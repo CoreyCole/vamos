@@ -219,6 +219,36 @@ func (s *Service) RenderEmbeddedChatPanel(
 			},
 		), markdown.EmbeddedChatURLReplacement{}, nil
 	}
+	workspace, err := s.GetWorkspaceForUserOrTrustedImport(
+		ctx,
+		request.UserEmail,
+		selection.WorkspaceID,
+	)
+	if err != nil {
+		return nil, markdown.EmbeddedChatURLReplacement{}, err
+	}
+	if WorkspaceWorkflowType(strings.TrimSpace(workspace.WorkflowType)) == WorkspaceWorkflowFreeform {
+		args, err := s.BuildEmbeddedFreeformPanelArgs(
+			ctx,
+			request.UserEmail,
+			selection.ThreadID,
+			selection.RunID,
+		)
+		if err != nil {
+			return nil, markdown.EmbeddedChatURLReplacement{}, err
+		}
+		replacement := markdown.EmbeddedChatURLReplacement{}
+		if !selection.ExplicitURL &&
+			strings.TrimSpace(request.Context) == ThoughtsChatContext {
+			replacement.URL = BuildThoughtsChatDocURL(EmbeddedChatURLState{
+				DocPath:     request.DocPath,
+				WorkspaceID: selection.WorkspaceID,
+				ThreadID:    args.ThreadID,
+				RunID:       args.RunID,
+			})
+		}
+		return EmbeddedFreeformRightRailContent(args), replacement, nil
+	}
 	args, err := s.BuildEmbeddedChatPanelArgs(ctx, EmbeddedChatPatchInput{
 		UserEmail:   request.UserEmail,
 		DocPath:     request.DocPath,

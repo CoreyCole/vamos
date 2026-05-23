@@ -13,6 +13,8 @@ import (
 
 	"github.com/a-h/templ"
 	"github.com/labstack/echo/v4"
+
+	"github.com/CoreyCole/vamos/server/services/markdown"
 )
 
 func TestBuildThoughtsChatDocURLIncludesChatQueryState(t *testing.T) {
@@ -168,6 +170,54 @@ func TestResolveEmbeddedChatSelectionIgnoresPersistedOutsideChatContext(t *testi
 	}
 	if got != (EmbeddedChatSelection{}) {
 		t.Fatalf("selection = %+v, want empty", got)
+	}
+}
+
+func TestRenderEmbeddedChatPanelUsesFreeformRendererForPersistedFreeformWorkspace(t *testing.T) {
+	service := newTestAgentChatService(t)
+	workspace, thread := mustCreateWorkspaceThreadForHandlerTest(
+		t,
+		service,
+		"user@example.com",
+	)
+	if err := service.PersistEmbeddedChatSelection(
+		t.Context(),
+		"user@example.com",
+		EmbeddedChatSelection{WorkspaceID: workspace.ID, ThreadID: thread.ID},
+	); err != nil {
+		t.Fatalf("PersistEmbeddedChatSelection() error = %v", err)
+	}
+
+	component, replacement, err := service.RenderEmbeddedChatPanel(
+		t.Context(),
+		markdown.EmbeddedChatRenderRequest{
+			UserEmail: "user@example.com",
+			DocPath:   "creative-mode-agent/plans/2026-04-30_test-plan/plan.md",
+			Context:   ThoughtsChatContext,
+		},
+	)
+	if err != nil {
+		t.Fatalf("RenderEmbeddedChatPanel() error = %v", err)
+	}
+	body := renderTemplToString(t, component)
+	for _, want := range []string{
+		"Freeform chat",
+		"/thoughts/chat/freeform/resume",
+		"creative-mode-agent/plans/2026-04-30_test-plan/plan.md?",
+		"context=chat",
+		"chat_workspace=" + workspace.ID,
+	} {
+		if !strings.Contains(body+replacement.URL, want) {
+			t.Fatalf("freeform embedded panel missing %q: body=%s replacement=%q", want, body, replacement.URL)
+		}
+	}
+	for _, notWant := range []string{
+		"/thoughts/chat/" + workspace.ID + "/send",
+		"agent-chat-workspace-header",
+	} {
+		if strings.Contains(body, notWant) {
+			t.Fatalf("freeform embedded panel contains %q: %s", notWant, body)
+		}
 	}
 }
 

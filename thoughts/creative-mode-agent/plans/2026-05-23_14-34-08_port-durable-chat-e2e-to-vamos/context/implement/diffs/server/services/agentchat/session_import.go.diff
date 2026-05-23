@@ -1,0 +1,29 @@
+--- server/services/agentchat/session_import.go	2026-05-23 13:53:41.544900129 -0700
++++ /home/ruby/cn/chestnut-flake/cn-agents-2026-05-19_16-21-15_vamos-durable-session-chat-architecture/pkg/agents/server/services/agentchat/session_import.go	2026-05-23 14:14:59.643510024 -0700
+@@ -1201,16 +1201,16 @@
+ 		return db.Workspace{}, false, err
+ 	}
+ 	workspace, err = q.CreateWorkspace(ctx, db.CreateWorkspaceParams{
+-		ID:                   workspaceID,
+-		UserEmail:            owner,
+-		Title:                validateWorkspaceTitle(filepath.Base(validatedRoot)),
+-		RootDocPath:         validatedRoot,
+-		Cwd:                  nullString(doc.Header.Cwd),
+-		WorkflowType:         string(workspaceTypeForPlanDir(validatedRoot)),
+-		WorkflowStateJson:    sql.NullString{},
+-		Source:               string(WorkspaceSourceImported),
+-		SelectedThreadID:     sql.NullString{},
+-		SelectedDocPath: sql.NullString{},
++		ID:                workspaceID,
++		UserEmail:         owner,
++		Title:             validateWorkspaceTitle(filepath.Base(validatedRoot)),
++		RootDocPath:       validatedRoot,
++		Cwd:               nullString(doc.Header.Cwd),
++		WorkflowType:      string(workspaceTypeForPlanDir(validatedRoot)),
++		WorkflowStateJson: sql.NullString{},
++		Source:            string(WorkspaceSourceImported),
++		SelectedThreadID:  sql.NullString{},
++		SelectedDocPath:   sql.NullString{},
+ 	})
+ 	return workspace, err == nil, err
+ }

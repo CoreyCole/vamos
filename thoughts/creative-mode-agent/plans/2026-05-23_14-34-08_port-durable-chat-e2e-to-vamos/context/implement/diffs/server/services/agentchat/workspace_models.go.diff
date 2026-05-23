@@ -1,0 +1,20 @@
+--- server/services/agentchat/workspace_models.go	2026-05-23 13:53:41.547426975 -0700
++++ /home/ruby/cn/chestnut-flake/cn-agents-2026-05-19_16-21-15_vamos-durable-session-chat-architecture/pkg/agents/server/services/agentchat/workspace_models.go	2026-05-23 14:14:59.923502269 -0700
+@@ -34,7 +34,7 @@
+ type WorkspaceCreateInput struct {
+ 	UserEmail     string
+ 	Title         string
+-	RootDocPath  string
++	RootDocPath   string
+ 	Cwd           string
+ 	WorkflowType  WorkspaceWorkflowType
+ 	WorkflowState json.RawMessage
+@@ -69,7 +69,7 @@
+ 	SessionID       string
+ 	RunID           string
+ 	ArtifactRelPath string
+-	DocPath    string
++	DocPath         string
+ 	CommentID       string
+ 	PayloadJSON     string
+ 	EventKey        string

@@ -15,7 +15,7 @@ plan_dir: thoughts/creative-mode-agent/plans/2026-05-23_14-34-08_port-durable-ch
 ## Status
 
 - [x] Slice 1: Port inventory + conflict ledger
-- [ ] Slice 2: Durable chat/session/schema reconciliation
+- [x] Slice 2: Durable chat/session/schema reconciliation
 - [ ] Slice 3: Vamos runtime CLI + ctl compatibility
 - [ ] Slice 4: Story parser, selector catalog, step catalog, check command
 - [ ] Slice 5: Deterministic generator + checked-in generated tests
