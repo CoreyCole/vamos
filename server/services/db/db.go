@@ -103,6 +103,7 @@ func sqliteDSN(dbPath string) string {
 func readSchemaSQL() ([]byte, error) {
 	candidates := []string{
 		filepath.Join("pkg", "db", "migrations", "schema.sql"),
+		filepath.Join("..", "vamos", "pkg", "db", "migrations", "schema.sql"),
 		filepath.Join("..", "..", "..", "pkg", "db", "migrations", "schema.sql"),
 		filepath.Join("..", "..", "pkg", "db", "migrations", "schema.sql"),
 	}
