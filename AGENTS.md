@@ -23,15 +23,23 @@ vamos/
 - Keep company-specific paths, domains, OAuth policy, users, repo names, and service names out of reusable code.
 - Host applications provide YAML/env config for branding, auth, thoughts roots, linked projects, deploy names, and workspace conventions.
 - The `thoughts/` directory is host-owned data. Vamos reads/writes the configured thoughts root; it should not assume a colocated `thoughts/` directory.
-- Runtime metadata uses `.vamos/` and `VAMOS_*` names. Do not reintroduce legacy `CN_AGENTS_*`, `REPO_PATH`, or `MARKDOWN_BASE_PATH` behavior.
+- Runtime metadata uses `.vamos/` and `VAMOS_*` names. Do not reintroduce legacy host-specific env such as `REPO_PATH` or `MARKDOWN_BASE_PATH`.
 - Datastar Pro JS assets are licensed and gitignored. Build tooling may copy from `VAMOS_DATASTAR_PRO_ASSET` or `../datastar-pro/datastar-pro-v1.js`; do not download them silently.
+
+## Development checkout model
+
+- `../vamos` is the working checkout for human/agent edits. Run Pi sessions and normal feature development here.
+- `../vamos-main` is the clean/latest baseline checkout. Keep it clean, on `main`, and do not edit it directly.
+- Feature branches use Graphite stacks from the working checkout. Preserve stack commit shape; do not squash or patch-apply branch contents into `main`.
+- `.agents` is committed as a symlink to `../.agents` when this repo is hosted beside a shared agent-config directory. Commit the symlink only; never copy private/shared agent files into this repository.
+- Use `/vamos-merge` when a workspace branch is ready. It fast-forwards the working checkout `main`, fast-forwards `../vamos-main`, then runs the configured host rebuild/restart verification.
 
 ## Linked project baseline model
 
 When a host config defines both working and baseline checkouts, treat them as separate roles:
 
-- working checkout: human/agent editable; may be dirty; e.g. `vamos`, `monorepo`
-- baseline checkout: clean/latest on configured branch; used for git history reads and copied workspace seeds; e.g. `vamos-main`, `monorepo-main`
+- working checkout: human/agent editable and may be dirty
+- baseline checkout: clean/latest on configured branch, used for git history reads and copied workspace seeds
 
 Before copying from a baseline checkout, verify it is clean, on the configured branch, and latest with upstream when strict baseline validation is requested.
 
