@@ -23,7 +23,7 @@ vamos/
 - Keep company-specific paths, domains, OAuth policy, users, repo names, and service names out of reusable code.
 - Host applications provide YAML/env config for branding, auth, thoughts roots, linked projects, deploy names, and workspace conventions.
 - The `thoughts/` directory is host-owned data. Vamos reads/writes the configured thoughts root; it should not assume a colocated `thoughts/` directory.
-- Runtime metadata uses `.vamos/` and `VAMOS_*` names. Do not reintroduce legacy host-specific env such as `REPO_PATH` or `MARKDOWN_BASE_PATH`.
+- Runtime metadata uses `.vamos/` and `VAMOS_*` names.
 - Datastar Pro JS assets are licensed and gitignored. Build tooling may copy from `VAMOS_DATASTAR_PRO_ASSET` or `../datastar-pro/datastar-pro-v1.js`; do not download them silently.
 
 ## Development checkout model
