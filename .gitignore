@@ -9,3 +9,9 @@ static/css/out.css
 static/css/out.*.css
 static/js/datastar*.js
 static/js/datastar*.js.map
+# Pi project-local runtime state
+.pi/sessions/
+.pi/git/
+.pi/npm/
+.pi/auth.json
+.pi/run-history.jsonl
