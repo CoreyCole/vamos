@@ -23,10 +23,10 @@ func TestLoadWorkspaceVerifyConfigFromEnv(t *testing.T) {
 	dir := t.TempDir()
 	envPath := filepath.Join(dir, ".env")
 	if err := os.WriteFile(envPath, []byte(strings.Join([]string{
-		"CN_AGENTS_PUBLIC_BASE_URL=https://main.cn-agents.test",
-		"CN_AGENTS_WORKSPACE_DOMAIN=cn-agents.test",
-		"CN_AGENTS_WORKSPACE_RESTART_TOKEN=" + testRestartToken,
-		"CN_AGENTS_PLAYWRIGHT_AUTH_TOKEN=playwright-secret",
+		"VAMOS_PUBLIC_BASE_URL=https://main.vamos.test",
+		"VAMOS_WORKSPACE_DOMAIN=vamos.test",
+		"VAMOS_WORKSPACE_RESTART_TOKEN=" + testRestartToken,
+		"VAMOS_PLAYWRIGHT_AUTH_TOKEN=playwright-secret",
 	}, "\n")), 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -39,7 +39,7 @@ func TestLoadWorkspaceVerifyConfigFromEnv(t *testing.T) {
 	if cfg.Domain != "override.test" {
 		t.Fatalf("Domain = %q", cfg.Domain)
 	}
-	if cfg.BaseURL != "https://main.cn-agents.test" {
+	if cfg.BaseURL != "https://main.vamos.test" {
 		t.Fatalf("BaseURL = %q", cfg.BaseURL)
 	}
 	if cfg.RestartToken != testRestartToken {
@@ -57,7 +57,7 @@ func TestRunServerLifecyclePhaseSendsRestartToken(t *testing.T) {
 	server := httptest.NewServer(
 		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if got := r.Header.Get(
-				"X-CN-Agents-Workspace-Restart-Token",
+				"X-Vamos-Workspace-Restart-Token",
 			); got != testRestartToken {
 				t.Fatalf("restart token header = %q", got)
 			}
@@ -100,7 +100,7 @@ func TestBrowserAuthUsesPlaywrightTokenNotRestartToken(t *testing.T) {
 	var gotToken string
 	server := httptest.NewServer(
 		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			gotToken = r.Header.Get("X-CN-Agents-Workspace-Restart-Token")
+			gotToken = r.Header.Get("X-Vamos-Workspace-Restart-Token")
 			w.WriteHeader(http.StatusAccepted)
 			_ = json.NewEncoder(w).
 				Encode(workspaces.VerifyWorkspaceRun{ID: "run-1", Status: workspaces.VerifyRunPassed})
@@ -181,8 +181,8 @@ func TestRunWorkspaceVerifyBrowserOrdering(t *testing.T) {
 	report, err := RunWorkspaceVerify(
 		t.Context(),
 		WorkspaceVerifyConfig{
-			BaseURL:             "https://main.cn-agents.test",
-			Domain:              "cn-agents.test",
+			BaseURL:             "https://main.vamos.test",
+			Domain:              "vamos.test",
 			Slug:                "demo",
 			RestartToken:        "restart",
 			PlaywrightAuthToken: "playwright",
@@ -258,8 +258,8 @@ func TestRunWorkspaceVerifyStopsAfterBrowserFailure(t *testing.T) {
 	_, err := RunWorkspaceVerify(
 		t.Context(),
 		WorkspaceVerifyConfig{
-			BaseURL:             "https://main.cn-agents.test",
-			Domain:              "cn-agents.test",
+			BaseURL:             "https://main.vamos.test",
+			Domain:              "vamos.test",
 			Slug:                "demo",
 			RestartToken:        "restart",
 			PlaywrightAuthToken: "playwright",
@@ -295,8 +295,8 @@ func TestRunBrowserVerifyCommandConstruction(t *testing.T) {
 		return os.WriteFile(outPath, []byte("ok"), 0o600)
 	}
 	step, err := RunBrowserVerify(t.Context(), BrowserVerifyConfig{
-		BaseURL:   "https://main.cn-agents.test",
-		Domain:    "cn-agents.test",
+		BaseURL:   "https://main.vamos.test",
+		Domain:    "vamos.test",
 		Slug:      "demo",
 		AuthToken: "playwright-secret",
 		ReportDir: t.TempDir(),
@@ -315,7 +315,7 @@ func TestRunBrowserVerifyCommandConstruction(t *testing.T) {
 		t.Fatalf("script = %q", gotScript)
 	}
 	joined := strings.Join(gotArgs, " ")
-	for _, want := range []string{"--base-url https://main.cn-agents.test", "--domain cn-agents.test", "--slug demo", "--token playwright-secret"} {
+	for _, want := range []string{"--base-url https://main.vamos.test", "--domain vamos.test", "--slug demo", "--token playwright-secret"} {
 		if !strings.Contains(joined, want) {
 			t.Fatalf("args %q missing %q", joined, want)
 		}
@@ -417,7 +417,7 @@ func TestLoadWorkspaceVerifyConfigRemoteFlags(t *testing.T) {
 	cfg, err := LoadWorkspaceVerifyConfig([]string{
 		"--env", filepath.Join(t.TempDir(), ".env"),
 		"--slug", "demo",
-		"--domain", "cn-agents.test",
+		"--domain", "vamos.test",
 		"--remote-ssh", "linux-client",
 		"--remote-shell", "ssh -J jump {host} -- {command}",
 		"--dns-server", "100.126.72.21",
@@ -439,8 +439,8 @@ func TestLoadWorkspaceVerifyConfigRemoteFlags(t *testing.T) {
 func TestRequireRemoteTailnetNeedsSSH(t *testing.T) {
 	t.Parallel()
 	report, err := RunWorkspaceVerify(t.Context(), WorkspaceVerifyConfig{
-		BaseURL:      "https://main.cn-agents.test",
-		Domain:       "cn-agents.test",
+		BaseURL:      "https://main.vamos.test",
+		Domain:       "vamos.test",
 		Slug:         "demo",
 		RestartToken: "restart",
 		ReportDir:    t.TempDir(),
@@ -501,8 +501,8 @@ func TestRemoteCommandConstruction(t *testing.T) {
 		}, nil
 	}
 	_, err := RunWorkspaceVerify(t.Context(), WorkspaceVerifyConfig{
-		BaseURL:      "https://main.cn-agents.test",
-		Domain:       "cn-agents.test",
+		BaseURL:      "https://main.vamos.test",
+		Domain:       "vamos.test",
 		Slug:         "demo",
 		RestartToken: "restart",
 		Start:        true,
@@ -525,12 +525,12 @@ func TestRemoteCommandConstruction(t *testing.T) {
 	}
 	all := strings.Join(joined, "\n")
 	for _, want := range []string{
-		"dig @100.126.72.21 main.cn-agents.test +short",
-		"dig @100.126.72.21 demo.cn-agents.test +short",
-		"getent hosts main.cn-agents.test",
-		"getent hosts demo.cn-agents.test",
-		"curl -I --fail --show-error --silent https://main.cn-agents.test",
-		"curl -I --fail --show-error --silent https://demo.cn-agents.test/",
+		"dig @100.126.72.21 main.vamos.test +short",
+		"dig @100.126.72.21 demo.vamos.test +short",
+		"getent hosts main.vamos.test",
+		"getent hosts demo.vamos.test",
+		"curl -I --fail --show-error --silent https://main.vamos.test",
+		"curl -I --fail --show-error --silent https://demo.vamos.test/",
 	} {
 		if !strings.Contains(all, want) {
 			t.Fatalf("commands missing %q:\n%s", want, all)
@@ -555,9 +555,9 @@ func TestRunRemoteCommandRejectsUnsafeHost(t *testing.T) {
 
 func TestRunRemoteCommandCustomTemplateQuotesArgv(t *testing.T) {
 	t.Parallel()
-	cmd := shellJoin([]string{"curl", "-I", "https://main.cn-agents.test/a path?x='y'"})
+	cmd := shellJoin([]string{"curl", "-I", "https://main.vamos.test/a path?x='y'"})
 	if !strings.Contains(cmd, "'curl' '-I'") ||
-		!strings.Contains(cmd, "'https://main.cn-agents.test/a path?x='\\''y'\\'''") {
+		!strings.Contains(cmd, "'https://main.vamos.test/a path?x='\\''y'\\'''") {
 		t.Fatalf("shellJoin = %q", cmd)
 	}
 }
@@ -580,7 +580,7 @@ func TestClassifyPreflightFailures(t *testing.T) {
 			workspaces.VerificationLayerDNSDirectCoreDNS,
 		},
 		{
-			"main.cn-agents.test did not resolve to expected IP 100.1.2.3",
+			"main.vamos.test did not resolve to expected IP 100.1.2.3",
 			workspaces.VerificationLayerDNSDirectCoreDNS,
 			workspaces.VerificationLayerDNSDirectCoreDNS,
 		},

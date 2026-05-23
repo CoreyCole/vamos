@@ -154,19 +154,19 @@ func LoadWorkspaceVerifyConfig(args []string) (WorkspaceVerifyConfig, error) {
 		return cfg, err
 	}
 	if cfg.Domain == "" {
-		cfg.Domain = env["CN_AGENTS_WORKSPACE_DOMAIN"]
+		cfg.Domain = env["VAMOS_WORKSPACE_DOMAIN"]
 	}
 	if cfg.BaseURL == "" {
-		cfg.BaseURL = env["CN_AGENTS_PUBLIC_BASE_URL"]
+		cfg.BaseURL = env["VAMOS_PUBLIC_BASE_URL"]
 	}
 	if cfg.BaseURL == "" && cfg.Domain != "" {
 		cfg.BaseURL = "https://main." + strings.Trim(cfg.Domain, ".")
 	}
 	if cfg.RestartToken == "" {
-		cfg.RestartToken = env["CN_AGENTS_WORKSPACE_RESTART_TOKEN"]
+		cfg.RestartToken = env["VAMOS_WORKSPACE_RESTART_TOKEN"]
 	}
 	if cfg.PlaywrightAuthToken == "" {
-		cfg.PlaywrightAuthToken = env["CN_AGENTS_PLAYWRIGHT_AUTH_TOKEN"]
+		cfg.PlaywrightAuthToken = env["VAMOS_PLAYWRIGHT_AUTH_TOKEN"]
 	}
 	cfg.Slug = strings.TrimSpace(cfg.Slug)
 	if cfg.ReportDir == "" {
@@ -273,7 +273,7 @@ func RunWorkspaceVerify(
 			workspaces.VerificationLayerConfig,
 			"config",
 			errors.New(
-				"workspace domain is required via --domain or CN_AGENTS_WORKSPACE_DOMAIN",
+				"workspace domain is required via --domain or VAMOS_WORKSPACE_DOMAIN",
 			),
 		)
 	}
@@ -282,7 +282,7 @@ func RunWorkspaceVerify(
 			workspaces.VerificationLayerConfig,
 			"config",
 			errors.New(
-				"base URL is required via --base-url, CN_AGENTS_PUBLIC_BASE_URL, or --domain",
+				"base URL is required via --base-url, VAMOS_PUBLIC_BASE_URL, or --domain",
 			),
 		)
 	}
@@ -291,7 +291,7 @@ func RunWorkspaceVerify(
 			workspaces.VerificationLayerConfig,
 			"config",
 			errors.New(
-				"restart token is required via --restart-token or CN_AGENTS_WORKSPACE_RESTART_TOKEN",
+				"restart token is required via --restart-token or VAMOS_WORKSPACE_RESTART_TOKEN",
 			),
 		)
 	}
@@ -746,7 +746,7 @@ func suggestionForLayer(layer workspaces.VerificationLayer) string {
 	case workspaces.VerificationLayerDNSDirectCoreDNS:
 		return "Check cn-agents-coredns.service, Corefile tailnet bind IP, and UFW tailnet DNS rules."
 	case workspaces.VerificationLayerDNSRemoteSystem:
-		return "Check Tailscale restricted nameserver for cn-agents.test and that the client accepts Tailscale DNS."
+		return "Check Tailscale restricted nameserver for vamos.test and that the client accepts Tailscale DNS."
 	case workspaces.VerificationLayerTLSRemote:
 		return "Install or re-trust the exported Caddy internal root CA on the remote client."
 	case workspaces.VerificationLayerCaddyPort:

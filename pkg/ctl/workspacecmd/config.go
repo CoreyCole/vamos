@@ -39,7 +39,7 @@ type workspaceRuntimeStatusFile struct {
 
 func LoadConfig(cwd string) (WorkspaceCLIConfig, error) {
 	checkout := findCheckoutRoot(cwd)
-	envPath := filepath.Join(checkout, ".cn-agents", "run", "workspace.env")
+	envPath := filepath.Join(checkout, ".vamos", "run", "workspace.env")
 	meta, err := readWorkspaceMetadata(envPath)
 	if errors.Is(err, os.ErrNotExist) {
 		return WorkspaceCLIConfig{}, fmt.Errorf(
@@ -53,7 +53,7 @@ func LoadConfig(cwd string) (WorkspaceCLIConfig, error) {
 	if strings.TrimSpace(meta.CheckoutPath) == "" {
 		meta.CheckoutPath = checkout
 	}
-	statusPath := filepath.Join(checkout, ".cn-agents", "run", "status.json")
+	statusPath := filepath.Join(checkout, ".vamos", "run", "status.json")
 	status := workspaceRuntimeStatusFile{}
 	if data, err := os.ReadFile(statusPath); err == nil {
 		_ = json.Unmarshal(data, &status)
@@ -73,12 +73,12 @@ func findCheckoutRoot(cwd string) string {
 	current := filepath.Clean(cwd)
 	for {
 		if _, err := os.Stat(
-			filepath.Join(current, ".cn-agents", "run", "workspace.env"),
+			filepath.Join(current, ".vamos", "run", "workspace.env"),
 		); err == nil {
 			return current
 		}
 		if _, err := os.Stat(
-			filepath.Join(current, "pkg", "agents", "go.mod"),
+			filepath.Join(current, "cmd", "server", "go.mod"),
 		); err == nil {
 			return current
 		}
@@ -116,10 +116,10 @@ func readWorkspaceMetadata(path string) (WorkspaceMetadata, error) {
 		return WorkspaceMetadata{}, err
 	}
 	return WorkspaceMetadata{
-		Slug:         vals["CN_AGENTS_WORKSPACE_SLUG"],
-		CheckoutPath: vals["CN_AGENTS_WORKSPACE_CHECKOUT"],
-		ManagerURL:   vals["CN_AGENTS_WORKSPACE_MANAGER_URL"],
-		RestartToken: vals["CN_AGENTS_WORKSPACE_RESTART_TOKEN"],
+		Slug:         vals["VAMOS_WORKSPACE_SLUG"],
+		CheckoutPath: vals["VAMOS_WORKSPACE_CHECKOUT"],
+		ManagerURL:   vals["VAMOS_WORKSPACE_MANAGER_URL"],
+		RestartToken: vals["VAMOS_WORKSPACE_RESTART_TOKEN"],
 	}, nil
 }
 

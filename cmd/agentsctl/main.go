@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/CoreyCole/vamos/cmd/agentsctl/internal/verifycmd"
-	"github.com/CoreyCole/vamos/cmd/agentsctl/internal/workspacecmd"
+	"github.com/CoreyCole/vamos/pkg/ctl/verifycmd"
+	"github.com/CoreyCole/vamos/pkg/ctl/workspacecmd"
 )
 
 const usageExitCode = 2
@@ -27,7 +27,7 @@ func main() {
 	}
 	fmt.Fprintln(
 		os.Stderr,
-		"usage: agentsctl verify workspaces [flags]\n       agentsctl workspace <status|logs|doctor|restart|register-current> [flags]",
+		"usage: agentsctl verify workspaces [flags]\n       agentsctl workspace <status|logs|doctor|restart|register-current> [flags]\n\nPrefer: vamos ctl ...",
 	)
 	os.Exit(usageExitCode)
 }

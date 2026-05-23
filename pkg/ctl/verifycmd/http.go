@@ -87,7 +87,7 @@ func StartServerVerifyRun(
 		return run, err
 	}
 	hreq.Header.Set("Content-Type", "application/json")
-	hreq.Header.Set("X-CN-Agents-Workspace-Restart-Token", cfg.RestartToken)
+	hreq.Header.Set("X-Vamos-Workspace-Restart-Token", cfg.RestartToken)
 	resp, err := http.DefaultClient.Do(hreq)
 	if err != nil {
 		return run, err
@@ -132,7 +132,7 @@ func WaitServerVerifyRun(
 		if err != nil {
 			return run, err
 		}
-		hreq.Header.Set("X-CN-Agents-Workspace-Restart-Token", cfg.RestartToken)
+		hreq.Header.Set("X-Vamos-Workspace-Restart-Token", cfg.RestartToken)
 		resp, err := http.DefaultClient.Do(hreq)
 		if err != nil {
 			return run, err

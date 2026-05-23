@@ -52,7 +52,7 @@ func RunRestart(
 		return err
 	}
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("X-CN-Agents-Workspace-Restart-Token", cfg.RestartToken)
+	req.Header.Set("X-Vamos-Workspace-Restart-Token", cfg.RestartToken)
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return err

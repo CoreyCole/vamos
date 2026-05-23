@@ -14,7 +14,7 @@ import (
 func TestLoadConfigWalksUpFromPkgAgents(t *testing.T) {
 	root := writeWorkspaceFixture(t)
 
-	cfg, err := LoadConfig(filepath.Join(root, "pkg", "agents"))
+	cfg, err := LoadConfig(filepath.Join(root, "cmd", "server"))
 	if err != nil {
 		t.Fatalf("LoadConfig: %v", err)
 	}
@@ -27,7 +27,7 @@ func TestLoadConfigWalksUpFromPkgAgents(t *testing.T) {
 		)
 	}
 	if cfg.Metadata.Slug != "feature" ||
-		cfg.ManagerURL != "https://main.cn-agents.test" ||
+		cfg.ManagerURL != "https://main.vamos.test" ||
 		cfg.RestartToken != "secret" {
 		t.Fatalf("metadata = %+v", cfg.Metadata)
 	}
@@ -39,18 +39,18 @@ func TestLoadConfigWalksUpFromPkgAgents(t *testing.T) {
 
 func TestLoadConfigMissingEnv(t *testing.T) {
 	root := t.TempDir()
-	if err := os.MkdirAll(filepath.Join(root, "pkg", "agents"), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Join(root, "cmd", "server"), 0o755); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.WriteFile(
-		filepath.Join(root, "pkg", "agents", "go.mod"),
+		filepath.Join(root, "cmd", "server", "go.mod"),
 		[]byte("module example\n"),
 		0o644,
 	); err != nil {
 		t.Fatal(err)
 	}
 
-	_, err := LoadConfig(filepath.Join(root, "pkg", "agents"))
+	_, err := LoadConfig(filepath.Join(root, "cmd", "server"))
 	if err == nil || !strings.Contains(err.Error(), "not a managed workspace checkout") {
 		t.Fatalf("LoadConfig error = %v", err)
 	}
@@ -65,7 +65,7 @@ func TestRunStatus(t *testing.T) {
 	for _, want := range []string{
 		"slug: feature",
 		"checkout: " + cfg.CheckoutPath,
-		"manager_url: https://main.cn-agents.test",
+		"manager_url: https://main.vamos.test",
 		"status: running",
 		"phase: ready",
 		"ports.web: 4217",
@@ -96,7 +96,7 @@ func TestMainLogsAcceptsTailAfterTarget(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = os.Chdir(oldWD) })
-	if err := os.Chdir(filepath.Join(cfg.CheckoutPath, "pkg", "agents")); err != nil {
+	if err := os.Chdir(filepath.Join(cfg.CheckoutPath, "cmd", "server")); err != nil {
 		t.Fatal(err)
 	}
 	if err := Main([]string{"logs", "web", "--tail", "1"}); err != nil {
@@ -130,7 +130,7 @@ func TestRunRestartPostsTokenComponentsAndForce(t *testing.T) {
 			if r.URL.Path != "/internal/workspaces/restart" {
 				t.Errorf("path = %s", r.URL.Path)
 			}
-			gotToken = r.Header.Get("X-CN-Agents-Workspace-Restart-Token")
+			gotToken = r.Header.Get("X-Vamos-Workspace-Restart-Token")
 			if err := json.NewDecoder(r.Body).Decode(&got); err != nil {
 				t.Errorf("Decode: %v", err)
 			}
@@ -186,7 +186,7 @@ func TestComponentsFromWorkspaceCLIFlags(t *testing.T) {
 func testConfig(t *testing.T) WorkspaceCLIConfig {
 	t.Helper()
 	root := writeWorkspaceFixture(t)
-	cfg, err := LoadConfig(filepath.Join(root, "pkg", "agents"))
+	cfg, err := LoadConfig(filepath.Join(root, "cmd", "server"))
 	if err != nil {
 		t.Fatalf("LoadConfig: %v", err)
 	}
@@ -196,21 +196,21 @@ func testConfig(t *testing.T) WorkspaceCLIConfig {
 func writeWorkspaceFixture(t *testing.T) string {
 	t.Helper()
 	root := t.TempDir()
-	if err := os.MkdirAll(filepath.Join(root, "pkg", "agents"), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Join(root, "cmd", "server"), 0o755); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.WriteFile(
-		filepath.Join(root, "pkg", "agents", "go.mod"),
+		filepath.Join(root, "cmd", "server", "go.mod"),
 		[]byte("module example\n"),
 		0o644,
 	); err != nil {
 		t.Fatal(err)
 	}
-	runDir := filepath.Join(root, ".cn-agents", "run")
+	runDir := filepath.Join(root, ".vamos", "run")
 	if err := os.MkdirAll(runDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	logDir := filepath.Join(root, ".cn-agents", "log")
+	logDir := filepath.Join(root, ".vamos", "log")
 	if err := os.MkdirAll(logDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -218,10 +218,10 @@ func writeWorkspaceFixture(t *testing.T) string {
 	if err := os.WriteFile(webLog, []byte("line1\nline2\nline3\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	env := "CN_AGENTS_WORKSPACE_SLUG=feature\n" +
-		"CN_AGENTS_WORKSPACE_CHECKOUT=" + root + "\n" +
-		"CN_AGENTS_WORKSPACE_MANAGER_URL=https://main.cn-agents.test\n" +
-		"CN_AGENTS_WORKSPACE_RESTART_TOKEN=secret\n"
+	env := "VAMOS_WORKSPACE_SLUG=feature\n" +
+		"VAMOS_WORKSPACE_CHECKOUT=" + root + "\n" +
+		"VAMOS_WORKSPACE_MANAGER_URL=https://main.vamos.test\n" +
+		"VAMOS_WORKSPACE_RESTART_TOKEN=secret\n"
 	if err := os.WriteFile(
 		filepath.Join(runDir, "workspace.env"),
 		[]byte(env),

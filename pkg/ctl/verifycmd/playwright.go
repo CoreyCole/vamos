@@ -41,7 +41,7 @@ func RunBrowserVerify(
 	}
 	if cfg.AuthToken == "" {
 		err := errors.New(
-			"playwright auth token is required via --playwright-auth-token or CN_AGENTS_PLAYWRIGHT_AUTH_TOKEN",
+			"playwright auth token is required via --playwright-auth-token or VAMOS_PLAYWRIGHT_AUTH_TOKEN",
 		)
 		step.Status = statusFailed
 		step.Error = err.Error()
@@ -110,7 +110,7 @@ func playwrightScriptPath() (string, error) {
 	for dir := cwd; ; dir = filepath.Dir(dir) {
 		candidates := []string{
 			filepath.Join(dir, "scripts", scriptRel),
-			filepath.Join(dir, "pkg", "agents", "scripts", scriptRel),
+			filepath.Join(dir, "cmd", "server", "scripts", scriptRel),
 		}
 		for _, candidate := range candidates {
 			info, err := os.Stat(candidate)

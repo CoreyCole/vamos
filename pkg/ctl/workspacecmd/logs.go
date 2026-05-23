@@ -45,7 +45,7 @@ func RunLogs(
 }
 
 func validateWorkspaceLogPath(cfg WorkspaceCLIConfig, path string) error {
-	logDir := filepath.Join(cfg.CheckoutPath, ".cn-agents", "log")
+	logDir := filepath.Join(cfg.CheckoutPath, ".vamos", "log")
 	absPath, err := filepath.Abs(path)
 	if err != nil {
 		return err
