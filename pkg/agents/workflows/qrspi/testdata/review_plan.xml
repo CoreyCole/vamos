@@ -1,0 +1,17 @@
+<qrspi-result>
+  <stage>review-plan</stage>
+  <status>complete</status>
+  <outcome>ready-for-workspace</outcome>
+  <policy>
+    <autoMode>false</autoMode>
+    <enablePlanReviews>true</enablePlanReviews>
+    <invalidResultRetryLimit>1</invalidResultRetryLimit>
+  </policy>
+  <summary>
+    <plan-goal>Build Agent Chat-native generic workflow runtime; QRSPI first.</plan-goal>
+    <stage-completed>Reviewed implementation plan and verified review-result contract coverage.</stage-completed>
+    <key-decisions>Ready for implementation.</key-decisions>
+  </summary>
+  <artifact>thoughts/creative-mode-agent/plans/example/reviews/example_plan-review/review.md</artifact>
+  <next>/q-implement thoughts/creative-mode-agent/plans/example/plan.md</next>
+</qrspi-result>

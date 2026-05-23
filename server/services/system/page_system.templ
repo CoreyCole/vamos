@@ -1,0 +1,68 @@
+package system
+
+import "github.com/CoreyCole/vamos/server/layouts"
+
+templ Dashboard(args DashboardArgs) {
+	@layouts.Root(layouts.RootArgs{
+		Title:        "System Health",
+		ShowHeader:   true,
+		UserEmail:    args.UserEmail,
+		CurrentTheme: args.CurrentTheme,
+		PageType:     layouts.PageTypeSystem,
+	}) {
+		<section
+			class="py-6 md:py-10"
+			data-signals="{memTotal:'',memUsed:'',memUsedPercent:'',swapTotal:'',swapUsed:'',swapUsedPercent:'',cpuPercent:'',diskTotal:'',diskUsed:'',diskUsedPercent:'',uptime:'',loadAvg:''}"
+		>
+			<div
+				class="mx-auto max-w-4xl px-4 sm:px-6 lg:px-8"
+				id="system-stream"
+				data-init="@get('/system/stream')"
+			>
+				<h1 class="text-2xl font-bold text-foreground mb-6">System Health</h1>
+				<!-- System Metrics — scalar signals with data-text -->
+				<div class="mb-6">
+					<h2 class="text-lg font-semibold text-foreground mb-4">System</h2>
+					<div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+						@metricCard("CPU", "$cpuPercent")
+						@metricCard("Memory", "$memUsed")
+						@metricCard("Memory %", "$memUsedPercent")
+						@metricCard("Total RAM", "$memTotal")
+						@metricCard("Swap", "$swapUsed")
+						@metricCard("Swap %", "$swapUsedPercent")
+						@metricCard("Disk", "$diskUsed")
+						@metricCard("Disk %", "$diskUsedPercent")
+						@metricCard("Load Avg", "$loadAvg")
+						@metricCard("Uptime", "$uptime")
+					</div>
+				</div>
+				<!-- Services — PatchElementTempl fragment -->
+				<div class="mb-6">
+					<h2 class="text-lg font-semibold text-foreground mb-4">Services</h2>
+					<div id="services-table">
+						@ServicesTable(nil)
+					</div>
+				</div>
+				<!-- Top Processes — PatchElementTempl fragment -->
+				<div class="mb-6">
+					<h2 class="text-lg font-semibold text-foreground mb-4">Processes (by memory)</h2>
+					<div id="processes-table">
+						@ProcessesTable(nil)
+					</div>
+				</div>
+				<!-- Crash Reports — PatchElementTempl fragment -->
+				<div class="mb-6" id="crashes-section">
+					@CrashesCard(nil)
+				</div>
+				<!-- Metrics History — PatchElementTempl fragment -->
+				<div class="mb-6">
+					<h2 class="text-lg font-semibold text-foreground mb-4">Metrics History</h2>
+					<p class="text-xs text-muted-foreground mb-3">Snapshots captured every 2 minutes. Retained across reboots for crash diagnosis.</p>
+					<div id="history-content">
+						@HistoryBootList(nil, "")
+					</div>
+				</div>
+			</div>
+		</section>
+	}
+}

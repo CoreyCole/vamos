@@ -1,0 +1,394 @@
+package calendar
+
+import (
+	"crypto/rand"
+	"fmt"
+	"github.com/CoreyCole/vamos/pkg/components/utils"
+	"time"
+)
+
+// CalendarDayData represents pre-calculated day information
+type CalendarDayData struct {
+	DateString     string // YYYY-MM-DD format
+	DayNumber      int    // Day of month (1-31)
+	IsCurrentMonth bool   // Is this day in the target month
+	IsToday        bool   // Is this today's date
+	IsOutsideDay   bool   // Is this day outside the target month
+}
+
+// calculateDayData pre-calculates day information based on the current month
+func calculateDayData(dayIndex, monthOffset int, currentDateStr, todaySignal string) CalendarDayData {
+	// Parse the current date to determine the year and month being displayed
+	currentDate, err := time.Parse("2006-01-02", currentDateStr)
+	if err != nil {
+		// Fallback to current month if parsing fails
+		currentDate = time.Now()
+	}
+
+	// Add month offset for multi-month calendars
+	targetDate := currentDate.AddDate(0, monthOffset, 0)
+	year := targetDate.Year()
+	month := int(targetDate.Month())
+
+	// Calculate the first day of the month and its weekday
+	firstDay := time.Date(year, time.Month(month), 1, 0, 0, 0, 0, time.UTC)
+	startWeekday := int(firstDay.Weekday()) // Sunday = 0
+
+	// Calculate the actual day number for this grid position
+	dayNumber := dayIndex - startWeekday + 1
+
+	// Determine if this is in the current month or outside days
+	isCurrentMonth := dayNumber >= 1 && dayNumber <= daysInMonth(year, month)
+
+	// Calculate the actual date for this cell
+	var actualDate time.Time
+	var displayDayNumber int
+
+	if dayNumber <= 0 {
+		// Previous month
+		prevMonth := firstDay.AddDate(0, -1, 0)
+		prevMonthDays := daysInMonth(prevMonth.Year(), int(prevMonth.Month()))
+		displayDayNumber = prevMonthDays + dayNumber
+		actualDate = time.Date(prevMonth.Year(), prevMonth.Month(), displayDayNumber, 0, 0, 0, 0, time.UTC)
+	} else if dayNumber > daysInMonth(year, month) {
+		// Next month
+		nextMonth := firstDay.AddDate(0, 1, 0)
+		displayDayNumber = dayNumber - daysInMonth(year, month)
+		actualDate = time.Date(nextMonth.Year(), nextMonth.Month(), displayDayNumber, 0, 0, 0, 0, time.UTC)
+	} else {
+		// Current month
+		displayDayNumber = dayNumber
+		actualDate = time.Date(year, time.Month(month), dayNumber, 0, 0, 0, 0, time.UTC)
+	}
+
+	// Format date string
+	dateString := actualDate.Format("2006-01-02")
+
+	// Check if this is today
+	today := time.Now().Format("2006-01-02")
+	isToday := dateString == today
+
+	return CalendarDayData{
+		DateString:     dateString,
+		DayNumber:      displayDayNumber,
+		IsCurrentMonth: isCurrentMonth,
+		IsToday:        isToday,
+		IsOutsideDay:   !isCurrentMonth,
+	}
+}
+
+// Helper function to get days in a month
+func daysInMonth(year, month int) int {
+	return time.Date(year, time.Month(month+1), 0, 0, 0, 0, 0, time.UTC).Day()
+}
+
+// CalendarSignals defines the signal structure for calendar components
+type CalendarSignals struct {
+	CurrentDate string `json:"currentDate"`
+	Mode        string `json:"mode"`
+	Today       string `json:"today"`
+	DateValue   string `json:"dateValue"`   // ISO date value for single mode
+	InputValue  string `json:"inputValue"` // Formatted input display value
+	RangeStart  string `json:"rangeStart"`
+	RangeEnd    string `json:"rangeEnd"`
+}
+
+// Calendar renders a simple, elegant calendar
+templ Calendar(args CalendarArgs) {
+	{{
+		// Generate unique ID
+		calendarID := args.ID
+		if calendarID == "" {
+			b := make([]byte, 4)
+			rand.Read(b)
+			calendarID = fmt.Sprintf("calendar_%x", b)
+		}
+
+		// Set defaults
+		mode := args.Mode
+		if mode == "" {
+			mode = "single"
+		}
+
+		numberOfMonths := args.NumberOfMonths
+		if numberOfMonths <= 0 {
+			numberOfMonths = 1
+		}
+
+		// Determine the initial month to display
+		var currentDateStr string
+		now := time.Now()
+		if args.DefaultDate != "" {
+			// Use the provided DefaultDate, normalized to first day of month
+			if t, err := time.Parse("2006-01-02", args.DefaultDate); err == nil {
+				currentDateStr = fmt.Sprintf("%04d-%02d-01", t.Year(), int(t.Month()))
+			} else {
+				// Fallback to current month if DefaultDate is invalid
+				currentDateStr = fmt.Sprintf("%04d-%02d-01", now.Year(), int(now.Month()))
+			}
+		} else {
+			// Default to current month
+			currentDateStr = fmt.Sprintf("%04d-%02d-01", now.Year(), int(now.Month()))
+		}
+
+		// Today string for highlighting
+		todayStr := now.Format("2006-01-02")
+
+		// Create signals only when not coordinated with DatePicker
+		var signals *utils.SignalManager
+		if args.DatePickerInputsID == "" {
+			// Create our own signals when standalone
+			signals = utils.Signals(calendarID, CalendarSignals{
+				CurrentDate: currentDateStr,
+				Mode:        mode,
+				Today:       todayStr,
+				DateValue:   args.SelectedDate, // Use selectedDate prop for dateValue
+				InputValue:  "",                // Will be calculated from dateValue
+				RangeStart:  args.RangeStart,
+				RangeEnd:    args.RangeEnd,
+			})
+		} else {
+			// When coordinated with DatePicker, reference existing signals
+			signals = &utils.SignalManager{ID: calendarID}
+		}
+
+		classes := calendarVariants(args.Class)
+	}}
+	<div
+		class={ "p-3 " + classes }
+		if args.DatePickerInputsID == "" {
+			data-signals={ signals.DataSignals }
+		}
+		{ args.Attributes... }
+	>
+		@CalendarHeader(CalendarHeaderArgs{ID: calendarID, NumberOfMonths: numberOfMonths})
+		<!-- Months container with responsive flex layout -->
+		if numberOfMonths == 1 {
+			<!-- Single month layout -->
+			@CalendarGrid(CalendarGridArgs{
+				ID:                 calendarID,
+				MonthOffset:        0,
+				HideOutsideDays:    args.HideOutsideDays,
+				NumberOfMonths:     numberOfMonths,
+				CurrentDateStr:     currentDateStr,
+				Mode:               mode,
+				DatePickerInputsID: args.DatePickerInputsID,
+			})
+		} else {
+			<!-- Multi-month layout - each month looks like a single calendar -->
+			<div class="flex flex-col sm:flex-row gap-8">
+				for monthIndex := 0; monthIndex < numberOfMonths; monthIndex++ {
+					<div class="flex-1">
+						<!-- Individual month header -->
+						<div class="flex justify-center pt-1 relative items-center w-full mb-4">
+							<div class="text-sm font-medium">
+								<span data-text={ "new Date(Date.UTC(new Date(" + signals.Signal("currentDate") + " + 'T12:00:00Z').getUTCFullYear(), new Date(" + signals.Signal("currentDate") + " + 'T12:00:00Z').getUTCMonth() + " + fmt.Sprintf("%d", monthIndex) + ", 1, 12, 0, 0)).toLocaleString('default', { month: 'long', year: 'numeric', timeZone: 'UTC' })" }></span>
+							</div>
+						</div>
+						@CalendarGrid(CalendarGridArgs{
+							ID:                 calendarID,
+							MonthOffset:        monthIndex,
+							HideOutsideDays:    args.HideOutsideDays,
+							NumberOfMonths:     numberOfMonths,
+							CurrentDateStr:     currentDateStr,
+							Mode:               mode,
+							DatePickerInputsID: args.DatePickerInputsID,
+						})
+					</div>
+				}
+			</div>
+		}
+	</div>
+}
+
+// CalendarHeader renders the month navigation
+templ CalendarHeader(args CalendarHeaderArgs) {
+	{{
+		// Use the same signal namespace as the parent calendar - don't create new signals
+		signals := utils.Signals(args.ID, CalendarSignals{})
+
+		// Signal references
+		currentDateRef := signals.Signal("currentDate")
+
+		// Navigation expressions - simplified UTC approach
+		prevMonthExpr := signals.Set("currentDate", "new Date(Date.UTC(new Date("+currentDateRef+").getUTCFullYear(), new Date("+currentDateRef+").getUTCMonth() - 1, 1)).toISOString().slice(0, 10)")
+		nextMonthExpr := signals.Set("currentDate", "new Date(Date.UTC(new Date("+currentDateRef+").getUTCFullYear(), new Date("+currentDateRef+").getUTCMonth() + 1, 1)).toISOString().slice(0, 10)")
+
+		// Month display expressions for multiple months
+		numberOfMonths := args.NumberOfMonths
+		if numberOfMonths <= 0 {
+			numberOfMonths = 1
+		}
+	}}
+	if numberOfMonths == 1 {
+		<!-- Single month header -->
+		<div class="flex justify-center pt-1 relative items-center w-full mb-4">
+			<!-- Previous month button -->
+			<button
+				type="button"
+				class="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-transparent hover:bg-accent hover:text-accent-foreground size-7 p-0 opacity-50 hover:opacity-100 absolute left-1"
+				data-on:click={ prevMonthExpr }
+			>
+				<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4">
+					<path d="m15 18-6-6 6-6"></path>
+				</svg>
+			</button>
+			<!-- Month/Year display -->
+			<div class="text-sm font-medium">
+				<span data-text={ "new Date(" + currentDateRef + " + 'T12:00:00Z').toLocaleString('default', { month: 'long', year: 'numeric', timeZone: 'UTC' })" }></span>
+			</div>
+			<!-- Next month button -->
+			<button
+				type="button"
+				class="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-transparent hover:bg-accent hover:text-accent-foreground size-7 p-0 opacity-50 hover:opacity-100 absolute right-1"
+				data-on:click={ nextMonthExpr }
+			>
+				<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4">
+					<path d="m9 18 6-6-6-6"></path>
+				</svg>
+			</button>
+		</div>
+	} else {
+		<!-- Multi-month header with navigation -->
+		<div class="flex justify-between items-center w-full mb-4">
+			<!-- Previous month button -->
+			<button
+				type="button"
+				class="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-transparent hover:bg-accent hover:text-accent-foreground size-7 p-0 opacity-50 hover:opacity-100"
+				data-on:click={ prevMonthExpr }
+			>
+				<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4">
+					<path d="m15 18-6-6 6-6"></path>
+				</svg>
+			</button>
+			<!-- Month range display -->
+			<div class="flex items-center space-x-1 text-sm font-medium">
+				<span data-text={ "new Date(" + currentDateRef + " + 'T12:00:00Z').toLocaleString('default', { month: 'long', year: 'numeric', timeZone: 'UTC' })" }></span>
+				<span>-</span>
+				<span data-text={ "new Date(new Date(" + currentDateRef + " + 'T12:00:00Z').getFullYear(), new Date(" + currentDateRef + " + 'T12:00:00Z').getMonth() + " + fmt.Sprintf("%d", numberOfMonths-1) + ", 1).toLocaleString('default', { month: 'long', year: 'numeric', timeZone: 'UTC' })" }></span>
+			</div>
+			<!-- Next month button -->
+			<button
+				type="button"
+				class="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-transparent hover:bg-accent hover:text-accent-foreground size-7 p-0 opacity-50 hover:opacity-100"
+				data-on:click={ nextMonthExpr }
+			>
+				<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4">
+					<path d="m9 18 6-6-6-6"></path>
+				</svg>
+			</button>
+		</div>
+	}
+}
+
+// CalendarGrid renders the calendar days
+templ CalendarGrid(args CalendarGridArgs) {
+	{{
+		// Use 5 weeks (35 days) for all calendars for a cleaner, more consistent look
+		weeksNeeded := 5
+		totalDays := weeksNeeded * 7
+	}}
+	<div class="w-full border-collapse">
+		<!-- Day headers -->
+		<div class="grid grid-cols-7 gap-1 mb-2">
+			<div class="text-muted-foreground rounded-md size-8 font-normal text-[0.8rem] flex items-center justify-center p-0">Su</div>
+			<div class="text-muted-foreground rounded-md size-8 font-normal text-[0.8rem] flex items-center justify-center p-0">Mo</div>
+			<div class="text-muted-foreground rounded-md size-8 font-normal text-[0.8rem] flex items-center justify-center p-0">Tu</div>
+			<div class="text-muted-foreground rounded-md size-8 font-normal text-[0.8rem] flex items-center justify-center p-0">We</div>
+			<div class="text-muted-foreground rounded-md size-8 font-normal text-[0.8rem] flex items-center justify-center p-0">Th</div>
+			<div class="text-muted-foreground rounded-md size-8 font-normal text-[0.8rem] flex items-center justify-center p-0">Fr</div>
+			<div class="text-muted-foreground rounded-md size-8 font-normal text-[0.8rem] flex items-center justify-center p-0">Sa</div>
+		</div>
+		<!-- Calendar days grid -->
+		<div class="grid grid-cols-7 gap-1">
+			<!-- Generate 35 days (5 weeks × 7 days) for cleaner layout -->
+			for dayIndex := 0; dayIndex < totalDays; dayIndex++ {
+				@CalendarDay(CalendarDayArgs{
+					ID:                 args.ID,
+					DayIndex:           dayIndex,
+					MonthOffset:        args.MonthOffset,
+					HideOutsideDays:    args.HideOutsideDays,
+					CurrentDateStr:     args.CurrentDateStr,
+					Mode:               args.Mode,
+					DatePickerInputsID: args.DatePickerInputsID,
+				})
+			}
+		</div>
+	</div>
+}
+
+// CalendarDay renders individual day button with pre-calculated data
+templ CalendarDay(args CalendarDayArgs) {
+	{{
+		// Share the same signal namespace as the parent calendar - don't create new signals
+		signals := utils.Signals(args.ID, CalendarSignals{})
+
+		// Pre-calculate day data using the static current date for now
+		// The real fix is that we need to make the grid responsive to currentDate signal changes
+		// For now, let's calculate the day correctly based on the fallback
+		currentDateForCalc := args.CurrentDateStr
+		if currentDateForCalc == "" {
+			// Fallback
+			now := time.Now()
+			currentDateForCalc = fmt.Sprintf("%04d-%02d-01", now.Year(), now.Month())
+		}
+
+		dayData := calculateDayData(args.DayIndex, args.MonthOffset, currentDateForCalc, signals.Signal("today"))
+
+		// Create calendar day handler using expression builder
+		dayHandler := newCalendarDayHandler(args.ID, signals, args.MonthOffset, args.Mode, dayData.DayNumber)
+
+		var clickHandler string
+		// Only allow clicks on days in the current month
+		if !dayData.IsCurrentMonth {
+			clickHandler = utils.NewExpression().
+				Statement("evt.preventDefault()").
+				Statement("evt.stopPropagation()").
+				Build()
+		} else {
+			// Use expression builder for clean click handling
+			clickHandler = dayHandler.buildClickHandler()
+
+			// Add DateInput signal coordination if needed
+			if args.DatePickerInputsID != "" {
+				dateInputSync := dayHandler.buildDateInputSync(args.DatePickerInputsID)
+				clickHandler += "; " + dateInputSync
+			}
+		}
+
+		// CSS classes
+		baseClasses := "inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 size-8 p-0 font-normal aria-selected:opacity-100 cursor-pointer hover:bg-accent hover:text-accent-foreground"
+
+		// Add styling for outside days
+		if dayData.IsOutsideDay {
+			baseClasses += " text-muted-foreground opacity-50"
+		}
+
+		// Add today styling
+		todayClasses := ""
+		if dayData.IsToday {
+			todayClasses = " bg-accent text-accent-foreground font-semibold"
+		}
+
+		// Use expression builder for clean conditional classes
+		var selectionClasses string
+		if dayData.IsCurrentMonth {
+			// Create calendar selection class helper
+			selectionClassHelper := newCalendarSelectionClasses(args.ID, signals, args.MonthOffset, dayData.DayNumber, args.Mode)
+			selectionClasses = selectionClassHelper.build()
+		} else {
+			// For outside days, no selection styling
+			selectionClasses = "{}"
+		}
+	}}
+	<div class="relative p-0 text-center text-sm focus-within:relative focus-within:z-20 flex items-center justify-center">
+		<button
+			type="button"
+			class={ baseClasses + todayClasses }
+			data-class={ selectionClasses }
+			data-on:click={ clickHandler }
+		>
+			{ fmt.Sprintf("%d", dayData.DayNumber) }
+		</button>
+	</div>
+}

@@ -1,0 +1,549 @@
+package commentui
+
+import (
+	"fmt"
+	"net/url"
+	"sort"
+	"time"
+
+	"github.com/CoreyCole/vamos/pkg/components/form"
+	"github.com/CoreyCole/vamos/pkg/components/textarea"
+)
+
+func formatCommentDate(t time.Time) string {
+	if t.IsZero() {
+		return ""
+	}
+	return t.Format("Jan 2")
+}
+
+func totalThreadCount(threads []CommentThreadView) int {
+	n := len(threads)
+	for _, thread := range threads {
+		n += len(thread.Replies)
+	}
+	return n
+}
+
+func uniqueAuthors(threads []CommentThreadView) []string {
+	seen := map[string]bool{}
+	authors := make([]string, 0)
+	for _, thread := range threads {
+		if thread.AuthorEmail != "" && !seen[thread.AuthorEmail] {
+			seen[thread.AuthorEmail] = true
+			authors = append(authors, thread.AuthorEmail)
+		}
+		for _, reply := range thread.Replies {
+			if reply.AuthorEmail != "" && !seen[reply.AuthorEmail] {
+				seen[reply.AuthorEmail] = true
+				authors = append(authors, reply.AuthorEmail)
+			}
+		}
+	}
+	sort.Strings(authors)
+	return authors
+}
+
+func replyRoute(routes CommentRoutes, commentID string) string {
+	if routes.Reply == nil {
+		return ""
+	}
+	return routes.Reply(commentID)
+}
+
+func resolveRoute(routes CommentRoutes, commentID string) string {
+	if routes.Resolve == nil {
+		return ""
+	}
+	return routes.Resolve(commentID)
+}
+
+func reopenRoute(routes CommentRoutes, commentID string) string {
+	if routes.Reopen == nil {
+		return ""
+	}
+	return routes.Reopen(commentID)
+}
+
+func selectionKeydownExpr(args SelectionSignalArgs) string {
+	if args.Prefix == "" {
+		return ""
+	}
+	p := "$" + args.Prefix
+	return "if (event.key === 'Escape') { window.getSelection().removeAllRanges(); " + p + ".text = ''; " + p + ".sectionId = ''; " + p + ".headingHint = ''; " + p + ".top = 0; " + p + ".left = 0 }"
+}
+
+func selectionMouseupExpr(args SelectionSignalArgs) string {
+	if args.Prefix == "" {
+		return ""
+	}
+	exclude := args.ExcludeSelector
+	if exclude == "" {
+		exclude = "[data-comment-target=true], [id^=comment-target-]"
+	}
+	containerLookup := "element.closest('[data-commentui-container=true]')"
+	p := "$" + args.Prefix
+	clear := p + ".text = ''; " + p + ".sectionId = ''; " + p + ".headingHint = ''; " + p + ".top = 0; " + p + ".left = 0;"
+	return "const selection = window.getSelection(); const text = selection.toString().trim(); if (text && selection.rangeCount > 0) { const range = selection.getRangeAt(0); const container = range.commonAncestorContainer; const element = container.nodeType === 3 ? container.parentElement : container; const inCommentArea = element.closest('" + exclude + "'); if (inCommentArea) { " + clear + " } else { const rect = range.getBoundingClientRect(); const section = element.closest('[data-section-id]'); const sectionId = section ? section.dataset.sectionId : ''; const headingHint = section ? (section.dataset.headingHint || '') : ''; const containerEl = " + containerLookup + "; const containerRect = containerEl ? containerEl.getBoundingClientRect() : {top: 0, left: 0}; " + p + ".text = text; " + p + ".sectionId = sectionId; " + p + ".headingHint = headingHint; " + p + ".top = rect.bottom - containerRect.top + (containerEl ? containerEl.scrollTop : window.scrollY); " + p + ".left = rect.left - containerRect.left + (containerEl ? containerEl.scrollLeft : 0); } } else { " + clear + " }"
+}
+
+func clickOutsideCollapseExpr(args CommentTargetView) string {
+	if args.SignalKey == "" {
+		return ""
+	}
+	return "if (!el.contains(event.target)) { $comment_" + args.SignalKey + "_expanded = false }"
+}
+
+func clickOutsideCancelExpr(args CommentTargetView) string {
+	if args.Routes.Cancel == "" {
+		return ""
+	}
+	values := url.Values{}
+	for name, value := range args.HiddenFields {
+		values.Set(name, value)
+	}
+	cancelURL := args.Routes.Cancel
+	if encoded := values.Encode(); encoded != "" {
+		cancelURL += "?" + encoded
+	}
+	return "if (!el.contains(event.target)) { @post('" + cancelURL + "') }"
+}
+
+func panelThreadTarget(args CommentsPanelArgs, thread CommentThreadView) CommentTargetView {
+	sectionID := sectionOrDocument(thread.SectionID)
+	target := BuildTargetView(TargetInput{
+		Surface:     args.Surface,
+		IDPrefix:    args.TargetPrefix,
+		DocPath:     args.DocPath,
+		SectionID:   sectionID,
+		HeadingHint: thread.HeadingHint,
+		UserEmail:   args.UserEmail,
+		Threads:     []CommentThreadView{thread},
+		Routes:      args.Routes,
+		HiddenFields: MergeHidden(args.HiddenFields, map[string]string{
+			"doc_path":      args.DocPath,
+			"section_hint":  sectionID,
+			"heading_hint":  thread.HeadingHint,
+			"context_panel": "1",
+		}),
+	})
+	target.HiddenFields = MergeHidden(target.HiddenFields, thread.HiddenFields)
+	return target
+}
+
+templ HiddenFields(fields map[string]string) {
+	for name, value := range fields {
+		<input type="hidden" name={ name } value={ value }/>
+	}
+}
+
+templ CommentableMarkdown(args CommentableMarkdownArgs) {
+	<div class="relative" data-signals="{}">
+		<div class="min-w-0 relative" data-commentui-container="true" data-on:keydown__window={ selectionKeydownExpr(args.SelectionSignals) } data-on:mouseup__debounce.500ms.leading={ selectionMouseupExpr(args.SelectionSignals) }>
+			if len(args.Sections) > 0 {
+				{{ documentThreads := DocumentComments(args.Comments) }}
+				if len(documentThreads) > 0 {
+					<div class="mb-2 flex justify-end">
+						@CommentTarget(CommentTargetView{
+							ID:           TargetID(args.IDPrefix, "document"),
+							SignalKey:    SignalKey(args.IDPrefix, "document"),
+							Surface:      args.Surface,
+							DocPath:      args.DocPath,
+							SectionID:    "document",
+							UserEmail:    args.UserEmail,
+							Threads:      documentThreads,
+							Routes:       args.Routes,
+							HiddenFields: MergeHidden(args.HiddenFields, map[string]string{"section_hint": "document", "heading_hint": ""}),
+						})
+					</div>
+				}
+				for _, section := range args.Sections {
+					{{
+						sectionID := sectionOrDocument(section.ID)
+						target := CommentTargetView{
+							ID:           TargetID(args.IDPrefix, sectionID),
+							SignalKey:    SignalKey(args.IDPrefix, sectionID),
+							Surface:      args.Surface,
+							DocPath:      args.DocPath,
+							SectionID:    sectionID,
+							HeadingHint:  section.Title,
+							UserEmail:    args.UserEmail,
+							Threads:      CommentsForSection(args.Comments, sectionID, section.Title),
+							Routes:       args.Routes,
+							HiddenFields: MergeHidden(args.HiddenFields, map[string]string{"section_hint": sectionID, "heading_hint": section.Title}),
+						}
+					}}
+					<section data-section-id={ sectionID } data-heading-hint={ section.Title } class="relative">
+						<div class="markdown-viewer prose prose-invert max-w-none">
+							if section.HeadingHTML != "" {
+								<div class="flex items-center justify-between gap-3">
+									@templ.Raw(section.HeadingHTML)
+									@CommentTarget(target)
+								</div>
+							} else {
+								<div class="mb-2 flex justify-end">
+									@CommentTarget(target)
+								</div>
+							}
+							@templ.Raw(section.BodyHTML)
+						</div>
+					</section>
+				}
+			} else {
+				<div class="markdown-viewer prose prose-invert max-w-none">
+					@templ.Raw(args.HTML)
+				</div>
+				@CommentTarget(CommentTargetView{
+					ID:           TargetID(args.IDPrefix, "document"),
+					SignalKey:    SignalKey(args.IDPrefix, "document"),
+					Surface:      args.Surface,
+					DocPath:      args.DocPath,
+					SectionID:    "document",
+					UserEmail:    args.UserEmail,
+					Threads:      DocumentComments(args.Comments),
+					Routes:       args.Routes,
+					HiddenFields: MergeHidden(args.HiddenFields, map[string]string{"section_hint": "document", "heading_hint": ""}),
+				})
+			}
+			@SelectedTextTrigger(args.SelectionSignals)
+		</div>
+	</div>
+}
+
+templ CommentTarget(args CommentTargetView) {
+	<div id={ args.ID } class="commentui-target flex items-center gap-1" data-comment-target="true">
+		if len(args.Threads) > 0 {
+			@CommentToggle(args)
+		}
+		@SectionMenu(args)
+	</div>
+}
+
+templ CommentTargetWithForm(args CommentTargetView, view CommentFormView) {
+	<div id={ args.ID } class={ CommentAnchorClass(args.SignalKey) + " commentui-target flex items-center gap-1 z-[100]" } data-comment-target="true" data-on:click__window={ clickOutsideCancelExpr(args) }>
+		<div class={ CommentPopoverClass(CommentPopoverPlacementTarget) + " ring-1 ring-primary/30" }>
+			@CommentForm(view)
+			if args.Surface == CommentSurfaceArtifact {
+				for _, thread := range args.Threads {
+					@CommentCard(thread, args)
+				}
+			}
+		</div>
+		@SectionMenu(args)
+	</div>
+}
+
+templ CommentsSidebar(view CommentSidebarView) {
+	<aside
+		id={ view.ID }
+		class={ commentSidebarClass(view.InitiallyExpanded) }
+		data-class={ "{'w-80': $" + view.SignalName + ", 'w-10': !$" + view.SignalName + "}" }
+	>
+		<span class="sr-only">Comments</span>
+		<div id={ view.ID + "-minimized" } data-show={ "!$" + view.SignalName }>
+			@MinimizedCommentRail(view)
+		</div>
+		<div id={ view.ID + "-expanded" } data-show={ "$" + view.SignalName }>
+			@ExpandedCommentSidebar(view)
+		</div>
+	</aside>
+}
+
+templ MinimizedCommentRail(view CommentSidebarView) {
+	<button
+		type="button"
+		class="inline-flex w-8 flex-col items-center gap-1 rounded-md border border-border bg-background/95 p-1 text-muted-foreground shadow-sm transition-colors hover:bg-muted hover:text-foreground"
+		data-on:click={ "$" + view.SignalName + " = true" }
+		data-attr:aria-expanded={ "$" + view.SignalName + " ? 'true' : 'false'" }
+		aria-controls={ view.ID + "-expanded" }
+		aria-label="Expand comments"
+		title="Expand comments"
+	>
+		if len(view.Threads) == 0 {
+			<svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z"></path></svg>
+		} else {
+			@StackedCommentAvatars(commentAuthorsView(view.Threads, 3), "h-6 w-6 text-[10px]")
+		}
+		<span class="sr-only">Expand comments</span>
+	</button>
+}
+
+templ ExpandedCommentSidebar(view CommentSidebarView) {
+	<div class="space-y-3 rounded-xl bg-background/95 p-3 shadow-sm ring-1 ring-border/50">
+		<div class="flex items-center justify-between gap-2">
+			<div class="min-w-0">
+				<p class="text-xs font-medium uppercase tracking-wide text-muted-foreground">Comments</p>
+				<p class="text-[11px] text-muted-foreground">{ fmt.Sprintf("%d total", totalThreadCount(view.Threads)) }</p>
+			</div>
+			<button type="button" class="inline-flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground" data-on:click={ "$" + view.SignalName + " = false" } data-attr:aria-expanded={ "$" + view.SignalName + " ? 'true' : 'false'" } aria-controls={ view.ID + "-expanded" } aria-label="Minimize comments" title="Minimize comments">
+				<span class="sr-only">Minimize comments</span>
+				<svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+			</button>
+		</div>
+		@SidebarThreadList(view)
+	</div>
+}
+
+templ StackedCommentAvatars(view CommentAuthorsView, avatarClass string) {
+	<span class="inline-flex items-center -space-x-1" aria-hidden="true">
+		for _, author := range view.DisplayAuthors {
+			<span class={ "inline-flex shrink-0 items-center justify-center rounded-full bg-primary/15 font-medium text-primary ring-2 ring-background " + avatarClass } title={ author }>{ commentInitial(author) }</span>
+		}
+		if view.RemainingCount > 0 {
+			<span class={ "inline-flex shrink-0 items-center justify-center rounded-full bg-muted font-medium text-muted-foreground ring-2 ring-background " + avatarClass }>+{ fmt.Sprintf("%d", view.RemainingCount) }</span>
+		}
+	</span>
+}
+
+templ CompactCommentMarker(args CommentTargetView) {
+	{{ authors := commentAuthorsView(args.Threads, 3) }}
+	<button
+		id={ "comment-toggle-" + args.SignalKey }
+		type="button"
+		class="hidden h-8 items-center rounded-full border border-border/50 bg-muted/50 px-2 text-xs text-muted-foreground transition-colors hover:bg-muted md:inline-flex"
+		data-on:click={ "$comment_" + args.SignalKey + "_expanded = !$comment_" + args.SignalKey + "_expanded; if ($comment_" + args.SignalKey + "_expanded) { $comment_zindex_counter = ($comment_zindex_counter || 0) + 1; $comment_" + args.SignalKey + "_zindex = $comment_zindex_counter }" }
+		data-attr:aria-expanded={ "$comment_" + args.SignalKey + "_expanded ? 'true' : 'false'" }
+		aria-controls={ "comment-expanded-" + args.SignalKey }
+		aria-label={ fmt.Sprintf("%d comments", authors.TotalCount) }
+	>
+		@StackedCommentAvatars(authors, "h-6 w-6 text-[10px]")
+		<span class="ml-2 tabular-nums">{ fmt.Sprintf("%d", authors.TotalCount) }</span>
+	</button>
+}
+
+templ SidebarThreadList(view CommentSidebarView) {
+	if len(view.Threads) == 0 {
+		<p class="rounded-md border border-dashed border-border p-3 text-xs text-muted-foreground">No comments yet.</p>
+	} else {
+		<div class="space-y-3">
+			for _, thread := range unresolvedThreads(view.Threads) {
+				@CommentCard(thread, sidebarThreadTarget(view.Target, thread))
+			}
+			for _, thread := range resolvedThreads(view.Threads) {
+				@SidebarResolvedThreadChip(thread, sidebarThreadTarget(view.Target, thread))
+			}
+		</div>
+	}
+}
+
+templ SidebarResolvedThreadChip(thread CommentThreadView, target CommentTargetView) {
+	{{ _ = target }}
+	<div class="flex items-center gap-2 rounded-md border border-border/70 bg-muted/30 px-2 py-1.5 text-xs text-muted-foreground">
+		<span class="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-emerald-500/10 text-[10px] font-medium text-emerald-200">✓</span>
+		<span class="min-w-0 flex-1 truncate">{ commentActorName(thread.AuthorEmail) }</span>
+		<span class="text-[11px] text-emerald-200">Resolved</span>
+	</div>
+}
+
+templ SectionMenu(args CommentTargetView) {
+	<details class="relative">
+		<summary class="inline-flex h-8 w-8 cursor-pointer list-none items-center justify-center rounded-full transition-colors hover:bg-muted" aria-label="Section actions">
+			<svg class="h-4 w-4 text-muted-foreground" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="5" r="2"></circle><circle cx="12" cy="12" r="2"></circle><circle cx="12" cy="19" r="2"></circle></svg>
+		</summary>
+		<div class="absolute right-0 z-50 mt-2 min-w-36 rounded-md border border-border bg-popover p-1 text-popover-foreground shadow-md">
+			<form data-on:submit={ "@post('" + args.Routes.Show + "', {contentType: 'form'})" } class="flex w-full items-center">
+				@HiddenFields(args.HiddenFields)
+				<input type="hidden" name="selected_text" value=""/>
+				<button type="submit" class="flex w-full items-center rounded-sm px-2 py-1.5 text-sm hover:bg-accent hover:text-accent-foreground"><span class="whitespace-nowrap">Add comment</span></button>
+			</form>
+		</div>
+	</details>
+}
+
+templ CommentToggle(args CommentTargetView) {
+	{{ count := totalThreadCount(args.Threads) }}
+	if args.Surface == CommentSurfaceArtifact {
+		<div class={ CommentAnchorClass(args.SignalKey) } data-style={ "{'z-index': $comment_" + args.SignalKey + "_expanded ? $comment_" + args.SignalKey + "_zindex : 0}" } data-on:click__window={ clickOutsideCollapseExpr(args) }>
+			@CompactCommentMarker(args)
+			if args.Routes.Expand != "" {
+				<form class="inline-flex md:hidden" data-on:submit={ "@post('" + args.Routes.Expand + "', {contentType: 'form'})" }>
+					@HiddenFields(args.HiddenFields)
+					<button type="submit" class="rounded-full border border-border/50 bg-muted/50 px-3 py-1.5 text-xs text-muted-foreground">{ fmt.Sprintf("%d", count) }</button>
+				</form>
+			}
+			<div id={ "comment-expanded-" + args.SignalKey } class={ CommentPopoverClass(CommentPopoverPlacementTarget) + " hidden md:block" } data-show={ "$comment_" + args.SignalKey + "_expanded" }>
+				for _, thread := range args.Threads {
+					@CommentCard(thread, args)
+				}
+			</div>
+		</div>
+	} else {
+		<div class={ CommentAnchorClass(args.SignalKey) }>
+			if args.Routes.Expand != "" {
+				<form class="inline-flex" data-on:submit={ "@post('" + args.Routes.Expand + "', {contentType: 'form'})" }>
+					@HiddenFields(MergeHidden(args.HiddenFields, map[string]string{"context_panel": "1"}))
+					<button type="submit" class="inline-flex h-8 items-center rounded-full border border-border/50 bg-muted/50 px-2 text-xs text-muted-foreground transition-colors hover:bg-muted" aria-label={ fmt.Sprintf("Open %d comments in context pane", count) }>
+						@StackedCommentAvatars(commentAuthorsView(args.Threads, 3), "h-6 w-6 text-[10px]")
+						<span class="ml-2 tabular-nums">{ fmt.Sprintf("%d", count) }</span>
+					</button>
+				</form>
+			} else {
+				@CompactCommentMarker(args)
+			}
+		</div>
+	}
+}
+
+templ CommentToggleWithForm(args CommentTargetView, view CommentFormView) {
+	<div class={ CommentAnchorClass(args.SignalKey) + " z-[100]" }>
+		<div class={ CommentPopoverClass(CommentPopoverPlacementTarget) + " ring-1 ring-primary/30" }>
+			@CommentForm(view)
+			if args.Surface == CommentSurfaceArtifact {
+				for _, thread := range args.Threads {
+					@CommentCard(thread, args)
+				}
+			}
+		</div>
+	</div>
+}
+
+templ CommentForm(view CommentFormView) {
+	<div id={ view.ID + "-container" }>
+		@form.Form(form.FormArgs{ID: view.ID, Action: view.Target.Routes.Create, ContentType: "form", Class: "space-y-2"}) {
+			@HiddenFields(view.Target.HiddenFields)
+			<input type="hidden" name="selected_text" value={ view.SelectedText }/>
+			if view.Error != "" {
+				<div class="rounded bg-destructive/10 px-3 py-2 text-sm text-destructive">{ view.Error }</div>
+			}
+			if view.SelectedText != "" {
+				<blockquote class="max-h-20 overflow-y-auto rounded border-l-2 border-muted-foreground/30 bg-muted px-2 py-1.5 text-xs text-muted-foreground"><span class="font-mono">{ view.SelectedText }</span></blockquote>
+			}
+			@textarea.Textarea(textarea.TextareaArgs{Placeholder: "Add a comment...", Name: "comment_text", Rows: 3, Class: "resize-none", Attributes: map[string]any{"data-ignore-morph": true}})
+			<div class="flex justify-end gap-2">
+				<button type="button" class="rounded-md px-3 py-1.5 text-xs text-muted-foreground hover:bg-muted" data-on:click={ "@post('" + view.Target.Routes.Cancel + "', {contentType: 'form'})" }>Cancel</button>
+				<button type="submit" class="rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90">Comment</button>
+			</div>
+		}
+	</div>
+}
+
+templ CommentsContextPanel(args CommentsPanelArgs) {
+	<aside id={ CommentsContextPanelID } class="flex h-full min-h-0 flex-col overflow-hidden bg-background">
+		<div class="shrink-0 border-b border-border px-3 py-2">
+			<p class="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Comments</p>
+			if args.ActiveSectionID != "" {
+				<p class="truncate text-sm text-foreground">{ args.ActiveSectionID }</p>
+			} else if args.DocPath != "" {
+				<p class="truncate text-sm text-muted-foreground">{ args.DocPath }</p>
+			}
+		</div>
+		<div id={ CommentsContextThreadListID } class="min-h-0 flex-1 space-y-3 overflow-y-auto p-3">
+			if len(args.Threads) == 0 {
+				<p class="rounded-md border border-dashed border-border p-3 text-sm text-muted-foreground">No comments yet.</p>
+			} else {
+				for _, thread := range unresolvedThreads(args.Threads) {
+					@CommentThreadCard(thread, panelThreadTarget(args, thread), CommentThreadOptions{ShowSection: true, ShowSelectedText: true})
+				}
+				for _, thread := range resolvedThreads(args.Threads) {
+					@CommentThreadCard(thread, panelThreadTarget(args, thread), CommentThreadOptions{ShowSection: true, ShowSelectedText: true, Compact: true})
+				}
+			}
+		</div>
+	</aside>
+}
+
+templ MobileSectionCommentTarget() {
+	<div id={ MobileSectionCommentContentID }>
+		<div class="py-4 text-center text-muted-foreground">
+			<p class="text-sm">Select a section to add or view comments</p>
+		</div>
+	</div>
+}
+
+templ CommentThreadCard(view CommentThreadView, target CommentTargetView, opts CommentThreadOptions) {
+	{{ _ = opts }}
+	@CommentCard(view, target)
+}
+
+templ CommentCard(view CommentThreadView, target CommentTargetView) {
+	<article id={ "comment-thread-" + view.ID } class="space-y-2 rounded-lg border border-border/70 bg-card p-3 text-xs shadow-sm">
+		<div class="flex items-start justify-between gap-3">
+			<div class="min-w-0">
+				<p class="font-medium text-foreground">{ view.AuthorEmail }</p>
+				if view.ActorLabel != "" {
+					<p class="text-muted-foreground">{ view.ActorLabel } · { formatCommentDate(view.CreatedAt) }</p>
+				} else {
+					<p class="text-muted-foreground">{ formatCommentDate(view.CreatedAt) }</p>
+				}
+			</div>
+			<div class="flex shrink-0 items-center gap-2">
+				if target.Routes.SelectComment != "" {
+					<form data-on:submit={ "@post('" + target.Routes.SelectComment + "', {contentType: 'form'})" }>
+						@HiddenFields(MergeHidden(target.HiddenFields, view.HiddenFields))
+						<input type="hidden" name="comment_id" value={ view.ID }/>
+						<button type="submit" class="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground" aria-label="Open comment in document" title="Open comment in document">
+							<svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path></svg>
+						</button>
+					</form>
+				}
+				if view.Resolved {
+					<span class="rounded-full bg-emerald-500/10 px-2 py-0.5 text-[11px] text-emerald-200">Resolved</span>
+				} else {
+					<span class="rounded-full bg-amber-500/10 px-2 py-0.5 text-[11px] text-amber-200">Open</span>
+				}
+			</div>
+		</div>
+		if view.SelectedText != "" {
+			<blockquote class="commentui-thread-quote whitespace-pre-wrap rounded-md border-l-4 border-primary/50 bg-muted px-3 py-2 text-muted-foreground">{ view.SelectedText }</blockquote>
+		}
+		<p class="whitespace-pre-wrap text-foreground">{ view.Body }</p>
+		for _, reply := range view.Replies {
+			@ReplyItem(reply)
+		}
+		@ReplyForm(view, target)
+		@ActionForms(view, target)
+	</article>
+}
+
+templ ReplyItem(reply CommentReplyView) {
+	<div class="pl-4">
+		<p class="text-muted-foreground">{ reply.AuthorEmail } · { formatCommentDate(reply.CreatedAt) }</p>
+		<p class="whitespace-pre-wrap text-foreground">{ reply.Body }</p>
+	</div>
+}
+
+templ ReplyForm(view CommentThreadView, target CommentTargetView) {
+	if replyRoute(target.Routes, view.ID) != "" {
+		<form class="flex items-start gap-2" data-on:submit={ "@post('" + replyRoute(target.Routes, view.ID) + "', {contentType: 'form'})" }>
+			@HiddenFields(MergeHidden(target.HiddenFields, view.HiddenFields))
+			<input type="hidden" name="request_id" value={ "reply-" + view.ID }/>
+			<textarea name="reply_text" class="min-h-12 flex-1 resize-none rounded-md border border-input bg-background px-2 py-1 text-xs text-foreground" data-ignore-morph placeholder="Reply..."></textarea>
+			<button type="submit" class="rounded-md px-2 py-1 text-xs hover:bg-muted">Reply</button>
+		</form>
+	}
+}
+
+templ ActionForms(view CommentThreadView, target CommentTargetView) {
+	if view.Resolved {
+		if reopenRoute(target.Routes, view.ID) != "" {
+			<form data-on:submit={ "@post('" + reopenRoute(target.Routes, view.ID) + "', {contentType: 'form'})" }>
+				@HiddenFields(MergeHidden(target.HiddenFields, view.HiddenFields))
+				<input type="hidden" name="request_id" value={ "reopen-" + view.ID }/>
+				<button type="submit" class="text-xs text-muted-foreground hover:text-foreground">Reopen</button>
+			</form>
+		}
+	} else {
+		if resolveRoute(target.Routes, view.ID) != "" {
+			<form data-on:submit={ "@post('" + resolveRoute(target.Routes, view.ID) + "', {contentType: 'form'})" }>
+				@HiddenFields(MergeHidden(target.HiddenFields, view.HiddenFields))
+				<input type="hidden" name="request_id" value={ "resolve-" + view.ID }/>
+				<button type="submit" class="text-xs text-muted-foreground hover:text-foreground">Resolve</button>
+			</form>
+		}
+	}
+}
+
+templ SelectedTextTrigger(args SelectionSignalArgs) {
+	if args.Prefix != "" && args.ShowRoute != "" {
+		{{ showExpression := "$" + args.Prefix + ".text && $" + args.Prefix + ".sectionId != ''" }}
+		<form id={ args.Prefix + "-inline-comment-trigger" } class={ SelectionTriggerClass() + " hidden" } data-show={ showExpression } data-class={ "{'hidden': !(" + showExpression + ")}" } data-style={ "{'--commentui-selection-top': ($" + args.Prefix + ".top || 0) + 'px', '--commentui-selection-left': ($" + args.Prefix + ".left || 0) + 'px'}" } data-on:submit={ "@post('" + args.ShowRoute + "', {contentType: 'form'})" }>
+			@HiddenFields(args.HiddenFields)
+			<input type="hidden" name="section_hint" data-bind={ args.Prefix + ".sectionId" }/>
+			<input type="hidden" name="heading_hint" data-bind={ args.Prefix + ".headingHint" }/>
+			<input type="hidden" name="selected_text" data-bind={ args.Prefix + ".text" }/>
+			<button type="submit" class="rounded-md bg-primary p-2 text-primary-foreground shadow-lg transition-colors hover:bg-primary/90" aria-label="Comment on selection">
+				<svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z"></path></svg>
+			</button>
+		</form>
+	}
+}

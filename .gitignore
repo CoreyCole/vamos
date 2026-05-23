@@ -1,0 +1,11 @@
+agents-server
+.build-agents/
+.vamos/
+node_modules/
+dist/
+data/
+plans/
+static/css/out.css
+static/css/out.*.css
+static/js/datastar*.js
+static/js/datastar*.js.map

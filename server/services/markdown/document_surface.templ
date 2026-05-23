@@ -1,0 +1,162 @@
+package markdown
+
+import (
+	"path/filepath"
+	"strings"
+
+	"github.com/CoreyCole/vamos/server/layouts/workbench"
+	"github.com/CoreyCole/vamos/server/services/commentui"
+)
+
+templ DocumentSurface(doc WorkbenchDocument, workspaceTree *workbench.WorkspaceDocTreeHeaderModel) {
+	<div id="document-surface" class="flex h-full min-h-0 flex-col overflow-hidden bg-background" data-signals={ encodePageSignals(doc.PageSessionID) }>
+		<div id="thoughts-url-sync" class="hidden" aria-hidden="true"></div>
+		<div id="thoughts-open-chat-result" class="hidden" aria-hidden="true"></div>
+		<div id="thoughts-markdown-scroll-region" class="min-h-0 flex-1 overflow-y-auto p-4 md:p-10">
+			@QRSPIArtifactContext(doc.QRSPIMetadata, workspaceTree)
+			@commentui.CommentableMarkdown(doc.CommentUI)
+		</div>
+		<div class="hidden" aria-hidden="true">
+			@commentui.MobileSectionCommentTarget()
+		</div>
+	</div>
+}
+
+templ ThoughtsTitleContent(title string) {
+	if title != "" {
+		<p class="truncate text-sm font-medium text-foreground">{ title }</p>
+	}
+}
+
+templ QRSPIArtifactContext(meta QRSPIMetadata, workspaceTree *workbench.WorkspaceDocTreeHeaderModel) {
+	if meta.Present {
+		<section class="mb-3 overflow-hidden rounded-lg border border-border bg-background">
+			<div class="flex flex-wrap items-center gap-2 px-3 py-2 text-xs text-muted-foreground">
+				if meta.PlanTitle != "" {
+					<span class="truncate rounded-md border border-border px-2 py-1 font-medium text-foreground">{ meta.PlanTitle }</span>
+				}
+				if meta.PlanDate != "" {
+					<span class="rounded-md border border-border px-2 py-1">{ meta.PlanDate }</span>
+				}
+				if meta.PlanTime != "" {
+					<span class="rounded-md border border-border px-2 py-1">{ meta.PlanTime }</span>
+				}
+				if meta.Ticket != "" {
+					<span class="rounded-md border border-border px-2 py-1">{ meta.Ticket }</span>
+				}
+				if meta.Repository != "" {
+					<span class="rounded-md border border-border px-2 py-1">{ meta.Repository }</span>
+				}
+				if !meta.UpdatedAt.IsZero() {
+					<span class="rounded-md border border-border px-2 py-1">Updated { formatDate(meta.UpdatedAt) }</span>
+				}
+				<button type="button" class="ml-auto rounded-md border border-border px-2 py-1 text-foreground hover:bg-muted" data-on:click="$qrspiArtifactExpanded = !$qrspiArtifactExpanded">
+					<span data-show="!$qrspiArtifactExpanded">Related docs ▾</span>
+					<span data-show="$qrspiArtifactExpanded" data-class="{'hidden': !$qrspiArtifactExpanded}" class="hidden">Hide docs ▴</span>
+				</button>
+			</div>
+			if len(meta.Nav) > 0 {
+				<nav class="flex flex-wrap items-center gap-1 border-t border-border px-3 py-2 text-xs" aria-label="QRSPI flow">
+					for i, item := range meta.Nav {
+						if i > 0 {
+							<span class="text-muted-foreground">→</span>
+						}
+						if item.Disabled {
+							<span class="rounded-md px-2 py-1 text-muted-foreground/60">{ item.Label }</span>
+						} else {
+							<form method="post" action="/thoughts/actions/select-document" data-on:submit="@post('/thoughts/actions/select-document', {contentType: 'form'})">
+								<input type="hidden" name="doc_path" value={ qrspiDocPathFromHref(item.Href) }/>
+								<button type="submit" class={ "rounded-md px-2 py-1 transition-colors hover:bg-muted", templ.KV("bg-muted font-medium text-foreground", item.Current), templ.KV("text-muted-foreground", !item.Current) }>{ item.Label }</button>
+							</form>
+						}
+					}
+				</nav>
+			}
+			<div data-show="$qrspiArtifactExpanded" data-class="{'hidden': !$qrspiArtifactExpanded}" class="hidden max-h-96 overflow-y-auto border-t border-border px-3 py-3 text-sm">
+				if workspaceTree != nil && len(workspaceTree.Nodes) > 0 {
+					<div class="space-y-0.5">
+						for _, node := range workspaceTree.Nodes {
+							@workbench.WorkspaceDocTreeNode(workbench.DocEntryModeThoughts, node)
+						}
+					</div>
+				} else {
+					<p class="text-sm text-muted-foreground">No workspace document tree available.</p>
+				}
+			</div>
+		</section>
+	}
+}
+
+templ DocumentActions(actions []DocumentAction) {
+	<div id="document-header-actions" class="flex shrink-0 items-center justify-end gap-2">
+		for _, action := range actions {
+			@DocumentActionControl(action)
+		}
+	</div>
+}
+
+templ DocumentActionControl(action DocumentAction) {
+	{{ label := documentActionLabel(action) }}
+	if action.Href != "" {
+		<a href={ templ.URL(action.Href) } class={ documentActionButtonClass(action) } aria-label={ label } title={ label }>{ documentActionIcon(action) }</a>
+	} else if action.FormAction != "" {
+		<form method="post" action={ action.FormAction } data-on:submit={ "@post('" + action.FormAction + "', {contentType: 'form'})" }>
+			for name, value := range action.HiddenFields {
+				<input type="hidden" name={ name } value={ value }/>
+			}
+			<button type="submit" class={ documentActionButtonClass(action) } aria-label={ label } title={ label }>{ documentActionIcon(action) }</button>
+		</form>
+	}
+}
+
+func qrspiDocPathFromHref(href string) string {
+	return strings.TrimPrefix(strings.TrimSpace(href), "/thoughts/")
+}
+
+func isDocumentChatAction(action DocumentAction) bool {
+	return action.FormAction == "/thoughts/chat/open" || action.FormAction == "/thoughts/actions/open-chat"
+}
+
+func isDocumentCommentsAction(action DocumentAction) bool {
+	return action.FormAction == "/thoughts/actions/open-comments" || strings.EqualFold(action.Label, "Comments") || strings.Contains(action.Href, "context=comments")
+}
+
+func hasOpenChatAction(actions []DocumentAction) bool {
+	for _, action := range actions {
+		if isDocumentChatAction(action) {
+			return true
+		}
+	}
+	return false
+}
+
+func documentActionButtonClass(action DocumentAction) string {
+	return "inline-flex h-8 w-8 items-center justify-center rounded-md border border-border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+}
+
+func documentActionLabel(action DocumentAction) string {
+	if strings.TrimSpace(action.AriaLabel) != "" {
+		return strings.TrimSpace(action.AriaLabel)
+	}
+	return strings.TrimSpace(action.Label)
+}
+
+templ OpenChatComposerAttachments(docPath string) {
+	<div id="agent-chat-composer-attachments">
+		<input type="hidden" name="attached_paths[]" value={ docPath }/>
+		<div class="agent-chat-content-padding flex flex-wrap gap-1 pt-3">
+			<span class="rounded-full border border-border bg-muted px-2 py-0.5 text-xs text-muted-foreground">{ filepath.Base(docPath) }</span>
+		</div>
+	</div>
+}
+
+func documentActionIcon(action DocumentAction) string {
+	switch action.Icon {
+	case "chat":
+		return "💬"
+	case "comments":
+		return "☰"
+	default:
+		return action.Label
+	}
+}

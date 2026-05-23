@@ -1,0 +1,97 @@
+package workbench
+
+templ WorkspaceDocTree(args WorkspaceDocTreeArgs) {
+	<section id="workspace-doc-tree" class="flex min-h-0 flex-col border-b border-border bg-card/60">
+		<div class="shrink-0 px-3 py-2 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Workspace docs</div>
+		if len(args.Nodes) == 0 {
+			<p class="px-3 pb-3 text-sm text-muted-foreground">
+				if args.EmptyMessage != "" {
+					{ args.EmptyMessage }
+				} else {
+					No workspace docs indexed.
+				}
+			</p>
+		} else {
+			<nav class="min-h-0 overflow-y-auto px-2 pb-2 text-sm" aria-label="Workspace documents" data-doc-scroll-container="workspace">
+				<div class="space-y-0.5">
+					for _, node := range args.Nodes {
+						@WorkspaceDocTreeNode(args.EntryMode, node)
+					}
+				</div>
+			</nav>
+		}
+	</section>
+}
+
+templ WorkspaceDocTreeHeader(args WorkspaceDocTreeHeaderModel) {
+	{{ targetID := args.TargetID }}
+	if targetID == "" {
+		{{ targetID = "workspace-doc-tree-header" }}
+	}
+	<div id={ targetID } class="min-w-0 flex-1" data-signals={ "{workspaceDocTreeOpen: " + sidebarBool(args.InitialOpen) + "}" }>
+		<button type="button" class="flex items-center gap-2 rounded-md px-2 py-1 text-left text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground" data-on:click="$workspaceDocTreeOpen = !$workspaceDocTreeOpen" data-attr:aria-expanded="$workspaceDocTreeOpen ? 'true' : 'false'">
+			<span data-show="!$workspaceDocTreeOpen">▸</span>
+			<span data-show="$workspaceDocTreeOpen">▾</span>
+			<span class="truncate">{ args.RootLabel }</span>
+		</button>
+		<div data-show="$workspaceDocTreeOpen" class="mt-2 max-h-72 overflow-y-auto rounded-md border border-border bg-card p-2 shadow-sm">
+			if len(args.Nodes) == 0 {
+				<p class="px-2 py-1 text-xs text-muted-foreground">{ args.EmptyLabel }</p>
+			} else {
+				<div class="space-y-0.5">
+					for _, node := range args.Nodes {
+						@WorkspaceDocTreeNode(DocEntryModeThoughts, node)
+					}
+				</div>
+			}
+		</div>
+	</div>
+}
+
+templ WorkspaceDocTreeNode(mode DocEntryMode, node WorkspaceDocNode) {
+	{{ openSignal := WorkspaceDocNodeToggleSignal(node) }}
+	<div class="space-y-0.5" data-signals={ "{" + openSignal + ": " + sidebarBool(node.IsExpanded) + "}" }>
+		if node.Kind == WorkspaceDocKindDir {
+			<button
+				type="button"
+				class={
+					"flex w-full items-center gap-1.5 rounded-md px-2 py-1 text-left transition-colors",
+					templ.KV("bg-accent font-medium text-accent-foreground", node.IsActive),
+					templ.KV("text-muted-foreground hover:bg-accent hover:text-accent-foreground", !node.IsActive),
+				}
+				data-on:click={ "$" + openSignal + " = !$" + openSignal }
+				data-attr:aria-expanded={ "$" + openSignal + " ? 'true' : 'false'" }
+			>
+				<span data-show={ "!$" + openSignal }>▸</span>
+				<span data-show={ "$" + openSignal }>▾</span>
+				<span class="truncate">{ node.Label }</span>
+			</button>
+		} else if WorkspaceDocNodeFormAction(mode, node) != "" {
+			<form method="post" action="/thoughts/actions/select-document" data-on:submit={ WorkspaceDocNodeFormAction(mode, node) }>
+				for name, value := range WorkspaceDocNodeHiddenFields(node) {
+					<input type="hidden" name={ name } value={ value }/>
+				}
+				<button
+					type="submit"
+					class={
+						"block w-full rounded-md px-2 py-1 text-left transition-colors",
+						templ.KV("bg-accent font-medium text-accent-foreground", node.IsActive),
+						templ.KV("text-muted-foreground hover:bg-accent hover:text-accent-foreground", !node.IsActive),
+					}
+					{ CurrentDocScrollAttrs(node.IsActive)... }
+				>
+					{ node.Label }
+				</button>
+			</form>
+		} else {
+			<span class="block rounded-md px-2 py-1 text-muted-foreground">{ node.Label }</span>
+		}
+		if len(node.Children) > 0 {
+			<div class="ml-3 border-l border-border pl-1" data-show={ "$" + openSignal }>
+				for _, child := range node.Children {
+					@WorkspaceDocTreeNode(mode, child)
+				}
+			</div>
+		}
+	</div>
+}

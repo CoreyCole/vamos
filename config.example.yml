@@ -1,0 +1,47 @@
+app:
+  name: Vamos
+  account_label: company account
+
+runtime:
+  thoughts_repo: /absolute/path/to/host-repo
+  thoughts_root: /absolute/path/to/host-repo/thoughts
+  state_dir: ~/.local/state/vamos
+  database_path: ~/.local/state/vamos/agents.db
+
+web:
+  listen_address: :4200
+  public_base_url: http://localhost:4200
+  cors_allowed_origins:
+    - http://localhost:4200
+
+projects:
+  default_repo: vamos
+  default_checkout: local
+  repos:
+    vamos:
+      github_url: https://github.com/CoreyCole/vamos
+      default_branch: main
+      default_checkout: local
+      baseline_checkout: vamos-main
+      checkouts:
+        local:
+          root_path: /absolute/path/to/vamos
+          purpose: working
+        vamos-main:
+          root_path: /absolute/path/to/vamos-main
+          purpose: baseline
+          must_be_clean: true
+          must_be_latest: true
+          webhook_sync_branch: main
+
+workspaces:
+  mode: standalone
+  metadata_dir_name: .vamos
+  checkout_prefixes: [vamos]
+  main_checkout_name: vamos
+  module_marker: go.mod
+  package_subdir: ""
+
+deploy:
+  web_service_name: vamos
+  ts_worker_service_name: vamos-ts-worker

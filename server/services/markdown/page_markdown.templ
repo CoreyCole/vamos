@@ -1,0 +1,514 @@
+package markdown
+
+import (
+	"encoding/json"
+	"fmt"
+	"path/filepath"
+	"strconv"
+	"strings"
+	"time"
+
+	"github.com/CoreyCole/vamos/pkg/components/sheet"
+	"github.com/CoreyCole/vamos/pkg/components/tooltip"
+	"github.com/CoreyCole/vamos/pkg/components/utils"
+	"github.com/CoreyCole/vamos/server/layouts"
+	"github.com/CoreyCole/vamos/server/layouts/workbench"
+	"github.com/CoreyCole/vamos/server/services/comments"
+	"github.com/CoreyCole/vamos/server/services/commentui"
+)
+
+// encodePageSignals encodes the initial page signals to JSON
+func encodePageSignals(pageSessionID string) string {
+	signals := map[string]interface{}{
+		"comment_text":          "",
+		"pageSessionId":         pageSessionID,
+		"qrspiArtifactExpanded": false,
+		"comment_selection": map[string]interface{}{
+			"text":        "",
+			"sectionId":   "",
+			"headingHint": "",
+			"top":         0,
+			"left":        0,
+		},
+		// Per-section form signals are created dynamically by backend:
+		// section_{sectionID}_form_open, section_{sectionID}_expanded
+	}
+	jsonBytes, err := json.Marshal(signals)
+	if err != nil {
+		return "{}"
+	}
+	return string(jsonBytes)
+}
+
+// formatDate formats a time.Time as YYYY-MM-DD
+func formatDate(t time.Time) string {
+	if t.IsZero() {
+		return ""
+	}
+	return t.Format("2006-01-02")
+}
+
+// formatTimestamp formats a time.Time as just the time portion with timezone
+// If time is exactly midnight UTC, shows "time unknown"
+func formatTimestamp(t time.Time) string {
+	if t.IsZero() {
+		return ""
+	}
+
+	// Check if this is exactly midnight UTC (time was not provided, only date)
+	utcTime := t.UTC()
+	if utcTime.Hour() == 0 && utcTime.Minute() == 0 && utcTime.Second() == 0 {
+		return "time unknown"
+	}
+
+	// Format the time
+	timeStr := t.Format("3:04 PM")
+
+	// Get the timezone name from Go's time library
+	// This will be a proper name like "PDT" or "EST" if the time was parsed in that location
+	// Otherwise it will be the offset like "-0700"
+	zoneName := t.Format("MST")
+
+	// If we got a numeric offset instead of a name, try to convert it to a common US timezone
+	if len(zoneName) > 0 && (zoneName[0] == '-' || zoneName[0] == '+') {
+		zoneName = offsetToTimezone(t)
+	}
+
+	return timeStr + " " + zoneName
+}
+
+// offsetToTimezone converts a UTC offset to a common US timezone abbreviation
+// This is approximate since multiple timezones can share offsets
+func offsetToTimezone(t time.Time) string {
+	_, offset := t.Zone()
+	offsetHours := offset / 3600
+
+	// Map common US timezone offsets to abbreviations
+	// We check the date to determine if it's likely DST or standard time
+	isDST := isDaylightSavingTime(t)
+
+	switch offsetHours {
+	case -8:
+		if isDST {
+			return "AKDT" // Alaska Daylight Time
+		}
+		return "PST" // Pacific Standard Time
+	case -7:
+		if isDST {
+			return "PDT" // Pacific Daylight Time
+		}
+		return "MST" // Mountain Standard Time
+	case -6:
+		if isDST {
+			return "MDT" // Mountain Daylight Time
+		}
+		return "CST" // Central Standard Time
+	case -5:
+		if isDST {
+			return "CDT" // Central Daylight Time
+		}
+		return "EST" // Eastern Standard Time
+	case -4:
+		if isDST {
+			return "EDT" // Eastern Daylight Time
+		}
+		return "AST" // Atlantic Standard Time
+	case 0:
+		return "UTC"
+	default:
+		// For other offsets, show as UTC+/-X
+		if offsetHours < 0 {
+			return "UTC" + t.Format("-07")
+		}
+		return "UTC+" + t.Format("-07")
+	}
+}
+
+// isDaylightSavingTime makes a simple determination if a date is likely in DST
+// US DST typically runs from second Sunday in March to first Sunday in November
+func isDaylightSavingTime(t time.Time) bool {
+	month := t.Month()
+	// Simple heuristic: March through October are likely DST months for US
+	// This isn't perfect but good enough for display purposes
+	return month >= time.March && month <= time.October
+}
+
+// MobileHeaderTriggers renders TOC trigger that appears in the header on mobile
+// Comments trigger is now in the profile dropdown menu
+templ MobileHeaderTriggers() {
+	<!-- TOC trigger - positioned in left side of header with spacing from logo, visible only on mobile -->
+	@sheet.SheetTrigger(sheet.SheetTriggerArgs{
+		SheetID: "toc_sheet",
+		Class:   "fixed top-0 left-2 h-14 z-50 flex items-center md:hidden",
+	}) {
+		<div class="p-2 rounded-md hover:bg-accent">
+			<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+				<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h7"></path>
+			</svg>
+			<span class="sr-only">Table of Contents</span>
+		</div>
+	}
+}
+
+// MobileTOCSheet renders the file tree + table of contents in a slide-out sheet for mobile
+templ MobileTOCSheet(toc []TocItem, fileTree []FileTreeNode, currentPath string) {
+	@sheet.Sheet(sheet.SheetArgs{
+		ID:    "toc_sheet",
+		Modal: true,
+		Side:  "left",
+	}) {
+		@sheet.SheetContent(sheet.SheetContentArgs{SheetID: "toc_sheet"}) {
+			@sheet.SheetHeader(sheet.SheetHeaderArgs{}) {
+				@sheet.SheetTitle(sheet.SheetTitleArgs{}) {
+					Navigation
+				}
+			}
+			<!-- File tree -->
+			@FileTreeSidebar(fileTree, currentPath)
+			<!-- TOC -->
+			if len(toc) > 0 {
+				<div class="border-t border-border pt-3 mt-2">
+					<p class="px-5 pb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">On this page</p>
+					@MarkdownSidebarMobile(toc)
+				</div>
+			}
+		}
+	}
+}
+
+// MarkdownSidebarMobile shows table of contents for mobile (closes sheet on click)
+templ MarkdownSidebarMobile(toc []TocItem) {
+	<nav class="space-y-2 py-4">
+		for _, item := range toc {
+			<a
+				href={ templ.URL("#" + item.ID) }
+				class={ "block text-base py-1 text-muted-foreground hover:text-foreground", tocLevelClass(item.Level) }
+				{ markdownSectionAttrs(item.ID)... }
+			>
+				{ item.Text }
+			</a>
+		}
+	</nav>
+}
+
+// MobileCommentsSheet renders the comments in a slide-out sheet for mobile
+templ MobileCommentsSheet(pageComments *comments.GetCommentsResponse, userEmail string) {
+	@sheet.Sheet(sheet.SheetArgs{
+		ID:    "comments_sheet",
+		Modal: true,
+		Side:  "right",
+	}) {
+		@sheet.SheetContent(sheet.SheetContentArgs{SheetID: "comments_sheet", Class: "overflow-y-auto"}) {
+			@sheet.SheetHeader(sheet.SheetHeaderArgs{}) {
+				@sheet.SheetTitle(sheet.SheetTitleArgs{}) {
+					Comments
+				}
+				@sheet.SheetDescription(sheet.SheetDescriptionArgs{}) {
+					if pageComments != nil && len(pageComments.Comments) > 0 {
+						{ fmt.Sprintf("%d comments", len(pageComments.Comments)) }
+					} else {
+						No comments yet
+					}
+				}
+			}
+			<div class="py-4 space-y-4">
+				if pageComments != nil {
+					for _, item := range pageComments.Comments {
+						@comments.CommentCard(item.Comment, item.Replies, userEmail)
+					}
+				} else {
+					<p class="text-sm text-muted-foreground">No comments on this page yet.</p>
+				}
+			</div>
+		}
+	}
+}
+
+// MobileSectionCommentSheet renders a non-modal bottom sheet for section comments on mobile
+// Content is SSE-patched when user clicks to add/view comments on a section
+templ MobileSectionCommentSheet() {
+	@sheet.Sheet(sheet.SheetArgs{
+		ID:    "mobile_section_comment_sheet",
+		Modal: false,
+		Side:  "bottom",
+		Class: "md:hidden",
+	}) {
+		@sheet.SheetContent(sheet.SheetContentArgs{
+			SheetID: "mobile_section_comment_sheet",
+			Class:   "max-h-[70vh] overflow-y-auto",
+		}) {
+			<!-- SSE-patchable content area -->
+			@commentui.MobileSectionCommentTarget()
+		}
+	}
+}
+
+// discussionsAvatarMenuExtra builds the discussions action for the avatar menu.
+templ discussionsAvatarMenuExtra(pageComments *comments.GetCommentsResponse, userEmail string) {
+	@comments.DiscussionsMenuEntry(pageComments, userEmail)
+}
+
+templ OpenChatControl(documentPath string) {
+	<div class="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-md border border-border bg-muted/20 p-3 text-sm text-muted-foreground">
+		<div>
+			<p class="font-medium text-foreground">Discuss this document in Chat</p>
+			<p class="text-xs text-muted-foreground">Open Chat with this document attached.</p>
+		</div>
+		<form method="post" action="/thoughts/chat/open" data-on:submit="@post('/thoughts/chat/open', {contentType: 'form'})">
+			<input type="hidden" name="doc_path" value={ documentPath }/>
+			<input type="hidden" name="attach" value="true"/>
+			<button type="submit" class="rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90">Open Chat</button>
+		</form>
+	</div>
+	<div id="thoughts-open-chat-result"></div>
+}
+
+templ OpenChatCandidateDropdown(documentPath string, candidates []ChatWorkspaceCandidate) {
+	<div id="thoughts-open-chat-result" class="mb-4 rounded-md border border-border bg-popover p-3 text-sm text-popover-foreground shadow-md">
+		<p class="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">Choose chat workspace</p>
+		<div class="space-y-2">
+			for _, candidate := range candidates {
+				<form data-on:submit="@post('/thoughts/chat/select', {contentType: 'form'})">
+					<input type="hidden" name="doc_path" value={ documentPath }/>
+					<input type="hidden" name="root_path" value={ candidate.RootPath }/>
+					<button type="submit" class="flex w-full flex-col rounded-md border border-border px-3 py-2 text-left hover:bg-muted">
+						<span class="font-medium text-foreground">{ candidate.Label }</span>
+						<span class="font-mono text-[11px] text-muted-foreground">{ candidate.RootPath }</span>
+					</button>
+				</form>
+			}
+		</div>
+	</div>
+}
+
+templ OpenChatEmptyState(documentPath string) {
+	{{ _ = documentPath }}
+	<div id="thoughts-open-chat-result" class="mb-4 rounded-md border border-border bg-muted/20 p-3 text-sm text-muted-foreground">
+		No AGENTS.md workspace root found for this document.
+	</div>
+}
+
+templ CommentsRightRailPanel(args commentui.CommentableMarkdownArgs) {
+	<div id="doc-right-comments-panel" class="h-full min-h-0" data-show="$rightRailActiveTab === 'comments'">
+		@commentui.CommentsContextPanel(commentui.BuildCommentsPanelArgs(args, ""))
+	</div>
+}
+
+templ OpenChatRightRailPanel(docPath string, result OpenChatWorkspaceResult) {
+	<div id="doc-right-chat-panel" class="h-full min-h-0" data-show="$rightRailActiveTab === 'chat'">
+		<div class="flex h-full min-h-0 flex-col bg-background">
+			<div class="shrink-0 border-b border-border px-3 py-2">
+				<p class="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Chat</p>
+				<p class="text-xs text-muted-foreground">Workspace { result.WorkspaceID }</p>
+			</div>
+			<div class="min-h-0 flex-1 overflow-y-auto p-3">
+				<p class="mb-3 text-sm text-muted-foreground">Workspace opened with this document attached.</p>
+				<form id="agent-chat-composer-form" data-on:submit={ "@post('/thoughts/chat/" + result.WorkspaceID + "/send', {contentType: 'form'})" } data-signals="{slashOpen: false, slashPrefix: ''}">
+					<div id="agent-chat-composer-attachments">
+						<input type="hidden" name="attached_paths[]" value={ docPath }/>
+						<div class="agent-chat-content-padding flex flex-wrap gap-1 pt-3">
+							<span class="rounded-full border border-border bg-muted px-2 py-0.5 text-xs text-muted-foreground">{ filepath.Base(docPath) }</span>
+						</div>
+					</div>
+					<div class="flex items-end gap-2 rounded-2xl border border-input bg-background px-3 py-2">
+						<textarea id="agent-chat-composer-input" name="prompt" class="min-h-[2.75rem] max-h-40 flex-1 resize-none bg-transparent px-0 py-1 text-sm text-foreground outline-none placeholder:text-muted-foreground" placeholder="Ask Pi about this document" data-ignore-morph></textarea>
+						<button type="submit" class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground transition-colors hover:bg-primary/90" aria-label="Send message" title="Send message">↗</button>
+					</div>
+				</form>
+			</div>
+		</div>
+	</div>
+}
+
+// MarkdownPage renders a full page with markdown content using the shared workbench.
+templ MarkdownPage(args *PageArgs) {
+	{{
+		state, _ := workbench.BuildWorkbenchState(workbench.BuildWorkbenchStateInput{
+			UserEmail:  args.UserEmail,
+			Page:       workbench.WorkbenchPageThoughts,
+			View:       workbench.WorkbenchViewFocus,
+			ActivePath: args.FilePath,
+			Regions: []workbench.WorkbenchRegion{
+				{ID: "thoughts-sections", Slot: workbench.WorkbenchSlotNavigation, Kind: workbench.RegionSections, Ratio: 0.22, MinRem: 14, Visible: true, TargetID: "thoughts-section-map-region", Title: "On this page", Component: SectionMapPanel(BuildSectionMapArgs(args))},
+				{ID: "thoughts-document", Slot: workbench.WorkbenchSlotPrimary, Kind: workbench.RegionDocument, Ratio: 0.56, MinRem: 28, Visible: true, TargetID: "thoughts-document-region", Component: DocumentPanel(BuildDocumentPanelArgs(args))},
+				{ID: "thoughts-context", Slot: workbench.WorkbenchSlotContext, Kind: workbench.RegionEmpty, Ratio: 0.22, MinRem: 18, Visible: false, TargetID: "thoughts-context-region", Title: "Context", Component: ThoughtsContextPanel(ThoughtsContextArgs{PageArgs: args, CommentUI: args.CommentUI})},
+			},
+		})
+	}}
+	@MarkdownWorkbenchPage(MarkdownWorkbenchArgs{PageArgs: args, Workbench: state})
+}
+
+templ MarkdownWorkbenchPage(args MarkdownWorkbenchArgs) {
+	{{
+		rootArgs := args.PageArgs.BuildRootArgs()
+		rootArgs.AvatarMenuExtra = discussionsAvatarMenuExtra(args.PageArgs.Comments, args.PageArgs.UserEmail)
+	}}
+	@layouts.Root(rootArgs) {
+		@workbench.Workbench(args.Workbench)
+	}
+}
+
+templ DocumentPanel(args DocumentPanelArgs) {
+	<div id="thoughts-document-panel" class="h-full min-h-0 overflow-hidden">
+		@DocumentSurface(args.Document, args.WorkspaceTree)
+	</div>
+}
+
+templ SectionMapPanel(args SectionMapArgs) {
+	<div id="thoughts-section-map" class="h-full overflow-y-auto bg-card/40">
+		if len(args.TOC) > 0 {
+			<div class="px-3 py-3">
+				@MarkdownSidebar(args.TOC)
+			</div>
+		} else {
+			<p class="p-3 text-sm text-muted-foreground">No sections in this document.</p>
+		}
+	</div>
+}
+
+templ EmbeddedChatInitialContent(urlReplacement string, component templ.Component) {
+	if urlReplacement != "" {
+		<div id="thoughts-url-sync" data-replace-url={ strconv.Quote(urlReplacement) }></div>
+	}
+	@component
+}
+
+templ ThoughtsContextPanel(args ThoughtsContextArgs) {
+	<div id="thoughts-context-panel" class="flex h-full min-h-0 flex-col overflow-hidden bg-background">
+		if args.Mode == "comments" {
+			@commentui.CommentsContextPanel(commentui.BuildCommentsPanelArgs(args.CommentUI, ""))
+		} else if args.Mode == "chat" {
+			<div class="hidden" aria-hidden="true">
+				@commentui.CommentsContextPanel(commentui.BuildCommentsPanelArgs(args.CommentUI, ""))
+			</div>
+			if args.Component != nil {
+				@args.Component
+			} else {
+				<div class="flex h-full min-h-0 flex-col justify-end gap-3 bg-background p-3 text-sm text-muted-foreground">
+					<p>No chat workspace is selected yet.</p>
+				</div>
+			}
+		} else {
+			<div class="hidden" aria-hidden="true">
+				@commentui.CommentsContextPanel(commentui.BuildCommentsPanelArgs(args.CommentUI, ""))
+			</div>
+			<div class="flex h-full items-center justify-center p-4 text-sm text-muted-foreground">Open comments or chat context from document actions.</div>
+		}
+	</div>
+}
+
+// FrontmatterTable renders the frontmatter metadata as a card with badge header
+templ FrontmatterTable(fm *Frontmatter) {
+	<div class="mb-8 overflow-hidden rounded-lg border border-border bg-background">
+		<!-- Badge Header -->
+		<div class="px-4 py-3 flex flex-row gap-3 items-center w-full bg-background">
+			if fm.Status != "" {
+				<div class="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-background border border-border">
+					<span class="text-sm text-muted-foreground">✓</span>
+					<span class="text-sm font-medium text-foreground">{ fm.Status }</span>
+				</div>
+			}
+			<span class="grow"></span>
+			if !fm.Date.IsZero() {
+				<div class="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-background border border-border">
+					<span class="text-sm text-muted-foreground">📅 Created </span>
+					@tooltip.TooltipTrigger(tooltip.TooltipTriggerArgs{
+						ID:        "created_date_trigger",
+						TooltipID: "created_date_tooltip",
+					}) {
+						<span class="text-sm font-medium text-foreground">{ formatDate(fm.Date) }</span>
+					}
+					@tooltip.TooltipContent(tooltip.TooltipContentArgs{
+						ID:        "created_date_tooltip",
+						UseAnchor: true,
+						Side:      utils.AnchorSideBottom,
+					}) {
+						<p class="text-xs">{ formatTimestamp(fm.Date) }</p>
+					}
+					if !fm.LastUpdated.IsZero() {
+						<span class="text-sm text-muted-foreground">Updated</span>
+						@tooltip.TooltipTrigger(tooltip.TooltipTriggerArgs{
+							ID:        "updated_date_trigger",
+							TooltipID: "updated_date_tooltip",
+						}) {
+							<span class="text-sm font-medium text-foreground">{ formatDate(fm.LastUpdated) }</span>
+						}
+						@tooltip.TooltipContent(tooltip.TooltipContentArgs{
+							ID:        "updated_date_tooltip",
+							UseAnchor: true,
+							Side:      utils.AnchorSideBottom,
+						}) {
+							<p class="text-xs">{ formatTimestamp(fm.LastUpdated) }</p>
+						}
+					}
+					if fm.Researcher != "" {
+						<span class="text-sm text-muted-foreground">{ "(" + fm.Researcher + ")" }</span>
+					}
+				</div>
+			}
+		</div>
+		<!-- Metadata Grid -->
+		<div class="px-4 py-4 grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-3">
+			if fm.Topic != "" {
+				<div class="flex flex-col gap-1 md:col-span-2">
+					<span class="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Topic</span>
+					<span class="text-sm text-foreground">{ fm.Topic }</span>
+				</div>
+			}
+		</div>
+		<!-- Tags Footer -->
+		if len(fm.Tags) > 0 {
+			<div class="px-4 py-3 border-t border-border flex flex-wrap gap-2 items-center">
+				<span class="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Tags:</span>
+				for _, tag := range fm.Tags {
+					<span class="px-2 py-1 text-xs rounded-md bg-muted text-foreground border border-border">
+						{ tag }
+					</span>
+				}
+			</div>
+		}
+	</div>
+}
+
+// MarkdownSidebar shows table of contents
+templ MarkdownSidebar(toc []TocItem) {
+	<div>
+		<nav class="space-y-1">
+			for _, item := range toc {
+				<a
+					href={ templ.URL("#" + item.ID) }
+					class={ "block text-sm text-muted-foreground hover:text-foreground transition-colors duration-200", tocLevelClass(item.Level) }
+					{ markdownSectionAttrs(item.ID)... }
+				>
+					{ item.Text }
+				</a>
+			}
+		</nav>
+	</div>
+}
+
+func markdownSectionAttrs(id string) templ.Attributes {
+	id = strings.TrimSpace(id)
+	if id == "" {
+		return templ.Attributes{}
+	}
+	return templ.Attributes{
+		workbench.WorkbenchSectionLinkAttr:      true,
+		workbench.WorkbenchSectionTargetAttr:    id,
+		workbench.WorkbenchSectionRegionAttr:    workbench.DefaultSectionRegionKey,
+		workbench.WorkbenchSectionContainerAttr: workbench.DefaultSectionContainerID,
+	}
+}
+
+func tocLevelClass(level int) string {
+	switch level {
+	case 1:
+		return "font-medium"
+	case 2:
+		return "ml-3"
+	case 3:
+		return "ml-6"
+	default:
+		return "ml-9"
+	}
+}

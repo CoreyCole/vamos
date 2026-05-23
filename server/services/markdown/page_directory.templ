@@ -1,0 +1,100 @@
+package markdown
+
+import (
+	"github.com/CoreyCole/vamos/server/layouts"
+	"github.com/CoreyCole/vamos/server/layouts/workbench"
+)
+
+// DirectoryListing renders a directory browser page with file tree sidebar.
+// Kept as a compatibility wrapper; normal routes use DirectoryWorkbenchPage.
+templ DirectoryListing(args *DirectoryArgs) {
+	{{
+		state, _ := workbench.BuildWorkbenchState(workbench.BuildWorkbenchStateInput{
+			UserEmail:  args.UserEmail,
+			Page:       workbench.WorkbenchPageThoughts,
+			View:       workbench.WorkbenchViewFocus,
+			ActivePath: args.Path,
+			Regions: []workbench.WorkbenchRegion{
+				{ID: "thoughts-sections", Slot: workbench.WorkbenchSlotNavigation, Kind: workbench.RegionThoughtsTree, Ratio: thoughtsNavigationRatio, MinRem: thoughtsNavigationMin, Visible: true, TargetID: "thoughts-sidebar-region", Component: workbench.SharedSidebar(BuildThoughtsDirectorySidebarArgs(args))},
+				{ID: "thoughts-document", Slot: workbench.WorkbenchSlotPrimary, Kind: workbench.RegionDocument, Ratio: thoughtsPrimaryRatio, MinRem: thoughtsPrimaryMin, Visible: true, TargetID: "thoughts-directory-region", Component: DirectoryPrimaryPanel(args)},
+				{ID: "thoughts-context", Slot: workbench.WorkbenchSlotContext, Kind: workbench.RegionEmpty, Ratio: thoughtsContextRatio, MinRem: thoughtsContextMin, Visible: false, TargetID: "thoughts-context-region", Component: EmptyDirectoryContextPanel()},
+			},
+			NormalRegions: thoughtsNormalRegions(false),
+		})
+	}}
+	@DirectoryWorkbenchPage(DirectoryWorkbenchArgs{Directory: args, Workbench: state})
+}
+
+templ DirectoryWorkbenchPage(args DirectoryWorkbenchArgs) {
+	{{ rootArgs := args.Directory.BuildRootArgs() }}
+	@layouts.Root(rootArgs) {
+		@workbench.Workbench(args.Workbench)
+	}
+}
+
+templ DirectoryPrimaryPanel(args *DirectoryArgs) {
+	<div id="thoughts-directory-primary" class="flex h-full min-h-0 flex-col overflow-hidden bg-background">
+		<div id="thoughts-url-sync" class="hidden" aria-hidden="true"></div>
+		<div id="thoughts-directory-title-sync" class="hidden" aria-hidden="true"></div>
+		<div id="thoughts-directory-scroll-region" class="min-h-0 flex-1 overflow-y-auto p-3 md:p-4">
+			<ul class="space-y-1">
+				for _, item := range args.Items {
+					<li>
+						<form
+							method="post"
+							action={ directoryItemFormRoute(item) }
+							data-on:submit={ directoryItemFormAction(item) }
+						>
+							if item.IsDir {
+								<input type="hidden" name="dir_path" value={ item.Path }/>
+							} else {
+								<input type="hidden" name="doc_path" value={ item.Path }/>
+							}
+							<button
+								type="submit"
+								class="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-primary transition-colors hover:bg-accent"
+							>
+								if item.IsDir {
+									<svg class="h-5 w-5 shrink-0 text-muted-foreground" fill="currentColor" viewBox="0 0 20 20">
+										<path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z"></path>
+									</svg>
+									{ item.Name }/
+								} else {
+									<svg class="h-5 w-5 shrink-0 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+										<path
+											stroke-linecap="round"
+											stroke-linejoin="round"
+											stroke-width="2"
+											d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+										></path>
+									</svg>
+									{ item.Name }
+								}
+							</button>
+						</form>
+					</li>
+				}
+			</ul>
+			if len(args.Items) == 0 {
+				<p class="px-3 py-2 text-sm italic text-muted-foreground">No markdown files or directories found.</p>
+			}
+		</div>
+	</div>
+}
+
+func directoryItemFormRoute(item DirectoryItem) string {
+	if item.IsDir {
+		return "/thoughts/actions/select-directory"
+	}
+	return "/thoughts/actions/select-document"
+}
+
+func directoryItemFormAction(item DirectoryItem) string {
+	return "@post('" + directoryItemFormRoute(item) + "', {contentType: 'form'})"
+}
+
+templ EmptyDirectoryContextPanel() {
+	<div id="thoughts-directory-context-panel" class="flex h-full items-center justify-center p-4 text-sm text-muted-foreground">
+		Open a document to use comments or chat context.
+	</div>
+}

@@ -1,0 +1,114 @@
+package agentchat
+
+import "github.com/CoreyCole/vamos/pkg/components/dropdown"
+
+templ FreeformChatComposer(args ChatPageArgs) {
+	if args.CurrentThread == nil {
+		@AgentChatComposer(AgentChatComposerArgs{Action: "@post('/agent-chat/send', {contentType: 'form'})", Cwd: args.Cwd, Placeholder: "Ask Pi to do work from the selected plan workspace", IncludeCwd: true, AttachedPaths: args.PendingAttachments})
+	} else {
+		@AgentChatComposer(AgentChatComposerArgs{Action: "@post('/agent-chat/resume', {contentType: 'form'})", ThreadID: args.CurrentThread.ID, Placeholder: "Continue this conversation", HasThread: true, AttachedPaths: args.PendingAttachments})
+	}
+}
+
+templ AgentChatComposer(args AgentChatComposerArgs) {
+	{{ args = normalizeComposerArgs(args) }}
+	<form id="agent-chat-composer-form" data-on:submit={ composerSubmitAction(args.Action) } data-signals="{slashOpen: false, slashPrefix: ''}">
+		<input id="agent-chat-composer-prompt-value" type="hidden" name="prompt"/>
+		if args.IncludeCwd {
+			<input type="hidden" name="cwd" value={ args.Cwd }/>
+		}
+		if args.HasThread {
+			<input type="hidden" name="thread_id" value={ args.ThreadID }/>
+		}
+		if args.DocPath != "" {
+			<input type="hidden" name="doc_path" value={ args.DocPath }/>
+		}
+		if args.RunID != "" {
+			<input type="hidden" name="run_id" value={ args.RunID }/>
+		}
+		for _, annotation := range args.SelectedAnnotations {
+			<input type="hidden" name="annotation_ids[]" value={ annotation.ID }/>
+		}
+		<div id="agent-chat-composer-attachments" class="flex flex-wrap items-center gap-1 pb-2">
+			for _, annotation := range args.SelectedAnnotations {
+				<span class="rounded-full border border-amber-500/40 bg-amber-500/10 px-2 py-0.5 text-xs text-amber-200">Annotation: { annotation.Label }</span>
+			}
+			for _, attached := range args.AttachedPaths {
+				<input type="hidden" name="attached_paths[]" value={ attached.Path }/>
+				<span class="rounded-full border border-border bg-muted px-2 py-0.5 text-xs text-muted-foreground">{ attached.Basename }</span>
+			}
+			if args.ShowCurrentDocToggle && args.DocPath != "" && args.WorkspaceID != "" {
+				<button type="button" class="ml-auto rounded-full border border-border px-2 py-0.5 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground" data-on:click={ "@post('/thoughts/chat/" + args.WorkspaceID + "/attach-doc', {contentType: 'form'})" }>
+					if args.CurrentDocAttached {
+						Remove current doc
+					} else {
+						Add current doc
+					}
+				</button>
+			}
+		</div>
+		<div class="relative">
+			<div id="agent-chat-slash-popover" class="absolute bottom-full left-0 z-30 mb-2 hidden max-h-64 w-full overflow-y-auto rounded-lg border border-border bg-popover p-2 shadow-lg" data-show="$slashOpen"></div>
+			<div class="flex items-start gap-2 rounded-2xl border border-input bg-background px-3 py-2">
+				@ComposerMetadataButton(args)
+				<textarea id="agent-chat-composer-input" class="min-h-[2.75rem] max-h-40 flex-1 resize-none bg-transparent px-0 py-1 text-sm text-foreground outline-none placeholder:text-muted-foreground" placeholder={ args.Placeholder } data-ignore-morph data-on:input={ slashCommandInputHandler(args.WorkspaceID, args.SlashEndpointBase) } data-on:keydown="if (evt.key === 'Enter' && !evt.shiftKey) { evt.preventDefault(); el.form.requestSubmit() }"></textarea>
+				<button type="submit" class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground transition-colors hover:bg-primary/90" aria-label="Send message" title="Send message">
+					<svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 11.5L21 3l-8.5 18-2.5-7.5L3 11.5z"></path>
+					</svg>
+				</button>
+			</div>
+		</div>
+	</form>
+}
+
+templ ComposerMetadataButton(args AgentChatComposerArgs) {
+	{{ dropdownID := "agent-chat-composer-metadata" }}
+	@dropdown.DropdownMenu(dropdown.DropdownMenuArgs{ID: dropdownID, Class: "shrink-0"}) {
+		@dropdown.DropdownMenuTrigger(dropdown.DropdownMenuTriggerArgs{ID: dropdownID, Class: "inline-flex h-8 w-8 items-center justify-center rounded-full border border-border text-xs font-semibold text-muted-foreground transition-colors hover:bg-muted hover:text-foreground", Attributes: templ.Attributes{"aria-label": "Show chat metadata", "title": "Show chat metadata"}}) {
+			<span aria-hidden="true">i</span>
+		}
+		@dropdown.DropdownMenuContent(dropdown.DropdownMenuContentArgs{ID: dropdownID, Side: "top", Align: "start", SideOffset: 8, Class: "w-72 max-w-[calc(100vw-2rem)] p-3 text-xs"}) {
+			<p class="font-semibold text-foreground">Chat metadata</p>
+			<dl class="mt-2 space-y-1">
+				<div>
+					<dt class="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Mode</dt>
+					<dd class="break-all text-foreground">{ args.ModeLabel }</dd>
+				</div>
+				if args.Cwd != "" {
+					<div>
+						<dt class="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Cwd</dt>
+						<dd class="break-all text-foreground">{ args.Cwd }</dd>
+					</div>
+				}
+				if args.WorkspaceID != "" {
+					<div>
+						<dt class="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Workspace</dt>
+						<dd class="break-all text-foreground">{ args.WorkspaceID }</dd>
+					</div>
+				}
+			</dl>
+		}
+	}
+}
+
+func normalizeComposerArgs(args AgentChatComposerArgs) AgentChatComposerArgs {
+	if args.ModeLabel == "" {
+		if args.WorkspaceID != "" {
+			args.ModeLabel = "Workspace chat"
+		} else {
+			args.ModeLabel = "Freeform chat"
+		}
+	}
+	return args
+}
+
+func composerSubmitAction(action string) string {
+	return "const input = document.getElementById('agent-chat-composer-input'); const prompt = document.getElementById('agent-chat-composer-prompt-value'); if (input && prompt) { prompt.value = input.value; input.dataset.clearedPrompt = input.value; input.value = ''; input.dispatchEvent(new Event('input', { bubbles: true })); input.focus({ preventScroll: true }); } " + action
+}
+
+templ WorkspaceComposer(workspaceID string, threadID string, hasThread bool, cwd string, attachedPaths []AttachedPath) {
+	<div id="agent-chat-workspace-composer">
+		@AgentChatComposer(AgentChatComposerArgs{Action: workspaceSendAction(workspaceID, threadID, hasThread), WorkspaceID: workspaceID, ThreadID: threadID, Cwd: cwd, Placeholder: workspacePromptPlaceholder(hasThread), HasThread: hasThread, IncludeCwd: true, AttachedPaths: attachedPaths})
+	</div>
+}

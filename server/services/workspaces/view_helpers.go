@@ -1,0 +1,242 @@
+package workspaces
+
+import (
+	"fmt"
+	"hash/fnv"
+	"strings"
+	"time"
+	"unicode"
+)
+
+func workspaceCardTitle(ws Workspace) string {
+	if ws.IsMain || ws.Slug == mainWorkspaceSlug {
+		return "Main"
+	}
+	_, titleSlug, ok := workspaceSlugTimestamp(ws.Slug)
+	if !ok {
+		if strings.TrimSpace(ws.DisplayName) != "" {
+			return workspaceTitleCase(ws.DisplayName)
+		}
+		titleSlug = ws.Slug
+	}
+	return workspaceTitleCase(strings.ReplaceAll(titleSlug, "-", " "))
+}
+
+func workspaceViewTitle(view ImplWorkspaceView) string {
+	if view.IsMain {
+		return "Main"
+	}
+	if strings.TrimSpace(view.Row.DisplayName) != "" {
+		return workspaceTitleCase(view.Row.DisplayName)
+	}
+	if strings.TrimSpace(view.Runtime.Workspace.DisplayName) != "" {
+		return workspaceCardTitle(view.Runtime.Workspace)
+	}
+	return workspaceTitleCase(strings.ReplaceAll(workspaceViewSlug(view), "-", " "))
+}
+
+func workspaceViewSlug(view ImplWorkspaceView) string {
+	if view.HasRuntime && strings.TrimSpace(view.Runtime.Workspace.Slug) != "" {
+		return strings.TrimSpace(view.Runtime.Workspace.Slug)
+	}
+	if strings.TrimSpace(view.Row.WorkspaceSlug) != "" {
+		return strings.TrimSpace(view.Row.WorkspaceSlug)
+	}
+	return strings.TrimSpace(view.Runtime.Workspace.Slug)
+}
+
+func canActOnImplWorkspace(view ImplWorkspaceView) bool {
+	return view.Row.Status == string(ImplWorkspaceStatusActive) &&
+		strings.TrimSpace(workspaceViewCheckoutPath(view)) != "" &&
+		strings.TrimSpace(view.Runtime.Workspace.Slug) != ""
+}
+
+func workspaceViewCheckoutPath(view ImplWorkspaceView) string {
+	if strings.TrimSpace(view.Row.CheckoutPath) != "" {
+		return view.Row.CheckoutPath
+	}
+	return view.Runtime.Workspace.CheckoutPath
+}
+
+func workspacePlanBindingLabel(view ImplWorkspaceView) string {
+	if view.Row.PlanDirRel.Valid && strings.TrimSpace(view.Row.PlanDirRel.String) != "" {
+		return view.Row.PlanDirRel.String
+	}
+	if view.Row.PlanDir.Valid {
+		return strings.TrimSpace(view.Row.PlanDir.String)
+	}
+	return ""
+}
+
+func workspaceViewActivity(view ImplWorkspaceView) string {
+	if view.Row.UpdatedAt.IsZero() {
+		return ""
+	}
+	return view.Row.UpdatedAt.Format("Jan 2, 2006 · 3:04 PM")
+}
+
+func workspaceImplStatusBadge(view ImplWorkspaceView) string {
+	switch view.Row.Status {
+	case string(ImplWorkspaceStatusMerged):
+		return "Merged"
+	case string(ImplWorkspaceStatusCleanedUp):
+		return "Cleaned up"
+	default:
+		return workspaceTransitionLabel(view.Runtime)
+	}
+}
+
+func workspaceCardTimestamp(ws Workspace) string {
+	stamp, _, ok := workspaceSlugTimestamp(ws.Slug)
+	if !ok {
+		return ""
+	}
+	return stamp.Format("Jan 2, 2006 · 3:04 PM")
+}
+
+func workspaceTrunkBranch(ws Workspace) string {
+	if strings.TrimSpace(ws.Stack.TrunkBranch) != "" {
+		return ws.Stack.TrunkBranch
+	}
+	if strings.TrimSpace(ws.Stack.BaseBranch) != "" {
+		return ws.Stack.BaseBranch
+	}
+	return ""
+}
+
+func workspaceBottomBranch(ws Workspace) string {
+	return strings.TrimSpace(ws.Stack.BottomBranch)
+}
+
+func workspaceTopBranch(ws Workspace) string {
+	return strings.TrimSpace(ws.Stack.TopBranch)
+}
+
+func workspaceActionIndicator(slug, action string) string {
+	h := fnv.New32a()
+	_, _ = h.Write([]byte(strings.TrimSpace(slug)))
+	_, _ = h.Write([]byte{0})
+	_, _ = h.Write([]byte(strings.TrimSpace(action)))
+	return fmt.Sprintf("_workspaceAction%x", h.Sum32())
+}
+
+func workspaceActionIndicatorSignal(slug, action string) string {
+	return "$" + workspaceActionIndicator(slug, action)
+}
+
+func workspaceCanStart(snap WorkspaceLifecycleSnapshot) bool {
+	ws := snap.Workspace
+	if ws.IsMain {
+		return false
+	}
+	switch normalizedObservedState(snap) {
+	case WorkspaceObservedStopped, WorkspaceObservedFailed, WorkspaceObservedCrashed:
+		return true
+	default:
+		return false
+	}
+}
+
+func workspaceCanStop(snap WorkspaceLifecycleSnapshot) bool {
+	return !snap.Workspace.IsMain &&
+		normalizedObservedState(snap) == WorkspaceObservedRunning
+}
+
+func workspaceCanRestart(snap WorkspaceLifecycleSnapshot) bool {
+	return !snap.Workspace.IsMain &&
+		normalizedObservedState(snap) == WorkspaceObservedRunning
+}
+
+func workspaceTransitioning(snap WorkspaceLifecycleSnapshot) bool {
+	switch normalizedObservedState(snap) {
+	case WorkspaceObservedStarting, WorkspaceObservedStopping:
+		return true
+	default:
+		return false
+	}
+}
+
+func workspaceTransitionLabel(snap WorkspaceLifecycleSnapshot) string {
+	return string(normalizedObservedState(snap))
+}
+
+func normalizedObservedState(snap WorkspaceLifecycleSnapshot) WorkspaceObservedState {
+	if snap.ObservedState == "" {
+		return observedFromStatus(snap.Workspace.Status)
+	}
+	return snap.ObservedState
+}
+
+func workspaceSlugTimestamp(slug string) (time.Time, string, bool) {
+	const timestampPartCount = 6
+
+	parts := strings.Split(slug, "-")
+	if len(parts) < timestampPartCount+1 {
+		return time.Time{}, slug, false
+	}
+	candidate := strings.Join(parts[:timestampPartCount], "-")
+	stamp, err := time.Parse("2006-01-02-15-04-05", candidate)
+	if err != nil {
+		return time.Time{}, slug, false
+	}
+	return stamp, strings.Join(parts[timestampPartCount:], "-"), true
+}
+
+func workspaceTitleCase(value string) string {
+	words := strings.Fields(strings.ReplaceAll(value, "-", " "))
+	for i, word := range words {
+		words[i] = workspaceTitleWord(word)
+	}
+	return strings.Join(words, " ")
+}
+
+func workspaceTitleWord(word string) string {
+	lower := strings.ToLower(strings.TrimSpace(word))
+	switch lower {
+	case "api",
+		"cli",
+		"css",
+		"db",
+		"dns",
+		"go",
+		"html",
+		"http",
+		"https",
+		"id",
+		"js",
+		"json",
+		"llm",
+		"mpa",
+		"oauth",
+		"pid",
+		"qrspi",
+		"sse",
+		"sql",
+		"sqlc",
+		"tls",
+		"ts",
+		"ui",
+		"url",
+		"ux":
+		return strings.ToUpper(lower)
+	case "cn":
+		return "CN"
+	case "agentchat":
+		return "Agent Chat"
+	case "datastar":
+		return "Datastar"
+	case "github":
+		return "GitHub"
+	case "temporal":
+		return "Temporal"
+	case "vamos":
+		return "Vamos"
+	}
+
+	runes := []rune(lower)
+	if len(runes) == 0 {
+		return ""
+	}
+	runes[0] = unicode.ToUpper(runes[0])
+	return string(runes)
+}

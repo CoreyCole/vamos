@@ -1,0 +1,462 @@
+@import "tailwindcss";
+
+/* Import local theme and component foundation copied from the local component reference. */
+@import "./theme-foundation.css";
+@import "./components-foundation.css";
+
+@source "../../server";
+@source "../../pkg/components";
+
+@layer base {
+  /* Global scroll behavior to account for sticky header */
+  html {
+    scroll-padding-top: 5rem; /* Header height (h-14 = 3.5rem) + extra spacing */
+  }
+}
+
+@layer components {
+  /* Markdown viewer styles */
+  .markdown-viewer {
+    color: hsl(var(--foreground));
+  }
+
+  /* Scroll margin for headings to prevent hiding behind sticky header */
+  .markdown-viewer h1,
+  .markdown-viewer h2,
+  .markdown-viewer h3,
+  .markdown-viewer h4,
+  .markdown-viewer h5,
+  .markdown-viewer h6 {
+    scroll-margin-top: 5rem; /* Header height (h-14 = 3.5rem) + extra spacing */
+  }
+
+  .markdown-viewer pre {
+    margin: 0;
+    overflow-x: auto;
+    background-color: transparent;
+    border: none;
+    padding: 0;
+  }
+
+  .markdown-code-block {
+    margin: 1rem 0;
+    overflow-x: auto;
+    border: 1px solid hsl(var(--border));
+    border-radius: 0.5rem;
+    background-color: hsl(var(--muted));
+  }
+
+  .markdown-code-block > pre {
+    padding: 1rem;
+    color: hsl(var(--foreground));
+  }
+
+  .markdown-viewer code:not(pre code) {
+    background-color: hsl(var(--muted));
+    color: hsl(var(--foreground));
+    padding: 0.125rem 0.375rem;
+    border-radius: 0.25rem;
+    font-size: 0.875rem;
+  }
+
+  /* Table styles for markdown viewer
+     Uses foreground with opacity for borders/headers so they're visible
+     in both light and dark mode (--border is too close to bg in dark mode) */
+  .markdown-viewer .table-wrapper {
+    margin: 1.5rem 0;
+    width: fit-content;
+    overflow: hidden;
+    border-radius: 0.5rem;
+    border: 1px solid hsl(var(--foreground) / 0.2);
+  }
+
+  .markdown-viewer table {
+    border-collapse: collapse;
+  }
+
+  .markdown-viewer thead {
+    background-color: hsl(var(--foreground) / 0.06);
+  }
+
+  .markdown-viewer tbody tr {
+    border-bottom: 1px solid hsl(var(--foreground) / 0.1);
+  }
+
+  .markdown-viewer tbody tr:last-child {
+    border-bottom: none;
+  }
+
+  .markdown-viewer th,
+  .markdown-viewer td {
+    padding: 0.75rem 1rem;
+    font-size: 0.875rem;
+    color: hsl(var(--foreground));
+  }
+
+  .markdown-viewer th {
+    font-weight: 600;
+    text-align: left;
+  }
+
+  .markdown-viewer h1 {
+    font-size: 1.875rem;
+    font-weight: 700;
+    margin-bottom: 1rem;
+    margin-top: 2rem;
+    color: hsl(var(--foreground));
+  }
+
+  .markdown-viewer h2 {
+    font-size: 1.5rem;
+    font-weight: 600;
+    margin-bottom: 1rem;
+    margin-top: 2rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid hsl(var(--border));
+    color: hsl(var(--foreground));
+  }
+
+  /* Section heading row - flex container with heading and toggle */
+  .markdown-viewer .section-heading-row {
+    margin-top: 2rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid hsl(var(--border));
+    margin-bottom: 1rem;
+  }
+
+  /* Remove margins/border from headings when inside heading row (handled by row) */
+  .markdown-viewer .section-heading-row h1,
+  .markdown-viewer .section-heading-row h2,
+  .markdown-viewer .section-heading-row h3,
+  .markdown-viewer .section-heading-row h4,
+  .markdown-viewer .section-heading-row h5,
+  .markdown-viewer .section-heading-row h6 {
+    margin: 0;
+    padding: 0;
+    border: none;
+  }
+
+
+  .markdown-viewer h3 {
+    font-size: 1.25rem;
+    font-weight: 600;
+    margin-bottom: 0.75rem;
+    margin-top: 1.5rem;
+    color: hsl(var(--foreground));
+  }
+
+  .markdown-viewer p {
+    margin-bottom: 1rem;
+    line-height: 1.75;
+    color: hsl(var(--foreground));
+  }
+
+  .markdown-viewer a {
+    color: hsl(var(--primary));
+    text-decoration: underline;
+    text-decoration-color: hsl(var(--primary) / 0.3);
+  }
+
+  .markdown-viewer a:hover {
+    color: hsl(var(--primary) / 0.8);
+    text-decoration-color: hsl(var(--primary) / 0.8);
+  }
+
+  .markdown-viewer ul,
+  .markdown-viewer ol {
+    margin-bottom: 1rem;
+    padding-left: 1.5rem;
+  }
+
+  .markdown-viewer li {
+    margin-top: 0.25rem;
+    margin-bottom: 0.25rem;
+    color: hsl(var(--foreground));
+  }
+
+  .markdown-viewer strong {
+    font-weight: 600;
+    color: hsl(var(--foreground));
+  }
+
+  .markdown-viewer blockquote {
+    border-left: 2px solid hsl(var(--border));
+    padding-left: 1rem;
+    font-style: italic;
+    color: hsl(var(--muted-foreground));
+    margin: 1rem 0;
+  }
+
+  /* Container and layout utilities */
+  .container-wrapper {
+    margin-left: auto;
+    margin-right: auto;
+    width: 100%;
+    max-width: 1536px;
+  }
+
+  .container {
+    width: 100%;
+    margin-left: auto;
+    margin-right: auto;
+    padding-left: 1rem;
+    padding-right: 1rem;
+    max-width: 1536px;
+  }
+
+  @media (min-width: 640px) {
+    .container {
+      padding-left: 1.5rem;
+      padding-right: 1.5rem;
+    }
+  }
+
+  /* No-scrollbar utility */
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  /* Comment selection highlight - Notion-style yellow */
+  .comment-selection-highlight {
+    background-color: rgba(251, 191, 36, 0.2);
+    border-radius: 0.125rem;
+  }
+
+  .agent-chat-content-padding {
+    padding: 0.875rem 1rem;
+  }
+
+  .agent-chat-content-padding > :first-child {
+    margin-top: 0;
+  }
+
+  .agent-chat-content-padding > :last-child {
+    margin-bottom: 0;
+  }
+
+  .chat-message-content > :not(.markdown-code-block):not(.streaming) {
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+
+  .chat-message-content > :first-child:not(.markdown-code-block):not(.streaming) {
+    padding-top: 0.875rem;
+  }
+
+  .chat-message-content > :last-child:not(.markdown-code-block):not(.streaming) {
+    padding-bottom: 0.875rem;
+  }
+
+  .chat-message-content > :not(.markdown-code-block):not(.streaming):has(+ .markdown-code-block) {
+    margin-bottom: 0;
+  }
+
+  .chat-message-content > .markdown-code-block + :not(.markdown-code-block):not(.streaming) {
+    margin-top: 0;
+  }
+
+  .chat-message-content > .streaming > :not(.markdown-code-block) {
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+
+  .chat-message-content > .streaming > :first-child:not(.markdown-code-block) {
+    padding-top: 0.875rem;
+  }
+
+  .chat-message-content > .streaming > :last-child:not(.markdown-code-block) {
+    padding-bottom: 0.875rem;
+  }
+
+  .chat-message-content > .streaming > :not(.markdown-code-block):has(+ .markdown-code-block) {
+    margin-bottom: 0;
+  }
+
+  .chat-message-content > .streaming > .markdown-code-block + :not(.markdown-code-block) {
+    margin-top: 0;
+  }
+
+  /* Chat message markdown adjustments - smaller margins for compact display */
+  .chat-message-content {
+    font-size: 0.9375rem;
+  }
+
+  .chat-message-content p {
+    margin-bottom: 0.5rem;
+  }
+
+  .chat-message-content p:last-child {
+    margin-bottom: 0;
+  }
+
+  .chat-message-content h1,
+  .chat-message-content h2,
+  .chat-message-content h3 {
+    margin-top: 1rem;
+    margin-bottom: 0.5rem;
+  }
+
+  .chat-message-content h1:first-child,
+  .chat-message-content h2:first-child,
+  .chat-message-content h3:first-child {
+    margin-top: 0;
+  }
+
+  .chat-message-content ul,
+  .chat-message-content ol {
+    margin-bottom: 0.5rem;
+  }
+
+  .chat-message-content pre {
+    margin: 0;
+  }
+
+  .chat-message-content .markdown-code-block {
+    margin: 0;
+    border: none;
+    border-radius: 0;
+    background-color: transparent;
+  }
+
+  .chat-message-content .markdown-code-block > pre {
+    padding: 0.875rem 1rem;
+  }
+
+  .chat-message-content blockquote {
+    margin: 0.5rem 1rem;
+  }
+
+  .agent-chat-thinking-detail,
+  .agent-chat-thinking-detail blockquote,
+  .agent-chat-thinking-detail p {
+    font-style: normal;
+  }
+
+  .agent-chat-thinking-detail blockquote,
+  .agent-chat-thinking-detail p {
+    line-height: 1rem;
+  }
+
+  .agent-chat-detail-markdown > :not(.markdown-code-block):not(.streaming) {
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+
+  .agent-chat-detail-markdown > :first-child:not(.markdown-code-block):not(.streaming) {
+    padding-top: 0;
+  }
+
+  .agent-chat-detail-markdown > :last-child:not(.markdown-code-block):not(.streaming) {
+    padding-bottom: 0.5rem;
+  }
+
+  .agent-chat-detail-markdown > :not(.markdown-code-block):not(.streaming):has(+ .markdown-code-block) {
+    margin-bottom: 0;
+  }
+
+  .agent-chat-detail-markdown > .markdown-code-block + :not(.markdown-code-block):not(.streaming) {
+    margin-top: 0;
+  }
+
+  .agent-chat-detail-markdown .markdown-code-block {
+    margin: 0;
+    border: none;
+    border-radius: 0;
+    background-color: transparent;
+  }
+
+  .agent-chat-detail-markdown .markdown-code-block > pre {
+    padding: 0.5rem 1rem;
+  }
+
+  .agent-chat-detail-text {
+    padding: 0 1rem 0.5rem;
+  }
+
+  .agent-chat-detail-panel.is-collapsed {
+    max-height: 24rem;
+    overflow: hidden;
+  }
+
+  .agent-chat-detail-panel.is-expanded {
+    max-height: none;
+    overflow: visible;
+  }
+
+  /* Table styles for chat - higher contrast since tables sit on bg-muted */
+  .chat-message-content .table-wrapper {
+    margin: 0.5rem 0;
+    border-color: hsl(var(--foreground) / 0.25);
+  }
+
+  .chat-message-content thead {
+    background-color: hsl(var(--foreground) / 0.1);
+  }
+
+  .chat-message-content tbody tr {
+    border-color: hsl(var(--foreground) / 0.2);
+  }
+
+  /* Comment indicator in markdown */
+  .has-comments {
+    position: relative;
+    cursor: pointer;
+  }
+
+  .has-comments::before {
+    content: '';
+    position: absolute;
+    left: -1rem;
+    top: 0;
+    bottom: 0;
+    width: 3px;
+    background-color: hsl(var(--primary));
+    border-radius: 2px;
+  }
+
+  .has-comments:hover {
+    background-color: hsl(var(--accent));
+  }
+
+  /* Cron detail table — matches markdown-viewer table style */
+  .cron-table-wrapper {
+    width: fit-content;
+    overflow: hidden;
+    border-radius: 0.5rem;
+    border: 1px solid hsl(var(--foreground) / 0.2);
+  }
+
+  .cron-table-wrapper table {
+    border-collapse: collapse;
+  }
+
+  .cron-table-wrapper tbody tr {
+    border-bottom: 1px solid hsl(var(--foreground) / 0.1);
+  }
+
+  .cron-table-wrapper tbody tr:last-child {
+    border-bottom: none;
+  }
+
+  .cron-table-wrapper td {
+    padding: 0.5rem 1rem;
+    font-size: 0.875rem;
+  }
+
+  .cron-table-wrapper tr.section-header {
+    background-color: hsl(var(--foreground) / 0.06);
+  }
+
+  .cron-table-wrapper tr.section-header td {
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: hsl(var(--muted-foreground));
+  }
+}

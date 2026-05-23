@@ -1,0 +1,195 @@
+//go:build !integration || unit
+// +build !integration unit
+
+package layouts
+
+import (
+	"bytes"
+	"context"
+	"io"
+	"strings"
+	"testing"
+
+	"github.com/a-h/templ"
+)
+
+func TestHeaderVisibleNavIsMinimal(t *testing.T) {
+	t.Parallel()
+
+	items := headerVisibleNavItems()
+	if got, want := len(items), 1; got != want {
+		t.Fatalf("headerVisibleNavItems() len = %d, want %d", got, want)
+	}
+	if got, want := items[0].Label, "Thoughts"; got != want {
+		t.Fatalf("visible nav label = %q, want %q", got, want)
+	}
+	if got, want := items[0].Href, "/thoughts/"; got != want {
+		t.Fatalf("visible nav href = %q, want %q", got, want)
+	}
+
+	body := renderLayoutComponent(t, Header(RootArgs{PageType: PageTypeAgentChat}))
+	for _, want := range []string{"Vamos", `href="/"`, "Thoughts", `href="/thoughts/"`} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("Header() missing %q: %s", want, body)
+		}
+	}
+	for _, removed := range []string{"Agent Chat / New chat", "header_mobile_product_nav", "$header_mobile_product_nav.open"} {
+		if strings.Contains(body, removed) {
+			t.Fatalf("Header() still contains removed mobile nav %q: %s", removed, body)
+		}
+	}
+}
+
+func TestHeaderBreadcrumbsAlignAfterThoughts(t *testing.T) {
+	t.Parallel()
+
+	body := renderLayoutComponent(t, Header(RootArgs{
+		PageType:    PageTypeMarkdown,
+		CurrentPath: "CoreyCole/plans/example/outline.md",
+	}))
+
+	thoughtsIndex := strings.Index(body, `href="/thoughts/"`)
+	breadcrumbIndex := strings.Index(body, `aria-label="breadcrumb"`)
+	if thoughtsIndex < 0 || breadcrumbIndex < 0 || breadcrumbIndex < thoughtsIndex {
+		t.Fatalf("breadcrumb should render after Thoughts nav link: %s", body)
+	}
+	breadcrumbSegment := body[breadcrumbIndex:]
+	for _, notWant := range []string{"justify-end", "data-init=\"el.scrollLeft = el.scrollWidth\"", "min-w-full"} {
+		if strings.Contains(breadcrumbSegment, notWant) {
+			t.Fatalf(
+				"breadcrumb should be left-aligned, found %q in: %s",
+				notWant,
+				breadcrumbSegment,
+			)
+		}
+	}
+}
+
+func TestHeaderAvatarContainsSecondaryActions(t *testing.T) {
+	SetGitHubLinkProvider(func(currentPath string) string {
+		return "https://github.example.test/acme/project/blob/main/" + strings.TrimSuffix(
+			currentPath,
+			"/",
+		)
+	})
+	t.Cleanup(func() { SetGitHubLinkProvider(nil) })
+
+	body := renderLayoutComponent(t, Header(RootArgs{
+		PageType:           PageTypeSystem,
+		UserEmail:          "user@example.com",
+		CurrentPath:        "thoughts/example.md",
+		ClipboardContent:   "encoded-doc",
+		CurrentSyntaxTheme: "github-dark",
+	}))
+	for _, want := range []string{
+		"System", "Storybook", "Syntax:", "syntax_theme_select", "/api/syntax-theme", "Toggle theme", "Copy document", "View on GitHub",
+		`href="/system"`, `href="/storybook"`,
+	} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("avatar menu missing %q: %s", want, body)
+		}
+	}
+	if strings.Contains(body, "Pipelines") ||
+		strings.Contains(body, `href="/pipe`+`lines"`) {
+		t.Fatalf("avatar menu still contains pipelines nav: %s", body)
+	}
+	if strings.Contains(body, `title="Copy document to clipboard"`) {
+		t.Fatalf("desktop copy control still rendered outside avatar: %s", body)
+	}
+	if strings.Contains(body, `<span class="sr-only">Toggle theme</span>`) {
+		t.Fatalf("old icon-only ThemeToggle still rendered outside avatar: %s", body)
+	}
+}
+
+func TestHeaderAvatarRendersPageExtra(t *testing.T) {
+	t.Parallel()
+
+	extra := templ.ComponentFunc(func(ctx context.Context, w io.Writer) error {
+		_, err := io.WriteString(w, `<button>Discussions</button>`)
+		return err
+	})
+	body := renderLayoutComponent(t, Header(RootArgs{
+		PageType:        PageTypeMarkdown,
+		UserEmail:       "user@example.com",
+		AvatarMenuExtra: extra,
+	}))
+	if !strings.Contains(body, "Discussions") {
+		t.Fatalf("Header() missing avatar extra: %s", body)
+	}
+	if strings.Contains(body, "HeaderExtra") {
+		t.Fatalf("HeaderExtra leaked into output: %s", body)
+	}
+}
+
+func TestHeaderWorkspaceSwitcher(t *testing.T) {
+	t.Parallel()
+
+	body := renderLayoutComponent(t, Header(RootArgs{
+		PageType:            PageTypeAgentChat,
+		UserEmail:           "user@example.com",
+		WorkspaceManagerURL: "https://main.cn-agents.test",
+		Workspaces: []WorkspaceNavItem{
+			{
+				Slug:    "main",
+				Label:   "main",
+				URL:     "https://main.cn-agents.test",
+				Status:  "running",
+				Current: true,
+			},
+			{
+				Slug:   "feature",
+				Label:  "feature",
+				URL:    "https://main.cn-agents.test/workspaces",
+				Status: "stopped",
+			},
+		},
+	}))
+	for _, want := range []string{
+		"Workspaces",
+		`href="https://main.cn-agents.test"`,
+		"current",
+		`href="https://main.cn-agents.test/workspaces"`,
+		"Manage workspaces",
+	} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("Header() missing %q: %s", want, body)
+		}
+	}
+	for _, notWant := range []string{"feature", "stopped"} {
+		if strings.Contains(body, notWant) {
+			t.Fatalf("Header() rendered stopped workspace %q: %s", notWant, body)
+		}
+	}
+}
+
+func TestAgentChatDoesNotActivateThoughts(t *testing.T) {
+	t.Parallel()
+
+	if isThoughtsPageType(PageTypeAgentChat) {
+		t.Fatal("PageTypeAgentChat should not be classified as Thoughts")
+	}
+	if !isThoughtsPageType(PageTypeMarkdown) {
+		t.Fatal("PageTypeMarkdown should be classified as Thoughts")
+	}
+
+	body := renderLayoutComponent(t, Header(RootArgs{PageType: PageTypeAgentChat}))
+	thoughtsHref := strings.LastIndex(body, `href="/thoughts/"`)
+	if thoughtsHref < 0 {
+		t.Fatalf("Header() missing Thoughts link: %s", body)
+	}
+	segmentStart := max(0, thoughtsHref-240)
+	thoughtsSegment := body[segmentStart:thoughtsHref]
+	if strings.Contains(thoughtsSegment, "text-foreground font-medium") {
+		t.Fatalf("Thoughts nav appears active for AgentChat: %s", thoughtsSegment)
+	}
+}
+
+func renderLayoutComponent(t *testing.T, component templ.Component) string {
+	t.Helper()
+
+	var body bytes.Buffer
+	if err := component.Render(t.Context(), &body); err != nil {
+		t.Fatalf("Render() error = %v", err)
+	}
+	return body.String()
+}

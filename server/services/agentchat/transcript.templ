@@ -1,0 +1,253 @@
+package agentchat
+
+import "strconv"
+
+templ MessagesPane(threadID string, state TranscriptPaneState, hasThread bool, forkAction string) {
+	<div id="agent-chat-messages" class="min-h-full pt-14 pb-28">
+		@StableTranscriptRegion(threadID, state.Stable, forkAction)
+		if hasThread {
+			@LiveTranscriptRegion(threadID, state, forkAction)
+		} else {
+			<div id="agent-chat-live-transcript"></div>
+		}
+	</div>
+}
+
+templ StableTranscriptRegion(threadID string, messages []TranscriptMessage, forkAction string) {
+	<div id="agent-chat-stable-transcript">
+		for _, msg := range messages {
+			@TranscriptMessageWithFork(threadID, msg, forkAction)
+		}
+	</div>
+}
+
+templ LiveTranscriptRegion(threadID string, state TranscriptPaneState, forkAction string) {
+	<div id="agent-chat-live-transcript">
+		if len(state.Live.Items) == 0 {
+			if len(state.Stable) == 0 && state.Cursor == 0 {
+				<p class="p-4 text-sm text-muted-foreground">Waiting for the first completed turn…</p>
+			}
+		} else {
+			for _, msg := range state.Live.Items {
+				@TranscriptMessageWithFork(threadID, msg, forkAction)
+			}
+		}
+	</div>
+}
+
+templ TranscriptMessageWithFork(threadID string, msg TranscriptMessage, forkAction string) {
+	if msg.WorkflowCard != nil {
+		@QRSPIWorkflowCardView(*msg.WorkflowCard)
+	} else if msg.Variant == "detail" {
+		@TranscriptDetailCard(msg)
+	} else {
+		<div class={ "relative border-b border-border first:border-t", templ.KV("bg-muted/60", msg.Role == "user") }>
+			@TranscriptForkControl(threadID, msg, forkAction)
+			@ChatMessage(ChatMessageArgs{ID: msg.DOMID, Role: msg.Role, Content: msg.Content, HTMLContent: msg.HTMLContent, Attachments: msg.Attachments})
+		</div>
+	}
+}
+
+templ TranscriptDetailCard(msg TranscriptMessage) {
+	<div class={ "border-b first:border-t", templ.KV("border-destructive/40 bg-destructive/5", msg.IsError), templ.KV("border-border", !msg.IsError) }>
+		<div
+			id={ "msg-" + msg.DOMID }
+			data-signals={ transcriptDetailSignals(msg) }
+			class="w-full"
+		>
+			<div class="flex items-center justify-between gap-3 px-4 pb-1 pt-2">
+				<div class="flex min-w-0 flex-1 items-center gap-2">
+					<p class="shrink-0 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{ msg.Title }</p>
+					if msg.HeaderCode != "" {
+						<code class="min-w-0 truncate rounded bg-muted px-1.5 py-0.5 text-[11px] text-foreground">{ msg.HeaderCode }</code>
+					}
+					if msg.HeaderSummary != "" {
+						<p class="min-w-0 flex-1 truncate text-[11px] text-muted-foreground">{ msg.HeaderSummary }</p>
+					}
+				</div>
+				if msg.Collapsible && msg.HideBodyWhenCollapsed {
+					<button
+						type="button"
+						class="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md border border-border bg-background/95 text-muted-foreground shadow-sm transition-colors hover:bg-muted hover:text-foreground"
+						data-on:click={ transcriptDetailToggle(msg) }
+						data-attr:aria-expanded={ transcriptDetailAriaExpanded(msg) }
+						aria-label="Toggle details"
+						title="Toggle details"
+					>
+						<svg class="h-3.5 w-3.5 transition-transform" data-class={ transcriptDetailCaretClasses(msg) } fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+						</svg>
+					</button>
+				}
+			</div>
+			if msg.HTMLContent != "" {
+				if msg.HideBodyWhenCollapsed {
+					<div data-show={ transcriptDetailExpanded(msg) } data-class={ transcriptDetailCollapsedBodyClasses(msg) } class="hidden relative">
+						<div class="agent-chat-detail-panel" data-class={ transcriptDetailBodyClasses(msg) }>
+							@TranscriptDetailHeader(msg)
+							<div class={ "agent-chat-detail-content agent-chat-detail-markdown markdown-viewer chat-message-content", templ.KV("text-xs agent-chat-thinking-detail", msg.Title == "thinking"), templ.KV("text-sm", msg.Title != "thinking") } data-ignore>
+								@templ.Raw(msg.HTMLContent)
+							</div>
+						</div>
+					</div>
+				} else {
+					<div class="relative">
+						<div class="agent-chat-detail-panel" data-class={ transcriptDetailBodyClasses(msg) }>
+							@TranscriptDetailHeader(msg)
+							<div class={ "agent-chat-detail-content agent-chat-detail-markdown markdown-viewer chat-message-content", templ.KV("text-xs agent-chat-thinking-detail", msg.Title == "thinking"), templ.KV("text-sm", msg.Title != "thinking") } data-ignore>
+								@templ.Raw(msg.HTMLContent)
+							</div>
+						</div>
+						if msg.Collapsible {
+							<button
+								type="button"
+								class="absolute bottom-2 right-2 z-10 inline-flex h-6 w-6 items-center justify-center rounded-md border border-border bg-background/95 text-muted-foreground shadow-sm transition-colors hover:bg-muted hover:text-foreground"
+								data-on:click={ transcriptDetailToggle(msg) }
+								data-attr:aria-expanded={ transcriptDetailAriaExpanded(msg) }
+								aria-label="Toggle details"
+								title="Toggle details"
+							>
+								<svg class="h-3.5 w-3.5 transition-transform" data-class={ transcriptDetailCaretClasses(msg) } fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+								</svg>
+							</button>
+						}
+					</div>
+				}
+			} else if msg.Content != "" {
+				if msg.HideBodyWhenCollapsed {
+					<div data-show={ transcriptDetailExpanded(msg) } data-class={ transcriptDetailCollapsedBodyClasses(msg) } class="hidden relative">
+						<div class="agent-chat-detail-panel" data-class={ transcriptDetailBodyClasses(msg) }>
+							<div class="agent-chat-detail-content agent-chat-detail-text whitespace-pre-wrap text-sm text-foreground">{ msg.Content }</div>
+						</div>
+					</div>
+				} else {
+					<div class="relative">
+						<div class="agent-chat-detail-panel" data-class={ transcriptDetailBodyClasses(msg) }>
+							<div class="agent-chat-detail-content agent-chat-detail-text whitespace-pre-wrap text-sm text-foreground">{ msg.Content }</div>
+						</div>
+						if msg.Collapsible {
+							<button
+								type="button"
+								class="absolute bottom-2 right-2 z-10 inline-flex h-6 w-6 items-center justify-center rounded-md border border-border bg-background/95 text-muted-foreground shadow-sm transition-colors hover:bg-muted hover:text-foreground"
+								data-on:click={ transcriptDetailToggle(msg) }
+								data-attr:aria-expanded={ transcriptDetailAriaExpanded(msg) }
+								aria-label="Toggle details"
+								title="Toggle details"
+							>
+								<svg class="h-3.5 w-3.5 transition-transform" data-class={ transcriptDetailCaretClasses(msg) } fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+								</svg>
+							</button>
+						}
+					</div>
+				}
+			}
+		</div>
+	</div>
+}
+
+templ TranscriptDetailHeader(msg TranscriptMessage) {
+	if msg.DetailHeader != "" {
+		<div class="overflow-x-auto border-b border-border bg-muted/50 px-4 py-2">
+			<code class="block w-max whitespace-pre text-xs text-foreground">{ msg.DetailHeader }</code>
+		</div>
+	}
+}
+
+templ ChatMessage(args ChatMessageArgs) {
+	{{ isUser := args.Role == "user" }}
+	<div id={ "msg-" + args.ID } class="w-full">
+		if len(args.Attachments) > 0 {
+			@AttachmentPills(args.Attachments)
+		}
+		if isUser {
+			<div class="agent-chat-content-padding whitespace-pre-wrap text-sm text-foreground">{ args.Content }</div>
+		} else {
+			<div class="markdown-viewer chat-message-content text-sm" data-ignore>
+				@templ.Raw(args.HTMLContent)
+			</div>
+		}
+	</div>
+}
+
+templ AttachmentPills(paths []AttachedPath) {
+	<div class="agent-chat-content-padding flex flex-wrap gap-1 pt-3">
+		for _, path := range paths {
+			<span class="rounded-full border border-border bg-muted px-2 py-0.5 text-xs text-muted-foreground">{ path.Basename }</span>
+		}
+	</div>
+}
+
+templ ChatMessageStreaming(args ChatMessageStreamingArgs) {
+	<div id={ "msg-" + args.ID } class="w-full">
+		<div class="agent-chat-content-padding markdown-viewer chat-message-content text-sm">
+			<div id={ "msg-content-" + args.ID } class="streaming"></div>
+			<span id={ "msg-cursor-" + args.ID } class="ml-0.5 inline-block h-4 w-2 animate-pulse bg-foreground/50"></span>
+		</div>
+	</div>
+}
+
+templ ChatMessageDelta(args ChatMessageDeltaArgs) {
+	<span class="whitespace-pre-wrap">{ args.Text }</span>
+}
+
+templ ChatMessageDeltaHTML(args ChatMessageDeltaHTMLArgs) {
+	@templ.Raw(args.HTMLContent)
+}
+
+templ ChatMessageComplete(args ChatMessageCompleteArgs) {
+	<div id={ "msg-" + args.ID } class="w-full">
+		<div class="markdown-viewer chat-message-content text-sm" data-ignore>
+			@templ.Raw(args.HTMLContent)
+		</div>
+	</div>
+}
+
+templ TranscriptForkControl(threadID string, msg TranscriptMessage, forkAction string) {
+	if msg.ShowForkForm {
+		<details class="absolute right-2 top-2 z-10 text-xs text-muted-foreground">
+			<summary
+				class="inline-flex h-7 w-7 cursor-pointer list-none items-center justify-center rounded-md text-muted-foreground transition-colors hover:text-foreground [&::-webkit-details-marker]:hidden"
+				title="Message actions"
+				aria-label="Message actions"
+			>
+				<svg class="h-4 w-4" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
+					<circle cx="10" cy="4" r="1.5"></circle>
+					<circle cx="10" cy="10" r="1.5"></circle>
+					<circle cx="10" cy="16" r="1.5"></circle>
+				</svg>
+			</summary>
+			<div class="absolute right-0 top-8 w-80 rounded-md border border-border bg-background/95 p-1 shadow-lg backdrop-blur">
+				<details>
+					<summary class="cursor-pointer list-none rounded px-2 py-1.5 text-xs font-medium text-foreground hover:bg-muted [&::-webkit-details-marker]:hidden">Fork</summary>
+					<form class="space-y-2 p-2 pt-1" data-on:submit={ forkAction }>
+						<input type="hidden" name="source_thread_id" value={ threadID }/>
+						<input type="hidden" name="source_entry_id" value={ msg.EntryID }/>
+						<textarea name="prompt" class="min-h-[84px] w-full rounded-md border border-input bg-background px-2 py-1 text-xs text-foreground" placeholder="Write the alternative continuation" data-ignore-morph></textarea>
+						<button type="submit" class="rounded-md bg-secondary px-2 py-1 text-xs font-medium text-secondary-foreground hover:bg-secondary/90">Create fork</button>
+					</form>
+				</details>
+				if msg.ChatSessionID != "" && msg.ChatNodeID != "" && msg.ChatEventSeq > 0 {
+					<details>
+						<summary class="cursor-pointer list-none rounded px-2 py-1.5 text-xs font-medium text-foreground hover:bg-muted [&::-webkit-details-marker]:hidden">Annotate</summary>
+						<form class="space-y-2 p-2 pt-1" data-on:submit={ "@post('/agent-chat/chat-sessions/" + msg.ChatSessionID + "/annotations', {contentType: 'form'})" }>
+							<input type="hidden" name="session_id" value={ msg.ChatSessionID }/>
+							<input type="hidden" name="node_id" value={ msg.ChatNodeID }/>
+							<input type="hidden" name="event_seq" value={ strconv.FormatInt(msg.ChatEventSeq, 10) }/>
+							<textarea name="body_markdown" class="min-h-[84px] w-full rounded-md border border-input bg-background px-2 py-1 text-xs text-foreground" placeholder="Add annotation for a future reply" data-ignore-morph></textarea>
+							<button type="submit" class="rounded-md bg-secondary px-2 py-1 text-xs font-medium text-secondary-foreground hover:bg-secondary/90">Save annotation</button>
+						</form>
+					</details>
+				}
+				<button
+					type="button"
+					class="w-full rounded px-2 py-1.5 text-left text-xs font-medium text-foreground hover:bg-muted"
+					data-on:click={ "@clipboard(window.location.href.split('#')[0] + " + strconv.Quote("#msg-"+msg.DOMID) + "); $agentChatToast = 'Link copied'; setTimeout(() => $agentChatToast = '', 2000)" }
+				>
+					Share
+				</button>
+			</div>
+		</details>
+	}
+}

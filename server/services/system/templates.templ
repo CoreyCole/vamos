@@ -1,0 +1,322 @@
+package system
+
+import (
+	"fmt"
+
+	"github.com/dustin/go-humanize"
+	"github.com/CoreyCole/vamos/pkg/db"
+)
+
+templ metricCard(label string, signalExpr string) {
+	<div class="rounded-lg border border-border bg-card p-4">
+		<p class="text-xs font-medium text-muted-foreground uppercase tracking-wider">{ label }</p>
+		<p class="mt-1 text-xl font-semibold text-foreground">
+			<span data-text={ signalExpr } class="tabular-nums">--</span>
+		</p>
+	</div>
+}
+
+templ statusDot(active string) {
+	switch active {
+		case "active":
+			<span class="inline-block h-2.5 w-2.5 rounded-full bg-green-500" title="Active"></span>
+		case "failed":
+			<span class="inline-block h-2.5 w-2.5 rounded-full bg-red-500" title="Failed"></span>
+		case "inactive":
+			<span class="inline-block h-2.5 w-2.5 rounded-full bg-gray-400" title="Inactive"></span>
+		default:
+			<span class="inline-block h-2.5 w-2.5 rounded-full bg-yellow-500 animate-pulse" title="Unknown"></span>
+	}
+}
+
+templ ServicesTable(services []ServiceInfo) {
+	if len(services) == 0 {
+		<p class="text-sm text-muted-foreground">Loading services...</p>
+	} else {
+		<div class="overflow-x-auto">
+			<table class="w-full text-sm">
+				<thead>
+					<tr class="border-b border-border text-left">
+						<th class="pb-2 font-medium text-muted-foreground">Service</th>
+						<th class="pb-2 font-medium text-muted-foreground">Status</th>
+						<th class="pb-2 font-medium text-muted-foreground">State</th>
+						<th class="pb-2 font-medium text-muted-foreground">Since</th>
+						<th class="pb-2 font-medium text-muted-foreground text-right">Memory</th>
+					</tr>
+				</thead>
+				<tbody>
+					for _, svc := range services {
+						<tr class="border-b border-border/50 last:border-0">
+							<td class="py-2 font-medium text-foreground">{ svc.Name }</td>
+							<td class="py-2">
+								<div class="flex items-center gap-2">
+									@statusDot(svc.Active)
+									<span class="text-muted-foreground">{ svc.Active }</span>
+								</div>
+							</td>
+							<td class="py-2 text-muted-foreground">{ svc.Sub }</td>
+							<td class="py-2 text-muted-foreground">{ svc.Since }</td>
+							<td class="py-2 text-muted-foreground text-right tabular-nums">
+								if svc.Memory != "" {
+									{ svc.Memory }
+								} else {
+									--
+								}
+							</td>
+						</tr>
+					}
+				</tbody>
+			</table>
+		</div>
+	}
+}
+
+templ ProcessesTable(procs []ProcessInfo) {
+	if len(procs) == 0 {
+		<p class="text-sm text-muted-foreground">Loading processes...</p>
+	} else {
+		<div class="overflow-x-auto">
+			<table class="w-full text-sm">
+				<thead>
+					<tr class="border-b border-border text-left">
+						<th class="pb-2 font-medium text-muted-foreground">PID</th>
+						<th class="pb-2 font-medium text-muted-foreground">User</th>
+						<th class="pb-2 font-medium text-muted-foreground text-right">Mem (MB)</th>
+						<th class="pb-2 pr-4 font-medium text-muted-foreground text-right">CPU %</th>
+						<th class="pb-2 font-medium text-muted-foreground">Command</th>
+					</tr>
+				</thead>
+				<tbody>
+					for _, p := range procs {
+						<tr class="border-b border-border/50 last:border-0">
+							<td class="py-2 text-muted-foreground tabular-nums">{ fmt.Sprintf("%d", p.PID) }</td>
+							<td class="py-2 text-muted-foreground">{ p.User }</td>
+							<td class="py-2 text-muted-foreground text-right tabular-nums">{ fmt.Sprintf("%.1f", p.MemMB) }</td>
+							<td class="py-2 pr-4 text-muted-foreground text-right tabular-nums">{ fmt.Sprintf("%.1f", p.CPUPct) }</td>
+							<td class="py-2 text-foreground font-mono text-xs truncate max-w-xs">{ p.Command }</td>
+						</tr>
+					}
+				</tbody>
+			</table>
+		</div>
+	}
+}
+
+templ CrashesCard(crashes []CrashReport) {
+	<div class="rounded-lg border border-border bg-card p-4">
+		<h2 class="text-lg font-semibold text-foreground mb-4">Crash Reports</h2>
+		if len(crashes) == 0 {
+			<p class="text-sm text-muted-foreground">No crash reports found</p>
+		} else {
+			<div class="overflow-x-auto">
+				<table class="w-full text-sm">
+					<thead>
+						<tr class="border-b border-border text-left">
+							<th class="pb-2 font-medium text-muted-foreground">Program</th>
+							<th class="pb-2 pr-4 font-medium text-muted-foreground text-right">Size</th>
+							<th class="pb-2 font-medium text-muted-foreground">Date</th>
+						</tr>
+					</thead>
+					<tbody>
+						for _, cr := range crashes {
+							<tr class="border-b border-border/50 last:border-0">
+								<td class="py-2 text-foreground font-mono text-xs">{ cr.Program }</td>
+								<td class="py-2 pr-4 text-muted-foreground text-right tabular-nums">{ fmt.Sprintf("%.1f MB", cr.SizeMB) }</td>
+								<td class="py-2 text-muted-foreground">{ cr.Date.Format("Jan 02 15:04") }</td>
+							</tr>
+						}
+					</tbody>
+				</table>
+			</div>
+			<p class="text-xs text-muted-foreground mt-2">
+				{ fmt.Sprintf("%d crash report(s) in /var/crash/", len(crashes)) }
+			</p>
+		}
+	</div>
+}
+
+templ HistoryBootList(boots []BootSession, currentBootID string) {
+	if len(boots) == 0 {
+		<p class="text-sm text-muted-foreground">No history recorded yet. First snapshot in ~2 minutes.</p>
+	} else {
+		<div class="overflow-x-auto">
+			<table class="w-full text-sm">
+				<thead>
+					<tr class="border-b border-border text-left">
+						<th class="pb-2 font-medium text-muted-foreground">Boot Session</th>
+						<th class="pb-2 font-medium text-muted-foreground">Started</th>
+						<th class="pb-2 font-medium text-muted-foreground">Last Seen</th>
+						<th class="pb-2 font-medium text-muted-foreground">Uptime</th>
+						<th class="pb-2 font-medium text-muted-foreground text-right">Snapshots</th>
+						<th class="pb-2 font-medium text-muted-foreground"></th>
+					</tr>
+				</thead>
+				<tbody>
+					for _, boot := range boots {
+						<tr class="border-b border-border/50 last:border-0">
+							<td class="py-2 font-mono text-xs">
+								if boot.BootID == currentBootID {
+									<span class="text-green-500 font-medium">current</span>
+								} else {
+									<span class="text-foreground">{ boot.BootID[:8] }...</span>
+								}
+							</td>
+							<td class="py-2 text-muted-foreground text-xs">{ boot.FirstSeen }</td>
+							<td class="py-2 text-muted-foreground text-xs">{ boot.LastSeen }</td>
+							<td class="py-2 text-muted-foreground text-xs">{ boot.Uptime }</td>
+							<td class="py-2 text-muted-foreground text-right tabular-nums">{ fmt.Sprintf("%d", boot.SnapshotCount) }</td>
+							<td class="py-2 text-right">
+								<form data-on:submit="@post('/system/history', {contentType: 'form'})">
+									<input type="hidden" name="bootId" value={ boot.BootID }/>
+									<button type="submit" class="text-xs text-primary hover:underline cursor-pointer" data-indicator="_histLoading">
+										<span data-show="$_histLoading">...</span>
+										<span data-show="!$_histLoading">View</span>
+									</button>
+								</form>
+							</td>
+						</tr>
+					}
+				</tbody>
+			</table>
+		</div>
+	}
+}
+
+templ HistorySnapshots(bootID string, currentBootID string, snapshots []db.SystemSnapshot, expandedSnapshotID int64, processes []db.SystemSnapshotProcess) {
+	<div class="mb-4">
+		<form data-on:submit="@post('/system/history', {contentType: 'form'})">
+			<button type="submit" class="text-xs text-primary hover:underline cursor-pointer mb-3" data-indicator="_histLoading">
+				<span data-show="$_histLoading">...</span>
+				<span data-show="!$_histLoading">&larr; Back to boot list</span>
+			</button>
+		</form>
+		<div class="flex items-center gap-2 mb-3">
+			<h3 class="text-sm font-medium text-foreground">
+				if bootID == currentBootID {
+					Boot: <span class="text-green-500">current</span>
+				} else {
+					Boot: <span class="font-mono">{ bootID[:8] }...</span>
+				}
+			</h3>
+			<span class="text-xs text-muted-foreground">
+				{ fmt.Sprintf("(%d snapshots)", len(snapshots)) }
+			</span>
+		</div>
+	</div>
+	if len(snapshots) == 0 {
+		<p class="text-sm text-muted-foreground">No snapshots for this boot session.</p>
+	} else {
+		<div class="overflow-x-auto">
+			<table class="w-full text-sm">
+				<thead>
+					<tr class="border-b border-border text-left">
+						<th class="pb-2 font-medium text-muted-foreground">Time</th>
+						<th class="pb-2 font-medium text-muted-foreground text-right">CPU</th>
+						<th class="pb-2 font-medium text-muted-foreground text-right">Mem Used</th>
+						<th class="pb-2 font-medium text-muted-foreground text-right">Mem %</th>
+						<th class="pb-2 font-medium text-muted-foreground text-right">Swap</th>
+						<th class="pb-2 font-medium text-muted-foreground text-right">Load</th>
+						<th class="pb-2 font-medium text-muted-foreground"></th>
+					</tr>
+				</thead>
+				<tbody>
+					for _, snap := range snapshots {
+						if snap.ID == expandedSnapshotID {
+							<tr class="border-b border-border/50 bg-muted/30">
+								<td class="py-2 text-muted-foreground text-xs tabular-nums">{ snap.CapturedAt.Format("Jan 02 15:04") }</td>
+								<td class="py-2 text-muted-foreground text-right tabular-nums">{ fmt.Sprintf("%.1f%%", snap.CpuPercent) }</td>
+								<td class="py-2 text-right tabular-nums">
+									if snap.MemUsedPercent > 80 {
+										<span class="text-red-400">{ humanize.Bytes(uint64(snap.MemUsedBytes)) }</span>
+									} else {
+										<span class="text-muted-foreground">{ humanize.Bytes(uint64(snap.MemUsedBytes)) }</span>
+									}
+								</td>
+								<td class="py-2 text-right tabular-nums">
+									if snap.MemUsedPercent > 80 {
+										<span class="text-red-400">{ fmt.Sprintf("%.1f%%", snap.MemUsedPercent) }</span>
+									} else {
+										<span class="text-muted-foreground">{ fmt.Sprintf("%.1f%%", snap.MemUsedPercent) }</span>
+									}
+								</td>
+								<td class="py-2 text-muted-foreground text-right tabular-nums">{ humanize.Bytes(uint64(snap.SwapUsedBytes)) }</td>
+								<td class="py-2 text-muted-foreground text-right tabular-nums">{ fmt.Sprintf("%.1f", snap.LoadAvg1) }</td>
+								<td class="py-2 text-right">
+									<form data-on:submit="@post('/system/history/snapshot', {contentType: 'form'})">
+										<input type="hidden" name="bootId" value={ bootID }/>
+										<input type="hidden" name="snapshotId" value="0"/>
+										<button type="submit" class="text-xs text-primary hover:underline cursor-pointer">Hide</button>
+									</form>
+								</td>
+							</tr>
+							<tr class="border-b border-border/50 bg-muted/20">
+								<td colspan="7" class="px-4 py-3">
+									if len(processes) == 0 {
+										<p class="text-xs text-muted-foreground">No process data recorded.</p>
+									} else {
+										<table class="w-full text-sm">
+											<thead>
+												<tr class="border-b border-border/50 text-left">
+													<th class="pb-1 text-xs font-medium text-muted-foreground">PID</th>
+													<th class="pb-1 text-xs font-medium text-muted-foreground">User</th>
+													<th class="pb-1 text-xs font-medium text-muted-foreground text-right">Mem (MB)</th>
+													<th class="pb-1 pr-4 text-xs font-medium text-muted-foreground text-right">CPU %</th>
+													<th class="pb-1 text-xs font-medium text-muted-foreground">Command</th>
+												</tr>
+											</thead>
+											<tbody>
+												for _, p := range processes {
+													<tr class="border-b border-border/30 last:border-0">
+														<td class="py-1 text-xs text-muted-foreground tabular-nums">{ fmt.Sprintf("%d", p.Pid) }</td>
+														<td class="py-1 text-xs text-muted-foreground">{ p.User }</td>
+														<td class="py-1 text-xs text-right tabular-nums">
+															if p.MemMb > 500 {
+																<span class="text-red-400 font-medium">{ fmt.Sprintf("%.1f", p.MemMb) }</span>
+															} else {
+																<span class="text-muted-foreground">{ fmt.Sprintf("%.1f", p.MemMb) }</span>
+															}
+														</td>
+														<td class="py-1 pr-4 text-xs text-muted-foreground text-right tabular-nums">{ fmt.Sprintf("%.1f", p.CpuPercent) }</td>
+														<td class="py-1 text-xs text-foreground font-mono truncate max-w-xs">{ p.Command }</td>
+													</tr>
+												}
+											</tbody>
+										</table>
+									}
+								</td>
+							</tr>
+						} else {
+							<tr class="border-b border-border/50 last:border-0">
+								<td class="py-2 text-muted-foreground text-xs tabular-nums">{ snap.CapturedAt.Format("Jan 02 15:04") }</td>
+								<td class="py-2 text-muted-foreground text-right tabular-nums">{ fmt.Sprintf("%.1f%%", snap.CpuPercent) }</td>
+								<td class="py-2 text-right tabular-nums">
+									if snap.MemUsedPercent > 80 {
+										<span class="text-red-400">{ humanize.Bytes(uint64(snap.MemUsedBytes)) }</span>
+									} else {
+										<span class="text-muted-foreground">{ humanize.Bytes(uint64(snap.MemUsedBytes)) }</span>
+									}
+								</td>
+								<td class="py-2 text-right tabular-nums">
+									if snap.MemUsedPercent > 80 {
+										<span class="text-red-400">{ fmt.Sprintf("%.1f%%", snap.MemUsedPercent) }</span>
+									} else {
+										<span class="text-muted-foreground">{ fmt.Sprintf("%.1f%%", snap.MemUsedPercent) }</span>
+									}
+								</td>
+								<td class="py-2 text-muted-foreground text-right tabular-nums">{ humanize.Bytes(uint64(snap.SwapUsedBytes)) }</td>
+								<td class="py-2 text-muted-foreground text-right tabular-nums">{ fmt.Sprintf("%.1f", snap.LoadAvg1) }</td>
+								<td class="py-2 text-right">
+									<form data-on:submit="@post('/system/history/snapshot', {contentType: 'form'})">
+										<input type="hidden" name="bootId" value={ bootID }/>
+										<input type="hidden" name="snapshotId" value={ fmt.Sprintf("%d", snap.ID) }/>
+										<button type="submit" class="text-xs text-primary hover:underline cursor-pointer">Processes</button>
+									</form>
+								</td>
+							</tr>
+						}
+					}
+				</tbody>
+			</table>
+		</div>
+	}
+}

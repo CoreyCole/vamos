@@ -1,0 +1,175 @@
+syntax = "proto3";
+
+package agents.comments.v1;
+
+import "buf/validate/validate.proto";
+
+option go_package = "github.com/CoreyCole/vamos/pkg/proto/comments/v1;commentsv1";
+
+// CommentsService handles comment and reply operations via Connect RPC
+service CommentsService {
+  // CreateComment creates a new comment on a file
+  rpc CreateComment(CreateCommentRequest) returns (CreateCommentResponse);
+
+  // CreateReply creates a reply to an existing comment
+  rpc CreateReply(CreateReplyRequest) returns (CreateReplyResponse);
+
+  // GetCommentsForFile retrieves all comments for a specific file
+  rpc GetCommentsForFile(GetCommentsRequest) returns (GetCommentsResponse);
+}
+
+// ShowCommentFormRequest contains data for opening the comment form
+message ShowCommentFormRequest {
+  // Section ID where the comment form should appear
+  string section_id = 1;
+
+  // Selected text from the document (optional, empty for menu-triggered forms)
+  string selected_text = 2;
+}
+
+// CreateCommentRequest contains data for creating a new comment
+message CreateCommentRequest {
+  // File path relative to repository root
+  string file_path = 1 [(buf.validate.field) = {
+    required: true
+    string: {min_len: 1}
+  }];
+
+  // Comment text content
+  string comment_text = 2 [(buf.validate.field) = {
+    required: true
+    string: {min_len: 1}
+  }];
+
+  // Selected text from the document (optional)
+  string selected_text = 3;
+
+  // Start line of selection (0 if no selection)
+  int64 start_line = 4;
+
+  // Start column of selection (0 if no selection)
+  int64 start_column = 5;
+
+  // End line of selection (0 if no selection)
+  int64 end_line = 6;
+
+  // End column of selection (0 if no selection)
+  int64 end_column = 7;
+
+  // Section ID where the comment belongs (optional)
+  string section_id = 8;
+}
+
+// CreateCommentResponse contains the created comment
+message CreateCommentResponse {
+  // The created comment
+  Comment comment = 1;
+}
+
+// CreateReplyRequest contains data for creating a reply
+message CreateReplyRequest {
+  // ID of the comment to reply to
+  string comment_id = 1 [(buf.validate.field) = {
+    required: true
+    string: {min_len: 1}
+  }];
+
+  // Reply text content
+  string reply_text = 2 [(buf.validate.field) = {
+    required: true
+    string: {min_len: 1}
+  }];
+}
+
+// CreateReplyResponse contains the created reply
+message CreateReplyResponse {
+  // The created reply
+  Reply reply = 1;
+}
+
+// GetCommentsRequest retrieves comments for a file
+message GetCommentsRequest {
+  // File path relative to repository root
+  string file_path = 1 [(buf.validate.field) = {
+    required: true
+    string: {min_len: 1}
+  }];
+}
+
+// GetCommentsResponse contains comments with their replies
+message GetCommentsResponse {
+  // List of comments with their replies
+  repeated CommentWithReplies comments = 1;
+}
+
+// Comment represents a comment on a file
+message Comment {
+  // Unique comment ID
+  string id = 1;
+
+  // File path relative to repository root
+  string file_path = 2;
+
+  // Git commit hash when comment was created
+  string git_commit = 3;
+
+  // User email who created the comment
+  string user_email = 4;
+
+  // Comment text content
+  string comment_text = 5;
+
+  // Selected text from the document
+  string selected_text = 6;
+
+  // Start line of selection
+  int64 start_line = 7;
+
+  // Start column of selection
+  int64 start_column = 8;
+
+  // End line of selection
+  int64 end_line = 9;
+
+  // End column of selection
+  int64 end_column = 10;
+
+  // Section ID where the comment belongs
+  string section_id = 11;
+
+  // Creation timestamp (RFC3339 format)
+  string created_at = 12;
+
+  // Last update timestamp (RFC3339 format)
+  string updated_at = 13;
+}
+
+// Reply represents a reply to a comment
+message Reply {
+  // Unique reply ID
+  string id = 1;
+
+  // Parent comment ID
+  string comment_id = 2;
+
+  // User email who created the reply
+  string user_email = 3;
+
+  // Reply text content
+  string reply_text = 4;
+
+  // Creation timestamp (RFC3339 format)
+  string created_at = 5;
+
+  // Last update timestamp (RFC3339 format)
+  string updated_at = 6;
+}
+
+// CommentWithReplies groups a comment with its replies
+message CommentWithReplies {
+  // The comment
+  Comment comment = 1;
+
+  // List of replies to this comment
+  repeated Reply replies = 2;
+}

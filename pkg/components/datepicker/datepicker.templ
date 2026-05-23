@@ -1,0 +1,501 @@
+package datepicker
+
+import (
+	"crypto/rand"
+	"fmt"
+	"github.com/CoreyCole/vamos/pkg/components/calendar"
+	"github.com/CoreyCole/vamos/pkg/components/dateinput"
+	"github.com/CoreyCole/vamos/pkg/components/utils"
+	"strings"
+	"time"
+)
+
+// datePickerSignals defines the reactive state for the DatePicker component
+type DatePickerSignals struct {
+	// Open state of the popover
+	Open bool `json:"open"`
+
+	// Input value (what user sees in the input field - YYYY/MM/DD format)
+	InputValue string `json:"inputValue"`
+
+	// Range start date (YYYY-MM-DD format)
+	RangeStart string `json:"rangeStart"`
+
+	// Range end date (YYYY-MM-DD format)
+	RangeEnd string `json:"rangeEnd"`
+
+	// Current display month (YYYY-MM-DD format, first day of month)
+	DisplayMonth string `json:"displayMonth"`
+
+	// Validation state
+	IsValid bool `json:"isValid"`
+
+	// Error message for invalid dates
+	ErrorMessage string `json:"errorMessage"`
+
+	// Whether user is currently typing (affects calendar sync behavior)
+	IsTyping bool `json:"isTyping"`
+
+	// Focused date in calendar (for keyboard navigation)
+	FocusedDate string `json:"focusedDate"`
+
+	// Highlighted date (for keyboard navigation within calendar)
+	HighlightedDate string `json:"highlightedDate"`
+
+	// Calendar-specific signals (needed for Calendar component compatibility)
+	CurrentDate string `json:"currentDate"`
+	Mode        string `json:"mode"`
+	Today       string `json:"today"`
+
+	// DateInput-specific signals (needed for DateInput component compatibility)
+	DateValue       string `json:"dateValue"`
+	StartInputValue string `json:"startInputValue"`
+	StartDateValue  string `json:"startDateValue"`
+	EndInputValue   string `json:"endInputValue"`
+	EndDateValue    string `json:"endDateValue"`
+	EndDateEnabled  bool   `json:"endDateEnabled"`
+}
+
+// calendarIconButton creates a calendar icon button component for use as postfix
+templ calendarIconButton(onClickHandler string) {
+	<button
+		type="button"
+		class="text-muted-foreground hover:text-foreground"
+		tabindex="-1"
+		data-on:click={ onClickHandler }
+	>
+		<svg
+			class="h-4 w-4"
+			xmlns="http://www.w3.org/2000/svg"
+			width="24"
+			height="24"
+			viewBox="0 0 24 24"
+			fill="none"
+			stroke="currentColor"
+			stroke-width="2"
+			stroke-linecap="round"
+			stroke-linejoin="round"
+		>
+			<path d="M8 2v4"></path>
+			<path d="M16 2v4"></path>
+			<rect width="18" height="18" x="3" y="4" rx="2"></rect>
+			<path d="M3 10h18"></path>
+		</svg>
+	</button>
+}
+
+// DatePicker renders a date picker with input field and calendar popover
+templ DatePicker(args DatePickerArgs) {
+	{{
+		// Generate unique ID if not provided
+		datePickerID := args.ID
+		if datePickerID == "" {
+			b := make([]byte, 4)
+			rand.Read(b)
+			datePickerID = fmt.Sprintf("datepicker_%x", b)
+		}
+
+		// CloseOnSelect defaults based on mode
+		closeOnSelect := true
+		if args.Mode == "range" {
+			closeOnSelect = false // Don't close on first selection in range mode
+		}
+
+		// Determine initial values
+		initialInputValue := ""
+		initialSelectedDate := args.SelectedDate
+		initialRangeStart := args.RangeStart
+		initialRangeEnd := args.RangeEnd
+
+		// Set initial display month
+		initialDisplayMonth := args.DefaultDate
+		if initialDisplayMonth == "" {
+			if args.SelectedDate != "" {
+				initialDisplayMonth = args.SelectedDate[:7] + "-01" // First day of selected month
+			} else if args.RangeStart != "" {
+				initialDisplayMonth = args.RangeStart[:7] + "-01"
+			} else {
+				// Current month
+				now := time.Now()
+				initialDisplayMonth = fmt.Sprintf("%04d-%02d-01", now.Year(), now.Month())
+			}
+		}
+
+		// Convert internal date to display format for input
+		if args.Mode == "range" {
+			if initialRangeStart != "" && initialRangeEnd != "" {
+				startDisplay := strings.ReplaceAll(initialRangeStart, "-", "/")
+				endDisplay := strings.ReplaceAll(initialRangeEnd, "-", "/")
+				initialInputValue = startDisplay + " - " + endDisplay
+			} else if initialRangeStart != "" {
+				initialInputValue = strings.ReplaceAll(initialRangeStart, "-", "/")
+			}
+		} else {
+			if initialSelectedDate != "" {
+				// Convert YYYY-MM-DD to MM/DD/YYYY
+				parts := strings.Split(initialSelectedDate, "-")
+				if len(parts) == 3 {
+					initialInputValue = parts[1] + "/" + parts[2] + "/" + parts[0]
+				}
+			}
+		}
+
+		// Set appropriate placeholder based on mode
+		placeholder := args.Placeholder
+		if placeholder == "" {
+			if args.Mode == "range" {
+				placeholder = "MM/DD/YYYY - MM/DD/YYYY"
+			} else {
+				placeholder = "MM/DD/YYYY"
+			}
+		}
+
+		// Create signals for reactive state (unified for all components)
+		now := time.Now()
+		todayStr := now.Format("2006-01-02")
+
+		signals := utils.Signals(datePickerID, DatePickerSignals{
+			Open:            false,
+			InputValue:      initialInputValue,
+			RangeStart:      initialRangeStart,
+			RangeEnd:        initialRangeEnd,
+			DisplayMonth:    initialDisplayMonth,
+			IsValid:         true,
+			ErrorMessage:    "",
+			IsTyping:        false,
+			FocusedDate:     "",
+			HighlightedDate: "",
+
+			// Calendar-specific signals
+			CurrentDate: initialDisplayMonth,
+			Mode:        args.Mode,
+			Today:       todayStr,
+
+			// DateInput-specific signals
+			DateValue:       initialSelectedDate, // Set DateValue here in the correct section
+			StartInputValue: "",
+			StartDateValue:  initialRangeStart,
+			EndInputValue:   "",
+			EndDateValue:    initialRangeEnd,
+			EndDateEnabled:  args.Mode == "range",
+		})
+
+		// Container classes
+		containerClasses := "relative " + args.Class
+
+		// Use expression builders for clean event handling
+		popoverHandler := newDatePickerPopoverHandler(datePickerID, datePickerID, args.Mode, signals)
+		clickOutsideHandler := popoverHandler.buildClickOutsideHandler()
+		calendarIconClickHandler := popoverHandler.buildOpenTriggerHandler()
+
+		// Auto-generate internal IDs for signal coordination
+		dateInputID := datePickerID
+		calendarID := datePickerID // Use same ID for unified signal namespace
+	}}
+	<div
+		data-slot="datepicker"
+		data-datepicker-id={ datePickerID }
+		data-signals={ signals.DataSignals }
+		data-on:click__outside={ clickOutsideHandler }
+		class={ containerClasses }
+		{ args.Attributes... }
+	>
+		<!-- Hidden input for form submission -->
+		if args.Name != "" {
+			if args.Mode == "range" {
+				<!-- Range mode: separate inputs for start and end -->
+				<input
+					type="hidden"
+					name={ args.Name + "_start" }
+					data-bind={ signals.Signal("rangeStart") }
+					if args.Required {
+						required
+					}
+				/>
+				<input
+					type="hidden"
+					name={ args.Name + "_end" }
+					data-bind={ signals.Signal("rangeEnd") }
+				/>
+			} else {
+				<!-- Single mode: single hidden input -->
+				<input
+					type="hidden"
+					name={ args.Name }
+					data-bind={ signals.Signal("dateValue") }
+					if args.Required {
+						required
+					}
+				/>
+			}
+		}
+		<!-- Input field with calendar icon -->
+		if args.Mode == "range" {
+			<!-- Range mode: use DateInput with calendar icon outside -->
+			{{
+				// Initial values for range mode
+				initialStartValue := ""
+				initialEndValue := ""
+
+				// Parse the initial range input value
+				if initialInputValue != "" {
+					parts := strings.Split(initialInputValue, " - ")
+					if len(parts) == 2 {
+						initialStartValue = parts[0]
+						initialEndValue = parts[1]
+					} else if len(parts) == 1 {
+						initialStartValue = parts[0]
+					}
+				}
+
+				// DateInput will handle calendar coordination directly via CalendarID
+			}}
+			<div
+				class="relative flex items-center gap-2"
+				if args.OpenOnFocus || !args.DisablePopoverOpenOnFocus {
+					data-on:focus__capture={ "evt.target.tagName.toLowerCase() === 'input' ? " + signals.Set("open", "true") + " : null" }
+				}
+			>
+				<!-- DateInput without postfix -->
+				<div class="flex-1">
+					@dateinput.DateInput(dateinput.DateInputArgs{
+						ID:         dateInputID,
+						Name:       "", // No form submission for DateInput itself
+						Mode:       "range",
+						StartValue: initialStartValue,
+						EndValue:   initialEndValue,
+						StartName:  "",         // Handled by DatePicker's hidden inputs
+						EndName:    "",         // Handled by DatePicker's hidden inputs
+						CalendarID: calendarID, // Coordinate with calendar using unified namespace
+						Disabled:   args.Disabled,
+						Required:   args.Required,
+						Class:      args.InputClass,
+						Attributes: map[string]any{
+							"data-on:keydown": "evt.key === 'Escape' ? " + signals.Set("open", "false") + " : null",
+						},
+					})
+				</div>
+				<!-- Calendar icon positioned outside -->
+				<div class="flex-shrink-0">
+					<button
+						type="button"
+						class="text-muted-foreground hover:text-foreground"
+						tabindex="-1"
+						data-on:click={ calendarIconClickHandler }
+					>
+						<svg
+							class="h-4 w-4"
+							xmlns="http://www.w3.org/2000/svg"
+							width="24"
+							height="24"
+							viewBox="0 0 24 24"
+							fill="none"
+							stroke="currentColor"
+							stroke-width="2"
+							stroke-linecap="round"
+							stroke-linejoin="round"
+						>
+							<path d="M8 2v4"></path>
+							<path d="M16 2v4"></path>
+							<rect width="18" height="18" x="3" y="4" rx="2"></rect>
+							<path d="M3 10h18"></path>
+						</svg>
+					</button>
+				</div>
+			</div>
+		} else {
+			<!-- Single mode: use DateInput with proper signal synchronization -->
+			{{
+				// DateInput will handle calendar coordination directly via CalendarID
+			}}
+			<div
+				if args.OpenOnFocus || !args.DisablePopoverOpenOnFocus {
+					data-on:focus__capture={ "evt.target.tagName.toLowerCase() === 'input' ? " + signals.Set("open", "true") + " : null" }
+				}
+			>
+				@dateinput.DateInput(dateinput.DateInputArgs{
+					ID:          dateInputID,
+					Name:        "", // No form submission for DateInput itself
+					Placeholder: placeholder,
+					Value:       initialInputValue,
+					CalendarID:  calendarID, // Coordinate with calendar using unified namespace
+					Disabled:    args.Disabled,
+					Required:    args.Required,
+					Class:       args.InputClass,
+					Attributes: map[string]any{
+						"data-on:keydown": "evt.key === 'Escape' ? " + signals.Set("open", "false") + " : null",
+					},
+				})
+				<!-- Calendar icon button positioned separately to maintain signal scope -->
+				<button
+					type="button"
+					class="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+					tabindex="-1"
+					data-on:click={ calendarIconClickHandler }
+				>
+					<svg
+						class="h-4 w-4"
+						xmlns="http://www.w3.org/2000/svg"
+						width="24"
+						height="24"
+						viewBox="0 0 24 24"
+						fill="none"
+						stroke="currentColor"
+						stroke-width="2"
+						stroke-linecap="round"
+						stroke-linejoin="round"
+					>
+						<path d="M8 2v4"></path>
+						<path d="M16 2v4"></path>
+						<rect width="18" height="18" x="3" y="4" rx="2"></rect>
+						<path d="M3 10h18"></path>
+					</svg>
+				</button>
+			</div>
+		}
+		<!-- Calendar popover -->
+		@DatePickerPopover(DatePickerPopoverArgs{
+			ID:                  datePickerID,
+			DateInputID:         dateInputID,
+			Mode:                args.Mode,
+			NumberOfMonths:      args.NumberOfMonths,
+			MinDate:             args.MinDate,
+			MaxDate:             args.MaxDate,
+			DisabledDates:       args.DisabledDates,
+			HideOutsideDays:     args.HideOutsideDays,
+			CloseOnSelect:       closeOnSelect,
+			Class:               args.CalendarClass,
+			Position:            args.PopoverPosition,
+			InitialSelectedDate: initialSelectedDate,
+			InitialDisplayMonth: initialDisplayMonth,
+			InitialRangeStart:   initialRangeStart,
+			InitialRangeEnd:     initialRangeEnd,
+			DatePickerInputsID:  dateInputID,
+		})
+	</div>
+}
+
+// DatePickerPopover renders the calendar popover with keyboard navigation
+templ DatePickerPopover(args DatePickerPopoverArgs) {
+	{{
+		// IMPORTANT: We need to use the same signal namespace as the parent DatePicker
+		// Don't create new signals here - reference the existing ones
+		signals := utils.Signals(args.ID, DatePickerSignals{})
+
+		// Popover show/hide - explicitly handle undefined to prevent flash
+		showExpr := signals.Signal("open") + " === true"
+
+		// DatePicker open check (following select.templ pattern)
+		datePickerOpenCheck := "document.querySelector('[data-datepicker-id=\"" + args.ID + "\"]') && " + signals.Signal("open")
+
+		// Determine the correct input ID for focus
+		inputID := args.DateInputID
+		if args.Mode == "range" {
+			inputID = args.DateInputID + "_start" // Focus on start input in range mode
+		}
+
+		// Escape: close and return focus to input
+		escapeHandler := "evt.key === 'Escape' && " + datePickerOpenCheck + " ? (evt.preventDefault(), evt.stopPropagation(), " +
+			signals.Set("open", "false") + ", document.getElementById('" + inputID + "').focus()) : null"
+
+		// Tab: close but allow tab to continue
+		tabHandler := "evt.key === 'Tab' && " + datePickerOpenCheck + " ? " + signals.Set("open", "false") + " : null"
+
+		// Combine keyboard handlers
+		keyHandler := escapeHandler + "; " + tabHandler
+
+		// Convert number of months
+		numMonths := args.NumberOfMonths
+		if numMonths <= 0 {
+			numMonths = 1
+		}
+
+		// Calendar date selection handler - update both DatePicker and DateInput signals
+		dateSelectHandler := ""
+
+		// Build the handler conditionally
+		if args.Mode == "range" {
+			// Range mode handler - sync with DateInput signals
+			dateInputSignals := utils.Signals(args.DateInputID, dateinput.DateInputSignals{})
+
+			dateSelectHandler = "(evt.detail.rangeStart && evt.detail.rangeEnd) ? (" +
+				"(startDisplay => endDisplay => (" +
+				dateInputSignals.Set("startInputValue", "startDisplay") + ", " +
+				dateInputSignals.Set("startDateValue", "evt.detail.rangeStart") + ", " +
+				dateInputSignals.Set("endInputValue", "endDisplay") + ", " +
+				dateInputSignals.Set("endDateValue", "evt.detail.rangeEnd") + ", " +
+				signals.Set("rangeStart", "evt.detail.rangeStart") + ", " +
+				signals.Set("rangeEnd", "evt.detail.rangeEnd") +
+				"))(evt.detail.rangeStart.replace(/-/g, '/'))(evt.detail.rangeEnd.replace(/-/g, '/'))" +
+				") : evt.detail.rangeStart ? (" +
+				"(startDisplay => (" +
+				dateInputSignals.Set("startInputValue", "startDisplay") + ", " +
+				dateInputSignals.Set("startDateValue", "evt.detail.rangeStart") + ", " +
+				dateInputSignals.Set("endInputValue", "''") + ", " +
+				dateInputSignals.Set("endDateValue", "''") + ", " +
+				signals.Set("rangeStart", "evt.detail.rangeStart") + ", " +
+				signals.Set("rangeEnd", "''") +
+				"))(evt.detail.rangeStart.replace(/-/g, '/'))" +
+				") : null"
+
+			// Add close logic if needed for range mode
+			if args.CloseOnSelect {
+				dateSelectHandler = "(" + dateSelectHandler + ", " + signals.Set("open", "false") + ")"
+			}
+		} else {
+			// Single date mode handler - update both DateInput and DatePicker signals
+			dateInputSignals := utils.Signals(args.DateInputID, dateinput.DateInputSignals{})
+			dateSelectHandler = "evt.detail.dateValue ? (" +
+				"(displayDate => (" +
+				dateInputSignals.Set("inputValue", "displayDate") + ", " +
+				dateInputSignals.Set("dateValue", "evt.detail.dateValue") + ", " +
+				signals.Set("dateValue", "evt.detail.dateValue") +
+				"))(evt.detail.dateValue.replace(/-/g, '/'))" +
+				") : null"
+
+			// Add close logic if needed for single mode
+			if args.CloseOnSelect {
+				dateSelectHandler = "(" + dateSelectHandler + ", " + signals.Set("open", "false") + ")"
+			}
+		}
+
+		// Month navigation handler - sync display month
+		monthChangeHandler := "evt.detail.displayMonth ? " + signals.Set("displayMonth", "evt.detail.displayMonth") + " : null"
+
+		// Position classes
+		positionClasses := "absolute left-0 z-50 p-0"
+		if args.Position == "top" {
+			positionClasses += " bottom-full mb-1"
+		} else {
+			positionClasses += " top-full mt-1"
+		}
+	}}
+	<div
+		data-slot="datepicker-popover"
+		class={ positionClasses }
+		data-show={ showExpr }
+		data-on:keydown__window={ keyHandler }
+		style="width: max-content; display: none;"
+	>
+		<div class={ "rounded-md border bg-popover p-4 text-popover-foreground shadow-md " + args.Class }>
+			@calendar.Calendar(calendar.CalendarArgs{
+				ID:                 args.ID, // Use same ID as DatePicker for unified namespace
+				Mode:               args.Mode,
+				SelectedDate:       args.InitialSelectedDate,
+				DefaultDate:        args.InitialDisplayMonth,
+				RangeStart:         args.InitialRangeStart,
+				RangeEnd:           args.InitialRangeEnd,
+				NumberOfMonths:     numMonths,
+				Disabled:           args.DisabledDates,
+				HideOutsideDays:    args.HideOutsideDays,
+				DatePickerInputsID: args.DatePickerInputsID, // Use DateInputID for signal coordination
+				MinDate:            args.MinDate,
+				MaxDate:            args.MaxDate,
+				Attributes: map[string]any{
+					"data-on:date-select":  dateSelectHandler,
+					"data-on:month-change": monthChangeHandler,
+				},
+			})
+		</div>
+	</div>
+}

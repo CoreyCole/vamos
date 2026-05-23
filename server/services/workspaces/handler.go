@@ -1,0 +1,732 @@
+package workspaces
+
+import (
+	"context"
+	"log"
+	"net/http"
+	"net/url"
+	"os"
+	"strings"
+	"sync"
+	"time"
+
+	"github.com/a-h/templ"
+	"github.com/labstack/echo/v4"
+	"github.com/starfederation/datastar-go/datastar"
+
+	"github.com/CoreyCole/vamos/pkg/db"
+	"github.com/CoreyCole/vamos/server/layouts"
+	"github.com/CoreyCole/vamos/server/services/auth"
+)
+
+type SessionCreator interface {
+	ValidateEmail(email string) error
+	CreateSession(ctx context.Context, email string) (*auth.Session, error)
+	LogAuthAttempt(
+		ctx context.Context,
+		email string,
+		success bool,
+		errorMessage string,
+	) error
+}
+
+type PlanWorkspaceLister interface {
+	ListActivePlanWorkspaces(ctx context.Context) ([]db.PlanWorkspace, error)
+}
+
+type ImplWorkspaceLister interface {
+	ListImplWorkspaces(ctx context.Context) ([]db.ImplWorkspace, error)
+}
+
+const workspaceSyncRefreshTimeout = 5 * time.Minute
+
+type WorkspaceSyncRefreshFunc func(ctx context.Context) error
+
+type Handler struct {
+	manager              Manager
+	lifecycle            LifecycleManager
+	planWorkspaces       PlanWorkspaceLister
+	implWorkspaces       ImplWorkspaceLister
+	workspaceSyncRefresh WorkspaceSyncRefreshFunc
+	refreshMu            sync.Mutex
+	refreshInFlight      bool
+	notifier             WorkspaceLifecycleNotifier
+	managerURL           string
+	currentSlug          string
+	authService          SessionCreator
+	signer               *HandoffSigner
+	restartToken         string
+	mainCheckoutPath     string
+	verifier             *Verifier
+	exitFunc             func(int)
+}
+
+type RestartRequest struct {
+	Slug         string            `json:"slug"`
+	CheckoutPath string            `json:"checkout_path"`
+	Components   []BundleComponent `json:"components"`
+	Force        bool              `json:"force,omitempty"`
+}
+
+type RestartComponentsOptions struct {
+	Force bool
+}
+
+type componentRestarter interface {
+	RestartComponents(
+		ctx context.Context,
+		slug string,
+		components []BundleComponent,
+		opts RestartComponentsOptions,
+	) (Workspace, error)
+}
+
+type HandlerOption func(*Handler)
+
+func WithDevAuth(authService SessionCreator, signer *HandoffSigner) HandlerOption {
+	return func(h *Handler) {
+		h.authService = authService
+		h.signer = signer
+	}
+}
+
+func WithRestartAPI(token, mainCheckoutPath string) HandlerOption {
+	return func(h *Handler) {
+		h.restartToken = strings.TrimSpace(token)
+		h.mainCheckoutPath = strings.TrimSpace(mainCheckoutPath)
+	}
+}
+
+func WithExitFunc(exitFunc func(int)) HandlerOption {
+	return func(h *Handler) {
+		if exitFunc != nil {
+			h.exitFunc = exitFunc
+		}
+	}
+}
+
+func WithLifecycleNotifier(notifier WorkspaceLifecycleNotifier) HandlerOption {
+	return func(h *Handler) {
+		h.notifier = notifier
+	}
+}
+
+func WithPlanWorkspaces(source PlanWorkspaceLister) HandlerOption {
+	return func(h *Handler) {
+		h.planWorkspaces = source
+	}
+}
+
+func WithImplWorkspaces(source ImplWorkspaceLister) HandlerOption {
+	return func(h *Handler) {
+		h.implWorkspaces = source
+	}
+}
+
+func WithWorkspaceSyncRefresh(refresh WorkspaceSyncRefreshFunc) HandlerOption {
+	return func(h *Handler) {
+		h.workspaceSyncRefresh = refresh
+	}
+}
+
+// Deprecated: use WithWorkspaceSyncRefresh.
+func WithPlanWorkspaceRefresh(refresh WorkspaceSyncRefreshFunc) HandlerOption {
+	return WithWorkspaceSyncRefresh(refresh)
+}
+
+func NewHandler(
+	manager Manager,
+	managerURL, currentSlug string,
+	opts ...HandlerOption,
+) *Handler {
+	h := &Handler{
+		manager:     manager,
+		managerURL:  strings.TrimRight(strings.TrimSpace(managerURL), "/"),
+		currentSlug: strings.TrimSpace(currentSlug),
+		exitFunc:    os.Exit,
+	}
+	if lifecycle, ok := manager.(LifecycleManager); ok {
+		h.lifecycle = lifecycle
+	}
+	for _, opt := range opts {
+		opt(h)
+	}
+	if h.notifier == nil {
+		h.notifier = NewLifecycleNotifier()
+	}
+	if manager, ok := h.manager.(*ManagerService); ok && manager != nil {
+		manager.SetLifecycleNotifier(h.notifier)
+	}
+	return h
+}
+
+func (h *Handler) RegisterRoutes(e *echo.Echo, authMiddleware echo.MiddlewareFunc) {
+	g := e.Group("/workspaces")
+	g.Use(authMiddleware)
+	g.GET("", h.HandleWorkspacesPage)
+	g.GET("/stream", h.HandleWorkspacesStream)
+	g.POST("/refresh", h.HandleRefreshWorkspaces)
+	g.GET("/switch/:slug", h.HandleSwitchWorkspace)
+	g.POST("/:slug/start", h.HandleStart)
+	g.POST("/:slug/stop", h.HandleStop)
+	g.POST("/:slug/restart", h.HandleRestart)
+	g.POST("/host-action", h.HandleWorkspaceHostAction)
+}
+
+func (h *Handler) RegisterDevAuthRoute(e *echo.Echo) {
+	e.GET("/internal/dev-auth/handoff", h.HandleDevAuthHandoff)
+}
+
+func (h *Handler) RegisterInternalRestartRoute(e *echo.Echo) {
+	e.POST("/internal/workspaces/restart", h.HandleInternalRestart)
+}
+
+func (h *Handler) HandleWorkspacesPage(c echo.Context) error {
+	views, err := h.listImplWorkspaceViews(c.Request().Context())
+	if err != nil {
+		return err
+	}
+	args := layouts.RootArgs{
+		Title:       "Workspaces",
+		CurrentPath: "/workspaces",
+		PageType:    layouts.PageTypeWorkspaces,
+		ShowHeader:  true,
+		UserEmail:   userEmailFromContext(c),
+		Workspaces: BuildNavItems(
+			ImplViewsToNavWorkspaces(views),
+			h.currentSlug,
+			h.managerURL,
+			"/workspaces",
+		),
+		CurrentWorkspaceSlug: h.currentSlug,
+		WorkspaceManagerURL:  h.managerURL,
+	}
+	return render(
+		c,
+		http.StatusOK,
+		WorkspacesDocument(args, views, h.isRefreshInFlight()),
+	)
+}
+
+func (h *Handler) HandleRefreshWorkspaces(c echo.Context) error {
+	if h.workspaceSyncRefresh == nil {
+		return echo.NewHTTPError(
+			http.StatusNotImplemented,
+			"workspace sync refresh is not configured",
+		)
+	}
+	started := h.tryStartWorkspaceSyncRefresh()
+	if started {
+		h.notifier.Notify("workspaces-refresh")
+		go h.runWorkspaceSyncRefresh()
+	}
+	if isDatastarRequest(c.Request()) {
+		sse := datastar.NewSSE(c.Response().Writer, c.Request())
+		c.Response().WriteHeader(http.StatusAccepted)
+		return sse.PatchElementTempl(
+			WorkspacesHeader(h.isRefreshInFlight()),
+			datastar.WithSelectorID("workspaces-header"),
+			datastar.WithModeOuter(),
+		)
+	}
+	return c.Redirect(http.StatusSeeOther, "/workspaces")
+}
+
+func (h *Handler) tryStartWorkspaceSyncRefresh() bool {
+	h.refreshMu.Lock()
+	defer h.refreshMu.Unlock()
+	if h.refreshInFlight {
+		return false
+	}
+	h.refreshInFlight = true
+	return true
+}
+
+func (h *Handler) isRefreshInFlight() bool {
+	h.refreshMu.Lock()
+	defer h.refreshMu.Unlock()
+	return h.refreshInFlight
+}
+
+func (h *Handler) runWorkspaceSyncRefresh() {
+	ctx, cancel := context.WithTimeout(context.Background(), workspaceSyncRefreshTimeout)
+	defer cancel()
+	if err := h.workspaceSyncRefresh(ctx); err != nil {
+		log.Printf("workspace_sync_refresh_failed: %v", err)
+	} else if h.manager != nil {
+		if err := h.manager.Refresh(ctx); err != nil {
+			log.Printf("workspace_manager_refresh_after_sync_failed: %v", err)
+		}
+	}
+	h.refreshMu.Lock()
+	h.refreshInFlight = false
+	h.refreshMu.Unlock()
+	h.notifier.Notify("workspaces-refresh")
+}
+
+func (h *Handler) HandleStart(c echo.Context) error {
+	return h.lifecycleAction(
+		c,
+		c.Param("slug"),
+		WorkspaceTransitionStart,
+		WorkspaceDesiredRunning,
+	)
+}
+
+func (h *Handler) HandleStop(c echo.Context) error {
+	return h.lifecycleAction(
+		c,
+		c.Param("slug"),
+		WorkspaceTransitionStop,
+		WorkspaceDesiredStopped,
+	)
+}
+
+func (h *Handler) HandleRestart(c echo.Context) error {
+	return h.lifecycleAction(
+		c,
+		c.Param("slug"),
+		WorkspaceTransitionRestart,
+		WorkspaceDesiredRunning,
+	)
+}
+
+func (h *Handler) lifecycleAction(
+	c echo.Context,
+	slug string,
+	kind WorkspaceTransitionKind,
+	desired WorkspaceDesiredState,
+) error {
+	if h.lifecycle == nil {
+		return echo.NewHTTPError(
+			http.StatusNotImplemented,
+			"workspace lifecycle manager is not configured",
+		)
+	}
+	snap, err := h.lifecycle.RequestLifecycle(
+		c.Request().Context(),
+		WorkspaceLifecycleRequest{Slug: slug, Kind: kind, DesiredState: desired},
+	)
+	if err != nil {
+		return err
+	}
+	if isDatastarRequest(c.Request()) {
+		views, err := h.listImplWorkspaceViews(c.Request().Context())
+		if err != nil {
+			views = lifecycleSnapshotsToImplViews([]WorkspaceLifecycleSnapshot{snap})
+		}
+		sse := datastar.NewSSE(c.Response().Writer, c.Request())
+		c.Response().WriteHeader(http.StatusAccepted)
+		return sse.PatchElementTempl(
+			WorkspacesList(views, h.managerURL),
+			datastar.WithSelectorID("workspaces-list"),
+			datastar.WithModeOuter(),
+		)
+	}
+	return c.JSON(http.StatusAccepted, snap)
+}
+
+func (h *Handler) HandleWorkspacesStream(c echo.Context) error {
+	if h.lifecycle == nil {
+		return echo.NewHTTPError(
+			http.StatusNotImplemented,
+			"workspace lifecycle manager is not configured",
+		)
+	}
+	sse := datastar.NewSSE(c.Response().Writer, c.Request())
+	send := func() error {
+		views, err := h.listImplWorkspaceViews(c.Request().Context())
+		if err != nil {
+			return err
+		}
+		if err := sse.PatchElementTempl(
+			WorkspacesHeader(h.isRefreshInFlight()),
+			datastar.WithSelectorID("workspaces-header"),
+			datastar.WithModeOuter(),
+		); err != nil {
+			return err
+		}
+		return sse.PatchElementTempl(
+			WorkspacesList(views, h.managerURL),
+			datastar.WithSelectorID("workspaces-list"),
+			datastar.WithModeOuter(),
+		)
+	}
+	if err := send(); err != nil {
+		return err
+	}
+	ch, unsubscribe := h.notifier.Subscribe()
+	defer unsubscribe()
+	for {
+		select {
+		case <-c.Request().Context().Done():
+			return nil
+		case <-ch:
+			if err := send(); err != nil {
+				return err
+			}
+		}
+	}
+}
+
+func (h *Handler) HandleWorkspaceHostAction(c echo.Context) error {
+	if h.manager == nil {
+		return echo.NewHTTPError(
+			http.StatusNotFound,
+			"workspace manager is not configured",
+		)
+	}
+	slug := strings.TrimSpace(c.FormValue("slug"))
+	if slug == "" {
+		return echo.NewHTTPError(http.StatusBadRequest, "missing workspace slug")
+	}
+	returnTo := strings.TrimSpace(c.FormValue("return_to"))
+	if returnTo == "" {
+		returnTo = "/workspaces"
+	}
+	if _, err := ValidateLocalRedirectPath(returnTo); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
+	}
+	switch strings.TrimSpace(c.FormValue("action")) {
+	case "start", "retry":
+		if _, err := h.manager.Start(c.Request().Context(), slug); err != nil {
+			return err
+		}
+	case "stop":
+		if _, err := h.manager.Stop(c.Request().Context(), slug); err != nil {
+			return err
+		}
+	default:
+		return echo.NewHTTPError(http.StatusBadRequest, "unsupported workspace action")
+	}
+	return c.Redirect(http.StatusSeeOther, returnTo)
+}
+
+func (h *Handler) HandleInternalRestart(c echo.Context) error {
+	if err := h.requireRestartToken(c); err != nil {
+		return err
+	}
+	var req RestartRequest
+	if err := c.Bind(&req); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
+	}
+	if strings.TrimSpace(req.CheckoutPath) == "" {
+		return echo.NewHTTPError(http.StatusBadRequest, "missing checkout_path")
+	}
+	if strings.TrimSpace(req.Slug) == "" {
+		meta, err := ReadMetadata(WorkspaceMetadataPath(req.CheckoutPath))
+		if err == nil {
+			req.Slug = meta.Slug
+		}
+	}
+	if samePath(req.CheckoutPath, h.mainCheckoutPath) {
+		if strings.TrimSpace(req.Slug) != "" && req.Slug != "main" {
+			return echo.NewHTTPError(
+				http.StatusBadRequest,
+				"workspace restart slug/checkout mismatch",
+			)
+		}
+		go func() {
+			time.Sleep(250 * time.Millisecond)
+			h.exitFunc(0)
+		}()
+		return c.JSON(http.StatusAccepted, map[string]string{"status": "main-restarting"})
+	}
+	if req.Slug == "main" {
+		return echo.NewHTTPError(
+			http.StatusBadRequest,
+			"workspace restart slug/checkout mismatch",
+		)
+	}
+	if h.manager == nil {
+		return echo.NewHTTPError(
+			http.StatusNotFound,
+			"workspace manager is not configured",
+		)
+	}
+	restarter, ok := h.manager.(componentRestarter)
+	if !ok {
+		return echo.NewHTTPError(
+			http.StatusNotFound,
+			"workspace component restart is not configured",
+		)
+	}
+	ws, ok := h.resolveRestartWorkspace(c.Request().Context(), req)
+	if !ok {
+		return echo.NewHTTPError(http.StatusNotFound, "unknown workspace")
+	}
+	if strings.TrimSpace(req.CheckoutPath) != "" &&
+		!samePath(ws.CheckoutPath, req.CheckoutPath) {
+		return echo.NewHTTPError(
+			http.StatusBadRequest,
+			"workspace restart slug/checkout mismatch",
+		)
+	}
+	restartSlug := ws.Slug
+	ws, err := restarter.RestartComponents(
+		c.Request().Context(),
+		restartSlug,
+		req.Components,
+		RestartComponentsOptions{Force: req.Force},
+	)
+	if err != nil {
+		if !req.Force && (ws.Status == StatusFailed || ws.Status == StatusCrashed ||
+			ws.Status == StatusStopped) {
+			started, startErr := h.manager.Start(c.Request().Context(), req.Slug)
+			if startErr != nil {
+				return err
+			}
+			return c.JSON(http.StatusAccepted, started)
+		}
+		return err
+	}
+	return c.JSON(http.StatusAccepted, ws)
+}
+
+func (h *Handler) resolveRestartWorkspace(
+	ctx context.Context,
+	req RestartRequest,
+) (Workspace, bool) {
+	slug := strings.TrimSpace(req.Slug)
+	if slug != "" {
+		if ws, ok := h.manager.Lookup(slug); ok {
+			if strings.TrimSpace(req.CheckoutPath) == "" ||
+				samePath(ws.CheckoutPath, req.CheckoutPath) {
+				return ws, true
+			}
+		}
+	}
+	checkoutPath := strings.TrimSpace(req.CheckoutPath)
+	if checkoutPath == "" {
+		return Workspace{}, false
+	}
+	_ = h.manager.Refresh(ctx)
+	for _, ws := range h.manager.List() {
+		if samePath(ws.CheckoutPath, checkoutPath) {
+			return ws, true
+		}
+	}
+	return Workspace{}, false
+}
+
+func (h *Handler) HandleSwitchWorkspace(c echo.Context) error {
+	if h.manager == nil || h.signer == nil {
+		return echo.NewHTTPError(
+			http.StatusNotFound,
+			"workspace switching is not configured",
+		)
+	}
+	slug := c.Param("slug")
+	redirectPath, err := ValidateLocalRedirectPath(c.QueryParam("redirect"))
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
+	}
+	email := userEmailFromContext(c)
+	if email == "" {
+		return echo.NewHTTPError(http.StatusUnauthorized)
+	}
+	ws, ok := h.manager.Lookup(slug)
+	if !ok {
+		return echo.NewHTTPError(http.StatusNotFound, "unknown workspace")
+	}
+	if ws.Status != StatusRunning || strings.TrimSpace(ws.URL) == "" {
+		log.Printf(
+			"workspace_switch_unavailable slug=%q status=%q url=%q redirect=%q",
+			slug,
+			ws.Status,
+			ws.URL,
+			redirectPath,
+		)
+		return c.Redirect(http.StatusSeeOther, "/workspaces")
+	}
+	token, err := h.signer.Sign(HandoffClaims{
+		Email:        email,
+		TargetSlug:   slug,
+		RedirectPath: redirectPath,
+	})
+	if err != nil {
+		return err
+	}
+	target := strings.TrimRight(
+		ws.URL,
+		"/",
+	) + "/internal/dev-auth/handoff?token=" + url.QueryEscape(
+		token,
+	)
+	log.Printf(
+		"workspace_switch_redirect slug=%q status=%q pid=%d port=%d url=%q redirect=%q user=%q",
+		slug,
+		ws.Status,
+		ws.PID,
+		ws.Port,
+		ws.URL,
+		redirectPath,
+		email,
+	)
+	return c.Redirect(http.StatusFound, target)
+}
+
+func (h *Handler) HandleDevAuthHandoff(c echo.Context) error {
+	if h.signer == nil || h.authService == nil {
+		return echo.NewHTTPError(
+			http.StatusNotFound,
+			"dev auth handoff is not configured",
+		)
+	}
+	ctx := c.Request().Context()
+	claims, err := h.signer.Verify(c.QueryParam("token"), h.currentSlug)
+	if err != nil {
+		h.logDevAuthAttempt(ctx, "unknown", false, err)
+		return echo.NewHTTPError(http.StatusUnauthorized, err.Error())
+	}
+	if err := h.authService.ValidateEmail(claims.Email); err != nil {
+		h.logDevAuthAttempt(ctx, claims.Email, false, err)
+		return echo.NewHTTPError(http.StatusUnauthorized, err.Error())
+	}
+	session, err := h.authService.CreateSession(ctx, claims.Email)
+	if err != nil {
+		h.logDevAuthAttempt(ctx, claims.Email, false, err)
+		return err
+	}
+	h.logDevAuthAttempt(ctx, claims.Email, true, nil)
+	c.SetCookie(&http.Cookie{
+		Name:     auth.SessionCookieName,
+		Value:    session.ID,
+		Path:     "/",
+		HttpOnly: true,
+		Secure:   true,
+		SameSite: http.SameSiteLaxMode,
+		Expires:  session.ExpiresAt,
+	})
+	return c.Redirect(http.StatusFound, claims.RedirectPath)
+}
+
+func (h *Handler) logDevAuthAttempt(
+	ctx context.Context,
+	email string,
+	success bool,
+	err error,
+) {
+	if h.authService == nil {
+		return
+	}
+	if strings.TrimSpace(email) == "" {
+		email = "unknown"
+	}
+	errorMessage := ""
+	if err != nil {
+		errorMessage = err.Error()
+	}
+	_ = h.authService.LogAuthAttempt(ctx, email, success, errorMessage)
+}
+
+func (h *Handler) listLifecycle(
+	ctx context.Context,
+) ([]WorkspaceLifecycleSnapshot, error) {
+	if h.lifecycle != nil {
+		return h.lifecycle.ListLifecycle(ctx)
+	}
+	if h.manager == nil {
+		return nil, echo.NewHTTPError(
+			http.StatusNotFound,
+			"workspace manager is not configured",
+		)
+	}
+	if err := h.manager.Refresh(ctx); err != nil {
+		return nil, err
+	}
+	items := h.manager.List()
+	snapshots := make([]WorkspaceLifecycleSnapshot, 0, len(items))
+	for _, ws := range items {
+		snapshots = append(
+			snapshots,
+			snapshotFromState(ws, WorkspaceLifecycleState{}),
+		)
+	}
+	return snapshots, nil
+}
+
+func (h *Handler) listImplWorkspaceViews(
+	ctx context.Context,
+) ([]ImplWorkspaceView, error) {
+	runtime, err := h.listLifecycle(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if h.implWorkspaces == nil {
+		return lifecycleSnapshotsToImplViews(runtime), nil
+	}
+	rows, err := h.implWorkspaces.ListImplWorkspaces(ctx)
+	if err != nil {
+		return nil, err
+	}
+	main, nonMain := splitMainSnapshot(runtime)
+	return BuildImplWorkspaceViews(rows, nonMain, main), nil
+}
+
+func snapshotsToWorkspaces(items []WorkspaceLifecycleSnapshot) []Workspace {
+	out := make([]Workspace, 0, len(items))
+	for _, item := range items {
+		out = append(out, item.Workspace)
+	}
+	return out
+}
+
+func isDatastarRequest(r *http.Request) bool {
+	return strings.Contains(r.Header.Get("Datastar-Request"), "true") ||
+		strings.Contains(r.Header.Get("Accept"), "text/event-stream")
+}
+
+func BuildNavItems(
+	items []Workspace,
+	currentSlug, managerURL string,
+	redirectPath ...string,
+) []layouts.WorkspaceNavItem {
+	managerURL = strings.TrimRight(strings.TrimSpace(managerURL), "/")
+	redirect := "/"
+	if len(redirectPath) > 0 {
+		if validated, err := ValidateLocalRedirectPath(redirectPath[0]); err == nil {
+			redirect = validated
+		}
+	}
+	nav := make([]layouts.WorkspaceNavItem, 0, len(items))
+	for _, ws := range items {
+		if ws.Slug == "main" || ws.Slug == currentSlug {
+			ws.Status = StatusRunning
+		}
+		itemURL := managerURL + "/workspaces"
+		if ws.Status == StatusRunning && strings.TrimSpace(ws.URL) != "" {
+			itemURL = managerURL + "/workspaces/switch/" + ws.Slug + "?redirect=" + url.QueryEscape(
+				redirect,
+			)
+		}
+		nav = append(nav, layouts.WorkspaceNavItem{
+			Slug:       ws.Slug,
+			Label:      workspaceNavLabel(ws),
+			URL:        itemURL,
+			Status:     string(ws.Status),
+			Current:    ws.Slug == currentSlug,
+			ManagerURL: managerURL,
+		})
+	}
+	return nav
+}
+
+func workspaceNavLabel(ws Workspace) string {
+	if strings.TrimSpace(ws.DisplayName) != "" {
+		return ws.DisplayName
+	}
+	return ws.Slug
+}
+
+func userEmailFromContext(c echo.Context) string {
+	if email, ok := c.Get("user_email").(string); ok {
+		return email
+	}
+	return ""
+}
+
+func render(c echo.Context, status int, component templ.Component) error {
+	c.Response().Writer.WriteHeader(status)
+	return component.Render(c.Request().Context(), c.Response().Writer)
+}

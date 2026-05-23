@@ -1,0 +1,59 @@
+syntax = "proto3";
+
+package agents.auth.v1;
+
+option go_package = "github.com/CoreyCole/vamos/pkg/proto/auth/v1;authv1";
+
+// AuthService handles authentication operations via Connect RPC
+service AuthService {
+  // Logout terminates the user's session and returns an HTML redirect
+  rpc Logout(LogoutRequest) returns (LogoutResponse);
+
+  // GetCurrentUser returns the currently authenticated user's information
+  rpc GetCurrentUser(GetCurrentUserRequest) returns (GetCurrentUserResponse);
+
+  // ValidateSession checks if the current session is valid
+  rpc ValidateSession(ValidateSessionRequest) returns (ValidateSessionResponse);
+}
+
+// LogoutRequest is empty as session is determined from cookie
+message LogoutRequest {}
+
+// LogoutResponse returns an HTML fragment for datastar to handle redirect
+message LogoutResponse {
+  // HTML content to render (typically a redirect)
+  string html = 1;
+
+  // Success indicator
+  bool success = 2;
+}
+
+// GetCurrentUserRequest is empty as user is determined from cookie/session
+message GetCurrentUserRequest {}
+
+// GetCurrentUserResponse contains the authenticated user's information
+message GetCurrentUserResponse {
+  // User's email address
+  string email = 1;
+
+  // Session ID
+  string session_id = 2;
+
+  // Session expiration timestamp (RFC3339 format)
+  string expires_at = 3;
+}
+
+// ValidateSessionRequest is empty as session is determined from cookie
+message ValidateSessionRequest {}
+
+// ValidateSessionResponse indicates session validity
+message ValidateSessionResponse {
+  // Whether the session is valid
+  bool valid = 1;
+
+  // User email if session is valid
+  string email = 2;
+
+  // Error message if session is invalid
+  string error = 3;
+}

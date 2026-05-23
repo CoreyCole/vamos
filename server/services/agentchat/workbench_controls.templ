@@ -1,0 +1,113 @@
+package agentchat
+
+import "github.com/CoreyCole/vamos/server/layouts/workbench"
+
+templ WorkbenchRegionToggleButton(signalKey string, label string, icon templ.Component) {
+	<button
+		type="button"
+		class="inline-flex h-8 w-8 items-center justify-center rounded-md border border-border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+		data-on:click={ "$workbench.regions." + signalKey + ".visible = !$workbench.regions." + signalKey + ".visible" }
+		data-attr:aria-pressed={ "$workbench.regions." + signalKey + ".visible ? 'true' : 'false'" }
+		aria-label={ label }
+		title={ label }
+	>
+		<span class="sr-only">{ label }</span>
+		@icon
+	</button>
+}
+
+templ SidebarIcon() {
+	<svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+		<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7h16M4 12h16M4 17h16"></path>
+	</svg>
+}
+
+templ ArtifactIcon() {
+	<svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+		<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z"></path>
+	</svg>
+}
+
+templ FocusIcon() {
+	<svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+		<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 3H5a2 2 0 0 0-2 2v3M16 3h3a2 2 0 0 1 2 2v3M8 21H5a2 2 0 0 1-2-2v-3M16 21h3a2 2 0 0 0 2-2v-3"></path>
+	</svg>
+}
+
+templ ExitFocusIcon() {
+	<svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+		<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 9H5V5m10 4h4V5M9 15H5v4m10-4h4v4"></path>
+	</svg>
+}
+
+templ ResetLayoutIcon() {
+	<svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+		<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v6h6M20 20v-6h-6M5 19a8 8 0 0 0 13-3M19 5A8 8 0 0 0 6 8"></path>
+	</svg>
+}
+
+templ WorkbenchFocusToggleButton(state workbench.WorkbenchState) {
+	<button
+		type="button"
+		class="inline-flex h-8 w-8 items-center justify-center rounded-md border border-border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+		data-show="!$workbench.focused"
+		data-on:click={ workbench.FocusEnterAction(state) }
+		aria-label="Focus chat"
+		title="Focus chat"
+	>
+		<span class="sr-only">Focus chat</span>
+		@FocusIcon()
+	</button>
+	<button
+		type="button"
+		class="inline-flex h-8 w-8 items-center justify-center rounded-md border border-border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+		data-show="$workbench.focused"
+		data-on:click={ workbench.FocusExitAction(state) }
+		aria-label="Exit focus"
+		title="Exit focus"
+	>
+		<span class="sr-only">Exit focus</span>
+		@ExitFocusIcon()
+	</button>
+}
+
+templ WorkbenchResetLayoutButton(state workbench.WorkbenchState) {
+	<form data-on:submit="@post('/api/layout-preferences/reset', {contentType: 'form'})">
+		<input type="hidden" name="page" value={ string(state.Page) }/>
+		<input type="hidden" name="view" value={ string(state.View) }/>
+		<button
+			type="submit"
+			class="inline-flex h-8 w-8 items-center justify-center rounded-md border border-border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+			aria-label="Reset layout"
+			title="Reset layout"
+		>
+			<span class="sr-only">Reset layout</span>
+			@ResetLayoutIcon()
+		</button>
+	</form>
+}
+
+templ FreeformRunHeader(state workbench.WorkbenchState) {
+	<div
+		id="agent-chat-run-header"
+		class="absolute inset-x-0 top-0 z-20 flex items-center justify-between border-b bg-card px-4 py-3 backdrop-blur supports-[backdrop-filter]:bg-card/95"
+	>
+		<div class="flex min-w-0 flex-1 items-center gap-2">
+			<div
+				class="flex items-center gap-2"
+				data-class="{'!hidden': $workbench.regions.agentChatNavigation.visible, '!flex': !$workbench.regions.agentChatNavigation.visible}"
+			>
+				@WorkbenchRegionToggleButton("agentChatNavigation", "Toggle sessions sidebar", SidebarIcon())
+				@NewChatButton()
+			</div>
+		</div>
+		<div class="pointer-events-none absolute inset-x-16 flex justify-center">
+			<p class="truncate text-sm font-medium text-foreground">Freeform Chat</p>
+		</div>
+		<div class="flex flex-1 items-center justify-end gap-2">
+			@WorkbenchRegionToggleButton("agentChatContext", "Toggle artifact pane", ArtifactIcon())
+			@WorkbenchFocusToggleButton(state)
+			@WorkbenchResetLayoutButton(state)
+		</div>
+	</div>
+}

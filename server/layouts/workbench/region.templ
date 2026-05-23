@@ -1,0 +1,25 @@
+package workbench
+
+templ Region(state WorkbenchState, region WorkbenchRegion) {
+	<section
+		id={ region.TargetID }
+		data-workbench-region={ region.ID }
+		data-workbench-signal={ SignalKey(region) }
+		data-workbench-visible?={ region.Visible }
+		data-workbench-ratio={ FloatAttr(region.Ratio) }
+		data-workbench-min-rem={ FloatAttr(region.MinRem) }
+		data-workbench-slot={ string(region.Slot) }
+		data-workbench-kind={ string(region.Kind) }
+		data-class={ RegionDataClass(region) }
+		data-attr:aria-hidden={ RegionAriaHidden(region) }
+		class={ RegionInitialClass(region) + " workbench-region overflow-hidden rounded-lg border border-border bg-card shadow-sm max-md:!w-full max-md:!flex-1" }
+	>
+		<div class="min-h-0 flex-1 overflow-hidden">
+			if region.Component != nil {
+				@region.Component
+			} else {
+				@EmptyRegion(region)
+			}
+		</div>
+	</section>
+}

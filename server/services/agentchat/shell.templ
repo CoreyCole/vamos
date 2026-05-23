@@ -1,0 +1,88 @@
+package agentchat
+
+templ AgentChatResponsiveLayout(args AgentChatResponsiveLayoutArgs) {
+	@args.Sidebar
+	<div
+		class={ "flex min-h-0 min-w-0 flex-1 flex-col gap-3 md:grid md:gap-4 transition-[grid-template-columns] duration-200 ease-out", agentChatDesktopGridInitialClass(args.HasSelectedThread) }
+		data-class="{'grid-cols-[minmax(0,1fr)_20rem]': $showSidebar, 'grid-cols-[minmax(0,1fr)_minmax(0,1fr)]': !$showSidebar}"
+	>
+		@AgentChatMobileToolbar()
+		@AgentChatChatPane(args.ChatHeader, args.Messages, args.Composer)
+		@AgentChatRightPane(args.RightPane)
+	</div>
+}
+
+templ AgentChatMobileToolbar() {
+	<div class="flex shrink-0 items-center justify-between gap-2 md:hidden">
+		@AgentChatMobileSidebarTrigger()
+		@AgentChatMobilePaneToggle()
+	</div>
+}
+
+templ AgentChatMobilePaneToggle() {
+	<div class="inline-grid grid-cols-2 rounded-lg border border-border bg-muted/40 p-1 text-xs" role="tablist" aria-label="Agent Chat mobile panes">
+		<button id="agent-chat-mobile-chat-tab" type="button" class="rounded-md px-3 py-1.5 font-medium text-muted-foreground transition-colors hover:bg-background/80 hover:text-foreground" data-on:click="$mobilePane = 'chat'" data-class="{'bg-background text-foreground shadow-sm': $mobilePane === 'chat'}" data-attr:aria-selected="$mobilePane === 'chat' ? 'true' : 'false'" aria-controls="agent-chat-chat-pane" role="tab">
+			Chat
+		</button>
+		<button id="agent-chat-mobile-rail-tab" type="button" class="rounded-md px-3 py-1.5 font-medium text-muted-foreground transition-colors hover:bg-background/80 hover:text-foreground" data-on:click="$mobilePane = 'rail'" data-class="{'bg-background text-foreground shadow-sm': $mobilePane === 'rail'}" data-attr:aria-selected="$mobilePane === 'rail' ? 'true' : 'false'" aria-controls="agent-chat-rail-pane" role="tab">
+			Artifacts
+		</button>
+	</div>
+}
+
+templ AgentChatChatPane(header templ.Component, messages templ.Component, composer templ.Component) {
+	<main id="agent-chat-chat-pane" class="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-lg border border-border bg-card" data-class="{'hidden md:flex': $mobilePane !== 'chat'}" role="tabpanel" aria-labelledby="agent-chat-mobile-chat-tab">
+		@header
+		<div class="relative min-h-0 flex-1">
+			@ChatScrollControls()
+			<div id="agent-chat-scroll-region" class="h-full overflow-y-auto">
+				@messages
+			</div>
+		</div>
+		<div class="absolute inset-x-0 bottom-0 z-20 bg-card p-4 pt-3 backdrop-blur supports-[backdrop-filter]:bg-card/95">
+			@composer
+		</div>
+	</main>
+}
+
+templ AgentChatRightPane(content templ.Component) {
+	<aside id="agent-chat-rail-pane" class="hidden min-h-0 min-w-0 flex-1 md:block" data-class="{'block': $mobilePane === 'rail', 'hidden md:block': $mobilePane !== 'rail'}" role="tabpanel" aria-labelledby="agent-chat-mobile-rail-tab">
+		@content
+	</aside>
+}
+
+templ AgentChatToast() {
+	<div
+		class="pointer-events-none fixed bottom-4 left-1/2 z-50 -translate-x-1/2 rounded-full border border-border bg-background/95 px-3 py-1.5 text-xs font-medium text-foreground shadow-lg backdrop-blur"
+		data-show="$agentChatToast"
+		data-text="$agentChatToast"
+	></div>
+}
+
+templ ChatScrollControls() {
+	<div class="pointer-events-none absolute bottom-24 right-4 top-16 z-20 flex flex-col justify-between">
+		<button
+			type="button"
+			class="pointer-events-auto inline-flex h-8 w-8 items-center justify-center rounded-md border border-border bg-background/95 text-muted-foreground shadow-sm backdrop-blur transition-colors hover:bg-muted hover:text-foreground"
+			aria-label="Scroll to top"
+			title="Scroll to top"
+			data-on:click="document.getElementById('agent-chat-scroll-region')?.scrollTo({ top: 0, behavior: 'smooth' })"
+		>
+			<svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+				<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7"></path>
+			</svg>
+		</button>
+		<button
+			type="button"
+			class="pointer-events-auto inline-flex h-8 w-8 items-center justify-center rounded-md border border-border bg-background/95 text-muted-foreground shadow-sm backdrop-blur transition-colors hover:bg-muted hover:text-foreground"
+			aria-label="Scroll to bottom"
+			title="Scroll to bottom"
+			data-on:click="document.getElementById('agent-chat-scroll-region')?.scrollTo({ top: document.getElementById('agent-chat-scroll-region')?.scrollHeight ?? 0, behavior: 'smooth' })"
+		>
+			<svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+				<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+			</svg>
+		</button>
+	</div>
+}
+

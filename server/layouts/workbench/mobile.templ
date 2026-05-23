@@ -1,0 +1,20 @@
+package workbench
+
+templ MobileRegionTabs(state WorkbenchState) {
+	<div class="flex shrink-0 items-center gap-2 md:hidden" role="tablist" aria-label="Workbench regions">
+		for _, region := range state.Regions {
+			<button
+				type="button"
+				class="rounded-md border border-border bg-background px-3 py-1.5 text-xs font-medium text-muted-foreground shadow-sm transition-colors hover:text-foreground"
+				data-show={ "$workbench.normalRegions." + SignalKey(region) + ".available" }
+				data-on:click={ "$workbench.activeRegionID = '" + SignalKey(region) + "'; $workbench.regions." + SignalKey(region) + ".visible = true" }
+				data-class={ "{'bg-muted text-foreground': $workbench.activeRegionID === '" + SignalKey(region) + "'}" }
+				data-attr:aria-selected={ "$workbench.activeRegionID === '" + SignalKey(region) + "' ? 'true' : 'false'" }
+				aria-controls={ region.TargetID }
+				role="tab"
+			>
+				{ mobileRegionLabel(region) }
+			</button>
+		}
+	</div>
+}

@@ -1,0 +1,485 @@
+package dateinput
+
+import (
+	"crypto/rand"
+	"fmt"
+	"github.com/CoreyCole/vamos/pkg/components/input"
+	"github.com/CoreyCole/vamos/pkg/components/utils"
+	"strings"
+)
+
+type DateInputSignals struct {
+	// Single mode signals
+	InputValue string `json:"inputValue"` // "12/25/2023" - display format
+	DateValue  string `json:"dateValue"`  // "2023-12-25" - ISO format for forms
+
+	// Range mode signals
+	StartInputValue string `json:"startInputValue"` // Start date display format
+	StartDateValue  string `json:"startDateValue"`  // Start date ISO format
+	EndInputValue   string `json:"endInputValue"`   // End date display format
+	EndDateValue    string `json:"endDateValue"`    // End date ISO format
+	EndDateEnabled  bool   `json:"endDateEnabled"`  // Checkbox state for optional end date
+
+	// Shared validation
+	IsValid      bool   `json:"isValid"`      // Overall validation state
+	ErrorMessage string `json:"errorMessage"` // Validation error message
+}
+
+// DateInput renders a smart date input with auto-formatting and validation
+// Supports both single mode and range mode with optional end dates
+templ DateInput(args DateInputArgs) {
+	{{
+		// Generate unique ID if not provided
+		dateInputID := args.ID
+		if dateInputID == "" {
+			b := make([]byte, 4)
+			rand.Read(b)
+			dateInputID = fmt.Sprintf("dateinput_%x", b)
+		}
+
+		// Determine mode (default to single)
+		mode := args.Mode
+		if mode == "" {
+			mode = "single"
+		}
+
+		// Declare signals variable at top level
+		var signals *utils.SignalManager
+
+		// Initialize based on mode - when CalendarID is provided, don't create own signals
+		if mode == "single" && args.CalendarID == "" {
+			// Single mode initialization (existing logic)
+			placeholder := args.Placeholder
+			if placeholder == "" {
+				placeholder = "MM/DD/YYYY"
+			}
+
+			initialInputValue := args.Value
+			initialDateValue := ""
+
+			// Convert input value to ISO format if provided
+			if initialInputValue != "" {
+				parts := strings.Split(initialInputValue, "/")
+				if len(parts) == 3 {
+					month, day, year := parts[0], parts[1], parts[2]
+					if len(year) == 2 {
+						if year >= "00" && year <= "30" {
+							year = "20" + year
+						} else {
+							year = "19" + year
+						}
+					}
+					initialDateValue = fmt.Sprintf("%s-%02s-%02s", year, month, day)
+				}
+			}
+
+			// Create signals for single mode
+			signals = utils.Signals(dateInputID, DateInputSignals{
+				InputValue:   initialInputValue,
+				DateValue:    initialDateValue,
+				IsValid:      true,
+				ErrorMessage: "",
+			})
+		} else if args.CalendarID == "" {
+			// Range mode initialization when no CalendarID is provided
+			initialStartInput := args.StartValue
+			initialEndInput := args.EndValue
+			initialStartDate := ""
+			initialEndDate := ""
+			initialEndEnabled := !args.EndDateOptional // If not optional, end date is enabled by default
+
+			// If end date has a value, it should be enabled regardless of optional setting
+			if initialEndInput != "" {
+				initialEndEnabled = true
+			}
+
+			// Convert start value to ISO format
+			if initialStartInput != "" {
+				parts := strings.Split(initialStartInput, "/")
+				if len(parts) == 3 {
+					month, day, year := parts[0], parts[1], parts[2]
+					if len(year) == 2 {
+						if year >= "00" && year <= "30" {
+							year = "20" + year
+						} else {
+							year = "19" + year
+						}
+					}
+					initialStartDate = fmt.Sprintf("%s-%02s-%02s", year, month, day)
+				}
+			}
+
+			// Convert end value to ISO format
+			if initialEndInput != "" {
+				parts := strings.Split(initialEndInput, "/")
+				if len(parts) == 3 {
+					month, day, year := parts[0], parts[1], parts[2]
+					if len(year) == 2 {
+						if year >= "00" && year <= "30" {
+							year = "20" + year
+						} else {
+							year = "19" + year
+						}
+					}
+					initialEndDate = fmt.Sprintf("%s-%02s-%02s", year, month, day)
+				}
+			}
+
+			// Create signals for range mode
+			signals = utils.Signals(dateInputID, DateInputSignals{
+				StartInputValue: initialStartInput,
+				StartDateValue:  initialStartDate,
+				EndInputValue:   initialEndInput,
+				EndDateValue:    initialEndDate,
+				EndDateEnabled:  initialEndEnabled,
+				IsValid:         true,
+				ErrorMessage:    "",
+			})
+		} else {
+			// When CalendarID is provided, reference existing calendar signals instead of creating new ones
+			// Don't create any DateInput-specific signals - use the calendar's signals directly
+			signals = &utils.SignalManager{ID: args.CalendarID}
+		}
+
+		// Input classes will be handled by the Input component
+
+		// Create DateInput handler using expression builder
+		dateInputHandler := newDateInputHandler(dateInputID, signals, args.CalendarID)
+		
+		// Determine signal names based on coordination mode
+		var inputSignalName, dateSignalName string
+		if mode == "single" {
+			// Use consistent signal names for both calendar and standalone modes
+			inputSignalName = "inputValue"
+			dateSignalName = "dateValue"
+		}
+
+		// Handler for allowed keys including slash and digits
+		keyHandler := "['Backspace', 'Delete', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Tab', 'Enter', 'Escape', '/'].includes(evt.key) || (evt.key >= '0' && evt.key <= '9') ? null : evt.preventDefault()"
+
+		// Set placeholder for single mode
+		placeholder := args.Placeholder
+		if mode == "single" && placeholder == "" {
+			placeholder = "MM/DD/YYYY"
+		}
+	}}
+	if mode == "single" {
+		<!-- Single Mode DateInput -->
+		<div
+			data-slot="dateinput"
+			data-dateinput-id={ dateInputID }
+			if args.CalendarID == "" {
+				data-signals={ signals.DataSignals }
+			}
+			class="relative w-full"
+			{ args.Attributes... }
+		>
+			<!-- Hidden input for form submission (ISO format) -->
+			if args.Name != "" {
+				<input
+					type="hidden"
+					name={ args.Name }
+					data-bind={ func() string {
+						if args.CalendarID != "" {
+							// When coordinating with calendar, use direct signal reference without $ prefix
+							return args.CalendarID + "." + dateSignalName
+						}
+						return signals.Signal(dateSignalName)
+					}() }
+					if args.Required {
+						required
+					}
+				/>
+			}
+			<!-- Input field with optional postfix -->
+			<div class="relative">
+				@input.Input(input.InputArgs{
+					Type:        "text",
+					ID:          dateInputID,
+					Name:        args.Name + "_display",
+					Placeholder: placeholder,
+					Class:       args.Class,
+					Disabled:    args.Disabled,
+					Attributes: templ.Attributes{
+						"maxlength":                     "12",
+						"data-bind":                     func() string {
+							if args.CalendarID != "" {
+								// When coordinating with calendar, use direct signal reference without $ prefix
+								return args.CalendarID + "." + inputSignalName
+							}
+							return signals.Signal(inputSignalName)
+						}(),
+						"data-on:input__debounce_300ms": dateInputHandler.buildInputHandler(inputSignalName, dateSignalName),
+						"data-on:blur":                  dateInputHandler.buildBlurHandler(inputSignalName, dateSignalName),
+						"data-on:keydown":               keyHandler,
+					},
+				})
+				if args.Postfix != nil {
+					<div class="absolute right-3 top-1/2 -translate-y-1/2">
+						@args.Postfix
+					</div>
+				}
+			</div>
+		</div>
+	} else {
+		<!-- Range Mode DateInput -->
+		{{
+			// Determine layout
+			orientation := args.Orientation
+			if orientation == "" {
+				orientation = "horizontal"
+			}
+
+			// Determine separator
+			separator := args.Separator
+			if separator == "" {
+				separator = "to"
+			}
+
+			// Determine placeholders
+			startPlaceholder := args.StartPlaceholder
+			if startPlaceholder == "" {
+				startPlaceholder = "MM/DD/YYYY"
+			}
+
+			endPlaceholder := args.EndPlaceholder
+			if endPlaceholder == "" {
+				endPlaceholder = "MM/DD/YYYY"
+			}
+
+			// Form field names
+			startFieldName := args.StartName
+			if startFieldName == "" {
+				startFieldName = args.Name + "_start"
+			}
+
+			endFieldName := args.EndName
+			if endFieldName == "" {
+				endFieldName = args.Name + "_end"
+			}
+
+			// Use expression builders for tab and checkbox handlers
+			startTabHandler := dateInputHandler.buildTabHandler("startInputValue", "startDateValue")
+			checkboxChangeHandler := dateInputHandler.buildCheckboxChangeHandler(dateInputID + "_end")
+
+			// Layout classes
+			containerClass := "space-y-4"
+			inputContainerClass := "space-y-2"
+			if orientation == "horizontal" {
+				containerClass = "space-y-2"
+				inputContainerClass = "flex items-center gap-3"
+			}
+		}}
+		<div
+			data-slot="dateinput-range"
+			data-dateinput-id={ dateInputID }
+			if args.CalendarID == "" {
+				data-signals={ signals.DataSignals }
+			}
+			class={ "w-full " + containerClass }
+			{ args.Attributes... }
+		>
+			<!-- Hidden inputs for form submission -->
+			if args.Name != "" || args.StartName != "" {
+				<input
+					type="hidden"
+					name={ startFieldName }
+					data-bind={ func() string {
+						if args.CalendarID != "" {
+							// When coordinating with calendar, use direct signal reference without $ prefix
+							return args.CalendarID + ".startDateValue"
+						}
+						return signals.Signal("startDateValue")
+					}() }
+					if args.Required {
+						required
+					}
+				/>
+				<!-- End date hidden input - only required if enabled and Required prop is true -->
+				<input
+					type="hidden"
+					name={ endFieldName }
+					data-bind={ func() string {
+						if args.CalendarID != "" {
+							// Use calendar signals SignalManager for proper signal reference
+							calendarSignals := &utils.SignalManager{ID: args.CalendarID}
+							return calendarSignals.Signal("endDateEnabled") + " ? " + calendarSignals.Signal("endDateValue") + " : ''"
+						}
+						return signals.Signal("endDateEnabled") + " ? " + signals.Signal("endDateValue") + " : ''"
+					}() }
+					data-required={ func() string {
+						if args.CalendarID != "" {
+							// Use calendar signals SignalManager for proper signal reference
+							calendarSignals := &utils.SignalManager{ID: args.CalendarID}
+							return calendarSignals.Signal("endDateEnabled") + " && " + fmt.Sprintf("%t", args.Required)
+						}
+						return signals.Signal("endDateEnabled") + " && " + fmt.Sprintf("%t", args.Required)
+					}() }
+				/>
+			}
+			<!-- Optional end date checkbox -->
+			if args.EndDateOptional {
+				<div class="flex items-center space-x-2">
+					<!-- Using button with checkbox role to avoid signal conflicts -->
+					<button
+						type="button"
+						id={ dateInputID + "_checkbox" }
+						role="checkbox"
+						class="peer border-input data-[state=checked]:bg-primary data-[state=checked]:text-primary-foreground data-[state=checked]:border-primary focus-visible:border-ring focus-visible:ring-ring/50 size-4 shrink-0 rounded-[4px] border shadow-xs transition-shadow outline-none focus-visible:ring-[3px] disabled:cursor-not-allowed disabled:opacity-50"
+						data-on:click={ func() string {
+							if args.CalendarID != "" {
+								// Use calendar signals SignalManager for proper signal reference
+								calendarSignals := &utils.SignalManager{ID: args.CalendarID}
+								return calendarSignals.Toggle("endDateEnabled") + "; " + checkboxChangeHandler
+							}
+							return signals.Toggle("endDateEnabled") + "; " + checkboxChangeHandler
+						}() }
+						data-attr:aria-checked={ func() string {
+							if args.CalendarID != "" {
+								// Use calendar signals SignalManager for proper signal reference
+								calendarSignals := &utils.SignalManager{ID: args.CalendarID}
+								return calendarSignals.Signal("endDateEnabled") + " ? 'true' : 'false'"
+							}
+							return signals.Signal("endDateEnabled") + " ? 'true' : 'false'"
+						}() }
+						data-attr:data-state={ func() string {
+							if args.CalendarID != "" {
+								// Use calendar signals SignalManager for proper signal reference
+								calendarSignals := &utils.SignalManager{ID: args.CalendarID}
+								return calendarSignals.Signal("endDateEnabled") + " ? 'checked' : 'unchecked'"
+							}
+							return signals.Signal("endDateEnabled") + " ? 'checked' : 'unchecked'"
+						}() }
+					>
+						<!-- Checkmark icon -->
+						<svg
+							xmlns="http://www.w3.org/2000/svg"
+							viewBox="0 0 24 24"
+							fill="none"
+							stroke="currentColor"
+							stroke-width="2"
+							stroke-linecap="round"
+							stroke-linejoin="round"
+							class="h-3.5 w-3.5"
+							data-attr:style={ func() string {
+								if args.CalendarID != "" {
+									// Use calendar signals SignalManager for proper signal reference
+									calendarSignals := &utils.SignalManager{ID: args.CalendarID}
+									return calendarSignals.Signal("endDateEnabled") + " ? 'opacity: 1' : 'opacity: 0'"
+								}
+								return signals.Signal("endDateEnabled") + " ? 'opacity: 1' : 'opacity: 0'"
+							}() }
+						>
+							<path d="M20 6 9 17l-5-5"></path>
+						</svg>
+					</button>
+					<label
+						for={ dateInputID + "_checkbox" }
+						class="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+					>
+						Set an end date
+					</label>
+				</div>
+			}
+			<!-- Date inputs container -->
+			<div class={ inputContainerClass }>
+				<!-- Start date input -->
+				<div class="flex-1 space-y-1">
+					if orientation == "vertical" || args.EndDateOptional {
+						<label class="text-sm font-medium text-foreground">
+							Start Date
+							if args.Required {
+								<span class="text-destructive">*</span>
+							}
+						</label>
+					}
+					@input.Input(input.InputArgs{
+						Type:        "text",
+						ID:          dateInputID + "_start",
+						Placeholder: startPlaceholder,
+						Class:       args.Class,
+						Disabled:    args.Disabled,
+						Attributes: templ.Attributes{
+							"maxlength":                     "12",
+							"data-bind":                     func() string {
+								if args.CalendarID != "" {
+									// When coordinating with calendar, use direct signal reference without $ prefix
+									return args.CalendarID + ".startInputValue"
+								}
+								return signals.Signal("startInputValue")
+							}(),
+							"data-on:input__debounce_300ms": dateInputHandler.buildInputHandler("startInputValue", "startDateValue"),
+							"data-on:blur":                  dateInputHandler.buildBlurHandler("startInputValue", "startDateValue"),
+							"data-on:keydown":               keyHandler + "; " + startTabHandler,
+						},
+					})
+				</div>
+				<!-- End date input with dynamic disable state -->
+				<div class="flex-1 space-y-1">
+					if orientation == "vertical" || args.EndDateOptional {
+						<label
+							for={ dateInputID + "_end" }
+							class="text-sm font-medium"
+							data-class={ func() string {
+								if args.CalendarID != "" {
+									// Use calendar signals SignalManager for proper signal reference
+									calendarSignals := &utils.SignalManager{ID: args.CalendarID}
+									return utils.NewDataClass().
+										Add("text-foreground", calendarSignals.Signal("endDateEnabled")).
+										Add("text-muted-foreground", "!"+calendarSignals.Signal("endDateEnabled")).
+										Build()
+								}
+								return utils.NewDataClass().
+									Add("text-foreground", signals.Signal("endDateEnabled")).
+									Add("text-muted-foreground", "!"+signals.Signal("endDateEnabled")).
+									Build()
+							}() }
+						>
+							End Date
+							if args.Required && !args.EndDateOptional {
+								<span class="text-destructive">*</span>
+							}
+						</label>
+					}
+					<!-- Single input with dynamic disabled state -->
+					@input.Input(input.InputArgs{
+						Type:        "text",
+						ID:          dateInputID + "_end",
+						Placeholder: endPlaceholder,
+						Class:       args.Class,
+						Disabled:    args.Disabled,
+						Attributes: templ.Attributes{
+							"maxlength":                     "12",
+							"data-bind":                     func() string {
+								if args.CalendarID != "" {
+									// When coordinating with calendar, use direct signal reference without $ prefix
+									return args.CalendarID + ".endInputValue"
+								}
+								return signals.Signal("endInputValue")
+							}(),
+							"data-on:input__debounce_300ms": dateInputHandler.buildInputHandler("endInputValue", "endDateValue"),
+							"data-on:blur":                  dateInputHandler.buildBlurHandler("endInputValue", "endDateValue"),
+							"data-on:keydown":               keyHandler,
+							"data-attr:disabled":            func() string {
+								if args.CalendarID != "" {
+									// Use calendar signals SignalManager for proper signal reference
+									calendarSignals := &utils.SignalManager{ID: args.CalendarID}
+									return "!" + calendarSignals.Signal("endDateEnabled")
+								}
+								return "!" + signals.Signal("endDateEnabled")
+							}(),
+							"data-attr:tabindex":            func() string {
+								if args.CalendarID != "" {
+									// Use calendar signals SignalManager for proper signal reference
+									calendarSignals := &utils.SignalManager{ID: args.CalendarID}
+									return calendarSignals.Signal("endDateEnabled") + " ? '0' : '-1'"
+								}
+								return signals.Signal("endDateEnabled") + " ? '0' : '-1'"
+							}(),
+						},
+					})
+				</div>
+			</div>
+		</div>
+	}
+}

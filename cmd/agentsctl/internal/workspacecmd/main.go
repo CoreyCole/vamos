@@ -1,0 +1,117 @@
+package workspacecmd
+
+import (
+	"context"
+	"flag"
+	"fmt"
+	"os"
+	"strings"
+)
+
+func Main(args []string) error {
+	if len(args) == 0 {
+		return usage()
+	}
+	cwd, err := os.Getwd()
+	if err != nil {
+		return err
+	}
+	ctx := context.Background()
+	if args[0] == "register-current" {
+		fs := flag.NewFlagSet(
+			"agentsctl workspace register-current",
+			flag.ContinueOnError,
+		)
+		managerURL := fs.String("manager-url", "", "workspace manager URL")
+		restartToken := fs.String("restart-token", "", "workspace restart/API token")
+		planDir := fs.String(
+			"plan-dir",
+			"",
+			"QRSPI plan directory to bind to this checkout",
+		)
+		createdBy := fs.String(
+			"created-by",
+			"agentsctl workspace register-current",
+			"binding provenance",
+		)
+		if err := fs.Parse(args[1:]); err != nil {
+			return err
+		}
+		return RunRegisterCurrent(ctx, cwd, RegisterOptions{
+			ManagerURL:   *managerURL,
+			RestartToken: *restartToken,
+			PlanDir:      *planDir,
+			CreatedBy:    *createdBy,
+		}, os.Stdout)
+	}
+	cfg, err := LoadConfig(cwd)
+	if err != nil {
+		return err
+	}
+	switch args[0] {
+	case "status":
+		return RunStatus(ctx, cfg, os.Stdout)
+	case "logs":
+		fs := flag.NewFlagSet("agentsctl workspace logs", flag.ContinueOnError)
+		tail := fs.Int("tail", 100, "lines to print")
+		var target string
+		logArgs := args[1:]
+		if len(logArgs) > 0 && !strings.HasPrefix(logArgs[0], "-") {
+			target = logArgs[0]
+			logArgs = logArgs[1:]
+		}
+		if err := fs.Parse(logArgs); err != nil {
+			return err
+		}
+		if target == "" && fs.NArg() == 1 {
+			target = fs.Arg(0)
+		}
+		if target == "" || fs.NArg() > 1 {
+			return fmt.Errorf(
+				"usage: agentsctl workspace logs <web|temporal|ts-worker> [--tail N]",
+			)
+		}
+		return RunLogs(ctx, cfg, WorkspaceLogTarget(target), *tail, os.Stdout)
+	case "doctor":
+		fs := flag.NewFlagSet("agentsctl workspace doctor", flag.ContinueOnError)
+		tail := fs.Int("tail", 120, "lines to print from each log")
+		if err := fs.Parse(args[1:]); err != nil {
+			return err
+		}
+		return RunDoctor(ctx, cfg, *tail, os.Stdout)
+	case "restart":
+		fs := flag.NewFlagSet("agentsctl workspace restart", flag.ContinueOnError)
+		force := fs.Bool("force", false, "force restart after stale process/stop failure")
+		components := multiStringFlag{}
+		fs.Var(
+			&components,
+			"component",
+			"component to restart: web or ts_worker; repeatable",
+		)
+		if err := fs.Parse(args[1:]); err != nil {
+			return err
+		}
+		normalized, err := componentsFromWorkspaceCLIFlags(components)
+		if err != nil {
+			return err
+		}
+		return RunRestart(ctx, cfg, normalized, *force, os.Stdout)
+	default:
+		return usage()
+	}
+}
+
+func usage() error {
+	return fmt.Errorf(
+		"usage: agentsctl workspace <status|logs|doctor|restart|register-current> [flags]",
+	)
+}
+
+type multiStringFlag []string
+
+func (f *multiStringFlag) String() string { return strings.Join(*f, ",") }
+
+func (f *multiStringFlag) Set(value string) error {
+	*f = append(*f, value)
+	return nil
+}

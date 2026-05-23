@@ -1,0 +1,35 @@
+package workbench
+
+func mobileRegionLabel(region WorkbenchRegion) string {
+	if region.Title != "" {
+		return region.Title
+	}
+	switch region.Kind {
+	case RegionChat:
+		return "Chat"
+	case RegionDocument:
+		return "Document"
+	case RegionComments:
+		return "Comments"
+	case RegionSections:
+		return "Sections"
+	case RegionPlanSidebar:
+		return "Workspace"
+	case RegionDoc:
+		return "Docs"
+	case RegionWorkflow:
+		return "Workflow"
+	case RegionRuns:
+		return "Runs"
+	case RegionThoughtsTree:
+		return "Thoughts"
+	default:
+		return "Region"
+	}
+}
+
+templ EmptyRegion(region WorkbenchRegion) {
+	<div class="flex h-full items-center justify-center rounded-lg border border-dashed border-border bg-muted/20 p-4 text-sm text-muted-foreground">
+		No { mobileRegionLabel(region) } content yet.
+	</div>
+}

@@ -1,0 +1,90 @@
+package layouts
+
+import (
+	"github.com/CoreyCole/vamos/pkg/components/card"
+)
+
+// TabContentLayoutArgs holds args for the two-panel tab content layout.
+type TabContentLayoutArgs struct {
+	ID string // Element ID for the outer container
+}
+
+// TabContentLayout renders a two-panel layout with a fixed-width sidebar and
+// flexible content area. Both panels scroll independently with a shared max-height.
+// Usage:
+//
+//	@layouts.TabContentLayout(layouts.TabContentLayoutArgs{ID: "files-list"}) {
+//	    @layouts.TabSidebar("w-64") { ... sidebar card ... }
+//	    // main content goes here directly
+//	}
+templ TabContentLayout(args TabContentLayoutArgs) {
+	<div id={ args.ID } class="flex gap-6 max-h-[calc(100svh-14rem)]">
+		{ children... }
+	</div>
+}
+
+// TabSidebar renders the fixed-width sidebar panel. Pass a Tailwind width
+// class like "w-64" or "w-80" to set the sidebar width.
+templ TabSidebar(width string) {
+	<div class={ "shrink-0 flex flex-col overflow-hidden", width }>
+		{ children... }
+	</div>
+}
+
+// TabSidebarCardArgs holds args for the sidebar card component.
+type TabSidebarCardArgs struct {
+	Title       string
+	Description string // optional
+}
+
+// TabSidebarCard renders a sidebar card with title, optional description,
+// and scrollable content area. Encapsulates the card boilerplate repeated
+// across all tab sidebars.
+templ TabSidebarCard(args TabSidebarCardArgs) {
+	@card.Card(card.CardArgs{Class: "flex flex-col overflow-hidden h-full"}) {
+		if args.Title != "" {
+			@card.CardHeader(card.CardHeaderArgs{}) {
+				@card.CardTitle(card.CardTitleArgs{Class: "text-sm"}) {
+					{ args.Title }
+				}
+				if args.Description != "" {
+					@card.CardDescription(card.CardDescriptionArgs{}) {
+						{ args.Description }
+					}
+				}
+			}
+		}
+		@card.CardContent(card.CardContentArgs{Class: "overflow-auto flex-1"}) {
+			{ children... }
+		}
+	}
+}
+
+// TabContentPanelArgs holds args for the content panel component.
+type TabContentPanelArgs struct {
+	ID string // element ID for SSE patching (e.g. "file-view", "session-transcript")
+}
+
+// TabContentPanel renders the right-side content card wrapper. The caller
+// provides CardHeader/CardContent children since panels vary (some have
+// CardAction, some need scrollable headers, etc.).
+templ TabContentPanel(args TabContentPanelArgs) {
+	<div id={ args.ID } class="flex-1 flex flex-col overflow-hidden">
+		@card.Card(card.CardArgs{Class: "flex flex-col overflow-hidden h-full"}) {
+			{ children... }
+		}
+	</div>
+}
+
+// TabContentPlaceholderArgs holds args for the empty state placeholder.
+type TabContentPlaceholderArgs struct {
+	ID      string // element ID matching the panel it replaces
+	Message string // e.g. "Select a file to view its contents."
+}
+
+// TabContentPlaceholder renders an empty state when nothing is selected.
+templ TabContentPlaceholder(args TabContentPlaceholderArgs) {
+	<div id={ args.ID } class="flex-1">
+		<p class="text-sm text-muted-foreground">{ args.Message }</p>
+	</div>
+}

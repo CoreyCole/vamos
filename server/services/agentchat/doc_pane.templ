@@ -1,0 +1,455 @@
+package agentchat
+
+import (
+	"fmt"
+
+	"github.com/google/uuid"
+
+	"github.com/CoreyCole/vamos/server/services/markdown"
+)
+
+templ DocScrollControls() {
+	<div class="pointer-events-none absolute bottom-4 right-4 top-4 z-20 flex flex-col justify-between">
+		<button
+			type="button"
+			class="pointer-events-auto inline-flex h-8 w-8 items-center justify-center rounded-md border border-border bg-background/95 text-muted-foreground shadow-sm backdrop-blur transition-colors hover:bg-muted hover:text-foreground"
+			aria-label="Scroll doc to top"
+			title="Scroll doc to top"
+			data-on:click="document.getElementById('agent-chat-doc-scroll-region')?.scrollTo({ top: 0, behavior: 'smooth' })"
+		>
+			<svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+				<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7"></path>
+			</svg>
+		</button>
+		<button
+			type="button"
+			class="pointer-events-auto inline-flex h-8 w-8 items-center justify-center rounded-md border border-border bg-background/95 text-muted-foreground shadow-sm backdrop-blur transition-colors hover:bg-muted hover:text-foreground"
+			aria-label="Scroll doc to bottom"
+			title="Scroll doc to bottom"
+			data-on:click="document.getElementById('agent-chat-doc-scroll-region')?.scrollTo({ top: document.getElementById('agent-chat-doc-scroll-region')?.scrollHeight ?? 0, behavior: 'smooth' })"
+		>
+			<svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+				<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+			</svg>
+		</button>
+	</div>
+}
+
+templ WorkspaceDocPane(state WorkspaceDocPaneState, workspaceID string, threadID string) {
+	@DocPaneForWorkspace(state, threadID, workspaceID)
+}
+
+templ DocPane(state DocPaneState, threadID string) {
+	@DocPaneForWorkspace(state, threadID, "")
+}
+
+templ DocPaneForWorkspace(state DocPaneState, threadID string, workspaceID string) {
+	<div id="agent-chat-doc-pane" class="flex h-full min-h-0 min-w-0 flex-col overflow-hidden rounded-lg border border-border bg-card">
+		<div class="flex h-14 shrink-0 items-center justify-center border-b border-border px-4">
+			<p class="truncate text-sm font-medium text-foreground">Docs</p>
+		</div>
+		if len(state.Tree) == 0 {
+			<div class="border-b p-4">
+				@DocPaneMeta(state, threadID)
+			</div>
+			<div class="p-4 text-xs text-muted-foreground">No renderable docs yet.</div>
+		} else {
+			<div class="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+				@WorkspaceDocTree(state, threadID, workspaceID)
+				@WorkspaceDocContent(state)
+			</div>
+		}
+	</div>
+}
+
+templ WorkspaceDocTree(state DocPaneState, threadID string, workspaceID string) {
+	<div id="agent-chat-doc-tree" class="relative border-b">
+		<div data-show="!$showDocTree" class="px-4 py-2 pr-10">
+			<div class="flex min-w-0 items-center gap-2">
+				<p class="min-w-0 flex-1 truncate text-sm font-medium leading-6 text-foreground">{ docPaneTitle(state) }</p>
+				if state.WorkingDir.CurrentTimestamp != "" {
+					<p class="shrink-0 text-[11px] text-muted-foreground">{ state.WorkingDir.CurrentTimestamp }</p>
+				}
+			</div>
+		</div>
+		<button
+			type="button"
+			class="absolute right-2 top-2 z-10 inline-flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+			data-on:click="$showDocTree = !$showDocTree"
+			data-attr:aria-pressed="$showDocTree ? 'true' : 'false'"
+			aria-label="Toggle doc file tree"
+			title="Toggle doc file tree"
+		>
+			<span class="sr-only">Toggle doc file tree</span>
+			<svg data-show="$showDocTree" class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+				<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7-7-7 7"></path>
+			</svg>
+			<svg data-show="!$showDocTree" class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+				<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 10l7 7 7-7"></path>
+			</svg>
+		</button>
+		<div
+			class="overflow-hidden transition-[max-height,opacity,padding] duration-200 ease-out"
+			data-class="{'max-h-96 px-4 pb-3 pt-2 opacity-100': $showDocTree, 'max-h-0 px-4 py-0 opacity-0 pointer-events-none': !$showDocTree}"
+		>
+			<div class="space-y-3 pr-10">
+				@DocPaneMeta(state, threadID)
+				@PlanLineageTree(state, threadID, workspaceID)
+				<div class="max-h-56 overflow-y-auto">
+					<div class="space-y-1">
+						for _, node := range state.Tree {
+							@DocTreeNodeRow(node, threadID, state.ActiveRunID, workspaceID)
+						}
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+}
+
+templ PlanLineageTree(state DocPaneState, threadID string, workspaceID string) {
+	if state.PlanLineage != nil && (state.PlanLineage.RootRelPath != "" || len(state.PlanLineage.Children) > 0) {
+		<div id={ "agent-chat-plan-lineage-" + signalSafeID(state.WorkspaceID) } class="space-y-2 rounded-md border border-border bg-muted/20 p-3">
+			<div class="flex items-center justify-between gap-2">
+				<p class="text-xs font-medium uppercase tracking-wide text-muted-foreground">Plan lineage</p>
+				<span class="rounded-full bg-background px-2 py-0.5 text-[11px] text-muted-foreground">QRSPI</span>
+			</div>
+			@PlanLineageNode(*state.PlanLineage, state, threadID, workspaceID)
+		</div>
+	}
+}
+
+templ PlanLineageNode(node PlanNode, state DocPaneState, threadID string, workspaceID string) {
+	<div class="space-y-1">
+		@PlanLineageNodeRow(node, state, threadID, workspaceID)
+		if len(node.Children) > 0 {
+			<div class="ml-3 space-y-1 border-l border-border pl-3">
+				for _, child := range node.Children {
+					@PlanLineageNodeRow(child, state, threadID, workspaceID)
+				}
+			</div>
+		}
+	</div>
+}
+
+templ PlanLineageNodeRow(node PlanNode, state DocPaneState, threadID string, workspaceID string) {
+	<div class="space-y-2 rounded-md border border-border bg-background/70 px-2 py-2 text-xs">
+		<div class="flex items-start justify-between gap-2">
+			<div class="min-w-0">
+				<p class="truncate font-medium text-foreground">{ node.Title }</p>
+				<p class="truncate text-[11px] text-muted-foreground">{ planNodeKindLabel(node.Kind) }</p>
+				if node.Workspace != nil {
+					<p class="mt-1 truncate font-mono text-[10px] text-muted-foreground">{ node.Workspace.CheckoutName }</p>
+				}
+			</div>
+			if node.RootRelPath != "" {
+				<form data-on:submit={ docSelectAction(workspaceID) } class="shrink-0">
+					<input type="hidden" name="thread_id" value={ threadID }/>
+					<input type="hidden" name="doc" value={ node.RootRelPath + "/design.md" }/>
+					<input type="hidden" name="doc_rel_path" value={ node.RootRelPath + "/design.md" }/>
+					<button type="submit" class="rounded-md border border-border px-2 py-1 text-[11px] text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">Open plan</button>
+				</form>
+			} else {
+				<form data-on:submit={ docSelectAction(workspaceID) } class="shrink-0">
+					<input type="hidden" name="thread_id" value={ threadID }/>
+					<input type="hidden" name="doc" value="design.md"/>
+					<input type="hidden" name="doc_rel_path" value="design.md"/>
+					<button type="submit" class="rounded-md border border-border px-2 py-1 text-[11px] text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">Open plan</button>
+				</form>
+			}
+		</div>
+		@PlanLineageWorkspaceCard(node, workspaceID, threadID)
+	</div>
+}
+
+templ PlanLineageWorkspaceCard(node PlanNode, workspaceID string, threadID string) {
+	if node.Workspace != nil {
+		<div class="space-y-2 rounded-md border border-border bg-muted/20 p-2">
+			<div class="flex items-center justify-between gap-2">
+				<div class="min-w-0">
+					<p class="truncate text-[11px] font-medium text-foreground">Workspace: { node.Workspace.Slug }</p>
+					<p class="truncate text-[10px] text-muted-foreground">Status: { node.Workspace.Status }{ " " + node.Workspace.Phase }</p>
+				</div>
+				if node.Workspace.URL != "" && node.Workspace.Status == "running" {
+					<a href={ templ.SafeURL(node.Workspace.URL) } class="rounded-md border border-border px-2 py-1 text-[11px] text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">Open</a>
+				}
+			</div>
+			if node.Workspace.Error != "" {
+				<p class="rounded bg-destructive/10 px-2 py-1 text-[10px] text-destructive">{ node.Workspace.Error }</p>
+			}
+			if node.Stack != nil {
+				<div class="grid grid-cols-2 gap-1 text-[10px] text-muted-foreground">
+					<p class="truncate">Branch: { node.Stack.Branch }</p>
+					<p class="truncate">Base: { node.Stack.BaseBranch }</p>
+					<p class="truncate">Ahead: { fmt.Sprint(node.Stack.AheadCount) }</p>
+					<p class="truncate">Behind: { fmt.Sprint(node.Stack.BehindCount) }</p>
+					if node.Stack.TopBranch != "" {
+						<p class="col-span-2 truncate">Top: { node.Stack.TopBranch }</p>
+					}
+					if node.Stack.BottomParent != "" {
+						<p class="col-span-2 truncate">Bottom parent: { node.Stack.BottomParent }</p>
+					}
+				</div>
+				if node.Stack.Merged {
+					<p class="rounded-md border border-emerald-500/30 bg-emerald-500/10 px-2 py-1 text-[10px] text-emerald-200">Merged — safe to delete this linked workspace when verification is complete.</p>
+				} else if node.Stack.Detail != "" {
+					<p class="text-[10px] text-muted-foreground">{ node.Stack.Detail }</p>
+				}
+			}
+			<div class="flex flex-wrap gap-1">
+				if hasWorkspaceAction(node.Workspace.Actions, WorkspaceActionStart) {
+					@PlanWorkspaceActionForm(workspaceID, threadID, node, WorkspaceActionStart, "Start", false)
+				}
+				if hasWorkspaceAction(node.Workspace.Actions, WorkspaceActionRetry) {
+					@PlanWorkspaceActionForm(workspaceID, threadID, node, WorkspaceActionRetry, "Retry", false)
+				}
+				if hasWorkspaceAction(node.Workspace.Actions, WorkspaceActionStop) {
+					@PlanWorkspaceActionForm(workspaceID, threadID, node, WorkspaceActionStop, "Stop", false)
+				}
+				if hasWorkspaceAction(node.Workspace.Actions, WorkspaceActionMerge) {
+					@PlanWorkspaceActionForm(workspaceID, threadID, node, WorkspaceActionMerge, "Merge guidance", false)
+				}
+				if hasWorkspaceAction(node.Workspace.Actions, WorkspaceActionRefresh) {
+					@PlanWorkspaceActionForm(workspaceID, threadID, node, WorkspaceActionRefresh, "Refresh", false)
+				}
+				if hasWorkspaceAction(node.Workspace.Actions, WorkspaceActionDelete) {
+					@PlanWorkspaceActionForm(workspaceID, threadID, node, WorkspaceActionDelete, "Delete", true)
+				}
+			</div>
+		</div>
+	}
+}
+
+templ PlanWorkspaceActionForm(workspaceID string, threadID string, node PlanNode, action WorkspaceAction, label string, confirm bool) {
+	<form data-on:submit={ planWorkspaceAction(workspaceID) }>
+		<input type="hidden" name="thread_id" value={ threadID }/>
+		<input type="hidden" name="plan_root" value={ node.RootRelPath }/>
+		<input type="hidden" name="slug" value={ node.Workspace.Slug }/>
+		<input type="hidden" name="action" value={ string(action) }/>
+		if confirm {
+			<input type="hidden" name="confirm_delete" value={ node.Workspace.Slug }/>
+		}
+		<button type="submit" class="rounded-md border border-border px-2 py-1 text-[11px] text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">{ label }</button>
+	</form>
+}
+
+templ WorkspaceDocContent(state DocPaneState) {
+	<div id="agent-chat-doc-content" class="relative min-h-0 min-w-0 flex-1 overflow-hidden">
+		@DocScrollControls()
+		<div id="agent-chat-doc-scroll-region" class="h-full min-w-0 overflow-y-auto overflow-x-hidden">
+			if doc, ok := BuildDocDocument(state); ok {
+				@markdown.DocumentSurface(doc, nil)
+			} else {
+				<div class="p-4">
+					<p class="text-xs text-muted-foreground">Select an doc file to render it here.</p>
+				</div>
+			}
+		</div>
+	</div>
+}
+
+templ WorkspaceDocComments(state DocPaneState) {
+	<div id="agent-chat-doc-comments" class="hidden max-h-72 shrink-0 overflow-y-auto border-t border-border bg-background/70 p-4 md:block">
+		if state.WorkspaceID == "" || !state.Selected.Exists || state.Selected.RelativePath == "" {
+			<p class="text-xs text-muted-foreground">Select a workspace doc to review comments.</p>
+		} else {
+			<div class="space-y-4">
+				<div class="flex items-center justify-between gap-3">
+					<div>
+						<p class="text-sm font-medium text-foreground">Doc comments</p>
+						<p class="text-xs text-muted-foreground">{ len(state.Comments) } comments on { state.Selected.RelativePath }</p>
+					</div>
+				</div>
+				<details class="rounded-md border border-border bg-card">
+					<summary class="cursor-pointer list-none px-3 py-2 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground [&::-webkit-details-marker]:hidden">
+						Comment on selected doc
+					</summary>
+					<form id="agent-chat-comment-form" class="space-y-2 border-t border-border p-3" data-on:submit={ "@post('/agent-chat/" + state.WorkspaceID + "/docs/comments', {contentType: 'form'})" }>
+						<input type="hidden" name="doc_rel_path" value={ state.Selected.RelativePath }/>
+						<input type="hidden" name="section_hint" value=""/>
+						<input type="hidden" name="heading_hint" value=""/>
+						<input type="hidden" name="start_line" value="0"/>
+						<input type="hidden" name="start_column" value="0"/>
+						<input type="hidden" name="end_line" value="0"/>
+						<input type="hidden" name="end_column" value="0"/>
+						<label class="block space-y-1 text-xs text-muted-foreground">
+							<span>Quoted text</span>
+							<textarea name="selected_text" class="min-h-16 w-full rounded-md border border-input bg-background px-2 py-1 text-xs text-foreground" placeholder="Paste the exact doc text being reviewed" data-ignore-morph></textarea>
+						</label>
+						<label class="block space-y-1 text-xs text-muted-foreground">
+							<span>Comment</span>
+							<textarea name="comment_text" class="min-h-20 w-full rounded-md border border-input bg-background px-2 py-1 text-xs text-foreground" placeholder="Add a review comment" data-ignore-morph></textarea>
+						</label>
+						<p id="agent-chat-comment-form-error" class="text-xs text-destructive" aria-live="polite"></p>
+						<button type="submit" class="inline-flex h-8 items-center rounded-md bg-primary px-3 text-xs font-medium text-primary-foreground transition-colors hover:bg-primary/90">Add comment</button>
+					</form>
+				</details>
+				<div class="space-y-3">
+					if len(state.Comments) == 0 {
+						<p class="rounded-md border border-dashed border-border p-3 text-xs text-muted-foreground">No comments yet.</p>
+					}
+					for _, comment := range state.Comments {
+						@WorkspaceDocCommentCard(state.WorkspaceID, comment)
+					}
+				</div>
+			</div>
+		}
+	</div>
+}
+
+templ WorkspaceDocCommentCard(workspaceID string, view WorkspaceDocCommentView) {
+	<article class="space-y-2 rounded-md border border-border bg-card p-3 text-xs">
+		<div class="flex items-start justify-between gap-3">
+			<div class="min-w-0">
+				<p class="font-medium text-foreground">{ view.Comment.UserEmail }</p>
+				<p class="text-muted-foreground">{ view.AnchorState } anchor · { view.Comment.DocPath }</p>
+			</div>
+			if view.Comment.Resolved {
+				<span class="rounded-full bg-emerald-500/10 px-2 py-0.5 text-[11px] text-emerald-200">Resolved</span>
+			} else {
+				<span class="rounded-full bg-amber-500/10 px-2 py-0.5 text-[11px] text-amber-200">Open</span>
+			}
+		</div>
+		if view.Comment.SelectedText != "" {
+			<blockquote class="border-l-2 border-border pl-2 text-muted-foreground">{ view.Comment.SelectedText }</blockquote>
+		}
+		<p class="text-foreground">{ view.Comment.CommentText }</p>
+		if len(view.Replies) > 0 {
+			<div class="space-y-2 border-l border-border pl-3">
+				for _, reply := range view.Replies {
+					<div>
+						<p class="font-medium text-muted-foreground">{ reply.ActorType } · { reply.UserEmail }</p>
+						<p class="text-foreground">{ reply.ReplyText }</p>
+					</div>
+				}
+			</div>
+		}
+		<form class="space-y-2" data-on:submit={ "@post('/agent-chat/" + workspaceID + "/docs/comments/" + view.Comment.ID + "/replies', {contentType: 'form'})" }>
+			<input type="hidden" name="request_id" value={ uuid.NewString() }/>
+			<textarea name="reply_text" class="min-h-16 w-full rounded-md border border-input bg-background px-2 py-1 text-xs text-foreground" placeholder="Reply" data-ignore-morph></textarea>
+			<div class="flex flex-wrap gap-2">
+				<button type="submit" class="rounded-md bg-secondary px-2 py-1 text-xs font-medium text-secondary-foreground hover:bg-secondary/90">Reply</button>
+			</div>
+		</form>
+		if view.Comment.Resolved {
+			<form data-on:submit={ "@post('/agent-chat/" + workspaceID + "/docs/comments/" + view.Comment.ID + "/reopen', {contentType: 'form'})" }>
+				<input type="hidden" name="reply_text" value=""/>
+				<input type="hidden" name="request_id" value={ uuid.NewString() }/>
+				<button type="submit" class="rounded-md border border-border px-2 py-1 text-xs text-muted-foreground hover:bg-accent hover:text-foreground">Reopen</button>
+			</form>
+		} else {
+			<form data-on:submit={ "@post('/agent-chat/" + workspaceID + "/docs/comments/" + view.Comment.ID + "/resolve', {contentType: 'form'})" }>
+				<input type="hidden" name="reply_text" value=""/>
+				<input type="hidden" name="request_id" value={ uuid.NewString() }/>
+				<button type="submit" class="rounded-md border border-border px-2 py-1 text-xs text-muted-foreground hover:bg-accent hover:text-foreground">Resolve</button>
+			</form>
+		}
+	</article>
+}
+
+templ DocPaneMeta(state DocPaneState, threadID string) {
+	if state.WorkingDir.ProjectName != "" {
+		<div class="space-y-2">
+			if len(state.WorkingDir.Crumbs) > 0 {
+				<div data-init="setTimeout(() => { el.scrollLeft = el.scrollWidth }, 0)" class="overflow-x-auto pb-1">
+					<div class="flex min-w-max items-center gap-2 px-2 text-xs">
+						for i, crumb := range state.WorkingDir.Crumbs {
+							<form data-on:submit="@post('/agent-chat/cwd', {contentType: 'form'})">
+								<input type="hidden" name="thread_id" value={ threadID }/>
+								<input type="hidden" name="cwd" value={ crumb.Path }/>
+								<button type="submit" class="truncate text-muted-foreground transition-colors hover:text-foreground">{ crumb.Label }</button>
+							</form>
+							if i < len(state.WorkingDir.Crumbs)-1 {
+								<svg class="h-3.5 w-3.5 shrink-0 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+								</svg>
+							}
+						}
+					</div>
+				</div>
+			}
+			<div class="px-2">
+				<div class="min-w-0 flex items-center gap-2">
+					if threadID != "" && state.WorkingDir.ResetPath != "" && !sameFilesystemPath(state.WorkingDir.AbsolutePath, state.WorkingDir.ResetPath) {
+						<form class="shrink-0" data-on:submit="@post('/agent-chat/cwd', {contentType: 'form'})">
+							<input type="hidden" name="thread_id" value={ threadID }/>
+							<input type="hidden" name="cwd" value={ state.WorkingDir.ResetPath }/>
+							<button type="submit" class="inline-flex h-6 w-6 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground" title="Return file tree to the plan directory" aria-label="Return file tree to the plan directory">
+								<svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7h5l2 2h11v8a2 2 0 01-2 2H5a2 2 0 01-2-2V7z"></path>
+								</svg>
+							</button>
+						</form>
+					}
+					<p class="min-w-0 flex-1 truncate text-sm font-medium leading-6 text-foreground">{ docPaneTitle(state) }</p>
+					if state.WorkingDir.CurrentTimestamp != "" {
+						<p class="shrink-0 text-[11px] text-muted-foreground">{ state.WorkingDir.CurrentTimestamp }</p>
+					}
+				</div>
+			</div>
+		</div>
+	} else if state.RootDocPath != "" {
+		<p class="mt-1 break-all text-[11px] text-muted-foreground">{ state.RootDocPath }</p>
+	}
+}
+
+templ DocTreeNodeRow(node DocTreeNode, threadID string, runID string, workspaceID string) {
+	if node.IsDir {
+		<details
+			class="group"
+			if node.IsExpanded {
+				open
+			}
+		>
+			<summary class="list-none">
+				<div class="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1 text-xs transition-colors hover:bg-accent">
+					<div class="flex min-w-0 flex-1 items-center gap-1.5">
+						<svg class="h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform group-open:rotate-90" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+						</svg>
+						if threadID != "" && node.AbsolutePath != "" {
+							<form class="shrink-0" data-on:submit="@post('/agent-chat/cwd', {contentType: 'form'})">
+								<input type="hidden" name="thread_id" value={ threadID }/>
+								<input type="hidden" name="cwd" value={ node.AbsolutePath }/>
+								<button type="submit" onclick="event.preventDefault(); event.stopPropagation(); this.form.requestSubmit();" class="inline-flex h-4 w-4 items-center justify-center text-muted-foreground transition-colors hover:text-foreground" title={ "Set working directory to " + node.Name } aria-label={ "Set working directory to " + node.Name }>
+									<svg class="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
+										<path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z"></path>
+									</svg>
+								</button>
+							</form>
+						} else {
+							<svg class="h-4 w-4 shrink-0 text-muted-foreground" fill="currentColor" viewBox="0 0 20 20">
+								<path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z"></path>
+							</svg>
+						}
+						<span class={ "truncate", templ.KV("font-medium text-foreground", node.IsExpanded), templ.KV("text-muted-foreground", !node.IsExpanded) }>{ node.Name }</span>
+					</div>
+				</div>
+			</summary>
+			if len(node.Children) > 0 {
+				<div class="ml-3 border-l border-border pl-2">
+					for _, child := range node.Children {
+						@DocTreeNodeRow(child, threadID, runID, workspaceID)
+					}
+				</div>
+			}
+		</details>
+	} else {
+		<form data-on:submit={ docSelectAction(workspaceID) }>
+			<input type="hidden" name="thread_id" value={ threadID }/>
+			<input type="hidden" name="run_id" value={ runID }/>
+			<input type="hidden" name="doc" value={ node.Path }/>
+			<button type="submit" class={ "flex w-full items-center gap-2 rounded-md px-2 py-1 text-left text-xs transition-colors", templ.KV("bg-primary/10 text-primary", node.Selected), templ.KV("text-muted-foreground hover:bg-muted hover:text-foreground", !node.Selected) }>
+				<span class="w-3.5 shrink-0"></span>
+				<svg class="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+				</svg>
+				<span class="truncate">{ node.Name }</span>
+			</button>
+		</form>
+	}
+}
+
+templ ArtifactPaneForWorkspace(state ArtifactPaneState, threadID string, workspaceID string) {
+	@DocPaneForWorkspace(state, threadID, workspaceID)
+}

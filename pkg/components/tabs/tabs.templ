@@ -1,0 +1,132 @@
+package tabs
+
+import (
+	"crypto/rand"
+	"fmt"
+	"github.com/CoreyCole/vamos/pkg/components/utils"
+)
+
+// TabsSignals defines the signal structure for tabs components
+type TabsSignals struct {
+	Active string `json:"active"`
+}
+
+// Tabs is the root container component that manages tab state
+templ Tabs(args TabsArgs) {
+	{{
+		// Generate unique ID if not provided
+		tabsID := args.ID
+		if tabsID == "" {
+			// Generate a random ID
+			b := make([]byte, 4)
+			rand.Read(b)
+			tabsID = fmt.Sprintf("tabs_%x", b)
+		}
+
+		// Generate CSS classes
+		classes := tabsVariants(args.Class)
+
+		// Set up the default active tab
+		defaultValue := args.DefaultValue
+		if defaultValue == "" {
+			defaultValue = "tab1" // fallback default
+		}
+
+		// Use controlled value if provided, otherwise use default
+		activeTab := args.Value
+		if activeTab == "" {
+			activeTab = defaultValue
+		}
+
+		// Create signals using the new structured system
+		signals := utils.Signals(tabsID, TabsSignals{
+			Active: activeTab,
+		})
+	}}
+	<div
+		data-slot="tabs"
+		data-signals={ signals.DataSignals }
+		class={ classes }
+		{ args.Attributes... }
+	>
+		{ children... }
+	</div>
+}
+
+// TabsList contains the tab triggers
+templ TabsList(args TabsListArgs) {
+	{{
+		// Generate CSS classes
+		classes := tabsListVariants(args.Class)
+	}}
+	<div
+		class={ classes }
+		role="tablist"
+		{ args.Attributes... }
+	>
+		{ children... }
+	</div>
+}
+
+// TabsTrigger is a clickable tab button
+templ TabsTrigger(args TabsTriggerArgs) {
+	{{
+		// Create signals manager for this tabs component
+		signals := utils.Signals(args.ID, TabsSignals{})
+
+		// Use the correct variant function that matches shadcn/ui exactly
+		baseClasses := tabsTriggerVariantsBase(args.Class)
+
+		// Create tabs handler for clean expressions
+		tabsHandler := NewTabsHandler(args.ID, signals)
+
+		// Use expression builders for clean, maintainable code
+		clickExpr := tabsHandler.BuildTriggerClickHandler(args.Value)
+		activeClassesObj := tabsHandler.BuildTriggerDataClass(args.Value)
+		stateAttr := tabsHandler.BuildTriggerStateAttr(args.Value)
+		ariaSelected := tabsHandler.BuildTriggerAriaSelected(args.Value)
+		tabIndex := tabsHandler.BuildTriggerTabIndex(args.Value)
+	}}
+	<button
+		type="button"
+		data-slot="tabs-trigger"
+		class={ baseClasses }
+		data-class={ activeClassesObj }
+		role="tab"
+		data-value={ args.Value }
+		data-on:click={ clickExpr }
+		data-attr:data-state={ stateAttr }
+		data-attr:aria-selected={ ariaSelected }
+		data-attr:tabindex={ tabIndex }
+		disabled?={ args.Disabled }
+		{ args.Attributes... }
+	>
+		{ children... }
+	</button>
+}
+
+// TabsContent displays the content for the active tab
+templ TabsContent(args TabsContentArgs) {
+	{{
+		// Create signals manager for this tabs component
+		signals := utils.Signals(args.ID, TabsSignals{})
+
+		// Generate CSS classes
+		classes := tabsContentVariants(args.Class)
+
+		// Create tabs handler for clean expressions
+		tabsHandler := NewTabsHandler(args.ID, signals)
+	}}
+	<div
+		data-slot="tabs-content"
+		class={ classes }
+		role="tabpanel"
+		data-value={ args.Value }
+		data-show={ tabsHandler.BuildContentShowExpression(args.Value) }
+		data-attr:aria-hidden={ tabsHandler.BuildContentAriaHidden(args.Value) }
+		tabindex="0"
+		{ args.Attributes... }
+	>
+		{ children... }
+	</div>
+}

@@ -1,0 +1,596 @@
+package storybook
+
+import (
+	"github.com/CoreyCole/vamos/pkg/components/avatar"
+	"github.com/CoreyCole/vamos/pkg/components/breadcrumb"
+	"github.com/CoreyCole/vamos/pkg/components/button"
+	"github.com/CoreyCole/vamos/pkg/components/card"
+	"github.com/CoreyCole/vamos/pkg/components/checkbox"
+	"github.com/CoreyCole/vamos/pkg/components/dialog"
+	"github.com/CoreyCole/vamos/pkg/components/dropdown"
+	"github.com/CoreyCole/vamos/pkg/components/input"
+	"github.com/CoreyCole/vamos/pkg/components/label"
+	selectui "github.com/CoreyCole/vamos/pkg/components/select"
+	"github.com/CoreyCole/vamos/pkg/components/tabs"
+	"github.com/CoreyCole/vamos/pkg/components/textarea"
+	"github.com/CoreyCole/vamos/pkg/components/tooltip"
+	"github.com/CoreyCole/vamos/server/layouts"
+)
+
+type PageArgs struct {
+	UserEmail    string
+	CurrentTheme string
+}
+
+templ Page(args PageArgs) {
+	@layouts.Root(layouts.RootArgs{
+		Title:        "Storybook",
+		ShowHeader:   true,
+		UserEmail:    args.UserEmail,
+		CurrentTheme: args.CurrentTheme,
+		PageType:     layouts.PageTypeStorybook,
+	}) {
+		<div class="py-6 md:py-10">
+			<div class="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8 space-y-12">
+				<div>
+					<h1 class="text-3xl font-bold text-foreground">Component Storybook</h1>
+					<p class="text-muted-foreground mt-1">Visual reference for all pkg/components</p>
+				</div>
+				@sectionButtons()
+				@sectionInputs()
+				@sectionSelect()
+				@sectionCheckbox()
+				@sectionCards()
+				@sectionTabs()
+				@sectionDialog()
+				@sectionDropdown()
+				@sectionTooltip()
+				@sectionBreadcrumb()
+				@sectionAvatar()
+			</div>
+		</div>
+	}
+}
+
+// --- Section helpers ---
+templ sectionHeader(title string, description string) {
+	<div class="border-b border-border pb-2">
+		<h2 class="text-xl font-semibold text-foreground">{ title }</h2>
+		<p class="text-sm text-muted-foreground">{ description }</p>
+	</div>
+}
+
+templ componentRow(label string) {
+	<div class="flex flex-col gap-2">
+		<span class="text-xs font-medium text-muted-foreground uppercase tracking-wider">{ label }</span>
+		<div class="flex flex-wrap items-center gap-3">
+			{ children... }
+		</div>
+	</div>
+}
+
+// --- Buttons ---
+templ sectionButtons() {
+	<section class="space-y-4">
+		@sectionHeader("Button", "All variants and sizes")
+		@componentRow("Variants") {
+			@button.Button(button.ButtonArgs{Variant: "default"}) {
+				Default
+			}
+			@button.Button(button.ButtonArgs{Variant: "secondary"}) {
+				Secondary
+			}
+			@button.Button(button.ButtonArgs{Variant: "outline"}) {
+				Outline
+			}
+			@button.Button(button.ButtonArgs{Variant: "ghost"}) {
+				Ghost
+			}
+			@button.Button(button.ButtonArgs{Variant: "destructive"}) {
+				Destructive
+			}
+			@button.Button(button.ButtonArgs{Variant: "link"}) {
+				Link
+			}
+		}
+		@componentRow("Sizes") {
+			@button.Button(button.ButtonArgs{Size: "sm"}) {
+				Small
+			}
+			@button.Button(button.ButtonArgs{Size: "default"}) {
+				Default
+			}
+			@button.Button(button.ButtonArgs{Size: "lg"}) {
+				Large
+			}
+			@button.Button(button.ButtonArgs{Size: "icon"}) {
+				<iconPlus></iconPlus>
+			}
+		}
+		@componentRow("States") {
+			@button.Button(button.ButtonArgs{Disabled: true}) {
+				Disabled
+			}
+			@button.Button(button.ButtonArgs{Variant: "outline", Disabled: true}) {
+				Disabled Outline
+			}
+		}
+	</section>
+}
+
+templ iconPlus() {
+	<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+}
+
+// --- Inputs ---
+templ sectionInputs() {
+	<section class="space-y-4">
+		@sectionHeader("Input & Textarea", "Text input components")
+		<div class="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-2xl">
+			<div class="space-y-2">
+				@label.Label(label.LabelArgs{For: "demo-input"}) {
+					Email
+				}
+				@input.Input(input.InputArgs{
+					ID:          "demo-input",
+					Type:        "email",
+					Name:        "email",
+					Placeholder: "name@example.com",
+				})
+			</div>
+			<div class="space-y-2">
+				@label.Label(label.LabelArgs{For: "demo-disabled"}) {
+					Disabled
+				}
+				@input.Input(input.InputArgs{
+					ID:          "demo-disabled",
+					Type:        "text",
+					Placeholder: "Can't type here",
+					Disabled:    true,
+				})
+			</div>
+			<div class="space-y-2 sm:col-span-2">
+				@label.Label(label.LabelArgs{For: "demo-textarea"}) {
+					Message
+				}
+				@textarea.Textarea(textarea.TextareaArgs{
+					ID:          "demo-textarea",
+					Name:        "message",
+					Placeholder: "Type your message here...",
+					Rows:        3,
+				})
+			</div>
+		</div>
+	</section>
+}
+
+// --- Select ---
+templ sectionSelect() {
+	<section class="space-y-4">
+		@sectionHeader("Select", "Dropdown selection with keyboard navigation")
+		<div class="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-2xl">
+			<div class="space-y-2">
+				@label.Label(label.LabelArgs{}) {
+					Fruit
+				}
+				@selectui.Select(selectui.SelectArgs{
+					ID:          "demo-select-fruit",
+					Placeholder: "Pick a fruit...",
+					Options: []selectui.SelectOptionArgs{
+						{Value: "apple", Label: "Apple"},
+						{Value: "banana", Label: "Banana"},
+						{Value: "cherry", Label: "Cherry"},
+						{Value: "dragonfruit", Label: "Dragonfruit"},
+						{Value: "elderberry", Label: "Elderberry"},
+					},
+				})
+			</div>
+			<div class="space-y-2">
+				@label.Label(label.LabelArgs{}) {
+					Disabled
+				}
+				@selectui.Select(selectui.SelectArgs{
+					ID:          "demo-select-disabled",
+					Placeholder: "Can't select...",
+					Disabled:    true,
+					Options: []selectui.SelectOptionArgs{
+						{Value: "a", Label: "Option A"},
+					},
+				})
+			</div>
+			<div class="space-y-2">
+				@label.Label(label.LabelArgs{}) {
+					With groups
+				}
+				@selectui.Select(selectui.SelectArgs{
+					ID:          "demo-select-grouped",
+					Placeholder: "Select a role...",
+					Options: []selectui.SelectOptionArgs{
+						{Value: "admin", Label: "Admin", Group: "Management"},
+						{Value: "manager", Label: "Manager", Group: "Management"},
+						{Value: "dev", Label: "Developer", Group: "Engineering"},
+						{Value: "designer", Label: "Designer", Group: "Engineering"},
+						{Value: "qa", Label: "QA Engineer", Group: "Engineering"},
+					},
+				})
+			</div>
+			<div class="space-y-2">
+				@label.Label(label.LabelArgs{}) {
+					Empty options
+				}
+				@selectui.Select(selectui.SelectArgs{
+					ID:          "demo-select-empty",
+					Placeholder: "No options available",
+					Options:     []selectui.SelectOptionArgs{},
+				})
+			</div>
+		</div>
+	</section>
+}
+
+// --- Checkbox ---
+templ sectionCheckbox() {
+	<section class="space-y-4">
+		@sectionHeader("Checkbox", "Toggle boolean values")
+		<div class="space-y-3">
+			<div class="flex items-center gap-2">
+				@checkbox.Checkbox(checkbox.CheckboxArgs{
+					ID:   "demo-cb-1",
+					Name: "terms",
+				})
+				@label.Label(label.LabelArgs{For: "demo-cb-1"}) {
+					Accept terms and conditions
+				}
+			</div>
+			<div class="flex items-center gap-2">
+				@checkbox.Checkbox(checkbox.CheckboxArgs{
+					ID:      "demo-cb-2",
+					Name:    "checked",
+					Checked: true,
+				})
+				@label.Label(label.LabelArgs{For: "demo-cb-2"}) {
+					Pre-checked
+				}
+			</div>
+			<div class="flex items-center gap-2">
+				@checkbox.Checkbox(checkbox.CheckboxArgs{
+					ID:       "demo-cb-3",
+					Name:     "disabled",
+					Disabled: true,
+				})
+				@label.Label(label.LabelArgs{For: "demo-cb-3"}) {
+					Disabled
+				}
+			</div>
+		</div>
+	</section>
+}
+
+// --- Cards ---
+templ sectionCards() {
+	<section class="space-y-4">
+		@sectionHeader("Card", "Container with header, content, and footer")
+		<div class="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-3xl">
+			@card.Card(card.CardArgs{}) {
+				@card.CardHeader(card.CardHeaderArgs{}) {
+					@card.CardTitle(card.CardTitleArgs{}) {
+						Card Title
+					}
+					@card.CardDescription(card.CardDescriptionArgs{}) {
+						A brief description of the card content.
+					}
+				}
+				@card.CardContent(card.CardContentArgs{}) {
+					<p class="text-sm text-foreground">This is the main content area of the card. It can contain any elements.</p>
+				}
+				@card.CardFooter(card.CardFooterArgs{}) {
+					@button.Button(button.ButtonArgs{Variant: "outline", Size: "sm"}) {
+						Cancel
+					}
+					@button.Button(button.ButtonArgs{Size: "sm"}) {
+						Save
+					}
+				}
+			}
+			@card.Card(card.CardArgs{}) {
+				@card.CardHeader(card.CardHeaderArgs{}) {
+					@card.CardTitle(card.CardTitleArgs{}) {
+						Notifications
+					}
+					@card.CardDescription(card.CardDescriptionArgs{}) {
+						You have 3 unread messages.
+					}
+				}
+				@card.CardContent(card.CardContentArgs{}) {
+					<div class="space-y-2">
+						<div class="flex items-center gap-2 text-sm">
+							<span class="h-2 w-2 rounded-full bg-blue-500"></span>
+							<span class="text-foreground">New deployment started</span>
+						</div>
+						<div class="flex items-center gap-2 text-sm">
+							<span class="h-2 w-2 rounded-full bg-green-500"></span>
+							<span class="text-foreground">Workflow completed</span>
+						</div>
+						<div class="flex items-center gap-2 text-sm">
+							<span class="h-2 w-2 rounded-full bg-amber-500"></span>
+							<span class="text-foreground">Review requested</span>
+						</div>
+					</div>
+				}
+			}
+		</div>
+	</section>
+}
+
+// --- Tabs ---
+templ sectionTabs() {
+	<section class="space-y-4">
+		@sectionHeader("Tabs", "Tabbed content sections")
+		<div class="max-w-lg">
+			@tabs.Tabs(tabs.TabsArgs{ID: "demo-tabs", DefaultValue: "account"}) {
+				@tabs.TabsList(tabs.TabsListArgs{}) {
+					@tabs.TabsTrigger(tabs.TabsTriggerArgs{ID: "demo-tabs", Value: "account"}) {
+						Account
+					}
+					@tabs.TabsTrigger(tabs.TabsTriggerArgs{ID: "demo-tabs", Value: "password"}) {
+						Password
+					}
+					@tabs.TabsTrigger(tabs.TabsTriggerArgs{ID: "demo-tabs", Value: "settings"}) {
+						Settings
+					}
+				}
+				@tabs.TabsContent(tabs.TabsContentArgs{ID: "demo-tabs", Value: "account"}) {
+					@card.Card(card.CardArgs{}) {
+						@card.CardHeader(card.CardHeaderArgs{}) {
+							@card.CardTitle(card.CardTitleArgs{}) {
+								Account
+							}
+							@card.CardDescription(card.CardDescriptionArgs{}) {
+								Make changes to your account here.
+							}
+						}
+						@card.CardContent(card.CardContentArgs{}) {
+							<div class="space-y-2">
+								@label.Label(label.LabelArgs{For: "tab-name"}) {
+									Name
+								}
+								@input.Input(input.InputArgs{ID: "tab-name", Placeholder: "Your name"})
+							</div>
+						}
+					}
+				}
+				@tabs.TabsContent(tabs.TabsContentArgs{ID: "demo-tabs", Value: "password"}) {
+					@card.Card(card.CardArgs{}) {
+						@card.CardHeader(card.CardHeaderArgs{}) {
+							@card.CardTitle(card.CardTitleArgs{}) {
+								Password
+							}
+							@card.CardDescription(card.CardDescriptionArgs{}) {
+								Change your password here.
+							}
+						}
+						@card.CardContent(card.CardContentArgs{}) {
+							<div class="space-y-2">
+								@label.Label(label.LabelArgs{For: "tab-pw"}) {
+									New Password
+								}
+								@input.Input(input.InputArgs{ID: "tab-pw", Type: "password", Placeholder: "New password"})
+							</div>
+						}
+					}
+				}
+				@tabs.TabsContent(tabs.TabsContentArgs{ID: "demo-tabs", Value: "settings"}) {
+					@card.Card(card.CardArgs{}) {
+						@card.CardHeader(card.CardHeaderArgs{}) {
+							@card.CardTitle(card.CardTitleArgs{}) {
+								Settings
+							}
+							@card.CardDescription(card.CardDescriptionArgs{}) {
+								Manage your preferences.
+							}
+						}
+						@card.CardContent(card.CardContentArgs{}) {
+							<p class="text-sm text-muted-foreground">Settings content goes here.</p>
+						}
+					}
+				}
+			}
+		</div>
+	</section>
+}
+
+// --- Dialog ---
+templ sectionDialog() {
+	<section class="space-y-4">
+		@sectionHeader("Dialog", "Modal overlay with backdrop")
+		<div class="flex gap-3">
+			<div>
+				@dialog.Dialog(dialog.DialogArgs{ID: "demo-dialog"}) {
+					@dialog.DialogHeader(dialog.DialogHeaderArgs{}) {
+						@dialog.DialogTitle(dialog.DialogTitleArgs{}) {
+							Edit Profile
+						}
+						@dialog.DialogDescription(dialog.DialogDescriptionArgs{}) {
+							Make changes to your profile here. Click save when you're done.
+						}
+					}
+					@dialog.DialogContent(dialog.DialogContentArgs{}) {
+						<div class="space-y-3">
+							<div class="space-y-2">
+								@label.Label(label.LabelArgs{For: "dlg-name"}) {
+									Name
+								}
+								@input.Input(input.InputArgs{ID: "dlg-name", Placeholder: "Enter name"})
+							</div>
+							<div class="space-y-2">
+								@label.Label(label.LabelArgs{For: "dlg-email"}) {
+									Email
+								}
+								@input.Input(input.InputArgs{ID: "dlg-email", Type: "email", Placeholder: "Enter email"})
+							</div>
+						</div>
+					}
+					@dialog.DialogFooter(dialog.DialogFooterArgs{}) {
+						@dialog.DialogClose(dialog.DialogCloseArgs{DialogID: "demo-dialog", Variant: "outline"}) {
+							Cancel
+						}
+						@dialog.DialogClose(dialog.DialogCloseArgs{DialogID: "demo-dialog"}) {
+							Save changes
+						}
+					}
+				}
+				@dialog.DialogTrigger(dialog.DialogTriggerArgs{
+					DialogID: "demo-dialog",
+					Class:    "inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 h-10 px-4 py-2 bg-primary text-primary-foreground hover:bg-primary/90",
+				}) {
+					Open Dialog
+				}
+			</div>
+			<div>
+				@dialog.Dialog(dialog.DialogArgs{ID: "demo-dialog-danger"}) {
+					@dialog.DialogHeader(dialog.DialogHeaderArgs{}) {
+						@dialog.DialogTitle(dialog.DialogTitleArgs{}) {
+							Are you sure?
+						}
+						@dialog.DialogDescription(dialog.DialogDescriptionArgs{}) {
+							This action cannot be undone. This will permanently delete the item.
+						}
+					}
+					@dialog.DialogFooter(dialog.DialogFooterArgs{}) {
+						@dialog.DialogClose(dialog.DialogCloseArgs{DialogID: "demo-dialog-danger", Variant: "outline"}) {
+							Cancel
+						}
+						@dialog.DialogClose(dialog.DialogCloseArgs{DialogID: "demo-dialog-danger", Variant: "destructive"}) {
+							Delete
+						}
+					}
+				}
+				@dialog.DialogTrigger(dialog.DialogTriggerArgs{
+					DialogID: "demo-dialog-danger",
+					Class:    "inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 h-10 px-4 py-2 border border-input bg-background text-foreground hover:bg-accent hover:text-accent-foreground",
+				}) {
+					Destructive Dialog
+				}
+			</div>
+		</div>
+	</section>
+}
+
+// --- Dropdown ---
+templ sectionDropdown() {
+	<section class="space-y-4">
+		@sectionHeader("Dropdown Menu", "Contextual menus with keyboard navigation")
+		<div class="flex gap-3">
+			@dropdown.DropdownMenu(dropdown.DropdownMenuArgs{ID: "demo-dd"}) {
+				@dropdown.DropdownMenuTrigger(dropdown.DropdownMenuTriggerArgs{
+					ID:    "demo-dd",
+					Class: "inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring border border-input bg-background shadow-xs hover:bg-accent hover:text-accent-foreground h-9 px-4 py-2",
+				}) {
+					Open Menu
+				}
+				@dropdown.DropdownMenuContent(dropdown.DropdownMenuContentArgs{ID: "demo-dd"}) {
+					@dropdown.DropdownMenuLabel(dropdown.DropdownMenuLabelArgs{}) {
+						My Account
+					}
+					@dropdown.DropdownMenuSeparator(dropdown.DropdownMenuSeparatorArgs{})
+					@dropdown.DropdownMenuItem(dropdown.DropdownMenuItemArgs{}) {
+						Profile
+					}
+					@dropdown.DropdownMenuItem(dropdown.DropdownMenuItemArgs{}) {
+						Billing
+					}
+					@dropdown.DropdownMenuItem(dropdown.DropdownMenuItemArgs{}) {
+						Settings
+					}
+					@dropdown.DropdownMenuSeparator(dropdown.DropdownMenuSeparatorArgs{})
+					@dropdown.DropdownMenuItem(dropdown.DropdownMenuItemArgs{Variant: "destructive"}) {
+						Log out
+					}
+				}
+			}
+		</div>
+	</section>
+}
+
+// --- Tooltip ---
+templ sectionTooltip() {
+	<section class="space-y-4">
+		@sectionHeader("Tooltip", "Hover hints on elements")
+		<div class="flex gap-6">
+			<div>
+				@tooltip.TooltipTrigger(tooltip.TooltipTriggerArgs{TooltipID: "demo-tip-1"}) {
+					@button.Button(button.ButtonArgs{Variant: "outline"}) {
+						Hover me
+					}
+				}
+				@tooltip.TooltipContent(tooltip.TooltipContentArgs{ID: "demo-tip-1"}) {
+					<p>This is a tooltip</p>
+				}
+			</div>
+			<div>
+				@tooltip.TooltipTrigger(tooltip.TooltipTriggerArgs{TooltipID: "demo-tip-2", DelayDuration: 0}) {
+					@button.Button(button.ButtonArgs{Variant: "secondary"}) {
+						No delay
+					}
+				}
+				@tooltip.TooltipContent(tooltip.TooltipContentArgs{ID: "demo-tip-2"}) {
+					<p>Instant tooltip</p>
+				}
+			</div>
+		</div>
+	</section>
+}
+
+// --- Breadcrumb ---
+templ sectionBreadcrumb() {
+	<section class="space-y-4">
+		@sectionHeader("Breadcrumb", "Navigation path indicators")
+		<div class="space-y-3">
+			@breadcrumb.Breadcrumb(breadcrumb.BreadcrumbArgs{}) {
+				@breadcrumb.BreadcrumbList(breadcrumb.BreadcrumbListArgs{}) {
+					@breadcrumb.BreadcrumbItem(breadcrumb.BreadcrumbItemArgs{}) {
+						@breadcrumb.BreadcrumbLink(breadcrumb.BreadcrumbLinkArgs{Href: "/"}) {
+							Home
+						}
+					}
+					@breadcrumb.BreadcrumbSeparator(breadcrumb.BreadcrumbSeparatorArgs{})
+					@breadcrumb.BreadcrumbItem(breadcrumb.BreadcrumbItemArgs{}) {
+						@breadcrumb.BreadcrumbLink(breadcrumb.BreadcrumbLinkArgs{Href: "/agent-chat"}) {
+							Agent Chat
+						}
+					}
+					@breadcrumb.BreadcrumbSeparator(breadcrumb.BreadcrumbSeparatorArgs{})
+					@breadcrumb.BreadcrumbItem(breadcrumb.BreadcrumbItemArgs{}) {
+						@breadcrumb.BreadcrumbPage(breadcrumb.BreadcrumbPageArgs{}) {
+							QRSPI Workflow
+						}
+					}
+				}
+			}
+		</div>
+	</section>
+}
+
+// --- Avatar ---
+templ sectionAvatar() {
+	<section class="space-y-4">
+		@sectionHeader("Avatar", "User identity indicators")
+		<div class="flex items-center gap-4">
+			@avatar.Avatar(avatar.AvatarArgs{BackgroundColor: "#3b82f6"}) {
+				JD
+			}
+			@avatar.Avatar(avatar.AvatarArgs{BackgroundColor: "#10b981"}) {
+				AB
+			}
+			@avatar.Avatar(avatar.AvatarArgs{BackgroundColor: "#f59e0b"}) {
+				CK
+			}
+			@avatar.Avatar(avatar.AvatarArgs{BackgroundColor: "#ef4444"}) {
+				RL
+			}
+			@avatar.Avatar(avatar.AvatarArgs{BackgroundColor: "#8b5cf6"}) {
+				MZ
+			}
+		</div>
+	</section>
+}

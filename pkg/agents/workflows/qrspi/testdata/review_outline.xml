@@ -1,0 +1,17 @@
+<qrspi-result>
+  <stage>review-outline</stage>
+  <status>complete</status>
+  <outcome>ready-for-human-review</outcome>
+  <policy>
+    <autoMode>false</autoMode>
+    <enablePlanReviews>true</enablePlanReviews>
+    <invalidResultRetryLimit>1</invalidResultRetryLimit>
+  </policy>
+  <summary>
+    <plan-goal>Build Agent Chat-native generic workflow runtime; QRSPI first.</plan-goal>
+    <stage-completed>Reviewed design and outline; canonical review node IDs preserved.</stage-completed>
+    <key-decisions>Ready for plan.</key-decisions>
+  </summary>
+  <artifact>thoughts/creative-mode-agent/plans/example/reviews/example_outline-review/review.md</artifact>
+  <next>/q-plan thoughts/creative-mode-agent/plans/example/outline.md</next>
+</qrspi-result>

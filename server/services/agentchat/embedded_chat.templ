@@ -1,0 +1,54 @@
+package agentchat
+
+templ EmbeddedChatRightRailPanel(args EmbeddedChatPanelArgs) {
+	<div id="doc-right-chat-panel" class="h-full min-h-0" data-show="$rightRailActiveTab === 'chat'">
+		@EmbeddedChatRightRailContent(args)
+	</div>
+}
+
+templ EmbeddedChatRightRailContent(args EmbeddedChatPanelArgs) {
+	<div class="flex h-full min-h-0 flex-col bg-background">
+		if args.WorkspaceID == "" {
+			<div class="flex min-h-0 flex-1 flex-col justify-end gap-3 p-3 text-sm text-muted-foreground">
+				<p>No chat workspace is selected for this document yet.</p>
+				<p>Use the composer after a workspace is available, or choose an AGENTS.md workspace from this document tree.</p>
+			</div>
+		} else {
+			<div id="thoughts-embedded-chat-stream" class="hidden" data-init={ "@get('" + args.StreamURL + "')" }></div>
+			<div class="min-h-0 flex-1 overflow-y-auto">
+				@MessagesPane(args.ThreadID, args.Transcript, args.HasThread, "")
+			</div>
+			<div class="shrink-0 border-t border-border bg-background p-3">
+				@EmbeddedWorkspaceComposer(args)
+			</div>
+		}
+	</div>
+}
+
+templ EmbeddedFreeformRightRailContent(args EmbeddedFreeformPanelArgs) {
+	<div class="flex h-full min-h-0 flex-col bg-background">
+		if args.StreamURL != "" {
+			<div id="thoughts-freeform-chat-stream" class="hidden" data-init={ "@get('" + args.StreamURL + "')" }></div>
+		}
+		<div class="min-h-0 flex-1 overflow-y-auto">
+			@MessagesPane(args.ThreadID, args.Transcript, args.HasThread, freeformForkAction())
+		</div>
+		<div class="shrink-0 border-t border-border bg-background p-3">
+			<div id="agent-chat-workspace-composer">
+				@AgentChatComposer(AgentChatComposerArgs{Action: args.ComposerAction, ThreadID: args.ThreadID, RunID: args.RunID, Cwd: args.Cwd, ModeLabel: "Freeform chat", Placeholder: workspacePromptPlaceholder(args.HasThread), HasThread: args.HasThread, IncludeCwd: !args.HasThread})
+			</div>
+		</div>
+	</div>
+}
+
+templ EmbeddedFreeformRightRailPanel(args EmbeddedFreeformPanelArgs) {
+	<div id="doc-right-chat-panel" class="h-full min-h-0" data-show="$rightRailActiveTab === 'chat'">
+		@EmbeddedFreeformRightRailContent(args)
+	</div>
+}
+
+templ EmbeddedWorkspaceComposer(args EmbeddedChatPanelArgs) {
+	<div id="agent-chat-workspace-composer">
+		@AgentChatComposer(AgentChatComposerArgs{Action: args.ComposerAction, WorkspaceID: args.WorkspaceID, ThreadID: args.ThreadID, DocPath: args.DocPath, RunID: args.RunID, Cwd: args.Cwd, ModeLabel: "Workspace chat", Placeholder: workspacePromptPlaceholder(args.HasThread), HasThread: args.HasThread, IncludeCwd: true, AttachedPaths: args.PendingAttachments, SlashEndpointBase: "/thoughts/chat", ShowCurrentDocToggle: args.DocPath != "", CurrentDocAttached: attachedPathContains(args.PendingAttachments, args.DocPath)})
+	</div>
+}

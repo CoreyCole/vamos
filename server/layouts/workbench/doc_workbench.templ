@@ -1,0 +1,108 @@
+package workbench
+
+templ CenterDocPane(args CenterDocPaneArgs) {
+	<section id="doc-workbench-center-pane" class="flex h-full min-h-0 min-w-0 flex-col bg-background">
+		<div class="shrink-0 border-b border-border px-3 py-2">
+			<div class="grid min-w-0 grid-cols-[auto_1fr_auto] items-center gap-2">
+				@DocWorkbenchRegionToggleButton("docWorkbenchSidebar", "Open Workspaces and Files", SidebarMenuIcon(), "")
+				<div id="doc-workbench-title" class="min-w-0 text-center" dir="rtl">
+					if args.Title != "" {
+						<p class="truncate text-sm font-medium text-foreground" dir="ltr">{ args.Title }</p>
+					}
+				</div>
+				<div class="flex items-center gap-2">
+					if args.Actions != nil {
+						@args.Actions
+					}
+					@DocWorkbenchRegionToggleButton("docWorkbenchRight", "Open Chat", ChatBubbleIcon(), "$rightRailActiveTab = 'chat'; ")
+				</div>
+			</div>
+		</div>
+		if args.WorkspaceDocTree != nil && args.HeaderWorkspaceTree == nil {
+			@WorkspaceDocTree(*args.WorkspaceDocTree)
+		}
+		<div id="doc-workbench-viewer-region" class="min-h-0 flex-1 overflow-hidden" data-view-transition-name={ ViewTransitionName("doc", "viewer") }>
+			if args.Document != nil {
+				@args.Document
+			} else {
+				<div class="flex h-full items-center justify-center p-4 text-sm text-muted-foreground">No document selected.</div>
+			}
+		</div>
+	</section>
+}
+
+templ DocWorkbenchRegionToggleButton(signalKey string, label string, icon templ.Component, beforeToggle string) {
+	<button
+		type="button"
+		class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+		data-on:click={ beforeToggle + "$workbench.focused = false; if (window.matchMedia('(max-width: 767px)').matches) { $workbench.activeRegionID = '" + signalKey + "'; $workbench.regions." + signalKey + ".visible = true } else { $workbench.regions." + signalKey + ".visible = !$workbench.regions." + signalKey + ".visible }" }
+		data-attr:aria-pressed={ "$workbench.regions." + signalKey + ".visible ? 'true' : 'false'" }
+		aria-label={ label }
+		title={ label }
+	>
+		<span class="sr-only">{ label }</span>
+		@icon
+	</button>
+}
+
+templ DocWorkbenchReturnButton() {
+	<button
+		type="button"
+		class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground md:hidden"
+		data-on:click="$workbench.focused = false; $workbench.activeRegionID = 'docWorkbenchCenter'; $workbench.regions.docWorkbenchCenter.visible = true"
+		aria-label="Back to document"
+		title="Back to document"
+	>
+		<span class="sr-only">Back to document</span>
+		@DocumentIcon()
+	</button>
+}
+
+templ DocumentIcon() {
+	<svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+		<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 4h7l5 5v11a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z"></path>
+		<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 4v5h5M8 13h8M8 17h5"></path>
+	</svg>
+}
+
+templ SidebarMenuIcon() {
+	<svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+		<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7h16M4 12h16M4 17h16"></path>
+	</svg>
+}
+
+templ ChatBubbleIcon() {
+	<svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+		<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h8M8 14h5m8-2a8 8 0 1 1-3.1-6.3L21 5l-.7 3.1A8 8 0 0 1 21 12Z"></path>
+	</svg>
+}
+
+templ RightRail(args RightRailArgs) {
+	<aside id="doc-right-rail" class="flex h-full min-h-0 flex-col bg-card" data-signals={ "{rightRailActiveTab: '" + string(args.ActiveTab) + "'}" }>
+		<div class="shrink-0 border-b border-border p-2">
+			<div class="flex items-center gap-2">
+				@DocWorkbenchReturnButton()
+				<div class="grid min-w-0 flex-1 grid-cols-2 gap-1 rounded-md bg-muted/40 p-1" role="tablist" aria-label="Doc right rail tabs">
+					<button type="button" class="rounded px-2 py-1 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground" data-on:click="$rightRailActiveTab = 'chat'" data-class="{'bg-background text-foreground shadow-sm': $rightRailActiveTab === 'chat'}">Chat</button>
+					<button type="button" class="rounded px-2 py-1 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground" data-on:click="$rightRailActiveTab = 'comments'" data-class="{'bg-background text-foreground shadow-sm': $rightRailActiveTab === 'comments'}">Comments</button>
+				</div>
+			</div>
+		</div>
+		<div class="min-h-0 flex-1 overflow-hidden">
+			<div id="doc-right-chat-panel" class="h-full min-h-0" data-show="$rightRailActiveTab === 'chat'">
+				if args.Chat != nil {
+					@args.Chat
+				} else {
+					<div class="flex h-full items-center justify-center p-4 text-sm text-muted-foreground">No chat selected.</div>
+				}
+			</div>
+			<div id="doc-right-comments-panel" class="h-full min-h-0" data-show="$rightRailActiveTab === 'comments'">
+				if args.Comments != nil {
+					@args.Comments
+				} else {
+					<div class="flex h-full items-center justify-center p-4 text-sm text-muted-foreground">No comments selected.</div>
+				}
+			</div>
+		</div>
+	</aside>
+}

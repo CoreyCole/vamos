@@ -1,0 +1,285 @@
+package workspaces
+
+import (
+	"fmt"
+	"net/url"
+
+	"github.com/CoreyCole/vamos/server/layouts"
+)
+
+templ WorkspacesDocument(args layouts.RootArgs, items []ImplWorkspaceView, refreshing bool) {
+	@layouts.Root(args) {
+		@WorkspacesPageWithRefresh(items, args.WorkspaceManagerURL, refreshing)
+	}
+}
+
+templ WorkspacesPage(items []ImplWorkspaceView, managerURL string) {
+	@WorkspacesPageWithRefresh(items, managerURL, false)
+}
+
+templ WorkspacesPageWithRefresh(items []ImplWorkspaceView, managerURL string, refreshing bool) {
+	<section class="mx-auto flex h-full w-full max-w-6xl flex-col gap-4 overflow-y-auto p-6" data-init="@get('/workspaces/stream')">
+		@WorkspacesHeader(refreshing)
+		@WorkspacesList(items, managerURL)
+	</section>
+}
+
+templ WorkspacesHeader(refreshing bool) {
+	<div id="workspaces-header" class="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+		<div>
+			<h1 class="text-2xl font-semibold tracking-tight">Workspaces</h1>
+			<p class="text-sm text-muted-foreground">Local implementation checkouts discovered under the configured workspace parent.</p>
+		</div>
+		<form method="post" action="/workspaces/refresh" data-on:submit="@post('/workspaces/refresh', {contentType: 'form'})">
+			<button
+				type="submit"
+				class="inline-flex h-9 items-center rounded-md border px-3 text-sm font-medium hover:bg-accent disabled:pointer-events-none disabled:opacity-50"
+				if refreshing {
+					disabled
+				}
+			>
+				if refreshing {
+					Refreshing...
+				} else {
+					Refresh
+				}
+			</button>
+		</form>
+	</div>
+}
+
+templ WorkspacesList(items []ImplWorkspaceView, managerURL string) {
+	<div id="workspaces-list" class="grid gap-3">
+		for _, view := range items {
+			@ImplWorkspaceTreeItem(view, managerURL)
+		}
+	</div>
+}
+
+templ ImplWorkspaceTreeItem(view ImplWorkspaceView, managerURL string) {
+	<div class="grid gap-3" data-workspace-tree-item={ workspaceViewSlug(view) }>
+		@ImplWorkspaceCard(view, managerURL)
+		if len(view.Children) > 0 {
+			<div class="ml-4 grid gap-3 border-l pl-4 md:ml-8 md:pl-6" data-workspace-children={ workspaceViewSlug(view) }>
+				for _, child := range view.Children {
+					@ImplWorkspaceTreeItem(child, managerURL)
+				}
+			</div>
+		}
+	</div>
+}
+
+templ WorkspaceRecovery(model RecoveryModel) {
+	<main class="mx-auto flex min-h-svh w-full max-w-5xl flex-col gap-6 p-6 text-foreground">
+		<section class="rounded-xl border bg-card p-6 text-card-foreground shadow-sm">
+			<div class="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+				<div class="min-w-0 space-y-2">
+					<p class="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Workspace recovery</p>
+					<h1 class="break-words text-2xl font-semibold tracking-tight">{ recoveryDisplayName(model) }</h1>
+					if model.Workspace.Slug != "" {
+						<p class="break-all font-mono text-xs text-muted-foreground">{ model.Workspace.Slug }</p>
+					}
+					<div class="flex flex-wrap gap-2 text-xs text-muted-foreground">
+						<span class="rounded-full border px-2 py-1">status: { string(model.Status.Status) }</span>
+						if model.Status.Phase != "" {
+							<span class="rounded-full border px-2 py-1">phase: { string(model.Status.Phase) }</span>
+						}
+						if model.Workspace.Port != 0 {
+							<span class="rounded-full border px-2 py-1">{ fmt.Sprintf("127.0.0.1:%d", model.Workspace.Port) }</span>
+						}
+					</div>
+				</div>
+				<div class="flex flex-wrap gap-2">
+					if recoverySwitchURL(model) != "" {
+						<a href={ templ.SafeURL(recoverySwitchURL(model)) } class="inline-flex h-9 items-center rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground hover:bg-primary/90">Open workspace</a>
+					} else {
+						<span class="inline-flex h-9 items-center rounded-md border px-3 text-sm text-muted-foreground">Open unavailable</span>
+					}
+					<a href={ templ.SafeURL(recoveryManagerWorkspacesURL(model.ManagerURL)) } class="inline-flex h-9 items-center rounded-md border px-3 text-sm font-medium hover:bg-accent">Open Manager</a>
+				</div>
+			</div>
+			if model.UnsafeRequest {
+				<div class="mt-4 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-200">The original request was not forwarded; retry after workspace is running.</div>
+			}
+			if model.Status.Error != "" {
+				<div class="mt-4 rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">{ model.Status.Error }</div>
+			}
+			if model.Status.Build.Error != "" {
+				<div class="mt-4 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-200">Last build failed: { model.Status.Build.Error }</div>
+			}
+			if !model.Unknown && model.Workspace.Slug != "" {
+				<div class="mt-5 flex flex-wrap gap-2">
+					if recoveryCanStart(model.Status.Status) {
+						@WorkspaceRecoveryActionForm(model, "start", "Start")
+					}
+					if recoveryCanRetry(model.Status.Status) {
+						@WorkspaceRecoveryActionForm(model, "retry", "Retry")
+					}
+					if recoveryCanStop(model.Status.Status) {
+						@WorkspaceRecoveryActionForm(model, "stop", "Stop")
+					}
+				</div>
+			}
+		</section>
+		<section class="rounded-xl border bg-card p-6 text-card-foreground shadow-sm">
+			<h2 class="text-lg font-semibold">Runtime logs</h2>
+			<p class="mt-1 text-sm text-muted-foreground">Recent checkout-local logs from the manager. Full paths are shown for local inspection.</p>
+			<div class="mt-4 grid gap-3">
+				for _, component := range recoverySortedLogComponents(model) {
+					<div class="rounded-lg border p-3">
+						<div class="flex flex-wrap items-center justify-between gap-2">
+							<h3 class="font-mono text-sm font-medium">{ string(component) }</h3>
+							if recoveryLogPath(model, component) != "" {
+								<span class="break-all font-mono text-xs text-muted-foreground">{ recoveryLogPath(model, component) }</span>
+							}
+						</div>
+						if model.LogTails[component] != "" {
+							<pre class="mt-3 max-h-64 overflow-auto rounded-md bg-muted p-3 text-xs text-muted-foreground">{ model.LogTails[component] }</pre>
+						} else {
+							<p class="mt-3 text-sm text-muted-foreground">No recent log lines available.</p>
+						}
+					</div>
+				}
+			</div>
+		</section>
+	</main>
+}
+
+templ WorkspaceRecoveryActionForm(model RecoveryModel, action string, label string) {
+	{{ indicator := workspaceActionIndicator(model.Workspace.Slug, action) }}
+	{{ indicatorSignal := workspaceActionIndicatorSignal(model.Workspace.Slug, action) }}
+	<form method="post" action="/workspaces/host-action" class="inline-flex">
+		<input type="hidden" name="slug" value={ model.Workspace.Slug }/>
+		<input type="hidden" name="action" value={ action }/>
+		<input type="hidden" name="return_to" value={ model.ReturnTo }/>
+		<button type="button" class="inline-flex h-9 items-center rounded-md border px-3 text-sm font-medium hover:bg-accent disabled:pointer-events-none disabled:opacity-50" data-indicator={ indicator } data-on:click="@post('/workspaces/host-action', {contentType: 'form'})" data-attr:disabled={ indicatorSignal }>
+			<span data-show={ "!" + indicatorSignal }>{ label }</span>
+			if action == "start" {
+				<span data-show={ indicatorSignal }>Starting...</span>
+			} else {
+				<span data-show={ indicatorSignal }>Working...</span>
+			}
+		</button>
+	</form>
+}
+
+templ ImplWorkspaceCard(view ImplWorkspaceView, managerURL string) {
+	{{ snap := view.Runtime }}
+	{{ ws := snap.Workspace }}
+	{{ slug := workspaceViewSlug(view) }}
+	<article id={ "workspace-" + slug } class="relative flex min-h-48 flex-col gap-4 rounded-lg border bg-card p-4 text-card-foreground shadow-sm">
+		if workspaceViewActivity(view) != "" {
+			<div class="absolute right-4 top-4 rounded-full border bg-background px-2.5 py-1 text-xs font-medium text-muted-foreground shadow-sm">Updated: { workspaceViewActivity(view) }</div>
+		} else if workspaceCardTimestamp(ws) != "" {
+			<div class="absolute right-4 top-4 rounded-full border bg-background px-2.5 py-1 text-xs font-medium text-muted-foreground shadow-sm">{ workspaceCardTimestamp(ws) }</div>
+		}
+		<div class="min-w-0 pr-0 md:pr-40">
+			<p class="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+				if view.Row.Status == string(ImplWorkspaceStatusMerged) || view.Row.Status == string(ImplWorkspaceStatusCleanedUp) {
+					Historical workspace
+				} else {
+					Implementation workspace
+				}
+			</p>
+			<h2 class="text-lg font-semibold tracking-tight">{ workspaceViewTitle(view) }</h2>
+			if slug != "" {
+				<p class="break-all font-mono text-xs text-muted-foreground">{ slug }</p>
+			}
+		</div>
+		<dl class="grid gap-x-4 gap-y-2 text-sm md:grid-cols-[max-content_minmax(0,1fr)]">
+			<dt class="text-xs font-medium uppercase tracking-wide text-muted-foreground">Status</dt>
+			<dd class="min-w-0 break-words">{ workspaceImplStatusBadge(view) }</dd>
+			if workspaceViewActivity(view) != "" {
+				<dt class="text-xs font-medium uppercase tracking-wide text-muted-foreground">Updated</dt>
+				<dd class="min-w-0 break-words text-xs text-muted-foreground">{ workspaceViewActivity(view) }</dd>
+			}
+			if workspacePlanBindingLabel(view) != "" {
+				<dt class="text-xs font-medium uppercase tracking-wide text-muted-foreground">Plan artifact</dt>
+				<dd class="min-w-0 break-all font-mono text-xs text-muted-foreground">{ workspacePlanBindingLabel(view) }</dd>
+			}
+			if workspaceViewCheckoutPath(view) != "" {
+				<dt class="text-xs font-medium uppercase tracking-wide text-muted-foreground">Local checkout</dt>
+				<dd class="min-w-0 break-all font-mono text-xs text-muted-foreground">{ workspaceViewCheckoutPath(view) }</dd>
+			}
+			if workspaceTrunkBranch(ws) != "" {
+				<dt class="text-xs font-medium uppercase tracking-wide text-muted-foreground">Trunk</dt>
+				<dd class="min-w-0 break-all font-mono text-xs text-muted-foreground">{ workspaceTrunkBranch(ws) }</dd>
+			}
+			if workspaceBottomBranch(ws) != "" {
+				<dt class="text-xs font-medium uppercase tracking-wide text-muted-foreground">Bottom branch</dt>
+				<dd class="min-w-0 break-all font-mono text-xs text-muted-foreground">{ workspaceBottomBranch(ws) }</dd>
+			}
+			if workspaceTopBranch(ws) != "" {
+				<dt class="text-xs font-medium uppercase tracking-wide text-muted-foreground">Top branch</dt>
+				<dd class="min-w-0 break-all font-mono text-xs text-muted-foreground">{ workspaceTopBranch(ws) }</dd>
+			}
+			if ws.Branch != "" {
+				<dt class="text-xs font-medium uppercase tracking-wide text-muted-foreground">Current branch</dt>
+				<dd class="min-w-0 break-all font-mono text-xs text-muted-foreground">{ ws.Branch }</dd>
+			}
+			if ws.Commit != "" {
+				<dt class="text-xs font-medium uppercase tracking-wide text-muted-foreground">Commit</dt>
+				<dd class="min-w-0 break-all font-mono text-xs text-muted-foreground">{ ws.Commit }</dd>
+			}
+			if ws.Port != 0 {
+				<dt class="text-xs font-medium uppercase tracking-wide text-muted-foreground">Port</dt>
+				<dd class="min-w-0 font-mono text-xs text-muted-foreground">{ fmt.Sprintf("127.0.0.1:%d", ws.Port) }</dd>
+			}
+			if ws.LogPath != "" {
+				<dt class="text-xs font-medium uppercase tracking-wide text-muted-foreground">Logs</dt>
+				<dd class="min-w-0 break-all font-mono text-xs text-muted-foreground">{ ws.LogPath }</dd>
+			}
+			if snap.Error != "" {
+				<dt class="text-xs font-medium uppercase tracking-wide text-muted-foreground">Error</dt>
+				<dd class="min-w-0 break-words text-sm text-destructive">{ snap.Error }</dd>
+			} else if ws.Error != "" {
+				<dt class="text-xs font-medium uppercase tracking-wide text-muted-foreground">Error</dt>
+				<dd class="min-w-0 break-words text-sm text-destructive">{ ws.Error }</dd>
+			}
+		</dl>
+		<div class="mt-auto flex flex-wrap justify-end gap-2 pt-2">
+			if canActOnImplWorkspace(view) && normalizedObservedState(snap) == WorkspaceObservedRunning && ws.URL != "" {
+				<a href={ templ.SafeURL(managerURL + "/workspaces/switch/" + slug + "?redirect=" + url.QueryEscape("/")) } class="inline-flex h-9 items-center rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground hover:bg-primary/90">Open</a>
+			}
+			if canActOnImplWorkspace(view) && workspaceTransitioning(snap) {
+				<button type="button" disabled class="inline-flex h-9 items-center rounded-md border px-3 text-sm font-medium opacity-50">
+					if normalizedObservedState(snap) == WorkspaceObservedStarting {
+						Starting...
+					} else {
+						Stopping...
+					}
+				</button>
+			}
+			if canActOnImplWorkspace(view) && workspaceCanStart(snap) {
+				{{ indicator := workspaceActionIndicator(slug, "start") }}
+				{{ indicatorSignal := workspaceActionIndicatorSignal(slug, "start") }}
+				<form method="post" action={ templ.SafeURL("/workspaces/" + slug + "/start") } data-indicator={ indicator } data-on:submit={ "@post('/workspaces/" + slug + "/start', {contentType: 'form'})" }>
+					<button type="submit" data-attr-disabled={ indicatorSignal } class="inline-flex h-9 items-center rounded-md border px-3 text-sm font-medium hover:bg-accent">
+						<span data-show={ "!" + indicatorSignal }>Start</span>
+						<span data-show={ indicatorSignal }>Starting...</span>
+					</button>
+				</form>
+			}
+			if canActOnImplWorkspace(view) && workspaceCanRestart(snap) {
+				{{ indicator := workspaceActionIndicator(slug, "restart") }}
+				{{ indicatorSignal := workspaceActionIndicatorSignal(slug, "restart") }}
+				<form method="post" action={ templ.SafeURL("/workspaces/" + slug + "/restart") } data-indicator={ indicator } data-on:submit={ "@post('/workspaces/" + slug + "/restart', {contentType: 'form'})" }>
+					<button type="submit" data-attr-disabled={ indicatorSignal } class="inline-flex h-9 items-center rounded-md border px-3 text-sm font-medium hover:bg-accent">
+						<span data-show={ "!" + indicatorSignal }>Restart</span>
+						<span data-show={ indicatorSignal }>Restarting...</span>
+					</button>
+				</form>
+			}
+			if canActOnImplWorkspace(view) && workspaceCanStop(snap) {
+				{{ indicator := workspaceActionIndicator(slug, "stop") }}
+				{{ indicatorSignal := workspaceActionIndicatorSignal(slug, "stop") }}
+				<form method="post" action={ templ.SafeURL("/workspaces/" + slug + "/stop") } data-indicator={ indicator } data-on:submit={ "@post('/workspaces/" + slug + "/stop', {contentType: 'form'})" }>
+					<button type="submit" data-attr-disabled={ indicatorSignal } class="inline-flex h-9 items-center rounded-md border px-3 text-sm font-medium text-destructive hover:bg-accent">
+						<span data-show={ "!" + indicatorSignal }>Stop</span>
+						<span data-show={ indicatorSignal }>Stopping...</span>
+					</button>
+				</form>
+			}
+		</div>
+	</article>
+}

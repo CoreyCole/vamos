@@ -1,0 +1,67 @@
+package agentchat
+
+import (
+	"context"
+	"errors"
+
+	"github.com/CoreyCole/vamos/server/services/workspaces"
+)
+
+type SyncWorkspacesInput struct {
+	ProjectName        string
+	ProjectInstanceKey string
+	ProjectRoot        string
+	ThoughtsRoot       string
+	ImplWorkspaces     workspaces.ImplWorkspaceDiscoveryConfig
+	ManagerURL         string
+	RestartToken       string
+	TrunkBranch        string
+}
+
+type SyncWorkspacesResult struct {
+	Plan    PlanWorkspaceDiscoveryResult
+	Impl    workspaces.ImplWorkspaceSyncResult
+	Changed bool
+}
+
+type WorkspaceSyncer struct {
+	PlanSyncer *PlanWorkspaceSyncer
+	ImplSyncer *workspaces.ImplWorkspaceSyncer
+}
+
+func (s *WorkspaceSyncer) Sync(
+	ctx context.Context,
+	input SyncWorkspacesInput,
+) (SyncWorkspacesResult, error) {
+	if s == nil {
+		return SyncWorkspacesResult{}, errors.New("workspace syncer is nil")
+	}
+	var result SyncWorkspacesResult
+	if s.PlanSyncer != nil {
+		plan, err := s.PlanSyncer.Sync(ctx, PlanWorkspaceDiscoveryInput{
+			ProjectName:        input.ProjectName,
+			ProjectInstanceKey: input.ProjectInstanceKey,
+			ProjectRoot:        input.ProjectRoot,
+			ThoughtsRoot:       input.ThoughtsRoot,
+			ImplWorkspaces:     input.ImplWorkspaces,
+		})
+		if err != nil {
+			return SyncWorkspacesResult{}, err
+		}
+		result.Plan = plan
+	}
+	if s.ImplSyncer != nil {
+		impl, err := s.ImplSyncer.Sync(ctx, workspaces.ImplWorkspaceSyncInput{
+			Discovery:    input.ImplWorkspaces,
+			ManagerURL:   input.ManagerURL,
+			RestartToken: input.RestartToken,
+			TrunkBranch:  input.TrunkBranch,
+		})
+		if err != nil {
+			return SyncWorkspacesResult{}, err
+		}
+		result.Impl = impl
+	}
+	result.Changed = result.Plan.Changed || result.Impl.Changed
+	return result, nil
+}

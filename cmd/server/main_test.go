@@ -1,0 +1,330 @@
+package main
+
+import (
+	"crypto/ed25519"
+	"encoding/base64"
+	"net/http"
+	"net/http/httptest"
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+
+	"github.com/labstack/echo/v4"
+
+	"github.com/CoreyCole/vamos/server/services/agentchat"
+	"github.com/CoreyCole/vamos/server/services/workspaces"
+)
+
+func TestRootUsesAuthenticatedChatWorkbench(t *testing.T) {
+	t.Parallel()
+
+	e := echo.New()
+	authRan := false
+	authStopsBeforeHandler := func(next echo.HandlerFunc) echo.HandlerFunc {
+		return func(c echo.Context) error {
+			authRan = true
+			return c.NoContent(http.StatusNoContent)
+		}
+	}
+	registerAgentChatEntryRoutes(e, authStopsBeforeHandler, &agentchat.Handler{}, nil)
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	rec := httptest.NewRecorder()
+
+	e.ServeHTTP(rec, req)
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusNoContent)
+	}
+	if !authRan {
+		t.Fatal("root route did not run auth middleware")
+	}
+}
+
+func TestAgentChatPageRoutesNotFound(t *testing.T) {
+	t.Parallel()
+
+	e := echo.New()
+	registerAgentChatEntryRoutes(e, func(next echo.HandlerFunc) echo.HandlerFunc {
+		return next
+	}, &agentchat.Handler{}, nil)
+
+	for _, tc := range []struct {
+		name string
+		path string
+	}{
+		{name: "bare retired page", path: "/agent-chat"},
+		{name: "slash retired page", path: "/agent-chat/"},
+		{name: "workspace page", path: "/agent-chat/foo"},
+		{name: "thread page", path: "/agent-chat/foo/thread/bar"},
+		{name: "document page", path: "/agent-chat/thoughts/x.md"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			rec := httptest.NewRecorder()
+			e.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, tc.path, nil))
+			if rec.Code != http.StatusNotFound {
+				t.Fatalf("%s status = %d, want 404", tc.path, rec.Code)
+			}
+		})
+	}
+}
+
+func TestDefaultStatePathUsesXDGStateHome(t *testing.T) {
+	stateHome := t.TempDir()
+	t.Setenv("XDG_STATE_HOME", stateHome)
+
+	got, err := defaultStatePath("agents.db")
+	if err != nil {
+		t.Fatalf("defaultStatePath() error = %v", err)
+	}
+	want := filepath.Join(stateHome, "cn-agents", "agents.db")
+	if got != want {
+		t.Fatalf("defaultStatePath() = %q, want %q", got, want)
+	}
+}
+
+func TestExpandRuntimePathsExpandsHomeRelativePaths(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	cfg, err := expandRuntimePaths(Config{
+		DatabasePath:          "~/.local/state/cn-agents/agents.db",
+		GoogleCredentialsFile: "~/cn-agents/client_secret.json",
+		MarkdownBasePath:      "~/cn-agents/thoughts",
+		RepoPath:              "~/cn-agents",
+		AgentChatDefaultDir:   "~/cn-agents/thoughts/creative-mode-agent/plans",
+		WorkspaceParentDir:    "~/cn",
+		WorkspaceStateDir:     "~/.local/state/cn-agents/workspaces",
+		ConfigPath:            "~/.config/agents/config.yml",
+	})
+	if err != nil {
+		t.Fatalf("expandRuntimePaths() error = %v", err)
+	}
+	for name, got := range map[string]string{
+		"DatabasePath":          cfg.DatabasePath,
+		"GoogleCredentialsFile": cfg.GoogleCredentialsFile,
+		"MarkdownBasePath":      cfg.MarkdownBasePath,
+		"RepoPath":              cfg.RepoPath,
+		"AgentChatDefaultDir":   cfg.AgentChatDefaultDir,
+		"WorkspaceParentDir":    cfg.WorkspaceParentDir,
+		"WorkspaceStateDir":     cfg.WorkspaceStateDir,
+		"ConfigPath":            cfg.ConfigPath,
+	} {
+		if !strings.HasPrefix(got, home+string(os.PathSeparator)) {
+			t.Fatalf("%s = %q, want under home %q", name, got, home)
+		}
+	}
+}
+
+func TestNormalizeListenAddress(t *testing.T) {
+	cases := []struct {
+		in   string
+		want string
+	}{
+		{"", ":4200"},
+		{"4301", ":4301"},
+		{":4301", ":4301"},
+		{"127.0.0.1:4301", "127.0.0.1:4301"},
+	}
+	for _, tc := range cases {
+		got, err := normalizeListenAddress(tc.in)
+		if err != nil {
+			t.Fatalf("%q: %v", tc.in, err)
+		}
+		if got != tc.want {
+			t.Fatalf("%q got %q want %q", tc.in, got, tc.want)
+		}
+	}
+}
+
+func TestNormalizeListenAddressRejectsBadValue(t *testing.T) {
+	for _, in := range []string{"abc", ":abc", "127.0.0.1:http"} {
+		if _, err := normalizeListenAddress(in); err == nil {
+			t.Fatalf("normalizeListenAddress(%q) error=nil", in)
+		}
+	}
+}
+
+func TestAgentChatCallbackBaseURL(t *testing.T) {
+	got := agentChatCallbackBaseURL(Config{
+		InternalCallbackBaseURL: "http://127.0.0.1:4301/",
+		PublicBaseURL:           "https://foo.cn-agents.test",
+	})
+	if got != "http://127.0.0.1:4301" {
+		t.Fatalf("got %q", got)
+	}
+	got = agentChatCallbackBaseURL(Config{PublicBaseURL: "https://foo.cn-agents.test/"})
+	if got != "https://foo.cn-agents.test" {
+		t.Fatalf("got %q", got)
+	}
+}
+
+func TestAgentChatDefaultDirPrefersExplicitDir(t *testing.T) {
+	got := agentChatDefaultDir(Config{
+		RepoPath:            "/repo",
+		AgentChatDefaultDir: "/explicit",
+	})
+	if got != "/explicit" {
+		t.Fatalf("agentChatDefaultDir() = %q, want /explicit", got)
+	}
+}
+
+func TestAgentChatDefaultDirFallsBackToRepoPath(t *testing.T) {
+	got := agentChatDefaultDir(Config{RepoPath: "/repo"})
+	if got != "/repo" {
+		t.Fatalf("agentChatDefaultDir() = %q, want /repo", got)
+	}
+}
+
+func TestHostFromBaseURL(t *testing.T) {
+	got := hostFromBaseURL("https://main.cn-agents.test/workspaces")
+	if got != "main.cn-agents.test" {
+		t.Fatalf("got %q", got)
+	}
+}
+
+func validSigningKeyForTest(t *testing.T) string {
+	t.Helper()
+	seed := make([]byte, ed25519.SeedSize)
+	for i := range seed {
+		seed[i] = byte(i + 1)
+	}
+	return base64.RawURLEncoding.EncodeToString(seed)
+}
+
+func validVerifyKeyForTest(t *testing.T) string {
+	t.Helper()
+	signingKey, err := workspaces.ParseHandoffSigningKey(validSigningKeyForTest(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	publicKey, ok := signingKey.Public().(ed25519.PublicKey)
+	if !ok {
+		t.Fatal("signing key did not expose Ed25519 public key")
+	}
+	return workspaces.EncodeHandoffVerifyKey(publicKey)
+}
+
+func TestValidateWorkspaceConfig(t *testing.T) {
+	if err := validateWorkspaceConfig(Config{WorkspaceMode: "standalone"}); err != nil {
+		t.Fatalf("standalone: %v", err)
+	}
+	if err := validateWorkspaceConfig(Config{WorkspaceMode: "manager"}); err == nil {
+		t.Fatal("manager without domain error=nil")
+	}
+	if err := validateWorkspaceConfig(
+		Config{WorkspaceMode: "manager", WorkspaceDomain: "cn-agents.test"},
+	); err == nil {
+		t.Fatal("manager without signing key error=nil")
+	}
+	if err := validateWorkspaceConfig(
+		Config{
+			WorkspaceMode:     "manager",
+			WorkspaceDomain:   "cn-agents.test",
+			DevAuthSigningKey: "not-base64",
+		},
+	); err == nil {
+		t.Fatal("manager with invalid signing key error=nil")
+	}
+	if err := validateWorkspaceConfig(
+		Config{
+			WorkspaceMode:     "manager",
+			WorkspaceDomain:   "cn-agents.test",
+			DevAuthSigningKey: validSigningKeyForTest(t),
+		},
+	); err != nil {
+		t.Fatalf("manager with signing key: %v", err)
+	}
+	if err := validateWorkspaceConfig(Config{WorkspaceMode: "child"}); err == nil {
+		t.Fatal("child without slug error=nil")
+	}
+	if err := validateWorkspaceConfig(
+		Config{WorkspaceMode: "child", WorkspaceSlug: "feature"},
+	); err == nil {
+		t.Fatal("child without verify key error=nil")
+	}
+	if err := validateWorkspaceConfig(
+		Config{
+			WorkspaceMode:    "child",
+			WorkspaceSlug:    "feature",
+			DevAuthVerifyKey: "not-base64",
+		},
+	); err == nil {
+		t.Fatal("child with invalid verify key error=nil")
+	}
+	if err := validateWorkspaceConfig(
+		Config{
+			WorkspaceMode:    "child",
+			WorkspaceSlug:    "feature",
+			DevAuthVerifyKey: validVerifyKeyForTest(t),
+		},
+	); err != nil {
+		t.Fatalf("child with verify key: %v", err)
+	}
+}
+
+func TestExpandRuntimePathsRejectsHostRelativePath(t *testing.T) {
+	t.Parallel()
+
+	_, err := expandRuntimePaths(Config{
+		DatabasePath:     "agents.db",
+		MarkdownBasePath: "thoughts",
+	})
+	if err == nil {
+		t.Fatal("expandRuntimePaths() error = nil, want host-relative path error")
+	}
+	if !strings.Contains(err.Error(), "MARKDOWN_BASE_PATH must be absolute") {
+		t.Fatalf("expandRuntimePaths() error = %v, want MARKDOWN_BASE_PATH context", err)
+	}
+}
+
+func TestExpandRuntimePathsAllowsMissingOptionalConfigPath(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	cfg, err := expandRuntimePaths(Config{DatabasePath: "agents.db"})
+	if err != nil {
+		t.Fatalf("expandRuntimePaths() error = %v", err)
+	}
+	want := filepath.Join(home, ".config", "agents", "config.yml")
+	if cfg.ConfigPath != want {
+		t.Fatalf("ConfigPath = %q, want %q", cfg.ConfigPath, want)
+	}
+}
+
+func TestExpandRuntimePathsResolvesRelativeRebuildScriptUnderModuleCWD(t *testing.T) {
+	cwd := t.TempDir()
+	oldCwd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("Getwd() error = %v", err)
+	}
+	if err := os.Chdir(cwd); err != nil {
+		t.Fatalf("Chdir() error = %v", err)
+	}
+	t.Cleanup(func() { _ = os.Chdir(oldCwd) })
+
+	cfg, err := expandRuntimePaths(Config{
+		DatabasePath:  "agents.db",
+		ConfigPath:    "~/missing.yml",
+		RebuildScript: "scripts/webhook-rebuild.sh",
+	})
+	if err != nil {
+		t.Fatalf("expandRuntimePaths() error = %v", err)
+	}
+	want := filepath.Join(cwd, "scripts", "webhook-rebuild.sh")
+	if cfg.RebuildScript != want {
+		t.Fatalf("RebuildScript = %q, want %q", cfg.RebuildScript, want)
+	}
+}
+
+func TestExpandRuntimePathsRejectsPreCutoverRelativeDatabasePath(t *testing.T) {
+	t.Parallel()
+
+	_, err := expandRuntimePaths(Config{DatabasePath: "data/thoughts.db"})
+	if err == nil {
+		t.Fatal("expandRuntimePaths() error = nil, want pre-cutover DB path error")
+	}
+	if !strings.Contains(err.Error(), "ambiguous after pkg/agents cwd cutover") {
+		t.Fatalf("expandRuntimePaths() error = %v, want cutover guard", err)
+	}
+}

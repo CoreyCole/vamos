@@ -1,0 +1,97 @@
+package agentchat
+
+import (
+	"fmt"
+
+	"github.com/CoreyCole/vamos/server/layouts"
+	"github.com/CoreyCole/vamos/server/layouts/workbench"
+)
+
+templ ChatPage(args ChatPageArgs) {
+	@layouts.Root(layouts.RootArgs{
+		Title:              "Agent Chat",
+		PageType:           layouts.PageTypeAgentChat,
+		ShowHeader:         true,
+		UserEmail:          args.UserEmail,
+		CurrentTheme:       args.CurrentTheme,
+		CurrentSyntaxTheme: args.CurrentSyntaxTheme,
+	}) {
+		<div data-init={ fmt.Sprintf("@get('/agent-chat/sessions/stream?thread=%s')", getThreadID(args.CurrentThread)) }></div>
+		if args.CurrentThread != nil {
+			<div data-init={ fmt.Sprintf("@get('/agent-chat/stream?thread=%s&run=%s&since=%d')", args.CurrentThread.ID, getRunID(args.ActiveRun), args.Cursor) }></div>
+		}
+		<div id="agent-chat-workbench-shell" data-signals={ chatShellSignalsForPlanSidebar(args.CurrentThread != nil, args.PlanSidebar) } class="relative h-full min-h-0 overflow-hidden">
+			@AgentChatToast()
+			@workbench.Workbench(ensureFreeformWorkbenchState(args))
+		</div>
+	}
+}
+
+templ FreeformNavigationRegion(args ChatPageArgs) {
+	@PlanSidebar(args.PlanSidebar)
+}
+
+templ FreeformChatPrimaryRegion(args ChatPageArgs) {
+	<main class="relative flex h-full min-h-0 w-full min-w-0 flex-col overflow-hidden rounded-lg border border-border bg-card">
+		@FreeformRunHeader(ensureFreeformWorkbenchState(args))
+		<div class="relative min-h-0 flex-1">
+			@ChatScrollControls()
+			<div id="agent-chat-scroll-region" class="h-full overflow-y-auto">
+				@MessagesPane(getThreadID(args.CurrentThread), args.Transcript, args.CurrentThread != nil, freeformForkAction())
+			</div>
+		</div>
+		<div class="absolute inset-x-0 bottom-0 z-20 bg-card p-4 pt-3 backdrop-blur supports-[backdrop-filter]:bg-card/95">
+			@FreeformChatComposer(args)
+		</div>
+	</main>
+}
+
+templ FreeformContextRegion(args ChatPageArgs) {
+	@DocPane(args.DocPane, getThreadID(args.CurrentThread))
+}
+
+templ WorkspaceResource(args WorkspacePageArgs) {
+	<div id="agent-chat-workspace-resource" class="contents">
+		@workbench.Workbench(ensureWorkspaceWorkbenchState(args))
+	</div>
+}
+
+templ WorkspacePlanSidebarRegion(args WorkspacePageArgs) {
+	@WorkspaceTopologySidebar(args.Projection.SidebarProjection)
+}
+
+templ WorkspaceDocPrimaryRegion(args WorkspacePageArgs) {
+	@WorkspaceDocPane(args.Projection.Docs, args.WorkspaceID, getThreadID(args.Projection.SelectedThread))
+}
+
+templ WorkspaceChatPrimaryRegion(args WorkspacePageArgs) {
+	<main id="agent-chat-chat-pane" class="relative flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-lg border border-border bg-card">
+		@WorkspaceHeader(args.Projection, ensureWorkspaceWorkbenchState(args))
+		<div class="relative min-h-0 flex-1">
+			@ChatScrollControls()
+			<div id="agent-chat-scroll-region" class="h-full overflow-y-auto">
+				@MessagesPane(getThreadID(args.Projection.SelectedThread), args.Projection.Transcript, args.Projection.SelectedThread != nil, workspaceForkAction(args.WorkspaceID, getThreadID(args.Projection.SelectedThread)))
+			</div>
+		</div>
+		<div class="absolute inset-x-0 bottom-0 z-20 bg-card p-4 pt-3 backdrop-blur supports-[backdrop-filter]:bg-card/95">
+			@WorkspaceComposer(args.WorkspaceID, getThreadID(args.Projection.SelectedThread), args.Projection.SelectedThread != nil, args.Projection.Workflow.ActiveCwd.Path, args.PendingAttachments)
+		</div>
+	</main>
+}
+
+templ WorkspaceChatPage(args WorkspacePageArgs) {
+	@layouts.Root(layouts.RootArgs{
+		Title:              "Agent Chat",
+		PageType:           layouts.PageTypeAgentChat,
+		ShowHeader:         true,
+		UserEmail:          args.UserEmail,
+		CurrentTheme:       args.CurrentTheme,
+		CurrentSyntaxTheme: args.CurrentSyntaxTheme,
+	}) {
+		<div data-init={ fmt.Sprintf("@get('/agent-chat/%s/stream?thread=%s&run=%s&since=%d')", args.WorkspaceID, getThreadID(args.Projection.SelectedThread), getRunID(args.Projection.ActiveRun), args.Cursor) }></div>
+		<div id="agent-chat-workspace-shell" data-signals={ workspaceShellSignals(args.Projection.SelectedThread != nil, args.Projection.PlanSidebar) } class="relative h-full min-h-0 overflow-hidden">
+			@AgentChatToast()
+			@WorkspaceResource(args)
+		</div>
+	}
+}

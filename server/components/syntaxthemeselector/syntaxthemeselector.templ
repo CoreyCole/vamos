@@ -1,0 +1,39 @@
+package syntaxthemeselector
+
+import selectui "github.com/CoreyCole/vamos/pkg/components/select"
+
+// Available syntax themes
+var DarkThemes = []selectui.SelectOptionArgs{
+	// {Value: "monokai", Label: "Monokai", Group: "Dark Themes"},
+	{Value: "github-dark", Label: "GitHub Dark", Group: "Dark Themes"},
+	{Value: "nord", Label: "Nord", Group: "Dark Themes"},
+	{Value: "dracula", Label: "Dracula", Group: "Dark Themes"},
+	{Value: "tokyonight-night", Label: "Tokyo Night", Group: "Dark Themes"},
+	{Value: "catppuccin-mocha", Label: "Catppuccin Mocha", Group: "Dark Themes"},
+}
+
+var LightThemes = []selectui.SelectOptionArgs{
+	// {Value: "github", Label: "GitHub", Group: "Light Themes"},
+	{Value: "solarized-light", Label: "Solarized Light", Group: "Light Themes"},
+	{Value: "catppuccin-latte", Label: "Catppuccin Latte", Group: "Light Themes"},
+	{Value: "tokyonight-day", Label: "Tokyo Night Day", Group: "Light Themes"},
+}
+
+templ SyntaxThemeSelector(args SyntaxThemeSelectorArgs) {
+	{{
+		// Combine all themes for the select options
+		allThemes := append(DarkThemes, LightThemes...)
+	}}
+	<div class={ "flex items-center gap-2", args.Class } { args.Attributes... }>
+		<span class="text-sm text-muted-foreground whitespace-nowrap">Syntax:</span>
+		@selectui.Select(selectui.SelectArgs{
+			ID:          "syntax_theme_select",
+			Name:        "syntaxTheme",
+			Value:       args.CurrentTheme,
+			Placeholder: "Select theme...",
+			Options:     allThemes,
+			OnChange:    "@post('/api/syntax-theme')",
+			Class:       "w-[180px]",
+		})
+	</div>
+}

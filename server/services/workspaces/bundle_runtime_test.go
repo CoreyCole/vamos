@@ -1,0 +1,583 @@
+package workspaces
+
+import (
+	"context"
+	"errors"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"reflect"
+	"strings"
+	"testing"
+	"time"
+)
+
+func TestWorkspaceRuntimeStartBundleOrdersComponentsAndPersistsRunningAfterReadiness(
+	t *testing.T,
+) {
+	ws := bundleTestWorkspace(t)
+	starter := &recordingStarter{}
+	prober := &recordingProber{}
+	runtime := &WorkspaceRuntime{
+		store:         FileBundleStore{},
+		starter:       starter,
+		stopper:       starter,
+		prober:        prober,
+		portAllocator: sequentialPorts(4300),
+		now:           func() time.Time { return time.Unix(100, 0) },
+	}
+
+	started, handles, err := runtime.StartBundle(
+		context.Background(),
+		ws,
+		RuntimeConfig{
+			ManagerURL:   "https://main.test",
+			RestartToken: "token",
+			BaseEnv:      map[string]string{"GOOGLE_CREDENTIALS_FILE": "/google.json"},
+		},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if started.Status != StatusRunning || started.PID == 0 ||
+		handles[ComponentWeb] == nil {
+		t.Fatalf("started=%#v handles=%#v", started, handles)
+	}
+	wantOrder := []BundleComponent{ComponentTemporal, ComponentWeb, ComponentTSWorker}
+	if !reflect.DeepEqual(starter.started, wantOrder) {
+		t.Fatalf("start order=%v want %v", starter.started, wantOrder)
+	}
+	if !reflect.DeepEqual(
+		prober.calls,
+		[]string{"temporal", "web", "web-worker", "fresh-file"},
+	) {
+		t.Fatalf("prober calls=%v", prober.calls)
+	}
+	status, err := FileBundleStore{}.ReadStatus(ws)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if status.Status != StatusRunning || status.Phase != "" ||
+		status.PIDs[ComponentWeb] == 0 ||
+		status.Ports[ComponentTemporal] == 0 {
+		t.Fatalf("status=%#v", status)
+	}
+}
+
+func TestWorkspaceRuntimeStartBundleFailureStopsReverseAndPersistsFailedPhase(
+	t *testing.T,
+) {
+	ws := bundleTestWorkspace(t)
+	starter := &recordingStarter{}
+	runtime := &WorkspaceRuntime{
+		store:         FileBundleStore{},
+		starter:       starter,
+		stopper:       starter,
+		prober:        &recordingProber{failWebWorker: errors.New("go worker not ready")},
+		portAllocator: sequentialPorts(4400),
+	}
+
+	started, _, err := runtime.StartBundle(
+		context.Background(),
+		ws,
+		RuntimeConfig{ManagerURL: "https://main.test"},
+	)
+	if err == nil || !strings.Contains(err.Error(), "go worker not ready") {
+		t.Fatalf("err=%v", err)
+	}
+	if started.Status != StatusFailed || started.Phase != PhaseStartingWeb {
+		t.Fatalf("started=%#v", started)
+	}
+	wantStopped := []BundleComponent{ComponentWeb, ComponentTemporal}
+	if !reflect.DeepEqual(starter.stopped, wantStopped) {
+		t.Fatalf("stop order=%v want %v", starter.stopped, wantStopped)
+	}
+	status, err := FileBundleStore{}.ReadStatus(ws)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if status.Status != StatusFailed || status.Phase != PhaseStartingWeb ||
+		!strings.Contains(status.Error, "go worker not ready") {
+		t.Fatalf("status=%#v", status)
+	}
+}
+
+func TestTemporalArgsExactStartDevCommand(t *testing.T) {
+	ws := Workspace{CheckoutPath: "/tmp/checkout"}
+	got := TemporalArgs(ws, 7234, 8234)
+	want := []string{
+		"temporal",
+		"server",
+		"start-dev",
+		"--db-filename",
+		RuntimePaths(ws.CheckoutPath).TemporalDB,
+		"--port",
+		"7234",
+		"--ui-port",
+		"8234",
+		"--ui-public-path",
+		"/temporal",
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("TemporalArgs=%v want %v", got, want)
+	}
+}
+
+func TestTSWorkerArgsRunFromPackagePath(t *testing.T) {
+	got := TSWorkerArgs(Workspace{PackagePath: "/tmp/checkout/pkg/agents"})
+	want := []string{"node", "dist/pkg/agents/temporal/workers/ts/worker.js"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("TSWorkerArgs=%v want %v", got, want)
+	}
+}
+
+func TestTSWorkerEnvIncludesWorkspaceTemporalReadyMarkerAndPiAuth(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	ws := Workspace{CheckoutPath: "/tmp/checkout"}
+	env := envMap(TSWorkerEnv(map[string]string{"PI_MODEL_ID": "gpt-5.5"}, ws, 7234))
+	assertEnv(t, env, "TEMPORAL_ADDR", "127.0.0.1:7234")
+	assertEnv(
+		t,
+		env,
+		"VAMOS_TS_WORKER_READY_FILE",
+		RuntimePaths(ws.CheckoutPath).TSReadyMarker,
+	)
+	assertEnv(t, env, "PI_AUTH_PATH", filepath.Join(home, ".pi", "agent", "auth.json"))
+	assertEnv(t, env, "PI_MODEL_ID", "gpt-5.5")
+}
+
+func TestFreshFileExistsWaitsPastStaleMarker(t *testing.T) {
+	marker := filepath.Join(t.TempDir(), "ts-worker.ready")
+	if err := os.WriteFile(marker, []byte("old\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	oldTime := time.Unix(100, 0)
+	if err := os.Chtimes(marker, oldTime, oldTime); err != nil {
+		t.Fatal(err)
+	}
+	notBefore := oldTime.Add(time.Second)
+	done := make(chan error, 1)
+	go func() {
+		done <- LocalReadinessProber{}.FreshFileExists(context.Background(), marker, notBefore)
+	}()
+
+	select {
+	case err := <-done:
+		t.Fatalf("FreshFileExists returned before marker became fresh: %v", err)
+	case <-time.After(100 * time.Millisecond):
+	}
+	freshTime := notBefore.Add(time.Second)
+	if err := os.Chtimes(marker, freshTime, freshTime); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Fatalf("FreshFileExists fresh err=%v", err)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("FreshFileExists did not accept fresh marker")
+	}
+}
+
+func TestChildEnvIncludesWorkspaceTemporalAndState(t *testing.T) {
+	ws := Workspace{Slug: "foo", CheckoutPath: "/tmp/checkout", URL: "https://foo.test/"}
+	ports := map[BundleComponent]int{
+		ComponentWeb:        4100,
+		ComponentTemporal:   7234,
+		ComponentTemporalUI: 8234,
+	}
+	env := envMap(
+		ChildEnv(
+			map[string]string{},
+			ws,
+			ports,
+			RuntimeConfig{
+				ManagerURL:       "https://main.test",
+				RestartToken:     "token",
+				DevAuthVerifyKey: "verify",
+				ThoughtsRepo:     "/tmp/host",
+				ThoughtsRoot:     "/tmp/host/thoughts",
+			},
+		),
+	)
+	assertEnv(t, env, "CN_TEMPORAL", "true")
+	assertEnv(t, env, "TEMPORAL_ADDRESS", "127.0.0.1:7234")
+	assertEnv(t, env, "TEMPORAL_UI_BASE_URL", "http://127.0.0.1:8234")
+	assertEnv(t, env, "VAMOS_DATABASE_PATH", RuntimePaths(ws.CheckoutPath).AgentsDB)
+	assertEnv(t, env, "OPENCLAW_STATE_DIR", RuntimePaths(ws.CheckoutPath).OpenClawDir)
+	assertEnv(t, env, "VAMOS_INTERNAL_CALLBACK_BASE_URL", "http://127.0.0.1:4100")
+	assertEnv(t, env, "VAMOS_THOUGHTS_ROOT", "/tmp/host/thoughts")
+}
+
+func TestManagerRestartReturnsStopErrorWithoutStart(t *testing.T) {
+	m, _ := newTestManager(t)
+	runtime := &stopFailRuntime{err: errors.New("cannot stop")}
+	m.bundleRuntime = runtime
+	if _, err := m.Restart(
+		context.Background(),
+		"foo",
+	); err == nil ||
+		!strings.Contains(err.Error(), "cannot stop") {
+		t.Fatalf("Restart err=%v", err)
+	}
+	if runtime.startCalls != 0 {
+		t.Fatalf("startCalls=%d want 0", runtime.startCalls)
+	}
+}
+
+func bundleTestWorkspace(t *testing.T) Workspace {
+	t.Helper()
+	checkout := t.TempDir()
+	packagePath := filepath.Join(checkout, "pkg", "agents")
+	if err := os.MkdirAll(packagePath, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	paths := RuntimePaths(checkout)
+	return Workspace{
+		Slug:         "foo",
+		CheckoutPath: checkout,
+		PackagePath:  packagePath,
+		Host:         "foo.test",
+		URL:          "https://foo.test/",
+		Bundle:       paths,
+		LogPath:      paths.WebLog,
+	}
+}
+
+func sequentialPorts(next int) func() (int, error) {
+	return func() (int, error) {
+		next++
+		return next, nil
+	}
+}
+
+func TestWorkspaceRuntimeRestartWebDoesNotRestartTemporal(t *testing.T) {
+	ws := bundleTestWorkspace(t)
+	ws.Status = StatusRunning
+	ws.Ports = map[BundleComponent]int{ComponentWeb: 4300, ComponentTemporal: 7234}
+	handles := BundleHandles{
+		ComponentTemporal: handleFor(ComponentTemporal, 1001),
+		ComponentWeb:      handleFor(ComponentWeb, 1002),
+		ComponentTSWorker: handleFor(ComponentTSWorker, 1003),
+	}
+	starter := &recordingStarter{}
+	prober := &recordingProber{}
+	runtime := &WorkspaceRuntime{
+		store:   FileBundleStore{},
+		starter: starter,
+		stopper: starter,
+		prober:  prober,
+	}
+
+	restarted, gotHandles, err := runtime.RestartComponents(
+		context.Background(),
+		ws,
+		handles,
+		[]BundleComponent{ComponentWeb},
+		RuntimeConfig{},
+		RestartComponentsOptions{},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if restarted.Status != StatusRunning {
+		t.Fatalf("status = %q, want running", restarted.Status)
+	}
+	if !reflect.DeepEqual(starter.stopped, []BundleComponent{ComponentWeb}) {
+		t.Fatalf("stopped = %v, want web only", starter.stopped)
+	}
+	if !reflect.DeepEqual(starter.started, []BundleComponent{ComponentWeb}) {
+		t.Fatalf("started = %v, want web only", starter.started)
+	}
+	if gotHandles[ComponentTemporal] != handles[ComponentTemporal] {
+		t.Fatal("temporal handle was replaced")
+	}
+}
+
+func TestWorkspaceRuntimeForceRestartWebIgnoresStopFailure(t *testing.T) {
+	ws := bundleTestWorkspace(t)
+	ws.Status = StatusFailed
+	ws.Ports = map[BundleComponent]int{ComponentWeb: 4300, ComponentTemporal: 7234}
+	handles := BundleHandles{
+		ComponentTemporal: handleFor(ComponentTemporal, 1001),
+		ComponentWeb:      handleFor(ComponentWeb, 1002),
+		ComponentTSWorker: handleFor(ComponentTSWorker, 1003),
+	}
+	oldWeb := handles[ComponentWeb]
+	starter := &recordingStarter{stopErr: errors.New("stop stuck")}
+	runtime := &WorkspaceRuntime{
+		store:   FileBundleStore{},
+		starter: starter,
+		stopper: starter,
+		prober:  &recordingProber{},
+	}
+
+	restarted, gotHandles, err := runtime.RestartComponents(
+		context.Background(),
+		ws,
+		handles,
+		[]BundleComponent{ComponentWeb},
+		RuntimeConfig{},
+		RestartComponentsOptions{Force: true},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if restarted.Status != StatusRunning || restarted.PID == 0 ||
+		restarted.PIDs[ComponentWeb] == 0 {
+		t.Fatalf("restarted=%#v", restarted)
+	}
+	if !reflect.DeepEqual(starter.stopped, []BundleComponent{ComponentWeb}) {
+		t.Fatalf("stopped = %v, want web", starter.stopped)
+	}
+	if !reflect.DeepEqual(starter.started, []BundleComponent{ComponentWeb}) {
+		t.Fatalf("started = %v, want web", starter.started)
+	}
+	if gotHandles[ComponentWeb] == oldWeb {
+		t.Fatal("web handle was not replaced")
+	}
+}
+
+func TestWorkspaceRuntimeRestartComponentsRewritesWorkspaceEnv(t *testing.T) {
+	ws := bundleTestWorkspace(t)
+	ws.Status = StatusRunning
+	ws.Ports = map[BundleComponent]int{ComponentWeb: 4300, ComponentTemporal: 7234}
+	stale := WorkspaceEnv{
+		Slug:         "old-slug",
+		CheckoutPath: ws.CheckoutPath,
+		ManagerURL:   "https://old.example.test",
+		RestartToken: "old-token",
+	}
+	if err := (FileBundleStore{}).WriteWorkspaceEnv(ws, stale); err != nil {
+		t.Fatal(err)
+	}
+	runtime := &WorkspaceRuntime{
+		store:   FileBundleStore{},
+		starter: &recordingStarter{},
+		stopper: &recordingStarter{},
+		prober:  &recordingProber{},
+	}
+
+	_, _, err := runtime.RestartComponents(
+		context.Background(),
+		ws,
+		BundleHandles{ComponentWeb: handleFor(ComponentWeb, 1002)},
+		[]BundleComponent{ComponentWeb},
+		RuntimeConfig{ManagerURL: "https://main.example.test", RestartToken: "new-token"},
+		RestartComponentsOptions{},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := (FileBundleStore{}).ReadWorkspaceEnv(ws)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Slug != ws.Slug || got.ManagerURL != "https://main.example.test" ||
+		got.RestartToken != "new-token" {
+		t.Fatalf("workspace env = %#v, want current slug/manager/token", got)
+	}
+}
+
+func TestWorkspaceRuntimeRestartWebStopFailureDoesNotStartWithoutForce(t *testing.T) {
+	ws := bundleTestWorkspace(t)
+	ws.Status = StatusRunning
+	ws.Ports = map[BundleComponent]int{ComponentWeb: 4300, ComponentTemporal: 7234}
+	handles := BundleHandles{ComponentWeb: handleFor(ComponentWeb, 1002)}
+	starter := &recordingStarter{stopErr: errors.New("stop stuck")}
+	runtime := &WorkspaceRuntime{
+		store:   FileBundleStore{},
+		starter: starter,
+		stopper: starter,
+		prober:  &recordingProber{},
+	}
+
+	_, _, err := runtime.RestartComponents(
+		context.Background(),
+		ws,
+		handles,
+		[]BundleComponent{ComponentWeb},
+		RuntimeConfig{},
+		RestartComponentsOptions{},
+	)
+	if err == nil || !strings.Contains(err.Error(), "stop web: stop stuck") {
+		t.Fatalf("err = %v, want stop failure", err)
+	}
+	if len(starter.started) != 0 {
+		t.Fatalf("started = %v, want none", starter.started)
+	}
+}
+
+func TestWorkspaceRuntimeForceRestartRequiresPersistedPorts(t *testing.T) {
+	ws := bundleTestWorkspace(t)
+	ws.Status = StatusFailed
+	ws.Ports = map[BundleComponent]int{ComponentWeb: 4300}
+	runtime := &WorkspaceRuntime{
+		store:   FileBundleStore{},
+		starter: &recordingStarter{},
+		stopper: &recordingStarter{},
+		prober:  &recordingProber{},
+	}
+
+	_, _, err := runtime.RestartComponents(
+		context.Background(),
+		ws,
+		nil,
+		[]BundleComponent{ComponentWeb},
+		RuntimeConfig{},
+		RestartComponentsOptions{Force: true},
+	)
+	if err == nil || !strings.Contains(err.Error(), "missing runtime ports") {
+		t.Fatalf("err = %v, want missing ports", err)
+	}
+}
+
+func TestWorkspaceRuntimeRestartTSWorkerDoesNotStopWeb(t *testing.T) {
+	ws := bundleTestWorkspace(t)
+	ws.Status = StatusRunning
+	ws.Ports = map[BundleComponent]int{ComponentWeb: 4300, ComponentTemporal: 7234}
+	handles := BundleHandles{
+		ComponentTemporal: handleFor(ComponentTemporal, 1001),
+		ComponentWeb:      handleFor(ComponentWeb, 1002),
+		ComponentTSWorker: handleFor(ComponentTSWorker, 1003),
+	}
+	starter := &recordingStarter{}
+	runtime := &WorkspaceRuntime{
+		store:   FileBundleStore{},
+		starter: starter,
+		stopper: starter,
+		prober:  &recordingProber{},
+	}
+
+	_, gotHandles, err := runtime.RestartComponents(
+		context.Background(),
+		ws,
+		handles,
+		[]BundleComponent{ComponentTSWorker},
+		RuntimeConfig{},
+		RestartComponentsOptions{},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(starter.stopped, []BundleComponent{ComponentTSWorker}) {
+		t.Fatalf("stopped = %v, want ts_worker only", starter.stopped)
+	}
+	if !reflect.DeepEqual(starter.started, []BundleComponent{ComponentTSWorker}) {
+		t.Fatalf("started = %v, want ts_worker only", starter.started)
+	}
+	if gotHandles[ComponentWeb] != handles[ComponentWeb] {
+		t.Fatal("web handle was replaced")
+	}
+}
+
+func handleFor(component BundleComponent, pid int) *ProcessHandle {
+	return &ProcessHandle{
+		Component: component,
+		Command:   &exec.Cmd{Process: &os.Process{Pid: pid}},
+		done:      make(chan error, 1),
+		exited:    make(chan struct{}),
+	}
+}
+
+type recordingStarter struct {
+	started []BundleComponent
+	stopped []BundleComponent
+	stopErr error
+}
+
+func (r *recordingStarter) StartComponent(
+	ctx context.Context,
+	spec ComponentSpec,
+) (*ProcessHandle, error) {
+	r.started = append(r.started, spec.Component)
+	pid := 2000 + len(r.started)
+	return &ProcessHandle{
+		Component: spec.Component,
+		Command:   &exec.Cmd{Process: &os.Process{Pid: pid}},
+		done:      make(chan error, 1),
+		exited:    make(chan struct{}),
+	}, nil
+}
+
+func (r *recordingStarter) StopComponent(
+	ctx context.Context,
+	handle *ProcessHandle,
+) error {
+	if handle == nil {
+		return nil
+	}
+	r.stopped = append(r.stopped, handle.Component)
+	if r.stopErr != nil {
+		return r.stopErr
+	}
+	handle.finish(nil)
+	return nil
+}
+
+type recordingProber struct {
+	calls         []string
+	failWebWorker error
+}
+
+func (p *recordingProber) TemporalReady(ctx context.Context, addr string) error {
+	p.calls = append(p.calls, "temporal")
+	return nil
+}
+
+func (p *recordingProber) WebReady(ctx context.Context, managerAddr, host string) error {
+	p.calls = append(p.calls, "web")
+	return nil
+}
+
+func (p *recordingProber) WebWorkerReady(
+	ctx context.Context,
+	managerAddr, host string,
+) error {
+	p.calls = append(p.calls, "web-worker")
+	return p.failWebWorker
+}
+
+func (p *recordingProber) FreshFileExists(
+	ctx context.Context,
+	path string,
+	notBefore time.Time,
+) error {
+	p.calls = append(p.calls, "fresh-file")
+	return nil
+}
+
+type stopFailRuntime struct {
+	err        error
+	startCalls int
+}
+
+func (s *stopFailRuntime) StartBundle(
+	context.Context,
+	Workspace,
+	RuntimeConfig,
+) (Workspace, BundleHandles, error) {
+	s.startCalls++
+	return Workspace{}, nil, nil
+}
+
+func (s *stopFailRuntime) StopBundle(
+	ctx context.Context,
+	ws Workspace,
+	handles BundleHandles,
+) (Workspace, error) {
+	return ws, s.err
+}
+
+func (s *stopFailRuntime) RestartComponents(
+	context.Context,
+	Workspace,
+	BundleHandles,
+	[]BundleComponent,
+	RuntimeConfig,
+	RestartComponentsOptions,
+) (Workspace, BundleHandles, error) {
+	return Workspace{}, nil, nil
+}

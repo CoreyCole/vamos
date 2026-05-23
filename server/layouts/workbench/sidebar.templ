@@ -1,0 +1,301 @@
+package workbench
+
+templ SharedSidebar(args WorkbenchSidebarArgs) {
+	<aside id={ sidebarID(args) } class="flex h-full min-h-0 min-w-0 flex-col bg-card" data-signals={ SidebarSignals(args) }>
+		<div class="shrink-0 border-b border-border p-2">
+			<div class="flex items-center gap-2">
+				<div class="grid min-w-0 flex-1 grid-cols-2 gap-1 rounded-md bg-muted/40 p-1" role="tablist" aria-label="Workbench sidebar tabs">
+					for _, tab := range args.Tabs {
+						if tab.Available {
+							<button
+								type="button"
+								class="rounded px-2 py-1 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
+								role="tab"
+								data-on:click={ sidebarTabClick(tab.Kind) }
+								data-class={ sidebarTabActiveClass(tab.Kind) }
+								{ sidebarRevealScrollAttrs(tab.Kind)... }
+							>
+								{ tab.Label }
+							</button>
+						}
+					}
+				</div>
+				@DocWorkbenchReturnButton()
+			</div>
+		</div>
+		<div class="min-h-0 flex-1 overflow-y-auto p-2">
+			<div data-show={ sidebarTabShow(SidebarTabWorkspaces) }>
+				@WorkspacesPanel(args.Workspaces)
+			</div>
+			<div data-show={ sidebarTabShow(SidebarTabFiles) }>
+				@FilesPanel(args.Files)
+			</div>
+		</div>
+	</aside>
+}
+
+templ WorkspacesPanel(model WorkspacesPanelModel) {
+	<div class="space-y-4">
+		if len(model.Roots) == 0 && len(model.ThreadGroups) == 0 {
+			<p class="px-3 py-2 text-sm text-muted-foreground">
+				if model.EmptyLabel != "" {
+					{ model.EmptyLabel }
+				} else {
+					No workspaces yet.
+				}
+			</p>
+		} else {
+			if len(model.Roots) > 0 {
+				<section>
+					<p class="px-3 pb-2 pt-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Workspaces</p>
+					<div class="space-y-1">
+						for _, root := range model.Roots {
+							@WorkspaceRootRow(root)
+						}
+					</div>
+				</section>
+			}
+			if len(model.ThreadGroups) > 0 {
+				<section>
+					<p class="px-3 pb-2 pt-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Sessions</p>
+					<div class="space-y-3">
+						for _, group := range model.ThreadGroups {
+							@WorkspaceThreadGroupPanel(group)
+						}
+					</div>
+				</section>
+			}
+		}
+	</div>
+}
+
+templ WorkspaceRootRow(root WorkspaceRootItem) {
+	{{ openSignal := workspaceRootOpenSignal(root) }}
+	<div>
+		<div
+			class={
+				"group flex items-start gap-2 rounded-md border px-2 py-2 transition-colors",
+				templ.KV("border-primary/30 bg-background shadow-sm", root.Active),
+				templ.KV("border-transparent hover:bg-muted/60", !root.Active),
+			}
+		>
+			<div class="min-w-0 flex-1">
+				if root.Href != "" {
+					<a href={ templ.SafeURL(root.Href) } class="block min-w-0">
+						@WorkspaceRootContent(root)
+					</a>
+				} else {
+					@WorkspaceRootContent(root)
+				}
+			</div>
+			if len(root.Children) > 0 {
+				<button
+					type="button"
+					class="mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded border border-border text-[10px] text-muted-foreground transition-colors hover:bg-background hover:text-foreground"
+					data-on:click={ "$" + openSignal + " = !$" + openSignal }
+					data-attr:aria-expanded={ "$" + openSignal + " ? 'true' : 'false'" }
+					aria-label="Toggle workspace tree"
+				>
+					<span data-show={ "!$" + openSignal }>▸</span>
+					<span data-show={ "$" + openSignal }>▾</span>
+				</button>
+			}
+		</div>
+		if len(root.Children) > 0 {
+			<div class="ml-3 space-y-1 border-l border-border pl-2 pt-1" data-show={ "$" + openSignal } data-signals={ "{" + openSignal + ": " + sidebarBool(root.InitiallyOpen || root.Active) + "}" }>
+				for _, child := range root.Children {
+					@WorkspaceRootRow(child)
+				}
+			</div>
+		}
+	</div>
+}
+
+templ WorkspaceRootContent(root WorkspaceRootItem) {
+	<div class="min-w-0 space-y-1">
+		<div class={ "truncate text-sm font-medium", templ.KV("text-foreground", root.Active), templ.KV("text-muted-foreground group-hover:text-foreground", !root.Active) }>{ root.Label }</div>
+		if root.KindLabel != "" || root.Timestamp != "" || root.CountLabel != "" {
+			<div class="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5 text-[10px] text-muted-foreground">
+				if root.KindLabel != "" {
+					<span class="shrink-0 uppercase tracking-wide">{ root.KindLabel }</span>
+				}
+				if root.Timestamp != "" {
+					<span class="truncate">{ root.Timestamp }</span>
+				}
+				if root.CountLabel != "" {
+					<span class="shrink-0">{ root.CountLabel }</span>
+				}
+			</div>
+		}
+		if len(root.Metadata) > 0 {
+			<div class="space-y-0.5 text-[10px] text-muted-foreground">
+				for _, item := range root.Metadata {
+					<div class="flex min-w-0 gap-1">
+						<span class="shrink-0 uppercase tracking-wide">{ item.Label }</span>
+						<span class="truncate">{ item.Value }</span>
+					</div>
+				}
+			</div>
+		}
+	</div>
+}
+
+templ WorkspaceThreadGroupPanel(group WorkspaceThreadGroup) {
+	<section class="space-y-1">
+		if group.Label != "" {
+			<p class="px-3 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{ group.Label }</p>
+		}
+		for _, thread := range group.Threads {
+			@WorkspaceThreadRow(thread)
+		}
+	</section>
+}
+
+templ WorkspaceThreadRow(thread WorkspaceThreadItem) {
+	if thread.Href != "" {
+		<a
+			href={ templ.SafeURL(thread.Href) }
+			class={
+				"block rounded-md px-3 py-2 text-sm transition-colors",
+				templ.KV("bg-accent text-accent-foreground", thread.Active),
+				templ.KV("text-muted-foreground hover:bg-muted hover:text-foreground", !thread.Active),
+			}
+		>
+			<span class="line-clamp-2">{ thread.Label }</span>
+		</a>
+	} else {
+		<div class="rounded-md border border-border/60 bg-muted/20 px-3 py-2 text-sm text-muted-foreground">
+			<span class="line-clamp-2">{ thread.Label }</span>
+		</div>
+	}
+}
+
+templ DocumentOutlinePanel(model DocumentPanelModel) {
+	if len(model.TOC) == 0 && len(model.Sections) == 0 {
+		<p class="px-3 py-2 text-sm text-muted-foreground">No document outline available.</p>
+	} else {
+		<nav class="space-y-1 text-sm" aria-label="Document outline">
+			if len(model.TOC) > 0 {
+				for _, item := range model.TOC {
+					<a
+						href={ templ.SafeURL(sidebarSectionHref(item.ID)) }
+						class={ "block truncate rounded-md px-2 py-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground", sidebarDepthClass(item.Level) }
+						{ sidebarSectionAttrs(item.ID)... }
+					>{ item.Text }</a>
+				}
+			} else {
+				for _, section := range model.Sections {
+					<a
+						href={ templ.SafeURL(sidebarSectionHref(section.ID)) }
+						class={ "block truncate rounded-md px-2 py-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground", sidebarDepthClass(section.Level) }
+						{ sidebarSectionAttrs(section.ID)... }
+					>{ section.Title }</a>
+				}
+			}
+		</nav>
+	}
+}
+
+templ DocumentMapPanel(model DocumentPanelModel) {
+	{{ signal := documentMapSignal(model) }}
+	<section data-signals={ "{" + signal + ": false}" }>
+		<button
+			type="button"
+			class="flex w-full items-center justify-between rounded-md px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wide text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+			data-on:click={ "$" + signal + " = !$" + signal }
+			data-attr:aria-expanded={ "$" + signal + " ? 'true' : 'false'" }
+		>
+			<span>Document</span>
+			<span data-show={ "!$" + signal }>▸</span>
+			<span data-show={ "$" + signal }>▾</span>
+		</button>
+		<div data-show={ "$" + signal } class="pt-1">
+			@DocumentOutlinePanel(model)
+		</div>
+	</section>
+}
+
+templ FilesPanel(model FilesPanelModel) {
+	<div class="space-y-4">
+		if len(model.Document.TOC) > 0 || len(model.Document.Sections) > 0 {
+			@DocumentMapPanel(model.Document)
+		}
+		<section>
+			<p class="px-3 pb-2 pt-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Files</p>
+			<nav class="py-1 text-sm" aria-label="Files" data-doc-scroll-container="global-files">
+				<div class="space-y-0.5">
+					for _, node := range model.Nodes {
+						@FileTreeItemRow(node)
+					}
+				</div>
+			</nav>
+		</section>
+	</div>
+}
+
+templ FileTreeItemRow(node FileTreeItem) {
+	if node.IsDir {
+		@FileTreeFolderRow(node)
+	} else {
+		@FileTreeFileRow(node)
+	}
+}
+
+templ FileTreeFolderRow(node FileTreeItem) {
+	{{ openSignal := fileTreeOpenSignal(node) }}
+	<div class="space-y-0.5">
+		<div
+			class={
+				"flex items-center gap-1.5 rounded-md px-2 py-1 transition-colors hover:bg-accent",
+				templ.KV("text-foreground font-medium", node.IsActive || node.IsExpanded),
+				templ.KV("text-muted-foreground", !node.IsActive && !node.IsExpanded),
+			}
+		>
+			<button
+				type="button"
+				class="inline-flex h-4 w-4 shrink-0 items-center justify-center rounded text-[10px] text-muted-foreground hover:bg-background hover:text-foreground"
+				data-on:click={ "$" + openSignal + " = !$" + openSignal }
+				aria-label="Toggle folder"
+			>
+				<span data-show={ "!$" + openSignal }>▸</span>
+				<span data-show={ "$" + openSignal }>▾</span>
+			</button>
+			@FileTreeNodeLink(node, "min-w-0 flex-1 truncate")
+		</div>
+		if len(node.Children) > 0 {
+			<div class="ml-3 border-l border-border pl-1" data-show={ "$" + openSignal } data-signals={ "{" + openSignal + ": " + sidebarBool(node.IsExpanded) + "}" }>
+				for _, child := range node.Children {
+					@FileTreeItemRow(child)
+				}
+			</div>
+		}
+	</div>
+}
+
+templ FileTreeFileRow(node FileTreeItem) {
+	<div
+		class={
+			"flex items-center gap-1.5 rounded-md px-2 py-1 transition-colors",
+			templ.KV("bg-accent text-accent-foreground font-medium", node.IsActive),
+			templ.KV("text-muted-foreground hover:bg-accent hover:text-accent-foreground", !node.IsActive),
+		}
+	>
+		<span class="w-3.5 shrink-0"></span>
+		@FileTreeNodeLink(node, "min-w-0 flex-1 truncate")
+	</div>
+}
+
+templ FileTreeNodeLink(node FileTreeItem, class string) {
+	if node.FormAction != "" {
+		<form class="min-w-0 flex-1" data-on:submit={ node.FormAction }>
+			for name, value := range node.HiddenFields {
+				<input type="hidden" name={ name } value={ value }/>
+			}
+			<button type="submit" class={ "w-full truncate text-left", class }>{ node.Name }</button>
+		</form>
+	} else if node.Href != "" {
+		<a href={ templ.SafeURL(node.Href) } class={ class } { CurrentDocScrollAttrs(node.IsActive)... }>{ node.Name }</a>
+	} else {
+		<span class={ class }>{ node.Name }</span>
+	}
+}

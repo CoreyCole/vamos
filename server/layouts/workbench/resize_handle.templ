@@ -1,0 +1,17 @@
+package workbench
+
+templ ResizeHandle(before WorkbenchRegion, afterSignalKey string) {
+	<div
+		role="separator"
+		aria-orientation="vertical"
+		aria-label="Resize workbench regions"
+		tabindex="0"
+		data-workbench-resize-handle
+		data-workbench-before={ SignalKey(before) }
+		data-workbench-after={ afterSignalKey }
+		class="group relative hidden w-0 shrink-0 outline-none md:!block"
+	>
+		<div class="absolute inset-y-2 -left-2 z-20 w-4 cursor-col-resize rounded-md focus-visible:ring-2 focus-visible:ring-ring"></div>
+		<div class="pointer-events-none absolute left-1/2 top-1/2 z-20 hidden h-10 w-1 -translate-x-1/2 -translate-y-1/2 rounded-full bg-muted-foreground/25 transition-colors group-hover:block group-focus-visible:block group-data-[resizing=true]:block group-data-[resizing=true]:bg-primary/60"></div>
+	</div>
+}

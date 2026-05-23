@@ -1,0 +1,727 @@
+package comments
+
+import (
+	"fmt"
+	"time"
+
+	"github.com/CoreyCole/vamos/pkg/components/avatar"
+	"github.com/CoreyCole/vamos/pkg/components/button"
+	"github.com/CoreyCole/vamos/pkg/components/dropdown"
+	"github.com/CoreyCole/vamos/pkg/components/form"
+	"github.com/CoreyCole/vamos/pkg/components/textarea"
+	"github.com/CoreyCole/vamos/pkg/db"
+	avatarhelpers "github.com/CoreyCole/vamos/server/components/avatar"
+	"github.com/CoreyCole/vamos/server/services/commentui"
+)
+
+// CommentFormArgs contains configuration for the comment form
+type CommentFormArgs struct {
+	ID           string
+	FilePath     string
+	SelectedText string
+	StartLine    int
+	StartColumn  int
+	EndLine      int
+	EndColumn    int
+	SectionID    string
+	Error        string // Error message to display
+}
+
+templ CommentForm(args CommentFormArgs) {
+	{{
+		formID := args.ID
+		if formID == "" {
+			formID = "comment"
+		}
+	}}
+	<div id={ formID + "-container" }>
+		@form.Form(form.FormArgs{
+			ID:          formID,
+			Action:      "/forms/comments",
+			ContentType: "form",
+			Class:       "space-y-3",
+		}) {
+			<!-- Hidden fields for context -->
+			<input type="hidden" name="doc_path" value={ args.FilePath }/>
+			<input type="hidden" name="selected_text" value={ args.SelectedText }/>
+			<input type="hidden" name="start_line" value={ itoa(args.StartLine) }/>
+			<input type="hidden" name="start_column" value={ itoa(args.StartColumn) }/>
+			<input type="hidden" name="end_line" value={ itoa(args.EndLine) }/>
+			<input type="hidden" name="end_column" value={ itoa(args.EndColumn) }/>
+			<input type="hidden" name="section_hint" value={ args.SectionID }/>
+			<!-- Error message -->
+			if args.Error != "" {
+				<div class="text-sm text-destructive bg-destructive/10 rounded px-3 py-2">
+					{ args.Error }
+				</div>
+			}
+			<!-- Selected text preview -->
+			if args.SelectedText != "" {
+				<div class="text-xs text-muted-foreground bg-muted rounded px-2 py-1.5 border-l-2 border-muted-foreground/30 max-h-20 overflow-y-auto">
+					<span class="font-mono">{ args.SelectedText }</span>
+				</div>
+			}
+			<!-- Comment textarea -->
+			@textarea.Textarea(textarea.TextareaArgs{
+				Placeholder: "Add a comment...",
+				Rows:        3,
+				Class:       "resize-none",
+				Attributes: templ.Attributes{
+					"name": "comment_text",
+				},
+			})
+			<!-- Action buttons -->
+			<div class="flex justify-end gap-2">
+				@button.Button(button.ButtonArgs{
+					Type:    "button",
+					Variant: "ghost",
+					Size:    "sm",
+					Attributes: templ.Attributes{
+						"data-on:click": "@post('/forms/comments/cancel', {contentType: 'form'})",
+					},
+				}) {
+					Cancel
+				}
+				@button.Button(button.ButtonArgs{
+					Type:    "submit",
+					Variant: "default",
+					Size:    "sm",
+				}) {
+					<span data-show="!$fetching">Comment</span>
+					<span data-show="$fetching">Posting...</span>
+				}
+			</div>
+		}
+	</div>
+}
+
+// Format timestamp for display
+func formatTimestamp(t time.Time) string {
+	return t.Format("Jan 2")
+}
+
+// Helper to convert int to string
+func itoa(i int) string {
+	return fmt.Sprintf("%d", i)
+}
+
+templ CommentCard(comment db.WorkspaceDocComment, replies []db.WorkspaceDocCommentReply, userEmail string) {
+	<div class="border border-border rounded-lg bg-card shadow-md">
+		<!-- Main comment -->
+		<div class="p-4">
+			<!-- Header row with avatar, username, date, and resolve button -->
+			<div class="flex items-center gap-3 mb-3">
+				@avatar.Avatar(avatar.AvatarArgs{
+					BackgroundColor: avatarhelpers.GetAvatarColor(comment.UserEmail),
+					Class:           "w-8 h-8 flex-shrink-0",
+				}) {
+					<span class="text-xs font-semibold">{ avatarhelpers.GetInitials(avatarhelpers.GetEmailBasename(comment.UserEmail)) }</span>
+				}
+				<span class="text-sm font-semibold text-foreground">{ avatarhelpers.GetEmailBasename(comment.UserEmail) }</span>
+				<span class="text-xs text-muted-foreground">•</span>
+				<span class="text-xs text-muted-foreground whitespace-nowrap">{ formatTimestamp(comment.CreatedAt) }</span>
+				<div class="ml-auto">
+					<form data-on:submit={ "@post('/forms/resolve', {contentType: 'form'})" } class="inline">
+						<input type="hidden" name="comment_id" value={ comment.ID }/>
+						<input type="hidden" name="doc_path" value={ comment.DocPath }/>
+						<button
+							type="submit"
+							class="text-xs px-2 py-1 rounded bg-green-600 hover:bg-green-700 text-white transition-colors"
+							title="Mark as resolved"
+						>
+							✓ Resolve
+						</button>
+					</form>
+				</div>
+			</div>
+			<!-- Selected text quote (full width) -->
+			if comment.SelectedText != "" {
+				<div class="mb-3 text-xs text-muted-foreground bg-muted rounded px-3 py-2 border-l-2 border-muted-foreground/30">
+					<span class="font-mono">{ comment.SelectedText }</span>
+				</div>
+			}
+			<!-- Comment text (full width) -->
+			<div class="text-sm text-foreground">
+				{ comment.CommentText }
+			</div>
+		</div>
+		<!-- Replies section with threading -->
+		if len(replies) > 0 {
+			<div class="border-t border-border">
+				<!-- Replies container -->
+				if len(replies) > 0 {
+					<div class="pl-4 pr-4 pt-3 pb-2 space-y-3">
+						for _, reply := range replies {
+							@ReplyItem(reply)
+						}
+					</div>
+				}
+				<!-- Reply input -->
+			</div>
+		}
+		<div class="pl-4 pr-4 pb-3">
+			@ReplyInput(comment.ID, comment.DocPath, userEmail)
+		</div>
+	</div>
+}
+
+templ ReplyItem(reply db.WorkspaceDocCommentReply) {
+	<div class="flex items-start gap-2 relative">
+		<div class="flex-shrink-0">
+			@avatar.Avatar(avatar.AvatarArgs{
+				BackgroundColor: avatarhelpers.GetAvatarColor(reply.UserEmail),
+				Class:           "w-8 h-8",
+			}) {
+				<span class="text-xs font-semibold">{ avatarhelpers.GetInitials(avatarhelpers.GetEmailBasename(reply.UserEmail)) }</span>
+			}
+		</div>
+		<div class="flex-1 min-w-0">
+			<div class="flex items-center gap-2 mb-1">
+				<span class="text-xs font-semibold text-foreground">{ avatarhelpers.GetEmailBasename(reply.UserEmail) }</span>
+				<span class="text-xs text-muted-foreground">•</span>
+				<span class="text-xs text-muted-foreground whitespace-nowrap">{ formatTimestamp(reply.CreatedAt) }</span>
+			</div>
+			<div class="text-sm text-foreground">
+				{ reply.ReplyText }
+			</div>
+		</div>
+	</div>
+}
+
+// ReplyItemSimple shows a reply with padding for thread line on left
+templ ReplyItemSimple(reply db.WorkspaceDocCommentReply) {
+	<div class="flex items-start gap-3 pl-10 pr-4">
+		@avatar.Avatar(avatar.AvatarArgs{
+			BackgroundColor: avatarhelpers.GetAvatarColor(reply.UserEmail),
+			Class:           "w-8 h-8 flex-shrink-0",
+		}) {
+			<span class="text-xs font-semibold">{ avatarhelpers.GetInitials(avatarhelpers.GetEmailBasename(reply.UserEmail)) }</span>
+		}
+		<div class="flex-1 min-w-0">
+			<div class="flex items-center gap-2 mb-1">
+				<span class="text-xs font-semibold text-foreground">{ avatarhelpers.GetEmailBasename(reply.UserEmail) }</span>
+				<span class="text-xs text-muted-foreground">•</span>
+				<span class="text-xs text-muted-foreground whitespace-nowrap">{ formatTimestamp(reply.CreatedAt) }</span>
+			</div>
+			<div class="text-sm text-foreground">
+				{ reply.ReplyText }
+			</div>
+		</div>
+	</div>
+}
+
+templ ReplyInput(commentID string, filePath string, userEmail string) {
+	{{ formID := "reply_" + commentID }}
+	<div
+		id={ formID + "-container" }
+		class="flex items-start gap-2 relative"
+	>
+		<!-- Container for avatar: 32px wide to match other avatars, with smaller avatar centered inside -->
+		<div class="flex-shrink-0 w-8 h-8 flex items-center justify-center">
+			@avatar.Avatar(avatar.AvatarArgs{
+				BackgroundColor: avatarhelpers.GetAvatarColor(userEmail),
+				Class:           "w-6 h-6",
+			}) {
+				<span class="text-[10px] font-semibold">{ avatarhelpers.GetInitials(avatarhelpers.GetEmailBasename(userEmail)) }</span>
+			}
+		</div>
+		@form.Form(form.FormArgs{
+			ID:          formID,
+			Action:      "/forms/replies",
+			ContentType: "form",
+			Class:       "flex-1 flex items-start gap-2",
+		}) {
+			<input type="hidden" name="comment_id" value={ commentID }/>
+			<input type="hidden" name="doc_path" value={ filePath }/>
+			@textarea.Textarea(textarea.TextareaArgs{
+				Placeholder: "Reply...",
+				Borderless:  true,
+				Rows:        2,
+				Class:       "flex-1 resize-none",
+				Attributes: templ.Attributes{
+					"name": "reply_text",
+				},
+			})
+			@button.Button(button.ButtonArgs{
+				Type:    "submit",
+				Size:    "icon",
+				Variant: "ghost",
+				Attributes: templ.Attributes{
+					"data-attr:disabled": "$fetching",
+				},
+			}) {
+				<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path>
+				</svg>
+			}
+		}
+	</div>
+}
+
+// filterCommentsBySection returns comments for a specific section
+func filterCommentsBySection(comments []CommentWithReplies, sectionID string) []CommentWithReplies {
+	var result []CommentWithReplies
+	for _, c := range comments {
+		cSectionID := c.Comment.SectionHint.String
+		if !c.Comment.SectionHint.Valid || cSectionID == "" {
+			cSectionID = "document"
+		}
+		if cSectionID == sectionID {
+			result = append(result, c)
+		}
+	}
+	return result
+}
+
+// groupCommentsBySection groups comments by their sectionID
+func groupCommentsBySection(comments []CommentWithReplies) map[string][]CommentWithReplies {
+	grouped := make(map[string][]CommentWithReplies)
+	for _, c := range comments {
+		sectionID := c.Comment.SectionHint.String
+		if !c.Comment.SectionHint.Valid || sectionID == "" {
+			sectionID = "document"
+		}
+		grouped[sectionID] = append(grouped[sectionID], c)
+	}
+	return grouped
+}
+
+// getSectionIDs returns ordered list of section IDs from comments
+func getSectionIDs(comments []CommentWithReplies) []string {
+	seen := make(map[string]bool)
+	var ids []string
+	for _, c := range comments {
+		sectionID := c.Comment.SectionHint.String
+		if !c.Comment.SectionHint.Valid || sectionID == "" {
+			sectionID = "document"
+		}
+		if !seen[sectionID] {
+			seen[sectionID] = true
+			ids = append(ids, sectionID)
+		}
+	}
+	return ids
+}
+
+// CommentSidebar is now just a spacer div that reserves width for absolute-positioned section targets
+// The actual comment toggles are rendered inline with each section in page_markdown.templ
+templ CommentSidebar(comments []CommentWithReplies, userEmail string) {
+	<div id="comment-sidebar" class="w-80 shrink-0 min-h-screen">
+		<!-- Spacer only - section targets handle comment toggle display -->
+	</div>
+}
+
+// SectionCommentsToggleArgs contains configuration for the section comments toggle
+type SectionCommentsToggleArgs struct {
+	SectionID string
+	Comments  []CommentWithReplies
+	UserEmail string
+}
+
+// getUniqueAuthors extracts unique author emails from comments and their replies
+func getUniqueAuthors(comments []CommentWithReplies) []string {
+	seen := make(map[string]bool)
+	var authors []string
+	for _, c := range comments {
+		if !seen[c.Comment.UserEmail] {
+			seen[c.Comment.UserEmail] = true
+			authors = append(authors, c.Comment.UserEmail)
+		}
+		for _, r := range c.Replies {
+			if !seen[r.UserEmail] {
+				seen[r.UserEmail] = true
+				authors = append(authors, r.UserEmail)
+			}
+		}
+	}
+	return authors
+}
+
+// getTotalCommentCount returns total count of comments + replies
+func getTotalCommentCount(comments []CommentWithReplies) int {
+	count := len(comments)
+	for _, c := range comments {
+		count += len(c.Replies)
+	}
+	return count
+}
+
+// Finds the nearest heading's id in the section-heading-row, builds full URL with fragment, copies to clipboard
+func copyLinkToSectionJS(menuID string) string {
+	return `
+		var row = el.closest('.section-heading-row');
+		var heading = row ? row.querySelector('h1[id], h2[id], h3[id], h4[id], h5[id], h6[id]') : null;
+		if (heading && heading.id) {
+			var url = location.origin + location.pathname + '#' + heading.id;
+			navigator.clipboard.writeText(url);
+		}
+		$` + menuID + `.open = false;
+	`
+}
+
+// SectionMenu renders the triple-dot dropdown menu for section actions
+// Always visible - allows adding comments without text selection
+templ SectionMenu(sectionID string) {
+	{{ menuID := "section-menu-" + sectionID }}
+	@dropdown.DropdownMenu(dropdown.DropdownMenuArgs{ID: menuID}) {
+		@dropdown.DropdownMenuTrigger(dropdown.DropdownMenuTriggerArgs{
+			ID:    menuID,
+			Class: "inline-flex items-center justify-center w-8 h-8 rounded-full hover:bg-muted transition-colors",
+		}) {
+			<!-- Triple-dot vertical icon -->
+			<svg class="w-4 h-4 text-muted-foreground" fill="currentColor" viewBox="0 0 24 24">
+				<circle cx="12" cy="5" r="2"></circle>
+				<circle cx="12" cy="12" r="2"></circle>
+				<circle cx="12" cy="19" r="2"></circle>
+			</svg>
+		}
+		@dropdown.DropdownMenuContent(dropdown.DropdownMenuContentArgs{
+			ID:    menuID,
+			Align: "end",
+		}) {
+			@dropdown.DropdownMenuItem(dropdown.DropdownMenuItemArgs{
+				ID: menuID,
+			}) {
+				<button
+					type="button"
+					class="flex items-center w-full"
+					data-on:click={ copyLinkToSectionJS(menuID) }
+				>
+					<svg class="mr-2 h-4 w-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path>
+					</svg>
+					<span class="whitespace-nowrap">Copy link to section</span>
+				</button>
+			}
+			@dropdown.DropdownMenuItem(dropdown.DropdownMenuItemArgs{
+				ID: menuID,
+			}) {
+				<form
+					data-on:submit={ "@post('/forms/comments/show', {contentType: 'form'}); $" + menuID + ".open = false" }
+					class="flex items-center w-full"
+				>
+					<input type="hidden" name="section_hint" value={ sectionID }/>
+					<input type="hidden" name="selected_text" value=""/>
+					<button type="submit" class="flex items-center w-full">
+						<svg class="mr-2 h-4 w-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z"></path>
+						</svg>
+						<span class="whitespace-nowrap">Add comment</span>
+					</button>
+				</form>
+			}
+		}
+	}
+}
+
+// SectionCommentTarget is an SSE-patchable container for a section's comments toggle and menu
+// Always shows menu, shows toggle only when comments exist
+// ID pattern: section-comments-target-{sectionID}
+templ SectionCommentTarget(args SectionCommentsToggleArgs) {
+	<div id={ "section-comments-target-" + args.SectionID } class="flex items-center gap-1">
+		if len(args.Comments) > 0 {
+			@SectionCommentsToggle(args)
+		}
+		@SectionMenu(args.SectionID)
+	</div>
+}
+
+// SectionCommentsToggle shows a collapsed view of section comments with stacked avatars
+// Clicking expands to show all comments for that section inline (desktop) or opens mobile sheet (mobile)
+templ SectionCommentsToggle(args SectionCommentsToggleArgs) {
+	if len(args.Comments) > 0 {
+		{{
+			authors := getUniqueAuthors(args.Comments)
+			totalCount := getTotalCommentCount(args.Comments)
+			maxAvatars := 5
+			displayAuthors := authors
+			if len(authors) > maxAvatars {
+				displayAuthors = authors[:maxAvatars]
+			}
+			remainingCount := len(authors) - maxAvatars
+			if remainingCount < 0 {
+				remainingCount = 0
+			}
+			firstAuthor := avatarhelpers.GetEmailBasename(authors[0])
+			othersCount := len(authors) - 1
+		}}
+		<!-- Wrapper with dynamic z-index: most recently expanded section gets highest z-index -->
+		<div
+			class="relative"
+			data-style={ "{'z-index': $section_" + args.SectionID + "_expanded ? $section_" + args.SectionID + "_zindex : 0}" }
+		>
+			<!-- DESKTOP: Toggle inline panel -->
+			<div
+				id={ "section-comments-" + args.SectionID }
+				class="hidden md:inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-muted/50 hover:bg-muted cursor-pointer transition-colors border border-border/50"
+				data-on:click={ "$section_" + args.SectionID + "_expanded = !$section_" + args.SectionID + "_expanded; if ($section_" + args.SectionID + "_expanded) { $section_zindex_counter = ($section_zindex_counter || 0) + 1; $section_" + args.SectionID + "_zindex = $section_zindex_counter }" }
+			>
+				<!-- Stacked avatars -->
+				<div class="flex items-center -space-x-2">
+					for _, email := range displayAuthors {
+						@avatar.Avatar(avatar.AvatarArgs{
+							BackgroundColor: avatarhelpers.GetAvatarColor(email),
+							Class:           "w-6 h-6 ring-2 ring-background",
+						}) {
+							<span class="text-[10px] font-semibold">{ avatarhelpers.GetInitials(avatarhelpers.GetEmailBasename(email)) }</span>
+						}
+					}
+					if remainingCount > 0 {
+						<div class="w-6 h-6 rounded-full bg-muted flex items-center justify-center ring-2 ring-background">
+							<span class="text-[10px] font-semibold text-muted-foreground">+{ itoa(remainingCount) }</span>
+						</div>
+					}
+				</div>
+				<!-- Author summary and count -->
+				<span class="text-xs text-muted-foreground whitespace-nowrap">
+					if othersCount == 0 {
+						{ firstAuthor }
+					} else if othersCount == 1 {
+						{ firstAuthor } and 1 other
+					} else {
+						{ firstAuthor } and { itoa(othersCount) } others
+					}
+					<span class="mx-1">·</span>
+					if totalCount == 1 {
+						1 comment
+					} else {
+						{ itoa(totalCount) } comments
+					}
+				</span>
+				<!-- Expand/collapse icon -->
+				<svg
+					class="w-4 h-4 text-muted-foreground transition-transform"
+					data-class={ "{'rotate-180': $section_" + args.SectionID + "_expanded}" }
+					fill="none"
+					stroke="currentColor"
+					viewBox="0 0 24 24"
+				>
+					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+				</svg>
+			</div>
+			<!-- MOBILE: POST to expand endpoint to populate sheet and open it -->
+			<form
+				class="md:hidden inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-muted/50 hover:bg-muted cursor-pointer transition-colors border border-border/50"
+				data-on:submit={ "@post('/forms/comments/expand', {contentType: 'form'})" }
+			>
+				<input type="hidden" name="section_hint" value={ args.SectionID }/>
+				<button type="submit" class="contents">
+					<!-- Stacked avatars -->
+					<div class="flex items-center -space-x-2">
+						for _, email := range displayAuthors {
+							@avatar.Avatar(avatar.AvatarArgs{
+								BackgroundColor: avatarhelpers.GetAvatarColor(email),
+								Class:           "w-6 h-6 ring-2 ring-background",
+							}) {
+								<span class="text-[10px] font-semibold">{ avatarhelpers.GetInitials(avatarhelpers.GetEmailBasename(email)) }</span>
+							}
+						}
+						if remainingCount > 0 {
+							<div class="w-6 h-6 rounded-full bg-muted flex items-center justify-center ring-2 ring-background">
+								<span class="text-[10px] font-semibold text-muted-foreground">+{ itoa(remainingCount) }</span>
+							</div>
+						}
+					</div>
+					<!-- Author summary and count -->
+					<span class="text-xs text-muted-foreground whitespace-nowrap">
+						if othersCount == 0 {
+							{ firstAuthor }
+						} else if othersCount == 1 {
+							{ firstAuthor } and 1 other
+						} else {
+							{ firstAuthor } and { itoa(othersCount) } others
+						}
+						<span class="mx-1">·</span>
+						if totalCount == 1 {
+							1 comment
+						} else {
+							{ itoa(totalCount) } comments
+						}
+					</span>
+					<!-- Expand icon -->
+					<svg class="w-4 h-4 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+					</svg>
+				</button>
+			</form>
+			<!-- Expanded comments panel - floats to the right of toggle (ml-12 accounts for menu button) -->
+			<!-- DESKTOP ONLY: hidden on mobile, shown on md+ screens -->
+			<div
+				id={ "section-comments-expanded-" + args.SectionID }
+				class="hidden md:block absolute left-full top-0 ml-12 w-80 space-y-4"
+				data-show={ "$section_" + args.SectionID + "_expanded" }
+			>
+				for _, item := range args.Comments {
+					@CommentCard(item.Comment, item.Replies, args.UserEmail)
+				}
+			</div>
+		</div>
+	}
+}
+
+// SectionCommentTargetWithForm renders the section target with a form at top of expanded panel
+// Used when user clicks to add a new comment - patches this in place of SectionCommentTarget
+templ SectionCommentTargetWithForm(args SectionCommentsToggleArgs, formArgs CommentFormArgs) {
+	<div id={ "section-comments-target-" + args.SectionID } class="flex items-center gap-1">
+		@SectionCommentsToggleWithForm(args, formArgs)
+		@SectionMenu(args.SectionID)
+	</div>
+}
+
+// MobileSectionCommentContent renders the content for the mobile section comment sheet
+// This is SSE-patched into the #mobile-section-comment-content container
+templ MobileSectionCommentContent(args SectionCommentsToggleArgs) {
+	<div id={ commentui.MobileSectionCommentContentID } class="space-y-4">
+		<div class="border-b border-border pb-3 mb-4">
+			<h3 class="text-lg font-semibold">Section Comments</h3>
+			<p class="text-sm text-muted-foreground">
+				if len(args.Comments) == 0 {
+					No comments on this section yet
+				} else if len(args.Comments) == 1 {
+					1 comment
+				} else {
+					{ itoa(getTotalCommentCount(args.Comments)) } comments
+				}
+			</p>
+		</div>
+		if len(args.Comments) > 0 {
+			for _, item := range args.Comments {
+				@CommentCard(item.Comment, item.Replies, args.UserEmail)
+			}
+		} else {
+			<p class="text-sm text-muted-foreground py-4 text-center">
+				Click "Add comment" to start a conversation about this section.
+			</p>
+		}
+	</div>
+}
+
+// MobileSectionCommentContentWithForm renders the mobile sheet content with a comment form
+// This is SSE-patched into the #mobile-section-comment-content container when adding a comment
+templ MobileSectionCommentContentWithForm(args SectionCommentsToggleArgs, formArgs CommentFormArgs) {
+	<div id={ commentui.MobileSectionCommentContentID } class="space-y-4">
+		<div class="border-b border-border pb-3 mb-4">
+			<h3 class="text-lg font-semibold">Add Comment</h3>
+			<p class="text-sm text-muted-foreground">Add a comment to this section</p>
+		</div>
+		<!-- Form at top -->
+		<div class="border border-primary/50 rounded-lg bg-card p-4 shadow-md">
+			@CommentForm(formArgs)
+		</div>
+		<!-- Existing comments below -->
+		if len(args.Comments) > 0 {
+			<div class="pt-4 border-t border-border mt-4">
+				<h4 class="text-sm font-medium text-muted-foreground mb-3">Existing Comments</h4>
+				for _, item := range args.Comments {
+					@CommentCard(item.Comment, item.Replies, args.UserEmail)
+				}
+			</div>
+		}
+	</div>
+}
+
+// SectionCommentsToggleWithForm is like SectionCommentsToggle but with form in expanded panel
+// Panel is always shown when form is present, form appears at top above existing comments
+templ SectionCommentsToggleWithForm(args SectionCommentsToggleArgs, formArgs CommentFormArgs) {
+	{{
+		authors := getUniqueAuthors(args.Comments)
+		totalCount := getTotalCommentCount(args.Comments)
+		maxAvatars := 5
+		displayAuthors := authors
+		if len(authors) > maxAvatars {
+			displayAuthors = authors[:maxAvatars]
+		}
+		remainingCount := len(authors) - maxAvatars
+		if remainingCount < 0 {
+			remainingCount = 0
+		}
+		// Handle case where no comments yet (form is first)
+		firstAuthor := ""
+		othersCount := 0
+		if len(authors) > 0 {
+			firstAuthor = avatarhelpers.GetEmailBasename(authors[0])
+			othersCount = len(authors) - 1
+		}
+	}}
+	<!-- Wrapper with high z-index since form is open -->
+	<div
+		class="relative z-[100]"
+	>
+		<!-- Toggle button - shows "New comment" if no existing comments -->
+		<div
+			id={ "section-comments-" + args.SectionID }
+			class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary/10 border border-primary/50 cursor-pointer transition-colors"
+			data-on:click={ "$section_" + args.SectionID + "_expanded = !$section_" + args.SectionID + "_expanded" }
+		>
+			if len(args.Comments) > 0 {
+				<!-- Stacked avatars -->
+				<div class="flex items-center -space-x-2">
+					for _, email := range displayAuthors {
+						@avatar.Avatar(avatar.AvatarArgs{
+							BackgroundColor: avatarhelpers.GetAvatarColor(email),
+							Class:           "w-6 h-6 ring-2 ring-background",
+						}) {
+							<span class="text-[10px] font-semibold">{ avatarhelpers.GetInitials(avatarhelpers.GetEmailBasename(email)) }</span>
+						}
+					}
+					if remainingCount > 0 {
+						<div class="w-6 h-6 rounded-full bg-muted flex items-center justify-center ring-2 ring-background">
+							<span class="text-[10px] font-semibold text-muted-foreground">+{ itoa(remainingCount) }</span>
+						</div>
+					}
+				</div>
+				<!-- Author summary and count -->
+				<span class="text-xs text-muted-foreground whitespace-nowrap">
+					if othersCount == 0 {
+						{ firstAuthor }
+					} else if othersCount == 1 {
+						{ firstAuthor } and 1 other
+					} else {
+						{ firstAuthor } and { itoa(othersCount) } others
+					}
+					<span class="mx-1">·</span>
+					if totalCount == 1 {
+						1 comment
+					} else {
+						{ itoa(totalCount) } comments
+					}
+				</span>
+			} else {
+				<!-- No existing comments - show "New comment" indicator -->
+				<svg class="w-4 h-4 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z"></path>
+				</svg>
+				<span class="text-xs text-primary font-medium whitespace-nowrap">New comment</span>
+			}
+			<!-- Expand/collapse icon -->
+			<svg
+				class="w-4 h-4 text-muted-foreground transition-transform"
+				data-class={ "{'rotate-180': $section_" + args.SectionID + "_expanded}" }
+				fill="none"
+				stroke="currentColor"
+				viewBox="0 0 24 24"
+			>
+				<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+			</svg>
+		</div>
+		<!-- Expanded panel with form at top - always shown when form is active (ml-12 accounts for menu button) -->
+		<!-- DESKTOP ONLY: hidden on mobile, shown on md+ screens -->
+		<div
+			id={ "section-comments-expanded-" + args.SectionID }
+			class="hidden md:block absolute left-full top-0 ml-12 w-80 space-y-4"
+			data-show={ "$section_" + args.SectionID + "_expanded" }
+		>
+			<!-- Form at top -->
+			<div class="border border-primary/50 rounded-lg bg-card p-4 shadow-md">
+				<div class="text-xs text-muted-foreground mb-2 font-medium">New Comment</div>
+				@CommentForm(formArgs)
+			</div>
+			<!-- Existing comments below -->
+			if len(args.Comments) > 0 {
+				for _, item := range args.Comments {
+					@CommentCard(item.Comment, item.Replies, args.UserEmail)
+				}
+			}
+		</div>
+	</div>
+}
