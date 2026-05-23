@@ -170,13 +170,21 @@ func TestNormalHostConfigDoesNotRequireVamosSourceCheckout(t *testing.T) {
 }
 
 func TestRejectLegacyConfig(t *testing.T) {
-	err := RejectLegacyConfig([]string{"REPO_PATH=/tmp/x"})
-	if err == nil {
-		t.Fatal("RejectLegacyConfig() error = nil, want error")
-	}
-	if !strings.Contains(err.Error(), "Vamos") ||
-		!strings.Contains(err.Error(), "REPO_PATH") {
-		t.Fatalf("RejectLegacyConfig() error = %v, want Vamos REPO_PATH message", err)
+	for _, env := range []string{
+		"CN_AGENTS_LISTEN_ADDRESS=:4200",
+		"CN_AGENTS_WORKSPACE_MODE=manager",
+		"REPO_PATH=/tmp/cn-agents",
+		"MARKDOWN_BASE_PATH=/tmp/cn-agents/thoughts",
+	} {
+		err := RejectLegacyConfig([]string{env})
+		if err == nil {
+			t.Fatalf("RejectLegacyConfig(%q) error = nil, want error", env)
+		}
+		key := strings.SplitN(env, "=", 2)[0]
+		if !strings.Contains(err.Error(), "Vamos") ||
+			!strings.Contains(err.Error(), key) {
+			t.Fatalf("RejectLegacyConfig(%q) error = %v, want Vamos %s message", env, err, key)
+		}
 	}
 }
 
