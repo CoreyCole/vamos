@@ -148,8 +148,118 @@ func workspaceErrorWorkspaceView(views []ImplWorkspaceView, slug string) *ImplWo
 	return nil
 }
 
-func (h *Handler) isWorkspaceErrorScanInFlight(string) bool {
-	return false
+type WorkspaceErrorScanner struct {
+	Manager  Manager
+	Store    WorkspaceErrorEventStore
+	Notifier WorkspaceLifecycleNotifier
+	Tailer   LogTailer
+}
+
+func (s *WorkspaceErrorScanner) ScanSelectedThenAll(ctx context.Context, selected string) error {
+	if s == nil || s.Manager == nil || s.Store == nil {
+		return nil
+	}
+	selected = strings.TrimSpace(selected)
+	seen := map[string]struct{}{}
+	if selected != "" {
+		if ws, ok := s.Manager.Lookup(selected); ok {
+			seen[selected] = struct{}{}
+			if err := s.ScanWorkspace(ctx, ws); err != nil {
+				return err
+			}
+		}
+	}
+	for _, ws := range s.Manager.List() {
+		if _, ok := seen[ws.Slug]; ok {
+			continue
+		}
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		if err := s.ScanWorkspace(ctx, ws); err != nil {
+			return err
+		}
+	}
+	return ctx.Err()
+}
+
+func (s *WorkspaceErrorScanner) ScanWorkspace(ctx context.Context, ws Workspace) error {
+	tailer := s.Tailer
+	if tailer == nil {
+		tailer = NewFileLogTailer()
+	}
+	recorder := &WorkspaceErrorRecorder{Store: s.Store, Notifier: s.Notifier}
+	for component, path := range workspaceErrorLogPaths(ws) {
+		if strings.TrimSpace(path) == "" {
+			continue
+		}
+		tail, err := tailer.Tail(path, 200)
+		if err != nil {
+			continue
+		}
+		for _, line := range strings.Split(tail, "\n") {
+			message, ok := classifyWorkspaceLogLine(line)
+			if !ok {
+				continue
+			}
+			_, err := recorder.Record(ctx, WorkspaceErrorRecordRequest{
+				WorkspaceSlug: ws.Slug,
+				Source:        WorkspaceErrorSourceLog,
+				Severity:      WorkspaceErrorSeverityError,
+				Message:       message,
+				Detail:        strings.TrimSpace(line),
+				DedupeKey:     normalizeWorkspaceLogDedupe(ws.Slug, component, line),
+			})
+			if err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func workspaceErrorLogPaths(ws Workspace) map[BundleComponent]string {
+	paths := map[BundleComponent]string{}
+	for component, path := range bundleLogs(ws.Bundle) {
+		if strings.TrimSpace(path) != "" {
+			paths[component] = path
+		}
+	}
+	if strings.TrimSpace(ws.BuildStatus.LogPath) != "" {
+		paths[BundleComponent("build")] = ws.BuildStatus.LogPath
+	}
+	if strings.TrimSpace(ws.LogPath) != "" {
+		paths[ComponentWeb] = ws.LogPath
+	}
+	return paths
+}
+
+func classifyWorkspaceLogLine(line string) (string, bool) {
+	normalized := strings.ToLower(strings.TrimSpace(line))
+	switch {
+	case strings.Contains(normalized, "workspace_child_crashed"):
+		return "workspace child crashed", true
+	case strings.Contains(normalized, "workspace_error"):
+		return "workspace runtime error", true
+	case strings.Contains(normalized, "panic:"):
+		return "workspace log panic", true
+	case strings.Contains(normalized, "fatal"):
+		return "workspace log fatal", true
+	case strings.Contains(normalized, "failed"):
+		return "workspace log failure", true
+	case strings.Contains(normalized, "error"):
+		return "workspace log error", true
+	default:
+		return "", false
+	}
+}
+
+func normalizeWorkspaceLogDedupe(slug string, component BundleComponent, line string) string {
+	normalized := strings.ToLower(strings.Join(strings.Fields(line), " "))
+	if len(normalized) > 240 {
+		normalized = normalized[:240]
+	}
+	return workspaceErrorDedupeKey(slug, string(WorkspaceErrorSourceLog), string(component), normalized)
 }
 
 type WorkspaceErrorRecorder struct {

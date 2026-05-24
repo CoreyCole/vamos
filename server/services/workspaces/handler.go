@@ -2,6 +2,7 @@ package workspaces
 
 import (
 	"context"
+	"errors"
 	"log"
 	"net/http"
 	"net/url"
@@ -38,34 +39,40 @@ type ImplWorkspaceLister interface {
 	ListImplWorkspaces(ctx context.Context) ([]db.ImplWorkspace, error)
 }
 
-const workspaceSyncRefreshTimeout = 5 * time.Minute
+const (
+	workspaceSyncRefreshTimeout = 5 * time.Minute
+	workspaceErrorScanTimeout   = 5 * time.Minute
+)
 
 type WorkspaceSyncRefreshFunc func(ctx context.Context) error
 
 type Handler struct {
-	manager                Manager
-	lifecycle              LifecycleManager
-	planWorkspaces         PlanWorkspaceLister
-	implWorkspaces         ImplWorkspaceLister
-	workspaceSyncRefresh   WorkspaceSyncRefreshFunc
-	workflowSummaries      WorkspaceWorkflowSummaryResolver
-	refreshMu              sync.Mutex
-	refreshInFlight        bool
-	notifier               WorkspaceLifecycleNotifier
-	managerURL             string
-	currentSlug            string
-	authService            SessionCreator
-	signer                 *HandoffSigner
-	restartToken           string
-	mainCheckoutPath       string
-	verifier               *Verifier
-	provisionStarter       WorkspaceProvisionStarter
-	releaseProjector       *ReleaseProjector
-	releaseStore           ReleaseQueueStore
-	releaseStarter         ReleaseWorkflowStarter
-	cleanupStarter         WorkspaceCleanupStarter
-	workspaceErrorRecorder *WorkspaceErrorRecorder
-	exitFunc               func(int)
+	manager                    Manager
+	lifecycle                  LifecycleManager
+	planWorkspaces             PlanWorkspaceLister
+	implWorkspaces             ImplWorkspaceLister
+	workspaceSyncRefresh       WorkspaceSyncRefreshFunc
+	workflowSummaries          WorkspaceWorkflowSummaryResolver
+	refreshMu                  sync.Mutex
+	refreshInFlight            bool
+	notifier                   WorkspaceLifecycleNotifier
+	managerURL                 string
+	currentSlug                string
+	authService                SessionCreator
+	signer                     *HandoffSigner
+	restartToken               string
+	mainCheckoutPath           string
+	verifier                   *Verifier
+	provisionStarter           WorkspaceProvisionStarter
+	releaseProjector           *ReleaseProjector
+	releaseStore               ReleaseQueueStore
+	releaseStarter             ReleaseWorkflowStarter
+	cleanupStarter             WorkspaceCleanupStarter
+	workspaceErrorRecorder     *WorkspaceErrorRecorder
+	workspaceErrorScanner      *WorkspaceErrorScanner
+	workspaceErrorScanMu       sync.Mutex
+	workspaceErrorScanInFlight map[string]bool
+	exitFunc                   func(int)
 }
 
 type RestartRequest struct {
@@ -174,6 +181,56 @@ func WithWorkspaceErrorStore(store WorkspaceErrorEventStore) HandlerOption {
 	}
 }
 
+func WithWorkspaceErrorScanner(scanner *WorkspaceErrorScanner) HandlerOption {
+	return func(h *Handler) {
+		h.workspaceErrorScanner = scanner
+	}
+}
+
+func (h *Handler) triggerWorkspaceErrorScan(selected string) {
+	if h.workspaceErrorScanner == nil {
+		return
+	}
+	key := workspaceErrorScanKey(selected)
+	h.workspaceErrorScanMu.Lock()
+	if h.workspaceErrorScanInFlight == nil {
+		h.workspaceErrorScanInFlight = map[string]bool{}
+	}
+	if h.workspaceErrorScanInFlight[key] {
+		h.workspaceErrorScanMu.Unlock()
+		return
+	}
+	h.workspaceErrorScanInFlight[key] = true
+	h.workspaceErrorScanMu.Unlock()
+	h.notifier.Notify(key)
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), workspaceErrorScanTimeout)
+		defer cancel()
+		if err := h.workspaceErrorScanner.ScanSelectedThenAll(ctx, selected); err != nil && !errors.Is(err, context.Canceled) && !errors.Is(err, context.DeadlineExceeded) {
+			log.Printf("workspace_error_scan_failed workspace=%q error=%v", selected, err)
+		}
+		h.workspaceErrorScanMu.Lock()
+		delete(h.workspaceErrorScanInFlight, key)
+		h.workspaceErrorScanMu.Unlock()
+		h.notifier.Notify(key)
+	}()
+}
+
+func (h *Handler) isWorkspaceErrorScanInFlight(selected string) bool {
+	key := workspaceErrorScanKey(selected)
+	h.workspaceErrorScanMu.Lock()
+	defer h.workspaceErrorScanMu.Unlock()
+	return h.workspaceErrorScanInFlight[key]
+}
+
+func workspaceErrorScanKey(selected string) string {
+	key := strings.TrimSpace(selected)
+	if key == "" {
+		return "*"
+	}
+	return key
+}
+
 // Deprecated: use WithWorkspaceSyncRefresh.
 func WithPlanWorkspaceRefresh(refresh WorkspaceSyncRefreshFunc) HandlerOption {
 	return WithWorkspaceSyncRefresh(refresh)
@@ -201,6 +258,17 @@ func NewHandler(
 	}
 	if h.workspaceErrorRecorder != nil && h.workspaceErrorRecorder.Notifier == nil {
 		h.workspaceErrorRecorder.Notifier = h.notifier
+	}
+	if h.workspaceErrorScanner != nil {
+		if h.workspaceErrorScanner.Notifier == nil {
+			h.workspaceErrorScanner.Notifier = h.notifier
+		}
+		if h.workspaceErrorScanner.Manager == nil {
+			h.workspaceErrorScanner.Manager = h.manager
+		}
+		if h.workspaceErrorRecorder != nil && h.workspaceErrorScanner.Store == nil {
+			h.workspaceErrorScanner.Store = h.workspaceErrorRecorder.Store
+		}
 	}
 	if manager, ok := h.manager.(*ManagerService); ok && manager != nil {
 		manager.SetLifecycleNotifier(h.notifier)

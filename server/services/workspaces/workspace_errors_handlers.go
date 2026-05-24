@@ -16,6 +16,8 @@ func (h *Handler) HandleWorkspaceErrorsPage(c echo.Context) error {
 	if err != nil {
 		return err
 	}
+	h.triggerWorkspaceErrorScan(model.SelectedWorkspace)
+	model.ScanInFlight = h.isWorkspaceErrorScanInFlight(model.SelectedWorkspace)
 	args := layouts.RootArgs{
 		Title:       "Workspace errors",
 		CurrentPath: "/workspaces/errors",
