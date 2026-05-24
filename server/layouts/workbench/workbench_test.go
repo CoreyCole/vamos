@@ -457,11 +457,12 @@ func TestWorkbenchResizeJSShowsHandlesForVisibleAdjacentRegions(t *testing.T) {
 		"before && after && isVisible(before) && isVisible(after)",
 		"const content = visible.filter((region) => region !== navigation)",
 		"if (!navigation || content.length === 0) return null",
-		"import { mergePaths } from '/js/datastar-pro-v1.js'",
+		"const datastarModule = import(\"/js/datastar-pro-v1.js\").catch",
+		"https://cdn.jsdelivr.net/gh/starfederation/datastar@v1.0.1/bundles/datastar.js",
 		"collapseRegion(root, navigationGroup.navigation)",
-		"regionSlot(region) !== 'primary'",
-		"attributeFilter: ['class', 'style', 'data-workbench-focused']",
-		"mobile: { activeRegionID: '' }",
+		"regionSlot(region) !== \"primary\"",
+		"attributeFilter: [\"class\", \"style\", \"data-workbench-focused\"]",
+		"mobile: { activeRegionID: \"\" }",
 	} {
 		if !strings.Contains(js, want) {
 			t.Fatalf("workbench-resize.js missing %q in %s", want, js)

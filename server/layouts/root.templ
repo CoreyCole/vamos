@@ -247,8 +247,12 @@ templ Root(args RootArgs) {
 				document.addEventListener('DOMContentLoaded', syncAppViewportShell);
 			</script>
 			<!-- Datastar library for reactive components -->
-			<!-- <script type="module" defer src="https://cdn.jsdelivr.net/gh/starfederation/datastar@main/bundles/datastar.js"></script> -->
-			<script type="module" defer src="/js/datastar-pro-v1.js"></script>
+			<script type="module">
+				import('/js/datastar-pro-v1.js').catch((error) => {
+					console.warn('Datastar Pro asset unavailable; falling back to public Datastar bundle', error);
+					return import('https://cdn.jsdelivr.net/gh/starfederation/datastar@v1.0.1/bundles/datastar.js');
+				});
+			</script>
 			<meta name="view-transition" content="same-origin"/>
 			<!-- Datastar Inspector diagnostics. Hidden by default; toggle from the avatar menu. -->
 			<script type="module" defer src="/js/datastar-inspector.js"></script>
