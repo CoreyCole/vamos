@@ -108,23 +108,28 @@ func RunE2E(ctx context.Context, cfg RunConfig) error {
 		manifest.FailuresPath = failuresPath
 		_, _ = artifacts.WriteMarkdownReport(artifactRoot, manifest, failures)
 	}
+	if _, err := artifacts.WriteManifest(artifactRoot, manifest); err != nil {
+		return err
+	}
 	if cfg.PlanDir != "" {
 		bundle, err := artifacts.ExportPlanBundle(
 			ctx,
 			manifest,
 			artifacts.PlanBundleOptions{
-				PlanDir:     cfg.PlanDir,
-				RunDir:      runDir,
-				IncludeHTML: true,
+				PlanDir:      cfg.PlanDir,
+				RunDir:       runDir,
+				Command:      "go " + strings.Join(args, " "),
+				IncludeHTML:  true,
+				IncludeTrace: true,
 			},
 		)
 		if err != nil {
 			return err
 		}
 		manifest.PlanBundlePath = bundle.IndexPath
-	}
-	if _, err := artifacts.WriteManifest(artifactRoot, manifest); err != nil {
-		return err
+		if _, err := artifacts.WriteManifest(artifactRoot, manifest); err != nil {
+			return err
+		}
 	}
 	if runErr != nil {
 		return fmt.Errorf("go %v: %w", args, runErr)
