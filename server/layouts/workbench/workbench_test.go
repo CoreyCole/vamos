@@ -170,6 +170,30 @@ func TestStripDurableInteractionState(t *testing.T) {
 	}
 }
 
+func TestStripDurableInteractionStateClearsMissingDefaultMobileRegion(t *testing.T) {
+	t.Parallel()
+
+	cfg := WorkbenchConfig{
+		Version: 1,
+		Page:    WorkbenchPageThoughts,
+		View:    WorkbenchViewSplit,
+		Regions: []RegionSpec{
+			{ID: "doc-workbench-sidebar", Slot: WorkbenchSlotNavigation, Kind: RegionThoughtsTree, Ratio: 0.22},
+			{ID: "doc-workbench-center", Slot: WorkbenchSlotPrimary, Kind: RegionDocument, Ratio: 0.61},
+			{ID: "doc-workbench-right", Slot: WorkbenchSlotContext, Kind: RegionChat, Ratio: 0.17},
+		},
+	}
+	defaults := DefaultWorkbenchConfig(WorkbenchPageThoughts, WorkbenchViewSplit, "")
+
+	stripped := StripDurableInteractionState(cfg, defaults)
+	if stripped.Mobile.ActiveRegionID != "" {
+		t.Fatalf("mobile active = %q, want empty when default is absent", stripped.Mobile.ActiveRegionID)
+	}
+	if err := ValidateWorkbenchConfig(stripped); err != nil {
+		t.Fatalf("ValidateWorkbenchConfig() error = %v", err)
+	}
+}
+
 func TestMergeWorkbenchConfigIgnoresWrongPageOrView(t *testing.T) {
 	t.Parallel()
 

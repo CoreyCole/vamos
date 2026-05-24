@@ -117,8 +117,24 @@ func StripDurableInteractionState(
 			stripped.Regions[i].Visible = false
 		}
 	}
-	stripped.Mobile.ActiveRegionID = defaults.Mobile.ActiveRegionID
+	if hasRegionID(stripped.Regions, defaults.Mobile.ActiveRegionID) {
+		stripped.Mobile.ActiveRegionID = defaults.Mobile.ActiveRegionID
+	} else if !hasRegionID(stripped.Regions, stripped.Mobile.ActiveRegionID) {
+		stripped.Mobile.ActiveRegionID = ""
+	}
 	return stripped
+}
+
+func hasRegionID(regions []RegionSpec, id string) bool {
+	if id == "" {
+		return false
+	}
+	for _, region := range regions {
+		if region.ID == id {
+			return true
+		}
+	}
+	return false
 }
 
 func migrateLegacyAgentChatSplitRatios(config *WorkbenchConfig) {
