@@ -27,9 +27,11 @@ import (
 	temporalmgr "github.com/CoreyCole/vamos/pkg/agents/temporal"
 	agentworker "github.com/CoreyCole/vamos/pkg/agents/worker"
 	conversationworkflow "github.com/CoreyCole/vamos/pkg/agents/workflows/conversation"
+	"github.com/CoreyCole/vamos/pkg/agents/workflows/runtime"
 	"github.com/CoreyCole/vamos/pkg/git"
 	"github.com/CoreyCole/vamos/pkg/proto/auth/v1/authv1connect"
 	"github.com/CoreyCole/vamos/pkg/proto/comments/v1/commentsv1connect"
+	"github.com/CoreyCole/vamos/pkg/release"
 	"github.com/CoreyCole/vamos/server"
 	"github.com/CoreyCole/vamos/server/config"
 	"github.com/CoreyCole/vamos/server/handlers"
@@ -931,17 +933,42 @@ func main() {
 	fmt.Printf("Markdown service initialized with comment service\n")
 
 	// Conditional Temporal startup
+	workspaceNotifier := workspaces.NewLifecycleNotifier()
 	provisionActivities := &workspaces.WorkspaceProvisionActivities{
 		ManagerURL:      workspaceManagerURL,
 		RestartToken:    cfg.WorkspaceRestartToken,
 		MetadataDirName: workspaceDiscovery.MetadataDirName,
 	}
+	releaseStore := workspaces.NewSQLReleaseQueueStore(dbService.Queries)
+	var releaseWorkflowRegistry *runtime.Registry
+	var releaseRegistry *release.Registry
+	if _, hasStage := workspaceDiscovery.ConfiguredCheckouts["stage"]; hasStage {
+		if _, hasMain := workspaceDiscovery.ConfiguredCheckouts["main"]; hasMain {
+			var err error
+			releaseWorkflowRegistry, releaseRegistry, err = workspaces.BuildDefaultReleaseRegistry("stage", "main")
+			if err != nil {
+				log.Fatal("Failed to build release registry:", err)
+			}
+			if err := workspaces.VerifyReleaseDefinitions(releaseRegistry, workspaceDiscovery.ConfiguredCheckouts); err != nil {
+				log.Fatal("Invalid release definition:", err)
+			}
+		}
+	}
 	releaseActivities := &workspaces.ReleaseActivities{
-		Store: workspaces.NewSQLReleaseQueueStore(dbService.Queries),
+		Store:            releaseStore,
+		ReleaseRegistry:  releaseRegistry,
+		WorkflowRegistry: releaseWorkflowRegistry,
+		Executor: workspaces.DefaultReleaseStepExecutor{
+			Git:        workspaces.ShellGitInspector{},
+			Commands:   workspaces.ExecCommandRunner{},
+			Workspaces: workspaces.DiscoveryWorkspaceResolver(workspaceDiscovery),
+		},
+		Notifier: workspaceNotifier,
 	}
 	provisionStarter := workspaces.WorkspaceProvisionStarter(
 		workspaces.NewDirectProvisionStarter(provisionActivities),
 	)
+	var releaseStarter workspaces.ReleaseWorkflowStarter
 	var cleanupStarter workspaces.WorkspaceCleanupStarter
 	var temporalManager *temporalmgr.Manager
 	var goWorker *agentworker.Worker
@@ -968,6 +995,9 @@ func main() {
 			goWorker.RegisterWorkflow(workspaces.ReleaseQueueWorkflow)
 			goWorker.RegisterWorkflow(workspaces.CleanupWorkspaceWorkflow)
 			provisionStarter = workspaces.NewTemporalProvisionStarter(temporalManager)
+			if releaseRegistry != nil {
+				releaseStarter = workspaces.NewTemporalReleaseStarter(temporalManager)
+			}
 			goWorker.RegisterActivity(provisionActivities)
 			goWorker.RegisterActivity(releaseActivities)
 			if workspaceManager != nil {
@@ -1150,16 +1180,23 @@ func main() {
 	authMiddleware := authmw.AuthMiddleware(authService)
 	var workspaceHandler *workspaces.Handler
 	if cfg.WorkspaceMode != "standalone" || workspaceManager != nil {
-		workspaceHandler = workspaces.NewHandler(
-			workspaceManager,
-			workspaceManagerURL,
-			cfg.WorkspaceSlug,
+		handlerOptions := []workspaces.HandlerOption{
 			workspaces.WithDevAuth(authService, handoffSigner),
 			workspaces.WithRestartAPI(cfg.WorkspaceRestartToken, cfg.RepoPath),
+			workspaces.WithLifecycleNotifier(workspaceNotifier),
 			workspaces.WithPlanWorkspaces(dbService.Queries),
 			workspaces.WithImplWorkspaces(dbService.Queries),
 			workspaces.WithWorkspaceProvisionStarter(provisionStarter),
 			workspaces.WithWorkspaceCleanupStarter(cleanupStarter),
+		}
+		if releaseRegistry != nil && releaseStarter != nil {
+			handlerOptions = append(handlerOptions, workspaces.WithReleaseQueue(
+				&workspaces.ReleaseProjector{Registry: releaseRegistry, Store: releaseStore, Git: workspaces.ShellGitInspector{}},
+				releaseStore,
+				releaseStarter,
+			))
+		}
+		handlerOptions = append(handlerOptions,
 			workspaces.WithWorkspaceSyncRefresh(func(ctx context.Context) error {
 				input := agentChatService.WorkspaceSyncInput()
 				if temporalManager == nil {
@@ -1212,6 +1249,12 @@ func main() {
 				)
 				return nil
 			}),
+		)
+		workspaceHandler = workspaces.NewHandler(
+			workspaceManager,
+			workspaceManagerURL,
+			cfg.WorkspaceSlug,
+			handlerOptions...,
 		)
 		if workspaceManager != nil {
 			workspaceHandler.RegisterRoutes(e, authMiddleware)

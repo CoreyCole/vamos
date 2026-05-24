@@ -26,6 +26,10 @@ vamos/
 - Runtime metadata uses `.vamos/` and `VAMOS_*` names.
 - Datastar Pro JS assets are licensed and gitignored. Build tooling may copy from `VAMOS_DATASTAR_PRO_ASSET` or `../datastar-pro/datastar-pro-v1.js`; do not download them silently.
 
+## Workflow-shaped feature guidance
+
+When a feature is deterministic, agentic, multi-step, stateful, or needs human/agent/service transitions, model it as a workflow on top of `pkg/agents/workflows/runtime` instead of inventing a parallel builder/state machine. Extend the shared runtime with new node kinds or metadata when needed, then keep domain packages as adapters (for example `pkg/release` owns lanes/git safety while workflow runtime owns definition IDs, versions, nodes, transitions, validation, and registries). Workspace provisioning is workflow-shaped too: CLI should invoke a server workflow to create checkouts and initialize `.vamos/`, not rely on agents to manually follow setup instructions.
+
 ## Development checkout model
 
 - `../vamos` is the working checkout for human/agent edits. Run Pi sessions and normal feature development here.
