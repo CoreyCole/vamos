@@ -5,6 +5,8 @@ import (
 	"net/url"
 	"path"
 	"strings"
+
+	"github.com/labstack/echo/v4"
 )
 
 type DocumentSelection struct {
@@ -23,6 +25,73 @@ type DocumentEmbeddedChatSelection struct {
 	WorkspaceID string
 	ThreadID    string
 	RunID       string
+}
+
+func (state EmbeddedChatLinkState) Selection() DocumentEmbeddedChatSelection {
+	return DocumentEmbeddedChatSelection{
+		WorkspaceID: strings.TrimSpace(state.WorkspaceID),
+		ThreadID:    strings.TrimSpace(state.ThreadID),
+		RunID:       strings.TrimSpace(state.RunID),
+	}
+}
+
+func (state EmbeddedChatLinkState) Preserve(href string) string {
+	if !state.Active {
+		return href
+	}
+	selection := state.Selection()
+	if selection.WorkspaceID != "" || selection.ThreadID != "" || selection.RunID != "" {
+		return PreserveEmbeddedChatQuery(href, selection)
+	}
+	return preserveChatContextQuery(href)
+}
+
+func preserveChatContextQuery(base string) string {
+	u, err := url.Parse(base)
+	if err != nil {
+		return base
+	}
+	q := u.Query()
+	q.Set("context", "chat")
+	u.RawQuery = q.Encode()
+	return u.String()
+}
+
+func EmbeddedChatLinkStateFromRequest(
+	c echo.Context,
+	fallback EmbeddedChatLinkState,
+) EmbeddedChatLinkState {
+	state := fallback
+	if strings.TrimSpace(c.QueryParam("context")) == thoughtsContextModeChat {
+		state.Active = true
+	}
+	if v := strings.TrimSpace(c.QueryParam("chat_workspace")); v != "" {
+		state.WorkspaceID = v
+		state.Active = true
+	}
+	if v := strings.TrimSpace(c.QueryParam("thread")); v != "" {
+		state.ThreadID = v
+		state.Active = true
+	}
+	if v := strings.TrimSpace(c.QueryParam("run")); v != "" {
+		state.RunID = v
+		state.Active = true
+	}
+	return state
+}
+
+func ThoughtsHrefWithChat(rawPath string, isDir bool, chat EmbeddedChatLinkState) string {
+	if isDir {
+		return chat.Preserve(ThoughtsDirURL(rawPath))
+	}
+	return chat.Preserve(ThoughtsDocURL(rawPath, ""))
+}
+
+func ThoughtsDirURLWithChatState(
+	dirPath string,
+	selection DocumentEmbeddedChatSelection,
+) string {
+	return PreserveEmbeddedChatQuery(ThoughtsDirURL(dirPath), selection)
 }
 
 func CanonicalThoughtsDocPath(raw string) (string, error) {

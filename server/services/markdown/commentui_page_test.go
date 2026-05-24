@@ -354,14 +354,13 @@ func TestDirectoryWorkbenchPageRendersSharedSidebarAndSelectionForms(t *testing.
 		`data-on:submit="@post(&#39;/thoughts/actions/select-document&#39;, {contentType: &#39;form&#39;})"`,
 		`name="doc_path"`,
 		`value="creative-mode-agent/plans/plan-a/design.md"`,
+		`href="/thoughts/creative-mode-agent/plans/plan-a/design.md"`,
 	} {
 		if !strings.Contains(html, want) {
 			t.Fatalf("DirectoryWorkbenchPage render missing %q in %s", want, html)
 		}
 	}
 	for _, unwanted := range []string{
-		`href="/thoughts/creative-mode-agent/plans/plan-a/"`,
-		`href="/thoughts/creative-mode-agent/plans/plan-a/design.md"`,
 		`$sidebarActiveTab = &#39;document&#39;`,
 		`$sidebarActiveTab = 'document'`,
 		`mx-auto max-w-4xl rounded-lg border border-border bg-card`,

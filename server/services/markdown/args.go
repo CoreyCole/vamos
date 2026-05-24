@@ -50,6 +50,13 @@ type DocumentWorkspaceContext struct {
 	Ambiguous    bool
 }
 
+type EmbeddedChatLinkState struct {
+	Active      bool
+	WorkspaceID string
+	ThreadID    string
+	RunID       string
+}
+
 type PageArgs struct {
 	ViewerArgs           ViewerArgs
 	TableOfContents      []TocItem
@@ -61,6 +68,7 @@ type PageArgs struct {
 	CurrentSyntaxTheme   string                        // Current syntax theme name
 	PageSessionID        string                        // Unique page session ID for this tab
 	FileTree             []FileTreeNode                // Sidebar file tree
+	ChatLinkState        EmbeddedChatLinkState
 	CommentUI            commentui.CommentableMarkdownArgs
 	WorkspaceContext     DocumentWorkspaceContext
 	QRSPIMetadata        QRSPIMetadata
@@ -156,6 +164,7 @@ type DirectoryArgs struct {
 	CurrentTheme       string         // "dark" or "light" - from user preferences
 	CurrentSyntaxTheme string         // Current syntax theme name
 	FileTree           []FileTreeNode // Sidebar file tree
+	ChatLinkState      EmbeddedChatLinkState
 }
 
 // DirectoryItem represents a file or directory

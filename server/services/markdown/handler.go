@@ -65,6 +65,12 @@ func (s *Service) ServeMarkdown(c echo.Context) error {
 		dirArgs.CurrentTheme = currentThemeMode
 		dirArgs.CurrentSyntaxTheme = currentTheme
 		dirArgs.FileTree = s.GetFileTree(requestPath)
+		dirArgs.ChatLinkState = EmbeddedChatLinkStateFromRequest(c, EmbeddedChatLinkState{
+			Active:      thoughtsContextMode(c) == thoughtsContextModeChat,
+			WorkspaceID: strings.TrimSpace(c.QueryParam("chat_workspace")),
+			ThreadID:    strings.TrimSpace(c.QueryParam("thread")),
+			RunID:       strings.TrimSpace(c.QueryParam("run")),
+		})
 
 		workbenchState, err := s.buildThoughtsDirectoryWorkbenchState(c, dirArgs)
 		if err != nil {
@@ -88,6 +94,12 @@ func (s *Service) ServeMarkdown(c echo.Context) error {
 				dirArgs.CurrentTheme = currentThemeMode
 				dirArgs.CurrentSyntaxTheme = currentTheme
 				dirArgs.FileTree = s.GetFileTree(requestPath)
+				dirArgs.ChatLinkState = EmbeddedChatLinkStateFromRequest(c, EmbeddedChatLinkState{
+					Active:      thoughtsContextMode(c) == thoughtsContextModeChat,
+					WorkspaceID: strings.TrimSpace(c.QueryParam("chat_workspace")),
+					ThreadID:    strings.TrimSpace(c.QueryParam("thread")),
+					RunID:       strings.TrimSpace(c.QueryParam("run")),
+				})
 				workbenchState, stateErr := s.buildThoughtsDirectoryWorkbenchState(
 					c,
 					dirArgs,
@@ -108,6 +120,12 @@ func (s *Service) ServeMarkdown(c echo.Context) error {
 	pageArgs.CurrentTheme = currentThemeMode
 	pageArgs.CurrentSyntaxTheme = currentTheme
 	pageArgs.FileTree = s.GetFileTree(pageArgs.FilePath)
+	pageArgs.ChatLinkState = EmbeddedChatLinkStateFromRequest(c, EmbeddedChatLinkState{
+		Active:      thoughtsContextMode(c) == thoughtsContextModeChat,
+		WorkspaceID: strings.TrimSpace(c.QueryParam("chat_workspace")),
+		ThreadID:    strings.TrimSpace(c.QueryParam("thread")),
+		RunID:       strings.TrimSpace(c.QueryParam("run")),
+	})
 	pageArgs.QRSPIMetadata = s.buildQRSPIMetadata(pageArgs)
 	// Generate unique page session ID for this tab
 	pageArgs.PageSessionID = uuid.Must(uuid.NewV4()).String()
@@ -626,6 +644,12 @@ func (s *Service) selectDocumentAndPatch(
 	userEmail, _ := c.Get("user_email").(string)
 	pageArgs.UserEmail = userEmail
 	pageArgs.FileTree = s.GetFileTree(pageArgs.FilePath)
+	pageArgs.ChatLinkState = EmbeddedChatLinkStateFromRequest(c, EmbeddedChatLinkState{
+		Active:      thoughtsContextMode(c) == thoughtsContextModeChat,
+		WorkspaceID: firstNonEmptyString(c.FormValue("chat_workspace"), c.QueryParam("chat_workspace")),
+		ThreadID:    firstNonEmptyString(c.FormValue("thread"), c.FormValue("thread_id"), c.QueryParam("thread")),
+		RunID:       firstNonEmptyString(c.FormValue("run"), c.FormValue("run_id"), c.QueryParam("run")),
+	})
 	workspaceCtx := DocumentWorkspaceContext{}
 	if s.workspaceResolver != nil && userEmail != "" {
 		resolved, err := s.workspaceResolver.ResolveWorkspaceForDocument(
@@ -782,6 +806,12 @@ func (s *Service) selectDirectoryAndPatch(
 	userEmail, _ := c.Get("user_email").(string)
 	dirArgs.UserEmail = userEmail
 	dirArgs.FileTree = s.GetFileTree(dirPath)
+	dirArgs.ChatLinkState = EmbeddedChatLinkStateFromRequest(c, EmbeddedChatLinkState{
+		Active:      thoughtsContextMode(c) == thoughtsContextModeChat,
+		WorkspaceID: firstNonEmptyString(c.FormValue("chat_workspace"), c.QueryParam("chat_workspace")),
+		ThreadID:    firstNonEmptyString(c.FormValue("thread"), c.FormValue("thread_id"), c.QueryParam("thread")),
+		RunID:       firstNonEmptyString(c.FormValue("run"), c.FormValue("run_id"), c.QueryParam("run")),
+	})
 
 	sse := datastar.NewSSE(c.Response().Writer, c.Request())
 	if err := patchThoughtsTitle(sse, directoryTitle(dirArgs)); err != nil {

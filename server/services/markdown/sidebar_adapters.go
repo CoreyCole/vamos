@@ -28,7 +28,7 @@ func BuildThoughtsSidebarArgs(
 			workspaces,
 			args.WorkspaceContext.WorkspaceID,
 		),
-		Files: BuildFilesPanelModel(args.FilePath, document, args.FileTree),
+		Files: BuildFilesPanelModel(args.FilePath, document, args.FileTree, args.ChatLinkState),
 	}
 }
 
@@ -46,6 +46,7 @@ func BuildThoughtsDirectorySidebarArgs(
 			args.Path,
 			workbench.DocumentPanelModel{CurrentPath: args.Path},
 			args.FileTree,
+			args.ChatLinkState,
 		),
 	}
 }
@@ -137,43 +138,33 @@ func BuildFilesPanelModel(
 	currentPath string,
 	document workbench.DocumentPanelModel,
 	nodes []FileTreeNode,
+	chat EmbeddedChatLinkState,
 ) workbench.FilesPanelModel {
 	return workbench.NewFilesPanelModel(
 		currentPath,
 		document,
-		buildFileTreeItems(nodes),
+		buildFileTreeItems(nodes, chat),
 	)
 }
 
-func buildFileTreeItems(nodes []FileTreeNode) []workbench.FileTreeItem {
+func buildFileTreeItems(
+	nodes []FileTreeNode,
+	chat EmbeddedChatLinkState,
+) []workbench.FileTreeItem {
 	out := make([]workbench.FileTreeItem, 0, len(nodes))
 	for _, node := range nodes {
-		action, fields := thoughtsSelectionAction(node)
 		item := workbench.FileTreeItem{
-			Name:         node.Name,
-			Path:         node.Path,
-			Href:         thoughtsHref(node.Path),
-			FormAction:   action,
-			HiddenFields: fields,
-			IsDir:        node.IsDir,
-			IsExpanded:   node.IsExpanded,
-			IsActive:     node.IsActive,
-			Children:     buildFileTreeItems(node.Children),
+			Name:       node.Name,
+			Path:       node.Path,
+			Href:       ThoughtsHrefWithChat(node.Path, node.IsDir, chat),
+			IsDir:      node.IsDir,
+			IsExpanded: node.IsExpanded,
+			IsActive:   node.IsActive,
+			Children:   buildFileTreeItems(node.Children, chat),
 		}
 		out = append(out, item)
 	}
 	return out
-}
-
-func thoughtsSelectionAction(node FileTreeNode) (string, map[string]string) {
-	if node.IsDir {
-		return "@post('/thoughts/actions/select-directory', {contentType: 'form'})", map[string]string{
-			"dir_path": node.Path,
-		}
-	}
-	return "@post('/thoughts/actions/select-document', {contentType: 'form'})", map[string]string{
-		"doc_path": node.Path,
-	}
 }
 
 func BuildWorkspaceDocTreeArgs(

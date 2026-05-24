@@ -2,6 +2,7 @@ package markdown
 
 import (
 	"database/sql"
+	"net/url"
 	"strings"
 	"testing"
 	"time"
@@ -66,17 +67,17 @@ func TestBuildThoughtsSidebarArgsDefaultsToFilesAndNestsDocument(t *testing.T) {
 		t.Fatalf("Files.Document.Sections[0].Title = %q, want Summary", got)
 	}
 	node := sidebar.Files.Nodes[0]
-	if node.Href == "" {
-		t.Fatal("thoughts file should keep href fallback")
+	if got, want := node.Href, "/thoughts/creative-mode-agent/plans/demo/design.md"; got != want {
+		t.Fatalf("file href = %q, want %q", got, want)
 	}
 	if !node.IsActive {
 		t.Fatal("thoughts file tree should highlight the current document on first paint")
 	}
-	if node.FormAction != "@post('/thoughts/actions/select-document', {contentType: 'form'})" {
-		t.Fatalf("file FormAction = %q", node.FormAction)
+	if node.FormAction != "" {
+		t.Fatalf("file FormAction = %q, want empty for anchor navigation", node.FormAction)
 	}
-	if got := node.HiddenFields["doc_path"]; got != "creative-mode-agent/plans/demo/design.md" {
-		t.Fatalf("doc_path = %q", got)
+	if len(node.HiddenFields) != 0 {
+		t.Fatalf("file HiddenFields = %#v, want none", node.HiddenFields)
 	}
 	if got := len(sidebar.Workspaces.Roots); got != 2 {
 		t.Fatalf("len(Workspaces.Roots) = %d, want 2", got)
@@ -99,7 +100,7 @@ func TestBuildThoughtsSidebarArgsDefaultsToFilesAndNestsDocument(t *testing.T) {
 	}
 }
 
-func TestBuildThoughtsDirectorySidebarArgsUsesDirectorySelectionForms(t *testing.T) {
+func TestBuildThoughtsDirectorySidebarArgsUsesDirectoryAnchors(t *testing.T) {
 	folderSidebar := BuildThoughtsDirectorySidebarArgs(&DirectoryArgs{
 		Path: "creative-mode-agent/plans/demo",
 		FileTree: []FileTreeNode{{
@@ -109,11 +110,85 @@ func TestBuildThoughtsDirectorySidebarArgsUsesDirectorySelectionForms(t *testing
 		}},
 	})
 	folder := folderSidebar.Files.Nodes[0]
-	if folder.FormAction != "@post('/thoughts/actions/select-directory', {contentType: 'form'})" {
-		t.Fatalf("dir FormAction = %q", folder.FormAction)
+	if folder.FormAction != "" {
+		t.Fatalf("dir FormAction = %q, want empty", folder.FormAction)
 	}
-	if got := folder.HiddenFields["dir_path"]; got != "creative-mode-agent/plans/demo" {
-		t.Fatalf("dir_path = %q", got)
+	if len(folder.HiddenFields) != 0 {
+		t.Fatalf("dir HiddenFields = %#v, want none", folder.HiddenFields)
+	}
+	if got, want := folder.Href, "/thoughts/creative-mode-agent/plans/demo"; got != want {
+		t.Fatalf("dir href = %q, want %q", got, want)
+	}
+}
+
+func TestBuildThoughtsSidebarArgsPreservesActiveChatQuery(t *testing.T) {
+	args := &PageArgs{
+		FilePath: "owner/plan-a/design.md",
+		ChatLinkState: EmbeddedChatLinkState{
+			Active:      true,
+			WorkspaceID: "ws_1",
+			ThreadID:    "th_1",
+			RunID:       "run_1",
+		},
+		FileTree: []FileTreeNode{{
+			Name: "outline.md",
+			Path: "owner/plan-a/outline.md",
+		}},
+	}
+	node := BuildThoughtsSidebarArgs(args).Files.Nodes[0]
+	parsed, err := url.Parse(node.Href)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if parsed.Path != "/thoughts/owner/plan-a/outline.md" {
+		t.Fatalf("path = %q", parsed.Path)
+	}
+	query := parsed.Query()
+	for key, want := range map[string]string{
+		"context":        "chat",
+		"chat_workspace": "ws_1",
+		"thread":         "th_1",
+		"run":            "run_1",
+	} {
+		if got := query.Get(key); got != want {
+			t.Fatalf("query[%s]=%q want %q in %q", key, got, want, node.Href)
+		}
+	}
+}
+
+func TestBuildThoughtsDirectorySidebarArgsPreservesActiveChatQuery(t *testing.T) {
+	args := &DirectoryArgs{
+		Path: "owner/plan-a",
+		ChatLinkState: EmbeddedChatLinkState{
+			Active:      true,
+			WorkspaceID: "ws_1",
+			ThreadID:    "th_1",
+			RunID:       "run_1",
+		},
+		FileTree: []FileTreeNode{{
+			Name:  "docs",
+			Path:  "owner/plan-a/docs",
+			IsDir: true,
+		}},
+	}
+	node := BuildThoughtsDirectorySidebarArgs(args).Files.Nodes[0]
+	parsed, err := url.Parse(node.Href)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if parsed.Path != "/thoughts/owner/plan-a/docs" {
+		t.Fatalf("path = %q", parsed.Path)
+	}
+	query := parsed.Query()
+	for key, want := range map[string]string{
+		"context":        "chat",
+		"chat_workspace": "ws_1",
+		"thread":         "th_1",
+		"run":            "run_1",
+	} {
+		if got := query.Get(key); got != want {
+			t.Fatalf("query[%s]=%q want %q in %q", key, got, want, node.Href)
+		}
 	}
 }
 
