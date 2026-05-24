@@ -936,6 +936,9 @@ func main() {
 		RestartToken:    cfg.WorkspaceRestartToken,
 		MetadataDirName: workspaceDiscovery.MetadataDirName,
 	}
+	releaseActivities := &workspaces.ReleaseActivities{
+		Store: workspaces.NewSQLReleaseQueueStore(dbService.Queries),
+	}
 	provisionStarter := workspaces.WorkspaceProvisionStarter(
 		workspaces.NewDirectProvisionStarter(provisionActivities),
 	)
@@ -961,8 +964,10 @@ func main() {
 			goWorker.RegisterWorkflow(workspaces.StopWorkspaceWorkflow)
 			goWorker.RegisterWorkflow(workspaces.RestartWorkspaceWorkflow)
 			goWorker.RegisterWorkflow(workspaces.WorkspaceProvisionWorkflow)
+			goWorker.RegisterWorkflow(workspaces.ReleaseQueueWorkflow)
 			provisionStarter = workspaces.NewTemporalProvisionStarter(temporalManager)
 			goWorker.RegisterActivity(provisionActivities)
+			goWorker.RegisterActivity(releaseActivities)
 			if workspaceManager != nil {
 				workspaceManager.SetLifecycleStarter(
 					workspaces.NewTemporalLifecycleStarter(temporalManager),

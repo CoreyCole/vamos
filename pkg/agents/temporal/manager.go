@@ -70,6 +70,18 @@ func (m *Manager) StartWorkflowIdempotent(
 	return "", err
 }
 
+// SignalWorkflow sends a signal to an existing workflow execution.
+func (m *Manager) SignalWorkflow(
+	ctx context.Context,
+	workflowID, runID, signalName string,
+	arg any,
+) error {
+	if err := m.client.SignalWorkflow(ctx, workflowID, runID, signalName, arg); err != nil {
+		return fmt.Errorf("signal workflow %s: %w", workflowID, err)
+	}
+	return nil
+}
+
 // StartWorkflowByName starts a workflow using a string name instead of a function
 // reference.
 func (m *Manager) StartWorkflowByName(
