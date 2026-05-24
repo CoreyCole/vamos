@@ -7,6 +7,9 @@ playwright-auth url="http://localhost:4200/agent-chat":
 pw-agent-chat:
   @just playwright-auth http://localhost:4200/agent-chat
 
+sync-thoughts:
+  @cd .. && just sync-thoughts
+
 verify-workspaces slug start="true" restart="true" stop="true" browser="false" report="" remote="" dns_server="" expect_ip="" require_remote="false":
   @set -eu; \
     slug="{{slug}}"; slug="${slug#slug=}"; \
