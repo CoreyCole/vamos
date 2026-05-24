@@ -602,6 +602,70 @@ func TestWorkspacesPageRendersNestedReviewWorkspaces(t *testing.T) {
 	}
 }
 
+func TestFilterHistoricalImplWorkspaceViewsPromotesActiveChildren(t *testing.T) {
+	views := []ImplWorkspaceView{
+		{
+			Row: db.ImplWorkspace{
+				WorkspaceSlug: "merged-parent",
+				DisplayName:   "Merged Parent",
+				Status:        string(ImplWorkspaceStatusMerged),
+			},
+			Children: []ImplWorkspaceView{
+				{
+					Row: db.ImplWorkspace{
+						WorkspaceSlug: "active-child",
+						DisplayName:   "Active Child",
+						Status:        string(ImplWorkspaceStatusActive),
+					},
+				},
+				{
+					Row: db.ImplWorkspace{
+						WorkspaceSlug: "cleaned-child",
+						DisplayName:   "Cleaned Child",
+						Status:        string(ImplWorkspaceStatusCleanedUp),
+					},
+				},
+			},
+		},
+		{
+			Row: db.ImplWorkspace{
+				WorkspaceSlug: "active-parent",
+				DisplayName:   "Active Parent",
+				Status:        string(ImplWorkspaceStatusActive),
+			},
+			Children: []ImplWorkspaceView{{
+				Row: db.ImplWorkspace{
+					WorkspaceSlug: "merged-child",
+					DisplayName:   "Merged Child",
+					Status:        string(ImplWorkspaceStatusMerged),
+				},
+			}},
+		},
+	}
+
+	filtered := filterHistoricalImplWorkspaceViews(views, false)
+	if len(filtered) != 2 {
+		t.Fatalf("len(filtered) = %d, want 2: %#v", len(filtered), filtered)
+	}
+	if filtered[0].Row.WorkspaceSlug != "active-child" {
+		t.Fatalf(
+			"first filtered slug = %q, want promoted active child",
+			filtered[0].Row.WorkspaceSlug,
+		)
+	}
+	if filtered[1].Row.WorkspaceSlug != "active-parent" || len(filtered[1].Children) != 0 {
+		t.Fatalf("active parent not preserved with historical child hidden: %#v", filtered[1])
+	}
+
+	shown := filterHistoricalImplWorkspaceViews(views, true)
+	if len(shown) != len(views) || shown[0].Row.WorkspaceSlug != "merged-parent" || len(shown[0].Children) != 2 {
+		t.Fatalf("show historical changed tree: %#v", shown)
+	}
+	if len(views[0].Children) != 2 || len(views[1].Children) != 1 {
+		t.Fatalf("filter mutated input children: %#v", views)
+	}
+}
+
 func TestWorkspacesPageSuppressesLifecycleActionsForHistoricalRows(t *testing.T) {
 	views := BuildImplWorkspaceViews([]db.ImplWorkspace{
 		{

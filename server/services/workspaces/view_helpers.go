@@ -51,6 +51,34 @@ func canActOnImplWorkspace(view ImplWorkspaceView) bool {
 		strings.TrimSpace(view.Runtime.Workspace.Slug) != ""
 }
 
+func isHistoricalImplWorkspaceView(view ImplWorkspaceView) bool {
+	return view.Row.Status == string(ImplWorkspaceStatusMerged) ||
+		view.Row.Status == string(ImplWorkspaceStatusCleanedUp)
+}
+
+func filterHistoricalImplWorkspaceViews(
+	views []ImplWorkspaceView,
+	showHistorical bool,
+) []ImplWorkspaceView {
+	if showHistorical {
+		return views
+	}
+	out := make([]ImplWorkspaceView, 0, len(views))
+	for _, view := range views {
+		filteredChildren := filterHistoricalImplWorkspaceViews(
+			view.Children,
+			showHistorical,
+		)
+		view.Children = filteredChildren
+		if isHistoricalImplWorkspaceView(view) {
+			out = append(out, filteredChildren...)
+			continue
+		}
+		out = append(out, view)
+	}
+	return out
+}
+
 func workspaceViewCheckoutPath(view ImplWorkspaceView) string {
 	if strings.TrimSpace(view.Row.CheckoutPath) != "" {
 		return view.Row.CheckoutPath

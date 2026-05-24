@@ -688,6 +688,14 @@ func isDatastarRequest(r *http.Request) bool {
 		strings.Contains(r.Header.Get("Accept"), "text/event-stream")
 }
 
+func showHistoricalFromRequest(r *http.Request) bool {
+	if r == nil {
+		return false
+	}
+	value := strings.TrimSpace(r.FormValue("show_historical"))
+	return value == "true" || value == "1" || value == "on" || value == "yes"
+}
+
 func BuildNavItems(
 	items []Workspace,
 	currentSlug, managerURL string,
