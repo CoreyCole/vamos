@@ -166,6 +166,44 @@ func workspaceTopBranch(ws Workspace) string {
 	return strings.TrimSpace(ws.Stack.TopBranch)
 }
 
+func shortWorkspaceRefreshError(value string) string {
+	value = strings.TrimSpace(value)
+	if len(value) <= 160 {
+		return value
+	}
+	return value[:157] + "..."
+}
+
+func workspaceRefreshSummary(state WorkspaceRefreshState) string {
+	result := state.LastResult
+	parts := make([]string, 0, 8)
+	if result.PlanUpserted > 0 {
+		parts = append(parts, fmt.Sprintf("plans %d", result.PlanUpserted))
+	}
+	if result.ImplUpserted > 0 {
+		parts = append(parts, fmt.Sprintf("workspaces %d", result.ImplUpserted))
+	}
+	if result.ImplRepairedEnv > 0 {
+		parts = append(parts, fmt.Sprintf("env repaired %d", result.ImplRepairedEnv))
+	}
+	if result.ImportedPiSessions > 0 {
+		parts = append(parts, fmt.Sprintf("terminal imported %d", result.ImportedPiSessions))
+	}
+	if result.AdoptedQRSPIWorkspaces > 0 {
+		parts = append(parts, fmt.Sprintf("QRSPI adopted %d", result.AdoptedQRSPIWorkspaces))
+	}
+	if result.ImplCleanedUp > 0 {
+		parts = append(parts, fmt.Sprintf("cleaned %d", result.ImplCleanedUp))
+	}
+	if result.ImplMerged > 0 {
+		parts = append(parts, fmt.Sprintf("merged %d", result.ImplMerged))
+	}
+	if len(parts) == 0 {
+		parts = append(parts, "no changes")
+	}
+	return "Last refresh: " + strings.Join(parts, ", ") + " · " + state.CompletedAt.Format("15:04:05")
+}
+
 func workspaceActionIndicator(slug, action string) string {
 	h := fnv.New32a()
 	_, _ = h.Write([]byte(strings.TrimSpace(slug)))

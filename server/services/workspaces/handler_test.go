@@ -1602,6 +1602,78 @@ func TestHandleRefreshWorkspacesRecordsResultAndNotifies(t *testing.T) {
 	}
 }
 
+func TestHandleRefreshWorkspacesDatastarShowsInFlightStatus(t *testing.T) {
+	releaseSync := make(chan struct{})
+	handler := NewHandler(
+		&fakeLifecycleManager{},
+		"https://main.cn-agents.test",
+		"main",
+		WithWorkspaceSyncRefresh(func(context.Context) (WorkspaceSyncRefreshResult, error) {
+			<-releaseSync
+			return WorkspaceSyncRefreshResult{}, nil
+		}),
+	)
+	defer close(releaseSync)
+	e := echo.New()
+	req := httptest.NewRequest(http.MethodPost, "/workspaces/refresh", nil)
+	req.Header.Set("Datastar-Request", "true")
+	rec := httptest.NewRecorder()
+	if err := handler.HandleRefreshWorkspaces(e.NewContext(req, rec)); err != nil {
+		t.Fatalf("HandleRefreshWorkspaces() error = %v", err)
+	}
+	html := rec.Body.String()
+	for _, want := range []string{"Refreshing...", "Refreshing workspace registry"} {
+		if !strings.Contains(html, want) {
+			t.Fatalf("Datastar refresh response missing %q: %s", want, html)
+		}
+	}
+}
+
+func TestHandleWorkspacesPageRendersRefreshResultSummary(t *testing.T) {
+	handler := NewHandler(
+		&fakeLifecycleManager{},
+		"https://main.cn-agents.test",
+		"main",
+	)
+	handler.recordWorkspaceSyncRefresh(WorkspaceSyncRefreshResult{
+		ImplUpserted:           1,
+		ImportedPiSessions:     2,
+		AdoptedQRSPIWorkspaces: 1,
+		Changed:                true,
+	}, nil, time.Date(2026, 5, 24, 12, 34, 56, 0, time.UTC))
+	e := echo.New()
+	req := httptest.NewRequest(http.MethodGet, "/workspaces", nil)
+	rec := httptest.NewRecorder()
+	if err := handler.HandleWorkspacesPage(e.NewContext(req, rec)); err != nil {
+		t.Fatalf("HandleWorkspacesPage() error = %v", err)
+	}
+	html := rec.Body.String()
+	for _, want := range []string{"Last refresh:", "workspaces 1", "terminal imported 2", "QRSPI adopted 1", "12:34:56"} {
+		if !strings.Contains(html, want) {
+			t.Fatalf("page missing refresh summary %q: %s", want, html)
+		}
+	}
+}
+
+func TestHandleWorkspacesPageRendersRefreshError(t *testing.T) {
+	handler := NewHandler(
+		&fakeLifecycleManager{},
+		"https://main.cn-agents.test",
+		"main",
+	)
+	handler.recordWorkspaceSyncRefresh(WorkspaceSyncRefreshResult{}, errors.New("boom"), time.Now())
+	e := echo.New()
+	req := httptest.NewRequest(http.MethodGet, "/workspaces", nil)
+	rec := httptest.NewRecorder()
+	if err := handler.HandleWorkspacesPage(e.NewContext(req, rec)); err != nil {
+		t.Fatalf("HandleWorkspacesPage() error = %v", err)
+	}
+	html := rec.Body.String()
+	if !strings.Contains(html, "Last refresh failed: boom") {
+		t.Fatalf("page missing refresh error: %s", html)
+	}
+}
+
 func TestHandleRefreshWorkspacesRecordsRefreshError(t *testing.T) {
 	notifier := NewLifecycleNotifier()
 	notifications, unsubscribe := notifier.Subscribe()

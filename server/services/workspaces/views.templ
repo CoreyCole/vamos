@@ -40,32 +40,41 @@ templ WorkspacesHeader(refresh WorkspaceRefreshState, showHistorical bool) {
 			<h1 class="text-2xl font-semibold tracking-tight">Workspaces</h1>
 			<p class="text-sm text-muted-foreground">Local implementation checkouts discovered under the configured workspace parent.</p>
 		</div>
-		<div class="flex flex-wrap gap-2">
-			<form method="get" action="/workspaces">
-				if showHistorical {
-					<button type="submit" class="inline-flex h-9 items-center rounded-md border px-3 text-sm font-medium hover:bg-accent">Hide historical</button>
-				} else {
-					<button type="submit" name="show_historical" value="true" class="inline-flex h-9 items-center rounded-md border px-3 text-sm font-medium hover:bg-accent">Show historical</button>
-				}
-			</form>
-			<form method="post" action="/workspaces/refresh" data-on:submit="@post('/workspaces/refresh', {contentType: 'form'})">
-				if showHistorical {
-					<input type="hidden" name="show_historical" value="true"/>
-				}
-				<button
-					type="submit"
-					class="inline-flex h-9 items-center rounded-md border px-3 text-sm font-medium hover:bg-accent disabled:pointer-events-none disabled:opacity-50"
-					if refresh.InFlight {
-						disabled
-					}
-				>
-					if refresh.InFlight {
-						Refreshing...
+		<div class="flex flex-col items-start gap-2 md:items-end">
+			<div class="flex flex-wrap gap-2">
+				<form method="get" action="/workspaces">
+					if showHistorical {
+						<button type="submit" class="inline-flex h-9 items-center rounded-md border px-3 text-sm font-medium hover:bg-accent">Hide historical</button>
 					} else {
-						Refresh
+						<button type="submit" name="show_historical" value="true" class="inline-flex h-9 items-center rounded-md border px-3 text-sm font-medium hover:bg-accent">Show historical</button>
 					}
-				</button>
-			</form>
+				</form>
+				<form method="post" action="/workspaces/refresh" data-on:submit="@post('/workspaces/refresh', {contentType: 'form'})">
+					if showHistorical {
+						<input type="hidden" name="show_historical" value="true"/>
+					}
+					<button
+						type="submit"
+						class="inline-flex h-9 items-center rounded-md border px-3 text-sm font-medium hover:bg-accent disabled:pointer-events-none disabled:opacity-50"
+						if refresh.InFlight {
+							disabled
+						}
+					>
+						if refresh.InFlight {
+							Refreshing...
+						} else {
+							Refresh
+						}
+					</button>
+				</form>
+			</div>
+			if refresh.InFlight {
+				<p class="text-xs text-muted-foreground">Refreshing workspace registry...</p>
+			} else if refresh.LastError != "" {
+				<p class="max-w-md text-xs text-destructive">Last refresh failed: { shortWorkspaceRefreshError(refresh.LastError) }</p>
+			} else if !refresh.CompletedAt.IsZero() {
+				<p class="text-xs text-muted-foreground">{ workspaceRefreshSummary(refresh) }</p>
+			}
 		</div>
 	</div>
 }
