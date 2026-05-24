@@ -152,6 +152,23 @@ func workspaceActionIndicatorSignal(slug, action string) string {
 	return "$" + workspaceActionIndicator(slug, action)
 }
 
+func releaseActionLabel(action ReleaseActionView) string {
+	if strings.TrimSpace(action.Label) != "" {
+		return action.Label
+	}
+	return workspaceTitleCase(strings.ReplaceAll(string(action.FlowID), "_", " "))
+}
+
+func releaseDisabledReason(action ReleaseActionView) string {
+	if !action.Disabled {
+		return ""
+	}
+	if strings.TrimSpace(action.DisabledReason) != "" {
+		return action.DisabledReason
+	}
+	return "release action unavailable"
+}
+
 func workspaceCanStart(snap WorkspaceLifecycleSnapshot) bool {
 	ws := snap.Workspace
 	if ws.IsMain {

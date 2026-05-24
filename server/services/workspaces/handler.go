@@ -59,6 +59,7 @@ type Handler struct {
 	mainCheckoutPath     string
 	verifier             *Verifier
 	provisionStarter     WorkspaceProvisionStarter
+	releaseProjector     *ReleaseProjector
 	exitFunc             func(int)
 }
 
@@ -133,6 +134,12 @@ func WithWorkspaceSyncRefresh(refresh WorkspaceSyncRefreshFunc) HandlerOption {
 func WithWorkspaceProvisionStarter(starter WorkspaceProvisionStarter) HandlerOption {
 	return func(h *Handler) {
 		h.provisionStarter = starter
+	}
+}
+
+func WithReleaseProjector(projector *ReleaseProjector) HandlerOption {
+	return func(h *Handler) {
+		h.releaseProjector = projector
 	}
 }
 
