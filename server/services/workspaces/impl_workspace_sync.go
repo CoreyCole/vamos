@@ -61,14 +61,15 @@ func (s *ImplWorkspaceSyncer) Sync(
 		)
 	}
 	discovered, err := Discover(DiscoveryConfig{
-		MainCheckoutPath: input.Discovery.MainCheckoutPath,
-		ParentDir:        input.Discovery.ParentDir,
-		Domain:           input.Discovery.Domain,
-		MetadataDirName:  input.Discovery.MetadataDirName,
-		CheckoutPrefixes: input.Discovery.CheckoutPrefixes,
-		MainCheckoutName: input.Discovery.MainCheckoutName,
-		ModuleMarker:     input.Discovery.ModuleMarker,
-		PackageSubdir:    input.Discovery.PackageSubdir,
+		MainCheckoutPath:    input.Discovery.MainCheckoutPath,
+		ParentDir:           input.Discovery.ParentDir,
+		Domain:              input.Discovery.Domain,
+		MetadataDirName:     input.Discovery.MetadataDirName,
+		CheckoutPrefixes:    input.Discovery.CheckoutPrefixes,
+		MainCheckoutName:    input.Discovery.MainCheckoutName,
+		ModuleMarker:        input.Discovery.ModuleMarker,
+		PackageSubdir:       input.Discovery.PackageSubdir,
+		ConfiguredCheckouts: input.Discovery.ConfiguredCheckouts,
 	})
 	if err != nil {
 		return ImplWorkspaceSyncResult{}, err
@@ -287,9 +288,11 @@ func (s *ImplWorkspaceSyncer) reconcileMissing(
 	if err != nil {
 		return 0, 0, err
 	}
+	configured := configuredCheckoutSlugs(input.Discovery)
 	for _, row := range rows {
 		if row.Status != string(ImplWorkspaceStatusActive) ||
-			activeSlugs.Has(row.WorkspaceSlug) {
+			activeSlugs.Has(row.WorkspaceSlug) ||
+			configured.Has(row.WorkspaceSlug) {
 			continue
 		}
 		status, evidence := DetermineMissingWorkspaceStatus(
@@ -318,6 +321,17 @@ func (s *ImplWorkspaceSyncer) reconcileMissing(
 		cleaned += int(n)
 	}
 	return cleaned, merged, nil
+}
+
+func configuredCheckoutSlugs(cfg ImplWorkspaceDiscoveryConfig) collections.Set[string] {
+	slugs := collections.NewSet[string]()
+	for slug := range cfg.ConfiguredCheckouts {
+		slug = strings.TrimSpace(slug)
+		if slug != "" {
+			slugs.Add(slug)
+		}
+	}
+	return slugs
 }
 
 func implWorkspaceRowChanged(before, after db.ImplWorkspace) bool {

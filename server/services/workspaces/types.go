@@ -213,14 +213,15 @@ type DiscoveryConfig struct {
 }
 
 type ImplWorkspaceDiscoveryConfig struct {
-	MainCheckoutPath string
-	ParentDir        string
-	Domain           string
-	MetadataDirName  string
-	CheckoutPrefixes []string
-	MainCheckoutName string
-	ModuleMarker     string
-	PackageSubdir    string
+	MainCheckoutPath    string
+	ParentDir           string
+	Domain              string
+	MetadataDirName     string
+	CheckoutPrefixes    []string
+	MainCheckoutName    string
+	ModuleMarker        string
+	PackageSubdir       string
+	ConfiguredCheckouts map[string]ConfiguredCheckout
 }
 
 type RuntimeConfig struct {

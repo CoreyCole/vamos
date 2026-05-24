@@ -1069,14 +1069,15 @@ func main() {
 	).WithEmbeddedChatRenderer(agentChatService)
 	agentChatService.SetImplWorkspaceDiscoveryConfig(
 		workspaces.ImplWorkspaceDiscoveryConfig{
-			MainCheckoutPath: workspaceDiscovery.MainCheckoutPath,
-			ParentDir:        workspaceParentDir,
-			Domain:           cfg.WorkspaceDomain,
-			MetadataDirName:  workspaceDiscovery.MetadataDirName,
-			CheckoutPrefixes: workspaceDiscovery.CheckoutPrefixes,
-			MainCheckoutName: workspaceDiscovery.MainCheckoutName,
-			ModuleMarker:     workspaceDiscovery.ModuleMarker,
-			PackageSubdir:    workspaceDiscovery.PackageSubdir,
+			MainCheckoutPath:    workspaceDiscovery.MainCheckoutPath,
+			ParentDir:           workspaceParentDir,
+			Domain:              cfg.WorkspaceDomain,
+			MetadataDirName:     workspaceDiscovery.MetadataDirName,
+			CheckoutPrefixes:    workspaceDiscovery.CheckoutPrefixes,
+			MainCheckoutName:    workspaceDiscovery.MainCheckoutName,
+			ModuleMarker:        workspaceDiscovery.ModuleMarker,
+			PackageSubdir:       workspaceDiscovery.PackageSubdir,
+			ConfiguredCheckouts: workspaceDiscovery.ConfiguredCheckouts,
 		},
 	)
 	agentChatService.SetWorkspaceRuntimeConfig(

@@ -212,14 +212,15 @@ func normalizeImplWorkspaceDiscoveryConfig(
 ) workspaces.ImplWorkspaceDiscoveryConfig {
 	discovery := workspaces.NormalizeDiscoveryConfig(implDiscoveryAsDiscoveryConfig(cfg))
 	return workspaces.ImplWorkspaceDiscoveryConfig{
-		MainCheckoutPath: discovery.MainCheckoutPath,
-		ParentDir:        discovery.ParentDir,
-		Domain:           discovery.Domain,
-		MetadataDirName:  discovery.MetadataDirName,
-		CheckoutPrefixes: discovery.CheckoutPrefixes,
-		MainCheckoutName: discovery.MainCheckoutName,
-		ModuleMarker:     discovery.ModuleMarker,
-		PackageSubdir:    discovery.PackageSubdir,
+		MainCheckoutPath:    discovery.MainCheckoutPath,
+		ParentDir:           discovery.ParentDir,
+		Domain:              discovery.Domain,
+		MetadataDirName:     discovery.MetadataDirName,
+		CheckoutPrefixes:    discovery.CheckoutPrefixes,
+		MainCheckoutName:    discovery.MainCheckoutName,
+		ModuleMarker:        discovery.ModuleMarker,
+		PackageSubdir:       discovery.PackageSubdir,
+		ConfiguredCheckouts: discovery.ConfiguredCheckouts,
 	}
 }
 
@@ -227,14 +228,15 @@ func implDiscoveryAsDiscoveryConfig(
 	cfg workspaces.ImplWorkspaceDiscoveryConfig,
 ) workspaces.DiscoveryConfig {
 	return workspaces.DiscoveryConfig{
-		MainCheckoutPath: cfg.MainCheckoutPath,
-		ParentDir:        cfg.ParentDir,
-		Domain:           cfg.Domain,
-		MetadataDirName:  cfg.MetadataDirName,
-		CheckoutPrefixes: cfg.CheckoutPrefixes,
-		MainCheckoutName: cfg.MainCheckoutName,
-		ModuleMarker:     cfg.ModuleMarker,
-		PackageSubdir:    cfg.PackageSubdir,
+		MainCheckoutPath:    cfg.MainCheckoutPath,
+		ParentDir:           cfg.ParentDir,
+		Domain:              cfg.Domain,
+		MetadataDirName:     cfg.MetadataDirName,
+		CheckoutPrefixes:    cfg.CheckoutPrefixes,
+		MainCheckoutName:    cfg.MainCheckoutName,
+		ModuleMarker:        cfg.ModuleMarker,
+		PackageSubdir:       cfg.PackageSubdir,
+		ConfiguredCheckouts: cfg.ConfiguredCheckouts,
 	}
 }
 
@@ -473,7 +475,8 @@ func implWorkspaceDiscoveryConfigIsZero(
 		len(cfg.CheckoutPrefixes) == 0 &&
 		strings.TrimSpace(cfg.MainCheckoutName) == "" &&
 		strings.TrimSpace(cfg.ModuleMarker) == "" &&
-		strings.TrimSpace(cfg.PackageSubdir) == ""
+		strings.TrimSpace(cfg.PackageSubdir) == "" &&
+		len(cfg.ConfiguredCheckouts) == 0
 }
 
 func nullStringsEqual(a, b sql.NullString) bool {

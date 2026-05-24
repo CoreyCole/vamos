@@ -20,6 +20,41 @@ func (n *recordingPlanWorkspaceNotifier) NotifyProjectPlanSidebar() WorkspaceStr
 	return WorkspaceStreamSignal{Scope: PatchWorkspaceSidebar}
 }
 
+func TestImplWorkspaceDiscoveryConfigPreservesConfiguredCheckouts(t *testing.T) {
+	cfg := workspaces.ImplWorkspaceDiscoveryConfig{
+		Domain: "workspaces.test",
+		ConfiguredCheckouts: map[string]workspaces.ConfiguredCheckout{
+			"work": {RootPath: "/repo/vamos", DisplayName: "Working checkout"},
+		},
+	}
+
+	normalized := normalizeImplWorkspaceDiscoveryConfig(cfg)
+	if normalized.ConfiguredCheckouts["work"].RootPath != "/repo/vamos" {
+		t.Fatalf("normalized configured checkouts = %#v", normalized.ConfiguredCheckouts)
+	}
+	discovery := implDiscoveryAsDiscoveryConfig(normalized)
+	if discovery.ConfiguredCheckouts["work"].DisplayName != "Working checkout" {
+		t.Fatalf("discovery configured checkouts = %#v", discovery.ConfiguredCheckouts)
+	}
+}
+
+func TestServiceWorkspaceSyncInputPreservesConfiguredCheckouts(t *testing.T) {
+	service := newTestAgentChatService(t)
+	service.SetImplWorkspaceDiscoveryConfig(workspaces.ImplWorkspaceDiscoveryConfig{
+		ParentDir: "/repo",
+		Domain:    "workspaces.test",
+		ConfiguredCheckouts: map[string]workspaces.ConfiguredCheckout{
+			"stage": {RootPath: "/repo/vamos-stage", DisplayName: "Stage checkout"},
+		},
+	})
+
+	input := service.WorkspaceSyncInput()
+	stage := input.ImplWorkspaces.ConfiguredCheckouts["stage"]
+	if stage.RootPath != "/repo/vamos-stage" || stage.DisplayName != "Stage checkout" {
+		t.Fatalf("workspace sync configured checkouts = %#v", input.ImplWorkspaces.ConfiguredCheckouts)
+	}
+}
+
 func TestPlanWorkspaceScannerUsesThoughtsRootNotProjectRoot(t *testing.T) {
 	root := t.TempDir()
 	projectRoot := filepath.Join(root, "cn-agents")

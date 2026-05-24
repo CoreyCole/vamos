@@ -14,6 +14,97 @@ import (
 	"github.com/CoreyCole/vamos/pkg/db"
 )
 
+func TestImplWorkspaceSyncIncludesConfiguredCheckouts(t *testing.T) {
+	ctx := context.Background()
+	parent := t.TempDir()
+	workDir := makeImplSyncCheckout(t, t.TempDir(), "editable-vamos")
+	queries := openImplSyncTestQueries(t)
+
+	result, err := (&ImplWorkspaceSyncer{Queries: queries}).Sync(
+		ctx,
+		ImplWorkspaceSyncInput{
+			Discovery: ImplWorkspaceDiscoveryConfig{
+				ParentDir: parent,
+				Domain:    "workspaces.example.test",
+				ConfiguredCheckouts: map[string]ConfiguredCheckout{
+					"work": {
+						RootPath:    workDir,
+						DisplayName: "Working checkout",
+					},
+				},
+			},
+			ManagerURL:   "https://main.workspaces.example.test",
+			RestartToken: "secret-token",
+		},
+	)
+	if err != nil {
+		t.Fatalf("Sync: %v", err)
+	}
+	if result.Upserted != 1 || result.RepairedEnv != 1 || !result.Changed {
+		t.Fatalf("result = %+v, want one configured upsert/env repair/change", result)
+	}
+
+	row, err := queries.GetImplWorkspace(ctx, "work")
+	if err != nil {
+		t.Fatalf("GetImplWorkspace(work): %v", err)
+	}
+	if row.Status != string(ImplWorkspaceStatusActive) {
+		t.Fatalf("status = %q, want active", row.Status)
+	}
+	if row.CheckoutPath != workDir || row.DisplayName != "Working checkout" {
+		t.Fatalf("row = %+v, want configured checkout path/name", row)
+	}
+	if row.Host != "work.workspaces.example.test" || row.Url != "https://work.workspaces.example.test/" {
+		t.Fatalf("host/url = %q/%q", row.Host, row.Url)
+	}
+}
+
+func TestImplWorkspaceSyncDoesNotCleanupConfiguredCheckoutWhenMissingFromScan(t *testing.T) {
+	ctx := context.Background()
+	parent := t.TempDir()
+	queries := openImplSyncTestQueries(t)
+	_, err := queries.UpsertDiscoveredImplWorkspace(
+		ctx,
+		db.UpsertDiscoveredImplWorkspaceParams{
+			WorkspaceSlug: "work",
+			CheckoutPath:  filepath.Join(parent, "vamos"),
+			DisplayName:   "Working checkout",
+			Host:          "work.workspaces.example.test",
+			Url:           "https://work.workspaces.example.test/",
+			Status:        string(ImplWorkspaceStatusActive),
+		},
+	)
+	if err != nil {
+		t.Fatalf("UpsertDiscoveredImplWorkspace: %v", err)
+	}
+
+	result, err := (&ImplWorkspaceSyncer{Queries: queries}).Sync(
+		ctx,
+		ImplWorkspaceSyncInput{
+			Discovery: ImplWorkspaceDiscoveryConfig{
+				ParentDir: parent,
+				Domain:    "workspaces.example.test",
+				ConfiguredCheckouts: map[string]ConfiguredCheckout{
+					"work": {RootPath: filepath.Join(parent, "missing-vamos")},
+				},
+			},
+		},
+	)
+	if err != nil {
+		t.Fatalf("Sync: %v", err)
+	}
+	if result.CleanedUp != 0 || result.Merged != 0 || result.Changed {
+		t.Fatalf("result = %+v, want configured missing checkout preserved", result)
+	}
+	row, err := queries.GetImplWorkspace(ctx, "work")
+	if err != nil {
+		t.Fatalf("GetImplWorkspace(work): %v", err)
+	}
+	if row.Status != string(ImplWorkspaceStatusActive) || row.CleanedUpAt.Valid || row.MergedAt.Valid {
+		t.Fatalf("row = %+v, want active configured checkout preserved", row)
+	}
+}
+
 func TestImplWorkspaceSyncerCreatesRowsAndWorkspaceEnv(t *testing.T) {
 	ctx := context.Background()
 	parent := t.TempDir()
