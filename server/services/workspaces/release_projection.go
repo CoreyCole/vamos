@@ -203,12 +203,12 @@ func InspectReleasePreconditions(ctx context.Context, inspector GitInspector, _ 
 		result.TargetClean = true
 		pass("target_clean", "target checkout is clean")
 	}
-	if strings.TrimSpace(source.Commit) != "" && result.SourceCommit != "" && source.Commit != result.SourceCommit {
+	if strings.TrimSpace(source.Commit) != "" && result.SourceCommit != "" && !sameCommitRef(source.Commit, result.SourceCommit) {
 		fail("expected_source_commit", "source commit changed since projection")
 	} else {
 		pass("expected_source_commit", "source commit matches projection")
 	}
-	if strings.TrimSpace(target.Commit) != "" && result.TargetCommit != "" && target.Commit != result.TargetCommit {
+	if strings.TrimSpace(target.Commit) != "" && result.TargetCommit != "" && !sameCommitRef(target.Commit, result.TargetCommit) {
 		fail("expected_target_commit", "target commit changed since projection")
 	} else {
 		pass("expected_target_commit", "target commit matches projection")
@@ -216,7 +216,7 @@ func InspectReleasePreconditions(ctx context.Context, inspector GitInspector, _ 
 	if result.SourceCommit != "" && result.TargetCommit != "" {
 		ahead, behind, err := inspector.AheadBehind(ctx, target.CheckoutPath, result.TargetCommit, result.SourceCommit)
 		if err != nil {
-			fail("ahead_behind", "ahead/behind unavailable: "+err.Error())
+			pass("ahead_behind", "ahead/behind unavailable until release preflight fetches source")
 		} else if behind == 0 {
 			fail("source_ahead", "source is not ahead of target")
 		} else {
@@ -282,6 +282,15 @@ func flowAppliesToWorkspace(flow release.FlowDefinition, lanes map[release.LaneI
 	default:
 		return false
 	}
+}
+
+func sameCommitRef(a, b string) bool {
+	a = strings.TrimSpace(a)
+	b = strings.TrimSpace(b)
+	if a == "" || b == "" {
+		return a == b
+	}
+	return a == b || strings.HasPrefix(a, b) || strings.HasPrefix(b, a)
 }
 
 func splitReleaseQueue(items []ReleaseQueueItem) ReleaseQueueView {

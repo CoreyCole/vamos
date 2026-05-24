@@ -2,6 +2,7 @@ package workspaces
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/CoreyCole/vamos/pkg/agents/workflows/runtime"
@@ -88,6 +89,42 @@ func TestInspectReleasePreconditionsCoversDirtyAndCommitMismatch(t *testing.T) {
 	}
 }
 
+func TestInspectReleasePreconditionsAllowsAbbreviatedProjectedCommits(t *testing.T) {
+	inspector := &fakeGitInspector{
+		head:   map[string]string{"/feature": "feature-1234567890", "/stage": "stage-1234567890"},
+		clean:  map[string]bool{"/stage": true},
+		behind: 1,
+	}
+	def := testReleaseRegistry(t).Definitions()[0]
+	flow := def.Flows["promote_to_stage"]
+
+	result := InspectReleasePreconditions(context.Background(), inspector, def, flow,
+		Workspace{Slug: "feature-a", CheckoutPath: "/feature", Commit: "feature"},
+		Workspace{Slug: "integration", CheckoutPath: "/stage", Commit: "stage"},
+	)
+	if !result.OK {
+		t.Fatalf("result.OK = false: %+v", result)
+	}
+}
+
+func TestInspectReleasePreconditionsAllowsUnknownSourceCommitInTargetCheckout(t *testing.T) {
+	inspector := &fakeGitInspector{
+		head:             map[string]string{"/feature": "feature-1", "/stage": "stage-1"},
+		clean:            map[string]bool{"/stage": true},
+		aheadBehindError: true,
+	}
+	def := testReleaseRegistry(t).Definitions()[0]
+	flow := def.Flows["promote_to_stage"]
+
+	result := InspectReleasePreconditions(context.Background(), inspector, def, flow,
+		Workspace{Slug: "feature-a", CheckoutPath: "/feature", Commit: "feature-1"},
+		Workspace{Slug: "integration", CheckoutPath: "/stage", Commit: "stage-1"},
+	)
+	if !result.OK {
+		t.Fatalf("result.OK = false: %+v", result)
+	}
+}
+
 func TestInspectReleasePreconditionsRequiresStageAheadOfMain(t *testing.T) {
 	inspector := &fakeGitInspector{
 		head:   map[string]string{"/stage": "stage-1", "/main": "main-1"},
@@ -145,11 +182,14 @@ func testReleaseRegistry(t *testing.T) *release.Registry {
 }
 
 type fakeGitInspector struct {
-	head   map[string]string
-	clean  map[string]bool
-	detail map[string]string
-	behind int
+	head             map[string]string
+	clean            map[string]bool
+	detail           map[string]string
+	behind           int
+	aheadBehindError bool
 }
+
+var errFakeGit = errors.New("fake git error")
 
 func (f *fakeGitInspector) Head(_ context.Context, checkout string) (string, error) {
 	return f.head[checkout], nil
@@ -164,6 +204,9 @@ func (f *fakeGitInspector) IsAncestor(_ context.Context, checkout string, ancest
 }
 
 func (f *fakeGitInspector) AheadBehind(_ context.Context, checkout string, left string, right string) (int, int, error) {
+	if f.aheadBehindError {
+		return 0, 0, errFakeGit
+	}
 	return 0, f.behind, nil
 }
 
