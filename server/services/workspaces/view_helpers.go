@@ -233,6 +233,24 @@ func workspaceReleaseSummary(view ImplWorkspaceView) string {
 	return releaseDisabledReason(view.ReleaseActions[0])
 }
 
+func releaseQueueSummary(panel ReleasePanelModel) string {
+	active := len(panel.Queue.Active)
+	pending := len(panel.Queue.Pending)
+	history := len(panel.History)
+	if active == 0 && pending == 0 && history == 0 {
+		return "empty"
+	}
+	return fmt.Sprintf("%d active · %d pending · %d history", active, pending, history)
+}
+
+func releaseLaneStatusLabel(lane ReleaseLaneView) string {
+	status := strings.TrimSpace(string(lane.Workspace.Status))
+	if status == "" {
+		return "unknown"
+	}
+	return status
+}
+
 func workspaceWorkflowStageLabel(summary WorkspaceWorkflowSummary) string {
 	stage := strings.TrimSpace(summary.Stage)
 	status := strings.TrimSpace(summary.Status)

@@ -14,6 +14,7 @@ import (
 	"github.com/labstack/echo/v4"
 
 	"github.com/CoreyCole/vamos/pkg/db"
+	"github.com/CoreyCole/vamos/pkg/release"
 )
 
 func TestBuildNavItems(t *testing.T) {
@@ -419,6 +420,88 @@ func TestWorkspacesPageRendersWorkspaceTableAndDialogs(t *testing.T) {
 		if strings.Contains(html, absent) {
 			t.Fatalf("WorkspacesPage unexpectedly contained %q: %s", absent, html)
 		}
+	}
+}
+
+func TestReleasePanelCollapsesLanesAndMergeQueue(t *testing.T) {
+	panel := ReleasePanelModel{
+		Enabled: true,
+		Lanes: []ReleaseLaneView{
+			{
+				ID:    release.LaneID("stage"),
+				Label: "Stage",
+				Workspace: Workspace{
+					Slug:   "stage",
+					URL:    "https://stage.workspaces.test/",
+					Status: StatusRunning,
+					Commit: "abcdef1234567890",
+				},
+				Actions: []ReleaseActionView{{
+					DefinitionID:      release.DefinitionID("default"),
+					DefinitionVersion: "v1",
+					FlowID:            release.FlowID("stage_to_main"),
+					Label:             "stage → main",
+					SourceSlug:        "stage",
+					TargetLane:        release.LaneID("main"),
+				}},
+			},
+			{
+				ID:    release.LaneID("main"),
+				Label: "Main",
+				Workspace: Workspace{
+					Slug:   "main",
+					Status: StatusStopped,
+					Commit: "1234567890abcdef",
+				},
+			},
+		},
+		Queue: ReleaseQueueView{
+			Active: []ReleaseQueueItem{{ID: "active-1", Status: ReleaseQueueStatusRunning}},
+		},
+		History: []ReleaseQueueItem{{ID: "history-1", Status: ReleaseQueueStatusSucceeded}},
+	}
+
+	var body bytes.Buffer
+	if err := ReleasePanel(panel).Render(t.Context(), &body); err != nil {
+		t.Fatalf("Render() error = %v", err)
+	}
+	html := body.String()
+	for _, want := range []string{
+		"<details",
+		"Release lanes",
+		"Merge queue · 1 active · 0 pending · 1 history",
+		"Stage",
+		"stage",
+		"abcdef1",
+		"Open",
+		`action="/workspaces/stage/stop"`,
+		"Main",
+		"1234567",
+		`action="/workspaces/main/start"`,
+		"stage → main",
+		"active-1",
+		"history-1",
+	} {
+		if !strings.Contains(html, want) {
+			t.Fatalf("ReleasePanel missing %q: %s", want, html)
+		}
+	}
+	if strings.Contains(html, "<details open") || strings.Contains(html, " open=\"") {
+		t.Fatalf("ReleasePanel details should be collapsed by default: %s", html)
+	}
+}
+
+func TestReleasePanelDisabledStateUsesCompactCard(t *testing.T) {
+	var body bytes.Buffer
+	if err := ReleasePanel(ReleasePanelModel{}).Render(t.Context(), &body); err != nil {
+		t.Fatalf("Render() error = %v", err)
+	}
+	html := body.String()
+	if !strings.Contains(html, "Release queue not configured.") {
+		t.Fatalf("disabled ReleasePanel missing message: %s", html)
+	}
+	if strings.Contains(html, "Release lanes") || strings.Contains(html, "Merge queue") {
+		t.Fatalf("disabled ReleasePanel rendered enabled disclosures: %s", html)
 	}
 }
 
