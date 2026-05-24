@@ -338,6 +338,9 @@ func TestWorkspaceRuntimeForceRestartWebIgnoresStopFailure(t *testing.T) {
 	if gotHandles[ComponentWeb] == oldWeb {
 		t.Fatal("web handle was not replaced")
 	}
+	if restarted.Ports[ComponentWeb] == 4300 {
+		t.Fatalf("web port = %d, want fresh force-restart port", restarted.Ports[ComponentWeb])
+	}
 }
 
 func TestWorkspaceRuntimeRestartComponentsRewritesWorkspaceEnv(t *testing.T) {

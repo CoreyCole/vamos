@@ -381,6 +381,14 @@ func (r *WorkspaceRuntime) restartWeb(
 	}
 	delete(handles, ComponentWeb)
 	_ = os.Remove(paths.WebPID)
+	if opts.Force {
+		port, err := r.portAllocator()
+		if err != nil {
+			return ws, err
+		}
+		ws.Ports[ComponentWeb] = port
+		ws.Port = port
+	}
 	web, err := r.starter.StartComponent(ctx, ComponentSpec{
 		Component: ComponentWeb,
 		Args:      []string{filepath.Join(ws.PackagePath, "agents-server")},

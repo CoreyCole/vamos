@@ -192,16 +192,23 @@ type RecoveryModel struct {
 	Unknown       bool
 }
 
+type ConfiguredCheckout struct {
+	RootPath    string
+	DisplayName string
+	IsMain      bool
+}
+
 type DiscoveryConfig struct {
-	MainCheckoutPath string
-	ParentDir        string
-	Domain           string
-	StateDir         string
-	MetadataDirName  string
-	CheckoutPrefixes []string
-	MainCheckoutName string
-	ModuleMarker     string
-	PackageSubdir    string
+	MainCheckoutPath    string
+	ParentDir           string
+	Domain              string
+	StateDir            string
+	MetadataDirName     string
+	CheckoutPrefixes    []string
+	MainCheckoutName    string
+	ModuleMarker        string
+	PackageSubdir       string
+	ConfiguredCheckouts map[string]ConfiguredCheckout
 }
 
 type ImplWorkspaceDiscoveryConfig struct {

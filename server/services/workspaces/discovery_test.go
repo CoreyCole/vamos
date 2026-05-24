@@ -121,6 +121,31 @@ func TestNormalizeWorkspaceSlugHashDistinguishesLongNamesWithSamePrefix(t *testi
 	}
 }
 
+func TestDiscoverIncludesConfiguredCheckoutWithStableSlug(t *testing.T) {
+	parent := t.TempDir()
+	checkout := makeCheckout(t, parent, "vamos")
+
+	got, err := Discover(DiscoveryConfig{
+		ParentDir:        parent,
+		Domain:           "workspaces.example.test",
+		CheckoutPrefixes: []string{"vamos"},
+		MainCheckoutName: "vamos-main",
+		MainCheckoutPath: filepath.Join(parent, "vamos-main"),
+		ConfiguredCheckouts: map[string]ConfiguredCheckout{
+			"work": {RootPath: checkout, DisplayName: "Working checkout"},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 1 {
+		t.Fatalf("discovered %d workspace(s): %#v", len(got), got)
+	}
+	if got[0].Slug != "work" || got[0].CheckoutPath != checkout || got[0].Host != "work.workspaces.example.test" || got[0].IsMain {
+		t.Fatalf("workspace = %#v", got[0])
+	}
+}
+
 func TestHostMapping(t *testing.T) {
 	if got := HostForSlug("foo", "cn-agents.test"); got != "foo.cn-agents.test" {
 		t.Fatal(got)

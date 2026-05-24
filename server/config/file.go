@@ -215,6 +215,16 @@ func ValidateHostConfig(cfg server.HostConfig) (server.HostConfig, error) {
 			return cfg, err
 		}
 	}
+	for slug, checkout := range cfg.Workspaces.ConfiguredCheckouts {
+		checkout.RootPath, err = ExpandOptionalHostPath(
+			"workspaces.configured_checkouts."+slug+".root_path",
+			checkout.RootPath,
+		)
+		if err != nil {
+			return cfg, err
+		}
+		cfg.Workspaces.ConfiguredCheckouts[slug] = checkout
+	}
 	if cfg.Workspaces.MetadataDirName == "" {
 		cfg.Workspaces.MetadataDirName = ".vamos"
 	}

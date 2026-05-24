@@ -116,20 +116,27 @@ type CheckoutConfig struct {
 }
 
 type WorkspaceConfig struct {
-	Mode             string                   `yaml:"mode"`
-	Domain           string                   `yaml:"domain"`
-	ParentDir        string                   `yaml:"parent_dir"`
-	StateDir         string                   `yaml:"state_dir"`
-	MetadataDirName  string                   `yaml:"metadata_dir_name"`
-	CheckoutPrefixes []string                 `yaml:"checkout_prefixes"`
-	MainCheckoutName string                   `yaml:"main_checkout_name"`
-	MainCheckoutPath string                   `yaml:"main_checkout_path"`
-	ModuleMarker     string                   `yaml:"module_marker"`
-	PackageSubdir    string                   `yaml:"package_subdir"`
-	ManagerURL       string                   `yaml:"manager_url"`
-	RestartToken     string                   `yaml:"restart_token"`
-	Slug             string                   `yaml:"slug"`
-	ProcessCommands  WorkspaceProcessCommands `yaml:"process_commands"`
+	Mode                string                             `yaml:"mode"`
+	Domain              string                             `yaml:"domain"`
+	ParentDir           string                             `yaml:"parent_dir"`
+	StateDir            string                             `yaml:"state_dir"`
+	MetadataDirName     string                             `yaml:"metadata_dir_name"`
+	CheckoutPrefixes    []string                           `yaml:"checkout_prefixes"`
+	MainCheckoutName    string                             `yaml:"main_checkout_name"`
+	MainCheckoutPath    string                             `yaml:"main_checkout_path"`
+	ModuleMarker        string                             `yaml:"module_marker"`
+	PackageSubdir       string                             `yaml:"package_subdir"`
+	ManagerURL          string                             `yaml:"manager_url"`
+	RestartToken        string                             `yaml:"restart_token"`
+	Slug                string                             `yaml:"slug"`
+	ConfiguredCheckouts map[string]WorkspaceCheckoutConfig `yaml:"configured_checkouts"`
+	ProcessCommands     WorkspaceProcessCommands           `yaml:"process_commands"`
+}
+
+type WorkspaceCheckoutConfig struct {
+	RootPath    string `yaml:"root_path"`
+	DisplayName string `yaml:"display_name"`
+	IsMain      bool   `yaml:"is_main"`
 }
 
 type WorkspaceProcessCommands struct {

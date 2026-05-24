@@ -118,12 +118,75 @@ func Discover(cfg DiscoveryConfig) ([]Workspace, error) {
 		bySlug[slug] = ws
 	}
 
+	for slug, configured := range cfg.ConfiguredCheckouts {
+		ws := workspaceFromConfiguredCheckout(slug, configured, cfg, discoveredAt)
+		if ws.Error != "" {
+			bySlug[ws.Slug] = ws
+			continue
+		}
+		if existing, exists := bySlug[ws.Slug]; exists && !samePath(existing.CheckoutPath, ws.CheckoutPath) {
+			existing.Status = StatusInvalid
+			existing.Error = fmt.Sprintf("duplicate workspace slug %q", ws.Slug)
+			bySlug[ws.Slug] = existing
+			continue
+		}
+		bySlug[ws.Slug] = ws
+	}
+
 	out := make([]Workspace, 0, len(bySlug))
 	for _, ws := range bySlug {
 		out = append(out, ws)
 	}
 	sortWorkspaces(out)
 	return out, nil
+}
+
+func workspaceFromConfiguredCheckout(
+	slug string,
+	configured ConfiguredCheckout,
+	cfg DiscoveryConfig,
+	discoveredAt time.Time,
+) Workspace {
+	normalizedSlug, err := NormalizeWorkspaceSlug(slug)
+	if err != nil {
+		return Workspace{Slug: slug, Status: StatusInvalid, Error: err.Error()}
+	}
+	checkoutPath := strings.TrimSpace(configured.RootPath)
+	if checkoutPath == "" {
+		return Workspace{Slug: normalizedSlug, Status: StatusInvalid, Error: "configured checkout root_path is required"}
+	}
+	packagePath := packagePath(checkoutPath, cfg)
+	bundle := RuntimePaths(checkoutPath, cfg.MetadataDirName)
+	branch, commit := gitSummary(context.Background(), checkoutPath)
+	isMain := configured.IsMain || samePath(checkoutPath, cfg.MainCheckoutPath) || normalizedSlug == mainWorkspaceSlug
+	logPath := bundle.WebLog
+	if isMain {
+		logPath = filepath.Join(checkoutPath, "log", "agents-server.log")
+	}
+	ws := Workspace{
+		Slug:            normalizedSlug,
+		DisplayName:     firstNonEmptyString(configured.DisplayName, displayNameForSlug(normalizedSlug)),
+		CheckoutPath:    checkoutPath,
+		PackagePath:     packagePath,
+		MetadataDirName: cfg.MetadataDirName,
+		Host:            HostForSlug(normalizedSlug, cfg.Domain),
+		URL:             WorkspaceURL(normalizedSlug, cfg.Domain),
+		Status:          StatusStopped,
+		Bundle:          bundle,
+		Ports:           map[BundleComponent]int{},
+		PIDs:            map[BundleComponent]int{},
+		LogPath:         logPath,
+		StateDir:        bundle.StateDir,
+		IsMain:          isMain,
+		DiscoveredAt:    discoveredAt,
+		Branch:          branch,
+		Commit:          commit,
+	}
+	if !IsValidCheckout(checkoutPath, cfg) {
+		ws.Status = StatusInvalid
+		ws.Error = fmt.Sprintf("configured checkout %q is not a valid checkout", checkoutPath)
+	}
+	return ws
 }
 
 func discoveryParentDir(cfg DiscoveryConfig) (string, error) {
@@ -336,6 +399,15 @@ func displayNameForSlug(slug string) string {
 		return mainWorkspaceSlug
 	}
 	return strings.ReplaceAll(slug, "-", " ")
+}
+
+func firstNonEmptyString(values ...string) string {
+	for _, value := range values {
+		if strings.TrimSpace(value) != "" {
+			return value
+		}
+	}
+	return ""
 }
 
 func gitSummary(ctx context.Context, checkoutPath string) (branch, commit string) {

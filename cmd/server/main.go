@@ -745,6 +745,16 @@ func main() {
 		)
 		workspaceDiscovery.ModuleMarker = hostCfg.Workspaces.ModuleMarker
 		workspaceDiscovery.PackageSubdir = hostCfg.Workspaces.PackageSubdir
+		if len(hostCfg.Workspaces.ConfiguredCheckouts) > 0 {
+			workspaceDiscovery.ConfiguredCheckouts = map[string]workspaces.ConfiguredCheckout{}
+			for slug, checkout := range hostCfg.Workspaces.ConfiguredCheckouts {
+				workspaceDiscovery.ConfiguredCheckouts[slug] = workspaces.ConfiguredCheckout{
+					RootPath:    checkout.RootPath,
+					DisplayName: checkout.DisplayName,
+					IsMain:      checkout.IsMain,
+				}
+			}
+		}
 	}
 	workspaceManagerURL := strings.TrimRight(cfg.PublicBaseURL, "/")
 	if cfg.WorkspaceMode == "child" && strings.TrimSpace(cfg.WorkspaceManagerURL) != "" {
