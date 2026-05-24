@@ -58,6 +58,7 @@ type Handler struct {
 	restartToken         string
 	mainCheckoutPath     string
 	verifier             *Verifier
+	provisionStarter     WorkspaceProvisionStarter
 	exitFunc             func(int)
 }
 
@@ -129,6 +130,12 @@ func WithWorkspaceSyncRefresh(refresh WorkspaceSyncRefreshFunc) HandlerOption {
 	}
 }
 
+func WithWorkspaceProvisionStarter(starter WorkspaceProvisionStarter) HandlerOption {
+	return func(h *Handler) {
+		h.provisionStarter = starter
+	}
+}
+
 // Deprecated: use WithWorkspaceSyncRefresh.
 func WithPlanWorkspaceRefresh(refresh WorkspaceSyncRefreshFunc) HandlerOption {
 	return WithWorkspaceSyncRefresh(refresh)
@@ -179,6 +186,10 @@ func (h *Handler) RegisterDevAuthRoute(e *echo.Echo) {
 
 func (h *Handler) RegisterInternalRestartRoute(e *echo.Echo) {
 	e.POST("/internal/workspaces/restart", h.HandleInternalRestart)
+}
+
+func (h *Handler) RegisterInternalProvisionRoute(e *echo.Echo) {
+	e.POST("/internal/workspaces/provision", h.HandleInternalProvisionWorkspace)
 }
 
 func (h *Handler) HandleWorkspacesPage(c echo.Context) error {
@@ -411,6 +422,31 @@ func (h *Handler) HandleWorkspaceHostAction(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest, "unsupported workspace action")
 	}
 	return c.Redirect(http.StatusSeeOther, returnTo)
+}
+
+func (h *Handler) HandleInternalProvisionWorkspace(c echo.Context) error {
+	if err := h.requireRestartToken(c); err != nil {
+		return err
+	}
+	if h.provisionStarter == nil {
+		return echo.NewHTTPError(
+			http.StatusNotFound,
+			"workspace provision starter is not configured",
+		)
+	}
+	var input WorkspaceProvisionInput
+	if err := c.Bind(&input); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
+	}
+	result, err := h.provisionStarter.StartProvision(c.Request().Context(), input)
+	if err != nil {
+		return err
+	}
+	status := http.StatusAccepted
+	if result.Status == WorkspaceProvisionStatusBlocked {
+		status = http.StatusConflict
+	}
+	return c.JSON(status, result)
 }
 
 func (h *Handler) HandleInternalRestart(c echo.Context) error {

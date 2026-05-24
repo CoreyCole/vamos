@@ -115,6 +115,41 @@ func TestRunLogsRejectsPathOutsideWorkspaceLogDir(t *testing.T) {
 	}
 }
 
+func TestRunCreatePostsProvisionRequest(t *testing.T) {
+	type provisionRequest struct {
+		PlanPath       string `json:"plan_path"`
+		PlanDir        string `json:"plan_dir"`
+		WorkspaceSlug  string `json:"workspace_slug"`
+		RequestedPath  string `json:"requested_path"`
+		SourceCheckout string `json:"source_checkout"`
+		TrunkBranch    string `json:"trunk_branch"`
+	}
+	var got provisionRequest
+	var gotToken string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/internal/workspaces/provision" {
+			t.Errorf("path = %s", r.URL.Path)
+		}
+		gotToken = r.Header.Get("X-Vamos-Workspace-Restart-Token")
+		if err := json.NewDecoder(r.Body).Decode(&got); err != nil {
+			t.Errorf("Decode: %v", err)
+		}
+		w.WriteHeader(http.StatusAccepted)
+		_, _ = w.Write([]byte(`{"status":"complete","workspace_path":"/tmp/ws"}`))
+	}))
+	defer server.Close()
+	var out bytes.Buffer
+	if err := RunCreate(t.Context(), CreateOptions{PlanPath: "thoughts/a/plans/p/plan.md", ManagerURL: server.URL, RestartToken: "secret", WorkspaceSlug: "feature", RequestedPath: "/tmp/ws", SourceCheckout: "/src", TrunkBranch: "main"}, &out); err != nil {
+		t.Fatalf("RunCreate: %v", err)
+	}
+	if gotToken != "secret" || got.PlanDir != "thoughts/a/plans/p" || got.WorkspaceSlug != "feature" || got.SourceCheckout != "/src" {
+		t.Fatalf("token=%q request=%+v", gotToken, got)
+	}
+	if !strings.Contains(out.String(), `"workspace_path":"/tmp/ws"`) {
+		t.Fatalf("output = %q", out.String())
+	}
+}
+
 func TestRunRestartPostsTokenComponentsAndForce(t *testing.T) {
 	cfg := testConfig(t)
 	type restartRequest struct {

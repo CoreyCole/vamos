@@ -27,7 +27,7 @@ func main() {
 	}
 	fmt.Fprintln(
 		os.Stderr,
-		"usage: agentsctl verify workspaces [flags]\n       agentsctl workspace <status|logs|doctor|restart|register-current> [flags]\n\nPrefer: vamos ctl ...",
+		"usage: agentsctl verify workspaces [flags]\n       agentsctl workspace <create|status|logs|doctor|restart|register-current> [flags]\n\nPrefer: vamos ctl ...",
 	)
 	os.Exit(usageExitCode)
 }

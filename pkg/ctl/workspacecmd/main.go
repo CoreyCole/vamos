@@ -17,6 +17,24 @@ func Main(args []string) error {
 		return err
 	}
 	ctx := context.Background()
+	if args[0] == "create" {
+		fs := flag.NewFlagSet("agentsctl workspace create", flag.ContinueOnError)
+		plan := fs.String("plan", "", "QRSPI plan.md path")
+		managerURL := fs.String("manager-url", os.Getenv("VAMOS_WORKSPACE_MANAGER_URL"), "workspace manager URL")
+		restartToken := fs.String("restart-token", os.Getenv("VAMOS_WORKSPACE_RESTART_TOKEN"), "workspace restart/API token")
+		slug := fs.String("slug", "", "workspace slug")
+		path := fs.String("path", "", "requested workspace path")
+		source := fs.String("source-checkout", "", "source checkout path")
+		baseline := fs.String("baseline-checkout", "", "baseline checkout path")
+		trunk := fs.String("trunk", "main", "trunk branch")
+		parent := fs.String("parent-stack-ref", "", "parent stack ref for continuation/review follow-up")
+		reviewFollowup := fs.Bool("review-followup", false, "base on reviewed implementation stack")
+		force := fs.Bool("force", false, "force provision when server allows it")
+		if err := fs.Parse(args[1:]); err != nil {
+			return err
+		}
+		return RunCreate(ctx, CreateOptions{PlanPath: *plan, ManagerURL: *managerURL, RestartToken: *restartToken, WorkspaceSlug: *slug, RequestedPath: *path, SourceCheckout: *source, BaselineCheckout: *baseline, TrunkBranch: *trunk, ParentStackRef: *parent, ReviewFollowup: *reviewFollowup, Force: *force}, os.Stdout)
+	}
 	if args[0] == "register-current" {
 		fs := flag.NewFlagSet(
 			"agentsctl workspace register-current",
@@ -103,7 +121,7 @@ func Main(args []string) error {
 
 func usage() error {
 	return fmt.Errorf(
-		"usage: agentsctl workspace <status|logs|doctor|restart|register-current> [flags]",
+		"usage: agentsctl workspace <create|status|logs|doctor|restart|register-current> [flags]",
 	)
 }
 

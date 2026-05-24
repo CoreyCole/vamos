@@ -931,6 +931,14 @@ func main() {
 	fmt.Printf("Markdown service initialized with comment service\n")
 
 	// Conditional Temporal startup
+	provisionActivities := &workspaces.WorkspaceProvisionActivities{
+		ManagerURL:      workspaceManagerURL,
+		RestartToken:    cfg.WorkspaceRestartToken,
+		MetadataDirName: workspaceDiscovery.MetadataDirName,
+	}
+	provisionStarter := workspaces.WorkspaceProvisionStarter(
+		workspaces.NewDirectProvisionStarter(provisionActivities),
+	)
 	var temporalManager *temporalmgr.Manager
 	var goWorker *agentworker.Worker
 	cnTemporal := os.Getenv("CN_TEMPORAL")
@@ -952,6 +960,9 @@ func main() {
 			goWorker.RegisterWorkflow(workspaces.StartWorkspaceWorkflow)
 			goWorker.RegisterWorkflow(workspaces.StopWorkspaceWorkflow)
 			goWorker.RegisterWorkflow(workspaces.RestartWorkspaceWorkflow)
+			goWorker.RegisterWorkflow(workspaces.WorkspaceProvisionWorkflow)
+			provisionStarter = workspaces.NewTemporalProvisionStarter(temporalManager)
+			goWorker.RegisterActivity(provisionActivities)
 			if workspaceManager != nil {
 				workspaceManager.SetLifecycleStarter(
 					workspaces.NewTemporalLifecycleStarter(temporalManager),
@@ -1135,6 +1146,7 @@ func main() {
 			workspaces.WithRestartAPI(cfg.WorkspaceRestartToken, cfg.RepoPath),
 			workspaces.WithPlanWorkspaces(dbService.Queries),
 			workspaces.WithImplWorkspaces(dbService.Queries),
+			workspaces.WithWorkspaceProvisionStarter(provisionStarter),
 			workspaces.WithWorkspaceSyncRefresh(func(ctx context.Context) error {
 				input := agentChatService.WorkspaceSyncInput()
 				if temporalManager == nil {
@@ -1193,6 +1205,7 @@ func main() {
 		}
 		if workspaceManager != nil && strings.TrimSpace(cfg.WorkspaceRestartToken) != "" {
 			workspaceHandler.RegisterInternalRestartRoute(e)
+			workspaceHandler.RegisterInternalProvisionRoute(e)
 			workspaceHandler.RegisterInternalVerificationRoutes(e, workspaces.NewVerifier(
 				workspaceManager,
 				cfg.ListenAddress,
