@@ -130,7 +130,26 @@ func OpenFreeformChatFixture(t testing.TB, ctx *e2e.Context, name string) {
 	if rootDocPath == "" {
 		t.Fatalf("fixture %s did not return root_doc_path", name)
 	}
+	persistE2EFreeformSelection(t, ctx, workspaceID, threadID)
 	Visit(t, ctx, thoughtsChatURL(rootDocPath, workspaceID, threadID))
+}
+
+func persistE2EFreeformSelection(t testing.TB, ctx *e2e.Context, workspaceID, threadID string) {
+	t.Helper()
+	database, err := e2e.OpenWorkspaceDB(t.Context(), ctx.Config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer database.Close()
+	if _, err := database.ExecContext(t.Context(), `
+INSERT INTO user_chat_selections (user_email, scope, scope_id, workspace_id, thread_id)
+VALUES ('playwright@localhost', 'freeform', '', ?, ?)
+ON CONFLICT(user_email, scope, scope_id) DO UPDATE SET
+workspace_id = excluded.workspace_id,
+thread_id = excluded.thread_id,
+updated_at = CURRENT_TIMESTAMP`, workspaceID, threadID); err != nil {
+		t.Fatal(err)
+	}
 }
 
 func OpenThoughtsRootChat(t testing.TB, ctx *e2e.Context, _ string) {
@@ -495,6 +514,36 @@ func OpenSeededWorkspaceChat(t testing.TB, ctx *e2e.Context, label string) {
 			threadID,
 		),
 	)
+}
+
+func OpenWorkspaceDocumentWithoutChatParams(t testing.TB, ctx *e2e.Context, label string) {
+	t.Helper()
+	workspaceID := ctx.Memory["workspace_"+label]
+	threadID := ctx.Memory["workspace_thread_"+label]
+	if workspaceID == "" || threadID == "" {
+		t.Fatalf("seeded workspace %s not found", label)
+	}
+	database, err := e2e.OpenWorkspaceDB(t.Context(), ctx.Config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer database.Close()
+	if _, err := database.ExecContext(t.Context(), `
+UPDATE workspaces
+SET selected_thread_id = ?, updated_at = CURRENT_TIMESTAMP
+WHERE id = ?`, threadID, workspaceID); err != nil {
+		t.Fatal(err)
+	}
+	Visit(
+		t,
+		ctx,
+		"/thoughts/creative-mode-agent/plans/2026-05-20_23-02-59_vamos-e2e-story-playwright-go/plan.md?context=chat",
+	)
+}
+
+func OpenThoughtsRootChatContext(t testing.TB, ctx *e2e.Context, _ string) {
+	t.Helper()
+	Visit(t, ctx, "/thoughts/?context=chat")
 }
 
 func planDocPath(planDir string) string {

@@ -20,6 +20,31 @@ func TestThoughtsWorkbench_RootOpensDocumentWorkbenchWithChat(t *testing.T) {
 	})
 }
 
+func TestThoughtsWorkbench_DocumentSidebarNavigationUsesNormalDocumentLinks(t *testing.T) {
+	e2e.RunScenario(t, "thoughts-workbench", "document-sidebar-navigation-uses-normal-document-links", func(t testing.TB, ctx *e2e.Context) {
+		steps.AuthenticatedAs(t, ctx, "tester@example.com")
+		steps.LoadFixture(t, ctx, "thoughts-workbench.basic")
+		steps.Visit(t, ctx, "/thoughts/example.md?context=chat&chat_workspace=ws_1&thread=th_1&run=run_1")
+		steps.WaitForFeatureReady(t, ctx, "thoughts.workbench")
+		steps.FollowFirstSidebarDocumentLink(t, ctx, "first")
+		steps.ExpectBrowserURLContains(t, ctx, "context=chat")
+		steps.ExpectBrowserURLContains(t, ctx, "thread=th_1")
+		steps.ExpectRegionReachable(t, ctx, "thoughts.workbench.center")
+	})
+}
+
+func TestThoughtsWorkbench_BreadcrumbParentNavigationWorks(t *testing.T) {
+	e2e.RunScenario(t, "thoughts-workbench", "breadcrumb-parent-navigation-works", func(t testing.TB, ctx *e2e.Context) {
+		steps.AuthenticatedAs(t, ctx, "tester@example.com")
+		steps.LoadFixture(t, ctx, "thoughts-workbench.basic")
+		steps.Visit(t, ctx, "/thoughts/owner/plans/demo/outline.md?context=chat&thread=th_1")
+		steps.WaitForFeatureReady(t, ctx, "thoughts.workbench")
+		steps.FollowFirstBreadcrumbLink(t, ctx, "first")
+		steps.ExpectBrowserURLContains(t, ctx, "/thoughts/")
+		steps.ExpectRegionReachable(t, ctx, "thoughts.workbench.center")
+	})
+}
+
 func TestThoughtsWorkbench_WorkbenchRegionsRemainUsableAcrossViewportClassesMobile(t *testing.T) {
 	e2e.RunScenarioWithViewport(t, "thoughts-workbench", "workbench-regions-remain-usable-across-viewport-classes-mobile", e2e.ViewportMobile, func(t testing.TB, ctx *e2e.Context) {
 		steps.Visit(t, ctx, "/")

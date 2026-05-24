@@ -55,6 +55,36 @@ func TestDurableSessionChat_FreeformChatStartedFromThoughtsRootSurvivesRefreshAn
 	})
 }
 
+func TestDurableSessionChat_AnchorDocumentNavigationPreservesEmbeddedChat(t *testing.T) {
+	e2e.RunScenario(t, "durable-session-chat", "anchor-document-navigation-preserves-embedded-chat", func(t testing.TB, ctx *e2e.Context) {
+		steps.AuthenticatedAs(t, ctx, "playwright@chestnutfi.com")
+		steps.LoadFixture(t, ctx, "freeform-chat.durable")
+		steps.OpenFreeformChatFixture(t, ctx, "freeform-chat.durable")
+		steps.FollowFirstSidebarDocumentLink(t, ctx, "first")
+		steps.ExpectBrowserURLContains(t, ctx, "context=chat")
+		steps.ExpectTranscriptContains(t, ctx, "VAMOS_E2E_FREEFORM_REPLAY_OK")
+	})
+}
+
+func TestDurableSessionChat_WorkspaceDocumentWithoutChatParamsRestoresWorkspaceChat(t *testing.T) {
+	e2e.RunScenario(t, "durable-session-chat", "workspace-document-without-chat-params-restores-workspace-chat", func(t testing.TB, ctx *e2e.Context) {
+		steps.AuthenticatedAs(t, ctx, "playwright@chestnutfi.com")
+		steps.SeedLatestWorkspaceChats(t, ctx, "VAMOS_E2E_WORKSPACE_DOC_RESTORE", "VAMOS_E2E_WORKSPACE_UNUSED")
+		steps.OpenWorkspaceDocumentWithoutChatParams(t, ctx, "A")
+		steps.ExpectTranscriptContains(t, ctx, "VAMOS_E2E_WORKSPACE_DOC_RESTORE")
+	})
+}
+
+func TestDurableSessionChat_RootThoughtsRestoresLatestFreeformChat(t *testing.T) {
+	e2e.RunScenario(t, "durable-session-chat", "root-thoughts-restores-latest-freeform-chat", func(t testing.TB, ctx *e2e.Context) {
+		steps.AuthenticatedAs(t, ctx, "playwright@chestnutfi.com")
+		steps.LoadFixture(t, ctx, "freeform-chat.durable")
+		steps.OpenFreeformChatFixture(t, ctx, "freeform-chat.durable")
+		steps.OpenThoughtsRootChatContext(t, ctx, "current")
+		steps.ExpectTranscriptContains(t, ctx, "VAMOS_E2E_FREEFORM_REPLAY_OK")
+	})
+}
+
 func TestDurableSessionChat_WorkspaceSwitchingRestoresEachWorkspaceLatestChat(t *testing.T) {
 	e2e.RunScenario(t, "durable-session-chat", "workspace-switching-restores-each-workspace-latest-chat", func(t testing.TB, ctx *e2e.Context) {
 		steps.AuthenticatedAs(t, ctx, "playwright@chestnutfi.com")

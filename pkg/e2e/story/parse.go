@@ -209,6 +209,18 @@ func parseStep(section, text string, line int) (Step, error) {
 	case strings.HasPrefix(text, "I open seeded workspace chat "):
 		step.Verb = "open_seeded_workspace_chat"
 		step.Args["label"] = firstQuote(text)
+	case strings.HasPrefix(text, "I open workspace document without chat params for seeded workspace "):
+		step.Verb = "open_workspace_document_without_chat_params"
+		step.Args["label"] = firstQuote(text)
+	case strings.HasPrefix(text, "I open Thoughts root with chat context"):
+		step.Verb = "open_thoughts_root_chat_context"
+		step.Args["target"] = "current"
+	case strings.HasPrefix(text, "I follow first sidebar document link"):
+		step.Verb = "follow_first_sidebar_document_link"
+		step.Args["target"] = "first"
+	case strings.HasPrefix(text, "I follow first breadcrumb link"):
+		step.Verb = "follow_first_breadcrumb_link"
+		step.Args["target"] = "first"
 	case strings.HasPrefix(text, "I reload chat"):
 		step.Verb = "reload_chat"
 		step.Args["target"] = "current"
@@ -239,6 +251,9 @@ func parseStep(section, text string, line int) (Step, error) {
 		step.Args["key"] = firstQuote(text)
 	case strings.HasPrefix(text, "Text ") && strings.HasSuffix(text, " is absent."):
 		step.Verb = "expect_text_absent"
+		step.Args["text"] = firstQuote(text)
+	case strings.HasPrefix(text, "Browser URL contains "):
+		step.Verb = "expect_browser_url_contains"
 		step.Args["text"] = firstQuote(text)
 	case strings.HasPrefix(text, "Transcript contains "):
 		step.Verb = "expect_transcript_contains"

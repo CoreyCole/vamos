@@ -2,7 +2,7 @@
 
 ## User story
 
-As an internal user, I want Agent Chat transcripts and Pi-produced artifacts to survive reloads and reopened sessions.
+As a workspace user, I want Agent Chat transcripts and Pi-produced artifacts to survive reloads and reopened sessions.
 
 ## Business rules
 
@@ -74,6 +74,54 @@ As an internal user, I want Agent Chat transcripts and Pi-produced artifacts to 
 - I wait for latest freeform chat run completion.
 - I reload chat.
 - Transcript contains "VAMOS_E2E_FREEFORM_REFRESH_SECOND".
+
+## Scenario: Anchor document navigation preserves embedded chat
+
+### Given
+
+- I am authenticated as "playwright@chestnutfi.com".
+- Fixture "freeform-chat.durable" is loaded.
+- I open freeform chat for fixture "freeform-chat.durable".
+
+### When
+
+- I follow first sidebar document link.
+
+### Then
+
+- Browser URL contains "context=chat".
+- Transcript contains "VAMOS_E2E_FREEFORM_REPLAY_OK".
+
+## Scenario: Workspace document without chat params restores workspace chat
+
+### Given
+
+- I am authenticated as "playwright@chestnutfi.com".
+- Latest workspace chats "VAMOS_E2E_WORKSPACE_DOC_RESTORE" and "VAMOS_E2E_WORKSPACE_UNUSED" are seeded.
+
+### When
+
+- I open workspace document without chat params for seeded workspace "A".
+
+### Then
+
+- Transcript contains "VAMOS_E2E_WORKSPACE_DOC_RESTORE".
+
+## Scenario: Root Thoughts restores latest freeform chat
+
+### Given
+
+- I am authenticated as "playwright@chestnutfi.com".
+- Fixture "freeform-chat.durable" is loaded.
+- I open freeform chat for fixture "freeform-chat.durable".
+
+### When
+
+- I open Thoughts root with chat context.
+
+### Then
+
+- Transcript contains "VAMOS_E2E_FREEFORM_REPLAY_OK".
 
 ## Scenario: Workspace switching restores each workspace latest chat
 
