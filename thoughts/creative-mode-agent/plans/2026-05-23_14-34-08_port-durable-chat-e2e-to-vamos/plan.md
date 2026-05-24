@@ -20,7 +20,7 @@ plan_dir: thoughts/creative-mode-agent/plans/2026-05-23_14-34-08_port-durable-ch
 - [x] Slice 4: Story parser, selector catalog, step catalog, check command
 - [x] Slice 5: Deterministic generator + checked-in generated tests
 - [x] Slice 6: Playwright runtime, auth, run artifacts
-- [ ] Slice 7: Workspace fixtures + durable-chat scenario helpers
+- [x] Slice 7: Workspace fixtures + durable-chat scenario helpers
 - [ ] Slice 8: Viewport/property matrices + QRSPI plan bundles
 - [ ] Slice 9: Semantic goldens, visual review, bounded repair
 - [ ] Slice 10: Docs, verification contract, implementation handoff

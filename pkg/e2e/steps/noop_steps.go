@@ -1,52 +1,106 @@
 package steps
 
-import "testing"
+import (
+	"strings"
+	"testing"
 
-func AuthenticatedAs(t testing.TB, _ any, _ string) { t.Helper() }
-func LoadFixture(t testing.TB, _ any, _ string)     { t.Helper() }
-func Visit(t testing.TB, _ any, _ string)           { t.Helper() }
-func OpenPlanWorkspace(t testing.TB, _ any, _ string) {
+	"github.com/playwright-community/playwright-go"
+
+	"github.com/CoreyCole/vamos/pkg/e2e/fixtures"
+	e2e "github.com/CoreyCole/vamos/pkg/e2e/runtime"
+)
+
+func AuthenticatedAs(t testing.TB, ctx *e2e.Context, email string) {
 	t.Helper()
+	c, cancel := e2e.ContextWithTimeout()
+	defer cancel()
+	if err := e2e.Authenticate(c, ctx.Page, ctx.Config, email); err != nil {
+		t.Fatal(err)
+	}
 }
-func OpenWorkspaceChat(t testing.TB, _ any, _ string) { t.Helper() }
-func OpenFreeformChatFixture(t testing.TB, _ any, _ string) {
+
+func LoadFixture(t testing.TB, ctx *e2e.Context, name string) fixtures.State {
 	t.Helper()
+	c, cancel := e2e.ContextWithTimeout()
+	defer cancel()
+	db, err := e2e.OpenWorkspaceDB(c, ctx.Config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	workspace := fixtures.WorkspaceIdentity{
+		Slug:         ctx.Config.Workspace.Slug,
+		CheckoutPath: ctx.Config.Workspace.CheckoutPath,
+		DBPath:       ctx.Config.Workspace.DBPath,
+		ManagerURL:   ctx.Config.Workspace.ManagerURL,
+	}
+	state, err := fixtures.Load(c, db, workspace, name)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx.Fixture = state
+	return state
 }
-func OpenThoughtsRootChat(t testing.TB, _ any, _ string) { t.Helper() }
-func SendFreeformChatPrompt(t testing.TB, _ any, _ string) {
+
+func Visit(t testing.TB, ctx *e2e.Context, path string) {
 	t.Helper()
+	_, err := ctx.Page.Goto(
+		ctx.Config.BaseURL+path,
+		playwright.PageGotoOptions{WaitUntil: playwright.WaitUntilStateDomcontentloaded},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
 }
-func WaitForLatestFreeformChatRun(t testing.TB, _ any, _ string) {
+
+func WaitForFeatureReady(t testing.TB, ctx *e2e.Context, feature string) {
 	t.Helper()
+	entry, err := ctx.Selectors.Resolve("feature." + feature)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := ctx.Page.Locator(entry.CSS).WaitFor(); err != nil {
+		t.Fatal(err)
+	}
 }
-func WaitForLatestFreeformChatRunCompletion(t testing.TB, _ any, _ string) {
+
+func ExpectRegionVisible(t testing.TB, ctx *e2e.Context, key string) {
 	t.Helper()
+	expectVisible(t, ctx, key)
 }
-func SeedLatestWorkspaceChats(t testing.TB, _ any, _, _ string) {
+
+func ExpectRegionReachable(t testing.TB, ctx *e2e.Context, key string) {
 	t.Helper()
+	expectVisible(t, ctx, key)
 }
-func OpenSeededWorkspaceChat(t testing.TB, _ any, _ string) { t.Helper() }
-func ReloadChat(t testing.TB, _ any, _ string)              { t.Helper() }
-func ReopenCurrentChat(t testing.TB, _ any, _ string)       { t.Helper() }
-func RememberFileHash(t testing.TB, _ any, _ string)        { t.Helper() }
-func SendPiDocsReviewPrompt(t testing.TB, _ any, _, _ string) {
+
+func ExpectTabSelected(t testing.TB, ctx *e2e.Context, key string) {
 	t.Helper()
+	expectVisible(t, ctx, key)
 }
-func WaitForChatMarker(t testing.TB, _ any, _ string) { t.Helper() }
-func WaitForFeatureReady(t testing.TB, _ any, _ string) {
+
+func ExpectTextAbsent(t testing.TB, ctx *e2e.Context, text string) {
 	t.Helper()
+	body, err := ctx.Page.Locator("body").InnerText()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(body, text) {
+		t.Fatalf("text %q present", text)
+	}
 }
-func ExpectRegionVisible(t testing.TB, _ any, _ string) { t.Helper() }
-func ExpectRegionReachable(t testing.TB, _ any, _ string) {
+
+func expectVisible(t testing.TB, ctx *e2e.Context, key string) {
 	t.Helper()
+	entry, err := ctx.Selectors.Resolve(key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	visible, err := ctx.Page.Locator(entry.CSS).IsVisible()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !visible {
+		t.Fatalf("selector %s for key %s not visible", entry.CSS, key)
+	}
 }
-func ExpectTabSelected(t testing.TB, _ any, _ string) { t.Helper() }
-func ExpectTextAbsent(t testing.TB, _ any, _ string)  { t.Helper() }
-func ExpectTranscriptContains(t testing.TB, _ any, _ string) {
-	t.Helper()
-}
-func ExpectFileHashChanged(t testing.TB, _ any, _ string) { t.Helper() }
-func ExpectPiReviewFileSections(t testing.TB, _ any, _ string) {
-	t.Helper()
-}
-func ExpectOnlyFileChanged(t testing.TB, _ any, _ string) { t.Helper() }

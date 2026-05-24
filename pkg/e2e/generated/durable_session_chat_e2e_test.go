@@ -10,16 +10,16 @@ import (
 
 func TestDurableSessionChat_QrspiPlanWorkspaceChatUpdatesVerificationArtifactThroughPiAndTemporal(t *testing.T) {
 	e2e.RunScenario(t, "durable-session-chat", "qrspi-plan-workspace-chat-updates-verification-artifact-through-pi-and-temporal", func(t testing.TB, ctx *e2e.Context) {
-		steps.AuthenticatedAs(t, ctx, "tester@example.com")
-		steps.OpenPlanWorkspace(t, ctx, "thoughts/example/plans/2026-05-20_23-02-59_vamos-e2e-story-playwright-go")
+		steps.AuthenticatedAs(t, ctx, "playwright@chestnutfi.com")
+		steps.OpenPlanWorkspace(t, ctx, "thoughts/creative-mode-agent/plans/2026-05-20_23-02-59_vamos-e2e-story-playwright-go")
 		steps.OpenWorkspaceChat(t, ctx, "current")
-		steps.RememberFileHash(t, ctx, "thoughts/example/plans/2026-05-20_23-02-59_vamos-e2e-story-playwright-go/context/implement/e2e-pi-plan-docs-review.md")
-		steps.SendPiDocsReviewPrompt(t, ctx, "VAMOS_E2E_PLAN_DOCS_REVIEW_OK", "thoughts/example/plans/2026-05-20_23-02-59_vamos-e2e-story-playwright-go/context/implement/e2e-pi-plan-docs-review.md")
+		steps.RememberFileHash(t, ctx, "thoughts/creative-mode-agent/plans/2026-05-20_23-02-59_vamos-e2e-story-playwright-go/context/implement/e2e-pi-plan-docs-review.md")
+		steps.SendPiDocsReviewPrompt(t, ctx, "VAMOS_E2E_PLAN_DOCS_REVIEW_OK", "thoughts/creative-mode-agent/plans/2026-05-20_23-02-59_vamos-e2e-story-playwright-go/context/implement/e2e-pi-plan-docs-review.md")
 		steps.WaitForChatMarker(t, ctx, "VAMOS_E2E_PLAN_DOCS_REVIEW_OK")
 		steps.ExpectTranscriptContains(t, ctx, "VAMOS_E2E_PLAN_DOCS_REVIEW_OK")
-		steps.ExpectFileHashChanged(t, ctx, "thoughts/example/plans/2026-05-20_23-02-59_vamos-e2e-story-playwright-go/context/implement/e2e-pi-plan-docs-review.md")
-		steps.ExpectPiReviewFileSections(t, ctx, "thoughts/example/plans/2026-05-20_23-02-59_vamos-e2e-story-playwright-go/context/implement/e2e-pi-plan-docs-review.md")
-		steps.ExpectOnlyFileChanged(t, ctx, "thoughts/example/plans/2026-05-20_23-02-59_vamos-e2e-story-playwright-go/context/implement/e2e-pi-plan-docs-review.md")
+		steps.ExpectFileHashChanged(t, ctx, "thoughts/creative-mode-agent/plans/2026-05-20_23-02-59_vamos-e2e-story-playwright-go/context/implement/e2e-pi-plan-docs-review.md")
+		steps.ExpectPiReviewFileSections(t, ctx, "thoughts/creative-mode-agent/plans/2026-05-20_23-02-59_vamos-e2e-story-playwright-go/context/implement/e2e-pi-plan-docs-review.md")
+		steps.ExpectOnlyFileChanged(t, ctx, "thoughts/creative-mode-agent/plans/2026-05-20_23-02-59_vamos-e2e-story-playwright-go/context/implement/e2e-pi-plan-docs-review.md")
 		steps.ReloadChat(t, ctx, "current")
 		steps.ExpectTranscriptContains(t, ctx, "VAMOS_E2E_PLAN_DOCS_REVIEW_OK")
 		steps.ReopenCurrentChat(t, ctx, "current")
@@ -29,7 +29,7 @@ func TestDurableSessionChat_QrspiPlanWorkspaceChatUpdatesVerificationArtifactThr
 
 func TestDurableSessionChat_FreeformChatFixtureReplaysDurableTranscript(t *testing.T) {
 	e2e.RunScenario(t, "durable-session-chat", "freeform-chat-fixture-replays-durable-transcript", func(t testing.TB, ctx *e2e.Context) {
-		steps.AuthenticatedAs(t, ctx, "tester@example.com")
+		steps.AuthenticatedAs(t, ctx, "playwright@chestnutfi.com")
 		steps.LoadFixture(t, ctx, "freeform-chat.durable")
 		steps.OpenFreeformChatFixture(t, ctx, "freeform-chat.durable")
 		steps.ExpectTranscriptContains(t, ctx, "VAMOS_E2E_FREEFORM_REPLAY_OK")
@@ -42,7 +42,7 @@ func TestDurableSessionChat_FreeformChatFixtureReplaysDurableTranscript(t *testi
 
 func TestDurableSessionChat_FreeformChatStartedFromThoughtsRootSurvivesRefreshAndResume(t *testing.T) {
 	e2e.RunScenario(t, "durable-session-chat", "freeform-chat-started-from-thoughts-root-survives-refresh-and-resume", func(t testing.TB, ctx *e2e.Context) {
-		steps.AuthenticatedAs(t, ctx, "tester@example.com")
+		steps.AuthenticatedAs(t, ctx, "playwright@chestnutfi.com")
 		steps.OpenThoughtsRootChat(t, ctx, "current")
 		steps.SendFreeformChatPrompt(t, ctx, "VAMOS_E2E_FREEFORM_REFRESH_FIRST")
 		steps.WaitForLatestFreeformChatRunCompletion(t, ctx, "current")
@@ -57,7 +57,7 @@ func TestDurableSessionChat_FreeformChatStartedFromThoughtsRootSurvivesRefreshAn
 
 func TestDurableSessionChat_WorkspaceSwitchingRestoresEachWorkspaceLatestChat(t *testing.T) {
 	e2e.RunScenario(t, "durable-session-chat", "workspace-switching-restores-each-workspace-latest-chat", func(t testing.TB, ctx *e2e.Context) {
-		steps.AuthenticatedAs(t, ctx, "tester@example.com")
+		steps.AuthenticatedAs(t, ctx, "playwright@chestnutfi.com")
 		steps.SeedLatestWorkspaceChats(t, ctx, "VAMOS_E2E_WORKSPACE_A_LATEST", "VAMOS_E2E_WORKSPACE_B_LATEST")
 		steps.OpenSeededWorkspaceChat(t, ctx, "A")
 		steps.ExpectTranscriptContains(t, ctx, "VAMOS_E2E_WORKSPACE_A_LATEST")

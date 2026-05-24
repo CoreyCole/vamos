@@ -7,8 +7,6 @@ import (
 	"sort"
 )
 
-const DurableFreeformFixture = "freeform-chat.durable"
-
 type State struct {
 	Name string
 	Data map[string]any
@@ -45,8 +43,8 @@ type (
 
 func DefaultRegistry() Registry {
 	return registry{
-		"thoughts-workbench.basic": stubFixture("thoughts-workbench.basic"),
-		DurableFreeformFixture:     stubFixture(DurableFreeformFixture),
+		"thoughts-workbench.basic": BuildThoughtsWorkbenchBasic,
+		DurableFreeformFixture:     BuildFreeformDurableChat,
 	}
 }
 
@@ -80,10 +78,4 @@ func (r registry) Names() []string {
 	}
 	sort.Strings(out)
 	return out
-}
-
-func stubFixture(name string) Builder {
-	return func(context.Context, DBTX, Input) (State, error) {
-		return State{Name: name, Data: map[string]any{}}, nil
-	}
 }

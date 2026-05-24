@@ -14,22 +14,22 @@ As an internal user, I want Agent Chat transcripts and Pi-produced artifacts to 
 
 ### Given
 
-- I am authenticated as "tester@example.com".
-- I open plan workspace "thoughts/example/plans/2026-05-20_23-02-59_vamos-e2e-story-playwright-go".
+- I am authenticated as "playwright@chestnutfi.com".
+- I open plan workspace "thoughts/creative-mode-agent/plans/2026-05-20_23-02-59_vamos-e2e-story-playwright-go".
 - I open workspace chat.
-- I remember file hash "thoughts/example/plans/2026-05-20_23-02-59_vamos-e2e-story-playwright-go/context/implement/e2e-pi-plan-docs-review.md".
+- I remember file hash "thoughts/creative-mode-agent/plans/2026-05-20_23-02-59_vamos-e2e-story-playwright-go/context/implement/e2e-pi-plan-docs-review.md".
 
 ### When
 
-- I send Pi docs review prompt "VAMOS_E2E_PLAN_DOCS_REVIEW_OK" for "thoughts/example/plans/2026-05-20_23-02-59_vamos-e2e-story-playwright-go/context/implement/e2e-pi-plan-docs-review.md".
+- I send Pi docs review prompt "VAMOS_E2E_PLAN_DOCS_REVIEW_OK" for "thoughts/creative-mode-agent/plans/2026-05-20_23-02-59_vamos-e2e-story-playwright-go/context/implement/e2e-pi-plan-docs-review.md".
 - I wait for chat marker "VAMOS_E2E_PLAN_DOCS_REVIEW_OK".
 
 ### Then
 
 - Transcript contains "VAMOS_E2E_PLAN_DOCS_REVIEW_OK".
-- File "thoughts/example/plans/2026-05-20_23-02-59_vamos-e2e-story-playwright-go/context/implement/e2e-pi-plan-docs-review.md" changed from remembered hash.
-- File "thoughts/example/plans/2026-05-20_23-02-59_vamos-e2e-story-playwright-go/context/implement/e2e-pi-plan-docs-review.md" contains required Pi review sections.
-- Only file "thoughts/example/plans/2026-05-20_23-02-59_vamos-e2e-story-playwright-go/context/implement/e2e-pi-plan-docs-review.md" changed.
+- File "thoughts/creative-mode-agent/plans/2026-05-20_23-02-59_vamos-e2e-story-playwright-go/context/implement/e2e-pi-plan-docs-review.md" changed from remembered hash.
+- File "thoughts/creative-mode-agent/plans/2026-05-20_23-02-59_vamos-e2e-story-playwright-go/context/implement/e2e-pi-plan-docs-review.md" contains required Pi review sections.
+- Only file "thoughts/creative-mode-agent/plans/2026-05-20_23-02-59_vamos-e2e-story-playwright-go/context/implement/e2e-pi-plan-docs-review.md" changed.
 - I reload chat.
 - Transcript contains "VAMOS_E2E_PLAN_DOCS_REVIEW_OK".
 - I reopen current chat.
@@ -39,7 +39,7 @@ As an internal user, I want Agent Chat transcripts and Pi-produced artifacts to 
 
 ### Given
 
-- I am authenticated as "tester@example.com".
+- I am authenticated as "playwright@chestnutfi.com".
 - Fixture "freeform-chat.durable" is loaded.
 
 ### When
@@ -58,7 +58,7 @@ As an internal user, I want Agent Chat transcripts and Pi-produced artifacts to 
 
 ### Given
 
-- I am authenticated as "tester@example.com".
+- I am authenticated as "playwright@chestnutfi.com".
 - I open Thoughts root chat.
 
 ### When
@@ -79,7 +79,7 @@ As an internal user, I want Agent Chat transcripts and Pi-produced artifacts to 
 
 ### Given
 
-- I am authenticated as "tester@example.com".
+- I am authenticated as "playwright@chestnutfi.com".
 - Latest workspace chats "VAMOS_E2E_WORKSPACE_A_LATEST" and "VAMOS_E2E_WORKSPACE_B_LATEST" are seeded.
 
 ### When

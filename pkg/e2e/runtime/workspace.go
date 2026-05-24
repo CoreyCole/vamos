@@ -62,10 +62,17 @@ func unshellValue(value string) string {
 func PreflightWorkspace(ctx context.Context, cfg Config) error {
 	ws := cfg.Workspace
 	if ws.Slug == "" || ws.Slug == "main" {
-		return fmt.Errorf("direct fixtures require registered non-main workspace slug, got %q", ws.Slug)
+		return fmt.Errorf(
+			"direct fixtures require registered non-main workspace slug, got %q",
+			ws.Slug,
+		)
 	}
 	if filepath.Clean(ws.CheckoutPath) != filepath.Clean(cfg.RepoRoot) {
-		return fmt.Errorf("workspace checkout mismatch: env=%s pwd=%s", ws.CheckoutPath, cfg.RepoRoot)
+		return fmt.Errorf(
+			"workspace checkout mismatch: env=%s pwd=%s",
+			ws.CheckoutPath,
+			cfg.RepoRoot,
+		)
 	}
 	if ws.DBPath == "" {
 		return fmt.Errorf("workspace DB path is empty")
@@ -73,9 +80,14 @@ func PreflightWorkspace(ctx context.Context, cfg Config) error {
 	cleanDB := filepath.Clean(ws.DBPath)
 	rel, err := filepath.Rel(cfg.RepoRoot, cleanDB)
 	if err == nil && strings.HasPrefix(rel, "..") {
-		return fmt.Errorf("workspace DB path %s is outside checkout %s", ws.DBPath, cfg.RepoRoot)
+		return fmt.Errorf(
+			"workspace DB path %s is outside checkout %s",
+			ws.DBPath,
+			cfg.RepoRoot,
+		)
 	}
 	if strings.HasPrefix(rel, "data"+string(filepath.Separator)) ||
+		strings.Contains(cleanDB, "/vamos/data/") ||
 		strings.Contains(cleanDB, "/.local/state/vamos/") {
 		return fmt.Errorf("refusing canonical DB path %s", ws.DBPath)
 	}
