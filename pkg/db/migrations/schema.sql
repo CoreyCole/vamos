@@ -288,6 +288,29 @@ created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 CREATE INDEX IF NOT EXISTS idx_release_queue_events_item_created
 ON release_queue_events (item_id, created_at ASC, id ASC) ;
 
+CREATE TABLE IF NOT EXISTS workspace_error_events (
+id INTEGER PRIMARY KEY AUTOINCREMENT,
+workspace_slug TEXT NOT NULL,
+source TEXT NOT NULL CHECK (source IN ('switch', 'manager', 'log')),
+severity TEXT NOT NULL CHECK (severity IN ('warn', 'error')),
+message TEXT NOT NULL,
+detail TEXT NOT NULL DEFAULT '',
+dedupe_key TEXT NOT NULL,
+occurrence_count INTEGER NOT NULL DEFAULT 1,
+payload_json TEXT NOT NULL DEFAULT '{}',
+first_seen_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+last_seen_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+) ;
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_workspace_error_events_dedupe
+ON workspace_error_events (dedupe_key) ;
+
+CREATE INDEX IF NOT EXISTS idx_workspace_error_events_recent
+ON workspace_error_events (last_seen_at DESC, id DESC) ;
+
+CREATE INDEX IF NOT EXISTS idx_workspace_error_events_workspace_recent
+ON workspace_error_events (workspace_slug, last_seen_at DESC, id DESC) ;
+
 CREATE TABLE IF NOT EXISTS agent_threads (
 id TEXT PRIMARY KEY,
 user_email TEXT NOT NULL,

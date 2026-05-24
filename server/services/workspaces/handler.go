@@ -43,28 +43,29 @@ const workspaceSyncRefreshTimeout = 5 * time.Minute
 type WorkspaceSyncRefreshFunc func(ctx context.Context) error
 
 type Handler struct {
-	manager              Manager
-	lifecycle            LifecycleManager
-	planWorkspaces       PlanWorkspaceLister
-	implWorkspaces       ImplWorkspaceLister
-	workspaceSyncRefresh WorkspaceSyncRefreshFunc
-	workflowSummaries    WorkspaceWorkflowSummaryResolver
-	refreshMu            sync.Mutex
-	refreshInFlight      bool
-	notifier             WorkspaceLifecycleNotifier
-	managerURL           string
-	currentSlug          string
-	authService          SessionCreator
-	signer               *HandoffSigner
-	restartToken         string
-	mainCheckoutPath     string
-	verifier             *Verifier
-	provisionStarter     WorkspaceProvisionStarter
-	releaseProjector     *ReleaseProjector
-	releaseStore         ReleaseQueueStore
-	releaseStarter       ReleaseWorkflowStarter
-	cleanupStarter       WorkspaceCleanupStarter
-	exitFunc             func(int)
+	manager                Manager
+	lifecycle              LifecycleManager
+	planWorkspaces         PlanWorkspaceLister
+	implWorkspaces         ImplWorkspaceLister
+	workspaceSyncRefresh   WorkspaceSyncRefreshFunc
+	workflowSummaries      WorkspaceWorkflowSummaryResolver
+	refreshMu              sync.Mutex
+	refreshInFlight        bool
+	notifier               WorkspaceLifecycleNotifier
+	managerURL             string
+	currentSlug            string
+	authService            SessionCreator
+	signer                 *HandoffSigner
+	restartToken           string
+	mainCheckoutPath       string
+	verifier               *Verifier
+	provisionStarter       WorkspaceProvisionStarter
+	releaseProjector       *ReleaseProjector
+	releaseStore           ReleaseQueueStore
+	releaseStarter         ReleaseWorkflowStarter
+	cleanupStarter         WorkspaceCleanupStarter
+	workspaceErrorRecorder *WorkspaceErrorRecorder
+	exitFunc               func(int)
 }
 
 type RestartRequest struct {
@@ -167,6 +168,12 @@ func WithWorkspaceCleanupStarter(starter WorkspaceCleanupStarter) HandlerOption 
 	}
 }
 
+func WithWorkspaceErrorStore(store WorkspaceErrorEventStore) HandlerOption {
+	return func(h *Handler) {
+		h.workspaceErrorRecorder = &WorkspaceErrorRecorder{Store: store}
+	}
+}
+
 // Deprecated: use WithWorkspaceSyncRefresh.
 func WithPlanWorkspaceRefresh(refresh WorkspaceSyncRefreshFunc) HandlerOption {
 	return WithWorkspaceSyncRefresh(refresh)
@@ -191,6 +198,9 @@ func NewHandler(
 	}
 	if h.notifier == nil {
 		h.notifier = NewLifecycleNotifier()
+	}
+	if h.workspaceErrorRecorder != nil && h.workspaceErrorRecorder.Notifier == nil {
+		h.workspaceErrorRecorder.Notifier = h.notifier
 	}
 	if manager, ok := h.manager.(*ManagerService); ok && manager != nil {
 		manager.SetLifecycleNotifier(h.notifier)
@@ -620,7 +630,12 @@ func (h *Handler) HandleSwitchWorkspace(c echo.Context) error {
 			ws.URL,
 			redirectPath,
 		)
-		return c.Redirect(http.StatusSeeOther, "/workspaces")
+		if h.workspaceErrorRecorder != nil {
+			if err := h.workspaceErrorRecorder.RecordSwitchUnavailable(c.Request().Context(), ws, redirectPath); err != nil {
+				log.Printf("workspace_switch_error_record_failed slug=%q error=%v", slug, err)
+			}
+		}
+		return c.Redirect(http.StatusSeeOther, "/workspaces/errors?workspace="+url.QueryEscape(slug))
 	}
 	token, err := h.signer.Sign(HandoffClaims{
 		Email:        email,

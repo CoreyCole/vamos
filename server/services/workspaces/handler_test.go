@@ -206,6 +206,77 @@ func TestHandleSwitchWorkspaceRedirectsToTargetHandoff(t *testing.T) {
 	}
 }
 
+func TestHandleSwitchWorkspaceUnavailableRecordsAndRedirectsToErrors(t *testing.T) {
+	store := &fakeWorkspaceErrorEventStore{}
+	manager := &fakeLifecycleManager{workspaces: []Workspace{{
+		Slug:   "feature",
+		Status: StatusCrashed,
+		Error:  "boom",
+	}}}
+	signer, _ := newTestHandoffSigner(t)
+	h := NewHandler(
+		manager,
+		"https://main.cn-agents.test",
+		"main",
+		WithDevAuth(nil, signer),
+		WithWorkspaceErrorStore(store),
+	)
+
+	req := httptest.NewRequest(http.MethodGet, "/workspaces/switch/feature?redirect=/thoughts/", nil)
+	rec := httptest.NewRecorder()
+	c := echo.New().NewContext(req, rec)
+	c.SetParamNames("slug")
+	c.SetParamValues("feature")
+	c.Set("user_email", "user@example.com")
+
+	if err := h.HandleSwitchWorkspace(c); err != nil {
+		t.Fatalf("HandleSwitchWorkspace() error = %v", err)
+	}
+	if got := rec.Header().Get("Location"); got != "/workspaces/errors?workspace=feature" {
+		t.Fatalf("Location = %q, want errors page", got)
+	}
+	if len(store.events) != 1 {
+		t.Fatalf("events = %d, want 1", len(store.events))
+	}
+	event := store.events[0]
+	if event.WorkspaceSlug != "feature" || event.Source != WorkspaceErrorSourceSwitch || event.Severity != WorkspaceErrorSeverityWarn {
+		t.Fatalf("event = %+v", event)
+	}
+	if event.DedupeKey == "" {
+		t.Fatal("empty dedupe key")
+	}
+}
+
+func TestWorkspaceErrorRecorderRecordValidatesAndDerivesDedupeKey(t *testing.T) {
+	store := &fakeWorkspaceErrorEventStore{}
+	recorder := &WorkspaceErrorRecorder{Store: store}
+	if _, err := recorder.Record(context.Background(), WorkspaceErrorRecordRequest{WorkspaceSlug: "feature", Source: WorkspaceErrorSourceSwitch}); err == nil {
+		t.Fatal("Record() error = nil, want missing message error")
+	}
+	event, err := recorder.Record(context.Background(), WorkspaceErrorRecordRequest{
+		WorkspaceSlug: " feature ",
+		Source:        WorkspaceErrorSourceSwitch,
+		Message:       " failed switch ",
+	})
+	if err != nil {
+		t.Fatalf("Record() error = %v", err)
+	}
+	if event.DedupeKey == "" || event.Severity != string(WorkspaceErrorSeverityError) {
+		t.Fatalf("event = %+v", event)
+	}
+}
+
+func TestWorkspaceErrorDedupeKeyStableAndNonEmpty(t *testing.T) {
+	first := workspaceErrorDedupeKey(" Feature ", "switch", "panic: boom")
+	second := workspaceErrorDedupeKey("feature", "switch", "panic:   boom")
+	if first == "" {
+		t.Fatal("empty key")
+	}
+	if first != second {
+		t.Fatalf("keys differ: %q != %q", first, second)
+	}
+}
+
 func TestHandleSwitchWorkspaceRedirectsManagerWorkspacePageToChildRoot(t *testing.T) {
 	manager := &fakeLifecycleManager{
 		workspaces: []Workspace{{
@@ -1487,6 +1558,41 @@ func (f *fakeCleanupStarter) StartCleanup(_ context.Context, input WorkspaceClea
 	}
 	f.inputs = append(f.inputs, input)
 	return nil
+}
+
+type fakeWorkspaceErrorEventStore struct {
+	events []UpsertWorkspaceErrorEventParams
+	listed []WorkspaceErrorEvent
+}
+
+func (f *fakeWorkspaceErrorEventStore) UpsertWorkspaceErrorEvent(_ context.Context, arg UpsertWorkspaceErrorEventParams) (WorkspaceErrorEvent, error) {
+	f.events = append(f.events, arg)
+	event := WorkspaceErrorEvent{
+		ID:              int64(len(f.events)),
+		WorkspaceSlug:   arg.WorkspaceSlug,
+		Source:          string(arg.Source),
+		Severity:        string(arg.Severity),
+		Message:         arg.Message,
+		Detail:          arg.Detail,
+		DedupeKey:       arg.DedupeKey,
+		OccurrenceCount: 1,
+	}
+	f.listed = append(f.listed, event)
+	return event, nil
+}
+
+func (f *fakeWorkspaceErrorEventStore) ListRecentWorkspaceErrorEvents(_ context.Context, _ int64) ([]WorkspaceErrorEvent, error) {
+	return append([]WorkspaceErrorEvent(nil), f.listed...), nil
+}
+
+func (f *fakeWorkspaceErrorEventStore) ListRecentWorkspaceErrorEventsForWorkspace(_ context.Context, arg ListRecentWorkspaceErrorEventsForWorkspaceParams) ([]WorkspaceErrorEvent, error) {
+	out := make([]WorkspaceErrorEvent, 0, len(f.listed))
+	for _, event := range f.listed {
+		if event.WorkspaceSlug == arg.WorkspaceSlug {
+			out = append(out, event)
+		}
+	}
+	return out, nil
 }
 
 type fakeLifecycleManager struct {

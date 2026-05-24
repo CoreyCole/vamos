@@ -290,6 +290,9 @@ func runRuntimeMigrations(ctx context.Context, database *sql.DB) error {
 	if err := reconcileRunningRunIndexPreflight(ctx, database); err != nil {
 		return err
 	}
+	if err := ensureWorkspaceErrorEvents(ctx, database); err != nil {
+		return err
+	}
 
 	indexes := []string{
 		`CREATE INDEX IF NOT EXISTS idx_agent_threads_workspace_updated ON agent_threads(workspace_id, updated_at DESC) WHERE workspace_id IS NOT NULL AND archived_at IS NULL`,
@@ -300,6 +303,35 @@ func runRuntimeMigrations(ctx context.Context, database *sql.DB) error {
 		`CREATE UNIQUE INDEX IF NOT EXISTS idx_agent_runs_thread_running ON agent_runs(thread_id) WHERE status = 'running'`,
 	}
 	for _, indexSQL := range indexes {
+		if err := ensureIndex(ctx, database, indexSQL); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func ensureWorkspaceErrorEvents(ctx context.Context, database *sql.DB) error {
+	if _, err := database.ExecContext(ctx, `
+CREATE TABLE IF NOT EXISTS workspace_error_events (
+id INTEGER PRIMARY KEY AUTOINCREMENT,
+workspace_slug TEXT NOT NULL,
+source TEXT NOT NULL CHECK (source IN ('switch', 'manager', 'log')),
+severity TEXT NOT NULL CHECK (severity IN ('warn', 'error')),
+message TEXT NOT NULL,
+detail TEXT NOT NULL DEFAULT '',
+dedupe_key TEXT NOT NULL,
+occurrence_count INTEGER NOT NULL DEFAULT 1,
+payload_json TEXT NOT NULL DEFAULT '{}',
+first_seen_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+last_seen_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+)`); err != nil {
+		return err
+	}
+	for _, indexSQL := range []string{
+		`CREATE UNIQUE INDEX IF NOT EXISTS idx_workspace_error_events_dedupe ON workspace_error_events(dedupe_key)`,
+		`CREATE INDEX IF NOT EXISTS idx_workspace_error_events_recent ON workspace_error_events(last_seen_at DESC, id DESC)`,
+		`CREATE INDEX IF NOT EXISTS idx_workspace_error_events_workspace_recent ON workspace_error_events(workspace_slug, last_seen_at DESC, id DESC)`,
+	} {
 		if err := ensureIndex(ctx, database, indexSQL); err != nil {
 			return err
 		}
