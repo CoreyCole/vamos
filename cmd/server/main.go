@@ -76,6 +76,15 @@ func resolveStaticRoot() string {
 	return "static"
 }
 
+func registerChildWorkspaceRedirect(e *echo.Echo, managerURL string) {
+	managerURL = strings.TrimRight(strings.TrimSpace(managerURL), "/")
+	redirect := func(c echo.Context) error {
+		return c.Redirect(http.StatusTemporaryRedirect, managerURL+c.Request().URL.RequestURI())
+	}
+	e.GET("/workspaces", redirect)
+	e.GET("/workspaces/*", redirect)
+}
+
 func newPrefixStrippingProxy(
 	targetURL, prefix string,
 	rewrites ...proxyRewrite,
@@ -1258,6 +1267,8 @@ func main() {
 		)
 		if workspaceManager != nil {
 			workspaceHandler.RegisterRoutes(e, authMiddleware)
+		} else if cfg.WorkspaceMode == "child" && strings.TrimSpace(workspaceManagerURL) != "" {
+			registerChildWorkspaceRedirect(e, workspaceManagerURL)
 		}
 		if workspaceManager != nil && strings.TrimSpace(cfg.WorkspaceRestartToken) != "" {
 			workspaceHandler.RegisterInternalRestartRoute(e)
