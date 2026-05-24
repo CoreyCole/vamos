@@ -19,7 +19,7 @@ plan_dir: thoughts/creative-mode-agent/plans/2026-05-23_14-34-08_port-durable-ch
 - [x] Slice 3: Vamos runtime CLI + ctl compatibility
 - [x] Slice 4: Story parser, selector catalog, step catalog, check command
 - [x] Slice 5: Deterministic generator + checked-in generated tests
-- [ ] Slice 6: Playwright runtime, auth, run artifacts
+- [x] Slice 6: Playwright runtime, auth, run artifacts
 - [ ] Slice 7: Workspace fixtures + durable-chat scenario helpers
 - [ ] Slice 8: Viewport/property matrices + QRSPI plan bundles
 - [ ] Slice 9: Semantic goldens, visual review, bounded repair

@@ -10,7 +10,7 @@ func NewCommand() *cobra.Command {
 	cmd := &cobra.Command{Use: "e2e", Short: "Story-driven E2E workflows"}
 	cmd.AddCommand(NewCheckCommand())
 	cmd.AddCommand(NewGenerateCommand())
-	cmd.AddCommand(notImplemented("run", "Run generated E2E tests"))
+	cmd.AddCommand(NewRunCommand())
 	cmd.AddCommand(notImplemented("review", "Run semantic visual review"))
 	cmd.AddCommand(notImplemented("fix", "Plan bounded E2E repairs"))
 	cmd.AddCommand(&cobra.Command{Use: "goldens", Short: "Manage semantic visual goldens"})
