@@ -252,6 +252,9 @@ func parseStep(section, text string, line int) (Step, error) {
 	case strings.HasPrefix(text, "Text ") && strings.HasSuffix(text, " is absent."):
 		step.Verb = "expect_text_absent"
 		step.Args["text"] = firstQuote(text)
+	case text == "Console has no errors or warnings.":
+		step.Verb = "expect_console_clean"
+		step.Args["scope"] = "errors_or_warnings"
 	case strings.HasPrefix(text, "Browser URL contains "):
 		step.Verb = "expect_browser_url_contains"
 		step.Args["text"] = firstQuote(text)

@@ -74,6 +74,7 @@ func DefaultCatalog() Catalog {
 	add("expect_tab_selected", "ExpectTabSelected", "key")
 	add("expect_text_absent", "ExpectTextAbsent", "text")
 	add("expect_browser_url_contains", "ExpectBrowserURLContains", "text")
+	add("expect_console_clean", "ExpectConsoleClean", "scope")
 	add("expect_transcript_contains", "ExpectTranscriptContains", "text")
 	add("expect_file_hash_changed", "ExpectFileHashChanged", "path")
 	add("expect_pi_review_file_sections", "ExpectPiReviewFileSections", "path")

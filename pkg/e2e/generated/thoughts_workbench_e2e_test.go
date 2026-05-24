@@ -17,6 +17,7 @@ func TestThoughtsWorkbench_RootOpensDocumentWorkbenchWithChat(t *testing.T) {
 		steps.ExpectRegionVisible(t, ctx, "thoughts.workbench.sidebar")
 		steps.ExpectTabSelected(t, ctx, "thoughts.rightRail.chat")
 		steps.ExpectTextAbsent(t, ctx, "Session history")
+		steps.ExpectConsoleClean(t, ctx, "errors_or_warnings")
 	})
 }
 
@@ -52,6 +53,18 @@ func TestThoughtsWorkbench_WorkbenchRegionsRemainUsableAcrossViewportClassesMobi
 		steps.ExpectRegionReachable(t, ctx, "thoughts.workbench.center")
 		steps.ExpectRegionReachable(t, ctx, "thoughts.workbench.right")
 		steps.ExpectTextAbsent(t, ctx, "Session history")
+		steps.ExpectConsoleClean(t, ctx, "errors_or_warnings")
+	})
+}
+
+func TestThoughtsWorkbench_WorkbenchRegionsRemainUsableAcrossViewportClassesMobileThoughts(t *testing.T) {
+	e2e.RunScenarioWithViewport(t, "thoughts-workbench", "workbench-regions-remain-usable-across-viewport-classes-mobile-thoughts", e2e.ViewportMobile, func(t testing.TB, ctx *e2e.Context) {
+		steps.Visit(t, ctx, "/thoughts")
+		steps.ExpectRegionReachable(t, ctx, "thoughts.workbench.sidebar")
+		steps.ExpectRegionReachable(t, ctx, "thoughts.workbench.center")
+		steps.ExpectRegionReachable(t, ctx, "thoughts.workbench.right")
+		steps.ExpectTextAbsent(t, ctx, "Session history")
+		steps.ExpectConsoleClean(t, ctx, "errors_or_warnings")
 	})
 }
 
@@ -62,6 +75,7 @@ func TestThoughtsWorkbench_WorkbenchRegionsRemainUsableAcrossViewportClassesMobi
 		steps.ExpectRegionReachable(t, ctx, "thoughts.workbench.center")
 		steps.ExpectRegionReachable(t, ctx, "thoughts.workbench.right")
 		steps.ExpectTextAbsent(t, ctx, "Session history")
+		steps.ExpectConsoleClean(t, ctx, "errors_or_warnings")
 	})
 }
 
@@ -72,6 +86,18 @@ func TestThoughtsWorkbench_WorkbenchRegionsRemainUsableAcrossViewportClassesDesk
 		steps.ExpectRegionReachable(t, ctx, "thoughts.workbench.center")
 		steps.ExpectRegionReachable(t, ctx, "thoughts.workbench.right")
 		steps.ExpectTextAbsent(t, ctx, "Session history")
+		steps.ExpectConsoleClean(t, ctx, "errors_or_warnings")
+	})
+}
+
+func TestThoughtsWorkbench_WorkbenchRegionsRemainUsableAcrossViewportClassesDesktopHalfThoughts(t *testing.T) {
+	e2e.RunScenarioWithViewport(t, "thoughts-workbench", "workbench-regions-remain-usable-across-viewport-classes-desktop-half-thoughts", e2e.ViewportDesktopHalf, func(t testing.TB, ctx *e2e.Context) {
+		steps.Visit(t, ctx, "/thoughts")
+		steps.ExpectRegionReachable(t, ctx, "thoughts.workbench.sidebar")
+		steps.ExpectRegionReachable(t, ctx, "thoughts.workbench.center")
+		steps.ExpectRegionReachable(t, ctx, "thoughts.workbench.right")
+		steps.ExpectTextAbsent(t, ctx, "Session history")
+		steps.ExpectConsoleClean(t, ctx, "errors_or_warnings")
 	})
 }
 
@@ -82,6 +108,7 @@ func TestThoughtsWorkbench_WorkbenchRegionsRemainUsableAcrossViewportClassesDesk
 		steps.ExpectRegionReachable(t, ctx, "thoughts.workbench.center")
 		steps.ExpectRegionReachable(t, ctx, "thoughts.workbench.right")
 		steps.ExpectTextAbsent(t, ctx, "Session history")
+		steps.ExpectConsoleClean(t, ctx, "errors_or_warnings")
 	})
 }
 
@@ -92,6 +119,18 @@ func TestThoughtsWorkbench_WorkbenchRegionsRemainUsableAcrossViewportClassesDesk
 		steps.ExpectRegionReachable(t, ctx, "thoughts.workbench.center")
 		steps.ExpectRegionReachable(t, ctx, "thoughts.workbench.right")
 		steps.ExpectTextAbsent(t, ctx, "Session history")
+		steps.ExpectConsoleClean(t, ctx, "errors_or_warnings")
+	})
+}
+
+func TestThoughtsWorkbench_WorkbenchRegionsRemainUsableAcrossViewportClassesDesktopFullThoughts(t *testing.T) {
+	e2e.RunScenarioWithViewport(t, "thoughts-workbench", "workbench-regions-remain-usable-across-viewport-classes-desktop-full-thoughts", e2e.ViewportDesktopFull, func(t testing.TB, ctx *e2e.Context) {
+		steps.Visit(t, ctx, "/thoughts")
+		steps.ExpectRegionReachable(t, ctx, "thoughts.workbench.sidebar")
+		steps.ExpectRegionReachable(t, ctx, "thoughts.workbench.center")
+		steps.ExpectRegionReachable(t, ctx, "thoughts.workbench.right")
+		steps.ExpectTextAbsent(t, ctx, "Session history")
+		steps.ExpectConsoleClean(t, ctx, "errors_or_warnings")
 	})
 }
 
@@ -102,5 +141,6 @@ func TestThoughtsWorkbench_WorkbenchRegionsRemainUsableAcrossViewportClassesDesk
 		steps.ExpectRegionReachable(t, ctx, "thoughts.workbench.center")
 		steps.ExpectRegionReachable(t, ctx, "thoughts.workbench.right")
 		steps.ExpectTextAbsent(t, ctx, "Session history")
+		steps.ExpectConsoleClean(t, ctx, "errors_or_warnings")
 	})
 }

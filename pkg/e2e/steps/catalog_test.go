@@ -17,6 +17,7 @@ func TestDefaultCatalogResolvesAllVerbs(t *testing.T) {
 		"expect_region_reachable",
 		"expect_tab_selected",
 		"expect_text_absent",
+		"expect_console_clean",
 	}
 	for _, verb := range verbs {
 		if err := catalog.ResolveStep(
@@ -29,6 +30,7 @@ func TestDefaultCatalogResolvesAllVerbs(t *testing.T) {
 					"feature": "x",
 					"key":     "k",
 					"text":    "t",
+					"scope":   "errors_or_warnings",
 				},
 			},
 		); err != nil {

@@ -16,6 +16,7 @@ type Context struct {
 	Playwright *playwright.Playwright
 	Browser    playwright.Browser
 	Page       playwright.Page
+	Console    *ConsoleMonitor
 	Artifacts  ArtifactSink
 	Selectors  selectors.Catalog
 	Fixture    any
@@ -117,6 +118,7 @@ func runScenario(
 		Playwright: pw,
 		Browser:    browser,
 		Page:       page,
+		Console:    NewConsoleMonitor(page),
 		Artifacts:  artifactSink,
 		Selectors:  selectors.DefaultCatalog(),
 		Memory:     map[string]string{},

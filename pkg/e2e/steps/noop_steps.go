@@ -3,6 +3,7 @@ package steps
 import (
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/playwright-community/playwright-go"
 
@@ -94,6 +95,14 @@ func ExpectBrowserURLContains(t testing.TB, ctx *e2e.Context, text string) {
 	t.Helper()
 	if !strings.Contains(ctx.Page.URL(), text) {
 		t.Fatalf("browser URL %q does not contain %q", ctx.Page.URL(), text)
+	}
+}
+
+func ExpectConsoleClean(t testing.TB, ctx *e2e.Context, _ string) {
+	t.Helper()
+	time.Sleep(250 * time.Millisecond)
+	if problems := ctx.Console.Problems(); len(problems) > 0 {
+		t.Fatalf("browser console errors/warnings:\n%s", e2e.FormatConsoleProblems(problems))
 	}
 }
 

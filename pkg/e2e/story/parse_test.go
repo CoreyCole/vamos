@@ -30,6 +30,7 @@ As an internal user, I want Thoughts.
 - Region "thoughts.workbench.sidebar" is visible.
 - Tab "thoughts.rightRail.chat" is selected.
 - Text "Session history" is absent.
+- Console has no errors or warnings.
 `)
 
 	feature, err := ParseFile(path, ParseOptions{Strict: true})
@@ -46,6 +47,9 @@ As an internal user, I want Thoughts.
 	}
 	if got, want := feature.Scenarios[0].When[0].Args["path"], "/"; got != want {
 		t.Fatalf("path=%q want %q", got, want)
+	}
+	if got, want := feature.Scenarios[0].Then[3].Verb, StepVerb("expect_console_clean"); got != want {
+		t.Fatalf("verb=%s want %s", got, want)
 	}
 }
 

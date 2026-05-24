@@ -27,6 +27,7 @@ As a workspace user, I want Thoughts to open as a document workbench with Chat a
 - Region "thoughts.workbench.sidebar" is visible.
 - Tab "thoughts.rightRail.chat" is selected.
 - Text "Session history" is absent.
+- Console has no errors or warnings.
 
 ## Scenario: Document sidebar navigation uses normal document links
 
@@ -78,6 +79,7 @@ For each viewport:
 For each route:
 
 - "/"
+- "/thoughts"
 - "/thoughts/example.md?context=chat"
 
 Then:
@@ -86,3 +88,4 @@ Then:
 - Region "thoughts.workbench.center" is reachable.
 - Region "thoughts.workbench.right" is reachable.
 - Text "Session history" is absent.
+- Console has no errors or warnings.
