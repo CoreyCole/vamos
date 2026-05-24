@@ -186,6 +186,8 @@ func (h *Handler) HandleWorkspacesPage(c echo.Context) error {
 	if err != nil {
 		return err
 	}
+	showHistorical := showHistoricalFromRequest(c.Request())
+	renderedViews := filterHistoricalImplWorkspaceViews(views, showHistorical)
 	args := layouts.RootArgs{
 		Title:       "Workspaces",
 		CurrentPath: "/workspaces",
@@ -193,7 +195,7 @@ func (h *Handler) HandleWorkspacesPage(c echo.Context) error {
 		ShowHeader:  true,
 		UserEmail:   userEmailFromContext(c),
 		Workspaces: BuildNavItems(
-			ImplViewsToNavWorkspaces(views),
+			ImplViewsToNavWorkspaces(renderedViews),
 			h.currentSlug,
 			h.managerURL,
 			"/workspaces",
@@ -204,11 +206,12 @@ func (h *Handler) HandleWorkspacesPage(c echo.Context) error {
 	return render(
 		c,
 		http.StatusOK,
-		WorkspacesDocument(args, views, h.isRefreshInFlight()),
+		WorkspacesDocument(args, renderedViews, h.isRefreshInFlight(), showHistorical),
 	)
 }
 
 func (h *Handler) HandleRefreshWorkspaces(c echo.Context) error {
+	showHistorical := showHistoricalFromRequest(c.Request())
 	if h.workspaceSyncRefresh == nil {
 		return echo.NewHTTPError(
 			http.StatusNotImplemented,
@@ -224,12 +227,16 @@ func (h *Handler) HandleRefreshWorkspaces(c echo.Context) error {
 		sse := datastar.NewSSE(c.Response().Writer, c.Request())
 		c.Response().WriteHeader(http.StatusAccepted)
 		return sse.PatchElementTempl(
-			WorkspacesHeader(h.isRefreshInFlight()),
+			WorkspacesHeader(h.isRefreshInFlight(), showHistorical),
 			datastar.WithSelectorID("workspaces-header"),
 			datastar.WithModeOuter(),
 		)
 	}
-	return c.Redirect(http.StatusSeeOther, "/workspaces")
+	redirect := "/workspaces"
+	if showHistorical {
+		redirect = "/workspaces?show_historical=true"
+	}
+	return c.Redirect(http.StatusSeeOther, redirect)
 }
 
 func (h *Handler) tryStartWorkspaceSyncRefresh() bool {
@@ -311,14 +318,16 @@ func (h *Handler) lifecycleAction(
 		return err
 	}
 	if isDatastarRequest(c.Request()) {
+		showHistorical := showHistoricalFromRequest(c.Request())
 		views, err := h.listImplWorkspaceViews(c.Request().Context())
 		if err != nil {
 			views = lifecycleSnapshotsToImplViews([]WorkspaceLifecycleSnapshot{snap})
 		}
+		views = filterHistoricalImplWorkspaceViews(views, showHistorical)
 		sse := datastar.NewSSE(c.Response().Writer, c.Request())
 		c.Response().WriteHeader(http.StatusAccepted)
 		return sse.PatchElementTempl(
-			WorkspacesList(views, h.managerURL),
+			WorkspacesList(views, h.managerURL, showHistorical),
 			datastar.WithSelectorID("workspaces-list"),
 			datastar.WithModeOuter(),
 		)
@@ -333,21 +342,23 @@ func (h *Handler) HandleWorkspacesStream(c echo.Context) error {
 			"workspace lifecycle manager is not configured",
 		)
 	}
+	showHistorical := showHistoricalFromRequest(c.Request())
 	sse := datastar.NewSSE(c.Response().Writer, c.Request())
 	send := func() error {
 		views, err := h.listImplWorkspaceViews(c.Request().Context())
 		if err != nil {
 			return err
 		}
+		views = filterHistoricalImplWorkspaceViews(views, showHistorical)
 		if err := sse.PatchElementTempl(
-			WorkspacesHeader(h.isRefreshInFlight()),
+			WorkspacesHeader(h.isRefreshInFlight(), showHistorical),
 			datastar.WithSelectorID("workspaces-header"),
 			datastar.WithModeOuter(),
 		); err != nil {
 			return err
 		}
 		return sse.PatchElementTempl(
-			WorkspacesList(views, h.managerURL),
+			WorkspacesList(views, h.managerURL, showHistorical),
 			datastar.WithSelectorID("workspaces-list"),
 			datastar.WithModeOuter(),
 		)

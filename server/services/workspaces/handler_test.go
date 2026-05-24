@@ -380,6 +380,7 @@ func TestWorkspacesPageRendersWorkspaceCardsAndForms(t *testing.T) {
 	if err := WorkspacesPage(
 		lifecycleSnapshotsToImplViews(snapshots),
 		"https://main.cn-agents.test",
+		false,
 	).Render(t.Context(), &body); err != nil {
 		t.Fatalf("Render() error = %v", err)
 	}
@@ -491,6 +492,7 @@ func TestWorkspacesPageRendersTransitionSafeActionControls(t *testing.T) {
 			if err := WorkspacesPage(
 				lifecycleSnapshotsToImplViews([]WorkspaceLifecycleSnapshot{snap}),
 				"https://main.cn-agents.test",
+				false,
 			).Render(t.Context(), &body); err != nil {
 				t.Fatalf("Render() error = %v", err)
 			}
@@ -532,6 +534,7 @@ func TestWorkspacesPageRendersImplRowWithPlanBinding(t *testing.T) {
 	if err := WorkspacesPage(
 		views,
 		"https://main.cn-agents.test",
+		false,
 	).Render(t.Context(), &body); err != nil {
 		t.Fatalf("Render() error = %v", err)
 	}
@@ -576,6 +579,7 @@ func TestWorkspacesPageRendersNestedReviewWorkspaces(t *testing.T) {
 	if err := WorkspacesPage(
 		views,
 		"https://main.cn-agents.test",
+		false,
 	).Render(t.Context(), &body); err != nil {
 		t.Fatalf("Render() error = %v", err)
 	}
@@ -666,6 +670,85 @@ func TestFilterHistoricalImplWorkspaceViewsPromotesActiveChildren(t *testing.T) 
 	}
 }
 
+func TestWorkspacesPageRendersHistoricalToggleAndPreservesMode(t *testing.T) {
+	views := BuildImplWorkspaceViews([]db.ImplWorkspace{{
+		WorkspaceSlug: "active",
+		CheckoutPath:  "/repo/active",
+		DisplayName:   "Active Workspace",
+		Status:        string(ImplWorkspaceStatusActive),
+	}}, nil, WorkspaceLifecycleSnapshot{})
+
+	var body bytes.Buffer
+	if err := WorkspacesPage(views, "https://main.cn-agents.test", false).Render(t.Context(), &body); err != nil {
+		t.Fatalf("Render(default) error = %v", err)
+	}
+	html := body.String()
+	for _, want := range []string{"Show historical", `data-init="@get('/workspaces/stream')"`} {
+		if !strings.Contains(html, want) {
+			t.Fatalf("default page missing %q: %s", want, html)
+		}
+	}
+	if strings.Contains(html, "Hide historical") {
+		t.Fatalf("default page unexpectedly contained Hide historical: %s", html)
+	}
+	idx := strings.Index(html, `action="/workspaces/refresh"`)
+	if idx < 0 {
+		t.Fatalf("missing refresh form: %s", html)
+	}
+	next := html[idx:]
+	end := strings.Index(next, "</form>")
+	if end < 0 {
+		t.Fatalf("refresh form not closed: %s", next)
+	}
+	if strings.Contains(next[:end], `name="show_historical" value="true"`) {
+		t.Fatalf("default refresh form unexpectedly preserved historical mode: %s", next[:end])
+	}
+
+	body.Reset()
+	if err := WorkspacesPage(views, "https://main.cn-agents.test", true).Render(t.Context(), &body); err != nil {
+		t.Fatalf("Render(historical) error = %v", err)
+	}
+	html = body.String()
+	for _, want := range []string{"Hide historical", `name="show_historical" value="true"`, `data-init="@get('/workspaces/stream?show_historical=true')"`} {
+		if !strings.Contains(html, want) {
+			t.Fatalf("historical page missing %q: %s", want, html)
+		}
+	}
+}
+
+func TestWorkspacesPagePreservesHistoricalModeInLifecycleActionForms(t *testing.T) {
+	snap := WorkspaceLifecycleSnapshot{
+		Workspace: Workspace{
+			Slug:         "feature",
+			DisplayName:  "feature branch",
+			CheckoutPath: "/repo/feature",
+			URL:          "https://feature.test",
+			Status:       StatusRunning,
+		},
+		ObservedState: WorkspaceObservedRunning,
+	}
+	var body bytes.Buffer
+	if err := WorkspacesPage(
+		lifecycleSnapshotsToImplViews([]WorkspaceLifecycleSnapshot{snap}),
+		"https://main.cn-agents.test",
+		true,
+	).Render(t.Context(), &body); err != nil {
+		t.Fatalf("Render() error = %v", err)
+	}
+	html := body.String()
+	for _, action := range []string{"restart", "stop"} {
+		idx := strings.Index(html, `action="/workspaces/feature/`+action+`"`)
+		if idx < 0 {
+			t.Fatalf("missing %s form: %s", action, html)
+		}
+		next := html[idx:]
+		end := strings.Index(next, "</form>")
+		if end < 0 || !strings.Contains(next[:end], `name="show_historical" value="true"`) {
+			t.Fatalf("%s form did not preserve show_historical: %s", action, next)
+		}
+	}
+}
+
 func TestWorkspacesPageSuppressesLifecycleActionsForHistoricalRows(t *testing.T) {
 	views := BuildImplWorkspaceViews([]db.ImplWorkspace{
 		{
@@ -686,6 +769,7 @@ func TestWorkspacesPageSuppressesLifecycleActionsForHistoricalRows(t *testing.T)
 	if err := WorkspacesPage(
 		views,
 		"https://main.cn-agents.test",
+		false,
 	).Render(t.Context(), &body); err != nil {
 		t.Fatalf("Render() error = %v", err)
 	}

@@ -7,62 +7,81 @@ import (
 	"github.com/CoreyCole/vamos/server/layouts"
 )
 
-templ WorkspacesDocument(args layouts.RootArgs, items []ImplWorkspaceView, refreshing bool) {
+templ WorkspacesDocument(args layouts.RootArgs, items []ImplWorkspaceView, refreshing bool, showHistorical bool) {
 	@layouts.Root(args) {
-		@WorkspacesPageWithRefresh(items, args.WorkspaceManagerURL, refreshing)
+		@WorkspacesPageWithRefresh(items, args.WorkspaceManagerURL, refreshing, showHistorical)
 	}
 }
 
-templ WorkspacesPage(items []ImplWorkspaceView, managerURL string) {
-	@WorkspacesPageWithRefresh(items, managerURL, false)
+templ WorkspacesPage(items []ImplWorkspaceView, managerURL string, showHistorical bool) {
+	@WorkspacesPageWithRefresh(items, managerURL, false, showHistorical)
 }
 
-templ WorkspacesPageWithRefresh(items []ImplWorkspaceView, managerURL string, refreshing bool) {
-	<section class="mx-auto flex h-full w-full max-w-6xl flex-col gap-4 overflow-y-auto p-6" data-init="@get('/workspaces/stream')">
-		@WorkspacesHeader(refreshing)
-		@WorkspacesList(items, managerURL)
-	</section>
+templ WorkspacesPageWithRefresh(items []ImplWorkspaceView, managerURL string, refreshing bool, showHistorical bool) {
+	if showHistorical {
+		<section class="mx-auto flex h-full w-full max-w-6xl flex-col gap-4 overflow-y-auto p-6" data-init="@get('/workspaces/stream?show_historical=true')">
+			@WorkspacesHeader(refreshing, showHistorical)
+			@WorkspacesList(items, managerURL, showHistorical)
+		</section>
+	} else {
+		<section class="mx-auto flex h-full w-full max-w-6xl flex-col gap-4 overflow-y-auto p-6" data-init="@get('/workspaces/stream')">
+			@WorkspacesHeader(refreshing, showHistorical)
+			@WorkspacesList(items, managerURL, showHistorical)
+		</section>
+	}
 }
 
-templ WorkspacesHeader(refreshing bool) {
+templ WorkspacesHeader(refreshing bool, showHistorical bool) {
 	<div id="workspaces-header" class="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
 		<div>
 			<h1 class="text-2xl font-semibold tracking-tight">Workspaces</h1>
 			<p class="text-sm text-muted-foreground">Local implementation checkouts discovered under the configured workspace parent.</p>
 		</div>
-		<form method="post" action="/workspaces/refresh" data-on:submit="@post('/workspaces/refresh', {contentType: 'form'})">
-			<button
-				type="submit"
-				class="inline-flex h-9 items-center rounded-md border px-3 text-sm font-medium hover:bg-accent disabled:pointer-events-none disabled:opacity-50"
-				if refreshing {
-					disabled
-				}
-			>
-				if refreshing {
-					Refreshing...
+		<div class="flex flex-wrap gap-2">
+			<form method="get" action="/workspaces">
+				if showHistorical {
+					<button type="submit" class="inline-flex h-9 items-center rounded-md border px-3 text-sm font-medium hover:bg-accent">Hide historical</button>
 				} else {
-					Refresh
+					<button type="submit" name="show_historical" value="true" class="inline-flex h-9 items-center rounded-md border px-3 text-sm font-medium hover:bg-accent">Show historical</button>
 				}
-			</button>
-		</form>
+			</form>
+			<form method="post" action="/workspaces/refresh" data-on:submit="@post('/workspaces/refresh', {contentType: 'form'})">
+				if showHistorical {
+					<input type="hidden" name="show_historical" value="true"/>
+				}
+				<button
+					type="submit"
+					class="inline-flex h-9 items-center rounded-md border px-3 text-sm font-medium hover:bg-accent disabled:pointer-events-none disabled:opacity-50"
+					if refreshing {
+						disabled
+					}
+				>
+					if refreshing {
+						Refreshing...
+					} else {
+						Refresh
+					}
+				</button>
+			</form>
+		</div>
 	</div>
 }
 
-templ WorkspacesList(items []ImplWorkspaceView, managerURL string) {
+templ WorkspacesList(items []ImplWorkspaceView, managerURL string, showHistorical bool) {
 	<div id="workspaces-list" class="grid gap-3">
 		for _, view := range items {
-			@ImplWorkspaceTreeItem(view, managerURL)
+			@ImplWorkspaceTreeItem(view, managerURL, showHistorical)
 		}
 	</div>
 }
 
-templ ImplWorkspaceTreeItem(view ImplWorkspaceView, managerURL string) {
+templ ImplWorkspaceTreeItem(view ImplWorkspaceView, managerURL string, showHistorical bool) {
 	<div class="grid gap-3" data-workspace-tree-item={ workspaceViewSlug(view) }>
-		@ImplWorkspaceCard(view, managerURL)
+		@ImplWorkspaceCard(view, managerURL, showHistorical)
 		if len(view.Children) > 0 {
 			<div class="ml-4 grid gap-3 border-l pl-4 md:ml-8 md:pl-6" data-workspace-children={ workspaceViewSlug(view) }>
 				for _, child := range view.Children {
-					@ImplWorkspaceTreeItem(child, managerURL)
+					@ImplWorkspaceTreeItem(child, managerURL, showHistorical)
 				}
 			</div>
 		}
@@ -163,7 +182,7 @@ templ WorkspaceRecoveryActionForm(model RecoveryModel, action string, label stri
 	</form>
 }
 
-templ ImplWorkspaceCard(view ImplWorkspaceView, managerURL string) {
+templ ImplWorkspaceCard(view ImplWorkspaceView, managerURL string, showHistorical bool) {
 	{{ snap := view.Runtime }}
 	{{ ws := snap.Workspace }}
 	{{ slug := workspaceViewSlug(view) }}
@@ -264,6 +283,9 @@ templ ImplWorkspaceCard(view ImplWorkspaceView, managerURL string) {
 				{{ indicator := workspaceActionIndicator(slug, "start") }}
 				{{ indicatorSignal := workspaceActionIndicatorSignal(slug, "start") }}
 				<form method="post" action={ templ.SafeURL("/workspaces/" + slug + "/start") } data-indicator={ indicator } data-on:submit={ "@post('/workspaces/" + slug + "/start', {contentType: 'form'})" }>
+					if showHistorical {
+						<input type="hidden" name="show_historical" value="true"/>
+					}
 					<button type="submit" data-attr-disabled={ indicatorSignal } class="inline-flex h-9 items-center rounded-md border px-3 text-sm font-medium hover:bg-accent">
 						<span data-show={ "!" + indicatorSignal }>Start</span>
 						<span data-show={ indicatorSignal }>Starting...</span>
@@ -274,6 +296,9 @@ templ ImplWorkspaceCard(view ImplWorkspaceView, managerURL string) {
 				{{ indicator := workspaceActionIndicator(slug, "restart") }}
 				{{ indicatorSignal := workspaceActionIndicatorSignal(slug, "restart") }}
 				<form method="post" action={ templ.SafeURL("/workspaces/" + slug + "/restart") } data-indicator={ indicator } data-on:submit={ "@post('/workspaces/" + slug + "/restart', {contentType: 'form'})" }>
+					if showHistorical {
+						<input type="hidden" name="show_historical" value="true"/>
+					}
 					<button type="submit" data-attr-disabled={ indicatorSignal } class="inline-flex h-9 items-center rounded-md border px-3 text-sm font-medium hover:bg-accent">
 						<span data-show={ "!" + indicatorSignal }>Restart</span>
 						<span data-show={ indicatorSignal }>Restarting...</span>
@@ -284,6 +309,9 @@ templ ImplWorkspaceCard(view ImplWorkspaceView, managerURL string) {
 				{{ indicator := workspaceActionIndicator(slug, "stop") }}
 				{{ indicatorSignal := workspaceActionIndicatorSignal(slug, "stop") }}
 				<form method="post" action={ templ.SafeURL("/workspaces/" + slug + "/stop") } data-indicator={ indicator } data-on:submit={ "@post('/workspaces/" + slug + "/stop', {contentType: 'form'})" }>
+					if showHistorical {
+						<input type="hidden" name="show_historical" value="true"/>
+					}
 					<button type="submit" data-attr-disabled={ indicatorSignal } class="inline-flex h-9 items-center rounded-md border px-3 text-sm font-medium text-destructive hover:bg-accent">
 						<span data-show={ "!" + indicatorSignal }>Stop</span>
 						<span data-show={ indicatorSignal }>Stopping...</span>
