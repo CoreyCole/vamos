@@ -15,7 +15,10 @@ import (
 
 	"github.com/labstack/echo/v4"
 
+	"github.com/CoreyCole/vamos/pkg/agents/workflows/qrspi"
+	wruntime "github.com/CoreyCole/vamos/pkg/agents/workflows/runtime"
 	"github.com/CoreyCole/vamos/pkg/db"
+	agentchatworkflows "github.com/CoreyCole/vamos/server/services/agentchat/workflows"
 )
 
 func TestParsePiSessionJSONLRejectsMalformedAndMissingParent(t *testing.T) {
@@ -338,6 +341,216 @@ func TestValidatePiSessionPathRejectsSymlinkEscape(t *testing.T) {
 	}
 	if _, err := service.validatePiSessionPath(link); err == nil {
 		t.Fatal("validatePiSessionPath() error = nil, want symlink escape rejection")
+	}
+}
+
+func TestImportAdoptablePiSessionsImportsTerminalQRSPIWorkspace(t *testing.T) {
+	service := newTestAgentChatService(t)
+	service.workflowService.(*agentchatworkflows.Service).Runner = agentchatworkflows.NoopRunner{}
+	planDir := filepath.Join(
+		service.thoughtsRoot,
+		"user@example.com",
+		"plans",
+		"2026-05-24_qrspi-terminal",
+	)
+	if err := ensureDir(filepath.Join(planDir, "questions")); err != nil {
+		t.Fatalf("ensureDir(planDir): %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(planDir, "questions", "research.md"), []byte("# Research\n"), 0o644); err != nil {
+		t.Fatalf("WriteFile(question): %v", err)
+	}
+	workspace, err := service.CreateWorkspace(t.Context(), WorkspaceCreateInput{
+		UserEmail:    "user@example.com",
+		Title:        "QRSPI Terminal",
+		RootDocPath:  planDir,
+		WorkflowType: WorkspaceWorkflowQRSPI,
+		Source:       WorkspaceSourceImported,
+	})
+	if err != nil {
+		t.Fatalf("CreateWorkspace() error = %v", err)
+	}
+	sessionPath := filepath.Join(service.piSessionsDir, "qrspi.jsonl")
+	writePiSessionFile(
+		t,
+		sessionPath,
+		piSessionWithQRSPIResult(
+			planDir,
+			`<qrspi-result>
+  <stage>question</stage>
+  <status>complete</status>
+  <outcome>complete</outcome>
+  <policy><autoMode>false</autoMode><enablePlanReviews>true</enablePlanReviews><invalidResultRetryLimit>1</invalidResultRetryLimit></policy>
+  <summary><plan-goal>Goal.</plan-goal><stage-completed>Questions done.</stage-completed><key-decisions>Research next.</key-decisions></summary>
+  <artifact>questions/research.md</artifact>
+  <next>/q-research questions/research.md</next>
+</qrspi-result>`,
+		)...,
+	)
+
+	result, err := service.ImportAdoptablePiSessions(t.Context())
+	if err != nil {
+		t.Fatalf("ImportAdoptablePiSessions() error = %v", err)
+	}
+	if result.ImportedSessions != 1 || result.AdoptedQRSPIWorkspaces != 1 || !result.Changed {
+		t.Fatalf("result = %+v, want imported/adopted changed", result)
+	}
+	stored, err := service.queries.GetWorkspace(t.Context(), workspace.ID)
+	if err != nil {
+		t.Fatalf("GetWorkspace() error = %v", err)
+	}
+	if !stored.SelectedThreadID.Valid || stored.SelectedThreadID.String == "" {
+		t.Fatalf("SelectedThreadID = %v, want imported terminal thread", stored.SelectedThreadID)
+	}
+	var state wruntime.State
+	if err := json.Unmarshal([]byte(stored.WorkflowStateJson.String), &state); err != nil {
+		t.Fatalf("Unmarshal(workflow state): %v", err)
+	}
+	if state.CurrentNodeID != qrspi.NodeResearch || state.LastResult == nil ||
+		state.LastResult.SourceNodeID != qrspi.NodeQuestion {
+		t.Fatalf("state = %+v, want question adopted and research current", state)
+	}
+}
+
+func TestImportAdoptablePiSessionsAdoptsLatestQRSPIResult(t *testing.T) {
+	service := newTestAgentChatService(t)
+	adapter := service.workflowService.(*agentchatworkflows.Service)
+	adapter.Runner = agentchatworkflows.NoopRunner{}
+	def, ok := adapter.Definitions.Get(qrspi.AgentChatWorkflowType)
+	if !ok {
+		t.Fatal("qrspi definition not registered")
+	}
+	policy, err := json.Marshal(qrspi.Policy{AutoMode: true, EnablePlanReviews: true, InvalidResultRetryLimit: 1})
+	if err != nil {
+		t.Fatalf("Marshal(policy): %v", err)
+	}
+	state, err := wruntime.InitialState(def, policy)
+	if err != nil {
+		t.Fatalf("InitialState() error = %v", err)
+	}
+	state.CurrentNodeID = qrspi.NodeReviewOutline
+	state.PendingNextNodeID = qrspi.NodeReviewOutline
+	state.Status = wruntime.WorkspaceStatusIdle
+	state.Nodes[qrspi.NodeQuestion] = wruntime.NodeState{Status: wruntime.NodeStatusComplete}
+	state.Nodes[qrspi.NodeResearch] = wruntime.NodeState{Status: wruntime.NodeStatusComplete}
+	state.Nodes[qrspi.NodeDesign] = wruntime.NodeState{Status: wruntime.NodeStatusComplete}
+	state.Nodes[qrspi.NodeOutline] = wruntime.NodeState{Status: wruntime.NodeStatusComplete}
+	rawState, err := json.Marshal(state)
+	if err != nil {
+		t.Fatalf("Marshal(state): %v", err)
+	}
+	planDir := filepath.Join(
+		service.thoughtsRoot,
+		"user@example.com",
+		"plans",
+		"2026-05-24_qrspi-auto",
+	)
+	if err := ensureDir(filepath.Join(planDir, "reviews", "outline-review")); err != nil {
+		t.Fatalf("ensureDir(planDir): %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(planDir, "reviews", "outline-review", "review.md"), []byte("# Review\n"), 0o644); err != nil {
+		t.Fatalf("WriteFile(review): %v", err)
+	}
+	workspace, err := service.CreateWorkspace(t.Context(), WorkspaceCreateInput{
+		UserEmail:     "user@example.com",
+		Title:         "QRSPI Auto",
+		RootDocPath:   planDir,
+		WorkflowType:  WorkspaceWorkflowQRSPI,
+		WorkflowState: rawState,
+		Source:        WorkspaceSourceImported,
+	})
+	if err != nil {
+		t.Fatalf("CreateWorkspace() error = %v", err)
+	}
+	sessionPath := filepath.Join(service.piSessionsDir, "qrspi-auto.jsonl")
+	writePiSessionFile(
+		t,
+		sessionPath,
+		piSessionWithQRSPIResult(
+			planDir,
+			`<qrspi-result>
+  <stage>review-outline</stage>
+  <status>complete</status>
+  <outcome>ready-for-human-review</outcome>
+  <policy><autoMode>true</autoMode><enablePlanReviews>true</enablePlanReviews><invalidResultRetryLimit>1</invalidResultRetryLimit></policy>
+  <summary><plan-goal>Goal.</plan-goal><stage-completed>Outline reviewed.</stage-completed><key-decisions>Plan next.</key-decisions></summary>
+  <artifact>reviews/outline-review/review.md</artifact>
+  <next>/q-plan outline.md</next>
+</qrspi-result>`,
+		)...,
+	)
+
+	result, err := service.ImportAdoptablePiSessions(t.Context())
+	if err != nil {
+		t.Fatalf("ImportAdoptablePiSessions() error = %v", err)
+	}
+	if result.AdoptedQRSPIWorkspaces != 1 {
+		t.Fatalf("result = %+v, want adopted", result)
+	}
+	stored, err := service.queries.GetWorkspace(t.Context(), workspace.ID)
+	if err != nil {
+		t.Fatalf("GetWorkspace() error = %v", err)
+	}
+	var got wruntime.State
+	if err := json.Unmarshal([]byte(stored.WorkflowStateJson.String), &got); err != nil {
+		t.Fatalf("Unmarshal(workflow state): %v", err)
+	}
+	if got.CurrentNodeID != qrspi.NodePlan || got.Nodes[qrspi.NodeHumanReviewOutline].Status != wruntime.NodeStatusBypassed {
+		t.Fatalf("state = %+v, want auto-approved outline review and plan current", got)
+	}
+}
+
+func TestImportAdoptablePiSessionsDoesNotExportWebRunsToTerminal(t *testing.T) {
+	service := newTestAgentChatService(t)
+	planDir := filepath.Join(
+		service.thoughtsRoot,
+		"user@example.com",
+		"plans",
+		"2026-05-24_web-only",
+	)
+	if err := ensureDir(planDir); err != nil {
+		t.Fatalf("ensureDir(planDir): %v", err)
+	}
+	_, err := service.CreateWorkspace(t.Context(), WorkspaceCreateInput{
+		UserEmail:    "user@example.com",
+		Title:        "Web only",
+		RootDocPath:  planDir,
+		WorkflowType: WorkspaceWorkflowQRSPI,
+		Source:       WorkspaceSourceWeb,
+	})
+	if err != nil {
+		t.Fatalf("CreateWorkspace() error = %v", err)
+	}
+	before, err := os.ReadDir(service.piSessionsDir)
+	if err != nil {
+		t.Fatalf("ReadDir(before): %v", err)
+	}
+	result, err := service.ImportAdoptablePiSessions(t.Context())
+	if err != nil {
+		t.Fatalf("ImportAdoptablePiSessions() error = %v", err)
+	}
+	after, err := os.ReadDir(service.piSessionsDir)
+	if err != nil {
+		t.Fatalf("ReadDir(after): %v", err)
+	}
+	if result.ImportedSessions != 0 || result.AdoptedQRSPIWorkspaces != 0 || result.Changed {
+		t.Fatalf("result = %+v, want zero", result)
+	}
+	if len(after) != len(before) {
+		t.Fatalf("session dir entries changed from %d to %d", len(before), len(after))
+	}
+}
+
+func piSessionWithQRSPIResult(cwd, assistant string) []string {
+	assistant = strings.ReplaceAll(assistant, "`", "\\`")
+	payload, err := json.Marshal(assistant)
+	if err != nil {
+		panic(err)
+	}
+	cwd = filepath.ToSlash(cwd)
+	return []string{
+		`{"type":"session","id":"s-qrspi","timestamp":"2026-05-24T12:00:00Z","cwd":"` + cwd + `"}`,
+		`{"type":"message","id":"user-1","timestamp":"2026-05-24T12:00:01Z","message":{"role":"user","content":"continue qrspi"}}`,
+		`{"type":"message","id":"assistant-1","parentId":"user-1","timestamp":"2026-05-24T12:00:02Z","message":{"role":"assistant","content":` + string(payload) + `}}`,
 	}
 }
 

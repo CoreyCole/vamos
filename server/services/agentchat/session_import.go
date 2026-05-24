@@ -18,7 +18,10 @@ import (
 
 	"github.com/google/uuid"
 
+	"github.com/CoreyCole/vamos/pkg/agents/workflows/qrspi"
+	wruntime "github.com/CoreyCole/vamos/pkg/agents/workflows/runtime"
 	"github.com/CoreyCole/vamos/pkg/db"
+	agentchatworkflows "github.com/CoreyCole/vamos/server/services/agentchat/workflows"
 )
 
 const (
@@ -1201,16 +1204,16 @@ func (s *Service) resolveImportWorkspace(
 		return db.Workspace{}, false, err
 	}
 	workspace, err = q.CreateWorkspace(ctx, db.CreateWorkspaceParams{
-		ID:                   workspaceID,
-		UserEmail:            owner,
-		Title:                validateWorkspaceTitle(filepath.Base(validatedRoot)),
-		RootDocPath:         validatedRoot,
-		Cwd:                  nullString(doc.Header.Cwd),
-		WorkflowType:         string(workspaceTypeForPlanDir(validatedRoot)),
-		WorkflowStateJson:    sql.NullString{},
-		Source:               string(WorkspaceSourceImported),
-		SelectedThreadID:     sql.NullString{},
-		SelectedDocPath: sql.NullString{},
+		ID:                workspaceID,
+		UserEmail:         owner,
+		Title:             validateWorkspaceTitle(filepath.Base(validatedRoot)),
+		RootDocPath:       validatedRoot,
+		Cwd:               nullString(doc.Header.Cwd),
+		WorkflowType:      string(workspaceTypeForPlanDir(validatedRoot)),
+		WorkflowStateJson: sql.NullString{},
+		Source:            string(WorkspaceSourceImported),
+		SelectedThreadID:  sql.NullString{},
+		SelectedDocPath:   sql.NullString{},
 	})
 	return workspace, err == nil, err
 }
@@ -1507,4 +1510,89 @@ func sessionImportEventKey(parts ...string) string {
 func copyLimited(r io.Reader, limit int64) ([]byte, error) {
 	limited := io.LimitReader(r, limit)
 	return io.ReadAll(limited)
+}
+
+func (s *Service) AdoptImportedQRSPIState(
+	ctx context.Context,
+	workspaceID string,
+	threadID string,
+	headEntryID string,
+) (bool, error) {
+	workspaceID = strings.TrimSpace(workspaceID)
+	threadID = strings.TrimSpace(threadID)
+	headEntryID = strings.TrimSpace(headEntryID)
+	if workspaceID == "" || threadID == "" || headEntryID == "" {
+		return false, nil
+	}
+	workspace, err := s.queries.GetWorkspace(ctx, workspaceID)
+	if err != nil {
+		return false, err
+	}
+	if WorkspaceWorkflowType(strings.TrimSpace(workspace.WorkflowType)) != WorkspaceWorkflowQRSPI {
+		return false, nil
+	}
+	adapter, ok := s.workflowService.(*agentchatworkflows.Service)
+	if !ok || adapter == nil || adapter.Definitions == nil || adapter.Store == nil {
+		return false, nil
+	}
+	def, ok := adapter.Definitions.Get(qrspi.AgentChatWorkflowType)
+	if !ok {
+		return false, nil
+	}
+	state, err := adapter.Store.LoadWorkspaceState(ctx, workspaceID)
+	if err != nil {
+		policy, policyErr := json.Marshal(qrspi.DefaultPolicy())
+		if policyErr != nil {
+			return false, policyErr
+		}
+		state, err = wruntime.InitialState(def, policy)
+		if err != nil {
+			return false, err
+		}
+	}
+	currentDef, ok := adapter.Definitions.Get(wruntime.WorkflowID(strings.TrimSpace(state.Type)))
+	if !ok {
+		return false, nil
+	}
+	assistant, err := adapter.Store.FinalAssistantText(ctx, threadID, headEntryID)
+	if err != nil {
+		return false, err
+	}
+	parseCtx := wruntime.ParseContext{
+		WorkflowType: strings.TrimSpace(state.Type),
+		ThreadID:     threadID,
+		HeadEntryID:  headEntryID,
+	}
+	parsed, err := currentDef.ResultParser.Parse(assistant, parseCtx)
+	if err != nil {
+		return false, nil
+	}
+	workflowResult, err := currentDef.ResultConverter.ToWorkflowResult(parsed, parseCtx)
+	if err != nil {
+		return false, err
+	}
+	_, applied, err := adapter.ApplyExternalWorkflowResult(
+		ctx,
+		agentchatworkflows.ExternalWorkflowResultInput{
+			WorkspaceID: workspaceID,
+			ThreadID:    threadID,
+			HeadEntryID: headEntryID,
+			State:       state,
+			Result:      workflowResult,
+		},
+	)
+	if err != nil {
+		return false, err
+	}
+	if !applied {
+		return false, nil
+	}
+	_ = s.queries.UpdateWorkspaceSelectedThread(
+		ctx,
+		db.UpdateWorkspaceSelectedThreadParams{
+			ID:               workspaceID,
+			SelectedThreadID: nullString(threadID),
+		},
+	)
+	return true, nil
 }

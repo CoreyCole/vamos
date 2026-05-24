@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"log"
 	"os"
 	"path/filepath"
 	"strings"
@@ -15,6 +16,7 @@ import (
 
 	"github.com/CoreyCole/vamos/pkg/collections"
 	"github.com/CoreyCole/vamos/pkg/db"
+	"github.com/CoreyCole/vamos/server/services/workspaces"
 )
 
 func (s *Service) RequestPiSessionIndex(req PiSessionIndexRequest) {
@@ -158,31 +160,8 @@ func (s *Service) indexPiSessionFile(
 		return db.AgentSession{}, err
 	}
 
+	scan.Inference = s.remapPiSessionScanInference(scan)
 	inference := scan.Inference
-	inference.PlanDir = s.remapSessionIndexPlanDir(inference.PlanDir, scan.Header.Cwd)
-	if inference.PlanDir == "" {
-		remappedCandidates := collections.NewSet[string]()
-		for _, candidate := range inference.Candidates {
-			if planDir, ok := s.remapCopiedWorkspacePlanDir(candidate); ok {
-				remappedCandidates.Add(planDir)
-			}
-		}
-		candidates := sortedSetValues(remappedCandidates)
-		inference.Candidates = candidates
-		switch len(candidates) {
-		case 1:
-			inference.PlanDir = candidates[0]
-			inference.Status = "single-plan"
-		case 0:
-			if strings.TrimSpace(inference.Status) == "" {
-				inference.Status = "none"
-			}
-		default:
-			inference.Status = "ambiguous"
-		}
-	}
-
-	scan.Inference = inference
 	status := statusForInference(inference)
 	lastError := sql.NullString{}
 	if status == "ambiguous" {
@@ -214,6 +193,171 @@ func (s *Service) indexPiSessionFile(
 			),
 		),
 	})
+}
+
+func (s *Service) ImportAdoptablePiSessions(
+	ctx context.Context,
+) (workspaces.TerminalSessionAdoptionResult, error) {
+	root := strings.TrimSpace(s.piSessionsDir)
+	if root == "" {
+		return workspaces.TerminalSessionAdoptionResult{}, nil
+	}
+	info, err := os.Stat(root)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return workspaces.TerminalSessionAdoptionResult{}, nil
+		}
+		return workspaces.TerminalSessionAdoptionResult{}, err
+	}
+	if !info.IsDir() {
+		return workspaces.TerminalSessionAdoptionResult{}, nil
+	}
+
+	result := workspaces.TerminalSessionAdoptionResult{}
+	affectedWorkspaces := collections.NewSet[string]()
+	err = filepath.WalkDir(root, func(path string, d fs.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
+		}
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		if d.IsDir() || filepath.Ext(path) != jsonlExtension {
+			return nil
+		}
+		adopted, importErr := s.importAdoptablePiSession(ctx, path)
+		if importErr != nil {
+			log.Printf("terminal_session_auto_import_failed path=%q: %v", path, importErr)
+			return nil
+		}
+		if adopted.WorkspaceID != "" {
+			affectedWorkspaces.Add(adopted.WorkspaceID)
+		}
+		result.ImportedSessions += adopted.ImportedSessions
+		result.AdoptedQRSPIWorkspaces += adopted.AdoptedQRSPIWorkspaces
+		result.Changed = result.Changed || adopted.Changed
+		return nil
+	})
+	if err != nil {
+		return result, err
+	}
+	if s.notifier != nil {
+		for _, workspaceID := range sortedSetValues(affectedWorkspaces) {
+			s.notifier.NotifyWorkspaceResource(workspaceID)
+		}
+	}
+	return result, nil
+}
+
+type piSessionAdoptionFileResult struct {
+	WorkspaceID            string
+	ImportedSessions       int
+	AdoptedQRSPIWorkspaces int
+	Changed                bool
+}
+
+func (s *Service) importAdoptablePiSession(
+	ctx context.Context,
+	path string,
+) (piSessionAdoptionFileResult, error) {
+	resolvedPath, err := s.validatePiSessionPath(path)
+	if err != nil {
+		return piSessionAdoptionFileResult{}, err
+	}
+	scan, err := ScanPiSessionJSONL(resolvedPath, PiSessionScanOptions{
+		BatchSize:    defaultPiSessionImportBatchSize,
+		ThoughtsRoot: s.thoughtsRoot,
+	})
+	if err != nil {
+		return piSessionAdoptionFileResult{}, err
+	}
+	scan.Inference = s.remapPiSessionScanInference(scan)
+	status := statusForInference(scan.Inference)
+	if status == "unassigned" || status == "ambiguous" {
+		return piSessionAdoptionFileResult{}, nil
+	}
+	workspace, ok, err := s.resolveImportWorkspaceFromScan(
+		ctx,
+		s.queries,
+		SessionImportInput{SessionPath: resolvedPath, Source: AgentSessionSourceTerminal},
+		scan,
+	)
+	if err != nil {
+		return piSessionAdoptionFileResult{}, fmt.Errorf("resolve import workspace: %w", err)
+	}
+	if !ok {
+		return piSessionAdoptionFileResult{}, nil
+	}
+	if WorkspaceWorkflowType(strings.TrimSpace(workspace.WorkflowType)) != WorkspaceWorkflowQRSPI {
+		return piSessionAdoptionFileResult{}, nil
+	}
+	imported, err := s.ImportPiSession(ctx, SessionImportInput{
+		SessionPath:          resolvedPath,
+		Source:               AgentSessionSourceTerminal,
+		ExplicitWorkspaceID:  workspace.ID,
+		ExplicitWorkspaceDir: workspace.RootDocPath,
+		UserEmail:            workspace.UserEmail,
+	})
+	if err != nil {
+		return piSessionAdoptionFileResult{}, fmt.Errorf("import pi session: %w", err)
+	}
+	fileResult := piSessionAdoptionFileResult{WorkspaceID: workspace.ID}
+	if imported.Status == "imported" || imported.Status == "diverged" {
+		fileResult.ImportedSessions = 1
+		if imported.Stats.EntriesImported > 0 || imported.Diverged {
+			fileResult.Changed = true
+		}
+	}
+	if imported.ThreadID == "" || imported.ImportedHeadEntry == "" {
+		return fileResult, nil
+	}
+	adopted, err := s.AdoptImportedQRSPIState(
+		ctx,
+		workspace.ID,
+		imported.ThreadID,
+		imported.ImportedHeadEntry,
+	)
+	if err != nil {
+		return fileResult, fmt.Errorf("adopt imported qrspi state: %w", err)
+	}
+	if adopted {
+		fileResult.AdoptedQRSPIWorkspaces = 1
+		fileResult.Changed = true
+	}
+	return fileResult, nil
+}
+
+func (s *Service) remapPiSessionScanInference(
+	scan PiSessionScanSummary,
+) WorkspaceInferenceResult {
+	inference := scan.Inference
+	inference.PlanDir = s.remapSessionIndexPlanDir(inference.PlanDir, scan.Header.Cwd)
+	if inference.PlanDir != "" {
+		if strings.TrimSpace(inference.Status) == "" || inference.Status == "none" {
+			inference.Status = "single-plan"
+		}
+		return inference
+	}
+	remappedCandidates := collections.NewSet[string]()
+	for _, candidate := range inference.Candidates {
+		if planDir, ok := s.remapCopiedWorkspacePlanDir(candidate); ok {
+			remappedCandidates.Add(planDir)
+		}
+	}
+	candidates := sortedSetValues(remappedCandidates)
+	inference.Candidates = candidates
+	switch len(candidates) {
+	case 1:
+		inference.PlanDir = candidates[0]
+		inference.Status = "single-plan"
+	case 0:
+		if strings.TrimSpace(inference.Status) == "" {
+			inference.Status = "none"
+		}
+	default:
+		inference.Status = "ambiguous"
+	}
+	return inference
 }
 
 func (s *Service) remapSessionIndexPlanDir(planDir, cwd string) string {
