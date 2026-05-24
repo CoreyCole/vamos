@@ -1,6 +1,9 @@
 package runtime
 
-import "encoding/json"
+import (
+	"encoding/json"
+	"time"
+)
 
 type (
 	WorkflowID    string
@@ -13,6 +16,7 @@ type (
 const (
 	NodeKindAgent       NodeKind = "agent"
 	NodeKindHumanReview NodeKind = "human_review"
+	NodeKindService     NodeKind = "service"
 	NodeKindDone        NodeKind = "done"
 )
 
@@ -50,9 +54,17 @@ type Node struct {
 	DisplayName    string
 	Kind           NodeKind
 	Prompt         PromptSpec
+	Service        ServiceSpec
 	Terminal       bool
 	Contract       ResultContract
 	AutoApprovable bool
+}
+
+type ServiceSpec struct {
+	Type     string            `json:"type"`
+	Timeout  time.Duration     `json:"timeout,omitempty"`
+	Args     json.RawMessage   `json:"args,omitempty"`
+	Metadata map[string]string `json:"metadata,omitempty"`
 }
 
 type ResultContract struct {

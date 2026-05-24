@@ -1,6 +1,9 @@
 package runtime
 
-import "fmt"
+import (
+	"fmt"
+	"strings"
+)
 
 func ValidateDefinition(def Definition) error {
 	if def.ID == "" {
@@ -14,14 +17,21 @@ func ValidateDefinition(def Definition) error {
 	}
 
 	hasTerminal := false
+	requiresAgentResultHandling := false
 	for id, node := range def.Nodes {
 		if id != node.ID {
 			return fmt.Errorf("node key %q does not match id %q", id, node.ID)
 		}
-		if node.Kind == NodeKindAgent && node.Prompt.SkillPath == "" &&
-			node.Prompt.Template == "" &&
-			node.Prompt.Static == "" {
-			return fmt.Errorf("agent node %q has no prompt", id)
+		if node.Kind == NodeKindAgent {
+			requiresAgentResultHandling = true
+			if node.Prompt.SkillPath == "" &&
+				node.Prompt.Template == "" &&
+				node.Prompt.Static == "" {
+				return fmt.Errorf("agent node %q has no prompt", id)
+			}
+		}
+		if node.Kind == NodeKindService && strings.TrimSpace(node.Service.Type) == "" {
+			return fmt.Errorf("service node %q has no service type", id)
 		}
 		if node.Terminal || node.Kind == NodeKindDone {
 			hasTerminal = true
@@ -46,10 +56,10 @@ func ValidateDefinition(def Definition) error {
 	if !hasTerminal {
 		return fmt.Errorf("definition has no terminal node")
 	}
-	if def.ResultParser == nil {
+	if requiresAgentResultHandling && def.ResultParser == nil {
 		return fmt.Errorf("result parser is required")
 	}
-	if def.ResultConverter == nil {
+	if requiresAgentResultHandling && def.ResultConverter == nil {
 		return fmt.Errorf("result converter is required")
 	}
 	if def.PolicySpec.Validate != nil && len(def.PolicySpec.Defaults) > 0 {

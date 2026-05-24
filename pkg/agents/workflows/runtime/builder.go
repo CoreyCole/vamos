@@ -39,6 +39,12 @@ func (b *Builder[TConfig]) Agent(id NodeID, prompt PromptSpec) *Builder[TConfig]
 	)
 }
 
+func (b *Builder[TConfig]) Service(id NodeID, spec ServiceSpec) *Builder[TConfig] {
+	return b.node(
+		Node{ID: id, DisplayName: string(id), Kind: NodeKindService, Service: spec},
+	)
+}
+
 func (b *Builder[TConfig]) HumanReview(id NodeID, reason string) *Builder[TConfig] {
 	return b.node(
 		Node{
@@ -191,6 +197,14 @@ func (b *Builder[TConfig]) Build() (Definition, error) {
 		return Definition{}, err
 	}
 	return b.def, nil
+}
+
+func (b *Builder[TConfig]) MustBuild() Definition {
+	def, err := b.Build()
+	if err != nil {
+		panic(err)
+	}
+	return def
 }
 
 func (b *Builder[TConfig]) node(node Node) *Builder[TConfig] {

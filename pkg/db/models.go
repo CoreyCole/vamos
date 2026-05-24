@@ -321,6 +321,38 @@ type PlanWorkspace struct {
 	ArchivedAt                sql.NullTime   `json:"archived_at"`
 }
 
+type ReleaseQueueEvent struct {
+	ID          int64     `json:"id"`
+	ItemID      string    `json:"item_id"`
+	Level       string    `json:"level"`
+	NodeID      string    `json:"node_id"`
+	Message     string    `json:"message"`
+	PayloadJson string    `json:"payload_json"`
+	CreatedAt   time.Time `json:"created_at"`
+}
+
+type ReleaseQueueItem struct {
+	ID                   string       `json:"id"`
+	DefinitionID         string       `json:"definition_id"`
+	DefinitionVersion    string       `json:"definition_version"`
+	WorkflowID           string       `json:"workflow_id"`
+	WorkflowVersion      string       `json:"workflow_version"`
+	FlowID               string       `json:"flow_id"`
+	SourceSlug           string       `json:"source_slug"`
+	TargetLane           string       `json:"target_lane"`
+	ExpectedSourceCommit string       `json:"expected_source_commit"`
+	ExpectedTargetCommit string       `json:"expected_target_commit"`
+	Status               string       `json:"status"`
+	CurrentNodeID        string       `json:"current_node_id"`
+	ActorEmail           string       `json:"actor_email"`
+	ErrorMessage         string       `json:"error_message"`
+	PayloadJson          string       `json:"payload_json"`
+	CreatedAt            time.Time    `json:"created_at"`
+	StartedAt            sql.NullTime `json:"started_at"`
+	FinishedAt           sql.NullTime `json:"finished_at"`
+	UpdatedAt            time.Time    `json:"updated_at"`
+}
+
 type Session struct {
 	ID             string    `json:"id"`
 	UserEmail      string    `json:"user_email"`

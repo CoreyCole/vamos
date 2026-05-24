@@ -11,9 +11,11 @@ import (
 
 type Querier interface {
 	AppendChatSessionEvent(ctx context.Context, arg AppendChatSessionEventParams) (ChatSessionEvent, error)
+	AppendReleaseQueueEvent(ctx context.Context, arg AppendReleaseQueueEventParams) (ReleaseQueueEvent, error)
 	ArchiveAllActivePlanWorkspaces(ctx context.Context) (int64, error)
 	ArchiveMissingPlanWorkspaces(ctx context.Context, planDirRels []string) (int64, error)
 	AttachThreadToWorkspace(ctx context.Context, arg AttachThreadToWorkspaceParams) error
+	ClaimNextPendingReleaseQueueItem(ctx context.Context) (ReleaseQueueItem, error)
 	CompleteAgentRun(ctx context.Context, arg CompleteAgentRunParams) error
 	CountUnresolvedWorkspaceComments(ctx context.Context, workspaceRoot string) (int64, error)
 	CreateAgentEntry(ctx context.Context, arg CreateAgentEntryParams) error
@@ -31,6 +33,7 @@ type Querier interface {
 	CreateDocumentComment(ctx context.Context, arg CreateDocumentCommentParams) (DocumentComment, error)
 	CreateDocumentCommentReply(ctx context.Context, arg CreateDocumentCommentReplyParams) (DocumentCommentReply, error)
 	CreateExternalAgentSession(ctx context.Context, arg CreateExternalAgentSessionParams) (ExternalAgentSession, error)
+	CreateReleaseQueueItem(ctx context.Context, arg CreateReleaseQueueItemParams) (ReleaseQueueItem, error)
 	CreateSession(ctx context.Context, arg CreateSessionParams) (Session, error)
 	CreateWorkspace(ctx context.Context, arg CreateWorkspaceParams) (Workspace, error)
 	CreateWorkspaceEvent(ctx context.Context, arg CreateWorkspaceEventParams) (WorkspaceEvent, error)
@@ -72,6 +75,7 @@ type Querier interface {
 	GetLayoutPreference(ctx context.Context, arg GetLayoutPreferenceParams) (LayoutPreference, error)
 	GetPlanWorkspace(ctx context.Context, planDirRel string) (PlanWorkspace, error)
 	GetRecentAuthAttempts(ctx context.Context, arg GetRecentAuthAttemptsParams) ([]AuthAttempt, error)
+	GetReleaseQueueItem(ctx context.Context, id string) (ReleaseQueueItem, error)
 	GetSession(ctx context.Context, id string) (Session, error)
 	GetSessionByEmail(ctx context.Context, userEmail string) (Session, error)
 	GetSnapshotProcesses(ctx context.Context, snapshotID int64) ([]SystemSnapshotProcess, error)
@@ -88,6 +92,7 @@ type Querier interface {
 	LinkExternalAgentSession(ctx context.Context, arg LinkExternalAgentSessionParams) (ChatSessionExternalLink, error)
 	ListActiveImplWorkspaces(ctx context.Context) ([]ImplWorkspace, error)
 	ListActivePlanWorkspaces(ctx context.Context) ([]PlanWorkspace, error)
+	ListActiveReleaseQueueItems(ctx context.Context) ([]ReleaseQueueItem, error)
 	ListAgentEntryPath(ctx context.Context, arg ListAgentEntryPathParams) ([]ListAgentEntryPathRow, error)
 	ListAgentRunAttachmentsForRun(ctx context.Context, runID string) ([]AgentRunAttachment, error)
 	ListAgentRunAttachmentsForThread(ctx context.Context, threadID string) ([]AgentRunAttachment, error)
@@ -111,7 +116,9 @@ type Querier interface {
 	ListDocumentComments(ctx context.Context, arg ListDocumentCommentsParams) ([]DocumentComment, error)
 	ListImplWorkspaces(ctx context.Context) ([]ImplWorkspace, error)
 	ListOpenChatAnnotationsByIDs(ctx context.Context, ids []string) ([]ChatAnnotation, error)
+	ListRecentReleaseQueueItems(ctx context.Context, limit int64) ([]ReleaseQueueItem, error)
 	ListRecentWorkspaceLogEvents(ctx context.Context, arg ListRecentWorkspaceLogEventsParams) ([]WorkspaceEvent, error)
+	ListReleaseQueueEvents(ctx context.Context, arg ListReleaseQueueEventsParams) ([]ReleaseQueueEvent, error)
 	ListWorkspaceDocs(ctx context.Context, workspaceID string) ([]WorkspaceDoc, error)
 	ListWorkspaceDocumentComments(ctx context.Context, arg ListWorkspaceDocumentCommentsParams) ([]DocumentComment, error)
 	ListWorkspaceEvents(ctx context.Context, arg ListWorkspaceEventsParams) ([]WorkspaceEvent, error)
@@ -123,6 +130,8 @@ type Querier interface {
 	MarkImplWorkspaceCleanedUp(ctx context.Context, workspaceSlug string) (int64, error)
 	MarkImplWorkspaceMerged(ctx context.Context, arg MarkImplWorkspaceMergedParams) (int64, error)
 	MarkMissingImplWorkspacesCleanedUp(ctx context.Context, workspaceSlugs []string) (int64, error)
+	MarkReleaseQueueItemRunning(ctx context.Context, arg MarkReleaseQueueItemRunningParams) (ReleaseQueueItem, error)
+	MarkReleaseQueueItemTerminal(ctx context.Context, arg MarkReleaseQueueItemTerminalParams) (ReleaseQueueItem, error)
 	MarkWorkspaceDocDeleted(ctx context.Context, arg MarkWorkspaceDocDeletedParams) error
 	RecordImplWorkspaceEnvError(ctx context.Context, arg RecordImplWorkspaceEnvErrorParams) error
 	RecordImplWorkspaceEnvRepair(ctx context.Context, workspaceSlug string) error

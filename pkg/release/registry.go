@@ -1,22 +1,29 @@
-package runtime
+package release
 
 import (
 	"fmt"
 	"sort"
 	"sync"
+
+	"github.com/CoreyCole/vamos/pkg/agents/workflows/runtime"
 )
 
-type Registry struct {
-	mu   sync.RWMutex
-	defs map[WorkflowID]map[string]Definition
+type WorkflowRegistry interface {
+	GetVersion(id runtime.WorkflowID, version string) (runtime.Definition, bool)
 }
 
-func NewRegistry() *Registry {
-	return &Registry{defs: map[WorkflowID]map[string]Definition{}}
+type Registry struct {
+	mu        sync.RWMutex
+	workflows WorkflowRegistry
+	defs      map[DefinitionID]map[string]Definition
+}
+
+func NewRegistry(workflows WorkflowRegistry) *Registry {
+	return &Registry{workflows: workflows, defs: map[DefinitionID]map[string]Definition{}}
 }
 
 func (r *Registry) Register(def Definition) error {
-	if err := ValidateDefinition(def); err != nil {
+	if err := ValidateDefinition(def, r.workflows); err != nil {
 		return err
 	}
 	r.mu.Lock()
@@ -25,28 +32,13 @@ func (r *Registry) Register(def Definition) error {
 		r.defs[def.ID] = map[string]Definition{}
 	}
 	if _, exists := r.defs[def.ID][def.Version]; exists {
-		return fmt.Errorf("workflow %q version %q already registered", def.ID, def.Version)
+		return fmt.Errorf("release definition %q version %q already registered", def.ID, def.Version)
 	}
 	r.defs[def.ID][def.Version] = def
 	return nil
 }
 
-func (r *Registry) Get(id WorkflowID) (Definition, bool) {
-	r.mu.RLock()
-	defer r.mu.RUnlock()
-	versions := r.defs[id]
-	if len(versions) == 0 {
-		return Definition{}, false
-	}
-	keys := make([]string, 0, len(versions))
-	for version := range versions {
-		keys = append(keys, version)
-	}
-	sort.Strings(keys)
-	return versions[keys[len(keys)-1]], true
-}
-
-func (r *Registry) GetVersion(id WorkflowID, version string) (Definition, bool) {
+func (r *Registry) Definition(id DefinitionID, version string) (Definition, bool) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 	versions := r.defs[id]

@@ -222,6 +222,53 @@ WHERE plan_dir_rel IS NOT NULL ;
 CREATE UNIQUE INDEX IF NOT EXISTS idx_impl_workspaces_checkout_path
 ON impl_workspaces (checkout_path) ;
 
+CREATE TABLE IF NOT EXISTS release_queue_items (
+id TEXT PRIMARY KEY,
+definition_id TEXT NOT NULL DEFAULT 'default',
+definition_version TEXT NOT NULL DEFAULT 'v1',
+workflow_id TEXT NOT NULL,
+workflow_version TEXT NOT NULL DEFAULT 'v1',
+flow_id TEXT NOT NULL,
+source_slug TEXT NOT NULL DEFAULT '',
+target_lane TEXT NOT NULL DEFAULT '',
+expected_source_commit TEXT NOT NULL DEFAULT '',
+expected_target_commit TEXT NOT NULL DEFAULT '',
+status TEXT NOT NULL CHECK (status IN ('pending',
+'running',
+'succeeded',
+'failed',
+'canceled')),
+current_node_id TEXT NOT NULL DEFAULT '',
+actor_email TEXT NOT NULL DEFAULT '',
+error_message TEXT NOT NULL DEFAULT '',
+payload_json TEXT NOT NULL DEFAULT '{}',
+created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+started_at DATETIME,
+finished_at DATETIME,
+updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+) ;
+
+CREATE INDEX IF NOT EXISTS idx_release_queue_items_active
+ON release_queue_items (status, created_at ASC)
+WHERE status IN ('pending', 'running') ;
+
+CREATE INDEX IF NOT EXISTS idx_release_queue_items_history
+ON release_queue_items (finished_at DESC, created_at DESC)
+WHERE status IN ('succeeded', 'failed', 'canceled') ;
+
+CREATE TABLE IF NOT EXISTS release_queue_events (
+id INTEGER PRIMARY KEY AUTOINCREMENT,
+item_id TEXT NOT NULL REFERENCES release_queue_items (id) ON DELETE CASCADE,
+level TEXT NOT NULL CHECK (level IN ('debug', 'info', 'warn', 'error')),
+node_id TEXT NOT NULL DEFAULT '',
+message TEXT NOT NULL,
+payload_json TEXT NOT NULL DEFAULT '{}',
+created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+) ;
+
+CREATE INDEX IF NOT EXISTS idx_release_queue_events_item_created
+ON release_queue_events (item_id, created_at ASC, id ASC) ;
+
 CREATE TABLE IF NOT EXISTS agent_threads (
 id TEXT PRIMARY KEY,
 user_email TEXT NOT NULL,

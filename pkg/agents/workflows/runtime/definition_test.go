@@ -119,6 +119,27 @@ func TestValidateDefinition(t *testing.T) {
 			wantErr: "has no prompt",
 		},
 		{
+			name: "service node type required",
+			build: func() (Definition, error) {
+				return New[struct{}]("test").Start("start").
+					Service("start", ServiceSpec{}).
+					Done("done").
+					Edge("start", "done").
+					Build()
+			},
+			wantErr: "service type",
+		},
+		{
+			name: "service-only definition allows missing parser converter",
+			build: func() (Definition, error) {
+				return New[struct{}]("test").Start("start").
+					Service("start", ServiceSpec{Type: "release.preflight"}).
+					Done("done").
+					Edge("start", "done").
+					Build()
+			},
+		},
+		{
 			name: "invalid default policy",
 			build: func() (Definition, error) {
 				return validBuilder().PolicySpec(PolicySpec{Defaults: []byte(`{"bad": true}`), Validate: func(json.RawMessage) error { return errors.New("bad policy") }}).
@@ -155,6 +176,20 @@ func TestRegistry(t *testing.T) {
 	}
 	if got, ok := registry.Get("test"); !ok || got.ID != "test" {
 		t.Fatalf("Get() = (%v, %v), want definition", got.ID, ok)
+	}
+	v2 := def
+	v2.Version = "v2"
+	if err := registry.Register(v2); err != nil {
+		t.Fatalf("Register(v2) error = %v", err)
+	}
+	if got, ok := registry.GetVersion("test", "v1"); !ok || got.Version != "v1" {
+		t.Fatalf("GetVersion(v1) = (%v,%v), want v1", got.Version, ok)
+	}
+	if got, ok := registry.Get("test"); !ok || got.Version != "v2" {
+		t.Fatalf("Get() = (%v,%v), want latest v2", got.Version, ok)
+	}
+	if len(registry.Definitions()) != 2 {
+		t.Fatalf("Definitions len = %d, want 2", len(registry.Definitions()))
 	}
 	if err := registry.Register(
 		def,
