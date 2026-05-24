@@ -27,7 +27,7 @@ func TestWorkspaceDocNodeHrefUsesThoughtsForAllEntryModes(t *testing.T) {
 	}
 }
 
-func TestWorkspaceDocTreeRendersDirectoryButtonsAndFileForms(t *testing.T) {
+func TestWorkspaceDocTreeRendersDirectoryButtonsAndFileAnchors(t *testing.T) {
 	args := WorkspaceDocTreeArgs{
 		WorkspaceID: "ws-1",
 		EntryMode:   DocEntryModeAgentChat,
@@ -42,6 +42,7 @@ func TestWorkspaceDocTreeRendersDirectoryButtonsAndFileForms(t *testing.T) {
 				RelPath:  "design.md",
 				Label:    "design.md",
 				Kind:     WorkspaceDocKindFile,
+				Href:     "/thoughts/plans/demo/design.md",
 				IsActive: true,
 			}},
 		}},
@@ -56,10 +57,7 @@ func TestWorkspaceDocTreeRendersDirectoryButtonsAndFileForms(t *testing.T) {
 		`data-doc-scroll-container="workspace"`,
 		`type="button"`,
 		`demo`,
-		`action="/thoughts/actions/select-document"`,
-		`data-on:submit="@post(&#39;/thoughts/actions/select-document&#39;, {contentType: &#39;form&#39;})"`,
-		`name="doc_path"`,
-		`value="plans/demo/design.md"`,
+		`href="/thoughts/plans/demo/design.md"`,
 		`data-current-doc-tree-item="true"`,
 		`data-scroll-into-view__smooth__vnearest`,
 		`workspaceDocTreeNode_plans_demo`,
@@ -72,6 +70,15 @@ func TestWorkspaceDocTreeRendersDirectoryButtonsAndFileForms(t *testing.T) {
 	}
 	if strings.Contains(html, `href="/thoughts/plans/demo"`) {
 		t.Fatalf("workspace doc tree should not render directory anchors:\n%s", html)
+	}
+	for _, notWant := range []string{
+		`action="/thoughts/actions/select-document"`,
+		"data-on:submit",
+		`name="doc_path"`,
+	} {
+		if strings.Contains(html, notWant) {
+			t.Fatalf("rendered tree contains %q in:\n%s", notWant, html)
+		}
 	}
 }
 
@@ -86,6 +93,7 @@ func TestWorkspaceDocTreeHeaderRendersCompactCollapsedControl(t *testing.T) {
 			RelPath:  "plan.md",
 			Label:    "plan.md",
 			Kind:     WorkspaceDocKindFile,
+			Href:     "/thoughts/plans/demo/plan.md",
 			IsActive: true,
 		}},
 	}
@@ -100,8 +108,7 @@ func TestWorkspaceDocTreeHeaderRendersCompactCollapsedControl(t *testing.T) {
 		`aria-expanded`,
 		`demo`,
 		`plan.md`,
-		`action="/thoughts/actions/select-document"`,
-		`name="doc_path"`,
+		`href="/thoughts/plans/demo/plan.md"`,
 		`data-current-doc-tree-item="true"`,
 	} {
 		if !strings.Contains(html, want) {

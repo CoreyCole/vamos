@@ -172,16 +172,21 @@ func BuildWorkspaceDocTreeArgs(
 	currentPath string,
 	entryMode workbench.DocEntryMode,
 	rows []db.WorkspaceDoc,
+	chatStates ...EmbeddedChatLinkState,
 ) *workbench.WorkspaceDocTreeArgs {
 	workspaceID = strings.TrimSpace(workspaceID)
 	if workspaceID == "" {
 		return nil
 	}
+	chat := EmbeddedChatLinkState{}
+	if len(chatStates) > 0 {
+		chat = chatStates[0]
+	}
 	args := &workbench.WorkspaceDocTreeArgs{
 		WorkspaceID:  workspaceID,
 		CurrentPath:  currentPath,
 		EntryMode:    entryMode,
-		Nodes:        buildWorkspaceDocTreeNodes(rows, currentPath),
+		Nodes:        buildWorkspaceDocTreeNodes(rows, currentPath, entryMode, chat),
 		EmptyMessage: "Workspace docs will appear after the workspace sync runs.",
 	}
 	if len(rows) > 0 {
@@ -193,6 +198,8 @@ func BuildWorkspaceDocTreeArgs(
 func buildWorkspaceDocTreeNodes(
 	rows []db.WorkspaceDoc,
 	current string,
+	entryMode workbench.DocEntryMode,
+	chat EmbeddedChatLinkState,
 ) []workbench.WorkspaceDocNode {
 	current = strings.Trim(strings.TrimSpace(path.Clean("/"+current)), "/")
 	type nodeRef struct {
@@ -214,11 +221,16 @@ func buildWorkspaceDocTreeNodes(
 			kind = workbench.WorkspaceDocKindFile
 		}
 		docPath := strings.Trim(strings.TrimSpace(row.DocPath), "/")
+		href := ""
+		if kind == workbench.WorkspaceDocKindFile {
+			href = chat.Preserve(workbench.WorkspaceDocNodeHref(entryMode, docPath))
+		}
 		refs[rel] = &nodeRef{node: &workbench.WorkspaceDocNode{
 			Path:     docPath,
 			RelPath:  rel,
 			Label:    label,
 			Kind:     kind,
+			Href:     href,
 			IsActive: docPath == current,
 		}}
 	}

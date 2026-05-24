@@ -421,9 +421,32 @@ func (s *Service) headerWorkspaceDocTreeNodes(
 		}
 	}
 	if root != "" {
-		return s.BuildWorkspaceDocTreeFromRoot(root, pageArgs.FilePath)
+		nodes, err := s.BuildWorkspaceDocTreeFromRoot(root, pageArgs.FilePath)
+		if err != nil {
+			return nil, err
+		}
+		return decorateWorkspaceDocNodeHrefs(nodes, pageArgs.ChatLinkState), nil
 	}
 	return s.workspaceDocTreeNodesFromIndex(c, pageArgs)
+}
+
+func decorateWorkspaceDocNodeHrefs(
+	nodes []workbench.WorkspaceDocNode,
+	chat EmbeddedChatLinkState,
+) []workbench.WorkspaceDocNode {
+	for i := range nodes {
+		if nodes[i].Kind == workbench.WorkspaceDocKindFile {
+			if strings.TrimSpace(nodes[i].Href) == "" {
+				nodes[i].Href = workbench.WorkspaceDocNodeHref(
+					workbench.DocEntryModeThoughts,
+					nodes[i].Path,
+				)
+			}
+			nodes[i].Href = chat.Preserve(nodes[i].Href)
+		}
+		nodes[i].Children = decorateWorkspaceDocNodeHrefs(nodes[i].Children, chat)
+	}
+	return nodes
 }
 
 func (s *Service) workspaceDocTreeNodesFromIndex(
@@ -450,6 +473,7 @@ func (s *Service) workspaceDocTreeNodesFromIndex(
 		pageArgs.FilePath,
 		workbench.DocEntryModeThoughts,
 		rows,
+		pageArgs.ChatLinkState,
 	)
 	if tree == nil {
 		return nil, nil

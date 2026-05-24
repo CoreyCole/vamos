@@ -253,3 +253,55 @@ func TestBuildThoughtsDirectorySidebarArgsUsesFilesWithEmptyDocument(t *testing.
 		)
 	}
 }
+
+func TestBuildWorkspaceDocTreeArgsPreservesChatState(t *testing.T) {
+	args := BuildWorkspaceDocTreeArgs(
+		"ws-1",
+		"owner/plan-a/design.md",
+		workbench.DocEntryModeThoughts,
+		[]db.WorkspaceDoc{
+			{
+				WorkspaceID: "ws-1",
+				DocPath:     "owner/plan-a",
+				RelPath:     ".",
+				Kind:        string(workbench.WorkspaceDocKindDir),
+				Title:       "plan-a",
+			},
+			{
+				WorkspaceID: "ws-1",
+				DocPath:     "owner/plan-a/design.md",
+				RelPath:     "design.md",
+				Kind:        string(workbench.WorkspaceDocKindFile),
+				Title:       "design.md",
+			},
+		},
+		EmbeddedChatLinkState{
+			Active:      true,
+			WorkspaceID: "ws 1",
+			ThreadID:    "th/1",
+			RunID:       "run+1",
+		},
+	)
+	if args == nil || len(args.Nodes) != 1 || len(args.Nodes[0].Children) != 1 {
+		t.Fatalf("workspace doc tree args = %#v", args)
+	}
+	node := args.Nodes[0].Children[0]
+	parsed, err := url.Parse(node.Href)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if parsed.Path != "/thoughts/owner/plan-a/design.md" {
+		t.Fatalf("path = %q", parsed.Path)
+	}
+	query := parsed.Query()
+	for key, want := range map[string]string{
+		"context":        "chat",
+		"chat_workspace": "ws 1",
+		"thread":         "th/1",
+		"run":            "run+1",
+	} {
+		if got := query.Get(key); got != want {
+			t.Fatalf("query[%s]=%q want %q in %q", key, got, want, node.Href)
+		}
+	}
+}

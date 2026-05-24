@@ -506,6 +506,7 @@ func (s *Service) BuildWorkspaceDocTreeFromRoot(
 				RelPath:  strings.TrimPrefix(strings.TrimPrefix(rel, rootRel), "/"),
 				Label:    file.Name(),
 				Kind:     workbench.WorkspaceDocKindFile,
+				Href:     workbench.WorkspaceDocNodeHref(workbench.DocEntryModeThoughts, rel),
 				IsActive: currentRel == rel,
 			})
 		}

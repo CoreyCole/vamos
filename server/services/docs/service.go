@@ -139,11 +139,16 @@ func buildWorkspaceDocTreeNodes(
 			kind = workbench.WorkspaceDocKindFile
 		}
 		docPath := strings.Trim(strings.TrimSpace(row.DocPath), "/")
+		href := ""
+		if kind == workbench.WorkspaceDocKindFile {
+			href = workbench.WorkspaceDocNodeHref(workbench.DocEntryModeThoughts, docPath)
+		}
 		refs[rel] = &nodeRef{node: &workbench.WorkspaceDocNode{
 			Path:     docPath,
 			RelPath:  rel,
 			Label:    label,
 			Kind:     kind,
+			Href:     href,
 			IsActive: docPath == current,
 		}}
 	}

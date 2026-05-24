@@ -36,6 +36,7 @@ type WorkspaceDocNode struct {
 	RelPath    string
 	Label      string
 	Kind       WorkspaceDocKind
+	Href       string
 	IsActive   bool
 	IsExpanded bool
 	Children   []WorkspaceDocNode
@@ -57,7 +58,7 @@ func WorkspaceDocNodeHref(mode DocEntryMode, docPath string) string {
 
 func WorkspaceDocNodeFormAction(mode DocEntryMode, node WorkspaceDocNode) string {
 	_ = mode
-	if node.Kind == WorkspaceDocKindDir {
+	if node.Kind == WorkspaceDocKindDir || strings.TrimSpace(node.Href) != "" {
 		return ""
 	}
 	return "@post('/thoughts/actions/select-document', {contentType: 'form'})"

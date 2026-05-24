@@ -66,6 +66,18 @@ templ WorkspaceDocTreeNode(mode DocEntryMode, node WorkspaceDocNode) {
 				<span data-show={ "$" + openSignal }>▾</span>
 				<span class="truncate">{ node.Label }</span>
 			</button>
+		} else if node.Href != "" {
+			<a
+				href={ templ.SafeURL(node.Href) }
+				class={
+					"block w-full rounded-md px-2 py-1 text-left transition-colors",
+					templ.KV("bg-accent font-medium text-accent-foreground", node.IsActive),
+					templ.KV("text-muted-foreground hover:bg-accent hover:text-accent-foreground", !node.IsActive),
+				}
+				{ CurrentDocScrollAttrs(node.IsActive)... }
+			>
+				{ node.Label }
+			</a>
 		} else if WorkspaceDocNodeFormAction(mode, node) != "" {
 			<form method="post" action="/thoughts/actions/select-document" data-on:submit={ WorkspaceDocNodeFormAction(mode, node) }>
 				for name, value := range WorkspaceDocNodeHiddenFields(node) {
