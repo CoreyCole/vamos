@@ -175,24 +175,77 @@ templ ReleaseQueueItemCard(item ReleaseQueueItem) {
 }
 
 templ WorkspacesList(items []ImplWorkspaceView, managerURL string, showHistorical bool) {
-	<div id="workspaces-list" class="grid gap-3">
-		for _, view := range items {
-			@ImplWorkspaceTreeItem(view, managerURL, showHistorical)
-		}
+	<div id="workspaces-list" class="overflow-hidden rounded-xl border bg-card text-card-foreground shadow-sm">
+		@WorkspacesTable(items, managerURL, showHistorical)
 	</div>
 }
 
-templ ImplWorkspaceTreeItem(view ImplWorkspaceView, managerURL string, showHistorical bool) {
-	<div class="grid gap-3" data-workspace-tree-item={ workspaceViewSlug(view) }>
-		@ImplWorkspaceCard(view, managerURL, showHistorical)
-		if len(view.Children) > 0 {
-			<div class="ml-4 grid gap-3 border-l pl-4 md:ml-8 md:pl-6" data-workspace-children={ workspaceViewSlug(view) }>
-				for _, child := range view.Children {
-					@ImplWorkspaceTreeItem(child, managerURL, showHistorical)
+templ WorkspacesTable(items []ImplWorkspaceView, managerURL string, showHistorical bool) {
+	<div class="overflow-x-auto">
+		<table class="w-full text-sm">
+			<thead class="bg-muted/50 text-left text-xs uppercase tracking-wide text-muted-foreground">
+				<tr>
+					<th class="px-3 py-2">Workspace</th>
+					<th class="px-3 py-2">QRSPI</th>
+					<th class="px-3 py-2">Runtime</th>
+					<th class="px-3 py-2">Branch</th>
+					<th class="px-3 py-2">Commit</th>
+					<th class="px-3 py-2">Release</th>
+					<th class="px-3 py-2 text-right">Actions</th>
+				</tr>
+			</thead>
+			<tbody class="divide-y">
+				for _, view := range items {
+					@WorkspaceTableRow(view, managerURL, showHistorical)
+					for _, child := range view.Children {
+						@WorkspaceTableRow(child, managerURL, showHistorical)
+					}
 				}
-			</div>
-		}
+			</tbody>
+		</table>
 	</div>
+	for _, view := range items {
+		@WorkspaceDetailDialog(view, managerURL, showHistorical)
+		for _, child := range view.Children {
+			@WorkspaceDetailDialog(child, managerURL, showHistorical)
+		}
+	}
+}
+
+templ WorkspaceTableRow(view ImplWorkspaceView, managerURL string, showHistorical bool) {
+	{{ slug := workspaceViewSlug(view) }}
+	<tr data-workspace-row={ slug } class="hover:bg-muted/40">
+		<td class="px-3 py-2 align-top">
+			<button type="button" class="font-medium hover:underline" data-on:click={ "document.getElementById('workspace-dialog-" + slug + "').showModal()" }>{ workspaceViewLabel(view) }</button>
+			if slug != "" {
+				<p class="break-all font-mono text-xs text-muted-foreground">{ slug }</p>
+			}
+		</td>
+		<td class="px-3 py-2 align-top">{ workspaceQRSPIBadge(view) }</td>
+		<td class="px-3 py-2 align-top">{ workspaceRuntimeLabel(view) }</td>
+		<td class="px-3 py-2 align-top font-mono text-xs">{ workspaceBranchLabel(view) }</td>
+		<td class="px-3 py-2 align-top font-mono text-xs">{ shortCommit(workspaceCommit(view)) }</td>
+		<td class="px-3 py-2 align-top">{ workspaceReleaseSummary(view) }</td>
+		<td class="px-3 py-2 align-top">
+			<div class="flex justify-end gap-2">
+				@WorkspaceLifecycleActions(view, managerURL, showHistorical)
+			</div>
+		</td>
+	</tr>
+}
+
+templ WorkspaceDetailDialog(view ImplWorkspaceView, managerURL string, showHistorical bool) {
+	{{ slug := workspaceViewSlug(view) }}
+	<dialog id={ "workspace-dialog-" + slug } class="w-full max-w-4xl rounded-xl bg-background p-0 text-foreground shadow-xl backdrop:bg-background/70">
+		<div class="max-h-[85vh] overflow-y-auto p-4">
+			<div class="mb-3 flex justify-end">
+				<form method="dialog">
+					<button class="inline-flex h-9 items-center rounded-md border px-3 text-sm font-medium hover:bg-accent">Close</button>
+				</form>
+			</div>
+			@ImplWorkspaceCard(view, managerURL, showHistorical)
+		</div>
+	</dialog>
 }
 
 templ WorkspaceRecovery(model RecoveryModel) {
@@ -385,59 +438,66 @@ templ ImplWorkspaceCard(view ImplWorkspaceView, managerURL string, showHistorica
 		}
 		<div class="mt-auto flex flex-wrap justify-end gap-2 pt-2">
 			@WorkspaceCleanupButton(workspaceCleanupAction(view))
-			if canActOnImplWorkspace(view) && normalizedObservedState(snap) == WorkspaceObservedRunning && ws.URL != "" {
-				<a href={ templ.SafeURL(managerURL + "/workspaces/switch/" + slug + "?redirect=" + url.QueryEscape("/")) } class="inline-flex h-9 items-center rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground hover:bg-primary/90">Open</a>
-			}
-			if canActOnImplWorkspace(view) && workspaceTransitioning(snap) {
-				<button type="button" disabled class="inline-flex h-9 items-center rounded-md border px-3 text-sm font-medium opacity-50">
-					if normalizedObservedState(snap) == WorkspaceObservedStarting {
-						Starting...
-					} else {
-						Stopping...
-					}
-				</button>
-			}
-			if canActOnImplWorkspace(view) && workspaceCanStart(snap) {
-				{{ indicator := workspaceActionIndicator(slug, "start") }}
-				{{ indicatorSignal := workspaceActionIndicatorSignal(slug, "start") }}
-				<form method="post" action={ templ.SafeURL("/workspaces/" + slug + "/start") } data-indicator={ indicator } data-on:submit={ "@post('/workspaces/" + slug + "/start', {contentType: 'form'})" }>
-					if showHistorical {
-						<input type="hidden" name="show_historical" value="true"/>
-					}
-					<button type="submit" data-attr-disabled={ indicatorSignal } class="inline-flex h-9 items-center rounded-md border px-3 text-sm font-medium hover:bg-accent">
-						<span data-show={ "!" + indicatorSignal }>Start</span>
-						<span data-show={ indicatorSignal }>Starting...</span>
-					</button>
-				</form>
-			}
-			if canActOnImplWorkspace(view) && workspaceCanRestart(snap) {
-				{{ indicator := workspaceActionIndicator(slug, "restart") }}
-				{{ indicatorSignal := workspaceActionIndicatorSignal(slug, "restart") }}
-				<form method="post" action={ templ.SafeURL("/workspaces/" + slug + "/restart") } data-indicator={ indicator } data-on:submit={ "@post('/workspaces/" + slug + "/restart', {contentType: 'form'})" }>
-					if showHistorical {
-						<input type="hidden" name="show_historical" value="true"/>
-					}
-					<button type="submit" data-attr-disabled={ indicatorSignal } class="inline-flex h-9 items-center rounded-md border px-3 text-sm font-medium hover:bg-accent">
-						<span data-show={ "!" + indicatorSignal }>Restart</span>
-						<span data-show={ indicatorSignal }>Restarting...</span>
-					</button>
-				</form>
-			}
-			if canActOnImplWorkspace(view) && workspaceCanStop(snap) {
-				{{ indicator := workspaceActionIndicator(slug, "stop") }}
-				{{ indicatorSignal := workspaceActionIndicatorSignal(slug, "stop") }}
-				<form method="post" action={ templ.SafeURL("/workspaces/" + slug + "/stop") } data-indicator={ indicator } data-on:submit={ "@post('/workspaces/" + slug + "/stop', {contentType: 'form'})" }>
-					if showHistorical {
-						<input type="hidden" name="show_historical" value="true"/>
-					}
-					<button type="submit" data-attr-disabled={ indicatorSignal } class="inline-flex h-9 items-center rounded-md border px-3 text-sm font-medium text-destructive hover:bg-accent">
-						<span data-show={ "!" + indicatorSignal }>Stop</span>
-						<span data-show={ indicatorSignal }>Stopping...</span>
-					</button>
-				</form>
-			}
+			@WorkspaceLifecycleActions(view, managerURL, showHistorical)
 		</div>
 	</article>
+}
+
+templ WorkspaceLifecycleActions(view ImplWorkspaceView, managerURL string, showHistorical bool) {
+	{{ snap := view.Runtime }}
+	{{ ws := snap.Workspace }}
+	{{ slug := workspaceViewSlug(view) }}
+	if canActOnImplWorkspace(view) && normalizedObservedState(snap) == WorkspaceObservedRunning && ws.URL != "" {
+		<a href={ templ.SafeURL(managerURL + "/workspaces/switch/" + slug + "?redirect=" + url.QueryEscape("/")) } class="inline-flex h-9 items-center rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground hover:bg-primary/90">Open</a>
+	}
+	if canActOnImplWorkspace(view) && workspaceTransitioning(snap) {
+		<button type="button" disabled class="inline-flex h-9 items-center rounded-md border px-3 text-sm font-medium opacity-50">
+			if normalizedObservedState(snap) == WorkspaceObservedStarting {
+				Starting...
+			} else {
+				Stopping...
+			}
+		</button>
+	}
+	if canActOnImplWorkspace(view) && workspaceCanStart(snap) {
+		{{ indicator := workspaceActionIndicator(slug, "start") }}
+		{{ indicatorSignal := workspaceActionIndicatorSignal(slug, "start") }}
+		<form method="post" action={ templ.SafeURL("/workspaces/" + slug + "/start") } data-indicator={ indicator } data-on:submit={ "@post('/workspaces/" + slug + "/start', {contentType: 'form'})" }>
+			if showHistorical {
+				<input type="hidden" name="show_historical" value="true"/>
+			}
+			<button type="submit" data-attr-disabled={ indicatorSignal } class="inline-flex h-9 items-center rounded-md border px-3 text-sm font-medium hover:bg-accent">
+				<span data-show={ "!" + indicatorSignal }>Start</span>
+				<span data-show={ indicatorSignal }>Starting...</span>
+			</button>
+		</form>
+	}
+	if canActOnImplWorkspace(view) && workspaceCanRestart(snap) {
+		{{ indicator := workspaceActionIndicator(slug, "restart") }}
+		{{ indicatorSignal := workspaceActionIndicatorSignal(slug, "restart") }}
+		<form method="post" action={ templ.SafeURL("/workspaces/" + slug + "/restart") } data-indicator={ indicator } data-on:submit={ "@post('/workspaces/" + slug + "/restart', {contentType: 'form'})" }>
+			if showHistorical {
+				<input type="hidden" name="show_historical" value="true"/>
+			}
+			<button type="submit" data-attr-disabled={ indicatorSignal } class="inline-flex h-9 items-center rounded-md border px-3 text-sm font-medium hover:bg-accent">
+				<span data-show={ "!" + indicatorSignal }>Restart</span>
+				<span data-show={ indicatorSignal }>Restarting...</span>
+			</button>
+		</form>
+	}
+	if canActOnImplWorkspace(view) && workspaceCanStop(snap) {
+		{{ indicator := workspaceActionIndicator(slug, "stop") }}
+		{{ indicatorSignal := workspaceActionIndicatorSignal(slug, "stop") }}
+		<form method="post" action={ templ.SafeURL("/workspaces/" + slug + "/stop") } data-indicator={ indicator } data-on:submit={ "@post('/workspaces/" + slug + "/stop', {contentType: 'form'})" }>
+			if showHistorical {
+				<input type="hidden" name="show_historical" value="true"/>
+			}
+			<button type="submit" data-attr-disabled={ indicatorSignal } class="inline-flex h-9 items-center rounded-md border px-3 text-sm font-medium text-destructive hover:bg-accent">
+				<span data-show={ "!" + indicatorSignal }>Stop</span>
+				<span data-show={ indicatorSignal }>Stopping...</span>
+			</button>
+		</form>
+	}
 }
 
 templ WorkspaceCleanupButton(action WorkspaceCleanupAction) {

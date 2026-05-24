@@ -173,6 +173,54 @@ func workspaceQRSPIBadge(view ImplWorkspaceView) string {
 	return workspaceWorkflowStageLabel(view.Workflow)
 }
 
+func workspaceRuntimeLabel(view ImplWorkspaceView) string {
+	if isHistoricalImplWorkspaceView(view) {
+		return workspaceImplStatusBadge(view)
+	}
+	return workspaceTransitionLabel(view.Runtime)
+}
+
+func workspaceBranchLabel(view ImplWorkspaceView) string {
+	if branch := workspaceTopBranch(view.Runtime.Workspace); branch != "" {
+		return branch
+	}
+	if branch := strings.TrimSpace(view.Runtime.Workspace.Branch); branch != "" {
+		return branch
+	}
+	if view.Row.TopBranch.Valid && strings.TrimSpace(view.Row.TopBranch.String) != "" {
+		return strings.TrimSpace(view.Row.TopBranch.String)
+	}
+	if view.Row.Branch.Valid && strings.TrimSpace(view.Row.Branch.String) != "" {
+		return strings.TrimSpace(view.Row.Branch.String)
+	}
+	return "—"
+}
+
+func workspaceCommit(view ImplWorkspaceView) string {
+	if commit := strings.TrimSpace(view.Runtime.Workspace.Commit); commit != "" {
+		return commit
+	}
+	if view.Row.CommitHash.Valid {
+		return strings.TrimSpace(view.Row.CommitHash.String)
+	}
+	return ""
+}
+
+func shortCommit(commit string) string {
+	commit = strings.TrimSpace(commit)
+	if len(commit) > 7 {
+		return commit[:7]
+	}
+	if commit == "" {
+		return "—"
+	}
+	return commit
+}
+
+func workspaceViewLabel(view ImplWorkspaceView) string {
+	return workspaceViewTitle(view)
+}
+
 func workspaceReleaseSummary(view ImplWorkspaceView) string {
 	if len(view.ReleaseActions) == 0 {
 		return "No release action"

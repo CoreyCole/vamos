@@ -339,7 +339,7 @@ func TestLifecycleNotifierSubscribeCleanup(t *testing.T) {
 	}
 }
 
-func TestWorkspacesPageRendersWorkspaceCardsAndForms(t *testing.T) {
+func TestWorkspacesPageRendersWorkspaceTableAndDialogs(t *testing.T) {
 	items := []Workspace{
 		{
 			Slug:         "main",
@@ -391,12 +391,21 @@ func TestWorkspacesPageRendersWorkspaceCardsAndForms(t *testing.T) {
 		"Implementation workspace",
 		"Local checkout",
 		"main",
+		"<table",
+		`data-workspace-row="main"`,
+		`id="workspace-dialog-main"`,
+		"QRSPI",
+		"Runtime",
+		"Branch",
+		"Commit",
+		"Release",
 		"/workspaces/switch/main",
 		"127.0.0.1:4200",
 		`method="post"`,
 		`data-init="@get('/workspaces/stream')"`,
 		`id="workspaces-list"`,
 		"Feature Branch",
+		`data-workspace-row="feature"`,
 		`action="/workspaces/feature/start"`,
 		"Crashed Branch",
 		"exit status 1",
@@ -595,8 +604,9 @@ func TestWorkspacesPageRendersNestedReviewWorkspaces(t *testing.T) {
 		)
 	}
 	for _, want := range []string{
-		`data-workspace-children="parent"`,
-		`data-workspace-tree-item="review-child"`,
+		`data-workspace-row="parent"`,
+		`data-workspace-row="review-child"`,
+		`id="workspace-dialog-review-child"`,
 		`action="/workspaces/review-child/start"`,
 		"creative-mode-agent/plans/workspace-discovery-sync/reviews/implementation-review",
 	} {
