@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/CoreyCole/vamos/pkg/agents/workflows/runtime"
+	"github.com/CoreyCole/vamos/pkg/db"
 	"github.com/CoreyCole/vamos/pkg/release"
 )
 
@@ -27,6 +28,63 @@ func TestEvaluateReleaseActionsUsesConfiguredCheckoutSlugs(t *testing.T) {
 	stageActions := EvaluateReleaseActions(reg, lanes, Workspace{Slug: "integration", Commit: "stage-1"})
 	if len(stageActions) != 1 || stageActions[0].FlowID != "release_to_main" || stageActions[0].TargetLane != "main" {
 		t.Fatalf("stage actions = %+v", stageActions)
+	}
+}
+
+func TestReleaseProjectionMovesFeatureActionsToRows(t *testing.T) {
+	reg := testReleaseRegistry(t)
+	projector := &ReleaseProjector{Registry: reg}
+	views := lifecycleSnapshotsToImplViews([]WorkspaceLifecycleSnapshot{
+		snapshotFromState(Workspace{Slug: "feature-a", Commit: "feature-1"}, WorkspaceLifecycleState{}),
+		snapshotFromState(Workspace{Slug: "integration", Commit: "stage-1"}, WorkspaceLifecycleState{}),
+		snapshotFromState(Workspace{Slug: "trunk", Commit: "main-1", IsMain: true}, WorkspaceLifecycleState{}),
+	})
+
+	panel, rowActions, err := projector.BuildWorkspaceProjection(context.Background(), views)
+	if err != nil {
+		t.Fatalf("BuildWorkspaceProjection: %v", err)
+	}
+	for _, lane := range panel.Lanes {
+		for _, action := range lane.Actions {
+			if action.FlowID == "promote_to_stage" && action.SourceSlug == "feature-a" {
+				t.Fatalf("feature action leaked into panel lane actions: %+v", action)
+			}
+		}
+	}
+	if len(rowActions["feature-a"]) != 1 {
+		t.Fatalf("feature row actions = %+v", rowActions)
+	}
+	if got := rowActions["feature-a"][0]; got.FlowID != "promote_to_stage" || got.TargetLane != "stage" {
+		t.Fatalf("feature row action = %+v", got)
+	}
+}
+
+func TestResolveReleaseActionFindsRowAction(t *testing.T) {
+	reg := testReleaseRegistry(t)
+	panel := ReleasePanelModel{Enabled: true}
+	views := []ImplWorkspaceView{{
+		Row: db.ImplWorkspace{WorkspaceSlug: "feature-a"},
+		ReleaseActions: []ReleaseActionView{{
+			DefinitionID:         "default",
+			DefinitionVersion:    "v1",
+			FlowID:               "promote_to_stage",
+			SourceSlug:           "feature-a",
+			ExpectedSourceCommit: "feature-1",
+			ExpectedTargetCommit: "stage-1",
+		}},
+	}}
+
+	_, action, ok := resolveReleaseAction(panel, views, reg, releaseEnqueueRequest{
+		DefinitionID:      "default",
+		DefinitionVersion: "v1",
+		FlowID:            "promote_to_stage",
+		SourceSlug:        "feature-a",
+	})
+	if !ok {
+		t.Fatal("resolveReleaseAction did not find row action")
+	}
+	if action.SourceSlug != "feature-a" || action.FlowID != "promote_to_stage" {
+		t.Fatalf("action = %+v", action)
 	}
 }
 

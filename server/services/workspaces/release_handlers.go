@@ -20,15 +20,11 @@ func (h *Handler) HandleEnqueueRelease(c echo.Context) error {
 	if err != nil {
 		return err
 	}
-	views, err := h.listImplWorkspaceViews(c.Request().Context())
+	model, err := h.buildWorkspacesPageModel(c.Request().Context())
 	if err != nil {
 		return err
 	}
-	panel, err := h.releasePanelForViews(c.Request().Context(), views)
-	if err != nil {
-		return err
-	}
-	def, action, ok := resolveReleaseAction(panel, h.releaseProjector.Registry, req)
+	def, action, ok := resolveReleaseAction(model.ReleasePanel, model.Views, h.releaseProjector.Registry, req)
 	if !ok {
 		return echo.NewHTTPError(http.StatusBadRequest, "release action is unavailable")
 	}
@@ -64,7 +60,7 @@ func (h *Handler) HandleEnqueueRelease(c echo.Context) error {
 	}
 	h.notifier.Notify("release-queue")
 	if isDatastarRequest(c.Request()) {
-		return h.patchWorkspaces(c, views)
+		return h.patchWorkspaces(c, model.Views)
 	}
 	return c.Redirect(http.StatusSeeOther, "/workspaces")
 }
@@ -96,12 +92,12 @@ func parseReleaseEnqueueForm(c echo.Context) (releaseEnqueueRequest, error) {
 	return req, nil
 }
 
-func resolveReleaseAction(panel ReleasePanelModel, reg *release.Registry, req releaseEnqueueRequest) (release.Definition, ReleaseActionView, bool) {
+func resolveReleaseAction(panel ReleasePanelModel, views []ImplWorkspaceView, reg *release.Registry, req releaseEnqueueRequest) (release.Definition, ReleaseActionView, bool) {
 	def, ok := reg.Definition(req.DefinitionID, req.DefinitionVersion)
 	if !ok {
 		return release.Definition{}, ReleaseActionView{}, false
 	}
-	for _, action := range releasePanelActions(panel) {
+	for _, action := range releaseProjectedActions(panel, views) {
 		if action.DefinitionID == req.DefinitionID && action.DefinitionVersion == req.DefinitionVersion && action.FlowID == req.FlowID && action.SourceSlug == req.SourceSlug {
 			return def, action, true
 		}
@@ -109,11 +105,19 @@ func resolveReleaseAction(panel ReleasePanelModel, reg *release.Registry, req re
 	return release.Definition{}, ReleaseActionView{}, false
 }
 
-func releasePanelActions(panel ReleasePanelModel) []ReleaseActionView {
-	actions := append([]ReleaseActionView{}, panel.FeatureActions...)
+func releaseProjectedActions(panel ReleasePanelModel, views []ImplWorkspaceView) []ReleaseActionView {
+	actions := make([]ReleaseActionView, 0)
 	for _, lane := range panel.Lanes {
 		actions = append(actions, lane.Actions...)
 	}
+	var walk func([]ImplWorkspaceView)
+	walk = func(items []ImplWorkspaceView) {
+		for _, view := range items {
+			actions = append(actions, view.ReleaseActions...)
+			walk(view.Children)
+		}
+	}
+	walk(views)
 	return actions
 }
 
@@ -127,11 +131,14 @@ func newReleaseQueueItemID() (string, error) {
 
 func (h *Handler) patchWorkspaces(c echo.Context, views []ImplWorkspaceView) error {
 	showHistorical := showHistoricalFromRequest(c.Request())
-	renderedViews := filterHistoricalImplWorkspaceViews(views, showHistorical)
-	panel, err := h.releasePanelForViews(c.Request().Context(), views)
+	panel, rowActions, err := h.releaseProjectionForViews(c.Request().Context(), views)
 	if err != nil {
 		return err
 	}
+	if len(rowActions) > 0 {
+		views = applyOptionsToImplWorkspaceViews(views, WithWorkspaceReleaseActions(rowActions))
+	}
+	renderedViews := filterHistoricalImplWorkspaceViews(views, showHistorical)
 	sse := datastar.NewSSE(c.Response().Writer, c.Request())
 	c.Response().WriteHeader(http.StatusAccepted)
 	if err := sse.PatchElementTempl(WorkspacesHeader(h.isRefreshInFlight(), showHistorical), datastar.WithSelectorID("workspaces-header"), datastar.WithModeOuter()); err != nil {

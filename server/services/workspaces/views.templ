@@ -101,14 +101,6 @@ templ ReleasePanel(panel ReleasePanelModel) {
 							}
 						</div>
 					}
-					if len(panel.FeatureActions) > 0 {
-						<h3 class="pt-2 text-sm font-semibold uppercase tracking-wide text-muted-foreground">Workspace actions</h3>
-						<div class="flex flex-wrap gap-2 rounded-lg border p-3">
-							for _, action := range panel.FeatureActions {
-								@ReleaseActionForm(action)
-							}
-						</div>
-					}
 				</div>
 				<div class="space-y-3">
 					<h3 class="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Active</h3>
@@ -381,6 +373,16 @@ templ ImplWorkspaceCard(view ImplWorkspaceView, managerURL string, showHistorica
 				<dd class="min-w-0 break-words text-sm text-destructive">{ ws.Error }</dd>
 			}
 		</dl>
+		if len(view.ReleaseActions) > 0 {
+			<div class="rounded-md border bg-muted/20 p-3">
+				<p class="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Release actions</p>
+				<div class="mt-2 flex flex-wrap gap-2">
+					for _, action := range view.ReleaseActions {
+						@ReleaseActionForm(action)
+					}
+				</div>
+			</div>
+		}
 		<div class="mt-auto flex flex-wrap justify-end gap-2 pt-2">
 			@WorkspaceCleanupButton(workspaceCleanupAction(view))
 			if canActOnImplWorkspace(view) && normalizedObservedState(snap) == WorkspaceObservedRunning && ws.URL != "" {

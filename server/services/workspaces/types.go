@@ -224,6 +224,16 @@ type ImplWorkspaceDiscoveryConfig struct {
 	ConfiguredCheckouts map[string]ConfiguredCheckout
 }
 
+type WorkspaceWorkflowSummary struct {
+	WorkflowType    string
+	Stage           string
+	Status          string
+	Outcome         string
+	WaitingHuman    bool
+	NextStep        string
+	PrimaryArtifact string
+}
+
 type RuntimeConfig struct {
 	ListenAddress    string
 	ManagerURL       string

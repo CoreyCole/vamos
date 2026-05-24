@@ -219,12 +219,12 @@ func (h *Handler) RegisterInternalProvisionRoute(e *echo.Echo) {
 }
 
 func (h *Handler) HandleWorkspacesPage(c echo.Context) error {
-	views, err := h.listImplWorkspaceViews(c.Request().Context())
+	model, err := h.buildWorkspacesPageModel(c.Request().Context())
 	if err != nil {
 		return err
 	}
 	showHistorical := showHistoricalFromRequest(c.Request())
-	renderedViews := filterHistoricalImplWorkspaceViews(views, showHistorical)
+	renderedViews := filterHistoricalImplWorkspaceViews(model.Views, showHistorical)
 	args := layouts.RootArgs{
 		Title:       "Workspaces",
 		CurrentPath: "/workspaces",
@@ -240,14 +240,10 @@ func (h *Handler) HandleWorkspacesPage(c echo.Context) error {
 		CurrentWorkspaceSlug: h.currentSlug,
 		WorkspaceManagerURL:  h.managerURL,
 	}
-	releasePanel, err := h.releasePanelForViews(c.Request().Context(), views)
-	if err != nil {
-		return err
-	}
 	return render(
 		c,
 		http.StatusOK,
-		WorkspacesDocument(args, renderedViews, releasePanel, h.isRefreshInFlight(), showHistorical),
+		WorkspacesDocument(args, renderedViews, model.ReleasePanel, h.isRefreshInFlight(), showHistorical),
 	)
 }
 
@@ -378,11 +374,11 @@ func (h *Handler) HandleWorkspacesStream(c echo.Context) error {
 	showHistorical := showHistoricalFromRequest(c.Request())
 	sse := datastar.NewSSE(c.Response().Writer, c.Request())
 	send := func() error {
-		views, err := h.listImplWorkspaceViews(c.Request().Context())
+		model, err := h.buildWorkspacesPageModel(c.Request().Context())
 		if err != nil {
 			return err
 		}
-		views = filterHistoricalImplWorkspaceViews(views, showHistorical)
+		views := filterHistoricalImplWorkspaceViews(model.Views, showHistorical)
 		if err := sse.PatchElementTempl(
 			WorkspacesHeader(h.isRefreshInFlight(), showHistorical),
 			datastar.WithSelectorID("workspaces-header"),
@@ -390,12 +386,8 @@ func (h *Handler) HandleWorkspacesStream(c echo.Context) error {
 		); err != nil {
 			return err
 		}
-		releasePanel, err := h.releasePanelForViews(c.Request().Context(), views)
-		if err != nil {
-			return err
-		}
 		if err := sse.PatchElementTempl(
-			ReleasePanel(releasePanel),
+			ReleasePanel(model.ReleasePanel),
 			datastar.WithSelectorID("release-queue-panel"),
 			datastar.WithModeOuter(),
 		); err != nil {
@@ -737,6 +729,26 @@ func (h *Handler) listLifecycle(
 	return snapshots, nil
 }
 
+type workspacesPageModel struct {
+	Views        []ImplWorkspaceView
+	ReleasePanel ReleasePanelModel
+}
+
+func (h *Handler) buildWorkspacesPageModel(ctx context.Context) (workspacesPageModel, error) {
+	views, err := h.listImplWorkspaceViews(ctx)
+	if err != nil {
+		return workspacesPageModel{}, err
+	}
+	panel, rowActions, err := h.releaseProjectionForViews(ctx, views)
+	if err != nil {
+		return workspacesPageModel{}, err
+	}
+	if len(rowActions) > 0 {
+		views = applyOptionsToImplWorkspaceViews(views, WithWorkspaceReleaseActions(rowActions))
+	}
+	return workspacesPageModel{Views: views, ReleasePanel: panel}, nil
+}
+
 func (h *Handler) listImplWorkspaceViews(
 	ctx context.Context,
 ) ([]ImplWorkspaceView, error) {
@@ -755,11 +767,11 @@ func (h *Handler) listImplWorkspaceViews(
 	return BuildImplWorkspaceViews(rows, nonMain, main), nil
 }
 
-func (h *Handler) releasePanelForViews(ctx context.Context, views []ImplWorkspaceView) (ReleasePanelModel, error) {
+func (h *Handler) releaseProjectionForViews(ctx context.Context, views []ImplWorkspaceView) (ReleasePanelModel, map[string][]ReleaseActionView, error) {
 	if h.releaseProjector == nil {
-		return ReleasePanelModel{Enabled: false}, nil
+		return ReleasePanelModel{Enabled: false}, nil, nil
 	}
-	return h.releaseProjector.BuildPanel(ctx, views)
+	return h.releaseProjector.BuildWorkspaceProjection(ctx, views)
 }
 
 func snapshotsToWorkspaces(items []WorkspaceLifecycleSnapshot) []Workspace {

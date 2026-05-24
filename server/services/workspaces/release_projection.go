@@ -36,22 +36,28 @@ type ReleasePreflightResult struct {
 }
 
 func (p *ReleaseProjector) BuildPanel(ctx context.Context, views []ImplWorkspaceView) (ReleasePanelModel, error) {
+	panel, _, err := p.BuildWorkspaceProjection(ctx, views)
+	return panel, err
+}
+
+func (p *ReleaseProjector) BuildWorkspaceProjection(ctx context.Context, views []ImplWorkspaceView) (ReleasePanelModel, map[string][]ReleaseActionView, error) {
 	if p == nil || p.Registry == nil {
-		return ReleasePanelModel{Enabled: false}, nil
+		return ReleasePanelModel{Enabled: false}, nil, nil
 	}
 	workspaces := flattenImplWorkspaceViews(views)
 	defs := p.Registry.Definitions()
 	if len(defs) == 0 {
-		return ReleasePanelModel{Enabled: false}, nil
+		return ReleasePanelModel{Enabled: false}, nil, nil
 	}
 
 	active, history, err := p.releaseQueue(ctx)
 	if err != nil {
-		return ReleasePanelModel{}, err
+		return ReleasePanelModel{}, nil, err
 	}
 	activeByStatus := splitReleaseQueue(active)
 
 	panel := ReleasePanelModel{Enabled: true, Queue: activeByStatus, History: history}
+	rowActions := make(map[string][]ReleaseActionView)
 	for _, def := range defs {
 		if !def.Enabled {
 			continue
@@ -69,12 +75,12 @@ func (p *ReleaseProjector) BuildPanel(ctx context.Context, views []ImplWorkspace
 			actions := p.evaluateActions(ctx, def, lanes, ws, active)
 			for _, action := range actions {
 				if action.SourceSlug != "" {
-					panel.FeatureActions = append(panel.FeatureActions, action)
+					rowActions[action.SourceSlug] = append(rowActions[action.SourceSlug], action)
 				}
 			}
 		}
 	}
-	return panel, nil
+	return panel, rowActions, nil
 }
 
 func (p *ReleaseProjector) releaseQueue(ctx context.Context) ([]ReleaseQueueItem, []ReleaseQueueItem, error) {

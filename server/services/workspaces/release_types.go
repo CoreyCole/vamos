@@ -74,10 +74,14 @@ type ReleaseQueueView struct {
 	Pending []ReleaseQueueItem
 }
 
+type WorkspaceReleaseProjection struct {
+	PanelActions []ReleaseActionView
+	RowActions   map[string][]ReleaseActionView
+}
+
 type ReleasePanelModel struct {
-	Enabled        bool
-	Lanes          []ReleaseLaneView
-	FeatureActions []ReleaseActionView
-	Queue          ReleaseQueueView
-	History        []ReleaseQueueItem
+	Enabled bool
+	Lanes   []ReleaseLaneView
+	Queue   ReleaseQueueView
+	History []ReleaseQueueItem
 }

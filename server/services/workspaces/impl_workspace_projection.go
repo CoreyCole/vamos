@@ -7,18 +7,37 @@ import (
 )
 
 type ImplWorkspaceView struct {
-	Row        db.ImplWorkspace
-	Runtime    WorkspaceLifecycleSnapshot
-	HasRuntime bool
-	IsMain     bool
-	Children   []ImplWorkspaceView
+	Row            db.ImplWorkspace
+	Runtime        WorkspaceLifecycleSnapshot
+	HasRuntime     bool
+	IsMain         bool
+	Children       []ImplWorkspaceView
+	ReleaseActions []ReleaseActionView
+	Workflow       WorkspaceWorkflowSummary
+}
+
+type ImplWorkspaceViewOption func(*implWorkspaceViewOptions)
+
+type implWorkspaceViewOptions struct {
+	releaseActions map[string][]ReleaseActionView
+	workflows      map[string]WorkspaceWorkflowSummary
+}
+
+func WithWorkspaceReleaseActions(actions map[string][]ReleaseActionView) ImplWorkspaceViewOption {
+	return func(opts *implWorkspaceViewOptions) { opts.releaseActions = actions }
+}
+
+func WithWorkspaceWorkflowSummaries(summaries map[string]WorkspaceWorkflowSummary) ImplWorkspaceViewOption {
+	return func(opts *implWorkspaceViewOptions) { opts.workflows = summaries }
 }
 
 func BuildImplWorkspaceViews(
 	rows []db.ImplWorkspace,
 	runtime []WorkspaceLifecycleSnapshot,
 	main WorkspaceLifecycleSnapshot,
+	opts ...ImplWorkspaceViewOption,
 ) []ImplWorkspaceView {
+	options := buildImplWorkspaceViewOptions(opts...)
 	runtimeBySlug := make(map[string]WorkspaceLifecycleSnapshot, len(runtime))
 	runtimeByPath := make(map[string]WorkspaceLifecycleSnapshot, len(runtime))
 	for _, snap := range runtime {
@@ -32,7 +51,7 @@ func BuildImplWorkspaceViews(
 
 	views := make([]ImplWorkspaceView, 0, len(rows)+1)
 	if strings.TrimSpace(main.Workspace.Slug) != "" {
-		views = append(views, ImplWorkspaceView{
+		view := ImplWorkspaceView{
 			Row: db.ImplWorkspace{
 				WorkspaceSlug: main.Workspace.Slug,
 				CheckoutPath:  main.Workspace.CheckoutPath,
@@ -44,7 +63,9 @@ func BuildImplWorkspaceViews(
 			Runtime:    main,
 			HasRuntime: true,
 			IsMain:     true,
-		})
+		}
+		applyImplWorkspaceViewOptions(&view, options)
+		views = append(views, view)
 	}
 
 	for _, row := range rows {
@@ -81,9 +102,51 @@ func BuildImplWorkspaceViews(
 				},
 			}, WorkspaceLifecycleState{})
 		}
+		applyImplWorkspaceViewOptions(&view, options)
 		views = append(views, view)
 	}
 	return BuildImplWorkspaceTree(views)
+}
+
+func buildImplWorkspaceViewOptions(opts ...ImplWorkspaceViewOption) implWorkspaceViewOptions {
+	var options implWorkspaceViewOptions
+	for _, opt := range opts {
+		if opt != nil {
+			opt(&options)
+		}
+	}
+	return options
+}
+
+func applyImplWorkspaceViewOptions(view *ImplWorkspaceView, opts implWorkspaceViewOptions) {
+	if view == nil {
+		return
+	}
+	slug := strings.TrimSpace(view.Row.WorkspaceSlug)
+	if slug == "" {
+		slug = strings.TrimSpace(view.Runtime.Workspace.Slug)
+	}
+	if opts.releaseActions != nil {
+		view.ReleaseActions = append([]ReleaseActionView{}, opts.releaseActions[slug]...)
+	}
+	if opts.workflows != nil {
+		view.Workflow = opts.workflows[slug]
+	}
+}
+
+func applyOptionsToImplWorkspaceViews(views []ImplWorkspaceView, opts ...ImplWorkspaceViewOption) []ImplWorkspaceView {
+	options := buildImplWorkspaceViewOptions(opts...)
+	out := append([]ImplWorkspaceView(nil), views...)
+	var apply func([]ImplWorkspaceView)
+	apply = func(items []ImplWorkspaceView) {
+		for i := range items {
+			applyImplWorkspaceViewOptions(&items[i], options)
+			items[i].Children = append([]ImplWorkspaceView(nil), items[i].Children...)
+			apply(items[i].Children)
+		}
+	}
+	apply(out)
+	return out
 }
 
 func BuildImplWorkspaceTree(views []ImplWorkspaceView) []ImplWorkspaceView {
