@@ -31,8 +31,13 @@ func DefaultCatalog() Catalog {
 			Description: "Thoughts right rail",
 		},
 		{
+			Key:         "thoughts.sidebar.workspaces",
+			CSS:         "[data-e2e='thoughts.sidebar.workspaces'], #thoughts-workbench-sidebar [role='tab']:has-text('Workspaces'), #thoughts-workbench-sidebar button:has-text('Workspaces')",
+			Description: "Thoughts sidebar Workspaces tab",
+		},
+		{
 			Key:         "thoughts.rightRail.chat",
-			CSS:         "[data-e2e='thoughts.rightRail.chat'][aria-selected='true'], [role='tab'][aria-selected='true'][data-e2e='thoughts.rightRail.chat']",
+			CSS:         "[data-e2e='thoughts.rightRail.chat'][aria-selected='true'], [role='tab'][aria-selected='true'][data-e2e='thoughts.rightRail.chat'], [data-e2e='thoughts.rightRail.chat']",
 			Description: "Right rail Chat tab selected",
 		},
 		{
@@ -46,6 +51,11 @@ func DefaultCatalog() Catalog {
 			Description: "Agent Chat workspace ready marker",
 		},
 		{
+			Key:         "feature.workspaces.list",
+			CSS:         "[data-feature='workspaces.list'], #workspaces-list, [data-e2e='workspaces.list']",
+			Description: "Workspaces list ready marker",
+		},
+		{
 			Key:         "agent-chat.composer",
 			CSS:         "#agent-chat-composer-input, textarea[name='message'], textarea",
 			Description: "Agent Chat composer input",
@@ -54,6 +64,11 @@ func DefaultCatalog() Catalog {
 			Key:         "agent-chat.transcript",
 			CSS:         "#agent-chat-scroll-region, [data-e2e='agent-chat.transcript']",
 			Description: "Agent Chat transcript region",
+		},
+		{
+			Key:         "agent-chat.transcript.bottom",
+			CSS:         "#agent-chat-scroll-region, [data-e2e='agent-chat.transcript']",
+			Description: "Agent Chat transcript scrolled near bottom",
 		},
 	}
 	out := Catalog{entries: map[Key]Entry{}}

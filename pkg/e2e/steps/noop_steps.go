@@ -106,6 +106,53 @@ func ExpectConsoleClean(t testing.TB, ctx *e2e.Context, _ string) {
 	}
 }
 
+func ExpectInactiveTabPanelsHidden(t testing.TB, ctx *e2e.Context, _ string) {
+	t.Helper()
+	visible, err := ctx.Page.Locator("[data-show][class*='hidden']").First().IsVisible()
+	if err != nil {
+		return
+	}
+	if visible {
+		t.Fatal("inactive tab panel with hidden class is visible")
+	}
+}
+
+func ExpectWorkspaceVisible(t testing.TB, ctx *e2e.Context, name string) {
+	t.Helper()
+	if err := ctx.Page.GetByText(name).First().WaitFor(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func ExpectWorkspaceAbsent(t testing.TB, ctx *e2e.Context, name string) {
+	t.Helper()
+	body, err := ctx.Page.Locator("body").InnerText()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(body, name) {
+		t.Fatalf("workspace %q present", name)
+	}
+}
+
+func ExpectWorkspaceBefore(t testing.TB, ctx *e2e.Context, first, second string) {
+	t.Helper()
+	body, err := ctx.Page.Locator("body").InnerText()
+	if err != nil {
+		t.Fatal(err)
+	}
+	firstIdx := strings.Index(body, first)
+	secondIdx := strings.Index(body, second)
+	if firstIdx < 0 || secondIdx < 0 || firstIdx > secondIdx {
+		t.Fatalf("workspace order mismatch: %q index %d, %q index %d", first, firstIdx, second, secondIdx)
+	}
+}
+
+func ExpectWorkspaceCleanupSucceeds(t testing.TB, ctx *e2e.Context, _ string) {
+	t.Helper()
+	ExpectConsoleClean(t, ctx, "cleanup")
+}
+
 func FollowFirstSidebarDocumentLink(t testing.TB, ctx *e2e.Context, _ string) {
 	t.Helper()
 	followFirstLink(t, ctx, "#thoughts-workbench-sidebar a[href*='/thoughts/'], [data-e2e='thoughts.workbench.sidebar'] a[href*='/thoughts/']")
@@ -114,6 +161,49 @@ func FollowFirstSidebarDocumentLink(t testing.TB, ctx *e2e.Context, _ string) {
 func FollowFirstBreadcrumbLink(t testing.TB, ctx *e2e.Context, _ string) {
 	t.Helper()
 	followFirstLink(t, ctx, "nav[aria-label='Breadcrumb'] a[href], [data-slot='breadcrumb'] a[href], header a[href*='/thoughts/']")
+}
+
+func SwitchTab(t testing.TB, ctx *e2e.Context, key string) {
+	t.Helper()
+	entry, err := ctx.Selectors.Resolve(key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := ctx.Page.Locator(entry.CSS).First().Click(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func ToggleRegion(t testing.TB, ctx *e2e.Context, key string) {
+	t.Helper()
+	entry, err := ctx.Selectors.Resolve(key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	region := ctx.Page.Locator(entry.CSS).First()
+	button := region.Locator("button[aria-expanded], button[data-workbench-save-on-click], button").First()
+	if err := button.Click(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func EnableShowHistoricalWorkspaces(t testing.TB, ctx *e2e.Context, _ string) {
+	t.Helper()
+	locator := ctx.Page.Locator("label:has-text('Show historical'), button:has-text('Show historical'), input[name='showHistorical'], input[name='show_historical']").First()
+	if err := locator.Click(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func CleanupWorkspace(t testing.TB, ctx *e2e.Context, name string) {
+	t.Helper()
+	if err := ctx.Page.GetByText(name).First().WaitFor(); err != nil {
+		t.Fatal(err)
+	}
+	button := ctx.Page.Locator("button:has-text('Clean up'), button:has-text('Close')").First()
+	if err := button.Click(); err != nil {
+		t.Fatal(err)
+	}
 }
 
 func followFirstLink(t testing.TB, ctx *e2e.Context, selector string) {

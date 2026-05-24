@@ -86,6 +86,17 @@ func TestDurableSessionChat_RootThoughtsRestoresLatestFreeformChat(t *testing.T)
 	})
 }
 
+func TestDurableSessionChat_AgentChatReloadScrollsTranscriptToBottom(t *testing.T) {
+	e2e.RunScenario(t, "durable-session-chat", "agent-chat-reload-scrolls-transcript-to-bottom", func(t testing.TB, ctx *e2e.Context) {
+		steps.AuthenticatedAs(t, ctx, "playwright@localhost")
+		steps.LoadFixture(t, ctx, "freeform-chat.durable")
+		steps.OpenFreeformChatFixture(t, ctx, "freeform-chat.durable")
+		steps.ReloadChat(t, ctx, "current")
+		steps.ExpectTranscriptContains(t, ctx, "VAMOS_E2E_FREEFORM_REPLAY_OK")
+		steps.ExpectRegionVisible(t, ctx, "agent-chat.transcript.bottom")
+	})
+}
+
 func TestDurableSessionChat_WorkspaceSwitchingRestoresEachWorkspaceLatestChat(t *testing.T) {
 	e2e.RunScenario(t, "durable-session-chat", "workspace-switching-restores-each-workspace-latest-chat", func(t testing.TB, ctx *e2e.Context) {
 		steps.AuthenticatedAs(t, ctx, "playwright@localhost")

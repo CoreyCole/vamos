@@ -46,6 +46,69 @@ func TestThoughtsWorkbench_BreadcrumbParentNavigationWorks(t *testing.T) {
 	})
 }
 
+func TestThoughtsWorkbench_WorkbenchReloadPreservesDbLayoutState(t *testing.T) {
+	e2e.RunScenario(t, "thoughts-workbench", "workbench-reload-preserves-db-layout-state", func(t testing.TB, ctx *e2e.Context) {
+		steps.AuthenticatedAs(t, ctx, "tester@example.com")
+		steps.LoadFixture(t, ctx, "thoughts-workbench.basic")
+		steps.Visit(t, ctx, "/thoughts/example.md?context=chat")
+		steps.WaitForFeatureReady(t, ctx, "thoughts.workbench")
+		steps.SwitchTab(t, ctx, "thoughts.sidebar.workspaces")
+		steps.SwitchTab(t, ctx, "thoughts.rightRail.chat")
+		steps.ToggleRegion(t, ctx, "thoughts.workbench.sidebar")
+		steps.FollowFirstSidebarDocumentLink(t, ctx, "first")
+		steps.ExpectTabSelected(t, ctx, "thoughts.sidebar.workspaces")
+		steps.ExpectTabSelected(t, ctx, "thoughts.rightRail.chat")
+		steps.ExpectRegionReachable(t, ctx, "thoughts.workbench.center")
+		steps.ExpectInactiveTabPanelsHidden(t, ctx, "current")
+	})
+}
+
+func TestThoughtsWorkbench_QrspiSidebarHidesTerminalPlanWorkspacesByDefault(t *testing.T) {
+	e2e.RunScenario(t, "thoughts-workbench", "qrspi-sidebar-hides-terminal-plan-workspaces-by-default", func(t testing.TB, ctx *e2e.Context) {
+		steps.AuthenticatedAs(t, ctx, "tester@example.com")
+		steps.LoadFixture(t, ctx, "thoughts-workbench.qrspi-lifecycle")
+		steps.Visit(t, ctx, "/")
+		steps.WaitForFeatureReady(t, ctx, "thoughts.workbench")
+		steps.SwitchTab(t, ctx, "thoughts.sidebar.workspaces")
+		steps.ExpectWorkspaceVisible(t, ctx, "question-plan")
+		steps.ExpectWorkspaceAbsent(t, ctx, "merged-plan")
+		steps.ExpectWorkspaceAbsent(t, ctx, "closed-plan")
+		steps.EnableShowHistoricalWorkspaces(t, ctx, "current")
+		steps.ExpectWorkspaceVisible(t, ctx, "merged-plan")
+		steps.ExpectWorkspaceVisible(t, ctx, "closed-plan")
+	})
+}
+
+func TestThoughtsWorkbench_WorkspacesPagePinsReleaseLanesAndHidesStaleImplementationRows(t *testing.T) {
+	e2e.RunScenario(t, "thoughts-workbench", "workspaces-page-pins-release-lanes-and-hides-stale-implementation-rows", func(t testing.TB, ctx *e2e.Context) {
+		steps.AuthenticatedAs(t, ctx, "tester@example.com")
+		steps.LoadFixture(t, ctx, "workspaces.release-lanes")
+		steps.Visit(t, ctx, "/workspaces")
+		steps.WaitForFeatureReady(t, ctx, "workspaces.list")
+		steps.ExpectWorkspaceBefore(t, ctx, "main", "stage")
+		steps.ExpectWorkspaceBefore(t, ctx, "stage", "active-feature")
+		steps.ExpectWorkspaceAbsent(t, ctx, "missing-feature")
+		steps.ExpectWorkspaceAbsent(t, ctx, "merged-feature")
+		steps.ExpectWorkspaceAbsent(t, ctx, "cleaned-feature")
+		steps.EnableShowHistoricalWorkspaces(t, ctx, "current")
+		steps.ExpectWorkspaceVisible(t, ctx, "missing-feature")
+		steps.ExpectWorkspaceVisible(t, ctx, "merged-feature")
+		steps.ExpectWorkspaceVisible(t, ctx, "cleaned-feature")
+	})
+}
+
+func TestThoughtsWorkbench_DuplicateCleanupIsHarmless(t *testing.T) {
+	e2e.RunScenario(t, "thoughts-workbench", "duplicate-cleanup-is-harmless", func(t testing.TB, ctx *e2e.Context) {
+		steps.AuthenticatedAs(t, ctx, "tester@example.com")
+		steps.LoadFixture(t, ctx, "workspaces.cleaned")
+		steps.Visit(t, ctx, "/workspaces")
+		steps.WaitForFeatureReady(t, ctx, "workspaces.list")
+		steps.CleanupWorkspace(t, ctx, "cleaned-feature")
+		steps.ExpectWorkspaceCleanupSucceeds(t, ctx, "current")
+		steps.ExpectWorkspaceAbsent(t, ctx, "cleaned-feature")
+	})
+}
+
 func TestThoughtsWorkbench_WorkbenchRegionsRemainUsableAcrossViewportClassesMobile(t *testing.T) {
 	e2e.RunScenarioWithViewport(t, "thoughts-workbench", "workbench-regions-remain-usable-across-viewport-classes-mobile", e2e.ViewportMobile, func(t testing.TB, ctx *e2e.Context) {
 		steps.Visit(t, ctx, "/")

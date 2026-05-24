@@ -23,6 +23,12 @@ If a manager host config registers configured checkouts with slugs `stage` and `
 
 For Vamos self-development, `main.<domain>` is the durable manager. `work.<domain>` and feature workspace hosts are sandbox runtimes. Release actions are triggered from main, not from sandbox-local DB state. Sandbox sessions may be imported or linked as evidence, but release readiness should come from explicit QRSPI/verification artifacts. See `docs/vamos-development-workflow.md`.
 
+## Durable main/stage lanes
+
+The reusable default release registry models `main` and `stage` as durable protected release lanes. They are pinned on the Workspaces page, exposed in workspace navigation when they have switch URLs, and are not cleanup targets.
+
+Promote-to-stage and stage-to-main remain generic release workflows. Host-specific restarts, systemd units, domains, and deploy commands belong in host workflows/executors outside reusable Vamos.
+
 ## Queue behavior
 
 1. `/workspaces/release/enqueue` validates the selected action and expected source/target commits.
@@ -46,7 +52,9 @@ Unknown service types are delegated to host executors when registered. Do not em
 
 ## Cleanup
 
-Workspace cleanup is manual. Merged workspaces render `Clean up`; unmerged workspaces render `Close` and require confirmation. Cleanup starts `CleanupWorkspaceWorkflow`, which delegates deletion to `ManagerService.CleanupWorkspace`, rejects configured/main checkouts, removes checkout-owned runtime files by deleting the checkout directory, marks implementation workspace rows cleaned up, and preserves configured thoughts roots and plan directories.
+Workspace cleanup is manual. Merged workspaces render `Clean up`; unmerged workspaces render `Close` and require confirmation. Cleanup starts `CleanupWorkspaceWorkflow`, which delegates deletion to `ManagerService.CleanupWorkspace`, rejects configured/main/stage release lanes, removes checkout-owned runtime files by deleting the checkout directory, marks implementation workspace rows cleaned up, and preserves configured thoughts roots and plan directories.
+
+Cleanup is idempotent for already historical workspaces. Closing a workspace removes it from default current lists; historical merged, cleaned, and missing rows remain available behind Show historical.
 
 ## Verification
 

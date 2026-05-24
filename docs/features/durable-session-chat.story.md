@@ -125,6 +125,23 @@ As a workspace user, I want Agent Chat transcripts and Pi-produced artifacts to 
 - Transcript contains "VAMOS_E2E_FREEFORM_REPLAY_OK".
 - Console has no errors or warnings.
 
+## Scenario: Agent chat reload scrolls transcript to bottom
+
+### Given
+
+- I am authenticated as "playwright@localhost".
+- Fixture "freeform-chat.durable" is loaded.
+- I open freeform chat for fixture "freeform-chat.durable".
+
+### When
+
+- I reload chat.
+
+### Then
+
+- Transcript contains "VAMOS_E2E_FREEFORM_REPLAY_OK".
+- Region "agent-chat.transcript.bottom" is visible.
+
 ## Scenario: Workspace switching restores each workspace latest chat
 
 ### Given

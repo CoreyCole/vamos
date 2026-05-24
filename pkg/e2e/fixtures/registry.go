@@ -43,9 +43,16 @@ type (
 
 func DefaultRegistry() Registry {
 	return registry{
-		"thoughts-workbench.basic": BuildThoughtsWorkbenchBasic,
-		DurableFreeformFixture:     BuildFreeformDurableChat,
+		"thoughts-workbench.basic":           BuildThoughtsWorkbenchBasic,
+		"thoughts-workbench.qrspi-lifecycle": BuildEmptyFixture,
+		"workspaces.cleaned":                 BuildEmptyFixture,
+		"workspaces.release-lanes":           BuildEmptyFixture,
+		DurableFreeformFixture:               BuildFreeformDurableChat,
 	}
+}
+
+func BuildEmptyFixture(_ context.Context, _ DBTX, input Input) (State, error) {
+	return State{Name: "empty", Data: map[string]any{"workspace": input.Workspace.Slug}}, nil
 }
 
 func Load(

@@ -221,6 +221,18 @@ func parseStep(section, text string, line int) (Step, error) {
 	case strings.HasPrefix(text, "I follow first breadcrumb link"):
 		step.Verb = "follow_first_breadcrumb_link"
 		step.Args["target"] = "first"
+	case strings.HasPrefix(text, "I switch tab "):
+		step.Verb = "switch_tab"
+		step.Args["key"] = firstQuote(text)
+	case strings.HasPrefix(text, "I toggle region "):
+		step.Verb = "toggle_region"
+		step.Args["key"] = firstQuote(text)
+	case text == "I enable Show historical workspaces.":
+		step.Verb = "enable_show_historical_workspaces"
+		step.Args["target"] = "current"
+	case strings.HasPrefix(text, "I clean up workspace "):
+		step.Verb = "cleanup_workspace"
+		step.Args["name"] = firstQuote(text)
 	case strings.HasPrefix(text, "I reload chat"):
 		step.Verb = "reload_chat"
 		step.Args["target"] = "current"
@@ -249,6 +261,22 @@ func parseStep(section, text string, line int) (Step, error) {
 	case strings.HasPrefix(text, "Tab ") && strings.HasSuffix(text, " is selected."):
 		step.Verb = "expect_tab_selected"
 		step.Args["key"] = firstQuote(text)
+	case text == "Inactive tab panels are hidden before interaction.":
+		step.Verb = "expect_inactive_tab_panels_hidden"
+		step.Args["target"] = "current"
+	case strings.HasPrefix(text, "Workspace ") && strings.HasSuffix(text, " is visible."):
+		step.Verb = "expect_workspace_visible"
+		step.Args["name"] = firstQuote(text)
+	case strings.HasPrefix(text, "Workspace ") && strings.HasSuffix(text, " is absent."):
+		step.Verb = "expect_workspace_absent"
+		step.Args["name"] = firstQuote(text)
+	case strings.HasPrefix(text, "Workspace ") && strings.Contains(text, " appears before workspace "):
+		step.Verb = "expect_workspace_before"
+		step.Args["first"] = firstQuote(text)
+		step.Args["second"] = secondQuote(text)
+	case text == "Workspace cleanup succeeds.":
+		step.Verb = "expect_workspace_cleanup_succeeds"
+		step.Args["target"] = "current"
 	case strings.HasPrefix(text, "Text ") && strings.HasSuffix(text, " is absent."):
 		step.Verb = "expect_text_absent"
 		step.Args["text"] = firstQuote(text)
