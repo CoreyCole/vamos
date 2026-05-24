@@ -137,6 +137,51 @@ func TestHandleSwitchWorkspaceRedirectsToTargetHandoff(t *testing.T) {
 	}
 }
 
+func TestHandleSwitchWorkspaceRedirectsManagerWorkspacePageToChildRoot(t *testing.T) {
+	manager := &fakeLifecycleManager{
+		workspaces: []Workspace{{
+			Slug:   "feature",
+			URL:    "https://feature.cn-agents.test/",
+			Status: StatusRunning,
+		}},
+	}
+	signer, verifyKey := newTestHandoffSigner(t)
+	verifier := newTestHandoffVerifier(t, verifyKey)
+	handler := NewHandler(
+		manager,
+		"https://main.cn-agents.test",
+		"main",
+		WithDevAuth(nil, signer),
+	)
+
+	e := echo.New()
+	req := httptest.NewRequest(
+		http.MethodGet,
+		"/workspaces/switch/feature?redirect=/workspaces",
+		nil,
+	)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	c.SetParamNames("slug")
+	c.SetParamValues("feature")
+	c.Set("user_email", "user@example.com")
+	if err := handler.HandleSwitchWorkspace(c); err != nil {
+		t.Fatalf("HandleSwitchWorkspace() error = %v", err)
+	}
+	location := rec.Header().Get("Location")
+	u, err := url.Parse(location)
+	if err != nil {
+		t.Fatalf("parse Location: %v", err)
+	}
+	claims, err := verifier.Verify(u.Query().Get("token"), "feature")
+	if err != nil {
+		t.Fatalf("Verify(location token) error = %v", err)
+	}
+	if claims.RedirectPath != "/" {
+		t.Fatalf("redirect path = %q, want child root", claims.RedirectPath)
+	}
+}
+
 func TestHandleStartReturnsAcceptedLifecycleSnapshot(t *testing.T) {
 	manager := &fakeLifecycleManager{
 		snapshots: []WorkspaceLifecycleSnapshot{

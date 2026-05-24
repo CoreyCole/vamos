@@ -517,7 +517,7 @@ func (h *Handler) HandleSwitchWorkspace(c echo.Context) error {
 		)
 	}
 	slug := c.Param("slug")
-	redirectPath, err := ValidateLocalRedirectPath(c.QueryParam("redirect"))
+	redirectPath, err := switchRedirectPath(c.QueryParam("redirect"))
 	if err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 	}
@@ -564,6 +564,17 @@ func (h *Handler) HandleSwitchWorkspace(c echo.Context) error {
 		email,
 	)
 	return c.Redirect(http.StatusFound, target)
+}
+
+func switchRedirectPath(raw string) (string, error) {
+	redirectPath, err := ValidateLocalRedirectPath(raw)
+	if err != nil {
+		return "", err
+	}
+	if redirectPath == "/workspaces" || strings.HasPrefix(redirectPath, "/workspaces/") {
+		return "/", nil
+	}
+	return redirectPath, nil
 }
 
 func (h *Handler) HandleDevAuthHandoff(c echo.Context) error {

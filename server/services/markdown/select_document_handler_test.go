@@ -1,17 +1,22 @@
 package markdown
 
 import (
+	"database/sql"
+	"net/http"
+	"net/http/httptest"
 	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
+	pkgdb "github.com/CoreyCole/vamos/pkg/db"
 	commentsvc "github.com/CoreyCole/vamos/server/services/comments"
 	dbsvc "github.com/CoreyCole/vamos/server/services/db"
+	"github.com/labstack/echo/v4"
 )
 
-func newDocumentSelectionService(t *testing.T) *Service {
+func newDocumentSelectionService(t *testing.T) (*Service, *dbsvc.Service) {
 	t.Helper()
 	root := t.TempDir()
 	planDir := filepath.Join(root, "owner", "plan-a")
@@ -46,7 +51,21 @@ func newDocumentSelectionService(t *testing.T) *Service {
 	if err != nil {
 		t.Fatal(err)
 	}
-	return service
+	return service, database
+}
+
+func newPostFormContext(
+	t *testing.T,
+	path string,
+	form url.Values,
+) (echo.Context, *httptest.ResponseRecorder) {
+	t.Helper()
+	req := httptest.NewRequest(http.MethodPost, path, strings.NewReader(form.Encode()))
+	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationForm)
+	rec := httptest.NewRecorder()
+	c := echo.New().NewContext(req, rec)
+	c.Set("user_email", "user@example.com")
+	return c, rec
 }
 
 func TestThoughtsDocURLWithChatStatePreservesChatQuery(t *testing.T) {
@@ -82,105 +101,45 @@ func TestThoughtsDocURLWithChatStatePreservesChatQuery(t *testing.T) {
 	}
 }
 
-func TestHandleSelectDocumentPreservesChatStateInURL(t *testing.T) {
-	t.Parallel()
-
-	service := newDocumentSelectionService(t)
-	c, rec := newPostFormContext(t, "/thoughts/actions/select-document", url.Values{
-		"doc_path":       {"owner/plan-a/design.md"},
-		"preserve_chat":  {"true"},
+func TestHandleSelectCommentPatchesTargetDocumentAndPreservesChatState(t *testing.T) {
+	service, database := newDocumentSelectionService(t)
+	_, err := database.Queries.CreateDocumentComment(t.Context(), pkgdb.CreateDocumentCommentParams{
+		ID:           "comment-1",
+		DocPath:      "thoughts/owner/plan-a/design.md",
+		UserEmail:    "user@example.com",
+		CommentText:  "Needs review",
+		SelectedText: "Design",
+		SectionHint: sql.NullString{
+			String: "design",
+			Valid:  true,
+		},
+	})
+	if err != nil {
+		t.Fatalf("CreateDocumentComment() error = %v", err)
+	}
+	c, rec := newPostFormContext(t, "/thoughts/actions/select-comment", url.Values{
+		"comment_id":     {"comment-1"},
 		"chat_workspace": {"ws_1"},
 		"thread_id":      {"th_1"},
 		"run_id":         {"run_1"},
 	})
 
-	if err := service.HandleSelectDocument(c); err != nil {
-		t.Fatal(err)
-	}
-	body := rec.Body.String()
-	for _, want := range []string{
-		"context=chat",
-		"chat_workspace=ws_1",
-		"thread=th_1",
-		"run=run_1",
-	} {
-		if !strings.Contains(body, want) {
-			t.Fatalf("response body missing %q:\n%s", want, body)
-		}
-	}
-}
-
-func TestHandleSelectDocumentPatchesDocumentWorkbenchChrome(t *testing.T) {
-	t.Parallel()
-
-	service := newDocumentSelectionService(t)
-	c, rec := newPostFormContext(t, "/thoughts/actions/select-document", url.Values{
-		"doc_path": {"owner/plan-a/design.md"},
-	})
-
-	if err := service.HandleSelectDocument(c); err != nil {
+	if err := service.HandleSelectComment(c); err != nil {
 		t.Fatal(err)
 	}
 	body := rec.Body.String()
 	for _, want := range []string{
 		"selector #workbench-root",
-		"doc-workbench-sidebar-region",
-		"doc-workbench-center-region",
-		"doc-workbench-right-region",
-		"doc-workbench-center-pane",
-		"doc-workbench-viewer-region",
 		"thoughts-document-panel",
 		"thoughts-shared-sidebar",
 		"thoughts-url-sync",
-		"Open Workspaces and Files",
-		"Open Chat",
-		`data-replace-url="&#34;/thoughts/owner/plan-a/design.md&#34;"`,
-	} {
-		if !strings.Contains(body, want) {
-			t.Fatalf("response body missing %q:\n%s", want, body)
-		}
-	}
-	for _, unwanted := range []string{
-		"selector #thoughts-directory-region",
-		"workspace-doc-tree-header",
-		"workspaceDocTreeOpen",
-	} {
-		if strings.Contains(body, unwanted) {
-			t.Fatalf(
-				"response body should not put related docs tree in topbar %q:\n%s",
-				unwanted,
-				body,
-			)
-		}
-	}
-}
-
-func TestHandleSelectDocumentWithHashDispatchesWorkbenchSectionNav(t *testing.T) {
-	service := newDocumentSelectionService(t)
-	c, rec := newPostFormContext(t, "/thoughts/actions/select-document", url.Values{
-		"doc_path": {"owner/plan-a/design.md"},
-		"hash":     {"design"},
-	})
-
-	if err := service.HandleSelectDocument(c); err != nil {
-		t.Fatal(err)
-	}
-	body := rec.Body.String()
-	for _, want := range []string{
-		`data-replace-url="&#34;/thoughts/owner/plan-a/design.md#design&#34;"`,
+		`data-replace-url="&#34;/thoughts/owner/plan-a/design.md?chat_workspace=ws_1&amp;context=chat&amp;run=run_1&amp;thread=th_1#design&#34;"`,
 		"workbench-section-nav",
 		`detail: { hash: 'design', updateURL: false }`,
+		"comment-thread-comment-1",
 	} {
 		if !strings.Contains(body, want) {
 			t.Fatalf("response body missing %q:\n%s", want, body)
-		}
-	}
-	for _, unwanted := range []string{
-		"data-doc-section-target",
-		"workbenchScrollDocumentSection",
-	} {
-		if strings.Contains(body, unwanted) {
-			t.Fatalf("response body contains unwanted %q:\n%s", unwanted, body)
 		}
 	}
 }

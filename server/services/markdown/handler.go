@@ -629,27 +629,6 @@ func (s *Service) HandleSelectComment(c echo.Context) error {
 	})
 }
 
-func (s *Service) HandleSelectDocument(c echo.Context) error {
-	return s.selectDocumentAndPatch(c, DocumentSelection{
-		DocPath:   c.FormValue("doc_path"),
-		Hash:      c.FormValue("hash"),
-		CommentID: c.FormValue("comment_id"),
-		PreserveChat: strings.EqualFold(c.FormValue("preserve_chat"), "true") ||
-			c.FormValue("preserve_chat") == "1",
-		PreserveQRSPIContext: strings.EqualFold(
-			c.FormValue("qrspi_context_open"),
-			"true",
-		) ||
-			c.FormValue("qrspi_context_open") == "1",
-	})
-}
-
-func (s *Service) HandleSelectDirectory(c echo.Context) error {
-	return s.selectDirectoryAndPatch(c, DirectorySelection{
-		DirPath: c.FormValue("dir_path"),
-	})
-}
-
 func (s *Service) selectDocumentAndPatch(
 	c echo.Context,
 	selection DocumentSelection,
@@ -754,13 +733,6 @@ func (s *Service) selectDocumentAndPatch(
 	); err != nil {
 		return err
 	}
-	if selection.PreserveQRSPIContext {
-		if err := sse.MarshalAndPatchSignals(map[string]any{
-			"qrspiArtifactExpanded": true,
-		}); err != nil {
-			return err
-		}
-	}
 	if strings.TrimSpace(selection.CommentID) != "" {
 		if err := sse.MarshalAndPatchSignals(map[string]any{
 			"rightRailActiveTab": "comments",
@@ -810,88 +782,6 @@ func (s *Service) selectDocumentAndPatch(
 		return sse.ExecuteScript(script)
 	}
 	return nil
-}
-
-func (s *Service) selectDirectoryAndPatch(
-	c echo.Context,
-	selection DirectorySelection,
-) error {
-	dirPath, err := CanonicalThoughtsDirPath(selection.DirPath)
-	if err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
-	}
-	dirArgs, err := s.GetDirectoryListing(dirPath)
-	if err != nil {
-		return echo.NewHTTPError(http.StatusNotFound, err.Error())
-	}
-	userEmail, _ := c.Get("user_email").(string)
-	dirArgs.UserEmail = userEmail
-	dirArgs.FileTree = s.GetFileTree(dirPath)
-	dirArgs.ChatLinkState = EmbeddedChatLinkStateFromRequest(c, EmbeddedChatLinkState{
-		Active:      thoughtsContextMode(c) == thoughtsContextModeChat,
-		WorkspaceID: firstNonEmptyString(c.FormValue("chat_workspace"), c.QueryParam("chat_workspace")),
-		ThreadID:    firstNonEmptyString(c.FormValue("thread"), c.FormValue("thread_id"), c.QueryParam("thread")),
-		RunID:       firstNonEmptyString(c.FormValue("run"), c.FormValue("run_id"), c.QueryParam("run")),
-	})
-
-	sse := datastar.NewSSE(c.Response().Writer, c.Request())
-	if err := patchThoughtsTitle(sse, directoryTitle(dirArgs)); err != nil {
-		return err
-	}
-	if err := patchThoughtsPrimary(sse, DirectoryPrimaryPanel(dirArgs)); err != nil {
-		return err
-	}
-	if err := s.patchThoughtsDirectorySidebar(sse, c, dirArgs); err != nil {
-		return err
-	}
-	return patchThoughtsURL(sse, ThoughtsDirURL(dirArgs.Path))
-}
-
-func patchThoughtsTitle(sse *datastar.ServerSentEventGenerator, title string) error {
-	return sse.PatchElementTempl(
-		ThoughtsTitleContent(title),
-		datastar.WithSelector("#doc-workbench-title, #thoughts-directory-title-sync"),
-		datastar.WithModeInner(),
-	)
-}
-
-func patchThoughtsPrimary(
-	sse *datastar.ServerSentEventGenerator,
-	component templ.Component,
-) error {
-	return sse.PatchElementTempl(
-		component,
-		datastar.WithSelector(
-			"#"+documentWorkbenchPrimarySelectorID+", #"+directoryWorkbenchPrimarySelectorID,
-		),
-		datastar.WithModeInner(),
-	)
-}
-
-func (s *Service) patchThoughtsDocumentSidebar(
-	sse *datastar.ServerSentEventGenerator,
-	c echo.Context,
-	pageArgs *PageArgs,
-) error {
-	return sse.PatchElementTempl(
-		workbench.SharedSidebar(
-			BuildThoughtsSidebarArgs(pageArgs, s.listWorkbenchWorkspaces(c)),
-		),
-		datastar.WithSelectorID(thoughtsSharedSidebarSelectorID),
-	)
-}
-
-func (s *Service) patchThoughtsDirectorySidebar(
-	sse *datastar.ServerSentEventGenerator,
-	c echo.Context,
-	args *DirectoryArgs,
-) error {
-	return sse.PatchElementTempl(
-		workbench.SharedSidebar(
-			BuildThoughtsDirectorySidebarArgs(args, s.listWorkbenchWorkspaces(c)),
-		),
-		datastar.WithSelectorID(thoughtsSharedSidebarSelectorID),
-	)
 }
 
 func patchThoughtsURL(sse *datastar.ServerSentEventGenerator, url string) error {

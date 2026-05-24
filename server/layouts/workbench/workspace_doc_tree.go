@@ -56,21 +56,6 @@ func WorkspaceDocNodeHref(mode DocEntryMode, docPath string) string {
 	return "/thoughts/" + strings.Join(parts, "/")
 }
 
-func WorkspaceDocNodeFormAction(mode DocEntryMode, node WorkspaceDocNode) string {
-	_ = mode
-	if node.Kind == WorkspaceDocKindDir || strings.TrimSpace(node.Href) != "" {
-		return ""
-	}
-	return "@post('/thoughts/actions/select-document', {contentType: 'form'})"
-}
-
-func WorkspaceDocNodeHiddenFields(node WorkspaceDocNode) map[string]string {
-	if node.Kind == WorkspaceDocKindDir {
-		return nil
-	}
-	return map[string]string{"doc_path": node.Path, "qrspi_context_open": "1"}
-}
-
 func WorkspaceDocNodeToggleSignal(node WorkspaceDocNode) string {
 	key := strings.TrimSpace(node.RelPath)
 	if key == "" || key == "." {

@@ -288,6 +288,49 @@ const (
 	pathPolicyState
 )
 
+func applyVamosEnvOverrides(cfg Config) Config {
+	overrides := []struct {
+		name string
+		set  func(string)
+	}{
+		{"VAMOS_LISTEN_ADDRESS", func(v string) { cfg.ListenAddress = v }},
+		{"VAMOS_PUBLIC_BASE_URL", func(v string) { cfg.PublicBaseURL = v }},
+		{"VAMOS_INTERNAL_CALLBACK_BASE_URL", func(v string) { cfg.InternalCallbackBaseURL = v }},
+		{"VAMOS_WORKSPACE_MODE", func(v string) { cfg.WorkspaceMode = v }},
+		{"VAMOS_WORKSPACE_DOMAIN", func(v string) { cfg.WorkspaceDomain = v }},
+		{"VAMOS_WORKSPACE_PARENT_DIR", func(v string) { cfg.WorkspaceParentDir = v }},
+		{"VAMOS_WORKSPACE_STATE_DIR", func(v string) { cfg.WorkspaceStateDir = v }},
+		{"VAMOS_WORKSPACE_SLUG", func(v string) { cfg.WorkspaceSlug = v }},
+		{"VAMOS_WORKSPACE_MANAGER_URL", func(v string) { cfg.WorkspaceManagerURL = v }},
+		{"VAMOS_WORKSPACE_RESTART_TOKEN", func(v string) { cfg.WorkspaceRestartToken = v }},
+		{"VAMOS_DEV_AUTH_SIGNING_KEY", func(v string) { cfg.DevAuthSigningKey = v }},
+		{"VAMOS_DEV_AUTH_VERIFY_KEY", func(v string) { cfg.DevAuthVerifyKey = v }},
+		{"VAMOS_THOUGHTS_ROOT", func(v string) { cfg.MarkdownBasePath = v }},
+		{"VAMOS_THOUGHTS_REPO", func(v string) { cfg.RepoPath = v }},
+		{"VAMOS_DATABASE_PATH", func(v string) { cfg.DatabasePath = v }},
+		{"VAMOS_CONFIG", func(v string) { cfg.ConfigPath = v }},
+		{"VAMOS_PLAYWRIGHT_AUTH_ENABLED", func(v string) { cfg.PlaywrightAuthEnabled = parseBoolEnv(v, cfg.PlaywrightAuthEnabled) }},
+		{"VAMOS_PLAYWRIGHT_AUTH_EMAIL", func(v string) { cfg.PlaywrightAuthEmail = v }},
+		{"VAMOS_PLAYWRIGHT_AUTH_TOKEN", func(v string) { cfg.PlaywrightAuthToken = v }},
+		{"VAMOS_INTERNAL_TOKEN", func(v string) { cfg.InternalAgentChatToken = v }},
+		{"VAMOS_DEFAULT_CWD", func(v string) { cfg.AgentChatDefaultDir = v }},
+	}
+	for _, override := range overrides {
+		if value, ok := os.LookupEnv(override.name); ok {
+			override.set(value)
+		}
+	}
+	return cfg
+}
+
+func parseBoolEnv(raw string, fallback bool) bool {
+	value, err := strconv.ParseBool(strings.TrimSpace(raw))
+	if err != nil {
+		return fallback
+	}
+	return value
+}
+
 func validateInternalAgentChatConfig(cfg Config) error {
 	if strings.TrimSpace(cfg.InternalAgentChatToken) != "" {
 		return nil
@@ -596,6 +639,7 @@ func main() {
 	if err := envconfig.Process("", &cfg); err != nil {
 		log.Fatal(err)
 	}
+	cfg = applyVamosEnvOverrides(cfg)
 	cfg, err := expandRuntimePaths(cfg)
 	if err != nil {
 		log.Fatal(err)
@@ -1200,8 +1244,6 @@ func main() {
 		"/actions/open-comments",
 		markdownService.HandleOpenCommentsInPlace,
 	)
-	thoughtsGroup.POST("/actions/select-document", markdownService.HandleSelectDocument)
-	thoughtsGroup.POST("/actions/select-directory", markdownService.HandleSelectDirectory)
 	thoughtsGroup.POST("/actions/select-comment", markdownService.HandleSelectComment)
 	thoughtsGroup.POST("/actions/open-chat", markdownService.OpenChatForDocument)
 	thoughtsGroup.POST("/chat/open", markdownService.OpenChatForDocument)

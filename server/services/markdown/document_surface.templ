@@ -64,10 +64,7 @@ templ QRSPIArtifactContext(meta QRSPIMetadata, workspaceTree *workbench.Workspac
 						if item.Disabled {
 							<span class="rounded-md px-2 py-1 text-muted-foreground/60">{ item.Label }</span>
 						} else {
-							<form method="post" action="/thoughts/actions/select-document" data-on:submit="@post('/thoughts/actions/select-document', {contentType: 'form'})">
-								<input type="hidden" name="doc_path" value={ qrspiDocPathFromHref(item.Href) }/>
-								<button type="submit" class={ "rounded-md px-2 py-1 transition-colors hover:bg-muted", templ.KV("bg-muted font-medium text-foreground", item.Current), templ.KV("text-muted-foreground", !item.Current) }>{ item.Label }</button>
-							</form>
+							<a href={ templ.SafeURL(item.Href) } class={ "rounded-md px-2 py-1 transition-colors hover:bg-muted", templ.KV("bg-muted font-medium text-foreground", item.Current), templ.KV("text-muted-foreground", !item.Current) }>{ item.Label }</a>
 						}
 					}
 				</nav>
@@ -107,10 +104,6 @@ templ DocumentActionControl(action DocumentAction) {
 			<button type="submit" class={ documentActionButtonClass(action) } aria-label={ label } title={ label }>{ documentActionIcon(action) }</button>
 		</form>
 	}
-}
-
-func qrspiDocPathFromHref(href string) string {
-	return strings.TrimPrefix(strings.TrimSpace(href), "/thoughts/")
 }
 
 func isDocumentChatAction(action DocumentAction) bool {

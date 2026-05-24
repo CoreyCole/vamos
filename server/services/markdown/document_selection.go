@@ -10,15 +10,10 @@ import (
 )
 
 type DocumentSelection struct {
-	DocPath              string
-	Hash                 string
-	CommentID            string
-	PreserveChat         bool
-	PreserveQRSPIContext bool
-}
-
-type DirectorySelection struct {
-	DirPath string
+	DocPath      string
+	Hash         string
+	CommentID    string
+	PreserveChat bool
 }
 
 type DocumentEmbeddedChatSelection struct {
