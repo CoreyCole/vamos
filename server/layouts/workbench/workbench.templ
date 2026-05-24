@@ -7,10 +7,11 @@ templ Workbench(state WorkbenchState) {
 		data-workbench-page={ string(state.Page) }
 		data-workbench-view={ string(state.View) }
 		data-workbench-mobile-active={ state.Config.Mobile.ActiveRegionID }
+		data-attr:data-workbench-mobile-active="$workbench.activeRegionID"
 		data-attr:data-workbench-focused="$workbench.focused ? 'true' : 'false'"
 		class="flex h-full min-h-0 w-full overflow-hidden p-2 md:p-4"
 	>
-		<script type="module" src="/js/workbench-resize.js?v=5"></script>
+		<script type="module" src="/js/workbench-resize.js?v=6"></script>
 		<script type="module" src="/js/workbench-doc-scroll.js?v=3"></script>
 		<div class="flex min-h-0 w-full flex-col gap-2 overflow-hidden">
 			@MobileRegionTabs(state)

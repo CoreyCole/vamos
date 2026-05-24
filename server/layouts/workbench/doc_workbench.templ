@@ -35,7 +35,8 @@ templ DocWorkbenchRegionToggleButton(signalKey string, label string, icon templ.
 	<button
 		type="button"
 		class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-		data-on:click={ beforeToggle + "$workbench.focused = false; if (window.matchMedia('(max-width: 767px)').matches) { $workbench.activeRegionID = '" + signalKey + "'; $workbench.regions." + signalKey + ".visible = true } else { $workbench.regions." + signalKey + ".visible = !$workbench.regions." + signalKey + ".visible }" }
+		data-on:click={ beforeToggle + "$workbench.focused = false; if (window.matchMedia('(max-width: 767px)').matches) { $workbench.activeRegionID = '" + signalKey + "'; $workbench.regions." + signalKey + ".visible = true } else { $workbench.regions." + signalKey + ".visible = !$workbench.regions." + signalKey + ".visible }; el.closest('#workbench-root')?.dispatchEvent(new CustomEvent('workbench-state-changed', { bubbles: true }))" }
+		data-workbench-save-on-click
 		data-attr:aria-pressed={ "$workbench.regions." + signalKey + ".visible ? 'true' : 'false'" }
 		aria-label={ label }
 		title={ label }
@@ -49,7 +50,8 @@ templ DocWorkbenchReturnButton() {
 	<button
 		type="button"
 		class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground md:hidden"
-		data-on:click="$workbench.focused = false; $workbench.activeRegionID = 'docWorkbenchCenter'; $workbench.regions.docWorkbenchCenter.visible = true"
+		data-on:click="$workbench.focused = false; $workbench.activeRegionID = 'docWorkbenchCenter'; $workbench.regions.docWorkbenchCenter.visible = true; el.closest('#workbench-root')?.dispatchEvent(new CustomEvent('workbench-state-changed', { bubbles: true }))"
+		data-workbench-save-on-click
 		aria-label="Back to document"
 		title="Back to document"
 	>
@@ -78,25 +80,31 @@ templ ChatBubbleIcon() {
 }
 
 templ RightRail(args RightRailArgs) {
-	<aside id="doc-right-rail" class="flex h-full min-h-0 flex-col bg-card" data-signals={ "{rightRailActiveTab: '" + string(args.ActiveTab) + "'}" }>
+	<aside
+		id="doc-right-rail"
+		class="flex h-full min-h-0 flex-col bg-card"
+		data-signals={ "{rightRailActiveTab: '" + string(args.ActiveTab) + "'}" }
+		data-workbench-right-rail-tab={ string(args.ActiveTab) }
+		data-attr:data-workbench-right-rail-tab="$rightRailActiveTab"
+	>
 		<div class="shrink-0 border-b border-border p-2">
 			<div class="flex items-center gap-2">
 				@DocWorkbenchReturnButton()
 				<div class="grid min-w-0 flex-1 grid-cols-2 gap-1 rounded-md bg-muted/40 p-1" role="tablist" aria-label="Doc right rail tabs">
-					<button type="button" class="rounded px-2 py-1 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground" data-on:click="$rightRailActiveTab = 'chat'" data-class="{'bg-background text-foreground shadow-sm': $rightRailActiveTab === 'chat'}">Chat</button>
-					<button type="button" class="rounded px-2 py-1 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground" data-on:click="$rightRailActiveTab = 'comments'" data-class="{'bg-background text-foreground shadow-sm': $rightRailActiveTab === 'comments'}">Comments</button>
+					<button type="button" class="rounded px-2 py-1 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground" data-on:click="$rightRailActiveTab = 'chat'; el.closest('#workbench-root')?.dispatchEvent(new CustomEvent('workbench-state-changed', { bubbles: true }))" data-workbench-save-on-click data-class="{'bg-background text-foreground shadow-sm': $rightRailActiveTab === 'chat'}">Chat</button>
+					<button type="button" class="rounded px-2 py-1 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground" data-on:click="$rightRailActiveTab = 'comments'; el.closest('#workbench-root')?.dispatchEvent(new CustomEvent('workbench-state-changed', { bubbles: true }))" data-workbench-save-on-click data-class="{'bg-background text-foreground shadow-sm': $rightRailActiveTab === 'comments'}">Comments</button>
 				</div>
 			</div>
 		</div>
 		<div class="min-h-0 flex-1 overflow-hidden">
-			<div id="doc-right-chat-panel" class="h-full min-h-0" data-show="$rightRailActiveTab === 'chat'">
+			<div id="doc-right-chat-panel" class={ RightRailPanelInitialClass(args.ActiveTab, RightRailTabChat) } data-show="$rightRailActiveTab === 'chat'">
 				if args.Chat != nil {
 					@args.Chat
 				} else {
 					<div class="flex h-full items-center justify-center p-4 text-sm text-muted-foreground">No chat selected.</div>
 				}
 			</div>
-			<div id="doc-right-comments-panel" class="h-full min-h-0" data-show="$rightRailActiveTab === 'comments'">
+			<div id="doc-right-comments-panel" class={ RightRailPanelInitialClass(args.ActiveTab, RightRailTabComments) } data-show="$rightRailActiveTab === 'comments'">
 				if args.Comments != nil {
 					@args.Comments
 				} else {

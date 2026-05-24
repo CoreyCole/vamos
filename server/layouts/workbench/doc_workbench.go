@@ -162,6 +162,13 @@ func BuildDocWorkbenchState(input WorkbenchDocContext) (WorkbenchState, error) {
 	})
 }
 
+func RightRailPanelInitialClass(active RightRailTab, panel RightRailTab) string {
+	if active == panel {
+		return "h-full min-h-0"
+	}
+	return "hidden h-full min-h-0"
+}
+
 func rightRailKind(tab RightRailTab) RegionKind {
 	if tab == RightRailTabChat {
 		return RegionChat

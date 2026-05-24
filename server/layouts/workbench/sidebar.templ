@@ -1,7 +1,14 @@
 package workbench
 
 templ SharedSidebar(args WorkbenchSidebarArgs) {
-	<aside id={ sidebarID(args) } class="flex h-full min-h-0 min-w-0 flex-col bg-card" data-signals={ SidebarSignals(args) }>
+	{{ activeTab := NormalizeSidebarDefault(args) }}
+	<aside
+		id={ sidebarID(args) }
+		class="flex h-full min-h-0 min-w-0 flex-col bg-card"
+		data-signals={ SidebarSignals(args) }
+		data-workbench-sidebar-tab={ string(activeTab) }
+		data-attr:data-workbench-sidebar-tab="$sidebarActiveTab"
+	>
 		<div class="shrink-0 border-b border-border p-2">
 			<div class="flex items-center gap-2">
 				<div class="grid min-w-0 flex-1 grid-cols-2 gap-1 rounded-md bg-muted/40 p-1" role="tablist" aria-label="Workbench sidebar tabs">
@@ -12,6 +19,7 @@ templ SharedSidebar(args WorkbenchSidebarArgs) {
 								class="rounded px-2 py-1 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
 								role="tab"
 								data-on:click={ sidebarTabClick(tab.Kind) }
+								data-workbench-save-on-click
 								data-class={ sidebarTabActiveClass(tab.Kind) }
 								{ sidebarRevealScrollAttrs(tab.Kind)... }
 							>
@@ -24,10 +32,10 @@ templ SharedSidebar(args WorkbenchSidebarArgs) {
 			</div>
 		</div>
 		<div class="min-h-0 flex-1 overflow-y-auto p-2">
-			<div data-show={ sidebarTabShow(SidebarTabWorkspaces) }>
+			<div class={ SidebarPanelInitialClass(activeTab, SidebarTabWorkspaces) } data-show={ sidebarTabShow(SidebarTabWorkspaces) }>
 				@WorkspacesPanel(args.Workspaces)
 			</div>
-			<div data-show={ sidebarTabShow(SidebarTabFiles) }>
+			<div class={ SidebarPanelInitialClass(activeTab, SidebarTabFiles) } data-show={ sidebarTabShow(SidebarTabFiles) }>
 				@FilesPanel(args.Files)
 			</div>
 		</div>

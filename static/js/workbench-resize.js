@@ -12,6 +12,8 @@ async function mergeWorkbenchPaths(patches) {
 }
 
 const roots = new WeakSet();
+const pendingSaves = new WeakMap();
+let navigationSaveInstalled = false;
 
 function clamp(value, min, max) {
   return Math.min(Math.max(value, min), max);
@@ -171,13 +173,40 @@ function updateHandles(root) {
   }
 }
 
+function regionVisibleFromRoot(root, region) {
+  const attr = region.getAttribute("data-workbench-visible");
+  if (attr === "true") return true;
+  if (attr === "false") return false;
+  return isVisible(region);
+}
+
+function currentSidebarTab(root) {
+  const sidebar = root.querySelector(
+    "#workbench-shared-sidebar, #thoughts-shared-sidebar",
+  );
+  return (
+    sidebar?.dataset.workbenchSidebarTab ||
+    root.dataset.workbenchSidebarTab ||
+    ""
+  );
+}
+
+function currentRightRailTab(root) {
+  const rail = root.querySelector("#doc-right-rail");
+  return (
+    rail?.dataset.workbenchRightRailTab ||
+    root.dataset.workbenchRightRailTab ||
+    ""
+  );
+}
+
 function currentConfig(root) {
   const regions = allRegions(root).map((region) => ({
     id: region.dataset.workbenchRegion,
     slot: region.dataset.workbenchSlot,
     kind: region.dataset.workbenchKind,
     ratio: Number(region.dataset.workbenchRatio || 0),
-    visible: false,
+    visible: regionVisibleFromRoot(root, region),
   }));
 
   return {
@@ -185,7 +214,11 @@ function currentConfig(root) {
     page: root.dataset.workbenchPage,
     view: root.dataset.workbenchView,
     regions,
-    mobile: { activeRegionID: "" },
+    mobile: { activeRegionID: root.dataset.workbenchMobileActive || "" },
+    tabs: {
+      sidebarTab: currentSidebarTab(root),
+      rightRailTab: currentRightRailTab(root),
+    },
   };
 }
 
@@ -198,6 +231,33 @@ function saveConfig(root) {
     },
     body: JSON.stringify({ config: currentConfig(root) }),
   }).catch(() => {});
+}
+
+function scheduleSave(root) {
+  window.clearTimeout(pendingSaves.get(root));
+  pendingSaves.set(
+    root,
+    window.setTimeout(() => saveConfig(root), 150),
+  );
+}
+
+function saveBeforeNavigation(event) {
+  const link = event.target.closest?.("a[href]");
+  if (
+    !link ||
+    link.target ||
+    event.metaKey ||
+    event.ctrlKey ||
+    event.shiftKey ||
+    event.altKey
+  ) {
+    return;
+  }
+  const root =
+    link.closest("#workbench-root") ||
+    document.querySelector("#workbench-root");
+  if (!root) return;
+  saveConfig(root);
 }
 
 function startResize(event) {
@@ -324,6 +384,15 @@ function initWorkbench(root) {
     "[data-workbench-resize-handle]",
   )) {
     handle.addEventListener("pointerdown", startResize);
+  }
+  root.addEventListener("workbench-state-changed", () => scheduleSave(root));
+  root.addEventListener("click", (event) => {
+    if (!event.target.closest?.("[data-workbench-save-on-click]")) return;
+    requestAnimationFrame(() => scheduleSave(root));
+  });
+  if (!navigationSaveInstalled) {
+    document.addEventListener("click", saveBeforeNavigation, { capture: true });
+    navigationSaveInstalled = true;
   }
 }
 

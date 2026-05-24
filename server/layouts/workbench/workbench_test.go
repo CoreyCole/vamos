@@ -367,7 +367,7 @@ func TestWorkbenchLoadsDocScrollScript(t *testing.T) {
 		t.Fatalf("Workbench.Render() error = %v", err)
 	}
 	html := body.String()
-	for _, want := range []string{`/js/workbench-resize.js`, `/js/workbench-doc-scroll.js`} {
+	for _, want := range []string{`/js/workbench-resize.js?v=6`, `/js/workbench-doc-scroll.js`} {
 		if !strings.Contains(html, want) {
 			t.Fatalf("Workbench html = %s, want %q", html, want)
 		}
@@ -442,7 +442,11 @@ func TestWorkbenchResizeJSShowsHandlesForVisibleAdjacentRegions(t *testing.T) {
 		"collapseRegion(root, navigationGroup.navigation)",
 		"regionSlot(region) !== \"primary\"",
 		"attributeFilter: [\"class\", \"style\", \"data-workbench-focused\"]",
-		"mobile: { activeRegionID: \"\" }",
+		"tabs: {",
+		"activeRegionID: root.dataset.workbenchMobileActive",
+		"visible: regionVisibleFromRoot(root, region)",
+		"workbench-state-changed",
+		"saveBeforeNavigation",
 	} {
 		if !strings.Contains(js, want) {
 			t.Fatalf("workbench-resize.js missing %q in %s", want, js)
@@ -453,6 +457,8 @@ func TestWorkbenchResizeJSShowsHandlesForVisibleAdjacentRegions(t *testing.T) {
 		"workbenchFocused(root) ||",
 		"regionMaxWidth",
 		"workbenchMaxRem",
+		"visible: false",
+		"mobile: { activeRegionID: \"\" }",
 	} {
 		if strings.Contains(js, unwanted) {
 			t.Fatalf("workbench-resize.js should not contain %q in %s", unwanted, js)
@@ -707,6 +713,48 @@ func TestSharedSidebarRendersRouteNeutralTabs(t *testing.T) {
 	} {
 		if strings.Contains(html, unwanted) {
 			t.Fatalf("SharedSidebar html = %s, should not contain %q", html, unwanted)
+		}
+	}
+}
+
+func TestSharedSidebarSSRHiddenInactivePanel(t *testing.T) {
+	t.Parallel()
+
+	html := renderSharedSidebarForTest(t, WorkbenchSidebarArgs{
+		DefaultTab: SidebarTabWorkspaces,
+		Tabs:       DefaultSidebarTabs(),
+	})
+	if !strings.Contains(html, `data-workbench-sidebar-tab="workspaces"`) {
+		t.Fatalf("SharedSidebar html = %s, want saved tab data attr", html)
+	}
+	if !strings.Contains(html, `<div class="" data-show="$sidebarActiveTab === &#39;workspaces&#39;">`) {
+		t.Fatalf("SharedSidebar html = %s, want active workspaces panel without hidden class", html)
+	}
+	if !strings.Contains(html, `<div class="hidden" data-show="$sidebarActiveTab === &#39;files&#39;">`) {
+		t.Fatalf("SharedSidebar html = %s, want inactive files panel hidden", html)
+	}
+}
+
+func TestRightRailSSRHiddenInactivePanel(t *testing.T) {
+	t.Parallel()
+
+	var body bytes.Buffer
+	if err := RightRail(RightRailArgs{
+		ActiveTab: RightRailTabComments,
+		Chat:      templ.Raw("<p>chat</p>"),
+		Comments:  templ.Raw("<p>comments</p>"),
+	}).Render(t.Context(), &body); err != nil {
+		t.Fatalf("RightRail.Render() error = %v", err)
+	}
+	html := body.String()
+	for _, want := range []string{
+		`data-workbench-right-rail-tab="comments"`,
+		`id="doc-right-chat-panel" class="hidden h-full min-h-0"`,
+		`id="doc-right-comments-panel" class="h-full min-h-0"`,
+		`data-workbench-save-on-click`,
+	} {
+		if !strings.Contains(html, want) {
+			t.Fatalf("RightRail html = %s, want %q", html, want)
 		}
 	}
 }

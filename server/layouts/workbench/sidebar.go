@@ -172,6 +172,13 @@ func SidebarSignals(args WorkbenchSidebarArgs) string {
 	return "{sidebarActiveTab: '" + string(NormalizeSidebarDefault(args)) + "'}"
 }
 
+func SidebarPanelInitialClass(active SidebarTabKind, panel SidebarTabKind) string {
+	if active == panel {
+		return ""
+	}
+	return "hidden"
+}
+
 func sidebarID(args WorkbenchSidebarArgs) string {
 	if strings.TrimSpace(args.ID) != "" {
 		return args.ID
@@ -186,7 +193,7 @@ func sidebarTabActiveClass(kind SidebarTabKind) string {
 }
 
 func sidebarTabClick(kind SidebarTabKind) string {
-	expr := "$sidebarActiveTab = '" + string(kind) + "'"
+	expr := "$sidebarActiveTab = '" + string(kind) + "'; el.closest('#workbench-root')?.dispatchEvent(new CustomEvent('workbench-state-changed', { bubbles: true }))"
 	if kind != SidebarTabFiles {
 		return expr
 	}
