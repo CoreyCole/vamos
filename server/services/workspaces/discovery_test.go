@@ -146,6 +146,39 @@ func TestDiscoverIncludesConfiguredCheckoutWithStableSlug(t *testing.T) {
 	}
 }
 
+func TestDiscoverWarnsWhenDatastarProAssetMissing(t *testing.T) {
+	parent := t.TempDir()
+	makeCheckout(t, parent, "vamos")
+
+	got, err := Discover(DiscoveryConfig{ParentDir: parent, MainCheckoutPath: filepath.Join(parent, "vamos")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 1 || len(got[0].Warnings) != 1 || !strings.Contains(got[0].Warnings[0], "Datastar Pro asset missing") {
+		t.Fatalf("warnings = %#v", got)
+	}
+}
+
+func TestDiscoverDoesNotWarnWhenDatastarProAssetExists(t *testing.T) {
+	parent := t.TempDir()
+	checkout := makeCheckout(t, parent, "vamos")
+	asset := filepath.Join(checkout, "static", "js", "datastar-pro-v1.js")
+	if err := os.MkdirAll(filepath.Dir(asset), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(asset, []byte("export {};\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := Discover(DiscoveryConfig{ParentDir: parent, MainCheckoutPath: checkout})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 1 || len(got[0].Warnings) != 0 {
+		t.Fatalf("warnings = %#v", got)
+	}
+}
+
 func TestHostMapping(t *testing.T) {
 	if got := HostForSlug("foo", "cn-agents.test"); got != "foo.cn-agents.test" {
 		t.Fatal(got)

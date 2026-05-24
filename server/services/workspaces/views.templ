@@ -186,6 +186,16 @@ templ ImplWorkspaceCard(view ImplWorkspaceView, managerURL string) {
 				<p class="break-all font-mono text-xs text-muted-foreground">{ slug }</p>
 			}
 		</div>
+		if len(ws.Warnings) > 0 {
+			<div class="rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-200">
+				<p class="font-medium">Startup warning</p>
+				<ul class="mt-1 list-disc space-y-1 pl-5">
+					for _, warning := range ws.Warnings {
+						<li>{ warning }</li>
+					}
+				</ul>
+			</div>
+		}
 		<dl class="grid gap-x-4 gap-y-2 text-sm md:grid-cols-[max-content_minmax(0,1fr)]">
 			<dt class="text-xs font-medium uppercase tracking-wide text-muted-foreground">Status</dt>
 			<dd class="min-w-0 break-words">{ workspaceImplStatusBadge(view) }</dd>

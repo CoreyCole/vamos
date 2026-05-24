@@ -174,6 +174,7 @@ type Workspace struct {
 	Branch          string
 	Commit          string
 	Error           string
+	Warnings        []string
 	LogPath         string
 	StateDir        string
 	IsMain          bool
