@@ -112,13 +112,14 @@ type ThoughtsContextArgs struct {
 }
 
 type EmbeddedChatRenderRequest struct {
-	UserEmail   string
-	DocPath     string
-	Context     string
-	WorkspaceID string
-	ThreadID    string
-	RunID       string
-	AttachDoc   bool
+	UserEmail        string
+	DocPath          string
+	Context          string
+	WorkspaceID      string
+	ThreadID         string
+	RunID            string
+	AttachDoc        bool
+	WorkspaceContext DocumentWorkspaceContext
 }
 
 type EmbeddedChatURLReplacement struct {

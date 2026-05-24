@@ -350,17 +350,14 @@ func (s *Service) buildEmbeddedChatComponent(
 	c echo.Context,
 	pageArgs *PageArgs,
 ) (templ.Component, EmbeddedChatURLReplacement, error) {
-	workspaceID := strings.TrimSpace(c.QueryParam("chat_workspace"))
-	if workspaceID == "" && pageArgs.WorkspaceContext.WorkspaceID != "" {
-		workspaceID = pageArgs.WorkspaceContext.WorkspaceID
-	}
 	return s.buildEmbeddedChatComponentForRequest(c, EmbeddedChatRenderRequest{
-		UserEmail:   pageArgs.UserEmail,
-		DocPath:     pageArgs.FilePath,
-		Context:     thoughtsContextMode(c),
-		WorkspaceID: workspaceID,
-		ThreadID:    strings.TrimSpace(c.QueryParam("thread")),
-		RunID:       strings.TrimSpace(c.QueryParam("run")),
+		UserEmail:        pageArgs.UserEmail,
+		DocPath:          pageArgs.FilePath,
+		Context:          thoughtsContextMode(c),
+		WorkspaceID:      strings.TrimSpace(c.QueryParam("chat_workspace")),
+		ThreadID:         strings.TrimSpace(c.QueryParam("thread")),
+		RunID:            strings.TrimSpace(c.QueryParam("run")),
+		WorkspaceContext: pageArgs.WorkspaceContext,
 	})
 }
 

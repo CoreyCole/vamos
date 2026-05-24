@@ -6,6 +6,7 @@ package agentchat
 import (
 	"bytes"
 	"context"
+	"database/sql"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -14,6 +15,7 @@ import (
 	"github.com/a-h/templ"
 	"github.com/labstack/echo/v4"
 
+	"github.com/CoreyCole/vamos/pkg/db"
 	"github.com/CoreyCole/vamos/server/services/markdown"
 )
 
@@ -93,6 +95,75 @@ func TestResolveEmbeddedChatSelectionExplicitURLWins(t *testing.T) {
 	}
 }
 
+func TestResolveEmbeddedChatSelectionWorkspaceDocUsesWorkspaceRowBeforeUserSelection(
+	t *testing.T,
+) {
+	ctx := context.Background()
+	service := newTestAgentChatService(t)
+	workspace, workspaceThread := mustCreateWorkspaceThreadForHandlerTest(
+		t,
+		service,
+		"owner@example.com",
+	)
+	freeformWorkspace := mustCreateWorkspaceForHandlerTest(t, service, "owner@example.com")
+	freeformThread := mustCreateAgentThread(
+		t,
+		service,
+		"thread-2",
+		"owner@example.com",
+		freeformWorkspace.RootDocPath,
+		"lineage-2",
+	)
+	if err := service.queries.AttachThreadToWorkspace(
+		ctx,
+		db.AttachThreadToWorkspaceParams{
+			ID:          freeformThread.ID,
+			WorkspaceID: sql.NullString{String: freeformWorkspace.ID, Valid: true},
+		},
+	); err != nil {
+		t.Fatalf("AttachThreadToWorkspace() error = %v", err)
+	}
+	if err := service.queries.UpdateWorkspaceWorkflowState(
+		ctx,
+		db.UpdateWorkspaceWorkflowStateParams{
+			ID:                workspace.ID,
+			WorkflowType:      string(WorkspaceWorkflowQRSPI),
+			WorkflowStateJson: sql.NullString{},
+		},
+	); err != nil {
+		t.Fatalf("UpdateWorkspaceWorkflowState() error = %v", err)
+	}
+	if err := service.PersistEmbeddedChatSelection(
+		ctx,
+		"owner@example.com",
+		EmbeddedChatSelection{
+			WorkspaceID: freeformWorkspace.ID,
+			ThreadID:    freeformThread.ID,
+			Scope:       EmbeddedChatSelectionScopeFreeform,
+		},
+	); err != nil {
+		t.Fatalf("PersistEmbeddedChatSelection() error = %v", err)
+	}
+
+	got, err := service.ResolveEmbeddedChatSelection(
+		ctx,
+		"owner@example.com",
+		EmbeddedChatURLState{
+			Context: ThoughtsChatContext,
+			WorkspaceContext: markdown.DocumentWorkspaceContext{
+				WorkspaceID: workspace.ID,
+			},
+		},
+	)
+	if err != nil {
+		t.Fatalf("ResolveEmbeddedChatSelection() error = %v", err)
+	}
+	if got.WorkspaceID != workspace.ID || got.ThreadID != workspaceThread.ID ||
+		got.Scope != EmbeddedChatSelectionScopeWorkspace {
+		t.Fatalf("selection = %+v", got)
+	}
+}
+
 func TestResolveEmbeddedChatSelectionUsesPersistedWhenChatContextHasNoParams(
 	t *testing.T,
 ) {
@@ -126,6 +197,106 @@ func TestResolveEmbeddedChatSelectionUsesPersistedWhenChatContextHasNoParams(
 	if got.ExplicitURL || got.WorkspaceID != workspace.ID || got.ThreadID != thread.ID ||
 		got.RunID != "run_2" {
 		t.Fatalf("selection = %+v", got)
+	}
+}
+
+func TestResolveEmbeddedChatSelectionRootIgnoresGlobalWorkspaceSelection(t *testing.T) {
+	ctx := context.Background()
+	service := newTestAgentChatService(t)
+	workspace, thread := mustCreateWorkspaceThreadForHandlerTest(
+		t,
+		service,
+		"owner@example.com",
+	)
+	if err := service.queries.UpdateWorkspaceWorkflowState(
+		ctx,
+		db.UpdateWorkspaceWorkflowStateParams{
+			ID:                workspace.ID,
+			WorkflowType:      string(WorkspaceWorkflowQRSPI),
+			WorkflowStateJson: sql.NullString{},
+		},
+	); err != nil {
+		t.Fatalf("UpdateWorkspaceWorkflowState() error = %v", err)
+	}
+	if err := service.PersistEmbeddedChatSelection(
+		ctx,
+		"owner@example.com",
+		EmbeddedChatSelection{WorkspaceID: workspace.ID, ThreadID: thread.ID},
+	); err != nil {
+		t.Fatalf("PersistEmbeddedChatSelection() error = %v", err)
+	}
+
+	got, err := service.ResolveEmbeddedChatSelection(
+		ctx,
+		"owner@example.com",
+		EmbeddedChatURLState{Context: ThoughtsChatContext},
+	)
+	if err != nil {
+		t.Fatalf("ResolveEmbeddedChatSelection() error = %v", err)
+	}
+	if got != (EmbeddedChatSelection{}) {
+		t.Fatalf("selection = %+v, want empty", got)
+	}
+}
+
+func TestPersistEmbeddedChatSelectionWritesScopedRows(t *testing.T) {
+	ctx := context.Background()
+	service := newTestAgentChatService(t)
+	workspace, thread := mustCreateWorkspaceThreadForHandlerTest(
+		t,
+		service,
+		"owner@example.com",
+	)
+	if err := service.PersistEmbeddedChatSelection(
+		ctx,
+		"owner@example.com",
+		EmbeddedChatSelection{
+			WorkspaceID: workspace.ID,
+			ThreadID:    thread.ID,
+			Scope:       EmbeddedChatSelectionScopeWorkspace,
+		},
+	); err != nil {
+		t.Fatalf("PersistEmbeddedChatSelection(workspace) error = %v", err)
+	}
+	workspaceRow, err := service.queries.GetUserChatSelection(
+		ctx,
+		db.GetUserChatSelectionParams{
+			UserEmail: "owner@example.com",
+			Scope:     string(EmbeddedChatSelectionScopeWorkspace),
+			ScopeID:   workspace.ID,
+		},
+	)
+	if err != nil {
+		t.Fatalf("GetUserChatSelection(workspace) error = %v", err)
+	}
+	if workspaceRow.WorkspaceID != workspace.ID || workspaceRow.ThreadID.String != thread.ID {
+		t.Fatalf("workspace row = %+v", workspaceRow)
+	}
+
+	if err := service.PersistEmbeddedChatSelection(
+		ctx,
+		"owner@example.com",
+		EmbeddedChatSelection{
+			WorkspaceID: workspace.ID,
+			ThreadID:    thread.ID,
+			Scope:       EmbeddedChatSelectionScopeFreeform,
+		},
+	); err != nil {
+		t.Fatalf("PersistEmbeddedChatSelection(freeform) error = %v", err)
+	}
+	freeformRow, err := service.queries.GetUserChatSelection(
+		ctx,
+		db.GetUserChatSelectionParams{
+			UserEmail: "owner@example.com",
+			Scope:     string(EmbeddedChatSelectionScopeFreeform),
+			ScopeID:   "",
+		},
+	)
+	if err != nil {
+		t.Fatalf("GetUserChatSelection(freeform) error = %v", err)
+	}
+	if freeformRow.WorkspaceID != workspace.ID || freeformRow.ScopeID != "" {
+		t.Fatalf("freeform row = %+v", freeformRow)
 	}
 }
 

@@ -358,6 +358,8 @@ type SystemSnapshotProcess struct {
 
 type UserChatSelection struct {
 	UserEmail   string         `json:"user_email"`
+	Scope       string         `json:"scope"`
+	ScopeID     string         `json:"scope_id"`
 	WorkspaceID string         `json:"workspace_id"`
 	ThreadID    sql.NullString `json:"thread_id"`
 	RunID       sql.NullString `json:"run_id"`

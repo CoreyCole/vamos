@@ -10,17 +10,59 @@ import (
 	"database/sql"
 )
 
-const getUserChatSelection = `-- name: GetUserChatSelection :one
-SELECT user_email, workspace_id, thread_id, run_id, created_at, updated_at
+const getLatestUserChatSelectionByScope = `-- name: GetLatestUserChatSelectionByScope :one
+SELECT user_email, scope, scope_id, workspace_id, thread_id, run_id, created_at, updated_at
 FROM user_chat_selections
-WHERE user_email = ?1
+WHERE
+    user_email = ?1
+    AND scope = ?2
+ORDER BY updated_at DESC
+LIMIT 1
 `
 
-func (q *Queries) GetUserChatSelection(ctx context.Context, userEmail string) (UserChatSelection, error) {
-	row := q.db.QueryRowContext(ctx, getUserChatSelection, userEmail)
+type GetLatestUserChatSelectionByScopeParams struct {
+	UserEmail string `json:"user_email"`
+	Scope     string `json:"scope"`
+}
+
+func (q *Queries) GetLatestUserChatSelectionByScope(ctx context.Context, arg GetLatestUserChatSelectionByScopeParams) (UserChatSelection, error) {
+	row := q.db.QueryRowContext(ctx, getLatestUserChatSelectionByScope, arg.UserEmail, arg.Scope)
 	var i UserChatSelection
 	err := row.Scan(
 		&i.UserEmail,
+		&i.Scope,
+		&i.ScopeID,
+		&i.WorkspaceID,
+		&i.ThreadID,
+		&i.RunID,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const getUserChatSelection = `-- name: GetUserChatSelection :one
+SELECT user_email, scope, scope_id, workspace_id, thread_id, run_id, created_at, updated_at
+FROM user_chat_selections
+WHERE
+    user_email = ?1
+    AND scope = ?2
+    AND scope_id = ?3
+`
+
+type GetUserChatSelectionParams struct {
+	UserEmail string `json:"user_email"`
+	Scope     string `json:"scope"`
+	ScopeID   string `json:"scope_id"`
+}
+
+func (q *Queries) GetUserChatSelection(ctx context.Context, arg GetUserChatSelectionParams) (UserChatSelection, error) {
+	row := q.db.QueryRowContext(ctx, getUserChatSelection, arg.UserEmail, arg.Scope, arg.ScopeID)
+	var i UserChatSelection
+	err := row.Scan(
+		&i.UserEmail,
+		&i.Scope,
+		&i.ScopeID,
 		&i.WorkspaceID,
 		&i.ThreadID,
 		&i.RunID,
@@ -33,6 +75,8 @@ func (q *Queries) GetUserChatSelection(ctx context.Context, userEmail string) (U
 const upsertUserChatSelection = `-- name: UpsertUserChatSelection :one
 INSERT INTO user_chat_selections (
     user_email,
+    scope,
+    scope_id,
     workspace_id,
     thread_id,
     run_id
@@ -41,18 +85,22 @@ VALUES (
     ?1,
     ?2,
     ?3,
-    ?4
+    ?4,
+    ?5,
+    ?6
 )
-ON CONFLICT (user_email) DO UPDATE SET
+ON CONFLICT (user_email, scope, scope_id) DO UPDATE SET
 workspace_id = excluded.workspace_id,
 thread_id = excluded.thread_id,
 run_id = excluded.run_id,
 updated_at = CURRENT_TIMESTAMP
-RETURNING user_email, workspace_id, thread_id, run_id, created_at, updated_at
+RETURNING user_email, scope, scope_id, workspace_id, thread_id, run_id, created_at, updated_at
 `
 
 type UpsertUserChatSelectionParams struct {
 	UserEmail   string         `json:"user_email"`
+	Scope       string         `json:"scope"`
+	ScopeID     string         `json:"scope_id"`
 	WorkspaceID string         `json:"workspace_id"`
 	ThreadID    sql.NullString `json:"thread_id"`
 	RunID       sql.NullString `json:"run_id"`
@@ -61,6 +109,8 @@ type UpsertUserChatSelectionParams struct {
 func (q *Queries) UpsertUserChatSelection(ctx context.Context, arg UpsertUserChatSelectionParams) (UserChatSelection, error) {
 	row := q.db.QueryRowContext(ctx, upsertUserChatSelection,
 		arg.UserEmail,
+		arg.Scope,
+		arg.ScopeID,
 		arg.WorkspaceID,
 		arg.ThreadID,
 		arg.RunID,
@@ -68,6 +118,8 @@ func (q *Queries) UpsertUserChatSelection(ctx context.Context, arg UpsertUserCha
 	var i UserChatSelection
 	err := row.Scan(
 		&i.UserEmail,
+		&i.Scope,
+		&i.ScopeID,
 		&i.WorkspaceID,
 		&i.ThreadID,
 		&i.RunID,

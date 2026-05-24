@@ -76,13 +76,21 @@ CREATE INDEX IF NOT EXISTS idx_layout_preferences_user
 ON layout_preferences (user_email, page, view) ;
 
 CREATE TABLE IF NOT EXISTS user_chat_selections (
-user_email TEXT PRIMARY KEY,
+user_email TEXT NOT NULL,
+scope TEXT NOT NULL DEFAULT 'global' CHECK (scope IN ('global',
+'freeform',
+'workspace')),
+scope_id TEXT NOT NULL DEFAULT '',
 workspace_id TEXT NOT NULL,
 thread_id TEXT,
 run_id TEXT,
 created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+PRIMARY KEY (user_email, scope, scope_id)
 ) ;
+
+CREATE INDEX IF NOT EXISTS idx_user_chat_selections_user_updated
+ON user_chat_selections (user_email, updated_at DESC) ;
 
 -- ============================================================
 -- System Health Metrics History

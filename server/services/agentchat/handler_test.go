@@ -602,15 +602,15 @@ func TestSendEmbeddedWorkspacePromptPatchesPanelAndDoesNotRedirect(t *testing.T)
 		}
 	}
 
-	selection, err := service.GetLastEmbeddedChatSelection(
+	selection, err := service.LastFreeformEmbeddedChatSelection(
 		t.Context(),
 		"user@example.com",
 	)
 	if err != nil {
-		t.Fatalf("GetLastEmbeddedChatSelection() error = %v", err)
+		t.Fatalf("LastFreeformEmbeddedChatSelection() error = %v", err)
 	}
 	if selection.WorkspaceID != workspaceRecord.ID || selection.ThreadID == "" ||
-		selection.RunID == "" {
+		selection.RunID == "" || selection.Scope != EmbeddedChatSelectionScopeFreeform {
 		t.Fatalf("selection = %+v, want persisted concrete chat", selection)
 	}
 }
@@ -748,15 +748,15 @@ func TestResumeEmbeddedWorkspaceThreadPatchesPanelAndURL(t *testing.T) {
 		}
 	}
 
-	selection, err := service.GetLastEmbeddedChatSelection(
+	selection, err := service.LastFreeformEmbeddedChatSelection(
 		t.Context(),
 		"user@example.com",
 	)
 	if err != nil {
-		t.Fatalf("GetLastEmbeddedChatSelection() error = %v", err)
+		t.Fatalf("LastFreeformEmbeddedChatSelection() error = %v", err)
 	}
 	if selection.WorkspaceID != workspaceRecord.ID || selection.ThreadID != thread.ID ||
-		selection.RunID == "" {
+		selection.RunID == "" || selection.Scope != EmbeddedChatSelectionScopeFreeform {
 		t.Fatalf("selection = %+v, want persisted resumed chat", selection)
 	}
 }

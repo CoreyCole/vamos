@@ -17,12 +17,21 @@ import (
 
 const ThoughtsChatContext = "chat"
 
+type EmbeddedChatSelectionScope string
+
+const (
+	EmbeddedChatSelectionScopeGlobal    EmbeddedChatSelectionScope = "global"
+	EmbeddedChatSelectionScopeFreeform  EmbeddedChatSelectionScope = "freeform"
+	EmbeddedChatSelectionScopeWorkspace EmbeddedChatSelectionScope = "workspace"
+)
+
 type EmbeddedChatURLState struct {
-	DocPath     string
-	Context     string
-	WorkspaceID string
-	ThreadID    string
-	RunID       string
+	DocPath          string
+	Context          string
+	WorkspaceID      string
+	ThreadID         string
+	RunID            string
+	WorkspaceContext markdown.DocumentWorkspaceContext
 }
 
 type EmbeddedChatSelection struct {
@@ -30,6 +39,7 @@ type EmbeddedChatSelection struct {
 	ThreadID    string
 	RunID       string
 	ExplicitURL bool
+	Scope       EmbeddedChatSelectionScope
 }
 
 type EmbeddedChatPanelArgs struct {
@@ -101,22 +111,137 @@ func (s *Service) GetLastEmbeddedChatSelection(
 	ctx context.Context,
 	userEmail string,
 ) (EmbeddedChatSelection, error) {
+	return s.lastEmbeddedChatSelectionForScope(
+		ctx,
+		userEmail,
+		EmbeddedChatSelectionScopeGlobal,
+	)
+}
+
+func (s *Service) LastWorkspaceEmbeddedChatSelection(
+	ctx context.Context,
+	userEmail string,
+	workspaceID string,
+) (EmbeddedChatSelection, error) {
+	workspaceID = strings.TrimSpace(workspaceID)
+	if workspaceID == "" {
+		return EmbeddedChatSelection{}, nil
+	}
+	workspace, err := s.GetWorkspaceForUserOrTrustedImport(ctx, userEmail, workspaceID)
+	if err != nil {
+		return EmbeddedChatSelection{}, err
+	}
+	if threadID := strings.TrimSpace(workspace.SelectedThreadID.String); threadID != "" {
+		return EmbeddedChatSelection{
+			WorkspaceID: workspace.ID,
+			ThreadID:    threadID,
+			Scope:       EmbeddedChatSelectionScopeWorkspace,
+		}, nil
+	}
+	if strings.TrimSpace(workspace.CurrentSessionID.String) != "" {
+		return EmbeddedChatSelection{
+			WorkspaceID: workspace.ID,
+			Scope:       EmbeddedChatSelectionScopeWorkspace,
+		}, nil
+	}
+	row, err := s.queries.GetUserChatSelection(ctx, db.GetUserChatSelectionParams{
+		UserEmail: strings.TrimSpace(userEmail),
+		Scope:     string(EmbeddedChatSelectionScopeWorkspace),
+		ScopeID:   workspace.ID,
+	})
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return EmbeddedChatSelection{
+				WorkspaceID: workspace.ID,
+				Scope:       EmbeddedChatSelectionScopeWorkspace,
+			}, nil
+		}
+		return EmbeddedChatSelection{}, err
+	}
+	return embeddedChatSelectionFromRow(row, EmbeddedChatSelectionScopeWorkspace), nil
+}
+
+func (s *Service) LastFreeformEmbeddedChatSelection(
+	ctx context.Context,
+	userEmail string,
+) (EmbeddedChatSelection, error) {
+	for _, scope := range []EmbeddedChatSelectionScope{
+		EmbeddedChatSelectionScopeFreeform,
+		EmbeddedChatSelectionScopeGlobal,
+	} {
+		selection, err := s.lastEmbeddedChatSelectionForScope(ctx, userEmail, scope)
+		if err != nil {
+			return EmbeddedChatSelection{}, err
+		}
+		if strings.TrimSpace(selection.WorkspaceID) == "" {
+			continue
+		}
+		workspace, err := s.GetWorkspaceForUserOrTrustedImport(
+			ctx,
+			userEmail,
+			selection.WorkspaceID,
+		)
+		if err != nil {
+			return EmbeddedChatSelection{}, err
+		}
+		if WorkspaceWorkflowType(strings.TrimSpace(workspace.WorkflowType)) == WorkspaceWorkflowFreeform {
+			selection.Scope = scope
+			return selection, nil
+		}
+	}
+	threads, err := s.queries.ListAgentThreads(ctx, db.ListAgentThreadsParams{
+		UserEmail: strings.TrimSpace(userEmail),
+		Limit:     50,
+	})
+	if err != nil {
+		return EmbeddedChatSelection{}, err
+	}
+	for _, thread := range threads {
+		if strings.TrimSpace(thread.WorkspaceID.String) == "" {
+			return EmbeddedChatSelection{
+				ThreadID: thread.ID,
+				Scope:    EmbeddedChatSelectionScopeFreeform,
+			}, nil
+		}
+	}
+	return EmbeddedChatSelection{}, nil
+}
+
+func (s *Service) lastEmbeddedChatSelectionForScope(
+	ctx context.Context,
+	userEmail string,
+	scope EmbeddedChatSelectionScope,
+) (EmbeddedChatSelection, error) {
 	userEmail = strings.TrimSpace(userEmail)
 	if userEmail == "" {
 		return EmbeddedChatSelection{}, nil
 	}
-	row, err := s.queries.GetUserChatSelection(ctx, userEmail)
+	row, err := s.queries.GetLatestUserChatSelectionByScope(
+		ctx,
+		db.GetLatestUserChatSelectionByScopeParams{
+			UserEmail: userEmail,
+			Scope:     string(scope),
+		},
+	)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return EmbeddedChatSelection{}, nil
 		}
 		return EmbeddedChatSelection{}, err
 	}
+	return embeddedChatSelectionFromRow(row, scope), nil
+}
+
+func embeddedChatSelectionFromRow(
+	row db.UserChatSelection,
+	scope EmbeddedChatSelectionScope,
+) EmbeddedChatSelection {
 	return EmbeddedChatSelection{
 		WorkspaceID: strings.TrimSpace(row.WorkspaceID),
 		ThreadID:    strings.TrimSpace(row.ThreadID.String),
 		RunID:       strings.TrimSpace(row.RunID.String),
-	}, nil
+		Scope:       scope,
+	}
 }
 
 func (s *Service) PersistEmbeddedChatSelection(
@@ -129,8 +254,18 @@ func (s *Service) PersistEmbeddedChatSelection(
 	if userEmail == "" || workspaceID == "" {
 		return nil
 	}
+	scope := selection.Scope
+	if scope == "" {
+		scope = EmbeddedChatSelectionScopeGlobal
+	}
+	scopeID := ""
+	if scope == EmbeddedChatSelectionScopeWorkspace {
+		scopeID = workspaceID
+	}
 	_, err := s.queries.UpsertUserChatSelection(ctx, db.UpsertUserChatSelectionParams{
 		UserEmail:   userEmail,
+		Scope:       string(scope),
+		ScopeID:     scopeID,
 		WorkspaceID: workspaceID,
 		ThreadID:    nullString(strings.TrimSpace(selection.ThreadID)),
 		RunID:       nullString(strings.TrimSpace(selection.RunID)),
@@ -182,17 +317,24 @@ func (s *Service) ResolveEmbeddedChatSelection(
 			ThreadID:    strings.TrimSpace(state.ThreadID),
 			RunID:       strings.TrimSpace(state.RunID),
 			ExplicitURL: true,
+			Scope:       EmbeddedChatSelectionScopeGlobal,
 		}
 		return s.validateEmbeddedChatSelection(ctx, userEmail, selection)
 	}
 	if strings.TrimSpace(state.Context) != ThoughtsChatContext {
 		return EmbeddedChatSelection{}, nil
 	}
-	selection, err := s.GetLastEmbeddedChatSelection(ctx, userEmail)
+	if workspaceID := strings.TrimSpace(state.WorkspaceContext.WorkspaceID); workspaceID != "" {
+		selection, err := s.LastWorkspaceEmbeddedChatSelection(ctx, userEmail, workspaceID)
+		if err != nil {
+			return EmbeddedChatSelection{}, err
+		}
+		return s.validateEmbeddedChatSelection(ctx, userEmail, selection)
+	}
+	selection, err := s.LastFreeformEmbeddedChatSelection(ctx, userEmail)
 	if err != nil || strings.TrimSpace(selection.WorkspaceID) == "" {
 		return selection, err
 	}
-	selection.ExplicitURL = false
 	return s.validateEmbeddedChatSelection(ctx, userEmail, selection)
 }
 
@@ -201,15 +343,28 @@ func (s *Service) RenderEmbeddedChatPanel(
 	request markdown.EmbeddedChatRenderRequest,
 ) (templ.Component, markdown.EmbeddedChatURLReplacement, error) {
 	state := EmbeddedChatURLState{
-		DocPath:     request.DocPath,
-		Context:     request.Context,
-		WorkspaceID: request.WorkspaceID,
-		ThreadID:    request.ThreadID,
-		RunID:       request.RunID,
+		DocPath:          request.DocPath,
+		Context:          request.Context,
+		WorkspaceID:      request.WorkspaceID,
+		ThreadID:         request.ThreadID,
+		RunID:            request.RunID,
+		WorkspaceContext: request.WorkspaceContext,
 	}
 	selection, err := s.ResolveEmbeddedChatSelection(ctx, request.UserEmail, state)
 	if err != nil {
 		return nil, markdown.EmbeddedChatURLReplacement{}, err
+	}
+	if selection.WorkspaceID == "" && (selection.ThreadID != "" || selection.RunID != "") {
+		args, err := s.BuildEmbeddedFreeformPanelArgs(
+			ctx,
+			request.UserEmail,
+			selection.ThreadID,
+			selection.RunID,
+		)
+		if err != nil {
+			return nil, markdown.EmbeddedChatURLReplacement{}, err
+		}
+		return EmbeddedFreeformRightRailContent(args), markdown.EmbeddedChatURLReplacement{}, nil
 	}
 	if selection.WorkspaceID == "" {
 		return EmbeddedFreeformRightRailContent(

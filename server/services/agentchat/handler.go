@@ -1,6 +1,7 @@
 package agentchat
 
 import (
+	"context"
 	"crypto/subtle"
 	"database/sql"
 	"encoding/json"
@@ -869,6 +870,20 @@ func (h *Handler) SendEmbeddedFreeformPrompt(c echo.Context) error {
 	if run != nil {
 		runID = run.ID
 	}
+	if thread.WorkspaceID.Valid {
+		if err := h.service.PersistEmbeddedChatSelection(
+			c.Request().Context(),
+			userEmail,
+			EmbeddedChatSelection{
+				WorkspaceID: thread.WorkspaceID.String,
+				ThreadID:    thread.ID,
+				RunID:       runID,
+				Scope:       EmbeddedChatSelectionScopeFreeform,
+			},
+		); err != nil {
+			return echo.NewHTTPError(http.StatusBadRequest, err.Error())
+		}
+	}
 	args, err := h.service.BuildEmbeddedFreeformPanelArgs(
 		c.Request().Context(),
 		userEmail,
@@ -921,6 +936,23 @@ func (h *Handler) ResumeEmbeddedFreeformThread(c echo.Context) error {
 	runID := ""
 	if run != nil {
 		runID = run.ID
+	}
+	if thread, err := h.service.queries.GetAgentThread(
+		c.Request().Context(),
+		threadID,
+	); err == nil && thread.WorkspaceID.Valid {
+		if err := h.service.PersistEmbeddedChatSelection(
+			c.Request().Context(),
+			userEmail,
+			EmbeddedChatSelection{
+				WorkspaceID: thread.WorkspaceID.String,
+				ThreadID:    threadID,
+				RunID:       runID,
+				Scope:       EmbeddedChatSelectionScopeFreeform,
+			},
+		); err != nil {
+			return echo.NewHTTPError(http.StatusBadRequest, err.Error())
+		}
 	}
 	args, err := h.service.BuildEmbeddedFreeformPanelArgs(
 		c.Request().Context(),
@@ -1280,6 +1312,7 @@ func (h *Handler) SendEmbeddedWorkspacePrompt(c echo.Context) error {
 		WorkspaceID: workspaceRow.ID,
 		ThreadID:    thread.ID,
 		RunID:       run.ID,
+		Scope:       embeddedChatSelectionScopeForWorkspace(workspaceRow),
 	}
 	if err := h.service.PersistEmbeddedChatSelection(
 		c.Request().Context(),
@@ -1309,6 +1342,30 @@ func (h *Handler) SendEmbeddedWorkspacePrompt(c echo.Context) error {
 		return err
 	}
 	return h.resetAndFocusEmbeddedComposer(sse)
+}
+
+func embeddedChatSelectionScopeForWorkspace(workspace db.Workspace) EmbeddedChatSelectionScope {
+	if WorkspaceWorkflowType(strings.TrimSpace(workspace.WorkflowType)) == WorkspaceWorkflowFreeform {
+		return EmbeddedChatSelectionScopeFreeform
+	}
+	return EmbeddedChatSelectionScopeWorkspace
+}
+
+func embeddedChatSelectionScopeForWorkspaceRow(
+	workspaceID string,
+	service *Service,
+	ctx context.Context,
+	userEmail string,
+) EmbeddedChatSelectionScope {
+	workspace, err := service.GetWorkspaceForUserOrTrustedImport(
+		ctx,
+		userEmail,
+		workspaceID,
+	)
+	if err != nil {
+		return EmbeddedChatSelectionScopeWorkspace
+	}
+	return embeddedChatSelectionScopeForWorkspace(workspace)
 }
 
 func (h *Handler) patchEmbeddedChatPanel(
@@ -1631,6 +1688,7 @@ func (h *Handler) ResumeEmbeddedWorkspaceThread(c echo.Context) error {
 		WorkspaceID: workspaceID,
 		ThreadID:    threadID,
 		RunID:       runID,
+		Scope:       embeddedChatSelectionScopeForWorkspaceRow(workspaceID, h.service, c.Request().Context(), userEmail),
 	}
 	if err := h.service.PersistEmbeddedChatSelection(
 		c.Request().Context(),

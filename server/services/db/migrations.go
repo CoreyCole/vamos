@@ -104,6 +104,9 @@ func prepareSchemaCompatibilityMigrations(ctx context.Context, database *sql.DB)
 	); err != nil {
 		return err
 	}
+	if err := ensureScopedUserChatSelections(ctx, database); err != nil {
+		return err
+	}
 	if err := handlePreAgentChatArtifactCommentsTable(ctx, database); err != nil {
 		return err
 	}
@@ -348,6 +351,71 @@ func ensureWorkspaceEventsDocColumnsIfTableExists(
 		}
 	}
 	return nil
+}
+
+func ensureScopedUserChatSelections(ctx context.Context, database *sql.DB) error {
+	exists, err := tableExists(ctx, database, "user_chat_selections")
+	if err != nil || !exists {
+		return err
+	}
+	hasScope, err := tableColumnExists(ctx, database, "user_chat_selections", "scope")
+	if err != nil || hasScope {
+		return err
+	}
+	if _, err := database.ExecContext(ctx, `PRAGMA foreign_keys = OFF`); err != nil {
+		return err
+	}
+	defer func() { _, _ = database.ExecContext(ctx, `PRAGMA foreign_keys = ON`) }()
+
+	tx, err := database.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	statements := []string{
+		`CREATE TABLE user_chat_selections_new (
+			user_email TEXT NOT NULL,
+			scope TEXT NOT NULL DEFAULT 'global' CHECK (scope IN ('global', 'freeform', 'workspace')),
+			scope_id TEXT NOT NULL DEFAULT '',
+			workspace_id TEXT NOT NULL,
+			thread_id TEXT,
+			run_id TEXT,
+			created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			PRIMARY KEY (user_email, scope, scope_id)
+		)`,
+		`INSERT INTO user_chat_selections_new (
+			user_email,
+			scope,
+			scope_id,
+			workspace_id,
+			thread_id,
+			run_id,
+			created_at,
+			updated_at
+		)
+		SELECT
+			user_email,
+			'global',
+			'',
+			workspace_id,
+			thread_id,
+			run_id,
+			created_at,
+			updated_at
+		FROM user_chat_selections`,
+		`DROP TABLE user_chat_selections`,
+		`ALTER TABLE user_chat_selections_new RENAME TO user_chat_selections`,
+		`CREATE INDEX IF NOT EXISTS idx_user_chat_selections_user_updated
+			ON user_chat_selections (user_email, updated_at DESC)`,
+	}
+	for _, statement := range statements {
+		if _, err := tx.ExecContext(ctx, statement); err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
 }
 
 func ensurePlanWorkspacesImplMetadataColumns(

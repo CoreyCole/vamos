@@ -9,6 +9,8 @@ import (
 	"strings"
 	"testing"
 
+	querydb "github.com/CoreyCole/vamos/pkg/db"
+
 	_ "modernc.org/sqlite"
 )
 
@@ -254,6 +256,54 @@ VALUES ('comment-1', 'workspace-1', 'comment.md', 'user@example.com', 'body', 's
 				wants[tableName],
 			)
 		}
+	}
+}
+
+func TestLegacyUserChatSelectionsMigratesToScopedTable(t *testing.T) {
+	t.Parallel()
+
+	database := openMigratorTestDB(t)
+	_, err := database.ExecContext(t.Context(), `
+CREATE TABLE user_chat_selections (
+    user_email TEXT PRIMARY KEY,
+    workspace_id TEXT NOT NULL,
+    thread_id TEXT,
+    run_id TEXT,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+INSERT INTO user_chat_selections (user_email, workspace_id, thread_id, run_id, created_at, updated_at)
+VALUES ('owner@example.com', 'workspace-1', 'thread-1', 'run-1', '2026-01-01 00:00:00', '2026-01-02 00:00:00');`)
+	if err != nil {
+		t.Fatalf("seed legacy user_chat_selections: %v", err)
+	}
+
+	if err := prepareSchemaCompatibilityMigrations(t.Context(), database); err != nil {
+		t.Fatalf("prepareSchemaCompatibilityMigrations() error = %v", err)
+	}
+	for _, column := range []string{"scope", "scope_id"} {
+		if !columnExists(t, database, "user_chat_selections", column) {
+			t.Fatalf("user_chat_selections.%s missing after migration", column)
+		}
+	}
+	if !indexExists(t, database, "idx_user_chat_selections_user_updated") {
+		t.Fatal("idx_user_chat_selections_user_updated missing after migration")
+	}
+
+	row, err := querydb.New(database).GetUserChatSelection(
+		t.Context(),
+		querydb.GetUserChatSelectionParams{
+			UserEmail: "owner@example.com",
+			Scope:     "global",
+			ScopeID:   "",
+		},
+	)
+	if err != nil {
+		t.Fatalf("GetUserChatSelection(global) error = %v", err)
+	}
+	if row.WorkspaceID != "workspace-1" || row.ThreadID.String != "thread-1" ||
+		row.RunID.String != "run-1" {
+		t.Fatalf("migrated row = %+v", row)
 	}
 }
 
