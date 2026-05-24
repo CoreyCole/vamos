@@ -44,11 +44,13 @@ func ReleaseLaneWorkspaces(reg *release.Registry) []ReleaseLaneWorkspace {
 		for _, lane := range def.Lanes {
 			role := ReleaseLaneRole(lane.ID)
 			out = append(out, ReleaseLaneWorkspace{
-				LaneID:    lane.ID,
-				Role:      role,
-				Slug:      strings.TrimSpace(lane.CheckoutSlug),
-				Label:     strings.TrimSpace(lane.Label),
-				Protected: lane.Protected,
+				LaneID: lane.ID,
+				Role:   role,
+				Slug:   strings.TrimSpace(lane.CheckoutSlug),
+				Label:  firstNonEmpty(lane.Label, string(lane.ID)),
+				Protected: lane.Protected ||
+					lane.ID == DefaultMainLaneID ||
+					lane.ID == DefaultStageLaneID,
 			})
 		}
 	}

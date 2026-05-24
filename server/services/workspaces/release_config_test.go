@@ -27,6 +27,13 @@ func TestBuildDefaultReleaseRegistry(t *testing.T) {
 	if got := def.Lanes[DefaultMainLaneID].CheckoutSlug; got != "trunk" {
 		t.Fatalf("main checkout slug = %q, want trunk", got)
 	}
+	protected := ProtectedReleaseSlugs(releases)
+	if lane, ok := protected["integration"]; !ok || !lane.Protected || lane.Role != ReleaseLaneRoleStage {
+		t.Fatalf("stage protected lane = %+v, ok=%v", lane, ok)
+	}
+	if lane, ok := protected["trunk"]; !ok || !lane.Protected || lane.Role != ReleaseLaneRoleMain {
+		t.Fatalf("main protected lane = %+v, ok=%v", lane, ok)
+	}
 }
 
 func TestAgentsGuideContainsWorkflowShapedGuidance(t *testing.T) {

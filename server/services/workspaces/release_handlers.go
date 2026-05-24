@@ -143,7 +143,7 @@ func (h *Handler) patchWorkspaces(c echo.Context, views []ImplWorkspaceView) err
 	if len(rowActions) > 0 {
 		views = applyOptionsToImplWorkspaceViews(views, WithWorkspaceReleaseActions(rowActions))
 	}
-	renderedViews := filterHistoricalImplWorkspaceViews(views, showHistorical, h.protectedReleaseSlugs())
+	renderedViews := h.renderedImplWorkspaceViews(views, showHistorical)
 	sse := datastar.NewSSE(c.Response().Writer, c.Request())
 	c.Response().WriteHeader(http.StatusAccepted)
 	if err := sse.PatchElementTempl(WorkspacesHeader(h.isRefreshInFlight(), showHistorical), datastar.WithSelectorID("workspaces-header"), datastar.WithModeOuter()); err != nil {

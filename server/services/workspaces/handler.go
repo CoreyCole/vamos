@@ -231,7 +231,7 @@ func (h *Handler) HandleWorkspacesPage(c echo.Context) error {
 		return err
 	}
 	showHistorical := showHistoricalFromRequest(c.Request())
-	renderedViews := filterHistoricalImplWorkspaceViews(model.Views, showHistorical, h.protectedReleaseSlugs())
+	renderedViews := h.renderedImplWorkspaceViews(model.Views, showHistorical)
 	args := layouts.RootArgs{
 		Title:       "Workspaces",
 		CurrentPath: "/workspaces",
@@ -243,6 +243,7 @@ func (h *Handler) HandleWorkspacesPage(c echo.Context) error {
 			h.currentSlug,
 			h.managerURL,
 			"/workspaces",
+			h.protectedReleaseSlugList()...,
 		),
 		CurrentWorkspaceSlug: h.currentSlug,
 		WorkspaceManagerURL:  h.managerURL,
@@ -385,7 +386,7 @@ func (h *Handler) HandleWorkspacesStream(c echo.Context) error {
 		if err != nil {
 			return err
 		}
-		views := filterHistoricalImplWorkspaceViews(model.Views, showHistorical, h.protectedReleaseSlugs())
+		views := h.renderedImplWorkspaceViews(model.Views, showHistorical)
 		if err := sse.PatchElementTempl(
 			WorkspacesHeader(h.isRefreshInFlight(), showHistorical),
 			datastar.WithSelectorID("workspaces-header"),
@@ -607,6 +608,9 @@ func (h *Handler) HandleSwitchWorkspace(c echo.Context) error {
 	ws, ok := h.manager.Lookup(slug)
 	if !ok {
 		return echo.NewHTTPError(http.StatusNotFound, "unknown workspace")
+	}
+	if ws.Status != StatusRunning && h.isProtectedReleaseWorkspace(slug) && strings.TrimSpace(ws.URL) != "" {
+		ws.Status = StatusRunning
 	}
 	if ws.Status != StatusRunning || strings.TrimSpace(ws.URL) == "" {
 		log.Printf(
@@ -834,6 +838,32 @@ func flattenImplWorkspaceRows(views []ImplWorkspaceView) []db.ImplWorkspace {
 	return rows
 }
 
+func (h *Handler) renderedImplWorkspaceViews(views []ImplWorkspaceView, showHistorical bool) []ImplWorkspaceView {
+	return orderReleaseLaneViewsFirst(
+		filterHistoricalImplWorkspaceViews(views, showHistorical, h.protectedReleaseSlugs()),
+		h.releaseLaneWorkspaces(),
+	)
+}
+
+func (h *Handler) releaseLaneWorkspaces() []ReleaseLaneWorkspace {
+	if h.releaseProjector == nil || h.releaseProjector.Registry == nil {
+		return nil
+	}
+	return ReleaseLaneWorkspaces(h.releaseProjector.Registry)
+}
+
+func (h *Handler) protectedReleaseSlugList() []string {
+	protected := h.protectedReleaseSlugs()
+	if len(protected) == 0 {
+		return nil
+	}
+	out := make([]string, 0, len(protected))
+	for slug := range protected {
+		out = append(out, slug)
+	}
+	return out
+}
+
 func snapshotsToWorkspaces(items []WorkspaceLifecycleSnapshot) []Workspace {
 	out := make([]Workspace, 0, len(items))
 	for _, item := range items {
@@ -858,18 +888,25 @@ func showHistoricalFromRequest(r *http.Request) bool {
 func BuildNavItems(
 	items []Workspace,
 	currentSlug, managerURL string,
-	redirectPath ...string,
+	redirectPath string,
+	alwaysRunningSlugs ...string,
 ) []layouts.WorkspaceNavItem {
 	managerURL = strings.TrimRight(strings.TrimSpace(managerURL), "/")
 	redirect := "/"
-	if len(redirectPath) > 0 {
-		if validated, err := ValidateLocalRedirectPath(redirectPath[0]); err == nil {
-			redirect = validated
+	if validated, err := ValidateLocalRedirectPath(redirectPath); err == nil {
+		redirect = validated
+	}
+	alwaysRunning := make(map[string]struct{}, len(alwaysRunningSlugs)+2)
+	alwaysRunning[mainWorkspaceSlug] = struct{}{}
+	alwaysRunning[currentSlug] = struct{}{}
+	for _, slug := range alwaysRunningSlugs {
+		if slug = strings.TrimSpace(slug); slug != "" {
+			alwaysRunning[slug] = struct{}{}
 		}
 	}
 	nav := make([]layouts.WorkspaceNavItem, 0, len(items))
 	for _, ws := range items {
-		if ws.Slug == "main" || ws.Slug == currentSlug {
+		if _, ok := alwaysRunning[ws.Slug]; ok {
 			ws.Status = StatusRunning
 		}
 		itemURL := managerURL + "/workspaces"

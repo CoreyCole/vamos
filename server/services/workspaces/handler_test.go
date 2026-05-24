@@ -82,6 +82,74 @@ func TestBuildNavItemsTreatsMainAndCurrentWorkspaceAsReachable(t *testing.T) {
 	}
 }
 
+func TestBuildNavItemsTreatsProtectedReleaseLanesAsReachable(t *testing.T) {
+	t.Parallel()
+
+	items := []Workspace{
+		{
+			Slug:        "production-like-stage",
+			DisplayName: "Stage",
+			URL:         "https://stage.cn-agents.test/",
+			Status:      StatusStopped,
+		},
+	}
+
+	got := BuildNavItems(
+		items,
+		"main",
+		"https://main.cn-agents.test",
+		"/workspaces",
+		"production-like-stage",
+	)
+	if len(got) != 1 {
+		t.Fatalf("len(got) = %d, want 1", len(got))
+	}
+	if got[0].Status != "running" || got[0].URL != "https://main.cn-agents.test/workspaces/switch/production-like-stage?redirect=%2Fworkspaces" {
+		t.Fatalf("protected stage nav item = %+v", got[0])
+	}
+}
+
+func TestHandleSwitchWorkspaceAllowsProtectedStoppedReleaseLaneWithURL(t *testing.T) {
+	t.Parallel()
+
+	_, releases, err := BuildDefaultReleaseRegistry("stage", "main")
+	if err != nil {
+		t.Fatalf("BuildDefaultReleaseRegistry() error = %v", err)
+	}
+	manager := &fakeLifecycleManager{
+		workspaces: []Workspace{{
+			Slug:   "stage",
+			URL:    "https://stage.cn-agents.test/",
+			Status: StatusStopped,
+		}},
+	}
+	signer, _ := newTestHandoffSigner(t)
+	h := NewHandler(
+		manager,
+		"https://main.cn-agents.test",
+		"main",
+		WithDevAuth(&fakeSessionCreator{}, signer),
+		WithReleaseProjector(&ReleaseProjector{Registry: releases}),
+	)
+	req := httptest.NewRequest(http.MethodGet, "/workspaces/switch/stage?redirect=/workspaces", nil)
+	rec := httptest.NewRecorder()
+	c := echo.New().NewContext(req, rec)
+	c.SetPath("/workspaces/switch/:slug")
+	c.SetParamNames("slug")
+	c.SetParamValues("stage")
+	c.Set("user_email", "dev@example.com")
+
+	if err := h.HandleSwitchWorkspace(c); err != nil {
+		t.Fatalf("HandleSwitchWorkspace() error = %v", err)
+	}
+	if rec.Code != http.StatusFound && rec.Code != http.StatusSeeOther {
+		t.Fatalf("status = %d, want redirect", rec.Code)
+	}
+	if location := rec.Header().Get("Location"); !strings.HasPrefix(location, "https://stage.cn-agents.test/internal/dev-auth/handoff?token=") {
+		t.Fatalf("Location = %q, want stage handoff", location)
+	}
+}
+
 func TestHandleSwitchWorkspaceRedirectsToTargetHandoff(t *testing.T) {
 	manager := &ManagerService{
 		workspaces: map[string]Workspace{

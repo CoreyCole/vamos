@@ -149,6 +149,39 @@ func applyOptionsToImplWorkspaceViews(views []ImplWorkspaceView, opts ...ImplWor
 	return out
 }
 
+func orderReleaseLaneViewsFirst(
+	views []ImplWorkspaceView,
+	lanes []ReleaseLaneWorkspace,
+) []ImplWorkspaceView {
+	if len(views) == 0 || len(lanes) == 0 {
+		return views
+	}
+	laneBySlug := make(map[string]ReleaseLaneWorkspace, len(lanes))
+	for _, lane := range lanes {
+		if lane.Slug != "" {
+			laneBySlug[lane.Slug] = lane
+		}
+	}
+	mainViews := make([]ImplWorkspaceView, 0, 1)
+	stageViews := make([]ImplWorkspaceView, 0, 1)
+	otherViews := make([]ImplWorkspaceView, 0, len(views))
+	for _, view := range views {
+		slug := workspaceViewSlug(view)
+		lane, isLane := laneBySlug[slug]
+		switch {
+		case view.IsMain || slug == mainWorkspaceSlug || lane.Role == ReleaseLaneRoleMain:
+			mainViews = append(mainViews, view)
+		case isLane && lane.Role == ReleaseLaneRoleStage:
+			stageViews = append(stageViews, view)
+		default:
+			otherViews = append(otherViews, view)
+		}
+	}
+	out := append(mainViews, stageViews...)
+	out = append(out, otherViews...)
+	return out
+}
+
 func BuildImplWorkspaceTree(views []ImplWorkspaceView) []ImplWorkspaceView {
 	byPlanDir := make(map[string]int, len(views))
 	for i := range views {

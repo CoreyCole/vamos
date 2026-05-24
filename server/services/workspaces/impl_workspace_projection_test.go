@@ -34,6 +34,28 @@ func TestBuildImplWorkspaceViewsPinsMain(t *testing.T) {
 	}
 }
 
+func TestOrderReleaseLaneViewsFirstPinsMainThenStage(t *testing.T) {
+	t.Parallel()
+
+	views := []ImplWorkspaceView{
+		{Row: db.ImplWorkspace{WorkspaceSlug: "feature", Status: string(ImplWorkspaceStatusActive)}},
+		{Row: db.ImplWorkspace{WorkspaceSlug: "stage-custom", Status: string(ImplWorkspaceStatusActive)}},
+		{Row: db.ImplWorkspace{WorkspaceSlug: "trunk-custom", Status: string(ImplWorkspaceStatusActive)}},
+	}
+	lanes := []ReleaseLaneWorkspace{
+		{Role: ReleaseLaneRoleStage, Slug: "stage-custom"},
+		{Role: ReleaseLaneRoleMain, Slug: "trunk-custom"},
+	}
+
+	got := orderReleaseLaneViewsFirst(views, lanes)
+	if len(got) != 3 {
+		t.Fatalf("len(got) = %d, want 3", len(got))
+	}
+	if workspaceViewSlug(got[0]) != "trunk-custom" || workspaceViewSlug(got[1]) != "stage-custom" || workspaceViewSlug(got[2]) != "feature" {
+		t.Fatalf("order = [%q %q %q], want main stage feature", workspaceViewSlug(got[0]), workspaceViewSlug(got[1]), workspaceViewSlug(got[2]))
+	}
+}
+
 func TestBuildImplWorkspaceViewsMatchesRuntimeBySlug(t *testing.T) {
 	rows := []db.ImplWorkspace{{
 		WorkspaceSlug: "feature",

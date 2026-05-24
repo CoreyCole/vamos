@@ -846,6 +846,19 @@ func main() {
 			workspaces.HostForSlug("main", cfg.WorkspaceDomain),
 		))
 	}
+	var releaseWorkflowRegistry *runtime.Registry
+	var releaseRegistry *release.Registry
+	protectedReleaseSlugs := func() []string {
+		protected := workspaces.ProtectedReleaseSlugs(releaseRegistry)
+		if len(protected) == 0 {
+			return nil
+		}
+		out := make([]string, 0, len(protected))
+		for slug := range protected {
+			out = append(out, slug)
+		}
+		return out
+	}
 	if cfg.WorkspaceMode == "manager" && workspaceManager != nil {
 		layouts.SetWorkspaceNavProvider(
 			func(currentPath string) []layouts.WorkspaceNavItem {
@@ -855,6 +868,7 @@ func main() {
 					cfg.WorkspaceSlug,
 					workspaceManagerURL,
 					currentPath,
+					protectedReleaseSlugs()...,
 				)
 			},
 		)
@@ -870,6 +884,7 @@ func main() {
 					cfg.WorkspaceSlug,
 					workspaceManagerURL,
 					currentPath,
+					protectedReleaseSlugs()...,
 				)
 			},
 		)
@@ -949,8 +964,6 @@ func main() {
 		MetadataDirName: workspaceDiscovery.MetadataDirName,
 	}
 	releaseStore := workspaces.NewSQLReleaseQueueStore(dbService.Queries)
-	var releaseWorkflowRegistry *runtime.Registry
-	var releaseRegistry *release.Registry
 	if _, hasStage := workspaceDiscovery.ConfiguredCheckouts["stage"]; hasStage {
 		if _, hasMain := workspaceDiscovery.ConfiguredCheckouts["main"]; hasMain {
 			var err error
