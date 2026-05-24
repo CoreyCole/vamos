@@ -1127,13 +1127,13 @@ func main() {
 		workspaceManager,
 		workspaceNotifier,
 		nil,
-		nil,
+		agentChatService,
 	)
 	workspaceSyncCompleteForManualRefresh := workspaces.NewWorkspaceSyncCompletion(
 		workspaceManager,
 		nil,
 		nil,
-		nil,
+		agentChatService,
 	)
 	if goWorker != nil {
 		goWorker.RegisterWorkflow(agentchat.SyncWorkspacesWorkflow)
