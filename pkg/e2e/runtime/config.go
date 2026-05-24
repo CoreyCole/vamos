@@ -21,6 +21,7 @@ type Config struct {
 	BaseURL      string
 	AuthToken    string
 	ArtifactsDir string
+	ThoughtsRoot string
 	Workspace    WorkspaceIdentity
 	Headless     bool
 	Viewports    []ViewportClass
@@ -45,6 +46,10 @@ func LoadConfigFromEnv(cwd string) (Config, error) {
 	artifactsDir := strings.TrimSpace(os.Getenv("VAMOS_E2E_ARTIFACTS_DIR"))
 	if artifactsDir == "" {
 		artifactsDir = filepath.Join(root, ".e2e-runs")
+	}
+	thoughtsRoot := strings.TrimSpace(os.Getenv("VAMOS_E2E_THOUGHTS_ROOT"))
+	if thoughtsRoot == "" {
+		thoughtsRoot = filepath.Join(root, "thoughts")
 	}
 
 	repoRoot := root
@@ -71,6 +76,7 @@ func LoadConfigFromEnv(cwd string) (Config, error) {
 		BaseURL:      strings.TrimRight(baseURL, "/"),
 		AuthToken:    strings.TrimSpace(os.Getenv("VAMOS_E2E_AUTH_TOKEN")),
 		ArtifactsDir: artifactsDir,
+		ThoughtsRoot: thoughtsRoot,
 		Workspace:    workspace,
 		Headless:     os.Getenv("E2E_HEADLESS") != "false",
 		Viewports:    viewports,

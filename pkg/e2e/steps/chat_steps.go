@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 	"net/url"
+	"os"
 	"path"
 	"path/filepath"
 	"strings"
@@ -134,6 +135,7 @@ func OpenFreeformChatFixture(t testing.TB, ctx *e2e.Context, name string) {
 
 func OpenThoughtsRootChat(t testing.TB, ctx *e2e.Context, _ string) {
 	t.Helper()
+	ensureE2EPlanFixture(t, ctx)
 	clearPlaywrightChatSelection(t, ctx)
 	Visit(
 		t,
@@ -383,6 +385,7 @@ UPDATE agent_runs SET status = 'complete', completed_at = CURRENT_TIMESTAMP WHER
 
 func SeedLatestWorkspaceChats(t testing.TB, ctx *e2e.Context, markerA, markerB string) {
 	t.Helper()
+	ensureE2EPlanFixture(t, ctx)
 	database, err := e2e.OpenWorkspaceDB(t.Context(), ctx.Config)
 	if err != nil {
 		t.Fatal(err)
@@ -390,6 +393,23 @@ func SeedLatestWorkspaceChats(t testing.TB, ctx *e2e.Context, markerA, markerB s
 	defer database.Close()
 	seedWorkspaceChat(t, ctx, database, "A", markerA)
 	seedWorkspaceChat(t, ctx, database, "B", markerB)
+}
+
+func ensureE2EPlanFixture(t testing.TB, ctx *e2e.Context) {
+	t.Helper()
+	planPath := filepath.Join(
+		ctx.Config.ThoughtsRoot,
+		"creative-mode-agent",
+		"plans",
+		"2026-05-20_23-02-59_vamos-e2e-story-playwright-go",
+		"plan.md",
+	)
+	if err := os.MkdirAll(filepath.Dir(planPath), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(planPath, []byte("# Vamos E2E Story Fixture\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 }
 
 func seedWorkspaceChat(
