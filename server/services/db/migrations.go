@@ -433,6 +433,9 @@ func ensurePlanWorkspacesImplMetadataColumns(
 		{name: "impl_workspace_state", definition: "TEXT NOT NULL DEFAULT 'none' CHECK (impl_workspace_state IN ('none', 'active', 'merged', 'missing'))"},
 		{name: "impl_workspace_merged_at", definition: "DATETIME"},
 		{name: "impl_workspace_missing_at", definition: "DATETIME"},
+		{name: "qrspi_lifecycle", definition: "TEXT NOT NULL DEFAULT 'question' CHECK (qrspi_lifecycle IN ('question', 'research', 'design', 'outline', 'review_outline', 'plan', 'review_plan', 'workspace', 'implement', 'review_implementation', 'verify', 'merged', 'closed'))"},
+		{name: "qrspi_lifecycle_updated_at", definition: "DATETIME"},
+		{name: "qrspi_closed_reason", definition: "TEXT NOT NULL DEFAULT ''"},
 	} {
 		if err := ensureColumn(
 			ctx,
@@ -444,7 +447,7 @@ func ensurePlanWorkspacesImplMetadataColumns(
 			return err
 		}
 	}
-	return nil
+	return ensureIndex(ctx, database, "CREATE INDEX IF NOT EXISTS idx_plan_workspaces_lifecycle_activity ON plan_workspaces (qrspi_lifecycle, artifact_updated_at DESC, plan_dir_rel) WHERE archived_at IS NULL")
 }
 
 func ensureAgentRunsWorkflowColumns(ctx context.Context, database *sql.DB) error {

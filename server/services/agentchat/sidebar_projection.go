@@ -37,21 +37,26 @@ type WorkspaceLifecycleBadge struct {
 type WorkspaceLifecycleStage string
 
 const (
-	WorkspaceLifecycleQuestion   WorkspaceLifecycleStage = "question"
-	WorkspaceLifecycleResearch   WorkspaceLifecycleStage = "research"
-	WorkspaceLifecycleDesign     WorkspaceLifecycleStage = "design"
-	WorkspaceLifecycleOutline    WorkspaceLifecycleStage = "outline"
-	WorkspaceLifecyclePlan       WorkspaceLifecycleStage = "plan"
-	WorkspaceLifecycleWorkspace  WorkspaceLifecycleStage = "workspace"
-	WorkspaceLifecycleImplement  WorkspaceLifecycleStage = "implement"
-	WorkspaceLifecycleReview     WorkspaceLifecycleStage = "review"
-	WorkspaceLifecyclePRDraft    WorkspaceLifecycleStage = "pr_draft"
-	WorkspaceLifecyclePRReady    WorkspaceLifecycleStage = "pr_ready"
-	WorkspaceLifecyclePRChanges  WorkspaceLifecycleStage = "pr_changes"
-	WorkspaceLifecyclePRApproved WorkspaceLifecycleStage = "pr_approved"
-	WorkspaceLifecycleMerged     WorkspaceLifecycleStage = "merged"
-	WorkspaceLifecycleBlocked    WorkspaceLifecycleStage = "blocked"
-	WorkspaceLifecycleFailed     WorkspaceLifecycleStage = "failed"
+	WorkspaceLifecycleQuestion             WorkspaceLifecycleStage = "question"
+	WorkspaceLifecycleResearch             WorkspaceLifecycleStage = "research"
+	WorkspaceLifecycleDesign               WorkspaceLifecycleStage = "design"
+	WorkspaceLifecycleOutline              WorkspaceLifecycleStage = "outline"
+	WorkspaceLifecycleReviewOutline        WorkspaceLifecycleStage = "review_outline"
+	WorkspaceLifecyclePlan                 WorkspaceLifecycleStage = "plan"
+	WorkspaceLifecycleReviewPlan           WorkspaceLifecycleStage = "review_plan"
+	WorkspaceLifecycleWorkspace            WorkspaceLifecycleStage = "workspace"
+	WorkspaceLifecycleImplement            WorkspaceLifecycleStage = "implement"
+	WorkspaceLifecycleReview               WorkspaceLifecycleStage = "review"
+	WorkspaceLifecycleReviewImplementation WorkspaceLifecycleStage = "review_implementation"
+	WorkspaceLifecycleVerify               WorkspaceLifecycleStage = "verify"
+	WorkspaceLifecycleClosed               WorkspaceLifecycleStage = "closed"
+	WorkspaceLifecyclePRDraft              WorkspaceLifecycleStage = "pr_draft"
+	WorkspaceLifecyclePRReady              WorkspaceLifecycleStage = "pr_ready"
+	WorkspaceLifecyclePRChanges            WorkspaceLifecycleStage = "pr_changes"
+	WorkspaceLifecyclePRApproved           WorkspaceLifecycleStage = "pr_approved"
+	WorkspaceLifecycleMerged               WorkspaceLifecycleStage = "merged"
+	WorkspaceLifecycleBlocked              WorkspaceLifecycleStage = "blocked"
+	WorkspaceLifecycleFailed               WorkspaceLifecycleStage = "failed"
 )
 
 type SidebarInput struct {
@@ -210,16 +215,24 @@ func lifecycleStageFromNode(node string) WorkspaceLifecycleStage {
 		return WorkspaceLifecycleResearch
 	case strings.Contains(node, "design"):
 		return WorkspaceLifecycleDesign
+	case strings.Contains(node, "review_implementation"), strings.Contains(node, "review-implementation"):
+		return WorkspaceLifecycleReviewImplementation
+	case strings.Contains(node, "review_outline"), strings.Contains(node, "review-outline"):
+		return WorkspaceLifecycleReviewOutline
+	case strings.Contains(node, "review_plan"), strings.Contains(node, "review-plan"):
+		return WorkspaceLifecycleReviewPlan
+	case strings.Contains(node, "verify"):
+		return WorkspaceLifecycleVerify
 	case strings.Contains(node, "outline"):
 		return WorkspaceLifecycleOutline
 	case strings.Contains(node, "plan"):
 		return WorkspaceLifecyclePlan
 	case strings.Contains(node, "workspace"):
 		return WorkspaceLifecycleWorkspace
-	case strings.Contains(node, "review"):
-		return WorkspaceLifecycleReview
 	case strings.Contains(node, "implement"):
 		return WorkspaceLifecycleImplement
+	case strings.Contains(node, "review"):
+		return WorkspaceLifecycleReview
 	case strings.Contains(node, "done"), strings.Contains(node, "merge"):
 		return WorkspaceLifecycleMerged
 	default:
@@ -237,14 +250,24 @@ func lifecycleLabel(stage WorkspaceLifecycleStage) string {
 		return "Design"
 	case WorkspaceLifecycleOutline:
 		return "Outline"
+	case WorkspaceLifecycleReviewOutline:
+		return "Review outline"
 	case WorkspaceLifecyclePlan:
 		return "Plan"
+	case WorkspaceLifecycleReviewPlan:
+		return "Review plan"
 	case WorkspaceLifecycleWorkspace:
 		return "Workspace"
 	case WorkspaceLifecycleImplement:
 		return "Implement"
 	case WorkspaceLifecycleReview:
 		return "Review"
+	case WorkspaceLifecycleReviewImplementation:
+		return "Review implementation"
+	case WorkspaceLifecycleVerify:
+		return "Verify"
+	case WorkspaceLifecycleClosed:
+		return "Closed"
 	case WorkspaceLifecyclePRDraft:
 		return "PR draft"
 	case WorkspaceLifecyclePRReady:
@@ -265,18 +288,21 @@ func lifecycleLabel(stage WorkspaceLifecycleStage) string {
 }
 
 const (
-	lifecycleProgressNone      = 0
-	lifecycleProgressQuestion  = 10
-	lifecycleProgressResearch  = 20
-	lifecycleProgressDesign    = 35
-	lifecycleProgressOutline   = 50
-	lifecycleProgressPlan      = 60
-	lifecycleProgressWorkspace = 65
-	lifecycleProgressImplement = 75
-	lifecycleProgressReview    = 85
-	lifecycleProgressPR        = 90
-	lifecycleProgressApproved  = 95
-	lifecycleProgressMerged    = 100
+	lifecycleProgressNone          = 0
+	lifecycleProgressQuestion      = 10
+	lifecycleProgressResearch      = 20
+	lifecycleProgressDesign        = 35
+	lifecycleProgressOutline       = 50
+	lifecycleProgressReviewOutline = 55
+	lifecycleProgressPlan          = 60
+	lifecycleProgressReviewPlan    = 62
+	lifecycleProgressWorkspace     = 65
+	lifecycleProgressImplement     = 75
+	lifecycleProgressReview        = 85
+	lifecycleProgressVerify        = 92
+	lifecycleProgressPR            = 90
+	lifecycleProgressApproved      = 95
+	lifecycleProgressMerged        = 100
 )
 
 func lifecycleProgress(stage WorkspaceLifecycleStage) int {
@@ -289,14 +315,20 @@ func lifecycleProgress(stage WorkspaceLifecycleStage) int {
 		return lifecycleProgressDesign
 	case WorkspaceLifecycleOutline:
 		return lifecycleProgressOutline
+	case WorkspaceLifecycleReviewOutline:
+		return lifecycleProgressReviewOutline
 	case WorkspaceLifecyclePlan:
 		return lifecycleProgressPlan
+	case WorkspaceLifecycleReviewPlan:
+		return lifecycleProgressReviewPlan
 	case WorkspaceLifecycleWorkspace:
 		return lifecycleProgressWorkspace
 	case WorkspaceLifecycleImplement:
 		return lifecycleProgressImplement
-	case WorkspaceLifecycleReview:
+	case WorkspaceLifecycleReview, WorkspaceLifecycleReviewImplementation:
 		return lifecycleProgressReview
+	case WorkspaceLifecycleVerify:
+		return lifecycleProgressVerify
 	case WorkspaceLifecyclePRDraft,
 		WorkspaceLifecyclePRReady,
 		WorkspaceLifecyclePRChanges:
@@ -316,9 +348,14 @@ func lifecycleTone(stage WorkspaceLifecycleStage) string {
 	switch stage {
 	case WorkspaceLifecycleBlocked, WorkspaceLifecycleFailed, WorkspaceLifecyclePRChanges:
 		return "destructive"
-	case WorkspaceLifecycleMerged, WorkspaceLifecyclePRApproved:
+	case WorkspaceLifecycleMerged, WorkspaceLifecycleClosed, WorkspaceLifecyclePRApproved:
 		return "success"
-	case WorkspaceLifecycleReview, WorkspaceLifecyclePRDraft, WorkspaceLifecyclePRReady:
+	case WorkspaceLifecycleReview,
+		WorkspaceLifecycleReviewOutline,
+		WorkspaceLifecycleReviewPlan,
+		WorkspaceLifecycleReviewImplementation,
+		WorkspaceLifecyclePRDraft,
+		WorkspaceLifecyclePRReady:
 		return "accent"
 	case WorkspaceLifecycleQuestion,
 		WorkspaceLifecycleResearch,
@@ -326,7 +363,8 @@ func lifecycleTone(stage WorkspaceLifecycleStage) string {
 		WorkspaceLifecycleOutline,
 		WorkspaceLifecyclePlan,
 		WorkspaceLifecycleWorkspace,
-		WorkspaceLifecycleImplement:
+		WorkspaceLifecycleImplement,
+		WorkspaceLifecycleVerify:
 		return "muted"
 	default:
 		return "muted"

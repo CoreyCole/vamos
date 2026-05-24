@@ -31,7 +31,7 @@ type SessionCreator interface {
 }
 
 type PlanWorkspaceLister interface {
-	ListActivePlanWorkspaces(ctx context.Context) ([]db.PlanWorkspace, error)
+	ListCurrentPlanWorkspaces(ctx context.Context) ([]db.PlanWorkspace, error)
 }
 
 type ImplWorkspaceLister interface {

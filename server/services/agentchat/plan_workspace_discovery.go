@@ -19,6 +19,7 @@ import (
 
 	"github.com/CoreyCole/vamos/pkg/collections"
 	"github.com/CoreyCole/vamos/pkg/db"
+	"github.com/CoreyCole/vamos/server/services/planworkspace"
 	"github.com/CoreyCole/vamos/server/services/workspaces"
 )
 
@@ -45,6 +46,9 @@ type DiscoveredPlanWorkspace struct {
 	ImplWorkspaceURL          string
 	ImplWorkspaceDiscoveredAt time.Time
 	ArtifactUpdatedAt         time.Time
+	QRSPIStage                planworkspace.QRSPIStage
+	QRSPILifecycleUpdatedAt   time.Time
+	QRSPIClosedReason         string
 }
 
 type PlanWorkspaceDiscoveryResult struct {
@@ -322,6 +326,10 @@ func (s PlanWorkspaceScanner) Scan(
 			if err != nil {
 				return err
 			}
+			frontmatter, err := readPlanWorkspaceFrontmatter(path)
+			if err != nil {
+				return err
+			}
 			slug, err := workspaces.NormalizeWorkspaceSlug(rel)
 			if err != nil {
 				return fmt.Errorf("derive workspace slug for %s: %w", path, err)
@@ -334,11 +342,14 @@ func (s PlanWorkspaceScanner) Scan(
 				discoveredAt,
 			)
 			item := DiscoveredPlanWorkspace{
-				PlanDir:           filepath.Clean(path),
-				PlanDirRel:        rel,
-				Label:             planWorkspaceLabel(path),
-				WorkspaceSlug:     slug,
-				ArtifactUpdatedAt: updatedAt,
+				PlanDir:                 filepath.Clean(path),
+				PlanDirRel:              rel,
+				Label:                   planWorkspaceLabel(path),
+				WorkspaceSlug:           slug,
+				ArtifactUpdatedAt:       updatedAt,
+				QRSPIStage:              frontmatter.QRSPIStage,
+				QRSPILifecycleUpdatedAt: frontmatter.QRSPILifecycleUpdatedAt,
+				QRSPIClosedReason:       frontmatter.QRSPIClosedReason,
 			}
 			if implOK {
 				item.ImplWorkspacePath = implPath
@@ -394,6 +405,8 @@ func (s *PlanWorkspaceSyncer) Sync(
 			Label:             item.Label,
 			WorkspaceSlug:     item.WorkspaceSlug,
 			ArtifactUpdatedAt: item.ArtifactUpdatedAt,
+			QrspiLifecycle:    string(item.QRSPIStage),
+			QrspiClosedReason: item.QRSPIClosedReason,
 		}
 		if strings.TrimSpace(item.ImplWorkspacePath) != "" {
 			params.ImplWorkspacePath = sql.NullString{
@@ -410,6 +423,12 @@ func (s *PlanWorkspaceSyncer) Sync(
 		if !item.ImplWorkspaceDiscoveredAt.IsZero() {
 			params.ImplWorkspaceDiscoveredAt = sql.NullTime{
 				Time:  item.ImplWorkspaceDiscoveredAt,
+				Valid: true,
+			}
+		}
+		if !item.QRSPILifecycleUpdatedAt.IsZero() {
+			params.QrspiLifecycleUpdatedAt = sql.NullTime{
+				Time:  item.QRSPILifecycleUpdatedAt,
 				Valid: true,
 			}
 		}
@@ -435,11 +454,17 @@ func (s *PlanWorkspaceSyncer) Sync(
 		}
 		if before.PlanDir != row.PlanDir || before.Label != row.Label ||
 			before.WorkspaceSlug != row.WorkspaceSlug ||
+			before.QrspiLifecycle != row.QrspiLifecycle ||
+			before.QrspiClosedReason != row.QrspiClosedReason ||
 			!nullStringsEqual(before.ImplWorkspacePath, row.ImplWorkspacePath) ||
 			!nullStringsEqual(before.ImplWorkspaceUrl, row.ImplWorkspaceUrl) ||
 			!nullTimesEqual(
 				before.ImplWorkspaceDiscoveredAt,
 				row.ImplWorkspaceDiscoveredAt,
+			) ||
+			!nullTimesEqual(
+				before.QrspiLifecycleUpdatedAt,
+				row.QrspiLifecycleUpdatedAt,
 			) ||
 			!before.ArtifactUpdatedAt.Equal(row.ArtifactUpdatedAt) {
 			result.Changed = true
@@ -595,6 +620,18 @@ func planWorkspaceLabel(planDir string) string {
 		return filepath.Base(filepath.Clean(planDir))
 	}
 	return label
+}
+
+func readPlanWorkspaceFrontmatter(planDir string) (planworkspace.PlanWorkspaceFrontmatter, error) {
+	agentsPath := filepath.Join(planDir, "AGENTS.md")
+	data, err := os.ReadFile(agentsPath)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return planworkspace.PlanWorkspaceFrontmatter{QRSPIStage: planworkspace.QRSPIStageQuestion}, nil
+		}
+		return planworkspace.PlanWorkspaceFrontmatter{}, err
+	}
+	return planworkspace.ParsePlanWorkspaceFrontmatter(agentsPath, data)
 }
 
 func planWorkspaceActivityTimestamp(

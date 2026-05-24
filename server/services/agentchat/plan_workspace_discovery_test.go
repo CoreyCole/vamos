@@ -191,6 +191,86 @@ func TestPlanWorkspaceScannerRejectsMissingThoughtsRoot(t *testing.T) {
 	}
 }
 
+func TestPlanWorkspaceScannerReadsQRSPILifecycleFrontmatter(t *testing.T) {
+	thoughtsRoot := t.TempDir()
+	planDir := filepath.Join(thoughtsRoot, "agent", "plans", "lifecycle-plan")
+	writePlanWorkspaceFile(t, planDir, "plan.md", time.Now())
+	if err := os.WriteFile(
+		filepath.Join(planDir, "AGENTS.md"),
+		[]byte("---\nqrspi_lifecycle: merged\nqrspi_lifecycle_updated_at: 2026-05-24T10:00:00Z\nqrspi_closed_reason: shipped\n---\n# Plan\n"),
+		0o644,
+	); err != nil {
+		t.Fatal(err)
+	}
+
+	rows, err := (PlanWorkspaceScanner{ThoughtsRoot: thoughtsRoot}).Scan(context.Background())
+	if err != nil {
+		t.Fatalf("Scan() error = %v", err)
+	}
+	if len(rows) != 1 {
+		t.Fatalf("len(rows) = %d, want 1", len(rows))
+	}
+	if rows[0].QRSPIStage != "merged" || rows[0].QRSPIClosedReason != "shipped" {
+		t.Fatalf("lifecycle = %q reason %q", rows[0].QRSPIStage, rows[0].QRSPIClosedReason)
+	}
+	if rows[0].QRSPILifecycleUpdatedAt.IsZero() {
+		t.Fatal("QRSPILifecycleUpdatedAt is zero")
+	}
+}
+
+func TestPlanWorkspaceScannerDefaultsMissingLifecycleToQuestion(t *testing.T) {
+	thoughtsRoot := t.TempDir()
+	planDir := filepath.Join(thoughtsRoot, "agent", "plans", "default-plan")
+	writePlanWorkspaceFile(t, planDir, "plan.md", time.Now())
+
+	rows, err := (PlanWorkspaceScanner{ThoughtsRoot: thoughtsRoot}).Scan(context.Background())
+	if err != nil {
+		t.Fatalf("Scan() error = %v", err)
+	}
+	if len(rows) != 1 || rows[0].QRSPIStage != "question" {
+		t.Fatalf("rows = %#v, want question lifecycle", rows)
+	}
+}
+
+func TestPlanWorkspaceSyncerListsCurrentAndHistoricalLifecycle(t *testing.T) {
+	service := newTestAgentChatService(t)
+	ctx := context.Background()
+	for _, item := range []struct {
+		rel   string
+		stage string
+	}{
+		{rel: "agent/plans/current", stage: "implement"},
+		{rel: "agent/plans/merged", stage: "merged"},
+		{rel: "agent/plans/closed", stage: "closed"},
+	} {
+		_, err := service.queries.UpsertDiscoveredPlanWorkspace(ctx, db.UpsertDiscoveredPlanWorkspaceParams{
+			PlanDirRel:        item.rel,
+			PlanDir:           filepath.Join(service.thoughtsRoot, filepath.FromSlash(item.rel)),
+			Label:             item.rel,
+			WorkspaceSlug:     item.rel,
+			ArtifactUpdatedAt: time.Now(),
+			QrspiLifecycle:    item.stage,
+		})
+		if err != nil {
+			t.Fatalf("UpsertDiscoveredPlanWorkspace(%s) error = %v", item.stage, err)
+		}
+	}
+	current, err := service.queries.ListCurrentPlanWorkspaces(ctx)
+	if err != nil {
+		t.Fatalf("ListCurrentPlanWorkspaces() error = %v", err)
+	}
+	if len(current) != 1 || current[0].QrspiLifecycle != "implement" {
+		t.Fatalf("current = %#v, want only implement", current)
+	}
+	all, err := service.queries.ListPlanWorkspaces(ctx)
+	if err != nil {
+		t.Fatalf("ListPlanWorkspaces() error = %v", err)
+	}
+	if len(all) != 3 {
+		t.Fatalf("all len = %d, want 3", len(all))
+	}
+}
+
 func TestPlanWorkspaceScannerPopulatesSlugAndImplMetadata(t *testing.T) {
 	thoughtsRoot := t.TempDir()
 	parent := t.TempDir()

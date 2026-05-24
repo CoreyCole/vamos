@@ -169,6 +169,21 @@ impl_workspace_path TEXT,
 impl_workspace_url TEXT,
 impl_workspace_discovered_at DATETIME,
 artifact_updated_at DATETIME NOT NULL,
+qrspi_lifecycle TEXT NOT NULL DEFAULT 'question'
+CHECK (qrspi_lifecycle IN ('question',
+'research',
+'design',
+'outline',
+'review_outline',
+'plan',
+'review_plan',
+'workspace',
+'implement',
+'review_implementation',
+'verify',
+'merged', 'closed')),
+qrspi_lifecycle_updated_at DATETIME,
+qrspi_closed_reason TEXT NOT NULL DEFAULT '',
 discovered_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
 last_discovered_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
 archived_at DATETIME
@@ -176,6 +191,10 @@ archived_at DATETIME
 
 CREATE INDEX IF NOT EXISTS idx_plan_workspaces_active_activity
 ON plan_workspaces (artifact_updated_at DESC, plan_dir_rel)
+WHERE archived_at IS NULL ;
+
+CREATE INDEX IF NOT EXISTS idx_plan_workspaces_lifecycle_activity
+ON plan_workspaces (qrspi_lifecycle, artifact_updated_at DESC, plan_dir_rel)
 WHERE archived_at IS NULL ;
 
 CREATE UNIQUE INDEX IF NOT EXISTS idx_plan_workspaces_active_slug

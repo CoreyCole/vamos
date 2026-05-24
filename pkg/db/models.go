@@ -316,6 +316,9 @@ type PlanWorkspace struct {
 	ImplWorkspaceUrl          sql.NullString `json:"impl_workspace_url"`
 	ImplWorkspaceDiscoveredAt sql.NullTime   `json:"impl_workspace_discovered_at"`
 	ArtifactUpdatedAt         time.Time      `json:"artifact_updated_at"`
+	QrspiLifecycle            string         `json:"qrspi_lifecycle"`
+	QrspiLifecycleUpdatedAt   sql.NullTime   `json:"qrspi_lifecycle_updated_at"`
+	QrspiClosedReason         string         `json:"qrspi_closed_reason"`
 	DiscoveredAt              time.Time      `json:"discovered_at"`
 	LastDiscoveredAt          time.Time      `json:"last_discovered_at"`
 	ArchivedAt                sql.NullTime   `json:"archived_at"`

@@ -1,4 +1,12 @@
--- name: ListActivePlanWorkspaces :many
+-- name: ListCurrentPlanWorkspaces :many
+SELECT *
+FROM plan_workspaces
+WHERE
+    archived_at IS NULL
+    AND qrspi_lifecycle NOT IN ('merged', 'closed')
+ORDER BY artifact_updated_at DESC, lower(label), plan_dir_rel;
+
+-- name: ListPlanWorkspaces :many
 SELECT *
 FROM plan_workspaces
 WHERE archived_at IS NULL
@@ -18,7 +26,10 @@ INSERT INTO plan_workspaces (
     impl_workspace_path,
     impl_workspace_url,
     impl_workspace_discovered_at,
-    artifact_updated_at
+    artifact_updated_at,
+    qrspi_lifecycle,
+    qrspi_lifecycle_updated_at,
+    qrspi_closed_reason
 )
 VALUES (
     sqlc.arg('plan_dir_rel'),
@@ -28,7 +39,10 @@ VALUES (
     sqlc.narg('impl_workspace_path'),
     sqlc.narg('impl_workspace_url'),
     sqlc.narg('impl_workspace_discovered_at'),
-    sqlc.arg('artifact_updated_at')
+    sqlc.arg('artifact_updated_at'),
+    coalesce(nullif(sqlc.arg('qrspi_lifecycle'), ''), 'question'),
+    sqlc.narg('qrspi_lifecycle_updated_at'),
+    sqlc.arg('qrspi_closed_reason')
 )
 ON CONFLICT (plan_dir_rel) DO UPDATE SET
 plan_dir = excluded.plan_dir,
@@ -38,6 +52,9 @@ impl_workspace_path = excluded.impl_workspace_path,
 impl_workspace_url = excluded.impl_workspace_url,
 impl_workspace_discovered_at = excluded.impl_workspace_discovered_at,
 artifact_updated_at = excluded.artifact_updated_at,
+qrspi_lifecycle = excluded.qrspi_lifecycle,
+qrspi_lifecycle_updated_at = excluded.qrspi_lifecycle_updated_at,
+qrspi_closed_reason = excluded.qrspi_closed_reason,
 last_discovered_at = CURRENT_TIMESTAMP,
 archived_at = NULL
 RETURNING * ;

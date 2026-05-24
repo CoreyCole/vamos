@@ -37,13 +37,23 @@ func TestDeriveWorkspaceLifecycleQRSPIStages(t *testing.T) {
 		},
 		{
 			name:  "outline",
-			state: wruntime.State{CurrentNodeID: "review-outline"},
+			state: wruntime.State{CurrentNodeID: "outline"},
 			want:  WorkspaceLifecycleOutline,
 		},
 		{
+			name:  "review outline",
+			state: wruntime.State{CurrentNodeID: "review-outline"},
+			want:  WorkspaceLifecycleReviewOutline,
+		},
+		{
 			name:  "plan",
-			state: wruntime.State{CurrentNodeID: "review-plan"},
+			state: wruntime.State{CurrentNodeID: "plan"},
 			want:  WorkspaceLifecyclePlan,
+		},
+		{
+			name:  "review plan",
+			state: wruntime.State{CurrentNodeID: "review-plan"},
+			want:  WorkspaceLifecycleReviewPlan,
 		},
 		{
 			name:  "workspace",
@@ -56,9 +66,14 @@ func TestDeriveWorkspaceLifecycleQRSPIStages(t *testing.T) {
 			want:  WorkspaceLifecycleImplement,
 		},
 		{
-			name:  "review",
+			name:  "review implementation",
 			state: wruntime.State{CurrentNodeID: "review-implementation"},
-			want:  WorkspaceLifecycleReview,
+			want:  WorkspaceLifecycleReviewImplementation,
+		},
+		{
+			name:  "verify",
+			state: wruntime.State{CurrentNodeID: "verify"},
+			want:  WorkspaceLifecycleVerify,
 		},
 		{
 			name: "blocked",

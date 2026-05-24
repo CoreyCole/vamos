@@ -58,15 +58,33 @@ func firstWorkspaceList(workspaceLists [][]db.Workspace) []db.Workspace {
 	return workspaceLists[0]
 }
 
+type workspacePanelOptions struct {
+	showHistorical bool
+}
+
+type WorkspacePanelOption func(*workspacePanelOptions)
+
+func WithShowHistorical(show bool) WorkspacePanelOption {
+	return func(o *workspacePanelOptions) { o.showHistorical = show }
+}
+
 func BuildThoughtsWorkspacesPanelModel(
 	workspaces []db.Workspace,
 	currentWorkspaceID string,
+	options ...WorkspacePanelOption,
 ) workbench.WorkspacesPanelModel {
 	if len(workspaces) == 0 {
 		return workbench.WorkspacesPanelModel{
 			EmptyLabel: "No workspaces yet.",
 		}
 	}
+	panelOptions := workspacePanelOptions{}
+	for _, option := range options {
+		if option != nil {
+			option(&panelOptions)
+		}
+	}
+	_ = panelOptions
 	currentWorkspaceID = strings.TrimSpace(currentWorkspaceID)
 	roots := make([]workbench.WorkspaceRootItem, 0, len(workspaces))
 	for _, workspace := range workspaces {
