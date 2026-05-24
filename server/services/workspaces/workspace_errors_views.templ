@@ -1,0 +1,83 @@
+package workspaces
+
+import (
+	"fmt"
+	"net/url"
+
+	"github.com/CoreyCole/vamos/server/layouts"
+)
+
+templ WorkspaceErrorsDocument(args layouts.RootArgs, model WorkspaceErrorPageModel) {
+	@layouts.Root(args) {
+		<section class="mx-auto flex h-full w-full max-w-6xl flex-col gap-4 overflow-y-auto p-6" data-init={ templ.SafeURL("@get('" + workspaceErrorsStreamPath(model.SelectedWorkspace) + "')") }>
+			@WorkspaceErrorsHeader(model)
+			@WorkspaceErrorQueue(model)
+		</section>
+	}
+}
+
+templ WorkspaceErrorsHeader(model WorkspaceErrorPageModel) {
+	<div class="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+		<div>
+			<h1 class="text-2xl font-semibold tracking-tight">Workspace errors</h1>
+			<p class="text-sm text-muted-foreground">Recent manager and log findings from the main database.</p>
+			if model.SelectedWorkspace != "" {
+				<p class="mt-1 break-all font-mono text-xs text-muted-foreground">Filtered: { model.SelectedWorkspace }</p>
+			}
+		</div>
+		<div class="flex flex-wrap gap-2">
+			<a href="/workspaces" class="inline-flex h-9 items-center rounded-md border px-3 text-sm font-medium hover:bg-accent">Back to workspaces</a>
+			<a href="/workspaces/errors" class="inline-flex h-9 items-center rounded-md border px-3 text-sm font-medium hover:bg-accent">All errors</a>
+		</div>
+	</div>
+}
+
+templ WorkspaceErrorQueue(model WorkspaceErrorPageModel) {
+	<section id="workspace-error-queue" class="rounded-xl border bg-card p-4 text-card-foreground shadow-sm">
+		<div class="flex flex-col gap-1">
+			<h2 class="text-lg font-semibold tracking-tight">Error queue</h2>
+			if model.ScanInFlight {
+				<p class="text-sm text-muted-foreground">Log inspection running; updates stream here.</p>
+			} else {
+				<p class="text-sm text-muted-foreground">Latest deduped workspace error events.</p>
+			}
+		</div>
+		<div class="mt-4 grid gap-3">
+			if len(model.Events) == 0 {
+				<p class="rounded-lg border p-4 text-sm text-muted-foreground">No recorded workspace errors yet.</p>
+			}
+			for _, event := range model.Events {
+				@WorkspaceErrorEventCard(event, workspaceErrorWorkspaceView(model.Workspaces, event.WorkspaceSlug), model.ManagerURL)
+			}
+		</div>
+	</section>
+}
+
+templ WorkspaceErrorEventCard(event WorkspaceErrorEventView, workspace *ImplWorkspaceView, managerURL string) {
+	<article class="rounded-lg border p-3 text-sm">
+		<div class="flex flex-wrap items-start justify-between gap-2">
+			<div>
+				<p class="font-medium">{ event.Message }</p>
+				<p class="break-all font-mono text-xs text-muted-foreground">{ event.WorkspaceSlug } · { event.Source } · { event.Severity }</p>
+			</div>
+			<span class="rounded-full border px-2 py-1 text-xs">{ fmt.Sprintf("x%d", event.OccurrenceCount) }</span>
+		</div>
+		if event.Detail != "" {
+			<p class="mt-2 break-words text-sm text-muted-foreground">{ event.Detail }</p>
+		}
+		<p class="mt-2 text-xs text-muted-foreground">First: { workspaceErrorTime(event.FirstSeenAt) } · Latest: { workspaceErrorTime(event.LastSeenAt) }</p>
+		if workspace != nil {
+			<div class="mt-3 flex flex-wrap gap-2">
+				@WorkspaceErrorActionLinks(*workspace, managerURL)
+			</div>
+		}
+	</article>
+}
+
+templ WorkspaceErrorActionLinks(view ImplWorkspaceView, managerURL string) {
+	{{ slug := workspaceViewSlug(view) }}
+	if normalizedObservedState(view.Runtime) == WorkspaceObservedRunning && view.Runtime.Workspace.URL != "" {
+		<a href={ templ.SafeURL(managerURL + "/workspaces/switch/" + slug + "?redirect=" + url.QueryEscape("/")) } class="inline-flex h-8 items-center rounded-md bg-primary px-2 text-xs font-medium text-primary-foreground hover:bg-primary/90">Open</a>
+	}
+	<a href={ templ.SafeURL("/workspaces") } class="inline-flex h-8 items-center rounded-md border px-2 text-xs font-medium hover:bg-accent">Workspace list</a>
+}

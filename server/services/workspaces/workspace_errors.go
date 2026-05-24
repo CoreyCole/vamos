@@ -5,7 +5,9 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"net/url"
 	"strings"
+	"time"
 
 	"github.com/CoreyCole/vamos/pkg/db"
 )
@@ -26,6 +28,8 @@ const (
 )
 
 type WorkspaceErrorEvent = db.WorkspaceErrorEvent
+
+const workspaceErrorEventLimit = 100
 
 type UpsertWorkspaceErrorEventParams struct {
 	WorkspaceSlug string
@@ -79,6 +83,73 @@ func (s *SQLWorkspaceErrorEventStore) ListRecentWorkspaceErrorEventsForWorkspace
 		WorkspaceSlug: arg.WorkspaceSlug,
 		Limit:         arg.Limit,
 	})
+}
+
+type WorkspaceErrorPageModel struct {
+	SelectedWorkspace string
+	Events            []WorkspaceErrorEventView
+	Workspaces        []ImplWorkspaceView
+	ScanInFlight      bool
+	ManagerURL        string
+}
+
+type WorkspaceErrorEventView struct {
+	ID              int64
+	WorkspaceSlug   string
+	Source          string
+	Severity        string
+	Message         string
+	Detail          string
+	OccurrenceCount int64
+	FirstSeenAt     time.Time
+	LastSeenAt      time.Time
+}
+
+func mapWorkspaceErrorEventView(row WorkspaceErrorEvent) WorkspaceErrorEventView {
+	return WorkspaceErrorEventView{
+		ID:              row.ID,
+		WorkspaceSlug:   row.WorkspaceSlug,
+		Source:          row.Source,
+		Severity:        row.Severity,
+		Message:         row.Message,
+		Detail:          row.Detail,
+		OccurrenceCount: row.OccurrenceCount,
+		FirstSeenAt:     row.FirstSeenAt,
+		LastSeenAt:      row.LastSeenAt,
+	}
+}
+
+func workspaceErrorsStreamPath(selected string) string {
+	selected = strings.TrimSpace(selected)
+	if selected == "" {
+		return "/workspaces/errors/stream"
+	}
+	return "/workspaces/errors/stream?workspace=" + url.QueryEscape(selected)
+}
+
+func workspaceErrorTime(t time.Time) string {
+	if t.IsZero() {
+		return "unknown"
+	}
+	return t.Format("Jan 2, 2006 · 3:04 PM")
+}
+
+func workspaceErrorWorkspaceView(views []ImplWorkspaceView, slug string) *ImplWorkspaceView {
+	slug = strings.TrimSpace(slug)
+	for _, view := range views {
+		if workspaceViewSlug(view) == slug {
+			viewCopy := view
+			return &viewCopy
+		}
+		if child := workspaceErrorWorkspaceView(view.Children, slug); child != nil {
+			return child
+		}
+	}
+	return nil
+}
+
+func (h *Handler) isWorkspaceErrorScanInFlight(string) bool {
+	return false
 }
 
 type WorkspaceErrorRecorder struct {

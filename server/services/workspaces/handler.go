@@ -213,6 +213,8 @@ func (h *Handler) RegisterRoutes(e *echo.Echo, authMiddleware echo.MiddlewareFun
 	g.Use(authMiddleware)
 	g.GET("", h.HandleWorkspacesPage)
 	g.GET("/stream", h.HandleWorkspacesStream)
+	g.GET("/errors", h.HandleWorkspaceErrorsPage)
+	g.GET("/errors/stream", h.HandleWorkspaceErrorsStream)
 	g.POST("/refresh", h.HandleRefreshWorkspaces)
 	g.GET("/switch/:slug", h.HandleSwitchWorkspace)
 	g.POST("/:slug/start", h.HandleStart)

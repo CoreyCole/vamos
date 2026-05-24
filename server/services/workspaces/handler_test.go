@@ -461,6 +461,93 @@ func TestHandleWorkspacesStreamNotificationRendersUpdatedList(t *testing.T) {
 	}
 }
 
+func TestHandleWorkspaceErrorsPageRendersEmptyState(t *testing.T) {
+	manager := &fakeLifecycleManager{snapshots: []WorkspaceLifecycleSnapshot{{Workspace: Workspace{Slug: "feature", Status: StatusRunning}}}}
+	handler := NewHandler(manager, "https://main.cn-agents.test", "main")
+	req := httptest.NewRequest(http.MethodGet, "/workspaces/errors", nil)
+	rec := httptest.NewRecorder()
+	c := echo.New().NewContext(req, rec)
+	c.Set("user_email", "user@example.com")
+
+	if err := handler.HandleWorkspaceErrorsPage(c); err != nil {
+		t.Fatalf("HandleWorkspaceErrorsPage() error = %v", err)
+	}
+	html := rec.Body.String()
+	for _, want := range []string{"Workspace errors", `id="workspace-error-queue"`, "No recorded workspace errors yet.", `data-init="@get(&#39;/workspaces/errors/stream&#39;)"`} {
+		if !strings.Contains(html, want) {
+			t.Fatalf("errors page missing %q: %s", want, html)
+		}
+	}
+}
+
+func TestHandleWorkspaceErrorsPageRendersFilteredEvents(t *testing.T) {
+	store := &fakeWorkspaceErrorEventStore{listed: []WorkspaceErrorEvent{
+		{ID: 1, WorkspaceSlug: "feature", Source: "switch", Severity: "warn", Message: "workspace unavailable during switch", Detail: "boom", OccurrenceCount: 2, FirstSeenAt: time.Date(2026, 5, 24, 12, 0, 0, 0, time.UTC), LastSeenAt: time.Date(2026, 5, 24, 12, 5, 0, 0, time.UTC)},
+		{ID: 2, WorkspaceSlug: "other", Source: "log", Severity: "error", Message: "other panic", OccurrenceCount: 1},
+	}}
+	manager := &fakeLifecycleManager{snapshots: []WorkspaceLifecycleSnapshot{{Workspace: Workspace{Slug: "feature", Status: StatusRunning, URL: "https://feature.cn-agents.test/"}, ObservedState: WorkspaceObservedRunning}}}
+	signer, _ := newTestHandoffSigner(t)
+	handler := NewHandler(manager, "https://main.cn-agents.test", "main", WithDevAuth(nil, signer), WithWorkspaceErrorStore(store))
+	req := httptest.NewRequest(http.MethodGet, "/workspaces/errors?workspace=feature", nil)
+	rec := httptest.NewRecorder()
+	c := echo.New().NewContext(req, rec)
+	c.Set("user_email", "user@example.com")
+
+	if err := handler.HandleWorkspaceErrorsPage(c); err != nil {
+		t.Fatalf("HandleWorkspaceErrorsPage() error = %v", err)
+	}
+	html := rec.Body.String()
+	for _, want := range []string{"Filtered: feature", "workspace unavailable during switch", "feature · switch · warn", "boom", "x2", `data-init="@get(&#39;/workspaces/errors/stream?workspace=feature&#39;)"`, "/workspaces/switch/feature"} {
+		if !strings.Contains(html, want) {
+			t.Fatalf("filtered errors page missing %q: %s", want, html)
+		}
+	}
+	if strings.Contains(html, "other panic") {
+		t.Fatalf("filtered errors page contained other workspace event: %s", html)
+	}
+}
+
+func TestHandleWorkspaceErrorsStreamInitialRender(t *testing.T) {
+	store := &fakeWorkspaceErrorEventStore{listed: []WorkspaceErrorEvent{{ID: 1, WorkspaceSlug: "feature", Source: "switch", Severity: "warn", Message: "stream event", OccurrenceCount: 1}}}
+	manager := &fakeLifecycleManager{snapshots: []WorkspaceLifecycleSnapshot{{Workspace: Workspace{Slug: "feature", Status: StatusRunning}}}}
+	notifier := NewLifecycleNotifier()
+	handler := NewHandler(manager, "https://main.cn-agents.test", "main", WithLifecycleNotifier(notifier), WithWorkspaceErrorStore(store))
+	e := echo.New()
+	ctx, cancel := context.WithCancel(t.Context())
+	req := httptest.NewRequest(http.MethodGet, "/workspaces/errors/stream?workspace=feature", nil).WithContext(ctx)
+	rec := httptest.NewRecorder()
+	done := make(chan error, 1)
+	go func() { done <- handler.HandleWorkspaceErrorsStream(e.NewContext(req, rec)) }()
+	waitForBodyContains(t, rec, done, "stream event")
+	waitForBodyContains(t, rec, done, "workspace-error-queue")
+	cancel()
+	if err := <-done; err != nil {
+		t.Fatalf("HandleWorkspaceErrorsStream() error = %v", err)
+	}
+}
+
+func TestHandleWorkspaceErrorsStreamNotificationRendersUpdatedEvents(t *testing.T) {
+	store := &fakeWorkspaceErrorEventStore{listed: []WorkspaceErrorEvent{{ID: 1, WorkspaceSlug: "feature", Source: "switch", Severity: "warn", Message: "old event", OccurrenceCount: 1}}}
+	manager := &fakeLifecycleManager{snapshots: []WorkspaceLifecycleSnapshot{{Workspace: Workspace{Slug: "feature", Status: StatusRunning}}}}
+	notifier := NewLifecycleNotifier()
+	handler := NewHandler(manager, "https://main.cn-agents.test", "main", WithLifecycleNotifier(notifier), WithWorkspaceErrorStore(store))
+	e := echo.New()
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	req := httptest.NewRequest(http.MethodGet, "/workspaces/errors/stream", nil).WithContext(ctx)
+	rec := httptest.NewRecorder()
+	done := make(chan error, 1)
+	go func() { done <- handler.HandleWorkspaceErrorsStream(e.NewContext(req, rec)) }()
+	waitForBodyContains(t, rec, done, "old event")
+	store.listed = append(store.listed, WorkspaceErrorEvent{ID: 2, WorkspaceSlug: "feature", Source: "log", Severity: "error", Message: "new event", OccurrenceCount: 1})
+	notifier.Notify("feature")
+	waitForBodyContains(t, rec, done, "new event")
+	cancel()
+	if err := <-done; err != nil {
+		t.Fatalf("HandleWorkspaceErrorsStream() error = %v", err)
+	}
+}
+
 func TestLifecycleNotifierSubscribeCleanup(t *testing.T) {
 	notifier := NewLifecycleNotifier()
 	ch, unsubscribe := notifier.Subscribe()
