@@ -14,6 +14,14 @@ type GitInspector interface {
 	AheadBehind(ctx context.Context, checkout string, left, right string) (ahead, behind int, err error)
 }
 
+type GitMutator interface {
+	GitInspector
+	Fetch(ctx context.Context, checkout, remote, ref string) error
+	Merge(ctx context.Context, checkout, ref string) error
+	FastForwardTo(ctx context.Context, checkout, ref string) error
+	Push(ctx context.Context, checkout, remote, ref string) error
+}
+
 type ShellGitInspector struct {
 	Timeout time.Duration
 }
@@ -52,6 +60,22 @@ func (g ShellGitInspector) AheadBehind(ctx context.Context, checkout string, lef
 	ahead, _ = strconv.Atoi(fields[0])
 	behind, _ = strconv.Atoi(fields[1])
 	return ahead, behind, nil
+}
+
+func (g ShellGitInspector) Fetch(ctx context.Context, checkout, remote, ref string) error {
+	return g.runNoOutput(ctx, checkout, "git", "fetch", "--no-tags", remote, ref)
+}
+
+func (g ShellGitInspector) Merge(ctx context.Context, checkout, ref string) error {
+	return g.runNoOutput(ctx, checkout, "git", "merge", "--ff-only", ref)
+}
+
+func (g ShellGitInspector) FastForwardTo(ctx context.Context, checkout, ref string) error {
+	return g.runNoOutput(ctx, checkout, "git", "update-ref", "HEAD", ref)
+}
+
+func (g ShellGitInspector) Push(ctx context.Context, checkout, remote, ref string) error {
+	return g.runNoOutput(ctx, checkout, "git", "push", remote, ref)
 }
 
 func (g ShellGitInspector) run(ctx context.Context, checkout, name string, args ...string) (string, error) {
