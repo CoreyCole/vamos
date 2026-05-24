@@ -1222,25 +1222,37 @@ func main() {
 				releaseStarter,
 			))
 		}
+		workspaceSyncRefreshResultFromAgentChat := func(result agentchat.SyncWorkspacesResult) workspaces.WorkspaceSyncRefreshResult {
+			return workspaces.WorkspaceSyncRefreshResult{
+				PlanUpserted:    result.Plan.Upserted,
+				PlanArchived:    result.Plan.Archived,
+				ImplUpserted:    result.Impl.Upserted,
+				ImplRepairedEnv: result.Impl.RepairedEnv,
+				ImplCleanedUp:   result.Impl.CleanedUp,
+				ImplMerged:      result.Impl.Merged,
+				Changed:         result.Changed,
+			}
+		}
 		handlerOptions = append(handlerOptions,
-			workspaces.WithWorkspaceSyncRefresh(func(ctx context.Context) error {
+			workspaces.WithWorkspaceSyncRefresh(func(ctx context.Context) (workspaces.WorkspaceSyncRefreshResult, error) {
 				input := agentChatService.WorkspaceSyncInput()
 				if temporalManager == nil {
 					result, err := agentChatService.WorkspaceSyncer().Sync(ctx, input)
+					mapped := workspaceSyncRefreshResultFromAgentChat(result)
 					if err != nil {
-						return err
+						return mapped, err
 					}
 					log.Printf(
 						"workspace_sync_refresh_complete mode=direct plan_upserted=%d plan_archived=%d impl_upserted=%d impl_repaired_env=%d impl_cleaned_up=%d impl_merged=%d changed=%t",
-						result.Plan.Upserted,
-						result.Plan.Archived,
-						result.Impl.Upserted,
-						result.Impl.RepairedEnv,
-						result.Impl.CleanedUp,
-						result.Impl.Merged,
-						result.Changed,
+						mapped.PlanUpserted,
+						mapped.PlanArchived,
+						mapped.ImplUpserted,
+						mapped.ImplRepairedEnv,
+						mapped.ImplCleanedUp,
+						mapped.ImplMerged,
+						mapped.Changed,
 					)
-					return nil
+					return mapped, nil
 				}
 				run, err := temporalManager.Client().ExecuteWorkflow(
 					ctx,
@@ -1257,23 +1269,24 @@ func main() {
 					input,
 				)
 				if err != nil {
-					return err
+					return workspaces.WorkspaceSyncRefreshResult{}, err
 				}
 				var result agentchat.SyncWorkspacesResult
 				if err := run.Get(ctx, &result); err != nil {
-					return err
+					return workspaceSyncRefreshResultFromAgentChat(result), err
 				}
+				mapped := workspaceSyncRefreshResultFromAgentChat(result)
 				log.Printf(
 					"workspace_sync_refresh_complete mode=temporal plan_upserted=%d plan_archived=%d impl_upserted=%d impl_repaired_env=%d impl_cleaned_up=%d impl_merged=%d changed=%t",
-					result.Plan.Upserted,
-					result.Plan.Archived,
-					result.Impl.Upserted,
-					result.Impl.RepairedEnv,
-					result.Impl.CleanedUp,
-					result.Impl.Merged,
-					result.Changed,
+					mapped.PlanUpserted,
+					mapped.PlanArchived,
+					mapped.ImplUpserted,
+					mapped.ImplRepairedEnv,
+					mapped.ImplCleanedUp,
+					mapped.ImplMerged,
+					mapped.Changed,
 				)
-				return nil
+				return mapped, nil
 			}),
 		)
 		workspaceHandler = workspaces.NewHandler(

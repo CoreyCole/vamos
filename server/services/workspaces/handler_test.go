@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"database/sql"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -1470,7 +1471,7 @@ func TestHandleRefreshWorkspacesRedirectPreservesHistoricalMode(t *testing.T) {
 		&fakeLifecycleManager{},
 		"https://main.cn-agents.test",
 		"main",
-		WithWorkspaceSyncRefresh(func(context.Context) error { return nil }),
+		WithWorkspaceSyncRefresh(func(context.Context) (WorkspaceSyncRefreshResult, error) { return WorkspaceSyncRefreshResult{}, nil }),
 	)
 	e := echo.New()
 	req := httptest.NewRequest(
@@ -1550,6 +1551,92 @@ func TestLifecycleActionDatastarPreservesHistoricalMode(t *testing.T) {
 	}
 }
 
+func TestHandleRefreshWorkspacesRecordsResultAndNotifies(t *testing.T) {
+	notifier := NewLifecycleNotifier()
+	notifications, unsubscribe := notifier.Subscribe()
+	defer unsubscribe()
+	managerRefreshes := 0
+	manager := &fakeLifecycleManager{
+		beforeRefresh: func() {
+			managerRefreshes++
+		},
+	}
+	wantResult := WorkspaceSyncRefreshResult{
+		ImplUpserted:    1,
+		ImplRepairedEnv: 1,
+		Changed:         true,
+	}
+	handler := NewHandler(
+		manager,
+		"https://main.cn-agents.test",
+		"main",
+		WithLifecycleNotifier(notifier),
+		WithWorkspaceSyncRefresh(func(context.Context) (WorkspaceSyncRefreshResult, error) {
+			return wantResult, nil
+		}),
+	)
+	e := echo.New()
+	req := httptest.NewRequest(http.MethodPost, "/workspaces/refresh", nil)
+	rec := httptest.NewRecorder()
+	if err := handler.HandleRefreshWorkspaces(e.NewContext(req, rec)); err != nil {
+		t.Fatalf("HandleRefreshWorkspaces() error = %v", err)
+	}
+	waitForNotifications(t, notifications, 1)
+	waitForRefreshDone(t, handler)
+	waitForNotifications(t, notifications, 1)
+	state := handler.refreshState()
+	if state.InFlight {
+		t.Fatal("refresh still in flight")
+	}
+	if state.LastResult != wantResult {
+		t.Fatalf("LastResult = %+v, want %+v", state.LastResult, wantResult)
+	}
+	if state.LastError != "" {
+		t.Fatalf("LastError = %q, want empty", state.LastError)
+	}
+	if state.CompletedAt.IsZero() {
+		t.Fatal("CompletedAt is zero")
+	}
+	if managerRefreshes != 1 {
+		t.Fatalf("manager refreshes = %d, want 1", managerRefreshes)
+	}
+}
+
+func TestHandleRefreshWorkspacesRecordsRefreshError(t *testing.T) {
+	notifier := NewLifecycleNotifier()
+	notifications, unsubscribe := notifier.Subscribe()
+	defer unsubscribe()
+	managerRefreshes := 0
+	handler := NewHandler(
+		&fakeLifecycleManager{beforeRefresh: func() { managerRefreshes++ }},
+		"https://main.cn-agents.test",
+		"main",
+		WithLifecycleNotifier(notifier),
+		WithWorkspaceSyncRefresh(func(context.Context) (WorkspaceSyncRefreshResult, error) {
+			return WorkspaceSyncRefreshResult{}, errors.New("boom")
+		}),
+	)
+	e := echo.New()
+	req := httptest.NewRequest(http.MethodPost, "/workspaces/refresh", nil)
+	rec := httptest.NewRecorder()
+	if err := handler.HandleRefreshWorkspaces(e.NewContext(req, rec)); err != nil {
+		t.Fatalf("HandleRefreshWorkspaces() error = %v", err)
+	}
+	waitForNotifications(t, notifications, 1)
+	waitForRefreshDone(t, handler)
+	waitForNotifications(t, notifications, 1)
+	state := handler.refreshState()
+	if !strings.Contains(state.LastError, "boom") {
+		t.Fatalf("LastError = %q, want boom", state.LastError)
+	}
+	if state.CompletedAt.IsZero() {
+		t.Fatal("CompletedAt is zero")
+	}
+	if managerRefreshes != 0 {
+		t.Fatalf("manager refreshes = %d, want 0", managerRefreshes)
+	}
+}
+
 func TestHandleRefreshWorkspacesRunsSyncBeforeManagerRefresh(t *testing.T) {
 	managerRefreshed := make(chan struct{}, 1)
 	manager := &fakeLifecycleManager{
@@ -1563,10 +1650,10 @@ func TestHandleRefreshWorkspacesRunsSyncBeforeManagerRefresh(t *testing.T) {
 		manager,
 		"https://main.cn-agents.test",
 		"main",
-		WithWorkspaceSyncRefresh(func(context.Context) error {
+		WithWorkspaceSyncRefresh(func(context.Context) (WorkspaceSyncRefreshResult, error) {
 			syncCalled <- struct{}{}
 			<-releaseSync
-			return nil
+			return WorkspaceSyncRefreshResult{}, nil
 		}),
 	)
 	e := echo.New()
@@ -1593,6 +1680,34 @@ func TestHandleRefreshWorkspacesRunsSyncBeforeManagerRefresh(t *testing.T) {
 	case <-managerRefreshed:
 	case <-time.After(time.Second):
 		t.Fatal("manager refresh did not run after workspace sync")
+	}
+}
+
+func waitForRefreshDone(t *testing.T, handler *Handler) {
+	t.Helper()
+	deadline := time.After(time.Second)
+	for {
+		if !handler.refreshState().InFlight {
+			return
+		}
+		select {
+		case <-deadline:
+			t.Fatal("timed out waiting for refresh to finish")
+		default:
+			time.Sleep(time.Millisecond)
+		}
+	}
+}
+
+func waitForNotifications(t *testing.T, notifications <-chan struct{}, count int) {
+	t.Helper()
+	deadline := time.After(time.Second)
+	for i := 0; i < count; i++ {
+		select {
+		case <-notifications:
+		case <-deadline:
+			t.Fatalf("timed out waiting for notification %d", i+1)
+		}
 	}
 }
 

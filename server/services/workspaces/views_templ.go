@@ -16,7 +16,7 @@ import (
 	"github.com/CoreyCole/vamos/server/layouts"
 )
 
-func WorkspacesDocument(args layouts.RootArgs, items []ImplWorkspaceView, releasePanel ReleasePanelModel, refreshing bool, showHistorical bool) templ.Component {
+func WorkspacesDocument(args layouts.RootArgs, items []ImplWorkspaceView, releasePanel ReleasePanelModel, refresh WorkspaceRefreshState, showHistorical bool) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
@@ -49,7 +49,7 @@ func WorkspacesDocument(args layouts.RootArgs, items []ImplWorkspaceView, releas
 				}()
 			}
 			ctx = templ.InitializeContext(ctx)
-			templ_7745c5c3_Err = WorkspacesPageWithRefresh(items, releasePanel, args.WorkspaceManagerURL, refreshing, showHistorical).Render(ctx, templ_7745c5c3_Buffer)
+			templ_7745c5c3_Err = WorkspacesPageWithRefresh(items, releasePanel, args.WorkspaceManagerURL, refresh, showHistorical).Render(ctx, templ_7745c5c3_Buffer)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -84,7 +84,7 @@ func WorkspacesPage(items []ImplWorkspaceView, managerURL string, showHistorical
 			templ_7745c5c3_Var3 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = WorkspacesPageWithRefresh(items, ReleasePanelModel{}, managerURL, false, showHistorical).Render(ctx, templ_7745c5c3_Buffer)
+		templ_7745c5c3_Err = WorkspacesPageWithRefresh(items, ReleasePanelModel{}, managerURL, WorkspaceRefreshState{}, showHistorical).Render(ctx, templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -92,7 +92,7 @@ func WorkspacesPage(items []ImplWorkspaceView, managerURL string, showHistorical
 	})
 }
 
-func WorkspacesPageWithRefresh(items []ImplWorkspaceView, releasePanel ReleasePanelModel, managerURL string, refreshing bool, showHistorical bool) templ.Component {
+func WorkspacesPageWithRefresh(items []ImplWorkspaceView, releasePanel ReleasePanelModel, managerURL string, refresh WorkspaceRefreshState, showHistorical bool) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
@@ -118,7 +118,7 @@ func WorkspacesPageWithRefresh(items []ImplWorkspaceView, releasePanel ReleasePa
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = WorkspacesHeader(refreshing, showHistorical).Render(ctx, templ_7745c5c3_Buffer)
+			templ_7745c5c3_Err = WorkspacesHeader(refresh, showHistorical).Render(ctx, templ_7745c5c3_Buffer)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -139,7 +139,7 @@ func WorkspacesPageWithRefresh(items []ImplWorkspaceView, releasePanel ReleasePa
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = WorkspacesHeader(refreshing, showHistorical).Render(ctx, templ_7745c5c3_Buffer)
+			templ_7745c5c3_Err = WorkspacesHeader(refresh, showHistorical).Render(ctx, templ_7745c5c3_Buffer)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -160,7 +160,7 @@ func WorkspacesPageWithRefresh(items []ImplWorkspaceView, releasePanel ReleasePa
 	})
 }
 
-func WorkspacesHeader(refreshing bool, showHistorical bool) templ.Component {
+func WorkspacesHeader(refresh WorkspaceRefreshState, showHistorical bool) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
@@ -210,7 +210,7 @@ func WorkspacesHeader(refreshing bool, showHistorical bool) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		if refreshing {
+		if refresh.InFlight {
 			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 11, " disabled")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
@@ -220,7 +220,7 @@ func WorkspacesHeader(refreshing bool, showHistorical bool) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		if refreshing {
+		if refresh.InFlight {
 			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 13, "Refreshing...")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err

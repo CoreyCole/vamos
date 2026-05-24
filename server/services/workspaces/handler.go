@@ -44,7 +44,28 @@ const (
 	workspaceErrorScanTimeout   = 5 * time.Minute
 )
 
-type WorkspaceSyncRefreshFunc func(ctx context.Context) error
+type WorkspaceSyncRefreshFunc func(ctx context.Context) (WorkspaceSyncRefreshResult, error)
+
+type WorkspaceSyncRefreshResult struct {
+	PlanUpserted           int
+	PlanArchived           int
+	ImplUpserted           int
+	ImplRepairedEnv        int
+	ImportedPiSessions     int
+	AdoptedQRSPIWorkspaces int
+	ImplCleanedUp          int
+	ImplMerged             int
+	Changed                bool
+}
+
+type WorkspaceRefreshState struct {
+	InFlight    bool
+	LastResult  WorkspaceSyncRefreshResult
+	LastError   string
+	CompletedAt time.Time
+}
+
+type WorkspaceSyncCompletionFunc func(ctx context.Context, result WorkspaceSyncRefreshResult, err error) WorkspaceSyncRefreshResult
 
 type Handler struct {
 	manager                    Manager
@@ -52,9 +73,10 @@ type Handler struct {
 	planWorkspaces             PlanWorkspaceLister
 	implWorkspaces             ImplWorkspaceLister
 	workspaceSyncRefresh       WorkspaceSyncRefreshFunc
+	workspaceSyncComplete      WorkspaceSyncCompletionFunc
 	workflowSummaries          WorkspaceWorkflowSummaryResolver
-	refreshMu                  sync.Mutex
-	refreshInFlight            bool
+	refreshStateMu             sync.Mutex
+	refreshStateValue          WorkspaceRefreshState
 	notifier                   WorkspaceLifecycleNotifier
 	managerURL                 string
 	currentSlug                string
@@ -74,7 +96,6 @@ type Handler struct {
 	workspaceErrorScanInFlight map[string]bool
 	exitFunc                   func(int)
 }
-
 type RestartRequest struct {
 	Slug         string            `json:"slug"`
 	CheckoutPath string            `json:"checkout_path"`
@@ -149,6 +170,11 @@ func WithWorkspaceWorkflowSummaryResolver(resolver WorkspaceWorkflowSummaryResol
 	}
 }
 
+func WithWorkspaceSyncCompletion(complete WorkspaceSyncCompletionFunc) HandlerOption {
+	return func(h *Handler) {
+		h.workspaceSyncComplete = complete
+	}
+}
 func WithWorkspaceProvisionStarter(starter WorkspaceProvisionStarter) HandlerOption {
 	return func(h *Handler) {
 		h.provisionStarter = starter
@@ -334,7 +360,7 @@ func (h *Handler) HandleWorkspacesPage(c echo.Context) error {
 	return render(
 		c,
 		http.StatusOK,
-		WorkspacesDocument(args, renderedViews, model.ReleasePanel, h.isRefreshInFlight(), showHistorical),
+		WorkspacesDocument(args, renderedViews, model.ReleasePanel, h.refreshState(), showHistorical),
 	)
 }
 
@@ -355,7 +381,7 @@ func (h *Handler) HandleRefreshWorkspaces(c echo.Context) error {
 		sse := datastar.NewSSE(c.Response().Writer, c.Request())
 		c.Response().WriteHeader(http.StatusAccepted)
 		return sse.PatchElementTempl(
-			WorkspacesHeader(h.isRefreshInFlight(), showHistorical),
+			WorkspacesHeader(h.refreshState(), showHistorical),
 			datastar.WithSelectorID("workspaces-header"),
 			datastar.WithModeOuter(),
 		)
@@ -368,34 +394,54 @@ func (h *Handler) HandleRefreshWorkspaces(c echo.Context) error {
 }
 
 func (h *Handler) tryStartWorkspaceSyncRefresh() bool {
-	h.refreshMu.Lock()
-	defer h.refreshMu.Unlock()
-	if h.refreshInFlight {
+	h.refreshStateMu.Lock()
+	defer h.refreshStateMu.Unlock()
+	if h.refreshStateValue.InFlight {
 		return false
 	}
-	h.refreshInFlight = true
+	h.refreshStateValue.InFlight = true
+	h.refreshStateValue.LastError = ""
 	return true
 }
 
-func (h *Handler) isRefreshInFlight() bool {
-	h.refreshMu.Lock()
-	defer h.refreshMu.Unlock()
-	return h.refreshInFlight
+func (h *Handler) refreshState() WorkspaceRefreshState {
+	h.refreshStateMu.Lock()
+	defer h.refreshStateMu.Unlock()
+	return h.refreshStateValue
+}
+
+func (h *Handler) recordWorkspaceSyncRefresh(
+	result WorkspaceSyncRefreshResult,
+	err error,
+	completedAt time.Time,
+) {
+	h.refreshStateMu.Lock()
+	defer h.refreshStateMu.Unlock()
+	h.refreshStateValue.InFlight = false
+	h.refreshStateValue.LastResult = result
+	h.refreshStateValue.CompletedAt = completedAt
+	if err != nil {
+		h.refreshStateValue.LastError = err.Error()
+	} else {
+		h.refreshStateValue.LastError = ""
+	}
 }
 
 func (h *Handler) runWorkspaceSyncRefresh() {
 	ctx, cancel := context.WithTimeout(context.Background(), workspaceSyncRefreshTimeout)
 	defer cancel()
-	if err := h.workspaceSyncRefresh(ctx); err != nil {
-		log.Printf("workspace_sync_refresh_failed: %v", err)
-	} else if h.manager != nil {
-		if err := h.manager.Refresh(ctx); err != nil {
-			log.Printf("workspace_manager_refresh_after_sync_failed: %v", err)
+	result, err := h.workspaceSyncRefresh(ctx)
+	if h.workspaceSyncComplete != nil {
+		result = h.workspaceSyncComplete(ctx, result, err)
+	} else if err == nil && h.manager != nil {
+		if refreshErr := h.manager.Refresh(ctx); refreshErr != nil {
+			log.Printf("workspace_manager_refresh_after_sync_failed: %v", refreshErr)
 		}
 	}
-	h.refreshMu.Lock()
-	h.refreshInFlight = false
-	h.refreshMu.Unlock()
+	if err != nil {
+		log.Printf("workspace_sync_refresh_failed: %v", err)
+	}
+	h.recordWorkspaceSyncRefresh(result, err, time.Now())
 	h.notifier.Notify("workspaces-refresh")
 }
 
@@ -471,7 +517,7 @@ func (h *Handler) HandleWorkspacesStream(c echo.Context) error {
 		}
 		views := h.renderedImplWorkspaceViews(model.Views, showHistorical)
 		if err := sse.PatchElementTempl(
-			WorkspacesHeader(h.isRefreshInFlight(), showHistorical),
+			WorkspacesHeader(h.refreshState(), showHistorical),
 			datastar.WithSelectorID("workspaces-header"),
 			datastar.WithModeOuter(),
 		); err != nil {

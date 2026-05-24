@@ -146,7 +146,7 @@ func (h *Handler) patchWorkspaces(c echo.Context, views []ImplWorkspaceView) err
 	renderedViews := h.renderedImplWorkspaceViews(views, showHistorical)
 	sse := datastar.NewSSE(c.Response().Writer, c.Request())
 	c.Response().WriteHeader(http.StatusAccepted)
-	if err := sse.PatchElementTempl(WorkspacesHeader(h.isRefreshInFlight(), showHistorical), datastar.WithSelectorID("workspaces-header"), datastar.WithModeOuter()); err != nil {
+	if err := sse.PatchElementTempl(WorkspacesHeader(h.refreshState(), showHistorical), datastar.WithSelectorID("workspaces-header"), datastar.WithModeOuter()); err != nil {
 		return err
 	}
 	if err := sse.PatchElementTempl(ReleasePanel(panel), datastar.WithSelectorID("release-queue-panel"), datastar.WithModeOuter()); err != nil {
