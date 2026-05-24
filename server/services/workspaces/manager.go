@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -494,6 +495,99 @@ func (m *ManagerService) startWorkspaceProcess(
 	m.mu.Unlock()
 	go m.watchBundle(slug, handles)
 	return started, nil
+}
+
+func (m *ManagerService) CleanupWorkspace(
+	ctx context.Context,
+	input WorkspaceCleanupWorkflowInput,
+) error {
+	slug := strings.TrimSpace(input.Slug)
+	if slug == "" {
+		return fmt.Errorf("workspace slug is required")
+	}
+	if input.Disposition == WorkspaceCleanupDispositionUnmerged && !input.Confirmed {
+		return fmt.Errorf("unmerged workspace cleanup requires confirmation")
+	}
+
+	m.mu.Lock()
+	ws, ok := m.workspaces[slug]
+	if !ok {
+		m.mu.Unlock()
+		return nil
+	}
+	if ws.IsMain || slug == mainWorkspaceSlug {
+		m.mu.Unlock()
+		return fmt.Errorf("workspace %q is managed by the control server", slug)
+	}
+	checkoutPath := ws.CheckoutPath
+	if err := m.validateCleanupPathLocked(ws); err != nil {
+		m.mu.Unlock()
+		return err
+	}
+	shouldStop := ws.Status != "" && ws.Status != StatusStopped
+	m.mu.Unlock()
+
+	if shouldStop {
+		if _, err := m.Stop(ctx, slug); err != nil {
+			return err
+		}
+	}
+	if checkoutPath != "" {
+		if err := os.RemoveAll(checkoutPath); err != nil {
+			return fmt.Errorf("remove workspace checkout: %w", err)
+		}
+	}
+
+	m.mu.Lock()
+	delete(m.children, slug)
+	delete(m.workspaces, slug)
+	m.mu.Unlock()
+	m.notifyLifecycleChanged(slug)
+	return nil
+}
+
+func (m *ManagerService) validateCleanupPathLocked(ws Workspace) error {
+	checkoutPath, err := filepath.Abs(strings.TrimSpace(ws.CheckoutPath))
+	if err != nil || checkoutPath == "" {
+		return fmt.Errorf("workspace %q has invalid checkout path", ws.Slug)
+	}
+	checkoutPath = filepath.Clean(checkoutPath)
+	if checkoutPath == string(filepath.Separator) {
+		return fmt.Errorf("workspace %q checkout path is unsafe", ws.Slug)
+	}
+	mainPath := strings.TrimSpace(m.discovery.MainCheckoutPath)
+	if mainPath != "" {
+		if absMain, err := filepath.Abs(mainPath); err == nil && checkoutPath == filepath.Clean(absMain) {
+			return fmt.Errorf("workspace %q checkout path is the main checkout", ws.Slug)
+		}
+	}
+	for slug, checkout := range m.discovery.ConfiguredCheckouts {
+		root := strings.TrimSpace(checkout.RootPath)
+		if root == "" {
+			continue
+		}
+		absRoot, err := filepath.Abs(root)
+		if err == nil && checkoutPath == filepath.Clean(absRoot) {
+			return fmt.Errorf("workspace %q checkout path is configured checkout %q", ws.Slug, slug)
+		}
+	}
+	parent := strings.TrimSpace(m.discovery.ParentDir)
+	if parent == "" && mainPath != "" {
+		parent = filepath.Dir(mainPath)
+	}
+	if parent == "" {
+		return nil
+	}
+	absParent, err := filepath.Abs(parent)
+	if err != nil {
+		return fmt.Errorf("workspace parent path is invalid: %w", err)
+	}
+	absParent = filepath.Clean(absParent)
+	rel, err := filepath.Rel(absParent, checkoutPath)
+	if err != nil || rel == "." || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+		return fmt.Errorf("workspace %q checkout path is outside workspace parent", ws.Slug)
+	}
+	return nil
 }
 
 func (m *ManagerService) Stop(ctx context.Context, slug string) (Workspace, error) {

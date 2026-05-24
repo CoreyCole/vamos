@@ -942,6 +942,7 @@ func main() {
 	provisionStarter := workspaces.WorkspaceProvisionStarter(
 		workspaces.NewDirectProvisionStarter(provisionActivities),
 	)
+	var cleanupStarter workspaces.WorkspaceCleanupStarter
 	var temporalManager *temporalmgr.Manager
 	var goWorker *agentworker.Worker
 	cnTemporal := os.Getenv("CN_TEMPORAL")
@@ -965,10 +966,16 @@ func main() {
 			goWorker.RegisterWorkflow(workspaces.RestartWorkspaceWorkflow)
 			goWorker.RegisterWorkflow(workspaces.WorkspaceProvisionWorkflow)
 			goWorker.RegisterWorkflow(workspaces.ReleaseQueueWorkflow)
+			goWorker.RegisterWorkflow(workspaces.CleanupWorkspaceWorkflow)
 			provisionStarter = workspaces.NewTemporalProvisionStarter(temporalManager)
 			goWorker.RegisterActivity(provisionActivities)
 			goWorker.RegisterActivity(releaseActivities)
 			if workspaceManager != nil {
+				cleanupStarter = workspaces.NewTemporalCleanupStarter(temporalManager)
+				goWorker.RegisterActivity(&workspaces.CleanupActivities{
+					Manager: workspaceManager,
+					Store:   dbService.Queries,
+				})
 				workspaceManager.SetLifecycleStarter(
 					workspaces.NewTemporalLifecycleStarter(temporalManager),
 				)
@@ -1152,6 +1159,7 @@ func main() {
 			workspaces.WithPlanWorkspaces(dbService.Queries),
 			workspaces.WithImplWorkspaces(dbService.Queries),
 			workspaces.WithWorkspaceProvisionStarter(provisionStarter),
+			workspaces.WithWorkspaceCleanupStarter(cleanupStarter),
 			workspaces.WithWorkspaceSyncRefresh(func(ctx context.Context) error {
 				input := agentChatService.WorkspaceSyncInput()
 				if temporalManager == nil {

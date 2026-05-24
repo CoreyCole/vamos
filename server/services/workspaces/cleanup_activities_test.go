@@ -1,0 +1,96 @@
+package workspaces
+
+import (
+	"context"
+	"os"
+	"path/filepath"
+	"testing"
+)
+
+type fakeImplWorkspaceCleanupMarker struct {
+	slugs []string
+	err   error
+}
+
+func (f *fakeImplWorkspaceCleanupMarker) MarkImplWorkspaceCleanedUp(ctx context.Context, workspaceSlug string) (int64, error) {
+	f.slugs = append(f.slugs, workspaceSlug)
+	return 1, f.err
+}
+
+func TestCleanupActivityRemovesCheckoutMarksRowAndPreservesPlanDir(t *testing.T) {
+	m, checkout := newTestManager(t)
+	planDir := filepath.Join(filepath.Dir(checkout), "thoughts", "creative-mode-agent", "plans", "demo")
+	if err := os.MkdirAll(planDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	marker := &fakeImplWorkspaceCleanupMarker{}
+	activities := &CleanupActivities{Manager: m, Store: marker}
+
+	err := activities.CleanupWorkspace(context.Background(), WorkspaceCleanupWorkflowInput{
+		Slug:         "foo",
+		TransitionID: "cleanup-1",
+		Disposition:  WorkspaceCleanupDispositionUnmerged,
+		Confirmed:    true,
+	})
+	if err != nil {
+		t.Fatalf("CleanupWorkspace: %v", err)
+	}
+	if _, err := os.Stat(checkout); !os.IsNotExist(err) {
+		t.Fatalf("checkout stat err=%v want not exist", err)
+	}
+	if _, err := os.Stat(planDir); err != nil {
+		t.Fatalf("plan dir should be preserved: %v", err)
+	}
+	if len(marker.slugs) != 1 || marker.slugs[0] != "foo" {
+		t.Fatalf("marked slugs=%v want [foo]", marker.slugs)
+	}
+}
+
+func TestCleanupActivityRetryAfterRemovalIsDuplicateSuccess(t *testing.T) {
+	m, checkout := newTestManager(t)
+	activities := &CleanupActivities{Manager: m, Store: &fakeImplWorkspaceCleanupMarker{}}
+	input := WorkspaceCleanupWorkflowInput{Slug: "foo", TransitionID: "cleanup-1", Disposition: WorkspaceCleanupDispositionMerged}
+
+	if err := activities.CleanupWorkspace(context.Background(), input); err != nil {
+		t.Fatalf("first CleanupWorkspace: %v", err)
+	}
+	if _, err := os.Stat(checkout); !os.IsNotExist(err) {
+		t.Fatalf("checkout stat err=%v want not exist", err)
+	}
+	if err := activities.CleanupWorkspace(context.Background(), input); err != nil {
+		t.Fatalf("retry CleanupWorkspace: %v", err)
+	}
+}
+
+func TestCleanupActivityRejectsUnmergedWithoutConfirmation(t *testing.T) {
+	m, checkout := newTestManager(t)
+	activities := &CleanupActivities{Manager: m}
+	err := activities.CleanupWorkspace(context.Background(), WorkspaceCleanupWorkflowInput{
+		Slug:        "foo",
+		Disposition: WorkspaceCleanupDispositionUnmerged,
+	})
+	if err == nil {
+		t.Fatal("CleanupWorkspace err=nil want confirmation error")
+	}
+	if _, statErr := os.Stat(checkout); statErr != nil {
+		t.Fatalf("checkout should remain: %v", statErr)
+	}
+}
+
+func TestCleanupActivityRejectsConfiguredCheckout(t *testing.T) {
+	m, checkout := newTestManager(t)
+	m.discovery.ConfiguredCheckouts = map[string]ConfiguredCheckout{
+		"stage": {RootPath: checkout, DisplayName: "Stage"},
+	}
+	activities := &CleanupActivities{Manager: m}
+	err := activities.CleanupWorkspace(context.Background(), WorkspaceCleanupWorkflowInput{
+		Slug:        "foo",
+		Disposition: WorkspaceCleanupDispositionMerged,
+	})
+	if err == nil {
+		t.Fatal("CleanupWorkspace err=nil want configured checkout error")
+	}
+	if _, statErr := os.Stat(checkout); statErr != nil {
+		t.Fatalf("checkout should remain: %v", statErr)
+	}
+}
