@@ -82,6 +82,7 @@ func TestDurableSessionChat_RootThoughtsRestoresLatestFreeformChat(t *testing.T)
 		steps.OpenFreeformChatFixture(t, ctx, "freeform-chat.durable")
 		steps.OpenThoughtsRootChatContext(t, ctx, "current")
 		steps.ExpectTranscriptContains(t, ctx, "VAMOS_E2E_FREEFORM_REPLAY_OK")
+		steps.ExpectConsoleClean(t, ctx, "errors_or_warnings")
 	})
 }
 

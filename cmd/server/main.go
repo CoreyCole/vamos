@@ -1322,6 +1322,10 @@ func main() {
 		"/chat/freeform/resume",
 		agentChatHandler.ResumeEmbeddedFreeformThread,
 	)
+	thoughtsGroup.GET(
+		"/chat/freeform/stream",
+		agentChatHandler.StreamEmbeddedFreeform,
+	)
 	thoughtsGroup.GET("/chat/:workspace_id", agentChatHandler.HandleWorkspacePage)
 	thoughtsGroup.GET(
 		"/chat/:workspace_id/thread/:thread_id",

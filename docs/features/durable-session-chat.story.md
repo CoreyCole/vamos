@@ -123,6 +123,7 @@ As a workspace user, I want Agent Chat transcripts and Pi-produced artifacts to 
 ### Then
 
 - Transcript contains "VAMOS_E2E_FREEFORM_REPLAY_OK".
+- Console has no errors or warnings.
 
 ## Scenario: Workspace switching restores each workspace latest chat
 

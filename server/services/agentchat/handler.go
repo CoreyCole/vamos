@@ -743,6 +743,55 @@ func (h *Handler) StreamWorkspace(c echo.Context) error {
 	}
 }
 
+func (h *Handler) StreamEmbeddedFreeform(c echo.Context) error {
+	userEmail, ok := c.Get("user_email").(string)
+	if !ok || userEmail == "" {
+		return echo.NewHTTPError(http.StatusUnauthorized, "not authenticated")
+	}
+
+	threadID := strings.TrimSpace(c.QueryParam("thread"))
+	if threadID == "" {
+		return nil
+	}
+
+	sse := datastar.NewSSE(c.Response().Writer, c.Request())
+	ctx := c.Request().Context()
+	signalCh := h.service.notifier.Subscribe(threadID)
+	defer h.service.notifier.Unsubscribe(threadID, signalCh)
+	h.service.RequestPiSessionIndex(PiSessionIndexRequest{
+		UserEmail: userEmail,
+		Reason:    "embedded-freeform-stream",
+	})
+
+	since := parseSince(c.QueryParam("since"))
+	currentCursor := h.service.CurrentCursor(threadID)
+	if since < currentCursor {
+		if err := h.patchEmbeddedFreeformChatPanel(c, sse, userEmail); err != nil {
+			return err
+		}
+		since = h.service.CurrentCursor(threadID)
+	}
+
+	for {
+		select {
+		case <-ctx.Done():
+			return nil
+		case signal := <-signalCh:
+			if signal.Cursor <= since {
+				continue
+			}
+			if signal.Scope == PatchLiveTranscript {
+				if err := h.patchEmbeddedFreeformLiveTranscript(c, sse, userEmail); err != nil {
+					return err
+				}
+			} else if err := h.patchEmbeddedFreeformChatPanel(c, sse, userEmail); err != nil {
+				return err
+			}
+			since = signal.Cursor
+		}
+	}
+}
+
 func (h *Handler) StreamEmbeddedWorkspace(c echo.Context) error {
 	userEmail, ok := c.Get("user_email").(string)
 	if !ok || userEmail == "" {
@@ -2662,6 +2711,43 @@ func (h *Handler) patchWorkspaceLiveTranscript(
 			workspaceForkAction(c.Param("workspace_id"), threadID),
 		),
 	)
+}
+
+func (h *Handler) patchEmbeddedFreeformChatPanel(
+	c echo.Context,
+	sse *datastar.ServerSentEventGenerator,
+	userEmail string,
+) error {
+	args, err := h.service.BuildEmbeddedFreeformPanelArgs(
+		c.Request().Context(),
+		userEmail,
+		strings.TrimSpace(c.QueryParam("thread")),
+		strings.TrimSpace(c.QueryParam("run")),
+	)
+	if err != nil {
+		return err
+	}
+	return sse.PatchElementTempl(
+		EmbeddedFreeformRightRailPanel(args),
+		datastar.WithSelectorID("doc-right-chat-panel"),
+	)
+}
+
+func (h *Handler) patchEmbeddedFreeformLiveTranscript(
+	c echo.Context,
+	sse *datastar.ServerSentEventGenerator,
+	userEmail string,
+) error {
+	args, err := h.service.BuildEmbeddedFreeformPanelArgs(
+		c.Request().Context(),
+		userEmail,
+		strings.TrimSpace(c.QueryParam("thread")),
+		strings.TrimSpace(c.QueryParam("run")),
+	)
+	if err != nil {
+		return err
+	}
+	return sse.PatchElementTempl(LiveTranscriptRegion(args.ThreadID, args.Transcript, freeformForkAction()))
 }
 
 func (h *Handler) patchEmbeddedChatLiveTranscript(

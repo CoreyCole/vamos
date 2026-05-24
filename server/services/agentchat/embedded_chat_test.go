@@ -374,6 +374,7 @@ func TestRenderEmbeddedChatPanelUsesFreeformRendererForPersistedFreeformWorkspac
 	for _, want := range []string{
 		"Freeform chat",
 		"/thoughts/chat/freeform/resume",
+		"/thoughts/chat/freeform/stream",
 		"creative-mode-agent/plans/2026-04-30_test-plan/plan.md?",
 		"context=chat",
 		"chat_workspace=" + workspace.ID,
@@ -383,6 +384,7 @@ func TestRenderEmbeddedChatPanelUsesFreeformRendererForPersistedFreeformWorkspac
 		}
 	}
 	for _, notWant := range []string{
+		"/agent-chat/stream",
 		"/thoughts/chat/" + workspace.ID + "/send",
 		"agent-chat-workspace-header",
 	} {

@@ -452,7 +452,7 @@ func (s *Service) BuildEmbeddedFreeformPanelArgs(
 			values.Set("run", resolvedRunID)
 		}
 		values.Set("since", "0")
-		streamURL = "/agent-chat/stream?" + values.Encode()
+		streamURL = "/thoughts/chat/freeform/stream?" + values.Encode()
 	}
 	return EmbeddedFreeformPanelArgs{
 		ThreadID:       resolvedThreadID,

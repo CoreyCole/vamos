@@ -761,6 +761,64 @@ func TestResumeEmbeddedWorkspaceThreadPatchesPanelAndURL(t *testing.T) {
 	}
 }
 
+func TestStreamEmbeddedFreeformCatchupPatchesEmbeddedPanelNotThreadPage(
+	t *testing.T,
+) {
+	t.Parallel()
+
+	service := newTestAgentChatService(t)
+	handler := NewHandler(service, nil)
+	thread := mustCreateAgentThread(
+		t,
+		service,
+		"freeform-thread-embedded-stream",
+		"user@example.com",
+		"/tmp/project",
+		"",
+	)
+	run := mustCreateAgentRun(t, service, thread.ID, "run-freeform-embedded-stream")
+	service.notifier.Notify(thread.ID, ThreadStreamSignal{Scope: PatchLiveTranscript})
+
+	reqCtx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	req := httptest.NewRequestWithContext(
+		reqCtx,
+		http.MethodGet,
+		"/thoughts/chat/freeform/stream?thread="+thread.ID+"&run="+run.ID+"&since=0",
+		http.NoBody,
+	)
+	rec := httptest.NewRecorder()
+	c := echo.New().NewContext(req, rec)
+	c.Set("user_email", "user@example.com")
+
+	done := make(chan error, 1)
+	go func() { done <- handler.StreamEmbeddedFreeform(c) }()
+	time.Sleep(25 * time.Millisecond)
+	cancel()
+
+	select {
+	case err := <-done:
+		if !isExpectedStreamCancel(err) {
+			t.Fatalf("StreamEmbeddedFreeform() error = %v", err)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("StreamEmbeddedFreeform() timed out")
+	}
+	body := rec.Body.String()
+	if !strings.Contains(body, "doc-right-chat-panel") &&
+		!strings.Contains(body, "agent-chat-live-transcript") {
+		t.Fatalf("embedded freeform stream response missing embedded patch target: %s", body)
+	}
+	for _, notWant := range []string{
+		"agent-chat-thread-sidebar",
+		"agent-chat-doc-pane",
+	} {
+		if strings.Contains(body, notWant) {
+			t.Fatalf("embedded freeform stream patched thread page target %q: %s", notWant, body)
+		}
+	}
+}
+
 func TestStreamEmbeddedWorkspaceCatchupPatchesEmbeddedPanelNotWorkspaceResource(
 	t *testing.T,
 ) {
