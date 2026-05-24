@@ -169,6 +169,54 @@ func releaseDisabledReason(action ReleaseActionView) string {
 	return "release action unavailable"
 }
 
+func workspaceQRSPIBadge(view ImplWorkspaceView) string {
+	return workspaceWorkflowStageLabel(view.Workflow)
+}
+
+func workspaceReleaseSummary(view ImplWorkspaceView) string {
+	if len(view.ReleaseActions) == 0 {
+		return "No release action"
+	}
+	for _, action := range view.ReleaseActions {
+		if !action.Disabled {
+			return releaseActionLabel(action)
+		}
+	}
+	return releaseDisabledReason(view.ReleaseActions[0])
+}
+
+func workspaceWorkflowStageLabel(summary WorkspaceWorkflowSummary) string {
+	stage := strings.TrimSpace(summary.Stage)
+	status := strings.TrimSpace(summary.Status)
+	if stage == "" && status == "" {
+		return "No plan"
+	}
+	if summary.WaitingHuman || strings.Contains(stage, "human") {
+		return "Human review"
+	}
+	if status == "done" || status == "complete" {
+		return "Done"
+	}
+	switch stage {
+	case "question", "research", "design", "design-product", "outline", "plan", "review-outline", "review-plan":
+		return "Plan"
+	case "workspace":
+		return "Workspace"
+	case "implement":
+		return "Implementing"
+	case "review-implementation":
+		return "Implementation review"
+	case "verify":
+		return "Verify"
+	case "done":
+		return "Done"
+	case "":
+		return "Unknown"
+	default:
+		return workspaceTitleCase(strings.ReplaceAll(stage, "-", " "))
+	}
+}
+
 func workspaceCanStart(snap WorkspaceLifecycleSnapshot) bool {
 	ws := snap.Workspace
 	if ws.IsMain {

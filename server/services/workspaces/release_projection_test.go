@@ -59,6 +59,54 @@ func TestReleaseProjectionMovesFeatureActionsToRows(t *testing.T) {
 	}
 }
 
+func TestReleaseProjectionGatesPromoteToStageOnWorkflowReadiness(t *testing.T) {
+	reg := testReleaseRegistry(t)
+	projector := &ReleaseProjector{Registry: reg}
+	baseViews := []ImplWorkspaceView{
+		{Runtime: snapshotFromState(Workspace{Slug: "feature-a", Commit: "feature-1"}, WorkspaceLifecycleState{})},
+		{Runtime: snapshotFromState(Workspace{Slug: "integration", Commit: "stage-1"}, WorkspaceLifecycleState{})},
+		{Runtime: snapshotFromState(Workspace{Slug: "trunk", Commit: "main-1", IsMain: true}, WorkspaceLifecycleState{})},
+	}
+
+	_, missingActions, err := projector.BuildWorkspaceProjection(context.Background(), baseViews)
+	if err != nil {
+		t.Fatalf("BuildWorkspaceProjection(missing): %v", err)
+	}
+	missing := missingActions["feature-a"][0]
+	if !missing.Disabled || missing.DisabledReason != "QRSPI human review is not ready" {
+		t.Fatalf("missing summary action = %+v", missing)
+	}
+
+	readyViews := applyOptionsToImplWorkspaceViews(baseViews, WithWorkspaceWorkflowSummaries(map[string]WorkspaceWorkflowSummary{
+		"feature-a": {Stage: "human-review", Status: "waiting_human", WaitingHuman: true},
+	}))
+	_, readyActions, err := projector.BuildWorkspaceProjection(context.Background(), readyViews)
+	if err != nil {
+		t.Fatalf("BuildWorkspaceProjection(ready): %v", err)
+	}
+	ready := readyActions["feature-a"][0]
+	if ready.Disabled {
+		t.Fatalf("human-review-ready action disabled: %+v", ready)
+	}
+}
+
+func TestWorkspaceHumanReviewReadyAcceptsDoneAndApprovedOutcomes(t *testing.T) {
+	cases := []WorkspaceWorkflowSummary{
+		{Status: "done"},
+		{Outcome: "human-approved"},
+		{Outcome: "ready-for-promotion"},
+		{Stage: "verify", WaitingHuman: true},
+	}
+	for _, tc := range cases {
+		if !workspaceHumanReviewReady(tc) {
+			t.Fatalf("workspaceHumanReviewReady(%+v) = false", tc)
+		}
+	}
+	if workspaceHumanReviewReady(WorkspaceWorkflowSummary{Stage: "implement", Status: "running"}) {
+		t.Fatal("implementing workflow unexpectedly ready")
+	}
+}
+
 func TestResolveReleaseActionFindsRowAction(t *testing.T) {
 	reg := testReleaseRegistry(t)
 	panel := ReleasePanelModel{Enabled: true}

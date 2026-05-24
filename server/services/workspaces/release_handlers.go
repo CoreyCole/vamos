@@ -131,6 +131,11 @@ func newReleaseQueueItemID() (string, error) {
 
 func (h *Handler) patchWorkspaces(c echo.Context, views []ImplWorkspaceView) error {
 	showHistorical := showHistoricalFromRequest(c.Request())
+	var err error
+	views, err = h.attachWorkflowSummaries(c.Request().Context(), views)
+	if err != nil {
+		return err
+	}
 	panel, rowActions, err := h.releaseProjectionForViews(c.Request().Context(), views)
 	if err != nil {
 		return err

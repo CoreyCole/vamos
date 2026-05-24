@@ -48,6 +48,7 @@ type Handler struct {
 	planWorkspaces       PlanWorkspaceLister
 	implWorkspaces       ImplWorkspaceLister
 	workspaceSyncRefresh WorkspaceSyncRefreshFunc
+	workflowSummaries    WorkspaceWorkflowSummaryResolver
 	refreshMu            sync.Mutex
 	refreshInFlight      bool
 	notifier             WorkspaceLifecycleNotifier
@@ -131,6 +132,12 @@ func WithImplWorkspaces(source ImplWorkspaceLister) HandlerOption {
 func WithWorkspaceSyncRefresh(refresh WorkspaceSyncRefreshFunc) HandlerOption {
 	return func(h *Handler) {
 		h.workspaceSyncRefresh = refresh
+	}
+}
+
+func WithWorkspaceWorkflowSummaryResolver(resolver WorkspaceWorkflowSummaryResolver) HandlerOption {
+	return func(h *Handler) {
+		h.workflowSummaries = resolver
 	}
 }
 
@@ -739,6 +746,10 @@ func (h *Handler) buildWorkspacesPageModel(ctx context.Context) (workspacesPageM
 	if err != nil {
 		return workspacesPageModel{}, err
 	}
+	views, err = h.attachWorkflowSummaries(ctx, views)
+	if err != nil {
+		return workspacesPageModel{}, err
+	}
 	panel, rowActions, err := h.releaseProjectionForViews(ctx, views)
 	if err != nil {
 		return workspacesPageModel{}, err
@@ -772,6 +783,55 @@ func (h *Handler) releaseProjectionForViews(ctx context.Context, views []ImplWor
 		return ReleasePanelModel{Enabled: false}, nil, nil
 	}
 	return h.releaseProjector.BuildWorkspaceProjection(ctx, views)
+}
+
+func (h *Handler) attachWorkflowSummaries(ctx context.Context, views []ImplWorkspaceView) ([]ImplWorkspaceView, error) {
+	if h.workflowSummaries == nil {
+		return views, nil
+	}
+	rows := flattenImplWorkspaceRows(views)
+	summaries, err := h.workflowSummariesForRows(ctx, rows)
+	if err != nil {
+		return nil, err
+	}
+	if len(summaries) == 0 {
+		return views, nil
+	}
+	return applyOptionsToImplWorkspaceViews(views, WithWorkspaceWorkflowSummaries(summaries)), nil
+}
+
+func (h *Handler) workflowSummariesForRows(ctx context.Context, rows []db.ImplWorkspace) (map[string]WorkspaceWorkflowSummary, error) {
+	out := make(map[string]WorkspaceWorkflowSummary)
+	if h.workflowSummaries == nil {
+		return out, nil
+	}
+	for _, row := range rows {
+		planDir := firstNonEmpty(nullStringValue(row.PlanDirRel), nullStringValue(row.PlanDir))
+		if planDir == "" || strings.TrimSpace(row.WorkspaceSlug) == "" {
+			continue
+		}
+		summary, ok, err := h.workflowSummaries.SummaryForPlanDir(ctx, planDir)
+		if err != nil {
+			return nil, err
+		}
+		if ok {
+			out[row.WorkspaceSlug] = summary
+		}
+	}
+	return out, nil
+}
+
+func flattenImplWorkspaceRows(views []ImplWorkspaceView) []db.ImplWorkspace {
+	rows := make([]db.ImplWorkspace, 0, len(views))
+	var walk func([]ImplWorkspaceView)
+	walk = func(items []ImplWorkspaceView) {
+		for _, view := range items {
+			rows = append(rows, view.Row)
+			walk(view.Children)
+		}
+	}
+	walk(views)
+	return rows
 }
 
 func snapshotsToWorkspaces(items []WorkspaceLifecycleSnapshot) []Workspace {

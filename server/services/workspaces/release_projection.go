@@ -45,6 +45,7 @@ func (p *ReleaseProjector) BuildWorkspaceProjection(ctx context.Context, views [
 		return ReleasePanelModel{Enabled: false}, nil, nil
 	}
 	workspaces := flattenImplWorkspaceViews(views)
+	workflows := workflowSummariesByWorkspaceSlug(views)
 	defs := p.Registry.Definitions()
 	if len(defs) == 0 {
 		return ReleasePanelModel{Enabled: false}, nil, nil
@@ -75,6 +76,7 @@ func (p *ReleaseProjector) BuildWorkspaceProjection(ctx context.Context, views [
 			actions := p.evaluateActions(ctx, def, lanes, ws, active)
 			for _, action := range actions {
 				if action.SourceSlug != "" {
+					action = gateWorkspaceReleaseAction(action, workflows[action.SourceSlug])
 					rowActions[action.SourceSlug] = append(rowActions[action.SourceSlug], action)
 				}
 			}
@@ -245,6 +247,42 @@ func flattenImplWorkspaceViews(views []ImplWorkspaceView) []Workspace {
 	}
 	walk(views)
 	return out
+}
+
+func workflowSummariesByWorkspaceSlug(views []ImplWorkspaceView) map[string]WorkspaceWorkflowSummary {
+	out := make(map[string]WorkspaceWorkflowSummary)
+	var walk func([]ImplWorkspaceView)
+	walk = func(items []ImplWorkspaceView) {
+		for _, view := range items {
+			if slug := workspaceViewSlug(view); slug != "" {
+				out[slug] = view.Workflow
+			}
+			walk(view.Children)
+		}
+	}
+	walk(views)
+	return out
+}
+
+func gateWorkspaceReleaseAction(action ReleaseActionView, workflow WorkspaceWorkflowSummary) ReleaseActionView {
+	if action.TargetLane != "stage" {
+		return action
+	}
+	if !workspaceHumanReviewReady(workflow) {
+		action.Disabled = true
+		action.DisabledReason = "QRSPI human review is not ready"
+	}
+	return action
+}
+
+func workspaceHumanReviewReady(workflow WorkspaceWorkflowSummary) bool {
+	stage := strings.TrimSpace(workflow.Stage)
+	status := strings.TrimSpace(workflow.Status)
+	outcome := strings.TrimSpace(workflow.Outcome)
+	if workflow.WaitingHuman && (stage == "human-review" || stage == "verify" || strings.Contains(stage, "human")) {
+		return true
+	}
+	return status == "done" || outcome == "human-approved" || outcome == "ready-for-promotion"
 }
 
 func matchReleaseLanes(def release.Definition, workspaces []Workspace) map[release.LaneID]Workspace {

@@ -234,6 +234,10 @@ type WorkspaceWorkflowSummary struct {
 	PrimaryArtifact string
 }
 
+type WorkspaceWorkflowSummaryResolver interface {
+	SummaryForPlanDir(ctx context.Context, planDir string) (WorkspaceWorkflowSummary, bool, error)
+}
+
 type RuntimeConfig struct {
 	ListenAddress    string
 	ManagerURL       string
