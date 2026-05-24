@@ -844,6 +844,237 @@ func TestHandleWorkspacesPageFollowsImplWorkspaceOrder(t *testing.T) {
 	}
 }
 
+func TestHandleWorkspacesPageHidesHistoricalRowsByDefault(t *testing.T) {
+	handler := NewHandler(
+		&fakeLifecycleManager{},
+		"https://main.cn-agents.test",
+		"main",
+		WithImplWorkspaces(fakeImplWorkspaceLister{rows: []db.ImplWorkspace{
+			{
+				WorkspaceSlug: "active",
+				CheckoutPath:  "/repo/active",
+				DisplayName:   "Active Workspace",
+				Status:        string(ImplWorkspaceStatusActive),
+			},
+			{
+				WorkspaceSlug: "merged",
+				CheckoutPath:  "/repo/merged",
+				DisplayName:   "Merged Workspace",
+				Status:        string(ImplWorkspaceStatusMerged),
+			},
+			{
+				WorkspaceSlug: "cleaned",
+				CheckoutPath:  "/repo/cleaned",
+				DisplayName:   "Cleaned Workspace",
+				Status:        string(ImplWorkspaceStatusCleanedUp),
+			},
+		}}),
+	)
+	e := echo.New()
+	req := httptest.NewRequest(http.MethodGet, "/workspaces", nil)
+	rec := httptest.NewRecorder()
+	if err := handler.HandleWorkspacesPage(e.NewContext(req, rec)); err != nil {
+		t.Fatalf("HandleWorkspacesPage() error = %v", err)
+	}
+	html := rec.Body.String()
+	for _, want := range []string{"Active Workspace", "Show historical"} {
+		if !strings.Contains(html, want) {
+			t.Fatalf("default page missing %q: %s", want, html)
+		}
+	}
+	for _, absent := range []string{"Merged Workspace", "Cleaned Workspace", "Historical workspace"} {
+		if strings.Contains(html, absent) {
+			t.Fatalf("default page unexpectedly contained %q: %s", absent, html)
+		}
+	}
+}
+
+func TestHandleWorkspacesPageShowsHistoricalRowsWhenRequested(t *testing.T) {
+	handler := NewHandler(
+		&fakeLifecycleManager{},
+		"https://main.cn-agents.test",
+		"main",
+		WithImplWorkspaces(fakeImplWorkspaceLister{rows: []db.ImplWorkspace{
+			{
+				WorkspaceSlug: "active",
+				CheckoutPath:  "/repo/active",
+				DisplayName:   "Active Workspace",
+				Status:        string(ImplWorkspaceStatusActive),
+			},
+			{
+				WorkspaceSlug: "merged",
+				CheckoutPath:  "/repo/merged",
+				DisplayName:   "Merged Workspace",
+				Status:        string(ImplWorkspaceStatusMerged),
+			},
+			{
+				WorkspaceSlug: "cleaned",
+				CheckoutPath:  "/repo/cleaned",
+				DisplayName:   "Cleaned Workspace",
+				Status:        string(ImplWorkspaceStatusCleanedUp),
+			},
+		}}),
+	)
+	e := echo.New()
+	req := httptest.NewRequest(http.MethodGet, "/workspaces?show_historical=true", nil)
+	rec := httptest.NewRecorder()
+	if err := handler.HandleWorkspacesPage(e.NewContext(req, rec)); err != nil {
+		t.Fatalf("HandleWorkspacesPage() error = %v", err)
+	}
+	html := rec.Body.String()
+	for _, want := range []string{
+		"Active Workspace",
+		"Merged Workspace",
+		"Cleaned Workspace",
+		"Historical workspace",
+		"Merged",
+		"Cleaned up",
+		"Hide historical",
+	} {
+		if !strings.Contains(html, want) {
+			t.Fatalf("historical page missing %q: %s", want, html)
+		}
+	}
+	for _, absent := range []string{
+		`action="/workspaces/merged/start"`,
+		`action="/workspaces/cleaned/start"`,
+		`action="/workspaces/merged/restart"`,
+		`action="/workspaces/cleaned/stop"`,
+	} {
+		if strings.Contains(html, absent) {
+			t.Fatalf("historical page unexpectedly contained action %q: %s", absent, html)
+		}
+	}
+}
+
+func TestHandleWorkspacesPagePromotesActiveChildUnderHiddenHistoricalParent(t *testing.T) {
+	handler := NewHandler(
+		&fakeLifecycleManager{},
+		"https://main.cn-agents.test",
+		"main",
+		WithImplWorkspaces(fakeImplWorkspaceLister{rows: []db.ImplWorkspace{
+			{
+				WorkspaceSlug: "parent",
+				CheckoutPath:  "/repo/parent",
+				DisplayName:   "Merged Parent",
+				Status:        string(ImplWorkspaceStatusMerged),
+				PlanDirRel: sql.NullString{
+					String: "creative-mode-agent/plans/parent",
+					Valid:  true,
+				},
+			},
+			{
+				WorkspaceSlug: "child",
+				CheckoutPath:  "/repo/child",
+				DisplayName:   "Active Review Child",
+				Status:        string(ImplWorkspaceStatusActive),
+				PlanDirRel: sql.NullString{
+					String: "creative-mode-agent/plans/parent/reviews/implementation-review",
+					Valid:  true,
+				},
+			},
+		}}),
+	)
+	e := echo.New()
+	req := httptest.NewRequest(http.MethodGet, "/workspaces", nil)
+	rec := httptest.NewRecorder()
+	if err := handler.HandleWorkspacesPage(e.NewContext(req, rec)); err != nil {
+		t.Fatalf("HandleWorkspacesPage() error = %v", err)
+	}
+	html := rec.Body.String()
+	if !strings.Contains(html, "Active Review Child") {
+		t.Fatalf("active child hidden with historical parent: %s", html)
+	}
+	if strings.Contains(html, "Merged Parent") || strings.Contains(html, `data-workspace-children="parent"`) {
+		t.Fatalf("historical parent still rendered in default mode: %s", html)
+	}
+}
+
+func TestHandleRefreshWorkspacesRedirectPreservesHistoricalMode(t *testing.T) {
+	handler := NewHandler(
+		&fakeLifecycleManager{},
+		"https://main.cn-agents.test",
+		"main",
+		WithWorkspaceSyncRefresh(func(context.Context) error { return nil }),
+	)
+	e := echo.New()
+	req := httptest.NewRequest(
+		http.MethodPost,
+		"/workspaces/refresh",
+		strings.NewReader("show_historical=true"),
+	)
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	rec := httptest.NewRecorder()
+	if err := handler.HandleRefreshWorkspaces(e.NewContext(req, rec)); err != nil {
+		t.Fatalf("HandleRefreshWorkspaces() error = %v", err)
+	}
+	if got := rec.Header().Get("Location"); got != "/workspaces?show_historical=true" {
+		t.Fatalf("Location = %q, want historical redirect", got)
+	}
+}
+
+func TestLifecycleActionDatastarPreservesHistoricalMode(t *testing.T) {
+	manager := &fakeLifecycleManager{snapshots: []WorkspaceLifecycleSnapshot{{
+		Workspace: Workspace{
+			Slug:         "active",
+			DisplayName:  "Active Workspace",
+			CheckoutPath: "/repo/active",
+			Status:       StatusRunning,
+		},
+		ObservedState: WorkspaceObservedRunning,
+	}}}
+	handler := NewHandler(
+		manager,
+		"https://main.cn-agents.test",
+		"main",
+		WithImplWorkspaces(fakeImplWorkspaceLister{rows: []db.ImplWorkspace{
+			{
+				WorkspaceSlug: "active",
+				CheckoutPath:  "/repo/active",
+				DisplayName:   "Active Workspace",
+				Status:        string(ImplWorkspaceStatusActive),
+			},
+			{
+				WorkspaceSlug: "merged",
+				CheckoutPath:  "/repo/merged",
+				DisplayName:   "Merged Workspace",
+				Status:        string(ImplWorkspaceStatusMerged),
+			},
+		}}),
+	)
+	e := echo.New()
+
+	for _, tc := range []struct {
+		name       string
+		body       string
+		wantMerged bool
+	}{
+		{name: "default", body: "", wantMerged: false},
+		{name: "historical", body: "show_historical=true", wantMerged: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			req := httptest.NewRequest(
+				http.MethodPost,
+				"/workspaces/active/restart",
+				strings.NewReader(tc.body),
+			)
+			req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+			req.Header.Set("Datastar-Request", "true")
+			rec := httptest.NewRecorder()
+			c := e.NewContext(req, rec)
+			c.SetParamNames("slug")
+			c.SetParamValues("active")
+			if err := handler.HandleRestart(c); err != nil {
+				t.Fatalf("HandleRestart() error = %v", err)
+			}
+			html := rec.Body.String()
+			if got := strings.Contains(html, "Merged Workspace"); got != tc.wantMerged {
+				t.Fatalf("merged visibility = %v, want %v: %s", got, tc.wantMerged, html)
+			}
+		})
+	}
+}
+
 func TestHandleRefreshWorkspacesRunsSyncBeforeManagerRefresh(t *testing.T) {
 	managerRefreshed := make(chan struct{}, 1)
 	manager := &fakeLifecycleManager{
