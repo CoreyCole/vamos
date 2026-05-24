@@ -11,9 +11,12 @@ Merge a completed `../vamos` branch into `main`, fast-forward the clean baseline
 
 - Runtime source checkout: `../vamos`.
 - Clean baseline checkout: `../vamos-main`.
-- Host working checkout: `../cn-agents` owns host changes and imports `github.com/CoreyCole/vamos` with `replace => ../vamos`.
+- Host working checkout: `../cn-agents` owns host changes.
 - Host systemd checkout: `../cn-agents-main` is the clean/browser-visible host checkout used for rebuilds and service restarts.
-- `../vamos-main` must stay clean; do not edit there.
+- Browser-visible `../cn-agents-main` imports the clean runtime baseline with `replace github.com/CoreyCole/vamos => ../vamos-main` and launches `../vamos-main/agents-server`.
+- `vamos-ts-worker` also runs from `../vamos-main`.
+- Fast-forwarding `../vamos-main` does **not** by itself update the running site. Always rebuild from `../cn-agents-main` (`just build --no-restart`) and restart systemd after syncing `../vamos-main` so Go binaries, TS worker output, Tailwind/static assets, and host wrapper all reflect the new commit.
+- `../vamos-main` must stay clean; do not edit there. Host rebuilds may generate ignored/build outputs there but must leave `git status` clean.
 - `.agents` is a committed symlink in Vamos: `.agents -> ../.agents`. Commit the symlink only, never the target files.
 - Systemd is installed/restarted only from clean `../cn-agents-main`, never from `../cn-agents` or a copied workspace.
 - Preserve commit shape; do not squash, patch-apply, or cherry-pick the runtime stack.
@@ -107,11 +110,11 @@ test "$(git rev-parse HEAD)" = "$(git -C ../vamos rev-parse HEAD)"
 git status --short
 ```
 
-Do not run builds or edits in `../vamos-main`.
+Do not edit `../vamos-main`; after host rebuilds, verify it remains clean.
 
 ## Step 6: Fast-forward ../cn-agents-main and restart host
 
-Because the host binary links against `replace github.com/CoreyCole/vamos => ../vamos`, every merged Vamos runtime change needs a host rebuild from clean `../cn-agents-main`.
+Because the browser-visible host imports and launches `../vamos-main`, every merged Vamos runtime change needs `../vamos-main` fast-forwarded first, then a host rebuild from clean `../cn-agents-main`.
 
 ```bash
 cd ../cn-agents-main
@@ -132,12 +135,16 @@ sleep 5
 systemctl --user is-active temporal-server vamos vamos-ts-worker
 systemctl --user show vamos -p WorkingDirectory --no-pager
 systemctl --user show vamos-ts-worker -p WorkingDirectory --no-pager
+pid=$(systemctl --user show vamos -p MainPID --value); readlink /proc/$pid/exe
+(cd ../vamos-main && git status --short)
 ```
 
 Expected:
 
 - `vamos` WorkingDirectory is `.../cn-agents-main`.
-- `vamos-ts-worker` WorkingDirectory is `.../vamos`.
+- `vamos-ts-worker` WorkingDirectory is `.../vamos-main`.
+- `vamos` executable is `.../vamos-main/agents-server`.
+- `../vamos-main` remains git-clean after build/restart.
 - `cn-agents.service`, `cn-agents-ts-worker.service`, and `cn-temporal.service` are inactive after cutover.
 
 ## Step 7: Verify browser-visible server
@@ -172,11 +179,30 @@ If host-only follow-up fixes were required, commit them on working `../cn-agents
 
 ## Completion response
 
-Report:
+Print this status block at the end of every successful run:
 
-- final `../vamos` branch/HEAD
-- final `../vamos-main` branch/HEAD
-- final `../cn-agents-main` branch/HEAD if rebuilt
+```bash
+printf 'Merge status (local):\n'
+for repo in ../vamos ../vamos-main ../cn-agents ../cn-agents-main; do
+  printf '%s %s %s\n' \
+    "$repo" \
+    "$(git -C "$repo" rev-parse --short HEAD)" \
+    "$(git -C "$repo" log -1 --format=%s)"
+done
+printf 'Services: '
+systemctl --user is-active temporal-server vamos vamos-ts-worker | paste -sd ' ' -
+printf 'vamos exe: '
+pid=$(systemctl --user show vamos -p MainPID --value); readlink /proc/$pid/exe
+printf 'vamos-ts-worker cwd: '
+tspid=$(systemctl --user show vamos-ts-worker -p MainPID --value); readlink /proc/$tspid/cwd
+```
+
+Then report:
+
+- final `../vamos` branch/HEAD and latest commit message
+- final `../vamos-main` branch/HEAD and latest commit message
+- final `../cn-agents` branch/HEAD and latest commit message
+- final `../cn-agents-main` branch/HEAD and latest commit message
 - systemd active states
 - verification URL/result
 - push status
