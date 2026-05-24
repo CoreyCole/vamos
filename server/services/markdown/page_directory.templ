@@ -40,38 +40,27 @@ templ DirectoryPrimaryPanel(args *DirectoryArgs) {
 			<ul class="space-y-1">
 				for _, item := range args.Items {
 					<li>
-						<form
-							method="post"
-							action={ directoryItemFormRoute(item) }
-							data-on:submit={ directoryItemFormAction(item) }
+						<a
+							href={ templ.SafeURL(DirectoryItemHref(item, args.ChatLinkState)) }
+							class="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-primary transition-colors hover:bg-accent"
 						>
 							if item.IsDir {
-								<input type="hidden" name="dir_path" value={ item.Path }/>
+								<svg class="h-5 w-5 shrink-0 text-muted-foreground" fill="currentColor" viewBox="0 0 20 20">
+									<path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z"></path>
+								</svg>
+								{ item.Name }/
 							} else {
-								<input type="hidden" name="doc_path" value={ item.Path }/>
+								<svg class="h-5 w-5 shrink-0 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+									<path
+										stroke-linecap="round"
+										stroke-linejoin="round"
+										stroke-width="2"
+										d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+									></path>
+								</svg>
+								{ item.Name }
 							}
-							<button
-								type="submit"
-								class="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-primary transition-colors hover:bg-accent"
-							>
-								if item.IsDir {
-									<svg class="h-5 w-5 shrink-0 text-muted-foreground" fill="currentColor" viewBox="0 0 20 20">
-										<path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z"></path>
-									</svg>
-									{ item.Name }/
-								} else {
-									<svg class="h-5 w-5 shrink-0 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-										<path
-											stroke-linecap="round"
-											stroke-linejoin="round"
-											stroke-width="2"
-											d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-										></path>
-									</svg>
-									{ item.Name }
-								}
-							</button>
-						</form>
+						</a>
 					</li>
 				}
 			</ul>
@@ -82,15 +71,8 @@ templ DirectoryPrimaryPanel(args *DirectoryArgs) {
 	</div>
 }
 
-func directoryItemFormRoute(item DirectoryItem) string {
-	if item.IsDir {
-		return "/thoughts/actions/select-directory"
-	}
-	return "/thoughts/actions/select-document"
-}
-
-func directoryItemFormAction(item DirectoryItem) string {
-	return "@post('" + directoryItemFormRoute(item) + "', {contentType: 'form'})"
+func DirectoryItemHref(item DirectoryItem, chat EmbeddedChatLinkState) string {
+	return ThoughtsHrefWithChat(item.Path, item.IsDir, chat)
 }
 
 templ EmptyDirectoryContextPanel() {

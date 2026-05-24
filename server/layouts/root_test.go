@@ -40,6 +40,54 @@ func TestHeaderVisibleNavIsMinimal(t *testing.T) {
 	}
 }
 
+func TestBuildBreadcrumbsFromPathLinksThoughtsParentsAndCurrent(t *testing.T) {
+	t.Parallel()
+
+	crumbs := buildBreadcrumbsFromPath("owner/plans/demo/outline.md", PageTypeMarkdown, BreadcrumbLinkState{})
+	want := []struct {
+		label string
+		href  string
+	}{
+		{label: "Thoughts", href: "/thoughts/"},
+		{label: "Owner", href: "/thoughts/owner"},
+		{label: "Plans", href: "/thoughts/owner/plans"},
+		{label: "Demo", href: "/thoughts/owner/plans/demo"},
+		{label: "Outline", href: ""},
+	}
+	if got, wantLen := len(crumbs), len(want); got != wantLen {
+		t.Fatalf("crumbs len = %d, want %d: %#v", got, wantLen, crumbs)
+	}
+	for i, wantCrumb := range want {
+		if crumbs[i].Label != wantCrumb.label || crumbs[i].Href != wantCrumb.href {
+			t.Fatalf("crumb[%d] = %#v, want label %q href %q", i, crumbs[i], wantCrumb.label, wantCrumb.href)
+		}
+	}
+}
+
+func TestBuildBreadcrumbsFromPathPreservesChatQuery(t *testing.T) {
+	t.Parallel()
+
+	crumbs := buildBreadcrumbsFromPath("owner/plans/demo/outline.md", PageTypeMarkdown, BreadcrumbLinkState{
+		Active:      true,
+		WorkspaceID: "ws 1",
+		ThreadID:    "th/1",
+		RunID:       "run+1",
+	})
+	if len(crumbs) < 2 {
+		t.Fatalf("crumbs len = %d, want at least 2", len(crumbs))
+	}
+	for _, crumb := range crumbs[:len(crumbs)-1] {
+		for _, want := range []string{"context=chat", "chat_workspace=ws+1", "thread=th%2F1", "run=run%2B1"} {
+			if !strings.Contains(crumb.Href, want) {
+				t.Fatalf("crumb href missing %q: %#v", want, crumb)
+			}
+		}
+	}
+	if got := crumbs[len(crumbs)-1].Href; got != "" {
+		t.Fatalf("current crumb href = %q, want empty", got)
+	}
+}
+
 func TestHeaderBreadcrumbsAlignAfterThoughts(t *testing.T) {
 	t.Parallel()
 

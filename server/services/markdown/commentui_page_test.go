@@ -263,7 +263,7 @@ func TestMarkdownPageHidesWorkspaceOwnershipText(t *testing.T) {
 }
 
 //nolint:paralleltest // templ component rendering uses shared Tailwind merge state in tests.
-func TestDirectoryWorkbenchPageRendersSharedSidebarAndSelectionForms(t *testing.T) {
+func TestDirectoryWorkbenchPageRendersSharedSidebarAndDirectoryAnchors(t *testing.T) {
 	args := &DirectoryArgs{
 		Path:      "thoughts/creative-mode-agent/plans",
 		UserEmail: "user@example.com",
@@ -346,14 +346,7 @@ func TestDirectoryWorkbenchPageRendersSharedSidebarAndSelectionForms(t *testing.
 		`id="thoughts-directory-scroll-region"`,
 		`Files`,
 		`Workspaces`,
-		`action="/thoughts/actions/select-directory"`,
-		`data-on:submit="@post(&#39;/thoughts/actions/select-directory&#39;, {contentType: &#39;form&#39;})"`,
-		`name="dir_path"`,
-		`value="creative-mode-agent/plans/plan-a/"`,
-		`action="/thoughts/actions/select-document"`,
-		`data-on:submit="@post(&#39;/thoughts/actions/select-document&#39;, {contentType: &#39;form&#39;})"`,
-		`name="doc_path"`,
-		`value="creative-mode-agent/plans/plan-a/design.md"`,
+		`href="/thoughts/creative-mode-agent/plans/plan-a"`,
 		`href="/thoughts/creative-mode-agent/plans/plan-a/design.md"`,
 	} {
 		if !strings.Contains(html, want) {
@@ -361,6 +354,12 @@ func TestDirectoryWorkbenchPageRendersSharedSidebarAndSelectionForms(t *testing.
 		}
 	}
 	for _, unwanted := range []string{
+		`action="/thoughts/actions/select-directory"`,
+		`data-on:submit="@post(&#39;/thoughts/actions/select-directory&#39;, {contentType: &#39;form&#39;})"`,
+		`name="dir_path"`,
+		`action="/thoughts/actions/select-document"`,
+		`data-on:submit="@post(&#39;/thoughts/actions/select-document&#39;, {contentType: &#39;form&#39;})"`,
+		`name="doc_path"`,
 		`$sidebarActiveTab = &#39;document&#39;`,
 		`$sidebarActiveTab = 'document'`,
 		`mx-auto max-w-4xl rounded-lg border border-border bg-card`,

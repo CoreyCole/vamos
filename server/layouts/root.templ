@@ -2,6 +2,7 @@ package layouts
 
 import (
 	"fmt"
+	"net/url"
 	"path/filepath"
 	"strings"
 
@@ -12,19 +13,27 @@ import (
 	"github.com/CoreyCole/vamos/server/components/syntaxthemeselector"
 )
 
+type BreadcrumbLinkState struct {
+	Active      bool
+	WorkspaceID string
+	ThreadID    string
+	RunID       string
+}
+
 type RootArgs struct {
-	Title                string
-	CurrentPath          string
-	PageType             PageType        // Type-safe page category
-	ShowHeader           bool            // Allow hiding for special pages
-	UserEmail            string          // User email for profile display (optional)
-	CurrentTheme         string          // "dark" or "light" - from user preferences
-	CurrentSyntaxTheme   string          // Current syntax theme name
-	ClipboardContent     string          // Base64-encoded content for clipboard button
-	AvatarMenuExtra      templ.Component // Page-specific content rendered in the avatar dropdown
-	Workspaces           []WorkspaceNavItem
-	CurrentWorkspaceSlug string
-	WorkspaceManagerURL  string
+	Title                   string
+	CurrentPath             string
+	PageType                PageType        // Type-safe page category
+	ShowHeader              bool            // Allow hiding for special pages
+	UserEmail               string          // User email for profile display (optional)
+	CurrentTheme            string          // "dark" or "light" - from user preferences
+	CurrentSyntaxTheme      string          // Current syntax theme name
+	ClipboardContent        string          // Base64-encoded content for clipboard button
+	AvatarMenuExtra         templ.Component // Page-specific content rendered in the avatar dropdown
+	Workspaces              []WorkspaceNavItem
+	CurrentWorkspaceSlug    string
+	WorkspaceManagerURL     string
+	BreadcrumbChatLinkState BreadcrumbLinkState
 }
 
 type WorkspaceNavItem struct {
@@ -280,7 +289,7 @@ templ Header(args RootArgs) {
 			<div class="h-14 flex flex-row items-center justify-between gap-3 px-4 md:px-10">
 				<!-- Left side: Logo/Branding, visible product navigation, and Breadcrumbs -->
 				{{ visibleNavItems := headerVisibleNavItems() }}
-				{{ crumbs := buildBreadcrumbsFromPath(args.CurrentPath, args.PageType) }}
+				{{ crumbs := buildBreadcrumbsFromPath(args.CurrentPath, args.PageType, args.BreadcrumbChatLinkState) }}
 				<div class="flex min-w-0 flex-1 flex-row items-center gap-3">
 					@HeaderBrand(args)
 					@HeaderVisibleProductNav(args, visibleNavItems)
@@ -473,48 +482,80 @@ templ HeaderProductNavItem(args RootArgs, item headerNavItem) {
 	</a>
 }
 
-// buildBreadcrumbsFromPath creates breadcrumb items from a file path and page type
-func buildBreadcrumbsFromPath(path string, pageType PageType) []breadcrumb.BreadcrumbItemData {
-	if path == "" {
-		return nil
-	}
-
-	// Remove leading slash and common prefixes
-	cleaned := strings.TrimPrefix(path, "/")
-	cleaned = strings.TrimPrefix(cleaned, "thoughts/")
-	cleaned = strings.TrimSuffix(cleaned, ".md")
-
+// buildBreadcrumbsFromPath creates breadcrumb items from a file path and page type.
+func buildBreadcrumbsFromPath(rawPath string, pageType PageType, chat BreadcrumbLinkState) []breadcrumb.BreadcrumbItemData {
+	cleaned := cleanThoughtsBreadcrumbPath(rawPath)
 	if cleaned == "" {
 		return nil
 	}
 
-	// Split path into parts
 	parts := strings.Split(cleaned, "/")
-	if len(parts) == 0 {
-		return nil
-	}
-
-	// Build breadcrumb items
-	items := make([]breadcrumb.BreadcrumbItemData, 0, len(parts))
-	currentPath := "/thoughts"
-
-	for i, part := range parts {
-		currentPath = currentPath + "/" + part
+	items := make([]breadcrumb.BreadcrumbItemData, 0, len(parts)+1)
+	items = append(items, breadcrumb.BreadcrumbItemData{
+		Label: "Thoughts",
+		Href:  breadcrumbPreserveChat("/thoughts/", chat),
+	})
+	for i := range parts {
 		isLast := i == len(parts)-1
-
-		// For the last item, don't include href (it's the current page)
-		href := currentPath
-		if isLast {
-			href = "" // Empty href means current page
+		href := ""
+		if !isLast {
+			href = thoughtsBreadcrumbHref(cleaned, parts, i, pageType, chat)
 		}
-
 		items = append(items, breadcrumb.BreadcrumbItemData{
 			Label: formatBreadcrumbLabelForPathPart(parts, i),
 			Href:  href,
 		})
 	}
-
 	return items
+}
+
+func cleanThoughtsBreadcrumbPath(rawPath string) string {
+	cleaned := strings.TrimSpace(rawPath)
+	cleaned = strings.TrimPrefix(cleaned, "/")
+	cleaned = strings.TrimPrefix(cleaned, "thoughts/")
+	cleaned = strings.Trim(cleaned, "/")
+	cleaned = strings.TrimSuffix(cleaned, ".md")
+	return cleaned
+}
+
+func thoughtsBreadcrumbHref(
+	currentPath string,
+	parts []string,
+	index int,
+	pageType PageType,
+	chat BreadcrumbLinkState,
+) string {
+	_ = currentPath
+	_ = pageType
+	if index < 0 || index >= len(parts) {
+		return breadcrumbPreserveChat("/thoughts/", chat)
+	}
+	joined := strings.Join(parts[:index+1], "/")
+	if strings.TrimSpace(joined) == "" {
+		return breadcrumbPreserveChat("/thoughts/", chat)
+	}
+	return breadcrumbPreserveChat("/thoughts/"+joined, chat)
+}
+
+func breadcrumbPreserveChat(href string, chat BreadcrumbLinkState) string {
+	if !chat.Active {
+		return href
+	}
+	values := []string{"context=chat"}
+	if strings.TrimSpace(chat.WorkspaceID) != "" {
+		values = append(values, "chat_workspace="+url.QueryEscape(strings.TrimSpace(chat.WorkspaceID)))
+	}
+	if strings.TrimSpace(chat.ThreadID) != "" {
+		values = append(values, "thread="+url.QueryEscape(strings.TrimSpace(chat.ThreadID)))
+	}
+	if strings.TrimSpace(chat.RunID) != "" {
+		values = append(values, "run="+url.QueryEscape(strings.TrimSpace(chat.RunID)))
+	}
+	sep := "?"
+	if strings.Contains(href, "?") {
+		sep = "&"
+	}
+	return href + sep + strings.Join(values, "&")
 }
 
 func formatBreadcrumbLabelForPathPart(parts []string, index int) string {

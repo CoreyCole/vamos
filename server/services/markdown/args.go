@@ -198,6 +198,12 @@ func (args *PageArgs) BuildRootArgs() layouts.RootArgs {
 		CurrentTheme:       args.CurrentTheme,
 		CurrentSyntaxTheme: args.CurrentSyntaxTheme,
 		ClipboardContent:   args.ViewerArgs.RawMarkdown,
+		BreadcrumbChatLinkState: layouts.BreadcrumbLinkState{
+			Active:      args.ChatLinkState.Active,
+			WorkspaceID: args.ChatLinkState.WorkspaceID,
+			ThreadID:    args.ChatLinkState.ThreadID,
+			RunID:       args.ChatLinkState.RunID,
+		},
 	}
 }
 
@@ -216,6 +222,12 @@ func (args *DirectoryArgs) BuildRootArgs() layouts.RootArgs {
 		UserEmail:          args.UserEmail,
 		CurrentTheme:       args.CurrentTheme,
 		CurrentSyntaxTheme: args.CurrentSyntaxTheme,
+		BreadcrumbChatLinkState: layouts.BreadcrumbLinkState{
+			Active:      args.ChatLinkState.Active,
+			WorkspaceID: args.ChatLinkState.WorkspaceID,
+			ThreadID:    args.ChatLinkState.ThreadID,
+			RunID:       args.ChatLinkState.RunID,
+		},
 	}
 }
 

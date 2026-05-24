@@ -10,6 +10,7 @@ import templruntime "github.com/a-h/templ/runtime"
 
 import (
 	"fmt"
+	"net/url"
 	"path/filepath"
 	"strings"
 
@@ -20,19 +21,27 @@ import (
 	"github.com/CoreyCole/vamos/server/components/syntaxthemeselector"
 )
 
+type BreadcrumbLinkState struct {
+	Active      bool
+	WorkspaceID string
+	ThreadID    string
+	RunID       string
+}
+
 type RootArgs struct {
-	Title                string
-	CurrentPath          string
-	PageType             PageType        // Type-safe page category
-	ShowHeader           bool            // Allow hiding for special pages
-	UserEmail            string          // User email for profile display (optional)
-	CurrentTheme         string          // "dark" or "light" - from user preferences
-	CurrentSyntaxTheme   string          // Current syntax theme name
-	ClipboardContent     string          // Base64-encoded content for clipboard button
-	AvatarMenuExtra      templ.Component // Page-specific content rendered in the avatar dropdown
-	Workspaces           []WorkspaceNavItem
-	CurrentWorkspaceSlug string
-	WorkspaceManagerURL  string
+	Title                   string
+	CurrentPath             string
+	PageType                PageType        // Type-safe page category
+	ShowHeader              bool            // Allow hiding for special pages
+	UserEmail               string          // User email for profile display (optional)
+	CurrentTheme            string          // "dark" or "light" - from user preferences
+	CurrentSyntaxTheme      string          // Current syntax theme name
+	ClipboardContent        string          // Base64-encoded content for clipboard button
+	AvatarMenuExtra         templ.Component // Page-specific content rendered in the avatar dropdown
+	Workspaces              []WorkspaceNavItem
+	CurrentWorkspaceSlug    string
+	WorkspaceManagerURL     string
+	BreadcrumbChatLinkState BreadcrumbLinkState
 }
 
 type WorkspaceNavItem struct {
@@ -208,7 +217,7 @@ func Root(args RootArgs) templ.Component {
 		var templ_7745c5c3_Var4 string
 		templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.JoinStringErrs(args.Title)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/layouts/root.templ`, Line: 162, Col: 22}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/layouts/root.templ`, Line: 171, Col: 22}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var4))
 		if templ_7745c5c3_Err != nil {
@@ -221,7 +230,7 @@ func Root(args RootArgs) templ.Component {
 		var templ_7745c5c3_Var5 templ.SafeURL
 		templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.JoinURLErrs(cssFile)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/layouts/root.templ`, Line: 179, Col: 40}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/layouts/root.templ`, Line: 188, Col: 40}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var5))
 		if templ_7745c5c3_Err != nil {
@@ -239,7 +248,7 @@ func Root(args RootArgs) templ.Component {
 			var templ_7745c5c3_Var6 templ.SafeURL
 			templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.JoinURLErrs("/css/syntax-" + args.CurrentSyntaxTheme + ".css")
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/layouts/root.templ`, Line: 182, Col: 101}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/layouts/root.templ`, Line: 191, Col: 101}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var6))
 			if templ_7745c5c3_Err != nil {
@@ -262,7 +271,7 @@ func Root(args RootArgs) templ.Component {
 		var templ_7745c5c3_Var7 string
 		templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf(`{"theme": "%s", "_datastarInspectorEnabled": false}`, theme))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/layouts/root.templ`, Line: 260, Col: 170}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/layouts/root.templ`, Line: 269, Col: 170}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var7))
 		if templ_7745c5c3_Err != nil {
@@ -320,7 +329,7 @@ func Header(args RootArgs) templ.Component {
 			return templ_7745c5c3_Err
 		}
 		visibleNavItems := headerVisibleNavItems()
-		crumbs := buildBreadcrumbsFromPath(args.CurrentPath, args.PageType)
+		crumbs := buildBreadcrumbsFromPath(args.CurrentPath, args.PageType, args.BreadcrumbChatLinkState)
 		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 14, "<div class=\"flex min-w-0 flex-1 flex-row items-center gap-3\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
@@ -434,7 +443,7 @@ func HeaderAvatarMenu(args RootArgs, githubURL string, workspaceItems []Workspac
 					var templ_7745c5c3_Var13 string
 					templ_7745c5c3_Var13, templ_7745c5c3_Err = templ.JoinStringErrs(avatarhelpers.GetInitials(avatarhelpers.GetEmailBasename(args.UserEmail)))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/layouts/root.templ`, Line: 311, Col: 115}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/layouts/root.templ`, Line: 320, Col: 115}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var13))
 					if templ_7745c5c3_Err != nil {
@@ -487,7 +496,7 @@ func HeaderAvatarMenu(args RootArgs, githubURL string, workspaceItems []Workspac
 					var templ_7745c5c3_Var16 string
 					templ_7745c5c3_Var16, templ_7745c5c3_Err = templ.JoinStringErrs(args.UserEmail)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/layouts/root.templ`, Line: 316, Col: 20}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/layouts/root.templ`, Line: 325, Col: 20}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var16))
 					if templ_7745c5c3_Err != nil {
@@ -551,7 +560,7 @@ func HeaderAvatarMenu(args RootArgs, githubURL string, workspaceItems []Workspac
 							var templ_7745c5c3_Var19 templ.SafeURL
 							templ_7745c5c3_Var19, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(ws.URL))
 							if templ_7745c5c3_Err != nil {
-								return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/layouts/root.templ`, Line: 327, Col: 35}
+								return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/layouts/root.templ`, Line: 336, Col: 35}
 							}
 							_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var19))
 							if templ_7745c5c3_Err != nil {
@@ -577,7 +586,7 @@ func HeaderAvatarMenu(args RootArgs, githubURL string, workspaceItems []Workspac
 							var templ_7745c5c3_Var21 string
 							templ_7745c5c3_Var21, templ_7745c5c3_Err = templ.JoinStringErrs(ws.Label)
 							if templ_7745c5c3_Err != nil {
-								return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/layouts/root.templ`, Line: 333, Col: 23}
+								return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/layouts/root.templ`, Line: 342, Col: 23}
 							}
 							_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var21))
 							if templ_7745c5c3_Err != nil {
@@ -614,7 +623,7 @@ func HeaderAvatarMenu(args RootArgs, githubURL string, workspaceItems []Workspac
 					var templ_7745c5c3_Var22 templ.SafeURL
 					templ_7745c5c3_Var22, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(workspaceManager + "/workspaces"))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/layouts/root.templ`, Line: 341, Col: 61}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/layouts/root.templ`, Line: 350, Col: 61}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var22))
 					if templ_7745c5c3_Err != nil {
@@ -802,7 +811,7 @@ func HeaderAvatarNavLink(dropdownID string, href string, label string, active bo
 		var templ_7745c5c3_Var26 templ.SafeURL
 		templ_7745c5c3_Var26, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(href))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/layouts/root.templ`, Line: 384, Col: 28}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/layouts/root.templ`, Line: 393, Col: 28}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var26))
 		if templ_7745c5c3_Err != nil {
@@ -815,7 +824,7 @@ func HeaderAvatarNavLink(dropdownID string, href string, label string, active bo
 		var templ_7745c5c3_Var27 string
 		templ_7745c5c3_Var27, templ_7745c5c3_Err = templ.JoinStringErrs("$" + dropdownID + ".open = false")
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/layouts/root.templ`, Line: 385, Col: 52}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/layouts/root.templ`, Line: 394, Col: 52}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var27))
 		if templ_7745c5c3_Err != nil {
@@ -841,7 +850,7 @@ func HeaderAvatarNavLink(dropdownID string, href string, label string, active bo
 		var templ_7745c5c3_Var29 string
 		templ_7745c5c3_Var29, templ_7745c5c3_Err = templ.JoinStringErrs(label)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/layouts/root.templ`, Line: 392, Col: 9}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/layouts/root.templ`, Line: 401, Col: 9}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var29))
 		if templ_7745c5c3_Err != nil {
@@ -883,7 +892,7 @@ func HeaderAvatarPersistedThemeAction(dropdownID string) templ.Component {
 		var templ_7745c5c3_Var31 string
 		templ_7745c5c3_Var31, templ_7745c5c3_Err = templ.JoinStringErrs("$theme = $theme === 'dark' ? 'light' : 'dark'; document.documentElement.classList.toggle('dark', $theme === 'dark'); localStorage.setItem('theme', $theme); @post('/api/theme'); $" + dropdownID + ".open = false")
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/layouts/root.templ`, Line: 398, Col: 229}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/layouts/root.templ`, Line: 407, Col: 229}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var31))
 		if templ_7745c5c3_Err != nil {
@@ -925,7 +934,7 @@ func HeaderAvatarDatastarInspectorAction(dropdownID string) templ.Component {
 		var templ_7745c5c3_Var33 string
 		templ_7745c5c3_Var33, templ_7745c5c3_Err = templ.JoinStringErrs("$_datastarInspectorEnabled = !$_datastarInspectorEnabled; $" + dropdownID + ".open = false")
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/layouts/root.templ`, Line: 410, Col: 110}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/layouts/root.templ`, Line: 419, Col: 110}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var33))
 		if templ_7745c5c3_Err != nil {
@@ -967,7 +976,7 @@ func HeaderAvatarCopyAction(dropdownID string, clipboardContent string) templ.Co
 		var templ_7745c5c3_Var35 string
 		templ_7745c5c3_Var35, templ_7745c5c3_Err = templ.JoinStringErrs(clipboardContent)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/layouts/root.templ`, Line: 421, Col: 59}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/layouts/root.templ`, Line: 430, Col: 59}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var35))
 		if templ_7745c5c3_Err != nil {
@@ -980,7 +989,7 @@ func HeaderAvatarCopyAction(dropdownID string, clipboardContent string) templ.Co
 		var templ_7745c5c3_Var36 string
 		templ_7745c5c3_Var36, templ_7745c5c3_Err = templ.JoinStringErrs("navigator.clipboard.writeText(document.getElementById('clipboard-content-avatar').content.textContent); $" + dropdownID + ".open = false")
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/layouts/root.templ`, Line: 423, Col: 156}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/layouts/root.templ`, Line: 432, Col: 156}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var36))
 		if templ_7745c5c3_Err != nil {
@@ -1022,7 +1031,7 @@ func HeaderAvatarGitHubLink(dropdownID string, githubURL string) templ.Component
 		var templ_7745c5c3_Var38 templ.SafeURL
 		templ_7745c5c3_Var38, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(githubURL))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/layouts/root.templ`, Line: 435, Col: 33}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/layouts/root.templ`, Line: 444, Col: 33}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var38))
 		if templ_7745c5c3_Err != nil {
@@ -1035,7 +1044,7 @@ func HeaderAvatarGitHubLink(dropdownID string, githubURL string) templ.Component
 		var templ_7745c5c3_Var39 string
 		templ_7745c5c3_Var39, templ_7745c5c3_Err = templ.JoinStringErrs("$" + dropdownID + ".open = false")
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/layouts/root.templ`, Line: 438, Col: 52}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/layouts/root.templ`, Line: 447, Col: 52}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var39))
 		if templ_7745c5c3_Err != nil {
@@ -1077,7 +1086,7 @@ func HeaderBrand(args RootArgs) templ.Component {
 		var templ_7745c5c3_Var41 string
 		templ_7745c5c3_Var41, templ_7745c5c3_Err = templ.JoinStringErrs(AppName())
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/layouts/root.templ`, Line: 450, Col: 57}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/layouts/root.templ`, Line: 459, Col: 57}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var41))
 		if templ_7745c5c3_Err != nil {
@@ -1180,7 +1189,7 @@ func HeaderProductNavItem(args RootArgs, item headerNavItem) templ.Component {
 		var templ_7745c5c3_Var46 templ.SafeURL
 		templ_7745c5c3_Var46, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(item.Href))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/layouts/root.templ`, Line: 470, Col: 33}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/layouts/root.templ`, Line: 479, Col: 33}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var46))
 		if templ_7745c5c3_Err != nil {
@@ -1193,7 +1202,7 @@ func HeaderProductNavItem(args RootArgs, item headerNavItem) templ.Component {
 		var templ_7745c5c3_Var47 string
 		templ_7745c5c3_Var47, templ_7745c5c3_Err = templ.JoinStringErrs(item.Label)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/layouts/root.templ`, Line: 472, Col: 14}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/layouts/root.templ`, Line: 481, Col: 14}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var47))
 		if templ_7745c5c3_Err != nil {
@@ -1207,48 +1216,80 @@ func HeaderProductNavItem(args RootArgs, item headerNavItem) templ.Component {
 	})
 }
 
-// buildBreadcrumbsFromPath creates breadcrumb items from a file path and page type
-func buildBreadcrumbsFromPath(path string, pageType PageType) []breadcrumb.BreadcrumbItemData {
-	if path == "" {
-		return nil
-	}
-
-	// Remove leading slash and common prefixes
-	cleaned := strings.TrimPrefix(path, "/")
-	cleaned = strings.TrimPrefix(cleaned, "thoughts/")
-	cleaned = strings.TrimSuffix(cleaned, ".md")
-
+// buildBreadcrumbsFromPath creates breadcrumb items from a file path and page type.
+func buildBreadcrumbsFromPath(rawPath string, pageType PageType, chat BreadcrumbLinkState) []breadcrumb.BreadcrumbItemData {
+	cleaned := cleanThoughtsBreadcrumbPath(rawPath)
 	if cleaned == "" {
 		return nil
 	}
 
-	// Split path into parts
 	parts := strings.Split(cleaned, "/")
-	if len(parts) == 0 {
-		return nil
-	}
-
-	// Build breadcrumb items
-	items := make([]breadcrumb.BreadcrumbItemData, 0, len(parts))
-	currentPath := "/thoughts"
-
-	for i, part := range parts {
-		currentPath = currentPath + "/" + part
+	items := make([]breadcrumb.BreadcrumbItemData, 0, len(parts)+1)
+	items = append(items, breadcrumb.BreadcrumbItemData{
+		Label: "Thoughts",
+		Href:  breadcrumbPreserveChat("/thoughts/", chat),
+	})
+	for i := range parts {
 		isLast := i == len(parts)-1
-
-		// For the last item, don't include href (it's the current page)
-		href := currentPath
-		if isLast {
-			href = "" // Empty href means current page
+		href := ""
+		if !isLast {
+			href = thoughtsBreadcrumbHref(cleaned, parts, i, pageType, chat)
 		}
-
 		items = append(items, breadcrumb.BreadcrumbItemData{
 			Label: formatBreadcrumbLabelForPathPart(parts, i),
 			Href:  href,
 		})
 	}
-
 	return items
+}
+
+func cleanThoughtsBreadcrumbPath(rawPath string) string {
+	cleaned := strings.TrimSpace(rawPath)
+	cleaned = strings.TrimPrefix(cleaned, "/")
+	cleaned = strings.TrimPrefix(cleaned, "thoughts/")
+	cleaned = strings.Trim(cleaned, "/")
+	cleaned = strings.TrimSuffix(cleaned, ".md")
+	return cleaned
+}
+
+func thoughtsBreadcrumbHref(
+	currentPath string,
+	parts []string,
+	index int,
+	pageType PageType,
+	chat BreadcrumbLinkState,
+) string {
+	_ = currentPath
+	_ = pageType
+	if index < 0 || index >= len(parts) {
+		return breadcrumbPreserveChat("/thoughts/", chat)
+	}
+	joined := strings.Join(parts[:index+1], "/")
+	if strings.TrimSpace(joined) == "" {
+		return breadcrumbPreserveChat("/thoughts/", chat)
+	}
+	return breadcrumbPreserveChat("/thoughts/"+joined, chat)
+}
+
+func breadcrumbPreserveChat(href string, chat BreadcrumbLinkState) string {
+	if !chat.Active {
+		return href
+	}
+	values := []string{"context=chat"}
+	if strings.TrimSpace(chat.WorkspaceID) != "" {
+		values = append(values, "chat_workspace="+url.QueryEscape(strings.TrimSpace(chat.WorkspaceID)))
+	}
+	if strings.TrimSpace(chat.ThreadID) != "" {
+		values = append(values, "thread="+url.QueryEscape(strings.TrimSpace(chat.ThreadID)))
+	}
+	if strings.TrimSpace(chat.RunID) != "" {
+		values = append(values, "run="+url.QueryEscape(strings.TrimSpace(chat.RunID)))
+	}
+	sep := "?"
+	if strings.Contains(href, "?") {
+		sep = "&"
+	}
+	return href + sep + strings.Join(values, "&")
 }
 
 func formatBreadcrumbLabelForPathPart(parts []string, index int) string {
