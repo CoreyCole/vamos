@@ -172,7 +172,7 @@ func TestImplWorkspaceSyncerRepairsStaleWorkspaceEnv(t *testing.T) {
 	if err := WriteMetadata(WorkspaceMetadataPath(checkout), WorkspaceMetadata{
 		Slug:         "wrong",
 		CheckoutPath: filepath.Join(parent, "wrong"),
-		ManagerURL:   "https://old.example.test",
+		ManagerURL:   "https://work.example.test",
 		RestartToken: "old-token",
 		PID:          123,
 		Port:         456,

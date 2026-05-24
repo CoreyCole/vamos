@@ -1602,6 +1602,61 @@ func TestHandleRefreshWorkspacesRecordsResultAndNotifies(t *testing.T) {
 	}
 }
 
+func TestHandleRefreshWorkspacesPatchesAfterManagerRefreshAndTerminalAdoption(t *testing.T) {
+	managerRefreshes := 0
+	manager := &fakeLifecycleManager{beforeRefresh: func() { managerRefreshes++ }}
+	handler := NewHandler(
+		manager,
+		"https://main.cn-agents.test",
+		"main",
+		WithImplWorkspaces(fakeImplWorkspaceLister{rows: []db.ImplWorkspace{{
+			WorkspaceSlug: "adopted-workspace",
+			CheckoutPath:  "/repo/adopted-workspace",
+			DisplayName:   "Adopted Workspace",
+			Status:        string(ImplWorkspaceStatusActive),
+		}}}),
+		WithWorkspaceSyncRefresh(func(context.Context) (WorkspaceSyncRefreshResult, error) {
+			return WorkspaceSyncRefreshResult{ImplUpserted: 1, ImplRepairedEnv: 1, Changed: true}, nil
+		}),
+		WithWorkspaceSyncCompletion(func(ctx context.Context, result WorkspaceSyncRefreshResult, err error) WorkspaceSyncRefreshResult {
+			if err != nil {
+				return result
+			}
+			_ = manager.Refresh(ctx)
+			result.ImportedPiSessions = 1
+			result.AdoptedQRSPIWorkspaces = 1
+			result.Changed = true
+			return result
+		}),
+	)
+	e := echo.New()
+	refreshReq := httptest.NewRequest(http.MethodPost, "/workspaces/refresh", nil)
+	refreshReq.Header.Set("Datastar-Request", "true")
+	refreshRec := httptest.NewRecorder()
+	if err := handler.HandleRefreshWorkspaces(e.NewContext(refreshReq, refreshRec)); err != nil {
+		t.Fatalf("HandleRefreshWorkspaces() error = %v", err)
+	}
+	if !strings.Contains(refreshRec.Body.String(), "Refreshing workspace registry") {
+		t.Fatalf("Datastar start patch missing refreshing state: %s", refreshRec.Body.String())
+	}
+	waitForRefreshDone(t, handler)
+	if managerRefreshes != 1 {
+		t.Fatalf("manager refreshes = %d, want 1", managerRefreshes)
+	}
+
+	pageReq := httptest.NewRequest(http.MethodGet, "/workspaces", nil)
+	pageRec := httptest.NewRecorder()
+	if err := handler.HandleWorkspacesPage(e.NewContext(pageReq, pageRec)); err != nil {
+		t.Fatalf("HandleWorkspacesPage() error = %v", err)
+	}
+	html := pageRec.Body.String()
+	for _, want := range []string{"Adopted Workspace", "env repaired 1", "terminal imported 1", "QRSPI adopted 1"} {
+		if !strings.Contains(html, want) {
+			t.Fatalf("page missing %q after refresh completion: %s", want, html)
+		}
+	}
+}
+
 func TestHandleRefreshWorkspacesDatastarShowsInFlightStatus(t *testing.T) {
 	releaseSync := make(chan struct{})
 	handler := NewHandler(

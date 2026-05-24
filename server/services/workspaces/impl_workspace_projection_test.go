@@ -131,6 +131,55 @@ func TestBuildImplWorkspaceViewsSynthesizesStoppedRuntimeFromImplRow(t *testing.
 	}
 }
 
+func TestBuildImplWorkspaceViewsKeepsActiveRowVisibleWithoutRuntime(t *testing.T) {
+	rows := []db.ImplWorkspace{{
+		WorkspaceSlug: "2026-05-24-01-04-46-page-reload-ux",
+		CheckoutPath:  "/tmp/vamos-2026-05-24_01-04-46_page-reload-ux",
+		DisplayName:   "Page reload UX",
+		Status:        string(ImplWorkspaceStatusActive),
+	}}
+
+	got := BuildImplWorkspaceViews(rows, nil, WorkspaceLifecycleSnapshot{})
+	if len(got) != 1 {
+		t.Fatalf("len(got) = %d, want active row visible: %+v", len(got), got)
+	}
+	view := got[0]
+	if view.HasRuntime {
+		t.Fatalf("HasRuntime = true, want DB-only projection")
+	}
+	if view.Runtime.Workspace.Status != StatusStopped ||
+		view.Runtime.Workspace.Slug != rows[0].WorkspaceSlug ||
+		view.Runtime.Workspace.CheckoutPath != rows[0].CheckoutPath {
+		t.Fatalf("synthesized runtime = %+v", view.Runtime.Workspace)
+	}
+}
+
+func TestBuildImplWorkspaceViewsKeepsActiveRowVisibleWithCrashedRuntime(t *testing.T) {
+	rows := []db.ImplWorkspace{{
+		WorkspaceSlug: "feature",
+		CheckoutPath:  "/repo/cn-agents-feature",
+		DisplayName:   "Feature row",
+		Status:        string(ImplWorkspaceStatusActive),
+	}}
+	runtime := []WorkspaceLifecycleSnapshot{snapshotFromState(Workspace{
+		Slug:         "feature",
+		DisplayName:  "Feature runtime",
+		CheckoutPath: "/repo/cn-agents-feature",
+		Status:       StatusCrashed,
+		Error:        "exit status 1",
+	}, WorkspaceLifecycleState{Error: "exit status 1"})}
+
+	got := BuildImplWorkspaceViews(rows, runtime, WorkspaceLifecycleSnapshot{})
+	if len(got) != 1 {
+		t.Fatalf("len(got) = %d, want active row visible: %+v", len(got), got)
+	}
+	view := got[0]
+	if !view.HasRuntime || view.Runtime.Workspace.Status != StatusCrashed ||
+		view.Runtime.Error != "exit status 1" {
+		t.Fatalf("view = %+v, want crashed runtime attached to visible active row", view)
+	}
+}
+
 func TestBuildImplWorkspaceViewsNestsReviewPlanRows(t *testing.T) {
 	rows := []db.ImplWorkspace{
 		{
