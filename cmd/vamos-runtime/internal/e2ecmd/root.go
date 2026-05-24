@@ -8,7 +8,7 @@ import (
 
 func NewCommand() *cobra.Command {
 	cmd := &cobra.Command{Use: "e2e", Short: "Story-driven E2E workflows"}
-	cmd.AddCommand(notImplemented("check", "Parse and validate E2E stories"))
+	cmd.AddCommand(NewCheckCommand())
 	cmd.AddCommand(notImplemented("generate", "Generate Playwright-Go tests from stories"))
 	cmd.AddCommand(notImplemented("run", "Run generated E2E tests"))
 	cmd.AddCommand(notImplemented("review", "Run semantic visual review"))
