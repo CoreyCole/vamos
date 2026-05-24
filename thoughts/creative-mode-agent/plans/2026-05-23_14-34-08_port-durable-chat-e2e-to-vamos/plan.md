@@ -23,7 +23,7 @@ plan_dir: thoughts/creative-mode-agent/plans/2026-05-23_14-34-08_port-durable-ch
 - [x] Slice 7: Workspace fixtures + durable-chat scenario helpers
 - [x] Slice 8: Viewport/property matrices + QRSPI plan bundles
 - [x] Slice 9: Semantic goldens, visual review, bounded repair
-- [ ] Slice 10: Docs, verification contract, implementation handoff
+- [x] Slice 10: Docs, verification contract, implementation handoff
 
 ## Implementation Workspace Prep
 

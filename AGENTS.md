@@ -61,3 +61,7 @@ Use plain `just build` only when intentionally restarting a configured running s
 - Use real HTML forms with `name` attributes and stable IDs for SSE-patched elements.
 - Avoid inline styles; use Tailwind utilities.
 - Shared UI primitives live under `pkg/components/`.
+
+## Story E2E guidance
+
+Use `vamos e2e check` for story/parser/generator validation. Use `vamos e2e run` only in a registered non-main workspace when fixtures are enabled; it refuses canonical main DBs. Generated files under `pkg/e2e/generated` come from `docs/features/*.story.md` and should be regenerated, not hand-edited. Visual review belongs to `vamos e2e review` and `e2e-image-review`, not deterministic test runs. `vamos e2e fix` is bounded to selectors, steps, runtime, and generated tests unless a human explicitly approves story/product changes.
