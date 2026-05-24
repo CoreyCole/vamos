@@ -231,7 +231,7 @@ func (h *Handler) HandleWorkspacesPage(c echo.Context) error {
 		return err
 	}
 	showHistorical := showHistoricalFromRequest(c.Request())
-	renderedViews := filterHistoricalImplWorkspaceViews(model.Views, showHistorical)
+	renderedViews := filterHistoricalImplWorkspaceViews(model.Views, showHistorical, h.protectedReleaseSlugs())
 	args := layouts.RootArgs{
 		Title:       "Workspaces",
 		CurrentPath: "/workspaces",
@@ -385,7 +385,7 @@ func (h *Handler) HandleWorkspacesStream(c echo.Context) error {
 		if err != nil {
 			return err
 		}
-		views := filterHistoricalImplWorkspaceViews(model.Views, showHistorical)
+		views := filterHistoricalImplWorkspaceViews(model.Views, showHistorical, h.protectedReleaseSlugs())
 		if err := sse.PatchElementTempl(
 			WorkspacesHeader(h.isRefreshInFlight(), showHistorical),
 			datastar.WithSelectorID("workspaces-header"),

@@ -1,6 +1,14 @@
 package workspaces
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/CoreyCole/vamos/pkg/db"
+)
+
+func dbImplWorkspace(slug, checkoutPath, status string) db.ImplWorkspace {
+	return db.ImplWorkspace{WorkspaceSlug: slug, CheckoutPath: checkoutPath, Status: status}
+}
 
 func TestWorkspaceCardTitleFormatsTimestampedSlug(t *testing.T) {
 	t.Parallel()
@@ -122,5 +130,55 @@ func TestWorkspaceTransitionLabelFallsBackToWorkspaceStatus(t *testing.T) {
 	snap := WorkspaceLifecycleSnapshot{Workspace: Workspace{Status: StatusStopped}}
 	if got := workspaceTransitionLabel(snap); got != "stopped" {
 		t.Fatalf("workspaceTransitionLabel() = %q, want stopped", got)
+	}
+}
+
+func TestIsHistoricalImplWorkspaceViewUsesFilesystemBackedRuntime(t *testing.T) {
+	t.Parallel()
+
+	activeRuntime := ImplWorkspaceView{
+		Row: dbImplWorkspace("active", "/repo/active", string(ImplWorkspaceStatusActive)),
+		Runtime: snapshotFromState(
+			Workspace{Slug: "active", CheckoutPath: "/repo/active"},
+			WorkspaceLifecycleState{},
+		),
+		HasRuntime: true,
+	}
+	if isHistoricalImplWorkspaceView(activeRuntime, nil) {
+		t.Fatalf("active runtime-backed workspace should be current")
+	}
+
+	missingRuntime := ImplWorkspaceView{
+		Row: dbImplWorkspace("missing", "/repo/missing", string(ImplWorkspaceStatusActive)),
+	}
+	if !isHistoricalImplWorkspaceView(missingRuntime, nil) {
+		t.Fatalf("active row without runtime should be historical")
+	}
+
+	noCheckout := ImplWorkspaceView{Row: dbImplWorkspace("missing-path", "", string(ImplWorkspaceStatusActive))}
+	if !isHistoricalImplWorkspaceView(noCheckout, nil) {
+		t.Fatalf("active row without checkout should be historical")
+	}
+
+	merged := ImplWorkspaceView{Row: dbImplWorkspace("merged", "/repo/merged", string(ImplWorkspaceStatusMerged))}
+	if !isHistoricalImplWorkspaceView(merged, nil) {
+		t.Fatalf("merged row should be historical")
+	}
+}
+
+func TestIsHistoricalImplWorkspaceViewKeepsMainAndProtectedCurrent(t *testing.T) {
+	t.Parallel()
+
+	main := ImplWorkspaceView{Row: dbImplWorkspace("main", "", string(ImplWorkspaceStatusCleanedUp)), IsMain: true}
+	if isHistoricalImplWorkspaceView(main, nil) {
+		t.Fatalf("main should stay current")
+	}
+
+	protected := map[string]ReleaseLaneWorkspace{
+		"stage": {Slug: "stage", Protected: true},
+	}
+	stage := ImplWorkspaceView{Row: dbImplWorkspace("stage", "", string(ImplWorkspaceStatusCleanedUp))}
+	if isHistoricalImplWorkspaceView(stage, protected) {
+		t.Fatalf("protected release lane should stay current")
 	}
 }

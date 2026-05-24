@@ -712,8 +712,11 @@ func TestFilterHistoricalImplWorkspaceViewsPromotesActiveChildren(t *testing.T) 
 					Row: db.ImplWorkspace{
 						WorkspaceSlug: "active-child",
 						DisplayName:   "Active Child",
+						CheckoutPath:  "/repo/active-child",
 						Status:        string(ImplWorkspaceStatusActive),
 					},
+					Runtime:    snapshotFromState(Workspace{Slug: "active-child", CheckoutPath: "/repo/active-child"}, WorkspaceLifecycleState{}),
+					HasRuntime: true,
 				},
 				{
 					Row: db.ImplWorkspace{
@@ -728,8 +731,11 @@ func TestFilterHistoricalImplWorkspaceViewsPromotesActiveChildren(t *testing.T) 
 			Row: db.ImplWorkspace{
 				WorkspaceSlug: "active-parent",
 				DisplayName:   "Active Parent",
+				CheckoutPath:  "/repo/active-parent",
 				Status:        string(ImplWorkspaceStatusActive),
 			},
+			Runtime:    snapshotFromState(Workspace{Slug: "active-parent", CheckoutPath: "/repo/active-parent"}, WorkspaceLifecycleState{}),
+			HasRuntime: true,
 			Children: []ImplWorkspaceView{{
 				Row: db.ImplWorkspace{
 					WorkspaceSlug: "merged-child",
@@ -939,7 +945,9 @@ func TestHandleWorkspacesPageFollowsImplWorkspaceOrder(t *testing.T) {
 
 func TestHandleWorkspacesPageHidesHistoricalRowsByDefault(t *testing.T) {
 	handler := NewHandler(
-		&fakeLifecycleManager{},
+		&fakeLifecycleManager{snapshots: []WorkspaceLifecycleSnapshot{
+			snapshotFromState(Workspace{Slug: "active", CheckoutPath: "/repo/active", Status: StatusRunning}, WorkspaceLifecycleState{}),
+		}},
 		"https://main.cn-agents.test",
 		"main",
 		WithImplWorkspaces(fakeImplWorkspaceLister{rows: []db.ImplWorkspace{
@@ -1042,7 +1050,9 @@ func TestHandleWorkspacesPageShowsHistoricalRowsWhenRequested(t *testing.T) {
 
 func TestHandleWorkspacesPagePromotesActiveChildUnderHiddenHistoricalParent(t *testing.T) {
 	handler := NewHandler(
-		&fakeLifecycleManager{},
+		&fakeLifecycleManager{snapshots: []WorkspaceLifecycleSnapshot{
+			snapshotFromState(Workspace{Slug: "child", CheckoutPath: "/repo/child", Status: StatusRunning}, WorkspaceLifecycleState{}),
+		}},
 		"https://main.cn-agents.test",
 		"main",
 		WithImplWorkspaces(fakeImplWorkspaceLister{rows: []db.ImplWorkspace{
@@ -1080,6 +1090,152 @@ func TestHandleWorkspacesPagePromotesActiveChildUnderHiddenHistoricalParent(t *t
 	}
 	if strings.Contains(html, "Merged Parent") || strings.Contains(html, `data-workspace-children="parent"`) {
 		t.Fatalf("historical parent still rendered in default mode: %s", html)
+	}
+}
+
+func TestHandleWorkspacesPageHidesMissingActiveRowsByDefault(t *testing.T) {
+	handler := NewHandler(
+		&fakeLifecycleManager{},
+		"https://main.cn-agents.test",
+		"main",
+		WithImplWorkspaces(fakeImplWorkspaceLister{rows: []db.ImplWorkspace{{
+			WorkspaceSlug: "missing",
+			CheckoutPath:  "/repo/missing",
+			DisplayName:   "Missing Workspace",
+			Status:        string(ImplWorkspaceStatusActive),
+		}}}),
+	)
+	e := echo.New()
+	req := httptest.NewRequest(http.MethodGet, "/workspaces", nil)
+	rec := httptest.NewRecorder()
+	if err := handler.HandleWorkspacesPage(e.NewContext(req, rec)); err != nil {
+		t.Fatalf("HandleWorkspacesPage() error = %v", err)
+	}
+	if strings.Contains(rec.Body.String(), "Missing Workspace") {
+		t.Fatalf("default page rendered missing active row: %s", rec.Body.String())
+	}
+
+	req = httptest.NewRequest(http.MethodGet, "/workspaces?show_historical=true", nil)
+	rec = httptest.NewRecorder()
+	if err := handler.HandleWorkspacesPage(e.NewContext(req, rec)); err != nil {
+		t.Fatalf("HandleWorkspacesPage(historical) error = %v", err)
+	}
+	if !strings.Contains(rec.Body.String(), "Missing Workspace") {
+		t.Fatalf("historical page hid missing active row: %s", rec.Body.String())
+	}
+}
+
+func TestHandleCleanupWorkspaceAlreadyCleanedIsIdempotent(t *testing.T) {
+	starter := &fakeCleanupStarter{}
+	handler := NewHandler(
+		&fakeLifecycleManager{},
+		"https://main.cn-agents.test",
+		"main",
+		WithImplWorkspaces(fakeImplWorkspaceLister{rows: []db.ImplWorkspace{{
+			WorkspaceSlug: "cleaned",
+			CheckoutPath:  "/repo/cleaned",
+			DisplayName:   "Cleaned Workspace",
+			Status:        string(ImplWorkspaceStatusCleanedUp),
+		}}}),
+		WithWorkspaceCleanupStarter(starter),
+	)
+	e := echo.New()
+
+	req := httptest.NewRequest(http.MethodPost, "/workspaces/cleanup", strings.NewReader("slug=cleaned"))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set("Datastar-Request", "true")
+	rec := httptest.NewRecorder()
+	if err := handler.HandleCleanupWorkspace(e.NewContext(req, rec)); err != nil {
+		t.Fatalf("HandleCleanupWorkspace(datastar) error = %v", err)
+	}
+	if rec.Code != http.StatusOK && rec.Code != http.StatusAccepted {
+		t.Fatalf("status = %d, want ok/accepted", rec.Code)
+	}
+	if len(starter.inputs) != 0 {
+		t.Fatalf("idempotent cleanup started workflow: %#v", starter.inputs)
+	}
+	if strings.Contains(rec.Body.String(), "Cleaned Workspace") {
+		t.Fatalf("default idempotent patch rendered cleaned row: %s", rec.Body.String())
+	}
+
+	req = httptest.NewRequest(http.MethodPost, "/workspaces/cleanup", strings.NewReader("slug=cleaned"))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	rec = httptest.NewRecorder()
+	if err := handler.HandleCleanupWorkspace(e.NewContext(req, rec)); err != nil {
+		t.Fatalf("HandleCleanupWorkspace(redirect) error = %v", err)
+	}
+	if rec.Code != http.StatusSeeOther || rec.Header().Get("Location") != "/workspaces" {
+		t.Fatalf("redirect = status %d location %q", rec.Code, rec.Header().Get("Location"))
+	}
+}
+
+func TestHandleCleanupWorkspaceDatastarOmitsCleanedSlugFromDefaultPatch(t *testing.T) {
+	starter := &fakeCleanupStarter{}
+	handler := NewHandler(
+		&fakeLifecycleManager{snapshots: []WorkspaceLifecycleSnapshot{
+			snapshotFromState(Workspace{Slug: "active", CheckoutPath: "/repo/active", Status: StatusRunning}, WorkspaceLifecycleState{}),
+		}},
+		"https://main.cn-agents.test",
+		"main",
+		WithImplWorkspaces(fakeImplWorkspaceLister{rows: []db.ImplWorkspace{{
+			WorkspaceSlug: "active",
+			CheckoutPath:  "/repo/active",
+			DisplayName:   "Active Workspace",
+			Status:        string(ImplWorkspaceStatusActive),
+		}}}),
+		WithWorkspaceCleanupStarter(starter),
+	)
+	e := echo.New()
+	req := httptest.NewRequest(
+		http.MethodPost,
+		"/workspaces/cleanup",
+		strings.NewReader("slug=active&confirmed=true"),
+	)
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set("Datastar-Request", "true")
+	rec := httptest.NewRecorder()
+	if err := handler.HandleCleanupWorkspace(e.NewContext(req, rec)); err != nil {
+		t.Fatalf("HandleCleanupWorkspace() error = %v", err)
+	}
+	if rec.Code != http.StatusOK && rec.Code != http.StatusAccepted {
+		t.Fatalf("status = %d, want ok/accepted", rec.Code)
+	}
+	if len(starter.inputs) != 1 || starter.inputs[0].Slug != "active" {
+		t.Fatalf("cleanup inputs = %#v", starter.inputs)
+	}
+	if strings.Contains(rec.Body.String(), "Active Workspace") {
+		t.Fatalf("default cleanup patch rendered cleaned slug: %s", rec.Body.String())
+	}
+}
+
+func TestHandleCleanupWorkspaceRejectsProtectedReleaseLane(t *testing.T) {
+	_, reg, err := BuildDefaultReleaseRegistry("stage", "main")
+	if err != nil {
+		t.Fatalf("BuildDefaultReleaseRegistry: %v", err)
+	}
+	handler := NewHandler(
+		&fakeLifecycleManager{snapshots: []WorkspaceLifecycleSnapshot{
+			snapshotFromState(Workspace{Slug: "main", CheckoutPath: "/repo/main", Status: StatusRunning, IsMain: true}, WorkspaceLifecycleState{}),
+		}},
+		"https://main.cn-agents.test",
+		"main",
+		WithImplWorkspaces(fakeImplWorkspaceLister{rows: []db.ImplWorkspace{{
+			WorkspaceSlug: "main",
+			CheckoutPath:  "/repo/main",
+			DisplayName:   "Main",
+			Status:        string(ImplWorkspaceStatusActive),
+		}}}),
+		WithReleaseProjector(&ReleaseProjector{Registry: reg}),
+		WithWorkspaceCleanupStarter(&fakeCleanupStarter{}),
+	)
+	e := echo.New()
+	req := httptest.NewRequest(http.MethodPost, "/workspaces/cleanup", strings.NewReader("slug=main"))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	rec := httptest.NewRecorder()
+	err = handler.HandleCleanupWorkspace(e.NewContext(req, rec))
+	httpErr, ok := err.(*echo.HTTPError)
+	if !ok || httpErr.Code != http.StatusBadRequest {
+		t.Fatalf("HandleCleanupWorkspace() err = %#v, want bad request", err)
 	}
 }
 
@@ -1250,6 +1406,19 @@ func (f fakeImplWorkspaceLister) ListImplWorkspaces(
 		return nil, f.err
 	}
 	return append([]db.ImplWorkspace(nil), f.rows...), nil
+}
+
+type fakeCleanupStarter struct {
+	inputs []WorkspaceCleanupWorkflowInput
+	err    error
+}
+
+func (f *fakeCleanupStarter) StartCleanup(_ context.Context, input WorkspaceCleanupWorkflowInput) error {
+	if f.err != nil {
+		return f.err
+	}
+	f.inputs = append(f.inputs, input)
+	return nil
 }
 
 type fakeLifecycleManager struct {

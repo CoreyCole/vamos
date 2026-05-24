@@ -51,26 +51,52 @@ func canActOnImplWorkspace(view ImplWorkspaceView) bool {
 		strings.TrimSpace(view.Runtime.Workspace.Slug) != ""
 }
 
-func isHistoricalImplWorkspaceView(view ImplWorkspaceView) bool {
-	return view.Row.Status == string(ImplWorkspaceStatusMerged) ||
-		view.Row.Status == string(ImplWorkspaceStatusCleanedUp)
+func isHistoricalImplWorkspaceView(
+	view ImplWorkspaceView,
+	protected map[string]ReleaseLaneWorkspace,
+) bool {
+	slug := workspaceViewSlug(view)
+	if lane, ok := protected[slug]; ok && lane.Protected {
+		return false
+	}
+	if view.IsMain || slug == mainWorkspaceSlug {
+		return false
+	}
+	if view.Row.Status == string(ImplWorkspaceStatusMerged) ||
+		view.Row.Status == string(ImplWorkspaceStatusCleanedUp) {
+		return true
+	}
+	if view.HasRuntime && strings.TrimSpace(view.Runtime.Workspace.Slug) != "" {
+		return false
+	}
+	checkout := strings.TrimSpace(workspaceViewCheckoutPath(view))
+	if checkout == "" {
+		return true
+	}
+	return !view.HasRuntime || strings.TrimSpace(view.Runtime.Workspace.Slug) == ""
 }
 
 func filterHistoricalImplWorkspaceViews(
 	views []ImplWorkspaceView,
 	showHistorical bool,
+	protected ...map[string]ReleaseLaneWorkspace,
 ) []ImplWorkspaceView {
 	if showHistorical {
 		return views
+	}
+	protectedBySlug := map[string]ReleaseLaneWorkspace{}
+	if len(protected) > 0 && protected[0] != nil {
+		protectedBySlug = protected[0]
 	}
 	out := make([]ImplWorkspaceView, 0, len(views))
 	for _, view := range views {
 		filteredChildren := filterHistoricalImplWorkspaceViews(
 			view.Children,
 			showHistorical,
+			protectedBySlug,
 		)
 		view.Children = filteredChildren
-		if isHistoricalImplWorkspaceView(view) {
+		if isHistoricalImplWorkspaceView(view, protectedBySlug) {
 			out = append(out, filteredChildren...)
 			continue
 		}

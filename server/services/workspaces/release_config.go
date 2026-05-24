@@ -20,6 +20,52 @@ const (
 	DefaultMainLaneID               release.LaneID       = "main"
 )
 
+type ReleaseLaneRole string
+
+const (
+	ReleaseLaneRoleStage ReleaseLaneRole = "stage"
+	ReleaseLaneRoleMain  ReleaseLaneRole = "main"
+)
+
+type ReleaseLaneWorkspace struct {
+	LaneID    release.LaneID
+	Role      ReleaseLaneRole
+	Slug      string
+	Label     string
+	Protected bool
+}
+
+func ReleaseLaneWorkspaces(reg *release.Registry) []ReleaseLaneWorkspace {
+	if reg == nil {
+		return nil
+	}
+	var out []ReleaseLaneWorkspace
+	for _, def := range reg.Definitions() {
+		for _, lane := range def.Lanes {
+			role := ReleaseLaneRole(lane.ID)
+			out = append(out, ReleaseLaneWorkspace{
+				LaneID:    lane.ID,
+				Role:      role,
+				Slug:      strings.TrimSpace(lane.CheckoutSlug),
+				Label:     strings.TrimSpace(lane.Label),
+				Protected: lane.Protected,
+			})
+		}
+	}
+	return out
+}
+
+func ProtectedReleaseSlugs(reg *release.Registry) map[string]ReleaseLaneWorkspace {
+	lanes := ReleaseLaneWorkspaces(reg)
+	out := make(map[string]ReleaseLaneWorkspace, len(lanes))
+	for _, lane := range lanes {
+		if lane.Slug != "" && lane.Protected {
+			out[lane.Slug] = lane
+		}
+	}
+	return out
+}
+
 // BuildDefaultReleaseRegistry builds the reusable two-lane release model used by
 // hosts that configure generic stage/main checkouts. Hosts with different lanes
 // can construct their own release.Registry and pass it to WithReleaseQueue.

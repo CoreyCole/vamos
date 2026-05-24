@@ -55,11 +55,17 @@ func (h *Handler) HandleCleanupWorkspace(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusNotFound, "unknown workspace")
 	}
 	action := workspaceCleanupAction(view)
-	if action.Disabled {
-		return echo.NewHTTPError(http.StatusConflict, action.DisabledReason)
-	}
 	if h.isProtectedReleaseWorkspace(slug) {
 		return echo.NewHTTPError(http.StatusBadRequest, "protected release lane cannot be cleaned up")
+	}
+	if action.Disabled {
+		if isIdempotentCleanupNoop(action, view) {
+			if isDatastarRequest(c.Request()) {
+				return h.patchWorkspacesFresh(c)
+			}
+			return c.Redirect(http.StatusSeeOther, "/workspaces")
+		}
+		return echo.NewHTTPError(http.StatusConflict, action.DisabledReason)
 	}
 	confirmed := c.FormValue("confirmed") == "true"
 	if action.RequiresConfirm && !confirmed {
@@ -71,7 +77,7 @@ func (h *Handler) HandleCleanupWorkspace(c echo.Context) error {
 	}
 	h.notifier.Notify("workspace-cleanup")
 	if isDatastarRequest(c.Request()) {
-		return h.patchWorkspaces(c, views)
+		return h.patchWorkspacesFreshWithoutSlug(c, slug)
 	}
 	return c.Redirect(http.StatusSeeOther, "/workspaces")
 }
@@ -113,6 +119,14 @@ func workspaceCleanupAction(view ImplWorkspaceView) WorkspaceCleanupAction {
 	return action
 }
 
+func isIdempotentCleanupNoop(action WorkspaceCleanupAction, view ImplWorkspaceView) bool {
+	if view.Row.Status == string(ImplWorkspaceStatusMerged) ||
+		view.Row.Status == string(ImplWorkspaceStatusCleanedUp) {
+		return true
+	}
+	return strings.Contains(strings.ToLower(action.DisabledReason), "already cleaned")
+}
+
 func findImplWorkspaceView(views []ImplWorkspaceView, slug string) (ImplWorkspaceView, bool) {
 	for _, view := range views {
 		if workspaceViewSlug(view) == slug {
@@ -126,15 +140,13 @@ func findImplWorkspaceView(views []ImplWorkspaceView, slug string) (ImplWorkspac
 }
 
 func (h *Handler) isProtectedReleaseWorkspace(slug string) bool {
+	_, ok := h.protectedReleaseSlugs()[strings.TrimSpace(slug)]
+	return ok
+}
+
+func (h *Handler) protectedReleaseSlugs() map[string]ReleaseLaneWorkspace {
 	if h.releaseProjector == nil || h.releaseProjector.Registry == nil {
-		return false
+		return nil
 	}
-	for _, def := range h.releaseProjector.Registry.Definitions() {
-		for _, lane := range def.Lanes {
-			if strings.TrimSpace(lane.CheckoutSlug) == slug && lane.Protected {
-				return true
-			}
-		}
-	}
-	return false
+	return ProtectedReleaseSlugs(h.releaseProjector.Registry)
 }

@@ -143,7 +143,7 @@ func (h *Handler) patchWorkspaces(c echo.Context, views []ImplWorkspaceView) err
 	if len(rowActions) > 0 {
 		views = applyOptionsToImplWorkspaceViews(views, WithWorkspaceReleaseActions(rowActions))
 	}
-	renderedViews := filterHistoricalImplWorkspaceViews(views, showHistorical)
+	renderedViews := filterHistoricalImplWorkspaceViews(views, showHistorical, h.protectedReleaseSlugs())
 	sse := datastar.NewSSE(c.Response().Writer, c.Request())
 	c.Response().WriteHeader(http.StatusAccepted)
 	if err := sse.PatchElementTempl(WorkspacesHeader(h.isRefreshInFlight(), showHistorical), datastar.WithSelectorID("workspaces-header"), datastar.WithModeOuter()); err != nil {
@@ -153,4 +153,40 @@ func (h *Handler) patchWorkspaces(c echo.Context, views []ImplWorkspaceView) err
 		return err
 	}
 	return sse.PatchElementTempl(WorkspacesList(renderedViews, h.managerURL, showHistorical), datastar.WithSelectorID("workspaces-list"), datastar.WithModeOuter())
+}
+
+func (h *Handler) patchWorkspacesFresh(c echo.Context) error {
+	views, err := h.listImplWorkspaceViews(c.Request().Context())
+	if err != nil {
+		return err
+	}
+	return h.patchWorkspaces(c, views)
+}
+
+func (h *Handler) patchWorkspacesFreshWithoutSlug(c echo.Context, slug string) error {
+	views, err := h.listImplWorkspaceViews(c.Request().Context())
+	if err != nil {
+		return err
+	}
+	if !showHistoricalFromRequest(c.Request()) {
+		views = omitImplWorkspaceViewSlug(views, slug)
+	}
+	return h.patchWorkspaces(c, views)
+}
+
+func omitImplWorkspaceViewSlug(views []ImplWorkspaceView, slug string) []ImplWorkspaceView {
+	slug = strings.TrimSpace(slug)
+	if slug == "" {
+		return views
+	}
+	out := make([]ImplWorkspaceView, 0, len(views))
+	for _, view := range views {
+		view.Children = omitImplWorkspaceViewSlug(view.Children, slug)
+		if workspaceViewSlug(view) == slug {
+			out = append(out, view.Children...)
+			continue
+		}
+		out = append(out, view)
+	}
+	return out
 }
