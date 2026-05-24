@@ -21,6 +21,11 @@ func DefaultWorkbenchConfig(
 	contextMode string,
 ) WorkbenchConfig {
 	cfg := WorkbenchConfig{Version: 1, Page: page, View: view}
+	if page == WorkbenchPageAgentChat {
+		cfg.Tabs = WorkbenchTabState{SidebarTab: SidebarTabWorkspaces, RightRailTab: RightRailTabChat}
+	} else {
+		cfg.Tabs = WorkbenchTabState{SidebarTab: SidebarTabFiles, RightRailTab: RightRailTabChat}
+	}
 	switch page {
 	case WorkbenchPageAgentChat:
 		cfg.Regions = []RegionSpec{
@@ -87,42 +92,53 @@ func MergeWorkbenchConfig(
 		saved.View != defaults.View {
 		return defaults
 	}
+	normalized := NormalizePersistentWorkbenchConfig(*saved, defaults)
 	byID := map[string]RegionSpec{}
-	for _, region := range saved.Regions {
+	for _, region := range normalized.Regions {
 		byID[region.ID] = region
 	}
 	out := cloneWorkbenchConfig(defaults)
 	for i, region := range out.Regions {
 		if savedRegion, ok := byID[region.ID]; ok {
-			out.Regions[i].Ratio = clamp(savedRegion.Ratio, minSavedRatio, maxSavedRatio)
+			out.Regions[i].Ratio = savedRegion.Ratio
+			out.Regions[i].Visible = savedRegion.Visible
 		}
 	}
+	out.Mobile = normalized.Mobile
+	out.Tabs = normalized.Tabs
 	migrateLegacyAgentChatSplitRatios(&out)
 	return out
 }
 
-func StripDurableInteractionState(
+func NormalizePersistentWorkbenchConfig(
 	config WorkbenchConfig,
 	defaults WorkbenchConfig,
 ) WorkbenchConfig {
-	stripped := cloneWorkbenchConfig(config)
+	out := cloneWorkbenchConfig(config)
 	defaultByID := map[string]RegionSpec{}
 	for _, region := range defaults.Regions {
 		defaultByID[region.ID] = region
 	}
-	for i, region := range stripped.Regions {
+	for i, region := range out.Regions {
 		if defaultRegion, ok := defaultByID[region.ID]; ok {
-			stripped.Regions[i].Visible = defaultRegion.Visible
-		} else {
-			stripped.Regions[i].Visible = false
+			out.Regions[i].Slot = defaultRegion.Slot
+			out.Regions[i].Kind = defaultRegion.Kind
+			out.Regions[i].Ratio = clamp(region.Ratio, minSavedRatio, maxSavedRatio)
+			continue
 		}
+		out.Regions[i].Visible = false
 	}
-	if hasRegionID(stripped.Regions, defaults.Mobile.ActiveRegionID) {
-		stripped.Mobile.ActiveRegionID = defaults.Mobile.ActiveRegionID
-	} else if !hasRegionID(stripped.Regions, stripped.Mobile.ActiveRegionID) {
-		stripped.Mobile.ActiveRegionID = ""
+	if !hasRegionID(out.Regions, out.Mobile.ActiveRegionID) {
+		out.Mobile.ActiveRegionID = defaults.Mobile.ActiveRegionID
 	}
-	return stripped
+	if out.Tabs.SidebarTab == "" {
+		out.Tabs.SidebarTab = defaults.Tabs.SidebarTab
+	}
+	if out.Tabs.RightRailTab == "" {
+		out.Tabs.RightRailTab = defaults.Tabs.RightRailTab
+	}
+	migrateLegacyAgentChatSplitRatios(&out)
+	return out
 }
 
 func hasRegionID(regions []RegionSpec, id string) bool {
@@ -220,6 +236,17 @@ func configFromRegions(
 		Page:    page,
 		View:    view,
 		Mobile:  MobileSpec{ActiveRegionID: mobileActive},
+	}
+	if page == WorkbenchPageAgentChat {
+		cfg.Tabs = WorkbenchTabState{
+			SidebarTab:   SidebarTabWorkspaces,
+			RightRailTab: RightRailTabChat,
+		}
+	} else {
+		cfg.Tabs = WorkbenchTabState{
+			SidebarTab:   SidebarTabFiles,
+			RightRailTab: RightRailTabChat,
+		}
 	}
 	for _, region := range regions {
 		ratio := region.Ratio

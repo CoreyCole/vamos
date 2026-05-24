@@ -272,22 +272,15 @@ func (s *Service) buildThoughtsWorkbenchState(
 	pageArgs *PageArgs,
 ) (workbench.WorkbenchState, error) {
 	view, contextMode := thoughtsViewFromQuery(c)
-	saved := workbench.DefaultWorkbenchConfig(
-		workbench.WorkbenchPageThoughts,
-		view,
-		contextMode,
-	)
+	var saved *workbench.WorkbenchConfig
 	if s.layoutPrefs != nil && pageArgs.UserEmail != "" {
-		saved = s.layoutPrefs.GetOrDefault(
+		saved, _ = s.layoutPrefs.GetDocumentWorkbench(
 			c.Request().Context(),
 			pageArgs.UserEmail,
 			workbench.WorkbenchPageThoughts,
-			view,
-			contextMode,
 		)
 	}
 	_ = view
-	_ = saved
 	rightTab := workbench.RightRailTabComments
 	if contextMode == thoughtsContextModeChat {
 		rightTab = workbench.RightRailTabChat
@@ -317,6 +310,7 @@ func (s *Service) buildThoughtsWorkbenchState(
 		),
 		InitialSidebarOpen: false,
 		InitialRailOpen:    contextMode != "",
+		SavedConfig:        saved,
 		Center: workbench.CenterDocPaneArgs{
 			Title: DocumentTitle(pageArgs.FilePath, pageArgs.ViewerArgs.Frontmatter),
 			Document: DocumentPanel(
@@ -501,18 +495,12 @@ func (s *Service) buildThoughtsDirectoryWorkbenchState(
 	args *DirectoryArgs,
 ) (workbench.WorkbenchState, error) {
 	view, contextMode := thoughtsViewFromQuery(c)
-	saved := workbench.DefaultWorkbenchConfig(
-		workbench.WorkbenchPageThoughts,
-		view,
-		contextMode,
-	)
+	var saved *workbench.WorkbenchConfig
 	if s.layoutPrefs != nil && args.UserEmail != "" {
-		saved = s.layoutPrefs.GetOrDefault(
+		saved, _ = s.layoutPrefs.GetDocumentWorkbench(
 			c.Request().Context(),
 			args.UserEmail,
 			workbench.WorkbenchPageThoughts,
-			view,
-			contextMode,
 		)
 	}
 	chatComponent, chatURLReplacement, err := s.buildEmbeddedChatComponentForRequest(
@@ -550,6 +538,7 @@ func (s *Service) buildThoughtsDirectoryWorkbenchState(
 		),
 		InitialSidebarOpen: false,
 		InitialRailOpen:    contextMode != "",
+		SavedConfig:        saved,
 		Center: workbench.CenterDocPaneArgs{
 			Title:    DirectoryTitle(args.Path),
 			Document: DirectoryPrimaryPanel(args),
@@ -570,7 +559,6 @@ func (s *Service) buildThoughtsDirectoryWorkbenchState(
 		state.Config.Mobile.ActiveRegionID = "doc-workbench-right"
 	}
 	_ = view
-	_ = saved
 	return state, nil
 }
 

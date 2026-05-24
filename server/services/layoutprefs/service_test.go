@@ -43,15 +43,15 @@ func TestServiceUpsertGetReset(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Upsert() error = %v", err)
 	}
-	if saved.Regions[0].Visible {
-		t.Fatal("saved config should strip visible navigation")
+	if !saved.Regions[0].Visible {
+		t.Fatal("saved config should preserve visible navigation")
 	}
 	if saved.Regions[0].Ratio != 0.31 {
 		t.Fatalf("saved ratio = %v, want 0.31", saved.Regions[0].Ratio)
 	}
-	if saved.Mobile.ActiveRegionID != "agent-chat-primary" {
+	if saved.Mobile.ActiveRegionID != "agent-chat-navigation" {
 		t.Fatalf(
-			"saved mobile active = %q, want default primary",
+			"saved mobile active = %q, want saved navigation",
 			saved.Mobile.ActiveRegionID,
 		)
 	}
@@ -69,8 +69,8 @@ func TestServiceUpsertGetReset(t *testing.T) {
 		got.View != workbench.WorkbenchViewFocus {
 		t.Fatalf("Get() = %#v", got)
 	}
-	if got.Regions[0].Visible {
-		t.Fatal("Get() should strip durable navigation visibility")
+	if !got.Regions[0].Visible {
+		t.Fatal("Get() should preserve durable navigation visibility")
 	}
 	if got.Regions[0].Ratio != 0.31 {
 		t.Fatalf("Get() ratio = %v, want 0.31", got.Regions[0].Ratio)
@@ -91,8 +91,64 @@ func TestServiceUpsertGetReset(t *testing.T) {
 		workbench.WorkbenchViewFocus,
 		"",
 	)
-	if defaulted.Regions[0].Visible {
-		t.Fatal("GetOrDefault() should return hidden navigation after reset")
+	if !defaulted.Regions[0].Visible {
+		t.Fatal("GetOrDefault() should return default visible navigation after reset")
+	}
+}
+
+func TestServicePreservesWorkbenchStateAndSharesDocWorkbenchScope(t *testing.T) {
+	t.Parallel()
+
+	svc, err := dbsvc.NewService(filepath.Join(t.TempDir(), "agents.db"))
+	if err != nil {
+		t.Fatalf("NewService() error = %v", err)
+	}
+	t.Cleanup(func() { _ = svc.Close() })
+
+	service := NewService(svc.Queries)
+	cfg := workbench.WorkbenchConfig{
+		Version: 1,
+		Page:    workbench.WorkbenchPageAgentChat,
+		View:    workbench.WorkbenchViewSplit,
+		Regions: []workbench.RegionSpec{
+			{ID: "doc-workbench-sidebar", Slot: workbench.WorkbenchSlotNavigation, Kind: workbench.RegionThoughtsTree, Ratio: 0.31, Visible: false},
+			{ID: "doc-workbench-center", Slot: workbench.WorkbenchSlotPrimary, Kind: workbench.RegionDocument, Ratio: 0.44, Visible: true},
+			{ID: "doc-workbench-right", Slot: workbench.WorkbenchSlotContext, Kind: workbench.RegionComments, Ratio: 0.25, Visible: true},
+		},
+		Mobile: workbench.MobileSpec{ActiveRegionID: "doc-workbench-right"},
+		Tabs: workbench.WorkbenchTabState{
+			SidebarTab:   workbench.SidebarTabWorkspaces,
+			RightRailTab: workbench.RightRailTabComments,
+		},
+	}
+	if _, err := service.Upsert(t.Context(), Input{
+		UserEmail: "agent@example.com",
+		Page:      workbench.WorkbenchPageAgentChat,
+		View:      workbench.WorkbenchViewSplit,
+		Config:    cfg,
+	}); err != nil {
+		t.Fatalf("Upsert() error = %v", err)
+	}
+
+	got, err := service.GetDocumentWorkbench(
+		t.Context(),
+		"agent@example.com",
+		workbench.WorkbenchPageThoughts,
+	)
+	if err != nil {
+		t.Fatalf("GetDocumentWorkbench() error = %v", err)
+	}
+	if got.Page != workbench.WorkbenchPageThoughts {
+		t.Fatalf("page = %q, want thoughts render page", got.Page)
+	}
+	if got.Regions[0].Visible || got.Regions[0].Ratio != 0.31 {
+		t.Fatalf("sidebar region = %#v, want hidden ratio 0.31", got.Regions[0])
+	}
+	if got.Mobile.ActiveRegionID != "doc-workbench-right" {
+		t.Fatalf("mobile active = %q, want right", got.Mobile.ActiveRegionID)
+	}
+	if got.Tabs.SidebarTab != workbench.SidebarTabWorkspaces || got.Tabs.RightRailTab != workbench.RightRailTabComments {
+		t.Fatalf("tabs = %#v, want workspaces/comments", got.Tabs)
 	}
 }
 
@@ -248,6 +304,32 @@ func TestHandlerRejectsUnauthenticatedAndInvalidPayloads(t *testing.T) {
 	}
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("Save() invalid payload status = %d", rec.Code)
+	}
+}
+
+func TestServiceRejectsInvalidTabs(t *testing.T) {
+	t.Parallel()
+
+	svc, err := dbsvc.NewService(filepath.Join(t.TempDir(), "agents.db"))
+	if err != nil {
+		t.Fatalf("NewService() error = %v", err)
+	}
+	t.Cleanup(func() { _ = svc.Close() })
+
+	service := NewService(svc.Queries)
+	cfg := workbench.DefaultWorkbenchConfig(
+		workbench.WorkbenchPageAgentChat,
+		workbench.WorkbenchViewFocus,
+		"",
+	)
+	cfg.Tabs.SidebarTab = workbench.SidebarTabKind("bad-tab")
+	if _, err := service.Upsert(t.Context(), Input{
+		UserEmail: "agent@example.com",
+		Page:      workbench.WorkbenchPageAgentChat,
+		View:      workbench.WorkbenchViewFocus,
+		Config:    cfg,
+	}); err == nil {
+		t.Fatal("Upsert() error = nil, want invalid tab error")
 	}
 }
 

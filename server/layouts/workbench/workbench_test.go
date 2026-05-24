@@ -124,7 +124,7 @@ func TestMergeWorkbenchConfigMigratesLegacyAgentChatSplitRatios(t *testing.T) {
 	}
 }
 
-func TestMergeWorkbenchConfigAppliesRatiosOnly(t *testing.T) {
+func TestMergeWorkbenchConfigPreservesVisibleMobileAndTabs(t *testing.T) {
 	t.Parallel()
 
 	defaults := DefaultWorkbenchConfig(WorkbenchPageAgentChat, WorkbenchViewFocus, "")
@@ -132,65 +132,45 @@ func TestMergeWorkbenchConfigAppliesRatiosOnly(t *testing.T) {
 	saved.Regions[0].Visible = false
 	saved.Regions[0].Ratio = 0.31
 	saved.Mobile.ActiveRegionID = "agent-chat-navigation"
+	saved.Tabs = WorkbenchTabState{SidebarTab: SidebarTabFiles, RightRailTab: RightRailTabComments}
 
 	merged := MergeWorkbenchConfig(defaults, &saved)
 	if got := regionSpecByID(merged, "agent-chat-navigation").Ratio; got != 0.31 {
 		t.Fatalf("navigation ratio = %v, want 0.31", got)
 	}
-	if !regionSpecByID(merged, "agent-chat-navigation").Visible {
-		t.Fatal("saved visibility leaked into merged config")
+	if regionSpecByID(merged, "agent-chat-navigation").Visible {
+		t.Fatal("saved hidden navigation was not preserved")
 	}
-	if merged.Mobile.ActiveRegionID != defaults.Mobile.ActiveRegionID {
-		t.Fatalf(
-			"mobile active = %q, want default %q",
-			merged.Mobile.ActiveRegionID,
-			defaults.Mobile.ActiveRegionID,
-		)
+	if merged.Mobile.ActiveRegionID != "agent-chat-navigation" {
+		t.Fatalf("mobile active = %q, want saved navigation", merged.Mobile.ActiveRegionID)
+	}
+	if merged.Tabs.SidebarTab != SidebarTabFiles || merged.Tabs.RightRailTab != RightRailTabComments {
+		t.Fatalf("tabs = %#v, want files/comments", merged.Tabs)
 	}
 }
 
-func TestStripDurableInteractionState(t *testing.T) {
+func TestNormalizePersistentWorkbenchConfigPreservesDurableState(t *testing.T) {
 	t.Parallel()
 
 	defaults := DefaultWorkbenchConfig(WorkbenchPageAgentChat, WorkbenchViewFocus, "")
 	cfg := cloneWorkbenchConfig(defaults)
-	cfg.Regions[0].Visible = true
+	cfg.Regions[0].Visible = false
 	cfg.Regions[0].Ratio = 0.34
 	cfg.Mobile.ActiveRegionID = "agent-chat-navigation"
+	cfg.Tabs = WorkbenchTabState{SidebarTab: SidebarTabFiles, RightRailTab: RightRailTabComments}
 
-	stripped := StripDurableInteractionState(cfg, defaults)
-	if got := regionSpecByID(stripped, "agent-chat-navigation").Ratio; got != 0.34 {
+	normalized := NormalizePersistentWorkbenchConfig(cfg, defaults)
+	if got := regionSpecByID(normalized, "agent-chat-navigation").Ratio; got != 0.34 {
 		t.Fatalf("ratio = %v, want preserved 0.34", got)
 	}
-	if !regionSpecByID(stripped, "agent-chat-navigation").Visible {
-		t.Fatal("visibility should be reset to default")
+	if regionSpecByID(normalized, "agent-chat-navigation").Visible {
+		t.Fatal("visibility should remain hidden")
 	}
-	if stripped.Mobile.ActiveRegionID != defaults.Mobile.ActiveRegionID {
-		t.Fatalf("mobile active = %q, want default", stripped.Mobile.ActiveRegionID)
+	if normalized.Mobile.ActiveRegionID != "agent-chat-navigation" {
+		t.Fatalf("mobile active = %q, want saved navigation", normalized.Mobile.ActiveRegionID)
 	}
-}
-
-func TestStripDurableInteractionStateClearsMissingDefaultMobileRegion(t *testing.T) {
-	t.Parallel()
-
-	cfg := WorkbenchConfig{
-		Version: 1,
-		Page:    WorkbenchPageThoughts,
-		View:    WorkbenchViewSplit,
-		Regions: []RegionSpec{
-			{ID: "doc-workbench-sidebar", Slot: WorkbenchSlotNavigation, Kind: RegionThoughtsTree, Ratio: 0.22},
-			{ID: "doc-workbench-center", Slot: WorkbenchSlotPrimary, Kind: RegionDocument, Ratio: 0.61},
-			{ID: "doc-workbench-right", Slot: WorkbenchSlotContext, Kind: RegionChat, Ratio: 0.17},
-		},
-	}
-	defaults := DefaultWorkbenchConfig(WorkbenchPageThoughts, WorkbenchViewSplit, "")
-
-	stripped := StripDurableInteractionState(cfg, defaults)
-	if stripped.Mobile.ActiveRegionID != "" {
-		t.Fatalf("mobile active = %q, want empty when default is absent", stripped.Mobile.ActiveRegionID)
-	}
-	if err := ValidateWorkbenchConfig(stripped); err != nil {
-		t.Fatalf("ValidateWorkbenchConfig() error = %v", err)
+	if normalized.Tabs.SidebarTab != SidebarTabFiles || normalized.Tabs.RightRailTab != RightRailTabComments {
+		t.Fatalf("tabs = %#v, want files/comments", normalized.Tabs)
 	}
 }
 
@@ -480,7 +460,7 @@ func TestWorkbenchResizeJSShowsHandlesForVisibleAdjacentRegions(t *testing.T) {
 	}
 }
 
-func TestBuildWorkbenchStateAppliesSavedRatiosButKeepsRouteVisibility(t *testing.T) {
+func TestBuildWorkbenchStateAppliesSavedRatiosAndVisibility(t *testing.T) {
 	t.Parallel()
 
 	saved := DefaultWorkbenchConfig(WorkbenchPageAgentChat, WorkbenchViewFocus, "")
@@ -513,8 +493,8 @@ func TestBuildWorkbenchStateAppliesSavedRatiosButKeepsRouteVisibility(t *testing
 	if state.Regions[0].Ratio != 0.33 {
 		t.Fatalf("navigation ratio = %v, want saved 0.33", state.Regions[0].Ratio)
 	}
-	if state.Regions[0].Visible {
-		t.Fatal("route-hidden navigation should stay hidden despite saved visibility")
+	if !state.Regions[0].Visible {
+		t.Fatal("saved navigation visibility should be restored")
 	}
 }
 

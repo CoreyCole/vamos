@@ -108,6 +108,74 @@ func TestBuildDocWorkbenchStateKeepsDocumentActiveWhenRailInitiallyOpen(t *testi
 	}
 }
 
+func TestBuildDocWorkbenchStateUsesSavedTabsOverEntryDefaults(t *testing.T) {
+	t.Parallel()
+
+	saved := WorkbenchConfig{
+		Version: 1,
+		Page:    WorkbenchPageThoughts,
+		View:    WorkbenchViewSplit,
+		Regions: []RegionSpec{
+			{ID: "doc-workbench-sidebar", Slot: WorkbenchSlotNavigation, Kind: RegionThoughtsTree, Ratio: 0.22, Visible: true},
+			{ID: "doc-workbench-center", Slot: WorkbenchSlotPrimary, Kind: RegionDocument, Ratio: 0.52, Visible: true},
+			{ID: "doc-workbench-right", Slot: WorkbenchSlotContext, Kind: RegionChat, Ratio: 0.26, Visible: true},
+		},
+		Mobile: MobileSpec{ActiveRegionID: "doc-workbench-center"},
+		Tabs:   WorkbenchTabState{SidebarTab: SidebarTabWorkspaces, RightRailTab: RightRailTabComments},
+	}
+	state, err := BuildDocWorkbenchState(WorkbenchDocContext{
+		EntryMode:    DocEntryModeThoughts,
+		SelectedPath: "plans/demo/design.md",
+		Sidebar: WorkbenchSidebarArgs{
+			ID:   "doc-workbench-shared-sidebar",
+			Tabs: DefaultSidebarTabs(),
+		},
+		Center:      CenterDocPaneArgs{Document: templ.Raw("<p>doc</p>")},
+		RightRail:   RightRailArgs{Chat: templ.Raw("<p>chat</p>"), Comments: templ.Raw("<p>comments</p>")},
+		SavedConfig: &saved,
+	})
+	if err != nil {
+		t.Fatalf("BuildDocWorkbenchState error = %v", err)
+	}
+	if state.Config.Tabs.SidebarTab != SidebarTabWorkspaces || state.Config.Tabs.RightRailTab != RightRailTabComments {
+		t.Fatalf("tabs = %#v, want workspaces/comments", state.Config.Tabs)
+	}
+	if state.ContextMode != string(RightRailTabComments) {
+		t.Fatalf("context mode = %q, want comments", state.ContextMode)
+	}
+}
+
+func TestBuildDocWorkbenchStateUsesSavedRegionVisibility(t *testing.T) {
+	t.Parallel()
+
+	saved := WorkbenchConfig{
+		Version: 1,
+		Page:    WorkbenchPageThoughts,
+		View:    WorkbenchViewSplit,
+		Regions: []RegionSpec{
+			{ID: "doc-workbench-sidebar", Slot: WorkbenchSlotNavigation, Kind: RegionThoughtsTree, Ratio: 0.22, Visible: false},
+			{ID: "doc-workbench-center", Slot: WorkbenchSlotPrimary, Kind: RegionDocument, Ratio: 0.52, Visible: true},
+			{ID: "doc-workbench-right", Slot: WorkbenchSlotContext, Kind: RegionChat, Ratio: 0.26, Visible: true},
+		},
+		Mobile: MobileSpec{ActiveRegionID: "doc-workbench-right"},
+	}
+	state, err := BuildDocWorkbenchState(WorkbenchDocContext{
+		EntryMode:    DocEntryModeThoughts,
+		SelectedPath: "plans/demo/design.md",
+		Center:       CenterDocPaneArgs{Document: templ.Raw("<p>doc</p>")},
+		RightRail:    RightRailArgs{Chat: templ.Raw("<p>chat</p>")},
+		SavedConfig:  &saved,
+	})
+	if err != nil {
+		t.Fatalf("BuildDocWorkbenchState error = %v", err)
+	}
+	assertRegionVisible(t, state, "doc-workbench-sidebar", false)
+	assertRegionVisible(t, state, "doc-workbench-right", true)
+	if state.Config.Mobile.ActiveRegionID != "doc-workbench-right" {
+		t.Fatalf("mobile active = %q, want right rail", state.Config.Mobile.ActiveRegionID)
+	}
+}
+
 func TestDocWorkbenchRenderContainsSharedChrome(t *testing.T) {
 	state, err := BuildDocWorkbenchState(WorkbenchDocContext{
 		EntryMode:    DocEntryModeThoughts,

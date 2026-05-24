@@ -66,12 +66,18 @@ type WorkbenchRegion struct {
 	Component templ.Component
 }
 
+type WorkbenchTabState struct {
+	SidebarTab   SidebarTabKind `json:"sidebarTab"`
+	RightRailTab RightRailTab   `json:"rightRailTab"`
+}
+
 type WorkbenchConfig struct {
-	Version int           `json:"version"`
-	Page    WorkbenchPage `json:"page"`
-	View    WorkbenchView `json:"view"`
-	Regions []RegionSpec  `json:"regions"`
-	Mobile  MobileSpec    `json:"mobile"`
+	Version int               `json:"version"`
+	Page    WorkbenchPage     `json:"page"`
+	View    WorkbenchView     `json:"view"`
+	Regions []RegionSpec      `json:"regions"`
+	Mobile  MobileSpec        `json:"mobile"`
+	Tabs    WorkbenchTabState `json:"tabs,omitempty"`
 }
 
 type RegionSpec struct {
@@ -157,6 +163,20 @@ func ValidateWorkbenchConfig(config WorkbenchConfig) error {
 			"mobile active region %q not present",
 			config.Mobile.ActiveRegionID,
 		)
+	}
+	if config.Tabs.SidebarTab != "" {
+		switch config.Tabs.SidebarTab {
+		case SidebarTabWorkspaces, SidebarTabFiles:
+		default:
+			return fmt.Errorf("invalid sidebar tab %q", config.Tabs.SidebarTab)
+		}
+	}
+	if config.Tabs.RightRailTab != "" {
+		switch config.Tabs.RightRailTab {
+		case RightRailTabChat, RightRailTabComments:
+		default:
+			return fmt.Errorf("invalid right rail tab %q", config.Tabs.RightRailTab)
+		}
 	}
 	return nil
 }

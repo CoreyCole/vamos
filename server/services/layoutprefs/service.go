@@ -25,9 +25,29 @@ type Input struct {
 	Config    workbench.WorkbenchConfig
 }
 
-func stripForStorage(config workbench.WorkbenchConfig) workbench.WorkbenchConfig {
+func normalizeForStorage(config workbench.WorkbenchConfig) workbench.WorkbenchConfig {
 	defaults := workbench.DefaultWorkbenchConfig(config.Page, config.View, "")
-	return workbench.StripDurableInteractionState(config, defaults)
+	if isDocumentWorkbenchConfig(config) {
+		defaults = config
+	}
+	return workbench.NormalizePersistentWorkbenchConfig(config, defaults)
+}
+
+func isDocumentWorkbenchConfig(config workbench.WorkbenchConfig) bool {
+	for _, region := range config.Regions {
+		switch region.ID {
+		case "doc-workbench-sidebar", "doc-workbench-center", "doc-workbench-right":
+			return true
+		}
+	}
+	return false
+}
+
+func layoutPreferenceKey(page workbench.WorkbenchPage, config workbench.WorkbenchConfig) workbench.WorkbenchPage {
+	if isDocumentWorkbenchConfig(config) {
+		return workbench.WorkbenchPageThoughts
+	}
+	return page
 }
 
 func (s *Service) Get(
@@ -51,8 +71,21 @@ func (s *Service) Get(
 	if err := workbench.ValidateWorkbenchConfig(cfg); err != nil {
 		return nil, err
 	}
-	stripped := stripForStorage(cfg)
-	return &stripped, workbench.ValidateWorkbenchConfig(stripped)
+	normalized := normalizeForStorage(cfg)
+	return &normalized, workbench.ValidateWorkbenchConfig(normalized)
+}
+
+func (s *Service) GetDocumentWorkbench(
+	ctx context.Context,
+	userEmail string,
+	page workbench.WorkbenchPage,
+) (*workbench.WorkbenchConfig, error) {
+	cfg, err := s.Get(ctx, userEmail, workbench.WorkbenchPageThoughts, workbench.WorkbenchViewSplit)
+	if err != nil || cfg == nil {
+		return nil, err
+	}
+	cfg.Page = page
+	return cfg, workbench.ValidateWorkbenchConfig(*cfg)
 }
 
 func (s *Service) GetOrDefault(
@@ -77,14 +110,18 @@ func (s *Service) Upsert(
 	if err := workbench.ValidateWorkbenchConfig(input.Config); err != nil {
 		return workbench.WorkbenchConfig{}, err
 	}
-	stripped := stripForStorage(input.Config)
-	payload, err := json.Marshal(stripped)
+	normalized := normalizeForStorage(input.Config)
+	keyPage := layoutPreferenceKey(input.Page, normalized)
+	if keyPage != normalized.Page {
+		normalized.Page = keyPage
+	}
+	payload, err := json.Marshal(normalized)
 	if err != nil {
 		return workbench.WorkbenchConfig{}, err
 	}
 	row, err := s.queries.UpsertLayoutPreference(ctx, db.UpsertLayoutPreferenceParams{
 		UserEmail:  input.UserEmail,
-		Page:       string(input.Page),
+		Page:       string(keyPage),
 		View:       string(input.View),
 		ConfigJson: string(payload),
 	})
@@ -98,8 +135,8 @@ func (s *Service) Upsert(
 	if err := workbench.ValidateWorkbenchConfig(saved); err != nil {
 		return workbench.WorkbenchConfig{}, err
 	}
-	stripped = stripForStorage(saved)
-	return stripped, workbench.ValidateWorkbenchConfig(stripped)
+	normalized = normalizeForStorage(saved)
+	return normalized, workbench.ValidateWorkbenchConfig(normalized)
 }
 
 func (s *Service) Reset(

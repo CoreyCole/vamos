@@ -51,6 +51,7 @@ type WorkbenchDocContext struct {
 	RightRail          RightRailArgs
 	InitialSidebarOpen bool
 	InitialRailOpen    bool
+	SavedConfig        *WorkbenchConfig
 }
 
 type CenterDocPaneArgs struct {
@@ -72,12 +73,22 @@ func BuildDocWorkbenchState(input WorkbenchDocContext) (WorkbenchState, error) {
 		return WorkbenchState{}, fmt.Errorf("selected doc path is required")
 	}
 	defaults := DocWorkbenchDefaultsFor(input.EntryMode)
+	sidebarTab := defaults.SidebarTab
+	rightTab := defaults.RightTab
+	if input.SavedConfig != nil {
+		if input.SavedConfig.Tabs.SidebarTab != "" {
+			sidebarTab = input.SavedConfig.Tabs.SidebarTab
+		}
+		if input.SavedConfig.Tabs.RightRailTab != "" {
+			rightTab = input.SavedConfig.Tabs.RightRailTab
+		}
+	}
 	sidebar := input.Sidebar
-	sidebar.DefaultTab = defaults.SidebarTab
+	sidebar.DefaultTab = sidebarTab
 
 	rightRail := input.RightRail
-	if rightRail.ActiveTab == "" {
-		rightRail.ActiveTab = defaults.RightTab
+	if rightRail.ActiveTab == "" || input.SavedConfig != nil && input.SavedConfig.Tabs.RightRailTab != "" {
+		rightRail.ActiveTab = rightTab
 	}
 
 	page := WorkbenchPageThoughts
@@ -132,8 +143,9 @@ func BuildDocWorkbenchState(input WorkbenchDocContext) (WorkbenchState, error) {
 		ActivePath:   input.SelectedPath,
 		ContextMode:  string(rightRail.ActiveTab),
 		RouteHref:    routeHref,
+		SavedConfig:  input.SavedConfig,
 		Regions:      regions,
-		FocusDefault: !input.InitialSidebarOpen && !input.InitialRailOpen,
+		FocusDefault: input.SavedConfig == nil && !input.InitialSidebarOpen && !input.InitialRailOpen,
 		NormalRegions: []RegionNormalState{
 			{
 				SignalKey: "doc-workbench-sidebar",
