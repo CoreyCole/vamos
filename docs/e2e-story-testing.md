@@ -22,9 +22,10 @@ go run ./cmd/vamos-runtime e2e generate
 go run ./cmd/vamos-runtime e2e generate --check
 ```
 
-Run generated browser tests from a registered non-main workspace:
+Run generated browser tests from a registered non-main workspace. If the host serves a thoughts root outside the workspace checkout, set `VAMOS_E2E_THOUGHTS_ROOT` so fixtures create served documents in the same tree the browser reads.
 
 ```bash
+VAMOS_E2E_THOUGHTS_ROOT=/path/to/host/thoughts \
 go run ./cmd/vamos-runtime e2e run \
   --story durable-session-chat \
   --plan-dir thoughts/creative-mode-agent/plans/<plan-dir>
