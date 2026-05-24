@@ -77,6 +77,15 @@ func TestCleanupActivityRejectsUnmergedWithoutConfirmation(t *testing.T) {
 	}
 }
 
+func TestWorkspaceCleanupActionRejectsConfiguredCheckout(t *testing.T) {
+	action := workspaceCleanupAction(ImplWorkspaceView{
+		Runtime: snapshotFromState(Workspace{Slug: "work", CheckoutPath: "/repo/work", IsConfigured: true}, WorkspaceLifecycleState{}),
+	})
+	if !action.Disabled || action.DisabledReason != "configured checkout cannot be cleaned up" {
+		t.Fatalf("cleanup action = %+v, want configured checkout disabled", action)
+	}
+}
+
 func TestCleanupActivityRejectsConfiguredCheckout(t *testing.T) {
 	m, checkout := newTestManager(t)
 	m.discovery.ConfiguredCheckouts = map[string]ConfiguredCheckout{

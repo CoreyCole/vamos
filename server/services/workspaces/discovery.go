@@ -179,6 +179,7 @@ func workspaceFromConfiguredCheckout(
 		LogPath:         logPath,
 		StateDir:        bundle.StateDir,
 		IsMain:          isMain,
+		IsConfigured:    true,
 		DiscoveredAt:    discoveredAt,
 		Branch:          branch,
 		Commit:          commit,

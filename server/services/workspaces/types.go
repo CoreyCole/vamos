@@ -178,6 +178,7 @@ type Workspace struct {
 	LogPath         string
 	StateDir        string
 	IsMain          bool
+	IsConfigured    bool
 	DiscoveredAt    time.Time
 	Stack           StackSummary
 }

@@ -89,6 +89,11 @@ func workspaceCleanupAction(view ImplWorkspaceView) WorkspaceCleanupAction {
 		action.DisabledReason = "main workspace cannot be cleaned up"
 		return action
 	}
+	if view.Runtime.Workspace.IsConfigured {
+		action.Disabled = true
+		action.DisabledReason = "configured checkout cannot be cleaned up"
+		return action
+	}
 	switch view.Row.Status {
 	case string(ImplWorkspaceStatusMerged):
 		action.Label = "Clean up"
