@@ -1,5 +1,3 @@
-const initialized = new WeakSet();
-
 export function scrollAgentChatToBottom(root = document) {
   const region =
     root.querySelector?.("#agent-chat-scroll-region") ||
@@ -11,8 +9,6 @@ export function scrollAgentChatToBottom(root = document) {
 export function initAgentChatInitialScroll(root = document) {
   const regions = root.querySelectorAll?.("#agent-chat-scroll-region") || [];
   for (const region of regions) {
-    if (initialized.has(region)) continue;
-    initialized.add(region);
     requestAnimationFrame(() => {
       region.scrollTop = region.scrollHeight;
       requestAnimationFrame(() => {

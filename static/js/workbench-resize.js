@@ -225,6 +225,7 @@ function currentConfig(root) {
 function saveConfig(root) {
   fetch("/api/layout-preferences", {
     method: "POST",
+    keepalive: true,
     headers: {
       "Content-Type": "application/json",
       Accept: "text/event-stream",

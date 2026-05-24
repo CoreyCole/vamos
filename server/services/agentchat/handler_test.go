@@ -1581,6 +1581,14 @@ func TestAgentChatInitialScrollSource(t *testing.T) {
 			t.Fatalf("agent-chat-scroll.js missing %q", want)
 		}
 	}
+	for _, unwanted := range []string{
+		"WeakSet",
+		"initialized.has(region)",
+	} {
+		if strings.Contains(body, unwanted) {
+			t.Fatalf("agent-chat-scroll.js should keep patch scroll idempotent; found %q", unwanted)
+		}
+	}
 }
 
 func TestChatMarkdownRawHTMLIsIgnoredByDatastar(t *testing.T) {

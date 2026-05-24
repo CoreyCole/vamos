@@ -447,6 +447,7 @@ func TestWorkbenchResizeJSShowsHandlesForVisibleAdjacentRegions(t *testing.T) {
 		"visible: regionVisibleFromRoot(root, region)",
 		"workbench-state-changed",
 		"saveBeforeNavigation",
+		"keepalive: true",
 	} {
 		if !strings.Contains(js, want) {
 			t.Fatalf("workbench-resize.js missing %q in %s", want, js)
