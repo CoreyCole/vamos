@@ -73,6 +73,9 @@ func RunE2E(ctx context.Context, cfg RunConfig) error {
 	}
 
 	args := BuildGoTestArgs(cfg)
+	if err := ensureSelectedTestsExist(ctx, args); err != nil {
+		return err
+	}
 	cmd := exec.CommandContext(ctx, "go", args...)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
@@ -149,6 +152,49 @@ func BuildGoTestArgs(cfg RunConfig) []string {
 		args = append(args, "-run", pattern)
 	}
 	return args
+}
+
+func ensureSelectedTestsExist(ctx context.Context, args []string) error {
+	pattern := ""
+	for i := 0; i < len(args)-1; i++ {
+		if args[i] == "-run" {
+			pattern = args[i+1]
+			break
+		}
+	}
+	if pattern == "" {
+		return nil
+	}
+	listArgs := []string{"test", "./pkg/e2e/generated", "-list", pattern}
+	listCmd := exec.CommandContext(ctx, "go", listArgs...)
+	listCmd.Dir = repoRootForCommand(".")
+	out, err := listCmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("go %v: %w\n%s", listArgs, err, strings.TrimSpace(string(out)))
+	}
+	for _, line := range strings.Split(string(out), "\n") {
+		if strings.HasPrefix(strings.TrimSpace(line), "Test") {
+			return nil
+		}
+	}
+	return fmt.Errorf("no generated E2E tests matched -run %q", pattern)
+}
+
+func repoRootForCommand(cwd string) string {
+	abs, err := filepath.Abs(cwd)
+	if err != nil {
+		return cwd
+	}
+	for {
+		if _, err := os.Stat(filepath.Join(abs, "go.mod")); err == nil {
+			return abs
+		}
+		parent := filepath.Dir(abs)
+		if parent == abs {
+			return cwd
+		}
+		abs = parent
+	}
 }
 
 func slugToTestFragment(slug string) string {

@@ -2,6 +2,8 @@ package e2ecmd
 
 import (
 	"bytes"
+	"context"
+	"strings"
 	"testing"
 )
 
@@ -40,6 +42,18 @@ func TestBuildGoTestArgs(t *testing.T) {
 		if got[i] != want[i] {
 			t.Fatalf("BuildGoTestArgs()=%v want %v", got, want)
 		}
+	}
+}
+
+func TestEnsureSelectedTestsExistRejectsNoMatch(t *testing.T) {
+	err := ensureSelectedTestsExist(context.Background(), []string{
+		"test",
+		"./pkg/e2e/generated",
+		"-run",
+		"DefinitelyNoGeneratedE2ETestMatchesThis",
+	})
+	if err == nil || !strings.Contains(err.Error(), "no generated E2E tests matched") {
+		t.Fatalf("ensureSelectedTestsExist() error = %v", err)
 	}
 }
 
