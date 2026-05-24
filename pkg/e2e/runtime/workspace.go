@@ -41,7 +41,7 @@ func ReadWorkspaceEnv(checkout string) (WorkspaceIdentity, error) {
 
 	dbPath := vals["VAMOS_DATABASE_PATH"]
 	if dbPath == "" {
-		dbPath = filepath.Join(checkout, ".vamos", "state", "vamos.db")
+		dbPath = filepath.Join(checkout, ".vamos", "state", "agents.db")
 	}
 	return WorkspaceIdentity{
 		Slug:         vals["VAMOS_WORKSPACE_SLUG"],

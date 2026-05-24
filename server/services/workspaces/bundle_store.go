@@ -74,6 +74,7 @@ func (s FileBundleStore) ReadWorkspaceEnv(ws Workspace) (WorkspaceEnv, error) {
 		CheckoutPath: meta.CheckoutPath,
 		ManagerURL:   meta.ManagerURL,
 		RestartToken: meta.RestartToken,
+		DatabasePath: meta.DatabasePath,
 	}, nil
 }
 
@@ -83,6 +84,7 @@ func (s FileBundleStore) WriteWorkspaceEnv(ws Workspace, env WorkspaceEnv) error
 		CheckoutPath: env.CheckoutPath,
 		ManagerURL:   env.ManagerURL,
 		RestartToken: env.RestartToken,
+		DatabasePath: env.DatabasePath,
 	})
 }
 

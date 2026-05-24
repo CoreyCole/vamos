@@ -14,6 +14,7 @@ type WorkspaceMetadata struct {
 	CheckoutPath string
 	ManagerURL   string
 	RestartToken string `json:"-"`
+	DatabasePath string
 	PID          int
 	Port         int
 }
@@ -26,12 +27,17 @@ func WriteMetadata(path string, meta WorkspaceMetadata) error {
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return err
 	}
+	databasePath := strings.TrimSpace(meta.DatabasePath)
+	if databasePath == "" && strings.TrimSpace(meta.CheckoutPath) != "" {
+		databasePath = RuntimePaths(meta.CheckoutPath).AgentsDB
+	}
 	content := fmt.Sprintf(
-		"VAMOS_WORKSPACE_SLUG=%s\nVAMOS_WORKSPACE_CHECKOUT=%s\nVAMOS_WORKSPACE_MANAGER_URL=%s\nVAMOS_WORKSPACE_RESTART_TOKEN=%s\nVAMOS_WORKSPACE_PID=%d\nVAMOS_WORKSPACE_PORT=%d\n",
+		"VAMOS_WORKSPACE_SLUG=%s\nVAMOS_WORKSPACE_CHECKOUT=%s\nVAMOS_WORKSPACE_MANAGER_URL=%s\nVAMOS_WORKSPACE_RESTART_TOKEN=%s\nVAMOS_DATABASE_PATH=%s\nVAMOS_WORKSPACE_PID=%d\nVAMOS_WORKSPACE_PORT=%d\n",
 		shellValue(meta.Slug),
 		shellValue(meta.CheckoutPath),
 		shellValue(meta.ManagerURL),
 		shellValue(meta.RestartToken),
+		shellValue(databasePath),
 		meta.PID,
 		meta.Port,
 	)
@@ -69,6 +75,7 @@ func ReadMetadata(path string) (WorkspaceMetadata, error) {
 		CheckoutPath: vals["VAMOS_WORKSPACE_CHECKOUT"],
 		ManagerURL:   vals["VAMOS_WORKSPACE_MANAGER_URL"],
 		RestartToken: vals["VAMOS_WORKSPACE_RESTART_TOKEN"],
+		DatabasePath: vals["VAMOS_DATABASE_PATH"],
 		PID:          pid,
 		Port:         port,
 	}, nil

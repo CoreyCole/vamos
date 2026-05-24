@@ -163,6 +163,7 @@ func ReconcileWorkspaceEnv(
 		CheckoutPath: ws.CheckoutPath,
 		ManagerURL:   managerURL,
 		RestartToken: restartToken,
+		DatabasePath: RuntimePaths(ws.CheckoutPath, ws.MetadataDirName).AgentsDB,
 	}
 	metadataPath := WorkspaceMetadataPath(ws.CheckoutPath, ws.MetadataDirName)
 	existing, err := ReadMetadata(metadataPath)
@@ -197,7 +198,8 @@ func workspaceMetadataMatches(existing, expected WorkspaceMetadata) bool {
 			existing.RestartToken,
 		) == strings.TrimSpace(
 			expected.RestartToken,
-		)
+		) &&
+		cleanPathKey(existing.DatabasePath) == cleanPathKey(expected.DatabasePath)
 }
 
 func readBestEffortPlanBinding(checkoutPath string) PlanWorkspaceBinding {

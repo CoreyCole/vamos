@@ -152,6 +152,7 @@ type WorkspaceEnv struct {
 	CheckoutPath string `json:"checkout_path"`
 	ManagerURL   string `json:"manager_url"`
 	RestartToken string `json:"restart_token"`
+	DatabasePath string `json:"database_path"`
 }
 
 type Workspace struct {
@@ -160,24 +161,24 @@ type Workspace struct {
 	CheckoutPath    string
 	PackagePath     string
 	MetadataDirName string
-	Host         string
-	URL          string
-	Status       Status
-	Phase        BundlePhase
-	BuildStatus  BuildStatus
-	Bundle       WorkspaceRuntimePaths
-	Ports        map[BundleComponent]int
-	PIDs         map[BundleComponent]int
-	Port         int
-	PID          int
-	Branch       string
-	Commit       string
-	Error        string
-	LogPath      string
-	StateDir     string
-	IsMain       bool
-	DiscoveredAt time.Time
-	Stack        StackSummary
+	Host            string
+	URL             string
+	Status          Status
+	Phase           BundlePhase
+	BuildStatus     BuildStatus
+	Bundle          WorkspaceRuntimePaths
+	Ports           map[BundleComponent]int
+	PIDs            map[BundleComponent]int
+	Port            int
+	PID             int
+	Branch          string
+	Commit          string
+	Error           string
+	LogPath         string
+	StateDir        string
+	IsMain          bool
+	DiscoveredAt    time.Time
+	Stack           StackSummary
 }
 
 type RecoveryModel struct {

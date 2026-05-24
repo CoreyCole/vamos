@@ -118,6 +118,7 @@ func TestFileBundleStoreRoundTrips(t *testing.T) {
 		CheckoutPath: ws.CheckoutPath,
 		ManagerURL:   "https://main.cn-agents.test",
 		RestartToken: "tok'en",
+		DatabasePath: RuntimePaths(ws.CheckoutPath).AgentsDB,
 	}
 	if err := store.WriteWorkspaceEnv(ws, env); err != nil {
 		t.Fatalf("WriteWorkspaceEnv: %v", err)

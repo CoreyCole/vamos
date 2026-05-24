@@ -32,7 +32,7 @@ func TestPreflightWorkspaceRejectsUnsafeWorkspaces(t *testing.T) {
 		Workspace: WorkspaceIdentity{
 			Slug:         "feature-a",
 			CheckoutPath: checkout,
-			DBPath:       filepath.Join(checkout, ".vamos", "state", "vamos.db"),
+			DBPath:       filepath.Join(checkout, ".vamos", "state", "agents.db"),
 		},
 	}
 	cases := []struct {
@@ -109,7 +109,7 @@ func newWorkspaceCheckout(t *testing.T, slug string) string {
 	}
 	db, err := sql.Open(
 		"sqlite",
-		filepath.Join(checkout, ".vamos", "state", "vamos.db"),
+		filepath.Join(checkout, ".vamos", "state", "agents.db"),
 	)
 	if err != nil {
 		t.Fatal(err)

@@ -14,11 +14,13 @@ import (
 
 func TestMetadataRoundTrip(t *testing.T) {
 	path := RuntimePaths(filepath.Join(t.TempDir(), "checkout with spaces")).WorkspaceEnv
+	checkoutPath := filepath.Join(t.TempDir(), "checkout with spaces and 'quote'")
 	want := WorkspaceMetadata{
 		Slug:         "foo",
-		CheckoutPath: filepath.Join(t.TempDir(), "checkout with spaces and 'quote'"),
+		CheckoutPath: checkoutPath,
 		ManagerURL:   "https://main.cn-agents.test",
 		RestartToken: "tok'en",
+		DatabasePath: RuntimePaths(checkoutPath).AgentsDB,
 		PID:          1234,
 		Port:         4567,
 	}
