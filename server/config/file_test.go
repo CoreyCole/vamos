@@ -169,6 +169,48 @@ func TestNormalHostConfigDoesNotRequireVamosSourceCheckout(t *testing.T) {
 	}
 }
 
+func TestLoadFromEnvAndFileOverlaysWorkspaceChildEnv(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	path := filepath.Join(t.TempDir(), "config.yml")
+	if err := os.WriteFile(path, []byte(`app:
+  name: Vamos
+runtime:
+  thoughts_repo: ~/host
+  thoughts_root: ~/host/thoughts
+  state_dir: ~/.local/state/vamos
+auth:
+  dev_auth_signing_key: signing-key
+web:
+  listen_address: :4200
+  public_base_url: https://main.example.test
+workspaces:
+  mode: manager
+  domain: example.test
+  slug: main
+  manager_url: https://main.example.test
+  restart_token: manager-token
+`), 0o644); err != nil {
+		t.Fatalf("write config: %v", err)
+	}
+	t.Setenv(EnvConfigPath, path)
+	t.Setenv("VAMOS_WORKSPACE_MODE", "child")
+	t.Setenv("VAMOS_WORKSPACE_SLUG", "work")
+	t.Setenv("VAMOS_WORKSPACE_MANAGER_URL", "https://main.example.test")
+	t.Setenv("VAMOS_WORKSPACE_RESTART_TOKEN", "child-token")
+	t.Setenv("VAMOS_DEV_AUTH_VERIFY_KEY", "verify-key")
+
+	cfg, err := LoadFromEnvAndFile()
+	if err != nil {
+		t.Fatalf("LoadFromEnvAndFile() error = %v", err)
+	}
+	if cfg.Workspaces.Mode != "child" || cfg.Workspaces.Slug != "work" ||
+		cfg.Workspaces.RestartToken != "child-token" ||
+		cfg.Auth.DevAuthVerifyKey != "verify-key" {
+		t.Fatalf("workspace env overlay failed: %+v auth=%+v", cfg.Workspaces, cfg.Auth)
+	}
+}
+
 func TestRejectLegacyConfig(t *testing.T) {
 	for _, env := range []string{
 		"CN_AGENTS_LISTEN_ADDRESS=:4200",

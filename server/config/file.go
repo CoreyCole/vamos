@@ -313,6 +313,14 @@ func overlayEnv(cfg *server.HostConfig) {
 	overlayString(&cfg.Auth.PlaywrightToken, "VAMOS_PLAYWRIGHT_AUTH_TOKEN")
 	overlayString(&cfg.Web.ListenAddress, "VAMOS_LISTEN_ADDRESS")
 	overlayString(&cfg.Web.PublicBaseURL, "VAMOS_PUBLIC_BASE_URL")
+	overlayString(&cfg.Workspaces.Mode, "VAMOS_WORKSPACE_MODE")
+	overlayString(&cfg.Workspaces.Domain, "VAMOS_WORKSPACE_DOMAIN")
+	overlayString(&cfg.Workspaces.ParentDir, "VAMOS_WORKSPACE_PARENT_DIR")
+	overlayString(&cfg.Workspaces.StateDir, "VAMOS_WORKSPACE_STATE_DIR")
+	overlayString(&cfg.Workspaces.MetadataDirName, "VAMOS_WORKSPACE_METADATA_DIR")
+	overlayString(&cfg.Workspaces.Slug, "VAMOS_WORKSPACE_SLUG")
+	overlayString(&cfg.Workspaces.ManagerURL, "VAMOS_WORKSPACE_MANAGER_URL")
+	overlayString(&cfg.Workspaces.RestartToken, "VAMOS_WORKSPACE_RESTART_TOKEN")
 }
 
 func overlayString(dst *string, envName string) {
