@@ -75,8 +75,9 @@ type ReleaseQueueView struct {
 }
 
 type ReleasePanelModel struct {
-	Enabled bool
-	Lanes   []ReleaseLaneView
-	Queue   ReleaseQueueView
-	History []ReleaseQueueItem
+	Enabled        bool
+	Lanes          []ReleaseLaneView
+	FeatureActions []ReleaseActionView
+	Queue          ReleaseQueueView
+	History        []ReleaseQueueItem
 }

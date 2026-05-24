@@ -62,6 +62,17 @@ func (p *ReleaseProjector) BuildPanel(ctx context.Context, views []ImplWorkspace
 			actions := p.evaluateActions(ctx, def, lanes, ws, active)
 			panel.Lanes = append(panel.Lanes, ReleaseLaneView{ID: lane.ID, Label: lane.Label, Workspace: ws, Actions: actions})
 		}
+		for _, ws := range workspaces {
+			if workspaceIsReleaseLane(lanes, ws) {
+				continue
+			}
+			actions := p.evaluateActions(ctx, def, lanes, ws, active)
+			for _, action := range actions {
+				if action.SourceSlug != "" {
+					panel.FeatureActions = append(panel.FeatureActions, action)
+				}
+			}
+		}
 	}
 	return panel, nil
 }
@@ -245,6 +256,15 @@ func matchReleaseLanes(def release.Definition, workspaces []Workspace) map[relea
 
 func workspaceMatchesLane(ws Workspace, lane release.LaneDefinition) bool {
 	return strings.TrimSpace(ws.Slug) == strings.TrimSpace(lane.CheckoutSlug)
+}
+
+func workspaceIsReleaseLane(lanes map[release.LaneID]Workspace, ws Workspace) bool {
+	for _, laneWS := range lanes {
+		if laneWS.Slug != "" && laneWS.Slug == ws.Slug {
+			return true
+		}
+	}
+	return false
 }
 
 func flowAppliesToWorkspace(flow release.FlowDefinition, lanes map[release.LaneID]Workspace, ws Workspace) bool {

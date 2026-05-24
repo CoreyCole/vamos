@@ -60,6 +60,9 @@ type Handler struct {
 	verifier             *Verifier
 	provisionStarter     WorkspaceProvisionStarter
 	releaseProjector     *ReleaseProjector
+	releaseStore         ReleaseQueueStore
+	releaseStarter       ReleaseWorkflowStarter
+	cleanupStarter       WorkspaceCleanupStarter
 	exitFunc             func(int)
 }
 
@@ -143,6 +146,20 @@ func WithReleaseProjector(projector *ReleaseProjector) HandlerOption {
 	}
 }
 
+func WithReleaseQueue(projector *ReleaseProjector, store ReleaseQueueStore, starter ReleaseWorkflowStarter) HandlerOption {
+	return func(h *Handler) {
+		h.releaseProjector = projector
+		h.releaseStore = store
+		h.releaseStarter = starter
+	}
+}
+
+func WithWorkspaceCleanupStarter(starter WorkspaceCleanupStarter) HandlerOption {
+	return func(h *Handler) {
+		h.cleanupStarter = starter
+	}
+}
+
 // Deprecated: use WithWorkspaceSyncRefresh.
 func WithPlanWorkspaceRefresh(refresh WorkspaceSyncRefreshFunc) HandlerOption {
 	return WithWorkspaceSyncRefresh(refresh)
@@ -185,6 +202,8 @@ func (h *Handler) RegisterRoutes(e *echo.Echo, authMiddleware echo.MiddlewareFun
 	g.POST("/:slug/stop", h.HandleStop)
 	g.POST("/:slug/restart", h.HandleRestart)
 	g.POST("/host-action", h.HandleWorkspaceHostAction)
+	g.POST("/release/enqueue", h.HandleEnqueueRelease)
+	g.POST("/cleanup", h.HandleCleanupWorkspace)
 }
 
 func (h *Handler) RegisterDevAuthRoute(e *echo.Echo) {
@@ -221,10 +240,14 @@ func (h *Handler) HandleWorkspacesPage(c echo.Context) error {
 		CurrentWorkspaceSlug: h.currentSlug,
 		WorkspaceManagerURL:  h.managerURL,
 	}
+	releasePanel, err := h.releasePanelForViews(c.Request().Context(), views)
+	if err != nil {
+		return err
+	}
 	return render(
 		c,
 		http.StatusOK,
-		WorkspacesDocument(args, renderedViews, h.isRefreshInFlight(), showHistorical),
+		WorkspacesDocument(args, renderedViews, releasePanel, h.isRefreshInFlight(), showHistorical),
 	)
 }
 
@@ -336,19 +359,11 @@ func (h *Handler) lifecycleAction(
 		return err
 	}
 	if isDatastarRequest(c.Request()) {
-		showHistorical := showHistoricalFromRequest(c.Request())
 		views, err := h.listImplWorkspaceViews(c.Request().Context())
 		if err != nil {
 			views = lifecycleSnapshotsToImplViews([]WorkspaceLifecycleSnapshot{snap})
 		}
-		views = filterHistoricalImplWorkspaceViews(views, showHistorical)
-		sse := datastar.NewSSE(c.Response().Writer, c.Request())
-		c.Response().WriteHeader(http.StatusAccepted)
-		return sse.PatchElementTempl(
-			WorkspacesList(views, h.managerURL, showHistorical),
-			datastar.WithSelectorID("workspaces-list"),
-			datastar.WithModeOuter(),
-		)
+		return h.patchWorkspaces(c, views)
 	}
 	return c.JSON(http.StatusAccepted, snap)
 }
@@ -371,6 +386,17 @@ func (h *Handler) HandleWorkspacesStream(c echo.Context) error {
 		if err := sse.PatchElementTempl(
 			WorkspacesHeader(h.isRefreshInFlight(), showHistorical),
 			datastar.WithSelectorID("workspaces-header"),
+			datastar.WithModeOuter(),
+		); err != nil {
+			return err
+		}
+		releasePanel, err := h.releasePanelForViews(c.Request().Context(), views)
+		if err != nil {
+			return err
+		}
+		if err := sse.PatchElementTempl(
+			ReleasePanel(releasePanel),
+			datastar.WithSelectorID("release-queue-panel"),
 			datastar.WithModeOuter(),
 		); err != nil {
 			return err
@@ -727,6 +753,13 @@ func (h *Handler) listImplWorkspaceViews(
 	}
 	main, nonMain := splitMainSnapshot(runtime)
 	return BuildImplWorkspaceViews(rows, nonMain, main), nil
+}
+
+func (h *Handler) releasePanelForViews(ctx context.Context, views []ImplWorkspaceView) (ReleasePanelModel, error) {
+	if h.releaseProjector == nil {
+		return ReleasePanelModel{Enabled: false}, nil
+	}
+	return h.releaseProjector.BuildPanel(ctx, views)
 }
 
 func snapshotsToWorkspaces(items []WorkspaceLifecycleSnapshot) []Workspace {

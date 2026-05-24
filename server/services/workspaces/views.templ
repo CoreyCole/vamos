@@ -7,25 +7,27 @@ import (
 	"github.com/CoreyCole/vamos/server/layouts"
 )
 
-templ WorkspacesDocument(args layouts.RootArgs, items []ImplWorkspaceView, refreshing bool, showHistorical bool) {
+templ WorkspacesDocument(args layouts.RootArgs, items []ImplWorkspaceView, releasePanel ReleasePanelModel, refreshing bool, showHistorical bool) {
 	@layouts.Root(args) {
-		@WorkspacesPageWithRefresh(items, args.WorkspaceManagerURL, refreshing, showHistorical)
+		@WorkspacesPageWithRefresh(items, releasePanel, args.WorkspaceManagerURL, refreshing, showHistorical)
 	}
 }
 
 templ WorkspacesPage(items []ImplWorkspaceView, managerURL string, showHistorical bool) {
-	@WorkspacesPageWithRefresh(items, managerURL, false, showHistorical)
+	@WorkspacesPageWithRefresh(items, ReleasePanelModel{}, managerURL, false, showHistorical)
 }
 
-templ WorkspacesPageWithRefresh(items []ImplWorkspaceView, managerURL string, refreshing bool, showHistorical bool) {
+templ WorkspacesPageWithRefresh(items []ImplWorkspaceView, releasePanel ReleasePanelModel, managerURL string, refreshing bool, showHistorical bool) {
 	if showHistorical {
 		<section class="mx-auto flex h-full w-full max-w-6xl flex-col gap-4 overflow-y-auto p-6" data-init="@get('/workspaces/stream?show_historical=true')">
 			@WorkspacesHeader(refreshing, showHistorical)
+			@ReleasePanel(releasePanel)
 			@WorkspacesList(items, managerURL, showHistorical)
 		</section>
 	} else {
 		<section class="mx-auto flex h-full w-full max-w-6xl flex-col gap-4 overflow-y-auto p-6" data-init="@get('/workspaces/stream')">
 			@WorkspacesHeader(refreshing, showHistorical)
+			@ReleasePanel(releasePanel)
 			@WorkspacesList(items, managerURL, showHistorical)
 		</section>
 	}
@@ -64,6 +66,119 @@ templ WorkspacesHeader(refreshing bool, showHistorical bool) {
 				</button>
 			</form>
 		</div>
+	</div>
+}
+
+templ ReleasePanel(panel ReleasePanelModel) {
+	<section id="release-queue-panel" class="rounded-xl border bg-card p-4 text-card-foreground shadow-sm">
+		<div class="flex flex-col gap-1">
+			<h2 class="text-lg font-semibold tracking-tight">Release queue</h2>
+			<p class="text-sm text-muted-foreground">Workflow-backed release actions and durable history.</p>
+		</div>
+		if !panel.Enabled {
+			<p class="mt-3 text-sm text-muted-foreground">Release queue not configured.</p>
+		} else {
+			<div class="mt-4 grid gap-4 lg:grid-cols-[1fr_1fr]">
+				<div class="space-y-3">
+					<h3 class="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Lanes</h3>
+					for _, lane := range panel.Lanes {
+						<div class="rounded-lg border p-3">
+							<div class="flex items-start justify-between gap-3">
+								<div class="min-w-0">
+									<p class="font-medium">{ lane.Label }</p>
+									<p class="break-all font-mono text-xs text-muted-foreground">{ lane.Workspace.Slug }</p>
+								</div>
+								if lane.Workspace.Commit != "" {
+									<span class="rounded-full border px-2 py-1 font-mono text-xs text-muted-foreground">{ lane.Workspace.Commit }</span>
+								}
+							</div>
+							if len(lane.Actions) > 0 {
+								<div class="mt-3 flex flex-wrap gap-2">
+									for _, action := range lane.Actions {
+										@ReleaseActionForm(action)
+									}
+								</div>
+							}
+						</div>
+					}
+					if len(panel.FeatureActions) > 0 {
+						<h3 class="pt-2 text-sm font-semibold uppercase tracking-wide text-muted-foreground">Workspace actions</h3>
+						<div class="flex flex-wrap gap-2 rounded-lg border p-3">
+							for _, action := range panel.FeatureActions {
+								@ReleaseActionForm(action)
+							}
+						</div>
+					}
+				</div>
+				<div class="space-y-3">
+					<h3 class="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Active</h3>
+					<div id="release-active-item" class="space-y-2">
+						if len(panel.Queue.Active) == 0 && len(panel.Queue.Pending) == 0 {
+							<p class="text-sm text-muted-foreground">No active release work.</p>
+						}
+						for _, item := range panel.Queue.Active {
+							@ReleaseQueueItemCard(item)
+						}
+						for _, item := range panel.Queue.Pending {
+							@ReleaseQueueItemCard(item)
+						}
+					</div>
+					<h3 class="text-sm font-semibold uppercase tracking-wide text-muted-foreground">History</h3>
+					<div id="release-history" class="space-y-2">
+						if len(panel.History) == 0 {
+							<p class="text-sm text-muted-foreground">No release history yet.</p>
+						}
+						for _, item := range panel.History {
+							@ReleaseQueueItemCard(item)
+						}
+					</div>
+				</div>
+			</div>
+		}
+	</section>
+}
+
+templ ReleaseActionForm(action ReleaseActionView) {
+	{{ indicator := workspaceActionIndicator(action.SourceSlug, string(action.FlowID)) }}
+	{{ indicatorSignal := workspaceActionIndicatorSignal(action.SourceSlug, string(action.FlowID)) }}
+	<form method="post" action="/workspaces/release/enqueue" data-indicator={ indicator } data-on:submit="@post('/workspaces/release/enqueue', {contentType: 'form'})">
+		<input type="hidden" name="definition_id" value={ string(action.DefinitionID) }/>
+		<input type="hidden" name="definition_version" value={ action.DefinitionVersion }/>
+		<input type="hidden" name="flow_id" value={ string(action.FlowID) }/>
+		<input type="hidden" name="source_slug" value={ action.SourceSlug }/>
+		<input type="hidden" name="expected_source_commit" value={ action.ExpectedSourceCommit }/>
+		<input type="hidden" name="expected_target_commit" value={ action.ExpectedTargetCommit }/>
+		<button
+			type="submit"
+			data-attr-disabled={ indicatorSignal }
+			class="inline-flex h-9 items-center rounded-md border px-3 text-sm font-medium hover:bg-accent disabled:pointer-events-none disabled:opacity-50"
+			if action.Disabled {
+				disabled
+			}
+			title={ releaseDisabledReason(action) }
+		>
+			<span data-show={ "!" + indicatorSignal }>{ releaseActionLabel(action) }</span>
+			<span data-show={ indicatorSignal }>Enqueueing...</span>
+		</button>
+		if action.Disabled {
+			<p class="mt-1 text-xs text-muted-foreground">{ releaseDisabledReason(action) }</p>
+		}
+	</form>
+}
+
+templ ReleaseQueueItemCard(item ReleaseQueueItem) {
+	<div class="rounded-lg border p-3 text-sm">
+		<div class="flex flex-wrap items-center justify-between gap-2">
+			<span class="font-mono text-xs">{ item.ID }</span>
+			<span class="rounded-full border px-2 py-1 text-xs">{ string(item.Status) }</span>
+		</div>
+		<p class="mt-1 text-xs text-muted-foreground">{ string(item.FlowID) } · { item.SourceSlug } → { item.TargetLane }</p>
+		if item.CurrentNodeID != "" {
+			<p class="mt-1 text-xs text-muted-foreground">Step: { string(item.CurrentNodeID) }</p>
+		}
+		if item.ErrorMessage != "" {
+			<p class="mt-2 text-xs text-destructive">{ item.ErrorMessage }</p>
+		}
 	</div>
 }
 
@@ -267,6 +382,7 @@ templ ImplWorkspaceCard(view ImplWorkspaceView, managerURL string, showHistorica
 			}
 		</dl>
 		<div class="mt-auto flex flex-wrap justify-end gap-2 pt-2">
+			@WorkspaceCleanupButton(workspaceCleanupAction(view))
 			if canActOnImplWorkspace(view) && normalizedObservedState(snap) == WorkspaceObservedRunning && ws.URL != "" {
 				<a href={ templ.SafeURL(managerURL + "/workspaces/switch/" + slug + "?redirect=" + url.QueryEscape("/")) } class="inline-flex h-9 items-center rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground hover:bg-primary/90">Open</a>
 			}
@@ -320,4 +436,33 @@ templ ImplWorkspaceCard(view ImplWorkspaceView, managerURL string, showHistorica
 			}
 		</div>
 	</article>
+}
+
+templ WorkspaceCleanupButton(action WorkspaceCleanupAction) {
+	if action.Slug != "" && !action.Disabled {
+		{{ indicator := workspaceActionIndicator(action.Slug, "cleanup") }}
+		{{ indicatorSignal := workspaceActionIndicatorSignal(action.Slug, "cleanup") }}
+		if action.RequiresConfirm {
+			<details class="max-w-xs rounded-md border p-2">
+				<summary class="cursor-pointer text-sm font-medium text-destructive">{ action.Label }</summary>
+				<p class="mt-2 text-xs text-amber-700 dark:text-amber-300">{ action.Warning }</p>
+				<form method="post" action="/workspaces/cleanup" class="mt-2" data-indicator={ indicator } data-on:submit="@post('/workspaces/cleanup', {contentType: 'form'})">
+					<input type="hidden" name="slug" value={ action.Slug }/>
+					<input type="hidden" name="confirmed" value="true"/>
+					<button type="submit" data-attr-disabled={ indicatorSignal } class="inline-flex h-8 items-center rounded-md border border-destructive/40 px-2 text-xs font-medium text-destructive hover:bg-destructive/10 disabled:pointer-events-none disabled:opacity-50">
+						<span data-show={ "!" + indicatorSignal }>Confirm close</span>
+						<span data-show={ indicatorSignal }>Working...</span>
+					</button>
+				</form>
+			</details>
+		} else {
+			<form method="post" action="/workspaces/cleanup" data-indicator={ indicator } data-on:submit="@post('/workspaces/cleanup', {contentType: 'form'})">
+				<input type="hidden" name="slug" value={ action.Slug }/>
+				<button type="submit" data-attr-disabled={ indicatorSignal } class="inline-flex h-9 items-center rounded-md border px-3 text-sm font-medium hover:bg-accent disabled:pointer-events-none disabled:opacity-50">
+					<span data-show={ "!" + indicatorSignal }>{ action.Label }</span>
+					<span data-show={ indicatorSignal }>Working...</span>
+				</button>
+			</form>
+		}
+	}
 }
