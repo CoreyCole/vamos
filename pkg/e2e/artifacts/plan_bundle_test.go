@@ -74,13 +74,15 @@ func TestExportPlanBundleCopiesArtifactsAndIndex(t *testing.T) {
 	}
 }
 
-func TestExportPlanBundleRejectsUnsafeRelativePlanDir(t *testing.T) {
-	_, err := ExportPlanBundle(
-		context.Background(),
-		RunManifest{ID: "run-1"},
-		PlanBundleOptions{PlanDir: "tmp/not-thoughts"},
-	)
-	if err == nil {
-		t.Fatal("ExportPlanBundle() error = nil, want unsafe relative plan dir rejection")
+func TestExportPlanBundleRejectsUnsafePlanDirs(t *testing.T) {
+	for _, planDir := range []string{"tmp/not-thoughts", filepath.Join(t.TempDir(), "not-thoughts")} {
+		_, err := ExportPlanBundle(
+			context.Background(),
+			RunManifest{ID: "run-1"},
+			PlanBundleOptions{PlanDir: planDir},
+		)
+		if err == nil {
+			t.Fatalf("ExportPlanBundle(%q) error = nil, want unsafe plan dir rejection", planDir)
+		}
 	}
 }

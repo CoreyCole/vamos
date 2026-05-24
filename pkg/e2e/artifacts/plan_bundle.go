@@ -117,10 +117,19 @@ func safePlanDir(planDir string) (string, error) {
 			return "", fmt.Errorf("plan dir must not contain '..': %s", planDir)
 		}
 	}
-	if !filepath.IsAbs(clean) && parts[0] != "thoughts" {
+	if !planDirHasThoughtsRoot(parts) {
 		return "", fmt.Errorf("plan dir must be under thoughts/: %s", planDir)
 	}
 	return clean, nil
+}
+
+func planDirHasThoughtsRoot(parts []string) bool {
+	for _, part := range parts {
+		if part == "thoughts" {
+			return true
+		}
+	}
+	return false
 }
 
 func writeJSONFile(path string, value any) error {

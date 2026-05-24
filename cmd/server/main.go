@@ -54,6 +54,26 @@ type proxyRewrite struct {
 	new         string
 }
 
+func resolveStaticRoot() string {
+	if root := strings.TrimSpace(os.Getenv("VAMOS_STATIC_ROOT")); root != "" {
+		return root
+	}
+	if _, err := os.Stat(filepath.Join("static", "css", "index.css")); err == nil {
+		return "static"
+	}
+	exe, err := os.Executable()
+	if err == nil {
+		if resolved, err := filepath.EvalSymlinks(exe); err == nil {
+			exe = resolved
+		}
+		candidate := filepath.Join(filepath.Dir(exe), "static")
+		if _, err := os.Stat(filepath.Join(candidate, "css", "index.css")); err == nil {
+			return candidate
+		}
+	}
+	return "static"
+}
+
 func newPrefixStrippingProxy(
 	targetURL, prefix string,
 	rewrites ...proxyRewrite,
@@ -1009,12 +1029,14 @@ func main() {
 	)
 	e.Any(commentsPath+"*", echo.WrapHandler(commentsRPCHandler))
 
-	// Static files
-	e.Static("/static", "static/")
-	e.Static("/css", "static/css/")
-	e.Static("/js", "static/js/")
-	e.Static("/img", "static/img/")
-	e.File("/manifest.json", "static/manifest.json")
+	// Static files. Resolve relative to the runtime package when the host
+	// binary is launched from a wrapper checkout with a different working dir.
+	staticRoot := resolveStaticRoot()
+	e.Static("/static", staticRoot)
+	e.Static("/css", filepath.Join(staticRoot, "css"))
+	e.Static("/js", filepath.Join(staticRoot, "js"))
+	e.Static("/img", filepath.Join(staticRoot, "img"))
+	e.File("/manifest.json", filepath.Join(staticRoot, "manifest.json"))
 
 	// Setup webhook service (only when secret is configured)
 	if cfg.WebhookSecret != "" {
