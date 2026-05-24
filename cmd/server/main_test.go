@@ -183,6 +183,37 @@ func TestHostFromBaseURL(t *testing.T) {
 	}
 }
 
+func TestRegisterChildWorkspaceRedirectSendsWorkspaceRoutesToManager(t *testing.T) {
+	t.Parallel()
+
+	e := echo.New()
+	registerChildWorkspaceRedirect(e, "https://main.cn-agents.test/")
+	e.GET("/*", func(c echo.Context) error { return c.String(http.StatusOK, "child") })
+
+	for _, tc := range []struct {
+		path string
+		want string
+	}{
+		{path: "/workspaces", want: "https://main.cn-agents.test/workspaces"},
+		{path: "/workspaces/start/work?redirect=%2F", want: "https://main.cn-agents.test/workspaces/start/work?redirect=%2F"},
+	} {
+		rec := httptest.NewRecorder()
+		e.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, tc.path, nil))
+		if rec.Code != http.StatusTemporaryRedirect {
+			t.Fatalf("%s status = %d, want %d", tc.path, rec.Code, http.StatusTemporaryRedirect)
+		}
+		if got := rec.Header().Get("Location"); got != tc.want {
+			t.Fatalf("%s Location = %q, want %q", tc.path, got, tc.want)
+		}
+	}
+
+	rec := httptest.NewRecorder()
+	e.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/agent-chat", nil))
+	if rec.Code != http.StatusOK || rec.Body.String() != "child" {
+		t.Fatalf("non-workspaces route status = %d body = %q", rec.Code, rec.Body.String())
+	}
+}
+
 func validSigningKeyForTest(t *testing.T) string {
 	t.Helper()
 	seed := make([]byte, ed25519.SeedSize)

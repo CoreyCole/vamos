@@ -691,6 +691,105 @@ func TestIndexPiSessionsUpsertsInferredPlanDir(t *testing.T) {
 	}
 }
 
+func TestPiSessionFilesSurviveWorkspaceCleanupLocation(t *testing.T) {
+	t.Parallel()
+	service := newTestAgentChatService(t)
+	service.piSessionsDir = t.TempDir()
+
+	workspaceCheckout := filepath.Join(t.TempDir(), "vamos-feature")
+	workspacePlanDir := filepath.Join(workspaceCheckout, "thoughts", "user", "plans", "cleanup-proof")
+	if err := os.MkdirAll(filepath.Join(workspaceCheckout, ".vamos", "state"), 0o755); err != nil {
+		t.Fatalf("MkdirAll(workspace state) error = %v", err)
+	}
+	if err := os.MkdirAll(workspacePlanDir, 0o755); err != nil {
+		t.Fatalf("MkdirAll(workspace plan) error = %v", err)
+	}
+	sessionPath := filepath.Join(service.piSessionsDir, "workspace", "cleanup-proof.jsonl")
+	writePiSessionFile(
+		t,
+		sessionPath,
+		`{"type":"session","id":"cleanup-proof","timestamp":"2026-05-24T12:00:00Z","cwd":`+strconv.Quote(workspacePlanDir)+`}`,
+		`{"type":"message","id":"user-1","timestamp":"2026-05-24T12:00:01Z","message":{"role":"user","content":"sandbox verification"}}`,
+	)
+
+	if err := os.RemoveAll(workspaceCheckout); err != nil {
+		t.Fatalf("RemoveAll(workspaceCheckout) error = %v", err)
+	}
+	if _, err := os.Stat(sessionPath); err != nil {
+		t.Fatalf("global Pi session file should survive checkout cleanup: %v", err)
+	}
+
+	result, err := service.indexPiSessions(
+		t.Context(),
+		PiSessionIndexRequest{UserEmail: "user@example.com", Reason: "cleanup-test"},
+	)
+	if err != nil {
+		t.Fatalf("indexPiSessions() error = %v", err)
+	}
+	if result.Indexed != 1 || result.Failed != 0 {
+		t.Fatalf("indexPiSessions() = %+v, want one indexed", result)
+	}
+	indexed, err := service.queries.GetAgentSessionByPath(t.Context(), nullString(sessionPath))
+	if err != nil {
+		t.Fatalf("GetAgentSessionByPath() error = %v", err)
+	}
+	wantPlanDir := filepath.Join(service.thoughtsRoot, "user", "plans", "cleanup-proof")
+	if indexed.InferredPlanDir.String != wantPlanDir || indexed.ThreadID.Valid {
+		t.Fatalf("indexed session = %#v, want remapped plan %q and no imported thread", indexed, wantPlanDir)
+	}
+}
+
+func TestPiSessionIndexDoesNotImportTranscriptWithoutOpenAction(t *testing.T) {
+	t.Parallel()
+	service := newTestAgentChatService(t)
+
+	copiedPlanDir := filepath.Join(
+		t.TempDir(),
+		"vamos-copy",
+		"thoughts",
+		"user",
+		"plans",
+		"index-only",
+	)
+	sessionPath := filepath.Join(service.piSessionsDir, "index-only.jsonl")
+	writePiSessionFile(
+		t,
+		sessionPath,
+		`{"type":"session","id":"index-only","timestamp":"2026-05-24T12:00:00Z","cwd":`+strconv.Quote(copiedPlanDir)+`}`,
+		`{"type":"message","id":"user-1","parentId":null,"timestamp":"2026-05-24T12:00:01Z","message":{"role":"user","content":"hello"}}`,
+		`{"type":"custom","id":"custom-1","parentId":"user-1","timestamp":"2026-05-24T12:00:02Z","customType":"plan-classification","data":{"planDir":"thoughts/user/plans/index-only","source":"prompt-path"}}`,
+		`{"type":"message","id":"assistant-1","parentId":"custom-1","timestamp":"2026-05-24T12:00:03Z","message":{"role":"assistant","content":"world"}}`,
+	)
+
+	result, err := service.indexPiSessions(
+		t.Context(),
+		PiSessionIndexRequest{UserEmail: "user@example.com", Reason: "index-only"},
+	)
+	if err != nil {
+		t.Fatalf("indexPiSessions() error = %v", err)
+	}
+	if result.Indexed != 1 || result.Imported != 0 {
+		t.Fatalf("indexPiSessions() = %+v, want metadata index without import", result)
+	}
+	threads, err := service.queries.ListAgentThreads(
+		t.Context(),
+		db.ListAgentThreadsParams{UserEmail: "user@example.com", Limit: 10},
+	)
+	if err != nil {
+		t.Fatalf("ListAgentThreads() error = %v", err)
+	}
+	if len(threads) != 0 {
+		t.Fatalf("indexed Pi session created %d transcript thread(s), want 0", len(threads))
+	}
+	indexed, err := service.queries.GetAgentSessionByPath(t.Context(), nullString(sessionPath))
+	if err != nil {
+		t.Fatalf("GetAgentSessionByPath() error = %v", err)
+	}
+	if indexed.ThreadID.Valid {
+		t.Fatalf("indexed session = %#v, want metadata without thread import", indexed)
+	}
+}
+
 func TestRequestPiSessionIndexCoalescesPerUser(t *testing.T) {
 	t.Parallel()
 	service := newTestAgentChatService(t)

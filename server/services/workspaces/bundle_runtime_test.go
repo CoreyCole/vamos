@@ -202,13 +202,74 @@ func TestChildEnvIncludesWorkspaceTemporalAndState(t *testing.T) {
 			},
 		),
 	)
+	assertWorkspaceRuntimePaths(t, ws, ws.CheckoutPath)
 	assertEnv(t, env, "CN_TEMPORAL", "true")
 	assertEnv(t, env, "TEMPORAL_ADDRESS", "127.0.0.1:7234")
 	assertEnv(t, env, "TEMPORAL_UI_BASE_URL", "http://127.0.0.1:8234")
 	assertEnv(t, env, "VAMOS_DATABASE_PATH", RuntimePaths(ws.CheckoutPath).AgentsDB)
 	assertEnv(t, env, "OPENCLAW_STATE_DIR", RuntimePaths(ws.CheckoutPath).OpenClawDir)
+	assertEnv(t, env, "VAMOS_WORKSPACE_MODE", "child")
+	assertEnv(t, env, "VAMOS_WORKSPACE_MANAGER_URL", "https://main.test")
+	assertEnv(t, env, "VAMOS_WORKSPACE_RESTART_TOKEN", "token")
 	assertEnv(t, env, "VAMOS_INTERNAL_CALLBACK_BASE_URL", "http://127.0.0.1:4100")
 	assertEnv(t, env, "VAMOS_THOUGHTS_ROOT", "/tmp/host/thoughts")
+}
+
+func TestConfiguredCheckoutUsesFeatureWorkspaceRuntimeShape(t *testing.T) {
+	parent := t.TempDir()
+	checkout := makeCheckout(t, parent, "vamos-work")
+
+	workspaces, err := Discover(DiscoveryConfig{
+		ParentDir: parent,
+		Domain:    "workspaces.example.test",
+		ConfiguredCheckouts: map[string]ConfiguredCheckout{
+			"work": {RootPath: checkout, DisplayName: "Working checkout"},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(workspaces) != 1 {
+		t.Fatalf("discovered %d workspaces, want 1", len(workspaces))
+	}
+	ws := workspaces[0]
+	if ws.Slug != "work" || ws.URL != "https://work.workspaces.example.test/" {
+		t.Fatalf("workspace = %#v", ws)
+	}
+	assertWorkspaceRuntimePaths(t, ws, checkout)
+
+	ports := map[BundleComponent]int{
+		ComponentWeb:        4100,
+		ComponentTemporal:   7234,
+		ComponentTemporalUI: 8234,
+	}
+	env := envMap(ChildEnv(nil, ws, ports, RuntimeConfig{ManagerURL: "https://main.test", RestartToken: "token"}))
+	assertEnv(t, env, "VAMOS_WORKSPACE_MODE", "child")
+	assertEnv(t, env, "VAMOS_DATABASE_PATH", filepath.Join(checkout, ".vamos", "state", "agents.db"))
+	assertEnv(t, env, "TEMPORAL_ADDRESS", "127.0.0.1:7234")
+	assertEnv(t, env, "OPENCLAW_STATE_DIR", filepath.Join(checkout, ".vamos", "state", "openclaw"))
+	assertEnv(t, env, "VAMOS_WORKSPACE_MANAGER_URL", "https://main.test")
+	assertEnv(t, env, "VAMOS_WORKSPACE_RESTART_TOKEN", "token")
+}
+
+func assertWorkspaceRuntimePaths(t *testing.T, ws Workspace, checkout string) {
+	t.Helper()
+	paths := RuntimePaths(checkout, ".vamos")
+	if paths.AgentsDB != filepath.Join(checkout, ".vamos", "state", "agents.db") {
+		t.Fatalf("AgentsDB = %q", paths.AgentsDB)
+	}
+	if paths.TemporalDB != filepath.Join(checkout, ".vamos", "state", "temporal.db") {
+		t.Fatalf("TemporalDB = %q", paths.TemporalDB)
+	}
+	if paths.OpenClawDir != filepath.Join(checkout, ".vamos", "state", "openclaw") {
+		t.Fatalf("OpenClawDir = %q", paths.OpenClawDir)
+	}
+	if ws.Bundle.AgentsDB != "" && ws.Bundle.AgentsDB != paths.AgentsDB {
+		t.Fatalf("workspace bundle AgentsDB = %q, want %q", ws.Bundle.AgentsDB, paths.AgentsDB)
+	}
+	if ws.Bundle.TemporalDB != "" && ws.Bundle.TemporalDB != paths.TemporalDB {
+		t.Fatalf("workspace bundle TemporalDB = %q, want %q", ws.Bundle.TemporalDB, paths.TemporalDB)
+	}
 }
 
 func TestManagerRestartReturnsStopErrorWithoutStart(t *testing.T) {
