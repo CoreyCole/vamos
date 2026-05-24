@@ -166,7 +166,7 @@ func AgentChatChatPane(header templ.Component, messages templ.Component, compose
 			templ_7745c5c3_Var6 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, "<main id=\"agent-chat-chat-pane\" class=\"relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-lg border border-border bg-card\" data-class=\"{'hidden md:flex': $mobilePane !== 'chat'}\" role=\"tabpanel\" aria-labelledby=\"agent-chat-mobile-chat-tab\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, "<script type=\"module\" src=\"/js/agent-chat-scroll.js?v=1\"></script><main id=\"agent-chat-chat-pane\" class=\"relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-lg border border-border bg-card\" data-class=\"{'hidden md:flex': $mobilePane !== 'chat'}\" role=\"tabpanel\" aria-labelledby=\"agent-chat-mobile-chat-tab\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -182,7 +182,7 @@ func AgentChatChatPane(header templ.Component, messages templ.Component, compose
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 9, "<div id=\"agent-chat-scroll-region\" class=\"h-full overflow-y-auto\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 9, "<div id=\"agent-chat-scroll-region\" data-agent-chat-initial-scroll class=\"h-full overflow-y-auto\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

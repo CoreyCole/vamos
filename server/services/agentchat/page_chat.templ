@@ -32,11 +32,12 @@ templ FreeformNavigationRegion(args ChatPageArgs) {
 }
 
 templ FreeformChatPrimaryRegion(args ChatPageArgs) {
+	<script type="module" src="/js/agent-chat-scroll.js?v=1"></script>
 	<main class="relative flex h-full min-h-0 w-full min-w-0 flex-col overflow-hidden rounded-lg border border-border bg-card">
 		@FreeformRunHeader(ensureFreeformWorkbenchState(args))
 		<div class="relative min-h-0 flex-1">
 			@ChatScrollControls()
-			<div id="agent-chat-scroll-region" class="h-full overflow-y-auto">
+			<div id="agent-chat-scroll-region" data-agent-chat-initial-scroll class="h-full overflow-y-auto">
 				@MessagesPane(getThreadID(args.CurrentThread), args.Transcript, args.CurrentThread != nil, freeformForkAction())
 			</div>
 		</div>
@@ -65,11 +66,12 @@ templ WorkspaceDocPrimaryRegion(args WorkspacePageArgs) {
 }
 
 templ WorkspaceChatPrimaryRegion(args WorkspacePageArgs) {
+	<script type="module" src="/js/agent-chat-scroll.js?v=1"></script>
 	<main id="agent-chat-chat-pane" class="relative flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-lg border border-border bg-card">
 		@WorkspaceHeader(args.Projection, ensureWorkspaceWorkbenchState(args))
 		<div class="relative min-h-0 flex-1">
 			@ChatScrollControls()
-			<div id="agent-chat-scroll-region" class="h-full overflow-y-auto">
+			<div id="agent-chat-scroll-region" data-agent-chat-initial-scroll class="h-full overflow-y-auto">
 				@MessagesPane(getThreadID(args.Projection.SelectedThread), args.Projection.Transcript, args.Projection.SelectedThread != nil, workspaceForkAction(args.WorkspaceID, getThreadID(args.Projection.SelectedThread)))
 			</div>
 		</div>

@@ -180,7 +180,7 @@ func FreeformChatPrimaryRegion(args ChatPageArgs) templ.Component {
 			templ_7745c5c3_Var7 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 8, "<main class=\"relative flex h-full min-h-0 w-full min-w-0 flex-col overflow-hidden rounded-lg border border-border bg-card\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 8, "<script type=\"module\" src=\"/js/agent-chat-scroll.js?v=1\"></script><main class=\"relative flex h-full min-h-0 w-full min-w-0 flex-col overflow-hidden rounded-lg border border-border bg-card\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -196,7 +196,7 @@ func FreeformChatPrimaryRegion(args ChatPageArgs) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 10, "<div id=\"agent-chat-scroll-region\" class=\"h-full overflow-y-auto\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 10, "<div id=\"agent-chat-scroll-region\" data-agent-chat-initial-scroll class=\"h-full overflow-y-auto\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -365,7 +365,7 @@ func WorkspaceChatPrimaryRegion(args WorkspacePageArgs) templ.Component {
 			templ_7745c5c3_Var12 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 15, "<main id=\"agent-chat-chat-pane\" class=\"relative flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-lg border border-border bg-card\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 15, "<script type=\"module\" src=\"/js/agent-chat-scroll.js?v=1\"></script><main id=\"agent-chat-chat-pane\" class=\"relative flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-lg border border-border bg-card\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -381,7 +381,7 @@ func WorkspaceChatPrimaryRegion(args WorkspacePageArgs) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 17, "<div id=\"agent-chat-scroll-region\" class=\"h-full overflow-y-auto\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 17, "<div id=\"agent-chat-scroll-region\" data-agent-chat-initial-scroll class=\"h-full overflow-y-auto\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -445,7 +445,7 @@ func WorkspaceChatPage(args WorkspacePageArgs) templ.Component {
 			var templ_7745c5c3_Var15 string
 			templ_7745c5c3_Var15, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("@get('/agent-chat/%s/stream?thread=%s&run=%s&since=%d')", args.WorkspaceID, getThreadID(args.Projection.SelectedThread), getRunID(args.Projection.ActiveRun), args.Cursor))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/page_chat.templ`, Line: 91, Col: 202}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/page_chat.templ`, Line: 93, Col: 202}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var15))
 			if templ_7745c5c3_Err != nil {
@@ -458,7 +458,7 @@ func WorkspaceChatPage(args WorkspacePageArgs) templ.Component {
 			var templ_7745c5c3_Var16 string
 			templ_7745c5c3_Var16, templ_7745c5c3_Err = templ.JoinStringErrs(workspaceShellSignals(args.Projection.SelectedThread != nil, args.Projection.PlanSidebar))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/page_chat.templ`, Line: 92, Col: 143}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/page_chat.templ`, Line: 94, Col: 143}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var16))
 			if templ_7745c5c3_Err != nil {

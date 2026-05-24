@@ -1545,6 +1545,44 @@ func renderAgentChatComponent(t *testing.T, component templ.Component) string {
 	return body.String()
 }
 
+func TestAgentChatInitialScrollAssets(t *testing.T) {
+	t.Parallel()
+
+	body := renderAgentChatComponent(
+		t,
+		AgentChatChatPane(templ.NopComponent, templ.NopComponent, templ.NopComponent),
+	)
+	for _, want := range []string{
+		`src="/js/agent-chat-scroll.js?v=1"`,
+		`id="agent-chat-scroll-region"`,
+		`data-agent-chat-initial-scroll`,
+	} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("AgentChatChatPane missing %q: %s", want, body)
+		}
+	}
+}
+
+func TestAgentChatInitialScrollSource(t *testing.T) {
+	t.Parallel()
+
+	source, err := os.ReadFile(filepath.Join("..", "..", "..", "static", "js", "agent-chat-scroll.js"))
+	if err != nil {
+		t.Fatalf("ReadFile(agent-chat-scroll.js) error = %v", err)
+	}
+	body := string(source)
+	for _, want := range []string{
+		"scrollTop = region.scrollHeight",
+		"datastar-patch-elements",
+		"MutationObserver",
+		"requestAnimationFrame",
+	} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("agent-chat-scroll.js missing %q", want)
+		}
+	}
+}
+
 func TestChatMarkdownRawHTMLIsIgnoredByDatastar(t *testing.T) {
 	t.Parallel()
 
