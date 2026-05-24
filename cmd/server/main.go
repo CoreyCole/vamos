@@ -1112,12 +1112,38 @@ func main() {
 			InternalAllowLoopback: cfg.InternalAgentChatAllowLoopback,
 		},
 	).WithLayoutPreferenceService(layoutPrefsService)
+	workspaceSyncRefreshResultFromAgentChat := func(result agentchat.SyncWorkspacesResult) workspaces.WorkspaceSyncRefreshResult {
+		return workspaces.WorkspaceSyncRefreshResult{
+			PlanUpserted:    result.Plan.Upserted,
+			PlanArchived:    result.Plan.Archived,
+			ImplUpserted:    result.Impl.Upserted,
+			ImplRepairedEnv: result.Impl.RepairedEnv,
+			ImplCleanedUp:   result.Impl.CleanedUp,
+			ImplMerged:      result.Impl.Merged,
+			Changed:         result.Changed,
+		}
+	}
+	workspaceSyncCompleteForSchedule := workspaces.NewWorkspaceSyncCompletion(
+		workspaceManager,
+		workspaceNotifier,
+		nil,
+		nil,
+	)
+	workspaceSyncCompleteForManualRefresh := workspaces.NewWorkspaceSyncCompletion(
+		workspaceManager,
+		nil,
+		nil,
+		nil,
+	)
 	if goWorker != nil {
 		goWorker.RegisterWorkflow(agentchat.SyncWorkspacesWorkflow)
 		goWorker.RegisterWorkflow(agentchat.PlanWorkspaceDiscoveryWorkflow)
 		goWorker.RegisterActivity(agentChatService.FailConversationRunAfterActivityError)
 		goWorker.RegisterActivity(&agentchat.WorkspaceSyncActivities{
 			Syncer: agentChatService.WorkspaceSyncer(),
+			OnComplete: func(ctx context.Context, result agentchat.SyncWorkspacesResult, err error) {
+				workspaceSyncCompleteForSchedule(ctx, workspaceSyncRefreshResultFromAgentChat(result), err)
+			},
 		})
 		goWorker.RegisterActivity(&agentchat.PlanWorkspaceDiscoveryActivities{
 			Syncer: agentChatService.PlanWorkspaceDiscoverySyncer(),
@@ -1125,6 +1151,7 @@ func main() {
 	}
 	if temporalManager != nil {
 		input := agentChatService.WorkspaceSyncInput()
+		input.RunCompletionHook = true
 		if err := agentchat.EnsureSyncWorkspacesSchedule(
 			runtimeCtx,
 			temporalManager.Client(),
@@ -1222,18 +1249,8 @@ func main() {
 				releaseStarter,
 			))
 		}
-		workspaceSyncRefreshResultFromAgentChat := func(result agentchat.SyncWorkspacesResult) workspaces.WorkspaceSyncRefreshResult {
-			return workspaces.WorkspaceSyncRefreshResult{
-				PlanUpserted:    result.Plan.Upserted,
-				PlanArchived:    result.Plan.Archived,
-				ImplUpserted:    result.Impl.Upserted,
-				ImplRepairedEnv: result.Impl.RepairedEnv,
-				ImplCleanedUp:   result.Impl.CleanedUp,
-				ImplMerged:      result.Impl.Merged,
-				Changed:         result.Changed,
-			}
-		}
 		handlerOptions = append(handlerOptions,
+			workspaces.WithWorkspaceSyncCompletion(workspaceSyncCompleteForManualRefresh),
 			workspaces.WithWorkspaceSyncRefresh(func(ctx context.Context) (workspaces.WorkspaceSyncRefreshResult, error) {
 				input := agentChatService.WorkspaceSyncInput()
 				if temporalManager == nil {

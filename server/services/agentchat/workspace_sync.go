@@ -16,6 +16,7 @@ type SyncWorkspacesInput struct {
 	ManagerURL         string
 	RestartToken       string
 	TrunkBranch        string
+	RunCompletionHook  bool
 }
 
 type SyncWorkspacesResult struct {

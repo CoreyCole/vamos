@@ -67,6 +67,50 @@ type WorkspaceRefreshState struct {
 
 type WorkspaceSyncCompletionFunc func(ctx context.Context, result WorkspaceSyncRefreshResult, err error) WorkspaceSyncRefreshResult
 
+type TerminalSessionAdopter interface {
+	ImportAdoptablePiSessions(ctx context.Context) (TerminalSessionAdoptionResult, error)
+}
+
+type TerminalSessionAdoptionResult struct {
+	ImportedSessions       int
+	AdoptedQRSPIWorkspaces int
+	Changed                bool
+}
+
+func NewWorkspaceSyncCompletion(
+	manager Registry,
+	workspaceNotifier WorkspaceLifecycleNotifier,
+	agentChatNotifier func(),
+	adopter TerminalSessionAdopter,
+) WorkspaceSyncCompletionFunc {
+	return func(ctx context.Context, result WorkspaceSyncRefreshResult, err error) WorkspaceSyncRefreshResult {
+		if err == nil {
+			if manager != nil {
+				if refreshErr := manager.Refresh(ctx); refreshErr != nil {
+					log.Printf("workspace_manager_refresh_after_sync_failed: %v", refreshErr)
+				}
+			}
+			if adopter != nil {
+				adoption, adoptionErr := adopter.ImportAdoptablePiSessions(ctx)
+				if adoptionErr != nil {
+					log.Printf("terminal_session_adoption_after_sync_failed: %v", adoptionErr)
+				} else {
+					result.ImportedPiSessions += adoption.ImportedSessions
+					result.AdoptedQRSPIWorkspaces += adoption.AdoptedQRSPIWorkspaces
+					result.Changed = result.Changed || adoption.Changed
+				}
+			}
+			if agentChatNotifier != nil {
+				agentChatNotifier()
+			}
+		}
+		if workspaceNotifier != nil {
+			workspaceNotifier.Notify("workspaces-refresh")
+		}
+		return result
+	}
+}
+
 type Handler struct {
 	manager                    Manager
 	lifecycle                  LifecycleManager

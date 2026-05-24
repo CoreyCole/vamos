@@ -95,6 +95,60 @@ func TestSyncWorkspacesActivityRequiresSyncer(t *testing.T) {
 	}
 }
 
+type fakeWorkspaceSyncRunner struct {
+	result SyncWorkspacesResult
+	err    error
+}
+
+func (f fakeWorkspaceSyncRunner) Sync(context.Context, SyncWorkspacesInput) (SyncWorkspacesResult, error) {
+	return f.result, f.err
+}
+
+func TestWorkspaceSyncActivityCallsCompletionHookWhenEnabled(t *testing.T) {
+	wantResult := SyncWorkspacesResult{Changed: true}
+	var called bool
+	var gotResult SyncWorkspacesResult
+	var gotErr error
+	activity := &WorkspaceSyncActivities{
+		Syncer: fakeWorkspaceSyncRunner{result: wantResult},
+		OnComplete: func(_ context.Context, result SyncWorkspacesResult, err error) {
+			called = true
+			gotResult = result
+			gotErr = err
+		},
+	}
+
+	result, err := activity.SyncWorkspaces(
+		context.Background(),
+		SyncWorkspacesInput{RunCompletionHook: true},
+	)
+	if err != nil {
+		t.Fatalf("SyncWorkspaces() error = %v", err)
+	}
+	if result != wantResult || gotResult != wantResult || gotErr != nil || !called {
+		t.Fatalf(
+			"completion called=%t result=%#v got=%#v err=%v",
+			called,
+			result,
+			gotResult,
+			gotErr,
+		)
+	}
+}
+
+func TestWorkspaceSyncActivitySkipsCompletionHookWhenDisabled(t *testing.T) {
+	activity := &WorkspaceSyncActivities{
+		Syncer: fakeWorkspaceSyncRunner{result: SyncWorkspacesResult{Changed: true}},
+		OnComplete: func(context.Context, SyncWorkspacesResult, error) {
+			t.Fatal("completion hook should not run when disabled")
+		},
+	}
+
+	if _, err := activity.SyncWorkspaces(context.Background(), SyncWorkspacesInput{}); err != nil {
+		t.Fatalf("SyncWorkspaces() error = %v", err)
+	}
+}
+
 func TestWorkspaceSyncerRunsPlanAndImplSync(t *testing.T) {
 	service := newTestAgentChatService(t)
 	root := t.TempDir()

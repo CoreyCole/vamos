@@ -10,7 +10,12 @@ import (
 )
 
 type WorkspaceSyncActivities struct {
-	Syncer *WorkspaceSyncer
+	Syncer     workspaceSyncRunner
+	OnComplete func(context.Context, SyncWorkspacesResult, error)
+}
+
+type workspaceSyncRunner interface {
+	Sync(context.Context, SyncWorkspacesInput) (SyncWorkspacesResult, error)
 }
 
 func SyncWorkspacesWorkflow(
@@ -43,5 +48,9 @@ func (a *WorkspaceSyncActivities) SyncWorkspaces(
 			"workspace sync activity requires syncer",
 		)
 	}
-	return a.Syncer.Sync(ctx, input)
+	result, err := a.Syncer.Sync(ctx, input)
+	if input.RunCompletionHook && a.OnComplete != nil {
+		a.OnComplete(ctx, result, err)
+	}
+	return result, err
 }
