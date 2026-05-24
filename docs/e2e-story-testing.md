@@ -28,7 +28,7 @@ Run generated browser tests from a registered non-main workspace. If the host se
 VAMOS_E2E_THOUGHTS_ROOT=/path/to/host/thoughts \
 go run ./cmd/vamos-runtime e2e run \
   --story durable-session-chat \
-  --plan-dir thoughts/creative-mode-agent/plans/<plan-dir>
+  --plan-dir thoughts/<owner>/plans/<plan-dir>
 ```
 
 Run a focused scenario:
@@ -37,7 +37,7 @@ Run a focused scenario:
 go run ./cmd/vamos-runtime e2e run \
   --story durable-session-chat \
   --scenario freeform-chat-started-from-thoughts-root-survives-refresh-and-resume \
-  --plan-dir thoughts/creative-mode-agent/plans/<plan-dir>
+  --plan-dir thoughts/<owner>/plans/<plan-dir>
 ```
 
 Review a completed run against semantic goldens:
@@ -45,7 +45,7 @@ Review a completed run against semantic goldens:
 ```bash
 go run ./cmd/vamos-runtime e2e review \
   --run .e2e-runs/<run-id> \
-  --plan-dir thoughts/creative-mode-agent/plans/<plan-dir>
+  --plan-dir thoughts/<owner>/plans/<plan-dir>
 ```
 
 Accept semantic goldens only after explicit human approval:

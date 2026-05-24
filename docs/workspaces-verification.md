@@ -47,7 +47,7 @@ To keep artifacts with a plan or review:
 
 ```bash
 just verify-workspaces slug=multi-checkout-dev-workspaces start=true restart=true stop=true browser=true \
-  report=thoughts/creative-mode-agent/plans/2026-05-10_05-14-35_multi-checkout-dev-workspaces/reviews/2026-05-11_01-45-38_multi-checkout-dev-workspaces_e2e-verification-review/artifacts/$(date +%Y-%m-%d_%H-%M-%S)_multi-checkout-dev-workspaces
+  report=thoughts/<owner>/plans/<plan-dir>/reviews/<review-dir>/artifacts/$(date +%Y-%m-%d_%H-%M-%S)_multi-checkout-dev-workspaces
 ```
 
 Equivalent nested command:

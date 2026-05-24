@@ -9,12 +9,13 @@ As a workspace user, I want Agent Chat transcripts and Pi-produced artifacts to 
 - QRSPI workspace chat uses the real browser, server route, Temporal workflow, TS Pi activity, persisted callbacks, and replayed transcript.
 - The Pi verification prompt may update only the stable E2E review artifact.
 - Freeform durability is verified from seeded fixtures, not a live Pi send.
+- Fixture paths that contain `creative-mode-agent` are synthetic E2E fixture data; public prose should use `<owner>` placeholders.
 
 ## Scenario: QRSPI plan workspace chat updates verification artifact through Pi and Temporal
 
 ### Given
 
-- I am authenticated as "playwright@chestnutfi.com".
+- I am authenticated as "playwright@localhost".
 - I open plan workspace "thoughts/creative-mode-agent/plans/2026-05-20_23-02-59_vamos-e2e-story-playwright-go".
 - I open workspace chat.
 - I remember file hash "thoughts/creative-mode-agent/plans/2026-05-20_23-02-59_vamos-e2e-story-playwright-go/context/implement/e2e-pi-plan-docs-review.md".
@@ -39,7 +40,7 @@ As a workspace user, I want Agent Chat transcripts and Pi-produced artifacts to 
 
 ### Given
 
-- I am authenticated as "playwright@chestnutfi.com".
+- I am authenticated as "playwright@localhost".
 - Fixture "freeform-chat.durable" is loaded.
 
 ### When
@@ -58,7 +59,7 @@ As a workspace user, I want Agent Chat transcripts and Pi-produced artifacts to 
 
 ### Given
 
-- I am authenticated as "playwright@chestnutfi.com".
+- I am authenticated as "playwright@localhost".
 - I open Thoughts root chat.
 
 ### When
@@ -79,7 +80,7 @@ As a workspace user, I want Agent Chat transcripts and Pi-produced artifacts to 
 
 ### Given
 
-- I am authenticated as "playwright@chestnutfi.com".
+- I am authenticated as "playwright@localhost".
 - Fixture "freeform-chat.durable" is loaded.
 - I open freeform chat for fixture "freeform-chat.durable".
 
@@ -96,7 +97,7 @@ As a workspace user, I want Agent Chat transcripts and Pi-produced artifacts to 
 
 ### Given
 
-- I am authenticated as "playwright@chestnutfi.com".
+- I am authenticated as "playwright@localhost".
 - Latest workspace chats "VAMOS_E2E_WORKSPACE_DOC_RESTORE" and "VAMOS_E2E_WORKSPACE_UNUSED" are seeded.
 
 ### When
@@ -111,7 +112,7 @@ As a workspace user, I want Agent Chat transcripts and Pi-produced artifacts to 
 
 ### Given
 
-- I am authenticated as "playwright@chestnutfi.com".
+- I am authenticated as "playwright@localhost".
 - Fixture "freeform-chat.durable" is loaded.
 - I open freeform chat for fixture "freeform-chat.durable".
 
@@ -127,7 +128,7 @@ As a workspace user, I want Agent Chat transcripts and Pi-produced artifacts to 
 
 ### Given
 
-- I am authenticated as "playwright@chestnutfi.com".
+- I am authenticated as "playwright@localhost".
 - Latest workspace chats "VAMOS_E2E_WORKSPACE_A_LATEST" and "VAMOS_E2E_WORKSPACE_B_LATEST" are seeded.
 
 ### When

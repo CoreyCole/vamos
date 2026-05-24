@@ -10,7 +10,7 @@ import (
 
 func TestDurableSessionChat_QrspiPlanWorkspaceChatUpdatesVerificationArtifactThroughPiAndTemporal(t *testing.T) {
 	e2e.RunScenario(t, "durable-session-chat", "qrspi-plan-workspace-chat-updates-verification-artifact-through-pi-and-temporal", func(t testing.TB, ctx *e2e.Context) {
-		steps.AuthenticatedAs(t, ctx, "playwright@chestnutfi.com")
+		steps.AuthenticatedAs(t, ctx, "playwright@localhost")
 		steps.OpenPlanWorkspace(t, ctx, "thoughts/creative-mode-agent/plans/2026-05-20_23-02-59_vamos-e2e-story-playwright-go")
 		steps.OpenWorkspaceChat(t, ctx, "current")
 		steps.RememberFileHash(t, ctx, "thoughts/creative-mode-agent/plans/2026-05-20_23-02-59_vamos-e2e-story-playwright-go/context/implement/e2e-pi-plan-docs-review.md")
@@ -29,7 +29,7 @@ func TestDurableSessionChat_QrspiPlanWorkspaceChatUpdatesVerificationArtifactThr
 
 func TestDurableSessionChat_FreeformChatFixtureReplaysDurableTranscript(t *testing.T) {
 	e2e.RunScenario(t, "durable-session-chat", "freeform-chat-fixture-replays-durable-transcript", func(t testing.TB, ctx *e2e.Context) {
-		steps.AuthenticatedAs(t, ctx, "playwright@chestnutfi.com")
+		steps.AuthenticatedAs(t, ctx, "playwright@localhost")
 		steps.LoadFixture(t, ctx, "freeform-chat.durable")
 		steps.OpenFreeformChatFixture(t, ctx, "freeform-chat.durable")
 		steps.ExpectTranscriptContains(t, ctx, "VAMOS_E2E_FREEFORM_REPLAY_OK")
@@ -42,7 +42,7 @@ func TestDurableSessionChat_FreeformChatFixtureReplaysDurableTranscript(t *testi
 
 func TestDurableSessionChat_FreeformChatStartedFromThoughtsRootSurvivesRefreshAndResume(t *testing.T) {
 	e2e.RunScenario(t, "durable-session-chat", "freeform-chat-started-from-thoughts-root-survives-refresh-and-resume", func(t testing.TB, ctx *e2e.Context) {
-		steps.AuthenticatedAs(t, ctx, "playwright@chestnutfi.com")
+		steps.AuthenticatedAs(t, ctx, "playwright@localhost")
 		steps.OpenThoughtsRootChat(t, ctx, "current")
 		steps.SendFreeformChatPrompt(t, ctx, "VAMOS_E2E_FREEFORM_REFRESH_FIRST")
 		steps.WaitForLatestFreeformChatRunCompletion(t, ctx, "current")
@@ -57,7 +57,7 @@ func TestDurableSessionChat_FreeformChatStartedFromThoughtsRootSurvivesRefreshAn
 
 func TestDurableSessionChat_AnchorDocumentNavigationPreservesEmbeddedChat(t *testing.T) {
 	e2e.RunScenario(t, "durable-session-chat", "anchor-document-navigation-preserves-embedded-chat", func(t testing.TB, ctx *e2e.Context) {
-		steps.AuthenticatedAs(t, ctx, "playwright@chestnutfi.com")
+		steps.AuthenticatedAs(t, ctx, "playwright@localhost")
 		steps.LoadFixture(t, ctx, "freeform-chat.durable")
 		steps.OpenFreeformChatFixture(t, ctx, "freeform-chat.durable")
 		steps.FollowFirstSidebarDocumentLink(t, ctx, "first")
@@ -68,7 +68,7 @@ func TestDurableSessionChat_AnchorDocumentNavigationPreservesEmbeddedChat(t *tes
 
 func TestDurableSessionChat_WorkspaceDocumentWithoutChatParamsRestoresWorkspaceChat(t *testing.T) {
 	e2e.RunScenario(t, "durable-session-chat", "workspace-document-without-chat-params-restores-workspace-chat", func(t testing.TB, ctx *e2e.Context) {
-		steps.AuthenticatedAs(t, ctx, "playwright@chestnutfi.com")
+		steps.AuthenticatedAs(t, ctx, "playwright@localhost")
 		steps.SeedLatestWorkspaceChats(t, ctx, "VAMOS_E2E_WORKSPACE_DOC_RESTORE", "VAMOS_E2E_WORKSPACE_UNUSED")
 		steps.OpenWorkspaceDocumentWithoutChatParams(t, ctx, "A")
 		steps.ExpectTranscriptContains(t, ctx, "VAMOS_E2E_WORKSPACE_DOC_RESTORE")
@@ -77,7 +77,7 @@ func TestDurableSessionChat_WorkspaceDocumentWithoutChatParamsRestoresWorkspaceC
 
 func TestDurableSessionChat_RootThoughtsRestoresLatestFreeformChat(t *testing.T) {
 	e2e.RunScenario(t, "durable-session-chat", "root-thoughts-restores-latest-freeform-chat", func(t testing.TB, ctx *e2e.Context) {
-		steps.AuthenticatedAs(t, ctx, "playwright@chestnutfi.com")
+		steps.AuthenticatedAs(t, ctx, "playwright@localhost")
 		steps.LoadFixture(t, ctx, "freeform-chat.durable")
 		steps.OpenFreeformChatFixture(t, ctx, "freeform-chat.durable")
 		steps.OpenThoughtsRootChatContext(t, ctx, "current")
@@ -87,7 +87,7 @@ func TestDurableSessionChat_RootThoughtsRestoresLatestFreeformChat(t *testing.T)
 
 func TestDurableSessionChat_WorkspaceSwitchingRestoresEachWorkspaceLatestChat(t *testing.T) {
 	e2e.RunScenario(t, "durable-session-chat", "workspace-switching-restores-each-workspace-latest-chat", func(t testing.TB, ctx *e2e.Context) {
-		steps.AuthenticatedAs(t, ctx, "playwright@chestnutfi.com")
+		steps.AuthenticatedAs(t, ctx, "playwright@localhost")
 		steps.SeedLatestWorkspaceChats(t, ctx, "VAMOS_E2E_WORKSPACE_A_LATEST", "VAMOS_E2E_WORKSPACE_B_LATEST")
 		steps.OpenSeededWorkspaceChat(t, ctx, "A")
 		steps.ExpectTranscriptContains(t, ctx, "VAMOS_E2E_WORKSPACE_A_LATEST")
