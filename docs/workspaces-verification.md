@@ -34,6 +34,10 @@ External setup must also be in place:
 
 `main.<domain>` is reserved for the canonical manager checkout. Feature branches and QRSPI implementation copies must be started through the manager and tested at their derived slug host (`https://<slug>.<domain>/`). Do not manually run a feature checkout on the manager port to "take over" `main`; use `/workspaces`, `agentsctl workspace restart`, or `just build` from a managed child checkout so lifecycle stays owned by `server/services/workspaces/`.
 
+## Session ownership during verification
+
+Browser and chat sessions created while verifying `work` or feature workspace hosts belong to that workspace's disposable `.vamos` DB. Pi CLI sessions created from those directories may remain in `~/.pi/agent/sessions` after cleanup. Main may index or import them intentionally, but verification noise is not durable main chat history by default. Summarize important evidence into `verify.md`, review notes, screenshots, logs, or release records. See `docs/vamos-development-workflow.md`.
+
 ## Commands
 
 From the Vamos repo root:

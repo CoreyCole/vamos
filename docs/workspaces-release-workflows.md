@@ -19,6 +19,10 @@ If a manager host config registers configured checkouts with slugs `stage` and `
 
 `main` is protected and cannot be used as a release source. Hosts that need different lane names or host-specific verification commands should construct a custom `release.Registry` and workflow registry in host wiring rather than hardcoding private paths in Vamos.
 
+## Development topology
+
+For Vamos self-development, `main.<domain>` is the durable manager. `work.<domain>` and feature workspace hosts are sandbox runtimes. Release actions are triggered from main, not from sandbox-local DB state. Sandbox sessions may be imported or linked as evidence, but release readiness should come from explicit QRSPI/verification artifacts. See `docs/vamos-development-workflow.md`.
+
 ## Queue behavior
 
 1. `/workspaces/release/enqueue` validates the selected action and expected source/target commits.
@@ -57,7 +61,7 @@ just build --no-restart
 Manual acceptance requires a manager with Temporal enabled and at least `stage`/`main` configured checkouts:
 
 1. Open `/workspaces`.
-1. Confirm the release panel shows lane state and feature promote actions.
+1. Confirm the release panel shows lane state and row-scoped feature promote actions gated by QRSPI human-review readiness.
 1. Enqueue a feature → stage action; verify pending/running/log/succeeded or failed history updates.
 1. Confirm a failed item does not block a later item.
 1. Confirm merged workspaces show `Clean up`; unmerged workspaces show `Close` warning.
