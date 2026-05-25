@@ -10,19 +10,20 @@ pw-agent-chat:
 sync-thoughts:
   @cd .. && just sync-thoughts
 
-verify-workspaces slug start="true" restart="true" stop="true" browser="false" report="" remote="" dns_server="" expect_ip="" require_remote="false":
+verify-workspaces slug start="true" restart="true" stop="true" browser="false" agent_chat_probe="false" report="" remote="" dns_server="" expect_ip="" require_remote="false":
   @set -eu; \
     slug="{{slug}}"; slug="${slug#slug=}"; \
     start="{{start}}"; start="${start#start=}"; \
     restart="{{restart}}"; restart="${restart#restart=}"; \
     stop="{{stop}}"; stop="${stop#stop=}"; \
     browser="{{browser}}"; browser="${browser#browser=}"; \
+    agent_chat_probe="{{agent_chat_probe}}"; agent_chat_probe="${agent_chat_probe#agent_chat_probe=}"; \
     report="{{report}}"; report="${report#report=}"; \
     remote="{{remote}}"; remote="${remote#remote=}"; \
     dns_server="{{dns_server}}"; dns_server="${dns_server#dns_server=}"; \
     expect_ip="{{expect_ip}}"; expect_ip="${expect_ip#expect_ip=}"; \
     require_remote="{{require_remote}}"; require_remote="${require_remote#require_remote=}"; \
-    args="--env .env --slug $slug --start=$start --restart=$restart --stop=$stop --browser=$browser"; \
+    args="--env .env --slug $slug --start=$start --restart=$restart --stop=$stop --browser=$browser --agent-chat-probe=$agent_chat_probe"; \
     if [ -n "$report" ]; then args="$args --report $report"; fi; \
     if [ -n "$remote" ]; then args="$args --remote-ssh $remote"; fi; \
     if [ -n "$dns_server" ]; then args="$args --dns-server $dns_server"; fi; \

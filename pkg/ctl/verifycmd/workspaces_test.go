@@ -50,6 +50,22 @@ func TestLoadWorkspaceVerifyConfigFromEnv(t *testing.T) {
 	}
 }
 
+func TestLoadWorkspaceVerifyConfigParsesAgentChatProbe(t *testing.T) {
+	t.Parallel()
+	cfg, err := LoadWorkspaceVerifyConfig([]string{
+		"--env", filepath.Join(t.TempDir(), ".env"),
+		"--slug", "demo",
+		"--domain", "vamos.test",
+		"--agent-chat-probe",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !cfg.AgentChatProbe {
+		t.Fatal("AgentChatProbe = false, want true")
+	}
+}
+
 func TestRunServerLifecyclePhaseSendsRestartToken(t *testing.T) {
 	t.Parallel()
 	var posted workspaces.VerifyWorkspaceRequest
@@ -203,8 +219,14 @@ func TestRunWorkspaceVerifyBrowserOrdering(t *testing.T) {
 	if requests[0].Stop || !requests[0].Start || !requests[0].Restart {
 		t.Fatalf("first request = %+v", requests[0])
 	}
+	if requests[0].AgentChatProbe {
+		t.Fatalf("first request AgentChatProbe = true, want false")
+	}
 	if !requests[1].Stop || requests[1].Start || requests[1].Restart {
 		t.Fatalf("second request = %+v", requests[1])
+	}
+	if requests[1].AgentChatProbe {
+		t.Fatalf("stop request AgentChatProbe = true, want false")
 	}
 	if got := strings.Join(
 		events,
@@ -217,6 +239,72 @@ func TestRunWorkspaceVerifyBrowserOrdering(t *testing.T) {
 			"browser layer = %q",
 			report.Summary.Layers[workspaces.VerificationLayerBrowser],
 		)
+	}
+}
+
+//nolint:paralleltest // Mutates package-level test hooks.
+func TestRunWorkspaceVerifySendsAgentChatProbeFlag(t *testing.T) {
+	oldResolve, oldHTTPS, oldHost, oldRun := resolveHostFn, probeHTTPSFn, probeHostPreservationFn, runServerLifecyclePhaseFn
+	defer func() {
+		resolveHostFn, probeHTTPSFn, probeHostPreservationFn, runServerLifecyclePhaseFn = oldResolve, oldHTTPS, oldHost, oldRun
+	}()
+	resolveHostFn = func(ctx context.Context, host string) ([]net.IP, error) {
+		return []net.IP{net.ParseIP("127.0.0.1")}, nil
+	}
+	probeHTTPSFn = func(ctx context.Context, rawURL string, out io.Writer) error {
+		_, _ = out.Write([]byte("ok"))
+		return nil
+	}
+	probeHostPreservationFn = func(ctx context.Context, baseURL, childURL string, out io.Writer) error {
+		_, _ = out.Write([]byte("ok"))
+		return nil
+	}
+	var requests []workspaces.VerifyWorkspaceRequest
+	runServerLifecyclePhaseFn = func(ctx context.Context, cfg WorkspaceVerifyConfig, req workspaces.VerifyWorkspaceRequest) (workspaces.VerifyWorkspaceRun, error) {
+		requests = append(requests, req)
+		return workspaces.VerifyWorkspaceRun{
+			ID:     "run",
+			Status: workspaces.VerifyRunPassed,
+			Phases: []workspaces.VerifyWorkspacePhase{{
+				Layer:  workspaces.VerificationLayerAgentChat,
+				Status: workspaces.VerifyPhasePassed,
+			}},
+			AgentChatProbe: &workspaces.AgentChatProbeResult{
+				RunID:                  "agent-run",
+				CallbackEndpoint:       "http://127.0.0.1:4301/internal/agent-chat/events",
+				SnapshotLoaderEndpoint: "http://127.0.0.1:4301/internal/agent-chat/snapshots",
+				Cwd:                    "/tmp/demo",
+				ReachedSnapshotLoader:  true,
+				ReachedCallback:        true,
+			},
+		}, nil
+	}
+	report, err := RunWorkspaceVerify(t.Context(), WorkspaceVerifyConfig{
+		BaseURL:        "https://main.vamos.test",
+		Domain:         "vamos.test",
+		Slug:           "demo",
+		RestartToken:   "restart",
+		Start:          true,
+		Restart:        true,
+		Stop:           true,
+		AgentChatProbe: true,
+		ReportDir:      t.TempDir(),
+		Timeout:        time.Second,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(requests) != 2 {
+		t.Fatalf("requests len = %d", len(requests))
+	}
+	if !requests[0].AgentChatProbe {
+		t.Fatalf("first request AgentChatProbe = false, want true")
+	}
+	if requests[1].AgentChatProbe {
+		t.Fatalf("stop request AgentChatProbe = true, want false")
+	}
+	if report.Summary.Layers[workspaces.VerificationLayerAgentChat] != statusPassed {
+		t.Fatalf("agentchat layer = %q", report.Summary.Layers[workspaces.VerificationLayerAgentChat])
 	}
 }
 

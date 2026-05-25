@@ -24,6 +24,7 @@ type WorkspaceVerifyConfig struct {
 	Restart             bool
 	Stop                bool
 	Browser             bool
+	AgentChatProbe      bool
 	ReportDir           string
 	RestartToken        string
 	PlaywrightAuthToken string
@@ -100,6 +101,12 @@ func LoadWorkspaceVerifyConfig(args []string) (WorkspaceVerifyConfig, error) {
 	fs.BoolVar(&cfg.Restart, "restart", false, "restart workspace during verification")
 	fs.BoolVar(&cfg.Stop, "stop", false, "stop workspace after verification")
 	fs.BoolVar(&cfg.Browser, "browser", false, "run browser verification")
+	fs.BoolVar(
+		&cfg.AgentChatProbe,
+		"agent-chat-probe",
+		false,
+		"run child Agent Chat callback/snapshot isolation probe",
+	)
 	fs.StringVar(&cfg.ReportDir, "report", "", "report directory")
 	fs.StringVar(&cfg.RestartToken, "restart-token", "", "workspace restart/API token")
 	fs.StringVar(
@@ -384,11 +391,12 @@ func RunWorkspaceVerify(
 	}
 	childURL := "https://" + childHost + "/"
 	req := workspaces.VerifyWorkspaceRequest{
-		Slug:      cfg.Slug,
-		Start:     cfg.Start,
-		Restart:   cfg.Restart,
-		TailLines: defaultTailLines,
-		ReportDir: cfg.ReportDir,
+		Slug:           cfg.Slug,
+		Start:          cfg.Start,
+		Restart:        cfg.Restart,
+		TailLines:      defaultTailLines,
+		ReportDir:      cfg.ReportDir,
+		AgentChatProbe: cfg.AgentChatProbe,
 	}
 	run, err := runServerLifecyclePhaseFn(ctx, cfg, req)
 	report.ServerRuns = append(report.ServerRuns, run)
@@ -693,6 +701,9 @@ func reportDirFromArtifacts(report *WorkspaceVerifyReport) string {
 func markServerLayers(report *WorkspaceVerifyReport, run workspaces.VerifyWorkspaceRun) {
 	if strings.TrimSpace(run.Diagnostics.LogTail) != "" {
 		report.Summary.Layers[workspaces.VerificationLayerLogs] = statusPassed
+	}
+	if run.AgentChatProbe != nil {
+		report.Summary.Layers[workspaces.VerificationLayerAgentChat] = statusPassed
 	}
 	for _, phase := range run.Phases {
 		if phase.Status == workspaces.VerifyPhasePassed {

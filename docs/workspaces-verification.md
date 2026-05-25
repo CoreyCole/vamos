@@ -4,8 +4,9 @@
 
 `agentsctl verify workspaces` proves multi-checkout workspace lifecycle from both sides:
 
-- server-owned lifecycle, process, metadata, proxy, and log truth
+- server-owned lifecycle, process, metadata, proxy, logs, runtime env snapshot, and worker identity truth
 - client-visible DNS, TLS, Caddy/public-host routing, manager auth, browser switch handoff, and unavailable-after-stop behavior
+- optional child-local Agent Chat probe proof for callback/snapshot/cwd isolation
 
 Use it before claiming a workspace checkout can be switched to, restarted, inspected, and reached at its public host.
 
@@ -45,6 +46,7 @@ From the Vamos repo root:
 ```bash
 just build --no-restart
 just verify-workspaces slug=multi-checkout-dev-workspaces start=true restart=true stop=true browser=true
+just verify-workspaces slug=multi-checkout-dev-workspaces start=true restart=true stop=true browser=true agent_chat_probe=true
 ```
 
 To keep artifacts with a plan or review:
@@ -63,7 +65,7 @@ go run ./cmd/agentsctl verify workspaces \
   --base-url https://main.vamos.test \
   --domain vamos.test \
   --slug multi-checkout-dev-workspaces \
-  --start=true --restart=true --stop=true --browser=true
+  --start=true --restart=true --stop=true --browser=true --agent-chat-probe=true
 ```
 
 ## Verification layers
@@ -76,10 +78,11 @@ go run ./cmd/agentsctl verify workspaces \
 | `caddy` | Public HTTPS routing/proxy path reaches the manager and child hosts. |
 | `auth` | Restart-token APIs and Playwright verifier auth are accepted. |
 | `lifecycle` | Manager can start, restart, and stop the child process. |
-| `metadata` | Workspace metadata is written/read and matches the target slug. |
+| `metadata` | Workspace metadata, runtime env snapshot, and TS worker identity marker are written/read and match the target slug/checkout/ports. |
 | `logs` | Manager/child log tails can be captured for diagnostics. |
 | `proxy` | Manager host-dispatch proxies the child host while running. |
 | `handoff` | Manager switch redirects through signed handoff to the child workspace. |
+| `agentchat` | Optional child-local Agent Chat probe proves workflow input callback/snapshot endpoints and cwd use the child web server/checkout. |
 | `browser` | Playwright reaches the child public host and later sees unavailable state after stop. |
 
 ## Artifacts
@@ -87,13 +90,14 @@ go run ./cmd/agentsctl verify workspaces \
 Reports are written under the requested `--report` directory, or `tmp/workspace-verification/<timestamp>_<slug>` by default. Expected files include:
 
 - `summary.md` and `summary.json`
-- `server-runs.json`
+- `server-runs.json`; when `agent_chat_probe=true`, each run may include `agent_chat_probe` with run ID, workflow ID, callback endpoint, snapshot endpoint, cwd, Temporal address, TS worker PID, and reached snapshot/callback booleans
 - `dns-main.txt` and `dns-child.txt`
 - public HTTPS/curl probe output files
 - `manager-log-tail.txt` and `child-log-tail.txt` when available
 - `playwright-output.txt`
 - `screenshots/manager-workspaces.png`, `screenshots/child-app.png`, `screenshots/unavailable-after-stop.png`
 - `playwright-trace.zip` when the browser verifier reaches tracing setup
+- child `.vamos/run/runtime-env.json` and TS worker ready marker are surfaced through server diagnostics in `server-runs.json`
 
 Include the report path and first failed layer in handoffs/reviews. Do not claim full acceptance without a passing browser-enabled run.
 
@@ -104,7 +108,8 @@ Include the report path and first failed layer in handoffs/reviews. Do not claim
 - **Caddy/proxy**: TLS succeeds but public host returns the wrong app, 404, or unavailable while the child is running. Check wildcard site config, upstream address, and Host preservation.
 - **Auth**: 401/403 from internal endpoints usually means `VAMOS_WORKSPACE_RESTART_TOKEN` or `VAMOS_PLAYWRIGHT_AUTH_TOKEN` differs between CLI and manager environment.
 - **Lifecycle**: start/restart/stop failures or stale PID/port checks point to child process startup, state directory, env override, or port allocation problems.
-- **Metadata/logs**: missing metadata/log tails indicate the child did not boot far enough or state/log paths are not isolated per workspace.
+- **Metadata/logs**: missing metadata/log tails, runtime env snapshot, or TS worker identity marker indicate the child did not boot far enough or state/log paths are not isolated per workspace.
+- **Agent Chat probe**: `localhost:4200` callback/snapshot URLs, wrong cwd, missing internal token, or failed snapshot/callback proof mean the child web process did not build or accept child-local workflow endpoints. Check `VAMOS_INTERNAL_TOKEN`, `.vamos/run/runtime-env.json`, Agent Chat callback base, and child web logs.
 - **Handoff/browser**: manager auth works but switch does not land on `https://<slug>.vamos.test/`. Inspect manager switch logs, child `/internal/dev-auth/handoff`, cookie domain/security, and browser screenshots.
 
 ## Acceptance rule
@@ -113,6 +118,12 @@ A complete acceptance run must pass all configured layers with the manager servi
 
 ```bash
 just verify-workspaces slug=<slug> start=true restart=true stop=true browser=true
+```
+
+Isolation-hardening acceptance for callback/snapshot/cwd proof additionally requires:
+
+```bash
+just verify-workspaces slug=<slug> start=true restart=true stop=true browser=true agent_chat_probe=true
 ```
 
 If DNS/TLS/Caddy are not configured on the current host, record the layer-specific failure and report path, but leave final E2E acceptance open.
