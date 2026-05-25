@@ -200,7 +200,7 @@ func workspaceQRSPIBadge(view ImplWorkspaceView) string {
 }
 
 func workspaceRuntimeLabel(view ImplWorkspaceView) string {
-	if isHistoricalImplWorkspaceView(view) {
+	if isHistoricalImplWorkspaceView(view, nil) {
 		return workspaceImplStatusBadge(view)
 	}
 	return workspaceTransitionLabel(view.Runtime)

@@ -1212,6 +1212,8 @@ func main() {
 			workspaces.WithWorkspaceWorkflowSummaryResolver(agentChatService),
 			workspaces.WithWorkspaceProvisionStarter(provisionStarter),
 			workspaces.WithWorkspaceCleanupStarter(cleanupStarter),
+			workspaces.WithWorkspaceErrorStore(workspaces.NewSQLWorkspaceErrorEventStore(dbService.Queries)),
+			workspaces.WithWorkspaceErrorScanner(&workspaces.WorkspaceErrorScanner{Tailer: workspaces.NewFileLogTailer()}),
 		}
 		if releaseRegistry != nil && releaseStarter != nil {
 			handlerOptions = append(handlerOptions, workspaces.WithReleaseQueue(
