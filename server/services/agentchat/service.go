@@ -1507,6 +1507,9 @@ func (s *Service) createWebAgentSession(
 }
 
 func (s *Service) workspaceThreadCwd(record db.Workspace) string {
+	if cwd := strings.TrimSpace(s.defaultCwd); cwd != "" {
+		return cwd
+	}
 	if root := strings.TrimSpace(s.projectRoot); root != "" {
 		return root
 	}

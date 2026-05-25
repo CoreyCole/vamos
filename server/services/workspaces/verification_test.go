@@ -178,7 +178,7 @@ func TestVerifierExecuteRunFailsWhenAgentChatProbeReportsStaleCallback(t *testin
 		body := fmt.Sprintf(`{
 			"run_id":"run-1",
 			"workflow_id":"workflow-1",
-			"callback_endpoint":"http://localhost:4200/internal/agent-chat/events",
+			"callback_endpoint":"http://127.0.0.1:4200/internal/agent-chat/events",
 			"snapshot_loader_endpoint":"http://127.0.0.1:%d/internal/agent-chat/snapshots",
 			"cwd":%q,
 			"reached_snapshot_loader":true,

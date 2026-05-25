@@ -1224,11 +1224,7 @@ func buildBreadcrumbsFromPath(rawPath string, pageType PageType, chat Breadcrumb
 	}
 
 	parts := strings.Split(cleaned, "/")
-	items := make([]breadcrumb.BreadcrumbItemData, 0, len(parts)+1)
-	items = append(items, breadcrumb.BreadcrumbItemData{
-		Label: "Thoughts",
-		Href:  breadcrumbPreserveChat("/thoughts/", chat),
-	})
+	items := make([]breadcrumb.BreadcrumbItemData, 0, len(parts))
 	for i := range parts {
 		isLast := i == len(parts)-1
 		href := ""

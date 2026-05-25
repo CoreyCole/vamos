@@ -3,7 +3,7 @@ package main
 import (
 	"testing"
 
-	server "github.com/CoreyCole/vamos/server"
+	"github.com/CoreyCole/vamos/server"
 )
 
 func TestApplyVamosEnvOverridesPrefersRuntimeWorkspaceEnv(t *testing.T) {
@@ -70,16 +70,35 @@ func TestApplyVamosEnvOverridesPrefersRuntimeWorkspaceEnv(t *testing.T) {
 	}
 }
 
-func TestVamosEnvOverridesHostConfigCallbackDefault(t *testing.T) {
+func TestApplyHostConfigThenVamosEnvOverridesKeepsChildRuntimeAuthority(t *testing.T) {
 	t.Setenv("VAMOS_INTERNAL_CALLBACK_BASE_URL", "http://127.0.0.1:1234")
+	t.Setenv("VAMOS_DEFAULT_CWD", "/repo/workspace")
+	t.Setenv("VAMOS_THOUGHTS_REPO", "/repo/workspace")
+	t.Setenv("VAMOS_THOUGHTS_ROOT", "/repo/workspace/thoughts")
+	t.Setenv("VAMOS_DATABASE_PATH", "/repo/workspace/.vamos/state/agents.db")
 
 	cfg := applyHostConfigToLegacyConfig(Config{}, server.HostConfig{
 		Web: server.WebConfig{InternalCallbackBaseURL: "http://localhost:4200"},
+		Runtime: server.RuntimeConfig{
+			ThoughtsRepo: "/stale/repo",
+			ThoughtsRoot: "/stale/repo/thoughts",
+			DatabasePath: "/stale/repo/.vamos/state/agents.db",
+		},
 	})
+	cfg.AgentChatDefaultDir = "/stale/repo"
 	cfg = applyVamosEnvOverrides(cfg)
 
 	if cfg.InternalCallbackBaseURL != "http://127.0.0.1:1234" {
 		t.Fatalf("InternalCallbackBaseURL = %q", cfg.InternalCallbackBaseURL)
+	}
+	if cfg.AgentChatDefaultDir != "/repo/workspace" {
+		t.Fatalf("AgentChatDefaultDir = %q", cfg.AgentChatDefaultDir)
+	}
+	if cfg.RepoPath != "/repo/workspace" || cfg.MarkdownBasePath != "/repo/workspace/thoughts" {
+		t.Fatalf("repo/thoughts = %q/%q", cfg.RepoPath, cfg.MarkdownBasePath)
+	}
+	if cfg.DatabasePath != "/repo/workspace/.vamos/state/agents.db" {
+		t.Fatalf("DatabasePath = %q", cfg.DatabasePath)
 	}
 }
 

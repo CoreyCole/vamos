@@ -76,7 +76,7 @@ git log --format='%h %s' --reverse origin/main..HEAD
 git diff --stat origin/main..HEAD
 ```
 
-Conflict handling follows `.pi/skills/vamos-sync/SKILL.md`: resolve conflicts in the source checkout, preserve both latest `main` behavior and stack intent, regenerate templ/sqlc/E2E outputs from sources, run targeted tests, continue with `gt continue --no-interactive`, and ask the user to approve conflict resolutions before merging.
+Conflict handling follows `.pi/skills/vamos-sync/SKILL.md`: resolve conflicts in the source checkout, preserve both latest `main` behavior and stack intent, regenerate templ/sqlc/E2E outputs from sources, run targeted tests, stage resolved files with `gt add <file>` (or `git add` only when Graphite has no wrapper for that file), then continue with **`gt continue --no-interactive`**. Do **not** use `git rebase --continue` for Graphite restack conflicts; it may bypass Graphite bookkeeping or open an editor. Ask the user to approve conflict resolutions before merging.
 
 Only after this synced/restacked source branch is clean should later steps fetch or fast-forward it into `../vamos`.
 

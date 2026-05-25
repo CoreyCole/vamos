@@ -40,7 +40,7 @@ func TestHeaderVisibleNavIsMinimal(t *testing.T) {
 	}
 }
 
-func TestBuildBreadcrumbsFromPathLinksThoughtsParentsAndCurrent(t *testing.T) {
+func TestBuildBreadcrumbsFromPathLinksParentsAndCurrentWithoutThoughtsRoot(t *testing.T) {
 	t.Parallel()
 
 	crumbs := buildBreadcrumbsFromPath("owner/plans/demo/outline.md", PageTypeMarkdown, BreadcrumbLinkState{})
@@ -48,7 +48,6 @@ func TestBuildBreadcrumbsFromPathLinksThoughtsParentsAndCurrent(t *testing.T) {
 		label string
 		href  string
 	}{
-		{label: "Thoughts", href: "/thoughts/"},
 		{label: "Owner", href: "/thoughts/owner"},
 		{label: "Plans", href: "/thoughts/owner/plans"},
 		{label: "Demo", href: "/thoughts/owner/plans/demo"},
@@ -77,6 +76,9 @@ func TestBuildBreadcrumbsFromPathPreservesChatQuery(t *testing.T) {
 		t.Fatalf("crumbs len = %d, want at least 2", len(crumbs))
 	}
 	for _, crumb := range crumbs[:len(crumbs)-1] {
+		if crumb.Label == "Thoughts" {
+			t.Fatalf("breadcrumbs should not duplicate top-level Thoughts nav: %#v", crumbs)
+		}
 		for _, want := range []string{"context=chat", "chat_workspace=ws+1", "thread=th%2F1", "run=run%2B1"} {
 			if !strings.Contains(crumb.Href, want) {
 				t.Fatalf("crumb href missing %q: %#v", want, crumb)
@@ -88,7 +90,7 @@ func TestBuildBreadcrumbsFromPathPreservesChatQuery(t *testing.T) {
 	}
 }
 
-func TestHeaderBreadcrumbsAlignAfterThoughts(t *testing.T) {
+func TestHeaderBreadcrumbsAlignAfterThoughtsWithoutDuplicateRoot(t *testing.T) {
 	t.Parallel()
 
 	body := renderLayoutComponent(t, Header(RootArgs{
@@ -102,6 +104,9 @@ func TestHeaderBreadcrumbsAlignAfterThoughts(t *testing.T) {
 		t.Fatalf("breadcrumb should render after Thoughts nav link: %s", body)
 	}
 	breadcrumbSegment := body[breadcrumbIndex:]
+	if strings.Contains(breadcrumbSegment, ">Thoughts</a>") || strings.Contains(breadcrumbSegment, ">Thoughts</span>") {
+		t.Fatalf("breadcrumb should not duplicate top-level Thoughts nav: %s", breadcrumbSegment)
+	}
 	for _, notWant := range []string{"justify-end", "data-init=\"el.scrollLeft = el.scrollWidth\"", "min-w-full"} {
 		if strings.Contains(breadcrumbSegment, notWant) {
 			t.Fatalf(

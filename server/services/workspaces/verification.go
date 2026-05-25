@@ -228,11 +228,16 @@ func (v *Verifier) executeRun(
 				if err != nil {
 					return err
 				}
-				if !strings.HasPrefix(probe.CallbackEndpoint, "http://127.0.0.1:") {
-					return fmt.Errorf("callback endpoint is not child loopback: %s", probe.CallbackEndpoint)
+				webPort := diagnostics.RuntimeStatus().Ports[ComponentWeb]
+				if webPort == 0 {
+					webPort = diagnostics.Workspace.Port
 				}
-				if !strings.HasPrefix(probe.SnapshotLoaderEndpoint, "http://127.0.0.1:") {
-					return fmt.Errorf("snapshot endpoint is not child loopback: %s", probe.SnapshotLoaderEndpoint)
+				expectedBase := "http://127.0.0.1:" + strconv.Itoa(webPort)
+				if probe.CallbackEndpoint != expectedBase+"/internal/agent-chat/events" {
+					return fmt.Errorf("callback endpoint = %q, want child endpoint %q", probe.CallbackEndpoint, expectedBase+"/internal/agent-chat/events")
+				}
+				if probe.SnapshotLoaderEndpoint != expectedBase+"/internal/agent-chat/snapshots" {
+					return fmt.Errorf("snapshot endpoint = %q, want child endpoint %q", probe.SnapshotLoaderEndpoint, expectedBase+"/internal/agent-chat/snapshots")
 				}
 				if !samePath(probe.Cwd, diagnostics.Workspace.CheckoutPath) {
 					return fmt.Errorf("probe cwd = %q, want %q", probe.Cwd, diagnostics.Workspace.CheckoutPath)

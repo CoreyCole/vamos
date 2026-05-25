@@ -4997,6 +4997,20 @@ func newAgentChatTestDB(t *testing.T) (*sql.DB, *db.Queries) {
 	return dbConn, db.New(dbConn)
 }
 
+func TestWorkspaceThreadCwdPrefersConfiguredDefaultCwd(t *testing.T) {
+	service := &Service{
+		projectRoot: "/host/thoughts-repo",
+		defaultCwd:  "/workspace/checkout",
+	}
+
+	got := service.workspaceThreadCwd(db.Workspace{
+		RootDocPath: "/host/thoughts-repo/thoughts",
+	})
+	if got != "/workspace/checkout" {
+		t.Fatalf("workspaceThreadCwd() = %q, want default cwd", got)
+	}
+}
+
 func TestNewServiceWithOptionsUsesConfiguredThoughtsRoot(t *testing.T) {
 	dbConn, queries := newAgentChatTestDB(t)
 	hostRepo := filepath.Join(t.TempDir(), "host-repo")
