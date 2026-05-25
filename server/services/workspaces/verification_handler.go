@@ -13,11 +13,13 @@ import (
 )
 
 type Verifier struct {
-	Manager           Manager
-	ManagerListenAddr string
-	Runs              VerifyRunStore
-	Tailer            LogTailer
-	Prober            LocalProber
+	Manager                Manager
+	ManagerListenAddr      string
+	Runs                   VerifyRunStore
+	Tailer                 LogTailer
+	Prober                 LocalProber
+	InternalAgentChatToken string
+	HTTPClient             *http.Client
 }
 
 func NewVerifier(

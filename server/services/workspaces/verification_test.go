@@ -112,6 +112,94 @@ func TestVerifierHostDispatchUsesManagerListenAddress(t *testing.T) {
 	}
 }
 
+func TestVerifierExecuteRunIncludesAgentChatProbeWhenRequested(t *testing.T) {
+	t.Parallel()
+
+	manager := newVerificationFakeManager(t, "demo")
+	verifier := NewVerifier(
+		manager,
+		":4200",
+		NewMemoryVerifyRunStore(),
+		verificationFakeTailer{},
+		&verificationFakeProber{pidAlive: true, portOpen: true, statusCode: http.StatusOK},
+	)
+	var sawToken bool
+	verifier.InternalAgentChatToken = "secret"
+	verifier.HTTPClient = &http.Client{Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
+		if req.URL.Path != "/internal/agent-chat/probe" {
+			t.Fatalf("probe path = %q", req.URL.Path)
+		}
+		if req.Header.Get("X-Vamos-Internal-Token") == "secret" {
+			sawToken = true
+		}
+		body := fmt.Sprintf(`{
+			"run_id":"run-1",
+			"workflow_id":"workflow-1",
+			"callback_endpoint":"http://127.0.0.1:%d/internal/agent-chat/events",
+			"snapshot_loader_endpoint":"http://127.0.0.1:%d/internal/agent-chat/snapshots",
+			"cwd":%q,
+			"reached_snapshot_loader":true,
+			"reached_callback":true
+		}`, manager.workspace.Ports[ComponentWeb], manager.workspace.Ports[ComponentWeb], manager.workspace.CheckoutPath)
+		return &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(body))}, nil
+	})}
+
+	run := verifier.executeRun(
+		context.Background(),
+		VerifyWorkspaceRun{ID: "run-1", Slug: "demo", Status: VerifyRunRunning, StartedAt: time.Now()},
+		VerifyWorkspaceRequest{Slug: "demo", AgentChatProbe: true},
+	)
+	if run.Status != VerifyRunPassed {
+		t.Fatalf("status = %q, want passed; phases = %+v", run.Status, run.Phases)
+	}
+	if run.AgentChatProbe == nil || run.AgentChatProbe.TSWorkerPID != manager.workspace.PIDs[ComponentTSWorker] {
+		t.Fatalf("agent chat probe = %+v, want result with ts worker pid", run.AgentChatProbe)
+	}
+	if !sawToken {
+		t.Fatalf("probe request did not include internal token")
+	}
+	if !hasVerificationPhase(run, "agent-chat-probe", VerifyPhasePassed) {
+		t.Fatalf("phases = %+v, want passed agent-chat-probe", run.Phases)
+	}
+}
+
+func TestVerifierExecuteRunFailsWhenAgentChatProbeReportsStaleCallback(t *testing.T) {
+	t.Parallel()
+
+	manager := newVerificationFakeManager(t, "demo")
+	verifier := NewVerifier(
+		manager,
+		":4200",
+		NewMemoryVerifyRunStore(),
+		verificationFakeTailer{},
+		&verificationFakeProber{pidAlive: true, portOpen: true, statusCode: http.StatusOK},
+	)
+	verifier.HTTPClient = &http.Client{Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
+		body := fmt.Sprintf(`{
+			"run_id":"run-1",
+			"workflow_id":"workflow-1",
+			"callback_endpoint":"http://localhost:4200/internal/agent-chat/events",
+			"snapshot_loader_endpoint":"http://127.0.0.1:%d/internal/agent-chat/snapshots",
+			"cwd":%q,
+			"reached_snapshot_loader":true,
+			"reached_callback":true
+		}`, manager.workspace.Ports[ComponentWeb], manager.workspace.CheckoutPath)
+		return &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(body))}, nil
+	})}
+
+	run := verifier.executeRun(
+		context.Background(),
+		VerifyWorkspaceRun{ID: "run-1", Slug: "demo", Status: VerifyRunRunning, StartedAt: time.Now()},
+		VerifyWorkspaceRequest{Slug: "demo", AgentChatProbe: true},
+	)
+	if run.Status != VerifyRunFailed {
+		t.Fatalf("status = %q, want failed", run.Status)
+	}
+	if run.Error == nil || run.Error.Layer != VerificationLayerAgentChat || !strings.Contains(run.Error.Message, "callback endpoint") {
+		t.Fatalf("run error = %+v, want agentchat stale callback", run.Error)
+	}
+}
+
 func TestVerifierVerifyBundleReportsComponentHealth(t *testing.T) {
 	t.Parallel()
 
@@ -607,6 +695,21 @@ func (m *verificationFakeManager) Restart(context.Context, string) (Workspace, e
 	return m.workspace, nil
 }
 
+type roundTripFunc func(*http.Request) (*http.Response, error)
+
+func (f roundTripFunc) RoundTrip(req *http.Request) (*http.Response, error) {
+	return f(req)
+}
+
+func hasVerificationPhase(run VerifyWorkspaceRun, name string, status VerifyPhaseStatus) bool {
+	for _, phase := range run.Phases {
+		if phase.Name == name && phase.Status == status {
+			return true
+		}
+	}
+	return false
+}
+
 type verificationFakeTailer struct{}
 
 func (verificationFakeTailer) Tail(string, int) (string, error) { return "log line", nil }
@@ -641,10 +744,18 @@ func (p *verificationFakeProber) HTTPHost(
 }
 
 func removeMetadataForTest(checkout string) error {
-	if err := os.Remove(WorkspaceMetadataPath(checkout)); err != nil {
-		return err
+	paths := []string{WorkspaceMetadataPath(checkout), RuntimePaths(checkout).WorkspaceEnv}
+	seen := map[string]bool{}
+	for _, path := range paths {
+		if seen[path] {
+			continue
+		}
+		seen[path] = true
+		if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
+			return err
+		}
 	}
-	return os.Remove(RuntimePaths(checkout).WorkspaceEnv)
+	return nil
 }
 
 func writeTSWorkerIdentityMarkerForTest(t *testing.T, ws Workspace) {

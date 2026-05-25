@@ -346,12 +346,32 @@ type WorkspaceDiagnostics struct {
 }
 
 type VerifyWorkspaceRequest struct {
-	Slug      string `json:"slug"`
-	Start     bool   `json:"start"`
-	Restart   bool   `json:"restart"`
-	Stop      bool   `json:"stop"`
-	TailLines int    `json:"tail_lines"`
-	ReportDir string `json:"report_dir"`
+	Slug           string `json:"slug"`
+	Start          bool   `json:"start"`
+	Restart        bool   `json:"restart"`
+	Stop           bool   `json:"stop"`
+	TailLines      int    `json:"tail_lines"`
+	ReportDir      string `json:"report_dir"`
+	AgentChatProbe bool   `json:"agent_chat_probe"`
+}
+
+type AgentChatProbeRequest struct {
+	Slug         string        `json:"slug"`
+	CheckoutPath string        `json:"checkout_path,omitempty"`
+	Timeout      time.Duration `json:"timeout,omitempty"`
+}
+
+type AgentChatProbeResult struct {
+	RunID                  string `json:"run_id,omitempty"`
+	WorkflowID             string `json:"workflow_id,omitempty"`
+	CallbackEndpoint       string `json:"callback_endpoint,omitempty"`
+	SnapshotLoaderEndpoint string `json:"snapshot_loader_endpoint,omitempty"`
+	Cwd                    string `json:"cwd,omitempty"`
+	TemporalAddress        string `json:"temporal_address,omitempty"`
+	TSWorkerPID            int    `json:"ts_worker_pid,omitempty"`
+	ReachedSnapshotLoader  bool   `json:"reached_snapshot_loader"`
+	ReachedCallback        bool   `json:"reached_callback"`
+	Error                  string `json:"error,omitempty"`
 }
 
 type VerifyRunStatus string
@@ -382,21 +402,22 @@ type VerifyWorkspacePhase struct {
 }
 
 type VerifyWorkspaceRun struct {
-	ID            string                    `json:"id"`
-	Slug          string                    `json:"slug"`
-	Status        VerifyRunStatus           `json:"status"`
-	StartedAt     time.Time                 `json:"started_at"`
-	CompletedAt   *time.Time                `json:"completed_at,omitempty"`
-	Phases        []VerifyWorkspacePhase    `json:"phases"`
-	Snapshots     []VerifyWorkspaceSnapshot `json:"snapshots"`
-	Diagnostics   WorkspaceDiagnostics      `json:"diagnostics"`
-	Runtime       RuntimeStatus             `json:"runtime"`
-	TemporalOK    bool                      `json:"temporal_ok"`
-	WebOK         bool                      `json:"web_ok"`
-	TSWorkerOK    bool                      `json:"ts_worker_ok"`
-	TemporalUIURL string                    `json:"temporal_ui_url,omitempty"`
-	Errors        []string                  `json:"errors,omitempty"`
-	Error         *VerifyWorkspaceError     `json:"error,omitempty"`
+	ID             string                    `json:"id"`
+	Slug           string                    `json:"slug"`
+	Status         VerifyRunStatus           `json:"status"`
+	StartedAt      time.Time                 `json:"started_at"`
+	CompletedAt    *time.Time                `json:"completed_at,omitempty"`
+	Phases         []VerifyWorkspacePhase    `json:"phases"`
+	Snapshots      []VerifyWorkspaceSnapshot `json:"snapshots"`
+	Diagnostics    WorkspaceDiagnostics      `json:"diagnostics"`
+	Runtime        RuntimeStatus             `json:"runtime"`
+	TemporalOK     bool                      `json:"temporal_ok"`
+	WebOK          bool                      `json:"web_ok"`
+	TSWorkerOK     bool                      `json:"ts_worker_ok"`
+	TemporalUIURL  string                    `json:"temporal_ui_url,omitempty"`
+	AgentChatProbe *AgentChatProbeResult     `json:"agent_chat_probe,omitempty"`
+	Errors         []string                  `json:"errors,omitempty"`
+	Error          *VerifyWorkspaceError     `json:"error,omitempty"`
 }
 
 type VerifyRunStore interface {

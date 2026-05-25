@@ -2121,15 +2121,16 @@ func (s *Service) seedPendingUserPrompt(
 	return nil
 }
 
-func (s *Service) startRun(
+type preparedRunInput struct {
+	Input         conversation.RunInput
+	ChatSessionID string
+}
+
+func (s *Service) buildRunInput(
 	ctx context.Context,
 	thread db.AgentThread,
 	run db.AgentRun,
-) (*db.AgentRun, error) {
-	if s.temporal == nil {
-		return nil, fmt.Errorf("temporal not configured")
-	}
-
+) (preparedRunInput, error) {
 	restoreHead := ""
 	if run.RestoreHeadEntryID.Valid {
 		restoreHead = run.RestoreHeadEntryID.String
@@ -2142,7 +2143,6 @@ func (s *Service) startRun(
 	if run.SessionID.Valid {
 		sessionID = run.SessionID.String
 	}
-
 	inputContext := s.runDocumentContext(ctx, run)
 	if attachments, err := s.attachedPathsForRun(ctx, run.ID); err == nil {
 		attachmentContext := BuildAttachedPathContext(attachments)
@@ -2153,27 +2153,44 @@ func (s *Service) startRun(
 			inputContext += attachmentContext
 		}
 	}
-
 	chatSessionID := s.chatSessionIDForRun(ctx, run)
-	input := conversation.RunInput{
-		WorkspaceID:            workspaceID,
-		SessionID:              sessionID,
-		ChatSessionID:          chatSessionID,
-		RunID:                  run.ID,
-		ThreadID:               thread.ID,
-		Trigger:                conversation.RunTrigger(run.Trigger),
-		Prompt:                 run.PromptText,
-		Context:                inputContext,
-		Cwd:                    thread.Cwd,
-		RootDocPath:            run.RootDocPath,
-		ThinkingLevel:          "high",
-		CallbackEndpoint:       s.callbackURL("/internal/agent-chat/events"),
-		SnapshotLoaderEndpoint: s.callbackURL("/internal/agent-chat/snapshots"),
-		SnapshotRef: conversation.SnapshotRef{
-			LineageID:   thread.LineageID,
-			HeadEntryID: restoreHead,
+	return preparedRunInput{
+		Input: conversation.RunInput{
+			WorkspaceID:            workspaceID,
+			SessionID:              sessionID,
+			ChatSessionID:          chatSessionID,
+			RunID:                  run.ID,
+			ThreadID:               thread.ID,
+			Trigger:                conversation.RunTrigger(run.Trigger),
+			Prompt:                 run.PromptText,
+			Context:                inputContext,
+			Cwd:                    thread.Cwd,
+			RootDocPath:            run.RootDocPath,
+			ThinkingLevel:          "high",
+			CallbackEndpoint:       s.callbackURL("/internal/agent-chat/events"),
+			SnapshotLoaderEndpoint: s.callbackURL("/internal/agent-chat/snapshots"),
+			SnapshotRef: conversation.SnapshotRef{
+				LineageID:   thread.LineageID,
+				HeadEntryID: restoreHead,
+			},
 		},
+		ChatSessionID: chatSessionID,
+	}, nil
+}
+
+func (s *Service) startRun(
+	ctx context.Context,
+	thread db.AgentThread,
+	run db.AgentRun,
+) (*db.AgentRun, error) {
+	if s.temporal == nil {
+		return nil, fmt.Errorf("temporal not configured")
 	}
+	prepared, err := s.buildRunInput(ctx, thread, run)
+	if err != nil {
+		return nil, err
+	}
+	input := prepared.Input
 
 	temporalRunID, err := s.temporal.StartWorkflow(
 		ctx,
@@ -2194,7 +2211,7 @@ func (s *Service) startRun(
 		s.notifyThreadScope(ctx, thread.ID, PatchRunHeader)
 		return &run, nil
 	}
-	if err := s.recordTemporalWorkerSurface(ctx, run, chatSessionID); err != nil {
+	if err := s.recordTemporalWorkerSurface(ctx, run, prepared.ChatSessionID); err != nil {
 		s.notifyThreadScope(ctx, thread.ID, PatchRunHeader)
 		return &run, nil
 	}
@@ -2205,13 +2222,13 @@ func (s *Service) startRun(
 		return &run, nil
 	}
 
-	if workspaceID != "" {
+	if input.WorkspaceID != "" {
 		event, _ := s.AppendWorkspaceEvent(ctx, s.queries, AppendWorkspaceEventInput{
-			WorkspaceID: workspaceID,
+			WorkspaceID: input.WorkspaceID,
 			EventType:   "run_started",
 			ActorType:   "system",
 			ThreadID:    thread.ID,
-			SessionID:   sessionID,
+			SessionID:   input.SessionID,
 			RunID:       run.ID,
 			EventKey:    "run_started:" + run.ID,
 		})

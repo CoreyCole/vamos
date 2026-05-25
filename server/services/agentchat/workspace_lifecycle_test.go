@@ -24,6 +24,7 @@ import (
 	wruntime "github.com/CoreyCole/vamos/pkg/agents/workflows/runtime"
 	"github.com/CoreyCole/vamos/pkg/db"
 	agentchatworkflows "github.com/CoreyCole/vamos/server/services/agentchat/workflows"
+	"github.com/CoreyCole/vamos/server/services/workspaces"
 )
 
 type fakeTemporalStarter struct {
@@ -338,6 +339,74 @@ func TestStartWorkspaceThreadCreatesSessionRunAndBoundedRunInput(t *testing.T) {
 	if bytes.Contains(encoded, []byte("entries")) ||
 		bytes.Contains(encoded, []byte("payload_json")) {
 		t.Fatalf("run input includes full snapshot payload: %s", encoded)
+	}
+}
+
+func TestRunWorkspaceProbeUsesChildLocalCallbackSnapshotAndCwd(t *testing.T) {
+	service := newTestAgentChatService(t)
+	fakeTemporal := &fakeTemporalStarter{}
+	service.temporal = fakeTemporal
+	handler := NewHandler(service, nil, HandlerOptions{InternalToken: "secret"})
+	t.Setenv("VAMOS_INTERNAL_TOKEN", "secret")
+	t.Setenv("TEMPORAL_ADDRESS", "127.0.0.1:7234")
+
+	e := echo.New()
+	e.GET("/internal/agent-chat/snapshots", handler.HandleInternalRunSnapshot)
+	e.POST("/internal/agent-chat/events", handler.HandleInternalRunEvent)
+	server := httptest.NewServer(e)
+	t.Cleanup(server.Close)
+	service.callbackBaseURL = server.URL
+
+	result, err := service.RunWorkspaceProbe(t.Context(), workspaces.AgentChatProbeRequest{})
+	if err != nil {
+		t.Fatalf("RunWorkspaceProbe() error = %v; result = %+v", err, result)
+	}
+	if result.RunID == "" || result.WorkflowID == "" {
+		t.Fatalf("probe ids = %+v, want run and workflow ids", result)
+	}
+	if result.CallbackEndpoint != server.URL+"/internal/agent-chat/events" {
+		t.Fatalf("callback endpoint = %q, want child endpoint", result.CallbackEndpoint)
+	}
+	if result.SnapshotLoaderEndpoint != server.URL+"/internal/agent-chat/snapshots" {
+		t.Fatalf("snapshot endpoint = %q, want child endpoint", result.SnapshotLoaderEndpoint)
+	}
+	if result.Cwd != service.projectRoot {
+		t.Fatalf("cwd = %q, want project root %q", result.Cwd, service.projectRoot)
+	}
+	if !result.ReachedSnapshotLoader || !result.ReachedCallback {
+		t.Fatalf("probe reached flags = %+v, want snapshot and callback", result)
+	}
+	if result.TemporalAddress != "127.0.0.1:7234" {
+		t.Fatalf("temporal address = %q", result.TemporalAddress)
+	}
+	input, ok := fakeTemporal.lastInput.(conversation.RunInput)
+	if !ok {
+		t.Fatalf("temporal input type = %T, want conversation.RunInput", fakeTemporal.lastInput)
+	}
+	if input.CallbackEndpoint != result.CallbackEndpoint ||
+		input.SnapshotLoaderEndpoint != result.SnapshotLoaderEndpoint ||
+		input.Cwd != result.Cwd {
+		t.Fatalf("temporal input = %+v, probe result = %+v", input, result)
+	}
+	storedRun, err := service.queries.GetAgentRun(t.Context(), result.RunID)
+	if err != nil {
+		t.Fatalf("GetAgentRun() error = %v", err)
+	}
+	if storedRun.Status != "failed" {
+		t.Fatalf("probe run status = %q, want failed diagnostic run", storedRun.Status)
+	}
+}
+
+func TestHandleInternalWorkspaceProbeRequiresInternalTrust(t *testing.T) {
+	service := newTestAgentChatService(t)
+	handler := NewHandler(service, nil, HandlerOptions{InternalToken: "secret"})
+	req := httptest.NewRequest(http.MethodPost, "/internal/agent-chat/probe", strings.NewReader(`{}`))
+	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+	req.RemoteAddr = "127.0.0.1:1234"
+	rec := httptest.NewRecorder()
+	c := echo.New().NewContext(req, rec)
+	if err := handler.HandleInternalWorkspaceProbe(c); err == nil {
+		t.Fatalf("HandleInternalWorkspaceProbe() error = nil, want unauthorized")
 	}
 }
 

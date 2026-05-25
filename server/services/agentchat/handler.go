@@ -28,6 +28,7 @@ import (
 	"github.com/CoreyCole/vamos/server/services/layoutprefs"
 	"github.com/CoreyCole/vamos/server/services/markdown"
 	"github.com/CoreyCole/vamos/server/services/theme"
+	"github.com/CoreyCole/vamos/server/services/workspaces"
 )
 
 const resetAndFocusComposerScript = `
@@ -2370,6 +2371,21 @@ func (h *Handler) HandleInternalPiSessionImport(c echo.Context) error {
 	})
 	if err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
+	}
+	return c.JSON(http.StatusOK, result)
+}
+
+func (h *Handler) HandleInternalWorkspaceProbe(c echo.Context) error {
+	if !h.trustedInternalRequest(c) {
+		return echo.NewHTTPError(http.StatusUnauthorized, "invalid internal token")
+	}
+	var req workspaces.AgentChatProbeRequest
+	if err := c.Bind(&req); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid probe payload")
+	}
+	result, err := h.service.RunWorkspaceProbe(c.Request().Context(), req)
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, result)
 	}
 	return c.JSON(http.StatusOK, result)
 }

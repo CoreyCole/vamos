@@ -1,6 +1,7 @@
 package workspaces
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -206,6 +207,47 @@ func (v *Verifier) executeRun(
 			return v.assertHostDispatch(ctx, req.Slug)
 		},
 	)
+	if req.AgentChatProbe {
+		v.phase(
+			ctx,
+			&run,
+			"agent-chat-probe",
+			VerificationLayerAgentChat,
+			func(ctx context.Context) error {
+				diagnostics, err := v.Diagnostics(ctx, req.Slug, req.TailLines)
+				if err != nil {
+					return err
+				}
+				probe, err := v.runAgentChatProbe(ctx, diagnostics)
+				if diagnostics.TSWorkerIdentity != nil && diagnostics.TSWorkerIdentity.PID != 0 {
+					probe.TSWorkerPID = diagnostics.TSWorkerIdentity.PID
+				} else if diagnostics.RuntimeStatus().PIDs[ComponentTSWorker] != 0 {
+					probe.TSWorkerPID = diagnostics.RuntimeStatus().PIDs[ComponentTSWorker]
+				}
+				run.AgentChatProbe = &probe
+				if err != nil {
+					return err
+				}
+				if !strings.HasPrefix(probe.CallbackEndpoint, "http://127.0.0.1:") {
+					return fmt.Errorf("callback endpoint is not child loopback: %s", probe.CallbackEndpoint)
+				}
+				if !strings.HasPrefix(probe.SnapshotLoaderEndpoint, "http://127.0.0.1:") {
+					return fmt.Errorf("snapshot endpoint is not child loopback: %s", probe.SnapshotLoaderEndpoint)
+				}
+				if !samePath(probe.Cwd, diagnostics.Workspace.CheckoutPath) {
+					return fmt.Errorf("probe cwd = %q, want %q", probe.Cwd, diagnostics.Workspace.CheckoutPath)
+				}
+				if !probe.ReachedSnapshotLoader {
+					return fmt.Errorf("snapshot loader was not reached")
+				}
+				if !probe.ReachedCallback {
+					return fmt.Errorf("callback endpoint was not reached")
+				}
+				run.AgentChatProbe = &probe
+				return nil
+			},
+		)
+	}
 	if req.Restart {
 		before := v.snapshot(ctx, "before-restart", req.Slug)
 		run.Snapshots = append(run.Snapshots, before)
@@ -289,6 +331,57 @@ func (v *Verifier) executeRun(
 		}
 	}
 	return run
+}
+
+func (v *Verifier) runAgentChatProbe(
+	ctx context.Context,
+	diagnostics WorkspaceDiagnostics,
+) (AgentChatProbeResult, error) {
+	ws := diagnostics.Workspace
+	port := diagnostics.RuntimeStatus().Ports[ComponentWeb]
+	if port == 0 {
+		port = ws.Port
+	}
+	if port == 0 {
+		return AgentChatProbeResult{}, fmt.Errorf("workspace web port is unknown")
+	}
+	body, err := json.Marshal(AgentChatProbeRequest{
+		Slug:         ws.Slug,
+		CheckoutPath: ws.CheckoutPath,
+		Timeout:      20 * time.Second,
+	})
+	if err != nil {
+		return AgentChatProbeResult{}, err
+	}
+	endpoint := "http://127.0.0.1:" + strconv.Itoa(port) + "/internal/agent-chat/probe"
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(body))
+	if err != nil {
+		return AgentChatProbeResult{}, err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	if token := strings.TrimSpace(v.InternalAgentChatToken); token != "" {
+		req.Header.Set("X-Vamos-Internal-Token", token)
+	}
+	client := v.HTTPClient
+	if client == nil {
+		client = http.DefaultClient
+	}
+	resp, err := client.Do(req)
+	if err != nil {
+		return AgentChatProbeResult{}, err
+	}
+	defer resp.Body.Close()
+	var result AgentChatProbeResult
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return result, err
+	}
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		if result.Error != "" {
+			return result, errors.New(result.Error)
+		}
+		return result, fmt.Errorf("agent chat probe returned HTTP %d", resp.StatusCode)
+	}
+	return result, nil
 }
 
 func (v *Verifier) waitForLifecycleTerminal(

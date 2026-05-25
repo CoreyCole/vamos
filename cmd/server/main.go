@@ -1323,13 +1323,15 @@ func main() {
 		if workspaceManager != nil && strings.TrimSpace(cfg.WorkspaceRestartToken) != "" {
 			workspaceHandler.RegisterInternalRestartRoute(e)
 			workspaceHandler.RegisterInternalProvisionRoute(e)
-			workspaceHandler.RegisterInternalVerificationRoutes(e, workspaces.NewVerifier(
+			verifier := workspaces.NewVerifier(
 				workspaceManager,
 				cfg.ListenAddress,
 				workspaces.NewMemoryVerifyRunStore(),
 				workspaces.NewFileLogTailer(),
 				workspaces.NewSystemLocalProber(),
-			))
+			)
+			verifier.InternalAgentChatToken = cfg.InternalAgentChatToken
+			workspaceHandler.RegisterInternalVerificationRoutes(e, verifier)
 		}
 		if handoffSigner != nil {
 			workspaceHandler.RegisterDevAuthRoute(e)
@@ -1423,6 +1425,7 @@ func main() {
 	// Internal Agent Chat endpoints (from TS worker — no auth, localhost only)
 	e.POST("/internal/agent-chat/events", agentChatHandler.HandleInternalRunEvent)
 	e.GET("/internal/agent-chat/snapshots", agentChatHandler.HandleInternalRunSnapshot)
+	e.POST("/internal/agent-chat/probe", agentChatHandler.HandleInternalWorkspaceProbe)
 	e.POST(
 		"/internal/agent-chat/import-session",
 		agentChatHandler.HandleInternalPiSessionImport,
