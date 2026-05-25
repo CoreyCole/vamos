@@ -17,6 +17,8 @@ type BundleStore interface {
 	WriteLifecycle(ws Workspace, state WorkspaceLifecycleState) error
 	ReadWorkspaceEnv(ws Workspace) (WorkspaceEnv, error)
 	WriteWorkspaceEnv(ws Workspace, env WorkspaceEnv) error
+	ReadRuntimeEnvSnapshot(ws Workspace) (RuntimeEnvSnapshot, error)
+	WriteRuntimeEnvSnapshot(ws Workspace, snapshot RuntimeEnvSnapshot) error
 }
 
 type FileBundleStore struct{}
@@ -86,6 +88,18 @@ func (s FileBundleStore) WriteWorkspaceEnv(ws Workspace, env WorkspaceEnv) error
 		RestartToken: env.RestartToken,
 		DatabasePath: env.DatabasePath,
 	})
+}
+
+func (s FileBundleStore) ReadRuntimeEnvSnapshot(ws Workspace) (RuntimeEnvSnapshot, error) {
+	var snapshot RuntimeEnvSnapshot
+	if err := readJSONFile(s.Paths(ws).RuntimeEnvSnapshot, &snapshot); err != nil {
+		return RuntimeEnvSnapshot{}, err
+	}
+	return snapshot, nil
+}
+
+func (s FileBundleStore) WriteRuntimeEnvSnapshot(ws Workspace, snapshot RuntimeEnvSnapshot) error {
+	return writeJSONFile(s.Paths(ws).RuntimeEnvSnapshot, snapshot, 0o644)
 }
 
 func readJSONFile(path string, value any) error {

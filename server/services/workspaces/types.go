@@ -83,10 +83,34 @@ type WorkspaceRuntimePaths struct {
 	Root, RunDir, LogDir, StateDir             string
 	WorkspaceEnv, DesiredJSON, StatusJSON      string
 	LifecycleJSON, PortsJSON                   string
+	RuntimeEnvSnapshot                         string
 	WebPID, TemporalPID, TSWorkerPID           string
 	WebLog, TemporalLog, TSWorkerLog, BuildLog string
 	AgentsDB, TemporalDB, OpenClawDir          string
 	TSReadyMarker                              string
+}
+
+type RuntimeEnvSnapshot struct {
+	Version       int                    `json:"version"`
+	WorkspaceSlug string                 `json:"workspace_slug"`
+	CheckoutPath  string                 `json:"checkout_path"`
+	WrittenAt     time.Time              `json:"written_at"`
+	Web           RuntimeProcessEnvProof `json:"web"`
+	TSWorker      RuntimeProcessEnvProof `json:"ts_worker"`
+}
+
+type RuntimeProcessEnvProof struct {
+	PID                     int      `json:"pid,omitempty"`
+	ListenAddress           string   `json:"listen_address,omitempty"`
+	PublicBaseURL           string   `json:"public_base_url,omitempty"`
+	InternalCallbackBaseURL string   `json:"internal_callback_base_url,omitempty"`
+	TemporalAddress         string   `json:"temporal_address,omitempty"`
+	TemporalUIBaseURL       string   `json:"temporal_ui_base_url,omitempty"`
+	DatabasePath            string   `json:"database_path,omitempty"`
+	DefaultCWD              string   `json:"default_cwd,omitempty"`
+	TaskQueue               string   `json:"task_queue,omitempty"`
+	ReadyMarker             string   `json:"ready_marker,omitempty"`
+	RedactedKeys            []string `json:"redacted_keys,omitempty"`
 }
 
 type BuildStatus struct {

@@ -64,6 +64,44 @@ func TestWorkspaceRuntimeStartBundleOrdersComponentsAndPersistsRunningAfterReadi
 	}
 }
 
+func TestWorkspaceRuntimeStartBundleWritesRuntimeEnvSnapshot(t *testing.T) {
+	ws := bundleTestWorkspace(t)
+	starter := &recordingStarter{}
+	runtime := &WorkspaceRuntime{
+		store:         FileBundleStore{},
+		starter:       starter,
+		stopper:       starter,
+		prober:        &recordingProber{},
+		portAllocator: sequentialPorts(4300),
+		now:           func() time.Time { return time.Unix(100, 0) },
+	}
+
+	started, _, err := runtime.StartBundle(
+		context.Background(),
+		ws,
+		RuntimeConfig{ManagerURL: "https://main.test", RestartToken: "token"},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	snapshot, err := FileBundleStore{}.ReadRuntimeEnvSnapshot(started)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if snapshot.WorkspaceSlug != ws.Slug || snapshot.CheckoutPath != ws.CheckoutPath {
+		t.Fatalf("snapshot identity=%#v", snapshot)
+	}
+	if snapshot.Web.PID != started.PIDs[ComponentWeb] || snapshot.TSWorker.PID != started.PIDs[ComponentTSWorker] {
+		t.Fatalf("snapshot pids=%#v started=%#v", snapshot, started.PIDs)
+	}
+	if snapshot.Web.InternalCallbackBaseURL != "http://127.0.0.1:4301" || snapshot.Web.TemporalAddress != "127.0.0.1:4302" {
+		t.Fatalf("snapshot web proof=%#v", snapshot.Web)
+	}
+	if snapshot.TSWorker.TaskQueue != "agents-ts" || snapshot.TSWorker.ReadyMarker != RuntimePaths(ws.CheckoutPath).TSReadyMarker {
+		t.Fatalf("snapshot ts proof=%#v", snapshot.TSWorker)
+	}
+}
+
 func TestWorkspaceRuntimeStartBundleFailureStopsReverseAndPersistsFailedPhase(
 	t *testing.T,
 ) {
@@ -128,6 +166,61 @@ func TestTSWorkerArgsRunFromPackagePath(t *testing.T) {
 	want := []string{"node", "dist/pkg/agents/temporal/workers/ts/worker.js"}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("TSWorkerArgs=%v want %v", got, want)
+	}
+}
+
+func TestRuntimePathsIncludesRuntimeEnvSnapshot(t *testing.T) {
+	paths := RuntimePaths("/tmp/checkout")
+	want := filepath.Join("/tmp/checkout", ".vamos", "run", "runtime-env.json")
+	if paths.RuntimeEnvSnapshot != want {
+		t.Fatalf("RuntimeEnvSnapshot=%q want %q", paths.RuntimeEnvSnapshot, want)
+	}
+}
+
+func TestBuildRuntimeEnvSnapshotRecordsSelectedChildProof(t *testing.T) {
+	ws := Workspace{
+		Slug:            "foo",
+		CheckoutPath:    "/tmp/checkout",
+		MetadataDirName: ".vamos",
+		URL:             "https://foo.test/",
+	}
+	ports := map[BundleComponent]int{
+		ComponentWeb:        4301,
+		ComponentTemporal:   4302,
+		ComponentTemporalUI: 4303,
+	}
+	pids := map[BundleComponent]int{ComponentWeb: 2002, ComponentTSWorker: 2003}
+	writtenAt := time.Unix(123, 0)
+
+	snapshot := BuildRuntimeEnvSnapshot(ws, RuntimeConfig{}, ports, pids, writtenAt)
+
+	paths := RuntimePaths(ws.CheckoutPath, ws.MetadataDirName)
+	if snapshot.Version != 1 || snapshot.WorkspaceSlug != ws.Slug || snapshot.CheckoutPath != ws.CheckoutPath || !snapshot.WrittenAt.Equal(writtenAt.UTC()) {
+		t.Fatalf("snapshot identity=%#v", snapshot)
+	}
+	if snapshot.Web.PID != 2002 || snapshot.Web.ListenAddress != "127.0.0.1:4301" ||
+		snapshot.Web.PublicBaseURL != "https://foo.test" ||
+		snapshot.Web.InternalCallbackBaseURL != "http://127.0.0.1:4301" ||
+		snapshot.Web.TemporalAddress != "127.0.0.1:4302" ||
+		snapshot.Web.TemporalUIBaseURL != "http://127.0.0.1:4303" ||
+		snapshot.Web.DatabasePath != paths.AgentsDB ||
+		snapshot.Web.DefaultCWD != ws.CheckoutPath {
+		t.Fatalf("web proof=%#v", snapshot.Web)
+	}
+	if snapshot.TSWorker.PID != 2003 || snapshot.TSWorker.TemporalAddress != "127.0.0.1:4302" ||
+		snapshot.TSWorker.DefaultCWD != ws.CheckoutPath || snapshot.TSWorker.TaskQueue != "agents-ts" ||
+		snapshot.TSWorker.ReadyMarker != paths.TSReadyMarker {
+		t.Fatalf("ts proof=%#v", snapshot.TSWorker)
+	}
+	for _, forbidden := range []string{"token", "secret", "auth.json"} {
+		if strings.Contains(snapshot.Web.PublicBaseURL, forbidden) || strings.Contains(snapshot.TSWorker.ReadyMarker, forbidden) {
+			t.Fatalf("snapshot leaked forbidden value %q: %#v", forbidden, snapshot)
+		}
+	}
+	if !containsString(snapshot.Web.RedactedKeys, "VAMOS_WORKSPACE_RESTART_TOKEN") ||
+		!containsString(snapshot.Web.RedactedKeys, "VAMOS_INTERNAL_TOKEN") ||
+		!containsString(snapshot.TSWorker.RedactedKeys, "PI_AUTH_PATH") {
+		t.Fatalf("redacted keys web=%v ts=%v", snapshot.Web.RedactedKeys, snapshot.TSWorker.RedactedKeys)
 	}
 }
 
@@ -357,6 +450,47 @@ func TestWorkspaceRuntimeRestartWebDoesNotRestartTemporal(t *testing.T) {
 	}
 }
 
+func TestWorkspaceRuntimeRestartWebUpdatesRuntimeEnvSnapshot(t *testing.T) {
+	ws := bundleTestWorkspace(t)
+	ws.Status = StatusRunning
+	ws.Ports = map[BundleComponent]int{ComponentWeb: 4300, ComponentTemporal: 7234, ComponentTemporalUI: 8234}
+	handles := BundleHandles{
+		ComponentTemporal: handleFor(ComponentTemporal, 1001),
+		ComponentWeb:      handleFor(ComponentWeb, 1002),
+		ComponentTSWorker: handleFor(ComponentTSWorker, 1003),
+	}
+	starter := &recordingStarter{}
+	runtime := &WorkspaceRuntime{
+		store:   FileBundleStore{},
+		starter: starter,
+		stopper: starter,
+		prober:  &recordingProber{},
+		now:     func() time.Time { return time.Unix(200, 0) },
+	}
+
+	restarted, _, err := runtime.RestartComponents(
+		context.Background(),
+		ws,
+		handles,
+		[]BundleComponent{ComponentWeb},
+		RuntimeConfig{},
+		RestartComponentsOptions{},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	snapshot, err := FileBundleStore{}.ReadRuntimeEnvSnapshot(restarted)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if snapshot.Web.PID != restarted.PIDs[ComponentWeb] || snapshot.Web.PID == 1002 {
+		t.Fatalf("web pid snapshot=%d restarted=%#v", snapshot.Web.PID, restarted.PIDs)
+	}
+	if snapshot.TSWorker.PID != 1003 || snapshot.Web.TemporalAddress != "127.0.0.1:7234" {
+		t.Fatalf("snapshot=%#v", snapshot)
+	}
+}
+
 func TestWorkspaceRuntimeForceRestartWebIgnoresStopFailure(t *testing.T) {
 	ws := bundleTestWorkspace(t)
 	ws.Status = StatusFailed
@@ -401,6 +535,47 @@ func TestWorkspaceRuntimeForceRestartWebIgnoresStopFailure(t *testing.T) {
 	}
 	if restarted.Ports[ComponentWeb] == 4300 {
 		t.Fatalf("web port = %d, want fresh force-restart port", restarted.Ports[ComponentWeb])
+	}
+}
+
+func TestWorkspaceRuntimeRestartTSWorkerUpdatesRuntimeEnvSnapshot(t *testing.T) {
+	ws := bundleTestWorkspace(t)
+	ws.Status = StatusRunning
+	ws.Ports = map[BundleComponent]int{ComponentWeb: 4300, ComponentTemporal: 7234, ComponentTemporalUI: 8234}
+	handles := BundleHandles{
+		ComponentTemporal: handleFor(ComponentTemporal, 1001),
+		ComponentWeb:      handleFor(ComponentWeb, 1002),
+		ComponentTSWorker: handleFor(ComponentTSWorker, 1003),
+	}
+	starter := &recordingStarter{}
+	runtime := &WorkspaceRuntime{
+		store:   FileBundleStore{},
+		starter: starter,
+		stopper: starter,
+		prober:  &recordingProber{},
+		now:     func() time.Time { return time.Unix(300, 0) },
+	}
+
+	restarted, _, err := runtime.RestartComponents(
+		context.Background(),
+		ws,
+		handles,
+		[]BundleComponent{ComponentTSWorker},
+		RuntimeConfig{},
+		RestartComponentsOptions{},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	snapshot, err := FileBundleStore{}.ReadRuntimeEnvSnapshot(restarted)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if snapshot.TSWorker.PID != restarted.PIDs[ComponentTSWorker] || snapshot.TSWorker.PID == 1003 {
+		t.Fatalf("ts pid snapshot=%d restarted=%#v", snapshot.TSWorker.PID, restarted.PIDs)
+	}
+	if snapshot.Web.PID != 1002 || snapshot.TSWorker.TemporalAddress != "127.0.0.1:7234" {
+		t.Fatalf("snapshot=%#v", snapshot)
 	}
 }
 
@@ -535,6 +710,15 @@ func TestWorkspaceRuntimeRestartTSWorkerDoesNotStopWeb(t *testing.T) {
 	if gotHandles[ComponentWeb] != handles[ComponentWeb] {
 		t.Fatal("web handle was replaced")
 	}
+}
+
+func containsString(values []string, want string) bool {
+	for _, value := range values {
+		if value == want {
+			return true
+		}
+	}
+	return false
 }
 
 func handleFor(component BundleComponent, pid int) *ProcessHandle {

@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -158,6 +159,9 @@ func (r *WorkspaceRuntime) StartBundle(
 	if err := r.prober.WebWorkerReady(ctx, webAddr, ws.Host); err != nil {
 		return fail(PhaseStartingWeb, err)
 	}
+	if err := r.writeRuntimeEnvSnapshot(ws, rt, bundlePIDs(handles)); err != nil {
+		return fail(PhaseStartingWeb, err)
+	}
 
 	status.Phase = PhaseStartingTSWorker
 	_ = os.Remove(paths.TSReadyMarker)
@@ -179,6 +183,9 @@ func (r *WorkspaceRuntime) StartBundle(
 	}
 	handles[ComponentTSWorker] = ts
 	if err := r.prober.FreshFileExists(ctx, paths.TSReadyMarker, tsStart); err != nil {
+		return fail(PhaseStartingTSWorker, err)
+	}
+	if err := r.writeRuntimeEnvSnapshot(ws, rt, bundlePIDs(handles)); err != nil {
 		return fail(PhaseStartingTSWorker, err)
 	}
 
@@ -408,6 +415,9 @@ func (r *WorkspaceRuntime) restartWeb(
 	if err := r.prober.WebWorkerReady(ctx, webAddr, ws.Host); err != nil {
 		return ws, err
 	}
+	if err := r.writeRuntimeEnvSnapshot(ws, rt, bundlePIDs(handles)); err != nil {
+		return ws, err
+	}
 	ws.PIDs = bundlePIDs(handles)
 	ws.PID = ws.PIDs[ComponentWeb]
 	return ws, nil
@@ -454,6 +464,9 @@ func (r *WorkspaceRuntime) restartTSWorker(
 	}
 	handles[ComponentTSWorker] = ts
 	if err := r.prober.FreshFileExists(ctx, paths.TSReadyMarker, tsStart); err != nil {
+		return ws, err
+	}
+	if err := r.writeRuntimeEnvSnapshot(ws, rt, bundlePIDs(handles)); err != nil {
 		return ws, err
 	}
 	ws.PIDs = bundlePIDs(handles)
@@ -555,6 +568,76 @@ func bundleLogs(paths WorkspaceRuntimePaths) map[BundleComponent]string {
 		ComponentTemporal: paths.TemporalLog,
 		ComponentWeb:      paths.WebLog,
 		ComponentTSWorker: paths.TSWorkerLog,
+	}
+}
+
+func (r *WorkspaceRuntime) writeRuntimeEnvSnapshot(
+	ws Workspace,
+	rt RuntimeConfig,
+	pids map[BundleComponent]int,
+) error {
+	return r.store.WriteRuntimeEnvSnapshot(
+		ws,
+		BuildRuntimeEnvSnapshot(ws, rt, ws.Ports, pids, r.now()),
+	)
+}
+
+func BuildRuntimeEnvSnapshot(
+	ws Workspace,
+	rt RuntimeConfig,
+	ports map[BundleComponent]int,
+	pids map[BundleComponent]int,
+	writtenAt time.Time,
+) RuntimeEnvSnapshot {
+	paths := RuntimePaths(ws.CheckoutPath, ws.MetadataDirName)
+	webPort := ports[ComponentWeb]
+	temporalPort := ports[ComponentTemporal]
+	temporalUIPort := ports[ComponentTemporalUI]
+	listenAddress := ""
+	callbackBase := ""
+	if webPort != 0 {
+		listenAddress = "127.0.0.1:" + strconv.Itoa(webPort)
+		callbackBase = "http://" + listenAddress
+	}
+	temporalAddress := ""
+	if temporalPort != 0 {
+		temporalAddress = "127.0.0.1:" + strconv.Itoa(temporalPort)
+	}
+	temporalUIBase := ""
+	if temporalUIPort != 0 {
+		temporalUIBase = "http://127.0.0.1:" + strconv.Itoa(temporalUIPort)
+	}
+	return RuntimeEnvSnapshot{
+		Version:       1,
+		WorkspaceSlug: ws.Slug,
+		CheckoutPath:  ws.CheckoutPath,
+		WrittenAt:     writtenAt.UTC(),
+		Web: RuntimeProcessEnvProof{
+			PID:                     pids[ComponentWeb],
+			ListenAddress:           listenAddress,
+			PublicBaseURL:           strings.TrimRight(ws.URL, "/"),
+			InternalCallbackBaseURL: callbackBase,
+			TemporalAddress:         temporalAddress,
+			TemporalUIBaseURL:       temporalUIBase,
+			DatabasePath:            paths.AgentsDB,
+			DefaultCWD:              ws.CheckoutPath,
+			RedactedKeys: []string{
+				"VAMOS_WORKSPACE_RESTART_TOKEN",
+				"VAMOS_INTERNAL_TOKEN",
+				"VAMOS_DEV_AUTH_VERIFY_KEY",
+			},
+		},
+		TSWorker: RuntimeProcessEnvProof{
+			PID:             pids[ComponentTSWorker],
+			TemporalAddress: temporalAddress,
+			DefaultCWD:      ws.CheckoutPath,
+			TaskQueue:       "agents-ts",
+			ReadyMarker:     paths.TSReadyMarker,
+			RedactedKeys: []string{
+				"PI_AUTH_PATH",
+				"VAMOS_INTERNAL_TOKEN",
+			},
+		},
 	}
 }
 
