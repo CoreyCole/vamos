@@ -209,3 +209,41 @@ func processAlive(pid int) bool {
 	}
 	return process.Signal(syscall.Signal(0)) == nil
 }
+
+func processMatchesWorkspace(ws Workspace, pid int) bool {
+	if pid <= 0 {
+		return false
+	}
+	env, err := processEnv(pid)
+	if err == nil {
+		if slug := strings.TrimSpace(env["VAMOS_WORKSPACE_SLUG"]); slug != "" && slug != ws.Slug {
+			return false
+		}
+		if cwd := strings.TrimSpace(env["VAMOS_DEFAULT_CWD"]); cwd != "" {
+			return samePath(cwd, ws.CheckoutPath)
+		}
+	}
+	cwd, err := os.Readlink(filepath.Join("/proc", strconv.Itoa(pid), "cwd"))
+	if err != nil {
+		return true
+	}
+	return samePath(cwd, ws.PackagePath)
+}
+
+func processEnv(pid int) (map[string]string, error) {
+	data, err := os.ReadFile(filepath.Join("/proc", strconv.Itoa(pid), "environ"))
+	if err != nil {
+		return nil, err
+	}
+	out := map[string]string{}
+	for _, item := range strings.Split(string(data), "\x00") {
+		if item == "" {
+			continue
+		}
+		key, value, ok := strings.Cut(item, "=")
+		if ok {
+			out[key] = value
+		}
+	}
+	return out, nil
+}

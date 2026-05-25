@@ -31,6 +31,7 @@ type bundleRuntime interface {
 }
 
 type processAliveFunc func(int) bool
+type processMatchesWorkspaceFunc func(Workspace, int) bool
 
 type ManagerService struct {
 	mu        sync.Mutex
@@ -40,9 +41,10 @@ type ManagerService struct {
 	workspaces map[string]Workspace
 	children   map[string]BundleHandles
 
-	bundleRuntime bundleRuntime
-	store         BundleStore
-	processAlive  processAliveFunc
+	bundleRuntime           bundleRuntime
+	store                   BundleStore
+	processAlive            processAliveFunc
+	processMatchesWorkspace processMatchesWorkspaceFunc
 
 	lifecycleStarter       WorkspaceLifecycleStarter
 	lifecycleNotifier      WorkspaceLifecycleNotifier
@@ -53,15 +55,16 @@ type ManagerService struct {
 
 func NewManager(cfg RuntimeConfig, discovery DiscoveryConfig) (*ManagerService, error) {
 	m := &ManagerService{
-		runtime:         cfg,
-		discovery:       discovery,
-		workspaces:      map[string]Workspace{},
-		children:        map[string]BundleHandles{},
-		bundleRuntime:   NewWorkspaceRuntime(),
-		store:           FileBundleStore{},
-		processAlive:    processAlive,
-		now:             func() time.Time { return time.Now().UTC() },
-		newTransitionID: func() string { return uuid.NewString() },
+		runtime:                 cfg,
+		discovery:               discovery,
+		workspaces:              map[string]Workspace{},
+		children:                map[string]BundleHandles{},
+		bundleRuntime:           NewWorkspaceRuntime(),
+		store:                   FileBundleStore{},
+		processAlive:            processAlive,
+		processMatchesWorkspace: processMatchesWorkspace,
+		now:                     func() time.Time { return time.Now().UTC() },
+		newTransitionID:         func() string { return uuid.NewString() },
 	}
 	if err := m.Refresh(context.Background()); err != nil {
 		return nil, err
@@ -166,10 +169,21 @@ func (m *ManagerService) reconcileRuntimeLocked(ws Workspace) Workspace {
 	ws.BuildStatus = status.Build
 	ws.Port = status.Ports[ComponentWeb]
 	ws.PID = status.PIDs[ComponentWeb]
-	if ws.PID != 0 && !m.processAlive(ws.PID) && ws.Status == StatusRunning {
-		ws.Status = StatusCrashed
-		ws.PID = 0
-		ws.Error = "workspace process is not alive"
+	if ws.PID != 0 && ws.Status == StatusRunning {
+		if !m.processAlive(ws.PID) {
+			ws.Status = StatusCrashed
+			ws.PID = 0
+			ws.Error = "workspace process is not alive"
+		} else if m.processMatchesWorkspace != nil &&
+			!m.processMatchesWorkspace(ws, ws.PID) {
+			ws.Status = StatusStopped
+			ws.Phase = ""
+			ws.Port = 0
+			ws.PID = 0
+			ws.Ports = nil
+			ws.PIDs = nil
+			ws.Error = "stale workspace process ignored; start workspace to recreate runtime state"
+		}
 	}
 	return ws
 }

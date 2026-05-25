@@ -1,6 +1,10 @@
 package main
 
-import "testing"
+import (
+	"testing"
+
+	server "github.com/CoreyCole/vamos/server"
+)
 
 func TestApplyVamosEnvOverridesPrefersRuntimeWorkspaceEnv(t *testing.T) {
 	t.Setenv("VAMOS_LISTEN_ADDRESS", "127.0.0.1:0")
@@ -63,6 +67,19 @@ func TestApplyVamosEnvOverridesPrefersRuntimeWorkspaceEnv(t *testing.T) {
 	}
 	if !cfg.PlaywrightAuthEnabled || cfg.PlaywrightAuthEmail != "operator@example.com" || cfg.PlaywrightAuthToken != "playwright-token" {
 		t.Fatalf("playwright cfg = %#v", cfg)
+	}
+}
+
+func TestVamosEnvOverridesHostConfigCallbackDefault(t *testing.T) {
+	t.Setenv("VAMOS_INTERNAL_CALLBACK_BASE_URL", "http://127.0.0.1:1234")
+
+	cfg := applyHostConfigToLegacyConfig(Config{}, server.HostConfig{
+		Web: server.WebConfig{InternalCallbackBaseURL: "http://localhost:4200"},
+	})
+	cfg = applyVamosEnvOverrides(cfg)
+
+	if cfg.InternalCallbackBaseURL != "http://127.0.0.1:1234" {
+		t.Fatalf("InternalCallbackBaseURL = %q", cfg.InternalCallbackBaseURL)
 	}
 }
 

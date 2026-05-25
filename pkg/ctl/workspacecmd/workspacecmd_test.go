@@ -115,6 +115,31 @@ func TestRunLogsRejectsPathOutsideWorkspaceLogDir(t *testing.T) {
 	}
 }
 
+func TestRunCreatePrintsWorkspaceURL(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusAccepted)
+		_, _ = w.Write([]byte(`{"status":"complete","workspace_slug":"feature","url":"https://feature.workspaces.creative-mode.ai/"}`))
+	}))
+	defer server.Close()
+
+	var out bytes.Buffer
+	err := RunCreate(t.Context(), CreateOptions{
+		PlanPath:       "thoughts/a/plans/p/plan.md",
+		ManagerURL:     server.URL,
+		RestartToken:   "secret",
+		WorkspaceSlug:  "feature",
+		RequestedPath:  "/tmp/ws",
+		SourceCheckout: "/src",
+		TrunkBranch:    "main",
+	}, &out)
+	if err != nil {
+		t.Fatalf("RunCreate: %v", err)
+	}
+	if want := "workspace URL: https://feature.workspaces.creative-mode.ai/"; !strings.Contains(out.String(), want) {
+		t.Fatalf("output missing %q:\n%s", want, out.String())
+	}
+}
+
 func TestRunCreatePostsProvisionRequest(t *testing.T) {
 	type provisionRequest struct {
 		PlanPath       string `json:"plan_path"`
@@ -198,6 +223,39 @@ func TestRunRestartPostsTokenComponentsAndForce(t *testing.T) {
 	}
 	if !strings.Contains(out.String(), "restart accepted: 202 Accepted") {
 		t.Fatalf("output = %q", out.String())
+	}
+}
+
+func TestRunRestartPrintsWorkspaceURL(t *testing.T) {
+	cfg := testConfig(t)
+	server := httptest.NewServer(
+		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusAccepted)
+			_, _ = w.Write([]byte(`{"Slug":"feature","URL":"https://feature.workspaces.creative-mode.ai/"}`))
+		}),
+	)
+	defer server.Close()
+	cfg.ManagerURL = server.URL
+	cfg.Metadata.ManagerURL = server.URL
+
+	var out bytes.Buffer
+	if err := RunRestart(t.Context(), cfg, nil, false, &out); err != nil {
+		t.Fatalf("RunRestart: %v", err)
+	}
+	if want := "workspace URL: https://feature.workspaces.creative-mode.ai/"; !strings.Contains(out.String(), want) {
+		t.Fatalf("output missing %q:\n%s", want, out.String())
+	}
+}
+
+func TestWorkspaceURLFromResponseInfersFromMainManagerURL(t *testing.T) {
+	got := workspaceURLFromResponse(
+		[]byte(`{"status":"complete","workspace_slug":"2026-05-24-10-46-22-workspace-visibility-registration"}`),
+		"",
+		"https://main.workspaces.creative-mode.ai/",
+	)
+	want := "https://2026-05-24-10-46-22-workspace-visibility-registration.workspaces.creative-mode.ai/"
+	if got != want {
+		t.Fatalf("workspaceURLFromResponse() = %q, want %q", got, want)
 	}
 }
 

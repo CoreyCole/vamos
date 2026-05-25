@@ -56,6 +56,10 @@ go run ./cmd/vamos-runtime e2e goldens accept \
   --human-approved
 ```
 
+## QRSPI `/q-verify` gate
+
+When this guide is the project verification guide, `/q-verify` must stop after automated checks and ask the user to manually test the running workspace before it marks verification complete. The prompt must include the workspace URL printed by `vamos ctl workspace restart` / `agentsctl workspace restart` (for example `https://<workspace-slug>.<workspace-domain>/`) and a concise list of flows to inspect. Do not proceed to a complete `verify.md` until the user confirms manual testing passed, or record `needs_human` / `blocked` with the user's findings.
+
 ## Safety
 
 - Browser runs with fixtures must use a registered non-main workspace.

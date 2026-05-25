@@ -1604,7 +1604,15 @@ func TestHandleRefreshWorkspacesRecordsResultAndNotifies(t *testing.T) {
 
 func TestHandleRefreshWorkspacesPatchesAfterManagerRefreshAndTerminalAdoption(t *testing.T) {
 	managerRefreshes := 0
-	manager := &fakeLifecycleManager{beforeRefresh: func() { managerRefreshes++ }}
+	manager := &fakeLifecycleManager{
+		beforeRefresh: func() { managerRefreshes++ },
+		snapshots: []WorkspaceLifecycleSnapshot{snapshotFromState(Workspace{
+			Slug:         "adopted-workspace",
+			CheckoutPath: "/repo/adopted-workspace",
+			DisplayName:  "Adopted Workspace",
+			Status:       StatusStopped,
+		}, WorkspaceLifecycleState{})},
+	}
 	handler := NewHandler(
 		manager,
 		"https://main.cn-agents.test",

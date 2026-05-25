@@ -31,7 +31,7 @@ func MessagesPane(threadID string, state TranscriptPaneState, hasThread bool, fo
 			templ_7745c5c3_Var1 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<div id=\"agent-chat-messages\" class=\"min-h-full pt-14 pb-28\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<div id=\"agent-chat-messages\" class=\"min-h-full pb-28\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

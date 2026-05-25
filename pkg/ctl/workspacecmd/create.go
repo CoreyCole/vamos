@@ -71,5 +71,8 @@ func RunCreate(ctx context.Context, opts CreateOptions, out io.Writer) error {
 		return err
 	}
 	_, _ = fmt.Fprintln(out)
+	if workspaceURL := workspaceURLFromResponse(data, opts.WorkspaceSlug, opts.ManagerURL); workspaceURL != "" {
+		_, _ = fmt.Fprintf(out, "workspace URL: %s\n", workspaceURL)
+	}
 	return nil
 }

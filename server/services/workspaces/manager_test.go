@@ -997,9 +997,50 @@ func TestManagerRefreshPreservesTransitionWithStaleCopiedRuntimeState(t *testing
 	}
 }
 
+func TestManagerRefreshIgnoresCopiedRuntimeStatusWithLiveForeignPID(t *testing.T) {
+	m, checkout := newTestManager(t)
+	m.processAlive = func(pid int) bool { return pid == 4321 }
+	m.processMatchesWorkspace = func(ws Workspace, pid int) bool { return false }
+	store := FileBundleStore{}
+	ws := Workspace{Slug: "foo", CheckoutPath: checkout, Bundle: RuntimePaths(checkout)}
+	if err := store.WriteWorkspaceEnv(
+		ws,
+		WorkspaceEnv{
+			Slug:         "foo",
+			CheckoutPath: checkout,
+			ManagerURL:   m.runtime.ManagerURL,
+			RestartToken: m.runtime.RestartToken,
+		},
+	); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.WriteStatus(
+		ws,
+		RuntimeStatus{
+			Status: StatusRunning,
+			Ports:  map[BundleComponent]int{ComponentWeb: 9876},
+			PIDs:   map[BundleComponent]int{ComponentWeb: 4321},
+		},
+	); err != nil {
+		t.Fatal(err)
+	}
+	if err := m.Refresh(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	got, ok := m.Lookup("foo")
+	if !ok {
+		t.Fatal("workspace not found")
+	}
+	if got.Status != StatusStopped || got.PID != 0 || got.Port != 0 ||
+		!strings.Contains(got.Error, "stale workspace process") {
+		t.Fatalf("reconcile=%#v, want stale foreign PID ignored", got)
+	}
+}
+
 func TestManagerRefreshReconcilesFromMetadata(t *testing.T) {
 	m, checkout := newTestManager(t)
 	m.processAlive = func(pid int) bool { return pid == 4321 }
+	m.processMatchesWorkspace = func(ws Workspace, pid int) bool { return true }
 	store := FileBundleStore{}
 	ws := Workspace{Slug: "foo", CheckoutPath: checkout, Bundle: RuntimePaths(checkout)}
 	if err := store.WriteWorkspaceEnv(

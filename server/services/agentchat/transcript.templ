@@ -3,7 +3,7 @@ package agentchat
 import "strconv"
 
 templ MessagesPane(threadID string, state TranscriptPaneState, hasThread bool, forkAction string) {
-	<div id="agent-chat-messages" class="min-h-full pt-14 pb-28">
+	<div id="agent-chat-messages" class="min-h-full pb-28">
 		@StableTranscriptRegion(threadID, state.Stable, forkAction)
 		if hasThread {
 			@LiveTranscriptRegion(threadID, state, forkAction)

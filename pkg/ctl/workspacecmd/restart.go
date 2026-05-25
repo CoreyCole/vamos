@@ -67,6 +67,9 @@ func RunRestart(
 		)
 	}
 	fmt.Fprintf(out, "restart accepted: %s\n", resp.Status)
+	if workspaceURL := workspaceURLFromResponse(data, cfg.Metadata.Slug, cfg.ManagerURL); workspaceURL != "" {
+		_, _ = fmt.Fprintf(out, "workspace URL: %s\n", workspaceURL)
+	}
 	if trimmed := bytes.TrimSpace(data); len(trimmed) > 0 {
 		fmt.Fprintln(out, string(trimmed))
 	}

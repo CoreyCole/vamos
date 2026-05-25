@@ -20,13 +20,16 @@ Merge a completed `../vamos` branch into `main`, fast-forward the clean baseline
 - `.agents` is a committed symlink in Vamos: `.agents -> ../.agents`. Commit the symlink only, never the target files.
 - Systemd is installed/restarted only from clean `../cn-agents-main`, never from `../cn-agents` or a copied workspace.
 - Preserve commit shape; do not squash, patch-apply, or cherry-pick the runtime stack.
+- Do **not** check out or fetch a copied workspace feature branch into `../vamos` until that feature branch stack has already been synced/restacked onto latest `origin/main` in its own source checkout.
+- The sync/restack phase is the same procedure as `.pi/skills/vamos-sync/SKILL.md`; use that skill for conflict handling details.
 
 ## Step 1: Preflight
 
-From `../vamos` or a Vamos implementation workspace:
+From `../vamos` or a Vamos implementation workspace. Record the starting checkout as the source; later sync/restack happens there.
 
 ```bash
 pwd
+source_checkout=$(git rev-parse --show-toplevel)
 git rev-parse --show-toplevel
 git branch --show-current
 git status --short
@@ -44,13 +47,26 @@ Rules:
 - `../cn-agents-main` must be on `main` and clean except private gitignored config. Stop if tracked files are dirty.
 - If `.agents` is missing in Vamos, create `ln -s ../.agents .agents` and commit that symlink in Vamos.
 
-## Step 2: Sync latest main and restack source
+## Step 2: Publish latest `../vamos/main`, then sync/restack the source branch
+
+First make the canonical working checkout's `main` visible to the remote. This prevents a copied workspace stack from restacking onto stale `origin/main` while `../vamos/main` has newer local trunk commits.
 
 ```bash
 cd ../vamos
-source_branch=$(git branch --show-current)
+git switch main
+git status --short # must be clean
 git fetch origin +refs/heads/main:refs/remotes/origin/main
+git merge-base --is-ancestor origin/main main
+git push origin main
+```
 
+Then sync/restack the feature stack in the source checkout where the feature branch already lives. If the source is a copied implementation workspace, run these commands there, not in `../vamos`. If the source is `../vamos`, switch back to the feature branch only after the `main` push above succeeds.
+
+```bash
+cd "$source_checkout"
+source_branch=$(git branch --show-current)
+git status --short # must be clean
+git fetch origin +refs/heads/main:refs/remotes/origin/main
 gt sync --no-interactive
 gt restack --branch "$source_branch" --no-interactive
 
@@ -60,14 +76,17 @@ git log --format='%h %s' --reverse origin/main..HEAD
 git diff --stat origin/main..HEAD
 ```
 
-If conflicts occur, resolve only the Vamos runtime branch conflict, run targeted tests, continue with `gt continue --no-interactive`, then ask the user to approve conflict resolutions before merging.
+Conflict handling follows `.pi/skills/vamos-sync/SKILL.md`: resolve conflicts in the source checkout, preserve both latest `main` behavior and stack intent, regenerate templ/sqlc/E2E outputs from sources, run targeted tests, continue with `gt continue --no-interactive`, and ask the user to approve conflict resolutions before merging.
+
+Only after this synced/restacked source branch is clean should later steps fetch or fast-forward it into `../vamos`.
 
 ## Step 3: Confirm merge preview
 
 Show the user:
 
 ```bash
-cd ../vamos
+cd "$source_checkout"
+printf 'Source checkout: %s\n' "$(pwd)"
 printf 'Source branch: %s\n' "$(git branch --show-current)"
 printf 'Source head: %s\n' "$(git rev-parse HEAD)"
 gt log short
@@ -82,19 +101,31 @@ Ask: `Proceed with vamos merge? (yes/no)`. Do not continue without explicit yes.
 ## Step 4: Fast-forward ../vamos main
 
 ```bash
-cd ../vamos
-source_branch=$(git branch --show-current)
-source_head=$(git rev-parse HEAD)
-git status --short
+source_checkout=${source_checkout:-$(pwd)}
+source_head=$(git -C "$source_checkout" rev-parse HEAD)
+source_branch=$(git -C "$source_checkout" branch --show-current)
 
-git merge-base --is-ancestor main "$source_head"
-git update-ref refs/heads/main "$source_head"
+cd ../vamos
 git switch main
+git status --short # must be clean
+git fetch origin +refs/heads/main:refs/remotes/origin/main
+git merge-base --is-ancestor origin/main main
+
+if test "$(git rev-parse --show-toplevel)" != "$(git -C "$source_checkout" rev-parse --show-toplevel)"; then
+  git fetch "$source_checkout" "$source_branch"
+  test "$(git rev-parse FETCH_HEAD)" = "$source_head"
+  git merge-base --is-ancestor main FETCH_HEAD
+  git update-ref refs/heads/main FETCH_HEAD
+else
+  git merge-base --is-ancestor main "$source_head"
+  git update-ref refs/heads/main "$source_head"
+fi
+
 git read-tree --reset -u HEAD
 test "$(git rev-parse HEAD)" = "$source_head"
 ```
 
-If the source branch is not in `../vamos` (for example a copied Vamos workspace), fetch from that absolute path into `../vamos` first, then fast-forward `../vamos/main` to `FETCH_HEAD` only after `git merge-base --is-ancestor main FETCH_HEAD` succeeds.
+Never import an unsynced copied-workspace branch into `../vamos` and then try to restack it there. The branch must already have passed Step 2 in its source checkout.
 
 ## Step 5: Fast-forward ../vamos-main baseline
 
