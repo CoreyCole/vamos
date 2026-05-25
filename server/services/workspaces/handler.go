@@ -272,6 +272,9 @@ func NewHandler(
 	}
 	if manager, ok := h.manager.(*ManagerService); ok && manager != nil {
 		manager.SetLifecycleNotifier(h.notifier)
+		if h.workspaceErrorRecorder != nil {
+			manager.SetWorkspaceErrorRecorder(h.workspaceErrorRecorder)
+		}
 	}
 	return h
 }

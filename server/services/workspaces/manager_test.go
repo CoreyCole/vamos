@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 )
@@ -837,6 +838,53 @@ func TestManagerMarksCrashedOnUnexpectedExit(t *testing.T) {
 	})
 }
 
+func TestManagerMarkErrorRecordsWorkspaceError(t *testing.T) {
+	m, _ := newTestManager(t)
+	sink := &recordingWorkspaceErrorSink{}
+	m.SetWorkspaceErrorRecorder(sink)
+	m.bundleRuntime = &fakeBundleRuntime{startErr: errors.New("start failed")}
+
+	if _, err := m.Start(context.Background(), "foo"); err == nil {
+		t.Fatal("Start() error = nil")
+	}
+
+	events := sink.recorded()
+	if len(events) != 1 {
+		t.Fatalf("events=%d want 1", len(events))
+	}
+	event := events[0]
+	if event.WorkspaceSlug != "foo" || event.Source != WorkspaceErrorSourceManager || event.Severity != WorkspaceErrorSeverityError {
+		t.Fatalf("event=%#v", event)
+	}
+	if event.Message != "workspace manager reported failure" || !strings.Contains(event.Detail, "mark_error: start failed") {
+		t.Fatalf("event=%#v", event)
+	}
+	if event.DedupeKey == "" {
+		t.Fatal("empty dedupe key")
+	}
+}
+
+func TestManagerWatchBundleCrashRecordsWorkspaceError(t *testing.T) {
+	m, _ := newTestManager(t)
+	sink := &recordingWorkspaceErrorSink{}
+	m.SetWorkspaceErrorRecorder(sink)
+	runtime := &fakeBundleRuntime{}
+	m.bundleRuntime = runtime
+	if _, err := m.Start(context.Background(), "foo"); err != nil {
+		t.Fatal(err)
+	}
+
+	runtime.web.finish(errors.New("boom"))
+
+	waitFor(t, func() bool {
+		events := sink.recorded()
+		return len(events) == 1 && events[0].WorkspaceSlug == "foo" &&
+			events[0].Source == WorkspaceErrorSourceManager &&
+			strings.Contains(events[0].Detail, "child_crashed: boom") &&
+			events[0].DedupeKey != ""
+	})
+}
+
 func TestManagerIgnoresCopiedRuntimeStateFromAnotherWorkspace(t *testing.T) {
 	m, checkout := newTestManager(t)
 	store := FileBundleStore{}
@@ -1006,6 +1054,24 @@ func newLifecycleTestManager(t *testing.T) (*ManagerService, string) {
 		return fmt.Sprintf("transition-%d", ids)
 	}
 	return m, checkout
+}
+
+type recordingWorkspaceErrorSink struct {
+	mu     sync.Mutex
+	events []WorkspaceErrorRecordRequest
+}
+
+func (s *recordingWorkspaceErrorSink) Record(_ context.Context, req WorkspaceErrorRecordRequest) (WorkspaceErrorEvent, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.events = append(s.events, req)
+	return WorkspaceErrorEvent{ID: int64(len(s.events)), WorkspaceSlug: req.WorkspaceSlug, Source: string(req.Source), Severity: string(req.Severity), Message: req.Message, Detail: req.Detail, DedupeKey: req.DedupeKey, OccurrenceCount: 1}, nil
+}
+
+func (s *recordingWorkspaceErrorSink) recorded() []WorkspaceErrorRecordRequest {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return append([]WorkspaceErrorRecordRequest(nil), s.events...)
 }
 
 type fakeLifecycleStarter struct {

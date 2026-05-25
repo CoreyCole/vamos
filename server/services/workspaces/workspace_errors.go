@@ -262,6 +262,10 @@ func normalizeWorkspaceLogDedupe(slug string, component BundleComponent, line st
 	return workspaceErrorDedupeKey(slug, string(WorkspaceErrorSourceLog), string(component), normalized)
 }
 
+type WorkspaceErrorSink interface {
+	Record(ctx context.Context, req WorkspaceErrorRecordRequest) (WorkspaceErrorEvent, error)
+}
+
 type WorkspaceErrorRecorder struct {
 	Store    WorkspaceErrorEventStore
 	Notifier WorkspaceLifecycleNotifier
@@ -321,6 +325,22 @@ func (r *WorkspaceErrorRecorder) RecordSwitchUnavailable(ctx context.Context, ws
 		Message:       "workspace unavailable during switch",
 		Detail:        detail,
 		DedupeKey:     workspaceErrorDedupeKey(ws.Slug, string(WorkspaceErrorSourceSwitch), string(ws.Status), strings.TrimSpace(ws.URL), redirectPath),
+	})
+	return err
+}
+
+func recordWorkspaceManagerError(ctx context.Context, sink WorkspaceErrorSink, ws Workspace, sourceDetail string) error {
+	if sink == nil || strings.TrimSpace(ws.Slug) == "" || strings.TrimSpace(ws.Error) == "" {
+		return nil
+	}
+	detail := strings.TrimSpace(strings.TrimSpace(sourceDetail) + ": " + strings.TrimSpace(ws.Error))
+	_, err := sink.Record(ctx, WorkspaceErrorRecordRequest{
+		WorkspaceSlug: ws.Slug,
+		Source:        WorkspaceErrorSourceManager,
+		Severity:      WorkspaceErrorSeverityError,
+		Message:       "workspace manager reported failure",
+		Detail:        detail,
+		DedupeKey:     workspaceErrorDedupeKey(ws.Slug, string(WorkspaceErrorSourceManager), string(ws.Status), string(ws.Phase), ws.Error),
 	})
 	return err
 }

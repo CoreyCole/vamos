@@ -44,10 +44,11 @@ type ManagerService struct {
 	store         BundleStore
 	processAlive  processAliveFunc
 
-	lifecycleStarter  WorkspaceLifecycleStarter
-	lifecycleNotifier WorkspaceLifecycleNotifier
-	now               func() time.Time
-	newTransitionID   func() string
+	lifecycleStarter       WorkspaceLifecycleStarter
+	lifecycleNotifier      WorkspaceLifecycleNotifier
+	workspaceErrorRecorder WorkspaceErrorSink
+	now                    func() time.Time
+	newTransitionID        func() string
 }
 
 func NewManager(cfg RuntimeConfig, discovery DiscoveryConfig) (*ManagerService, error) {
@@ -209,6 +210,16 @@ func (m *ManagerService) SetLifecycleNotifier(notifier WorkspaceLifecycleNotifie
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.lifecycleNotifier = notifier
+}
+
+func (m *ManagerService) SetWorkspaceErrorRecorder(recorder WorkspaceErrorSink) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.workspaceErrorRecorder = recorder
+}
+
+func (m *ManagerService) workspaceErrorSinkLocked() WorkspaceErrorSink {
+	return m.workspaceErrorRecorder
 }
 
 func (m *ManagerService) notifyLifecycleChanged(slug string) {
@@ -724,7 +735,14 @@ func (m *ManagerService) watchBundle(slug string, handles BundleHandles) {
 	current.PID = 0
 	m.workspaces[slug] = current
 	_ = m.writeRuntimeStatus(current)
+	sink := m.workspaceErrorSinkLocked()
+	crashed := current.Status == StatusCrashed
 	m.mu.Unlock()
+	if crashed {
+		if recErr := recordWorkspaceManagerError(context.Background(), sink, current, "child_crashed"); recErr != nil {
+			log.Printf("workspace_manager_error_record_failed slug=%q error=%v", slug, recErr)
+		}
+	}
 	m.notifyLifecycleChanged(slug)
 }
 
@@ -734,14 +752,18 @@ func (m *ManagerService) markError(
 	err error,
 ) (Workspace, error) {
 	m.mu.Lock()
-	defer m.mu.Unlock()
 	ws := m.workspaces[slug]
 	ws.Status = status
 	ws.Error = err.Error()
 	ws.PID = 0
 	m.workspaces[slug] = ws
 	_ = m.writeRuntimeStatus(ws)
+	sink := m.workspaceErrorSinkLocked()
+	m.mu.Unlock()
 	log.Printf("workspace_error slug=%q status=%q error=%q", slug, status, ws.Error)
+	if recErr := recordWorkspaceManagerError(context.Background(), sink, ws, "mark_error"); recErr != nil {
+		log.Printf("workspace_manager_error_record_failed slug=%q error=%v", slug, recErr)
+	}
 	return ws, err
 }
 
