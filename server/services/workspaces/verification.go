@@ -2,6 +2,7 @@ package workspaces
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -491,6 +492,50 @@ func (v *Verifier) verifyPort(
 		return false
 	}
 	return v.Prober.PortOpen("127.0.0.1:" + strconv.Itoa(port))
+}
+
+func ReadTSWorkerIdentityMarker(path string) (TSWorkerIdentityMarker, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return TSWorkerIdentityMarker{}, err
+	}
+	var marker TSWorkerIdentityMarker
+	if err := json.Unmarshal(data, &marker); err != nil {
+		return TSWorkerIdentityMarker{}, err
+	}
+	return marker, nil
+}
+
+func VerifyTSWorkerIdentity(
+	ws Workspace,
+	runtime RuntimeStatus,
+	marker TSWorkerIdentityMarker,
+) error {
+	if marker.Version != 1 {
+		return fmt.Errorf("ts worker identity marker version = %d, want 1", marker.Version)
+	}
+	if marker.WorkspaceSlug != ws.Slug {
+		return fmt.Errorf("ts worker slug = %q, want %q", marker.WorkspaceSlug, ws.Slug)
+	}
+	if !samePath(marker.CheckoutPath, ws.CheckoutPath) {
+		return fmt.Errorf("ts worker checkout = %q, want %q", marker.CheckoutPath, ws.CheckoutPath)
+	}
+	if temporalPort := runtime.Ports[ComponentTemporal]; temporalPort != 0 {
+		wantTemporal := "127.0.0.1:" + strconv.Itoa(temporalPort)
+		if marker.TemporalAddress != wantTemporal {
+			return fmt.Errorf("ts worker temporal address = %q, want %q", marker.TemporalAddress, wantTemporal)
+		}
+	}
+	if marker.TaskQueue != "agents-ts" {
+		return fmt.Errorf("ts worker task queue = %q, want agents-ts", marker.TaskQueue)
+	}
+	if pid := runtime.PIDs[ComponentTSWorker]; pid != 0 && marker.PID != pid {
+		return fmt.Errorf("ts worker pid = %d, want %d", marker.PID, pid)
+	}
+	if wantMarker := RuntimePaths(ws.CheckoutPath, ws.MetadataDirName).TSReadyMarker; marker.ReadyMarker != wantMarker {
+		return fmt.Errorf("ts worker marker path = %q, want %q", marker.ReadyMarker, wantMarker)
+	}
+	return nil
 }
 
 func freshReadyMarker(path string) bool {

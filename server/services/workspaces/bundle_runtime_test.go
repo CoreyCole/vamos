@@ -227,7 +227,7 @@ func TestBuildRuntimeEnvSnapshotRecordsSelectedChildProof(t *testing.T) {
 func TestTSWorkerEnvIncludesWorkspaceTemporalReadyMarkerAndPiAuth(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
-	ws := Workspace{CheckoutPath: "/tmp/checkout"}
+	ws := Workspace{Slug: "foo", CheckoutPath: "/tmp/checkout"}
 	env := envMap(TSWorkerEnv(map[string]string{"PI_MODEL_ID": "gpt-5.5"}, ws, 7234))
 	assertEnv(t, env, "TEMPORAL_ADDR", "127.0.0.1:7234")
 	assertEnv(
@@ -236,8 +236,94 @@ func TestTSWorkerEnvIncludesWorkspaceTemporalReadyMarkerAndPiAuth(t *testing.T) 
 		"VAMOS_TS_WORKER_READY_FILE",
 		RuntimePaths(ws.CheckoutPath).TSReadyMarker,
 	)
+	assertEnv(t, env, "VAMOS_WORKSPACE_SLUG", "foo")
+	assertEnv(t, env, "VAMOS_DEFAULT_CWD", "/tmp/checkout")
+	assertEnv(t, env, "VAMOS_TS_WORKER_TASK_QUEUE", "agents-ts")
 	assertEnv(t, env, "PI_AUTH_PATH", filepath.Join(home, ".pi", "agent", "auth.json"))
 	assertEnv(t, env, "PI_MODEL_ID", "gpt-5.5")
+}
+
+func TestReadTSWorkerIdentityMarkerParsesStructuredJSON(t *testing.T) {
+	markerPath := filepath.Join(t.TempDir(), "ts-worker.ready")
+	startedAt := time.Unix(123, 0).UTC()
+	body := `{
+		"version": 1,
+		"pid": 2003,
+		"started_at": "` + startedAt.Format(time.RFC3339) + `",
+		"workspace_slug": "foo",
+		"checkout_path": "/tmp/checkout",
+		"temporal_address": "127.0.0.1:7234",
+		"task_queue": "agents-ts",
+		"ready_marker": "` + markerPath + `"
+	}`
+	if err := os.WriteFile(markerPath, []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	marker, err := ReadTSWorkerIdentityMarker(markerPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if marker.Version != 1 || marker.PID != 2003 || !marker.StartedAt.Equal(startedAt) ||
+		marker.WorkspaceSlug != "foo" || marker.CheckoutPath != "/tmp/checkout" ||
+		marker.TemporalAddress != "127.0.0.1:7234" || marker.TaskQueue != "agents-ts" ||
+		marker.ReadyMarker != markerPath {
+		t.Fatalf("marker=%#v", marker)
+	}
+}
+
+func TestVerifyTSWorkerIdentityAcceptsExpectedMarker(t *testing.T) {
+	ws := Workspace{Slug: "foo", CheckoutPath: "/tmp/checkout", MetadataDirName: ".vamos"}
+	runtime := RuntimeStatus{
+		Ports: map[BundleComponent]int{ComponentTemporal: 7234},
+		PIDs:  map[BundleComponent]int{ComponentTSWorker: 2003},
+	}
+	marker := TSWorkerIdentityMarker{
+		Version:         1,
+		PID:             2003,
+		WorkspaceSlug:   "foo",
+		CheckoutPath:    "/tmp/checkout",
+		TemporalAddress: "127.0.0.1:7234",
+		TaskQueue:       "agents-ts",
+		ReadyMarker:     RuntimePaths(ws.CheckoutPath, ws.MetadataDirName).TSReadyMarker,
+	}
+
+	if err := VerifyTSWorkerIdentity(ws, runtime, marker); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestVerifyTSWorkerIdentityRejectsMismatch(t *testing.T) {
+	ws := Workspace{Slug: "foo", CheckoutPath: "/tmp/checkout", MetadataDirName: ".vamos"}
+	runtime := RuntimeStatus{
+		Ports: map[BundleComponent]int{ComponentTemporal: 7234},
+		PIDs:  map[BundleComponent]int{ComponentTSWorker: 2003},
+	}
+	base := TSWorkerIdentityMarker{
+		Version:         1,
+		PID:             2003,
+		WorkspaceSlug:   "foo",
+		CheckoutPath:    "/tmp/checkout",
+		TemporalAddress: "127.0.0.1:7234",
+		TaskQueue:       "agents-ts",
+		ReadyMarker:     RuntimePaths(ws.CheckoutPath, ws.MetadataDirName).TSReadyMarker,
+	}
+	cases := map[string]func(*TSWorkerIdentityMarker){
+		"slug":     func(marker *TSWorkerIdentityMarker) { marker.WorkspaceSlug = "bar" },
+		"checkout": func(marker *TSWorkerIdentityMarker) { marker.CheckoutPath = "/tmp/other" },
+		"temporal": func(marker *TSWorkerIdentityMarker) { marker.TemporalAddress = "127.0.0.1:9999" },
+		"queue":    func(marker *TSWorkerIdentityMarker) { marker.TaskQueue = "other" },
+		"pid":      func(marker *TSWorkerIdentityMarker) { marker.PID = 9999 },
+	}
+	for name, mutate := range cases {
+		t.Run(name, func(t *testing.T) {
+			marker := base
+			mutate(&marker)
+			if err := VerifyTSWorkerIdentity(ws, runtime, marker); err == nil {
+				t.Fatalf("VerifyTSWorkerIdentity(%s) succeeded", name)
+			}
+		})
+	}
 }
 
 func TestFreshFileExistsWaitsPastStaleMarker(t *testing.T) {

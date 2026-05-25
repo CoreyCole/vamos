@@ -669,12 +669,13 @@ func TSWorkerEnv(parent map[string]string, ws Workspace, temporalPort int) []str
 	for key, value := range parent {
 		env = appendEnv(env, key, value)
 	}
-	env = appendEnv(env, "TEMPORAL_ADDR", "127.0.0.1:"+strconv.Itoa(temporalPort))
-	env = appendEnv(
-		env,
-		"VAMOS_TS_WORKER_READY_FILE",
-		RuntimePaths(ws.CheckoutPath, ws.MetadataDirName).TSReadyMarker,
-	)
+	temporalAddr := "127.0.0.1:" + strconv.Itoa(temporalPort)
+	paths := RuntimePaths(ws.CheckoutPath, ws.MetadataDirName)
+	env = appendEnv(env, "TEMPORAL_ADDR", temporalAddr)
+	env = appendEnv(env, "VAMOS_TS_WORKER_READY_FILE", paths.TSReadyMarker)
+	env = appendEnv(env, "VAMOS_WORKSPACE_SLUG", ws.Slug)
+	env = appendEnv(env, "VAMOS_DEFAULT_CWD", ws.CheckoutPath)
+	env = appendEnv(env, "VAMOS_TS_WORKER_TASK_QUEUE", "agents-ts")
 	if home := os.Getenv("HOME"); home != "" {
 		env = appendEnv(
 			env,

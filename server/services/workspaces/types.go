@@ -113,6 +113,17 @@ type RuntimeProcessEnvProof struct {
 	RedactedKeys            []string `json:"redacted_keys,omitempty"`
 }
 
+type TSWorkerIdentityMarker struct {
+	Version         int       `json:"version"`
+	PID             int       `json:"pid"`
+	StartedAt       time.Time `json:"started_at"`
+	WorkspaceSlug   string    `json:"workspace_slug"`
+	CheckoutPath    string    `json:"checkout_path"`
+	TemporalAddress string    `json:"temporal_address"`
+	TaskQueue       string    `json:"task_queue"`
+	ReadyMarker     string    `json:"ready_marker"`
+}
+
 type BuildStatus struct {
 	LastSuccessAt time.Time `json:"last_success_at,omitempty"`
 	LastFailedAt  time.Time `json:"last_failed_at,omitempty"`
