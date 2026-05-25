@@ -386,6 +386,7 @@ func (h *Handler) buildFreeformWorkbenchState(
 	args ChatPageArgs,
 ) (workbench.WorkbenchState, error) {
 	var saved *workbench.WorkbenchConfig
+	viewportClass := workbench.ResolveViewportClass(c.Request().Header, c.Request().UserAgent())
 	if h.layoutPrefs != nil {
 		cfg := h.layoutPrefs.GetOrDefault(
 			c.Request().Context(),
@@ -393,10 +394,11 @@ func (h *Handler) buildFreeformWorkbenchState(
 			workbench.WorkbenchPageAgentChat,
 			workbench.WorkbenchViewFocus,
 			"",
+			viewportClass,
 		)
 		saved = &cfg
 	}
-	return buildFreeformWorkbenchState(args, saved, c.Request().URL.RequestURI())
+	return buildFreeformWorkbenchState(args, saved, c.Request().URL.RequestURI(), viewportClass)
 }
 
 func (h *Handler) HandleWorkspacePage(c echo.Context) error {
@@ -465,6 +467,7 @@ func (h *Handler) buildWorkspaceWorkbenchState(
 	args WorkspacePageArgs,
 ) (workbench.WorkbenchState, error) {
 	var saved *workbench.WorkbenchConfig
+	viewportClass := workbench.ResolveViewportClass(c.Request().Header, c.Request().UserAgent())
 	if h.layoutPrefs != nil {
 		cfg := h.layoutPrefs.GetOrDefault(
 			c.Request().Context(),
@@ -472,10 +475,11 @@ func (h *Handler) buildWorkspaceWorkbenchState(
 			workbench.WorkbenchPageAgentChat,
 			workbench.WorkbenchViewSplit,
 			"docs",
+			viewportClass,
 		)
 		saved = &cfg
 	}
-	return buildWorkspaceWorkbenchState(args, saved, c.Request().URL.RequestURI())
+	return buildWorkspaceWorkbenchState(args, saved, c.Request().URL.RequestURI(), viewportClass)
 }
 
 func (h *Handler) StreamSessions(c echo.Context) error {

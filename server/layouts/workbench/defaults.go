@@ -19,13 +19,13 @@ func DefaultWorkbenchConfig(
 	page WorkbenchPage,
 	view WorkbenchView,
 	contextMode string,
+	viewportClass ...ViewportClass,
 ) WorkbenchConfig {
-	cfg := WorkbenchConfig{Version: 1, Page: page, View: view}
-	if page == WorkbenchPageAgentChat {
-		cfg.Tabs = WorkbenchTabState{SidebarTab: SidebarTabWorkspaces, RightRailTab: RightRailTabChat}
-	} else {
-		cfg.Tabs = WorkbenchTabState{SidebarTab: SidebarTabFiles, RightRailTab: RightRailTabChat}
+	resolvedViewportClass := ViewportDesktopFull
+	if len(viewportClass) > 0 {
+		resolvedViewportClass = normalizeViewportClass(viewportClass[0])
 	}
+	cfg := WorkbenchConfig{Version: 1, Page: page, View: view, ViewportClass: resolvedViewportClass}
 	switch page {
 	case WorkbenchPageAgentChat:
 		cfg.Regions = []RegionSpec{
@@ -86,59 +86,80 @@ func DefaultWorkbenchConfig(
 func MergeWorkbenchConfig(
 	defaults WorkbenchConfig,
 	saved *WorkbenchConfig,
+	viewportClasses ...ViewportClass,
 ) WorkbenchConfig {
+	viewportClass := defaults.ViewportClass
+	if len(viewportClasses) > 0 {
+		viewportClass = viewportClasses[0]
+	}
+	viewportClass = normalizeViewportClass(viewportClass)
+	out := cloneWorkbenchConfig(defaults)
+	out.ViewportClass = viewportClass
 	if saved == nil || ValidateWorkbenchConfig(*saved) != nil ||
 		saved.Page != defaults.Page ||
 		saved.View != defaults.View {
-		return defaults
+		return out
 	}
-	normalized := NormalizePersistentWorkbenchConfig(*saved, defaults)
+	if saved.ViewportClass != "" && normalizeViewportClass(saved.ViewportClass) != viewportClass {
+		return out
+	}
 	byID := map[string]RegionSpec{}
-	for _, region := range normalized.Regions {
+	for _, region := range saved.Regions {
 		byID[region.ID] = region
 	}
-	out := cloneWorkbenchConfig(defaults)
 	for i, region := range out.Regions {
 		if savedRegion, ok := byID[region.ID]; ok {
-			out.Regions[i].Ratio = savedRegion.Ratio
-			out.Regions[i].Visible = savedRegion.Visible
+			out.Regions[i].Ratio = clamp(savedRegion.Ratio, minSavedRatio, maxSavedRatio)
+			if viewportClass.IsDesktop() {
+				out.Regions[i].Visible = savedRegion.Visible
+			}
 		}
 	}
-	out.Mobile = normalized.Mobile
-	out.Tabs = normalized.Tabs
+	if viewportClass == ViewportMobile && hasRegionID(out.Regions, saved.Mobile.ActiveRegionID) {
+		out.Mobile.ActiveRegionID = saved.Mobile.ActiveRegionID
+	}
 	migrateLegacyAgentChatSplitRatios(&out)
 	return out
 }
 
-func NormalizePersistentWorkbenchConfig(
+func StripDurableInteractionState(
 	config WorkbenchConfig,
 	defaults WorkbenchConfig,
+	viewportClasses ...ViewportClass,
 ) WorkbenchConfig {
-	out := cloneWorkbenchConfig(config)
-	defaultByID := map[string]RegionSpec{}
-	for _, region := range defaults.Regions {
-		defaultByID[region.ID] = region
+	viewportClass := config.ViewportClass
+	if len(viewportClasses) > 0 {
+		viewportClass = viewportClasses[0]
 	}
-	for i, region := range out.Regions {
-		if defaultRegion, ok := defaultByID[region.ID]; ok {
-			out.Regions[i].Slot = defaultRegion.Slot
-			out.Regions[i].Kind = defaultRegion.Kind
-			out.Regions[i].Ratio = clamp(region.Ratio, minSavedRatio, maxSavedRatio)
-			continue
+	viewportClass = normalizeViewportClass(viewportClass)
+	stripped := cloneWorkbenchConfig(config)
+	stripped.ViewportClass = viewportClass
+	if viewportClass == ViewportMobile {
+		defaultByID := regionSpecMap(defaults)
+		for i, region := range stripped.Regions {
+			if defaultRegion, ok := defaultByID[region.ID]; ok {
+				stripped.Regions[i].Visible = defaultRegion.Visible
+			} else {
+				stripped.Regions[i].Visible = false
+			}
 		}
-		out.Regions[i].Visible = false
 	}
-	if !hasRegionID(out.Regions, out.Mobile.ActiveRegionID) {
-		out.Mobile.ActiveRegionID = defaults.Mobile.ActiveRegionID
+	if !hasRegionID(stripped.Regions, stripped.Mobile.ActiveRegionID) {
+		if hasRegionID(stripped.Regions, defaults.Mobile.ActiveRegionID) {
+			stripped.Mobile.ActiveRegionID = defaults.Mobile.ActiveRegionID
+		} else {
+			stripped.Mobile.ActiveRegionID = ""
+		}
 	}
-	if out.Tabs.SidebarTab == "" {
-		out.Tabs.SidebarTab = defaults.Tabs.SidebarTab
+	return stripped
+}
+
+func regionSpecMap(config WorkbenchConfig) map[string]RegionSpec {
+	byID := map[string]RegionSpec{}
+	for _, region := range config.Regions {
+		byID[region.ID] = region
 	}
-	if out.Tabs.RightRailTab == "" {
-		out.Tabs.RightRailTab = defaults.Tabs.RightRailTab
-	}
-	migrateLegacyAgentChatSplitRatios(&out)
-	return out
+	return byID
 }
 
 func hasRegionID(regions []RegionSpec, id string) bool {
@@ -186,13 +207,15 @@ func approxEqual(a, b float64) bool {
 }
 
 func BuildWorkbenchState(input BuildWorkbenchStateInput) (WorkbenchState, error) {
+	viewportClass := normalizeViewportClass(input.ViewportClass)
 	defaults := configFromRegions(
 		input.Page,
 		input.View,
 		input.Regions,
 		defaultMobileActiveRegion(input.Regions),
+		viewportClass,
 	)
-	config := MergeWorkbenchConfig(defaults, input.SavedConfig)
+	config := MergeWorkbenchConfig(defaults, input.SavedConfig, viewportClass)
 	regions := applyConfigToRegions(input.Regions, config)
 	if input.FocusDefault {
 		for i := range regions {
@@ -203,12 +226,14 @@ func BuildWorkbenchState(input BuildWorkbenchStateInput) (WorkbenchState, error)
 			input.View,
 			regions,
 			defaultMobileActiveRegion(regions),
+			viewportClass,
 		)
 	}
 	state := WorkbenchState{
 		UserEmail:     input.UserEmail,
 		Page:          input.Page,
 		View:          input.View,
+		ViewportClass: viewportClass,
 		ActivePath:    input.ActivePath,
 		ContextMode:   input.ContextMode,
 		RouteHref:     input.RouteHref,
@@ -225,28 +250,20 @@ func configFromRegions(
 	view WorkbenchView,
 	regions []WorkbenchRegion,
 	mobileActive string,
+	viewportClass ViewportClass,
 ) WorkbenchConfig {
-	pageDefaults := DefaultWorkbenchConfig(page, view, "")
+	viewportClass = normalizeViewportClass(viewportClass)
+	pageDefaults := DefaultWorkbenchConfig(page, view, "", viewportClass)
 	defaultByID := map[string]RegionSpec{}
 	for _, region := range pageDefaults.Regions {
 		defaultByID[region.ID] = region
 	}
 	cfg := WorkbenchConfig{
-		Version: 1,
-		Page:    page,
-		View:    view,
-		Mobile:  MobileSpec{ActiveRegionID: mobileActive},
-	}
-	if page == WorkbenchPageAgentChat {
-		cfg.Tabs = WorkbenchTabState{
-			SidebarTab:   SidebarTabWorkspaces,
-			RightRailTab: RightRailTabChat,
-		}
-	} else {
-		cfg.Tabs = WorkbenchTabState{
-			SidebarTab:   SidebarTabFiles,
-			RightRailTab: RightRailTabChat,
-		}
+		Version:       1,
+		Page:          page,
+		View:          view,
+		ViewportClass: viewportClass,
+		Mobile:        MobileSpec{ActiveRegionID: mobileActive},
 	}
 	for _, region := range regions {
 		ratio := region.Ratio

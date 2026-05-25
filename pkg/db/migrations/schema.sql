@@ -66,14 +66,16 @@ CREATE TABLE IF NOT EXISTS layout_preferences (
 user_email TEXT NOT NULL,
 page TEXT NOT NULL CHECK (page IN ('agent-chat', 'thoughts')),
 view TEXT NOT NULL CHECK (view IN ('focus', 'split')),
+viewport_class TEXT NOT NULL DEFAULT 'desktop-full'
+CHECK (viewport_class IN ('mobile', 'desktop-half', 'desktop-full')),
 config_json TEXT NOT NULL,
 created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
 updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-PRIMARY KEY (user_email, page, view)
+PRIMARY KEY (user_email, page, view, viewport_class)
 ) ;
 
 CREATE INDEX IF NOT EXISTS idx_layout_preferences_user
-ON layout_preferences (user_email, page, view) ;
+ON layout_preferences (user_email, page, view, viewport_class) ;
 
 CREATE TABLE IF NOT EXISTS user_chat_selections (
 user_email TEXT NOT NULL,

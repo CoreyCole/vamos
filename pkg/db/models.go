@@ -299,12 +299,13 @@ type ImplWorkspace struct {
 }
 
 type LayoutPreference struct {
-	UserEmail  string    `json:"user_email"`
-	Page       string    `json:"page"`
-	View       string    `json:"view"`
-	ConfigJson string    `json:"config_json"`
-	CreatedAt  time.Time `json:"created_at"`
-	UpdatedAt  time.Time `json:"updated_at"`
+	UserEmail     string    `json:"user_email"`
+	Page          string    `json:"page"`
+	View          string    `json:"view"`
+	ViewportClass string    `json:"viewport_class"`
+	ConfigJson    string    `json:"config_json"`
+	CreatedAt     time.Time `json:"created_at"`
+	UpdatedAt     time.Time `json:"updated_at"`
 }
 
 type PlanWorkspace struct {

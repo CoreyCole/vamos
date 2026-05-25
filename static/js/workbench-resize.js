@@ -12,8 +12,6 @@ async function mergeWorkbenchPaths(patches) {
 }
 
 const roots = new WeakSet();
-const pendingSaves = new WeakMap();
-let navigationSaveInstalled = false;
 
 function clamp(value, min, max) {
   return Math.min(Math.max(value, min), max);
@@ -124,8 +122,8 @@ function collapseRegion(root, region) {
     region.style.opacity = "0";
   });
 
-  window.setTimeout(() => {
-    void mergeWorkbenchPaths([
+  window.setTimeout(async () => {
+    await mergeWorkbenchPaths([
       [
         "workbench.regions." + region.dataset.workbenchSignal + ".visible",
         false,
@@ -173,93 +171,62 @@ function updateHandles(root) {
   }
 }
 
-function regionVisibleFromRoot(root, region) {
-  const attr = region.getAttribute("data-workbench-visible");
-  if (attr === "true") return true;
-  if (attr === "false") return false;
-  return isVisible(region);
+function currentViewportClass(root) {
+  return root.dataset.workbenchViewportClass || "desktop-full";
 }
 
-function currentSidebarTab(root) {
-  const sidebar = root.querySelector(
-    "#workbench-shared-sidebar, #thoughts-shared-sidebar",
-  );
-  return (
-    sidebar?.dataset.workbenchSidebarTab ||
-    root.dataset.workbenchSidebarTab ||
-    ""
-  );
+function activeRegionID(root) {
+  const activeSignal = root.dataset.workbenchMobileActive || "";
+  if (!activeSignal) return "";
+  return regionBySignal(root, activeSignal)?.dataset.workbenchRegion || "";
 }
 
-function currentRightRailTab(root) {
-  const rail = root.querySelector("#doc-right-rail");
-  return (
-    rail?.dataset.workbenchRightRailTab ||
-    root.dataset.workbenchRightRailTab ||
-    ""
-  );
+function activeRegionSignal(root) {
+  return root.dataset.workbenchMobileActive || "";
 }
 
-function currentConfig(root) {
-  const regions = allRegions(root).map((region) => ({
+function visibleRegionSpecs(root) {
+  return allRegions(root).map((region) => ({
     id: region.dataset.workbenchRegion,
     slot: region.dataset.workbenchSlot,
     kind: region.dataset.workbenchKind,
     ratio: Number(region.dataset.workbenchRatio || 0),
-    visible: regionVisibleFromRoot(root, region),
+    visible: isVisible(region),
   }));
+}
 
+function currentConfig(root) {
+  const viewportClass = currentViewportClass(root);
   return {
     version: 1,
     page: root.dataset.workbenchPage,
     view: root.dataset.workbenchView,
-    regions,
-    mobile: { activeRegionID: root.dataset.workbenchMobileActive || "" },
-    tabs: {
-      sidebarTab: currentSidebarTab(root),
-      rightRailTab: currentRightRailTab(root),
-    },
+    viewportClass,
+    regions: visibleRegionSpecs(root),
+    mobile: { activeRegionID: activeRegionID(root) },
   };
 }
 
 function saveConfig(root) {
   fetch("/api/layout-preferences", {
     method: "POST",
-    keepalive: true,
     headers: {
       "Content-Type": "application/json",
       Accept: "text/event-stream",
     },
-    body: JSON.stringify({ config: currentConfig(root) }),
+    body: JSON.stringify({
+      viewportClass: currentViewportClass(root),
+      config: currentConfig(root),
+    }),
   }).catch(() => {});
 }
 
-function scheduleSave(root) {
-  window.clearTimeout(pendingSaves.get(root));
-  pendingSaves.set(
-    root,
-    window.setTimeout(() => saveConfig(root), 150),
-  );
+function saveConfigForEvent(event) {
+  const root = event.target?.closest?.("#workbench-root");
+  if (root) saveConfig(root);
 }
 
-function saveBeforeNavigation(event) {
-  const link = event.target.closest?.("a[href]");
-  if (
-    !link ||
-    link.target ||
-    event.metaKey ||
-    event.ctrlKey ||
-    event.shiftKey ||
-    event.altKey
-  ) {
-    return;
-  }
-  const root =
-    link.closest("#workbench-root") ||
-    document.querySelector("#workbench-root");
-  if (!root) return;
-  saveConfig(root);
-}
+document.addEventListener("workbench-layout-save", saveConfigForEvent);
 
 function startResize(event) {
   if (event.button !== 0) return;
@@ -385,15 +352,6 @@ function initWorkbench(root) {
     "[data-workbench-resize-handle]",
   )) {
     handle.addEventListener("pointerdown", startResize);
-  }
-  root.addEventListener("workbench-state-changed", () => scheduleSave(root));
-  root.addEventListener("click", (event) => {
-    if (!event.target.closest?.("[data-workbench-save-on-click]")) return;
-    requestAnimationFrame(() => scheduleSave(root));
-  });
-  if (!navigationSaveInstalled) {
-    document.addEventListener("click", saveBeforeNavigation, { capture: true });
-    navigationSaveInstalled = true;
   }
 }
 

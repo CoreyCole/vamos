@@ -267,20 +267,39 @@ func thoughtsContextMode(c echo.Context) string {
 	return strings.TrimSpace(mode)
 }
 
+func viewportClassForRequest(c echo.Context) workbench.ViewportClass {
+	return workbench.ResolveViewportClass(c.Request().Header, c.Request().UserAgent())
+}
+
+func (s *Service) savedThoughtsWorkbenchConfig(
+	c echo.Context,
+	userEmail string,
+	view workbench.WorkbenchView,
+	viewportClass workbench.ViewportClass,
+) *workbench.WorkbenchConfig {
+	if s.layoutPrefs == nil || strings.TrimSpace(userEmail) == "" {
+		return nil
+	}
+	cfg, err := s.layoutPrefs.Get(
+		c.Request().Context(),
+		userEmail,
+		workbench.WorkbenchPageThoughts,
+		view,
+		viewportClass,
+	)
+	if err != nil {
+		return nil
+	}
+	return cfg
+}
+
 func (s *Service) buildThoughtsWorkbenchState(
 	c echo.Context,
 	pageArgs *PageArgs,
 ) (workbench.WorkbenchState, error) {
 	view, contextMode := thoughtsViewFromQuery(c)
-	var saved *workbench.WorkbenchConfig
-	if s.layoutPrefs != nil && pageArgs.UserEmail != "" {
-		saved, _ = s.layoutPrefs.GetDocumentWorkbench(
-			c.Request().Context(),
-			pageArgs.UserEmail,
-			workbench.WorkbenchPageThoughts,
-		)
-	}
-	_ = view
+	viewportClass := viewportClassForRequest(c)
+	saved := s.savedThoughtsWorkbenchConfig(c, pageArgs.UserEmail, view, viewportClass)
 	rightTab := workbench.RightRailTabComments
 	if contextMode == thoughtsContextModeChat {
 		rightTab = workbench.RightRailTabChat
@@ -300,17 +319,19 @@ func (s *Service) buildThoughtsWorkbenchState(
 		return workbench.WorkbenchState{}, err
 	}
 	return workbench.BuildDocWorkbenchState(workbench.WorkbenchDocContext{
-		EntryMode:    workbench.DocEntryModeThoughts,
-		UserEmail:    pageArgs.UserEmail,
-		SelectedPath: pageArgs.FilePath,
-		RouteHref:    c.Request().URL.RequestURI(),
+		EntryMode:     workbench.DocEntryModeThoughts,
+		UserEmail:     pageArgs.UserEmail,
+		SelectedPath:  pageArgs.FilePath,
+		RouteHref:     c.Request().URL.RequestURI(),
+		View:          view,
+		ViewportClass: viewportClass,
+		SavedConfig:   saved,
 		Sidebar: BuildThoughtsSidebarArgs(
 			pageArgs,
 			s.listWorkbenchWorkspaces(c),
 		),
 		InitialSidebarOpen: false,
 		InitialRailOpen:    contextMode != "",
-		SavedConfig:        saved,
 		Center: workbench.CenterDocPaneArgs{
 			Title: DocumentTitle(pageArgs.FilePath, pageArgs.ViewerArgs.Frontmatter),
 			Document: DocumentPanel(
@@ -495,14 +516,8 @@ func (s *Service) buildThoughtsDirectoryWorkbenchState(
 	args *DirectoryArgs,
 ) (workbench.WorkbenchState, error) {
 	view, contextMode := thoughtsViewFromQuery(c)
-	var saved *workbench.WorkbenchConfig
-	if s.layoutPrefs != nil && args.UserEmail != "" {
-		saved, _ = s.layoutPrefs.GetDocumentWorkbench(
-			c.Request().Context(),
-			args.UserEmail,
-			workbench.WorkbenchPageThoughts,
-		)
-	}
+	viewportClass := viewportClassForRequest(c)
+	saved := s.savedThoughtsWorkbenchConfig(c, args.UserEmail, view, viewportClass)
 	chatComponent, chatURLReplacement, err := s.buildEmbeddedChatComponentForRequest(
 		c,
 		EmbeddedChatRenderRequest{
@@ -528,17 +543,19 @@ func (s *Service) buildThoughtsDirectoryWorkbenchState(
 		selectedPath = "/"
 	}
 	state, err := workbench.BuildDocWorkbenchState(workbench.WorkbenchDocContext{
-		EntryMode:    workbench.DocEntryModeThoughts,
-		UserEmail:    args.UserEmail,
-		SelectedPath: selectedPath,
-		RouteHref:    c.Request().URL.RequestURI(),
+		EntryMode:     workbench.DocEntryModeThoughts,
+		UserEmail:     args.UserEmail,
+		SelectedPath:  selectedPath,
+		RouteHref:     c.Request().URL.RequestURI(),
+		View:          view,
+		ViewportClass: viewportClass,
+		SavedConfig:   saved,
 		Sidebar: BuildThoughtsDirectorySidebarArgs(
 			args,
 			s.listWorkbenchWorkspaces(c),
 		),
 		InitialSidebarOpen: false,
 		InitialRailOpen:    contextMode != "",
-		SavedConfig:        saved,
 		Center: workbench.CenterDocPaneArgs{
 			Title:    DirectoryTitle(args.Path),
 			Document: DirectoryPrimaryPanel(args),
@@ -555,10 +572,9 @@ func (s *Service) buildThoughtsDirectoryWorkbenchState(
 	if err != nil {
 		return workbench.WorkbenchState{}, err
 	}
-	if contextMode == thoughtsContextModeChat {
+	if contextMode == thoughtsContextModeChat && (viewportClass != workbench.ViewportMobile || saved == nil) {
 		state.Config.Mobile.ActiveRegionID = "doc-workbench-right"
 	}
-	_ = view
 	return state, nil
 }
 

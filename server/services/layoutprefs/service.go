@@ -19,35 +19,24 @@ func NewService(queries db.Querier) *Service {
 }
 
 type Input struct {
-	UserEmail string
-	Page      workbench.WorkbenchPage
-	View      workbench.WorkbenchView
-	Config    workbench.WorkbenchConfig
+	UserEmail     string
+	Page          workbench.WorkbenchPage
+	View          workbench.WorkbenchView
+	ViewportClass workbench.ViewportClass
+	Config        workbench.WorkbenchConfig
 }
 
-func normalizeForStorage(config workbench.WorkbenchConfig) workbench.WorkbenchConfig {
-	defaults := workbench.DefaultWorkbenchConfig(config.Page, config.View, "")
-	if isDocumentWorkbenchConfig(config) {
-		defaults = config
+func normalizeViewportClass(viewportClass workbench.ViewportClass) workbench.ViewportClass {
+	if parsed, ok := workbench.ParseViewportClass(string(viewportClass)); ok {
+		return parsed
 	}
-	return workbench.NormalizePersistentWorkbenchConfig(config, defaults)
+	return workbench.ViewportDesktopFull
 }
 
-func isDocumentWorkbenchConfig(config workbench.WorkbenchConfig) bool {
-	for _, region := range config.Regions {
-		switch region.ID {
-		case "doc-workbench-sidebar", "doc-workbench-center", "doc-workbench-right":
-			return true
-		}
-	}
-	return false
-}
-
-func layoutPreferenceKey(page workbench.WorkbenchPage, config workbench.WorkbenchConfig) workbench.WorkbenchPage {
-	if isDocumentWorkbenchConfig(config) {
-		return workbench.WorkbenchPageThoughts
-	}
-	return page
+func stripForStorage(config workbench.WorkbenchConfig, viewportClass workbench.ViewportClass) workbench.WorkbenchConfig {
+	viewportClass = normalizeViewportClass(viewportClass)
+	defaults := workbench.DefaultWorkbenchConfig(config.Page, config.View, "", viewportClass)
+	return workbench.StripDurableInteractionState(config, defaults, viewportClass)
 }
 
 func (s *Service) Get(
@@ -55,11 +44,18 @@ func (s *Service) Get(
 	userEmail string,
 	page workbench.WorkbenchPage,
 	view workbench.WorkbenchView,
+	viewportClasses ...workbench.ViewportClass,
 ) (*workbench.WorkbenchConfig, error) {
+	viewportClass := workbench.ViewportDesktopFull
+	if len(viewportClasses) > 0 {
+		viewportClass = viewportClasses[0]
+	}
+	viewportClass = normalizeViewportClass(viewportClass)
 	row, err := s.queries.GetLayoutPreference(ctx, db.GetLayoutPreferenceParams{
-		UserEmail: userEmail,
-		Page:      string(page),
-		View:      string(view),
+		UserEmail:     userEmail,
+		Page:          string(page),
+		View:          string(view),
+		ViewportClass: string(viewportClass),
 	})
 	if err != nil {
 		return nil, err
@@ -71,21 +67,8 @@ func (s *Service) Get(
 	if err := workbench.ValidateWorkbenchConfig(cfg); err != nil {
 		return nil, err
 	}
-	normalized := normalizeForStorage(cfg)
-	return &normalized, workbench.ValidateWorkbenchConfig(normalized)
-}
-
-func (s *Service) GetDocumentWorkbench(
-	ctx context.Context,
-	userEmail string,
-	page workbench.WorkbenchPage,
-) (*workbench.WorkbenchConfig, error) {
-	cfg, err := s.Get(ctx, userEmail, workbench.WorkbenchPageThoughts, workbench.WorkbenchViewSplit)
-	if err != nil || cfg == nil {
-		return nil, err
-	}
-	cfg.Page = page
-	return cfg, workbench.ValidateWorkbenchConfig(*cfg)
+	stripped := stripForStorage(cfg, viewportClass)
+	return &stripped, workbench.ValidateWorkbenchConfig(stripped)
 }
 
 func (s *Service) GetOrDefault(
@@ -94,36 +77,44 @@ func (s *Service) GetOrDefault(
 	page workbench.WorkbenchPage,
 	view workbench.WorkbenchView,
 	contextMode string,
+	viewportClasses ...workbench.ViewportClass,
 ) workbench.WorkbenchConfig {
-	cfg, err := s.Get(ctx, userEmail, page, view)
-	defaults := workbench.DefaultWorkbenchConfig(page, view, contextMode)
+	viewportClass := workbench.ViewportDesktopFull
+	if len(viewportClasses) > 0 {
+		viewportClass = viewportClasses[0]
+	}
+	cfg, err := s.Get(ctx, userEmail, page, view, viewportClass)
+	defaults := workbench.DefaultWorkbenchConfig(page, view, contextMode, viewportClass)
 	if err != nil || cfg == nil {
 		return defaults
 	}
-	return workbench.MergeWorkbenchConfig(defaults, cfg)
+	return workbench.MergeWorkbenchConfig(defaults, cfg, viewportClass)
 }
 
 func (s *Service) Upsert(
 	ctx context.Context,
 	input Input,
 ) (workbench.WorkbenchConfig, error) {
+	viewportClass := input.ViewportClass
+	if viewportClass == "" {
+		viewportClass = input.Config.ViewportClass
+	}
+	viewportClass = normalizeViewportClass(viewportClass)
+	input.Config.ViewportClass = viewportClass
 	if err := workbench.ValidateWorkbenchConfig(input.Config); err != nil {
 		return workbench.WorkbenchConfig{}, err
 	}
-	normalized := normalizeForStorage(input.Config)
-	keyPage := layoutPreferenceKey(input.Page, normalized)
-	if keyPage != normalized.Page {
-		normalized.Page = keyPage
-	}
-	payload, err := json.Marshal(normalized)
+	stripped := stripForStorage(input.Config, viewportClass)
+	payload, err := json.Marshal(stripped)
 	if err != nil {
 		return workbench.WorkbenchConfig{}, err
 	}
 	row, err := s.queries.UpsertLayoutPreference(ctx, db.UpsertLayoutPreferenceParams{
-		UserEmail:  input.UserEmail,
-		Page:       string(keyPage),
-		View:       string(input.View),
-		ConfigJson: string(payload),
+		UserEmail:     input.UserEmail,
+		Page:          string(input.Page),
+		View:          string(input.View),
+		ViewportClass: string(viewportClass),
+		ConfigJson:    string(payload),
 	})
 	if err != nil {
 		return workbench.WorkbenchConfig{}, err
@@ -135,8 +126,8 @@ func (s *Service) Upsert(
 	if err := workbench.ValidateWorkbenchConfig(saved); err != nil {
 		return workbench.WorkbenchConfig{}, err
 	}
-	normalized = normalizeForStorage(saved)
-	return normalized, workbench.ValidateWorkbenchConfig(normalized)
+	stripped = stripForStorage(saved, viewportClass)
+	return stripped, workbench.ValidateWorkbenchConfig(stripped)
 }
 
 func (s *Service) Reset(
@@ -144,11 +135,18 @@ func (s *Service) Reset(
 	userEmail string,
 	page workbench.WorkbenchPage,
 	view workbench.WorkbenchView,
+	viewportClasses ...workbench.ViewportClass,
 ) error {
+	viewportClass := workbench.ViewportDesktopFull
+	if len(viewportClasses) > 0 {
+		viewportClass = viewportClasses[0]
+	}
+	viewportClass = normalizeViewportClass(viewportClass)
 	err := s.queries.DeleteLayoutPreference(ctx, db.DeleteLayoutPreferenceParams{
-		UserEmail: userEmail,
-		Page:      string(page),
-		View:      string(view),
+		UserEmail:     userEmail,
+		Page:          string(page),
+		View:          string(view),
+		ViewportClass: string(viewportClass),
 	})
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil

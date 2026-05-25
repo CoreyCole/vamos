@@ -2,12 +2,53 @@ package workbench
 
 import (
 	"bytes"
+	"net/http"
 	"os"
 	"strings"
 	"testing"
 
 	"github.com/a-h/templ"
 )
+
+func TestParseViewportClass(t *testing.T) {
+	t.Parallel()
+
+	for _, tc := range []struct {
+		input string
+		want  ViewportClass
+		ok    bool
+	}{
+		{input: "mobile", want: ViewportMobile, ok: true},
+		{input: "desktop-half", want: ViewportDesktopHalf, ok: true},
+		{input: "desktop-full", want: ViewportDesktopFull, ok: true},
+		{input: " desktop-full ", want: ViewportDesktopFull, ok: true},
+		{input: "tablet", ok: false},
+	} {
+		got, ok := ParseViewportClass(tc.input)
+		if ok != tc.ok || got != tc.want {
+			t.Fatalf("ParseViewportClass(%q) = %q/%v, want %q/%v", tc.input, got, ok, tc.want, tc.ok)
+		}
+	}
+}
+
+func TestResolveViewportClassUsesHeaderThenUAFallback(t *testing.T) {
+	t.Parallel()
+
+	header := http.Header{}
+	header.Set(ViewportClassHeader, "desktop-half")
+	if got := ResolveViewportClass(header, "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)"); got != ViewportDesktopHalf {
+		t.Fatalf("header ResolveViewportClass() = %q, want desktop-half", got)
+	}
+
+	header = http.Header{"User-Agent": []string{"Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)"}}
+	if got := ResolveViewportClass(header, ""); got != ViewportMobile {
+		t.Fatalf("mobile UA ResolveViewportClass() = %q, want mobile", got)
+	}
+
+	if got := ResolveViewportClass(http.Header{}, "Mozilla/5.0 (X11; Linux x86_64)"); got != ViewportDesktopFull {
+		t.Fatalf("desktop fallback ResolveViewportClass() = %q, want desktop-full", got)
+	}
+}
 
 func TestDefaultWorkbenchLayoutUsesWorkspaceDocChat(t *testing.T) {
 	t.Parallel()
@@ -124,53 +165,96 @@ func TestMergeWorkbenchConfigMigratesLegacyAgentChatSplitRatios(t *testing.T) {
 	}
 }
 
-func TestMergeWorkbenchConfigPreservesVisibleMobileAndTabs(t *testing.T) {
+func TestMergeWorkbenchConfigPartitionsDurableFieldsByViewportClass(t *testing.T) {
 	t.Parallel()
 
-	defaults := DefaultWorkbenchConfig(WorkbenchPageAgentChat, WorkbenchViewFocus, "")
+	defaults := DefaultWorkbenchConfig(WorkbenchPageAgentChat, WorkbenchViewFocus, "", ViewportMobile)
 	saved := cloneWorkbenchConfig(defaults)
 	saved.Regions[0].Visible = false
 	saved.Regions[0].Ratio = 0.31
 	saved.Mobile.ActiveRegionID = "agent-chat-navigation"
-	saved.Tabs = WorkbenchTabState{SidebarTab: SidebarTabFiles, RightRailTab: RightRailTabComments}
 
-	merged := MergeWorkbenchConfig(defaults, &saved)
+	merged := MergeWorkbenchConfig(defaults, &saved, ViewportMobile)
 	if got := regionSpecByID(merged, "agent-chat-navigation").Ratio; got != 0.31 {
 		t.Fatalf("navigation ratio = %v, want 0.31", got)
 	}
-	if regionSpecByID(merged, "agent-chat-navigation").Visible {
-		t.Fatal("saved hidden navigation was not preserved")
+	if !regionSpecByID(merged, "agent-chat-navigation").Visible {
+		t.Fatal("mobile should keep default visibility")
 	}
 	if merged.Mobile.ActiveRegionID != "agent-chat-navigation" {
 		t.Fatalf("mobile active = %q, want saved navigation", merged.Mobile.ActiveRegionID)
 	}
-	if merged.Tabs.SidebarTab != SidebarTabFiles || merged.Tabs.RightRailTab != RightRailTabComments {
-		t.Fatalf("tabs = %#v, want files/comments", merged.Tabs)
+	desktopSaved := saved
+	desktopSaved.ViewportClass = ViewportDesktopHalf
+	desktop := MergeWorkbenchConfig(
+		DefaultWorkbenchConfig(WorkbenchPageAgentChat, WorkbenchViewFocus, "", ViewportDesktopHalf),
+		&desktopSaved,
+		ViewportDesktopHalf,
+	)
+	if regionSpecByID(desktop, "agent-chat-navigation").Visible {
+		t.Fatal("desktop should preserve saved visibility")
+	}
+	if desktop.Mobile.ActiveRegionID != defaults.Mobile.ActiveRegionID {
+		t.Fatalf("desktop mobile active = %q, want default", desktop.Mobile.ActiveRegionID)
 	}
 }
 
-func TestNormalizePersistentWorkbenchConfigPreservesDurableState(t *testing.T) {
+func TestStripDurableInteractionState(t *testing.T) {
 	t.Parallel()
 
 	defaults := DefaultWorkbenchConfig(WorkbenchPageAgentChat, WorkbenchViewFocus, "")
 	cfg := cloneWorkbenchConfig(defaults)
-	cfg.Regions[0].Visible = false
+	cfg.Regions[0].Visible = true
 	cfg.Regions[0].Ratio = 0.34
 	cfg.Mobile.ActiveRegionID = "agent-chat-navigation"
-	cfg.Tabs = WorkbenchTabState{SidebarTab: SidebarTabFiles, RightRailTab: RightRailTabComments}
 
-	normalized := NormalizePersistentWorkbenchConfig(cfg, defaults)
-	if got := regionSpecByID(normalized, "agent-chat-navigation").Ratio; got != 0.34 {
+	stripped := StripDurableInteractionState(cfg, defaults, ViewportMobile)
+	if got := regionSpecByID(stripped, "agent-chat-navigation").Ratio; got != 0.34 {
 		t.Fatalf("ratio = %v, want preserved 0.34", got)
 	}
-	if regionSpecByID(normalized, "agent-chat-navigation").Visible {
-		t.Fatal("visibility should remain hidden")
+	if !regionSpecByID(stripped, "agent-chat-navigation").Visible {
+		t.Fatal("mobile visibility should be reset to default")
 	}
-	if normalized.Mobile.ActiveRegionID != "agent-chat-navigation" {
-		t.Fatalf("mobile active = %q, want saved navigation", normalized.Mobile.ActiveRegionID)
+	if stripped.Mobile.ActiveRegionID != "agent-chat-navigation" {
+		t.Fatalf("mobile active = %q, want saved navigation", stripped.Mobile.ActiveRegionID)
 	}
-	if normalized.Tabs.SidebarTab != SidebarTabFiles || normalized.Tabs.RightRailTab != RightRailTabComments {
-		t.Fatalf("tabs = %#v, want files/comments", normalized.Tabs)
+}
+
+func TestStripDurableInteractionStateClearsMissingDefaultMobileRegion(t *testing.T) {
+	t.Parallel()
+
+	cfg := WorkbenchConfig{
+		Version: 1,
+		Page:    WorkbenchPageThoughts,
+		View:    WorkbenchViewSplit,
+		Regions: []RegionSpec{
+			{ID: "doc-workbench-sidebar", Slot: WorkbenchSlotNavigation, Kind: RegionThoughtsTree, Ratio: 0.22},
+			{ID: "doc-workbench-center", Slot: WorkbenchSlotPrimary, Kind: RegionDocument, Ratio: 0.61},
+			{ID: "doc-workbench-right", Slot: WorkbenchSlotContext, Kind: RegionChat, Ratio: 0.17},
+		},
+	}
+	defaults := DefaultWorkbenchConfig(WorkbenchPageThoughts, WorkbenchViewSplit, "")
+
+	stripped := StripDurableInteractionState(cfg, defaults, ViewportMobile)
+	if stripped.Mobile.ActiveRegionID != "" {
+		t.Fatalf("mobile active = %q, want empty fallback", stripped.Mobile.ActiveRegionID)
+	}
+	if err := ValidateWorkbenchConfig(stripped); err != nil {
+		t.Fatalf("ValidateWorkbenchConfig() error = %v", err)
+	}
+}
+
+func TestDesktopFullDoesNotUseSavedMobileActiveRegion(t *testing.T) {
+	t.Parallel()
+
+	defaults := DefaultWorkbenchConfig(WorkbenchPageThoughts, WorkbenchViewSplit, "chat", ViewportDesktopFull)
+	mobileSaved := cloneWorkbenchConfig(defaults)
+	mobileSaved.ViewportClass = ViewportMobile
+	mobileSaved.Mobile.ActiveRegionID = "thoughts-context"
+
+	merged := MergeWorkbenchConfig(defaults, &mobileSaved, ViewportDesktopFull)
+	if merged.Mobile.ActiveRegionID == "thoughts-context" {
+		t.Fatal("desktop-full used saved mobile active region")
 	}
 }
 
@@ -367,7 +451,7 @@ func TestWorkbenchLoadsDocScrollScript(t *testing.T) {
 		t.Fatalf("Workbench.Render() error = %v", err)
 	}
 	html := body.String()
-	for _, want := range []string{`/js/workbench-resize.js?v=6`, `/js/workbench-doc-scroll.js`} {
+	for _, want := range []string{`/js/workbench-resize.js`, `/js/workbench-doc-scroll.js`} {
 		if !strings.Contains(html, want) {
 			t.Fatalf("Workbench html = %s, want %q", html, want)
 		}
@@ -400,7 +484,6 @@ func TestWorkbenchDocScrollAssetContract(t *testing.T) {
 		"docWorkbenchCenter",
 		"scrollTargetInsideContainer",
 		"data-workbench-signal",
-		`button[aria-label="Back to document"]`,
 		"handleWorkbenchSectionClick, true",
 		"sectionTargetFromEventDetail",
 		"Object.hasOwn(detail, 'hash')",
@@ -417,6 +500,8 @@ func TestWorkbenchDocScrollAssetContract(t *testing.T) {
 		"style.display",
 		"style.setProperty('display'",
 		"data-workbench-region-key",
+		"workbench-layout-save",
+		"root.dataset.workbenchMobileActive = key",
 	} {
 		if strings.Contains(js, unwanted) {
 			t.Fatalf("workbench-doc-scroll.js should not contain %q in %s", unwanted, js)
@@ -442,12 +527,14 @@ func TestWorkbenchResizeJSShowsHandlesForVisibleAdjacentRegions(t *testing.T) {
 		"collapseRegion(root, navigationGroup.navigation)",
 		"regionSlot(region) !== \"primary\"",
 		"attributeFilter: [\"class\", \"style\", \"data-workbench-focused\"]",
-		"tabs: {",
-		"activeRegionID: root.dataset.workbenchMobileActive",
-		"visible: regionVisibleFromRoot(root, region)",
-		"workbench-state-changed",
-		"saveBeforeNavigation",
-		"keepalive: true",
+		"function currentViewportClass(root)",
+		"function activeRegionID(root)",
+		"function visibleRegionSpecs(root)",
+		"viewportClass: currentViewportClass(root)",
+		"mobile: { activeRegionID: activeRegionID(root) }",
+		"body: JSON.stringify({",
+		"viewportClass: currentViewportClass(root)",
+		"workbench-layout-save",
 	} {
 		if !strings.Contains(js, want) {
 			t.Fatalf("workbench-resize.js missing %q in %s", want, js)
@@ -458,7 +545,8 @@ func TestWorkbenchResizeJSShowsHandlesForVisibleAdjacentRegions(t *testing.T) {
 		"workbenchFocused(root) ||",
 		"regionMaxWidth",
 		"workbenchMaxRem",
-		"visible: false",
+		"localStorage",
+		"document.cookie",
 		"mobile: { activeRegionID: \"\" }",
 	} {
 		if strings.Contains(js, unwanted) {
@@ -467,16 +555,17 @@ func TestWorkbenchResizeJSShowsHandlesForVisibleAdjacentRegions(t *testing.T) {
 	}
 }
 
-func TestBuildWorkbenchStateAppliesSavedRatiosAndVisibility(t *testing.T) {
+func TestBuildWorkbenchStateAppliesSavedRatiosButKeepsRouteVisibility(t *testing.T) {
 	t.Parallel()
 
-	saved := DefaultWorkbenchConfig(WorkbenchPageAgentChat, WorkbenchViewFocus, "")
+	saved := DefaultWorkbenchConfig(WorkbenchPageAgentChat, WorkbenchViewFocus, "", ViewportMobile)
 	saved.Regions[0].Visible = true
 	saved.Regions[0].Ratio = 0.33
 	state, err := BuildWorkbenchState(BuildWorkbenchStateInput{
-		Page:        WorkbenchPageAgentChat,
-		View:        WorkbenchViewFocus,
-		SavedConfig: &saved,
+		Page:          WorkbenchPageAgentChat,
+		View:          WorkbenchViewFocus,
+		ViewportClass: ViewportMobile,
+		SavedConfig:   &saved,
 		Regions: []WorkbenchRegion{
 			{
 				ID:      "agent-chat-navigation",
@@ -500,8 +589,8 @@ func TestBuildWorkbenchStateAppliesSavedRatiosAndVisibility(t *testing.T) {
 	if state.Regions[0].Ratio != 0.33 {
 		t.Fatalf("navigation ratio = %v, want saved 0.33", state.Regions[0].Ratio)
 	}
-	if !state.Regions[0].Visible {
-		t.Fatal("saved navigation visibility should be restored")
+	if state.Regions[0].Visible {
+		t.Fatal("route-hidden navigation should stay hidden despite saved visibility")
 	}
 }
 
@@ -618,6 +707,9 @@ func TestMobileRegionTabsRenderFromWorkbench(t *testing.T) {
 		`aria-controls="doc-workbench-right-region"`,
 		`data-attr:aria-selected`,
 		`id="workbench-regions"`,
+		`data-workbench-mobile-active="docWorkbenchCenter"`,
+		`data-workbench-viewport-class="desktop-full"`,
+		`workbench-layout-save`,
 	} {
 		if !strings.Contains(html, want) {
 			t.Fatalf("Workbench missing %s: %s", want, html)
@@ -714,48 +806,6 @@ func TestSharedSidebarRendersRouteNeutralTabs(t *testing.T) {
 	} {
 		if strings.Contains(html, unwanted) {
 			t.Fatalf("SharedSidebar html = %s, should not contain %q", html, unwanted)
-		}
-	}
-}
-
-func TestSharedSidebarSSRHiddenInactivePanel(t *testing.T) {
-	t.Parallel()
-
-	html := renderSharedSidebarForTest(t, WorkbenchSidebarArgs{
-		DefaultTab: SidebarTabWorkspaces,
-		Tabs:       DefaultSidebarTabs(),
-	})
-	if !strings.Contains(html, `data-workbench-sidebar-tab="workspaces"`) {
-		t.Fatalf("SharedSidebar html = %s, want saved tab data attr", html)
-	}
-	if !strings.Contains(html, `<div class="" data-show="$sidebarActiveTab === &#39;workspaces&#39;">`) {
-		t.Fatalf("SharedSidebar html = %s, want active workspaces panel without hidden class", html)
-	}
-	if !strings.Contains(html, `<div class="hidden" data-show="$sidebarActiveTab === &#39;files&#39;">`) {
-		t.Fatalf("SharedSidebar html = %s, want inactive files panel hidden", html)
-	}
-}
-
-func TestRightRailSSRHiddenInactivePanel(t *testing.T) {
-	t.Parallel()
-
-	var body bytes.Buffer
-	if err := RightRail(RightRailArgs{
-		ActiveTab: RightRailTabComments,
-		Chat:      templ.Raw("<p>chat</p>"),
-		Comments:  templ.Raw("<p>comments</p>"),
-	}).Render(t.Context(), &body); err != nil {
-		t.Fatalf("RightRail.Render() error = %v", err)
-	}
-	html := body.String()
-	for _, want := range []string{
-		`data-workbench-right-rail-tab="comments"`,
-		`id="doc-right-chat-panel" class="hidden h-full min-h-0"`,
-		`id="doc-right-comments-panel" class="h-full min-h-0"`,
-		`data-workbench-save-on-click`,
-	} {
-		if !strings.Contains(html, want) {
-			t.Fatalf("RightRail html = %s, want %q", html, want)
 		}
 	}
 }

@@ -110,10 +110,16 @@ func prepareSchemaCompatibilityMigrations(ctx context.Context, database *sql.DB)
 	if err := handlePreAgentChatArtifactCommentsTable(ctx, database); err != nil {
 		return err
 	}
+	if err := ensureLayoutPreferencesViewportClass(ctx, database); err != nil {
+		return err
+	}
 	return ensureArtifactCommentsDocPathColumn(ctx, database)
 }
 
 func runRuntimeMigrations(ctx context.Context, database *sql.DB) error {
+	if err := ensureLayoutPreferencesViewportClass(ctx, database); err != nil {
+		return err
+	}
 	if err := renameColumnIfTableExists(
 		ctx,
 		database,
@@ -383,6 +389,47 @@ func ensureWorkspaceEventsDocColumnsIfTableExists(
 		}
 	}
 	return nil
+}
+
+func ensureLayoutPreferencesViewportClass(ctx context.Context, database *sql.DB) error {
+	exists, err := tableExists(ctx, database, "layout_preferences")
+	if err != nil || !exists {
+		return err
+	}
+	hasViewportClass, err := tableColumnExists(ctx, database, "layout_preferences", "viewport_class")
+	if err != nil || hasViewportClass {
+		return err
+	}
+
+	tx, err := database.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	statements := []string{
+		`CREATE TABLE layout_preferences_new (
+			user_email TEXT NOT NULL,
+			page TEXT NOT NULL CHECK (page IN ('agent-chat', 'thoughts')),
+			view TEXT NOT NULL CHECK (view IN ('focus', 'split')),
+			viewport_class TEXT NOT NULL DEFAULT 'desktop-full' CHECK (viewport_class IN ('mobile', 'desktop-half', 'desktop-full')),
+			config_json TEXT NOT NULL,
+			created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			PRIMARY KEY (user_email, page, view, viewport_class)
+		)`,
+		`INSERT INTO layout_preferences_new (user_email, page, view, viewport_class, config_json, created_at, updated_at)
+		 SELECT user_email, page, view, 'desktop-full', config_json, created_at, updated_at FROM layout_preferences`,
+		`DROP TABLE layout_preferences`,
+		`ALTER TABLE layout_preferences_new RENAME TO layout_preferences`,
+		`CREATE INDEX IF NOT EXISTS idx_layout_preferences_user ON layout_preferences (user_email, page, view, viewport_class)`,
+	}
+	for _, statement := range statements {
+		if _, err := tx.ExecContext(ctx, statement); err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
 }
 
 func ensureScopedUserChatSelections(ctx context.Context, database *sql.DB) error {

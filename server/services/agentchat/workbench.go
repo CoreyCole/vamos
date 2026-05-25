@@ -24,6 +24,7 @@ func buildFreeformWorkbenchState(
 	args ChatPageArgs,
 	saved *workbench.WorkbenchConfig,
 	routeHref string,
+	viewportClass ...workbench.ViewportClass,
 ) (workbench.WorkbenchState, error) {
 	regions := []workbench.WorkbenchRegion{
 		{
@@ -59,10 +60,15 @@ func buildFreeformWorkbenchState(
 			Component: FreeformContextRegion(args),
 		},
 	}
+	resolvedViewportClass := workbench.ViewportDesktopFull
+	if len(viewportClass) > 0 {
+		resolvedViewportClass = viewportClass[0]
+	}
 	return workbench.BuildWorkbenchState(workbench.BuildWorkbenchStateInput{
 		UserEmail:     args.UserEmail,
 		Page:          workbench.WorkbenchPageAgentChat,
 		View:          workbench.WorkbenchViewFocus,
+		ViewportClass: resolvedViewportClass,
 		ContextMode:   "",
 		RouteHref:     routeHref,
 		SavedConfig:   saved,
@@ -84,6 +90,7 @@ func buildWorkspaceWorkbenchState(
 	args WorkspacePageArgs,
 	saved *workbench.WorkbenchConfig,
 	routeHref string,
+	viewportClass ...workbench.ViewportClass,
 ) (workbench.WorkbenchState, error) {
 	threadID := getThreadID(args.Projection.SelectedThread)
 	if saved == nil {
@@ -137,10 +144,15 @@ func buildWorkspaceWorkbenchState(
 			Component: WorkspaceChatPrimaryRegion(args),
 		},
 	}
+	resolvedViewportClass := workbench.ViewportDesktopFull
+	if len(viewportClass) > 0 {
+		resolvedViewportClass = viewportClass[0]
+	}
 	return workbench.BuildWorkbenchState(workbench.BuildWorkbenchStateInput{
 		UserEmail:     args.UserEmail,
 		Page:          workbench.WorkbenchPageAgentChat,
 		View:          workbench.WorkbenchViewSplit,
+		ViewportClass: resolvedViewportClass,
 		ActivePath:    threadID,
 		ContextMode:   "chat",
 		RouteHref:     routeHref,

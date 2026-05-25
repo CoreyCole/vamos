@@ -307,6 +307,49 @@ VALUES ('owner@example.com', 'workspace-1', 'thread-1', 'run-1', '2026-01-01 00:
 	}
 }
 
+func TestLegacyLayoutPreferencesMigratesToViewportClassKey(t *testing.T) {
+	t.Parallel()
+
+	database := openMigratorTestDB(t)
+	_, err := database.ExecContext(t.Context(), `
+CREATE TABLE layout_preferences (
+    user_email TEXT NOT NULL,
+    page TEXT NOT NULL,
+    view TEXT NOT NULL,
+    config_json TEXT NOT NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (user_email, page, view)
+);
+INSERT INTO layout_preferences (user_email, page, view, config_json)
+VALUES ('agent@example.com', 'thoughts', 'split', '{"version":1,"page":"thoughts","view":"split","regions":[],"mobile":{"activeRegionID":""}}');`)
+	if err != nil {
+		t.Fatalf("seed legacy layout_preferences: %v", err)
+	}
+
+	if err := prepareSchemaCompatibilityMigrations(t.Context(), database); err != nil {
+		t.Fatalf("prepareSchemaCompatibilityMigrations() error = %v", err)
+	}
+	if !columnExists(t, database, "layout_preferences", "viewport_class") {
+		t.Fatal("layout_preferences.viewport_class missing after migration")
+	}
+	row, err := querydb.New(database).GetLayoutPreference(
+		t.Context(),
+		querydb.GetLayoutPreferenceParams{
+			UserEmail:     "agent@example.com",
+			Page:          "thoughts",
+			View:          "split",
+			ViewportClass: "desktop-full",
+		},
+	)
+	if err != nil {
+		t.Fatalf("GetLayoutPreference() error = %v", err)
+	}
+	if row.ViewportClass != "desktop-full" {
+		t.Fatalf("viewport_class = %q, want desktop-full", row.ViewportClass)
+	}
+}
+
 func TestPreAgentChatArtifactCommentsTableRenamed(t *testing.T) {
 	t.Parallel()
 

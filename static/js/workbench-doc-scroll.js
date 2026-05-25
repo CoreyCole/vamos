@@ -63,10 +63,6 @@ function handleReveal(event) {
 	scheduleCurrentDocRevealScroll(trigger);
 }
 
-function isMobileWorkbench() {
-	return window.matchMedia('(max-width: 767px)').matches;
-}
-
 function cleanSectionHash(hashOrID) {
 	const raw = String(hashOrID || '').trim();
 	if (!raw) return '';
@@ -121,10 +117,6 @@ function activateWorkbenchRegion(root, regionKey = 'docWorkbenchCenter') {
 	const key = activeRegionSignalKey(root, regionKey);
 	const activeRegion = workbenchRegionForSignal(root, key);
 	if (!activeRegion) return;
-	if (isMobileWorkbench() && key === 'docWorkbenchCenter') {
-		root.querySelector('button[aria-label="Back to document"]')?.click();
-	}
-	root.dataset.workbenchMobileActive = key;
 	activeRegion.classList.remove('max-md:!hidden');
 	activeRegion.classList.add('max-md:!flex');
 	for (const region of root.querySelectorAll('[data-workbench-signal]')) {

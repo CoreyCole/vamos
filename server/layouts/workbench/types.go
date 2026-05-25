@@ -19,11 +19,17 @@ const (
 
 type WorkbenchView string
 
+type ViewportClass string
+
 type WorkbenchLayoutMode string
 
 const (
 	WorkbenchViewFocus WorkbenchView = "focus"
 	WorkbenchViewSplit WorkbenchView = "split"
+
+	ViewportMobile      ViewportClass = "mobile"
+	ViewportDesktopHalf ViewportClass = "desktop-half"
+	ViewportDesktopFull ViewportClass = "desktop-full"
 
 	WorkbenchWorkspaceDocChat WorkbenchLayoutMode = "workspace-doc-chat"
 )
@@ -66,18 +72,13 @@ type WorkbenchRegion struct {
 	Component templ.Component
 }
 
-type WorkbenchTabState struct {
-	SidebarTab   SidebarTabKind `json:"sidebarTab"`
-	RightRailTab RightRailTab   `json:"rightRailTab"`
-}
-
 type WorkbenchConfig struct {
-	Version int               `json:"version"`
-	Page    WorkbenchPage     `json:"page"`
-	View    WorkbenchView     `json:"view"`
-	Regions []RegionSpec      `json:"regions"`
-	Mobile  MobileSpec        `json:"mobile"`
-	Tabs    WorkbenchTabState `json:"tabs,omitempty"`
+	Version       int           `json:"version"`
+	Page          WorkbenchPage `json:"page"`
+	View          WorkbenchView `json:"view"`
+	ViewportClass ViewportClass `json:"viewportClass,omitempty"`
+	Regions       []RegionSpec  `json:"regions"`
+	Mobile        MobileSpec    `json:"mobile"`
 }
 
 type RegionSpec struct {
@@ -99,28 +100,30 @@ type RegionNormalState struct {
 }
 
 type WorkbenchState struct {
-	UserEmail   string
-	Page        WorkbenchPage
-	View        WorkbenchView
-	ActivePath  string
-	ContextMode string
-	RouteHref   string
-	Config      WorkbenchConfig
-	Regions     []WorkbenchRegion
+	UserEmail     string
+	Page          WorkbenchPage
+	View          WorkbenchView
+	ViewportClass ViewportClass
+	ActivePath    string
+	ContextMode   string
+	RouteHref     string
+	Config        WorkbenchConfig
+	Regions       []WorkbenchRegion
 
 	FocusDefault  bool
 	NormalRegions []RegionNormalState
 }
 
 type BuildWorkbenchStateInput struct {
-	UserEmail   string
-	Page        WorkbenchPage
-	View        WorkbenchView
-	ActivePath  string
-	ContextMode string
-	RouteHref   string
-	SavedConfig *WorkbenchConfig
-	Regions     []WorkbenchRegion
+	UserEmail     string
+	Page          WorkbenchPage
+	View          WorkbenchView
+	ViewportClass ViewportClass
+	ActivePath    string
+	ContextMode   string
+	RouteHref     string
+	SavedConfig   *WorkbenchConfig
+	Regions       []WorkbenchRegion
 
 	FocusDefault  bool
 	NormalRegions []RegionNormalState
@@ -135,6 +138,11 @@ func ValidateWorkbenchConfig(config WorkbenchConfig) error {
 	}
 	if !validView(config.View) {
 		return fmt.Errorf("invalid view %q", config.View)
+	}
+	if config.ViewportClass != "" {
+		if _, ok := ParseViewportClass(string(config.ViewportClass)); !ok {
+			return fmt.Errorf("invalid viewport class %q", config.ViewportClass)
+		}
 	}
 
 	seen := map[string]bool{}
@@ -164,21 +172,31 @@ func ValidateWorkbenchConfig(config WorkbenchConfig) error {
 			config.Mobile.ActiveRegionID,
 		)
 	}
-	if config.Tabs.SidebarTab != "" {
-		switch config.Tabs.SidebarTab {
-		case SidebarTabWorkspaces, SidebarTabFiles:
-		default:
-			return fmt.Errorf("invalid sidebar tab %q", config.Tabs.SidebarTab)
-		}
-	}
-	if config.Tabs.RightRailTab != "" {
-		switch config.Tabs.RightRailTab {
-		case RightRailTabChat, RightRailTabComments:
-		default:
-			return fmt.Errorf("invalid right rail tab %q", config.Tabs.RightRailTab)
-		}
-	}
 	return nil
+}
+
+func ParseViewportClass(value string) (ViewportClass, bool) {
+	switch ViewportClass(strings.TrimSpace(value)) {
+	case ViewportMobile:
+		return ViewportMobile, true
+	case ViewportDesktopHalf:
+		return ViewportDesktopHalf, true
+	case ViewportDesktopFull:
+		return ViewportDesktopFull, true
+	default:
+		return "", false
+	}
+}
+
+func (v ViewportClass) IsDesktop() bool {
+	return v == ViewportDesktopHalf || v == ViewportDesktopFull
+}
+
+func normalizeViewportClass(value ViewportClass) ViewportClass {
+	if parsed, ok := ParseViewportClass(string(value)); ok {
+		return parsed
+	}
+	return ViewportDesktopFull
 }
 
 func validPage(page WorkbenchPage) bool {

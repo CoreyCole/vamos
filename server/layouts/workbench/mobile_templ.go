@@ -52,9 +52,9 @@ func MobileRegionTabs(state WorkbenchState) templ.Component {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var3 string
-			templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.JoinStringErrs("$workbench.activeRegionID = '" + SignalKey(region) + "'; $workbench.regions." + SignalKey(region) + ".visible = true")
+			templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.JoinStringErrs("$workbench.activeRegionID = '" + SignalKey(region) + "'; $workbench.regions." + SignalKey(region) + ".visible = true; el.closest('#workbench-root').dataset.workbenchMobileActive = '" + SignalKey(region) + "'; queueMicrotask(() => el.dispatchEvent(new CustomEvent('workbench-layout-save', {bubbles: true})))")
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/layouts/workbench/mobile.templ`, Line: 10, Col: 138}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/layouts/workbench/mobile.templ`, Line: 10, Col: 328}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var3))
 			if templ_7745c5c3_Err != nil {
