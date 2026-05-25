@@ -12,8 +12,8 @@ Merge a completed `../vamos` branch into `main`, verify the durable `stage` lane
 - Runtime source checkout: `../vamos`.
 - Durable stage lane checkout: `../vamos` in this host setup.
 - Clean baseline checkout: `../vamos-main`.
-- Host working checkout: `../cn-agents` owns host changes.
-- Host systemd checkout: `../cn-agents-main` is the clean/browser-visible host checkout used for rebuilds and service restarts.
+- Host working checkout: `../cn-agents` owns host changes and is where any tracked host edits must be committed before merge.
+- Host systemd checkout: `../cn-agents-main` is the clean/browser-visible host checkout used for rebuilds and service restarts. Do not make normal tracked edits there.
 - Browser-visible `../cn-agents-main` imports the clean runtime baseline with `replace github.com/CoreyCole/vamos => ../vamos-main` and launches `../vamos-main/agents-server`.
 - `vamos-ts-worker` also runs from `../vamos-main`.
 - Before fast-forwarding `../vamos-main` or pushing merged runtime commits to `origin/main`, prove the durable `stage` lane can run the merged `../vamos` commit. If stage verification fails, stop the merge flow and fix stage first.
@@ -43,11 +43,11 @@ git status --short
 
 Rules:
 
-- Source tracked files must be clean before merge. Stop for dirty tracked files.
+- Source tracked files must be clean before merge. If the source checkout has task-owned pending changes, commit them first; if the changes are unrelated or ambiguous, stop and triage instead of merging them implicitly.
 - `../vamos` is the durable stage lane checkout in this host setup and should be on `main` with clean tracked files before merge. `.vamos/` runtime state may be gitignored.
 - `../vamos-main` must be on `main` and clean. Stop if dirty.
-- `../cn-agents` should be on `main`; it is the host working checkout for host changes.
-- `../cn-agents-main` must be on `main` and clean except private gitignored config. Stop if tracked files are dirty.
+- `../cn-agents` should be on `main`; it is the host working checkout for host changes. If host-side changes are part of this merge flow, commit them in `../cn-agents` before syncing baselines. Do not leave task-owned tracked changes pending there.
+- `../cn-agents-main` must be on `main` and clean except private gitignored config. Stop if tracked files are dirty. If you accidentally edited tracked files there, move or re-apply those edits in `../cn-agents`, then restore `../cn-agents-main` to clean before continuing.
 - If `.agents` is missing in Vamos, create `ln -s ../.agents .agents` and commit that symlink in Vamos.
 
 ## Step 2: Publish latest `../vamos/main`, then sync/restack the source branch
@@ -82,6 +82,15 @@ git diff --stat origin/main..HEAD
 Conflict handling follows `.pi/skills/vamos-sync/SKILL.md`: resolve conflicts in the source checkout, preserve both latest `main` behavior and stack intent, regenerate templ/sqlc/E2E outputs from sources, run targeted tests, stage resolved files with `gt add <file>` (or `git add` only when Graphite has no wrapper for that file), then continue with **`gt continue --no-interactive`**. Do **not** use `git rebase --continue` for Graphite restack conflicts; it may bypass Graphite bookkeeping or open an editor. Ask the user to approve conflict resolutions before merging.
 
 Only after this synced/restacked source branch is clean should later steps fetch or fast-forward it into `../vamos`.
+
+## Step 2.5: Commit pending task-owned changes in ../vamos and ../cn-agents
+
+Before any baseline fast-forward or restart work, ensure task-owned tracked changes are committed in the writable working checkouts.
+
+- If `../vamos` still has pending tracked changes for the merge task, stage only those files and commit them on the correct branch before continuing.
+- If `../cn-agents` has pending tracked host/config/doc changes that are part of the same rollout, stage only those files and commit them in `../cn-agents` before continuing.
+- Do not commit unrelated dirty files from other agents or half-finished work. Stop and ask if ownership is unclear.
+- Never make these commits in `../cn-agents-main`; that checkout must stay clean and browser-visible only.
 
 ## Step 3: Merge preview
 
