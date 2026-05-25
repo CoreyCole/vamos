@@ -176,3 +176,21 @@ Then:
 - Region "thoughts.workbench.right" is reachable.
 - Text "Session history" is absent.
 - Console has no errors or warnings.
+
+### Saved mobile active state does not pin desktop refresh
+
+For each viewport:
+
+- mobile
+- desktop-full
+
+For each route:
+
+- "/thoughts/example.md?context=chat"
+
+Then:
+
+- Region "thoughts.workbench.sidebar" is reachable.
+- Region "thoughts.workbench.center" is reachable.
+- Region "thoughts.workbench.right" is reachable.
+- Console has no errors or warnings.

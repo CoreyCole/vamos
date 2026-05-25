@@ -31,6 +31,18 @@ type ArtifactSink interface {
 
 const scenarioTimeout = 5 * time.Minute
 
+func newPageOptionsForViewport(viewport Viewport) playwright.BrowserNewPageOptions {
+	return playwright.BrowserNewPageOptions{
+		Viewport: &playwright.Size{
+			Width:  viewport.Width,
+			Height: viewport.Height,
+		},
+		ExtraHttpHeaders: map[string]string{
+			"X-Vamos-Viewport-Class": string(viewport.Class),
+		},
+	}
+}
+
 func RunScenario(t *testing.T, featureSlug, scenarioSlug string, fn ScenarioFunc) {
 	runScenario(t, featureSlug, scenarioSlug, ViewportDesktopFull, fn)
 }
@@ -91,12 +103,7 @@ func runScenario(
 	if err != nil {
 		t.Fatal(err)
 	}
-	page, err := browser.NewPage(playwright.BrowserNewPageOptions{
-		Viewport: &playwright.Size{
-			Width:  viewports[0].Width,
-			Height: viewports[0].Height,
-		},
-	})
+	page, err := browser.NewPage(newPageOptionsForViewport(viewports[0]))
 	if err != nil {
 		t.Fatalf("new page: %v", err)
 	}

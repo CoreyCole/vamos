@@ -21,6 +21,16 @@ func TestResolveViewports(t *testing.T) {
 	}
 }
 
+func TestNewPageOptionsForViewportSendsViewportClassHeader(t *testing.T) {
+	options := newPageOptionsForViewport(Viewport{Class: ViewportDesktopHalf, Width: 900, Height: 900})
+	if options.Viewport == nil || options.Viewport.Width != 900 || options.Viewport.Height != 900 {
+		t.Fatalf("viewport options = %#v", options.Viewport)
+	}
+	if got := options.ExtraHttpHeaders["X-Vamos-Viewport-Class"]; got != "desktop-half" {
+		t.Fatalf("X-Vamos-Viewport-Class = %q, want desktop-half", got)
+	}
+}
+
 func TestResolveViewportsRejectsUnknown(t *testing.T) {
 	if _, err := ResolveViewports([]string{"watch"}); err == nil {
 		t.Fatal("ResolveViewports() error = nil, want unknown viewport")

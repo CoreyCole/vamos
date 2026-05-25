@@ -207,3 +207,23 @@ func TestThoughtsWorkbench_WorkbenchRegionsRemainUsableAcrossViewportClassesDesk
 		steps.ExpectConsoleClean(t, ctx, "errors_or_warnings")
 	})
 }
+
+func TestThoughtsWorkbench_SavedMobileActiveStateDoesNotPinDesktopRefreshMobileThoughtsExampleMdContextChat(t *testing.T) {
+	e2e.RunScenarioWithViewport(t, "thoughts-workbench", "saved-mobile-active-state-does-not-pin-desktop-refresh-mobile-thoughts-example-md-context-chat", e2e.ViewportMobile, func(t testing.TB, ctx *e2e.Context) {
+		steps.Visit(t, ctx, "/thoughts/example.md?context=chat")
+		steps.ExpectRegionReachable(t, ctx, "thoughts.workbench.sidebar")
+		steps.ExpectRegionReachable(t, ctx, "thoughts.workbench.center")
+		steps.ExpectRegionReachable(t, ctx, "thoughts.workbench.right")
+		steps.ExpectConsoleClean(t, ctx, "errors_or_warnings")
+	})
+}
+
+func TestThoughtsWorkbench_SavedMobileActiveStateDoesNotPinDesktopRefreshDesktopFullThoughtsExampleMdContextChat(t *testing.T) {
+	e2e.RunScenarioWithViewport(t, "thoughts-workbench", "saved-mobile-active-state-does-not-pin-desktop-refresh-desktop-full-thoughts-example-md-context-chat", e2e.ViewportDesktopFull, func(t testing.TB, ctx *e2e.Context) {
+		steps.Visit(t, ctx, "/thoughts/example.md?context=chat")
+		steps.ExpectRegionReachable(t, ctx, "thoughts.workbench.sidebar")
+		steps.ExpectRegionReachable(t, ctx, "thoughts.workbench.center")
+		steps.ExpectRegionReachable(t, ctx, "thoughts.workbench.right")
+		steps.ExpectConsoleClean(t, ctx, "errors_or_warnings")
+	})
+}
