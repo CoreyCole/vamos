@@ -83,7 +83,7 @@ func TestBuildNavItemsTreatsMainAndCurrentWorkspaceAsReachable(t *testing.T) {
 	}
 }
 
-func TestBuildNavItemsTreatsProtectedReleaseLanesAsReachable(t *testing.T) {
+func TestBuildNavItemsKeepsStoppedProtectedReleaseLanesSwitchable(t *testing.T) {
 	t.Parallel()
 
 	items := []Workspace{
@@ -105,12 +105,12 @@ func TestBuildNavItemsTreatsProtectedReleaseLanesAsReachable(t *testing.T) {
 	if len(got) != 1 {
 		t.Fatalf("len(got) = %d, want 1", len(got))
 	}
-	if got[0].Status != "running" || got[0].URL != "https://main.cn-agents.test/workspaces/switch/production-like-stage?redirect=%2Fworkspaces" {
+	if got[0].Status != "stopped" || got[0].URL != "https://main.cn-agents.test/workspaces/switch/production-like-stage?redirect=%2Fworkspaces" {
 		t.Fatalf("protected stage nav item = %+v", got[0])
 	}
 }
 
-func TestHandleSwitchWorkspaceAllowsProtectedStoppedReleaseLaneWithURL(t *testing.T) {
+func TestHandleSwitchWorkspaceAutoStartsProtectedReleaseLane(t *testing.T) {
 	t.Parallel()
 
 	_, releases, err := BuildDefaultReleaseRegistry("stage", "main")
@@ -123,6 +123,11 @@ func TestHandleSwitchWorkspaceAllowsProtectedStoppedReleaseLaneWithURL(t *testin
 			URL:    "https://stage.cn-agents.test/",
 			Status: StatusStopped,
 		}},
+		startResult: Workspace{
+			Slug:   "stage",
+			URL:    "https://stage.cn-agents.test/",
+			Status: StatusRunning,
+		},
 	}
 	signer, _ := newTestHandoffSigner(t)
 	h := NewHandler(
@@ -143,11 +148,65 @@ func TestHandleSwitchWorkspaceAllowsProtectedStoppedReleaseLaneWithURL(t *testin
 	if err := h.HandleSwitchWorkspace(c); err != nil {
 		t.Fatalf("HandleSwitchWorkspace() error = %v", err)
 	}
-	if rec.Code != http.StatusFound && rec.Code != http.StatusSeeOther {
-		t.Fatalf("status = %d, want redirect", rec.Code)
+	if rec.Code != http.StatusFound {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusFound)
+	}
+	if manager.startCalls != 1 {
+		t.Fatalf("startCalls = %d, want 1", manager.startCalls)
 	}
 	if location := rec.Header().Get("Location"); !strings.HasPrefix(location, "https://stage.cn-agents.test/internal/dev-auth/handoff?token=") {
 		t.Fatalf("Location = %q, want stage handoff", location)
+	}
+}
+
+func TestHandleSwitchWorkspaceProtectedReleaseLaneStartFailureRedirectsToErrors(t *testing.T) {
+	t.Parallel()
+
+	_, releases, err := BuildDefaultReleaseRegistry("stage", "main")
+	if err != nil {
+		t.Fatalf("BuildDefaultReleaseRegistry() error = %v", err)
+	}
+	store := &fakeWorkspaceErrorEventStore{}
+	manager := &fakeLifecycleManager{
+		workspaces: []Workspace{{
+			Slug:   "stage",
+			URL:    "https://stage.cn-agents.test/",
+			Status: StatusStopped,
+			Error:  "boot failed",
+		}},
+		startErr: errors.New("boot failed"),
+	}
+	signer, _ := newTestHandoffSigner(t)
+	h := NewHandler(
+		manager,
+		"https://main.cn-agents.test",
+		"main",
+		WithDevAuth(&fakeSessionCreator{}, signer),
+		WithReleaseProjector(&ReleaseProjector{Registry: releases}),
+		WithWorkspaceErrorStore(store),
+	)
+	req := httptest.NewRequest(http.MethodGet, "/workspaces/switch/stage?redirect=/workspaces", nil)
+	rec := httptest.NewRecorder()
+	c := echo.New().NewContext(req, rec)
+	c.SetPath("/workspaces/switch/:slug")
+	c.SetParamNames("slug")
+	c.SetParamValues("stage")
+	c.Set("user_email", "dev@example.com")
+
+	if err := h.HandleSwitchWorkspace(c); err != nil {
+		t.Fatalf("HandleSwitchWorkspace() error = %v", err)
+	}
+	if rec.Code != http.StatusSeeOther {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusSeeOther)
+	}
+	if location := rec.Header().Get("Location"); location != "/workspaces/errors?workspace=stage" {
+		t.Fatalf("Location = %q, want stage errors page", location)
+	}
+	if manager.startCalls != 1 {
+		t.Fatalf("startCalls = %d, want 1", manager.startCalls)
+	}
+	if len(store.events) != 1 || store.events[0].WorkspaceSlug != "stage" {
+		t.Fatalf("workspace error events = %+v", store.events)
 	}
 }
 
@@ -1937,6 +1996,9 @@ type fakeLifecycleManager struct {
 	snapshots     []WorkspaceLifecycleSnapshot
 	requests      []WorkspaceLifecycleRequest
 	beforeRefresh func()
+	startResult   Workspace
+	startErr      error
+	startCalls    int
 }
 
 func (f *fakeLifecycleManager) Refresh(context.Context) error {
@@ -1968,7 +2030,20 @@ func (f *fakeLifecycleManager) LookupHost(
 	return Workspace{}, false
 }
 
-func (f *fakeLifecycleManager) Start(context.Context, string) (Workspace, error) {
+func (f *fakeLifecycleManager) Start(_ context.Context, slug string) (Workspace, error) {
+	f.startCalls++
+	if f.startErr != nil {
+		return Workspace{}, f.startErr
+	}
+	if strings.TrimSpace(f.startResult.Slug) != "" {
+		for i := range f.workspaces {
+			if f.workspaces[i].Slug == slug {
+				f.workspaces[i] = f.startResult
+				break
+			}
+		}
+		return f.startResult, nil
+	}
 	return Workspace{}, nil
 }
 

@@ -783,7 +783,19 @@ func (h *Handler) HandleSwitchWorkspace(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusNotFound, "unknown workspace")
 	}
 	if ws.Status != StatusRunning && h.isProtectedReleaseWorkspace(slug) && strings.TrimSpace(ws.URL) != "" {
-		ws.Status = StatusRunning
+		started, err := h.ensureWorkspaceRunningForSwitch(c.Request().Context(), ws)
+		if err != nil {
+			log.Printf("workspace_switch_start_failed slug=%q error=%v", slug, err)
+			if latest, ok := h.manager.Lookup(slug); ok {
+				ws = latest
+				if strings.TrimSpace(ws.URL) == "" {
+					ws.URL = started.URL
+				}
+			}
+		}
+		if ws.Status != StatusRunning && started.Status != "" {
+			ws = started
+		}
 	}
 	if ws.Status != StatusRunning || strings.TrimSpace(ws.URL) == "" {
 		log.Printf(
@@ -825,6 +837,38 @@ func (h *Handler) HandleSwitchWorkspace(c echo.Context) error {
 		email,
 	)
 	return c.Redirect(http.StatusFound, target)
+}
+
+func (h *Handler) ensureWorkspaceRunningForSwitch(ctx context.Context, ws Workspace) (Workspace, error) {
+	started, err := h.manager.Start(ctx, ws.Slug)
+	if err != nil {
+		return started, err
+	}
+	if started.Status == StatusRunning && strings.TrimSpace(started.URL) != "" {
+		return started, nil
+	}
+	deadline, cancel := context.WithTimeout(ctx, 20*time.Second)
+	defer cancel()
+	ticker := time.NewTicker(250 * time.Millisecond)
+	defer ticker.Stop()
+	latest := started
+	for {
+		if current, ok := h.manager.Lookup(ws.Slug); ok {
+			latest = current
+			if latest.Status == StatusRunning && strings.TrimSpace(latest.URL) != "" {
+				return latest, nil
+			}
+			switch latest.Status {
+			case StatusFailed, StatusCrashed, StatusInvalid, StatusStopped:
+				return latest, nil
+			}
+		}
+		select {
+		case <-deadline.Done():
+			return latest, deadline.Err()
+		case <-ticker.C:
+		}
+	}
 }
 
 func switchRedirectPath(raw string) (string, error) {
@@ -1067,28 +1111,32 @@ func BuildNavItems(
 	items []Workspace,
 	currentSlug, managerURL string,
 	redirectPath string,
-	alwaysRunningSlugs ...string,
+	switchableSlugs ...string,
 ) []layouts.WorkspaceNavItem {
 	managerURL = strings.TrimRight(strings.TrimSpace(managerURL), "/")
 	redirect := "/"
 	if validated, err := ValidateLocalRedirectPath(redirectPath); err == nil {
 		redirect = validated
 	}
-	alwaysRunning := make(map[string]struct{}, len(alwaysRunningSlugs)+2)
-	alwaysRunning[mainWorkspaceSlug] = struct{}{}
-	alwaysRunning[currentSlug] = struct{}{}
-	for _, slug := range alwaysRunningSlugs {
+	forcedRunning := make(map[string]struct{}, 2)
+	forcedRunning[mainWorkspaceSlug] = struct{}{}
+	forcedRunning[currentSlug] = struct{}{}
+	switchable := make(map[string]struct{}, len(switchableSlugs)+2)
+	switchable[mainWorkspaceSlug] = struct{}{}
+	switchable[currentSlug] = struct{}{}
+	for _, slug := range switchableSlugs {
 		if slug = strings.TrimSpace(slug); slug != "" {
-			alwaysRunning[slug] = struct{}{}
+			switchable[slug] = struct{}{}
 		}
 	}
 	nav := make([]layouts.WorkspaceNavItem, 0, len(items))
 	for _, ws := range items {
-		if _, ok := alwaysRunning[ws.Slug]; ok {
+		if _, ok := forcedRunning[ws.Slug]; ok {
 			ws.Status = StatusRunning
 		}
 		itemURL := managerURL + "/workspaces"
-		if ws.Status == StatusRunning && strings.TrimSpace(ws.URL) != "" {
+		_, switchableOK := switchable[ws.Slug]
+		if switchableOK && strings.TrimSpace(ws.URL) != "" {
 			itemURL = managerURL + "/workspaces/switch/" + ws.Slug + "?redirect=" + url.QueryEscape(
 				redirect,
 			)

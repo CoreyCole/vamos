@@ -33,12 +33,13 @@ When a feature is deterministic, agentic, multi-step, stateful, or needs human/a
 ## Development checkout model
 
 - `../vamos` is the working checkout for human/agent edits. Run Pi sessions and normal feature development here.
-- `../vamos-main` is the clean/latest baseline checkout. Keep it clean, on `main`, and do not edit it directly.
+- In the current Chestnut dogfood host setup, the durable `stage` lane points at `../vamos`. Use that stage host for fast runtime iteration, quick fixes, and pre-merge verification.
+- `../vamos-main` is the clean/latest baseline checkout. In the current host setup, durable `main` points at `../vamos-main`. Keep it clean, on `main`, and do not edit it directly.
 - Feature branches use Graphite stacks from the working checkout. Preserve stack commit shape; do not squash or patch-apply branch contents into `main`.
 - For substantial planned work, use the QRSPI skills (`/q-question`, `/q-research`, `/q-design`, `/q-outline`, `/q-plan`, `/q-review`, `/q-workspace`, `/q-implement`, `/q-review-implementation`, `/q-verify`) rather than ad hoc planning or implementation.
 - `.agents` is committed as a symlink to `../.agents` when this repo is hosted beside a shared agent-config directory. Put broadly useful cross-repository skills there; commit the symlink only, never the target files.
 - `.pi/` is a real project-local directory for Vamos-specific Pi resources: skills, prompts, and extensions that should travel with this repository.
-- Use `/vamos-merge` when a workspace branch is ready. It fast-forwards the working checkout `main`, fast-forwards `../vamos-main`, then runs the configured host rebuild/restart verification.
+- Use `/vamos-merge` when a workspace branch is ready. It verifies `stage` from `../vamos`, fast-forwards `../vamos-main`, then runs the configured host rebuild/restart verification.
 
 ## Linked project baseline model
 

@@ -76,6 +76,25 @@ func resolveStaticRoot() string {
 	return "static"
 }
 
+func workspaceReleaseHandlerOptions(
+	releaseRegistry *release.Registry,
+	releaseStore workspaces.ReleaseQueueStore,
+	releaseStarter workspaces.ReleaseWorkflowStarter,
+) []workspaces.HandlerOption {
+	if releaseRegistry == nil {
+		return nil
+	}
+	projector := &workspaces.ReleaseProjector{
+		Registry: releaseRegistry,
+		Store:    releaseStore,
+		Git:      workspaces.ShellGitInspector{},
+	}
+	if releaseStarter != nil {
+		return []workspaces.HandlerOption{workspaces.WithReleaseQueue(projector, releaseStore, releaseStarter)}
+	}
+	return []workspaces.HandlerOption{workspaces.WithReleaseProjector(projector)}
+}
+
 func registerChildWorkspaceRedirect(e *echo.Echo, managerURL string) {
 	managerURL = strings.TrimRight(strings.TrimSpace(managerURL), "/")
 	redirect := func(c echo.Context) error {
@@ -1242,13 +1261,11 @@ func main() {
 			workspaces.WithWorkspaceErrorStore(workspaces.NewSQLWorkspaceErrorEventStore(dbService.Queries)),
 			workspaces.WithWorkspaceErrorScanner(&workspaces.WorkspaceErrorScanner{Tailer: workspaces.NewFileLogTailer()}),
 		}
-		if releaseRegistry != nil && releaseStarter != nil {
-			handlerOptions = append(handlerOptions, workspaces.WithReleaseQueue(
-				&workspaces.ReleaseProjector{Registry: releaseRegistry, Store: releaseStore, Git: workspaces.ShellGitInspector{}},
-				releaseStore,
-				releaseStarter,
-			))
-		}
+		handlerOptions = append(handlerOptions, workspaceReleaseHandlerOptions(
+			releaseRegistry,
+			releaseStore,
+			releaseStarter,
+		)...)
 		handlerOptions = append(handlerOptions,
 			workspaces.WithWorkspaceSyncCompletion(workspaceSyncCompleteForManualRefresh),
 			workspaces.WithWorkspaceSyncRefresh(func(ctx context.Context) (workspaces.WorkspaceSyncRefreshResult, error) {

@@ -1,20 +1,22 @@
 ---
 name: vamos-merge
-description: Merge completed Vamos runtime work into main, sync clean ../vamos-main and ../cn-agents-main baselines, then rebuild/restart the systemd host serving main.workspaces.creative-mode.ai. Use when asked to merge Vamos work, sync Vamos main/baseline, run /vamos-merge, or get latest Vamos running under systemd.
+description: Merge completed Vamos runtime work into main, verify the durable stage lane is operational from the merged ../vamos checkout, then sync clean ../vamos-main and ../cn-agents-main baselines and rebuild/restart the systemd host serving main.workspaces.creative-mode.ai. Use when asked to merge Vamos work, sync Vamos main/baseline, run /vamos-merge, or get latest Vamos running under systemd.
 ---
 
 # Vamos Merge
 
-Merge a completed `../vamos` branch into `main`, fast-forward the clean baseline checkouts `../vamos-main` and `../cn-agents-main`, then rebuild/restart the clean host checkout so `https://main.workspaces.creative-mode.ai` runs the new runtime.
+Merge a completed `../vamos` branch into `main`, verify the durable `stage` lane is healthy from the merged local runtime checkout, then fast-forward the clean baseline checkouts `../vamos-main` and `../cn-agents-main` and rebuild/restart the clean host checkout so `https://main.workspaces.creative-mode.ai` runs the new runtime.
 
 ## Invariants
 
 - Runtime source checkout: `../vamos`.
+- Durable stage lane checkout: `../vamos` in this host setup.
 - Clean baseline checkout: `../vamos-main`.
 - Host working checkout: `../cn-agents` owns host changes.
 - Host systemd checkout: `../cn-agents-main` is the clean/browser-visible host checkout used for rebuilds and service restarts.
 - Browser-visible `../cn-agents-main` imports the clean runtime baseline with `replace github.com/CoreyCole/vamos => ../vamos-main` and launches `../vamos-main/agents-server`.
 - `vamos-ts-worker` also runs from `../vamos-main`.
+- Before fast-forwarding `../vamos-main` or pushing merged runtime commits to `origin/main`, prove the durable `stage` lane can run the merged `../vamos` commit. If stage verification fails, stop the merge flow and fix stage first.
 - Fast-forwarding `../vamos-main` does **not** by itself update the running site. Always rebuild from `../cn-agents-main` (`just build --no-restart`) and restart systemd after syncing `../vamos-main` so Go binaries, TS worker output, Tailwind/static assets, and host wrapper all reflect the new commit.
 - `../vamos-main` must stay clean; do not edit there. Host rebuilds may generate ignored/build outputs there but must leave `git status` clean.
 - `.agents` is a committed symlink in Vamos: `.agents -> ../.agents`. Commit the symlink only, never the target files.
@@ -42,6 +44,7 @@ git status --short
 Rules:
 
 - Source tracked files must be clean before merge. Stop for dirty tracked files.
+- `../vamos` is the durable stage lane checkout in this host setup and should be on `main` with clean tracked files before merge. `.vamos/` runtime state may be gitignored.
 - `../vamos-main` must be on `main` and clean. Stop if dirty.
 - `../cn-agents` should be on `main`; it is the host working checkout for host changes.
 - `../cn-agents-main` must be on `main` and clean except private gitignored config. Stop if tracked files are dirty.
@@ -125,7 +128,33 @@ test "$(git rev-parse HEAD)" = "$source_head"
 
 Never import an unsynced copied-workspace branch into `../vamos` and then try to restack it there. The branch must already have passed Step 2 in its source checkout.
 
-## Step 5: Fast-forward ../vamos-main baseline
+## Step 5: Verify the durable stage lane from ../vamos
+
+Before touching `../vamos-main` or pushing merged runtime commits to `origin/main`, prove the durable stage lane can boot from the merged `../vamos` checkout.
+
+```bash
+cd ../vamos
+git branch --show-current # must be main
+git status --short        # tracked files must be clean; .vamos runtime state is gitignored
+
+just build --no-restart
+sleep 5
+curl -ksS -D /tmp/vamos-stage.headers https://stage.workspaces.creative-mode.ai/login \
+  -o /tmp/vamos-stage-login.html -m 20
+head -10 /tmp/vamos-stage.headers
+rg -n "<title>|<h1" /tmp/vamos-stage-login.html
+```
+
+Success criteria:
+
+- `../vamos` is the durable stage lane checkout for this host setup.
+- `just build --no-restart` succeeds and the workspace restart/start hook does not fail.
+- `https://stage.workspaces.creative-mode.ai/login` returns HTTP 200 or expected auth redirect, **not** 503.
+- If the authenticated main manager switches to stage while stage is already running, the redirect should be immediate; if stage was stopped, the manager should auto-start it and then redirect. If stage cannot start, the main manager should route to `/workspaces/errors?workspace=stage` instead of a dead stage host.
+
+If any stage verification step fails, stop here. Do **not** fast-forward `../vamos-main` and do **not** push merged runtime commits to `origin/main` until stage is healthy.
+
+## Step 6: Fast-forward ../vamos-main baseline
 
 ```bash
 cd ../vamos-main
@@ -141,7 +170,7 @@ git status --short
 
 Do not edit `../vamos-main`; after host rebuilds, verify it remains clean.
 
-## Step 6: Fast-forward ../cn-agents-main and restart host
+## Step 7: Fast-forward ../cn-agents-main and restart host
 
 Because the browser-visible host imports and launches `../vamos-main`, every merged Vamos runtime change needs `../vamos-main` fast-forwarded first, then a host rebuild from clean `../cn-agents-main`.
 
@@ -176,7 +205,7 @@ Expected:
 - `../vamos-main` remains git-clean after build/restart.
 - `cn-agents.service`, `cn-agents-ts-worker.service`, and `cn-temporal.service` are inactive after cutover.
 
-## Step 7: Verify browser-visible server
+## Step 8: Verify browser-visible server
 
 ```bash
 curl -ksS -D /tmp/vamos-main.headers https://main.workspaces.creative-mode.ai/login \
@@ -195,9 +224,9 @@ Success criteria:
 - `vamos.service` remains active after the request.
 - No fresh startup errors in `log/vamos.error.log`.
 
-## Step 8: Push
+## Step 9: Push
 
-Push the merged runtime main automatically. Do not ask for confirmation: `/vamos-merge` is only invoked when the stack is ready to merge and publish.
+Push the merged runtime main automatically, but only after stage verification and browser-visible main verification have both passed. Do not ask for confirmation: `/vamos-merge` is only invoked when the stack is ready to merge and publish.
 
 ```bash
 cd ../vamos
@@ -233,5 +262,6 @@ Then report:
 - final `../cn-agents` branch/HEAD and latest commit message
 - final `../cn-agents-main` branch/HEAD and latest commit message
 - systemd active states
+- stage verification URL/result
 - verification URL/result
 - push status

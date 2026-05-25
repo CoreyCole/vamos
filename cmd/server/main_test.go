@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"crypto/ed25519"
 	"encoding/base64"
 	"net/http"
@@ -358,4 +359,93 @@ func TestExpandRuntimePathsRejectsPreCutoverRelativeDatabasePath(t *testing.T) {
 	if !strings.Contains(err.Error(), "ambiguous after pkg/agents cwd cutover") {
 		t.Fatalf("expandRuntimePaths() error = %v, want cutover guard", err)
 	}
+}
+
+func TestWorkspaceReleaseHandlerOptionsShowReleaseLanesWithoutTemporalQueue(t *testing.T) {
+	t.Parallel()
+
+	_, releaseRegistry, err := workspaces.BuildDefaultReleaseRegistry("stage", "main")
+	if err != nil {
+		t.Fatalf("BuildDefaultReleaseRegistry() error = %v", err)
+	}
+	handler := workspaces.NewHandler(
+		fakeMainTestLifecycleManager{snapshots: []workspaces.WorkspaceLifecycleSnapshot{
+			{Workspace: workspaces.Workspace{Slug: "stage", DisplayName: "Stage", Status: workspaces.StatusRunning, URL: "https://stage.workspaces.test/", Commit: "abcdef1234567890"}},
+			{Workspace: workspaces.Workspace{Slug: "main", DisplayName: "Main", Status: workspaces.StatusStopped, IsMain: true, Commit: "1234567890abcdef"}},
+		}},
+		"https://main.workspaces.test",
+		"main",
+		workspaceReleaseHandlerOptions(releaseRegistry, nil, nil)...,
+	)
+
+	e := echo.New()
+	req := httptest.NewRequest(http.MethodGet, "/workspaces", nil)
+	rec := httptest.NewRecorder()
+	if err := handler.HandleWorkspacesPage(e.NewContext(req, rec)); err != nil {
+		t.Fatalf("HandleWorkspacesPage() error = %v", err)
+	}
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+	}
+	body := rec.Body.String()
+	for _, want := range []string{
+		"Release lanes",
+		`action="/workspaces/stage/stop"`,
+		`action="/workspaces/main/start"`,
+	} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("workspaces page missing %q: %s", want, body)
+		}
+	}
+}
+
+type fakeMainTestLifecycleManager struct {
+	snapshots []workspaces.WorkspaceLifecycleSnapshot
+}
+
+func (f fakeMainTestLifecycleManager) Refresh(context.Context) error { return nil }
+
+func (f fakeMainTestLifecycleManager) List() []workspaces.Workspace {
+	items := make([]workspaces.Workspace, 0, len(f.snapshots))
+	for _, snap := range f.snapshots {
+		items = append(items, snap.Workspace)
+	}
+	return items
+}
+
+func (f fakeMainTestLifecycleManager) Lookup(slug string) (workspaces.Workspace, bool) {
+	for _, snap := range f.snapshots {
+		if snap.Workspace.Slug == slug {
+			return snap.Workspace, true
+		}
+	}
+	return workspaces.Workspace{}, false
+}
+
+func (f fakeMainTestLifecycleManager) LookupHost(string) (workspaces.Workspace, bool) {
+	return workspaces.Workspace{}, false
+}
+
+func (f fakeMainTestLifecycleManager) Start(context.Context, string) (workspaces.Workspace, error) {
+	return workspaces.Workspace{}, nil
+}
+
+func (f fakeMainTestLifecycleManager) Stop(context.Context, string) (workspaces.Workspace, error) {
+	return workspaces.Workspace{}, nil
+}
+
+func (f fakeMainTestLifecycleManager) Restart(context.Context, string) (workspaces.Workspace, error) {
+	return workspaces.Workspace{}, nil
+}
+
+func (f fakeMainTestLifecycleManager) RequestLifecycle(context.Context, workspaces.WorkspaceLifecycleRequest) (workspaces.WorkspaceLifecycleSnapshot, error) {
+	return workspaces.WorkspaceLifecycleSnapshot{}, nil
+}
+
+func (f fakeMainTestLifecycleManager) ListLifecycle(context.Context) ([]workspaces.WorkspaceLifecycleSnapshot, error) {
+	return f.snapshots, nil
+}
+
+func (f fakeMainTestLifecycleManager) CompleteTransition(context.Context, string, string, workspaces.WorkspaceTransitionResult) error {
+	return nil
 }
