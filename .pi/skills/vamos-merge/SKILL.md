@@ -80,9 +80,9 @@ Conflict handling follows `.pi/skills/vamos-sync/SKILL.md`: resolve conflicts in
 
 Only after this synced/restacked source branch is clean should later steps fetch or fast-forward it into `../vamos`.
 
-## Step 3: Confirm merge preview
+## Step 3: Merge preview
 
-Show the user:
+Print the merge preview for auditability, then continue. Do not ask for confirmation: invoking `/vamos-merge` means the user is ready to fast-forward, deploy, and push unless a preflight, sync/restack, verification, or safety check fails.
 
 ```bash
 cd "$source_checkout"
@@ -95,8 +95,6 @@ git log --format='%h %s' --reverse origin/main..HEAD
 printf '\nFiles changed:\n'
 git diff --stat origin/main..HEAD
 ```
-
-Ask: `Proceed with vamos merge? (yes/no)`. Do not continue without explicit yes.
 
 ## Step 4: Fast-forward ../vamos main
 
@@ -197,16 +195,16 @@ Success criteria:
 - `vamos.service` remains active after the request.
 - No fresh startup errors in `log/vamos.error.log`.
 
-## Step 8: Push policy
+## Step 8: Push
 
-Push only after the user agrees:
+Push the merged runtime main automatically. Do not ask for confirmation: `/vamos-merge` is only invoked when the stack is ready to merge and publish.
 
 ```bash
 cd ../vamos
 git push origin main
 ```
 
-If host-only follow-up fixes were required, commit them on working `../cn-agents/main`, fast-forward `../cn-agents-main`, and push that repo separately after approval.
+If host-only follow-up fixes were required, commit them on working `../cn-agents/main`, fast-forward `../cn-agents-main`, and push that repo separately as part of the same merge flow after its verification passes.
 
 ## Completion response
 
