@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestFileLogTailerReturnsLastNLines(t *testing.T) {
@@ -40,17 +41,28 @@ func TestBuildWorkspaceDiagnostics(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("WriteMetadata: %v", err)
 	}
-	manager := &diagnosticsFakeManager{workspaces: map[string]Workspace{
-		"demo": {
-			Slug:         "demo",
-			CheckoutPath: checkout,
-			URL:          "https://demo.cn-agents.test/",
-			PID:          123,
-			Port:         4321,
-			StateDir:     stateDir,
-			LogPath:      logPath,
+	ws := Workspace{
+		Slug:         "demo",
+		CheckoutPath: checkout,
+		URL:          "https://demo.cn-agents.test/",
+		PID:          123,
+		Port:         4321,
+		StateDir:     stateDir,
+		LogPath:      logPath,
+		Ports: map[BundleComponent]int{
+			ComponentWeb:      4321,
+			ComponentTemporal: 7233,
 		},
-	}}
+		PIDs: map[BundleComponent]int{
+			ComponentWeb:      123,
+			ComponentTSWorker: 456,
+		},
+	}
+	if err := (FileBundleStore{}).WriteRuntimeEnvSnapshot(ws, BuildRuntimeEnvSnapshot(ws, RuntimeConfig{}, ws.Ports, ws.PIDs, time.Unix(100, 0))); err != nil {
+		t.Fatalf("WriteRuntimeEnvSnapshot: %v", err)
+	}
+	writeTSWorkerIdentityMarkerForTest(t, ws)
+	manager := &diagnosticsFakeManager{workspaces: map[string]Workspace{"demo": ws}}
 	prober := diagnosticsFakeProber{pidAlive: true, portOpen: true}
 	diagnostics, err := BuildWorkspaceDiagnostics(
 		context.Background(),
@@ -93,6 +105,9 @@ func TestBuildWorkspaceDiagnostics(t *testing.T) {
 			diagnostics.PortOpen,
 		)
 	}
+	if diagnostics.RuntimeEnvSnapshot == nil || diagnostics.TSWorkerIdentity == nil {
+		t.Fatalf("proof diagnostics snapshot=%#v identity=%#v errors=%q/%q", diagnostics.RuntimeEnvSnapshot, diagnostics.TSWorkerIdentity, diagnostics.RuntimeEnvSnapshotError, diagnostics.TSWorkerIdentityError)
+	}
 	if diagnostics.PublicURL != "https://demo.cn-agents.test/" ||
 		diagnostics.ManagerURL != "https://main.cn-agents.test" {
 		t.Fatalf(
@@ -100,6 +115,36 @@ func TestBuildWorkspaceDiagnostics(t *testing.T) {
 			diagnostics.PublicURL,
 			diagnostics.ManagerURL,
 		)
+	}
+}
+
+func TestBuildWorkspaceDiagnosticsReportsProofReadErrors(t *testing.T) {
+	t.Parallel()
+
+	checkout := t.TempDir()
+	if err := WriteMetadata(WorkspaceMetadataPath(checkout), WorkspaceMetadata{
+		Slug:         "demo",
+		CheckoutPath: checkout,
+		ManagerURL:   "https://main.test",
+	}); err != nil {
+		t.Fatalf("WriteMetadata: %v", err)
+	}
+	paths := RuntimePaths(checkout)
+	writeTestFile(t, paths.RuntimeEnvSnapshot, "{bad json")
+	writeTestFile(t, paths.TSReadyMarker, "{bad json")
+	manager := &diagnosticsFakeManager{workspaces: map[string]Workspace{
+		"demo": {Slug: "demo", CheckoutPath: checkout, Bundle: paths},
+	}}
+
+	diagnostics, err := BuildWorkspaceDiagnostics(context.Background(), manager, nil, nil, "demo", 0)
+	if err != nil {
+		t.Fatalf("BuildWorkspaceDiagnostics: %v", err)
+	}
+	if diagnostics.RuntimeEnvSnapshot != nil || diagnostics.RuntimeEnvSnapshotError == "" {
+		t.Fatalf("runtime snapshot proof = %#v error %q", diagnostics.RuntimeEnvSnapshot, diagnostics.RuntimeEnvSnapshotError)
+	}
+	if diagnostics.TSWorkerIdentity != nil || diagnostics.TSWorkerIdentityError == "" {
+		t.Fatalf("ts identity proof = %#v error %q", diagnostics.TSWorkerIdentity, diagnostics.TSWorkerIdentityError)
 	}
 }
 

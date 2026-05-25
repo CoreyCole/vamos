@@ -82,6 +82,16 @@ func (v *Verifier) VerifyBundle(ctx context.Context, slug string) VerifyWorkspac
 	if diagnostics.Metadata == nil {
 		run.Errors = append(run.Errors, "workspace env is missing or invalid")
 	}
+	if diagnostics.RuntimeEnvSnapshot == nil {
+		run.Errors = append(run.Errors, "runtime env snapshot is missing or invalid: "+diagnostics.RuntimeEnvSnapshotError)
+	} else if err := VerifyRuntimeEnvSnapshot(diagnostics.Workspace, run.Runtime, *diagnostics.RuntimeEnvSnapshot); err != nil {
+		run.Errors = append(run.Errors, "runtime env snapshot: "+err.Error())
+	}
+	if diagnostics.TSWorkerIdentity == nil {
+		run.Errors = append(run.Errors, "ts worker identity marker is missing or invalid: "+diagnostics.TSWorkerIdentityError)
+	} else if err := VerifyTSWorkerIdentity(diagnostics.Workspace, run.Runtime, *diagnostics.TSWorkerIdentity); err != nil {
+		run.Errors = append(run.Errors, "ts worker identity: "+err.Error())
+	}
 	if v.Prober == nil {
 		run.Errors = append(run.Errors, "local prober is not configured")
 	} else {
@@ -450,6 +460,19 @@ func (v *Verifier) checkWorkspaceHealthy(
 			ws.LocalAddr(),
 		)
 	}
+	runtime := diagnostics.RuntimeStatus()
+	if diagnostics.RuntimeEnvSnapshot == nil {
+		return fmt.Errorf("workspace %q runtime env snapshot is missing or invalid: %s", slug, diagnostics.RuntimeEnvSnapshotError)
+	}
+	if err := VerifyRuntimeEnvSnapshot(ws, runtime, *diagnostics.RuntimeEnvSnapshot); err != nil {
+		return fmt.Errorf("workspace %q runtime env snapshot: %w", slug, err)
+	}
+	if diagnostics.TSWorkerIdentity == nil {
+		return fmt.Errorf("workspace %q ts worker identity marker is missing or invalid: %s", slug, diagnostics.TSWorkerIdentityError)
+	}
+	if err := VerifyTSWorkerIdentity(ws, runtime, *diagnostics.TSWorkerIdentity); err != nil {
+		return fmt.Errorf("workspace %q ts worker identity: %w", slug, err)
+	}
 	return nil
 }
 
@@ -492,6 +515,64 @@ func (v *Verifier) verifyPort(
 		return false
 	}
 	return v.Prober.PortOpen("127.0.0.1:" + strconv.Itoa(port))
+}
+
+func VerifyRuntimeEnvSnapshot(
+	ws Workspace,
+	runtime RuntimeStatus,
+	snapshot RuntimeEnvSnapshot,
+) error {
+	if snapshot.Version != 1 {
+		return fmt.Errorf("runtime env snapshot version = %d, want 1", snapshot.Version)
+	}
+	if snapshot.WorkspaceSlug != ws.Slug {
+		return fmt.Errorf("runtime env snapshot slug = %q, want %q", snapshot.WorkspaceSlug, ws.Slug)
+	}
+	if !samePath(snapshot.CheckoutPath, ws.CheckoutPath) {
+		return fmt.Errorf("runtime env snapshot checkout = %q, want %q", snapshot.CheckoutPath, ws.CheckoutPath)
+	}
+	paths := RuntimePaths(ws.CheckoutPath, ws.MetadataDirName)
+	if webPID := runtime.PIDs[ComponentWeb]; webPID != 0 && snapshot.Web.PID != webPID {
+		return fmt.Errorf("web pid = %d, want %d", snapshot.Web.PID, webPID)
+	}
+	if tsPID := runtime.PIDs[ComponentTSWorker]; tsPID != 0 && snapshot.TSWorker.PID != tsPID {
+		return fmt.Errorf("ts worker pid = %d, want %d", snapshot.TSWorker.PID, tsPID)
+	}
+	if webPort := runtime.Ports[ComponentWeb]; webPort != 0 {
+		wantListen := "127.0.0.1:" + strconv.Itoa(webPort)
+		if snapshot.Web.ListenAddress != wantListen {
+			return fmt.Errorf("web listen address = %q, want %q", snapshot.Web.ListenAddress, wantListen)
+		}
+		wantCallback := "http://" + wantListen
+		if snapshot.Web.InternalCallbackBaseURL != wantCallback {
+			return fmt.Errorf("web internal callback base = %q, want %q", snapshot.Web.InternalCallbackBaseURL, wantCallback)
+		}
+	}
+	if !samePath(snapshot.Web.DatabasePath, paths.AgentsDB) {
+		return fmt.Errorf("web database path = %q, want %q", snapshot.Web.DatabasePath, paths.AgentsDB)
+	}
+	if !samePath(snapshot.Web.DefaultCWD, ws.CheckoutPath) {
+		return fmt.Errorf("web default cwd = %q, want %q", snapshot.Web.DefaultCWD, ws.CheckoutPath)
+	}
+	if temporalPort := runtime.Ports[ComponentTemporal]; temporalPort != 0 {
+		wantTemporal := "127.0.0.1:" + strconv.Itoa(temporalPort)
+		if snapshot.Web.TemporalAddress != wantTemporal {
+			return fmt.Errorf("web temporal address = %q, want %q", snapshot.Web.TemporalAddress, wantTemporal)
+		}
+		if snapshot.TSWorker.TemporalAddress != wantTemporal {
+			return fmt.Errorf("ts worker temporal address = %q, want %q", snapshot.TSWorker.TemporalAddress, wantTemporal)
+		}
+	}
+	if snapshot.TSWorker.TaskQueue != "agents-ts" {
+		return fmt.Errorf("ts worker task queue = %q, want agents-ts", snapshot.TSWorker.TaskQueue)
+	}
+	if snapshot.TSWorker.ReadyMarker != paths.TSReadyMarker {
+		return fmt.Errorf("ts worker ready marker = %q, want %q", snapshot.TSWorker.ReadyMarker, paths.TSReadyMarker)
+	}
+	if !samePath(snapshot.TSWorker.DefaultCWD, ws.CheckoutPath) {
+		return fmt.Errorf("ts worker default cwd = %q, want %q", snapshot.TSWorker.DefaultCWD, ws.CheckoutPath)
+	}
+	return nil
 }
 
 func ReadTSWorkerIdentityMarker(path string) (TSWorkerIdentityMarker, error) {

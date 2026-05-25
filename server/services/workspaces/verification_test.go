@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -141,7 +142,7 @@ func TestVerifierVerifyBundleReportsComponentHealth(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("WriteStatus: %v", err)
 	}
-	writeTestFile(t, paths.TSReadyMarker, "ready\n")
+	writeTSWorkerIdentityMarkerForTest(t, manager.workspace)
 	prober := &verificationFakeProber{
 		pidAlive:   true,
 		portOpen:   true,
@@ -179,6 +180,68 @@ func TestVerifierVerifyBundleReportsComponentHealth(t *testing.T) {
 	}
 	if !reflect.DeepEqual(manager.calls, []string{"refresh"}) {
 		t.Fatalf("manager calls = %#v, want refresh only", manager.calls)
+	}
+}
+
+func TestVerifierVerifyBundleFailsOnRuntimeEnvSnapshotMismatch(t *testing.T) {
+	t.Parallel()
+
+	manager := newVerificationFakeManager(t, "demo")
+	snapshot := BuildRuntimeEnvSnapshot(manager.workspace, RuntimeConfig{}, manager.workspace.Ports, manager.workspace.PIDs, time.Unix(100, 0))
+	snapshot.Web.InternalCallbackBaseURL = "http://localhost:4200"
+	if err := (FileBundleStore{}).WriteRuntimeEnvSnapshot(manager.workspace, snapshot); err != nil {
+		t.Fatalf("WriteRuntimeEnvSnapshot: %v", err)
+	}
+	verifier := NewVerifier(manager, ":4200", NewMemoryVerifyRunStore(), verificationFakeTailer{}, &verificationFakeProber{pidAlive: true, portOpen: true, statusCode: http.StatusOK})
+
+	run := verifier.VerifyBundle(context.Background(), "demo")
+
+	if run.Status != VerifyRunFailed {
+		t.Fatalf("status = %q, want failed", run.Status)
+	}
+	if !strings.Contains(strings.Join(run.Errors, "\n"), "callback base") {
+		t.Fatalf("errors = %#v, want callback base", run.Errors)
+	}
+}
+
+func TestVerifierVerifyBundleFailsOnTSWorkerIdentityMismatch(t *testing.T) {
+	t.Parallel()
+
+	manager := newVerificationFakeManager(t, "demo")
+	paths := RuntimePaths(manager.workspace.CheckoutPath)
+	writeTestFile(t, paths.TSReadyMarker, `{
+		"version": 1,
+		"pid": 103,
+		"started_at": "2026-05-24T20:00:00Z",
+		"workspace_slug": "other",
+		"checkout_path": "`+manager.workspace.CheckoutPath+`",
+		"temporal_address": "127.0.0.1:7233",
+		"task_queue": "agents-ts",
+		"ready_marker": "`+paths.TSReadyMarker+`"
+	}`)
+	verifier := NewVerifier(manager, ":4200", NewMemoryVerifyRunStore(), verificationFakeTailer{}, &verificationFakeProber{pidAlive: true, portOpen: true, statusCode: http.StatusOK})
+
+	run := verifier.VerifyBundle(context.Background(), "demo")
+
+	if run.Status != VerifyRunFailed {
+		t.Fatalf("status = %q, want failed", run.Status)
+	}
+	if !strings.Contains(strings.Join(run.Errors, "\n"), "ts worker identity") {
+		t.Fatalf("errors = %#v, want ts worker identity", run.Errors)
+	}
+}
+
+func TestVerifyRuntimeEnvSnapshotRejectsStaleCallback(t *testing.T) {
+	t.Parallel()
+
+	ws := Workspace{Slug: "demo", CheckoutPath: t.TempDir()}
+	runtime := RuntimeStatus{Ports: map[BundleComponent]int{ComponentWeb: 4101, ComponentTemporal: 7233}}
+	snapshot := BuildRuntimeEnvSnapshot(ws, RuntimeConfig{}, runtime.Ports, map[BundleComponent]int{}, time.Unix(100, 0))
+	snapshot.Web.InternalCallbackBaseURL = "http://localhost:4200"
+
+	err := VerifyRuntimeEnvSnapshot(ws, runtime, snapshot)
+	if err == nil || !strings.Contains(err.Error(), "callback base") {
+		t.Fatalf("VerifyRuntimeEnvSnapshot error = %v, want callback base", err)
 	}
 }
 
@@ -444,31 +507,60 @@ func newVerificationFakeManager(t *testing.T, slug string) *verificationFakeMana
 	stateDir := t.TempDir()
 	logPath := filepath.Join(stateDir, "agents-server.log")
 	writeTestFile(t, logPath, "log line\n")
-	if err := WriteMetadata(
-		WorkspaceMetadataPath(checkout),
-		WorkspaceMetadata{
-			Slug:         slug,
-			CheckoutPath: checkout,
-			ManagerURL:   "https://main.cn-agents.test",
-			PID:          101,
-			Port:         4101,
-		},
-	); err != nil {
-		t.Fatalf("WriteMetadata: %v", err)
+	paths := RuntimePaths(checkout)
+	if err := EnsureRuntimeDirs(paths); err != nil {
+		t.Fatalf("EnsureRuntimeDirs: %v", err)
 	}
-	return &verificationFakeManager{
-		workspace: Workspace{
-			Slug:         slug,
-			CheckoutPath: checkout,
-			Host:         slug + ".cn-agents.test",
-			URL:          "https://" + slug + ".cn-agents.test/",
-			Status:       StatusRunning,
-			Port:         4101,
-			PID:          101,
-			StateDir:     stateDir,
-			LogPath:      logPath,
+	metadata := WorkspaceMetadata{
+		Slug:         slug,
+		CheckoutPath: checkout,
+		ManagerURL:   "https://main.cn-agents.test",
+		PID:          101,
+		Port:         4101,
+	}
+	if err := WriteMetadata(WorkspaceMetadataPath(checkout), metadata); err != nil {
+		t.Fatalf("WriteMetadata legacy: %v", err)
+	}
+	if err := WriteMetadata(paths.WorkspaceEnv, metadata); err != nil {
+		t.Fatalf("WriteMetadata bundle: %v", err)
+	}
+	ws := Workspace{
+		Slug:         slug,
+		CheckoutPath: checkout,
+		Host:         slug + ".cn-agents.test",
+		URL:          "https://" + slug + ".cn-agents.test/",
+		Status:       StatusRunning,
+		Port:         4101,
+		PID:          101,
+		StateDir:     stateDir,
+		LogPath:      logPath,
+		Bundle:       paths,
+		Ports: map[BundleComponent]int{
+			ComponentWeb:        4101,
+			ComponentTemporal:   7233,
+			ComponentTemporalUI: 8233,
+		},
+		PIDs: map[BundleComponent]int{
+			ComponentWeb:      101,
+			ComponentTemporal: 102,
+			ComponentTSWorker: 103,
 		},
 	}
+	store := FileBundleStore{}
+	if err := store.WriteStatus(ws, RuntimeStatus{
+		Status: StatusRunning,
+		Logs:   bundleLogs(paths),
+		Ports:  ws.Ports,
+		PIDs:   ws.PIDs,
+		Build:  BuildStatus{LogPath: paths.BuildLog},
+	}); err != nil {
+		t.Fatalf("WriteStatus: %v", err)
+	}
+	if err := store.WriteRuntimeEnvSnapshot(ws, BuildRuntimeEnvSnapshot(ws, RuntimeConfig{}, ws.Ports, ws.PIDs, time.Unix(100, 0))); err != nil {
+		t.Fatalf("WriteRuntimeEnvSnapshot: %v", err)
+	}
+	writeTSWorkerIdentityMarkerForTest(t, ws)
+	return &verificationFakeManager{workspace: ws}
 }
 
 func (m *verificationFakeManager) Refresh(context.Context) error {
@@ -549,5 +641,24 @@ func (p *verificationFakeProber) HTTPHost(
 }
 
 func removeMetadataForTest(checkout string) error {
-	return os.Remove(WorkspaceMetadataPath(checkout))
+	if err := os.Remove(WorkspaceMetadataPath(checkout)); err != nil {
+		return err
+	}
+	return os.Remove(RuntimePaths(checkout).WorkspaceEnv)
+}
+
+func writeTSWorkerIdentityMarkerForTest(t *testing.T, ws Workspace) {
+	t.Helper()
+	paths := RuntimePaths(ws.CheckoutPath, ws.MetadataDirName)
+	marker := fmt.Sprintf(`{
+		"version": 1,
+		"pid": %d,
+		"started_at": "2026-05-24T20:00:00Z",
+		"workspace_slug": %q,
+		"checkout_path": %q,
+		"temporal_address": %q,
+		"task_queue": "agents-ts",
+		"ready_marker": %q
+	}`, ws.PIDs[ComponentTSWorker], ws.Slug, ws.CheckoutPath, "127.0.0.1:"+strconv.Itoa(ws.Ports[ComponentTemporal]), paths.TSReadyMarker)
+	writeTestFile(t, paths.TSReadyMarker, marker)
 }

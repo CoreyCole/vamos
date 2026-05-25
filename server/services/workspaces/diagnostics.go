@@ -143,6 +143,16 @@ func BuildWorkspaceDiagnostics(
 	if desiredStateErr == nil {
 		desiredStatePtr = &desiredState
 	}
+	var runtimeEnvSnapshotPtr *RuntimeEnvSnapshot
+	runtimeEnvSnapshot, runtimeEnvSnapshotErr := store.ReadRuntimeEnvSnapshot(ws)
+	if runtimeEnvSnapshotErr == nil {
+		runtimeEnvSnapshotPtr = &runtimeEnvSnapshot
+	}
+	var tsWorkerIdentityPtr *TSWorkerIdentityMarker
+	tsWorkerIdentity, tsWorkerIdentityErr := ReadTSWorkerIdentityMarker(paths.TSReadyMarker)
+	if tsWorkerIdentityErr == nil {
+		tsWorkerIdentityPtr = &tsWorkerIdentity
+	}
 
 	logPath := ws.LogPath
 	if logPath == "" && ws.StateDir != "" {
@@ -167,25 +177,33 @@ func BuildWorkspaceDiagnostics(
 		managerURL = metadataPtr.ManagerURL
 	}
 	diagnostics := WorkspaceDiagnostics{
-		Workspace:    ws,
-		Metadata:     metadataPtr,
-		MetadataRaw:  redactWorkspaceMetadataRaw(string(metadataRaw)),
-		MetadataPath: metadataPath,
-		RuntimeState: runtimeStatusPtr,
-		DesiredState: desiredStatePtr,
-		PIDAlive:     pidAlive,
-		PortOpen:     portOpen,
-		LogPath:      logPath,
-		LogTail:      logTail,
-		ManagerURL:   managerURL,
-		PublicURL:    ws.URL,
-		LatestError:  ws.Error,
+		Workspace:          ws,
+		Metadata:           metadataPtr,
+		MetadataRaw:        redactWorkspaceMetadataRaw(string(metadataRaw)),
+		MetadataPath:       metadataPath,
+		RuntimeState:       runtimeStatusPtr,
+		DesiredState:       desiredStatePtr,
+		RuntimeEnvSnapshot: runtimeEnvSnapshotPtr,
+		TSWorkerIdentity:   tsWorkerIdentityPtr,
+		PIDAlive:           pidAlive,
+		PortOpen:           portOpen,
+		LogPath:            logPath,
+		LogTail:            logTail,
+		ManagerURL:         managerURL,
+		PublicURL:          ws.URL,
+		LatestError:        ws.Error,
 	}
 	if runtimeStatusErr != nil {
 		diagnostics.RuntimeStatusError = runtimeStatusErr.Error()
 	}
 	if desiredStateErr != nil {
 		diagnostics.DesiredStateError = desiredStateErr.Error()
+	}
+	if runtimeEnvSnapshotErr != nil {
+		diagnostics.RuntimeEnvSnapshotError = runtimeEnvSnapshotErr.Error()
+	}
+	if tsWorkerIdentityErr != nil {
+		diagnostics.TSWorkerIdentityError = tsWorkerIdentityErr.Error()
 	}
 	return diagnostics, nil
 }

@@ -304,6 +304,7 @@ const (
 	VerificationLayerProxy            VerificationLayer = "proxy"
 	VerificationLayerHandoff          VerificationLayer = "handoff"
 	VerificationLayerBrowser          VerificationLayer = "browser"
+	VerificationLayerAgentChat        VerificationLayer = "agentchat"
 )
 
 type VerifyWorkspaceError struct {
@@ -323,21 +324,25 @@ type VerifyWorkspaceSnapshot struct {
 }
 
 type WorkspaceDiagnostics struct {
-	Workspace          Workspace          `json:"workspace"`
-	Metadata           *WorkspaceMetadata `json:"metadata,omitempty"`
-	MetadataRaw        string             `json:"metadata_raw,omitempty"`
-	MetadataPath       string             `json:"metadata_path"`
-	RuntimeState       *RuntimeStatus     `json:"runtime_status,omitempty"`
-	RuntimeStatusError string             `json:"runtime_status_error,omitempty"`
-	DesiredState       *DesiredState      `json:"desired_state,omitempty"`
-	DesiredStateError  string             `json:"desired_state_error,omitempty"`
-	PIDAlive           bool               `json:"pid_alive"`
-	PortOpen           bool               `json:"port_open"`
-	LogPath            string             `json:"log_path"`
-	LogTail            string             `json:"log_tail,omitempty"`
-	ManagerURL         string             `json:"manager_url"`
-	PublicURL          string             `json:"public_url"`
-	LatestError        string             `json:"latest_error,omitempty"`
+	Workspace               Workspace               `json:"workspace"`
+	Metadata                *WorkspaceMetadata      `json:"metadata,omitempty"`
+	MetadataRaw             string                  `json:"metadata_raw,omitempty"`
+	MetadataPath            string                  `json:"metadata_path"`
+	RuntimeState            *RuntimeStatus          `json:"runtime_status,omitempty"`
+	RuntimeStatusError      string                  `json:"runtime_status_error,omitempty"`
+	DesiredState            *DesiredState           `json:"desired_state,omitempty"`
+	DesiredStateError       string                  `json:"desired_state_error,omitempty"`
+	RuntimeEnvSnapshot      *RuntimeEnvSnapshot     `json:"runtime_env_snapshot,omitempty"`
+	RuntimeEnvSnapshotError string                  `json:"runtime_env_snapshot_error,omitempty"`
+	TSWorkerIdentity        *TSWorkerIdentityMarker `json:"ts_worker_identity,omitempty"`
+	TSWorkerIdentityError   string                  `json:"ts_worker_identity_error,omitempty"`
+	PIDAlive                bool                    `json:"pid_alive"`
+	PortOpen                bool                    `json:"port_open"`
+	LogPath                 string                  `json:"log_path"`
+	LogTail                 string                  `json:"log_tail,omitempty"`
+	ManagerURL              string                  `json:"manager_url"`
+	PublicURL               string                  `json:"public_url"`
+	LatestError             string                  `json:"latest_error,omitempty"`
 }
 
 type VerifyWorkspaceRequest struct {
