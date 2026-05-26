@@ -3026,6 +3026,10 @@ func (s *Service) BuildThreadPageArgs(
 	}
 	args.PlanSidebar.TargetID = "agent-chat-thread-sidebar"
 	args.Workflow, _ = s.BuildWorkspaceWorkflowState(ctx, primary)
+	args.Workflow.ThreadID = thread.ID
+	if args.Workflow.LastResultCard != nil {
+		args.Workflow.LastResultCard.ThreadID = thread.ID
+	}
 	args.Transcript.Stable = attachQRSPIWorkflowCardToLatestAssistantMessage(
 		args.Transcript.Stable,
 		args.Workflow.LastResultCard,

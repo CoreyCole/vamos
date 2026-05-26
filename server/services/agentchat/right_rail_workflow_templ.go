@@ -175,9 +175,9 @@ func WorkspaceWorkflowPanel(state WorkspaceWorkflowState) templ.Component {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var7 string
-			templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.JoinStringErrs("@post('/agent-chat/" + state.WorkspaceID + "/workflow/policy', {contentType: 'form'})")
+			templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.JoinStringErrs(workflowPolicyAction(state))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/right_rail_workflow.templ`, Line: 60, Col: 115}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/right_rail_workflow.templ`, Line: 60, Col: 55}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var7))
 			if templ_7745c5c3_Err != nil {
@@ -390,9 +390,9 @@ func WorkspaceWorkflowPanel(state WorkspaceWorkflowState) templ.Component {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var16 string
-			templ_7745c5c3_Var16, templ_7745c5c3_Err = templ.JoinStringErrs("@post('/agent-chat/" + state.WorkspaceID + "/workflow/advance', {contentType: 'form'})")
+			templ_7745c5c3_Var16, templ_7745c5c3_Err = templ.JoinStringErrs(workflowAdvanceAction(state))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/right_rail_workflow.templ`, Line: 99, Col: 129}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/right_rail_workflow.templ`, Line: 99, Col: 69}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var16))
 			if templ_7745c5c3_Err != nil {

@@ -5,37 +5,61 @@ templ QRSPIWorkflowCardView(card QRSPIWorkflowCard) {
 		<article class="rounded-xl border border-border bg-card p-4 shadow-sm">
 			<div class="flex items-start justify-between gap-3">
 				<div>
-					<p class="text-sm font-semibold text-foreground">QRSPI { card.Stage } complete</p>
-					<p class="text-xs text-muted-foreground">Outcome: { card.Outcome } · Status: { card.Status }</p>
+					<p class="text-sm font-semibold text-foreground">QRSPI result</p>
+					<p class="text-xs text-muted-foreground">{ card.Stage } · { card.Status }</p>
 				</div>
 				if card.WaitingHuman {
 					<span class="rounded-full bg-amber-500/10 px-2 py-0.5 text-xs text-amber-600">Waiting for you</span>
 				}
 			</div>
-			if card.Summary != "" {
-				<p class="mt-3 text-sm text-foreground">{ card.Summary }</p>
-			}
-			<div class="mt-3 grid gap-2 text-xs text-muted-foreground">
-				if card.PrimaryArtifact != "" {
-					<a class="break-words text-primary underline-offset-2 hover:underline" href={ workspaceArtifactHref(card.WorkspaceID, card.PrimaryArtifact) }>Artifact: { card.PrimaryArtifact }</a>
+			<table class="mt-3 w-full table-fixed text-sm">
+				<tbody class="divide-y divide-border">
+					@QRSPIResultRow("Stage", card.Stage)
+					@QRSPIResultRow("Status", card.Status)
+					@QRSPIResultRow("Outcome", card.Outcome)
+					@QRSPIResultRow("Policy", card.Policy.ModeLabel+" · "+card.Policy.ReviewLabel+" · "+card.Policy.RetryLabel)
+					@QRSPIResultRow("Workspace", card.Cwd.Label)
+					@QRSPIResultRow("Summary", card.Summary)
+					if card.PrimaryArtifact != "" {
+						<tr>
+							<th class="w-28 py-2 pr-3 text-left align-top text-xs font-medium uppercase tracking-wide text-muted-foreground">Artifact</th>
+							<td class="break-words py-2 text-foreground"><a class="text-primary underline-offset-2 hover:underline" href={ workspaceArtifactHref(card.WorkspaceID, card.PrimaryArtifact) }>{ card.PrimaryArtifact }</a></td>
+						</tr>
+					}
+					@QRSPIResultRow("Next", card.RuntimeNextStep)
+				</tbody>
+			</table>
+			<div class="mt-3 flex flex-wrap gap-2">
+				if card.WaitingHuman && card.ThreadID != "" {
+					<form data-on:submit={ "@post('/agent-chat/thread/" + card.ThreadID + "/workflow/advance', {contentType: 'form'})" }>
+						<button type="submit" class="rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90">Proceed</button>
+					</form>
+				} else if card.WaitingHuman {
+					<form data-on:submit={ "@post('/agent-chat/" + card.WorkspaceID + "/workflow/advance', {contentType: 'form'})" }>
+						<button type="submit" class="rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90">Proceed</button>
+					</form>
 				}
-				if card.RuntimeNextStep != "" {
-					<p>Next stage: <span class="text-foreground">{ card.RuntimeNextStep }</span></p>
+				if card.RuntimeNextStep != "" && card.ThreadID != "" {
+					<form data-on:submit={ "@post('/agent-chat/thread/" + card.ThreadID + "/workflow/next', {contentType: 'form'})" }>
+						<button type="submit" class="rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground hover:bg-muted">Start next thread</button>
+					</form>
 				}
-				<p>Cwd: <span class="text-foreground">{ card.Cwd.Label }</span> · { card.Cwd.Scope }</p>
-				<p>Policy: { card.Policy.ModeLabel } · { card.Policy.ReviewLabel } · { card.Policy.RetryLabel }</p>
 			</div>
-			if card.WaitingHuman {
-				<form class="mt-3" data-on:submit={ "@post('/agent-chat/" + card.WorkspaceID + "/workflow/advance', {contentType: 'form'})" }>
-					<button type="submit" class="rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90">Proceed</button>
-				</form>
-			}
 			if card.RawXML != "" {
 				<details class="mt-3">
-					<summary class="cursor-pointer text-xs text-muted-foreground">Show raw workflow result</summary>
+					<summary class="cursor-pointer text-xs text-muted-foreground">Raw workflow result / debug</summary>
 					<pre class="mt-2 overflow-x-auto whitespace-pre-wrap rounded-md bg-muted p-2 text-xs text-muted-foreground"><code>{ card.RawXML }</code></pre>
 				</details>
 			}
 		</article>
 	</div>
+}
+
+templ QRSPIResultRow(label string, value string) {
+	if value != "" {
+		<tr>
+			<th class="w-28 py-2 pr-3 text-left align-top text-xs font-medium uppercase tracking-wide text-muted-foreground">{ label }</th>
+			<td class="break-words py-2 text-foreground">{ value }</td>
+		</tr>
+	}
 }

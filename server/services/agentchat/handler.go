@@ -124,6 +124,9 @@ func (h *Handler) RegisterRuntimeRoutes(g *echo.Group) {
 	g.GET("/plan-workspace", h.OpenPlanWorkspace)
 	g.GET("/document/open", h.OpenDocumentChat)
 	g.POST("/document/open", h.OpenDocumentChat)
+	g.POST("/thread/:thread_id/workflow/advance", h.AdvanceThreadWorkflow)
+	g.POST("/thread/:thread_id/workflow/policy", h.UpdateThreadWorkflowPolicy)
+	g.POST("/thread/:thread_id/workflow/next", h.CreateNextQRSPIThread)
 	g.GET("/:workspace_id/stream", h.StreamWorkspace)
 	g.POST("/:workspace_id/send", h.SendWorkspacePrompt)
 	g.POST("/:workspace_id/workflow/advance", h.AdvanceWorkspaceWorkflow)
@@ -1442,6 +1445,34 @@ func (h *Handler) AttachCurrentDocToEmbeddedChat(c echo.Context) error {
 	)
 }
 
+func (h *Handler) AdvanceThreadWorkflow(c echo.Context) error {
+	userEmail, ok := c.Get("user_email").(string)
+	if !ok || userEmail == "" {
+		return echo.NewHTTPError(http.StatusUnauthorized, "not authenticated")
+	}
+	threadID := strings.TrimSpace(c.Param("thread_id"))
+	workspace, ok, err := h.service.ResolvePrimaryWorkspaceForThread(c.Request().Context(), userEmail, threadID)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
+	}
+	if !ok {
+		return echo.NewHTTPError(http.StatusNotFound, "primary workspace not found")
+	}
+	if _, err := h.service.AdvanceWorkflowHumanGate(
+		c.Request().Context(),
+		workspace.ID,
+		userEmail,
+	); err != nil {
+		status := http.StatusBadRequest
+		if errors.Is(err, sql.ErrNoRows) {
+			status = http.StatusNotFound
+		}
+		return echo.NewHTTPError(status, err.Error())
+	}
+	sse := datastar.NewSSE(c.Response().Writer, c.Request())
+	return h.patchThread(c, sse, threadID, PatchThreadPage)
+}
+
 func (h *Handler) AdvanceWorkspaceWorkflow(c echo.Context) error {
 	userEmail, ok := c.Get("user_email").(string)
 	if !ok || userEmail == "" {
@@ -1461,6 +1492,54 @@ func (h *Handler) AdvanceWorkspaceWorkflow(c echo.Context) error {
 	}
 	sse := datastar.NewSSE(c.Response().Writer, c.Request())
 	return h.patchWorkspaceResource(c, sse)
+}
+
+func (h *Handler) UpdateThreadWorkflowPolicy(c echo.Context) error {
+	userEmail, ok := c.Get("user_email").(string)
+	if !ok || userEmail == "" {
+		return echo.NewHTTPError(http.StatusUnauthorized, "not authenticated")
+	}
+	threadID := strings.TrimSpace(c.Param("thread_id"))
+	workspace, ok, err := h.service.ResolvePrimaryWorkspaceForThread(c.Request().Context(), userEmail, threadID)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
+	}
+	if !ok {
+		return echo.NewHTTPError(http.StatusNotFound, "primary workspace not found")
+	}
+	retryLimit, err := strconv.Atoi(
+		strings.TrimSpace(c.FormValue("invalidResultRetryLimit")),
+	)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid retry limit")
+	}
+	if _, err := h.service.UpdateWorkspaceWorkflowPolicy(
+		c.Request().Context(),
+		UpdateWorkspaceWorkflowPolicyInput{
+			WorkspaceID:             workspace.ID,
+			UserEmail:               userEmail,
+			AutoMode:                c.FormValue("autoMode") == "on",
+			EnablePlanReviews:       c.FormValue("enablePlanReviews") == "on",
+			InvalidResultRetryLimit: retryLimit,
+		},
+	); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
+	}
+	sse := datastar.NewSSE(c.Response().Writer, c.Request())
+	return h.patchThread(c, sse, threadID, PatchThreadPage)
+}
+
+func (h *Handler) CreateNextQRSPIThread(c echo.Context) error {
+	userEmail, ok := c.Get("user_email").(string)
+	if !ok || userEmail == "" {
+		return echo.NewHTTPError(http.StatusUnauthorized, "not authenticated")
+	}
+	thread, err := h.service.CreateNextQRSPIThread(c.Request().Context(), userEmail, c.Param("thread_id"))
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
+	}
+	sse := datastar.NewSSE(c.Response().Writer, c.Request())
+	return sse.Redirect("/agent-chat?thread=" + url.QueryEscape(thread.ID))
 }
 
 func (h *Handler) UpdateWorkspaceWorkflowPolicy(c echo.Context) error {
@@ -2805,12 +2884,22 @@ func (h *Handler) patchThreadPage(
 	sse *datastar.ServerSentEventGenerator,
 	scope StreamPatchScope,
 ) error {
+	threadID := firstNonEmpty(c.QueryParam("thread"), c.Param("thread_id"), c.FormValue("thread_id"))
+	return h.patchThread(c, sse, threadID, scope)
+}
+
+func (h *Handler) patchThread(
+	c echo.Context,
+	sse *datastar.ServerSentEventGenerator,
+	threadID string,
+	scope StreamPatchScope,
+) error {
 	userEmail, ok := c.Get("user_email").(string)
 	if !ok || userEmail == "" {
 		return nil
 	}
 
-	threadID := strings.TrimSpace(c.QueryParam("thread"))
+	threadID = strings.TrimSpace(threadID)
 	if scope == PatchLiveTranscript {
 		state, err := h.service.BuildLiveTranscriptState(
 			c.Request().Context(),

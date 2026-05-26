@@ -8,6 +8,7 @@ import (
 )
 
 type QRSPIWorkflowCard struct {
+	ThreadID        string
 	WorkspaceID     string
 	Stage           string
 	Status          string
@@ -29,6 +30,7 @@ func ProjectQRSPIWorkflowCard(
 	cwd WorkspaceCwdProjection,
 	nextLabel string,
 	workspaceID string,
+	threadID string,
 ) (*QRSPIWorkflowCard, error) {
 	if strings.TrimSpace(string(runResult.SourceNodeID)) == "" {
 		return nil, nil
@@ -44,6 +46,7 @@ func ProjectQRSPIWorkflowCard(
 		}
 	}
 	return &QRSPIWorkflowCard{
+		ThreadID:        strings.TrimSpace(threadID),
 		WorkspaceID:     workspaceID,
 		Stage:           string(runResult.SourceNodeID),
 		Status:          string(runResult.Status),

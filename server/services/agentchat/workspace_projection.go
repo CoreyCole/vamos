@@ -149,6 +149,10 @@ func (s *Service) BuildWorkspacePageArgs(
 		100,
 	)
 	projection.Workflow, _ = s.BuildWorkspaceWorkflowState(ctx, workspace)
+	projection.Workflow.ThreadID = threadID
+	if projection.Workflow.LastResultCard != nil {
+		projection.Workflow.LastResultCard.ThreadID = threadID
+	}
 	projection.Transcript.Stable = attachQRSPIWorkflowCardToLatestAssistantMessage(
 		projection.Transcript.Stable,
 		projection.Workflow.LastResultCard,
@@ -1322,6 +1326,7 @@ func (s *Service) BuildWorkspaceWorkflowState(
 					DisplayNext:     runtimeState.LastResult.DisplayNext,
 					Workspace:       runtimeState.LastResult.Workspace,
 					Outcome:         runtimeState.LastResult.Outcome,
+					Raw:             runtimeState.LastResult.Raw,
 				}
 				card, err := ProjectQRSPIWorkflowCard(
 					runtimeState,
@@ -1330,6 +1335,7 @@ func (s *Service) BuildWorkspaceWorkflowState(
 					state.ActiveCwd,
 					state.RuntimeNextStep,
 					workspace.ID,
+					strings.TrimSpace(workspace.SelectedThreadID.String),
 				)
 				if err != nil {
 					return WorkspaceWorkflowState{}, err

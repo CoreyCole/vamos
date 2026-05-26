@@ -48,6 +48,7 @@ func DecideTransition(
 		DisplayNext:     result.DisplayNext,
 		Workspace:       result.Workspace,
 		Outcome:         result.Outcome,
+		Raw:             result.Raw,
 	}
 	nodeState := state.Nodes[result.SourceNodeID]
 	nodeState.LastRunID = result.Evidence.RunID

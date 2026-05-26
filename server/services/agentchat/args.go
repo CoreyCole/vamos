@@ -514,6 +514,7 @@ type WorkspaceCwdProjection struct {
 
 type WorkspaceWorkflowState struct {
 	WorkspaceID       string
+	ThreadID          string
 	Type              WorkspaceWorkflowType
 	CurrentStep       string
 	Status            string

@@ -56,11 +56,13 @@ func TestProjectQRSPIWorkflowCardUsesRuntimeProjection(t *testing.T) {
 		cwd,
 		"Human Review Outline",
 		"workspace-1",
+		"thread-1",
 	)
 	if err != nil {
 		t.Fatalf("ProjectQRSPIWorkflowCard() error = %v", err)
 	}
 	if card == nil || card.RuntimeNextStep != "Human Review Outline" ||
+		card.ThreadID != "thread-1" ||
 		card.PrimaryArtifact != "thoughts/example/outline.md" ||
 		!card.WaitingHuman || card.Policy.ModeLabel != policy.ModeLabel ||
 		card.Cwd.Path != cwd.Path {
@@ -70,6 +72,7 @@ func TestProjectQRSPIWorkflowCardUsesRuntimeProjection(t *testing.T) {
 
 func TestQRSPIWorkflowCardViewDoesNotRenderDisplayNextAsCommand(t *testing.T) {
 	card := QRSPIWorkflowCard{
+		ThreadID:        "thread-1",
 		WorkspaceID:     "workspace-1",
 		Stage:           string(qrspi.NodeOutline),
 		Status:          string(wruntime.StatusComplete),
@@ -101,8 +104,11 @@ func TestQRSPIWorkflowCardViewDoesNotRenderDisplayNextAsCommand(t *testing.T) {
 	if strings.Contains(rendered, "/q-review") {
 		t.Fatalf("rendered card leaked display slash command: %s", rendered)
 	}
-	if !strings.Contains(rendered, "/workflow/advance") {
-		t.Fatalf("rendered card missing proceed form: %s", rendered)
+	if !strings.Contains(rendered, "/agent-chat/thread/thread-1/workflow/advance") {
+		t.Fatalf("rendered card missing thread proceed form: %s", rendered)
+	}
+	if strings.Contains(rendered, "/agent-chat/workspace-1/workflow/advance") {
+		t.Fatalf("rendered card leaked workspace action URL: %s", rendered)
 	}
 }
 

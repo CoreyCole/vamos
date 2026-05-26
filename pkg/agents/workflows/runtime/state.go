@@ -52,14 +52,15 @@ type NodeState struct {
 }
 
 type WorkflowResultSnapshot struct {
-	SourceNodeID    NodeID        `json:"source_node_id"`
-	Status          string        `json:"status"`
-	Summary         string        `json:"summary"`
-	PrimaryArtifact string        `json:"primary_artifact,omitempty"`
-	Artifacts       []ArtifactRef `json:"artifacts,omitempty"`
-	DisplayNext     string        `json:"display_next,omitempty"`
-	Workspace       string        `json:"workspace,omitempty"`
-	Outcome         ResultOutcome `json:"outcome,omitempty"`
+	SourceNodeID    NodeID          `json:"source_node_id"`
+	Status          string          `json:"status"`
+	Summary         string          `json:"summary"`
+	PrimaryArtifact string          `json:"primary_artifact,omitempty"`
+	Artifacts       []ArtifactRef   `json:"artifacts,omitempty"`
+	DisplayNext     string          `json:"display_next,omitempty"`
+	Workspace       string          `json:"workspace,omitempty"`
+	Outcome         ResultOutcome   `json:"outcome,omitempty"`
+	Raw             json.RawMessage `json:"raw,omitempty"`
 }
 
 type HumanGateState struct {
