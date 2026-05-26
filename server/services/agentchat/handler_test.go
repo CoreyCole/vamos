@@ -361,20 +361,7 @@ func TestInternalAgentChatRoutesTrustBoundary(t *testing.T) {
 func TestCompatThreadQueryRedirectsToWorkspaceThread(t *testing.T) {
 	service := newTestAgentChatService(t)
 	handler := NewHandler(service, nil)
-	root := filepath.Join(t.TempDir(), "thoughts")
-	planDir := filepath.Join(root, "creative-mode-agent", "plans", "2026-04-30_test-plan")
-	if err := os.MkdirAll(planDir, 0o755); err != nil {
-		t.Fatalf("MkdirAll(planDir) error = %v", err)
-	}
-	service.thoughtsRoot = root
-	thread := mustCreateAgentThread(
-		t,
-		service,
-		"thread-1",
-		"user@example.com",
-		planDir,
-		"lineage-1",
-	)
+	thread := mustCreateAgentThread(t, service, "thread-1", "user@example.com", service.defaultCwd, "lineage-1")
 
 	req := httptest.NewRequest(http.MethodGet, "/agent-chat?thread=thread-1", nil)
 	rec := httptest.NewRecorder()
@@ -384,47 +371,24 @@ func TestCompatThreadQueryRedirectsToWorkspaceThread(t *testing.T) {
 	if err := handler.HandleAgentChatIndex(c); err != nil {
 		t.Fatalf("HandleAgentChatIndex() error = %v", err)
 	}
-	if rec.Code != http.StatusFound {
-		t.Fatalf("status = %d, want %d", rec.Code, http.StatusFound)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
 	}
-
-	workspaceRecord, err := service.queries.GetPrimaryWorkspaceForThread(t.Context(), db.GetPrimaryWorkspaceForThreadParams{ThreadID: thread.ID, UserEmail: "user@example.com"})
-	if err != nil {
-		t.Fatalf("GetWorkspace() error = %v", err)
+	if got := rec.Header().Get("Location"); got != "" {
+		t.Fatalf("Location = %q, want no redirect", got)
 	}
-	wantLocation := workspaceThreadHrefForWorkspace(workspaceRecord, thread.ID)
-	if got := rec.Header().Get("Location"); got != wantLocation {
-		t.Fatalf("Location = %q, want %q", got, wantLocation)
+	if _, ok, err := service.ResolvePrimaryWorkspaceForThread(t.Context(), "user@example.com", thread.ID); err != nil || ok {
+		t.Fatalf("primary workspace = ok %v err %v, want no route-created workspace", ok, err)
 	}
 }
 
 func TestCompatThreadQueryRedirectPreservesRun(t *testing.T) {
-	t.Parallel()
-
 	service := newTestAgentChatService(t)
 	handler := NewHandler(service, nil)
-	root := filepath.Join(t.TempDir(), "thoughts")
-	planDir := filepath.Join(root, "creative-mode-agent", "plans", "2026-04-30_test-plan")
-	if err := os.MkdirAll(planDir, 0o755); err != nil {
-		t.Fatalf("MkdirAll(planDir) error = %v", err)
-	}
-	service.thoughtsRoot = root
-	thread := mustCreateAgentThread(
-		t,
-		service,
-		"thread-run-preserved",
-		"user@example.com",
-		planDir,
-		"lineage-run-preserved",
-	)
+	thread := mustCreateAgentThread(t, service, "thread-run-preserved", "user@example.com", service.defaultCwd, "lineage-run-preserved")
 	mustCreateAgentRun(t, service, thread.ID, "run-1")
 
-	req := httptest.NewRequestWithContext(
-		t.Context(),
-		http.MethodGet,
-		"/agent-chat?thread=thread-run-preserved&run=run-1",
-		http.NoBody,
-	)
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/agent-chat?thread=thread-run-preserved&run=run-1", http.NoBody)
 	rec := httptest.NewRecorder()
 	c := echo.New().NewContext(req, rec)
 	c.Set("user_email", "user@example.com")
@@ -432,32 +396,18 @@ func TestCompatThreadQueryRedirectPreservesRun(t *testing.T) {
 	if err := handler.HandleAgentChatIndex(c); err != nil {
 		t.Fatalf("HandleAgentChatIndex() error = %v", err)
 	}
-	if rec.Code != http.StatusFound {
-		t.Fatalf("status = %d, want %d", rec.Code, http.StatusFound)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
 	}
-
-	workspaceRecord, err := service.queries.GetPrimaryWorkspaceForThread(t.Context(), db.GetPrimaryWorkspaceForThreadParams{ThreadID: thread.ID, UserEmail: "user@example.com"})
-	if err != nil {
-		t.Fatalf("GetWorkspace() error = %v", err)
-	}
-	wantLocation := workspaceThreadHrefForWorkspace(
-		workspaceRecord,
-		thread.ID,
-	) + "&run=run-1"
-	if got := rec.Header().Get("Location"); got != wantLocation {
-		t.Fatalf("Location = %q, want %q", got, wantLocation)
+	if !strings.Contains(rec.Body.String(), "/agent-chat/stream?thread=thread-run-preserved&amp;run=run-1") && !strings.Contains(rec.Body.String(), "/agent-chat/stream?thread=thread-run-preserved&run=run-1") {
+		t.Fatalf("body missing thread stream with run id: %s", rec.Body.String())
 	}
 	storedRun, err := service.queries.GetAgentRun(t.Context(), "run-1")
 	if err != nil {
 		t.Fatalf("GetAgentRun() error = %v", err)
 	}
-	if !storedRun.WorkspaceID.Valid ||
-		storedRun.WorkspaceID.String != workspaceRecord.ID {
-		t.Fatalf(
-			"run WorkspaceID = %v, want %s",
-			storedRun.WorkspaceID,
-			workspaceRecord.ID,
-		)
+	if storedRun.WorkspaceID.Valid {
+		t.Fatalf("run WorkspaceID = %v, want no route-created workspace", storedRun.WorkspaceID)
 	}
 }
 
@@ -1627,129 +1577,64 @@ func TestWorkspaceRouteRendersWithoutSelectedThread(t *testing.T) {
 	handler := NewHandler(service, nil)
 	workspace := mustCreateWorkspaceForHandlerTest(t, service, "user@example.com")
 
-	req := httptest.NewRequest(http.MethodGet, "/agent-chat/"+workspace.ID, nil)
+	req := httptest.NewRequest(http.MethodGet, "/agent-chat/"+workspace.ID, http.NoBody)
 	rec := httptest.NewRecorder()
 	c := echo.New().NewContext(req, rec)
 	c.Set("user_email", "user@example.com")
 	c.SetParamNames("workspace_id")
 	c.SetParamValues(workspace.ID)
 
-	if err := handler.HandleWorkspacePage(c); err != nil {
-		t.Fatalf("HandleWorkspacePage() error = %v", err)
+	err := handler.HandleWorkspacePage(c)
+	if err == nil {
+		t.Fatal("HandleWorkspacePage() error = nil, want gone")
 	}
-	body := rec.Body.String()
-	if !strings.Contains(body, "agent-chat-workspace-shell") {
-		t.Fatalf("workspace shell not rendered: %s", body)
-	}
-	if !strings.Contains(body, "agent-chat-workspace-resource") {
-		t.Fatalf("workspace resource not rendered under shell: %s", body)
-	}
-	assertWorkspaceSidebarExpandedForEmptySelection(t, body)
-	if !strings.Contains(body, "agent-chat-stable-transcript") ||
-		!strings.Contains(body, "agent-chat-live-transcript") ||
-		!strings.Contains(body, "agent-chat-workspace-composer") {
-		t.Fatalf("empty workspace missing narrow patch targets: %s", body)
+	httpErr, ok := err.(*echo.HTTPError)
+	if !ok || httpErr.Code != http.StatusGone {
+		t.Fatalf("HandleWorkspacePage() error = %v, want 410 Gone", err)
 	}
 }
 
-func TestWorkspaceRouteWithoutThreadKeepsSidebarVisibleWithPersistedSelection(
-	t *testing.T,
-) {
-	t.Parallel()
-
-	ctx := t.Context()
+func TestWorkspaceRouteWithoutThreadKeepsSidebarVisibleWithPersistedSelection(t *testing.T) {
 	service := newTestAgentChatService(t)
 	handler := NewHandler(service, nil)
-	workspace, thread := mustCreateWorkspaceThreadForHandlerTest(
-		t,
-		service,
-		"user@example.com",
-	)
-	if err := service.queries.UpdateWorkspaceSelectedThread(
-		ctx,
-		db.UpdateWorkspaceSelectedThreadParams{
-			ID:               workspace.ID,
-			SelectedThreadID: sql.NullString{String: thread.ID, Valid: true},
-		},
-	); err != nil {
-		t.Fatalf("UpdateWorkspaceSelectedThread() error = %v", err)
-	}
+	workspace := mustCreateWorkspaceForHandlerTest(t, service, "user@example.com")
 
-	req := httptest.NewRequestWithContext(
-		ctx,
-		http.MethodGet,
-		"/agent-chat/"+workspace.ID,
-		http.NoBody,
-	)
+	req := httptest.NewRequest(http.MethodGet, "/agent-chat/"+workspace.ID, http.NoBody)
 	rec := httptest.NewRecorder()
 	c := echo.New().NewContext(req, rec)
 	c.Set("user_email", "user@example.com")
 	c.SetParamNames("workspace_id")
 	c.SetParamValues(workspace.ID)
 
-	if err := handler.HandleWorkspacePage(c); err != nil {
-		t.Fatalf("HandleWorkspacePage() error = %v", err)
+	err := handler.HandleWorkspacePage(c)
+	if err == nil {
+		t.Fatal("HandleWorkspacePage() error = nil, want gone")
 	}
-	body := rec.Body.String()
-	assertWorkspaceSidebarExpandedForEmptySelection(t, body)
-	if strings.Contains(body, "stream?thread="+thread.ID) {
-		t.Fatalf(
-			"workspace route without thread should not restore persisted selection: %s",
-			body,
-		)
+	httpErr, ok := err.(*echo.HTTPError)
+	if !ok || httpErr.Code != http.StatusGone {
+		t.Fatalf("HandleWorkspacePage() error = %v, want 410 Gone", err)
 	}
 }
 
 func TestWorkspaceResourceKeepsShellSignalsAndTextareaGuards(t *testing.T) {
 	service := newTestAgentChatService(t)
 	handler := NewHandler(service, nil)
-	workspace, _ := mustCreateWorkspaceThreadForHandlerTest(
-		t,
-		service,
-		"user@example.com",
-	)
+	workspace := mustCreateWorkspaceForHandlerTest(t, service, "user@example.com")
 
-	req := httptest.NewRequest(http.MethodGet, "/agent-chat/"+workspace.ID, nil)
+	req := httptest.NewRequest(http.MethodGet, "/agent-chat/"+workspace.ID, http.NoBody)
 	rec := httptest.NewRecorder()
 	c := echo.New().NewContext(req, rec)
 	c.Set("user_email", "user@example.com")
 	c.SetParamNames("workspace_id")
 	c.SetParamValues(workspace.ID)
 
-	if err := handler.HandleWorkspacePage(c); err != nil {
-		t.Fatalf("HandleWorkspacePage() error = %v", err)
+	err := handler.HandleWorkspacePage(c)
+	if err == nil {
+		t.Fatal("HandleWorkspacePage() error = nil, want gone")
 	}
-	body := rec.Body.String()
-	if !strings.Contains(body, `id="agent-chat-workspace-shell"`) ||
-		!strings.Contains(body, `data-signals="{showDetails`) {
-		t.Fatalf("workspace shell did not own data-signals: %s", body)
-	}
-	if !strings.Contains(body, `id="agent-chat-workspace-resource"`) {
-		t.Fatalf("workspace resource missing: %s", body)
-	}
-	if strings.Index(body, `id="agent-chat-workspace-shell"`) < 0 ||
-		strings.Index(body, `id="agent-chat-workspace-resource"`) < 0 ||
-		strings.Index(
-			body,
-			`id="agent-chat-workspace-shell"`,
-		) > strings.Index(
-			body,
-			`id="agent-chat-workspace-resource"`,
-		) {
-		t.Fatalf("workspace resource did not render after shell start: %s", body)
-	}
-	for _, want := range []string{
-		`mobilePane: &#34;chat&#34;`,
-		`agent_chat_thread_sheet`,
-		`name="prompt"`,
-		`data-ignore-morph`,
-		`id="agent-chat-live-transcript"`,
-		`id="agent-chat-chat-region"`,
-		`id="agent-chat-chat-pane"`,
-	} {
-		if !strings.Contains(body, want) {
-			t.Fatalf("workspace page missing %s: %s", want, body)
-		}
+	httpErr, ok := err.(*echo.HTTPError)
+	if !ok || httpErr.Code != http.StatusGone {
+		t.Fatalf("HandleWorkspacePage() error = %v, want 410 Gone", err)
 	}
 }
 
@@ -1894,95 +1779,24 @@ func assertMobileDrawerMarkup(t *testing.T, body string) {
 }
 
 func TestWorkspaceRouteRendersSelectedThreadWithWorkspaceForkAction(t *testing.T) {
-	t.Parallel()
-
 	service := newTestAgentChatService(t)
 	handler := NewHandler(service, nil)
-	workspace, thread := mustCreateWorkspaceThreadForHandlerTest(
-		t,
-		service,
-		"user@example.com",
-	)
-	entryID := "user-1"
-	if err := service.queries.CreateAgentEntry(
-		t.Context(),
-		db.CreateAgentEntryParams{
-			LineageID:        thread.LineageID,
-			EntryID:          entryID,
-			ParentEntryID:    sql.NullString{},
-			EntryType:        "user",
-			OriginOrder:      1,
-			PayloadJson:      `{"content":"hello"}`,
-			OriginThreadID:   thread.ID,
-			OriginRunID:      sql.NullString{},
-			OriginSessionID:  sql.NullString{},
-			SessionTimestamp: time.Now().UTC(),
-		},
-	); err != nil {
-		t.Fatalf("CreateAgentEntry() error = %v", err)
-	}
-	if err := service.queries.UpdateAgentThreadHead(
-		t.Context(),
-		db.UpdateAgentThreadHeadParams{
-			ID:          thread.ID,
-			HeadEntryID: sql.NullString{String: entryID, Valid: true},
-		},
-	); err != nil {
-		t.Fatalf("UpdateAgentThreadHead() error = %v", err)
-	}
+	workspace := mustCreateWorkspaceForHandlerTest(t, service, "user@example.com")
 
-	req := httptest.NewRequestWithContext(
-		t.Context(),
-		http.MethodGet,
-		workspaceThreadHrefForWorkspace(workspace, thread.ID),
-		http.NoBody,
-	)
+	req := httptest.NewRequest(http.MethodGet, "/agent-chat/"+workspace.ID, http.NoBody)
 	rec := httptest.NewRecorder()
 	c := echo.New().NewContext(req, rec)
 	c.Set("user_email", "user@example.com")
-	c.SetParamNames("workspace_id", "thread_id")
-	c.SetParamValues(workspace.ID, thread.ID)
+	c.SetParamNames("workspace_id")
+	c.SetParamValues(workspace.ID)
 
-	if err := handler.HandleWorkspacePage(c); err != nil {
-		t.Fatalf("HandleWorkspacePage() error = %v", err)
+	err := handler.HandleWorkspacePage(c)
+	if err == nil {
+		t.Fatal("HandleWorkspacePage() error = nil, want gone")
 	}
-	body := rec.Body.String()
-	assertWorkspaceSidebarMinimizedForSelectedThread(t, body)
-	postSelectionPath := `/thread` + `/select`
-	if strings.Contains(body, postSelectionPath) {
-		t.Fatalf("workspace sidebar still renders POST selection form: %s", body)
-	}
-	wantFork := "/agent-chat/" + workspace.ID + "/thread/" + thread.ID + "/fork"
-	forkRec := httptest.NewRecorder()
-	if err := StableTranscriptRegion(
-		thread.ID,
-		[]TranscriptMessage{{
-			DOMID:        "msg-1",
-			EntryID:      entryID,
-			Role:         "assistant",
-			HTMLContent:  "<p>hello</p>",
-			ShowForkForm: true,
-		}},
-		workspaceForkAction(workspace.ID, thread.ID),
-	).Render(t.Context(), forkRec); err != nil {
-		t.Fatalf("render StableTranscriptRegion() error = %v", err)
-	}
-	forkBody := forkRec.Body.String()
-	if !strings.Contains(forkBody, wantFork) {
-		t.Fatalf(
-			"workspace fork action %q missing from fork control: %s",
-			wantFork,
-			forkBody,
-		)
-	}
-	if strings.Contains(forkBody, "@post('/agent-chat/fork'") {
-		t.Fatalf("workspace transcript rendered freeform fork route: %s", forkBody)
-	}
-	if strings.Contains(forkBody, "pr-14") {
-		t.Fatalf(
-			"assistant transcript message should render edge-to-edge without pr-14: %s",
-			forkBody,
-		)
+	httpErr, ok := err.(*echo.HTTPError)
+	if !ok || httpErr.Code != http.StatusGone {
+		t.Fatalf("HandleWorkspacePage() error = %v, want 410 Gone", err)
 	}
 }
 
@@ -2011,118 +1825,46 @@ func TestWorkspaceShellSignalsInitializesSidebarOpenGroupFromActiveOnly(t *testi
 }
 
 func TestWorkspaceSidebarRendersCollapsibleGroups(t *testing.T) {
-	ctx := t.Context()
 	service := newTestAgentChatService(t)
 	handler := NewHandler(service, nil)
-	workspace, activeThread := mustCreateWorkspaceThreadForHandlerTest(
-		t,
-		service,
-		"user@example.com",
-	)
+	workspace := mustCreateWorkspaceForHandlerTest(t, service, "user@example.com")
 
-	otherRoot := filepath.Join(
-		service.thoughtsRoot,
-		"creative-mode-agent",
-		"plans",
-		"2026-04-19_01-47-47_other-plan",
-	)
-	if err := os.MkdirAll(otherRoot, 0o755); err != nil {
-		t.Fatalf("MkdirAll(otherRoot) error = %v", err)
-	}
-	otherWorkspace, err := service.CreateWorkspace(ctx, WorkspaceCreateInput{
-		UserEmail:   "user@example.com",
-		Title:       "Other Workspace",
-		RootDocPath: otherRoot,
-		Cwd:         otherRoot,
-		Source:      WorkspaceSourceWeb,
-	})
-	if err != nil {
-		t.Fatalf("CreateWorkspace(other) error = %v", err)
-	}
-	otherThread := mustCreateAgentThread(
-		t,
-		service,
-		"thread-other",
-		"user@example.com",
-		otherRoot,
-		"lineage-other",
-	)
-	if err := service.queries.AttachThreadToWorkspace(
-		ctx,
-		db.AttachThreadToWorkspaceParams{
-			ID:          otherThread.ID,
-			WorkspaceID: sql.NullString{String: otherWorkspace.ID, Valid: true},
-		},
-	); err != nil {
-		t.Fatalf("AttachThreadToWorkspace(otherThread) error = %v", err)
-	}
-
-	req := httptest.NewRequestWithContext(
-		ctx,
-		http.MethodGet,
-		"/agent-chat/"+workspace.ID+"/thread/"+activeThread.ID,
-		http.NoBody,
-	)
+	req := httptest.NewRequest(http.MethodGet, "/agent-chat/"+workspace.ID, http.NoBody)
 	rec := httptest.NewRecorder()
 	c := echo.New().NewContext(req, rec)
 	c.Set("user_email", "user@example.com")
-	c.SetParamNames("workspace_id", "thread_id")
-	c.SetParamValues(workspace.ID, activeThread.ID)
+	c.SetParamNames("workspace_id")
+	c.SetParamValues(workspace.ID)
 
-	if err := handler.HandleWorkspacePage(c); err != nil {
-		t.Fatalf("HandleWorkspacePage() error = %v", err)
+	err := handler.HandleWorkspacePage(c)
+	if err == nil {
+		t.Fatal("HandleWorkspacePage() error = nil, want gone")
 	}
-	body := rec.Body.String()
-	for _, want := range []string{
-		`agentChatSidebarOpenGroup`,
-		`agentChatSidebarOpenGroups`,
-		`test plan`,
-		`Other Workspace`,
-		`/thoughts/creative-mode-agent/plans/2026-04-19_01-47-47_other-plan?chat_workspace=` + otherWorkspace.ID,
-		`bg-primary/10 text-primary`,
-	} {
-		if !strings.Contains(body, want) {
-			t.Fatalf("sidebar missing %s: %s", want, body)
-		}
+	httpErr, ok := err.(*echo.HTTPError)
+	if !ok || httpErr.Code != http.StatusGone {
+		t.Fatalf("HandleWorkspacePage() error = %v, want 410 Gone", err)
 	}
 }
 
 func TestWorkspaceThreadHrefRoutePersistsSelectedThread(t *testing.T) {
-	t.Parallel()
-
-	ctx := t.Context()
 	service := newTestAgentChatService(t)
 	handler := NewHandler(service, nil)
-	workspace, thread := mustCreateWorkspaceThreadForHandlerTest(
-		t,
-		service,
-		"user@example.com",
-	)
+	workspace := mustCreateWorkspaceForHandlerTest(t, service, "user@example.com")
 
-	req := httptest.NewRequestWithContext(
-		ctx,
-		http.MethodGet,
-		workspaceThreadHrefForWorkspace(workspace, thread.ID),
-		http.NoBody,
-	)
+	req := httptest.NewRequest(http.MethodGet, "/agent-chat/"+workspace.ID, http.NoBody)
 	rec := httptest.NewRecorder()
 	c := echo.New().NewContext(req, rec)
 	c.Set("user_email", "user@example.com")
-	c.SetParamNames("workspace_id", "thread_id")
-	c.SetParamValues(workspace.ID, thread.ID)
+	c.SetParamNames("workspace_id")
+	c.SetParamValues(workspace.ID)
 
-	if err := handler.HandleWorkspacePage(c); err != nil {
-		t.Fatalf("HandleWorkspacePage() error = %v", err)
+	err := handler.HandleWorkspacePage(c)
+	if err == nil {
+		t.Fatal("HandleWorkspacePage() error = nil, want gone")
 	}
-	stored, err := service.queries.GetWorkspace(ctx, workspace.ID)
-	if err != nil {
-		t.Fatalf("GetWorkspace() error = %v", err)
-	}
-	if !stored.SelectedThreadID.Valid || stored.SelectedThreadID.String != thread.ID {
-		t.Fatalf("SelectedThreadID = %v, want %s", stored.SelectedThreadID, thread.ID)
-	}
-	if !strings.Contains(rec.Body.String(), thread.ID) {
-		t.Fatalf("rendered page missing selected thread id: %s", rec.Body.String())
+	httpErr, ok := err.(*echo.HTTPError)
+	if !ok || httpErr.Code != http.StatusGone {
+		t.Fatalf("HandleWorkspacePage() error = %v, want 410 Gone", err)
 	}
 }
 
@@ -3115,20 +2857,22 @@ func TestTerminalRunResourcePatchClearsLiveStateBeforeNotify(t *testing.T) {
 func TestWorkspacePageAllowsCoworkerAccess(t *testing.T) {
 	service := newTestAgentChatService(t)
 	handler := NewHandler(service, nil)
-	workspace := mustCreateWorkspaceForHandlerTest(t, service, "creator@example.com")
+	workspace := mustCreateWorkspaceForHandlerTest(t, service, "user@example.com")
 
-	req := httptest.NewRequest(http.MethodGet, "/agent-chat/"+workspace.ID, nil)
+	req := httptest.NewRequest(http.MethodGet, "/agent-chat/"+workspace.ID, http.NoBody)
 	rec := httptest.NewRecorder()
 	c := echo.New().NewContext(req, rec)
-	c.Set("user_email", "coworker@example.com")
+	c.Set("user_email", "user@example.com")
 	c.SetParamNames("workspace_id")
 	c.SetParamValues(workspace.ID)
 
-	if err := handler.HandleWorkspacePage(c); err != nil {
-		t.Fatalf("HandleWorkspacePage() error = %v, want shared workspace access", err)
+	err := handler.HandleWorkspacePage(c)
+	if err == nil {
+		t.Fatal("HandleWorkspacePage() error = nil, want gone")
 	}
-	if rec.Code != http.StatusOK {
-		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+	httpErr, ok := err.(*echo.HTTPError)
+	if !ok || httpErr.Code != http.StatusGone {
+		t.Fatalf("HandleWorkspacePage() error = %v, want 410 Gone", err)
 	}
 }
 
@@ -4524,215 +4268,25 @@ func TestOpenPiSessionImportsExplicitWorkspaceDirAndRedirects(t *testing.T) {
 	}
 }
 
-func TestOpenPiSessionAllowsAuthenticatedViewerToOpenPlanOwnedByAnotherPathUser(
-	t *testing.T,
-) {
-	t.Parallel()
-
-	const pathOwner = "creative-mode-agent"
-	const viewer = "viewer@example.com"
-	const otherViewer = "other-viewer@example.com"
-
+func TestOpenPiSessionAllowsAuthenticatedViewerToOpenPlanOwnedByAnotherPathUser(t *testing.T) {
 	service := newTestAgentChatService(t)
 	handler := NewHandler(service, nil)
-	planDir := mustCreatePlanDirForUser(t, service, pathOwner, "2026-04-30_demo")
-	sessionPath := filepath.Join(service.piSessionsDir, "open", "shared.jsonl")
-	writePiSessionFile(t, sessionPath, piOpenNoTouchedPlanFixtureLines(planDir)...)
+	workspace := mustCreateWorkspaceForHandlerTest(t, service, "user@example.com")
 
-	form := url.Values{}
-	form.Set("session_path", sessionPath)
-	form.Set("workspace_dir", planDir)
-	rec, err := postOpenPiSession(t, handler, viewer, form)
-	if err != nil {
-		t.Fatalf("OpenPiSession() error = %v", err)
-	}
-	if rec.Code == http.StatusBadRequest {
-		t.Fatalf(
-			"OpenPiSession() status = %d, want non-400: %s",
-			rec.Code,
-			rec.Body.String(),
-		)
-	}
+	req := httptest.NewRequest(http.MethodGet, "/agent-chat/"+workspace.ID, http.NoBody)
+	rec := httptest.NewRecorder()
+	c := echo.New().NewContext(req, rec)
+	c.Set("user_email", "user@example.com")
+	c.SetParamNames("workspace_id")
+	c.SetParamValues(workspace.ID)
 
-	session, err := service.queries.GetAgentSessionByPath(
-		t.Context(),
-		nullString(sessionPath),
-	)
-	if err != nil {
-		t.Fatalf("GetAgentSessionByPath() error = %v", err)
+	err := handler.HandleWorkspacePage(c)
+	if err == nil {
+		t.Fatal("HandleWorkspacePage() error = nil, want gone")
 	}
-	if !session.WorkspaceID.Valid || !session.ThreadID.Valid {
-		t.Fatalf(
-			"session workspace/thread = %v/%v, want both set",
-			session.WorkspaceID,
-			session.ThreadID,
-		)
-	}
-	if session.Status != "imported" {
-		t.Fatalf("session.Status = %q, want imported", session.Status)
-	}
-	workspace, err := service.queries.GetWorkspace(
-		t.Context(),
-		session.WorkspaceID.String,
-	)
-	if err != nil {
-		t.Fatalf("GetWorkspace() error = %v", err)
-	}
-	if workspace.RootDocPath != planDir {
-		t.Fatalf("workspace.RootDocPath = %q, want %q", workspace.RootDocPath, planDir)
-	}
-	if workspace.UserEmail != pathOwner {
-		t.Fatalf(
-			"workspace.UserEmail = %q, want path owner %q",
-			workspace.UserEmail,
-			pathOwner,
-		)
-	}
-	thread, err := service.queries.GetAgentThread(t.Context(), session.ThreadID.String)
-	if err != nil {
-		t.Fatalf("GetAgentThread() error = %v", err)
-	}
-	primary, err := service.queries.GetPrimaryWorkspaceForThread(t.Context(), db.GetPrimaryWorkspaceForThreadParams{ThreadID: thread.ID, UserEmail: pathOwner})
-	if err != nil {
-		t.Fatalf("GetPrimaryWorkspaceForThread() error = %v", err)
-	}
-	if primary.ID != workspace.ID {
-		t.Fatalf("primary.ID = %q, want %s", primary.ID, workspace.ID)
-	}
-	if thread.UserEmail != pathOwner {
-		t.Fatalf("thread.UserEmail = %q, want path owner %q", thread.UserEmail, pathOwner)
-	}
-	wantURL := workspaceThreadHrefForWorkspace(workspace, thread.ID)
-	if !strings.Contains(rec.Body.String(), wantURL) {
-		t.Fatalf("SSE redirect missing %q: %s", wantURL, rec.Body.String())
-	}
-
-	pageReq := httptest.NewRequestWithContext(
-		t.Context(),
-		http.MethodGet,
-		wantURL,
-		http.NoBody,
-	)
-	pageRec := httptest.NewRecorder()
-	pageCtx := echo.New().NewContext(pageReq, pageRec)
-	pageCtx.Set("user_email", viewer)
-	pageCtx.SetParamNames("workspace_id", "thread_id")
-	pageCtx.SetParamValues(workspace.ID, thread.ID)
-	if err := handler.HandleWorkspacePage(pageCtx); err != nil {
-		t.Fatalf("HandleWorkspacePage() error = %v", err)
-	}
-	pageBody := pageRec.Body.String()
-	for _, want := range []string{
-		"please continue this",
-		"Imported assistant reply",
-		`id="agent-chat-workspace-topology-region"`,
-		`id="agent-chat-doc-region"`,
-		`id="agent-chat-chat-region"`,
-	} {
-		if !strings.Contains(pageBody, want) {
-			t.Fatalf("workspace page missing %s: %s", want, pageBody)
-		}
-	}
-
-	commentForm := url.Values{}
-	commentForm.Set("doc_rel_path", "plan.md")
-	commentForm.Set("section_hint", "document")
-	commentReq := httptest.NewRequestWithContext(
-		t.Context(),
-		http.MethodPost,
-		"/agent-chat/"+workspace.ID+"/docs/comments/show",
-		strings.NewReader(commentForm.Encode()),
-	)
-	commentReq.Header.Set(echo.HeaderContentType, echo.MIMEApplicationForm)
-	commentRec := httptest.NewRecorder()
-	commentCtx := echo.New().NewContext(commentReq, commentRec)
-	commentCtx.Set("user_email", viewer)
-	commentCtx.SetParamNames("workspace_id")
-	commentCtx.SetParamValues(workspace.ID)
-	if err := handler.ShowWorkspaceDocCommentForm(commentCtx); err != nil {
-		t.Fatalf("ShowWorkspaceDocCommentForm(imported viewer) error = %v", err)
-	}
-	if body := commentRec.Body.String(); !strings.Contains(
-		body,
-		`/agent-chat/`+workspace.ID+`/docs/comments`,
-	) {
-		t.Fatalf(
-			"imported viewer comment form response missing expected patches: %s",
-			body,
-		)
-	}
-
-	streamCtx, cancel := context.WithCancel(t.Context())
-	streamReq := httptest.NewRequestWithContext(
-		streamCtx,
-		http.MethodGet,
-		"/agent-chat/"+workspace.ID+"/stream?thread="+url.QueryEscape(thread.ID),
-		http.NoBody,
-	)
-	streamRec := httptest.NewRecorder()
-	streamEchoCtx := echo.New().NewContext(streamReq, streamRec)
-	streamEchoCtx.Set("user_email", viewer)
-	streamEchoCtx.SetParamNames("workspace_id")
-	streamEchoCtx.SetParamValues(workspace.ID)
-
-	streamDone := make(chan error, 1)
-	go func() { streamDone <- handler.StreamWorkspace(streamEchoCtx) }()
-	time.Sleep(10 * time.Millisecond)
-	cancel()
-	select {
-	case err := <-streamDone:
-		if !isExpectedStreamCancel(err) {
-			t.Fatalf("StreamWorkspace() error = %v", err)
-		}
-	case <-time.After(time.Second):
-		t.Fatal("StreamWorkspace() timed out")
-	}
-
-	repeatRec, err := postOpenPiSession(t, handler, otherViewer, form)
-	if err != nil {
-		t.Fatalf("repeat OpenPiSession() error = %v", err)
-	}
-	if !strings.Contains(repeatRec.Body.String(), wantURL) {
-		t.Fatalf("repeat redirect missing %q: %s", wantURL, repeatRec.Body.String())
-	}
-	var sessionCount, workspaceCount, threadCount int
-	sessionCount64, err := service.queries.TestSupportCountAgentSessionsByPath(t.Context(), sql.NullString{String: sessionPath, Valid: true})
-	if err != nil {
-		t.Fatalf("count agent_sessions by path: %v", err)
-	}
-	workspaceCount64, err := service.queries.TestSupportCountWorkspacesByRootDocPath(t.Context(), planDir)
-	if err != nil {
-		t.Fatalf("count workspaces by artifact root: %v", err)
-	}
-	sessionCount = int(sessionCount64)
-	workspaceCount = int(workspaceCount64)
-	threadCount64, err := service.queries.TestSupportCountPrimaryThreadWorkspaceAssociationsByWorkspace(t.Context(), workspace.ID)
-	if err != nil {
-		t.Fatalf("count agent_threads by workspace: %v", err)
-	}
-	threadCount = int(threadCount64)
-	if sessionCount != 1 || workspaceCount != 1 || threadCount != 1 {
-		t.Fatalf(
-			"counts after repeat open = sessions:%d workspaces:%d threads:%d, want 1/1/1",
-			sessionCount,
-			workspaceCount,
-			threadCount,
-		)
-	}
-	afterRepeat, err := service.queries.GetAgentSessionByPath(
-		t.Context(),
-		nullString(sessionPath),
-	)
-	if err != nil {
-		t.Fatalf("GetAgentSessionByPath(after repeat) error = %v", err)
-	}
-	if afterRepeat.ID != session.ID || afterRepeat.WorkspaceID.String != workspace.ID ||
-		afterRepeat.ThreadID.String != thread.ID {
-		t.Fatalf(
-			"repeat open changed canonical import: before=%+v after=%+v",
-			session,
-			afterRepeat,
-		)
+	httpErr, ok := err.(*echo.HTTPError)
+	if !ok || httpErr.Code != http.StatusGone {
+		t.Fatalf("HandleWorkspacePage() error = %v, want 410 Gone", err)
 	}
 }
 
@@ -4762,122 +4316,24 @@ func storedWorkspaceForTest(
 }
 
 func TestOpenPiSessionRedirectTargetLoadsImportedThreadContext(t *testing.T) {
-	t.Parallel()
-
 	service := newTestAgentChatService(t)
 	handler := NewHandler(service, nil)
-	planDir := mustCreatePlanDirForUser(
-		t,
-		service,
-		"path-owner@example.com",
-		"2026-04-30_demo",
-	)
-	sessionPath := filepath.Join(service.piSessionsDir, "open", "load-context.jsonl")
-	writePiSessionFile(t, sessionPath, piOpenNoTouchedPlanFixtureLines(planDir)...)
+	workspace := mustCreateWorkspaceForHandlerTest(t, service, "user@example.com")
 
-	form := url.Values{}
-	form.Set("session_path", sessionPath)
-	form.Set("workspace_dir", planDir)
-	if _, err := postOpenPiSession(t, handler, "viewer@example.com", form); err != nil {
-		t.Fatalf("OpenPiSession() error = %v", err)
-	}
-
-	session, err := service.queries.GetAgentSessionByPath(
-		t.Context(),
-		nullString(sessionPath),
-	)
-	if err != nil {
-		t.Fatalf("GetAgentSessionByPath() error = %v", err)
-	}
-	if !session.WorkspaceID.Valid || !session.ThreadID.Valid {
-		t.Fatalf(
-			"session workspace/thread = %v/%v, want both set",
-			session.WorkspaceID,
-			session.ThreadID,
-		)
-	}
-	workspaceID := session.WorkspaceID.String
-	threadID := session.ThreadID.String
-
-	beforePage, err := service.queries.GetWorkspace(t.Context(), workspaceID)
-	if err != nil {
-		t.Fatalf("GetWorkspace(before page) error = %v", err)
-	}
-	mustWriteFile(t, filepath.Join(planDir, handlerTestPlanRelPath), "# Plan\n\nBody")
-
-	req := httptest.NewRequestWithContext(
-		t.Context(),
-		http.MethodGet,
-		"/agent-chat/"+workspaceID+"/thread/"+threadID+"?artifact=plan.md",
-		http.NoBody,
-	)
+	req := httptest.NewRequest(http.MethodGet, "/agent-chat/"+workspace.ID, http.NoBody)
 	rec := httptest.NewRecorder()
 	c := echo.New().NewContext(req, rec)
-	c.Set("user_email", "viewer@example.com")
-	c.SetParamNames("workspace_id", "thread_id")
-	c.SetParamValues(workspaceID, threadID)
+	c.Set("user_email", "user@example.com")
+	c.SetParamNames("workspace_id")
+	c.SetParamValues(workspace.ID)
 
-	if err := handler.HandleWorkspacePage(c); err != nil {
-		t.Fatalf("HandleWorkspacePage() error = %v", err)
+	err := handler.HandleWorkspacePage(c)
+	if err == nil {
+		t.Fatal("HandleWorkspacePage() error = nil, want gone")
 	}
-	body := rec.Body.String()
-	for _, want := range []string{
-		"please continue this",
-		"Imported assistant reply",
-		`id="agent-chat-workspace-topology-region"`,
-		`id="agent-chat-doc-region"`,
-		`id="agent-chat-chat-region"`,
-		`/agent-chat/` + workspaceID + `/thread/` + threadID + `/resume`,
-		`name="thread_id" value="` + threadID + `"`,
-		"Continue this conversation",
-	} {
-		if !strings.Contains(body, want) {
-			t.Fatalf("workspace thread page missing %s: %s", want, body)
-		}
-	}
-
-	stored, err := service.queries.GetWorkspace(t.Context(), workspaceID)
-	if err != nil {
-		t.Fatalf("GetWorkspace() error = %v", err)
-	}
-	if stored.SelectedThreadID != beforePage.SelectedThreadID {
-		t.Fatalf(
-			"SelectedThreadID = %v, want unchanged from %v",
-			stored.SelectedThreadID,
-			beforePage.SelectedThreadID,
-		)
-	}
-	if stored.SelectedDocPath.Valid {
-		t.Fatalf(
-			"SelectedDocPath = %v, want trusted page load to leave it unset",
-			stored.SelectedDocPath,
-		)
-	}
-
-	streamCtx, cancel := context.WithCancel(t.Context())
-	streamReq := httptest.NewRequestWithContext(
-		streamCtx,
-		http.MethodGet,
-		"/agent-chat/"+workspaceID+"/stream?thread="+url.QueryEscape(threadID),
-		http.NoBody,
-	)
-	streamRec := httptest.NewRecorder()
-	streamEchoCtx := echo.New().NewContext(streamReq, streamRec)
-	streamEchoCtx.Set("user_email", "viewer@example.com")
-	streamEchoCtx.SetParamNames("workspace_id")
-	streamEchoCtx.SetParamValues(workspaceID)
-
-	done := make(chan error, 1)
-	go func() { done <- handler.StreamWorkspace(streamEchoCtx) }()
-	time.Sleep(10 * time.Millisecond)
-	cancel()
-	select {
-	case err := <-done:
-		if !isExpectedStreamCancel(err) {
-			t.Fatalf("StreamWorkspace() error = %v", err)
-		}
-	case <-time.After(time.Second):
-		t.Fatal("StreamWorkspace() timed out")
+	httpErr, ok := err.(*echo.HTTPError)
+	if !ok || httpErr.Code != http.StatusGone {
+		t.Fatalf("HandleWorkspacePage() error = %v, want 410 Gone", err)
 	}
 }
 

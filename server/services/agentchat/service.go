@@ -1870,10 +1870,23 @@ func (s *Service) createRun(
 	prompt string,
 	restoreHeadEntryID sql.NullString,
 ) (db.AgentRun, error) {
+	workspaceID := thread.WorkspaceID
+	if !workspaceID.Valid || strings.TrimSpace(workspaceID.String) == "" {
+		workspace, err := q.GetPrimaryWorkspaceForThread(ctx, db.GetPrimaryWorkspaceForThreadParams{
+			ThreadID:  thread.ID,
+			UserEmail: thread.UserEmail,
+		})
+		if err != nil && !errors.Is(err, sql.ErrNoRows) {
+			return db.AgentRun{}, err
+		}
+		if err == nil {
+			workspaceID = nullString(workspace.ID)
+		}
+	}
 	return s.createRunRecord(
 		ctx,
 		q,
-		thread.WorkspaceID,
+		workspaceID,
 		sql.NullString{},
 		thread,
 		trigger,
@@ -2877,6 +2890,21 @@ func (s *Service) BuildPageArgs(
 	ctx context.Context,
 	userEmail, threadID, runID, selectedDoc, selectedCwd string,
 ) (*ChatPageArgs, error) {
+	return s.BuildThreadPageArgs(ctx, ThreadProjectionInput{
+		UserEmail: userEmail,
+		ThreadID:  threadID,
+		RunID:     runID,
+		DocPath:   selectedDoc,
+		Cwd:       selectedCwd,
+	})
+}
+
+func (s *Service) BuildThreadPageArgs(
+	ctx context.Context,
+	input ThreadProjectionInput,
+) (*ChatPageArgs, error) {
+	userEmail := strings.TrimSpace(input.UserEmail)
+	threadID := strings.TrimSpace(input.ThreadID)
 	threads, err := s.queries.ListAgentThreads(
 		ctx,
 		db.ListAgentThreadsParams{
@@ -2890,7 +2918,7 @@ func (s *Service) BuildPageArgs(
 
 	sessions := s.buildAgentChatSessionSidebarRefs(threads)
 
-	cwd := s.resolveCwd(selectedCwd)
+	cwd := s.resolveCwd(input.Cwd)
 	activePlanDir := ""
 	if activePlan, ok := s.canonicalPlanDirFromSource(cwd); ok {
 		activePlanDir = activePlan
@@ -2909,7 +2937,7 @@ func (s *Service) BuildPageArgs(
 
 	args := &ChatPageArgs{
 		Sessions:     sessions,
-		ThreadGroups: s.buildThreadSidebarGroups(sessions, strings.TrimSpace(threadID)),
+		ThreadGroups: s.buildThreadSidebarGroups(sessions, threadID),
 		PlanSidebar:  planSidebar,
 		Cwd:          cwd,
 		Transcript: TranscriptPaneState{
@@ -2920,22 +2948,22 @@ func (s *Service) BuildPageArgs(
 		DocPane: DocPaneState{},
 	}
 
-	if strings.TrimSpace(threadID) == "" {
-		args.DocPane, err = s.BuildFreeformDocsPane(ctx, userEmail, selectedDoc)
+	if threadID == "" {
+		args.DocPane, err = s.BuildFreeformDocsPane(ctx, userEmail, input.DocPath)
 		if err != nil {
 			return nil, err
 		}
 		return args, nil
 	}
 
-	thread, err := s.queries.GetAgentThreadForUser(
-		ctx,
-		db.GetAgentThreadForUserParams{ID: threadID, UserEmail: userEmail},
-	)
+	workspaceContext, err := s.GetThreadWorkspaceContext(ctx, userEmail, threadID)
 	if err != nil {
 		return nil, err
 	}
+	thread := workspaceContext.Thread
 	args.CurrentThread = &thread
+	args.PrimaryWorkspace = workspaceContext.Primary
+	args.RelatedWorkspaces = workspaceContext.Related
 	if activePlan, ok := s.canonicalPlanDirFromSource(thread.Cwd); ok {
 		args.PlanSidebar, err = s.BuildPlanSidebarState(ctx, PlanSidebarInput{
 			UserEmail:      userEmail,
@@ -2955,8 +2983,8 @@ func (s *Service) BuildPageArgs(
 	args.Transcript.Live, args.Cursor = s.buildLiveTranscript(thread.ID)
 	args.Transcript.Cursor = args.Cursor
 
-	if strings.TrimSpace(runID) != "" {
-		run, err := s.queries.GetAgentRun(ctx, runID)
+	if strings.TrimSpace(input.RunID) != "" {
+		run, err := s.queries.GetAgentRun(ctx, strings.TrimSpace(input.RunID))
 		if err == nil && run.ThreadID == thread.ID {
 			args.ActiveRun = &run
 		}
@@ -2971,16 +2999,37 @@ func (s *Service) BuildPageArgs(
 	if args.ActiveRun != nil {
 		activeRunID = args.ActiveRun.ID
 	}
-	args.DocPane, err = s.BuildDocPane(
-		ctx,
-		thread.ID,
-		activeRunID,
-		selectedDoc,
-	)
+	if workspaceContext.Primary == nil {
+		args.DocPane, err = s.BuildDocPane(ctx, thread.ID, activeRunID, input.DocPath)
+		if err != nil {
+			return nil, err
+		}
+		return args, nil
+	}
+
+	primary := *workspaceContext.Primary
+	thread.WorkspaceID = nullString(primary.ID)
+	args.CurrentThread = &thread
+	args.Cwd = firstNonEmpty(primary.Cwd.String, primary.RootDocPath, thread.Cwd)
+	args.DocPane, err = s.buildWorkspaceDocPane(ctx, primary, activeRunID, input.DocPath, false)
 	if err != nil {
 		return nil, err
 	}
-
+	args.PlanSidebar, err = s.BuildPlanSidebarState(ctx, PlanSidebarInput{
+		UserEmail:         userEmail,
+		ActiveWorkspaceID: primary.ID,
+		ActiveThreadID:    thread.ID,
+		ActivePlanDir:     primary.RootDocPath,
+	})
+	if err != nil {
+		return nil, err
+	}
+	args.PlanSidebar.TargetID = "agent-chat-thread-sidebar"
+	args.Workflow, _ = s.BuildWorkspaceWorkflowState(ctx, primary)
+	args.Transcript.Stable = attachQRSPIWorkflowCardToLatestAssistantMessage(
+		args.Transcript.Stable,
+		args.Workflow.LastResultCard,
+	)
 	return args, nil
 }
 

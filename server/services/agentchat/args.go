@@ -620,6 +620,14 @@ type WorkspacePageArgs struct {
 	PendingAttachments []AttachedPath
 }
 
+type ThreadProjectionInput struct {
+	UserEmail string
+	ThreadID  string
+	RunID     string
+	DocPath   string
+	Cwd       string
+}
+
 type ChatPageArgs struct {
 	UserEmail          string
 	CurrentTheme       string
@@ -631,6 +639,9 @@ type ChatPageArgs struct {
 	Cwd                string
 	CurrentThread      *db.AgentThread
 	ActiveRun          *db.AgentRun
+	PrimaryWorkspace   *db.Workspace
+	RelatedWorkspaces  []db.Workspace
+	Workflow           WorkspaceWorkflowState
 	Transcript         TranscriptPaneState
 	DocPane            DocPaneState
 	ArtifactPane       DocPaneState

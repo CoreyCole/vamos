@@ -465,6 +465,15 @@ func thoughtsWorkspaceHref(rootDocPath, workspaceID string) string {
 	return thoughtsDocRedirectURL(rootDocPath, values)
 }
 
+func threadHref(threadID string) string {
+	threadID = strings.TrimSpace(threadID)
+	if threadID == "" {
+		return ""
+	}
+	values := url.Values{"thread": []string{threadID}}
+	return "/agent-chat?" + values.Encode()
+}
+
 func workspaceThreadHrefForWorkspace(workspace db.Workspace, threadID string) string {
 	threadID = strings.TrimSpace(threadID)
 	if threadID == "" {
@@ -1560,9 +1569,12 @@ func (s *Service) RedirectURLForThread(
 	ctx context.Context,
 	userEmail, threadID string,
 ) (string, error) {
-	workspace, thread, err := s.EnsureThreadWorkspace(ctx, userEmail, threadID)
+	thread, err := s.queries.GetAgentThreadForUser(ctx, db.GetAgentThreadForUserParams{
+		ID:        strings.TrimSpace(threadID),
+		UserEmail: strings.TrimSpace(userEmail),
+	})
 	if err != nil {
 		return "", err
 	}
-	return workspaceThreadHrefForWorkspace(workspace, thread.ID), nil
+	return threadHref(thread.ID), nil
 }

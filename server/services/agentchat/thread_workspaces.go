@@ -2,6 +2,8 @@ package agentchat
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -99,6 +101,20 @@ func (s *Service) AttachThreadRunsAndSessionsToPrimary(ctx context.Context, thre
 		return err
 	}
 	return tx.Commit()
+}
+
+func (s *Service) ResolvePrimaryWorkspaceForThread(ctx context.Context, userEmail, threadID string) (db.Workspace, bool, error) {
+	workspace, err := s.queries.GetPrimaryWorkspaceForThread(ctx, db.GetPrimaryWorkspaceForThreadParams{
+		ThreadID:  strings.TrimSpace(threadID),
+		UserEmail: strings.TrimSpace(userEmail),
+	})
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return db.Workspace{}, false, nil
+		}
+		return db.Workspace{}, false, err
+	}
+	return workspace, true, nil
 }
 
 func (s *Service) threadHasWorkspaceAssociation(ctx context.Context, threadID, workspaceID string) (bool, error) {

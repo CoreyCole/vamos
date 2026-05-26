@@ -5,6 +5,8 @@ import "github.com/CoreyCole/vamos/pkg/components/dropdown"
 templ FreeformChatComposer(args ChatPageArgs) {
 	if args.CurrentThread == nil {
 		@AgentChatComposer(AgentChatComposerArgs{Action: "@post('/agent-chat/send', {contentType: 'form'})", Cwd: args.Cwd, Placeholder: "Ask Pi to do work from the selected plan workspace", IncludeCwd: true, AttachedPaths: args.PendingAttachments})
+	} else if args.PrimaryWorkspace != nil {
+		@AgentChatComposer(AgentChatComposerArgs{Action: "@post('/agent-chat/resume', {contentType: 'form'})", WorkspaceID: args.PrimaryWorkspace.ID, ThreadID: args.CurrentThread.ID, Cwd: args.Cwd, ModeLabel: "Workspace-backed thread", Placeholder: "Continue this conversation", HasThread: true, IncludeCwd: true, AttachedPaths: args.PendingAttachments})
 	} else {
 		@AgentChatComposer(AgentChatComposerArgs{Action: "@post('/agent-chat/resume', {contentType: 'form'})", ThreadID: args.CurrentThread.ID, Placeholder: "Continue this conversation", HasThread: true, AttachedPaths: args.PendingAttachments})
 	}

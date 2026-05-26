@@ -316,26 +316,6 @@ func (h *Handler) HandleAgentChatIndex(c echo.Context) error {
 		return c.Redirect(http.StatusFound, "/login")
 	}
 
-	threadID := strings.TrimSpace(c.QueryParam("thread"))
-	if threadID != "" {
-		redirectURL, err := h.service.RedirectURLForThread(
-			c.Request().Context(),
-			userEmail,
-			threadID,
-		)
-		if err != nil {
-			return echo.NewHTTPError(http.StatusNotFound, err.Error())
-		}
-		if runID := strings.TrimSpace(c.QueryParam("run")); runID != "" {
-			separator := "?"
-			if strings.Contains(redirectURL, "?") {
-				separator = "&"
-			}
-			redirectURL += separator + "run=" + url.QueryEscape(runID)
-		}
-		return c.Redirect(http.StatusFound, redirectURL)
-	}
-
 	return h.HandleChatPage(c)
 }
 
@@ -343,13 +323,6 @@ func (h *Handler) HandleChatPage(c echo.Context) error {
 	userEmail, ok := c.Get("user_email").(string)
 	if !ok || userEmail == "" {
 		return c.Redirect(http.StatusFound, "/login")
-	}
-
-	if err := h.service.ReconcileUnattachedAgentChatThreads(
-		c.Request().Context(),
-		userEmail,
-	); err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 	}
 
 	args, err := h.service.BuildPageArgs(
@@ -403,64 +376,13 @@ func (h *Handler) buildFreeformWorkbenchState(
 }
 
 func (h *Handler) HandleWorkspacePage(c echo.Context) error {
-	userEmail, ok := c.Get("user_email").(string)
-	if !ok || userEmail == "" {
+	if userEmail, ok := c.Get("user_email").(string); !ok || userEmail == "" {
 		return c.Redirect(http.StatusFound, "/login")
 	}
-
-	args, err := h.service.BuildWorkspacePageArgs(
-		c.Request().Context(),
-		BuildWorkspacePageInput{
-			UserEmail:   userEmail,
-			WorkspaceID: c.Param("workspace_id"),
-			ThreadID:    c.Param("thread_id"),
-			RunID:       c.QueryParam("run"),
-			DocRelPath:  c.QueryParam("doc"),
-			DocPath:     c.QueryParam("doc"),
-		},
+	return echo.NewHTTPError(
+		http.StatusGone,
+		"workspace chat routes were removed; use /agent-chat?thread=<id>",
 	)
-	if err != nil {
-		return echo.NewHTTPError(http.StatusNotFound, err.Error())
-	}
-	if threadID := strings.TrimSpace(c.Param("thread_id")); threadID != "" {
-		if _, err := h.service.GetWorkspaceForUserOrTrustedImport(
-			c.Request().Context(),
-			userEmail,
-			args.WorkspaceID,
-		); err == nil {
-			_ = h.service.queries.UpdateWorkspaceSelectedThread(
-				c.Request().Context(),
-				db.UpdateWorkspaceSelectedThreadParams{
-					ID:               args.WorkspaceID,
-					SelectedThreadID: nullString(threadID),
-				},
-			)
-		}
-	}
-
-	currentTheme := "dark"
-	currentSyntaxTheme := ""
-	if h.themeService != nil {
-		currentTheme = h.themeService.GetCurrentThemeMode(c)
-		currentSyntaxTheme = h.themeService.GetCurrentTheme(c)
-	}
-	args.CurrentTheme = currentTheme
-	args.CurrentSyntaxTheme = currentSyntaxTheme
-	if attachedPath := strings.TrimSpace(
-		c.QueryParam("attached_path"),
-	); attachedPath != "" {
-		attached, err := h.service.ValidateAttachedThoughtsPath(attachedPath)
-		if err != nil {
-			return echo.NewHTTPError(http.StatusBadRequest, err.Error())
-		}
-		args.PendingAttachments = []AttachedPath{attached}
-	}
-	workbenchState, err := h.buildWorkspaceWorkbenchState(c, *args)
-	if err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
-	}
-	args.Workbench = workbenchState
-	return WorkspaceChatPage(*args).Render(c.Request().Context(), c.Response().Writer)
 }
 
 func (h *Handler) buildWorkspaceWorkbenchState(
