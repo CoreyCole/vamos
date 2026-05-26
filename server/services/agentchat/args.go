@@ -51,6 +51,49 @@ type ThreadWorkspaceContext struct {
 	Related []db.Workspace
 }
 
+type NewThreadTargetKind string
+
+const (
+	NewThreadTargetPrimary  NewThreadTargetKind = "primary"
+	NewThreadTargetRelated  NewThreadTargetKind = "related"
+	NewThreadTargetFreeform NewThreadTargetKind = "freeform"
+)
+
+type ThreadMetadataView struct {
+	ThreadID                string
+	Title                   string
+	URL                     string
+	ThreadCwd               string
+	PiCwd                   string
+	ImplementationWorkspace string
+	Primary                 *ThreadWorkspaceView
+	Related                 []ThreadWorkspaceView
+	NewTargets              []ThreadNewTargetView
+}
+
+type ThreadWorkspaceView struct {
+	WorkspaceID  string
+	Label        string
+	RootDocPath  string
+	WorkflowType string
+	Lifecycle    string
+	Role         string
+}
+
+type ThreadExecutionTargetView struct {
+	ThreadCwd               string
+	PiCwd                   string
+	ImplementationWorkspace string
+	Source                  string
+}
+
+type ThreadNewTargetView struct {
+	Kind        NewThreadTargetKind
+	WorkspaceID string
+	Label       string
+	Selected    bool
+}
+
 type TranscriptMessage struct {
 	DOMID                 string
 	EntryID               string
@@ -277,6 +320,7 @@ type AgentChatComposerArgs struct {
 	ShowCurrentDocToggle bool
 	CurrentDocAttached   bool
 	SelectedAnnotations  []SelectedChatAnnotation
+	ThreadMetadata       ThreadMetadataView
 }
 
 type ChatMessageArgs struct {
@@ -642,6 +686,7 @@ type ChatPageArgs struct {
 	ActiveRun          *db.AgentRun
 	PrimaryWorkspace   *db.Workspace
 	RelatedWorkspaces  []db.Workspace
+	ThreadMetadata     ThreadMetadataView
 	Workflow           WorkspaceWorkflowState
 	Transcript         TranscriptPaneState
 	DocPane            DocPaneState

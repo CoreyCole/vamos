@@ -4,11 +4,11 @@ import "github.com/CoreyCole/vamos/pkg/components/dropdown"
 
 templ FreeformChatComposer(args ChatPageArgs) {
 	if args.CurrentThread == nil {
-		@AgentChatComposer(AgentChatComposerArgs{Action: "@post('/agent-chat/send', {contentType: 'form'})", Cwd: args.Cwd, Placeholder: "Ask Pi to do work from the selected plan workspace", IncludeCwd: true, AttachedPaths: args.PendingAttachments})
+		@AgentChatComposer(AgentChatComposerArgs{Action: "@post('/agent-chat/send', {contentType: 'form'})", Cwd: args.Cwd, Placeholder: "Ask Pi to do work from the selected plan workspace", IncludeCwd: true, AttachedPaths: args.PendingAttachments, ThreadMetadata: args.ThreadMetadata})
 	} else if args.PrimaryWorkspace != nil {
-		@AgentChatComposer(AgentChatComposerArgs{Action: "@post('/agent-chat/resume', {contentType: 'form'})", WorkspaceID: args.PrimaryWorkspace.ID, ThreadID: args.CurrentThread.ID, Cwd: args.Cwd, ModeLabel: "Workspace-backed thread", Placeholder: "Continue this conversation", HasThread: true, IncludeCwd: true, AttachedPaths: args.PendingAttachments})
+		@AgentChatComposer(AgentChatComposerArgs{Action: "@post('/agent-chat/resume', {contentType: 'form'})", WorkspaceID: args.PrimaryWorkspace.ID, ThreadID: args.CurrentThread.ID, Cwd: args.Cwd, ModeLabel: "Workspace-backed thread", Placeholder: "Continue this conversation", HasThread: true, IncludeCwd: true, AttachedPaths: args.PendingAttachments, ThreadMetadata: args.ThreadMetadata})
 	} else {
-		@AgentChatComposer(AgentChatComposerArgs{Action: "@post('/agent-chat/resume', {contentType: 'form'})", ThreadID: args.CurrentThread.ID, Placeholder: "Continue this conversation", HasThread: true, AttachedPaths: args.PendingAttachments})
+		@AgentChatComposer(AgentChatComposerArgs{Action: "@post('/agent-chat/resume', {contentType: 'form'})", ThreadID: args.CurrentThread.ID, Placeholder: "Continue this conversation", HasThread: true, AttachedPaths: args.PendingAttachments, ThreadMetadata: args.ThreadMetadata})
 	}
 }
 
@@ -70,27 +70,82 @@ templ ComposerMetadataButton(args AgentChatComposerArgs) {
 		@dropdown.DropdownMenuTrigger(dropdown.DropdownMenuTriggerArgs{ID: dropdownID, Class: "inline-flex h-8 w-8 items-center justify-center rounded-full border border-border text-xs font-semibold text-muted-foreground transition-colors hover:bg-muted hover:text-foreground", Attributes: templ.Attributes{"aria-label": "Show chat metadata", "title": "Show chat metadata"}}) {
 			<span aria-hidden="true">i</span>
 		}
-		@dropdown.DropdownMenuContent(dropdown.DropdownMenuContentArgs{ID: dropdownID, Side: "top", Align: "start", SideOffset: 8, Class: "w-72 max-w-[calc(100vw-2rem)] p-3 text-xs"}) {
-			<p class="font-semibold text-foreground">Chat metadata</p>
-			<dl class="mt-2 space-y-1">
-				<div>
-					<dt class="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Mode</dt>
-					<dd class="break-all text-foreground">{ args.ModeLabel }</dd>
-				</div>
-				if args.Cwd != "" {
-					<div>
-						<dt class="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Cwd</dt>
-						<dd class="break-all text-foreground">{ args.Cwd }</dd>
-					</div>
-				}
-				if args.WorkspaceID != "" {
-					<div>
-						<dt class="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Workspace</dt>
-						<dd class="break-all text-foreground">{ args.WorkspaceID }</dd>
-					</div>
-				}
-			</dl>
+		@dropdown.DropdownMenuContent(dropdown.DropdownMenuContentArgs{ID: dropdownID, Side: "top", Align: "start", SideOffset: 8, Class: "w-80 max-w-[calc(100vw-2rem)] space-y-3 p-3 text-xs"}) {
+			@ThreadMetadataPopover(args)
 		}
+	}
+}
+
+templ ThreadMetadataPopover(args AgentChatComposerArgs) {
+	{{ view := args.ThreadMetadata }}
+	<p class="font-semibold text-foreground">Chat metadata</p>
+	<dl class="mt-2 space-y-1">
+		<div>
+			<dt class="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Mode</dt>
+			<dd class="break-all text-foreground">{ args.ModeLabel }</dd>
+		</div>
+		if view.ThreadID != "" {
+			<div>
+				<dt class="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Thread</dt>
+				<dd class="break-all text-foreground">{ view.ThreadID }</dd>
+			</div>
+			<div>
+				<dt class="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">URL</dt>
+				<dd class="break-all text-foreground">{ view.URL }</dd>
+			</div>
+		}
+		if view.ThreadCwd != "" {
+			<div>
+				<dt class="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Thread cwd</dt>
+				<dd class="break-all text-foreground">{ view.ThreadCwd }</dd>
+			</div>
+		}
+		if firstNonEmpty(view.PiCwd, args.Cwd) != "" {
+			<div>
+				<dt class="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Pi cwd</dt>
+				<dd class="break-all text-foreground">{ firstNonEmpty(view.PiCwd, args.Cwd) }</dd>
+			</div>
+		}
+		if view.ImplementationWorkspace != "" {
+			<div>
+				<dt class="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Implementation workspace</dt>
+				<dd class="break-all text-foreground">{ view.ImplementationWorkspace }</dd>
+			</div>
+		}
+		if view.Primary != nil {
+			<div>
+				<dt class="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Primary workspace</dt>
+				<dd class="break-all text-foreground">● { view.Primary.Label } · { view.Primary.WorkflowType } · { view.Primary.Lifecycle }</dd>
+				<dd class="break-all text-muted-foreground">{ view.Primary.RootDocPath }</dd>
+			</div>
+		} else if args.WorkspaceID != "" {
+			<div>
+				<dt class="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Workspace</dt>
+				<dd class="break-all text-foreground">{ args.WorkspaceID }</dd>
+			</div>
+		}
+		if len(view.Related) > 0 {
+			<div>
+				<dt class="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Related workspaces</dt>
+				<dd class="space-y-1">
+					for _, workspace := range view.Related {
+						<div class="break-all text-muted-foreground">○ { workspace.Label } · context only</div>
+					}
+				</dd>
+			</div>
+		}
+	</dl>
+	if len(view.NewTargets) > 0 {
+		<div class="border-t border-border pt-3">
+			<p class="mb-2 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">New thread</p>
+			<div class="space-y-1">
+				for _, target := range view.NewTargets {
+					<button type="button" class="w-full rounded-md border border-border px-2 py-1 text-left text-xs text-foreground transition-colors hover:bg-muted" data-on:click={ threadNewTargetAction(view.ThreadID, target) }>
+						{ target.Label }
+					</button>
+				}
+			</div>
+		</div>
 	}
 }
 
@@ -107,6 +162,17 @@ func normalizeComposerArgs(args AgentChatComposerArgs) AgentChatComposerArgs {
 
 func composerSubmitAction(action string) string {
 	return "const input = document.getElementById('agent-chat-composer-input'); const prompt = document.getElementById('agent-chat-composer-prompt-value'); if (input && prompt) { prompt.value = input.value; input.dataset.clearedPrompt = input.value; input.value = ''; input.dispatchEvent(new Event('input', { bubbles: true })); input.focus({ preventScroll: true }); } " + action
+}
+
+func threadNewTargetAction(threadID string, target ThreadNewTargetView) string {
+	if threadID == "" {
+		return ""
+	}
+	query := "?target_kind=" + string(target.Kind)
+	if target.WorkspaceID != "" {
+		query += "&workspace_id=" + target.WorkspaceID
+	}
+	return "@post('/agent-chat/thread/" + threadID + "/new" + query + "')"
 }
 
 templ WorkspaceComposer(workspaceID string, threadID string, hasThread bool, cwd string, attachedPaths []AttachedPath) {

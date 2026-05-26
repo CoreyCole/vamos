@@ -127,6 +127,7 @@ func (h *Handler) RegisterRuntimeRoutes(g *echo.Group) {
 	g.POST("/thread/:thread_id/workflow/advance", h.AdvanceThreadWorkflow)
 	g.POST("/thread/:thread_id/workflow/policy", h.UpdateThreadWorkflowPolicy)
 	g.POST("/thread/:thread_id/workflow/next", h.CreateNextQRSPIThread)
+	g.POST("/thread/:thread_id/new", h.CreateThreadFromTarget)
 	g.GET("/:workspace_id/stream", h.StreamWorkspace)
 	g.POST("/:workspace_id/send", h.SendWorkspacePrompt)
 	g.POST("/:workspace_id/workflow/advance", h.AdvanceWorkspaceWorkflow)
@@ -1535,6 +1536,31 @@ func (h *Handler) CreateNextQRSPIThread(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusUnauthorized, "not authenticated")
 	}
 	thread, err := h.service.CreateNextQRSPIThread(c.Request().Context(), userEmail, c.Param("thread_id"))
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
+	}
+	sse := datastar.NewSSE(c.Response().Writer, c.Request())
+	return sse.Redirect("/agent-chat?thread=" + url.QueryEscape(thread.ID))
+}
+
+func (h *Handler) CreateThreadFromTarget(c echo.Context) error {
+	userEmail, ok := c.Get("user_email").(string)
+	if !ok || userEmail == "" {
+		return echo.NewHTTPError(http.StatusUnauthorized, "not authenticated")
+	}
+	kind := NewThreadTargetKind(strings.TrimSpace(firstNonEmpty(c.FormValue("target_kind"), c.QueryParam("target_kind"))))
+	if kind == "" {
+		kind = NewThreadTargetPrimary
+	}
+	if kind != NewThreadTargetPrimary && kind != NewThreadTargetRelated && kind != NewThreadTargetFreeform {
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid target kind")
+	}
+	thread, err := h.service.CreateThreadFromWorkspace(c.Request().Context(), CreateThreadFromWorkspaceInput{
+		UserEmail:         userEmail,
+		SourceThreadID:    c.Param("thread_id"),
+		TargetWorkspaceID: strings.TrimSpace(firstNonEmpty(c.FormValue("workspace_id"), c.QueryParam("workspace_id"))),
+		TargetKind:        kind,
+	})
 	if err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 	}

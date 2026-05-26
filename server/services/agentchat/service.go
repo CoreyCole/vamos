@@ -2964,6 +2964,7 @@ func (s *Service) BuildThreadPageArgs(
 	args.CurrentThread = &thread
 	args.PrimaryWorkspace = workspaceContext.Primary
 	args.RelatedWorkspaces = workspaceContext.Related
+	args.ThreadMetadata = s.BuildThreadMetadataView(ctx, workspaceContext, firstNonEmpty(input.Cwd, thread.Cwd))
 	if activePlan, ok := s.canonicalPlanDirFromSource(thread.Cwd); ok {
 		args.PlanSidebar, err = s.BuildPlanSidebarState(ctx, PlanSidebarInput{
 			UserEmail:      userEmail,
@@ -3010,7 +3011,7 @@ func (s *Service) BuildThreadPageArgs(
 	primary := *workspaceContext.Primary
 	thread.WorkspaceID = nullString(primary.ID)
 	args.CurrentThread = &thread
-	args.Cwd = firstNonEmpty(primary.Cwd.String, primary.RootDocPath, thread.Cwd)
+	args.Cwd = firstNonEmpty(args.ThreadMetadata.PiCwd, primary.Cwd.String, primary.RootDocPath, thread.Cwd)
 	args.DocPane, err = s.buildWorkspaceDocPane(ctx, primary, activeRunID, input.DocPath, false)
 	if err != nil {
 		return nil, err
