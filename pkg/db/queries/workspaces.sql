@@ -70,6 +70,12 @@ AND archived_at IS NULL
 ORDER BY updated_at DESC
 LIMIT 1 ;
 
+-- name: UpdateWorkspaceRootDocPathForTest :exec
+UPDATE workspaces
+SET root_doc_path = sqlc.arg ('root_doc_path'),
+updated_at = CURRENT_TIMESTAMP
+WHERE id = sqlc.arg ('id') ;
+
 -- name: UpdateWorkspaceSelectedThread :exec
 UPDATE workspaces
 SET selected_thread_id = sqlc.narg ('selected_thread_id'),

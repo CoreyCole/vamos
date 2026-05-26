@@ -372,13 +372,7 @@ func TestBuildPlanSidebarStateOverlaysCurrentUserThreadMetadata(t *testing.T) {
 		service.projectRoot,
 		"overlay-lineage",
 	)
-	_, err = service.db.ExecContext(
-		t.Context(),
-		"UPDATE agent_threads SET workspace_id = ? WHERE id = ?",
-		workspace.ID,
-		thread.ID,
-	)
-	if err != nil {
+	if err := service.SetThreadPrimaryWorkspace(t.Context(), thread.ID, workspace.ID, "test"); err != nil {
 		t.Fatalf("attach thread: %v", err)
 	}
 
@@ -440,13 +434,7 @@ func TestBuildPlanSidebarStateOverlayHrefSurvivesNewerArtifactTimestamp(t *testi
 		service.projectRoot,
 		"newer-artifact-lineage",
 	)
-	_, err = service.db.ExecContext(
-		t.Context(),
-		"UPDATE agent_threads SET workspace_id = ? WHERE id = ?",
-		workspace.ID,
-		thread.ID,
-	)
-	if err != nil {
+	if err := service.SetThreadPrimaryWorkspace(t.Context(), thread.ID, workspace.ID, "test"); err != nil {
 		t.Fatalf("attach thread: %v", err)
 	}
 
@@ -502,13 +490,7 @@ func TestBuildPlanSidebarStateDoesNotExposeCrossUserWorkspaceHref(t *testing.T) 
 		service.projectRoot,
 		"other-lineage",
 	)
-	_, err = service.db.ExecContext(
-		t.Context(),
-		"UPDATE agent_threads SET workspace_id = ? WHERE id = ?",
-		workspace.ID,
-		thread.ID,
-	)
-	if err != nil {
+	if err := service.SetThreadPrimaryWorkspace(t.Context(), thread.ID, workspace.ID, "test"); err != nil {
 		t.Fatalf("attach other thread: %v", err)
 	}
 
@@ -905,13 +887,7 @@ func TestCollectPlanSidebarSourcesUsesTenantSafeWorkspaceJoin(t *testing.T) {
 		service.projectRoot,
 		"owner-lineage",
 	)
-	_, err = service.db.ExecContext(
-		t.Context(),
-		"UPDATE agent_threads SET workspace_id = ? WHERE id = ?",
-		ownerWorkspace.ID,
-		ownerThread.ID,
-	)
-	if err != nil {
+	if err := service.SetThreadPrimaryWorkspace(t.Context(), ownerThread.ID, ownerWorkspace.ID, "test"); err != nil {
 		t.Fatalf("attach owner thread: %v", err)
 	}
 	foreignThread := mustCreateAgentThread(
@@ -922,13 +898,7 @@ func TestCollectPlanSidebarSourcesUsesTenantSafeWorkspaceJoin(t *testing.T) {
 		service.projectRoot,
 		"foreign-lineage",
 	)
-	_, err = service.db.ExecContext(
-		t.Context(),
-		"UPDATE agent_threads SET workspace_id = ? WHERE id = ?",
-		foreignWorkspace.ID,
-		foreignThread.ID,
-	)
-	if err != nil {
+	if err := service.SetThreadPrimaryWorkspace(t.Context(), foreignThread.ID, foreignWorkspace.ID, "test"); err != nil {
 		t.Fatalf("attach foreign thread: %v", err)
 	}
 
@@ -2670,12 +2640,12 @@ func TestEnsureThreadWorkspaceLazyAttachment(t *testing.T) {
 			thread.ID,
 		)
 	}
-	stored, err := service.queries.GetAgentThread(context.Background(), thread.ID)
+	primary, err := service.queries.GetPrimaryWorkspaceForThread(context.Background(), db.GetPrimaryWorkspaceForThreadParams{ThreadID: thread.ID, UserEmail: "creative-mode-agent"})
 	if err != nil {
-		t.Fatalf("GetAgentThread() error = %v", err)
+		t.Fatalf("GetPrimaryWorkspaceForThread() error = %v", err)
 	}
-	if !stored.WorkspaceID.Valid || stored.WorkspaceID.String != workspace.ID {
-		t.Fatalf("stored.WorkspaceID = %v, want %s", stored.WorkspaceID, workspace.ID)
+	if primary.ID != workspace.ID {
+		t.Fatalf("primary.ID = %q, want %s", primary.ID, workspace.ID)
 	}
 	events, err := service.queries.ListWorkspaceEvents(
 		context.Background(),
@@ -4814,12 +4784,12 @@ func TestReconcileUnattachedAgentChatThreadsAttachesThreads(t *testing.T) {
 	); err != nil {
 		t.Fatalf("ReconcileUnattachedAgentChatThreads() error = %v", err)
 	}
-	updated, err := service.queries.GetAgentThread(context.Background(), thread.ID)
+	primary, err := service.queries.GetPrimaryWorkspaceForThread(context.Background(), db.GetPrimaryWorkspaceForThreadParams{ThreadID: thread.ID, UserEmail: "user@example.com"})
 	if err != nil {
-		t.Fatalf("GetAgentThread() error = %v", err)
+		t.Fatalf("GetPrimaryWorkspaceForThread() error = %v", err)
 	}
-	if !updated.WorkspaceID.Valid || updated.WorkspaceID.String == "" {
-		t.Fatalf("updated.WorkspaceID = %v, want attached workspace", updated.WorkspaceID)
+	if primary.ID == "" {
+		t.Fatalf("primary.ID empty, want attached workspace")
 	}
 }
 
@@ -5186,7 +5156,6 @@ func mustCreateAgentThread(
 		db.CreateAgentThreadParams{
 			ID:                id,
 			UserEmail:         userEmail,
-			WorkspaceID:       sql.NullString{},
 			Title:             "Test Thread",
 			Cwd:               cwd,
 			LineageID:         lineageID,

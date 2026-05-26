@@ -293,11 +293,8 @@ func TestImportPiSessionRejectsSymlinkEscapeBeforeScan(t *testing.T) {
 	); err == nil || !strings.Contains(err.Error(), "outside Pi sessions dir") {
 		t.Fatalf("ImportPiSession() error = %v, want path rejection before scan", err)
 	}
-	var count int
-	if err := service.db.QueryRowContext(
-		t.Context(),
-		`SELECT COUNT(*) FROM agent_sessions`,
-	).Scan(&count); err != nil {
+	count, err := service.queries.TestSupportCountAgentSessions(t.Context())
+	if err != nil {
 		t.Fatalf("count sessions: %v", err)
 	}
 	if count != 0 {

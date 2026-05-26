@@ -10,6 +10,25 @@ import (
 	"database/sql"
 )
 
+const backfillAgentSessionsWorkspaceForThread = `-- name: BackfillAgentSessionsWorkspaceForThread :exec
+;
+
+UPDATE agent_sessions
+SET workspace_id = ?1
+WHERE thread_id = ?2
+AND (workspace_id IS NULL OR workspace_id = '')
+`
+
+type BackfillAgentSessionsWorkspaceForThreadParams struct {
+	WorkspaceID sql.NullString `json:"workspace_id"`
+	ThreadID    sql.NullString `json:"thread_id"`
+}
+
+func (q *Queries) BackfillAgentSessionsWorkspaceForThread(ctx context.Context, arg BackfillAgentSessionsWorkspaceForThreadParams) error {
+	_, err := q.db.ExecContext(ctx, backfillAgentSessionsWorkspaceForThread, arg.WorkspaceID, arg.ThreadID)
+	return err
+}
+
 const createAgentSession = `-- name: CreateAgentSession :one
 INSERT INTO agent_sessions (
     id,

@@ -15,6 +15,8 @@ type Querier interface {
 	ArchiveAllActivePlanWorkspaces(ctx context.Context) (int64, error)
 	ArchiveMissingPlanWorkspaces(ctx context.Context, planDirRels []string) (int64, error)
 	AttachThreadToWorkspace(ctx context.Context, arg AttachThreadToWorkspaceParams) error
+	BackfillAgentRunsWorkspaceForThread(ctx context.Context, arg BackfillAgentRunsWorkspaceForThreadParams) error
+	BackfillAgentSessionsWorkspaceForThread(ctx context.Context, arg BackfillAgentSessionsWorkspaceForThreadParams) error
 	ClaimNextPendingReleaseQueueItem(ctx context.Context) (ReleaseQueueItem, error)
 	CompleteAgentRun(ctx context.Context, arg CompleteAgentRunParams) error
 	CountUnresolvedWorkspaceComments(ctx context.Context, workspaceRoot string) (int64, error)
@@ -44,6 +46,7 @@ type Querier interface {
 	DeleteSession(ctx context.Context, id string) error
 	DeleteSnapshotProcessesByBootIDs(ctx context.Context, bootIds []string) error
 	DeleteSnapshotsByExcludedBootIDs(ctx context.Context, bootIds []string) error
+	DemoteThreadPrimaryWorkspaces(ctx context.Context, threadID string) error
 	EnsureChatSessionSequence(ctx context.Context, sessionID string) error
 	FailAgentRun(ctx context.Context, arg FailAgentRunParams) error
 	FailAgentRunIfRunning(ctx context.Context, arg FailAgentRunIfRunningParams) (AgentRun, error)
@@ -74,6 +77,7 @@ type Querier interface {
 	GetLatestUserChatSelectionByScope(ctx context.Context, arg GetLatestUserChatSelectionByScopeParams) (UserChatSelection, error)
 	GetLayoutPreference(ctx context.Context, arg GetLayoutPreferenceParams) (LayoutPreference, error)
 	GetPlanWorkspace(ctx context.Context, planDirRel string) (PlanWorkspace, error)
+	GetPrimaryWorkspaceForThread(ctx context.Context, arg GetPrimaryWorkspaceForThreadParams) (Workspace, error)
 	GetRecentAuthAttempts(ctx context.Context, arg GetRecentAuthAttemptsParams) ([]AuthAttempt, error)
 	GetReleaseQueueItem(ctx context.Context, id string) (ReleaseQueueItem, error)
 	GetSession(ctx context.Context, id string) (Session, error)
@@ -104,7 +108,7 @@ type Querier interface {
 	ListAgentSessionsForUser(ctx context.Context, userEmail sql.NullString) ([]AgentSession, error)
 	ListAgentSurfaceAttachmentsBySession(ctx context.Context, chatSessionID string) ([]AgentSurfaceAttachment, error)
 	ListAgentThreads(ctx context.Context, arg ListAgentThreadsParams) ([]AgentThread, error)
-	ListAgentThreadsByWorkspace(ctx context.Context, workspaceID sql.NullString) ([]AgentThread, error)
+	ListAgentThreadsByWorkspace(ctx context.Context, workspaceID string) ([]AgentThread, error)
 	ListAgentThreadsForUserWithWorkspace(ctx context.Context, userEmail string) ([]ListAgentThreadsForUserWithWorkspaceRow, error)
 	ListChatAnnotationsBySession(ctx context.Context, sessionID string) ([]ChatAnnotation, error)
 	ListChatSessionEventsAfter(ctx context.Context, arg ListChatSessionEventsAfterParams) ([]ChatSessionEvent, error)
@@ -122,6 +126,8 @@ type Querier interface {
 	ListRecentWorkspaceErrorEventsForWorkspace(ctx context.Context, arg ListRecentWorkspaceErrorEventsForWorkspaceParams) ([]WorkspaceErrorEvent, error)
 	ListRecentWorkspaceLogEvents(ctx context.Context, arg ListRecentWorkspaceLogEventsParams) ([]WorkspaceEvent, error)
 	ListReleaseQueueEvents(ctx context.Context, arg ListReleaseQueueEventsParams) ([]ReleaseQueueEvent, error)
+	ListThreadWorkspaceAssociations(ctx context.Context, threadID string) ([]ListThreadWorkspaceAssociationsRow, error)
+	ListThreadsByPrimaryWorkspace(ctx context.Context, workspaceID string) ([]AgentThread, error)
 	ListWorkspaceDocs(ctx context.Context, workspaceID string) ([]WorkspaceDoc, error)
 	ListWorkspaceDocumentComments(ctx context.Context, arg ListWorkspaceDocumentCommentsParams) ([]DocumentComment, error)
 	ListWorkspaceEvents(ctx context.Context, arg ListWorkspaceEventsParams) ([]WorkspaceEvent, error)
@@ -144,9 +150,22 @@ type Querier interface {
 	ResolveDocumentComment(ctx context.Context, arg ResolveDocumentCommentParams) error
 	ResolveWorkspaceForDocPath(ctx context.Context, arg ResolveWorkspaceForDocPathParams) (ResolveWorkspaceForDocPathRow, error)
 	SoftDeleteDocumentComment(ctx context.Context, id string) error
+	TestSupportCountAgentSessions(ctx context.Context) (int64, error)
+	TestSupportCountAgentSessionsByPath(ctx context.Context, sessionPath sql.NullString) (int64, error)
+	TestSupportCountChatSessionEvents(ctx context.Context, sessionID string) (int64, error)
+	// Test/support queries for assertions that intentionally inspect persistence shape.
+	// Keep production code on service/query helpers; use these only from tests.
+	TestSupportCountPrimaryThreadWorkspaceAssociations(ctx context.Context, threadID string) (int64, error)
+	TestSupportCountPrimaryThreadWorkspaceAssociationsByWorkspace(ctx context.Context, workspaceID string) (int64, error)
+	TestSupportCountRelatedThreadWorkspaceAssociation(ctx context.Context, arg TestSupportCountRelatedThreadWorkspaceAssociationParams) (int64, error)
+	TestSupportCountWorkspaces(ctx context.Context) (int64, error)
+	TestSupportCountWorkspacesByRootDocPath(ctx context.Context, rootDocPath string) (int64, error)
+	TestSupportGetAgentSessionWorkspaceID(ctx context.Context, id string) (sql.NullString, error)
+	ThreadHasWorkspaceAssociation(ctx context.Context, arg ThreadHasWorkspaceAssociationParams) (bool, error)
 	UpdateAgentRunCheckpoint(ctx context.Context, arg UpdateAgentRunCheckpointParams) error
 	UpdateAgentRunStarted(ctx context.Context, arg UpdateAgentRunStartedParams) error
 	UpdateAgentRunWorkflowResult(ctx context.Context, arg UpdateAgentRunWorkflowResultParams) error
+	UpdateAgentRunWorkspaceForTest(ctx context.Context, arg UpdateAgentRunWorkspaceForTestParams) error
 	UpdateAgentSessionImportFailedState(ctx context.Context, arg UpdateAgentSessionImportFailedStateParams) error
 	UpdateAgentSessionImportFinalState(ctx context.Context, arg UpdateAgentSessionImportFinalStateParams) error
 	UpdateAgentSessionImportingState(ctx context.Context, arg UpdateAgentSessionImportingStateParams) error
@@ -161,6 +180,7 @@ type Querier interface {
 	UpdateSyntaxTheme(ctx context.Context, arg UpdateSyntaxThemeParams) (UserPreference, error)
 	UpdateTheme(ctx context.Context, arg UpdateThemeParams) (UserPreference, error)
 	UpdateWorkspaceCurrentSession(ctx context.Context, arg UpdateWorkspaceCurrentSessionParams) error
+	UpdateWorkspaceRootDocPathForTest(ctx context.Context, arg UpdateWorkspaceRootDocPathForTestParams) error
 	UpdateWorkspaceSelectedDoc(ctx context.Context, arg UpdateWorkspaceSelectedDocParams) error
 	UpdateWorkspaceSelectedThread(ctx context.Context, arg UpdateWorkspaceSelectedThreadParams) error
 	UpdateWorkspaceWorkflowState(ctx context.Context, arg UpdateWorkspaceWorkflowStateParams) error
@@ -169,6 +189,7 @@ type Querier interface {
 	UpsertDiscoveredImplWorkspace(ctx context.Context, arg UpsertDiscoveredImplWorkspaceParams) (ImplWorkspace, error)
 	UpsertDiscoveredPlanWorkspace(ctx context.Context, arg UpsertDiscoveredPlanWorkspaceParams) (PlanWorkspace, error)
 	UpsertLayoutPreference(ctx context.Context, arg UpsertLayoutPreferenceParams) (LayoutPreference, error)
+	UpsertThreadWorkspaceAssociation(ctx context.Context, arg UpsertThreadWorkspaceAssociationParams) error
 	UpsertUserChatSelection(ctx context.Context, arg UpsertUserChatSelectionParams) (UserChatSelection, error)
 	UpsertUserPreferences(ctx context.Context, arg UpsertUserPreferencesParams) (UserPreference, error)
 	UpsertWorkspaceDoc(ctx context.Context, arg UpsertWorkspaceDocParams) error

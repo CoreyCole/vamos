@@ -92,6 +92,17 @@ AND workflow_node_id = sqlc.arg ('workflow_node_id')
 ORDER BY created_at DESC
 LIMIT 1 ;
 
+-- name: BackfillAgentRunsWorkspaceForThread :exec
+UPDATE agent_runs
+SET workspace_id = sqlc.arg ('workspace_id')
+WHERE thread_id = sqlc.arg ('thread_id')
+AND (workspace_id IS NULL OR workspace_id = '') ;
+
+-- name: UpdateAgentRunWorkspaceForTest :exec
+UPDATE agent_runs
+SET workspace_id = sqlc.arg ('workspace_id')
+WHERE id = sqlc.arg ('id') ;
+
 -- name: UpdateAgentRunStarted :exec
 UPDATE agent_runs
 SET status = 'running',

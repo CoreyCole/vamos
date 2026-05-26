@@ -680,6 +680,9 @@ func (s *Service) ImportPiSession(
 	); err != nil {
 		return SessionImportResult{}, err
 	}
+	if err := q.AttachThreadToWorkspace(ctx, db.AttachThreadToWorkspaceParams{ID: thread.ID, WorkspaceID: nullString(workspace.ID)}); err != nil {
+		return SessionImportResult{}, err
+	}
 	if err := tx.Commit(); err != nil {
 		return SessionImportResult{}, err
 	}
@@ -767,6 +770,9 @@ func (s *Service) ImportPiSession(
 			HeadEntryID: nullString(scan.FinalEntryID),
 		},
 	); err != nil {
+		return SessionImportResult{}, err
+	}
+	if err := q.AttachThreadToWorkspace(ctx, db.AttachThreadToWorkspaceParams{ID: thread.ID, WorkspaceID: nullString(workspace.ID)}); err != nil {
 		return SessionImportResult{}, err
 	}
 	_ = q.UpdateWorkspaceSelectedThread(
@@ -1071,7 +1077,22 @@ func (s *Service) validateImportSessionReuse(
 	if err != nil {
 		return err
 	}
-	if !thread.WorkspaceID.Valid || strings.TrimSpace(thread.WorkspaceID.String) == "" {
+	primaryWorkspaceID := ""
+	if thread.WorkspaceID.Valid {
+		primaryWorkspaceID = strings.TrimSpace(thread.WorkspaceID.String)
+	} else {
+		rows, err := q.ListThreadWorkspaceAssociations(ctx, thread.ID)
+		if err != nil {
+			return err
+		}
+		for _, row := range rows {
+			if row.IsPrimary == 1 {
+				primaryWorkspaceID = strings.TrimSpace(row.WorkspaceID)
+				break
+			}
+		}
+	}
+	if primaryWorkspaceID == "" {
 		if workspaceOK {
 			return errors.New(
 				"pi session thread is not attached to the resolved workspace",
@@ -1079,10 +1100,10 @@ func (s *Service) validateImportSessionReuse(
 		}
 		return nil
 	}
-	if workspaceOK && thread.WorkspaceID.String != workspace.ID {
+	if workspaceOK && primaryWorkspaceID != workspace.ID {
 		return errors.New("pi session thread belongs to a different workspace")
 	}
-	if hasWorkspace && thread.WorkspaceID.String != session.WorkspaceID.String {
+	if hasWorkspace && primaryWorkspaceID != session.WorkspaceID.String {
 		return errors.New("pi session workspace does not match its thread")
 	}
 	return nil
@@ -1235,7 +1256,6 @@ func (s *Service) createImportedThreadFromScan(
 	thread, err := q.CreateAgentThread(ctx, db.CreateAgentThreadParams{
 		ID:                uuid.NewString(),
 		UserEmail:         workspace.UserEmail,
-		WorkspaceID:       nullString(workspace.ID),
 		Title:             title,
 		Cwd:               workspace.RootDocPath,
 		LineageID:         lineageID,
@@ -1258,7 +1278,6 @@ func (s *Service) createImportedThread(
 	thread, err := q.CreateAgentThread(ctx, db.CreateAgentThreadParams{
 		ID:                uuid.NewString(),
 		UserEmail:         workspace.UserEmail,
-		WorkspaceID:       nullString(workspace.ID),
 		Title:             title,
 		Cwd:               workspace.RootDocPath,
 		LineageID:         lineageID,

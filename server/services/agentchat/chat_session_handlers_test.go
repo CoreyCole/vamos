@@ -182,9 +182,8 @@ func TestPostChatSessionCommandReturnsAcceptedOutcome(t *testing.T) {
 	if rec.Code != http.StatusAccepted {
 		t.Fatalf("status = %d, want 202: %s", rec.Code, rec.Body.String())
 	}
-	var eventCount int
-	if err := service.db.QueryRowContext(context.Background(), `SELECT COUNT(*) FROM chat_session_events WHERE session_id = ?`, session.ID).
-		Scan(&eventCount); err != nil {
+	eventCount, err := service.queries.TestSupportCountChatSessionEvents(context.Background(), session.ID)
+	if err != nil {
 		t.Fatalf("count events: %v", err)
 	}
 	if eventCount != 2 {

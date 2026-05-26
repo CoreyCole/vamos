@@ -10,6 +10,25 @@ import (
 	"database/sql"
 )
 
+const backfillAgentRunsWorkspaceForThread = `-- name: BackfillAgentRunsWorkspaceForThread :exec
+;
+
+UPDATE agent_runs
+SET workspace_id = ?1
+WHERE thread_id = ?2
+AND (workspace_id IS NULL OR workspace_id = '')
+`
+
+type BackfillAgentRunsWorkspaceForThreadParams struct {
+	WorkspaceID sql.NullString `json:"workspace_id"`
+	ThreadID    string         `json:"thread_id"`
+}
+
+func (q *Queries) BackfillAgentRunsWorkspaceForThread(ctx context.Context, arg BackfillAgentRunsWorkspaceForThreadParams) error {
+	_, err := q.db.ExecContext(ctx, backfillAgentRunsWorkspaceForThread, arg.WorkspaceID, arg.ThreadID)
+	return err
+}
+
 const completeAgentRun = `-- name: CompleteAgentRun :exec
 ;
 
@@ -617,5 +636,23 @@ type UpdateAgentRunWorkflowResultParams struct {
 
 func (q *Queries) UpdateAgentRunWorkflowResult(ctx context.Context, arg UpdateAgentRunWorkflowResultParams) error {
 	_, err := q.db.ExecContext(ctx, updateAgentRunWorkflowResult, arg.WorkflowResultStatus, arg.WorkflowResultJson, arg.ID)
+	return err
+}
+
+const updateAgentRunWorkspaceForTest = `-- name: UpdateAgentRunWorkspaceForTest :exec
+;
+
+UPDATE agent_runs
+SET workspace_id = ?1
+WHERE id = ?2
+`
+
+type UpdateAgentRunWorkspaceForTestParams struct {
+	WorkspaceID sql.NullString `json:"workspace_id"`
+	ID          string         `json:"id"`
+}
+
+func (q *Queries) UpdateAgentRunWorkspaceForTest(ctx context.Context, arg UpdateAgentRunWorkspaceForTestParams) error {
+	_, err := q.db.ExecContext(ctx, updateAgentRunWorkspaceForTest, arg.WorkspaceID, arg.ID)
 	return err
 }

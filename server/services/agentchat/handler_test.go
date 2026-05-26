@@ -388,17 +388,7 @@ func TestCompatThreadQueryRedirectsToWorkspaceThread(t *testing.T) {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusFound)
 	}
 
-	stored, err := service.queries.GetAgentThread(t.Context(), thread.ID)
-	if err != nil {
-		t.Fatalf("GetAgentThread() error = %v", err)
-	}
-	if !stored.WorkspaceID.Valid || stored.WorkspaceID.String == "" {
-		t.Fatalf("WorkspaceID = %v, want lazy attachment", stored.WorkspaceID)
-	}
-	workspaceRecord, err := service.queries.GetWorkspace(
-		t.Context(),
-		stored.WorkspaceID.String,
-	)
+	workspaceRecord, err := service.queries.GetPrimaryWorkspaceForThread(t.Context(), db.GetPrimaryWorkspaceForThreadParams{ThreadID: thread.ID, UserEmail: "user@example.com"})
 	if err != nil {
 		t.Fatalf("GetWorkspace() error = %v", err)
 	}
@@ -446,14 +436,7 @@ func TestCompatThreadQueryRedirectPreservesRun(t *testing.T) {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusFound)
 	}
 
-	stored, err := service.queries.GetAgentThread(t.Context(), thread.ID)
-	if err != nil {
-		t.Fatalf("GetAgentThread() error = %v", err)
-	}
-	workspaceRecord, err := service.queries.GetWorkspace(
-		t.Context(),
-		stored.WorkspaceID.String,
-	)
+	workspaceRecord, err := service.queries.GetPrimaryWorkspaceForThread(t.Context(), db.GetPrimaryWorkspaceForThreadParams{ThreadID: thread.ID, UserEmail: "user@example.com"})
 	if err != nil {
 		t.Fatalf("GetWorkspace() error = %v", err)
 	}
@@ -469,11 +452,11 @@ func TestCompatThreadQueryRedirectPreservesRun(t *testing.T) {
 		t.Fatalf("GetAgentRun() error = %v", err)
 	}
 	if !storedRun.WorkspaceID.Valid ||
-		storedRun.WorkspaceID.String != stored.WorkspaceID.String {
+		storedRun.WorkspaceID.String != workspaceRecord.ID {
 		t.Fatalf(
 			"run WorkspaceID = %v, want %s",
 			storedRun.WorkspaceID,
-			stored.WorkspaceID.String,
+			workspaceRecord.ID,
 		)
 	}
 }
@@ -516,7 +499,7 @@ func TestSendWorkspacePromptNavigatesToConcreteThreadURL(t *testing.T) {
 		t.Context(),
 		db.GetAgentThreadForWorkspaceUserParams{
 			ThreadID:    storedWorkspace.SelectedThreadID.String,
-			WorkspaceID: nullString(workspace.ID),
+			WorkspaceID: workspace.ID,
 			UserEmail:   "user@example.com",
 		},
 	)
@@ -3073,12 +3056,7 @@ func TestTerminalRunResourcePatchClearsLiveStateBeforeNotify(t *testing.T) {
 		"user@example.com",
 	)
 	run := mustCreateAgentRun(t, service, thread.ID, "run-terminal-live-1")
-	if _, err := service.db.ExecContext(
-		ctx,
-		`UPDATE agent_runs SET workspace_id = ? WHERE id = ?`,
-		workspace.ID,
-		run.ID,
-	); err != nil {
+	if err := service.queries.UpdateAgentRunWorkspaceForTest(ctx, db.UpdateAgentRunWorkspaceForTestParams{ID: run.ID, WorkspaceID: nullString(workspace.ID)}); err != nil {
 		t.Fatalf("update run workspace_id: %v", err)
 	}
 	workspaceSignals := service.notifier.Subscribe(workspace.ID)
@@ -3222,12 +3200,7 @@ func TestPatchWorkspaceLiveTranscriptUsesLiveOnlyBuilder(t *testing.T) {
 	if err := os.MkdirAll(blockedRoot, 0o755); err != nil {
 		t.Fatalf("MkdirAll(blockedRoot) error = %v", err)
 	}
-	if _, err := service.db.ExecContext(
-		t.Context(),
-		`UPDATE workspaces SET root_doc_path = ? WHERE id = ?`,
-		blockedRoot,
-		workspace.ID,
-	); err != nil {
+	if err := service.queries.UpdateWorkspaceRootDocPathForTest(t.Context(), db.UpdateWorkspaceRootDocPathForTestParams{ID: workspace.ID, RootDocPath: blockedRoot}); err != nil {
 		t.Fatalf("update workspace artifact root: %v", err)
 	}
 	if err := os.Chmod(blockedRoot, 0o000); err != nil {
@@ -4425,14 +4398,11 @@ func assertHTTPErrorCode(t *testing.T, err error, want int) {
 
 func countAgentSessions(t *testing.T, service *Service) int {
 	t.Helper()
-	var count int
-	if err := service.db.QueryRowContext(
-		t.Context(),
-		`SELECT COUNT(*) FROM agent_sessions`,
-	).Scan(&count); err != nil {
+	count, err := service.queries.TestSupportCountAgentSessions(t.Context())
+	if err != nil {
 		t.Fatalf("count agent_sessions: %v", err)
 	}
-	return count
+	return int(count)
 }
 
 func TestThreadSidebarRendersPiSessionOpenForm(t *testing.T) {
@@ -4622,8 +4592,12 @@ func TestOpenPiSessionAllowsAuthenticatedViewerToOpenPlanOwnedByAnotherPathUser(
 	if err != nil {
 		t.Fatalf("GetAgentThread() error = %v", err)
 	}
-	if !thread.WorkspaceID.Valid || thread.WorkspaceID.String != workspace.ID {
-		t.Fatalf("thread.WorkspaceID = %v, want %s", thread.WorkspaceID, workspace.ID)
+	primary, err := service.queries.GetPrimaryWorkspaceForThread(t.Context(), db.GetPrimaryWorkspaceForThreadParams{ThreadID: thread.ID, UserEmail: pathOwner})
+	if err != nil {
+		t.Fatalf("GetPrimaryWorkspaceForThread() error = %v", err)
+	}
+	if primary.ID != workspace.ID {
+		t.Fatalf("primary.ID = %q, want %s", primary.ID, workspace.ID)
 	}
 	if thread.UserEmail != pathOwner {
 		t.Fatalf("thread.UserEmail = %q, want path owner %q", thread.UserEmail, pathOwner)
@@ -4722,27 +4696,21 @@ func TestOpenPiSessionAllowsAuthenticatedViewerToOpenPlanOwnedByAnotherPathUser(
 		t.Fatalf("repeat redirect missing %q: %s", wantURL, repeatRec.Body.String())
 	}
 	var sessionCount, workspaceCount, threadCount int
-	if err := service.db.QueryRowContext(
-		t.Context(),
-		`SELECT COUNT(*) FROM agent_sessions WHERE session_path = ?`,
-		sessionPath,
-	).Scan(&sessionCount); err != nil {
+	sessionCount64, err := service.queries.TestSupportCountAgentSessionsByPath(t.Context(), sql.NullString{String: sessionPath, Valid: true})
+	if err != nil {
 		t.Fatalf("count agent_sessions by path: %v", err)
 	}
-	if err := service.db.QueryRowContext(
-		t.Context(),
-		`SELECT COUNT(*) FROM workspaces WHERE root_doc_path = ?`,
-		planDir,
-	).Scan(&workspaceCount); err != nil {
+	workspaceCount64, err := service.queries.TestSupportCountWorkspacesByRootDocPath(t.Context(), planDir)
+	if err != nil {
 		t.Fatalf("count workspaces by artifact root: %v", err)
 	}
-	if err := service.db.QueryRowContext(
-		t.Context(),
-		`SELECT COUNT(*) FROM agent_threads WHERE workspace_id = ?`,
-		workspace.ID,
-	).Scan(&threadCount); err != nil {
+	sessionCount = int(sessionCount64)
+	workspaceCount = int(workspaceCount64)
+	threadCount64, err := service.queries.TestSupportCountPrimaryThreadWorkspaceAssociationsByWorkspace(t.Context(), workspace.ID)
+	if err != nil {
 		t.Fatalf("count agent_threads by workspace: %v", err)
 	}
+	threadCount = int(threadCount64)
 	if sessionCount != 1 || workspaceCount != 1 || threadCount != 1 {
 		t.Fatalf(
 			"counts after repeat open = sessions:%d workspaces:%d threads:%d, want 1/1/1",
@@ -5243,14 +5211,11 @@ func TestOpenPiSessionIsIdempotentForAlreadyImportedSession(t *testing.T) {
 		t.Fatalf("second redirect missing %q: %s", wantURL, secondRec.Body.String())
 	}
 
-	var threadCount int
-	if err := service.db.QueryRowContext(
-		t.Context(),
-		`SELECT COUNT(*) FROM agent_threads WHERE workspace_id = ?`,
-		second.WorkspaceID.String,
-	).Scan(&threadCount); err != nil {
+	threadCount64, err := service.queries.TestSupportCountPrimaryThreadWorkspaceAssociationsByWorkspace(t.Context(), second.WorkspaceID.String)
+	if err != nil {
 		t.Fatalf("count agent_threads: %v", err)
 	}
+	threadCount := int(threadCount64)
 	if threadCount != 1 {
 		t.Fatalf("agent thread count = %d, want 1", threadCount)
 	}
@@ -5433,9 +5398,22 @@ func TestOpenPiSessionRejectsHistoricalOwnerlessUnassignedSessionReuse(t *testin
 		`{"type":"session","id":"s-historical","timestamp":"2026-04-30T12:00:00Z","cwd":"/tmp/project"}`,
 		`{"type":"message","id":"user-1","timestamp":"2026-04-30T12:00:01Z","message":{"role":"user","content":"hello"}}`,
 	)
-	_, err := service.db.ExecContext(t.Context(), `
-INSERT INTO agent_sessions (id, source, session_path, status)
-VALUES ('historical-ownerless-unassigned', 'adopted', ?, 'unassigned')`, sessionPath)
+	_, err := service.queries.CreateAgentSession(t.Context(), db.CreateAgentSessionParams{
+		ID:                  "historical-ownerless-unassigned",
+		WorkspaceID:         sql.NullString{},
+		ThreadID:            sql.NullString{},
+		UserEmail:           sql.NullString{},
+		Source:              "adopted",
+		SessionPath:         nullString(sessionPath),
+		SessionID:           sql.NullString{},
+		ParentSessionID:     sql.NullString{},
+		Cwd:                 sql.NullString{},
+		Status:              "unassigned",
+		InferredWorkspaceID: sql.NullString{},
+		InferredPlanDir:     sql.NullString{},
+		LastError:           sql.NullString{},
+		MetadataJson:        sql.NullString{},
+	})
 	if err != nil {
 		t.Fatalf("seed historical ownerless session: %v", err)
 	}
@@ -5500,9 +5478,22 @@ func TestOpenPiSessionAllowsHistoricalOwnerlessAssignedCrossUserWhenMappingMatch
 	); err != nil {
 		t.Fatalf("AttachThreadToWorkspace() error = %v", err)
 	}
-	_, err := service.db.ExecContext(t.Context(), `
-INSERT INTO agent_sessions (id, workspace_id, thread_id, user_email, source, session_path, status)
-VALUES ('historical-ownerless-assigned', ?, ?, NULL, 'adopted', ?, 'imported')`, historicalWorkspace.ID, thread.ID, sessionPath)
+	_, err := service.queries.CreateAgentSession(t.Context(), db.CreateAgentSessionParams{
+		ID:                  "historical-ownerless-assigned",
+		WorkspaceID:         nullString(historicalWorkspace.ID),
+		ThreadID:            nullString(thread.ID),
+		UserEmail:           sql.NullString{},
+		Source:              "adopted",
+		SessionPath:         nullString(sessionPath),
+		SessionID:           sql.NullString{},
+		ParentSessionID:     sql.NullString{},
+		Cwd:                 sql.NullString{},
+		Status:              "imported",
+		InferredWorkspaceID: sql.NullString{},
+		InferredPlanDir:     sql.NullString{},
+		LastError:           sql.NullString{},
+		MetadataJson:        sql.NullString{},
+	})
 	if err != nil {
 		t.Fatalf("seed historical assigned session: %v", err)
 	}

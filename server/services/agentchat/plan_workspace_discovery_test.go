@@ -561,13 +561,11 @@ func writePlanWorkspaceFile(t *testing.T, dir, name string, modTime time.Time) s
 
 func countWorkspaces(t *testing.T, service *Service) int {
 	t.Helper()
-	var count int
-	if err := service.db.QueryRowContext(context.Background(), "SELECT COUNT(*) FROM workspaces").
-		Scan(&count); err != nil &&
-		err != sql.ErrNoRows {
+	count, err := service.queries.TestSupportCountWorkspaces(context.Background())
+	if err != nil && err != sql.ErrNoRows {
 		t.Fatalf("count workspaces: %v", err)
 	}
-	return count
+	return int(count)
 }
 
 var (

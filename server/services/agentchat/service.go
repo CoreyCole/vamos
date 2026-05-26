@@ -632,15 +632,18 @@ func (s *Service) workflowThread(
 		threadID = strings.TrimSpace(workspaceRecord.SelectedThreadID.String)
 	}
 	if threadID != "" {
-		thread, err := q.GetAgentThread(ctx, threadID)
+		thread, err := q.GetAgentThreadForWorkspaceUser(ctx, db.GetAgentThreadForWorkspaceUserParams{
+			ThreadID:    threadID,
+			WorkspaceID: workspaceRecord.ID,
+			UserEmail:   workspaceRecord.UserEmail,
+		})
 		if err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				return db.AgentThread{}, errors.New("thread is not attached to workflow workspace")
+			}
 			return db.AgentThread{}, err
 		}
-		if !thread.WorkspaceID.Valid || thread.WorkspaceID.String != workspaceRecord.ID {
-			return db.AgentThread{}, errors.New(
-				"thread is not attached to workflow workspace",
-			)
-		}
+		thread.WorkspaceID = nullString(workspaceRecord.ID)
 		if effectiveCwd == "" || strings.TrimSpace(thread.Cwd) == effectiveCwd {
 			return thread, nil
 		}
@@ -649,10 +652,9 @@ func (s *Service) workflowThread(
 	if cwd == "" {
 		cwd = s.workspaceThreadCwd(workspaceRecord)
 	}
-	return q.CreateAgentThread(ctx, db.CreateAgentThreadParams{
+	thread, err := q.CreateAgentThread(ctx, db.CreateAgentThreadParams{
 		ID:                uuid.NewString(),
 		UserEmail:         workspaceRecord.UserEmail,
-		WorkspaceID:       nullString(workspaceRecord.ID),
 		Title:             truncateTitle(prompt),
 		Cwd:               cwd,
 		LineageID:         uuid.NewString(),
@@ -660,6 +662,17 @@ func (s *Service) workflowThread(
 		ParentThreadID:    sql.NullString{},
 		ForkedFromEntryID: sql.NullString{},
 	})
+	if err != nil {
+		return db.AgentThread{}, err
+	}
+	if err := q.AttachThreadToWorkspace(ctx, db.AttachThreadToWorkspaceParams{
+		ID:          thread.ID,
+		WorkspaceID: nullString(workspaceRecord.ID),
+	}); err != nil {
+		return db.AgentThread{}, err
+	}
+	thread.WorkspaceID = nullString(workspaceRecord.ID)
+	return thread, nil
 }
 
 func (s *Service) updateWorkflowRunState(
@@ -738,8 +751,10 @@ func (s *Service) ReconcileUnattachedAgentChatThreads(
 		return err
 	}
 	for _, thread := range threads {
-		if thread.WorkspaceID.Valid {
+		if _, err := s.queries.GetPrimaryWorkspaceForThread(ctx, db.GetPrimaryWorkspaceForThreadParams{ThreadID: thread.ID, UserEmail: userEmail}); err == nil {
 			continue
+		} else if !errors.Is(err, sql.ErrNoRows) {
+			return err
 		}
 		// Historical unattached threads can point at arbitrary cwd values from
 		// before workspace doc-root constraints existed. Reconcile valid
@@ -760,9 +775,11 @@ func (s *Service) EnsureThreadWorkspace(
 	if err != nil {
 		return db.Workspace{}, db.AgentThread{}, err
 	}
-	if thread.WorkspaceID.Valid {
-		workspace, err := s.GetWorkspaceForUser(ctx, userEmail, thread.WorkspaceID.String)
-		return workspace, thread, err
+	if workspace, err := s.queries.GetPrimaryWorkspaceForThread(ctx, db.GetPrimaryWorkspaceForThreadParams{ThreadID: thread.ID, UserEmail: userEmail}); err == nil {
+		thread.WorkspaceID = sql.NullString{String: workspace.ID, Valid: true}
+		return workspace, thread, nil
+	} else if !errors.Is(err, sql.ErrNoRows) {
+		return db.Workspace{}, db.AgentThread{}, err
 	}
 
 	root, err := ValidateWorkspaceRootDocPath(thread.Cwd, s.thoughtsRoot, userEmail)
@@ -868,27 +885,11 @@ func (s *Service) attachThreadRunsAndSessionsToWorkspace(
 	if workspaceID == "" || threadID == "" {
 		return nil
 	}
-	if _, err := tx.ExecContext(
-		ctx,
-		`UPDATE agent_sessions
-			SET workspace_id = ?
-			WHERE thread_id = ?
-			AND (workspace_id IS NULL OR workspace_id = '')`,
-		workspaceID,
-		threadID,
-	); err != nil {
+	q := s.queries.WithTx(tx)
+	if err := q.BackfillAgentSessionsWorkspaceForThread(ctx, db.BackfillAgentSessionsWorkspaceForThreadParams{WorkspaceID: nullString(workspaceID), ThreadID: nullString(threadID)}); err != nil {
 		return err
 	}
-	_, err := tx.ExecContext(
-		ctx,
-		`UPDATE agent_runs
-			SET workspace_id = ?
-			WHERE thread_id = ?
-			AND (workspace_id IS NULL OR workspace_id = '')`,
-		workspaceID,
-		threadID,
-	)
-	return err
+	return q.BackfillAgentRunsWorkspaceForThread(ctx, db.BackfillAgentRunsWorkspaceForThreadParams{WorkspaceID: nullString(workspaceID), ThreadID: threadID})
 }
 
 func ValidateWorkspaceRootDocPath(
@@ -1131,7 +1132,6 @@ func (s *Service) StartWorkspaceThread(
 	thread, err := q.CreateAgentThread(ctx, db.CreateAgentThreadParams{
 		ID:                uuid.NewString(),
 		UserEmail:         userEmail,
-		WorkspaceID:       nullString(workspace.ID),
 		Title:             truncateTitle(prompt),
 		Cwd:               s.workspaceThreadCwd(workspace),
 		LineageID:         uuid.NewString(),
@@ -1142,6 +1142,13 @@ func (s *Service) StartWorkspaceThread(
 	if err != nil {
 		return nil, nil, nil, err
 	}
+	if err := q.AttachThreadToWorkspace(ctx, db.AttachThreadToWorkspaceParams{
+		ID:          thread.ID,
+		WorkspaceID: nullString(workspace.ID),
+	}); err != nil {
+		return nil, nil, nil, err
+	}
+	thread.WorkspaceID = nullString(workspace.ID)
 
 	session, err := s.createWebAgentSession(ctx, q, workspace, thread)
 	if err != nil {
@@ -1627,7 +1634,6 @@ func (s *Service) StartThread(
 	thread, err := q.CreateAgentThread(ctx, db.CreateAgentThreadParams{
 		ID:                threadID,
 		UserEmail:         userEmail,
-		WorkspaceID:       sql.NullString{},
 		Title:             title,
 		Cwd:               resolvedCwd,
 		LineageID:         lineageID,
@@ -1780,11 +1786,7 @@ func (s *Service) UpdateThreadCwd(
 		return &thread, nil
 	}
 
-	if _, err := s.db.ExecContext(ctx, `
-		UPDATE agent_threads
-		SET cwd = ?, updated_at = CURRENT_TIMESTAMP
-		WHERE id = ?
-	`, resolvedCwd, thread.ID); err != nil {
+	if err := s.queries.UpdateAgentThreadCwd(ctx, db.UpdateAgentThreadCwdParams{ID: thread.ID, Cwd: resolvedCwd}); err != nil {
 		return nil, err
 	}
 
@@ -2018,7 +2020,6 @@ func (s *Service) createForkThreadRecord(
 	thread, err := q.CreateAgentThread(ctx, db.CreateAgentThreadParams{
 		ID:                uuid.NewString(),
 		UserEmail:         sourceThread.UserEmail,
-		WorkspaceID:       sourceThread.WorkspaceID,
 		Title:             truncateTitle(prompt),
 		Cwd:               sourceThread.Cwd,
 		LineageID:         sourceThread.LineageID,

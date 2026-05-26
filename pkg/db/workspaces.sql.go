@@ -354,6 +354,25 @@ func (q *Queries) UpdateWorkspaceCurrentSession(ctx context.Context, arg UpdateW
 	return err
 }
 
+const updateWorkspaceRootDocPathForTest = `-- name: UpdateWorkspaceRootDocPathForTest :exec
+;
+
+UPDATE workspaces
+SET root_doc_path = ?1,
+updated_at = CURRENT_TIMESTAMP
+WHERE id = ?2
+`
+
+type UpdateWorkspaceRootDocPathForTestParams struct {
+	RootDocPath string `json:"root_doc_path"`
+	ID          string `json:"id"`
+}
+
+func (q *Queries) UpdateWorkspaceRootDocPathForTest(ctx context.Context, arg UpdateWorkspaceRootDocPathForTestParams) error {
+	_, err := q.db.ExecContext(ctx, updateWorkspaceRootDocPathForTest, arg.RootDocPath, arg.ID)
+	return err
+}
+
 const updateWorkspaceSelectedDoc = `-- name: UpdateWorkspaceSelectedDoc :exec
 ;
 

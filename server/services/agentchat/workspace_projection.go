@@ -2,6 +2,7 @@ package agentchat
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -214,14 +215,19 @@ func (s *Service) sharedWorkspaceThread(
 	workspaceID string,
 	threadID string,
 ) (db.AgentThread, error) {
+	workspaceID = strings.TrimSpace(workspaceID)
 	thread, err := s.queries.GetAgentThread(ctx, strings.TrimSpace(threadID))
 	if err != nil {
 		return db.AgentThread{}, err
 	}
-	if !thread.WorkspaceID.Valid ||
-		strings.TrimSpace(thread.WorkspaceID.String) != strings.TrimSpace(workspaceID) {
+	ok, err := s.threadHasWorkspaceAssociation(ctx, thread.ID, workspaceID)
+	if err != nil {
+		return db.AgentThread{}, err
+	}
+	if !ok {
 		return db.AgentThread{}, errors.New("thread does not belong to workspace")
 	}
+	thread.WorkspaceID = sql.NullString{String: workspaceID, Valid: true}
 	return thread, nil
 }
 
@@ -234,14 +240,9 @@ func (s *Service) trustedImportedWorkspaceThread(
 	if err != nil {
 		return db.Workspace{}, db.AgentThread{}, err
 	}
-	thread, err := s.queries.GetAgentThread(ctx, strings.TrimSpace(threadID))
+	thread, err := s.sharedWorkspaceThread(ctx, workspace.ID, threadID)
 	if err != nil {
 		return db.Workspace{}, db.AgentThread{}, err
-	}
-	if !thread.WorkspaceID.Valid || thread.WorkspaceID.String != workspace.ID {
-		return db.Workspace{}, db.AgentThread{}, errors.New(
-			"thread does not belong to workspace",
-		)
 	}
 
 	sessions, err := s.queries.ListAgentSessionsByWorkspace(ctx, nullString(workspace.ID))
@@ -377,7 +378,7 @@ func (s *Service) BuildWorkspaceSidebarState(
 	for _, workspace := range workspaces {
 		threads, err := s.queries.ListAgentThreadsByWorkspace(
 			ctx,
-			nullString(workspace.ID),
+			workspace.ID,
 		)
 		if err != nil {
 			threads = []db.AgentThread{}

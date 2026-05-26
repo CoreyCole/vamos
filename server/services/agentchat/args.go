@@ -29,6 +29,28 @@ type AttachedPath struct {
 	Basename string `json:"basename"`
 }
 
+type ThreadWorkspaceRole string
+
+const (
+	ThreadWorkspaceRolePrimary ThreadWorkspaceRole = "primary"
+	ThreadWorkspaceRoleRelated ThreadWorkspaceRole = "related"
+)
+
+type ThreadWorkspaceAssociation struct {
+	ThreadID    string
+	WorkspaceID string
+	IsPrimary   bool
+	Role        ThreadWorkspaceRole
+	AdoptedFrom string
+	AdoptedAt   time.Time
+}
+
+type ThreadWorkspaceContext struct {
+	Thread  db.AgentThread
+	Primary *db.Workspace
+	Related []db.Workspace
+}
+
 type TranscriptMessage struct {
 	DOMID                 string
 	EntryID               string

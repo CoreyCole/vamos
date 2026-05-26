@@ -332,8 +332,11 @@ func (s *Service) ResolveEmbeddedChatSelection(
 		return s.validateEmbeddedChatSelection(ctx, userEmail, selection)
 	}
 	selection, err := s.LastFreeformEmbeddedChatSelection(ctx, userEmail)
-	if err != nil || strings.TrimSpace(selection.WorkspaceID) == "" {
-		return selection, err
+	if err != nil {
+		return EmbeddedChatSelection{}, err
+	}
+	if strings.TrimSpace(selection.WorkspaceID) == "" {
+		return EmbeddedChatSelection{}, nil
 	}
 	return s.validateEmbeddedChatSelection(ctx, userEmail, selection)
 }

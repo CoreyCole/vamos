@@ -130,6 +130,12 @@ metadata_json = excluded.metadata_json,
 updated_at = CURRENT_TIMESTAMP
 RETURNING * ;
 
+-- name: BackfillAgentSessionsWorkspaceForThread :exec
+UPDATE agent_sessions
+SET workspace_id = sqlc.arg ('workspace_id')
+WHERE thread_id = sqlc.arg ('thread_id')
+AND (workspace_id IS NULL OR workspace_id = '') ;
+
 -- name: UpdateAgentSessionImportingState :exec
 UPDATE agent_sessions
 SET workspace_id = sqlc.narg ('workspace_id'),

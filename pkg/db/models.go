@@ -93,16 +93,26 @@ type AgentSurfaceAttachment struct {
 type AgentThread struct {
 	ID                string         `json:"id"`
 	UserEmail         string         `json:"user_email"`
-	WorkspaceID       sql.NullString `json:"workspace_id"`
 	Title             string         `json:"title"`
 	Cwd               string         `json:"cwd"`
 	LineageID         string         `json:"lineage_id"`
 	HeadEntryID       sql.NullString `json:"head_entry_id"`
 	ParentThreadID    sql.NullString `json:"parent_thread_id"`
 	ForkedFromEntryID sql.NullString `json:"forked_from_entry_id"`
+	WorkspaceID       sql.NullString `json:"workspace_id"`
 	CreatedAt         time.Time      `json:"created_at"`
 	UpdatedAt         time.Time      `json:"updated_at"`
 	ArchivedAt        sql.NullTime   `json:"archived_at"`
+}
+
+type AgentThreadWorkspace struct {
+	ThreadID    string    `json:"thread_id"`
+	WorkspaceID string    `json:"workspace_id"`
+	IsPrimary   int64     `json:"is_primary"`
+	Role        string    `json:"role"`
+	AdoptedFrom string    `json:"adopted_from"`
+	AdoptedAt   time.Time `json:"adopted_at"`
+	CreatedAt   time.Time `json:"created_at"`
 }
 
 type AuthAttempt struct {

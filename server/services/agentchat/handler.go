@@ -1647,7 +1647,7 @@ func (h *Handler) ResumeWorkspaceThread(c echo.Context) error {
 		c.Request().Context(),
 		db.GetAgentThreadForWorkspaceUserParams{
 			ThreadID:    threadID,
-			WorkspaceID: nullString(workspaceID),
+			WorkspaceID: workspaceID,
 			UserEmail:   userEmail,
 		},
 	); err != nil {
@@ -1695,7 +1695,7 @@ func (h *Handler) ResumeEmbeddedWorkspaceThread(c echo.Context) error {
 		c.Request().Context(),
 		db.GetAgentThreadForWorkspaceUserParams{
 			ThreadID:    threadID,
-			WorkspaceID: nullString(workspaceID),
+			WorkspaceID: workspaceID,
 			UserEmail:   userEmail,
 		},
 	); err != nil {
@@ -1785,7 +1785,7 @@ func (h *Handler) ForkWorkspaceThread(c echo.Context) error {
 		c.Request().Context(),
 		db.GetAgentThreadForWorkspaceUserParams{
 			ThreadID:    sourceThreadID,
-			WorkspaceID: nullString(workspaceID),
+			WorkspaceID: workspaceID,
 			UserEmail:   userEmail,
 		},
 	); err != nil {

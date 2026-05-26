@@ -113,6 +113,9 @@ func prepareSchemaCompatibilityMigrations(ctx context.Context, database *sql.DB)
 	if err := ensureLayoutPreferencesViewportClass(ctx, database); err != nil {
 		return err
 	}
+	if err := ensureAgentThreadWorkspaces(ctx, database); err != nil {
+		return err
+	}
 	return ensureArtifactCommentsDocPathColumn(ctx, database)
 }
 
@@ -162,13 +165,7 @@ func runRuntimeMigrations(ctx context.Context, database *sql.DB) error {
 	if err := ensureAgentSessionsUserEmailBackfill(ctx, database); err != nil {
 		return err
 	}
-	if err := ensureColumn(
-		ctx,
-		database,
-		"agent_threads",
-		"workspace_id",
-		"TEXT REFERENCES workspaces(id)",
-	); err != nil {
+	if err := ensureAgentThreadWorkspaces(ctx, database); err != nil {
 		return err
 	}
 	if err := ensureColumn(
@@ -527,6 +524,47 @@ func ensurePlanWorkspacesImplMetadataColumns(
 		}
 	}
 	return ensureIndex(ctx, database, "CREATE INDEX IF NOT EXISTS idx_plan_workspaces_lifecycle_activity ON plan_workspaces (qrspi_lifecycle, artifact_updated_at DESC, plan_dir_rel) WHERE archived_at IS NULL")
+}
+
+func ensureAgentThreadWorkspaces(ctx context.Context, database *sql.DB) error {
+	exists, err := tableExists(ctx, database, "agent_threads")
+	if err != nil || !exists {
+		return err
+	}
+	statements := []string{
+		`CREATE TABLE IF NOT EXISTS agent_thread_workspaces (
+			thread_id TEXT NOT NULL REFERENCES agent_threads(id) ON DELETE CASCADE,
+			workspace_id TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+			is_primary INTEGER NOT NULL DEFAULT 0,
+			role TEXT NOT NULL DEFAULT 'related' CHECK (role IN ('primary', 'related')),
+			adopted_from TEXT NOT NULL DEFAULT '',
+			adopted_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			PRIMARY KEY (thread_id, workspace_id)
+		)`,
+		`CREATE UNIQUE INDEX IF NOT EXISTS idx_agent_thread_workspaces_primary
+			ON agent_thread_workspaces(thread_id)
+			WHERE is_primary = 1`,
+		`CREATE INDEX IF NOT EXISTS idx_agent_thread_workspaces_workspace
+			ON agent_thread_workspaces(workspace_id, thread_id)`,
+	}
+	for _, statement := range statements {
+		if _, err := database.ExecContext(ctx, statement); err != nil {
+			return err
+		}
+	}
+	hasWorkspaceID, err := tableColumnExists(ctx, database, "agent_threads", "workspace_id")
+	if err != nil || !hasWorkspaceID {
+		return err
+	}
+	if _, err := database.ExecContext(ctx, `
+		INSERT OR IGNORE INTO agent_thread_workspaces (thread_id, workspace_id, is_primary, role, adopted_from)
+		SELECT id, workspace_id, 1, 'primary', 'migration'
+		FROM agent_threads
+		WHERE workspace_id IS NOT NULL AND TRIM(workspace_id) != ''`); err != nil {
+		return err
+	}
+	return dropColumnIfExists(ctx, database, "agent_threads", "workspace_id")
 }
 
 func ensureAgentRunsWorkflowColumns(ctx context.Context, database *sql.DB) error {

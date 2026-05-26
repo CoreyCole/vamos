@@ -316,7 +316,6 @@ ON workspace_error_events (workspace_slug, last_seen_at DESC, id DESC) ;
 CREATE TABLE IF NOT EXISTS agent_threads (
 id TEXT PRIMARY KEY,
 user_email TEXT NOT NULL,
-workspace_id TEXT REFERENCES workspaces (id),
 title TEXT NOT NULL DEFAULT 'New Chat',
 cwd TEXT NOT NULL,
 lineage_id TEXT NOT NULL,
@@ -331,6 +330,25 @@ archived_at DATETIME
 CREATE INDEX IF NOT EXISTS idx_agent_threads_user_updated
 ON agent_threads (user_email, updated_at DESC)
 WHERE archived_at IS NULL ;
+
+CREATE TABLE IF NOT EXISTS agent_thread_workspaces (
+thread_id TEXT NOT NULL REFERENCES agent_threads (id) ON DELETE CASCADE,
+workspace_id TEXT NOT NULL REFERENCES workspaces (id) ON DELETE CASCADE,
+is_primary INTEGER NOT NULL DEFAULT 0,
+role TEXT NOT NULL DEFAULT 'related'
+CHECK (role IN ('primary', 'related')),
+adopted_from TEXT NOT NULL DEFAULT '',
+adopted_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+PRIMARY KEY (thread_id, workspace_id)
+) ;
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_agent_thread_workspaces_primary
+ON agent_thread_workspaces (thread_id)
+WHERE is_primary = 1 ;
+
+CREATE INDEX IF NOT EXISTS idx_agent_thread_workspaces_workspace
+ON agent_thread_workspaces (workspace_id, thread_id) ;
 
 CREATE TABLE IF NOT EXISTS agent_sessions (
 id TEXT PRIMARY KEY,
