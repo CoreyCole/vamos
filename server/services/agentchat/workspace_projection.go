@@ -312,11 +312,11 @@ func (s *Service) RedirectURLForImportedThread(
 	workspaceID string,
 	threadID string,
 ) (string, error) {
-	workspace, thread, err := s.trustedImportedWorkspaceThread(ctx, workspaceID, threadID)
+	_, thread, err := s.trustedImportedWorkspaceThread(ctx, workspaceID, threadID)
 	if err != nil {
 		return "", err
 	}
-	return workspaceThreadHrefForWorkspace(workspace, thread.ID), nil
+	return threadHref(thread.ID), nil
 }
 
 func (s *Service) BuildWorkspaceLiveTranscriptState(
@@ -478,17 +478,8 @@ func threadHref(threadID string) string {
 	return "/agent-chat?" + values.Encode()
 }
 
-func workspaceThreadHrefForWorkspace(workspace db.Workspace, threadID string) string {
-	threadID = strings.TrimSpace(threadID)
-	if threadID == "" {
-		return ""
-	}
-	values := url.Values{}
-	if workspace.ID != "" {
-		values.Set("chat_workspace", workspace.ID)
-	}
-	values.Set("thread", threadID)
-	return thoughtsDocRedirectURL(workspace.RootDocPath, values)
+func workspaceThreadHrefForWorkspace(_ db.Workspace, threadID string) string {
+	return threadHref(threadID)
 }
 
 func workspaceThreadHref(workspaceID, threadID string) string {
@@ -773,25 +764,9 @@ func (s *Service) workspaceSessionHistoryItem(
 }
 
 func (s *Service) workspaceSessionThreadHref(
-	workspaceID, threadID, planDir string,
+	_, threadID, _ string,
 ) string {
-	workspaceID = strings.TrimSpace(workspaceID)
-	threadID = strings.TrimSpace(threadID)
-	if workspaceID == "" || threadID == "" {
-		return ""
-	}
-	values := url.Values{
-		"chat_workspace": []string{workspaceID},
-		"thread":         []string{threadID},
-	}
-	if href := thoughtsDocRedirectURLForRoot(
-		s.thoughtsRoot,
-		planDir,
-		values,
-	); href != "" {
-		return href
-	}
-	return workspaceThreadHref(workspaceID, threadID)
+	return threadHref(threadID)
 }
 
 func firstCommandFromPrompt(prompt string) string {
@@ -1143,14 +1118,11 @@ func workspaceLogItem(event db.WorkspaceEvent, workspace db.Workspace) Workspace
 }
 
 func workspaceLogThreadHref(
-	event db.WorkspaceEvent,
-	workspace db.Workspace,
+	_ db.WorkspaceEvent,
+	_ db.Workspace,
 	threadID string,
 ) string {
-	if strings.TrimSpace(workspace.ID) == strings.TrimSpace(event.WorkspaceID) {
-		return workspaceThreadHrefForWorkspace(workspace, threadID)
-	}
-	return workspaceThreadHref(event.WorkspaceID, threadID)
+	return threadHref(threadID)
 }
 
 func workspaceLogDetail(event db.WorkspaceEvent) string {

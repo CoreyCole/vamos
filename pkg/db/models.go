@@ -95,11 +95,11 @@ type AgentThread struct {
 	UserEmail         string         `json:"user_email"`
 	Title             string         `json:"title"`
 	Cwd               string         `json:"cwd"`
+	WorkspaceID       sql.NullString `json:"workspace_id"`
 	LineageID         string         `json:"lineage_id"`
 	HeadEntryID       sql.NullString `json:"head_entry_id"`
 	ParentThreadID    sql.NullString `json:"parent_thread_id"`
 	ForkedFromEntryID sql.NullString `json:"forked_from_entry_id"`
-	WorkspaceID       sql.NullString `json:"workspace_id"`
 	CreatedAt         time.Time      `json:"created_at"`
 	UpdatedAt         time.Time      `json:"updated_at"`
 	ArchivedAt        sql.NullTime   `json:"archived_at"`

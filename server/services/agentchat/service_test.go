@@ -3504,7 +3504,7 @@ func TestWorkspaceSessionHistoryItem(t *testing.T) {
 	want := WorkspaceSessionHistoryItem{
 		ID:                 "session-row-1",
 		ThreadID:           "thread-1",
-		ThreadHref:         workspaceThreadHref("workspace-1", "thread-1"),
+		ThreadHref:         threadHref("thread-1"),
 		Title:              "header-session",
 		Status:             "imported",
 		SourceLabel:        "pi",
