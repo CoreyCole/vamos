@@ -65,7 +65,7 @@ func (s *Service) resolveAttachableCandidatePath(rawPath, cwd string) (string, b
 	candidate := rawPath
 	if !filepath.IsAbs(candidate) {
 		if strings.HasPrefix(filepath.ToSlash(candidate), "thoughts/") {
-			candidate = filepath.Join(filepath.Dir(s.thoughtsRoot), filepath.FromSlash(strings.TrimPrefix(filepath.ToSlash(candidate), "thoughts/")))
+			candidate = filepath.Join(s.thoughtsRoot, filepath.FromSlash(strings.TrimPrefix(filepath.ToSlash(candidate), "thoughts/")))
 		} else if strings.TrimSpace(cwd) != "" {
 			candidate = filepath.Join(cwd, candidate)
 		} else {

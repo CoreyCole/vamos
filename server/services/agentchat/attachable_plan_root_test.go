@@ -35,6 +35,25 @@ func TestResolveAttachablePlanRootMostSpecificNestedQRSPIPlan(t *testing.T) {
 	}
 }
 
+func TestResolveAttachablePlanRootAcceptsThoughtsRelativePath(t *testing.T) {
+	thoughtsRoot := t.TempDir()
+	plan := filepath.Join(thoughtsRoot, "creative-mode-agent", "plans", "demo")
+	if err := os.MkdirAll(plan, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(plan, "design.md"), []byte("ok"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	svc := &Service{thoughtsRoot: thoughtsRoot}
+	got, ok := svc.ResolveAttachablePlanRoot("thoughts/creative-mode-agent/plans/demo/design.md")
+	if !ok {
+		t.Fatal("ResolveAttachablePlanRoot() ok = false")
+	}
+	if got.AbsPath != plan || got.RelPath != "creative-mode-agent/plans/demo" {
+		t.Fatalf("root = %+v, want %s", got, plan)
+	}
+}
+
 func TestResolveAttachablePlanRootRejectsLightweightPlanningReview(t *testing.T) {
 	thoughtsRoot := t.TempDir()
 	review := filepath.Join(thoughtsRoot, "agent", "plans", "parent", "reviews", "2026-05-26_parent_plan-review")
