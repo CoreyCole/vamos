@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -292,7 +293,9 @@ func (s *ImplWorkspaceSyncer) reconcileMissing(
 	for _, row := range rows {
 		if row.Status != string(ImplWorkspaceStatusActive) ||
 			activeSlugs.Has(row.WorkspaceSlug) ||
-			configured.Has(row.WorkspaceSlug) {
+			configured.Has(row.WorkspaceSlug) ||
+			row.WorkspaceSlug == "stage" ||
+			!rowInDiscoveryScope(row, input.Discovery) {
 			continue
 		}
 		status, evidence := DetermineMissingWorkspaceStatus(
@@ -332,6 +335,39 @@ func configuredCheckoutSlugs(cfg ImplWorkspaceDiscoveryConfig) collections.Set[s
 		}
 	}
 	return slugs
+}
+
+func rowInDiscoveryScope(row db.ImplWorkspace, cfg ImplWorkspaceDiscoveryConfig) bool {
+	discovery := NormalizeDiscoveryConfig(DiscoveryConfig{
+		MainCheckoutPath: cfg.MainCheckoutPath,
+		ParentDir:        cfg.ParentDir,
+		CheckoutPrefixes: cfg.CheckoutPrefixes,
+		MainCheckoutName: cfg.MainCheckoutName,
+	})
+	checkout := strings.TrimSpace(row.CheckoutPath)
+	if checkout == "" {
+		return false
+	}
+	if samePath(checkout, discovery.MainCheckoutPath) {
+		return true
+	}
+	parent, err := discoveryParentDir(discovery)
+	if err != nil || strings.TrimSpace(parent) == "" {
+		return false
+	}
+	cleanParent := cleanPathKey(parent)
+	cleanCheckout := cleanPathKey(checkout)
+	if cleanParent == "" || cleanCheckout == "" || strings.TrimPrefix(cleanCheckout, cleanParent) == cleanCheckout {
+		return false
+	}
+	rel, err := filepath.Rel(parent, checkout)
+	if err != nil || rel == "." || strings.HasPrefix(rel, "..") || filepath.IsAbs(rel) {
+		return false
+	}
+	if strings.Contains(rel, string(filepath.Separator)) {
+		return false
+	}
+	return hasConfiguredPrefix(filepath.Base(checkout), discovery.CheckoutPrefixes)
 }
 
 func implWorkspaceRowChanged(before, after db.ImplWorkspace) bool {

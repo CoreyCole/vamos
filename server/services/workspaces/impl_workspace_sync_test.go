@@ -105,6 +105,56 @@ func TestImplWorkspaceSyncDoesNotCleanupConfiguredCheckoutWhenMissingFromScan(t 
 	}
 }
 
+func TestImplWorkspaceSyncerDoesNotCleanupRowsOutsideDiscoveryScope(t *testing.T) {
+	ctx := context.Background()
+	parent := t.TempDir()
+	vamosCheckout := makeImplSyncCheckout(t, parent, "vamos")
+	makeImplSyncCheckout(t, parent, "monorepo-feature")
+	queries := openImplSyncTestQueries(t)
+	_, err := queries.UpsertDiscoveredImplWorkspace(
+		ctx,
+		db.UpsertDiscoveredImplWorkspaceParams{
+			WorkspaceSlug: "stage",
+			CheckoutPath:  vamosCheckout,
+			DisplayName:   "Stage",
+			Host:          "stage.workspaces.example.test",
+			Url:           "https://stage.workspaces.example.test/",
+			Status:        string(ImplWorkspaceStatusActive),
+			Branch:        nullableString("main"),
+			CommitHash:    nullableString(gitCommit(ctx, vamosCheckout)),
+			TrunkBranch:   nullableString("main"),
+		},
+	)
+	if err != nil {
+		t.Fatalf("UpsertDiscoveredImplWorkspace: %v", err)
+	}
+
+	result, err := (&ImplWorkspaceSyncer{Queries: queries}).Sync(
+		ctx,
+		ImplWorkspaceSyncInput{
+			Discovery: ImplWorkspaceDiscoveryConfig{
+				ParentDir:        parent,
+				Domain:           "workspaces.example.test",
+				CheckoutPrefixes: []string{"monorepo"},
+				MainCheckoutPath: filepath.Join(parent, "monorepo-main"),
+			},
+		},
+	)
+	if err != nil {
+		t.Fatalf("Sync: %v", err)
+	}
+	if result.CleanedUp != 0 || result.Merged != 0 {
+		t.Fatalf("result = %+v, want out-of-scope vamos row preserved", result)
+	}
+	row, err := queries.GetImplWorkspace(ctx, "stage")
+	if err != nil {
+		t.Fatalf("GetImplWorkspace(stage): %v", err)
+	}
+	if row.Status != string(ImplWorkspaceStatusActive) {
+		t.Fatalf("status = %q, want active", row.Status)
+	}
+}
+
 func TestImplWorkspaceSyncerCreatesRowsAndWorkspaceEnv(t *testing.T) {
 	ctx := context.Background()
 	parent := t.TempDir()
