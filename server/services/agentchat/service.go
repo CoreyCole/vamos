@@ -2565,7 +2565,22 @@ func (s *Service) FinalizeRun(ctx context.Context, result conversation.RunResult
 		s.NotifyWorkspaceForEvent(*event)
 	}
 	s.notifyThreadScope(ctx, run.ThreadID, PatchRunHeader)
-	if s.workflowService != nil {
+	adoption := ThreadWorkspaceAdoptionResult{}
+	if !run.WorkflowNodeID.Valid {
+		var adoptionErr error
+		adoption, adoptionErr = s.AdoptThreadWorkspacesForRun(ctx, ThreadWorkspaceAdoptionInput{
+			ThreadID: run.ThreadID,
+			RunID:    run.ID,
+			Source:   "run_complete",
+		})
+		if adoptionErr != nil {
+			return adoptionErr
+		}
+		if adoption.Adopted {
+			s.notifyThreadScope(ctx, run.ThreadID, PatchThreadPage)
+		}
+	}
+	if s.workflowService != nil && !adoption.AppliedWorkflowResult {
 		return s.workflowService.OnRunComplete(ctx, result)
 	}
 	return nil

@@ -239,6 +239,47 @@ func TestQRSPIXMLParserRejectsCompleteWithoutOutcome(t *testing.T) {
 	}
 }
 
+func TestQRSPIXMLParserStructuredNextAndWorkspaceMetadata(t *testing.T) {
+	output := `<qrspi-result>
+  <stage>workspace</stage>
+  <status>complete</status>
+  <outcome>complete</outcome>
+  <workspaceMetadata>
+    <planWorkspace>/tmp/thoughts/agent/plans/example</planWorkspace>
+    <implementationWorkspace>/tmp/vamos-example</implementationWorkspace>
+    <trunkBranch>main</trunkBranch>
+    <stackBottomBranch>cc/example_slice-1</stackBottomBranch>
+    <parentBranch>main</parentBranch>
+    <currentBranch>cc/example_slice-1</currentBranch>
+  </workspaceMetadata>
+  <policy><autoMode>false</autoMode><enablePlanReviews>true</enablePlanReviews><invalidResultRetryLimit>1</invalidResultRetryLimit></policy>
+  <summary><plan-goal>Goal.</plan-goal><stage-completed>Workspace ready.</stage-completed><key-decisions>Start implement.</key-decisions></summary>
+  <artifact>/tmp/thoughts/agent/plans/example/plan.md</artifact>
+  <next>
+    <step>Read q-implement.</step>
+    <step>Start /q-implement immediately.</step>
+  </next>
+</qrspi-result>`
+	parsedAny, err := (QRSPIXMLParser{}).Parse(output, wruntime.ParseContext{ExpectedNodeID: NodeWorkspace})
+	if err != nil {
+		t.Fatalf("Parse() error = %v", err)
+	}
+	parsed := parsedAny.(ResultXML)
+	if parsed.WorkspaceMetadata.ImplementationWorkspace != "/tmp/vamos-example" || len(parsed.Next.Steps) != 2 {
+		t.Fatalf("parsed metadata/next = %+v / %+v", parsed.WorkspaceMetadata, parsed.Next)
+	}
+	result, err := (QRSPIResultConverter{}).ToWorkflowResult(parsed, wruntime.ParseContext{WorkflowType: "qrspi"})
+	if err != nil {
+		t.Fatalf("ToWorkflowResult() error = %v", err)
+	}
+	if !strings.Contains(result.DisplayNext, "Read q-implement") || !strings.Contains(result.DisplayNext, "Start /q-implement") {
+		t.Fatalf("DisplayNext = %q", result.DisplayNext)
+	}
+	if got := WorkflowResultImplementationWorkspace(result); got != "/tmp/vamos-example" {
+		t.Fatalf("ImplementationWorkspace = %q", got)
+	}
+}
+
 func TestQRSPIResultConverter(t *testing.T) {
 	parser := QRSPIXMLParser{}
 	parsedAny, err := parser.Parse(

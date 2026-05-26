@@ -31,6 +31,12 @@ WHERE
     lineage_id = sqlc.arg('lineage_id')
     AND entry_id = sqlc.arg('entry_id');
 
+-- name: ListAgentEntriesByRun :many
+SELECT *
+FROM agent_entries
+WHERE origin_run_id = sqlc.narg('origin_run_id')
+ORDER BY origin_order ASC;
+
 -- name: ListAgentEntryPath :many
 WITH RECURSIVE ancestry AS (
     SELECT

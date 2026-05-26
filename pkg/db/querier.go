@@ -96,6 +96,7 @@ type Querier interface {
 	LinkExternalAgentSession(ctx context.Context, arg LinkExternalAgentSessionParams) (ChatSessionExternalLink, error)
 	ListActiveImplWorkspaces(ctx context.Context) ([]ImplWorkspace, error)
 	ListActiveReleaseQueueItems(ctx context.Context) ([]ReleaseQueueItem, error)
+	ListAgentEntriesByRun(ctx context.Context, originRunID sql.NullString) ([]AgentEntry, error)
 	ListAgentEntryPath(ctx context.Context, arg ListAgentEntryPathParams) ([]ListAgentEntryPathRow, error)
 	ListAgentRunAttachmentsForRun(ctx context.Context, runID string) ([]AgentRunAttachment, error)
 	ListAgentRunAttachmentsForThread(ctx context.Context, threadID string) ([]AgentRunAttachment, error)

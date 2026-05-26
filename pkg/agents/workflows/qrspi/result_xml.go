@@ -11,16 +11,31 @@ import (
 )
 
 type ResultXML struct {
-	XMLName   xml.Name      `xml:"qrspi-result"       json:"-"`
-	Stage     string        `xml:"stage"              json:"stage"`
-	Status    string        `xml:"status"             json:"status"`
-	Outcome   string        `xml:"outcome"            json:"outcome,omitempty"`
-	Workspace string        `xml:"workspace"          json:"workspace,omitempty"`
-	Policy    PolicyXML     `xml:"policy"             json:"policy"`
-	Summary   SummaryXML    `xml:"summary"            json:"summary"`
-	Artifact  string        `xml:"artifact"           json:"artifact"`
-	Artifacts []ArtifactXML `xml:"artifacts>artifact" json:"artifacts,omitempty"`
-	Next      string        `xml:"next"               json:"next"`
+	XMLName           xml.Name             `xml:"qrspi-result"       json:"-"`
+	Stage             string               `xml:"stage"              json:"stage"`
+	Status            string               `xml:"status"             json:"status"`
+	Outcome           string               `xml:"outcome"             json:"outcome,omitempty"`
+	Workspace         string               `xml:"workspace"           json:"workspace,omitempty"`
+	WorkspaceMetadata WorkspaceMetadataXML `xml:"workspaceMetadata"  json:"workspaceMetadata,omitempty"`
+	Policy            PolicyXML            `xml:"policy"              json:"policy"`
+	Summary           SummaryXML           `xml:"summary"             json:"summary"`
+	Artifact          string               `xml:"artifact"            json:"artifact"`
+	Artifacts         []ArtifactXML        `xml:"artifacts>artifact"  json:"artifacts,omitempty"`
+	Next              NextXML              `xml:"next"                json:"next"`
+}
+
+type WorkspaceMetadataXML struct {
+	PlanWorkspace           string `xml:"planWorkspace"           json:"planWorkspace,omitempty"`
+	ImplementationWorkspace string `xml:"implementationWorkspace" json:"implementationWorkspace,omitempty"`
+	TrunkBranch             string `xml:"trunkBranch"             json:"trunkBranch,omitempty"`
+	StackBottomBranch       string `xml:"stackBottomBranch"       json:"stackBottomBranch,omitempty"`
+	ParentBranch            string `xml:"parentBranch"            json:"parentBranch,omitempty"`
+	CurrentBranch           string `xml:"currentBranch"           json:"currentBranch,omitempty"`
+}
+
+type NextXML struct {
+	Text  string   `xml:",chardata" json:"text,omitempty"`
+	Steps []string `xml:"step"      json:"steps,omitempty"`
 }
 
 type PolicyXML struct {
@@ -42,6 +57,54 @@ type ArtifactXML struct {
 	Path string `xml:",chardata" json:"path"`
 }
 
+func (m WorkspaceMetadataXML) Trimmed() WorkspaceMetadataXML {
+	return WorkspaceMetadataXML{
+		PlanWorkspace:           strings.TrimSpace(m.PlanWorkspace),
+		ImplementationWorkspace: strings.TrimSpace(m.ImplementationWorkspace),
+		TrunkBranch:             strings.TrimSpace(m.TrunkBranch),
+		StackBottomBranch:       strings.TrimSpace(m.StackBottomBranch),
+		ParentBranch:            strings.TrimSpace(m.ParentBranch),
+		CurrentBranch:           strings.TrimSpace(m.CurrentBranch),
+	}
+}
+
+func (n NextXML) Trimmed() NextXML {
+	steps := make([]string, 0, len(n.Steps))
+	for _, step := range n.Steps {
+		if trimmed := strings.TrimSpace(step); trimmed != "" {
+			steps = append(steps, trimmed)
+		}
+	}
+	return NextXML{Text: strings.TrimSpace(n.Text), Steps: steps}
+}
+
+func (n NextXML) DisplayText() string {
+	n = n.Trimmed()
+	if len(n.Steps) > 0 {
+		return strings.Join(n.Steps, "\n")
+	}
+	return n.Text
+}
+
+func WorkflowResultWorkspaceMetadata(result wruntime.WorkflowResult) WorkspaceMetadataXML {
+	if len(result.Raw) == 0 {
+		return WorkspaceMetadataXML{}
+	}
+	var parsed ResultXML
+	if err := json.Unmarshal(result.Raw, &parsed); err != nil {
+		return WorkspaceMetadataXML{}
+	}
+	return parsed.WorkspaceMetadata.Trimmed()
+}
+
+func WorkflowResultImplementationWorkspace(result wruntime.WorkflowResult) string {
+	return WorkflowResultWorkspaceMetadata(result).ImplementationWorkspace
+}
+
+func QRSPIResultWorkspaceMetadata(result ResultXML) WorkspaceMetadataXML {
+	return result.WorkspaceMetadata.Trimmed()
+}
+
 type QRSPIXMLParser struct{}
 
 func (QRSPIXMLParser) Parse(output string, ctx wruntime.ParseContext) (any, error) {
@@ -60,8 +123,9 @@ func (QRSPIXMLParser) Parse(output string, ctx wruntime.ParseContext) (any, erro
 	parsed.Status = strings.TrimSpace(parsed.Status)
 	parsed.Outcome = strings.TrimSpace(parsed.Outcome)
 	parsed.Workspace = strings.TrimSpace(parsed.Workspace)
+	parsed.WorkspaceMetadata = parsed.WorkspaceMetadata.Trimmed()
 	parsed.Artifact = strings.TrimSpace(parsed.Artifact)
-	parsed.Next = strings.TrimSpace(parsed.Next)
+	parsed.Next = parsed.Next.Trimmed()
 	if parsed.Stage == "" {
 		return nil, fmt.Errorf("qrspi result stage is required")
 	}
@@ -159,7 +223,7 @@ func (QRSPIResultConverter) ToWorkflowResult(
 		PrimaryArtifact: strings.TrimSpace(parsed.Artifact),
 		Artifacts:       artifacts,
 		Workspace:       strings.TrimSpace(parsed.Workspace),
-		DisplayNext:     strings.TrimSpace(parsed.Next),
+		DisplayNext:     parsed.Next.DisplayText(),
 		Policy:          policy,
 		Evidence: wruntime.EvidenceRef{
 			RunID:       ctx.RunID,

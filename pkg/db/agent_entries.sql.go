@@ -99,6 +99,48 @@ func (q *Queries) GetAgentEntry(ctx context.Context, arg GetAgentEntryParams) (A
 	return i, err
 }
 
+const listAgentEntriesByRun = `-- name: ListAgentEntriesByRun :many
+SELECT lineage_id, entry_id, parent_entry_id, entry_type, origin_order, payload_json, origin_thread_id, origin_run_id, origin_session_id, session_timestamp, created_at
+FROM agent_entries
+WHERE origin_run_id = ?1
+ORDER BY origin_order ASC
+`
+
+func (q *Queries) ListAgentEntriesByRun(ctx context.Context, originRunID sql.NullString) ([]AgentEntry, error) {
+	rows, err := q.db.QueryContext(ctx, listAgentEntriesByRun, originRunID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []AgentEntry
+	for rows.Next() {
+		var i AgentEntry
+		if err := rows.Scan(
+			&i.LineageID,
+			&i.EntryID,
+			&i.ParentEntryID,
+			&i.EntryType,
+			&i.OriginOrder,
+			&i.PayloadJson,
+			&i.OriginThreadID,
+			&i.OriginRunID,
+			&i.OriginSessionID,
+			&i.SessionTimestamp,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listAgentEntryPath = `-- name: ListAgentEntryPath :many
 WITH RECURSIVE ancestry AS (
     SELECT
