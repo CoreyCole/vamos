@@ -1,0 +1,55 @@
+# Verify
+
+This is the standard Vamos verification entrypoint. `/q-verify` must read this file before choosing project-specific checks. It summarizes the verification layers and points to the detailed guides.
+
+## Verification layers
+
+1. **Code generation / build**
+
+   - `templ generate ./server/services/agentchat` when Agent Chat templ files changed.
+   - `just build --no-restart` for compile/generation without restarting a managed workspace.
+
+1. **Unit and package tests**
+
+   - Run focused package tests for touched code.
+   - Common Agent Chat / Thoughts regression set:
+     ```bash
+     go test ./server/services/agentchat ./server/services/markdown
+     go test ./server/config ./server/services/workspaces ./server/services/agentchat ./cmd/build-agents/internal/build
+     ```
+
+1. **Story validation and generated E2E freshness**
+
+   - Required when touching story specs, selectors, steps, generated tests, Agent Chat, Thoughts workbench, route state, or browser-facing behavior:
+     ```bash
+     go run ./cmd/vamos-runtime e2e check
+     go run ./cmd/vamos-runtime e2e generate --check
+     ```
+   - `e2e check` is static validation only. It does not run a browser or prove app behavior.
+
+1. **Browser E2E runs**
+
+   - Required for browser-facing changes before human testing.
+   - Use `docs/e2e-story-testing.md` for command details, fixture safety, artifacts, and story selection.
+   - For Agent Chat, Thoughts chat, URL-state, route, transcript, or QRSPI-next changes, run relevant `durable-session-chat` scenarios at minimum; add `thoughts-workbench` scenarios when document workbench URL/navigation behavior changed.
+
+1. **Workspace/public-host readiness**
+
+   - Required before asking a human to test a managed feature URL.
+   - Use `docs/workspaces-verification.md`.
+   - `just build --no-restart` is not enough for human testing. Restart the managed child (`just build` or manager restart action) and verify the public URL reaches the child app, not workspace recovery.
+
+1. **Manual human testing**
+
+   - `/q-verify` must ask the user to test the running workspace after automated checks pass and before marking verification complete.
+   - Include the exact URL and concise flows to inspect.
+
+## Required `/q-verify` behavior
+
+- Read this file first as the project verification guide.
+- Then read linked detailed guides relevant to the touched surface:
+  - `docs/e2e-story-testing.md`
+  - `docs/workspaces-verification.md`
+- Record commands, artifacts, failures, and skipped checks in `verify.md`.
+- If browser E2E or managed restart cannot run, record `blocked` instead of treating static checks as sufficient.
+- Do not request human testing until verify-stage fixes are committed and the running workspace is confirmed to serve the committed code.
