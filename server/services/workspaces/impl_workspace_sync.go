@@ -89,17 +89,20 @@ func (s *ImplWorkspaceSyncer) Sync(
 		seen.Add(slug)
 
 		gitState := InspectImplWorkspaceGit(ctx, ws.CheckoutPath, input.TrunkBranch)
+		before, beforeErr := s.Queries.GetImplWorkspace(ctx, slug)
+		if beforeErr != nil && !errors.Is(beforeErr, sql.ErrNoRows) {
+			return ImplWorkspaceSyncResult{}, beforeErr
+		}
+		if beforeErr == nil {
+			gitState = applyCachedMergeProof(gitState, before)
+		}
 		binding := readBestEffortPlanBinding(ws.CheckoutPath)
 		params := implWorkspaceUpsertParams(ws, gitState, binding)
-		before, beforeErr := s.Queries.GetImplWorkspace(ctx, slug)
 		row, err := s.Queries.UpsertDiscoveredImplWorkspace(ctx, params)
 		if err != nil {
 			return ImplWorkspaceSyncResult{}, err
 		}
 		result.Upserted++
-		if beforeErr != nil && !errors.Is(beforeErr, sql.ErrNoRows) {
-			return ImplWorkspaceSyncResult{}, beforeErr
-		}
 		rowChanged := errors.Is(beforeErr, sql.ErrNoRows) ||
 			implWorkspaceRowChanged(before, row)
 		if rowChanged {
@@ -136,13 +139,13 @@ func (s *ImplWorkspaceSyncer) Sync(
 		}
 	}
 
-	cleaned, merged, err := s.reconcileMissing(ctx, input, seen)
+	cleaned, merged, missingChanged, err := s.reconcileMissing(ctx, input, seen)
 	if err != nil {
 		return ImplWorkspaceSyncResult{}, err
 	}
 	result.CleanedUp = cleaned
 	result.Merged += merged
-	if cleaned > 0 || merged > 0 {
+	if cleaned > 0 || merged > 0 || missingChanged {
 		result.Changed = true
 	}
 	return result, nil
@@ -219,22 +222,28 @@ func implWorkspaceUpsertParams(
 ) db.UpsertDiscoveredImplWorkspaceParams {
 	status := string(ImplWorkspaceStatusActive)
 	mergeEvidence := sql.NullString{}
+	proof := gitState.MergeProof
+	if proof.Kind == "" {
+		proof.Kind = MergeProofUnknown
+	}
 	if gitState.Merged {
 		status = string(ImplWorkspaceStatusMerged)
-		mergeEvidence = nullableString(
-			activeCheckoutMergeEvidence(gitState.Commit, gitState.MergeRef),
-		)
+		mergeEvidence = nullableString(activeCheckoutMergeEvidence(gitState.Commit, proof))
 	}
 	params := db.UpsertDiscoveredImplWorkspaceParams{
-		WorkspaceSlug: ws.Slug,
-		CheckoutPath:  ws.CheckoutPath,
-		DisplayName:   workspaceNavLabel(ws),
-		Host:          ws.Host,
-		Url:           ws.URL,
-		Status:        status,
-		MergeEvidence: mergeEvidence,
-		AheadCount:    int64(gitState.AheadCount),
-		BehindCount:   int64(gitState.BehindCount),
+		WorkspaceSlug:            ws.Slug,
+		CheckoutPath:             ws.CheckoutPath,
+		DisplayName:              workspaceNavLabel(ws),
+		Host:                     ws.Host,
+		Url:                      ws.URL,
+		Status:                   status,
+		MergeEvidence:            mergeEvidence,
+		CleanupProofKind:         string(proof.Kind),
+		CleanupProofSourceRef:    nullableString(proof.SourceRef),
+		CleanupProofTargetCommit: nullableString(proof.TargetCommit),
+		CleanupRiskReason:        nullableString(proof.RiskReason),
+		AheadCount:               int64(gitState.AheadCount),
+		BehindCount:              int64(gitState.BehindCount),
 	}
 	params.Branch = nullableString(firstNonEmpty(gitState.Branch, ws.Branch))
 	params.CommitHash = nullableString(firstNonEmpty(gitState.Commit, ws.Commit))
@@ -244,6 +253,9 @@ func implWorkspaceUpsertParams(
 	params.BottomParentBranch = nullableString(gitState.BottomParent)
 	params.BaseBranch = nullableString(gitState.BaseBranch)
 	params.GitDetail = nullableString(gitState.Detail)
+	if !proof.ProvenAt.IsZero() {
+		params.CleanupProofAt = sql.NullTime{Time: proof.ProvenAt, Valid: true}
+	}
 	if strings.TrimSpace(binding.PlanDir) != "" {
 		params.PlanDirRel = nullableString(binding.PlanDir)
 		params.PlanDir = nullableString(binding.PlanDir)
@@ -251,19 +263,60 @@ func implWorkspaceUpsertParams(
 	return params
 }
 
-func activeCheckoutMergeEvidence(commit, ref string) string {
+func activeCheckoutMergeEvidence(commit string, proof MergeProof) string {
 	commit = strings.TrimSpace(commit)
-	ref = strings.TrimSpace(ref)
-	if commit == "" && ref == "" {
-		return "active checkout HEAD is ancestor of trunk"
+	ref := strings.TrimSpace(proof.SourceRef)
+	if ref == "" {
+		ref = "trunk"
+	}
+	head := "active checkout HEAD"
+	if commit != "" {
+		head += " " + commit
+	}
+	switch proof.Kind {
+	case MergeProofPatchEquivalent:
+		return head + " is patch-equivalent to " + ref
+	case MergeProofCached:
+		return head + " uses cached merge proof for " + ref
+	default:
+		return head + " is ancestor of " + ref
+	}
+}
+
+func missingCheckoutMergeEvidence(row db.ImplWorkspace, proof MergeProof) string {
+	commit := nullStringValue(row.CommitHash)
+	ref := firstNonEmpty(proof.SourceRef, "origin/main")
+	if proof.Detail != "" {
+		return proof.Detail
 	}
 	if commit == "" {
-		return "active checkout HEAD is ancestor of " + ref
+		return strings.TrimSpace(proof.RiskReason)
 	}
-	if ref == "" {
-		return "active checkout HEAD " + commit + " is ancestor of trunk"
+	return "missing checkout commit " + commit + " is ancestor of " + ref
+}
+
+func applyCachedMergeProof(state ImplWorkspaceGitState, before db.ImplWorkspace) ImplWorkspaceGitState {
+	if state.MergeProof.Strong() || !sameStoredHead(before, state.Commit) {
+		return state
 	}
-	return "active checkout HEAD " + commit + " is ancestor of " + ref
+	kind := MergeProofKind(strings.TrimSpace(before.CleanupProofKind))
+	if kind != MergeProofAncestor && kind != MergeProofPatchEquivalent && kind != MergeProofCached {
+		return state
+	}
+	state.Merged = true
+	state.MergeRef = nullStringValue(before.CleanupProofSourceRef)
+	state.MergeProof = MergeProof{
+		Kind:         MergeProofCached,
+		SourceRef:    nullStringValue(before.CleanupProofSourceRef),
+		TargetCommit: nullStringValue(before.CleanupProofTargetCommit),
+		ProvenAt:     time.Now(),
+		Detail:       "cached merge proof for unchanged HEAD",
+	}
+	return state
+}
+
+func sameStoredHead(row db.ImplWorkspace, head string) bool {
+	return strings.TrimSpace(nullStringValue(row.CommitHash)) != "" && strings.TrimSpace(nullStringValue(row.CommitHash)) == strings.TrimSpace(head)
 }
 
 func nullableString(value string) sql.NullString {
@@ -284,10 +337,10 @@ func (s *ImplWorkspaceSyncer) reconcileMissing(
 	ctx context.Context,
 	input ImplWorkspaceSyncInput,
 	activeSlugs collections.Set[string],
-) (cleaned, merged int, err error) {
+) (cleaned, merged int, changed bool, err error) {
 	rows, err := s.Queries.ListImplWorkspaces(ctx)
 	if err != nil {
-		return 0, 0, err
+		return 0, 0, false, err
 	}
 	configured := configuredCheckoutSlugs(input.Discovery)
 	for _, row := range rows {
@@ -298,7 +351,7 @@ func (s *ImplWorkspaceSyncer) reconcileMissing(
 			!rowInDiscoveryScope(row, input.Discovery) {
 			continue
 		}
-		status, evidence := DetermineMissingWorkspaceStatus(
+		status, proof := DetermineMissingWorkspaceStatus(
 			ctx,
 			input.Discovery.MainCheckoutPath,
 			row,
@@ -307,23 +360,32 @@ func (s *ImplWorkspaceSyncer) reconcileMissing(
 			n, err := s.Queries.MarkImplWorkspaceMerged(
 				ctx,
 				db.MarkImplWorkspaceMergedParams{
-					WorkspaceSlug: row.WorkspaceSlug,
-					MergeEvidence: nullableString(evidence),
+					WorkspaceSlug:            row.WorkspaceSlug,
+					MergeEvidence:            nullableString(missingCheckoutMergeEvidence(row, proof)),
+					CleanupProofKind:         string(proof.Kind),
+					CleanupProofSourceRef:    nullableString(proof.SourceRef),
+					CleanupProofTargetCommit: nullableString(proof.TargetCommit),
 				},
 			)
 			if err != nil {
-				return cleaned, merged, err
+				return cleaned, merged, changed, err
 			}
 			merged += int(n)
+			changed = changed || n > 0
 			continue
 		}
-		n, err := s.Queries.MarkImplWorkspaceCleanedUp(ctx, row.WorkspaceSlug)
+		n, err := s.Queries.MarkImplWorkspaceMergeUnknown(ctx, db.MarkImplWorkspaceMergeUnknownParams{
+			WorkspaceSlug:         row.WorkspaceSlug,
+			CleanupProofSourceRef: nullableString(proof.SourceRef),
+			CleanupRiskReason:     nullableString(proof.RiskReason),
+			MergeEvidence:         nullableString(proof.RiskReason),
+		})
 		if err != nil {
-			return cleaned, merged, err
+			return cleaned, merged, changed, err
 		}
-		cleaned += int(n)
+		changed = changed || n > 0
 	}
-	return cleaned, merged, nil
+	return cleaned, merged, changed, nil
 }
 
 func configuredCheckoutSlugs(cfg ImplWorkspaceDiscoveryConfig) collections.Set[string] {
@@ -388,6 +450,10 @@ func implWorkspaceRowChanged(before, after db.ImplWorkspace) bool {
 		before.AheadCount != after.AheadCount ||
 		before.BehindCount != after.BehindCount ||
 		!nullStringsEqual(before.MergeEvidence, after.MergeEvidence) ||
+		before.CleanupProofKind != after.CleanupProofKind ||
+		!nullStringsEqual(before.CleanupProofSourceRef, after.CleanupProofSourceRef) ||
+		!nullStringsEqual(before.CleanupProofTargetCommit, after.CleanupProofTargetCommit) ||
+		!nullStringsEqual(before.CleanupRiskReason, after.CleanupRiskReason) ||
 		!nullStringsEqual(before.GitDetail, after.GitDetail) ||
 		!nullTimesEqual(before.MergedAt, after.MergedAt)
 }

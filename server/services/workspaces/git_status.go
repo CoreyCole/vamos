@@ -26,6 +26,28 @@ type StackSummary struct {
 	Detail       string
 }
 
+type MergeProofKind string
+
+const (
+	MergeProofAncestor        MergeProofKind = "ancestor"
+	MergeProofPatchEquivalent MergeProofKind = "patch_equivalent"
+	MergeProofCached          MergeProofKind = "cached"
+	MergeProofUnknown         MergeProofKind = "unknown"
+)
+
+type MergeProof struct {
+	Kind         MergeProofKind
+	SourceRef    string
+	TargetCommit string
+	ProvenAt     time.Time
+	Detail       string
+	RiskReason   string
+}
+
+func (p MergeProof) Strong() bool {
+	return p.Kind == MergeProofAncestor || p.Kind == MergeProofPatchEquivalent || p.Kind == MergeProofCached
+}
+
 func InspectStack(ctx context.Context, checkoutPath string) StackSummary {
 	return InspectStackWithTrunk(ctx, checkoutPath, "main")
 }
@@ -150,6 +172,72 @@ func checkoutMergeRefCandidates(trunkBranch string) []string {
 	add("origin/main")
 	add("main")
 	return refs
+}
+
+func mergeTruthRef(trunkBranch string) string {
+	trunkBranch = strings.TrimSpace(trunkBranch)
+	if trunkBranch == "" || trunkBranch == "main" {
+		return "origin/main"
+	}
+	if strings.HasPrefix(trunkBranch, "origin/") {
+		return trunkBranch
+	}
+	return "origin/" + trunkBranch
+}
+
+func fetchOriginMain(ctx context.Context, checkoutPath string) error {
+	return runCheckoutCommandNoOutput(ctx, checkoutPath, "git", "fetch", "origin", "main")
+}
+
+func revParseRef(ctx context.Context, checkoutPath, ref string) string {
+	out, err := runCheckoutCommand(ctx, checkoutPath, "git", "rev-parse", "--short", ref)
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(out)
+}
+
+func InspectMergeProof(ctx context.Context, checkoutPath, trunkBranch string) MergeProof {
+	checkoutPath = strings.TrimSpace(checkoutPath)
+	if checkoutPath == "" {
+		return MergeProof{Kind: MergeProofUnknown, RiskReason: "checkout path is empty"}
+	}
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+
+	ref := mergeTruthRef(trunkBranch)
+	fetchErr := fetchOriginMain(ctx, checkoutPath)
+	target := revParseRef(ctx, checkoutPath, ref)
+	if fetchErr != nil {
+		return MergeProof{Kind: MergeProofUnknown, SourceRef: ref, TargetCommit: target, RiskReason: "fetch " + ref + " failed: " + fetchErr.Error()}
+	}
+	if err := runCheckoutCommandNoOutput(ctx, checkoutPath, "git", "merge-base", "--is-ancestor", "HEAD", ref); err == nil {
+		return MergeProof{Kind: MergeProofAncestor, SourceRef: ref, TargetCommit: target, ProvenAt: time.Now(), Detail: "HEAD is ancestor of " + ref}
+	}
+	if provePatchEquivalent(ctx, checkoutPath, ref) {
+		return MergeProof{Kind: MergeProofPatchEquivalent, SourceRef: ref, TargetCommit: target, ProvenAt: time.Now(), Detail: "HEAD patch-equivalent to " + ref}
+	}
+	reason := "HEAD is not proven merged into " + ref
+	return MergeProof{Kind: MergeProofUnknown, SourceRef: ref, TargetCommit: target, RiskReason: reason}
+}
+
+func provePatchEquivalent(ctx context.Context, checkoutPath, ref string) bool {
+	out, err := runCheckoutCommand(ctx, checkoutPath, "git", "cherry", ref, "HEAD")
+	if err != nil {
+		return false
+	}
+	found := false
+	for _, line := range strings.Split(out, "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		found = true
+		if strings.HasPrefix(line, "+") {
+			return false
+		}
+	}
+	return found
 }
 
 func inspectCheckoutHeadMerged(

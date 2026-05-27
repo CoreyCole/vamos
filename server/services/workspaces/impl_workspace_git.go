@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/CoreyCole/vamos/pkg/db"
 )
@@ -21,6 +22,7 @@ type ImplWorkspaceGitState struct {
 	BehindCount  int
 	Merged       bool
 	MergeRef     string
+	MergeProof   MergeProof
 	Available    bool
 	Detail       string
 }
@@ -39,6 +41,13 @@ func InspectImplWorkspaceGit(
 	if strings.TrimSpace(stack.BottomBranch) == "" {
 		stack.BottomBranch = stack.Branch
 	}
+	proof := InspectMergeProof(ctx, checkoutPath, stack.TrunkBranch)
+	stack.Merged = proof.Kind == MergeProofAncestor || proof.Kind == MergeProofPatchEquivalent
+	if stack.Merged {
+		stack.MergeRef = firstNonEmpty(proof.SourceRef, stack.MergeRef)
+	} else {
+		stack.MergeRef = ""
+	}
 	return ImplWorkspaceGitState{
 		Branch:       stack.Branch,
 		Commit:       gitCommit(ctx, checkoutPath),
@@ -51,6 +60,7 @@ func InspectImplWorkspaceGit(
 		BehindCount:  stack.BehindCount,
 		Merged:       stack.Merged,
 		MergeRef:     stack.MergeRef,
+		MergeProof:   proof,
 		Available:    stack.Available,
 		Detail:       stack.Detail,
 	}
@@ -60,16 +70,17 @@ func DetermineMissingWorkspaceStatus(
 	ctx context.Context,
 	mainCheckoutPath string,
 	stored db.ImplWorkspace,
-) (ImplWorkspaceStatus, string) {
+) (ImplWorkspaceStatus, MergeProof) {
 	commit := nullStringValue(stored.CommitHash)
-	trunk := firstNonEmpty(nullStringValue(stored.TrunkBranch), "origin/main", "main")
-	if commit == "" || strings.TrimSpace(mainCheckoutPath) == "" {
-		return ImplWorkspaceStatusCleanedUp, "missing checkout; no commit evidence"
+	ref := mergeTruthRef(firstNonEmpty(nullStringValue(stored.TrunkBranch), "main"))
+	if commit == "" {
+		return ImplWorkspaceStatusActive, MergeProof{Kind: MergeProofUnknown, SourceRef: ref, RiskReason: "missing checkout; no commit evidence"}
 	}
-	ref := trunk
-	if !strings.HasPrefix(ref, "origin/") && ref != "main" {
-		ref = "origin/" + ref
+	if strings.TrimSpace(mainCheckoutPath) == "" {
+		return ImplWorkspaceStatusActive, MergeProof{Kind: MergeProofUnknown, SourceRef: ref, RiskReason: "missing checkout; no main checkout for proof"}
 	}
+	_ = fetchOriginMain(ctx, mainCheckoutPath)
+	target := revParseRef(ctx, mainCheckoutPath, ref)
 	if err := runCheckoutCommandNoOutput(
 		ctx,
 		mainCheckoutPath,
@@ -79,22 +90,9 @@ func DetermineMissingWorkspaceStatus(
 		commit,
 		ref,
 	); err == nil {
-		return ImplWorkspaceStatusMerged,
-			fmt.Sprintf("commit %s is ancestor of %s", commit, ref)
+		return ImplWorkspaceStatusMerged, MergeProof{Kind: MergeProofAncestor, SourceRef: ref, TargetCommit: target, ProvenAt: time.Now(), Detail: fmt.Sprintf("commit %s is ancestor of %s", commit, ref)}
 	}
-	if err := runCheckoutCommandNoOutput(
-		ctx,
-		mainCheckoutPath,
-		"git",
-		"merge-base",
-		"--is-ancestor",
-		commit,
-		"main",
-	); err == nil {
-		return ImplWorkspaceStatusMerged,
-			fmt.Sprintf("commit %s is ancestor of main", commit)
-	}
-	return ImplWorkspaceStatusCleanedUp, "missing checkout; commit not proven merged"
+	return ImplWorkspaceStatusActive, MergeProof{Kind: MergeProofUnknown, SourceRef: ref, TargetCommit: target, RiskReason: "missing checkout; commit not proven merged"}
 }
 
 func gitCommit(ctx context.Context, checkoutPath string) string {

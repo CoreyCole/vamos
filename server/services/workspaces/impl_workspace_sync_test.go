@@ -381,7 +381,7 @@ func TestImplWorkspaceSyncerSkipsActiveLifecycle(t *testing.T) {
 	}
 }
 
-func TestImplWorkspaceSyncerMarksMissingCleanedUp(t *testing.T) {
+func TestImplWorkspaceSyncerKeepsMissingUnprovenActive(t *testing.T) {
 	ctx := context.Background()
 	parent := t.TempDir()
 	checkout := makeImplSyncCheckout(
@@ -409,8 +409,8 @@ func TestImplWorkspaceSyncerMarksMissingCleanedUp(t *testing.T) {
 	if err != nil {
 		t.Fatalf("second Sync: %v", err)
 	}
-	if result.CleanedUp != 1 || !result.Changed {
-		t.Fatalf("result = %+v, want one cleaned up and changed", result)
+	if result.CleanedUp != 0 || result.Merged != 0 || !result.Changed {
+		t.Fatalf("result = %+v, want missing unproven active and changed", result)
 	}
 	row, err := queries.GetImplWorkspace(
 		ctx,
@@ -419,11 +419,13 @@ func TestImplWorkspaceSyncerMarksMissingCleanedUp(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetImplWorkspace: %v", err)
 	}
-	if row.Status != string(ImplWorkspaceStatusCleanedUp) || !row.CleanedUpAt.Valid {
+	if row.Status != string(ImplWorkspaceStatusActive) || row.CleanedUpAt.Valid || row.CleanupProofKind != string(MergeProofUnknown) || !strings.Contains(row.CleanupRiskReason.String, "no commit evidence") {
 		t.Fatalf(
-			"row status=%q cleaned_up_at=%v, want cleaned_up with timestamp",
+			"row status=%q cleaned_up_at=%v proof=%q risk=%+v, want active unknown risk",
 			row.Status,
 			row.CleanedUpAt,
+			row.CleanupProofKind,
+			row.CleanupRiskReason,
 		)
 	}
 }
@@ -467,14 +469,14 @@ func TestImplWorkspaceSyncerMarksMissingMergedWithMainEvidence(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Sync: %v", err)
 	}
-	if result.Merged != 2 || result.CleanedUp != 0 || !result.Changed {
-		t.Fatalf("result = %+v, want missing and discovered checkouts merged", result)
+	if result.Merged != 1 || result.CleanedUp != 0 || !result.Changed {
+		t.Fatalf("result = %+v, want missing checkout merged", result)
 	}
 	row, err := queries.GetImplWorkspace(ctx, "missing-workspace")
 	if err != nil {
 		t.Fatalf("GetImplWorkspace: %v", err)
 	}
-	if row.Status != string(ImplWorkspaceStatusMerged) || !row.MergedAt.Valid ||
+	if row.Status != string(ImplWorkspaceStatusMerged) || !row.MergedAt.Valid || row.CleanupProofKind != string(MergeProofAncestor) ||
 		!strings.Contains(row.MergeEvidence.String, mainCommit) {
 		t.Fatalf(
 			"row status=%q merged_at=%v evidence=%+v, want merged evidence",
@@ -485,7 +487,7 @@ func TestImplWorkspaceSyncerMarksMissingMergedWithMainEvidence(t *testing.T) {
 	}
 }
 
-func TestImplWorkspaceSyncerMarksMissingCleanedUpWithoutMergeEvidence(t *testing.T) {
+func TestImplWorkspaceSyncerKeepsMissingUnprovenActiveWithRisk(t *testing.T) {
 	ctx := context.Background()
 	parent := t.TempDir()
 	mainCheckout := makeImplSyncCheckout(t, parent, "cn-agents")
@@ -538,9 +540,9 @@ func TestImplWorkspaceSyncerMarksMissingCleanedUpWithoutMergeEvidence(t *testing
 	if err != nil {
 		t.Fatalf("Sync: %v", err)
 	}
-	if result.CleanedUp != 1 || result.Merged != 1 || !result.Changed {
+	if result.CleanedUp != 0 || !result.Changed {
 		t.Fatalf(
-			"result = %+v, want one cleaned up, one discovered merged, and changed",
+			"result = %+v, want missing unproven active and changed",
 			result,
 		)
 	}
@@ -548,11 +550,13 @@ func TestImplWorkspaceSyncerMarksMissingCleanedUpWithoutMergeEvidence(t *testing
 	if err != nil {
 		t.Fatalf("GetImplWorkspace: %v", err)
 	}
-	if row.Status != string(ImplWorkspaceStatusCleanedUp) || !row.CleanedUpAt.Valid {
+	if row.Status != string(ImplWorkspaceStatusActive) || row.CleanedUpAt.Valid || row.CleanupProofKind != string(MergeProofUnknown) || !strings.Contains(row.CleanupRiskReason.String, "not proven merged") {
 		t.Fatalf(
-			"row status=%q cleaned_up_at=%v, want cleaned_up",
+			"row status=%q cleaned_up_at=%v proof=%q risk=%+v, want active unknown risk",
 			row.Status,
 			row.CleanedUpAt,
+			row.CleanupProofKind,
+			row.CleanupRiskReason,
 		)
 	}
 }
@@ -592,9 +596,9 @@ func TestImplWorkspaceSyncerMarksDiscoveredMergedWithHeadEvidence(t *testing.T) 
 	if err != nil {
 		t.Fatalf("GetImplWorkspace: %v", err)
 	}
-	if row.Status != string(ImplWorkspaceStatusMerged) || !row.MergedAt.Valid ||
+	if row.Status != string(ImplWorkspaceStatusMerged) || !row.MergedAt.Valid || row.CleanupProofKind != string(MergeProofAncestor) ||
 		!strings.Contains(row.MergeEvidence.String, commit) ||
-		!strings.Contains(row.MergeEvidence.String, "main") {
+		!strings.Contains(row.MergeEvidence.String, "origin/main") {
 		t.Fatalf(
 			"row status=%q merged_at=%v evidence=%+v, want merged HEAD evidence",
 			row.Status,
@@ -660,6 +664,46 @@ func TestImplWorkspaceSyncerDoesNotReportUnchangedDiscoveredMerged(t *testing.T)
 	}
 }
 
+func TestImplWorkspaceSyncerKeepsCachedMergedProofAfterFetchFailure(t *testing.T) {
+	isolateImplSyncGitPath(t)
+	ctx := context.Background()
+	parent := t.TempDir()
+	checkout := makeImplSyncCheckout(
+		t,
+		parent,
+		"cn-agents-2026-05-20_20-18-45_workspace-discovery-sync",
+	)
+	initImplSyncGitRepo(t, checkout)
+	queries := openImplSyncTestQueries(t)
+	syncer := &ImplWorkspaceSyncer{Queries: queries}
+	input := ImplWorkspaceSyncInput{
+		Discovery: ImplWorkspaceDiscoveryConfig{
+			ParentDir: parent,
+			Domain:    "workspaces.example.test",
+		},
+		TrunkBranch: "main",
+	}
+
+	if _, err := syncer.Sync(ctx, input); err != nil {
+		t.Fatalf("initial Sync: %v", err)
+	}
+	runImplSyncGit(t, checkout, "remote", "set-url", "origin", filepath.Join(t.TempDir(), "missing.git"))
+	result, err := syncer.Sync(ctx, input)
+	if err != nil {
+		t.Fatalf("second Sync: %v", err)
+	}
+	if result.Merged != 1 || !result.Changed {
+		t.Fatalf("result = %+v, want cached merged proof change", result)
+	}
+	row, err := queries.GetImplWorkspace(ctx, "2026-05-20-20-18-45-workspace-discovery-sync")
+	if err != nil {
+		t.Fatalf("GetImplWorkspace: %v", err)
+	}
+	if row.Status != string(ImplWorkspaceStatusMerged) || row.CleanupProofKind != string(MergeProofCached) || !strings.Contains(row.MergeEvidence.String, "cached") {
+		t.Fatalf("row status=%q proof=%q evidence=%+v, want cached merged proof", row.Status, row.CleanupProofKind, row.MergeEvidence)
+	}
+}
+
 func TestImplWorkspaceSyncerRestoresDiscoveredMergedCheckoutToActiveWhenHeadChanges(
 	t *testing.T,
 ) {
@@ -709,9 +753,9 @@ func TestImplWorkspaceSyncerRestoresDiscoveredMergedCheckoutToActiveWhenHeadChan
 		t.Fatalf("GetImplWorkspace: %v", err)
 	}
 	if row.Status != string(ImplWorkspaceStatusActive) || row.MergedAt.Valid ||
-		row.MergeEvidence.Valid {
+		row.MergeEvidence.Valid || row.CleanupProofKind != string(MergeProofUnknown) || !row.CleanupRiskReason.Valid {
 		t.Fatalf(
-			"row status=%q merged_at=%v evidence=%+v, want active with cleared merge fields",
+			"row status=%q merged_at=%v evidence=%+v, want active with cleared merge fields and unknown proof",
 			row.Status,
 			row.MergedAt,
 			row.MergeEvidence,
@@ -818,6 +862,10 @@ func initImplSyncGitRepo(t *testing.T, checkout string) string {
 	}
 	runImplSyncGit(t, checkout, "add", "README.md", "pkg/agents/go.mod")
 	runImplSyncGit(t, checkout, "commit", "-m", "initial")
+	origin := filepath.Join(t.TempDir(), "origin.git")
+	runImplSyncGit(t, checkout, "init", "--bare", origin)
+	runImplSyncGit(t, checkout, "remote", "add", "origin", origin)
+	runImplSyncGit(t, checkout, "push", "-u", "origin", "main")
 	return strings.TrimSpace(runImplSyncGit(t, checkout, "rev-parse", "--short", "HEAD"))
 }
 
