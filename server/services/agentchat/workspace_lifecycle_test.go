@@ -204,8 +204,9 @@ func TestStartWorkspaceThreadCreatesSessionRunAndBoundedRunInput(t *testing.T) {
 	if err != nil {
 		t.Fatalf("StartWorkspaceThread() error = %v", err)
 	}
-	if !thread.WorkspaceID.Valid || thread.WorkspaceID.String != workspace.ID {
-		t.Fatalf("thread workspace = %v, want %s", thread.WorkspaceID, workspace.ID)
+	primary, ok, err := service.ResolvePrimaryWorkspaceForThread(context.Background(), "user@example.com", thread.ID)
+	if err != nil || !ok || primary.ID != workspace.ID {
+		t.Fatalf("primary workspace = (%v, %v, %v), want %s", primary.ID, ok, err, workspace.ID)
 	}
 	if !run.WorkspaceID.Valid || run.WorkspaceID.String != workspace.ID {
 		t.Fatalf("run workspace = %v, want %s", run.WorkspaceID, workspace.ID)
@@ -663,14 +664,15 @@ func TestStartThreadAttachesPlanScopedFreeformRunBeforeTemporalStart(t *testing.
 	if thread == nil || run == nil {
 		t.Fatalf("StartThread() thread/run = %v/%v, want values", thread, run)
 	}
-	if !thread.WorkspaceID.Valid || thread.WorkspaceID.String == "" {
-		t.Fatalf("thread workspace = %v, want attached workspace", thread.WorkspaceID)
+	primary, ok, err := service.ResolvePrimaryWorkspaceForThread(t.Context(), "user@example.com", thread.ID)
+	if err != nil || !ok || strings.TrimSpace(primary.ID) == "" {
+		t.Fatalf("primary workspace = (%v, %v, %v), want attached workspace", primary.ID, ok, err)
 	}
-	if !run.WorkspaceID.Valid || run.WorkspaceID.String != thread.WorkspaceID.String {
+	if !run.WorkspaceID.Valid || run.WorkspaceID.String != primary.ID {
 		t.Fatalf(
 			"run workspace = %v, want %s",
 			run.WorkspaceID,
-			thread.WorkspaceID.String,
+			primary.ID,
 		)
 	}
 
@@ -681,11 +683,11 @@ func TestStartThreadAttachesPlanScopedFreeformRunBeforeTemporalStart(t *testing.
 			fakeTemporal.lastInput,
 		)
 	}
-	if input.WorkspaceID != thread.WorkspaceID.String {
+	if input.WorkspaceID != primary.ID {
 		t.Fatalf(
 			"input workspace = %q, want %q",
 			input.WorkspaceID,
-			thread.WorkspaceID.String,
+			primary.ID,
 		)
 	}
 
@@ -694,17 +696,17 @@ func TestStartThreadAttachesPlanScopedFreeformRunBeforeTemporalStart(t *testing.
 		t.Fatalf("GetAgentRun() error = %v", err)
 	}
 	if !storedRun.WorkspaceID.Valid ||
-		storedRun.WorkspaceID.String != thread.WorkspaceID.String {
+		storedRun.WorkspaceID.String != primary.ID {
 		t.Fatalf(
 			"stored run workspace = %v, want %s",
 			storedRun.WorkspaceID,
-			thread.WorkspaceID.String,
+			primary.ID,
 		)
 	}
 	events, err := service.queries.ListWorkspaceEvents(
 		t.Context(),
 		db.ListWorkspaceEventsParams{
-			WorkspaceID: thread.WorkspaceID.String,
+			WorkspaceID: primary.ID,
 			Limit:       10,
 		},
 	)
@@ -749,8 +751,9 @@ func TestStartThreadWithoutCwdCreatesFreeformWorkspaceWithAgentsArtifact(t *test
 	if thread == nil || run == nil {
 		t.Fatalf("StartThread() thread/run = %v/%v, want values", thread, run)
 	}
-	if !thread.WorkspaceID.Valid || thread.WorkspaceID.String == "" {
-		t.Fatalf("thread workspace = %v, want workspace", thread.WorkspaceID)
+	primary, ok, err := service.ResolvePrimaryWorkspaceForThread(t.Context(), "user@example.com", thread.ID)
+	if err != nil || !ok || strings.TrimSpace(primary.ID) == "" {
+		t.Fatalf("primary workspace = (%v, %v, %v), want workspace", primary.ID, ok, err)
 	}
 	if !strings.Contains(thread.Cwd, filepath.Join("user@example.com", "freeform")) {
 		t.Fatalf("thread cwd = %q, want user freeform workspace", thread.Cwd)

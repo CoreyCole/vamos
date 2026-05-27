@@ -84,10 +84,11 @@ func (s *Service) resolveActiveThreadPlanDir(
 	if planDir, ok := s.canonicalPlanDirFromSource(thread.Cwd); ok {
 		return planDir
 	}
-	if !thread.WorkspaceID.Valid {
+	workspace, ok, err := s.ResolvePrimaryWorkspaceForThread(ctx, userEmail, thread.ID)
+	if err != nil || !ok {
 		return ""
 	}
-	return s.resolveActiveWorkspacePlanDir(ctx, userEmail, thread.WorkspaceID.String)
+	return s.resolveActiveWorkspacePlanDir(ctx, userEmail, workspace.ID)
 }
 
 func (s *Service) resolveActiveWorkspacePlanDir(
@@ -200,7 +201,7 @@ func (s *Service) collectUserPlanSidebarOverlaySources(
 			source := PlanSidebarSource{
 				PlanDir:     planDir,
 				PlanDirRel:  s.planSidebarRel(planDir),
-				WorkspaceID: row.WorkspaceID.String,
+				WorkspaceID: row.PrimaryWorkspaceID.String,
 				ThreadID:    row.ID,
 				Source:      planSidebarSourceThread,
 				Title:       row.Title,

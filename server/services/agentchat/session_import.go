@@ -1078,18 +1078,14 @@ func (s *Service) validateImportSessionReuse(
 		return err
 	}
 	primaryWorkspaceID := ""
-	if thread.WorkspaceID.Valid {
-		primaryWorkspaceID = strings.TrimSpace(thread.WorkspaceID.String)
-	} else {
-		rows, err := q.ListThreadWorkspaceAssociations(ctx, thread.ID)
-		if err != nil {
-			return err
-		}
-		for _, row := range rows {
-			if row.IsPrimary == 1 {
-				primaryWorkspaceID = strings.TrimSpace(row.WorkspaceID)
-				break
-			}
+	rows, err := q.ListThreadWorkspaceAssociations(ctx, thread.ID)
+	if err != nil {
+		return err
+	}
+	for _, row := range rows {
+		if row.IsPrimary == 1 {
+			primaryWorkspaceID = strings.TrimSpace(row.WorkspaceID)
+			break
 		}
 	}
 	if primaryWorkspaceID == "" {

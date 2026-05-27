@@ -2625,10 +2625,13 @@ func TestEnsureThreadWorkspaceLazyAttachment(t *testing.T) {
 	if err != nil {
 		t.Fatalf("EnsureThreadWorkspace() error = %v", err)
 	}
-	if attached.WorkspaceID.String != workspace.ID || !attached.WorkspaceID.Valid {
+	primary, ok, err := service.ResolvePrimaryWorkspaceForThread(context.Background(), "creative-mode-agent", attached.ID)
+	if err != nil || !ok || primary.ID != workspace.ID {
 		t.Fatalf(
-			"attached workspace_id = %v, want %s",
-			attached.WorkspaceID,
+			"primary workspace = (%v, %v, %v), want %s",
+			primary.ID,
+			ok,
+			err,
 			workspace.ID,
 		)
 	}
@@ -2640,12 +2643,12 @@ func TestEnsureThreadWorkspaceLazyAttachment(t *testing.T) {
 			thread.ID,
 		)
 	}
-	primary, err := service.queries.GetPrimaryWorkspaceForThread(context.Background(), db.GetPrimaryWorkspaceForThreadParams{ThreadID: thread.ID, UserEmail: "creative-mode-agent"})
+	primaryRow, err := service.queries.GetPrimaryWorkspaceForThread(context.Background(), db.GetPrimaryWorkspaceForThreadParams{ThreadID: thread.ID, UserEmail: "creative-mode-agent"})
 	if err != nil {
 		t.Fatalf("GetPrimaryWorkspaceForThread() error = %v", err)
 	}
-	if primary.ID != workspace.ID {
-		t.Fatalf("primary.ID = %q, want %s", primary.ID, workspace.ID)
+	if primaryRow.ID != workspace.ID {
+		t.Fatalf("primary.ID = %q, want %s", primaryRow.ID, workspace.ID)
 	}
 	events, err := service.queries.ListWorkspaceEvents(
 		context.Background(),

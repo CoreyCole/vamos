@@ -197,11 +197,18 @@ func (s *Service) LastFreeformEmbeddedChatSelection(
 		return EmbeddedChatSelection{}, err
 	}
 	for _, thread := range threads {
-		if strings.TrimSpace(thread.WorkspaceID.String) == "" {
+		_, err := s.queries.GetPrimaryWorkspaceForThread(ctx, db.GetPrimaryWorkspaceForThreadParams{
+			ThreadID:  thread.ID,
+			UserEmail: thread.UserEmail,
+		})
+		if errors.Is(err, sql.ErrNoRows) {
 			return EmbeddedChatSelection{
 				ThreadID: thread.ID,
 				Scope:    EmbeddedChatSelectionScopeFreeform,
 			}, nil
+		}
+		if err != nil {
+			return EmbeddedChatSelection{}, err
 		}
 	}
 	return EmbeddedChatSelection{}, nil

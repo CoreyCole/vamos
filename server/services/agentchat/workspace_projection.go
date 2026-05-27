@@ -2,7 +2,6 @@ package agentchat
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -231,7 +230,6 @@ func (s *Service) sharedWorkspaceThread(
 	if !ok {
 		return db.AgentThread{}, errors.New("thread does not belong to workspace")
 	}
-	thread.WorkspaceID = sql.NullString{String: workspaceID, Valid: true}
 	return thread, nil
 }
 

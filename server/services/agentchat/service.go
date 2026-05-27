@@ -643,7 +643,6 @@ func (s *Service) workflowThread(
 			}
 			return db.AgentThread{}, err
 		}
-		thread.WorkspaceID = nullString(workspaceRecord.ID)
 		if effectiveCwd == "" || strings.TrimSpace(thread.Cwd) == effectiveCwd {
 			return thread, nil
 		}
@@ -671,7 +670,6 @@ func (s *Service) workflowThread(
 	}); err != nil {
 		return db.AgentThread{}, err
 	}
-	thread.WorkspaceID = nullString(workspaceRecord.ID)
 	return thread, nil
 }
 
@@ -776,7 +774,6 @@ func (s *Service) EnsureThreadWorkspace(
 		return db.Workspace{}, db.AgentThread{}, err
 	}
 	if workspace, err := s.queries.GetPrimaryWorkspaceForThread(ctx, db.GetPrimaryWorkspaceForThreadParams{ThreadID: thread.ID, UserEmail: userEmail}); err == nil {
-		thread.WorkspaceID = sql.NullString{String: workspace.ID, Valid: true}
 		return workspace, thread, nil
 	} else if !errors.Is(err, sql.ErrNoRows) {
 		return db.Workspace{}, db.AgentThread{}, err
@@ -869,7 +866,6 @@ func (s *Service) EnsureThreadWorkspace(
 	if err := tx.Commit(); err != nil {
 		return db.Workspace{}, db.AgentThread{}, err
 	}
-	thread.WorkspaceID = sql.NullString{String: workspace.ID, Valid: true}
 	workspace.SelectedThreadID = sql.NullString{String: thread.ID, Valid: true}
 	return workspace, thread, nil
 }
@@ -1148,8 +1144,6 @@ func (s *Service) StartWorkspaceThread(
 	}); err != nil {
 		return nil, nil, nil, err
 	}
-	thread.WorkspaceID = nullString(workspace.ID)
-
 	session, err := s.createWebAgentSession(ctx, q, workspace, thread)
 	if err != nil {
 		return nil, nil, nil, err
@@ -1670,13 +1664,13 @@ func (s *Service) StartThread(
 		return nil, nil, err
 	}
 
-	if _, attachedThread, err := s.EnsureThreadWorkspace(
+	if workspace, attachedThread, err := s.EnsureThreadWorkspace(
 		ctx,
 		userEmail,
 		thread.ID,
 	); err == nil {
 		thread = attachedThread
-		run.WorkspaceID = attachedThread.WorkspaceID
+		run.WorkspaceID = nullString(workspace.ID)
 	}
 
 	if err := s.seedPendingUserPrompt(thread, run); err != nil {
@@ -1870,18 +1864,16 @@ func (s *Service) createRun(
 	prompt string,
 	restoreHeadEntryID sql.NullString,
 ) (db.AgentRun, error) {
-	workspaceID := thread.WorkspaceID
-	if !workspaceID.Valid || strings.TrimSpace(workspaceID.String) == "" {
-		workspace, err := q.GetPrimaryWorkspaceForThread(ctx, db.GetPrimaryWorkspaceForThreadParams{
-			ThreadID:  thread.ID,
-			UserEmail: thread.UserEmail,
-		})
-		if err != nil && !errors.Is(err, sql.ErrNoRows) {
-			return db.AgentRun{}, err
-		}
-		if err == nil {
-			workspaceID = nullString(workspace.ID)
-		}
+	workspaceID := sql.NullString{}
+	workspace, err := q.GetPrimaryWorkspaceForThread(ctx, db.GetPrimaryWorkspaceForThreadParams{
+		ThreadID:  thread.ID,
+		UserEmail: thread.UserEmail,
+	})
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return db.AgentRun{}, err
+	}
+	if err == nil {
+		workspaceID = nullString(workspace.ID)
 	}
 	return s.createRunRecord(
 		ctx,
@@ -2319,11 +2311,14 @@ func (s *Service) notifyThreadScopes(
 	s.notifier.NotifyScopes(threadID, scopes...)
 
 	thread, err := s.queries.GetAgentThread(ctx, threadID)
-	if err != nil || !thread.WorkspaceID.Valid ||
-		strings.TrimSpace(thread.WorkspaceID.String) == "" {
+	if err != nil {
 		return
 	}
-	workspaceID := strings.TrimSpace(thread.WorkspaceID.String)
+	workspace, ok, err := s.ResolvePrimaryWorkspaceForThread(ctx, thread.UserEmail, thread.ID)
+	if err != nil || !ok {
+		return
+	}
+	workspaceID := strings.TrimSpace(workspace.ID)
 	if workspaceID == threadID {
 		return
 	}
@@ -3009,7 +3004,6 @@ func (s *Service) BuildThreadPageArgs(
 	}
 
 	primary := *workspaceContext.Primary
-	thread.WorkspaceID = nullString(primary.ID)
 	args.CurrentThread = &thread
 	args.Cwd = firstNonEmpty(args.ThreadMetadata.PiCwd, primary.Cwd.String, primary.RootDocPath, thread.Cwd)
 	args.DocPane, err = s.buildWorkspaceDocPane(ctx, primary, activeRunID, input.DocPath, false)

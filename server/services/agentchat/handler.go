@@ -850,12 +850,12 @@ func (h *Handler) SendEmbeddedFreeformPrompt(c echo.Context) error {
 	if run != nil {
 		runID = run.ID
 	}
-	if thread.WorkspaceID.Valid {
+	if run != nil && run.WorkspaceID.Valid {
 		if err := h.service.PersistEmbeddedChatSelection(
 			c.Request().Context(),
 			userEmail,
 			EmbeddedChatSelection{
-				WorkspaceID: thread.WorkspaceID.String,
+				WorkspaceID: run.WorkspaceID.String,
 				ThreadID:    thread.ID,
 				RunID:       runID,
 				Scope:       EmbeddedChatSelectionScopeFreeform,
@@ -917,15 +917,12 @@ func (h *Handler) ResumeEmbeddedFreeformThread(c echo.Context) error {
 	if run != nil {
 		runID = run.ID
 	}
-	if thread, err := h.service.queries.GetAgentThread(
-		c.Request().Context(),
-		threadID,
-	); err == nil && thread.WorkspaceID.Valid {
+	if run != nil && run.WorkspaceID.Valid {
 		if err := h.service.PersistEmbeddedChatSelection(
 			c.Request().Context(),
 			userEmail,
 			EmbeddedChatSelection{
-				WorkspaceID: thread.WorkspaceID.String,
+				WorkspaceID: run.WorkspaceID.String,
 				ThreadID:    threadID,
 				RunID:       runID,
 				Scope:       EmbeddedChatSelectionScopeFreeform,

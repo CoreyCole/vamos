@@ -5135,7 +5135,6 @@ func mustCreateWorkspaceThreadForHandlerTest(
 	); err != nil {
 		t.Fatalf("UpdateWorkspaceSelectedThread() error = %v", err)
 	}
-	thread.WorkspaceID = sql.NullString{String: workspace.ID, Valid: true}
 	return workspace, thread
 }
 
