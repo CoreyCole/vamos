@@ -68,6 +68,26 @@ func newPostFormContext(
 	return c, rec
 }
 
+func TestPreserveEmbeddedChatQueryRemovesStaleWorkspaceWhenThreadExists(t *testing.T) {
+	t.Parallel()
+
+	got := PreserveEmbeddedChatQuery(
+		"/thoughts/creative-mode-agent?context=chat&chat_workspace=stale_ws",
+		DocumentEmbeddedChatSelection{WorkspaceID: "ws_1", ThreadID: "th_1", RunID: "run_1"},
+	)
+	parsed, err := url.Parse(got)
+	if err != nil {
+		t.Fatalf("url.Parse(%q) error = %v", got, err)
+	}
+	query := parsed.Query()
+	if gotValue := query.Get("chat_workspace"); gotValue != "" {
+		t.Fatalf("query[%q] = %q, want empty in %q", "chat_workspace", gotValue, got)
+	}
+	if gotValue := query.Get("thread"); gotValue != "th_1" {
+		t.Fatalf("query[thread] = %q, want th_1 in %q", gotValue, got)
+	}
+}
+
 func TestThoughtsDocURLWithChatStatePreservesChatQuery(t *testing.T) {
 	t.Parallel()
 

@@ -191,8 +191,8 @@ func PreserveEmbeddedChatQuery(
 		if workspaceID := strings.TrimSpace(selection.WorkspaceID); workspaceID != "" {
 			q.Set("chat_workspace", workspaceID)
 		}
-	}
-	if threadID != "" {
+	} else {
+		q.Del("chat_workspace")
 		q.Set("thread", threadID)
 	}
 	if runID := strings.TrimSpace(selection.RunID); runID != "" {
