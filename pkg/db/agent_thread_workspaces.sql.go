@@ -181,7 +181,18 @@ func (q *Queries) ListThreadWorkspaceAssociations(ctx context.Context, threadID 
 }
 
 const listThreadsByPrimaryWorkspace = `-- name: ListThreadsByPrimaryWorkspace :many
-SELECT t.id, t.user_email, t.title, t.cwd, t.workspace_id, t.lineage_id, t.head_entry_id, t.parent_thread_id, t.forked_from_entry_id, t.created_at, t.updated_at, t.archived_at
+SELECT
+    t.id,
+    t.user_email,
+    t.title,
+    t.cwd,
+    t.lineage_id,
+    t.head_entry_id,
+    t.parent_thread_id,
+    t.forked_from_entry_id,
+    t.created_at,
+    t.updated_at,
+    t.archived_at
 FROM agent_threads t
 JOIN agent_thread_workspaces atw ON atw.thread_id = t.id
 WHERE
@@ -205,7 +216,6 @@ func (q *Queries) ListThreadsByPrimaryWorkspace(ctx context.Context, workspaceID
 			&i.UserEmail,
 			&i.Title,
 			&i.Cwd,
-			&i.WorkspaceID,
 			&i.LineageID,
 			&i.HeadEntryID,
 			&i.ParentThreadID,
