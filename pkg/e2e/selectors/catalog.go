@@ -17,32 +17,32 @@ func DefaultCatalog() Catalog {
 	entries := []Entry{
 		{
 			Key:         "thoughts.workbench.sidebar",
-			CSS:         "[data-e2e='thoughts.workbench.sidebar'], #thoughts-workbench-sidebar",
+			CSS:         "[data-e2e='thoughts.workbench.sidebar'], #thoughts-workbench-sidebar, #doc-workbench-sidebar-region",
 			Description: "Thoughts workbench sidebar",
 		},
 		{
 			Key:         "thoughts.workbench.center",
-			CSS:         "[data-e2e='thoughts.workbench.center'], #thoughts-workbench-center",
+			CSS:         "[data-e2e='thoughts.workbench.center'], #thoughts-workbench-center, #doc-workbench-center-region",
 			Description: "Thoughts document pane",
 		},
 		{
 			Key:         "thoughts.workbench.right",
-			CSS:         "[data-e2e='thoughts.workbench.right'], #thoughts-workbench-right",
+			CSS:         "[data-e2e='thoughts.workbench.right'], #thoughts-workbench-right, #doc-workbench-right-region",
 			Description: "Thoughts right rail",
 		},
 		{
 			Key:         "thoughts.sidebar.workspaces",
-			CSS:         "[data-e2e='thoughts.sidebar.workspaces'], #thoughts-workbench-sidebar [role='tab']:has-text('Workspaces'), #thoughts-workbench-sidebar button:has-text('Workspaces')",
+			CSS:         "[data-e2e='thoughts.sidebar.workspaces'], #thoughts-shared-sidebar [role='tab']:has-text('Workspaces'), #thoughts-shared-sidebar button:has-text('Workspaces'), #thoughts-workbench-sidebar [role='tab']:has-text('Workspaces'), #thoughts-workbench-sidebar button:has-text('Workspaces')",
 			Description: "Thoughts sidebar Workspaces tab",
 		},
 		{
 			Key:         "thoughts.rightRail.chat",
-			CSS:         "[data-e2e='thoughts.rightRail.chat'][aria-selected='true'], [role='tab'][aria-selected='true'][data-e2e='thoughts.rightRail.chat'], [data-e2e='thoughts.rightRail.chat']",
+			CSS:         "[data-e2e='thoughts.rightRail.chat'][aria-selected='true'], [role='tab'][aria-selected='true'][data-e2e='thoughts.rightRail.chat'], [data-e2e='thoughts.rightRail.chat'], #doc-right-rail [role='tab']:has-text('Chat'), #doc-right-rail button:has-text('Chat')",
 			Description: "Right rail Chat tab selected",
 		},
 		{
 			Key:         "feature.thoughts.workbench",
-			CSS:         "[data-feature='thoughts.workbench'], #thoughts-workbench",
+			CSS:         "[data-feature='thoughts.workbench'], #thoughts-workbench, #workbench-root",
 			Description: "Workbench ready marker",
 		},
 		{
