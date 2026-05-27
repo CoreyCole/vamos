@@ -27,17 +27,19 @@ This is the standard Vamos verification entrypoint. `/q-verify` must read this f
      ```
    - `e2e check` is static validation only. It does not run a browser or prove app behavior.
 
+1. **Workspace/public-host readiness**
+
+   - Required before browser E2E and before asking a human to test a managed feature URL.
+   - Use `docs/workspaces-verification.md`.
+   - `just build --no-restart` is not enough for browser or human testing. Restart the managed child (`just build` or manager restart action) and verify the public URL reaches the child app, not workspace recovery.
+
 1. **Browser E2E runs**
 
    - Required for browser-facing changes before human testing.
+   - Browser E2E must run against the same public feature URL the human will test. Pass that exact URL with `--base-url`; do not use a different local server unless the human will also test that server.
+   - Recommended sequence: managed restart -> confirm public URL healthy -> `e2e run --base-url <same-public-url>` -> human tests `<same-public-url>`.
    - Use `docs/e2e-story-testing.md` for command details, fixture safety, artifacts, and story selection.
    - For Agent Chat, Thoughts chat, URL-state, route, transcript, or QRSPI-next changes, run relevant `durable-session-chat` scenarios at minimum; add `thoughts-workbench` scenarios when document workbench URL/navigation behavior changed.
-
-1. **Workspace/public-host readiness**
-
-   - Required before asking a human to test a managed feature URL.
-   - Use `docs/workspaces-verification.md`.
-   - `just build --no-restart` is not enough for human testing. Restart the managed child (`just build` or manager restart action) and verify the public URL reaches the child app, not workspace recovery.
 
 1. **Manual human testing**
 
