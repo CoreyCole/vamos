@@ -483,16 +483,11 @@ func workspaceThreadHrefForWorkspace(_ db.Workspace, threadID string) string {
 }
 
 func workspaceThreadHref(workspaceID, threadID string) string {
-	workspaceID = strings.TrimSpace(workspaceID)
 	threadID = strings.TrimSpace(threadID)
-	if workspaceID == "" || threadID == "" {
+	if strings.TrimSpace(workspaceID) == "" || threadID == "" {
 		return ""
 	}
-	values := url.Values{
-		"chat_workspace": []string{workspaceID},
-		"thread":         []string{threadID},
-	}
-	return "/thoughts/?" + values.Encode()
+	return BuildThoughtsChatDocURL(EmbeddedChatURLState{ThreadID: threadID})
 }
 
 type WorkspaceSessionSummary struct {

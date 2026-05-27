@@ -16,7 +16,7 @@ templ ChatPage(args ChatPageArgs) {
 		CurrentTheme:       args.CurrentTheme,
 		CurrentSyntaxTheme: args.CurrentSyntaxTheme,
 	}) {
-		<div data-init={ fmt.Sprintf("@get('/agent-chat/sessions/stream?thread=%s')", getThreadID(args.CurrentThread)) }></div>
+		<div data-init={ fmt.Sprintf("@get('/agent-chat/sessions/stream?current_thread=%s')", getThreadID(args.CurrentThread)) }></div>
 		if args.CurrentThread != nil {
 			<div data-init={ fmt.Sprintf("@get('/agent-chat/thread/%s/stream?run=%s&since=%d')", args.CurrentThread.ID, getRunID(args.ActiveRun), args.Cursor) }></div>
 		}

@@ -53,9 +53,9 @@ func ChatPage(args ChatPageArgs) templ.Component {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var3 string
-			templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("@get('/agent-chat/sessions/stream?thread=%s')", getThreadID(args.CurrentThread)))
+			templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("@get('/agent-chat/sessions/stream?current_thread=%s')", getThreadID(args.CurrentThread)))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/page_chat.templ`, Line: 19, Col: 112}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/page_chat.templ`, Line: 19, Col: 120}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var3))
 			if templ_7745c5c3_Err != nil {

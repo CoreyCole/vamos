@@ -32,6 +32,48 @@ import (
 
 const handlerTestPlanRelPath = "plan.md"
 
+func assertNoLegacyExistingThreadChatRoutes(t *testing.T, body, workspaceID string) {
+	t.Helper()
+	legacy := []string{
+		"/thoughts/chat/" + workspaceID + "/thread/",
+		"/thoughts/chat/" + workspaceID + "/stream?thread=",
+		"/thoughts/chat/" + workspaceID + "/attach-doc",
+		"/thoughts/chat/" + workspaceID + "/slash-commands",
+		"/agent-chat/" + workspaceID + "/thread/",
+		"/agent-chat/" + workspaceID + "/stream?thread=",
+		"/agent-chat/" + workspaceID + "/slash-commands",
+		"/agent-chat/stream?thread=",
+		"/agent-chat/resume",
+		"/agent-chat/fork",
+		"/thoughts/chat/freeform/stream?thread=",
+		"/thoughts/chat/freeform/resume",
+	}
+	for _, needle := range legacy {
+		if strings.Contains(body, needle) {
+			t.Fatalf("legacy existing-thread chat route %q found in body", needle)
+		}
+	}
+}
+
+func assertThreadOnlyChatRoute(t *testing.T, body, threadID string) {
+	t.Helper()
+	for _, needle := range []string{
+		"/thoughts/chat/thread/" + threadID,
+		"/agent-chat/thread/" + threadID,
+	} {
+		if !strings.Contains(body, needle) {
+			t.Fatalf("thread-only chat route %q not found in body", needle)
+		}
+	}
+}
+
+func assertNoChatWorkspaceWithThread(t *testing.T, rawURL string) {
+	t.Helper()
+	if strings.Contains(rawURL, "thread=") && strings.Contains(rawURL, "chat_workspace=") {
+		t.Fatalf("existing-thread URL preserved chat_workspace: %s", rawURL)
+	}
+}
+
 func isExpectedStreamCancel(err error) bool {
 	return err == nil || errors.Is(err, context.Canceled)
 }
@@ -651,7 +693,7 @@ func TestAttachCurrentDocToEmbeddedChatPatchesComposerWithDocPill(t *testing.T) 
 	}
 }
 
-func TestResumeEmbeddedWorkspaceThreadPatchesPanelAndURL(t *testing.T) {
+func TestResumeEmbeddedThreadPatchesPanelAndURL(t *testing.T) {
 	t.Parallel()
 
 	service := newTestAgentChatService(t)
@@ -670,20 +712,22 @@ func TestResumeEmbeddedWorkspaceThreadPatchesPanelAndURL(t *testing.T) {
 	req := httptest.NewRequestWithContext(
 		t.Context(),
 		http.MethodPost,
-		"/thoughts/chat/"+workspaceRecord.ID+"/thread/"+thread.ID+"/resume",
+		"/thoughts/chat/thread/"+thread.ID+"/resume",
 		strings.NewReader(form.Encode()),
 	)
 	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationForm)
 	rec := httptest.NewRecorder()
 	c := echo.New().NewContext(req, rec)
 	c.Set("user_email", "user@example.com")
-	c.SetParamNames("workspace_id", "thread_id")
-	c.SetParamValues(workspaceRecord.ID, thread.ID)
+	c.SetParamNames("thread_id")
+	c.SetParamValues(thread.ID)
 
-	if err := handler.ResumeEmbeddedWorkspaceThread(c); err != nil {
-		t.Fatalf("ResumeEmbeddedWorkspaceThread() error = %v", err)
+	if err := handler.ResumeEmbeddedThread(c); err != nil {
+		t.Fatalf("ResumeEmbeddedThread() error = %v", err)
 	}
 	body := rec.Body.String()
+	assertNoLegacyExistingThreadChatRoutes(t, body, workspaceRecord.ID)
+	assertNoChatWorkspaceWithThread(t, body)
 	for _, want := range []string{
 		"doc-right-chat-panel",
 		"agent-chat-workspace-composer",
@@ -756,6 +800,8 @@ func TestResumeEmbeddedThreadResolvesPrimaryWorkspace(t *testing.T) {
 		t.Fatalf("ResumeEmbeddedThread() error = %v", err)
 	}
 	body := rec.Body.String()
+	assertNoLegacyExistingThreadChatRoutes(t, body, workspaceRecord.ID)
+	assertNoChatWorkspaceWithThread(t, body)
 	for _, want := range []string{
 		"doc-right-chat-panel",
 		"resume by thread only",
@@ -2105,11 +2151,13 @@ func TestStreamThreadPatchesPlanSidebarAfterProjectAndUserNotify(t *testing.T) {
 	)
 
 	reqCtx, cancel := context.WithCancel(context.Background())
-	req := httptest.NewRequest(http.MethodGet, "/agent-chat/stream?thread="+url.QueryEscape(thread.ID), nil).
+	req := httptest.NewRequest(http.MethodGet, "/agent-chat/thread/"+url.PathEscape(thread.ID)+"/stream", nil).
 		WithContext(reqCtx)
 	rec := httptest.NewRecorder()
 	c := echo.New().NewContext(req, rec)
 	c.Set("user_email", "user@example.com")
+	c.SetParamNames("thread_id")
+	c.SetParamValues(thread.ID)
 	done := make(chan error, 1)
 	go func() { done <- handler.StreamThread(c) }()
 
@@ -3000,12 +3048,14 @@ func TestPatchThreadPageCanTargetLiveTranscriptOnly(t *testing.T) {
 
 	req := httptest.NewRequest(
 		http.MethodGet,
-		"/agent-chat/stream?thread=thread-1&run=run-1",
+		"/agent-chat/thread/thread-1/stream?run=run-1",
 		nil,
 	)
 	rec := httptest.NewRecorder()
 	c := echo.New().NewContext(req, rec)
 	c.Set("user_email", "user@example.com")
+	c.SetParamNames("thread_id")
+	c.SetParamValues("thread-1")
 	sse := datastar.NewSSE(rec, req)
 
 	if err := handler.patchThreadPage(c, sse, PatchLiveTranscript); err != nil {
@@ -3119,12 +3169,14 @@ func TestPatchLiveTranscriptSkipsPiSessionSidebarScan(t *testing.T) {
 
 	req := httptest.NewRequest(
 		http.MethodGet,
-		"/agent-chat/stream?thread=thread-1&run=run-1",
+		"/agent-chat/thread/thread-1/stream?run=run-1",
 		nil,
 	)
 	rec := httptest.NewRecorder()
 	c := echo.New().NewContext(req, rec)
 	c.Set("user_email", "user@example.com")
+	c.SetParamNames("thread_id")
+	c.SetParamValues("thread-1")
 	sse := datastar.NewSSE(rec, req)
 
 	if err := handler.patchThreadPage(c, sse, PatchLiveTranscript); err != nil {
@@ -3214,12 +3266,14 @@ func TestPatchRunHeaderScopeClearsLiveRegionWithoutTouchingArtifactPane(t *testi
 
 	req := httptest.NewRequest(
 		http.MethodGet,
-		"/agent-chat/stream?thread=thread-1&run=run-1",
+		"/agent-chat/thread/thread-1/stream?run=run-1",
 		nil,
 	)
 	rec := httptest.NewRecorder()
 	c := echo.New().NewContext(req, rec)
 	c.Set("user_email", "user@example.com")
+	c.SetParamNames("thread_id")
+	c.SetParamValues("thread-1")
 	sse := datastar.NewSSE(rec, req)
 
 	if err := handler.patchThreadPage(c, sse, PatchRunHeader); err != nil {
@@ -3273,10 +3327,12 @@ func TestPatchStableTranscriptScopeDoesNotTouchSidebarOrArtifactPane(t *testing.
 		t.Fatalf("UpdateAgentThreadHead() error = %v", err)
 	}
 
-	req := httptest.NewRequest(http.MethodGet, "/agent-chat/stream?thread=thread-1", nil)
+	req := httptest.NewRequest(http.MethodGet, "/agent-chat/thread/thread-1/stream", nil)
 	rec := httptest.NewRecorder()
 	c := echo.New().NewContext(req, rec)
 	c.Set("user_email", "user@example.com")
+	c.SetParamNames("thread_id")
+	c.SetParamValues("thread-1")
 	sse := datastar.NewSSE(rec, req)
 
 	if err := handler.patchThreadPage(c, sse, PatchStableTranscript); err != nil {
@@ -3311,12 +3367,14 @@ func TestPatchThreadPageIncludesRunHeader(t *testing.T) {
 
 	req := httptest.NewRequest(
 		http.MethodGet,
-		"/agent-chat/stream?thread=thread-1&run=run-1",
+		"/agent-chat/thread/thread-1/stream?run=run-1",
 		nil,
 	)
 	rec := httptest.NewRecorder()
 	c := echo.New().NewContext(req, rec)
 	c.Set("user_email", "user@example.com")
+	c.SetParamNames("thread_id")
+	c.SetParamValues("thread-1")
 	sse := datastar.NewSSE(rec, req)
 
 	if err := handler.patchThreadPage(c, sse, PatchThreadPage); err != nil {
@@ -3357,11 +3415,13 @@ func TestStreamThreadSkipsInitialPatchWhenSinceIsCurrent(t *testing.T) {
 
 	reqCtx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	req := httptest.NewRequest(http.MethodGet, "/agent-chat/stream?thread="+thread.ID+"&since=1", nil).
+	req := httptest.NewRequest(http.MethodGet, "/agent-chat/thread/"+url.PathEscape(thread.ID)+"/stream?since=1", nil).
 		WithContext(reqCtx)
 	rec := httptest.NewRecorder()
 	c := echo.New().NewContext(req, rec)
 	c.Set("user_email", "user@example.com")
+	c.SetParamNames("thread_id")
+	c.SetParamValues(thread.ID)
 
 	done := make(chan error, 1)
 	go func() { done <- handler.StreamThread(c) }()
@@ -3408,11 +3468,13 @@ func TestStreamThreadSendsCatchUpPatchWhenSinceIsStale(t *testing.T) {
 
 	reqCtx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	req := httptest.NewRequest(http.MethodGet, "/agent-chat/stream?thread="+thread.ID+"&run=run-1&since=0", nil).
+	req := httptest.NewRequest(http.MethodGet, "/agent-chat/thread/"+url.PathEscape(thread.ID)+"/stream?run=run-1&since=0", nil).
 		WithContext(reqCtx)
 	rec := httptest.NewRecorder()
 	c := echo.New().NewContext(req, rec)
 	c.Set("user_email", "user@example.com")
+	c.SetParamNames("thread_id")
+	c.SetParamValues(thread.ID)
 
 	done := make(chan error, 1)
 	go func() { done <- handler.StreamThread(c) }()
@@ -3463,7 +3525,7 @@ func TestResumeThreadRequiresThreadIDAndPrompt(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			req := httptest.NewRequest(
 				http.MethodPost,
-				"/agent-chat/resume",
+				"/agent-chat/thread/thread-1/resume",
 				bytes.NewBufferString(tt.form),
 			)
 			req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationForm)
@@ -3520,7 +3582,7 @@ func TestForkThreadRequiresSourceThreadIDSourceEntryIDAndPrompt(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			req := httptest.NewRequest(
 				http.MethodPost,
-				"/agent-chat/fork",
+				"/agent-chat/thread/thread-1/fork",
 				bytes.NewBufferString(tt.form),
 			)
 			req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationForm)
@@ -4290,7 +4352,7 @@ func TestThreadSidebarRendersPiSessionOpenForm(t *testing.T) {
 	anchorRec := httptest.NewRecorder()
 	anchor := ThreadSidebarThread{
 		ID:    "thread-1",
-		Href:  "/agent-chat/workspace-1/thread/thread-1",
+		Href:  "/agent-chat/thread/thread-1/stream",
 		Title: "Browser thread",
 	}
 	if err := WorkspaceSidebarThreadRow("workspace-1", anchor).Render(
@@ -4300,7 +4362,7 @@ func TestThreadSidebarRendersPiSessionOpenForm(t *testing.T) {
 		t.Fatalf("Render(anchor) error = %v", err)
 	}
 	anchorBody := anchorRec.Body.String()
-	if !strings.Contains(anchorBody, `href="/agent-chat/workspace-1/thread/thread-1"`) {
+	if !strings.Contains(anchorBody, `href="/agent-chat/thread/thread-1/stream"`) {
 		t.Fatalf("DB-backed row did not render anchor: %s", anchorBody)
 	}
 	if strings.Contains(anchorBody, piSessionOpenEndpoint) {

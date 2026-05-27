@@ -544,7 +544,7 @@ func (h *Handler) patchPlanSidebar(
 		c.Request().Context(),
 		PlanSidebarInput{
 			UserEmail:      userEmail,
-			ActiveThreadID: c.QueryParam("thread"),
+			ActiveThreadID: firstNonEmpty(c.QueryParam("thread"), c.QueryParam("current_thread")),
 		},
 	)
 	if err != nil {

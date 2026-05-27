@@ -44,7 +44,8 @@ func TestBuildThoughtsChatDocURLIncludesChatQueryState(t *testing.T) {
 func TestParseEmbeddedChatURLReadsDocumentAndChatQuery(t *testing.T) {
 	req := httptest.NewRequest(
 		http.MethodGet,
-		"/thoughts/user/plans/a/doc.md?context=chat&chat_workspace=ws_1&thread=th_1&run=run_1",
+		"/thoughts/user/plans/a/doc.md?context=chat&chat_workspace=ws_1&"+
+			"thread=th_1&run=run_1",
 		nil,
 	)
 	c := echo.New().NewContext(req, httptest.NewRecorder())
@@ -403,6 +404,8 @@ func TestRenderEmbeddedChatPanelUsesFreeformRendererForPersistedFreeformWorkspac
 		t.Fatalf("RenderEmbeddedChatPanel() error = %v", err)
 	}
 	body := renderTemplToString(t, component)
+	assertNoLegacyExistingThreadChatRoutes(t, body, workspace.ID)
+	assertNoChatWorkspaceWithThread(t, replacement.URL)
 	for _, want := range []string{
 		"Workspace-backed thread",
 		"In this workspace",
@@ -462,6 +465,7 @@ func TestRenderEmbeddedFreeformPanelShowsUpgradedThreadMetadata(t *testing.T) {
 		t.Fatalf("RenderEmbeddedChatPanel() error = %v", err)
 	}
 	body := renderTemplToString(t, component)
+	assertNoLegacyExistingThreadChatRoutes(t, body, primaryWorkspace.ID)
 	for _, want := range []string{
 		"Workspace-backed thread",
 		"Primary workspace",
