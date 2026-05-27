@@ -632,6 +632,13 @@ func TestRunRuntimeMigrationsRemovesAgentThreadWorkspaceID(t *testing.T) {
 
 	database := openMigratorTestDB(t)
 	createOldShapeAgentChatTables(t, database)
+	if _, err := database.ExecContext(t.Context(), `
+ALTER TABLE agent_threads ADD COLUMN workspace_id TEXT;
+CREATE INDEX idx_agent_threads_workspace_updated
+	ON agent_threads(workspace_id, updated_at DESC)
+	WHERE workspace_id IS NOT NULL AND archived_at IS NULL;`); err != nil {
+		t.Fatalf("seed legacy agent_threads workspace index: %v", err)
+	}
 
 	if err := runRuntimeMigrations(t.Context(), database); err != nil {
 		t.Fatalf("runRuntimeMigrations() error = %v", err)

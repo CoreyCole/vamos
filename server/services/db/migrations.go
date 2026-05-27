@@ -556,6 +556,9 @@ func ensureAgentThreadWorkspaces(ctx context.Context, database *sql.DB) error {
 	if err != nil || !hasWorkspaceID {
 		return err
 	}
+	if _, err := database.ExecContext(ctx, `DROP INDEX IF EXISTS idx_agent_threads_workspace_updated`); err != nil {
+		return err
+	}
 	return dropColumnIfExists(ctx, database, "agent_threads", "workspace_id")
 }
 
