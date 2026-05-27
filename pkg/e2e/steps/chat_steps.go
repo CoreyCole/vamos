@@ -253,9 +253,9 @@ VALUES (?, ?, ?, 'resume', 'running', ?, ?, ?)`, runID, workspaceID, threadID, "
 		t.Fatal(err)
 	}
 	if _, err := database.ExecContext(t.Context(), `
-INSERT INTO user_chat_selections (user_email, workspace_id, thread_id, run_id)
-VALUES ('playwright@localhost', ?, ?, ?)
-ON CONFLICT(user_email) DO UPDATE SET
+INSERT INTO user_chat_selections (user_email, scope, scope_id, workspace_id, thread_id, run_id)
+VALUES ('playwright@localhost', 'freeform', '', ?, ?, ?)
+ON CONFLICT(user_email, scope, scope_id) DO UPDATE SET
   workspace_id = excluded.workspace_id,
   thread_id = excluded.thread_id,
   run_id = excluded.run_id,
@@ -583,11 +583,10 @@ func thoughtsChatURL(docPath, workspaceID, threadID string) string {
 	}
 	values := url.Values{}
 	values.Set("context", "chat")
-	if workspaceID != "" {
-		values.Set("chat_workspace", workspaceID)
-	}
 	if threadID != "" {
 		values.Set("thread", threadID)
+	} else if workspaceID != "" {
+		values.Set("chat_workspace", workspaceID)
 	}
 	return "/thoughts/" + strings.Join(parts, "/") + "?" + values.Encode()
 }
@@ -595,7 +594,7 @@ func thoughtsChatURL(docPath, workspaceID, threadID string) string {
 func ReloadChat(t testing.TB, ctx *e2e.Context, _ string) {
 	t.Helper()
 	if _, err := ctx.Page.Reload(
-		playwright.PageReloadOptions{WaitUntil: playwright.WaitUntilStateNetworkidle},
+		playwright.PageReloadOptions{WaitUntil: playwright.WaitUntilStateDomcontentloaded},
 	); err != nil {
 		t.Fatal(err)
 	}
@@ -607,7 +606,7 @@ func ReopenCurrentChat(t testing.TB, ctx *e2e.Context, _ string) {
 	Visit(t, ctx, "/")
 	if _, err := ctx.Page.Goto(
 		url,
-		playwright.PageGotoOptions{WaitUntil: playwright.WaitUntilStateNetworkidle},
+		playwright.PageGotoOptions{WaitUntil: playwright.WaitUntilStateDomcontentloaded},
 	); err != nil {
 		t.Fatal(err)
 	}
