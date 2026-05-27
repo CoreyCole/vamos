@@ -26,8 +26,14 @@ type agentChatShellSignalOptions struct {
 	SidebarOpenGroups   string
 }
 
-func freeformForkAction() string {
-	return "@post('/agent-chat/fork', {contentType: 'form'})"
+func freeformForkAction(threadID string) string {
+	if strings.TrimSpace(threadID) == "" {
+		return ""
+	}
+	return fmt.Sprintf(
+		"@post('%s', {contentType: 'form'})",
+		threadChatAction(threadID, "fork"),
+	)
 }
 
 func threadChatAction(threadID, action string) string {
@@ -64,7 +70,7 @@ func workspaceForkAction(workspaceID, threadID string) string {
 			threadChatAction(threadID, "fork"),
 		)
 	}
-	return freeformForkAction()
+	return freeformForkAction(threadID)
 }
 
 func workspaceSendAction(workspaceID, threadID string, hasThread bool) string {

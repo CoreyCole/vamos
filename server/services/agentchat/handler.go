@@ -994,6 +994,10 @@ func (h *Handler) ResumeEmbeddedFreeformThread(c echo.Context) error {
 	if threadID == "" {
 		return echo.NewHTTPError(http.StatusBadRequest, "thread_id is required")
 	}
+	return h.resumeEmbeddedFreeformThreadByID(c, userEmail, threadID)
+}
+
+func (h *Handler) resumeEmbeddedFreeformThreadByID(c echo.Context, userEmail, threadID string) error {
 	prompt := strings.TrimSpace(c.FormValue("prompt"))
 	if prompt == "" {
 		return echo.NewHTTPError(http.StatusBadRequest, "prompt is required")
@@ -1948,7 +1952,7 @@ func (h *Handler) ResumeEmbeddedThread(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 	}
 	if !ok {
-		return echo.NewHTTPError(http.StatusNotFound, "thread has no primary workspace")
+		return h.resumeEmbeddedFreeformThreadByID(c, userEmail, threadID)
 	}
 	return h.resumeEmbeddedWorkspaceThread(c, userEmail, workspace.ID, threadID)
 }
@@ -3042,7 +3046,7 @@ func (h *Handler) patchEmbeddedFreeformLiveTranscript(
 	if err != nil {
 		return err
 	}
-	return sse.PatchElementTempl(LiveTranscriptRegion(args.ThreadID, args.Transcript, freeformForkAction()))
+	return sse.PatchElementTempl(LiveTranscriptRegion(args.ThreadID, args.Transcript, freeformForkAction(args.ThreadID)))
 }
 
 func (h *Handler) patchEmbeddedChatLiveTranscript(
@@ -3185,7 +3189,7 @@ func (h *Handler) patchThread(
 			return err
 		}
 		return sse.PatchElementTempl(
-			LiveTranscriptRegion(threadID, state, freeformForkAction()),
+			LiveTranscriptRegion(threadID, state, freeformForkAction(threadID)),
 		)
 	}
 
@@ -3208,21 +3212,23 @@ func (h *Handler) patchThread(
 		return sse.PatchElementTempl(RunHeader(ensureFreeformWorkbenchState(*args)))
 	}
 	patchMessages := func() error {
+		threadID := getThreadID(args.CurrentThread)
 		return sse.PatchElementTempl(
 			MessagesPane(
-				getThreadID(args.CurrentThread),
+				threadID,
 				args.Transcript,
 				args.CurrentThread != nil,
-				freeformForkAction(),
+				freeformForkAction(threadID),
 			),
 		)
 	}
 	patchLive := func() error {
+		threadID := getThreadID(args.CurrentThread)
 		return sse.PatchElementTempl(
 			LiveTranscriptRegion(
-				getThreadID(args.CurrentThread),
+				threadID,
 				args.Transcript,
-				freeformForkAction(),
+				freeformForkAction(threadID),
 			),
 		)
 	}

@@ -31,7 +31,7 @@ templ EmbeddedFreeformRightRailContent(args EmbeddedFreeformPanelArgs) {
 			<div id="thoughts-freeform-chat-stream" class="hidden" data-init={ "@get('" + args.StreamURL + "')" }></div>
 		}
 		<div class="min-h-0 flex-1 overflow-y-auto">
-			@MessagesPane(args.ThreadID, args.Transcript, args.HasThread, freeformForkAction())
+			@MessagesPane(args.ThreadID, args.Transcript, args.HasThread, freeformForkAction(args.ThreadID))
 		</div>
 		<div class="shrink-0 border-t border-border bg-background p-3">
 			<div id="agent-chat-workspace-composer">

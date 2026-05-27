@@ -166,7 +166,7 @@ func EmbeddedFreeformRightRailContent(args EmbeddedFreeformPanelArgs) templ.Comp
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = MessagesPane(args.ThreadID, args.Transcript, args.HasThread, freeformForkAction()).Render(ctx, templ_7745c5c3_Buffer)
+		templ_7745c5c3_Err = MessagesPane(args.ThreadID, args.Transcript, args.HasThread, freeformForkAction(args.ThreadID)).Render(ctx, templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

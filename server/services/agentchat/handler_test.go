@@ -824,6 +824,54 @@ func TestResumeEmbeddedThreadResolvesPrimaryWorkspace(t *testing.T) {
 	}
 }
 
+func TestResumeEmbeddedThreadSupportsFreeformThread(t *testing.T) {
+	t.Parallel()
+
+	service := newTestAgentChatService(t)
+	service.temporal = &fakeTemporalStarter{}
+	handler := NewHandler(service, nil)
+	thread := mustCreateAgentThread(
+		t,
+		service,
+		"freeform-thread-embedded-resume",
+		"user@example.com",
+		"/tmp/project",
+		"",
+	)
+
+	form := url.Values{
+		"prompt": {"resume pure freeform from thoughts"},
+	}
+	req := httptest.NewRequestWithContext(
+		t.Context(),
+		http.MethodPost,
+		"/thoughts/chat/thread/"+thread.ID+"/resume",
+		strings.NewReader(form.Encode()),
+	)
+	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationForm)
+	rec := httptest.NewRecorder()
+	c := echo.New().NewContext(req, rec)
+	c.Set("user_email", "user@example.com")
+	c.SetParamNames("thread_id")
+	c.SetParamValues(thread.ID)
+
+	if err := handler.ResumeEmbeddedThread(c); err != nil {
+		t.Fatalf("ResumeEmbeddedThread() error = %v", err)
+	}
+	body := rec.Body.String()
+	for _, want := range []string{
+		"doc-right-chat-panel",
+		"Freeform chat",
+		"/thoughts/chat/thread/" + thread.ID + "/resume",
+		"/thoughts/chat/thread/" + thread.ID + "/stream",
+	} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("body missing %q: %s", want, body)
+		}
+	}
+	assertNoChatWorkspaceWithThread(t, body)
+}
+
 func TestStreamEmbeddedThreadSupportsFreeformCatchupPanel(
 	t *testing.T,
 ) {
