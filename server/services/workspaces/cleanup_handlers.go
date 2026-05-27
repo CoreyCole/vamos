@@ -129,8 +129,7 @@ func workspaceCleanupAction(view ImplWorkspaceView) WorkspaceCleanupAction {
 }
 
 func isIdempotentCleanupNoop(action WorkspaceCleanupAction, view ImplWorkspaceView) bool {
-	if view.Row.Status == string(ImplWorkspaceStatusMerged) ||
-		view.Row.Status == string(ImplWorkspaceStatusCleanedUp) {
+	if view.Row.Status == string(ImplWorkspaceStatusCleanedUp) {
 		return true
 	}
 	return strings.Contains(strings.ToLower(action.DisabledReason), "already cleaned")

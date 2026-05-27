@@ -1559,6 +1559,37 @@ func TestHandleCleanupWorkspaceAlreadyCleanedIsIdempotent(t *testing.T) {
 	}
 }
 
+func TestHandleCleanupWorkspaceRejectsMergedUnknownProof(t *testing.T) {
+	starter := &fakeCleanupStarter{}
+	handler := NewHandler(
+		&fakeLifecycleManager{},
+		"https://main.cn-agents.test",
+		"main",
+		WithImplWorkspaces(fakeImplWorkspaceLister{rows: []db.ImplWorkspace{{
+			WorkspaceSlug:     "unknown",
+			CheckoutPath:      "/repo/unknown",
+			DisplayName:       "Unknown Proof Workspace",
+			Status:            string(ImplWorkspaceStatusMerged),
+			CleanupProofKind:  string(MergeProofUnknown),
+			CleanupRiskReason: nullableString("fetch failed"),
+		}}}),
+		WithWorkspaceCleanupStarter(starter),
+	)
+	e := echo.New()
+	req := httptest.NewRequest(http.MethodPost, "/workspaces/cleanup", strings.NewReader("slug=unknown"))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	rec := httptest.NewRecorder()
+
+	err := handler.HandleCleanupWorkspace(e.NewContext(req, rec))
+	httpErr, ok := err.(*echo.HTTPError)
+	if !ok || httpErr.Code != http.StatusConflict {
+		t.Fatalf("HandleCleanupWorkspace() err = %#v, want conflict", err)
+	}
+	if len(starter.inputs) != 0 {
+		t.Fatalf("unsafe merged cleanup started workflow: %#v", starter.inputs)
+	}
+}
+
 func TestHandleCleanupWorkspaceDatastarOmitsCleanedSlugFromDefaultPatch(t *testing.T) {
 	starter := &fakeCleanupStarter{}
 	handler := NewHandler(
