@@ -1,6 +1,7 @@
 package workspaces
 
 import (
+	"database/sql"
 	"fmt"
 	"hash/fnv"
 	"strings"
@@ -285,8 +286,165 @@ func workspaceViewLabel(view ImplWorkspaceView) string {
 	return workspaceViewTitle(view)
 }
 
+type CleanupGroup string
+
+const (
+	CleanupGroupNeedsAttention CleanupGroup = "needs_attention"
+	CleanupGroupSafeToCleanup  CleanupGroup = "safe_to_cleanup"
+	CleanupGroupCleanedUp      CleanupGroup = "cleaned_up"
+)
+
+type CleanupReadiness struct {
+	Group        CleanupGroup
+	Safe         bool
+	ProofKind    MergeProofKind
+	SourceRef    string
+	TargetCommit string
+	ProvenAt     time.Time
+	RiskReason   string
+	Summary      string
+}
+
+type WorkspaceGroups struct {
+	NeedsAttention []ImplWorkspaceView
+	SafeToCleanup  []ImplWorkspaceView
+	CleanedUp      []ImplWorkspaceView
+}
+
+func workspaceCleanupReadiness(view ImplWorkspaceView) CleanupReadiness {
+	proof := proofKindFromRow(view)
+	readiness := CleanupReadiness{
+		ProofKind:    proof,
+		SourceRef:    nullStringValue(view.Row.CleanupProofSourceRef),
+		TargetCommit: nullStringValue(view.Row.CleanupProofTargetCommit),
+		ProvenAt:     nullTimeValue(view.Row.CleanupProofAt),
+	}
+	if view.Row.Status == string(ImplWorkspaceStatusCleanedUp) {
+		readiness.Group = CleanupGroupCleanedUp
+		readiness.Summary = "Cleanup completed"
+		return readiness
+	}
+	if view.Row.Status == string(ImplWorkspaceStatusMerged) && isStrongCleanupProof(proof) {
+		readiness.Group = CleanupGroupSafeToCleanup
+		readiness.Safe = true
+		readiness.Summary = workspaceProofSummary(view)
+		return readiness
+	}
+	readiness.Group = CleanupGroupNeedsAttention
+	readiness.RiskReason = workspaceRiskReason(view)
+	readiness.Summary = readiness.RiskReason
+	return readiness
+}
+
+func proofKindFromRow(view ImplWorkspaceView) MergeProofKind {
+	switch MergeProofKind(strings.TrimSpace(view.Row.CleanupProofKind)) {
+	case MergeProofAncestor:
+		return MergeProofAncestor
+	case MergeProofPatchEquivalent:
+		return MergeProofPatchEquivalent
+	case MergeProofCached:
+		return MergeProofCached
+	default:
+		return MergeProofUnknown
+	}
+}
+
+func isStrongCleanupProof(kind MergeProofKind) bool {
+	return kind == MergeProofAncestor || kind == MergeProofPatchEquivalent || kind == MergeProofCached
+}
+
+func nullTimeValue(value sql.NullTime) time.Time {
+	if !value.Valid {
+		return time.Time{}
+	}
+	return value.Time
+}
+
+func workspaceProofSummary(view ImplWorkspaceView) string {
+	source := firstNonEmpty(nullStringValue(view.Row.CleanupProofSourceRef), "origin/main")
+	switch proofKindFromRow(view) {
+	case MergeProofAncestor:
+		return "Ancestor proof against " + source
+	case MergeProofPatchEquivalent:
+		return "Patch-equivalent to " + source
+	case MergeProofCached:
+		return "Cached proof for unchanged HEAD"
+	default:
+		return workspaceRiskReason(view)
+	}
+}
+
+func workspaceRiskReason(view ImplWorkspaceView) string {
+	if reason := nullStringValue(view.Row.CleanupRiskReason); reason != "" {
+		return reason
+	}
+	if view.Row.Status == string(ImplWorkspaceStatusActive) && view.Row.AheadCount > 0 {
+		return fmt.Sprintf("Unmerged · %d ahead", view.Row.AheadCount)
+	}
+	if view.Row.Status == string(ImplWorkspaceStatusMerged) {
+		return "Merged status lacks strong cleanup proof"
+	}
+	return "Cleanup proof unknown"
+}
+
+func groupImplWorkspaceViews(
+	views []ImplWorkspaceView,
+	protected map[string]ReleaseLaneWorkspace,
+	showCleanedHistory bool,
+) WorkspaceGroups {
+	var groups WorkspaceGroups
+	var walk func([]ImplWorkspaceView)
+	walk = func(items []ImplWorkspaceView) {
+		for _, view := range items {
+			children := view.Children
+			view.Children = nil
+			slug := workspaceViewSlug(view)
+			lane, isProtectedLane := protected[slug]
+			if (isProtectedLane && lane.Protected) || view.IsMain || slug == mainWorkspaceSlug {
+				groups.NeedsAttention = append(groups.NeedsAttention, view)
+				walk(children)
+				continue
+			}
+			readiness := view.Cleanup
+			if readiness.Group == "" {
+				readiness = workspaceCleanupReadiness(view)
+				view.Cleanup = readiness
+			}
+			switch readiness.Group {
+			case CleanupGroupSafeToCleanup:
+				groups.SafeToCleanup = append(groups.SafeToCleanup, view)
+			case CleanupGroupCleanedUp:
+				if showCleanedHistory {
+					groups.CleanedUp = append(groups.CleanedUp, view)
+				}
+			default:
+				groups.NeedsAttention = append(groups.NeedsAttention, view)
+			}
+			walk(children)
+		}
+	}
+	walk(views)
+	return groups
+}
+
 func workspaceReleaseSummary(view ImplWorkspaceView) string {
+	readiness := view.Cleanup
+	if readiness.Group == "" {
+		readiness = workspaceCleanupReadiness(view)
+	}
+	if readiness.Group == CleanupGroupSafeToCleanup {
+		return "Merged · safe to clean up"
+	}
+	if readiness.Group == CleanupGroupCleanedUp {
+		return "Cleaned up"
+	}
+	if readiness.RiskReason != "" && view.Row.Status != string(ImplWorkspaceStatusActive) {
+		return readiness.RiskReason
+	}
 	if len(view.ReleaseActions) == 0 {
+		if view.Row.Status == string(ImplWorkspaceStatusActive) && view.Row.AheadCount > 0 {
+			return fmt.Sprintf("Unmerged · %d ahead", view.Row.AheadCount)
+		}
 		return "No release action"
 	}
 	for _, action := range view.ReleaseActions {

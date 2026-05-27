@@ -1,6 +1,7 @@
 package workspaces
 
 import (
+	"database/sql"
 	"testing"
 
 	"github.com/CoreyCole/vamos/pkg/db"
@@ -163,6 +164,110 @@ func TestIsHistoricalImplWorkspaceViewUsesFilesystemBackedRuntime(t *testing.T) 
 	merged := ImplWorkspaceView{Row: dbImplWorkspace("merged", "/repo/merged", string(ImplWorkspaceStatusMerged))}
 	if !isHistoricalImplWorkspaceView(merged, nil) {
 		t.Fatalf("merged row should be historical")
+	}
+}
+
+func TestWorkspaceCleanupReadiness(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name      string
+		view      ImplWorkspaceView
+		wantGroup CleanupGroup
+		wantSafe  bool
+	}{
+		{
+			name:      "active ahead needs attention",
+			view:      ImplWorkspaceView{Row: db.ImplWorkspace{Status: string(ImplWorkspaceStatusActive), AheadCount: 3}},
+			wantGroup: CleanupGroupNeedsAttention,
+		},
+		{
+			name: "merged ancestor safe",
+			view: ImplWorkspaceView{Row: db.ImplWorkspace{
+				Status:                string(ImplWorkspaceStatusMerged),
+				CleanupProofKind:      string(MergeProofAncestor),
+				CleanupProofSourceRef: sql.NullString{String: "origin/main", Valid: true},
+			}},
+			wantGroup: CleanupGroupSafeToCleanup,
+			wantSafe:  true,
+		},
+		{
+			name:      "merged patch equivalent safe",
+			view:      ImplWorkspaceView{Row: db.ImplWorkspace{Status: string(ImplWorkspaceStatusMerged), CleanupProofKind: string(MergeProofPatchEquivalent)}},
+			wantGroup: CleanupGroupSafeToCleanup,
+			wantSafe:  true,
+		},
+		{
+			name:      "merged cached safe",
+			view:      ImplWorkspaceView{Row: db.ImplWorkspace{Status: string(ImplWorkspaceStatusMerged), CleanupProofKind: string(MergeProofCached)}},
+			wantGroup: CleanupGroupSafeToCleanup,
+			wantSafe:  true,
+		},
+		{
+			name:      "merged unknown needs attention",
+			view:      ImplWorkspaceView{Row: db.ImplWorkspace{Status: string(ImplWorkspaceStatusMerged), CleanupProofKind: string(MergeProofUnknown)}},
+			wantGroup: CleanupGroupNeedsAttention,
+		},
+		{
+			name:      "cleaned up history",
+			view:      ImplWorkspaceView{Row: db.ImplWorkspace{Status: string(ImplWorkspaceStatusCleanedUp)}},
+			wantGroup: CleanupGroupCleanedUp,
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			got := workspaceCleanupReadiness(tc.view)
+			if got.Group != tc.wantGroup || got.Safe != tc.wantSafe {
+				t.Fatalf("workspaceCleanupReadiness() = %+v, want group %q safe %v", got, tc.wantGroup, tc.wantSafe)
+			}
+		})
+	}
+}
+
+func TestWorkspaceReleaseSummaryShowsCleanupReadiness(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name string
+		view ImplWorkspaceView
+		want string
+	}{
+		{
+			name: "merged safe",
+			view: ImplWorkspaceView{Row: db.ImplWorkspace{Status: string(ImplWorkspaceStatusMerged), CleanupProofKind: string(MergeProofAncestor)}},
+			want: "Merged · safe to clean up",
+		},
+		{
+			name: "merged unknown",
+			view: ImplWorkspaceView{Row: db.ImplWorkspace{Status: string(ImplWorkspaceStatusMerged), CleanupProofKind: string(MergeProofUnknown)}},
+			want: "Merged status lacks strong cleanup proof",
+		},
+		{
+			name: "cleaned up",
+			view: ImplWorkspaceView{Row: db.ImplWorkspace{Status: string(ImplWorkspaceStatusCleanedUp)}},
+			want: "Cleaned up",
+		},
+		{
+			name: "active ahead",
+			view: ImplWorkspaceView{Row: db.ImplWorkspace{Status: string(ImplWorkspaceStatusActive), AheadCount: 3}},
+			want: "Unmerged · 3 ahead",
+		},
+		{
+			name: "active no release action",
+			view: ImplWorkspaceView{Row: db.ImplWorkspace{Status: string(ImplWorkspaceStatusActive)}},
+			want: "No release action",
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			if got := workspaceReleaseSummary(tc.view); got != tc.want {
+				t.Fatalf("workspaceReleaseSummary() = %q, want %q", got, tc.want)
+			}
+		})
 	}
 }
 

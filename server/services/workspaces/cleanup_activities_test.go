@@ -5,6 +5,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/CoreyCole/vamos/pkg/db"
 )
 
 type fakeImplWorkspaceCleanupMarker struct {
@@ -83,6 +85,28 @@ func TestWorkspaceCleanupActionRejectsConfiguredCheckout(t *testing.T) {
 	})
 	if !action.Disabled || action.DisabledReason != "configured checkout cannot be cleaned up" {
 		t.Fatalf("cleanup action = %+v, want configured checkout disabled", action)
+	}
+}
+
+func TestWorkspaceCleanupActionRequiresStrongProofForMergedRows(t *testing.T) {
+	safe := workspaceCleanupAction(ImplWorkspaceView{Row: db.ImplWorkspace{
+		WorkspaceSlug:     "safe",
+		Status:            string(ImplWorkspaceStatusMerged),
+		CleanupProofKind:  string(MergeProofAncestor),
+		CleanupRiskReason: nullableString("ignored after strong proof"),
+	}})
+	if safe.Disabled || safe.Label != "Clean up" || safe.Disposition != WorkspaceCleanupDispositionMerged {
+		t.Fatalf("safe action = %+v, want enabled merged cleanup", safe)
+	}
+
+	unknown := workspaceCleanupAction(ImplWorkspaceView{Row: db.ImplWorkspace{
+		WorkspaceSlug:     "unknown",
+		Status:            string(ImplWorkspaceStatusMerged),
+		CleanupProofKind:  string(MergeProofUnknown),
+		CleanupRiskReason: nullableString("fetch failed"),
+	}})
+	if !unknown.Disabled || unknown.DisabledReason != "fetch failed" {
+		t.Fatalf("unknown action = %+v, want disabled with risk reason", unknown)
 	}
 }
 

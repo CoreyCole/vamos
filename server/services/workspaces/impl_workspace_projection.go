@@ -14,6 +14,7 @@ type ImplWorkspaceView struct {
 	Children       []ImplWorkspaceView
 	ReleaseActions []ReleaseActionView
 	Workflow       WorkspaceWorkflowSummary
+	Cleanup        CleanupReadiness
 }
 
 type ImplWorkspaceViewOption func(*implWorkspaceViewOptions)
@@ -105,7 +106,9 @@ func BuildImplWorkspaceViews(
 		applyImplWorkspaceViewOptions(&view, options)
 		views = append(views, view)
 	}
-	return BuildImplWorkspaceTree(views)
+	tree := BuildImplWorkspaceTree(views)
+	applyCleanupReadiness(tree)
+	return tree
 }
 
 func buildImplWorkspaceViewOptions(opts ...ImplWorkspaceViewOption) implWorkspaceViewOptions {
@@ -141,12 +144,20 @@ func applyOptionsToImplWorkspaceViews(views []ImplWorkspaceView, opts ...ImplWor
 	apply = func(items []ImplWorkspaceView) {
 		for i := range items {
 			applyImplWorkspaceViewOptions(&items[i], options)
+			items[i].Cleanup = workspaceCleanupReadiness(items[i])
 			items[i].Children = append([]ImplWorkspaceView(nil), items[i].Children...)
 			apply(items[i].Children)
 		}
 	}
 	apply(out)
 	return out
+}
+
+func applyCleanupReadiness(views []ImplWorkspaceView) {
+	for i := range views {
+		views[i].Cleanup = workspaceCleanupReadiness(views[i])
+		applyCleanupReadiness(views[i].Children)
+	}
 }
 
 func orderReleaseLaneViewsFirst(

@@ -298,10 +298,11 @@ func TestBuildImplWorkspaceViewsPreservesCleanedUpMergedRowsAsHistory(t *testing
 			Status:        string(ImplWorkspaceStatusCleanedUp),
 		},
 		{
-			WorkspaceSlug: "merged",
-			DisplayName:   "Merged",
-			CheckoutPath:  "/repo/merged",
-			Status:        string(ImplWorkspaceStatusMerged),
+			WorkspaceSlug:    "merged",
+			DisplayName:      "Merged",
+			CheckoutPath:     "/repo/merged",
+			Status:           string(ImplWorkspaceStatusMerged),
+			CleanupProofKind: string(MergeProofAncestor),
 		},
 	}
 
@@ -310,7 +311,71 @@ func TestBuildImplWorkspaceViewsPreservesCleanedUpMergedRowsAsHistory(t *testing
 		t.Fatalf("len(got) = %d, want 2", len(got))
 	}
 	if got[0].Row.Status != string(ImplWorkspaceStatusCleanedUp) ||
-		got[1].Row.Status != string(ImplWorkspaceStatusMerged) {
+		got[0].Cleanup.Group != CleanupGroupCleanedUp ||
+		got[1].Row.Status != string(ImplWorkspaceStatusMerged) ||
+		got[1].Cleanup.Group != CleanupGroupSafeToCleanup {
 		t.Fatalf("got = %+v", got)
+	}
+}
+
+func TestGroupImplWorkspaceViewsByCleanupReadiness(t *testing.T) {
+	t.Parallel()
+
+	views := BuildImplWorkspaceViews([]db.ImplWorkspace{
+		{WorkspaceSlug: "active", Status: string(ImplWorkspaceStatusActive), AheadCount: 2},
+		{WorkspaceSlug: "merged", Status: string(ImplWorkspaceStatusMerged), CleanupProofKind: string(MergeProofAncestor)},
+		{WorkspaceSlug: "cleaned", Status: string(ImplWorkspaceStatusCleanedUp)},
+	}, nil, WorkspaceLifecycleSnapshot{})
+
+	groups := groupImplWorkspaceViews(views, nil, false)
+	if len(groups.NeedsAttention) != 1 || workspaceViewSlug(groups.NeedsAttention[0]) != "active" {
+		t.Fatalf("needs attention = %+v", groups.NeedsAttention)
+	}
+	if len(groups.SafeToCleanup) != 1 || workspaceViewSlug(groups.SafeToCleanup[0]) != "merged" {
+		t.Fatalf("safe to cleanup = %+v", groups.SafeToCleanup)
+	}
+	if len(groups.CleanedUp) != 0 {
+		t.Fatalf("cleaned hidden = %+v, want empty", groups.CleanedUp)
+	}
+
+	groups = groupImplWorkspaceViews(views, nil, true)
+	if len(groups.CleanedUp) != 1 || workspaceViewSlug(groups.CleanedUp[0]) != "cleaned" {
+		t.Fatalf("cleaned shown = %+v", groups.CleanedUp)
+	}
+}
+
+func TestGroupImplWorkspaceViewsPromotesActiveChildren(t *testing.T) {
+	t.Parallel()
+
+	views := []ImplWorkspaceView{{
+		Row:     db.ImplWorkspace{WorkspaceSlug: "parent", Status: string(ImplWorkspaceStatusCleanedUp)},
+		Cleanup: CleanupReadiness{Group: CleanupGroupCleanedUp},
+		Children: []ImplWorkspaceView{{
+			Row:     db.ImplWorkspace{WorkspaceSlug: "child", Status: string(ImplWorkspaceStatusActive)},
+			Cleanup: CleanupReadiness{Group: CleanupGroupNeedsAttention},
+		}},
+	}}
+
+	groups := groupImplWorkspaceViews(views, nil, false)
+	if len(groups.NeedsAttention) != 1 || workspaceViewSlug(groups.NeedsAttention[0]) != "child" {
+		t.Fatalf("needs attention = %+v, want active child promoted", groups.NeedsAttention)
+	}
+}
+
+func TestGroupImplWorkspaceViewsKeepsProtectedLaneVisible(t *testing.T) {
+	t.Parallel()
+
+	views := []ImplWorkspaceView{{
+		Row:     db.ImplWorkspace{WorkspaceSlug: "stage", Status: string(ImplWorkspaceStatusCleanedUp)},
+		Cleanup: CleanupReadiness{Group: CleanupGroupCleanedUp},
+	}}
+	protected := map[string]ReleaseLaneWorkspace{"stage": {Slug: "stage", Protected: true}}
+
+	groups := groupImplWorkspaceViews(views, protected, false)
+	if len(groups.NeedsAttention) != 1 || workspaceViewSlug(groups.NeedsAttention[0]) != "stage" {
+		t.Fatalf("needs attention = %+v, want protected lane visible", groups.NeedsAttention)
+	}
+	if action := workspaceCleanupAction(groups.NeedsAttention[0]); !action.Disabled {
+		t.Fatalf("cleanup action = %+v, want protected-like cleaned row uncleanable", action)
 	}
 }
