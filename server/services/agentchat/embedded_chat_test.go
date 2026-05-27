@@ -200,6 +200,36 @@ func TestResolveEmbeddedChatSelectionUsesPersistedWhenChatContextHasNoParams(
 	}
 }
 
+func TestResolveEmbeddedChatSelectionDropsStaleCrossWorkspaceThread(t *testing.T) {
+	ctx := context.Background()
+	service := newTestAgentChatService(t)
+	_, thread := mustCreateWorkspaceThreadForHandlerTest(t, service, "owner@example.com")
+	otherWorkspace := mustCreateWorkspaceForHandlerTest(t, service, "owner@example.com")
+	if err := service.PersistEmbeddedChatSelection(
+		ctx,
+		"owner@example.com",
+		EmbeddedChatSelection{
+			WorkspaceID: otherWorkspace.ID,
+			ThreadID:    thread.ID,
+			RunID:       "stale-run",
+		},
+	); err != nil {
+		t.Fatalf("PersistEmbeddedChatSelection() error = %v", err)
+	}
+
+	got, err := service.ResolveEmbeddedChatSelection(
+		ctx,
+		"owner@example.com",
+		EmbeddedChatURLState{Context: ThoughtsChatContext},
+	)
+	if err != nil {
+		t.Fatalf("ResolveEmbeddedChatSelection() error = %v", err)
+	}
+	if got.WorkspaceID != otherWorkspace.ID || got.ThreadID != "" || got.RunID != "" {
+		t.Fatalf("selection = %+v, want workspace-only fallback", got)
+	}
+}
+
 func TestResolveEmbeddedChatSelectionRootIgnoresGlobalWorkspaceSelection(t *testing.T) {
 	ctx := context.Background()
 	service := newTestAgentChatService(t)
@@ -372,8 +402,9 @@ func TestRenderEmbeddedChatPanelUsesFreeformRendererForPersistedFreeformWorkspac
 	}
 	body := renderTemplToString(t, component)
 	for _, want := range []string{
-		"Freeform chat",
-		"/thoughts/chat/freeform/resume",
+		"Workspace-backed thread",
+		"In this workspace",
+		"/thoughts/chat/thread/" + thread.ID + "/resume",
 		"/thoughts/chat/freeform/stream",
 		"creative-mode-agent/plans/2026-04-30_test-plan/plan.md?",
 		"context=chat",
@@ -391,6 +422,77 @@ func TestRenderEmbeddedChatPanelUsesFreeformRendererForPersistedFreeformWorkspac
 		if strings.Contains(body, notWant) {
 			t.Fatalf("freeform embedded panel contains %q: %s", notWant, body)
 		}
+	}
+}
+
+func TestRenderEmbeddedFreeformPanelShowsUpgradedThreadMetadata(t *testing.T) {
+	service := newTestAgentChatService(t)
+	freeformWorkspace, thread := mustCreateWorkspaceThreadForHandlerTest(
+		t,
+		service,
+		"user@example.com",
+	)
+	primaryWorkspace := mustCreateWorkspaceForHandlerTest(t, service, "user@example.com")
+	if err := service.SetThreadPrimaryWorkspace(t.Context(), thread.ID, primaryWorkspace.ID, "test"); err != nil {
+		t.Fatalf("SetThreadPrimaryWorkspace() error = %v", err)
+	}
+	if err := service.PersistEmbeddedChatSelection(
+		t.Context(),
+		"user@example.com",
+		EmbeddedChatSelection{WorkspaceID: freeformWorkspace.ID, ThreadID: thread.ID},
+	); err != nil {
+		t.Fatalf("PersistEmbeddedChatSelection() error = %v", err)
+	}
+
+	component, _, err := service.RenderEmbeddedChatPanel(
+		t.Context(),
+		markdown.EmbeddedChatRenderRequest{
+			UserEmail: "user@example.com",
+			DocPath:   "creative-mode-agent/plans/2026-04-30_test-plan/plan.md",
+			Context:   ThoughtsChatContext,
+		},
+	)
+	if err != nil {
+		t.Fatalf("RenderEmbeddedChatPanel() error = %v", err)
+	}
+	body := renderTemplToString(t, component)
+	for _, want := range []string{
+		"Workspace-backed thread",
+		"Primary workspace",
+		"New thread",
+		"In this workspace",
+		"Freeform",
+		"/agent-chat/thread/" + thread.ID + "/new?target_kind=primary",
+		"workspace_id=" + primaryWorkspace.ID,
+	} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("upgraded freeform embedded panel missing %q: %s", want, body)
+		}
+	}
+}
+
+func TestBuildEmbeddedFreeformPanelArgsUsesWorkspaceResumeForUpgradedThread(t *testing.T) {
+	service := newTestAgentChatService(t)
+	freeformWorkspace, thread := mustCreateWorkspaceThreadForHandlerTest(t, service, "user@example.com")
+	primaryWorkspace := mustCreateWorkspaceForHandlerTest(t, service, "user@example.com")
+	if err := service.SetThreadPrimaryWorkspace(t.Context(), thread.ID, primaryWorkspace.ID, "test"); err != nil {
+		t.Fatalf("SetThreadPrimaryWorkspace() error = %v", err)
+	}
+	if err := service.PersistEmbeddedChatSelection(
+		t.Context(),
+		"user@example.com",
+		EmbeddedChatSelection{WorkspaceID: freeformWorkspace.ID, ThreadID: thread.ID},
+	); err != nil {
+		t.Fatalf("PersistEmbeddedChatSelection() error = %v", err)
+	}
+
+	args, err := service.BuildEmbeddedFreeformPanelArgs(t.Context(), "user@example.com", thread.ID, "")
+	if err != nil {
+		t.Fatalf("BuildEmbeddedFreeformPanelArgs() error = %v", err)
+	}
+	want := "/thoughts/chat/thread/" + thread.ID + "/resume"
+	if !strings.Contains(args.ComposerAction, want) {
+		t.Fatalf("ComposerAction = %q, want %q", args.ComposerAction, want)
 	}
 }
 

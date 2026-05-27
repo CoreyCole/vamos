@@ -174,7 +174,7 @@ func EmbeddedFreeformRightRailContent(args EmbeddedFreeformPanelArgs) templ.Comp
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = AgentChatComposer(AgentChatComposerArgs{Action: args.ComposerAction, ThreadID: args.ThreadID, RunID: args.RunID, Cwd: args.Cwd, ModeLabel: "Freeform chat", Placeholder: workspacePromptPlaceholder(args.HasThread), HasThread: args.HasThread, IncludeCwd: !args.HasThread}).Render(ctx, templ_7745c5c3_Buffer)
+		templ_7745c5c3_Err = AgentChatComposer(AgentChatComposerArgs{Action: args.ComposerAction, ThreadID: args.ThreadID, RunID: args.RunID, Cwd: args.Cwd, ModeLabel: embeddedFreeformModeLabel(args.ThreadMetadata), Placeholder: workspacePromptPlaceholder(args.HasThread), HasThread: args.HasThread, IncludeCwd: !args.HasThread, ThreadMetadata: args.ThreadMetadata}).Render(ctx, templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -248,7 +248,7 @@ func EmbeddedWorkspaceComposer(args EmbeddedChatPanelArgs) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = AgentChatComposer(AgentChatComposerArgs{Action: args.ComposerAction, WorkspaceID: args.WorkspaceID, ThreadID: args.ThreadID, DocPath: args.DocPath, RunID: args.RunID, Cwd: args.Cwd, ModeLabel: "Workspace chat", Placeholder: workspacePromptPlaceholder(args.HasThread), HasThread: args.HasThread, IncludeCwd: true, AttachedPaths: args.PendingAttachments, SlashEndpointBase: "/thoughts/chat", ShowCurrentDocToggle: args.DocPath != "", CurrentDocAttached: attachedPathContains(args.PendingAttachments, args.DocPath)}).Render(ctx, templ_7745c5c3_Buffer)
+		templ_7745c5c3_Err = AgentChatComposer(AgentChatComposerArgs{Action: args.ComposerAction, WorkspaceID: args.WorkspaceID, ThreadID: args.ThreadID, DocPath: args.DocPath, RunID: args.RunID, Cwd: args.Cwd, ModeLabel: embeddedWorkspaceModeLabel(args.ThreadMetadata), Placeholder: workspacePromptPlaceholder(args.HasThread), HasThread: args.HasThread, IncludeCwd: true, AttachedPaths: args.PendingAttachments, SlashEndpointBase: "/thoughts/chat", ShowCurrentDocToggle: args.DocPath != "", CurrentDocAttached: attachedPathContains(args.PendingAttachments, args.DocPath), ThreadMetadata: args.ThreadMetadata}).Render(ctx, templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

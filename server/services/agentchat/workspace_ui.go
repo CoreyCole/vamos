@@ -76,8 +76,7 @@ func workspaceSendAction(workspaceID, threadID string, hasThread bool) string {
 func embeddedWorkspaceSendAction(workspaceID, threadID string, hasThread bool) string {
 	if hasThread {
 		return fmt.Sprintf(
-			"@post('/thoughts/chat/%s/thread/%s/resume', {contentType: 'form'})",
-			workspaceID,
+			"@post('/thoughts/chat/thread/%s/resume', {contentType: 'form'})",
 			threadID,
 		)
 	}

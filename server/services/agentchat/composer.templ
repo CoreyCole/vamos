@@ -1,6 +1,11 @@
 package agentchat
 
-import "github.com/CoreyCole/vamos/pkg/components/dropdown"
+import (
+	"strconv"
+	"strings"
+
+	"github.com/CoreyCole/vamos/pkg/components/dropdown"
+)
 
 templ FreeformChatComposer(args ChatPageArgs) {
 	if args.CurrentThread == nil {
@@ -62,6 +67,7 @@ templ AgentChatComposer(args AgentChatComposerArgs) {
 			</div>
 		</div>
 	</form>
+	@ThreadNewTargetForms(args.ThreadMetadata)
 }
 
 templ ComposerMetadataButton(args AgentChatComposerArgs) {
@@ -97,26 +103,26 @@ templ ThreadMetadataPopover(args AgentChatComposerArgs) {
 		if view.ThreadCwd != "" {
 			<div>
 				<dt class="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Thread cwd</dt>
-				<dd class="break-all text-foreground">{ view.ThreadCwd }</dd>
+				<dd class="break-all text-foreground">{ displayThreadPath(view.ThreadCwd) }</dd>
 			</div>
 		}
 		if firstNonEmpty(view.PiCwd, args.Cwd) != "" {
 			<div>
 				<dt class="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Pi cwd</dt>
-				<dd class="break-all text-foreground">{ firstNonEmpty(view.PiCwd, args.Cwd) }</dd>
+				<dd class="break-all text-foreground">{ displayThreadPath(firstNonEmpty(view.PiCwd, args.Cwd)) }</dd>
 			</div>
 		}
 		if view.ImplementationWorkspace != "" {
 			<div>
 				<dt class="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Implementation workspace</dt>
-				<dd class="break-all text-foreground">{ view.ImplementationWorkspace }</dd>
+				<dd class="break-all text-foreground">{ displayThreadPath(view.ImplementationWorkspace) }</dd>
 			</div>
 		}
 		if view.Primary != nil {
 			<div>
 				<dt class="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Primary workspace</dt>
-				<dd class="break-all text-foreground">● { view.Primary.Label } · { view.Primary.WorkflowType } · { view.Primary.Lifecycle }</dd>
-				<dd class="break-all text-muted-foreground">{ view.Primary.RootDocPath }</dd>
+				<dd class="break-all text-foreground">● { threadWorkspaceSummary(view, *view.Primary) }</dd>
+				<dd class="break-all text-muted-foreground">{ displayThreadPath(view.Primary.RootDocPath) }</dd>
 			</div>
 		} else if args.WorkspaceID != "" {
 			<div>
@@ -129,7 +135,7 @@ templ ThreadMetadataPopover(args AgentChatComposerArgs) {
 				<dt class="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Related workspaces</dt>
 				<dd class="space-y-1">
 					for _, workspace := range view.Related {
-						<div class="break-all text-muted-foreground">○ { workspace.Label } · context only</div>
+						<div class="break-all text-muted-foreground">○ { workspace.Label }</div>
 					}
 				</dd>
 			</div>
@@ -138,14 +144,37 @@ templ ThreadMetadataPopover(args AgentChatComposerArgs) {
 	if len(view.NewTargets) > 0 {
 		<div class="border-t border-border pt-3">
 			<p class="mb-2 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">New thread</p>
-			<div class="space-y-1">
-				for _, target := range view.NewTargets {
-					<button type="button" class="w-full rounded-md border border-border px-2 py-1 text-left text-xs text-foreground transition-colors hover:bg-muted" data-on:click={ threadNewTargetAction(view.ThreadID, target) }>
-						{ target.Label }
+			@ThreadNewTargetControl(view)
+		</div>
+	}
+}
+
+templ ThreadNewTargetControl(view ThreadMetadataView) {
+	{{ defaultIndex := defaultNewThreadTargetIndex(view.NewTargets) }}
+	<div class="flex items-stretch gap-1">
+		<button type="submit" form={ threadNewTargetFormID(defaultIndex) } class="inline-flex h-8 flex-1 items-center justify-center rounded-md bg-primary px-3 text-xs font-medium text-primary-foreground transition-colors hover:bg-primary/90">
+			New thread
+		</button>
+		@dropdown.DropdownMenu(dropdown.DropdownMenuArgs{ID: "agent-chat-new-thread-target", Class: "relative shrink-0"}) {
+			@dropdown.DropdownMenuTrigger(dropdown.DropdownMenuTriggerArgs{ID: "agent-chat-new-thread-target", Class: "inline-flex h-8 w-8 items-center justify-center rounded-md border border-border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground", Attributes: templ.Attributes{"aria-label": "Choose new thread target", "title": "Choose new thread target"}}) {
+				<span aria-hidden="true">⌄</span>
+			}
+			@dropdown.DropdownMenuContent(dropdown.DropdownMenuContentArgs{ID: "agent-chat-new-thread-target", Side: "top", Align: "end", SideOffset: 8, Class: "w-56 p-1 text-xs"}) {
+				for i, target := range view.NewTargets {
+					<button type="submit" form={ threadNewTargetFormID(i) } class="block w-full rounded-md px-2 py-1.5 text-left text-xs text-foreground transition-colors hover:bg-muted">
+						{ threadNewTargetLabel(target, target.Selected || i == defaultIndex) }
 					</button>
 				}
-			</div>
-		</div>
+			}
+		}
+	</div>
+}
+
+templ ThreadNewTargetForms(view ThreadMetadataView) {
+	if view.ThreadID != "" && len(view.NewTargets) > 0 {
+		for i, target := range view.NewTargets {
+			<form id={ threadNewTargetFormID(i) } data-on:submit={ threadNewTargetAction(view.ThreadID, target) }></form>
+		}
 	}
 }
 
@@ -173,6 +202,73 @@ func threadNewTargetAction(threadID string, target ThreadNewTargetView) string {
 		query += "&workspace_id=" + target.WorkspaceID
 	}
 	return "@post('/agent-chat/thread/" + threadID + "/new" + query + "')"
+}
+
+func threadNewTargetFormID(index int) string {
+	return "agent-chat-new-thread-target-form-" + strconv.Itoa(index)
+}
+
+func defaultNewThreadTargetIndex(targets []ThreadNewTargetView) int {
+	for i, target := range targets {
+		if target.Selected {
+			return i
+		}
+	}
+	return 0
+}
+
+func threadNewTargetLabel(target ThreadNewTargetView, selected bool) string {
+	label := strings.TrimSpace(target.Label)
+	switch target.Kind {
+	case NewThreadTargetPrimary:
+		label = "In this workspace"
+	case NewThreadTargetFreeform:
+		label = "Freeform"
+	case NewThreadTargetRelated:
+		label = strings.TrimPrefix(label, "Related: ")
+		if label == "" {
+			label = "Related workspace"
+		}
+		label = "Related: " + label
+	}
+	if selected {
+		return "✓ " + label
+	}
+	return label
+}
+
+func displayThreadPath(path string) string {
+	path = strings.TrimSpace(path)
+	if path == "" || strings.HasPrefix(path, "thoughts/") {
+		return path
+	}
+	if suffix, ok := strings.CutPrefix(path, "thoughts/"); ok {
+		return "thoughts/" + suffix
+	}
+	if before, after, ok := strings.Cut(path, "/thoughts/"); ok && before != "" && after != "" {
+		return "thoughts/" + after
+	}
+	return path
+}
+
+func threadWorkspaceSummary(metadata ThreadMetadataView, workspace ThreadWorkspaceView) string {
+	workflow := strings.TrimSpace(workspace.WorkflowType)
+	if isFreeformThreadPath(metadata.ThreadCwd) && strings.EqualFold(workflow, "QRSPI") {
+		return "freeform → QRSPI"
+	}
+	label := strings.TrimSpace(workspace.Label)
+	if workflow == "" || strings.EqualFold(label, workflow) {
+		return label
+	}
+	if label == "" {
+		return workflow
+	}
+	return label + " · " + workflow
+}
+
+func isFreeformThreadPath(path string) bool {
+	path = strings.TrimSpace(path)
+	return strings.Contains(path, "/freeform/") || strings.Contains(path, "\\freeform\\")
 }
 
 templ WorkspaceComposer(workspaceID string, threadID string, hasThread bool, cwd string, attachedPaths []AttachedPath) {

@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	stdhtml "html"
+	"log"
 	"net"
 	"net/http"
 	"net/url"
@@ -338,6 +339,10 @@ func (h *Handler) HandleChatPage(c echo.Context) error {
 		c.QueryParam("cwd"),
 	)
 	if err != nil {
+		if isRecoverableThreadWorkspaceMismatch(err) {
+			h.logRecoverableThreadWorkspaceMismatch(c, err)
+			return c.Redirect(http.StatusSeeOther, "/")
+		}
 		return echo.NewHTTPError(http.StatusNotFound, err.Error())
 	}
 
@@ -357,6 +362,23 @@ func (h *Handler) HandleChatPage(c echo.Context) error {
 	}
 	args.Workbench = workbenchState
 	return ChatPage(*args).Render(c.Request().Context(), c.Response().Writer)
+}
+
+func isRecoverableThreadWorkspaceMismatch(err error) bool {
+	return errors.Is(err, ErrThreadWorkspaceMismatch)
+}
+
+func (h *Handler) logRecoverableThreadWorkspaceMismatch(c echo.Context, err error) {
+	if c == nil || c.Request() == nil {
+		log.Printf("workspace_error source=agentchat severity=warn message=%q", err.Error())
+		return
+	}
+	log.Printf(
+		"workspace_error source=agentchat severity=warn path=%q query=%q message=%q",
+		c.Request().URL.Path,
+		c.Request().URL.RawQuery,
+		err.Error(),
+	)
 }
 
 func (h *Handler) buildFreeformWorkbenchState(
@@ -1537,7 +1559,7 @@ func (h *Handler) CreateNextQRSPIThread(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 	}
 	sse := datastar.NewSSE(c.Response().Writer, c.Request())
-	return sse.Redirect("/agent-chat?thread=" + url.QueryEscape(thread.ID))
+	return sse.Redirect(h.threadRedirectURL(c.Request().Context(), userEmail, thread.ID))
 }
 
 func (h *Handler) CreateThreadFromTarget(c echo.Context) error {
@@ -1562,7 +1584,15 @@ func (h *Handler) CreateThreadFromTarget(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 	}
 	sse := datastar.NewSSE(c.Response().Writer, c.Request())
-	return sse.Redirect("/agent-chat?thread=" + url.QueryEscape(thread.ID))
+	return sse.Redirect(h.threadRedirectURL(c.Request().Context(), userEmail, thread.ID))
+}
+
+func (h *Handler) threadRedirectURL(ctx context.Context, userEmail, threadID string) string {
+	workspaceContext, err := h.service.GetThreadWorkspaceContext(ctx, userEmail, threadID)
+	if err == nil {
+		return threadThoughtsURL(workspaceContext)
+	}
+	return BuildThoughtsChatDocURL(EmbeddedChatURLState{Context: ThoughtsChatContext, ThreadID: threadID})
 }
 
 func (h *Handler) UpdateWorkspaceWorkflowPolicy(c echo.Context) error {
@@ -1708,6 +1738,26 @@ func (h *Handler) ResumeWorkspaceThread(c echo.Context) error {
 	return h.writeNoRedirectSuccess(c)
 }
 
+func (h *Handler) ResumeEmbeddedThread(c echo.Context) error {
+	userEmail, ok := c.Get("user_email").(string)
+	if !ok || userEmail == "" {
+		return echo.NewHTTPError(http.StatusUnauthorized, "not authenticated")
+	}
+	threadID := strings.TrimSpace(c.Param("thread_id"))
+	workspace, ok, err := h.service.ResolvePrimaryWorkspaceForThread(
+		c.Request().Context(),
+		userEmail,
+		threadID,
+	)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
+	}
+	if !ok {
+		return echo.NewHTTPError(http.StatusNotFound, "thread has no primary workspace")
+	}
+	return h.resumeEmbeddedWorkspaceThread(c, userEmail, workspace.ID, threadID)
+}
+
 func (h *Handler) ResumeEmbeddedWorkspaceThread(c echo.Context) error {
 	userEmail, ok := c.Get("user_email").(string)
 	if !ok || userEmail == "" {
@@ -1715,6 +1765,10 @@ func (h *Handler) ResumeEmbeddedWorkspaceThread(c echo.Context) error {
 	}
 	workspaceID := strings.TrimSpace(c.Param("workspace_id"))
 	threadID := strings.TrimSpace(c.Param("thread_id"))
+	return h.resumeEmbeddedWorkspaceThread(c, userEmail, workspaceID, threadID)
+}
+
+func (h *Handler) resumeEmbeddedWorkspaceThread(c echo.Context, userEmail, workspaceID, threadID string) error {
 	if _, err := h.service.queries.GetAgentThreadForWorkspaceUser(
 		c.Request().Context(),
 		db.GetAgentThreadForWorkspaceUserParams{
@@ -2702,6 +2756,10 @@ func (h *Handler) patchWorkspaceResource(
 		h.workspacePatchInput(c, userEmail),
 	)
 	if err != nil {
+		if isRecoverableThreadWorkspaceMismatch(err) {
+			h.logRecoverableThreadWorkspaceMismatch(c, err)
+			return sse.ExecuteScript("window.location.href = '/';")
+		}
 		return err
 	}
 	workbenchState, err := h.buildWorkspaceWorkbenchState(c, *args)

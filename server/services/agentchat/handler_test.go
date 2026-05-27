@@ -84,6 +84,36 @@ func TestHandleInternalRunEventAppliesCheckpoint(t *testing.T) {
 	}
 }
 
+func TestStreamWorkspaceRedirectsStaleThreadWorkspaceMismatch(t *testing.T) {
+	service := newTestAgentChatService(t)
+	handler := NewHandler(service, nil)
+	ownerWorkspace, thread := mustCreateWorkspaceThreadForHandlerTest(t, service, "user@example.com")
+	otherWorkspace := mustCreateWorkspaceForHandlerTest(t, service, "user@example.com")
+	if ownerWorkspace.ID == otherWorkspace.ID {
+		t.Fatal("test setup created same workspace twice")
+	}
+
+	req := httptest.NewRequest(
+		http.MethodGet,
+		"/agent-chat/"+otherWorkspace.ID+"/stream?thread="+url.QueryEscape(thread.ID),
+		nil,
+	)
+	req.Header.Set("Accept", "text/event-stream")
+	rec := httptest.NewRecorder()
+	c := echo.New().NewContext(req, rec)
+	c.Set("user_email", "user@example.com")
+	c.SetParamNames("workspace_id")
+	c.SetParamValues(otherWorkspace.ID)
+
+	sse := datastar.NewSSE(rec, req)
+	if err := handler.patchWorkspaceResource(c, sse); err != nil {
+		t.Fatalf("patchWorkspaceResource() error = %v", err)
+	}
+	if body := rec.Body.String(); !strings.Contains(body, "window.location.href = '/'") {
+		t.Fatalf("stream body = %q, want redirect script", body)
+	}
+}
+
 func TestHandleInternalRunEventIgnoresLateLiveEventForTerminalRun(t *testing.T) {
 	t.Parallel()
 
@@ -524,7 +554,6 @@ func TestSendEmbeddedWorkspacePromptPatchesPanelAndDoesNotRedirect(t *testing.T)
 	}
 	for _, notWant := range []string{
 		"datastar-redirect",
-		"/agent-chat/",
 	} {
 		if strings.Contains(body, notWant) {
 			t.Fatalf(
@@ -670,7 +699,6 @@ func TestResumeEmbeddedWorkspaceThreadPatchesPanelAndURL(t *testing.T) {
 	}
 	for _, notWant := range []string{
 		"datastar-redirect",
-		"/agent-chat/",
 	} {
 		if strings.Contains(body, notWant) {
 			t.Fatalf(
@@ -691,6 +719,62 @@ func TestResumeEmbeddedWorkspaceThreadPatchesPanelAndURL(t *testing.T) {
 	if selection.WorkspaceID != workspaceRecord.ID || selection.ThreadID != thread.ID ||
 		selection.RunID == "" || selection.Scope != EmbeddedChatSelectionScopeFreeform {
 		t.Fatalf("selection = %+v, want persisted resumed chat", selection)
+	}
+}
+
+func TestResumeEmbeddedThreadResolvesPrimaryWorkspace(t *testing.T) {
+	service := newTestAgentChatService(t)
+	service.temporal = &fakeTemporalStarter{}
+	handler := NewHandler(service, nil)
+	workspaceRecord, thread := mustCreateWorkspaceThreadForHandlerTest(
+		t,
+		service,
+		"user@example.com",
+	)
+	if err := service.SetThreadPrimaryWorkspace(t.Context(), thread.ID, workspaceRecord.ID, "test"); err != nil {
+		t.Fatalf("SetThreadPrimaryWorkspace() error = %v", err)
+	}
+
+	form := url.Values{
+		"prompt":   {"resume by thread only"},
+		"doc_path": {"creative-mode-agent/plans/2026-04-30_test-plan/plan.md"},
+	}
+	req := httptest.NewRequestWithContext(
+		t.Context(),
+		http.MethodPost,
+		"/thoughts/chat/thread/"+thread.ID+"/resume",
+		strings.NewReader(form.Encode()),
+	)
+	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationForm)
+	rec := httptest.NewRecorder()
+	c := echo.New().NewContext(req, rec)
+	c.Set("user_email", "user@example.com")
+	c.SetParamNames("thread_id")
+	c.SetParamValues(thread.ID)
+
+	if err := handler.ResumeEmbeddedThread(c); err != nil {
+		t.Fatalf("ResumeEmbeddedThread() error = %v", err)
+	}
+	body := rec.Body.String()
+	for _, want := range []string{
+		"doc-right-chat-panel",
+		"resume by thread only",
+		"chat_workspace=" + workspaceRecord.ID,
+		"thread=" + thread.ID,
+		"run=",
+	} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("body missing %q: %s", want, body)
+		}
+	}
+	for _, notWant := range []string{
+		"datastar-redirect",
+		"thread_id=",
+		"prompt=",
+	} {
+		if strings.Contains(body, notWant) {
+			t.Fatalf("thread-only embedded resume leaked %q: %s", notWant, body)
+		}
 	}
 }
 

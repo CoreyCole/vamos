@@ -35,7 +35,7 @@ templ EmbeddedFreeformRightRailContent(args EmbeddedFreeformPanelArgs) {
 		</div>
 		<div class="shrink-0 border-t border-border bg-background p-3">
 			<div id="agent-chat-workspace-composer">
-				@AgentChatComposer(AgentChatComposerArgs{Action: args.ComposerAction, ThreadID: args.ThreadID, RunID: args.RunID, Cwd: args.Cwd, ModeLabel: "Freeform chat", Placeholder: workspacePromptPlaceholder(args.HasThread), HasThread: args.HasThread, IncludeCwd: !args.HasThread})
+				@AgentChatComposer(AgentChatComposerArgs{Action: args.ComposerAction, ThreadID: args.ThreadID, RunID: args.RunID, Cwd: args.Cwd, ModeLabel: embeddedFreeformModeLabel(args.ThreadMetadata), Placeholder: workspacePromptPlaceholder(args.HasThread), HasThread: args.HasThread, IncludeCwd: !args.HasThread, ThreadMetadata: args.ThreadMetadata})
 			</div>
 		</div>
 	</div>
@@ -49,6 +49,6 @@ templ EmbeddedFreeformRightRailPanel(args EmbeddedFreeformPanelArgs) {
 
 templ EmbeddedWorkspaceComposer(args EmbeddedChatPanelArgs) {
 	<div id="agent-chat-workspace-composer">
-		@AgentChatComposer(AgentChatComposerArgs{Action: args.ComposerAction, WorkspaceID: args.WorkspaceID, ThreadID: args.ThreadID, DocPath: args.DocPath, RunID: args.RunID, Cwd: args.Cwd, ModeLabel: "Workspace chat", Placeholder: workspacePromptPlaceholder(args.HasThread), HasThread: args.HasThread, IncludeCwd: true, AttachedPaths: args.PendingAttachments, SlashEndpointBase: "/thoughts/chat", ShowCurrentDocToggle: args.DocPath != "", CurrentDocAttached: attachedPathContains(args.PendingAttachments, args.DocPath)})
+		@AgentChatComposer(AgentChatComposerArgs{Action: args.ComposerAction, WorkspaceID: args.WorkspaceID, ThreadID: args.ThreadID, DocPath: args.DocPath, RunID: args.RunID, Cwd: args.Cwd, ModeLabel: embeddedWorkspaceModeLabel(args.ThreadMetadata), Placeholder: workspacePromptPlaceholder(args.HasThread), HasThread: args.HasThread, IncludeCwd: true, AttachedPaths: args.PendingAttachments, SlashEndpointBase: "/thoughts/chat", ShowCurrentDocToggle: args.DocPath != "", CurrentDocAttached: attachedPathContains(args.PendingAttachments, args.DocPath), ThreadMetadata: args.ThreadMetadata})
 	</div>
 }

@@ -53,6 +53,18 @@ func TestBuildNavItems(t *testing.T) {
 	}
 }
 
+func TestBuildNavItemsStripsNonAuthQueryWhenSwitchingWorkspaces(t *testing.T) {
+	items := []Workspace{{Slug: "main", URL: "https://main.cn-agents.test/", Status: StatusRunning}, {Slug: "feature", URL: "https://feature.cn-agents.test/", Status: StatusRunning}}
+
+	got := BuildNavItems(items, "main", "https://main.cn-agents.test", "/agent-chat?thread=stale&token=auth", "feature")
+	if got[0].URL != "https://main.cn-agents.test/workspaces/switch/main?redirect=%2Fagent-chat%3Fthread%3Dstale%26token%3Dauth" {
+		t.Fatalf("current workspace URL = %q, want full query preserved", got[0].URL)
+	}
+	if got[1].URL != "https://main.cn-agents.test/workspaces/switch/feature?redirect=%2Fagent-chat%3Ftoken%3Dauth" {
+		t.Fatalf("other workspace URL = %q, want non-auth query stripped", got[1].URL)
+	}
+}
+
 func TestBuildNavItemsTreatsMainAndCurrentWorkspaceAsReachable(t *testing.T) {
 	t.Parallel()
 
@@ -334,6 +346,16 @@ func TestWorkspaceErrorDedupeKeyStableAndNonEmpty(t *testing.T) {
 	}
 	if first != second {
 		t.Fatalf("keys differ: %q != %q", first, second)
+	}
+}
+
+func TestSwitchRedirectPathForTargetStripsNonAuthQueryForDifferentWorkspace(t *testing.T) {
+	got, err := switchRedirectPathForTarget("/agent-chat?thread=stale&run=old&token=auth", "main", "feature")
+	if err != nil {
+		t.Fatalf("switchRedirectPathForTarget() error = %v", err)
+	}
+	if got != "/agent-chat?token=auth" {
+		t.Fatalf("redirect = %q, want only auth query", got)
 	}
 }
 

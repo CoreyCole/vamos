@@ -16,6 +16,8 @@ import (
 	agentchatworkflows "github.com/CoreyCole/vamos/server/services/agentchat/workflows"
 )
 
+var ErrThreadWorkspaceMismatch = errors.New("thread does not belong to workspace")
+
 func (s *Service) BuildWorkspacePageArgs(
 	ctx context.Context,
 	input BuildWorkspacePageInput,
@@ -228,7 +230,7 @@ func (s *Service) sharedWorkspaceThread(
 		return db.AgentThread{}, err
 	}
 	if !ok {
-		return db.AgentThread{}, errors.New("thread does not belong to workspace")
+		return db.AgentThread{}, ErrThreadWorkspaceMismatch
 	}
 	return thread, nil
 }

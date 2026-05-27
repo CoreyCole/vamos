@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"log"
 	"net/url"
 	"path/filepath"
 	"strings"
@@ -53,6 +54,7 @@ type EmbeddedChatPanelArgs struct {
 	StreamURL          string
 	ComposerAction     string
 	Cwd                string
+	ThreadMetadata     ThreadMetadataView
 }
 
 type EmbeddedChatPatchInput struct {
@@ -72,6 +74,7 @@ type EmbeddedFreeformPanelArgs struct {
 	StreamURL      string
 	ComposerAction string
 	Cwd            string
+	ThreadMetadata ThreadMetadataView
 }
 
 func ParseEmbeddedChatURL(c echo.Context) EmbeddedChatURLState {
@@ -304,6 +307,17 @@ func (s *Service) validateEmbeddedChatSelection(
 			selection.WorkspaceID,
 			selection.ThreadID,
 		); err != nil {
+			if errors.Is(err, ErrThreadWorkspaceMismatch) {
+				log.Printf(
+					"workspace_error source=agentchat severity=warn workspace_id=%q thread_id=%q message=%q",
+					selection.WorkspaceID,
+					selection.ThreadID,
+					err.Error(),
+				)
+				selection.ThreadID = ""
+				selection.RunID = ""
+				return selection, nil
+			}
 			return EmbeddedChatSelection{}, err
 		}
 	}
@@ -453,6 +467,9 @@ func (s *Service) BuildEmbeddedFreeformPanelArgs(
 	composerAction := "@post('/thoughts/chat/freeform/send', {contentType: 'form'})"
 	if resolvedThreadID != "" {
 		composerAction = "@post('/thoughts/chat/freeform/resume', {contentType: 'form'})"
+		if args.PrimaryWorkspace != nil {
+			composerAction = embeddedWorkspaceSendAction("", resolvedThreadID, true)
+		}
 	}
 	streamURL := ""
 	if resolvedThreadID != "" {
@@ -472,7 +489,22 @@ func (s *Service) BuildEmbeddedFreeformPanelArgs(
 		StreamURL:      streamURL,
 		ComposerAction: composerAction,
 		Cwd:            args.Cwd,
+		ThreadMetadata: args.ThreadMetadata,
 	}, nil
+}
+
+func embeddedFreeformModeLabel(metadata ThreadMetadataView) string {
+	if metadata.Primary != nil {
+		return "Workspace-backed thread"
+	}
+	return "Freeform chat"
+}
+
+func embeddedWorkspaceModeLabel(metadata ThreadMetadataView) string {
+	if metadata.Primary != nil {
+		return "Workspace-backed thread"
+	}
+	return "Workspace chat"
 }
 
 func attachedPathContains(paths []AttachedPath, docPath string) bool {
@@ -516,6 +548,18 @@ func (s *Service) BuildEmbeddedChatPanelArgs(
 			{Path: attachmentPath, Basename: filepath.Base(input.DocPath)},
 		}
 	}
+	threadMetadata := ThreadMetadataView{}
+	if pageArgs.Projection.SelectedThread != nil {
+		workspaceContext, err := s.GetThreadWorkspaceContext(
+			ctx,
+			input.UserEmail,
+			pageArgs.Projection.SelectedThread.ID,
+		)
+		if err != nil {
+			return EmbeddedChatPanelArgs{}, err
+		}
+		threadMetadata = s.BuildThreadMetadataView(ctx, workspaceContext, pageArgs.Projection.Workspace.Cwd.String)
+	}
 	return EmbeddedChatPanelArgs{
 		DocPath:            input.DocPath,
 		WorkspaceID:        pageArgs.WorkspaceID,
@@ -524,6 +568,7 @@ func (s *Service) BuildEmbeddedChatPanelArgs(
 		Transcript:         pageArgs.Projection.Transcript,
 		HasThread:          threadID != "",
 		PendingAttachments: attachments,
+		ThreadMetadata:     threadMetadata,
 		StreamURL: embeddedWorkspaceStreamURL(
 			pageArgs.WorkspaceID,
 			threadID,

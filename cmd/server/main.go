@@ -1417,6 +1417,10 @@ func main() {
 		agentChatHandler.SendEmbeddedWorkspacePrompt,
 	)
 	thoughtsGroup.POST(
+		"/chat/thread/:thread_id/resume",
+		agentChatHandler.ResumeEmbeddedThread,
+	)
+	thoughtsGroup.POST(
 		"/chat/:workspace_id/thread/:thread_id/resume",
 		agentChatHandler.ResumeEmbeddedWorkspaceThread,
 	)

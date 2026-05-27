@@ -771,7 +771,7 @@ func (h *Handler) HandleSwitchWorkspace(c echo.Context) error {
 		)
 	}
 	slug := c.Param("slug")
-	redirectPath, err := switchRedirectPath(c.QueryParam("redirect"))
+	redirectPath, err := switchRedirectPathForTarget(c.QueryParam("redirect"), h.currentSlug, slug)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 	}
@@ -873,6 +873,10 @@ func (h *Handler) ensureWorkspaceRunningForSwitch(ctx context.Context, ws Worksp
 }
 
 func switchRedirectPath(raw string) (string, error) {
+	return switchRedirectPathForTarget(raw, "", "")
+}
+
+func switchRedirectPathForTarget(raw, currentSlug, targetSlug string) (string, error) {
 	redirectPath, err := ValidateLocalRedirectPath(raw)
 	if err != nil {
 		return "", err
@@ -880,7 +884,38 @@ func switchRedirectPath(raw string) (string, error) {
 	if redirectPath == "/workspaces" || strings.HasPrefix(redirectPath, "/workspaces/") {
 		return "/", nil
 	}
-	return redirectPath, nil
+	if strings.TrimSpace(currentSlug) == "" || strings.TrimSpace(targetSlug) == "" || strings.TrimSpace(currentSlug) == strings.TrimSpace(targetSlug) {
+		return redirectPath, nil
+	}
+	return stripNonAuthSwitchRedirectQuery(redirectPath), nil
+}
+
+func stripNonAuthSwitchRedirectQuery(redirectPath string) string {
+	u, err := url.Parse(redirectPath)
+	if err != nil || u.RawQuery == "" {
+		return redirectPath
+	}
+	query := u.Query()
+	filtered := url.Values{}
+	for key, values := range query {
+		if !isSwitchAuthQueryParam(key) {
+			continue
+		}
+		for _, value := range values {
+			filtered.Add(key, value)
+		}
+	}
+	u.RawQuery = filtered.Encode()
+	return u.RequestURI()
+}
+
+func isSwitchAuthQueryParam(key string) bool {
+	switch strings.ToLower(strings.TrimSpace(key)) {
+	case "auth", "auth_token", "code", "redirect", "session", "session_id", "state", "token":
+		return true
+	default:
+		return false
+	}
 }
 
 func (h *Handler) HandleDevAuthHandoff(c echo.Context) error {
@@ -1150,8 +1185,12 @@ func BuildNavItems(
 		itemURL := managerURL + "/workspaces"
 		_, switchableOK := switchable[ws.Slug]
 		if switchableOK && strings.TrimSpace(ws.URL) != "" {
+			itemRedirect := redirect
+			if ws.Slug != currentSlug {
+				itemRedirect = stripNonAuthSwitchRedirectQuery(itemRedirect)
+			}
 			itemURL = managerURL + "/workspaces/switch/" + ws.Slug + "?redirect=" + url.QueryEscape(
-				redirect,
+				itemRedirect,
 			)
 		}
 		nav = append(nav, layouts.WorkspaceNavItem{

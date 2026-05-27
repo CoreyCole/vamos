@@ -16,7 +16,7 @@ func (s *Service) BuildThreadMetadataView(
 	view := ThreadMetadataView{
 		ThreadID:  thread.ID,
 		Title:     thread.Title,
-		URL:       "/agent-chat?thread=" + thread.ID,
+		URL:       threadThoughtsURL(workspaceContext),
 		ThreadCwd: thread.Cwd,
 		PiCwd:     firstNonEmpty(piCwd, thread.Cwd),
 		Related:   make([]ThreadWorkspaceView, 0, len(workspaceContext.Related)),
@@ -51,6 +51,17 @@ func (s *Service) BuildThreadMetadataView(
 		}
 	}
 	return view
+}
+
+func threadThoughtsURL(workspaceContext ThreadWorkspaceContext) string {
+	state := EmbeddedChatURLState{
+		Context:  ThoughtsChatContext,
+		ThreadID: workspaceContext.Thread.ID,
+	}
+	if workspaceContext.Primary != nil {
+		state.WorkspaceID = workspaceContext.Primary.ID
+	}
+	return BuildThoughtsChatDocURL(state)
 }
 
 func threadWorkspaceView(workspace db.Workspace, role ThreadWorkspaceRole) ThreadWorkspaceView {
