@@ -58,7 +58,9 @@ go run ./cmd/vamos-runtime e2e goldens accept \
 
 ## QRSPI `/q-verify` gate
 
-When this guide is the project verification guide, `/q-verify` must stop after automated checks and ask the user to manually test the running workspace before it marks verification complete. The prompt must include the workspace URL printed by `vamos ctl workspace restart` / `agentsctl workspace restart` (for example `https://<workspace-slug>.<workspace-domain>/`) and a concise list of flows to inspect. Do not proceed to a complete `verify.md` until the user confirms manual testing passed, or record `needs_human` / `blocked` with the user's findings.
+When this guide is the project verification guide, `/q-verify` must run the story validation and generated-test freshness checks, then run the relevant browser E2E story scenarios for the touched surface before asking for human testing. For Agent Chat, Thoughts chat, URL-state, route, transcript, or QRSPI-next changes, at minimum run the focused `durable-session-chat` scenarios that cover freeform replay, freeform refresh/resume, document navigation preserving embedded chat, and workspace chat restore/switching; add `thoughts-workbench` scenarios when document workbench URL/navigation behavior changed. If managed restart is unavailable, record browser E2E as blocked instead of treating `e2e check` / `generate --check` as sufficient.
+
+After automated browser checks, `/q-verify` must stop and ask the user to manually test the running workspace before it marks verification complete. The prompt must include the workspace URL printed by `vamos ctl workspace restart` / `agentsctl workspace restart` (for example `https://<workspace-slug>.<workspace-domain>/`) and a concise list of flows to inspect. Do not proceed to a complete `verify.md` until the user confirms manual testing passed, or record `needs_human` / `blocked` with the user's findings.
 
 ## Safety
 

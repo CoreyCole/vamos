@@ -39,9 +39,18 @@ VALUES (?, 'playwright@localhost', 'E2E durable freeform chat', ?, 'freeform', '
 		return State{}, fmt.Errorf("insert freeform workspace: %w", err)
 	}
 	if _, err := db.ExecContext(ctx, `
-INSERT INTO agent_threads (id, user_email, workspace_id, title, cwd, lineage_id, head_entry_id)
-VALUES (?, 'playwright@localhost', ?, 'E2E durable freeform thread', ?, ?, ?)`, threadID, workspaceID, input.Workspace.CheckoutPath, lineageID, assistantEntryID); err != nil {
+INSERT INTO agent_threads (id, user_email, title, cwd, lineage_id, head_entry_id)
+VALUES (?, 'playwright@localhost', 'E2E durable freeform thread', ?, ?, ?)`, threadID, input.Workspace.CheckoutPath, lineageID, assistantEntryID); err != nil {
 		return State{}, fmt.Errorf("insert freeform agent thread: %w", err)
+	}
+	if _, err := db.ExecContext(ctx, `
+INSERT INTO agent_thread_workspaces (thread_id, workspace_id, is_primary, role, adopted_from, adopted_at)
+VALUES (?, ?, 1, 'primary', 'e2e_fixture', CURRENT_TIMESTAMP)
+ON CONFLICT(thread_id, workspace_id) DO UPDATE SET
+is_primary = 1,
+role = 'primary',
+adopted_at = CURRENT_TIMESTAMP`, threadID, workspaceID); err != nil {
+		return State{}, fmt.Errorf("attach freeform agent thread to workspace: %w", err)
 	}
 	if _, err := db.ExecContext(ctx, `
 INSERT INTO agent_entries (lineage_id, entry_id, parent_entry_id, entry_type, origin_order, payload_json, origin_thread_id, session_timestamp)

@@ -70,6 +70,19 @@ LIMIT 1`, rootDocPath).Scan(&workspaceID, &threadID); err != nil {
 	return workspaceID, threadID
 }
 
+func attachE2EThreadWorkspace(tb testing.TB, database *sql.DB, threadID, workspaceID string) {
+	tb.Helper()
+	if _, err := database.ExecContext(tb.Context(), `
+INSERT INTO agent_thread_workspaces (thread_id, workspace_id, is_primary, role, adopted_from, adopted_at)
+VALUES (?, ?, 1, 'primary', 'e2e_fixture', CURRENT_TIMESTAMP)
+ON CONFLICT(thread_id, workspace_id) DO UPDATE SET
+is_primary = 1,
+role = 'primary',
+adopted_at = CURRENT_TIMESTAMP`, threadID, workspaceID); err != nil {
+		tb.Fatal(err)
+	}
+}
+
 func createE2EWorkspaceThread(
 	tb testing.TB,
 	ctx *e2e.Context,
@@ -84,16 +97,16 @@ func createE2EWorkspaceThread(
 	threadID := uuid.NewString()
 	cwd := filepath.Clean(ctx.Config.RepoRoot)
 	if _, err := database.ExecContext(tb.Context(), `
-INSERT INTO agent_threads (id, user_email, workspace_id, title, cwd, lineage_id)
-VALUES (?, 'playwright@localhost', ?, ?, ?, ?)`,
+INSERT INTO agent_threads (id, user_email, title, cwd, lineage_id)
+VALUES (?, 'playwright@localhost', ?, ?, ?)`,
 		threadID,
-		workspaceID,
 		"E2E Pi docs review",
 		cwd,
 		threadID,
 	); err != nil {
 		tb.Fatal(err)
 	}
+	attachE2EThreadWorkspace(tb, database, threadID, workspaceID)
 	if _, err := database.ExecContext(tb.Context(), `
 UPDATE workspaces
 SET selected_thread_id = ?, updated_at = CURRENT_TIMESTAMP
@@ -114,6 +127,7 @@ func OpenWorkspaceChat(t testing.TB, ctx *e2e.Context, _ string) {
 
 func OpenFreeformChatFixture(t testing.TB, ctx *e2e.Context, name string) {
 	t.Helper()
+	ensureE2EPlanFixture(t, ctx)
 	state, ok := ctx.Fixture.(fixtures.State)
 	if !ok || state.Name != name {
 		state = LoadFixture(t, ctx, name)
@@ -225,10 +239,11 @@ VALUES (?, 'playwright@localhost', 'E2E freeform refresh chat', ?, 'freeform', '
 			t.Fatal(err)
 		}
 		if _, err := database.ExecContext(t.Context(), `
-INSERT INTO agent_threads (id, user_email, workspace_id, title, cwd, lineage_id)
-VALUES (?, 'playwright@localhost', ?, 'E2E freeform refresh thread', ?, ?)`, threadID, workspaceID, ctx.Config.RepoRoot, lineageID); err != nil {
+INSERT INTO agent_threads (id, user_email, title, cwd, lineage_id)
+VALUES (?, 'playwright@localhost', 'E2E freeform refresh thread', ?, ?)`, threadID, ctx.Config.RepoRoot, lineageID); err != nil {
 			t.Fatal(err)
 		}
+		attachE2EThreadWorkspace(t, database, threadID, workspaceID)
 		ctx.Memory["freeform_workspace_id"] = workspaceID
 		ctx.Memory["freeform_thread_id"] = threadID
 	}
@@ -459,10 +474,11 @@ VALUES (?, 'playwright@localhost', ?, ?, 'freeform', 'imported', ?, ?, ?)`, work
 		t.Fatalf("insert workspace %s: %v", label, err)
 	}
 	if _, err := database.ExecContext(t.Context(), `
-INSERT INTO agent_threads (id, user_email, workspace_id, title, cwd, lineage_id, head_entry_id)
-VALUES (?, 'playwright@localhost', ?, ?, ?, ?, ?)`, threadID, workspaceID, "E2E workspace thread "+label, ctx.Config.RepoRoot, lineageID, entryID); err != nil {
+INSERT INTO agent_threads (id, user_email, title, cwd, lineage_id, head_entry_id)
+VALUES (?, 'playwright@localhost', ?, ?, ?, ?)`, threadID, "E2E workspace thread "+label, ctx.Config.RepoRoot, lineageID, entryID); err != nil {
 		t.Fatalf("insert workspace thread %s: %v", label, err)
 	}
+	attachE2EThreadWorkspace(t, database, threadID, workspaceID)
 	payload := fmt.Sprintf(
 		`{"type":"message","id":%q,"parentId":null,"message":{"role":"assistant","content":%q}}`,
 		entryID,
