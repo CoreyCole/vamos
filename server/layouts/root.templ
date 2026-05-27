@@ -538,11 +538,13 @@ func breadcrumbPreserveChat(href string, chat BreadcrumbLinkState) string {
 		return href
 	}
 	values := []string{"context=chat"}
-	if strings.TrimSpace(chat.WorkspaceID) != "" {
-		values = append(values, "chat_workspace="+url.QueryEscape(strings.TrimSpace(chat.WorkspaceID)))
-	}
-	if strings.TrimSpace(chat.ThreadID) != "" {
-		values = append(values, "thread="+url.QueryEscape(strings.TrimSpace(chat.ThreadID)))
+	threadID := strings.TrimSpace(chat.ThreadID)
+	if threadID == "" {
+		if workspaceID := strings.TrimSpace(chat.WorkspaceID); workspaceID != "" {
+			values = append(values, "chat_workspace="+url.QueryEscape(workspaceID))
+		}
+	} else {
+		values = append(values, "thread="+url.QueryEscape(threadID))
 	}
 	if strings.TrimSpace(chat.RunID) != "" {
 		values = append(values, "run="+url.QueryEscape(strings.TrimSpace(chat.RunID)))

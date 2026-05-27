@@ -79,10 +79,13 @@ func TestBuildBreadcrumbsFromPathPreservesChatQuery(t *testing.T) {
 		if crumb.Label == "Thoughts" {
 			t.Fatalf("breadcrumbs should not duplicate top-level Thoughts nav: %#v", crumbs)
 		}
-		for _, want := range []string{"context=chat", "chat_workspace=ws+1", "thread=th%2F1", "run=run%2B1"} {
+		for _, want := range []string{"context=chat", "thread=th%2F1", "run=run%2B1"} {
 			if !strings.Contains(crumb.Href, want) {
 				t.Fatalf("crumb href missing %q: %#v", want, crumb)
 			}
+		}
+		if strings.Contains(crumb.Href, "chat_workspace=") {
+			t.Fatalf("crumb href preserved chat_workspace with thread: %#v", crumb)
 		}
 	}
 	if got := crumbs[len(crumbs)-1].Href; got != "" {
