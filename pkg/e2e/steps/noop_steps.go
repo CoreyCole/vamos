@@ -155,7 +155,7 @@ func ExpectWorkspaceCleanupSucceeds(t testing.TB, ctx *e2e.Context, _ string) {
 
 func FollowFirstSidebarDocumentLink(t testing.TB, ctx *e2e.Context, _ string) {
 	t.Helper()
-	followFirstLink(t, ctx, "#thoughts-workbench-sidebar a[href*='/thoughts/'], [data-e2e='thoughts.workbench.sidebar'] a[href*='/thoughts/']")
+	followFirstLink(t, ctx, "#thoughts-shared-sidebar a[href*='/thoughts/'], #thoughts-workbench-sidebar a[href*='/thoughts/'], [data-e2e='thoughts.workbench.sidebar'] a[href*='/thoughts/']")
 }
 
 func FollowFirstBreadcrumbLink(t testing.TB, ctx *e2e.Context, _ string) {
@@ -208,7 +208,8 @@ func CleanupWorkspace(t testing.TB, ctx *e2e.Context, name string) {
 
 func followFirstLink(t testing.TB, ctx *e2e.Context, selector string) {
 	t.Helper()
-	link := ctx.Page.Locator(selector).First()
+	visible := true
+	link := ctx.Page.Locator(selector).Filter(playwright.LocatorFilterOptions{Visible: &visible}).First()
 	if err := link.WaitFor(); err != nil {
 		t.Fatal(err)
 	}
