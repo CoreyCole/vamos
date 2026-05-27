@@ -111,7 +111,10 @@ func (h *Handler) notFoundAgentChatPage(c echo.Context) error {
 // visible Agent Chat page surface moves under the Thoughts workbench.
 // TODO(slice-5-runtime-rehome): move these endpoints under /thoughts/chat/*.
 func (h *Handler) RegisterRuntimeRoutes(g *echo.Group) {
-	g.GET("/stream", h.StreamThread)
+	g.GET("/thread/:thread_id/stream", h.StreamThread)
+	g.GET("/thread/:thread_id/slash-commands", h.ListThreadSlashCommands)
+	g.POST("/thread/:thread_id/resume", h.ResumeThreadByPath)
+	g.POST("/thread/:thread_id/fork", h.ForkThreadByPath)
 	g.GET("/sessions/stream", h.StreamSessions)
 	g.POST("/pi-sessions/open", h.OpenPiSession)
 	g.GET("/chat-sessions/:session_id", h.GetChatSessionSnapshot)
@@ -129,14 +132,11 @@ func (h *Handler) RegisterRuntimeRoutes(g *echo.Group) {
 	g.POST("/thread/:thread_id/workflow/policy", h.UpdateThreadWorkflowPolicy)
 	g.POST("/thread/:thread_id/workflow/next", h.CreateNextQRSPIThread)
 	g.POST("/thread/:thread_id/new", h.CreateThreadFromTarget)
-	g.GET("/:workspace_id/stream", h.StreamWorkspace)
 	g.POST("/:workspace_id/send", h.SendWorkspacePrompt)
 	g.POST("/:workspace_id/workflow/advance", h.AdvanceWorkspaceWorkflow)
 	g.POST("/:workspace_id/workflow/policy", h.UpdateWorkspaceWorkflowPolicy)
 	g.GET("/:workspace_id/slash-commands", h.ListWorkspaceSlashCommands)
 	g.POST("/:workspace_id/plan-workspace-action", h.PlanWorkspaceAction)
-	g.POST("/:workspace_id/thread/:thread_id/resume", h.ResumeWorkspaceThread)
-	g.POST("/:workspace_id/thread/:thread_id/fork", h.ForkWorkspaceThread)
 	g.POST("/:workspace_id/docs/select", h.SelectWorkspaceDoc)
 	g.POST("/:workspace_id/docs/comments/show", h.ShowWorkspaceDocCommentForm)
 	g.POST(
@@ -172,8 +172,6 @@ func (h *Handler) RegisterRuntimeRoutes(g *echo.Group) {
 		h.AgentReopenWorkspaceDocCommentAPI,
 	)
 	g.POST("/send", h.SendPrompt)
-	g.POST("/resume", h.ResumeThread)
-	g.POST("/fork", h.ForkThread)
 	g.POST("/cwd", h.ChangeCwd)
 	g.POST("/docs/select", h.SelectDoc)
 }
@@ -557,9 +555,12 @@ func (h *Handler) patchPlanSidebar(
 }
 
 func (h *Handler) StreamThread(c echo.Context) error {
-	threadID := strings.TrimSpace(c.QueryParam("thread"))
+	threadID := strings.TrimSpace(c.Param("thread_id"))
 	if threadID == "" {
-		return nil
+		threadID = strings.TrimSpace(c.QueryParam("thread"))
+	}
+	if threadID == "" {
+		return echo.NewHTTPError(http.StatusBadRequest, "thread_id is required")
 	}
 	userEmail, _ := c.Get("user_email").(string)
 
@@ -1091,7 +1092,33 @@ func (h *Handler) ResumeThread(c echo.Context) error {
 	if threadID == "" {
 		return echo.NewHTTPError(http.StatusBadRequest, "thread_id is required")
 	}
+	return h.resumeFreeformThreadByID(c, userEmail, threadID)
+}
 
+func (h *Handler) ResumeThreadByPath(c echo.Context) error {
+	userEmail, ok := c.Get("user_email").(string)
+	if !ok || userEmail == "" {
+		return echo.NewHTTPError(http.StatusUnauthorized, "not authenticated")
+	}
+	threadID := strings.TrimSpace(c.Param("thread_id"))
+	if threadID == "" {
+		return echo.NewHTTPError(http.StatusBadRequest, "thread_id is required")
+	}
+	workspace, ok, err := h.service.ResolvePrimaryWorkspaceForThread(
+		c.Request().Context(),
+		userEmail,
+		threadID,
+	)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
+	}
+	if ok {
+		return h.resumeWorkspaceThreadByID(c, userEmail, workspace.ID, threadID)
+	}
+	return h.resumeFreeformThreadByID(c, userEmail, threadID)
+}
+
+func (h *Handler) resumeFreeformThreadByID(c echo.Context, userEmail, threadID string) error {
 	prompt := strings.TrimSpace(c.FormValue("prompt"))
 	if prompt == "" {
 		return echo.NewHTTPError(http.StatusBadRequest, "prompt is required")
@@ -1133,7 +1160,33 @@ func (h *Handler) ForkThread(c echo.Context) error {
 	if sourceThreadID == "" {
 		return echo.NewHTTPError(http.StatusBadRequest, "source_thread_id is required")
 	}
+	return h.forkFreeformThreadByID(c, userEmail, sourceThreadID)
+}
 
+func (h *Handler) ForkThreadByPath(c echo.Context) error {
+	userEmail, ok := c.Get("user_email").(string)
+	if !ok || userEmail == "" {
+		return echo.NewHTTPError(http.StatusUnauthorized, "not authenticated")
+	}
+	sourceThreadID := strings.TrimSpace(c.Param("thread_id"))
+	if sourceThreadID == "" {
+		return echo.NewHTTPError(http.StatusBadRequest, "thread_id is required")
+	}
+	workspace, ok, err := h.service.ResolvePrimaryWorkspaceForThread(
+		c.Request().Context(),
+		userEmail,
+		sourceThreadID,
+	)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
+	}
+	if ok {
+		return h.forkWorkspaceThreadByID(c, userEmail, workspace.ID, sourceThreadID)
+	}
+	return h.forkFreeformThreadByID(c, userEmail, sourceThreadID)
+}
+
+func (h *Handler) forkFreeformThreadByID(c echo.Context, userEmail, sourceThreadID string) error {
 	sourceEntryID := strings.TrimSpace(c.FormValue("source_entry_id"))
 	if sourceEntryID == "" {
 		return echo.NewHTTPError(http.StatusBadRequest, "source_entry_id is required")
@@ -1835,6 +1888,10 @@ func (h *Handler) ResumeWorkspaceThread(c echo.Context) error {
 	}
 	workspaceID := c.Param("workspace_id")
 	threadID := strings.TrimSpace(c.Param("thread_id"))
+	return h.resumeWorkspaceThreadByID(c, userEmail, workspaceID, threadID)
+}
+
+func (h *Handler) resumeWorkspaceThreadByID(c echo.Context, userEmail, workspaceID, threadID string) error {
 	if _, err := h.service.queries.GetAgentThreadForWorkspaceUser(
 		c.Request().Context(),
 		db.GetAgentThreadForWorkspaceUserParams{
@@ -1997,6 +2054,10 @@ func (h *Handler) ForkWorkspaceThread(c echo.Context) error {
 	}
 	workspaceID := c.Param("workspace_id")
 	sourceThreadID := strings.TrimSpace(c.Param("thread_id"))
+	return h.forkWorkspaceThreadByID(c, userEmail, workspaceID, sourceThreadID)
+}
+
+func (h *Handler) forkWorkspaceThreadByID(c echo.Context, userEmail, workspaceID, sourceThreadID string) error {
 	if _, err := h.service.queries.GetAgentThreadForWorkspaceUser(
 		c.Request().Context(),
 		db.GetAgentThreadForWorkspaceUserParams{
@@ -2836,31 +2897,25 @@ func workspaceDocFormPath(rootPath, rawPath string) (string, error) {
 	return ValidateWorkspaceRelPath(rootPath, rawPath)
 }
 
+func threadThoughtsChatURL(threadID, runID string) string {
+	values := url.Values{}
+	values.Set("context", ThoughtsChatContext)
+	values.Set("thread", strings.TrimSpace(threadID))
+	if strings.TrimSpace(runID) != "" {
+		values.Set("run", strings.TrimSpace(runID))
+	}
+	return "/thoughts/?" + values.Encode()
+}
+
 func workspaceThreadURL(workspaceID, threadID, runID string) string {
-	return workspaceThreadURLWithBase("/agent-chat", workspaceID, threadID, runID)
+	return threadThoughtsChatURL(threadID, runID)
 }
 
 func workspaceThreadURLForRequest(
 	c echo.Context,
 	workspaceID, threadID, runID string,
 ) string {
-	if strings.HasPrefix(c.Request().URL.Path, "/thoughts/chat/") {
-		return workspaceThreadURLWithBase("/thoughts/chat", workspaceID, threadID, runID)
-	}
-	return workspaceThreadURL(workspaceID, threadID, runID)
-}
-
-func workspaceThreadURLWithBase(base, workspaceID, threadID, runID string) string {
-	path := fmt.Sprintf(
-		"%s/%s/thread/%s",
-		base,
-		url.PathEscape(workspaceID),
-		url.PathEscape(threadID),
-	)
-	if strings.TrimSpace(runID) == "" {
-		return path
-	}
-	return path + "?run=" + url.QueryEscape(runID)
+	return threadThoughtsChatURL(threadID, runID)
 }
 
 func (h *Handler) writeNoRedirectSuccess(c echo.Context) error {

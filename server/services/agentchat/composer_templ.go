@@ -42,12 +42,12 @@ func FreeformChatComposer(args ChatPageArgs) templ.Component {
 				return templ_7745c5c3_Err
 			}
 		} else if args.PrimaryWorkspace != nil {
-			templ_7745c5c3_Err = AgentChatComposer(AgentChatComposerArgs{Action: "@post('/agent-chat/resume', {contentType: 'form'})", WorkspaceID: args.PrimaryWorkspace.ID, ThreadID: args.CurrentThread.ID, Cwd: args.Cwd, ModeLabel: "Workspace-backed thread", Placeholder: "Continue this conversation", HasThread: true, IncludeCwd: true, AttachedPaths: args.PendingAttachments, ThreadMetadata: args.ThreadMetadata}).Render(ctx, templ_7745c5c3_Buffer)
+			templ_7745c5c3_Err = AgentChatComposer(AgentChatComposerArgs{Action: "@post('" + threadChatAction(args.CurrentThread.ID, "resume") + "', {contentType: 'form'})", WorkspaceID: args.PrimaryWorkspace.ID, ThreadID: args.CurrentThread.ID, Cwd: args.Cwd, ModeLabel: "Workspace-backed thread", Placeholder: "Continue this conversation", HasThread: true, IncludeCwd: true, AttachedPaths: args.PendingAttachments, ThreadMetadata: args.ThreadMetadata}).Render(ctx, templ_7745c5c3_Buffer)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		} else {
-			templ_7745c5c3_Err = AgentChatComposer(AgentChatComposerArgs{Action: "@post('/agent-chat/resume', {contentType: 'form'})", ThreadID: args.CurrentThread.ID, Placeholder: "Continue this conversation", HasThread: true, AttachedPaths: args.PendingAttachments, ThreadMetadata: args.ThreadMetadata}).Render(ctx, templ_7745c5c3_Buffer)
+			templ_7745c5c3_Err = AgentChatComposer(AgentChatComposerArgs{Action: "@post('" + threadChatAction(args.CurrentThread.ID, "resume") + "', {contentType: 'form'})", ThreadID: args.CurrentThread.ID, Placeholder: "Continue this conversation", HasThread: true, AttachedPaths: args.PendingAttachments, ThreadMetadata: args.ThreadMetadata}).Render(ctx, templ_7745c5c3_Buffer)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}

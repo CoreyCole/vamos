@@ -30,6 +30,15 @@ func freeformForkAction() string {
 	return "@post('/agent-chat/fork', {contentType: 'form'})"
 }
 
+func threadChatAction(threadID, action string) string {
+	threadID = strings.TrimSpace(threadID)
+	action = strings.Trim(strings.TrimSpace(action), "/")
+	if threadID == "" || action == "" {
+		return ""
+	}
+	return "/agent-chat/thread/" + url.PathEscape(threadID) + "/" + action
+}
+
 func piSessionOpenAction() string {
 	return "@post('" + piSessionOpenEndpoint + "', {contentType: 'form'})"
 }
@@ -49,27 +58,25 @@ func piSessionOpenIndicatorSignal(thread ThreadSidebarThread) string {
 }
 
 func workspaceForkAction(workspaceID, threadID string) string {
-	if workspaceID == "" || threadID == "" {
-		return freeformForkAction()
+	if threadID != "" {
+		return fmt.Sprintf(
+			"@post('%s', {contentType: 'form'})",
+			threadChatAction(threadID, "fork"),
+		)
 	}
-	return fmt.Sprintf(
-		"@post('/agent-chat/%s/thread/%s/fork', {contentType: 'form'})",
-		workspaceID,
-		threadID,
-	)
+	return freeformForkAction()
 }
 
 func workspaceSendAction(workspaceID, threadID string, hasThread bool) string {
 	if hasThread {
 		return fmt.Sprintf(
-			"@post('/agent-chat/%s/thread/%s/resume', {contentType: 'form'})",
-			workspaceID,
-			threadID,
+			"@post('%s', {contentType: 'form'})",
+			threadChatAction(threadID, "resume"),
 		)
 	}
 	return fmt.Sprintf(
 		"@post('/agent-chat/%s/send', {contentType: 'form'})",
-		workspaceID,
+		url.PathEscape(workspaceID),
 	)
 }
 

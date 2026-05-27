@@ -429,7 +429,7 @@ func TestCompatThreadQueryRedirectPreservesRun(t *testing.T) {
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
 	}
-	if !strings.Contains(rec.Body.String(), "/agent-chat/stream?thread=thread-run-preserved&amp;run=run-1") && !strings.Contains(rec.Body.String(), "/agent-chat/stream?thread=thread-run-preserved&run=run-1") {
+	if !strings.Contains(rec.Body.String(), "/agent-chat/thread/thread-run-preserved/stream?run=run-1") {
 		t.Fatalf("body missing thread stream with run id: %s", rec.Body.String())
 	}
 	storedRun, err := service.queries.GetAgentRun(t.Context(), "run-1")
@@ -836,48 +836,57 @@ func TestStreamEmbeddedFreeformCatchupPatchesEmbeddedPanelNotThreadPage(
 	}
 }
 
-func TestStreamEmbeddedWorkspaceCatchupPatchesEmbeddedPanelNotWorkspaceResource(
+func TestStreamEmbeddedThreadCatchupPatchesEmbeddedPanelNotWorkspaceResource(
 	t *testing.T,
 ) {
 	t.Parallel()
 
 	service := newTestAgentChatService(t)
 	handler := NewHandler(service, nil)
-	workspaceRecord, thread := mustCreateWorkspaceThreadForHandlerTest(
+	_, thread := mustCreateWorkspaceThreadForHandlerTest(
 		t,
 		service,
 		"user@example.com",
 	)
 	run := mustCreateAgentRun(t, service, thread.ID, "run-embedded-catchup")
-	service.notifier.NotifyWorkspaceResource(workspaceRecord.ID)
+	if err := service.ApplyLiveEvent(conversation.EventEnvelope{
+		RunID:       run.ID,
+		ThreadID:    thread.ID,
+		EventType:   "message_end",
+		PayloadJSON: `{"message":{"role":"assistant","content":[{"type":"text","text":"embedded catchup"}]}}`,
+	}); err != nil {
+		t.Fatalf("ApplyLiveEvent() error = %v", err)
+	}
 
 	reqCtx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 	req := httptest.NewRequestWithContext(
 		reqCtx,
 		http.MethodGet,
-		"/thoughts/chat/"+workspaceRecord.ID+"/stream?thread="+thread.ID+
-			"&run="+run.ID+"&doc=creative-mode-agent/plans/2026-04-30_test-plan/plan.md&since=0",
+		"/thoughts/chat/thread/"+thread.ID+"/stream?run="+run.ID+
+			"&doc=creative-mode-agent/plans/2026-04-30_test-plan/plan.md&since=-1",
 		http.NoBody,
 	)
 	rec := httptest.NewRecorder()
 	c := echo.New().NewContext(req, rec)
 	c.Set("user_email", "user@example.com")
-	c.SetParamNames("workspace_id")
-	c.SetParamValues(workspaceRecord.ID)
+	c.SetParamNames("thread_id")
+	c.SetParamValues(thread.ID)
 
 	done := make(chan error, 1)
-	go func() { done <- handler.StreamEmbeddedWorkspace(c) }()
-	time.Sleep(25 * time.Millisecond)
+	go func() { done <- handler.StreamEmbeddedThread(c) }()
+	waitForSubscriberCount(t, service.notifier, thread.ID, 1)
+	service.notifier.Notify(thread.ID, ThreadStreamSignal{Cursor: 1, Scope: PatchLiveTranscript})
+	waitForResponseContains(t, rec, "agent-chat-live-transcript")
 	cancel()
 
 	select {
 	case err := <-done:
 		if !isExpectedStreamCancel(err) {
-			t.Fatalf("StreamEmbeddedWorkspace() error = %v", err)
+			t.Fatalf("StreamEmbeddedThread() error = %v", err)
 		}
 	case <-time.After(time.Second):
-		t.Fatal("StreamEmbeddedWorkspace() timed out")
+		t.Fatal("StreamEmbeddedThread() timed out")
 	}
 	body := rec.Body.String()
 	if !strings.Contains(body, "doc-right-chat-panel") &&
@@ -915,23 +924,29 @@ func TestWriteNoRedirectSuccessClearsComposer(t *testing.T) {
 	}
 }
 
-func TestWorkspaceThreadURLIncludesRunWhenPresent(t *testing.T) {
+func TestWorkspaceThreadURLUsesThreadOnlyThoughtsURLWithRun(t *testing.T) {
 	t.Parallel()
 
 	got := workspaceThreadURL("workspace/id", "thread id", "run+id")
-	want := "/agent-chat/workspace%2Fid/thread/thread%20id?run=run%2Bid"
+	want := "/thoughts/?context=chat&run=run%2Bid&thread=thread+id"
 	if got != want {
 		t.Fatalf("workspaceThreadURL() = %q, want %q", got, want)
 	}
+	if strings.Contains(got, "workspace") {
+		t.Fatalf("workspaceThreadURL() = %q, want no workspace path/query", got)
+	}
 }
 
-func TestWorkspaceThreadURLOmitsRunWhenEmpty(t *testing.T) {
+func TestWorkspaceThreadURLUsesThreadOnlyThoughtsURLWithoutRun(t *testing.T) {
 	t.Parallel()
 
 	got := workspaceThreadURL("workspace/id", "thread id", " ")
-	want := "/agent-chat/workspace%2Fid/thread/thread%20id"
+	want := "/thoughts/?context=chat&thread=thread+id"
 	if got != want {
 		t.Fatalf("workspaceThreadURL() = %q, want %q", got, want)
+	}
+	if strings.Contains(got, "workspace") {
+		t.Fatalf("workspaceThreadURL() = %q, want no workspace path/query", got)
 	}
 }
 
