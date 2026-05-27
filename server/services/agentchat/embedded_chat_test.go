@@ -405,7 +405,7 @@ func TestRenderEmbeddedChatPanelUsesFreeformRendererForPersistedFreeformWorkspac
 		"Workspace-backed thread",
 		"In this workspace",
 		"/thoughts/chat/thread/" + thread.ID + "/resume",
-		"/thoughts/chat/freeform/stream",
+		"/thoughts/chat/thread/" + thread.ID + "/stream",
 		"creative-mode-agent/plans/2026-04-30_test-plan/plan.md?",
 		"context=chat",
 		"chat_workspace=" + workspace.ID,
@@ -416,6 +416,7 @@ func TestRenderEmbeddedChatPanelUsesFreeformRendererForPersistedFreeformWorkspac
 	}
 	for _, notWant := range []string{
 		"/agent-chat/stream",
+		"/thoughts/chat/freeform/stream",
 		"/thoughts/chat/" + workspace.ID + "/send",
 		"agent-chat-workspace-header",
 	} {

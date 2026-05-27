@@ -466,20 +466,16 @@ func (s *Service) BuildEmbeddedFreeformPanelArgs(
 	resolvedRunID := getRunID(args.ActiveRun)
 	composerAction := "@post('/thoughts/chat/freeform/send', {contentType: 'form'})"
 	if resolvedThreadID != "" {
-		composerAction = "@post('/thoughts/chat/freeform/resume', {contentType: 'form'})"
-		if args.PrimaryWorkspace != nil {
-			composerAction = embeddedWorkspaceSendAction("", resolvedThreadID, true)
-		}
+		composerAction = "@post('" + thoughtsThreadChatAction(resolvedThreadID, "resume") + "', {contentType: 'form'})"
 	}
 	streamURL := ""
 	if resolvedThreadID != "" {
 		values := url.Values{}
-		values.Set("thread", resolvedThreadID)
 		if resolvedRunID != "" {
 			values.Set("run", resolvedRunID)
 		}
 		values.Set("since", "0")
-		streamURL = "/thoughts/chat/freeform/stream?" + values.Encode()
+		streamURL = thoughtsThreadChatAction(resolvedThreadID, "stream") + "?" + values.Encode()
 	}
 	return EmbeddedFreeformPanelArgs{
 		ThreadID:       resolvedThreadID,

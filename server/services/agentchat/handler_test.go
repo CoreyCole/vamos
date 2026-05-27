@@ -2545,7 +2545,7 @@ func TestUpdateWorkspaceWorkflowPolicyHandlerPersistsAndPatchesPanel(t *testing.
 }
 
 func TestSlashCommandInputHandlerBuildsSafeCommandButtons(t *testing.T) {
-	script := slashCommandInputHandler("workspace-1", "")
+	script := slashCommandInputHandler("workspace-1", "", "")
 	for _, unsafe := range []string{"onclick=", "innerHTML = commands", "escapeHTML"} {
 		if strings.Contains(script, unsafe) {
 			t.Fatalf("slash command handler contains unsafe %q: %s", unsafe, script)

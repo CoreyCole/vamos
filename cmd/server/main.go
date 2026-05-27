@@ -1395,19 +1395,23 @@ func main() {
 	thoughtsGroup.POST("/chat/open", markdownService.OpenChatForDocument)
 	thoughtsGroup.POST("/chat/select", markdownService.SelectChatWorkspaceCandidate)
 	thoughtsGroup.POST("/chat/freeform/send", agentChatHandler.SendEmbeddedFreeformPrompt)
+	thoughtsGroup.GET(
+		"/chat/thread/:thread_id/stream",
+		agentChatHandler.StreamEmbeddedThread,
+	)
 	thoughtsGroup.POST(
-		"/chat/freeform/resume",
-		agentChatHandler.ResumeEmbeddedFreeformThread,
+		"/chat/thread/:thread_id/resume",
+		agentChatHandler.ResumeEmbeddedThread,
+	)
+	thoughtsGroup.POST(
+		"/chat/thread/:thread_id/attach-doc",
+		agentChatHandler.AttachCurrentDocToEmbeddedThread,
 	)
 	thoughtsGroup.GET(
-		"/chat/freeform/stream",
-		agentChatHandler.StreamEmbeddedFreeform,
+		"/chat/thread/:thread_id/slash-commands",
+		agentChatHandler.ListThreadSlashCommands,
 	)
 	thoughtsGroup.GET("/chat/:workspace_id", agentChatHandler.HandleWorkspacePage)
-	thoughtsGroup.GET(
-		"/chat/:workspace_id/thread/:thread_id",
-		agentChatHandler.HandleWorkspacePage,
-	)
 	thoughtsGroup.GET(
 		"/chat/:workspace_id/stream",
 		agentChatHandler.StreamEmbeddedWorkspace,
@@ -1417,16 +1421,12 @@ func main() {
 		agentChatHandler.SendEmbeddedWorkspacePrompt,
 	)
 	thoughtsGroup.POST(
-		"/chat/thread/:thread_id/resume",
-		agentChatHandler.ResumeEmbeddedThread,
-	)
-	thoughtsGroup.POST(
-		"/chat/:workspace_id/thread/:thread_id/resume",
-		agentChatHandler.ResumeEmbeddedWorkspaceThread,
-	)
-	thoughtsGroup.POST(
 		"/chat/:workspace_id/attach-doc",
 		agentChatHandler.AttachCurrentDocToEmbeddedChat,
+	)
+	thoughtsGroup.GET(
+		"/chat/:workspace_id/slash-commands",
+		agentChatHandler.ListWorkspaceSlashCommands,
 	)
 	thoughtsGroup.GET("/*", markdownService.ServeMarkdown)
 

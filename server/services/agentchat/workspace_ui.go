@@ -73,16 +73,38 @@ func workspaceSendAction(workspaceID, threadID string, hasThread bool) string {
 	)
 }
 
+func thoughtsThreadChatAction(threadID, action string) string {
+	threadID = strings.TrimSpace(threadID)
+	action = strings.Trim(strings.TrimSpace(action), "/")
+	if threadID == "" || action == "" {
+		return ""
+	}
+	return "/thoughts/chat/thread/" + url.PathEscape(threadID) + "/" + action
+}
+
 func embeddedWorkspaceSendAction(workspaceID, threadID string, hasThread bool) string {
 	if hasThread {
 		return fmt.Sprintf(
-			"@post('/thoughts/chat/thread/%s/resume', {contentType: 'form'})",
-			threadID,
+			"@post('%s', {contentType: 'form'})",
+			thoughtsThreadChatAction(threadID, "resume"),
 		)
 	}
 	return fmt.Sprintf(
 		"@post('/thoughts/chat/%s/send', {contentType: 'form'})",
-		workspaceID,
+		url.PathEscape(workspaceID),
+	)
+}
+
+func embeddedAttachDocAction(workspaceID, threadID string, hasThread bool) string {
+	if hasThread {
+		return fmt.Sprintf(
+			"@post('%s', {contentType: 'form'})",
+			thoughtsThreadChatAction(threadID, "attach-doc"),
+		)
+	}
+	return fmt.Sprintf(
+		"@post('/thoughts/chat/%s/attach-doc', {contentType: 'form'})",
+		url.PathEscape(workspaceID),
 	)
 }
 
@@ -91,9 +113,6 @@ func embeddedWorkspaceStreamURL(
 	cursor int64,
 ) string {
 	values := url.Values{}
-	if threadID != "" {
-		values.Set("thread", threadID)
-	}
 	if runID != "" {
 		values.Set("run", runID)
 	}
@@ -101,17 +120,27 @@ func embeddedWorkspaceStreamURL(
 		values.Set("doc", docPath)
 	}
 	values.Set("since", strconv.FormatInt(cursor, 10))
+	if threadID != "" {
+		return thoughtsThreadChatAction(threadID, "stream") + "?" + values.Encode()
+	}
 	return "/thoughts/chat/" + url.PathEscape(workspaceID) + "/stream?" + values.Encode()
 }
 
-func slashCommandInputHandler(workspaceID, endpointBase string) string {
+func slashCommandInputHandler(workspaceID, threadID, endpointBase string) string {
+	threadID = strings.TrimSpace(threadID)
 	workspaceID = strings.TrimSpace(workspaceID)
-	if workspaceID == "" {
-		return "const v = el.value; $slashOpen = v.startsWith('/'); $slashPrefix = $slashOpen ? v.split(/\\s+/)[0] : '';"
-	}
 	endpointBase = strings.TrimRight(strings.TrimSpace(endpointBase), "/")
 	if endpointBase == "" {
 		endpointBase = "/agent-chat"
+	}
+	commandURL := ""
+	switch {
+	case threadID != "":
+		commandURL = endpointBase + "/thread/" + url.PathEscape(threadID) + "/slash-commands"
+	case workspaceID != "":
+		commandURL = endpointBase + "/" + url.PathEscape(workspaceID) + "/slash-commands"
+	default:
+		return "const v = el.value; $slashOpen = v.startsWith('/'); $slashPrefix = $slashOpen ? v.split(/\\s+/)[0] : '';"
 	}
 	return fmt.Sprintf(`const v = el.value;
 const popover = document.getElementById('agent-chat-slash-popover');
@@ -126,7 +155,7 @@ const showSlashMessage = (text, className) => {
   message.textContent = text;
   popover.replaceChildren(message);
 };
-fetch('%s/%s/slash-commands?prefix=' + encodeURIComponent($slashPrefix), {headers: {'Accept': 'application/json'}})
+fetch('%s?prefix=' + encodeURIComponent($slashPrefix), {headers: {'Accept': 'application/json'}})
   .then(r => r.ok ? r.json() : [])
   .then(commands => {
     if (!$slashOpen || !Array.isArray(commands) || commands.length === 0) {
@@ -173,7 +202,7 @@ fetch('%s/%s/slash-commands?prefix=' + encodeURIComponent($slashPrefix), {header
     });
     popover.replaceChildren(...buttons);
   })
-  .catch(() => { showSlashMessage('Command discovery failed', 'px-2 py-1 text-xs text-destructive'); });`, endpointBase, url.PathEscape(workspaceID))
+  .catch(() => { showSlashMessage('Command discovery failed', 'px-2 py-1 text-xs text-destructive'); });`, commandURL)
 }
 
 func chatShellSignals(hasSelectedThread bool) string {

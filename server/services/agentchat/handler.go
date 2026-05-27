@@ -745,6 +745,88 @@ func (h *Handler) StreamEmbeddedFreeform(c echo.Context) error {
 	}
 }
 
+func (h *Handler) StreamEmbeddedThread(c echo.Context) error {
+	userEmail, ok := c.Get("user_email").(string)
+	if !ok || userEmail == "" {
+		return echo.NewHTTPError(http.StatusUnauthorized, "not authenticated")
+	}
+	threadID := strings.TrimSpace(c.Param("thread_id"))
+	if threadID == "" {
+		return echo.NewHTTPError(http.StatusBadRequest, "thread_id is required")
+	}
+	if _, err := h.service.queries.GetAgentThreadForUser(
+		c.Request().Context(),
+		db.GetAgentThreadForUserParams{ID: threadID, UserEmail: userEmail},
+	); err != nil {
+		return echo.NewHTTPError(http.StatusNotFound, err.Error())
+	}
+
+	workspaceRecord, hasPrimary, err := h.service.ResolvePrimaryWorkspaceForThread(
+		c.Request().Context(),
+		userEmail,
+		threadID,
+	)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
+	}
+
+	sse := datastar.NewSSE(c.Response().Writer, c.Request())
+	ctx := c.Request().Context()
+	signalCh := h.service.notifier.Subscribe(threadID)
+	defer h.service.notifier.Unsubscribe(threadID, signalCh)
+	h.service.RequestPiSessionIndex(PiSessionIndexRequest{
+		UserEmail: userEmail,
+		Reason:    "embedded-thread-stream",
+	})
+
+	patchPanel := func() error {
+		if hasPrimary {
+			input := h.embeddedPatchInput(c, userEmail)
+			input.WorkspaceID = workspaceRecord.ID
+			input.ThreadID = threadID
+			return h.patchEmbeddedChatPanel(c, sse, input)
+		}
+		return h.patchEmbeddedFreeformChatPanel(c, sse, userEmail)
+	}
+	patchTranscript := func() error {
+		if hasPrimary {
+			input := h.embeddedPatchInput(c, userEmail)
+			input.WorkspaceID = workspaceRecord.ID
+			input.ThreadID = threadID
+			return h.patchEmbeddedChatLiveTranscript(c, sse, input)
+		}
+		return h.patchEmbeddedFreeformLiveTranscript(c, sse, userEmail)
+	}
+
+	since := parseSince(c.QueryParam("since"))
+	currentCursor := h.service.CurrentCursor(threadID)
+	if since < currentCursor {
+		if err := patchPanel(); err != nil {
+			return err
+		}
+		since = h.service.CurrentCursor(threadID)
+	}
+
+	for {
+		select {
+		case <-ctx.Done():
+			return nil
+		case signal := <-signalCh:
+			if signal.Cursor <= since {
+				continue
+			}
+			if signal.Scope == PatchLiveTranscript {
+				if err := patchTranscript(); err != nil {
+					return err
+				}
+			} else if err := patchPanel(); err != nil {
+				return err
+			}
+			since = signal.Cursor
+		}
+	}
+}
+
 func (h *Handler) StreamEmbeddedWorkspace(c echo.Context) error {
 	userEmail, ok := c.Get("user_email").(string)
 	if !ok || userEmail == "" {
@@ -1405,6 +1487,26 @@ func (h *Handler) resetAndFocusEmbeddedComposer(
 	return sse.ExecuteScript(resetAndFocusComposerScript)
 }
 
+func (h *Handler) AttachCurrentDocToEmbeddedThread(c echo.Context) error {
+	userEmail, ok := c.Get("user_email").(string)
+	if !ok || userEmail == "" {
+		return echo.NewHTTPError(http.StatusUnauthorized, "not authenticated")
+	}
+	threadID := strings.TrimSpace(c.Param("thread_id"))
+	workspace, ok, err := h.service.ResolvePrimaryWorkspaceForThread(
+		c.Request().Context(),
+		userEmail,
+		threadID,
+	)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
+	}
+	if !ok {
+		return echo.NewHTTPError(http.StatusNotFound, "thread has no primary workspace")
+	}
+	return h.attachCurrentDocToEmbeddedChat(c, userEmail, workspace.ID, threadID)
+}
+
 func (h *Handler) AttachCurrentDocToEmbeddedChat(c echo.Context) error {
 	userEmail, ok := c.Get("user_email").(string)
 	if !ok || userEmail == "" {
@@ -1418,6 +1520,10 @@ func (h *Handler) AttachCurrentDocToEmbeddedChat(c echo.Context) error {
 	); err != nil {
 		return echo.NewHTTPError(http.StatusNotFound, err.Error())
 	}
+	return h.attachCurrentDocToEmbeddedChat(c, userEmail, workspaceID, strings.TrimSpace(c.FormValue("thread_id")))
+}
+
+func (h *Handler) attachCurrentDocToEmbeddedChat(c echo.Context, userEmail, workspaceID, threadID string) error {
 	docPath := markdown.CanonicalThoughtsDocPathLoose(c.FormValue("doc_path"))
 	if docPath == "" {
 		return echo.NewHTTPError(http.StatusBadRequest, "doc_path is required")
@@ -1433,7 +1539,7 @@ func (h *Handler) AttachCurrentDocToEmbeddedChat(c echo.Context) error {
 			UserEmail:   userEmail,
 			DocPath:     docPath,
 			WorkspaceID: workspaceID,
-			ThreadID:    strings.TrimSpace(c.FormValue("thread_id")),
+			ThreadID:    threadID,
 			RunID:       strings.TrimSpace(c.FormValue("run_id")),
 		},
 	)
@@ -1622,6 +1728,34 @@ func (h *Handler) UpdateWorkspaceWorkflowPolicy(c echo.Context) error {
 	return h.patchWorkspace(c, sse, PatchWorkflowPanel)
 }
 
+func (h *Handler) ListThreadSlashCommands(c echo.Context) error {
+	userEmail, ok := c.Get("user_email").(string)
+	if !ok || userEmail == "" {
+		return echo.NewHTTPError(http.StatusUnauthorized, "not authenticated")
+	}
+	threadID := strings.TrimSpace(c.Param("thread_id"))
+	workspace, ok, err := h.service.ResolvePrimaryWorkspaceForThread(
+		c.Request().Context(),
+		userEmail,
+		threadID,
+	)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
+	}
+	if !ok {
+		workspaceContext, ctxErr := h.service.GetThreadWorkspaceContext(c.Request().Context(), userEmail, threadID)
+		if ctxErr != nil {
+			return echo.NewHTTPError(http.StatusNotFound, ctxErr.Error())
+		}
+		return h.listSlashCommandsForCwd(c, firstNonEmpty(c.QueryParam("cwd"), workspaceContext.Thread.Cwd))
+	}
+	cwd := strings.TrimSpace(c.QueryParam("cwd"))
+	if cwd == "" {
+		cwd = h.service.WorkspaceSlashCommandCwd(workspace)
+	}
+	return h.listSlashCommandsForCwd(c, cwd)
+}
+
 func (h *Handler) ListWorkspaceSlashCommands(c echo.Context) error {
 	userEmail, ok := c.Get("user_email").(string)
 	if !ok || userEmail == "" {
@@ -1643,6 +1777,10 @@ func (h *Handler) ListWorkspaceSlashCommands(c echo.Context) error {
 	if cwd == "" {
 		cwd = h.service.WorkspaceSlashCommandCwd(workspace)
 	}
+	return h.listSlashCommandsForCwd(c, cwd)
+}
+
+func (h *Handler) listSlashCommandsForCwd(c echo.Context, cwd string) error {
 	commands, err := h.service.ListSlashCommands(
 		c.Request().Context(),
 		ListSlashCommandsInput{Cwd: cwd, Prefix: c.QueryParam("prefix")},
@@ -2823,7 +2961,7 @@ func (h *Handler) patchEmbeddedFreeformChatPanel(
 	args, err := h.service.BuildEmbeddedFreeformPanelArgs(
 		c.Request().Context(),
 		userEmail,
-		strings.TrimSpace(c.QueryParam("thread")),
+		firstNonEmpty(c.QueryParam("thread"), c.Param("thread_id")),
 		strings.TrimSpace(c.QueryParam("run")),
 	)
 	if err != nil {
@@ -2843,7 +2981,7 @@ func (h *Handler) patchEmbeddedFreeformLiveTranscript(
 	args, err := h.service.BuildEmbeddedFreeformPanelArgs(
 		c.Request().Context(),
 		userEmail,
-		strings.TrimSpace(c.QueryParam("thread")),
+		firstNonEmpty(c.QueryParam("thread"), c.Param("thread_id")),
 		strings.TrimSpace(c.QueryParam("run")),
 	)
 	if err != nil {
@@ -2951,6 +3089,7 @@ func (h *Handler) embeddedPatchInput(
 		WorkspaceID: strings.TrimSpace(c.Param("workspace_id")),
 		ThreadID: firstNonEmpty(
 			c.QueryParam("thread"),
+			c.Param("thread_id"),
 			c.FormValue("thread_id"),
 		),
 		RunID: firstNonEmpty(
