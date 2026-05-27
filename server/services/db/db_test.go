@@ -64,6 +64,87 @@ func TestNewServiceCreatesParentAndMigratesSchema(t *testing.T) {
 	}
 }
 
+func TestNewServiceAgentThreadQueriesDoNotRequireWorkspaceIDColumn(t *testing.T) {
+	t.Parallel()
+
+	svc, err := NewService(filepath.Join(t.TempDir(), "vamos.db"))
+	if err != nil {
+		t.Fatalf("NewService() error = %v", err)
+	}
+	t.Cleanup(func() { _ = svc.Close() })
+
+	if columnExists(t, svc.DB(), "agent_threads", "workspace_id") {
+		t.Fatal("agent_threads.workspace_id exists after NewService")
+	}
+
+	ctx := t.Context()
+	userEmail := "thread-query@example.com"
+	workspaceID := "workspace-thread-query"
+	threadID := "thread-query"
+	rootDocPath := filepath.Join(t.TempDir(), "plan")
+
+	if _, err := svc.Queries.CreateWorkspace(ctx, querydb.CreateWorkspaceParams{
+		ID:                workspaceID,
+		UserEmail:         userEmail,
+		Title:             "Thread Query Workspace",
+		RootDocPath:       rootDocPath,
+		Cwd:               sql.NullString{String: rootDocPath, Valid: true},
+		WorkflowType:      "freeform",
+		WorkflowStateJson: sql.NullString{},
+		Source:            "imported",
+		SelectedThreadID:  sql.NullString{},
+		SelectedDocPath:   sql.NullString{},
+	}); err != nil {
+		t.Fatalf("CreateWorkspace() error = %v", err)
+	}
+
+	thread, err := svc.Queries.CreateAgentThread(ctx, querydb.CreateAgentThreadParams{
+		ID:                threadID,
+		UserEmail:         userEmail,
+		Title:             "Thread Query",
+		Cwd:               rootDocPath,
+		LineageID:         "lineage-thread-query",
+		HeadEntryID:       sql.NullString{},
+		ParentThreadID:    sql.NullString{},
+		ForkedFromEntryID: sql.NullString{},
+	})
+	if err != nil {
+		t.Fatalf("CreateAgentThread() error = %v", err)
+	}
+	if thread.ID != threadID {
+		t.Fatalf("CreateAgentThread() ID = %q, want %q", thread.ID, threadID)
+	}
+
+	if err := svc.Queries.AttachThreadToWorkspace(ctx, querydb.AttachThreadToWorkspaceParams{
+		ID:          threadID,
+		WorkspaceID: sql.NullString{String: workspaceID, Valid: true},
+	}); err != nil {
+		t.Fatalf("AttachThreadToWorkspace() error = %v", err)
+	}
+
+	if _, err := svc.Queries.GetAgentThread(ctx, threadID); err != nil {
+		t.Fatalf("GetAgentThread() error = %v", err)
+	}
+	if _, err := svc.Queries.GetAgentThreadForUser(ctx, querydb.GetAgentThreadForUserParams{ID: threadID, UserEmail: userEmail}); err != nil {
+		t.Fatalf("GetAgentThreadForUser() error = %v", err)
+	}
+	if _, err := svc.Queries.ListAgentThreads(ctx, querydb.ListAgentThreadsParams{UserEmail: userEmail, Limit: 10}); err != nil {
+		t.Fatalf("ListAgentThreads() error = %v", err)
+	}
+	if _, err := svc.Queries.GetAgentThreadForWorkspaceUser(ctx, querydb.GetAgentThreadForWorkspaceUserParams{WorkspaceID: workspaceID, ThreadID: threadID, UserEmail: userEmail}); err != nil {
+		t.Fatalf("GetAgentThreadForWorkspaceUser() error = %v", err)
+	}
+	if _, err := svc.Queries.ListAgentThreadsByWorkspace(ctx, workspaceID); err != nil {
+		t.Fatalf("ListAgentThreadsByWorkspace() error = %v", err)
+	}
+	if _, err := svc.Queries.ListAgentThreadsForUserWithWorkspace(ctx, userEmail); err != nil {
+		t.Fatalf("ListAgentThreadsForUserWithWorkspace() error = %v", err)
+	}
+	if _, err := svc.Queries.ListThreadsByPrimaryWorkspace(ctx, workspaceID); err != nil {
+		t.Fatalf("ListThreadsByPrimaryWorkspace() error = %v", err)
+	}
+}
+
 func TestNewServiceEnablesForeignKeys(t *testing.T) {
 	t.Parallel()
 
