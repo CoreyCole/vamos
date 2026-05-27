@@ -985,6 +985,110 @@ func TestWorkspacesPageRendersNestedReviewWorkspaces(t *testing.T) {
 	}
 }
 
+func TestWorkspacesPageRendersWorkspaceGroups(t *testing.T) {
+	views := BuildImplWorkspaceViews([]db.ImplWorkspace{
+		{
+			WorkspaceSlug: "active",
+			CheckoutPath:  "/repo/active",
+			DisplayName:   "Active Workspace",
+			Status:        string(ImplWorkspaceStatusActive),
+			AheadCount:    2,
+		},
+		{
+			WorkspaceSlug:         "merged-safe",
+			CheckoutPath:          "/repo/merged-safe",
+			DisplayName:           "Merged Safe Workspace",
+			Status:                string(ImplWorkspaceStatusMerged),
+			CleanupProofKind:      string(MergeProofAncestor),
+			CleanupProofSourceRef: sql.NullString{String: "origin/main", Valid: true},
+		},
+		{
+			WorkspaceSlug: "cleaned",
+			CheckoutPath:  "/repo/cleaned",
+			DisplayName:   "Cleaned Workspace",
+			Status:        string(ImplWorkspaceStatusCleanedUp),
+		},
+	}, nil, WorkspaceLifecycleSnapshot{})
+
+	var body bytes.Buffer
+	if err := WorkspacesPage(views, "https://main.cn-agents.test", false).Render(t.Context(), &body); err != nil {
+		t.Fatalf("Render(default) error = %v", err)
+	}
+	html := body.String()
+	for _, want := range []string{
+		"Needs attention",
+		"Merged — safe to clean up",
+		"Active Workspace",
+		"Merged Safe Workspace",
+		"Merged · safe to clean up",
+	} {
+		if !strings.Contains(html, want) {
+			t.Fatalf("default grouped page missing %q: %s", want, html)
+		}
+	}
+	for _, absent := range []string{"Cleaned Workspace", "Cleaned up history"} {
+		if strings.Contains(html, absent) {
+			t.Fatalf("default grouped page unexpectedly contained %q: %s", absent, html)
+		}
+	}
+
+	body.Reset()
+	if err := WorkspacesPage(views, "https://main.cn-agents.test", true).Render(t.Context(), &body); err != nil {
+		t.Fatalf("Render(cleaned history) error = %v", err)
+	}
+	html = body.String()
+	for _, want := range []string{"Cleaned up history", "Cleaned Workspace"} {
+		if !strings.Contains(html, want) {
+			t.Fatalf("cleaned history page missing %q: %s", want, html)
+		}
+	}
+}
+
+func TestWorkspaceDetailShowsProofDiagnostics(t *testing.T) {
+	proofAt := time.Date(2026, 5, 27, 8, 15, 0, 0, time.UTC)
+	views := BuildImplWorkspaceViews([]db.ImplWorkspace{{
+		WorkspaceSlug:            "merged-safe",
+		CheckoutPath:             "/repo/merged-safe",
+		DisplayName:              "Merged Safe Workspace",
+		Status:                   string(ImplWorkspaceStatusMerged),
+		AheadCount:               1,
+		BehindCount:              3,
+		MergeEvidence:            sql.NullString{String: "active checkout HEAD abc123 is ancestor of origin/main", Valid: true},
+		GitDetail:                sql.NullString{String: "git detail text", Valid: true},
+		CleanupProofKind:         string(MergeProofAncestor),
+		CleanupProofSourceRef:    sql.NullString{String: "origin/main", Valid: true},
+		CleanupProofTargetCommit: sql.NullString{String: "abcdef1234567890", Valid: true},
+		CleanupProofAt:           sql.NullTime{Time: proofAt, Valid: true},
+	}}, nil, WorkspaceLifecycleSnapshot{})
+
+	var body bytes.Buffer
+	if err := WorkspacesPage(views, "https://main.cn-agents.test", false).Render(t.Context(), &body); err != nil {
+		t.Fatalf("Render() error = %v", err)
+	}
+	html := body.String()
+	for _, want := range []string{
+		"Git divergence",
+		"1 ahead · 3 behind",
+		"Cleanup readiness",
+		"Ancestor proof against origin/main",
+		"Merge proof",
+		"ancestor",
+		"Proof source",
+		"origin/main",
+		"Proof target",
+		"abcdef1234567890",
+		"Proof time",
+		"Merge evidence",
+		"active checkout HEAD abc123 is ancestor of origin/main",
+		"Git detail",
+		"git detail text",
+	} {
+		if !strings.Contains(html, want) {
+			t.Fatalf("detail diagnostics missing %q: %s", want, html)
+		}
+	}
+}
+
 func TestFilterHistoricalImplWorkspaceViewsPromotesActiveChildren(t *testing.T) {
 	views := []ImplWorkspaceView{
 		{
@@ -1055,7 +1159,7 @@ func TestFilterHistoricalImplWorkspaceViewsPromotesActiveChildren(t *testing.T) 
 	}
 }
 
-func TestWorkspacesPageRendersHistoricalToggleAndPreservesMode(t *testing.T) {
+func TestWorkspacesPageRendersCleanedHistoryToggleAndPreservesMode(t *testing.T) {
 	views := BuildImplWorkspaceViews([]db.ImplWorkspace{{
 		WorkspaceSlug: "active",
 		CheckoutPath:  "/repo/active",
@@ -1068,13 +1172,13 @@ func TestWorkspacesPageRendersHistoricalToggleAndPreservesMode(t *testing.T) {
 		t.Fatalf("Render(default) error = %v", err)
 	}
 	html := body.String()
-	for _, want := range []string{"Show historical", `data-init="@get('/workspaces/stream')"`} {
+	for _, want := range []string{"Show cleaned history", `data-init="@get('/workspaces/stream')"`} {
 		if !strings.Contains(html, want) {
 			t.Fatalf("default page missing %q: %s", want, html)
 		}
 	}
-	if strings.Contains(html, "Hide historical") {
-		t.Fatalf("default page unexpectedly contained Hide historical: %s", html)
+	if strings.Contains(html, "Hide cleaned history") {
+		t.Fatalf("default page unexpectedly contained Hide cleaned history: %s", html)
 	}
 	idx := strings.Index(html, `action="/workspaces/refresh"`)
 	if idx < 0 {
@@ -1085,8 +1189,8 @@ func TestWorkspacesPageRendersHistoricalToggleAndPreservesMode(t *testing.T) {
 	if end < 0 {
 		t.Fatalf("refresh form not closed: %s", next)
 	}
-	if strings.Contains(next[:end], `name="show_historical" value="true"`) {
-		t.Fatalf("default refresh form unexpectedly preserved historical mode: %s", next[:end])
+	if strings.Contains(next[:end], `name="show_cleaned_history" value="true"`) {
+		t.Fatalf("default refresh form unexpectedly preserved cleaned history mode: %s", next[:end])
 	}
 
 	body.Reset()
@@ -1094,7 +1198,7 @@ func TestWorkspacesPageRendersHistoricalToggleAndPreservesMode(t *testing.T) {
 		t.Fatalf("Render(historical) error = %v", err)
 	}
 	html = body.String()
-	for _, want := range []string{"Hide historical", `name="show_historical" value="true"`, `data-init="@get('/workspaces/stream?show_historical=true')"`} {
+	for _, want := range []string{"Hide cleaned history", `name="show_cleaned_history" value="true"`, `name="show_historical" value="true"`, `data-init="@get('/workspaces/stream?show_cleaned_history=true')"`} {
 		if !strings.Contains(html, want) {
 			t.Fatalf("historical page missing %q: %s", want, html)
 		}
@@ -1128,8 +1232,8 @@ func TestWorkspacesPagePreservesHistoricalModeInLifecycleActionForms(t *testing.
 		}
 		next := html[idx:]
 		end := strings.Index(next, "</form>")
-		if end < 0 || !strings.Contains(next[:end], `name="show_historical" value="true"`) {
-			t.Fatalf("%s form did not preserve show_historical: %s", action, next)
+		if end < 0 || !strings.Contains(next[:end], `name="show_cleaned_history" value="true"`) || !strings.Contains(next[:end], `name="show_historical" value="true"`) {
+			t.Fatalf("%s form did not preserve cleaned history mode: %s", action, next)
 		}
 	}
 }
@@ -1159,7 +1263,7 @@ func TestWorkspacesPageSuppressesLifecycleActionsForHistoricalRows(t *testing.T)
 		t.Fatalf("Render() error = %v", err)
 	}
 	html := body.String()
-	for _, want := range []string{"Historical workspace", "Merged", "Cleaned up"} {
+	for _, want := range []string{"Historical workspace", "Merged", "Merged status lacks strong cleanup proof"} {
 		if !strings.Contains(html, want) {
 			t.Fatalf("WorkspacesPage missing %q: %s", want, html)
 		}
@@ -1229,7 +1333,7 @@ func TestHandleWorkspacesPageFollowsImplWorkspaceOrder(t *testing.T) {
 	}
 }
 
-func TestHandleWorkspacesPageHidesHistoricalRowsByDefault(t *testing.T) {
+func TestHandleWorkspacesPageHidesCleanedRowsByDefault(t *testing.T) {
 	handler := NewHandler(
 		&fakeLifecycleManager{snapshots: []WorkspaceLifecycleSnapshot{
 			snapshotFromState(Workspace{Slug: "active", CheckoutPath: "/repo/active", Status: StatusRunning}, WorkspaceLifecycleState{}),
@@ -1264,12 +1368,12 @@ func TestHandleWorkspacesPageHidesHistoricalRowsByDefault(t *testing.T) {
 		t.Fatalf("HandleWorkspacesPage() error = %v", err)
 	}
 	html := rec.Body.String()
-	for _, want := range []string{"Active Workspace", "Show historical"} {
+	for _, want := range []string{"Active Workspace", "Merged Workspace", "Show cleaned history", "Needs attention"} {
 		if !strings.Contains(html, want) {
 			t.Fatalf("default page missing %q: %s", want, html)
 		}
 	}
-	for _, absent := range []string{"Merged Workspace", "Cleaned Workspace", "Historical workspace"} {
+	for _, absent := range []string{"Cleaned Workspace", "Cleaned up history"} {
 		if strings.Contains(html, absent) {
 			t.Fatalf("default page unexpectedly contained %q: %s", absent, html)
 		}
@@ -1303,7 +1407,7 @@ func TestHandleWorkspacesPageShowsHistoricalRowsWhenRequested(t *testing.T) {
 		}}),
 	)
 	e := echo.New()
-	req := httptest.NewRequest(http.MethodGet, "/workspaces?show_historical=true", nil)
+	req := httptest.NewRequest(http.MethodGet, "/workspaces?show_cleaned_history=true", nil)
 	rec := httptest.NewRecorder()
 	if err := handler.HandleWorkspacesPage(e.NewContext(req, rec)); err != nil {
 		t.Fatalf("HandleWorkspacesPage() error = %v", err)
@@ -1316,7 +1420,7 @@ func TestHandleWorkspacesPageShowsHistoricalRowsWhenRequested(t *testing.T) {
 		"Historical workspace",
 		"Merged",
 		"Cleaned up",
-		"Hide historical",
+		"Hide cleaned history",
 	} {
 		if !strings.Contains(html, want) {
 			t.Fatalf("historical page missing %q: %s", want, html)
@@ -1374,12 +1478,12 @@ func TestHandleWorkspacesPagePromotesActiveChildUnderHiddenHistoricalParent(t *t
 	if !strings.Contains(html, "Active Review Child") {
 		t.Fatalf("active child hidden with historical parent: %s", html)
 	}
-	if strings.Contains(html, "Merged Parent") || strings.Contains(html, `data-workspace-children="parent"`) {
-		t.Fatalf("historical parent still rendered in default mode: %s", html)
+	if !strings.Contains(html, "Merged Parent") {
+		t.Fatalf("unknown-proof parent should remain visible for attention: %s", html)
 	}
 }
 
-func TestHandleWorkspacesPageHidesMissingActiveRowsByDefault(t *testing.T) {
+func TestHandleWorkspacesPageShowsMissingActiveRowsByDefault(t *testing.T) {
 	handler := NewHandler(
 		&fakeLifecycleManager{},
 		"https://main.cn-agents.test",
@@ -1397,11 +1501,11 @@ func TestHandleWorkspacesPageHidesMissingActiveRowsByDefault(t *testing.T) {
 	if err := handler.HandleWorkspacesPage(e.NewContext(req, rec)); err != nil {
 		t.Fatalf("HandleWorkspacesPage() error = %v", err)
 	}
-	if strings.Contains(rec.Body.String(), "Missing Workspace") {
-		t.Fatalf("default page rendered missing active row: %s", rec.Body.String())
+	if !strings.Contains(rec.Body.String(), "Missing Workspace") {
+		t.Fatalf("default page hid missing active row: %s", rec.Body.String())
 	}
 
-	req = httptest.NewRequest(http.MethodGet, "/workspaces?show_historical=true", nil)
+	req = httptest.NewRequest(http.MethodGet, "/workspaces?show_cleaned_history=true", nil)
 	rec = httptest.NewRecorder()
 	if err := handler.HandleWorkspacesPage(e.NewContext(req, rec)); err != nil {
 		t.Fatalf("HandleWorkspacesPage(historical) error = %v", err)
@@ -1525,7 +1629,7 @@ func TestHandleCleanupWorkspaceRejectsProtectedReleaseLane(t *testing.T) {
 	}
 }
 
-func TestHandleRefreshWorkspacesRedirectPreservesHistoricalMode(t *testing.T) {
+func TestHandleRefreshWorkspacesRedirectPreservesCleanedHistoryMode(t *testing.T) {
 	handler := NewHandler(
 		&fakeLifecycleManager{},
 		"https://main.cn-agents.test",
@@ -1543,12 +1647,12 @@ func TestHandleRefreshWorkspacesRedirectPreservesHistoricalMode(t *testing.T) {
 	if err := handler.HandleRefreshWorkspaces(e.NewContext(req, rec)); err != nil {
 		t.Fatalf("HandleRefreshWorkspaces() error = %v", err)
 	}
-	if got := rec.Header().Get("Location"); got != "/workspaces?show_historical=true" {
-		t.Fatalf("Location = %q, want historical redirect", got)
+	if got := rec.Header().Get("Location"); got != "/workspaces?show_cleaned_history=true" {
+		t.Fatalf("Location = %q, want cleaned history redirect", got)
 	}
 }
 
-func TestLifecycleActionDatastarPreservesHistoricalMode(t *testing.T) {
+func TestLifecycleActionDatastarPreservesCleanedHistoryMode(t *testing.T) {
 	manager := &fakeLifecycleManager{snapshots: []WorkspaceLifecycleSnapshot{{
 		Workspace: Workspace{
 			Slug:         "active",
@@ -1584,8 +1688,9 @@ func TestLifecycleActionDatastarPreservesHistoricalMode(t *testing.T) {
 		body       string
 		wantMerged bool
 	}{
-		{name: "default", body: "", wantMerged: false},
-		{name: "historical", body: "show_historical=true", wantMerged: true},
+		{name: "default", body: "", wantMerged: true},
+		{name: "cleaned history", body: "show_cleaned_history=true", wantMerged: true},
+		{name: "legacy historical", body: "show_historical=true", wantMerged: true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			req := httptest.NewRequest(

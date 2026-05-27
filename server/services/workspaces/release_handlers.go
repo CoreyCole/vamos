@@ -130,7 +130,7 @@ func newReleaseQueueItemID() (string, error) {
 }
 
 func (h *Handler) patchWorkspaces(c echo.Context, views []ImplWorkspaceView) error {
-	showHistorical := showHistoricalFromRequest(c.Request())
+	showCleanedHistory := showCleanedHistoryFromRequest(c.Request())
 	var err error
 	views, err = h.attachWorkflowSummaries(c.Request().Context(), views)
 	if err != nil {
@@ -143,16 +143,16 @@ func (h *Handler) patchWorkspaces(c echo.Context, views []ImplWorkspaceView) err
 	if len(rowActions) > 0 {
 		views = applyOptionsToImplWorkspaceViews(views, WithWorkspaceReleaseActions(rowActions))
 	}
-	renderedViews := h.renderedImplWorkspaceViews(views, showHistorical)
+	groups := h.workspaceGroups(views, showCleanedHistory)
 	sse := datastar.NewSSE(c.Response().Writer, c.Request())
 	c.Response().WriteHeader(http.StatusAccepted)
-	if err := sse.PatchElementTempl(WorkspacesHeader(h.refreshState(), showHistorical), datastar.WithSelectorID("workspaces-header"), datastar.WithModeOuter()); err != nil {
+	if err := sse.PatchElementTempl(WorkspacesHeader(h.refreshState(), showCleanedHistory), datastar.WithSelectorID("workspaces-header"), datastar.WithModeOuter()); err != nil {
 		return err
 	}
 	if err := sse.PatchElementTempl(ReleasePanel(panel), datastar.WithSelectorID("release-queue-panel"), datastar.WithModeOuter()); err != nil {
 		return err
 	}
-	return sse.PatchElementTempl(WorkspacesList(renderedViews, h.managerURL, showHistorical), datastar.WithSelectorID("workspaces-list"), datastar.WithModeOuter())
+	return sse.PatchElementTempl(WorkspacesList(groups, h.managerURL, showCleanedHistory), datastar.WithSelectorID("workspaces-list"), datastar.WithModeOuter())
 }
 
 func (h *Handler) patchWorkspacesFresh(c echo.Context) error {

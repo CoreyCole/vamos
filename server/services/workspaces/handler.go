@@ -383,8 +383,9 @@ func (h *Handler) HandleWorkspacesPage(c echo.Context) error {
 	if err != nil {
 		return err
 	}
-	showHistorical := showHistoricalFromRequest(c.Request())
-	renderedViews := h.renderedImplWorkspaceViews(model.Views, showHistorical)
+	showCleanedHistory := showCleanedHistoryFromRequest(c.Request())
+	renderedViews := h.renderedImplWorkspaceViews(model.Views, showCleanedHistory)
+	groups := h.workspaceGroups(model.Views, showCleanedHistory)
 	args := layouts.RootArgs{
 		Title:       "Workspaces",
 		CurrentPath: "/workspaces",
@@ -404,12 +405,12 @@ func (h *Handler) HandleWorkspacesPage(c echo.Context) error {
 	return render(
 		c,
 		http.StatusOK,
-		WorkspacesDocument(args, renderedViews, model.ReleasePanel, h.refreshState(), showHistorical),
+		WorkspacesDocument(args, groups, model.ReleasePanel, h.refreshState(), showCleanedHistory),
 	)
 }
 
 func (h *Handler) HandleRefreshWorkspaces(c echo.Context) error {
-	showHistorical := showHistoricalFromRequest(c.Request())
+	showCleanedHistory := showCleanedHistoryFromRequest(c.Request())
 	if h.workspaceSyncRefresh == nil {
 		return echo.NewHTTPError(
 			http.StatusNotImplemented,
@@ -425,14 +426,14 @@ func (h *Handler) HandleRefreshWorkspaces(c echo.Context) error {
 		sse := datastar.NewSSE(c.Response().Writer, c.Request())
 		c.Response().WriteHeader(http.StatusAccepted)
 		return sse.PatchElementTempl(
-			WorkspacesHeader(h.refreshState(), showHistorical),
+			WorkspacesHeader(h.refreshState(), showCleanedHistory),
 			datastar.WithSelectorID("workspaces-header"),
 			datastar.WithModeOuter(),
 		)
 	}
 	redirect := "/workspaces"
-	if showHistorical {
-		redirect = "/workspaces?show_historical=true"
+	if showCleanedHistory {
+		redirect = "/workspaces?show_cleaned_history=true"
 	}
 	return c.Redirect(http.StatusSeeOther, redirect)
 }
@@ -552,16 +553,16 @@ func (h *Handler) HandleWorkspacesStream(c echo.Context) error {
 			"workspace lifecycle manager is not configured",
 		)
 	}
-	showHistorical := showHistoricalFromRequest(c.Request())
+	showCleanedHistory := showCleanedHistoryFromRequest(c.Request())
 	sse := datastar.NewSSE(c.Response().Writer, c.Request())
 	send := func() error {
 		model, err := h.buildWorkspacesPageModel(c.Request().Context())
 		if err != nil {
 			return err
 		}
-		views := h.renderedImplWorkspaceViews(model.Views, showHistorical)
+		groups := h.workspaceGroups(model.Views, showCleanedHistory)
 		if err := sse.PatchElementTempl(
-			WorkspacesHeader(h.refreshState(), showHistorical),
+			WorkspacesHeader(h.refreshState(), showCleanedHistory),
 			datastar.WithSelectorID("workspaces-header"),
 			datastar.WithModeOuter(),
 		); err != nil {
@@ -575,7 +576,7 @@ func (h *Handler) HandleWorkspacesStream(c echo.Context) error {
 			return err
 		}
 		return sse.PatchElementTempl(
-			WorkspacesList(views, h.managerURL, showHistorical),
+			WorkspacesList(groups, h.managerURL, showCleanedHistory),
 			datastar.WithSelectorID("workspaces-list"),
 			datastar.WithModeOuter(),
 		)
@@ -1067,6 +1068,11 @@ func (h *Handler) renderedImplWorkspaceViews(views []ImplWorkspaceView, showHist
 	)
 }
 
+func (h *Handler) workspaceGroups(views []ImplWorkspaceView, showCleanedHistory bool) WorkspaceGroups {
+	ordered := orderReleaseLaneViewsFirst(views, h.releaseLaneWorkspaces())
+	return groupImplWorkspaceViews(ordered, h.protectedReleaseSlugs(), showCleanedHistory)
+}
+
 func (h *Handler) releaseLaneWorkspaces() []ReleaseLaneWorkspace {
 	if h.releaseProjector == nil || h.releaseProjector.Registry == nil {
 		return nil
@@ -1099,12 +1105,19 @@ func isDatastarRequest(r *http.Request) bool {
 		strings.Contains(r.Header.Get("Accept"), "text/event-stream")
 }
 
-func showHistoricalFromRequest(r *http.Request) bool {
+func showCleanedHistoryFromRequest(r *http.Request) bool {
 	if r == nil {
 		return false
 	}
-	value := strings.TrimSpace(r.FormValue("show_historical"))
+	value := strings.TrimSpace(r.FormValue("show_cleaned_history"))
+	if value == "" {
+		value = strings.TrimSpace(r.FormValue("show_historical"))
+	}
 	return value == "true" || value == "1" || value == "on" || value == "yes"
+}
+
+func showHistoricalFromRequest(r *http.Request) bool {
+	return showCleanedHistoryFromRequest(r)
 }
 
 func BuildNavItems(

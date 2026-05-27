@@ -8,33 +8,37 @@ import (
 	"github.com/CoreyCole/vamos/server/layouts"
 )
 
-templ WorkspacesDocument(args layouts.RootArgs, items []ImplWorkspaceView, releasePanel ReleasePanelModel, refresh WorkspaceRefreshState, showHistorical bool) {
+templ WorkspacesDocument(args layouts.RootArgs, groups WorkspaceGroups, releasePanel ReleasePanelModel, refresh WorkspaceRefreshState, showCleanedHistory bool) {
 	@layouts.Root(args) {
-		@WorkspacesPageWithRefresh(items, releasePanel, args.WorkspaceManagerURL, refresh, showHistorical)
+		@WorkspacesPageWithRefreshGroups(groups, releasePanel, args.WorkspaceManagerURL, refresh, showCleanedHistory)
 	}
 }
 
-templ WorkspacesPage(items []ImplWorkspaceView, managerURL string, showHistorical bool) {
-	@WorkspacesPageWithRefresh(items, ReleasePanelModel{}, managerURL, WorkspaceRefreshState{}, showHistorical)
+templ WorkspacesPage(items []ImplWorkspaceView, managerURL string, showCleanedHistory bool) {
+	@WorkspacesPageWithRefreshGroups(groupImplWorkspaceViews(items, nil, showCleanedHistory), ReleasePanelModel{}, managerURL, WorkspaceRefreshState{}, showCleanedHistory)
 }
 
-templ WorkspacesPageWithRefresh(items []ImplWorkspaceView, releasePanel ReleasePanelModel, managerURL string, refresh WorkspaceRefreshState, showHistorical bool) {
-	if showHistorical {
-		<section class="mx-auto flex h-full w-full max-w-6xl flex-col gap-4 overflow-y-auto p-6" data-init="@get('/workspaces/stream?show_historical=true')">
-			@WorkspacesHeader(refresh, showHistorical)
-			@ReleasePanel(releasePanel)
-			@WorkspacesList(items, managerURL, showHistorical)
+templ WorkspacesPageWithRefreshGroups(groups WorkspaceGroups, releasePanel ReleasePanelModel, managerURL string, refresh WorkspaceRefreshState, showCleanedHistory bool) {
+	if showCleanedHistory {
+		<section class="h-full w-full overflow-y-auto p-6" data-init="@get('/workspaces/stream?show_cleaned_history=true')">
+			<div class="mx-auto flex w-full max-w-6xl flex-col gap-4">
+				@WorkspacesHeader(refresh, showCleanedHistory)
+				@ReleasePanel(releasePanel)
+				@WorkspacesList(groups, managerURL, showCleanedHistory)
+			</div>
 		</section>
 	} else {
-		<section class="mx-auto flex h-full w-full max-w-6xl flex-col gap-4 overflow-y-auto p-6" data-init="@get('/workspaces/stream')">
-			@WorkspacesHeader(refresh, showHistorical)
-			@ReleasePanel(releasePanel)
-			@WorkspacesList(items, managerURL, showHistorical)
+		<section class="h-full w-full overflow-y-auto p-6" data-init="@get('/workspaces/stream')">
+			<div class="mx-auto flex w-full max-w-6xl flex-col gap-4">
+				@WorkspacesHeader(refresh, showCleanedHistory)
+				@ReleasePanel(releasePanel)
+				@WorkspacesList(groups, managerURL, showCleanedHistory)
+			</div>
 		</section>
 	}
 }
 
-templ WorkspacesHeader(refresh WorkspaceRefreshState, showHistorical bool) {
+templ WorkspacesHeader(refresh WorkspaceRefreshState, showCleanedHistory bool) {
 	<div id="workspaces-header" class="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
 		<div>
 			<h1 class="text-2xl font-semibold tracking-tight">Workspaces</h1>
@@ -43,14 +47,15 @@ templ WorkspacesHeader(refresh WorkspaceRefreshState, showHistorical bool) {
 		<div class="flex flex-col items-start gap-2 md:items-end">
 			<div class="flex flex-wrap gap-2">
 				<form method="get" action="/workspaces">
-					if showHistorical {
-						<button type="submit" class="inline-flex h-9 items-center rounded-md border px-3 text-sm font-medium hover:bg-accent">Hide historical</button>
+					if showCleanedHistory {
+						<button type="submit" class="inline-flex h-9 items-center rounded-md border px-3 text-sm font-medium hover:bg-accent">Hide cleaned history</button>
 					} else {
-						<button type="submit" name="show_historical" value="true" class="inline-flex h-9 items-center rounded-md border px-3 text-sm font-medium hover:bg-accent">Show historical</button>
+						<button type="submit" name="show_cleaned_history" value="true" class="inline-flex h-9 items-center rounded-md border px-3 text-sm font-medium hover:bg-accent">Show cleaned history</button>
 					}
 				</form>
 				<form method="post" action="/workspaces/refresh" data-on:submit="@post('/workspaces/refresh', {contentType: 'form'})">
-					if showHistorical {
+					if showCleanedHistory {
+						<input type="hidden" name="show_cleaned_history" value="true"/>
 						<input type="hidden" name="show_historical" value="true"/>
 					}
 					<button
@@ -225,10 +230,28 @@ templ ReleaseQueueItemCard(item ReleaseQueueItem) {
 	</div>
 }
 
-templ WorkspacesList(items []ImplWorkspaceView, managerURL string, showHistorical bool) {
-	<div id="workspaces-list" class="overflow-hidden rounded-xl border bg-card text-card-foreground shadow-sm">
-		@WorkspacesTable(items, managerURL, showHistorical)
+templ WorkspacesList(groups WorkspaceGroups, managerURL string, showCleanedHistory bool) {
+	<div id="workspaces-list" class="space-y-4">
+		@WorkspaceGroupSection("Needs attention", "Active, unmerged, divergent, missing, or proof-unknown workspaces.", groups.NeedsAttention, "No active or uncertain workspaces.", managerURL, showCleanedHistory)
+		@WorkspaceGroupSection("Merged — safe to clean up", "Strong or cached proof says this HEAD landed on origin/main.", groups.SafeToCleanup, "No merged workspaces ready for cleanup.", managerURL, showCleanedHistory)
+		if showCleanedHistory {
+			@WorkspaceGroupSection("Cleaned up history", "Explicit cleanup workflow completed.", groups.CleanedUp, "No cleaned-up workspaces.", managerURL, showCleanedHistory)
+		}
 	</div>
+}
+
+templ WorkspaceGroupSection(title string, description string, items []ImplWorkspaceView, empty string, managerURL string, showCleanedHistory bool) {
+	<section class="overflow-hidden rounded-xl border bg-card text-card-foreground shadow-sm">
+		<div class="border-b bg-muted/20 px-3 py-3">
+			<h2 class="text-sm font-semibold">{ title }</h2>
+			<p class="mt-1 text-xs text-muted-foreground">{ description }</p>
+		</div>
+		if len(items) == 0 {
+			<p class="px-3 py-4 text-sm text-muted-foreground">{ empty }</p>
+		} else {
+			@WorkspacesTable(items, managerURL, showCleanedHistory)
+		}
+	</section>
 }
 
 templ WorkspacesTable(items []ImplWorkspaceView, managerURL string, showHistorical bool) {
@@ -461,6 +484,11 @@ templ ImplWorkspaceCard(view ImplWorkspaceView, managerURL string, showHistorica
 				<dt class="text-xs font-medium uppercase tracking-wide text-muted-foreground">Commit</dt>
 				<dd class="min-w-0 break-all font-mono text-xs text-muted-foreground">{ ws.Commit }</dd>
 			}
+			if view.Row.AheadCount != 0 || view.Row.BehindCount != 0 {
+				<dt class="text-xs font-medium uppercase tracking-wide text-muted-foreground">Git divergence</dt>
+				<dd class="min-w-0 break-words text-xs text-muted-foreground">{ fmt.Sprintf("%d ahead · %d behind", view.Row.AheadCount, view.Row.BehindCount) }</dd>
+			}
+			@WorkspaceProofDiagnostics(view)
 			if ws.Port != 0 {
 				<dt class="text-xs font-medium uppercase tracking-wide text-muted-foreground">Port</dt>
 				<dd class="min-w-0 font-mono text-xs text-muted-foreground">{ fmt.Sprintf("127.0.0.1:%d", ws.Port) }</dd>
@@ -494,6 +522,45 @@ templ ImplWorkspaceCard(view ImplWorkspaceView, managerURL string, showHistorica
 	</article>
 }
 
+templ WorkspaceProofDiagnostics(view ImplWorkspaceView) {
+	{{ readiness := view.Cleanup }}
+	if readiness.Group == "" {
+		{{ readiness = workspaceCleanupReadiness(view) }}
+	}
+	if readiness.Group != "" {
+		<dt class="text-xs font-medium uppercase tracking-wide text-muted-foreground">Cleanup readiness</dt>
+		<dd class="min-w-0 break-words">{ readiness.Summary }</dd>
+	}
+	if readiness.ProofKind != "" {
+		<dt class="text-xs font-medium uppercase tracking-wide text-muted-foreground">Merge proof</dt>
+		<dd class="min-w-0 break-words font-mono text-xs text-muted-foreground">{ string(readiness.ProofKind) }</dd>
+	}
+	if readiness.SourceRef != "" {
+		<dt class="text-xs font-medium uppercase tracking-wide text-muted-foreground">Proof source</dt>
+		<dd class="min-w-0 break-all font-mono text-xs text-muted-foreground">{ readiness.SourceRef }</dd>
+	}
+	if readiness.TargetCommit != "" {
+		<dt class="text-xs font-medium uppercase tracking-wide text-muted-foreground">Proof target</dt>
+		<dd class="min-w-0 break-all font-mono text-xs text-muted-foreground">{ readiness.TargetCommit }</dd>
+	}
+	if !readiness.ProvenAt.IsZero() {
+		<dt class="text-xs font-medium uppercase tracking-wide text-muted-foreground">Proof time</dt>
+		<dd class="min-w-0 text-xs text-muted-foreground">{ readiness.ProvenAt.Format("Jan 2, 2006 · 3:04 PM") }</dd>
+	}
+	if readiness.RiskReason != "" {
+		<dt class="text-xs font-medium uppercase tracking-wide text-muted-foreground">Risk</dt>
+		<dd class="min-w-0 break-words text-sm text-amber-700 dark:text-amber-300">{ readiness.RiskReason }</dd>
+	}
+	if view.Row.MergeEvidence.Valid && strings.TrimSpace(view.Row.MergeEvidence.String) != "" {
+		<dt class="text-xs font-medium uppercase tracking-wide text-muted-foreground">Merge evidence</dt>
+		<dd class="min-w-0 break-words text-xs text-muted-foreground">{ view.Row.MergeEvidence.String }</dd>
+	}
+	if view.Row.GitDetail.Valid && strings.TrimSpace(view.Row.GitDetail.String) != "" {
+		<dt class="text-xs font-medium uppercase tracking-wide text-muted-foreground">Git detail</dt>
+		<dd class="min-w-0 break-words text-xs text-muted-foreground">{ view.Row.GitDetail.String }</dd>
+	}
+}
+
 templ WorkspaceLifecycleActions(view ImplWorkspaceView, managerURL string, showHistorical bool) {
 	{{ snap := view.Runtime }}
 	{{ ws := snap.Workspace }}
@@ -515,6 +582,7 @@ templ WorkspaceLifecycleActions(view ImplWorkspaceView, managerURL string, showH
 		{{ indicatorSignal := workspaceActionIndicatorSignal(slug, "start") }}
 		<form method="post" action={ templ.SafeURL("/workspaces/" + slug + "/start") } data-indicator={ indicator } data-on:submit={ "@post('/workspaces/" + slug + "/start', {contentType: 'form'})" }>
 			if showHistorical {
+				<input type="hidden" name="show_cleaned_history" value="true"/>
 				<input type="hidden" name="show_historical" value="true"/>
 			}
 			<button type="submit" data-attr-disabled={ indicatorSignal } class="inline-flex h-9 items-center rounded-md border px-3 text-sm font-medium hover:bg-accent">
@@ -528,6 +596,7 @@ templ WorkspaceLifecycleActions(view ImplWorkspaceView, managerURL string, showH
 		{{ indicatorSignal := workspaceActionIndicatorSignal(slug, "restart") }}
 		<form method="post" action={ templ.SafeURL("/workspaces/" + slug + "/restart") } data-indicator={ indicator } data-on:submit={ "@post('/workspaces/" + slug + "/restart', {contentType: 'form'})" }>
 			if showHistorical {
+				<input type="hidden" name="show_cleaned_history" value="true"/>
 				<input type="hidden" name="show_historical" value="true"/>
 			}
 			<button type="submit" data-attr-disabled={ indicatorSignal } class="inline-flex h-9 items-center rounded-md border px-3 text-sm font-medium hover:bg-accent">
@@ -541,6 +610,7 @@ templ WorkspaceLifecycleActions(view ImplWorkspaceView, managerURL string, showH
 		{{ indicatorSignal := workspaceActionIndicatorSignal(slug, "stop") }}
 		<form method="post" action={ templ.SafeURL("/workspaces/" + slug + "/stop") } data-indicator={ indicator } data-on:submit={ "@post('/workspaces/" + slug + "/stop', {contentType: 'form'})" }>
 			if showHistorical {
+				<input type="hidden" name="show_cleaned_history" value="true"/>
 				<input type="hidden" name="show_historical" value="true"/>
 			}
 			<button type="submit" data-attr-disabled={ indicatorSignal } class="inline-flex h-9 items-center rounded-md border px-3 text-sm font-medium text-destructive hover:bg-accent">
