@@ -59,6 +59,9 @@ func TestNewServiceCreatesParentAndMigratesSchema(t *testing.T) {
 	if !testTableExists(t, svc.DB(), "workspaces") {
 		t.Fatal("workspaces table missing after schema migration")
 	}
+	if columnExists(t, svc.DB(), "agent_threads", "workspace_id") {
+		t.Fatal("agent_threads.workspace_id exists after NewService")
+	}
 }
 
 func TestNewServiceEnablesForeignKeys(t *testing.T) {
@@ -543,7 +546,7 @@ CREATE TABLE workspace_events (
 	}
 }
 
-func TestRunRuntimeMigrationsAddsWorkspaceColumnsAndIndexes(t *testing.T) {
+func TestRunRuntimeMigrationsRemovesAgentThreadWorkspaceID(t *testing.T) {
 	t.Parallel()
 
 	database := openMigratorTestDB(t)
@@ -553,11 +556,13 @@ func TestRunRuntimeMigrationsAddsWorkspaceColumnsAndIndexes(t *testing.T) {
 		t.Fatalf("runRuntimeMigrations() error = %v", err)
 	}
 
+	if columnExists(t, database, "agent_threads", "workspace_id") {
+		t.Fatal("agent_threads.workspace_id still exists after runtime migrations")
+	}
 	for _, tc := range []struct {
 		table  string
 		column string
 	}{
-		{table: "agent_threads", column: "workspace_id"},
 		{table: "agent_runs", column: "workspace_id"},
 		{table: "agent_runs", column: "session_id"},
 		{table: "agent_entries", column: "origin_session_id"},
@@ -566,8 +571,10 @@ func TestRunRuntimeMigrationsAddsWorkspaceColumnsAndIndexes(t *testing.T) {
 			t.Fatalf("columnExists(%s, %s) = false, want true", tc.table, tc.column)
 		}
 	}
+	if indexExists(t, database, "idx_agent_threads_workspace_updated") {
+		t.Fatal("idx_agent_threads_workspace_updated still exists after runtime migrations")
+	}
 	for _, indexName := range []string{
-		"idx_agent_threads_workspace_updated",
 		"idx_agent_sessions_workspace_updated",
 		"idx_agent_runs_workspace_created",
 		"idx_agent_entries_origin_session",

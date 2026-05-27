@@ -298,7 +298,6 @@ func runRuntimeMigrations(ctx context.Context, database *sql.DB) error {
 	}
 
 	indexes := []string{
-		`CREATE INDEX IF NOT EXISTS idx_agent_threads_workspace_updated ON agent_threads(workspace_id, updated_at DESC) WHERE workspace_id IS NOT NULL AND archived_at IS NULL`,
 		`CREATE INDEX IF NOT EXISTS idx_agent_sessions_workspace_updated ON agent_sessions(workspace_id, updated_at DESC) WHERE workspace_id IS NOT NULL`,
 		`CREATE INDEX IF NOT EXISTS idx_agent_runs_workspace_created ON agent_runs(workspace_id, created_at DESC) WHERE workspace_id IS NOT NULL`,
 		`CREATE INDEX IF NOT EXISTS idx_agent_runs_workspace_node_created ON agent_runs(workspace_id, workflow_node_id, created_at DESC) WHERE workflow_node_id IS NOT NULL`,
@@ -555,13 +554,6 @@ func ensureAgentThreadWorkspaces(ctx context.Context, database *sql.DB) error {
 	}
 	hasWorkspaceID, err := tableColumnExists(ctx, database, "agent_threads", "workspace_id")
 	if err != nil || !hasWorkspaceID {
-		return err
-	}
-	if _, err := database.ExecContext(ctx, `
-		INSERT OR IGNORE INTO agent_thread_workspaces (thread_id, workspace_id, is_primary, role, adopted_from)
-		SELECT id, workspace_id, 1, 'primary', 'migration'
-		FROM agent_threads
-		WHERE workspace_id IS NOT NULL AND TRIM(workspace_id) != ''`); err != nil {
 		return err
 	}
 	return dropColumnIfExists(ctx, database, "agent_threads", "workspace_id")
