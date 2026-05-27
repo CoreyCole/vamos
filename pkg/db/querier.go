@@ -138,6 +138,7 @@ type Querier interface {
 	LogAuthAttempt(ctx context.Context, arg LogAuthAttemptParams) (AuthAttempt, error)
 	MarkAllActiveImplWorkspacesCleanedUp(ctx context.Context) (int64, error)
 	MarkImplWorkspaceCleanedUp(ctx context.Context, workspaceSlug string) (int64, error)
+	MarkImplWorkspaceMergeUnknown(ctx context.Context, arg MarkImplWorkspaceMergeUnknownParams) (int64, error)
 	MarkImplWorkspaceMerged(ctx context.Context, arg MarkImplWorkspaceMergedParams) (int64, error)
 	MarkMissingImplWorkspacesCleanedUp(ctx context.Context, workspaceSlugs []string) (int64, error)
 	MarkReleaseQueueItemRunning(ctx context.Context, arg MarkReleaseQueueItemRunningParams) (ReleaseQueueItem, error)

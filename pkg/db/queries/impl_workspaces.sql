@@ -30,6 +30,11 @@ INSERT INTO impl_workspaces (
     status,
     merged_at,
     merge_evidence,
+    cleanup_proof_kind,
+    cleanup_proof_source_ref,
+    cleanup_proof_target_commit,
+    cleanup_proof_at,
+    cleanup_risk_reason,
     branch,
     commit_hash,
     trunk_branch,
@@ -56,6 +61,11 @@ VALUES (
         END
     ),
     sqlc.narg('merge_evidence'),
+    COALESCE(NULLIF(sqlc.arg('cleanup_proof_kind'), ''), 'unknown'),
+    sqlc.narg('cleanup_proof_source_ref'),
+    sqlc.narg('cleanup_proof_target_commit'),
+    sqlc.narg('cleanup_proof_at'),
+    sqlc.narg('cleanup_risk_reason'),
     sqlc.narg('branch'),
     sqlc.narg('commit_hash'),
     sqlc.narg('trunk_branch'),
@@ -90,6 +100,11 @@ merge_evidence = (CASE
 WHEN excluded.status = 'merged' THEN excluded.merge_evidence
 ELSE NULL
 END),
+cleanup_proof_kind = excluded.cleanup_proof_kind,
+cleanup_proof_source_ref = excluded.cleanup_proof_source_ref,
+cleanup_proof_target_commit = excluded.cleanup_proof_target_commit,
+cleanup_proof_at = excluded.cleanup_proof_at,
+cleanup_risk_reason = excluded.cleanup_risk_reason,
 branch = excluded.branch,
 commit_hash = excluded.commit_hash,
 trunk_branch = excluded.trunk_branch,
@@ -110,7 +125,7 @@ SET status = 'cleaned_up',
 cleaned_up_at = CURRENT_TIMESTAMP,
 updated_at = CURRENT_TIMESTAMP
 WHERE workspace_slug = sqlc.arg ('workspace_slug')
-AND status = 'active' ;
+AND status IN ('active', 'merged') ;
 
 -- name: MarkMissingImplWorkspacesCleanedUp :execrows
 UPDATE impl_workspaces
@@ -132,8 +147,24 @@ UPDATE impl_workspaces
 SET status = 'merged',
 merged_at = CURRENT_TIMESTAMP,
 merge_evidence = sqlc.arg ('merge_evidence'),
+cleanup_proof_kind = COALESCE(NULLIF(sqlc.arg('cleanup_proof_kind'), ''), 'unknown'),
+cleanup_proof_source_ref = sqlc.narg('cleanup_proof_source_ref'),
+cleanup_proof_target_commit = sqlc.narg('cleanup_proof_target_commit'),
+cleanup_proof_at = CURRENT_TIMESTAMP,
+cleanup_risk_reason = NULL,
 updated_at = CURRENT_TIMESTAMP
 WHERE workspace_slug = sqlc.arg ('workspace_slug') ;
+
+-- name: MarkImplWorkspaceMergeUnknown :execrows
+UPDATE impl_workspaces
+SET cleanup_proof_kind = 'unknown',
+cleanup_proof_source_ref = sqlc.narg('cleanup_proof_source_ref'),
+cleanup_proof_target_commit = NULL,
+cleanup_proof_at = NULL,
+cleanup_risk_reason = sqlc.narg('cleanup_risk_reason'),
+merge_evidence = sqlc.narg('merge_evidence'),
+updated_at = CURRENT_TIMESTAMP
+WHERE workspace_slug = sqlc.arg('workspace_slug') ;
 
 -- name: RecordImplWorkspaceEnvRepair :exec
 UPDATE impl_workspaces

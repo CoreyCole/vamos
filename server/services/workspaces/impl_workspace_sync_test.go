@@ -8,11 +8,79 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	_ "modernc.org/sqlite"
 
 	"github.com/CoreyCole/vamos/pkg/db"
 )
+
+func TestImplWorkspaceProofFieldsRoundTrip(t *testing.T) {
+	ctx := context.Background()
+	queries := openImplSyncTestQueries(t)
+	proofAt := time.Now().UTC().Truncate(time.Second)
+
+	row, err := queries.UpsertDiscoveredImplWorkspace(
+		ctx,
+		db.UpsertDiscoveredImplWorkspaceParams{
+			WorkspaceSlug:            "proof",
+			CheckoutPath:             "/tmp/proof",
+			DisplayName:              "Proof",
+			Host:                     "proof.workspaces.example.test",
+			Url:                      "https://proof.workspaces.example.test/",
+			Status:                   string(ImplWorkspaceStatusMerged),
+			MergeEvidence:            nullableString("active checkout HEAD abc123 is ancestor of origin/main"),
+			CleanupProofKind:         "ancestor",
+			CleanupProofSourceRef:    nullableString("origin/main"),
+			CleanupProofTargetCommit: nullableString("abc123"),
+			CleanupProofAt:           sql.NullTime{Time: proofAt, Valid: true},
+			CleanupRiskReason:        nullableString(""),
+		},
+	)
+	if err != nil {
+		t.Fatalf("UpsertDiscoveredImplWorkspace: %v", err)
+	}
+	if row.CleanupProofKind != "ancestor" || row.CleanupProofSourceRef.String != "origin/main" || row.CleanupProofTargetCommit.String != "abc123" || !row.CleanupProofAt.Valid {
+		t.Fatalf("proof fields = kind %q source %+v target %+v at %+v, want ancestor origin/main abc123 valid time", row.CleanupProofKind, row.CleanupProofSourceRef, row.CleanupProofTargetCommit, row.CleanupProofAt)
+	}
+}
+
+func TestImplWorkspaceCleanedUpMarksMergedRows(t *testing.T) {
+	ctx := context.Background()
+	queries := openImplSyncTestQueries(t)
+	_, err := queries.UpsertDiscoveredImplWorkspace(
+		ctx,
+		db.UpsertDiscoveredImplWorkspaceParams{
+			WorkspaceSlug:         "merged",
+			CheckoutPath:          "/tmp/merged",
+			DisplayName:           "Merged",
+			Host:                  "merged.workspaces.example.test",
+			Url:                   "https://merged.workspaces.example.test/",
+			Status:                string(ImplWorkspaceStatusMerged),
+			MergeEvidence:         nullableString("active checkout HEAD abc123 is ancestor of origin/main"),
+			CleanupProofKind:      "ancestor",
+			CleanupProofSourceRef: nullableString("origin/main"),
+		},
+	)
+	if err != nil {
+		t.Fatalf("UpsertDiscoveredImplWorkspace: %v", err)
+	}
+
+	n, err := queries.MarkImplWorkspaceCleanedUp(ctx, "merged")
+	if err != nil {
+		t.Fatalf("MarkImplWorkspaceCleanedUp: %v", err)
+	}
+	if n != 1 {
+		t.Fatalf("rows affected = %d, want 1", n)
+	}
+	row, err := queries.GetImplWorkspace(ctx, "merged")
+	if err != nil {
+		t.Fatalf("GetImplWorkspace: %v", err)
+	}
+	if row.Status != string(ImplWorkspaceStatusCleanedUp) || !row.CleanedUpAt.Valid {
+		t.Fatalf("row status=%q cleaned_up_at=%v, want cleaned_up with timestamp", row.Status, row.CleanedUpAt)
+	}
+}
 
 func TestImplWorkspaceSyncIncludesConfiguredCheckouts(t *testing.T) {
 	ctx := context.Background()

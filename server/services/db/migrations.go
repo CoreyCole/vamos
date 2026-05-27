@@ -104,6 +104,9 @@ func prepareSchemaCompatibilityMigrations(ctx context.Context, database *sql.DB)
 	); err != nil {
 		return err
 	}
+	if err := ensureImplWorkspaceCleanupProofColumnsIfTableExists(ctx, database); err != nil {
+		return err
+	}
 	if err := ensureScopedUserChatSelections(ctx, database); err != nil {
 		return err
 	}
@@ -199,6 +202,9 @@ func runRuntimeMigrations(ctx context.Context, database *sql.DB) error {
 		ctx,
 		database,
 	); err != nil {
+		return err
+	}
+	if err := ensureImplWorkspaceCleanupProofColumnsIfTableExists(ctx, database); err != nil {
 		return err
 	}
 	if err := ensureColumn(
@@ -361,6 +367,31 @@ func ensurePlanWorkspacesImplMetadataColumnsIfTableExists(
 		return err
 	}
 	return ensurePlanWorkspacesImplMetadataColumns(ctx, database)
+}
+
+func ensureImplWorkspaceCleanupProofColumnsIfTableExists(
+	ctx context.Context,
+	database *sql.DB,
+) error {
+	exists, err := tableExists(ctx, database, "impl_workspaces")
+	if err != nil || !exists {
+		return err
+	}
+	for _, column := range []struct {
+		name       string
+		definition string
+	}{
+		{name: "cleanup_proof_kind", definition: "TEXT NOT NULL DEFAULT 'unknown' CHECK (cleanup_proof_kind IN ('ancestor', 'patch_equivalent', 'cached', 'unknown'))"},
+		{name: "cleanup_proof_source_ref", definition: "TEXT"},
+		{name: "cleanup_proof_target_commit", definition: "TEXT"},
+		{name: "cleanup_proof_at", definition: "DATETIME"},
+		{name: "cleanup_risk_reason", definition: "TEXT"},
+	} {
+		if err := ensureColumn(ctx, database, "impl_workspaces", column.name, column.definition); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func ensureWorkspaceEventsDocColumnsIfTableExists(
