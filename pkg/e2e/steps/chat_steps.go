@@ -461,16 +461,26 @@ func seedWorkspaceChat(
 	branchID := "e2e-workspace-branch-" + safeLabel + "-" + stamp
 	lineageID := "e2e-workspace-lineage-" + safeLabel + "-" + stamp
 	entryID := "e2e-workspace-entry-" + safeLabel + "-" + stamp
+	thoughtsRoot := ctx.Config.ThoughtsRoot
+	if resolved, err := filepath.EvalSymlinks(thoughtsRoot); err == nil {
+		thoughtsRoot = resolved
+	}
 	rootDocPath := filepath.Join(
-		ctx.Config.RepoRoot,
-		"thoughts",
+		thoughtsRoot,
 		"creative-mode-agent",
 		"plans",
 		"2026-05-20_23-02-59_vamos-e2e-story-playwright-go",
+		"workspace-"+safeLabel+"-"+stamp,
 	)
+	if err := os.MkdirAll(rootDocPath, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(rootDocPath, "plan.md"), []byte("# E2E Workspace "+label+"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	if _, err := database.ExecContext(t.Context(), `
 INSERT INTO workspaces (id, user_email, title, root_doc_path, workflow_type, source, selected_thread_id, current_session_id, current_branch_id)
-VALUES (?, 'playwright@localhost', ?, ?, 'freeform', 'imported', ?, ?, ?)`, workspaceID, "E2E workspace "+label, rootDocPath, threadID, threadID, branchID); err != nil {
+VALUES (?, 'playwright@localhost', ?, ?, 'qrspi', 'imported', ?, ?, ?)`, workspaceID, "E2E workspace "+label, rootDocPath, threadID, threadID, branchID); err != nil {
 		t.Fatalf("insert workspace %s: %v", label, err)
 	}
 	if _, err := database.ExecContext(t.Context(), `
@@ -510,6 +520,7 @@ VALUES (?, 1, ?, '[]', ?, '[]', '{}')`, threadID, messages, participants); err !
 	}
 	ctx.Memory["workspace_"+label] = workspaceID
 	ctx.Memory["workspace_thread_"+label] = threadID
+	ctx.Memory["workspace_root_"+label] = rootDocPath
 }
 
 func OpenSeededWorkspaceChat(t testing.TB, ctx *e2e.Context, label string) {
@@ -536,7 +547,8 @@ func OpenWorkspaceDocumentWithoutChatParams(t testing.TB, ctx *e2e.Context, labe
 	t.Helper()
 	workspaceID := ctx.Memory["workspace_"+label]
 	threadID := ctx.Memory["workspace_thread_"+label]
-	if workspaceID == "" || threadID == "" {
+	rootDocPath := ctx.Memory["workspace_root_"+label]
+	if workspaceID == "" || threadID == "" || rootDocPath == "" {
 		t.Fatalf("seeded workspace %s not found", label)
 	}
 	database, err := e2e.OpenWorkspaceDB(t.Context(), ctx.Config)
@@ -550,11 +562,7 @@ SET selected_thread_id = ?, updated_at = CURRENT_TIMESTAMP
 WHERE id = ?`, threadID, workspaceID); err != nil {
 		t.Fatal(err)
 	}
-	Visit(
-		t,
-		ctx,
-		"/thoughts/creative-mode-agent/plans/2026-05-20_23-02-59_vamos-e2e-story-playwright-go/plan.md?context=chat",
-	)
+	Visit(t, ctx, thoughtsChatURL(filepath.Join(rootDocPath, "plan.md"), "", ""))
 }
 
 func OpenThoughtsRootChatContext(t testing.TB, ctx *e2e.Context, _ string) {
