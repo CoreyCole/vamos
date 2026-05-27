@@ -54,14 +54,10 @@ func (s *Service) BuildThreadMetadataView(
 }
 
 func threadThoughtsURL(workspaceContext ThreadWorkspaceContext) string {
-	state := EmbeddedChatURLState{
+	return BuildThoughtsChatDocURL(EmbeddedChatURLState{
 		Context:  ThoughtsChatContext,
 		ThreadID: workspaceContext.Thread.ID,
-	}
-	if workspaceContext.Primary != nil {
-		state.WorkspaceID = workspaceContext.Primary.ID
-	}
-	return BuildThoughtsChatDocURL(state)
+	})
 }
 
 func threadWorkspaceView(workspace db.Workspace, role ThreadWorkspaceRole) ThreadWorkspaceView {

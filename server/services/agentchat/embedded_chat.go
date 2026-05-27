@@ -95,10 +95,13 @@ func ParseEmbeddedChatURL(c echo.Context) EmbeddedChatURLState {
 func BuildThoughtsChatDocURL(state EmbeddedChatURLState) string {
 	values := url.Values{}
 	values.Set("context", ThoughtsChatContext)
-	if workspaceID := strings.TrimSpace(state.WorkspaceID); workspaceID != "" {
-		values.Set("chat_workspace", workspaceID)
+	threadID := strings.TrimSpace(state.ThreadID)
+	if threadID == "" {
+		if workspaceID := strings.TrimSpace(state.WorkspaceID); workspaceID != "" {
+			values.Set("chat_workspace", workspaceID)
+		}
 	}
-	if threadID := strings.TrimSpace(state.ThreadID); threadID != "" {
+	if threadID != "" {
 		values.Set("thread", threadID)
 	}
 	if runID := strings.TrimSpace(state.RunID); runID != "" {

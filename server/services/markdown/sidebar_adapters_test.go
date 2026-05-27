@@ -145,14 +145,16 @@ func TestBuildThoughtsSidebarArgsPreservesActiveChatQuery(t *testing.T) {
 	}
 	query := parsed.Query()
 	for key, want := range map[string]string{
-		"context":        "chat",
-		"chat_workspace": "ws_1",
-		"thread":         "th_1",
-		"run":            "run_1",
+		"context": "chat",
+		"thread":  "th_1",
+		"run":     "run_1",
 	} {
 		if got := query.Get(key); got != want {
 			t.Fatalf("query[%s]=%q want %q in %q", key, got, want, node.Href)
 		}
+	}
+	if got := query.Get("chat_workspace"); got != "" {
+		t.Fatalf("query[chat_workspace]=%q want empty in %q", got, node.Href)
 	}
 }
 
@@ -181,14 +183,16 @@ func TestBuildThoughtsDirectorySidebarArgsPreservesActiveChatQuery(t *testing.T)
 	}
 	query := parsed.Query()
 	for key, want := range map[string]string{
-		"context":        "chat",
-		"chat_workspace": "ws_1",
-		"thread":         "th_1",
-		"run":            "run_1",
+		"context": "chat",
+		"thread":  "th_1",
+		"run":     "run_1",
 	} {
 		if got := query.Get(key); got != want {
 			t.Fatalf("query[%s]=%q want %q in %q", key, got, want, node.Href)
 		}
+	}
+	if got := query.Get("chat_workspace"); got != "" {
+		t.Fatalf("query[chat_workspace]=%q want empty in %q", got, node.Href)
 	}
 }
 
@@ -295,13 +299,15 @@ func TestBuildWorkspaceDocTreeArgsPreservesChatState(t *testing.T) {
 	}
 	query := parsed.Query()
 	for key, want := range map[string]string{
-		"context":        "chat",
-		"chat_workspace": "ws 1",
-		"thread":         "th/1",
-		"run":            "run+1",
+		"context": "chat",
+		"thread":  "th/1",
+		"run":     "run+1",
 	} {
 		if got := query.Get(key); got != want {
 			t.Fatalf("query[%s]=%q want %q in %q", key, got, want, node.Href)
 		}
+	}
+	if got := query.Get("chat_workspace"); got != "" {
+		t.Fatalf("query[chat_workspace]=%q want empty in %q", got, node.Href)
 	}
 }

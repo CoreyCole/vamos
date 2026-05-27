@@ -90,14 +90,16 @@ func TestThoughtsDocURLWithChatStatePreservesChatQuery(t *testing.T) {
 	}
 	query := parsed.Query()
 	for key, want := range map[string]string{
-		"context":        "chat",
-		"chat_workspace": "ws_1",
-		"thread":         "th_1",
-		"run":            "run_1",
+		"context": "chat",
+		"thread":  "th_1",
+		"run":     "run_1",
 	} {
 		if gotValue := query.Get(key); gotValue != want {
 			t.Fatalf("query[%q] = %q, want %q in %q", key, gotValue, want, got)
 		}
+	}
+	if gotValue := query.Get("chat_workspace"); gotValue != "" {
+		t.Fatalf("query[%q] = %q, want empty in %q", "chat_workspace", gotValue, got)
 	}
 }
 
@@ -133,7 +135,7 @@ func TestHandleSelectCommentPatchesTargetDocumentAndPreservesChatState(t *testin
 		"thoughts-document-panel",
 		"thoughts-shared-sidebar",
 		"thoughts-url-sync",
-		`data-replace-url="&#34;/thoughts/owner/plan-a/design.md?chat_workspace=ws_1&amp;context=chat&amp;run=run_1&amp;thread=th_1#design&#34;"`,
+		`data-replace-url="&#34;/thoughts/owner/plan-a/design.md?context=chat&amp;run=run_1&amp;thread=th_1#design&#34;"`,
 		"workbench-section-nav",
 		`detail: { hash: 'design', updateURL: false }`,
 		"comment-thread-comment-1",

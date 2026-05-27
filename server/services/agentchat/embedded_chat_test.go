@@ -29,13 +29,15 @@ func TestBuildThoughtsChatDocURLIncludesChatQueryState(t *testing.T) {
 	for _, want := range []string{
 		"/thoughts/user/plans/a/doc.md?",
 		"context=chat",
-		"chat_workspace=ws+1",
 		"thread=thread%2F1",
 		"run=run%2B1",
 	} {
 		if !strings.Contains(got, want) {
 			t.Fatalf("BuildThoughtsChatDocURL() = %q, missing %q", got, want)
 		}
+	}
+	if strings.Contains(got, "chat_workspace=") {
+		t.Fatalf("BuildThoughtsChatDocURL() = %q, want no chat_workspace with thread", got)
 	}
 }
 
@@ -408,11 +410,14 @@ func TestRenderEmbeddedChatPanelUsesFreeformRendererForPersistedFreeformWorkspac
 		"/thoughts/chat/thread/" + thread.ID + "/stream",
 		"creative-mode-agent/plans/2026-04-30_test-plan/plan.md?",
 		"context=chat",
-		"chat_workspace=" + workspace.ID,
+		"thread=" + thread.ID,
 	} {
 		if !strings.Contains(body+replacement.URL, want) {
 			t.Fatalf("freeform embedded panel missing %q: body=%s replacement=%q", want, body, replacement.URL)
 		}
+	}
+	if strings.Contains(replacement.URL, "chat_workspace=") {
+		t.Fatalf("replacement URL preserved chat_workspace with thread: %q", replacement.URL)
 	}
 	for _, notWant := range []string{
 		"/agent-chat/stream",

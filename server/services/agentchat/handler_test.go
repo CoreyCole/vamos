@@ -544,7 +544,6 @@ func TestSendEmbeddedWorkspacePromptPatchesPanelAndDoesNotRedirect(t *testing.T)
 		"agent-chat-workspace-composer",
 		"data-replace-url",
 		"context=chat",
-		"chat_workspace=" + workspaceRecord.ID,
 		"thread=",
 		"run=",
 	} {
@@ -554,6 +553,7 @@ func TestSendEmbeddedWorkspacePromptPatchesPanelAndDoesNotRedirect(t *testing.T)
 	}
 	for _, notWant := range []string{
 		"datastar-redirect",
+		"chat_workspace=",
 	} {
 		if strings.Contains(body, notWant) {
 			t.Fatalf(
@@ -689,7 +689,6 @@ func TestResumeEmbeddedWorkspaceThreadPatchesPanelAndURL(t *testing.T) {
 		"agent-chat-workspace-composer",
 		"data-replace-url",
 		"context=chat",
-		"chat_workspace=" + workspaceRecord.ID,
 		"thread=" + thread.ID,
 		"run=",
 	} {
@@ -699,6 +698,7 @@ func TestResumeEmbeddedWorkspaceThreadPatchesPanelAndURL(t *testing.T) {
 	}
 	for _, notWant := range []string{
 		"datastar-redirect",
+		"chat_workspace=",
 	} {
 		if strings.Contains(body, notWant) {
 			t.Fatalf(
@@ -759,7 +759,6 @@ func TestResumeEmbeddedThreadResolvesPrimaryWorkspace(t *testing.T) {
 	for _, want := range []string{
 		"doc-right-chat-panel",
 		"resume by thread only",
-		"chat_workspace=" + workspaceRecord.ID,
 		"thread=" + thread.ID,
 		"run=",
 	} {
@@ -771,6 +770,7 @@ func TestResumeEmbeddedThreadResolvesPrimaryWorkspace(t *testing.T) {
 		"datastar-redirect",
 		"thread_id=",
 		"prompt=",
+		"chat_workspace=",
 	} {
 		if strings.Contains(body, notWant) {
 			t.Fatalf("thread-only embedded resume leaked %q: %s", notWant, body)
@@ -778,7 +778,7 @@ func TestResumeEmbeddedThreadResolvesPrimaryWorkspace(t *testing.T) {
 	}
 }
 
-func TestStreamEmbeddedFreeformCatchupPatchesEmbeddedPanelNotThreadPage(
+func TestStreamEmbeddedThreadSupportsFreeformCatchupPanel(
 	t *testing.T,
 ) {
 	t.Parallel()
@@ -801,22 +801,24 @@ func TestStreamEmbeddedFreeformCatchupPatchesEmbeddedPanelNotThreadPage(
 	req := httptest.NewRequestWithContext(
 		reqCtx,
 		http.MethodGet,
-		"/thoughts/chat/freeform/stream?thread="+thread.ID+"&run="+run.ID+"&since=0",
+		"/thoughts/chat/thread/"+thread.ID+"/stream?run="+run.ID+"&since=0",
 		http.NoBody,
 	)
 	rec := httptest.NewRecorder()
 	c := echo.New().NewContext(req, rec)
 	c.Set("user_email", "user@example.com")
+	c.SetParamNames("thread_id")
+	c.SetParamValues(thread.ID)
 
 	done := make(chan error, 1)
-	go func() { done <- handler.StreamEmbeddedFreeform(c) }()
+	go func() { done <- handler.StreamEmbeddedThread(c) }()
 	time.Sleep(25 * time.Millisecond)
 	cancel()
 
 	select {
 	case err := <-done:
 		if !isExpectedStreamCancel(err) {
-			t.Fatalf("StreamEmbeddedFreeform() error = %v", err)
+			t.Fatalf("StreamEmbeddedThread() error = %v", err)
 		}
 	case <-time.After(time.Second):
 		t.Fatal("StreamEmbeddedFreeform() timed out")

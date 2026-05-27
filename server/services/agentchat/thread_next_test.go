@@ -133,10 +133,13 @@ func TestBuildThreadMetadataViewListsTargets(t *testing.T) {
 	if len(view.Related) != 1 || view.Related[0].WorkspaceID != related.ID {
 		t.Fatalf("related = %#v, want %s", view.Related, related.ID)
 	}
-	for _, want := range []string{"/thoughts/?", "context=chat", "chat_workspace=" + primary.ID, "thread=" + thread.ID} {
+	for _, want := range []string{"/thoughts/?", "context=chat", "thread=" + thread.ID} {
 		if !strings.Contains(view.URL, want) {
 			t.Fatalf("metadata URL = %q, want %q", view.URL, want)
 		}
+	}
+	if strings.Contains(view.URL, "chat_workspace=") {
+		t.Fatalf("metadata URL = %q, want no chat_workspace with thread", view.URL)
 	}
 	if strings.Contains(view.URL, "/agent-chat") {
 		t.Fatalf("metadata URL = %q, should not use retired page route", view.URL)

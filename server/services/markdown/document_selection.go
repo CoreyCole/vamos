@@ -186,10 +186,13 @@ func PreserveEmbeddedChatQuery(
 	}
 	q := u.Query()
 	q.Set("context", "chat")
-	if workspaceID := strings.TrimSpace(selection.WorkspaceID); workspaceID != "" {
-		q.Set("chat_workspace", workspaceID)
+	threadID := strings.TrimSpace(selection.ThreadID)
+	if threadID == "" {
+		if workspaceID := strings.TrimSpace(selection.WorkspaceID); workspaceID != "" {
+			q.Set("chat_workspace", workspaceID)
+		}
 	}
-	if threadID := strings.TrimSpace(selection.ThreadID); threadID != "" {
+	if threadID != "" {
 		q.Set("thread", threadID)
 	}
 	if runID := strings.TrimSpace(selection.RunID); runID != "" {
