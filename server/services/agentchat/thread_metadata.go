@@ -17,6 +17,7 @@ func (s *Service) BuildThreadMetadataView(
 		ThreadID:  thread.ID,
 		Title:     thread.Title,
 		URL:       threadThoughtsURL(workspaceContext),
+		ProjectID: strings.TrimSpace(thread.ProjectID),
 		ThreadCwd: thread.Cwd,
 		PiCwd:     firstNonEmpty(piCwd, thread.Cwd),
 		Related:   make([]ThreadWorkspaceView, 0, len(workspaceContext.Related)),

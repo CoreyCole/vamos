@@ -544,6 +544,7 @@ func (h *Handler) patchPlanSidebar(
 		c.Request().Context(),
 		PlanSidebarInput{
 			UserEmail:      userEmail,
+			ProjectID:      strings.TrimSpace(c.QueryParam("project")),
 			ActiveThreadID: firstNonEmpty(c.QueryParam("thread"), c.QueryParam("current_thread")),
 		},
 	)

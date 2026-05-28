@@ -2963,6 +2963,7 @@ func (s *Service) BuildThreadPageArgs(
 	if activePlan, ok := s.canonicalPlanDirFromSource(thread.Cwd); ok {
 		args.PlanSidebar, err = s.BuildPlanSidebarState(ctx, PlanSidebarInput{
 			UserEmail:      userEmail,
+			ProjectID:      thread.ProjectID,
 			ActiveThreadID: thread.ID,
 			ActivePlanDir:  activePlan,
 		})
@@ -3012,6 +3013,7 @@ func (s *Service) BuildThreadPageArgs(
 	}
 	args.PlanSidebar, err = s.BuildPlanSidebarState(ctx, PlanSidebarInput{
 		UserEmail:         userEmail,
+		ProjectID:         thread.ProjectID,
 		ActiveWorkspaceID: primary.ID,
 		ActiveThreadID:    thread.ID,
 		ActivePlanDir:     primary.RootDocPath,

@@ -119,6 +119,9 @@ func prepareSchemaCompatibilityMigrations(ctx context.Context, database *sql.DB)
 	if err := ensureAgentThreadWorkspaces(ctx, database); err != nil {
 		return err
 	}
+	if err := ensureAgentThreadProjectColumnsIfTableExists(ctx, database); err != nil {
+		return err
+	}
 	return ensureArtifactCommentsDocPathColumn(ctx, database)
 }
 
@@ -169,6 +172,9 @@ func runRuntimeMigrations(ctx context.Context, database *sql.DB) error {
 		return err
 	}
 	if err := ensureAgentThreadWorkspaces(ctx, database); err != nil {
+		return err
+	}
+	if err := ensureAgentThreadProjectColumnsIfTableExists(ctx, database); err != nil {
 		return err
 	}
 	if err := ensureColumn(
@@ -727,6 +733,17 @@ func ensureAgentThreadWorkspaces(ctx context.Context, database *sql.DB) error {
 		return err
 	}
 	return dropColumnIfExists(ctx, database, "agent_threads", "workspace_id")
+}
+
+func ensureAgentThreadProjectColumnsIfTableExists(ctx context.Context, database *sql.DB) error {
+	exists, err := tableExists(ctx, database, "agent_threads")
+	if err != nil || !exists {
+		return err
+	}
+	if err := ensureColumn(ctx, database, "agent_threads", "project_id", "TEXT NOT NULL DEFAULT ''"); err != nil {
+		return err
+	}
+	return ensureIndex(ctx, database, "CREATE INDEX IF NOT EXISTS idx_agent_threads_project_user_updated ON agent_threads (project_id, user_email, updated_at DESC) WHERE archived_at IS NULL")
 }
 
 func ensureAgentRunsWorkflowColumns(ctx context.Context, database *sql.DB) error {

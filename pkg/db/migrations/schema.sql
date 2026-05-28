@@ -205,7 +205,10 @@ ON plan_workspaces (qrspi_lifecycle, artifact_updated_at DESC, plan_dir_rel)
 WHERE archived_at IS NULL ;
 
 CREATE INDEX IF NOT EXISTS idx_plan_workspaces_project_lifecycle_activity
-ON plan_workspaces (project_id, qrspi_lifecycle, artifact_updated_at DESC, plan_dir_rel)
+ON plan_workspaces (project_id,
+qrspi_lifecycle,
+artifact_updated_at DESC,
+plan_dir_rel)
 WHERE archived_at IS NULL ;
 
 CREATE UNIQUE INDEX IF NOT EXISTS idx_plan_workspaces_active_slug
@@ -215,7 +218,9 @@ WHERE archived_at IS NULL AND workspace_slug <> '' ;
 CREATE TABLE IF NOT EXISTS impl_workspaces (
 project_id TEXT NOT NULL DEFAULT '',
 workspace_slug TEXT NOT NULL,
-checkout_role TEXT NOT NULL DEFAULT '' CHECK (checkout_role IN ('', 'main', 'stage')),
+checkout_role TEXT NOT NULL DEFAULT '' CHECK (checkout_role IN ('',
+'main',
+'stage')),
 checkout_path TEXT NOT NULL,
 display_name TEXT NOT NULL,
 host TEXT NOT NULL DEFAULT '',
@@ -237,7 +242,10 @@ merged_at DATETIME,
 cleaned_up_at DATETIME,
 merge_evidence TEXT,
 cleanup_proof_kind TEXT NOT NULL DEFAULT 'unknown'
-CHECK (cleanup_proof_kind IN ('ancestor', 'patch_equivalent', 'cached', 'unknown')),
+CHECK (cleanup_proof_kind IN ('ancestor',
+'patch_equivalent',
+'cached',
+'unknown')),
 cleanup_proof_source_ref TEXT,
 cleanup_proof_target_commit TEXT,
 cleanup_proof_at DATETIME,
@@ -337,6 +345,7 @@ user_email TEXT NOT NULL,
 title TEXT NOT NULL DEFAULT 'New Chat',
 cwd TEXT NOT NULL,
 lineage_id TEXT NOT NULL,
+project_id TEXT NOT NULL DEFAULT '',
 head_entry_id TEXT,
 parent_thread_id TEXT REFERENCES agent_threads (id),
 forked_from_entry_id TEXT,
@@ -347,6 +356,10 @@ archived_at DATETIME
 
 CREATE INDEX IF NOT EXISTS idx_agent_threads_user_updated
 ON agent_threads (user_email, updated_at DESC)
+WHERE archived_at IS NULL ;
+
+CREATE INDEX IF NOT EXISTS idx_agent_threads_project_user_updated
+ON agent_threads (project_id, user_email, updated_at DESC)
 WHERE archived_at IS NULL ;
 
 CREATE TABLE IF NOT EXISTS agent_thread_workspaces (

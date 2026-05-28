@@ -63,6 +63,7 @@ type ThreadMetadataView struct {
 	ThreadID                string
 	Title                   string
 	URL                     string
+	ProjectID               string
 	ThreadCwd               string
 	PiCwd                   string
 	ImplementationWorkspace string
@@ -167,6 +168,7 @@ type ThreadSidebarArgs struct {
 
 type PlanSidebarInput struct {
 	UserEmail         string
+	ProjectID         string
 	ActiveWorkspaceID string
 	ActiveThreadID    string
 	ActivePlanDir     string
@@ -205,6 +207,7 @@ type PlanSidebarNode struct {
 type PlanSidebarSource struct {
 	PlanDir     string
 	PlanDirRel  string
+	ProjectID   string
 	WorkspaceID string
 	ThreadID    string
 	SessionID   string

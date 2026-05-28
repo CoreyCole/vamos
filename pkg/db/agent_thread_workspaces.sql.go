@@ -202,15 +202,29 @@ WHERE
 ORDER BY t.updated_at DESC
 `
 
-func (q *Queries) ListThreadsByPrimaryWorkspace(ctx context.Context, workspaceID string) ([]AgentThread, error) {
+type ListThreadsByPrimaryWorkspaceRow struct {
+	ID                string         `json:"id"`
+	UserEmail         string         `json:"user_email"`
+	Title             string         `json:"title"`
+	Cwd               string         `json:"cwd"`
+	LineageID         string         `json:"lineage_id"`
+	HeadEntryID       sql.NullString `json:"head_entry_id"`
+	ParentThreadID    sql.NullString `json:"parent_thread_id"`
+	ForkedFromEntryID sql.NullString `json:"forked_from_entry_id"`
+	CreatedAt         time.Time      `json:"created_at"`
+	UpdatedAt         time.Time      `json:"updated_at"`
+	ArchivedAt        sql.NullTime   `json:"archived_at"`
+}
+
+func (q *Queries) ListThreadsByPrimaryWorkspace(ctx context.Context, workspaceID string) ([]ListThreadsByPrimaryWorkspaceRow, error) {
 	rows, err := q.db.QueryContext(ctx, listThreadsByPrimaryWorkspace, workspaceID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []AgentThread
+	var items []ListThreadsByPrimaryWorkspaceRow
 	for rows.Next() {
-		var i AgentThread
+		var i ListThreadsByPrimaryWorkspaceRow
 		if err := rows.Scan(
 			&i.ID,
 			&i.UserEmail,

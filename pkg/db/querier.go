@@ -128,7 +128,7 @@ type Querier interface {
 	ListRecentWorkspaceLogEvents(ctx context.Context, arg ListRecentWorkspaceLogEventsParams) ([]WorkspaceEvent, error)
 	ListReleaseQueueEvents(ctx context.Context, arg ListReleaseQueueEventsParams) ([]ReleaseQueueEvent, error)
 	ListThreadWorkspaceAssociations(ctx context.Context, threadID string) ([]ListThreadWorkspaceAssociationsRow, error)
-	ListThreadsByPrimaryWorkspace(ctx context.Context, workspaceID string) ([]AgentThread, error)
+	ListThreadsByPrimaryWorkspace(ctx context.Context, workspaceID string) ([]ListThreadsByPrimaryWorkspaceRow, error)
 	ListWorkspaceDocs(ctx context.Context, workspaceID string) ([]WorkspaceDoc, error)
 	ListWorkspaceDocumentComments(ctx context.Context, arg ListWorkspaceDocumentCommentsParams) ([]DocumentComment, error)
 	ListWorkspaceEvents(ctx context.Context, arg ListWorkspaceEventsParams) ([]WorkspaceEvent, error)
@@ -174,6 +174,7 @@ type Querier interface {
 	UpdateAgentSessionInferenceState(ctx context.Context, arg UpdateAgentSessionInferenceStateParams) error
 	UpdateAgentThreadCwd(ctx context.Context, arg UpdateAgentThreadCwdParams) error
 	UpdateAgentThreadHead(ctx context.Context, arg UpdateAgentThreadHeadParams) error
+	UpdateAgentThreadProject(ctx context.Context, arg UpdateAgentThreadProjectParams) error
 	UpdateAgentThreadTitle(ctx context.Context, arg UpdateAgentThreadTitleParams) error
 	UpdateChatCommandStatus(ctx context.Context, arg UpdateChatCommandStatusParams) (ChatSessionCommand, error)
 	UpdateChatSessionProjectionSeq(ctx context.Context, arg UpdateChatSessionProjectionSeqParams) error

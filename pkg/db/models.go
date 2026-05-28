@@ -96,6 +96,7 @@ type AgentThread struct {
 	Title             string         `json:"title"`
 	Cwd               string         `json:"cwd"`
 	LineageID         string         `json:"lineage_id"`
+	ProjectID         string         `json:"project_id"`
 	HeadEntryID       sql.NullString `json:"head_entry_id"`
 	ParentThreadID    sql.NullString `json:"parent_thread_id"`
 	ForkedFromEntryID sql.NullString `json:"forked_from_entry_id"`

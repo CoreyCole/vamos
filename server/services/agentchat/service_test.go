@@ -340,6 +340,103 @@ func TestBuildPlanSidebarStateIncludesDiscoveredPlanWorkspacesForAnyUser(t *test
 	}
 }
 
+func TestBuildPlanSidebarStateFiltersByProject(t *testing.T) {
+	service := newTestAgentChatService(t)
+	now := time.Now().UTC()
+	alphaPlan := filepath.Join(service.thoughtsRoot, "user", "plans", "alpha")
+	betaPlan := filepath.Join(service.thoughtsRoot, "user", "plans", "beta")
+	mustWriteFile(t, filepath.Join(alphaPlan, "AGENTS.md"), "---\nproject: example.com/alpha/app\n---\n# Alpha\n")
+	mustWriteFile(t, filepath.Join(betaPlan, "AGENTS.md"), "---\nproject: example.com/beta/app\n---\n# Beta\n")
+	mustUpsertDiscoveredPlanWorkspaceWithProject(t, service, alphaPlan, "Alpha", "example.com/alpha/app", now)
+	mustUpsertDiscoveredPlanWorkspaceWithProject(t, service, betaPlan, "Beta", "example.com/beta/app", now.Add(time.Minute))
+	mustCreateAgentSession(t, service, "alpha-session", "user@example.com", alphaPlan, "", "")
+	mustCreateAgentSession(t, service, "beta-session", "user@example.com", betaPlan, "", "")
+
+	allState, err := service.BuildPlanSidebarState(t.Context(), PlanSidebarInput{UserEmail: "user@example.com"})
+	if err != nil {
+		t.Fatalf("BuildPlanSidebarState(all) error = %v", err)
+	}
+	if got := flattenPlanSidebarNodeLabels(allState.Nodes); !reflect.DeepEqual(got, []string{"beta", "alpha"}) {
+		t.Fatalf("all labels = %#v, want beta and alpha", got)
+	}
+
+	alphaState, err := service.BuildPlanSidebarState(t.Context(), PlanSidebarInput{UserEmail: "user@example.com", ProjectID: "example.com/alpha/app"})
+	if err != nil {
+		t.Fatalf("BuildPlanSidebarState(alpha) error = %v", err)
+	}
+	if got := flattenPlanSidebarNodeLabels(alphaState.Nodes); !reflect.DeepEqual(got, []string{"alpha"}) {
+		t.Fatalf("alpha labels = %#v, want only alpha", got)
+	}
+}
+
+func TestAdoptThreadProjectForRunUsesXMLBeforeFrontmatterWrites(t *testing.T) {
+	service := newTestAgentChatService(t)
+	alphaPlan := filepath.Join(service.thoughtsRoot, "user", "plans", "alpha")
+	mustWriteFile(t, filepath.Join(alphaPlan, "AGENTS.md"), "---\nproject: example.com/alpha/app\n---\n# Alpha\n")
+	thread := mustCreateAgentThread(t, service, "project-thread-xml", "user@example.com", service.projectRoot, "lineage-project-xml")
+	entries := []db.AgentEntry{
+		{EntryID: "call-1", PayloadJson: `{"type":"message","id":"call-1","message":{"role":"assistant","content":[{"type":"toolCall","id":"write-1","name":"write","arguments":{"path":"` + filepath.ToSlash(filepath.Join(alphaPlan, "plan.md")) + `"}}]}}`},
+		{EntryID: "tool-1", PayloadJson: `{"type":"message","id":"tool-1","message":{"role":"toolResult","toolCallId":"write-1","toolName":"write","content":"Wrote file","isError":false}}`},
+	}
+	assistantText := `<qrspi-result>
+  <project>example.com/beta/app</project>
+  <stage>plan</stage>
+  <status>complete</status>
+  <outcome>complete</outcome>
+  <summary>
+    <plan-goal>Test project adoption.</plan-goal>
+    <stage-completed>Done.</stage-completed>
+    <key-decisions>XML wins.</key-decisions>
+  </summary>
+</qrspi-result>`
+
+	projectID, err := service.AdoptThreadProjectForRun(t.Context(), thread, entries, assistantText)
+	if err != nil {
+		t.Fatalf("AdoptThreadProjectForRun() error = %v", err)
+	}
+	if projectID != "example.com/beta/app" {
+		t.Fatalf("projectID = %q, want XML project", projectID)
+	}
+	updated, err := service.queries.GetAgentThread(t.Context(), thread.ID)
+	if err != nil {
+		t.Fatalf("GetAgentThread() error = %v", err)
+	}
+	if updated.ProjectID != "example.com/beta/app" {
+		t.Fatalf("thread project = %q, want beta", updated.ProjectID)
+	}
+}
+
+func TestAdoptThreadProjectForRunUsesSuccessfulFrontmatterWrites(t *testing.T) {
+	service := newTestAgentChatService(t)
+	alphaPlan := filepath.Join(service.thoughtsRoot, "user", "plans", "alpha-write")
+	mustWriteFile(t, filepath.Join(alphaPlan, "AGENTS.md"), "---\nproject: example.com/alpha/app\n---\n# Alpha\n")
+	thread := mustCreateAgentThread(t, service, "project-thread-write", "user@example.com", service.projectRoot, "lineage-project-write")
+	entries := []db.AgentEntry{
+		{EntryID: "call-1", PayloadJson: `{"type":"message","id":"call-1","message":{"role":"assistant","content":[{"type":"toolCall","id":"write-1","name":"write","arguments":{"path":"` + filepath.ToSlash(filepath.Join(alphaPlan, "design.md")) + `"}}]}}`},
+		{EntryID: "tool-1", PayloadJson: `{"type":"message","id":"tool-1","message":{"role":"toolResult","toolCallId":"write-1","toolName":"write","content":"Wrote file","isError":false}}`},
+	}
+
+	projectID, err := service.AdoptThreadProjectForRun(t.Context(), thread, entries, "no xml here")
+	if err != nil {
+		t.Fatalf("AdoptThreadProjectForRun() error = %v", err)
+	}
+	if projectID != "example.com/alpha/app" {
+		t.Fatalf("projectID = %q, want frontmatter project", projectID)
+	}
+}
+
+func TestAdoptThreadProjectForRunIgnoresCwdDefault(t *testing.T) {
+	service := newTestAgentChatService(t)
+	thread := mustCreateAgentThread(t, service, "project-thread-empty", "user@example.com", service.projectRoot, "lineage-project-empty")
+	projectID, err := service.AdoptThreadProjectForRun(t.Context(), thread, nil, "no xml here")
+	if err != nil {
+		t.Fatalf("AdoptThreadProjectForRun() error = %v", err)
+	}
+	if projectID != "" {
+		t.Fatalf("projectID = %q, want no cwd/default adoption", projectID)
+	}
+}
+
 func TestBuildPlanSidebarStateOverlaysCurrentUserThreadMetadata(t *testing.T) {
 	t.Parallel()
 	service := newTestAgentChatService(t)
@@ -905,6 +1002,7 @@ func TestCollectPlanSidebarSourcesUsesTenantSafeWorkspaceJoin(t *testing.T) {
 	sources, err := service.collectPlanSidebarSources(
 		t.Context(),
 		"owner@example.com",
+		"",
 	)
 	if err != nil {
 		t.Fatalf("collectPlanSidebarSources() error = %v", err)
@@ -5073,6 +5171,18 @@ func mustUpsertDiscoveredPlanWorkspace(
 	artifactUpdatedAt time.Time,
 ) db.PlanWorkspace {
 	t.Helper()
+	return mustUpsertDiscoveredPlanWorkspaceWithProject(t, service, planDir, label, "", artifactUpdatedAt)
+}
+
+func mustUpsertDiscoveredPlanWorkspaceWithProject(
+	t *testing.T,
+	service *Service,
+	planDir string,
+	label string,
+	projectID string,
+	artifactUpdatedAt time.Time,
+) db.PlanWorkspace {
+	t.Helper()
 	rel, err := planWorkspaceRel(service.thoughtsRoot, planDir)
 	if err != nil {
 		t.Fatalf("planWorkspaceRel() error = %v", err)
@@ -5081,6 +5191,7 @@ func mustUpsertDiscoveredPlanWorkspace(
 		t.Context(),
 		db.UpsertDiscoveredPlanWorkspaceParams{
 			PlanDirRel:        rel,
+			ProjectID:         projectID,
 			PlanDir:           planDir,
 			Label:             label,
 			ArtifactUpdatedAt: artifactUpdatedAt,
@@ -5146,6 +5257,15 @@ func writePiSessionFile(t *testing.T, path string, lines ...string) {
 	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
 		t.Fatalf("WriteFile(session): %v", err)
 	}
+}
+
+func flattenPlanSidebarNodeLabels(nodes []PlanSidebarNode) []string {
+	labels := make([]string, 0, len(nodes))
+	for _, node := range nodes {
+		labels = append(labels, node.Label)
+		labels = append(labels, flattenPlanSidebarNodeLabels(node.Children)...)
+	}
+	return labels
 }
 
 func mustCreateAgentThread(

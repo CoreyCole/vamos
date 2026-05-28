@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"github.com/CoreyCole/vamos/pkg/agents/workflows/qrspi"
@@ -22,6 +23,7 @@ type ThreadWorkspaceAdoptionInput struct {
 }
 
 type ThreadWorkspaceAdoptionResult struct {
+	ProjectID             string
 	PrimaryWorkspaceID    string
 	RelatedWorkspaceIDs   []string
 	AppliedWorkflowResult bool
@@ -51,10 +53,14 @@ func (s *Service) AdoptThreadWorkspacesForRun(ctx context.Context, input ThreadW
 	if strings.TrimSpace(assistantText) == "" && headEntryID != "" {
 		assistantText, _ = s.finalAssistantTextForAdoption(ctx, thread.ID, headEntryID)
 	}
+	projectID, err := s.AdoptThreadProjectForRun(ctx, thread, entries, assistantText)
+	if err != nil {
+		return ThreadWorkspaceAdoptionResult{}, err
+	}
 	xmlRoots := s.resolveAttachableRootsFromQRSPIXML(ctx, assistantText, thread.Cwd)
 	primary, related := choosePrimaryAndRelatedRoots(xmlRoots, writeRoots)
 	if primary.RelPath == "" {
-		return ThreadWorkspaceAdoptionResult{}, nil
+		return ThreadWorkspaceAdoptionResult{ProjectID: projectID}, nil
 	}
 	primaryWorkspace, err := s.EnsureQRSPIWorkspaceForRoot(ctx, thread.UserEmail, primary)
 	if err != nil {
@@ -63,7 +69,7 @@ func (s *Service) AdoptThreadWorkspacesForRun(ctx context.Context, input ThreadW
 	if err := s.SetThreadPrimaryWorkspace(ctx, thread.ID, primaryWorkspace.ID, input.Source); err != nil {
 		return ThreadWorkspaceAdoptionResult{}, err
 	}
-	out := ThreadWorkspaceAdoptionResult{PrimaryWorkspaceID: primaryWorkspace.ID, Adopted: true}
+	out := ThreadWorkspaceAdoptionResult{ProjectID: projectID, PrimaryWorkspaceID: primaryWorkspace.ID, Adopted: true}
 	for _, root := range related {
 		workspace, err := s.EnsureQRSPIWorkspaceForRoot(ctx, thread.UserEmail, root)
 		if err != nil {
@@ -85,6 +91,89 @@ func (s *Service) AdoptThreadWorkspacesForRun(ctx context.Context, input ThreadW
 		out.AppliedWorkflowResult = applied
 	}
 	return out, nil
+}
+
+func (s *Service) AdoptThreadProjectForRun(ctx context.Context, thread db.AgentThread, entries []db.AgentEntry, assistantText string) (string, error) {
+	projectID := s.projectFromQRSPIXML(assistantText)
+	if projectID == "" {
+		projectID = s.projectFromSuccessfulQRSPIWrites(entries, thread.Cwd)
+	}
+	projectID = strings.TrimSpace(projectID)
+	if projectID == "" {
+		return "", nil
+	}
+	if projectID == strings.TrimSpace(thread.ProjectID) {
+		return projectID, nil
+	}
+	return projectID, s.queries.UpdateAgentThreadProject(ctx, db.UpdateAgentThreadProjectParams{
+		ID:        thread.ID,
+		ProjectID: projectID,
+	})
+}
+
+func (s *Service) projectFromQRSPIXML(text string) string {
+	if !strings.Contains(text, "<qrspi-result>") {
+		return ""
+	}
+	parsedAny, err := qrspi.QRSPIXMLParser{}.Parse(text, wruntime.ParseContext{})
+	if err != nil {
+		return ""
+	}
+	parsed, ok := parsedAny.(qrspi.ResultXML)
+	if !ok {
+		return ""
+	}
+	return qrspi.QRSPIResultProject(parsed)
+}
+
+func (s *Service) projectFromSuccessfulQRSPIWrites(entries []db.AgentEntry, cwd string) string {
+	toolCalls := map[string]toolCallRef{}
+	projectID := ""
+	for _, row := range entries {
+		entry, ok := agentEntryToPiSessionEntry(row)
+		if !ok {
+			continue
+		}
+		before := map[string]struct{}{}
+		collectTouchedPlanDirsFromEntry(entry, s.thoughtsRoot, cwd, toolCalls, before)
+		if strings.TrimSpace(entry.Message.Role) != "toolResult" || entry.Message.IsError ||
+			(strings.TrimSpace(entry.Message.ToolName) != "write" && strings.TrimSpace(entry.Message.ToolName) != "edit") {
+			continue
+		}
+		for _, rawPath := range extractPathStrings(entry.Message.Details, entry.Message.Content) {
+			if root, ok := s.ResolveAttachablePlanRootFrom(rawPath, cwd); ok {
+				before[root.AbsPath] = struct{}{}
+			}
+		}
+		if call, ok := toolCalls[strings.TrimSpace(entry.Message.ToolCallID)]; ok {
+			for _, rawPath := range extractPathStrings(call.Arguments) {
+				if root, ok := s.ResolveAttachablePlanRootFrom(rawPath, cwd); ok {
+					before[root.AbsPath] = struct{}{}
+				}
+			}
+		}
+		paths := make([]string, 0, len(before))
+		for path := range before {
+			paths = append(paths, path)
+		}
+		sort.Strings(paths)
+		for _, path := range paths {
+			if root, ok := s.ResolveAttachablePlanRootFrom(path, cwd); ok {
+				if project := s.projectFromAttachablePlanRoot(root); project != "" {
+					projectID = project
+				}
+			}
+		}
+	}
+	return projectID
+}
+
+func (s *Service) projectFromAttachablePlanRoot(root AttachablePlanRoot) string {
+	frontmatter, err := readPlanWorkspaceFrontmatter(root.AbsPath)
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(frontmatter.Project)
 }
 
 func (s *Service) ResolveAttachableRootsFromRun(ctx context.Context, run db.AgentRun) ([]AttachablePlanRoot, error) {

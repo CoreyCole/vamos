@@ -5,6 +5,7 @@ INSERT INTO agent_threads (
     title,
     cwd,
     lineage_id,
+    project_id,
     head_entry_id,
     parent_thread_id,
     forked_from_entry_id
@@ -15,6 +16,7 @@ VALUES (
     sqlc.arg('title'),
     sqlc.arg('cwd'),
     sqlc.arg('lineage_id'),
+    sqlc.arg('project_id'),
     sqlc.narg('head_entry_id'),
     sqlc.narg('parent_thread_id'),
     sqlc.narg('forked_from_entry_id')
@@ -25,6 +27,7 @@ RETURNING
     title,
     cwd,
     lineage_id,
+    project_id,
     head_entry_id,
     parent_thread_id,
     forked_from_entry_id,
@@ -39,6 +42,7 @@ SELECT
     title,
     cwd,
     lineage_id,
+    project_id,
     head_entry_id,
     parent_thread_id,
     forked_from_entry_id,
@@ -56,6 +60,7 @@ SELECT
     title,
     cwd,
     lineage_id,
+    project_id,
     head_entry_id,
     parent_thread_id,
     forked_from_entry_id,
@@ -74,6 +79,7 @@ SELECT
     title,
     cwd,
     lineage_id,
+    project_id,
     head_entry_id,
     parent_thread_id,
     forked_from_entry_id,
@@ -104,6 +110,12 @@ SET cwd = sqlc.arg ('cwd'),
 updated_at = CURRENT_TIMESTAMP
 WHERE id = sqlc.arg ('id') ;
 
+-- name: UpdateAgentThreadProject :exec
+UPDATE agent_threads
+SET project_id = sqlc.arg ('project_id'),
+updated_at = CURRENT_TIMESTAMP
+WHERE id = sqlc.arg ('id') ;
+
 -- name: ListAgentThreadsByWorkspace :many
 SELECT
     t.id,
@@ -111,6 +123,7 @@ SELECT
     t.title,
     t.cwd,
     t.lineage_id,
+    t.project_id,
     t.head_entry_id,
     t.parent_thread_id,
     t.forked_from_entry_id,
@@ -131,6 +144,7 @@ SELECT
     t.title,
     t.cwd,
     t.lineage_id,
+    t.project_id,
     t.head_entry_id,
     t.parent_thread_id,
     t.forked_from_entry_id,
@@ -157,6 +171,7 @@ SELECT
     t.title,
     t.cwd,
     t.lineage_id,
+    t.project_id,
     t.head_entry_id,
     t.parent_thread_id,
     t.forked_from_entry_id,

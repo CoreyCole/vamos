@@ -30,7 +30,7 @@ func (s *Service) BuildPlanSidebarState(
 	if activePlan == "" {
 		activePlan = s.resolveActivePlanDir(ctx, input)
 	}
-	sources, err := s.collectPlanSidebarSources(ctx, input.UserEmail)
+	sources, err := s.collectPlanSidebarSources(ctx, input.UserEmail, input.ProjectID)
 	if err != nil {
 		return PlanSidebarState{}, err
 	}
@@ -113,12 +113,13 @@ func (s *Service) resolveActiveWorkspacePlanDir(
 func (s *Service) collectPlanSidebarSources(
 	ctx context.Context,
 	userEmail string,
+	projectID string,
 ) ([]PlanSidebarSource, error) {
-	discovered, err := s.collectDiscoveredPlanSidebarSources(ctx)
+	discovered, err := s.collectDiscoveredPlanSidebarSources(ctx, projectID)
 	if err != nil {
 		return nil, err
 	}
-	overlay, err := s.collectUserPlanSidebarOverlaySources(ctx, userEmail)
+	overlay, err := s.collectUserPlanSidebarOverlaySources(ctx, userEmail, projectID)
 	if err != nil {
 		return nil, err
 	}
@@ -127,8 +128,9 @@ func (s *Service) collectPlanSidebarSources(
 
 func (s *Service) collectDiscoveredPlanSidebarSources(
 	ctx context.Context,
+	projectID string,
 ) ([]PlanSidebarSource, error) {
-	rows, err := s.queries.ListCurrentPlanWorkspaces(ctx, "")
+	rows, err := s.queries.ListCurrentPlanWorkspaces(ctx, strings.TrimSpace(projectID))
 	if err != nil {
 		return nil, err
 	}
@@ -142,6 +144,7 @@ func (s *Service) collectDiscoveredPlanSidebarSources(
 		sources = append(sources, PlanSidebarSource{
 			PlanDir:    planDir,
 			PlanDirRel: row.PlanDirRel,
+			ProjectID:  row.ProjectID,
 			Source:     planSidebarSourceDiscovered,
 			Title:      row.Label,
 			UpdatedAt:  row.ArtifactUpdatedAt,
@@ -153,7 +156,9 @@ func (s *Service) collectDiscoveredPlanSidebarSources(
 func (s *Service) collectUserPlanSidebarOverlaySources(
 	ctx context.Context,
 	userEmail string,
+	projectID string,
 ) ([]PlanSidebarSource, error) {
+	projectID = strings.TrimSpace(projectID)
 	userEmail = strings.TrimSpace(userEmail)
 	if userEmail == "" {
 		return []PlanSidebarSource{}, nil
@@ -184,7 +189,9 @@ func (s *Service) collectUserPlanSidebarOverlaySources(
 			Title:       sessionTitleForPlanSidebar(session),
 			UpdatedAt:   session.UpdatedAt,
 		}
-		addPlanSidebarSource(&sources, seen, source)
+		if s.planSidebarSourceMatchesProject(ctx, &source, projectID) {
+			addPlanSidebarSource(&sources, seen, source)
+		}
 	}
 
 	threads, err := s.queries.ListAgentThreadsForUserWithWorkspace(ctx, userEmail)
@@ -201,18 +208,59 @@ func (s *Service) collectUserPlanSidebarOverlaySources(
 			source := PlanSidebarSource{
 				PlanDir:     planDir,
 				PlanDirRel:  s.planSidebarRel(planDir),
+				ProjectID:   row.ProjectID,
 				WorkspaceID: row.PrimaryWorkspaceID.String,
 				ThreadID:    row.ID,
 				Source:      planSidebarSourceThread,
 				Title:       row.Title,
 				UpdatedAt:   row.UpdatedAt,
 			}
-			addPlanSidebarSource(&sources, seen, source)
+			if s.planSidebarSourceMatchesProject(ctx, &source, projectID) {
+				addPlanSidebarSource(&sources, seen, source)
+			}
 			break
 		}
 	}
 
 	return sources, nil
+}
+
+func (s *Service) planSidebarSourceMatchesProject(ctx context.Context, source *PlanSidebarSource, projectID string) bool {
+	projectID = strings.TrimSpace(projectID)
+	if projectID == "" {
+		return true
+	}
+	if source == nil {
+		return false
+	}
+	if sourceProject := strings.TrimSpace(source.ProjectID); sourceProject != "" {
+		return sourceProject == projectID
+	}
+	source.ProjectID = s.sourceProjectForPlanDir(ctx, source.PlanDir, source.PlanDirRel)
+	return strings.TrimSpace(source.ProjectID) == projectID
+}
+
+func (s *Service) sourceProjectForPlanDir(ctx context.Context, planDir, planDirRel string) string {
+	planDirRel = strings.TrimSpace(planDirRel)
+	if planDirRel == "" {
+		planDirRel = s.planSidebarRel(planDir)
+	}
+	if planDirRel != "" {
+		if row, err := s.queries.GetPlanWorkspace(ctx, planDirRel); err == nil {
+			if projectID := strings.TrimSpace(row.ProjectID); projectID != "" {
+				return projectID
+			}
+		}
+	}
+	canonical, ok := s.canonicalPlanDirFromSource(planDir)
+	if !ok {
+		return ""
+	}
+	frontmatter, err := readPlanWorkspaceFrontmatter(canonical)
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(frontmatter.Project)
 }
 
 func mergePlanSidebarSources(

@@ -18,6 +18,7 @@ INSERT INTO agent_threads (
     title,
     cwd,
     lineage_id,
+    project_id,
     head_entry_id,
     parent_thread_id,
     forked_from_entry_id
@@ -30,7 +31,8 @@ VALUES (
     ?5,
     ?6,
     ?7,
-    ?8
+    ?8,
+    ?9
 )
 RETURNING
     id,
@@ -38,6 +40,7 @@ RETURNING
     title,
     cwd,
     lineage_id,
+    project_id,
     head_entry_id,
     parent_thread_id,
     forked_from_entry_id,
@@ -52,6 +55,7 @@ type CreateAgentThreadParams struct {
 	Title             string         `json:"title"`
 	Cwd               string         `json:"cwd"`
 	LineageID         string         `json:"lineage_id"`
+	ProjectID         string         `json:"project_id"`
 	HeadEntryID       sql.NullString `json:"head_entry_id"`
 	ParentThreadID    sql.NullString `json:"parent_thread_id"`
 	ForkedFromEntryID sql.NullString `json:"forked_from_entry_id"`
@@ -64,6 +68,7 @@ func (q *Queries) CreateAgentThread(ctx context.Context, arg CreateAgentThreadPa
 		arg.Title,
 		arg.Cwd,
 		arg.LineageID,
+		arg.ProjectID,
 		arg.HeadEntryID,
 		arg.ParentThreadID,
 		arg.ForkedFromEntryID,
@@ -75,6 +80,7 @@ func (q *Queries) CreateAgentThread(ctx context.Context, arg CreateAgentThreadPa
 		&i.Title,
 		&i.Cwd,
 		&i.LineageID,
+		&i.ProjectID,
 		&i.HeadEntryID,
 		&i.ParentThreadID,
 		&i.ForkedFromEntryID,
@@ -92,6 +98,7 @@ SELECT
     title,
     cwd,
     lineage_id,
+    project_id,
     head_entry_id,
     parent_thread_id,
     forked_from_entry_id,
@@ -112,6 +119,7 @@ func (q *Queries) GetAgentThread(ctx context.Context, id string) (AgentThread, e
 		&i.Title,
 		&i.Cwd,
 		&i.LineageID,
+		&i.ProjectID,
 		&i.HeadEntryID,
 		&i.ParentThreadID,
 		&i.ForkedFromEntryID,
@@ -131,6 +139,7 @@ SELECT
     title,
     cwd,
     lineage_id,
+    project_id,
     head_entry_id,
     parent_thread_id,
     forked_from_entry_id,
@@ -157,6 +166,7 @@ func (q *Queries) GetAgentThreadForUser(ctx context.Context, arg GetAgentThreadF
 		&i.Title,
 		&i.Cwd,
 		&i.LineageID,
+		&i.ProjectID,
 		&i.HeadEntryID,
 		&i.ParentThreadID,
 		&i.ForkedFromEntryID,
@@ -176,6 +186,7 @@ SELECT
     t.title,
     t.cwd,
     t.lineage_id,
+    t.project_id,
     t.head_entry_id,
     t.parent_thread_id,
     t.forked_from_entry_id,
@@ -210,6 +221,7 @@ func (q *Queries) GetAgentThreadForWorkspaceUser(ctx context.Context, arg GetAge
 		&i.Title,
 		&i.Cwd,
 		&i.LineageID,
+		&i.ProjectID,
 		&i.HeadEntryID,
 		&i.ParentThreadID,
 		&i.ForkedFromEntryID,
@@ -229,6 +241,7 @@ SELECT
     title,
     cwd,
     lineage_id,
+    project_id,
     head_entry_id,
     parent_thread_id,
     forked_from_entry_id,
@@ -262,6 +275,7 @@ func (q *Queries) ListAgentThreads(ctx context.Context, arg ListAgentThreadsPara
 			&i.Title,
 			&i.Cwd,
 			&i.LineageID,
+			&i.ProjectID,
 			&i.HeadEntryID,
 			&i.ParentThreadID,
 			&i.ForkedFromEntryID,
@@ -291,6 +305,7 @@ SELECT
     t.title,
     t.cwd,
     t.lineage_id,
+    t.project_id,
     t.head_entry_id,
     t.parent_thread_id,
     t.forked_from_entry_id,
@@ -320,6 +335,7 @@ func (q *Queries) ListAgentThreadsByWorkspace(ctx context.Context, workspaceID s
 			&i.Title,
 			&i.Cwd,
 			&i.LineageID,
+			&i.ProjectID,
 			&i.HeadEntryID,
 			&i.ParentThreadID,
 			&i.ForkedFromEntryID,
@@ -349,6 +365,7 @@ SELECT
     t.title,
     t.cwd,
     t.lineage_id,
+    t.project_id,
     t.head_entry_id,
     t.parent_thread_id,
     t.forked_from_entry_id,
@@ -375,6 +392,7 @@ type ListAgentThreadsForUserWithWorkspaceRow struct {
 	Title                string         `json:"title"`
 	Cwd                  string         `json:"cwd"`
 	LineageID            string         `json:"lineage_id"`
+	ProjectID            string         `json:"project_id"`
 	HeadEntryID          sql.NullString `json:"head_entry_id"`
 	ParentThreadID       sql.NullString `json:"parent_thread_id"`
 	ForkedFromEntryID    sql.NullString `json:"forked_from_entry_id"`
@@ -400,6 +418,7 @@ func (q *Queries) ListAgentThreadsForUserWithWorkspace(ctx context.Context, user
 			&i.Title,
 			&i.Cwd,
 			&i.LineageID,
+			&i.ProjectID,
 			&i.HeadEntryID,
 			&i.ParentThreadID,
 			&i.ForkedFromEntryID,
@@ -457,6 +476,25 @@ type UpdateAgentThreadHeadParams struct {
 
 func (q *Queries) UpdateAgentThreadHead(ctx context.Context, arg UpdateAgentThreadHeadParams) error {
 	_, err := q.db.ExecContext(ctx, updateAgentThreadHead, arg.HeadEntryID, arg.ID)
+	return err
+}
+
+const updateAgentThreadProject = `-- name: UpdateAgentThreadProject :exec
+;
+
+UPDATE agent_threads
+SET project_id = ?1,
+updated_at = CURRENT_TIMESTAMP
+WHERE id = ?2
+`
+
+type UpdateAgentThreadProjectParams struct {
+	ProjectID string `json:"project_id"`
+	ID        string `json:"id"`
+}
+
+func (q *Queries) UpdateAgentThreadProject(ctx context.Context, arg UpdateAgentThreadProjectParams) error {
+	_, err := q.db.ExecContext(ctx, updateAgentThreadProject, arg.ProjectID, arg.ID)
 	return err
 }
 
