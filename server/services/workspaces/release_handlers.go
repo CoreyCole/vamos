@@ -20,7 +20,7 @@ func (h *Handler) HandleEnqueueRelease(c echo.Context) error {
 	if err != nil {
 		return err
 	}
-	model, err := h.buildWorkspacesPageModel(c.Request().Context())
+	model, err := h.buildWorkspacesPageModel(c.Request().Context(), ProjectFilterFromRequest(c.Request()))
 	if err != nil {
 		return err
 	}
@@ -131,6 +131,7 @@ func newReleaseQueueItemID() (string, error) {
 
 func (h *Handler) patchWorkspaces(c echo.Context, views []ImplWorkspaceView) error {
 	showCleanedHistory := showCleanedHistoryFromRequest(c.Request())
+	filter := ProjectFilterFromRequest(c.Request())
 	var err error
 	views, err = h.attachWorkflowSummaries(c.Request().Context(), views)
 	if err != nil {
@@ -146,17 +147,17 @@ func (h *Handler) patchWorkspaces(c echo.Context, views []ImplWorkspaceView) err
 	groups := h.workspaceGroups(views, showCleanedHistory)
 	sse := datastar.NewSSE(c.Response().Writer, c.Request())
 	c.Response().WriteHeader(http.StatusAccepted)
-	if err := sse.PatchElementTempl(WorkspacesHeader(h.refreshState(), showCleanedHistory), datastar.WithSelectorID("workspaces-header"), datastar.WithModeOuter()); err != nil {
+	if err := sse.PatchElementTempl(WorkspacesHeader(h.refreshState(), showCleanedHistory, filter, projectOptionsFromViews(views, filter.QueryValue())), datastar.WithSelectorID("workspaces-header"), datastar.WithModeOuter()); err != nil {
 		return err
 	}
 	if err := sse.PatchElementTempl(ReleasePanel(panel), datastar.WithSelectorID("release-queue-panel"), datastar.WithModeOuter()); err != nil {
 		return err
 	}
-	return sse.PatchElementTempl(WorkspacesList(groups, h.managerURL, showCleanedHistory), datastar.WithSelectorID("workspaces-list"), datastar.WithModeOuter())
+	return sse.PatchElementTempl(WorkspacesList(groups, h.managerURL, showCleanedHistory, filter), datastar.WithSelectorID("workspaces-list"), datastar.WithModeOuter())
 }
 
 func (h *Handler) patchWorkspacesFresh(c echo.Context) error {
-	views, err := h.listImplWorkspaceViews(c.Request().Context())
+	views, err := h.listImplWorkspaceViews(c.Request().Context(), ProjectFilterFromRequest(c.Request()))
 	if err != nil {
 		return err
 	}
@@ -164,7 +165,7 @@ func (h *Handler) patchWorkspacesFresh(c echo.Context) error {
 }
 
 func (h *Handler) patchWorkspacesFreshWithoutSlug(c echo.Context, slug string) error {
-	views, err := h.listImplWorkspaceViews(c.Request().Context())
+	views, err := h.listImplWorkspaceViews(c.Request().Context(), ProjectFilterFromRequest(c.Request()))
 	if err != nil {
 		return err
 	}

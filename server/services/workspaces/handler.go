@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -379,7 +380,8 @@ func (h *Handler) RegisterInternalProvisionRoute(e *echo.Echo) {
 }
 
 func (h *Handler) HandleWorkspacesPage(c echo.Context) error {
-	model, err := h.buildWorkspacesPageModel(c.Request().Context())
+	filter := ProjectFilterFromRequest(c.Request())
+	model, err := h.buildWorkspacesPageModel(c.Request().Context(), filter)
 	if err != nil {
 		return err
 	}
@@ -405,12 +407,13 @@ func (h *Handler) HandleWorkspacesPage(c echo.Context) error {
 	return render(
 		c,
 		http.StatusOK,
-		WorkspacesDocument(args, groups, model.ReleasePanel, h.refreshState(), showCleanedHistory),
+		WorkspacesDocument(args, groups, model.ReleasePanel, h.refreshState(), showCleanedHistory, filter, model.ProjectOptions),
 	)
 }
 
 func (h *Handler) HandleRefreshWorkspaces(c echo.Context) error {
 	showCleanedHistory := showCleanedHistoryFromRequest(c.Request())
+	filter := ProjectFilterFromRequest(c.Request())
 	if h.workspaceSyncRefresh == nil {
 		return echo.NewHTTPError(
 			http.StatusNotImplemented,
@@ -425,17 +428,17 @@ func (h *Handler) HandleRefreshWorkspaces(c echo.Context) error {
 	if isDatastarRequest(c.Request()) {
 		sse := datastar.NewSSE(c.Response().Writer, c.Request())
 		c.Response().WriteHeader(http.StatusAccepted)
+		model, err := h.buildWorkspacesPageModel(c.Request().Context(), filter)
+		if err != nil {
+			return err
+		}
 		return sse.PatchElementTempl(
-			WorkspacesHeader(h.refreshState(), showCleanedHistory),
+			WorkspacesHeader(h.refreshState(), showCleanedHistory, filter, model.ProjectOptions),
 			datastar.WithSelectorID("workspaces-header"),
 			datastar.WithModeOuter(),
 		)
 	}
-	redirect := "/workspaces"
-	if showCleanedHistory {
-		redirect = "/workspaces?show_cleaned_history=true"
-	}
-	return c.Redirect(http.StatusSeeOther, redirect)
+	return c.Redirect(http.StatusSeeOther, workspacesURL("/workspaces", showCleanedHistory, filter))
 }
 
 func (h *Handler) tryStartWorkspaceSyncRefresh() bool {
@@ -537,9 +540,10 @@ func (h *Handler) lifecycleAction(
 		return err
 	}
 	if isDatastarRequest(c.Request()) {
-		views, err := h.listImplWorkspaceViews(c.Request().Context())
+		filter := ProjectFilterFromRequest(c.Request())
+		views, err := h.listImplWorkspaceViews(c.Request().Context(), filter)
 		if err != nil {
-			views = lifecycleSnapshotsToImplViews([]WorkspaceLifecycleSnapshot{snap})
+			views = lifecycleSnapshotsToImplViews(filterLifecycleSnapshotsByProject([]WorkspaceLifecycleSnapshot{snap}, filter))
 		}
 		return h.patchWorkspaces(c, views)
 	}
@@ -554,15 +558,16 @@ func (h *Handler) HandleWorkspacesStream(c echo.Context) error {
 		)
 	}
 	showCleanedHistory := showCleanedHistoryFromRequest(c.Request())
+	filter := ProjectFilterFromRequest(c.Request())
 	sse := datastar.NewSSE(c.Response().Writer, c.Request())
 	send := func() error {
-		model, err := h.buildWorkspacesPageModel(c.Request().Context())
+		model, err := h.buildWorkspacesPageModel(c.Request().Context(), filter)
 		if err != nil {
 			return err
 		}
 		groups := h.workspaceGroups(model.Views, showCleanedHistory)
 		if err := sse.PatchElementTempl(
-			WorkspacesHeader(h.refreshState(), showCleanedHistory),
+			WorkspacesHeader(h.refreshState(), showCleanedHistory, filter, model.ProjectOptions),
 			datastar.WithSelectorID("workspaces-header"),
 			datastar.WithModeOuter(),
 		); err != nil {
@@ -576,7 +581,7 @@ func (h *Handler) HandleWorkspacesStream(c echo.Context) error {
 			return err
 		}
 		return sse.PatchElementTempl(
-			WorkspacesList(groups, h.managerURL, showCleanedHistory),
+			WorkspacesList(groups, h.managerURL, showCleanedHistory, filter),
 			datastar.WithSelectorID("workspaces-list"),
 			datastar.WithModeOuter(),
 		)
@@ -998,13 +1003,54 @@ func (h *Handler) listLifecycle(
 	return snapshots, nil
 }
 
-type workspacesPageModel struct {
-	Views        []ImplWorkspaceView
-	ReleasePanel ReleasePanelModel
+type ProjectFilter struct {
+	ProjectID string
 }
 
-func (h *Handler) buildWorkspacesPageModel(ctx context.Context) (workspacesPageModel, error) {
-	views, err := h.listImplWorkspaceViews(ctx)
+type ProjectOption struct {
+	ID       string
+	Label    string
+	Selected bool
+}
+
+type workspacesPageModel struct {
+	Views          []ImplWorkspaceView
+	ReleasePanel   ReleasePanelModel
+	ProjectFilter  ProjectFilter
+	ProjectOptions []ProjectOption
+}
+
+func ProjectFilterFromRequest(r *http.Request) ProjectFilter {
+	if r == nil {
+		return ProjectFilter{}
+	}
+	return ProjectFilter{ProjectID: strings.TrimSpace(r.FormValue("project"))}
+}
+
+func (f ProjectFilter) QueryValue() string {
+	return strings.TrimSpace(f.ProjectID)
+}
+
+func (f ProjectFilter) AppendTo(values url.Values) {
+	if projectID := f.QueryValue(); projectID != "" {
+		values.Set("project", projectID)
+	}
+}
+
+func workspacesURL(path string, showCleanedHistory bool, filter ProjectFilter) string {
+	values := url.Values{}
+	if showCleanedHistory {
+		values.Set("show_cleaned_history", "true")
+	}
+	filter.AppendTo(values)
+	if encoded := values.Encode(); encoded != "" {
+		return path + "?" + encoded
+	}
+	return path
+}
+
+func (h *Handler) buildWorkspacesPageModel(ctx context.Context, filter ProjectFilter) (workspacesPageModel, error) {
+	views, err := h.listImplWorkspaceViews(ctx, filter)
 	if err != nil {
 		return workspacesPageModel{}, err
 	}
@@ -1019,25 +1065,66 @@ func (h *Handler) buildWorkspacesPageModel(ctx context.Context) (workspacesPageM
 	if len(rowActions) > 0 {
 		views = applyOptionsToImplWorkspaceViews(views, WithWorkspaceReleaseActions(rowActions))
 	}
-	return workspacesPageModel{Views: views, ReleasePanel: panel}, nil
+	return workspacesPageModel{Views: views, ReleasePanel: panel, ProjectFilter: filter, ProjectOptions: projectOptionsFromViews(views, filter.QueryValue())}, nil
 }
 
 func (h *Handler) listImplWorkspaceViews(
 	ctx context.Context,
+	filter ProjectFilter,
 ) ([]ImplWorkspaceView, error) {
 	runtime, err := h.listLifecycle(ctx)
 	if err != nil {
 		return nil, err
 	}
+	runtime = filterLifecycleSnapshotsByProject(runtime, filter)
 	if h.implWorkspaces == nil {
 		return lifecycleSnapshotsToImplViews(runtime), nil
 	}
-	rows, err := h.implWorkspaces.ListImplWorkspaces(ctx, "")
+	rows, err := h.implWorkspaces.ListImplWorkspaces(ctx, filter.QueryValue())
 	if err != nil {
 		return nil, err
 	}
 	main, nonMain := splitMainSnapshot(runtime)
 	return BuildImplWorkspaceViews(rows, nonMain, main), nil
+}
+
+func filterLifecycleSnapshotsByProject(items []WorkspaceLifecycleSnapshot, filter ProjectFilter) []WorkspaceLifecycleSnapshot {
+	projectID := filter.QueryValue()
+	if projectID == "" {
+		return items
+	}
+	out := make([]WorkspaceLifecycleSnapshot, 0, len(items))
+	for _, item := range items {
+		if strings.TrimSpace(item.Workspace.ProjectID) == projectID {
+			out = append(out, item)
+		}
+	}
+	return out
+}
+
+func projectOptionsFromViews(views []ImplWorkspaceView, selected string) []ProjectOption {
+	seen := map[string]struct{}{}
+	var ids []string
+	var walk func([]ImplWorkspaceView)
+	walk = func(items []ImplWorkspaceView) {
+		for _, view := range items {
+			projectID := strings.TrimSpace(firstNonEmpty(view.Row.ProjectID, view.Runtime.Workspace.ProjectID))
+			if projectID != "" {
+				if _, ok := seen[projectID]; !ok {
+					seen[projectID] = struct{}{}
+					ids = append(ids, projectID)
+				}
+			}
+			walk(view.Children)
+		}
+	}
+	walk(views)
+	slices.Sort(ids)
+	options := make([]ProjectOption, 0, len(ids))
+	for _, id := range ids {
+		options = append(options, ProjectOption{ID: id, Label: id, Selected: id == selected})
+	}
+	return options
 }
 
 func (h *Handler) releaseProjectionForViews(ctx context.Context, views []ImplWorkspaceView) (ReleasePanelModel, map[string][]ReleaseActionView, error) {

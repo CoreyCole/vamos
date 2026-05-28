@@ -70,7 +70,7 @@ func (h *Handler) HandleWorkspaceErrorsStream(c echo.Context) error {
 
 func (h *Handler) workspaceErrorPageModel(ctx context.Context, selected string) (WorkspaceErrorPageModel, error) {
 	selected = strings.TrimSpace(selected)
-	views, err := h.listImplWorkspaceViews(ctx)
+	views, err := h.listImplWorkspaceViews(ctx, ProjectFilter{})
 	if err != nil {
 		return WorkspaceErrorPageModel{}, err
 	}

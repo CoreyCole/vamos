@@ -29,6 +29,7 @@ type WorkspaceCleanupWorkflowInput struct {
 }
 
 type WorkspaceCleanupAction struct {
+	ProjectID         string
 	Slug              string
 	Label             string
 	Disposition       WorkspaceCleanupDisposition
@@ -47,11 +48,12 @@ func (h *Handler) HandleCleanupWorkspace(c echo.Context) error {
 	if slug == "" {
 		return echo.NewHTTPError(http.StatusBadRequest, "missing workspace slug")
 	}
-	views, err := h.listImplWorkspaceViews(c.Request().Context())
+	filter := ProjectFilterFromRequest(c.Request())
+	views, err := h.listImplWorkspaceViews(c.Request().Context(), filter)
 	if err != nil {
 		return err
 	}
-	view, ok := findImplWorkspaceView(views, slug)
+	view, ok := findImplWorkspaceViewForProject(views, filter.QueryValue(), slug)
 	if !ok {
 		return echo.NewHTTPError(http.StatusNotFound, "unknown workspace")
 	}
@@ -64,7 +66,7 @@ func (h *Handler) HandleCleanupWorkspace(c echo.Context) error {
 			if isDatastarRequest(c.Request()) {
 				return h.patchWorkspacesFresh(c)
 			}
-			return c.Redirect(http.StatusSeeOther, "/workspaces")
+			return c.Redirect(http.StatusSeeOther, workspacesURL("/workspaces", showCleanedHistoryFromRequest(c.Request()), filter))
 		}
 		return echo.NewHTTPError(http.StatusConflict, action.DisabledReason)
 	}
@@ -80,12 +82,12 @@ func (h *Handler) HandleCleanupWorkspace(c echo.Context) error {
 	if isDatastarRequest(c.Request()) {
 		return h.patchWorkspacesFreshWithoutSlug(c, slug)
 	}
-	return c.Redirect(http.StatusSeeOther, "/workspaces")
+	return c.Redirect(http.StatusSeeOther, workspacesURL("/workspaces", showCleanedHistoryFromRequest(c.Request()), filter))
 }
 
 func workspaceCleanupAction(view ImplWorkspaceView) WorkspaceCleanupAction {
 	slug := workspaceViewSlug(view)
-	action := WorkspaceCleanupAction{Slug: slug, PlanDirsPreserved: true}
+	action := WorkspaceCleanupAction{ProjectID: strings.TrimSpace(view.Row.ProjectID), Slug: slug, PlanDirsPreserved: true}
 	if slug == "" {
 		action.Disabled = true
 		action.DisabledReason = "workspace slug is unknown"
@@ -137,11 +139,16 @@ func isIdempotentCleanupNoop(action WorkspaceCleanupAction, view ImplWorkspaceVi
 }
 
 func findImplWorkspaceView(views []ImplWorkspaceView, slug string) (ImplWorkspaceView, bool) {
+	return findImplWorkspaceViewForProject(views, "", slug)
+}
+
+func findImplWorkspaceViewForProject(views []ImplWorkspaceView, projectID, slug string) (ImplWorkspaceView, bool) {
+	projectID = strings.TrimSpace(projectID)
 	for _, view := range views {
-		if workspaceViewSlug(view) == slug {
+		if workspaceViewSlug(view) == slug && (projectID == "" || strings.TrimSpace(view.Row.ProjectID) == projectID) {
 			return view, true
 		}
-		if child, ok := findImplWorkspaceView(view.Children, slug); ok {
+		if child, ok := findImplWorkspaceViewForProject(view.Children, projectID, slug); ok {
 			return child, true
 		}
 	}

@@ -1355,6 +1355,58 @@ func TestHandleWorkspacesPageFollowsImplWorkspaceOrder(t *testing.T) {
 	}
 }
 
+func TestHandleWorkspacesPageFiltersImplWorkspacesByProject(t *testing.T) {
+	const (
+		alphaProjectID = "example.com/alpha/app"
+		betaProjectID  = "example.com/beta/app"
+	)
+	handler := NewHandler(
+		&fakeLifecycleManager{snapshots: []WorkspaceLifecycleSnapshot{
+			snapshotFromState(Workspace{ProjectID: alphaProjectID, Slug: "alpha", DisplayName: "Alpha Runtime", Status: StatusStopped}, WorkspaceLifecycleState{}),
+			snapshotFromState(Workspace{ProjectID: betaProjectID, Slug: "beta", DisplayName: "Beta Runtime", Status: StatusStopped}, WorkspaceLifecycleState{}),
+		}},
+		"https://main.cn-agents.test",
+		"main",
+		WithImplWorkspaces(fakeImplWorkspaceLister{rows: []db.ImplWorkspace{
+			{ProjectID: alphaProjectID, WorkspaceSlug: "alpha", DisplayName: "Alpha Workspace", CheckoutPath: "/repo/alpha", Status: string(ImplWorkspaceStatusActive)},
+			{ProjectID: betaProjectID, WorkspaceSlug: "beta", DisplayName: "Beta Workspace", CheckoutPath: "/repo/beta", Status: string(ImplWorkspaceStatusActive)},
+		}}),
+	)
+	e := echo.New()
+	req := httptest.NewRequest(http.MethodGet, "/workspaces?project=example.com%2Falpha%2Fapp", nil)
+	rec := httptest.NewRecorder()
+	if err := handler.HandleWorkspacesPage(e.NewContext(req, rec)); err != nil {
+		t.Fatalf("HandleWorkspacesPage() error = %v", err)
+	}
+	html := rec.Body.String()
+	for _, want := range []string{"Alpha Workspace", `value="example.com/alpha/app" selected`, `data-init="@get(&#39;/workspaces/stream?project=example.com%2Falpha%2Fapp&#39;)"`} {
+		if !strings.Contains(html, want) {
+			t.Fatalf("filtered workspaces page missing %q: %s", want, html)
+		}
+	}
+	if strings.Contains(html, "Beta Workspace") {
+		t.Fatalf("filtered workspaces page included beta: %s", html)
+	}
+}
+
+func TestHandleRefreshWorkspacesRedirectPreservesProjectAndCleanedHistory(t *testing.T) {
+	handler := NewHandler(
+		&fakeLifecycleManager{},
+		"https://main.cn-agents.test",
+		"main",
+		WithWorkspaceSyncRefresh(func(context.Context) (WorkspaceSyncRefreshResult, error) { return WorkspaceSyncRefreshResult{}, nil }),
+	)
+	e := echo.New()
+	req := httptest.NewRequest(http.MethodPost, "/workspaces/refresh?project=example.com%2Falpha%2Fapp&show_cleaned_history=true", nil)
+	rec := httptest.NewRecorder()
+	if err := handler.HandleRefreshWorkspaces(e.NewContext(req, rec)); err != nil {
+		t.Fatalf("HandleRefreshWorkspaces() error = %v", err)
+	}
+	if got := rec.Header().Get("Location"); got != "/workspaces?project=example.com%2Falpha%2Fapp&show_cleaned_history=true" {
+		t.Fatalf("Location = %q", got)
+	}
+}
+
 func TestHandleWorkspacesPageHidesCleanedRowsByDefault(t *testing.T) {
 	handler := NewHandler(
 		&fakeLifecycleManager{snapshots: []WorkspaceLifecycleSnapshot{
@@ -2093,13 +2145,22 @@ type fakeImplWorkspaceLister struct {
 }
 
 func (f fakeImplWorkspaceLister) ListImplWorkspaces(
-	context.Context,
-	string,
+	_ context.Context,
+	projectID string,
 ) ([]db.ImplWorkspace, error) {
 	if f.err != nil {
 		return nil, f.err
 	}
-	return append([]db.ImplWorkspace(nil), f.rows...), nil
+	if strings.TrimSpace(projectID) == "" {
+		return append([]db.ImplWorkspace(nil), f.rows...), nil
+	}
+	out := make([]db.ImplWorkspace, 0, len(f.rows))
+	for _, row := range f.rows {
+		if strings.TrimSpace(row.ProjectID) == strings.TrimSpace(projectID) {
+			out = append(out, row)
+		}
+	}
+	return out, nil
 }
 
 type fakeCleanupStarter struct {
