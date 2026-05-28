@@ -213,7 +213,9 @@ ON plan_workspaces (workspace_slug)
 WHERE archived_at IS NULL AND workspace_slug <> '' ;
 
 CREATE TABLE IF NOT EXISTS impl_workspaces (
-workspace_slug TEXT PRIMARY KEY,
+project_id TEXT NOT NULL DEFAULT '',
+workspace_slug TEXT NOT NULL,
+checkout_role TEXT NOT NULL DEFAULT '' CHECK (checkout_role IN ('', 'main', 'stage')),
 checkout_path TEXT NOT NULL,
 display_name TEXT NOT NULL,
 host TEXT NOT NULL DEFAULT '',
@@ -245,11 +247,12 @@ env_last_error TEXT,
 git_detail TEXT,
 discovered_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
 last_discovered_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+PRIMARY KEY (project_id, workspace_slug)
 ) ;
 
-CREATE INDEX IF NOT EXISTS idx_impl_workspaces_status_updated
-ON impl_workspaces (status, updated_at DESC) ;
+CREATE INDEX IF NOT EXISTS idx_impl_workspaces_project_status_updated
+ON impl_workspaces (project_id, status, updated_at DESC) ;
 
 CREATE INDEX IF NOT EXISTS idx_impl_workspaces_plan_dir_rel
 ON impl_workspaces (plan_dir_rel)

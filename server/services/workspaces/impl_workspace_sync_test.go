@@ -66,14 +66,14 @@ func TestImplWorkspaceCleanedUpMarksMergedRows(t *testing.T) {
 		t.Fatalf("UpsertDiscoveredImplWorkspace: %v", err)
 	}
 
-	n, err := queries.MarkImplWorkspaceCleanedUp(ctx, "merged")
+	n, err := queries.MarkImplWorkspaceCleanedUp(ctx, db.MarkImplWorkspaceCleanedUpParams{WorkspaceSlug: "merged"})
 	if err != nil {
 		t.Fatalf("MarkImplWorkspaceCleanedUp: %v", err)
 	}
 	if n != 1 {
 		t.Fatalf("rows affected = %d, want 1", n)
 	}
-	row, err := queries.GetImplWorkspace(ctx, "merged")
+	row, err := queries.GetImplWorkspace(ctx, db.GetImplWorkspaceParams{WorkspaceSlug: "merged"})
 	if err != nil {
 		t.Fatalf("GetImplWorkspace: %v", err)
 	}
@@ -112,7 +112,7 @@ func TestImplWorkspaceSyncIncludesConfiguredCheckouts(t *testing.T) {
 		t.Fatalf("result = %+v, want one configured upsert/env repair/change", result)
 	}
 
-	row, err := queries.GetImplWorkspace(ctx, "work")
+	row, err := queries.GetImplWorkspace(ctx, db.GetImplWorkspaceParams{WorkspaceSlug: "work"})
 	if err != nil {
 		t.Fatalf("GetImplWorkspace(work): %v", err)
 	}
@@ -164,7 +164,7 @@ func TestImplWorkspaceSyncDoesNotCleanupConfiguredCheckoutWhenMissingFromScan(t 
 	if result.CleanedUp != 0 || result.Merged != 0 || result.Changed {
 		t.Fatalf("result = %+v, want configured missing checkout preserved", result)
 	}
-	row, err := queries.GetImplWorkspace(ctx, "work")
+	row, err := queries.GetImplWorkspace(ctx, db.GetImplWorkspaceParams{WorkspaceSlug: "work"})
 	if err != nil {
 		t.Fatalf("GetImplWorkspace(work): %v", err)
 	}
@@ -214,7 +214,7 @@ func TestImplWorkspaceSyncerDoesNotCleanupRowsOutsideDiscoveryScope(t *testing.T
 	if result.CleanedUp != 0 || result.Merged != 0 {
 		t.Fatalf("result = %+v, want out-of-scope vamos row preserved", result)
 	}
-	row, err := queries.GetImplWorkspace(ctx, "stage")
+	row, err := queries.GetImplWorkspace(ctx, db.GetImplWorkspaceParams{WorkspaceSlug: "stage"})
 	if err != nil {
 		t.Fatalf("GetImplWorkspace(stage): %v", err)
 	}
@@ -254,10 +254,7 @@ func TestImplWorkspaceSyncerCreatesRowsAndWorkspaceEnv(t *testing.T) {
 		t.Fatalf("result = %+v, want two upserts, two env repairs, changed", result)
 	}
 
-	row, err := queries.GetImplWorkspace(
-		ctx,
-		"2026-05-20-20-18-45-workspace-discovery-sync",
-	)
+	row, err := queries.GetImplWorkspace(ctx, db.GetImplWorkspaceParams{WorkspaceSlug: "2026-05-20-20-18-45-workspace-discovery-sync"})
 	if err != nil {
 		t.Fatalf("GetImplWorkspace(feature): %v", err)
 	}
@@ -412,10 +409,7 @@ func TestImplWorkspaceSyncerKeepsMissingUnprovenActive(t *testing.T) {
 	if result.CleanedUp != 0 || result.Merged != 0 || !result.Changed {
 		t.Fatalf("result = %+v, want missing unproven active and changed", result)
 	}
-	row, err := queries.GetImplWorkspace(
-		ctx,
-		"2026-05-20-20-18-45-workspace-discovery-sync",
-	)
+	row, err := queries.GetImplWorkspace(ctx, db.GetImplWorkspaceParams{WorkspaceSlug: "2026-05-20-20-18-45-workspace-discovery-sync"})
 	if err != nil {
 		t.Fatalf("GetImplWorkspace: %v", err)
 	}
@@ -472,7 +466,7 @@ func TestImplWorkspaceSyncerMarksMissingMergedWithMainEvidence(t *testing.T) {
 	if result.Merged != 1 || result.CleanedUp != 0 || !result.Changed {
 		t.Fatalf("result = %+v, want missing checkout merged", result)
 	}
-	row, err := queries.GetImplWorkspace(ctx, "missing-workspace")
+	row, err := queries.GetImplWorkspace(ctx, db.GetImplWorkspaceParams{WorkspaceSlug: "missing-workspace"})
 	if err != nil {
 		t.Fatalf("GetImplWorkspace: %v", err)
 	}
@@ -546,7 +540,7 @@ func TestImplWorkspaceSyncerKeepsMissingUnprovenActiveWithRisk(t *testing.T) {
 			result,
 		)
 	}
-	row, err := queries.GetImplWorkspace(ctx, "missing-workspace")
+	row, err := queries.GetImplWorkspace(ctx, db.GetImplWorkspaceParams{WorkspaceSlug: "missing-workspace"})
 	if err != nil {
 		t.Fatalf("GetImplWorkspace: %v", err)
 	}
@@ -589,10 +583,7 @@ func TestImplWorkspaceSyncerMarksDiscoveredMergedWithHeadEvidence(t *testing.T) 
 	if result.Merged != 1 || !result.Changed {
 		t.Fatalf("result = %+v, want discovered merged change", result)
 	}
-	row, err := queries.GetImplWorkspace(
-		ctx,
-		"2026-05-20-20-18-45-workspace-discovery-sync",
-	)
+	row, err := queries.GetImplWorkspace(ctx, db.GetImplWorkspaceParams{WorkspaceSlug: "2026-05-20-20-18-45-workspace-discovery-sync"})
 	if err != nil {
 		t.Fatalf("GetImplWorkspace: %v", err)
 	}
@@ -605,6 +596,49 @@ func TestImplWorkspaceSyncerMarksDiscoveredMergedWithHeadEvidence(t *testing.T) 
 			row.MergedAt,
 			row.MergeEvidence,
 		)
+	}
+}
+
+func TestImplWorkspaceSyncerKeepsConfiguredStageRoleActiveWhenHeadIsMerged(t *testing.T) {
+	isolateImplSyncGitPath(t)
+	ctx := context.Background()
+	parent := t.TempDir()
+	checkout := makeImplSyncCheckout(t, t.TempDir(), "stage-checkout")
+	initImplSyncGitRepo(t, checkout)
+	queries := openImplSyncTestQueries(t)
+
+	result, err := (&ImplWorkspaceSyncer{Queries: queries}).Sync(
+		ctx,
+		ImplWorkspaceSyncInput{
+			ProjectID: "example.com/alpha/app",
+			Discovery: ImplWorkspaceDiscoveryConfig{
+				ProjectID: "example.com/alpha/app",
+				ParentDir: parent,
+				Domain:    "workspaces.example.test",
+				ConfiguredCheckouts: map[string]ConfiguredCheckout{
+					"stage": {
+						RootPath:    checkout,
+						DisplayName: "Stage",
+						Role:        CheckoutRoleStage,
+						ProjectID:   "example.com/alpha/app",
+					},
+				},
+			},
+			TrunkBranch: "main",
+		},
+	)
+	if err != nil {
+		t.Fatalf("Sync: %v", err)
+	}
+	if result.Merged != 0 {
+		t.Fatalf("result = %+v, want protected stage not counted merged", result)
+	}
+	row, err := queries.GetImplWorkspace(ctx, db.GetImplWorkspaceParams{ProjectID: "example.com/alpha/app", WorkspaceSlug: "stage"})
+	if err != nil {
+		t.Fatalf("GetImplWorkspace(stage): %v", err)
+	}
+	if row.Status != string(ImplWorkspaceStatusActive) || row.CheckoutRole != string(CheckoutRoleStage) || row.ProjectID != "example.com/alpha/app" {
+		t.Fatalf("row status=%q role=%q project=%q, want active stage alpha", row.Status, row.CheckoutRole, row.ProjectID)
 	}
 }
 
@@ -631,10 +665,7 @@ func TestImplWorkspaceSyncerDoesNotReportUnchangedDiscoveredMerged(t *testing.T)
 	if _, err := syncer.Sync(ctx, input); err != nil {
 		t.Fatalf("initial Sync: %v", err)
 	}
-	first, err := queries.GetImplWorkspace(
-		ctx,
-		"2026-05-20-20-18-45-workspace-discovery-sync",
-	)
+	first, err := queries.GetImplWorkspace(ctx, db.GetImplWorkspaceParams{WorkspaceSlug: "2026-05-20-20-18-45-workspace-discovery-sync"})
 	if err != nil {
 		t.Fatalf("GetImplWorkspace(first): %v", err)
 	}
@@ -645,10 +676,7 @@ func TestImplWorkspaceSyncerDoesNotReportUnchangedDiscoveredMerged(t *testing.T)
 	if result.Merged != 0 || result.Changed {
 		t.Fatalf("result = %+v, want unchanged merged sync quiet", result)
 	}
-	second, err := queries.GetImplWorkspace(
-		ctx,
-		"2026-05-20-20-18-45-workspace-discovery-sync",
-	)
+	second, err := queries.GetImplWorkspace(ctx, db.GetImplWorkspaceParams{WorkspaceSlug: "2026-05-20-20-18-45-workspace-discovery-sync"})
 	if err != nil {
 		t.Fatalf("GetImplWorkspace(second): %v", err)
 	}
@@ -695,7 +723,7 @@ func TestImplWorkspaceSyncerKeepsCachedMergedProofAfterFetchFailure(t *testing.T
 	if result.Merged != 1 || !result.Changed {
 		t.Fatalf("result = %+v, want cached merged proof change", result)
 	}
-	row, err := queries.GetImplWorkspace(ctx, "2026-05-20-20-18-45-workspace-discovery-sync")
+	row, err := queries.GetImplWorkspace(ctx, db.GetImplWorkspaceParams{WorkspaceSlug: "2026-05-20-20-18-45-workspace-discovery-sync"})
 	if err != nil {
 		t.Fatalf("GetImplWorkspace: %v", err)
 	}
@@ -745,10 +773,7 @@ func TestImplWorkspaceSyncerRestoresDiscoveredMergedCheckoutToActiveWhenHeadChan
 	if result.Merged != 0 || !result.Changed {
 		t.Fatalf("result = %+v, want restored active change", result)
 	}
-	row, err := queries.GetImplWorkspace(
-		ctx,
-		"2026-05-20-20-18-45-workspace-discovery-sync",
-	)
+	row, err := queries.GetImplWorkspace(ctx, db.GetImplWorkspaceParams{WorkspaceSlug: "2026-05-20-20-18-45-workspace-discovery-sync"})
 	if err != nil {
 		t.Fatalf("GetImplWorkspace: %v", err)
 	}
@@ -795,10 +820,7 @@ func TestImplWorkspaceSyncerAttachesPlanBinding(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Sync: %v", err)
 	}
-	row, err := queries.GetImplWorkspace(
-		ctx,
-		"2026-05-20-20-18-45-workspace-discovery-sync",
-	)
+	row, err := queries.GetImplWorkspace(ctx, db.GetImplWorkspaceParams{WorkspaceSlug: "2026-05-20-20-18-45-workspace-discovery-sync"})
 	if err != nil {
 		t.Fatalf("GetImplWorkspace: %v", err)
 	}

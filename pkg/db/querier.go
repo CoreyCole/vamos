@@ -69,7 +69,7 @@ type Querier interface {
 	GetChatThread(ctx context.Context, id string) (ChatThread, error)
 	GetDistinctBootIDs(ctx context.Context) ([]GetDistinctBootIDsRow, error)
 	GetDocumentComment(ctx context.Context, id string) (DocumentComment, error)
-	GetImplWorkspace(ctx context.Context, workspaceSlug string) (ImplWorkspace, error)
+	GetImplWorkspace(ctx context.Context, arg GetImplWorkspaceParams) (ImplWorkspace, error)
 	GetLatestAgentRunByThread(ctx context.Context, threadID string) (AgentRun, error)
 	GetLatestAgentRunByWorkspaceNode(ctx context.Context, arg GetLatestAgentRunByWorkspaceNodeParams) (AgentRun, error)
 	GetLatestAgentRunByWorkspaceThread(ctx context.Context, arg GetLatestAgentRunByWorkspaceThreadParams) (AgentRun, error)
@@ -119,7 +119,7 @@ type Querier interface {
 	ListCurrentPlanWorkspaces(ctx context.Context, projectID string) ([]PlanWorkspace, error)
 	ListDocumentCommentReplies(ctx context.Context, commentID string) ([]DocumentCommentReply, error)
 	ListDocumentComments(ctx context.Context, arg ListDocumentCommentsParams) ([]DocumentComment, error)
-	ListImplWorkspaces(ctx context.Context) ([]ImplWorkspace, error)
+	ListImplWorkspaces(ctx context.Context, projectID string) ([]ImplWorkspace, error)
 	ListOpenChatAnnotationsByIDs(ctx context.Context, ids []string) ([]ChatAnnotation, error)
 	ListPlanWorkspaces(ctx context.Context, projectID string) ([]PlanWorkspace, error)
 	ListRecentReleaseQueueItems(ctx context.Context, limit int64) ([]ReleaseQueueItem, error)
@@ -137,7 +137,7 @@ type Querier interface {
 	ListWorkspacesForUser(ctx context.Context, arg ListWorkspacesForUserParams) ([]Workspace, error)
 	LogAuthAttempt(ctx context.Context, arg LogAuthAttemptParams) (AuthAttempt, error)
 	MarkAllActiveImplWorkspacesCleanedUp(ctx context.Context) (int64, error)
-	MarkImplWorkspaceCleanedUp(ctx context.Context, workspaceSlug string) (int64, error)
+	MarkImplWorkspaceCleanedUp(ctx context.Context, arg MarkImplWorkspaceCleanedUpParams) (int64, error)
 	MarkImplWorkspaceMergeUnknown(ctx context.Context, arg MarkImplWorkspaceMergeUnknownParams) (int64, error)
 	MarkImplWorkspaceMerged(ctx context.Context, arg MarkImplWorkspaceMergedParams) (int64, error)
 	MarkMissingImplWorkspacesCleanedUp(ctx context.Context, workspaceSlugs []string) (int64, error)
@@ -145,7 +145,7 @@ type Querier interface {
 	MarkReleaseQueueItemTerminal(ctx context.Context, arg MarkReleaseQueueItemTerminalParams) (ReleaseQueueItem, error)
 	MarkWorkspaceDocDeleted(ctx context.Context, arg MarkWorkspaceDocDeletedParams) error
 	RecordImplWorkspaceEnvError(ctx context.Context, arg RecordImplWorkspaceEnvErrorParams) error
-	RecordImplWorkspaceEnvRepair(ctx context.Context, workspaceSlug string) error
+	RecordImplWorkspaceEnvRepair(ctx context.Context, arg RecordImplWorkspaceEnvRepairParams) error
 	ReopenDocumentComment(ctx context.Context, id string) error
 	ReserveChatSessionSeq(ctx context.Context, sessionID string) (int64, error)
 	ResolveChatAnnotation(ctx context.Context, id string) error

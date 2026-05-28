@@ -2094,6 +2094,7 @@ type fakeImplWorkspaceLister struct {
 
 func (f fakeImplWorkspaceLister) ListImplWorkspaces(
 	context.Context,
+	string,
 ) ([]db.ImplWorkspace, error) {
 	if f.err != nil {
 		return nil, f.err

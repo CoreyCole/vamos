@@ -1,26 +1,34 @@
 -- name: ListImplWorkspaces :many
 SELECT *
 FROM impl_workspaces
+WHERE
+    CAST(sqlc.arg('project_id') AS TEXT) = ''
+    OR project_id = CAST(sqlc.arg('project_id') AS TEXT)
 ORDER BY
     status = 'active' DESC,
     updated_at DESC,
-    lower(display_name),
+    LOWER(display_name),
+    project_id,
     workspace_slug;
 
 -- name: ListActiveImplWorkspaces :many
 SELECT *
 FROM impl_workspaces
 WHERE status = 'active'
-ORDER BY lower(display_name), workspace_slug;
+ORDER BY LOWER(display_name), project_id, workspace_slug;
 
 -- name: GetImplWorkspace :one
 SELECT *
 FROM impl_workspaces
-WHERE workspace_slug = sqlc.arg('workspace_slug');
+WHERE
+    project_id = sqlc.arg('project_id')
+    AND workspace_slug = sqlc.arg('workspace_slug');
 
 -- name: UpsertDiscoveredImplWorkspace :one
 INSERT INTO impl_workspaces (
+    project_id,
     workspace_slug,
+    checkout_role,
     checkout_path,
     display_name,
     host,
@@ -47,7 +55,9 @@ INSERT INTO impl_workspaces (
     git_detail
 )
 VALUES (
+    sqlc.arg('project_id'),
     sqlc.arg('workspace_slug'),
+    sqlc.arg('checkout_role'),
     sqlc.arg('checkout_path'),
     sqlc.arg('display_name'),
     sqlc.arg('host'),
@@ -57,7 +67,7 @@ VALUES (
     sqlc.arg('status'),
     (
         CASE
-            WHEN sqlc.arg('status') = 'merged' THEN current_timestamp ELSE NULL
+            WHEN sqlc.arg('status') = 'merged' THEN CURRENT_TIMESTAMP ELSE NULL
         END
     ),
     sqlc.narg('merge_evidence'),
@@ -77,7 +87,8 @@ VALUES (
     sqlc.arg('behind_count'),
     sqlc.narg('git_detail')
 )
-ON CONFLICT (workspace_slug) DO UPDATE SET
+ON CONFLICT (project_id, workspace_slug) DO UPDATE SET
+checkout_role = excluded.checkout_role,
 checkout_path = excluded.checkout_path,
 display_name = excluded.display_name,
 host = excluded.host,
@@ -124,7 +135,8 @@ UPDATE impl_workspaces
 SET status = 'cleaned_up',
 cleaned_up_at = CURRENT_TIMESTAMP,
 updated_at = CURRENT_TIMESTAMP
-WHERE workspace_slug = sqlc.arg ('workspace_slug')
+WHERE project_id = sqlc.arg ('project_id')
+AND workspace_slug = sqlc.arg ('workspace_slug')
 AND status IN ('active', 'merged') ;
 
 -- name: MarkMissingImplWorkspacesCleanedUp :execrows
@@ -147,34 +159,40 @@ UPDATE impl_workspaces
 SET status = 'merged',
 merged_at = CURRENT_TIMESTAMP,
 merge_evidence = sqlc.arg ('merge_evidence'),
-cleanup_proof_kind = COALESCE(NULLIF(sqlc.arg('cleanup_proof_kind'), ''), 'unknown'),
-cleanup_proof_source_ref = sqlc.narg('cleanup_proof_source_ref'),
-cleanup_proof_target_commit = sqlc.narg('cleanup_proof_target_commit'),
+cleanup_proof_kind = COALESCE (NULLIF (sqlc.arg ('cleanup_proof_kind'),
+''),
+'unknown'),
+cleanup_proof_source_ref = sqlc.narg ('cleanup_proof_source_ref'),
+cleanup_proof_target_commit = sqlc.narg ('cleanup_proof_target_commit'),
 cleanup_proof_at = CURRENT_TIMESTAMP,
 cleanup_risk_reason = NULL,
 updated_at = CURRENT_TIMESTAMP
-WHERE workspace_slug = sqlc.arg ('workspace_slug') ;
+WHERE project_id = sqlc.arg ('project_id')
+AND workspace_slug = sqlc.arg ('workspace_slug') ;
 
 -- name: MarkImplWorkspaceMergeUnknown :execrows
 UPDATE impl_workspaces
 SET cleanup_proof_kind = 'unknown',
-cleanup_proof_source_ref = sqlc.narg('cleanup_proof_source_ref'),
+cleanup_proof_source_ref = sqlc.narg ('cleanup_proof_source_ref'),
 cleanup_proof_target_commit = NULL,
 cleanup_proof_at = NULL,
-cleanup_risk_reason = sqlc.narg('cleanup_risk_reason'),
-merge_evidence = sqlc.narg('merge_evidence'),
+cleanup_risk_reason = sqlc.narg ('cleanup_risk_reason'),
+merge_evidence = sqlc.narg ('merge_evidence'),
 updated_at = CURRENT_TIMESTAMP
-WHERE workspace_slug = sqlc.arg('workspace_slug') ;
+WHERE project_id = sqlc.arg ('project_id')
+AND workspace_slug = sqlc.arg ('workspace_slug') ;
 
 -- name: RecordImplWorkspaceEnvRepair :exec
 UPDATE impl_workspaces
 SET env_last_repaired_at = CURRENT_TIMESTAMP,
 env_last_error = NULL,
 updated_at = CURRENT_TIMESTAMP
-WHERE workspace_slug = sqlc.arg ('workspace_slug') ;
+WHERE project_id = sqlc.arg ('project_id')
+AND workspace_slug = sqlc.arg ('workspace_slug') ;
 
 -- name: RecordImplWorkspaceEnvError :exec
 UPDATE impl_workspaces
 SET env_last_error = sqlc.arg ('env_last_error'),
 updated_at = CURRENT_TIMESTAMP
-WHERE workspace_slug = sqlc.arg ('workspace_slug') ;
+WHERE project_id = sqlc.arg ('project_id')
+AND workspace_slug = sqlc.arg ('workspace_slug') ;

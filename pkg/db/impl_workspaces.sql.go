@@ -12,16 +12,25 @@ import (
 )
 
 const getImplWorkspace = `-- name: GetImplWorkspace :one
-SELECT workspace_slug, checkout_path, display_name, host, url, plan_dir_rel, plan_dir, status, branch, commit_hash, trunk_branch, top_branch, bottom_branch, bottom_parent_branch, base_branch, ahead_count, behind_count, merged_at, cleaned_up_at, merge_evidence, cleanup_proof_kind, cleanup_proof_source_ref, cleanup_proof_target_commit, cleanup_proof_at, cleanup_risk_reason, env_last_repaired_at, env_last_error, git_detail, discovered_at, last_discovered_at, updated_at
+SELECT project_id, workspace_slug, checkout_role, checkout_path, display_name, host, url, plan_dir_rel, plan_dir, status, branch, commit_hash, trunk_branch, top_branch, bottom_branch, bottom_parent_branch, base_branch, ahead_count, behind_count, merged_at, cleaned_up_at, merge_evidence, cleanup_proof_kind, cleanup_proof_source_ref, cleanup_proof_target_commit, cleanup_proof_at, cleanup_risk_reason, env_last_repaired_at, env_last_error, git_detail, discovered_at, last_discovered_at, updated_at
 FROM impl_workspaces
-WHERE workspace_slug = ?1
+WHERE
+    project_id = ?1
+    AND workspace_slug = ?2
 `
 
-func (q *Queries) GetImplWorkspace(ctx context.Context, workspaceSlug string) (ImplWorkspace, error) {
-	row := q.db.QueryRowContext(ctx, getImplWorkspace, workspaceSlug)
+type GetImplWorkspaceParams struct {
+	ProjectID     string `json:"project_id"`
+	WorkspaceSlug string `json:"workspace_slug"`
+}
+
+func (q *Queries) GetImplWorkspace(ctx context.Context, arg GetImplWorkspaceParams) (ImplWorkspace, error) {
+	row := q.db.QueryRowContext(ctx, getImplWorkspace, arg.ProjectID, arg.WorkspaceSlug)
 	var i ImplWorkspace
 	err := row.Scan(
+		&i.ProjectID,
 		&i.WorkspaceSlug,
+		&i.CheckoutRole,
 		&i.CheckoutPath,
 		&i.DisplayName,
 		&i.Host,
@@ -57,10 +66,10 @@ func (q *Queries) GetImplWorkspace(ctx context.Context, workspaceSlug string) (I
 }
 
 const listActiveImplWorkspaces = `-- name: ListActiveImplWorkspaces :many
-SELECT workspace_slug, checkout_path, display_name, host, url, plan_dir_rel, plan_dir, status, branch, commit_hash, trunk_branch, top_branch, bottom_branch, bottom_parent_branch, base_branch, ahead_count, behind_count, merged_at, cleaned_up_at, merge_evidence, cleanup_proof_kind, cleanup_proof_source_ref, cleanup_proof_target_commit, cleanup_proof_at, cleanup_risk_reason, env_last_repaired_at, env_last_error, git_detail, discovered_at, last_discovered_at, updated_at
+SELECT project_id, workspace_slug, checkout_role, checkout_path, display_name, host, url, plan_dir_rel, plan_dir, status, branch, commit_hash, trunk_branch, top_branch, bottom_branch, bottom_parent_branch, base_branch, ahead_count, behind_count, merged_at, cleaned_up_at, merge_evidence, cleanup_proof_kind, cleanup_proof_source_ref, cleanup_proof_target_commit, cleanup_proof_at, cleanup_risk_reason, env_last_repaired_at, env_last_error, git_detail, discovered_at, last_discovered_at, updated_at
 FROM impl_workspaces
 WHERE status = 'active'
-ORDER BY lower(display_name), workspace_slug
+ORDER BY LOWER(display_name), project_id, workspace_slug
 `
 
 func (q *Queries) ListActiveImplWorkspaces(ctx context.Context) ([]ImplWorkspace, error) {
@@ -73,7 +82,9 @@ func (q *Queries) ListActiveImplWorkspaces(ctx context.Context) ([]ImplWorkspace
 	for rows.Next() {
 		var i ImplWorkspace
 		if err := rows.Scan(
+			&i.ProjectID,
 			&i.WorkspaceSlug,
+			&i.CheckoutRole,
 			&i.CheckoutPath,
 			&i.DisplayName,
 			&i.Host,
@@ -119,17 +130,21 @@ func (q *Queries) ListActiveImplWorkspaces(ctx context.Context) ([]ImplWorkspace
 }
 
 const listImplWorkspaces = `-- name: ListImplWorkspaces :many
-SELECT workspace_slug, checkout_path, display_name, host, url, plan_dir_rel, plan_dir, status, branch, commit_hash, trunk_branch, top_branch, bottom_branch, bottom_parent_branch, base_branch, ahead_count, behind_count, merged_at, cleaned_up_at, merge_evidence, cleanup_proof_kind, cleanup_proof_source_ref, cleanup_proof_target_commit, cleanup_proof_at, cleanup_risk_reason, env_last_repaired_at, env_last_error, git_detail, discovered_at, last_discovered_at, updated_at
+SELECT project_id, workspace_slug, checkout_role, checkout_path, display_name, host, url, plan_dir_rel, plan_dir, status, branch, commit_hash, trunk_branch, top_branch, bottom_branch, bottom_parent_branch, base_branch, ahead_count, behind_count, merged_at, cleaned_up_at, merge_evidence, cleanup_proof_kind, cleanup_proof_source_ref, cleanup_proof_target_commit, cleanup_proof_at, cleanup_risk_reason, env_last_repaired_at, env_last_error, git_detail, discovered_at, last_discovered_at, updated_at
 FROM impl_workspaces
+WHERE
+    CAST(?1 AS TEXT) = ''
+    OR project_id = CAST(?1 AS TEXT)
 ORDER BY
     status = 'active' DESC,
     updated_at DESC,
-    lower(display_name),
+    LOWER(display_name),
+    project_id,
     workspace_slug
 `
 
-func (q *Queries) ListImplWorkspaces(ctx context.Context) ([]ImplWorkspace, error) {
-	rows, err := q.db.QueryContext(ctx, listImplWorkspaces)
+func (q *Queries) ListImplWorkspaces(ctx context.Context, projectID string) ([]ImplWorkspace, error) {
+	rows, err := q.db.QueryContext(ctx, listImplWorkspaces, projectID)
 	if err != nil {
 		return nil, err
 	}
@@ -138,7 +153,9 @@ func (q *Queries) ListImplWorkspaces(ctx context.Context) ([]ImplWorkspace, erro
 	for rows.Next() {
 		var i ImplWorkspace
 		if err := rows.Scan(
+			&i.ProjectID,
 			&i.WorkspaceSlug,
+			&i.CheckoutRole,
 			&i.CheckoutPath,
 			&i.DisplayName,
 			&i.Host,
@@ -208,12 +225,18 @@ UPDATE impl_workspaces
 SET status = 'cleaned_up',
 cleaned_up_at = CURRENT_TIMESTAMP,
 updated_at = CURRENT_TIMESTAMP
-WHERE workspace_slug = ?1
+WHERE project_id = ?1
+AND workspace_slug = ?2
 AND status IN ('active', 'merged')
 `
 
-func (q *Queries) MarkImplWorkspaceCleanedUp(ctx context.Context, workspaceSlug string) (int64, error) {
-	result, err := q.db.ExecContext(ctx, markImplWorkspaceCleanedUp, workspaceSlug)
+type MarkImplWorkspaceCleanedUpParams struct {
+	ProjectID     string `json:"project_id"`
+	WorkspaceSlug string `json:"workspace_slug"`
+}
+
+func (q *Queries) MarkImplWorkspaceCleanedUp(ctx context.Context, arg MarkImplWorkspaceCleanedUpParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, markImplWorkspaceCleanedUp, arg.ProjectID, arg.WorkspaceSlug)
 	if err != nil {
 		return 0, err
 	}
@@ -231,13 +254,15 @@ cleanup_proof_at = NULL,
 cleanup_risk_reason = ?2,
 merge_evidence = ?3,
 updated_at = CURRENT_TIMESTAMP
-WHERE workspace_slug = ?4
+WHERE project_id = ?4
+AND workspace_slug = ?5
 `
 
 type MarkImplWorkspaceMergeUnknownParams struct {
 	CleanupProofSourceRef sql.NullString `json:"cleanup_proof_source_ref"`
 	CleanupRiskReason     sql.NullString `json:"cleanup_risk_reason"`
 	MergeEvidence         sql.NullString `json:"merge_evidence"`
+	ProjectID             string         `json:"project_id"`
 	WorkspaceSlug         string         `json:"workspace_slug"`
 }
 
@@ -246,6 +271,7 @@ func (q *Queries) MarkImplWorkspaceMergeUnknown(ctx context.Context, arg MarkImp
 		arg.CleanupProofSourceRef,
 		arg.CleanupRiskReason,
 		arg.MergeEvidence,
+		arg.ProjectID,
 		arg.WorkspaceSlug,
 	)
 	if err != nil {
@@ -261,13 +287,16 @@ UPDATE impl_workspaces
 SET status = 'merged',
 merged_at = CURRENT_TIMESTAMP,
 merge_evidence = ?1,
-cleanup_proof_kind = COALESCE(NULLIF(?2, ''), 'unknown'),
+cleanup_proof_kind = COALESCE (NULLIF (?2,
+''),
+'unknown'),
 cleanup_proof_source_ref = ?3,
 cleanup_proof_target_commit = ?4,
 cleanup_proof_at = CURRENT_TIMESTAMP,
 cleanup_risk_reason = NULL,
 updated_at = CURRENT_TIMESTAMP
-WHERE workspace_slug = ?5
+WHERE project_id = ?5
+AND workspace_slug = ?6
 `
 
 type MarkImplWorkspaceMergedParams struct {
@@ -275,6 +304,7 @@ type MarkImplWorkspaceMergedParams struct {
 	CleanupProofKind         interface{}    `json:"cleanup_proof_kind"`
 	CleanupProofSourceRef    sql.NullString `json:"cleanup_proof_source_ref"`
 	CleanupProofTargetCommit sql.NullString `json:"cleanup_proof_target_commit"`
+	ProjectID                string         `json:"project_id"`
 	WorkspaceSlug            string         `json:"workspace_slug"`
 }
 
@@ -284,6 +314,7 @@ func (q *Queries) MarkImplWorkspaceMerged(ctx context.Context, arg MarkImplWorks
 		arg.CleanupProofKind,
 		arg.CleanupProofSourceRef,
 		arg.CleanupProofTargetCommit,
+		arg.ProjectID,
 		arg.WorkspaceSlug,
 	)
 	if err != nil {
@@ -327,16 +358,18 @@ const recordImplWorkspaceEnvError = `-- name: RecordImplWorkspaceEnvError :exec
 UPDATE impl_workspaces
 SET env_last_error = ?1,
 updated_at = CURRENT_TIMESTAMP
-WHERE workspace_slug = ?2
+WHERE project_id = ?2
+AND workspace_slug = ?3
 `
 
 type RecordImplWorkspaceEnvErrorParams struct {
 	EnvLastError  sql.NullString `json:"env_last_error"`
+	ProjectID     string         `json:"project_id"`
 	WorkspaceSlug string         `json:"workspace_slug"`
 }
 
 func (q *Queries) RecordImplWorkspaceEnvError(ctx context.Context, arg RecordImplWorkspaceEnvErrorParams) error {
-	_, err := q.db.ExecContext(ctx, recordImplWorkspaceEnvError, arg.EnvLastError, arg.WorkspaceSlug)
+	_, err := q.db.ExecContext(ctx, recordImplWorkspaceEnvError, arg.EnvLastError, arg.ProjectID, arg.WorkspaceSlug)
 	return err
 }
 
@@ -347,17 +380,25 @@ UPDATE impl_workspaces
 SET env_last_repaired_at = CURRENT_TIMESTAMP,
 env_last_error = NULL,
 updated_at = CURRENT_TIMESTAMP
-WHERE workspace_slug = ?1
+WHERE project_id = ?1
+AND workspace_slug = ?2
 `
 
-func (q *Queries) RecordImplWorkspaceEnvRepair(ctx context.Context, workspaceSlug string) error {
-	_, err := q.db.ExecContext(ctx, recordImplWorkspaceEnvRepair, workspaceSlug)
+type RecordImplWorkspaceEnvRepairParams struct {
+	ProjectID     string `json:"project_id"`
+	WorkspaceSlug string `json:"workspace_slug"`
+}
+
+func (q *Queries) RecordImplWorkspaceEnvRepair(ctx context.Context, arg RecordImplWorkspaceEnvRepairParams) error {
+	_, err := q.db.ExecContext(ctx, recordImplWorkspaceEnvRepair, arg.ProjectID, arg.WorkspaceSlug)
 	return err
 }
 
 const upsertDiscoveredImplWorkspace = `-- name: UpsertDiscoveredImplWorkspace :one
 INSERT INTO impl_workspaces (
+    project_id,
     workspace_slug,
+    checkout_role,
     checkout_path,
     display_name,
     host,
@@ -392,15 +433,15 @@ VALUES (
     ?6,
     ?7,
     ?8,
+    ?9,
+    ?10,
     (
         CASE
-            WHEN ?8 = 'merged' THEN current_timestamp ELSE NULL
+            WHEN ?10 = 'merged' THEN CURRENT_TIMESTAMP ELSE NULL
         END
     ),
-    ?9,
-    COALESCE(NULLIF(?10, ''), 'unknown'),
     ?11,
-    ?12,
+    COALESCE(NULLIF(?12, ''), 'unknown'),
     ?13,
     ?14,
     ?15,
@@ -412,9 +453,12 @@ VALUES (
     ?21,
     ?22,
     ?23,
-    ?24
+    ?24,
+    ?25,
+    ?26
 )
-ON CONFLICT (workspace_slug) DO UPDATE SET
+ON CONFLICT (project_id, workspace_slug) DO UPDATE SET
+checkout_role = excluded.checkout_role,
 checkout_path = excluded.checkout_path,
 display_name = excluded.display_name,
 host = excluded.host,
@@ -454,11 +498,13 @@ behind_count = excluded.behind_count,
 git_detail = excluded.git_detail,
 last_discovered_at = CURRENT_TIMESTAMP,
 updated_at = CURRENT_TIMESTAMP
-RETURNING workspace_slug, checkout_path, display_name, host, url, plan_dir_rel, plan_dir, status, branch, commit_hash, trunk_branch, top_branch, bottom_branch, bottom_parent_branch, base_branch, ahead_count, behind_count, merged_at, cleaned_up_at, merge_evidence, cleanup_proof_kind, cleanup_proof_source_ref, cleanup_proof_target_commit, cleanup_proof_at, cleanup_risk_reason, env_last_repaired_at, env_last_error, git_detail, discovered_at, last_discovered_at, updated_at
+RETURNING project_id, workspace_slug, checkout_role, checkout_path, display_name, host, url, plan_dir_rel, plan_dir, status, branch, commit_hash, trunk_branch, top_branch, bottom_branch, bottom_parent_branch, base_branch, ahead_count, behind_count, merged_at, cleaned_up_at, merge_evidence, cleanup_proof_kind, cleanup_proof_source_ref, cleanup_proof_target_commit, cleanup_proof_at, cleanup_risk_reason, env_last_repaired_at, env_last_error, git_detail, discovered_at, last_discovered_at, updated_at
 `
 
 type UpsertDiscoveredImplWorkspaceParams struct {
+	ProjectID                string         `json:"project_id"`
 	WorkspaceSlug            string         `json:"workspace_slug"`
+	CheckoutRole             string         `json:"checkout_role"`
 	CheckoutPath             string         `json:"checkout_path"`
 	DisplayName              string         `json:"display_name"`
 	Host                     string         `json:"host"`
@@ -486,7 +532,9 @@ type UpsertDiscoveredImplWorkspaceParams struct {
 
 func (q *Queries) UpsertDiscoveredImplWorkspace(ctx context.Context, arg UpsertDiscoveredImplWorkspaceParams) (ImplWorkspace, error) {
 	row := q.db.QueryRowContext(ctx, upsertDiscoveredImplWorkspace,
+		arg.ProjectID,
 		arg.WorkspaceSlug,
+		arg.CheckoutRole,
 		arg.CheckoutPath,
 		arg.DisplayName,
 		arg.Host,
@@ -513,7 +561,9 @@ func (q *Queries) UpsertDiscoveredImplWorkspace(ctx context.Context, arg UpsertD
 	)
 	var i ImplWorkspace
 	err := row.Scan(
+		&i.ProjectID,
 		&i.WorkspaceSlug,
+		&i.CheckoutRole,
 		&i.CheckoutPath,
 		&i.DisplayName,
 		&i.Host,

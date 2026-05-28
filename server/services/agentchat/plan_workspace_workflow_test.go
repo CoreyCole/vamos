@@ -16,6 +16,7 @@ import (
 	"go.temporal.io/sdk/testsuite"
 
 	temporalmgr "github.com/CoreyCole/vamos/pkg/agents/temporal"
+	"github.com/CoreyCole/vamos/pkg/db"
 	"github.com/CoreyCole/vamos/server/services/workspaces"
 )
 
@@ -216,7 +217,7 @@ func TestWorkspaceSyncerRunsPlanAndImplSync(t *testing.T) {
 	}
 	if _, err := service.queries.GetImplWorkspace(
 		context.Background(),
-		"feature",
+		db.GetImplWorkspaceParams{WorkspaceSlug: "feature"},
 	); err != nil {
 		t.Fatalf("GetImplWorkspace(feature): %v", err)
 	}

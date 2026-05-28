@@ -3,10 +3,12 @@ package workspaces
 import (
 	"context"
 	"fmt"
+
+	"github.com/CoreyCole/vamos/pkg/db"
 )
 
 type implWorkspaceCleanupMarker interface {
-	MarkImplWorkspaceCleanedUp(ctx context.Context, workspaceSlug string) (int64, error)
+	MarkImplWorkspaceCleanedUp(ctx context.Context, arg db.MarkImplWorkspaceCleanedUpParams) (int64, error)
 }
 
 // CleanupActivities own retry-safe side effects for workspace cleanup workflows.
@@ -26,7 +28,7 @@ func (a *CleanupActivities) CleanupWorkspace(ctx context.Context, input Workspac
 		return err
 	}
 	if a.Store != nil {
-		if _, err := a.Store.MarkImplWorkspaceCleanedUp(ctx, input.Slug); err != nil {
+		if _, err := a.Store.MarkImplWorkspaceCleanedUp(ctx, db.MarkImplWorkspaceCleanedUpParams{ProjectID: input.ProjectID, WorkspaceSlug: input.Slug}); err != nil {
 			return fmt.Errorf("mark implementation workspace cleaned up: %w", err)
 		}
 	}

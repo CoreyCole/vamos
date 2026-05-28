@@ -279,7 +279,9 @@ type ExternalAgentSession struct {
 }
 
 type ImplWorkspace struct {
+	ProjectID                string         `json:"project_id"`
 	WorkspaceSlug            string         `json:"workspace_slug"`
+	CheckoutRole             string         `json:"checkout_role"`
 	CheckoutPath             string         `json:"checkout_path"`
 	DisplayName              string         `json:"display_name"`
 	Host                     string         `json:"host"`

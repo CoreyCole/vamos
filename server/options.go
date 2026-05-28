@@ -107,12 +107,20 @@ type RepoConfig struct {
 	Checkouts        map[string]CheckoutConfig `yaml:"checkouts"`
 }
 
+type CheckoutRole string
+
+const (
+	CheckoutRoleMain  CheckoutRole = "main"
+	CheckoutRoleStage CheckoutRole = "stage"
+)
+
 type CheckoutConfig struct {
-	RootPath          string `yaml:"root_path"`
-	Purpose           string `yaml:"purpose"`
-	MustBeClean       bool   `yaml:"must_be_clean"`
-	MustBeLatest      bool   `yaml:"must_be_latest"`
-	WebhookSyncBranch string `yaml:"webhook_sync_branch"`
+	RootPath          string       `yaml:"root_path"`
+	Purpose           string       `yaml:"purpose"`
+	Role              CheckoutRole `yaml:"role"`
+	MustBeClean       bool         `yaml:"must_be_clean"`
+	MustBeLatest      bool         `yaml:"must_be_latest"`
+	WebhookSyncBranch string       `yaml:"webhook_sync_branch"`
 }
 
 type WorkspaceConfig struct {
@@ -134,9 +142,11 @@ type WorkspaceConfig struct {
 }
 
 type WorkspaceCheckoutConfig struct {
-	RootPath    string `yaml:"root_path"`
-	DisplayName string `yaml:"display_name"`
-	IsMain      bool   `yaml:"is_main"`
+	RootPath    string       `yaml:"root_path"`
+	DisplayName string       `yaml:"display_name"`
+	IsMain      bool         `yaml:"is_main"`
+	Role        CheckoutRole `yaml:"role"`
+	ProjectID   string       `yaml:"project_id"`
 }
 
 type WorkspaceProcessCommands struct {

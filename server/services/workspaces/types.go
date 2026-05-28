@@ -3,6 +3,7 @@ package workspaces
 import (
 	"context"
 	"net/http"
+	"strings"
 	"time"
 )
 
@@ -190,7 +191,29 @@ type WorkspaceEnv struct {
 	DatabasePath string `json:"database_path"`
 }
 
+type CheckoutRole string
+
+const (
+	CheckoutRoleMain  CheckoutRole = "main"
+	CheckoutRoleStage CheckoutRole = "stage"
+)
+
+type ImplWorkspaceKey struct {
+	ProjectID string
+	Slug      string
+}
+
+func ImplWorkspaceKeyFor(projectID, slug string) ImplWorkspaceKey {
+	return ImplWorkspaceKey{ProjectID: strings.TrimSpace(projectID), Slug: strings.TrimSpace(slug)}
+}
+
+func IsProtectedCheckoutRole(role CheckoutRole) bool {
+	return role == CheckoutRoleMain || role == CheckoutRoleStage
+}
+
 type Workspace struct {
+	ProjectID       string
+	CheckoutRole    CheckoutRole
 	Slug            string
 	DisplayName     string
 	CheckoutPath    string
@@ -233,9 +256,12 @@ type ConfiguredCheckout struct {
 	RootPath    string
 	DisplayName string
 	IsMain      bool
+	Role        CheckoutRole
+	ProjectID   string
 }
 
 type DiscoveryConfig struct {
+	ProjectID           string
 	MainCheckoutPath    string
 	ParentDir           string
 	Domain              string
@@ -249,6 +275,7 @@ type DiscoveryConfig struct {
 }
 
 type ImplWorkspaceDiscoveryConfig struct {
+	ProjectID           string
 	MainCheckoutPath    string
 	ParentDir           string
 	Domain              string

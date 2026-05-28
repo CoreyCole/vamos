@@ -36,6 +36,7 @@ type ImplWorkspaceSyncer struct {
 }
 
 type ImplWorkspaceSyncInput struct {
+	ProjectID    string
 	Discovery    ImplWorkspaceDiscoveryConfig
 	ManagerURL   string
 	RestartToken string
@@ -61,7 +62,9 @@ func (s *ImplWorkspaceSyncer) Sync(
 			"impl workspace syncer requires queries",
 		)
 	}
+	discoveryProjectID := firstNonEmpty(input.Discovery.ProjectID, input.ProjectID)
 	discovered, err := Discover(DiscoveryConfig{
+		ProjectID:           discoveryProjectID,
 		MainCheckoutPath:    input.Discovery.MainCheckoutPath,
 		ParentDir:           input.Discovery.ParentDir,
 		Domain:              input.Discovery.Domain,
@@ -83,13 +86,16 @@ func (s *ImplWorkspaceSyncer) Sync(
 	seen := collections.NewSet[string]()
 	for _, ws := range discovered {
 		slug := strings.TrimSpace(ws.Slug)
-		if slug == "" || ws.Status == StatusInvalid || seen.Has(slug) {
+		projectID := firstNonEmpty(ws.ProjectID, discoveryProjectID)
+		key := ImplWorkspaceKeyFor(projectID, slug)
+		seenKey := implWorkspaceSeenKey(key)
+		if slug == "" || ws.Status == StatusInvalid || seen.Has(seenKey) {
 			continue
 		}
-		seen.Add(slug)
+		seen.Add(seenKey)
 
 		gitState := InspectImplWorkspaceGit(ctx, ws.CheckoutPath, input.TrunkBranch)
-		before, beforeErr := s.Queries.GetImplWorkspace(ctx, slug)
+		before, beforeErr := s.Queries.GetImplWorkspace(ctx, db.GetImplWorkspaceParams{ProjectID: key.ProjectID, WorkspaceSlug: key.Slug})
 		if beforeErr != nil && !errors.Is(beforeErr, sql.ErrNoRows) {
 			return ImplWorkspaceSyncResult{}, beforeErr
 		}
@@ -97,7 +103,7 @@ func (s *ImplWorkspaceSyncer) Sync(
 			gitState = applyCachedMergeProof(gitState, before)
 		}
 		binding := readBestEffortPlanBinding(ws.CheckoutPath)
-		params := implWorkspaceUpsertParams(ws, gitState, binding)
+		params := implWorkspaceUpsertParams(projectID, ws, gitState, binding)
 		row, err := s.Queries.UpsertDiscoveredImplWorkspace(ctx, params)
 		if err != nil {
 			return ImplWorkspaceSyncResult{}, err
@@ -122,7 +128,7 @@ func (s *ImplWorkspaceSyncer) Sync(
 		case ImplWorkspaceEnvActionCreated, ImplWorkspaceEnvActionRepaired:
 			result.RepairedEnv++
 			result.Changed = true
-			if err := s.Queries.RecordImplWorkspaceEnvRepair(ctx, slug); err != nil {
+			if err := s.Queries.RecordImplWorkspaceEnvRepair(ctx, db.RecordImplWorkspaceEnvRepairParams{ProjectID: key.ProjectID, WorkspaceSlug: key.Slug}); err != nil {
 				return ImplWorkspaceSyncResult{}, err
 			}
 		}
@@ -130,7 +136,8 @@ func (s *ImplWorkspaceSyncer) Sync(
 			if err := s.Queries.RecordImplWorkspaceEnvError(
 				ctx,
 				db.RecordImplWorkspaceEnvErrorParams{
-					WorkspaceSlug: slug,
+					ProjectID:     key.ProjectID,
+					WorkspaceSlug: key.Slug,
 					EnvLastError:  nullableString(repairErr.Error()),
 				},
 			); err != nil {
@@ -216,6 +223,7 @@ func readBestEffortPlanBinding(checkoutPath string) PlanWorkspaceBinding {
 }
 
 func implWorkspaceUpsertParams(
+	projectID string,
 	ws Workspace,
 	gitState ImplWorkspaceGitState,
 	binding PlanWorkspaceBinding,
@@ -226,12 +234,15 @@ func implWorkspaceUpsertParams(
 	if proof.Kind == "" {
 		proof.Kind = MergeProofUnknown
 	}
-	if gitState.Merged {
+	protected := IsProtectedCheckoutRole(ws.CheckoutRole) || ws.IsMain || ws.Slug == mainWorkspaceSlug
+	if gitState.Merged && !protected {
 		status = string(ImplWorkspaceStatusMerged)
 		mergeEvidence = nullableString(activeCheckoutMergeEvidence(gitState.Commit, proof))
 	}
 	params := db.UpsertDiscoveredImplWorkspaceParams{
+		ProjectID:                strings.TrimSpace(projectID),
 		WorkspaceSlug:            ws.Slug,
+		CheckoutRole:             string(ws.CheckoutRole),
 		CheckoutPath:             ws.CheckoutPath,
 		DisplayName:              workspaceNavLabel(ws),
 		Host:                     ws.Host,
@@ -338,15 +349,17 @@ func (s *ImplWorkspaceSyncer) reconcileMissing(
 	input ImplWorkspaceSyncInput,
 	activeSlugs collections.Set[string],
 ) (cleaned, merged int, changed bool, err error) {
-	rows, err := s.Queries.ListImplWorkspaces(ctx)
+	rows, err := s.Queries.ListImplWorkspaces(ctx, firstNonEmpty(input.Discovery.ProjectID, input.ProjectID))
 	if err != nil {
 		return 0, 0, false, err
 	}
 	configured := configuredCheckoutSlugs(input.Discovery)
 	for _, row := range rows {
+		rowKey := implWorkspaceSeenKey(ImplWorkspaceKeyFor(row.ProjectID, row.WorkspaceSlug))
 		if row.Status != string(ImplWorkspaceStatusActive) ||
-			activeSlugs.Has(row.WorkspaceSlug) ||
+			activeSlugs.Has(rowKey) ||
 			configured.Has(row.WorkspaceSlug) ||
+			IsProtectedCheckoutRole(CheckoutRole(strings.TrimSpace(row.CheckoutRole))) ||
 			row.WorkspaceSlug == "stage" ||
 			!rowInDiscoveryScope(row, input.Discovery) {
 			continue
@@ -360,6 +373,7 @@ func (s *ImplWorkspaceSyncer) reconcileMissing(
 			n, err := s.Queries.MarkImplWorkspaceMerged(
 				ctx,
 				db.MarkImplWorkspaceMergedParams{
+					ProjectID:                row.ProjectID,
 					WorkspaceSlug:            row.WorkspaceSlug,
 					MergeEvidence:            nullableString(missingCheckoutMergeEvidence(row, proof)),
 					CleanupProofKind:         string(proof.Kind),
@@ -375,6 +389,7 @@ func (s *ImplWorkspaceSyncer) reconcileMissing(
 			continue
 		}
 		n, err := s.Queries.MarkImplWorkspaceMergeUnknown(ctx, db.MarkImplWorkspaceMergeUnknownParams{
+			ProjectID:             row.ProjectID,
 			WorkspaceSlug:         row.WorkspaceSlug,
 			CleanupProofSourceRef: nullableString(proof.SourceRef),
 			CleanupRiskReason:     nullableString(proof.RiskReason),
@@ -386,6 +401,10 @@ func (s *ImplWorkspaceSyncer) reconcileMissing(
 		changed = changed || n > 0
 	}
 	return cleaned, merged, changed, nil
+}
+
+func implWorkspaceSeenKey(key ImplWorkspaceKey) string {
+	return strings.TrimSpace(key.ProjectID) + "\x00" + strings.TrimSpace(key.Slug)
 }
 
 func configuredCheckoutSlugs(cfg ImplWorkspaceDiscoveryConfig) collections.Set[string] {
@@ -433,7 +452,9 @@ func rowInDiscoveryScope(row db.ImplWorkspace, cfg ImplWorkspaceDiscoveryConfig)
 }
 
 func implWorkspaceRowChanged(before, after db.ImplWorkspace) bool {
-	return before.CheckoutPath != after.CheckoutPath ||
+	return before.ProjectID != after.ProjectID ||
+		before.CheckoutRole != after.CheckoutRole ||
+		before.CheckoutPath != after.CheckoutPath ||
 		before.DisplayName != after.DisplayName ||
 		before.Host != after.Host ||
 		before.Url != after.Url ||

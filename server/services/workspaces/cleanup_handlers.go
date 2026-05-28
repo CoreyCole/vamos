@@ -21,6 +21,7 @@ const (
 )
 
 type WorkspaceCleanupWorkflowInput struct {
+	ProjectID    string                      `json:"project_id"`
 	Slug         string                      `json:"slug"`
 	TransitionID string                      `json:"transition_id"`
 	Disposition  WorkspaceCleanupDisposition `json:"disposition"`
@@ -71,7 +72,7 @@ func (h *Handler) HandleCleanupWorkspace(c echo.Context) error {
 	if action.RequiresConfirm && !confirmed {
 		return echo.NewHTTPError(http.StatusBadRequest, "unmerged workspace close requires confirmation")
 	}
-	input := WorkspaceCleanupWorkflowInput{Slug: slug, TransitionID: uuid.NewString(), Disposition: action.Disposition, Confirmed: confirmed}
+	input := WorkspaceCleanupWorkflowInput{ProjectID: view.Row.ProjectID, Slug: slug, TransitionID: uuid.NewString(), Disposition: action.Disposition, Confirmed: confirmed}
 	if err := h.cleanupStarter.StartCleanup(c.Request().Context(), input); err != nil {
 		return err
 	}
@@ -95,7 +96,7 @@ func workspaceCleanupAction(view ImplWorkspaceView) WorkspaceCleanupAction {
 		action.DisabledReason = "main workspace cannot be cleaned up"
 		return action
 	}
-	if view.Runtime.Workspace.IsConfigured {
+	if view.Runtime.Workspace.IsConfigured || IsProtectedCheckoutRole(CheckoutRole(strings.TrimSpace(view.Row.CheckoutRole))) {
 		action.Disabled = true
 		action.DisabledReason = "configured checkout cannot be cleaned up"
 		return action

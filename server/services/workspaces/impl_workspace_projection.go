@@ -54,6 +54,8 @@ func BuildImplWorkspaceViews(
 	if strings.TrimSpace(main.Workspace.Slug) != "" {
 		view := ImplWorkspaceView{
 			Row: db.ImplWorkspace{
+				ProjectID:     main.Workspace.ProjectID,
+				CheckoutRole:  string(main.Workspace.CheckoutRole),
 				WorkspaceSlug: main.Workspace.Slug,
 				CheckoutPath:  main.Workspace.CheckoutPath,
 				DisplayName:   workspaceNavLabel(main.Workspace),
@@ -82,6 +84,8 @@ func BuildImplWorkspaceViews(
 			view.HasRuntime = true
 		} else {
 			view.Runtime = snapshotFromState(Workspace{
+				ProjectID:    row.ProjectID,
+				CheckoutRole: CheckoutRole(row.CheckoutRole),
 				Slug:         row.WorkspaceSlug,
 				DisplayName:  row.DisplayName,
 				CheckoutPath: row.CheckoutPath,
@@ -273,6 +277,8 @@ func ImplViewsToNavWorkspaces(views []ImplWorkspaceView) []Workspace {
 		}
 		if view.Row.Status == string(ImplWorkspaceStatusActive) {
 			out = append(out, Workspace{
+				ProjectID:    view.Row.ProjectID,
+				CheckoutRole: CheckoutRole(view.Row.CheckoutRole),
 				Slug:         view.Row.WorkspaceSlug,
 				DisplayName:  view.Row.DisplayName,
 				CheckoutPath: view.Row.CheckoutPath,
@@ -298,6 +304,8 @@ func lifecycleSnapshotsToImplViews(
 	for _, snap := range items {
 		views = append(views, ImplWorkspaceView{
 			Row: db.ImplWorkspace{
+				ProjectID:     snap.Workspace.ProjectID,
+				CheckoutRole:  string(snap.Workspace.CheckoutRole),
 				WorkspaceSlug: snap.Workspace.Slug,
 				CheckoutPath:  snap.Workspace.CheckoutPath,
 				DisplayName:   workspaceNavLabel(snap.Workspace),

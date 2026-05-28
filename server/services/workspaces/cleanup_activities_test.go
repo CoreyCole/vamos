@@ -14,8 +14,8 @@ type fakeImplWorkspaceCleanupMarker struct {
 	err   error
 }
 
-func (f *fakeImplWorkspaceCleanupMarker) MarkImplWorkspaceCleanedUp(ctx context.Context, workspaceSlug string) (int64, error) {
-	f.slugs = append(f.slugs, workspaceSlug)
+func (f *fakeImplWorkspaceCleanupMarker) MarkImplWorkspaceCleanedUp(ctx context.Context, arg db.MarkImplWorkspaceCleanedUpParams) (int64, error) {
+	f.slugs = append(f.slugs, arg.WorkspaceSlug)
 	return 1, f.err
 }
 

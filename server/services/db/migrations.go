@@ -381,6 +381,8 @@ func ensureImplWorkspaceCleanupProofColumnsIfTableExists(
 		name       string
 		definition string
 	}{
+		{name: "project_id", definition: "TEXT NOT NULL DEFAULT ''"},
+		{name: "checkout_role", definition: "TEXT NOT NULL DEFAULT '' CHECK (checkout_role IN ('', 'main', 'stage'))"},
 		{name: "cleanup_proof_kind", definition: "TEXT NOT NULL DEFAULT 'unknown' CHECK (cleanup_proof_kind IN ('ancestor', 'patch_equivalent', 'cached', 'unknown'))"},
 		{name: "cleanup_proof_source_ref", definition: "TEXT"},
 		{name: "cleanup_proof_target_commit", definition: "TEXT"},
@@ -391,7 +393,131 @@ func ensureImplWorkspaceCleanupProofColumnsIfTableExists(
 			return err
 		}
 	}
+	if err := ensureImplWorkspaceCompositePrimaryKey(ctx, database); err != nil {
+		return err
+	}
+	for _, indexSQL := range []string{
+		`CREATE INDEX IF NOT EXISTS idx_impl_workspaces_project_status_updated ON impl_workspaces (project_id, status, updated_at DESC)`,
+		`CREATE INDEX IF NOT EXISTS idx_impl_workspaces_plan_dir_rel ON impl_workspaces (plan_dir_rel) WHERE plan_dir_rel IS NOT NULL`,
+		`CREATE UNIQUE INDEX IF NOT EXISTS idx_impl_workspaces_checkout_path ON impl_workspaces (checkout_path)`,
+	} {
+		if err := ensureIndex(ctx, database, indexSQL); err != nil {
+			return err
+		}
+	}
 	return nil
+}
+
+func ensureImplWorkspaceCompositePrimaryKey(ctx context.Context, database *sql.DB) error {
+	composite, err := implWorkspacesHasCompositePrimaryKey(ctx, database)
+	if err != nil || composite {
+		return err
+	}
+	if _, err := database.ExecContext(ctx, `PRAGMA foreign_keys = OFF`); err != nil {
+		return err
+	}
+	defer func() { _, _ = database.ExecContext(ctx, `PRAGMA foreign_keys = ON`) }()
+
+	tx, err := database.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	statements := []string{
+		`DROP INDEX IF EXISTS idx_impl_workspaces_status_updated`,
+		`DROP INDEX IF EXISTS idx_impl_workspaces_project_status_updated`,
+		`DROP INDEX IF EXISTS idx_impl_workspaces_plan_dir_rel`,
+		`DROP INDEX IF EXISTS idx_impl_workspaces_checkout_path`,
+		`CREATE TABLE impl_workspaces_new (
+			project_id TEXT NOT NULL DEFAULT '',
+			workspace_slug TEXT NOT NULL,
+			checkout_role TEXT NOT NULL DEFAULT '' CHECK (checkout_role IN ('', 'main', 'stage')),
+			checkout_path TEXT NOT NULL,
+			display_name TEXT NOT NULL,
+			host TEXT NOT NULL DEFAULT '',
+			url TEXT NOT NULL DEFAULT '',
+			plan_dir_rel TEXT REFERENCES plan_workspaces (plan_dir_rel),
+			plan_dir TEXT,
+			status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'cleaned_up', 'merged')),
+			branch TEXT,
+			commit_hash TEXT,
+			trunk_branch TEXT,
+			top_branch TEXT,
+			bottom_branch TEXT,
+			bottom_parent_branch TEXT,
+			base_branch TEXT,
+			ahead_count INTEGER NOT NULL DEFAULT 0,
+			behind_count INTEGER NOT NULL DEFAULT 0,
+			merged_at DATETIME,
+			cleaned_up_at DATETIME,
+			merge_evidence TEXT,
+			cleanup_proof_kind TEXT NOT NULL DEFAULT 'unknown' CHECK (cleanup_proof_kind IN ('ancestor', 'patch_equivalent', 'cached', 'unknown')),
+			cleanup_proof_source_ref TEXT,
+			cleanup_proof_target_commit TEXT,
+			cleanup_proof_at DATETIME,
+			cleanup_risk_reason TEXT,
+			env_last_repaired_at DATETIME,
+			env_last_error TEXT,
+			git_detail TEXT,
+			discovered_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			last_discovered_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			PRIMARY KEY (project_id, workspace_slug)
+		)`,
+		`INSERT INTO impl_workspaces_new (
+			project_id, workspace_slug, checkout_role, checkout_path, display_name, host, url,
+			plan_dir_rel, plan_dir, status, branch, commit_hash, trunk_branch, top_branch,
+			bottom_branch, bottom_parent_branch, base_branch, ahead_count, behind_count,
+			merged_at, cleaned_up_at, merge_evidence, cleanup_proof_kind,
+			cleanup_proof_source_ref, cleanup_proof_target_commit, cleanup_proof_at,
+			cleanup_risk_reason, env_last_repaired_at, env_last_error, git_detail,
+			discovered_at, last_discovered_at, updated_at
+		)
+		SELECT COALESCE(project_id, ''), workspace_slug, COALESCE(checkout_role, ''), checkout_path,
+			display_name, host, url, plan_dir_rel, plan_dir, status, branch, commit_hash,
+			trunk_branch, top_branch, bottom_branch, bottom_parent_branch, base_branch,
+			ahead_count, behind_count, merged_at, cleaned_up_at, merge_evidence,
+			COALESCE(NULLIF(cleanup_proof_kind, ''), 'unknown'), cleanup_proof_source_ref,
+			cleanup_proof_target_commit, cleanup_proof_at, cleanup_risk_reason,
+			env_last_repaired_at, env_last_error, git_detail, discovered_at,
+			last_discovered_at, updated_at
+		FROM impl_workspaces`,
+		`DROP TABLE impl_workspaces`,
+		`ALTER TABLE impl_workspaces_new RENAME TO impl_workspaces`,
+	}
+	for _, statement := range statements {
+		if _, err := tx.ExecContext(ctx, statement); err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
+}
+
+func implWorkspacesHasCompositePrimaryKey(ctx context.Context, database *sql.DB) (bool, error) {
+	rows, err := database.QueryContext(ctx, "PRAGMA table_info(impl_workspaces)")
+	if err != nil {
+		return false, err
+	}
+	defer rows.Close()
+	pk := map[int]string{}
+	for rows.Next() {
+		var cid int
+		var name, typ string
+		var notNull int
+		var dflt any
+		var pkIndex int
+		if err := rows.Scan(&cid, &name, &typ, &notNull, &dflt, &pkIndex); err != nil {
+			return false, err
+		}
+		if pkIndex > 0 {
+			pk[pkIndex] = name
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return false, err
+	}
+	return len(pk) == 2 && strings.EqualFold(pk[1], "project_id") && strings.EqualFold(pk[2], "workspace_slug"), nil
 }
 
 func ensureWorkspaceEventsDocColumnsIfTableExists(

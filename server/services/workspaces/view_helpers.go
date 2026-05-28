@@ -60,6 +60,9 @@ func isHistoricalImplWorkspaceView(
 	if lane, ok := protected[slug]; ok && lane.Protected {
 		return false
 	}
+	if IsProtectedCheckoutRole(CheckoutRole(strings.TrimSpace(view.Row.CheckoutRole))) {
+		return false
+	}
 	if view.IsMain || slug == mainWorkspaceSlug {
 		return false
 	}
@@ -400,7 +403,7 @@ func groupImplWorkspaceViews(
 			view.Children = nil
 			slug := workspaceViewSlug(view)
 			lane, isProtectedLane := protected[slug]
-			if (isProtectedLane && lane.Protected) || view.IsMain || slug == mainWorkspaceSlug {
+			if (isProtectedLane && lane.Protected) || IsProtectedCheckoutRole(CheckoutRole(strings.TrimSpace(view.Row.CheckoutRole))) || view.IsMain || slug == mainWorkspaceSlug {
 				groups.NeedsAttention = append(groups.NeedsAttention, view)
 				walk(children)
 				continue

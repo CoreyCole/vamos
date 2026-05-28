@@ -40,11 +40,12 @@ type RepoConfigFile struct {
 }
 
 type CheckoutConfigFile struct {
-	RootPath          string `yaml:"root_path"`
-	Purpose           string `yaml:"purpose"`
-	MustBeClean       bool   `yaml:"must_be_clean"`
-	MustBeLatest      bool   `yaml:"must_be_latest"`
-	WebhookSyncBranch string `yaml:"webhook_sync_branch"`
+	RootPath          string              `yaml:"root_path"`
+	Purpose           string              `yaml:"purpose"`
+	Role              server.CheckoutRole `yaml:"role"`
+	MustBeClean       bool                `yaml:"must_be_clean"`
+	MustBeLatest      bool                `yaml:"must_be_latest"`
+	WebhookSyncBranch string              `yaml:"webhook_sync_branch"`
 }
 
 type LoadFileConfigOptions struct {
@@ -223,6 +224,9 @@ func ValidateHostConfig(cfg server.HostConfig) (server.HostConfig, error) {
 		if err != nil {
 			return cfg, err
 		}
+		if err := validateCheckoutRole("workspaces.configured_checkouts."+slug+".role", checkout.Role); err != nil {
+			return cfg, err
+		}
 		cfg.Workspaces.ConfiguredCheckouts[slug] = checkout
 	}
 	if cfg.Workspaces.MetadataDirName == "" {
@@ -255,11 +259,23 @@ func ValidateHostConfig(cfg server.HostConfig) (server.HostConfig, error) {
 			if err != nil {
 				return cfg, err
 			}
+			if err := validateCheckoutRole("projects.repos."+repoName+".checkouts."+checkoutName+".role", checkout.Role); err != nil {
+				return cfg, err
+			}
 			repo.Checkouts[checkoutName] = checkout
 		}
 		cfg.Projects.Repos[repoName] = repo
 	}
 	return cfg, nil
+}
+
+func validateCheckoutRole(path string, role server.CheckoutRole) error {
+	switch role {
+	case "", server.CheckoutRoleMain, server.CheckoutRoleStage:
+		return nil
+	default:
+		return fmt.Errorf("%s role must be main or stage; got %q", path, role)
+	}
 }
 
 func RejectLegacyConfig(environ []string) error {

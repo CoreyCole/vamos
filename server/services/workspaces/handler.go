@@ -36,7 +36,7 @@ type PlanWorkspaceLister interface {
 }
 
 type ImplWorkspaceLister interface {
-	ListImplWorkspaces(ctx context.Context) ([]db.ImplWorkspace, error)
+	ListImplWorkspaces(ctx context.Context, projectID string) ([]db.ImplWorkspace, error)
 }
 
 const (
@@ -1032,7 +1032,7 @@ func (h *Handler) listImplWorkspaceViews(
 	if h.implWorkspaces == nil {
 		return lifecycleSnapshotsToImplViews(runtime), nil
 	}
-	rows, err := h.implWorkspaces.ListImplWorkspaces(ctx)
+	rows, err := h.implWorkspaces.ListImplWorkspaces(ctx, "")
 	if err != nil {
 		return nil, err
 	}

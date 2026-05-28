@@ -819,6 +819,7 @@ func main() {
 		)
 		workspaceDiscovery.ModuleMarker = hostCfg.Workspaces.ModuleMarker
 		workspaceDiscovery.PackageSubdir = hostCfg.Workspaces.PackageSubdir
+		workspaceDiscovery.ProjectID = strings.TrimSpace(hostCfg.Projects.DefaultRepo)
 		if len(hostCfg.Workspaces.ConfiguredCheckouts) > 0 {
 			workspaceDiscovery.ConfiguredCheckouts = map[string]workspaces.ConfiguredCheckout{}
 			for slug, checkout := range hostCfg.Workspaces.ConfiguredCheckouts {
@@ -826,6 +827,31 @@ func main() {
 					RootPath:    checkout.RootPath,
 					DisplayName: checkout.DisplayName,
 					IsMain:      checkout.IsMain,
+					Role:        workspaces.CheckoutRole(checkout.Role),
+					ProjectID:   checkout.ProjectID,
+				}
+			}
+		}
+		if len(hostCfg.Projects.Repos) > 0 {
+			if workspaceDiscovery.ConfiguredCheckouts == nil {
+				workspaceDiscovery.ConfiguredCheckouts = map[string]workspaces.ConfiguredCheckout{}
+			}
+			for projectID, repo := range hostCfg.Projects.Repos {
+				for checkoutName, checkout := range repo.Checkouts {
+					if strings.TrimSpace(checkout.RootPath) == "" {
+						continue
+					}
+					slug := checkoutName
+					if existing, exists := workspaceDiscovery.ConfiguredCheckouts[slug]; exists && strings.TrimSpace(existing.ProjectID) != "" && strings.TrimSpace(existing.ProjectID) != projectID {
+						slug = workspaces.ProjectScopedCheckoutSlug(projectID, checkoutName)
+					}
+					workspaceDiscovery.ConfiguredCheckouts[slug] = workspaces.ConfiguredCheckout{
+						RootPath:    checkout.RootPath,
+						DisplayName: firstNonEmpty(checkout.Purpose, checkoutName),
+						IsMain:      checkout.Role == server.CheckoutRoleMain || checkoutName == hostCfg.Projects.DefaultCheckout || checkoutName == repo.DefaultCheckout,
+						Role:        workspaces.CheckoutRole(checkout.Role),
+						ProjectID:   projectID,
+					}
 				}
 			}
 		}
@@ -1101,6 +1127,7 @@ func main() {
 	).WithEmbeddedChatRenderer(agentChatService)
 	agentChatService.SetImplWorkspaceDiscoveryConfig(
 		workspaces.ImplWorkspaceDiscoveryConfig{
+			ProjectID:           workspaceDiscovery.ProjectID,
 			MainCheckoutPath:    workspaceDiscovery.MainCheckoutPath,
 			ParentDir:           workspaceParentDir,
 			Domain:              cfg.WorkspaceDomain,

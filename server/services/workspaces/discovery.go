@@ -97,6 +97,7 @@ func Discover(cfg DiscoveryConfig) ([]Workspace, error) {
 			logPath = filepath.Join(checkoutPath, "log", "agents-server.log")
 		}
 		ws := Workspace{
+			ProjectID:       strings.TrimSpace(cfg.ProjectID),
 			Slug:            slug,
 			DisplayName:     displayNameForSlug(slug),
 			CheckoutPath:    checkoutPath,
@@ -165,6 +166,8 @@ func workspaceFromConfiguredCheckout(
 		logPath = filepath.Join(checkoutPath, "log", "agents-server.log")
 	}
 	ws := Workspace{
+		ProjectID:       strings.TrimSpace(firstNonEmptyString(configured.ProjectID, cfg.ProjectID)),
+		CheckoutRole:    configured.Role,
 		Slug:            normalizedSlug,
 		DisplayName:     firstNonEmptyString(configured.DisplayName, displayNameForSlug(normalizedSlug)),
 		CheckoutPath:    checkoutPath,
@@ -301,6 +304,15 @@ func SlugFromPlanDirName(name string) (string, error) {
 		return "", errInvalidSlug
 	}
 	return NormalizeWorkspaceSlug(name)
+}
+
+func ProjectScopedCheckoutSlug(projectID, checkoutName string) string {
+	base := strings.TrimSpace(projectID) + "-" + strings.TrimSpace(checkoutName)
+	slug, err := NormalizeWorkspaceSlug(base)
+	if err != nil {
+		return workspaceSlugHash(base)
+	}
+	return slug
 }
 
 func NormalizeWorkspaceSlug(raw string) (string, error) {

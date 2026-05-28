@@ -54,8 +54,13 @@ func (s *WorkspaceSyncer) Sync(
 		result.Plan = plan
 	}
 	if s.ImplSyncer != nil {
+		implDiscovery := input.ImplWorkspaces
+		if implDiscovery.ProjectID == "" {
+			implDiscovery.ProjectID = input.ProjectID
+		}
 		impl, err := s.ImplSyncer.Sync(ctx, workspaces.ImplWorkspaceSyncInput{
-			Discovery:    input.ImplWorkspaces,
+			ProjectID:    input.ProjectID,
+			Discovery:    implDiscovery,
 			ManagerURL:   input.ManagerURL,
 			RestartToken: input.RestartToken,
 			TrunkBranch:  input.TrunkBranch,
