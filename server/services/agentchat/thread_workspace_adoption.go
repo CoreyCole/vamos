@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -14,6 +15,7 @@ import (
 	"github.com/CoreyCole/vamos/pkg/db"
 	agentchatworkflows "github.com/CoreyCole/vamos/server/services/agentchat/workflows"
 	"github.com/CoreyCole/vamos/server/services/markdown"
+	"github.com/CoreyCole/vamos/server/services/planworkspace"
 )
 
 type ThreadWorkspaceAdoptionInput struct {
@@ -141,12 +143,18 @@ func (s *Service) projectFromSuccessfulQRSPIWrites(entries []db.AgentEntry, cwd 
 			continue
 		}
 		for _, rawPath := range extractPathStrings(entry.Message.Details, entry.Message.Content) {
+			if project := s.projectFromTouchedQRSPIFrontmatter(rawPath, cwd); project != "" {
+				projectID = project
+			}
 			if root, ok := s.ResolveAttachablePlanRootFrom(rawPath, cwd); ok {
 				before[root.AbsPath] = struct{}{}
 			}
 		}
 		if call, ok := toolCalls[strings.TrimSpace(entry.Message.ToolCallID)]; ok {
 			for _, rawPath := range extractPathStrings(call.Arguments) {
+				if project := s.projectFromTouchedQRSPIFrontmatter(rawPath, cwd); project != "" {
+					projectID = project
+				}
 				if root, ok := s.ResolveAttachablePlanRootFrom(rawPath, cwd); ok {
 					before[root.AbsPath] = struct{}{}
 				}
@@ -170,6 +178,30 @@ func (s *Service) projectFromSuccessfulQRSPIWrites(entries []db.AgentEntry, cwd 
 
 func (s *Service) projectFromAttachablePlanRoot(root AttachablePlanRoot) string {
 	frontmatter, err := readPlanWorkspaceFrontmatter(root.AbsPath)
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(frontmatter.Project)
+}
+
+func (s *Service) projectFromTouchedQRSPIFrontmatter(rawPath, cwd string) string {
+	abs, ok := s.resolveAttachableCandidatePath(rawPath, cwd)
+	if !ok {
+		return ""
+	}
+	info, err := os.Stat(abs)
+	if err != nil || info.IsDir() {
+		return ""
+	}
+	root, ok := s.ResolveAttachablePlanRootFrom(abs, cwd)
+	if !ok || (!sameFilesystemPath(abs, root.AbsPath) && !pathWithinRoot(abs, root.AbsPath)) {
+		return ""
+	}
+	data, err := os.ReadFile(abs)
+	if err != nil {
+		return ""
+	}
+	frontmatter, err := planworkspace.ParsePlanWorkspaceFrontmatter(abs, data)
 	if err != nil {
 		return ""
 	}

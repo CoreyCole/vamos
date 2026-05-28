@@ -409,7 +409,8 @@ func TestAdoptThreadProjectForRunUsesXMLBeforeFrontmatterWrites(t *testing.T) {
 func TestAdoptThreadProjectForRunUsesSuccessfulFrontmatterWrites(t *testing.T) {
 	service := newTestAgentChatService(t)
 	alphaPlan := filepath.Join(service.thoughtsRoot, "user", "plans", "alpha-write")
-	mustWriteFile(t, filepath.Join(alphaPlan, "AGENTS.md"), "---\nproject: example.com/alpha/app\n---\n# Alpha\n")
+	mustWriteFile(t, filepath.Join(alphaPlan, "AGENTS.md"), "# Alpha\n")
+	mustWriteFile(t, filepath.Join(alphaPlan, "design.md"), "---\nproject: example.com/alpha/app\nstage: design\n---\n# Design\n")
 	thread := mustCreateAgentThread(t, service, "project-thread-write", "user@example.com", service.projectRoot, "lineage-project-write")
 	entries := []db.AgentEntry{
 		{EntryID: "call-1", PayloadJson: `{"type":"message","id":"call-1","message":{"role":"assistant","content":[{"type":"toolCall","id":"write-1","name":"write","arguments":{"path":"` + filepath.ToSlash(filepath.Join(alphaPlan, "design.md")) + `"}}]}}`},
