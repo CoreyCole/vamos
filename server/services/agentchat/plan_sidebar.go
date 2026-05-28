@@ -128,7 +128,7 @@ func (s *Service) collectPlanSidebarSources(
 func (s *Service) collectDiscoveredPlanSidebarSources(
 	ctx context.Context,
 ) ([]PlanSidebarSource, error) {
-	rows, err := s.queries.ListCurrentPlanWorkspaces(ctx)
+	rows, err := s.queries.ListCurrentPlanWorkspaces(ctx, "")
 	if err != nil {
 		return nil, err
 	}

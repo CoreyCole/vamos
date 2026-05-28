@@ -32,7 +32,7 @@ type SessionCreator interface {
 }
 
 type PlanWorkspaceLister interface {
-	ListCurrentPlanWorkspaces(ctx context.Context) ([]db.PlanWorkspace, error)
+	ListCurrentPlanWorkspaces(ctx context.Context, projectID string) ([]db.PlanWorkspace, error)
 }
 
 type ImplWorkspaceLister interface {

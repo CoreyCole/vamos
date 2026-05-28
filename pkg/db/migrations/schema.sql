@@ -164,6 +164,7 @@ WHERE archived_at IS NULL ;
 
 CREATE TABLE IF NOT EXISTS plan_workspaces (
 plan_dir_rel TEXT PRIMARY KEY,
+project_id TEXT NOT NULL DEFAULT '',
 plan_dir TEXT NOT NULL,
 label TEXT NOT NULL,
 workspace_slug TEXT NOT NULL DEFAULT '',
@@ -195,8 +196,16 @@ CREATE INDEX IF NOT EXISTS idx_plan_workspaces_active_activity
 ON plan_workspaces (artifact_updated_at DESC, plan_dir_rel)
 WHERE archived_at IS NULL ;
 
+CREATE INDEX IF NOT EXISTS idx_plan_workspaces_project_active_activity
+ON plan_workspaces (project_id, artifact_updated_at DESC, plan_dir_rel)
+WHERE archived_at IS NULL ;
+
 CREATE INDEX IF NOT EXISTS idx_plan_workspaces_lifecycle_activity
 ON plan_workspaces (qrspi_lifecycle, artifact_updated_at DESC, plan_dir_rel)
+WHERE archived_at IS NULL ;
+
+CREATE INDEX IF NOT EXISTS idx_plan_workspaces_project_lifecycle_activity
+ON plan_workspaces (project_id, qrspi_lifecycle, artifact_updated_at DESC, plan_dir_rel)
 WHERE archived_at IS NULL ;
 
 CREATE UNIQUE INDEX IF NOT EXISTS idx_plan_workspaces_active_slug

@@ -31,6 +31,7 @@ const (
 
 type PlanWorkspaceDiscoveryInput struct {
 	ProjectName        string
+	ProjectID          string
 	ProjectInstanceKey string
 	ProjectRoot        string
 	ThoughtsRoot       string
@@ -38,6 +39,7 @@ type PlanWorkspaceDiscoveryInput struct {
 }
 
 type DiscoveredPlanWorkspace struct {
+	ProjectID                 string
 	PlanDir                   string
 	PlanDirRel                string
 	Label                     string
@@ -87,6 +89,7 @@ type PlanWorkspaceNotifier interface {
 }
 
 type PlanWorkspaceScanner struct {
+	ProjectID      string
 	ThoughtsRoot   string
 	ImplWorkspaces workspaces.ImplWorkspaceDiscoveryConfig
 	Now            func() time.Time
@@ -342,6 +345,7 @@ func (s PlanWorkspaceScanner) Scan(
 				discoveredAt,
 			)
 			item := DiscoveredPlanWorkspace{
+				ProjectID:               firstNonEmpty(frontmatter.Project, s.ProjectID),
 				PlanDir:                 filepath.Clean(path),
 				PlanDirRel:              rel,
 				Label:                   planWorkspaceLabel(path),
@@ -382,6 +386,9 @@ func (s *PlanWorkspaceSyncer) Sync(
 	if strings.TrimSpace(s.Scanner.ThoughtsRoot) == "" {
 		s.Scanner.ThoughtsRoot = input.ThoughtsRoot
 	}
+	if strings.TrimSpace(s.Scanner.ProjectID) == "" {
+		s.Scanner.ProjectID = input.ProjectID
+	}
 	if implWorkspaceDiscoveryConfigIsZero(s.Scanner.ImplWorkspaces) {
 		s.Scanner.ImplWorkspaces = input.ImplWorkspaces
 	}
@@ -401,6 +408,7 @@ func (s *PlanWorkspaceSyncer) Sync(
 		before, beforeErr := s.Queries.GetPlanWorkspace(ctx, item.PlanDirRel)
 		params := db.UpsertDiscoveredPlanWorkspaceParams{
 			PlanDirRel:        item.PlanDirRel,
+			ProjectID:         strings.TrimSpace(item.ProjectID),
 			PlanDir:           item.PlanDir,
 			Label:             item.Label,
 			WorkspaceSlug:     item.WorkspaceSlug,
@@ -452,7 +460,7 @@ func (s *PlanWorkspaceSyncer) Sync(
 			result.Restored++
 			result.Changed = true
 		}
-		if before.PlanDir != row.PlanDir || before.Label != row.Label ||
+		if before.ProjectID != row.ProjectID || before.PlanDir != row.PlanDir || before.Label != row.Label ||
 			before.WorkspaceSlug != row.WorkspaceSlug ||
 			before.QrspiLifecycle != row.QrspiLifecycle ||
 			before.QrspiClosedReason != row.QrspiClosedReason ||

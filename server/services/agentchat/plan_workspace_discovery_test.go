@@ -232,6 +232,39 @@ func TestPlanWorkspaceScannerDefaultsMissingLifecycleToQuestion(t *testing.T) {
 	}
 }
 
+func TestPlanWorkspaceScannerPopulatesProjectFromFrontmatterOrInput(t *testing.T) {
+	thoughtsRoot := t.TempDir()
+	frontmatterPlan := filepath.Join(thoughtsRoot, "agent", "plans", "frontmatter-project")
+	inputPlan := filepath.Join(thoughtsRoot, "agent", "plans", "input-project")
+	writePlanWorkspaceFile(t, frontmatterPlan, "plan.md", time.Now())
+	writePlanWorkspaceFile(t, inputPlan, "plan.md", time.Now())
+	if err := os.WriteFile(
+		filepath.Join(frontmatterPlan, "AGENTS.md"),
+		[]byte("---\nproject: example.com/alpha/app\n---\n# Plan\n"),
+		0o644,
+	); err != nil {
+		t.Fatal(err)
+	}
+
+	rows, err := (PlanWorkspaceScanner{
+		ThoughtsRoot: thoughtsRoot,
+		ProjectID:    "example.com/beta/app",
+	}).Scan(context.Background())
+	if err != nil {
+		t.Fatalf("Scan() error = %v", err)
+	}
+	byRel := map[string]DiscoveredPlanWorkspace{}
+	for _, row := range rows {
+		byRel[row.PlanDirRel] = row
+	}
+	if got := byRel["agent/plans/frontmatter-project"].ProjectID; got != "example.com/alpha/app" {
+		t.Fatalf("frontmatter project = %q", got)
+	}
+	if got := byRel["agent/plans/input-project"].ProjectID; got != "example.com/beta/app" {
+		t.Fatalf("input project = %q", got)
+	}
+}
+
 func TestPlanWorkspaceSyncerListsCurrentAndHistoricalLifecycle(t *testing.T) {
 	service := newTestAgentChatService(t)
 	ctx := context.Background()
@@ -255,19 +288,59 @@ func TestPlanWorkspaceSyncerListsCurrentAndHistoricalLifecycle(t *testing.T) {
 			t.Fatalf("UpsertDiscoveredPlanWorkspace(%s) error = %v", item.stage, err)
 		}
 	}
-	current, err := service.queries.ListCurrentPlanWorkspaces(ctx)
+	current, err := service.queries.ListCurrentPlanWorkspaces(ctx, "")
 	if err != nil {
 		t.Fatalf("ListCurrentPlanWorkspaces() error = %v", err)
 	}
 	if len(current) != 1 || current[0].QrspiLifecycle != "implement" {
 		t.Fatalf("current = %#v, want only implement", current)
 	}
-	all, err := service.queries.ListPlanWorkspaces(ctx)
+	all, err := service.queries.ListPlanWorkspaces(ctx, "")
 	if err != nil {
 		t.Fatalf("ListPlanWorkspaces() error = %v", err)
 	}
 	if len(all) != 3 {
 		t.Fatalf("all len = %d, want 3", len(all))
+	}
+}
+
+func TestPlanWorkspaceSyncerPersistsAndFiltersProjectID(t *testing.T) {
+	service := newTestAgentChatService(t)
+	ctx := context.Background()
+	for _, item := range []struct {
+		rel     string
+		project string
+	}{
+		{rel: "agent/plans/alpha", project: "example.com/alpha/app"},
+		{rel: "agent/plans/beta", project: "example.com/beta/app"},
+	} {
+		_, err := service.queries.UpsertDiscoveredPlanWorkspace(ctx, db.UpsertDiscoveredPlanWorkspaceParams{
+			PlanDirRel:        item.rel,
+			ProjectID:         item.project,
+			PlanDir:           filepath.Join(service.thoughtsRoot, filepath.FromSlash(item.rel)),
+			Label:             item.rel,
+			WorkspaceSlug:     item.rel,
+			ArtifactUpdatedAt: time.Now(),
+			QrspiLifecycle:    "implement",
+		})
+		if err != nil {
+			t.Fatalf("UpsertDiscoveredPlanWorkspace(%s) error = %v", item.rel, err)
+		}
+	}
+
+	all, err := service.queries.ListCurrentPlanWorkspaces(ctx, "")
+	if err != nil {
+		t.Fatalf("ListCurrentPlanWorkspaces(all) error = %v", err)
+	}
+	if len(all) != 2 {
+		t.Fatalf("all len = %d, want 2", len(all))
+	}
+	alpha, err := service.queries.ListCurrentPlanWorkspaces(ctx, "example.com/alpha/app")
+	if err != nil {
+		t.Fatalf("ListCurrentPlanWorkspaces(alpha) error = %v", err)
+	}
+	if len(alpha) != 1 || alpha[0].ProjectID != "example.com/alpha/app" || alpha[0].PlanDirRel != "agent/plans/alpha" {
+		t.Fatalf("alpha rows = %#v", alpha)
 	}
 }
 

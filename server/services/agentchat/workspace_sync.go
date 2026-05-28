@@ -9,6 +9,7 @@ import (
 
 type SyncWorkspacesInput struct {
 	ProjectName        string
+	ProjectID          string
 	ProjectInstanceKey string
 	ProjectRoot        string
 	ThoughtsRoot       string
@@ -41,6 +42,7 @@ func (s *WorkspaceSyncer) Sync(
 	if s.PlanSyncer != nil {
 		plan, err := s.PlanSyncer.Sync(ctx, PlanWorkspaceDiscoveryInput{
 			ProjectName:        input.ProjectName,
+			ProjectID:          input.ProjectID,
 			ProjectInstanceKey: input.ProjectInstanceKey,
 			ProjectRoot:        input.ProjectRoot,
 			ThoughtsRoot:       input.ThoughtsRoot,

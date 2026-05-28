@@ -10,9 +10,12 @@ import (
 
 func TestParsePlanWorkspaceFrontmatter(t *testing.T) {
 	updatedAt := "2026-05-24T10:00:00Z"
-	got, err := ParsePlanWorkspaceFrontmatter("AGENTS.md", []byte("---\nqrspi_lifecycle: review_plan\nqrspi_lifecycle_updated_at: "+updatedAt+"\nqrspi_closed_reason: duplicate\n---\n# Body\n"))
+	got, err := ParsePlanWorkspaceFrontmatter("AGENTS.md", []byte("---\nproject: ' example.com/alpha/app '\nqrspi_lifecycle: review_plan\nqrspi_lifecycle_updated_at: "+updatedAt+"\nqrspi_closed_reason: duplicate\n---\n# Body\n"))
 	if err != nil {
 		t.Fatalf("ParsePlanWorkspaceFrontmatter() error = %v", err)
+	}
+	if got.Project != "example.com/alpha/app" {
+		t.Fatalf("Project = %q", got.Project)
 	}
 	if got.QRSPIStage != QRSPIStageReviewPlan {
 		t.Fatalf("QRSPIStage = %q", got.QRSPIStage)
@@ -32,6 +35,9 @@ func TestParsePlanWorkspaceFrontmatterDefaultsMissingFrontmatterToQuestion(t *te
 	}
 	if got.QRSPIStage != QRSPIStageQuestion {
 		t.Fatalf("QRSPIStage = %q, want question", got.QRSPIStage)
+	}
+	if got.Project != "" {
+		t.Fatalf("Project = %q, want empty", got.Project)
 	}
 }
 

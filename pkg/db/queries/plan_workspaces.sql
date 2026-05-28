@@ -4,13 +4,22 @@ FROM plan_workspaces
 WHERE
     archived_at IS NULL
     AND qrspi_lifecycle NOT IN ('merged', 'closed')
-ORDER BY artifact_updated_at DESC, lower(label), plan_dir_rel;
+    AND (
+        CAST(sqlc.arg('project_id') AS TEXT) = ''
+        OR project_id = CAST(sqlc.arg('project_id') AS TEXT)
+    )
+ORDER BY artifact_updated_at DESC, LOWER(label), plan_dir_rel;
 
 -- name: ListPlanWorkspaces :many
 SELECT *
 FROM plan_workspaces
-WHERE archived_at IS NULL
-ORDER BY artifact_updated_at DESC, lower(label), plan_dir_rel;
+WHERE
+    archived_at IS NULL
+    AND (
+        CAST(sqlc.arg('project_id') AS TEXT) = ''
+        OR project_id = CAST(sqlc.arg('project_id') AS TEXT)
+    )
+ORDER BY artifact_updated_at DESC, LOWER(label), plan_dir_rel;
 
 -- name: GetPlanWorkspace :one
 SELECT *
@@ -20,6 +29,7 @@ WHERE plan_dir_rel = sqlc.arg('plan_dir_rel');
 -- name: UpsertDiscoveredPlanWorkspace :one
 INSERT INTO plan_workspaces (
     plan_dir_rel,
+    project_id,
     plan_dir,
     label,
     workspace_slug,
@@ -33,6 +43,7 @@ INSERT INTO plan_workspaces (
 )
 VALUES (
     sqlc.arg('plan_dir_rel'),
+    sqlc.arg('project_id'),
     sqlc.arg('plan_dir'),
     sqlc.arg('label'),
     sqlc.arg('workspace_slug'),
@@ -40,11 +51,12 @@ VALUES (
     sqlc.narg('impl_workspace_url'),
     sqlc.narg('impl_workspace_discovered_at'),
     sqlc.arg('artifact_updated_at'),
-    coalesce(nullif(sqlc.arg('qrspi_lifecycle'), ''), 'question'),
+    COALESCE(NULLIF(sqlc.arg('qrspi_lifecycle'), ''), 'question'),
     sqlc.narg('qrspi_lifecycle_updated_at'),
     sqlc.arg('qrspi_closed_reason')
 )
 ON CONFLICT (plan_dir_rel) DO UPDATE SET
+project_id = excluded.project_id,
 plan_dir = excluded.plan_dir,
 label = excluded.label,
 workspace_slug = excluded.workspace_slug,

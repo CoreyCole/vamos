@@ -532,6 +532,7 @@ func ensurePlanWorkspacesImplMetadataColumns(
 		name       string
 		definition string
 	}{
+		{name: "project_id", definition: "TEXT NOT NULL DEFAULT ''"},
 		{name: "workspace_slug", definition: "TEXT NOT NULL DEFAULT ''"},
 		{name: "impl_workspace_path", definition: "TEXT"},
 		{name: "impl_workspace_url", definition: "TEXT"},
@@ -553,7 +554,16 @@ func ensurePlanWorkspacesImplMetadataColumns(
 			return err
 		}
 	}
-	return ensureIndex(ctx, database, "CREATE INDEX IF NOT EXISTS idx_plan_workspaces_lifecycle_activity ON plan_workspaces (qrspi_lifecycle, artifact_updated_at DESC, plan_dir_rel) WHERE archived_at IS NULL")
+	for _, indexSQL := range []string{
+		"CREATE INDEX IF NOT EXISTS idx_plan_workspaces_lifecycle_activity ON plan_workspaces (qrspi_lifecycle, artifact_updated_at DESC, plan_dir_rel) WHERE archived_at IS NULL",
+		"CREATE INDEX IF NOT EXISTS idx_plan_workspaces_project_active_activity ON plan_workspaces (project_id, artifact_updated_at DESC, plan_dir_rel) WHERE archived_at IS NULL",
+		"CREATE INDEX IF NOT EXISTS idx_plan_workspaces_project_lifecycle_activity ON plan_workspaces (project_id, qrspi_lifecycle, artifact_updated_at DESC, plan_dir_rel) WHERE archived_at IS NULL",
+	} {
+		if err := ensureIndex(ctx, database, indexSQL); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func ensureAgentThreadWorkspaces(ctx context.Context, database *sql.DB) error {

@@ -29,6 +29,7 @@ const (
 )
 
 type PlanWorkspaceFrontmatter struct {
+	Project                 string     `yaml:"project"`
 	QRSPIStage              QRSPIStage `yaml:"qrspi_lifecycle"`
 	QRSPILifecycleUpdatedAt time.Time  `yaml:"qrspi_lifecycle_updated_at"`
 	QRSPIClosedReason       string     `yaml:"qrspi_closed_reason"`
@@ -43,6 +44,7 @@ func ParsePlanWorkspaceFrontmatter(path string, data []byte) (PlanWorkspaceFront
 	if err := yaml.Unmarshal(front, &fm); err != nil {
 		return PlanWorkspaceFrontmatter{}, fmt.Errorf("parse %s frontmatter: %w", path, err)
 	}
+	fm.Project = strings.TrimSpace(fm.Project)
 	if fm.QRSPIStage == "" {
 		fm.QRSPIStage = QRSPIStageQuestion
 	}

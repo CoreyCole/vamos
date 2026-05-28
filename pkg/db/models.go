@@ -324,6 +324,7 @@ type LayoutPreference struct {
 
 type PlanWorkspace struct {
 	PlanDirRel                string         `json:"plan_dir_rel"`
+	ProjectID                 string         `json:"project_id"`
 	PlanDir                   string         `json:"plan_dir"`
 	Label                     string         `json:"label"`
 	WorkspaceSlug             string         `json:"workspace_slug"`
