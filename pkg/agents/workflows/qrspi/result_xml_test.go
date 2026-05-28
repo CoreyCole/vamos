@@ -239,6 +239,33 @@ func TestQRSPIXMLParserRejectsCompleteWithoutOutcome(t *testing.T) {
 	}
 }
 
+func TestQRSPIXMLParserParsesProject(t *testing.T) {
+	output := strings.Replace(
+		validResultXML("plan"),
+		"<stage>plan</stage>",
+		"<project>github.com/CoreyCole/vamos</project>\n  <stage>plan</stage>",
+		1,
+	)
+	parsedAny, err := (QRSPIXMLParser{}).Parse(output, wruntime.ParseContext{ExpectedNodeID: NodePlan})
+	if err != nil {
+		t.Fatalf("Parse() error = %v", err)
+	}
+	parsed := parsedAny.(ResultXML)
+	if got := QRSPIResultProject(parsed); got != "github.com/CoreyCole/vamos" {
+		t.Fatalf("project = %q", got)
+	}
+	result, err := (QRSPIResultConverter{}).ToWorkflowResult(
+		parsed,
+		wruntime.ParseContext{WorkflowType: string(AgentChatWorkflowType)},
+	)
+	if err != nil {
+		t.Fatalf("ToWorkflowResult() error = %v", err)
+	}
+	if got := WorkflowResultProject(result); got != "github.com/CoreyCole/vamos" {
+		t.Fatalf("WorkflowResultProject() = %q", got)
+	}
+}
+
 func TestQRSPIXMLParserStructuredNextAndWorkspaceMetadata(t *testing.T) {
 	output := `<qrspi-result>
   <stage>workspace</stage>

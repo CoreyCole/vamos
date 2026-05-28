@@ -153,6 +153,7 @@ func parseFrontmatter(content []byte) (*Frontmatter, []byte, error) {
 		Researcher     string   `yaml:"researcher"`
 		GitCommit      string   `yaml:"git_commit"`
 		Branch         string   `yaml:"branch"`
+		Project        string   `yaml:"project"`
 		Repository     string   `yaml:"repository"`
 		Topic          string   `yaml:"topic"`
 		Tags           []string `yaml:"tags"`
@@ -174,9 +175,10 @@ func parseFrontmatter(content []byte) (*Frontmatter, []byte, error) {
 	// Convert to final Frontmatter with parsed dates
 	fm := &Frontmatter{
 		Researcher:     rawFm.Researcher,
-		GitCommit:      rawFm.GitCommit,
-		Branch:         rawFm.Branch,
-		Repository:     rawFm.Repository,
+		GitCommit:      strings.TrimSpace(rawFm.GitCommit),
+		Branch:         strings.TrimSpace(rawFm.Branch),
+		Project:        strings.TrimSpace(rawFm.Project),
+		Repository:     strings.TrimSpace(rawFm.Repository),
 		Topic:          rawFm.Topic,
 		Tags:           rawFm.Tags,
 		Status:         rawFm.Status,
@@ -194,6 +196,26 @@ func parseFrontmatter(content []byte) (*Frontmatter, []byte, error) {
 	// Return frontmatter and the content after the closing ---
 	contentStart := startIdx + 3 + endIdx + 5 // skip "---\n" + yaml + "\n---\n"
 	return fm, content[contentStart:], nil
+}
+
+func isQRSPIFrontmatter(fm *Frontmatter) bool {
+	if fm == nil {
+		return false
+	}
+	return strings.TrimSpace(fm.PlanDir) != "" || strings.TrimSpace(fm.Stage) != ""
+}
+
+func githubRepoKeyForFrontmatter(fm *Frontmatter) string {
+	if fm == nil {
+		return ""
+	}
+	if project := strings.TrimSpace(fm.Project); project != "" {
+		return project
+	}
+	if isQRSPIFrontmatter(fm) {
+		return ""
+	}
+	return strings.TrimSpace(fm.Repository)
 }
 
 // parseDate tries to parse a date string in various formats
@@ -274,9 +296,9 @@ func (s *Service) ProcessMarkdownFile(requestPath string) (*PageArgs, error) {
 	// Also render full HTML for fallback
 	htmlContent := s.renderer.MarkdownBytesToHTML(markdownContent)
 
-	// Post-process: link code file paths to GitHub if repository is in frontmatter
+	// Post-process: link code file paths to GitHub if frontmatter resolves to a GitHub repository.
 	if frontmatter != nil {
-		gh := s.renderer.ResolveGitHubRepo(frontmatter.Repository)
+		gh := s.renderer.ResolveGitHubRepo(githubRepoKeyForFrontmatter(frontmatter))
 		if gh != nil {
 			htmlContent = LinkCodePathsToGitHub(htmlContent, gh)
 			for i := range sections {
@@ -522,8 +544,8 @@ func (s *Service) BuildWorkspaceDocTreeFromRoot(
 func (s *Service) resolveThoughtsRelAndAbs(path string) (string, string, error) {
 	rel := normalizeThoughtsRelativePath(path)
 	if filepath.IsAbs(strings.TrimSpace(path)) {
-		abs := filepath.Clean(strings.TrimSpace(path))
-		base := filepath.Clean(s.basePath)
+		abs := cleanPathForRootCheck(strings.TrimSpace(path))
+		base := cleanPathForRootCheck(s.basePath)
 		if !pathWithinRoot(abs, base) && abs != base {
 			return "", "", fmt.Errorf("path escapes thoughts root: %s", path)
 		}
@@ -533,7 +555,7 @@ func (s *Service) resolveThoughtsRelAndAbs(path string) (string, string, error) 
 		}
 		rel = filepath.ToSlash(computedRel)
 	}
-	if rel == "." || strings.HasPrefix(rel, "../") || rel == ".." {
+	if strings.HasPrefix(rel, "../") || rel == ".." {
 		return "", "", fmt.Errorf("path escapes thoughts root: %s", path)
 	}
 	return rel, filepath.Join(s.basePath, filepath.FromSlash(rel)), nil

@@ -19,6 +19,7 @@ type Frontmatter struct {
 	Researcher     string    `yaml:"researcher"`
 	GitCommit      string    `yaml:"git_commit"`
 	Branch         string    `yaml:"branch"`
+	Project        string    `yaml:"project"`
 	Repository     string    `yaml:"repository"`
 	Topic          string    `yaml:"topic"`
 	Tags           []string  `yaml:"tags"`

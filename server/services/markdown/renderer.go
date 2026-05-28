@@ -719,6 +719,10 @@ func (m Renderer) ResolveGitHubRepo(repo string) *GitHubRepo {
 	return ResolveGitHubRepoFromProjects(m.projects, repo)
 }
 
+func ResolveGitHubRepoFromProjectID(projects server.ProjectsConfig, projectID string) *GitHubRepo {
+	return ResolveGitHubRepoFromProjects(projects, projectID)
+}
+
 func ResolveGitHubRepoFromProjects(
 	projects server.ProjectsConfig,
 	repo string,

@@ -12,6 +12,7 @@ import (
 
 type ResultXML struct {
 	XMLName           xml.Name             `xml:"qrspi-result"       json:"-"`
+	Project           string               `xml:"project"            json:"project,omitempty"`
 	Stage             string               `xml:"stage"              json:"stage"`
 	Status            string               `xml:"status"             json:"status"`
 	Outcome           string               `xml:"outcome"             json:"outcome,omitempty"`
@@ -86,6 +87,17 @@ func (n NextXML) DisplayText() string {
 	return n.Text
 }
 
+func WorkflowResultProject(result wruntime.WorkflowResult) string {
+	if len(result.Raw) == 0 {
+		return ""
+	}
+	var parsed ResultXML
+	if err := json.Unmarshal(result.Raw, &parsed); err != nil {
+		return ""
+	}
+	return strings.TrimSpace(parsed.Project)
+}
+
 func WorkflowResultWorkspaceMetadata(result wruntime.WorkflowResult) WorkspaceMetadataXML {
 	if len(result.Raw) == 0 {
 		return WorkspaceMetadataXML{}
@@ -99,6 +111,10 @@ func WorkflowResultWorkspaceMetadata(result wruntime.WorkflowResult) WorkspaceMe
 
 func WorkflowResultImplementationWorkspace(result wruntime.WorkflowResult) string {
 	return WorkflowResultWorkspaceMetadata(result).ImplementationWorkspace
+}
+
+func QRSPIResultProject(result ResultXML) string {
+	return strings.TrimSpace(result.Project)
 }
 
 func QRSPIResultWorkspaceMetadata(result ResultXML) WorkspaceMetadataXML {
@@ -119,6 +135,7 @@ func (QRSPIXMLParser) Parse(output string, ctx wruntime.ParseContext) (any, erro
 		return nil, fmt.Errorf("parse qrspi result XML: %w", err)
 	}
 
+	parsed.Project = strings.TrimSpace(parsed.Project)
 	parsed.Stage = strings.TrimSpace(parsed.Stage)
 	parsed.Status = strings.TrimSpace(parsed.Status)
 	parsed.Outcome = strings.TrimSpace(parsed.Outcome)
