@@ -55,6 +55,18 @@ func TestDurableSessionChat_FreeformChatStartedFromThoughtsRootSurvivesRefreshAn
 	})
 }
 
+func TestDurableSessionChat_FreeformChatAdoptsQrspiProjectMetadata(t *testing.T) {
+	e2e.RunScenario(t, "durable-session-chat", "freeform-chat-adopts-qrspi-project-metadata", func(t testing.TB, ctx *e2e.Context) {
+		steps.AuthenticatedAs(t, ctx, "playwright@localhost")
+		steps.SeedProjectPlanWorkspaces(t, ctx, "example.com/alpha/app", "example.com/beta/app")
+		steps.OpenThoughtsRootChat(t, ctx, "current")
+		steps.SeedLatestFreeformChatQRSPIProjectResult(t, ctx, "example.com/alpha/app")
+		steps.ExpectThreadMetadataProject(t, ctx, "example.com/alpha/app")
+		steps.ReloadChat(t, ctx, "current")
+		steps.ExpectThreadMetadataProject(t, ctx, "example.com/alpha/app")
+	})
+}
+
 func TestDurableSessionChat_AnchorDocumentNavigationPreservesEmbeddedChat(t *testing.T) {
 	e2e.RunScenario(t, "durable-session-chat", "anchor-document-navigation-preserves-embedded-chat", func(t testing.TB, ctx *e2e.Context) {
 		steps.AuthenticatedAs(t, ctx, "playwright@localhost")

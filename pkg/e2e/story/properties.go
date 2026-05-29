@@ -1,6 +1,9 @@
 package story
 
-import "fmt"
+import (
+	"fmt"
+	"strings"
+)
 
 func ExpandProperties(feature Feature) ([]Scenario, error) {
 	out := []Scenario{}
@@ -11,6 +14,7 @@ func ExpandProperties(feature Feature) ([]Scenario, error) {
 		for _, combo := range expandDimensions(prop.Dimensions) {
 			slug := prop.Slug
 			title := prop.Title
+			given := inheritedPropertyGiven(feature)
 			when := []Step{}
 			if viewport := combo["viewport"]; viewport != "" {
 				slug += "-" + slugify(viewport)
@@ -28,18 +32,50 @@ func ExpandProperties(feature Feature) ([]Scenario, error) {
 						Verb: "visit",
 						Args: map[string]string{"path": route},
 					},
+					Step{
+						Kind: "when",
+						Verb: "wait_for_feature_ready",
+						Args: map[string]string{"feature": featureReadyKey(feature.Slug)},
+					},
 				)
 			}
 			out = append(out, Scenario{
 				Slug:     slug,
 				Title:    title,
 				Viewport: combo["viewport"],
+				Given:    given,
 				When:     when,
 				Then:     append([]Step{}, prop.Then...),
 			})
 		}
 	}
 	return out, nil
+}
+
+func inheritedPropertyGiven(feature Feature) []Step {
+	if len(feature.Scenarios) == 0 {
+		return nil
+	}
+	return append([]Step{}, feature.Scenarios[0].Given...)
+}
+
+func featureReadyKey(slug string) string {
+	return slugifyDotted(slug)
+}
+
+func slugifyDotted(slug string) string {
+	out := ""
+	lastDot := false
+	for _, r := range slug {
+		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') {
+			out += string(r)
+			lastDot = false
+		} else if !lastDot {
+			out += "."
+			lastDot = true
+		}
+	}
+	return strings.Trim(out, ".")
 }
 
 func expandDimensions(dims []Dimension) []map[string]string {

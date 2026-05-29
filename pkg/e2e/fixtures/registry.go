@@ -20,8 +20,9 @@ type WorkspaceIdentity struct {
 }
 
 type Input struct {
-	Workspace WorkspaceIdentity
-	Params    map[string]string
+	Workspace    WorkspaceIdentity
+	ThoughtsRoot string
+	Params       map[string]string
 }
 
 type DBTX interface {
@@ -44,7 +45,7 @@ type (
 func DefaultRegistry() Registry {
 	return registry{
 		"thoughts-workbench.basic":           BuildThoughtsWorkbenchBasic,
-		"thoughts-workbench.qrspi-lifecycle": BuildEmptyFixture,
+		"thoughts-workbench.qrspi-lifecycle": BuildThoughtsWorkbenchQRSPILifecycle,
 		"workspaces.cleaned":                 BuildEmptyFixture,
 		"workspaces.release-lanes":           BuildEmptyFixture,
 		DurableFreeformFixture:               BuildFreeformDurableChat,
@@ -59,13 +60,14 @@ func Load(
 	ctx context.Context,
 	db DBTX,
 	workspace WorkspaceIdentity,
+	thoughtsRoot string,
 	name string,
 ) (State, error) {
 	builder, err := DefaultRegistry().Resolve(name)
 	if err != nil {
 		return State{}, err
 	}
-	return builder(ctx, db, Input{Workspace: workspace, Params: map[string]string{}})
+	return builder(ctx, db, Input{Workspace: workspace, ThoughtsRoot: thoughtsRoot, Params: map[string]string{}})
 }
 
 func (r registry) Resolve(name string) (Builder, error) {

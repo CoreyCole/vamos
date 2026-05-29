@@ -14,6 +14,49 @@ import (
 	servicedb "github.com/CoreyCole/vamos/server/services/db"
 )
 
+func TestResolveThoughtsRelAndAbsAcceptsSymlinkedThoughtsRoot(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	shared := filepath.Join(root, "shared")
+	mustMkdirAll(t, shared)
+	symlinkRoot := filepath.Join(root, "checkout", "thoughts")
+	mustMkdirAll(t, filepath.Dir(symlinkRoot))
+	if err := os.Symlink(shared, symlinkRoot); err != nil {
+		t.Fatal(err)
+	}
+
+	rel, abs, err := (&Service{basePath: shared}).resolveThoughtsRelAndAbs(symlinkRoot)
+	if err != nil {
+		t.Fatalf("resolveThoughtsRelAndAbs() error = %v", err)
+	}
+	if got, want := rel, "."; got != want {
+		t.Fatalf("rel=%q want %q", got, want)
+	}
+	if got, want := abs, shared; got != want {
+		t.Fatalf("abs=%q want %q", got, want)
+	}
+}
+
+func TestPathWithinRootAcceptsResolvedSymlinkChild(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	shared := filepath.Join(root, "shared")
+	mustMkdirAll(t, shared)
+	symlinkRoot := filepath.Join(root, "checkout", "thoughts")
+	mustMkdirAll(t, filepath.Dir(symlinkRoot))
+	if err := os.Symlink(shared, symlinkRoot); err != nil {
+		t.Fatal(err)
+	}
+	resolvedChild := filepath.Join(shared, "example.md")
+	mustWriteFile(t, resolvedChild, []byte("# Example"))
+
+	if !pathWithinRoot(resolvedChild, symlinkRoot) {
+		t.Fatalf("pathWithinRoot(%q, %q) = false, want true", resolvedChild, symlinkRoot)
+	}
+}
+
 func TestResolveWorkspaceForDocumentLongestPrefix(t *testing.T) {
 	t.Parallel()
 

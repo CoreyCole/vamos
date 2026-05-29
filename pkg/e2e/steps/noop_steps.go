@@ -35,7 +35,7 @@ func LoadFixture(t testing.TB, ctx *e2e.Context, name string) fixtures.State {
 		DBPath:       ctx.Config.Workspace.DBPath,
 		ManagerURL:   ctx.Config.Workspace.ManagerURL,
 	}
-	state, err := fixtures.Load(c, db, workspace, name)
+	state, err := fixtures.Load(c, db, workspace, ctx.Config.ThoughtsRoot, name)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -72,7 +72,41 @@ func ExpectRegionVisible(t testing.TB, ctx *e2e.Context, key string) {
 
 func ExpectRegionReachable(t testing.TB, ctx *e2e.Context, key string) {
 	t.Helper()
-	expectVisible(t, ctx, key)
+	entry, err := ctx.Selectors.Resolve(key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	region := ctx.Page.Locator(entry.CSS).First()
+	if err := region.WaitFor(playwright.LocatorWaitForOptions{State: playwright.WaitForSelectorStateAttached}); err != nil {
+		t.Fatal(err)
+	}
+	visible, err := region.IsVisible()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if visible {
+		return
+	}
+	id, err := region.GetAttribute("id")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if id == "" {
+		t.Fatalf("selector %s for key %s is hidden and has no id for reachability toggle", entry.CSS, key)
+	}
+	signal, _ := region.GetAttribute("data-workbench-signal")
+	toggleSelector := "button[aria-controls='" + id + "'], [role='tab'][aria-controls='" + id + "']"
+	if signal != "" {
+		toggleSelector += ", button[data-on\\:click*='" + signal + ".visible']"
+	}
+	visibleOnly := true
+	toggle := ctx.Page.Locator(toggleSelector).Filter(playwright.LocatorFilterOptions{Visible: &visibleOnly}).First()
+	if err := toggle.Click(); err != nil {
+		t.Fatalf("selector %s for key %s is hidden and cannot be reached through %s toggle: %v", entry.CSS, key, id, err)
+	}
+	if err := region.WaitFor(playwright.LocatorWaitForOptions{State: playwright.WaitForSelectorStateVisible}); err != nil {
+		t.Fatalf("selector %s for key %s did not become visible after %s toggle: %v", entry.CSS, key, id, err)
+	}
 }
 
 func ExpectTabSelected(t testing.TB, ctx *e2e.Context, key string) {
@@ -155,7 +189,8 @@ func ExpectWorkspaceCleanupSucceeds(t testing.TB, ctx *e2e.Context, _ string) {
 
 func FollowFirstSidebarDocumentLink(t testing.TB, ctx *e2e.Context, _ string) {
 	t.Helper()
-	followFirstLink(t, ctx, "#thoughts-shared-sidebar a[href*='/thoughts/'], #thoughts-workbench-sidebar a[href*='/thoughts/'], [data-e2e='thoughts.workbench.sidebar'] a[href*='/thoughts/']")
+	ExpectRegionReachable(t, ctx, "thoughts.workbench.sidebar")
+	followFirstLink(t, ctx, "#doc-workbench-sidebar-region a[href*='/thoughts/'][href*='.md'], #thoughts-shared-sidebar a[href*='/thoughts/'][href*='.md'], #thoughts-workbench-sidebar a[href*='/thoughts/'][href*='.md'], [data-e2e='thoughts.workbench.sidebar'] a[href*='/thoughts/'][href*='.md']")
 }
 
 func FollowFirstBreadcrumbLink(t testing.TB, ctx *e2e.Context, _ string) {
@@ -208,15 +243,22 @@ func CleanupWorkspace(t testing.TB, ctx *e2e.Context, name string) {
 
 func followFirstLink(t testing.TB, ctx *e2e.Context, selector string) {
 	t.Helper()
-	visible := true
-	link := ctx.Page.Locator(selector).Filter(playwright.LocatorFilterOptions{Visible: &visible}).First()
-	if err := link.WaitFor(); err != nil {
+	link := ctx.Page.Locator(selector).First()
+	if err := link.WaitFor(playwright.LocatorWaitForOptions{State: playwright.WaitForSelectorStateAttached}); err != nil {
 		t.Fatal(err)
 	}
-	if err := link.Click(); err != nil {
+	href, err := link.GetAttribute("href")
+	if err != nil || href == "" {
+		t.Fatalf("first link %q has no href: %v", selector, err)
+	}
+	if strings.HasPrefix(href, "http://") || strings.HasPrefix(href, "https://") {
+		_, err = ctx.Page.Goto(href, playwright.PageGotoOptions{WaitUntil: playwright.WaitUntilStateDomcontentloaded})
+	} else {
+		_, err = ctx.Page.Goto(ctx.Config.BaseURL+href, playwright.PageGotoOptions{WaitUntil: playwright.WaitUntilStateDomcontentloaded})
+	}
+	if err != nil {
 		t.Fatal(err)
 	}
-	_ = ctx.Page.WaitForLoadState(playwright.PageWaitForLoadStateOptions{State: playwright.LoadStateDomcontentloaded})
 }
 
 func expectVisible(t testing.TB, ctx *e2e.Context, key string) {

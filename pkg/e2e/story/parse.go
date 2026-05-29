@@ -206,6 +206,10 @@ func parseStep(section, text string, line int) (Step, error) {
 		step.Verb = "seed_latest_workspace_chats"
 		step.Args["marker_a"] = firstQuote(text)
 		step.Args["marker_b"] = secondQuote(text)
+	case strings.HasPrefix(text, "Project plan workspaces ") && strings.HasSuffix(text, " are seeded."):
+		step.Verb = "seed_project_plan_workspaces"
+		step.Args["project_a"] = firstQuote(text)
+		step.Args["project_b"] = secondQuote(text)
 	case strings.HasPrefix(text, "I open seeded workspace chat "):
 		step.Verb = "open_seeded_workspace_chat"
 		step.Args["label"] = firstQuote(text)
@@ -249,6 +253,9 @@ func parseStep(section, text string, line int) (Step, error) {
 	case strings.HasPrefix(text, "I wait for chat marker "):
 		step.Verb = "wait_for_chat_marker"
 		step.Args["marker"] = firstQuote(text)
+	case strings.HasPrefix(text, "I seed latest freeform chat QRSPI project result "):
+		step.Verb = "seed_latest_freeform_chat_qrspi_project_result"
+		step.Args["project"] = firstQuote(text)
 	case strings.HasPrefix(text, "I wait for feature "):
 		step.Verb = "wait_for_feature_ready"
 		step.Args["feature"] = firstQuote(text)
@@ -289,6 +296,15 @@ func parseStep(section, text string, line int) (Step, error) {
 	case strings.HasPrefix(text, "Transcript contains "):
 		step.Verb = "expect_transcript_contains"
 		step.Args["text"] = firstQuote(text)
+	case strings.HasPrefix(text, "Thread metadata contains project "):
+		step.Verb = "expect_thread_metadata_project"
+		step.Args["project"] = firstQuote(text)
+	case strings.HasPrefix(text, "Plan sidebar contains project plan "):
+		step.Verb = "expect_plan_sidebar_contains_project_plan"
+		step.Args["project"] = firstQuote(text)
+	case strings.HasPrefix(text, "Plan sidebar does not contain project plan "):
+		step.Verb = "expect_plan_sidebar_absent_project_plan"
+		step.Args["project"] = firstQuote(text)
 	case strings.HasPrefix(text, "File ") && strings.Contains(text, " changed from remembered hash"):
 		step.Verb = "expect_file_hash_changed"
 		step.Args["path"] = firstQuote(text)

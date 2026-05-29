@@ -35,6 +35,8 @@ External setup must also be in place:
 
 `main.<domain>` is reserved for the canonical manager checkout. Feature branches and QRSPI implementation copies must be started through the manager and tested at their derived slug host (`https://<slug>.<domain>/`). Do not manually run a feature checkout on the manager port to "take over" `main`; use `/workspaces`, `agentsctl workspace restart`, or `just build` from a managed child checkout so lifecycle stays owned by `server/services/workspaces/`.
 
+Before sending a feature workspace to a human for manual testing, make the child runtime current and reachable. A build with `--no-restart` proves compilation only; it can leave the public feature host serving the previous process or the manager recovery page. Run a managed restart (`just build` from the feature checkout, or the manager restart action), then verify the public feature URL reaches the child app before handing it off.
+
 ## Session ownership during verification
 
 Browser and chat sessions created while verifying `work` or feature workspace hosts belong to that workspace's disposable `.vamos` DB. Pi CLI sessions created from those directories may remain in `~/.pi/agent/sessions` after cleanup. Main may index or import them intentionally, but verification noise is not durable main chat history by default. Summarize important evidence into `verify.md`, review notes, screenshots, logs, or release records. See `docs/vamos-development-workflow.md`.
@@ -47,6 +49,24 @@ From the Vamos repo root:
 just build --no-restart
 just verify-workspaces slug=multi-checkout-dev-workspaces start=true restart=true stop=true browser=true
 just verify-workspaces slug=multi-checkout-dev-workspaces start=true restart=true stop=true browser=true agent_chat_probe=true
+```
+
+For a feature branch handoff to a human tester, use the feature checkout root:
+
+```bash
+# 1. Compile without disturbing the running child while agent verification is still in progress.
+just build --no-restart
+
+# 2. When ready for human testing, restart the managed child runtime for this checkout.
+just build
+
+# 3. Confirm public routing reaches the child app, not workspace recovery.
+domain=<domain> # for example: vamos.test
+slug=$(grep '^VAMOS_WORKSPACE_SLUG=' .vamos/run/workspace.env | cut -d= -f2- | tr -d "'\"")
+curl -k -sS -D - --max-time 15 "https://${slug}.${domain}/" -o /tmp/vamos-feature-home.html
+
+# Expected unauthenticated result is usually HTTP 307 to /login?redirect=%2F.
+# A 503 Workspace recovery page means the feature runtime is not ready for human testing.
 ```
 
 To keep artifacts with a plan or review:
@@ -111,6 +131,21 @@ Include the report path and first failed layer in handoffs/reviews. Do not claim
 - **Metadata/logs**: missing metadata/log tails, runtime env snapshot, or TS worker identity marker indicate the child did not boot far enough or state/log paths are not isolated per workspace.
 - **Agent Chat probe**: `localhost:4200` callback/snapshot URLs, wrong cwd, missing internal token, or failed snapshot/callback proof mean the child web process did not build or accept child-local workflow endpoints. Check `VAMOS_INTERNAL_TOKEN`, `.vamos/run/runtime-env.json`, Agent Chat callback base, and child web logs.
 - **Handoff/browser**: manager auth works but switch does not land on `https://<slug>.vamos.test/`. Inspect manager switch logs, child `/internal/dev-auth/handoff`, cookie domain/security, and browser screenshots.
+
+## Feature workspace human-testing readiness
+
+Before telling a human to test a feature URL, record these checks in `verify.md` or the handoff:
+
+- `just build` (without `--no-restart`) completed from the feature checkout after the final committed changes.
+- The feature URL `https://<slug>.<domain>/` returns the child app. For auth-protected deployments, an unauthenticated `307` to `/login?redirect=%2F` is healthy.
+- The feature URL does **not** return the manager Workspace recovery page or HTTP `503`.
+- `.vamos/run/runtime-env.json` has `workspace_slug`, `checkout_path`, `database_path`, and `default_cwd` for the feature checkout, not `stage`, `main`, or another checkout.
+- `.vamos/run/status.json` has `status: running` and log paths under the feature checkout.
+- Recent `web.log` includes the current child `server_startup` line with the feature slug and public base URL.
+
+If the public URL shows Workspace recovery while status says running, suspect stale runtime metadata or a child process from another checkout. Restart via `just build` from the feature checkout or the manager restart action, then re-check the URL and runtime env. Do not ask for human testing until the public host reaches the child app.
+
+The workspace error queue may include old Temporal shutdown/restart warnings such as `context canceled`, `connect: connection refused`, `graceful_stop`, or `max_age`. Treat them as diagnostic context, not current blockers, when they predate the latest successful child startup and the public URL is healthy. Current `web.log`, `.vamos/run/runtime-env.json`, and the public feature URL are the source of truth for human-test readiness.
 
 ## Acceptance rule
 

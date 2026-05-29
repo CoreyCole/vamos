@@ -48,20 +48,20 @@ func WorkspaceErrorsDocument(args layouts.RootArgs, model WorkspaceErrorPageMode
 				}()
 			}
 			ctx = templ.InitializeContext(ctx)
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<section class=\"mx-auto flex h-full w-full max-w-6xl flex-col gap-4 overflow-y-auto p-6\" data-init=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<section class=\"h-full w-full overflow-y-auto p-6\" data-init=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var3 string
 			templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.JoinStringErrs(templ.SafeURL("@get('" + workspaceErrorsStreamPath(model.SelectedWorkspace) + "')"))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/workspace_errors_views.templ`, Line: 12, Col: 186}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/workspace_errors_views.templ`, Line: 12, Col: 148}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var3))
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "\"><div class=\"mx-auto flex w-full max-w-6xl flex-col gap-4\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -73,7 +73,7 @@ func WorkspaceErrorsDocument(args layouts.RootArgs, model WorkspaceErrorPageMode
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "</section>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "</div></section>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -120,7 +120,7 @@ func WorkspaceErrorsHeader(model WorkspaceErrorPageModel) templ.Component {
 			var templ_7745c5c3_Var5 string
 			templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.JoinStringErrs(model.SelectedWorkspace)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/workspace_errors_views.templ`, Line: 25, Col: 105}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/workspace_errors_views.templ`, Line: 27, Col: 105}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var5))
 			if templ_7745c5c3_Err != nil {
@@ -227,7 +227,7 @@ func WorkspaceErrorEventCard(event WorkspaceErrorEventView, workspace *ImplWorks
 		var templ_7745c5c3_Var8 string
 		templ_7745c5c3_Var8, templ_7745c5c3_Err = templ.JoinStringErrs(event.Message)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/workspace_errors_views.templ`, Line: 60, Col: 42}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/workspace_errors_views.templ`, Line: 62, Col: 42}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var8))
 		if templ_7745c5c3_Err != nil {
@@ -240,7 +240,7 @@ func WorkspaceErrorEventCard(event WorkspaceErrorEventView, workspace *ImplWorks
 		var templ_7745c5c3_Var9 string
 		templ_7745c5c3_Var9, templ_7745c5c3_Err = templ.JoinStringErrs(event.WorkspaceSlug)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/workspace_errors_views.templ`, Line: 61, Col: 86}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/workspace_errors_views.templ`, Line: 63, Col: 86}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var9))
 		if templ_7745c5c3_Err != nil {
@@ -253,7 +253,7 @@ func WorkspaceErrorEventCard(event WorkspaceErrorEventView, workspace *ImplWorks
 		var templ_7745c5c3_Var10 string
 		templ_7745c5c3_Var10, templ_7745c5c3_Err = templ.JoinStringErrs(event.Source)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/workspace_errors_views.templ`, Line: 61, Col: 106}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/workspace_errors_views.templ`, Line: 63, Col: 106}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var10))
 		if templ_7745c5c3_Err != nil {
@@ -266,7 +266,7 @@ func WorkspaceErrorEventCard(event WorkspaceErrorEventView, workspace *ImplWorks
 		var templ_7745c5c3_Var11 string
 		templ_7745c5c3_Var11, templ_7745c5c3_Err = templ.JoinStringErrs(event.Severity)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/workspace_errors_views.templ`, Line: 61, Col: 128}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/workspace_errors_views.templ`, Line: 63, Col: 128}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var11))
 		if templ_7745c5c3_Err != nil {
@@ -279,7 +279,7 @@ func WorkspaceErrorEventCard(event WorkspaceErrorEventView, workspace *ImplWorks
 		var templ_7745c5c3_Var12 string
 		templ_7745c5c3_Var12, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("x%d", event.OccurrenceCount))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/workspace_errors_views.templ`, Line: 63, Col: 98}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/workspace_errors_views.templ`, Line: 65, Col: 98}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var12))
 		if templ_7745c5c3_Err != nil {
@@ -297,7 +297,7 @@ func WorkspaceErrorEventCard(event WorkspaceErrorEventView, workspace *ImplWorks
 			var templ_7745c5c3_Var13 string
 			templ_7745c5c3_Var13, templ_7745c5c3_Err = templ.JoinStringErrs(event.Detail)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/workspace_errors_views.templ`, Line: 66, Col: 75}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/workspace_errors_views.templ`, Line: 68, Col: 75}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var13))
 			if templ_7745c5c3_Err != nil {
@@ -315,7 +315,7 @@ func WorkspaceErrorEventCard(event WorkspaceErrorEventView, workspace *ImplWorks
 		var templ_7745c5c3_Var14 string
 		templ_7745c5c3_Var14, templ_7745c5c3_Err = templ.JoinStringErrs(workspaceErrorTime(event.FirstSeenAt))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/workspace_errors_views.templ`, Line: 68, Col: 94}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/workspace_errors_views.templ`, Line: 70, Col: 94}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var14))
 		if templ_7745c5c3_Err != nil {
@@ -328,7 +328,7 @@ func WorkspaceErrorEventCard(event WorkspaceErrorEventView, workspace *ImplWorks
 		var templ_7745c5c3_Var15 string
 		templ_7745c5c3_Var15, templ_7745c5c3_Err = templ.JoinStringErrs(workspaceErrorTime(event.LastSeenAt))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/workspace_errors_views.templ`, Line: 68, Col: 146}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/workspace_errors_views.templ`, Line: 70, Col: 146}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var15))
 		if templ_7745c5c3_Err != nil {
@@ -390,7 +390,7 @@ func WorkspaceErrorActionLinks(view ImplWorkspaceView, managerURL string) templ.
 			var templ_7745c5c3_Var17 templ.SafeURL
 			templ_7745c5c3_Var17, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(managerURL + "/workspaces/switch/" + slug + "?redirect=" + url.QueryEscape("/")))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/workspace_errors_views.templ`, Line: 80, Col: 106}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/workspace_errors_views.templ`, Line: 82, Col: 106}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var17))
 			if templ_7745c5c3_Err != nil {
@@ -408,7 +408,7 @@ func WorkspaceErrorActionLinks(view ImplWorkspaceView, managerURL string) templ.
 		var templ_7745c5c3_Var18 templ.SafeURL
 		templ_7745c5c3_Var18, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL("/workspaces"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/workspace_errors_views.templ`, Line: 82, Col: 39}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/workspace_errors_views.templ`, Line: 84, Col: 39}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var18))
 		if templ_7745c5c3_Err != nil {

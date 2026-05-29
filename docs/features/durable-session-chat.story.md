@@ -76,6 +76,24 @@ As a workspace user, I want Agent Chat transcripts and Pi-produced artifacts to 
 - I reload chat.
 - Transcript contains "VAMOS_E2E_FREEFORM_REFRESH_SECOND".
 
+## Scenario: Freeform chat adopts QRSPI project metadata
+
+### Given
+
+- I am authenticated as "playwright@localhost".
+- Project plan workspaces "example.com/alpha/app" and "example.com/beta/app" are seeded.
+- I open Thoughts root chat.
+
+### When
+
+- I seed latest freeform chat QRSPI project result "example.com/alpha/app".
+
+### Then
+
+- Thread metadata contains project "example.com/alpha/app".
+- I reload chat.
+- Thread metadata contains project "example.com/alpha/app".
+
 ## Scenario: Anchor document navigation preserves embedded chat
 
 ### Given

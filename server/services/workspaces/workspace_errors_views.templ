@@ -9,9 +9,11 @@ import (
 
 templ WorkspaceErrorsDocument(args layouts.RootArgs, model WorkspaceErrorPageModel) {
 	@layouts.Root(args) {
-		<section class="mx-auto flex h-full w-full max-w-6xl flex-col gap-4 overflow-y-auto p-6" data-init={ templ.SafeURL("@get('" + workspaceErrorsStreamPath(model.SelectedWorkspace) + "')") }>
-			@WorkspaceErrorsHeader(model)
-			@WorkspaceErrorQueue(model)
+		<section class="h-full w-full overflow-y-auto p-6" data-init={ templ.SafeURL("@get('" + workspaceErrorsStreamPath(model.SelectedWorkspace) + "')") }>
+			<div class="mx-auto flex w-full max-w-6xl flex-col gap-4">
+				@WorkspaceErrorsHeader(model)
+				@WorkspaceErrorQueue(model)
+			</div>
 		</section>
 	}
 }

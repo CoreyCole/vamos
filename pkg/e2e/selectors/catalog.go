@@ -32,7 +32,7 @@ func DefaultCatalog() Catalog {
 		},
 		{
 			Key:         "thoughts.sidebar.workspaces",
-			CSS:         "[data-e2e='thoughts.sidebar.workspaces'], #thoughts-shared-sidebar [role='tab']:has-text('Workspaces'), #thoughts-shared-sidebar button:has-text('Workspaces'), #thoughts-workbench-sidebar [role='tab']:has-text('Workspaces'), #thoughts-workbench-sidebar button:has-text('Workspaces')",
+			CSS:         "[data-e2e='thoughts.sidebar.workspaces'], #doc-workbench-sidebar-region [role='tab']:has-text('Workspaces'), #doc-workbench-sidebar-region button:has-text('Workspaces'), #thoughts-shared-sidebar [role='tab']:has-text('Workspaces'), #thoughts-shared-sidebar button:has-text('Workspaces'), #thoughts-workbench-sidebar [role='tab']:has-text('Workspaces'), #thoughts-workbench-sidebar button:has-text('Workspaces')",
 			Description: "Thoughts sidebar Workspaces tab",
 		},
 		{

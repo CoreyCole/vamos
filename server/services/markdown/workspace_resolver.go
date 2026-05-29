@@ -136,8 +136,8 @@ func resolveExistingOrCleanPath(path string) (string, error) {
 }
 
 func pathWithinRoot(path, root string) bool {
-	path = filepath.Clean(path)
-	root = filepath.Clean(root)
+	path = cleanPathForRootCheck(path)
+	root = cleanPathForRootCheck(root)
 	if path == root {
 		return true
 	}
@@ -147,4 +147,12 @@ func pathWithinRoot(path, root string) bool {
 	}
 	return rel != "." && !strings.HasPrefix(rel, ".."+string(filepath.Separator)) &&
 		rel != ".."
+}
+
+func cleanPathForRootCheck(path string) string {
+	path = filepath.Clean(path)
+	if resolved, err := filepath.EvalSymlinks(path); err == nil {
+		return filepath.Clean(resolved)
+	}
+	return path
 }

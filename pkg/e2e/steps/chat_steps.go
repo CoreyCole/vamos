@@ -417,6 +417,51 @@ VALUES (?, 1, ?, '[]', ?, '[]', '{}')`, selection.threadID, messages, participan
 UPDATE agent_runs SET status = 'complete', completed_at = CURRENT_TIMESTAMP WHERE id = ?`, selection.runID)
 }
 
+func SeedProjectPlanWorkspaces(t testing.TB, ctx *e2e.Context, projectA, projectB string) {
+	t.Helper()
+	ensureE2EPlanFixture(t, ctx)
+	database, err := e2e.OpenWorkspaceDB(t.Context(), ctx.Config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = database.Close() }()
+	for _, projectID := range []string{projectA, projectB} {
+		seedProjectPlanWorkspace(t, ctx, database, projectID)
+	}
+}
+
+func seedProjectPlanWorkspace(t testing.TB, ctx *e2e.Context, database *sql.DB, projectID string) {
+	t.Helper()
+	stamp := time.Now().UTC().Format("20060102T150405.000000000")
+	slug := e2eProjectSlug(projectID)
+	rel := path.Join("creative-mode-agent", "plans", "e2e-project-filter-"+slug)
+	dir := filepath.Join(ctx.Config.ThoughtsRoot, rel)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	frontmatter := fmt.Sprintf("---\nproject: %s\nstage: plan\n---\n# %s\n", projectID, projectPlanLabel(projectID))
+	if err := os.WriteFile(filepath.Join(dir, "AGENTS.md"), []byte(frontmatter), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "plan.md"), []byte(frontmatter), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := database.ExecContext(t.Context(), `
+INSERT INTO plan_workspaces (plan_dir_rel, project_id, plan_dir, label, workspace_slug, artifact_updated_at, qrspi_lifecycle, last_discovered_at)
+VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP, 'plan', CURRENT_TIMESTAMP)
+ON CONFLICT(plan_dir_rel) DO UPDATE SET
+  project_id = excluded.project_id,
+  plan_dir = excluded.plan_dir,
+  label = excluded.label,
+  workspace_slug = excluded.workspace_slug,
+  artifact_updated_at = CURRENT_TIMESTAMP,
+  qrspi_lifecycle = excluded.qrspi_lifecycle,
+  archived_at = NULL,
+  last_discovered_at = CURRENT_TIMESTAMP`, rel, projectID, dir, projectPlanLabel(projectID), "e2e-project-filter-"+slug+"-"+stamp); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func SeedLatestWorkspaceChats(t testing.TB, ctx *e2e.Context, markerA, markerB string) {
 	t.Helper()
 	ensureE2EPlanFixture(t, ctx)
@@ -523,6 +568,95 @@ VALUES (?, 1, ?, '[]', ?, '[]', '{}')`, threadID, messages, participants); err !
 	ctx.Memory["workspace_root_"+label] = rootDocPath
 }
 
+func SeedLatestFreeformChatQRSPIProjectResult(t testing.TB, ctx *e2e.Context, projectID string) {
+	t.Helper()
+	ensureE2EPlanFixture(t, ctx)
+	database, err := e2e.OpenWorkspaceDB(t.Context(), ctx.Config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = database.Close() }()
+	stamp := time.Now().UTC().Format("20060102T150405.000000000")
+	workspaceID := "e2e-freeform-project-ws-" + stamp
+	threadID := "e2e-freeform-project-thread-" + stamp
+	branchID := "e2e-freeform-project-branch-" + stamp
+	lineageID := "e2e-freeform-project-lineage-" + stamp
+	entryID := "e2e-freeform-project-entry-" + stamp
+	rootDocPath := filepath.Join(
+		ctx.Config.ThoughtsRoot,
+		"creative-mode-agent",
+		"plans",
+		"2026-05-20_23-02-59_vamos-e2e-story-playwright-go",
+	)
+	if _, err := database.ExecContext(t.Context(), `
+INSERT INTO workspaces (id, user_email, title, root_doc_path, workflow_type, source, selected_thread_id, current_session_id, current_branch_id)
+VALUES (?, 'playwright@localhost', 'E2E freeform project adoption', ?, 'freeform', 'imported', ?, ?, ?)`, workspaceID, rootDocPath, threadID, threadID, branchID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := database.ExecContext(t.Context(), `
+INSERT INTO agent_threads (id, user_email, title, cwd, lineage_id, head_entry_id, project_id)
+VALUES (?, 'playwright@localhost', 'E2E freeform project thread', ?, ?, ?, ?)`, threadID, ctx.Config.RepoRoot, lineageID, entryID, projectID); err != nil {
+		t.Fatal(err)
+	}
+	attachE2EThreadWorkspace(t, database, threadID, workspaceID)
+	assistantText := fmt.Sprintf(`E2E freeform QRSPI project result
+
+<qrspi-result>
+  <project>%s</project>
+  <stage>plan</stage>
+  <status>complete</status>
+  <outcome>complete</outcome>
+  <summary>
+    <plan-goal>E2E project filtering.</plan-goal>
+    <stage-completed>Seeded freeform project adoption.</stage-completed>
+    <key-decisions>Project filters plan sidebar.</key-decisions>
+  </summary>
+  <artifact>thoughts/creative-mode-agent/plans/2026-05-20_23-02-59_vamos-e2e-story-playwright-go/plan.md</artifact>
+</qrspi-result>`, projectID)
+	payload := fmt.Sprintf(
+		`{"type":"message","id":%q,"parentId":null,"message":{"role":"assistant","content":%q}}`,
+		entryID,
+		assistantText,
+	)
+	if _, err := database.ExecContext(t.Context(), `
+INSERT INTO agent_entries (lineage_id, entry_id, parent_entry_id, entry_type, origin_order, payload_json, origin_thread_id, session_timestamp)
+VALUES (?, ?, NULL, 'message', 1, ?, ?, CURRENT_TIMESTAMP)`, lineageID, entryID, payload, threadID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := database.ExecContext(t.Context(), `
+INSERT INTO chat_sessions (id, workspace_id, created_by_user_email, branch_id, topology_kind, current_projection_seq)
+VALUES (?, ?, 'playwright@localhost', ?, 'root', 1)`, threadID, workspaceID, branchID); err != nil {
+		t.Fatal(err)
+	}
+	messages := fmt.Sprintf(`[{"id":"msg-%s","role":"assistant","content":%q}]`, stamp, assistantText)
+	participants := `[{"id":"assistant","displayName":"Assistant"}]`
+	if _, err := database.ExecContext(t.Context(), `
+INSERT INTO chat_session_projections (session_id, last_seq, messages_json, runs_json, participants_json, artifacts_json, topology_json)
+VALUES (?, 1, ?, '[]', ?, '[]', '{}')`, threadID, messages, participants); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := database.ExecContext(t.Context(), `
+INSERT INTO user_chat_selections (user_email, scope, scope_id, workspace_id, thread_id)
+VALUES ('playwright@localhost', 'freeform', '', ?, ?)
+ON CONFLICT(user_email, scope, scope_id) DO UPDATE SET
+  workspace_id = excluded.workspace_id,
+  thread_id = excluded.thread_id,
+  run_id = '',
+  updated_at = CURRENT_TIMESTAMP`, workspaceID, threadID); err != nil {
+		t.Fatal(err)
+	}
+	if ctx.Memory == nil {
+		ctx.Memory = map[string]string{}
+	}
+	ctx.Memory["freeform_workspace_id"] = workspaceID
+	ctx.Memory["freeform_thread_id"] = threadID
+	Visit(t, ctx, thoughtsChatURL(
+		"thoughts/creative-mode-agent/plans/2026-05-20_23-02-59_vamos-e2e-story-playwright-go/plan.md",
+		workspaceID,
+		threadID,
+	))
+}
+
 func OpenSeededWorkspaceChat(t testing.TB, ctx *e2e.Context, label string) {
 	t.Helper()
 	workspaceID := ctx.Memory["workspace_"+label]
@@ -568,6 +702,52 @@ WHERE id = ?`, threadID, workspaceID); err != nil {
 func OpenThoughtsRootChatContext(t testing.TB, ctx *e2e.Context, _ string) {
 	t.Helper()
 	Visit(t, ctx, "/thoughts/?context=chat")
+}
+
+func ExpectThreadMetadataProject(t testing.TB, ctx *e2e.Context, projectID string) {
+	t.Helper()
+	button := ctx.Page.Locator("button[title='Show chat metadata'], button[aria-label='Show chat metadata']").First()
+	if err := button.Click(); err != nil {
+		t.Fatal(err)
+	}
+	if err := ctx.Page.GetByText(projectID).First().WaitFor(); err != nil {
+		t.Fatalf("thread metadata project %q not visible: %v", projectID, err)
+	}
+}
+
+func ExpectPlanSidebarContainsProjectPlan(t testing.TB, ctx *e2e.Context, projectID string) {
+	t.Helper()
+	sidebar := ctx.Page.Locator("#agent-chat-thread-sidebar, #agent-chat-workspace-sidebar").First()
+	if err := sidebar.GetByText(projectPlanLabel(projectID)).First().WaitFor(); err != nil {
+		t.Fatalf("plan sidebar missing project plan %q: %v", projectID, err)
+	}
+}
+
+func ExpectPlanSidebarAbsentProjectPlan(t testing.TB, ctx *e2e.Context, projectID string) {
+	t.Helper()
+	sidebar := ctx.Page.Locator("#agent-chat-thread-sidebar, #agent-chat-workspace-sidebar").First()
+	text, err := sidebar.InnerText()
+	if err != nil {
+		t.Fatal(err)
+	}
+	label := projectPlanLabel(projectID)
+	if strings.Contains(text, label) {
+		t.Fatalf("plan sidebar contains project plan %q", projectID)
+	}
+}
+
+func projectPlanLabel(projectID string) string {
+	return "E2E Project Plan " + strings.TrimSpace(projectID)
+}
+
+func e2eProjectSlug(projectID string) string {
+	slug := strings.ToLower(strings.TrimSpace(projectID))
+	replacer := strings.NewReplacer("/", "-", ".", "-", "_", "-", " ", "-")
+	slug = replacer.Replace(slug)
+	for strings.Contains(slug, "--") {
+		slug = strings.ReplaceAll(slug, "--", "-")
+	}
+	return strings.Trim(slug, "-")
 }
 
 func planDocPath(planDir string) string {
