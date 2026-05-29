@@ -51,28 +51,66 @@ func ExportPlanBundle(
 	fmt.Fprintf(&b, "- Screenshots: %d\n", len(manifest.Screenshots))
 	fmt.Fprintf(&b, "- HTML snapshots: %d\n", len(manifest.HTMLSnapshots))
 	fmt.Fprintf(&b, "- Traces: %d\n\n", len(manifest.Traces))
-	copiedScreenshots := []string{}
-	for _, shot := range manifest.Screenshots {
-		base := filepath.Base(shot)
-		dst := filepath.Join(target, "screenshots", base)
-		if err := copyFile(shot, dst); err != nil {
-			return PlanBundle{}, err
-		}
-		copiedScreenshots = append(copiedScreenshots, dst)
-		fmt.Fprintf(&b, "![%s](screenshots/%s)\n\n", base, base)
-	}
-	if opts.IncludeHTML {
-		for _, snap := range manifest.HTMLSnapshots {
-			base := filepath.Base(snap)
-			if err := copyFile(snap, filepath.Join(target, "html", base)); err != nil {
+	if opts.RunDir != "" {
+		staticIndexPath := filepath.Join(opts.RunDir, "index.html")
+		if _, err := os.Stat(staticIndexPath); err == nil {
+			if err := copyFile(staticIndexPath, filepath.Join(target, "index.html")); err != nil {
 				return PlanBundle{}, err
 			}
-			fmt.Fprintf(&b, "- HTML snapshot: [`%s`](html/%s)\n", base, base)
+			fmt.Fprintf(&b, "- Static index: [`index.html`](index.html)\n")
 		}
 	}
-	if opts.IncludeTrace {
-		for _, trace := range manifest.Traces {
-			fmt.Fprintf(&b, "- Trace: `%s`\n", trace)
+	fmt.Fprintln(&b)
+
+	copiedScreenshots := []string{}
+	if len(manifest.Artifacts) > 0 {
+		copied, err := copyStructuredArtifacts(opts.RunDir, target, manifest.Artifacts)
+		if err != nil {
+			return PlanBundle{}, err
+		}
+		for _, dst := range copied {
+			if strings.EqualFold(filepath.Ext(dst), ".png") || strings.EqualFold(filepath.Ext(dst), ".jpg") || strings.EqualFold(filepath.Ext(dst), ".jpeg") || strings.EqualFold(filepath.Ext(dst), ".webp") {
+				copiedScreenshots = append(copiedScreenshots, dst)
+			}
+		}
+		fmt.Fprintln(&b, "## Artifacts")
+		fmt.Fprintln(&b)
+		for _, entry := range manifest.Artifacts {
+			label := strings.TrimSpace(fmt.Sprintf("%s / %s / %s / %s", entry.FeatureSlug, entry.ScenarioSlug, entry.Viewport, entry.Kind))
+			fmt.Fprintf(&b, "- %s: [`%s`](%s)\n", label, filepath.Base(entry.Path), entry.Path)
+			if entry.Kind == ArtifactKindScreenshot {
+				fmt.Fprintf(&b, "\n![%s / %s / %s](%s)\n\n", entry.FeatureSlug, entry.ScenarioSlug, entry.Viewport, entry.Path)
+			}
+		}
+	} else {
+		for _, shot := range manifest.Screenshots {
+			rel, ok := preserveRunRelativePath(opts.RunDir, shot)
+			if !ok {
+				rel = filepath.ToSlash(filepath.Join("screenshots", filepath.Base(shot)))
+			}
+			dst, err := copyRunArtifactOrAbsolute(opts.RunDir, target, shot, rel)
+			if err != nil {
+				return PlanBundle{}, err
+			}
+			copiedScreenshots = append(copiedScreenshots, dst)
+			fmt.Fprintf(&b, "![%s](%s)\n\n", filepath.Base(shot), rel)
+		}
+		if opts.IncludeHTML {
+			for _, snap := range manifest.HTMLSnapshots {
+				rel, ok := preserveRunRelativePath(opts.RunDir, snap)
+				if !ok {
+					rel = filepath.ToSlash(filepath.Join("html", filepath.Base(snap)))
+				}
+				if _, err := copyRunArtifactOrAbsolute(opts.RunDir, target, snap, rel); err != nil {
+					return PlanBundle{}, err
+				}
+				fmt.Fprintf(&b, "- HTML snapshot: [`%s`](%s)\n", filepath.Base(snap), rel)
+			}
+		}
+		if opts.IncludeTrace {
+			for _, trace := range manifest.Traces {
+				fmt.Fprintf(&b, "- Trace: `%s`\n", trace)
+			}
 		}
 	}
 	if err := writeJSONFile(filepath.Join(target, "manifest.json"), manifest); err != nil {
@@ -130,6 +168,61 @@ func planDirHasThoughtsRoot(parts []string) bool {
 		}
 	}
 	return false
+}
+
+func preserveRunRelativePath(runDir, artifactPath string) (string, bool) {
+	if runDir == "" || artifactPath == "" {
+		return "", false
+	}
+	rel, err := filepath.Rel(runDir, artifactPath)
+	if err != nil || strings.HasPrefix(rel, "..") || filepath.IsAbs(rel) {
+		return "", false
+	}
+	return filepath.ToSlash(rel), true
+}
+
+func copyRunArtifact(runDir, target, rel string) (string, error) {
+	if runDir == "" {
+		return "", fmt.Errorf("run dir is required")
+	}
+	cleanRel := filepath.Clean(filepath.FromSlash(rel))
+	if cleanRel == "." || strings.HasPrefix(cleanRel, "..") || filepath.IsAbs(cleanRel) {
+		return "", fmt.Errorf("unsafe run artifact path: %s", rel)
+	}
+	src := filepath.Join(runDir, cleanRel)
+	dst := filepath.Join(target, cleanRel)
+	if err := copyFile(src, dst); err != nil {
+		return "", err
+	}
+	return dst, nil
+}
+
+func copyStructuredArtifacts(runDir, target string, entries []ArtifactEntry) ([]string, error) {
+	copied := []string{}
+	for _, entry := range entries {
+		if entry.Path == "" {
+			continue
+		}
+		dst, err := copyRunArtifact(runDir, target, entry.Path)
+		if err != nil {
+			return nil, err
+		}
+		copied = append(copied, dst)
+	}
+	return copied, nil
+}
+
+func copyRunArtifactOrAbsolute(runDir, target, absolutePath, rel string) (string, error) {
+	if runDir != "" {
+		if dst, err := copyRunArtifact(runDir, target, rel); err == nil {
+			return dst, nil
+		}
+	}
+	dst := filepath.Join(target, filepath.Clean(filepath.FromSlash(rel)))
+	if err := copyFile(absolutePath, dst); err != nil {
+		return "", err
+	}
+	return dst, nil
 }
 
 func writeJSONFile(path string, value any) error {

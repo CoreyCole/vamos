@@ -8,52 +8,52 @@ import (
 	"testing"
 )
 
-func TestExportPlanBundleCopiesArtifactsAndIndex(t *testing.T) {
+func TestExportPlanBundlePreservesStructuredArtifactHierarchy(t *testing.T) {
 	runDir := t.TempDir()
-	shot := filepath.Join(runDir, "page.png")
-	if err := os.WriteFile(shot, []byte("png"), 0o644); err != nil {
-		t.Fatalf("write screenshot: %v", err)
+	paths := []string{
+		"thoughts-workbench/root-opens/mobile/page.png",
+		"thoughts-workbench/root-opens/desktop-full/page.png",
+		"thoughts-workbench/root-opens/mobile/page.html",
 	}
-	html := filepath.Join(runDir, "page.html")
-	if err := os.WriteFile(html, []byte("<main></main>"), 0o644); err != nil {
-		t.Fatalf("write html: %v", err)
+	for _, rel := range paths {
+		writePlanBundleTestFile(t, filepath.Join(runDir, filepath.FromSlash(rel)), rel)
 	}
+	writePlanBundleTestFile(t, filepath.Join(runDir, "index.html"), "<html></html>")
 	failures := filepath.Join(runDir, "failures.json")
-	if err := os.WriteFile(failures, []byte(`[]`), 0o644); err != nil {
-		t.Fatalf("write failures: %v", err)
-	}
+	writePlanBundleTestFile(t, failures, `[]`)
+
 	planDir := filepath.Join(t.TempDir(), "thoughts", "agent", "plans", "example")
 	bundle, err := ExportPlanBundle(
 		context.Background(),
 		RunManifest{
-			ID:            "run-1",
-			Stories:       []string{"durable-session-chat"},
-			Screenshots:   []string{shot},
-			HTMLSnapshots: []string{html},
-			Traces:        []string{filepath.Join(runDir, "trace.zip")},
-			FailuresPath:  failures,
+			ID:           "run-1",
+			Stories:      []string{"thoughts-workbench"},
+			FailuresPath: failures,
+			Artifacts: []ArtifactEntry{
+				{FeatureSlug: "thoughts-workbench", ScenarioSlug: "root-opens", Viewport: "mobile", Label: "page", Kind: ArtifactKindScreenshot, Path: "thoughts-workbench/root-opens/mobile/page.png"},
+				{FeatureSlug: "thoughts-workbench", ScenarioSlug: "root-opens", Viewport: "desktop-full", Label: "page", Kind: ArtifactKindScreenshot, Path: "thoughts-workbench/root-opens/desktop-full/page.png"},
+				{FeatureSlug: "thoughts-workbench", ScenarioSlug: "root-opens", Viewport: "mobile", Label: "page", Kind: ArtifactKindHTML, Path: "thoughts-workbench/root-opens/mobile/page.html"},
+			},
 		},
 		PlanBundleOptions{
-			PlanDir:      planDir,
-			RunDir:       runDir,
-			Command:      "go test ./pkg/e2e/generated",
-			IncludeHTML:  true,
-			IncludeTrace: true,
+			PlanDir:     planDir,
+			RunDir:      runDir,
+			Command:     "go test ./pkg/e2e/generated",
+			IncludeHTML: true,
 		},
 	)
 	if err != nil {
 		t.Fatalf("ExportPlanBundle() error = %v", err)
 	}
 	runBundleDir := filepath.Join(planDir, "context", "implement", "e2e-runs", "run-1")
-	for _, path := range []string{
-		filepath.Join(runBundleDir, "screenshots", "page.png"),
-		filepath.Join(runBundleDir, "html", "page.html"),
-		filepath.Join(runBundleDir, "manifest.json"),
-		filepath.Join(runBundleDir, "failures.json"),
-	} {
+	for _, rel := range append(paths, "index.html", "manifest.json", "failures.json") {
+		path := filepath.Join(runBundleDir, filepath.FromSlash(rel))
 		if _, err := os.Stat(path); err != nil {
 			t.Fatalf("bundle artifact missing %s: %v", path, err)
 		}
+	}
+	if got, want := len(bundle.ScreenshotPaths), 2; got != want {
+		t.Fatalf("ScreenshotPaths len=%d want %d: %#v", got, want, bundle.ScreenshotPaths)
 	}
 	data, err := os.ReadFile(bundle.IndexPath)
 	if err != nil {
@@ -64,13 +64,24 @@ func TestExportPlanBundleCopiesArtifactsAndIndex(t *testing.T) {
 		"`go test ./pkg/e2e/generated`",
 		"[`manifest.json`](manifest.json)",
 		"[`failures.json`](failures.json)",
-		"![page.png](screenshots/page.png)",
-		"[`page.html`](html/page.html)",
-		"trace.zip",
+		"[`index.html`](index.html)",
+		"thoughts-workbench/root-opens/mobile/page.png",
+		"thoughts-workbench/root-opens/desktop-full/page.png",
+		"thoughts-workbench/root-opens/mobile/page.html",
 	} {
 		if !strings.Contains(index, want) {
 			t.Fatalf("index missing %q:\n%s", want, index)
 		}
+	}
+}
+
+func writePlanBundleTestFile(t *testing.T, path, content string) {
+	t.Helper()
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatalf("mkdir %s: %v", filepath.Dir(path), err)
+	}
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatalf("write %s: %v", path, err)
 	}
 }
 
