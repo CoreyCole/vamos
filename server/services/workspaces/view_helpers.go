@@ -4,6 +4,10 @@ import (
 	"database/sql"
 	"fmt"
 	"hash/fnv"
+	"net/url"
+	"os"
+	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 	"unicode"
@@ -122,6 +126,63 @@ func workspacePlanBindingLabel(view ImplWorkspaceView) string {
 	}
 	if view.Row.PlanDir.Valid {
 		return strings.TrimSpace(view.Row.PlanDir.String)
+	}
+	return ""
+}
+
+func workspaceVerifyHTMLURL(view ImplWorkspaceView) string {
+	if _, ok := latestWorkspaceVerifyHTMLPath(view); !ok {
+		return ""
+	}
+	slug := url.PathEscape(workspaceViewSlug(view))
+	if slug == "" {
+		return ""
+	}
+	return "/workspaces/" + slug + "/verify-html"
+}
+
+func latestWorkspaceVerifyHTMLPath(view ImplWorkspaceView) (string, bool) {
+	planDir := workspacePlanDirAbs(view)
+	if planDir == "" {
+		return "", false
+	}
+	runsDir := filepath.Join(planDir, "context", "implement", "e2e-runs")
+	entries, err := os.ReadDir(runsDir)
+	if err != nil {
+		return "", false
+	}
+	runs := make([]string, 0, len(entries))
+	for _, entry := range entries {
+		if !entry.IsDir() {
+			continue
+		}
+		indexPath := filepath.Join(runsDir, entry.Name(), "index.html")
+		if info, err := os.Stat(indexPath); err == nil && !info.IsDir() {
+			runs = append(runs, entry.Name())
+		}
+	}
+	if len(runs) == 0 {
+		return "", false
+	}
+	sort.Strings(runs)
+	return filepath.Join(runsDir, runs[len(runs)-1], "index.html"), true
+}
+
+func workspacePlanDirAbs(view ImplWorkspaceView) string {
+	if view.Row.PlanDir.Valid {
+		if planDir := strings.TrimSpace(view.Row.PlanDir.String); filepath.IsAbs(planDir) {
+			return filepath.Clean(planDir)
+		}
+	}
+	checkoutPath := strings.TrimSpace(workspaceViewCheckoutPath(view))
+	if checkoutPath == "" {
+		return ""
+	}
+	if view.Row.PlanDirRel.Valid && strings.TrimSpace(view.Row.PlanDirRel.String) != "" {
+		return filepath.Join(checkoutPath, "thoughts", filepath.FromSlash(strings.TrimPrefix(strings.TrimSpace(view.Row.PlanDirRel.String), "thoughts/")))
+	}
+	if view.Row.PlanDir.Valid && strings.TrimSpace(view.Row.PlanDir.String) != "" {
+		return filepath.Join(checkoutPath, filepath.FromSlash(strings.TrimSpace(view.Row.PlanDir.String)))
 	}
 	return ""
 }

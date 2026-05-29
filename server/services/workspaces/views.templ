@@ -285,13 +285,13 @@ templ WorkspacesTable(items []ImplWorkspaceView, managerURL string, showHistoric
 		<table class="w-full text-sm">
 			<thead class="bg-muted/50 text-left text-xs uppercase tracking-wide text-muted-foreground">
 				<tr>
+					<th class="px-3 py-2">Actions</th>
 					<th class="px-3 py-2">Workspace</th>
 					<th class="px-3 py-2">QRSPI</th>
 					<th class="px-3 py-2">Runtime</th>
 					<th class="px-3 py-2">Branch</th>
 					<th class="px-3 py-2">Commit</th>
 					<th class="px-3 py-2">Release</th>
-					<th class="px-3 py-2 text-right">Actions</th>
 				</tr>
 			</thead>
 			<tbody class="divide-y">
@@ -316,6 +316,9 @@ templ WorkspaceTableRow(view ImplWorkspaceView, managerURL string, showHistorica
 	{{ slug := workspaceViewSlug(view) }}
 	<tr data-workspace-row={ slug } class="hover:bg-muted/40">
 		<td class="px-3 py-2 align-top">
+			@WorkspaceActionsMenu(view, managerURL, showHistorical, projectFilter)
+		</td>
+		<td class="px-3 py-2 align-top">
 			<button type="button" class="font-medium hover:underline" data-on:click={ "document.getElementById('workspace-dialog-" + slug + "').showModal()" }>{ workspaceViewLabel(view) }</button>
 			if slug != "" {
 				<p class="break-all font-mono text-xs text-muted-foreground">{ slug }</p>
@@ -326,11 +329,6 @@ templ WorkspaceTableRow(view ImplWorkspaceView, managerURL string, showHistorica
 		<td class="px-3 py-2 align-top font-mono text-xs">{ workspaceBranchLabel(view) }</td>
 		<td class="px-3 py-2 align-top font-mono text-xs">{ shortCommit(workspaceCommit(view)) }</td>
 		<td class="px-3 py-2 align-top">{ workspaceReleaseSummary(view) }</td>
-		<td class="px-3 py-2 align-top">
-			<div class="flex justify-end gap-2">
-				@WorkspaceLifecycleActions(view, managerURL, showHistorical, projectFilter)
-			</div>
-		</td>
 	</tr>
 }
 
@@ -541,9 +539,8 @@ templ ImplWorkspaceCard(view ImplWorkspaceView, managerURL string, showHistorica
 				</div>
 			</div>
 		}
-		<div class="mt-auto flex flex-wrap justify-end gap-2 pt-2">
-			@WorkspaceCleanupButton(workspaceCleanupAction(view))
-			@WorkspaceLifecycleActions(view, managerURL, showHistorical, projectFilter)
+		<div class="mt-auto flex flex-wrap justify-start gap-2 pt-2">
+			@WorkspaceActionsMenu(view, managerURL, showHistorical, projectFilter)
 		</div>
 	</article>
 }
@@ -585,6 +582,20 @@ templ WorkspaceProofDiagnostics(view ImplWorkspaceView) {
 		<dt class="text-xs font-medium uppercase tracking-wide text-muted-foreground">Git detail</dt>
 		<dd class="min-w-0 break-words text-xs text-muted-foreground">{ view.Row.GitDetail.String }</dd>
 	}
+}
+
+templ WorkspaceActionsMenu(view ImplWorkspaceView, managerURL string, showHistorical bool, projectFilter ProjectFilter) {
+	<details class="relative inline-block text-left">
+		<summary class="inline-flex h-8 cursor-pointer list-none items-center rounded-md border px-2 text-xs font-medium hover:bg-accent [&::-webkit-details-marker]:hidden">Actions</summary>
+		<div class="absolute left-0 z-20 mt-1 flex min-w-40 flex-col gap-1 rounded-md border bg-popover p-2 text-popover-foreground shadow-md">
+			<button type="button" class="inline-flex h-8 items-center rounded-md px-2 text-xs font-medium hover:bg-accent" data-on:click={ "document.getElementById('workspace-dialog-" + workspaceViewSlug(view) + "').showModal(); this.closest('details').removeAttribute('open')" }>Details</button>
+			if workspaceVerifyHTMLURL(view) != "" {
+				<a href={ templ.SafeURL(workspaceVerifyHTMLURL(view)) } target="_blank" rel="noreferrer" class="inline-flex h-8 items-center rounded-md px-2 text-xs font-medium hover:bg-accent">Verify HTML</a>
+			}
+			@WorkspaceCleanupButton(workspaceCleanupAction(view))
+			@WorkspaceLifecycleActions(view, managerURL, showHistorical, projectFilter)
+		</div>
+	</details>
 }
 
 templ WorkspaceLifecycleActions(view ImplWorkspaceView, managerURL string, showHistorical bool, projectFilter ProjectFilter) {

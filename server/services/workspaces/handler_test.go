@@ -8,6 +8,8 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -948,6 +950,75 @@ func TestWorkspacesPageRendersImplRowWithPlanBinding(t *testing.T) {
 		if strings.Contains(html, absent) {
 			t.Fatalf("WorkspacesPage unexpectedly contained %q: %s", absent, html)
 		}
+	}
+}
+
+func TestWorkspacesPageRendersVerifyHTMLAction(t *testing.T) {
+	checkout := t.TempDir()
+	planRel := "creative-mode-agent/plans/feature"
+	indexPath := filepath.Join(checkout, "thoughts", filepath.FromSlash(planRel), "context", "implement", "e2e-runs", "20260529T154543Z", "index.html")
+	if err := os.MkdirAll(filepath.Dir(indexPath), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(indexPath, []byte("<html>verify</html>"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	views := BuildImplWorkspaceViews([]db.ImplWorkspace{
+		{
+			WorkspaceSlug: "feature",
+			CheckoutPath:  checkout,
+			DisplayName:   "Feature Workspace",
+			Status:        string(ImplWorkspaceStatusActive),
+			PlanDirRel:    sql.NullString{String: planRel, Valid: true},
+		},
+	}, nil, WorkspaceLifecycleSnapshot{})
+
+	var body bytes.Buffer
+	if err := WorkspacesPage(views, "https://main.cn-agents.test", false).Render(t.Context(), &body); err != nil {
+		t.Fatalf("Render() error = %v", err)
+	}
+	html := body.String()
+	for _, want := range []string{"Actions", "Verify HTML", `href="/workspaces/feature/verify-html"`} {
+		if !strings.Contains(html, want) {
+			t.Fatalf("WorkspacesPage missing %q: %s", want, html)
+		}
+	}
+}
+
+func TestHandleVerifyHTMLServesLatestWorkspaceIndex(t *testing.T) {
+	checkout := t.TempDir()
+	planRel := "creative-mode-agent/plans/feature"
+	oldIndex := filepath.Join(checkout, "thoughts", filepath.FromSlash(planRel), "context", "implement", "e2e-runs", "20260528T000000Z", "index.html")
+	newIndex := filepath.Join(checkout, "thoughts", filepath.FromSlash(planRel), "context", "implement", "e2e-runs", "20260529T000000Z", "index.html")
+	for path, body := range map[string]string{oldIndex: "old", newIndex: "new"} {
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	handler := NewHandler(
+		&fakeLifecycleManager{},
+		"https://main.cn-agents.test",
+		"",
+		WithImplWorkspaces(fakeImplWorkspaceLister{rows: []db.ImplWorkspace{{
+			WorkspaceSlug: "feature",
+			CheckoutPath:  checkout,
+			Status:        string(ImplWorkspaceStatusActive),
+			PlanDirRel:    sql.NullString{String: planRel, Valid: true},
+		}}}),
+	)
+	e := echo.New()
+	handler.RegisterRoutes(e, func(next echo.HandlerFunc) echo.HandlerFunc { return next })
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/workspaces/feature/verify-html", nil)
+	e.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d body=%s", rec.Code, rec.Body.String())
+	}
+	if got := strings.TrimSpace(rec.Body.String()); got != "new" {
+		t.Fatalf("body = %q, want latest index", got)
 	}
 }
 

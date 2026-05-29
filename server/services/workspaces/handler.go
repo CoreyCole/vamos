@@ -359,6 +359,7 @@ func (h *Handler) RegisterRoutes(e *echo.Echo, authMiddleware echo.MiddlewareFun
 	g.GET("/errors/stream", h.HandleWorkspaceErrorsStream)
 	g.POST("/refresh", h.HandleRefreshWorkspaces)
 	g.GET("/switch/:slug", h.HandleSwitchWorkspace)
+	g.GET("/:slug/verify-html", h.HandleVerifyHTML)
 	g.POST("/:slug/start", h.HandleStart)
 	g.POST("/:slug/stop", h.HandleStop)
 	g.POST("/:slug/restart", h.HandleRestart)
@@ -409,6 +410,38 @@ func (h *Handler) HandleWorkspacesPage(c echo.Context) error {
 		http.StatusOK,
 		WorkspacesDocument(args, groups, model.ReleasePanel, h.refreshState(), showCleanedHistory, filter, model.ProjectOptions),
 	)
+}
+
+func (h *Handler) HandleVerifyHTML(c echo.Context) error {
+	slug := strings.TrimSpace(c.Param("slug"))
+	if slug == "" {
+		return echo.NewHTTPError(http.StatusBadRequest, "workspace slug is required")
+	}
+	views, err := h.listImplWorkspaceViews(c.Request().Context(), ProjectFilter{})
+	if err != nil {
+		return err
+	}
+	view, ok := findImplWorkspaceViewBySlug(views, slug)
+	if !ok {
+		return echo.NewHTTPError(http.StatusNotFound, "workspace not found")
+	}
+	path, ok := latestWorkspaceVerifyHTMLPath(view)
+	if !ok {
+		return echo.NewHTTPError(http.StatusNotFound, "workspace verify HTML not found")
+	}
+	return c.File(path)
+}
+
+func findImplWorkspaceViewBySlug(views []ImplWorkspaceView, slug string) (ImplWorkspaceView, bool) {
+	for _, view := range views {
+		if workspaceViewSlug(view) == slug {
+			return view, true
+		}
+		if child, ok := findImplWorkspaceViewBySlug(view.Children, slug); ok {
+			return child, true
+		}
+	}
+	return ImplWorkspaceView{}, false
 }
 
 func (h *Handler) HandleRefreshWorkspaces(c echo.Context) error {
