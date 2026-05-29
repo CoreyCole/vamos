@@ -29,6 +29,10 @@ type Config struct {
 
 type RuntimeConfig = Config
 
+func DefaultVerifyViewports() []ViewportClass {
+	return []ViewportClass{ViewportMobile, ViewportDesktopHalf, ViewportDesktopFull}
+}
+
 type WorkspaceIdentity struct {
 	Slug         string
 	CheckoutPath string

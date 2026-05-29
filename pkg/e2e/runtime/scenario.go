@@ -1,6 +1,7 @@
 package runtime
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -44,7 +45,7 @@ func newPageOptionsForViewport(viewport Viewport) playwright.BrowserNewPageOptio
 }
 
 func RunScenario(t *testing.T, featureSlug, scenarioSlug string, fn ScenarioFunc) {
-	runScenario(t, featureSlug, scenarioSlug, ViewportDesktopFull, fn)
+	runScenarioAcrossConfiguredViewports(t, featureSlug, scenarioSlug, fn)
 }
 
 func RunScenarioWithViewport(
@@ -53,33 +54,88 @@ func RunScenarioWithViewport(
 	viewport ViewportClass,
 	fn ScenarioFunc,
 ) {
-	runScenario(t, featureSlug, scenarioSlug, viewport, fn)
+	t.Helper()
+	cfg, err := loadScenarioConfig(t)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := runScenarioOnce(t, cfg, featureSlug, scenarioSlug, viewport, fn); err != nil {
+		t.Fatal(err)
+	}
 }
 
-func runScenario(
+func runScenarioAcrossConfiguredViewports(
 	t *testing.T,
 	featureSlug, scenarioSlug string,
-	viewport ViewportClass,
 	fn ScenarioFunc,
 ) {
+	t.Helper()
+	cfg, err := loadScenarioConfig(t)
+	if err != nil {
+		t.Fatal(err)
+	}
+	viewports, err := scenarioViewports(cfg, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, viewport := range viewports {
+		viewport := viewport
+		t.Run(string(viewport), func(t *testing.T) {
+			t.Helper()
+			if err := runScenarioOnce(t, cfg, featureSlug, scenarioSlug, viewport, fn); err != nil {
+				t.Fatal(err)
+			}
+		})
+	}
+}
+
+func loadScenarioConfig(t testing.TB) (Config, error) {
 	t.Helper()
 	if os.Getenv("VAMOS_BASE_URL") == "" && os.Getenv("VAMOS_E2E_RUN_BROWSER") != "1" {
 		t.Skip("VAMOS_BASE_URL is required for browser E2E")
 	}
 	cfg, err := LoadConfigFromEnv(".")
 	if err != nil {
-		t.Fatal(err)
+		return Config{}, err
 	}
 	if err := cfg.ValidateBrowserConfig(); err != nil {
-		t.Fatal(err)
+		return Config{}, err
 	}
-	if viewport != "" {
-		cfg.Viewports = []ViewportClass{viewport}
+	return cfg, nil
+}
+
+func scenarioViewports(cfg Config, explicit ViewportClass) ([]ViewportClass, error) {
+	if explicit != "" {
+		if _, err := ResolveViewports([]string{string(explicit)}); err != nil {
+			return nil, err
+		}
+		return []ViewportClass{explicit}, nil
 	}
+	if len(cfg.Viewports) == 0 {
+		return []ViewportClass{ViewportDesktopFull}, nil
+	}
+	names := make([]string, 0, len(cfg.Viewports))
+	for _, viewport := range cfg.Viewports {
+		names = append(names, string(viewport))
+	}
+	if _, err := ResolveViewports(names); err != nil {
+		return nil, err
+	}
+	return append([]ViewportClass{}, cfg.Viewports...), nil
+}
+
+func runScenarioOnce(
+	t testing.TB,
+	cfg Config,
+	featureSlug, scenarioSlug string,
+	viewport ViewportClass,
+	fn ScenarioFunc,
+) error {
+	t.Helper()
 
 	pw, err := playwright.Run()
 	if err != nil {
-		t.Fatalf("start playwright: %v", err)
+		return fmt.Errorf("start playwright: %w", err)
 	}
 	defer func() {
 		if err := pw.Stop(); err != nil {
@@ -91,7 +147,7 @@ func runScenario(
 		playwright.BrowserTypeLaunchOptions{Headless: playwright.Bool(cfg.Headless)},
 	)
 	if err != nil {
-		t.Fatalf("launch chromium: %v", err)
+		return fmt.Errorf("launch chromium: %w", err)
 	}
 	defer func() {
 		if err := browser.Close(); err != nil {
@@ -101,11 +157,11 @@ func runScenario(
 
 	viewports, err := ResolveViewports([]string{string(viewport)})
 	if err != nil {
-		t.Fatal(err)
+		return err
 	}
 	page, err := browser.NewPage(newPageOptionsForViewport(viewports[0]))
 	if err != nil {
-		t.Fatalf("new page: %v", err)
+		return fmt.Errorf("new page: %w", err)
 	}
 	artifactDir := cfg.ArtifactsDir
 	if artifactDir != "" {
@@ -118,7 +174,7 @@ func runScenario(
 	}
 	artifactSink, err := NewFileArtifactSink(artifactDir)
 	if err != nil {
-		t.Fatalf("artifact sink: %v", err)
+		return fmt.Errorf("artifact sink: %w", err)
 	}
 	ctx := &Context{
 		Config:     cfg,
@@ -146,4 +202,5 @@ func runScenario(
 	case <-time.After(scenarioTimeout):
 		t.Fatalf("scenario %s/%s timed out", featureSlug, scenarioSlug)
 	}
+	return nil
 }

@@ -45,6 +45,18 @@ func TestBuildGoTestArgs(t *testing.T) {
 	}
 }
 
+func TestSelectedViewportEnvDefaultsToVerifyViewports(t *testing.T) {
+	if got, want := selectedViewportEnv(RunConfig{}), "mobile,desktop-half,desktop-full"; got != want {
+		t.Fatalf("selectedViewportEnv()=%q want %q", got, want)
+	}
+}
+
+func TestSelectedViewportEnvPreservesExplicitCommaList(t *testing.T) {
+	if got, want := selectedViewportEnv(RunConfig{Viewport: "mobile,desktop-half"}), "mobile,desktop-half"; got != want {
+		t.Fatalf("selectedViewportEnv()=%q want %q", got, want)
+	}
+}
+
 func TestEnsureSelectedTestsExistRejectsNoMatch(t *testing.T) {
 	err := ensureSelectedTestsExist(context.Background(), []string{
 		"test",

@@ -21,7 +21,7 @@ func NewRunCommand() *cobra.Command {
 	}
 	cmd.Flags().StringVar(&cfg.Story, "story", "", "story slug to run")
 	cmd.Flags().StringVar(&cfg.Scenario, "scenario", "", "scenario slug to run")
-	cmd.Flags().StringVar(&cfg.Viewport, "viewport", "", "viewport class to run")
+	cmd.Flags().StringVar(&cfg.Viewport, "viewport", "", "viewport class or comma-separated viewport classes to run")
 	cmd.Flags().StringVar(&cfg.BaseURL, "base-url", "", "base URL for browser E2E")
 	cmd.Flags().StringVar(&cfg.ArtifactsDir, "artifacts-dir", "", "directory for run artifacts")
 	cmd.Flags().StringVar(&cfg.PlanDir, "plan-dir", "", "QRSPI plan dir for run index artifacts")

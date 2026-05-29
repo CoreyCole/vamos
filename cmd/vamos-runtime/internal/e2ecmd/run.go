@@ -28,10 +28,9 @@ func RunE2E(ctx context.Context, cfg RunConfig) error {
 			return err
 		}
 	}
-	if cfg.Viewport != "" {
-		if err := os.Setenv("VAMOS_E2E_VIEWPORTS", cfg.Viewport); err != nil {
-			return err
-		}
+	viewportEnv := selectedViewportEnv(cfg)
+	if err := os.Setenv("VAMOS_E2E_VIEWPORTS", viewportEnv); err != nil {
+		return err
 	}
 	if os.Getenv("VAMOS_BASE_URL") != "" {
 		if err := os.Setenv("VAMOS_E2E_RUN_BROWSER", "1"); err != nil {
@@ -84,10 +83,8 @@ func RunE2E(ctx context.Context, cfg RunConfig) error {
 		"VAMOS_BASE_URL="+runCfg.BaseURL,
 		"VAMOS_E2E_ARTIFACTS_DIR="+runDir,
 		"VAMOS_E2E_CAPTURE_SUCCESS=1",
+		"VAMOS_E2E_VIEWPORTS="+viewportEnv,
 	)
-	if cfg.Viewport != "" {
-		cmd.Env = append(cmd.Env, "VAMOS_E2E_VIEWPORTS="+cfg.Viewport)
-	}
 	runErr := cmd.Run()
 	manifest.Stories = appendSelectedStory(manifest.Stories, cfg.Story)
 	manifest.Screenshots = findFiles(runDir, ".png")
@@ -141,6 +138,22 @@ func RunE2E(ctx context.Context, cfg RunConfig) error {
 }
 
 func ShouldPreflight(RunConfig) bool { return true }
+
+func verifyViewportEnvValue() string {
+	viewports := runtime.DefaultVerifyViewports()
+	parts := make([]string, 0, len(viewports))
+	for _, viewport := range viewports {
+		parts = append(parts, string(viewport))
+	}
+	return strings.Join(parts, ",")
+}
+
+func selectedViewportEnv(cfg RunConfig) string {
+	if viewport := strings.TrimSpace(cfg.Viewport); viewport != "" {
+		return viewport
+	}
+	return verifyViewportEnvValue()
+}
 
 func BuildGoTestArgs(cfg RunConfig) []string {
 	args := []string{"test", "./pkg/e2e/generated"}

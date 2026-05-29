@@ -2,6 +2,7 @@ package runtime
 
 import (
 	"os"
+	"reflect"
 	"strings"
 	"testing"
 )
@@ -28,6 +29,25 @@ func TestLoadConfigFromEnvDefaults(t *testing.T) {
 	}
 	if err := cfg.ValidateBrowserConfig(); err != nil {
 		t.Fatalf("ValidateBrowserConfig() error = %v", err)
+	}
+}
+
+func TestLoadConfigFromEnvParsesCommaSeparatedViewports(t *testing.T) {
+	t.Setenv("VAMOS_E2E_VIEWPORTS", "mobile, desktop-half,desktop-full")
+	cfg, err := LoadConfigFromEnv(".")
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []ViewportClass{ViewportMobile, ViewportDesktopHalf, ViewportDesktopFull}
+	if !reflect.DeepEqual(cfg.Viewports, want) {
+		t.Fatalf("Viewports=%v want %v", cfg.Viewports, want)
+	}
+}
+
+func TestDefaultVerifyViewports(t *testing.T) {
+	want := []ViewportClass{ViewportMobile, ViewportDesktopHalf, ViewportDesktopFull}
+	if got := DefaultVerifyViewports(); !reflect.DeepEqual(got, want) {
+		t.Fatalf("DefaultVerifyViewports()=%v want %v", got, want)
 	}
 }
 
