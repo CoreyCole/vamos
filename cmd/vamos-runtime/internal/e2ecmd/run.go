@@ -86,9 +86,19 @@ func RunE2E(ctx context.Context, cfg RunConfig) error {
 		"VAMOS_E2E_VIEWPORTS="+viewportEnv,
 	)
 	runErr := cmd.Run()
+	manifest.Command = "go " + strings.Join(args, " ")
+	manifest.BaseURL = runCfg.BaseURL
+	manifest.ViewportFilter = viewportEnv
+	manifest.RepoCommit = currentGitCommit(ctx)
 	manifest.Stories = appendSelectedStory(manifest.Stories, cfg.Story)
-	manifest.Screenshots = findFiles(runDir, ".png")
-	manifest.HTMLSnapshots = findFiles(runDir, ".html")
+	collected, collectErr := artifacts.CollectRunArtifacts(runDir)
+	if collectErr != nil {
+		return collectErr
+	}
+	manifest.Artifacts = collected.Entries
+	manifest.Screenshots = collected.Screenshots
+	manifest.HTMLSnapshots = collected.HTMLSnapshots
+	manifest.Traces = collected.Traces
 	if runErr != nil {
 		failures := []artifacts.Failure{
 			{
@@ -118,7 +128,7 @@ func RunE2E(ctx context.Context, cfg RunConfig) error {
 			artifacts.PlanBundleOptions{
 				PlanDir:      cfg.PlanDir,
 				RunDir:       runDir,
-				Command:      "go " + strings.Join(args, " "),
+				Command:      manifest.Command,
 				IncludeHTML:  true,
 				IncludeTrace: true,
 			},
@@ -193,6 +203,16 @@ func ensureSelectedTestsExist(ctx context.Context, args []string) error {
 	return fmt.Errorf("no generated E2E tests matched -run %q", pattern)
 }
 
+func currentGitCommit(ctx context.Context) string {
+	cmd := exec.CommandContext(ctx, "git", "rev-parse", "HEAD")
+	cmd.Dir = repoRootForCommand(".")
+	out, err := cmd.Output()
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(string(out))
+}
+
 func repoRootForCommand(cwd string) string {
 	abs, err := filepath.Abs(cwd)
 	if err != nil {
@@ -221,18 +241,6 @@ func slugToTestFragment(slug string) string {
 		parts[i] = strings.ToUpper(part[:1]) + part[1:]
 	}
 	return strings.Join(parts, "")
-}
-
-func findFiles(root, ext string) []string {
-	out := []string{}
-	_ = filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
-		if err != nil || d.IsDir() || filepath.Ext(path) != ext {
-			return nil
-		}
-		out = append(out, path)
-		return nil
-	})
-	return out
 }
 
 func appendSelectedStory(stories []string, story string) []string {

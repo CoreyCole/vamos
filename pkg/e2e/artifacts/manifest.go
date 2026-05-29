@@ -6,18 +6,39 @@ import (
 	"time"
 )
 
+type ArtifactKind string
+
+const (
+	ArtifactKindScreenshot ArtifactKind = "screenshot"
+	ArtifactKindHTML       ArtifactKind = "html"
+	ArtifactKindTrace      ArtifactKind = "trace"
+)
+
+type ArtifactEntry struct {
+	FeatureSlug  string       `json:"featureSlug"`
+	ScenarioSlug string       `json:"scenarioSlug"`
+	Viewport     string       `json:"viewport"`
+	Label        string       `json:"label"`
+	Kind         ArtifactKind `json:"kind"`
+	Path         string       `json:"path"`
+}
+
 type RunManifest struct {
-	ID             string    `json:"id"`
-	StartedAt      time.Time `json:"startedAt"`
-	CompletedAt    time.Time `json:"completedAt,omitempty"`
-	RepoCommit     string    `json:"repoCommit,omitempty"`
-	Stories        []string  `json:"stories,omitempty"`
-	GeneratedFiles []string  `json:"generatedFiles,omitempty"`
-	Screenshots    []string  `json:"screenshots,omitempty"`
-	HTMLSnapshots  []string  `json:"htmlSnapshots,omitempty"`
-	Traces         []string  `json:"traces,omitempty"`
-	FailuresPath   string    `json:"failuresPath,omitempty"`
-	PlanBundlePath string    `json:"planBundlePath,omitempty"`
+	ID             string          `json:"id"`
+	StartedAt      time.Time       `json:"startedAt"`
+	CompletedAt    time.Time       `json:"completedAt,omitempty"`
+	RepoCommit     string          `json:"repoCommit,omitempty"`
+	Command        string          `json:"command,omitempty"`
+	BaseURL        string          `json:"baseUrl,omitempty"`
+	ViewportFilter string          `json:"viewportFilter,omitempty"`
+	Stories        []string        `json:"stories,omitempty"`
+	GeneratedFiles []string        `json:"generatedFiles,omitempty"`
+	Artifacts      []ArtifactEntry `json:"artifacts,omitempty"`
+	Screenshots    []string        `json:"screenshots,omitempty"`
+	HTMLSnapshots  []string        `json:"htmlSnapshots,omitempty"`
+	Traces         []string        `json:"traces,omitempty"`
+	FailuresPath   string          `json:"failuresPath,omitempty"`
+	PlanBundlePath string          `json:"planBundlePath,omitempty"`
 }
 
 type Failure struct {
