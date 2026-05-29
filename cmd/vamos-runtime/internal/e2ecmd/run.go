@@ -118,6 +118,9 @@ func RunE2E(ctx context.Context, cfg RunConfig) error {
 		manifest.FailuresPath = failuresPath
 		_, _ = artifacts.WriteMarkdownReport(artifactRoot, manifest, failures)
 	}
+	if _, err := artifacts.WriteStaticIndex(manifest, runDir, artifacts.StaticIndexOptions{}); err != nil {
+		return err
+	}
 	if _, err := artifacts.WriteManifest(artifactRoot, manifest); err != nil {
 		return err
 	}
