@@ -978,7 +978,7 @@ func TestWorkspacesPageRendersVerifyHTMLAction(t *testing.T) {
 		t.Fatalf("Render() error = %v", err)
 	}
 	html := body.String()
-	for _, want := range []string{"Actions", "Verify HTML", `href="/workspaces/feature/verify-html"`} {
+	for _, want := range []string{"Actions", "Verify HTML", `href="/workspaces/feature/verify-html"`, `target="_blank"`, `rel="noreferrer"`} {
 		if !strings.Contains(html, want) {
 			t.Fatalf("WorkspacesPage missing %q: %s", want, html)
 		}
@@ -1504,6 +1504,7 @@ func TestWorkspacesProjectFilterRendersEmptyAllProjectsOption(t *testing.T) {
 		`name="show_cleaned_history" value="true"`,
 		`name="project"`,
 		`data-select-id="project_filter"`,
+		`data-value=""`,
 		`All projects`,
 		`this.closest(&#39;form&#39;).requestSubmit()`,
 	} {
@@ -1514,6 +1515,88 @@ func TestWorkspacesProjectFilterRendersEmptyAllProjectsOption(t *testing.T) {
 	if strings.Contains(html, `value="all"`) || strings.Contains(html, "project="+"all") {
 		t.Fatalf("project filter rendered fake all value: %s", html)
 	}
+}
+
+func TestWorkspaceActionsMenuUsesFlowSafeForms(t *testing.T) {
+	snap := WorkspaceLifecycleSnapshot{
+		Workspace: Workspace{
+			ProjectID:    "example.com/alpha/app",
+			Slug:         "feature",
+			DisplayName:  "feature branch",
+			CheckoutPath: "/repo/feature",
+			URL:          "https://feature.test",
+			Status:       StatusRunning,
+		},
+		ObservedState: WorkspaceObservedRunning,
+	}
+	views := lifecycleSnapshotsToImplViews([]WorkspaceLifecycleSnapshot{snap})
+	if len(views) != 1 {
+		t.Fatalf("views len = %d, want 1", len(views))
+	}
+	views[0].Row.ProjectID = "example.com/alpha/app"
+
+	var body bytes.Buffer
+	if err := WorkspaceActionsMenu(
+		views[0],
+		"https://manager.test",
+		true,
+		ProjectFilter{ProjectID: "example.com/alpha/app"},
+	).Render(t.Context(), &body); err != nil {
+		t.Fatalf("WorkspaceActionsMenu() error = %v", err)
+	}
+	html := body.String()
+	for _, forbidden := range []string{"<span><form", "</form></span>", "<button><button", "</button></button>"} {
+		if strings.Contains(html, forbidden) {
+			t.Fatalf("actions menu has invalid nested markup %q: %s", forbidden, html)
+		}
+	}
+	for _, action := range []string{"restart", "stop"} {
+		form := formFragment(t, html, `action="/workspaces/feature/`+action+`"`)
+		for _, want := range []string{`name="project" value="example.com/alpha/app"`, `name="show_cleaned_history" value="true"`, `name="show_historical" value="true"`} {
+			if !strings.Contains(form, want) {
+				t.Fatalf("%s form missing %q: %s", action, want, form)
+			}
+		}
+	}
+}
+
+func TestWorkspaceActionsMenuPreservesCleanupFields(t *testing.T) {
+	view := BuildImplWorkspaceViews([]db.ImplWorkspace{{
+		ProjectID:     "example.com/alpha/app",
+		WorkspaceSlug: "feature",
+		CheckoutPath:  "/repo/feature",
+		DisplayName:   "Feature Workspace",
+		Status:        string(ImplWorkspaceStatusActive),
+	}}, nil, WorkspaceLifecycleSnapshot{})[0]
+
+	var body bytes.Buffer
+	if err := WorkspaceActionsMenu(view, "https://manager.test", false, ProjectFilter{}).Render(t.Context(), &body); err != nil {
+		t.Fatalf("WorkspaceActionsMenu() error = %v", err)
+	}
+	html := body.String()
+	form := formFragment(t, html, `action="/workspaces/cleanup"`)
+	for _, want := range []string{`name="slug" value="feature"`, `name="project" value="example.com/alpha/app"`, `name="confirmed" value="true"`} {
+		if !strings.Contains(form, want) {
+			t.Fatalf("cleanup form missing %q: %s", want, form)
+		}
+	}
+}
+
+func formFragment(t *testing.T, html string, marker string) string {
+	t.Helper()
+	idx := strings.Index(html, marker)
+	if idx < 0 {
+		t.Fatalf("missing form marker %q: %s", marker, html)
+	}
+	start := strings.LastIndex(html[:idx], "<form")
+	if start < 0 {
+		t.Fatalf("missing form start before %q: %s", marker, html)
+	}
+	end := strings.Index(html[idx:], "</form>")
+	if end < 0 {
+		t.Fatalf("missing form end after %q: %s", marker, html[idx:])
+	}
+	return html[start : idx+end+len("</form>")]
 }
 
 func TestHandleWorkspacesPageFiltersImplWorkspacesByProject(t *testing.T) {
