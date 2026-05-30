@@ -1,11 +1,10 @@
 @import "tailwindcss";
 
-/* Import local theme and component foundation copied from the local component reference. */
+/* Import local theme and component foundation used by DatastarUI-backed templates. */
 @import "./theme-foundation.css";
 @import "./components-foundation.css";
 
 @source "../../server";
-@source "../../pkg/components";
 
 @layer base {
   /* Global scroll behavior to account for sticky header */
@@ -136,7 +135,6 @@
     border: none;
   }
 
-
   .markdown-viewer h3 {
     font-size: 1.25rem;
     font-weight: 600;
@@ -244,19 +242,24 @@
     padding-right: 1rem;
   }
 
-  .chat-message-content > :first-child:not(.markdown-code-block):not(.streaming) {
+  .chat-message-content
+    > :first-child:not(.markdown-code-block):not(.streaming) {
     padding-top: 0.875rem;
   }
 
-  .chat-message-content > :last-child:not(.markdown-code-block):not(.streaming) {
+  .chat-message-content
+    > :last-child:not(.markdown-code-block):not(.streaming) {
     padding-bottom: 0.875rem;
   }
 
-  .chat-message-content > :not(.markdown-code-block):not(.streaming):has(+ .markdown-code-block) {
+  .chat-message-content
+    > :not(.markdown-code-block):not(.streaming):has(+ .markdown-code-block) {
     margin-bottom: 0;
   }
 
-  .chat-message-content > .markdown-code-block + :not(.markdown-code-block):not(.streaming) {
+  .chat-message-content
+    > .markdown-code-block
+    + :not(.markdown-code-block):not(.streaming) {
     margin-top: 0;
   }
 
@@ -273,11 +276,16 @@
     padding-bottom: 0.875rem;
   }
 
-  .chat-message-content > .streaming > :not(.markdown-code-block):has(+ .markdown-code-block) {
+  .chat-message-content
+    > .streaming
+    > :not(.markdown-code-block):has(+ .markdown-code-block) {
     margin-bottom: 0;
   }
 
-  .chat-message-content > .streaming > .markdown-code-block + :not(.markdown-code-block) {
+  .chat-message-content
+    > .streaming
+    > .markdown-code-block
+    + :not(.markdown-code-block) {
     margin-top: 0;
   }
 
@@ -347,19 +355,24 @@
     padding-right: 1rem;
   }
 
-  .agent-chat-detail-markdown > :first-child:not(.markdown-code-block):not(.streaming) {
+  .agent-chat-detail-markdown
+    > :first-child:not(.markdown-code-block):not(.streaming) {
     padding-top: 0;
   }
 
-  .agent-chat-detail-markdown > :last-child:not(.markdown-code-block):not(.streaming) {
+  .agent-chat-detail-markdown
+    > :last-child:not(.markdown-code-block):not(.streaming) {
     padding-bottom: 0.5rem;
   }
 
-  .agent-chat-detail-markdown > :not(.markdown-code-block):not(.streaming):has(+ .markdown-code-block) {
+  .agent-chat-detail-markdown
+    > :not(.markdown-code-block):not(.streaming):has(+ .markdown-code-block) {
     margin-bottom: 0;
   }
 
-  .agent-chat-detail-markdown > .markdown-code-block + :not(.markdown-code-block):not(.streaming) {
+  .agent-chat-detail-markdown
+    > .markdown-code-block
+    + :not(.markdown-code-block):not(.streaming) {
     margin-top: 0;
   }
 
@@ -409,7 +422,7 @@
   }
 
   .has-comments::before {
-    content: '';
+    content: "";
     position: absolute;
     left: -1rem;
     top: 0;

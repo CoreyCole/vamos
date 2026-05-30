@@ -63,7 +63,7 @@ func Page(args PageArgs) templ.Component {
 				}()
 			}
 			ctx = templ.InitializeContext(ctx)
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<div class=\"py-6 md:py-10\"><div class=\"mx-auto max-w-5xl px-4 sm:px-6 lg:px-8 space-y-12\"><div><h1 class=\"text-3xl font-bold text-foreground\">Component Storybook</h1><p class=\"text-muted-foreground mt-1\">Visual reference for all pkg/components</p></div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<div class=\"py-6 md:py-10\"><div class=\"mx-auto max-w-5xl px-4 sm:px-6 lg:px-8 space-y-12\"><div><h1 class=\"text-3xl font-bold text-foreground\">Component Storybook</h1><p class=\"text-muted-foreground mt-1\">Visual reference for DatastarUI components used by Vamos</p></div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}

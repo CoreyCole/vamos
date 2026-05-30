@@ -65,7 +65,8 @@ Use plain `just build` only when intentionally restarting a configured running s
 - Build MPAs with Datastar CQRS: backend source of truth, SSE streams for reads, short POSTs for writes.
 - Use real HTML forms with `name` attributes and stable IDs for SSE-patched elements.
 - Avoid inline styles; use Tailwind utilities.
-- Shared UI primitives live under `pkg/components/`.
+- Shared UI primitives come from the pinned DatastarUI dependency (`github.com/coreycole/datastarui/components/*`). Prefer those primitives before bespoke Tailwind in templ UI.
+- Reusable primitive fixes belong upstream in DatastarUI; Vamos owns app-specific composition and must not recreate a local component fork.
 
 ## Story E2E guidance
 

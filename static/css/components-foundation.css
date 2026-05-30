@@ -1,257 +1,257 @@
 /*
- * Component CSS copied from the local component reference for use by pkg/components.
- * These rules are intentionally local so cn-agents no longer depends on
- * external reference code for Tailwind build-time or runtime component CSS.
+ * Component foundation CSS shared by Vamos templates that use DatastarUI.
+ * These rules are intentionally local so Vamos has stable runtime component
+ * foundations without requiring Tailwind to scan dependency source at runtime.
  */
 
 @layer base {
-	@position-fallback --fallback {
-		@try {
-			top: anchor(bottom);
-			left: anchor(center);
-			translate: -50% 8px;
-		}
-		@try {
-			top: anchor(top);
-			left: anchor(center);
-			translate: -50% -100%;
-			margin-top: -8px;
-		}
-		@try {
-			top: anchor(center);
-			left: anchor(right);
-			translate: 8px -50%;
-		}
-		@try {
-			top: anchor(center);
-			left: anchor(left);
-			translate: -100% -50%;
-			margin-left: -8px;
-		}
-	}
+  @position-fallback --fallback {
+    @try {
+      top: anchor(bottom);
+      left: anchor(center);
+      translate: -50% 8px;
+    }
+    @try {
+      top: anchor(top);
+      left: anchor(center);
+      translate: -50% -100%;
+      margin-top: -8px;
+    }
+    @try {
+      top: anchor(center);
+      left: anchor(right);
+      translate: 8px -50%;
+    }
+    @try {
+      top: anchor(center);
+      left: anchor(left);
+      translate: -100% -50%;
+      margin-left: -8px;
+    }
+  }
 
-	.anchor-positioned {
-		position: absolute;
-		position-fallback: --fallback;
-	}
+  .anchor-positioned {
+    position: absolute;
+    position-fallback: --fallback;
+  }
 
-	[popover] {
-		opacity: 0;
-		transform: scale(0.95);
-		transition:
-			opacity 200ms ease-out,
-			transform 200ms ease-out,
-			overlay 200ms allow-discrete,
-			display 200ms allow-discrete;
-	}
+  [popover] {
+    opacity: 0;
+    transform: scale(0.95);
+    transition:
+      opacity 200ms ease-out,
+      transform 200ms ease-out,
+      overlay 200ms allow-discrete,
+      display 200ms allow-discrete;
+  }
 
-	[popover]:popover-open {
-		opacity: 1;
-		transform: scale(1);
+  [popover]:popover-open {
+    opacity: 1;
+    transform: scale(1);
 
-		@starting-style {
-			opacity: 0;
-			transform: scale(0.95);
-		}
-	}
+    @starting-style {
+      opacity: 0;
+      transform: scale(0.95);
+    }
+  }
 }
 
 @layer utilities {
-	.commentui-anchor {
-		anchor-name: --commentui-target;
-	}
+  .commentui-anchor {
+    anchor-name: --commentui-target;
+  }
 
-	.commentui-popover {
-		position: absolute;
-		z-index: 100;
-		width: min(20rem, calc(100vw - 2rem));
-	}
+  .commentui-popover {
+    position: absolute;
+    z-index: 100;
+    width: min(20rem, calc(100vw - 2rem));
+  }
 
-	.commentui-popover-target {
-		top: 0;
-		right: 0;
-	}
+  .commentui-popover-target {
+    top: 0;
+    right: 0;
+  }
 
-	.commentui-popover-selection {
-		position-anchor: --commentui-target;
-		top: anchor(bottom);
-		left: anchor(left);
-		margin-top: 0.5rem;
-	}
+  .commentui-popover-selection {
+    position-anchor: --commentui-target;
+    top: anchor(bottom);
+    left: anchor(left);
+    margin-top: 0.5rem;
+  }
 
-	.commentui-thread-quote {
-		max-height: none;
-		overflow: visible;
-	}
+  .commentui-thread-quote {
+    max-height: none;
+    overflow: visible;
+  }
 
-	.commentui-selection-trigger {
-		position: absolute;
-		left: var(--commentui-selection-left, 0px);
-		top: var(--commentui-selection-top, 0px);
-		z-index: 50;
-	}
+  .commentui-selection-trigger {
+    position: absolute;
+    left: var(--commentui-selection-left, 0px);
+    top: var(--commentui-selection-top, 0px);
+    z-index: 50;
+  }
 
-	@supports not (anchor-name: --commentui-target) {
-		.commentui-popover-selection {
-			top: 100%;
-			left: 0;
-		}
-	}
+  @supports not (anchor-name: --commentui-target) {
+    .commentui-popover-selection {
+      top: 100%;
+      left: 0;
+    }
+  }
 
-	[role='dialog'] input,
-	[role='dialog'] textarea,
-	[role='dialog'] select,
-	[role='dialog'] button {
-		pointer-events: auto;
-		z-index: 51;
-		position: relative;
-	}
+  [role="dialog"] input,
+  [role="dialog"] textarea,
+  [role="dialog"] select,
+  [role="dialog"] button {
+    pointer-events: auto;
+    z-index: 51;
+    position: relative;
+  }
 
-	[role='dialog'] input:focus-visible,
-	[role='dialog'] textarea:focus-visible,
-	[role='dialog'] select:focus-visible {
-		outline: 2px solid hsl(var(--ring));
-		outline-offset: 2px;
-		z-index: 52;
-	}
+  [role="dialog"] input:focus-visible,
+  [role="dialog"] textarea:focus-visible,
+  [role="dialog"] select:focus-visible {
+    outline: 2px solid hsl(var(--ring));
+    outline-offset: 2px;
+    z-index: 52;
+  }
 
-	@keyframes dialog-show {
-		from {
-			opacity: 0;
-			transform: translate(-50%, -50%) scale(0.95);
-		}
-		to {
-			opacity: 1;
-			transform: translate(-50%, -50%) scale(1);
-		}
-	}
+  @keyframes dialog-show {
+    from {
+      opacity: 0;
+      transform: translate(-50%, -50%) scale(0.95);
+    }
+    to {
+      opacity: 1;
+      transform: translate(-50%, -50%) scale(1);
+    }
+  }
 
-	[role='dialog'][data-state='open'] {
-		animation: dialog-show 0.2s ease-out;
-	}
+  [role="dialog"][data-state="open"] {
+    animation: dialog-show 0.2s ease-out;
+  }
 
-	@keyframes enter {
-		from {
-			opacity: var(--tw-enter-opacity, 1);
-			transform: translate3d(
-					var(--tw-enter-translate-x, 0),
-					var(--tw-enter-translate-y, 0),
-					0
-				)
-				scale3d(
-					var(--tw-enter-scale, 1),
-					var(--tw-enter-scale, 1),
-					var(--tw-enter-scale, 1)
-				)
-				rotate(var(--tw-enter-rotate, 0));
-		}
-	}
+  @keyframes enter {
+    from {
+      opacity: var(--tw-enter-opacity, 1);
+      transform: translate3d(
+          var(--tw-enter-translate-x, 0),
+          var(--tw-enter-translate-y, 0),
+          0
+        )
+        scale3d(
+          var(--tw-enter-scale, 1),
+          var(--tw-enter-scale, 1),
+          var(--tw-enter-scale, 1)
+        )
+        rotate(var(--tw-enter-rotate, 0));
+    }
+  }
 
-	@keyframes exit {
-		to {
-			opacity: var(--tw-exit-opacity, 1);
-			transform: translate3d(
-					var(--tw-exit-translate-x, 0),
-					var(--tw-exit-translate-y, 0),
-					0
-				)
-				scale3d(
-					var(--tw-exit-scale, 1),
-					var(--tw-exit-scale, 1),
-					var(--tw-exit-scale, 1)
-				)
-				rotate(var(--tw-exit-rotate, 0));
-		}
-	}
+  @keyframes exit {
+    to {
+      opacity: var(--tw-exit-opacity, 1);
+      transform: translate3d(
+          var(--tw-exit-translate-x, 0),
+          var(--tw-exit-translate-y, 0),
+          0
+        )
+        scale3d(
+          var(--tw-exit-scale, 1),
+          var(--tw-exit-scale, 1),
+          var(--tw-exit-scale, 1)
+        )
+        rotate(var(--tw-exit-rotate, 0));
+    }
+  }
 
-	.animate-in {
-		animation-name: enter;
-		animation-duration: 150ms;
-		animation-timing-function: ease;
-		animation-fill-mode: both;
-		--tw-enter-opacity: initial;
-		--tw-enter-scale: initial;
-		--tw-enter-rotate: initial;
-		--tw-enter-translate-x: initial;
-		--tw-enter-translate-y: initial;
-	}
+  .animate-in {
+    animation-name: enter;
+    animation-duration: 150ms;
+    animation-timing-function: ease;
+    animation-fill-mode: both;
+    --tw-enter-opacity: initial;
+    --tw-enter-scale: initial;
+    --tw-enter-rotate: initial;
+    --tw-enter-translate-x: initial;
+    --tw-enter-translate-y: initial;
+  }
 
-	.animate-out {
-		animation-name: exit;
-		animation-duration: 150ms;
-		animation-timing-function: ease;
-		animation-fill-mode: both;
-		--tw-exit-opacity: initial;
-		--tw-exit-scale: initial;
-		--tw-exit-rotate: initial;
-		--tw-exit-translate-x: initial;
-		--tw-exit-translate-y: initial;
-	}
+  .animate-out {
+    animation-name: exit;
+    animation-duration: 150ms;
+    animation-timing-function: ease;
+    animation-fill-mode: both;
+    --tw-exit-opacity: initial;
+    --tw-exit-scale: initial;
+    --tw-exit-rotate: initial;
+    --tw-exit-translate-x: initial;
+    --tw-exit-translate-y: initial;
+  }
 
-	.fade-in-0 {
-		--tw-enter-opacity: 0;
-	}
-	.fade-out-0 {
-		--tw-exit-opacity: 0;
-	}
-	.zoom-in-95 {
-		--tw-enter-scale: 0.95;
-	}
-	.zoom-out-95 {
-		--tw-exit-scale: 0.95;
-	}
-	.slide-in-from-top-2 {
-		--tw-enter-translate-y: -0.5rem;
-	}
-	.slide-in-from-bottom-2 {
-		--tw-enter-translate-y: 0.5rem;
-	}
-	.slide-in-from-left-2 {
-		--tw-enter-translate-x: -0.5rem;
-	}
-	.slide-in-from-right-2 {
-		--tw-enter-translate-x: 0.5rem;
-	}
-	.slide-in-from-left-full {
-		--tw-enter-translate-x: -100%;
-	}
-	.slide-in-from-right-full {
-		--tw-enter-translate-x: 100%;
-	}
-	.slide-in-from-top-full {
-		--tw-enter-translate-y: -100%;
-	}
-	.slide-in-from-bottom-full {
-		--tw-enter-translate-y: 100%;
-	}
-	.slide-out-to-top-2 {
-		--tw-exit-translate-y: -0.5rem;
-	}
-	.slide-out-to-bottom-2 {
-		--tw-exit-translate-y: 0.5rem;
-	}
-	.slide-out-to-left-2 {
-		--tw-exit-translate-x: -0.5rem;
-	}
-	.slide-out-to-right-2 {
-		--tw-exit-translate-x: 0.5rem;
-	}
-	.slide-out-to-left-full {
-		--tw-exit-translate-x: -100%;
-	}
-	.slide-out-to-right-full {
-		--tw-exit-translate-x: 100%;
-	}
-	.slide-out-to-top-full {
-		--tw-exit-translate-y: -100%;
-	}
-	.slide-out-to-bottom-full {
-		--tw-exit-translate-y: 100%;
-	}
-	.duration-200 {
-		animation-duration: 200ms;
-	}
-	.duration-300 {
-		animation-duration: 300ms;
-	}
+  .fade-in-0 {
+    --tw-enter-opacity: 0;
+  }
+  .fade-out-0 {
+    --tw-exit-opacity: 0;
+  }
+  .zoom-in-95 {
+    --tw-enter-scale: 0.95;
+  }
+  .zoom-out-95 {
+    --tw-exit-scale: 0.95;
+  }
+  .slide-in-from-top-2 {
+    --tw-enter-translate-y: -0.5rem;
+  }
+  .slide-in-from-bottom-2 {
+    --tw-enter-translate-y: 0.5rem;
+  }
+  .slide-in-from-left-2 {
+    --tw-enter-translate-x: -0.5rem;
+  }
+  .slide-in-from-right-2 {
+    --tw-enter-translate-x: 0.5rem;
+  }
+  .slide-in-from-left-full {
+    --tw-enter-translate-x: -100%;
+  }
+  .slide-in-from-right-full {
+    --tw-enter-translate-x: 100%;
+  }
+  .slide-in-from-top-full {
+    --tw-enter-translate-y: -100%;
+  }
+  .slide-in-from-bottom-full {
+    --tw-enter-translate-y: 100%;
+  }
+  .slide-out-to-top-2 {
+    --tw-exit-translate-y: -0.5rem;
+  }
+  .slide-out-to-bottom-2 {
+    --tw-exit-translate-y: 0.5rem;
+  }
+  .slide-out-to-left-2 {
+    --tw-exit-translate-x: -0.5rem;
+  }
+  .slide-out-to-right-2 {
+    --tw-exit-translate-x: 0.5rem;
+  }
+  .slide-out-to-left-full {
+    --tw-exit-translate-x: -100%;
+  }
+  .slide-out-to-right-full {
+    --tw-exit-translate-x: 100%;
+  }
+  .slide-out-to-top-full {
+    --tw-exit-translate-y: -100%;
+  }
+  .slide-out-to-bottom-full {
+    --tw-exit-translate-y: 100%;
+  }
+  .duration-200 {
+    animation-duration: 200ms;
+  }
+  .duration-300 {
+    animation-duration: 300ms;
+  }
 }

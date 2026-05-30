@@ -79,7 +79,7 @@ func TestValidatePlanRejectsArbitrarySourcePaths(t *testing.T) {
 			Changes: []Change{
 				{
 					Scope: FixScopeRuntime,
-					Path:  "pkg/components/button.go",
+					Path:  "pkg/agents/workflows/runtime/runtime.go",
 					Why:   "test",
 				},
 			},

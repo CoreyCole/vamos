@@ -116,8 +116,8 @@ func TailwindStep() Step {
 		Name:        StepTailwind,
 		ForceTarget: ForceTailwind,
 		Inputs: HashSpec{
-			Roots:    []string{"static/css", "server", "pkg/components"},
-			Includes: []string{"static/css/**/*.css", "server/**", "pkg/components/**"},
+			Roots:    []string{"static/css", "server"},
+			Includes: []string{"static/css/**/*.css", "server/**"},
 			Excludes: []string{"static/css/out*.css"},
 		},
 		Outputs: HashSpec{

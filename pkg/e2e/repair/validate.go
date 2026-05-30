@@ -18,7 +18,6 @@ var forbiddenPathPrefixes = []string{
 	"docs/features",
 	"server",
 	"static",
-	"pkg/components",
 }
 
 var allowedPathPrefixesByScope = map[FixScope][]string{
