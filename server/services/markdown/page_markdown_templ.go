@@ -16,13 +16,13 @@ import (
 	"strings"
 	"time"
 
-	"github.com/CoreyCole/vamos/pkg/components/sheet"
-	"github.com/CoreyCole/vamos/pkg/components/tooltip"
-	"github.com/CoreyCole/vamos/pkg/components/utils"
 	"github.com/CoreyCole/vamos/server/layouts"
 	"github.com/CoreyCole/vamos/server/layouts/workbench"
 	"github.com/CoreyCole/vamos/server/services/comments"
 	"github.com/CoreyCole/vamos/server/services/commentui"
+	"github.com/coreycole/datastarui/components/sheet"
+	"github.com/coreycole/datastarui/components/tooltip"
+	"github.com/coreycole/datastarui/utils"
 )
 
 // encodePageSignals encodes the initial page signals to JSON

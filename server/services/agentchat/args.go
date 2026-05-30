@@ -9,7 +9,7 @@ import (
 
 	"github.com/CoreyCole/vamos/pkg/agents/chatsession"
 	workspace "github.com/CoreyCole/vamos/pkg/agents/workspace"
-	"github.com/CoreyCole/vamos/pkg/components/utils"
+	"github.com/coreycole/datastarui/utils"
 	"github.com/CoreyCole/vamos/pkg/db"
 	"github.com/CoreyCole/vamos/server/layouts/workbench"
 	"github.com/CoreyCole/vamos/server/services/markdown"

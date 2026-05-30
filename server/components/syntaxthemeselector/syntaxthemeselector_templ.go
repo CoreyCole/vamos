@@ -8,7 +8,7 @@ package syntaxthemeselector
 import "github.com/a-h/templ"
 import templruntime "github.com/a-h/templ/runtime"
 
-import selectui "github.com/CoreyCole/vamos/pkg/components/select"
+import selectui "github.com/coreycole/datastarui/components/select"
 
 // Available syntax themes
 var DarkThemes = []selectui.SelectOptionArgs{

@@ -6,11 +6,11 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/CoreyCole/vamos/pkg/components/avatar"
-	"github.com/CoreyCole/vamos/pkg/components/breadcrumb"
-	"github.com/CoreyCole/vamos/pkg/components/dropdown"
 	avatarhelpers "github.com/CoreyCole/vamos/server/components/avatar"
 	"github.com/CoreyCole/vamos/server/components/syntaxthemeselector"
+	"github.com/coreycole/datastarui/components/avatar"
+	"github.com/coreycole/datastarui/components/breadcrumb"
+	"github.com/coreycole/datastarui/components/dropdown"
 )
 
 type BreadcrumbLinkState struct {
@@ -295,7 +295,26 @@ templ Header(args RootArgs) {
 					@HeaderVisibleProductNav(args, visibleNavItems)
 					if len(crumbs) > 0 {
 						<div class="min-w-0 flex-1 overflow-x-auto overscroll-x-contain whitespace-nowrap [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-							@breadcrumb.FromItemsWithClass(crumbs, "w-max", "flex-nowrap whitespace-nowrap")
+							@breadcrumb.Breadcrumb(breadcrumb.BreadcrumbArgs{Class: "w-max"}) {
+								@breadcrumb.BreadcrumbList(breadcrumb.BreadcrumbListArgs{Class: "flex-nowrap whitespace-nowrap"}) {
+									for i, crumb := range crumbs {
+										@breadcrumb.BreadcrumbItem(breadcrumb.BreadcrumbItemArgs{}) {
+											if crumb.Href != "" {
+												@breadcrumb.BreadcrumbLink(breadcrumb.BreadcrumbLinkArgs{Href: crumb.Href}) {
+													{ crumb.Label }
+												}
+											} else {
+												@breadcrumb.BreadcrumbPage(breadcrumb.BreadcrumbPageArgs{}) {
+													{ crumb.Label }
+												}
+											}
+										}
+										if i < len(crumbs)-1 {
+											@breadcrumb.BreadcrumbSeparator(breadcrumb.BreadcrumbSeparatorArgs{})
+										}
+									}
+								}
+							}
 						</div>
 					}
 				</div>
