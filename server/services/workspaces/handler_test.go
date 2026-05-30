@@ -1426,6 +1426,28 @@ func TestHandleWorkspacesPageFollowsImplWorkspaceOrder(t *testing.T) {
 	}
 }
 
+func TestWorkspacesProjectFilterRendersEmptyAllProjectsOption(t *testing.T) {
+	var body bytes.Buffer
+	if err := WorkspacesProjectFilter(ProjectFilter{}, []ProjectOption{{ID: "example.com/alpha/app", Label: "example.com/alpha/app"}}, true).Render(t.Context(), &body); err != nil {
+		t.Fatalf("WorkspacesProjectFilter() error = %v", err)
+	}
+	html := body.String()
+	for _, want := range []string{
+		`name="show_cleaned_history" value="true"`,
+		`name="project"`,
+		`data-select-id="project_filter"`,
+		`All projects`,
+		`this.closest(&#39;form&#39;).requestSubmit()`,
+	} {
+		if !strings.Contains(html, want) {
+			t.Fatalf("project filter missing %q: %s", want, html)
+		}
+	}
+	if strings.Contains(html, `value="all"`) || strings.Contains(html, "project="+"all") {
+		t.Fatalf("project filter rendered fake all value: %s", html)
+	}
+}
+
 func TestHandleWorkspacesPageFiltersImplWorkspacesByProject(t *testing.T) {
 	const (
 		alphaProjectID = "example.com/alpha/app"
@@ -1450,7 +1472,7 @@ func TestHandleWorkspacesPageFiltersImplWorkspacesByProject(t *testing.T) {
 		t.Fatalf("HandleWorkspacesPage() error = %v", err)
 	}
 	html := rec.Body.String()
-	for _, want := range []string{"Alpha Workspace", `value="example.com/alpha/app" selected`, `data-init="@get(&#39;/workspaces/stream?project=example.com%2Falpha%2Fapp&#39;)"`} {
+	for _, want := range []string{"Alpha Workspace", `name="project"`, `data-select-id="project_filter"`, `example.com/alpha/app`, `data-init="@get(&#39;/workspaces/stream?project=example.com%2Falpha%2Fapp&#39;)"`} {
 		if !strings.Contains(html, want) {
 			t.Fatalf("filtered workspaces page missing %q: %s", want, html)
 		}

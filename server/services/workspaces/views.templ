@@ -5,6 +5,10 @@ import (
 	"net/url"
 	"strings"
 
+	button "github.com/coreycole/datastarui/components/button"
+	card "github.com/coreycole/datastarui/components/card"
+	selectcomponent "github.com/coreycole/datastarui/components/select"
+
 	"github.com/CoreyCole/vamos/server/layouts"
 )
 
@@ -46,6 +50,38 @@ templ WorkspacesPageWithRefreshGroups(groups WorkspaceGroups, releasePanel Relea
 	}
 }
 
+func projectSelectOptions(options []ProjectOption) []selectcomponent.SelectOptionArgs {
+	out := make([]selectcomponent.SelectOptionArgs, 0, len(options)+1)
+	out = append(out, selectcomponent.SelectOptionArgs{Value: "", Label: "All projects"})
+	for _, option := range options {
+		out = append(out, selectcomponent.SelectOptionArgs{
+			Value:    option.ID,
+			Label:    option.Label,
+			Disabled: false,
+		})
+	}
+	return out
+}
+
+templ WorkspacesProjectFilter(projectFilter ProjectFilter, projectOptions []ProjectOption, showCleanedHistory bool) {
+	<form method="get" action="/workspaces" class="flex items-center gap-2">
+		if showCleanedHistory {
+			<input type="hidden" name="show_cleaned_history" value="true"/>
+		}
+		<label class="text-xs text-muted-foreground" for="project-filter">Project</label>
+		@selectcomponent.Select(selectcomponent.SelectArgs{
+			ID:          "project_filter",
+			Name:        "project",
+			Value:       projectFilter.QueryValue(),
+			Placeholder: "All projects",
+			Options:     projectSelectOptions(projectOptions),
+			OnChange:    "this.closest('form').requestSubmit()",
+			Class:       "min-w-48",
+			Attributes:  templ.Attributes{"id": "project-filter"},
+		})
+	</form>
+}
+
 templ WorkspacesHeader(refresh WorkspaceRefreshState, showCleanedHistory bool, projectFilter ProjectFilter, projectOptions []ProjectOption) {
 	<div id="workspaces-header" class="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
 		<div>
@@ -54,26 +90,19 @@ templ WorkspacesHeader(refresh WorkspaceRefreshState, showCleanedHistory bool, p
 		</div>
 		<div class="flex flex-col items-start gap-2 md:items-end">
 			<div class="flex flex-wrap gap-2">
-				<form method="get" action="/workspaces" class="flex items-center gap-2">
-					if showCleanedHistory {
-						<input type="hidden" name="show_cleaned_history" value="true"/>
-					}
-					<label class="text-xs text-muted-foreground" for="project-filter">Project</label>
-					<select id="project-filter" name="project" class="h-9 rounded-md border bg-background px-2 text-sm" data-on:change="this.form.requestSubmit()">
-						<option value="" selected?={ projectFilter.QueryValue() == "" }>All projects</option>
-						for _, option := range projectOptions {
-							<option value={ option.ID } selected?={ option.Selected }>{ option.Label }</option>
-						}
-					</select>
-				</form>
+				@WorkspacesProjectFilter(projectFilter, projectOptions, showCleanedHistory)
 				<form method="get" action="/workspaces">
 					if projectFilter.QueryValue() != "" {
 						<input type="hidden" name="project" value={ projectFilter.QueryValue() }/>
 					}
 					if showCleanedHistory {
-						<button type="submit" class="inline-flex h-9 items-center rounded-md border px-3 text-sm font-medium hover:bg-accent">Hide cleaned history</button>
+						@button.Button(button.ButtonArgs{Type: "submit", Variant: "outline", Size: "sm"}) {
+							Hide cleaned history
+						}
 					} else {
-						<button type="submit" name="show_cleaned_history" value="true" class="inline-flex h-9 items-center rounded-md border px-3 text-sm font-medium hover:bg-accent">Show cleaned history</button>
+						@button.Button(button.ButtonArgs{Type: "submit", Variant: "outline", Size: "sm", Attributes: templ.Attributes{"name": "show_cleaned_history", "value": "true"}}) {
+							Show cleaned history
+						}
 					}
 				</form>
 				<form method="post" action={ templ.SafeURL(workspacesURL("/workspaces/refresh", showCleanedHistory, projectFilter)) } data-on:submit={ templ.SafeURL("@post('" + workspacesURL("/workspaces/refresh", showCleanedHistory, projectFilter) + "', {contentType: 'form'})") }>
@@ -84,19 +113,13 @@ templ WorkspacesHeader(refresh WorkspaceRefreshState, showCleanedHistory bool, p
 						<input type="hidden" name="show_cleaned_history" value="true"/>
 						<input type="hidden" name="show_historical" value="true"/>
 					}
-					<button
-						type="submit"
-						class="inline-flex h-9 items-center rounded-md border px-3 text-sm font-medium hover:bg-accent disabled:pointer-events-none disabled:opacity-50"
-						if refresh.InFlight {
-							disabled
-						}
-					>
+					@button.Button(button.ButtonArgs{Type: "submit", Variant: "outline", Size: "sm", Disabled: refresh.InFlight}) {
 						if refresh.InFlight {
 							Refreshing...
 						} else {
 							Refresh
 						}
-					</button>
+					}
 				</form>
 			</div>
 			if refresh.InFlight {
@@ -113,10 +136,16 @@ templ WorkspacesHeader(refresh WorkspaceRefreshState, showCleanedHistory bool, p
 templ ReleasePanel(panel ReleasePanelModel) {
 	<section id="release-queue-panel" class="grid gap-3">
 		if !panel.Enabled {
-			<div class="rounded-xl border bg-card p-4 text-card-foreground shadow-sm">
-				<h2 class="text-lg font-semibold tracking-tight">Release queue</h2>
-				<p class="mt-3 text-sm text-muted-foreground">Release queue not configured.</p>
-			</div>
+			@card.Card(card.CardArgs{Class: "p-4"}) {
+				@card.CardHeader(card.CardHeaderArgs{Class: "p-0"}) {
+					@card.CardTitle(card.CardTitleArgs{Class: "text-lg"}) {
+						Release queue
+					}
+					@card.CardDescription(card.CardDescriptionArgs{Class: "mt-3"}) {
+						Release queue not configured.
+					}
+				}
+			}
 		} else {
 			@ReleaseLanesDisclosure(panel)
 			@ReleaseQueueDisclosure(panel)
@@ -159,26 +188,28 @@ templ ReleaseLaneCompactRow(lane ReleaseLaneView) {
 templ ReleaseLaneControls(lane ReleaseLaneView) {
 	{{ slug := strings.TrimSpace(lane.Workspace.Slug) }}
 	if slug != "" && lane.Workspace.Status == StatusRunning && lane.Workspace.URL != "" {
-		<a href={ templ.SafeURL(lane.Workspace.URL) } class="inline-flex h-9 items-center rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground hover:bg-primary/90">Open</a>
+		@button.LinkButton(button.LinkButtonArgs{Href: lane.Workspace.URL, Variant: "default", Size: "sm"}) {
+			Open
+		}
 	}
 	if slug != "" && (lane.Workspace.Status == StatusStopped || lane.Workspace.Status == StatusFailed || lane.Workspace.Status == StatusCrashed) {
 		{{ indicator := workspaceActionIndicator(slug, "start") }}
 		{{ indicatorSignal := workspaceActionIndicatorSignal(slug, "start") }}
 		<form method="post" action={ templ.SafeURL("/workspaces/" + slug + "/start") } data-indicator={ indicator } data-on:submit={ "@post('/workspaces/" + slug + "/start', {contentType: 'form'})" }>
-			<button type="submit" data-attr-disabled={ indicatorSignal } class="inline-flex h-9 items-center rounded-md border px-3 text-sm font-medium hover:bg-accent">
+			@button.Button(button.ButtonArgs{Type: "submit", Variant: "outline", Size: "sm", Attributes: templ.Attributes{"data-attr-disabled": indicatorSignal}}) {
 				<span data-show={ "!" + indicatorSignal }>Start</span>
 				<span data-show={ indicatorSignal }>Starting...</span>
-			</button>
+			}
 		</form>
 	}
 	if slug != "" && lane.Workspace.Status == StatusRunning {
 		{{ indicator := workspaceActionIndicator(slug, "stop") }}
 		{{ indicatorSignal := workspaceActionIndicatorSignal(slug, "stop") }}
 		<form method="post" action={ templ.SafeURL("/workspaces/" + slug + "/stop") } data-indicator={ indicator } data-on:submit={ "@post('/workspaces/" + slug + "/stop', {contentType: 'form'})" }>
-			<button type="submit" data-attr-disabled={ indicatorSignal } class="inline-flex h-9 items-center rounded-md border px-3 text-sm font-medium text-destructive hover:bg-accent">
+			@button.Button(button.ButtonArgs{Type: "submit", Variant: "outline", Size: "sm", Class: "text-destructive", Attributes: templ.Attributes{"data-attr-disabled": indicatorSignal}}) {
 				<span data-show={ "!" + indicatorSignal }>Stop</span>
 				<span data-show={ indicatorSignal }>Stopping...</span>
-			</button>
+			}
 		</form>
 	}
 }
@@ -222,18 +253,10 @@ templ ReleaseActionForm(action ReleaseActionView) {
 		<input type="hidden" name="source_slug" value={ action.SourceSlug }/>
 		<input type="hidden" name="expected_source_commit" value={ action.ExpectedSourceCommit }/>
 		<input type="hidden" name="expected_target_commit" value={ action.ExpectedTargetCommit }/>
-		<button
-			type="submit"
-			data-attr-disabled={ indicatorSignal }
-			class="inline-flex h-9 items-center rounded-md border px-3 text-sm font-medium hover:bg-accent disabled:pointer-events-none disabled:opacity-50"
-			if action.Disabled {
-				disabled
-			}
-			title={ releaseDisabledReason(action) }
-		>
+		@button.Button(button.ButtonArgs{Type: "submit", Variant: "outline", Size: "sm", Disabled: action.Disabled, Attributes: templ.Attributes{"data-attr-disabled": indicatorSignal, "title": releaseDisabledReason(action)}}) {
 			<span data-show={ "!" + indicatorSignal }>{ releaseActionLabel(action) }</span>
 			<span data-show={ indicatorSignal }>Enqueueing...</span>
-		</button>
+		}
 		if action.Disabled {
 			<p class="mt-1 text-xs text-muted-foreground">{ releaseDisabledReason(action) }</p>
 		}
@@ -241,7 +264,7 @@ templ ReleaseActionForm(action ReleaseActionView) {
 }
 
 templ ReleaseQueueItemCard(item ReleaseQueueItem) {
-	<div class="rounded-lg border p-3 text-sm">
+	@card.Card(card.CardArgs{Class: "gap-2 p-3 text-sm"}) {
 		<div class="flex flex-wrap items-center justify-between gap-2">
 			<span class="font-mono text-xs">{ item.ID }</span>
 			<span class="rounded-full border px-2 py-1 text-xs">{ string(item.Status) }</span>
@@ -253,7 +276,7 @@ templ ReleaseQueueItemCard(item ReleaseQueueItem) {
 		if item.ErrorMessage != "" {
 			<p class="mt-2 text-xs text-destructive">{ item.ErrorMessage }</p>
 		}
-	</div>
+	}
 }
 
 templ WorkspacesList(groups WorkspaceGroups, managerURL string, showCleanedHistory bool, projectFilter ProjectFilter) {
@@ -444,7 +467,7 @@ templ ImplWorkspaceCard(view ImplWorkspaceView, managerURL string, showHistorica
 	{{ snap := view.Runtime }}
 	{{ ws := snap.Workspace }}
 	{{ slug := workspaceViewSlug(view) }}
-	<article id={ "workspace-" + slug } class="relative flex min-h-48 flex-col gap-4 rounded-lg border bg-card p-4 text-card-foreground shadow-sm">
+	@card.Card(card.CardArgs{Class: "relative flex min-h-48 flex-col gap-4 p-4", Attributes: templ.Attributes{"id": "workspace-" + slug}}) {
 		if workspaceViewActivity(view) != "" {
 			<div class="absolute right-4 top-4 rounded-full border bg-background px-2.5 py-1 text-xs font-medium text-muted-foreground shadow-sm">Updated: { workspaceViewActivity(view) }</div>
 		} else if workspaceCardTimestamp(ws) != "" {
@@ -542,7 +565,7 @@ templ ImplWorkspaceCard(view ImplWorkspaceView, managerURL string, showHistorica
 		<div class="mt-auto flex flex-wrap justify-start gap-2 pt-2">
 			@WorkspaceActionsMenu(view, managerURL, showHistorical, projectFilter)
 		</div>
-	</article>
+	}
 }
 
 templ WorkspaceProofDiagnostics(view ImplWorkspaceView) {
@@ -603,16 +626,18 @@ templ WorkspaceLifecycleActions(view ImplWorkspaceView, managerURL string, showH
 	{{ ws := snap.Workspace }}
 	{{ slug := workspaceViewSlug(view) }}
 	if canActOnImplWorkspace(view) && normalizedObservedState(snap) == WorkspaceObservedRunning && ws.URL != "" {
-		<a href={ templ.SafeURL(managerURL + "/workspaces/switch/" + slug + "?redirect=" + url.QueryEscape("/")) } class="inline-flex h-9 items-center rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground hover:bg-primary/90">Open</a>
+		@button.LinkButton(button.LinkButtonArgs{Href: managerURL + "/workspaces/switch/" + slug + "?redirect=" + url.QueryEscape("/"), Variant: "default", Size: "sm"}) {
+			Open
+		}
 	}
 	if canActOnImplWorkspace(view) && workspaceTransitioning(snap) {
-		<button type="button" disabled class="inline-flex h-9 items-center rounded-md border px-3 text-sm font-medium opacity-50">
+		@button.Button(button.ButtonArgs{Type: "button", Variant: "outline", Size: "sm", Disabled: true, Class: "opacity-50"}) {
 			if normalizedObservedState(snap) == WorkspaceObservedStarting {
 				Starting...
 			} else {
 				Stopping...
 			}
-		</button>
+		}
 	}
 	if canActOnImplWorkspace(view) && workspaceCanStart(snap) {
 		{{ indicator := workspaceActionIndicator(slug, "start") }}
@@ -625,10 +650,10 @@ templ WorkspaceLifecycleActions(view ImplWorkspaceView, managerURL string, showH
 				<input type="hidden" name="show_cleaned_history" value="true"/>
 				<input type="hidden" name="show_historical" value="true"/>
 			}
-			<button type="submit" data-attr-disabled={ indicatorSignal } class="inline-flex h-9 items-center rounded-md border px-3 text-sm font-medium hover:bg-accent">
+			@button.Button(button.ButtonArgs{Type: "submit", Variant: "outline", Size: "sm", Attributes: templ.Attributes{"data-attr-disabled": indicatorSignal}}) {
 				<span data-show={ "!" + indicatorSignal }>Start</span>
 				<span data-show={ indicatorSignal }>Starting...</span>
-			</button>
+			}
 		</form>
 	}
 	if canActOnImplWorkspace(view) && workspaceCanRestart(snap) {
@@ -642,10 +667,10 @@ templ WorkspaceLifecycleActions(view ImplWorkspaceView, managerURL string, showH
 				<input type="hidden" name="show_cleaned_history" value="true"/>
 				<input type="hidden" name="show_historical" value="true"/>
 			}
-			<button type="submit" data-attr-disabled={ indicatorSignal } class="inline-flex h-9 items-center rounded-md border px-3 text-sm font-medium hover:bg-accent">
+			@button.Button(button.ButtonArgs{Type: "submit", Variant: "outline", Size: "sm", Attributes: templ.Attributes{"data-attr-disabled": indicatorSignal}}) {
 				<span data-show={ "!" + indicatorSignal }>Restart</span>
 				<span data-show={ indicatorSignal }>Restarting...</span>
-			</button>
+			}
 		</form>
 	}
 	if canActOnImplWorkspace(view) && workspaceCanStop(snap) {
@@ -659,10 +684,10 @@ templ WorkspaceLifecycleActions(view ImplWorkspaceView, managerURL string, showH
 				<input type="hidden" name="show_cleaned_history" value="true"/>
 				<input type="hidden" name="show_historical" value="true"/>
 			}
-			<button type="submit" data-attr-disabled={ indicatorSignal } class="inline-flex h-9 items-center rounded-md border px-3 text-sm font-medium text-destructive hover:bg-accent">
+			@button.Button(button.ButtonArgs{Type: "submit", Variant: "outline", Size: "sm", Class: "text-destructive", Attributes: templ.Attributes{"data-attr-disabled": indicatorSignal}}) {
 				<span data-show={ "!" + indicatorSignal }>Stop</span>
 				<span data-show={ indicatorSignal }>Stopping...</span>
-			</button>
+			}
 		</form>
 	}
 }
