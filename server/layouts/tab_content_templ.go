@@ -9,7 +9,7 @@ import "github.com/a-h/templ"
 import templruntime "github.com/a-h/templ/runtime"
 
 import (
-	"github.com/coreycole/datastarui/components/card"
+	"github.com/CoreyCole/vamos/pkg/datastarui/components/card"
 )
 
 // TabContentLayoutArgs holds args for the two-panel tab content layout.

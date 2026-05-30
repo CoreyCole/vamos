@@ -12,14 +12,14 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/CoreyCole/vamos/pkg/datastarui/components/avatar"
+	"github.com/CoreyCole/vamos/pkg/datastarui/components/button"
+	"github.com/CoreyCole/vamos/pkg/datastarui/components/dropdown"
+	"github.com/CoreyCole/vamos/pkg/datastarui/components/form"
+	"github.com/CoreyCole/vamos/pkg/datastarui/components/textarea"
 	"github.com/CoreyCole/vamos/pkg/db"
 	avatarhelpers "github.com/CoreyCole/vamos/server/components/avatar"
 	"github.com/CoreyCole/vamos/server/services/commentui"
-	"github.com/coreycole/datastarui/components/avatar"
-	"github.com/coreycole/datastarui/components/button"
-	"github.com/coreycole/datastarui/components/dropdown"
-	"github.com/coreycole/datastarui/components/form"
-	"github.com/coreycole/datastarui/components/textarea"
 )
 
 // CommentFormArgs contains configuration for the comment form

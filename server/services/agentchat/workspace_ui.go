@@ -8,8 +8,8 @@ import (
 	"strings"
 
 	agentworkspace "github.com/CoreyCole/vamos/pkg/agents/workspace"
-	"github.com/coreycole/datastarui/components/sheet"
-	"github.com/coreycole/datastarui/utils"
+	"github.com/CoreyCole/vamos/pkg/datastarui/components/sheet"
+	"github.com/CoreyCole/vamos/pkg/datastarui/utils"
 )
 
 const (

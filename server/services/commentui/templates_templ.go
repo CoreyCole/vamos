@@ -14,8 +14,8 @@ import (
 	"sort"
 	"time"
 
-	"github.com/coreycole/datastarui/components/form"
-	"github.com/coreycole/datastarui/components/textarea"
+	"github.com/CoreyCole/vamos/pkg/datastarui/components/form"
+	"github.com/CoreyCole/vamos/pkg/datastarui/components/textarea"
 )
 
 func formatCommentDate(t time.Time) string {

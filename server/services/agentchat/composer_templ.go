@@ -12,7 +12,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/coreycole/datastarui/components/dropdown"
+	"github.com/CoreyCole/vamos/pkg/datastarui/components/dropdown"
 )
 
 func FreeformChatComposer(args ChatPageArgs) templ.Component {

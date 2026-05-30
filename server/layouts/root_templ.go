@@ -14,11 +14,11 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/CoreyCole/vamos/pkg/datastarui/components/avatar"
+	"github.com/CoreyCole/vamos/pkg/datastarui/components/breadcrumb"
+	"github.com/CoreyCole/vamos/pkg/datastarui/components/dropdown"
 	avatarhelpers "github.com/CoreyCole/vamos/server/components/avatar"
 	"github.com/CoreyCole/vamos/server/components/syntaxthemeselector"
-	"github.com/coreycole/datastarui/components/avatar"
-	"github.com/coreycole/datastarui/components/breadcrumb"
-	"github.com/coreycole/datastarui/components/dropdown"
 )
 
 type BreadcrumbLinkState struct {

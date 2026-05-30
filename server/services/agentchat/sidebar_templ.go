@@ -13,9 +13,9 @@ import (
 	"strconv"
 
 	"github.com/CoreyCole/vamos/pkg/agents/chatsession"
+	localsheet "github.com/CoreyCole/vamos/pkg/datastarui/components/sheet"
+	localutils "github.com/CoreyCole/vamos/pkg/datastarui/utils"
 	"github.com/CoreyCole/vamos/server/layouts/workbench"
-	localsheet "github.com/coreycole/datastarui/components/sheet"
-	localutils "github.com/coreycole/datastarui/utils"
 )
 
 func SidebarToggleButton() templ.Component {

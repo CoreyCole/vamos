@@ -13,10 +13,10 @@ import (
 	"net/url"
 	"strings"
 
-	button "github.com/coreycole/datastarui/components/button"
-	card "github.com/coreycole/datastarui/components/card"
-	dropdown "github.com/coreycole/datastarui/components/dropdown"
-	selectcomponent "github.com/coreycole/datastarui/components/select"
+	button "github.com/CoreyCole/vamos/pkg/datastarui/components/button"
+	card "github.com/CoreyCole/vamos/pkg/datastarui/components/card"
+	dropdown "github.com/CoreyCole/vamos/pkg/datastarui/components/dropdown"
+	selectcomponent "github.com/CoreyCole/vamos/pkg/datastarui/components/select"
 
 	"github.com/CoreyCole/vamos/server/layouts"
 )
