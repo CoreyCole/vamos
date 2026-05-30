@@ -7,6 +7,7 @@ import (
 
 	button "github.com/coreycole/datastarui/components/button"
 	card "github.com/coreycole/datastarui/components/card"
+	dropdown "github.com/coreycole/datastarui/components/dropdown"
 	selectcomponent "github.com/coreycole/datastarui/components/select"
 
 	"github.com/CoreyCole/vamos/server/layouts"
@@ -607,31 +608,55 @@ templ WorkspaceProofDiagnostics(view ImplWorkspaceView) {
 	}
 }
 
-templ WorkspaceActionsMenu(view ImplWorkspaceView, managerURL string, showHistorical bool, projectFilter ProjectFilter) {
-	<details class="relative inline-block text-left">
-		<summary class="inline-flex h-8 cursor-pointer list-none items-center rounded-md border px-2 text-xs font-medium hover:bg-accent [&::-webkit-details-marker]:hidden">Actions</summary>
-		<div class="absolute left-0 z-20 mt-1 flex min-w-40 flex-col gap-1 rounded-md border bg-popover p-2 text-popover-foreground shadow-md">
-			<button type="button" class="inline-flex h-8 items-center rounded-md px-2 text-xs font-medium hover:bg-accent" data-on:click={ "document.getElementById('workspace-dialog-" + workspaceViewSlug(view) + "').showModal(); this.closest('details').removeAttribute('open')" }>Details</button>
-			if workspaceVerifyHTMLURL(view) != "" {
-				<a href={ templ.SafeURL(workspaceVerifyHTMLURL(view)) } target="_blank" rel="noreferrer" class="inline-flex h-8 items-center rounded-md px-2 text-xs font-medium hover:bg-accent">Verify HTML</a>
-			}
-			@WorkspaceCleanupButton(workspaceCleanupAction(view))
-			@WorkspaceLifecycleActions(view, managerURL, showHistorical, projectFilter)
-		</div>
-	</details>
+func workspaceActionsDropdownID(slug string) string {
+	replacer := strings.NewReplacer("-", "_", ".", "_", "/", "_")
+	return "workspace_actions_" + replacer.Replace(slug)
 }
 
-templ WorkspaceLifecycleActions(view ImplWorkspaceView, managerURL string, showHistorical bool, projectFilter ProjectFilter) {
+func workspaceDropdownActionClass(destructive bool) string {
+	if destructive {
+		return "w-full justify-start text-xs text-destructive"
+	}
+	return "w-full justify-start text-xs"
+}
+
+templ WorkspaceActionsMenu(view ImplWorkspaceView, managerURL string, showHistorical bool, projectFilter ProjectFilter) {
+	{{ slug := workspaceViewSlug(view) }}
+	{{ dropdownID := workspaceActionsDropdownID(slug) }}
+	@dropdown.DropdownMenu(dropdown.DropdownMenuArgs{ID: dropdownID}) {
+		@dropdown.DropdownMenuTrigger(dropdown.DropdownMenuTriggerArgs{ID: dropdownID, Class: "inline-flex h-8 items-center rounded-md border px-2 text-xs font-medium hover:bg-accent"}) {
+			Actions
+		}
+		@dropdown.DropdownMenuContent(dropdown.DropdownMenuContentArgs{ID: dropdownID, Align: "end", Class: "min-w-44"}) {
+			@dropdown.DropdownMenuItem(dropdown.DropdownMenuItemArgs{
+				ID:      dropdownID,
+				OnClick: "document.getElementById('workspace-dialog-" + slug + "').showModal()",
+				Class:   "text-xs",
+			}) {
+				Details
+			}
+			if workspaceVerifyHTMLURL(view) != "" {
+				@dropdown.DropdownMenuLinkItem(dropdown.DropdownMenuLinkItemArgs{ID: dropdownID, Href: workspaceVerifyHTMLURL(view), Target: "_blank", Rel: "noreferrer", Class: "text-xs"}) {
+					Verify HTML
+				}
+			}
+			@WorkspaceCleanupDropdownItem(workspaceCleanupAction(view), dropdownID)
+			@WorkspaceLifecycleDropdownItems(view, managerURL, showHistorical, projectFilter, dropdownID)
+		}
+	}
+}
+
+templ WorkspaceLifecycleDropdownItems(view ImplWorkspaceView, managerURL string, showHistorical bool, projectFilter ProjectFilter, dropdownID string) {
 	{{ snap := view.Runtime }}
 	{{ ws := snap.Workspace }}
 	{{ slug := workspaceViewSlug(view) }}
 	if canActOnImplWorkspace(view) && normalizedObservedState(snap) == WorkspaceObservedRunning && ws.URL != "" {
-		@button.LinkButton(button.LinkButtonArgs{Href: managerURL + "/workspaces/switch/" + slug + "?redirect=" + url.QueryEscape("/"), Variant: "default", Size: "sm"}) {
+		@dropdown.DropdownMenuLinkItem(dropdown.DropdownMenuLinkItemArgs{ID: dropdownID, Href: managerURL + "/workspaces/switch/" + slug + "?redirect=" + url.QueryEscape("/"), Class: "text-xs"}) {
 			Open
 		}
 	}
 	if canActOnImplWorkspace(view) && workspaceTransitioning(snap) {
-		@button.Button(button.ButtonArgs{Type: "button", Variant: "outline", Size: "sm", Disabled: true, Class: "opacity-50"}) {
+		@dropdown.DropdownMenuItem(dropdown.DropdownMenuItemArgs{ID: dropdownID, Disabled: true, Class: "text-xs opacity-50"}) {
 			if normalizedObservedState(snap) == WorkspaceObservedStarting {
 				Starting...
 			} else {
@@ -640,43 +665,22 @@ templ WorkspaceLifecycleActions(view ImplWorkspaceView, managerURL string, showH
 		}
 	}
 	if canActOnImplWorkspace(view) && workspaceCanStart(snap) {
-		{{ indicator := workspaceActionIndicator(slug, "start") }}
-		{{ indicatorSignal := workspaceActionIndicatorSignal(slug, "start") }}
-		<form method="post" action={ templ.SafeURL("/workspaces/" + slug + "/start") } data-indicator={ indicator } data-on:submit={ "@post('/workspaces/" + slug + "/start', {contentType: 'form'})" }>
-			if projectFilter.QueryValue() != "" {
-				<input type="hidden" name="project" value={ projectFilter.QueryValue() }/>
-			}
-			if showHistorical {
-				<input type="hidden" name="show_cleaned_history" value="true"/>
-				<input type="hidden" name="show_historical" value="true"/>
-			}
-			@button.Button(button.ButtonArgs{Type: "submit", Variant: "outline", Size: "sm", Attributes: templ.Attributes{"data-attr-disabled": indicatorSignal}}) {
-				<span data-show={ "!" + indicatorSignal }>Start</span>
-				<span data-show={ indicatorSignal }>Starting...</span>
-			}
-		</form>
+		@WorkspaceLifecycleDropdownForm(dropdownID, slug, "start", "Start", "Starting...", false, showHistorical, projectFilter)
 	}
 	if canActOnImplWorkspace(view) && workspaceCanRestart(snap) {
-		{{ indicator := workspaceActionIndicator(slug, "restart") }}
-		{{ indicatorSignal := workspaceActionIndicatorSignal(slug, "restart") }}
-		<form method="post" action={ templ.SafeURL("/workspaces/" + slug + "/restart") } data-indicator={ indicator } data-on:submit={ "@post('/workspaces/" + slug + "/restart', {contentType: 'form'})" }>
-			if projectFilter.QueryValue() != "" {
-				<input type="hidden" name="project" value={ projectFilter.QueryValue() }/>
-			}
-			if showHistorical {
-				<input type="hidden" name="show_cleaned_history" value="true"/>
-				<input type="hidden" name="show_historical" value="true"/>
-			}
-			@button.Button(button.ButtonArgs{Type: "submit", Variant: "outline", Size: "sm", Attributes: templ.Attributes{"data-attr-disabled": indicatorSignal}}) {
-				<span data-show={ "!" + indicatorSignal }>Restart</span>
-				<span data-show={ indicatorSignal }>Restarting...</span>
-			}
-		</form>
+		@WorkspaceLifecycleDropdownForm(dropdownID, slug, "restart", "Restart", "Restarting...", false, showHistorical, projectFilter)
 	}
 	if canActOnImplWorkspace(view) && workspaceCanStop(snap) {
-		{{ indicator := workspaceActionIndicator(slug, "stop") }}
-		{{ indicatorSignal := workspaceActionIndicatorSignal(slug, "stop") }}
-		<form method="post" action={ templ.SafeURL("/workspaces/" + slug + "/stop") } data-indicator={ indicator } data-on:submit={ "@post('/workspaces/" + slug + "/stop', {contentType: 'form'})" }>
+		@WorkspaceLifecycleDropdownForm(dropdownID, slug, "stop", "Stop", "Stopping...", true, showHistorical, projectFilter)
+	}
+}
+
+templ WorkspaceLifecycleDropdownForm(dropdownID string, slug string, action string, label string, loadingLabel string, destructive bool, showHistorical bool, projectFilter ProjectFilter) {
+	{{ indicator := workspaceActionIndicator(slug, action) }}
+	{{ indicatorSignal := workspaceActionIndicatorSignal(slug, action) }}
+	{{ actionPath := "/workspaces/" + slug + "/" + action }}
+	@dropdown.DropdownMenuCustomItem(dropdown.DropdownMenuCustomItemArgs{ID: dropdownID, Class: "p-0"}) {
+		<form method="post" action={ templ.SafeURL(actionPath) } data-indicator={ indicator } data-on:submit={ "@post('" + actionPath + "', {contentType: 'form'})" }>
 			if projectFilter.QueryValue() != "" {
 				<input type="hidden" name="project" value={ projectFilter.QueryValue() }/>
 			}
@@ -684,41 +688,45 @@ templ WorkspaceLifecycleActions(view ImplWorkspaceView, managerURL string, showH
 				<input type="hidden" name="show_cleaned_history" value="true"/>
 				<input type="hidden" name="show_historical" value="true"/>
 			}
-			@button.Button(button.ButtonArgs{Type: "submit", Variant: "outline", Size: "sm", Class: "text-destructive", Attributes: templ.Attributes{"data-attr-disabled": indicatorSignal}}) {
-				<span data-show={ "!" + indicatorSignal }>Stop</span>
-				<span data-show={ indicatorSignal }>Stopping...</span>
+			@button.Button(button.ButtonArgs{Type: "submit", Variant: "ghost", Size: "sm", Class: workspaceDropdownActionClass(destructive), Attributes: templ.Attributes{"data-attr-disabled": indicatorSignal}}) {
+				<span data-show={ "!" + indicatorSignal }>{ label }</span>
+				<span data-show={ indicatorSignal }>{ loadingLabel }</span>
 			}
 		</form>
 	}
 }
 
-templ WorkspaceCleanupButton(action WorkspaceCleanupAction) {
+templ WorkspaceCleanupDropdownItem(action WorkspaceCleanupAction, dropdownID string) {
 	if action.Slug != "" && !action.Disabled {
 		{{ indicator := workspaceActionIndicator(action.Slug, "cleanup") }}
 		{{ indicatorSignal := workspaceActionIndicatorSignal(action.Slug, "cleanup") }}
 		if action.RequiresConfirm {
-			<details class="max-w-xs rounded-md border p-2">
-				<summary class="cursor-pointer text-sm font-medium text-destructive">{ action.Label }</summary>
-				<p class="mt-2 text-xs text-amber-700 dark:text-amber-300">{ action.Warning }</p>
-				<form method="post" action="/workspaces/cleanup" class="mt-2" data-indicator={ indicator } data-on:submit="@post('/workspaces/cleanup', {contentType: 'form'})">
+			@dropdown.DropdownMenuCustomItem(dropdown.DropdownMenuCustomItemArgs{ID: dropdownID, Class: "block max-w-xs p-2"}) {
+				<details>
+					<summary class="cursor-pointer text-xs font-medium text-destructive">{ action.Label }</summary>
+					<p class="mt-2 text-xs text-amber-700 dark:text-amber-300">{ action.Warning }</p>
+					<form method="post" action="/workspaces/cleanup" class="mt-2" data-indicator={ indicator } data-on:submit="@post('/workspaces/cleanup', {contentType: 'form'})">
+						<input type="hidden" name="slug" value={ action.Slug }/>
+						<input type="hidden" name="project" value={ action.ProjectID }/>
+						<input type="hidden" name="confirmed" value="true"/>
+						@button.Button(button.ButtonArgs{Type: "submit", Variant: "outline", Size: "sm", Class: "border-destructive/40 text-destructive hover:bg-destructive/10", Attributes: templ.Attributes{"data-attr-disabled": indicatorSignal}}) {
+							<span data-show={ "!" + indicatorSignal }>Confirm close</span>
+							<span data-show={ indicatorSignal }>Working...</span>
+						}
+					</form>
+				</details>
+			}
+		} else {
+			@dropdown.DropdownMenuCustomItem(dropdown.DropdownMenuCustomItemArgs{ID: dropdownID, Class: "p-0"}) {
+				<form method="post" action="/workspaces/cleanup" data-indicator={ indicator } data-on:submit="@post('/workspaces/cleanup', {contentType: 'form'})">
 					<input type="hidden" name="slug" value={ action.Slug }/>
 					<input type="hidden" name="project" value={ action.ProjectID }/>
-					<input type="hidden" name="confirmed" value="true"/>
-					<button type="submit" data-attr-disabled={ indicatorSignal } class="inline-flex h-8 items-center rounded-md border border-destructive/40 px-2 text-xs font-medium text-destructive hover:bg-destructive/10 disabled:pointer-events-none disabled:opacity-50">
-						<span data-show={ "!" + indicatorSignal }>Confirm close</span>
+					@button.Button(button.ButtonArgs{Type: "submit", Variant: "ghost", Size: "sm", Class: "w-full justify-start text-xs", Attributes: templ.Attributes{"data-attr-disabled": indicatorSignal}}) {
+						<span data-show={ "!" + indicatorSignal }>{ action.Label }</span>
 						<span data-show={ indicatorSignal }>Working...</span>
-					</button>
+					}
 				</form>
-			</details>
-		} else {
-			<form method="post" action="/workspaces/cleanup" data-indicator={ indicator } data-on:submit="@post('/workspaces/cleanup', {contentType: 'form'})">
-				<input type="hidden" name="slug" value={ action.Slug }/>
-				<input type="hidden" name="project" value={ action.ProjectID }/>
-				<button type="submit" data-attr-disabled={ indicatorSignal } class="inline-flex h-9 items-center rounded-md border px-3 text-sm font-medium hover:bg-accent disabled:pointer-events-none disabled:opacity-50">
-					<span data-show={ "!" + indicatorSignal }>{ action.Label }</span>
-					<span data-show={ indicatorSignal }>Working...</span>
-				</button>
-			</form>
+			}
 		}
 	}
 }
