@@ -1,0 +1,399 @@
+{
+  "source": ".",
+  "commit": "7f9e455f2a37a8ef104f9f8da5cfe1e1a0d01354",
+  "modulePath": "github.com/CoreyCole/vamos",
+  "components": {
+    "avatar": {
+      "version": "7f9e455f2a37a8ef104f9f8da5cfe1e1a0d01354",
+      "files": [
+        "components/avatar/args.go",
+        "components/avatar/avatar.templ"
+      ]
+    },
+    "breadcrumb": {
+      "version": "7f9e455f2a37a8ef104f9f8da5cfe1e1a0d01354",
+      "files": [
+        "components/breadcrumb/args.go",
+        "components/breadcrumb/breadcrumb.templ",
+        "components/breadcrumb/fromitems.templ",
+        "components/breadcrumb/variants.go"
+      ]
+    },
+    "button": {
+      "version": "7f9e455f2a37a8ef104f9f8da5cfe1e1a0d01354",
+      "files": [
+        "components/button/args.go",
+        "components/button/button.templ",
+        "components/button/variants.go"
+      ]
+    },
+    "card": {
+      "version": "7f9e455f2a37a8ef104f9f8da5cfe1e1a0d01354",
+      "files": [
+        "components/card/args.go",
+        "components/card/card.templ",
+        "components/card/variants.go"
+      ]
+    },
+    "checkbox": {
+      "version": "7f9e455f2a37a8ef104f9f8da5cfe1e1a0d01354",
+      "files": [
+        "components/checkbox/args.go",
+        "components/checkbox/checkbox.templ",
+        "components/checkbox/variants.go"
+      ]
+    },
+    "dialog": {
+      "version": "7f9e455f2a37a8ef104f9f8da5cfe1e1a0d01354",
+      "files": [
+        "components/dialog/args.go",
+        "components/dialog/dialog.templ",
+        "components/dialog/expressions.go",
+        "components/dialog/variants.go"
+      ]
+    },
+    "dropdown": {
+      "version": "7f9e455f2a37a8ef104f9f8da5cfe1e1a0d01354",
+      "files": [
+        "components/dropdown/args.go",
+        "components/dropdown/dropdown.templ",
+        "components/dropdown/expressions.go",
+        "components/dropdown/variants.go"
+      ]
+    },
+    "form": {
+      "version": "7f9e455f2a37a8ef104f9f8da5cfe1e1a0d01354",
+      "files": [
+        "components/form/args.go",
+        "components/form/form.templ",
+        "components/form/variants.go"
+      ]
+    },
+    "input": {
+      "version": "7f9e455f2a37a8ef104f9f8da5cfe1e1a0d01354",
+      "files": [
+        "components/input/args.go",
+        "components/input/input.templ",
+        "components/input/variants.go"
+      ]
+    },
+    "label": {
+      "version": "7f9e455f2a37a8ef104f9f8da5cfe1e1a0d01354",
+      "files": [
+        "components/label/args.go",
+        "components/label/label.templ",
+        "components/label/variants.go"
+      ]
+    },
+    "select": {
+      "version": "7f9e455f2a37a8ef104f9f8da5cfe1e1a0d01354",
+      "files": [
+        "components/select/args.go",
+        "components/select/expressions.go",
+        "components/select/select.templ",
+        "components/select/variants.go"
+      ]
+    },
+    "sheet": {
+      "version": "7f9e455f2a37a8ef104f9f8da5cfe1e1a0d01354",
+      "files": [
+        "components/sheet/args.go",
+        "components/sheet/expressions.go",
+        "components/sheet/sheet.templ",
+        "components/sheet/variants.go"
+      ]
+    },
+    "tabs": {
+      "version": "7f9e455f2a37a8ef104f9f8da5cfe1e1a0d01354",
+      "files": [
+        "components/tabs/args.go",
+        "components/tabs/expressions.go",
+        "components/tabs/tabs.templ",
+        "components/tabs/variants.go"
+      ]
+    },
+    "tailwind": {
+      "version": "7f9e455f2a37a8ef104f9f8da5cfe1e1a0d01354",
+      "files": [
+        "tailwind/README.md",
+        "tailwind/utilities.css"
+      ]
+    },
+    "textarea": {
+      "version": "7f9e455f2a37a8ef104f9f8da5cfe1e1a0d01354",
+      "files": [
+        "components/textarea/args.go",
+        "components/textarea/textarea.templ",
+        "components/textarea/variants.go"
+      ]
+    },
+    "tooltip": {
+      "version": "7f9e455f2a37a8ef104f9f8da5cfe1e1a0d01354",
+      "files": [
+        "components/tooltip/args.go",
+        "components/tooltip/expressions.go",
+        "components/tooltip/tooltip.templ",
+        "components/tooltip/variants.go"
+      ]
+    },
+    "utils": {
+      "version": "7f9e455f2a37a8ef104f9f8da5cfe1e1a0d01354",
+      "files": [
+        "utils/anchor.go",
+        "utils/connect_errors.go",
+        "utils/context.go",
+        "utils/data_class.go",
+        "utils/device.go",
+        "utils/expressions.go",
+        "utils/signals.go",
+        "utils/tailwind_merge.go"
+      ]
+    }
+  },
+  "files": {
+    "components/avatar/args.go": {
+      "sourcePath": "components/avatar/args.go",
+      "hash": "a26951a998a768b1b9b1bfe2a0adabe92fed7a0f7c26e70f33ea2e3cda6a134d"
+    },
+    "components/avatar/avatar.templ": {
+      "sourcePath": "components/avatar/avatar.templ",
+      "hash": "c6e7d0f11cf60c110399a2866535524d7f2f8846a5f3c86e8dfeba1991282f7b"
+    },
+    "components/breadcrumb/args.go": {
+      "sourcePath": "components/breadcrumb/args.go",
+      "hash": "eab731aefce8f13c013fceaf37eb7a3816868b331a963e31fb48a489b09faa0b"
+    },
+    "components/breadcrumb/breadcrumb.templ": {
+      "sourcePath": "components/breadcrumb/breadcrumb.templ",
+      "hash": "43101da471563aac05019c60664bae1bd9079d5eaa893e8b90f8f4d8e07cbb97"
+    },
+    "components/breadcrumb/fromitems.templ": {
+      "sourcePath": "components/breadcrumb/fromitems.templ",
+      "hash": "06d9c98394293fefc37e4d90cf7094c83ed6c2104468171f01e9e8838bb6e778"
+    },
+    "components/breadcrumb/variants.go": {
+      "sourcePath": "components/breadcrumb/variants.go",
+      "hash": "de7ffba0abc69b5db88e9029e60acead6332751af268585f58298ffd46828154"
+    },
+    "components/button/args.go": {
+      "sourcePath": "components/button/args.go",
+      "hash": "6f0dbac65a8f25eaff6d186dedc71192f5c1e3c87e3a885b183c7c9843fd5ad6"
+    },
+    "components/button/button.templ": {
+      "sourcePath": "components/button/button.templ",
+      "hash": "0d76451ea4e6948c78f64ff747157068de30326256d7d0c8995d13c60ef86b33"
+    },
+    "components/button/variants.go": {
+      "sourcePath": "components/button/variants.go",
+      "hash": "9d76d2e578608032c475eae8b558d0f53550fb46f8b1e3119055c16b361101c2"
+    },
+    "components/card/args.go": {
+      "sourcePath": "components/card/args.go",
+      "hash": "1dd2b28e6d8361b08b2c9b0ada3404021e751c87d9a5cf5012ccc7a529c56096"
+    },
+    "components/card/card.templ": {
+      "sourcePath": "components/card/card.templ",
+      "hash": "09ce9ba16c4385efcd08d9cc24e3ef30286799c4e4ae4cc499208bd1c01020b6"
+    },
+    "components/card/variants.go": {
+      "sourcePath": "components/card/variants.go",
+      "hash": "ddd0bcd63240b5ac6aa4b52f2debda2561a4b231b634a676cbbead847829291f"
+    },
+    "components/checkbox/args.go": {
+      "sourcePath": "components/checkbox/args.go",
+      "hash": "5028ce4f2a1b9b98e7ba6aa53d9be987ab900d18bdf1db363a58b66dfbc40d49"
+    },
+    "components/checkbox/checkbox.templ": {
+      "sourcePath": "components/checkbox/checkbox.templ",
+      "hash": "65008c6a4460c8baae5f88ea082838056a9dbcffe049d71358b8ad4f626abc1d"
+    },
+    "components/checkbox/variants.go": {
+      "sourcePath": "components/checkbox/variants.go",
+      "hash": "f81cf6e4866d6427f98b2f2fa56d7cc6647015d6e6b4f01c994377e015642b77"
+    },
+    "components/dialog/args.go": {
+      "sourcePath": "components/dialog/args.go",
+      "hash": "b05872bae08bd4e5d413e118a5138776cbcd0c62a765193ff6a76e413450dd30"
+    },
+    "components/dialog/dialog.templ": {
+      "sourcePath": "components/dialog/dialog.templ",
+      "hash": "3e270110bad895354e8e99366cfd67cb13450d6fb2b314dac38a4ab56f87760e"
+    },
+    "components/dialog/expressions.go": {
+      "sourcePath": "components/dialog/expressions.go",
+      "hash": "5dd242a6f3b1b9181b29bc48a63ec71022906b691b9afac0899b32997932ee13"
+    },
+    "components/dialog/variants.go": {
+      "sourcePath": "components/dialog/variants.go",
+      "hash": "9cb77306846b335cbf97f2c459d116daf4fc9a095a324ee85b32d2b3d21d541a"
+    },
+    "components/dropdown/args.go": {
+      "sourcePath": "components/dropdown/args.go",
+      "hash": "3de65290a6ba2811b9e6873f00031ac46f3d1325efb638e473e1a905b1df2269"
+    },
+    "components/dropdown/dropdown.templ": {
+      "sourcePath": "components/dropdown/dropdown.templ",
+      "hash": "5680dc4c872d051bfb4fcbf956528b43557b90effa48c184eaf8d761db20a739"
+    },
+    "components/dropdown/expressions.go": {
+      "sourcePath": "components/dropdown/expressions.go",
+      "hash": "920b491a7a4a434864122e2917ed42cf4e49129bd6377208a7b171c20a039197"
+    },
+    "components/dropdown/variants.go": {
+      "sourcePath": "components/dropdown/variants.go",
+      "hash": "6c69730559089e00f986f686e5287fd484c9687ccf1c6f797629436b71d2d276"
+    },
+    "components/form/args.go": {
+      "sourcePath": "components/form/args.go",
+      "hash": "cbe40c9d89d3b81d9692998acb3c75406f56b94b940b3acefbb0d194e1eb2468"
+    },
+    "components/form/form.templ": {
+      "sourcePath": "components/form/form.templ",
+      "hash": "a1bc34373ae246958ef24ceb56a3ff6b0078c75d8d29c8a2deef1df4c758a2a7"
+    },
+    "components/form/variants.go": {
+      "sourcePath": "components/form/variants.go",
+      "hash": "487271939e06aa9b8bd89af11d8232ef3925ac37de72afd7e5379197ada37409"
+    },
+    "components/input/args.go": {
+      "sourcePath": "components/input/args.go",
+      "hash": "1d6ffe65aa37a547c3fb02c0b16d0b6fecae0ae29c8940984281c56937f6ba80"
+    },
+    "components/input/input.templ": {
+      "sourcePath": "components/input/input.templ",
+      "hash": "ee6d22f8cf087d1a7a80e132c18547d88d2f0e7515e634e1535d58bd8bb25096"
+    },
+    "components/input/variants.go": {
+      "sourcePath": "components/input/variants.go",
+      "hash": "f55273f1a37883a754c0e3105ae424dc03ed8b506734218216cb7da50e850150"
+    },
+    "components/label/args.go": {
+      "sourcePath": "components/label/args.go",
+      "hash": "3faf4340b8cf0de443a35cea31aa268ffc4869a72f0f67c958aac3e5fae5eb37"
+    },
+    "components/label/label.templ": {
+      "sourcePath": "components/label/label.templ",
+      "hash": "484d28ef67a51bd80c771c566d32c19590d0242b7c96e7f78717583f74cbaf5a"
+    },
+    "components/label/variants.go": {
+      "sourcePath": "components/label/variants.go",
+      "hash": "6914a427ff29df0f11425a12dd41486edd13f84ae4a3e629d7268a01aa9ba5cf"
+    },
+    "components/select/args.go": {
+      "sourcePath": "components/select/args.go",
+      "hash": "1f5f4549d2cc3877ea6617b86c59c9b355793e71dc2da730774e4868303e5a79"
+    },
+    "components/select/expressions.go": {
+      "sourcePath": "components/select/expressions.go",
+      "hash": "490f40abafb9d7ac95f0aab626ee1d98521281e8e1c4fe07e4bae0af86b79ee9"
+    },
+    "components/select/select.templ": {
+      "sourcePath": "components/select/select.templ",
+      "hash": "1fb277604052d59fd0813d3eab3696f9cfde8416ab73f2786791818a70d2dc7c"
+    },
+    "components/select/variants.go": {
+      "sourcePath": "components/select/variants.go",
+      "hash": "3aeabfcd21c6dac7de0b7db0f390553e3bad474995a0bce8d77fb668797beaf8"
+    },
+    "components/sheet/args.go": {
+      "sourcePath": "components/sheet/args.go",
+      "hash": "654922c6c54b496a662135171091164b555b6c72e4861ef2c467c3824ca97bfa"
+    },
+    "components/sheet/expressions.go": {
+      "sourcePath": "components/sheet/expressions.go",
+      "hash": "4a708496f6efe2526598b1f244d551048e023e2fe72d5adfad90f0f4448c3387"
+    },
+    "components/sheet/sheet.templ": {
+      "sourcePath": "components/sheet/sheet.templ",
+      "hash": "d5497f65e793ffd1851d3267aca09ff34e3a6189b67f908fcac8810088e884f6"
+    },
+    "components/sheet/variants.go": {
+      "sourcePath": "components/sheet/variants.go",
+      "hash": "667e582662a6abb11fda49009ac8e0b8fade5a1f18a682ab3678eed41018468b"
+    },
+    "components/tabs/args.go": {
+      "sourcePath": "components/tabs/args.go",
+      "hash": "0433c204aa488af768ffa3868402e32ffff9de9ab3066ea000d6f8f30f87ea5b"
+    },
+    "components/tabs/expressions.go": {
+      "sourcePath": "components/tabs/expressions.go",
+      "hash": "9e8980b7c3b15cc6b0e50db535eeb051032961ca09fcc8053e592dd94258c6f9"
+    },
+    "components/tabs/tabs.templ": {
+      "sourcePath": "components/tabs/tabs.templ",
+      "hash": "ae90afdc30a2cba10e403aeea8dbbb17ed0e61a4f7f14532f85d1ef29c09c4d0"
+    },
+    "components/tabs/variants.go": {
+      "sourcePath": "components/tabs/variants.go",
+      "hash": "3f97d3569619c183fa9bbf87803d5cd960c8d2eea81649ef79670b738d8e6192"
+    },
+    "components/textarea/args.go": {
+      "sourcePath": "components/textarea/args.go",
+      "hash": "5f57860a428c18d46b91468feb333a57e31decf7bfc0202757851b94fc64ebd8"
+    },
+    "components/textarea/textarea.templ": {
+      "sourcePath": "components/textarea/textarea.templ",
+      "hash": "c2adb89f69185b840c9e7d0a1a7f1add3207b9e74f87b09fbeeddea968421a9b"
+    },
+    "components/textarea/variants.go": {
+      "sourcePath": "components/textarea/variants.go",
+      "hash": "6871493f124b58c1d30137e4f87cc516622f6fb5051339465abc5691cfaaaa3d"
+    },
+    "components/tooltip/args.go": {
+      "sourcePath": "components/tooltip/args.go",
+      "hash": "ac01cd15fd953170ea59c6a3ba84f67c8f6aba1bd28cdf8700ed5b659bea1bef"
+    },
+    "components/tooltip/expressions.go": {
+      "sourcePath": "components/tooltip/expressions.go",
+      "hash": "4f0be05e177ae99c2ad5d20df0d80254ab3e961044b3bb43e6170aba71619f01"
+    },
+    "components/tooltip/tooltip.templ": {
+      "sourcePath": "components/tooltip/tooltip.templ",
+      "hash": "29e7c9bcba5df95fb503da051c6a528450dee93750f7ba7bb10496d86dd91442"
+    },
+    "components/tooltip/variants.go": {
+      "sourcePath": "components/tooltip/variants.go",
+      "hash": "dcd9c3d783cc1e29bb8140f29e7da06667ce5da67766314d18a493d1ca77e5ad"
+    },
+    "tailwind/README.md": {
+      "sourcePath": "tailwind/README.md",
+      "hash": "e1b39bc46d93a9a855095abcba94eed70fc52c00b761bb9bea09662ccb1aa6ca"
+    },
+    "tailwind/utilities.css": {
+      "sourcePath": "tailwind/utilities.css",
+      "hash": "a79f5ea097e4d634326a91c3b946c7e6164bd3203ef13bc22fdbead52dbcdf9e"
+    },
+    "utils/anchor.go": {
+      "sourcePath": "utils/anchor.go",
+      "hash": "f0e742ca30e456b2fb5334df0037cd8d39c292be936b850c94095e77161fda5e"
+    },
+    "utils/connect_errors.go": {
+      "sourcePath": "utils/connect_errors.go",
+      "hash": "8f9028d58de3414f68f7e2c1dec6a4e269254bed737327f581936dd1685f2294"
+    },
+    "utils/context.go": {
+      "sourcePath": "utils/context.go",
+      "hash": "bf4c4cb0317d5bfb7f300ea1267ddfef027d66620edd9aa4be7c08288d6e42c2"
+    },
+    "utils/data_class.go": {
+      "sourcePath": "utils/data_class.go",
+      "hash": "e419c31ba36c06cb9334c864f11fbc65969b3e273f2ae0d07728793df40850a4"
+    },
+    "utils/device.go": {
+      "sourcePath": "utils/device.go",
+      "hash": "f277bba9368aeb7331e09adad1198ca2a70d2459197cab6e64469f0c5efc3a7f"
+    },
+    "utils/expressions.go": {
+      "sourcePath": "utils/expressions.go",
+      "hash": "96da07130642faad66777e638ded670755853e5f2a3d1c1efd06a8e5762fed17"
+    },
+    "utils/signals.go": {
+      "sourcePath": "utils/signals.go",
+      "hash": "61aa432d0438f7f3b349d996352279b9397d09d53100a9c0cdb3e4f42f2e08ce"
+    },
+    "utils/tailwind_merge.go": {
+      "sourcePath": "utils/tailwind_merge.go",
+      "hash": "3d8ea9f4974f6ff018ad5fe88b2d7b3408143d855fb3be81049788a3b3b791cf"
+    }
+  }
+}
