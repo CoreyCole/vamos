@@ -91,6 +91,24 @@ func TestBuildStepsUseStandaloneModulePaths(t *testing.T) {
 	assertContains(t, byName[StepDatastarAssets].Inputs.Roots, "../datastar-pro/datastar-pro-v1.js")
 }
 
+func TestTailwindHashesCopiedDatastarUI(t *testing.T) {
+	t.Parallel()
+
+	steps := BuildSteps(Options{RepoRoot: t.TempDir(), BinaryName: "agents-server"})
+	byName := map[StepName]Step{}
+	for _, step := range steps {
+		byName[step.Name] = step
+	}
+
+	tailwind := byName[StepTailwind]
+	assertContains(t, tailwind.Inputs.Roots, "pkg/datastarui")
+	assertContains(t, tailwind.Inputs.Includes, "pkg/datastarui/**/*.css")
+	assertContains(t, tailwind.Inputs.Includes, "pkg/datastarui/**/*.go")
+	assertContains(t, tailwind.Inputs.Includes, "pkg/datastarui/**/*.templ")
+	assertContains(t, tailwind.Inputs.Includes, "pkg/datastarui/datastarui.lock.json")
+	assertNotContains(t, byName[StepGo].Inputs.Excludes, "pkg/datastarui/**")
+}
+
 func TestBuildStepsUsesDatastarAssetEnvOverride(t *testing.T) {
 	t.Setenv("VAMOS_DATASTAR_PRO_ASSET", "/opt/datastar/datastar-pro-v1.js")
 
@@ -266,6 +284,15 @@ func assertContains(t *testing.T, got []string, want string) {
 		}
 	}
 	t.Fatalf("%#v does not contain %q", got, want)
+}
+
+func assertNotContains(t *testing.T, got []string, want string) {
+	t.Helper()
+	for _, value := range got {
+		if value == want {
+			t.Fatalf("%#v unexpectedly contains %q", got, want)
+		}
+	}
 }
 
 func writeTSWorkerInputs(t *testing.T, repoRoot string) {

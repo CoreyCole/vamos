@@ -95,7 +95,6 @@ func GoStep(repoRoot, binaryName string) Step {
 				".build-agents/**",
 				"node_modules/**",
 				"dist/**",
-				"pkg/datastarui/**",
 			},
 		},
 		Outputs:        HashSpec{Roots: []string{binaryName}, Optional: true},
@@ -116,8 +115,15 @@ func TailwindStep() Step {
 		Name:        StepTailwind,
 		ForceTarget: ForceTailwind,
 		Inputs: HashSpec{
-			Roots:    []string{"static/css", "server"},
-			Includes: []string{"static/css/**/*.css", "server/**"},
+			Roots: []string{"static/css", "server", "pkg/datastarui"},
+			Includes: []string{
+				"static/css/**/*.css",
+				"server/**",
+				"pkg/datastarui/**/*.css",
+				"pkg/datastarui/**/*.go",
+				"pkg/datastarui/**/*.templ",
+				"pkg/datastarui/datastarui.lock.json",
+			},
 			Excludes: []string{"static/css/out*.css"},
 		},
 		Outputs: HashSpec{

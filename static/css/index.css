@@ -3,8 +3,10 @@
 /* Import local theme and component foundation used by DatastarUI-backed templates. */
 @import "./theme-foundation.css";
 @import "./components-foundation.css";
+@import "../../pkg/datastarui/tailwind/utilities.css";
 
 @source "../../server";
+@source "../../pkg/datastarui";
 
 @layer base {
   /* Global scroll behavior to account for sticky header */
