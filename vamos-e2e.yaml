@@ -1,6 +1,6 @@
 app: vamos
 base_url: http://localhost:4200
-run_package: ./pkg/e2e/generated
+run_package: ./pkg/e2e/tests
 artifacts_dir: .e2e-runs
 server:
   command: just build
