@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/CoreyCole/vamos/pkg/e2e/artifacts"
+	"github.com/CoreyCole/vamos/pkg/e2e/repair"
 )
 
 func TestFixCommandHasRunAndApplyFlags(t *testing.T) {
@@ -29,7 +29,7 @@ func TestRunFixRequiresRunDir(t *testing.T) {
 func TestRunFixNeedsHumanReturnsTypedError(t *testing.T) {
 	runDir := t.TempDir()
 	writeFixManifest(t, runDir)
-	writeFixFailures(t, runDir, []artifacts.Failure{{Error: "unsupported story step"}})
+	writeFixFailures(t, runDir, []repair.Failure{{Error: "unsupported story step"}})
 	err := RunFix(context.Background(), FixConfig{RunDir: runDir})
 	var needsHuman NeedsHumanError
 	if !errors.As(err, &needsHuman) {
@@ -40,7 +40,7 @@ func TestRunFixNeedsHumanReturnsTypedError(t *testing.T) {
 func TestRunFixApplyReturnsNotEnabled(t *testing.T) {
 	runDir := t.TempDir()
 	writeFixManifest(t, runDir)
-	writeFixFailures(t, runDir, []artifacts.Failure{{Error: "selector not visible"}})
+	writeFixFailures(t, runDir, []repair.Failure{{Error: "selector not visible"}})
 	err := RunFix(context.Background(), FixConfig{RunDir: runDir, Apply: true})
 	if err == nil {
 		t.Fatal("RunFix(apply) error=nil want not enabled")
@@ -49,7 +49,7 @@ func TestRunFixApplyReturnsNotEnabled(t *testing.T) {
 
 func writeFixManifest(t *testing.T, dir string) {
 	t.Helper()
-	data, err := json.Marshal(artifacts.RunManifest{ID: filepath.Base(dir)})
+	data, err := json.Marshal(map[string]string{"id": filepath.Base(dir)})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -58,7 +58,7 @@ func writeFixManifest(t *testing.T, dir string) {
 	}
 }
 
-func writeFixFailures(t *testing.T, dir string, failures []artifacts.Failure) {
+func writeFixFailures(t *testing.T, dir string, failures []repair.Failure) {
 	t.Helper()
 	data, err := json.Marshal(failures)
 	if err != nil {

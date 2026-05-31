@@ -6,8 +6,6 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
-
-	"github.com/CoreyCole/vamos/pkg/e2e/artifacts"
 )
 
 func TestBuildPlanSelectorFailure(t *testing.T) {
@@ -15,7 +13,7 @@ func TestBuildPlanSelectorFailure(t *testing.T) {
 	writeFailures(
 		t,
 		dir,
-		[]artifacts.Failure{
+		[]Failure{
 			{Error: "selector for thoughts.workbench.sidebar not visible"},
 		},
 	)
@@ -42,7 +40,7 @@ func TestBuildPlanUnsupportedStoryStepNeedsHuman(t *testing.T) {
 	writeFailures(
 		t,
 		dir,
-		[]artifacts.Failure{{Error: "unsupported story step: I change production UI"}},
+		[]Failure{{Error: "unsupported story step: I change production UI"}},
 	)
 	plan, err := BuildPlan(
 		context.Background(),
@@ -95,6 +93,7 @@ func TestValidatePlanRejectsArbitrarySourcePaths(t *testing.T) {
 
 func TestValidatePlanAllowsBoundedPaths(t *testing.T) {
 	plan := Plan{Changes: []Change{
+		{Scope: FixScopeDatastarUI, Path: "../datastarui/e2e", Why: "artifact behavior"},
 		{Scope: FixScopeVamosHelpers, Path: "pkg/e2e/vamos", Why: "selector drift"},
 		{
 			Scope: FixScopeTests,
@@ -107,7 +106,16 @@ func TestValidatePlanAllowsBoundedPaths(t *testing.T) {
 	}
 }
 
-func writeFailures(t *testing.T, dir string, failures []artifacts.Failure) {
+func TestValidatePlanRejectsDeletedLegacyE2EPaths(t *testing.T) {
+	for _, path := range []string{"pkg/e2e/selectors", "pkg/e2e/steps", "pkg/e2e/runtime"} {
+		err := ValidatePlan(Plan{Changes: []Change{{Scope: FixScopeVamosHelpers, Path: path, Why: "stale scope"}}})
+		if err == nil {
+			t.Fatalf("ValidatePlan(%s) error=nil want rejected stale path", path)
+		}
+	}
+}
+
+func writeFailures(t *testing.T, dir string, failures []Failure) {
 	t.Helper()
 	data, err := json.Marshal(failures)
 	if err != nil {

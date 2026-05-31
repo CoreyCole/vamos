@@ -10,7 +10,6 @@ static/css/out.css
 static/css/out.*.css
 static/js/datastar*.js
 static/js/datastar*.js.map
-pkg/e2e/artifacts/tmp/
 # Pi project-local runtime state
 .pi/sessions/
 .pi/git/

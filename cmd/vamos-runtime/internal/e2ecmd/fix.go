@@ -24,6 +24,16 @@ func (e NeedsHumanError) Error() string {
 	return "repair plan needs human approval: " + strings.Join(e.Reasons, "; ")
 }
 
+func manifestPathForRun(runDir string) string {
+	for _, name := range []string{"manifest.json", "run.json"} {
+		path := filepath.Join(runDir, name)
+		if _, err := os.Stat(path); err == nil {
+			return path
+		}
+	}
+	return filepath.Join(runDir, "manifest.json")
+}
+
 func RunFix(ctx context.Context, cfg FixConfig) error {
 	if strings.TrimSpace(cfg.RunDir) == "" {
 		return fmt.Errorf("--run is required")

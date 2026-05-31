@@ -6,8 +6,6 @@ import (
 	"fmt"
 	"os"
 	"strings"
-
-	"github.com/CoreyCole/vamos/pkg/e2e/artifacts"
 )
 
 type FixScope string
@@ -22,6 +20,14 @@ type Request struct {
 	RunManifestPath string
 	FailuresPath    string
 	AllowedScopes   []FixScope
+}
+
+type Failure struct {
+	Story    string `json:"Story,omitempty"`
+	Scenario string `json:"Scenario,omitempty"`
+	Viewport string `json:"Viewport,omitempty"`
+	Step     string `json:"Step,omitempty"`
+	Error    string `json:"Error,omitempty"`
 }
 
 type Plan struct {
@@ -60,8 +66,8 @@ func BuildPlan(ctx context.Context, req Request) (Plan, error) {
 	return filterPlanScopes(plan, req.AllowedScopes), nil
 }
 
-func decodeFailures(data []byte) ([]artifacts.Failure, error) {
-	var failures []artifacts.Failure
+func decodeFailures(data []byte) ([]Failure, error) {
+	var failures []Failure
 	if err := json.Unmarshal(data, &failures); err == nil {
 		return failures, nil
 	}
@@ -69,9 +75,9 @@ func decodeFailures(data []byte) ([]artifacts.Failure, error) {
 	if err := json.Unmarshal(data, &generic); err != nil {
 		return nil, err
 	}
-	failures = make([]artifacts.Failure, 0, len(generic))
+	failures = make([]Failure, 0, len(generic))
 	for _, item := range generic {
-		failures = append(failures, artifacts.Failure{
+		failures = append(failures, Failure{
 			Story:    fmt.Sprint(item["Story"]),
 			Scenario: fmt.Sprint(item["Scenario"]),
 			Viewport: fmt.Sprint(item["Viewport"]),
@@ -82,7 +88,7 @@ func decodeFailures(data []byte) ([]artifacts.Failure, error) {
 	return failures, nil
 }
 
-func selectChangeForFailure(plan *Plan, failure artifacts.Failure) {
+func selectChangeForFailure(plan *Plan, failure Failure) {
 	msg := strings.ToLower(strings.Join([]string{failure.Step, failure.Error}, " "))
 	switch {
 	case strings.Contains(msg, "unsupported story step") || strings.Contains(msg, "unknown fixture"):
@@ -104,7 +110,7 @@ func selectChangeForFailure(plan *Plan, failure artifacts.Failure) {
 			"pkg/e2e/vamos",
 			"typed Vamos locator/readiness helper drift",
 		)
-	case strings.Contains(msg, "timeout") || strings.Contains(msg, "networkidle") || strings.Contains(msg, "browser"):
+	case strings.Contains(msg, "timeout") || strings.Contains(msg, "networkidle") || strings.Contains(msg, "browser") || strings.Contains(msg, "artifact"):
 		addChange(
 			plan,
 			FixScopeDatastarUI,
