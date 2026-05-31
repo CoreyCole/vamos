@@ -13,164 +13,126 @@ const planDocsReviewPath = "thoughts/creative-mode-agent/plans/2026-05-20_23-02-
 const planWorkspacePath = "thoughts/creative-mode-agent/plans/2026-05-20_23-02-59_vamos-e2e-story-playwright-go"
 
 func TestDurableSessionChat_QrspiPlanWorkspaceChatUpdatesVerificationArtifactThroughPiAndTemporal(t *testing.T) {
-	spec.Feature("Durable session chat").
-		Scenario("qrspi plan workspace chat updates verification artifact through pi and temporal").
-		Given(
-			vamos.AuthenticatedAs("playwright@localhost"),
-			vamos.OpenPlanWorkspace(planWorkspacePath),
-			vamos.OpenWorkspaceChat("current"),
-			vamos.RememberFileHash(planDocsReviewPath),
-		).
-		When(
-			vamos.SendPiDocsReviewPrompt("VAMOS_E2E_PLAN_DOCS_REVIEW_OK", planDocsReviewPath),
-			vamos.WaitForChatMarker("VAMOS_E2E_PLAN_DOCS_REVIEW_OK"),
-		).
-		Then(
-			vamos.TranscriptContains("VAMOS_E2E_PLAN_DOCS_REVIEW_OK"),
-			vamos.ExpectFileHashChanged(planDocsReviewPath),
-			vamos.ExpectPiReviewFileSections(planDocsReviewPath),
-			vamos.ExpectOnlyFileChanged(planDocsReviewPath),
-			vamos.ReloadChat(),
-			vamos.TranscriptContains("VAMOS_E2E_PLAN_DOCS_REVIEW_OK"),
-			vamos.ReopenCurrentChat(),
-			vamos.TranscriptContains("VAMOS_E2E_PLAN_DOCS_REVIEW_OK"),
-		).
-		Run(t)
+	spec.Story(t, "durable session chat qrspi plan workspace chat updates verification artifact through pi and temporal").
+		App(vamos.App()).
+		As(vamos.Robot).
+		Do(vamos.OpenPlanWorkspace(planWorkspacePath)).
+		Do(vamos.OpenWorkspaceChat("current")).
+		Do(vamos.RememberFileHash(planDocsReviewPath)).
+		Do(vamos.SendPiDocsReviewPrompt("VAMOS_E2E_PLAN_DOCS_REVIEW_OK", planDocsReviewPath)).
+		Expect(vamos.WaitForChatMarker("VAMOS_E2E_PLAN_DOCS_REVIEW_OK")).
+		Expect(vamos.TranscriptContains("VAMOS_E2E_PLAN_DOCS_REVIEW_OK")).
+		Expect(vamos.ExpectFileHashChanged(planDocsReviewPath)).
+		Expect(vamos.ExpectPiReviewFileSections(planDocsReviewPath)).
+		Expect(vamos.ExpectOnlyFileChanged(planDocsReviewPath)).
+		Do(vamos.ReloadChat()).
+		Expect(vamos.TranscriptContains("VAMOS_E2E_PLAN_DOCS_REVIEW_OK")).
+		Do(vamos.ReopenCurrentChat()).
+		Expect(vamos.TranscriptContains("VAMOS_E2E_PLAN_DOCS_REVIEW_OK")).
+		Run()
 }
 
 func TestDurableSessionChat_FreeformChatFixtureReplaysDurableTranscript(t *testing.T) {
-	spec.Feature("Durable session chat").
-		Scenario("freeform chat fixture replays durable transcript").
-		Given(
-			vamos.AuthenticatedAs("playwright@localhost"),
-			vamos.WorkspaceFixture(fixtures.DurableFreeformFixture).Build(),
-			vamos.OpenFreeformChatFixture(fixtures.DurableFreeformFixture),
-		).
-		Then(
-			vamos.TranscriptContains("VAMOS_E2E_FREEFORM_REPLAY_OK"),
-			vamos.ReloadChat(),
-			vamos.TranscriptContains("VAMOS_E2E_FREEFORM_REPLAY_OK"),
-			vamos.ReopenCurrentChat(),
-			vamos.TranscriptContains("VAMOS_E2E_FREEFORM_REPLAY_OK"),
-		).
-		Run(t)
+	spec.Story(t, "durable session chat freeform chat fixture replays durable transcript").
+		App(vamos.App()).
+		As(vamos.Robot).
+		With(vamos.WorkspaceFixture(fixtures.DurableFreeformFixture)).
+		Do(vamos.OpenFreeformChatFixture(fixtures.DurableFreeformFixture)).
+		Expect(vamos.TranscriptContains("VAMOS_E2E_FREEFORM_REPLAY_OK")).
+		Do(vamos.ReloadChat()).
+		Expect(vamos.TranscriptContains("VAMOS_E2E_FREEFORM_REPLAY_OK")).
+		Do(vamos.ReopenCurrentChat()).
+		Expect(vamos.TranscriptContains("VAMOS_E2E_FREEFORM_REPLAY_OK")).
+		Run()
 }
 
 func TestDurableSessionChat_FreeformChatStartedFromThoughtsRootSurvivesRefreshAndResume(t *testing.T) {
-	spec.Feature("Durable session chat").
-		Scenario("freeform chat started from thoughts root survives refresh and resume").
-		Given(
-			vamos.AuthenticatedAs("playwright@localhost"),
-			vamos.OpenThoughtsRootChat("current"),
-		).
-		When(
-			vamos.SendFreeformChatPrompt("VAMOS_E2E_FREEFORM_REFRESH_FIRST"),
-			vamos.WaitForLatestFreeformChatRunCompletion("current"),
-		).
-		Then(
-			vamos.ReloadChat(),
-			vamos.TranscriptContains("VAMOS_E2E_FREEFORM_REFRESH_FIRST"),
-			vamos.SendFreeformChatPrompt("VAMOS_E2E_FREEFORM_REFRESH_SECOND"),
-			vamos.WaitForLatestFreeformChatRunCompletion("current"),
-			vamos.ReloadChat(),
-			vamos.TranscriptContains("VAMOS_E2E_FREEFORM_REFRESH_SECOND"),
-		).
-		Run(t)
+	spec.Story(t, "durable session chat freeform chat started from thoughts root survives refresh and resume").
+		App(vamos.App()).
+		As(vamos.Robot).
+		Do(vamos.OpenThoughtsRootChat("current")).
+		Do(vamos.SendFreeformChatPrompt("VAMOS_E2E_FREEFORM_REFRESH_FIRST")).
+		Do(vamos.WaitForLatestFreeformChatRunCompletion("current")).
+		Do(vamos.ReloadChat()).
+		Expect(vamos.TranscriptContains("VAMOS_E2E_FREEFORM_REFRESH_FIRST")).
+		Do(vamos.SendFreeformChatPrompt("VAMOS_E2E_FREEFORM_REFRESH_SECOND")).
+		Do(vamos.WaitForLatestFreeformChatRunCompletion("current")).
+		Do(vamos.ReloadChat()).
+		Expect(vamos.TranscriptContains("VAMOS_E2E_FREEFORM_REFRESH_SECOND")).
+		Run()
 }
 
 func TestDurableSessionChat_FreeformChatAdoptsQrspiProjectMetadata(t *testing.T) {
-	spec.Feature("Durable session chat").
-		Scenario("freeform chat adopts qrspi project metadata").
-		Given(
-			vamos.AuthenticatedAs("playwright@localhost"),
-			vamos.SeedProjectPlanWorkspaces("example.com/alpha/app", "example.com/beta/app"),
-			vamos.OpenThoughtsRootChat("current"),
-			vamos.SeedLatestFreeformChatQRSPIProjectResult("example.com/alpha/app"),
-		).
-		Then(
-			vamos.ExpectThreadMetadataProject("example.com/alpha/app"),
-			vamos.ReloadChat(),
-			vamos.ExpectThreadMetadataProject("example.com/alpha/app"),
-		).
-		Run(t)
+	spec.Story(t, "durable session chat freeform chat adopts qrspi project metadata").
+		App(vamos.App()).
+		As(vamos.Robot).
+		Do(vamos.SeedProjectPlanWorkspaces("example.com/alpha/app", "example.com/beta/app")).
+		Do(vamos.OpenThoughtsRootChat("current")).
+		Do(vamos.SeedLatestFreeformChatQRSPIProjectResult("example.com/alpha/app")).
+		Expect(vamos.ExpectThreadMetadataProject("example.com/alpha/app")).
+		Do(vamos.ReloadChat()).
+		Expect(vamos.ExpectThreadMetadataProject("example.com/alpha/app")).
+		Run()
 }
 
 func TestDurableSessionChat_AnchorDocumentNavigationPreservesEmbeddedChat(t *testing.T) {
-	spec.Feature("Durable session chat").
-		Scenario("anchor document navigation preserves embedded chat").
-		Given(
-			vamos.AuthenticatedAs("playwright@localhost"),
-			vamos.WorkspaceFixture(fixtures.DurableFreeformFixture).Build(),
-			vamos.OpenFreeformChatFixture(fixtures.DurableFreeformFixture),
-		).
-		When(vamos.FollowFirstSidebarDocumentLink()).
-		Then(
-			spec.URLContains("context=chat"),
-			vamos.TranscriptContains("VAMOS_E2E_FREEFORM_REPLAY_OK"),
-		).
-		Run(t)
+	spec.Story(t, "durable session chat anchor document navigation preserves embedded chat").
+		App(vamos.App()).
+		As(vamos.Robot).
+		With(vamos.WorkspaceFixture(fixtures.DurableFreeformFixture)).
+		Do(vamos.OpenFreeformChatFixture(fixtures.DurableFreeformFixture)).
+		Do(vamos.FollowFirstSidebarDocumentLink()).
+		Expect(spec.ExpectStep(spec.URLContains("context=chat"))).
+		Expect(vamos.TranscriptContains("VAMOS_E2E_FREEFORM_REPLAY_OK")).
+		Run()
 }
 
 func TestDurableSessionChat_WorkspaceDocumentWithoutChatParamsRestoresWorkspaceChat(t *testing.T) {
-	spec.Feature("Durable session chat").
-		Scenario("workspace document without chat params restores workspace chat").
-		Given(
-			vamos.AuthenticatedAs("playwright@localhost"),
-			vamos.SeedLatestWorkspaceChats("VAMOS_E2E_WORKSPACE_DOC_RESTORE", "VAMOS_E2E_WORKSPACE_UNUSED"),
-			vamos.OpenWorkspaceDocumentWithoutChatParams("A"),
-		).
-		Then(vamos.TranscriptContains("VAMOS_E2E_WORKSPACE_DOC_RESTORE")).
-		Run(t)
+	spec.Story(t, "durable session chat workspace document without chat params restores workspace chat").
+		App(vamos.App()).
+		As(vamos.Robot).
+		Do(vamos.SeedLatestWorkspaceChats("VAMOS_E2E_WORKSPACE_DOC_RESTORE", "VAMOS_E2E_WORKSPACE_UNUSED")).
+		Do(vamos.OpenWorkspaceDocumentWithoutChatParams("A")).
+		Expect(vamos.TranscriptContains("VAMOS_E2E_WORKSPACE_DOC_RESTORE")).
+		Run()
 }
 
 func TestDurableSessionChat_RootThoughtsRestoresLatestFreeformChat(t *testing.T) {
-	spec.Feature("Durable session chat").
-		Scenario("root thoughts restores latest freeform chat").
-		Given(
-			vamos.AuthenticatedAs("playwright@localhost"),
-			vamos.WorkspaceFixture(fixtures.DurableFreeformFixture).Build(),
-			vamos.OpenFreeformChatFixture(fixtures.DurableFreeformFixture),
-			vamos.OpenThoughtsRootChatContext("current"),
-		).
-		Then(
-			vamos.TranscriptContains("VAMOS_E2E_FREEFORM_REPLAY_OK"),
-			vamos.ExpectConsoleClean(),
-		).
-		Run(t)
+	spec.Story(t, "durable session chat root thoughts restores latest freeform chat").
+		App(vamos.App()).
+		As(vamos.Robot).
+		With(vamos.WorkspaceFixture(fixtures.DurableFreeformFixture)).
+		Do(vamos.OpenFreeformChatFixture(fixtures.DurableFreeformFixture)).
+		Do(vamos.OpenThoughtsRootChatContext("current")).
+		Expect(vamos.TranscriptContains("VAMOS_E2E_FREEFORM_REPLAY_OK")).
+		Expect(vamos.Console.Clean()).
+		Run()
 }
 
 func TestDurableSessionChat_AgentChatReloadScrollsTranscriptToBottom(t *testing.T) {
-	spec.Feature("Durable session chat").
-		Scenario("agent chat reload scrolls transcript to bottom").
-		Given(
-			vamos.AuthenticatedAs("playwright@localhost"),
-			vamos.WorkspaceFixture(fixtures.DurableFreeformFixture).Build(),
-			vamos.OpenFreeformChatFixture(fixtures.DurableFreeformFixture),
-		).
-		Then(
-			vamos.ReloadChat(),
-			vamos.TranscriptContains("VAMOS_E2E_FREEFORM_REPLAY_OK"),
-			spec.Visible(vamos.TranscriptBottom()),
-		).
-		Run(t)
+	spec.Story(t, "durable session chat agent chat reload scrolls transcript to bottom").
+		App(vamos.App()).
+		As(vamos.Robot).
+		With(vamos.WorkspaceFixture(fixtures.DurableFreeformFixture)).
+		Do(vamos.OpenFreeformChatFixture(fixtures.DurableFreeformFixture)).
+		Do(vamos.ReloadChat()).
+		Expect(vamos.TranscriptContains("VAMOS_E2E_FREEFORM_REPLAY_OK")).
+		Expect(spec.ExpectStep(spec.Visible(vamos.TranscriptBottom()))).
+		Run()
 }
 
 func TestDurableSessionChat_WorkspaceSwitchingRestoresEachWorkspaceLatestChat(t *testing.T) {
-	spec.Feature("Durable session chat").
-		Scenario("workspace switching restores each workspace latest chat").
-		Given(
-			vamos.AuthenticatedAs("playwright@localhost"),
-			vamos.SeedLatestWorkspaceChats("VAMOS_E2E_WORKSPACE_A_LATEST", "VAMOS_E2E_WORKSPACE_B_LATEST"),
-		).
-		Then(
-			vamos.OpenSeededWorkspaceChat("A"),
-			vamos.TranscriptContains("VAMOS_E2E_WORKSPACE_A_LATEST"),
-			vamos.OpenSeededWorkspaceChat("B"),
-			vamos.TranscriptContains("VAMOS_E2E_WORKSPACE_B_LATEST"),
-			vamos.OpenSeededWorkspaceChat("A"),
-			vamos.TranscriptContains("VAMOS_E2E_WORKSPACE_A_LATEST"),
-			vamos.OpenSeededWorkspaceChat("B"),
-			vamos.TranscriptContains("VAMOS_E2E_WORKSPACE_B_LATEST"),
-		).
-		Run(t)
+	spec.Story(t, "durable session chat workspace switching restores each workspace latest chat").
+		App(vamos.App()).
+		As(vamos.Robot).
+		Do(vamos.SeedLatestWorkspaceChats("VAMOS_E2E_WORKSPACE_A_LATEST", "VAMOS_E2E_WORKSPACE_B_LATEST")).
+		Do(vamos.OpenSeededWorkspaceChat("A")).
+		Expect(vamos.TranscriptContains("VAMOS_E2E_WORKSPACE_A_LATEST")).
+		Do(vamos.OpenSeededWorkspaceChat("B")).
+		Expect(vamos.TranscriptContains("VAMOS_E2E_WORKSPACE_B_LATEST")).
+		Do(vamos.OpenSeededWorkspaceChat("A")).
+		Expect(vamos.TranscriptContains("VAMOS_E2E_WORKSPACE_A_LATEST")).
+		Do(vamos.OpenSeededWorkspaceChat("B")).
+		Expect(vamos.TranscriptContains("VAMOS_E2E_WORKSPACE_B_LATEST")).
+		Run()
 }

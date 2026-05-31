@@ -10,80 +10,62 @@ import (
 )
 
 func TestThoughtsWorkbench_RootOpensDocumentWorkbenchWithChat(t *testing.T) {
-	spec.Feature("Thoughts workbench").
-		Scenario("root opens document workbench with chat").
-		Given(
-			vamos.AuthenticatedAs("playwright@localhost"),
-			vamos.WorkspaceFixture("thoughts-workbench.basic").Build(),
-			spec.Visit("/"),
-			vamos.WaitForFeatureReady("thoughts.workbench"),
-		).
-		Then(
-			spec.Visible(vamos.Sidebar()),
-			spec.Visible(vamos.RightRailChatTab()),
-			spec.TextAbsent("Session history"),
-			vamos.ExpectConsoleClean(),
-		).
-		Run(t)
+	spec.Story(t, "thoughts workbench root opens document workbench with chat").
+		App(vamos.App()).
+		As(vamos.Robot).
+		With(vamos.WorkspaceFixture("thoughts-workbench.basic")).
+		Visit(vamos.Pages.Root()).
+		Expect(vamos.Thoughts.Ready()).
+		Expect(vamos.Thoughts.SidebarVisible()).
+		Expect(vamos.Thoughts.RightRailChatTabVisible()).
+		Expect(spec.ExpectStep(spec.TextAbsent("Session history"))).
+		Expect(vamos.Console.Clean()).
+		Run()
 }
 
 func TestThoughtsWorkbench_DocumentSidebarNavigationUsesNormalDocumentLinks(t *testing.T) {
-	spec.Feature("Thoughts workbench").
-		Scenario("document sidebar navigation uses normal document links").
-		Given(
-			vamos.AuthenticatedAs("playwright@localhost"),
-			vamos.WorkspaceFixture("thoughts-workbench.basic").Build(),
-			spec.Visit("/thoughts/example.md?context=chat&thread=th_1"),
-			vamos.WaitForFeatureReady("thoughts.workbench"),
-		).
-		When(vamos.FollowFirstSidebarDocumentLink()).
-		Then(
-			spec.URLContains("context=chat"),
-			spec.URLContains("thread=th_1"),
-			spec.Visible(vamos.CenterPane()),
-		).
-		Run(t)
+	spec.Story(t, "thoughts workbench document sidebar navigation uses normal document links").
+		App(vamos.App()).
+		As(vamos.Robot).
+		With(vamos.WorkspaceFixture("thoughts-workbench.basic")).
+		Visit(vamos.Pages.Path("/thoughts/example.md?context=chat&thread=th_1")).
+		Expect(vamos.Thoughts.Ready()).
+		Do(vamos.FollowFirstSidebarDocumentLink()).
+		Expect(spec.ExpectStep(spec.URLContains("context=chat"))).
+		Expect(spec.ExpectStep(spec.URLContains("thread=th_1"))).
+		Expect(vamos.Thoughts.CenterPaneVisible()).
+		Run()
 }
 
 func TestThoughtsWorkbench_BreadcrumbParentNavigationWorks(t *testing.T) {
-	spec.Feature("Thoughts workbench").
-		Scenario("breadcrumb parent navigation works").
-		Given(
-			vamos.AuthenticatedAs("playwright@localhost"),
-			vamos.WorkspaceFixture("thoughts-workbench.basic").Build(),
-			spec.Visit("/thoughts/owner/plans/demo/outline.md?context=chat&thread=th_1"),
-			vamos.WaitForFeatureReady("thoughts.workbench"),
-		).
-		When(vamos.FollowFirstBreadcrumbLink()).
-		Then(
-			spec.URLContains("/thoughts/"),
-			spec.Visible(vamos.CenterPane()),
-		).
-		Run(t)
+	spec.Story(t, "thoughts workbench breadcrumb parent navigation works").
+		App(vamos.App()).
+		As(vamos.Robot).
+		With(vamos.WorkspaceFixture("thoughts-workbench.basic")).
+		Visit(vamos.Pages.Path("/thoughts/owner/plans/demo/outline.md?context=chat&thread=th_1")).
+		Expect(vamos.Thoughts.Ready()).
+		Do(vamos.FollowFirstBreadcrumbLink()).
+		Expect(spec.ExpectStep(spec.URLContains("/thoughts/"))).
+		Expect(vamos.Thoughts.CenterPaneVisible()).
+		Run()
 }
 
 func TestThoughtsWorkbench_WorkbenchReloadPreservesDbLayoutState(t *testing.T) {
-	spec.Feature("Thoughts workbench").
-		Scenario("workbench reload preserves db layout state").
-		Given(
-			vamos.AuthenticatedAs("playwright@localhost"),
-			vamos.WorkspaceFixture("thoughts-workbench.basic").Build(),
-			spec.Visit("/thoughts/example.md?context=chat"),
-			vamos.WaitForFeatureReady("thoughts.workbench"),
-		).
-		When(
-			vamos.SwitchTab("thoughts.sidebar.workspaces"),
-			vamos.SwitchTab("thoughts.rightRail.chat"),
-			vamos.ToggleRegion("thoughts.workbench.sidebar"),
-			vamos.FollowFirstSidebarDocumentLink(),
-		).
-		Then(
-			spec.Visible(vamos.Selector("thoughts.sidebar.workspaces")),
-			spec.Visible(vamos.RightRailChatTab()),
-			spec.Visible(vamos.CenterPane()),
-			vamos.ExpectInactiveTabPanelsHidden(),
-		).
-		Run(t)
+	spec.Story(t, "thoughts workbench reload preserves db layout state").
+		App(vamos.App()).
+		As(vamos.Robot).
+		With(vamos.WorkspaceFixture("thoughts-workbench.basic")).
+		Visit(vamos.Pages.Path("/thoughts/example.md?context=chat")).
+		Expect(vamos.Thoughts.Ready()).
+		Do(vamos.SwitchTab("thoughts.sidebar.workspaces")).
+		Do(vamos.SwitchTab("thoughts.rightRail.chat")).
+		Do(vamos.ToggleRegion("thoughts.workbench.sidebar")).
+		Do(vamos.FollowFirstSidebarDocumentLink()).
+		Expect(spec.ExpectStep(spec.Visible(vamos.Thoughts.WorkspacesTab()))).
+		Expect(vamos.Thoughts.RightRailChatTabVisible()).
+		Expect(vamos.Thoughts.CenterPaneVisible()).
+		Expect(vamos.ExpectInactiveTabPanelsHidden()).
+		Run()
 }
 
 func TestThoughtsWorkbench_WorkbenchRegionsRemainUsableAcrossViewportClassesMobile(t *testing.T) {
@@ -130,43 +112,35 @@ func TestThoughtsWorkbench_SavedMobileActiveStateDoesNotPinDesktopRefreshDesktop
 	runSavedMobileActiveStateDoesNotPinDesktopRefresh(t, duiruntime.ViewportDesktopFull)
 }
 
-func runWorkbenchRegionsRemainUsable(t *testing.T, viewport duiruntime.ViewportClass, path string) {
+func runWorkbenchRegionsRemainUsable(t *testing.T, viewport duiruntime.ViewportClass, p string) {
 	t.Helper()
-	spec.Feature("Thoughts workbench").
-		Scenario("workbench regions remain usable across viewport classes").
+	spec.Story(t, "thoughts workbench regions remain usable across viewport classes").
+		App(vamos.App()).
 		Viewport(viewport).
-		Given(
-			vamos.AuthenticatedAs("playwright@localhost"),
-			vamos.WorkspaceFixture("thoughts-workbench.basic").Build(),
-			spec.Visit(path),
-			vamos.WaitForFeatureReady("thoughts.workbench"),
-		).
-		Then(
-			spec.Visible(vamos.Sidebar()),
-			spec.Visible(vamos.CenterPane()),
-			spec.Visible(vamos.RightRail()),
-			spec.TextAbsent("Session history"),
-			vamos.ExpectConsoleClean(),
-		).
-		Run(t)
+		As(vamos.Robot).
+		With(vamos.WorkspaceFixture("thoughts-workbench.basic")).
+		Visit(vamos.Pages.Path(p)).
+		Expect(vamos.Thoughts.Ready()).
+		Expect(vamos.Thoughts.SidebarVisible()).
+		Expect(vamos.Thoughts.CenterPaneVisible()).
+		Expect(vamos.Thoughts.RightRailVisible()).
+		Expect(spec.ExpectStep(spec.TextAbsent("Session history"))).
+		Expect(vamos.Console.Clean()).
+		Run()
 }
 
 func runSavedMobileActiveStateDoesNotPinDesktopRefresh(t *testing.T, viewport duiruntime.ViewportClass) {
 	t.Helper()
-	spec.Feature("Thoughts workbench").
-		Scenario("saved mobile active state does not pin desktop refresh").
+	spec.Story(t, "thoughts workbench saved mobile active state does not pin desktop refresh").
+		App(vamos.App()).
 		Viewport(viewport).
-		Given(
-			vamos.AuthenticatedAs("playwright@localhost"),
-			vamos.WorkspaceFixture("thoughts-workbench.basic").Build(),
-			spec.Visit("/thoughts/example.md?context=chat"),
-			vamos.WaitForFeatureReady("thoughts.workbench"),
-		).
-		Then(
-			spec.Visible(vamos.Sidebar()),
-			spec.Visible(vamos.CenterPane()),
-			spec.Visible(vamos.RightRail()),
-			vamos.ExpectConsoleClean(),
-		).
-		Run(t)
+		As(vamos.Robot).
+		With(vamos.WorkspaceFixture("thoughts-workbench.basic")).
+		Visit(vamos.Pages.Path("/thoughts/example.md?context=chat")).
+		Expect(vamos.Thoughts.Ready()).
+		Expect(vamos.Thoughts.SidebarVisible()).
+		Expect(vamos.Thoughts.CenterPaneVisible()).
+		Expect(vamos.Thoughts.RightRailVisible()).
+		Expect(vamos.Console.Clean()).
+		Run()
 }

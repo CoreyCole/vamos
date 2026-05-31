@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	duiruntime "github.com/coreycole/datastarui/e2e/runtime"
+	"github.com/coreycole/datastarui/e2e/spec"
 
 	"github.com/CoreyCole/vamos/pkg/e2e/fixtures"
 )
@@ -23,11 +24,10 @@ func TestStoreFixtureRoundTripsThroughRuntimeMemory(t *testing.T) {
 	}
 }
 
-func TestPageHelpersReturnConfiguredKeys(t *testing.T) {
-	if ThoughtsRootPage() != "ThoughtsRoot" {
-		t.Fatalf("ThoughtsRootPage()=%q", ThoughtsRootPage())
-	}
-	if ThoughtsWorkbenchPage() != "ThoughtsWorkbench" {
-		t.Fatalf("ThoughtsWorkbenchPage()=%q", ThoughtsWorkbenchPage())
-	}
+func TestTypedHelpersSatisfyDatastarUIInterfaces(t *testing.T) {
+	var _ spec.Actor = Robot
+	var _ spec.Fixture = WorkspaceFixture("thoughts-workbench.basic")
+	var _ spec.Page = Thoughts.Page()
+	var _ spec.Expectation = Thoughts.Ready()
+	var _ spec.Expectation = Console.Clean()
 }
