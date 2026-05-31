@@ -224,7 +224,7 @@ func selectedViewportEnv(cfg RunConfig) string {
 func BuildGoTestArgs(cfg RunConfig, appCfg duiappconfig.Config) []string {
 	runPackage := strings.TrimSpace(appCfg.RunPackage)
 	if runPackage == "" {
-		runPackage = "./pkg/e2e/generated"
+		runPackage = "./pkg/e2e/tests"
 	}
 	args := []string{"test", runPackage}
 	if cfg.Story != "" || cfg.Scenario != "" {

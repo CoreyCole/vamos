@@ -41,7 +41,7 @@ func TestBuildGoTestArgs(t *testing.T) {
 	got := BuildGoTestArgs(RunConfig{Story: "thoughts-workbench", Scenario: "root-opens"}, duiappconfig.Config{})
 	want := []string{
 		"test",
-		"./pkg/e2e/generated",
+		"./pkg/e2e/tests",
 		"-run",
 		"ThoughtsWorkbench.*RootOpens",
 	}
@@ -69,9 +69,9 @@ func TestSelectedViewportEnvPreservesExplicitCommaList(t *testing.T) {
 func TestEnsureSelectedTestsExistRejectsNoMatch(t *testing.T) {
 	err := ensureSelectedTestsExist(context.Background(), []string{
 		"test",
-		"./pkg/e2e/generated",
+		"./pkg/e2e/tests",
 		"-run",
-		"DefinitelyNoGeneratedE2ETestMatchesThis",
+		"DefinitelyNoGoStoryE2ETestMatchesThis",
 	}, ".")
 	if err == nil || !strings.Contains(err.Error(), "no E2E tests matched") {
 		t.Fatalf("ensureSelectedTestsExist() error = %v", err)

@@ -3,9 +3,7 @@ package e2ecmd
 import "github.com/spf13/cobra"
 
 func NewCommand() *cobra.Command {
-	cmd := &cobra.Command{Use: "e2e", Short: "Story-driven E2E workflows"}
-	cmd.AddCommand(NewCheckCommand())
-	cmd.AddCommand(NewGenerateCommand())
+	cmd := &cobra.Command{Use: "e2e", Short: "Go Story E2E workflows"}
 	cmd.AddCommand(NewRunCommand())
 	cmd.AddCommand(NewReviewCommand())
 	cmd.AddCommand(NewFixCommand())

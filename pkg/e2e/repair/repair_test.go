@@ -94,9 +94,9 @@ func TestValidatePlanAllowsBoundedPaths(t *testing.T) {
 	plan := Plan{Changes: []Change{
 		{Scope: FixScopeSelectors, Path: "pkg/e2e/selectors", Why: "selector drift"},
 		{
-			Scope: FixScopeGenerated,
-			Path:  "pkg/e2e/generated",
-			Why:   "freshen generated tests",
+			Scope: FixScopeTests,
+			Path:  "pkg/e2e/tests",
+			Why:   "repair authored Go Story test",
 		},
 	}}
 	if err := ValidatePlan(plan); err != nil {

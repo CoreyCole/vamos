@@ -18,14 +18,14 @@ This is the standard Vamos verification entrypoint. `/q-verify` must read this f
      go test ./server/config ./server/services/workspaces ./server/services/agentchat ./cmd/build-agents/internal/build
      ```
 
-1. **Story validation and generated E2E freshness**
+1. **Go Story E2E listing and package tests**
 
-   - Required when touching story specs, selectors, steps, generated tests, Agent Chat, Thoughts workbench, route state, or browser-facing behavior:
+   - Required when touching Go Story tests, selectors, steps, Vamos E2E helpers, Agent Chat, Thoughts workbench, route state, or browser-facing behavior:
      ```bash
-     go run ./cmd/vamos-runtime e2e check
-     go run ./cmd/vamos-runtime e2e generate --check
+     go test ./pkg/e2e/tests -list Test
+     go test ./pkg/e2e/vamos ./pkg/e2e/tests -run '^$'
      ```
-   - `e2e check` is static validation only. It does not run a browser or prove app behavior.
+   - Listing/package tests are static checks only. They do not run a browser or prove app behavior.
 
 1. **Workspace/public-host readiness**
 

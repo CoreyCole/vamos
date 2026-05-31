@@ -818,7 +818,7 @@ Run nonce: %s
 Update only this file:
 %s
 
-Do not edit source code, generated tests, design.md, outline.md, plan.md, or docs. Only update the artifact file above.
+Do not edit source code, Go Story tests, design.md, outline.md, plan.md, or docs. Only update the artifact file above.
 
 Ensure the file contains:
 # E2E Pi Plan Docs Review

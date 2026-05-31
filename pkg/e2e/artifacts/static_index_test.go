@@ -10,7 +10,7 @@ func TestWriteStaticIndexProducesPortableHTML(t *testing.T) {
 	runDir := t.TempDir()
 	manifest := RunManifest{
 		ID:             "run-1",
-		Command:        "go test ./pkg/e2e/generated",
+		Command:        "go test ./pkg/e2e/tests",
 		BaseURL:        "http://localhost:4200",
 		ViewportFilter: "mobile,desktop-full",
 		RepoCommit:     "abc123",

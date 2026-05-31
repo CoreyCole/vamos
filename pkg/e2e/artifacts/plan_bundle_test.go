@@ -38,7 +38,7 @@ func TestExportPlanBundlePreservesStructuredArtifactHierarchy(t *testing.T) {
 		PlanBundleOptions{
 			PlanDir:     planDir,
 			RunDir:      runDir,
-			Command:     "go test ./pkg/e2e/generated",
+			Command:     "go test ./pkg/e2e/tests",
 			IncludeHTML: true,
 		},
 	)
@@ -61,7 +61,7 @@ func TestExportPlanBundlePreservesStructuredArtifactHierarchy(t *testing.T) {
 	}
 	index := string(data)
 	for _, want := range []string{
-		"`go test ./pkg/e2e/generated`",
+		"`go test ./pkg/e2e/tests`",
 		"[`manifest.json`](manifest.json)",
 		"[`failures.json`](failures.json)",
 		"[`index.html`](index.html)",

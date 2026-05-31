@@ -35,7 +35,7 @@ func RunFix(ctx context.Context, cfg FixConfig) error {
 			repair.FixScopeSelectors,
 			repair.FixScopeSteps,
 			repair.FixScopeRuntime,
-			repair.FixScopeGenerated,
+			repair.FixScopeTests,
 		},
 	})
 	if err != nil {

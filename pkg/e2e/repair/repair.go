@@ -16,7 +16,7 @@ const (
 	FixScopeSelectors FixScope = "selectors"
 	FixScopeSteps     FixScope = "steps"
 	FixScopeRuntime   FixScope = "runtime"
-	FixScopeGenerated FixScope = "generated"
+	FixScopeTests     FixScope = "tests"
 )
 
 type Request struct {
@@ -91,12 +91,12 @@ func selectChangeForFailure(plan *Plan, failure artifacts.Failure) {
 			plan.NeedsHuman,
 			"new story language or fixture requires explicit story/step design",
 		)
-	case strings.Contains(msg, "generated file") && strings.Contains(msg, "stale"):
+	case strings.Contains(msg, "go story") || strings.Contains(msg, "test"):
 		addChange(
 			plan,
-			FixScopeGenerated,
-			"pkg/e2e/generated",
-			"regenerate checked-in tests from canonical stories",
+			FixScopeTests,
+			"pkg/e2e/tests",
+			"authored Go Story test needs bounded repair",
 		)
 	case strings.Contains(msg, "unknown selector") || strings.Contains(msg, "not visible") || strings.Contains(msg, "locator") || strings.Contains(msg, "selector"):
 		addChange(

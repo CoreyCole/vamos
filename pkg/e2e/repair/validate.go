@@ -11,11 +11,10 @@ var allowedScopes = map[FixScope]bool{
 	FixScopeSelectors: true,
 	FixScopeSteps:     true,
 	FixScopeRuntime:   true,
-	FixScopeGenerated: true,
+	FixScopeTests:     true,
 }
 
 var forbiddenPathPrefixes = []string{
-	"docs/features",
 	"server",
 	"static",
 }
@@ -24,7 +23,7 @@ var allowedPathPrefixesByScope = map[FixScope][]string{
 	FixScopeSelectors: {"pkg/e2e/selectors"},
 	FixScopeSteps:     {"pkg/e2e/steps"},
 	FixScopeRuntime:   {"pkg/e2e/runtime"},
-	FixScopeGenerated: {"pkg/e2e/generated"},
+	FixScopeTests:     {"pkg/e2e/tests", "pkg/e2e/vamos"},
 }
 
 func ValidatePlan(plan Plan) error {

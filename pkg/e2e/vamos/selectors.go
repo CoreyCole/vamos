@@ -2,6 +2,7 @@ package vamos
 
 import "github.com/coreycole/datastarui/e2e/spec"
 
+func Selector(key string) spec.Locator { return spec.SelectorAlias(key) }
 func Feature(name string) spec.Locator { return spec.SelectorAlias("feature." + name) }
 func Sidebar() spec.Locator            { return spec.SelectorAlias("thoughts.workbench.sidebar") }
 func CenterPane() spec.Locator         { return spec.SelectorAlias("thoughts.workbench.center") }
