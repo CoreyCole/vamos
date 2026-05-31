@@ -32,9 +32,8 @@ func RunFix(ctx context.Context, cfg FixConfig) error {
 		RunManifestPath: manifestPathForRun(cfg.RunDir),
 		FailuresPath:    filepath.Join(cfg.RunDir, "failures.json"),
 		AllowedScopes: []repair.FixScope{
-			repair.FixScopeSelectors,
-			repair.FixScopeSteps,
-			repair.FixScopeRuntime,
+			repair.FixScopeDatastarUI,
+			repair.FixScopeVamosHelpers,
 			repair.FixScopeTests,
 		},
 	})

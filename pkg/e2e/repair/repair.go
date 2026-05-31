@@ -13,10 +13,9 @@ import (
 type FixScope string
 
 const (
-	FixScopeSelectors FixScope = "selectors"
-	FixScopeSteps     FixScope = "steps"
-	FixScopeRuntime   FixScope = "runtime"
-	FixScopeTests     FixScope = "tests"
+	FixScopeDatastarUI   FixScope = "datastarui"
+	FixScopeVamosHelpers FixScope = "vamos_helpers"
+	FixScopeTests        FixScope = "tests"
 )
 
 type Request struct {
@@ -101,30 +100,30 @@ func selectChangeForFailure(plan *Plan, failure artifacts.Failure) {
 	case strings.Contains(msg, "unknown selector") || strings.Contains(msg, "not visible") || strings.Contains(msg, "locator") || strings.Contains(msg, "selector"):
 		addChange(
 			plan,
-			FixScopeSelectors,
-			"pkg/e2e/selectors",
-			"selector drift from E2E failure",
+			FixScopeVamosHelpers,
+			"pkg/e2e/vamos",
+			"typed Vamos locator/readiness helper drift",
 		)
 	case strings.Contains(msg, "timeout") || strings.Contains(msg, "networkidle") || strings.Contains(msg, "browser"):
 		addChange(
 			plan,
-			FixScopeRuntime,
-			"pkg/e2e/runtime",
-			"runtime/browser wait or artifact behavior needs deterministic helper repair",
+			FixScopeDatastarUI,
+			"../datastarui/e2e",
+			"generic DatastarUI runtime/artifact behavior needs repair",
 		)
 	case strings.Contains(msg, "step") || strings.Contains(msg, "expected"):
 		addChange(
 			plan,
-			FixScopeSteps,
-			"pkg/e2e/steps",
-			"curated step helper behavior needs repair",
+			FixScopeVamosHelpers,
+			"pkg/e2e/vamos",
+			"typed Vamos action/expectation helper needs repair",
 		)
 	default:
 		addChange(
 			plan,
-			FixScopeRuntime,
-			"pkg/e2e/runtime",
-			"runtime/browser failure needs deterministic helper repair",
+			FixScopeVamosHelpers,
+			"pkg/e2e/vamos",
+			"app E2E helper failure needs bounded repair",
 		)
 	}
 }

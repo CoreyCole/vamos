@@ -8,10 +8,9 @@ import (
 )
 
 var allowedScopes = map[FixScope]bool{
-	FixScopeSelectors: true,
-	FixScopeSteps:     true,
-	FixScopeRuntime:   true,
-	FixScopeTests:     true,
+	FixScopeDatastarUI:   true,
+	FixScopeVamosHelpers: true,
+	FixScopeTests:        true,
 }
 
 var forbiddenPathPrefixes = []string{
@@ -20,10 +19,9 @@ var forbiddenPathPrefixes = []string{
 }
 
 var allowedPathPrefixesByScope = map[FixScope][]string{
-	FixScopeSelectors: {"pkg/e2e/selectors"},
-	FixScopeSteps:     {"pkg/e2e/steps"},
-	FixScopeRuntime:   {"pkg/e2e/runtime"},
-	FixScopeTests:     {"pkg/e2e/tests", "pkg/e2e/vamos"},
+	FixScopeDatastarUI:   {"../datastarui/e2e", "../datastarui/cmd/datastarui"},
+	FixScopeVamosHelpers: {"pkg/e2e/vamos", "pkg/e2e/fixtures"},
+	FixScopeTests:        {"pkg/e2e/tests"},
 }
 
 func ValidatePlan(plan Plan) error {

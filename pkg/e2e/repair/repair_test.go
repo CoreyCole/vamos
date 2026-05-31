@@ -29,8 +29,11 @@ func TestBuildPlanSelectorFailure(t *testing.T) {
 	if len(plan.Changes) != 1 {
 		t.Fatalf("changes=%v want one selector change", plan.Changes)
 	}
-	if got, want := plan.Changes[0].Scope, FixScopeSelectors; got != want {
+	if got, want := plan.Changes[0].Scope, FixScopeVamosHelpers; got != want {
 		t.Fatalf("scope=%s want %s", got, want)
+	}
+	if got, want := plan.Changes[0].Path, "pkg/e2e/vamos"; got != want {
+		t.Fatalf("path=%s want %s", got, want)
 	}
 }
 
@@ -61,7 +64,7 @@ func TestValidatePlanRejectsProductionUIPaths(t *testing.T) {
 		Plan{
 			Changes: []Change{
 				{
-					Scope: FixScopeSelectors,
+					Scope: FixScopeVamosHelpers,
 					Path:  "server/layouts/root.templ",
 					Why:   "test",
 				},
@@ -78,7 +81,7 @@ func TestValidatePlanRejectsArbitrarySourcePaths(t *testing.T) {
 		Plan{
 			Changes: []Change{
 				{
-					Scope: FixScopeRuntime,
+					Scope: FixScopeDatastarUI,
 					Path:  "pkg/agents/workflows/runtime/runtime.go",
 					Why:   "test",
 				},
@@ -92,7 +95,7 @@ func TestValidatePlanRejectsArbitrarySourcePaths(t *testing.T) {
 
 func TestValidatePlanAllowsBoundedPaths(t *testing.T) {
 	plan := Plan{Changes: []Change{
-		{Scope: FixScopeSelectors, Path: "pkg/e2e/selectors", Why: "selector drift"},
+		{Scope: FixScopeVamosHelpers, Path: "pkg/e2e/vamos", Why: "selector drift"},
 		{
 			Scope: FixScopeTests,
 			Path:  "pkg/e2e/tests",
