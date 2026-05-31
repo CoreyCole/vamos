@@ -141,6 +141,14 @@ func workspaceVerifyHTMLURL(view ImplWorkspaceView) string {
 	return "/workspaces/" + slug + "/verify-html"
 }
 
+func workspaceDirectPublicURL(view ImplWorkspaceView) string {
+	url := strings.TrimSpace(view.Runtime.Workspace.URL)
+	if url == "" || !view.Runtime.Workspace.IsConfigured {
+		return ""
+	}
+	return url
+}
+
 func latestWorkspaceVerifyHTMLPath(view ImplWorkspaceView) (string, bool) {
 	planDir := workspacePlanDirAbs(view)
 	if planDir == "" {

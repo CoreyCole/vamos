@@ -1,11 +1,11 @@
 ---
 name: vamos-merge
-description: Merge completed Vamos runtime work into main, verify the durable stage lane is operational from the merged ../vamos checkout, then sync clean ../vamos-main and ../cn-agents-main baselines and rebuild/restart the systemd host serving main.workspaces.creative-mode.ai. Use when asked to merge Vamos work, sync Vamos main/baseline, run /vamos-merge, or get latest Vamos running under systemd.
+description: Merge completed Vamos runtime work into main, including any paired DatastarUI stack that Vamos depends on, verify the durable stage lane is operational from the merged ../vamos checkout, then sync clean ../vamos-main and ../cn-agents-main baselines and rebuild/restart the systemd host serving main.workspaces.creative-mode.ai. Use when asked to merge Vamos work, sync Vamos main/baseline, run /vamos-merge, merge a Vamos+DatastarUI stack, or get latest Vamos running under systemd.
 ---
 
 # Vamos Merge
 
-Merge a completed `../vamos` branch into `main`, verify the durable `stage` lane is healthy from the merged local runtime checkout, then fast-forward the clean baseline checkouts `../vamos-main` and `../cn-agents-main` and rebuild/restart the clean host checkout so `https://main.workspaces.creative-mode.ai` runs the new runtime.
+Merge a completed `../vamos` branch into `main` plus any paired `../datastarui` stack that the Vamos branch depends on, verify the durable `stage` lane is healthy from the merged local runtime checkout, then fast-forward the clean baseline checkouts `../vamos-main` and `../cn-agents-main` and rebuild/restart the clean host checkout so `https://main.workspaces.creative-mode.ai` runs the new runtime.
 
 ## Invariants
 
@@ -14,6 +14,7 @@ Merge a completed `../vamos` branch into `main`, verify the durable `stage` lane
 - Clean baseline checkout: `../vamos-main`.
 - Host working checkout: `../cn-agents` owns host changes and is where any tracked host edits must be committed before merge.
 - Host systemd checkout: `../cn-agents-main` is the clean/browser-visible host checkout used for rebuilds and service restarts. Do not make normal tracked edits there.
+- Optional paired DatastarUI checkout: `../datastarui`. When the Vamos stack depends on an unmerged DatastarUI stack, merge/push the DatastarUI stack first, then make the Vamos stack consume a merged/resolvable DatastarUI state (version, commit, copied source, or approved replace) before merging Vamos.
 - Browser-visible `../cn-agents-main` imports the clean runtime baseline with `replace github.com/CoreyCole/vamos => ../vamos-main` and launches `../vamos-main/agents-server`.
 - `vamos-ts-worker` also runs from `../vamos-main`.
 - Before fast-forwarding `../vamos-main` or pushing merged runtime commits to `origin/main`, prove the durable `stage` lane can run the merged `../vamos` commit. If stage verification fails, stop the merge flow and fix stage first.
@@ -22,6 +23,7 @@ Merge a completed `../vamos` branch into `main`, verify the durable `stage` lane
 - `.agents` is a committed symlink in Vamos: `.agents -> ../.agents`. Commit the symlink only, never the target files.
 - Systemd is installed/restarted only from clean `../cn-agents-main`, never from `../cn-agents` or a copied workspace.
 - Preserve commit shape; do not squash, patch-apply, or cherry-pick the runtime stack.
+- Preserve paired DatastarUI stack shape too. If DatastarUI changes are part of the work, do not squash or patch-copy them into Vamos. Merge/push DatastarUI through its own Graphite stack, then update/verify Vamos against the merged DatastarUI result.
 - Do **not** check out or fetch a copied workspace feature branch into `../vamos` until that feature branch stack has already been synced/restacked onto latest `origin/main` in its own source checkout.
 - The sync/restack phase is the same procedure as `.pi/skills/vamos-sync/SKILL.md`; use that skill for conflict handling details.
 
@@ -39,6 +41,7 @@ git status --short
 (cd ../vamos-main && git branch --show-current && git status --short)
 (cd ../cn-agents && git branch --show-current && git status --short)
 (cd ../cn-agents-main && git branch --show-current && git status --short)
+if test -d ../datastarui; then (cd ../datastarui && git branch --show-current && git status --short); fi
 ```
 
 Rules:
@@ -48,6 +51,7 @@ Rules:
 - `../vamos-main` must be on `main` and clean. Stop if dirty.
 - `../cn-agents` should be on `main`; it is the host working checkout for host changes. If host-side changes are part of this merge flow, commit them in `../cn-agents` before syncing baselines. Do not leave task-owned tracked changes pending there.
 - `../cn-agents-main` must be on `main` and clean except private gitignored config. Stop if tracked files are dirty. If you accidentally edited tracked files there, move or re-apply those edits in `../cn-agents`, then restore `../cn-agents-main` to clean before continuing.
+- If `../datastarui` is present and on a non-main branch with commits ahead of `main`, determine whether the Vamos source branch depends on it. Check `go.mod` replaces, copied-source manifests/locks, imports, plan/handoff notes, and user intent. If dependent, treat `../datastarui` as a required paired stack and merge it before merging Vamos. If unrelated or ambiguous, stop and ask.
 - If `.agents` is missing in Vamos, create `ln -s ../.agents .agents` and commit that symlink in Vamos.
 
 ## Step 2: Publish latest `../vamos/main`, then sync/restack the source branch
@@ -82,6 +86,51 @@ git diff --stat origin/main..HEAD
 Conflict handling follows `.pi/skills/vamos-sync/SKILL.md`: resolve conflicts in the source checkout, preserve both latest `main` behavior and stack intent, regenerate templ/sqlc/E2E outputs from sources, run targeted tests, stage resolved files with `gt add <file>` (or `git add` only when Graphite has no wrapper for that file), then continue with **`gt continue --no-interactive`**. Do **not** use `git rebase --continue` for Graphite restack conflicts; it may bypass Graphite bookkeeping or open an editor. Ask the user to approve conflict resolutions before merging.
 
 Only after this synced/restacked source branch is clean should later steps fetch or fast-forward it into `../vamos`.
+
+## Step 2.1: Merge paired DatastarUI stack first when required
+
+Run this step when the Vamos source branch depends on `../datastarui` changes that are not on DatastarUI `main` yet. Examples: `go.mod` has `replace github.com/coreycole/datastarui => ../datastarui`, Vamos copied-source/lock files were generated from the DatastarUI branch, or the plan/handoff says the work spans both repos.
+
+```bash
+if test -d ../datastarui; then
+  cd ../datastarui
+  datastarui_branch=$(git branch --show-current)
+  git status --short # must be clean before merge; commit task-owned changes first
+  git fetch origin +refs/heads/main:refs/remotes/origin/main
+  gt sync --no-interactive
+  gt restack --branch "$datastarui_branch" --no-interactive
+  git status --short
+  git merge-base --is-ancestor origin/main HEAD
+  git log --format='%h %s' --reverse origin/main..HEAD
+  git diff --stat origin/main..HEAD
+fi
+```
+
+If the DatastarUI stack is required and synced/restacked cleanly, fast-forward DatastarUI `main` and push it before merging Vamos:
+
+```bash
+cd ../datastarui
+datastarui_head=$(git rev-parse HEAD)
+datastarui_branch=$(git branch --show-current)
+git switch main
+git status --short # must be clean
+git fetch origin +refs/heads/main:refs/remotes/origin/main
+git merge-base --is-ancestor origin/main main
+git fetch . "$datastarui_branch"
+git merge-base --is-ancestor main "$datastarui_head"
+git update-ref refs/heads/main "$datastarui_head"
+git read-tree --reset -u HEAD
+git push origin main
+```
+
+Then return to the Vamos source checkout and make the Vamos dependency state merge-safe before continuing:
+
+- If Vamos temporarily used `replace github.com/coreycole/datastarui => ../datastarui`, remove it or replace it with an approved merge-safe dependency reference before merging Vamos, unless the repo explicitly intends to keep a sibling replace.
+- If Vamos uses copied DatastarUI source, regenerate/update the copied source from the now-merged DatastarUI `main` and commit that in the Vamos source stack.
+- Run the relevant Vamos tests/builds that prove the merged DatastarUI dependency still satisfies the Vamos branch.
+- If DatastarUI merge fails, stop. Do not merge Vamos while it depends on an unmerged DatastarUI branch.
+
+Skip this step only when DatastarUI is not part of the current work or the user explicitly confirms the DatastarUI stack has already merged and Vamos no longer depends on unmerged DatastarUI commits.
 
 ## Step 2.5: Commit pending task-owned changes in ../vamos and ../cn-agents
 
@@ -250,7 +299,8 @@ Print this status block at the end of every successful run:
 
 ```bash
 printf 'Merge status (local):\n'
-for repo in ../vamos ../vamos-main ../cn-agents ../cn-agents-main; do
+for repo in ../datastarui ../vamos ../vamos-main ../cn-agents ../cn-agents-main; do
+  test -d "$repo/.git" || continue
   printf '%s %s %s\n' \
     "$repo" \
     "$(git -C "$repo" rev-parse --short HEAD)" \
@@ -266,6 +316,7 @@ tspid=$(systemctl --user show vamos-ts-worker -p MainPID --value); readlink /pro
 
 Then report:
 
+- final `../datastarui` branch/HEAD and latest commit message when DatastarUI participated in the merge
 - final `../vamos` branch/HEAD and latest commit message
 - final `../vamos-main` branch/HEAD and latest commit message
 - final `../cn-agents` branch/HEAD and latest commit message
@@ -273,4 +324,4 @@ Then report:
 - systemd active states
 - stage verification URL/result
 - verification URL/result
-- push status
+- push status for DatastarUI when applicable, and Vamos

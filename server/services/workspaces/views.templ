@@ -512,6 +512,14 @@ templ ImplWorkspaceCard(view ImplWorkspaceView, managerURL string, showHistorica
 				<dt class="text-xs font-medium uppercase tracking-wide text-muted-foreground">Local checkout</dt>
 				<dd class="min-w-0 break-all font-mono text-xs text-muted-foreground">{ workspaceViewCheckoutPath(view) }</dd>
 			}
+			if workspaceDirectPublicURL(view) != "" {
+				<dt class="text-xs font-medium uppercase tracking-wide text-muted-foreground">Public URL</dt>
+				<dd class="min-w-0 break-all text-xs"><a class="font-medium text-primary underline-offset-4 hover:underline" href={ templ.SafeURL(workspaceDirectPublicURL(view)) } target="_blank" rel="noreferrer">{ workspaceDirectPublicURL(view) }</a></dd>
+			}
+			if workspaceVerifyHTMLURL(view) != "" {
+				<dt class="text-xs font-medium uppercase tracking-wide text-muted-foreground">Latest verify HTML</dt>
+				<dd class="min-w-0 break-all text-xs"><a class="font-medium text-primary underline-offset-4 hover:underline" href={ templ.SafeURL(workspaceVerifyHTMLURL(view)) } target="_blank" rel="noreferrer">Inspect screenshots</a></dd>
+			}
 			if workspaceTrunkBranch(ws) != "" {
 				<dt class="text-xs font-medium uppercase tracking-wide text-muted-foreground">Trunk</dt>
 				<dd class="min-w-0 break-all font-mono text-xs text-muted-foreground">{ workspaceTrunkBranch(ws) }</dd>
@@ -638,6 +646,11 @@ templ WorkspaceActionsMenu(view ImplWorkspaceView, managerURL string, showHistor
 			if workspaceVerifyHTMLURL(view) != "" {
 				@dropdown.DropdownMenuLinkItem(dropdown.DropdownMenuLinkItemArgs{ID: dropdownID, Href: workspaceVerifyHTMLURL(view), Target: "_blank", Rel: "noreferrer", Class: "text-xs"}) {
 					Verify HTML
+				}
+			}
+			if workspaceDirectPublicURL(view) != "" {
+				@dropdown.DropdownMenuLinkItem(dropdown.DropdownMenuLinkItemArgs{ID: dropdownID, Href: workspaceDirectPublicURL(view), Target: "_blank", Rel: "noreferrer", Class: "text-xs"}) {
+					Open public URL
 				}
 			}
 			@WorkspaceCleanupDropdownItem(workspaceCleanupAction(view), dropdownID)

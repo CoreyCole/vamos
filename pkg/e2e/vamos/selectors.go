@@ -39,13 +39,13 @@ func (thoughtsFeature) Sidebar() spec.Locator {
 	return spec.CSS("#doc-workbench-sidebar-region, #thoughts-shared-sidebar, #thoughts-workbench-sidebar, [data-e2e='thoughts.workbench.sidebar']")
 }
 func (thoughtsFeature) CenterPane() spec.Locator {
-	return spec.CSS("#doc-workbench-center, #thoughts-workbench-center, main[data-e2e='thoughts.workbench.center'], [data-e2e='thoughts.workbench.center']")
+	return spec.CSS("#doc-workbench-center-region, #doc-workbench-center-pane, #doc-workbench-center, #thoughts-workbench-center, main[data-e2e='thoughts.workbench.center'], [data-e2e='thoughts.workbench.center']")
 }
 func (thoughtsFeature) RightRail() spec.Locator {
-	return spec.CSS("#doc-workbench-right-rail, #thoughts-workbench-right, aside[data-e2e='thoughts.workbench.right'], [data-e2e='thoughts.workbench.right']")
+	return spec.CSS("#doc-workbench-right-region, #doc-right-rail, #doc-workbench-right-rail, #thoughts-workbench-right, aside[data-e2e='thoughts.workbench.right'], [data-e2e='thoughts.workbench.right']")
 }
 func (thoughtsFeature) RightRailChatTab() spec.Locator {
-	return spec.CSS("[role='tab'][aria-controls*='chat'], button:has-text('Chat'), [data-e2e='thoughts.rightRail.chat']")
+	return spec.CSS("[aria-label='Doc right rail tabs'] button:has-text('Chat'), [data-e2e='thoughts.rightRail.chat']")
 }
 func (thoughtsFeature) WorkspacesTab() spec.Locator {
 	return spec.CSS("[role='tab'][aria-controls*='workspace'], button:has-text('Workspaces'), [data-e2e='thoughts.sidebar.workspaces']")

@@ -43,6 +43,31 @@ Browser and chat sessions created while verifying `work` or feature workspace ho
 
 ## Commands
 
+### Playwright auth token
+
+Browser-enabled workspace verification uses the same app auth endpoint as authored Go Story E2E:
+
+```text
+GET /internal/playwright-auth?token=<token>&redirect=<path>
+```
+
+For public workspace hosts, provide a token configured on the running manager/child. Host env commonly uses `CN_AGENTS_PLAYWRIGHT_AUTH_TOKEN`; the child runtime receives it as `VAMOS_PLAYWRIGHT_AUTH_TOKEN`. The verifier accepts either `--playwright-auth-token` or environment variable `VAMOS_PLAYWRIGHT_AUTH_TOKEN`:
+
+```bash
+export VAMOS_PLAYWRIGHT_AUTH_TOKEN=<secret>
+just verify-workspaces slug=<slug> start=true restart=true stop=true browser=true
+# or
+VAMOS_PLAYWRIGHT_AUTH_TOKEN=<secret> \
+  go run ./cmd/agentsctl verify workspaces \
+    --env .env \
+    --base-url https://main.<domain> \
+    --domain <domain> \
+    --slug <slug> \
+    --start=true --restart=true --stop=true --browser=true
+```
+
+If the token is missing, browser verification fails before manual testing with `playwright auth token is required via --playwright-auth-token or VAMOS_PLAYWRIGHT_AUTH_TOKEN`. Do not treat non-browser workspace verification as full acceptance for public browser changes.
+
 From the Vamos repo root:
 
 ```bash

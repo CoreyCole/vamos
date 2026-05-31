@@ -37,8 +37,9 @@ This is the standard Vamos verification entrypoint. `/q-verify` must read this f
 
    - Required for browser-facing changes before human testing.
    - Browser E2E must run against the same public feature URL the human will test. Pass that exact URL with `--base-url`; do not use a different local server unless the human will also test that server.
-   - Recommended sequence: managed restart -> confirm public URL healthy -> `e2e run --base-url <same-public-url>` -> human tests `<same-public-url>`.
-   - Use `docs/e2e-story-testing.md` for command details, fixture safety, artifacts, and story selection.
+   - Public workspace E2E authenticates through `/internal/playwright-auth` and requires the manager/child Playwright token. Use `VAMOS_PLAYWRIGHT_AUTH_TOKEN` for `agentsctl verify workspaces` and `VAMOS_E2E_AUTH_TOKEN` for Vamos Go Story tests launched by the DatastarUI CLI; both should match the configured host token (`CN_AGENTS_PLAYWRIGHT_AUTH_TOKEN`).
+   - Recommended sequence: managed restart -> confirm public URL healthy -> browser-enabled `agentsctl verify workspaces` -> `just e2e --base-url <same-public-url> --story <story>` -> human tests `<same-public-url>`.
+   - Use `docs/e2e-story-testing.md` for command details, auth, fixture safety, artifacts, and story selection.
    - For Agent Chat, Thoughts chat, URL-state, route, transcript, or QRSPI-next changes, run relevant `durable-session-chat` scenarios at minimum; add `thoughts-workbench` scenarios when document workbench URL/navigation behavior changed.
 
 1. **Manual human testing**
