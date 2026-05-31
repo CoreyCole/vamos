@@ -7,6 +7,9 @@ playwright-auth url="http://localhost:4200/agent-chat":
 pw-agent-chat:
   @just playwright-auth http://localhost:4200/agent-chat
 
+e2e *args:
+  @VAMOS_ROOT="$PWD"; ../datastarui/scripts/datastarui.sh e2e run --config "$VAMOS_ROOT/datastarui-e2e.yml" {{args}}
+
 sync-thoughts:
   @cd .. && just sync-thoughts
 

@@ -3,11 +3,36 @@
 ## Model
 
 - Authored Go Story API tests in `pkg/e2e/tests` are canonical.
-- App-owned helpers in `pkg/e2e/vamos` compose auth, fixtures, pages, selectors, and legacy complex steps.
+- DatastarUI owns the flat Story builder, runtime, launcher, artifacts, review, and goldens.
+- App-owned helpers in `pkg/e2e/vamos` compose auth, fixtures, pages, selectors, readiness, and expectations.
 - The old markdown story parser/generator path has been removed; there is no `docs/features` source or `pkg/e2e/generated` package.
-- Add new coverage as reviewed Go Story tests and Vamos helpers only.
+- Add new coverage as reviewed Go Story tests plus typed Vamos helpers only.
 
 ## Commands
+
+### Auth for public workspace E2E
+
+Browser E2E authenticates through the app endpoint:
+
+```text
+GET /internal/playwright-auth?token=<token>&redirect=<path>
+```
+
+For public workspace hosts, the manager/child must be started with Playwright auth enabled and a token:
+
+```dotenv
+CN_AGENTS_PLAYWRIGHT_AUTH_ENABLED=true
+CN_AGENTS_PLAYWRIGHT_AUTH_TOKEN=<secret>
+# child runtime receives the same value as VAMOS_PLAYWRIGHT_AUTH_TOKEN
+```
+
+Use that same secret for E2E runs:
+
+```bash
+export VAMOS_E2E_AUTH_TOKEN=<secret>
+```
+
+Vamos Go Story auth helpers read `VAMOS_E2E_AUTH_TOKEN` and visit `/internal/playwright-auth` before scenario steps. Loopback-only local auth may work without a token, but public workspace URLs require one. Run stories with the local `just e2e` recipe; it delegates to `../datastarui/scripts/datastarui.sh` with this checkout's `datastarui-e2e.yml`. The script rebuilds the stable launcher `../datastarui/bin/datastarui` only when launcher sources change. The launcher builds `../datastarui/bin/datastarui-runtime-<hash>` when DatastarUI CLI/E2E sources change, then execs that runtime.
 
 List authored Go Story tests:
 
@@ -19,24 +44,21 @@ Run authored Go Story browser tests from a registered non-main workspace. If the
 
 ```bash
 VAMOS_E2E_THOUGHTS_ROOT=/path/to/host/thoughts \
-go run ./cmd/vamos-runtime e2e run \
-  --story durable-session-chat \
-  --plan-dir thoughts/<owner>/plans/<plan-dir>
+  just e2e --story durable-session-chat
 ```
 
 Run a focused scenario:
 
 ```bash
-go run ./cmd/vamos-runtime e2e run \
+just e2e \
   --story durable-session-chat \
-  --scenario freeform-chat-started-from-thoughts-root-survives-refresh-and-resume \
-  --plan-dir thoughts/<owner>/plans/<plan-dir>
+  --scenario freeform-chat-started-from-thoughts-root-survives-refresh-and-resume
 ```
 
 Review a completed run against semantic goldens:
 
 ```bash
-go run ./cmd/vamos-runtime e2e review \
+../datastarui/scripts/datastarui.sh e2e review \
   --run .e2e-runs/<run-id> \
   --plan-dir thoughts/<owner>/plans/<plan-dir>
 ```
@@ -44,7 +66,7 @@ go run ./cmd/vamos-runtime e2e review \
 Accept semantic goldens only after explicit human approval:
 
 ```bash
-go run ./cmd/vamos-runtime e2e goldens accept \
+../datastarui/scripts/datastarui.sh e2e goldens accept \
   --run .e2e-runs/<run-id> \
   --human-approved
 ```
@@ -60,11 +82,11 @@ After automated browser checks pass against the same URL, `/q-verify` must stop 
 - Browser runs with fixtures must use a registered non-main workspace.
 - Runtime metadata uses `.vamos/run/workspace.env` and `VAMOS_*` environment variables.
 - The runtime refuses canonical main database paths when fixture setup could mutate durable state.
-- `e2e review` may emit `needs-human-review` when no Pi visual adapter is available; that is a review handoff, not a deterministic test failure.
-- `e2e fix` is bounded to selectors, steps, runtime, authored Go Story tests, and Vamos E2E helpers unless a human explicitly approves wider changes.
+- DatastarUI `e2e review` may emit `needs-human-review`; that is a review handoff, not a deterministic test failure.
+- Vamos repair/fix policy is bounded to typed app helpers and authored Go Story tests unless a human explicitly approves wider changes.
 
 ## Run artifacts
 
-`vamos e2e run` writes artifacts under `--artifacts-dir` or `.e2e-runs/<run-id>`. When `--plan-dir thoughts/...` is provided, it also writes a QRSPI run index under the plan context directory and links to heavy artifacts instead of copying trace binaries into `thoughts/`.
+`just e2e` / `datastarui e2e run` writes browser artifacts under `--artifacts-dir` or the config `artifacts_dir`, grouped by run timestamp, feature, scenario, and viewport.
 
-Keep run manifests, failure summaries, screenshots, HTML snapshots, traces, visual review markdown, and the exact command with implementation handoffs or verification artifacts.
+Keep screenshots, HTML snapshots, traces when present, visual review markdown, and the exact command with implementation handoffs or verification artifacts.

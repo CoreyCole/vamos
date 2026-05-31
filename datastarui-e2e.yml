@@ -5,13 +5,5 @@ artifacts_dir: .e2e-runs
 server:
   command: just build
   skip_when_base_url_set: false
-auth:
-  mode: vamos_playwright_endpoint
-preflight:
-  mode: vamos_workspace
 viewports:
   - desktop-full
-selectors_file: pkg/e2e/selectors/vamos.yaml
-pages:
-  ThoughtsRoot: /
-  ThoughtsWorkbench: /thoughts
