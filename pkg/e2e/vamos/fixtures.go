@@ -2,6 +2,8 @@ package vamos
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -9,7 +11,6 @@ import (
 	"github.com/coreycole/datastarui/e2e/spec"
 
 	"github.com/CoreyCole/vamos/pkg/e2e/fixtures"
-	oldruntime "github.com/CoreyCole/vamos/pkg/e2e/runtime"
 )
 
 type WorkspaceFixtureBuilder struct {
@@ -20,6 +21,7 @@ func WorkspaceFixture(name string) *WorkspaceFixtureBuilder {
 	return &WorkspaceFixtureBuilder{name: name}
 }
 
+func (b *WorkspaceFixtureBuilder) SetupStep() spec.Step                                  { return b.Build() }
 func (b *WorkspaceFixtureBuilder) WithThoughtsFile(_, _ string) *WorkspaceFixtureBuilder { return b }
 func (b *WorkspaceFixtureBuilder) WithChatThread(_ string, _ []Message) *WorkspaceFixtureBuilder {
 	return b
@@ -33,24 +35,26 @@ type Message struct {
 func (b *WorkspaceFixtureBuilder) Build() spec.Step {
 	return spec.Custom("workspace fixture "+b.name, func(t testing.TB, ctx *duiruntime.Context) {
 		t.Helper()
-		legacy, err := legacyConfig(ctx.Config)
+		ws, err := ReadWorkspaceEnv(ctx.Config.RepoRoot)
 		if err != nil {
 			t.Fatal(err)
 		}
-		c, cancel := oldruntime.ContextWithTimeout()
-		defer cancel()
-		db, err := oldruntime.OpenWorkspaceDB(c, legacy)
+		db, err := OpenWorkspaceDB(t.Context(), ctx.Config)
 		if err != nil {
 			t.Fatal(err)
 		}
 		defer db.Close()
 		workspace := fixtures.WorkspaceIdentity{
-			Slug:         legacy.Workspace.Slug,
-			CheckoutPath: legacy.Workspace.CheckoutPath,
-			DBPath:       legacy.Workspace.DBPath,
-			ManagerURL:   legacy.Workspace.ManagerURL,
+			Slug:         ws.Slug,
+			CheckoutPath: ws.CheckoutPath,
+			DBPath:       ws.DBPath,
+			ManagerURL:   ws.ManagerURL,
 		}
-		state, err := fixtures.Load(c, db, workspace, legacy.ThoughtsRoot, b.name)
+		thoughtsRoot := strings.TrimSpace(os.Getenv("VAMOS_E2E_THOUGHTS_ROOT"))
+		if thoughtsRoot == "" {
+			thoughtsRoot = filepath.Join(ctx.Config.RepoRoot, "thoughts")
+		}
+		state, err := fixtures.Load(t.Context(), db, workspace, thoughtsRoot, b.name)
 		if err != nil {
 			t.Fatal(err)
 		}
