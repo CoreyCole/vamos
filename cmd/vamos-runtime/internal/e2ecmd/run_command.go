@@ -10,7 +10,7 @@ func NewRunCommand() *cobra.Command {
 	cfg := RunConfig{}
 	cmd := &cobra.Command{
 		Use:   "run",
-		Short: "Run generated E2E tests",
+		Short: "Run configured Go Story E2E tests",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			ctx := cmd.Context()
 			if ctx == nil {
@@ -25,6 +25,7 @@ func NewRunCommand() *cobra.Command {
 	cmd.Flags().StringVar(&cfg.BaseURL, "base-url", "", "base URL for browser E2E")
 	cmd.Flags().StringVar(&cfg.ArtifactsDir, "artifacts-dir", "", "directory for run artifacts")
 	cmd.Flags().StringVar(&cfg.PlanDir, "plan-dir", "", "QRSPI plan dir for run index artifacts")
-	cmd.Flags().BoolVar(&cfg.NoRestart, "no-restart", false, "skip just build restart before running")
+	cmd.Flags().BoolVar(&cfg.NoRestart, "no-restart", false, "skip configured server restart before running")
+	cmd.Flags().StringVar(&cfg.ConfigPath, "config", "", "E2E YAML config path (defaults to vamos-e2e.yaml discovery)")
 	return cmd
 }
