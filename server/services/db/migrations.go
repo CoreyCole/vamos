@@ -71,10 +71,7 @@ func prepareSchemaCompatibilityMigrations(ctx context.Context, database *sql.DB)
 	); err != nil {
 		return err
 	}
-	if err := ensurePlanWorkspacesImplMetadataColumnsIfTableExists(
-		ctx,
-		database,
-	); err != nil {
+	if err := ensurePlanWorkspacesColumnsIfTableExists(ctx, database); err != nil {
 		return err
 	}
 	if err := ensureImplWorkspaceCleanupProofColumnsIfTableExists(ctx, database); err != nil {
@@ -150,10 +147,7 @@ func runRuntimeMigrations(ctx context.Context, database *sql.DB) error {
 	); err != nil {
 		return err
 	}
-	if err := ensurePlanWorkspacesImplMetadataColumnsIfTableExists(
-		ctx,
-		database,
-	); err != nil {
+	if err := ensurePlanWorkspacesColumnsIfTableExists(ctx, database); err != nil {
 		return err
 	}
 	if err := ensureImplWorkspaceCleanupProofColumnsIfTableExists(ctx, database); err != nil {
@@ -309,7 +303,7 @@ func ensureAgentRunsWorkflowColumnsIfTableExists(
 	return ensureAgentRunsWorkflowColumns(ctx, database)
 }
 
-func ensurePlanWorkspacesImplMetadataColumnsIfTableExists(
+func ensurePlanWorkspacesColumnsIfTableExists(
 	ctx context.Context,
 	database *sql.DB,
 ) error {
@@ -317,7 +311,7 @@ func ensurePlanWorkspacesImplMetadataColumnsIfTableExists(
 	if err != nil || !exists {
 		return err
 	}
-	return ensurePlanWorkspacesImplMetadataColumns(ctx, database)
+	return ensurePlanWorkspacesColumns(ctx, database)
 }
 
 func ensureImplWorkspaceCleanupProofColumnsIfTableExists(
@@ -601,7 +595,7 @@ func ensureScopedUserChatSelections(ctx context.Context, database *sql.DB) error
 	return tx.Commit()
 }
 
-func ensurePlanWorkspacesImplMetadataColumns(
+func ensurePlanWorkspacesColumns(
 	ctx context.Context,
 	database *sql.DB,
 ) error {
@@ -610,24 +604,31 @@ func ensurePlanWorkspacesImplMetadataColumns(
 		definition string
 	}{
 		{name: "project_id", definition: "TEXT NOT NULL DEFAULT ''"},
-		{name: "workspace_slug", definition: "TEXT NOT NULL DEFAULT ''"},
-		{name: "impl_workspace_path", definition: "TEXT"},
-		{name: "impl_workspace_url", definition: "TEXT"},
-		{name: "impl_workspace_discovered_at", definition: "DATETIME"},
-		{name: "impl_workspace_state", definition: "TEXT NOT NULL DEFAULT 'none' CHECK (impl_workspace_state IN ('none', 'active', 'merged', 'missing'))"},
-		{name: "impl_workspace_merged_at", definition: "DATETIME"},
-		{name: "impl_workspace_missing_at", definition: "DATETIME"},
 		{name: "qrspi_lifecycle", definition: "TEXT NOT NULL DEFAULT 'question' CHECK (qrspi_lifecycle IN ('question', 'research', 'design', 'outline', 'review_outline', 'plan', 'review_plan', 'workspace', 'implement', 'review_implementation', 'verify', 'merged', 'closed'))"},
 		{name: "qrspi_lifecycle_updated_at", definition: "DATETIME"},
 		{name: "qrspi_closed_reason", definition: "TEXT NOT NULL DEFAULT ''"},
 	} {
-		if err := ensureColumn(
-			ctx,
-			database,
-			"plan_workspaces",
-			column.name,
-			column.definition,
-		); err != nil {
+		if err := ensureColumn(ctx, database, "plan_workspaces", column.name, column.definition); err != nil {
+			return err
+		}
+	}
+	for _, indexName := range []string{
+		"idx_plan_workspaces_active_slug",
+	} {
+		if _, err := database.ExecContext(ctx, "DROP INDEX IF EXISTS "+indexName); err != nil {
+			return err
+		}
+	}
+	for _, column := range []string{
+		"workspace_slug",
+		"impl_workspace_path",
+		"impl_workspace_url",
+		"impl_workspace_discovered_at",
+		"impl_workspace_state",
+		"impl_workspace_merged_at",
+		"impl_workspace_missing_at",
+	} {
+		if err := dropColumnIfExists(ctx, database, "plan_workspaces", column); err != nil {
 			return err
 		}
 	}

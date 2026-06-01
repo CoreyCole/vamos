@@ -90,7 +90,7 @@ func (q *Queries) ArchiveMissingPlanWorkspaces(ctx context.Context, planDirRels 
 }
 
 const getPlanWorkspace = `-- name: GetPlanWorkspace :one
-SELECT plan_dir_rel, project_id, plan_dir, label, workspace_slug, impl_workspace_path, impl_workspace_url, impl_workspace_discovered_at, artifact_updated_at, qrspi_lifecycle, qrspi_lifecycle_updated_at, qrspi_closed_reason, discovered_at, last_discovered_at, archived_at
+SELECT plan_dir_rel, project_id, plan_dir, label, artifact_updated_at, qrspi_lifecycle, qrspi_lifecycle_updated_at, qrspi_closed_reason, discovered_at, last_discovered_at, archived_at
 FROM plan_workspaces
 WHERE plan_dir_rel = ?1
 `
@@ -103,10 +103,6 @@ func (q *Queries) GetPlanWorkspace(ctx context.Context, planDirRel string) (Plan
 		&i.ProjectID,
 		&i.PlanDir,
 		&i.Label,
-		&i.WorkspaceSlug,
-		&i.ImplWorkspacePath,
-		&i.ImplWorkspaceUrl,
-		&i.ImplWorkspaceDiscoveredAt,
 		&i.ArtifactUpdatedAt,
 		&i.QrspiLifecycle,
 		&i.QrspiLifecycleUpdatedAt,
@@ -119,7 +115,7 @@ func (q *Queries) GetPlanWorkspace(ctx context.Context, planDirRel string) (Plan
 }
 
 const listCurrentPlanWorkspaces = `-- name: ListCurrentPlanWorkspaces :many
-SELECT plan_dir_rel, project_id, plan_dir, label, workspace_slug, impl_workspace_path, impl_workspace_url, impl_workspace_discovered_at, artifact_updated_at, qrspi_lifecycle, qrspi_lifecycle_updated_at, qrspi_closed_reason, discovered_at, last_discovered_at, archived_at
+SELECT plan_dir_rel, project_id, plan_dir, label, artifact_updated_at, qrspi_lifecycle, qrspi_lifecycle_updated_at, qrspi_closed_reason, discovered_at, last_discovered_at, archived_at
 FROM plan_workspaces
 WHERE
     archived_at IS NULL
@@ -153,10 +149,6 @@ func (q *Queries) ListCurrentPlanWorkspaces(ctx context.Context, projectID strin
 			&i.ProjectID,
 			&i.PlanDir,
 			&i.Label,
-			&i.WorkspaceSlug,
-			&i.ImplWorkspacePath,
-			&i.ImplWorkspaceUrl,
-			&i.ImplWorkspaceDiscoveredAt,
 			&i.ArtifactUpdatedAt,
 			&i.QrspiLifecycle,
 			&i.QrspiLifecycleUpdatedAt,
@@ -266,7 +258,7 @@ func (q *Queries) ListPlanWorkspaceProjects(ctx context.Context, planDirRel stri
 }
 
 const listPlanWorkspaces = `-- name: ListPlanWorkspaces :many
-SELECT plan_dir_rel, project_id, plan_dir, label, workspace_slug, impl_workspace_path, impl_workspace_url, impl_workspace_discovered_at, artifact_updated_at, qrspi_lifecycle, qrspi_lifecycle_updated_at, qrspi_closed_reason, discovered_at, last_discovered_at, archived_at
+SELECT plan_dir_rel, project_id, plan_dir, label, artifact_updated_at, qrspi_lifecycle, qrspi_lifecycle_updated_at, qrspi_closed_reason, discovered_at, last_discovered_at, archived_at
 FROM plan_workspaces
 WHERE
     archived_at IS NULL
@@ -299,10 +291,6 @@ func (q *Queries) ListPlanWorkspaces(ctx context.Context, projectID string) ([]P
 			&i.ProjectID,
 			&i.PlanDir,
 			&i.Label,
-			&i.WorkspaceSlug,
-			&i.ImplWorkspacePath,
-			&i.ImplWorkspaceUrl,
-			&i.ImplWorkspaceDiscoveredAt,
 			&i.ArtifactUpdatedAt,
 			&i.QrspiLifecycle,
 			&i.QrspiLifecycleUpdatedAt,
@@ -330,10 +318,6 @@ INSERT INTO plan_workspaces (
     project_id,
     plan_dir,
     label,
-    workspace_slug,
-    impl_workspace_path,
-    impl_workspace_url,
-    impl_workspace_discovered_at,
     artifact_updated_at,
     qrspi_lifecycle,
     qrspi_lifecycle_updated_at,
@@ -345,44 +329,32 @@ VALUES (
     ?3,
     ?4,
     ?5,
-    ?6,
+    COALESCE(NULLIF(?6, ''), 'question'),
     ?7,
-    ?8,
-    ?9,
-    COALESCE(NULLIF(?10, ''), 'question'),
-    ?11,
-    ?12
+    ?8
 )
 ON CONFLICT (plan_dir_rel) DO UPDATE SET
 project_id = excluded.project_id,
 plan_dir = excluded.plan_dir,
 label = excluded.label,
-workspace_slug = excluded.workspace_slug,
-impl_workspace_path = excluded.impl_workspace_path,
-impl_workspace_url = excluded.impl_workspace_url,
-impl_workspace_discovered_at = excluded.impl_workspace_discovered_at,
 artifact_updated_at = excluded.artifact_updated_at,
 qrspi_lifecycle = excluded.qrspi_lifecycle,
 qrspi_lifecycle_updated_at = excluded.qrspi_lifecycle_updated_at,
 qrspi_closed_reason = excluded.qrspi_closed_reason,
 last_discovered_at = CURRENT_TIMESTAMP,
 archived_at = NULL
-RETURNING plan_dir_rel, project_id, plan_dir, label, workspace_slug, impl_workspace_path, impl_workspace_url, impl_workspace_discovered_at, artifact_updated_at, qrspi_lifecycle, qrspi_lifecycle_updated_at, qrspi_closed_reason, discovered_at, last_discovered_at, archived_at
+RETURNING plan_dir_rel, project_id, plan_dir, label, artifact_updated_at, qrspi_lifecycle, qrspi_lifecycle_updated_at, qrspi_closed_reason, discovered_at, last_discovered_at, archived_at
 `
 
 type UpsertDiscoveredPlanWorkspaceParams struct {
-	PlanDirRel                string         `json:"plan_dir_rel"`
-	ProjectID                 string         `json:"project_id"`
-	PlanDir                   string         `json:"plan_dir"`
-	Label                     string         `json:"label"`
-	WorkspaceSlug             string         `json:"workspace_slug"`
-	ImplWorkspacePath         sql.NullString `json:"impl_workspace_path"`
-	ImplWorkspaceUrl          sql.NullString `json:"impl_workspace_url"`
-	ImplWorkspaceDiscoveredAt sql.NullTime   `json:"impl_workspace_discovered_at"`
-	ArtifactUpdatedAt         time.Time      `json:"artifact_updated_at"`
-	QrspiLifecycle            interface{}    `json:"qrspi_lifecycle"`
-	QrspiLifecycleUpdatedAt   sql.NullTime   `json:"qrspi_lifecycle_updated_at"`
-	QrspiClosedReason         string         `json:"qrspi_closed_reason"`
+	PlanDirRel              string       `json:"plan_dir_rel"`
+	ProjectID               string       `json:"project_id"`
+	PlanDir                 string       `json:"plan_dir"`
+	Label                   string       `json:"label"`
+	ArtifactUpdatedAt       time.Time    `json:"artifact_updated_at"`
+	QrspiLifecycle          interface{}  `json:"qrspi_lifecycle"`
+	QrspiLifecycleUpdatedAt sql.NullTime `json:"qrspi_lifecycle_updated_at"`
+	QrspiClosedReason       string       `json:"qrspi_closed_reason"`
 }
 
 func (q *Queries) UpsertDiscoveredPlanWorkspace(ctx context.Context, arg UpsertDiscoveredPlanWorkspaceParams) (PlanWorkspace, error) {
@@ -391,10 +363,6 @@ func (q *Queries) UpsertDiscoveredPlanWorkspace(ctx context.Context, arg UpsertD
 		arg.ProjectID,
 		arg.PlanDir,
 		arg.Label,
-		arg.WorkspaceSlug,
-		arg.ImplWorkspacePath,
-		arg.ImplWorkspaceUrl,
-		arg.ImplWorkspaceDiscoveredAt,
 		arg.ArtifactUpdatedAt,
 		arg.QrspiLifecycle,
 		arg.QrspiLifecycleUpdatedAt,
@@ -406,10 +374,6 @@ func (q *Queries) UpsertDiscoveredPlanWorkspace(ctx context.Context, arg UpsertD
 		&i.ProjectID,
 		&i.PlanDir,
 		&i.Label,
-		&i.WorkspaceSlug,
-		&i.ImplWorkspacePath,
-		&i.ImplWorkspaceUrl,
-		&i.ImplWorkspaceDiscoveredAt,
 		&i.ArtifactUpdatedAt,
 		&i.QrspiLifecycle,
 		&i.QrspiLifecycleUpdatedAt,

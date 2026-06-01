@@ -364,6 +364,7 @@ func TestPlanWorkspaceSyncerCreatesAndUpdatesProjectBindings(t *testing.T) {
 	syncer := &PlanWorkspaceSyncer{
 		Queries: service.queries,
 		Scanner: PlanWorkspaceScanner{
+			ProjectID:    "vamos",
 			ThoughtsRoot: thoughtsRoot,
 			ImplWorkspaces: workspaces.ImplWorkspaceDiscoveryConfig{
 				ParentDir:        parent,
@@ -444,7 +445,6 @@ func TestPlanWorkspaceSyncerListsCurrentAndHistoricalLifecycle(t *testing.T) {
 			PlanDirRel:        item.rel,
 			PlanDir:           filepath.Join(service.thoughtsRoot, filepath.FromSlash(item.rel)),
 			Label:             item.rel,
-			WorkspaceSlug:     item.rel,
 			ArtifactUpdatedAt: time.Now(),
 			QrspiLifecycle:    item.stage,
 		})
@@ -483,7 +483,6 @@ func TestPlanWorkspaceSyncerPersistsAndFiltersProjectID(t *testing.T) {
 			ProjectID:         item.project,
 			PlanDir:           filepath.Join(service.thoughtsRoot, filepath.FromSlash(item.rel)),
 			Label:             item.rel,
-			WorkspaceSlug:     item.rel,
 			ArtifactUpdatedAt: time.Now(),
 			QrspiLifecycle:    "implement",
 		})
@@ -508,7 +507,7 @@ func TestPlanWorkspaceSyncerPersistsAndFiltersProjectID(t *testing.T) {
 	}
 }
 
-func TestPlanWorkspaceScannerPopulatesSlugAndImplMetadata(t *testing.T) {
+func TestPlanWorkspaceScannerPopulatesSlugAndImplBinding(t *testing.T) {
 	thoughtsRoot := t.TempDir()
 	parent := t.TempDir()
 	planName := "2026-05-16_20-48-11_qrspi-auto-mode-workspace-config-ux"
@@ -529,6 +528,7 @@ func TestPlanWorkspaceScannerPopulatesSlugAndImplMetadata(t *testing.T) {
 	discoveredAt := time.Date(2026, 5, 5, 10, 0, 0, 0, time.Local)
 
 	rows, err := (PlanWorkspaceScanner{
+		ProjectID:    "vamos",
 		ThoughtsRoot: thoughtsRoot,
 		ImplWorkspaces: workspaces.ImplWorkspaceDiscoveryConfig{
 			ParentDir:        parent,
@@ -550,14 +550,18 @@ func TestPlanWorkspaceScannerPopulatesSlugAndImplMetadata(t *testing.T) {
 	if row.WorkspaceSlug != wantSlug {
 		t.Fatalf("WorkspaceSlug = %q", row.WorkspaceSlug)
 	}
-	if row.ImplWorkspacePath != implDir {
-		t.Fatalf("ImplWorkspacePath = %q want %q", row.ImplWorkspacePath, implDir)
+	if len(row.ImplBindings) != 1 {
+		t.Fatalf("ImplBindings len = %d", len(row.ImplBindings))
 	}
-	if row.ImplWorkspaceURL != "https://"+wantSlug+".workspaces.test/" {
-		t.Fatalf("ImplWorkspaceURL = %q", row.ImplWorkspaceURL)
+	binding := row.ImplBindings[0]
+	if binding.CheckoutPath != implDir {
+		t.Fatalf("binding checkout path = %q want %q", binding.CheckoutPath, implDir)
 	}
-	if !row.ImplWorkspaceDiscoveredAt.Equal(discoveredAt) {
-		t.Fatalf("ImplWorkspaceDiscoveredAt = %s", row.ImplWorkspaceDiscoveredAt)
+	if binding.URL != "https://"+wantSlug+".workspaces.test/" {
+		t.Fatalf("binding URL = %q", binding.URL)
+	}
+	if !binding.DiscoveredAt.Equal(discoveredAt) {
+		t.Fatalf("binding discovered at = %s", binding.DiscoveredAt)
 	}
 }
 
@@ -589,6 +593,7 @@ func TestPlanWorkspaceSyncerClearsMissingImplMetadata(t *testing.T) {
 	syncer := &PlanWorkspaceSyncer{
 		Queries: service.queries,
 		Scanner: PlanWorkspaceScanner{
+			ProjectID:    "vamos",
 			ThoughtsRoot: thoughtsRoot,
 			ImplWorkspaces: workspaces.ImplWorkspaceDiscoveryConfig{
 				ParentDir:        parent,
@@ -608,16 +613,15 @@ func TestPlanWorkspaceSyncerClearsMissingImplMetadata(t *testing.T) {
 	); err != nil {
 		t.Fatalf("first Sync() error = %v", err)
 	}
-	withImpl, err := service.queries.GetPlanWorkspace(
+	withImpl, err := service.queries.ListPlanWorkspaceImplBindings(
 		context.Background(),
 		"agent/plans/impl-sync-plan",
 	)
 	if err != nil {
-		t.Fatalf("GetPlanWorkspace(with impl) error = %v", err)
+		t.Fatalf("ListPlanWorkspaceImplBindings(with impl) error = %v", err)
 	}
-	if !withImpl.ImplWorkspacePath.Valid || !withImpl.ImplWorkspaceUrl.Valid ||
-		!withImpl.ImplWorkspaceDiscoveredAt.Valid {
-		t.Fatalf("impl metadata not populated: %#v", withImpl)
+	if len(withImpl) != 1 || withImpl[0].Status != "active" || !withImpl[0].CheckoutPath.Valid {
+		t.Fatalf("impl binding not populated: %#v", withImpl)
 	}
 
 	if err := os.RemoveAll(implDir); err != nil {
@@ -634,19 +638,22 @@ func TestPlanWorkspaceSyncerClearsMissingImplMetadata(t *testing.T) {
 			notifier.count,
 		)
 	}
-	withoutImpl, err := service.queries.GetPlanWorkspace(
+	withoutImpl, err := service.queries.ListPlanWorkspaceImplBindings(
 		context.Background(),
 		"agent/plans/impl-sync-plan",
 	)
 	if err != nil {
+		t.Fatalf("ListPlanWorkspaceImplBindings(without impl) error = %v", err)
+	}
+	if len(withoutImpl) != 1 || withoutImpl[0].Status != "planned" || withoutImpl[0].CheckoutPath.Valid {
+		t.Fatalf("impl binding not cleared: %#v", withoutImpl)
+	}
+	planRow, err := service.queries.GetPlanWorkspace(context.Background(), "agent/plans/impl-sync-plan")
+	if err != nil {
 		t.Fatalf("GetPlanWorkspace(without impl) error = %v", err)
 	}
-	if withoutImpl.ImplWorkspacePath.Valid || withoutImpl.ImplWorkspaceUrl.Valid ||
-		withoutImpl.ImplWorkspaceDiscoveredAt.Valid {
-		t.Fatalf("impl metadata not cleared: %#v", withoutImpl)
-	}
-	if withoutImpl.ArchivedAt.Valid {
-		t.Fatalf("plan row archived after impl deletion: %#v", withoutImpl)
+	if planRow.ArchivedAt.Valid {
+		t.Fatalf("plan row archived after impl deletion: %#v", planRow)
 	}
 }
 

@@ -41,21 +41,18 @@ type PlanWorkspaceDiscoveryInput struct {
 }
 
 type DiscoveredPlanWorkspace struct {
-	ProjectID                 string
-	RelatedProjects           []string
-	DeclaredSource            string
-	PlanDir                   string
-	PlanDirRel                string
-	Label                     string
-	WorkspaceSlug             string
-	ImplWorkspacePath         string
-	ImplWorkspaceURL          string
-	ImplWorkspaceDiscoveredAt time.Time
-	ImplBindings              []DiscoveredPlanWorkspaceImplBinding
-	ArtifactUpdatedAt         time.Time
-	QRSPIStage                planworkspace.QRSPIStage
-	QRSPILifecycleUpdatedAt   time.Time
-	QRSPIClosedReason         string
+	ProjectID               string
+	RelatedProjects         []string
+	DeclaredSource          string
+	PlanDir                 string
+	PlanDirRel              string
+	Label                   string
+	WorkspaceSlug           string
+	ImplBindings            []DiscoveredPlanWorkspaceImplBinding
+	ArtifactUpdatedAt       time.Time
+	QRSPIStage              planworkspace.QRSPIStage
+	QRSPILifecycleUpdatedAt time.Time
+	QRSPIClosedReason       string
 }
 
 type DiscoveredPlanWorkspaceImplBinding struct {
@@ -127,7 +124,7 @@ func (s PlanWorkspaceScanner) now() time.Time {
 	return time.Now()
 }
 
-func ExpectedImplWorkspacePath(
+func expectedImplementationCheckoutPath(
 	planDir string,
 	cfg workspaces.ImplWorkspaceDiscoveryConfig,
 ) string {
@@ -171,7 +168,7 @@ func DiscoverImplWorkspaceBinding(
 		BindingSource: "metadata",
 		DiscoveredAt:  discoveredAt,
 	}
-	expected := ExpectedImplWorkspacePath(planDir, cfg)
+	expected := expectedImplementationCheckoutPath(planDir, cfg)
 	if isValidImplCheckout(expected, cfg) && discoveryConfigMatchesProject(cfg, projectID) {
 		binding.WorkspaceSlug = slug
 		binding.CheckoutPath = filepath.Clean(expected)
@@ -421,12 +418,6 @@ func (s PlanWorkspaceScanner) Scan(
 				return fmt.Errorf("derive workspace slug for %s: %w", path, err)
 			}
 			discoveredAt := s.now()
-			implPath, implURL, implAt, implOK := DiscoverImplWorkspace(
-				path,
-				slug,
-				s.ImplWorkspaces,
-				discoveredAt,
-			)
 			primaryProject := firstNonEmpty(frontmatter.Project, s.ProjectID)
 			relatedProjects := planworkspace.NormalizeRelatedProjects(primaryProject, frontmatter.RelatedProjects)
 			implBindings := discoverPlanWorkspaceImplBindings(path, rel, primaryProject, relatedProjects, slug, s.ImplWorkspaces, discoveredAt)
@@ -443,11 +434,6 @@ func (s PlanWorkspaceScanner) Scan(
 				QRSPILifecycleUpdatedAt: frontmatter.QRSPILifecycleUpdatedAt,
 				QRSPIClosedReason:       frontmatter.QRSPIClosedReason,
 				ImplBindings:            implBindings,
-			}
-			if implOK {
-				item.ImplWorkspacePath = implPath
-				item.ImplWorkspaceURL = implURL
-				item.ImplWorkspaceDiscoveredAt = implAt
 			}
 			discovered = append(discovered, item)
 			return nil
@@ -500,28 +486,9 @@ func (s *PlanWorkspaceSyncer) Sync(
 			ProjectID:         strings.TrimSpace(item.ProjectID),
 			PlanDir:           item.PlanDir,
 			Label:             item.Label,
-			WorkspaceSlug:     item.WorkspaceSlug,
 			ArtifactUpdatedAt: item.ArtifactUpdatedAt,
 			QrspiLifecycle:    string(item.QRSPIStage),
 			QrspiClosedReason: item.QRSPIClosedReason,
-		}
-		if strings.TrimSpace(item.ImplWorkspacePath) != "" {
-			params.ImplWorkspacePath = sql.NullString{
-				String: item.ImplWorkspacePath,
-				Valid:  true,
-			}
-		}
-		if strings.TrimSpace(item.ImplWorkspaceURL) != "" {
-			params.ImplWorkspaceUrl = sql.NullString{
-				String: item.ImplWorkspaceURL,
-				Valid:  true,
-			}
-		}
-		if !item.ImplWorkspaceDiscoveredAt.IsZero() {
-			params.ImplWorkspaceDiscoveredAt = sql.NullTime{
-				Time:  item.ImplWorkspaceDiscoveredAt,
-				Valid: true,
-			}
 		}
 		if !item.QRSPILifecycleUpdatedAt.IsZero() {
 			params.QrspiLifecycleUpdatedAt = sql.NullTime{
@@ -573,15 +540,8 @@ func (s *PlanWorkspaceSyncer) Sync(
 			result.Changed = true
 		}
 		if before.ProjectID != row.ProjectID || before.PlanDir != row.PlanDir || before.Label != row.Label ||
-			before.WorkspaceSlug != row.WorkspaceSlug ||
 			before.QrspiLifecycle != row.QrspiLifecycle ||
 			before.QrspiClosedReason != row.QrspiClosedReason ||
-			!nullStringsEqual(before.ImplWorkspacePath, row.ImplWorkspacePath) ||
-			!nullStringsEqual(before.ImplWorkspaceUrl, row.ImplWorkspaceUrl) ||
-			!nullTimesEqual(
-				before.ImplWorkspaceDiscoveredAt,
-				row.ImplWorkspaceDiscoveredAt,
-			) ||
 			!nullTimesEqual(
 				before.QrspiLifecycleUpdatedAt,
 				row.QrspiLifecycleUpdatedAt,

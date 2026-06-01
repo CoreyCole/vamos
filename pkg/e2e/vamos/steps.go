@@ -1141,7 +1141,6 @@ func seedFreeformTranscriptForSelection(t testing.TB, ctx *duiruntime.Context, s
 
 func seedProjectPlanWorkspace(t testing.TB, ctx *duiruntime.Context, database *sql.DB, projectID string) {
 	t.Helper()
-	stamp := time.Now().UTC().Format("20060102T150405.000000000")
 	slug := e2eProjectSlug(projectID)
 	rel := path.Join("creative-mode-agent", "plans", "e2e-project-filter-"+slug)
 	dir := filepath.Join(thoughtsRoot(ctx), rel)
@@ -1155,9 +1154,9 @@ func seedProjectPlanWorkspace(t testing.TB, ctx *duiruntime.Context, database *s
 	if err := os.WriteFile(filepath.Join(dir, "plan.md"), []byte(frontmatter), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	execSQL(t, database, `INSERT INTO plan_workspaces (plan_dir_rel, project_id, plan_dir, label, workspace_slug, artifact_updated_at, qrspi_lifecycle, last_discovered_at)
-VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP, 'plan', CURRENT_TIMESTAMP)
-ON CONFLICT(plan_dir_rel) DO UPDATE SET project_id = excluded.project_id, plan_dir = excluded.plan_dir, label = excluded.label, workspace_slug = excluded.workspace_slug, artifact_updated_at = CURRENT_TIMESTAMP, qrspi_lifecycle = excluded.qrspi_lifecycle, archived_at = NULL, last_discovered_at = CURRENT_TIMESTAMP`, rel, projectID, dir, projectPlanLabel(projectID), "e2e-project-filter-"+slug+"-"+stamp)
+	execSQL(t, database, `INSERT INTO plan_workspaces (plan_dir_rel, project_id, plan_dir, label, artifact_updated_at, qrspi_lifecycle, last_discovered_at)
+VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP, 'plan', CURRENT_TIMESTAMP)
+ON CONFLICT(plan_dir_rel) DO UPDATE SET project_id = excluded.project_id, plan_dir = excluded.plan_dir, label = excluded.label, artifact_updated_at = CURRENT_TIMESTAMP, qrspi_lifecycle = excluded.qrspi_lifecycle, archived_at = NULL, last_discovered_at = CURRENT_TIMESTAMP`, rel, projectID, dir, projectPlanLabel(projectID))
 }
 
 func seedQRSPIContinuationWorkspace(t testing.TB, ctx *duiruntime.Context, database *sql.DB) {

@@ -78,8 +78,8 @@ func BuildThoughtsWorkbenchQRSPILifecycle(ctx context.Context, db DBTX, input In
 		}
 		rel := filepath.ToSlash(filepath.Join("creative-mode-agent", "plans", plan.name))
 		if _, err := db.ExecContext(ctx, `
-INSERT INTO plan_workspaces (plan_dir_rel, plan_dir, label, workspace_slug, artifact_updated_at, qrspi_lifecycle, qrspi_closed_reason, last_discovered_at)
-VALUES (?, ?, ?, '', CURRENT_TIMESTAMP, ?, '', CURRENT_TIMESTAMP)
+INSERT INTO plan_workspaces (plan_dir_rel, plan_dir, label, artifact_updated_at, qrspi_lifecycle, qrspi_closed_reason, last_discovered_at)
+VALUES (?, ?, ?, CURRENT_TIMESTAMP, ?, '', CURRENT_TIMESTAMP)
 ON CONFLICT(plan_dir_rel) DO UPDATE SET plan_dir = excluded.plan_dir, label = excluded.label, artifact_updated_at = CURRENT_TIMESTAMP, qrspi_lifecycle = excluded.qrspi_lifecycle, archived_at = NULL, last_discovered_at = CURRENT_TIMESTAMP`, rel, dir, plan.name, plan.stage); err != nil {
 			if strings.Contains(err.Error(), "no such table") {
 				continue

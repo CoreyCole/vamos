@@ -185,10 +185,6 @@ plan_dir_rel TEXT PRIMARY KEY,
 project_id TEXT NOT NULL DEFAULT '',
 plan_dir TEXT NOT NULL,
 label TEXT NOT NULL,
-workspace_slug TEXT NOT NULL DEFAULT '',
-impl_workspace_path TEXT,
-impl_workspace_url TEXT,
-impl_workspace_discovered_at DATETIME,
 artifact_updated_at DATETIME NOT NULL,
 qrspi_lifecycle TEXT NOT NULL DEFAULT 'question'
 CHECK (qrspi_lifecycle IN ('question',
@@ -228,10 +224,6 @@ qrspi_lifecycle,
 artifact_updated_at DESC,
 plan_dir_rel)
 WHERE archived_at IS NULL ;
-
-CREATE UNIQUE INDEX IF NOT EXISTS idx_plan_workspaces_active_slug
-ON plan_workspaces (workspace_slug)
-WHERE archived_at IS NULL AND workspace_slug <> '' ;
 
 CREATE TABLE IF NOT EXISTS plan_workspace_projects (
 plan_dir_rel TEXT NOT NULL REFERENCES plan_workspaces (plan_dir_rel),
@@ -814,7 +806,7 @@ WHERE deleted_at IS NULL ;
 
 CREATE INDEX IF NOT EXISTS idx_document_comments_workspace_active
 ON document_comments (workspace_root, resolved, doc_path, created_at DESC)
-WHERE workspace_root != '' AND deleted_at IS NULL ;
+WHERE workspace_root <> '' AND deleted_at IS NULL ;
 
 CREATE TABLE IF NOT EXISTS document_comment_replies (
 id TEXT PRIMARY KEY,

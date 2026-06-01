@@ -817,7 +817,6 @@ func TestImplWorkspaceSyncerAttachesPlanBinding(t *testing.T) {
 		ProjectID:         "vamos",
 		PlanDir:           planDir,
 		Label:             "workspace discovery sync",
-		WorkspaceSlug:     "2026-05-20-20-18-45-workspace-discovery-sync",
 		ArtifactUpdatedAt: time.Now(),
 		QrspiLifecycle:    "implement",
 	})

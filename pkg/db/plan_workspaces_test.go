@@ -15,7 +15,6 @@ func insertPlanWorkspaceForProjectTest(t *testing.T, ctx context.Context, q *Que
 		ProjectID:         projectID,
 		PlanDir:           "thoughts/" + rel,
 		Label:             rel,
-		WorkspaceSlug:     strings.ReplaceAll(rel, "/", "-"),
 		ArtifactUpdatedAt: time.Now(),
 		QrspiLifecycle:    "implement",
 	})
