@@ -51,10 +51,24 @@ type DiscoveredPlanWorkspace struct {
 	ImplWorkspacePath         string
 	ImplWorkspaceURL          string
 	ImplWorkspaceDiscoveredAt time.Time
+	ImplBindings              []DiscoveredPlanWorkspaceImplBinding
 	ArtifactUpdatedAt         time.Time
 	QRSPIStage                planworkspace.QRSPIStage
 	QRSPILifecycleUpdatedAt   time.Time
 	QRSPIClosedReason         string
+}
+
+type DiscoveredPlanWorkspaceImplBinding struct {
+	PlanDirRel        string
+	ProjectID         string
+	WorkspaceSlug     string
+	CheckoutPath      string
+	URL               string
+	Status            string
+	BindingSource     string
+	ImplProjectID     string
+	ImplWorkspaceSlug string
+	DiscoveredAt      time.Time
 }
 
 type PlanWorkspaceDiscoveryResult struct {
@@ -135,16 +149,47 @@ func DiscoverImplWorkspace(
 	cfg workspaces.ImplWorkspaceDiscoveryConfig,
 	discoveredAt time.Time,
 ) (path, url string, at time.Time, ok bool) {
-	expected := ExpectedImplWorkspacePath(planDir, cfg)
-	if isValidImplCheckout(expected, cfg) {
-		return filepath.Clean(
-				expected,
-			), workspaces.WorkspaceURL(
-				slug,
-				cfg.Domain,
-			), discoveredAt, true
+	binding := DiscoverImplWorkspaceBinding(planDir, "", "", slug, cfg, discoveredAt)
+	if binding.Status != "active" {
+		return "", "", time.Time{}, false
 	}
-	return discoverBoundOrSyncedImplWorkspace(planDir, cfg, discoveredAt)
+	return binding.CheckoutPath, binding.URL, binding.DiscoveredAt, true
+}
+
+func DiscoverImplWorkspaceBinding(
+	planDir string,
+	planDirRel string,
+	projectID string,
+	slug string,
+	cfg workspaces.ImplWorkspaceDiscoveryConfig,
+	discoveredAt time.Time,
+) DiscoveredPlanWorkspaceImplBinding {
+	binding := DiscoveredPlanWorkspaceImplBinding{
+		PlanDirRel:    planDirRel,
+		ProjectID:     strings.TrimSpace(projectID),
+		Status:        "planned",
+		BindingSource: "metadata",
+		DiscoveredAt:  discoveredAt,
+	}
+	expected := ExpectedImplWorkspacePath(planDir, cfg)
+	if isValidImplCheckout(expected, cfg) && discoveryConfigMatchesProject(cfg, projectID) {
+		binding.WorkspaceSlug = slug
+		binding.CheckoutPath = filepath.Clean(expected)
+		binding.URL = workspaces.WorkspaceURL(slug, cfg.Domain)
+		binding.Status = "active"
+		binding.BindingSource = "expected_path"
+		return binding
+	}
+	path, url, checkoutSlug, source, ok := discoverBoundOrSyncedImplWorkspaceForProject(planDir, projectID, cfg)
+	if !ok {
+		return binding
+	}
+	binding.WorkspaceSlug = checkoutSlug
+	binding.CheckoutPath = path
+	binding.URL = url
+	binding.Status = "active"
+	binding.BindingSource = source
+	return binding
 }
 
 func discoverBoundOrSyncedImplWorkspace(
@@ -152,16 +197,28 @@ func discoverBoundOrSyncedImplWorkspace(
 	cfg workspaces.ImplWorkspaceDiscoveryConfig,
 	discoveredAt time.Time,
 ) (path, url string, at time.Time, ok bool) {
+	path, url, _, _, ok = discoverBoundOrSyncedImplWorkspaceForProject(planDir, "", cfg)
+	if !ok {
+		return "", "", time.Time{}, false
+	}
+	return path, url, discoveredAt, true
+}
+
+func discoverBoundOrSyncedImplWorkspaceForProject(
+	planDir string,
+	projectID string,
+	cfg workspaces.ImplWorkspaceDiscoveryConfig,
+) (path, url, slug, source string, ok bool) {
 	parent := strings.TrimSpace(cfg.ParentDir)
 	if parent == "" && strings.TrimSpace(cfg.MainCheckoutPath) != "" {
 		parent = filepath.Dir(filepath.Clean(cfg.MainCheckoutPath))
 	}
 	if parent == "" {
-		return "", "", time.Time{}, false
+		return "", "", "", "", false
 	}
 	entries, err := os.ReadDir(parent)
 	if err != nil {
-		return "", "", time.Time{}, false
+		return "", "", "", "", false
 	}
 	var syncedFallback string
 	var syncedFallbackSlug string
@@ -185,28 +242,24 @@ func discoverBoundOrSyncedImplWorkspace(
 		binding, err := workspaces.ReadPlanWorkspaceBinding(
 			workspaces.PlanWorkspaceBindingPath(checkoutPath),
 		)
-		if err == nil && workspaces.PlanWorkspaceBindingMatches(binding, planDir) {
-			return filepath.Clean(
-					checkoutPath,
-				), workspaces.WorkspaceURL(
-					checkoutSlug,
-					cfg.Domain,
-				), discoveredAt, true
+		if err == nil && workspaces.PlanWorkspaceBindingMatchesProject(binding, planDir, projectID) {
+			return filepath.Clean(checkoutPath), workspaces.WorkspaceURL(checkoutSlug, cfg.Domain), checkoutSlug, "binding_file", true
 		}
-		if syncedFallback == "" && syncedPlanDirExists(checkoutPath, planDir) {
+		if syncedFallback == "" && discoveryConfigMatchesProject(cfg, projectID) && syncedPlanDirExists(checkoutPath, planDir) {
 			syncedFallback = checkoutPath
 			syncedFallbackSlug = checkoutSlug
 		}
 	}
 	if syncedFallback != "" {
-		return filepath.Clean(
-				syncedFallback,
-			), workspaces.WorkspaceURL(
-				syncedFallbackSlug,
-				cfg.Domain,
-			), discoveredAt, true
+		return filepath.Clean(syncedFallback), workspaces.WorkspaceURL(syncedFallbackSlug, cfg.Domain), syncedFallbackSlug, "synced_plan_dir", true
 	}
-	return "", "", time.Time{}, false
+	return "", "", "", "", false
+}
+
+func discoveryConfigMatchesProject(cfg workspaces.ImplWorkspaceDiscoveryConfig, projectID string) bool {
+	configuredProject := strings.TrimSpace(cfg.ProjectID)
+	projectID = strings.TrimSpace(projectID)
+	return configuredProject == "" || projectID == "" || configuredProject == projectID
 }
 
 func isValidImplCheckout(
@@ -280,6 +333,31 @@ func syncedPlanDirExists(checkoutPath, planDir string) bool {
 	return err == nil && info.IsDir()
 }
 
+func discoverPlanWorkspaceImplBindings(
+	planDir string,
+	planDirRel string,
+	primaryProject string,
+	relatedProjects []string,
+	slug string,
+	cfg workspaces.ImplWorkspaceDiscoveryConfig,
+	discoveredAt time.Time,
+) []DiscoveredPlanWorkspaceImplBinding {
+	projectIDs := make([]string, 0, 1+len(relatedProjects))
+	if primaryProject = strings.TrimSpace(primaryProject); primaryProject != "" {
+		projectIDs = append(projectIDs, primaryProject)
+	}
+	for _, related := range relatedProjects {
+		if related = strings.TrimSpace(related); related != "" && related != primaryProject {
+			projectIDs = append(projectIDs, related)
+		}
+	}
+	bindings := make([]DiscoveredPlanWorkspaceImplBinding, 0, len(projectIDs))
+	for _, projectID := range projectIDs {
+		bindings = append(bindings, DiscoverImplWorkspaceBinding(planDir, planDirRel, projectID, slug, cfg, discoveredAt))
+	}
+	return bindings
+}
+
 func (s PlanWorkspaceScanner) Scan(
 	ctx context.Context,
 ) ([]DiscoveredPlanWorkspace, error) {
@@ -350,9 +428,11 @@ func (s PlanWorkspaceScanner) Scan(
 				discoveredAt,
 			)
 			primaryProject := firstNonEmpty(frontmatter.Project, s.ProjectID)
+			relatedProjects := planworkspace.NormalizeRelatedProjects(primaryProject, frontmatter.RelatedProjects)
+			implBindings := discoverPlanWorkspaceImplBindings(path, rel, primaryProject, relatedProjects, slug, s.ImplWorkspaces, discoveredAt)
 			item := DiscoveredPlanWorkspace{
 				ProjectID:               primaryProject,
-				RelatedProjects:         planworkspace.NormalizeRelatedProjects(primaryProject, frontmatter.RelatedProjects),
+				RelatedProjects:         relatedProjects,
 				DeclaredSource:          frontmatter.DeclaredSource,
 				PlanDir:                 filepath.Clean(path),
 				PlanDirRel:              rel,
@@ -362,6 +442,7 @@ func (s PlanWorkspaceScanner) Scan(
 				QRSPIStage:              frontmatter.QRSPIStage,
 				QRSPILifecycleUpdatedAt: frontmatter.QRSPILifecycleUpdatedAt,
 				QRSPIClosedReason:       frontmatter.QRSPIClosedReason,
+				ImplBindings:            implBindings,
 			}
 			if implOK {
 				item.ImplWorkspacePath = implPath
@@ -458,6 +539,13 @@ func (s *PlanWorkspaceSyncer) Sync(
 			return PlanWorkspaceDiscoveryResult{}, err
 		}
 		if rolesChanged {
+			result.Changed = true
+		}
+		bindingsChanged, err := syncPlanWorkspaceImplBindings(ctx, s.Queries, item)
+		if err != nil {
+			return PlanWorkspaceDiscoveryResult{}, err
+		}
+		if bindingsChanged {
 			result.Changed = true
 		}
 
@@ -732,6 +820,58 @@ func isPlanWorkspaceChildContainer(name string) bool {
 	default:
 		return false
 	}
+}
+
+func syncPlanWorkspaceImplBindings(
+	ctx context.Context,
+	q *db.Queries,
+	item DiscoveredPlanWorkspace,
+) (bool, error) {
+	changed := false
+	beforeRows, err := q.ListPlanWorkspaceImplBindings(ctx, item.PlanDirRel)
+	if err != nil {
+		return false, err
+	}
+	beforeByProject := make(map[string]db.PlanWorkspaceImplBinding, len(beforeRows))
+	for _, row := range beforeRows {
+		beforeByProject[row.ProjectID] = row
+	}
+	for _, binding := range item.ImplBindings {
+		if strings.TrimSpace(binding.ProjectID) == "" {
+			continue
+		}
+		row, err := q.UpsertPlanWorkspaceImplBinding(ctx, db.UpsertPlanWorkspaceImplBindingParams{
+			PlanDirRel:        item.PlanDirRel,
+			ProjectID:         binding.ProjectID,
+			WorkspaceSlug:     nullableString(binding.WorkspaceSlug),
+			CheckoutPath:      nullableString(binding.CheckoutPath),
+			Url:               nullableString(binding.URL),
+			Status:            binding.Status,
+			BindingSource:     binding.BindingSource,
+			ImplProjectID:     nullableString(binding.ImplProjectID),
+			ImplWorkspaceSlug: nullableString(binding.ImplWorkspaceSlug),
+		})
+		if err != nil {
+			return false, err
+		}
+		if before, ok := beforeByProject[row.ProjectID]; !ok || planWorkspaceImplBindingChanged(before, row) {
+			changed = true
+		}
+	}
+	return changed, nil
+}
+
+func planWorkspaceImplBindingChanged(a, b db.PlanWorkspaceImplBinding) bool {
+	return a.PlanDirRel != b.PlanDirRel ||
+		a.ProjectID != b.ProjectID ||
+		!nullStringsEqual(a.WorkspaceSlug, b.WorkspaceSlug) ||
+		!nullStringsEqual(a.CheckoutPath, b.CheckoutPath) ||
+		!nullStringsEqual(a.Url, b.Url) ||
+		a.Status != b.Status ||
+		a.BindingSource != b.BindingSource ||
+		!nullStringsEqual(a.ImplProjectID, b.ImplProjectID) ||
+		!nullStringsEqual(a.ImplWorkspaceSlug, b.ImplWorkspaceSlug) ||
+		a.ArchivedAt.Valid != b.ArchivedAt.Valid
 }
 
 func syncPlanWorkspaceProjects(

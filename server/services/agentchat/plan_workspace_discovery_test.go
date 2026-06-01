@@ -355,6 +355,80 @@ func TestPlanWorkspaceSyncerSyncsProjectRolesFromMetadata(t *testing.T) {
 	}
 }
 
+func TestPlanWorkspaceSyncerCreatesAndUpdatesProjectBindings(t *testing.T) {
+	service := newTestAgentChatService(t)
+	thoughtsRoot := t.TempDir()
+	parent := t.TempDir()
+	planDir := filepath.Join(thoughtsRoot, "agent", "plans", "project-bindings")
+	writePlanWorkspaceMarkdown(t, planDir, "plan.md", "---\nproject: vamos\nrelated_projects: [datastarui]\n---\n# Plan\n")
+	syncer := &PlanWorkspaceSyncer{
+		Queries: service.queries,
+		Scanner: PlanWorkspaceScanner{
+			ThoughtsRoot: thoughtsRoot,
+			ImplWorkspaces: workspaces.ImplWorkspaceDiscoveryConfig{
+				ParentDir:        parent,
+				Domain:           "workspaces.test",
+				CheckoutPrefixes: []string{"vamos", "datastarui"},
+				ModuleMarker:     "go.mod",
+			},
+		},
+	}
+
+	if _, err := syncer.Sync(context.Background(), PlanWorkspaceDiscoveryInput{}); err != nil {
+		t.Fatalf("Sync() error = %v", err)
+	}
+	bindings, err := service.queries.ListPlanWorkspaceImplBindings(context.Background(), "agent/plans/project-bindings")
+	if err != nil {
+		t.Fatalf("ListPlanWorkspaceImplBindings() error = %v", err)
+	}
+	got := planBindingStatusByProject(bindings)
+	want := map[string]string{"vamos": "planned:metadata:", "datastarui": "planned:metadata:"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("planned bindings = %#v, want %#v", got, want)
+	}
+
+	checkout := filepath.Join(parent, "datastarui-project-bindings")
+	writePlanWorkspaceFile(t, checkout, "go.mod", time.Now())
+	if err := workspaces.WritePlanWorkspaceBinding(
+		workspaces.PlanWorkspaceBindingPath(checkout),
+		workspaces.PlanWorkspaceBinding{
+			PlanDir:       planDir,
+			WorkspaceSlug: "project-bindings",
+			CheckoutPath:  checkout,
+			ProjectID:     "datastarui",
+		},
+	); err != nil {
+		t.Fatalf("WritePlanWorkspaceBinding() error = %v", err)
+	}
+	if _, err := syncer.Sync(context.Background(), PlanWorkspaceDiscoveryInput{}); err != nil {
+		t.Fatalf("second Sync() error = %v", err)
+	}
+	bindings, err = service.queries.ListPlanWorkspaceImplBindings(context.Background(), "agent/plans/project-bindings")
+	if err != nil {
+		t.Fatalf("ListPlanWorkspaceImplBindings(second) error = %v", err)
+	}
+	got = planBindingStatusByProject(bindings)
+	want = map[string]string{
+		"vamos":      "planned:metadata:",
+		"datastarui": "active:binding_file:" + checkout,
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("updated bindings = %#v, want %#v", got, want)
+	}
+}
+
+func planBindingStatusByProject(bindings []db.PlanWorkspaceImplBinding) map[string]string {
+	out := make(map[string]string, len(bindings))
+	for _, binding := range bindings {
+		checkout := ""
+		if binding.CheckoutPath.Valid {
+			checkout = binding.CheckoutPath.String
+		}
+		out[binding.ProjectID] = binding.Status + ":" + binding.BindingSource + ":" + checkout
+	}
+	return out
+}
+
 func TestPlanWorkspaceSyncerListsCurrentAndHistoricalLifecycle(t *testing.T) {
 	service := newTestAgentChatService(t)
 	ctx := context.Background()

@@ -788,6 +788,20 @@ func TestImplWorkspaceSyncerRestoresDiscoveredMergedCheckoutToActiveWhenHeadChan
 	}
 }
 
+func TestPlanWorkspaceBindingMatchesProject(t *testing.T) {
+	binding := PlanWorkspaceBinding{PlanDir: "thoughts/agent/plans/demo", ProjectID: "datastarui"}
+	if !PlanWorkspaceBindingMatchesProject(binding, "thoughts/agent/plans/demo", "datastarui") {
+		t.Fatal("binding should match same project")
+	}
+	if PlanWorkspaceBindingMatchesProject(binding, "thoughts/agent/plans/demo", "vamos") {
+		t.Fatal("binding should not match a different project")
+	}
+	legacy := PlanWorkspaceBinding{PlanDir: "thoughts/agent/plans/demo"}
+	if !PlanWorkspaceBindingMatchesProject(legacy, "thoughts/agent/plans/demo", "vamos") {
+		t.Fatal("legacy binding without project id should remain compatible")
+	}
+}
+
 func TestImplWorkspaceSyncerAttachesPlanBinding(t *testing.T) {
 	ctx := context.Background()
 	parent := t.TempDir()
@@ -798,6 +812,18 @@ func TestImplWorkspaceSyncerAttachesPlanBinding(t *testing.T) {
 	)
 	queries := openImplSyncTestQueries(t)
 	planDir := "thoughts/creative-mode-agent/plans/2026-05-20_20-18-45_workspace-discovery-sync"
+	_, err := queries.UpsertDiscoveredPlanWorkspace(ctx, db.UpsertDiscoveredPlanWorkspaceParams{
+		PlanDirRel:        planDir,
+		ProjectID:         "vamos",
+		PlanDir:           planDir,
+		Label:             "workspace discovery sync",
+		WorkspaceSlug:     "2026-05-20-20-18-45-workspace-discovery-sync",
+		ArtifactUpdatedAt: time.Now(),
+		QrspiLifecycle:    "implement",
+	})
+	if err != nil {
+		t.Fatalf("UpsertDiscoveredPlanWorkspace: %v", err)
+	}
 	if err := WritePlanWorkspaceBinding(
 		PlanWorkspaceBindingPath(checkout),
 		PlanWorkspaceBinding{
@@ -809,7 +835,8 @@ func TestImplWorkspaceSyncerAttachesPlanBinding(t *testing.T) {
 		t.Fatalf("WritePlanWorkspaceBinding: %v", err)
 	}
 
-	_, err := (&ImplWorkspaceSyncer{Queries: queries}).Sync(ctx, ImplWorkspaceSyncInput{
+	_, err = (&ImplWorkspaceSyncer{Queries: queries}).Sync(ctx, ImplWorkspaceSyncInput{
+		ProjectID: "vamos",
 		Discovery: ImplWorkspaceDiscoveryConfig{
 			ParentDir: parent,
 			Domain:    "workspaces.example.test",
@@ -820,7 +847,7 @@ func TestImplWorkspaceSyncerAttachesPlanBinding(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Sync: %v", err)
 	}
-	row, err := queries.GetImplWorkspace(ctx, db.GetImplWorkspaceParams{WorkspaceSlug: "2026-05-20-20-18-45-workspace-discovery-sync"})
+	row, err := queries.GetImplWorkspace(ctx, db.GetImplWorkspaceParams{ProjectID: "vamos", WorkspaceSlug: "2026-05-20-20-18-45-workspace-discovery-sync"})
 	if err != nil {
 		t.Fatalf("GetImplWorkspace: %v", err)
 	}
@@ -832,6 +859,13 @@ func TestImplWorkspaceSyncerAttachesPlanBinding(t *testing.T) {
 			row.PlanDir,
 			planDir,
 		)
+	}
+	bindings, err := queries.ListPlanWorkspaceImplBindings(ctx, planDir)
+	if err != nil {
+		t.Fatalf("ListPlanWorkspaceImplBindings: %v", err)
+	}
+	if len(bindings) != 1 || bindings[0].ProjectID != "vamos" || bindings[0].Status != "active" || bindings[0].BindingSource != "binding_file" {
+		t.Fatalf("plan workspace impl bindings = %#v", bindings)
 	}
 }
 

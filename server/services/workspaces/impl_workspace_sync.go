@@ -108,6 +108,9 @@ func (s *ImplWorkspaceSyncer) Sync(
 		if err != nil {
 			return ImplWorkspaceSyncResult{}, err
 		}
+		if err := upsertPlanBindingForImplWorkspace(ctx, s.Queries, projectID, ws, binding); err != nil {
+			return ImplWorkspaceSyncResult{}, err
+		}
 		result.Upserted++
 		rowChanged := errors.Is(beforeErr, sql.ErrNoRows) ||
 			implWorkspaceRowChanged(before, row)
@@ -220,6 +223,41 @@ func readBestEffortPlanBinding(checkoutPath string) PlanWorkspaceBinding {
 		return PlanWorkspaceBinding{}
 	}
 	return binding
+}
+
+func upsertPlanBindingForImplWorkspace(
+	ctx context.Context,
+	q *db.Queries,
+	projectID string,
+	ws Workspace,
+	binding PlanWorkspaceBinding,
+) error {
+	planDir := strings.TrimSpace(binding.PlanDir)
+	if planDir == "" {
+		return nil
+	}
+	if _, err := q.GetPlanWorkspace(ctx, planDir); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil
+		}
+		return err
+	}
+	bindingProjectID := strings.TrimSpace(firstNonEmpty(binding.ProjectID, projectID))
+	if bindingProjectID == "" {
+		return nil
+	}
+	_, err := q.UpsertPlanWorkspaceImplBinding(ctx, db.UpsertPlanWorkspaceImplBindingParams{
+		PlanDirRel:        planDir,
+		ProjectID:         bindingProjectID,
+		WorkspaceSlug:     nullableString(ws.Slug),
+		CheckoutPath:      nullableString(ws.CheckoutPath),
+		Url:               nullableString(ws.URL),
+		Status:            string(ImplWorkspaceStatusActive),
+		BindingSource:     "binding_file",
+		ImplProjectID:     nullableString(projectID),
+		ImplWorkspaceSlug: nullableString(ws.Slug),
+	})
+	return err
 }
 
 func implWorkspaceUpsertParams(

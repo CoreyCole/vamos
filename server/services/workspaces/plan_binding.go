@@ -14,6 +14,7 @@ type PlanWorkspaceBinding struct {
 	PlanDir       string    `json:"plan_dir"`
 	WorkspaceSlug string    `json:"workspace_slug"`
 	CheckoutPath  string    `json:"checkout_path"`
+	ProjectID     string    `json:"project_id,omitempty"`
 	CreatedBy     string    `json:"created_by,omitempty"`
 	UpdatedAt     time.Time `json:"updated_at"`
 }
@@ -51,6 +52,14 @@ func WritePlanWorkspaceBinding(path string, binding PlanWorkspaceBinding) error 
 
 func PlanWorkspaceBindingMatches(binding PlanWorkspaceBinding, planDir string) bool {
 	return normalizePlanDir(binding.PlanDir) == normalizePlanDir(planDir)
+}
+
+func PlanWorkspaceBindingMatchesProject(binding PlanWorkspaceBinding, planDir, projectID string) bool {
+	if !PlanWorkspaceBindingMatches(binding, planDir) {
+		return false
+	}
+	bindingProject := strings.TrimSpace(binding.ProjectID)
+	return bindingProject == "" || bindingProject == strings.TrimSpace(projectID)
 }
 
 func normalizePlanDir(value string) string {
