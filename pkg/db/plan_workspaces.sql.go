@@ -28,6 +28,40 @@ func (q *Queries) ArchiveAllActivePlanWorkspaces(ctx context.Context) (int64, er
 	return result.RowsAffected()
 }
 
+const archiveMissingPlanWorkspaceProjects = `-- name: ArchiveMissingPlanWorkspaceProjects :execrows
+;
+
+UPDATE plan_workspace_projects
+SET archived_at = CURRENT_TIMESTAMP
+WHERE plan_dir_rel = ?1
+AND archived_at IS NULL
+AND project_id NOT IN (/*SLICE:project_ids*/?)
+`
+
+type ArchiveMissingPlanWorkspaceProjectsParams struct {
+	PlanDirRel string   `json:"plan_dir_rel"`
+	ProjectIds []string `json:"project_ids"`
+}
+
+func (q *Queries) ArchiveMissingPlanWorkspaceProjects(ctx context.Context, arg ArchiveMissingPlanWorkspaceProjectsParams) (int64, error) {
+	query := archiveMissingPlanWorkspaceProjects
+	var queryParams []interface{}
+	queryParams = append(queryParams, arg.PlanDirRel)
+	if len(arg.ProjectIds) > 0 {
+		for _, v := range arg.ProjectIds {
+			queryParams = append(queryParams, v)
+		}
+		query = strings.Replace(query, "/*SLICE:project_ids*/?", strings.Repeat(",?", len(arg.ProjectIds))[1:], 1)
+	} else {
+		query = strings.Replace(query, "/*SLICE:project_ids*/?", "NULL", 1)
+	}
+	result, err := q.db.ExecContext(ctx, query, queryParams...)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
 const archiveMissingPlanWorkspaces = `-- name: ArchiveMissingPlanWorkspaces :execrows
 ;
 
@@ -93,6 +127,14 @@ WHERE
     AND (
         CAST(?1 AS TEXT) = ''
         OR project_id = CAST(?1 AS TEXT)
+        OR EXISTS (
+            SELECT 1
+            FROM plan_workspace_projects pwp
+            WHERE
+                pwp.plan_dir_rel = plan_workspaces.plan_dir_rel
+                AND pwp.project_id = CAST(?1 AS TEXT)
+                AND pwp.archived_at IS NULL
+        )
     )
 ORDER BY artifact_updated_at DESC, LOWER(label), plan_dir_rel
 `
@@ -136,6 +178,93 @@ func (q *Queries) ListCurrentPlanWorkspaces(ctx context.Context, projectID strin
 	return items, nil
 }
 
+const listPlanWorkspaceImplBindings = `-- name: ListPlanWorkspaceImplBindings :many
+;
+
+SELECT plan_dir_rel, project_id, workspace_slug, checkout_path, url, status, binding_source, impl_project_id, impl_workspace_slug, discovered_at, last_discovered_at, archived_at
+FROM plan_workspace_impl_bindings
+WHERE plan_dir_rel = ?1
+AND archived_at IS NULL
+ORDER BY project_id
+`
+
+func (q *Queries) ListPlanWorkspaceImplBindings(ctx context.Context, planDirRel string) ([]PlanWorkspaceImplBinding, error) {
+	rows, err := q.db.QueryContext(ctx, listPlanWorkspaceImplBindings, planDirRel)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []PlanWorkspaceImplBinding
+	for rows.Next() {
+		var i PlanWorkspaceImplBinding
+		if err := rows.Scan(
+			&i.PlanDirRel,
+			&i.ProjectID,
+			&i.WorkspaceSlug,
+			&i.CheckoutPath,
+			&i.Url,
+			&i.Status,
+			&i.BindingSource,
+			&i.ImplProjectID,
+			&i.ImplWorkspaceSlug,
+			&i.DiscoveredAt,
+			&i.LastDiscoveredAt,
+			&i.ArchivedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listPlanWorkspaceProjects = `-- name: ListPlanWorkspaceProjects :many
+;
+
+SELECT plan_dir_rel, project_id, role, declared_source, declared_at, last_discovered_at, archived_at
+FROM plan_workspace_projects
+WHERE plan_dir_rel = ?1
+AND archived_at IS NULL
+ORDER BY CASE role WHEN 'primary' THEN 0 ELSE 1 END, project_id
+`
+
+func (q *Queries) ListPlanWorkspaceProjects(ctx context.Context, planDirRel string) ([]PlanWorkspaceProject, error) {
+	rows, err := q.db.QueryContext(ctx, listPlanWorkspaceProjects, planDirRel)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []PlanWorkspaceProject
+	for rows.Next() {
+		var i PlanWorkspaceProject
+		if err := rows.Scan(
+			&i.PlanDirRel,
+			&i.ProjectID,
+			&i.Role,
+			&i.DeclaredSource,
+			&i.DeclaredAt,
+			&i.LastDiscoveredAt,
+			&i.ArchivedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listPlanWorkspaces = `-- name: ListPlanWorkspaces :many
 SELECT plan_dir_rel, project_id, plan_dir, label, workspace_slug, impl_workspace_path, impl_workspace_url, impl_workspace_discovered_at, artifact_updated_at, qrspi_lifecycle, qrspi_lifecycle_updated_at, qrspi_closed_reason, discovered_at, last_discovered_at, archived_at
 FROM plan_workspaces
@@ -144,6 +273,14 @@ WHERE
     AND (
         CAST(?1 AS TEXT) = ''
         OR project_id = CAST(?1 AS TEXT)
+        OR EXISTS (
+            SELECT 1
+            FROM plan_workspace_projects pwp
+            WHERE
+                pwp.plan_dir_rel = plan_workspaces.plan_dir_rel
+                AND pwp.project_id = CAST(?1 AS TEXT)
+                AND pwp.archived_at IS NULL
+        )
     )
 ORDER BY artifact_updated_at DESC, LOWER(label), plan_dir_rel
 `
@@ -278,6 +415,136 @@ func (q *Queries) UpsertDiscoveredPlanWorkspace(ctx context.Context, arg UpsertD
 		&i.QrspiLifecycleUpdatedAt,
 		&i.QrspiClosedReason,
 		&i.DiscoveredAt,
+		&i.LastDiscoveredAt,
+		&i.ArchivedAt,
+	)
+	return i, err
+}
+
+const upsertPlanWorkspaceImplBinding = `-- name: UpsertPlanWorkspaceImplBinding :one
+;
+
+INSERT INTO plan_workspace_impl_bindings (
+plan_dir_rel,
+project_id,
+workspace_slug,
+checkout_path,
+url,
+status,
+binding_source,
+impl_project_id,
+impl_workspace_slug
+)
+VALUES (
+?1,
+?2,
+?3,
+?4,
+?5,
+?6,
+?7,
+?8,
+?9
+)
+ON CONFLICT (plan_dir_rel, project_id) DO UPDATE SET
+workspace_slug = excluded.workspace_slug,
+checkout_path = excluded.checkout_path,
+url = excluded.url,
+status = excluded.status,
+binding_source = excluded.binding_source,
+impl_project_id = excluded.impl_project_id,
+impl_workspace_slug = excluded.impl_workspace_slug,
+last_discovered_at = CURRENT_TIMESTAMP,
+archived_at = NULL
+RETURNING plan_dir_rel, project_id, workspace_slug, checkout_path, url, status, binding_source, impl_project_id, impl_workspace_slug, discovered_at, last_discovered_at, archived_at
+`
+
+type UpsertPlanWorkspaceImplBindingParams struct {
+	PlanDirRel        string         `json:"plan_dir_rel"`
+	ProjectID         string         `json:"project_id"`
+	WorkspaceSlug     sql.NullString `json:"workspace_slug"`
+	CheckoutPath      sql.NullString `json:"checkout_path"`
+	Url               sql.NullString `json:"url"`
+	Status            string         `json:"status"`
+	BindingSource     string         `json:"binding_source"`
+	ImplProjectID     sql.NullString `json:"impl_project_id"`
+	ImplWorkspaceSlug sql.NullString `json:"impl_workspace_slug"`
+}
+
+func (q *Queries) UpsertPlanWorkspaceImplBinding(ctx context.Context, arg UpsertPlanWorkspaceImplBindingParams) (PlanWorkspaceImplBinding, error) {
+	row := q.db.QueryRowContext(ctx, upsertPlanWorkspaceImplBinding,
+		arg.PlanDirRel,
+		arg.ProjectID,
+		arg.WorkspaceSlug,
+		arg.CheckoutPath,
+		arg.Url,
+		arg.Status,
+		arg.BindingSource,
+		arg.ImplProjectID,
+		arg.ImplWorkspaceSlug,
+	)
+	var i PlanWorkspaceImplBinding
+	err := row.Scan(
+		&i.PlanDirRel,
+		&i.ProjectID,
+		&i.WorkspaceSlug,
+		&i.CheckoutPath,
+		&i.Url,
+		&i.Status,
+		&i.BindingSource,
+		&i.ImplProjectID,
+		&i.ImplWorkspaceSlug,
+		&i.DiscoveredAt,
+		&i.LastDiscoveredAt,
+		&i.ArchivedAt,
+	)
+	return i, err
+}
+
+const upsertPlanWorkspaceProject = `-- name: UpsertPlanWorkspaceProject :one
+;
+
+INSERT INTO plan_workspace_projects (
+plan_dir_rel,
+project_id,
+role,
+declared_source
+)
+VALUES (
+?1,
+?2,
+?3,
+?4
+)
+ON CONFLICT (plan_dir_rel, project_id) DO UPDATE SET
+role = excluded.role,
+declared_source = excluded.declared_source,
+last_discovered_at = CURRENT_TIMESTAMP,
+archived_at = NULL
+RETURNING plan_dir_rel, project_id, role, declared_source, declared_at, last_discovered_at, archived_at
+`
+
+type UpsertPlanWorkspaceProjectParams struct {
+	PlanDirRel     string `json:"plan_dir_rel"`
+	ProjectID      string `json:"project_id"`
+	Role           string `json:"role"`
+	DeclaredSource string `json:"declared_source"`
+}
+
+func (q *Queries) UpsertPlanWorkspaceProject(ctx context.Context, arg UpsertPlanWorkspaceProjectParams) (PlanWorkspaceProject, error) {
+	row := q.db.QueryRowContext(ctx, upsertPlanWorkspaceProject,
+		arg.PlanDirRel,
+		arg.ProjectID,
+		arg.Role,
+		arg.DeclaredSource,
+	)
+	var i PlanWorkspaceProject
+	err := row.Scan(
+		&i.PlanDirRel,
+		&i.ProjectID,
+		&i.Role,
+		&i.DeclaredSource,
+		&i.DeclaredAt,
 		&i.LastDiscoveredAt,
 		&i.ArchivedAt,
 	)

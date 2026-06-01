@@ -13,6 +13,7 @@ type Querier interface {
 	AppendChatSessionEvent(ctx context.Context, arg AppendChatSessionEventParams) (ChatSessionEvent, error)
 	AppendReleaseQueueEvent(ctx context.Context, arg AppendReleaseQueueEventParams) (ReleaseQueueEvent, error)
 	ArchiveAllActivePlanWorkspaces(ctx context.Context) (int64, error)
+	ArchiveMissingPlanWorkspaceProjects(ctx context.Context, arg ArchiveMissingPlanWorkspaceProjectsParams) (int64, error)
 	ArchiveMissingPlanWorkspaces(ctx context.Context, planDirRels []string) (int64, error)
 	AttachThreadToWorkspace(ctx context.Context, arg AttachThreadToWorkspaceParams) error
 	BackfillAgentRunsWorkspaceForThread(ctx context.Context, arg BackfillAgentRunsWorkspaceForThreadParams) error
@@ -124,6 +125,8 @@ type Querier interface {
 	ListOpenChatAnnotationsByIDs(ctx context.Context, ids []string) ([]ChatAnnotation, error)
 	ListPlanOwnedSessionArtifactsByPlanDir(ctx context.Context, planDir sql.NullString) ([]AgentSession, error)
 	ListPlanOwnedSessionArtifactsByPlanDirPrefix(ctx context.Context, arg ListPlanOwnedSessionArtifactsByPlanDirPrefixParams) ([]AgentSession, error)
+	ListPlanWorkspaceImplBindings(ctx context.Context, planDirRel string) ([]PlanWorkspaceImplBinding, error)
+	ListPlanWorkspaceProjects(ctx context.Context, planDirRel string) ([]PlanWorkspaceProject, error)
 	ListPlanWorkspaces(ctx context.Context, projectID string) ([]PlanWorkspace, error)
 	ListPrivateSessionArtifactsByPlanDir(ctx context.Context, arg ListPrivateSessionArtifactsByPlanDirParams) ([]AgentSession, error)
 	ListPrivateSessionArtifactsByPlanDirPrefix(ctx context.Context, arg ListPrivateSessionArtifactsByPlanDirPrefixParams) ([]AgentSession, error)
@@ -202,6 +205,8 @@ type Querier interface {
 	UpsertDiscoveredImplWorkspace(ctx context.Context, arg UpsertDiscoveredImplWorkspaceParams) (ImplWorkspace, error)
 	UpsertDiscoveredPlanWorkspace(ctx context.Context, arg UpsertDiscoveredPlanWorkspaceParams) (PlanWorkspace, error)
 	UpsertLayoutPreference(ctx context.Context, arg UpsertLayoutPreferenceParams) (LayoutPreference, error)
+	UpsertPlanWorkspaceImplBinding(ctx context.Context, arg UpsertPlanWorkspaceImplBindingParams) (PlanWorkspaceImplBinding, error)
+	UpsertPlanWorkspaceProject(ctx context.Context, arg UpsertPlanWorkspaceProjectParams) (PlanWorkspaceProject, error)
 	UpsertThreadWorkspaceAssociation(ctx context.Context, arg UpsertThreadWorkspaceAssociationParams) error
 	UpsertUserChatSelection(ctx context.Context, arg UpsertUserChatSelectionParams) (UserChatSelection, error)
 	UpsertUserPreferences(ctx context.Context, arg UpsertUserPreferencesParams) (UserPreference, error)

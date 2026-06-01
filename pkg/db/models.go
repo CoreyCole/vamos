@@ -367,6 +367,31 @@ type PlanWorkspace struct {
 	ArchivedAt                sql.NullTime   `json:"archived_at"`
 }
 
+type PlanWorkspaceImplBinding struct {
+	PlanDirRel        string         `json:"plan_dir_rel"`
+	ProjectID         string         `json:"project_id"`
+	WorkspaceSlug     sql.NullString `json:"workspace_slug"`
+	CheckoutPath      sql.NullString `json:"checkout_path"`
+	Url               sql.NullString `json:"url"`
+	Status            string         `json:"status"`
+	BindingSource     string         `json:"binding_source"`
+	ImplProjectID     sql.NullString `json:"impl_project_id"`
+	ImplWorkspaceSlug sql.NullString `json:"impl_workspace_slug"`
+	DiscoveredAt      time.Time      `json:"discovered_at"`
+	LastDiscoveredAt  time.Time      `json:"last_discovered_at"`
+	ArchivedAt        sql.NullTime   `json:"archived_at"`
+}
+
+type PlanWorkspaceProject struct {
+	PlanDirRel       string       `json:"plan_dir_rel"`
+	ProjectID        string       `json:"project_id"`
+	Role             string       `json:"role"`
+	DeclaredSource   string       `json:"declared_source"`
+	DeclaredAt       time.Time    `json:"declared_at"`
+	LastDiscoveredAt time.Time    `json:"last_discovered_at"`
+	ArchivedAt       sql.NullTime `json:"archived_at"`
+}
+
 type ReleaseQueueEvent struct {
 	ID          int64     `json:"id"`
 	ItemID      string    `json:"item_id"`

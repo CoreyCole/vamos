@@ -233,6 +233,25 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_plan_workspaces_active_slug
 ON plan_workspaces (workspace_slug)
 WHERE archived_at IS NULL AND workspace_slug <> '' ;
 
+CREATE TABLE IF NOT EXISTS plan_workspace_projects (
+plan_dir_rel TEXT NOT NULL REFERENCES plan_workspaces (plan_dir_rel),
+project_id TEXT NOT NULL DEFAULT '',
+role TEXT NOT NULL CHECK (role IN ('primary', 'related')),
+declared_source TEXT NOT NULL DEFAULT '',
+declared_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+last_discovered_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+archived_at DATETIME,
+PRIMARY KEY (plan_dir_rel, project_id)
+) ;
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_plan_workspace_projects_one_primary
+ON plan_workspace_projects (plan_dir_rel)
+WHERE archived_at IS NULL AND role = 'primary' ;
+
+CREATE INDEX IF NOT EXISTS idx_plan_workspace_projects_project_active
+ON plan_workspace_projects (project_id, role, plan_dir_rel)
+WHERE archived_at IS NULL ;
+
 CREATE TABLE IF NOT EXISTS impl_workspaces (
 project_id TEXT NOT NULL DEFAULT '',
 workspace_slug TEXT NOT NULL,
@@ -286,6 +305,38 @@ WHERE plan_dir_rel IS NOT NULL ;
 
 CREATE UNIQUE INDEX IF NOT EXISTS idx_impl_workspaces_checkout_path
 ON impl_workspaces (checkout_path) ;
+
+CREATE TABLE IF NOT EXISTS plan_workspace_impl_bindings (
+plan_dir_rel TEXT NOT NULL REFERENCES plan_workspaces (plan_dir_rel),
+project_id TEXT NOT NULL DEFAULT '',
+workspace_slug TEXT,
+checkout_path TEXT,
+url TEXT,
+status TEXT NOT NULL DEFAULT 'planned'
+CHECK (status IN ('planned', 'active', 'missing', 'merged', 'cleaned_up')),
+binding_source TEXT NOT NULL DEFAULT 'metadata'
+CHECK (binding_source IN ('metadata',
+'expected_path',
+'binding_file',
+'synced_plan_dir',
+'manual')),
+impl_project_id TEXT,
+impl_workspace_slug TEXT,
+discovered_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+last_discovered_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+archived_at DATETIME,
+PRIMARY KEY (plan_dir_rel, project_id),
+FOREIGN KEY (impl_project_id, impl_workspace_slug)
+REFERENCES impl_workspaces (project_id, workspace_slug)
+) ;
+
+CREATE INDEX IF NOT EXISTS idx_plan_workspace_impl_bindings_project_active
+ON plan_workspace_impl_bindings (project_id, status, plan_dir_rel)
+WHERE archived_at IS NULL ;
+
+CREATE INDEX IF NOT EXISTS idx_plan_workspace_impl_bindings_impl_workspace
+ON plan_workspace_impl_bindings (impl_project_id, impl_workspace_slug)
+WHERE archived_at IS NULL AND impl_workspace_slug IS NOT NULL ;
 
 CREATE TABLE IF NOT EXISTS release_queue_items (
 id TEXT PRIMARY KEY,
