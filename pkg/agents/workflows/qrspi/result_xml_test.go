@@ -262,6 +262,46 @@ func TestQRSPIXMLParserParsesProject(t *testing.T) {
 	}
 }
 
+func TestQRSPIXMLParserParsesRelatedProjects(t *testing.T) {
+	output := strings.Replace(
+		validResultXML("plan"),
+		"<stage>plan</stage>",
+		"<project>vamos</project>\n  <relatedProjects><project>datastarui</project><project> cn-agents </project><project>vamos</project><project></project><project>datastarui</project></relatedProjects>\n  <stage>plan</stage>",
+		1,
+	)
+	parsedAny, err := (QRSPIXMLParser{}).Parse(output, wruntime.ParseContext{ExpectedNodeID: NodePlan})
+	if err != nil {
+		t.Fatalf("Parse() error = %v", err)
+	}
+	parsed := parsedAny.(ResultXML)
+	want := []string{"datastarui", "cn-agents"}
+	if got := QRSPIResultRelatedProjects(parsed); !equalStrings(got, want) {
+		t.Fatalf("related projects = %#v, want %#v", got, want)
+	}
+	result, err := (QRSPIResultConverter{}).ToWorkflowResult(
+		parsed,
+		wruntime.ParseContext{WorkflowType: string(AgentChatWorkflowType)},
+	)
+	if err != nil {
+		t.Fatalf("ToWorkflowResult() error = %v", err)
+	}
+	if got := WorkflowResultRelatedProjects(result); !equalStrings(got, want) {
+		t.Fatalf("workflow related projects = %#v, want %#v", got, want)
+	}
+}
+
+func equalStrings(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
+}
+
 func TestQRSPIXMLParserStructuredNextAndWorkspaceMetadata(t *testing.T) {
 	output := `<qrspi-result>
   <stage>workspace</stage>
