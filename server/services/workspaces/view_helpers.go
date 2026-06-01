@@ -11,6 +11,8 @@ import (
 	"strings"
 	"time"
 	"unicode"
+
+	"github.com/CoreyCole/vamos/pkg/db"
 )
 
 func workspaceCardTitle(ws Workspace) string {
@@ -356,6 +358,100 @@ func shortCommit(commit string) string {
 
 func workspaceViewLabel(view ImplWorkspaceView) string {
 	return workspaceViewTitle(view)
+}
+
+func BuildPlanWorkspaceView(
+	planDirRel string,
+	roles []db.PlanWorkspaceProject,
+	bindings []db.PlanWorkspaceImplBinding,
+	impls []db.ImplWorkspace,
+	filterProjectID string,
+) PlanWorkspaceView {
+	roleByProject := make(map[string]string, len(roles))
+	projects := make([]PlanWorkspaceProjectView, 0, len(roles))
+	for _, role := range roles {
+		projectID := strings.TrimSpace(role.ProjectID)
+		if projectID == "" {
+			continue
+		}
+		roleName := strings.TrimSpace(role.Role)
+		roleByProject[projectID] = roleName
+		projects = append(projects, PlanWorkspaceProjectView{ProjectID: projectID, Role: roleName, Label: projectID})
+	}
+	sort.SliceStable(projects, func(i, j int) bool {
+		if projects[i].Role != projects[j].Role {
+			return projects[i].Role == "primary"
+		}
+		return projects[i].ProjectID < projects[j].ProjectID
+	})
+
+	implByKey := make(map[string]*db.ImplWorkspace, len(impls))
+	for i := range impls {
+		key := strings.TrimSpace(impls[i].ProjectID) + "\x00" + strings.TrimSpace(impls[i].WorkspaceSlug)
+		implByKey[key] = &impls[i]
+	}
+	bindingViews := make([]PlanWorkspaceImplBindingView, 0, len(bindings))
+	for _, binding := range bindings {
+		projectID := strings.TrimSpace(binding.ProjectID)
+		if projectID == "" {
+			continue
+		}
+		workspaceSlug := strings.TrimSpace(binding.WorkspaceSlug.String)
+		key := strings.TrimSpace(binding.ImplProjectID.String) + "\x00" + strings.TrimSpace(binding.ImplWorkspaceSlug.String)
+		bindingViews = append(bindingViews, PlanWorkspaceImplBindingView{
+			ProjectID:     projectID,
+			Role:          roleByProject[projectID],
+			WorkspaceSlug: workspaceSlug,
+			CheckoutPath:  strings.TrimSpace(binding.CheckoutPath.String),
+			URL:           strings.TrimSpace(binding.Url.String),
+			Status:        strings.TrimSpace(binding.Status),
+			ImplWorkspace: implByKey[key],
+		})
+	}
+	sort.SliceStable(bindingViews, func(i, j int) bool {
+		if bindingViews[i].Role != bindingViews[j].Role {
+			return bindingViews[i].Role == "primary"
+		}
+		return bindingViews[i].ProjectID < bindingViews[j].ProjectID
+	})
+	return PlanWorkspaceView{
+		PlanDirRel:  strings.TrimSpace(planDirRel),
+		Projects:    projects,
+		Bindings:    bindingViews,
+		MatchedRole: matchedPlanWorkspaceRole(projects, filterProjectID),
+	}
+}
+
+func matchedPlanWorkspaceRole(projects []PlanWorkspaceProjectView, projectID string) string {
+	projectID = strings.TrimSpace(projectID)
+	if projectID == "" {
+		return ""
+	}
+	for _, project := range projects {
+		if strings.TrimSpace(project.ProjectID) == projectID {
+			return strings.TrimSpace(project.Role)
+		}
+	}
+	return ""
+}
+
+func primaryPlanWorkspaceProject(projects []PlanWorkspaceProjectView) string {
+	for _, project := range projects {
+		if strings.TrimSpace(project.Role) == "primary" {
+			return strings.TrimSpace(project.ProjectID)
+		}
+	}
+	return ""
+}
+
+func relatedPlanWorkspaceProjects(projects []PlanWorkspaceProjectView) []PlanWorkspaceProjectView {
+	out := make([]PlanWorkspaceProjectView, 0, len(projects))
+	for _, project := range projects {
+		if strings.TrimSpace(project.Role) == "related" {
+			out = append(out, project)
+		}
+	}
+	return out
 }
 
 type CleanupGroup string

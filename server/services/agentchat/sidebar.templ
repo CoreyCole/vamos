@@ -286,6 +286,18 @@ templ PlanSidebarNodeContent(node PlanSidebarNode) {
 		if node.LatestSourceLabel != "" {
 			<span class="shrink-0 rounded border border-border px-1 py-0.5 font-medium uppercase tracking-wide">{ node.LatestSourceLabel }</span>
 		}
+		if node.PrimaryProject != "" {
+			<span class="shrink-0 rounded border border-primary/30 bg-primary/5 px-1 py-0.5 font-medium text-primary">Primary: { node.PrimaryProject }</span>
+		}
+		for _, project := range node.RelatedProjects {
+			<span class="shrink-0 rounded border border-border px-1 py-0.5">Related: { project }</span>
+		}
+		if node.MatchedRole != "" {
+			<span class="shrink-0 rounded border border-border px-1 py-0.5 uppercase tracking-wide">{ node.MatchedRole } match</span>
+		}
+		for _, binding := range node.Bindings {
+			<span class="shrink-0 rounded border border-border px-1 py-0.5">{ binding.ProjectID }: { binding.Status }</span>
+		}
 		if planSidebarTimestampLabel(node) != "" {
 			<span class="truncate">{ planSidebarTimestampLabel(node) }</span>
 		}

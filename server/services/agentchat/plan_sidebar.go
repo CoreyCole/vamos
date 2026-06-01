@@ -140,13 +140,18 @@ func (s *Service) collectDiscoveredPlanSidebarSources(
 		if !ok {
 			continue
 		}
+		roles, bindings := s.planSidebarProjectViews(ctx, row.PlanDirRel)
 		sources = append(sources, PlanSidebarSource{
-			PlanDir:    planDir,
-			PlanDirRel: row.PlanDirRel,
-			ProjectID:  row.ProjectID,
-			Source:     planSidebarSourceDiscovered,
-			Title:      row.Label,
-			UpdatedAt:  row.ArtifactUpdatedAt,
+			PlanDir:         planDir,
+			PlanDirRel:      row.PlanDirRel,
+			ProjectID:       row.ProjectID,
+			PrimaryProject:  row.ProjectID,
+			RelatedProjects: relatedPlanSidebarProjects(roles, row.ProjectID),
+			MatchedRole:     matchedPlanSidebarRole(row.ProjectID, roles, projectID),
+			Bindings:        planSidebarBindingViews(roles, bindings),
+			Source:          planSidebarSourceDiscovered,
+			Title:           row.Label,
+			UpdatedAt:       row.ArtifactUpdatedAt,
 		})
 	}
 	return sources, nil
@@ -232,11 +237,123 @@ func (s *Service) planSidebarSourceMatchesProject(ctx context.Context, source *P
 	if source == nil {
 		return false
 	}
-	if sourceProject := strings.TrimSpace(source.ProjectID); sourceProject != "" {
-		return sourceProject == projectID
+	if strings.TrimSpace(source.PrimaryProject) == "" && len(source.RelatedProjects) == 0 {
+		roles, bindings := s.planSidebarProjectViews(ctx, source.PlanDirRel)
+		if strings.TrimSpace(source.ProjectID) == "" {
+			source.ProjectID = s.sourceProjectForPlanDir(ctx, source.PlanDir, source.PlanDirRel)
+		}
+		source.PrimaryProject = firstNonEmpty(source.ProjectID, primaryPlanSidebarProject(roles))
+		source.RelatedProjects = relatedPlanSidebarProjects(roles, source.PrimaryProject)
+		source.Bindings = planSidebarBindingViews(roles, bindings)
 	}
-	source.ProjectID = s.sourceProjectForPlanDir(ctx, source.PlanDir, source.PlanDirRel)
-	return strings.TrimSpace(source.ProjectID) == projectID
+	source.MatchedRole = matchedPlanSidebarRole(source.PrimaryProject, planSidebarRolesFromSource(*source), projectID)
+	return source.MatchedRole != ""
+}
+
+func (s *Service) planSidebarProjectViews(ctx context.Context, planDirRel string) ([]db.PlanWorkspaceProject, []db.PlanWorkspaceImplBinding) {
+	planDirRel = strings.TrimSpace(planDirRel)
+	if planDirRel == "" {
+		return nil, nil
+	}
+	roles, _ := s.queries.ListPlanWorkspaceProjects(ctx, planDirRel)
+	bindings, _ := s.queries.ListPlanWorkspaceImplBindings(ctx, planDirRel)
+	return roles, bindings
+}
+
+func primaryPlanSidebarProject(roles []db.PlanWorkspaceProject) string {
+	for _, role := range roles {
+		if strings.TrimSpace(role.Role) == "primary" {
+			return strings.TrimSpace(role.ProjectID)
+		}
+	}
+	return ""
+}
+
+func relatedPlanSidebarProjects(roles []db.PlanWorkspaceProject, primary string) []string {
+	primary = strings.TrimSpace(primary)
+	out := make([]string, 0, len(roles))
+	for _, role := range roles {
+		projectID := strings.TrimSpace(role.ProjectID)
+		if projectID == "" || projectID == primary || strings.TrimSpace(role.Role) != "related" {
+			continue
+		}
+		out = append(out, projectID)
+	}
+	sort.Strings(out)
+	return out
+}
+
+func planSidebarRolesFromSource(source PlanSidebarSource) []db.PlanWorkspaceProject {
+	roles := make([]db.PlanWorkspaceProject, 0, 1+len(source.RelatedProjects))
+	if primary := strings.TrimSpace(firstNonEmpty(source.PrimaryProject, source.ProjectID)); primary != "" {
+		roles = append(roles, db.PlanWorkspaceProject{ProjectID: primary, Role: "primary"})
+	}
+	for _, related := range source.RelatedProjects {
+		if related = strings.TrimSpace(related); related != "" {
+			roles = append(roles, db.PlanWorkspaceProject{ProjectID: related, Role: "related"})
+		}
+	}
+	return roles
+}
+
+func matchedPlanSidebarRole(primary string, roles []db.PlanWorkspaceProject, projectID string) string {
+	projectID = strings.TrimSpace(projectID)
+	if projectID == "" {
+		return ""
+	}
+	if strings.TrimSpace(primary) == projectID {
+		return "primary"
+	}
+	for _, role := range roles {
+		if strings.TrimSpace(role.ProjectID) == projectID {
+			return strings.TrimSpace(role.Role)
+		}
+	}
+	return ""
+}
+
+func planSidebarBindingViews(roles []db.PlanWorkspaceProject, bindings []db.PlanWorkspaceImplBinding) []PlanSidebarBindingView {
+	roleByProject := map[string]string{}
+	for _, role := range roles {
+		roleByProject[strings.TrimSpace(role.ProjectID)] = strings.TrimSpace(role.Role)
+	}
+	out := make([]PlanSidebarBindingView, 0, len(bindings))
+	for _, binding := range bindings {
+		projectID := strings.TrimSpace(binding.ProjectID)
+		if projectID == "" {
+			continue
+		}
+		out = append(out, PlanSidebarBindingView{
+			ProjectID:     projectID,
+			Role:          roleByProject[projectID],
+			WorkspaceSlug: strings.TrimSpace(binding.WorkspaceSlug.String),
+			CheckoutPath:  strings.TrimSpace(binding.CheckoutPath.String),
+			URL:           strings.TrimSpace(binding.Url.String),
+			Status:        strings.TrimSpace(binding.Status),
+		})
+	}
+	sort.SliceStable(out, func(i, j int) bool {
+		if out[i].Role != out[j].Role {
+			return out[i].Role == "primary"
+		}
+		return out[i].ProjectID < out[j].ProjectID
+	})
+	return out
+}
+
+func applyPlanSidebarProjectSource(node *PlanSidebarNode, source PlanSidebarSource) {
+	if primary := strings.TrimSpace(firstNonEmpty(source.PrimaryProject, source.ProjectID)); primary != "" {
+		node.PrimaryProject = primary
+	}
+	if len(source.RelatedProjects) > 0 {
+		node.RelatedProjects = append([]string(nil), source.RelatedProjects...)
+	}
+	if strings.TrimSpace(source.MatchedRole) != "" {
+		node.MatchedRole = strings.TrimSpace(source.MatchedRole)
+	}
+	if len(source.Bindings) > 0 {
+		node.Bindings = append([]PlanSidebarBindingView(nil), source.Bindings...)
+	}
 }
 
 func (s *Service) sourceProjectForPlanDir(ctx context.Context, planDir, planDirRel string) string {
@@ -468,6 +585,7 @@ func planSidebarTimestamp(node PlanSidebarNode) time.Time {
 
 func applyPlanSidebarSource(node *PlanSidebarNode, source PlanSidebarSource) {
 	node.DirectCount++
+	applyPlanSidebarProjectSource(node, source)
 	if source.UpdatedAt.After(node.DirectLatestAt) {
 		node.DirectLatestAt = source.UpdatedAt
 		if node.LatestUserActivityAt.IsZero() {

@@ -347,6 +347,7 @@ templ WorkspaceTableRow(view ImplWorkspaceView, managerURL string, showHistorica
 			if slug != "" {
 				<p class="break-all font-mono text-xs text-muted-foreground">{ slug }</p>
 			}
+			@PlanWorkspaceRoleBadges(view.Plan)
 		</td>
 		<td class="px-3 py-2 align-top">{ workspaceQRSPIBadge(view) }</td>
 		<td class="px-3 py-2 align-top">{ workspaceRuntimeLabel(view) }</td>
@@ -446,6 +447,32 @@ templ WorkspaceRecovery(model RecoveryModel) {
 	</main>
 }
 
+templ PlanWorkspaceRoleBadges(plan PlanWorkspaceView) {
+	if len(plan.Projects) > 0 {
+		<div class="mt-1 flex min-w-0 flex-wrap gap-1 text-[10px] text-muted-foreground">
+			if primaryPlanWorkspaceProject(plan.Projects) != "" {
+				<span class="rounded border border-primary/30 bg-primary/5 px-1.5 py-0.5 font-medium text-primary">Primary: { primaryPlanWorkspaceProject(plan.Projects) }</span>
+			}
+			for _, project := range relatedPlanWorkspaceProjects(plan.Projects) {
+				<span class="rounded border px-1.5 py-0.5">Related: { project.ProjectID }</span>
+			}
+			if plan.MatchedRole != "" {
+				<span class="rounded border px-1.5 py-0.5 uppercase tracking-wide">{ plan.MatchedRole } match</span>
+			}
+		</div>
+	}
+}
+
+templ PlanWorkspaceBindingBadges(plan PlanWorkspaceView) {
+	if len(plan.Bindings) > 0 {
+		<div class="flex min-w-0 flex-wrap gap-1 text-xs text-muted-foreground">
+			for _, binding := range plan.Bindings {
+				<span class="rounded border px-1.5 py-0.5">{ binding.ProjectID }: { binding.Status }</span>
+			}
+		</div>
+	}
+}
+
 templ WorkspaceRecoveryActionForm(model RecoveryModel, action string, label string) {
 	{{ indicator := workspaceActionIndicator(model.Workspace.Slug, action) }}
 	{{ indicatorSignal := workspaceActionIndicatorSignal(model.Workspace.Slug, action) }}
@@ -500,6 +527,18 @@ templ ImplWorkspaceCard(view ImplWorkspaceView, managerURL string, showHistorica
 		<dl class="grid gap-x-4 gap-y-2 text-sm md:grid-cols-[max-content_minmax(0,1fr)]">
 			<dt class="text-xs font-medium uppercase tracking-wide text-muted-foreground">Status</dt>
 			<dd class="min-w-0 break-words">{ workspaceImplStatusBadge(view) }</dd>
+			if len(view.Plan.Projects) > 0 {
+				<dt class="text-xs font-medium uppercase tracking-wide text-muted-foreground">Plan projects</dt>
+				<dd class="min-w-0">
+					@PlanWorkspaceRoleBadges(view.Plan)
+				</dd>
+			}
+			if len(view.Plan.Bindings) > 0 {
+				<dt class="text-xs font-medium uppercase tracking-wide text-muted-foreground">Plan bindings</dt>
+				<dd class="min-w-0">
+					@PlanWorkspaceBindingBadges(view.Plan)
+				</dd>
+			}
 			if workspaceViewActivity(view) != "" {
 				<dt class="text-xs font-medium uppercase tracking-wide text-muted-foreground">Updated</dt>
 				<dd class="min-w-0 break-words text-xs text-muted-foreground">{ workspaceViewActivity(view) }</dd>

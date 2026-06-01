@@ -369,6 +369,45 @@ func TestBuildPlanSidebarStateFiltersByProject(t *testing.T) {
 	}
 }
 
+func TestBuildPlanSidebarStateShowsRelatedProjectBindingStatus(t *testing.T) {
+	service := newTestAgentChatService(t)
+	now := time.Now().UTC()
+	planDir := filepath.Join(service.thoughtsRoot, "user", "plans", "multi")
+	mustWriteFile(t, filepath.Join(planDir, "plan.md"), "---\nproject: vamos\nrelated_projects: [datastarui]\n---\n# Multi\n")
+	row := mustUpsertDiscoveredPlanWorkspaceWithProject(t, service, planDir, "Multi", "vamos", now)
+	for _, role := range []db.UpsertPlanWorkspaceProjectParams{
+		{PlanDirRel: row.PlanDirRel, ProjectID: "vamos", Role: "primary", DeclaredSource: "plan.md"},
+		{PlanDirRel: row.PlanDirRel, ProjectID: "datastarui", Role: "related", DeclaredSource: "plan.md"},
+	} {
+		if _, err := service.queries.UpsertPlanWorkspaceProject(t.Context(), role); err != nil {
+			t.Fatalf("UpsertPlanWorkspaceProject() error = %v", err)
+		}
+	}
+	if _, err := service.queries.UpsertPlanWorkspaceImplBinding(t.Context(), db.UpsertPlanWorkspaceImplBindingParams{
+		PlanDirRel:    row.PlanDirRel,
+		ProjectID:     "datastarui",
+		Status:        "planned",
+		BindingSource: "metadata",
+	}); err != nil {
+		t.Fatalf("UpsertPlanWorkspaceImplBinding() error = %v", err)
+	}
+
+	state, err := service.BuildPlanSidebarState(t.Context(), PlanSidebarInput{UserEmail: "user@example.com", ProjectID: "datastarui"})
+	if err != nil {
+		t.Fatalf("BuildPlanSidebarState() error = %v", err)
+	}
+	if len(state.Nodes) != 1 {
+		t.Fatalf("len(nodes) = %d, want 1", len(state.Nodes))
+	}
+	node := state.Nodes[0]
+	if node.PrimaryProject != "vamos" || !reflect.DeepEqual(node.RelatedProjects, []string{"datastarui"}) || node.MatchedRole != "related" {
+		t.Fatalf("node projects = primary %q related %#v matched %q", node.PrimaryProject, node.RelatedProjects, node.MatchedRole)
+	}
+	if len(node.Bindings) != 1 || node.Bindings[0].ProjectID != "datastarui" || node.Bindings[0].Status != "planned" {
+		t.Fatalf("node bindings = %#v, want datastarui planned", node.Bindings)
+	}
+}
+
 func TestAdoptThreadProjectForRunUsesXMLBeforeFrontmatterWrites(t *testing.T) {
 	service := newTestAgentChatService(t)
 	alphaPlan := filepath.Join(service.thoughtsRoot, "user", "plans", "alpha")

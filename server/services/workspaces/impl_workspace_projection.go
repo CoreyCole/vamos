@@ -15,6 +15,30 @@ type ImplWorkspaceView struct {
 	ReleaseActions []ReleaseActionView
 	Workflow       WorkspaceWorkflowSummary
 	Cleanup        CleanupReadiness
+	Plan           PlanWorkspaceView
+}
+
+type PlanWorkspaceProjectView struct {
+	ProjectID string
+	Role      string
+	Label     string
+}
+
+type PlanWorkspaceImplBindingView struct {
+	ProjectID     string
+	Role          string
+	WorkspaceSlug string
+	CheckoutPath  string
+	URL           string
+	Status        string
+	ImplWorkspace *db.ImplWorkspace
+}
+
+type PlanWorkspaceView struct {
+	PlanDirRel  string
+	Projects    []PlanWorkspaceProjectView
+	Bindings    []PlanWorkspaceImplBindingView
+	MatchedRole string
 }
 
 type ImplWorkspaceViewOption func(*implWorkspaceViewOptions)

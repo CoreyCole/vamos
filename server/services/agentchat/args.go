@@ -193,6 +193,10 @@ type PlanSidebarNode struct {
 	Depth                int
 	Expanded             bool
 	Active               bool
+	PrimaryProject       string
+	RelatedProjects      []string
+	MatchedRole          string
+	Bindings             []PlanSidebarBindingView
 	DirectLatestAt       time.Time
 	AggregateLatestAt    time.Time
 	LatestThreadID       string
@@ -204,16 +208,29 @@ type PlanSidebarNode struct {
 	Children             []PlanSidebarNode
 }
 
+type PlanSidebarBindingView struct {
+	ProjectID     string
+	Role          string
+	WorkspaceSlug string
+	CheckoutPath  string
+	URL           string
+	Status        string
+}
+
 type PlanSidebarSource struct {
-	PlanDir     string
-	PlanDirRel  string
-	ProjectID   string
-	WorkspaceID string
-	ThreadID    string
-	SessionID   string
-	Source      string
-	Title       string
-	UpdatedAt   time.Time
+	PlanDir         string
+	PlanDirRel      string
+	ProjectID       string
+	PrimaryProject  string
+	RelatedProjects []string
+	MatchedRole     string
+	Bindings        []PlanSidebarBindingView
+	WorkspaceID     string
+	ThreadID        string
+	SessionID       string
+	Source          string
+	Title           string
+	UpdatedAt       time.Time
 }
 
 type AgentChatSidebarTargetArgs struct {

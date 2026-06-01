@@ -34,6 +34,8 @@ type SessionCreator interface {
 
 type PlanWorkspaceLister interface {
 	ListCurrentPlanWorkspaces(ctx context.Context, projectID string) ([]db.PlanWorkspace, error)
+	ListPlanWorkspaceProjects(ctx context.Context, planDirRel string) ([]db.PlanWorkspaceProject, error)
+	ListPlanWorkspaceImplBindings(ctx context.Context, planDirRel string) ([]db.PlanWorkspaceImplBinding, error)
 }
 
 type ImplWorkspaceLister interface {
@@ -1090,6 +1092,10 @@ func (h *Handler) buildWorkspacesPageModel(ctx context.Context, filter ProjectFi
 	if err != nil {
 		return workspacesPageModel{}, err
 	}
+	views, err = h.attachPlanWorkspaceMetadata(ctx, views, filter)
+	if err != nil {
+		return workspacesPageModel{}, err
+	}
 	views, err = h.attachWorkflowSummaries(ctx, views)
 	if err != nil {
 		return workspacesPageModel{}, err
@@ -1101,7 +1107,11 @@ func (h *Handler) buildWorkspacesPageModel(ctx context.Context, filter ProjectFi
 	if len(rowActions) > 0 {
 		views = applyOptionsToImplWorkspaceViews(views, WithWorkspaceReleaseActions(rowActions))
 	}
-	return workspacesPageModel{Views: views, ReleasePanel: panel, ProjectFilter: filter, ProjectOptions: projectOptionsFromViews(views, filter.QueryValue())}, nil
+	options, err := h.projectOptions(ctx, views, filter.QueryValue())
+	if err != nil {
+		return workspacesPageModel{}, err
+	}
+	return workspacesPageModel{Views: views, ReleasePanel: panel, ProjectFilter: filter, ProjectOptions: options}, nil
 }
 
 func (h *Handler) listImplWorkspaceViews(
@@ -1138,17 +1148,39 @@ func filterLifecycleSnapshotsByProject(items []WorkspaceLifecycleSnapshot, filte
 	return out
 }
 
-func projectOptionsFromViews(views []ImplWorkspaceView, selected string) []ProjectOption {
+func (h *Handler) attachPlanWorkspaceMetadata(ctx context.Context, views []ImplWorkspaceView, filter ProjectFilter) ([]ImplWorkspaceView, error) {
+	if h.planWorkspaces == nil {
+		return views, nil
+	}
+	planRels := collectImplViewPlanRels(views)
+	if len(planRels) == 0 {
+		return views, nil
+	}
+	models := make(map[string]PlanWorkspaceView, len(planRels))
+	for _, planRel := range planRels {
+		roles, err := h.planWorkspaces.ListPlanWorkspaceProjects(ctx, planRel)
+		if err != nil {
+			return nil, err
+		}
+		bindings, err := h.planWorkspaces.ListPlanWorkspaceImplBindings(ctx, planRel)
+		if err != nil {
+			return nil, err
+		}
+		models[planRel] = BuildPlanWorkspaceView(planRel, roles, bindings, nil, filter.QueryValue())
+	}
+	return applyPlanWorkspaceViews(views, models), nil
+}
+
+func collectImplViewPlanRels(views []ImplWorkspaceView) []string {
 	seen := map[string]struct{}{}
 	var ids []string
 	var walk func([]ImplWorkspaceView)
 	walk = func(items []ImplWorkspaceView) {
 		for _, view := range items {
-			projectID := strings.TrimSpace(firstNonEmpty(view.Row.ProjectID, view.Runtime.Workspace.ProjectID))
-			if projectID != "" {
-				if _, ok := seen[projectID]; !ok {
-					seen[projectID] = struct{}{}
-					ids = append(ids, projectID)
+			if planRel := implViewPlanRel(view); planRel != "" {
+				if _, ok := seen[planRel]; !ok {
+					seen[planRel] = struct{}{}
+					ids = append(ids, planRel)
 				}
 			}
 			walk(view.Children)
@@ -1156,11 +1188,88 @@ func projectOptionsFromViews(views []ImplWorkspaceView, selected string) []Proje
 	}
 	walk(views)
 	slices.Sort(ids)
+	return ids
+}
+
+func implViewPlanRel(view ImplWorkspaceView) string {
+	return strings.TrimSpace(firstNonEmpty(nullStringValue(view.Row.PlanDirRel), nullStringValue(view.Row.PlanDir)))
+}
+
+func applyPlanWorkspaceViews(views []ImplWorkspaceView, models map[string]PlanWorkspaceView) []ImplWorkspaceView {
+	out := append([]ImplWorkspaceView(nil), views...)
+	for i := range out {
+		if model, ok := models[implViewPlanRel(out[i])]; ok {
+			out[i].Plan = model
+		}
+		out[i].Children = applyPlanWorkspaceViews(out[i].Children, models)
+	}
+	return out
+}
+
+func (h *Handler) projectOptions(ctx context.Context, views []ImplWorkspaceView, selected string) ([]ProjectOption, error) {
+	seen := map[string]struct{}{}
+	ids := projectIDsFromViews(views, seen)
+	if h.planWorkspaces != nil {
+		plans, err := h.planWorkspaces.ListCurrentPlanWorkspaces(ctx, "")
+		if err != nil {
+			return nil, err
+		}
+		for _, plan := range plans {
+			addProjectOptionID(&ids, seen, plan.ProjectID)
+			roles, err := h.planWorkspaces.ListPlanWorkspaceProjects(ctx, plan.PlanDirRel)
+			if err != nil {
+				return nil, err
+			}
+			for _, role := range roles {
+				addProjectOptionID(&ids, seen, role.ProjectID)
+			}
+		}
+	}
+	slices.Sort(ids)
+	options := make([]ProjectOption, 0, len(ids))
+	for _, id := range ids {
+		options = append(options, ProjectOption{ID: id, Label: id, Selected: id == selected})
+	}
+	return options, nil
+}
+
+func projectOptionsFromViews(views []ImplWorkspaceView, selected string) []ProjectOption {
+	seen := map[string]struct{}{}
+	ids := projectIDsFromViews(views, seen)
+	slices.Sort(ids)
 	options := make([]ProjectOption, 0, len(ids))
 	for _, id := range ids {
 		options = append(options, ProjectOption{ID: id, Label: id, Selected: id == selected})
 	}
 	return options
+}
+
+func projectIDsFromViews(views []ImplWorkspaceView, seen map[string]struct{}) []string {
+	var ids []string
+	var walk func([]ImplWorkspaceView)
+	walk = func(items []ImplWorkspaceView) {
+		for _, view := range items {
+			addProjectOptionID(&ids, seen, firstNonEmpty(view.Row.ProjectID, view.Runtime.Workspace.ProjectID))
+			for _, project := range view.Plan.Projects {
+				addProjectOptionID(&ids, seen, project.ProjectID)
+			}
+			walk(view.Children)
+		}
+	}
+	walk(views)
+	return ids
+}
+
+func addProjectOptionID(ids *[]string, seen map[string]struct{}, projectID string) {
+	projectID = strings.TrimSpace(projectID)
+	if projectID == "" {
+		return
+	}
+	if _, ok := seen[projectID]; ok {
+		return
+	}
+	seen[projectID] = struct{}{}
+	*ids = append(*ids, projectID)
 }
 
 func (h *Handler) releaseProjectionForViews(ctx context.Context, views []ImplWorkspaceView) (ReleasePanelModel, map[string][]ReleaseActionView, error) {
