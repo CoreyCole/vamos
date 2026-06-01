@@ -32,6 +32,7 @@ When a feature is deterministic, agentic, multi-step, stateful, or needs human/a
 
 ## Development checkout model
 
+- For the local dogfood project map, configured workspace hosts, Caddy/Coredns notes, and cross-project checkout roles, read `docs/vamos-manifest.md`. Put setup-specific notes there instead of general OSS docs.
 - `../vamos` is the working checkout for human/agent edits. Run Pi sessions and normal feature development here.
 - In the current Chestnut dogfood host setup, the durable `stage` lane points at `../vamos`. Use that stage host for fast runtime iteration, quick fixes, and pre-merge verification.
 - `../vamos-main` is the clean/latest baseline checkout. In the current host setup, durable `main` points at `../vamos-main`. Keep it clean, on `main`, and do not edit it directly.
