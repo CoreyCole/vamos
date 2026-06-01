@@ -212,14 +212,52 @@ func OpenWorkspaceDocumentWithoutChatParams(label string) spec.Step {
 
 func ExpectThreadMetadataProject(projectID string) expectation {
 	return expectation{customStep("thread metadata project "+projectID, func(t testing.TB, ctx *duiruntime.Context) {
-		button := ctx.Page.Locator("button[title='Show chat metadata'], button[aria-label='Show chat metadata']").First()
-		if err := button.Click(); err != nil {
-			t.Fatal(err)
+		openThreadMetadata(t, ctx)
+		content := ctx.Page.Locator("[data-slot='dropdown-menu-content'][data-show='$agent_chat_composer_metadata.open']").First()
+		if err := content.WaitFor(playwright.LocatorWaitForOptions{State: playwright.WaitForSelectorStateVisible}); err != nil {
+			t.Fatalf("thread metadata menu did not become visible: %v", err)
 		}
-		if err := ctx.Page.GetByText(projectID).First().WaitFor(); err != nil {
+		if err := content.GetByText(projectID).First().WaitFor(playwright.LocatorWaitForOptions{State: playwright.WaitForSelectorStateVisible}); err != nil {
 			t.Fatalf("thread metadata project %q not visible: %v", projectID, err)
 		}
 	})}
+}
+
+func ExpectThreadMetadataMenuVisible() expectation {
+	return expectation{customStep("thread metadata menu visible", func(t testing.TB, ctx *duiruntime.Context) {
+		openThreadMetadata(t, ctx)
+		content := ctx.Page.Locator("[data-slot='dropdown-menu-content'][data-show='$agent_chat_composer_metadata.open']").First()
+		if err := content.WaitFor(playwright.LocatorWaitForOptions{State: playwright.WaitForSelectorStateVisible}); err != nil {
+			t.Fatalf("thread metadata menu did not become visible: %v", err)
+		}
+		if err := content.GetByText("Chat metadata").First().WaitFor(playwright.LocatorWaitForOptions{State: playwright.WaitForSelectorStateVisible}); err != nil {
+			t.Fatalf("thread metadata label not visible: %v", err)
+		}
+	})}
+}
+
+func ExpectAvatarMenuVisible() expectation {
+	return expectation{customStep("avatar menu visible", func(t testing.TB, ctx *duiruntime.Context) {
+		trigger := ctx.Page.Locator("header [data-slot='dropdown-menu-trigger'][data-on\\:click*='user_profile']").First()
+		if err := trigger.Click(); err != nil {
+			t.Fatal(err)
+		}
+		content := ctx.Page.Locator("[data-slot='dropdown-menu-content'][data-show='$user_profile.open']").First()
+		if err := content.WaitFor(playwright.LocatorWaitForOptions{State: playwright.WaitForSelectorStateVisible}); err != nil {
+			t.Fatalf("avatar menu did not become visible: %v", err)
+		}
+		if err := content.GetByText("Log out").First().WaitFor(playwright.LocatorWaitForOptions{State: playwright.WaitForSelectorStateVisible}); err != nil {
+			t.Fatalf("avatar menu log out item not visible: %v", err)
+		}
+	})}
+}
+
+func openThreadMetadata(t testing.TB, ctx *duiruntime.Context) {
+	t.Helper()
+	button := ctx.Page.Locator("button[title='Show chat metadata'], button[aria-label='Show chat metadata']").First()
+	if err := button.Click(); err != nil {
+		t.Fatal(err)
+	}
 }
 
 func SwitchTab(key string) spec.Step {

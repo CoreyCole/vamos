@@ -872,7 +872,7 @@ func TestWorkspacesPageRendersTransitionSafeActionControls(t *testing.T) {
 			want: []string{
 				`action="/workspaces/feature/stop"`,
 				`action="/workspaces/feature/restart"`,
-				`data-attr-disabled="$_workspaceAction`,
+				`data-attr:disabled="$_workspaceAction`,
 			},
 			wantAbsent: []string{`action="/workspaces/feature/start"`},
 		},

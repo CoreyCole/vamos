@@ -72,6 +72,7 @@ func TestDurableSessionChat_FreeformChatAdoptsQrspiProjectMetadata(t *testing.T)
 		Expect(vamos.ExpectThreadMetadataProject("example.com/alpha/app")).
 		Do(vamos.ReloadChat()).
 		Expect(vamos.ExpectThreadMetadataProject("example.com/alpha/app")).
+		Expect(vamos.ExpectAvatarMenuVisible()).
 		Run()
 }
 
@@ -105,6 +106,8 @@ func TestDurableSessionChat_RootThoughtsRestoresLatestFreeformChat(t *testing.T)
 		Do(vamos.OpenFreeformChatFixture(fixtures.DurableFreeformFixture)).
 		Do(vamos.OpenThoughtsRootChatContext("current")).
 		Expect(vamos.TranscriptContains("VAMOS_E2E_FREEFORM_REPLAY_OK")).
+		Expect(vamos.ExpectThreadMetadataMenuVisible()).
+		Expect(vamos.ExpectAvatarMenuVisible()).
 		Expect(vamos.Console.Clean()).
 		Run()
 }

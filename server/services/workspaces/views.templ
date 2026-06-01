@@ -197,7 +197,7 @@ templ ReleaseLaneControls(lane ReleaseLaneView) {
 		{{ indicator := workspaceActionIndicator(slug, "start") }}
 		{{ indicatorSignal := workspaceActionIndicatorSignal(slug, "start") }}
 		<form method="post" action={ templ.SafeURL("/workspaces/" + slug + "/start") } data-indicator={ indicator } data-on:submit={ "@post('/workspaces/" + slug + "/start', {contentType: 'form'})" }>
-			@button.Button(button.ButtonArgs{Type: "submit", Variant: "outline", Size: "sm", Attributes: templ.Attributes{"data-attr-disabled": indicatorSignal}}) {
+			@button.Button(button.ButtonArgs{Type: "submit", Variant: "outline", Size: "sm", Attributes: templ.Attributes{"data-attr:disabled": indicatorSignal}}) {
 				<span data-show={ "!" + indicatorSignal }>Start</span>
 				<span data-show={ indicatorSignal }>Starting...</span>
 			}
@@ -207,7 +207,7 @@ templ ReleaseLaneControls(lane ReleaseLaneView) {
 		{{ indicator := workspaceActionIndicator(slug, "stop") }}
 		{{ indicatorSignal := workspaceActionIndicatorSignal(slug, "stop") }}
 		<form method="post" action={ templ.SafeURL("/workspaces/" + slug + "/stop") } data-indicator={ indicator } data-on:submit={ "@post('/workspaces/" + slug + "/stop', {contentType: 'form'})" }>
-			@button.Button(button.ButtonArgs{Type: "submit", Variant: "outline", Size: "sm", Class: "text-destructive", Attributes: templ.Attributes{"data-attr-disabled": indicatorSignal}}) {
+			@button.Button(button.ButtonArgs{Type: "submit", Variant: "outline", Size: "sm", Class: "text-destructive", Attributes: templ.Attributes{"data-attr:disabled": indicatorSignal}}) {
 				<span data-show={ "!" + indicatorSignal }>Stop</span>
 				<span data-show={ indicatorSignal }>Stopping...</span>
 			}
@@ -254,7 +254,7 @@ templ ReleaseActionForm(action ReleaseActionView) {
 		<input type="hidden" name="source_slug" value={ action.SourceSlug }/>
 		<input type="hidden" name="expected_source_commit" value={ action.ExpectedSourceCommit }/>
 		<input type="hidden" name="expected_target_commit" value={ action.ExpectedTargetCommit }/>
-		@button.Button(button.ButtonArgs{Type: "submit", Variant: "outline", Size: "sm", Disabled: action.Disabled, Attributes: templ.Attributes{"data-attr-disabled": indicatorSignal, "title": releaseDisabledReason(action)}}) {
+		@button.Button(button.ButtonArgs{Type: "submit", Variant: "outline", Size: "sm", Disabled: action.Disabled, Attributes: templ.Attributes{"data-attr:disabled": indicatorSignal, "title": releaseDisabledReason(action)}}) {
 			<span data-show={ "!" + indicatorSignal }>{ releaseActionLabel(action) }</span>
 			<span data-show={ indicatorSignal }>Enqueueing...</span>
 		}
@@ -701,7 +701,7 @@ templ WorkspaceLifecycleDropdownForm(dropdownID string, slug string, action stri
 				<input type="hidden" name="show_cleaned_history" value="true"/>
 				<input type="hidden" name="show_historical" value="true"/>
 			}
-			@button.Button(button.ButtonArgs{Type: "submit", Variant: "ghost", Size: "sm", Class: workspaceDropdownActionClass(destructive), Attributes: templ.Attributes{"data-attr-disabled": indicatorSignal}}) {
+			@button.Button(button.ButtonArgs{Type: "submit", Variant: "ghost", Size: "sm", Class: workspaceDropdownActionClass(destructive), Attributes: templ.Attributes{"data-attr:disabled": indicatorSignal}}) {
 				<span data-show={ "!" + indicatorSignal }>{ label }</span>
 				<span data-show={ indicatorSignal }>{ loadingLabel }</span>
 			}
@@ -722,7 +722,7 @@ templ WorkspaceCleanupDropdownItem(action WorkspaceCleanupAction, dropdownID str
 						<input type="hidden" name="slug" value={ action.Slug }/>
 						<input type="hidden" name="project" value={ action.ProjectID }/>
 						<input type="hidden" name="confirmed" value="true"/>
-						@button.Button(button.ButtonArgs{Type: "submit", Variant: "outline", Size: "sm", Class: "border-destructive/40 text-destructive hover:bg-destructive/10", Attributes: templ.Attributes{"data-attr-disabled": indicatorSignal}}) {
+						@button.Button(button.ButtonArgs{Type: "submit", Variant: "outline", Size: "sm", Class: "border-destructive/40 text-destructive hover:bg-destructive/10", Attributes: templ.Attributes{"data-attr:disabled": indicatorSignal}}) {
 							<span data-show={ "!" + indicatorSignal }>Confirm close</span>
 							<span data-show={ indicatorSignal }>Working...</span>
 						}
@@ -734,7 +734,7 @@ templ WorkspaceCleanupDropdownItem(action WorkspaceCleanupAction, dropdownID str
 				<form method="post" action="/workspaces/cleanup" data-indicator={ indicator } data-on:submit="@post('/workspaces/cleanup', {contentType: 'form'})">
 					<input type="hidden" name="slug" value={ action.Slug }/>
 					<input type="hidden" name="project" value={ action.ProjectID }/>
-					@button.Button(button.ButtonArgs{Type: "submit", Variant: "ghost", Size: "sm", Class: "w-full justify-start text-xs", Attributes: templ.Attributes{"data-attr-disabled": indicatorSignal}}) {
+					@button.Button(button.ButtonArgs{Type: "submit", Variant: "ghost", Size: "sm", Class: "w-full justify-start text-xs", Attributes: templ.Attributes{"data-attr:disabled": indicatorSignal}}) {
 						<span data-show={ "!" + indicatorSignal }>{ action.Label }</span>
 						<span data-show={ indicatorSignal }>Working...</span>
 					}
