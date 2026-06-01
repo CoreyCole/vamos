@@ -9,7 +9,7 @@ require (
 	github.com/PuerkitoBio/goquery v1.11.0
 	github.com/a-h/templ v0.3.977
 	github.com/alecthomas/chroma/v2 v2.20.0
-	github.com/coreycole/datastarui v0.0.0
+	github.com/coreycole/datastarui v0.0.0-20260601175616-23fb67476613
 	github.com/dustin/go-humanize v1.0.1
 	github.com/gofrs/uuid v4.4.0+incompatible
 	github.com/gomarkdown/markdown v0.0.0-20231222211730-1d6d20845b47
@@ -80,5 +80,3 @@ require (
 	modernc.org/mathutil v1.7.1 // indirect
 	modernc.org/memory v1.11.0 // indirect
 )
-
-replace github.com/coreycole/datastarui => ../datastarui
