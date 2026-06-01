@@ -265,6 +265,96 @@ func TestPlanWorkspaceScannerPopulatesProjectFromFrontmatterOrInput(t *testing.T
 	}
 }
 
+func TestPlanWorkspaceScannerUsesAuthoritativeProjectMetadataSource(t *testing.T) {
+	thoughtsRoot := t.TempDir()
+	planDir := filepath.Join(thoughtsRoot, "agent", "plans", "metadata-source")
+	writePlanWorkspaceFile(t, planDir, "notes.md", time.Now())
+	writePlanWorkspaceMarkdown(t, planDir, "AGENTS.md", "---\nproject: agents\nrelated_projects: [ignored-agents]\n---\n# Agents\n")
+	writePlanWorkspaceMarkdown(t, planDir, "design.md", "---\nproject: design\nrelated_projects: [ignored-design]\n---\n# Design\n")
+	writePlanWorkspaceMarkdown(t, planDir, "outline.md", "---\nproject: outline\nrelated_projects: [ignored-outline]\n---\n# Outline\n")
+	writePlanWorkspaceMarkdown(t, planDir, "plan.md", "---\nproject: vamos\nrelated_projects:\n  - datastarui\n  - cn-agents\n  - vamos\n  - datastarui\n---\n# Plan\n")
+
+	rows, err := (PlanWorkspaceScanner{ThoughtsRoot: thoughtsRoot}).Scan(context.Background())
+	if err != nil {
+		t.Fatalf("Scan() error = %v", err)
+	}
+	if len(rows) != 1 {
+		t.Fatalf("len(rows) = %d", len(rows))
+	}
+	row := rows[0]
+	if row.ProjectID != "vamos" {
+		t.Fatalf("ProjectID = %q", row.ProjectID)
+	}
+	wantRelated := []string{"cn-agents", "datastarui"}
+	if !reflect.DeepEqual(row.RelatedProjects, wantRelated) {
+		t.Fatalf("RelatedProjects = %#v, want %#v", row.RelatedProjects, wantRelated)
+	}
+	if row.DeclaredSource != filepath.Join(planDir, "plan.md") {
+		t.Fatalf("DeclaredSource = %q", row.DeclaredSource)
+	}
+}
+
+func TestPlanWorkspaceSyncerSyncsProjectRolesFromMetadata(t *testing.T) {
+	service := newTestAgentChatService(t)
+	thoughtsRoot := t.TempDir()
+	planDir := filepath.Join(thoughtsRoot, "agent", "plans", "project-roles")
+	writePlanWorkspaceMarkdown(t, planDir, "plan.md", "---\nproject: vamos\nrelated_projects: [datastarui, cn-agents]\n---\n# Plan\n")
+	notifier := &recordingPlanWorkspaceNotifier{}
+	syncer := &PlanWorkspaceSyncer{
+		Queries:  service.queries,
+		Scanner:  PlanWorkspaceScanner{ThoughtsRoot: thoughtsRoot},
+		Notifier: notifier,
+	}
+
+	result, err := syncer.Sync(context.Background(), PlanWorkspaceDiscoveryInput{})
+	if err != nil {
+		t.Fatalf("Sync() error = %v", err)
+	}
+	if !result.Changed || notifier.count != 1 {
+		t.Fatalf("result = %#v notifier=%d, want changed", result, notifier.count)
+	}
+	plan, err := service.queries.GetPlanWorkspace(context.Background(), "agent/plans/project-roles")
+	if err != nil {
+		t.Fatalf("GetPlanWorkspace() error = %v", err)
+	}
+	if plan.ProjectID != "vamos" {
+		t.Fatalf("plan ProjectID = %q", plan.ProjectID)
+	}
+	roles, err := service.queries.ListPlanWorkspaceProjects(context.Background(), "agent/plans/project-roles")
+	if err != nil {
+		t.Fatalf("ListPlanWorkspaceProjects() error = %v", err)
+	}
+	got := make([]string, 0, len(roles))
+	for _, role := range roles {
+		got = append(got, role.ProjectID+":"+role.Role+":"+filepath.Base(role.DeclaredSource))
+	}
+	want := []string{"vamos:primary:plan.md", "cn-agents:related:plan.md", "datastarui:related:plan.md"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("roles = %#v, want %#v", got, want)
+	}
+
+	writePlanWorkspaceMarkdown(t, planDir, "plan.md", "---\nproject: vamos\nrelated_projects: [datastarui]\n---\n# Plan\n")
+	result, err = syncer.Sync(context.Background(), PlanWorkspaceDiscoveryInput{})
+	if err != nil {
+		t.Fatalf("second Sync() error = %v", err)
+	}
+	if !result.Changed || notifier.count != 2 {
+		t.Fatalf("second result = %#v notifier=%d, want changed", result, notifier.count)
+	}
+	roles, err = service.queries.ListPlanWorkspaceProjects(context.Background(), "agent/plans/project-roles")
+	if err != nil {
+		t.Fatalf("ListPlanWorkspaceProjects(second) error = %v", err)
+	}
+	got = got[:0]
+	for _, role := range roles {
+		got = append(got, role.ProjectID+":"+role.Role)
+	}
+	want = []string{"vamos:primary", "datastarui:related"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("roles after archive = %#v, want %#v", got, want)
+	}
+}
+
 func TestPlanWorkspaceSyncerListsCurrentAndHistoricalLifecycle(t *testing.T) {
 	service := newTestAgentChatService(t)
 	ctx := context.Background()
@@ -751,6 +841,18 @@ func TestPlanWorkspaceSyncerUsesInputThoughtsRoot(t *testing.T) {
 	if !result.Changed || result.Discovered != 1 {
 		t.Fatalf("result = %#v, want discovered from input thoughts root", result)
 	}
+}
+
+func writePlanWorkspaceMarkdown(t *testing.T, dir, name, content string) string {
+	t.Helper()
+	path := filepath.Join(dir, name)
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatalf("MkdirAll(%s): %v", filepath.Dir(path), err)
+	}
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatalf("WriteFile(%s): %v", path, err)
+	}
+	return path
 }
 
 func writePlanWorkspaceFile(t *testing.T, dir, name string, modTime time.Time) string {

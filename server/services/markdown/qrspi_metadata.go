@@ -9,19 +9,21 @@ import (
 )
 
 type QRSPIMetadata struct {
-	Present     bool
-	Stage       string
-	PlanSlug    string
-	PlanTitle   string
-	PlanDate    string
-	PlanTime    string
-	PlanDir     string
-	Ticket      string
-	Repository  string
-	UpdatedAt   time.Time
-	UpdatedBy   string
-	Nav         []QRSPINavItem
-	RelatedDocs []QRSPIDocGroup
+	Present         bool
+	Stage           string
+	PlanSlug        string
+	PlanTitle       string
+	PlanDate        string
+	PlanTime        string
+	PlanDir         string
+	Ticket          string
+	Project         string
+	RelatedProjects []string
+	Repository      string
+	UpdatedAt       time.Time
+	UpdatedBy       string
+	Nav             []QRSPINavItem
+	RelatedDocs     []QRSPIDocGroup
 }
 
 type QRSPINavItem struct {
@@ -56,17 +58,19 @@ func (s *Service) buildQRSPIMetadata(pageArgs *PageArgs) QRSPIMetadata {
 	slug := planSlug(planDir)
 	date, clock, title := splitPlanSlug(filepath.Base(strings.Trim(planDir, "/")), slug)
 	meta := QRSPIMetadata{
-		Present:    true,
-		Stage:      strings.TrimSpace(fm.Stage),
-		PlanSlug:   slug,
-		PlanTitle:  title,
-		PlanDate:   date,
-		PlanTime:   clock,
-		PlanDir:    planDir,
-		Ticket:     strings.Trim(strings.TrimSpace(fm.Ticket), `"`),
-		Repository: canonicalRepositoryLabel(fm.Repository),
-		UpdatedAt:  fm.LastUpdated,
-		UpdatedBy:  strings.TrimSpace(fm.LastUpdatedBy),
+		Present:         true,
+		Stage:           strings.TrimSpace(fm.Stage),
+		PlanSlug:        slug,
+		PlanTitle:       title,
+		PlanDate:        date,
+		PlanTime:        clock,
+		PlanDir:         planDir,
+		Ticket:          strings.Trim(strings.TrimSpace(fm.Ticket), `"`),
+		Project:         strings.TrimSpace(fm.Project),
+		RelatedProjects: fm.RelatedProjects,
+		Repository:      canonicalRepositoryLabel(fm.Repository),
+		UpdatedAt:       fm.LastUpdated,
+		UpdatedBy:       strings.TrimSpace(fm.LastUpdatedBy),
 	}
 	if meta.UpdatedAt.IsZero() {
 		meta.UpdatedAt = fm.Date

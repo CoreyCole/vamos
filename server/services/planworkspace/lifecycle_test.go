@@ -3,6 +3,7 @@ package planworkspace
 import (
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -25,6 +26,17 @@ func TestParsePlanWorkspaceFrontmatter(t *testing.T) {
 	}
 	if got.QRSPILifecycleUpdatedAt.IsZero() {
 		t.Fatal("QRSPILifecycleUpdatedAt is zero")
+	}
+}
+
+func TestParsePlanWorkspaceFrontmatterNormalizesRelatedProjects(t *testing.T) {
+	got, err := ParsePlanWorkspaceFrontmatter("plan.md", []byte("---\nproject: vamos\nrelated_projects:\n  - datastarui\n  - ' vamos '\n  - ''\n  - cn-agents\n  - datastarui\n---\n# Body\n"))
+	if err != nil {
+		t.Fatalf("ParsePlanWorkspaceFrontmatter() error = %v", err)
+	}
+	want := []string{"cn-agents", "datastarui"}
+	if !reflect.DeepEqual(got.RelatedProjects, want) {
+		t.Fatalf("RelatedProjects = %#v, want %#v", got.RelatedProjects, want)
 	}
 }
 

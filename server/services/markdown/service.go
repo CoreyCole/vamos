@@ -22,6 +22,7 @@ import (
 	"github.com/CoreyCole/vamos/server/layouts/workbench"
 	"github.com/CoreyCole/vamos/server/services/comments"
 	"github.com/CoreyCole/vamos/server/services/layoutprefs"
+	"github.com/CoreyCole/vamos/server/services/planworkspace"
 )
 
 type ThemeProvider interface {
@@ -149,23 +150,24 @@ func parseFrontmatter(content []byte) (*Frontmatter, []byte, error) {
 
 	// Parse YAML into temporary struct with string dates
 	var rawFm struct {
-		Date           string   `yaml:"date"`
-		Researcher     string   `yaml:"researcher"`
-		GitCommit      string   `yaml:"git_commit"`
-		Branch         string   `yaml:"branch"`
-		Project        string   `yaml:"project"`
-		Repository     string   `yaml:"repository"`
-		Topic          string   `yaml:"topic"`
-		Tags           []string `yaml:"tags"`
-		Status         string   `yaml:"status"`
-		LastUpdated    string   `yaml:"last_updated"`
-		LastUpdatedBy  string   `yaml:"last_updated_by"`
-		Stage          string   `yaml:"stage"`
-		Ticket         string   `yaml:"ticket"`
-		PlanDir        string   `yaml:"plan_dir"`
-		Verdict        string   `yaml:"verdict"`
-		RelatedADRs    []string `yaml:"related_adrs"`
-		BrainstormDocs []string `yaml:"brainstorm_docs"`
+		Date            string   `yaml:"date"`
+		Researcher      string   `yaml:"researcher"`
+		GitCommit       string   `yaml:"git_commit"`
+		Branch          string   `yaml:"branch"`
+		Project         string   `yaml:"project"`
+		RelatedProjects []string `yaml:"related_projects"`
+		Repository      string   `yaml:"repository"`
+		Topic           string   `yaml:"topic"`
+		Tags            []string `yaml:"tags"`
+		Status          string   `yaml:"status"`
+		LastUpdated     string   `yaml:"last_updated"`
+		LastUpdatedBy   string   `yaml:"last_updated_by"`
+		Stage           string   `yaml:"stage"`
+		Ticket          string   `yaml:"ticket"`
+		PlanDir         string   `yaml:"plan_dir"`
+		Verdict         string   `yaml:"verdict"`
+		RelatedADRs     []string `yaml:"related_adrs"`
+		BrainstormDocs  []string `yaml:"brainstorm_docs"`
 	}
 
 	if err := yaml.Unmarshal(yamlContent, &rawFm); err != nil {
@@ -174,23 +176,24 @@ func parseFrontmatter(content []byte) (*Frontmatter, []byte, error) {
 
 	// Convert to final Frontmatter with parsed dates
 	fm := &Frontmatter{
-		Researcher:     rawFm.Researcher,
-		GitCommit:      strings.TrimSpace(rawFm.GitCommit),
-		Branch:         strings.TrimSpace(rawFm.Branch),
-		Project:        strings.TrimSpace(rawFm.Project),
-		Repository:     strings.TrimSpace(rawFm.Repository),
-		Topic:          rawFm.Topic,
-		Tags:           rawFm.Tags,
-		Status:         rawFm.Status,
-		LastUpdatedBy:  rawFm.LastUpdatedBy,
-		Stage:          rawFm.Stage,
-		Ticket:         rawFm.Ticket,
-		PlanDir:        rawFm.PlanDir,
-		Verdict:        rawFm.Verdict,
-		RelatedADRs:    rawFm.RelatedADRs,
-		BrainstormDocs: rawFm.BrainstormDocs,
-		Date:           parseDate(rawFm.Date),
-		LastUpdated:    parseDate(rawFm.LastUpdated),
+		Researcher:      rawFm.Researcher,
+		GitCommit:       strings.TrimSpace(rawFm.GitCommit),
+		Branch:          strings.TrimSpace(rawFm.Branch),
+		Project:         strings.TrimSpace(rawFm.Project),
+		RelatedProjects: planworkspace.NormalizeRelatedProjects(rawFm.Project, rawFm.RelatedProjects),
+		Repository:      strings.TrimSpace(rawFm.Repository),
+		Topic:           rawFm.Topic,
+		Tags:            rawFm.Tags,
+		Status:          rawFm.Status,
+		LastUpdatedBy:   rawFm.LastUpdatedBy,
+		Stage:           rawFm.Stage,
+		Ticket:          rawFm.Ticket,
+		PlanDir:         rawFm.PlanDir,
+		Verdict:         rawFm.Verdict,
+		RelatedADRs:     rawFm.RelatedADRs,
+		BrainstormDocs:  rawFm.BrainstormDocs,
+		Date:            parseDate(rawFm.Date),
+		LastUpdated:     parseDate(rawFm.LastUpdated),
 	}
 
 	// Return frontmatter and the content after the closing ---

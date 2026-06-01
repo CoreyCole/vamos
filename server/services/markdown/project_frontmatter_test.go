@@ -1,6 +1,9 @@
 package markdown
 
-import "testing"
+import (
+	"reflect"
+	"testing"
+)
 
 func TestGitHubRepoKeyForQRSPIFrontmatterUsesProject(t *testing.T) {
 	fm, _, err := parseFrontmatter([]byte(`---
@@ -16,6 +19,26 @@ plan_dir: thoughts/example/plans/demo
 	}
 	if got := githubRepoKeyForFrontmatter(fm); got != "github.com/CoreyCole/vamos" {
 		t.Fatalf("githubRepoKeyForFrontmatter() = %q", got)
+	}
+}
+
+func TestParseFrontmatterNormalizesRelatedProjects(t *testing.T) {
+	fm, _, err := parseFrontmatter([]byte(`---
+project: vamos
+related_projects:
+  - datastarui
+  - vamos
+  - cn-agents
+  - datastarui
+---
+# Body
+`))
+	if err != nil {
+		t.Fatalf("parseFrontmatter() error = %v", err)
+	}
+	want := []string{"cn-agents", "datastarui"}
+	if !reflect.DeepEqual(fm.RelatedProjects, want) {
+		t.Fatalf("RelatedProjects = %#v, want %#v", fm.RelatedProjects, want)
 	}
 }
 

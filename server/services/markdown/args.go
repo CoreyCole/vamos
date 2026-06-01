@@ -15,23 +15,24 @@ import (
 
 // Frontmatter represents the YAML frontmatter in markdown files
 type Frontmatter struct {
-	Date           time.Time `yaml:"date"`
-	Researcher     string    `yaml:"researcher"`
-	GitCommit      string    `yaml:"git_commit"`
-	Branch         string    `yaml:"branch"`
-	Project        string    `yaml:"project"`
-	Repository     string    `yaml:"repository"`
-	Topic          string    `yaml:"topic"`
-	Tags           []string  `yaml:"tags"`
-	Status         string    `yaml:"status"`
-	LastUpdated    time.Time `yaml:"last_updated"`
-	LastUpdatedBy  string    `yaml:"last_updated_by"`
-	Stage          string    `yaml:"stage"`
-	Ticket         string    `yaml:"ticket"`
-	PlanDir        string    `yaml:"plan_dir"`
-	Verdict        string    `yaml:"verdict"`
-	RelatedADRs    []string  `yaml:"related_adrs"`
-	BrainstormDocs []string  `yaml:"brainstorm_docs"`
+	Date            time.Time `yaml:"date"`
+	Researcher      string    `yaml:"researcher"`
+	GitCommit       string    `yaml:"git_commit"`
+	Branch          string    `yaml:"branch"`
+	Project         string    `yaml:"project"`
+	RelatedProjects []string  `yaml:"related_projects"`
+	Repository      string    `yaml:"repository"`
+	Topic           string    `yaml:"topic"`
+	Tags            []string  `yaml:"tags"`
+	Status          string    `yaml:"status"`
+	LastUpdated     time.Time `yaml:"last_updated"`
+	LastUpdatedBy   string    `yaml:"last_updated_by"`
+	Stage           string    `yaml:"stage"`
+	Ticket          string    `yaml:"ticket"`
+	PlanDir         string    `yaml:"plan_dir"`
+	Verdict         string    `yaml:"verdict"`
+	RelatedADRs     []string  `yaml:"related_adrs"`
+	BrainstormDocs  []string  `yaml:"brainstorm_docs"`
 }
 
 // ViewerArgs for the markdown content renderer

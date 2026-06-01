@@ -4,10 +4,13 @@ import (
 	"bytes"
 	"fmt"
 	"os"
+	"sort"
 	"strings"
 	"time"
 
 	"gopkg.in/yaml.v3"
+
+	"github.com/CoreyCole/vamos/pkg/collections"
 )
 
 type QRSPIStage string
@@ -30,9 +33,11 @@ const (
 
 type PlanWorkspaceFrontmatter struct {
 	Project                 string     `yaml:"project"`
+	RelatedProjects         []string   `yaml:"related_projects"`
 	QRSPIStage              QRSPIStage `yaml:"qrspi_lifecycle"`
 	QRSPILifecycleUpdatedAt time.Time  `yaml:"qrspi_lifecycle_updated_at"`
 	QRSPIClosedReason       string     `yaml:"qrspi_closed_reason"`
+	DeclaredSource          string     `yaml:"-"`
 }
 
 func ParsePlanWorkspaceFrontmatter(path string, data []byte) (PlanWorkspaceFrontmatter, error) {
@@ -45,6 +50,7 @@ func ParsePlanWorkspaceFrontmatter(path string, data []byte) (PlanWorkspaceFront
 		return PlanWorkspaceFrontmatter{}, fmt.Errorf("parse %s frontmatter: %w", path, err)
 	}
 	fm.Project = strings.TrimSpace(fm.Project)
+	fm.RelatedProjects = NormalizeRelatedProjects(fm.Project, fm.RelatedProjects)
 	if fm.QRSPIStage == "" {
 		fm.QRSPIStage = QRSPIStageQuestion
 	}
@@ -52,6 +58,22 @@ func ParsePlanWorkspaceFrontmatter(path string, data []byte) (PlanWorkspaceFront
 		return PlanWorkspaceFrontmatter{}, fmt.Errorf("invalid qrspi_lifecycle %q", fm.QRSPIStage)
 	}
 	return fm, nil
+}
+
+func NormalizeRelatedProjects(primary string, related []string) []string {
+	primary = strings.TrimSpace(primary)
+	seen := collections.NewSet[string]()
+	out := make([]string, 0, len(related))
+	for _, project := range related {
+		project = strings.TrimSpace(project)
+		if project == "" || project == primary || seen.Has(project) {
+			continue
+		}
+		seen.Add(project)
+		out = append(out, project)
+	}
+	sort.Strings(out)
+	return out
 }
 
 func MergePlanWorkspaceFrontmatter(path string, update PlanWorkspaceFrontmatter) error {
