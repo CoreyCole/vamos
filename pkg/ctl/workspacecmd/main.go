@@ -22,6 +22,7 @@ func Main(args []string) error {
 		plan := fs.String("plan", "", "QRSPI plan.md path")
 		managerURL := fs.String("manager-url", os.Getenv("VAMOS_WORKSPACE_MANAGER_URL"), "workspace manager URL")
 		restartToken := fs.String("restart-token", os.Getenv("VAMOS_WORKSPACE_RESTART_TOKEN"), "workspace restart/API token")
+		projectID := fs.String("project", "", "project id for plan workspace binding")
 		slug := fs.String("slug", "", "workspace slug")
 		path := fs.String("path", "", "requested workspace path")
 		source := fs.String("source-checkout", "", "source checkout path")
@@ -33,7 +34,7 @@ func Main(args []string) error {
 		if err := fs.Parse(args[1:]); err != nil {
 			return err
 		}
-		return RunCreate(ctx, CreateOptions{PlanPath: *plan, ManagerURL: *managerURL, RestartToken: *restartToken, WorkspaceSlug: *slug, RequestedPath: *path, SourceCheckout: *source, BaselineCheckout: *baseline, TrunkBranch: *trunk, ParentStackRef: *parent, ReviewFollowup: *reviewFollowup, Force: *force}, os.Stdout)
+		return RunCreate(ctx, CreateOptions{PlanPath: *plan, ProjectID: *projectID, ManagerURL: *managerURL, RestartToken: *restartToken, WorkspaceSlug: *slug, RequestedPath: *path, SourceCheckout: *source, BaselineCheckout: *baseline, TrunkBranch: *trunk, ParentStackRef: *parent, ReviewFollowup: *reviewFollowup, Force: *force}, os.Stdout)
 	}
 	if args[0] == "register-current" {
 		fs := flag.NewFlagSet(
@@ -47,6 +48,7 @@ func Main(args []string) error {
 			"",
 			"QRSPI plan directory to bind to this checkout",
 		)
+		projectID := fs.String("project", "", "project id for plan workspace binding")
 		createdBy := fs.String(
 			"created-by",
 			"vamos ctl workspace register-current",
@@ -59,6 +61,7 @@ func Main(args []string) error {
 			ManagerURL:   *managerURL,
 			RestartToken: *restartToken,
 			PlanDir:      *planDir,
+			ProjectID:    *projectID,
 			CreatedBy:    *createdBy,
 		}, os.Stdout)
 	}

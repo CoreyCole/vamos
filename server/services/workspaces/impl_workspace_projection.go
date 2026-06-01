@@ -222,18 +222,29 @@ func orderReleaseLaneViewsFirst(
 }
 
 func BuildImplWorkspaceTree(views []ImplWorkspaceView) []ImplWorkspaceView {
-	byPlanDir := make(map[string]int, len(views))
+	parentsByPlanDir := make(map[string][]int, len(views))
+	parentsByPlanProject := make(map[planDirProjectKey]int, len(views))
 	for i := range views {
-		if dir := implWorkspaceViewPlanDirKey(views[i]); dir != "" {
-			byPlanDir[dir] = i
+		dir := implWorkspaceViewPlanDirKey(views[i])
+		if dir == "" || parentPlanDirKey(dir) != "" {
+			continue
+		}
+		parentsByPlanDir[dir] = append(parentsByPlanDir[dir], i)
+		projectID := implWorkspaceViewProjectID(views[i])
+		if projectID != "" {
+			parentsByPlanProject[planDirProjectKey{PlanDir: dir, ProjectID: projectID}] = i
 		}
 	}
 
 	childrenByParent := make(map[int][]ImplWorkspaceView)
 	childIndexes := make(map[int]bool)
 	for i := range views {
-		parentDir := parentPlanDirKey(implWorkspaceViewPlanDirKey(views[i]))
-		parentIndex, ok := byPlanDir[parentDir]
+		planDir := implWorkspaceViewPlanDirKey(views[i])
+		parentDir := parentPlanDirKey(planDir)
+		if parentDir == "" {
+			continue
+		}
+		parentIndex, ok := parentIndexForReviewWorkspace(views[i], parentDir, parentsByPlanDir, parentsByPlanProject)
 		if !ok || parentIndex == i {
 			continue
 		}
@@ -250,6 +261,37 @@ func BuildImplWorkspaceTree(views []ImplWorkspaceView) []ImplWorkspaceView {
 		out = append(out, view)
 	}
 	return out
+}
+
+type planDirProjectKey struct {
+	PlanDir   string
+	ProjectID string
+}
+
+func parentIndexForReviewWorkspace(
+	view ImplWorkspaceView,
+	parentDir string,
+	parentsByPlanDir map[string][]int,
+	parentsByPlanProject map[planDirProjectKey]int,
+) (int, bool) {
+	projectID := implWorkspaceViewProjectID(view)
+	if projectID != "" {
+		if idx, ok := parentsByPlanProject[planDirProjectKey{PlanDir: parentDir, ProjectID: projectID}]; ok {
+			return idx, true
+		}
+	}
+	candidates := parentsByPlanDir[parentDir]
+	if len(candidates) != 1 {
+		return 0, false
+	}
+	return candidates[0], true
+}
+
+func implWorkspaceViewProjectID(view ImplWorkspaceView) string {
+	if projectID := strings.TrimSpace(view.Row.ProjectID); projectID != "" {
+		return projectID
+	}
+	return strings.TrimSpace(view.Runtime.Workspace.ProjectID)
 }
 
 func implWorkspaceViewPlanDirKey(view ImplWorkspaceView) string {

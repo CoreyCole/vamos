@@ -15,6 +15,7 @@ import (
 
 type CreateOptions struct {
 	PlanPath         string
+	ProjectID        string
 	ManagerURL       string
 	RestartToken     string
 	WorkspaceSlug    string
@@ -38,6 +39,7 @@ func RunCreate(ctx context.Context, opts CreateOptions, out io.Writer) error {
 	input := workspaces.WorkspaceProvisionInput{
 		PlanPath:         planPath,
 		PlanDir:          filepath.Dir(planPath),
+		ProjectID:        strings.TrimSpace(opts.ProjectID),
 		WorkspaceSlug:    strings.TrimSpace(opts.WorkspaceSlug),
 		RequestedPath:    strings.TrimSpace(opts.RequestedPath),
 		SourceCheckout:   strings.TrimSpace(opts.SourceCheckout),

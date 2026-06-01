@@ -68,6 +68,9 @@ func (a *WorkspaceProvisionActivities) provision(
 	metadataPath := filepath.Join(input.RequestedPath, metaDirName, "workspace.json")
 	if existing, ok := readProvisionMetadata(metadataPath); ok {
 		if provisionMetadataMatches(existing, input, baseCommit) {
+			if err := writeProvisionPlanBinding(input, time.Now().UTC()); err != nil {
+				return WorkspaceProvisionResult{}, err
+			}
 			return WorkspaceProvisionResult{WorkspacePath: input.RequestedPath, WorkspaceSlug: input.WorkspaceSlug, BaseRef: existing.BaseRef, BaseCommit: existing.BaseCommit, MetadataDir: filepath.Dir(metadataPath), Status: WorkspaceProvisionStatusComplete, Message: "workspace already provisioned"}, nil
 		}
 		return blockedProvision(input, "existing workspace metadata does not match request"), nil
@@ -89,7 +92,7 @@ func (a *WorkspaceProvisionActivities) provision(
 	if a.Now != nil {
 		now = a.Now().UTC()
 	}
-	meta := WorkspaceProvisionMetadata{Slug: input.WorkspaceSlug, PlanPath: input.PlanPath, PlanDir: input.PlanDir, WorkspacePath: input.RequestedPath, SourceCheckout: input.SourceCheckout, BaselineCheckout: input.BaselineCheckout, BaseRef: baseRef, BaseCommit: strings.TrimSpace(baseCommit), TrunkBranch: input.TrunkBranch, ParentStackRef: input.ParentStackRef, ReviewFollowup: input.ReviewFollowup, CreatedAt: now}
+	meta := WorkspaceProvisionMetadata{Slug: input.WorkspaceSlug, ProjectID: input.ProjectID, PlanPath: input.PlanPath, PlanDir: input.PlanDir, WorkspacePath: input.RequestedPath, SourceCheckout: input.SourceCheckout, BaselineCheckout: input.BaselineCheckout, BaseRef: baseRef, BaseCommit: strings.TrimSpace(baseCommit), TrunkBranch: input.TrunkBranch, ParentStackRef: input.ParentStackRef, ReviewFollowup: input.ReviewFollowup, CreatedAt: now}
 	if err := writeJSONFile(metadataPath, meta, 0o644); err != nil {
 		return WorkspaceProvisionResult{}, err
 	}
@@ -110,7 +113,24 @@ func (a *WorkspaceProvisionActivities) provision(
 	if err := syncProvisionPlanDir(input, input.RequestedPath); err != nil {
 		return WorkspaceProvisionResult{}, err
 	}
+	if err := writeProvisionPlanBinding(input, now); err != nil {
+		return WorkspaceProvisionResult{}, err
+	}
 	return WorkspaceProvisionResult{WorkspacePath: input.RequestedPath, WorkspaceSlug: input.WorkspaceSlug, BaseRef: baseRef, BaseCommit: strings.TrimSpace(baseCommit), MetadataDir: filepath.Dir(metadataPath), Status: WorkspaceProvisionStatusComplete}, nil
+}
+
+func writeProvisionPlanBinding(input WorkspaceProvisionInput, now time.Time) error {
+	if input.PlanDir == "" {
+		return nil
+	}
+	return WritePlanWorkspaceBinding(PlanWorkspaceBindingPath(input.RequestedPath), PlanWorkspaceBinding{
+		PlanDir:       input.PlanDir,
+		WorkspaceSlug: input.WorkspaceSlug,
+		CheckoutPath:  input.RequestedPath,
+		ProjectID:     input.ProjectID,
+		CreatedBy:     "workspace-provision",
+		UpdatedAt:     now,
+	})
 }
 
 func normalizeProvisionInput(input WorkspaceProvisionInput) WorkspaceProvisionInput {
@@ -123,6 +143,7 @@ func normalizeProvisionInput(input WorkspaceProvisionInput) WorkspaceProvisionIn
 			input.PlanDir = ""
 		}
 	}
+	input.ProjectID = strings.TrimSpace(input.ProjectID)
 	input.WorkspaceSlug = strings.TrimSpace(input.WorkspaceSlug)
 	input.RequestedPath = filepath.Clean(strings.TrimSpace(input.RequestedPath))
 	if input.RequestedPath == "." {
@@ -158,7 +179,7 @@ func readProvisionMetadata(path string) (WorkspaceProvisionMetadata, bool) {
 }
 
 func provisionMetadataMatches(meta WorkspaceProvisionMetadata, input WorkspaceProvisionInput, baseCommit string) bool {
-	return meta.Slug == input.WorkspaceSlug && samePath(meta.WorkspacePath, input.RequestedPath) && meta.PlanDir == input.PlanDir && strings.TrimSpace(meta.BaseCommit) == strings.TrimSpace(baseCommit)
+	return meta.Slug == input.WorkspaceSlug && strings.TrimSpace(meta.ProjectID) == input.ProjectID && samePath(meta.WorkspacePath, input.RequestedPath) && meta.PlanDir == input.PlanDir && strings.TrimSpace(meta.BaseCommit) == strings.TrimSpace(baseCommit)
 }
 
 func existingDestinationState(ctx context.Context, path string) (exists bool, dirty bool) {

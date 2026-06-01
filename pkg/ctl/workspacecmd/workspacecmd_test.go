@@ -144,6 +144,7 @@ func TestRunCreatePostsProvisionRequest(t *testing.T) {
 	type provisionRequest struct {
 		PlanPath       string `json:"plan_path"`
 		PlanDir        string `json:"plan_dir"`
+		ProjectID      string `json:"project_id"`
 		WorkspaceSlug  string `json:"workspace_slug"`
 		RequestedPath  string `json:"requested_path"`
 		SourceCheckout string `json:"source_checkout"`
@@ -164,10 +165,10 @@ func TestRunCreatePostsProvisionRequest(t *testing.T) {
 	}))
 	defer server.Close()
 	var out bytes.Buffer
-	if err := RunCreate(t.Context(), CreateOptions{PlanPath: "thoughts/a/plans/p/plan.md", ManagerURL: server.URL, RestartToken: "secret", WorkspaceSlug: "feature", RequestedPath: "/tmp/ws", SourceCheckout: "/src", TrunkBranch: "main"}, &out); err != nil {
+	if err := RunCreate(t.Context(), CreateOptions{PlanPath: "thoughts/a/plans/p/plan.md", ProjectID: "vamos", ManagerURL: server.URL, RestartToken: "secret", WorkspaceSlug: "feature", RequestedPath: "/tmp/ws", SourceCheckout: "/src", TrunkBranch: "main"}, &out); err != nil {
 		t.Fatalf("RunCreate: %v", err)
 	}
-	if gotToken != "secret" || got.PlanDir != "thoughts/a/plans/p" || got.WorkspaceSlug != "feature" || got.SourceCheckout != "/src" {
+	if gotToken != "secret" || got.PlanDir != "thoughts/a/plans/p" || got.ProjectID != "vamos" || got.WorkspaceSlug != "feature" || got.SourceCheckout != "/src" {
 		t.Fatalf("token=%q request=%+v", gotToken, got)
 	}
 	if !strings.Contains(out.String(), `"workspace_path":"/tmp/ws"`) {

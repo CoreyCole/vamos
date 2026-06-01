@@ -17,6 +17,7 @@ type RegisterOptions struct {
 	ManagerURL   string
 	RestartToken string
 	PlanDir      string
+	ProjectID    string
 	CreatedBy    string
 }
 
@@ -87,6 +88,7 @@ func RunRegisterCurrent(
 				PlanDir:       opts.PlanDir,
 				WorkspaceSlug: slug,
 				CheckoutPath:  checkout,
+				ProjectID:     strings.TrimSpace(opts.ProjectID),
 				CreatedBy: defaultString(
 					opts.CreatedBy,
 					"vamos ctl workspace register-current",

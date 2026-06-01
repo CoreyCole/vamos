@@ -217,6 +217,117 @@ func TestBuildImplWorkspaceViewsNestsReviewPlanRows(t *testing.T) {
 	}
 }
 
+func TestBuildImplWorkspaceViewsKeepsSamePlanDifferentProjectsAsSiblings(t *testing.T) {
+	rows := []db.ImplWorkspace{
+		{
+			ProjectID:     "vamos",
+			WorkspaceSlug: "vamos-parent",
+			CheckoutPath:  "/repo/vamos-parent",
+			DisplayName:   "Vamos parent",
+			Status:        string(ImplWorkspaceStatusActive),
+			PlanDirRel: sql.NullString{
+				String: "creative-mode-agent/plans/2026-06-01_multi-project",
+				Valid:  true,
+			},
+		},
+		{
+			ProjectID:     "datastarui",
+			WorkspaceSlug: "datastarui-parent",
+			CheckoutPath:  "/repo/datastarui-parent",
+			DisplayName:   "DatastarUI parent",
+			Status:        string(ImplWorkspaceStatusActive),
+			PlanDirRel: sql.NullString{
+				String: "creative-mode-agent/plans/2026-06-01_multi-project",
+				Valid:  true,
+			},
+		},
+	}
+
+	got := BuildImplWorkspaceViews(rows, nil, WorkspaceLifecycleSnapshot{})
+	if len(got) != 2 {
+		t.Fatalf("len(got) = %d, want two sibling roots: %+v", len(got), got)
+	}
+	if got[0].Row.WorkspaceSlug != "vamos-parent" || got[1].Row.WorkspaceSlug != "datastarui-parent" {
+		t.Fatalf("got = %+v, want both parent rows preserved in input order", got)
+	}
+}
+
+func TestBuildImplWorkspaceViewsNestsReviewPlanRowsByProject(t *testing.T) {
+	rows := []db.ImplWorkspace{
+		{
+			ProjectID:     "vamos",
+			WorkspaceSlug: "vamos-parent",
+			CheckoutPath:  "/repo/vamos-parent",
+			DisplayName:   "Vamos parent",
+			Status:        string(ImplWorkspaceStatusActive),
+			PlanDirRel: sql.NullString{
+				String: "creative-mode-agent/plans/2026-06-01_multi-project",
+				Valid:  true,
+			},
+		},
+		{
+			ProjectID:     "datastarui",
+			WorkspaceSlug: "datastarui-parent",
+			CheckoutPath:  "/repo/datastarui-parent",
+			DisplayName:   "DatastarUI parent",
+			Status:        string(ImplWorkspaceStatusActive),
+			PlanDirRel: sql.NullString{
+				String: "creative-mode-agent/plans/2026-06-01_multi-project",
+				Valid:  true,
+			},
+		},
+		{
+			ProjectID:     "datastarui",
+			WorkspaceSlug: "datastarui-review",
+			CheckoutPath:  "/repo/datastarui-review",
+			DisplayName:   "DatastarUI review",
+			Status:        string(ImplWorkspaceStatusActive),
+			PlanDirRel: sql.NullString{
+				String: "creative-mode-agent/plans/2026-06-01_multi-project/reviews/2026-06-01_multi-project_implementation-review",
+				Valid:  true,
+			},
+		},
+	}
+
+	got := BuildImplWorkspaceViews(rows, nil, WorkspaceLifecycleSnapshot{})
+	if len(got) != 2 {
+		t.Fatalf("len(got) = %d, want two roots: %+v", len(got), got)
+	}
+	if len(got[0].Children) != 0 {
+		t.Fatalf("vamos children = %+v, want none", got[0].Children)
+	}
+	if len(got[1].Children) != 1 || got[1].Children[0].Row.WorkspaceSlug != "datastarui-review" {
+		t.Fatalf("datastarui children = %+v, want review child", got[1].Children)
+	}
+}
+
+func TestBuildImplWorkspaceViewsKeepsAmbiguousReviewPlanRowsTopLevel(t *testing.T) {
+	rows := []db.ImplWorkspace{
+		{
+			ProjectID:     "vamos",
+			WorkspaceSlug: "vamos-parent",
+			Status:        string(ImplWorkspaceStatusActive),
+			PlanDirRel:    sql.NullString{String: "creative-mode-agent/plans/demo", Valid: true},
+		},
+		{
+			ProjectID:     "datastarui",
+			WorkspaceSlug: "datastarui-parent",
+			Status:        string(ImplWorkspaceStatusActive),
+			PlanDirRel:    sql.NullString{String: "creative-mode-agent/plans/demo", Valid: true},
+		},
+		{
+			WorkspaceSlug: "review-child",
+			Status:        string(ImplWorkspaceStatusActive),
+			PlanDirRel:    sql.NullString{String: "creative-mode-agent/plans/demo/reviews/review", Valid: true},
+		},
+	}
+
+	got := BuildImplWorkspaceViews(rows, nil, WorkspaceLifecycleSnapshot{})
+	if len(got) != 3 || got[2].Row.WorkspaceSlug != "review-child" || len(got[2].Children) != 0 {
+		t.Fatalf("got = %+v, want ambiguous review child as top-level row", got)
+	}
+}
+
 func TestBuildImplWorkspaceViewsKeepsOrphanReviewPlanRowsTopLevel(t *testing.T) {
 	rows := []db.ImplWorkspace{{
 		WorkspaceSlug: "review-child",

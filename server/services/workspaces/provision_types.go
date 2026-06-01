@@ -8,6 +8,7 @@ import (
 type WorkspaceProvisionInput struct {
 	PlanPath         string `json:"plan_path"`
 	PlanDir          string `json:"plan_dir"`
+	ProjectID        string `json:"project_id"`
 	WorkspaceSlug    string `json:"workspace_slug"`
 	RequestedPath    string `json:"requested_path"`
 	SourceCheckout   string `json:"source_checkout"`
@@ -30,6 +31,7 @@ type WorkspaceProvisionResult struct {
 
 type WorkspaceProvisionMetadata struct {
 	Slug             string    `json:"slug"`
+	ProjectID        string    `json:"project_id,omitempty"`
 	PlanPath         string    `json:"plan_path"`
 	PlanDir          string    `json:"plan_dir"`
 	WorkspacePath    string    `json:"workspace_path"`

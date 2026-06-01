@@ -25,6 +25,7 @@ func TestProvisionWorkspaceCreatesCopyAndMetadata(t *testing.T) {
 		Now:          func() time.Time { return time.Unix(100, 0) },
 	}).provision(t.Context(), WorkspaceProvisionInput{
 		PlanPath:       filepath.Join(planDir, "plan.md"),
+		ProjectID:      "vamos",
 		WorkspaceSlug:  "feature",
 		RequestedPath:  dest,
 		SourceCheckout: source,
@@ -53,6 +54,17 @@ func TestProvisionWorkspaceCreatesCopyAndMetadata(t *testing.T) {
 	}
 	if meta.Slug != "feature" || meta.ManagerURL != "https://manager.test" || meta.RestartToken != "secret" {
 		t.Fatalf("metadata = %+v", meta)
+	}
+	provisionMeta, ok := readProvisionMetadata(filepath.Join(dest, ".vamos", "workspace.json"))
+	if !ok || provisionMeta.ProjectID != "vamos" {
+		t.Fatalf("provision metadata = %+v ok=%v, want project id", provisionMeta, ok)
+	}
+	binding, err := ReadPlanWorkspaceBinding(PlanWorkspaceBindingPath(dest))
+	if err != nil {
+		t.Fatalf("ReadPlanWorkspaceBinding: %v", err)
+	}
+	if binding.ProjectID != "vamos" || binding.WorkspaceSlug != "feature" || binding.PlanDir != filepath.Join(planDir) {
+		t.Fatalf("binding = %+v", binding)
 	}
 }
 
@@ -83,7 +95,7 @@ func TestProvisionWorkspaceBlocksDirtyDestination(t *testing.T) {
 func TestProvisionWorkspaceIdempotentForMatchingMetadata(t *testing.T) {
 	source := initProvisionGitRepo(t)
 	dest := filepath.Join(t.TempDir(), "workspace")
-	input := WorkspaceProvisionInput{PlanPath: "thoughts/agent/plans/plan/plan.md", WorkspaceSlug: "feature", RequestedPath: dest, SourceCheckout: source, TrunkBranch: "main"}
+	input := WorkspaceProvisionInput{PlanPath: "thoughts/agent/plans/plan/plan.md", ProjectID: "vamos", WorkspaceSlug: "feature", RequestedPath: dest, SourceCheckout: source, TrunkBranch: "main"}
 	activities := &WorkspaceProvisionActivities{}
 	first, err := activities.provision(t.Context(), input)
 	if err != nil || first.Status != WorkspaceProvisionStatusComplete {
@@ -95,6 +107,14 @@ func TestProvisionWorkspaceIdempotentForMatchingMetadata(t *testing.T) {
 	}
 	if second.Status != WorkspaceProvisionStatusComplete || second.Message != "workspace already provisioned" {
 		t.Fatalf("second = %+v", second)
+	}
+	input.ProjectID = "datastarui"
+	mismatch, err := activities.provision(t.Context(), input)
+	if err != nil {
+		t.Fatalf("mismatch err: %v", err)
+	}
+	if mismatch.Status != WorkspaceProvisionStatusBlocked {
+		t.Fatalf("mismatch = %+v, want blocked", mismatch)
 	}
 }
 
