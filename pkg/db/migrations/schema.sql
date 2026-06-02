@@ -391,6 +391,18 @@ session_path TEXT,
 session_id TEXT,
 parent_session_id TEXT,
 cwd TEXT,
+agent TEXT NOT NULL DEFAULT 'pi',
+parent_plan_dir TEXT,
+source_review_dir TEXT,
+workflow_id TEXT,
+workflow_node_id TEXT,
+continued_from_session_id TEXT,
+forked_from_session_id TEXT,
+file_size INTEGER NOT NULL DEFAULT 0,
+file_mtime DATETIME,
+file_hash TEXT,
+last_indexed_offset INTEGER NOT NULL DEFAULT 0,
+needs_hydration INTEGER NOT NULL DEFAULT 1,
 status TEXT NOT NULL DEFAULT 'pending'
 CHECK (status IN ('pending',
 'importing',
@@ -424,6 +436,14 @@ WHERE inferred_plan_dir IS NOT NULL ;
 CREATE INDEX IF NOT EXISTS idx_agent_sessions_user_workspace_plan_dir_updated
 ON agent_sessions (user_email, workspace_id, inferred_plan_dir, updated_at DESC)
 WHERE inferred_plan_dir IS NOT NULL ;
+
+CREATE INDEX IF NOT EXISTS idx_agent_sessions_plan_agent_updated
+ON agent_sessions (inferred_plan_dir, agent, updated_at DESC)
+WHERE inferred_plan_dir IS NOT NULL ;
+
+CREATE INDEX IF NOT EXISTS idx_agent_sessions_workflow_node
+ON agent_sessions (workflow_id, workflow_node_id, updated_at DESC)
+WHERE workflow_id IS NOT NULL ;
 
 CREATE TABLE IF NOT EXISTS agent_entries (
 lineage_id TEXT NOT NULL,

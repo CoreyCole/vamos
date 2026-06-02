@@ -152,6 +152,14 @@ func (s *Service) indexPiSessionFile(
 	if err != nil {
 		return db.AgentSession{}, err
 	}
+	info, err := os.Stat(resolvedPath)
+	if err != nil {
+		return db.AgentSession{}, err
+	}
+	hash, err := fileSHA256(resolvedPath)
+	if err != nil {
+		return db.AgentSession{}, err
+	}
 	scan, err := ScanPiSessionJSONL(resolvedPath, PiSessionScanOptions{
 		BatchSize:    defaultPiSessionImportBatchSize,
 		ThoughtsRoot: s.thoughtsRoot,
@@ -178,6 +186,12 @@ func (s *Service) indexPiSessionFile(
 		SessionID:           nullableString(scan.Header.ID),
 		ParentSessionID:     nullableString(scan.Header.ParentSession),
 		Cwd:                 nullableString(scan.Header.Cwd),
+		Agent:               defaultAgentSessionAgent,
+		FileSize:            info.Size(),
+		FileMtime:           sql.NullTime{Time: info.ModTime(), Valid: true},
+		FileHash:            nullableString(hash),
+		LastIndexedOffset:   info.Size(),
+		NeedsHydration:      1,
 		Status:              status,
 		InferredWorkspaceID: nullableString(inference.WorkspaceID),
 		InferredPlanDir:     nullableString(inference.PlanDir),

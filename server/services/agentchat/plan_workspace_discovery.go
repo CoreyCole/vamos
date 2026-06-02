@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -15,6 +16,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"go.temporal.io/sdk/activity"
 
 	"github.com/CoreyCole/vamos/pkg/collections"
@@ -59,6 +61,7 @@ type PlanWorkspaceDiscoveryResult struct {
 	Upserted             int
 	Archived             int
 	Restored             int
+	AgentSessionsIndexed int
 	Changed              bool
 	MaxArtifactUpdatedAt time.Time
 }
@@ -449,6 +452,14 @@ func (s *PlanWorkspaceSyncer) Sync(
 		if item.ArtifactUpdatedAt.After(result.MaxArtifactUpdatedAt) {
 			result.MaxArtifactUpdatedAt = item.ArtifactUpdatedAt
 		}
+		indexedSessions, sessionIndexChanged, err := s.syncPlanAgentSessions(ctx, item.PlanDir)
+		if err != nil {
+			return PlanWorkspaceDiscoveryResult{}, err
+		}
+		if indexedSessions > 0 {
+			result.AgentSessionsIndexed += indexedSessions
+		}
+		result.Changed = result.Changed || sessionIndexChanged
 		if errors.Is(beforeErr, sql.ErrNoRows) {
 			result.Changed = true
 			continue
@@ -496,6 +507,96 @@ func (s *PlanWorkspaceSyncer) Sync(
 		s.Notifier.NotifyProjectPlanSidebar()
 	}
 	return result, nil
+}
+
+func (s *PlanWorkspaceSyncer) syncPlanAgentSessions(
+	ctx context.Context,
+	planDir string,
+) (int, bool, error) {
+	items, err := DiscoverPlanAgentSessions(planDir)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return 0, false, nil
+		}
+		return 0, false, err
+	}
+	changed := false
+	for _, item := range items {
+		before, beforeErr := s.Queries.GetAgentSessionByPath(ctx, nullableString(item.Path))
+		metadata, _ := jsonMarshalString(item)
+		row, err := s.Queries.UpsertAgentSessionIndex(ctx, db.UpsertAgentSessionIndexParams{
+			ID:                     uuid.NewString(),
+			WorkspaceID:            sql.NullString{},
+			ThreadID:               sql.NullString{},
+			UserEmail:              sql.NullString{},
+			Source:                 string(AgentSessionSourceTerminal),
+			SessionPath:            nullableString(item.Path),
+			SessionID:              nullableString(item.SessionID),
+			ParentSessionID:        nullableString(item.ContinuedFromSessionID),
+			Cwd:                    nullableString(item.CWD),
+			Agent:                  item.Agent,
+			ParentPlanDir:          nullableString(item.ParentPlanDir),
+			SourceReviewDir:        nullableString(item.SourceReviewDir),
+			WorkflowID:             nullableString(item.WorkflowID),
+			WorkflowNodeID:         nullableString(item.NodeID),
+			ContinuedFromSessionID: nullableString(item.ContinuedFromSessionID),
+			ForkedFromSessionID:    nullableString(item.ForkedFromSessionID),
+			FileSize:               item.Size,
+			FileMtime:              sql.NullTime{Time: item.MTime, Valid: !item.MTime.IsZero()},
+			FileHash:               nullableString(item.Hash),
+			LastIndexedOffset:      item.LastOffset,
+			NeedsHydration:         boolInt(item.NeedsHydration),
+			Status:                 "pending",
+			InferredWorkspaceID:    sql.NullString{},
+			InferredPlanDir:        nullableString(item.PlanDir),
+			LastError:              sql.NullString{},
+			MetadataJson:           nullableString(metadata),
+		})
+		if err != nil {
+			return 0, false, err
+		}
+		if errors.Is(beforeErr, sql.ErrNoRows) || beforeErr == nil && agentSessionIndexChanged(before, row) {
+			changed = true
+		}
+		if beforeErr != nil && !errors.Is(beforeErr, sql.ErrNoRows) {
+			return 0, false, beforeErr
+		}
+	}
+	return len(items), changed, nil
+}
+
+func agentSessionIndexChanged(before, after db.AgentSession) bool {
+	return before.SessionID != after.SessionID ||
+		before.ParentSessionID != after.ParentSessionID ||
+		before.Cwd != after.Cwd ||
+		before.InferredPlanDir != after.InferredPlanDir ||
+		before.Agent != after.Agent ||
+		before.ParentPlanDir != after.ParentPlanDir ||
+		before.SourceReviewDir != after.SourceReviewDir ||
+		before.WorkflowID != after.WorkflowID ||
+		before.WorkflowNodeID != after.WorkflowNodeID ||
+		before.ContinuedFromSessionID != after.ContinuedFromSessionID ||
+		before.ForkedFromSessionID != after.ForkedFromSessionID ||
+		before.FileSize != after.FileSize ||
+		before.FileMtime != after.FileMtime ||
+		before.FileHash != after.FileHash ||
+		before.LastIndexedOffset != after.LastIndexedOffset ||
+		before.NeedsHydration != after.NeedsHydration
+}
+
+func jsonMarshalString(value any) (string, error) {
+	data, err := json.Marshal(value)
+	if err != nil {
+		return "", err
+	}
+	return string(data), nil
+}
+
+func boolInt(value bool) int64 {
+	if value {
+		return 1
+	}
+	return 0
 }
 
 func implWorkspaceDiscoveryConfigIsZero(

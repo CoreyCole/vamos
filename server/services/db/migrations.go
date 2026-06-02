@@ -122,6 +122,12 @@ func prepareSchemaCompatibilityMigrations(ctx context.Context, database *sql.DB)
 	if err := ensureAgentThreadProjectColumnsIfTableExists(ctx, database); err != nil {
 		return err
 	}
+	if err := ensureAgentSessionIndexColumns(ctx, database); err != nil {
+		return err
+	}
+	if err := ensureAgentSessionArtifactColumns(ctx, database); err != nil {
+		return err
+	}
 	return ensureArtifactCommentsDocPathColumn(ctx, database)
 }
 
@@ -168,7 +174,13 @@ func runRuntimeMigrations(ctx context.Context, database *sql.DB) error {
 	if err := ensureAgentSessionsImportingStatus(ctx, database); err != nil {
 		return err
 	}
+	if err := ensureAgentSessionIndexColumns(ctx, database); err != nil {
+		return err
+	}
 	if err := ensureAgentSessionsUserEmailBackfill(ctx, database); err != nil {
+		return err
+	}
+	if err := ensureAgentSessionArtifactColumns(ctx, database); err != nil {
 		return err
 	}
 	if err := ensureAgentThreadWorkspaces(ctx, database); err != nil {
@@ -311,6 +323,8 @@ func runRuntimeMigrations(ctx context.Context, database *sql.DB) error {
 
 	indexes := []string{
 		`CREATE INDEX IF NOT EXISTS idx_agent_sessions_workspace_updated ON agent_sessions(workspace_id, updated_at DESC) WHERE workspace_id IS NOT NULL`,
+		`CREATE INDEX IF NOT EXISTS idx_agent_sessions_plan_agent_updated ON agent_sessions(inferred_plan_dir, agent, updated_at DESC) WHERE inferred_plan_dir IS NOT NULL`,
+		`CREATE INDEX IF NOT EXISTS idx_agent_sessions_workflow_node ON agent_sessions(workflow_id, workflow_node_id, updated_at DESC) WHERE workflow_id IS NOT NULL`,
 		`CREATE INDEX IF NOT EXISTS idx_agent_runs_workspace_created ON agent_runs(workspace_id, created_at DESC) WHERE workspace_id IS NOT NULL`,
 		`CREATE INDEX IF NOT EXISTS idx_agent_runs_workspace_node_created ON agent_runs(workspace_id, workflow_node_id, created_at DESC) WHERE workflow_node_id IS NOT NULL`,
 		`CREATE INDEX IF NOT EXISTS idx_agent_entries_origin_session ON agent_entries(origin_session_id) WHERE origin_session_id IS NOT NULL`,
@@ -318,6 +332,60 @@ func runRuntimeMigrations(ctx context.Context, database *sql.DB) error {
 	}
 	for _, indexSQL := range indexes {
 		if err := ensureIndex(ctx, database, indexSQL); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func ensureAgentSessionIndexColumns(ctx context.Context, database *sql.DB) error {
+	exists, err := tableExists(ctx, database, "agent_sessions")
+	if err != nil || !exists {
+		return err
+	}
+	columns := []struct {
+		name       string
+		definition string
+	}{
+		{"inferred_workspace_id", "TEXT"},
+		{"inferred_plan_dir", "TEXT"},
+		{"imported_head_entry_id", "TEXT"},
+		{"last_imported_at", "DATETIME"},
+		{"last_error", "TEXT"},
+		{"metadata_json", "TEXT"},
+	}
+	for _, column := range columns {
+		if err := ensureColumn(ctx, database, "agent_sessions", column.name, column.definition); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func ensureAgentSessionArtifactColumns(ctx context.Context, database *sql.DB) error {
+	exists, err := tableExists(ctx, database, "agent_sessions")
+	if err != nil || !exists {
+		return err
+	}
+	columns := []struct {
+		name       string
+		definition string
+	}{
+		{"agent", "TEXT NOT NULL DEFAULT 'pi'"},
+		{"parent_plan_dir", "TEXT"},
+		{"source_review_dir", "TEXT"},
+		{"workflow_id", "TEXT"},
+		{"workflow_node_id", "TEXT"},
+		{"continued_from_session_id", "TEXT"},
+		{"forked_from_session_id", "TEXT"},
+		{"file_size", "INTEGER NOT NULL DEFAULT 0"},
+		{"file_mtime", "DATETIME"},
+		{"file_hash", "TEXT"},
+		{"last_indexed_offset", "INTEGER NOT NULL DEFAULT 0"},
+		{"needs_hydration", "INTEGER NOT NULL DEFAULT 1"},
+	}
+	for _, column := range columns {
+		if err := ensureColumn(ctx, database, "agent_sessions", column.name, column.definition); err != nil {
 			return err
 		}
 	}

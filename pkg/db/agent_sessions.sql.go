@@ -40,6 +40,18 @@ INSERT INTO agent_sessions (
     session_id,
     parent_session_id,
     cwd,
+    agent,
+    parent_plan_dir,
+    source_review_dir,
+    workflow_id,
+    workflow_node_id,
+    continued_from_session_id,
+    forked_from_session_id,
+    file_size,
+    file_mtime,
+    file_hash,
+    last_indexed_offset,
+    needs_hydration,
     status,
     inferred_workspace_id,
     inferred_plan_dir,
@@ -57,6 +69,18 @@ VALUES (
     ?7,
     ?8,
     ?9,
+    'pi',
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    0,
+    NULL,
+    NULL,
+    0,
+    1,
     ?10,
     ?11,
     ?12,
@@ -64,7 +88,7 @@ VALUES (
     ?14,
     ?15
 )
-RETURNING id, workspace_id, thread_id, user_email, source, session_path, session_id, parent_session_id, cwd, status, inferred_workspace_id, inferred_plan_dir, imported_head_entry_id, last_imported_at, last_error, metadata_json, created_at, updated_at
+RETURNING id, workspace_id, thread_id, user_email, source, session_path, session_id, parent_session_id, cwd, agent, parent_plan_dir, source_review_dir, workflow_id, workflow_node_id, continued_from_session_id, forked_from_session_id, file_size, file_mtime, file_hash, last_indexed_offset, needs_hydration, status, inferred_workspace_id, inferred_plan_dir, imported_head_entry_id, last_imported_at, last_error, metadata_json, created_at, updated_at
 `
 
 type CreateAgentSessionParams struct {
@@ -114,6 +138,18 @@ func (q *Queries) CreateAgentSession(ctx context.Context, arg CreateAgentSession
 		&i.SessionID,
 		&i.ParentSessionID,
 		&i.Cwd,
+		&i.Agent,
+		&i.ParentPlanDir,
+		&i.SourceReviewDir,
+		&i.WorkflowID,
+		&i.WorkflowNodeID,
+		&i.ContinuedFromSessionID,
+		&i.ForkedFromSessionID,
+		&i.FileSize,
+		&i.FileMtime,
+		&i.FileHash,
+		&i.LastIndexedOffset,
+		&i.NeedsHydration,
 		&i.Status,
 		&i.InferredWorkspaceID,
 		&i.InferredPlanDir,
@@ -130,7 +166,7 @@ func (q *Queries) CreateAgentSession(ctx context.Context, arg CreateAgentSession
 const getAgentSession = `-- name: GetAgentSession :one
 ;
 
-SELECT id, workspace_id, thread_id, user_email, source, session_path, session_id, parent_session_id, cwd, status, inferred_workspace_id, inferred_plan_dir, imported_head_entry_id, last_imported_at, last_error, metadata_json, created_at, updated_at
+SELECT id, workspace_id, thread_id, user_email, source, session_path, session_id, parent_session_id, cwd, agent, parent_plan_dir, source_review_dir, workflow_id, workflow_node_id, continued_from_session_id, forked_from_session_id, file_size, file_mtime, file_hash, last_indexed_offset, needs_hydration, status, inferred_workspace_id, inferred_plan_dir, imported_head_entry_id, last_imported_at, last_error, metadata_json, created_at, updated_at
 FROM agent_sessions
 WHERE id = ?1
 `
@@ -148,6 +184,18 @@ func (q *Queries) GetAgentSession(ctx context.Context, id string) (AgentSession,
 		&i.SessionID,
 		&i.ParentSessionID,
 		&i.Cwd,
+		&i.Agent,
+		&i.ParentPlanDir,
+		&i.SourceReviewDir,
+		&i.WorkflowID,
+		&i.WorkflowNodeID,
+		&i.ContinuedFromSessionID,
+		&i.ForkedFromSessionID,
+		&i.FileSize,
+		&i.FileMtime,
+		&i.FileHash,
+		&i.LastIndexedOffset,
+		&i.NeedsHydration,
 		&i.Status,
 		&i.InferredWorkspaceID,
 		&i.InferredPlanDir,
@@ -164,7 +212,7 @@ func (q *Queries) GetAgentSession(ctx context.Context, id string) (AgentSession,
 const getAgentSessionByPath = `-- name: GetAgentSessionByPath :one
 ;
 
-SELECT id, workspace_id, thread_id, user_email, source, session_path, session_id, parent_session_id, cwd, status, inferred_workspace_id, inferred_plan_dir, imported_head_entry_id, last_imported_at, last_error, metadata_json, created_at, updated_at
+SELECT id, workspace_id, thread_id, user_email, source, session_path, session_id, parent_session_id, cwd, agent, parent_plan_dir, source_review_dir, workflow_id, workflow_node_id, continued_from_session_id, forked_from_session_id, file_size, file_mtime, file_hash, last_indexed_offset, needs_hydration, status, inferred_workspace_id, inferred_plan_dir, imported_head_entry_id, last_imported_at, last_error, metadata_json, created_at, updated_at
 FROM agent_sessions
 WHERE session_path = ?1
 `
@@ -182,6 +230,18 @@ func (q *Queries) GetAgentSessionByPath(ctx context.Context, sessionPath sql.Nul
 		&i.SessionID,
 		&i.ParentSessionID,
 		&i.Cwd,
+		&i.Agent,
+		&i.ParentPlanDir,
+		&i.SourceReviewDir,
+		&i.WorkflowID,
+		&i.WorkflowNodeID,
+		&i.ContinuedFromSessionID,
+		&i.ForkedFromSessionID,
+		&i.FileSize,
+		&i.FileMtime,
+		&i.FileHash,
+		&i.LastIndexedOffset,
+		&i.NeedsHydration,
 		&i.Status,
 		&i.InferredWorkspaceID,
 		&i.InferredPlanDir,
@@ -198,7 +258,7 @@ func (q *Queries) GetAgentSessionByPath(ctx context.Context, sessionPath sql.Nul
 const listAgentSessionsByPlanDir = `-- name: ListAgentSessionsByPlanDir :many
 ;
 
-SELECT id, workspace_id, thread_id, user_email, source, session_path, session_id, parent_session_id, cwd, status, inferred_workspace_id, inferred_plan_dir, imported_head_entry_id, last_imported_at, last_error, metadata_json, created_at, updated_at
+SELECT id, workspace_id, thread_id, user_email, source, session_path, session_id, parent_session_id, cwd, agent, parent_plan_dir, source_review_dir, workflow_id, workflow_node_id, continued_from_session_id, forked_from_session_id, file_size, file_mtime, file_hash, last_indexed_offset, needs_hydration, status, inferred_workspace_id, inferred_plan_dir, imported_head_entry_id, last_imported_at, last_error, metadata_json, created_at, updated_at
 FROM agent_sessions
 WHERE user_email = ?1
 AND inferred_plan_dir = ?2
@@ -231,6 +291,18 @@ func (q *Queries) ListAgentSessionsByPlanDir(ctx context.Context, arg ListAgentS
 			&i.SessionID,
 			&i.ParentSessionID,
 			&i.Cwd,
+			&i.Agent,
+			&i.ParentPlanDir,
+			&i.SourceReviewDir,
+			&i.WorkflowID,
+			&i.WorkflowNodeID,
+			&i.ContinuedFromSessionID,
+			&i.ForkedFromSessionID,
+			&i.FileSize,
+			&i.FileMtime,
+			&i.FileHash,
+			&i.LastIndexedOffset,
+			&i.NeedsHydration,
 			&i.Status,
 			&i.InferredWorkspaceID,
 			&i.InferredPlanDir,
@@ -257,7 +329,7 @@ func (q *Queries) ListAgentSessionsByPlanDir(ctx context.Context, arg ListAgentS
 const listAgentSessionsByPlanDirPrefix = `-- name: ListAgentSessionsByPlanDirPrefix :many
 ;
 
-SELECT id, workspace_id, thread_id, user_email, source, session_path, session_id, parent_session_id, cwd, status, inferred_workspace_id, inferred_plan_dir, imported_head_entry_id, last_imported_at, last_error, metadata_json, created_at, updated_at
+SELECT id, workspace_id, thread_id, user_email, source, session_path, session_id, parent_session_id, cwd, agent, parent_plan_dir, source_review_dir, workflow_id, workflow_node_id, continued_from_session_id, forked_from_session_id, file_size, file_mtime, file_hash, last_indexed_offset, needs_hydration, status, inferred_workspace_id, inferred_plan_dir, imported_head_entry_id, last_imported_at, last_error, metadata_json, created_at, updated_at
 FROM agent_sessions
 WHERE user_email = ?1
 AND (?2 = '' OR workspace_id = ?2)
@@ -299,6 +371,18 @@ func (q *Queries) ListAgentSessionsByPlanDirPrefix(ctx context.Context, arg List
 			&i.SessionID,
 			&i.ParentSessionID,
 			&i.Cwd,
+			&i.Agent,
+			&i.ParentPlanDir,
+			&i.SourceReviewDir,
+			&i.WorkflowID,
+			&i.WorkflowNodeID,
+			&i.ContinuedFromSessionID,
+			&i.ForkedFromSessionID,
+			&i.FileSize,
+			&i.FileMtime,
+			&i.FileHash,
+			&i.LastIndexedOffset,
+			&i.NeedsHydration,
 			&i.Status,
 			&i.InferredWorkspaceID,
 			&i.InferredPlanDir,
@@ -325,7 +409,7 @@ func (q *Queries) ListAgentSessionsByPlanDirPrefix(ctx context.Context, arg List
 const listAgentSessionsByWorkspace = `-- name: ListAgentSessionsByWorkspace :many
 ;
 
-SELECT id, workspace_id, thread_id, user_email, source, session_path, session_id, parent_session_id, cwd, status, inferred_workspace_id, inferred_plan_dir, imported_head_entry_id, last_imported_at, last_error, metadata_json, created_at, updated_at
+SELECT id, workspace_id, thread_id, user_email, source, session_path, session_id, parent_session_id, cwd, agent, parent_plan_dir, source_review_dir, workflow_id, workflow_node_id, continued_from_session_id, forked_from_session_id, file_size, file_mtime, file_hash, last_indexed_offset, needs_hydration, status, inferred_workspace_id, inferred_plan_dir, imported_head_entry_id, last_imported_at, last_error, metadata_json, created_at, updated_at
 FROM agent_sessions
 WHERE workspace_id = ?1
 ORDER BY updated_at DESC
@@ -350,6 +434,18 @@ func (q *Queries) ListAgentSessionsByWorkspace(ctx context.Context, workspaceID 
 			&i.SessionID,
 			&i.ParentSessionID,
 			&i.Cwd,
+			&i.Agent,
+			&i.ParentPlanDir,
+			&i.SourceReviewDir,
+			&i.WorkflowID,
+			&i.WorkflowNodeID,
+			&i.ContinuedFromSessionID,
+			&i.ForkedFromSessionID,
+			&i.FileSize,
+			&i.FileMtime,
+			&i.FileHash,
+			&i.LastIndexedOffset,
+			&i.NeedsHydration,
 			&i.Status,
 			&i.InferredWorkspaceID,
 			&i.InferredPlanDir,
@@ -376,7 +472,7 @@ func (q *Queries) ListAgentSessionsByWorkspace(ctx context.Context, workspaceID 
 const listAgentSessionsForUser = `-- name: ListAgentSessionsForUser :many
 ;
 
-SELECT id, workspace_id, thread_id, user_email, source, session_path, session_id, parent_session_id, cwd, status, inferred_workspace_id, inferred_plan_dir, imported_head_entry_id, last_imported_at, last_error, metadata_json, created_at, updated_at
+SELECT id, workspace_id, thread_id, user_email, source, session_path, session_id, parent_session_id, cwd, agent, parent_plan_dir, source_review_dir, workflow_id, workflow_node_id, continued_from_session_id, forked_from_session_id, file_size, file_mtime, file_hash, last_indexed_offset, needs_hydration, status, inferred_workspace_id, inferred_plan_dir, imported_head_entry_id, last_imported_at, last_error, metadata_json, created_at, updated_at
 FROM agent_sessions
 WHERE user_email = ?1
 AND inferred_plan_dir IS NOT NULL
@@ -402,6 +498,18 @@ func (q *Queries) ListAgentSessionsForUser(ctx context.Context, userEmail sql.Nu
 			&i.SessionID,
 			&i.ParentSessionID,
 			&i.Cwd,
+			&i.Agent,
+			&i.ParentPlanDir,
+			&i.SourceReviewDir,
+			&i.WorkflowID,
+			&i.WorkflowNodeID,
+			&i.ContinuedFromSessionID,
+			&i.ForkedFromSessionID,
+			&i.FileSize,
+			&i.FileMtime,
+			&i.FileHash,
+			&i.LastIndexedOffset,
+			&i.NeedsHydration,
 			&i.Status,
 			&i.InferredWorkspaceID,
 			&i.InferredPlanDir,
@@ -579,6 +687,18 @@ session_path,
 session_id,
 parent_session_id,
 cwd,
+agent,
+parent_plan_dir,
+source_review_dir,
+workflow_id,
+workflow_node_id,
+continued_from_session_id,
+forked_from_session_id,
+file_size,
+file_mtime,
+file_hash,
+last_indexed_offset,
+needs_hydration,
 status,
 inferred_workspace_id,
 inferred_plan_dir,
@@ -596,12 +716,24 @@ VALUES (
 ?7,
 ?8,
 ?9,
-?10,
+COALESCE (NULLIF (?10, ''), 'pi'),
 ?11,
 ?12,
-NULL,
 ?13,
-?14
+?14,
+?15,
+?16,
+?17,
+?18,
+?19,
+?20,
+?21,
+?22,
+?23,
+?24,
+NULL,
+?25,
+?26
 )
 ON CONFLICT (session_path) WHERE session_path IS NOT NULL DO UPDATE SET
 user_email = excluded.user_email,
@@ -609,6 +741,26 @@ source = excluded.source,
 session_id = excluded.session_id,
 parent_session_id = excluded.parent_session_id,
 cwd = excluded.cwd,
+agent = excluded.agent,
+parent_plan_dir = excluded.parent_plan_dir,
+source_review_dir = excluded.source_review_dir,
+workflow_id = excluded.workflow_id,
+workflow_node_id = excluded.workflow_node_id,
+continued_from_session_id = excluded.continued_from_session_id,
+forked_from_session_id = excluded.forked_from_session_id,
+file_size = excluded.file_size,
+file_mtime = excluded.file_mtime,
+file_hash = excluded.file_hash,
+last_indexed_offset = excluded.last_indexed_offset,
+needs_hydration = CASE
+WHEN agent_sessions.file_size = excluded.file_size
+AND COALESCE (agent_sessions.file_mtime,
+'') = COALESCE (excluded.file_mtime,
+'')
+AND COALESCE (agent_sessions.file_hash, '') = COALESCE (excluded.file_hash, '')
+THEN agent_sessions.needs_hydration
+ELSE excluded.needs_hydration
+END,
 status = CASE
 WHEN agent_sessions.status IN ('importing', 'imported', 'diverged')
 THEN agent_sessions.status
@@ -619,24 +771,36 @@ inferred_plan_dir = excluded.inferred_plan_dir,
 last_error = excluded.last_error,
 metadata_json = excluded.metadata_json,
 updated_at = CURRENT_TIMESTAMP
-RETURNING id, workspace_id, thread_id, user_email, source, session_path, session_id, parent_session_id, cwd, status, inferred_workspace_id, inferred_plan_dir, imported_head_entry_id, last_imported_at, last_error, metadata_json, created_at, updated_at
+RETURNING id, workspace_id, thread_id, user_email, source, session_path, session_id, parent_session_id, cwd, agent, parent_plan_dir, source_review_dir, workflow_id, workflow_node_id, continued_from_session_id, forked_from_session_id, file_size, file_mtime, file_hash, last_indexed_offset, needs_hydration, status, inferred_workspace_id, inferred_plan_dir, imported_head_entry_id, last_imported_at, last_error, metadata_json, created_at, updated_at
 `
 
 type UpsertAgentSessionIndexParams struct {
-	ID                  string         `json:"id"`
-	WorkspaceID         sql.NullString `json:"workspace_id"`
-	ThreadID            sql.NullString `json:"thread_id"`
-	UserEmail           sql.NullString `json:"user_email"`
-	Source              string         `json:"source"`
-	SessionPath         sql.NullString `json:"session_path"`
-	SessionID           sql.NullString `json:"session_id"`
-	ParentSessionID     sql.NullString `json:"parent_session_id"`
-	Cwd                 sql.NullString `json:"cwd"`
-	Status              string         `json:"status"`
-	InferredWorkspaceID sql.NullString `json:"inferred_workspace_id"`
-	InferredPlanDir     sql.NullString `json:"inferred_plan_dir"`
-	LastError           sql.NullString `json:"last_error"`
-	MetadataJson        sql.NullString `json:"metadata_json"`
+	ID                     string         `json:"id"`
+	WorkspaceID            sql.NullString `json:"workspace_id"`
+	ThreadID               sql.NullString `json:"thread_id"`
+	UserEmail              sql.NullString `json:"user_email"`
+	Source                 string         `json:"source"`
+	SessionPath            sql.NullString `json:"session_path"`
+	SessionID              sql.NullString `json:"session_id"`
+	ParentSessionID        sql.NullString `json:"parent_session_id"`
+	Cwd                    sql.NullString `json:"cwd"`
+	Agent                  interface{}    `json:"agent"`
+	ParentPlanDir          sql.NullString `json:"parent_plan_dir"`
+	SourceReviewDir        sql.NullString `json:"source_review_dir"`
+	WorkflowID             sql.NullString `json:"workflow_id"`
+	WorkflowNodeID         sql.NullString `json:"workflow_node_id"`
+	ContinuedFromSessionID sql.NullString `json:"continued_from_session_id"`
+	ForkedFromSessionID    sql.NullString `json:"forked_from_session_id"`
+	FileSize               int64          `json:"file_size"`
+	FileMtime              sql.NullTime   `json:"file_mtime"`
+	FileHash               sql.NullString `json:"file_hash"`
+	LastIndexedOffset      int64          `json:"last_indexed_offset"`
+	NeedsHydration         int64          `json:"needs_hydration"`
+	Status                 string         `json:"status"`
+	InferredWorkspaceID    sql.NullString `json:"inferred_workspace_id"`
+	InferredPlanDir        sql.NullString `json:"inferred_plan_dir"`
+	LastError              sql.NullString `json:"last_error"`
+	MetadataJson           sql.NullString `json:"metadata_json"`
 }
 
 func (q *Queries) UpsertAgentSessionIndex(ctx context.Context, arg UpsertAgentSessionIndexParams) (AgentSession, error) {
@@ -650,6 +814,18 @@ func (q *Queries) UpsertAgentSessionIndex(ctx context.Context, arg UpsertAgentSe
 		arg.SessionID,
 		arg.ParentSessionID,
 		arg.Cwd,
+		arg.Agent,
+		arg.ParentPlanDir,
+		arg.SourceReviewDir,
+		arg.WorkflowID,
+		arg.WorkflowNodeID,
+		arg.ContinuedFromSessionID,
+		arg.ForkedFromSessionID,
+		arg.FileSize,
+		arg.FileMtime,
+		arg.FileHash,
+		arg.LastIndexedOffset,
+		arg.NeedsHydration,
 		arg.Status,
 		arg.InferredWorkspaceID,
 		arg.InferredPlanDir,
@@ -667,6 +843,18 @@ func (q *Queries) UpsertAgentSessionIndex(ctx context.Context, arg UpsertAgentSe
 		&i.SessionID,
 		&i.ParentSessionID,
 		&i.Cwd,
+		&i.Agent,
+		&i.ParentPlanDir,
+		&i.SourceReviewDir,
+		&i.WorkflowID,
+		&i.WorkflowNodeID,
+		&i.ContinuedFromSessionID,
+		&i.ForkedFromSessionID,
+		&i.FileSize,
+		&i.FileMtime,
+		&i.FileHash,
+		&i.LastIndexedOffset,
+		&i.NeedsHydration,
 		&i.Status,
 		&i.InferredWorkspaceID,
 		&i.InferredPlanDir,

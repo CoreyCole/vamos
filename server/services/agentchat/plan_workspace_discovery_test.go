@@ -486,6 +486,45 @@ func TestPlanWorkspaceSyncerClearsMissingImplMetadata(t *testing.T) {
 	}
 }
 
+func TestPlanWorkspaceSyncerIndexesPlanOwnedAgentSessions(t *testing.T) {
+	service := newTestAgentChatService(t)
+	thoughtsRoot := t.TempDir()
+	planDir := filepath.Join(thoughtsRoot, "agent", "plans", "2026-06-02_plan")
+	writePlanWorkspaceFile(t, planDir, "plan.md", time.Now())
+	sessionPath := filepath.Join(planDir, ".sessions", "pi", "session.jsonl")
+	writeSessionHeader(t, sessionPath, `{"type":"session","id":"plan-session","cwd":"/repo","workflow_id":"wf","workflow_node_id":"outline"}`)
+
+	result, err := (&PlanWorkspaceSyncer{
+		Queries: service.queries,
+		Scanner: PlanWorkspaceScanner{ThoughtsRoot: thoughtsRoot},
+	}).Sync(context.Background(), PlanWorkspaceDiscoveryInput{})
+	if err != nil {
+		t.Fatalf("Sync: %v", err)
+	}
+	if result.AgentSessionsIndexed != 1 || !result.Changed {
+		t.Fatalf("result = %+v, want one indexed session and changed", result)
+	}
+	row, err := service.queries.GetAgentSessionByPath(context.Background(), nullableString(sessionPath))
+	if err != nil {
+		t.Fatalf("GetAgentSessionByPath: %v", err)
+	}
+	if row.Agent != "pi" || !row.InferredPlanDir.Valid || row.InferredPlanDir.String != planDir || !row.WorkflowID.Valid || row.WorkflowID.String != "wf" || !row.WorkflowNodeID.Valid || row.WorkflowNodeID.String != "outline" || row.NeedsHydration != 1 {
+		t.Fatalf("indexed session = %#v", row)
+	}
+
+	service.piSessionsDir = filepath.Join(t.TempDir(), "blocked-global")
+	if err := os.Mkdir(service.piSessionsDir, 0o000); err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = os.Chmod(service.piSessionsDir, 0o755) }()
+	if _, err := (&PlanWorkspaceSyncer{
+		Queries: service.queries,
+		Scanner: PlanWorkspaceScanner{ThoughtsRoot: thoughtsRoot},
+	}).Sync(context.Background(), PlanWorkspaceDiscoveryInput{}); err != nil {
+		t.Fatalf("Sync should not scan global pi sessions dir: %v", err)
+	}
+}
+
 func TestPlanWorkspaceSyncerIdempotencyArchiveAndRestore(t *testing.T) {
 	service := newTestAgentChatService(t)
 	thoughtsRoot := t.TempDir()
