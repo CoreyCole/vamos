@@ -33,79 +33,10 @@ func (s *Service) CreateNextQRSPIThread(ctx context.Context, userEmail, sourceTh
 	if !ok {
 		return db.AgentThread{}, fmt.Errorf("primary workspace not found")
 	}
-	assistantText, err := s.latestAssistantTextForThread(ctx, sourceThread)
-	if err != nil {
+	if _, err := s.AdvanceWorkflowHumanGate(ctx, primary.ID, userEmail); err != nil {
 		return db.AgentThread{}, err
 	}
-	resultXML := extractFirstQRSPIResultXML(assistantText)
-	if resultXML == "" {
-		return db.AgentThread{}, fmt.Errorf("latest assistant message has no qrspi result")
-	}
-	cwd := firstNonEmpty(qrspiImplementationWorkspaceFromText(resultXML), sourceThread.Cwd, primary.Cwd.String, primary.RootDocPath)
-	contextText := nextQRSPIThreadContext(sourceThread.ID, primary.ID, cwd, resultXML)
-	payloadBytes, err := json.Marshal(map[string]any{
-		"type":      "message",
-		"id":        uuid.NewString(),
-		"parentId":  nil,
-		"timestamp": time.Now().UTC().Format(time.RFC3339Nano),
-		"message": map[string]any{
-			"role":    "assistant",
-			"content": contextText,
-		},
-	})
-	if err != nil {
-		return db.AgentThread{}, err
-	}
-	entryID := uuid.NewString()
-	tx, err := s.db.BeginTx(ctx, nil)
-	if err != nil {
-		return db.AgentThread{}, err
-	}
-	defer func() { _ = tx.Rollback() }()
-	q := s.queries.WithTx(tx)
-	thread, err := q.CreateAgentThread(ctx, db.CreateAgentThreadParams{
-		ID:                uuid.NewString(),
-		UserEmail:         userEmail,
-		Title:             truncateTitle("Continue " + sourceThread.Title),
-		Cwd:               cwd,
-		LineageID:         uuid.NewString(),
-		HeadEntryID:       sql.NullString{String: entryID, Valid: true},
-		ParentThreadID:    sql.NullString{String: sourceThread.ID, Valid: true},
-		ForkedFromEntryID: sql.NullString{},
-	})
-	if err != nil {
-		return db.AgentThread{}, err
-	}
-	if err := q.CreateAgentEntry(ctx, db.CreateAgentEntryParams{
-		LineageID:        thread.LineageID,
-		EntryID:          entryID,
-		ParentEntryID:    sql.NullString{},
-		EntryType:        "message",
-		OriginOrder:      0,
-		PayloadJson:      string(payloadBytes),
-		OriginThreadID:   thread.ID,
-		OriginRunID:      sql.NullString{},
-		OriginSessionID:  sql.NullString{},
-		SessionTimestamp: time.Now().UTC(),
-	}); err != nil {
-		return db.AgentThread{}, err
-	}
-	if err := q.UpsertThreadWorkspaceAssociation(ctx, db.UpsertThreadWorkspaceAssociationParams{
-		ThreadID:    thread.ID,
-		WorkspaceID: primary.ID,
-		IsPrimary:   1,
-		Role:        string(ThreadWorkspaceRolePrimary),
-		AdoptedFrom: "qrspi_next_thread",
-	}); err != nil {
-		return db.AgentThread{}, err
-	}
-	if err := q.UpdateWorkspaceSelectedThread(ctx, db.UpdateWorkspaceSelectedThreadParams{ID: primary.ID, SelectedThreadID: nullString(thread.ID)}); err != nil {
-		return db.AgentThread{}, err
-	}
-	if err := tx.Commit(); err != nil {
-		return db.AgentThread{}, err
-	}
-	return thread, nil
+	return sourceThread, nil
 }
 
 type CreateThreadFromWorkspaceInput struct {

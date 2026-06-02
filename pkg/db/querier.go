@@ -136,6 +136,7 @@ type Querier interface {
 	ListWorkspaces(ctx context.Context, limit int64) ([]Workspace, error)
 	ListWorkspacesForUser(ctx context.Context, arg ListWorkspacesForUserParams) ([]Workspace, error)
 	LogAuthAttempt(ctx context.Context, arg LogAuthAttemptParams) (AuthAttempt, error)
+	MarkAgentSessionHydratedByPath(ctx context.Context, sessionPath sql.NullString) error
 	MarkAllActiveImplWorkspacesCleanedUp(ctx context.Context) (int64, error)
 	MarkImplWorkspaceCleanedUp(ctx context.Context, arg MarkImplWorkspaceCleanedUpParams) (int64, error)
 	MarkImplWorkspaceMergeUnknown(ctx context.Context, arg MarkImplWorkspaceMergeUnknownParams) (int64, error)

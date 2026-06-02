@@ -2,6 +2,7 @@ package agentchat
 
 import (
 	"bufio"
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -13,6 +14,9 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/CoreyCole/vamos/pkg/agents/chatsession"
+	"github.com/CoreyCole/vamos/pkg/db"
 )
 
 const defaultAgentSessionAgent = "pi"
@@ -191,6 +195,94 @@ func sessionArtifactOwnership(planRoot, path string) (agent, ownerPlanDir, paren
 		return agent, ownerPlanDir, parentPlanDir, sourceReviewDir, nil
 	}
 	return "", "", "", "", fmt.Errorf("session path %q is not under .sessions/<agent>", path)
+}
+
+func (s *Service) HydrateSessionArtifact(ctx context.Context, path string) (chatsession.ChatProjection, error) {
+	path = strings.TrimSpace(path)
+	if path == "" {
+		return chatsession.ChatProjection{}, errors.New("session path is required")
+	}
+	resolvedPath, err := s.validatePiSessionPath(path)
+	if err != nil {
+		return chatsession.ChatProjection{}, err
+	}
+	artifact, err := s.queries.GetAgentSessionByPath(ctx, nullableString(resolvedPath))
+	if err != nil {
+		return chatsession.ChatProjection{}, err
+	}
+	if artifact.NeedsHydration != 0 && artifact.Status != "imported" && artifact.Status != "diverged" {
+		if _, err := s.ImportPiSession(ctx, SessionImportInput{
+			SessionPath: resolvedPath,
+			Source:      AgentSessionSourceTerminal,
+			UserEmail:   strings.TrimSpace(artifact.UserEmail.String),
+		}); err != nil {
+			return chatsession.ChatProjection{}, err
+		}
+		if err := s.queries.MarkAgentSessionHydratedByPath(ctx, nullableString(resolvedPath)); err != nil {
+			return chatsession.ChatProjection{}, err
+		}
+		artifact, err = s.queries.GetAgentSessionByPath(ctx, nullableString(resolvedPath))
+		if err != nil {
+			return chatsession.ChatProjection{}, err
+		}
+	}
+	if artifact.ThreadID.Valid && strings.TrimSpace(artifact.ThreadID.String) != "" {
+		return s.chatProjectionFromAgentThread(ctx, strings.TrimSpace(artifact.ThreadID.String))
+	}
+	return chatsession.ChatProjection{SessionID: strings.TrimSpace(artifact.SessionID.String)}, nil
+}
+
+func (s *Service) chatProjectionFromAgentThread(ctx context.Context, threadID string) (chatsession.ChatProjection, error) {
+	thread, err := s.queries.GetAgentThread(ctx, threadID)
+	if err != nil {
+		return chatsession.ChatProjection{}, err
+	}
+	if !thread.HeadEntryID.Valid || strings.TrimSpace(thread.HeadEntryID.String) == "" {
+		return chatsession.ChatProjection{SessionID: thread.ID}, nil
+	}
+	entries, err := s.queries.ListAgentEntryPath(ctx, db.ListAgentEntryPathParams{
+		LineageID:   thread.LineageID,
+		HeadEntryID: thread.HeadEntryID.String,
+	})
+	if err != nil {
+		return chatsession.ChatProjection{}, err
+	}
+	projection := chatsession.ChatProjection{SessionID: thread.ID}
+	for _, entry := range entries {
+		message, ok := projectedMessageFromAgentEntry(entry)
+		if !ok {
+			continue
+		}
+		projection.Messages = append(projection.Messages, message)
+		projection.LastSeq++
+	}
+	return projection, nil
+}
+
+func projectedMessageFromAgentEntry(entry db.ListAgentEntryPathRow) (chatsession.ProjectedMessage, bool) {
+	var payload struct {
+		Type    string `json:"type"`
+		Message struct {
+			Role    string `json:"role"`
+			Content any    `json:"content"`
+		} `json:"message"`
+	}
+	if err := json.Unmarshal([]byte(entry.PayloadJson), &payload); err != nil {
+		return chatsession.ProjectedMessage{}, false
+	}
+	if strings.TrimSpace(payload.Type) != "message" {
+		return chatsession.ProjectedMessage{}, false
+	}
+	content := extractContentText(payload.Message.Content)
+	role := strings.TrimSpace(payload.Message.Role)
+	if role == "" || strings.TrimSpace(content) == "" {
+		return chatsession.ProjectedMessage{}, false
+	}
+	return chatsession.ProjectedMessage{
+		ID:      entry.EntryID,
+		Role:    role,
+		Content: content,
+	}, true
 }
 
 func ShallowParseAgentSession(path string) (AgentSessionMetadata, error) {

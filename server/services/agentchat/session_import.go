@@ -984,11 +984,17 @@ func (s *Service) validatePiSessionPath(path string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	if !pathWithinRoot(resolved, root) {
+	allowed := pathWithinRoot(resolved, root)
+	thoughtsRoot, thoughtsErr := resolveWorkspacePath(s.thoughtsRoot)
+	if !allowed && thoughtsErr == nil && pathWithinRoot(resolved, thoughtsRoot) && pathInPlanSessionDir(thoughtsRoot, resolved) {
+		allowed = true
+	}
+	if !allowed {
 		return "", fmt.Errorf(
-			"session path %q is outside Pi sessions dir %q",
+			"session path %q is outside Pi sessions dir %q or plan-owned .sessions dirs under %q",
 			resolved,
 			root,
+			s.thoughtsRoot,
 		)
 	}
 	if filepath.Ext(resolved) != ".jsonl" {

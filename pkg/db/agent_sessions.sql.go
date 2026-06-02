@@ -533,6 +533,21 @@ func (q *Queries) ListAgentSessionsForUser(ctx context.Context, userEmail sql.Nu
 	return items, nil
 }
 
+const markAgentSessionHydratedByPath = `-- name: MarkAgentSessionHydratedByPath :exec
+;
+
+UPDATE agent_sessions
+SET needs_hydration = 0,
+last_error = NULL,
+updated_at = CURRENT_TIMESTAMP
+WHERE session_path = ?1
+`
+
+func (q *Queries) MarkAgentSessionHydratedByPath(ctx context.Context, sessionPath sql.NullString) error {
+	_, err := q.db.ExecContext(ctx, markAgentSessionHydratedByPath, sessionPath)
+	return err
+}
+
 const updateAgentSessionImportFailedState = `-- name: UpdateAgentSessionImportFailedState :exec
 ;
 
@@ -566,6 +581,7 @@ inferred_workspace_id = ?4,
 inferred_plan_dir = ?5,
 imported_head_entry_id = ?6,
 last_imported_at = CURRENT_TIMESTAMP,
+needs_hydration = 0,
 last_error = NULL,
 metadata_json = ?7,
 updated_at = CURRENT_TIMESTAMP

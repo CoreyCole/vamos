@@ -1,10 +1,13 @@
 package agentchat
 
 import (
+	"context"
 	"encoding/json"
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/CoreyCole/vamos/pkg/db"
 )
 
 func TestPlanAgentSessionDirAndWorkspaceConfig(t *testing.T) {
@@ -68,6 +71,49 @@ func TestDiscoverPlanAgentSessionsIndexesTopLevelAndReviewPlans(t *testing.T) {
 	}
 	if byID["review"].Agent != "codex" || byID["review"].ParentPlanDir != planDir || byID["review"].SourceReviewDir == "" || byID["review"].ContinuedFromSessionID != "top" || byID["review"].ForkedFromSessionID != "fork" {
 		t.Fatalf("review item = %#v", byID["review"])
+	}
+}
+
+func TestHydrateSessionArtifactImportsColdPlanOwnedSession(t *testing.T) {
+	service := newTestAgentChatService(t)
+	planDir := filepath.Join(service.thoughtsRoot, "user@example.com", "plans", "2026-06-02_plan")
+	if err := ensureDir(planDir); err != nil {
+		t.Fatalf("ensureDir(planDir): %v", err)
+	}
+	artifactPath := filepath.Join(planDir, "plan.md")
+	sessionPath := filepath.Join(planDir, ".sessions", "pi", "session.jsonl")
+	writePiSessionFile(t, sessionPath, piImportFixtureLines(artifactPath)...)
+
+	_, err := service.queries.UpsertAgentSessionIndex(context.Background(), db.UpsertAgentSessionIndexParams{
+		ID:                "indexed-session",
+		UserEmail:         nullableString("user@example.com"),
+		Source:            string(AgentSessionSourceTerminal),
+		SessionPath:       nullableString(sessionPath),
+		SessionID:         nullableString("session-1"),
+		Agent:             "pi",
+		FileSize:          int64(len([]byte("x"))),
+		LastIndexedOffset: int64(len([]byte("x"))),
+		NeedsHydration:    1,
+		Status:            "pending",
+		InferredPlanDir:   nullableString(planDir),
+	})
+	if err != nil {
+		t.Fatalf("UpsertAgentSessionIndex: %v", err)
+	}
+
+	projection, err := service.HydrateSessionArtifact(context.Background(), sessionPath)
+	if err != nil {
+		t.Fatalf("HydrateSessionArtifact: %v", err)
+	}
+	if len(projection.Messages) == 0 {
+		t.Fatalf("projection messages = 0, want imported messages")
+	}
+	row, err := service.queries.GetAgentSessionByPath(context.Background(), nullableString(sessionPath))
+	if err != nil {
+		t.Fatalf("GetAgentSessionByPath: %v", err)
+	}
+	if row.NeedsHydration != 0 || !row.ThreadID.Valid {
+		t.Fatalf("row hydration/thread = %d/%v, want hydrated linked thread", row.NeedsHydration, row.ThreadID)
 	}
 }
 

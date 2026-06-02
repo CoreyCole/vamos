@@ -225,10 +225,18 @@ inferred_workspace_id = sqlc.narg ('inferred_workspace_id'),
 inferred_plan_dir = sqlc.narg ('inferred_plan_dir'),
 imported_head_entry_id = sqlc.narg ('imported_head_entry_id'),
 last_imported_at = CURRENT_TIMESTAMP,
+needs_hydration = 0,
 last_error = NULL,
 metadata_json = sqlc.narg ('metadata_json'),
 updated_at = CURRENT_TIMESTAMP
 WHERE id = sqlc.arg ('id') ;
+
+-- name: MarkAgentSessionHydratedByPath :exec
+UPDATE agent_sessions
+SET needs_hydration = 0,
+last_error = NULL,
+updated_at = CURRENT_TIMESTAMP
+WHERE session_path = sqlc.arg ('session_path') ;
 
 -- name: UpdateAgentSessionImportFailedState :exec
 UPDATE agent_sessions

@@ -2,63 +2,49 @@ package agentchat
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
 	"strings"
 	"testing"
 
+	conversation "github.com/CoreyCole/vamos/pkg/agents/conversation"
 	"github.com/CoreyCole/vamos/pkg/db"
 )
 
-func TestCreateNextQRSPIThreadUsesImplementationWorkspace(t *testing.T) {
+func TestCreateNextQRSPIThreadUsesRuntimePendingContinuation(t *testing.T) {
 	service := newTestAgentChatService(t)
 	workspace := mustCreateWorkspaceForHandlerTest(t, service, "user@example.com")
-	implementationWorkspace := t.TempDir()
-	thread := mustCreateAgentThread(t, service, "thread-1", "user@example.com", "/home/ruby/cn/chestnut-flake/vamos", "lineage-1")
-	resultXML := `<qrspi-result>
-  <stage>workspace</stage>
-  <status>complete</status>
-  <outcome>complete</outcome>
-  <workspaceMetadata>
-    <planWorkspace>/tmp/plan</planWorkspace>
-    <implementationWorkspace>` + implementationWorkspace + `</implementationWorkspace>
-    <trunkBranch>main</trunkBranch>
-    <stackBottomBranch>cc/base</stackBottomBranch>
-    <parentBranch>cc/base</parentBranch>
-    <currentBranch>cc/current</currentBranch>
-  </workspaceMetadata>
-  <policy><autoMode>false</autoMode><enablePlanReviews>true</enablePlanReviews><invalidResultRetryLimit>1</invalidResultRetryLimit></policy>
-  <summary><plan-goal>goal</plan-goal><stage-completed>done</stage-completed><key-decisions>next</key-decisions></summary>
-  <artifact>/tmp/plan/plan.md</artifact>
-  <next><step>Read q-implement</step><step>Start /q-implement</step></next>
-</qrspi-result>`
-	mustCreateAgentEntry(t, service, thread.LineageID, "assistant-1", "", "message", 1, `{"type":"message","id":"assistant-1","message":{"role":"assistant","content":`+mustJSONText(t, resultXML)+`}}`)
-	if err := service.queries.UpdateAgentThreadHead(context.Background(), db.UpdateAgentThreadHeadParams{ID: thread.ID, HeadEntryID: sql.NullString{String: "assistant-1", Valid: true}}); err != nil {
-		t.Fatalf("UpdateAgentThreadHead() error = %v", err)
-	}
+	thread := mustCreateAgentThread(t, service, "thread-1", "user@example.com", "/repo", "lineage-1")
 	if err := service.SetThreadPrimaryWorkspace(context.Background(), thread.ID, workspace.ID, "test"); err != nil {
 		t.Fatalf("SetThreadPrimaryWorkspace() error = %v", err)
 	}
+	fake := &fakeWorkflowCompletionService{}
+	service.workflowService = fake
 
 	next, err := service.CreateNextQRSPIThread(context.Background(), "user@example.com", thread.ID)
 	if err != nil {
 		t.Fatalf("CreateNextQRSPIThread() error = %v", err)
 	}
-	if next.Cwd != implementationWorkspace {
-		t.Fatalf("next cwd = %q, want implementation workspace %q", next.Cwd, implementationWorkspace)
+	if next.ID != thread.ID {
+		t.Fatalf("next thread = %q, want source thread %q", next.ID, thread.ID)
 	}
-	primary, ok, err := service.ResolvePrimaryWorkspaceForThread(context.Background(), "user@example.com", next.ID)
-	if err != nil || !ok || primary.ID != workspace.ID {
-		t.Fatalf("next primary = %#v ok=%v err=%v, want %s", primary, ok, err, workspace.ID)
+	if fake.workspaceID != workspace.ID || fake.userEmail != "user@example.com" {
+		t.Fatalf("runtime continue = workspace %q user %q, want %s", fake.workspaceID, fake.userEmail, workspace.ID)
 	}
-	entry, err := service.queries.GetAgentEntry(context.Background(), db.GetAgentEntryParams{LineageID: next.LineageID, EntryID: next.HeadEntryID.String})
-	if err != nil {
-		t.Fatalf("GetAgentEntry() error = %v", err)
-	}
-	contextText := assistantTextFromPayload(entry.PayloadJson)
-	if !strings.Contains(contextText, resultXML) || !strings.Contains(contextText, implementationWorkspace) {
-		t.Fatalf("context payload missing prior XML/cwd: %s", entry.PayloadJson)
-	}
+}
+
+type fakeWorkflowCompletionService struct {
+	workspaceID string
+	userEmail   string
+}
+
+func (f *fakeWorkflowCompletionService) OnRunComplete(context.Context, conversation.RunResult) error {
+	return nil
+}
+
+func (f *fakeWorkflowCompletionService) AdvanceHumanGate(_ context.Context, workspaceID, userEmail string) (string, error) {
+	f.workspaceID = workspaceID
+	f.userEmail = userEmail
+	return "run-1", nil
 }
 
 func TestCreateThreadFromWorkspaceTargets(t *testing.T) {
