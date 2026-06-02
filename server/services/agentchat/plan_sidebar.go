@@ -174,7 +174,7 @@ func (s *Service) collectUserPlanSidebarOverlaySources(
 		return nil, err
 	}
 	for _, session := range sessions {
-		planDir, ok := s.canonicalPlanDirFromSource(session.PlanDir.String)
+		planDir, ok := s.canonicalPlanDirFromSessionArtifact(session.PlanDir.String)
 		if !ok {
 			continue
 		}
@@ -274,6 +274,17 @@ func mergePlanSidebarSources(
 		addPlanSidebarSource(&merged, seen, source)
 	}
 	return merged
+}
+
+func (s *Service) canonicalPlanDirFromSessionArtifact(raw string) (string, bool) {
+	clean := strings.TrimSpace(raw)
+	if clean == "" {
+		return "", false
+	}
+	if !filepath.IsAbs(clean) && s.thoughtsRoot != "" {
+		clean = filepath.Join(s.thoughtsRoot, filepath.FromSlash(clean))
+	}
+	return s.canonicalPlanDirFromSource(clean)
 }
 
 func (s *Service) canonicalPlanDirFromSource(raw string) (string, bool) {

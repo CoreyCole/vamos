@@ -56,7 +56,7 @@ func TestThreadWorkspaceRelatedUpsertAndRunSessionBackfill(t *testing.T) {
 		ExternalSessionID:   sql.NullString{},
 		ParentSessionID:     sql.NullString{},
 		Cwd:                 nullString(thread.Cwd),
-		ProjectionState:     "pending",
+		ProjectionState:     "needs_hydration",
 		AttachedWorkspaceID: sql.NullString{},
 		PlanDir:             sql.NullString{},
 		ImportedHeadEntryID: sql.NullString{},

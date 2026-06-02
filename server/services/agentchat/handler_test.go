@@ -4449,8 +4449,8 @@ func TestOpenPiSessionImportsExplicitWorkspaceDirAndRedirects(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetAgentSessionByPath() error = %v", err)
 	}
-	if session.IdentityKind != string(AgentSessionSourceAdopted) {
-		t.Fatalf("session.IdentityKind = %q, want adopted", session.IdentityKind)
+	if session.IdentityKind != string(AgentSessionIdentityKindGlobalPi) {
+		t.Fatalf("session.IdentityKind = %q, want global_pi", session.IdentityKind)
 	}
 	if !session.AttachedWorkspaceID.Valid || !session.ProjectedThreadID.Valid {
 		t.Fatalf(
@@ -5153,7 +5153,7 @@ func TestOpenPiSessionAllowsHistoricalOwnerlessAssignedCrossUserWhenMappingMatch
 		ExternalSessionID:   sql.NullString{},
 		ParentSessionID:     sql.NullString{},
 		Cwd:                 sql.NullString{},
-		ProjectionState:     "imported",
+		ProjectionState:     "hydrated",
 		AttachedWorkspaceID: sql.NullString{},
 		PlanDir:             sql.NullString{},
 		LastError:           sql.NullString{},
@@ -5268,7 +5268,7 @@ func TestOpenPiSessionPersistsOwnerForFailedImportAndAllowsDifferentUserRetry(
 	if afterRetry.ID != before.ID || !afterRetry.IndexedByUserEmail.Valid ||
 		afterRetry.IndexedByUserEmail.String != "first@example.com" ||
 		!afterRetry.AttachedWorkspaceID.Valid || !afterRetry.ProjectedThreadID.Valid ||
-		afterRetry.ProjectionState != "imported" {
+		afterRetry.ProjectionState != "hydrated" {
 		t.Fatalf(
 			"after same-user retry = %+v, want same row imported for first user",
 			afterRetry,

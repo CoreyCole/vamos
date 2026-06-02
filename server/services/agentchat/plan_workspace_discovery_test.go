@@ -525,6 +525,103 @@ func TestPlanWorkspaceSyncerIndexesPlanOwnedAgentSessions(t *testing.T) {
 	}
 }
 
+func TestPlanWorkspaceSyncerPreservesHydratedProjectionOnUnchangedFile(t *testing.T) {
+	service := newTestAgentChatService(t)
+	thoughtsRoot := t.TempDir()
+	planDir := filepath.Join(thoughtsRoot, "agent", "plans", "2026-06-02_plan")
+	writePlanWorkspaceFile(t, planDir, "plan.md", time.Now())
+	sessionPath := filepath.Join(planDir, ".sessions", "pi", "session.jsonl")
+	writeSessionHeader(t, sessionPath, `{"type":"session","id":"plan-session","cwd":"/repo"}`)
+
+	syncer := &PlanWorkspaceSyncer{
+		Queries: service.queries,
+		Scanner: PlanWorkspaceScanner{ThoughtsRoot: thoughtsRoot},
+	}
+	if _, err := syncer.Sync(context.Background(), PlanWorkspaceDiscoveryInput{}); err != nil {
+		t.Fatalf("first Sync: %v", err)
+	}
+	row, err := service.queries.GetAgentSessionByPath(context.Background(), nullableString("agent/plans/2026-06-02_plan/.sessions/pi/session.jsonl"))
+	if err != nil {
+		t.Fatalf("GetAgentSessionByPath: %v", err)
+	}
+	thread := mustCreateAgentThread(t, service, "thread-preserved", "user@example.com", planDir, "lineage-preserved")
+	if err := service.queries.UpdateAgentSessionImportFinalState(context.Background(), db.UpdateAgentSessionImportFinalStateParams{
+		ID:                  row.ID,
+		AttachedWorkspaceID: sql.NullString{},
+		ProjectedThreadID:   nullableString(thread.ID),
+		ProjectionState:     "hydrated",
+		PlanDir:             nullableString("agent/plans/2026-06-02_plan"),
+		ImportedHeadEntryID: sql.NullString{},
+		MetadataJson:        sql.NullString{},
+	}); err != nil {
+		t.Fatalf("UpdateAgentSessionImportFinalState: %v", err)
+	}
+
+	result, err := syncer.Sync(context.Background(), PlanWorkspaceDiscoveryInput{})
+	if err != nil {
+		t.Fatalf("second Sync: %v", err)
+	}
+	if result.Changed {
+		t.Fatalf("second result = %#v, want unchanged", result)
+	}
+	row, err = service.queries.GetAgentSessionByPath(context.Background(), nullableString("agent/plans/2026-06-02_plan/.sessions/pi/session.jsonl"))
+	if err != nil {
+		t.Fatalf("GetAgentSessionByPath: %v", err)
+	}
+	if row.ProjectionState != "hydrated" || !row.ProjectedThreadID.Valid || row.ProjectedThreadID.String != thread.ID {
+		t.Fatalf("row = %#v, want hydrated projection preserved", row)
+	}
+}
+
+func TestPlanWorkspaceSyncerMarksChangedFileNeedsHydration(t *testing.T) {
+	service := newTestAgentChatService(t)
+	thoughtsRoot := t.TempDir()
+	planDir := filepath.Join(thoughtsRoot, "agent", "plans", "2026-06-02_plan")
+	writePlanWorkspaceFile(t, planDir, "plan.md", time.Now())
+	sessionPath := filepath.Join(planDir, ".sessions", "pi", "session.jsonl")
+	writeSessionHeader(t, sessionPath, `{"type":"session","id":"plan-session","cwd":"/repo"}`)
+
+	syncer := &PlanWorkspaceSyncer{
+		Queries: service.queries,
+		Scanner: PlanWorkspaceScanner{ThoughtsRoot: thoughtsRoot},
+	}
+	if _, err := syncer.Sync(context.Background(), PlanWorkspaceDiscoveryInput{}); err != nil {
+		t.Fatalf("first Sync: %v", err)
+	}
+	row, err := service.queries.GetAgentSessionByPath(context.Background(), nullableString("agent/plans/2026-06-02_plan/.sessions/pi/session.jsonl"))
+	if err != nil {
+		t.Fatalf("GetAgentSessionByPath: %v", err)
+	}
+	thread := mustCreateAgentThread(t, service, "thread-stale", "user@example.com", planDir, "lineage-stale")
+	if err := service.queries.UpdateAgentSessionImportFinalState(context.Background(), db.UpdateAgentSessionImportFinalStateParams{
+		ID:                  row.ID,
+		AttachedWorkspaceID: sql.NullString{},
+		ProjectedThreadID:   nullableString(thread.ID),
+		ProjectionState:     "hydrated",
+		PlanDir:             nullableString("agent/plans/2026-06-02_plan"),
+		ImportedHeadEntryID: sql.NullString{},
+		MetadataJson:        sql.NullString{},
+	}); err != nil {
+		t.Fatalf("UpdateAgentSessionImportFinalState: %v", err)
+	}
+	writeSessionHeader(t, sessionPath, `{"type":"session","id":"plan-session","cwd":"/repo","workflow_node_id":"plan"}`)
+
+	result, err := syncer.Sync(context.Background(), PlanWorkspaceDiscoveryInput{})
+	if err != nil {
+		t.Fatalf("changed Sync: %v", err)
+	}
+	if !result.Changed {
+		t.Fatalf("changed result = %#v, want changed", result)
+	}
+	row, err = service.queries.GetAgentSessionByPath(context.Background(), nullableString("agent/plans/2026-06-02_plan/.sessions/pi/session.jsonl"))
+	if err != nil {
+		t.Fatalf("GetAgentSessionByPath: %v", err)
+	}
+	if row.ProjectionState != "needs_hydration" || row.ProjectedThreadID.Valid {
+		t.Fatalf("row = %#v, want changed file reset for hydration", row)
+	}
+}
+
 func TestPlanWorkspaceSyncerIdempotencyArchiveAndRestore(t *testing.T) {
 	service := newTestAgentChatService(t)
 	thoughtsRoot := t.TempDir()
