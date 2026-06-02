@@ -184,6 +184,69 @@ func TestHostFromBaseURL(t *testing.T) {
 	}
 }
 
+func TestWorkspacesE2EPageEnabled(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		cfg  Config
+		want bool
+	}{
+		{
+			name: "default false",
+			cfg: Config{
+				WorkspaceMode:       "child",
+				WorkspaceManagerURL: "https://main.test",
+			},
+			want: false,
+		},
+		{
+			name: "standalone false",
+			cfg: Config{
+				WorkspaceMode:            "standalone",
+				E2EWorkspacesPageEnabled: true,
+				WorkspaceManagerURL:      "https://main.test",
+			},
+			want: false,
+		},
+		{
+			name: "manager false",
+			cfg: Config{
+				WorkspaceMode:            "manager",
+				E2EWorkspacesPageEnabled: true,
+				WorkspaceManagerURL:      "https://main.test",
+			},
+			want: false,
+		},
+		{
+			name: "child without manager url false",
+			cfg: Config{
+				WorkspaceMode:            "child",
+				E2EWorkspacesPageEnabled: true,
+			},
+			want: false,
+		},
+		{
+			name: "child explicit flag true",
+			cfg: Config{
+				WorkspaceMode:            "child",
+				E2EWorkspacesPageEnabled: true,
+				WorkspaceManagerURL:      "https://main.test",
+			},
+			want: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			if got := workspacesE2EPageEnabled(tt.cfg); got != tt.want {
+				t.Fatalf("workspacesE2EPageEnabled() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestRegisterChildWorkspaceRedirectSendsWorkspaceRoutesToManager(t *testing.T) {
 	t.Parallel()
 
