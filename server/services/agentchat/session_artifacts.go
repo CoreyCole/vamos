@@ -11,6 +11,7 @@ import (
 	"io"
 	"io/fs"
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
 	"time"
@@ -27,6 +28,7 @@ type SessionArtifactIndex struct {
 	SourceReviewDir        string
 	Agent                  string
 	Path                   string
+	ResolvedPath           string
 	SessionID              string
 	CWD                    string
 	WorkflowID             string
@@ -93,29 +95,56 @@ func DiscoverPlanAgentSessions(planDir string) ([]SessionArtifactIndex, error) {
 	if planDir == "" {
 		return nil, errors.New("plan dir is required")
 	}
-	root, err := filepath.EvalSymlinks(planDir)
+	planDir = filepath.Clean(planDir)
+	return DiscoverPlanAgentSessionsUnderThoughts(filepath.Dir(filepath.Dir(filepath.Dir(planDir))), planDir)
+}
+
+func DiscoverPlanAgentSessionsUnderThoughts(thoughtsRoot, planDir string) ([]SessionArtifactIndex, error) {
+	logicalRoot := filepath.Clean(strings.TrimSpace(thoughtsRoot))
+	logicalPlanDir := filepath.Clean(strings.TrimSpace(planDir))
+	if logicalRoot == "" || logicalRoot == "." {
+		return nil, errors.New("thoughts root is required")
+	}
+	if logicalPlanDir == "" || logicalPlanDir == "." {
+		return nil, errors.New("plan dir is required")
+	}
+	if abs, err := filepath.Abs(logicalRoot); err == nil {
+		logicalRoot = abs
+	}
+	if abs, err := filepath.Abs(logicalPlanDir); err == nil {
+		logicalPlanDir = abs
+	}
+	resolvedRoot, err := filepath.EvalSymlinks(logicalRoot)
 	if err != nil {
 		return nil, err
 	}
+	resolvedPlanDir, err := filepath.EvalSymlinks(logicalPlanDir)
+	if err != nil {
+		return nil, err
+	}
+	if !pathWithinRoot(resolvedPlanDir, resolvedRoot) {
+		return nil, fmt.Errorf("plan dir %q escapes thoughts root %q", logicalPlanDir, logicalRoot)
+	}
+
 	var items []SessionArtifactIndex
-	err = filepath.WalkDir(root, func(path string, entry fs.DirEntry, walkErr error) error {
+	err = filepath.WalkDir(logicalPlanDir, func(logicalPath string, entry fs.DirEntry, walkErr error) error {
 		if walkErr != nil {
 			return walkErr
 		}
 		if entry.IsDir() {
 			return nil
 		}
-		if filepath.Ext(path) != jsonlExtension || !pathInPlanSessionDir(root, path) {
+		if filepath.Ext(logicalPath) != jsonlExtension || !pathInPlanSessionDir(logicalPlanDir, logicalPath) {
 			return nil
 		}
-		resolved, err := filepath.EvalSymlinks(path)
+		resolvedPath, err := filepath.EvalSymlinks(logicalPath)
 		if err != nil {
 			return err
 		}
-		if !pathWithinRoot(resolved, root) {
-			return fmt.Errorf("session path %q escapes plan dir %q", resolved, root)
+		if !pathWithinRoot(resolvedPath, resolvedRoot) {
+			return fmt.Errorf("session path %q escapes thoughts root %q", resolvedPath, resolvedRoot)
 		}
-		item, err := buildSessionArtifactIndex(root, resolved)
+		item, err := buildSessionArtifactIndex(logicalRoot, resolvedRoot, logicalPath, resolvedPath)
 		if err != nil {
 			return err
 		}
@@ -139,20 +168,27 @@ func pathInPlanSessionDir(root, path string) bool {
 	return false
 }
 
-func buildSessionArtifactIndex(planRoot, path string) (SessionArtifactIndex, error) {
-	info, err := os.Stat(path)
+func buildSessionArtifactIndex(logicalRoot, resolvedRoot, logicalPath, resolvedPath string) (SessionArtifactIndex, error) {
+	if !pathWithinRoot(resolvedPath, resolvedRoot) {
+		return SessionArtifactIndex{}, fmt.Errorf("session path %q escapes thoughts root %q", resolvedPath, resolvedRoot)
+	}
+	info, err := os.Stat(resolvedPath)
 	if err != nil {
 		return SessionArtifactIndex{}, err
 	}
-	metadata, err := ShallowParseAgentSession(path)
+	metadata, err := ShallowParseAgentSession(resolvedPath)
 	if err != nil {
 		return SessionArtifactIndex{}, err
 	}
-	agent, ownerPlanDir, parentPlanDir, sourceReviewDir, err := sessionArtifactOwnership(planRoot, path)
+	agent, ownerPlanDir, parentPlanDir, sourceReviewDir, err := sessionArtifactOwnership(logicalRoot, logicalPath)
 	if err != nil {
 		return SessionArtifactIndex{}, err
 	}
-	hash, err := fileSHA256(path)
+	hash, err := fileSHA256(resolvedPath)
+	if err != nil {
+		return SessionArtifactIndex{}, err
+	}
+	sessionPath, err := thoughtsRelativeArtifactPath(logicalRoot, logicalPath)
 	if err != nil {
 		return SessionArtifactIndex{}, err
 	}
@@ -161,7 +197,8 @@ func buildSessionArtifactIndex(planRoot, path string) (SessionArtifactIndex, err
 		ParentPlanDir:          parentPlanDir,
 		SourceReviewDir:        sourceReviewDir,
 		Agent:                  agent,
-		Path:                   path,
+		Path:                   sessionPath,
+		ResolvedPath:           resolvedPath,
 		SessionID:              metadata.SessionID,
 		CWD:                    metadata.CWD,
 		WorkflowID:             metadata.WorkflowID,
@@ -176,25 +213,33 @@ func buildSessionArtifactIndex(planRoot, path string) (SessionArtifactIndex, err
 	}, nil
 }
 
-func sessionArtifactOwnership(planRoot, path string) (agent, ownerPlanDir, parentPlanDir, sourceReviewDir string, err error) {
-	rel, err := filepath.Rel(planRoot, path)
-	if err != nil {
-		return "", "", "", "", err
+func sessionArtifactOwnership(logicalRoot, logicalPath string) (agent, ownerPlanDir, parentPlanDir, sourceReviewDir string, err error) {
+	rel, err := filepath.Rel(filepath.Clean(logicalRoot), filepath.Clean(logicalPath))
+	if err != nil || rel == "." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) || rel == ".." {
+		return "", "", "", "", fmt.Errorf("session path %q is outside thoughts root %q", logicalPath, logicalRoot)
 	}
-	parts := strings.Split(rel, string(filepath.Separator))
+	parts := strings.Split(filepath.ToSlash(rel), "/")
 	for i, part := range parts {
 		if part != ".sessions" || i+2 >= len(parts) {
 			continue
 		}
 		agent = parts[i+1]
-		ownerPlanDir = filepath.Join(append([]string{planRoot}, parts[:i]...)...)
-		if i >= 2 && parts[0] == "reviews" {
-			parentPlanDir = planRoot
-			sourceReviewDir = filepath.Join(planRoot, "reviews", parts[1])
+		ownerPlanDir = path.Join(parts[:i]...)
+		if i >= 5 && parts[i-2] == "reviews" {
+			parentPlanDir = path.Join(parts[:i-2]...)
+			sourceReviewDir = path.Join(parts[:i]...)
 		}
 		return agent, ownerPlanDir, parentPlanDir, sourceReviewDir, nil
 	}
-	return "", "", "", "", fmt.Errorf("session path %q is not under .sessions/<agent>", path)
+	return "", "", "", "", fmt.Errorf("session path %q is not under .sessions/<agent>", logicalPath)
+}
+
+func thoughtsRelativeArtifactPath(logicalRoot, logicalPath string) (string, error) {
+	rel, err := filepath.Rel(filepath.Clean(logicalRoot), filepath.Clean(logicalPath))
+	if err != nil || rel == "." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) || rel == ".." {
+		return "", fmt.Errorf("path %q is outside thoughts root %q", logicalPath, logicalRoot)
+	}
+	return filepath.ToSlash(rel), nil
 }
 
 func (s *Service) HydrateSessionArtifact(ctx context.Context, path string) (chatsession.ChatProjection, error) {

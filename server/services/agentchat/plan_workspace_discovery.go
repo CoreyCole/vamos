@@ -513,7 +513,7 @@ func (s *PlanWorkspaceSyncer) syncPlanAgentSessions(
 	ctx context.Context,
 	planDir string,
 ) (int, bool, error) {
-	items, err := DiscoverPlanAgentSessions(planDir)
+	items, err := DiscoverPlanAgentSessionsUnderThoughts(strings.TrimSpace(s.Scanner.ThoughtsRoot), planDir)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
 			return 0, false, nil

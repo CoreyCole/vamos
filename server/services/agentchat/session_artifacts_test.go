@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/CoreyCole/vamos/pkg/db"
@@ -46,15 +47,16 @@ func TestPlanAgentSessionDirAndWorkspaceConfig(t *testing.T) {
 
 func TestDiscoverPlanAgentSessionsIndexesTopLevelAndReviewPlans(t *testing.T) {
 	root := t.TempDir()
-	planDir := filepath.Join(root, "thoughts", "agent", "plans", "2026-06-02_plan")
+	thoughtsRoot := filepath.Join(root, "thoughts")
+	planDir := filepath.Join(thoughtsRoot, "agent", "plans", "2026-06-02_plan")
 	topSession := filepath.Join(planDir, ".sessions", "pi", "top.jsonl")
 	reviewSession := filepath.Join(planDir, "reviews", "2026-06-02_plan_implementation-review", ".sessions", "codex", "review.jsonl")
 	writeSessionHeader(t, topSession, `{"type":"session","id":"top","cwd":"/repo","workflow_id":"wf","workflow_node_id":"design"}`)
 	writeSessionHeader(t, reviewSession, `{"type":"session","id":"review","cwd":"/repo2","parentSession":"top","forked_from_session_id":"fork"}`)
 
-	items, err := DiscoverPlanAgentSessions(planDir)
+	items, err := DiscoverPlanAgentSessionsUnderThoughts(thoughtsRoot, planDir)
 	if err != nil {
-		t.Fatalf("DiscoverPlanAgentSessions: %v", err)
+		t.Fatalf("DiscoverPlanAgentSessionsUnderThoughts: %v", err)
 	}
 	if len(items) != 2 {
 		t.Fatalf("items len = %d, want 2: %#v", len(items), items)
@@ -62,15 +64,68 @@ func TestDiscoverPlanAgentSessionsIndexesTopLevelAndReviewPlans(t *testing.T) {
 	byID := map[string]SessionArtifactIndex{}
 	for _, item := range items {
 		byID[item.SessionID] = item
-		if item.Hash == "" || item.Size == 0 || item.LastOffset == 0 || !item.NeedsHydration {
+		if item.Hash == "" || item.Size == 0 || item.LastOffset == 0 || !item.NeedsHydration || item.ResolvedPath == "" {
 			t.Fatalf("incomplete fingerprint for %#v", item)
 		}
 	}
-	if byID["top"].Agent != "pi" || byID["top"].PlanDir != planDir || byID["top"].WorkflowID != "wf" || byID["top"].NodeID != "design" {
+	if byID["top"].Agent != "pi" || byID["top"].Path != "agent/plans/2026-06-02_plan/.sessions/pi/top.jsonl" || byID["top"].PlanDir != "agent/plans/2026-06-02_plan" || byID["top"].WorkflowID != "wf" || byID["top"].NodeID != "design" {
 		t.Fatalf("top item = %#v", byID["top"])
 	}
-	if byID["review"].Agent != "codex" || byID["review"].ParentPlanDir != planDir || byID["review"].SourceReviewDir == "" || byID["review"].ContinuedFromSessionID != "top" || byID["review"].ForkedFromSessionID != "fork" {
+	if byID["review"].Agent != "codex" || byID["review"].ParentPlanDir != "agent/plans/2026-06-02_plan" || byID["review"].SourceReviewDir != "agent/plans/2026-06-02_plan/reviews/2026-06-02_plan_implementation-review" || byID["review"].ContinuedFromSessionID != "top" || byID["review"].ForkedFromSessionID != "fork" {
 		t.Fatalf("review item = %#v", byID["review"])
+	}
+}
+
+func TestDiscoverPlanAgentSessionsUnderThoughtsUsesLogicalIdentityWithSymlinkRoot(t *testing.T) {
+	physicalRoot := filepath.Join(t.TempDir(), "physical-thoughts")
+	logicalRoot := filepath.Join(t.TempDir(), "checkout", "thoughts")
+	if err := os.MkdirAll(filepath.Dir(logicalRoot), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(physicalRoot, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(physicalRoot, logicalRoot); err != nil {
+		t.Fatal(err)
+	}
+	planDir := filepath.Join(logicalRoot, "agent", "plans", "plan-a")
+	sessionPath := filepath.Join(planDir, ".sessions", "pi", "session.jsonl")
+	writeSessionHeader(t, sessionPath, `{"type":"session","id":"session","cwd":"/repo"}`)
+
+	items, err := DiscoverPlanAgentSessionsUnderThoughts(logicalRoot, planDir)
+	if err != nil {
+		t.Fatalf("DiscoverPlanAgentSessionsUnderThoughts: %v", err)
+	}
+	if len(items) != 1 {
+		t.Fatalf("items len = %d, want 1", len(items))
+	}
+	if items[0].Path != "agent/plans/plan-a/.sessions/pi/session.jsonl" || items[0].PlanDir != "agent/plans/plan-a" {
+		t.Fatalf("item identity = %#v", items[0])
+	}
+	if strings.HasPrefix(filepath.ToSlash(items[0].Path), filepath.ToSlash(physicalRoot)) {
+		t.Fatalf("Path stored physical root: %#v", items[0])
+	}
+	if !strings.HasPrefix(filepath.ToSlash(items[0].ResolvedPath), filepath.ToSlash(physicalRoot)) {
+		t.Fatalf("ResolvedPath = %q, want physical root %q", items[0].ResolvedPath, physicalRoot)
+	}
+}
+
+func TestDiscoverPlanAgentSessionsUnderThoughtsRejectsSymlinkEscape(t *testing.T) {
+	thoughtsRoot := filepath.Join(t.TempDir(), "thoughts")
+	outsideRoot := filepath.Join(t.TempDir(), "outside")
+	planDir := filepath.Join(thoughtsRoot, "agent", "plans", "plan-a")
+	if err := os.MkdirAll(filepath.Join(planDir, ".sessions", "pi"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	outsideSession := filepath.Join(outsideRoot, "session.jsonl")
+	writeSessionHeader(t, outsideSession, `{"type":"session","id":"session","cwd":"/repo"}`)
+	if err := os.Symlink(outsideSession, filepath.Join(planDir, ".sessions", "pi", "session.jsonl")); err != nil {
+		t.Fatal(err)
+	}
+
+	_, err := DiscoverPlanAgentSessionsUnderThoughts(thoughtsRoot, planDir)
+	if err == nil || !strings.Contains(err.Error(), "escapes thoughts root") {
+		t.Fatalf("DiscoverPlanAgentSessionsUnderThoughts err = %v, want escape error", err)
 	}
 }
 

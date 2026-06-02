@@ -504,11 +504,11 @@ func TestPlanWorkspaceSyncerIndexesPlanOwnedAgentSessions(t *testing.T) {
 	if result.AgentSessionsIndexed != 1 || !result.Changed {
 		t.Fatalf("result = %+v, want one indexed session and changed", result)
 	}
-	row, err := service.queries.GetAgentSessionByPath(context.Background(), nullableString(sessionPath))
+	row, err := service.queries.GetAgentSessionByPath(context.Background(), nullableString("agent/plans/2026-06-02_plan/.sessions/pi/session.jsonl"))
 	if err != nil {
-		t.Fatalf("GetAgentSessionByPath: %v", err)
+		t.Fatalf("GetAgentSessionByPath(relative): %v", err)
 	}
-	if row.Agent != "pi" || !row.InferredPlanDir.Valid || row.InferredPlanDir.String != planDir || !row.WorkflowID.Valid || row.WorkflowID.String != "wf" || !row.WorkflowNodeID.Valid || row.WorkflowNodeID.String != "outline" || row.NeedsHydration != 1 {
+	if row.Agent != "pi" || !row.InferredPlanDir.Valid || row.InferredPlanDir.String != "agent/plans/2026-06-02_plan" || !row.WorkflowID.Valid || row.WorkflowID.String != "wf" || !row.WorkflowNodeID.Valid || row.WorkflowNodeID.String != "outline" || row.NeedsHydration != 1 || !row.SessionPath.Valid || row.SessionPath.String != "agent/plans/2026-06-02_plan/.sessions/pi/session.jsonl" {
 		t.Fatalf("indexed session = %#v", row)
 	}
 

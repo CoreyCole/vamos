@@ -2,6 +2,42 @@
 
 Vamos Agents is a reusable Go/templ/Datastar server for private agentic software factories. It serves a configured `thoughts/` artifact directory, manages shared Agent Chat/Pi sessions, and hosts workflow runtimes such as QRSPI.
 
+Agent Chat is fully multiplayer/shared. There is no per-user/private-workspace visibility model for plan-owned sessions. `user_email` and `workspace_id` should be populated when known for provenance, attribution, routing, and attachment metadata, but they must not gate sidebar/history visibility or hydration of plan-owned `.sessions/<agent>` artifacts.
+
+Vamos is pre-release OSS: optimize for clean long-term design, not legacy DB compatibility. The filesystem `thoughts/` tree and plan-owned `.sessions/<agent>` JSONL files are durable source of truth; the DB is rebuildable index/projection/cache. If the scheduled sync workflow can rebuild correct state from filesystem artifacts, it is acceptable to drop old DB rows, replace columns, or migrate destructively rather than preserving legacy code paths or tech debt.
+
+### Long-term product architecture philosophy
+
+Vamos is a distributed organizational memory and coordination system for AI-assisted software work. It should support local development, shared servers, durable artifacts, and multiplayer planning across an organization. Design for the future where AI sessions, plans, reviews, decisions, code context, and handoffs are shared organizational knowledge — not isolated state on one developer's laptop.
+
+Implications for future planning:
+
+- Prefer durable, portable, organization-shareable artifacts over machine-local state.
+- Prefer `thoughts/...`-relative artifact identity over absolute filesystem paths. Vamos runs on many engineers' machines and shared servers from different checkout roots; absolute host paths are safety/IO details only, not durable identity.
+- Prefer shared/multiplayer session and plan models over private per-user chat history when artifacts are plan-owned or project-owned.
+- Treat `thoughts/`, QRSPI artifacts, `.sessions/<agent>`, ADRs, reviews, and handoffs as the recursive self-improvement substrate for the organization.
+- Schema should express the durable domain clearly: artifact identity, provenance, lineage, workflow run, plan ownership, session/thread identity, sharing/visibility, and projection state.
+- Do not preserve legacy columns, legacy adapters, or confusing compatibility paths when they obscure that domain model.
+- If an old schema encoded laptop-local assumptions, user-private visibility, absolute paths, or transient workspace ownership, replace it with the long-term organizational model.
+- Prefer explicit identity/visibility enums and normalized relationships over inferring semantics from nullable columns or path shapes.
+- Keep provenance separate from authorization/visibility. Who created/indexed/attached something is not necessarily who may see it.
+- The correct design should make multiplayer planning and shared AI session discovery obvious to future agents reading the schema and queries.
+
+### Thoughts-backed DB/schema doctrine
+
+For all future Vamos planning and implementation involving `thoughts/` artifacts, QRSPI plans, and plan-owned `.sessions/<agent>` JSONL:
+
+- Disk is source of truth.
+- DB is disposable projection/index/cache and should be safe to wipe at any time.
+- A new engineer joining with the shared `thoughts/` directory should be able to run the scheduled filesystem-to-DB sync and rebuild the DB projection from disk artifacts.
+- Prefer the best long-term schema over compatibility with old DB rows.
+- Big schema changes are OK when they simplify the durable domain model and eliminate complexity from legacy decisions.
+- Destructive migrations, dropped columns, renamed columns, table replacement, and full row rebuilds are acceptable when the scheduled filesystem-to-DB sync can rebuild from `thoughts/`.
+- "Scheduled sync" means the scheduled Temporal filesystem-to-DB indexing/projection workflow that reads disk artifacts and writes DB rows. It does not mean `just sync-thoughts` or any thoughts durable-cloud-storage persistence step.
+- The scheduled filesystem-to-DB sync must rebuild correct DB state from filesystem artifacts instead of preserving stale projection state.
+- Do not add compatibility shims for legacy absolute paths or owner/workspace visibility when a clean re-index from disk is possible.
+- For plan-owned artifacts, `user_email` and `workspace_id` are provenance/routing/attachment metadata only; never authorization or visibility gates.
+
 ## Repository shape
 
 ```text
@@ -23,6 +59,7 @@ vamos/
 - Keep company-specific paths, domains, OAuth policy, users, repo names, and service names out of reusable code.
 - Host applications provide YAML/env config for branding, auth, thoughts roots, linked projects, deploy names, and workspace conventions.
 - The `thoughts/` directory is host-owned data. Vamos reads/writes the configured thoughts root; it should not assume a colocated `thoughts/` directory.
+- Store durable artifact references as `thoughts/...`-relative paths whenever possible. Resolve absolute paths only at IO boundaries for validation and file access.
 - Runtime metadata uses `.vamos/` and `VAMOS_*` names.
 - Datastar Pro JS assets are licensed and gitignored. Build tooling may copy from `VAMOS_DATASTAR_PRO_ASSET` or `../datastar-pro/datastar-pro-v1.js`; do not download them silently.
 
