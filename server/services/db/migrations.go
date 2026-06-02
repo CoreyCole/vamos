@@ -17,33 +17,6 @@ func prepareSchemaCompatibilityMigrations(ctx context.Context, database *sql.DB)
 	if err := ensureAgentRunsWorkflowColumnsIfTableExists(ctx, database); err != nil {
 		return err
 	}
-	if err := ensureColumnIfTableExists(
-		ctx,
-		database,
-		"agent_sessions",
-		"workspace_id",
-		"TEXT REFERENCES workspaces(id)",
-	); err != nil {
-		return err
-	}
-	if err := ensureColumnIfTableExists(
-		ctx,
-		database,
-		"agent_sessions",
-		"thread_id",
-		"TEXT REFERENCES agent_threads(id)",
-	); err != nil {
-		return err
-	}
-	if err := ensureColumnIfTableExists(
-		ctx,
-		database,
-		"agent_sessions",
-		"user_email",
-		"TEXT",
-	); err != nil {
-		return err
-	}
 	for _, column := range []struct {
 		tableName  string
 		legacyName string
@@ -122,10 +95,7 @@ func prepareSchemaCompatibilityMigrations(ctx context.Context, database *sql.DB)
 	if err := ensureAgentThreadProjectColumnsIfTableExists(ctx, database); err != nil {
 		return err
 	}
-	if err := ensureAgentSessionIndexColumns(ctx, database); err != nil {
-		return err
-	}
-	if err := ensureAgentSessionArtifactColumns(ctx, database); err != nil {
+	if err := ensureAgentSessionsProjectionSchema(ctx, database); err != nil {
 		return err
 	}
 	return ensureArtifactCommentsDocPathColumn(ctx, database)
@@ -144,43 +114,7 @@ func runRuntimeMigrations(ctx context.Context, database *sql.DB) error {
 	); err != nil {
 		return err
 	}
-	if err := ensureColumn(
-		ctx,
-		database,
-		"agent_sessions",
-		"workspace_id",
-		"TEXT REFERENCES workspaces(id)",
-	); err != nil {
-		return err
-	}
-	if err := ensureColumn(
-		ctx,
-		database,
-		"agent_sessions",
-		"thread_id",
-		"TEXT REFERENCES agent_threads(id)",
-	); err != nil {
-		return err
-	}
-	if err := ensureColumn(
-		ctx,
-		database,
-		"agent_sessions",
-		"user_email",
-		"TEXT",
-	); err != nil {
-		return err
-	}
-	if err := ensureAgentSessionsImportingStatus(ctx, database); err != nil {
-		return err
-	}
-	if err := ensureAgentSessionIndexColumns(ctx, database); err != nil {
-		return err
-	}
-	if err := ensureAgentSessionsUserEmailBackfill(ctx, database); err != nil {
-		return err
-	}
-	if err := ensureAgentSessionArtifactColumns(ctx, database); err != nil {
+	if err := ensureAgentSessionsProjectionSchema(ctx, database); err != nil {
 		return err
 	}
 	if err := ensureAgentThreadWorkspaces(ctx, database); err != nil {
@@ -322,9 +256,6 @@ func runRuntimeMigrations(ctx context.Context, database *sql.DB) error {
 	}
 
 	indexes := []string{
-		`CREATE INDEX IF NOT EXISTS idx_agent_sessions_workspace_updated ON agent_sessions(workspace_id, updated_at DESC) WHERE workspace_id IS NOT NULL`,
-		`CREATE INDEX IF NOT EXISTS idx_agent_sessions_plan_agent_updated ON agent_sessions(inferred_plan_dir, agent, updated_at DESC) WHERE inferred_plan_dir IS NOT NULL`,
-		`CREATE INDEX IF NOT EXISTS idx_agent_sessions_workflow_node ON agent_sessions(workflow_id, workflow_node_id, updated_at DESC) WHERE workflow_id IS NOT NULL`,
 		`CREATE INDEX IF NOT EXISTS idx_agent_runs_workspace_created ON agent_runs(workspace_id, created_at DESC) WHERE workspace_id IS NOT NULL`,
 		`CREATE INDEX IF NOT EXISTS idx_agent_runs_workspace_node_created ON agent_runs(workspace_id, workflow_node_id, created_at DESC) WHERE workflow_node_id IS NOT NULL`,
 		`CREATE INDEX IF NOT EXISTS idx_agent_entries_origin_session ON agent_entries(origin_session_id) WHERE origin_session_id IS NOT NULL`,
@@ -332,60 +263,6 @@ func runRuntimeMigrations(ctx context.Context, database *sql.DB) error {
 	}
 	for _, indexSQL := range indexes {
 		if err := ensureIndex(ctx, database, indexSQL); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func ensureAgentSessionIndexColumns(ctx context.Context, database *sql.DB) error {
-	exists, err := tableExists(ctx, database, "agent_sessions")
-	if err != nil || !exists {
-		return err
-	}
-	columns := []struct {
-		name       string
-		definition string
-	}{
-		{"inferred_workspace_id", "TEXT"},
-		{"inferred_plan_dir", "TEXT"},
-		{"imported_head_entry_id", "TEXT"},
-		{"last_imported_at", "DATETIME"},
-		{"last_error", "TEXT"},
-		{"metadata_json", "TEXT"},
-	}
-	for _, column := range columns {
-		if err := ensureColumn(ctx, database, "agent_sessions", column.name, column.definition); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func ensureAgentSessionArtifactColumns(ctx context.Context, database *sql.DB) error {
-	exists, err := tableExists(ctx, database, "agent_sessions")
-	if err != nil || !exists {
-		return err
-	}
-	columns := []struct {
-		name       string
-		definition string
-	}{
-		{"agent", "TEXT NOT NULL DEFAULT 'pi'"},
-		{"parent_plan_dir", "TEXT"},
-		{"source_review_dir", "TEXT"},
-		{"workflow_id", "TEXT"},
-		{"workflow_node_id", "TEXT"},
-		{"continued_from_session_id", "TEXT"},
-		{"forked_from_session_id", "TEXT"},
-		{"file_size", "INTEGER NOT NULL DEFAULT 0"},
-		{"file_mtime", "DATETIME"},
-		{"file_hash", "TEXT"},
-		{"last_indexed_offset", "INTEGER NOT NULL DEFAULT 0"},
-		{"needs_hydration", "INTEGER NOT NULL DEFAULT 1"},
-	}
-	for _, column := range columns {
-		if err := ensureColumn(ctx, database, "agent_sessions", column.name, column.definition); err != nil {
 			return err
 		}
 	}
@@ -1032,23 +909,28 @@ func preAgentChatArtifactCommentsTableName(
 	return "", errors.New("no available pre-AgentChat artifact_comments table name")
 }
 
-func ensureAgentSessionsImportingStatus(ctx context.Context, database *sql.DB) error {
+func ensureAgentSessionsProjectionSchema(ctx context.Context, database *sql.DB) error {
 	exists, err := tableExists(ctx, database, "agent_sessions")
 	if err != nil || !exists {
 		return err
 	}
-
-	var createSQL string
-	if err := database.QueryRowContext(
-		ctx,
-		`SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'agent_sessions'`,
-	).Scan(&createSQL); err != nil {
+	hasIdentityKind, err := tableColumnExists(ctx, database, "agent_sessions", "identity_kind")
+	if err != nil {
 		return err
 	}
-	if strings.Contains(createSQL, "'importing'") ||
-		!strings.Contains(strings.ToUpper(createSQL), "CHECK") ||
-		!strings.Contains(createSQL, "'imported'") {
-		return nil
+	hasArtifactPath, err := tableColumnExists(ctx, database, "agent_sessions", "artifact_path")
+	if err != nil {
+		return err
+	}
+	hasProjectionState, err := tableColumnExists(ctx, database, "agent_sessions", "projection_state")
+	if err != nil {
+		return err
+	}
+	if hasIdentityKind && hasArtifactPath && hasProjectionState {
+		return ensureAgentSessionProjectionIndexes(ctx, database)
+	}
+	if err := ensureLegacyAgentSessionColumnsForProjection(ctx, database); err != nil {
+		return err
 	}
 
 	if _, err := database.ExecContext(ctx, `PRAGMA foreign_keys = OFF`); err != nil {
@@ -1063,60 +945,46 @@ func ensureAgentSessionsImportingStatus(ctx context.Context, database *sql.DB) e
 	defer func() { _ = tx.Rollback() }()
 
 	statements := []string{
-		`CREATE TABLE agent_sessions_new (
-			id TEXT PRIMARY KEY,
-			workspace_id TEXT REFERENCES workspaces(id),
-			thread_id TEXT REFERENCES agent_threads(id),
-			user_email TEXT,
-			source TEXT NOT NULL CHECK (source IN ('terminal', 'web', 'adopted')),
-			session_path TEXT,
-			session_id TEXT,
-			parent_session_id TEXT,
-			cwd TEXT,
-			status TEXT NOT NULL DEFAULT 'pending'
-				CHECK (status IN ('pending', 'importing', 'imported', 'unassigned', 'ambiguous', 'diverged', 'failed')),
-			inferred_workspace_id TEXT,
-			inferred_plan_dir TEXT,
-			imported_head_entry_id TEXT,
-			last_imported_at DATETIME,
-			last_error TEXT,
-			metadata_json TEXT,
-			created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-			updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
-		)`,
+		agentSessionsProjectionTableSQL("agent_sessions_new"),
 		`INSERT INTO agent_sessions_new (
-			id,
-			workspace_id,
-			thread_id,
-			user_email,
-			source,
-			session_path,
-			session_id,
-			parent_session_id,
-			cwd,
-			status,
-			inferred_workspace_id,
-			inferred_plan_dir,
-			imported_head_entry_id,
-			last_imported_at,
-			last_error,
-			metadata_json,
-			created_at,
-			updated_at
+			id, identity_kind, artifact_path, plan_dir, parent_plan_dir, source_review_dir,
+			agent, external_session_id, parent_session_id, cwd, workflow_id, workflow_node_id,
+			continued_from_session_id, forked_from_session_id, file_size, file_mtime, file_hash,
+			last_indexed_offset, projection_state, projected_thread_id, indexed_by_user_email,
+			attached_workspace_id, imported_head_entry_id, last_imported_at, last_error,
+			metadata_json, created_at, updated_at
 		)
 		SELECT
 			id,
-			workspace_id,
-			thread_id,
-			user_email,
-			source,
+			CASE WHEN source = 'web' THEN 'web' ELSE 'global_pi' END,
 			session_path,
+			inferred_plan_dir,
+			NULL,
+			NULL,
+			'pi',
 			session_id,
 			parent_session_id,
 			cwd,
-			status,
-			inferred_workspace_id,
-			inferred_plan_dir,
+			NULL,
+			NULL,
+			NULL,
+			NULL,
+			0,
+			NULL,
+			NULL,
+			0,
+			CASE status
+				WHEN 'pending' THEN 'needs_hydration'
+				WHEN 'imported' THEN 'hydrated'
+				ELSE status
+			END,
+			thread_id,
+			COALESCE(
+				user_email,
+				(SELECT workspaces.user_email FROM workspaces WHERE workspaces.id = agent_sessions.workspace_id),
+				(SELECT agent_threads.user_email FROM agent_threads WHERE agent_threads.id = agent_sessions.thread_id)
+			),
+			workspace_id,
 			imported_head_entry_id,
 			last_imported_at,
 			last_error,
@@ -1126,56 +994,101 @@ func ensureAgentSessionsImportingStatus(ctx context.Context, database *sql.DB) e
 		FROM agent_sessions`,
 		`DROP TABLE agent_sessions`,
 		`ALTER TABLE agent_sessions_new RENAME TO agent_sessions`,
-		`CREATE UNIQUE INDEX IF NOT EXISTS idx_agent_sessions_path
-			ON agent_sessions(session_path)
-			WHERE session_path IS NOT NULL`,
 	}
 	for _, statement := range statements {
 		if _, err := tx.ExecContext(ctx, statement); err != nil {
 			return err
 		}
 	}
-	return tx.Commit()
+	if err := tx.Commit(); err != nil {
+		return err
+	}
+	return ensureAgentSessionProjectionIndexes(ctx, database)
 }
 
-func ensureAgentSessionsUserEmailBackfill(ctx context.Context, database *sql.DB) error {
-	exists, err := tableExists(ctx, database, "agent_sessions")
-	if err != nil || !exists {
-		return err
+func ensureLegacyAgentSessionColumnsForProjection(ctx context.Context, database *sql.DB) error {
+	columns := []struct {
+		name       string
+		definition string
+	}{
+		{"workspace_id", "TEXT REFERENCES workspaces(id)"},
+		{"thread_id", "TEXT REFERENCES agent_threads(id)"},
+		{"user_email", "TEXT"},
+		{"session_path", "TEXT"},
+		{"session_id", "TEXT"},
+		{"parent_session_id", "TEXT"},
+		{"cwd", "TEXT"},
+		{"inferred_plan_dir", "TEXT"},
+		{"imported_head_entry_id", "TEXT"},
+		{"last_imported_at", "DATETIME"},
+		{"last_error", "TEXT"},
+		{"metadata_json", "TEXT"},
+		{"created_at", "DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP"},
+		{"updated_at", "DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP"},
 	}
-	hasUserEmail, err := tableColumnExists(ctx, database, "agent_sessions", "user_email")
-	if err != nil || !hasUserEmail {
-		return err
+	for _, column := range columns {
+		if err := ensureColumn(ctx, database, "agent_sessions", column.name, column.definition); err != nil {
+			return err
+		}
 	}
+	return nil
+}
 
-	statements := []string{
-		`UPDATE agent_sessions
-SET user_email = (
-    SELECT workspaces.user_email
-    FROM workspaces
-    WHERE workspaces.id = agent_sessions.workspace_id
-)
-WHERE (user_email IS NULL OR TRIM(user_email) = '')
-  AND workspace_id IS NOT NULL
-  AND TRIM(workspace_id) != ''
-  AND EXISTS (
-      SELECT 1 FROM workspaces WHERE workspaces.id = agent_sessions.workspace_id
-  )`,
-		`UPDATE agent_sessions
-SET user_email = (
-    SELECT agent_threads.user_email
-    FROM agent_threads
-    WHERE agent_threads.id = agent_sessions.thread_id
-)
-WHERE (user_email IS NULL OR TRIM(user_email) = '')
-  AND thread_id IS NOT NULL
-  AND TRIM(thread_id) != ''
-  AND EXISTS (
-      SELECT 1 FROM agent_threads WHERE agent_threads.id = agent_sessions.thread_id
-  )`,
+func agentSessionsProjectionTableSQL(tableName string) string {
+	return fmt.Sprintf(`CREATE TABLE %s (
+		id TEXT PRIMARY KEY,
+		identity_kind TEXT NOT NULL DEFAULT 'global_pi'
+			CHECK (identity_kind IN ('plan_owned', 'global_pi', 'web')),
+		artifact_path TEXT,
+		plan_dir TEXT,
+		parent_plan_dir TEXT,
+		source_review_dir TEXT,
+		agent TEXT NOT NULL DEFAULT 'pi',
+		external_session_id TEXT,
+		parent_session_id TEXT,
+		cwd TEXT,
+		workflow_id TEXT,
+		workflow_node_id TEXT,
+		continued_from_session_id TEXT,
+		forked_from_session_id TEXT,
+		file_size INTEGER NOT NULL DEFAULT 0,
+		file_mtime DATETIME,
+		file_hash TEXT,
+		last_indexed_offset INTEGER NOT NULL DEFAULT 0,
+		projection_state TEXT NOT NULL DEFAULT 'needs_hydration'
+			CHECK (projection_state IN ('needs_hydration', 'importing', 'hydrated', 'unassigned', 'ambiguous', 'diverged', 'failed')),
+		projected_thread_id TEXT REFERENCES agent_threads (id),
+		indexed_by_user_email TEXT,
+		attached_workspace_id TEXT REFERENCES workspaces (id),
+		imported_head_entry_id TEXT,
+		last_imported_at DATETIME,
+		last_error TEXT,
+		metadata_json TEXT,
+		created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+		updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+	)`, tableName)
+}
+
+func ensureAgentSessionProjectionIndexes(ctx context.Context, database *sql.DB) error {
+	indexes := []string{
+		`CREATE UNIQUE INDEX IF NOT EXISTS idx_agent_sessions_artifact_path
+			ON agent_sessions (artifact_path)
+			WHERE artifact_path IS NOT NULL`,
+		`CREATE INDEX IF NOT EXISTS idx_agent_sessions_plan_owned_updated
+			ON agent_sessions (plan_dir, agent, updated_at DESC)
+			WHERE identity_kind = 'plan_owned' AND plan_dir IS NOT NULL`,
+		`CREATE INDEX IF NOT EXISTS idx_agent_sessions_private_user_plan_updated
+			ON agent_sessions (indexed_by_user_email, plan_dir, updated_at DESC)
+			WHERE identity_kind != 'plan_owned' AND plan_dir IS NOT NULL`,
+		`CREATE INDEX IF NOT EXISTS idx_agent_sessions_private_user_workspace_plan_updated
+			ON agent_sessions (indexed_by_user_email, attached_workspace_id, plan_dir, updated_at DESC)
+			WHERE identity_kind != 'plan_owned' AND plan_dir IS NOT NULL`,
+		`CREATE INDEX IF NOT EXISTS idx_agent_sessions_workflow_node
+			ON agent_sessions (workflow_id, workflow_node_id, updated_at DESC)
+			WHERE workflow_id IS NOT NULL`,
 	}
-	for _, statement := range statements {
-		if _, err := database.ExecContext(ctx, statement); err != nil {
+	for _, indexSQL := range indexes {
+		if err := ensureIndex(ctx, database, indexSQL); err != nil {
 			return err
 		}
 	}

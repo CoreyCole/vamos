@@ -663,7 +663,7 @@ CREATE INDEX idx_agent_threads_workspace_updated
 		t.Fatal("idx_agent_threads_workspace_updated still exists after runtime migrations")
 	}
 	for _, indexName := range []string{
-		"idx_agent_sessions_workspace_updated",
+		"idx_agent_sessions_artifact_path",
 		"idx_agent_runs_workspace_created",
 		"idx_agent_entries_origin_session",
 		"idx_agent_runs_thread_running",
@@ -761,17 +761,22 @@ VALUES ('session-1', 'terminal', '/tmp/session.jsonl', 'pending');`)
 	}
 	if _, err := database.ExecContext(
 		t.Context(),
-		`UPDATE agent_sessions SET status = 'importing' WHERE id = 'session-1'`,
+		`UPDATE agent_sessions SET projection_state = 'importing' WHERE id = 'session-1'`,
 	); err != nil {
-		t.Fatalf("update status importing after migration: %v", err)
+		t.Fatalf("update projection_state importing after migration: %v", err)
 	}
-	for _, column := range []string{"workspace_id", "thread_id", "user_email"} {
+	for _, column := range []string{"identity_kind", "artifact_path", "indexed_by_user_email", "attached_workspace_id", "projected_thread_id", "projection_state"} {
 		if !columnExists(t, database, "agent_sessions", column) {
 			t.Fatalf("agent_sessions.%s missing after migration", column)
 		}
 	}
-	if !indexExists(t, database, "idx_agent_sessions_path") {
-		t.Fatal("idx_agent_sessions_path missing after migration")
+	for _, column := range []string{"workspace_id", "thread_id", "user_email", "session_path", "status"} {
+		if columnExists(t, database, "agent_sessions", column) {
+			t.Fatalf("agent_sessions.%s still exists after projection migration", column)
+		}
+	}
+	if !indexExists(t, database, "idx_agent_sessions_artifact_path") {
+		t.Fatal("idx_agent_sessions_artifact_path missing after migration")
 	}
 }
 
@@ -881,7 +886,7 @@ VALUES
 		var owner sql.NullString
 		if err := database.QueryRowContext(
 			t.Context(),
-			`SELECT user_email FROM agent_sessions WHERE id = ?`,
+			`SELECT indexed_by_user_email FROM agent_sessions WHERE id = ?`,
 			id,
 		).Scan(&owner); err != nil {
 			t.Fatalf("query %s owner: %v", id, err)
@@ -899,12 +904,12 @@ VALUES
 
 	if _, err := database.ExecContext(
 		t.Context(),
-		`UPDATE agent_sessions SET status = 'importing' WHERE id = 'workspace-owned'`,
+		`UPDATE agent_sessions SET projection_state = 'importing' WHERE id = 'workspace-owned'`,
 	); err != nil {
-		t.Fatalf("importing status after migration: %v", err)
+		t.Fatalf("importing projection_state after migration: %v", err)
 	}
-	if !indexExists(t, database, "idx_agent_sessions_path") {
-		t.Fatal("idx_agent_sessions_path missing after migration")
+	if !indexExists(t, database, "idx_agent_sessions_artifact_path") {
+		t.Fatal("idx_agent_sessions_artifact_path missing after migration")
 	}
 }
 
