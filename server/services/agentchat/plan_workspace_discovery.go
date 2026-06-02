@@ -274,6 +274,7 @@ func normalizeImplWorkspaceDiscoveryConfig(
 ) workspaces.ImplWorkspaceDiscoveryConfig {
 	discovery := workspaces.NormalizeDiscoveryConfig(implDiscoveryAsDiscoveryConfig(cfg))
 	return workspaces.ImplWorkspaceDiscoveryConfig{
+		ProjectID:           strings.TrimSpace(cfg.ProjectID),
 		MainCheckoutPath:    discovery.MainCheckoutPath,
 		ParentDir:           discovery.ParentDir,
 		Domain:              discovery.Domain,

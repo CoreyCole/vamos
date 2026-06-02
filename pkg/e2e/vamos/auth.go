@@ -89,12 +89,23 @@ func Authenticate(
 	if err != nil {
 		return err
 	}
-	_, err = page.Goto(
+	response, err := page.Goto(
 		authURL,
 		playwright.PageGotoOptions{WaitUntil: playwright.WaitUntilStateDomcontentloaded},
 	)
 	if err != nil {
 		return err
+	}
+	if response == nil {
+		return fmt.Errorf("playwright auth failed; no response from %s", authURL)
+	}
+	status := response.Status()
+	if status < 200 || status >= 400 {
+		hint := ""
+		if strings.HasPrefix(strings.TrimSpace(cfg.BaseURL), "https://") && strings.TrimSpace(os.Getenv("VAMOS_E2E_AUTH_TOKEN")) == "" {
+			hint = "; set VAMOS_E2E_AUTH_TOKEN for public workspace URLs"
+		}
+		return fmt.Errorf("playwright auth failed; %s returned HTTP %d%s", authURL, status, hint)
 	}
 	select {
 	case <-ctx.Done():

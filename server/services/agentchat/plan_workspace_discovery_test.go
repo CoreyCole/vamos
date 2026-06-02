@@ -22,13 +22,17 @@ func (n *recordingPlanWorkspaceNotifier) NotifyProjectPlanSidebar() WorkspaceStr
 
 func TestImplWorkspaceDiscoveryConfigPreservesConfiguredCheckouts(t *testing.T) {
 	cfg := workspaces.ImplWorkspaceDiscoveryConfig{
-		Domain: "workspaces.test",
+		ProjectID: "vamos",
+		Domain:    "workspaces.test",
 		ConfiguredCheckouts: map[string]workspaces.ConfiguredCheckout{
 			"work": {RootPath: "/repo/vamos", DisplayName: "Working checkout"},
 		},
 	}
 
 	normalized := normalizeImplWorkspaceDiscoveryConfig(cfg)
+	if normalized.ProjectID != "vamos" {
+		t.Fatalf("normalized ProjectID = %q", normalized.ProjectID)
+	}
 	if normalized.ConfiguredCheckouts["work"].RootPath != "/repo/vamos" {
 		t.Fatalf("normalized configured checkouts = %#v", normalized.ConfiguredCheckouts)
 	}
@@ -352,6 +356,48 @@ func TestPlanWorkspaceSyncerSyncsProjectRolesFromMetadata(t *testing.T) {
 	want = []string{"vamos:primary", "datastarui:related"}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("roles after archive = %#v, want %#v", got, want)
+	}
+}
+
+func TestPlanWorkspaceSyncerDoesNotUsePrimarySyncedCheckoutForRelatedBinding(t *testing.T) {
+	service := newTestAgentChatService(t)
+	thoughtsRoot := t.TempDir()
+	parent := t.TempDir()
+	planDir := filepath.Join(thoughtsRoot, "agent", "plans", "project-synced")
+	writePlanWorkspaceMarkdown(t, planDir, "plan.md", "---\nproject: vamos\nrelated_projects: [datastarui]\n---\n# Plan\n")
+	checkout := filepath.Join(parent, "vamos-project-synced")
+	writePlanWorkspaceFile(t, checkout, "go.mod", time.Now())
+	writePlanWorkspaceFile(t, filepath.Join(checkout, "agent", "plans", "project-synced"), "plan.md", time.Now())
+
+	syncer := &PlanWorkspaceSyncer{
+		Queries: service.queries,
+		Scanner: PlanWorkspaceScanner{
+			ProjectID:    "vamos",
+			ThoughtsRoot: thoughtsRoot,
+			ImplWorkspaces: workspaces.ImplWorkspaceDiscoveryConfig{
+				ProjectID:        "vamos",
+				ParentDir:        parent,
+				Domain:           "workspaces.test",
+				CheckoutPrefixes: []string{"vamos", "datastarui"},
+				ModuleMarker:     "go.mod",
+			},
+		},
+	}
+
+	if _, err := syncer.Sync(context.Background(), PlanWorkspaceDiscoveryInput{}); err != nil {
+		t.Fatalf("Sync() error = %v", err)
+	}
+	bindings, err := service.queries.ListPlanWorkspaceImplBindings(context.Background(), "agent/plans/project-synced")
+	if err != nil {
+		t.Fatalf("ListPlanWorkspaceImplBindings() error = %v", err)
+	}
+	got := planBindingStatusByProject(bindings)
+	want := map[string]string{
+		"vamos":      "active:expected_path:" + checkout,
+		"datastarui": "planned:metadata:",
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("bindings = %#v, want %#v", got, want)
 	}
 }
 

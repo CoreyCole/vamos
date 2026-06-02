@@ -129,6 +129,68 @@ func SeedProjectPlanWorkspaces(projectA, projectB string) spec.Step {
 	})
 }
 
+func SeedMultiProjectPlanFilteringFixture(primaryProject, relatedProject string) spec.Step {
+	return customStep("seed multi-project plan filtering fixture", func(t testing.TB, ctx *duiruntime.Context) {
+		ensureE2EPlanFixture(t, ctx)
+		database := openDB(t, ctx)
+		defer database.Close()
+		seedMultiProjectPlanWorkspace(t, ctx, database, primaryProject, relatedProject)
+		seedPrimaryOnlyPlanWorkspace(t, ctx, database, primaryProject)
+	})
+}
+
+func OpenWorkspacesWithProjectFilter(projectID string) spec.Step {
+	return customStep("open workspaces filtered by "+projectID, func(t testing.TB, ctx *duiruntime.Context) {
+		values := url.Values{}
+		values.Set("project", projectID)
+		p := "/workspaces?" + values.Encode()
+		authURL, err := BuildAuthURL(ctx.Config, p)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := ctx.Page.Goto(authURL, playwright.PageGotoOptions{WaitUntil: playwright.WaitUntilStateDomcontentloaded}); err != nil {
+			t.Fatal(err)
+		}
+	})
+}
+
+func ExpectProjectFilteredPlanVisible(surface, primaryProject, relatedProject string) expectation {
+	return expectation{customStep("project filtered multi-project plan visible in "+surface, func(t testing.TB, ctx *duiruntime.Context) {
+		expectProjectFilteredPlanTexts(t, ctx, surface, []string{"e2e-multi-project-filter"})
+	})}
+}
+
+func ExpectProjectFilteredPlanBadgesVisible(surface, primaryProject, relatedProject string) expectation {
+	return expectation{customStep("project filtered multi-project plan badges visible in "+surface, func(t testing.TB, ctx *duiruntime.Context) {
+		expectProjectFilteredPlanTexts(t, ctx, surface, []string{
+			"e2e-multi-project-filter",
+			"Primary: " + primaryProject,
+			"Related: " + relatedProject,
+			"related match",
+			relatedProject + ":",
+		})
+	})}
+}
+
+func expectProjectFilteredPlanTexts(t testing.TB, ctx *duiruntime.Context, surface string, texts []string) {
+	t.Helper()
+	body := ctx.Page.Locator("body")
+	for _, text := range texts {
+		if err := body.Filter(playwright.LocatorFilterOptions{HasText: text}).WaitFor(); err != nil {
+			bodyText, _ := body.InnerText()
+			if len(bodyText) > 2000 {
+				bodyText = bodyText[:2000]
+			}
+			t.Fatalf("%s missing %q: %v\nbody:\n%s", surface, text, err, bodyText)
+		}
+	}
+	if count, err := ctx.Page.GetByText("E2E Primary Only Plan").Count(); err != nil {
+		t.Fatalf("%s primary-only plan count: %v", surface, err)
+	} else if count != 0 {
+		t.Fatalf("%s shows primary-only plan under related project filter", surface)
+	}
+}
+
 func SeedLatestFreeformChatQRSPIProjectResult(projectID string) spec.Step {
 	return customStep("seed latest freeform chat qrspi project result "+projectID, func(t testing.TB, ctx *duiruntime.Context) {
 		ensureE2EPlanFixture(t, ctx)
@@ -1144,16 +1206,7 @@ func seedProjectPlanWorkspace(t testing.TB, ctx *duiruntime.Context, database *s
 	slug := e2eProjectSlug(projectID)
 	rel := path.Join("creative-mode-agent", "plans", "e2e-project-filter-"+slug)
 	dir := filepath.Join(thoughtsRoot(ctx), rel)
-	if err := os.MkdirAll(dir, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	frontmatter := fmt.Sprintf("---\nproject: %s\nstage: plan\n---\n# %s\n", projectID, projectPlanLabel(projectID))
-	if err := os.WriteFile(filepath.Join(dir, "AGENTS.md"), []byte(frontmatter), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(filepath.Join(dir, "plan.md"), []byte(frontmatter), 0o644); err != nil {
-		t.Fatal(err)
-	}
+	writePlanWorkspaceFixtureFiles(t, dir, fmt.Sprintf("---\nproject: %s\nstage: plan\n---\n# %s\n", projectID, projectPlanLabel(projectID)))
 	execSQL(t, database, `INSERT INTO plan_workspaces (plan_dir_rel, project_id, plan_dir, label, artifact_updated_at, qrspi_lifecycle, last_discovered_at)
 VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP, 'plan', CURRENT_TIMESTAMP)
 ON CONFLICT(plan_dir_rel) DO UPDATE SET project_id = excluded.project_id, plan_dir = excluded.plan_dir, label = excluded.label, artifact_updated_at = CURRENT_TIMESTAMP, qrspi_lifecycle = excluded.qrspi_lifecycle, archived_at = NULL, last_discovered_at = CURRENT_TIMESTAMP`, rel, projectID, dir, projectPlanLabel(projectID))
@@ -1195,6 +1248,85 @@ VALUES (?, 'playwright@localhost', 'E2E QRSPI continuation', ?, 'qrspi', 'import
 	ctx.Memory["qrspi_continuation_workspace_id"] = workspaceID
 	ctx.Memory["qrspi_continuation_thread_id"] = threadID
 	ctx.Memory["qrspi_continuation_root_doc_path"] = rootDocPath
+}
+
+func seedMultiProjectPlanWorkspace(t testing.TB, ctx *duiruntime.Context, database *sql.DB, primaryProject, relatedProject string) {
+	t.Helper()
+	rel := path.Join("creative-mode-agent", "plans", "e2e-multi-project-filter")
+	dir := filepath.Join(thoughtsRoot(ctx), rel)
+	content := fmt.Sprintf("---\nproject: %s\nrelated_projects:\n  - %s\nstage: plan\n---\n# E2E Multi Project Plan\n", primaryProject, relatedProject)
+	writePlanWorkspaceFixtureFiles(t, dir, content)
+	seedPlanWorkspaceRows(t, ctx, database, rel, dir, "E2E Multi Project Plan", primaryProject, []string{relatedProject}, map[string]string{
+		primaryProject: "planned",
+		relatedProject: "active",
+	})
+}
+
+func seedPrimaryOnlyPlanWorkspace(t testing.TB, ctx *duiruntime.Context, database *sql.DB, projectID string) {
+	t.Helper()
+	rel := path.Join("creative-mode-agent", "plans", "e2e-primary-only-filter")
+	dir := filepath.Join(thoughtsRoot(ctx), rel)
+	content := fmt.Sprintf("---\nproject: %s\nstage: plan\n---\n# E2E Primary Only Plan\n", projectID)
+	writePlanWorkspaceFixtureFiles(t, dir, content)
+	seedPlanWorkspaceRows(t, ctx, database, rel, dir, "E2E Primary Only Plan", projectID, nil, map[string]string{projectID: "active"})
+}
+
+func writePlanWorkspaceFixtureFiles(t testing.TB, dir, content string) {
+	t.Helper()
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "AGENTS.md"), []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "plan.md"), []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func seedPlanWorkspaceRows(t testing.TB, ctx *duiruntime.Context, database *sql.DB, rel, dir, label, primaryProject string, relatedProjects []string, bindingStatuses map[string]string) {
+	t.Helper()
+	execSQL(t, database, `INSERT INTO plan_workspaces (plan_dir_rel, project_id, plan_dir, label, artifact_updated_at, qrspi_lifecycle, last_discovered_at)
+VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP, 'plan', CURRENT_TIMESTAMP)
+ON CONFLICT(plan_dir_rel) DO UPDATE SET project_id = excluded.project_id, plan_dir = excluded.plan_dir, label = excluded.label, artifact_updated_at = CURRENT_TIMESTAMP, qrspi_lifecycle = excluded.qrspi_lifecycle, archived_at = NULL, last_discovered_at = CURRENT_TIMESTAMP`, rel, primaryProject, dir, label)
+	seedPlanWorkspaceProjectRole(t, database, rel, primaryProject, "primary")
+	for _, projectID := range relatedProjects {
+		seedPlanWorkspaceProjectRole(t, database, rel, projectID, "related")
+	}
+	for projectID, status := range bindingStatuses {
+		seedPlanWorkspaceBinding(t, ctx, database, rel, dir, projectID, status)
+	}
+}
+
+func seedPlanWorkspaceProjectRole(t testing.TB, database *sql.DB, rel, projectID, role string) {
+	t.Helper()
+	execSQL(t, database, `INSERT INTO plan_workspace_projects (plan_dir_rel, project_id, role, declared_source)
+VALUES (?, ?, ?, 'e2e')
+ON CONFLICT(plan_dir_rel, project_id) DO UPDATE SET role = excluded.role, declared_source = excluded.declared_source, archived_at = NULL, last_discovered_at = CURRENT_TIMESTAMP`, rel, projectID, role)
+}
+
+func seedPlanWorkspaceBinding(t testing.TB, ctx *duiruntime.Context, database *sql.DB, rel, planDir, projectID, status string) {
+	t.Helper()
+	slug := "e2e-" + e2eProjectSlug(projectID) + "-" + e2eProjectSlug(path.Base(rel))
+	checkout := filepath.Join(ctx.Config.RepoRoot, ".e2e-workspaces", slug)
+	if err := os.MkdirAll(checkout, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	workspaceSlug, checkoutPath, workspaceURL, bindingSource, implProjectID, implWorkspaceSlug := any(nil), any(nil), any(nil), "metadata", any(nil), any(nil)
+	if status == "active" {
+		workspaceSlug = slug
+		checkoutPath = checkout
+		workspaceURL = "https://" + slug + ".workspaces.e2e/"
+		bindingSource = "binding_file"
+		implProjectID = projectID
+		implWorkspaceSlug = slug
+		execSQL(t, database, `INSERT INTO impl_workspaces (project_id, workspace_slug, checkout_path, display_name, host, url, plan_dir_rel, plan_dir, status, branch, commit_hash, trunk_branch)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'active', 'main', 'e2ecommit', 'main')
+ON CONFLICT(project_id, workspace_slug) DO UPDATE SET checkout_path = excluded.checkout_path, display_name = excluded.display_name, host = excluded.host, url = excluded.url, plan_dir_rel = excluded.plan_dir_rel, plan_dir = excluded.plan_dir, status = excluded.status, updated_at = CURRENT_TIMESTAMP`, projectID, slug, checkout, "E2E "+projectID+" workspace", slug+".workspaces.e2e", workspaceURL, rel, planDir)
+	}
+	execSQL(t, database, `INSERT INTO plan_workspace_impl_bindings (plan_dir_rel, project_id, workspace_slug, checkout_path, url, status, binding_source, impl_project_id, impl_workspace_slug)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+ON CONFLICT(plan_dir_rel, project_id) DO UPDATE SET workspace_slug = excluded.workspace_slug, checkout_path = excluded.checkout_path, url = excluded.url, status = excluded.status, binding_source = excluded.binding_source, impl_project_id = excluded.impl_project_id, impl_workspace_slug = excluded.impl_workspace_slug, archived_at = NULL, last_discovered_at = CURRENT_TIMESTAMP`, rel, projectID, workspaceSlug, checkoutPath, workspaceURL, status, bindingSource, implProjectID, implWorkspaceSlug)
 }
 
 func seedWorkspaceChat(t testing.TB, ctx *duiruntime.Context, database *sql.DB, label, marker string) {

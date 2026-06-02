@@ -76,6 +76,16 @@ func TestDurableSessionChat_FreeformChatAdoptsQrspiProjectMetadata(t *testing.T)
 		Run()
 }
 
+func TestDurableSessionChat_WorkspaceSidebarProjectFilterIncludesRelatedPlans(t *testing.T) {
+	spec.Story(t, "durable session chat workspace sidebar project filter includes related plans").
+		App(vamos.App()).
+		As(vamos.Robot).
+		Do(vamos.SeedMultiProjectPlanFilteringFixture("vamos", "datastarui")).
+		Do(vamos.SeedLatestFreeformChatQRSPIProjectResult("datastarui")).
+		Expect(vamos.ExpectProjectFilteredPlanVisible("workspace sidebar", "vamos", "datastarui")).
+		Run()
+}
+
 func TestDurableSessionChat_AnchorDocumentNavigationPreservesEmbeddedChat(t *testing.T) {
 	spec.Story(t, "durable session chat anchor document navigation preserves embedded chat").
 		App(vamos.App()).

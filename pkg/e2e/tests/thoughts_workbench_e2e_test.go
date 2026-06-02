@@ -68,6 +68,16 @@ func TestThoughtsWorkbench_WorkbenchReloadPreservesDbLayoutState(t *testing.T) {
 		Run()
 }
 
+func TestThoughtsWorkbench_WorkspacesPageProjectFilterIncludesRelatedPlans(t *testing.T) {
+	spec.Story(t, "thoughts workbench workspaces page project filter includes related plans").
+		App(vamos.App()).
+		As(vamos.Robot).
+		Do(vamos.SeedMultiProjectPlanFilteringFixture("vamos", "datastarui")).
+		Do(vamos.OpenWorkspacesWithProjectFilter("datastarui")).
+		Expect(vamos.ExpectProjectFilteredPlanBadgesVisible("workspaces page", "vamos", "datastarui")).
+		Run()
+}
+
 func TestThoughtsWorkbench_WorkbenchRegionsRemainUsableAcrossViewportClassesMobile(t *testing.T) {
 	runWorkbenchRegionsRemainUsable(t, duiruntime.ViewportMobile, "/")
 }
