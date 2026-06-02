@@ -1,8 +1,11 @@
 package vamos
 
 import (
+	"context"
 	"crypto/sha256"
 	"database/sql"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"net/url"
 	"os"
@@ -19,6 +22,7 @@ import (
 	duiruntime "github.com/coreycole/datastarui/e2e/runtime"
 	"github.com/coreycole/datastarui/e2e/spec"
 
+	"github.com/CoreyCole/vamos/pkg/db"
 	"github.com/CoreyCole/vamos/pkg/e2e/fixtures"
 )
 
@@ -214,6 +218,187 @@ func OpenQRSPIContinuationWorkspaceChat() spec.Step {
 		}
 		visit(t, ctx, thoughtsChatURL(filepath.Join(rootDocPath, "plan.md"), workspaceID, threadID))
 	})
+}
+
+type workflowRunSnapshot struct {
+	ID                 string
+	ThreadID           string
+	SessionID          string
+	SessionPath        string
+	Status             string
+	WorkflowNodeID     string
+	WorkflowResultJSON string
+}
+
+type workflowResultProjection struct {
+	SourceNodeID    string `json:"source_node_id"`
+	Status          string `json:"status"`
+	Outcome         string `json:"outcome"`
+	PrimaryArtifact string `json:"primary_artifact"`
+	DisplayNext     string `json:"display_next"`
+}
+
+func latestWorkflowRunForNode(ctx context.Context, queries *db.Queries, workspaceID string, nodeID string) (workflowRunSnapshot, bool, error) {
+	run, err := queries.GetLatestAgentRunByWorkspaceNode(ctx, db.GetLatestAgentRunByWorkspaceNodeParams{
+		WorkspaceID:    sql.NullString{String: workspaceID, Valid: workspaceID != ""},
+		WorkflowNodeID: sql.NullString{String: nodeID, Valid: nodeID != ""},
+	})
+	if errors.Is(err, sql.ErrNoRows) {
+		return workflowRunSnapshot{}, false, nil
+	}
+	if err != nil {
+		return workflowRunSnapshot{}, false, err
+	}
+	snapshot := workflowRunSnapshot{
+		ID:             run.ID,
+		ThreadID:       run.ThreadID,
+		Status:         run.Status,
+		WorkflowNodeID: run.WorkflowNodeID.String,
+	}
+	if run.SessionID.Valid {
+		snapshot.SessionID = run.SessionID.String
+		snapshot.SessionPath = run.SessionID.String
+	}
+	if run.WorkflowResultJson.Valid {
+		snapshot.WorkflowResultJSON = run.WorkflowResultJson.String
+	}
+	return snapshot, true, nil
+}
+
+func waitForWorkflowRunForNode(t testing.TB, ctx *duiruntime.Context, nodeID string, requireResult bool) workflowRunSnapshot {
+	t.Helper()
+	workspaceID := ctx.Memory["qrspi_q_to_r_workspace_id"]
+	if workspaceID == "" {
+		t.Fatal("qrspi question-to-research workspace id missing")
+	}
+	database := openDB(t, ctx)
+	defer database.Close()
+	queries := db.New(database)
+	deadline := time.Now().Add(piResponseTimeoutMS * time.Millisecond)
+	var last workflowRunSnapshot
+	for time.Now().Before(deadline) {
+		snapshot, ok, err := latestWorkflowRunForNode(t.Context(), queries, workspaceID, nodeID)
+		if err != nil {
+			t.Fatalf("latest workflow run for node %s: %v", nodeID, err)
+		}
+		if ok {
+			last = snapshot
+			if !requireResult || strings.TrimSpace(snapshot.WorkflowResultJSON) != "" {
+				return snapshot
+			}
+		}
+		time.Sleep(chatPollInterval)
+	}
+	dumpWorkflowRunDiagnostics(t, database, workspaceID)
+	t.Fatalf("workflow run for node %s not ready; last=%+v", nodeID, last)
+	return workflowRunSnapshot{}
+}
+
+func decodeWorkflowResultProjection(raw string) (workflowResultProjection, error) {
+	var projection workflowResultProjection
+	if err := json.Unmarshal([]byte(strings.TrimSpace(raw)), &projection); err != nil {
+		return workflowResultProjection{}, err
+	}
+	return projection, nil
+}
+
+func workflowCurrentNode(t testing.TB, ctx *duiruntime.Context, workspaceID string) string {
+	t.Helper()
+	database := openDB(t, ctx)
+	defer database.Close()
+	workspace, err := db.New(database).GetWorkspace(t.Context(), workspaceID)
+	if err != nil {
+		t.Fatalf("get workspace %s: %v", workspaceID, err)
+	}
+	if !workspace.WorkflowStateJson.Valid {
+		t.Fatalf("workspace %s has no workflow state", workspaceID)
+	}
+	var state struct {
+		CurrentNodeID string `json:"current_node_id"`
+		PendingNext   string `json:"pending_next_node_id"`
+		Status        string `json:"status"`
+	}
+	if err := json.Unmarshal([]byte(workspace.WorkflowStateJson.String), &state); err != nil {
+		t.Fatalf("decode workspace workflow state: %v", err)
+	}
+	if state.CurrentNodeID != "" {
+		return state.CurrentNodeID
+	}
+	return state.PendingNext
+}
+
+func dumpWorkflowRunDiagnostics(t testing.TB, database *sql.DB, workspaceID string) {
+	t.Helper()
+	rows, err := database.QueryContext(t.Context(), `
+SELECT id, status, workflow_node_id, workflow_result_status, created_at
+FROM agent_runs
+WHERE workspace_id = ?
+ORDER BY created_at DESC
+LIMIT 5`, workspaceID)
+	if err != nil {
+		t.Logf("workflow run diagnostic query failed: %v", err)
+		return
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var id, status string
+		var nodeID, resultStatus sql.NullString
+		var createdAt string
+		if err := rows.Scan(&id, &status, &nodeID, &resultStatus, &createdAt); err != nil {
+			t.Logf("workflow run diagnostic scan failed: %v", err)
+			return
+		}
+		t.Logf("workflow run diagnostic: id=%s status=%s node=%s result=%s created=%s", id, status, nodeID.String, resultStatus.String, createdAt)
+	}
+}
+
+func WaitForWorkflowRunResult(nodeID string) expectation {
+	return expectation{customStep("wait for workflow run result "+nodeID, func(t testing.TB, ctx *duiruntime.Context) {
+		snapshot := waitForWorkflowRunForNode(t, ctx, nodeID, true)
+		projection, err := decodeWorkflowResultProjection(snapshot.WorkflowResultJSON)
+		if err != nil {
+			t.Fatalf("decode workflow result for %s: %v", nodeID, err)
+		}
+		if projection.SourceNodeID != nodeID || projection.Status != "complete" {
+			t.Fatalf("workflow result for %s = %+v", nodeID, projection)
+		}
+	})}
+}
+
+func WaitForWorkflowRunStarted(nodeID string) expectation {
+	return expectation{customStep("wait for workflow run started "+nodeID, func(t testing.TB, ctx *duiruntime.Context) {
+		_ = waitForWorkflowRunForNode(t, ctx, nodeID, false)
+	})}
+}
+
+func ExpectWorkflowCurrentNode(nodeID string) expectation {
+	return expectation{customStep("workflow current node "+nodeID, func(t testing.TB, ctx *duiruntime.Context) {
+		got := workflowCurrentNode(t, ctx, ctx.Memory["qrspi_q_to_r_workspace_id"])
+		if got != nodeID {
+			t.Fatalf("workflow current node = %q, want %q", got, nodeID)
+		}
+	})}
+}
+
+func ExpectDistinctWorkflowRuns(firstNodeID, secondNodeID string) expectation {
+	return expectation{customStep("distinct workflow runs "+firstNodeID+" "+secondNodeID, func(t testing.TB, ctx *duiruntime.Context) {
+		first := waitForWorkflowRunForNode(t, ctx, firstNodeID, true)
+		second := waitForWorkflowRunForNode(t, ctx, secondNodeID, false)
+		if first.ID == second.ID {
+			t.Fatalf("%s and %s used same run id %s", firstNodeID, secondNodeID, first.ID)
+		}
+		if first.ThreadID == "" || second.ThreadID == "" {
+			t.Fatalf("workflow runs missing thread ids: first=%+v second=%+v", first, second)
+		}
+	})}
+}
+
+func ExpectResearchRunVisible() expectation {
+	return expectation{customStep("research run visible", func(t testing.TB, ctx *duiruntime.Context) {
+		if err := ctx.Page.Locator("body").Filter(playwright.LocatorFilterOptions{HasText: "research"}).WaitFor(playwright.LocatorWaitForOptions{Timeout: playwright.Float(transcriptTextTimeoutMS)}); err != nil {
+			t.Fatalf("research state not visible after reload: %v", err)
+		}
+	})}
 }
 
 func SetFirstTranscriptMessageHash() spec.Step {
