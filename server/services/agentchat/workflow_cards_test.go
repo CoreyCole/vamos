@@ -80,6 +80,14 @@ func TestQRSPIWorkflowCardViewDoesNotRenderDisplayNextAsCommand(t *testing.T) {
 		Summary:         "Outline complete.",
 		PrimaryArtifact: "thoughts/example/outline.md",
 		RuntimeNextStep: "Human Review Outline",
+		NextSteps:       []string{"Read qrspi-planning.", "Start q-review immediately."},
+		AgentProgress: AgentProgress{
+			State:         "waiting_human",
+			CurrentNodeID: string(qrspi.NodeHumanReviewOutline),
+		},
+		JumpCurrentHref: "/thoughts/example?context=chat&thread=thread-1#msg-current",
+		JumpNextEndHref: "/thoughts/example?context=chat&thread=thread-1#msg-next",
+		RawXML:          "<qrspi-result><stage>outline</stage></qrspi-result>",
 		Cwd: WorkspaceCwdProjection{
 			Label: "planning",
 			Scope: "planning_checkout",
@@ -109,6 +117,19 @@ func TestQRSPIWorkflowCardViewDoesNotRenderDisplayNextAsCommand(t *testing.T) {
 	}
 	if strings.Contains(rendered, "/agent-chat/workspace-1/workflow/advance") {
 		t.Fatalf("rendered card leaked workspace action URL: %s", rendered)
+	}
+	for _, want := range []string{
+		"XML next steps",
+		"Start q-review immediately.",
+		"Progress",
+		"waiting_human · human-review-outline",
+		"Jump to current agent position",
+		"Jump to end of next step",
+		"overflow-x-auto",
+	} {
+		if !strings.Contains(rendered, want) {
+			t.Fatalf("rendered card missing %q: %s", want, rendered)
+		}
 	}
 }
 

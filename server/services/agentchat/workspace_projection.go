@@ -204,45 +204,70 @@ func (s *Service) transcriptFromChatProjection(proj chatsession.ChatProjection) 
 		messages = append(messages, item)
 	}
 	for _, tool := range proj.Tools {
-		title := firstNonEmptyString(tool.Name, "tool")
-		body := strings.TrimSpace(tool.Summary)
-		if body == "" {
-			body = tool.Status
-		}
-		item := s.newDetailTranscriptMessage(
-			firstNonEmptyString(tool.ID, fmt.Sprintf("tool-%d", tool.Seq)),
-			tool.ID,
-			title,
-			body,
-			tool.Status == "failed",
-			true,
-		)
-		item.ToolCallID = tool.ID
-		item.ChatSessionID = proj.SessionID
-		item.ChatNodeID = tool.ID
-		item.ChatEventSeq = tool.Seq
+		item := s.projectedToolTranscriptMessage(proj.SessionID, tool)
 		messages = append(messages, item)
 	}
 	for _, artifact := range proj.Artifacts {
-		title := "file " + artifact.Kind
-		item := s.newDetailTranscriptMessage(
-			firstNonEmptyString(artifact.Path, fmt.Sprintf("artifact-%d", artifact.Seq)),
-			artifact.Path,
-			title,
-			artifact.Path,
-			false,
-			false,
-		)
-		item.HeaderCode = artifact.Path
-		item.ChatSessionID = proj.SessionID
-		item.ChatNodeID = artifact.Path
-		item.ChatEventSeq = artifact.Seq
+		item := s.projectedArtifactTranscriptMessage(proj.SessionID, artifact)
 		messages = append(messages, item)
 	}
 	sort.SliceStable(messages, func(i, j int) bool {
 		return messages[i].ChatEventSeq < messages[j].ChatEventSeq
 	})
 	return messages
+}
+
+func (s *Service) projectedToolTranscriptMessage(
+	sessionID string,
+	tool chatsession.ProjectedToolEvent,
+) TranscriptMessage {
+	title := firstNonEmptyString(tool.Name, "tool")
+	body := strings.TrimSpace(tool.Summary)
+	if body == "" {
+		body = tool.Status
+	}
+	item := s.newDetailTranscriptMessage(
+		firstNonEmptyString(tool.ID, fmt.Sprintf("tool-%d", tool.Seq)),
+		tool.ID,
+		title,
+		body,
+		tool.Status == "failed",
+		true,
+	)
+	item.ToolCallID = tool.ID
+	item.HeaderSummary = tool.Status
+	item.ChatSessionID = sessionID
+	item.ChatNodeID = tool.ID
+	item.ChatEventSeq = tool.Seq
+	return item
+}
+
+func (s *Service) projectedArtifactTranscriptMessage(
+	sessionID string,
+	artifact chatsession.ProjectedArtifact,
+) TranscriptMessage {
+	title := "file " + artifact.Kind
+	if strings.EqualFold(artifact.Kind, "written") {
+		title = "file write"
+	}
+	if strings.EqualFold(artifact.Kind, "edited") {
+		title = "file edit"
+	}
+	path := strings.TrimSpace(artifact.Path)
+	item := s.newDetailTranscriptMessage(
+		firstNonEmptyString(path, fmt.Sprintf("artifact-%d", artifact.Seq)),
+		path,
+		title,
+		path,
+		false,
+		false,
+	)
+	item.HeaderCode = path
+	item.HeaderSummary = artifact.Kind
+	item.ChatSessionID = sessionID
+	item.ChatNodeID = path
+	item.ChatEventSeq = artifact.Seq
+	return item
 }
 
 func (s *Service) workspacePageContext(

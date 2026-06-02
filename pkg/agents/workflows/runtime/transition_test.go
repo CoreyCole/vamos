@@ -51,7 +51,9 @@ func TestDecideTransitionDiscussModeLeavesPendingNextIdle(t *testing.T) {
 		Start("start").
 		Agent("start", PromptSpec{Static: "start"}).
 		Agent("review", PromptSpec{Static: "review"}).
+		Done("done").
 		Edge("start", "review").
+		Edge("review", "done").
 		ResultParser(parserStub{}).
 		ResultConverter(converterStub{}).
 		Build()

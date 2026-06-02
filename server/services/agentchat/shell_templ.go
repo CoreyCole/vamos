@@ -182,7 +182,7 @@ func AgentChatChatPane(header templ.Component, messages templ.Component, compose
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 9, "<div id=\"agent-chat-scroll-region\" data-agent-chat-initial-scroll class=\"h-full overflow-y-auto\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 9, "<div id=\"agent-chat-scroll-region\" data-agent-chat-initial-scroll class=\"h-full min-w-0 overflow-y-auto overflow-x-hidden\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

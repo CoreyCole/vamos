@@ -285,9 +285,9 @@ func TestStartWorkspaceThreadCreatesSessionRunAndBoundedRunInput(t *testing.T) {
 		t.Fatalf("ListChatSessionEventsAfter() error = %v", err)
 	}
 	if len(events) < 2 ||
-		events[0].EventType != string(chatsession.EventMessageCreated) ||
+		events[0].EventType != string(chatsession.EventMessageCompleted) ||
 		events[1].EventType != string(chatsession.EventRunStarted) {
-		t.Fatalf("chat session events = %+v, want prompt then run started", events)
+		t.Fatalf("chat session events = %+v, want prompt completion then run started", events)
 	}
 	attachments, err := service.queries.ListAgentSurfaceAttachmentsBySession(
 		t.Context(),
@@ -1082,9 +1082,9 @@ func TestApplyCheckpointWritesAssistantMessageSessionEvent(t *testing.T) {
 		t.Fatalf("ListChatSessionEventsAfter() error = %v", err)
 	}
 	if len(events) != 2 ||
-		events[1].EventType != string(chatsession.EventMessageCreated) ||
+		events[1].EventType != string(chatsession.EventMessageCheckpointed) ||
 		!strings.Contains(events[1].PayloadJson, "durable hello") {
-		t.Fatalf("chat session events = %+v, want assistant message", events)
+		t.Fatalf("chat session events = %+v, want assistant checkpoint", events)
 	}
 }
 

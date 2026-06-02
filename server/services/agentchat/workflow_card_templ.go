@@ -29,7 +29,7 @@ func QRSPIWorkflowCardView(card QRSPIWorkflowCard) templ.Component {
 			templ_7745c5c3_Var1 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<div class=\"border-b border-border bg-background/70 px-4 py-3\"><article class=\"rounded-xl border border-border bg-card p-4 shadow-sm\"><div class=\"flex items-start justify-between gap-3\"><div><p class=\"text-sm font-semibold text-foreground\">QRSPI result</p><p class=\"text-xs text-muted-foreground\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<div class=\"min-w-0 overflow-x-hidden border-b border-border bg-background/70 px-4 py-3\"><article class=\"min-w-0 rounded-xl border border-border bg-card p-4 shadow-sm\"><div class=\"flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between\"><div class=\"min-w-0\"><p class=\"text-sm font-semibold text-foreground\">QRSPI result</p><p class=\"text-xs text-muted-foreground\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -142,7 +142,7 @@ func QRSPIWorkflowCardView(card QRSPIWorkflowCard) templ.Component {
 			return templ_7745c5c3_Err
 		}
 		if len(card.NextSteps) > 0 {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 10, "<div class=\"mt-3 rounded-lg border border-border bg-background/60 p-3\"><p class=\"text-xs font-medium uppercase tracking-wide text-muted-foreground\">XML next steps</p><ol class=\"mt-2 list-decimal space-y-1 pl-5 text-sm text-foreground\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 10, "<div class=\"mt-3 min-w-0 rounded-lg border border-border bg-background/60 p-3\"><p class=\"text-xs font-medium uppercase tracking-wide text-muted-foreground\">XML next steps</p><ol class=\"mt-2 list-decimal space-y-1 pl-5 text-sm text-foreground\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -170,7 +170,7 @@ func QRSPIWorkflowCardView(card QRSPIWorkflowCard) templ.Component {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 14, "<div class=\"mt-3 flex flex-wrap gap-2\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 14, "<div class=\"mt-3 flex min-w-0 flex-wrap gap-2\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -291,14 +291,14 @@ func QRSPIWorkflowCardView(card QRSPIWorkflowCard) templ.Component {
 			return templ_7745c5c3_Err
 		}
 		if card.RawXML != "" {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 28, "<details class=\"mt-3\"><summary class=\"cursor-pointer text-xs text-muted-foreground\">Raw workflow result / debug</summary><pre class=\"mt-2 overflow-x-auto whitespace-pre-wrap rounded-md bg-muted p-2 text-xs text-muted-foreground\"><code>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 28, "<details class=\"mt-3\"><summary class=\"cursor-pointer text-xs text-muted-foreground\">Raw workflow result / debug</summary><pre class=\"mt-2 max-w-full overflow-x-auto whitespace-pre rounded-md bg-muted p-2 text-xs text-muted-foreground\"><code>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var13 string
 			templ_7745c5c3_Var13, templ_7745c5c3_Err = templ.JoinStringErrs(card.RawXML)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/workflow_card.templ`, Line: 73, Col: 132}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/workflow_card.templ`, Line: 73, Col: 138}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var13))
 			if templ_7745c5c3_Err != nil {

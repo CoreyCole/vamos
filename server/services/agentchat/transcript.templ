@@ -3,18 +3,18 @@ package agentchat
 import "strconv"
 
 templ MessagesPane(threadID string, state TranscriptPaneState, hasThread bool, forkAction string) {
-	<div id="agent-chat-messages" class="min-h-full pb-28">
+	<div id="agent-chat-messages" class="min-h-full min-w-0 overflow-x-hidden pb-28">
 		@StableTranscriptRegion(threadID, state.Stable, forkAction)
 		if hasThread {
 			@LiveTranscriptRegion(threadID, state, forkAction)
 		} else {
-			<div id="agent-chat-live-transcript"></div>
+			<div id="agent-chat-live-transcript" class="min-w-0 overflow-x-hidden"></div>
 		}
 	</div>
 }
 
 templ StableTranscriptRegion(threadID string, messages []TranscriptMessage, forkAction string) {
-	<div id="agent-chat-stable-transcript">
+	<div id="agent-chat-stable-transcript" class="min-w-0 overflow-x-hidden">
 		for _, msg := range messages {
 			@TranscriptMessageWithFork(threadID, msg, forkAction)
 		}
@@ -22,7 +22,7 @@ templ StableTranscriptRegion(threadID string, messages []TranscriptMessage, fork
 }
 
 templ LiveTranscriptRegion(threadID string, state TranscriptPaneState, forkAction string) {
-	<div id="agent-chat-live-transcript">
+	<div id="agent-chat-live-transcript" class="min-w-0 overflow-x-hidden">
 		if len(state.Live.Items) == 0 {
 			if len(state.Stable) == 0 && state.Cursor == 0 {
 				<p class="p-4 text-sm text-muted-foreground">Waiting for the first completed turn…</p>
@@ -41,7 +41,7 @@ templ TranscriptMessageWithFork(threadID string, msg TranscriptMessage, forkActi
 	} else if msg.Variant == "detail" {
 		@TranscriptDetailCard(msg)
 	} else {
-		<div class={ "relative border-b border-border first:border-t", templ.KV("bg-muted/60", msg.Role == "user") }>
+		<div class={ "relative min-w-0 overflow-x-hidden border-b border-border first:border-t", templ.KV("bg-muted/60", msg.Role == "user") }>
 			@TranscriptForkControl(threadID, msg, forkAction)
 			@ChatMessage(ChatMessageArgs{ID: msg.DOMID, Role: msg.Role, Content: msg.Content, HTMLContent: msg.HTMLContent, Attachments: msg.Attachments})
 		</div>
@@ -49,11 +49,11 @@ templ TranscriptMessageWithFork(threadID string, msg TranscriptMessage, forkActi
 }
 
 templ TranscriptDetailCard(msg TranscriptMessage) {
-	<div class={ "border-b first:border-t", templ.KV("border-destructive/40 bg-destructive/5", msg.IsError), templ.KV("border-border", !msg.IsError) }>
+	<div class={ "min-w-0 overflow-x-hidden border-b first:border-t", templ.KV("border-destructive/40 bg-destructive/5", msg.IsError), templ.KV("border-border", !msg.IsError) }>
 		<div
 			id={ "msg-" + msg.DOMID }
 			data-signals={ transcriptDetailSignals(msg) }
-			class="w-full"
+			class="w-full min-w-0 overflow-x-hidden"
 		>
 			<div class="flex items-center justify-between gap-3 px-4 pb-1 pt-2">
 				<div class="flex min-w-0 flex-1 items-center gap-2">
@@ -118,13 +118,13 @@ templ TranscriptDetailCard(msg TranscriptMessage) {
 				if msg.HideBodyWhenCollapsed {
 					<div data-show={ transcriptDetailExpanded(msg) } data-class={ transcriptDetailCollapsedBodyClasses(msg) } class="hidden relative">
 						<div class="agent-chat-detail-panel" data-class={ transcriptDetailBodyClasses(msg) }>
-							<div class="agent-chat-detail-content agent-chat-detail-text whitespace-pre-wrap text-sm text-foreground">{ msg.Content }</div>
+							<div class="agent-chat-detail-content agent-chat-detail-text whitespace-pre-wrap break-words text-sm text-foreground">{ msg.Content }</div>
 						</div>
 					</div>
 				} else {
 					<div class="relative">
 						<div class="agent-chat-detail-panel" data-class={ transcriptDetailBodyClasses(msg) }>
-							<div class="agent-chat-detail-content agent-chat-detail-text whitespace-pre-wrap text-sm text-foreground">{ msg.Content }</div>
+							<div class="agent-chat-detail-content agent-chat-detail-text whitespace-pre-wrap break-words text-sm text-foreground">{ msg.Content }</div>
 						</div>
 						if msg.Collapsible {
 							<button
@@ -157,14 +157,14 @@ templ TranscriptDetailHeader(msg TranscriptMessage) {
 
 templ ChatMessage(args ChatMessageArgs) {
 	{{ isUser := args.Role == "user" }}
-	<div id={ "msg-" + args.ID } class="w-full">
+	<div id={ "msg-" + args.ID } class="w-full min-w-0 overflow-x-hidden">
 		if len(args.Attachments) > 0 {
 			@AttachmentPills(args.Attachments)
 		}
 		if isUser {
-			<div class="agent-chat-content-padding whitespace-pre-wrap text-sm text-foreground">{ args.Content }</div>
+			<div class="agent-chat-content-padding whitespace-pre-wrap break-words text-sm text-foreground">{ args.Content }</div>
 		} else {
-			<div class="markdown-viewer chat-message-content text-sm" data-ignore>
+			<div class="markdown-viewer chat-message-content min-w-0 break-words text-sm" data-ignore>
 				@templ.Raw(args.HTMLContent)
 			</div>
 		}
@@ -180,8 +180,8 @@ templ AttachmentPills(paths []AttachedPath) {
 }
 
 templ ChatMessageStreaming(args ChatMessageStreamingArgs) {
-	<div id={ "msg-" + args.ID } class="w-full">
-		<div class="agent-chat-content-padding markdown-viewer chat-message-content text-sm">
+	<div id={ "msg-" + args.ID } class="w-full min-w-0 overflow-x-hidden">
+		<div class="agent-chat-content-padding markdown-viewer chat-message-content min-w-0 break-words text-sm">
 			<div id={ "msg-content-" + args.ID } class="streaming"></div>
 			<span id={ "msg-cursor-" + args.ID } class="ml-0.5 inline-block h-4 w-2 animate-pulse bg-foreground/50"></span>
 		</div>
@@ -197,8 +197,8 @@ templ ChatMessageDeltaHTML(args ChatMessageDeltaHTMLArgs) {
 }
 
 templ ChatMessageComplete(args ChatMessageCompleteArgs) {
-	<div id={ "msg-" + args.ID } class="w-full">
-		<div class="markdown-viewer chat-message-content text-sm" data-ignore>
+	<div id={ "msg-" + args.ID } class="w-full min-w-0 overflow-x-hidden">
+		<div class="markdown-viewer chat-message-content min-w-0 break-words text-sm" data-ignore>
 			@templ.Raw(args.HTMLContent)
 		</div>
 	</div>

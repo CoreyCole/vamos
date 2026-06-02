@@ -1,10 +1,10 @@
 package agentchat
 
 templ QRSPIWorkflowCardView(card QRSPIWorkflowCard) {
-	<div class="border-b border-border bg-background/70 px-4 py-3">
-		<article class="rounded-xl border border-border bg-card p-4 shadow-sm">
-			<div class="flex items-start justify-between gap-3">
-				<div>
+	<div class="min-w-0 overflow-x-hidden border-b border-border bg-background/70 px-4 py-3">
+		<article class="min-w-0 rounded-xl border border-border bg-card p-4 shadow-sm">
+			<div class="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+				<div class="min-w-0">
 					<p class="text-sm font-semibold text-foreground">QRSPI result</p>
 					<p class="text-xs text-muted-foreground">{ card.Stage } · { card.Status }</p>
 				</div>
@@ -32,7 +32,7 @@ templ QRSPIWorkflowCardView(card QRSPIWorkflowCard) {
 				</tbody>
 			</table>
 			if len(card.NextSteps) > 0 {
-				<div class="mt-3 rounded-lg border border-border bg-background/60 p-3">
+				<div class="mt-3 min-w-0 rounded-lg border border-border bg-background/60 p-3">
 					<p class="text-xs font-medium uppercase tracking-wide text-muted-foreground">XML next steps</p>
 					<ol class="mt-2 list-decimal space-y-1 pl-5 text-sm text-foreground">
 						for _, step := range card.NextSteps {
@@ -41,7 +41,7 @@ templ QRSPIWorkflowCardView(card QRSPIWorkflowCard) {
 					</ol>
 				</div>
 			}
-			<div class="mt-3 flex flex-wrap gap-2">
+			<div class="mt-3 flex min-w-0 flex-wrap gap-2">
 				if card.WaitingHuman && card.ThreadID != "" {
 					<form data-on:submit={ "@post('/agent-chat/thread/" + card.ThreadID + "/workflow/advance', {contentType: 'form'})" }>
 						<button type="submit" class="rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90">Proceed</button>
@@ -70,7 +70,7 @@ templ QRSPIWorkflowCardView(card QRSPIWorkflowCard) {
 			if card.RawXML != "" {
 				<details class="mt-3">
 					<summary class="cursor-pointer text-xs text-muted-foreground">Raw workflow result / debug</summary>
-					<pre class="mt-2 overflow-x-auto whitespace-pre-wrap rounded-md bg-muted p-2 text-xs text-muted-foreground"><code>{ card.RawXML }</code></pre>
+					<pre class="mt-2 max-w-full overflow-x-auto whitespace-pre rounded-md bg-muted p-2 text-xs text-muted-foreground"><code>{ card.RawXML }</code></pre>
 				</details>
 			}
 		</article>

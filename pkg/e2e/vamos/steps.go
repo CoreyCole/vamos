@@ -195,6 +195,111 @@ func OpenSeededWorkspaceChat(label string) spec.Step {
 	})
 }
 
+func SeedQRSPIContinuationWorkspace() spec.Step {
+	return customStep("seed qrspi continuation workspace", func(t testing.TB, ctx *duiruntime.Context) {
+		ensureE2EPlanFixture(t, ctx)
+		database := openDB(t, ctx)
+		defer database.Close()
+		seedQRSPIContinuationWorkspace(t, ctx, database)
+	})
+}
+
+func OpenQRSPIContinuationWorkspaceChat() spec.Step {
+	return customStep("open qrspi continuation workspace chat", func(t testing.TB, ctx *duiruntime.Context) {
+		workspaceID := ctx.Memory["qrspi_continuation_workspace_id"]
+		threadID := ctx.Memory["qrspi_continuation_thread_id"]
+		rootDocPath := ctx.Memory["qrspi_continuation_root_doc_path"]
+		if workspaceID == "" || threadID == "" || rootDocPath == "" {
+			t.Fatal("qrspi continuation workspace not seeded")
+		}
+		visit(t, ctx, thoughtsChatURL(filepath.Join(rootDocPath, "plan.md"), workspaceID, threadID))
+	})
+}
+
+func SetFirstTranscriptMessageHash() spec.Step {
+	return customStep("set first transcript message hash", func(t testing.TB, ctx *duiruntime.Context) {
+		id, err := ctx.Page.Locator("#agent-chat-messages [id^='msg-']").First().GetAttribute("id")
+		if err != nil || id == "" {
+			t.Fatalf("first transcript message has no id: %v", err)
+		}
+		ensureMemory(ctx)
+		ctx.Memory["first_transcript_hash"] = "#" + id
+		if _, err := ctx.Page.Evaluate("hash => { window.location.hash = hash }", "#"+id); err != nil {
+			t.Fatalf("set transcript hash: %v", err)
+		}
+	})
+}
+
+func WorkflowCardShowsNextSteps() expectation {
+	return expectation{customStep("workflow card shows next steps", func(t testing.TB, ctx *duiruntime.Context) {
+		if err := ctx.Page.Locator("article").Filter(playwright.LocatorFilterOptions{HasText: "XML next steps"}).WaitFor(); err != nil {
+			t.Fatalf("workflow card next steps missing: %v", err)
+		}
+	})}
+}
+
+func WorkflowCardShowsAgentProgress() expectation {
+	return expectation{customStep("workflow card shows agent progress", func(t testing.TB, ctx *duiruntime.Context) {
+		if err := ctx.Page.Locator("article").Filter(playwright.LocatorFilterOptions{HasText: "Progress"}).WaitFor(); err != nil {
+			t.Fatalf("workflow card progress missing: %v", err)
+		}
+	})}
+}
+
+func WorkflowCardHasJumpCurrent() expectation {
+	return expectation{customStep("workflow card has jump current", func(t testing.TB, ctx *duiruntime.Context) {
+		if err := ctx.Page.Locator("a").Filter(playwright.LocatorFilterOptions{HasText: "Jump to current agent position"}).WaitFor(); err != nil {
+			t.Fatalf("jump current link missing: %v", err)
+		}
+	})}
+}
+
+func WorkflowCardHasJumpNextEnd() expectation {
+	return expectation{customStep("workflow card has jump next end", func(t testing.TB, ctx *duiruntime.Context) {
+		if err := ctx.Page.Locator("a").Filter(playwright.LocatorFilterOptions{HasText: "Jump to end of next step"}).WaitFor(); err != nil {
+			t.Fatalf("jump next end link missing: %v", err)
+		}
+	})}
+}
+
+func ExpectHashAnchorPreserved() expectation {
+	return expectation{customStep("hash anchor preserved", func(t testing.TB, ctx *duiruntime.Context) {
+		want := ctx.Memory["first_transcript_hash"]
+		if want == "" {
+			t.Fatal("first transcript hash not remembered")
+		}
+		got, err := ctx.Page.Evaluate("() => window.location.hash")
+		if err != nil {
+			t.Fatalf("read location hash: %v", err)
+		}
+		if fmt.Sprint(got) != want {
+			t.Fatalf("hash = %v, want %s", got, want)
+		}
+	})}
+}
+
+func MobileTranscriptHasNoHorizontalOverflow() expectation {
+	return expectation{customStep("mobile transcript has no horizontal overflow", func(t testing.TB, ctx *duiruntime.Context) {
+		result, err := ctx.Page.Locator("#agent-chat-scroll-region").First().Evaluate("el => el.scrollWidth <= el.clientWidth + 1", nil)
+		if err != nil {
+			t.Fatalf("measure transcript overflow: %v", err)
+		}
+		if result != true {
+			t.Fatalf("transcript has horizontal overflow: %v", result)
+		}
+	})}
+}
+
+func ToolWriteEditRendered() expectation {
+	return expectation{customStep("tool write edit rendered", func(t testing.TB, ctx *duiruntime.Context) {
+		for _, text := range []string{"bash", "file write", "file edit", "e2e/created.txt", "e2e/updated.txt"} {
+			if err := ctx.Page.Locator("body").Filter(playwright.LocatorFilterOptions{HasText: text}).WaitFor(); err != nil {
+				t.Fatalf("missing rendered tool/file text %q: %v", text, err)
+			}
+		}
+	})}
+}
+
 func OpenWorkspaceDocumentWithoutChatParams(label string) spec.Step {
 	return customStep("open workspace document without chat params "+label, func(t testing.TB, ctx *duiruntime.Context) {
 		workspaceID := ctx.Memory["workspace_"+label]
@@ -725,6 +830,37 @@ func seedProjectPlanWorkspace(t testing.TB, ctx *duiruntime.Context, database *s
 	execSQL(t, database, `INSERT INTO plan_workspaces (plan_dir_rel, project_id, plan_dir, label, workspace_slug, artifact_updated_at, qrspi_lifecycle, last_discovered_at)
 VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP, 'plan', CURRENT_TIMESTAMP)
 ON CONFLICT(plan_dir_rel) DO UPDATE SET project_id = excluded.project_id, plan_dir = excluded.plan_dir, label = excluded.label, workspace_slug = excluded.workspace_slug, artifact_updated_at = CURRENT_TIMESTAMP, qrspi_lifecycle = excluded.qrspi_lifecycle, archived_at = NULL, last_discovered_at = CURRENT_TIMESTAMP`, rel, projectID, dir, projectPlanLabel(projectID), "e2e-project-filter-"+slug+"-"+stamp)
+}
+
+func seedQRSPIContinuationWorkspace(t testing.TB, ctx *duiruntime.Context, database *sql.DB) {
+	t.Helper()
+	stamp := time.Now().UTC().Format("20060102T150405.000000000")
+	workspaceID := "e2e-qrspi-continuation-ws-" + stamp
+	threadID := "e2e-qrspi-continuation-thread-" + stamp
+	branchID := "e2e-qrspi-continuation-branch-" + stamp
+	rootDocPath := filepath.Join(thoughtsRoot(ctx), "creative-mode-agent", "plans", "e2e-qrspi-continuation-"+stamp)
+	if err := os.MkdirAll(rootDocPath, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(rootDocPath, "plan.md"), []byte("# E2E QRSPI Continuation\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	workflowState := `{"type":"qrspi","version":"v1","current_node_id":"review-plan","status":"idle","policy":{"advanceMode":"guided","enablePlanReviews":true,"invalidResultRetryLimit":1},"executionCwd":"` + ctx.Config.RepoRoot + `","attempts":{"plan":1},"nodes":{"plan":{"status":"complete","attempts":1,"last_run_id":"run-` + stamp + `"},"review-plan":{"status":"pending"}},"last_result":{"source_node_id":"plan","status":"complete","summary":"E2E QRSPI plan complete.","primary_artifact":"thoughts/creative-mode-agent/plans/e2e-qrspi-continuation-` + stamp + `/plan.md","display_next":"Read ~/.agents/skills/qrspi-planning/SKILL.md.\nRead ~/.agents/skills/q-review/SKILL.md.\nRead thoughts/creative-mode-agent/plans/e2e-qrspi-continuation-` + stamp + `/plan.md.\nStart /q-review immediately unless blocked.","outcome":"complete"},"pending_next_node_id":"review-plan"}`
+	execSQL(t, database, `INSERT INTO workspaces (id, user_email, title, root_doc_path, workflow_type, source, selected_thread_id, current_session_id, current_branch_id, workflow_state_json)
+VALUES (?, 'playwright@localhost', 'E2E QRSPI continuation', ?, 'qrspi', 'imported', ?, ?, ?, ?)`, workspaceID, rootDocPath, threadID, threadID, branchID, workflowState)
+	execSQL(t, database, `INSERT INTO agent_threads (id, user_email, title, cwd, lineage_id, head_entry_id) VALUES (?, 'playwright@localhost', 'E2E QRSPI continuation thread', ?, ?, ?)`, threadID, ctx.Config.RepoRoot, threadID, "e2e-qrspi-assistant-"+stamp)
+	attachE2EThreadWorkspace(t, database, threadID, workspaceID)
+	execSQL(t, database, `INSERT INTO chat_sessions (id, workspace_id, created_by_user_email, branch_id, topology_kind, current_projection_seq) VALUES (?, ?, 'playwright@localhost', ?, 'root', 0)`, threadID, workspaceID, branchID)
+	execSQL(t, database, `INSERT INTO chat_session_events (session_id, seq, event_type, actor_participant_id, payload_json) VALUES (?, 1, 'message.completed', 'user', ?)`, threadID, fmt.Sprintf(`{"id":"e2e-prompt-%s","role":"user","content":"VAMOS_E2E_QRSPI_CONTINUATION_PROMPT"}`, stamp))
+	execSQL(t, database, `INSERT INTO chat_session_events (session_id, seq, event_type, actor_participant_id, payload_json) VALUES (?, 2, 'message.completed', 'assistant', ?)`, threadID, fmt.Sprintf(`{"id":"e2e-assistant-%s","role":"assistant","content":"QRSPI continuation ready"}`, stamp))
+	execSQL(t, database, `INSERT INTO chat_session_events (session_id, seq, event_type, payload_json) VALUES (?, 3, 'tool.completed', ?)`, threadID, fmt.Sprintf(`{"tool_call_id":"tool-%s","tool_name":"bash","summary":"ran continuation smoke check"}`, stamp))
+	execSQL(t, database, `INSERT INTO chat_session_events (session_id, seq, event_type, payload_json) VALUES (?, 4, 'file.written', '{"path":"e2e/created.txt"}')`, threadID)
+	execSQL(t, database, `INSERT INTO chat_session_events (session_id, seq, event_type, payload_json) VALUES (?, 5, 'file.edited', '{"path":"e2e/updated.txt"}')`, threadID)
+	execSQL(t, database, `UPDATE workspaces SET updated_at = CURRENT_TIMESTAMP WHERE id = ?`, workspaceID)
+	ensureMemory(ctx)
+	ctx.Memory["qrspi_continuation_workspace_id"] = workspaceID
+	ctx.Memory["qrspi_continuation_thread_id"] = threadID
+	ctx.Memory["qrspi_continuation_root_doc_path"] = rootDocPath
 }
 
 func seedWorkspaceChat(t testing.TB, ctx *duiruntime.Context, database *sql.DB, label, marker string) {
