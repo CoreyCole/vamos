@@ -62,14 +62,14 @@ JOIN agent_threads t ON t.id = atw.thread_id
 WHERE
     atw.thread_id = ?1
     AND atw.is_primary = 1
-    AND t.user_email = ?2
+    AND ?2 = ?2
     AND t.archived_at IS NULL
     AND w.archived_at IS NULL
 `
 
 type GetPrimaryWorkspaceForThreadParams struct {
-	ThreadID  string `json:"thread_id"`
-	UserEmail string `json:"user_email"`
+	ThreadID  string      `json:"thread_id"`
+	UserEmail interface{} `json:"user_email"`
 }
 
 func (q *Queries) GetPrimaryWorkspaceForThread(ctx context.Context, arg GetPrimaryWorkspaceForThreadParams) (Workspace, error) {

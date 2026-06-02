@@ -61,9 +61,9 @@ func TestImportPiSessionAutoAdoptsSingleTouchedPlan(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ImportPiSession() error = %v", err)
 	}
-	if result.Status != "imported" || result.WorkspaceID == "" || result.ThreadID == "" ||
+	if result.Status != "hydrated" || result.WorkspaceID == "" || result.ThreadID == "" ||
 		result.ImportedHeadEntry != "tool-1" {
-		t.Fatalf("result = %+v, want imported workspace/thread/head", result)
+		t.Fatalf("result = %+v, want hydrated workspace/thread/head", result)
 	}
 	if result.Stats.BatchCount < 1 || result.Stats.EntriesRead != 3 ||
 		result.Stats.EntriesImported != 3 || result.Stats.EntriesSkipped != 0 {
@@ -191,9 +191,9 @@ func TestImportPiSessionLargeSessionUsesMultipleBatches(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ImportPiSession() error = %v", err)
 	}
-	if result.Status != "imported" ||
+	if result.Status != "hydrated" ||
 		result.ImportedHeadEntry != piEntryID(entryCount-1) {
-		t.Fatalf("result = %+v, want imported final head", result)
+		t.Fatalf("result = %+v, want hydrated final head", result)
 	}
 	if result.Stats.BatchCount != 2 || result.Stats.EntriesRead != entryCount ||
 		result.Stats.EntriesImported != entryCount || result.Stats.EntriesSkipped != 0 {
@@ -265,7 +265,7 @@ func TestImportPiSessionPartialBatchFailureCanRetry(t *testing.T) {
 	if err != nil {
 		t.Fatalf("retry ImportPiSession() error = %v", err)
 	}
-	if retry.Status != "imported" ||
+	if retry.Status != "hydrated" ||
 		retry.Stats.EntriesSkipped != defaultPiSessionImportBatchSize ||
 		retry.Stats.EntriesImported != entryCount-defaultPiSessionImportBatchSize {
 		t.Fatalf("retry = %+v, want duplicate skip recovery", retry)
@@ -321,6 +321,32 @@ func TestInternalPiSessionImportRequiresToken(t *testing.T) {
 	c := echo.New().NewContext(req, rec)
 	if err := handler.HandleInternalPiSessionImport(c); err == nil {
 		t.Fatal("HandleInternalPiSessionImport() error = nil, want unauthorized")
+	}
+}
+
+func TestImportPiSessionRejectsOwnerlessGlobalSessionReuse(t *testing.T) {
+	service := newTestAgentChatService(t)
+	planDir := filepath.Join(service.thoughtsRoot, "user@example.com", "plans", "2026-04-30_ownerless")
+	if err := ensureDir(planDir); err != nil {
+		t.Fatalf("ensureDir(planDir): %v", err)
+	}
+	sessionPath := filepath.Join(service.piSessionsDir, "ownerless.jsonl")
+	writePiSessionFile(t, sessionPath, piImportFixtureLines(filepath.Join(planDir, "design.md"))...)
+	_, err := service.queries.UpsertAgentSessionIndex(t.Context(), db.UpsertAgentSessionIndexParams{
+		ID:                "ownerless-global",
+		IdentityKind:      "global_pi",
+		ArtifactPath:      nullString(sessionPath),
+		Agent:             "pi",
+		FileSize:          1,
+		LastIndexedOffset: 1,
+		ProjectionState:   "unassigned",
+	})
+	if err != nil {
+		t.Fatalf("UpsertAgentSessionIndex: %v", err)
+	}
+	_, err = service.ImportPiSession(t.Context(), SessionImportInput{SessionPath: sessionPath})
+	if err == nil || !strings.Contains(err.Error(), "no owner") {
+		t.Fatalf("ImportPiSession() error = %v, want ownerless reuse rejection", err)
 	}
 }
 

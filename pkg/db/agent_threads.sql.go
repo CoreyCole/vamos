@@ -35,18 +35,18 @@ VALUES (
     ?9
 )
 RETURNING
-    id,
-    user_email,
-    title,
-    cwd,
-    lineage_id,
-    project_id,
-    head_entry_id,
-    parent_thread_id,
-    forked_from_entry_id,
-    created_at,
-    updated_at,
-    archived_at
+id,
+user_email,
+title,
+cwd,
+lineage_id,
+project_id,
+head_entry_id,
+parent_thread_id,
+forked_from_entry_id,
+created_at,
+updated_at,
+archived_at
 `
 
 type CreateAgentThreadParams struct {
@@ -92,19 +92,21 @@ func (q *Queries) CreateAgentThread(ctx context.Context, arg CreateAgentThreadPa
 }
 
 const getAgentThread = `-- name: GetAgentThread :one
+;
+
 SELECT
-    id,
-    user_email,
-    title,
-    cwd,
-    lineage_id,
-    project_id,
-    head_entry_id,
-    parent_thread_id,
-    forked_from_entry_id,
-    created_at,
-    updated_at,
-    archived_at
+id,
+user_email,
+title,
+cwd,
+lineage_id,
+project_id,
+head_entry_id,
+parent_thread_id,
+forked_from_entry_id,
+created_at,
+updated_at,
+archived_at
 FROM agent_threads
 WHERE id = ?1
 AND archived_at IS NULL
@@ -134,18 +136,18 @@ const getAgentThreadForUser = `-- name: GetAgentThreadForUser :one
 ;
 
 SELECT
-    id,
-    user_email,
-    title,
-    cwd,
-    lineage_id,
-    project_id,
-    head_entry_id,
-    parent_thread_id,
-    forked_from_entry_id,
-    created_at,
-    updated_at,
-    archived_at
+id,
+user_email,
+title,
+cwd,
+lineage_id,
+project_id,
+head_entry_id,
+parent_thread_id,
+forked_from_entry_id,
+created_at,
+updated_at,
+archived_at
 FROM agent_threads
 WHERE id = ?1
 AND user_email = ?2
@@ -181,18 +183,18 @@ const getAgentThreadForWorkspaceUser = `-- name: GetAgentThreadForWorkspaceUser 
 ;
 
 SELECT
-    t.id,
-    t.user_email,
-    t.title,
-    t.cwd,
-    t.lineage_id,
-    t.project_id,
-    t.head_entry_id,
-    t.parent_thread_id,
-    t.forked_from_entry_id,
-    t.created_at,
-    t.updated_at,
-    t.archived_at
+t.id,
+t.user_email,
+t.title,
+t.cwd,
+t.lineage_id,
+t.project_id,
+t.head_entry_id,
+t.parent_thread_id,
+t.forked_from_entry_id,
+t.created_at,
+t.updated_at,
+t.archived_at
 FROM agent_threads AS t
 JOIN agent_thread_workspaces atw
 ON atw.thread_id = t.id
@@ -232,22 +234,63 @@ func (q *Queries) GetAgentThreadForWorkspaceUser(ctx context.Context, arg GetAge
 	return i, err
 }
 
+const getSharedAgentThread = `-- name: GetSharedAgentThread :one
+;
+
+SELECT
+id,
+user_email,
+title,
+cwd,
+lineage_id,
+project_id,
+head_entry_id,
+parent_thread_id,
+forked_from_entry_id,
+created_at,
+updated_at,
+archived_at
+FROM agent_threads
+WHERE id = ?1
+AND archived_at IS NULL
+`
+
+func (q *Queries) GetSharedAgentThread(ctx context.Context, id string) (AgentThread, error) {
+	row := q.db.QueryRowContext(ctx, getSharedAgentThread, id)
+	var i AgentThread
+	err := row.Scan(
+		&i.ID,
+		&i.UserEmail,
+		&i.Title,
+		&i.Cwd,
+		&i.LineageID,
+		&i.ProjectID,
+		&i.HeadEntryID,
+		&i.ParentThreadID,
+		&i.ForkedFromEntryID,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.ArchivedAt,
+	)
+	return i, err
+}
+
 const listAgentThreads = `-- name: ListAgentThreads :many
 ;
 
 SELECT
-    id,
-    user_email,
-    title,
-    cwd,
-    lineage_id,
-    project_id,
-    head_entry_id,
-    parent_thread_id,
-    forked_from_entry_id,
-    created_at,
-    updated_at,
-    archived_at
+id,
+user_email,
+title,
+cwd,
+lineage_id,
+project_id,
+head_entry_id,
+parent_thread_id,
+forked_from_entry_id,
+created_at,
+updated_at,
+archived_at
 FROM agent_threads
 WHERE user_email = ?1
 AND archived_at IS NULL
@@ -300,18 +343,18 @@ const listAgentThreadsByWorkspace = `-- name: ListAgentThreadsByWorkspace :many
 ;
 
 SELECT
-    t.id,
-    t.user_email,
-    t.title,
-    t.cwd,
-    t.lineage_id,
-    t.project_id,
-    t.head_entry_id,
-    t.parent_thread_id,
-    t.forked_from_entry_id,
-    t.created_at,
-    t.updated_at,
-    t.archived_at
+t.id,
+t.user_email,
+t.title,
+t.cwd,
+t.lineage_id,
+t.project_id,
+t.head_entry_id,
+t.parent_thread_id,
+t.forked_from_entry_id,
+t.created_at,
+t.updated_at,
+t.archived_at
 FROM agent_threads t
 JOIN agent_thread_workspaces atw ON atw.thread_id = t.id
 WHERE atw.workspace_id = ?1
@@ -360,20 +403,20 @@ const listAgentThreadsForUserWithWorkspace = `-- name: ListAgentThreadsForUserWi
 ;
 
 SELECT
-    t.id,
-    t.user_email,
-    t.title,
-    t.cwd,
-    t.lineage_id,
-    t.project_id,
-    t.head_entry_id,
-    t.parent_thread_id,
-    t.forked_from_entry_id,
-    t.created_at,
-    t.updated_at,
-    t.archived_at,
-    atw.workspace_id AS primary_workspace_id,
-    w.root_doc_path AS workspace_root_doc_path
+t.id,
+t.user_email,
+t.title,
+t.cwd,
+t.lineage_id,
+t.project_id,
+t.head_entry_id,
+t.parent_thread_id,
+t.forked_from_entry_id,
+t.created_at,
+t.updated_at,
+t.archived_at,
+atw.workspace_id AS primary_workspace_id,
+w.root_doc_path AS workspace_root_doc_path
 FROM agent_threads t
 LEFT JOIN agent_thread_workspaces atw
 ON atw.thread_id = t.id AND atw.is_primary = 1
@@ -427,6 +470,66 @@ func (q *Queries) ListAgentThreadsForUserWithWorkspace(ctx context.Context, user
 			&i.ArchivedAt,
 			&i.PrimaryWorkspaceID,
 			&i.WorkspaceRootDocPath,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listSharedAgentThreadsByPlanDir = `-- name: ListSharedAgentThreadsByPlanDir :many
+;
+
+SELECT DISTINCT
+t.id,
+t.user_email,
+t.title,
+t.cwd,
+t.lineage_id,
+t.project_id,
+t.head_entry_id,
+t.parent_thread_id,
+t.forked_from_entry_id,
+t.created_at,
+t.updated_at,
+t.archived_at
+FROM agent_threads t
+JOIN agent_sessions s ON s.projected_thread_id = t.id
+WHERE s.identity_kind = 'plan_owned'
+AND s.plan_dir = ?1
+AND t.archived_at IS NULL
+ORDER BY t.updated_at DESC
+`
+
+func (q *Queries) ListSharedAgentThreadsByPlanDir(ctx context.Context, planDir sql.NullString) ([]AgentThread, error) {
+	rows, err := q.db.QueryContext(ctx, listSharedAgentThreadsByPlanDir, planDir)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []AgentThread
+	for rows.Next() {
+		var i AgentThread
+		if err := rows.Scan(
+			&i.ID,
+			&i.UserEmail,
+			&i.Title,
+			&i.Cwd,
+			&i.LineageID,
+			&i.ProjectID,
+			&i.HeadEntryID,
+			&i.ParentThreadID,
+			&i.ForkedFromEntryID,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.ArchivedAt,
 		); err != nil {
 			return nil, err
 		}

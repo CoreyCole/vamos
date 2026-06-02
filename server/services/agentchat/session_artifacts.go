@@ -22,6 +22,21 @@ import (
 
 const defaultAgentSessionAgent = "pi"
 
+type AgentSessionIdentityKind string
+
+const (
+	AgentSessionIdentityKindPlanOwned AgentSessionIdentityKind = "plan_owned"
+	AgentSessionIdentityKindGlobalPi  AgentSessionIdentityKind = "global_pi"
+	AgentSessionIdentityKindWeb       AgentSessionIdentityKind = "web"
+)
+
+type SessionPathIdentity struct {
+	Kind         AgentSessionIdentityKind
+	IdentityPath string
+	ResolvedPath string
+	PlanOwned    bool
+}
+
 type SessionArtifactIndex struct {
 	PlanDir                string
 	ParentPlanDir          string
@@ -242,49 +257,104 @@ func thoughtsRelativeArtifactPath(logicalRoot, logicalPath string) (string, erro
 	return filepath.ToSlash(rel), nil
 }
 
-func (s *Service) HydrateSessionArtifact(ctx context.Context, path string) (chatsession.ChatProjection, error) {
-	path = strings.TrimSpace(path)
-	if path == "" {
-		return chatsession.ChatProjection{}, errors.New("session path is required")
+func (s *Service) resolveSessionPathIdentity(input string) (SessionPathIdentity, error) {
+	input = strings.TrimSpace(input)
+	if input == "" {
+		return SessionPathIdentity{}, errors.New("session path is required")
 	}
-	identityPath := filepath.ToSlash(path)
-	resolvedPath := path
-	if filepath.IsAbs(path) {
-		var err error
-		resolvedPath, err = s.validatePiSessionPath(path)
+	if rel, ok := s.thoughtsRelativePath(input); ok && planOwnedSessionRelPath(rel) {
+		resolved := filepath.Join(s.thoughtsRoot, filepath.FromSlash(rel))
+		resolved, err := resolveWorkspacePath(resolved)
 		if err != nil {
-			return chatsession.ChatProjection{}, err
+			return SessionPathIdentity{}, err
 		}
-		if rel, ok := s.thoughtsRelativePath(resolvedPath); ok {
-			identityPath = rel
-		} else {
-			identityPath = resolvedPath
+		thoughtsRoot, err := resolveWorkspacePath(s.thoughtsRoot)
+		if err != nil {
+			return SessionPathIdentity{}, err
+		}
+		if !pathWithinRoot(resolved, thoughtsRoot) || !pathInPlanSessionDir(thoughtsRoot, resolved) {
+			return SessionPathIdentity{}, fmt.Errorf("session path %q escapes thoughts plan sessions", input)
+		}
+		return SessionPathIdentity{Kind: AgentSessionIdentityKindPlanOwned, IdentityPath: rel, ResolvedPath: resolved, PlanOwned: true}, nil
+	}
+	if !filepath.IsAbs(input) && planOwnedSessionRelPath(filepath.ToSlash(input)) {
+		identityPath := strings.Trim(strings.TrimSpace(filepath.ToSlash(input)), "/")
+		candidate := filepath.Join(s.thoughtsRoot, filepath.FromSlash(identityPath))
+		resolved, err := resolveWorkspacePath(candidate)
+		if err != nil {
+			return SessionPathIdentity{}, err
+		}
+		thoughtsRoot, err := resolveWorkspacePath(s.thoughtsRoot)
+		if err != nil {
+			return SessionPathIdentity{}, err
+		}
+		if !pathWithinRoot(resolved, thoughtsRoot) || !pathInPlanSessionDir(thoughtsRoot, resolved) {
+			return SessionPathIdentity{}, fmt.Errorf("session path %q escapes thoughts plan sessions", input)
+		}
+		return SessionPathIdentity{Kind: AgentSessionIdentityKindPlanOwned, IdentityPath: identityPath, ResolvedPath: resolved, PlanOwned: true}, nil
+	}
+	resolved, err := s.validatePiSessionPath(input)
+	if err != nil {
+		return SessionPathIdentity{}, err
+	}
+	return SessionPathIdentity{Kind: AgentSessionIdentityKindGlobalPi, IdentityPath: resolved, ResolvedPath: resolved}, nil
+}
+
+func planOwnedSessionRelPath(rel string) bool {
+	parts := strings.Split(strings.Trim(strings.TrimSpace(filepath.ToSlash(rel)), "/"), "/")
+	for i, part := range parts {
+		if part == ".sessions" && i+2 < len(parts) && strings.HasSuffix(parts[len(parts)-1], jsonlExtension) {
+			return true
 		}
 	}
-	artifact, err := s.queries.GetAgentSessionByPath(ctx, nullableString(identityPath))
+	return false
+}
+
+func (s *Service) HydrateSessionArtifact(ctx context.Context, path string) (chatsession.ChatProjection, error) {
+	identity, err := s.resolveSessionPathIdentity(path)
+	if err != nil {
+		return chatsession.ChatProjection{}, err
+	}
+	artifact, err := s.queries.GetAgentSessionByPath(ctx, nullableString(identity.IdentityPath))
 	if err != nil {
 		return chatsession.ChatProjection{}, err
 	}
 	if artifact.ProjectionState == "needs_hydration" {
+		userEmail := strings.TrimSpace(artifact.IndexedByUserEmail.String)
+		if userEmail == "" && artifact.IdentityKind == string(AgentSessionIdentityKindPlanOwned) {
+			userEmail = "plan-owned-session"
+		}
 		if _, err := s.ImportPiSession(ctx, SessionImportInput{
-			SessionPath: identityPath,
+			SessionPath: identity.IdentityPath,
 			Source:      AgentSessionSourceTerminal,
-			UserEmail:   strings.TrimSpace(artifact.IndexedByUserEmail.String),
+			UserEmail:   userEmail,
 		}); err != nil {
 			return chatsession.ChatProjection{}, err
 		}
-		if err := s.queries.MarkAgentSessionHydratedByPath(ctx, nullableString(identityPath)); err != nil {
+		if err := s.queries.MarkAgentSessionHydratedByPath(ctx, nullableString(identity.IdentityPath)); err != nil {
 			return chatsession.ChatProjection{}, err
 		}
-		artifact, err = s.queries.GetAgentSessionByPath(ctx, nullableString(identityPath))
+		artifact, err = s.queries.GetAgentSessionByPath(ctx, nullableString(identity.IdentityPath))
 		if err != nil {
 			return chatsession.ChatProjection{}, err
 		}
 	}
 	if artifact.ProjectedThreadID.Valid && strings.TrimSpace(artifact.ProjectedThreadID.String) != "" {
-		return s.chatProjectionFromAgentThread(ctx, strings.TrimSpace(artifact.ProjectedThreadID.String))
+		threadID := strings.TrimSpace(artifact.ProjectedThreadID.String)
+		if artifact.IdentityKind == string(AgentSessionIdentityKindPlanOwned) {
+			return s.sharedChatProjectionFromAgentThread(ctx, threadID)
+		}
+		return s.chatProjectionFromAgentThread(ctx, threadID)
 	}
 	return chatsession.ChatProjection{SessionID: strings.TrimSpace(artifact.ExternalSessionID.String)}, nil
+}
+
+func (s *Service) sharedChatProjectionFromAgentThread(ctx context.Context, threadID string) (chatsession.ChatProjection, error) {
+	thread, err := s.queries.GetSharedAgentThread(ctx, threadID)
+	if err != nil {
+		return chatsession.ChatProjection{}, err
+	}
+	return s.chatProjectionFromThreadRow(ctx, thread)
 }
 
 func (s *Service) chatProjectionFromAgentThread(ctx context.Context, threadID string) (chatsession.ChatProjection, error) {
@@ -292,6 +362,10 @@ func (s *Service) chatProjectionFromAgentThread(ctx context.Context, threadID st
 	if err != nil {
 		return chatsession.ChatProjection{}, err
 	}
+	return s.chatProjectionFromThreadRow(ctx, thread)
+}
+
+func (s *Service) chatProjectionFromThreadRow(ctx context.Context, thread db.AgentThread) (chatsession.ChatProjection, error) {
 	if !thread.HeadEntryID.Valid || strings.TrimSpace(thread.HeadEntryID.String) == "" {
 		return chatsession.ChatProjection{SessionID: thread.ID}, nil
 	}

@@ -516,13 +516,18 @@ func (s *Service) ImportPiSession(
 	ctx context.Context,
 	input SessionImportInput,
 ) (SessionImportResult, error) {
-	resolvedPath, err := s.validatePiSessionPath(input.SessionPath)
+	identity, err := s.resolveSessionPathIdentity(input.SessionPath)
 	if err != nil {
 		return SessionImportResult{}, err
 	}
+	resolvedPath := identity.ResolvedPath
+	sessionPath := identity.IdentityPath
 	source := input.Source
 	if source == "" {
 		source = AgentSessionSourceTerminal
+	}
+	if source == AgentSessionSourceWeb {
+		identity.Kind = AgentSessionIdentityKindWeb
 	}
 
 	scan, scanErr := ScanPiSessionJSONL(resolvedPath, PiSessionScanOptions{
@@ -542,8 +547,8 @@ func (s *Service) ImportPiSession(
 		session, existed, err := s.ensureImportSession(
 			ctx,
 			s.queries,
-			resolvedPath,
-			source,
+			sessionPath,
+			identity.Kind,
 			PiSessionHeader{},
 			"failed",
 			"",
@@ -606,8 +611,8 @@ func (s *Service) ImportPiSession(
 	session, existed, err := s.ensureImportSession(
 		ctx,
 		q,
-		resolvedPath,
-		source,
+		sessionPath,
+		identity.Kind,
 		scan.Header,
 		status,
 		maybeWorkspaceID(workspace, workspaceOK),
@@ -631,6 +636,10 @@ func (s *Service) ImportPiSession(
 			return SessionImportResult{}, err
 		}
 	}
+	importPlanDir := scan.Inference.PlanDir
+	if identity.PlanOwned && session.PlanDir.Valid && strings.TrimSpace(session.PlanDir.String) != "" {
+		importPlanDir = strings.TrimSpace(session.PlanDir.String)
+	}
 	if !workspaceOK {
 		if err := q.UpdateAgentSessionInferenceState(
 			ctx,
@@ -639,7 +648,7 @@ func (s *Service) ImportPiSession(
 				AttachedWorkspaceID: sql.NullString{},
 				ProjectedThreadID:   sql.NullString{},
 				ProjectionState:     status,
-				PlanDir:             nullString(scan.Inference.PlanDir),
+				PlanDir:             nullString(importPlanDir),
 				LastError:           sql.NullString{},
 				MetadataJson:        nullString(metadata),
 			},
@@ -672,7 +681,7 @@ func (s *Service) ImportPiSession(
 			ID:                  session.ID,
 			AttachedWorkspaceID: nullString(workspace.ID),
 			ProjectedThreadID:   nullString(thread.ID),
-			PlanDir:             nullString(scan.Inference.PlanDir),
+			PlanDir:             nullString(importPlanDir),
 			MetadataJson:        nullString(metadata),
 		},
 	); err != nil {
@@ -753,7 +762,7 @@ func (s *Service) ImportPiSession(
 			AttachedWorkspaceID: nullString(workspace.ID),
 			ProjectedThreadID:   nullString(thread.ID),
 			ProjectionState:     status,
-			PlanDir:             nullString(scan.Inference.PlanDir),
+			PlanDir:             nullString(importPlanDir),
 			ImportedHeadEntryID: nullString(scan.FinalEntryID),
 			MetadataJson:        nullString(metadata),
 		},
@@ -1004,7 +1013,7 @@ func (s *Service) ensureImportSession(
 	ctx context.Context,
 	q *db.Queries,
 	sessionPath string,
-	source AgentSessionSource,
+	identityKind AgentSessionIdentityKind,
 	header PiSessionHeader,
 	status, workspaceID, inferredPlanDir, lastError, metadata string,
 	userEmail string,
@@ -1016,13 +1025,12 @@ func (s *Service) ensureImportSession(
 	if !errors.Is(err, sql.ErrNoRows) {
 		return db.AgentSession{}, false, err
 	}
-	identityKind := "global_pi"
-	if source == AgentSessionSourceWeb {
-		identityKind = "web"
+	if identityKind == "" {
+		identityKind = AgentSessionIdentityKindGlobalPi
 	}
 	session, err := q.CreateAgentSession(ctx, db.CreateAgentSessionParams{
 		ID:                  uuid.NewString(),
-		IdentityKind:        identityKind,
+		IdentityKind:        string(identityKind),
 		ArtifactPath:        nullString(sessionPath),
 		PlanDir:             nullString(inferredPlanDir),
 		ExternalSessionID:   nullString(header.ID),
@@ -1300,7 +1308,7 @@ func statusForInference(inference WorkspaceInferenceResult) string {
 	case "ambiguous":
 		return "ambiguous"
 	default:
-		return "pending"
+		return "needs_hydration"
 	}
 }
 

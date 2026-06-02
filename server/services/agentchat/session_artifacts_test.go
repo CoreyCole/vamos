@@ -131,43 +131,89 @@ func TestDiscoverPlanAgentSessionsUnderThoughtsRejectsSymlinkEscape(t *testing.T
 
 func TestHydrateSessionArtifactImportsColdPlanOwnedSession(t *testing.T) {
 	service := newTestAgentChatService(t)
-	planDir := filepath.Join(service.thoughtsRoot, "user@example.com", "plans", "2026-06-02_plan")
+	planRel := "user@example.com/plans/2026-06-02_plan"
+	planDir := filepath.Join(service.thoughtsRoot, filepath.FromSlash(planRel))
 	if err := ensureDir(planDir); err != nil {
 		t.Fatalf("ensureDir(planDir): %v", err)
 	}
 	artifactPath := filepath.Join(planDir, "plan.md")
-	sessionPath := filepath.Join(planDir, ".sessions", "pi", "session.jsonl")
+	sessionRel := planRel + "/.sessions/pi/session.jsonl"
+	sessionPath := filepath.Join(service.thoughtsRoot, filepath.FromSlash(sessionRel))
 	writePiSessionFile(t, sessionPath, piImportFixtureLines(artifactPath)...)
 
 	_, err := service.queries.UpsertAgentSessionIndex(context.Background(), db.UpsertAgentSessionIndexParams{
-		ID:                 "indexed-session",
-		IndexedByUserEmail: nullableString("user@example.com"),
-		IdentityKind:       "global_pi",
-		ArtifactPath:       nullableString(sessionPath),
-		ExternalSessionID:  nullableString("session-1"),
-		Agent:              "pi",
-		FileSize:           int64(len([]byte("x"))),
-		LastIndexedOffset:  int64(len([]byte("x"))),
-		ProjectionState:    "needs_hydration",
-		PlanDir:            nullableString(planDir),
+		ID:                "indexed-session",
+		IdentityKind:      "plan_owned",
+		ArtifactPath:      nullableString(sessionRel),
+		PlanDir:           nullableString(planRel),
+		ExternalSessionID: nullableString("session-1"),
+		Agent:             "pi",
+		FileSize:          int64(len([]byte("x"))),
+		LastIndexedOffset: int64(len([]byte("x"))),
+		ProjectionState:   "needs_hydration",
 	})
 	if err != nil {
 		t.Fatalf("UpsertAgentSessionIndex: %v", err)
 	}
 
-	projection, err := service.HydrateSessionArtifact(context.Background(), sessionPath)
+	for _, input := range []string{sessionRel, sessionPath} {
+		projection, err := service.HydrateSessionArtifact(context.Background(), input)
+		if err != nil {
+			t.Fatalf("HydrateSessionArtifact(%q): %v", input, err)
+		}
+		if len(projection.Messages) == 0 {
+			t.Fatalf("projection messages = 0, want imported messages")
+		}
+	}
+	row, err := service.queries.GetAgentSessionByPath(context.Background(), nullableString(sessionRel))
+	if err != nil {
+		t.Fatalf("GetAgentSessionByPath: %v", err)
+	}
+	if row.ProjectionState == "needs_hydration" || !row.ProjectedThreadID.Valid {
+		t.Fatalf("row hydration/thread = %s/%v, want hydrated linked thread", row.ProjectionState, row.ProjectedThreadID)
+	}
+	if row.IndexedByUserEmail.Valid {
+		t.Fatalf("IndexedByUserEmail = %v, want ownerless provenance", row.IndexedByUserEmail)
+	}
+}
+
+func TestPlanOwnedHydratedThreadSharedAcrossUsers(t *testing.T) {
+	service := newTestAgentChatService(t)
+	planRel := "user@example.com/plans/2026-06-02_plan"
+	planDir := filepath.Join(service.thoughtsRoot, filepath.FromSlash(planRel))
+	if err := ensureDir(planDir); err != nil {
+		t.Fatalf("ensureDir(planDir): %v", err)
+	}
+	sessionRel := planRel + "/.sessions/pi/session.jsonl"
+	sessionPath := filepath.Join(service.thoughtsRoot, filepath.FromSlash(sessionRel))
+	writePiSessionFile(t, sessionPath, piImportFixtureLines(filepath.Join(planDir, "plan.md"))...)
+	_, err := service.queries.UpsertAgentSessionIndex(context.Background(), db.UpsertAgentSessionIndexParams{
+		ID:                "shared-plan-session",
+		IdentityKind:      "plan_owned",
+		ArtifactPath:      nullableString(sessionRel),
+		PlanDir:           nullableString(planRel),
+		ExternalSessionID: nullableString("session-1"),
+		Agent:             "pi",
+		FileSize:          1,
+		LastIndexedOffset: 1,
+		ProjectionState:   "needs_hydration",
+	})
+	if err != nil {
+		t.Fatalf("UpsertAgentSessionIndex: %v", err)
+	}
+	projection, err := service.HydrateSessionArtifact(context.Background(), sessionRel)
 	if err != nil {
 		t.Fatalf("HydrateSessionArtifact: %v", err)
 	}
 	if len(projection.Messages) == 0 {
 		t.Fatalf("projection messages = 0, want imported messages")
 	}
-	row, err := service.queries.GetAgentSessionByPath(context.Background(), nullableString(sessionPath))
+	state, err := service.BuildPlanSessionState(context.Background(), "other@example.com", "other-workspace", planDir, projection.SessionID, false)
 	if err != nil {
-		t.Fatalf("GetAgentSessionByPath: %v", err)
+		t.Fatalf("BuildPlanSessionState: %v", err)
 	}
-	if row.ProjectionState == "needs_hydration" || !row.ProjectedThreadID.Valid {
-		t.Fatalf("row hydration/thread = %s/%v, want hydrated linked thread", row.ProjectionState, row.ProjectedThreadID)
+	if len(state.History) != 1 || state.History[0].SessionPathLabel != sessionRel || state.History[0].ThreadID != projection.SessionID {
+		t.Fatalf("history = %#v, want shared hydrated plan-owned thread", state.History)
 	}
 }
 

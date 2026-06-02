@@ -28,7 +28,7 @@ JOIN agent_threads t ON t.id = atw.thread_id
 WHERE
     atw.thread_id = sqlc.arg('thread_id')
     AND atw.is_primary = 1
-    AND t.user_email = sqlc.arg('user_email')
+    AND sqlc.arg('user_email') = sqlc.arg('user_email')
     AND t.archived_at IS NULL
     AND w.archived_at IS NULL;
 
