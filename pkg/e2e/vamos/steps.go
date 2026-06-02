@@ -151,6 +151,9 @@ func OpenWorkspacesWithProjectFilter(projectID string) spec.Step {
 		if _, err := ctx.Page.Goto(authURL, playwright.PageGotoOptions{WaitUntil: playwright.WaitUntilStateDomcontentloaded}); err != nil {
 			t.Fatal(err)
 		}
+		if err := ctx.Page.Locator("#workspaces-list").WaitFor(); err != nil {
+			t.Fatalf("workspaces list did not render: %v", err)
+		}
 	})
 }
 
