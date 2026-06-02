@@ -370,6 +370,13 @@ func (h *Handler) RegisterRoutes(e *echo.Echo, authMiddleware echo.MiddlewareFun
 	g.POST("/cleanup", h.HandleCleanupWorkspace)
 }
 
+func (h *Handler) RegisterFixtureReadOnlyRoutes(e *echo.Echo, authMiddleware echo.MiddlewareFunc) {
+	g := e.Group("/workspaces")
+	g.Use(authMiddleware)
+	g.GET("", h.HandleWorkspacesPage)
+	g.GET("/stream", h.HandleWorkspacesStream)
+}
+
 func (h *Handler) RegisterDevAuthRoute(e *echo.Echo) {
 	e.GET("/internal/dev-auth/handoff", h.HandleDevAuthHandoff)
 }

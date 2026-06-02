@@ -1391,14 +1391,20 @@ func main() {
 				return mapped, nil
 			}),
 		)
+		var handlerManager workspaces.Manager = workspaceManager
+		if handlerManager == nil && workspacesE2EPageEnabled(cfg) {
+			handlerManager = newFixtureLifecycleRegistry(cfg)
+		}
 		workspaceHandler = workspaces.NewHandler(
-			workspaceManager,
+			handlerManager,
 			workspaceManagerURL,
 			cfg.WorkspaceSlug,
 			handlerOptions...,
 		)
 		if workspaceManager != nil {
 			workspaceHandler.RegisterRoutes(e, authMiddleware)
+		} else if workspacesE2EPageEnabled(cfg) {
+			workspaceHandler.RegisterFixtureReadOnlyRoutes(e, authMiddleware)
 		} else if cfg.WorkspaceMode == "child" && strings.TrimSpace(workspaceManagerURL) != "" {
 			registerChildWorkspaceRedirect(e, workspaceManagerURL)
 		}

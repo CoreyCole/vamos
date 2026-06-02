@@ -454,6 +454,82 @@ func TestHandleStartReturnsAcceptedLifecycleSnapshot(t *testing.T) {
 	}
 }
 
+func TestRegisterFixtureReadOnlyRoutesRegistersPageAndStream(t *testing.T) {
+	t.Parallel()
+
+	manager := &fakeLifecycleManager{snapshots: []WorkspaceLifecycleSnapshot{{
+		Workspace: Workspace{
+			Slug:        "feature",
+			DisplayName: "feature",
+			URL:         "https://feature.test",
+			Status:      StatusRunning,
+		},
+		DesiredState:  WorkspaceDesiredRunning,
+		ObservedState: WorkspaceObservedRunning,
+	}}}
+	handler := NewHandler(manager, "https://main.test", "feature")
+	e := echo.New()
+	authCalls := 0
+	handler.RegisterFixtureReadOnlyRoutes(e, func(next echo.HandlerFunc) echo.HandlerFunc {
+		return func(c echo.Context) error {
+			authCalls++
+			c.Set("user_email", "fixture@example.test")
+			return next(c)
+		}
+	})
+
+	rec := httptest.NewRecorder()
+	e.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/workspaces", nil))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("/workspaces status = %d, want 200 body=%s", rec.Code, rec.Body.String())
+	}
+
+	ctx, cancel := context.WithCancel(t.Context())
+	req := httptest.NewRequest(http.MethodGet, "/workspaces/stream", nil).WithContext(ctx)
+	rec = httptest.NewRecorder()
+	done := make(chan error, 1)
+	go func() {
+		e.ServeHTTP(rec, req)
+		done <- nil
+	}()
+	waitForBodyContains(t, rec, done, "workspaces-list")
+	cancel()
+	if err := <-done; err != nil {
+		t.Fatalf("/workspaces/stream error = %v", err)
+	}
+	if rec.Code != http.StatusOK {
+		t.Fatalf("/workspaces/stream status = %d, want 200 body=%s", rec.Code, rec.Body.String())
+	}
+	if authCalls != 2 {
+		t.Fatalf("authCalls = %d, want 2", authCalls)
+	}
+}
+
+func TestRegisterFixtureReadOnlyRoutesDoesNotRegisterMutationRoutes(t *testing.T) {
+	t.Parallel()
+
+	handler := NewHandler(&fakeLifecycleManager{}, "https://main.test", "feature")
+	e := echo.New()
+	handler.RegisterFixtureReadOnlyRoutes(e, func(next echo.HandlerFunc) echo.HandlerFunc { return next })
+
+	for _, tc := range []struct{ method, path string }{
+		{http.MethodPost, "/workspaces/refresh"},
+		{http.MethodGet, "/workspaces/switch/feature"},
+		{http.MethodPost, "/workspaces/feature/start"},
+		{http.MethodPost, "/workspaces/feature/stop"},
+		{http.MethodPost, "/workspaces/feature/restart"},
+		{http.MethodPost, "/workspaces/host-action"},
+		{http.MethodPost, "/workspaces/release/enqueue"},
+		{http.MethodPost, "/workspaces/cleanup"},
+	} {
+		rec := httptest.NewRecorder()
+		e.ServeHTTP(rec, httptest.NewRequest(tc.method, tc.path, nil))
+		if rec.Code != http.StatusNotFound {
+			t.Fatalf("%s %s status = %d, want 404", tc.method, tc.path, rec.Code)
+		}
+	}
+}
+
 func TestHandleWorkspacesStreamInitialRenderContainsWholeList(t *testing.T) {
 	manager := &fakeLifecycleManager{
 		snapshots: []WorkspaceLifecycleSnapshot{
