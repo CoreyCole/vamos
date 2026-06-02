@@ -58,10 +58,12 @@ templ WorkspaceWorkflowPanel(state WorkspaceWorkflowState) {
 				<div class="rounded-lg border border-border bg-background/50 p-3">
 					<p class="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">Workflow config</p>
 					<form data-on:submit={ workflowPolicyAction(state) }>
-						<label class="flex items-center gap-2 text-sm">
-							<input type="checkbox" name="autoMode" checked?={ state.Policy.AutoMode } disabled?={ !state.Policy.Editable }/>
-							<span>Auto-continue safe gates</span>
-						</label>
+						<label class="block text-xs text-muted-foreground">Advance mode</label>
+						<select class="mt-1 w-full rounded-md border border-input bg-background px-2 py-1 text-sm" name="advanceMode" disabled?={ !state.Policy.Editable }>
+							<option value="discuss" selected?={ state.Policy.AdvanceMode == "discuss" }>Discuss — pause after valid XML</option>
+							<option value="guided" selected?={ state.Policy.AdvanceMode == "guided" }>Guided — continue safe steps</option>
+							<option value="autopilot" selected?={ state.Policy.AdvanceMode == "autopilot" }>Autopilot — auto-approve safe gates</option>
+						</select>
 						<label class="mt-2 flex items-center gap-2 text-sm">
 							<input type="checkbox" name="enablePlanReviews" checked?={ state.Policy.EnablePlanReviews } disabled?={ !state.Policy.Editable }/>
 							<span>Run planning reviews</span>

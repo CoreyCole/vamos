@@ -40,9 +40,10 @@ type NextXML struct {
 }
 
 type PolicyXML struct {
-	AutoMode                bool `xml:"autoMode"                json:"autoMode"`
-	EnablePlanReviews       bool `xml:"enablePlanReviews"       json:"enablePlanReviews"`
-	InvalidResultRetryLimit int  `xml:"invalidResultRetryLimit" json:"invalidResultRetryLimit"`
+	AdvanceMode             AdvanceMode `xml:"advanceMode"             json:"advanceMode,omitempty"`
+	AutoMode                bool        `xml:"autoMode"                json:"autoMode"`
+	EnablePlanReviews       bool        `xml:"enablePlanReviews"       json:"enablePlanReviews"`
+	InvalidResultRetryLimit int         `xml:"invalidResultRetryLimit" json:"invalidResultRetryLimit"`
 }
 
 type SummaryXML struct {
@@ -148,7 +149,7 @@ func (QRSPIXMLParser) Parse(output string, ctx wruntime.ParseContext) (any, erro
 	}
 	if parsed.Stage == "review" {
 		return nil, fmt.Errorf(
-			"ambiguous qrspi review stage %q; emit review-design, review-outline, review-plan, or review-implementation",
+			"ambiguous qrspi review stage %q; emit review-outline, review-plan, or review-implementation",
 			parsed.Stage,
 		)
 	}
@@ -173,7 +174,7 @@ func (QRSPIXMLParser) Parse(output string, ctx wruntime.ParseContext) (any, erro
 
 func (QRSPIXMLParser) CorrectionPrompt(err error, attempt int) string {
 	return fmt.Sprintf(
-		"Your previous response did not contain a valid QRSPI workflow result (%v). Re-emit only the corrected <qrspi-result> XML for attempt %d. Review stages must use canonical stage IDs review-design, review-outline, review-plan, or review-implementation.",
+		"Your previous response did not contain a valid QRSPI workflow result (%v). Re-emit only the corrected <qrspi-result> XML for attempt %d. Review stages must use canonical stage IDs review-outline, review-plan, or review-implementation.",
 		err,
 		attempt,
 	)
@@ -205,6 +206,7 @@ func (QRSPIResultConverter) ToWorkflowResult(
 	raw, _ := json.Marshal(parsed)
 	policy, _ := json.Marshal(
 		Policy{
+			AdvanceMode:             parsed.Policy.AdvanceMode,
 			AutoMode:                parsed.Policy.AutoMode,
 			EnablePlanReviews:       parsed.Policy.EnablePlanReviews,
 			InvalidResultRetryLimit: parsed.Policy.InvalidResultRetryLimit,

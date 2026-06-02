@@ -35,16 +35,6 @@ func TestQRSPIEndToEndPlanningPath(t *testing.T) {
 	)
 	assertCurrentNode(t, store, runner, qrspi.NodeDesign)
 	completeQRSPIIntegrationNode(t, svc, store, qrspi.NodeDesign, "complete", "design.md")
-	assertCurrentNode(t, store, runner, qrspi.NodeReviewDesign)
-
-	completeQRSPIIntegrationNode(
-		t,
-		svc,
-		store,
-		qrspi.NodeReviewDesign,
-		"complete",
-		"reviews/design-review/review.md",
-	)
 	assertCurrentNode(t, store, runner, qrspi.NodeOutline)
 
 	completeQRSPIIntegrationNode(
@@ -315,14 +305,6 @@ func TestQRSPIHumanReviewLoadsAutomatedReviewContext(t *testing.T) {
 		"research/runtime.md",
 	)
 	completeQRSPIIntegrationNode(t, svc, store, qrspi.NodeDesign, "complete", "design.md")
-	completeQRSPIIntegrationNode(
-		t,
-		svc,
-		store,
-		qrspi.NodeReviewDesign,
-		"complete",
-		"reviews/design-review/review.md",
-	)
 
 	assertCurrentNode(t, store, runner, qrspi.NodeOutline)
 }
@@ -716,13 +698,6 @@ func TestQRSPIPlanningReviewResearchAddressLoops(t *testing.T) {
 		addressNode  wruntime.NodeID
 		readyOutcome wruntime.ResultOutcome
 	}{
-		{
-			name:         "design",
-			reviewNode:   qrspi.NodeReviewDesign,
-			researchNode: qrspi.NodeResearchForReviewDesign,
-			addressNode:  qrspi.NodeAddressReviewResearchDesign,
-			readyOutcome: wruntime.OutcomeReadyForOutline,
-		},
 		{
 			name:         "outline",
 			reviewNode:   qrspi.NodeReviewOutline,
@@ -1232,8 +1207,6 @@ func mustQRSPIIntegrationPolicy(t *testing.T, policy qrspi.Policy) []byte {
 
 func qRSPIIntegrationOutcome(node wruntime.NodeID) wruntime.ResultOutcome {
 	switch node {
-	case qrspi.NodeReviewDesign:
-		return wruntime.OutcomeReadyForOutline
 	case qrspi.NodeReviewOutline, qrspi.NodeReviewImplementation:
 		return wruntime.OutcomeReadyForHumanReview
 	case qrspi.NodeReviewPlan:

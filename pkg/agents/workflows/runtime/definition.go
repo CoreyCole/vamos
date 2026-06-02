@@ -153,3 +153,8 @@ type PolicySpec struct {
 type AutoModeConfig interface {
 	IsAutoMode() bool
 }
+
+type AdvanceModeConfig interface {
+	AutoModeConfig
+	ShouldStartNonHumanEdges() bool
+}

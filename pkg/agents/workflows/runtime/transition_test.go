@@ -5,6 +5,14 @@ import (
 	"testing"
 )
 
+type transitionConfig struct {
+	StartNonHuman bool `json:"startNonHuman"`
+	Auto          bool `json:"auto"`
+}
+
+func (c transitionConfig) IsAutoMode() bool               { return c.Auto }
+func (c transitionConfig) ShouldStartNonHumanEdges() bool { return c.StartNonHuman }
+
 func transitionDefinition(t *testing.T) Definition {
 	t.Helper()
 	def, err := New[struct{}]("test").
@@ -34,6 +42,33 @@ func completeResult(node NodeID) WorkflowResult {
 		PrimaryArtifact: "thoughts/example.md",
 		DisplayNext:     "/next",
 		Evidence:        EvidenceRef{RunID: "run-1"},
+	}
+}
+
+func TestDecideTransitionDiscussModeLeavesPendingNextIdle(t *testing.T) {
+	def, err := New[transitionConfig]("test").
+		Config(transitionConfig{StartNonHuman: false}, nil).
+		Start("start").
+		Agent("start", PromptSpec{Static: "start"}).
+		Agent("review", PromptSpec{Static: "review"}).
+		Edge("start", "review").
+		ResultParser(parserStub{}).
+		ResultConverter(converterStub{}).
+		Build()
+	if err != nil {
+		t.Fatal(err)
+	}
+	state, err := InitialState(def, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	decision, err := DecideTransition(def, state, completeResult("start"))
+	if err != nil {
+		t.Fatalf("DecideTransition() error = %v", err)
+	}
+	if decision.StartNext || decision.NextNodeID != "review" || decision.State.CurrentNodeID != "review" || decision.State.PendingNextNodeID != "review" || decision.State.Status != WorkspaceStatusIdle {
+		t.Fatalf("decision = %+v", decision)
 	}
 }
 

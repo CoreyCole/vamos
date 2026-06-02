@@ -83,12 +83,10 @@ func skillPrompt(
 
 func helperPromptContext(state wruntime.State, node wruntime.Node) string {
 	switch node.ID {
-	case "research-for-review-design",
-		"research-for-review-outline",
+	case "research-for-review-outline",
 		"research-for-review-plan":
 		return researchForReviewPrompt(node.ID, state)
-	case "address-review-research-design",
-		"address-review-research-outline",
+	case "address-review-research-outline",
 		"address-review-research-plan":
 		return addressReviewResearchPrompt(node.ID, state)
 	default:

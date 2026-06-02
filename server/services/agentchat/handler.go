@@ -21,6 +21,7 @@ import (
 	datastar "github.com/starfederation/datastar-go/datastar"
 
 	conversation "github.com/CoreyCole/vamos/pkg/agents/conversation"
+	"github.com/CoreyCole/vamos/pkg/agents/workflows/qrspi"
 	workspace "github.com/CoreyCole/vamos/pkg/agents/workspace"
 	"github.com/CoreyCole/vamos/pkg/db"
 	"github.com/CoreyCole/vamos/server/layouts/workbench"
@@ -1702,6 +1703,7 @@ func (h *Handler) UpdateThreadWorkflowPolicy(c echo.Context) error {
 		UpdateWorkspaceWorkflowPolicyInput{
 			WorkspaceID:             workspace.ID,
 			UserEmail:               userEmail,
+			AdvanceMode:             qrspi.AdvanceMode(strings.TrimSpace(c.FormValue("advanceMode"))),
 			AutoMode:                c.FormValue("autoMode") == "on",
 			EnablePlanReviews:       c.FormValue("enablePlanReviews") == "on",
 			InvalidResultRetryLimit: retryLimit,
@@ -1775,6 +1777,7 @@ func (h *Handler) UpdateWorkspaceWorkflowPolicy(c echo.Context) error {
 		UpdateWorkspaceWorkflowPolicyInput{
 			WorkspaceID:             c.Param("workspace_id"),
 			UserEmail:               userEmail,
+			AdvanceMode:             qrspi.AdvanceMode(strings.TrimSpace(c.FormValue("advanceMode"))),
 			AutoMode:                c.FormValue("autoMode") == "on",
 			EnablePlanReviews:       c.FormValue("enablePlanReviews") == "on",
 			InvalidResultRetryLimit: retryLimit,

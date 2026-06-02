@@ -4457,7 +4457,7 @@ func TestBuildWorkspaceWorkflowStateDefaultsQRSPIToDefinitionGraph(t *testing.T)
 	if err != nil {
 		t.Fatalf("BuildWorkspaceWorkflowState() error = %v", err)
 	}
-	if !strings.Contains(projected.Mermaid, "review-design") ||
+	if strings.Contains(projected.Mermaid, "review-design") ||
 		!strings.Contains(projected.Mermaid, "human-review-implementation") {
 		t.Fatalf(
 			"Mermaid = %q, want definition-derived QRSPI review nodes",
@@ -4482,10 +4482,6 @@ func TestBuildWorkspaceWorkflowStateProjectsRuntimeState(t *testing.T) {
 			wruntime.NodeID("review-outline"): 0,
 		},
 		Nodes: map[wruntime.NodeID]wruntime.NodeState{
-			wruntime.NodeID("review-design"): {
-				Status:       wruntime.NodeStatusBypassed,
-				BypassReason: "plan reviews disabled",
-			},
 			wruntime.NodeID("review-plan"): {
 				Status:       wruntime.NodeStatusBypassed,
 				BypassReason: "plan reviews disabled",
@@ -4545,7 +4541,7 @@ func TestBuildWorkspaceWorkflowStateProjectsRuntimeState(t *testing.T) {
 		t.Fatalf("projected = %#v, want runtime workflow projection", projected)
 	}
 	if diff := cmp.Diff(
-		[]string{"review-design", "review-plan"},
+		[]string{"review-plan"},
 		projected.BypassedNodes,
 	); diff != "" {
 		t.Fatalf("BypassedNodes mismatch (-want +got):\n%s", diff)

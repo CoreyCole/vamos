@@ -2,6 +2,7 @@ package workflows
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"strings"
 
@@ -117,15 +118,33 @@ func (s *Service) OnRunComplete(
 		return err
 	}
 	if decision.StartNext {
-		_, err = s.startNodeRun(ctx, def, decision.State, StartNodeRunInput{
+		nextRunID, startErr := s.startNodeRun(ctx, def, decision.State, StartNodeRunInput{
 			WorkspaceID: workspaceID,
 			ThreadID:    run.ThreadID,
 			NodeID:      decision.NextNodeID,
 			Attempt:     decision.State.Attempts[decision.NextNodeID] + 1,
 			Cwd:         effectiveNodeCwd(decision.State, decision.NextNodeID),
 		})
+		if startErr != nil {
+			_ = s.Store.AppendWorkflowEvents(ctx, workspaceID, run, []wruntime.Event{{
+				Type:    "workflow_next_start_failed",
+				NodeID:  decision.NextNodeID,
+				Message: startErr.Error(),
+			}})
+			return startErr
+		}
+		if strings.TrimSpace(nextRunID) != "" {
+			_ = s.Store.AppendWorkflowEvents(ctx, workspaceID, db.AgentRun{
+				ID:          nextRunID,
+				WorkspaceID: sql.NullString{String: workspaceID, Valid: true},
+			}, []wruntime.Event{{
+				Type:    "workflow_next_started",
+				NodeID:  decision.NextNodeID,
+				Message: nextRunID,
+			}})
+		}
 	}
-	return err
+	return nil
 }
 
 func (s *Service) startNodeRun(

@@ -17,10 +17,28 @@ type QRSPIWorkflowCard struct {
 	PrimaryArtifact string
 	Artifacts       []wruntime.ArtifactRef
 	RuntimeNextStep string
+	NextSteps       []string
+	AgentProgress   AgentProgress
+	NextSessionID   string
+	NextThreadID    string
+	JumpCurrentHref string
+	JumpNextEndHref string
 	Cwd             WorkspaceCwdProjection
 	Policy          WorkspaceWorkflowPolicyProjection
 	WaitingHuman    bool
+	CanContinue     bool
 	RawXML          string
+}
+
+type AgentProgress struct {
+	State           string
+	CurrentNodeID   string
+	CurrentThreadID string
+	CurrentRunID    string
+	LastMessageID   string
+	CurrentHref     string
+	NextEndHref     string
+	UpdatedAt       string
 }
 
 func ProjectQRSPIWorkflowCard(
@@ -45,8 +63,10 @@ func ProjectQRSPIWorkflowCard(
 			rawXML = string(runResult.Raw)
 		}
 	}
+	threadID = strings.TrimSpace(threadID)
+	progress := agentProgressForWorkflowState(state, threadID)
 	return &QRSPIWorkflowCard{
-		ThreadID:        strings.TrimSpace(threadID),
+		ThreadID:        threadID,
 		WorkspaceID:     workspaceID,
 		Stage:           string(runResult.SourceNodeID),
 		Status:          string(runResult.Status),
@@ -55,11 +75,44 @@ func ProjectQRSPIWorkflowCard(
 		PrimaryArtifact: runResult.PrimaryArtifact,
 		Artifacts:       runResult.Artifacts,
 		RuntimeNextStep: nextLabel,
+		NextSteps:       displayNextSteps(runResult.DisplayNext),
+		AgentProgress:   progress,
+		NextThreadID:    threadID,
+		JumpCurrentHref: progress.CurrentHref,
+		JumpNextEndHref: progress.NextEndHref,
 		Cwd:             cwd,
 		Policy:          policy,
 		WaitingHuman:    state.Status == wruntime.WorkspaceStatusWaitingHuman,
+		CanContinue:     state.PendingNextNodeID != "" && state.Status == wruntime.WorkspaceStatusIdle,
 		RawXML:          rawXML,
 	}, nil
+}
+
+func displayNextSteps(displayNext string) []string {
+	lines := strings.Split(displayNext, "\n")
+	steps := make([]string, 0, len(lines))
+	for _, line := range lines {
+		if step := strings.TrimSpace(line); step != "" {
+			steps = append(steps, step)
+		}
+	}
+	return steps
+}
+
+func agentProgressForWorkflowState(state wruntime.State, threadID string) AgentProgress {
+	progress := AgentProgress{
+		State:           string(state.Status),
+		CurrentNodeID:   string(state.CurrentNodeID),
+		CurrentThreadID: threadID,
+	}
+	if threadID != "" {
+		progress.CurrentHref = BuildThoughtsChatDocURL(EmbeddedChatURLState{Context: ThoughtsChatContext, ThreadID: threadID})
+		progress.NextEndHref = progress.CurrentHref
+	}
+	if state.PendingNextNodeID != "" {
+		progress.CurrentNodeID = string(state.PendingNextNodeID)
+	}
+	return progress
 }
 
 func RuntimeNextNodeLabel(def wruntime.Definition, state wruntime.State) string {

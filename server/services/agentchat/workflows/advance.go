@@ -27,12 +27,20 @@ func (s *Service) AdvanceHumanGate(
 	if err != nil {
 		return "", err
 	}
-	if state.Status != wruntime.WorkspaceStatusWaitingHuman || state.HumanGate == nil {
-		return "", errors.New("workspace is not waiting at a human gate")
+	originalState := state
+	isHumanGate := state.Status == wruntime.WorkspaceStatusWaitingHuman && state.HumanGate != nil
+	isPendingNode := state.Status == wruntime.WorkspaceStatusIdle && strings.TrimSpace(string(state.PendingNextNodeID)) != ""
+	if !isHumanGate && !isPendingNode {
+		return "", errors.New("workspace has no pending workflow node")
 	}
 
-	originalState := state
-	next := state.HumanGate.To
+	next := state.PendingNextNodeID
+	if isHumanGate {
+		next = state.HumanGate.To
+	}
+	if strings.TrimSpace(string(next)) == "" {
+		return "", errors.New("workspace has no pending workflow node")
+	}
 	state.CurrentNodeID = next
 	state.Status = wruntime.WorkspaceStatusIdle
 	state.HumanGate = nil
@@ -55,10 +63,14 @@ func (s *Service) AdvanceHumanGate(
 	if err := s.Store.SaveWorkspaceState(ctx, workspaceID, state); err != nil {
 		return "", err
 	}
+	eventType := "workflow_pending_node_started"
+	if isHumanGate {
+		eventType = "workflow_human_gate_approved"
+	}
 	if err := s.Store.AppendWorkflowEvents(ctx, workspaceID, db.AgentRun{
 		WorkspaceID: sql.NullString{String: workspaceID, Valid: true},
 	}, []wruntime.Event{{
-		Type:    "workflow_human_gate_approved",
+		Type:    eventType,
 		NodeID:  next,
 		Message: strings.TrimSpace(userEmail),
 	}}); err != nil {

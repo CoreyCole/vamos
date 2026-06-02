@@ -16,12 +16,21 @@ import (
 type WorkflowPolicyPreset string
 
 const (
-	WorkflowPolicyPresetManual    WorkflowPolicyPreset = "manual"
-	WorkflowPolicyPresetAssisted  WorkflowPolicyPreset = "assisted"
+	WorkflowPolicyPresetDiscuss   WorkflowPolicyPreset = "discuss"
+	WorkflowPolicyPresetGuided    WorkflowPolicyPreset = "guided"
+	WorkflowPolicyPresetAutopilot WorkflowPolicyPreset = "autopilot"
 	WorkflowPolicyPresetFastDraft WorkflowPolicyPreset = "fast_draft"
 )
 
+const (
+	legacyWorkflowPolicyPresetManual   WorkflowPolicyPreset = "manual"
+	legacyWorkflowPolicyPresetAssisted WorkflowPolicyPreset = "assisted"
+	WorkflowPolicyPresetManual         WorkflowPolicyPreset = WorkflowPolicyPresetGuided
+	WorkflowPolicyPresetAssisted       WorkflowPolicyPreset = WorkflowPolicyPresetAutopilot
+)
+
 type WorkspaceWorkflowPolicyProjection struct {
+	AdvanceMode             qrspi.AdvanceMode
 	AutoMode                bool
 	EnablePlanReviews       bool
 	InvalidResultRetryLimit int
@@ -37,6 +46,7 @@ type WorkspaceWorkflowPolicyProjection struct {
 type UpdateWorkspaceWorkflowPolicyInput struct {
 	WorkspaceID             string
 	UserEmail               string
+	AdvanceMode             qrspi.AdvanceMode
 	AutoMode                bool
 	EnablePlanReviews       bool
 	InvalidResultRetryLimit int
@@ -44,14 +54,22 @@ type UpdateWorkspaceWorkflowPolicyInput struct {
 
 func PolicyForPreset(preset WorkflowPolicyPreset) qrspi.Policy {
 	switch preset {
-	case WorkflowPolicyPresetAssisted:
+	case WorkflowPolicyPresetDiscuss:
 		return qrspi.Policy{
+			AdvanceMode:             qrspi.AdvanceModeDiscuss,
+			EnablePlanReviews:       true,
+			InvalidResultRetryLimit: 1,
+		}
+	case WorkflowPolicyPresetAutopilot:
+		return qrspi.Policy{
+			AdvanceMode:             qrspi.AdvanceModeAutopilot,
 			AutoMode:                true,
 			EnablePlanReviews:       true,
 			InvalidResultRetryLimit: 1,
 		}
 	case WorkflowPolicyPresetFastDraft:
 		return qrspi.Policy{
+			AdvanceMode:             qrspi.AdvanceModeAutopilot,
 			AutoMode:                true,
 			EnablePlanReviews:       false,
 			InvalidResultRetryLimit: 1,
@@ -63,10 +81,12 @@ func PolicyForPreset(preset WorkflowPolicyPreset) qrspi.Policy {
 
 func parseWorkflowPolicyPreset(value string) (WorkflowPolicyPreset, error) {
 	switch WorkflowPolicyPreset(strings.TrimSpace(value)) {
-	case "", WorkflowPolicyPresetManual:
-		return WorkflowPolicyPresetManual, nil
-	case WorkflowPolicyPresetAssisted:
-		return WorkflowPolicyPresetAssisted, nil
+	case "", WorkflowPolicyPresetGuided, legacyWorkflowPolicyPresetManual:
+		return WorkflowPolicyPresetGuided, nil
+	case WorkflowPolicyPresetDiscuss:
+		return WorkflowPolicyPresetDiscuss, nil
+	case WorkflowPolicyPresetAutopilot, legacyWorkflowPolicyPresetAssisted:
+		return WorkflowPolicyPresetAutopilot, nil
 	case WorkflowPolicyPresetFastDraft:
 		return WorkflowPolicyPresetFastDraft, nil
 	default:
@@ -98,7 +118,8 @@ func ProjectWorkspaceWorkflowPolicy(
 		return WorkspaceWorkflowPolicyProjection{}, err
 	}
 	return WorkspaceWorkflowPolicyProjection{
-		AutoMode:                policy.AutoMode,
+		AdvanceMode:             policy.EffectiveAdvanceMode(),
+		AutoMode:                policy.IsAutoMode(),
 		EnablePlanReviews:       policy.EnablePlanReviews,
 		InvalidResultRetryLimit: policy.InvalidResultRetryLimit,
 		Preset:                  presetForPolicy(policy),
@@ -116,11 +137,13 @@ func ProjectWorkspaceWorkflowPolicy(
 
 func presetForPolicy(policy qrspi.Policy) WorkflowPolicyPreset {
 	switch {
-	case !policy.AutoMode && policy.EnablePlanReviews && policy.InvalidResultRetryLimit == 1:
-		return WorkflowPolicyPresetManual
-	case policy.AutoMode && policy.EnablePlanReviews && policy.InvalidResultRetryLimit == 1:
-		return WorkflowPolicyPresetAssisted
-	case policy.AutoMode && !policy.EnablePlanReviews && policy.InvalidResultRetryLimit == 1:
+	case policy.EffectiveAdvanceMode() == qrspi.AdvanceModeDiscuss && policy.EnablePlanReviews && policy.InvalidResultRetryLimit == 1:
+		return WorkflowPolicyPresetDiscuss
+	case policy.EffectiveAdvanceMode() == qrspi.AdvanceModeGuided && policy.EnablePlanReviews && policy.InvalidResultRetryLimit == 1:
+		return WorkflowPolicyPresetGuided
+	case policy.EffectiveAdvanceMode() == qrspi.AdvanceModeAutopilot && policy.EnablePlanReviews && policy.InvalidResultRetryLimit == 1:
+		return WorkflowPolicyPresetAutopilot
+	case policy.EffectiveAdvanceMode() == qrspi.AdvanceModeAutopilot && !policy.EnablePlanReviews && policy.InvalidResultRetryLimit == 1:
 		return WorkflowPolicyPresetFastDraft
 	default:
 		return ""
@@ -128,10 +151,14 @@ func presetForPolicy(policy qrspi.Policy) WorkflowPolicyPreset {
 }
 
 func policyModeLabel(policy qrspi.Policy) string {
-	if policy.AutoMode {
-		return "Assisted: auto-continue safe gates"
+	switch policy.EffectiveAdvanceMode() {
+	case qrspi.AdvanceModeDiscuss:
+		return "Discuss: pause after valid XML"
+	case qrspi.AdvanceModeAutopilot:
+		return "Autopilot: auto-continue safe gates"
+	default:
+		return "Guided: continue graph-safe steps"
 	}
-	return "Manual: stop at human gates"
 }
 
 func policyReviewLabel(policy qrspi.Policy) string {
@@ -200,8 +227,17 @@ func (s *Service) UpdateWorkspaceWorkflowPolicy(
 		)
 	}
 
+	advanceMode := input.AdvanceMode
+	if advanceMode == "" {
+		if input.AutoMode {
+			advanceMode = qrspi.AdvanceModeAutopilot
+		} else {
+			advanceMode = qrspi.AdvanceModeGuided
+		}
+	}
 	policy := qrspi.Policy{
-		AutoMode:                input.AutoMode,
+		AdvanceMode:             advanceMode,
+		AutoMode:                advanceMode == qrspi.AdvanceModeAutopilot,
 		EnablePlanReviews:       input.EnablePlanReviews,
 		InvalidResultRetryLimit: input.InvalidResultRetryLimit,
 	}
@@ -236,12 +272,14 @@ func (s *Service) UpdateWorkspaceWorkflowPolicy(
 	}
 
 	eventPayload := struct {
+		AdvanceMode             string `json:"advanceMode"`
 		AutoMode                bool   `json:"autoMode"`
 		EnablePlanReviews       bool   `json:"enablePlanReviews"`
 		InvalidResultRetryLimit int    `json:"invalidResultRetryLimit"`
 		Status                  string `json:"status"`
 	}{
-		AutoMode:                policy.AutoMode,
+		AdvanceMode:             string(policy.EffectiveAdvanceMode()),
+		AutoMode:                policy.IsAutoMode(),
 		EnablePlanReviews:       policy.EnablePlanReviews,
 		InvalidResultRetryLimit: policy.InvalidResultRetryLimit,
 		Status:                  string(state.Status),

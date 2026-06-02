@@ -43,13 +43,14 @@ func TestQRSPITransitions(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, ok := def.Nodes[wruntime.NodeID("human-review-design")]; ok {
-		t.Fatalf("human-review-design should not be in canonical QRSPI graph")
+	for _, absent := range []wruntime.NodeID{"human-review-design", "review-design", "research-for-review-design", "address-review-research-design"} {
+		if _, ok := def.Nodes[absent]; ok {
+			t.Fatalf("%s should not be in canonical QRSPI graph", absent)
+		}
 	}
 	state = assertStartsNext(t, def, state, NodeQuestion, NodeResearch)
 	state = assertStartsNext(t, def, state, NodeResearch, NodeDesign)
-	state = assertStartsNext(t, def, state, NodeDesign, NodeReviewDesign)
-	state = assertStartsNext(t, def, state, NodeReviewDesign, NodeOutline)
+	state = assertStartsNext(t, def, state, NodeDesign, NodeOutline)
 	state = assertStartsNext(t, def, state, NodeOutline, NodeReviewOutline)
 	state = assertWaitsHuman(t, def, state, NodeReviewOutline, NodeHumanReviewOutline)
 	state = advanceHumanGate(state)
@@ -140,7 +141,7 @@ func TestQRSPIWorkflowRenderersExposeReviewBranches(t *testing.T) {
 
 	mermaid := wruntime.RenderMermaid(def)
 	for _, want := range []string{
-		"review-design -- outcome=needs-review-research --> research-for-review-design",
+		"design -- outcome=complete --> outline",
 		"review-outline -- outcome=ready-for-human-review --> human-review-outline",
 		"review-plan -- outcome=ready-for-workspace --> workspace",
 		"review-implementation -- outcome=needs-followup --> question",
@@ -153,7 +154,7 @@ func TestQRSPIWorkflowRenderersExposeReviewBranches(t *testing.T) {
 	table := wruntime.RenderTransitionTable(def)
 	for _, want := range []string{
 		"| From | Condition | To |",
-		"| review-design | outcome=ready-for-outline | outline |",
+		"| design | outcome=complete | outline |",
 		"| plan | predicate | review-plan |",
 		"| workspace | outcome=complete | implement |",
 	} {
@@ -253,8 +254,6 @@ func qrspiResult(
 
 func defaultOutcome(node wruntime.NodeID) wruntime.ResultOutcome {
 	switch node {
-	case NodeReviewDesign:
-		return wruntime.OutcomeReadyForOutline
 	case NodeReviewOutline, NodeReviewImplementation:
 		return wruntime.OutcomeReadyForHumanReview
 	case NodeReviewPlan:

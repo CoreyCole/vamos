@@ -153,7 +153,7 @@ func DecideTransition(
 	return TransitionDecision{
 		State:      state,
 		NextNodeID: next,
-		StartNext:  true,
+		StartNext:  shouldStartNonHumanEdge(config),
 		Events:     []Event{{Type: "workflow_node_ready", NodeID: next}},
 	}, nil
 }
@@ -231,6 +231,11 @@ func decodeTransitionConfig(def Definition, state State) (any, error) {
 func autoModeEnabled(config any) bool {
 	autoMode, ok := config.(AutoModeConfig)
 	return ok && autoMode.IsAutoMode()
+}
+
+func shouldStartNonHumanEdge(config any) bool {
+	advanceMode, ok := config.(AdvanceModeConfig)
+	return !ok || advanceMode.ShouldStartNonHumanEdges()
 }
 
 func autoApproveHumanReview(

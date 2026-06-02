@@ -150,7 +150,6 @@ func TestQRSPIXMLParserReviewStages(t *testing.T) {
 		stage   wruntime.NodeID
 		fixture string
 	}{
-		{stage: NodeReviewDesign, fixture: "testdata/review_design.xml"},
 		{stage: NodeReviewOutline, fixture: "testdata/review_outline.xml"},
 		{stage: NodeReviewPlan, fixture: "testdata/review_plan.xml"},
 		{stage: NodeReviewImplementation, fixture: "testdata/review_implementation.xml"},
@@ -185,9 +184,6 @@ func TestQRSPIXMLParserAcceptsCanonicalStagesAndOutcomes(t *testing.T) {
 		{NodeQuestion, wruntime.OutcomeComplete},
 		{NodeResearch, wruntime.OutcomeComplete},
 		{NodeDesign, wruntime.OutcomeComplete},
-		{NodeReviewDesign, wruntime.OutcomeReadyForOutline},
-		{NodeResearchForReviewDesign, wruntime.OutcomeComplete},
-		{NodeAddressReviewResearchDesign, wruntime.OutcomeComplete},
 		{NodeOutline, wruntime.OutcomeComplete},
 		{NodeReviewOutline, wruntime.OutcomeReadyForHumanReview},
 		{NodeHumanReviewOutline, wruntime.OutcomeComplete},
@@ -355,7 +351,7 @@ func TestQRSPIResultConverter(t *testing.T) {
 
 func TestCorrectionPromptMentionsCanonicalReviewStages(t *testing.T) {
 	prompt := (QRSPIXMLParser{}).CorrectionPrompt(errors.New("bad"), 1)
-	for _, stage := range []string{"review-design", "review-outline", "review-plan", "review-implementation"} {
+	for _, stage := range []string{"review-outline", "review-plan", "review-implementation"} {
 		if !strings.Contains(prompt, stage) {
 			t.Fatalf("CorrectionPrompt() = %q, missing %q", prompt, stage)
 		}
@@ -370,7 +366,7 @@ func TestDefinition(t *testing.T) {
 	if def.ID != AgentChatWorkflowType || def.Start != NodeQuestion {
 		t.Fatalf("definition ID/start = %q/%q", def.ID, def.Start)
 	}
-	for _, node := range []wruntime.NodeID{NodeQuestion, NodeResearch, NodeDesign, NodeReviewDesign, NodeResearchForReviewDesign, NodeAddressReviewResearchDesign, NodeOutline, NodeReviewOutline, NodeHumanReviewOutline, NodeResearchForReviewOutline, NodeAddressReviewResearchOutline, NodePlan, NodeReviewPlan, NodeResearchForReviewPlan, NodeAddressReviewResearchPlan, NodeWorkspace, NodeImplement, NodeReviewImplementation, NodeHumanReviewImplementation, NodeDone} {
+	for _, node := range []wruntime.NodeID{NodeQuestion, NodeResearch, NodeDesign, NodeOutline, NodeReviewOutline, NodeHumanReviewOutline, NodeResearchForReviewOutline, NodeAddressReviewResearchOutline, NodePlan, NodeReviewPlan, NodeResearchForReviewPlan, NodeAddressReviewResearchPlan, NodeWorkspace, NodeImplement, NodeReviewImplementation, NodeHumanReviewImplementation, NodeDone} {
 		if _, ok := def.Nodes[node]; !ok {
 			t.Fatalf("missing node %q", node)
 		}

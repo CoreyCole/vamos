@@ -65,8 +65,8 @@ func TestOnRunCompleteValidQRSPIResultAdvancesWorkflow(t *testing.T) {
 			store.savedState.Status,
 		)
 	}
-	if len(store.events) != 1 || store.events[0].Type != "workflow_node_ready" ||
-		store.events[0].NodeID != qrspi.NodeResearch {
+	if !hasWorkflowNodeEvent(store.events, "workflow_node_ready", qrspi.NodeResearch) ||
+		!hasWorkflowNodeEvent(store.events, "workflow_next_started", qrspi.NodeResearch) {
 		t.Fatalf("events = %#v", store.events)
 	}
 	if len(runner.starts) != 1 || runner.starts[0].NodeID != qrspi.NodeResearch ||
@@ -493,6 +493,15 @@ func (r *fakeRunner) StartNodeRun(
 ) (string, error) {
 	r.starts = append(r.starts, input)
 	return "next-run", nil
+}
+
+func hasWorkflowNodeEvent(events []wruntime.Event, eventType string, nodeID wruntime.NodeID) bool {
+	for _, event := range events {
+		if event.Type == eventType && event.NodeID == nodeID {
+			return true
+		}
+	}
+	return false
 }
 
 func mustQRSPIWorkflowPolicy(t *testing.T, policy qrspi.Policy) []byte {

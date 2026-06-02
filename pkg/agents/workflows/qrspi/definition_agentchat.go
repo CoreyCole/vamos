@@ -9,10 +9,6 @@ const (
 	NodeResearch wruntime.NodeID = "research"
 	NodeDesign   wruntime.NodeID = "design"
 
-	NodeReviewDesign                wruntime.NodeID = "review-design"
-	NodeResearchForReviewDesign     wruntime.NodeID = "research-for-review-design"
-	NodeAddressReviewResearchDesign wruntime.NodeID = "address-review-research-design"
-
 	NodeOutline                      wruntime.NodeID = "outline"
 	NodeReviewOutline                wruntime.NodeID = "review-outline"
 	NodeHumanReviewOutline           wruntime.NodeID = "human-review-outline"
@@ -49,18 +45,6 @@ func Definition() (wruntime.Definition, error) {
 		RequiresPrimaryArtifact().
 		Agent(NodeDesign, Skill("~/.agents/skills/q-design/SKILL.md")).
 		Statuses(wruntime.StatusComplete, wruntime.StatusNeedsHuman, wruntime.StatusBlocked, wruntime.StatusError).
-		Outcomes(wruntime.OutcomeComplete).
-		RequiresPrimaryArtifact().
-		Agent(NodeReviewDesign, Skill("~/.agents/skills/q-review/SKILL.md")).
-		Statuses(wruntime.StatusComplete, wruntime.StatusNeedsHuman, wruntime.StatusBlocked, wruntime.StatusError).
-		Outcomes(wruntime.OutcomeReadyForOutline, wruntime.OutcomeNeedsReviewResearch).
-		RequiresPrimaryArtifact().
-		Agent(NodeResearchForReviewDesign, Skill("~/.agents/skills/q-research-for-review/SKILL.md")).
-		Statuses(wruntime.StatusComplete, wruntime.StatusBlocked, wruntime.StatusError).
-		Outcomes(wruntime.OutcomeComplete).
-		RequiresPrimaryArtifact().
-		Agent(NodeAddressReviewResearchDesign, Skill("~/.agents/skills/q-address-review-research/SKILL.md")).
-		Statuses(wruntime.StatusComplete, wruntime.StatusBlocked, wruntime.StatusError).
 		Outcomes(wruntime.OutcomeComplete).
 		RequiresPrimaryArtifact().
 		Agent(NodeOutline, Skill("~/.agents/skills/q-outline/SKILL.md")).
@@ -118,15 +102,7 @@ func Definition() (wruntime.Definition, error) {
 		Done(NodeDone).
 		From(NodeQuestion).On(wruntime.OutcomeComplete).GoTo(NodeResearch).
 		From(NodeResearch).On(wruntime.OutcomeComplete).GoTo(NodeDesign).
-		From(NodeDesign).When(ConfigPlanReviewsEnabled).GoTo(NodeReviewDesign).
-		From(NodeDesign).When(ConfigPlanReviewsDisabled).GoTo(NodeOutline).
-		From(NodeReviewDesign).
-		On(wruntime.OutcomeNeedsReviewResearch).GoTo(NodeResearchForReviewDesign).
-		From(NodeReviewDesign).On(wruntime.OutcomeReadyForOutline).GoTo(NodeOutline).
-		From(NodeResearchForReviewDesign).
-		On(wruntime.OutcomeComplete).GoTo(NodeAddressReviewResearchDesign).
-		From(NodeAddressReviewResearchDesign).
-		On(wruntime.OutcomeComplete).GoTo(NodeReviewDesign).
+		From(NodeDesign).On(wruntime.OutcomeComplete).GoTo(NodeOutline).
 		From(NodeOutline).When(ConfigPlanReviewsEnabled).GoTo(NodeReviewOutline).
 		From(NodeOutline).When(ConfigPlanReviewsDisabled).GoTo(NodePlan).
 		From(NodeReviewOutline).
