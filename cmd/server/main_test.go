@@ -185,7 +185,7 @@ func TestHostFromBaseURL(t *testing.T) {
 	}
 }
 
-func TestWorkspacesE2EPageEnabled(t *testing.T) {
+func TestChildWorkspacesReadOnlyEnabled(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -193,58 +193,27 @@ func TestWorkspacesE2EPageEnabled(t *testing.T) {
 		cfg  Config
 		want bool
 	}{
-		{
-			name: "default false",
-			cfg: Config{
-				WorkspaceMode:       "child",
-				WorkspaceManagerURL: "https://main.test",
-			},
-			want: false,
-		},
-		{
-			name: "standalone false",
-			cfg: Config{
-				WorkspaceMode:            "standalone",
-				E2EWorkspacesPageEnabled: true,
-				WorkspaceManagerURL:      "https://main.test",
-			},
-			want: false,
-		},
-		{
-			name: "manager false",
-			cfg: Config{
-				WorkspaceMode:            "manager",
-				E2EWorkspacesPageEnabled: true,
-				WorkspaceManagerURL:      "https://main.test",
-			},
-			want: false,
-		},
-		{
-			name: "child without manager url false",
-			cfg: Config{
-				WorkspaceMode:            "child",
-				E2EWorkspacesPageEnabled: true,
-			},
-			want: false,
-		},
-		{
-			name: "child explicit flag true",
-			cfg: Config{
-				WorkspaceMode:            "child",
-				E2EWorkspacesPageEnabled: true,
-				WorkspaceManagerURL:      "https://main.test",
-			},
-			want: true,
-		},
+		{name: "standalone false", cfg: Config{WorkspaceMode: "standalone"}, want: false},
+		{name: "manager false", cfg: Config{WorkspaceMode: "manager"}, want: false},
+		{name: "child true", cfg: Config{WorkspaceMode: "child"}, want: true},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			if got := workspacesE2EPageEnabled(tt.cfg); got != tt.want {
-				t.Fatalf("workspacesE2EPageEnabled() = %v, want %v", got, tt.want)
+			if got := childWorkspacesReadOnlyEnabled(tt.cfg); got != tt.want {
+				t.Fatalf("childWorkspacesReadOnlyEnabled() = %v, want %v", got, tt.want)
 			}
 		})
+	}
+}
+
+func TestWorkspaceHandlerManagerUsesFixtureForChildWithoutManager(t *testing.T) {
+	t.Parallel()
+
+	manager := workspaceHandlerManager(nil, Config{WorkspaceMode: "child", WorkspaceSlug: "feature"})
+	if _, ok := manager.(*fixtureLifecycleRegistry); !ok {
+		t.Fatalf("workspaceHandlerManager() = %T, want *fixtureLifecycleRegistry", manager)
 	}
 }
 
@@ -282,37 +251,6 @@ func TestFixtureLifecycleRegistryRejectsMutations(t *testing.T) {
 	}
 	if _, err := registry.RequestLifecycle(context.Background(), workspaces.WorkspaceLifecycleRequest{Slug: "feature", Kind: workspaces.WorkspaceTransitionRestart}); !errors.Is(err, errFixtureWorkspacesReadOnly) {
 		t.Fatalf("RequestLifecycle() error = %v, want read-only", err)
-	}
-}
-
-func TestRegisterChildWorkspaceRedirectSendsWorkspaceRoutesToManager(t *testing.T) {
-	t.Parallel()
-
-	e := echo.New()
-	registerChildWorkspaceRedirect(e, "https://main.cn-agents.test/")
-	e.GET("/*", func(c echo.Context) error { return c.String(http.StatusOK, "child") })
-
-	for _, tc := range []struct {
-		path string
-		want string
-	}{
-		{path: "/workspaces", want: "https://main.cn-agents.test/workspaces"},
-		{path: "/workspaces/start/work?redirect=%2F", want: "https://main.cn-agents.test/workspaces/start/work?redirect=%2F"},
-	} {
-		rec := httptest.NewRecorder()
-		e.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, tc.path, nil))
-		if rec.Code != http.StatusTemporaryRedirect {
-			t.Fatalf("%s status = %d, want %d", tc.path, rec.Code, http.StatusTemporaryRedirect)
-		}
-		if got := rec.Header().Get("Location"); got != tc.want {
-			t.Fatalf("%s Location = %q, want %q", tc.path, got, tc.want)
-		}
-	}
-
-	rec := httptest.NewRecorder()
-	e.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/agent-chat", nil))
-	if rec.Code != http.StatusOK || rec.Body.String() != "child" {
-		t.Fatalf("non-workspaces route status = %d body = %q", rec.Code, rec.Body.String())
 	}
 }
 

@@ -58,6 +58,10 @@ External setup must also be in place:
 
 Before sending a feature workspace to a human for manual testing, make the child runtime current and reachable. A build with `--no-restart` proves compilation only; it can leave the public feature host serving the previous process or the manager recovery page. Run a managed restart (`just build` from the feature checkout, or the manager restart action), then verify the public feature URL reaches the child app before handing it off.
 
+## Feature Workspaces page read-only mode
+
+Feature child hosts are still not real workspace managers. They mount only the read-only Workspaces page and Datastar stream (`/workspaces`, `/workspaces/stream`) backed by the workspace-local database selected by `.vamos/run/workspace.env`. Real lifecycle/provision/release/cleanup actions remain manager-owned and unavailable on child Workspaces routes.
+
 ## Session ownership during verification
 
 Browser and chat sessions created while verifying `work` or feature workspace hosts belong to that workspace's disposable `.vamos` DB. Pi CLI sessions created from those directories may remain in `~/.pi/agent/sessions` after cleanup. Main may index or import them intentionally, but verification noise is not durable main chat history by default. Summarize important evidence into `verify.md`, review notes, screenshots, logs, or release records. See `docs/vamos-development-workflow.md`.

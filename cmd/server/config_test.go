@@ -14,7 +14,6 @@ func TestApplyVamosEnvOverridesPrefersRuntimeWorkspaceEnv(t *testing.T) {
 	t.Setenv("VAMOS_WORKSPACE_SLUG", "feature")
 	t.Setenv("VAMOS_WORKSPACE_MANAGER_URL", "https://main.workspaces.test")
 	t.Setenv("VAMOS_WORKSPACE_RESTART_TOKEN", "restart-token")
-	t.Setenv("VAMOS_E2E_WORKSPACES_PAGE_ENABLED", "true")
 	t.Setenv("VAMOS_DEV_AUTH_VERIFY_KEY", "verify-key")
 	t.Setenv("VAMOS_THOUGHTS_REPO", "/repo")
 	t.Setenv("VAMOS_THOUGHTS_ROOT", "/repo/thoughts")
@@ -50,9 +49,6 @@ func TestApplyVamosEnvOverridesPrefersRuntimeWorkspaceEnv(t *testing.T) {
 	}
 	if cfg.WorkspaceManagerURL != "https://main.workspaces.test" || cfg.WorkspaceRestartToken != "restart-token" {
 		t.Fatalf("workspace manager/restart = %q/%q", cfg.WorkspaceManagerURL, cfg.WorkspaceRestartToken)
-	}
-	if !cfg.E2EWorkspacesPageEnabled {
-		t.Fatal("E2EWorkspacesPageEnabled = false, want true")
 	}
 	if cfg.DevAuthVerifyKey != "verify-key" {
 		t.Fatalf("DevAuthVerifyKey = %q", cfg.DevAuthVerifyKey)
@@ -108,17 +104,10 @@ func TestApplyHostConfigThenVamosEnvOverridesKeepsChildRuntimeAuthority(t *testi
 
 func TestApplyVamosEnvOverridesInvalidBoolKeepsLegacyValue(t *testing.T) {
 	t.Setenv("VAMOS_PLAYWRIGHT_AUTH_ENABLED", "not-a-bool")
-	t.Setenv("VAMOS_E2E_WORKSPACES_PAGE_ENABLED", "not-a-bool")
 
-	cfg := applyVamosEnvOverrides(Config{
-		PlaywrightAuthEnabled:    true,
-		E2EWorkspacesPageEnabled: true,
-	})
+	cfg := applyVamosEnvOverrides(Config{PlaywrightAuthEnabled: true})
 
 	if !cfg.PlaywrightAuthEnabled {
 		t.Fatal("invalid VAMOS_PLAYWRIGHT_AUTH_ENABLED should keep existing value")
-	}
-	if !cfg.E2EWorkspacesPageEnabled {
-		t.Fatal("invalid VAMOS_E2E_WORKSPACES_PAGE_ENABLED should keep existing value")
 	}
 }

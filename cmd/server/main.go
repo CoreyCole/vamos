@@ -97,15 +97,6 @@ func workspaceReleaseHandlerOptions(
 	return []workspaces.HandlerOption{workspaces.WithReleaseProjector(projector)}
 }
 
-func registerChildWorkspaceRedirect(e *echo.Echo, managerURL string) {
-	managerURL = strings.TrimRight(strings.TrimSpace(managerURL), "/")
-	redirect := func(c echo.Context) error {
-		return c.Redirect(http.StatusTemporaryRedirect, managerURL+c.Request().URL.RequestURI())
-	}
-	e.GET("/workspaces", redirect)
-	e.GET("/workspaces/*", redirect)
-}
-
 func newPrefixStrippingProxy(
 	targetURL, prefix string,
 	rewrites ...proxyRewrite,
@@ -179,34 +170,33 @@ func newPrefixStrippingProxy(
 
 // Config holds environment configuration
 type Config struct {
-	ListenAddress            string   `envconfig:"CN_AGENTS_LISTEN_ADDRESS"             default:":4200"`
-	PublicBaseURL            string   `envconfig:"CN_AGENTS_PUBLIC_BASE_URL"            default:"http://localhost:4200"`
-	InternalCallbackBaseURL  string   `envconfig:"CN_AGENTS_INTERNAL_CALLBACK_BASE_URL" default:""`
-	WorkspaceMode            string   `envconfig:"CN_AGENTS_WORKSPACE_MODE"             default:"standalone"`
-	WorkspaceDomain          string   `envconfig:"CN_AGENTS_WORKSPACE_DOMAIN"           default:""`
-	WorkspaceParentDir       string   `envconfig:"CN_AGENTS_WORKSPACE_PARENT_DIR"       default:""`
-	WorkspaceStateDir        string   `envconfig:"CN_AGENTS_WORKSPACE_STATE_DIR"        default:"~/.local/state/cn-agents/workspaces"`
-	WorkspaceSlug            string   `envconfig:"CN_AGENTS_WORKSPACE_SLUG"                default:"main"`
-	WorkspaceManagerURL      string   `envconfig:"CN_AGENTS_WORKSPACE_MANAGER_URL"         default:""`
-	WorkspaceRestartToken    string   `envconfig:"CN_AGENTS_WORKSPACE_RESTART_TOKEN"       default:""`
-	E2EWorkspacesPageEnabled bool     `envconfig:"CN_AGENTS_E2E_WORKSPACES_PAGE_ENABLED" default:"false"`
-	DevAuthSigningKey        string   `envconfig:"CN_AGENTS_DEV_AUTH_SIGNING_KEY"       default:""`
-	DevAuthVerifyKey         string   `envconfig:"CN_AGENTS_DEV_AUTH_VERIFY_KEY"        default:""`
-	MarkdownBasePath         string   `envconfig:"MARKDOWN_BASE_PATH"                   default:""`
-	DatabasePath             string   `envconfig:"DATABASE_PATH"                        default:"~/.local/state/cn-agents/agents.db"`
-	GoogleCredentialsFile    string   `envconfig:"GOOGLE_CREDENTIALS_FILE"              default:""`
-	RepoPath                 string   `envconfig:"REPO_PATH"                            default:""`
-	ThoughtsBaseURL          string   `envconfig:"THOUGHTS_BASE_URL"                    default:""`
-	GitHubBaseURL            string   `envconfig:"GITHUB_BASE_URL"                      default:""`
-	ConfigPath               string   `envconfig:"CN_AGENTS_CONFIG"                     default:""`
-	WebhookSecret            string   `envconfig:"WEBHOOK_SECRET"                       default:""`
-	RebuildScript            string   `envconfig:"REBUILD_SCRIPT"                       default:"scripts/webhook-rebuild.sh"`
-	TemporalUIBaseURL        string   `envconfig:"TEMPORAL_UI_BASE_URL"                 default:"http://127.0.0.1:8233"`
-	AuthAllowedDomains       []string `envconfig:"AUTH_ALLOWED_DOMAINS"                 default:""`
-	AuthWhitelistedEmails    []string `envconfig:"AUTH_WHITELISTED_EMAILS"              default:""`
-	PlaywrightAuthEnabled    bool     `envconfig:"CN_AGENTS_PLAYWRIGHT_AUTH_ENABLED"    default:"false"`
-	PlaywrightAuthEmail      string   `envconfig:"CN_AGENTS_PLAYWRIGHT_AUTH_EMAIL"      default:"playwright@localhost"`
-	PlaywrightAuthToken      string   `envconfig:"CN_AGENTS_PLAYWRIGHT_AUTH_TOKEN"      default:""`
+	ListenAddress           string   `envconfig:"CN_AGENTS_LISTEN_ADDRESS"             default:":4200"`
+	PublicBaseURL           string   `envconfig:"CN_AGENTS_PUBLIC_BASE_URL"            default:"http://localhost:4200"`
+	InternalCallbackBaseURL string   `envconfig:"CN_AGENTS_INTERNAL_CALLBACK_BASE_URL" default:""`
+	WorkspaceMode           string   `envconfig:"CN_AGENTS_WORKSPACE_MODE"             default:"standalone"`
+	WorkspaceDomain         string   `envconfig:"CN_AGENTS_WORKSPACE_DOMAIN"           default:""`
+	WorkspaceParentDir      string   `envconfig:"CN_AGENTS_WORKSPACE_PARENT_DIR"       default:""`
+	WorkspaceStateDir       string   `envconfig:"CN_AGENTS_WORKSPACE_STATE_DIR"        default:"~/.local/state/cn-agents/workspaces"`
+	WorkspaceSlug           string   `envconfig:"CN_AGENTS_WORKSPACE_SLUG"                default:"main"`
+	WorkspaceManagerURL     string   `envconfig:"CN_AGENTS_WORKSPACE_MANAGER_URL"         default:""`
+	WorkspaceRestartToken   string   `envconfig:"CN_AGENTS_WORKSPACE_RESTART_TOKEN"       default:""`
+	DevAuthSigningKey       string   `envconfig:"CN_AGENTS_DEV_AUTH_SIGNING_KEY"       default:""`
+	DevAuthVerifyKey        string   `envconfig:"CN_AGENTS_DEV_AUTH_VERIFY_KEY"        default:""`
+	MarkdownBasePath        string   `envconfig:"MARKDOWN_BASE_PATH"                   default:""`
+	DatabasePath            string   `envconfig:"DATABASE_PATH"                        default:"~/.local/state/cn-agents/agents.db"`
+	GoogleCredentialsFile   string   `envconfig:"GOOGLE_CREDENTIALS_FILE"              default:""`
+	RepoPath                string   `envconfig:"REPO_PATH"                            default:""`
+	ThoughtsBaseURL         string   `envconfig:"THOUGHTS_BASE_URL"                    default:""`
+	GitHubBaseURL           string   `envconfig:"GITHUB_BASE_URL"                      default:""`
+	ConfigPath              string   `envconfig:"CN_AGENTS_CONFIG"                     default:""`
+	WebhookSecret           string   `envconfig:"WEBHOOK_SECRET"                       default:""`
+	RebuildScript           string   `envconfig:"REBUILD_SCRIPT"                       default:"scripts/webhook-rebuild.sh"`
+	TemporalUIBaseURL       string   `envconfig:"TEMPORAL_UI_BASE_URL"                 default:"http://127.0.0.1:8233"`
+	AuthAllowedDomains      []string `envconfig:"AUTH_ALLOWED_DOMAINS"                 default:""`
+	AuthWhitelistedEmails   []string `envconfig:"AUTH_WHITELISTED_EMAILS"              default:""`
+	PlaywrightAuthEnabled   bool     `envconfig:"CN_AGENTS_PLAYWRIGHT_AUTH_ENABLED"    default:"false"`
+	PlaywrightAuthEmail     string   `envconfig:"CN_AGENTS_PLAYWRIGHT_AUTH_EMAIL"      default:"playwright@localhost"`
+	PlaywrightAuthToken     string   `envconfig:"CN_AGENTS_PLAYWRIGHT_AUTH_TOKEN"      default:""`
 	// Optional explicit default working directory for new agent-chat threads.
 	AgentChatDefaultDir string `envconfig:"AGENT_CHAT_DEFAULT_DIR" default:""`
 	// Detail cards collapse only when their content exceeds this many lines.
@@ -336,7 +326,6 @@ func applyVamosEnvOverrides(cfg Config) Config {
 		{"VAMOS_WORKSPACE_SLUG", func(v string) { cfg.WorkspaceSlug = v }},
 		{"VAMOS_WORKSPACE_MANAGER_URL", func(v string) { cfg.WorkspaceManagerURL = v }},
 		{"VAMOS_WORKSPACE_RESTART_TOKEN", func(v string) { cfg.WorkspaceRestartToken = v }},
-		{"VAMOS_E2E_WORKSPACES_PAGE_ENABLED", func(v string) { cfg.E2EWorkspacesPageEnabled = parseBoolEnv(v, cfg.E2EWorkspacesPageEnabled) }},
 		{"VAMOS_DEV_AUTH_SIGNING_KEY", func(v string) { cfg.DevAuthSigningKey = v }},
 		{"VAMOS_DEV_AUTH_VERIFY_KEY", func(v string) { cfg.DevAuthVerifyKey = v }},
 		{"VAMOS_THOUGHTS_ROOT", func(v string) { cfg.MarkdownBasePath = v }},
@@ -365,10 +354,18 @@ func parseBoolEnv(raw string, fallback bool) bool {
 	return value
 }
 
-func workspacesE2EPageEnabled(cfg Config) bool {
-	return cfg.WorkspaceMode == "child" &&
-		cfg.E2EWorkspacesPageEnabled &&
-		strings.TrimSpace(cfg.WorkspaceManagerURL) != ""
+func childWorkspacesReadOnlyEnabled(cfg Config) bool {
+	return cfg.WorkspaceMode == "child"
+}
+
+func workspaceHandlerManager(workspaceManager *workspaces.ManagerService, cfg Config) workspaces.Manager {
+	if workspaceManager != nil {
+		return workspaceManager
+	}
+	if childWorkspacesReadOnlyEnabled(cfg) {
+		return newFixtureLifecycleRegistry(cfg)
+	}
+	return nil
 }
 
 func validateInternalAgentChatConfig(cfg Config) error {
@@ -1391,10 +1388,7 @@ func main() {
 				return mapped, nil
 			}),
 		)
-		var handlerManager workspaces.Manager = workspaceManager
-		if handlerManager == nil && workspacesE2EPageEnabled(cfg) {
-			handlerManager = newFixtureLifecycleRegistry(cfg)
-		}
+		handlerManager := workspaceHandlerManager(workspaceManager, cfg)
 		workspaceHandler = workspaces.NewHandler(
 			handlerManager,
 			workspaceManagerURL,
@@ -1403,10 +1397,8 @@ func main() {
 		)
 		if workspaceManager != nil {
 			workspaceHandler.RegisterRoutes(e, authMiddleware)
-		} else if workspacesE2EPageEnabled(cfg) {
+		} else if childWorkspacesReadOnlyEnabled(cfg) {
 			workspaceHandler.RegisterFixtureReadOnlyRoutes(e, authMiddleware)
-		} else if cfg.WorkspaceMode == "child" && strings.TrimSpace(workspaceManagerURL) != "" {
-			registerChildWorkspaceRedirect(e, workspaceManagerURL)
 		}
 		if workspaceManager != nil && strings.TrimSpace(cfg.WorkspaceRestartToken) != "" {
 			workspaceHandler.RegisterInternalRestartRoute(e)

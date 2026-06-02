@@ -530,6 +530,27 @@ func TestRegisterFixtureReadOnlyRoutesDoesNotRegisterMutationRoutes(t *testing.T
 	}
 }
 
+func TestFixtureReadOnlyRoutesDoNotExposeReleaseCleanupOrErrorRoutes(t *testing.T) {
+	t.Parallel()
+
+	handler := NewHandler(&fakeLifecycleManager{}, "https://main.test", "feature")
+	e := echo.New()
+	handler.RegisterFixtureReadOnlyRoutes(e, func(next echo.HandlerFunc) echo.HandlerFunc { return next })
+
+	for _, tc := range []struct{ method, path string }{
+		{http.MethodPost, "/workspaces/release/enqueue"},
+		{http.MethodPost, "/workspaces/cleanup"},
+		{http.MethodGet, "/workspaces/errors"},
+		{http.MethodGet, "/workspaces/errors/stream"},
+	} {
+		rec := httptest.NewRecorder()
+		e.ServeHTTP(rec, httptest.NewRequest(tc.method, tc.path, nil))
+		if rec.Code != http.StatusNotFound {
+			t.Fatalf("%s %s status = %d, want 404", tc.method, tc.path, rec.Code)
+		}
+	}
+}
+
 func TestHandleWorkspacesStreamInitialRenderContainsWholeList(t *testing.T) {
 	manager := &fakeLifecycleManager{
 		snapshots: []WorkspaceLifecycleSnapshot{

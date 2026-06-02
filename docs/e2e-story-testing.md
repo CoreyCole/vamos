@@ -71,13 +71,7 @@ VAMOS_E2E_QRSPI_PROMPT_OVERRIDE=1 \
 
 ### Workspaces page stories on feature child hosts
 
-Feature child servers normally redirect `/workspaces` to the main manager so real lifecycle authority stays on main. Browser stories that need feature-branch Workspaces page code may enable the read-only fixture route with:
-
-```dotenv
-VAMOS_E2E_WORKSPACES_PAGE_ENABLED=true
-```
-
-Use only with registered non-main workspace fixture runs. The route serves `/workspaces` and `/workspaces/stream` from the feature checkout with workspace-local fixture DB rows selected by `.vamos/run/workspace.env`; lifecycle/provision/release/cleanup mutation routes remain unavailable. Public browser E2E still needs `VAMOS_E2E_AUTH_TOKEN` when the host requires Playwright auth.
+Feature child servers serve a read-only Workspaces page so browser stories exercise feature-branch Workspaces page code directly. Full lifecycle authority stays on the manager checkout: child hosts mount only `/workspaces` and `/workspaces/stream` from the feature checkout with workspace-local fixture DB rows selected by `.vamos/run/workspace.env`; lifecycle/provision/release/cleanup mutation routes remain unavailable. Public browser E2E still needs `VAMOS_E2E_AUTH_TOKEN` when the host requires Playwright auth.
 
 Review a completed run against semantic goldens:
 
