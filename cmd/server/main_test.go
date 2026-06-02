@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/ed25519"
 	"encoding/base64"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -244,6 +245,43 @@ func TestWorkspacesE2EPageEnabled(t *testing.T) {
 				t.Fatalf("workspacesE2EPageEnabled() = %v, want %v", got, tt.want)
 			}
 		})
+	}
+}
+
+func TestNewFixtureLifecycleRegistryDescribesCurrentChild(t *testing.T) {
+	t.Parallel()
+
+	registry := newFixtureLifecycleRegistry(Config{
+		WorkspaceSlug: "feature-slug",
+		PublicBaseURL: "https://feature.workspaces.test/",
+		RepoPath:      "/repo/feature",
+	})
+
+	snapshots, err := registry.ListLifecycle(context.Background())
+	if err != nil {
+		t.Fatalf("ListLifecycle() error = %v", err)
+	}
+	if len(snapshots) != 1 {
+		t.Fatalf("len(snapshots) = %d, want 1", len(snapshots))
+	}
+	got := snapshots[0]
+	if got.Workspace.Slug != "feature-slug" || got.Workspace.CheckoutPath != "/repo/feature" || got.Workspace.Host != "feature.workspaces.test" {
+		t.Fatalf("snapshot workspace = %+v", got.Workspace)
+	}
+	if got.DesiredState != workspaces.WorkspaceDesiredRunning || got.ObservedState != workspaces.WorkspaceObservedRunning {
+		t.Fatalf("snapshot state = %s/%s", got.DesiredState, got.ObservedState)
+	}
+}
+
+func TestFixtureLifecycleRegistryRejectsMutations(t *testing.T) {
+	t.Parallel()
+
+	registry := newFixtureLifecycleRegistry(Config{WorkspaceSlug: "feature"})
+	if _, err := registry.Start(context.Background(), "feature"); !errors.Is(err, errFixtureWorkspacesReadOnly) {
+		t.Fatalf("Start() error = %v, want read-only", err)
+	}
+	if _, err := registry.RequestLifecycle(context.Background(), workspaces.WorkspaceLifecycleRequest{Slug: "feature", Kind: workspaces.WorkspaceTransitionRestart}); !errors.Is(err, errFixtureWorkspacesReadOnly) {
+		t.Fatalf("RequestLifecycle() error = %v, want read-only", err)
 	}
 }
 
