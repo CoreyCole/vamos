@@ -20,6 +20,16 @@ type ProjectedRun struct {
 	Status       string `json:"status"`
 	StartedSeq   int64  `json:"started_seq,omitempty"`
 	CompletedSeq int64  `json:"completed_seq,omitempty"`
+	Summary      string `json:"summary,omitempty"`
+}
+
+type ProjectedToolEvent struct {
+	ID      string `json:"id"`
+	Seq     int64  `json:"seq"`
+	Status  string `json:"status"`
+	Name    string `json:"name,omitempty"`
+	RunID   string `json:"run_id,omitempty"`
+	Summary string `json:"summary,omitempty"`
 }
 
 type ProjectedParticipant struct {
@@ -39,6 +49,7 @@ type ChatProjection struct {
 	LastSeq      int64                  `json:"last_seq"`
 	Messages     []ProjectedMessage     `json:"messages"`
 	Runs         []ProjectedRun         `json:"runs"`
+	Tools        []ProjectedToolEvent   `json:"tools"`
 	Participants []ProjectedParticipant `json:"participants"`
 	Artifacts    []ProjectedArtifact    `json:"artifacts"`
 	Tree         ChatTreeProjection     `json:"tree"`
@@ -102,7 +113,7 @@ func ApplyEvent(proj ChatProjection, event ChatEvent) (ChatProjection, error) {
 	}
 
 	switch event.EventType {
-	case EventMessageCreated:
+	case EventMessageCreated, EventMessageStarted, EventMessageCheckpointed, EventMessageCompleted:
 		msg := ProjectedMessage{
 			ID:      stringFromPayload(payload, "id", nodeID(event)),
 			Seq:     event.Seq,
@@ -149,7 +160,12 @@ func ApplyEvent(proj ChatProjection, event ChatEvent) (ChatProjection, error) {
 		)
 		proj.Runs = upsertRun(
 			proj.Runs,
-			ProjectedRun{ID: id, Status: "complete", CompletedSeq: event.Seq},
+			ProjectedRun{
+				ID:           id,
+				Status:       "complete",
+				CompletedSeq: event.Seq,
+				Summary:      stringFromPayload(payload, "summary", ""),
+			},
 		)
 		if summary := stringFromPayload(payload, "summary", ""); summary != "" {
 			proj.Tree.Nodes = upsertTreeNode(
@@ -165,6 +181,37 @@ func ApplyEvent(proj ChatProjection, event ChatEvent) (ChatProjection, error) {
 					CanFork:    true,
 				},
 			)
+		}
+	case EventToolStarted, EventToolUpdated, EventToolCompleted, EventToolFailed:
+		status := "updated"
+		switch event.EventType {
+		case EventToolStarted:
+			status = "running"
+		case EventToolCompleted:
+			status = "complete"
+		case EventToolFailed:
+			status = "failed"
+		}
+		tool := ProjectedToolEvent{
+			ID: firstNonEmpty(
+				stringFromPayload(payload, "tool_call_id", ""),
+				stringFromPayload(payload, "id", nodeID(event)),
+			),
+			Seq:     event.Seq,
+			Status:  status,
+			Name:    stringFromPayload(payload, "tool_name", ""),
+			RunID:   firstNonEmpty(event.RunID, stringFromPayload(payload, "run_id", "")),
+			Summary: stringFromPayload(payload, "summary", ""),
+		}
+		proj.Tools = upsertTool(proj.Tools, tool)
+	case EventFileWritten, EventFileEdited:
+		artifact := ProjectedArtifact{
+			Path: stringFromPayload(payload, "path", ""),
+			Kind: strings.TrimPrefix(string(event.EventType), "file."),
+			Seq:  event.Seq,
+		}
+		if artifact.Path != "" {
+			proj.Artifacts = upsertArtifact(proj.Artifacts, artifact)
 		}
 	case EventRunFailed:
 		id := firstNonEmpty(
@@ -276,6 +323,33 @@ func upsertRun(items []ProjectedRun, item ProjectedRun) []ProjectedRun {
 			}
 			if item.CompletedSeq != 0 {
 				items[i].CompletedSeq = item.CompletedSeq
+			}
+			if item.Summary != "" {
+				items[i].Summary = item.Summary
+			}
+			return items
+		}
+	}
+	return append(items, item)
+}
+
+func upsertTool(items []ProjectedToolEvent, item ProjectedToolEvent) []ProjectedToolEvent {
+	for i := range items {
+		if items[i].ID == item.ID {
+			if item.Seq != 0 {
+				items[i].Seq = item.Seq
+			}
+			if item.Status != "" {
+				items[i].Status = item.Status
+			}
+			if item.Name != "" {
+				items[i].Name = item.Name
+			}
+			if item.RunID != "" {
+				items[i].RunID = item.RunID
+			}
+			if item.Summary != "" {
+				items[i].Summary = item.Summary
 			}
 			return items
 		}

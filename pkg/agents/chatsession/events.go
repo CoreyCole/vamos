@@ -2,6 +2,8 @@ package chatsession
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"strings"
 
 	"github.com/CoreyCole/vamos/pkg/db"
@@ -60,7 +62,37 @@ func appendEventTx(
 	if err != nil {
 		return ChatEvent{}, err
 	}
-	return eventFromRow(row), nil
+	event := eventFromRow(row)
+	if err := updateProjectionTx(ctx, q, event); err != nil {
+		return ChatEvent{}, err
+	}
+	return event, nil
+}
+
+func updateProjectionTx(ctx context.Context, q *db.Queries, event ChatEvent) error {
+	row, err := q.GetChatSessionProjection(ctx, event.SessionID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	proj, err := projectionFromRow(row)
+	if err != nil {
+		return err
+	}
+	proj, err = ApplyEvent(proj, event)
+	if err != nil {
+		return err
+	}
+	_, err = q.UpsertChatSessionProjection(ctx, projectionParams(proj))
+	if err != nil {
+		return err
+	}
+	return q.UpdateChatSessionProjectionSeq(ctx, db.UpdateChatSessionProjectionSeqParams{
+		ID:                   event.SessionID,
+		CurrentProjectionSeq: proj.LastSeq,
+	})
 }
 
 func eventFromRow(row db.ChatSessionEvent) ChatEvent {

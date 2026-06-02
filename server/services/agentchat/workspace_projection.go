@@ -10,6 +10,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/CoreyCole/vamos/pkg/agents/chatsession"
 	"github.com/CoreyCole/vamos/pkg/agents/workflows/qrspi"
 	wruntime "github.com/CoreyCole/vamos/pkg/agents/workflows/runtime"
 	"github.com/CoreyCole/vamos/pkg/db"
@@ -62,6 +63,7 @@ func (s *Service) BuildWorkspacePageArgs(
 			currentChatSessionID,
 		); err == nil {
 			projection.ChatTree = snapshot.Tree
+			projection.Transcript.Stable = s.transcriptFromChatProjection(snapshot)
 		}
 	}
 
@@ -75,9 +77,13 @@ func (s *Service) BuildWorkspacePageArgs(
 			}
 		}
 		projection.SelectedThread = &thread
-		stable, err := s.buildStableTranscript(ctx, thread)
-		if err != nil {
-			return nil, err
+		stable := projection.Transcript.Stable
+		if len(stable) == 0 {
+			var err error
+			stable, err = s.buildStableTranscript(ctx, thread)
+			if err != nil {
+				return nil, err
+			}
 		}
 		metadata, err := s.buildTranscriptMetadata(ctx, thread)
 		if err != nil {
@@ -177,6 +183,66 @@ func (s *Service) BuildWorkspacePageArgs(
 		Cursor:      s.CurrentCursor(workspace.ID),
 		Projection:  projection,
 	}, nil
+}
+
+func (s *Service) transcriptFromChatProjection(proj chatsession.ChatProjection) []TranscriptMessage {
+	messages := make([]TranscriptMessage, 0, len(proj.Messages)+len(proj.Tools)+len(proj.Artifacts))
+	for _, msg := range proj.Messages {
+		domID := strings.TrimSpace(msg.ID)
+		if domID == "" {
+			domID = fmt.Sprintf("chat-%d", msg.Seq)
+		}
+		entryID := domID
+		role := strings.TrimSpace(msg.Role)
+		if role == "" {
+			role = "assistant"
+		}
+		item := s.newBubbleTranscriptMessage(domID, entryID, role, msg.Content, role == "assistant")
+		item.ChatSessionID = proj.SessionID
+		item.ChatNodeID = domID
+		item.ChatEventSeq = msg.Seq
+		messages = append(messages, item)
+	}
+	for _, tool := range proj.Tools {
+		title := firstNonEmptyString(tool.Name, "tool")
+		body := strings.TrimSpace(tool.Summary)
+		if body == "" {
+			body = tool.Status
+		}
+		item := s.newDetailTranscriptMessage(
+			firstNonEmptyString(tool.ID, fmt.Sprintf("tool-%d", tool.Seq)),
+			tool.ID,
+			title,
+			body,
+			tool.Status == "failed",
+			true,
+		)
+		item.ToolCallID = tool.ID
+		item.ChatSessionID = proj.SessionID
+		item.ChatNodeID = tool.ID
+		item.ChatEventSeq = tool.Seq
+		messages = append(messages, item)
+	}
+	for _, artifact := range proj.Artifacts {
+		title := "file " + artifact.Kind
+		item := s.newDetailTranscriptMessage(
+			firstNonEmptyString(artifact.Path, fmt.Sprintf("artifact-%d", artifact.Seq)),
+			artifact.Path,
+			title,
+			artifact.Path,
+			false,
+			false,
+		)
+		item.HeaderCode = artifact.Path
+		item.ChatSessionID = proj.SessionID
+		item.ChatNodeID = artifact.Path
+		item.ChatEventSeq = artifact.Seq
+		messages = append(messages, item)
+	}
+	sort.SliceStable(messages, func(i, j int) bool {
+		return messages[i].ChatEventSeq < messages[j].ChatEventSeq
+	})
+	return messages
 }
 
 func (s *Service) workspacePageContext(

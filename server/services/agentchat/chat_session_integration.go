@@ -83,7 +83,7 @@ func appendPromptAndRunStartedSessionEventsTx(
 	messageID := fmt.Sprintf("%s:prompt", run.ID)
 	if _, err := appendChatSessionEventTx(ctx, q, chatsession.AppendEventInput{
 		SessionID:          chatSession.ID,
-		EventType:          chatsession.EventMessageCreated,
+		EventType:          chatsession.EventMessageCompleted,
 		ActorParticipantID: actorEmail,
 		RunID:              run.ID,
 		PayloadJSON: marshalSessionPayload(map[string]any{
@@ -310,7 +310,7 @@ func SemanticEventForCheckpoint(
 		}
 		events = append(events, chatsession.AppendEventInput{
 			SessionID: chatSessionID,
-			EventType: chatsession.EventMessageCreated,
+			EventType: chatsession.EventMessageCheckpointed,
 			RunID:     cp.RunID,
 			PayloadJSON: marshalSessionPayload(map[string]any{
 				"id":      messageID,

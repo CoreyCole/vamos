@@ -5,6 +5,43 @@ import (
 	"testing"
 )
 
+func TestProjectionAppliesSemanticEvents(t *testing.T) {
+	events := []ChatEvent{
+		{
+			SessionID:   "session-1",
+			Seq:         1,
+			EventType:   EventMessageCompleted,
+			PayloadJSON: []byte(`{"id":"m1","role":"user","content":"hello"}`),
+		},
+		{
+			SessionID:   "session-1",
+			Seq:         2,
+			EventType:   EventToolStarted,
+			RunID:       "run-1",
+			PayloadJSON: []byte(`{"tool_call_id":"tool-1","tool_name":"read","summary":"reading"}`),
+		},
+		{
+			SessionID:   "session-1",
+			Seq:         3,
+			EventType:   EventFileWritten,
+			PayloadJSON: []byte(`{"path":"notes.md"}`),
+		},
+	}
+	proj, err := RebuildProjection(events, nil)
+	if err != nil {
+		t.Fatalf("RebuildProjection() error = %v", err)
+	}
+	if len(proj.Messages) != 1 || proj.Messages[0].Content != "hello" {
+		t.Fatalf("messages = %+v, want semantic completed message", proj.Messages)
+	}
+	if len(proj.Tools) != 1 || proj.Tools[0].ID != "tool-1" || proj.Tools[0].Status != "running" {
+		t.Fatalf("tools = %+v, want projected running tool", proj.Tools)
+	}
+	if len(proj.Artifacts) != 1 || proj.Artifacts[0].Path != "notes.md" || proj.Artifacts[0].Kind != "written" {
+		t.Fatalf("artifacts = %+v, want written file artifact", proj.Artifacts)
+	}
+}
+
 func TestProjectionRebuildEqualsIncremental(t *testing.T) {
 	events := []ChatEvent{
 		{
