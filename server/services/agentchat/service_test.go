@@ -760,9 +760,9 @@ func TestIndexPiSessionsUpsertsInferredPlanDir(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetAgentSessionByPath() error = %v", err)
 	}
-	if session.UserEmail.String != "user@example.com" ||
-		session.InferredPlanDir.String != planDir ||
-		session.SessionID.String != "session-indexed" {
+	if session.IndexedByUserEmail.String != "user@example.com" ||
+		session.PlanDir.String != planDir ||
+		session.ExternalSessionID.String != "session-indexed" {
 		t.Fatalf(
 			"indexed session = %#v, want normalized user and plan dir %q",
 			session,
@@ -814,7 +814,7 @@ func TestPiSessionFilesSurviveWorkspaceCleanupLocation(t *testing.T) {
 		t.Fatalf("GetAgentSessionByPath() error = %v", err)
 	}
 	wantPlanDir := filepath.Join(service.thoughtsRoot, "user", "plans", "cleanup-proof")
-	if indexed.InferredPlanDir.String != wantPlanDir || indexed.ThreadID.Valid {
+	if indexed.PlanDir.String != wantPlanDir || indexed.ProjectedThreadID.Valid {
 		t.Fatalf("indexed session = %#v, want remapped plan %q and no imported thread", indexed, wantPlanDir)
 	}
 }
@@ -865,7 +865,7 @@ func TestPiSessionIndexDoesNotImportTranscriptWithoutOpenAction(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetAgentSessionByPath() error = %v", err)
 	}
-	if indexed.ThreadID.Valid {
+	if indexed.ProjectedThreadID.Valid {
 		t.Fatalf("indexed session = %#v, want metadata without thread import", indexed)
 	}
 }
@@ -3490,11 +3490,11 @@ func TestWorkspaceSessionHistoryDoesNotDependOnPiPillForClickability(t *testing.
 
 	threaded := service.workspaceSessionHistoryItem(
 		db.AgentSession{
-			ID:          "threaded-session",
-			WorkspaceID: nullString(workspace.ID),
-			ThreadID:    nullString(thread.ID),
-			Source:      "pi",
-			Status:      "imported",
+			ID:                  "threaded-session",
+			AttachedWorkspaceID: nullString(workspace.ID),
+			ProjectedThreadID:   nullString(thread.ID),
+			IdentityKind:        "pi",
+			ProjectionState:     "imported",
 		},
 		"",
 		"",
@@ -3506,11 +3506,11 @@ func TestWorkspaceSessionHistoryDoesNotDependOnPiPillForClickability(t *testing.
 
 	orphan := service.workspaceSessionHistoryItem(
 		db.AgentSession{
-			ID:          "orphan-session",
-			WorkspaceID: nullString(workspace.ID),
-			ThreadID:    sql.NullString{},
-			Source:      "pi",
-			Status:      "pending",
+			ID:                  "orphan-session",
+			AttachedWorkspaceID: nullString(workspace.ID),
+			ProjectedThreadID:   sql.NullString{},
+			IdentityKind:        "pi",
+			ProjectionState:     "pending",
 		},
 		"",
 		"",
@@ -3583,17 +3583,17 @@ func TestWorkspaceSessionHistoryItem(t *testing.T) {
 	service := newTestAgentChatService(t)
 	updatedAt := time.Date(2026, 5, 6, 19, 30, 0, 0, time.UTC)
 	session := db.AgentSession{
-		ID:              "session-row-1",
-		WorkspaceID:     sql.NullString{String: "workspace-1", Valid: true},
-		ThreadID:        sql.NullString{String: "thread-1", Valid: true},
-		Source:          "pi",
-		SessionPath:     sql.NullString{String: "/tmp/pi/session.jsonl", Valid: true},
-		SessionID:       sql.NullString{String: "pi-session-1", Valid: true},
-		Cwd:             sql.NullString{String: "/tmp/project", Valid: true},
-		Status:          "imported",
-		InferredPlanDir: sql.NullString{String: "thoughts/user/plans/plan", Valid: true},
-		LastError:       sql.NullString{String: "warning text", Valid: true},
-		UpdatedAt:       updatedAt,
+		ID:                  "session-row-1",
+		AttachedWorkspaceID: sql.NullString{String: "workspace-1", Valid: true},
+		ProjectedThreadID:   sql.NullString{String: "thread-1", Valid: true},
+		IdentityKind:        "pi",
+		ArtifactPath:        sql.NullString{String: "/tmp/pi/session.jsonl", Valid: true},
+		ExternalSessionID:   sql.NullString{String: "pi-session-1", Valid: true},
+		Cwd:                 sql.NullString{String: "/tmp/project", Valid: true},
+		ProjectionState:     "imported",
+		PlanDir:             sql.NullString{String: "thoughts/user/plans/plan", Valid: true},
+		LastError:           sql.NullString{String: "warning text", Valid: true},
+		UpdatedAt:           updatedAt,
 	}
 	summary := WorkspaceSessionSummary{
 		Header:          PiSessionHeader{ID: "header-session"},
@@ -3645,17 +3645,16 @@ func TestBuildWorkspaceSessionState(t *testing.T) {
 	})
 	if _, err := service.queries.CreateAgentSession(ctx, db.CreateAgentSessionParams{
 		ID:                  "session-future",
-		WorkspaceID:         nullString(workspace.ID),
-		ThreadID:            nullString(thread.ID),
-		UserEmail:           nullString("user@example.com"),
-		Source:              "adopted",
-		SessionPath:         nullString("/tmp/future.jsonl"),
-		SessionID:           nullString("pi-future"),
+		ProjectedThreadID:   nullString(thread.ID),
+		IndexedByUserEmail:  nullString("user@example.com"),
+		IdentityKind:        "global_pi",
+		ArtifactPath:        nullString("/tmp/future.jsonl"),
+		ExternalSessionID:   nullString("pi-future"),
 		ParentSessionID:     sql.NullString{},
 		Cwd:                 nullString("/tmp/future"),
-		Status:              "imported",
-		InferredWorkspaceID: nullString(workspace.ID),
-		InferredPlanDir:     nullString("plans/future"),
+		ProjectionState:     "imported",
+		AttachedWorkspaceID: nullString(workspace.ID),
+		PlanDir:             nullString("plans/future"),
 		ImportedHeadEntryID: sql.NullString{},
 		LastError:           sql.NullString{},
 		MetadataJson:        nullString(futureMetadata),
@@ -3702,17 +3701,16 @@ func TestBuildWorkspaceSessionState(t *testing.T) {
 	)
 	if _, err := service.queries.CreateAgentSession(ctx, db.CreateAgentSessionParams{
 		ID:                  "session-old",
-		WorkspaceID:         nullString(workspace.ID),
-		ThreadID:            nullString(oldThread.ID),
-		UserEmail:           nullString("user@example.com"),
-		Source:              "adopted",
-		SessionPath:         nullString("/tmp/old.jsonl"),
-		SessionID:           nullString("pi-old"),
+		ProjectedThreadID:   nullString(oldThread.ID),
+		IndexedByUserEmail:  nullString("user@example.com"),
+		IdentityKind:        "global_pi",
+		ArtifactPath:        nullString("/tmp/old.jsonl"),
+		ExternalSessionID:   nullString("pi-old"),
 		ParentSessionID:     sql.NullString{},
 		Cwd:                 nullString("/tmp/old"),
-		Status:              "diverged",
-		InferredWorkspaceID: nullString(workspace.ID),
-		InferredPlanDir:     nullString("plans/old"),
+		ProjectionState:     "diverged",
+		AttachedWorkspaceID: nullString(workspace.ID),
+		PlanDir:             nullString("plans/old"),
 		ImportedHeadEntryID: nullString("old-user"),
 		LastError:           sql.NullString{},
 		MetadataJson:        nullString(oldMetadata),
@@ -3721,17 +3719,16 @@ func TestBuildWorkspaceSessionState(t *testing.T) {
 	}
 	if _, err := service.queries.CreateAgentSession(ctx, db.CreateAgentSessionParams{
 		ID:                  "session-malformed",
-		WorkspaceID:         nullString(workspace.ID),
-		ThreadID:            sql.NullString{},
-		UserEmail:           nullString("user@example.com"),
-		Source:              "adopted",
-		SessionPath:         nullString("/tmp/malformed.jsonl"),
-		SessionID:           nullString("pi-malformed"),
+		ProjectedThreadID:   sql.NullString{},
+		IndexedByUserEmail:  nullString("user@example.com"),
+		IdentityKind:        "global_pi",
+		ArtifactPath:        nullString("/tmp/malformed.jsonl"),
+		ExternalSessionID:   nullString("pi-malformed"),
 		ParentSessionID:     sql.NullString{},
 		Cwd:                 sql.NullString{},
-		Status:              "pending",
-		InferredWorkspaceID: sql.NullString{},
-		InferredPlanDir:     sql.NullString{},
+		ProjectionState:     "pending",
+		AttachedWorkspaceID: sql.NullString{},
+		PlanDir:             sql.NullString{},
 		ImportedHeadEntryID: sql.NullString{},
 		LastError:           nullString("bad metadata"),
 		MetadataJson:        nullString("{not json"),
@@ -3943,6 +3940,42 @@ func TestBuildPlanSessionStateFiltersOtherUsersAndWorkspaces(t *testing.T) {
 			"history = %#v, want current user's active workspace session only",
 			state.History,
 		)
+	}
+}
+
+func TestPlanOwnedAgentSessionsSharedAcrossUsers(t *testing.T) {
+	ctx := t.Context()
+	service := newTestAgentChatService(t)
+	workspace, _ := mustCreateWorkspaceThreadForHandlerTest(
+		t,
+		service,
+		"user@example.com",
+	)
+	planRel, ok := service.thoughtsRelativePath(workspace.RootDocPath)
+	if !ok {
+		t.Fatalf("workspace root not under thoughts: %s", workspace.RootDocPath)
+	}
+	artifactPath := filepath.ToSlash(filepath.Join(planRel, ".sessions", "pi", "session.jsonl"))
+	_, err := service.queries.UpsertAgentSessionIndex(ctx, db.UpsertAgentSessionIndexParams{
+		ID:                "plan-owned-session",
+		IdentityKind:      "plan_owned",
+		ArtifactPath:      nullString(artifactPath),
+		PlanDir:           nullString(planRel),
+		Agent:             "pi",
+		FileSize:          1,
+		LastIndexedOffset: 1,
+		ProjectionState:   "needs_hydration",
+	})
+	if err != nil {
+		t.Fatalf("UpsertAgentSessionIndex: %v", err)
+	}
+
+	state, err := service.BuildPlanSessionState(ctx, "other@example.com", "other-workspace", workspace.RootDocPath, "", false)
+	if err != nil {
+		t.Fatalf("BuildPlanSessionState: %v", err)
+	}
+	if len(state.History) != 1 || state.History[0].ID != "plan-owned-session" {
+		t.Fatalf("history = %#v, want shared plan-owned session", state.History)
 	}
 }
 
@@ -4272,17 +4305,16 @@ func TestBuildWorkspaceLogStateFiltersBeforeLimit(t *testing.T) {
 
 	if _, err := service.queries.CreateAgentSession(ctx, db.CreateAgentSessionParams{
 		ID:                  "session-1",
-		WorkspaceID:         nullString(workspace.ID),
-		ThreadID:            nullString(thread.ID),
-		UserEmail:           nullString("user@example.com"),
-		Source:              "adopted",
-		SessionPath:         nullString("/tmp/workspace-log.jsonl"),
-		SessionID:           nullString("pi-session-1"),
+		ProjectedThreadID:   nullString(thread.ID),
+		IndexedByUserEmail:  nullString("user@example.com"),
+		IdentityKind:        "global_pi",
+		ArtifactPath:        nullString("/tmp/workspace-log.jsonl"),
+		ExternalSessionID:   nullString("pi-session-1"),
 		ParentSessionID:     sql.NullString{},
 		Cwd:                 nullString(workspace.RootDocPath),
-		Status:              "imported",
-		InferredWorkspaceID: nullString(workspace.ID),
-		InferredPlanDir:     sql.NullString{},
+		ProjectionState:     "imported",
+		AttachedWorkspaceID: nullString(workspace.ID),
+		PlanDir:             sql.NullString{},
 		ImportedHeadEntryID: sql.NullString{},
 		LastError:           sql.NullString{},
 		MetadataJson:        sql.NullString{},
@@ -5210,30 +5242,30 @@ func mustCreateAgentSession(
 	workspaceID string,
 ) db.AgentSession {
 	t.Helper()
+	storedPlanDir := planDir
+	if rel, ok := service.thoughtsRelativePath(planDir); ok {
+		storedPlanDir = rel
+	}
 	session, err := service.queries.CreateAgentSession(
 		t.Context(),
 		db.CreateAgentSessionParams{
-			ID: id,
-			WorkspaceID: sql.NullString{
-				String: workspaceID,
-				Valid:  workspaceID != "",
-			},
-			ThreadID: sql.NullString{String: threadID, Valid: threadID != ""},
-			UserEmail: sql.NullString{
+			ID:                  id,
+			AttachedWorkspaceID: sql.NullString{String: workspaceID, Valid: workspaceID != ""},
+			ProjectedThreadID:   sql.NullString{String: threadID, Valid: threadID != ""},
+			IndexedByUserEmail: sql.NullString{
 				String: userEmail,
 				Valid:  userEmail != "",
 			},
-			Source: "terminal",
-			SessionPath: sql.NullString{
+			IdentityKind: "global_pi",
+			ArtifactPath: sql.NullString{
 				String: filepath.Join(t.TempDir(), id+".jsonl"),
 				Valid:  true,
 			},
-			SessionID:           sql.NullString{String: id, Valid: true},
+			ExternalSessionID:   sql.NullString{String: id, Valid: true},
 			ParentSessionID:     sql.NullString{},
 			Cwd:                 sql.NullString{String: planDir, Valid: planDir != ""},
-			Status:              "unassigned",
-			InferredWorkspaceID: sql.NullString{},
-			InferredPlanDir:     sql.NullString{String: planDir, Valid: planDir != ""},
+			ProjectionState:     "unassigned",
+			PlanDir:             sql.NullString{String: storedPlanDir, Valid: storedPlanDir != ""},
 			ImportedHeadEntryID: sql.NullString{},
 			LastError:           sql.NullString{},
 			MetadataJson:        sql.NullString{},

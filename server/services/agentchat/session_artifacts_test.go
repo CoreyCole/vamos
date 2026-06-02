@@ -140,17 +140,16 @@ func TestHydrateSessionArtifactImportsColdPlanOwnedSession(t *testing.T) {
 	writePiSessionFile(t, sessionPath, piImportFixtureLines(artifactPath)...)
 
 	_, err := service.queries.UpsertAgentSessionIndex(context.Background(), db.UpsertAgentSessionIndexParams{
-		ID:                "indexed-session",
-		UserEmail:         nullableString("user@example.com"),
-		Source:            string(AgentSessionSourceTerminal),
-		SessionPath:       nullableString(sessionPath),
-		SessionID:         nullableString("session-1"),
-		Agent:             "pi",
-		FileSize:          int64(len([]byte("x"))),
-		LastIndexedOffset: int64(len([]byte("x"))),
-		NeedsHydration:    1,
-		Status:            "pending",
-		InferredPlanDir:   nullableString(planDir),
+		ID:                 "indexed-session",
+		IndexedByUserEmail: nullableString("user@example.com"),
+		IdentityKind:       "global_pi",
+		ArtifactPath:       nullableString(sessionPath),
+		ExternalSessionID:  nullableString("session-1"),
+		Agent:              "pi",
+		FileSize:           int64(len([]byte("x"))),
+		LastIndexedOffset:  int64(len([]byte("x"))),
+		ProjectionState:    "needs_hydration",
+		PlanDir:            nullableString(planDir),
 	})
 	if err != nil {
 		t.Fatalf("UpsertAgentSessionIndex: %v", err)
@@ -167,8 +166,8 @@ func TestHydrateSessionArtifactImportsColdPlanOwnedSession(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetAgentSessionByPath: %v", err)
 	}
-	if row.NeedsHydration != 0 || !row.ThreadID.Valid {
-		t.Fatalf("row hydration/thread = %d/%v, want hydrated linked thread", row.NeedsHydration, row.ThreadID)
+	if row.ProjectionState == "needs_hydration" || !row.ProjectedThreadID.Valid {
+		t.Fatalf("row hydration/thread = %s/%v, want hydrated linked thread", row.ProjectionState, row.ProjectedThreadID)
 	}
 }
 

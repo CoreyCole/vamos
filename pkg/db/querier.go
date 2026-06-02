@@ -56,7 +56,7 @@ type Querier interface {
 	GetAgentRun(ctx context.Context, id string) (AgentRun, error)
 	GetAgentRunForWorkspace(ctx context.Context, arg GetAgentRunForWorkspaceParams) (AgentRun, error)
 	GetAgentSession(ctx context.Context, id string) (AgentSession, error)
-	GetAgentSessionByPath(ctx context.Context, sessionPath sql.NullString) (AgentSession, error)
+	GetAgentSessionByPath(ctx context.Context, artifactPath sql.NullString) (AgentSession, error)
 	GetAgentThread(ctx context.Context, id string) (AgentThread, error)
 	GetAgentThreadForUser(ctx context.Context, arg GetAgentThreadForUserParams) (AgentThread, error)
 	GetAgentThreadForWorkspaceUser(ctx context.Context, arg GetAgentThreadForWorkspaceUserParams) (AgentThread, error)
@@ -103,10 +103,7 @@ type Querier interface {
 	ListAgentRunsByThread(ctx context.Context, threadID string) ([]AgentRun, error)
 	ListAgentRunsByWorkspace(ctx context.Context, workspaceID sql.NullString) ([]AgentRun, error)
 	ListAgentRunsByWorkspaceNode(ctx context.Context, arg ListAgentRunsByWorkspaceNodeParams) ([]AgentRun, error)
-	ListAgentSessionsByPlanDir(ctx context.Context, arg ListAgentSessionsByPlanDirParams) ([]AgentSession, error)
-	ListAgentSessionsByPlanDirPrefix(ctx context.Context, arg ListAgentSessionsByPlanDirPrefixParams) ([]AgentSession, error)
-	ListAgentSessionsByWorkspace(ctx context.Context, workspaceID sql.NullString) ([]AgentSession, error)
-	ListAgentSessionsForUser(ctx context.Context, userEmail sql.NullString) ([]AgentSession, error)
+	ListAgentSessionsByWorkspace(ctx context.Context, attachedWorkspaceID sql.NullString) ([]AgentSession, error)
 	ListAgentSurfaceAttachmentsBySession(ctx context.Context, chatSessionID string) ([]AgentSurfaceAttachment, error)
 	ListAgentThreads(ctx context.Context, arg ListAgentThreadsParams) ([]AgentThread, error)
 	ListAgentThreadsByWorkspace(ctx context.Context, workspaceID string) ([]AgentThread, error)
@@ -121,7 +118,12 @@ type Querier interface {
 	ListDocumentComments(ctx context.Context, arg ListDocumentCommentsParams) ([]DocumentComment, error)
 	ListImplWorkspaces(ctx context.Context, projectID string) ([]ImplWorkspace, error)
 	ListOpenChatAnnotationsByIDs(ctx context.Context, ids []string) ([]ChatAnnotation, error)
+	ListPlanOwnedSessionArtifactsByPlanDir(ctx context.Context, planDir sql.NullString) ([]AgentSession, error)
+	ListPlanOwnedSessionArtifactsByPlanDirPrefix(ctx context.Context, arg ListPlanOwnedSessionArtifactsByPlanDirPrefixParams) ([]AgentSession, error)
 	ListPlanWorkspaces(ctx context.Context, projectID string) ([]PlanWorkspace, error)
+	ListPrivateSessionArtifactsByPlanDir(ctx context.Context, arg ListPrivateSessionArtifactsByPlanDirParams) ([]AgentSession, error)
+	ListPrivateSessionArtifactsByPlanDirPrefix(ctx context.Context, arg ListPrivateSessionArtifactsByPlanDirPrefixParams) ([]AgentSession, error)
+	ListPrivateSessionArtifactsForUser(ctx context.Context, indexedByUserEmail sql.NullString) ([]AgentSession, error)
 	ListRecentReleaseQueueItems(ctx context.Context, limit int64) ([]ReleaseQueueItem, error)
 	ListRecentWorkspaceErrorEvents(ctx context.Context, limit int64) ([]WorkspaceErrorEvent, error)
 	ListRecentWorkspaceErrorEventsForWorkspace(ctx context.Context, arg ListRecentWorkspaceErrorEventsForWorkspaceParams) ([]WorkspaceErrorEvent, error)
@@ -136,7 +138,7 @@ type Querier interface {
 	ListWorkspaces(ctx context.Context, limit int64) ([]Workspace, error)
 	ListWorkspacesForUser(ctx context.Context, arg ListWorkspacesForUserParams) ([]Workspace, error)
 	LogAuthAttempt(ctx context.Context, arg LogAuthAttemptParams) (AuthAttempt, error)
-	MarkAgentSessionHydratedByPath(ctx context.Context, sessionPath sql.NullString) error
+	MarkAgentSessionHydratedByPath(ctx context.Context, artifactPath sql.NullString) error
 	MarkAllActiveImplWorkspacesCleanedUp(ctx context.Context) (int64, error)
 	MarkImplWorkspaceCleanedUp(ctx context.Context, arg MarkImplWorkspaceCleanedUpParams) (int64, error)
 	MarkImplWorkspaceMergeUnknown(ctx context.Context, arg MarkImplWorkspaceMergeUnknownParams) (int64, error)
@@ -154,7 +156,7 @@ type Querier interface {
 	ResolveWorkspaceForDocPath(ctx context.Context, arg ResolveWorkspaceForDocPathParams) (ResolveWorkspaceForDocPathRow, error)
 	SoftDeleteDocumentComment(ctx context.Context, id string) error
 	TestSupportCountAgentSessions(ctx context.Context) (int64, error)
-	TestSupportCountAgentSessionsByPath(ctx context.Context, sessionPath sql.NullString) (int64, error)
+	TestSupportCountAgentSessionsByPath(ctx context.Context, artifactPath sql.NullString) (int64, error)
 	TestSupportCountChatSessionEvents(ctx context.Context, sessionID string) (int64, error)
 	// Test/support queries for assertions that intentionally inspect persistence shape.
 	// Keep production code on service/query helpers; use these only from tests.

@@ -25,11 +25,11 @@ func (q *Queries) TestSupportCountAgentSessions(ctx context.Context) (int64, err
 const testSupportCountAgentSessionsByPath = `-- name: TestSupportCountAgentSessionsByPath :one
 SELECT COUNT(*)
 FROM agent_sessions
-WHERE session_path = ?1
+WHERE artifact_path = ?1
 `
 
-func (q *Queries) TestSupportCountAgentSessionsByPath(ctx context.Context, sessionPath sql.NullString) (int64, error) {
-	row := q.db.QueryRowContext(ctx, testSupportCountAgentSessionsByPath, sessionPath)
+func (q *Queries) TestSupportCountAgentSessionsByPath(ctx context.Context, artifactPath sql.NullString) (int64, error) {
+	row := q.db.QueryRowContext(ctx, testSupportCountAgentSessionsByPath, artifactPath)
 	var count int64
 	err := row.Scan(&count)
 	return count, err
@@ -129,14 +129,14 @@ func (q *Queries) TestSupportCountWorkspacesByRootDocPath(ctx context.Context, r
 }
 
 const testSupportGetAgentSessionWorkspaceID = `-- name: TestSupportGetAgentSessionWorkspaceID :one
-SELECT workspace_id
+SELECT attached_workspace_id
 FROM agent_sessions
 WHERE id = ?1
 `
 
 func (q *Queries) TestSupportGetAgentSessionWorkspaceID(ctx context.Context, id string) (sql.NullString, error) {
 	row := q.db.QueryRowContext(ctx, testSupportGetAgentSessionWorkspaceID, id)
-	var workspace_id sql.NullString
-	err := row.Scan(&workspace_id)
-	return workspace_id, err
+	var attached_workspace_id sql.NullString
+	err := row.Scan(&attached_workspace_id)
+	return attached_workspace_id, err
 }

@@ -245,7 +245,7 @@ func TestImportPiSessionPartialBatchFailureCanRetry(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetAgentSession() error = %v", err)
 	}
-	if session.Status != "failed" || session.LastImportedAt.Valid ||
+	if session.ProjectionState != "failed" || session.LastImportedAt.Valid ||
 		!session.LastError.Valid {
 		t.Fatalf("session = %+v, want failed without last_imported_at", session)
 	}

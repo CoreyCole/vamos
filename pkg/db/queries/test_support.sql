@@ -18,7 +18,7 @@ WHERE
     AND role = 'related';
 
 -- name: TestSupportGetAgentSessionWorkspaceID :one
-SELECT workspace_id
+SELECT attached_workspace_id
 FROM agent_sessions
 WHERE id = sqlc.arg('id');
 
@@ -34,7 +34,7 @@ FROM agent_sessions;
 -- name: TestSupportCountAgentSessionsByPath :one
 SELECT COUNT(*)
 FROM agent_sessions
-WHERE session_path = sqlc.arg('session_path');
+WHERE artifact_path = sqlc.arg('artifact_path');
 
 -- name: TestSupportCountWorkspaces :one
 SELECT COUNT(*)

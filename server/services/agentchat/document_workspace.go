@@ -64,7 +64,7 @@ func (s *Service) OpenDocumentWorkspace(
 	workspace, err := q.FindWorkspaceByRootDocPathForUser(
 		ctx,
 		db.FindWorkspaceByRootDocPathForUserParams{
-			UserEmail:    userEmail,
+			UserEmail:   userEmail,
 			RootDocPath: root,
 		},
 	)
@@ -82,31 +82,31 @@ func (s *Service) OpenDocumentWorkspace(
 			Title: validateWorkspaceTitle(
 				"Chat: " + filepath.Base(docAbs),
 			),
-			RootDocPath:         root,
-			Cwd:                  nullString(root),
-			WorkflowType:         string(WorkspaceWorkflowFreeform),
-			WorkflowStateJson:    sql.NullString{},
-			Source:               string(WorkspaceSourceWeb),
-			SelectedThreadID:     sql.NullString{},
-			SelectedDocPath: nullString(rel),
+			RootDocPath:       root,
+			Cwd:               nullString(root),
+			WorkflowType:      string(WorkspaceWorkflowFreeform),
+			WorkflowStateJson: sql.NullString{},
+			Source:            string(WorkspaceSourceWeb),
+			SelectedThreadID:  sql.NullString{},
+			SelectedDocPath:   nullString(rel),
 		})
 		if err != nil {
 			return DocumentWorkspaceOpenResult{}, err
 		}
 	} else if err := q.UpdateWorkspaceSelectedDoc(ctx, db.UpdateWorkspaceSelectedDocParams{
-		ID:                   workspace.ID,
+		ID:              workspace.ID,
 		SelectedDocPath: nullString(rel),
 	}); err != nil {
 		return DocumentWorkspaceOpenResult{}, err
 	}
 
 	if _, err := s.AppendWorkspaceEvent(ctx, q, AppendWorkspaceEventInput{
-		WorkspaceID:  workspace.ID,
-		EventType:    "doc_selected",
-		ActorEmail:   userEmail,
-		ActorType:    "user",
-		DocPath: rel,
-		EventKey:     "doc_selected:" + rel,
+		WorkspaceID: workspace.ID,
+		EventType:   "doc_selected",
+		ActorEmail:  userEmail,
+		ActorType:   "user",
+		DocPath:     rel,
+		EventKey:    "doc_selected:" + rel,
 	}); err != nil {
 		return DocumentWorkspaceOpenResult{}, err
 	}

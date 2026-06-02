@@ -526,17 +526,15 @@ func (s *PlanWorkspaceSyncer) syncPlanAgentSessions(
 		metadata, _ := jsonMarshalString(item)
 		row, err := s.Queries.UpsertAgentSessionIndex(ctx, db.UpsertAgentSessionIndexParams{
 			ID:                     uuid.NewString(),
-			WorkspaceID:            sql.NullString{},
-			ThreadID:               sql.NullString{},
-			UserEmail:              sql.NullString{},
-			Source:                 string(AgentSessionSourceTerminal),
-			SessionPath:            nullableString(item.Path),
-			SessionID:              nullableString(item.SessionID),
-			ParentSessionID:        nullableString(item.ContinuedFromSessionID),
-			Cwd:                    nullableString(item.CWD),
-			Agent:                  item.Agent,
+			IdentityKind:           "plan_owned",
+			ArtifactPath:           nullableString(item.Path),
+			PlanDir:                nullableString(item.PlanDir),
 			ParentPlanDir:          nullableString(item.ParentPlanDir),
 			SourceReviewDir:        nullableString(item.SourceReviewDir),
+			Agent:                  item.Agent,
+			ExternalSessionID:      nullableString(item.SessionID),
+			ParentSessionID:        nullableString(item.ContinuedFromSessionID),
+			Cwd:                    nullableString(item.CWD),
 			WorkflowID:             nullableString(item.WorkflowID),
 			WorkflowNodeID:         nullableString(item.NodeID),
 			ContinuedFromSessionID: nullableString(item.ContinuedFromSessionID),
@@ -545,10 +543,10 @@ func (s *PlanWorkspaceSyncer) syncPlanAgentSessions(
 			FileMtime:              sql.NullTime{Time: item.MTime, Valid: !item.MTime.IsZero()},
 			FileHash:               nullableString(item.Hash),
 			LastIndexedOffset:      item.LastOffset,
-			NeedsHydration:         boolInt(item.NeedsHydration),
-			Status:                 "pending",
-			InferredWorkspaceID:    sql.NullString{},
-			InferredPlanDir:        nullableString(item.PlanDir),
+			ProjectionState:        "needs_hydration",
+			ProjectedThreadID:      sql.NullString{},
+			IndexedByUserEmail:     sql.NullString{},
+			AttachedWorkspaceID:    sql.NullString{},
 			LastError:              sql.NullString{},
 			MetadataJson:           nullableString(metadata),
 		})
@@ -566,10 +564,10 @@ func (s *PlanWorkspaceSyncer) syncPlanAgentSessions(
 }
 
 func agentSessionIndexChanged(before, after db.AgentSession) bool {
-	return before.SessionID != after.SessionID ||
+	return before.ExternalSessionID != after.ExternalSessionID ||
 		before.ParentSessionID != after.ParentSessionID ||
 		before.Cwd != after.Cwd ||
-		before.InferredPlanDir != after.InferredPlanDir ||
+		before.PlanDir != after.PlanDir ||
 		before.Agent != after.Agent ||
 		before.ParentPlanDir != after.ParentPlanDir ||
 		before.SourceReviewDir != after.SourceReviewDir ||
@@ -581,7 +579,7 @@ func agentSessionIndexChanged(before, after db.AgentSession) bool {
 		before.FileMtime != after.FileMtime ||
 		before.FileHash != after.FileHash ||
 		before.LastIndexedOffset != after.LastIndexedOffset ||
-		before.NeedsHydration != after.NeedsHydration
+		before.ProjectionState != after.ProjectionState
 }
 
 func jsonMarshalString(value any) (string, error) {

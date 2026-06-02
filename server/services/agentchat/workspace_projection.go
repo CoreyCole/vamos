@@ -365,7 +365,7 @@ func (s *Service) trustedImportedWorkspace(
 		return db.Workspace{}, err
 	}
 	for _, session := range sessions {
-		if isTrustedImportedSessionStatus(session.Status) {
+		if isTrustedImportedSessionStatus(session.ProjectionState) {
 			return workspace, nil
 		}
 	}
@@ -378,11 +378,11 @@ func hasImportedSessionForThread(sessions []db.AgentSession, threadID string) bo
 		return false
 	}
 	for _, session := range sessions {
-		if !session.ThreadID.Valid ||
-			strings.TrimSpace(session.ThreadID.String) != threadID {
+		if !session.ProjectedThreadID.Valid ||
+			strings.TrimSpace(session.ProjectedThreadID.String) != threadID {
 			continue
 		}
-		if isTrustedImportedSessionStatus(session.Status) {
+		if isTrustedImportedSessionStatus(session.ProjectionState) {
 			return true
 		}
 	}
@@ -391,7 +391,7 @@ func hasImportedSessionForThread(sessions []db.AgentSession, threadID string) bo
 
 func isTrustedImportedSessionStatus(status string) bool {
 	switch strings.TrimSpace(status) {
-	case "imported", "diverged":
+	case "hydrated", "imported", "diverged":
 		return true
 	default:
 		return false
@@ -621,31 +621,49 @@ func (s *Service) BuildPlanSessionState(
 
 	workspaceID = strings.TrimSpace(workspaceID)
 	userEmail = strings.TrimSpace(userEmail)
-	var sessions []db.AgentSession
+	planRel, ok := s.thoughtsRelativePath(canonical)
+	if !ok {
+		planRel = filepath.ToSlash(canonical)
+	}
+	var planOwned []db.AgentSession
+	var private []db.AgentSession
 	var err error
 	if includeDescendants {
-		sessions, err = s.queries.ListAgentSessionsByPlanDirPrefix(
+		planOwned, err = s.queries.ListPlanOwnedSessionArtifactsByPlanDirPrefix(
 			ctx,
-			db.ListAgentSessionsByPlanDirPrefixParams{
-				UserEmail:     nullString(userEmail),
-				WorkspaceID:   workspaceID,
-				PlanDir:       nullString(canonical),
-				PlanDirPrefix: nullString(canonical + string(filepath.Separator) + "%"),
+			db.ListPlanOwnedSessionArtifactsByPlanDirPrefixParams{
+				PlanDir:       nullString(planRel),
+				PlanDirPrefix: nullString(planRel + "/%"),
 			},
 		)
+		if err == nil {
+			private, err = s.queries.ListPrivateSessionArtifactsByPlanDirPrefix(
+				ctx,
+				db.ListPrivateSessionArtifactsByPlanDirPrefixParams{
+					IndexedByUserEmail:  nullString(userEmail),
+					AttachedWorkspaceID: workspaceID,
+					PlanDir:             nullString(planRel),
+					PlanDirPrefix:       nullString(planRel + "/%"),
+				},
+			)
+		}
 	} else {
-		sessions, err = s.queries.ListAgentSessionsByPlanDir(
-			ctx,
-			db.ListAgentSessionsByPlanDirParams{
-				UserEmail:   nullString(userEmail),
-				WorkspaceID: workspaceID,
-				PlanDir:     nullString(canonical),
-			},
-		)
+		planOwned, err = s.queries.ListPlanOwnedSessionArtifactsByPlanDir(ctx, nullString(planRel))
+		if err == nil {
+			private, err = s.queries.ListPrivateSessionArtifactsByPlanDir(
+				ctx,
+				db.ListPrivateSessionArtifactsByPlanDirParams{
+					IndexedByUserEmail:  nullString(userEmail),
+					PlanDir:             nullString(planRel),
+					AttachedWorkspaceID: workspaceID,
+				},
+			)
+		}
 	}
 	if err != nil {
 		return WorkspaceSessionState{}, err
 	}
+	sessions := mergeAgentSessionsByUpdatedAt(planOwned, private)
 	return s.workspaceSessionStateFromRows(
 		ctx,
 		sessions,
@@ -653,6 +671,39 @@ func (s *Service) BuildPlanSessionState(
 		canonical,
 		includeDescendants,
 	), nil
+}
+
+func (s *Service) thoughtsRelativePath(raw string) (string, bool) {
+	clean := strings.TrimSpace(raw)
+	if clean == "" || strings.TrimSpace(s.thoughtsRoot) == "" {
+		return "", false
+	}
+	if !filepath.IsAbs(clean) && s.projectRoot != "" {
+		clean = filepath.Join(s.projectRoot, clean)
+	}
+	if abs, err := filepath.Abs(clean); err == nil {
+		clean = abs
+	}
+	rel, err := filepath.Rel(filepath.Clean(s.thoughtsRoot), filepath.Clean(clean))
+	if err != nil || rel == "." || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+		return "", false
+	}
+	return filepath.ToSlash(rel), true
+}
+
+func mergeAgentSessionsByUpdatedAt(groups ...[]db.AgentSession) []db.AgentSession {
+	total := 0
+	for _, group := range groups {
+		total += len(group)
+	}
+	sessions := make([]db.AgentSession, 0, total)
+	for _, group := range groups {
+		sessions = append(sessions, group...)
+	}
+	sort.SliceStable(sessions, func(i, j int) bool {
+		return sessions[i].UpdatedAt.After(sessions[j].UpdatedAt)
+	})
+	return sessions
 }
 
 func (s *Service) workspaceSessionStateFromRows(
@@ -672,10 +723,10 @@ func (s *Service) workspaceSessionStateFromRows(
 	for _, session := range sessions {
 		summary := s.workspaceSessionSummary(ctx, session)
 		sessionPlanDir := planDir
-		if strings.TrimSpace(sessionPlanDir) == "" && session.WorkspaceID.Valid {
+		if strings.TrimSpace(sessionPlanDir) == "" && session.AttachedWorkspaceID.Valid {
 			if workspace, err := s.queries.GetWorkspace(
 				ctx,
-				session.WorkspaceID.String,
+				session.AttachedWorkspaceID.String,
 			); err == nil {
 				sessionPlanDir = workspace.RootDocPath
 			}
@@ -729,10 +780,10 @@ func (s *Service) workspaceSessionSummary(
 		FirstPromptText: strings.TrimSpace(metadata.FirstUserText),
 		ImportStats:     metadata.Stats,
 	}
-	if session.ThreadID.Valid && strings.TrimSpace(session.ThreadID.String) != "" {
+	if session.ProjectedThreadID.Valid && strings.TrimSpace(session.ProjectedThreadID.String) != "" {
 		if thread, err := s.queries.GetAgentThread(
 			ctx,
-			session.ThreadID.String,
+			session.ProjectedThreadID.String,
 		); err == nil {
 			summary.ThreadTitle = thread.Title
 			if summary.FirstPromptText == "" {
@@ -812,15 +863,15 @@ func (s *Service) workspaceSessionHistoryItem(
 	summary WorkspaceSessionSummary,
 ) WorkspaceSessionHistoryItem {
 	threadID := ""
-	if session.ThreadID.Valid {
-		threadID = strings.TrimSpace(session.ThreadID.String)
+	if session.ProjectedThreadID.Valid {
+		threadID = strings.TrimSpace(session.ProjectedThreadID.String)
 	}
 	title := strings.TrimSpace(summary.Header.ID)
 	if title == "" {
 		title = strings.TrimSpace(summary.ThreadTitle)
 	}
 	if title == "" {
-		title = strings.TrimSpace(session.SessionID.String)
+		title = strings.TrimSpace(session.ExternalSessionID.String)
 	}
 	if title == "" {
 		title = session.ID
@@ -829,16 +880,16 @@ func (s *Service) workspaceSessionHistoryItem(
 		ID:       session.ID,
 		ThreadID: threadID,
 		ThreadHref: s.workspaceSessionThreadHref(
-			session.WorkspaceID.String,
+			session.AttachedWorkspaceID.String,
 			threadID,
 			planDir,
 		),
 		Title:              title,
-		Status:             strings.TrimSpace(session.Status),
-		SourceLabel:        strings.TrimSpace(session.Source),
+		Status:             strings.TrimSpace(session.ProjectionState),
+		SourceLabel:        strings.TrimSpace(session.IdentityKind),
 		CwdLabel:           strings.TrimSpace(session.Cwd.String),
-		SessionPathLabel:   strings.TrimSpace(session.SessionPath.String),
-		InferredPlanLabel:  strings.TrimSpace(session.InferredPlanDir.String),
+		SessionPathLabel:   strings.TrimSpace(session.ArtifactPath.String),
+		InferredPlanLabel:  strings.TrimSpace(session.PlanDir.String),
 		FirstPromptExcerpt: truncateSessionHistoryText(summary.FirstPromptText, 160),
 		FirstCommandLabel:  firstCommandFromPrompt(summary.FirstPromptText),
 		ImportStatsLabel:   importStatsLabel(summary.ImportStats),

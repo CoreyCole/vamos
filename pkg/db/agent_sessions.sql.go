@@ -14,35 +14,33 @@ const backfillAgentSessionsWorkspaceForThread = `-- name: BackfillAgentSessionsW
 ;
 
 UPDATE agent_sessions
-SET workspace_id = ?1
-WHERE thread_id = ?2
-AND (workspace_id IS NULL OR workspace_id = '')
+SET attached_workspace_id = ?1
+WHERE projected_thread_id = ?2
+AND (attached_workspace_id IS NULL OR attached_workspace_id = '')
 `
 
 type BackfillAgentSessionsWorkspaceForThreadParams struct {
-	WorkspaceID sql.NullString `json:"workspace_id"`
-	ThreadID    sql.NullString `json:"thread_id"`
+	AttachedWorkspaceID sql.NullString `json:"attached_workspace_id"`
+	ProjectedThreadID   sql.NullString `json:"projected_thread_id"`
 }
 
 func (q *Queries) BackfillAgentSessionsWorkspaceForThread(ctx context.Context, arg BackfillAgentSessionsWorkspaceForThreadParams) error {
-	_, err := q.db.ExecContext(ctx, backfillAgentSessionsWorkspaceForThread, arg.WorkspaceID, arg.ThreadID)
+	_, err := q.db.ExecContext(ctx, backfillAgentSessionsWorkspaceForThread, arg.AttachedWorkspaceID, arg.ProjectedThreadID)
 	return err
 }
 
 const createAgentSession = `-- name: CreateAgentSession :one
 INSERT INTO agent_sessions (
     id,
-    workspace_id,
-    thread_id,
-    user_email,
-    source,
-    session_path,
-    session_id,
-    parent_session_id,
-    cwd,
-    agent,
+    identity_kind,
+    artifact_path,
+    plan_dir,
     parent_plan_dir,
     source_review_dir,
+    agent,
+    external_session_id,
+    parent_session_id,
+    cwd,
     workflow_id,
     workflow_node_id,
     continued_from_session_id,
@@ -51,10 +49,10 @@ INSERT INTO agent_sessions (
     file_mtime,
     file_hash,
     last_indexed_offset,
-    needs_hydration,
-    status,
-    inferred_workspace_id,
-    inferred_plan_dir,
+    projection_state,
+    projected_thread_id,
+    indexed_by_user_email,
+    attached_workspace_id,
     imported_head_entry_id,
     last_error,
     metadata_json
@@ -64,46 +62,43 @@ VALUES (
     ?2,
     ?3,
     ?4,
+    NULL,
+    NULL,
+    'pi',
     ?5,
     ?6,
     ?7,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    0,
+    NULL,
+    NULL,
+    0,
     ?8,
     ?9,
-    'pi',
-    NULL,
-    NULL,
-    NULL,
-    NULL,
-    NULL,
-    NULL,
-    0,
-    NULL,
-    NULL,
-    0,
-    1,
     ?10,
     ?11,
     ?12,
     ?13,
-    ?14,
-    ?15
+    ?14
 )
-RETURNING id, workspace_id, thread_id, user_email, source, session_path, session_id, parent_session_id, cwd, agent, parent_plan_dir, source_review_dir, workflow_id, workflow_node_id, continued_from_session_id, forked_from_session_id, file_size, file_mtime, file_hash, last_indexed_offset, needs_hydration, status, inferred_workspace_id, inferred_plan_dir, imported_head_entry_id, last_imported_at, last_error, metadata_json, created_at, updated_at
+RETURNING id, identity_kind, artifact_path, plan_dir, parent_plan_dir, source_review_dir, agent, external_session_id, parent_session_id, cwd, workflow_id, workflow_node_id, continued_from_session_id, forked_from_session_id, file_size, file_mtime, file_hash, last_indexed_offset, projection_state, projected_thread_id, indexed_by_user_email, attached_workspace_id, imported_head_entry_id, last_imported_at, last_error, metadata_json, created_at, updated_at
 `
 
 type CreateAgentSessionParams struct {
 	ID                  string         `json:"id"`
-	WorkspaceID         sql.NullString `json:"workspace_id"`
-	ThreadID            sql.NullString `json:"thread_id"`
-	UserEmail           sql.NullString `json:"user_email"`
-	Source              string         `json:"source"`
-	SessionPath         sql.NullString `json:"session_path"`
-	SessionID           sql.NullString `json:"session_id"`
+	IdentityKind        string         `json:"identity_kind"`
+	ArtifactPath        sql.NullString `json:"artifact_path"`
+	PlanDir             sql.NullString `json:"plan_dir"`
+	ExternalSessionID   sql.NullString `json:"external_session_id"`
 	ParentSessionID     sql.NullString `json:"parent_session_id"`
 	Cwd                 sql.NullString `json:"cwd"`
-	Status              string         `json:"status"`
-	InferredWorkspaceID sql.NullString `json:"inferred_workspace_id"`
-	InferredPlanDir     sql.NullString `json:"inferred_plan_dir"`
+	ProjectionState     string         `json:"projection_state"`
+	ProjectedThreadID   sql.NullString `json:"projected_thread_id"`
+	IndexedByUserEmail  sql.NullString `json:"indexed_by_user_email"`
+	AttachedWorkspaceID sql.NullString `json:"attached_workspace_id"`
 	ImportedHeadEntryID sql.NullString `json:"imported_head_entry_id"`
 	LastError           sql.NullString `json:"last_error"`
 	MetadataJson        sql.NullString `json:"metadata_json"`
@@ -112,17 +107,16 @@ type CreateAgentSessionParams struct {
 func (q *Queries) CreateAgentSession(ctx context.Context, arg CreateAgentSessionParams) (AgentSession, error) {
 	row := q.db.QueryRowContext(ctx, createAgentSession,
 		arg.ID,
-		arg.WorkspaceID,
-		arg.ThreadID,
-		arg.UserEmail,
-		arg.Source,
-		arg.SessionPath,
-		arg.SessionID,
+		arg.IdentityKind,
+		arg.ArtifactPath,
+		arg.PlanDir,
+		arg.ExternalSessionID,
 		arg.ParentSessionID,
 		arg.Cwd,
-		arg.Status,
-		arg.InferredWorkspaceID,
-		arg.InferredPlanDir,
+		arg.ProjectionState,
+		arg.ProjectedThreadID,
+		arg.IndexedByUserEmail,
+		arg.AttachedWorkspaceID,
 		arg.ImportedHeadEntryID,
 		arg.LastError,
 		arg.MetadataJson,
@@ -130,17 +124,15 @@ func (q *Queries) CreateAgentSession(ctx context.Context, arg CreateAgentSession
 	var i AgentSession
 	err := row.Scan(
 		&i.ID,
-		&i.WorkspaceID,
-		&i.ThreadID,
-		&i.UserEmail,
-		&i.Source,
-		&i.SessionPath,
-		&i.SessionID,
-		&i.ParentSessionID,
-		&i.Cwd,
-		&i.Agent,
+		&i.IdentityKind,
+		&i.ArtifactPath,
+		&i.PlanDir,
 		&i.ParentPlanDir,
 		&i.SourceReviewDir,
+		&i.Agent,
+		&i.ExternalSessionID,
+		&i.ParentSessionID,
+		&i.Cwd,
 		&i.WorkflowID,
 		&i.WorkflowNodeID,
 		&i.ContinuedFromSessionID,
@@ -149,10 +141,10 @@ func (q *Queries) CreateAgentSession(ctx context.Context, arg CreateAgentSession
 		&i.FileMtime,
 		&i.FileHash,
 		&i.LastIndexedOffset,
-		&i.NeedsHydration,
-		&i.Status,
-		&i.InferredWorkspaceID,
-		&i.InferredPlanDir,
+		&i.ProjectionState,
+		&i.ProjectedThreadID,
+		&i.IndexedByUserEmail,
+		&i.AttachedWorkspaceID,
 		&i.ImportedHeadEntryID,
 		&i.LastImportedAt,
 		&i.LastError,
@@ -166,7 +158,7 @@ func (q *Queries) CreateAgentSession(ctx context.Context, arg CreateAgentSession
 const getAgentSession = `-- name: GetAgentSession :one
 ;
 
-SELECT id, workspace_id, thread_id, user_email, source, session_path, session_id, parent_session_id, cwd, agent, parent_plan_dir, source_review_dir, workflow_id, workflow_node_id, continued_from_session_id, forked_from_session_id, file_size, file_mtime, file_hash, last_indexed_offset, needs_hydration, status, inferred_workspace_id, inferred_plan_dir, imported_head_entry_id, last_imported_at, last_error, metadata_json, created_at, updated_at
+SELECT id, identity_kind, artifact_path, plan_dir, parent_plan_dir, source_review_dir, agent, external_session_id, parent_session_id, cwd, workflow_id, workflow_node_id, continued_from_session_id, forked_from_session_id, file_size, file_mtime, file_hash, last_indexed_offset, projection_state, projected_thread_id, indexed_by_user_email, attached_workspace_id, imported_head_entry_id, last_imported_at, last_error, metadata_json, created_at, updated_at
 FROM agent_sessions
 WHERE id = ?1
 `
@@ -176,17 +168,15 @@ func (q *Queries) GetAgentSession(ctx context.Context, id string) (AgentSession,
 	var i AgentSession
 	err := row.Scan(
 		&i.ID,
-		&i.WorkspaceID,
-		&i.ThreadID,
-		&i.UserEmail,
-		&i.Source,
-		&i.SessionPath,
-		&i.SessionID,
-		&i.ParentSessionID,
-		&i.Cwd,
-		&i.Agent,
+		&i.IdentityKind,
+		&i.ArtifactPath,
+		&i.PlanDir,
 		&i.ParentPlanDir,
 		&i.SourceReviewDir,
+		&i.Agent,
+		&i.ExternalSessionID,
+		&i.ParentSessionID,
+		&i.Cwd,
 		&i.WorkflowID,
 		&i.WorkflowNodeID,
 		&i.ContinuedFromSessionID,
@@ -195,10 +185,10 @@ func (q *Queries) GetAgentSession(ctx context.Context, id string) (AgentSession,
 		&i.FileMtime,
 		&i.FileHash,
 		&i.LastIndexedOffset,
-		&i.NeedsHydration,
-		&i.Status,
-		&i.InferredWorkspaceID,
-		&i.InferredPlanDir,
+		&i.ProjectionState,
+		&i.ProjectedThreadID,
+		&i.IndexedByUserEmail,
+		&i.AttachedWorkspaceID,
 		&i.ImportedHeadEntryID,
 		&i.LastImportedAt,
 		&i.LastError,
@@ -212,27 +202,25 @@ func (q *Queries) GetAgentSession(ctx context.Context, id string) (AgentSession,
 const getAgentSessionByPath = `-- name: GetAgentSessionByPath :one
 ;
 
-SELECT id, workspace_id, thread_id, user_email, source, session_path, session_id, parent_session_id, cwd, agent, parent_plan_dir, source_review_dir, workflow_id, workflow_node_id, continued_from_session_id, forked_from_session_id, file_size, file_mtime, file_hash, last_indexed_offset, needs_hydration, status, inferred_workspace_id, inferred_plan_dir, imported_head_entry_id, last_imported_at, last_error, metadata_json, created_at, updated_at
+SELECT id, identity_kind, artifact_path, plan_dir, parent_plan_dir, source_review_dir, agent, external_session_id, parent_session_id, cwd, workflow_id, workflow_node_id, continued_from_session_id, forked_from_session_id, file_size, file_mtime, file_hash, last_indexed_offset, projection_state, projected_thread_id, indexed_by_user_email, attached_workspace_id, imported_head_entry_id, last_imported_at, last_error, metadata_json, created_at, updated_at
 FROM agent_sessions
-WHERE session_path = ?1
+WHERE artifact_path = ?1
 `
 
-func (q *Queries) GetAgentSessionByPath(ctx context.Context, sessionPath sql.NullString) (AgentSession, error) {
-	row := q.db.QueryRowContext(ctx, getAgentSessionByPath, sessionPath)
+func (q *Queries) GetAgentSessionByPath(ctx context.Context, artifactPath sql.NullString) (AgentSession, error) {
+	row := q.db.QueryRowContext(ctx, getAgentSessionByPath, artifactPath)
 	var i AgentSession
 	err := row.Scan(
 		&i.ID,
-		&i.WorkspaceID,
-		&i.ThreadID,
-		&i.UserEmail,
-		&i.Source,
-		&i.SessionPath,
-		&i.SessionID,
-		&i.ParentSessionID,
-		&i.Cwd,
-		&i.Agent,
+		&i.IdentityKind,
+		&i.ArtifactPath,
+		&i.PlanDir,
 		&i.ParentPlanDir,
 		&i.SourceReviewDir,
+		&i.Agent,
+		&i.ExternalSessionID,
+		&i.ParentSessionID,
+		&i.Cwd,
 		&i.WorkflowID,
 		&i.WorkflowNodeID,
 		&i.ContinuedFromSessionID,
@@ -241,10 +229,10 @@ func (q *Queries) GetAgentSessionByPath(ctx context.Context, sessionPath sql.Nul
 		&i.FileMtime,
 		&i.FileHash,
 		&i.LastIndexedOffset,
-		&i.NeedsHydration,
-		&i.Status,
-		&i.InferredWorkspaceID,
-		&i.InferredPlanDir,
+		&i.ProjectionState,
+		&i.ProjectedThreadID,
+		&i.IndexedByUserEmail,
+		&i.AttachedWorkspaceID,
 		&i.ImportedHeadEntryID,
 		&i.LastImportedAt,
 		&i.LastError,
@@ -255,25 +243,17 @@ func (q *Queries) GetAgentSessionByPath(ctx context.Context, sessionPath sql.Nul
 	return i, err
 }
 
-const listAgentSessionsByPlanDir = `-- name: ListAgentSessionsByPlanDir :many
+const listAgentSessionsByWorkspace = `-- name: ListAgentSessionsByWorkspace :many
 ;
 
-SELECT id, workspace_id, thread_id, user_email, source, session_path, session_id, parent_session_id, cwd, agent, parent_plan_dir, source_review_dir, workflow_id, workflow_node_id, continued_from_session_id, forked_from_session_id, file_size, file_mtime, file_hash, last_indexed_offset, needs_hydration, status, inferred_workspace_id, inferred_plan_dir, imported_head_entry_id, last_imported_at, last_error, metadata_json, created_at, updated_at
+SELECT id, identity_kind, artifact_path, plan_dir, parent_plan_dir, source_review_dir, agent, external_session_id, parent_session_id, cwd, workflow_id, workflow_node_id, continued_from_session_id, forked_from_session_id, file_size, file_mtime, file_hash, last_indexed_offset, projection_state, projected_thread_id, indexed_by_user_email, attached_workspace_id, imported_head_entry_id, last_imported_at, last_error, metadata_json, created_at, updated_at
 FROM agent_sessions
-WHERE user_email = ?1
-AND inferred_plan_dir = ?2
-AND (?3 = '' OR workspace_id = ?3)
+WHERE attached_workspace_id = ?1
 ORDER BY updated_at DESC
 `
 
-type ListAgentSessionsByPlanDirParams struct {
-	UserEmail   sql.NullString `json:"user_email"`
-	PlanDir     sql.NullString `json:"plan_dir"`
-	WorkspaceID interface{}    `json:"workspace_id"`
-}
-
-func (q *Queries) ListAgentSessionsByPlanDir(ctx context.Context, arg ListAgentSessionsByPlanDirParams) ([]AgentSession, error) {
-	rows, err := q.db.QueryContext(ctx, listAgentSessionsByPlanDir, arg.UserEmail, arg.PlanDir, arg.WorkspaceID)
+func (q *Queries) ListAgentSessionsByWorkspace(ctx context.Context, attachedWorkspaceID sql.NullString) ([]AgentSession, error) {
+	rows, err := q.db.QueryContext(ctx, listAgentSessionsByWorkspace, attachedWorkspaceID)
 	if err != nil {
 		return nil, err
 	}
@@ -283,17 +263,15 @@ func (q *Queries) ListAgentSessionsByPlanDir(ctx context.Context, arg ListAgentS
 		var i AgentSession
 		if err := rows.Scan(
 			&i.ID,
-			&i.WorkspaceID,
-			&i.ThreadID,
-			&i.UserEmail,
-			&i.Source,
-			&i.SessionPath,
-			&i.SessionID,
-			&i.ParentSessionID,
-			&i.Cwd,
-			&i.Agent,
+			&i.IdentityKind,
+			&i.ArtifactPath,
+			&i.PlanDir,
 			&i.ParentPlanDir,
 			&i.SourceReviewDir,
+			&i.Agent,
+			&i.ExternalSessionID,
+			&i.ParentSessionID,
+			&i.Cwd,
 			&i.WorkflowID,
 			&i.WorkflowNodeID,
 			&i.ContinuedFromSessionID,
@@ -302,10 +280,10 @@ func (q *Queries) ListAgentSessionsByPlanDir(ctx context.Context, arg ListAgentS
 			&i.FileMtime,
 			&i.FileHash,
 			&i.LastIndexedOffset,
-			&i.NeedsHydration,
-			&i.Status,
-			&i.InferredWorkspaceID,
-			&i.InferredPlanDir,
+			&i.ProjectionState,
+			&i.ProjectedThreadID,
+			&i.IndexedByUserEmail,
+			&i.AttachedWorkspaceID,
 			&i.ImportedHeadEntryID,
 			&i.LastImportedAt,
 			&i.LastError,
@@ -326,31 +304,228 @@ func (q *Queries) ListAgentSessionsByPlanDir(ctx context.Context, arg ListAgentS
 	return items, nil
 }
 
-const listAgentSessionsByPlanDirPrefix = `-- name: ListAgentSessionsByPlanDirPrefix :many
+const listPlanOwnedSessionArtifactsByPlanDir = `-- name: ListPlanOwnedSessionArtifactsByPlanDir :many
 ;
 
-SELECT id, workspace_id, thread_id, user_email, source, session_path, session_id, parent_session_id, cwd, agent, parent_plan_dir, source_review_dir, workflow_id, workflow_node_id, continued_from_session_id, forked_from_session_id, file_size, file_mtime, file_hash, last_indexed_offset, needs_hydration, status, inferred_workspace_id, inferred_plan_dir, imported_head_entry_id, last_imported_at, last_error, metadata_json, created_at, updated_at
+SELECT id, identity_kind, artifact_path, plan_dir, parent_plan_dir, source_review_dir, agent, external_session_id, parent_session_id, cwd, workflow_id, workflow_node_id, continued_from_session_id, forked_from_session_id, file_size, file_mtime, file_hash, last_indexed_offset, projection_state, projected_thread_id, indexed_by_user_email, attached_workspace_id, imported_head_entry_id, last_imported_at, last_error, metadata_json, created_at, updated_at
 FROM agent_sessions
-WHERE user_email = ?1
-AND (?2 = '' OR workspace_id = ?2)
-AND (
-inferred_plan_dir = ?3
-OR inferred_plan_dir LIKE ?4
-)
+WHERE identity_kind = 'plan_owned'
+AND plan_dir = ?1
 ORDER BY updated_at DESC
 `
 
-type ListAgentSessionsByPlanDirPrefixParams struct {
-	UserEmail     sql.NullString `json:"user_email"`
-	WorkspaceID   interface{}    `json:"workspace_id"`
+func (q *Queries) ListPlanOwnedSessionArtifactsByPlanDir(ctx context.Context, planDir sql.NullString) ([]AgentSession, error) {
+	rows, err := q.db.QueryContext(ctx, listPlanOwnedSessionArtifactsByPlanDir, planDir)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []AgentSession
+	for rows.Next() {
+		var i AgentSession
+		if err := rows.Scan(
+			&i.ID,
+			&i.IdentityKind,
+			&i.ArtifactPath,
+			&i.PlanDir,
+			&i.ParentPlanDir,
+			&i.SourceReviewDir,
+			&i.Agent,
+			&i.ExternalSessionID,
+			&i.ParentSessionID,
+			&i.Cwd,
+			&i.WorkflowID,
+			&i.WorkflowNodeID,
+			&i.ContinuedFromSessionID,
+			&i.ForkedFromSessionID,
+			&i.FileSize,
+			&i.FileMtime,
+			&i.FileHash,
+			&i.LastIndexedOffset,
+			&i.ProjectionState,
+			&i.ProjectedThreadID,
+			&i.IndexedByUserEmail,
+			&i.AttachedWorkspaceID,
+			&i.ImportedHeadEntryID,
+			&i.LastImportedAt,
+			&i.LastError,
+			&i.MetadataJson,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listPlanOwnedSessionArtifactsByPlanDirPrefix = `-- name: ListPlanOwnedSessionArtifactsByPlanDirPrefix :many
+;
+
+SELECT id, identity_kind, artifact_path, plan_dir, parent_plan_dir, source_review_dir, agent, external_session_id, parent_session_id, cwd, workflow_id, workflow_node_id, continued_from_session_id, forked_from_session_id, file_size, file_mtime, file_hash, last_indexed_offset, projection_state, projected_thread_id, indexed_by_user_email, attached_workspace_id, imported_head_entry_id, last_imported_at, last_error, metadata_json, created_at, updated_at
+FROM agent_sessions
+WHERE identity_kind = 'plan_owned'
+AND (plan_dir = ?1 OR plan_dir LIKE ?2)
+ORDER BY updated_at DESC
+`
+
+type ListPlanOwnedSessionArtifactsByPlanDirPrefixParams struct {
 	PlanDir       sql.NullString `json:"plan_dir"`
 	PlanDirPrefix sql.NullString `json:"plan_dir_prefix"`
 }
 
-func (q *Queries) ListAgentSessionsByPlanDirPrefix(ctx context.Context, arg ListAgentSessionsByPlanDirPrefixParams) ([]AgentSession, error) {
-	rows, err := q.db.QueryContext(ctx, listAgentSessionsByPlanDirPrefix,
-		arg.UserEmail,
-		arg.WorkspaceID,
+func (q *Queries) ListPlanOwnedSessionArtifactsByPlanDirPrefix(ctx context.Context, arg ListPlanOwnedSessionArtifactsByPlanDirPrefixParams) ([]AgentSession, error) {
+	rows, err := q.db.QueryContext(ctx, listPlanOwnedSessionArtifactsByPlanDirPrefix, arg.PlanDir, arg.PlanDirPrefix)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []AgentSession
+	for rows.Next() {
+		var i AgentSession
+		if err := rows.Scan(
+			&i.ID,
+			&i.IdentityKind,
+			&i.ArtifactPath,
+			&i.PlanDir,
+			&i.ParentPlanDir,
+			&i.SourceReviewDir,
+			&i.Agent,
+			&i.ExternalSessionID,
+			&i.ParentSessionID,
+			&i.Cwd,
+			&i.WorkflowID,
+			&i.WorkflowNodeID,
+			&i.ContinuedFromSessionID,
+			&i.ForkedFromSessionID,
+			&i.FileSize,
+			&i.FileMtime,
+			&i.FileHash,
+			&i.LastIndexedOffset,
+			&i.ProjectionState,
+			&i.ProjectedThreadID,
+			&i.IndexedByUserEmail,
+			&i.AttachedWorkspaceID,
+			&i.ImportedHeadEntryID,
+			&i.LastImportedAt,
+			&i.LastError,
+			&i.MetadataJson,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listPrivateSessionArtifactsByPlanDir = `-- name: ListPrivateSessionArtifactsByPlanDir :many
+;
+
+SELECT id, identity_kind, artifact_path, plan_dir, parent_plan_dir, source_review_dir, agent, external_session_id, parent_session_id, cwd, workflow_id, workflow_node_id, continued_from_session_id, forked_from_session_id, file_size, file_mtime, file_hash, last_indexed_offset, projection_state, projected_thread_id, indexed_by_user_email, attached_workspace_id, imported_head_entry_id, last_imported_at, last_error, metadata_json, created_at, updated_at
+FROM agent_sessions
+WHERE identity_kind != 'plan_owned'
+AND indexed_by_user_email = ?1
+AND plan_dir = ?2
+AND (?3 = '' OR attached_workspace_id = ?3)
+ORDER BY updated_at DESC
+`
+
+type ListPrivateSessionArtifactsByPlanDirParams struct {
+	IndexedByUserEmail  sql.NullString `json:"indexed_by_user_email"`
+	PlanDir             sql.NullString `json:"plan_dir"`
+	AttachedWorkspaceID interface{}    `json:"attached_workspace_id"`
+}
+
+func (q *Queries) ListPrivateSessionArtifactsByPlanDir(ctx context.Context, arg ListPrivateSessionArtifactsByPlanDirParams) ([]AgentSession, error) {
+	rows, err := q.db.QueryContext(ctx, listPrivateSessionArtifactsByPlanDir, arg.IndexedByUserEmail, arg.PlanDir, arg.AttachedWorkspaceID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []AgentSession
+	for rows.Next() {
+		var i AgentSession
+		if err := rows.Scan(
+			&i.ID,
+			&i.IdentityKind,
+			&i.ArtifactPath,
+			&i.PlanDir,
+			&i.ParentPlanDir,
+			&i.SourceReviewDir,
+			&i.Agent,
+			&i.ExternalSessionID,
+			&i.ParentSessionID,
+			&i.Cwd,
+			&i.WorkflowID,
+			&i.WorkflowNodeID,
+			&i.ContinuedFromSessionID,
+			&i.ForkedFromSessionID,
+			&i.FileSize,
+			&i.FileMtime,
+			&i.FileHash,
+			&i.LastIndexedOffset,
+			&i.ProjectionState,
+			&i.ProjectedThreadID,
+			&i.IndexedByUserEmail,
+			&i.AttachedWorkspaceID,
+			&i.ImportedHeadEntryID,
+			&i.LastImportedAt,
+			&i.LastError,
+			&i.MetadataJson,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listPrivateSessionArtifactsByPlanDirPrefix = `-- name: ListPrivateSessionArtifactsByPlanDirPrefix :many
+;
+
+SELECT id, identity_kind, artifact_path, plan_dir, parent_plan_dir, source_review_dir, agent, external_session_id, parent_session_id, cwd, workflow_id, workflow_node_id, continued_from_session_id, forked_from_session_id, file_size, file_mtime, file_hash, last_indexed_offset, projection_state, projected_thread_id, indexed_by_user_email, attached_workspace_id, imported_head_entry_id, last_imported_at, last_error, metadata_json, created_at, updated_at
+FROM agent_sessions
+WHERE identity_kind != 'plan_owned'
+AND indexed_by_user_email = ?1
+AND (?2 = '' OR attached_workspace_id = ?2)
+AND (plan_dir = ?3 OR plan_dir LIKE ?4)
+ORDER BY updated_at DESC
+`
+
+type ListPrivateSessionArtifactsByPlanDirPrefixParams struct {
+	IndexedByUserEmail  sql.NullString `json:"indexed_by_user_email"`
+	AttachedWorkspaceID interface{}    `json:"attached_workspace_id"`
+	PlanDir             sql.NullString `json:"plan_dir"`
+	PlanDirPrefix       sql.NullString `json:"plan_dir_prefix"`
+}
+
+func (q *Queries) ListPrivateSessionArtifactsByPlanDirPrefix(ctx context.Context, arg ListPrivateSessionArtifactsByPlanDirPrefixParams) ([]AgentSession, error) {
+	rows, err := q.db.QueryContext(ctx, listPrivateSessionArtifactsByPlanDirPrefix,
+		arg.IndexedByUserEmail,
+		arg.AttachedWorkspaceID,
 		arg.PlanDir,
 		arg.PlanDirPrefix,
 	)
@@ -363,17 +538,15 @@ func (q *Queries) ListAgentSessionsByPlanDirPrefix(ctx context.Context, arg List
 		var i AgentSession
 		if err := rows.Scan(
 			&i.ID,
-			&i.WorkspaceID,
-			&i.ThreadID,
-			&i.UserEmail,
-			&i.Source,
-			&i.SessionPath,
-			&i.SessionID,
-			&i.ParentSessionID,
-			&i.Cwd,
-			&i.Agent,
+			&i.IdentityKind,
+			&i.ArtifactPath,
+			&i.PlanDir,
 			&i.ParentPlanDir,
 			&i.SourceReviewDir,
+			&i.Agent,
+			&i.ExternalSessionID,
+			&i.ParentSessionID,
+			&i.Cwd,
 			&i.WorkflowID,
 			&i.WorkflowNodeID,
 			&i.ContinuedFromSessionID,
@@ -382,10 +555,10 @@ func (q *Queries) ListAgentSessionsByPlanDirPrefix(ctx context.Context, arg List
 			&i.FileMtime,
 			&i.FileHash,
 			&i.LastIndexedOffset,
-			&i.NeedsHydration,
-			&i.Status,
-			&i.InferredWorkspaceID,
-			&i.InferredPlanDir,
+			&i.ProjectionState,
+			&i.ProjectedThreadID,
+			&i.IndexedByUserEmail,
+			&i.AttachedWorkspaceID,
 			&i.ImportedHeadEntryID,
 			&i.LastImportedAt,
 			&i.LastError,
@@ -406,17 +579,19 @@ func (q *Queries) ListAgentSessionsByPlanDirPrefix(ctx context.Context, arg List
 	return items, nil
 }
 
-const listAgentSessionsByWorkspace = `-- name: ListAgentSessionsByWorkspace :many
+const listPrivateSessionArtifactsForUser = `-- name: ListPrivateSessionArtifactsForUser :many
 ;
 
-SELECT id, workspace_id, thread_id, user_email, source, session_path, session_id, parent_session_id, cwd, agent, parent_plan_dir, source_review_dir, workflow_id, workflow_node_id, continued_from_session_id, forked_from_session_id, file_size, file_mtime, file_hash, last_indexed_offset, needs_hydration, status, inferred_workspace_id, inferred_plan_dir, imported_head_entry_id, last_imported_at, last_error, metadata_json, created_at, updated_at
+SELECT id, identity_kind, artifact_path, plan_dir, parent_plan_dir, source_review_dir, agent, external_session_id, parent_session_id, cwd, workflow_id, workflow_node_id, continued_from_session_id, forked_from_session_id, file_size, file_mtime, file_hash, last_indexed_offset, projection_state, projected_thread_id, indexed_by_user_email, attached_workspace_id, imported_head_entry_id, last_imported_at, last_error, metadata_json, created_at, updated_at
 FROM agent_sessions
-WHERE workspace_id = ?1
+WHERE identity_kind != 'plan_owned'
+AND indexed_by_user_email = ?1
+AND plan_dir IS NOT NULL
 ORDER BY updated_at DESC
 `
 
-func (q *Queries) ListAgentSessionsByWorkspace(ctx context.Context, workspaceID sql.NullString) ([]AgentSession, error) {
-	rows, err := q.db.QueryContext(ctx, listAgentSessionsByWorkspace, workspaceID)
+func (q *Queries) ListPrivateSessionArtifactsForUser(ctx context.Context, indexedByUserEmail sql.NullString) ([]AgentSession, error) {
+	rows, err := q.db.QueryContext(ctx, listPrivateSessionArtifactsForUser, indexedByUserEmail)
 	if err != nil {
 		return nil, err
 	}
@@ -426,17 +601,15 @@ func (q *Queries) ListAgentSessionsByWorkspace(ctx context.Context, workspaceID 
 		var i AgentSession
 		if err := rows.Scan(
 			&i.ID,
-			&i.WorkspaceID,
-			&i.ThreadID,
-			&i.UserEmail,
-			&i.Source,
-			&i.SessionPath,
-			&i.SessionID,
-			&i.ParentSessionID,
-			&i.Cwd,
-			&i.Agent,
+			&i.IdentityKind,
+			&i.ArtifactPath,
+			&i.PlanDir,
 			&i.ParentPlanDir,
 			&i.SourceReviewDir,
+			&i.Agent,
+			&i.ExternalSessionID,
+			&i.ParentSessionID,
+			&i.Cwd,
 			&i.WorkflowID,
 			&i.WorkflowNodeID,
 			&i.ContinuedFromSessionID,
@@ -445,74 +618,10 @@ func (q *Queries) ListAgentSessionsByWorkspace(ctx context.Context, workspaceID 
 			&i.FileMtime,
 			&i.FileHash,
 			&i.LastIndexedOffset,
-			&i.NeedsHydration,
-			&i.Status,
-			&i.InferredWorkspaceID,
-			&i.InferredPlanDir,
-			&i.ImportedHeadEntryID,
-			&i.LastImportedAt,
-			&i.LastError,
-			&i.MetadataJson,
-			&i.CreatedAt,
-			&i.UpdatedAt,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const listAgentSessionsForUser = `-- name: ListAgentSessionsForUser :many
-;
-
-SELECT id, workspace_id, thread_id, user_email, source, session_path, session_id, parent_session_id, cwd, agent, parent_plan_dir, source_review_dir, workflow_id, workflow_node_id, continued_from_session_id, forked_from_session_id, file_size, file_mtime, file_hash, last_indexed_offset, needs_hydration, status, inferred_workspace_id, inferred_plan_dir, imported_head_entry_id, last_imported_at, last_error, metadata_json, created_at, updated_at
-FROM agent_sessions
-WHERE user_email = ?1
-AND inferred_plan_dir IS NOT NULL
-ORDER BY updated_at DESC
-`
-
-func (q *Queries) ListAgentSessionsForUser(ctx context.Context, userEmail sql.NullString) ([]AgentSession, error) {
-	rows, err := q.db.QueryContext(ctx, listAgentSessionsForUser, userEmail)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []AgentSession
-	for rows.Next() {
-		var i AgentSession
-		if err := rows.Scan(
-			&i.ID,
-			&i.WorkspaceID,
-			&i.ThreadID,
-			&i.UserEmail,
-			&i.Source,
-			&i.SessionPath,
-			&i.SessionID,
-			&i.ParentSessionID,
-			&i.Cwd,
-			&i.Agent,
-			&i.ParentPlanDir,
-			&i.SourceReviewDir,
-			&i.WorkflowID,
-			&i.WorkflowNodeID,
-			&i.ContinuedFromSessionID,
-			&i.ForkedFromSessionID,
-			&i.FileSize,
-			&i.FileMtime,
-			&i.FileHash,
-			&i.LastIndexedOffset,
-			&i.NeedsHydration,
-			&i.Status,
-			&i.InferredWorkspaceID,
-			&i.InferredPlanDir,
+			&i.ProjectionState,
+			&i.ProjectedThreadID,
+			&i.IndexedByUserEmail,
+			&i.AttachedWorkspaceID,
 			&i.ImportedHeadEntryID,
 			&i.LastImportedAt,
 			&i.LastError,
@@ -537,14 +646,14 @@ const markAgentSessionHydratedByPath = `-- name: MarkAgentSessionHydratedByPath 
 ;
 
 UPDATE agent_sessions
-SET needs_hydration = 0,
+SET projection_state = CASE WHEN projection_state = 'needs_hydration' THEN 'hydrated' ELSE projection_state END,
 last_error = NULL,
 updated_at = CURRENT_TIMESTAMP
-WHERE session_path = ?1
+WHERE artifact_path = ?1
 `
 
-func (q *Queries) MarkAgentSessionHydratedByPath(ctx context.Context, sessionPath sql.NullString) error {
-	_, err := q.db.ExecContext(ctx, markAgentSessionHydratedByPath, sessionPath)
+func (q *Queries) MarkAgentSessionHydratedByPath(ctx context.Context, artifactPath sql.NullString) error {
+	_, err := q.db.ExecContext(ctx, markAgentSessionHydratedByPath, artifactPath)
 	return err
 }
 
@@ -552,7 +661,7 @@ const updateAgentSessionImportFailedState = `-- name: UpdateAgentSessionImportFa
 ;
 
 UPDATE agent_sessions
-SET status = 'failed',
+SET projection_state = 'failed',
 last_error = ?1,
 metadata_json = ?2,
 updated_at = CURRENT_TIMESTAMP
@@ -574,26 +683,23 @@ const updateAgentSessionImportFinalState = `-- name: UpdateAgentSessionImportFin
 ;
 
 UPDATE agent_sessions
-SET workspace_id = ?1,
-thread_id = ?2,
-status = ?3,
-inferred_workspace_id = ?4,
-inferred_plan_dir = ?5,
-imported_head_entry_id = ?6,
+SET attached_workspace_id = ?1,
+projected_thread_id = ?2,
+projection_state = ?3,
+plan_dir = ?4,
+imported_head_entry_id = ?5,
 last_imported_at = CURRENT_TIMESTAMP,
-needs_hydration = 0,
 last_error = NULL,
-metadata_json = ?7,
+metadata_json = ?6,
 updated_at = CURRENT_TIMESTAMP
-WHERE id = ?8
+WHERE id = ?7
 `
 
 type UpdateAgentSessionImportFinalStateParams struct {
-	WorkspaceID         sql.NullString `json:"workspace_id"`
-	ThreadID            sql.NullString `json:"thread_id"`
-	Status              string         `json:"status"`
-	InferredWorkspaceID sql.NullString `json:"inferred_workspace_id"`
-	InferredPlanDir     sql.NullString `json:"inferred_plan_dir"`
+	AttachedWorkspaceID sql.NullString `json:"attached_workspace_id"`
+	ProjectedThreadID   sql.NullString `json:"projected_thread_id"`
+	ProjectionState     string         `json:"projection_state"`
+	PlanDir             sql.NullString `json:"plan_dir"`
 	ImportedHeadEntryID sql.NullString `json:"imported_head_entry_id"`
 	MetadataJson        sql.NullString `json:"metadata_json"`
 	ID                  string         `json:"id"`
@@ -601,11 +707,10 @@ type UpdateAgentSessionImportFinalStateParams struct {
 
 func (q *Queries) UpdateAgentSessionImportFinalState(ctx context.Context, arg UpdateAgentSessionImportFinalStateParams) error {
 	_, err := q.db.ExecContext(ctx, updateAgentSessionImportFinalState,
-		arg.WorkspaceID,
-		arg.ThreadID,
-		arg.Status,
-		arg.InferredWorkspaceID,
-		arg.InferredPlanDir,
+		arg.AttachedWorkspaceID,
+		arg.ProjectedThreadID,
+		arg.ProjectionState,
+		arg.PlanDir,
 		arg.ImportedHeadEntryID,
 		arg.MetadataJson,
 		arg.ID,
@@ -617,32 +722,29 @@ const updateAgentSessionImportingState = `-- name: UpdateAgentSessionImportingSt
 ;
 
 UPDATE agent_sessions
-SET workspace_id = ?1,
-thread_id = ?2,
-status = 'importing',
-inferred_workspace_id = ?3,
-inferred_plan_dir = ?4,
+SET attached_workspace_id = ?1,
+projected_thread_id = ?2,
+projection_state = 'importing',
+plan_dir = ?3,
 last_error = NULL,
-metadata_json = ?5,
+metadata_json = ?4,
 updated_at = CURRENT_TIMESTAMP
-WHERE id = ?6
+WHERE id = ?5
 `
 
 type UpdateAgentSessionImportingStateParams struct {
-	WorkspaceID         sql.NullString `json:"workspace_id"`
-	ThreadID            sql.NullString `json:"thread_id"`
-	InferredWorkspaceID sql.NullString `json:"inferred_workspace_id"`
-	InferredPlanDir     sql.NullString `json:"inferred_plan_dir"`
+	AttachedWorkspaceID sql.NullString `json:"attached_workspace_id"`
+	ProjectedThreadID   sql.NullString `json:"projected_thread_id"`
+	PlanDir             sql.NullString `json:"plan_dir"`
 	MetadataJson        sql.NullString `json:"metadata_json"`
 	ID                  string         `json:"id"`
 }
 
 func (q *Queries) UpdateAgentSessionImportingState(ctx context.Context, arg UpdateAgentSessionImportingStateParams) error {
 	_, err := q.db.ExecContext(ctx, updateAgentSessionImportingState,
-		arg.WorkspaceID,
-		arg.ThreadID,
-		arg.InferredWorkspaceID,
-		arg.InferredPlanDir,
+		arg.AttachedWorkspaceID,
+		arg.ProjectedThreadID,
+		arg.PlanDir,
 		arg.MetadataJson,
 		arg.ID,
 	)
@@ -653,24 +755,22 @@ const updateAgentSessionInferenceState = `-- name: UpdateAgentSessionInferenceSt
 ;
 
 UPDATE agent_sessions
-SET workspace_id = ?1,
-thread_id = ?2,
-status = ?3,
-inferred_workspace_id = ?4,
-inferred_plan_dir = ?5,
+SET attached_workspace_id = ?1,
+projected_thread_id = ?2,
+projection_state = ?3,
+plan_dir = ?4,
 imported_head_entry_id = NULL,
-last_error = ?6,
-metadata_json = ?7,
+last_error = ?5,
+metadata_json = ?6,
 updated_at = CURRENT_TIMESTAMP
-WHERE id = ?8
+WHERE id = ?7
 `
 
 type UpdateAgentSessionInferenceStateParams struct {
-	WorkspaceID         sql.NullString `json:"workspace_id"`
-	ThreadID            sql.NullString `json:"thread_id"`
-	Status              string         `json:"status"`
-	InferredWorkspaceID sql.NullString `json:"inferred_workspace_id"`
-	InferredPlanDir     sql.NullString `json:"inferred_plan_dir"`
+	AttachedWorkspaceID sql.NullString `json:"attached_workspace_id"`
+	ProjectedThreadID   sql.NullString `json:"projected_thread_id"`
+	ProjectionState     string         `json:"projection_state"`
+	PlanDir             sql.NullString `json:"plan_dir"`
 	LastError           sql.NullString `json:"last_error"`
 	MetadataJson        sql.NullString `json:"metadata_json"`
 	ID                  string         `json:"id"`
@@ -678,11 +778,10 @@ type UpdateAgentSessionInferenceStateParams struct {
 
 func (q *Queries) UpdateAgentSessionInferenceState(ctx context.Context, arg UpdateAgentSessionInferenceStateParams) error {
 	_, err := q.db.ExecContext(ctx, updateAgentSessionInferenceState,
-		arg.WorkspaceID,
-		arg.ThreadID,
-		arg.Status,
-		arg.InferredWorkspaceID,
-		arg.InferredPlanDir,
+		arg.AttachedWorkspaceID,
+		arg.ProjectedThreadID,
+		arg.ProjectionState,
+		arg.PlanDir,
 		arg.LastError,
 		arg.MetadataJson,
 		arg.ID,
@@ -695,17 +794,15 @@ const upsertAgentSessionIndex = `-- name: UpsertAgentSessionIndex :one
 
 INSERT INTO agent_sessions (
 id,
-workspace_id,
-thread_id,
-user_email,
-source,
-session_path,
-session_id,
-parent_session_id,
-cwd,
-agent,
+identity_kind,
+artifact_path,
+plan_dir,
 parent_plan_dir,
 source_review_dir,
+agent,
+external_session_id,
+parent_session_id,
+cwd,
 workflow_id,
 workflow_node_id,
 continued_from_session_id,
@@ -714,10 +811,10 @@ file_size,
 file_mtime,
 file_hash,
 last_indexed_offset,
-needs_hydration,
-status,
-inferred_workspace_id,
-inferred_plan_dir,
+projection_state,
+projected_thread_id,
+indexed_by_user_email,
+attached_workspace_id,
 imported_head_entry_id,
 last_error,
 metadata_json
@@ -729,10 +826,10 @@ VALUES (
 ?4,
 ?5,
 ?6,
-?7,
+COALESCE (NULLIF (?7, ''), 'pi'),
 ?8,
 ?9,
-COALESCE (NULLIF (?10, ''), 'pi'),
+?10,
 ?11,
 ?12,
 ?13,
@@ -745,21 +842,19 @@ COALESCE (NULLIF (?10, ''), 'pi'),
 ?20,
 ?21,
 ?22,
-?23,
-?24,
 NULL,
-?25,
-?26
+?23,
+?24
 )
-ON CONFLICT (session_path) WHERE session_path IS NOT NULL DO UPDATE SET
-user_email = excluded.user_email,
-source = excluded.source,
-session_id = excluded.session_id,
-parent_session_id = excluded.parent_session_id,
-cwd = excluded.cwd,
-agent = excluded.agent,
+ON CONFLICT (artifact_path) WHERE artifact_path IS NOT NULL DO UPDATE SET
+identity_kind = excluded.identity_kind,
+plan_dir = excluded.plan_dir,
 parent_plan_dir = excluded.parent_plan_dir,
 source_review_dir = excluded.source_review_dir,
+agent = excluded.agent,
+external_session_id = excluded.external_session_id,
+parent_session_id = excluded.parent_session_id,
+cwd = excluded.cwd,
 workflow_id = excluded.workflow_id,
 workflow_node_id = excluded.workflow_node_id,
 continued_from_session_id = excluded.continued_from_session_id,
@@ -768,41 +863,46 @@ file_size = excluded.file_size,
 file_mtime = excluded.file_mtime,
 file_hash = excluded.file_hash,
 last_indexed_offset = excluded.last_indexed_offset,
-needs_hydration = CASE
+projection_state = CASE
 WHEN agent_sessions.file_size = excluded.file_size
 AND COALESCE (agent_sessions.file_mtime,
 '') = COALESCE (excluded.file_mtime,
 '')
 AND COALESCE (agent_sessions.file_hash, '') = COALESCE (excluded.file_hash, '')
-THEN agent_sessions.needs_hydration
-ELSE excluded.needs_hydration
+AND agent_sessions.projection_state IN ('importing', 'hydrated', 'diverged')
+THEN agent_sessions.projection_state
+ELSE excluded.projection_state
 END,
-status = CASE
-WHEN agent_sessions.status IN ('importing', 'imported', 'diverged')
-THEN agent_sessions.status
-ELSE excluded.status
+projected_thread_id = CASE
+WHEN agent_sessions.file_size = excluded.file_size
+AND COALESCE (agent_sessions.file_mtime,
+'') = COALESCE (excluded.file_mtime,
+'')
+AND COALESCE (agent_sessions.file_hash, '') = COALESCE (excluded.file_hash, '')
+THEN agent_sessions.projected_thread_id
+ELSE excluded.projected_thread_id
 END,
-inferred_workspace_id = excluded.inferred_workspace_id,
-inferred_plan_dir = excluded.inferred_plan_dir,
+indexed_by_user_email = COALESCE (excluded.indexed_by_user_email,
+agent_sessions.indexed_by_user_email),
+attached_workspace_id = COALESCE (excluded.attached_workspace_id,
+agent_sessions.attached_workspace_id),
 last_error = excluded.last_error,
 metadata_json = excluded.metadata_json,
 updated_at = CURRENT_TIMESTAMP
-RETURNING id, workspace_id, thread_id, user_email, source, session_path, session_id, parent_session_id, cwd, agent, parent_plan_dir, source_review_dir, workflow_id, workflow_node_id, continued_from_session_id, forked_from_session_id, file_size, file_mtime, file_hash, last_indexed_offset, needs_hydration, status, inferred_workspace_id, inferred_plan_dir, imported_head_entry_id, last_imported_at, last_error, metadata_json, created_at, updated_at
+RETURNING id, identity_kind, artifact_path, plan_dir, parent_plan_dir, source_review_dir, agent, external_session_id, parent_session_id, cwd, workflow_id, workflow_node_id, continued_from_session_id, forked_from_session_id, file_size, file_mtime, file_hash, last_indexed_offset, projection_state, projected_thread_id, indexed_by_user_email, attached_workspace_id, imported_head_entry_id, last_imported_at, last_error, metadata_json, created_at, updated_at
 `
 
 type UpsertAgentSessionIndexParams struct {
 	ID                     string         `json:"id"`
-	WorkspaceID            sql.NullString `json:"workspace_id"`
-	ThreadID               sql.NullString `json:"thread_id"`
-	UserEmail              sql.NullString `json:"user_email"`
-	Source                 string         `json:"source"`
-	SessionPath            sql.NullString `json:"session_path"`
-	SessionID              sql.NullString `json:"session_id"`
-	ParentSessionID        sql.NullString `json:"parent_session_id"`
-	Cwd                    sql.NullString `json:"cwd"`
-	Agent                  interface{}    `json:"agent"`
+	IdentityKind           string         `json:"identity_kind"`
+	ArtifactPath           sql.NullString `json:"artifact_path"`
+	PlanDir                sql.NullString `json:"plan_dir"`
 	ParentPlanDir          sql.NullString `json:"parent_plan_dir"`
 	SourceReviewDir        sql.NullString `json:"source_review_dir"`
+	Agent                  interface{}    `json:"agent"`
+	ExternalSessionID      sql.NullString `json:"external_session_id"`
+	ParentSessionID        sql.NullString `json:"parent_session_id"`
+	Cwd                    sql.NullString `json:"cwd"`
 	WorkflowID             sql.NullString `json:"workflow_id"`
 	WorkflowNodeID         sql.NullString `json:"workflow_node_id"`
 	ContinuedFromSessionID sql.NullString `json:"continued_from_session_id"`
@@ -811,10 +911,10 @@ type UpsertAgentSessionIndexParams struct {
 	FileMtime              sql.NullTime   `json:"file_mtime"`
 	FileHash               sql.NullString `json:"file_hash"`
 	LastIndexedOffset      int64          `json:"last_indexed_offset"`
-	NeedsHydration         int64          `json:"needs_hydration"`
-	Status                 string         `json:"status"`
-	InferredWorkspaceID    sql.NullString `json:"inferred_workspace_id"`
-	InferredPlanDir        sql.NullString `json:"inferred_plan_dir"`
+	ProjectionState        string         `json:"projection_state"`
+	ProjectedThreadID      sql.NullString `json:"projected_thread_id"`
+	IndexedByUserEmail     sql.NullString `json:"indexed_by_user_email"`
+	AttachedWorkspaceID    sql.NullString `json:"attached_workspace_id"`
 	LastError              sql.NullString `json:"last_error"`
 	MetadataJson           sql.NullString `json:"metadata_json"`
 }
@@ -822,17 +922,15 @@ type UpsertAgentSessionIndexParams struct {
 func (q *Queries) UpsertAgentSessionIndex(ctx context.Context, arg UpsertAgentSessionIndexParams) (AgentSession, error) {
 	row := q.db.QueryRowContext(ctx, upsertAgentSessionIndex,
 		arg.ID,
-		arg.WorkspaceID,
-		arg.ThreadID,
-		arg.UserEmail,
-		arg.Source,
-		arg.SessionPath,
-		arg.SessionID,
-		arg.ParentSessionID,
-		arg.Cwd,
-		arg.Agent,
+		arg.IdentityKind,
+		arg.ArtifactPath,
+		arg.PlanDir,
 		arg.ParentPlanDir,
 		arg.SourceReviewDir,
+		arg.Agent,
+		arg.ExternalSessionID,
+		arg.ParentSessionID,
+		arg.Cwd,
 		arg.WorkflowID,
 		arg.WorkflowNodeID,
 		arg.ContinuedFromSessionID,
@@ -841,27 +939,25 @@ func (q *Queries) UpsertAgentSessionIndex(ctx context.Context, arg UpsertAgentSe
 		arg.FileMtime,
 		arg.FileHash,
 		arg.LastIndexedOffset,
-		arg.NeedsHydration,
-		arg.Status,
-		arg.InferredWorkspaceID,
-		arg.InferredPlanDir,
+		arg.ProjectionState,
+		arg.ProjectedThreadID,
+		arg.IndexedByUserEmail,
+		arg.AttachedWorkspaceID,
 		arg.LastError,
 		arg.MetadataJson,
 	)
 	var i AgentSession
 	err := row.Scan(
 		&i.ID,
-		&i.WorkspaceID,
-		&i.ThreadID,
-		&i.UserEmail,
-		&i.Source,
-		&i.SessionPath,
-		&i.SessionID,
-		&i.ParentSessionID,
-		&i.Cwd,
-		&i.Agent,
+		&i.IdentityKind,
+		&i.ArtifactPath,
+		&i.PlanDir,
 		&i.ParentPlanDir,
 		&i.SourceReviewDir,
+		&i.Agent,
+		&i.ExternalSessionID,
+		&i.ParentSessionID,
+		&i.Cwd,
 		&i.WorkflowID,
 		&i.WorkflowNodeID,
 		&i.ContinuedFromSessionID,
@@ -870,10 +966,10 @@ func (q *Queries) UpsertAgentSessionIndex(ctx context.Context, arg UpsertAgentSe
 		&i.FileMtime,
 		&i.FileHash,
 		&i.LastIndexedOffset,
-		&i.NeedsHydration,
-		&i.Status,
-		&i.InferredWorkspaceID,
-		&i.InferredPlanDir,
+		&i.ProjectionState,
+		&i.ProjectedThreadID,
+		&i.IndexedByUserEmail,
+		&i.AttachedWorkspaceID,
 		&i.ImportedHeadEntryID,
 		&i.LastImportedAt,
 		&i.LastError,

@@ -508,7 +508,7 @@ func TestPlanWorkspaceSyncerIndexesPlanOwnedAgentSessions(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetAgentSessionByPath(relative): %v", err)
 	}
-	if row.Agent != "pi" || !row.InferredPlanDir.Valid || row.InferredPlanDir.String != "agent/plans/2026-06-02_plan" || !row.WorkflowID.Valid || row.WorkflowID.String != "wf" || !row.WorkflowNodeID.Valid || row.WorkflowNodeID.String != "outline" || row.NeedsHydration != 1 || !row.SessionPath.Valid || row.SessionPath.String != "agent/plans/2026-06-02_plan/.sessions/pi/session.jsonl" {
+	if row.Agent != "pi" || !row.PlanDir.Valid || row.PlanDir.String != "agent/plans/2026-06-02_plan" || !row.WorkflowID.Valid || row.WorkflowID.String != "wf" || !row.WorkflowNodeID.Valid || row.WorkflowNodeID.String != "outline" || row.ProjectionState != "needs_hydration" || !row.ArtifactPath.Valid || row.ArtifactPath.String != "agent/plans/2026-06-02_plan/.sessions/pi/session.jsonl" {
 		t.Fatalf("indexed session = %#v", row)
 	}
 

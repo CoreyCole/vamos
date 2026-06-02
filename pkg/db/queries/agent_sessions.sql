@@ -1,17 +1,15 @@
 -- name: CreateAgentSession :one
 INSERT INTO agent_sessions (
     id,
-    workspace_id,
-    thread_id,
-    user_email,
-    source,
-    session_path,
-    session_id,
-    parent_session_id,
-    cwd,
-    agent,
+    identity_kind,
+    artifact_path,
+    plan_dir,
     parent_plan_dir,
     source_review_dir,
+    agent,
+    external_session_id,
+    parent_session_id,
+    cwd,
     workflow_id,
     workflow_node_id,
     continued_from_session_id,
@@ -20,27 +18,25 @@ INSERT INTO agent_sessions (
     file_mtime,
     file_hash,
     last_indexed_offset,
-    needs_hydration,
-    status,
-    inferred_workspace_id,
-    inferred_plan_dir,
+    projection_state,
+    projected_thread_id,
+    indexed_by_user_email,
+    attached_workspace_id,
     imported_head_entry_id,
     last_error,
     metadata_json
 )
 VALUES (
     sqlc.arg('id'),
-    sqlc.narg('workspace_id'),
-    sqlc.narg('thread_id'),
-    sqlc.narg('user_email'),
-    sqlc.arg('source'),
-    sqlc.narg('session_path'),
-    sqlc.narg('session_id'),
+    sqlc.arg('identity_kind'),
+    sqlc.narg('artifact_path'),
+    sqlc.narg('plan_dir'),
+    NULL,
+    NULL,
+    'pi',
+    sqlc.narg('external_session_id'),
     sqlc.narg('parent_session_id'),
     sqlc.narg('cwd'),
-    'pi',
-    NULL,
-    NULL,
     NULL,
     NULL,
     NULL,
@@ -49,10 +45,10 @@ VALUES (
     NULL,
     NULL,
     0,
-    1,
-    sqlc.arg('status'),
-    sqlc.narg('inferred_workspace_id'),
-    sqlc.narg('inferred_plan_dir'),
+    sqlc.arg('projection_state'),
+    sqlc.narg('projected_thread_id'),
+    sqlc.narg('indexed_by_user_email'),
+    sqlc.narg('attached_workspace_id'),
     sqlc.narg('imported_head_entry_id'),
     sqlc.narg('last_error'),
     sqlc.narg('metadata_json')
@@ -67,54 +63,66 @@ WHERE id = sqlc.arg ('id') ;
 -- name: GetAgentSessionByPath :one
 SELECT *
 FROM agent_sessions
-WHERE session_path = sqlc.arg ('session_path') ;
+WHERE artifact_path = sqlc.arg ('artifact_path') ;
 
 -- name: ListAgentSessionsByWorkspace :many
 SELECT *
 FROM agent_sessions
-WHERE workspace_id = sqlc.arg ('workspace_id')
+WHERE attached_workspace_id = sqlc.arg ('attached_workspace_id')
 ORDER BY updated_at DESC ;
 
--- name: ListAgentSessionsByPlanDir :many
+-- name: ListPlanOwnedSessionArtifactsByPlanDir :many
 SELECT *
 FROM agent_sessions
-WHERE user_email = sqlc.arg ('user_email')
-AND inferred_plan_dir = sqlc.arg ('plan_dir')
-AND (sqlc.arg ('workspace_id') = '' OR workspace_id = sqlc.arg ('workspace_id'))
+WHERE identity_kind = 'plan_owned'
+AND plan_dir = sqlc.arg ('plan_dir')
 ORDER BY updated_at DESC ;
 
--- name: ListAgentSessionsByPlanDirPrefix :many
+-- name: ListPlanOwnedSessionArtifactsByPlanDirPrefix :many
 SELECT *
 FROM agent_sessions
-WHERE user_email = sqlc.arg ('user_email')
-AND (sqlc.arg ('workspace_id') = '' OR workspace_id = sqlc.arg ('workspace_id'))
-AND (
-inferred_plan_dir = sqlc.arg ('plan_dir')
-OR inferred_plan_dir LIKE sqlc.arg ('plan_dir_prefix')
-)
+WHERE identity_kind = 'plan_owned'
+AND (plan_dir = sqlc.arg ('plan_dir') OR plan_dir LIKE sqlc.arg ('plan_dir_prefix'))
 ORDER BY updated_at DESC ;
 
--- name: ListAgentSessionsForUser :many
+-- name: ListPrivateSessionArtifactsByPlanDir :many
 SELECT *
 FROM agent_sessions
-WHERE user_email = sqlc.arg ('user_email')
-AND inferred_plan_dir IS NOT NULL
+WHERE identity_kind != 'plan_owned'
+AND indexed_by_user_email = sqlc.arg ('indexed_by_user_email')
+AND plan_dir = sqlc.arg ('plan_dir')
+AND (sqlc.arg ('attached_workspace_id') = '' OR attached_workspace_id = sqlc.arg ('attached_workspace_id'))
+ORDER BY updated_at DESC ;
+
+-- name: ListPrivateSessionArtifactsByPlanDirPrefix :many
+SELECT *
+FROM agent_sessions
+WHERE identity_kind != 'plan_owned'
+AND indexed_by_user_email = sqlc.arg ('indexed_by_user_email')
+AND (sqlc.arg ('attached_workspace_id') = '' OR attached_workspace_id = sqlc.arg ('attached_workspace_id'))
+AND (plan_dir = sqlc.arg ('plan_dir') OR plan_dir LIKE sqlc.arg ('plan_dir_prefix'))
+ORDER BY updated_at DESC ;
+
+-- name: ListPrivateSessionArtifactsForUser :many
+SELECT *
+FROM agent_sessions
+WHERE identity_kind != 'plan_owned'
+AND indexed_by_user_email = sqlc.arg ('indexed_by_user_email')
+AND plan_dir IS NOT NULL
 ORDER BY updated_at DESC ;
 
 -- name: UpsertAgentSessionIndex :one
 INSERT INTO agent_sessions (
 id,
-workspace_id,
-thread_id,
-user_email,
-source,
-session_path,
-session_id,
-parent_session_id,
-cwd,
-agent,
+identity_kind,
+artifact_path,
+plan_dir,
 parent_plan_dir,
 source_review_dir,
+agent,
+external_session_id,
+parent_session_id,
+cwd,
 workflow_id,
 workflow_node_id,
 continued_from_session_id,
@@ -123,27 +131,25 @@ file_size,
 file_mtime,
 file_hash,
 last_indexed_offset,
-needs_hydration,
-status,
-inferred_workspace_id,
-inferred_plan_dir,
+projection_state,
+projected_thread_id,
+indexed_by_user_email,
+attached_workspace_id,
 imported_head_entry_id,
 last_error,
 metadata_json
 )
 VALUES (
 sqlc.arg ('id'),
-sqlc.narg ('workspace_id'),
-sqlc.narg ('thread_id'),
-sqlc.narg ('user_email'),
-sqlc.arg ('source'),
-sqlc.arg ('session_path'),
-sqlc.narg ('session_id'),
-sqlc.narg ('parent_session_id'),
-sqlc.narg ('cwd'),
-COALESCE (NULLIF (sqlc.arg ('agent'), ''), 'pi'),
+sqlc.arg ('identity_kind'),
+sqlc.arg ('artifact_path'),
+sqlc.narg ('plan_dir'),
 sqlc.narg ('parent_plan_dir'),
 sqlc.narg ('source_review_dir'),
+COALESCE (NULLIF (sqlc.arg ('agent'), ''), 'pi'),
+sqlc.narg ('external_session_id'),
+sqlc.narg ('parent_session_id'),
+sqlc.narg ('cwd'),
 sqlc.narg ('workflow_id'),
 sqlc.narg ('workflow_node_id'),
 sqlc.narg ('continued_from_session_id'),
@@ -152,23 +158,23 @@ sqlc.arg ('file_size'),
 sqlc.narg ('file_mtime'),
 sqlc.narg ('file_hash'),
 sqlc.arg ('last_indexed_offset'),
-sqlc.arg ('needs_hydration'),
-sqlc.arg ('status'),
-sqlc.narg ('inferred_workspace_id'),
-sqlc.narg ('inferred_plan_dir'),
+sqlc.arg ('projection_state'),
+sqlc.narg ('projected_thread_id'),
+sqlc.narg ('indexed_by_user_email'),
+sqlc.narg ('attached_workspace_id'),
 NULL,
 sqlc.narg ('last_error'),
 sqlc.narg ('metadata_json')
 )
-ON CONFLICT (session_path) WHERE session_path IS NOT NULL DO UPDATE SET
-user_email = excluded.user_email,
-source = excluded.source,
-session_id = excluded.session_id,
-parent_session_id = excluded.parent_session_id,
-cwd = excluded.cwd,
-agent = excluded.agent,
+ON CONFLICT (artifact_path) WHERE artifact_path IS NOT NULL DO UPDATE SET
+identity_kind = excluded.identity_kind,
+plan_dir = excluded.plan_dir,
 parent_plan_dir = excluded.parent_plan_dir,
 source_review_dir = excluded.source_review_dir,
+agent = excluded.agent,
+external_session_id = excluded.external_session_id,
+parent_session_id = excluded.parent_session_id,
+cwd = excluded.cwd,
 workflow_id = excluded.workflow_id,
 workflow_node_id = excluded.workflow_node_id,
 continued_from_session_id = excluded.continued_from_session_id,
@@ -177,22 +183,29 @@ file_size = excluded.file_size,
 file_mtime = excluded.file_mtime,
 file_hash = excluded.file_hash,
 last_indexed_offset = excluded.last_indexed_offset,
-needs_hydration = CASE
+projection_state = CASE
 WHEN agent_sessions.file_size = excluded.file_size
 AND COALESCE (agent_sessions.file_mtime,
 '') = COALESCE (excluded.file_mtime,
 '')
 AND COALESCE (agent_sessions.file_hash, '') = COALESCE (excluded.file_hash, '')
-THEN agent_sessions.needs_hydration
-ELSE excluded.needs_hydration
+AND agent_sessions.projection_state IN ('importing', 'hydrated', 'diverged')
+THEN agent_sessions.projection_state
+ELSE excluded.projection_state
 END,
-status = CASE
-WHEN agent_sessions.status IN ('importing', 'imported', 'diverged')
-THEN agent_sessions.status
-ELSE excluded.status
+projected_thread_id = CASE
+WHEN agent_sessions.file_size = excluded.file_size
+AND COALESCE (agent_sessions.file_mtime,
+'') = COALESCE (excluded.file_mtime,
+'')
+AND COALESCE (agent_sessions.file_hash, '') = COALESCE (excluded.file_hash, '')
+THEN agent_sessions.projected_thread_id
+ELSE excluded.projected_thread_id
 END,
-inferred_workspace_id = excluded.inferred_workspace_id,
-inferred_plan_dir = excluded.inferred_plan_dir,
+indexed_by_user_email = COALESCE (excluded.indexed_by_user_email,
+agent_sessions.indexed_by_user_email),
+attached_workspace_id = COALESCE (excluded.attached_workspace_id,
+agent_sessions.attached_workspace_id),
 last_error = excluded.last_error,
 metadata_json = excluded.metadata_json,
 updated_at = CURRENT_TIMESTAMP
@@ -200,17 +213,16 @@ RETURNING * ;
 
 -- name: BackfillAgentSessionsWorkspaceForThread :exec
 UPDATE agent_sessions
-SET workspace_id = sqlc.arg ('workspace_id')
-WHERE thread_id = sqlc.arg ('thread_id')
-AND (workspace_id IS NULL OR workspace_id = '') ;
+SET attached_workspace_id = sqlc.arg ('attached_workspace_id')
+WHERE projected_thread_id = sqlc.arg ('projected_thread_id')
+AND (attached_workspace_id IS NULL OR attached_workspace_id = '') ;
 
 -- name: UpdateAgentSessionImportingState :exec
 UPDATE agent_sessions
-SET workspace_id = sqlc.narg ('workspace_id'),
-thread_id = sqlc.narg ('thread_id'),
-status = 'importing',
-inferred_workspace_id = sqlc.narg ('inferred_workspace_id'),
-inferred_plan_dir = sqlc.narg ('inferred_plan_dir'),
+SET attached_workspace_id = sqlc.narg ('attached_workspace_id'),
+projected_thread_id = sqlc.narg ('projected_thread_id'),
+projection_state = 'importing',
+plan_dir = sqlc.narg ('plan_dir'),
 last_error = NULL,
 metadata_json = sqlc.narg ('metadata_json'),
 updated_at = CURRENT_TIMESTAMP
@@ -218,14 +230,12 @@ WHERE id = sqlc.arg ('id') ;
 
 -- name: UpdateAgentSessionImportFinalState :exec
 UPDATE agent_sessions
-SET workspace_id = sqlc.narg ('workspace_id'),
-thread_id = sqlc.narg ('thread_id'),
-status = sqlc.arg ('status'),
-inferred_workspace_id = sqlc.narg ('inferred_workspace_id'),
-inferred_plan_dir = sqlc.narg ('inferred_plan_dir'),
+SET attached_workspace_id = sqlc.narg ('attached_workspace_id'),
+projected_thread_id = sqlc.narg ('projected_thread_id'),
+projection_state = sqlc.arg ('projection_state'),
+plan_dir = sqlc.narg ('plan_dir'),
 imported_head_entry_id = sqlc.narg ('imported_head_entry_id'),
 last_imported_at = CURRENT_TIMESTAMP,
-needs_hydration = 0,
 last_error = NULL,
 metadata_json = sqlc.narg ('metadata_json'),
 updated_at = CURRENT_TIMESTAMP
@@ -233,14 +243,14 @@ WHERE id = sqlc.arg ('id') ;
 
 -- name: MarkAgentSessionHydratedByPath :exec
 UPDATE agent_sessions
-SET needs_hydration = 0,
+SET projection_state = CASE WHEN projection_state = 'needs_hydration' THEN 'hydrated' ELSE projection_state END,
 last_error = NULL,
 updated_at = CURRENT_TIMESTAMP
-WHERE session_path = sqlc.arg ('session_path') ;
+WHERE artifact_path = sqlc.arg ('artifact_path') ;
 
 -- name: UpdateAgentSessionImportFailedState :exec
 UPDATE agent_sessions
-SET status = 'failed',
+SET projection_state = 'failed',
 last_error = sqlc.narg ('last_error'),
 metadata_json = sqlc.narg ('metadata_json'),
 updated_at = CURRENT_TIMESTAMP
@@ -248,11 +258,10 @@ WHERE id = sqlc.arg ('id') ;
 
 -- name: UpdateAgentSessionInferenceState :exec
 UPDATE agent_sessions
-SET workspace_id = sqlc.narg ('workspace_id'),
-thread_id = sqlc.narg ('thread_id'),
-status = sqlc.arg ('status'),
-inferred_workspace_id = sqlc.narg ('inferred_workspace_id'),
-inferred_plan_dir = sqlc.narg ('inferred_plan_dir'),
+SET attached_workspace_id = sqlc.narg ('attached_workspace_id'),
+projected_thread_id = sqlc.narg ('projected_thread_id'),
+projection_state = sqlc.arg ('projection_state'),
+plan_dir = sqlc.narg ('plan_dir'),
 imported_head_entry_id = NULL,
 last_error = sqlc.narg ('last_error'),
 metadata_json = sqlc.narg ('metadata_json'),

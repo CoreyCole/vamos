@@ -2,7 +2,6 @@ package agentchat
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 	"path/filepath"
 	"sort"
@@ -167,23 +166,23 @@ func (s *Service) collectUserPlanSidebarOverlaySources(
 	sources := []PlanSidebarSource{}
 	seen := collections.NewSet[string]()
 
-	sessions, err := s.queries.ListAgentSessionsForUser(
+	sessions, err := s.queries.ListPrivateSessionArtifactsForUser(
 		ctx,
-		sql.NullString{String: userEmail, Valid: true},
+		nullString(userEmail),
 	)
 	if err != nil {
 		return nil, err
 	}
 	for _, session := range sessions {
-		planDir, ok := s.canonicalPlanDirFromSource(session.InferredPlanDir.String)
+		planDir, ok := s.canonicalPlanDirFromSource(session.PlanDir.String)
 		if !ok {
 			continue
 		}
 		source := PlanSidebarSource{
 			PlanDir:     planDir,
 			PlanDirRel:  s.planSidebarRel(planDir),
-			WorkspaceID: session.WorkspaceID.String,
-			ThreadID:    session.ThreadID.String,
+			WorkspaceID: session.AttachedWorkspaceID.String,
+			ThreadID:    session.ProjectedThreadID.String,
 			SessionID:   session.ID,
 			Source:      planSidebarSourceSession,
 			Title:       sessionTitleForPlanSidebar(session),
@@ -510,13 +509,13 @@ func planSidebarSourceKey(source PlanSidebarSource) string {
 }
 
 func sessionTitleForPlanSidebar(session db.AgentSession) string {
-	if session.SessionID.Valid && strings.TrimSpace(session.SessionID.String) != "" {
-		return strings.TrimSpace(session.SessionID.String)
+	if session.ExternalSessionID.Valid && strings.TrimSpace(session.ExternalSessionID.String) != "" {
+		return strings.TrimSpace(session.ExternalSessionID.String)
 	}
-	if session.SessionPath.Valid && strings.TrimSpace(session.SessionPath.String) != "" {
+	if session.ArtifactPath.Valid && strings.TrimSpace(session.ArtifactPath.String) != "" {
 		return strings.TrimSuffix(
-			filepath.Base(session.SessionPath.String),
-			filepath.Ext(session.SessionPath.String),
+			filepath.Base(session.ArtifactPath.String),
+			filepath.Ext(session.ArtifactPath.String),
 		)
 	}
 	return strings.TrimSpace(session.ID)

@@ -126,11 +126,11 @@ func (s *Service) indexPiSessions(
 			return nil //nolint:nilerr // Keep indexing best-effort across corrupt session files.
 		}
 		result.Indexed++
-		if record.InferredPlanDir.Valid && record.InferredPlanDir.String != "" {
-			affectedPlans.Add(record.InferredPlanDir.String)
+		if record.PlanDir.Valid && record.PlanDir.String != "" {
+			affectedPlans.Add(record.PlanDir.String)
 		}
-		if record.WorkspaceID.Valid && record.WorkspaceID.String != "" {
-			affectedWorkspaces.Add(record.WorkspaceID.String)
+		if record.AttachedWorkspaceID.Valid && record.AttachedWorkspaceID.String != "" {
+			affectedWorkspaces.Add(record.AttachedWorkspaceID.String)
 		}
 		return nil
 	})
@@ -177,25 +177,29 @@ func (s *Service) indexPiSessionFile(
 	}
 
 	return s.queries.UpsertAgentSessionIndex(ctx, db.UpsertAgentSessionIndexParams{
-		ID:                  uuid.NewString(),
-		WorkspaceID:         nullableString(inference.WorkspaceID),
-		ThreadID:            sql.NullString{},
-		UserEmail:           nullableString(userEmail),
-		Source:              string(AgentSessionSourceTerminal),
-		SessionPath:         nullableString(resolvedPath),
-		SessionID:           nullableString(scan.Header.ID),
-		ParentSessionID:     nullableString(scan.Header.ParentSession),
-		Cwd:                 nullableString(scan.Header.Cwd),
-		Agent:               defaultAgentSessionAgent,
-		FileSize:            info.Size(),
-		FileMtime:           sql.NullTime{Time: info.ModTime(), Valid: true},
-		FileHash:            nullableString(hash),
-		LastIndexedOffset:   info.Size(),
-		NeedsHydration:      1,
-		Status:              status,
-		InferredWorkspaceID: nullableString(inference.WorkspaceID),
-		InferredPlanDir:     nullableString(inference.PlanDir),
-		LastError:           lastError,
+		ID:                     uuid.NewString(),
+		IdentityKind:           "global_pi",
+		ArtifactPath:           nullableString(resolvedPath),
+		PlanDir:                nullableString(inference.PlanDir),
+		ParentPlanDir:          sql.NullString{},
+		SourceReviewDir:        sql.NullString{},
+		Agent:                  defaultAgentSessionAgent,
+		ExternalSessionID:      nullableString(scan.Header.ID),
+		ParentSessionID:        nullableString(scan.Header.ParentSession),
+		Cwd:                    nullableString(scan.Header.Cwd),
+		WorkflowID:             sql.NullString{},
+		WorkflowNodeID:         sql.NullString{},
+		ContinuedFromSessionID: sql.NullString{},
+		ForkedFromSessionID:    sql.NullString{},
+		FileSize:               info.Size(),
+		FileMtime:              sql.NullTime{Time: info.ModTime(), Valid: true},
+		FileHash:               nullableString(hash),
+		LastIndexedOffset:      info.Size(),
+		ProjectionState:        status,
+		ProjectedThreadID:      sql.NullString{},
+		IndexedByUserEmail:     nullableString(userEmail),
+		AttachedWorkspaceID:    nullableString(inference.WorkspaceID),
+		LastError:              lastError,
 		MetadataJson: nullableString(
 			importMetadataJSONWithSummary(
 				scan,
@@ -316,7 +320,7 @@ func (s *Service) importAdoptablePiSession(
 		return piSessionAdoptionFileResult{}, fmt.Errorf("import pi session: %w", err)
 	}
 	fileResult := piSessionAdoptionFileResult{WorkspaceID: workspace.ID}
-	if imported.Status == "imported" || imported.Status == "diverged" {
+	if imported.Status == "hydrated" || imported.Status == "imported" || imported.Status == "diverged" {
 		fileResult.ImportedSessions = 1
 		if imported.Stats.EntriesImported > 0 || imported.Diverged {
 			fileResult.Changed = true

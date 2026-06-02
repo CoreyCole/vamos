@@ -214,8 +214,8 @@ func TestStartWorkspaceThreadCreatesSessionRunAndBoundedRunInput(t *testing.T) {
 	if !run.SessionID.Valid || run.SessionID.String != session.ID {
 		t.Fatalf("run session = %v, want %s", run.SessionID, session.ID)
 	}
-	if !session.WorkspaceID.Valid || session.WorkspaceID.String != workspace.ID {
-		t.Fatalf("session workspace = %v, want %s", session.WorkspaceID, workspace.ID)
+	if !session.AttachedWorkspaceID.Valid || session.AttachedWorkspaceID.String != workspace.ID {
+		t.Fatalf("session workspace = %v, want %s", session.AttachedWorkspaceID, workspace.ID)
 	}
 	if thread.Cwd != service.projectRoot {
 		t.Fatalf("thread cwd = %q, want project root %q", thread.Cwd, service.projectRoot)
@@ -960,16 +960,15 @@ func TestDuplicateCheckpointDoesNotDuplicateWorkspaceEvents(t *testing.T) {
 		context.Background(),
 		db.CreateAgentSessionParams{
 			ID:                  "session-1",
-			WorkspaceID:         nullString(workspace.ID),
-			ThreadID:            nullString(thread.ID),
-			Source:              string(AgentSessionSourceWeb),
-			Status:              "pending",
+			ProjectedThreadID:   nullString(thread.ID),
+			IdentityKind:        "web",
+			ProjectionState:     "pending",
 			Cwd:                 nullString(workspace.RootDocPath),
-			SessionPath:         sql.NullString{},
-			SessionID:           sql.NullString{},
+			ArtifactPath:        sql.NullString{},
+			ExternalSessionID:   sql.NullString{},
 			ParentSessionID:     sql.NullString{},
-			InferredWorkspaceID: sql.NullString{},
-			InferredPlanDir:     sql.NullString{},
+			AttachedWorkspaceID: sql.NullString{},
+			PlanDir:             sql.NullString{},
 			ImportedHeadEntryID: sql.NullString{},
 			LastError:           sql.NullString{},
 			MetadataJson:        sql.NullString{},
@@ -1545,16 +1544,15 @@ func mustCreateWorkspaceLifecycleRun(
 		t.Context(),
 		db.CreateAgentSessionParams{
 			ID:                  "session-" + runID,
-			WorkspaceID:         nullString(workspace.ID),
-			ThreadID:            nullString(thread.ID),
-			Source:              string(AgentSessionSourceWeb),
-			Status:              "pending",
+			ProjectedThreadID:   nullString(thread.ID),
+			IdentityKind:        "web",
+			ProjectionState:     "pending",
 			Cwd:                 nullString(workspace.RootDocPath),
-			SessionPath:         sql.NullString{},
-			SessionID:           sql.NullString{},
+			ArtifactPath:        sql.NullString{},
+			ExternalSessionID:   sql.NullString{},
 			ParentSessionID:     sql.NullString{},
-			InferredWorkspaceID: sql.NullString{},
-			InferredPlanDir:     sql.NullString{},
+			AttachedWorkspaceID: sql.NullString{},
+			PlanDir:             sql.NullString{},
 			ImportedHeadEntryID: sql.NullString{},
 			LastError:           sql.NullString{},
 			MetadataJson:        sql.NullString{},

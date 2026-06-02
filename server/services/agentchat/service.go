@@ -882,7 +882,7 @@ func (s *Service) attachThreadRunsAndSessionsToWorkspace(
 		return nil
 	}
 	q := s.queries.WithTx(tx)
-	if err := q.BackfillAgentSessionsWorkspaceForThread(ctx, db.BackfillAgentSessionsWorkspaceForThreadParams{WorkspaceID: nullString(workspaceID), ThreadID: nullString(threadID)}); err != nil {
+	if err := q.BackfillAgentSessionsWorkspaceForThread(ctx, db.BackfillAgentSessionsWorkspaceForThreadParams{AttachedWorkspaceID: nullString(workspaceID), ProjectedThreadID: nullString(threadID)}); err != nil {
 		return err
 	}
 	return q.BackfillAgentRunsWorkspaceForThread(ctx, db.BackfillAgentRunsWorkspaceForThreadParams{WorkspaceID: nullString(workspaceID), ThreadID: threadID})
@@ -1490,17 +1490,16 @@ func (s *Service) createWebAgentSession(
 ) (db.AgentSession, error) {
 	return q.CreateAgentSession(ctx, db.CreateAgentSessionParams{
 		ID:                  uuid.NewString(),
-		WorkspaceID:         nullString(workspace.ID),
-		ThreadID:            nullString(thread.ID),
-		UserEmail:           normalizeSessionOwnerEmail(workspace.UserEmail),
-		Source:              string(AgentSessionSourceWeb),
-		SessionPath:         sql.NullString{},
-		SessionID:           sql.NullString{},
+		IdentityKind:        "web",
+		ArtifactPath:        sql.NullString{},
+		PlanDir:             sql.NullString{},
+		ExternalSessionID:   sql.NullString{},
 		ParentSessionID:     sql.NullString{},
 		Cwd:                 nullString(thread.Cwd),
-		Status:              "pending",
-		InferredWorkspaceID: sql.NullString{},
-		InferredPlanDir:     sql.NullString{},
+		ProjectionState:     "needs_hydration",
+		ProjectedThreadID:   nullString(thread.ID),
+		IndexedByUserEmail:  normalizeSessionOwnerEmail(workspace.UserEmail),
+		AttachedWorkspaceID: nullString(workspace.ID),
 		ImportedHeadEntryID: sql.NullString{},
 		LastError:           sql.NullString{},
 		MetadataJson:        sql.NullString{},

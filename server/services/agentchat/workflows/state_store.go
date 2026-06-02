@@ -99,16 +99,16 @@ func (s *DBStore) AppendWorkflowEvents(
 			return fmt.Errorf("marshal workflow event: %w", err)
 		}
 		_, err = s.Queries.CreateWorkspaceEvent(ctx, db.CreateWorkspaceEventParams{
-			WorkspaceID:  strings.TrimSpace(workspaceID),
-			EventType:    strings.TrimSpace(event.Type),
-			ActorEmail:   sql.NullString{},
-			ActorType:    "system",
-			ThreadID:     nullString(run.ThreadID),
-			SessionID:    run.SessionID,
-			RunID:        nullString(run.ID),
-			DocPath: sql.NullString{},
-			CommentID:    sql.NullString{},
-			PayloadJson:  nullString(string(payload)),
+			WorkspaceID: strings.TrimSpace(workspaceID),
+			EventType:   strings.TrimSpace(event.Type),
+			ActorEmail:  sql.NullString{},
+			ActorType:   "system",
+			ThreadID:    nullString(run.ThreadID),
+			SessionID:   run.SessionID,
+			RunID:       nullString(run.ID),
+			DocPath:     sql.NullString{},
+			CommentID:   sql.NullString{},
+			PayloadJson: nullString(string(payload)),
 			EventKey: nullString(
 				run.ID + ":" + event.Type + ":" + string(event.NodeID),
 			),
@@ -133,8 +133,8 @@ func (s *DBStore) ArtifactExists(
 		return false, err
 	}
 	artifact, err := s.Queries.GetWorkspaceDoc(ctx, db.GetWorkspaceDocParams{
-		WorkspaceID:  strings.TrimSpace(workspaceID),
-		DocPath: documentPath,
+		WorkspaceID: strings.TrimSpace(workspaceID),
+		DocPath:     documentPath,
 	})
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {

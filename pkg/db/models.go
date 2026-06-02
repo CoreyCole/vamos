@@ -57,17 +57,15 @@ type AgentRunAttachment struct {
 
 type AgentSession struct {
 	ID                     string         `json:"id"`
-	WorkspaceID            sql.NullString `json:"workspace_id"`
-	ThreadID               sql.NullString `json:"thread_id"`
-	UserEmail              sql.NullString `json:"user_email"`
-	Source                 string         `json:"source"`
-	SessionPath            sql.NullString `json:"session_path"`
-	SessionID              sql.NullString `json:"session_id"`
-	ParentSessionID        sql.NullString `json:"parent_session_id"`
-	Cwd                    sql.NullString `json:"cwd"`
-	Agent                  string         `json:"agent"`
+	IdentityKind           string         `json:"identity_kind"`
+	ArtifactPath           sql.NullString `json:"artifact_path"`
+	PlanDir                sql.NullString `json:"plan_dir"`
 	ParentPlanDir          sql.NullString `json:"parent_plan_dir"`
 	SourceReviewDir        sql.NullString `json:"source_review_dir"`
+	Agent                  string         `json:"agent"`
+	ExternalSessionID      sql.NullString `json:"external_session_id"`
+	ParentSessionID        sql.NullString `json:"parent_session_id"`
+	Cwd                    sql.NullString `json:"cwd"`
 	WorkflowID             sql.NullString `json:"workflow_id"`
 	WorkflowNodeID         sql.NullString `json:"workflow_node_id"`
 	ContinuedFromSessionID sql.NullString `json:"continued_from_session_id"`
@@ -76,10 +74,10 @@ type AgentSession struct {
 	FileMtime              sql.NullTime   `json:"file_mtime"`
 	FileHash               sql.NullString `json:"file_hash"`
 	LastIndexedOffset      int64          `json:"last_indexed_offset"`
-	NeedsHydration         int64          `json:"needs_hydration"`
-	Status                 string         `json:"status"`
-	InferredWorkspaceID    sql.NullString `json:"inferred_workspace_id"`
-	InferredPlanDir        sql.NullString `json:"inferred_plan_dir"`
+	ProjectionState        string         `json:"projection_state"`
+	ProjectedThreadID      sql.NullString `json:"projected_thread_id"`
+	IndexedByUserEmail     sql.NullString `json:"indexed_by_user_email"`
+	AttachedWorkspaceID    sql.NullString `json:"attached_workspace_id"`
 	ImportedHeadEntryID    sql.NullString `json:"imported_head_entry_id"`
 	LastImportedAt         sql.NullTime   `json:"last_imported_at"`
 	LastError              sql.NullString `json:"last_error"`

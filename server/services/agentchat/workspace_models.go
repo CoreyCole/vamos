@@ -34,7 +34,7 @@ const (
 type WorkspaceCreateInput struct {
 	UserEmail     string
 	Title         string
-	RootDocPath  string
+	RootDocPath   string
 	Cwd           string
 	WorkflowType  WorkspaceWorkflowType
 	WorkflowState json.RawMessage
@@ -69,7 +69,7 @@ type AppendWorkspaceEventInput struct {
 	SessionID       string
 	RunID           string
 	ArtifactRelPath string
-	DocPath    string
+	DocPath         string
 	CommentID       string
 	PayloadJSON     string
 	EventKey        string

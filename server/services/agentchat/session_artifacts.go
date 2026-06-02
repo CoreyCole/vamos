@@ -247,34 +247,44 @@ func (s *Service) HydrateSessionArtifact(ctx context.Context, path string) (chat
 	if path == "" {
 		return chatsession.ChatProjection{}, errors.New("session path is required")
 	}
-	resolvedPath, err := s.validatePiSessionPath(path)
+	identityPath := filepath.ToSlash(path)
+	resolvedPath := path
+	if filepath.IsAbs(path) {
+		var err error
+		resolvedPath, err = s.validatePiSessionPath(path)
+		if err != nil {
+			return chatsession.ChatProjection{}, err
+		}
+		if rel, ok := s.thoughtsRelativePath(resolvedPath); ok {
+			identityPath = rel
+		} else {
+			identityPath = resolvedPath
+		}
+	}
+	artifact, err := s.queries.GetAgentSessionByPath(ctx, nullableString(identityPath))
 	if err != nil {
 		return chatsession.ChatProjection{}, err
 	}
-	artifact, err := s.queries.GetAgentSessionByPath(ctx, nullableString(resolvedPath))
-	if err != nil {
-		return chatsession.ChatProjection{}, err
-	}
-	if artifact.NeedsHydration != 0 && artifact.Status != "imported" && artifact.Status != "diverged" {
+	if artifact.ProjectionState == "needs_hydration" {
 		if _, err := s.ImportPiSession(ctx, SessionImportInput{
-			SessionPath: resolvedPath,
+			SessionPath: identityPath,
 			Source:      AgentSessionSourceTerminal,
-			UserEmail:   strings.TrimSpace(artifact.UserEmail.String),
+			UserEmail:   strings.TrimSpace(artifact.IndexedByUserEmail.String),
 		}); err != nil {
 			return chatsession.ChatProjection{}, err
 		}
-		if err := s.queries.MarkAgentSessionHydratedByPath(ctx, nullableString(resolvedPath)); err != nil {
+		if err := s.queries.MarkAgentSessionHydratedByPath(ctx, nullableString(identityPath)); err != nil {
 			return chatsession.ChatProjection{}, err
 		}
-		artifact, err = s.queries.GetAgentSessionByPath(ctx, nullableString(resolvedPath))
+		artifact, err = s.queries.GetAgentSessionByPath(ctx, nullableString(identityPath))
 		if err != nil {
 			return chatsession.ChatProjection{}, err
 		}
 	}
-	if artifact.ThreadID.Valid && strings.TrimSpace(artifact.ThreadID.String) != "" {
-		return s.chatProjectionFromAgentThread(ctx, strings.TrimSpace(artifact.ThreadID.String))
+	if artifact.ProjectedThreadID.Valid && strings.TrimSpace(artifact.ProjectedThreadID.String) != "" {
+		return s.chatProjectionFromAgentThread(ctx, strings.TrimSpace(artifact.ProjectedThreadID.String))
 	}
-	return chatsession.ChatProjection{SessionID: strings.TrimSpace(artifact.SessionID.String)}, nil
+	return chatsession.ChatProjection{SessionID: strings.TrimSpace(artifact.ExternalSessionID.String)}, nil
 }
 
 func (s *Service) chatProjectionFromAgentThread(ctx context.Context, threadID string) (chatsession.ChatProjection, error) {

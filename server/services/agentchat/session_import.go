@@ -636,11 +636,10 @@ func (s *Service) ImportPiSession(
 			ctx,
 			db.UpdateAgentSessionInferenceStateParams{
 				ID:                  session.ID,
-				WorkspaceID:         sql.NullString{},
-				ThreadID:            sql.NullString{},
-				Status:              status,
-				InferredWorkspaceID: sql.NullString{},
-				InferredPlanDir:     nullString(scan.Inference.PlanDir),
+				AttachedWorkspaceID: sql.NullString{},
+				ProjectedThreadID:   sql.NullString{},
+				ProjectionState:     status,
+				PlanDir:             nullString(scan.Inference.PlanDir),
 				LastError:           sql.NullString{},
 				MetadataJson:        nullString(metadata),
 			},
@@ -671,10 +670,9 @@ func (s *Service) ImportPiSession(
 		ctx,
 		db.UpdateAgentSessionImportingStateParams{
 			ID:                  session.ID,
-			WorkspaceID:         nullString(workspace.ID),
-			ThreadID:            nullString(thread.ID),
-			InferredWorkspaceID: nullString(workspace.ID),
-			InferredPlanDir:     nullString(scan.Inference.PlanDir),
+			AttachedWorkspaceID: nullString(workspace.ID),
+			ProjectedThreadID:   nullString(thread.ID),
+			PlanDir:             nullString(scan.Inference.PlanDir),
 			MetadataJson:        nullString(metadata),
 		},
 	); err != nil {
@@ -738,7 +736,7 @@ func (s *Service) ImportPiSession(
 		}, batchErr
 	}
 
-	status = "imported"
+	status = "hydrated"
 	if diverged {
 		status = "diverged"
 	}
@@ -752,11 +750,10 @@ func (s *Service) ImportPiSession(
 		ctx,
 		db.UpdateAgentSessionImportFinalStateParams{
 			ID:                  session.ID,
-			WorkspaceID:         nullString(workspace.ID),
-			ThreadID:            nullString(thread.ID),
-			Status:              status,
-			InferredWorkspaceID: nullString(workspace.ID),
-			InferredPlanDir:     nullString(scan.Inference.PlanDir),
+			AttachedWorkspaceID: nullString(workspace.ID),
+			ProjectedThreadID:   nullString(thread.ID),
+			ProjectionState:     status,
+			PlanDir:             nullString(scan.Inference.PlanDir),
 			ImportedHeadEntryID: nullString(scan.FinalEntryID),
 			MetadataJson:        nullString(metadata),
 		},
@@ -916,8 +913,8 @@ func (s *Service) resolveImportThreadFromScan(
 	workspace db.Workspace,
 	scan PiSessionScanSummary,
 ) (db.AgentThread, bool, error) {
-	if session.ThreadID.Valid && strings.TrimSpace(session.ThreadID.String) != "" {
-		thread, err := q.GetAgentThread(ctx, session.ThreadID.String)
+	if session.ProjectedThreadID.Valid && strings.TrimSpace(session.ProjectedThreadID.String) != "" {
+		thread, err := q.GetAgentThread(ctx, session.ProjectedThreadID.String)
 		if err != nil {
 			return db.AgentThread{}, false, err
 		}
@@ -953,8 +950,8 @@ func (s *Service) resolveImportThread(
 	workspace db.Workspace,
 	doc PiSessionDocument,
 ) (db.AgentThread, bool, error) {
-	if session.ThreadID.Valid && strings.TrimSpace(session.ThreadID.String) != "" {
-		thread, err := q.GetAgentThread(ctx, session.ThreadID.String)
+	if session.ProjectedThreadID.Valid && strings.TrimSpace(session.ProjectedThreadID.String) != "" {
+		thread, err := q.GetAgentThread(ctx, session.ProjectedThreadID.String)
 		if err != nil {
 			return db.AgentThread{}, false, err
 		}
@@ -1019,19 +1016,22 @@ func (s *Service) ensureImportSession(
 	if !errors.Is(err, sql.ErrNoRows) {
 		return db.AgentSession{}, false, err
 	}
+	identityKind := "global_pi"
+	if source == AgentSessionSourceWeb {
+		identityKind = "web"
+	}
 	session, err := q.CreateAgentSession(ctx, db.CreateAgentSessionParams{
 		ID:                  uuid.NewString(),
-		WorkspaceID:         nullString(workspaceID),
-		ThreadID:            sql.NullString{},
-		UserEmail:           normalizeSessionOwnerEmail(userEmail),
-		Source:              string(source),
-		SessionPath:         nullString(sessionPath),
-		SessionID:           nullString(header.ID),
+		IdentityKind:        identityKind,
+		ArtifactPath:        nullString(sessionPath),
+		PlanDir:             nullString(inferredPlanDir),
+		ExternalSessionID:   nullString(header.ID),
 		ParentSessionID:     nullString(header.ParentSession),
 		Cwd:                 nullString(header.Cwd),
-		Status:              status,
-		InferredWorkspaceID: nullString(workspaceID),
-		InferredPlanDir:     nullString(inferredPlanDir),
+		ProjectionState:     status,
+		ProjectedThreadID:   sql.NullString{},
+		IndexedByUserEmail:  normalizeSessionOwnerEmail(userEmail),
+		AttachedWorkspaceID: nullString(workspaceID),
 		ImportedHeadEntryID: sql.NullString{},
 		LastError:           nullString(lastError),
 		MetadataJson:        nullString(metadata),
@@ -1053,12 +1053,15 @@ func (s *Service) validateImportSessionReuse(
 ) error {
 	_ = strings.TrimSpace(userEmail)
 
-	hasWorkspace := session.WorkspaceID.Valid &&
-		strings.TrimSpace(session.WorkspaceID.String) != ""
-	hasThread := session.ThreadID.Valid &&
-		strings.TrimSpace(session.ThreadID.String) != ""
+	hasWorkspace := session.AttachedWorkspaceID.Valid &&
+		strings.TrimSpace(session.AttachedWorkspaceID.String) != ""
+	hasThread := session.ProjectedThreadID.Valid &&
+		strings.TrimSpace(session.ProjectedThreadID.String) != ""
 
-	if !session.UserEmail.Valid && !hasWorkspace && !hasThread {
+	if session.IdentityKind == "plan_owned" {
+		return nil
+	}
+	if !session.IndexedByUserEmail.Valid && !hasWorkspace && !hasThread {
 		return errors.New("pi session has no owner and cannot be reused")
 	}
 
@@ -1067,7 +1070,7 @@ func (s *Service) validateImportSessionReuse(
 	}
 
 	if hasWorkspace {
-		existingWorkspace, err := q.GetWorkspace(ctx, session.WorkspaceID.String)
+		existingWorkspace, err := q.GetWorkspace(ctx, session.AttachedWorkspaceID.String)
 		if err != nil {
 			return err
 		}
@@ -1079,7 +1082,7 @@ func (s *Service) validateImportSessionReuse(
 	if !hasThread {
 		return nil
 	}
-	thread, err := q.GetAgentThread(ctx, session.ThreadID.String)
+	thread, err := q.GetAgentThread(ctx, session.ProjectedThreadID.String)
 	if err != nil {
 		return err
 	}
@@ -1105,7 +1108,7 @@ func (s *Service) validateImportSessionReuse(
 	if workspaceOK && primaryWorkspaceID != workspace.ID {
 		return errors.New("pi session thread belongs to a different workspace")
 	}
-	if hasWorkspace && primaryWorkspaceID != session.WorkspaceID.String {
+	if hasWorkspace && primaryWorkspaceID != session.AttachedWorkspaceID.String {
 		return errors.New("pi session workspace does not match its thread")
 	}
 	return nil

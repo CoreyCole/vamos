@@ -383,17 +383,16 @@ ON agent_thread_workspaces (workspace_id, thread_id) ;
 
 CREATE TABLE IF NOT EXISTS agent_sessions (
 id TEXT PRIMARY KEY,
-workspace_id TEXT REFERENCES workspaces (id),
-thread_id TEXT REFERENCES agent_threads (id),
-user_email TEXT,
-source TEXT NOT NULL CHECK (source IN ('terminal', 'web', 'adopted')),
-session_path TEXT,
-session_id TEXT,
-parent_session_id TEXT,
-cwd TEXT,
-agent TEXT NOT NULL DEFAULT 'pi',
+identity_kind TEXT NOT NULL DEFAULT 'global_pi'
+CHECK (identity_kind IN ('plan_owned', 'global_pi', 'web')),
+artifact_path TEXT,
+plan_dir TEXT,
 parent_plan_dir TEXT,
 source_review_dir TEXT,
+agent TEXT NOT NULL DEFAULT 'pi',
+external_session_id TEXT,
+parent_session_id TEXT,
+cwd TEXT,
 workflow_id TEXT,
 workflow_node_id TEXT,
 continued_from_session_id TEXT,
@@ -402,17 +401,17 @@ file_size INTEGER NOT NULL DEFAULT 0,
 file_mtime DATETIME,
 file_hash TEXT,
 last_indexed_offset INTEGER NOT NULL DEFAULT 0,
-needs_hydration INTEGER NOT NULL DEFAULT 1,
-status TEXT NOT NULL DEFAULT 'pending'
-CHECK (status IN ('pending',
+projection_state TEXT NOT NULL DEFAULT 'needs_hydration'
+CHECK (projection_state IN ('needs_hydration',
 'importing',
-'imported',
+'hydrated',
 'unassigned',
 'ambiguous',
 'diverged',
 'failed')),
-inferred_workspace_id TEXT,
-inferred_plan_dir TEXT,
+projected_thread_id TEXT REFERENCES agent_threads (id),
+indexed_by_user_email TEXT,
+attached_workspace_id TEXT REFERENCES workspaces (id),
 imported_head_entry_id TEXT,
 last_imported_at DATETIME,
 last_error TEXT,
@@ -421,25 +420,24 @@ created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
 updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 ) ;
 
-CREATE UNIQUE INDEX IF NOT EXISTS idx_agent_sessions_path
-ON agent_sessions (session_path)
-WHERE session_path IS NOT NULL ;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_agent_sessions_artifact_path
+ON agent_sessions (artifact_path)
+WHERE artifact_path IS NOT NULL ;
 
-CREATE INDEX IF NOT EXISTS idx_agent_sessions_user_plan_updated
-ON agent_sessions (user_email, updated_at DESC)
-WHERE inferred_plan_dir IS NOT NULL ;
+CREATE INDEX IF NOT EXISTS idx_agent_sessions_plan_owned_updated
+ON agent_sessions (plan_dir, agent, updated_at DESC)
+WHERE identity_kind = 'plan_owned' AND plan_dir IS NOT NULL ;
 
-CREATE INDEX IF NOT EXISTS idx_agent_sessions_user_plan_dir_updated
-ON agent_sessions (user_email, inferred_plan_dir, updated_at DESC)
-WHERE inferred_plan_dir IS NOT NULL ;
+CREATE INDEX IF NOT EXISTS idx_agent_sessions_private_user_plan_updated
+ON agent_sessions (indexed_by_user_email, plan_dir, updated_at DESC)
+WHERE identity_kind != 'plan_owned' AND plan_dir IS NOT NULL ;
 
-CREATE INDEX IF NOT EXISTS idx_agent_sessions_user_workspace_plan_dir_updated
-ON agent_sessions (user_email, workspace_id, inferred_plan_dir, updated_at DESC)
-WHERE inferred_plan_dir IS NOT NULL ;
-
-CREATE INDEX IF NOT EXISTS idx_agent_sessions_plan_agent_updated
-ON agent_sessions (inferred_plan_dir, agent, updated_at DESC)
-WHERE inferred_plan_dir IS NOT NULL ;
+CREATE INDEX IF NOT EXISTS idx_agent_sessions_private_user_workspace_plan_updated
+ON agent_sessions (indexed_by_user_email,
+attached_workspace_id,
+plan_dir,
+updated_at DESC)
+WHERE identity_kind != 'plan_owned' AND plan_dir IS NOT NULL ;
 
 CREATE INDEX IF NOT EXISTS idx_agent_sessions_workflow_node
 ON agent_sessions (workflow_id, workflow_node_id, updated_at DESC)

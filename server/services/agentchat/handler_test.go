@@ -4449,22 +4449,22 @@ func TestOpenPiSessionImportsExplicitWorkspaceDirAndRedirects(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetAgentSessionByPath() error = %v", err)
 	}
-	if session.Source != string(AgentSessionSourceAdopted) {
-		t.Fatalf("session.Source = %q, want adopted", session.Source)
+	if session.IdentityKind != string(AgentSessionSourceAdopted) {
+		t.Fatalf("session.IdentityKind = %q, want adopted", session.IdentityKind)
 	}
-	if !session.WorkspaceID.Valid || !session.ThreadID.Valid {
+	if !session.AttachedWorkspaceID.Valid || !session.ProjectedThreadID.Valid {
 		t.Fatalf(
 			"session workspace/thread = %v/%v, want both set",
-			session.WorkspaceID,
-			session.ThreadID,
+			session.AttachedWorkspaceID,
+			session.ProjectedThreadID,
 		)
 	}
-	if !session.UserEmail.Valid || session.UserEmail.String != authenticatedUser {
-		t.Fatalf("session.UserEmail = %v, want authenticated user", session.UserEmail)
+	if !session.IndexedByUserEmail.Valid || session.IndexedByUserEmail.String != authenticatedUser {
+		t.Fatalf("session.IndexedByUserEmail = %v, want authenticated user", session.IndexedByUserEmail)
 	}
 	storedWorkspace, err := service.queries.GetWorkspace(
 		t.Context(),
-		session.WorkspaceID.String,
+		session.AttachedWorkspaceID.String,
 	)
 	if err != nil {
 		t.Fatalf("GetWorkspace() error = %v", err)
@@ -4473,7 +4473,7 @@ func TestOpenPiSessionImportsExplicitWorkspaceDirAndRedirects(t *testing.T) {
 		storedWorkspace.RootDocPath != planDir {
 		t.Fatalf("workspace = %+v, want authenticated user's plan", storedWorkspace)
 	}
-	wantURL := workspaceThreadHrefForWorkspace(storedWorkspace, session.ThreadID.String)
+	wantURL := workspaceThreadHrefForWorkspace(storedWorkspace, session.ProjectedThreadID.String)
 	if !strings.Contains(rec.Body.String(), wantURL) {
 		t.Fatalf("SSE redirect missing %q: %s", wantURL, rec.Body.String())
 	}
@@ -4578,7 +4578,7 @@ func TestOpenPiSessionRedirectsDivergedImportedSession(t *testing.T) {
 	if err := service.queries.UpdateAgentThreadHead(
 		t.Context(),
 		db.UpdateAgentThreadHeadParams{
-			ID:          firstSession.ThreadID.String,
+			ID:          firstSession.ProjectedThreadID.String,
 			HeadEntryID: nullString("web-head"),
 		},
 	); err != nil {
@@ -4596,22 +4596,22 @@ func TestOpenPiSessionRedirectsDivergedImportedSession(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetAgentSessionByPath(after) error = %v", err)
 	}
-	if afterSession.Status != "diverged" {
-		t.Fatalf("session.Status = %q, want diverged", afterSession.Status)
+	if afterSession.ProjectionState != "diverged" {
+		t.Fatalf("session.ProjectionState = %q, want diverged", afterSession.ProjectionState)
 	}
-	if afterSession.ThreadID.String == firstSession.ThreadID.String {
-		t.Fatalf("ThreadID = %s, want diverged sibling", afterSession.ThreadID.String)
+	if afterSession.ProjectedThreadID.String == firstSession.ProjectedThreadID.String {
+		t.Fatalf("ThreadID = %s, want diverged sibling", afterSession.ProjectedThreadID.String)
 	}
 	afterWorkspace, err := service.queries.GetWorkspace(
 		t.Context(),
-		afterSession.WorkspaceID.String,
+		afterSession.AttachedWorkspaceID.String,
 	)
 	if err != nil {
 		t.Fatalf("GetWorkspace(after) error = %v", err)
 	}
 	wantURL := workspaceThreadHrefForWorkspace(
 		afterWorkspace,
-		afterSession.ThreadID.String,
+		afterSession.ProjectedThreadID.String,
 	)
 	if !strings.Contains(rec.Body.String(), wantURL) {
 		t.Fatalf("SSE redirect missing %q: %s", wantURL, rec.Body.String())
@@ -4811,12 +4811,12 @@ func TestOpenPiSessionReturnsBadRequestWhenImportProducesNoThread(t *testing.T) 
 	if err != nil {
 		t.Fatalf("GetAgentSessionByPath() error = %v", err)
 	}
-	if session.Status != "unassigned" || session.ThreadID.Valid ||
-		session.WorkspaceID.Valid {
+	if session.ProjectionState != "unassigned" || session.ProjectedThreadID.Valid ||
+		session.AttachedWorkspaceID.Valid {
 		t.Fatalf("session = %+v, want unassigned without thread/workspace", session)
 	}
-	if !session.UserEmail.Valid || session.UserEmail.String != "user@example.com" {
-		t.Fatalf("session.UserEmail = %v, want authenticated user", session.UserEmail)
+	if !session.IndexedByUserEmail.Valid || session.IndexedByUserEmail.String != "user@example.com" {
+		t.Fatalf("session.IndexedByUserEmail = %v, want authenticated user", session.IndexedByUserEmail)
 	}
 }
 
@@ -4858,27 +4858,27 @@ func TestOpenPiSessionIsIdempotentForAlreadyImportedSession(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetAgentSessionByPath(second) error = %v", err)
 	}
-	if !first.ThreadID.Valid || !second.ThreadID.Valid ||
-		first.ThreadID.String != second.ThreadID.String {
+	if !first.ProjectedThreadID.Valid || !second.ProjectedThreadID.Valid ||
+		first.ProjectedThreadID.String != second.ProjectedThreadID.String {
 		t.Fatalf(
 			"thread IDs first=%v second=%v, want same",
-			first.ThreadID,
-			second.ThreadID,
+			first.ProjectedThreadID,
+			second.ProjectedThreadID,
 		)
 	}
 	secondWorkspace, err := service.queries.GetWorkspace(
 		t.Context(),
-		second.WorkspaceID.String,
+		second.AttachedWorkspaceID.String,
 	)
 	if err != nil {
 		t.Fatalf("GetWorkspace(second) error = %v", err)
 	}
-	wantURL := workspaceThreadHrefForWorkspace(secondWorkspace, second.ThreadID.String)
+	wantURL := workspaceThreadHrefForWorkspace(secondWorkspace, second.ProjectedThreadID.String)
 	if !strings.Contains(secondRec.Body.String(), wantURL) {
 		t.Fatalf("second redirect missing %q: %s", wantURL, secondRec.Body.String())
 	}
 
-	threadCount64, err := service.queries.TestSupportCountPrimaryThreadWorkspaceAssociationsByWorkspace(t.Context(), second.WorkspaceID.String)
+	threadCount64, err := service.queries.TestSupportCountPrimaryThreadWorkspaceAssociationsByWorkspace(t.Context(), second.AttachedWorkspaceID.String)
 	if err != nil {
 		t.Fatalf("count agent_threads: %v", err)
 	}
@@ -4932,8 +4932,8 @@ func TestOpenPiSessionAllowsCrossUserAlreadyImportedSession(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetAgentSessionByPath(after) error = %v", err)
 	}
-	if after.WorkspaceID != before.WorkspaceID || after.ThreadID != before.ThreadID ||
-		after.Status != before.Status || after.UserEmail != before.UserEmail {
+	if after.AttachedWorkspaceID != before.AttachedWorkspaceID || after.ProjectedThreadID != before.ProjectedThreadID ||
+		after.ProjectionState != before.ProjectionState || after.IndexedByUserEmail != before.IndexedByUserEmail {
 		t.Fatalf(
 			"session mutated after cross-user open: before=%+v after=%+v",
 			before,
@@ -4942,12 +4942,12 @@ func TestOpenPiSessionAllowsCrossUserAlreadyImportedSession(t *testing.T) {
 	}
 	beforeWorkspace, err := service.queries.GetWorkspace(
 		t.Context(),
-		before.WorkspaceID.String,
+		before.AttachedWorkspaceID.String,
 	)
 	if err != nil {
 		t.Fatalf("GetWorkspace(before) error = %v", err)
 	}
-	wantURL := workspaceThreadHrefForWorkspace(beforeWorkspace, before.ThreadID.String)
+	wantURL := workspaceThreadHrefForWorkspace(beforeWorkspace, before.ProjectedThreadID.String)
 	if !strings.Contains(rec.Body.String(), wantURL) {
 		t.Fatalf("cross-user redirect missing %q: %s", wantURL, rec.Body.String())
 	}
@@ -4986,8 +4986,8 @@ func TestOpenPiSessionAllowsSameUserRetryForUnassignedSession(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetAgentSessionByPath(after) error = %v", err)
 	}
-	if after.ID != before.ID || after.UserEmail != before.UserEmail ||
-		after.Status != "unassigned" || after.WorkspaceID.Valid || after.ThreadID.Valid {
+	if after.ID != before.ID || after.IndexedByUserEmail != before.IndexedByUserEmail ||
+		after.ProjectionState != "unassigned" || after.AttachedWorkspaceID.Valid || after.ProjectedThreadID.Valid {
 		t.Fatalf(
 			"session after retry = %+v, want same owner-bearing unassigned row %+v",
 			after,
@@ -5037,8 +5037,8 @@ func TestOpenPiSessionAllowsCrossUserRetryForOwnerBearingUnassignedSession(
 	if err != nil {
 		t.Fatalf("GetAgentSessionByPath(after) error = %v", err)
 	}
-	if after.ID != before.ID || after.UserEmail != before.UserEmail ||
-		after.Status != before.Status || after.WorkspaceID.Valid || after.ThreadID.Valid {
+	if after.ID != before.ID || after.IndexedByUserEmail != before.IndexedByUserEmail ||
+		after.ProjectionState != before.ProjectionState || after.AttachedWorkspaceID.Valid || after.ProjectedThreadID.Valid {
 		t.Fatalf(
 			"session mutated after cross-user retry: before=%+v after=%+v",
 			before,
@@ -5067,17 +5067,16 @@ func TestOpenPiSessionRejectsHistoricalOwnerlessUnassignedSessionReuse(t *testin
 	)
 	_, err := service.queries.CreateAgentSession(t.Context(), db.CreateAgentSessionParams{
 		ID:                  "historical-ownerless-unassigned",
-		WorkspaceID:         sql.NullString{},
-		ThreadID:            sql.NullString{},
-		UserEmail:           sql.NullString{},
-		Source:              "adopted",
-		SessionPath:         nullString(sessionPath),
-		SessionID:           sql.NullString{},
+		AttachedWorkspaceID: sql.NullString{},
+		ProjectedThreadID:   sql.NullString{},
+		IndexedByUserEmail:  sql.NullString{},
+		IdentityKind:        "global_pi",
+		ArtifactPath:        nullString(sessionPath),
+		ExternalSessionID:   sql.NullString{},
 		ParentSessionID:     sql.NullString{},
 		Cwd:                 sql.NullString{},
-		Status:              "unassigned",
-		InferredWorkspaceID: sql.NullString{},
-		InferredPlanDir:     sql.NullString{},
+		ProjectionState:     "unassigned",
+		PlanDir:             sql.NullString{},
 		LastError:           sql.NullString{},
 		MetadataJson:        sql.NullString{},
 	})
@@ -5098,8 +5097,8 @@ func TestOpenPiSessionRejectsHistoricalOwnerlessUnassignedSessionReuse(t *testin
 	if err != nil {
 		t.Fatalf("GetAgentSessionByPath() error = %v", err)
 	}
-	if session.UserEmail.Valid || session.WorkspaceID.Valid ||
-		session.ThreadID.Valid || session.Status != "unassigned" {
+	if session.IndexedByUserEmail.Valid || session.AttachedWorkspaceID.Valid ||
+		session.ProjectedThreadID.Valid || session.ProjectionState != "unassigned" {
 		t.Fatalf("historical session mutated: %+v", session)
 	}
 }
@@ -5147,17 +5146,16 @@ func TestOpenPiSessionAllowsHistoricalOwnerlessAssignedCrossUserWhenMappingMatch
 	}
 	_, err := service.queries.CreateAgentSession(t.Context(), db.CreateAgentSessionParams{
 		ID:                  "historical-ownerless-assigned",
-		WorkspaceID:         nullString(historicalWorkspace.ID),
-		ThreadID:            nullString(thread.ID),
-		UserEmail:           sql.NullString{},
-		Source:              "adopted",
-		SessionPath:         nullString(sessionPath),
-		SessionID:           sql.NullString{},
+		ProjectedThreadID:   nullString(thread.ID),
+		IndexedByUserEmail:  sql.NullString{},
+		IdentityKind:        "global_pi",
+		ArtifactPath:        nullString(sessionPath),
+		ExternalSessionID:   sql.NullString{},
 		ParentSessionID:     sql.NullString{},
 		Cwd:                 sql.NullString{},
-		Status:              "imported",
-		InferredWorkspaceID: sql.NullString{},
-		InferredPlanDir:     sql.NullString{},
+		ProjectionState:     "imported",
+		AttachedWorkspaceID: sql.NullString{},
+		PlanDir:             sql.NullString{},
 		LastError:           sql.NullString{},
 		MetadataJson:        sql.NullString{},
 	})
@@ -5216,9 +5214,9 @@ func TestOpenPiSessionPersistsOwnerForFailedImportAndAllowsDifferentUserRetry(
 	if err != nil {
 		t.Fatalf("GetAgentSessionByPath(before) error = %v", err)
 	}
-	if before.Status != failedStatus || !before.UserEmail.Valid ||
-		before.UserEmail.String != "first@example.com" ||
-		before.WorkspaceID.Valid || before.ThreadID.Valid {
+	if before.ProjectionState != failedStatus || !before.IndexedByUserEmail.Valid ||
+		before.IndexedByUserEmail.String != "first@example.com" ||
+		before.AttachedWorkspaceID.Valid || before.ProjectedThreadID.Valid {
 		t.Fatalf(
 			"failed session = %+v, want owner-bearing failed row without workspace/thread",
 			before,
@@ -5241,9 +5239,9 @@ func TestOpenPiSessionPersistsOwnerForFailedImportAndAllowsDifferentUserRetry(
 	if err != nil {
 		t.Fatalf("GetAgentSessionByPath(afterReject) error = %v", err)
 	}
-	if afterReject.ID != before.ID || afterReject.UserEmail != before.UserEmail ||
-		afterReject.WorkspaceID.Valid || afterReject.ThreadID.Valid ||
-		afterReject.Status != before.Status {
+	if afterReject.ID != before.ID || afterReject.IndexedByUserEmail != before.IndexedByUserEmail ||
+		afterReject.AttachedWorkspaceID.Valid || afterReject.ProjectedThreadID.Valid ||
+		afterReject.ProjectionState != before.ProjectionState {
 		t.Fatalf(
 			"failed session mutated after cross-user retry: before=%+v after=%+v",
 			before,
@@ -5267,10 +5265,10 @@ func TestOpenPiSessionPersistsOwnerForFailedImportAndAllowsDifferentUserRetry(
 	if err != nil {
 		t.Fatalf("GetAgentSessionByPath(afterRetry) error = %v", err)
 	}
-	if afterRetry.ID != before.ID || !afterRetry.UserEmail.Valid ||
-		afterRetry.UserEmail.String != "first@example.com" ||
-		!afterRetry.WorkspaceID.Valid || !afterRetry.ThreadID.Valid ||
-		afterRetry.Status != "imported" {
+	if afterRetry.ID != before.ID || !afterRetry.IndexedByUserEmail.Valid ||
+		afterRetry.IndexedByUserEmail.String != "first@example.com" ||
+		!afterRetry.AttachedWorkspaceID.Valid || !afterRetry.ProjectedThreadID.Valid ||
+		afterRetry.ProjectionState != "imported" {
 		t.Fatalf(
 			"after same-user retry = %+v, want same row imported for first user",
 			afterRetry,
