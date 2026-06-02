@@ -44,6 +44,10 @@ func (h *Handler) GetChatSessionSnapshot(c echo.Context) error {
 	if err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
 	}
+	projection.Messages = mergePartialProjectedMessages(
+		projection.Messages,
+		h.service.ActivePartialSnapshot(session.ID),
+	)
 	return c.JSON(
 		http.StatusOK,
 		chatSessionSnapshotResponse{Projection: projection, LastSeq: projection.LastSeq},
@@ -75,6 +79,9 @@ func (h *Handler) StreamChatSessionEvents(c echo.Context) error {
 
 	svc := chatsession.NewService(h.service.db, h.service.queries)
 	lastSeq, err := writeChatSessionEvents(ctx, c.Response(), svc, sessionID, afterSeq)
+	if err == nil {
+		err = writeActivePartialEvent(c.Response(), sessionID, h.service.ActivePartialSnapshot(sessionID))
+	}
 	if err != nil {
 		return err
 	}
@@ -168,6 +175,56 @@ func chatSessionAfterSeq(c echo.Context) int64 {
 		}
 	}
 	return 0
+}
+
+func mergePartialProjectedMessages(
+	messages []chatsession.ProjectedMessage,
+	partials []chatsession.ProjectedMessage,
+) []chatsession.ProjectedMessage {
+	if len(partials) == 0 {
+		return messages
+	}
+	merged := append([]chatsession.ProjectedMessage{}, messages...)
+	for _, partial := range partials {
+		found := false
+		for i, message := range merged {
+			if message.ID == partial.ID && message.ID != "" {
+				merged[i] = partial
+				found = true
+				break
+			}
+		}
+		if !found {
+			merged = append(merged, partial)
+		}
+	}
+	return merged
+}
+
+func writeActivePartialEvent(
+	response *echo.Response,
+	sessionID string,
+	partials []chatsession.ProjectedMessage,
+) error {
+	if len(partials) == 0 {
+		return nil
+	}
+	payload, err := json.Marshal(map[string]any{
+		"session_id": sessionID,
+		"messages":   partials,
+	})
+	if err != nil {
+		return err
+	}
+	if _, err := fmt.Fprintf(
+		response,
+		"event: active.partial\ndata: %s\n\n",
+		payload,
+	); err != nil {
+		return err
+	}
+	response.Flush()
+	return nil
 }
 
 func writeChatSessionEvents(

@@ -2352,6 +2352,101 @@ func (s *Service) ApplyLiveEvent(env conversation.EventEnvelope) error {
 	return err
 }
 
+func (s *Service) ApplyLiveAgentEvent(
+	ctx context.Context,
+	env conversation.EventEnvelope,
+) error {
+	if err := s.ApplyLiveEvent(env); err != nil {
+		return err
+	}
+	sessionID := strings.TrimSpace(env.ChatSessionID)
+	if sessionID == "" && strings.TrimSpace(env.RunID) != "" {
+		if run, err := s.queries.GetAgentRun(ctx, env.RunID); err == nil {
+			sessionID = s.chatSessionIDForRun(ctx, run)
+		}
+	}
+	if sessionID == "" {
+		return nil
+	}
+	input, ok := SemanticEventForLiveEnvelope(sessionID, env)
+	if !ok {
+		return nil
+	}
+	_, err := appendSemanticEventTx(ctx, s.queries, input)
+	return err
+}
+
+func (s *Service) ActivePartialSnapshot(sessionID string) []chatsession.ProjectedMessage {
+	sessionID = strings.TrimSpace(sessionID)
+	if sessionID == "" {
+		return nil
+	}
+	type liveSnapshot struct {
+		threadID string
+		runID    string
+		state    conversation.LiveTurnState
+	}
+	s.liveMu.RLock()
+	snapshots := make([]liveSnapshot, 0, len(s.liveThreads))
+	for threadID, live := range s.liveThreads {
+		if live == nil || live.Reducer == nil || strings.TrimSpace(live.RunID) == "" {
+			continue
+		}
+		snapshots = append(snapshots, liveSnapshot{
+			threadID: threadID,
+			runID:    live.RunID,
+			state:    live.Reducer.Snapshot(),
+		})
+	}
+	s.liveMu.RUnlock()
+
+	messages := []chatsession.ProjectedMessage{}
+	for _, snapshot := range snapshots {
+		run, err := s.queries.GetAgentRun(context.Background(), snapshot.runID)
+		if err != nil || s.chatSessionIDForRun(context.Background(), run) != sessionID {
+			continue
+		}
+		for _, item := range snapshot.state.Items {
+			msg, ok := projectedPartialMessage(snapshot.runID, item)
+			if ok {
+				messages = append(messages, msg)
+			}
+		}
+	}
+	return messages
+}
+
+func projectedPartialMessage(
+	runID string,
+	item conversation.LiveTurnItem,
+) (chatsession.ProjectedMessage, bool) {
+	switch item.Kind {
+	case conversation.LiveTurnUserMessage,
+		conversation.LiveTurnAssistantMessage,
+		conversation.LiveTurnToolResult:
+		var payload struct {
+			Role    string `json:"role"`
+			Content any    `json:"content"`
+		}
+		if len(item.MessageJSON) > 0 {
+			_ = json.Unmarshal(item.MessageJSON, &payload)
+		}
+		role := firstNonEmptyString(item.Role, payload.Role, "message")
+		content := contentString(payload.Content)
+		if strings.TrimSpace(content) == "" && len(item.MessageJSON) > 0 {
+			content = string(item.MessageJSON)
+		}
+		return chatsession.ProjectedMessage{
+			ID:      firstNonEmptyString(item.Key, runID+":partial"),
+			Role:    role,
+			Content: content,
+			RunID:   runID,
+		}, strings.TrimSpace(content) != ""
+	default:
+		return chatsession.ProjectedMessage{}, false
+	}
+}
+
 func (s *Service) resetLiveThread(threadID string) {
 	s.liveMu.Lock()
 	defer s.liveMu.Unlock()

@@ -1088,6 +1088,102 @@ func TestApplyCheckpointWritesAssistantMessageSessionEvent(t *testing.T) {
 	}
 }
 
+func TestApplyLiveAgentEventWritesSemanticProgressEvents(t *testing.T) {
+	service, workspace, thread, run := mustCreateWorkspaceLifecycleRun(
+		t,
+		"run-session-live-progress",
+	)
+	chatSession := mustCreateLifecycleChatSession(t, service, workspace, run)
+	events := []conversation.EventEnvelope{
+		{
+			WorkspaceID:   workspace.ID,
+			ChatSessionID: chatSession.ID,
+			RunID:         run.ID,
+			ThreadID:      thread.ID,
+			EventType:     "message_update",
+			PayloadJSON:   `{"message":{"role":"assistant","content":[{"type":"text","text":"thinking"}]}}`,
+		},
+		{
+			WorkspaceID:   workspace.ID,
+			ChatSessionID: chatSession.ID,
+			RunID:         run.ID,
+			ThreadID:      thread.ID,
+			EventType:     "tool_execution_start",
+			PayloadJSON:   `{"toolCallId":"call-1","toolName":"read","args":{"path":"main.go"}}`,
+		},
+		{
+			WorkspaceID:   workspace.ID,
+			ChatSessionID: chatSession.ID,
+			RunID:         run.ID,
+			ThreadID:      thread.ID,
+			EventType:     "tool_execution_end",
+			PayloadJSON:   `{"toolCallId":"call-1","toolName":"read","result":{"content":[{"type":"text","text":"ok"}]},"isError":false}`,
+		},
+	}
+	for _, env := range events {
+		if err := service.ApplyLiveAgentEvent(t.Context(), env); err != nil {
+			t.Fatalf("ApplyLiveAgentEvent(%s) error = %v", env.EventType, err)
+		}
+	}
+	stored, err := service.queries.ListChatSessionEventsAfter(
+		t.Context(),
+		db.ListChatSessionEventsAfterParams{
+			SessionID: chatSession.ID,
+			AfterSeq:  0,
+			Limit:     10,
+		},
+	)
+	if err != nil {
+		t.Fatalf("ListChatSessionEventsAfter() error = %v", err)
+	}
+	gotTypes := []string{}
+	for _, event := range stored {
+		gotTypes = append(gotTypes, event.EventType)
+	}
+	wantTypes := []string{
+		string(chatsession.EventRunStarted),
+		string(chatsession.EventMessageCheckpointed),
+		string(chatsession.EventToolStarted),
+		string(chatsession.EventToolCompleted),
+	}
+	if strings.Join(gotTypes, ",") != strings.Join(wantTypes, ",") {
+		t.Fatalf("event types = %v, want %v", gotTypes, wantTypes)
+	}
+	projection, err := chatsession.NewService(service.db, service.queries).
+		Snapshot(t.Context(), chatSession.ID)
+	if err != nil {
+		t.Fatalf("Snapshot() error = %v", err)
+	}
+	if len(projection.Messages) != 1 || projection.Messages[0].Content != "thinking" {
+		t.Fatalf("projection messages = %+v, want live checkpoint", projection.Messages)
+	}
+	if len(projection.Tools) != 1 || projection.Tools[0].Status != "complete" {
+		t.Fatalf("projection tools = %+v, want completed tool", projection.Tools)
+	}
+}
+
+func TestChatSessionSnapshotIncludesActivePartialMessage(t *testing.T) {
+	service, workspace, thread, run := mustCreateWorkspaceLifecycleRun(
+		t,
+		"run-session-active-partial",
+	)
+	chatSession := mustCreateLifecycleChatSession(t, service, workspace, run)
+	if err := service.ApplyLiveEvent(conversation.EventEnvelope{
+		WorkspaceID:   workspace.ID,
+		ChatSessionID: chatSession.ID,
+		RunID:         run.ID,
+		ThreadID:      thread.ID,
+		EventType:     "message_update",
+		PayloadJSON:   `{"message":{"role":"assistant","content":[{"type":"text","text":"partial answer"}]}}`,
+	}); err != nil {
+		t.Fatalf("ApplyLiveEvent() error = %v", err)
+	}
+	partials := service.ActivePartialSnapshot(chatSession.ID)
+	if len(partials) != 1 || partials[0].Content != "partial answer" {
+		t.Fatalf("ActivePartialSnapshot() = %+v, want partial answer", partials)
+	}
+}
+
 func TestFinalizeRunWritesSessionRunCompletedEvent(t *testing.T) {
 	service, workspace, thread, run := mustCreateWorkspaceLifecycleRun(
 		t,

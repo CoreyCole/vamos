@@ -2716,7 +2716,7 @@ func (h *Handler) HandleInternalRunEvent(c echo.Context) error {
 		if run.ID != "" && run.Status != agentRunStatusRunning {
 			return c.NoContent(http.StatusAccepted)
 		}
-		if err := h.service.ApplyLiveEvent(env); err != nil {
+		if err := h.service.ApplyLiveAgentEvent(c.Request().Context(), env); err != nil {
 			return echo.NewHTTPError(http.StatusBadRequest, "invalid live stream payload")
 		}
 		if strings.TrimSpace(env.WorkspaceID) != "" {
