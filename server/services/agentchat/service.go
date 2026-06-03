@@ -50,12 +50,13 @@ type workflowCompletionService interface {
 }
 
 type StartWorkflowInput struct {
-	UserEmail    string
-	Title        string
-	RootDocPath  string
-	Cwd          string
-	WorkflowType WorkspaceWorkflowType
-	Policy       json.RawMessage
+	UserEmail      string
+	Title          string
+	RootDocPath    string
+	Cwd            string
+	WorkflowType   WorkspaceWorkflowType
+	Policy         json.RawMessage
+	PromptOverride string
 }
 
 var ErrThreadRunInProgress = errors.New("thread already has an active run")
@@ -457,6 +458,9 @@ func (s *Service) StartWorkflow(
 	prompt, err := agentchatworkflows.RenderNodePrompt(ctx, def, node, state)
 	if err != nil {
 		return "", err
+	}
+	if override := strings.TrimSpace(input.PromptOverride); override != "" {
+		prompt = override
 	}
 	workspaceRecord, err := s.CreateWorkspace(ctx, WorkspaceCreateInput{
 		UserEmail:     input.UserEmail,

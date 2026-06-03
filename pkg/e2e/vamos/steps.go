@@ -220,6 +220,57 @@ func OpenQRSPIContinuationWorkspaceChat() spec.Step {
 	})
 }
 
+func StartQRSPIQuestionToResearchWorkspace() spec.Step {
+	return customStep("start qrspi question to research workspace", func(t testing.TB, ctx *duiruntime.Context) {
+		ensureMemory(ctx)
+		stamp := time.Now().UTC().Format("20060102T150405.000000000")
+		marker := "VAMOS_E2E_QRSPI_Q_TO_R_" + stamp
+		planRel := path.Join("creative-mode-agent", "plans", "e2e-qrspi-q-to-r-"+stamp)
+		artifactRel := path.Join("thoughts", planRel, "questions", stamp+"_questions.md")
+		planAbs := filepath.Join(thoughtsRoot(ctx), filepath.FromSlash(planRel))
+		if err := os.MkdirAll(filepath.Join(planAbs, "questions"), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(planAbs, "AGENTS.md"), []byte("# E2E QRSPI Question To Research\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(planAbs, "plan.md"), []byte("# E2E QRSPI Question To Research\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(planAbs, "questions", stamp+"_questions.md"), []byte("# E2E placeholder\n"+marker+"\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		prompt := qrspiQuestionToResearchPrompt(marker, artifactRel)
+		values := url.Values{}
+		values.Set("workflow_type", "qrspi")
+		values.Set("policy_preset", "assisted")
+		values.Set("plan_dir", "thoughts/"+planRel)
+		values.Set("e2e_qrspi_start_prompt", prompt)
+		visit(t, ctx, "/agent-chat/plan-workspace?"+values.Encode())
+
+		workspaceID, _ := latestPlanWorkspaceByRootDocPath(t, ctx, planAbs)
+		if workspaceID == "" {
+			t.Fatal("qrspi question-to-research workspace not created")
+		}
+		ctx.Memory["qrspi_q_to_r_workspace_id"] = workspaceID
+		question := waitForWorkflowRunForNode(t, ctx, "question", false)
+		ctx.Memory["qrspi_q_to_r_thread_id"] = question.ThreadID
+		ctx.Memory["qrspi_q_to_r_marker"] = marker
+		ctx.Memory["qrspi_q_to_r_artifact"] = artifactRel
+		visit(t, ctx, thoughtsChatURL(path.Join("thoughts", planRel, "plan.md"), workspaceID, question.ThreadID))
+	})
+}
+
+func qrspiQuestionToResearchPrompt(marker, artifactPath string) string {
+	return fmt.Sprintf(`E2E TEST MODE.
+Do not ask follow-up questions. Do not wait for human input.
+Complete q-question immediately.
+The questions artifact already exists at %s and contains marker %s.
+Reply with exactly one valid QRSPI result block in the currently supported runtime result format.
+Do not include prose outside the result block.
+Required semantic result: source node question, status complete, outcome complete, primary artifact %s, next step starts q-research immediately.`, artifactPath, marker, artifactPath)
+}
+
 type workflowRunSnapshot struct {
 	ID                 string
 	ThreadID           string
@@ -834,12 +885,17 @@ func followFirstLink(t testing.TB, ctx *duiruntime.Context, selector string) {
 
 func latestPlanWorkspace(t testing.TB, ctx *duiruntime.Context, planDir string) (string, string) {
 	t.Helper()
-	database := openDB(t, ctx)
-	defer database.Close()
 	rootDocPath := filepath.Join(ctx.Config.RepoRoot, strings.TrimPrefix(planDir, "thoughts/"))
 	if strings.HasPrefix(planDir, "thoughts/") {
 		rootDocPath = filepath.Join(ctx.Config.RepoRoot, planDir)
 	}
+	return latestPlanWorkspaceByRootDocPath(t, ctx, rootDocPath)
+}
+
+func latestPlanWorkspaceByRootDocPath(t testing.TB, ctx *duiruntime.Context, rootDocPath string) (string, string) {
+	t.Helper()
+	database := openDB(t, ctx)
+	defer database.Close()
 	rootDocPath = filepath.Clean(rootDocPath)
 	var workspaceID, threadID string
 	if err := database.QueryRowContext(t.Context(), `SELECT id, selected_thread_id FROM workspaces WHERE root_doc_path = ? AND workflow_type = 'qrspi' AND archived_at IS NULL ORDER BY updated_at DESC LIMIT 1`, rootDocPath).Scan(&workspaceID, &threadID); err != nil {

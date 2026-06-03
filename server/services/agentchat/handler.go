@@ -12,6 +12,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"os"
 	"path"
 	"path/filepath"
 	"strconv"
@@ -228,6 +229,25 @@ func thoughtsDocRedirectURLForRoot(
 	return out
 }
 
+func e2eQRSPIStartPromptOverride(c echo.Context) string {
+	if !e2eBoolEnv("VAMOS_E2E_QRSPI_PROMPT_OVERRIDE") {
+		return ""
+	}
+	if prompt := strings.TrimSpace(c.QueryParam("e2e_qrspi_start_prompt")); prompt != "" {
+		return prompt
+	}
+	return strings.TrimSpace(c.FormValue("e2e_qrspi_start_prompt"))
+}
+
+func e2eBoolEnv(name string) bool {
+	switch strings.ToLower(strings.TrimSpace(os.Getenv(name))) {
+	case "1", "true", "yes", "on":
+		return true
+	default:
+		return false
+	}
+}
+
 func (h *Handler) OpenPlanWorkspace(c echo.Context) error {
 	userEmail, ok := c.Get("user_email").(string)
 	if !ok || userEmail == "" {
@@ -266,12 +286,13 @@ func (h *Handler) OpenPlanWorkspace(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 	}
 	runID, err := h.service.StartWorkflow(c.Request().Context(), StartWorkflowInput{
-		UserEmail:    userEmail,
-		Title:        planWorkspaceLabel(planDir),
-		RootDocPath:  planDir,
-		Cwd:          h.service.defaultCwd,
-		WorkflowType: WorkspaceWorkflowQRSPI,
-		Policy:       policyJSON,
+		UserEmail:      userEmail,
+		Title:          planWorkspaceLabel(planDir),
+		RootDocPath:    planDir,
+		Cwd:            h.service.defaultCwd,
+		WorkflowType:   WorkspaceWorkflowQRSPI,
+		Policy:         policyJSON,
+		PromptOverride: e2eQRSPIStartPromptOverride(c),
 	})
 	if err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, err.Error())

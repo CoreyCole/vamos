@@ -1261,6 +1261,88 @@ func TestOpenPlanWorkspaceQRSPIStartsWorkflowWithPolicyPreset(t *testing.T) {
 	}
 }
 
+func TestOpenPlanWorkspaceQRSPIIgnoresPromptOverrideWithoutE2EEnv(t *testing.T) {
+	service := newTestAgentChatService(t)
+	service.temporal = &fakeTemporalStarter{}
+	handler := NewHandler(service, nil)
+	planDir := mustCreateHandlerTestPlanWorkspace(
+		t,
+		service,
+		"2026-05-16_qrspi-override-ignored-plan",
+	)
+	override := "VAMOS_E2E_OVERRIDE_SHOULD_BE_IGNORED"
+
+	invokeOpenPlanWorkspaceWithQuery(
+		t,
+		handler,
+		url.Values{
+			"plan_dir":               {planDir},
+			"workflow_type":          {string(WorkspaceWorkflowQRSPI)},
+			"e2e_qrspi_start_prompt": {override},
+		},
+		"alice@example.com",
+		http.StatusSeeOther,
+	)
+
+	workspace := listWorkspacesForHandlerTest(t, service, "alice@example.com")[0]
+	run, err := service.queries.GetLatestAgentRunByWorkspaceNode(t.Context(), db.GetLatestAgentRunByWorkspaceNodeParams{
+		WorkspaceID:    sql.NullString{String: workspace.ID, Valid: true},
+		WorkflowNodeID: sql.NullString{String: "question", Valid: true},
+	})
+	if err != nil {
+		t.Fatalf("GetLatestAgentRunByWorkspaceNode() error = %v", err)
+	}
+	if strings.Contains(run.PromptText, override) {
+		t.Fatalf("prompt contains disabled E2E override marker: %q", run.PromptText)
+	}
+	if !strings.Contains(run.PromptText, "~/.agents/skills/q-question/SKILL.md") {
+		t.Fatalf("prompt = %q, want normal q-question prompt", run.PromptText)
+	}
+	if run.WorkflowNodeID.String != "question" {
+		t.Fatalf("workflow_node_id = %q, want question", run.WorkflowNodeID.String)
+	}
+}
+
+func TestOpenPlanWorkspaceQRSPIUsesPromptOverrideWithE2EEnv(t *testing.T) {
+	service := newTestAgentChatService(t)
+	service.temporal = &fakeTemporalStarter{}
+	handler := NewHandler(service, nil)
+	planDir := mustCreateHandlerTestPlanWorkspace(
+		t,
+		service,
+		"2026-05-16_qrspi-override-enabled-plan",
+	)
+	override := "VAMOS_E2E_OVERRIDE_ENABLED"
+	t.Setenv("VAMOS_E2E_QRSPI_PROMPT_OVERRIDE", "1")
+
+	invokeOpenPlanWorkspaceWithQuery(
+		t,
+		handler,
+		url.Values{
+			"plan_dir":               {planDir},
+			"workflow_type":          {string(WorkspaceWorkflowQRSPI)},
+			"e2e_qrspi_start_prompt": {override},
+		},
+		"alice@example.com",
+		http.StatusSeeOther,
+	)
+
+	workspace := listWorkspacesForHandlerTest(t, service, "alice@example.com")[0]
+	run, err := service.queries.GetLatestAgentRunByWorkspaceNode(t.Context(), db.GetLatestAgentRunByWorkspaceNodeParams{
+		WorkspaceID:    sql.NullString{String: workspace.ID, Valid: true},
+		WorkflowNodeID: sql.NullString{String: "question", Valid: true},
+	})
+	if err != nil {
+		t.Fatalf("GetLatestAgentRunByWorkspaceNode() error = %v", err)
+	}
+	if !strings.Contains(run.PromptText, override) {
+		t.Fatalf("prompt = %q, want override marker %q", run.PromptText, override)
+	}
+	if run.WorkflowNodeID.String != "question" {
+		t.Fatalf("workflow_node_id = %q, want question", run.WorkflowNodeID.String)
+	}
+}
+
 func TestOpenPlanWorkspaceQRSPIFastDraftSkipsPlanningReviews(t *testing.T) {
 	service := newTestAgentChatService(t)
 	service.temporal = &fakeTemporalStarter{}
