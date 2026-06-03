@@ -13,42 +13,31 @@ import (
 	"github.com/CoreyCole/vamos/server/layouts"
 )
 
-templ WorkspacesDocument(args layouts.RootArgs, groups WorkspaceGroups, releasePanel ReleasePanelModel, refresh WorkspaceRefreshState, showCleanedHistory bool, projectFilter ProjectFilter, projectOptions []ProjectOption) {
+templ WorkspacesDocument(args layouts.RootArgs, groups WorkspaceGroups, releasePanel ReleasePanelModel, refresh WorkspaceRefreshState, filter WorkspacesFilter, projectOptions []ProjectOption) {
 	@layouts.Root(args) {
-		@WorkspacesPageWithRefreshGroups(groups, releasePanel, args.WorkspaceManagerURL, refresh, showCleanedHistory, projectFilter, projectOptions)
+		@WorkspacesPageWithRefreshGroups(groups, releasePanel, args.WorkspaceManagerURL, refresh, filter, projectOptions)
 	}
 }
 
 templ WorkspacesPage(items []ImplWorkspaceView, managerURL string, showCleanedHistory bool) {
-	@WorkspacesPageWithRefreshGroups(groupImplWorkspaceViews(items, nil, showCleanedHistory), ReleasePanelModel{}, managerURL, WorkspaceRefreshState{}, showCleanedHistory, ProjectFilter{}, projectOptionsFromViews(items, ""))
+	@WorkspacesPageWithRefreshGroups(groupImplWorkspaceViews(items, nil, showCleanedHistory), ReleasePanelModel{}, managerURL, WorkspaceRefreshState{}, workspacesFilterFromHistory(showCleanedHistory), projectOptionsFromViews(items, ""))
 }
 
-templ WorkspacesPageWithRefreshGroups(groups WorkspaceGroups, releasePanel ReleasePanelModel, managerURL string, refresh WorkspaceRefreshState, showCleanedHistory bool, projectFilter ProjectFilter, projectOptions []ProjectOption) {
-	if projectFilter.QueryValue() == "" && showCleanedHistory {
-		<section class="h-full w-full overflow-y-auto p-6" data-init="@get('/workspaces/stream?show_cleaned_history=true')">
-			<div class="mx-auto flex w-full max-w-6xl flex-col gap-4">
-				@WorkspacesHeader(refresh, showCleanedHistory, projectFilter, projectOptions)
-				@ReleasePanel(releasePanel)
-				@WorkspacesList(groups, managerURL, showCleanedHistory, projectFilter)
-			</div>
-		</section>
-	} else if projectFilter.QueryValue() == "" {
-		<section class="h-full w-full overflow-y-auto p-6" data-init="@get('/workspaces/stream')">
-			<div class="mx-auto flex w-full max-w-6xl flex-col gap-4">
-				@WorkspacesHeader(refresh, showCleanedHistory, projectFilter, projectOptions)
-				@ReleasePanel(releasePanel)
-				@WorkspacesList(groups, managerURL, showCleanedHistory, projectFilter)
-			</div>
-		</section>
-	} else {
-		<section class="h-full w-full overflow-y-auto p-6" data-init={ templ.SafeURL("@get('" + workspacesURL("/workspaces/stream", showCleanedHistory, projectFilter) + "')") }>
-			<div class="mx-auto flex w-full max-w-6xl flex-col gap-4">
-				@WorkspacesHeader(refresh, showCleanedHistory, projectFilter, projectOptions)
-				@ReleasePanel(releasePanel)
-				@WorkspacesList(groups, managerURL, showCleanedHistory, projectFilter)
-			</div>
-		</section>
+func workspacesFilterFromHistory(showHistorical bool) WorkspacesFilter {
+	if showHistorical {
+		return WorkspacesFilter{History: WorkspacesHistoryAll}.WithDefaults()
 	}
+	return WorkspacesFilter{}.WithDefaults()
+}
+
+templ WorkspacesPageWithRefreshGroups(groups WorkspaceGroups, releasePanel ReleasePanelModel, managerURL string, refresh WorkspaceRefreshState, filter WorkspacesFilter, projectOptions []ProjectOption) {
+	<section class="h-full w-full overflow-y-auto p-6" data-init={ templ.SafeURL("@get('" + workspacesURL("/workspaces/stream", filter) + "')") }>
+		<div class="mx-auto flex w-full max-w-6xl flex-col gap-4">
+			@WorkspacesHeader(refresh, filter, projectOptions)
+			@ReleasePanel(releasePanel)
+			@WorkspacesList(groups, managerURL, filter)
+		</div>
+	</section>
 }
 
 func projectSelectOptions(options []ProjectOption) []selectcomponent.SelectOptionArgs {
@@ -64,16 +53,26 @@ func projectSelectOptions(options []ProjectOption) []selectcomponent.SelectOptio
 	return out
 }
 
-templ WorkspacesProjectFilter(projectFilter ProjectFilter, projectOptions []ProjectOption, showCleanedHistory bool) {
+templ WorkspacesProjectFilter(projectFilter WorkspacesFilter, projectOptions []ProjectOption) {
+	{{ projectFilter = projectFilter.WithDefaults() }}
 	<form method="get" action="/workspaces" class="flex items-center gap-2">
-		if showCleanedHistory {
-			<input type="hidden" name="show_cleaned_history" value="true"/>
+		if projectFilter.ShowHistorical() {
+			<input type="hidden" name="history" value="all"/>
+		}
+		if projectFilter.QueryValue() != "" {
+			<input type="hidden" name="q" value={ projectFilter.QueryValue() }/>
+		}
+		if projectFilter.Group != WorkspacesGroupAll {
+			<input type="hidden" name="group" value={ string(projectFilter.Group) }/>
+		}
+		if projectFilter.Sort != WorkspacesSortUpdatedDesc {
+			<input type="hidden" name="sort" value={ string(projectFilter.Sort) }/>
 		}
 		<label class="text-xs text-muted-foreground" for="project-filter">Project</label>
 		@selectcomponent.Select(selectcomponent.SelectArgs{
 			ID:          "project_filter",
 			Name:        "project",
-			Value:       projectFilter.QueryValue(),
+			Value:       projectFilter.ProjectQueryValue(),
 			Placeholder: "All projects",
 			Options:     projectSelectOptions(projectOptions),
 			OnChange:    "this.closest('form').requestSubmit()",
@@ -83,7 +82,8 @@ templ WorkspacesProjectFilter(projectFilter ProjectFilter, projectOptions []Proj
 	</form>
 }
 
-templ WorkspacesHeader(refresh WorkspaceRefreshState, showCleanedHistory bool, projectFilter ProjectFilter, projectOptions []ProjectOption) {
+templ WorkspacesHeader(refresh WorkspaceRefreshState, projectFilter WorkspacesFilter, projectOptions []ProjectOption) {
+	{{ projectFilter = projectFilter.WithDefaults() }}
 	<div id="workspaces-header" class="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
 		<div>
 			<h1 class="text-2xl font-semibold tracking-tight">Workspaces</h1>
@@ -91,28 +91,45 @@ templ WorkspacesHeader(refresh WorkspaceRefreshState, showCleanedHistory bool, p
 		</div>
 		<div class="flex flex-col items-start gap-2 md:items-end">
 			<div class="flex flex-wrap gap-2">
-				@WorkspacesProjectFilter(projectFilter, projectOptions, showCleanedHistory)
+				@WorkspacesProjectFilter(projectFilter, projectOptions)
 				<form method="get" action="/workspaces">
-					if projectFilter.QueryValue() != "" {
-						<input type="hidden" name="project" value={ projectFilter.QueryValue() }/>
+					if projectFilter.ProjectQueryValue() != "" {
+						<input type="hidden" name="project" value={ projectFilter.ProjectQueryValue() }/>
 					}
-					if showCleanedHistory {
+					if projectFilter.QueryValue() != "" {
+						<input type="hidden" name="q" value={ projectFilter.QueryValue() }/>
+					}
+					if projectFilter.Group != WorkspacesGroupAll {
+						<input type="hidden" name="group" value={ string(projectFilter.Group) }/>
+					}
+					if projectFilter.Sort != WorkspacesSortUpdatedDesc {
+						<input type="hidden" name="sort" value={ string(projectFilter.Sort) }/>
+					}
+					if projectFilter.ShowHistorical() {
 						@button.Button(button.ButtonArgs{Type: "submit", Variant: "outline", Size: "sm"}) {
 							Hide cleaned history
 						}
 					} else {
-						@button.Button(button.ButtonArgs{Type: "submit", Variant: "outline", Size: "sm", Attributes: templ.Attributes{"name": "show_cleaned_history", "value": "true"}}) {
+						@button.Button(button.ButtonArgs{Type: "submit", Variant: "outline", Size: "sm", Attributes: templ.Attributes{"name": "history", "value": "all"}}) {
 							Show cleaned history
 						}
 					}
 				</form>
-				<form method="post" action={ templ.SafeURL(workspacesURL("/workspaces/refresh", showCleanedHistory, projectFilter)) } data-on:submit={ templ.SafeURL("@post('" + workspacesURL("/workspaces/refresh", showCleanedHistory, projectFilter) + "', {contentType: 'form'})") }>
-					if projectFilter.QueryValue() != "" {
-						<input type="hidden" name="project" value={ projectFilter.QueryValue() }/>
+				<form method="post" action={ templ.SafeURL(workspacesURL("/workspaces/refresh", projectFilter)) } data-on:submit={ templ.SafeURL("@post('" + workspacesURL("/workspaces/refresh", projectFilter) + "', {contentType: 'form'})") }>
+					if projectFilter.ProjectQueryValue() != "" {
+						<input type="hidden" name="project" value={ projectFilter.ProjectQueryValue() }/>
 					}
-					if showCleanedHistory {
-						<input type="hidden" name="show_cleaned_history" value="true"/>
-						<input type="hidden" name="show_historical" value="true"/>
+					if projectFilter.QueryValue() != "" {
+						<input type="hidden" name="q" value={ projectFilter.QueryValue() }/>
+					}
+					if projectFilter.ShowHistorical() {
+						<input type="hidden" name="history" value="all"/>
+					}
+					if projectFilter.Group != WorkspacesGroupAll {
+						<input type="hidden" name="group" value={ string(projectFilter.Group) }/>
+					}
+					if projectFilter.Sort != WorkspacesSortUpdatedDesc {
+						<input type="hidden" name="sort" value={ string(projectFilter.Sort) }/>
 					}
 					@button.Button(button.ButtonArgs{Type: "submit", Variant: "outline", Size: "sm", Disabled: refresh.InFlight}) {
 						if refresh.InFlight {
@@ -280,7 +297,8 @@ templ ReleaseQueueItemCard(item ReleaseQueueItem) {
 	}
 }
 
-templ WorkspacesList(groups WorkspaceGroups, managerURL string, showCleanedHistory bool, projectFilter ProjectFilter) {
+templ WorkspacesList(groups WorkspaceGroups, managerURL string, projectFilter WorkspacesFilter) {
+	{{ showCleanedHistory := projectFilter.ShowHistorical() }}
 	<div id="workspaces-list" class="space-y-4">
 		@WorkspaceGroupSection("Needs attention", "Active, unmerged, divergent, missing, or proof-unknown workspaces.", groups.NeedsAttention, "No active or uncertain workspaces.", managerURL, showCleanedHistory, projectFilter)
 		@WorkspaceGroupSection("Merged — safe to clean up", "Strong or cached proof says this HEAD landed on origin/main.", groups.SafeToCleanup, "No merged workspaces ready for cleanup.", managerURL, showCleanedHistory, projectFilter)
@@ -290,7 +308,7 @@ templ WorkspacesList(groups WorkspaceGroups, managerURL string, showCleanedHisto
 	</div>
 }
 
-templ WorkspaceGroupSection(title string, description string, items []ImplWorkspaceView, empty string, managerURL string, showCleanedHistory bool, projectFilter ProjectFilter) {
+templ WorkspaceGroupSection(title string, description string, items []ImplWorkspaceView, empty string, managerURL string, showCleanedHistory bool, projectFilter WorkspacesFilter) {
 	<section class="overflow-hidden rounded-xl border bg-card text-card-foreground shadow-sm">
 		<div class="border-b bg-muted/20 px-3 py-3">
 			<h2 class="text-sm font-semibold">{ title }</h2>
@@ -304,7 +322,7 @@ templ WorkspaceGroupSection(title string, description string, items []ImplWorksp
 	</section>
 }
 
-templ WorkspacesTable(items []ImplWorkspaceView, managerURL string, showHistorical bool, projectFilter ProjectFilter) {
+templ WorkspacesTable(items []ImplWorkspaceView, managerURL string, showHistorical bool, projectFilter WorkspacesFilter) {
 	<div class="overflow-x-auto">
 		<table class="w-full text-sm">
 			<thead class="bg-muted/50 text-left text-xs uppercase tracking-wide text-muted-foreground">
@@ -336,7 +354,7 @@ templ WorkspacesTable(items []ImplWorkspaceView, managerURL string, showHistoric
 	}
 }
 
-templ WorkspaceTableRow(view ImplWorkspaceView, managerURL string, showHistorical bool, projectFilter ProjectFilter) {
+templ WorkspaceTableRow(view ImplWorkspaceView, managerURL string, showHistorical bool, projectFilter WorkspacesFilter) {
 	{{ slug := workspaceViewSlug(view) }}
 	<tr data-workspace-row={ slug } class="hover:bg-muted/40">
 		<td class="px-3 py-2 align-top">
@@ -357,7 +375,7 @@ templ WorkspaceTableRow(view ImplWorkspaceView, managerURL string, showHistorica
 	</tr>
 }
 
-templ WorkspaceDetailDialog(view ImplWorkspaceView, managerURL string, showHistorical bool, projectFilter ProjectFilter) {
+templ WorkspaceDetailDialog(view ImplWorkspaceView, managerURL string, showHistorical bool, projectFilter WorkspacesFilter) {
 	{{ slug := workspaceViewSlug(view) }}
 	<dialog id={ "workspace-dialog-" + slug } class="w-full max-w-4xl rounded-xl bg-background p-0 text-foreground shadow-xl backdrop:bg-background/70">
 		<div class="max-h-[85vh] overflow-y-auto p-4">
@@ -491,7 +509,7 @@ templ WorkspaceRecoveryActionForm(model RecoveryModel, action string, label stri
 	</form>
 }
 
-templ ImplWorkspaceCard(view ImplWorkspaceView, managerURL string, showHistorical bool, projectFilter ProjectFilter) {
+templ ImplWorkspaceCard(view ImplWorkspaceView, managerURL string, showHistorical bool, projectFilter WorkspacesFilter) {
 	{{ snap := view.Runtime }}
 	{{ ws := snap.Workspace }}
 	{{ slug := workspaceViewSlug(view) }}
@@ -667,7 +685,7 @@ func workspaceDropdownActionClass(destructive bool) string {
 	return "w-full justify-start text-xs"
 }
 
-templ WorkspaceActionsMenu(view ImplWorkspaceView, managerURL string, showHistorical bool, projectFilter ProjectFilter) {
+templ WorkspaceActionsMenu(view ImplWorkspaceView, managerURL string, showHistorical bool, projectFilter WorkspacesFilter) {
 	{{ slug := workspaceViewSlug(view) }}
 	{{ dropdownID := workspaceActionsDropdownID(slug) }}
 	@dropdown.DropdownMenu(dropdown.DropdownMenuArgs{ID: dropdownID}) {
@@ -692,13 +710,13 @@ templ WorkspaceActionsMenu(view ImplWorkspaceView, managerURL string, showHistor
 					Open public URL
 				}
 			}
-			@WorkspaceCleanupDropdownItem(workspaceCleanupAction(view), dropdownID)
+			@WorkspaceCleanupDropdownItem(workspaceCleanupAction(view), dropdownID, projectFilter)
 			@WorkspaceLifecycleDropdownItems(view, managerURL, showHistorical, projectFilter, dropdownID)
 		}
 	}
 }
 
-templ WorkspaceLifecycleDropdownItems(view ImplWorkspaceView, managerURL string, showHistorical bool, projectFilter ProjectFilter, dropdownID string) {
+templ WorkspaceLifecycleDropdownItems(view ImplWorkspaceView, managerURL string, showHistorical bool, projectFilter WorkspacesFilter, dropdownID string) {
 	{{ snap := view.Runtime }}
 	{{ ws := snap.Workspace }}
 	{{ slug := workspaceViewSlug(view) }}
@@ -727,18 +745,27 @@ templ WorkspaceLifecycleDropdownItems(view ImplWorkspaceView, managerURL string,
 	}
 }
 
-templ WorkspaceLifecycleDropdownForm(dropdownID string, slug string, action string, label string, loadingLabel string, destructive bool, showHistorical bool, projectFilter ProjectFilter) {
+templ WorkspaceLifecycleDropdownForm(dropdownID string, slug string, action string, label string, loadingLabel string, destructive bool, showHistorical bool, projectFilter WorkspacesFilter) {
+	{{ projectFilter = projectFilter.WithDefaults() }}
 	{{ indicator := workspaceActionIndicator(slug, action) }}
 	{{ indicatorSignal := workspaceActionIndicatorSignal(slug, action) }}
 	{{ actionPath := "/workspaces/" + slug + "/" + action }}
 	@dropdown.DropdownMenuCustomItem(dropdown.DropdownMenuCustomItemArgs{ID: dropdownID, Class: "p-0"}) {
 		<form method="post" action={ templ.SafeURL(actionPath) } data-indicator={ indicator } data-on:submit={ "@post('" + actionPath + "', {contentType: 'form'})" }>
+			if projectFilter.ProjectQueryValue() != "" {
+				<input type="hidden" name="project" value={ projectFilter.ProjectQueryValue() }/>
+			}
 			if projectFilter.QueryValue() != "" {
-				<input type="hidden" name="project" value={ projectFilter.QueryValue() }/>
+				<input type="hidden" name="q" value={ projectFilter.QueryValue() }/>
 			}
 			if showHistorical {
-				<input type="hidden" name="show_cleaned_history" value="true"/>
-				<input type="hidden" name="show_historical" value="true"/>
+				<input type="hidden" name="history" value="all"/>
+			}
+			if projectFilter.Group != WorkspacesGroupAll {
+				<input type="hidden" name="group" value={ string(projectFilter.Group) }/>
+			}
+			if projectFilter.Sort != WorkspacesSortUpdatedDesc {
+				<input type="hidden" name="sort" value={ string(projectFilter.Sort) }/>
 			}
 			@button.Button(button.ButtonArgs{Type: "submit", Variant: "ghost", Size: "sm", Class: workspaceDropdownActionClass(destructive), Attributes: templ.Attributes{"data-attr:disabled": indicatorSignal}}) {
 				<span data-show={ "!" + indicatorSignal }>{ label }</span>
@@ -748,7 +775,8 @@ templ WorkspaceLifecycleDropdownForm(dropdownID string, slug string, action stri
 	}
 }
 
-templ WorkspaceCleanupDropdownItem(action WorkspaceCleanupAction, dropdownID string) {
+templ WorkspaceCleanupDropdownItem(action WorkspaceCleanupAction, dropdownID string, projectFilter WorkspacesFilter) {
+	{{ projectFilter = projectFilter.WithDefaults() }}
 	if action.Slug != "" && !action.Disabled {
 		{{ indicator := workspaceActionIndicator(action.Slug, "cleanup") }}
 		{{ indicatorSignal := workspaceActionIndicatorSignal(action.Slug, "cleanup") }}
@@ -759,7 +787,19 @@ templ WorkspaceCleanupDropdownItem(action WorkspaceCleanupAction, dropdownID str
 					<p class="mt-2 text-xs text-amber-700 dark:text-amber-300">{ action.Warning }</p>
 					<form method="post" action="/workspaces/cleanup" class="mt-2" data-indicator={ indicator } data-on:submit="@post('/workspaces/cleanup', {contentType: 'form'})">
 						<input type="hidden" name="slug" value={ action.Slug }/>
-						<input type="hidden" name="project" value={ action.ProjectID }/>
+						<input type="hidden" name="project" value={ firstNonEmpty(projectFilter.ProjectQueryValue(), action.ProjectID) }/>
+						if projectFilter.QueryValue() != "" {
+							<input type="hidden" name="q" value={ projectFilter.QueryValue() }/>
+						}
+						if projectFilter.ShowHistorical() {
+							<input type="hidden" name="history" value="all"/>
+						}
+						if projectFilter.Group != WorkspacesGroupAll {
+							<input type="hidden" name="group" value={ string(projectFilter.Group) }/>
+						}
+						if projectFilter.Sort != WorkspacesSortUpdatedDesc {
+							<input type="hidden" name="sort" value={ string(projectFilter.Sort) }/>
+						}
 						<input type="hidden" name="confirmed" value="true"/>
 						@button.Button(button.ButtonArgs{Type: "submit", Variant: "outline", Size: "sm", Class: "border-destructive/40 text-destructive hover:bg-destructive/10", Attributes: templ.Attributes{"data-attr:disabled": indicatorSignal}}) {
 							<span data-show={ "!" + indicatorSignal }>Confirm close</span>
@@ -772,7 +812,19 @@ templ WorkspaceCleanupDropdownItem(action WorkspaceCleanupAction, dropdownID str
 			@dropdown.DropdownMenuCustomItem(dropdown.DropdownMenuCustomItemArgs{ID: dropdownID, Class: "p-0"}) {
 				<form method="post" action="/workspaces/cleanup" data-indicator={ indicator } data-on:submit="@post('/workspaces/cleanup', {contentType: 'form'})">
 					<input type="hidden" name="slug" value={ action.Slug }/>
-					<input type="hidden" name="project" value={ action.ProjectID }/>
+					<input type="hidden" name="project" value={ firstNonEmpty(projectFilter.ProjectQueryValue(), action.ProjectID) }/>
+					if projectFilter.QueryValue() != "" {
+						<input type="hidden" name="q" value={ projectFilter.QueryValue() }/>
+					}
+					if projectFilter.ShowHistorical() {
+						<input type="hidden" name="history" value="all"/>
+					}
+					if projectFilter.Group != WorkspacesGroupAll {
+						<input type="hidden" name="group" value={ string(projectFilter.Group) }/>
+					}
+					if projectFilter.Sort != WorkspacesSortUpdatedDesc {
+						<input type="hidden" name="sort" value={ string(projectFilter.Sort) }/>
+					}
 					@button.Button(button.ButtonArgs{Type: "submit", Variant: "ghost", Size: "sm", Class: "w-full justify-start text-xs", Attributes: templ.Attributes{"data-attr:disabled": indicatorSignal}}) {
 						<span data-show={ "!" + indicatorSignal }>{ action.Label }</span>
 						<span data-show={ indicatorSignal }>Working...</span>

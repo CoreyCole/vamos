@@ -48,12 +48,12 @@ func (h *Handler) HandleCleanupWorkspace(c echo.Context) error {
 	if slug == "" {
 		return echo.NewHTTPError(http.StatusBadRequest, "missing workspace slug")
 	}
-	filter := ProjectFilterFromRequest(c.Request())
+	filter := WorkspacesFilterFromRequest(c.Request())
 	views, err := h.listImplWorkspaceViews(c.Request().Context(), filter)
 	if err != nil {
 		return err
 	}
-	view, ok := findImplWorkspaceViewForProject(views, filter.QueryValue(), slug)
+	view, ok := findImplWorkspaceViewForProject(views, filter.ProjectQueryValue(), slug)
 	if !ok {
 		return echo.NewHTTPError(http.StatusNotFound, "unknown workspace")
 	}
@@ -66,7 +66,7 @@ func (h *Handler) HandleCleanupWorkspace(c echo.Context) error {
 			if isDatastarRequest(c.Request()) {
 				return h.patchWorkspacesFresh(c)
 			}
-			return c.Redirect(http.StatusSeeOther, workspacesURL("/workspaces", showCleanedHistoryFromRequest(c.Request()), filter))
+			return c.Redirect(http.StatusSeeOther, workspacesURL("/workspaces", filter))
 		}
 		return echo.NewHTTPError(http.StatusConflict, action.DisabledReason)
 	}
@@ -82,7 +82,7 @@ func (h *Handler) HandleCleanupWorkspace(c echo.Context) error {
 	if isDatastarRequest(c.Request()) {
 		return h.patchWorkspacesFreshWithoutSlug(c, slug)
 	}
-	return c.Redirect(http.StatusSeeOther, workspacesURL("/workspaces", showCleanedHistoryFromRequest(c.Request()), filter))
+	return c.Redirect(http.StatusSeeOther, workspacesURL("/workspaces", filter))
 }
 
 func workspaceCleanupAction(view ImplWorkspaceView) WorkspaceCleanupAction {

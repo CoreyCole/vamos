@@ -821,7 +821,7 @@ func TestWorkspacesPageRendersWorkspaceTableAndDialogs(t *testing.T) {
 		"/workspaces/switch/main",
 		"127.0.0.1:4200",
 		`method="post"`,
-		`data-init="@get('/workspaces/stream')"`,
+		`data-init="@get(&#39;/workspaces/stream&#39;)"`,
 		`id="workspaces-list"`,
 		"Feature Branch",
 		`data-workspace-row="feature"`,
@@ -1441,7 +1441,7 @@ func TestWorkspacesPageRendersCleanedHistoryToggleAndPreservesMode(t *testing.T)
 		t.Fatalf("Render(default) error = %v", err)
 	}
 	html := body.String()
-	for _, want := range []string{"Show cleaned history", `data-init="@get('/workspaces/stream')"`} {
+	for _, want := range []string{"Show cleaned history", `data-init="@get(&#39;/workspaces/stream&#39;)"`} {
 		if !strings.Contains(html, want) {
 			t.Fatalf("default page missing %q: %s", want, html)
 		}
@@ -1467,7 +1467,7 @@ func TestWorkspacesPageRendersCleanedHistoryToggleAndPreservesMode(t *testing.T)
 		t.Fatalf("Render(historical) error = %v", err)
 	}
 	html = body.String()
-	for _, want := range []string{"Hide cleaned history", `name="show_cleaned_history" value="true"`, `name="show_historical" value="true"`, `data-init="@get('/workspaces/stream?show_cleaned_history=true')"`} {
+	for _, want := range []string{"Hide cleaned history", `name="history" value="all"`, `data-init="@get(&#39;/workspaces/stream?history=all&#39;)"`} {
 		if !strings.Contains(html, want) {
 			t.Fatalf("historical page missing %q: %s", want, html)
 		}
@@ -1501,7 +1501,7 @@ func TestWorkspacesPagePreservesHistoricalModeInLifecycleActionForms(t *testing.
 		}
 		next := html[idx:]
 		end := strings.Index(next, "</form>")
-		if end < 0 || !strings.Contains(next[:end], `name="show_cleaned_history" value="true"`) || !strings.Contains(next[:end], `name="show_historical" value="true"`) {
+		if end < 0 || !strings.Contains(next[:end], `name="history" value="all"`) {
 			t.Fatalf("%s form did not preserve cleaned history mode: %s", action, next)
 		}
 	}
@@ -1604,12 +1604,12 @@ func TestHandleWorkspacesPageFollowsImplWorkspaceOrder(t *testing.T) {
 
 func TestWorkspacesProjectFilterRendersEmptyAllProjectsOption(t *testing.T) {
 	var body bytes.Buffer
-	if err := WorkspacesProjectFilter(ProjectFilter{}, []ProjectOption{{ID: "example.com/alpha/app", Label: "example.com/alpha/app"}}, true).Render(t.Context(), &body); err != nil {
+	if err := WorkspacesProjectFilter(WorkspacesFilter{History: WorkspacesHistoryAll}, []ProjectOption{{ID: "example.com/alpha/app", Label: "example.com/alpha/app"}}).Render(t.Context(), &body); err != nil {
 		t.Fatalf("WorkspacesProjectFilter() error = %v", err)
 	}
 	html := body.String()
 	for _, want := range []string{
-		`name="show_cleaned_history" value="true"`,
+		`name="history" value="all"`,
 		`name="project"`,
 		`data-select-id="project_filter"`,
 		`data-value=""`,
@@ -1620,8 +1620,8 @@ func TestWorkspacesProjectFilterRendersEmptyAllProjectsOption(t *testing.T) {
 			t.Fatalf("project filter missing %q: %s", want, html)
 		}
 	}
-	if strings.Contains(html, `value="all"`) || strings.Contains(html, "project="+"all") {
-		t.Fatalf("project filter rendered fake all value: %s", html)
+	if strings.Contains(html, "project="+"all") {
+		t.Fatalf("project filter rendered fake all project value: %s", html)
 	}
 }
 
@@ -1648,7 +1648,7 @@ func TestWorkspaceActionsMenuUsesFlowSafeForms(t *testing.T) {
 		views[0],
 		"https://manager.test",
 		true,
-		ProjectFilter{ProjectID: "example.com/alpha/app"},
+		WorkspacesFilter{ProjectID: "example.com/alpha/app", History: WorkspacesHistoryAll},
 	).Render(t.Context(), &body); err != nil {
 		t.Fatalf("WorkspaceActionsMenu() error = %v", err)
 	}
@@ -1660,7 +1660,7 @@ func TestWorkspaceActionsMenuUsesFlowSafeForms(t *testing.T) {
 	}
 	for _, action := range []string{"restart", "stop"} {
 		form := formFragment(t, html, `action="/workspaces/feature/`+action+`"`)
-		for _, want := range []string{`name="project" value="example.com/alpha/app"`, `name="show_cleaned_history" value="true"`, `name="show_historical" value="true"`} {
+		for _, want := range []string{`name="project" value="example.com/alpha/app"`, `name="history" value="all"`} {
 			if !strings.Contains(form, want) {
 				t.Fatalf("%s form missing %q: %s", action, want, form)
 			}
@@ -1678,7 +1678,7 @@ func TestWorkspaceActionsMenuPreservesCleanupFields(t *testing.T) {
 	}}, nil, WorkspaceLifecycleSnapshot{})[0]
 
 	var body bytes.Buffer
-	if err := WorkspaceActionsMenu(view, "https://manager.test", false, ProjectFilter{}).Render(t.Context(), &body); err != nil {
+	if err := WorkspaceActionsMenu(view, "https://manager.test", false, WorkspacesFilter{}).Render(t.Context(), &body); err != nil {
 		t.Fatalf("WorkspaceActionsMenu() error = %v", err)
 	}
 	html := body.String()
@@ -1741,6 +1741,34 @@ func TestHandleWorkspacesPageFiltersImplWorkspacesByProject(t *testing.T) {
 	}
 }
 
+func TestWorkspacesFilterFromRequestAndURLCanonicalizeState(t *testing.T) {
+	req := httptest.NewRequest(http.MethodGet, "/workspaces?project=example.com%2Falpha%2Fapp&q=+branch+&history=all&group=needs_attention&sort=name_asc", nil)
+	filter := WorkspacesFilterFromRequest(req)
+	if filter.ProjectQueryValue() != "example.com/alpha/app" || filter.QueryValue() != "branch" || !filter.ShowHistorical() || filter.Group != WorkspacesGroupNeedsAttention || filter.Sort != WorkspacesSortNameAsc {
+		t.Fatalf("filter = %#v", filter)
+	}
+	if got := workspacesURL("/workspaces/stream", filter); got != "/workspaces/stream?group=needs_attention&history=all&project=example.com%2Falpha%2Fapp&q=branch&sort=name_asc" {
+		t.Fatalf("workspacesURL() = %q", got)
+	}
+
+	legacyReq := httptest.NewRequest(http.MethodGet, "/workspaces?show_historical=true", nil)
+	legacy := WorkspacesFilterFromRequest(legacyReq)
+	if !legacy.ShowHistorical() {
+		t.Fatalf("legacy filter did not enable history: %#v", legacy)
+	}
+	if got := workspacesURL("/workspaces", legacy); got != "/workspaces?history=all" {
+		t.Fatalf("legacy canonical URL = %q", got)
+	}
+
+	defaults := WorkspacesFilterFromRequest(httptest.NewRequest(http.MethodGet, "/workspaces?group=bogus&sort=bogus&history=bogus", nil))
+	if defaults.ProjectQueryValue() != "" || defaults.QueryValue() != "" || defaults.ShowHistorical() || defaults.Group != WorkspacesGroupAll || defaults.Sort != WorkspacesSortUpdatedDesc {
+		t.Fatalf("defaults = %#v", defaults)
+	}
+	if got := workspacesURL("/workspaces", defaults); got != "/workspaces" {
+		t.Fatalf("default URL = %q", got)
+	}
+}
+
 func TestHandleRefreshWorkspacesRedirectPreservesProjectAndCleanedHistory(t *testing.T) {
 	handler := NewHandler(
 		&fakeLifecycleManager{},
@@ -1754,7 +1782,7 @@ func TestHandleRefreshWorkspacesRedirectPreservesProjectAndCleanedHistory(t *tes
 	if err := handler.HandleRefreshWorkspaces(e.NewContext(req, rec)); err != nil {
 		t.Fatalf("HandleRefreshWorkspaces() error = %v", err)
 	}
-	if got := rec.Header().Get("Location"); got != "/workspaces?project=example.com%2Falpha%2Fapp&show_cleaned_history=true" {
+	if got := rec.Header().Get("Location"); got != "/workspaces?history=all&project=example.com%2Falpha%2Fapp" {
 		t.Fatalf("Location = %q", got)
 	}
 }
@@ -2104,7 +2132,7 @@ func TestHandleRefreshWorkspacesRedirectPreservesCleanedHistoryMode(t *testing.T
 	if err := handler.HandleRefreshWorkspaces(e.NewContext(req, rec)); err != nil {
 		t.Fatalf("HandleRefreshWorkspaces() error = %v", err)
 	}
-	if got := rec.Header().Get("Location"); got != "/workspaces?show_cleaned_history=true" {
+	if got := rec.Header().Get("Location"); got != "/workspaces?history=all" {
 		t.Fatalf("Location = %q, want cleaned history redirect", got)
 	}
 }

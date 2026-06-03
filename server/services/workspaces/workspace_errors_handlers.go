@@ -70,11 +70,11 @@ func (h *Handler) HandleWorkspaceErrorsStream(c echo.Context) error {
 
 func (h *Handler) workspaceErrorPageModel(ctx context.Context, selected string) (WorkspaceErrorPageModel, error) {
 	selected = strings.TrimSpace(selected)
-	views, err := h.listImplWorkspaceViews(ctx, ProjectFilter{})
+	views, err := h.listImplWorkspaceViews(ctx, WorkspacesFilter{})
 	if err != nil {
 		return WorkspaceErrorPageModel{}, err
 	}
-	views = h.renderedImplWorkspaceViews(views, true)
+	views = h.renderedImplWorkspaceViews(views, WorkspacesFilter{History: WorkspacesHistoryAll})
 	var events []WorkspaceErrorEvent
 	if h.workspaceErrorRecorder != nil && h.workspaceErrorRecorder.Store != nil {
 		if selected != "" {

@@ -390,14 +390,13 @@ func (h *Handler) RegisterInternalProvisionRoute(e *echo.Echo) {
 }
 
 func (h *Handler) HandleWorkspacesPage(c echo.Context) error {
-	filter := ProjectFilterFromRequest(c.Request())
+	filter := WorkspacesFilterFromRequest(c.Request())
 	model, err := h.buildWorkspacesPageModel(c.Request().Context(), filter)
 	if err != nil {
 		return err
 	}
-	showCleanedHistory := showCleanedHistoryFromRequest(c.Request())
-	renderedViews := h.renderedImplWorkspaceViews(model.Views, showCleanedHistory)
-	groups := h.workspaceGroups(model.Views, showCleanedHistory)
+	renderedViews := h.renderedImplWorkspaceViews(model.Views, filter)
+	groups := h.workspaceGroups(model.Views, filter)
 	args := layouts.RootArgs{
 		Title:       "Workspaces",
 		CurrentPath: "/workspaces",
@@ -417,7 +416,7 @@ func (h *Handler) HandleWorkspacesPage(c echo.Context) error {
 	return render(
 		c,
 		http.StatusOK,
-		WorkspacesDocument(args, groups, model.ReleasePanel, h.refreshState(), showCleanedHistory, filter, model.ProjectOptions),
+		WorkspacesDocument(args, groups, model.ReleasePanel, h.refreshState(), filter, model.ProjectOptions),
 	)
 }
 
@@ -426,7 +425,7 @@ func (h *Handler) HandleVerifyHTML(c echo.Context) error {
 	if slug == "" {
 		return echo.NewHTTPError(http.StatusBadRequest, "workspace slug is required")
 	}
-	views, err := h.listImplWorkspaceViews(c.Request().Context(), ProjectFilter{})
+	views, err := h.listImplWorkspaceViews(c.Request().Context(), WorkspacesFilter{})
 	if err != nil {
 		return err
 	}
@@ -454,8 +453,7 @@ func findImplWorkspaceViewBySlug(views []ImplWorkspaceView, slug string) (ImplWo
 }
 
 func (h *Handler) HandleRefreshWorkspaces(c echo.Context) error {
-	showCleanedHistory := showCleanedHistoryFromRequest(c.Request())
-	filter := ProjectFilterFromRequest(c.Request())
+	filter := WorkspacesFilterFromRequest(c.Request())
 	if h.workspaceSyncRefresh == nil {
 		return echo.NewHTTPError(
 			http.StatusNotImplemented,
@@ -475,12 +473,12 @@ func (h *Handler) HandleRefreshWorkspaces(c echo.Context) error {
 			return err
 		}
 		return sse.PatchElementTempl(
-			WorkspacesHeader(h.refreshState(), showCleanedHistory, filter, model.ProjectOptions),
+			WorkspacesHeader(h.refreshState(), filter, model.ProjectOptions),
 			datastar.WithSelectorID("workspaces-header"),
 			datastar.WithModeOuter(),
 		)
 	}
-	return c.Redirect(http.StatusSeeOther, workspacesURL("/workspaces", showCleanedHistory, filter))
+	return c.Redirect(http.StatusSeeOther, workspacesURL("/workspaces", filter))
 }
 
 func (h *Handler) tryStartWorkspaceSyncRefresh() bool {
@@ -582,7 +580,7 @@ func (h *Handler) lifecycleAction(
 		return err
 	}
 	if isDatastarRequest(c.Request()) {
-		filter := ProjectFilterFromRequest(c.Request())
+		filter := WorkspacesFilterFromRequest(c.Request())
 		views, err := h.listImplWorkspaceViews(c.Request().Context(), filter)
 		if err != nil {
 			views = lifecycleSnapshotsToImplViews(filterLifecycleSnapshotsByProject([]WorkspaceLifecycleSnapshot{snap}, filter))
@@ -599,17 +597,16 @@ func (h *Handler) HandleWorkspacesStream(c echo.Context) error {
 			"workspace lifecycle manager is not configured",
 		)
 	}
-	showCleanedHistory := showCleanedHistoryFromRequest(c.Request())
-	filter := ProjectFilterFromRequest(c.Request())
+	filter := WorkspacesFilterFromRequest(c.Request())
 	sse := datastar.NewSSE(c.Response().Writer, c.Request())
 	send := func() error {
 		model, err := h.buildWorkspacesPageModel(c.Request().Context(), filter)
 		if err != nil {
 			return err
 		}
-		groups := h.workspaceGroups(model.Views, showCleanedHistory)
+		groups := h.workspaceGroups(model.Views, filter)
 		if err := sse.PatchElementTempl(
-			WorkspacesHeader(h.refreshState(), showCleanedHistory, filter, model.ProjectOptions),
+			WorkspacesHeader(h.refreshState(), filter, model.ProjectOptions),
 			datastar.WithSelectorID("workspaces-header"),
 			datastar.WithModeOuter(),
 		); err != nil {
@@ -623,7 +620,7 @@ func (h *Handler) HandleWorkspacesStream(c echo.Context) error {
 			return err
 		}
 		return sse.PatchElementTempl(
-			WorkspacesList(groups, h.managerURL, showCleanedHistory, filter),
+			WorkspacesList(groups, h.managerURL, filter),
 			datastar.WithSelectorID("workspaces-list"),
 			datastar.WithModeOuter(),
 		)
@@ -1048,8 +1045,35 @@ func (h *Handler) listLifecycle(
 	return snapshots, nil
 }
 
-type ProjectFilter struct {
+type WorkspacesHistoryMode string
+
+const (
+	WorkspacesHistoryActive WorkspacesHistoryMode = "active"
+	WorkspacesHistoryAll    WorkspacesHistoryMode = "all"
+)
+
+type WorkspacesGroupFilter string
+
+const (
+	WorkspacesGroupAll            WorkspacesGroupFilter = "all"
+	WorkspacesGroupNeedsAttention WorkspacesGroupFilter = "needs_attention"
+	WorkspacesGroupSafeToCleanup  WorkspacesGroupFilter = "safe_to_cleanup"
+	WorkspacesGroupCleanedUp      WorkspacesGroupFilter = "cleaned_up"
+)
+
+type WorkspacesSort string
+
+const (
+	WorkspacesSortUpdatedDesc WorkspacesSort = "updated_desc"
+	WorkspacesSortNameAsc     WorkspacesSort = "name_asc"
+)
+
+type WorkspacesFilter struct {
 	ProjectID string
+	Query     string
+	History   WorkspacesHistoryMode
+	Group     WorkspacesGroupFilter
+	Sort      WorkspacesSort
 }
 
 type ProjectOption struct {
@@ -1058,35 +1082,92 @@ type ProjectOption struct {
 	Selected bool
 }
 
+type WorkspacesFilterOption struct {
+	Value    string
+	Label    string
+	Selected bool
+}
+
 type workspacesPageModel struct {
 	Views          []ImplWorkspaceView
 	ReleasePanel   ReleasePanelModel
-	ProjectFilter  ProjectFilter
+	Filter         WorkspacesFilter
 	ProjectOptions []ProjectOption
+	GroupOptions   []WorkspacesFilterOption
+	SortOptions    []WorkspacesFilterOption
 }
 
-func ProjectFilterFromRequest(r *http.Request) ProjectFilter {
+func WorkspacesFilterFromRequest(r *http.Request) WorkspacesFilter {
 	if r == nil {
-		return ProjectFilter{}
+		return WorkspacesFilter{}.WithDefaults()
 	}
-	return ProjectFilter{ProjectID: strings.TrimSpace(r.FormValue("project"))}
+	filter := WorkspacesFilter{
+		ProjectID: strings.TrimSpace(r.FormValue("project")),
+		Query:     strings.TrimSpace(r.FormValue("q")),
+		History:   WorkspacesHistoryMode(strings.TrimSpace(r.FormValue("history"))),
+		Group:     WorkspacesGroupFilter(strings.TrimSpace(r.FormValue("group"))),
+		Sort:      WorkspacesSort(strings.TrimSpace(r.FormValue("sort"))),
+	}
+	if filter.History == "" && showCleanedHistoryFromRequest(r) {
+		filter.History = WorkspacesHistoryAll
+	}
+	return filter.WithDefaults()
 }
 
-func (f ProjectFilter) QueryValue() string {
+func (f WorkspacesFilter) WithDefaults() WorkspacesFilter {
+	f.ProjectID = strings.TrimSpace(f.ProjectID)
+	f.Query = strings.TrimSpace(f.Query)
+	switch f.History {
+	case WorkspacesHistoryAll:
+	default:
+		f.History = WorkspacesHistoryActive
+	}
+	switch f.Group {
+	case WorkspacesGroupNeedsAttention, WorkspacesGroupSafeToCleanup, WorkspacesGroupCleanedUp:
+	default:
+		f.Group = WorkspacesGroupAll
+	}
+	switch f.Sort {
+	case WorkspacesSortNameAsc:
+	default:
+		f.Sort = WorkspacesSortUpdatedDesc
+	}
+	return f
+}
+
+func (f WorkspacesFilter) ProjectQueryValue() string {
 	return strings.TrimSpace(f.ProjectID)
 }
 
-func (f ProjectFilter) AppendTo(values url.Values) {
-	if projectID := f.QueryValue(); projectID != "" {
-		values.Set("project", projectID)
+func (f WorkspacesFilter) QueryValue() string {
+	return strings.TrimSpace(f.Query)
+}
+
+func (f WorkspacesFilter) ShowHistorical() bool {
+	return f.WithDefaults().History == WorkspacesHistoryAll
+}
+
+func (f WorkspacesFilter) AppendTo(values url.Values) {
+	f = f.WithDefaults()
+	if f.ProjectID != "" {
+		values.Set("project", f.ProjectID)
+	}
+	if f.Query != "" {
+		values.Set("q", f.Query)
+	}
+	if f.History == WorkspacesHistoryAll {
+		values.Set("history", string(WorkspacesHistoryAll))
+	}
+	if f.Group != WorkspacesGroupAll {
+		values.Set("group", string(f.Group))
+	}
+	if f.Sort != WorkspacesSortUpdatedDesc {
+		values.Set("sort", string(f.Sort))
 	}
 }
 
-func workspacesURL(path string, showCleanedHistory bool, filter ProjectFilter) string {
+func workspacesURL(path string, filter WorkspacesFilter) string {
 	values := url.Values{}
-	if showCleanedHistory {
-		values.Set("show_cleaned_history", "true")
-	}
 	filter.AppendTo(values)
 	if encoded := values.Encode(); encoded != "" {
 		return path + "?" + encoded
@@ -1094,7 +1175,25 @@ func workspacesURL(path string, showCleanedHistory bool, filter ProjectFilter) s
 	return path
 }
 
-func (h *Handler) buildWorkspacesPageModel(ctx context.Context, filter ProjectFilter) (workspacesPageModel, error) {
+func workspacesGroupOptions(selected WorkspacesGroupFilter) []WorkspacesFilterOption {
+	selected = WorkspacesFilter{Group: selected}.WithDefaults().Group
+	return []WorkspacesFilterOption{
+		{Value: string(WorkspacesGroupAll), Label: "All groups", Selected: selected == WorkspacesGroupAll},
+		{Value: string(WorkspacesGroupNeedsAttention), Label: "Needs attention", Selected: selected == WorkspacesGroupNeedsAttention},
+		{Value: string(WorkspacesGroupSafeToCleanup), Label: "Safe to cleanup", Selected: selected == WorkspacesGroupSafeToCleanup},
+		{Value: string(WorkspacesGroupCleanedUp), Label: "Cleaned up", Selected: selected == WorkspacesGroupCleanedUp},
+	}
+}
+
+func workspacesSortOptions(selected WorkspacesSort) []WorkspacesFilterOption {
+	selected = WorkspacesFilter{Sort: selected}.WithDefaults().Sort
+	return []WorkspacesFilterOption{
+		{Value: string(WorkspacesSortUpdatedDesc), Label: "Recent activity", Selected: selected == WorkspacesSortUpdatedDesc},
+		{Value: string(WorkspacesSortNameAsc), Label: "Name A-Z", Selected: selected == WorkspacesSortNameAsc},
+	}
+}
+
+func (h *Handler) buildWorkspacesPageModel(ctx context.Context, filter WorkspacesFilter) (workspacesPageModel, error) {
 	views, err := h.listImplWorkspaceViews(ctx, filter)
 	if err != nil {
 		return workspacesPageModel{}, err
@@ -1114,16 +1213,24 @@ func (h *Handler) buildWorkspacesPageModel(ctx context.Context, filter ProjectFi
 	if len(rowActions) > 0 {
 		views = applyOptionsToImplWorkspaceViews(views, WithWorkspaceReleaseActions(rowActions))
 	}
-	options, err := h.projectOptions(ctx, views, filter.QueryValue())
+	filter = filter.WithDefaults()
+	options, err := h.projectOptions(ctx, views, filter.ProjectQueryValue())
 	if err != nil {
 		return workspacesPageModel{}, err
 	}
-	return workspacesPageModel{Views: views, ReleasePanel: panel, ProjectFilter: filter, ProjectOptions: options}, nil
+	return workspacesPageModel{
+		Views:          views,
+		ReleasePanel:   panel,
+		Filter:         filter,
+		ProjectOptions: options,
+		GroupOptions:   workspacesGroupOptions(filter.Group),
+		SortOptions:    workspacesSortOptions(filter.Sort),
+	}, nil
 }
 
 func (h *Handler) listImplWorkspaceViews(
 	ctx context.Context,
-	filter ProjectFilter,
+	filter WorkspacesFilter,
 ) ([]ImplWorkspaceView, error) {
 	runtime, err := h.listLifecycle(ctx)
 	if err != nil {
@@ -1133,7 +1240,7 @@ func (h *Handler) listImplWorkspaceViews(
 	if h.implWorkspaces == nil {
 		return lifecycleSnapshotsToImplViews(runtime), nil
 	}
-	rows, err := h.implWorkspaces.ListImplWorkspaces(ctx, filter.QueryValue())
+	rows, err := h.implWorkspaces.ListImplWorkspaces(ctx, filter.ProjectQueryValue())
 	if err != nil {
 		return nil, err
 	}
@@ -1141,8 +1248,8 @@ func (h *Handler) listImplWorkspaceViews(
 	return BuildImplWorkspaceViews(rows, nonMain, main), nil
 }
 
-func filterLifecycleSnapshotsByProject(items []WorkspaceLifecycleSnapshot, filter ProjectFilter) []WorkspaceLifecycleSnapshot {
-	projectID := filter.QueryValue()
+func filterLifecycleSnapshotsByProject(items []WorkspaceLifecycleSnapshot, filter WorkspacesFilter) []WorkspaceLifecycleSnapshot {
+	projectID := filter.ProjectQueryValue()
 	if projectID == "" {
 		return items
 	}
@@ -1155,7 +1262,7 @@ func filterLifecycleSnapshotsByProject(items []WorkspaceLifecycleSnapshot, filte
 	return out
 }
 
-func (h *Handler) attachPlanWorkspaceMetadata(ctx context.Context, views []ImplWorkspaceView, filter ProjectFilter) ([]ImplWorkspaceView, error) {
+func (h *Handler) attachPlanWorkspaceMetadata(ctx context.Context, views []ImplWorkspaceView, filter WorkspacesFilter) ([]ImplWorkspaceView, error) {
 	if h.planWorkspaces == nil {
 		return views, nil
 	}
@@ -1173,7 +1280,7 @@ func (h *Handler) attachPlanWorkspaceMetadata(ctx context.Context, views []ImplW
 		if err != nil {
 			return nil, err
 		}
-		models[planRel] = BuildPlanWorkspaceView(planRel, roles, bindings, nil, filter.QueryValue())
+		models[planRel] = BuildPlanWorkspaceView(planRel, roles, bindings, nil, filter.ProjectQueryValue())
 	}
 	return applyPlanWorkspaceViews(views, models), nil
 }
@@ -1335,16 +1442,16 @@ func flattenImplWorkspaceRows(views []ImplWorkspaceView) []db.ImplWorkspace {
 	return rows
 }
 
-func (h *Handler) renderedImplWorkspaceViews(views []ImplWorkspaceView, showHistorical bool) []ImplWorkspaceView {
+func (h *Handler) renderedImplWorkspaceViews(views []ImplWorkspaceView, filter WorkspacesFilter) []ImplWorkspaceView {
 	return orderReleaseLaneViewsFirst(
-		filterHistoricalImplWorkspaceViews(views, showHistorical, h.protectedReleaseSlugs()),
+		filterHistoricalImplWorkspaceViews(views, filter.ShowHistorical(), h.protectedReleaseSlugs()),
 		h.releaseLaneWorkspaces(),
 	)
 }
 
-func (h *Handler) workspaceGroups(views []ImplWorkspaceView, showCleanedHistory bool) WorkspaceGroups {
+func (h *Handler) workspaceGroups(views []ImplWorkspaceView, filter WorkspacesFilter) WorkspaceGroups {
 	ordered := orderReleaseLaneViewsFirst(views, h.releaseLaneWorkspaces())
-	return groupImplWorkspaceViews(ordered, h.protectedReleaseSlugs(), showCleanedHistory)
+	return groupImplWorkspaceViews(ordered, h.protectedReleaseSlugs(), filter.ShowHistorical())
 }
 
 func (h *Handler) releaseLaneWorkspaces() []ReleaseLaneWorkspace {
@@ -1383,15 +1490,20 @@ func showCleanedHistoryFromRequest(r *http.Request) bool {
 	if r == nil {
 		return false
 	}
-	value := strings.TrimSpace(r.FormValue("show_cleaned_history"))
-	if value == "" {
-		value = strings.TrimSpace(r.FormValue("show_historical"))
+	if strings.TrimSpace(r.FormValue("history")) == string(WorkspacesHistoryAll) {
+		return true
 	}
-	return value == "true" || value == "1" || value == "on" || value == "yes"
+	for _, name := range []string{"show_cleaned_history", "show_historical"} {
+		switch strings.TrimSpace(r.FormValue(name)) {
+		case "true", "1", "on", "yes":
+			return true
+		}
+	}
+	return false
 }
 
 func showHistoricalFromRequest(r *http.Request) bool {
-	return showCleanedHistoryFromRequest(r)
+	return WorkspacesFilterFromRequest(r).ShowHistorical()
 }
 
 func BuildNavItems(
