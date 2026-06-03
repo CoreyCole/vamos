@@ -3,6 +3,7 @@ package workspaces
 import (
 	"database/sql"
 	"testing"
+	"time"
 
 	"github.com/CoreyCole/vamos/pkg/db"
 )
@@ -286,4 +287,137 @@ func TestIsHistoricalImplWorkspaceViewKeepsMainAndProtectedCurrent(t *testing.T)
 	if isHistoricalImplWorkspaceView(stage, protected) {
 		t.Fatalf("protected release lane should stay current")
 	}
+}
+
+func TestApplyWorkspacesFilterSearchGroupSortAndHistory(t *testing.T) {
+	t.Parallel()
+
+	oldTime := time.Date(2026, 6, 1, 10, 0, 0, 0, time.UTC)
+	newTime := time.Date(2026, 6, 1, 11, 0, 0, 0, time.UTC)
+	views := []ImplWorkspaceView{
+		{
+			Row: db.ImplWorkspace{
+				ProjectID:     "vamos",
+				WorkspaceSlug: "merged-weak",
+				DisplayName:   "Merged Weak",
+				CheckoutPath:  "/repo/merged-weak",
+				Status:        string(ImplWorkspaceStatusMerged),
+				UpdatedAt:     newTime,
+			},
+		},
+		{
+			Row: db.ImplWorkspace{
+				ProjectID:     "vamos",
+				WorkspaceSlug: "zeta-active",
+				DisplayName:   "Zeta Active",
+				CheckoutPath:  "/repo/zeta-active",
+				Status:        string(ImplWorkspaceStatusActive),
+				Branch:        sql.NullString{String: "feature/search-branch", Valid: true},
+				CommitHash:    sql.NullString{String: "abcdef123456", Valid: true},
+				UpdatedAt:     oldTime,
+			},
+			Runtime:    snapshotFromState(Workspace{Slug: "zeta-active", CheckoutPath: "/repo/zeta-active", Status: StatusRunning}, WorkspaceLifecycleState{}),
+			HasRuntime: true,
+			Workflow:   WorkspaceWorkflowSummary{WorkflowType: "qrspi", Stage: "implement", Status: "running"},
+			Plan: PlanWorkspaceView{
+				PlanDirRel: "thoughts/creative-mode-agent/plans/search-plan",
+				Projects:   []PlanWorkspaceProjectView{{ProjectID: "datastarui", Role: "related", Label: "datastarui"}},
+				Bindings:   []PlanWorkspaceImplBindingView{{ProjectID: "vamos", Role: "primary", WorkspaceSlug: "zeta-active", CheckoutPath: "/repo/zeta-active", Status: "active"}},
+			},
+		},
+		{
+			Row: db.ImplWorkspace{
+				ProjectID:     "vamos",
+				WorkspaceSlug: "alpha-active",
+				DisplayName:   "Alpha Active",
+				CheckoutPath:  "/repo/alpha-active",
+				Status:        string(ImplWorkspaceStatusActive),
+				UpdatedAt:     newTime,
+			},
+			Runtime:    snapshotFromState(Workspace{Slug: "alpha-active", CheckoutPath: "/repo/alpha-active", Status: StatusRunning}, WorkspaceLifecycleState{}),
+			HasRuntime: true,
+		},
+		{
+			Row: db.ImplWorkspace{
+				ProjectID:     "vamos",
+				WorkspaceSlug: "main",
+				DisplayName:   "Main",
+				Status:        string(ImplWorkspaceStatusActive),
+				UpdatedAt:     oldTime,
+			},
+			IsMain: true,
+		},
+	}
+
+	active := applyWorkspacesFilter(views, WorkspacesFilter{}, map[string]ReleaseLaneWorkspace{"main": {Slug: "main", Protected: true}})
+	gotSlugs := workspaceViewSlugs(active)
+	wantSlugs := []string{"main", "alpha-active", "zeta-active"}
+	if !equalStrings(gotSlugs, wantSlugs) {
+		t.Fatalf("active/default slugs = %#v, want %#v", gotSlugs, wantSlugs)
+	}
+	if len(views[1].Plan.Projects) != 1 {
+		t.Fatalf("filter mutated original views: %#v", views[1].Plan.Projects)
+	}
+
+	searched := applyWorkspacesFilter(views, WorkspacesFilter{Query: "DATASTARUI"}, nil)
+	if got := workspaceViewSlugs(searched); !equalStrings(got, []string{"zeta-active"}) {
+		t.Fatalf("search by plan project = %#v", got)
+	}
+
+	byName := applyWorkspacesFilter(views, WorkspacesFilter{Sort: WorkspacesSortNameAsc}, nil)
+	if got := workspaceViewSlugs(byName); !equalStrings(got, []string{"main", "alpha-active", "zeta-active"}) {
+		t.Fatalf("name sort slugs = %#v", got)
+	}
+
+	history := applyWorkspacesFilter(views, WorkspacesFilter{History: WorkspacesHistoryAll}, nil)
+	if got := workspaceViewSlugs(history); !equalStrings(got, []string{"main", "alpha-active", "merged-weak", "zeta-active"}) {
+		t.Fatalf("history slugs = %#v", got)
+	}
+}
+
+func TestGroupFilterImplWorkspaceViews(t *testing.T) {
+	t.Parallel()
+
+	views := []ImplWorkspaceView{
+		{Row: db.ImplWorkspace{WorkspaceSlug: "active", CheckoutPath: "/repo/active", Status: string(ImplWorkspaceStatusActive)}, Runtime: snapshotFromState(Workspace{Slug: "active", CheckoutPath: "/repo/active"}, WorkspaceLifecycleState{}), HasRuntime: true},
+		{Row: db.ImplWorkspace{WorkspaceSlug: "safe", Status: string(ImplWorkspaceStatusMerged), CleanupProofKind: string(MergeProofAncestor)}},
+		{Row: db.ImplWorkspace{WorkspaceSlug: "cleaned", Status: string(ImplWorkspaceStatusCleanedUp)}},
+	}
+
+	all := groupFilterImplWorkspaceViews(views, WorkspacesFilter{History: WorkspacesHistoryAll}, nil)
+	if len(all.NeedsAttention) != 1 || len(all.SafeToCleanup) != 1 || len(all.CleanedUp) != 1 {
+		t.Fatalf("all groups = %#v", all)
+	}
+	needs := groupFilterImplWorkspaceViews(views, WorkspacesFilter{History: WorkspacesHistoryAll, Group: WorkspacesGroupNeedsAttention}, nil)
+	if len(needs.NeedsAttention) != 1 || len(needs.SafeToCleanup) != 0 || len(needs.CleanedUp) != 0 {
+		t.Fatalf("needs group = %#v", needs)
+	}
+	safe := groupFilterImplWorkspaceViews(views, WorkspacesFilter{History: WorkspacesHistoryAll, Group: WorkspacesGroupSafeToCleanup}, nil)
+	if len(safe.SafeToCleanup) != 1 || len(safe.NeedsAttention) != 0 || len(safe.CleanedUp) != 0 {
+		t.Fatalf("safe group = %#v", safe)
+	}
+	cleanedDefault := groupFilterImplWorkspaceViews(views, WorkspacesFilter{Group: WorkspacesGroupCleanedUp}, nil)
+	if len(cleanedDefault.CleanedUp) != 0 {
+		t.Fatalf("cleaned default group = %#v", cleanedDefault)
+	}
+}
+
+func workspaceViewSlugs(views []ImplWorkspaceView) []string {
+	out := make([]string, 0, len(views))
+	for _, view := range views {
+		out = append(out, workspaceViewSlug(view))
+	}
+	return out
+}
+
+func equalStrings(left, right []string) bool {
+	if len(left) != len(right) {
+		return false
+	}
+	for i := range left {
+		if left[i] != right[i] {
+			return false
+		}
+	}
+	return true
 }

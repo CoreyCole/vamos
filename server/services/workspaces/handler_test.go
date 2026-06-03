@@ -1822,12 +1822,12 @@ func TestHandleWorkspacesPageHidesCleanedRowsByDefault(t *testing.T) {
 		t.Fatalf("HandleWorkspacesPage() error = %v", err)
 	}
 	html := rec.Body.String()
-	for _, want := range []string{"Active Workspace", "Merged Workspace", "Show cleaned history", "Needs attention"} {
+	for _, want := range []string{"Active Workspace", "Show cleaned history", "Needs attention"} {
 		if !strings.Contains(html, want) {
 			t.Fatalf("default page missing %q: %s", want, html)
 		}
 	}
-	for _, absent := range []string{"Cleaned Workspace", "Cleaned up history"} {
+	for _, absent := range []string{"Merged Workspace", "Cleaned Workspace", "Cleaned up history"} {
 		if strings.Contains(html, absent) {
 			t.Fatalf("default page unexpectedly contained %q: %s", absent, html)
 		}
@@ -1932,12 +1932,12 @@ func TestHandleWorkspacesPagePromotesActiveChildUnderHiddenHistoricalParent(t *t
 	if !strings.Contains(html, "Active Review Child") {
 		t.Fatalf("active child hidden with historical parent: %s", html)
 	}
-	if !strings.Contains(html, "Merged Parent") {
-		t.Fatalf("unknown-proof parent should remain visible for attention: %s", html)
+	if strings.Contains(html, "Merged Parent") {
+		t.Fatalf("historical parent should be hidden by default: %s", html)
 	}
 }
 
-func TestHandleWorkspacesPageShowsMissingActiveRowsByDefault(t *testing.T) {
+func TestHandleWorkspacesPageHidesMissingActiveRowsByDefault(t *testing.T) {
 	handler := NewHandler(
 		&fakeLifecycleManager{},
 		"https://main.cn-agents.test",
@@ -1955,8 +1955,8 @@ func TestHandleWorkspacesPageShowsMissingActiveRowsByDefault(t *testing.T) {
 	if err := handler.HandleWorkspacesPage(e.NewContext(req, rec)); err != nil {
 		t.Fatalf("HandleWorkspacesPage() error = %v", err)
 	}
-	if !strings.Contains(rec.Body.String(), "Missing Workspace") {
-		t.Fatalf("default page hid missing active row: %s", rec.Body.String())
+	if strings.Contains(rec.Body.String(), "Missing Workspace") {
+		t.Fatalf("default page showed missing active row: %s", rec.Body.String())
 	}
 
 	req = httptest.NewRequest(http.MethodGet, "/workspaces?show_cleaned_history=true", nil)
@@ -2173,7 +2173,7 @@ func TestLifecycleActionDatastarPreservesCleanedHistoryMode(t *testing.T) {
 		body       string
 		wantMerged bool
 	}{
-		{name: "default", body: "", wantMerged: true},
+		{name: "default", body: "", wantMerged: false},
 		{name: "cleaned history", body: "show_cleaned_history=true", wantMerged: true},
 		{name: "legacy historical", body: "show_historical=true", wantMerged: true},
 	} {

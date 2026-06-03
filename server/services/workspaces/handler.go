@@ -1443,15 +1443,12 @@ func flattenImplWorkspaceRows(views []ImplWorkspaceView) []db.ImplWorkspace {
 }
 
 func (h *Handler) renderedImplWorkspaceViews(views []ImplWorkspaceView, filter WorkspacesFilter) []ImplWorkspaceView {
-	return orderReleaseLaneViewsFirst(
-		filterHistoricalImplWorkspaceViews(views, filter.ShowHistorical(), h.protectedReleaseSlugs()),
-		h.releaseLaneWorkspaces(),
-	)
+	return applyWorkspacesFilter(views, filter, h.protectedReleaseSlugs())
 }
 
 func (h *Handler) workspaceGroups(views []ImplWorkspaceView, filter WorkspacesFilter) WorkspaceGroups {
-	ordered := orderReleaseLaneViewsFirst(views, h.releaseLaneWorkspaces())
-	return groupImplWorkspaceViews(ordered, h.protectedReleaseSlugs(), filter.ShowHistorical())
+	filtered := applyWorkspacesFilter(views, filter, h.protectedReleaseSlugs())
+	return groupFilterImplWorkspaceViews(filtered, filter, h.protectedReleaseSlugs())
 }
 
 func (h *Handler) releaseLaneWorkspaces() []ReleaseLaneWorkspace {

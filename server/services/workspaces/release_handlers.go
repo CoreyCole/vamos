@@ -132,6 +132,10 @@ func newReleaseQueueItemID() (string, error) {
 func (h *Handler) patchWorkspaces(c echo.Context, views []ImplWorkspaceView) error {
 	filter := WorkspacesFilterFromRequest(c.Request())
 	var err error
+	views, err = h.attachPlanWorkspaceMetadata(c.Request().Context(), views, filter)
+	if err != nil {
+		return err
+	}
 	views, err = h.attachWorkflowSummaries(c.Request().Context(), views)
 	if err != nil {
 		return err

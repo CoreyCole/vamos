@@ -92,7 +92,7 @@ func filterHistoricalImplWorkspaceViews(
 	protected ...map[string]ReleaseLaneWorkspace,
 ) []ImplWorkspaceView {
 	if showHistorical {
-		return views
+		return cloneImplWorkspaceViews(views)
 	}
 	protectedBySlug := map[string]ReleaseLaneWorkspace{}
 	if len(protected) > 0 && protected[0] != nil {
@@ -113,6 +113,128 @@ func filterHistoricalImplWorkspaceViews(
 		out = append(out, view)
 	}
 	return out
+}
+
+func applyWorkspacesFilter(
+	views []ImplWorkspaceView,
+	filter WorkspacesFilter,
+	protected map[string]ReleaseLaneWorkspace,
+) []ImplWorkspaceView {
+	filter = filter.WithDefaults()
+	out := filterHistoricalImplWorkspaceViews(views, filter.ShowHistorical(), protected)
+	if query := normalizeWorkspaceSearchQuery(filter.Query); query != "" {
+		out = searchImplWorkspaceViews(out, query)
+	}
+	return sortImplWorkspaceViews(out, filter.Sort, protected)
+}
+
+func cloneImplWorkspaceViews(views []ImplWorkspaceView) []ImplWorkspaceView {
+	out := append([]ImplWorkspaceView(nil), views...)
+	for i := range out {
+		out[i].Children = cloneImplWorkspaceViews(out[i].Children)
+	}
+	return out
+}
+
+func searchImplWorkspaceViews(views []ImplWorkspaceView, normalizedQuery string) []ImplWorkspaceView {
+	normalizedQuery = normalizeWorkspaceSearchQuery(normalizedQuery)
+	if normalizedQuery == "" {
+		return cloneImplWorkspaceViews(views)
+	}
+	out := make([]ImplWorkspaceView, 0, len(views))
+	for _, view := range views {
+		children := searchImplWorkspaceViews(view.Children, normalizedQuery)
+		if workspaceMatchesQuery(view, normalizedQuery) || len(children) > 0 {
+			view.Children = children
+			out = append(out, view)
+		}
+	}
+	return out
+}
+
+func normalizeWorkspaceSearchQuery(query string) string {
+	return strings.Join(strings.Fields(strings.ToLower(strings.TrimSpace(query))), " ")
+}
+
+func workspaceMatchesQuery(view ImplWorkspaceView, normalizedQuery string) bool {
+	return strings.Contains(workspaceSearchText(view), normalizeWorkspaceSearchQuery(normalizedQuery))
+}
+
+func workspaceSearchText(view ImplWorkspaceView) string {
+	fields := []string{
+		workspaceViewTitle(view),
+		workspaceViewSlug(view),
+		workspaceViewLabel(view),
+		firstNonEmpty(view.Row.ProjectID, view.Runtime.Workspace.ProjectID),
+		workspaceBranchLabel(view),
+		workspaceCommit(view),
+		workspaceViewCheckoutPath(view),
+		workspacePlanBindingLabel(view),
+		workspacePlanDirAbs(view),
+		workspaceImplStatusBadge(view),
+		workspaceRuntimeLabel(view),
+		workspaceQRSPIBadge(view),
+		workspaceReleaseSummary(view),
+		nullStringValue(view.Row.GitDetail),
+		nullStringValue(view.Row.MergeEvidence),
+		nullStringValue(view.Row.CleanupRiskReason),
+	}
+	for _, project := range view.Plan.Projects {
+		fields = append(fields, project.ProjectID, project.Role, project.Label)
+	}
+	for _, binding := range view.Plan.Bindings {
+		fields = append(fields,
+			binding.ProjectID,
+			binding.Role,
+			binding.WorkspaceSlug,
+			binding.CheckoutPath,
+			binding.URL,
+			binding.Status,
+		)
+	}
+	return normalizeWorkspaceSearchQuery(strings.Join(fields, " "))
+}
+
+func sortImplWorkspaceViews(
+	views []ImplWorkspaceView,
+	sortMode WorkspacesSort,
+	protected map[string]ReleaseLaneWorkspace,
+) []ImplWorkspaceView {
+	ordered := cloneImplWorkspaceViews(views)
+	for i := range ordered {
+		ordered[i].Children = sortImplWorkspaceViews(ordered[i].Children, sortMode, protected)
+	}
+	pinned := make([]ImplWorkspaceView, 0, len(ordered))
+	rest := make([]ImplWorkspaceView, 0, len(ordered))
+	for _, view := range ordered {
+		if isProtectedWorkspaceView(view, protected) {
+			pinned = append(pinned, view)
+			continue
+		}
+		rest = append(rest, view)
+	}
+	sort.SliceStable(rest, func(i, j int) bool {
+		left := rest[i]
+		right := rest[j]
+		switch sortMode {
+		case WorkspacesSortNameAsc:
+			return strings.ToLower(workspaceViewTitle(left)) < strings.ToLower(workspaceViewTitle(right))
+		default:
+			if !left.Row.UpdatedAt.Equal(right.Row.UpdatedAt) {
+				return left.Row.UpdatedAt.After(right.Row.UpdatedAt)
+			}
+			return strings.ToLower(workspaceViewTitle(left)) < strings.ToLower(workspaceViewTitle(right))
+		}
+	})
+	return append(pinned, rest...)
+}
+
+func isProtectedWorkspaceView(view ImplWorkspaceView, protected map[string]ReleaseLaneWorkspace) bool {
+	slug := workspaceViewSlug(view)
+	if lane, ok := protected[slug]; ok && lane.Protected {
+		return true
+	}
+	return IsProtectedCheckoutRole(CheckoutRole(strings.TrimSpace(view.Row.CheckoutRole))) || view.IsMain || slug == mainWorkspaceSlug
 }
 
 func workspaceViewCheckoutPath(view ImplWorkspaceView) string {
@@ -553,6 +675,27 @@ func workspaceRiskReason(view ImplWorkspaceView) string {
 		return "Merged status lacks strong cleanup proof"
 	}
 	return "Cleanup proof unknown"
+}
+
+func groupFilterImplWorkspaceViews(
+	views []ImplWorkspaceView,
+	filter WorkspacesFilter,
+	protected map[string]ReleaseLaneWorkspace,
+) WorkspaceGroups {
+	groups := groupImplWorkspaceViews(views, protected, filter.ShowHistorical())
+	switch filter.WithDefaults().Group {
+	case WorkspacesGroupNeedsAttention:
+		return WorkspaceGroups{NeedsAttention: groups.NeedsAttention}
+	case WorkspacesGroupSafeToCleanup:
+		return WorkspaceGroups{SafeToCleanup: groups.SafeToCleanup}
+	case WorkspacesGroupCleanedUp:
+		if filter.ShowHistorical() {
+			return WorkspaceGroups{CleanedUp: groups.CleanedUp}
+		}
+		return WorkspaceGroups{}
+	default:
+		return groups
+	}
 }
 
 func groupImplWorkspaceViews(
