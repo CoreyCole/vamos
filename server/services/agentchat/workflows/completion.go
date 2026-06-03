@@ -44,10 +44,15 @@ func (s *Service) OnRunComplete(
 		return fmt.Errorf("workflow definition %q is not registered", state.Type)
 	}
 
-	output, err := s.Store.FinalAssistantText(ctx, run.ThreadID, result.HeadEntryID)
+	headEntryID := strings.TrimSpace(result.HeadEntryID)
+	if headEntryID == "" && run.ResultHeadEntryID.Valid {
+		headEntryID = run.ResultHeadEntryID.String
+	}
+	output, err := s.Store.FinalAssistantText(ctx, run.ThreadID, headEntryID)
 	if err != nil {
 		return err
 	}
+	result.HeadEntryID = headEntryID
 	parseCtx := parseContext(state, run, result, nodeID)
 	parsed, err := def.ResultParser.Parse(output, parseCtx)
 	if err != nil {

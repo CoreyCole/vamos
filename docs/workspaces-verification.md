@@ -45,7 +45,7 @@ Browser and chat sessions created while verifying `work` or feature workspace ho
 
 ### Playwright auth token
 
-Browser-enabled workspace verification uses the same app auth endpoint as authored Go Story E2E:
+Browser-enabled workspace verification is implemented with the same DatastarUI Go Story E2E runner used by authored app stories, and authenticates through the same app auth endpoint:
 
 ```text
 GET /internal/playwright-auth?token=<token>&redirect=<path>
@@ -139,9 +139,8 @@ Reports are written under the requested `--report` directory, or `tmp/workspace-
 - `dns-main.txt` and `dns-child.txt`
 - public HTTPS/curl probe output files
 - `manager-log-tail.txt` and `child-log-tail.txt` when available
-- `playwright-output.txt`
-- `screenshots/manager-workspaces.png`, `screenshots/child-app.png`, `screenshots/unavailable-after-stop.png`
-- `playwright-trace.zip` when the browser verifier reaches tracing setup
+- `datastarui-e2e-output.txt`
+- `datastarui-e2e-runs/<run-id>/summary.json`, `index.html`, screenshots/traces, and per-job artifacts from the `workspace-public-switch` / `workspace-public-unavailable` Go stories
 - child `.vamos/run/runtime-env.json` and TS worker ready marker are surfaced through server diagnostics in `server-runs.json`
 
 Include the report path and first failed layer in handoffs/reviews. Do not claim full acceptance without a passing browser-enabled run.

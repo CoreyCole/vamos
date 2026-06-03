@@ -925,6 +925,9 @@ func switchRedirectPathForTarget(raw, currentSlug, targetSlug string) (string, e
 	if strings.TrimSpace(currentSlug) == "" || strings.TrimSpace(targetSlug) == "" || strings.TrimSpace(currentSlug) == strings.TrimSpace(targetSlug) {
 		return redirectPath, nil
 	}
+	if strings.HasPrefix(redirectPath, "/thoughts/") {
+		return redirectPath, nil
+	}
 	return stripNonAuthSwitchRedirectQuery(redirectPath), nil
 }
 

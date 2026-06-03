@@ -75,6 +75,49 @@ func TestOnRunCompleteValidQRSPIResultAdvancesWorkflow(t *testing.T) {
 	}
 }
 
+func TestOnRunCompleteFallsBackToPersistedResultHeadEntry(t *testing.T) {
+	def, err := qrspi.Definition()
+	if err != nil {
+		t.Fatalf("qrspi.Definition() error = %v", err)
+	}
+	state, err := wruntime.InitialState(def, nil)
+	if err != nil {
+		t.Fatalf("InitialState() error = %v", err)
+	}
+	registry := wruntime.NewRegistry()
+	if err := registry.Register(def); err != nil {
+		t.Fatalf("Register() error = %v", err)
+	}
+	store := &fakeStore{
+		state:          state,
+		assistantText:  validQuestionResultXML(),
+		artifactExists: true,
+		run: db.AgentRun{
+			ID:          "run-1",
+			WorkspaceID: sql.NullString{String: "workspace-1", Valid: true},
+			ThreadID:    "thread-1",
+			ResultHeadEntryID: sql.NullString{
+				String: "assistant-from-db",
+				Valid:  true,
+			},
+			WorkflowNodeID: sql.NullString{
+				String: string(qrspi.NodeQuestion),
+				Valid:  true,
+			},
+		},
+	}
+	if err := (&Service{Definitions: registry, Store: store, Runner: &fakeRunner{}}).
+		OnRunComplete(context.Background(), conversation.RunResult{RunID: "run-1"}); err != nil {
+		t.Fatalf("OnRunComplete() error = %v", err)
+	}
+	if store.finalHeadEntryID != "assistant-from-db" {
+		t.Fatalf("FinalAssistantText headEntryID = %q", store.finalHeadEntryID)
+	}
+	if store.savedResult.SourceNodeID != qrspi.NodeQuestion {
+		t.Fatalf("saved result = %#v", store.savedResult)
+	}
+}
+
 func TestApplyQRSPIWorkspaceResultPersistsExecutionCwd(t *testing.T) {
 	t.Parallel()
 
@@ -418,10 +461,11 @@ type fakeStore struct {
 	artifactExistence map[string]bool
 	planningCwd       string
 
-	loadStateCalls int
-	savedState     wruntime.State
-	savedResult    wruntime.WorkflowResult
-	events         []wruntime.Event
+	loadStateCalls   int
+	savedState       wruntime.State
+	savedResult      wruntime.WorkflowResult
+	events           []wruntime.Event
+	finalHeadEntryID string
 }
 
 func (s *fakeStore) LoadWorkspaceState(context.Context, string) (wruntime.State, error) {
@@ -475,7 +519,8 @@ func (s *fakeStore) ArtifactExists(_ context.Context, _, relPath string) (bool, 
 	return s.artifactExists, nil
 }
 
-func (s *fakeStore) FinalAssistantText(context.Context, string, string) (string, error) {
+func (s *fakeStore) FinalAssistantText(_ context.Context, _, headEntryID string) (string, error) {
+	s.finalHeadEntryID = headEntryID
 	return s.assistantText, nil
 }
 

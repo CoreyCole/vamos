@@ -22,9 +22,9 @@ type BrowserVerifyConfig struct {
 	Timeout       time.Duration
 }
 
-type browserCommandRunner func(ctx context.Context, script string, args []string, outPath string) error
+type browserCommandRunner func(ctx context.Context, cfg BrowserVerifyConfig, story, outPath string) error
 
-var runBrowserCommand browserCommandRunner = runNodeBrowserCommand
+var runBrowserCommand browserCommandRunner = runDatastarUIBrowserCommand
 
 func RunBrowserVerify(
 	ctx context.Context,
@@ -34,10 +34,12 @@ func RunBrowserVerify(
 		Name:       "browser",
 		Layer:      workspaces.VerificationLayerBrowser,
 		Status:     statusPassed,
-		OutputPath: filepath.Join(cfg.ReportDir, "playwright-output.txt"),
+		OutputPath: filepath.Join(cfg.ReportDir, "datastarui-e2e-output.txt"),
 	}
+	story := "workspace-public-switch"
 	if cfg.ExpectStopped {
 		step.Name = "browser-unavailable-after-stop"
+		story = "workspace-public-unavailable"
 	}
 	if cfg.AuthToken == "" {
 		err := errors.New(
@@ -47,29 +49,13 @@ func RunBrowserVerify(
 		step.Error = err.Error()
 		return step, err
 	}
-	script, err := playwrightScriptPath()
-	if err != nil {
-		step.Status = statusFailed
-		step.Error = err.Error()
-		return step, err
-	}
-	args := []string{
-		"--base-url", cfg.BaseURL,
-		"--domain", cfg.Domain,
-		"--slug", cfg.Slug,
-		"--token", cfg.AuthToken,
-		"--report", cfg.ReportDir,
-	}
-	if cfg.ExpectStopped {
-		args = append(args, "--expect-stopped")
-	}
 	runCtx := ctx
 	cancel := func() {}
 	if cfg.Timeout > 0 {
 		runCtx, cancel = context.WithTimeout(ctx, cfg.Timeout)
 	}
 	defer cancel()
-	if err := runBrowserCommand(runCtx, script, args, step.OutputPath); err != nil {
+	if err := runBrowserCommand(runCtx, cfg, story, step.OutputPath); err != nil {
 		step.Status = statusFailed
 		step.Error = err.Error()
 		return step, err
@@ -77,10 +63,10 @@ func RunBrowserVerify(
 	return step, nil
 }
 
-func runNodeBrowserCommand(
+func runDatastarUIBrowserCommand(
 	ctx context.Context,
-	script string,
-	args []string,
+	cfg BrowserVerifyConfig,
+	story string,
 	outPath string,
 ) error {
 	if err := os.MkdirAll(filepath.Dir(outPath), 0o755); err != nil {
@@ -91,37 +77,61 @@ func runNodeBrowserCommand(
 		return err
 	}
 	defer out.Close()
-	cmdArgs := append([]string{script}, args...)
-	cmd := exec.CommandContext(ctx, "node", cmdArgs...)
+
+	repoRoot, err := findVamosRepoRoot()
+	if err != nil {
+		return err
+	}
+	artifactsDir := filepath.Join(cfg.ReportDir, "datastarui-e2e-runs")
+	cmd := exec.CommandContext(
+		ctx,
+		filepath.Join(repoRoot, "..", "datastarui", "scripts", "datastarui.sh"),
+		"e2e",
+		"run",
+		"--config",
+		filepath.Join(repoRoot, "datastarui-e2e.yml"),
+		"--base-url",
+		cfg.BaseURL,
+		"--no-restart",
+		"--story",
+		story,
+		"--viewport",
+		"desktop-full",
+		"--artifacts-dir",
+		artifactsDir,
+	)
+	cmd.Dir = repoRoot
 	cmd.Stdout = out
 	cmd.Stderr = out
+	cmd.Env = append(os.Environ(),
+		"VAMOS_E2E_AUTH_TOKEN="+cfg.AuthToken,
+		"VAMOS_E2E_WORKSPACE_SLUG="+cfg.Slug,
+		"VAMOS_E2E_WORKSPACE_DOMAIN="+cfg.Domain,
+	)
 	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("playwright verifier failed: %w (see %s)", err, outPath)
+		return fmt.Errorf("datastarui e2e verifier failed: %w (see %s)", err, outPath)
 	}
 	return nil
 }
 
-func playwrightScriptPath() (string, error) {
-	const scriptRel = "workspace-verify-playwright.mjs"
+func findVamosRepoRoot() (string, error) {
 	cwd, err := os.Getwd()
 	if err != nil {
 		return "", err
 	}
 	for dir := cwd; ; dir = filepath.Dir(dir) {
-		candidates := []string{
-			filepath.Join(dir, "scripts", scriptRel),
-			filepath.Join(dir, "cmd", "server", "scripts", scriptRel),
-		}
-		for _, candidate := range candidates {
-			info, err := os.Stat(candidate)
-			if err == nil && !info.IsDir() {
-				return candidate, nil
-			}
+		if fileExists(filepath.Join(dir, "go.mod")) && fileExists(filepath.Join(dir, "datastarui-e2e.yml")) {
+			return dir, nil
 		}
 		parent := filepath.Dir(dir)
 		if parent == dir {
 			break
 		}
 	}
-	return "", errors.New("workspace-verify-playwright.mjs not found")
+	return "", errors.New("vamos repo root with datastarui-e2e.yml not found")
+}
+
+func fileExists(path string) bool {
+	info, err := os.Stat(path)
+	return err == nil && !info.IsDir()
 }

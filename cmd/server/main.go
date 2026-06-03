@@ -1273,7 +1273,11 @@ func main() {
 	e.Any(path+"*", echo.WrapHandler(handler))
 
 	// Create auth middleware
-	authMiddleware := authmw.AuthMiddleware(authService)
+	authMiddleware := authmw.AuthMiddleware(authService, authmw.AuthRedirectConfig{
+		ManagerURL:      workspaceManagerURL,
+		WorkspaceDomain: cfg.WorkspaceDomain,
+		CurrentSlug:     cfg.WorkspaceSlug,
+	})
 	var workspaceHandler *workspaces.Handler
 	if cfg.WorkspaceMode != "standalone" || workspaceManager != nil {
 		handlerOptions := []workspaces.HandlerOption{

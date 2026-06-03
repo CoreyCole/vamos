@@ -361,6 +361,17 @@ func TestSwitchRedirectPathForTargetStripsNonAuthQueryForDifferentWorkspace(t *t
 	}
 }
 
+func TestSwitchRedirectPathForTargetPreservesThoughtsDirectLinkQuery(t *testing.T) {
+	got, err := switchRedirectPathForTarget("/thoughts/plan.md?context=chat&thread=abc", "main", "feature")
+	if err != nil {
+		t.Fatalf("switchRedirectPathForTarget() error = %v", err)
+	}
+	want := "/thoughts/plan.md?context=chat&thread=abc"
+	if got != want {
+		t.Fatalf("redirect = %q, want %q", got, want)
+	}
+}
+
 func TestHandleSwitchWorkspaceRedirectsManagerWorkspacePageToChildRoot(t *testing.T) {
 	manager := &fakeLifecycleManager{
 		workspaces: []Workspace{{

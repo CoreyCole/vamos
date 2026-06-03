@@ -373,12 +373,12 @@ func TestRunWorkspaceVerifyStopsAfterBrowserFailure(t *testing.T) {
 func TestRunBrowserVerifyCommandConstruction(t *testing.T) {
 	oldRunner := runBrowserCommand
 	defer func() { runBrowserCommand = oldRunner }()
-	var gotScript string
-	var gotArgs []string
+	var gotCfg BrowserVerifyConfig
+	var gotStory string
 	var gotOut string
-	runBrowserCommand = func(ctx context.Context, script string, args []string, outPath string) error {
-		gotScript = script
-		gotArgs = append([]string(nil), args...)
+	runBrowserCommand = func(ctx context.Context, cfg BrowserVerifyConfig, story, outPath string) error {
+		gotCfg = cfg
+		gotStory = story
 		gotOut = outPath
 		return os.WriteFile(outPath, []byte("ok"), 0o600)
 	}
@@ -396,31 +396,36 @@ func TestRunBrowserVerifyCommandConstruction(t *testing.T) {
 	if step.Status != statusPassed || step.OutputPath == "" || gotOut != step.OutputPath {
 		t.Fatalf("step=%+v gotOut=%q", step, gotOut)
 	}
-	if !strings.HasSuffix(
-		gotScript,
-		filepath.Join("scripts", "workspace-verify-playwright.mjs"),
-	) {
-		t.Fatalf("script = %q", gotScript)
+	if gotStory != "workspace-public-switch" {
+		t.Fatalf("story = %q", gotStory)
 	}
-	joined := strings.Join(gotArgs, " ")
-	for _, want := range []string{"--base-url https://main.vamos.test", "--domain vamos.test", "--slug demo", "--token playwright-secret"} {
-		if !strings.Contains(joined, want) {
-			t.Fatalf("args %q missing %q", joined, want)
-		}
+	if gotCfg.BaseURL != "https://main.vamos.test" || gotCfg.Domain != "vamos.test" || gotCfg.Slug != "demo" || gotCfg.AuthToken != "playwright-secret" {
+		t.Fatalf("cfg = %+v", gotCfg)
 	}
 }
 
-func TestPlaywrightScriptPath(t *testing.T) {
-	t.Parallel()
-	path, err := playwrightScriptPath()
+//nolint:paralleltest // Mutates package-level command runner.
+func TestRunBrowserVerifyUnavailableStory(t *testing.T) {
+	oldRunner := runBrowserCommand
+	defer func() { runBrowserCommand = oldRunner }()
+	var gotStory string
+	runBrowserCommand = func(ctx context.Context, cfg BrowserVerifyConfig, story, outPath string) error {
+		gotStory = story
+		return os.WriteFile(outPath, []byte("ok"), 0o600)
+	}
+	_, err := RunBrowserVerify(t.Context(), BrowserVerifyConfig{
+		BaseURL:       "https://main.vamos.test",
+		Domain:        "vamos.test",
+		Slug:          "demo",
+		AuthToken:     "playwright-secret",
+		ReportDir:     t.TempDir(),
+		ExpectStopped: true,
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.HasSuffix(
-		path,
-		filepath.Join("scripts", "workspace-verify-playwright.mjs"),
-	) {
-		t.Fatalf("path = %q", path)
+	if gotStory != "workspace-public-unavailable" {
+		t.Fatalf("story = %q", gotStory)
 	}
 }
 

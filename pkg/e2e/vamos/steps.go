@@ -262,13 +262,45 @@ func StartQRSPIQuestionToResearchWorkspace() spec.Step {
 }
 
 func qrspiQuestionToResearchPrompt(marker, artifactPath string) string {
+	planPath := path.Dir(path.Dir(artifactPath))
 	return fmt.Sprintf(`E2E TEST MODE.
-Do not ask follow-up questions. Do not wait for human input.
-Complete q-question immediately.
+Do not ask follow-up questions. Do not inspect files. Do not explain.
 The questions artifact already exists at %s and contains marker %s.
-Reply with exactly one valid QRSPI result block in the currently supported runtime result format.
-Do not include prose outside the result block.
-Required semantic result: source node question, status complete, outcome complete, primary artifact %s, next step starts q-research immediately.`, artifactPath, marker, artifactPath)
+Reply with only this raw XML. No markdown fence. No prose.
+
+<qrspi-result>
+  <stage>question</stage>
+  <status>complete</status>
+  <outcome>complete</outcome>
+  <project>github.com/coreycole/vamos</project>
+  <relatedProjects></relatedProjects>
+  <workspace>%s</workspace>
+  <workspaceMetadata>
+    <planWorkspace>%s</planWorkspace>
+    <implementationWorkspace></implementationWorkspace>
+    <trunkBranch>main</trunkBranch>
+    <stackBottomBranch></stackBottomBranch>
+    <parentBranch></parentBranch>
+    <currentBranch></currentBranch>
+  </workspaceMetadata>
+  <policy>
+    <autoMode>false</autoMode>
+    <enablePlanReviews>true</enablePlanReviews>
+    <invalidResultRetryLimit>1</invalidResultRetryLimit>
+  </policy>
+  <summary>
+    <plan-goal>Advance the E2E QRSPI q-question to q-research using the existing questions artifact.</plan-goal>
+    <stage-completed>Verified existing question artifact marker %s.</stage-completed>
+    <key-decisions>Next stage should start immediately: q-research.</key-decisions>
+  </summary>
+  <artifact>%s</artifact>
+  <next>
+    <step>Read ~/.agents/skills/qrspi-planning/SKILL.md.</step>
+    <step>Read ~/.agents/skills/q-research/SKILL.md.</step>
+    <step>Read %s.</step>
+    <step>Start /q-research immediately unless blocked by an explicit human/safety gate.</step>
+  </next>
+</qrspi-result>`, artifactPath, marker, planPath, planPath, marker, artifactPath, artifactPath)
 }
 
 type workflowRunSnapshot struct {
@@ -381,7 +413,15 @@ func workflowCurrentNode(t testing.TB, ctx *duiruntime.Context, workspaceID stri
 func dumpWorkflowRunDiagnostics(t testing.TB, database *sql.DB, workspaceID string) {
 	t.Helper()
 	rows, err := database.QueryContext(t.Context(), `
-SELECT id, status, workflow_node_id, workflow_result_status, created_at
+SELECT id,
+       status,
+       workflow_node_id,
+       workflow_result_status,
+       COALESCE(workflow_result_json, ''),
+       COALESCE(error_message, ''),
+       substr(prompt_text, 1, 1000),
+       created_at,
+       COALESCE(completed_at, '')
 FROM agent_runs
 WHERE workspace_id = ?
 ORDER BY created_at DESC
@@ -392,15 +432,55 @@ LIMIT 5`, workspaceID)
 	}
 	defer rows.Close()
 	for rows.Next() {
-		var id, status string
+		var id, status, resultJSON, errorMessage, promptPreview, createdAt, completedAt string
 		var nodeID, resultStatus sql.NullString
-		var createdAt string
-		if err := rows.Scan(&id, &status, &nodeID, &resultStatus, &createdAt); err != nil {
+		if err := rows.Scan(&id, &status, &nodeID, &resultStatus, &resultJSON, &errorMessage, &promptPreview, &createdAt, &completedAt); err != nil {
 			t.Logf("workflow run diagnostic scan failed: %v", err)
 			return
 		}
-		t.Logf("workflow run diagnostic: id=%s status=%s node=%s result=%s created=%s", id, status, nodeID.String, resultStatus.String, createdAt)
+		t.Logf("workflow run diagnostic: id=%s status=%s node=%s result_status=%s result_json_len=%d error=%q created=%s completed=%s", id, status, nodeID.String, resultStatus.String, len(strings.TrimSpace(resultJSON)), errorMessage, createdAt, completedAt)
+		t.Logf("workflow run prompt preview id=%s: %s", id, compactLogPreview(promptPreview, 1000))
+		dumpWorkflowRunEventDiagnostics(t, database, id)
 	}
+}
+
+func dumpWorkflowRunEventDiagnostics(t testing.TB, database *sql.DB, runID string) {
+	t.Helper()
+	rows, err := database.QueryContext(t.Context(), `
+SELECT seq,
+       event_type,
+       length(COALESCE(json_extract(payload_json, '$.content'), '')),
+       substr(COALESCE(json_extract(payload_json, '$.content'), payload_json), 1, 1500)
+FROM chat_session_events
+WHERE run_id = ?
+  AND event_type IN ('message.completed', 'run.completed', 'run.failed')
+ORDER BY seq`, runID)
+	if err != nil {
+		t.Logf("workflow event diagnostic query failed for run %s: %v", runID, err)
+		return
+	}
+	defer func() {
+		if err := rows.Close(); err != nil {
+			t.Logf("workflow event diagnostic rows close failed for run %s: %v", runID, err)
+		}
+	}()
+	for rows.Next() {
+		var seq, contentLen int
+		var eventType, preview string
+		if err := rows.Scan(&seq, &eventType, &contentLen, &preview); err != nil {
+			t.Logf("workflow event diagnostic scan failed for run %s: %v", runID, err)
+			return
+		}
+		t.Logf("workflow event diagnostic: run=%s seq=%d event=%s content_len=%d preview=%s", runID, seq, eventType, contentLen, compactLogPreview(preview, 1500))
+	}
+}
+
+func compactLogPreview(value string, limit int) string {
+	value = strings.TrimSpace(value)
+	if len(value) > limit {
+		value = value[:limit] + "…"
+	}
+	return strings.ReplaceAll(value, "\n", `\n`)
 }
 
 func WaitForWorkflowRunResult(nodeID string) expectation {
@@ -516,7 +596,11 @@ func ExpectHashAnchorPreserved() expectation {
 
 func MobileTranscriptHasNoHorizontalOverflow() expectation {
 	return expectation{customStep("mobile transcript has no horizontal overflow", func(t testing.TB, ctx *duiruntime.Context) {
-		result, err := ctx.Page.Locator("#agent-chat-scroll-region").First().Evaluate("el => el.scrollWidth <= el.clientWidth + 1", nil)
+		locator := ctx.Page.Locator("#agent-chat-scroll-region, #agent-chat-messages").First()
+		if err := locator.WaitFor(); err != nil {
+			t.Fatalf("transcript scroll region missing: %v", err)
+		}
+		result, err := locator.Evaluate("el => el.scrollWidth <= el.clientWidth + 1", nil)
 		if err != nil {
 			t.Fatalf("measure transcript overflow: %v", err)
 		}
@@ -897,6 +981,9 @@ func latestPlanWorkspaceByRootDocPath(t testing.TB, ctx *duiruntime.Context, roo
 	database := openDB(t, ctx)
 	defer database.Close()
 	rootDocPath = filepath.Clean(rootDocPath)
+	if resolved, err := filepath.EvalSymlinks(rootDocPath); err == nil {
+		rootDocPath = resolved
+	}
 	var workspaceID, threadID string
 	if err := database.QueryRowContext(t.Context(), `SELECT id, selected_thread_id FROM workspaces WHERE root_doc_path = ? AND workflow_type = 'qrspi' AND archived_at IS NULL ORDER BY updated_at DESC LIMIT 1`, rootDocPath).Scan(&workspaceID, &threadID); err != nil {
 		t.Fatal(err)
@@ -1090,13 +1177,20 @@ func seedQRSPIContinuationWorkspace(t testing.TB, ctx *duiruntime.Context, datab
 	execSQL(t, database, `INSERT INTO workspaces (id, user_email, title, root_doc_path, workflow_type, source, selected_thread_id, current_session_id, current_branch_id, workflow_state_json)
 VALUES (?, 'playwright@localhost', 'E2E QRSPI continuation', ?, 'qrspi', 'imported', ?, ?, ?, ?)`, workspaceID, rootDocPath, threadID, threadID, branchID, workflowState)
 	execSQL(t, database, `INSERT INTO agent_threads (id, user_email, title, cwd, lineage_id, head_entry_id) VALUES (?, 'playwright@localhost', 'E2E QRSPI continuation thread', ?, ?, ?)`, threadID, ctx.Config.RepoRoot, threadID, "e2e-qrspi-assistant-"+stamp)
+	userEntryPayload := fmt.Sprintf(`{"type":"message","id":%q,"parentId":null,"message":{"role":"user","content":"VAMOS_E2E_QRSPI_CONTINUATION_PROMPT"}}`, "e2e-qrspi-user-"+stamp)
+	assistantEntryPayload := fmt.Sprintf(`{"type":"message","id":%q,"parentId":%q,"message":{"role":"assistant","content":%q}}`, "e2e-qrspi-assistant-"+stamp, "e2e-qrspi-user-"+stamp, "QRSPI continuation ready\n\nbash ran continuation smoke check\n\nfile write e2e/created.txt\nfile edit e2e/updated.txt")
+	execSQL(t, database, `INSERT INTO agent_entries (lineage_id, entry_id, parent_entry_id, entry_type, origin_order, payload_json, origin_thread_id, session_timestamp) VALUES (?, ?, NULL, 'message', 1, ?, ?, CURRENT_TIMESTAMP)`, threadID, "e2e-qrspi-user-"+stamp, userEntryPayload, threadID)
+	execSQL(t, database, `INSERT INTO agent_entries (lineage_id, entry_id, parent_entry_id, entry_type, origin_order, payload_json, origin_thread_id, session_timestamp) VALUES (?, ?, ?, 'message', 2, ?, ?, CURRENT_TIMESTAMP)`, threadID, "e2e-qrspi-assistant-"+stamp, "e2e-qrspi-user-"+stamp, assistantEntryPayload, threadID)
 	attachE2EThreadWorkspace(t, database, threadID, workspaceID)
-	execSQL(t, database, `INSERT INTO chat_sessions (id, workspace_id, created_by_user_email, branch_id, topology_kind, current_projection_seq) VALUES (?, ?, 'playwright@localhost', ?, 'root', 0)`, threadID, workspaceID, branchID)
+	execSQL(t, database, `INSERT INTO chat_sessions (id, workspace_id, created_by_user_email, branch_id, topology_kind, current_projection_seq) VALUES (?, ?, 'playwright@localhost', ?, 'root', 5)`, threadID, workspaceID, branchID)
 	execSQL(t, database, `INSERT INTO chat_session_events (session_id, seq, event_type, actor_participant_id, payload_json) VALUES (?, 1, 'message.completed', 'user', ?)`, threadID, fmt.Sprintf(`{"id":"e2e-prompt-%s","role":"user","content":"VAMOS_E2E_QRSPI_CONTINUATION_PROMPT"}`, stamp))
 	execSQL(t, database, `INSERT INTO chat_session_events (session_id, seq, event_type, actor_participant_id, payload_json) VALUES (?, 2, 'message.completed', 'assistant', ?)`, threadID, fmt.Sprintf(`{"id":"e2e-assistant-%s","role":"assistant","content":"QRSPI continuation ready"}`, stamp))
 	execSQL(t, database, `INSERT INTO chat_session_events (session_id, seq, event_type, payload_json) VALUES (?, 3, 'tool.completed', ?)`, threadID, fmt.Sprintf(`{"tool_call_id":"tool-%s","tool_name":"bash","summary":"ran continuation smoke check"}`, stamp))
 	execSQL(t, database, `INSERT INTO chat_session_events (session_id, seq, event_type, payload_json) VALUES (?, 4, 'file.written', '{"path":"e2e/created.txt"}')`, threadID)
 	execSQL(t, database, `INSERT INTO chat_session_events (session_id, seq, event_type, payload_json) VALUES (?, 5, 'file.edited', '{"path":"e2e/updated.txt"}')`, threadID)
+	messages := fmt.Sprintf(`[{"id":"e2e-prompt-%s","seq":1,"role":"user","content":"VAMOS_E2E_QRSPI_CONTINUATION_PROMPT"},{"id":"e2e-assistant-%s","seq":2,"role":"assistant","content":%q}]`, stamp, stamp, "QRSPI continuation ready\n\nbash ran continuation smoke check")
+	artifacts := `[{"path":"e2e/created.txt","kind":"written","seq":4},{"path":"e2e/updated.txt","kind":"edited","seq":5}]`
+	execSQL(t, database, `INSERT INTO chat_session_projections (session_id, last_seq, messages_json, runs_json, participants_json, artifacts_json, topology_json) VALUES (?, 5, ?, '[]', '[{"id":"user","label":"User","kind":"user"},{"id":"assistant","label":"Assistant","kind":"assistant"}]', ?, '{}')`, threadID, messages, artifacts)
 	execSQL(t, database, `UPDATE workspaces SET updated_at = CURRENT_TIMESTAMP WHERE id = ?`, workspaceID)
 	ensureMemory(ctx)
 	ctx.Memory["qrspi_continuation_workspace_id"] = workspaceID
