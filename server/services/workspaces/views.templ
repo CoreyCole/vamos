@@ -13,14 +13,15 @@ import (
 	"github.com/CoreyCole/vamos/server/layouts"
 )
 
-templ WorkspacesDocument(args layouts.RootArgs, groups WorkspaceGroups, releasePanel ReleasePanelModel, refresh WorkspaceRefreshState, filter WorkspacesFilter, projectOptions []ProjectOption) {
+templ WorkspacesDocument(args layouts.RootArgs, groups WorkspaceGroups, releasePanel ReleasePanelModel, refresh WorkspaceRefreshState, filter WorkspacesFilter, projectOptions []ProjectOption, groupOptions []WorkspacesFilterOption, sortOptions []WorkspacesFilterOption) {
 	@layouts.Root(args) {
-		@WorkspacesPageWithRefreshGroups(groups, releasePanel, args.WorkspaceManagerURL, refresh, filter, projectOptions)
+		@WorkspacesPageWithRefreshGroups(groups, releasePanel, args.WorkspaceManagerURL, refresh, filter, projectOptions, groupOptions, sortOptions)
 	}
 }
 
 templ WorkspacesPage(items []ImplWorkspaceView, managerURL string, showCleanedHistory bool) {
-	@WorkspacesPageWithRefreshGroups(groupImplWorkspaceViews(items, nil, showCleanedHistory), ReleasePanelModel{}, managerURL, WorkspaceRefreshState{}, workspacesFilterFromHistory(showCleanedHistory), projectOptionsFromViews(items, ""))
+	{{ filter := workspacesFilterFromHistory(showCleanedHistory) }}
+	@WorkspacesPageWithRefreshGroups(groupImplWorkspaceViews(items, nil, showCleanedHistory), ReleasePanelModel{}, managerURL, WorkspaceRefreshState{}, filter, projectOptionsFromViews(items, ""), workspacesGroupOptions(filter.Group), workspacesSortOptions(filter.Sort))
 }
 
 func workspacesFilterFromHistory(showHistorical bool) WorkspacesFilter {
@@ -30,10 +31,10 @@ func workspacesFilterFromHistory(showHistorical bool) WorkspacesFilter {
 	return WorkspacesFilter{}.WithDefaults()
 }
 
-templ WorkspacesPageWithRefreshGroups(groups WorkspaceGroups, releasePanel ReleasePanelModel, managerURL string, refresh WorkspaceRefreshState, filter WorkspacesFilter, projectOptions []ProjectOption) {
+templ WorkspacesPageWithRefreshGroups(groups WorkspaceGroups, releasePanel ReleasePanelModel, managerURL string, refresh WorkspaceRefreshState, filter WorkspacesFilter, projectOptions []ProjectOption, groupOptions []WorkspacesFilterOption, sortOptions []WorkspacesFilterOption) {
 	<section class="h-full w-full overflow-y-auto p-6" data-init={ templ.SafeURL("@get('" + workspacesURL("/workspaces/stream", filter) + "')") }>
 		<div class="mx-auto flex w-full max-w-6xl flex-col gap-4">
-			@WorkspacesHeader(refresh, filter, projectOptions)
+			@WorkspacesHeader(refresh, filter, projectOptions, groupOptions, sortOptions)
 			@ReleasePanel(releasePanel)
 			@WorkspacesList(groups, managerURL, filter)
 		</div>
@@ -53,21 +54,34 @@ func projectSelectOptions(options []ProjectOption) []selectcomponent.SelectOptio
 	return out
 }
 
+func workspaceSelectOptions(options []WorkspacesFilterOption) []selectcomponent.SelectOptionArgs {
+	out := make([]selectcomponent.SelectOptionArgs, 0, len(options))
+	for _, option := range options {
+		out = append(out, selectcomponent.SelectOptionArgs{
+			Value:    option.Value,
+			Label:    option.Label,
+			Disabled: false,
+		})
+	}
+	return out
+}
+
 templ WorkspacesProjectFilter(projectFilter WorkspacesFilter, projectOptions []ProjectOption) {
+	@WorkspacesFilterForm(projectFilter, projectOptions, workspacesGroupOptions(projectFilter.Group), workspacesSortOptions(projectFilter.Sort))
+}
+
+templ WorkspacesFilterForm(projectFilter WorkspacesFilter, projectOptions []ProjectOption, groupOptions []WorkspacesFilterOption, sortOptions []WorkspacesFilterOption) {
 	{{ projectFilter = projectFilter.WithDefaults() }}
-	<form method="get" action="/workspaces" class="flex items-center gap-2">
-		if projectFilter.ShowHistorical() {
-			<input type="hidden" name="history" value="all"/>
-		}
-		if projectFilter.QueryValue() != "" {
-			<input type="hidden" name="q" value={ projectFilter.QueryValue() }/>
-		}
-		if projectFilter.Group != WorkspacesGroupAll {
-			<input type="hidden" name="group" value={ string(projectFilter.Group) }/>
-		}
-		if projectFilter.Sort != WorkspacesSortUpdatedDesc {
-			<input type="hidden" name="sort" value={ string(projectFilter.Sort) }/>
-		}
+	<form method="get" action="/workspaces" id="workspaces-filter-form" class="flex flex-wrap items-center gap-2">
+		<label class="sr-only" for="workspaces-search">Search workspaces</label>
+		<input
+			id="workspaces-search"
+			name="q"
+			value={ projectFilter.QueryValue() }
+			placeholder="Search workspaces"
+			class="h-9 min-w-56 rounded-md border bg-background px-3 text-sm"
+			data-on:input__debounce.300ms="this.closest('form').requestSubmit()"
+		/>
 		<label class="text-xs text-muted-foreground" for="project-filter">Project</label>
 		@selectcomponent.Select(selectcomponent.SelectArgs{
 			ID:          "project_filter",
@@ -79,10 +93,23 @@ templ WorkspacesProjectFilter(projectFilter WorkspacesFilter, projectOptions []P
 			Class:       "min-w-48",
 			Attributes:  templ.Attributes{"id": "project-filter"},
 		})
+		<label class="sr-only" for="workspaces-group-filter">Workspace group</label>
+		@selectcomponent.Select(selectcomponent.SelectArgs{ID: "workspaces_group", Name: "group", Value: string(projectFilter.Group), Placeholder: "All groups", Options: workspaceSelectOptions(groupOptions), OnChange: "this.closest('form').requestSubmit()", Class: "min-w-44", Attributes: templ.Attributes{"id": "workspaces-group-filter"}})
+		<label class="sr-only" for="workspaces-sort-filter">Workspace sort</label>
+		@selectcomponent.Select(selectcomponent.SelectArgs{ID: "workspaces_sort", Name: "sort", Value: string(projectFilter.Sort), Placeholder: "Recent activity", Options: workspaceSelectOptions(sortOptions), OnChange: "this.closest('form').requestSubmit()", Class: "min-w-40", Attributes: templ.Attributes{"id": "workspaces-sort-filter"}})
+		if projectFilter.ShowHistorical() {
+			@button.LinkButton(button.LinkButtonArgs{Href: workspacesURL("/workspaces", projectFilter.WithHistory(WorkspacesHistoryActive)), Variant: "outline", Size: "sm"}) {
+				Hide history
+			}
+		} else {
+			@button.LinkButton(button.LinkButtonArgs{Href: workspacesURL("/workspaces", projectFilter.WithHistory(WorkspacesHistoryAll)), Variant: "outline", Size: "sm"}) {
+				Show history
+			}
+		}
 	</form>
 }
 
-templ WorkspacesHeader(refresh WorkspaceRefreshState, projectFilter WorkspacesFilter, projectOptions []ProjectOption) {
+templ WorkspacesHeader(refresh WorkspaceRefreshState, projectFilter WorkspacesFilter, projectOptions []ProjectOption, groupOptions []WorkspacesFilterOption, sortOptions []WorkspacesFilterOption) {
 	{{ projectFilter = projectFilter.WithDefaults() }}
 	<div id="workspaces-header" class="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
 		<div>
@@ -91,30 +118,7 @@ templ WorkspacesHeader(refresh WorkspaceRefreshState, projectFilter WorkspacesFi
 		</div>
 		<div class="flex flex-col items-start gap-2 md:items-end">
 			<div class="flex flex-wrap gap-2">
-				@WorkspacesProjectFilter(projectFilter, projectOptions)
-				<form method="get" action="/workspaces">
-					if projectFilter.ProjectQueryValue() != "" {
-						<input type="hidden" name="project" value={ projectFilter.ProjectQueryValue() }/>
-					}
-					if projectFilter.QueryValue() != "" {
-						<input type="hidden" name="q" value={ projectFilter.QueryValue() }/>
-					}
-					if projectFilter.Group != WorkspacesGroupAll {
-						<input type="hidden" name="group" value={ string(projectFilter.Group) }/>
-					}
-					if projectFilter.Sort != WorkspacesSortUpdatedDesc {
-						<input type="hidden" name="sort" value={ string(projectFilter.Sort) }/>
-					}
-					if projectFilter.ShowHistorical() {
-						@button.Button(button.ButtonArgs{Type: "submit", Variant: "outline", Size: "sm"}) {
-							Hide cleaned history
-						}
-					} else {
-						@button.Button(button.ButtonArgs{Type: "submit", Variant: "outline", Size: "sm", Attributes: templ.Attributes{"name": "history", "value": "all"}}) {
-							Show cleaned history
-						}
-					}
-				</form>
+				@WorkspacesFilterForm(projectFilter, projectOptions, groupOptions, sortOptions)
 				<form method="post" action={ templ.SafeURL(workspacesURL("/workspaces/refresh", projectFilter)) } data-on:submit={ templ.SafeURL("@post('" + workspacesURL("/workspaces/refresh", projectFilter) + "', {contentType: 'form'})") }>
 					if projectFilter.ProjectQueryValue() != "" {
 						<input type="hidden" name="project" value={ projectFilter.ProjectQueryValue() }/>

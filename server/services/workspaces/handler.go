@@ -416,7 +416,7 @@ func (h *Handler) HandleWorkspacesPage(c echo.Context) error {
 	return render(
 		c,
 		http.StatusOK,
-		WorkspacesDocument(args, groups, model.ReleasePanel, h.refreshState(), filter, model.ProjectOptions),
+		WorkspacesDocument(args, groups, model.ReleasePanel, h.refreshState(), filter, model.ProjectOptions, model.GroupOptions, model.SortOptions),
 	)
 }
 
@@ -473,7 +473,7 @@ func (h *Handler) HandleRefreshWorkspaces(c echo.Context) error {
 			return err
 		}
 		return sse.PatchElementTempl(
-			WorkspacesHeader(h.refreshState(), filter, model.ProjectOptions),
+			WorkspacesHeader(h.refreshState(), filter, model.ProjectOptions, model.GroupOptions, model.SortOptions),
 			datastar.WithSelectorID("workspaces-header"),
 			datastar.WithModeOuter(),
 		)
@@ -606,7 +606,7 @@ func (h *Handler) HandleWorkspacesStream(c echo.Context) error {
 		}
 		groups := h.workspaceGroups(model.Views, filter)
 		if err := sse.PatchElementTempl(
-			WorkspacesHeader(h.refreshState(), filter, model.ProjectOptions),
+			WorkspacesHeader(h.refreshState(), filter, model.ProjectOptions, model.GroupOptions, model.SortOptions),
 			datastar.WithSelectorID("workspaces-header"),
 			datastar.WithModeOuter(),
 		); err != nil {
@@ -1145,6 +1145,11 @@ func (f WorkspacesFilter) QueryValue() string {
 
 func (f WorkspacesFilter) ShowHistorical() bool {
 	return f.WithDefaults().History == WorkspacesHistoryAll
+}
+
+func (f WorkspacesFilter) WithHistory(history WorkspacesHistoryMode) WorkspacesFilter {
+	f.History = history
+	return f.WithDefaults()
 }
 
 func (f WorkspacesFilter) AppendTo(values url.Values) {

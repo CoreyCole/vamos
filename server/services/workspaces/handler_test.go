@@ -1441,13 +1441,13 @@ func TestWorkspacesPageRendersCleanedHistoryToggleAndPreservesMode(t *testing.T)
 		t.Fatalf("Render(default) error = %v", err)
 	}
 	html := body.String()
-	for _, want := range []string{"Show cleaned history", `data-init="@get(&#39;/workspaces/stream&#39;)"`} {
+	for _, want := range []string{"Show history", `id="workspaces-filter-form"`, `name="q"`, `name="project"`, `name="group"`, `name="sort"`, `data-on:input__debounce.300ms`, `data-init="@get(&#39;/workspaces/stream&#39;)"`} {
 		if !strings.Contains(html, want) {
 			t.Fatalf("default page missing %q: %s", want, html)
 		}
 	}
-	if strings.Contains(html, "Hide cleaned history") {
-		t.Fatalf("default page unexpectedly contained Hide cleaned history: %s", html)
+	if strings.Contains(html, "Hide history") {
+		t.Fatalf("default page unexpectedly contained Hide history: %s", html)
 	}
 	idx := strings.Index(html, `action="/workspaces/refresh"`)
 	if idx < 0 {
@@ -1467,7 +1467,7 @@ func TestWorkspacesPageRendersCleanedHistoryToggleAndPreservesMode(t *testing.T)
 		t.Fatalf("Render(historical) error = %v", err)
 	}
 	html = body.String()
-	for _, want := range []string{"Hide cleaned history", `name="history" value="all"`, `data-init="@get(&#39;/workspaces/stream?history=all&#39;)"`} {
+	for _, want := range []string{"Hide history", `href="/workspaces"`, `action="/workspaces/refresh?history=all"`, `data-init="@get(&#39;/workspaces/stream?history=all&#39;)"`} {
 		if !strings.Contains(html, want) {
 			t.Fatalf("historical page missing %q: %s", want, html)
 		}
@@ -1609,11 +1609,16 @@ func TestWorkspacesProjectFilterRendersEmptyAllProjectsOption(t *testing.T) {
 	}
 	html := body.String()
 	for _, want := range []string{
-		`name="history" value="all"`,
+		`id="workspaces-filter-form"`,
+		`name="q"`,
 		`name="project"`,
+		`name="group"`,
+		`name="sort"`,
 		`data-select-id="project_filter"`,
 		`data-value=""`,
 		`All projects`,
+		`Hide history`,
+		`data-on:input__debounce.300ms`,
 		`this.closest(&#39;form&#39;).requestSubmit()`,
 	} {
 		if !strings.Contains(html, want) {

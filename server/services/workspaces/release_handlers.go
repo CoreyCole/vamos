@@ -150,7 +150,7 @@ func (h *Handler) patchWorkspaces(c echo.Context, views []ImplWorkspaceView) err
 	groups := h.workspaceGroups(views, filter)
 	sse := datastar.NewSSE(c.Response().Writer, c.Request())
 	c.Response().WriteHeader(http.StatusAccepted)
-	if err := sse.PatchElementTempl(WorkspacesHeader(h.refreshState(), filter, projectOptionsFromViews(views, filter.ProjectQueryValue())), datastar.WithSelectorID("workspaces-header"), datastar.WithModeOuter()); err != nil {
+	if err := sse.PatchElementTempl(WorkspacesHeader(h.refreshState(), filter, projectOptionsFromViews(views, filter.ProjectQueryValue()), workspacesGroupOptions(filter.Group), workspacesSortOptions(filter.Sort)), datastar.WithSelectorID("workspaces-header"), datastar.WithModeOuter()); err != nil {
 		return err
 	}
 	if err := sse.PatchElementTempl(ReleasePanel(panel), datastar.WithSelectorID("release-queue-panel"), datastar.WithModeOuter()); err != nil {
