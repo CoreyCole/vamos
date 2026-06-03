@@ -333,6 +333,8 @@ func ensureImplWorkspaceCleanupProofColumnsIfTableExists(
 		{name: "cleanup_proof_target_commit", definition: "TEXT"},
 		{name: "cleanup_proof_at", definition: "DATETIME"},
 		{name: "cleanup_risk_reason", definition: "TEXT"},
+		{name: "activity_hash", definition: "TEXT NOT NULL DEFAULT ''"},
+		{name: "activity_checked_at", definition: "DATETIME"},
 	} {
 		if err := ensureColumn(ctx, database, "impl_workspaces", column.name, column.definition); err != nil {
 			return err
@@ -405,6 +407,8 @@ func ensureImplWorkspaceCompositePrimaryKey(ctx context.Context, database *sql.D
 			env_last_repaired_at DATETIME,
 			env_last_error TEXT,
 			git_detail TEXT,
+			activity_hash TEXT NOT NULL DEFAULT '',
+			activity_checked_at DATETIME,
 			discovered_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
 			last_discovered_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
 			updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -417,7 +421,7 @@ func ensureImplWorkspaceCompositePrimaryKey(ctx context.Context, database *sql.D
 			merged_at, cleaned_up_at, merge_evidence, cleanup_proof_kind,
 			cleanup_proof_source_ref, cleanup_proof_target_commit, cleanup_proof_at,
 			cleanup_risk_reason, env_last_repaired_at, env_last_error, git_detail,
-			discovered_at, last_discovered_at, updated_at
+			activity_hash, activity_checked_at, discovered_at, last_discovered_at, updated_at
 		)
 		SELECT COALESCE(project_id, ''), workspace_slug, COALESCE(checkout_role, ''), checkout_path,
 			display_name, host, url, plan_dir_rel, plan_dir, status, branch, commit_hash,
@@ -425,8 +429,8 @@ func ensureImplWorkspaceCompositePrimaryKey(ctx context.Context, database *sql.D
 			ahead_count, behind_count, merged_at, cleaned_up_at, merge_evidence,
 			COALESCE(NULLIF(cleanup_proof_kind, ''), 'unknown'), cleanup_proof_source_ref,
 			cleanup_proof_target_commit, cleanup_proof_at, cleanup_risk_reason,
-			env_last_repaired_at, env_last_error, git_detail, discovered_at,
-			last_discovered_at, updated_at
+			env_last_repaired_at, env_last_error, git_detail, activity_hash,
+			activity_checked_at, discovered_at, last_discovered_at, updated_at
 		FROM impl_workspaces`,
 		`DROP TABLE impl_workspaces`,
 		`ALTER TABLE impl_workspaces_new RENAME TO impl_workspaces`,

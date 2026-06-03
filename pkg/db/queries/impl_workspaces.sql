@@ -52,7 +52,8 @@ INSERT INTO impl_workspaces (
     base_branch,
     ahead_count,
     behind_count,
-    git_detail
+    git_detail,
+    activity_hash
 )
 VALUES (
     sqlc.arg('project_id'),
@@ -85,7 +86,8 @@ VALUES (
     sqlc.narg('base_branch'),
     sqlc.arg('ahead_count'),
     sqlc.arg('behind_count'),
-    sqlc.narg('git_detail')
+    sqlc.narg('git_detail'),
+    sqlc.arg('activity_hash')
 )
 ON CONFLICT (project_id, workspace_slug) DO UPDATE SET
 checkout_role = excluded.checkout_role,
@@ -127,7 +129,17 @@ ahead_count = excluded.ahead_count,
 behind_count = excluded.behind_count,
 git_detail = excluded.git_detail,
 last_discovered_at = CURRENT_TIMESTAMP,
-updated_at = CURRENT_TIMESTAMP
+activity_checked_at = CURRENT_TIMESTAMP,
+updated_at = CASE
+WHEN impl_workspaces.status IS NOT excluded.status THEN CURRENT_TIMESTAMP
+WHEN COALESCE (impl_workspaces.activity_hash,
+'') = '' THEN impl_workspaces.updated_at
+WHEN COALESCE (impl_workspaces.activity_hash,
+'') IS NOT COALESCE (excluded.activity_hash,
+'') THEN CURRENT_TIMESTAMP
+ELSE impl_workspaces.updated_at
+END,
+activity_hash = excluded.activity_hash
 RETURNING * ;
 
 -- name: MarkImplWorkspaceCleanedUp :execrows
@@ -177,22 +189,19 @@ cleanup_proof_source_ref = sqlc.narg ('cleanup_proof_source_ref'),
 cleanup_proof_target_commit = NULL,
 cleanup_proof_at = NULL,
 cleanup_risk_reason = sqlc.narg ('cleanup_risk_reason'),
-merge_evidence = sqlc.narg ('merge_evidence'),
-updated_at = CURRENT_TIMESTAMP
+merge_evidence = sqlc.narg ('merge_evidence')
 WHERE project_id = sqlc.arg ('project_id')
 AND workspace_slug = sqlc.arg ('workspace_slug') ;
 
 -- name: RecordImplWorkspaceEnvRepair :exec
 UPDATE impl_workspaces
 SET env_last_repaired_at = CURRENT_TIMESTAMP,
-env_last_error = NULL,
-updated_at = CURRENT_TIMESTAMP
+env_last_error = NULL
 WHERE project_id = sqlc.arg ('project_id')
 AND workspace_slug = sqlc.arg ('workspace_slug') ;
 
 -- name: RecordImplWorkspaceEnvError :exec
 UPDATE impl_workspaces
-SET env_last_error = sqlc.arg ('env_last_error'),
-updated_at = CURRENT_TIMESTAMP
+SET env_last_error = sqlc.arg ('env_last_error')
 WHERE project_id = sqlc.arg ('project_id')
 AND workspace_slug = sqlc.arg ('workspace_slug') ;

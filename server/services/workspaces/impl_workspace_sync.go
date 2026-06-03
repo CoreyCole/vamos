@@ -2,8 +2,11 @@ package workspaces
 
 import (
 	"context"
+	"crypto/sha256"
 	"database/sql"
+	"encoding/hex"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -266,6 +269,7 @@ func implWorkspaceUpsertParams(
 	gitState ImplWorkspaceGitState,
 	binding PlanWorkspaceBinding,
 ) db.UpsertDiscoveredImplWorkspaceParams {
+	ws.ProjectID = firstNonEmpty(ws.ProjectID, projectID)
 	status := string(ImplWorkspaceStatusActive)
 	mergeEvidence := sql.NullString{}
 	proof := gitState.MergeProof
@@ -302,6 +306,7 @@ func implWorkspaceUpsertParams(
 	params.BottomParentBranch = nullableString(gitState.BottomParent)
 	params.BaseBranch = nullableString(gitState.BaseBranch)
 	params.GitDetail = nullableString(gitState.Detail)
+	params.ActivityHash = workspaceActivityHash(ws, gitState, binding)
 	if !proof.ProvenAt.IsZero() {
 		params.CleanupProofAt = sql.NullTime{Time: proof.ProvenAt, Valid: true}
 	}
@@ -310,6 +315,33 @@ func implWorkspaceUpsertParams(
 		params.PlanDir = nullableString(binding.PlanDir)
 	}
 	return params
+}
+
+func workspaceActivityHash(
+	ws Workspace,
+	gitState ImplWorkspaceGitState,
+	binding PlanWorkspaceBinding,
+) string {
+	parts := []string{
+		"project=" + strings.TrimSpace(ws.ProjectID),
+		"slug=" + strings.TrimSpace(ws.Slug),
+		"checkout_role=" + strings.TrimSpace(string(ws.CheckoutRole)),
+		"checkout_path=" + cleanPathKey(ws.CheckoutPath),
+		"branch=" + strings.TrimSpace(firstNonEmpty(gitState.Branch, ws.Branch)),
+		"commit=" + strings.TrimSpace(firstNonEmpty(gitState.Commit, ws.Commit)),
+		"trunk=" + strings.TrimSpace(gitState.TrunkBranch),
+		"top=" + strings.TrimSpace(gitState.TopBranch),
+		"bottom=" + strings.TrimSpace(gitState.BottomBranch),
+		"bottom_parent=" + strings.TrimSpace(gitState.BottomParent),
+		"base=" + strings.TrimSpace(gitState.BaseBranch),
+		fmt.Sprintf("ahead=%d", gitState.AheadCount),
+		fmt.Sprintf("behind=%d", gitState.BehindCount),
+		"git_detail=" + strings.TrimSpace(gitState.Detail),
+		"plan_dir=" + strings.TrimSpace(binding.PlanDir),
+		"binding_project=" + strings.TrimSpace(binding.ProjectID),
+	}
+	h := sha256.Sum256([]byte(strings.Join(parts, "\x00")))
+	return hex.EncodeToString(h[:])
 }
 
 func activeCheckoutMergeEvidence(commit string, proof MergeProof) string {
@@ -514,6 +546,7 @@ func implWorkspaceRowChanged(before, after db.ImplWorkspace) bool {
 		!nullStringsEqual(before.CleanupProofTargetCommit, after.CleanupProofTargetCommit) ||
 		!nullStringsEqual(before.CleanupRiskReason, after.CleanupRiskReason) ||
 		!nullStringsEqual(before.GitDetail, after.GitDetail) ||
+		before.ActivityHash != after.ActivityHash ||
 		!nullTimesEqual(before.MergedAt, after.MergedAt)
 }
 

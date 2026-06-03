@@ -320,6 +320,8 @@ type ImplWorkspace struct {
 	EnvLastRepairedAt        sql.NullTime   `json:"env_last_repaired_at"`
 	EnvLastError             sql.NullString `json:"env_last_error"`
 	GitDetail                sql.NullString `json:"git_detail"`
+	ActivityHash             string         `json:"activity_hash"`
+	ActivityCheckedAt        sql.NullTime   `json:"activity_checked_at"`
 	DiscoveredAt             time.Time      `json:"discovered_at"`
 	LastDiscoveredAt         time.Time      `json:"last_discovered_at"`
 	UpdatedAt                time.Time      `json:"updated_at"`

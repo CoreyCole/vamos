@@ -45,6 +45,103 @@ func TestImplWorkspaceProofFieldsRoundTrip(t *testing.T) {
 	}
 }
 
+func TestImplWorkspaceActivityTimestampsIgnoreMaintenanceChurn(t *testing.T) {
+	ctx := context.Background()
+	dbConn, queries := openImplSyncTestDB(t)
+	oldUpdatedAt := time.Date(2000, 1, 2, 3, 4, 5, 0, time.UTC)
+
+	upsert := func(activityHash, branch string) db.ImplWorkspace {
+		t.Helper()
+		row, err := queries.UpsertDiscoveredImplWorkspace(ctx, db.UpsertDiscoveredImplWorkspaceParams{
+			ProjectID:        "vamos",
+			WorkspaceSlug:    "activity",
+			CheckoutPath:     "/tmp/activity",
+			DisplayName:      "Activity",
+			Host:             "activity.workspaces.example.test",
+			Url:              "https://activity.workspaces.example.test/",
+			Status:           string(ImplWorkspaceStatusActive),
+			Branch:           nullableString(branch),
+			CommitHash:       nullableString("abc123"),
+			CleanupProofKind: "unknown",
+			ActivityHash:     activityHash,
+		})
+		if err != nil {
+			t.Fatalf("UpsertDiscoveredImplWorkspace(%q): %v", activityHash, err)
+		}
+		return row
+	}
+
+	upsert("", "main")
+	if _, err := dbConn.ExecContext(ctx, `UPDATE impl_workspaces SET updated_at = ?, activity_hash = '', activity_checked_at = NULL WHERE project_id = 'vamos' AND workspace_slug = 'activity'`, oldUpdatedAt); err != nil {
+		t.Fatalf("seed old updated_at: %v", err)
+	}
+
+	row := upsert("hash-1", "main")
+	if row.ActivityHash != "hash-1" || !row.ActivityCheckedAt.Valid {
+		t.Fatalf("activity fields = hash %q checked %+v, want hash-1 and checked timestamp", row.ActivityHash, row.ActivityCheckedAt)
+	}
+	if !row.UpdatedAt.Equal(oldUpdatedAt) {
+		t.Fatalf("first activity hash seed updated_at = %s, want preserved %s", row.UpdatedAt, oldUpdatedAt)
+	}
+
+	row = upsert("hash-1", "main")
+	if !row.UpdatedAt.Equal(oldUpdatedAt) {
+		t.Fatalf("unchanged activity hash updated_at = %s, want preserved %s", row.UpdatedAt, oldUpdatedAt)
+	}
+
+	row = upsert("hash-2", "feature")
+	if !row.UpdatedAt.After(oldUpdatedAt) {
+		t.Fatalf("changed activity hash updated_at = %s, want after %s", row.UpdatedAt, oldUpdatedAt)
+	}
+
+	setOldUpdatedAt := func() {
+		t.Helper()
+		if _, err := dbConn.ExecContext(ctx, `UPDATE impl_workspaces SET status = 'active', updated_at = ? WHERE project_id = 'vamos' AND workspace_slug = 'activity'`, oldUpdatedAt); err != nil {
+			t.Fatalf("reset old updated_at: %v", err)
+		}
+	}
+	assertOldUpdatedAt := func(label string) {
+		t.Helper()
+		row, err := queries.GetImplWorkspace(ctx, db.GetImplWorkspaceParams{ProjectID: "vamos", WorkspaceSlug: "activity"})
+		if err != nil {
+			t.Fatalf("GetImplWorkspace after %s: %v", label, err)
+		}
+		if !row.UpdatedAt.Equal(oldUpdatedAt) {
+			t.Fatalf("%s updated_at = %s, want preserved %s", label, row.UpdatedAt, oldUpdatedAt)
+		}
+	}
+
+	setOldUpdatedAt()
+	if err := queries.RecordImplWorkspaceEnvRepair(ctx, db.RecordImplWorkspaceEnvRepairParams{ProjectID: "vamos", WorkspaceSlug: "activity"}); err != nil {
+		t.Fatalf("RecordImplWorkspaceEnvRepair: %v", err)
+	}
+	assertOldUpdatedAt("env repair")
+
+	setOldUpdatedAt()
+	if err := queries.RecordImplWorkspaceEnvError(ctx, db.RecordImplWorkspaceEnvErrorParams{ProjectID: "vamos", WorkspaceSlug: "activity", EnvLastError: nullableString("broken env")}); err != nil {
+		t.Fatalf("RecordImplWorkspaceEnvError: %v", err)
+	}
+	assertOldUpdatedAt("env error")
+
+	setOldUpdatedAt()
+	if _, err := queries.MarkImplWorkspaceMergeUnknown(ctx, db.MarkImplWorkspaceMergeUnknownParams{ProjectID: "vamos", WorkspaceSlug: "activity", CleanupRiskReason: nullableString("not proven")}); err != nil {
+		t.Fatalf("MarkImplWorkspaceMergeUnknown: %v", err)
+	}
+	assertOldUpdatedAt("merge unknown")
+
+	setOldUpdatedAt()
+	if _, err := queries.MarkImplWorkspaceMerged(ctx, db.MarkImplWorkspaceMergedParams{ProjectID: "vamos", WorkspaceSlug: "activity", MergeEvidence: nullableString("active checkout HEAD abc123 is ancestor of origin/main"), CleanupProofKind: "ancestor"}); err != nil {
+		t.Fatalf("MarkImplWorkspaceMerged: %v", err)
+	}
+	row, err := queries.GetImplWorkspace(ctx, db.GetImplWorkspaceParams{ProjectID: "vamos", WorkspaceSlug: "activity"})
+	if err != nil {
+		t.Fatalf("GetImplWorkspace after merge: %v", err)
+	}
+	if !row.UpdatedAt.After(oldUpdatedAt) {
+		t.Fatalf("merge lifecycle updated_at = %s, want after %s", row.UpdatedAt, oldUpdatedAt)
+	}
+}
+
 func TestImplWorkspaceCleanedUpMarksMergedRows(t *testing.T) {
 	ctx := context.Background()
 	queries := openImplSyncTestQueries(t)
@@ -870,6 +967,12 @@ func TestImplWorkspaceSyncerAttachesPlanBinding(t *testing.T) {
 
 func openImplSyncTestQueries(t *testing.T) *db.Queries {
 	t.Helper()
+	_, queries := openImplSyncTestDB(t)
+	return queries
+}
+
+func openImplSyncTestDB(t *testing.T) (*sql.DB, *db.Queries) {
+	t.Helper()
 	dbConn, err := sql.Open("sqlite", ":memory:")
 	if err != nil {
 		t.Fatalf("open sqlite: %v", err)
@@ -883,7 +986,7 @@ func openImplSyncTestQueries(t *testing.T) *db.Queries {
 	if _, err := dbConn.Exec(string(schema)); err != nil {
 		t.Fatalf("exec schema: %v", err)
 	}
-	return db.New(dbConn)
+	return dbConn, db.New(dbConn)
 }
 
 func makeImplSyncCheckout(t *testing.T, parent, name string) string {

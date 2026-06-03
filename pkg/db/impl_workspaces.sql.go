@@ -12,7 +12,7 @@ import (
 )
 
 const getImplWorkspace = `-- name: GetImplWorkspace :one
-SELECT project_id, workspace_slug, checkout_role, checkout_path, display_name, host, url, plan_dir_rel, plan_dir, status, branch, commit_hash, trunk_branch, top_branch, bottom_branch, bottom_parent_branch, base_branch, ahead_count, behind_count, merged_at, cleaned_up_at, merge_evidence, cleanup_proof_kind, cleanup_proof_source_ref, cleanup_proof_target_commit, cleanup_proof_at, cleanup_risk_reason, env_last_repaired_at, env_last_error, git_detail, discovered_at, last_discovered_at, updated_at
+SELECT project_id, workspace_slug, checkout_role, checkout_path, display_name, host, url, plan_dir_rel, plan_dir, status, branch, commit_hash, trunk_branch, top_branch, bottom_branch, bottom_parent_branch, base_branch, ahead_count, behind_count, merged_at, cleaned_up_at, merge_evidence, cleanup_proof_kind, cleanup_proof_source_ref, cleanup_proof_target_commit, cleanup_proof_at, cleanup_risk_reason, env_last_repaired_at, env_last_error, git_detail, activity_hash, activity_checked_at, discovered_at, last_discovered_at, updated_at
 FROM impl_workspaces
 WHERE
     project_id = ?1
@@ -58,6 +58,8 @@ func (q *Queries) GetImplWorkspace(ctx context.Context, arg GetImplWorkspacePara
 		&i.EnvLastRepairedAt,
 		&i.EnvLastError,
 		&i.GitDetail,
+		&i.ActivityHash,
+		&i.ActivityCheckedAt,
 		&i.DiscoveredAt,
 		&i.LastDiscoveredAt,
 		&i.UpdatedAt,
@@ -66,7 +68,7 @@ func (q *Queries) GetImplWorkspace(ctx context.Context, arg GetImplWorkspacePara
 }
 
 const listActiveImplWorkspaces = `-- name: ListActiveImplWorkspaces :many
-SELECT project_id, workspace_slug, checkout_role, checkout_path, display_name, host, url, plan_dir_rel, plan_dir, status, branch, commit_hash, trunk_branch, top_branch, bottom_branch, bottom_parent_branch, base_branch, ahead_count, behind_count, merged_at, cleaned_up_at, merge_evidence, cleanup_proof_kind, cleanup_proof_source_ref, cleanup_proof_target_commit, cleanup_proof_at, cleanup_risk_reason, env_last_repaired_at, env_last_error, git_detail, discovered_at, last_discovered_at, updated_at
+SELECT project_id, workspace_slug, checkout_role, checkout_path, display_name, host, url, plan_dir_rel, plan_dir, status, branch, commit_hash, trunk_branch, top_branch, bottom_branch, bottom_parent_branch, base_branch, ahead_count, behind_count, merged_at, cleaned_up_at, merge_evidence, cleanup_proof_kind, cleanup_proof_source_ref, cleanup_proof_target_commit, cleanup_proof_at, cleanup_risk_reason, env_last_repaired_at, env_last_error, git_detail, activity_hash, activity_checked_at, discovered_at, last_discovered_at, updated_at
 FROM impl_workspaces
 WHERE status = 'active'
 ORDER BY LOWER(display_name), project_id, workspace_slug
@@ -112,6 +114,8 @@ func (q *Queries) ListActiveImplWorkspaces(ctx context.Context) ([]ImplWorkspace
 			&i.EnvLastRepairedAt,
 			&i.EnvLastError,
 			&i.GitDetail,
+			&i.ActivityHash,
+			&i.ActivityCheckedAt,
 			&i.DiscoveredAt,
 			&i.LastDiscoveredAt,
 			&i.UpdatedAt,
@@ -130,7 +134,7 @@ func (q *Queries) ListActiveImplWorkspaces(ctx context.Context) ([]ImplWorkspace
 }
 
 const listImplWorkspaces = `-- name: ListImplWorkspaces :many
-SELECT project_id, workspace_slug, checkout_role, checkout_path, display_name, host, url, plan_dir_rel, plan_dir, status, branch, commit_hash, trunk_branch, top_branch, bottom_branch, bottom_parent_branch, base_branch, ahead_count, behind_count, merged_at, cleaned_up_at, merge_evidence, cleanup_proof_kind, cleanup_proof_source_ref, cleanup_proof_target_commit, cleanup_proof_at, cleanup_risk_reason, env_last_repaired_at, env_last_error, git_detail, discovered_at, last_discovered_at, updated_at
+SELECT project_id, workspace_slug, checkout_role, checkout_path, display_name, host, url, plan_dir_rel, plan_dir, status, branch, commit_hash, trunk_branch, top_branch, bottom_branch, bottom_parent_branch, base_branch, ahead_count, behind_count, merged_at, cleaned_up_at, merge_evidence, cleanup_proof_kind, cleanup_proof_source_ref, cleanup_proof_target_commit, cleanup_proof_at, cleanup_risk_reason, env_last_repaired_at, env_last_error, git_detail, activity_hash, activity_checked_at, discovered_at, last_discovered_at, updated_at
 FROM impl_workspaces
 WHERE
     CAST(?1 AS TEXT) = ''
@@ -183,6 +187,8 @@ func (q *Queries) ListImplWorkspaces(ctx context.Context, projectID string) ([]I
 			&i.EnvLastRepairedAt,
 			&i.EnvLastError,
 			&i.GitDetail,
+			&i.ActivityHash,
+			&i.ActivityCheckedAt,
 			&i.DiscoveredAt,
 			&i.LastDiscoveredAt,
 			&i.UpdatedAt,
@@ -252,8 +258,7 @@ cleanup_proof_source_ref = ?1,
 cleanup_proof_target_commit = NULL,
 cleanup_proof_at = NULL,
 cleanup_risk_reason = ?2,
-merge_evidence = ?3,
-updated_at = CURRENT_TIMESTAMP
+merge_evidence = ?3
 WHERE project_id = ?4
 AND workspace_slug = ?5
 `
@@ -356,8 +361,7 @@ const recordImplWorkspaceEnvError = `-- name: RecordImplWorkspaceEnvError :exec
 ;
 
 UPDATE impl_workspaces
-SET env_last_error = ?1,
-updated_at = CURRENT_TIMESTAMP
+SET env_last_error = ?1
 WHERE project_id = ?2
 AND workspace_slug = ?3
 `
@@ -378,8 +382,7 @@ const recordImplWorkspaceEnvRepair = `-- name: RecordImplWorkspaceEnvRepair :exe
 
 UPDATE impl_workspaces
 SET env_last_repaired_at = CURRENT_TIMESTAMP,
-env_last_error = NULL,
-updated_at = CURRENT_TIMESTAMP
+env_last_error = NULL
 WHERE project_id = ?1
 AND workspace_slug = ?2
 `
@@ -422,7 +425,8 @@ INSERT INTO impl_workspaces (
     base_branch,
     ahead_count,
     behind_count,
-    git_detail
+    git_detail,
+    activity_hash
 )
 VALUES (
     ?1,
@@ -455,7 +459,8 @@ VALUES (
     ?23,
     ?24,
     ?25,
-    ?26
+    ?26,
+    ?27
 )
 ON CONFLICT (project_id, workspace_slug) DO UPDATE SET
 checkout_role = excluded.checkout_role,
@@ -497,8 +502,18 @@ ahead_count = excluded.ahead_count,
 behind_count = excluded.behind_count,
 git_detail = excluded.git_detail,
 last_discovered_at = CURRENT_TIMESTAMP,
-updated_at = CURRENT_TIMESTAMP
-RETURNING project_id, workspace_slug, checkout_role, checkout_path, display_name, host, url, plan_dir_rel, plan_dir, status, branch, commit_hash, trunk_branch, top_branch, bottom_branch, bottom_parent_branch, base_branch, ahead_count, behind_count, merged_at, cleaned_up_at, merge_evidence, cleanup_proof_kind, cleanup_proof_source_ref, cleanup_proof_target_commit, cleanup_proof_at, cleanup_risk_reason, env_last_repaired_at, env_last_error, git_detail, discovered_at, last_discovered_at, updated_at
+activity_checked_at = CURRENT_TIMESTAMP,
+updated_at = CASE
+WHEN impl_workspaces.status IS NOT excluded.status THEN CURRENT_TIMESTAMP
+WHEN COALESCE (impl_workspaces.activity_hash,
+'') = '' THEN impl_workspaces.updated_at
+WHEN COALESCE (impl_workspaces.activity_hash,
+'') IS NOT COALESCE (excluded.activity_hash,
+'') THEN CURRENT_TIMESTAMP
+ELSE impl_workspaces.updated_at
+END,
+activity_hash = excluded.activity_hash
+RETURNING project_id, workspace_slug, checkout_role, checkout_path, display_name, host, url, plan_dir_rel, plan_dir, status, branch, commit_hash, trunk_branch, top_branch, bottom_branch, bottom_parent_branch, base_branch, ahead_count, behind_count, merged_at, cleaned_up_at, merge_evidence, cleanup_proof_kind, cleanup_proof_source_ref, cleanup_proof_target_commit, cleanup_proof_at, cleanup_risk_reason, env_last_repaired_at, env_last_error, git_detail, activity_hash, activity_checked_at, discovered_at, last_discovered_at, updated_at
 `
 
 type UpsertDiscoveredImplWorkspaceParams struct {
@@ -528,6 +543,7 @@ type UpsertDiscoveredImplWorkspaceParams struct {
 	AheadCount               int64          `json:"ahead_count"`
 	BehindCount              int64          `json:"behind_count"`
 	GitDetail                sql.NullString `json:"git_detail"`
+	ActivityHash             string         `json:"activity_hash"`
 }
 
 func (q *Queries) UpsertDiscoveredImplWorkspace(ctx context.Context, arg UpsertDiscoveredImplWorkspaceParams) (ImplWorkspace, error) {
@@ -558,6 +574,7 @@ func (q *Queries) UpsertDiscoveredImplWorkspace(ctx context.Context, arg UpsertD
 		arg.AheadCount,
 		arg.BehindCount,
 		arg.GitDetail,
+		arg.ActivityHash,
 	)
 	var i ImplWorkspace
 	err := row.Scan(
@@ -591,6 +608,8 @@ func (q *Queries) UpsertDiscoveredImplWorkspace(ctx context.Context, arg UpsertD
 		&i.EnvLastRepairedAt,
 		&i.EnvLastError,
 		&i.GitDetail,
+		&i.ActivityHash,
+		&i.ActivityCheckedAt,
 		&i.DiscoveredAt,
 		&i.LastDiscoveredAt,
 		&i.UpdatedAt,
