@@ -136,14 +136,44 @@ func SeedMultiProjectPlanFilteringFixture(primaryProject, relatedProject string)
 		defer database.Close()
 		seedMultiProjectPlanWorkspace(t, ctx, database, primaryProject, relatedProject)
 		seedPrimaryOnlyPlanWorkspace(t, ctx, database, primaryProject)
+		seedWorkspacesTableFilterRows(t, ctx, database, primaryProject)
 	})
 }
 
+type WorkspacesStoryFilters struct {
+	Project string
+	Query   string
+	History string
+	Group   string
+	Sort    string
+}
+
 func OpenWorkspacesWithProjectFilter(projectID string) spec.Step {
-	return customStep("open workspaces filtered by "+projectID, func(t testing.TB, ctx *duiruntime.Context) {
+	return OpenWorkspacesWithFilters(WorkspacesStoryFilters{Project: projectID})
+}
+
+func OpenWorkspacesWithFilters(filters WorkspacesStoryFilters) spec.Step {
+	return customStep("open workspaces with filters", func(t testing.TB, ctx *duiruntime.Context) {
 		values := url.Values{}
-		values.Set("project", projectID)
-		p := "/workspaces?" + values.Encode()
+		if filters.Project != "" {
+			values.Set("project", filters.Project)
+		}
+		if filters.Query != "" {
+			values.Set("q", filters.Query)
+		}
+		if filters.History != "" {
+			values.Set("history", filters.History)
+		}
+		if filters.Group != "" {
+			values.Set("group", filters.Group)
+		}
+		if filters.Sort != "" {
+			values.Set("sort", filters.Sort)
+		}
+		p := "/workspaces"
+		if encoded := values.Encode(); encoded != "" {
+			p += "?" + encoded
+		}
 		authURL, err := BuildAuthURL(ctx.Config, p)
 		if err != nil {
 			t.Fatal(err)
@@ -155,6 +185,45 @@ func OpenWorkspacesWithProjectFilter(projectID string) spec.Step {
 			t.Fatalf("workspaces list did not render: %v", err)
 		}
 	})
+}
+
+func ExpectWorkspaceVisible(label string) expectation {
+	return expectation{customStep("workspace visible "+label, func(t testing.TB, ctx *duiruntime.Context) {
+		if err := ctx.Page.Locator("#workspaces-list").GetByText(label).First().WaitFor(); err != nil {
+			bodyText, _ := ctx.Page.Locator("body").InnerText()
+			if len(bodyText) > 2000 {
+				bodyText = bodyText[:2000]
+			}
+			t.Fatalf("workspace %q not visible: %v\nbody:\n%s", label, err, bodyText)
+		}
+	})}
+}
+
+func ExpectWorkspaceHidden(label string) expectation {
+	return expectation{customStep("workspace hidden "+label, func(t testing.TB, ctx *duiruntime.Context) {
+		count, err := ctx.Page.Locator("#workspaces-list").GetByText(label).Count()
+		if err != nil {
+			t.Fatalf("workspace %q count: %v", label, err)
+		}
+		if count != 0 {
+			t.Fatalf("workspace %q visible, want hidden", label)
+		}
+	})}
+}
+
+func ExpectWorkspacesURLContains(params map[string]string) expectation {
+	return expectation{customStep("workspaces URL contains filters", func(t testing.TB, ctx *duiruntime.Context) {
+		parsed, err := url.Parse(ctx.Page.URL())
+		if err != nil {
+			t.Fatal(err)
+		}
+		values := parsed.Query()
+		for key, want := range params {
+			if got := values.Get(key); got != want {
+				t.Fatalf("URL query %s = %q, want %q in %s", key, got, want, ctx.Page.URL())
+			}
+		}
+	})}
 }
 
 func ExpectProjectFilteredPlanVisible(surface, primaryProject, relatedProject string) expectation {
@@ -1306,6 +1375,24 @@ func seedPlanWorkspaceProjectRole(t testing.TB, database *sql.DB, rel, projectID
 	execSQL(t, database, `INSERT INTO plan_workspace_projects (plan_dir_rel, project_id, role, declared_source)
 VALUES (?, ?, ?, 'e2e')
 ON CONFLICT(plan_dir_rel, project_id) DO UPDATE SET role = excluded.role, declared_source = excluded.declared_source, archived_at = NULL, last_discovered_at = CURRENT_TIMESTAMP`, rel, projectID, role)
+}
+
+func seedWorkspacesTableFilterRows(t testing.TB, ctx *duiruntime.Context, database *sql.DB, projectID string) {
+	t.Helper()
+	seedImplWorkspaceRow(t, ctx, database, projectID, "e2e-active-workspace", "E2E Active Workspace", "active")
+	seedImplWorkspaceRow(t, ctx, database, projectID, "e2e-merged-history", "E2E Merged History", "merged")
+	seedImplWorkspaceRow(t, ctx, database, projectID, "e2e-cleaned-history", "E2E Cleaned History", "cleaned_up")
+}
+
+func seedImplWorkspaceRow(t testing.TB, ctx *duiruntime.Context, database *sql.DB, projectID, slug, displayName, status string) {
+	t.Helper()
+	checkout := filepath.Join(ctx.Config.RepoRoot, ".e2e-workspaces", slug)
+	if err := os.MkdirAll(checkout, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	execSQL(t, database, `INSERT INTO impl_workspaces (project_id, workspace_slug, checkout_path, display_name, host, url, status, branch, commit_hash, trunk_branch, activity_hash)
+VALUES (?, ?, ?, ?, ?, ?, ?, 'main', 'e2ecommit', 'main', ?)
+ON CONFLICT(project_id, workspace_slug) DO UPDATE SET checkout_path = excluded.checkout_path, display_name = excluded.display_name, host = excluded.host, url = excluded.url, status = excluded.status, branch = excluded.branch, commit_hash = excluded.commit_hash, trunk_branch = excluded.trunk_branch, activity_hash = excluded.activity_hash, updated_at = CURRENT_TIMESTAMP`, projectID, slug, checkout, displayName, slug+".workspaces.e2e", "https://"+slug+".workspaces.e2e/", status, "e2e-activity-"+slug)
 }
 
 func seedPlanWorkspaceBinding(t testing.TB, ctx *duiruntime.Context, database *sql.DB, rel, planDir, projectID, status string) {

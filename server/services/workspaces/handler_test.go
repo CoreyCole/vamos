@@ -1827,7 +1827,7 @@ func TestHandleWorkspacesPageHidesCleanedRowsByDefault(t *testing.T) {
 		t.Fatalf("HandleWorkspacesPage() error = %v", err)
 	}
 	html := rec.Body.String()
-	for _, want := range []string{"Active Workspace", "Show cleaned history", "Needs attention"} {
+	for _, want := range []string{"Active Workspace", "Show history", "Needs attention"} {
 		if !strings.Contains(html, want) {
 			t.Fatalf("default page missing %q: %s", want, html)
 		}
@@ -1879,7 +1879,7 @@ func TestHandleWorkspacesPageShowsHistoricalRowsWhenRequested(t *testing.T) {
 		"Historical workspace",
 		"Merged",
 		"Cleaned up",
-		"Hide cleaned history",
+		"Hide history",
 	} {
 		if !strings.Contains(html, want) {
 			t.Fatalf("historical page missing %q: %s", want, html)

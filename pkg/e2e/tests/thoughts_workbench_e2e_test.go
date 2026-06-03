@@ -78,6 +78,33 @@ func TestThoughtsWorkbench_WorkspacesPageProjectFilterIncludesRelatedPlans(t *te
 		Run()
 }
 
+func TestThoughtsWorkbench_WorkspacesPageSearchHistoryAndProjectFilters(t *testing.T) {
+	spec.Story(t, "thoughts workbench workspaces page search history and filters").
+		App(vamos.App()).
+		As(vamos.Robot).
+		Do(vamos.SeedMultiProjectPlanFilteringFixture("vamos", "datastarui")).
+		Do(vamos.OpenWorkspacesWithFilters(vamos.WorkspacesStoryFilters{})).
+		Expect(vamos.ExpectWorkspaceVisible("E2E Active Workspace")).
+		Expect(vamos.ExpectWorkspaceHidden("E2E Merged History")).
+		Expect(vamos.ExpectWorkspaceHidden("E2E Cleaned History")).
+		Do(vamos.OpenWorkspacesWithFilters(vamos.WorkspacesStoryFilters{History: "all"})).
+		Expect(vamos.ExpectWorkspaceVisible("E2E Merged History")).
+		Expect(vamos.ExpectWorkspaceVisible("E2E Cleaned History")).
+		Do(vamos.OpenWorkspacesWithFilters(vamos.WorkspacesStoryFilters{Project: "datastarui", Query: "multi-project"})).
+		Expect(vamos.ExpectProjectFilteredPlanBadgesVisible("workspaces page", "vamos", "datastarui")).
+		Expect(vamos.ExpectWorkspaceHidden("E2E Primary Only Plan")).
+		Expect(vamos.ExpectWorkspacesURLContains(map[string]string{"project": "datastarui", "q": "multi-project"})).
+		Do(vamos.OpenWorkspacesWithFilters(vamos.WorkspacesStoryFilters{Project: "vamos", Query: "primary-only"})).
+		Expect(vamos.ExpectWorkspaceVisible("E2E Primary Only Plan")).
+		Expect(vamos.ExpectWorkspaceHidden("E2E datastarui workspace")).
+		Expect(vamos.ExpectWorkspacesURLContains(map[string]string{"project": "vamos", "q": "primary-only"})).
+		Do(vamos.OpenWorkspacesWithFilters(vamos.WorkspacesStoryFilters{Project: "vamos", Query: "active"})).
+		Expect(vamos.ExpectWorkspaceVisible("E2E Active Workspace")).
+		Expect(vamos.ExpectWorkspaceHidden("E2E datastarui workspace")).
+		Expect(vamos.ExpectWorkspacesURLContains(map[string]string{"project": "vamos", "q": "active"})).
+		Run()
+}
+
 func TestThoughtsWorkbench_WorkbenchRegionsRemainUsableAcrossViewportClassesMobile(t *testing.T) {
 	runWorkbenchRegionsRemainUsable(t, duiruntime.ViewportMobile, "/")
 }
