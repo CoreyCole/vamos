@@ -7,12 +7,14 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"path/filepath"
 	"testing"
 	"time"
 
 	"github.com/labstack/echo/v4"
 
 	"github.com/CoreyCole/vamos/pkg/auth/agentbrowser"
+	dbsvc "github.com/CoreyCole/vamos/server/services/db"
 )
 
 func TestAgentBrowserMintAndLoginSetsSessionCookie(t *testing.T) {
@@ -104,6 +106,63 @@ func TestAgentBrowserMintAndLoginSetsSessionCookie(t *testing.T) {
 	}
 	if session.UserEmail != "agent@example.test" {
 		t.Fatalf("expected agent email, got %q", session.UserEmail)
+	}
+}
+
+func TestSQLMachineCredentialSurvivesRestartAndMintsBrowserToken(t *testing.T) {
+	t.Parallel()
+
+	publicKey, privateKey, err := ed25519.GenerateKey(nil)
+	if err != nil {
+		t.Fatalf("GenerateKey returned error: %v", err)
+	}
+	dbPath := filepath.Join(t.TempDir(), "agents.db")
+	svc, err := dbsvc.NewService(dbPath)
+	if err != nil {
+		t.Fatalf("NewService returned error: %v", err)
+	}
+	created, err := NewSQLMachineCredentialStore(svc.Queries).Create(t.Context(), CreateMachineCredentialInput{
+		DefaultActorEmail: "agent@example.test",
+		AllowedSlugs:      []string{"stage"},
+		AllowedPurposes:   []agentbrowser.Purpose{agentbrowser.PurposeE2EPlaywright},
+	})
+	if err != nil {
+		t.Fatalf("Create returned error: %v", err)
+	}
+	if err := svc.Close(); err != nil {
+		t.Fatalf("Close returned error: %v", err)
+	}
+
+	reopened, err := dbsvc.NewService(dbPath)
+	if err != nil {
+		t.Fatalf("reopen NewService returned error: %v", err)
+	}
+	defer reopened.Close()
+
+	e := echo.New()
+	RegisterAgentBrowserAuthRoutes(e, newPlaywrightAuthTestService(t), AgentBrowserAuthConfig{
+		Enabled:            true,
+		WorkspaceSlug:      "stage",
+		SigningKey:         privateKey,
+		VerifyKey:          publicKey,
+		MachineCredentials: NewSQLMachineCredentialStore(reopened.Queries),
+		Replay:             agentbrowser.NewMemoryReplayCache(),
+	})
+	body := bytes.NewBufferString(`{"slug":"stage","purpose":"e2e_playwright","redirect_path":"/","ttl_seconds":60}`)
+	req := httptest.NewRequest(http.MethodPost, "/internal/agent-auth/mint-browser-token", body)
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer vamos_machine_"+created.Credential.ID+"."+created.Secret)
+	rec := httptest.NewRecorder()
+	e.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected mint status 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	var resp BrowserTokenResponse
+	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+		t.Fatalf("Decode response returned error: %v", err)
+	}
+	if resp.Token == "" || resp.ExpiresAt.IsZero() {
+		t.Fatalf("expected token and expiry, got %+v", resp)
 	}
 }
 

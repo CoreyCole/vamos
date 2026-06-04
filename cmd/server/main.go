@@ -802,7 +802,6 @@ func main() {
 		if derived, ok := agentBrowserSigningKey.Public().(ed25519.PublicKey); ok {
 			agentBrowserVerifyKey = derived
 		}
-		agentBrowserMachineCredentials = auth.NewMemoryMachineCredentialStore()
 	case "child":
 		handoffSigner, err = workspaces.NewHandoffVerifierFromVerifyKey(
 			cfg.DevAuthVerifyKey,
@@ -969,6 +968,10 @@ func main() {
 	defer dbService.Close()
 
 	fmt.Printf("Database initialized at: %s\n", cfg.DatabasePath)
+
+	if cfg.WorkspaceMode == "manager" {
+		agentBrowserMachineCredentials = auth.NewSQLMachineCredentialStore(dbService.Queries)
+	}
 
 	// Create auth service
 	authService, err := auth.NewService(
