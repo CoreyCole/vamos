@@ -18,12 +18,26 @@ Browser E2E authenticates through the app endpoint with a short-lived manager-mi
 GET /internal/agent-auth/browser-login?purpose=e2e_playwright&token=<minted>&redirect=<path>
 ```
 
-Configure a manager-issued machine credential once, then mint an E2E token for each run window:
+Create a manager-issued machine credential once in the manager SQLite DB, store it on the runner, then mint an E2E token for each run window:
 
 ```bash
+# Manager host.
+vamos auth create-machine-key \
+  --database-path <manager-agents.db> \
+  --manager-url <manager-url> \
+  --name e2e-runner \
+  --email agent@example.test \
+  --slug <slug> \
+  --purpose e2e_playwright \
+  --purpose verify
+
+# Runner/client machine, using the printed key id and one-time secret.
 vamos auth login-machine --manager-url <manager-url> --key-id <id> --secret <secret>
+vamos auth status --slug <slug>
 eval "$(vamos auth playwright-env --slug <slug>)"
 ```
+
+Add `--purpose hermes_chat` when the same credential will also be used for `vamos chat`.
 
 Vamos Go Story auth helpers read `VAMOS_E2E_AUTH_TOKEN` and visit `/internal/agent-auth/browser-login` before scenario steps. Public workspace URLs require a minted token. Run stories with the local `just e2e` recipe; it delegates to `../datastarui/scripts/datastarui.sh` with this checkout's `datastarui-e2e.yml`. The script rebuilds the stable launcher `../datastarui/bin/datastarui` only when launcher sources change. The launcher builds `../datastarui/bin/datastarui-runtime-<hash>` when DatastarUI CLI/E2E sources change, then execs that runtime.
 

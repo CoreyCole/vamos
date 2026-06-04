@@ -67,7 +67,7 @@ func EnsureE2EAuthToken(ctx context.Context, cfg WorkspaceVerifyConfig) (string,
 func (m managerE2ETokenMinter) MintE2EToken(ctx context.Context, cfg WorkspaceVerifyConfig) (string, error) {
 	profile, secret, err := loadMachineProfile(cfg.MachineProfile)
 	if err != nil {
-		return "", fmt.Errorf("playwright auth token missing; run vamos auth login-machine, then eval \"$(vamos auth playwright-env --slug %s)\": %w", cfg.Slug, err)
+		return "", fmt.Errorf("playwright auth token missing; run vamos auth create-machine-key on the manager, then vamos auth login-machine and eval \"$(vamos auth playwright-env --slug %s)\": %w", cfg.Slug, err)
 	}
 	managerURL := strings.TrimRight(strings.TrimSpace(firstNonEmpty(cfg.ManagerURL, profile.ManagerURL, cfg.BaseURL)), "/")
 	if managerURL == "" {

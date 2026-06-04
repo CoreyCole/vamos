@@ -37,7 +37,7 @@ This is the standard Vamos verification entrypoint. `/q-verify` must read this f
 
    - Required for browser-facing changes before human testing.
    - Browser E2E must run against the same public feature URL the human will test. Pass that exact URL with `--base-url`; do not use a different local server unless the human will also test that server.
-   - Public workspace E2E authenticates through `/internal/agent-auth/browser-login` with short-lived tokens from `vamos auth playwright-env`. Run `vamos auth login-machine` once, then `eval "$(vamos auth playwright-env --slug <slug>)"` before `vamos ctl verify workspaces` or Go Story runs.
+   - Public workspace E2E authenticates through `/internal/agent-auth/browser-login` with short-lived tokens from `vamos auth playwright-env`. First create a machine key on the manager DB with `vamos auth create-machine-key --database-path <manager-agents.db> --manager-url <manager-url> --slug <slug> --purpose e2e_playwright --purpose verify`, then run `vamos auth login-machine` and `eval "$(vamos auth playwright-env --slug <slug>)"` before `vamos ctl verify workspaces` or Go Story runs.
    - Recommended sequence: managed restart -> confirm public URL healthy -> browser-enabled `vamos ctl verify workspaces` -> `just e2e --base-url <same-public-url> --story <story>` -> human tests `<same-public-url>`.
    - Use `docs/e2e-story-testing.md` for command details, auth, fixture safety, artifacts, and story selection.
    - For Agent Chat, Thoughts chat, URL-state, route, transcript, or QRSPI-next changes, run relevant `durable-session-chat` scenarios at minimum; add `thoughts-workbench` scenarios when document workbench URL/navigation behavior changed.

@@ -22,12 +22,27 @@ VAMOS_WORKSPACE_RESTART_TOKEN=...
 VAMOS_PLAYWRIGHT_AUTH_ENABLED=true
 ```
 
-For browser verification, configure a manager-issued machine credential once:
+For browser verification, create a manager machine credential in the manager SQLite DB, then store it on the verifier/client machine:
 
 ```bash
+# Run on the manager host, where the manager SQLite DB is reachable.
+vamos auth create-machine-key \
+  --database-path <manager-agents.db> \
+  --manager-url https://main.vamos.test \
+  --name laptop \
+  --email agent@example.test \
+  --slug <slug> \
+  --purpose e2e_playwright \
+  --purpose hermes_chat \
+  --purpose verify
+
+# Run on the verifier/client machine, using the printed key id and one-time secret.
 vamos auth login-machine --manager-url https://main.vamos.test --key-id <id> --secret <secret>
+vamos auth status --slug <slug>
 eval "$(vamos auth playwright-env --slug <slug>)"
 ```
+
+When restricting purposes, include `--purpose verify` for `vamos auth status`.
 
 External setup must also be in place:
 
@@ -58,12 +73,24 @@ GET /internal/agent-auth/browser-login?purpose=e2e_playwright&token=<minted>&red
 Normal shell flow:
 
 ```bash
+# Manager host: create the durable machine key in the manager SQLite DB.
+vamos auth create-machine-key \
+  --database-path <manager-agents.db> \
+  --manager-url https://main.<domain> \
+  --name laptop \
+  --email agent@example.test \
+  --slug <slug> \
+  --purpose e2e_playwright \
+  --purpose verify
+
+# Verifier/client machine: store the printed one-time secret and mint per-run auth.
 vamos auth login-machine --manager-url https://main.<domain> --key-id <id> --secret <secret>
+vamos auth status --slug <slug>
 eval "$(vamos auth playwright-env --slug <slug>)"
 just verify-workspaces slug=<slug> start=true restart=true stop=true browser=true
 ```
 
-`vamos ctl verify workspaces --browser=true` also attempts to mint an `e2e_playwright` token from the stored machine profile when no env token is present. If minting cannot run, it fails with guidance to run `vamos auth login-machine` and `vamos auth playwright-env`; do not hunt for host secrets.
+Add `--purpose hermes_chat` when the same credential will also back `vamos chat`. `vamos ctl verify workspaces --browser=true` also attempts to mint an `e2e_playwright` token from the stored machine profile when no env token is present. If minting cannot run, it fails with guidance to create a key on the manager, run `vamos auth login-machine`, and run `vamos auth playwright-env`; do not hunt for host secrets.
 
 From the Vamos repo root:
 
