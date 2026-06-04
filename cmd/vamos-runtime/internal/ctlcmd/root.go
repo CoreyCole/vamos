@@ -5,6 +5,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/CoreyCole/vamos/pkg/ctl/projectmetadatacmd"
 	"github.com/CoreyCole/vamos/pkg/ctl/verifycmd"
 	"github.com/CoreyCole/vamos/pkg/ctl/workspacecmd"
 )
@@ -13,6 +14,7 @@ func NewCommand() *cobra.Command {
 	cmd := &cobra.Command{Use: "ctl", Short: "Workspace and operational controls"}
 	cmd.AddCommand(newWorkspaceCommand())
 	cmd.AddCommand(newVerifyCommand())
+	cmd.AddCommand(newProjectMetadataCommand())
 	return cmd
 }
 
@@ -44,6 +46,20 @@ func newVerifyCommand() *cobra.Command {
 		},
 	})
 	return cmd
+}
+
+func newProjectMetadataCommand() *cobra.Command {
+	return &cobra.Command{
+		Use:                "project-metadata <migrate-frontmatter>",
+		Short:              "Manage project metadata in thoughts artifacts",
+		DisableFlagParsing: true,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if wantsHelp(args) {
+				return cmd.Help()
+			}
+			return projectmetadatacmd.Main(args)
+		},
+	}
 }
 
 func wantsHelp(args []string) bool {

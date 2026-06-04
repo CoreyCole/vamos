@@ -128,10 +128,10 @@ func workspaceRestartRecoveryCommands() string {
 	return strings.Join([]string{
 		"Build completed but workspace restart failed.",
 		"Inspect:",
-		"  agentsctl workspace doctor",
-		"  agentsctl workspace logs web --tail 120",
+		"  vamos ctl workspace doctor",
+		"  vamos ctl workspace logs web --tail 120",
 		"Recover:",
-		"  agentsctl workspace restart --force",
+		"  vamos ctl workspace restart --force",
 	}, "\n")
 }
 

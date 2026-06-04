@@ -2,7 +2,7 @@
 
 ## Purpose
 
-`agentsctl verify workspaces` proves multi-checkout workspace lifecycle from both sides:
+`vamos ctl verify workspaces` proves multi-checkout workspace lifecycle from both sides:
 
 - server-owned lifecycle, process, metadata, proxy, logs, runtime env snapshot, and worker identity truth
 - client-visible DNS, TLS, Caddy/public-host routing, manager auth, browser switch handoff, and unavailable-after-stop behavior
@@ -33,7 +33,7 @@ External setup must also be in place:
 
 ## Main vs feature workspace rule
 
-`main.<domain>` is reserved for the canonical manager checkout. Feature branches and QRSPI implementation copies must be started through the manager and tested at their derived slug host (`https://<slug>.<domain>/`). Do not manually run a feature checkout on the manager port to "take over" `main`; use `/workspaces`, `agentsctl workspace restart`, or `just build` from a managed child checkout so lifecycle stays owned by `server/services/workspaces/`.
+`main.<domain>` is reserved for the canonical manager checkout. Feature branches and QRSPI implementation copies must be started through the manager and tested at their derived slug host (`https://<slug>.<domain>/`). Do not manually run a feature checkout on the manager port to "take over" `main`; use `/workspaces`, `vamos ctl workspace restart`, or `just build` from a managed child checkout so lifecycle stays owned by `server/services/workspaces/`.
 
 Before sending a feature workspace to a human for manual testing, make the child runtime current and reachable. A build with `--no-restart` proves compilation only; it can leave the public feature host serving the previous process or the manager recovery page. Run a managed restart (`just build` from the feature checkout, or the manager restart action), then verify the public feature URL reaches the child app before handing it off.
 
@@ -58,7 +58,7 @@ export VAMOS_PLAYWRIGHT_AUTH_TOKEN=<secret>
 just verify-workspaces slug=<slug> start=true restart=true stop=true browser=true
 # or
 VAMOS_PLAYWRIGHT_AUTH_TOKEN=<secret> \
-  go run ./cmd/agentsctl verify workspaces \
+  go run ./cmd/vamos-runtime ctl verify workspaces \
     --env .env \
     --base-url https://main.<domain> \
     --domain <domain> \
@@ -105,7 +105,7 @@ Equivalent nested command:
 
 ```bash
 cd vamos
-go run ./cmd/agentsctl verify workspaces \
+go run ./cmd/vamos-runtime ctl verify workspaces \
   --env .env \
   --base-url https://main.vamos.test \
   --domain vamos.test \

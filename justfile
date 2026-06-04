@@ -32,4 +32,4 @@ verify-workspaces slug start="true" restart="true" stop="true" browser="false" a
     if [ -n "$dns_server" ]; then args="$args --dns-server $dns_server"; fi; \
     if [ -n "$expect_ip" ]; then args="$args --expect-ip $expect_ip"; fi; \
     if [ "$require_remote" = "true" ]; then args="$args --require-remote-tailnet"; fi; \
-    go run ./cmd/agentsctl verify workspaces $args
+    go run ./cmd/vamos-runtime ctl verify workspaces $args

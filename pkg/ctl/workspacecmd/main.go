@@ -18,7 +18,7 @@ func Main(args []string) error {
 	}
 	ctx := context.Background()
 	if args[0] == "create" {
-		fs := flag.NewFlagSet("agentsctl workspace create", flag.ContinueOnError)
+		fs := flag.NewFlagSet("vamos ctl workspace create", flag.ContinueOnError)
 		plan := fs.String("plan", "", "QRSPI plan.md path")
 		managerURL := fs.String("manager-url", os.Getenv("VAMOS_WORKSPACE_MANAGER_URL"), "workspace manager URL")
 		restartToken := fs.String("restart-token", os.Getenv("VAMOS_WORKSPACE_RESTART_TOKEN"), "workspace restart/API token")
@@ -37,7 +37,7 @@ func Main(args []string) error {
 	}
 	if args[0] == "register-current" {
 		fs := flag.NewFlagSet(
-			"agentsctl workspace register-current",
+			"vamos ctl workspace register-current",
 			flag.ContinueOnError,
 		)
 		managerURL := fs.String("manager-url", "", "workspace manager URL")
@@ -49,7 +49,7 @@ func Main(args []string) error {
 		)
 		createdBy := fs.String(
 			"created-by",
-			"agentsctl workspace register-current",
+			"vamos ctl workspace register-current",
 			"binding provenance",
 		)
 		if err := fs.Parse(args[1:]); err != nil {
@@ -70,7 +70,7 @@ func Main(args []string) error {
 	case "status":
 		return RunStatus(ctx, cfg, os.Stdout)
 	case "logs":
-		fs := flag.NewFlagSet("agentsctl workspace logs", flag.ContinueOnError)
+		fs := flag.NewFlagSet("vamos ctl workspace logs", flag.ContinueOnError)
 		tail := fs.Int("tail", 100, "lines to print")
 		var target string
 		logArgs := args[1:]
@@ -86,19 +86,19 @@ func Main(args []string) error {
 		}
 		if target == "" || fs.NArg() > 1 {
 			return fmt.Errorf(
-				"usage: agentsctl workspace logs <web|temporal|ts-worker> [--tail N]",
+				"usage: vamos ctl workspace logs <web|temporal|ts-worker> [--tail N]",
 			)
 		}
 		return RunLogs(ctx, cfg, WorkspaceLogTarget(target), *tail, os.Stdout)
 	case "doctor":
-		fs := flag.NewFlagSet("agentsctl workspace doctor", flag.ContinueOnError)
+		fs := flag.NewFlagSet("vamos ctl workspace doctor", flag.ContinueOnError)
 		tail := fs.Int("tail", 120, "lines to print from each log")
 		if err := fs.Parse(args[1:]); err != nil {
 			return err
 		}
 		return RunDoctor(ctx, cfg, *tail, os.Stdout)
 	case "restart":
-		fs := flag.NewFlagSet("agentsctl workspace restart", flag.ContinueOnError)
+		fs := flag.NewFlagSet("vamos ctl workspace restart", flag.ContinueOnError)
 		force := fs.Bool("force", false, "force restart after stale process/stop failure")
 		components := multiStringFlag{}
 		fs.Var(
@@ -121,7 +121,7 @@ func Main(args []string) error {
 
 func usage() error {
 	return fmt.Errorf(
-		"usage: agentsctl workspace <create|status|logs|doctor|restart|register-current> [flags]",
+		"usage: vamos ctl workspace <create|status|logs|doctor|restart|register-current> [flags]",
 	)
 }
 

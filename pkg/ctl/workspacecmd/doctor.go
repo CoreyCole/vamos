@@ -40,7 +40,7 @@ func RunDoctor(
 		_ = RunLogs(ctx, cfg, target, tail, out)
 	}
 	fmt.Fprintln(out, "\nSuggested recovery:")
-	fmt.Fprintln(out, "  agentsctl workspace restart --force")
+	fmt.Fprintln(out, "  vamos ctl workspace restart --force")
 	return nil
 }
 

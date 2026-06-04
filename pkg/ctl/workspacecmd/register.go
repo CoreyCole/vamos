@@ -89,7 +89,7 @@ func RunRegisterCurrent(
 				CheckoutPath:  checkout,
 				CreatedBy: defaultString(
 					opts.CreatedBy,
-					"agentsctl workspace register-current",
+					"vamos ctl workspace register-current",
 				),
 				UpdatedAt: time.Now().UTC(),
 			},

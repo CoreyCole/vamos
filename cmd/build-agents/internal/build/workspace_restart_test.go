@@ -255,9 +255,9 @@ func TestTryWorkspaceRestartWithRecoveryForceFails(t *testing.T) {
 	for _, want := range []string{
 		"workspace graceful restart failed",
 		"workspace force restart failed",
-		"agentsctl workspace doctor",
-		"agentsctl workspace logs web --tail 120",
-		"agentsctl workspace restart --force",
+		"vamos ctl workspace doctor",
+		"vamos ctl workspace logs web --tail 120",
+		"vamos ctl workspace restart --force",
 	} {
 		if !strings.Contains(err.Error(), want) {
 			t.Fatalf("error missing %q: %s", want, err.Error())

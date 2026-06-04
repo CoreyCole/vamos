@@ -27,7 +27,7 @@ func WriteWorkspaceVerifyReport(report WorkspaceVerifyReport, dir string) error 
 	report.Artifacts["report_dir"] = dir
 	if _, ok := report.Artifacts["manager-log-tail"]; !ok {
 		path := filepath.Join(dir, "manager-log-tail.txt")
-		_ = os.WriteFile(path, []byte("manager log unavailable from agentsctl\n"), 0o600)
+		_ = os.WriteFile(path, []byte("manager log unavailable from vamos ctl\n"), 0o600)
 		report.Artifacts["manager-log-tail"] = path
 	}
 	if len(report.ServerRuns) > 0 {

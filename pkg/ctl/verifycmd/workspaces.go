@@ -92,7 +92,7 @@ func Main(args []string) error {
 
 func LoadWorkspaceVerifyConfig(args []string) (WorkspaceVerifyConfig, error) {
 	cfg := WorkspaceVerifyConfig{Timeout: defaultVerifyTimeout}
-	fs := flag.NewFlagSet("agentsctl verify workspaces", flag.ContinueOnError)
+	fs := flag.NewFlagSet("vamos ctl verify workspaces", flag.ContinueOnError)
 	fs.StringVar(&cfg.EnvPath, "env", "../../.env", "path to env file")
 	fs.StringVar(&cfg.BaseURL, "base-url", "", "manager public base URL")
 	fs.StringVar(&cfg.Domain, "domain", "", "workspace DNS domain")
