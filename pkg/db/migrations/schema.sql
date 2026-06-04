@@ -25,6 +25,24 @@ attempted_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 -- Index for querying auth attempts by email
 CREATE INDEX IF NOT EXISTS idx_auth_attempts_email ON auth_attempts (email) ;
 
+-- Machine credentials for manager-owned automation auth.
+CREATE TABLE IF NOT EXISTS machine_credentials (
+id TEXT PRIMARY KEY,
+name TEXT NOT NULL DEFAULT '',
+secret_hash BLOB NOT NULL,
+default_actor_email TEXT NOT NULL DEFAULT '',
+allowed_actor_emails_json TEXT NOT NULL DEFAULT '[]',
+allowed_slugs_json TEXT NOT NULL DEFAULT '[]',
+allowed_purposes_json TEXT NOT NULL DEFAULT '[]',
+expires_at DATETIME,
+revoked_at DATETIME,
+created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+last_used_at DATETIME
+) ;
+
+CREATE INDEX IF NOT EXISTS idx_machine_credentials_active
+ON machine_credentials (revoked_at, expires_at, created_at DESC) ;
+
 -- Chat threads table
 CREATE TABLE IF NOT EXISTS chat_threads (
 id TEXT PRIMARY KEY,

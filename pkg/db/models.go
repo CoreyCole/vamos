@@ -335,6 +335,20 @@ type LayoutPreference struct {
 	UpdatedAt     time.Time `json:"updated_at"`
 }
 
+type MachineCredential struct {
+	ID                     string       `json:"id"`
+	Name                   string       `json:"name"`
+	SecretHash             []byte       `json:"secret_hash"`
+	DefaultActorEmail      string       `json:"default_actor_email"`
+	AllowedActorEmailsJson string       `json:"allowed_actor_emails_json"`
+	AllowedSlugsJson       string       `json:"allowed_slugs_json"`
+	AllowedPurposesJson    string       `json:"allowed_purposes_json"`
+	ExpiresAt              sql.NullTime `json:"expires_at"`
+	RevokedAt              sql.NullTime `json:"revoked_at"`
+	CreatedAt              time.Time    `json:"created_at"`
+	LastUsedAt             sql.NullTime `json:"last_used_at"`
+}
+
 type PlanWorkspace struct {
 	PlanDirRel                string         `json:"plan_dir_rel"`
 	ProjectID                 string         `json:"project_id"`

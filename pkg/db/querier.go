@@ -35,6 +35,7 @@ type Querier interface {
 	CreateDocumentComment(ctx context.Context, arg CreateDocumentCommentParams) (DocumentComment, error)
 	CreateDocumentCommentReply(ctx context.Context, arg CreateDocumentCommentReplyParams) (DocumentCommentReply, error)
 	CreateExternalAgentSession(ctx context.Context, arg CreateExternalAgentSessionParams) (ExternalAgentSession, error)
+	CreateMachineCredential(ctx context.Context, arg CreateMachineCredentialParams) (MachineCredential, error)
 	CreateReleaseQueueItem(ctx context.Context, arg CreateReleaseQueueItemParams) (ReleaseQueueItem, error)
 	CreateSession(ctx context.Context, arg CreateSessionParams) (Session, error)
 	CreateWorkspace(ctx context.Context, arg CreateWorkspaceParams) (Workspace, error)
@@ -76,6 +77,7 @@ type Querier interface {
 	GetLatestSnapshotByBootID(ctx context.Context, bootID string) (SystemSnapshot, error)
 	GetLatestUserChatSelectionByScope(ctx context.Context, arg GetLatestUserChatSelectionByScopeParams) (UserChatSelection, error)
 	GetLayoutPreference(ctx context.Context, arg GetLayoutPreferenceParams) (LayoutPreference, error)
+	GetMachineCredential(ctx context.Context, id string) (MachineCredential, error)
 	GetPlanWorkspace(ctx context.Context, planDirRel string) (PlanWorkspace, error)
 	GetPrimaryWorkspaceForThread(ctx context.Context, arg GetPrimaryWorkspaceForThreadParams) (Workspace, error)
 	GetRecentAuthAttempts(ctx context.Context, arg GetRecentAuthAttemptsParams) ([]AuthAttempt, error)
@@ -118,6 +120,7 @@ type Querier interface {
 	ListDocumentCommentReplies(ctx context.Context, commentID string) ([]DocumentCommentReply, error)
 	ListDocumentComments(ctx context.Context, arg ListDocumentCommentsParams) ([]DocumentComment, error)
 	ListImplWorkspaces(ctx context.Context, projectID string) ([]ImplWorkspace, error)
+	ListMachineCredentials(ctx context.Context) ([]MachineCredential, error)
 	ListOpenChatAnnotationsByIDs(ctx context.Context, ids []string) ([]ChatAnnotation, error)
 	ListPlanOwnedSessionArtifactsByPlanDir(ctx context.Context, planDir sql.NullString) ([]AgentSession, error)
 	ListPlanOwnedSessionArtifactsByPlanDirPrefix(ctx context.Context, arg ListPlanOwnedSessionArtifactsByPlanDirPrefixParams) ([]AgentSession, error)
@@ -156,6 +159,7 @@ type Querier interface {
 	ResolveChatAnnotation(ctx context.Context, id string) error
 	ResolveDocumentComment(ctx context.Context, arg ResolveDocumentCommentParams) error
 	ResolveWorkspaceForDocPath(ctx context.Context, arg ResolveWorkspaceForDocPathParams) (ResolveWorkspaceForDocPathRow, error)
+	RevokeMachineCredential(ctx context.Context, arg RevokeMachineCredentialParams) (int64, error)
 	SoftDeleteDocumentComment(ctx context.Context, id string) error
 	TestSupportCountAgentSessions(ctx context.Context) (int64, error)
 	TestSupportCountAgentSessionsByPath(ctx context.Context, artifactPath sql.NullString) (int64, error)
@@ -184,6 +188,7 @@ type Querier interface {
 	UpdateChatCommandStatus(ctx context.Context, arg UpdateChatCommandStatusParams) (ChatSessionCommand, error)
 	UpdateChatSessionProjectionSeq(ctx context.Context, arg UpdateChatSessionProjectionSeqParams) error
 	UpdateChatThread(ctx context.Context, arg UpdateChatThreadParams) error
+	UpdateMachineCredentialLastUsed(ctx context.Context, arg UpdateMachineCredentialLastUsedParams) error
 	UpdateSessionAccess(ctx context.Context, id string) error
 	UpdateSyntaxTheme(ctx context.Context, arg UpdateSyntaxThemeParams) (UserPreference, error)
 	UpdateTheme(ctx context.Context, arg UpdateThemeParams) (UserPreference, error)
