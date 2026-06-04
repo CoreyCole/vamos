@@ -15,6 +15,7 @@ import (
 
 const (
 	purposeE2EPlaywright = "e2e_playwright"
+	purposeHermesChat    = "hermes_chat"
 	purposeVerify        = "verify"
 )
 
@@ -34,7 +35,9 @@ func newCommand(deps commandDeps) *cobra.Command {
 	cmd.AddCommand(newLoginMachineCommand(deps))
 	cmd.AddCommand(newStatusCommand(deps))
 	cmd.AddCommand(newPlaywrightEnvCommand(deps))
-	cmd.AddCommand(newCreateMachineKeyCommand())
+	cmd.AddCommand(newCreateMachineKeyCommand(deps))
+	cmd.AddCommand(newListMachineKeysCommand(deps))
+	cmd.AddCommand(newRevokeMachineKeyCommand(deps))
 	return cmd
 }
 
@@ -131,16 +134,6 @@ func newPlaywrightEnvCommand(deps commandDeps) *cobra.Command {
 	cmd.Flags().StringVar(&email, "email", "", "actor email for browser session")
 	cmd.Flags().DurationVar(&ttl, "ttl", 15*time.Minute, "browser token TTL")
 	return cmd
-}
-
-func newCreateMachineKeyCommand() *cobra.Command {
-	return &cobra.Command{
-		Use:   "create-machine-key",
-		Short: "Create a manager machine key",
-		RunE: func(cmd *cobra.Command, args []string) error {
-			return errors.New("not implemented: create the machine key on the manager first with the admin API, then run vamos auth login-machine")
-		},
-	}
 }
 
 func PrintPlaywrightEnv(w io.Writer, token string) error {

@@ -105,6 +105,7 @@ func readSchemaSQL() ([]byte, error) {
 		filepath.Join("pkg", "db", "migrations", "schema.sql"),
 		filepath.Join("..", "vamos", "pkg", "db", "migrations", "schema.sql"),
 		filepath.Join("..", "..", "..", "pkg", "db", "migrations", "schema.sql"),
+		filepath.Join("..", "..", "..", "..", "pkg", "db", "migrations", "schema.sql"),
 		filepath.Join("..", "..", "pkg", "db", "migrations", "schema.sql"),
 	}
 	var lastErr error
