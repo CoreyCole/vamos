@@ -2,9 +2,9 @@ package rootcmd
 
 import "testing"
 
-func TestRootCommandContainsAuthCtlAndE2E(t *testing.T) {
+func TestRootCommandContainsAuthChatCtlAndE2E(t *testing.T) {
 	cmd := NewCommand()
-	for _, name := range []string{"auth", "ctl", "e2e"} {
+	for _, name := range []string{"auth", "chat", "ctl", "e2e"} {
 		found := false
 		for _, child := range cmd.Commands() {
 			if child.Name() == name {

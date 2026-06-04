@@ -84,6 +84,7 @@ func TestComposerPostsSelectedAnnotationIDs(t *testing.T) {
 
 func TestPostChatSessionCommandAppendsAnnotationContext(t *testing.T) {
 	service := newTestAgentChatService(t)
+	service.temporal = &fakeTemporalStarter{}
 	handler := NewHandler(service, nil)
 	workspace := mustCreateWorkspaceForHandlerTest(t, service, "owner@example.com")
 	session := mustCreateHandlerChatSession(t, service, workspace)

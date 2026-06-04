@@ -156,8 +156,9 @@ func TestStreamChatSessionEventsUsesLastEventID(t *testing.T) {
 	}
 }
 
-func TestPostChatSessionCommandReturnsAcceptedOutcome(t *testing.T) {
+func TestPostChatSessionCommandStartsMessageSendRun(t *testing.T) {
 	service := newTestAgentChatService(t)
+	service.temporal = &fakeTemporalStarter{}
 	handler := NewHandler(service, nil)
 	workspace := mustCreateWorkspaceForHandlerTest(t, service, "owner@example.com")
 	session := mustCreateHandlerChatSession(t, service, workspace)
@@ -182,11 +183,18 @@ func TestPostChatSessionCommandReturnsAcceptedOutcome(t *testing.T) {
 	if rec.Code != http.StatusAccepted {
 		t.Fatalf("status = %d, want 202: %s", rec.Code, rec.Body.String())
 	}
+	var response map[string]string
+	if err := json.Unmarshal(rec.Body.Bytes(), &response); err != nil {
+		t.Fatalf("Unmarshal response: %v", err)
+	}
+	if response["status"] != string(chatsession.CommandApplied) || strings.TrimSpace(response["run_id"]) == "" || response["session_id"] != session.ID {
+		t.Fatalf("response = %+v", response)
+	}
 	eventCount, err := service.queries.TestSupportCountChatSessionEvents(context.Background(), session.ID)
 	if err != nil {
 		t.Fatalf("count events: %v", err)
 	}
-	if eventCount != 2 {
-		t.Fatalf("event count = %d, want submitted+accepted", eventCount)
+	if eventCount != 3 {
+		t.Fatalf("event count = %d, want submitted+accepted+applied", eventCount)
 	}
 }

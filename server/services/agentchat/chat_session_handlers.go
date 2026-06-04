@@ -152,6 +152,20 @@ func (h *Handler) PostChatSessionCommand(c echo.Context) error {
 		}
 		input.PayloadJSON = withAnnotationContext(input.PayloadJSON, annotationContext)
 	}
+	if input.Type == chatsession.CommandType("message.send") {
+		run, err := h.service.StartWorkspaceSessionCommand(ctx, input)
+		if err != nil {
+			return echo.NewHTTPError(http.StatusBadRequest, err.Error())
+		}
+		if h.service.notifier != nil {
+			h.service.notifier.NotifyWorkspaceResource(session.WorkspaceID)
+		}
+		return c.JSON(http.StatusAccepted, map[string]any{
+			"status":     string(chatsession.CommandApplied),
+			"run_id":     run.ID,
+			"session_id": session.ID,
+		})
+	}
 	outcome, err := chatsession.NewService(h.service.db, h.service.queries).
 		SubmitCommand(ctx, input)
 	if err != nil {
