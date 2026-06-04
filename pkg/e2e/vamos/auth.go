@@ -2,6 +2,7 @@ package vamos
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/url"
 	"os"
@@ -10,6 +11,7 @@ import (
 
 	"github.com/playwright-community/playwright-go"
 
+	"github.com/CoreyCole/vamos/pkg/auth/agentbrowser"
 	duiruntime "github.com/coreycole/datastarui/e2e/runtime"
 	"github.com/coreycole/datastarui/e2e/spec"
 )
@@ -45,21 +47,33 @@ func userEmail(user any) string {
 	}
 }
 
+func firstNonEmpty(values ...string) string {
+	for _, value := range values {
+		if strings.TrimSpace(value) != "" {
+			return value
+		}
+	}
+	return ""
+}
+
 func BuildAuthURL(cfg duiruntime.Config, redirect string) (string, error) {
 	if redirect == "" {
 		redirect = "/"
 	}
+	token := strings.TrimSpace(firstNonEmpty(os.Getenv("VAMOS_E2E_AUTH_TOKEN"), os.Getenv("VAMOS_PLAYWRIGHT_AUTH_TOKEN")))
+	if token == "" {
+		return "", errors.New("VAMOS_E2E_AUTH_TOKEN missing; run eval \"$(vamos auth playwright-env --slug <slug>)\"")
+	}
 	authURL, err := url.Parse(
-		strings.TrimRight(cfg.BaseURL, "/") + "/internal/playwright-auth",
+		strings.TrimRight(cfg.BaseURL, "/") + "/internal/agent-auth/browser-login",
 	)
 	if err != nil {
 		return "", err
 	}
 	q := authURL.Query()
+	q.Set("purpose", string(agentbrowser.PurposeE2EPlaywright))
+	q.Set("token", token)
 	q.Set("redirect", redirect)
-	if token := strings.TrimSpace(os.Getenv("VAMOS_E2E_AUTH_TOKEN")); token != "" {
-		q.Set("token", token)
-	}
 	authURL.RawQuery = q.Encode()
 	return authURL.String(), nil
 }
@@ -89,7 +103,7 @@ func Authenticate(
 	}
 	finalURL := page.URL()
 	if strings.Contains(finalURL, "/login") ||
-		strings.Contains(finalURL, "/internal/playwright-auth") {
+		strings.Contains(finalURL, "/internal/agent-auth/browser-login") {
 		return fmt.Errorf("playwright auth failed; final URL: %s", finalURL)
 	}
 	return nil

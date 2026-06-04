@@ -43,7 +43,7 @@ func RunBrowserVerify(
 	}
 	if cfg.AuthToken == "" {
 		err := errors.New(
-			"playwright auth token is required via --playwright-auth-token or VAMOS_PLAYWRIGHT_AUTH_TOKEN",
+			"playwright auth token missing; run vamos auth login-machine, then eval \"$(vamos auth playwright-env --slug <slug>)\" or pass --playwright-auth-token",
 		)
 		step.Status = statusFailed
 		step.Error = err.Error()

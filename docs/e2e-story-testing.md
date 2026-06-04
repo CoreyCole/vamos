@@ -12,27 +12,20 @@
 
 ### Auth for public workspace E2E
 
-Browser E2E authenticates through the app endpoint:
+Browser E2E authenticates through the app endpoint with a short-lived manager-minted token:
 
 ```text
-GET /internal/playwright-auth?token=<token>&redirect=<path>
+GET /internal/agent-auth/browser-login?purpose=e2e_playwright&token=<minted>&redirect=<path>
 ```
 
-For public workspace hosts, the manager/child must be started with Playwright auth enabled and a token:
-
-```dotenv
-CN_AGENTS_PLAYWRIGHT_AUTH_ENABLED=true
-CN_AGENTS_PLAYWRIGHT_AUTH_TOKEN=<secret>
-# child runtime receives the same value as VAMOS_PLAYWRIGHT_AUTH_TOKEN
-```
-
-Use that same secret for E2E runs:
+Configure a manager-issued machine credential once, then mint an E2E token for each run window:
 
 ```bash
-export VAMOS_E2E_AUTH_TOKEN=<secret>
+vamos auth login-machine --manager-url <manager-url> --key-id <id> --secret <secret>
+eval "$(vamos auth playwright-env --slug <slug>)"
 ```
 
-Vamos Go Story auth helpers read `VAMOS_E2E_AUTH_TOKEN` and visit `/internal/playwright-auth` before scenario steps. Loopback-only local auth may work without a token, but public workspace URLs require one. Run stories with the local `just e2e` recipe; it delegates to `../datastarui/scripts/datastarui.sh` with this checkout's `datastarui-e2e.yml`. The script rebuilds the stable launcher `../datastarui/bin/datastarui` only when launcher sources change. The launcher builds `../datastarui/bin/datastarui-runtime-<hash>` when DatastarUI CLI/E2E sources change, then execs that runtime.
+Vamos Go Story auth helpers read `VAMOS_E2E_AUTH_TOKEN` and visit `/internal/agent-auth/browser-login` before scenario steps. Public workspace URLs require a minted token. Run stories with the local `just e2e` recipe; it delegates to `../datastarui/scripts/datastarui.sh` with this checkout's `datastarui-e2e.yml`. The script rebuilds the stable launcher `../datastarui/bin/datastarui` only when launcher sources change. The launcher builds `../datastarui/bin/datastarui-runtime-<hash>` when DatastarUI CLI/E2E sources change, then execs that runtime.
 
 List authored Go Story tests:
 

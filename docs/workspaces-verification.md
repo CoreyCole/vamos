@@ -20,7 +20,13 @@ VAMOS_WORKSPACE_DOMAIN=vamos.test
 VAMOS_PUBLIC_BASE_URL=https://main.vamos.test
 VAMOS_WORKSPACE_RESTART_TOKEN=...
 VAMOS_PLAYWRIGHT_AUTH_ENABLED=true
-VAMOS_PLAYWRIGHT_AUTH_TOKEN=...
+```
+
+For browser verification, configure a manager-issued machine credential once:
+
+```bash
+vamos auth login-machine --manager-url https://main.vamos.test --key-id <id> --secret <secret>
+eval "$(vamos auth playwright-env --slug <slug>)"
 ```
 
 External setup must also be in place:
@@ -29,7 +35,7 @@ External setup must also be in place:
 - Caddy preserves the original `Host` header so manager host-dispatch can route `main` and child workspace hosts.
 - Tailnet DNS resolves `main.vamos.test` and `<slug>.vamos.test` to the manager host from the verifier machine.
 - Verifier machine trusts the Caddy internal CA if Caddy uses `tls internal`.
-- A sibling checkout exists for the target slug, for example `vamos-2026-05-10_05-14-35_multi-checkout-dev-workspaces` -> slug `multi-checkout-dev-workspaces`.
+- A sibling checkout exists for the target slug.
 
 ## Main vs feature workspace rule
 
@@ -43,30 +49,21 @@ Browser and chat sessions created while verifying `work` or feature workspace ho
 
 ## Commands
 
-### Playwright auth token
-
-Browser-enabled workspace verification is implemented with the same DatastarUI Go Story E2E runner used by authored app stories, and authenticates through the same app auth endpoint:
+Browser-enabled workspace verification uses the DatastarUI Go Story E2E runner and authenticates through a short-lived manager-minted browser token:
 
 ```text
-GET /internal/playwright-auth?token=<token>&redirect=<path>
+GET /internal/agent-auth/browser-login?purpose=e2e_playwright&token=<minted>&redirect=<path>
 ```
 
-For public workspace hosts, provide a token configured on the running manager/child. Host env commonly uses `CN_AGENTS_PLAYWRIGHT_AUTH_TOKEN`; the child runtime receives it as `VAMOS_PLAYWRIGHT_AUTH_TOKEN`. The verifier accepts either `--playwright-auth-token` or environment variable `VAMOS_PLAYWRIGHT_AUTH_TOKEN`:
+Normal shell flow:
 
 ```bash
-export VAMOS_PLAYWRIGHT_AUTH_TOKEN=<secret>
+vamos auth login-machine --manager-url https://main.<domain> --key-id <id> --secret <secret>
+eval "$(vamos auth playwright-env --slug <slug>)"
 just verify-workspaces slug=<slug> start=true restart=true stop=true browser=true
-# or
-VAMOS_PLAYWRIGHT_AUTH_TOKEN=<secret> \
-  go run ./cmd/vamos-runtime ctl verify workspaces \
-    --env .env \
-    --base-url https://main.<domain> \
-    --domain <domain> \
-    --slug <slug> \
-    --start=true --restart=true --stop=true --browser=true
 ```
 
-If the token is missing, browser verification fails before manual testing with `playwright auth token is required via --playwright-auth-token or VAMOS_PLAYWRIGHT_AUTH_TOKEN`. Do not treat non-browser workspace verification as full acceptance for public browser changes.
+`vamos ctl verify workspaces --browser=true` also attempts to mint an `e2e_playwright` token from the stored machine profile when no env token is present. If minting cannot run, it fails with guidance to run `vamos auth login-machine` and `vamos auth playwright-env`; do not hunt for host secrets.
 
 From the Vamos repo root:
 
@@ -121,7 +118,7 @@ go run ./cmd/vamos-runtime ctl verify workspaces \
 | `dns` | Manager and child public hostnames resolve from the verifier machine. |
 | `tls` | Public HTTPS reaches a TLS terminator, not plain Go HTTP. |
 | `caddy` | Public HTTPS routing/proxy path reaches the manager and child hosts. |
-| `auth` | Restart-token APIs and Playwright verifier auth are accepted. |
+| `auth` | Restart-token APIs and minted browser verifier auth are accepted. |
 | `lifecycle` | Manager can start, restart, and stop the child process. |
 | `metadata` | Workspace metadata, runtime env snapshot, and TS worker identity marker are written/read and match the target slug/checkout/ports. |
 | `logs` | Manager/child log tails can be captured for diagnostics. |
@@ -150,7 +147,7 @@ Include the report path and first failed layer in handoffs/reviews. Do not claim
 - **DNS**: `lookup main.vamos.test: no such host` means split DNS/wildcard DNS is not configured for the verifier machine. Configure Tailnet DNS so `*.vamos.test` resolves to the manager host.
 - **TLS**: `server gave HTTP response to HTTPS client`, certificate errors, or protocol errors mean HTTPS is not terminating correctly or the verifier does not trust Caddy's CA.
 - **Caddy/proxy**: TLS succeeds but public host returns the wrong app, 404, or unavailable while the child is running. Check wildcard site config, upstream address, and Host preservation.
-- **Auth**: 401/403 from internal endpoints usually means `VAMOS_WORKSPACE_RESTART_TOKEN` or `VAMOS_PLAYWRIGHT_AUTH_TOKEN` differs between CLI and manager environment.
+- **Auth**: 401/403 from internal endpoints usually means the restart token is wrong or the machine credential/profile cannot mint the scoped browser token.
 - **Lifecycle**: start/restart/stop failures or stale PID/port checks point to child process startup, state directory, env override, or port allocation problems.
 - **Metadata/logs**: missing metadata/log tails, runtime env snapshot, or TS worker identity marker indicate the child did not boot far enough or state/log paths are not isolated per workspace.
 - **Agent Chat probe**: `localhost:4200` callback/snapshot URLs, wrong cwd, missing internal token, or failed snapshot/callback proof mean the child web process did not build or accept child-local workflow endpoints. Check `VAMOS_INTERNAL_TOKEN`, `.vamos/run/runtime-env.json`, Agent Chat callback base, and child web logs.

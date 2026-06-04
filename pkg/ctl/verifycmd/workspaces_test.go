@@ -26,7 +26,8 @@ func TestLoadWorkspaceVerifyConfigFromEnv(t *testing.T) {
 		"VAMOS_PUBLIC_BASE_URL=https://main.vamos.test",
 		"VAMOS_WORKSPACE_DOMAIN=vamos.test",
 		"VAMOS_WORKSPACE_RESTART_TOKEN=" + testRestartToken,
-		"VAMOS_PLAYWRIGHT_AUTH_TOKEN=playwright-secret",
+		"VAMOS_E2E_AUTH_TOKEN=playwright-secret",
+		"VAMOS_WORKSPACE_MANAGER_URL=https://manager.vamos.test",
 	}, "\n")), 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -47,6 +48,9 @@ func TestLoadWorkspaceVerifyConfigFromEnv(t *testing.T) {
 	}
 	if cfg.PlaywrightAuthToken != "playwright-secret" {
 		t.Fatalf("PlaywrightAuthToken = %q", cfg.PlaywrightAuthToken)
+	}
+	if cfg.ManagerURL != "https://manager.vamos.test" {
+		t.Fatalf("ManagerURL = %q", cfg.ManagerURL)
 	}
 }
 
@@ -366,6 +370,71 @@ func TestRunWorkspaceVerifyStopsAfterBrowserFailure(t *testing.T) {
 	}
 	if !requests[1].Stop || requests[1].Start || requests[1].Restart {
 		t.Fatalf("cleanup request = %+v", requests[1])
+	}
+}
+
+//nolint:paralleltest // Mutates package-level command runner.
+func TestRunWorkspaceVerifyMintsBrowserTokenWhenMissing(t *testing.T) {
+	oldResolve, oldHTTPS, oldHost, oldRun, oldBrowser, oldEnsure := resolveHostFn, probeHTTPSFn, probeHostPreservationFn, runServerLifecyclePhaseFn, runBrowserVerifyFn, ensureBrowserAuthTokenFn
+	defer func() {
+		resolveHostFn, probeHTTPSFn, probeHostPreservationFn, runServerLifecyclePhaseFn, runBrowserVerifyFn, ensureBrowserAuthTokenFn = oldResolve, oldHTTPS, oldHost, oldRun, oldBrowser, oldEnsure
+	}()
+	resolveHostFn = func(ctx context.Context, host string) ([]net.IP, error) {
+		return []net.IP{net.ParseIP("127.0.0.1")}, nil
+	}
+	probeHTTPSFn = func(ctx context.Context, rawURL string, out io.Writer) error {
+		_, _ = out.Write([]byte("ok"))
+		return nil
+	}
+	probeHostPreservationFn = func(ctx context.Context, baseURL, childURL string, out io.Writer) error {
+		_, _ = out.Write([]byte("ok"))
+		return nil
+	}
+	runServerLifecyclePhaseFn = func(ctx context.Context, cfg WorkspaceVerifyConfig, req workspaces.VerifyWorkspaceRequest) (workspaces.VerifyWorkspaceRun, error) {
+		return workspaces.VerifyWorkspaceRun{ID: "run", Status: workspaces.VerifyRunPassed}, nil
+	}
+	ensureBrowserAuthTokenFn = func(ctx context.Context, cfg WorkspaceVerifyConfig) (string, error) {
+		if cfg.PlaywrightAuthToken != "" {
+			t.Fatalf("PlaywrightAuthToken = %q, want empty before mint", cfg.PlaywrightAuthToken)
+		}
+		return "minted-token", nil
+	}
+	runBrowserVerifyFn = func(ctx context.Context, cfg BrowserVerifyConfig) (ClientVerifyStep, error) {
+		if cfg.AuthToken != "minted-token" {
+			t.Fatalf("AuthToken = %q", cfg.AuthToken)
+		}
+		return ClientVerifyStep{Name: "browser", Layer: workspaces.VerificationLayerBrowser, Status: statusPassed}, nil
+	}
+	_, err := RunWorkspaceVerify(t.Context(), WorkspaceVerifyConfig{
+		BaseURL:      "https://main.vamos.test",
+		Domain:       "vamos.test",
+		Slug:         "demo",
+		RestartToken: "restart",
+		Browser:      true,
+		ReportDir:    t.TempDir(),
+		Timeout:      time.Second,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestEnsureE2EAuthTokenUsesEnvCompatibility(t *testing.T) {
+	t.Setenv("VAMOS_PLAYWRIGHT_AUTH_TOKEN", "compat-token")
+	got, err := EnsureE2EAuthToken(t.Context(), WorkspaceVerifyConfig{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != "compat-token" {
+		t.Fatalf("token = %q", got)
+	}
+}
+
+func TestEnsureE2EAuthTokenMissingCredentialGuidance(t *testing.T) {
+	t.Setenv("VAMOS_CONFIG_HOME", t.TempDir())
+	_, err := EnsureE2EAuthToken(t.Context(), WorkspaceVerifyConfig{Slug: "demo"})
+	if err == nil || !strings.Contains(err.Error(), "vamos auth login-machine") || !strings.Contains(err.Error(), "vamos auth playwright-env") {
+		t.Fatalf("EnsureE2EAuthToken() error = %v", err)
 	}
 }
 

@@ -12,17 +12,26 @@ import (
 	_ "modernc.org/sqlite"
 )
 
-func TestBuildAuthURLUsesVamosTokenEnv(t *testing.T) {
+func TestBuildAuthURLUsesMintedVamosTokenEnv(t *testing.T) {
 	t.Setenv("VAMOS_E2E_AUTH_TOKEN", "secret-token")
 	got, err := BuildAuthURL(duiruntime.Config{BaseURL: "http://example.test/"}, "/thoughts")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.HasPrefix(got, "http://example.test/internal/playwright-auth?") {
+	if !strings.HasPrefix(got, "http://example.test/internal/agent-auth/browser-login?") {
 		t.Fatalf("BuildAuthURL()=%q", got)
 	}
-	if !strings.Contains(got, "redirect=%2Fthoughts") || !strings.Contains(got, "token=secret-token") {
-		t.Fatalf("BuildAuthURL()=%q, want redirect and env token", got)
+	for _, want := range []string{"purpose=e2e_playwright", "redirect=%2Fthoughts", "token=secret-token"} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("BuildAuthURL()=%q, want %q", got, want)
+		}
+	}
+}
+
+func TestBuildAuthURLRequiresMintedToken(t *testing.T) {
+	_, err := BuildAuthURL(duiruntime.Config{BaseURL: "http://example.test/"}, "/")
+	if err == nil || !strings.Contains(err.Error(), "vamos auth playwright-env") {
+		t.Fatalf("BuildAuthURL() error = %v, want playwright-env guidance", err)
 	}
 }
 

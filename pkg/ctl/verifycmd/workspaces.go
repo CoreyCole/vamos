@@ -29,6 +29,9 @@ type WorkspaceVerifyConfig struct {
 	RestartToken        string
 	PlaywrightAuthToken string
 	PlaywrightURL       string
+	ManagerURL          string
+	MachineProfile      string
+	BrowserEmail        string
 	Timeout             time.Duration
 	RemoteProof         RemoteProofConfig
 }
@@ -69,6 +72,7 @@ var (
 	probeHostPreservationFn   = ProbeHostPreservation
 	runServerLifecyclePhaseFn = RunServerLifecyclePhase
 	runBrowserVerifyFn        = RunBrowserVerify
+	ensureBrowserAuthTokenFn  = EnsureE2EAuthToken
 	runRemoteCommandFn        = RunRemoteCommand
 )
 
@@ -121,6 +125,9 @@ func LoadWorkspaceVerifyConfig(args []string) (WorkspaceVerifyConfig, error) {
 		"",
 		"reserved Playwright URL override",
 	)
+	fs.StringVar(&cfg.ManagerURL, "manager-url", "", "workspace manager URL for minted browser auth")
+	fs.StringVar(&cfg.MachineProfile, "machine-profile", "default", "vamos auth machine credential profile")
+	fs.StringVar(&cfg.BrowserEmail, "browser-email", "", "actor email for minted browser verification sessions")
 	fs.DurationVar(&cfg.Timeout, "timeout", cfg.Timeout, "verification timeout")
 	fs.StringVar(
 		&cfg.RemoteProof.SSHHost,
@@ -173,7 +180,10 @@ func LoadWorkspaceVerifyConfig(args []string) (WorkspaceVerifyConfig, error) {
 		cfg.RestartToken = env["VAMOS_WORKSPACE_RESTART_TOKEN"]
 	}
 	if cfg.PlaywrightAuthToken == "" {
-		cfg.PlaywrightAuthToken = env["VAMOS_PLAYWRIGHT_AUTH_TOKEN"]
+		cfg.PlaywrightAuthToken = firstNonEmpty(env["VAMOS_E2E_AUTH_TOKEN"], env["VAMOS_PLAYWRIGHT_AUTH_TOKEN"])
+	}
+	if cfg.ManagerURL == "" {
+		cfg.ManagerURL = env["VAMOS_WORKSPACE_MANAGER_URL"]
 	}
 	cfg.Slug = strings.TrimSpace(cfg.Slug)
 	if cfg.ReportDir == "" {
@@ -450,11 +460,15 @@ func RunWorkspaceVerify(
 	}
 
 	if cfg.Browser {
+		browserAuthToken, err := ensureBrowserAuthTokenFn(ctx, cfg)
+		if err != nil {
+			return fail(workspaces.VerificationLayerAuth, "browser-auth", err)
+		}
 		step, err := runBrowserVerifyFn(ctx, BrowserVerifyConfig{
 			BaseURL:   cfg.BaseURL,
 			Domain:    cfg.Domain,
 			Slug:      cfg.Slug,
-			AuthToken: cfg.PlaywrightAuthToken,
+			AuthToken: browserAuthToken,
 			ReportDir: cfg.ReportDir,
 			Timeout:   cfg.Timeout,
 		})
@@ -473,7 +487,7 @@ func RunWorkspaceVerify(
 				BaseURL:       cfg.BaseURL,
 				Domain:        cfg.Domain,
 				Slug:          cfg.Slug,
-				AuthToken:     cfg.PlaywrightAuthToken,
+				AuthToken:     browserAuthToken,
 				ReportDir:     cfg.ReportDir,
 				ExpectStopped: true,
 				Timeout:       cfg.Timeout,
