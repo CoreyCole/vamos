@@ -42,11 +42,12 @@ type CreatedMachineCredential struct {
 }
 
 type BrowserTokenRequest struct {
-	Slug         string
-	Purpose      agentbrowser.Purpose
-	Email        string
-	RedirectPath string
-	TTL          time.Duration
+	Slug         string               `json:"slug"`
+	Purpose      agentbrowser.Purpose `json:"purpose"`
+	Email        string               `json:"email"`
+	RedirectPath string               `json:"redirect_path"`
+	TTL          time.Duration        `json:"-"`
+	TTLSeconds   int64                `json:"ttl_seconds"`
 }
 
 type MachineCredentialStore interface {

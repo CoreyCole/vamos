@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"crypto/ed25519"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -28,6 +29,7 @@ import (
 	agentworker "github.com/CoreyCole/vamos/pkg/agents/worker"
 	conversationworkflow "github.com/CoreyCole/vamos/pkg/agents/workflows/conversation"
 	"github.com/CoreyCole/vamos/pkg/agents/workflows/runtime"
+	"github.com/CoreyCole/vamos/pkg/auth/agentbrowser"
 	"github.com/CoreyCole/vamos/pkg/git"
 	"github.com/CoreyCole/vamos/pkg/proto/auth/v1/authv1connect"
 	"github.com/CoreyCole/vamos/pkg/proto/comments/v1/commentsv1connect"
@@ -779,6 +781,10 @@ func main() {
 	var workspaceManager *workspaces.ManagerService
 	var handoffSigner *workspaces.HandoffSigner
 	var childDevAuthVerifyKey string
+	var agentBrowserSigningKey ed25519.PrivateKey
+	var agentBrowserVerifyKey ed25519.PublicKey
+	var agentBrowserMachineCredentials auth.MachineCredentialStore
+	agentBrowserReplay := agentbrowser.NewMemoryReplayCache()
 	switch cfg.WorkspaceMode {
 	case "manager":
 		handoffSigner, childDevAuthVerifyKey, err = workspaces.NewHandoffSignerFromSigningKey(
@@ -789,12 +795,24 @@ func main() {
 		if err != nil {
 			log.Fatal(err)
 		}
+		agentBrowserSigningKey, err = workspaces.ParseHandoffSigningKey(cfg.DevAuthSigningKey)
+		if err != nil {
+			log.Fatal(err)
+		}
+		if derived, ok := agentBrowserSigningKey.Public().(ed25519.PublicKey); ok {
+			agentBrowserVerifyKey = derived
+		}
+		agentBrowserMachineCredentials = auth.NewMemoryMachineCredentialStore()
 	case "child":
 		handoffSigner, err = workspaces.NewHandoffVerifierFromVerifyKey(
 			cfg.DevAuthVerifyKey,
 			60*time.Second,
 			workspaces.NewMemoryReplayCache(),
 		)
+		if err != nil {
+			log.Fatal(err)
+		}
+		agentBrowserVerifyKey, err = workspaces.ParseHandoffVerifyKey(cfg.DevAuthVerifyKey)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -1266,6 +1284,14 @@ func main() {
 		Token:           cfg.PlaywrightAuthToken,
 		PublicHostToken: strings.TrimSpace(cfg.WorkspaceDomain) != "",
 		WorkspaceDomain: cfg.WorkspaceDomain,
+	})
+	auth.RegisterAgentBrowserAuthRoutes(e, authService, auth.AgentBrowserAuthConfig{
+		Enabled:            cfg.WorkspaceMode != "standalone" && len(agentBrowserVerifyKey) == ed25519.PublicKeySize,
+		WorkspaceSlug:      cfg.WorkspaceSlug,
+		SigningKey:         agentBrowserSigningKey,
+		VerifyKey:          agentBrowserVerifyKey,
+		MachineCredentials: agentBrowserMachineCredentials,
+		Replay:             agentBrowserReplay,
 	})
 
 	// Mount Connect RPC service for auth
