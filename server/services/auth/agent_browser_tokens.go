@@ -2,7 +2,6 @@ package auth
 
 import (
 	"crypto/ed25519"
-	"errors"
 	"net/http"
 	"strings"
 	"time"
@@ -43,7 +42,7 @@ func (s *Service) HandleMintBrowserToken(c echo.Context, cfg AgentBrowserAuthCon
 	if cfg.MachineCredentials == nil {
 		return echo.NewHTTPError(http.StatusServiceUnavailable, "machine credentials unavailable")
 	}
-	keyID, secret, err := machineCredentialFromRequest(c.Request())
+	keyID, secret, err := MachineCredentialFromBearer(c.Request())
 	if err != nil {
 		return echo.NewHTTPError(http.StatusUnauthorized, err.Error())
 	}
@@ -135,20 +134,4 @@ func MintBrowserToken(credential MachineCredential, req BrowserTokenRequest, cfg
 		return BrowserTokenResponse{}, err
 	}
 	return BrowserTokenResponse{Token: token, ExpiresAt: expiresAt}, nil
-}
-
-func machineCredentialFromRequest(r *http.Request) (string, string, error) {
-	raw := strings.TrimSpace(r.Header.Get("Authorization"))
-	if !strings.HasPrefix(raw, "Bearer ") {
-		return "", "", errors.New("machine bearer token required")
-	}
-	token := strings.TrimSpace(strings.TrimPrefix(raw, "Bearer "))
-	if strings.HasPrefix(token, "vamos_machine_") {
-		token = strings.TrimPrefix(token, "vamos_machine_")
-	}
-	keyID, secret, ok := strings.Cut(token, ".")
-	if !ok || strings.TrimSpace(keyID) == "" || strings.TrimSpace(secret) == "" {
-		return "", "", errors.New("invalid machine bearer token")
-	}
-	return strings.TrimSpace(keyID), strings.TrimSpace(secret), nil
 }
