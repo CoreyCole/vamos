@@ -1658,9 +1658,14 @@ func TestWorkspaceActionsMenuUsesFlowSafeForms(t *testing.T) {
 		t.Fatalf("WorkspaceActionsMenu() error = %v", err)
 	}
 	html := body.String()
-	for _, forbidden := range []string{"<span><form", "</form></span>", "<button><button", "</button></button>"} {
+	for _, want := range []string{`data-slot="dropdown-menu"`, `data-signals=`, `data-on:click=`, `data-show="$workspace_actions_feature.open"`} {
+		if !strings.Contains(html, want) {
+			t.Fatalf("actions menu missing DatastarUI dropdown marker %q: %s", want, html)
+		}
+	}
+	for _, forbidden := range []string{"<span><form", "</form></span>", "<button><button", "</button></button>", "<details", "<summary"} {
 		if strings.Contains(html, forbidden) {
-			t.Fatalf("actions menu has invalid nested markup %q: %s", forbidden, html)
+			t.Fatalf("actions menu has invalid or native-details markup %q: %s", forbidden, html)
 		}
 	}
 	for _, action := range []string{"restart", "stop"} {

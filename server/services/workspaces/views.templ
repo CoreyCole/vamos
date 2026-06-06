@@ -693,16 +693,12 @@ func workspaceDropdownActionClass(destructive bool) string {
 templ WorkspaceActionsMenu(view ImplWorkspaceView, managerURL string, showHistorical bool, projectFilter WorkspacesFilter) {
 	{{ slug := workspaceViewSlug(view) }}
 	{{ dropdownID := workspaceActionsDropdownID(slug) }}
-	@dropdown.DropdownMenu(dropdown.DropdownMenuArgs{ID: dropdownID}) {
-		@dropdown.DropdownMenuTrigger(dropdown.DropdownMenuTriggerArgs{ID: dropdownID, Class: "inline-flex h-8 items-center rounded-md border px-2 text-xs font-medium hover:bg-accent"}) {
+	@dropdown.DropdownMenu(dropdown.DropdownMenuArgs{ID: dropdownID, Class: "relative inline-block"}) {
+		@dropdown.DropdownMenuTrigger(dropdown.DropdownMenuTriggerArgs{ID: dropdownID, Class: "inline-flex h-8 cursor-pointer items-center rounded-md border px-2 text-xs font-medium hover:bg-accent"}) {
 			Actions
 		}
-		@dropdown.DropdownMenuContent(dropdown.DropdownMenuContentArgs{ID: dropdownID, Align: "end", Class: "min-w-44"}) {
-			@dropdown.DropdownMenuItem(dropdown.DropdownMenuItemArgs{
-				ID:      dropdownID,
-				OnClick: "document.getElementById('workspace-dialog-" + slug + "').showModal()",
-				Class:   "text-xs",
-			}) {
+		@dropdown.DropdownMenuContent(dropdown.DropdownMenuContentArgs{ID: dropdownID, Align: "end", Side: "bottom", SideOffset: 2, Class: "min-w-44 overflow-visible p-1 text-xs"}) {
+			@dropdown.DropdownMenuItem(dropdown.DropdownMenuItemArgs{ID: dropdownID, Class: "text-xs", OnClick: "document.getElementById('workspace-dialog-" + slug + "').showModal()"}) {
 				Details
 			}
 			if workspaceVerifyHTMLURL(view) != "" {
@@ -787,31 +783,29 @@ templ WorkspaceCleanupDropdownItem(action WorkspaceCleanupAction, dropdownID str
 		{{ indicatorSignal := workspaceActionIndicatorSignal(action.Slug, "cleanup") }}
 		if action.RequiresConfirm {
 			@dropdown.DropdownMenuCustomItem(dropdown.DropdownMenuCustomItemArgs{ID: dropdownID, Class: "block max-w-xs p-2"}) {
-				<details>
-					<summary class="cursor-pointer text-xs font-medium text-destructive">{ action.Label }</summary>
-					<p class="mt-2 text-xs text-amber-700 dark:text-amber-300">{ action.Warning }</p>
-					<form method="post" action="/workspaces/cleanup" class="mt-2" data-indicator={ indicator } data-on:submit="@post('/workspaces/cleanup', {contentType: 'form'})">
-						<input type="hidden" name="slug" value={ action.Slug }/>
-						<input type="hidden" name="project" value={ firstNonEmpty(projectFilter.ProjectQueryValue(), action.ProjectID) }/>
-						if projectFilter.QueryValue() != "" {
-							<input type="hidden" name="q" value={ projectFilter.QueryValue() }/>
-						}
-						if projectFilter.ShowHistorical() {
-							<input type="hidden" name="history" value="all"/>
-						}
-						if projectFilter.Group != WorkspacesGroupAll {
-							<input type="hidden" name="group" value={ string(projectFilter.Group) }/>
-						}
-						if projectFilter.Sort != WorkspacesSortUpdatedDesc {
-							<input type="hidden" name="sort" value={ string(projectFilter.Sort) }/>
-						}
-						<input type="hidden" name="confirmed" value="true"/>
-						@button.Button(button.ButtonArgs{Type: "submit", Variant: "outline", Size: "sm", Class: "border-destructive/40 text-destructive hover:bg-destructive/10", Attributes: templ.Attributes{"data-attr:disabled": indicatorSignal}}) {
-							<span data-show={ "!" + indicatorSignal }>Confirm close</span>
-							<span data-show={ indicatorSignal }>Working...</span>
-						}
-					</form>
-				</details>
+				<p class="text-xs font-medium text-destructive">{ action.Label }</p>
+				<p class="mt-2 text-xs text-amber-700 dark:text-amber-300">{ action.Warning }</p>
+				<form method="post" action="/workspaces/cleanup" class="mt-2" data-indicator={ indicator } data-on:submit="@post('/workspaces/cleanup', {contentType: 'form'})">
+					<input type="hidden" name="slug" value={ action.Slug }/>
+					<input type="hidden" name="project" value={ firstNonEmpty(projectFilter.ProjectQueryValue(), action.ProjectID) }/>
+					if projectFilter.QueryValue() != "" {
+						<input type="hidden" name="q" value={ projectFilter.QueryValue() }/>
+					}
+					if projectFilter.ShowHistorical() {
+						<input type="hidden" name="history" value="all"/>
+					}
+					if projectFilter.Group != WorkspacesGroupAll {
+						<input type="hidden" name="group" value={ string(projectFilter.Group) }/>
+					}
+					if projectFilter.Sort != WorkspacesSortUpdatedDesc {
+						<input type="hidden" name="sort" value={ string(projectFilter.Sort) }/>
+					}
+					<input type="hidden" name="confirmed" value="true"/>
+					@button.Button(button.ButtonArgs{Type: "submit", Variant: "outline", Size: "sm", Class: "border-destructive/40 text-destructive hover:bg-destructive/10", Attributes: templ.Attributes{"data-attr:disabled": indicatorSignal}}) {
+						<span data-show={ "!" + indicatorSignal }>Confirm close</span>
+						<span data-show={ indicatorSignal }>Working...</span>
+					}
+				</form>
 			}
 		} else {
 			@dropdown.DropdownMenuCustomItem(dropdown.DropdownMenuCustomItemArgs{ID: dropdownID, Class: "p-0"}) {

@@ -120,14 +120,19 @@ func (h *Handler) notFoundAgentChatPage(c echo.Context) error {
 	)
 }
 
+// RegisterMachineAPIRoutes registers endpoints that authenticate with machine
+// bearer credentials instead of browser session middleware.
+func (h *Handler) RegisterMachineAPIRoutes(g *echo.Group) {
+	g.POST("/runs", h.PostCLIChatRun)
+	g.POST("/steer", h.PostCLIChatSteer)
+	g.GET("/chat-sessions/:session_id", h.GetCLIChatSession)
+	g.GET("/chat-sessions/:session_id/events", h.StreamCLIChatSessionEvents)
+}
+
 // RegisterRuntimeRoutes keeps temporary chat/session endpoints available while the
 // visible Agent Chat page surface moves under the Thoughts workbench.
 // TODO(slice-5-runtime-rehome): move these endpoints under /thoughts/chat/*.
 func (h *Handler) RegisterRuntimeRoutes(g *echo.Group) {
-	g.POST("/api/runs", h.PostCLIChatRun)
-	g.POST("/api/steer", h.PostCLIChatSteer)
-	g.GET("/api/chat-sessions/:session_id", h.GetCLIChatSession)
-	g.GET("/api/chat-sessions/:session_id/events", h.StreamCLIChatSessionEvents)
 	g.GET("/thread/:thread_id/stream", h.StreamThread)
 	g.GET("/thread/:thread_id/slash-commands", h.ListThreadSlashCommands)
 	g.POST("/thread/:thread_id/resume", h.ResumeThreadByPath)

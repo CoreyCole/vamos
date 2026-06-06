@@ -213,8 +213,8 @@ func ensureWorkspaceRoot(dir, projectID string) error {
 		}
 		return err
 	}
-	defer file.Close()
-	_, err = file.WriteString(fmt.Sprintf("# CLI Agent Chat Workspace\n\nProject: `%s`\n", strings.TrimSpace(projectID)))
+	defer func() { _ = file.Close() }()
+	_, err = fmt.Fprintf(file, "# CLI Agent Chat Workspace\n\nProject: `%s`\n", strings.TrimSpace(projectID))
 	return err
 }
 
@@ -244,7 +244,7 @@ func (s *Service) startWorkspaceThreadWithCWD(
 	if err != nil {
 		return nil, nil, nil, err
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 	q := s.queries.WithTx(tx)
 
 	thread, err := q.CreateAgentThread(ctx, db.CreateAgentThreadParams{

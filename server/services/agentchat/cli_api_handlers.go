@@ -24,6 +24,9 @@ func (h *Handler) PostCLIChatRun(c echo.Context) error {
 	if err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 	}
+	if err := actor.AllowsSlug(resolution.CheckoutName); err != nil {
+		return echo.NewHTTPError(http.StatusForbidden, err.Error())
+	}
 	ref, err := h.service.StartCLIChatRun(
 		c.Request().Context(),
 		actor,

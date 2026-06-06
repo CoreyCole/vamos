@@ -3361,7 +3361,7 @@ func WorkspaceActionsMenu(view ImplWorkspaceView, managerURL string, showHistori
 				}
 				return nil
 			})
-			templ_7745c5c3_Err = dropdown.DropdownMenuTrigger(dropdown.DropdownMenuTriggerArgs{ID: dropdownID, Class: "inline-flex h-8 items-center rounded-md border px-2 text-xs font-medium hover:bg-accent"}).Render(templ.WithChildren(ctx, templ_7745c5c3_Var153), templ_7745c5c3_Buffer)
+			templ_7745c5c3_Err = dropdown.DropdownMenuTrigger(dropdown.DropdownMenuTriggerArgs{ID: dropdownID, Class: "inline-flex h-8 cursor-pointer items-center rounded-md border px-2 text-xs font-medium hover:bg-accent"}).Render(templ.WithChildren(ctx, templ_7745c5c3_Var153), templ_7745c5c3_Buffer)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -3399,11 +3399,7 @@ func WorkspaceActionsMenu(view ImplWorkspaceView, managerURL string, showHistori
 					}
 					return nil
 				})
-				templ_7745c5c3_Err = dropdown.DropdownMenuItem(dropdown.DropdownMenuItemArgs{
-					ID:      dropdownID,
-					OnClick: "document.getElementById('workspace-dialog-" + slug + "').showModal()",
-					Class:   "text-xs",
-				}).Render(templ.WithChildren(ctx, templ_7745c5c3_Var155), templ_7745c5c3_Buffer)
+				templ_7745c5c3_Err = dropdown.DropdownMenuItem(dropdown.DropdownMenuItemArgs{ID: dropdownID, Class: "text-xs", OnClick: "document.getElementById('workspace-dialog-" + slug + "').showModal()"}).Render(templ.WithChildren(ctx, templ_7745c5c3_Var155), templ_7745c5c3_Buffer)
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
@@ -3481,13 +3477,13 @@ func WorkspaceActionsMenu(view ImplWorkspaceView, managerURL string, showHistori
 				}
 				return nil
 			})
-			templ_7745c5c3_Err = dropdown.DropdownMenuContent(dropdown.DropdownMenuContentArgs{ID: dropdownID, Align: "end", Class: "min-w-44"}).Render(templ.WithChildren(ctx, templ_7745c5c3_Var154), templ_7745c5c3_Buffer)
+			templ_7745c5c3_Err = dropdown.DropdownMenuContent(dropdown.DropdownMenuContentArgs{ID: dropdownID, Align: "end", Side: "bottom", SideOffset: 2, Class: "min-w-44 overflow-visible p-1 text-xs"}).Render(templ.WithChildren(ctx, templ_7745c5c3_Var154), templ_7745c5c3_Buffer)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			return nil
 		})
-		templ_7745c5c3_Err = dropdown.DropdownMenu(dropdown.DropdownMenuArgs{ID: dropdownID}).Render(templ.WithChildren(ctx, templ_7745c5c3_Var152), templ_7745c5c3_Buffer)
+		templ_7745c5c3_Err = dropdown.DropdownMenu(dropdown.DropdownMenuArgs{ID: dropdownID, Class: "relative inline-block"}).Render(templ.WithChildren(ctx, templ_7745c5c3_Var152), templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -3640,7 +3636,7 @@ func WorkspaceLifecycleDropdownForm(dropdownID string, slug string, action strin
 			var templ_7745c5c3_Var163 templ.SafeURL
 			templ_7745c5c3_Var163, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(actionPath))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 759, Col: 56}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 755, Col: 56}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var163))
 			if templ_7745c5c3_Err != nil {
@@ -3653,7 +3649,7 @@ func WorkspaceLifecycleDropdownForm(dropdownID string, slug string, action strin
 			var templ_7745c5c3_Var164 string
 			templ_7745c5c3_Var164, templ_7745c5c3_Err = templ.JoinStringErrs(indicator)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 759, Col: 85}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 755, Col: 85}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var164))
 			if templ_7745c5c3_Err != nil {
@@ -3666,7 +3662,7 @@ func WorkspaceLifecycleDropdownForm(dropdownID string, slug string, action strin
 			var templ_7745c5c3_Var165 string
 			templ_7745c5c3_Var165, templ_7745c5c3_Err = templ.JoinStringErrs("@post('" + actionPath + "', {contentType: 'form'})")
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 759, Col: 157}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 755, Col: 157}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var165))
 			if templ_7745c5c3_Err != nil {
@@ -3684,7 +3680,7 @@ func WorkspaceLifecycleDropdownForm(dropdownID string, slug string, action strin
 				var templ_7745c5c3_Var166 string
 				templ_7745c5c3_Var166, templ_7745c5c3_Err = templ.JoinStringErrs(projectFilter.ProjectQueryValue())
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 761, Col: 81}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 757, Col: 81}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var166))
 				if templ_7745c5c3_Err != nil {
@@ -3703,7 +3699,7 @@ func WorkspaceLifecycleDropdownForm(dropdownID string, slug string, action strin
 				var templ_7745c5c3_Var167 string
 				templ_7745c5c3_Var167, templ_7745c5c3_Err = templ.JoinStringErrs(projectFilter.QueryValue())
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 764, Col: 68}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 760, Col: 68}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var167))
 				if templ_7745c5c3_Err != nil {
@@ -3728,7 +3724,7 @@ func WorkspaceLifecycleDropdownForm(dropdownID string, slug string, action strin
 				var templ_7745c5c3_Var168 string
 				templ_7745c5c3_Var168, templ_7745c5c3_Err = templ.JoinStringErrs(string(projectFilter.Group))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 770, Col: 73}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 766, Col: 73}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var168))
 				if templ_7745c5c3_Err != nil {
@@ -3747,7 +3743,7 @@ func WorkspaceLifecycleDropdownForm(dropdownID string, slug string, action strin
 				var templ_7745c5c3_Var169 string
 				templ_7745c5c3_Var169, templ_7745c5c3_Err = templ.JoinStringErrs(string(projectFilter.Sort))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 773, Col: 71}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 769, Col: 71}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var169))
 				if templ_7745c5c3_Err != nil {
@@ -3777,7 +3773,7 @@ func WorkspaceLifecycleDropdownForm(dropdownID string, slug string, action strin
 				var templ_7745c5c3_Var171 string
 				templ_7745c5c3_Var171, templ_7745c5c3_Err = templ.JoinStringErrs("!" + indicatorSignal)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 776, Col: 43}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 772, Col: 43}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var171))
 				if templ_7745c5c3_Err != nil {
@@ -3790,7 +3786,7 @@ func WorkspaceLifecycleDropdownForm(dropdownID string, slug string, action strin
 				var templ_7745c5c3_Var172 string
 				templ_7745c5c3_Var172, templ_7745c5c3_Err = templ.JoinStringErrs(label)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 776, Col: 53}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 772, Col: 53}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var172))
 				if templ_7745c5c3_Err != nil {
@@ -3803,7 +3799,7 @@ func WorkspaceLifecycleDropdownForm(dropdownID string, slug string, action strin
 				var templ_7745c5c3_Var173 string
 				templ_7745c5c3_Var173, templ_7745c5c3_Err = templ.JoinStringErrs(indicatorSignal)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 777, Col: 37}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 773, Col: 37}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var173))
 				if templ_7745c5c3_Err != nil {
@@ -3816,7 +3812,7 @@ func WorkspaceLifecycleDropdownForm(dropdownID string, slug string, action strin
 				var templ_7745c5c3_Var174 string
 				templ_7745c5c3_Var174, templ_7745c5c3_Err = templ.JoinStringErrs(loadingLabel)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 777, Col: 54}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 773, Col: 54}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var174))
 				if templ_7745c5c3_Err != nil {
@@ -3884,27 +3880,27 @@ func WorkspaceCleanupDropdownItem(action WorkspaceCleanupAction, dropdownID stri
 						}()
 					}
 					ctx = templ.InitializeContext(ctx)
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 289, "<details><summary class=\"cursor-pointer text-xs font-medium text-destructive\">")
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 289, "<p class=\"text-xs font-medium text-destructive\">")
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
 					var templ_7745c5c3_Var177 string
 					templ_7745c5c3_Var177, templ_7745c5c3_Err = templ.JoinStringErrs(action.Label)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 791, Col: 88}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 786, Col: 66}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var177))
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 290, "</summary><p class=\"mt-2 text-xs text-amber-700 dark:text-amber-300\">")
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 290, "</p><p class=\"mt-2 text-xs text-amber-700 dark:text-amber-300\">")
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
 					var templ_7745c5c3_Var178 string
 					templ_7745c5c3_Var178, templ_7745c5c3_Err = templ.JoinStringErrs(action.Warning)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 792, Col: 80}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 787, Col: 79}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var178))
 					if templ_7745c5c3_Err != nil {
@@ -3917,7 +3913,7 @@ func WorkspaceCleanupDropdownItem(action WorkspaceCleanupAction, dropdownID stri
 					var templ_7745c5c3_Var179 string
 					templ_7745c5c3_Var179, templ_7745c5c3_Err = templ.JoinStringErrs(indicator)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 793, Col: 93}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 788, Col: 92}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var179))
 					if templ_7745c5c3_Err != nil {
@@ -3930,7 +3926,7 @@ func WorkspaceCleanupDropdownItem(action WorkspaceCleanupAction, dropdownID stri
 					var templ_7745c5c3_Var180 string
 					templ_7745c5c3_Var180, templ_7745c5c3_Err = templ.JoinStringErrs(action.Slug)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 794, Col: 58}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 789, Col: 57}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var180))
 					if templ_7745c5c3_Err != nil {
@@ -3943,7 +3939,7 @@ func WorkspaceCleanupDropdownItem(action WorkspaceCleanupAction, dropdownID stri
 					var templ_7745c5c3_Var181 string
 					templ_7745c5c3_Var181, templ_7745c5c3_Err = templ.JoinStringErrs(firstNonEmpty(projectFilter.ProjectQueryValue(), action.ProjectID))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 795, Col: 116}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 790, Col: 115}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var181))
 					if templ_7745c5c3_Err != nil {
@@ -3961,7 +3957,7 @@ func WorkspaceCleanupDropdownItem(action WorkspaceCleanupAction, dropdownID stri
 						var templ_7745c5c3_Var182 string
 						templ_7745c5c3_Var182, templ_7745c5c3_Err = templ.JoinStringErrs(projectFilter.QueryValue())
 						if templ_7745c5c3_Err != nil {
-							return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 797, Col: 71}
+							return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 792, Col: 70}
 						}
 						_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var182))
 						if templ_7745c5c3_Err != nil {
@@ -3986,7 +3982,7 @@ func WorkspaceCleanupDropdownItem(action WorkspaceCleanupAction, dropdownID stri
 						var templ_7745c5c3_Var183 string
 						templ_7745c5c3_Var183, templ_7745c5c3_Err = templ.JoinStringErrs(string(projectFilter.Group))
 						if templ_7745c5c3_Err != nil {
-							return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 803, Col: 76}
+							return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 798, Col: 75}
 						}
 						_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var183))
 						if templ_7745c5c3_Err != nil {
@@ -4005,7 +4001,7 @@ func WorkspaceCleanupDropdownItem(action WorkspaceCleanupAction, dropdownID stri
 						var templ_7745c5c3_Var184 string
 						templ_7745c5c3_Var184, templ_7745c5c3_Err = templ.JoinStringErrs(string(projectFilter.Sort))
 						if templ_7745c5c3_Err != nil {
-							return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 806, Col: 74}
+							return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 801, Col: 73}
 						}
 						_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var184))
 						if templ_7745c5c3_Err != nil {
@@ -4039,7 +4035,7 @@ func WorkspaceCleanupDropdownItem(action WorkspaceCleanupAction, dropdownID stri
 						var templ_7745c5c3_Var186 string
 						templ_7745c5c3_Var186, templ_7745c5c3_Err = templ.JoinStringErrs("!" + indicatorSignal)
 						if templ_7745c5c3_Err != nil {
-							return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 810, Col: 46}
+							return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 805, Col: 45}
 						}
 						_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var186))
 						if templ_7745c5c3_Err != nil {
@@ -4052,7 +4048,7 @@ func WorkspaceCleanupDropdownItem(action WorkspaceCleanupAction, dropdownID stri
 						var templ_7745c5c3_Var187 string
 						templ_7745c5c3_Var187, templ_7745c5c3_Err = templ.JoinStringErrs(indicatorSignal)
 						if templ_7745c5c3_Err != nil {
-							return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 811, Col: 40}
+							return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 806, Col: 39}
 						}
 						_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var187))
 						if templ_7745c5c3_Err != nil {
@@ -4068,7 +4064,7 @@ func WorkspaceCleanupDropdownItem(action WorkspaceCleanupAction, dropdownID stri
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 306, "</form></details>")
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 306, "</form>")
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
@@ -4098,7 +4094,7 @@ func WorkspaceCleanupDropdownItem(action WorkspaceCleanupAction, dropdownID stri
 					var templ_7745c5c3_Var189 string
 					templ_7745c5c3_Var189, templ_7745c5c3_Err = templ.JoinStringErrs(indicator)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 818, Col: 79}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 812, Col: 79}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var189))
 					if templ_7745c5c3_Err != nil {
@@ -4111,7 +4107,7 @@ func WorkspaceCleanupDropdownItem(action WorkspaceCleanupAction, dropdownID stri
 					var templ_7745c5c3_Var190 string
 					templ_7745c5c3_Var190, templ_7745c5c3_Err = templ.JoinStringErrs(action.Slug)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 819, Col: 57}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 813, Col: 57}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var190))
 					if templ_7745c5c3_Err != nil {
@@ -4124,7 +4120,7 @@ func WorkspaceCleanupDropdownItem(action WorkspaceCleanupAction, dropdownID stri
 					var templ_7745c5c3_Var191 string
 					templ_7745c5c3_Var191, templ_7745c5c3_Err = templ.JoinStringErrs(firstNonEmpty(projectFilter.ProjectQueryValue(), action.ProjectID))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 820, Col: 115}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 814, Col: 115}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var191))
 					if templ_7745c5c3_Err != nil {
@@ -4142,7 +4138,7 @@ func WorkspaceCleanupDropdownItem(action WorkspaceCleanupAction, dropdownID stri
 						var templ_7745c5c3_Var192 string
 						templ_7745c5c3_Var192, templ_7745c5c3_Err = templ.JoinStringErrs(projectFilter.QueryValue())
 						if templ_7745c5c3_Err != nil {
-							return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 822, Col: 70}
+							return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 816, Col: 70}
 						}
 						_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var192))
 						if templ_7745c5c3_Err != nil {
@@ -4167,7 +4163,7 @@ func WorkspaceCleanupDropdownItem(action WorkspaceCleanupAction, dropdownID stri
 						var templ_7745c5c3_Var193 string
 						templ_7745c5c3_Var193, templ_7745c5c3_Err = templ.JoinStringErrs(string(projectFilter.Group))
 						if templ_7745c5c3_Err != nil {
-							return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 828, Col: 75}
+							return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 822, Col: 75}
 						}
 						_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var193))
 						if templ_7745c5c3_Err != nil {
@@ -4186,7 +4182,7 @@ func WorkspaceCleanupDropdownItem(action WorkspaceCleanupAction, dropdownID stri
 						var templ_7745c5c3_Var194 string
 						templ_7745c5c3_Var194, templ_7745c5c3_Err = templ.JoinStringErrs(string(projectFilter.Sort))
 						if templ_7745c5c3_Err != nil {
-							return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 831, Col: 73}
+							return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 825, Col: 73}
 						}
 						_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var194))
 						if templ_7745c5c3_Err != nil {
@@ -4216,7 +4212,7 @@ func WorkspaceCleanupDropdownItem(action WorkspaceCleanupAction, dropdownID stri
 						var templ_7745c5c3_Var196 string
 						templ_7745c5c3_Var196, templ_7745c5c3_Err = templ.JoinStringErrs("!" + indicatorSignal)
 						if templ_7745c5c3_Err != nil {
-							return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 834, Col: 45}
+							return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 828, Col: 45}
 						}
 						_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var196))
 						if templ_7745c5c3_Err != nil {
@@ -4229,7 +4225,7 @@ func WorkspaceCleanupDropdownItem(action WorkspaceCleanupAction, dropdownID stri
 						var templ_7745c5c3_Var197 string
 						templ_7745c5c3_Var197, templ_7745c5c3_Err = templ.JoinStringErrs(action.Label)
 						if templ_7745c5c3_Err != nil {
-							return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 834, Col: 62}
+							return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 828, Col: 62}
 						}
 						_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var197))
 						if templ_7745c5c3_Err != nil {
@@ -4242,7 +4238,7 @@ func WorkspaceCleanupDropdownItem(action WorkspaceCleanupAction, dropdownID stri
 						var templ_7745c5c3_Var198 string
 						templ_7745c5c3_Var198, templ_7745c5c3_Err = templ.JoinStringErrs(indicatorSignal)
 						if templ_7745c5c3_Err != nil {
-							return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 835, Col: 39}
+							return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 829, Col: 39}
 						}
 						_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var198))
 						if templ_7745c5c3_Err != nil {

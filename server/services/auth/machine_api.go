@@ -29,6 +29,16 @@ func MachineCredentialFromBearer(r *http.Request) (keyID, secret string, err err
 	return strings.TrimSpace(keyID), strings.TrimSpace(secret), nil
 }
 
+func (a MachineAPIActor) AllowsSlug(slug string) error {
+	if len(a.AllowedSlugs) == 0 {
+		return nil
+	}
+	if containsString(a.AllowedSlugs, strings.TrimSpace(slug)) {
+		return nil
+	}
+	return errors.New("slug not allowed")
+}
+
 func AuthenticateMachineAPIRequest(ctx context.Context, r *http.Request, store MachineCredentialStore) (MachineAPIActor, error) {
 	if store == nil {
 		return MachineAPIActor{}, errors.New("machine credentials unavailable")

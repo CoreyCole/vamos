@@ -56,8 +56,8 @@ func TestPostCLIChatRunStartsRunWithProjectCheckoutCWD(t *testing.T) {
 		PublicBaseURL: "https://vamos.example.test",
 	})
 	e := echo.New()
-	group := e.Group("/agent-chat")
-	handler.RegisterRuntimeRoutes(group)
+	group := e.Group("/agent-chat/api")
+	handler.RegisterMachineAPIRoutes(group)
 
 	body := bytes.NewBufferString(`{"project_id":"github.com/coreycole/vamos","prompt":"hello from cli"}`)
 	req := httptest.NewRequest(http.MethodPost, "/agent-chat/api/runs", body)
@@ -143,7 +143,7 @@ func TestPostCLIChatSteerStartsFollowUpRun(t *testing.T) {
 	store, secret := newCLITestMachineStore(t)
 	handler := newCLITestHandler(t, service, store, checkoutRoot)
 	e := echo.New()
-	handler.RegisterRuntimeRoutes(e.Group("/agent-chat"))
+	handler.RegisterMachineAPIRoutes(e.Group("/agent-chat/api"))
 
 	start := postCLIRun(t, e, secret, `{"project_id":"github.com/coreycole/vamos","prompt":"initial"}`)
 	if err := service.queries.CompleteAgentRun(t.Context(), db.CompleteAgentRunParams{ID: start.Ref.RunID, ResultHeadEntryID: sql.NullString{String: "entry-1", Valid: true}}); err != nil {
@@ -181,7 +181,7 @@ func TestPostCLIChatSteerRejectsActiveRunWithRefs(t *testing.T) {
 	store, secret := newCLITestMachineStore(t)
 	handler := newCLITestHandler(t, service, store, checkoutRoot)
 	e := echo.New()
-	handler.RegisterRuntimeRoutes(e.Group("/agent-chat"))
+	handler.RegisterMachineAPIRoutes(e.Group("/agent-chat/api"))
 
 	start := postCLIRun(t, e, secret, `{"project_id":"github.com/coreycole/vamos","prompt":"initial"}`)
 	req := httptest.NewRequest(http.MethodPost, "/agent-chat/api/steer", strings.NewReader(`{"thread_id":"`+start.Ref.ThreadID+`","prompt":"follow up"}`))
@@ -252,6 +252,33 @@ func postCLIRun(t *testing.T, e *echo.Echo, secret serverauth.CreatedMachineCred
 	return response
 }
 
+func TestPostCLIChatRunRejectsDisallowedCheckoutSlug(t *testing.T) {
+	service := newTestAgentChatService(t)
+	service.temporal = &fakeTemporalStarter{}
+	checkoutRoot := t.TempDir()
+	store := serverauth.NewMemoryMachineCredentialStore()
+	created, err := store.Create(t.Context(), serverauth.CreateMachineCredentialInput{
+		Name:              "cli",
+		DefaultActorEmail: "agent@example.test",
+		AllowedSlugs:      []string{"other"},
+	})
+	if err != nil {
+		t.Fatalf("Create machine credential: %v", err)
+	}
+	handler := newCLITestHandler(t, service, store, checkoutRoot)
+	e := echo.New()
+	handler.RegisterMachineAPIRoutes(e.Group("/agent-chat/api"))
+
+	req := httptest.NewRequest(http.MethodPost, "/agent-chat/api/runs", strings.NewReader(`{"project_id":"github.com/coreycole/vamos","prompt":"hello"}`))
+	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+	req.Header.Set("Authorization", "Bearer vamos_machine_"+created.Credential.ID+"."+created.Secret)
+	rec := httptest.NewRecorder()
+	e.ServeHTTP(rec, req)
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("status = %d, want 403; body=%s", rec.Code, rec.Body.String())
+	}
+}
+
 func TestPostCLIChatRunRejectsUnauthorizedAndUnknownProject(t *testing.T) {
 	service := newTestAgentChatService(t)
 	service.temporal = &fakeTemporalStarter{}
@@ -261,8 +288,8 @@ func TestPostCLIChatRunRejectsUnauthorizedAndUnknownProject(t *testing.T) {
 		ProjectsConfig:     servercfg.ProjectsConfig{Repos: map[string]servercfg.RepoConfig{}},
 	})
 	e := echo.New()
-	group := e.Group("/agent-chat")
-	handler.RegisterRuntimeRoutes(group)
+	group := e.Group("/agent-chat/api")
+	handler.RegisterMachineAPIRoutes(group)
 
 	req := httptest.NewRequest(http.MethodPost, "/agent-chat/api/runs", strings.NewReader(`{"project_id":"missing","prompt":"hello"}`))
 	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)

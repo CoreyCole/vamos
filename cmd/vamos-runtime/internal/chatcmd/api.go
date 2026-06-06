@@ -84,7 +84,7 @@ func (c HTTPAPIClient) Events(ctx context.Context, keyID, secret, sessionID stri
 		return nil, err
 	}
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		defer resp.Body.Close()
+		defer func() { _ = resp.Body.Close() }()
 		body, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
 		return nil, fmt.Errorf("chat session SSE failed: %s: %s", resp.Status, strings.TrimSpace(string(body)))
 	}
@@ -124,7 +124,7 @@ func (c HTTPAPIClient) doJSONAllowStatus(ctx context.Context, method, path, keyI
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		if statusAllowed(resp.StatusCode, allowedStatuses) {
 			if out == nil {

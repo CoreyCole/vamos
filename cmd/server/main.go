@@ -731,6 +731,9 @@ func registerAgentChatEntryRoutes(
 		return markdownService.ServeMarkdown(c)
 	}, authMiddleware)
 
+	agentChatAPIGroup := e.Group("/agent-chat/api")
+	handler.RegisterMachineAPIRoutes(agentChatAPIGroup)
+
 	agentChatGroup := e.Group("/agent-chat")
 	agentChatGroup.Use(authMiddleware)
 	handler.RegisterRuntimeRoutes(agentChatGroup)
@@ -1026,9 +1029,7 @@ func main() {
 
 	fmt.Printf("Database initialized at: %s\n", cfg.DatabasePath)
 
-	if cfg.WorkspaceMode == "manager" {
-		agentBrowserMachineCredentials = auth.NewSQLMachineCredentialStore(dbService.Queries)
-	}
+	agentBrowserMachineCredentials = auth.NewSQLMachineCredentialStore(dbService.Queries)
 
 	// Create auth service
 	authService, err := auth.NewService(
