@@ -152,33 +152,40 @@ func OpenWorkspacesWithProjectFilter(projectID string) spec.Step {
 	return OpenWorkspacesWithFilters(WorkspacesStoryFilters{Project: projectID})
 }
 
+func workspacesPath(filters WorkspacesStoryFilters) string {
+	values := url.Values{}
+	if filters.Project != "" {
+		values.Set("project", filters.Project)
+	}
+	if filters.Query != "" {
+		values.Set("q", filters.Query)
+	}
+	if filters.History != "" {
+		values.Set("history", filters.History)
+	}
+	if filters.Group != "" {
+		values.Set("group", filters.Group)
+	}
+	if filters.Sort != "" {
+		values.Set("sort", filters.Sort)
+	}
+	p := "/workspaces"
+	if encoded := values.Encode(); encoded != "" {
+		p += "?" + encoded
+	}
+	return p
+}
+
 func OpenWorkspacesWithFilters(filters WorkspacesStoryFilters) spec.Step {
 	return customStep("open workspaces with filters", func(t testing.TB, ctx *duiruntime.Context) {
-		values := url.Values{}
-		if filters.Project != "" {
-			values.Set("project", filters.Project)
-		}
-		if filters.Query != "" {
-			values.Set("q", filters.Query)
-		}
-		if filters.History != "" {
-			values.Set("history", filters.History)
-		}
-		if filters.Group != "" {
-			values.Set("group", filters.Group)
-		}
-		if filters.Sort != "" {
-			values.Set("sort", filters.Sort)
-		}
-		p := "/workspaces"
-		if encoded := values.Encode(); encoded != "" {
-			p += "?" + encoded
-		}
-		authURL, err := BuildAuthURL(ctx.Config, p)
-		if err != nil {
+		targetPath := workspacesPath(filters)
+		if err := Authenticate(context.Background(), ctx.Page, ctx.Config, "playwright@localhost"); err != nil {
 			t.Fatal(err)
 		}
-		if _, err := ctx.Page.Goto(authURL, playwright.PageGotoOptions{WaitUntil: playwright.WaitUntilStateDomcontentloaded}); err != nil {
+		if _, err := ctx.Page.Goto(
+			strings.TrimRight(ctx.Config.BaseURL, "/")+targetPath,
+			playwright.PageGotoOptions{WaitUntil: playwright.WaitUntilStateDomcontentloaded},
+		); err != nil {
 			t.Fatal(err)
 		}
 		if err := ctx.Page.Locator("#workspaces-list").WaitFor(); err != nil {
