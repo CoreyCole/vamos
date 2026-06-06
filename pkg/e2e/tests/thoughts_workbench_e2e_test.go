@@ -113,6 +113,11 @@ func TestThoughtsWorkbench_WorkspacesPageSearchHistoryAndProjectFilters(t *testi
 		Expect(vamos.ExpectWorkspaceVisible("E2E Active Workspace")).
 		Expect(vamos.ExpectWorkspaceHidden("E2E datastarui workspace")).
 		Expect(vamos.ExpectWorkspacesURLContains(map[string]string{"project": "vamos", "q": "active"})).
+		Do(vamos.OpenWorkspacesWithFilters(vamos.WorkspacesStoryFilters{History: "all"})).
+		Do(vamos.ChangeWorkspacesFilters(vamos.WorkspacesStoryFilters{History: "all", Query: "primary-only", Sort: "name_asc"})).
+		Expect(vamos.ExpectWorkspaceVisible("E2E Primary Only Plan")).
+		Expect(vamos.ExpectWorkspaceHidden("E2E datastarui workspace")).
+		Expect(vamos.ExpectWorkspacesURLContains(map[string]string{"history": "all", "q": "primary-only", "sort": "name_asc"})).
 		Run()
 }
 

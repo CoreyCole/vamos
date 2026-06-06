@@ -12,6 +12,7 @@ import (
 	"os/exec"
 	"path"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -250,6 +251,106 @@ func ExpectWorkspacesInOrder(labels ...string) expectation {
 			}
 		}
 	})}
+}
+
+func ChangeWorkspacesFilters(filters WorkspacesStoryFilters) spec.Step {
+	return customStep("change workspaces filters", func(t testing.TB, ctx *duiruntime.Context) {
+		applied := currentWorkspacesFilters(ctx.Page.URL())
+		if filters.History != "" && filters.History != "active" && applied.History != filters.History {
+			if err := ctx.Page.GetByRole(*playwright.AriaRoleLink, playwright.PageGetByRoleOptions{Name: "Show history"}).Click(); err != nil {
+				t.Fatal(err)
+			}
+			applied.History = filters.History
+			waitForWorkspacesURLParams(t, ctx, applied)
+		}
+		if filters.Query != "" && applied.Query != filters.Query {
+			if err := ctx.Page.Locator("#workspaces-search").Fill(filters.Query); err != nil {
+				t.Fatal(err)
+			}
+			applied.Query = filters.Query
+			waitForWorkspacesURLParams(t, ctx, applied)
+		}
+		if filters.Project != "" && applied.Project != filters.Project {
+			selectWorkspacesFilter(t, ctx, "#project-filter", filters.Project)
+			applied.Project = filters.Project
+			waitForWorkspacesURLParams(t, ctx, applied)
+		}
+		if filters.Group != "" && applied.Group != filters.Group {
+			selectWorkspacesFilter(t, ctx, "#workspaces-group-filter", filters.Group)
+			applied.Group = filters.Group
+			waitForWorkspacesURLParams(t, ctx, applied)
+		}
+		if filters.Sort != "" && applied.Sort != filters.Sort {
+			selectWorkspacesFilter(t, ctx, "#workspaces-sort-filter", filters.Sort)
+			applied.Sort = filters.Sort
+			waitForWorkspacesURLParams(t, ctx, applied)
+		}
+		if err := ctx.Page.Locator("#workspaces-list").WaitFor(); err != nil {
+			t.Fatalf("workspaces list did not render after filter change: %v", err)
+		}
+	})
+}
+
+func selectWorkspacesFilter(t testing.TB, ctx *duiruntime.Context, rootSelector, value string) {
+	t.Helper()
+	root := ctx.Page.Locator(rootSelector)
+	if err := root.Locator("button[data-slot='select-trigger']").Click(); err != nil {
+		t.Fatal(err)
+	}
+	option := root.Locator("[data-select-item][data-value=" + strconv.Quote(value) + "]")
+	if err := option.Click(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func waitForWorkspacesURLParams(t testing.TB, ctx *duiruntime.Context, filters WorkspacesStoryFilters) {
+	t.Helper()
+	deadline := time.Now().Add(5 * time.Second)
+	for time.Now().Before(deadline) {
+		parsed, err := url.Parse(ctx.Page.URL())
+		if err == nil && parsed.Path == "/workspaces" && workspacesURLHasFilters(parsed.Query(), filters) {
+			if err := ctx.Page.Locator("#workspaces-list").WaitFor(); err != nil {
+				t.Fatalf("workspaces list did not render at %s: %v", ctx.Page.URL(), err)
+			}
+			return
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+	t.Fatalf("workspaces URL did not settle with filters %+v; current=%s", filters, ctx.Page.URL())
+}
+
+func currentWorkspacesFilters(rawURL string) WorkspacesStoryFilters {
+	parsed, err := url.Parse(rawURL)
+	if err != nil {
+		return WorkspacesStoryFilters{}
+	}
+	values := parsed.Query()
+	return WorkspacesStoryFilters{
+		Project: values.Get("project"),
+		Query:   values.Get("q"),
+		History: values.Get("history"),
+		Group:   values.Get("group"),
+		Sort:    values.Get("sort"),
+	}
+}
+
+func workspacesURLHasFilters(values url.Values, filters WorkspacesStoryFilters) bool {
+	if filters.Project != "" && values.Get("project") != filters.Project {
+		return false
+	}
+	if filters.Query != "" && values.Get("q") != filters.Query {
+		return false
+	}
+	if filters.History != "" && filters.History != "active" && values.Get("history") != filters.History {
+		return false
+	}
+	if filters.Group != "" && values.Get("group") != filters.Group {
+		return false
+	}
+	if filters.Sort != "" && values.Get("sort") != filters.Sort {
+		return false
+	}
+	return true
 }
 
 func ExpectWorkspacesURLContains(params map[string]string) expectation {
