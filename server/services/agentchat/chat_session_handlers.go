@@ -25,33 +25,54 @@ func (h *Handler) GetChatSessionSnapshot(c echo.Context) error {
 	if !ok || strings.TrimSpace(userEmail) == "" {
 		return echo.NewHTTPError(http.StatusUnauthorized, "not authenticated")
 	}
-	session, err := h.service.queries.GetChatSession(
+	snapshot, err := h.getAuthorizedChatSessionSnapshot(
 		c.Request().Context(),
 		c.Param("session_id"),
+		userEmail,
 	)
 	if err != nil {
-		return echo.NewHTTPError(http.StatusNotFound, err.Error())
+		return chatSessionSnapshotHTTPError(err)
+	}
+	return c.JSON(http.StatusOK, snapshot)
+}
+
+func (h *Handler) getAuthorizedChatSessionSnapshot(
+	ctx context.Context,
+	sessionID string,
+	actorEmail string,
+) (chatSessionSnapshotResponse, error) {
+	sessionID = strings.TrimSpace(sessionID)
+	actorEmail = strings.TrimSpace(actorEmail)
+	session, err := h.service.queries.GetChatSession(ctx, sessionID)
+	if err != nil {
+		return chatSessionSnapshotResponse{}, err
 	}
 	if _, err := h.service.GetWorkspaceForUserOrTrustedImport(
-		c.Request().Context(),
-		userEmail,
+		ctx,
+		actorEmail,
 		session.WorkspaceID,
 	); err != nil {
-		return echo.NewHTTPError(http.StatusNotFound, err.Error())
+		return chatSessionSnapshotResponse{}, err
 	}
-	projection, err := chatsession.NewService(h.service.db, h.service.queries).
-		Snapshot(c.Request().Context(), session.ID)
+	projection, err := h.service.chatSessions.Snapshot(ctx, session.ID)
 	if err != nil {
-		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
+		return chatSessionSnapshotResponse{}, fmt.Errorf("snapshot chat session: %w", err)
 	}
 	projection.Messages = mergePartialProjectedMessages(
 		projection.Messages,
 		h.service.ActivePartialSnapshot(session.ID),
 	)
-	return c.JSON(
-		http.StatusOK,
-		chatSessionSnapshotResponse{Projection: projection, LastSeq: projection.LastSeq},
-	)
+	return chatSessionSnapshotResponse{Projection: projection, LastSeq: projection.LastSeq}, nil
+}
+
+func chatSessionSnapshotHTTPError(err error) error {
+	if err == nil {
+		return nil
+	}
+	if strings.Contains(err.Error(), "snapshot chat session") {
+		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
+	}
+	return echo.NewHTTPError(http.StatusNotFound, err.Error())
 }
 
 func (h *Handler) StreamChatSessionEvents(c echo.Context) error {
@@ -59,15 +80,24 @@ func (h *Handler) StreamChatSessionEvents(c echo.Context) error {
 	if !ok || strings.TrimSpace(userEmail) == "" {
 		return echo.NewHTTPError(http.StatusUnauthorized, "not authenticated")
 	}
+	return h.streamAuthorizedChatSessionEvents(c, c.Param("session_id"), userEmail)
+}
+
+func (h *Handler) streamAuthorizedChatSessionEvents(
+	c echo.Context,
+	sessionID string,
+	actorEmail string,
+) error {
 	ctx := c.Request().Context()
-	sessionID := strings.TrimSpace(c.Param("session_id"))
+	sessionID = strings.TrimSpace(sessionID)
+	actorEmail = strings.TrimSpace(actorEmail)
 	session, err := h.service.queries.GetChatSession(ctx, sessionID)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusNotFound, err.Error())
 	}
 	if _, err := h.service.GetWorkspaceForUserOrTrustedImport(
 		ctx,
-		userEmail,
+		actorEmail,
 		session.WorkspaceID,
 	); err != nil {
 		return echo.NewHTTPError(http.StatusNotFound, err.Error())
@@ -77,7 +107,7 @@ func (h *Handler) StreamChatSessionEvents(c echo.Context) error {
 	c.Response().Header().Set(echo.HeaderCacheControl, "no-cache")
 	c.Response().WriteHeader(http.StatusOK)
 
-	svc := chatsession.NewService(h.service.db, h.service.queries)
+	svc := h.service.chatSessions
 	lastSeq, err := writeChatSessionEvents(ctx, c.Response(), svc, sessionID, afterSeq)
 	if err == nil {
 		err = writeActivePartialEvent(c.Response(), sessionID, h.service.ActivePartialSnapshot(sessionID))
