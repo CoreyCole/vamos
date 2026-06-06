@@ -16,6 +16,7 @@ type ChatNDJSONEvent struct {
 	Ref              ChatRunRef      `json:"ref,omitempty"`
 	Response         string          `json:"response,omitempty"`
 	Error            string          `json:"error,omitempty"`
+	Reason           string          `json:"reason,omitempty"`
 	QRSPIResult      json.RawMessage `json:"qrspi_result,omitempty"`
 	LatestThreadID   string          `json:"latest_thread_id,omitempty"`
 	LatestWebURL     string          `json:"latest_web_url,omitempty"`

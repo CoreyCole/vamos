@@ -21,9 +21,11 @@ func (fakeStore) Load(string) (authcmd.Profile, string, error) {
 }
 
 type fakeAPI struct {
-	startReq    ChatStartRequest
-	eventAfters []int64
-	streams     []string
+	startReq      ChatStartRequest
+	steerReq      ChatSteerRequest
+	steerResponse ChatAPIResponse
+	eventAfters   []int64
+	streams       []string
 }
 
 func (f *fakeAPI) Start(_ context.Context, keyID, secret string, req ChatStartRequest) (ChatAPIResponse, error) {
@@ -34,8 +36,15 @@ func (f *fakeAPI) Start(_ context.Context, keyID, secret string, req ChatStartRe
 	return ChatAPIResponse{Type: "started", Ref: ChatRunRef{ProjectID: req.ProjectID, WorkspaceID: "ws-1", ThreadID: "thread-1", RunID: "run-1", ChatSessionID: "session-1", WebURL: "https://main.test/thoughts/?context=chat&thread=thread-1&run=run-1", CWD: "/repo", EventAfter: 0}}, nil
 }
 
-func (f *fakeAPI) Steer(context.Context, string, string, ChatSteerRequest) (ChatAPIResponse, error) {
-	return ChatAPIResponse{Type: "steer_rejected", Ref: ChatRunRef{ThreadID: "thread-1"}}, nil
+func (f *fakeAPI) Steer(_ context.Context, keyID, secret string, req ChatSteerRequest) (ChatAPIResponse, error) {
+	if keyID != "machine-1" || secret != "secret-1" {
+		return ChatAPIResponse{}, context.Canceled
+	}
+	f.steerReq = req
+	if f.steerResponse.Type != "" {
+		return f.steerResponse, nil
+	}
+	return ChatAPIResponse{Type: "steer_rejected", Ref: ChatRunRef{ThreadID: req.ThreadID}, Reason: "run_in_progress"}, nil
 }
 
 func (f *fakeAPI) Snapshot(context.Context, string, string, string) (snapshotResponse, error) {
@@ -119,6 +128,53 @@ func TestStreamRunNDJSONReconnectsWithLastSeq(t *testing.T) {
 	}
 	if got, want := api.eventAfters, []int64{5, 7}; len(got) != len(want) || got[0] != want[0] || got[1] != want[1] {
 		t.Fatalf("event afters = %v want %v", got, want)
+	}
+}
+
+func TestRunSteerPrintsAcceptedAndStreamsResult(t *testing.T) {
+	api := &fakeAPI{steerResponse: ChatAPIResponse{Type: "steer_accepted", Ref: ChatRunRef{WorkspaceID: "ws-1", ThreadID: "thread-1", RunID: "run-1", ChatSessionID: "session-1", WebURL: "https://main.test/thoughts/?thread=thread-1&run=run-1"}, InfluencesLatest: true}}
+	var out bytes.Buffer
+	err := RunSteer(context.Background(), SteerOptions{ManagerURL: "https://main.workspaces.test", ThreadID: "thread-1", Prompt: "recover", Profile: "default"}, deps{
+		Store:        fakeStore{},
+		APIClientNew: func(string) APIClient { return api },
+	}, &out)
+	if err != nil {
+		t.Fatalf("RunSteer() error = %v", err)
+	}
+	if api.steerReq.ThreadID != "thread-1" || api.steerReq.Prompt != "recover" {
+		t.Fatalf("steer request = %+v", api.steerReq)
+	}
+	lines := strings.Split(strings.TrimSpace(out.String()), "\n")
+	if len(lines) != 4 {
+		t.Fatalf("lines = %d: %q", len(lines), out.String())
+	}
+	var first ChatNDJSONEvent
+	if err := json.Unmarshal([]byte(lines[0]), &first); err != nil || first.Type != "steer_accepted" || !first.InfluencesLatest {
+		t.Fatalf("first = %+v err=%v", first, err)
+	}
+	var last ChatNDJSONEvent
+	if err := json.Unmarshal([]byte(lines[3]), &last); err != nil || last.Type != "result" || last.Status != "complete" {
+		t.Fatalf("last = %+v err=%v", last, err)
+	}
+}
+
+func TestRunSteerRejectedPrintsOneLineWithoutStreaming(t *testing.T) {
+	api := &fakeAPI{steerResponse: ChatAPIResponse{Type: "steer_rejected", Ref: ChatRunRef{ThreadID: "thread-1", RunID: "run-active"}, Reason: "run_in_progress", LatestThreadID: "thread-1", InfluencesLatest: true}}
+	var out bytes.Buffer
+	err := RunSteer(context.Background(), SteerOptions{ManagerURL: "https://main.workspaces.test", ThreadID: "thread-1", Prompt: "recover", Profile: "default"}, deps{
+		Store:        fakeStore{},
+		APIClientNew: func(string) APIClient { return api },
+	}, &out)
+	if err != nil {
+		t.Fatalf("RunSteer() error = %v", err)
+	}
+	lines := strings.Split(strings.TrimSpace(out.String()), "\n")
+	if len(lines) != 1 || len(api.eventAfters) != 0 {
+		t.Fatalf("lines=%d eventAfters=%v out=%q", len(lines), api.eventAfters, out.String())
+	}
+	var first ChatNDJSONEvent
+	if err := json.Unmarshal([]byte(lines[0]), &first); err != nil || first.Type != "steer_rejected" || first.Ref.RunID != "run-active" || first.LatestThreadID != "thread-1" {
+		t.Fatalf("first = %+v err=%v", first, err)
 	}
 }
 

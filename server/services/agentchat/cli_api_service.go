@@ -3,6 +3,7 @@ package agentchat
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"net/url"
 	"os"
@@ -62,6 +63,107 @@ func (s *Service) StartCLIChatRun(
 		CWD:           resolution.RootPath,
 		EventAfter:    lastSeq,
 	}, nil
+}
+
+func (s *Service) SteerCLIChatThread(
+	ctx context.Context,
+	actor serverauth.MachineAPIActor,
+	req ChatSteerRequest,
+	publicBaseURL string,
+) (ChatRunRef, ChatSteerDisposition, error) {
+	threadID := strings.TrimSpace(req.ThreadID)
+	prompt := strings.TrimSpace(req.Prompt)
+	if threadID == "" {
+		return ChatRunRef{}, ChatSteerDisposition{}, fmt.Errorf("thread_id is required")
+	}
+	if prompt == "" {
+		return ChatRunRef{}, ChatSteerDisposition{}, fmt.Errorf("prompt is required")
+	}
+
+	workspace, ok, err := s.ResolvePrimaryWorkspaceForThread(ctx, actor.ActorEmail, threadID)
+	if err != nil {
+		return ChatRunRef{}, ChatSteerDisposition{}, err
+	}
+	if !ok {
+		return ChatRunRef{}, ChatSteerDisposition{}, sql.ErrNoRows
+	}
+
+	disposition := s.chatSteerDisposition(ctx, workspace, threadID, publicBaseURL)
+	latestRun, err := s.queries.GetLatestAgentRunByWorkspaceThread(ctx, db.GetLatestAgentRunByWorkspaceThreadParams{
+		WorkspaceID: nullString(workspace.ID),
+		ThreadID:    threadID,
+	})
+	if err == nil && isActiveRunStatus(latestRun.Status) {
+		ref := ChatRunRef{
+			WorkspaceID: workspace.ID,
+			ThreadID:    threadID,
+			RunID:       latestRun.ID,
+			WebURL:      absoluteChatURL(publicBaseURL, threadID, latestRun.ID),
+			CWD:         strings.TrimSpace(workspace.Cwd.String),
+		}
+		if sessionID := s.chatSessionIDForRun(ctx, latestRun); sessionID != "" {
+			ref.ChatSessionID = sessionID
+		}
+		disposition.Reason = "run_in_progress"
+		return ref, disposition, ErrThreadRunInProgress
+	}
+
+	thread, run, _, err := s.ResumeWorkspaceThread(ctx, workspace.ID, actor.ActorEmail, threadID, prompt)
+	if err != nil {
+		if errors.Is(err, ErrThreadRunInProgress) {
+			disposition.Reason = "run_in_progress"
+		}
+		return ChatRunRef{}, disposition, err
+	}
+	chatSessionID := s.chatSessionIDForRun(ctx, *run)
+	lastSeq := int64(0)
+	if strings.TrimSpace(chatSessionID) != "" {
+		if projection, err := s.chatSessions.Snapshot(ctx, chatSessionID); err == nil {
+			lastSeq = projection.LastSeq
+		}
+	}
+	ref := ChatRunRef{
+		WorkspaceID:   workspace.ID,
+		ThreadID:      thread.ID,
+		RunID:         run.ID,
+		ChatSessionID: chatSessionID,
+		WebURL:        absoluteChatURL(publicBaseURL, thread.ID, run.ID),
+		CWD:           thread.Cwd,
+		EventAfter:    lastSeq,
+	}
+	return ref, disposition, nil
+}
+
+func (s *Service) chatSteerDisposition(ctx context.Context, workspace db.Workspace, threadID, publicBaseURL string) ChatSteerDisposition {
+	latestThreadID := strings.TrimSpace(workspace.SelectedThreadID.String)
+	if latestThreadID == "" {
+		latestThreadID = threadID
+	}
+	latestURL := ""
+	if latestThreadID != "" {
+		latestRunID := ""
+		if run, err := s.queries.GetLatestAgentRunByWorkspaceThread(ctx, db.GetLatestAgentRunByWorkspaceThreadParams{
+			WorkspaceID: nullString(workspace.ID),
+			ThreadID:    latestThreadID,
+		}); err == nil {
+			latestRunID = run.ID
+		}
+		latestURL = absoluteChatURL(publicBaseURL, latestThreadID, latestRunID)
+	}
+	return ChatSteerDisposition{
+		InfluencesLatest: latestThreadID == "" || latestThreadID == threadID,
+		LatestThreadID:   latestThreadID,
+		LatestWebURL:     latestURL,
+	}
+}
+
+func isActiveRunStatus(status string) bool {
+	switch strings.ToLower(strings.TrimSpace(status)) {
+	case "", "complete", "completed", "failed", "canceled", "cancelled":
+		return false
+	default:
+		return true
+	}
 }
 
 func (s *Service) createCLIProjectWorkspace(

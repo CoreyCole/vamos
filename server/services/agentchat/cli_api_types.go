@@ -23,6 +23,13 @@ type ChatRunRef struct {
 	EventAfter    int64  `json:"event_after"`
 }
 
+type ChatSteerDisposition struct {
+	InfluencesLatest bool
+	LatestThreadID   string
+	LatestWebURL     string
+	Reason           string
+}
+
 type ChatAPIResponse struct {
 	Type             string          `json:"type"`
 	Ref              ChatRunRef      `json:"ref,omitempty"`

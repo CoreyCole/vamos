@@ -4,6 +4,7 @@ package agentchat
 
 import (
 	"bytes"
+	"database/sql"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -132,6 +133,123 @@ func TestPostCLIChatRunStartsRunWithProjectCheckoutCWD(t *testing.T) {
 	if !workspace.CurrentSessionID.Valid || workspace.CurrentSessionID.String != ref.ChatSessionID {
 		t.Fatalf("workspace current session = %v, want %s", workspace.CurrentSessionID, ref.ChatSessionID)
 	}
+}
+
+func TestPostCLIChatSteerStartsFollowUpRun(t *testing.T) {
+	service := newTestAgentChatService(t)
+	fakeTemporal := &fakeTemporalStarter{}
+	service.temporal = fakeTemporal
+	checkoutRoot := t.TempDir()
+	store, secret := newCLITestMachineStore(t)
+	handler := newCLITestHandler(t, service, store, checkoutRoot)
+	e := echo.New()
+	handler.RegisterRuntimeRoutes(e.Group("/agent-chat"))
+
+	start := postCLIRun(t, e, secret, `{"project_id":"github.com/coreycole/vamos","prompt":"initial"}`)
+	if err := service.queries.CompleteAgentRun(t.Context(), db.CompleteAgentRunParams{ID: start.Ref.RunID, ResultHeadEntryID: sql.NullString{String: "entry-1", Valid: true}}); err != nil {
+		t.Fatalf("CompleteAgentRun: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/agent-chat/api/steer", strings.NewReader(`{"thread_id":"`+start.Ref.ThreadID+`","prompt":"follow up"}`))
+	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+	req.Header.Set("Authorization", "Bearer vamos_machine_"+secret.Credential.ID+"."+secret.Secret)
+	rec := httptest.NewRecorder()
+	e.ServeHTTP(rec, req)
+	if rec.Code != http.StatusAccepted {
+		t.Fatalf("status = %d, body = %s", rec.Code, rec.Body.String())
+	}
+	var response ChatAPIResponse
+	if err := json.Unmarshal(rec.Body.Bytes(), &response); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if response.Type != "steer_accepted" || !response.InfluencesLatest {
+		t.Fatalf("response = %+v", response)
+	}
+	if response.Ref.ThreadID != start.Ref.ThreadID || response.Ref.RunID == "" || response.Ref.RunID == start.Ref.RunID || response.Ref.ChatSessionID == "" {
+		t.Fatalf("ref = %+v start = %+v", response.Ref, start.Ref)
+	}
+	input, ok := fakeTemporal.lastInput.(conversation.RunInput)
+	if !ok || input.ThreadID != start.Ref.ThreadID || input.RunID != response.Ref.RunID {
+		t.Fatalf("temporal input = %+v (%T), response = %+v", fakeTemporal.lastInput, fakeTemporal.lastInput, response.Ref)
+	}
+}
+
+func TestPostCLIChatSteerRejectsActiveRunWithRefs(t *testing.T) {
+	service := newTestAgentChatService(t)
+	service.temporal = &fakeTemporalStarter{}
+	checkoutRoot := t.TempDir()
+	store, secret := newCLITestMachineStore(t)
+	handler := newCLITestHandler(t, service, store, checkoutRoot)
+	e := echo.New()
+	handler.RegisterRuntimeRoutes(e.Group("/agent-chat"))
+
+	start := postCLIRun(t, e, secret, `{"project_id":"github.com/coreycole/vamos","prompt":"initial"}`)
+	req := httptest.NewRequest(http.MethodPost, "/agent-chat/api/steer", strings.NewReader(`{"thread_id":"`+start.Ref.ThreadID+`","prompt":"follow up"}`))
+	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+	req.Header.Set("Authorization", "Bearer vamos_machine_"+secret.Credential.ID+"."+secret.Secret)
+	rec := httptest.NewRecorder()
+	e.ServeHTTP(rec, req)
+	if rec.Code != http.StatusConflict {
+		t.Fatalf("status = %d, body = %s", rec.Code, rec.Body.String())
+	}
+	var response ChatAPIResponse
+	if err := json.Unmarshal(rec.Body.Bytes(), &response); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if response.Type != "steer_rejected" || response.Reason != "run_in_progress" || response.Ref.RunID != start.Ref.RunID || response.LatestThreadID != start.Ref.ThreadID {
+		t.Fatalf("response = %+v, start = %+v", response, start.Ref)
+	}
+}
+
+func newCLITestMachineStore(t *testing.T) (*serverauth.MemoryMachineCredentialStore, serverauth.CreatedMachineCredential) {
+	t.Helper()
+	store := serverauth.NewMemoryMachineCredentialStore()
+	created, err := store.Create(t.Context(), serverauth.CreateMachineCredentialInput{
+		Name:              "cli",
+		DefaultActorEmail: "agent@example.test",
+	})
+	if err != nil {
+		t.Fatalf("Create machine credential: %v", err)
+	}
+	return store, created
+}
+
+func newCLITestHandler(t *testing.T, service *Service, store serverauth.MachineCredentialStore, checkoutRoot string) *Handler {
+	t.Helper()
+	return NewHandler(service, nil, HandlerOptions{
+		MachineCredentials: store,
+		ProjectsConfig: servercfg.ProjectsConfig{
+			DefaultCheckout: "stage",
+			Repos: map[string]servercfg.RepoConfig{
+				"github.com/coreycole/vamos": {
+					DefaultCheckout:  "stage",
+					BaselineCheckout: "main",
+					Checkouts: map[string]servercfg.CheckoutConfig{
+						"stage": {RootPath: checkoutRoot, Role: servercfg.CheckoutRoleStage},
+						"main":  {RootPath: t.TempDir(), Role: servercfg.CheckoutRoleMain, MustBeClean: true},
+					},
+				},
+			},
+		},
+		PublicBaseURL: "https://vamos.example.test",
+	})
+}
+
+func postCLIRun(t *testing.T, e *echo.Echo, secret serverauth.CreatedMachineCredential, body string) ChatAPIResponse {
+	t.Helper()
+	req := httptest.NewRequest(http.MethodPost, "/agent-chat/api/runs", strings.NewReader(body))
+	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+	req.Header.Set("Authorization", "Bearer vamos_machine_"+secret.Credential.ID+"."+secret.Secret)
+	rec := httptest.NewRecorder()
+	e.ServeHTTP(rec, req)
+	if rec.Code != http.StatusAccepted {
+		t.Fatalf("start status = %d, body = %s", rec.Code, rec.Body.String())
+	}
+	var response ChatAPIResponse
+	if err := json.Unmarshal(rec.Body.Bytes(), &response); err != nil {
+		t.Fatalf("decode start response: %v", err)
+	}
+	return response
 }
 
 func TestPostCLIChatRunRejectsUnauthorizedAndUnknownProject(t *testing.T) {

@@ -1,6 +1,8 @@
 package agentchat
 
 import (
+	"database/sql"
+	"errors"
 	"net/http"
 
 	"github.com/labstack/echo/v4"
@@ -36,6 +38,55 @@ func (h *Handler) PostCLIChatRun(c echo.Context) error {
 		h.service.notifier.NotifyWorkspaceResource(ref.WorkspaceID)
 	}
 	return c.JSON(http.StatusAccepted, ChatAPIResponse{Type: "started", Ref: ref})
+}
+
+func (h *Handler) PostCLIChatSteer(c echo.Context) error {
+	actor, err := h.authenticateCLIActor(c)
+	if err != nil {
+		return err
+	}
+	var req ChatSteerRequest
+	if err := c.Bind(&req); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid request")
+	}
+	ref, disposition, err := h.service.SteerCLIChatThread(
+		c.Request().Context(),
+		actor,
+		req,
+		h.publicBaseURL,
+	)
+	if err != nil {
+		response := ChatAPIResponse{
+			Type:             "steer_rejected",
+			Ref:              ref,
+			Error:            err.Error(),
+			Reason:           disposition.Reason,
+			LatestThreadID:   disposition.LatestThreadID,
+			LatestWebURL:     disposition.LatestWebURL,
+			InfluencesLatest: disposition.InfluencesLatest,
+		}
+		switch {
+		case errors.Is(err, ErrThreadRunInProgress):
+			if response.Reason == "" {
+				response.Reason = "run_in_progress"
+			}
+			return c.JSON(http.StatusConflict, response)
+		case errors.Is(err, sql.ErrNoRows):
+			return echo.NewHTTPError(http.StatusNotFound, err.Error())
+		default:
+			return echo.NewHTTPError(http.StatusBadRequest, err.Error())
+		}
+	}
+	if h.service.notifier != nil {
+		h.service.notifier.NotifyWorkspaceResource(ref.WorkspaceID)
+	}
+	return c.JSON(http.StatusAccepted, ChatAPIResponse{
+		Type:             "steer_accepted",
+		Ref:              ref,
+		LatestThreadID:   disposition.LatestThreadID,
+		LatestWebURL:     disposition.LatestWebURL,
+		InfluencesLatest: disposition.InfluencesLatest,
+	})
 }
 
 func (h *Handler) GetCLIChatSession(c echo.Context) error {

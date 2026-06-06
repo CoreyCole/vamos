@@ -181,7 +181,7 @@ func RunSteer(ctx context.Context, opts SteerOptions, d deps, out io.Writer) err
 	if err != nil {
 		return err
 	}
-	line := ChatNDJSONEvent{Type: resp.Type, Ref: resp.Ref, Error: resp.Error, LatestThreadID: resp.LatestThreadID, LatestWebURL: resp.LatestWebURL, InfluencesLatest: resp.InfluencesLatest}
+	line := ChatNDJSONEvent{Type: resp.Type, Ref: resp.Ref, Error: resp.Error, Reason: resp.Reason, LatestThreadID: resp.LatestThreadID, LatestWebURL: resp.LatestWebURL, InfluencesLatest: resp.InfluencesLatest}
 	if err := WriteNDJSON(out, line); err != nil {
 		return err
 	}

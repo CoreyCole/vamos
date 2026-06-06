@@ -51,7 +51,7 @@ func (c HTTPAPIClient) Start(ctx context.Context, keyID, secret string, req Chat
 
 func (c HTTPAPIClient) Steer(ctx context.Context, keyID, secret string, req ChatSteerRequest) (ChatAPIResponse, error) {
 	var out ChatAPIResponse
-	err := c.doJSON(ctx, http.MethodPost, "/agent-chat/api/steer", keyID, secret, req, &out)
+	err := c.doJSONAllowStatus(ctx, http.MethodPost, "/agent-chat/api/steer", keyID, secret, req, &out, http.StatusConflict)
 	return out, err
 }
 
@@ -92,6 +92,10 @@ func (c HTTPAPIClient) Events(ctx context.Context, keyID, secret, sessionID stri
 }
 
 func (c HTTPAPIClient) doJSON(ctx context.Context, method, path, keyID, secret string, in, out any) error {
+	return c.doJSONAllowStatus(ctx, method, path, keyID, secret, in, out)
+}
+
+func (c HTTPAPIClient) doJSONAllowStatus(ctx context.Context, method, path, keyID, secret string, in, out any, allowedStatuses ...int) error {
 	u, err := c.resolve(path)
 	if err != nil {
 		return err
@@ -122,6 +126,12 @@ func (c HTTPAPIClient) doJSON(ctx context.Context, method, path, keyID, secret s
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		if statusAllowed(resp.StatusCode, allowedStatuses) {
+			if out == nil {
+				return nil
+			}
+			return json.NewDecoder(resp.Body).Decode(out)
+		}
 		body, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
 		return fmt.Errorf("chat API failed: %s: %s", resp.Status, strings.TrimSpace(string(body)))
 	}
@@ -129,6 +139,15 @@ func (c HTTPAPIClient) doJSON(ctx context.Context, method, path, keyID, secret s
 		return nil
 	}
 	return json.NewDecoder(resp.Body).Decode(out)
+}
+
+func statusAllowed(status int, allowed []int) bool {
+	for _, candidate := range allowed {
+		if status == candidate {
+			return true
+		}
+	}
+	return false
 }
 
 func (c HTTPAPIClient) resolve(path string) (*url.URL, error) {

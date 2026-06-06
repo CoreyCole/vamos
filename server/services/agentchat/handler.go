@@ -125,6 +125,7 @@ func (h *Handler) notFoundAgentChatPage(c echo.Context) error {
 // TODO(slice-5-runtime-rehome): move these endpoints under /thoughts/chat/*.
 func (h *Handler) RegisterRuntimeRoutes(g *echo.Group) {
 	g.POST("/api/runs", h.PostCLIChatRun)
+	g.POST("/api/steer", h.PostCLIChatSteer)
 	g.GET("/api/chat-sessions/:session_id", h.GetCLIChatSession)
 	g.GET("/api/chat-sessions/:session_id/events", h.StreamCLIChatSessionEvents)
 	g.GET("/thread/:thread_id/stream", h.StreamThread)
