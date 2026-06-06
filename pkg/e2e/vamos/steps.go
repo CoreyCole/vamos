@@ -218,6 +218,40 @@ func ExpectWorkspaceHidden(label string) expectation {
 	})}
 }
 
+func ExpectWorkspacesInOrder(labels ...string) expectation {
+	return expectation{customStep("workspaces in order", func(t testing.TB, ctx *duiruntime.Context) {
+		rows := ctx.Page.Locator("#workspaces-list tr[data-workspace-row]")
+		count, err := rows.Count()
+		if err != nil {
+			t.Fatal(err)
+		}
+		actual := make([]string, 0, count)
+		for i := 0; i < count; i++ {
+			text, err := rows.Nth(i).InnerText()
+			if err != nil {
+				t.Fatal(err)
+			}
+			actual = append(actual, strings.Join(strings.Fields(text), " "))
+		}
+
+		nextIndex := 0
+		for _, want := range labels {
+			found := false
+			for nextIndex < len(actual) {
+				if strings.Contains(actual[nextIndex], want) {
+					found = true
+					nextIndex++
+					break
+				}
+				nextIndex++
+			}
+			if !found {
+				t.Fatalf("workspace %q not found in order; rows=%#v", want, actual)
+			}
+		}
+	})}
+}
+
 func ExpectWorkspacesURLContains(params map[string]string) expectation {
 	return expectation{customStep("workspaces URL contains filters", func(t testing.TB, ctx *duiruntime.Context) {
 		parsed, err := url.Parse(ctx.Page.URL())

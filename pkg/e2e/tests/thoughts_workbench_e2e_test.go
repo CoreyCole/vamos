@@ -90,6 +90,17 @@ func TestThoughtsWorkbench_WorkspacesPageSearchHistoryAndProjectFilters(t *testi
 		Do(vamos.OpenWorkspacesWithFilters(vamos.WorkspacesStoryFilters{History: "all"})).
 		Expect(vamos.ExpectWorkspaceVisible("E2E Merged History")).
 		Expect(vamos.ExpectWorkspaceVisible("E2E Cleaned History")).
+		Do(vamos.OpenWorkspacesWithFilters(vamos.WorkspacesStoryFilters{History: "all", Sort: "name_asc"})).
+		Expect(vamos.ExpectWorkspacesInOrder(
+			"E2E Active Workspace",
+			"E2E Cleaned History",
+			"E2E Merged History",
+		)).
+		Do(vamos.OpenWorkspacesWithFilters(vamos.WorkspacesStoryFilters{History: "all", Group: "needs_attention"})).
+		Expect(vamos.ExpectWorkspaceVisible("E2E Active Workspace")).
+		Expect(vamos.ExpectWorkspaceVisible("E2E Merged History")).
+		Expect(vamos.ExpectWorkspaceHidden("E2E Cleaned History")).
+		Expect(vamos.ExpectWorkspacesURLContains(map[string]string{"history": "all", "group": "needs_attention"})).
 		Do(vamos.OpenWorkspacesWithFilters(vamos.WorkspacesStoryFilters{Project: "datastarui", Query: "multi-project"})).
 		Expect(vamos.ExpectProjectFilteredPlanBadgesVisible("workspaces page", "vamos", "datastarui")).
 		Expect(vamos.ExpectWorkspaceHidden("E2E Primary Only Plan")).
