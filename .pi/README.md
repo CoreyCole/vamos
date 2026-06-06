@@ -6,6 +6,10 @@ This directory is for Vamos-specific Pi resources:
 - `prompts/` — Vamos-specific prompt templates
 - `extensions/` — Vamos-specific Pi extensions
 
+Project-local skills:
+
+- `hermes-vamos-chat-delegation` — Hermes background delegation contract for `vamos chat start` / `steer`
+
 Put broadly useful, cross-repository skills in `.agents/` instead. In local
 Chestnut development, `.agents` is a symlink to a shared agent configuration
 checkout; `.pi` is intentionally project-local to Vamos.
