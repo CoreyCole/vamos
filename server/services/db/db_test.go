@@ -627,6 +627,53 @@ CREATE TABLE workspace_events (
 	}
 }
 
+func TestRunRuntimeMigrationsAddsPlanWorkspaceImplBindingColumns(t *testing.T) {
+	t.Parallel()
+
+	database := openMigratorTestDB(t)
+	createOldShapeAgentChatTables(t, database)
+	_, err := database.ExecContext(t.Context(), `
+CREATE TABLE plan_workspaces (
+	plan_dir_rel TEXT PRIMARY KEY,
+	project_id TEXT NOT NULL DEFAULT '',
+	plan_dir TEXT NOT NULL,
+	label TEXT NOT NULL,
+	artifact_updated_at DATETIME NOT NULL,
+	qrspi_lifecycle TEXT NOT NULL DEFAULT 'question',
+	qrspi_closed_reason TEXT NOT NULL DEFAULT '',
+	last_discovered_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+	archived_at DATETIME
+);
+CREATE TABLE impl_workspaces (
+	project_id TEXT NOT NULL DEFAULT '',
+	workspace_slug TEXT NOT NULL,
+	checkout_path TEXT NOT NULL,
+	display_name TEXT NOT NULL,
+	plan_dir_rel TEXT,
+	status TEXT NOT NULL DEFAULT 'active',
+	updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+	PRIMARY KEY (project_id, workspace_slug)
+);
+CREATE TABLE plan_workspace_impl_bindings (
+	plan_dir_rel TEXT NOT NULL,
+	project_id TEXT NOT NULL DEFAULT '',
+	status TEXT NOT NULL DEFAULT 'planned',
+	PRIMARY KEY (plan_dir_rel, project_id)
+);`)
+	if err != nil {
+		t.Fatalf("seed old plan workspace bindings: %v", err)
+	}
+
+	if err := runRuntimeMigrations(t.Context(), database); err != nil {
+		t.Fatalf("runRuntimeMigrations() error = %v", err)
+	}
+	for _, column := range []string{"workspace_slug", "checkout_path", "url", "binding_source", "impl_project_id", "impl_workspace_slug", "last_discovered_at", "archived_at"} {
+		if !columnExists(t, database, "plan_workspace_impl_bindings", column) {
+			t.Fatalf("plan_workspace_impl_bindings.%s was not added", column)
+		}
+	}
+}
+
 func TestRunRuntimeMigrationsRemovesAgentThreadWorkspaceID(t *testing.T) {
 	t.Parallel()
 

@@ -80,7 +80,7 @@ templ WorkspacesFilterForm(projectFilter WorkspacesFilter, projectOptions []Proj
 			value={ projectFilter.QueryValue() }
 			placeholder="Search workspaces"
 			class="h-9 min-w-56 rounded-md border bg-background px-3 text-sm"
-			data-on:input__debounce.300ms="this.closest('form').requestSubmit()"
+			data-on:input__debounce.300ms="document.getElementById('workspaces-filter-form').requestSubmit()"
 		/>
 		<label class="text-xs text-muted-foreground" for="project-filter">Project</label>
 		@selectcomponent.Select(selectcomponent.SelectArgs{
@@ -89,15 +89,16 @@ templ WorkspacesFilterForm(projectFilter WorkspacesFilter, projectOptions []Proj
 			Value:       projectFilter.ProjectQueryValue(),
 			Placeholder: "All projects",
 			Options:     projectSelectOptions(projectOptions),
-			OnChange:    "this.closest('form').requestSubmit()",
+			OnChange:    "document.querySelector('#project-filter input[name=project]').value = $project_filter.value; document.getElementById('workspaces-filter-form').requestSubmit()",
 			Class:       "min-w-48",
 			Attributes:  templ.Attributes{"id": "project-filter"},
 		})
 		<label class="sr-only" for="workspaces-group-filter">Workspace group</label>
-		@selectcomponent.Select(selectcomponent.SelectArgs{ID: "workspaces_group", Name: "group", Value: string(projectFilter.Group), Placeholder: "All groups", Options: workspaceSelectOptions(groupOptions), OnChange: "this.closest('form').requestSubmit()", Class: "min-w-44", Attributes: templ.Attributes{"id": "workspaces-group-filter"}})
+		@selectcomponent.Select(selectcomponent.SelectArgs{ID: "workspaces_group", Name: "group", Value: string(projectFilter.Group), Placeholder: "All groups", Options: workspaceSelectOptions(groupOptions), OnChange: "document.querySelector('#workspaces-group-filter input[name=group]').value = $workspaces_group.value; document.getElementById('workspaces-filter-form').requestSubmit()", Class: "min-w-44", Attributes: templ.Attributes{"id": "workspaces-group-filter"}})
 		<label class="sr-only" for="workspaces-sort-filter">Workspace sort</label>
-		@selectcomponent.Select(selectcomponent.SelectArgs{ID: "workspaces_sort", Name: "sort", Value: string(projectFilter.Sort), Placeholder: "Recent activity", Options: workspaceSelectOptions(sortOptions), OnChange: "this.closest('form').requestSubmit()", Class: "min-w-40", Attributes: templ.Attributes{"id": "workspaces-sort-filter"}})
+		@selectcomponent.Select(selectcomponent.SelectArgs{ID: "workspaces_sort", Name: "sort", Value: string(projectFilter.Sort), Placeholder: "Recent activity", Options: workspaceSelectOptions(sortOptions), OnChange: "document.querySelector('#workspaces-sort-filter input[name=sort]').value = $workspaces_sort.value; document.getElementById('workspaces-filter-form').requestSubmit()", Class: "min-w-40", Attributes: templ.Attributes{"id": "workspaces-sort-filter"}})
 		if projectFilter.ShowHistorical() {
+			<input type="hidden" name="history" value="all"/>
 			@button.LinkButton(button.LinkButtonArgs{Href: workspacesURL("/workspaces", projectFilter.WithHistory(WorkspacesHistoryActive)), Variant: "outline", Size: "sm"}) {
 				Hide history
 			}

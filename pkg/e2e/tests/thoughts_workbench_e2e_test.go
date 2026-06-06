@@ -93,8 +93,8 @@ func TestThoughtsWorkbench_WorkspacesPageSearchHistoryAndProjectFilters(t *testi
 		Do(vamos.OpenWorkspacesWithFilters(vamos.WorkspacesStoryFilters{History: "all", Sort: "name_asc"})).
 		Expect(vamos.ExpectWorkspacesInOrder(
 			"E2E Active Workspace",
-			"E2E Cleaned History",
 			"E2E Merged History",
+			"E2E Cleaned History",
 		)).
 		Do(vamos.OpenWorkspacesWithFilters(vamos.WorkspacesStoryFilters{History: "all", Group: "needs_attention"})).
 		Expect(vamos.ExpectWorkspaceVisible("E2E Active Workspace")).
@@ -106,7 +106,7 @@ func TestThoughtsWorkbench_WorkspacesPageSearchHistoryAndProjectFilters(t *testi
 		Expect(vamos.ExpectWorkspaceHidden("E2E Primary Only Plan")).
 		Expect(vamos.ExpectWorkspacesURLContains(map[string]string{"project": "datastarui", "q": "multi-project"})).
 		Do(vamos.OpenWorkspacesWithFilters(vamos.WorkspacesStoryFilters{Project: "vamos", Query: "primary-only"})).
-		Expect(vamos.ExpectWorkspaceVisible("E2E Primary Only Plan")).
+		Expect(vamos.ExpectWorkspaceVisible("e2e-vamos-e2e-primary-only-filter")).
 		Expect(vamos.ExpectWorkspaceHidden("E2E datastarui workspace")).
 		Expect(vamos.ExpectWorkspacesURLContains(map[string]string{"project": "vamos", "q": "primary-only"})).
 		Do(vamos.OpenWorkspacesWithFilters(vamos.WorkspacesStoryFilters{Project: "vamos", Query: "active"})).
@@ -115,7 +115,7 @@ func TestThoughtsWorkbench_WorkspacesPageSearchHistoryAndProjectFilters(t *testi
 		Expect(vamos.ExpectWorkspacesURLContains(map[string]string{"project": "vamos", "q": "active"})).
 		Do(vamos.OpenWorkspacesWithFilters(vamos.WorkspacesStoryFilters{History: "all"})).
 		Do(vamos.ChangeWorkspacesFilters(vamos.WorkspacesStoryFilters{History: "all", Query: "primary-only", Sort: "name_asc"})).
-		Expect(vamos.ExpectWorkspaceVisible("E2E Primary Only Plan")).
+		Expect(vamos.ExpectWorkspaceVisible("e2e-vamos-e2e-primary-only-filter")).
 		Expect(vamos.ExpectWorkspaceHidden("E2E datastarui workspace")).
 		Expect(vamos.ExpectWorkspacesURLContains(map[string]string{"history": "all", "q": "primary-only", "sort": "name_asc"})).
 		Run()

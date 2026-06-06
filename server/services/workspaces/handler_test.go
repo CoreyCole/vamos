@@ -1619,7 +1619,7 @@ func TestWorkspacesProjectFilterRendersEmptyAllProjectsOption(t *testing.T) {
 		`All projects`,
 		`Hide history`,
 		`data-on:input__debounce.300ms`,
-		`this.closest(&#39;form&#39;).requestSubmit()`,
+		`document.getElementById(&#39;workspaces-filter-form&#39;).requestSubmit()`,
 	} {
 		if !strings.Contains(html, want) {
 			t.Fatalf("project filter missing %q: %s", want, html)

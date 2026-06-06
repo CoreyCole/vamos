@@ -71,6 +71,42 @@ func TestAgentChatPageRoutesNotFound(t *testing.T) {
 	}
 }
 
+func TestWorkspaceDomainFromPublicBaseURL(t *testing.T) {
+	t.Parallel()
+
+	got := workspaceDomainFromPublicBaseURL(
+		"https://feature.workspaces.test",
+		"feature",
+	)
+	if got != "workspaces.test" {
+		t.Fatalf("workspaceDomainFromPublicBaseURL() = %q, want workspaces.test", got)
+	}
+}
+
+func TestWorkspaceDomainFromPublicBaseURLWithPort(t *testing.T) {
+	t.Parallel()
+
+	got := workspaceDomainFromPublicBaseURL(
+		"https://feature.workspaces.test:8443",
+		"feature",
+	)
+	if got != "workspaces.test" {
+		t.Fatalf("workspaceDomainFromPublicBaseURL() = %q, want workspaces.test", got)
+	}
+}
+
+func TestWorkspaceDomainFromPublicBaseURLRejectsMismatchedSlug(t *testing.T) {
+	t.Parallel()
+
+	got := workspaceDomainFromPublicBaseURL(
+		"https://other.workspaces.test",
+		"feature",
+	)
+	if got != "" {
+		t.Fatalf("workspaceDomainFromPublicBaseURL() = %q, want empty", got)
+	}
+}
+
 func TestDefaultStatePathUsesXDGStateHome(t *testing.T) {
 	stateHome := t.TempDir()
 	t.Setenv("XDG_STATE_HOME", stateHome)

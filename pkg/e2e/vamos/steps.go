@@ -180,9 +180,6 @@ func workspacesPath(filters WorkspacesStoryFilters) string {
 func OpenWorkspacesWithFilters(filters WorkspacesStoryFilters) spec.Step {
 	return customStep("open workspaces with filters", func(t testing.TB, ctx *duiruntime.Context) {
 		targetPath := workspacesPath(filters)
-		if err := Authenticate(context.Background(), ctx.Page, ctx.Config, "playwright@localhost"); err != nil {
-			t.Fatal(err)
-		}
 		if _, err := ctx.Page.Goto(
 			strings.TrimRight(ctx.Config.BaseURL, "/")+targetPath,
 			playwright.PageGotoOptions{WaitUntil: playwright.WaitUntilStateDomcontentloaded},
@@ -238,8 +235,9 @@ func ExpectWorkspacesInOrder(labels ...string) expectation {
 		nextIndex := 0
 		for _, want := range labels {
 			found := false
+			wantNormalized := strings.ToLower(want)
 			for nextIndex < len(actual) {
-				if strings.Contains(actual[nextIndex], want) {
+				if strings.Contains(strings.ToLower(actual[nextIndex]), wantNormalized) {
 					found = true
 					nextIndex++
 					break
@@ -1532,9 +1530,13 @@ func seedImplWorkspaceRow(t testing.TB, ctx *duiruntime.Context, database *sql.D
 	if err := os.MkdirAll(checkout, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	execSQL(t, database, `INSERT INTO impl_workspaces (project_id, workspace_slug, checkout_path, display_name, host, url, status, branch, commit_hash, trunk_branch, activity_hash)
-VALUES (?, ?, ?, ?, ?, ?, ?, 'main', 'e2ecommit', 'main', ?)
-ON CONFLICT(project_id, workspace_slug) DO UPDATE SET checkout_path = excluded.checkout_path, display_name = excluded.display_name, host = excluded.host, url = excluded.url, status = excluded.status, branch = excluded.branch, commit_hash = excluded.commit_hash, trunk_branch = excluded.trunk_branch, activity_hash = excluded.activity_hash, updated_at = CURRENT_TIMESTAMP`, projectID, slug, checkout, displayName, slug+".workspaces.e2e", "https://"+slug+".workspaces.e2e/", status, "e2e-activity-"+slug)
+	checkoutRole := ""
+	if status == "active" {
+		checkoutRole = "stage"
+	}
+	execSQL(t, database, `INSERT INTO impl_workspaces (project_id, workspace_slug, checkout_role, checkout_path, display_name, host, url, status, branch, commit_hash, trunk_branch, activity_hash)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'main', 'e2ecommit', 'main', ?)
+ON CONFLICT(project_id, workspace_slug) DO UPDATE SET checkout_role = excluded.checkout_role, checkout_path = excluded.checkout_path, display_name = excluded.display_name, host = excluded.host, url = excluded.url, status = excluded.status, branch = excluded.branch, commit_hash = excluded.commit_hash, trunk_branch = excluded.trunk_branch, activity_hash = excluded.activity_hash, updated_at = CURRENT_TIMESTAMP`, projectID, slug, checkoutRole, checkout, displayName, slug+".workspaces.e2e", "https://"+slug+".workspaces.e2e/", status, "e2e-activity-"+slug)
 }
 
 func seedPlanWorkspaceBinding(t testing.TB, ctx *duiruntime.Context, database *sql.DB, rel, planDir, projectID, status string) {
@@ -1552,9 +1554,9 @@ func seedPlanWorkspaceBinding(t testing.TB, ctx *duiruntime.Context, database *s
 		bindingSource = "binding_file"
 		implProjectID = projectID
 		implWorkspaceSlug = slug
-		execSQL(t, database, `INSERT INTO impl_workspaces (project_id, workspace_slug, checkout_path, display_name, host, url, plan_dir_rel, plan_dir, status, branch, commit_hash, trunk_branch)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'active', 'main', 'e2ecommit', 'main')
-ON CONFLICT(project_id, workspace_slug) DO UPDATE SET checkout_path = excluded.checkout_path, display_name = excluded.display_name, host = excluded.host, url = excluded.url, plan_dir_rel = excluded.plan_dir_rel, plan_dir = excluded.plan_dir, status = excluded.status, updated_at = CURRENT_TIMESTAMP`, projectID, slug, checkout, "E2E "+projectID+" workspace", slug+".workspaces.e2e", workspaceURL, rel, planDir)
+		execSQL(t, database, `INSERT INTO impl_workspaces (project_id, workspace_slug, checkout_role, checkout_path, display_name, host, url, plan_dir_rel, plan_dir, status, branch, commit_hash, trunk_branch)
+VALUES (?, ?, 'stage', ?, ?, ?, ?, ?, ?, 'active', 'main', 'e2ecommit', 'main')
+ON CONFLICT(project_id, workspace_slug) DO UPDATE SET checkout_role = excluded.checkout_role, checkout_path = excluded.checkout_path, display_name = excluded.display_name, host = excluded.host, url = excluded.url, plan_dir_rel = excluded.plan_dir_rel, plan_dir = excluded.plan_dir, status = excluded.status, updated_at = CURRENT_TIMESTAMP`, projectID, slug, checkout, "E2E "+projectID+" workspace", slug+".workspaces.e2e", workspaceURL, rel, planDir)
 	}
 	execSQL(t, database, `INSERT INTO plan_workspace_impl_bindings (plan_dir_rel, project_id, workspace_slug, checkout_path, url, status, binding_source, impl_project_id, impl_workspace_slug)
 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)

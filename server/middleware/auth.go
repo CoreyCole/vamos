@@ -58,11 +58,14 @@ func managerSwitchRedirect(c echo.Context, cfg AuthRedirectConfig) string {
 	managerURL := strings.TrimRight(strings.TrimSpace(cfg.ManagerURL), "/")
 	slug := strings.TrimSpace(cfg.CurrentSlug)
 	domain := strings.Trim(strings.TrimSpace(cfg.WorkspaceDomain), ".")
-	if managerURL == "" || slug == "" || slug == "main" || domain == "" {
+	if managerURL == "" || slug == "" || slug == "main" {
 		return ""
 	}
-	host := requestHost(c.Request().Host)
-	if !isChildWorkspaceHost(host, slug, domain) {
+	host := authRedirectHost(c)
+	if domain == "" {
+		domain = deriveChildWorkspaceDomain(host, slug)
+	}
+	if domain == "" || !isChildWorkspaceHost(host, slug, domain) {
 		return ""
 	}
 	redirectPath := c.Request().URL.RequestURI()
@@ -72,8 +75,18 @@ func managerSwitchRedirect(c echo.Context, cfg AuthRedirectConfig) string {
 	return managerURL + "/workspaces/switch/" + url.PathEscape(slug) + "?redirect=" + url.QueryEscape(redirectPath)
 }
 
+func authRedirectHost(c echo.Context) string {
+	if forwarded := strings.TrimSpace(c.Request().Header.Get("X-Forwarded-Host")); forwarded != "" {
+		return requestHost(forwarded)
+	}
+	return requestHost(c.Request().Host)
+}
+
 func requestHost(hostport string) string {
 	host := strings.TrimSpace(hostport)
+	if comma := strings.Index(host, ","); comma >= 0 {
+		host = strings.TrimSpace(host[:comma])
+	}
 	if strings.HasPrefix(host, "[") {
 		if end := strings.Index(host, "]"); end >= 0 {
 			return strings.Trim(host[:end+1], "[]")
@@ -90,4 +103,14 @@ func isChildWorkspaceHost(host, slug, domain string) bool {
 	slug = strings.ToLower(strings.TrimSpace(slug))
 	domain = strings.Trim(strings.ToLower(strings.TrimSpace(domain)), ".")
 	return host == slug+"."+domain
+}
+
+func deriveChildWorkspaceDomain(host, slug string) string {
+	host = strings.Trim(strings.ToLower(strings.TrimSpace(host)), ".")
+	slug = strings.Trim(strings.ToLower(strings.TrimSpace(slug)), ".")
+	prefix := slug + "."
+	if slug == "" || !strings.HasPrefix(host, prefix) {
+		return ""
+	}
+	return strings.Trim(strings.TrimPrefix(host, prefix), ".")
 }

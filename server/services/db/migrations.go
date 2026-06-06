@@ -77,6 +77,9 @@ func prepareSchemaCompatibilityMigrations(ctx context.Context, database *sql.DB)
 	if err := ensureImplWorkspaceCleanupProofColumnsIfTableExists(ctx, database); err != nil {
 		return err
 	}
+	if err := ensurePlanWorkspaceRelationshipTables(ctx, database); err != nil {
+		return err
+	}
 	if err := ensureScopedUserChatSelections(ctx, database); err != nil {
 		return err
 	}
@@ -151,6 +154,9 @@ func runRuntimeMigrations(ctx context.Context, database *sql.DB) error {
 		return err
 	}
 	if err := ensureImplWorkspaceCleanupProofColumnsIfTableExists(ctx, database); err != nil {
+		return err
+	}
+	if err := ensurePlanWorkspaceRelationshipTables(ctx, database); err != nil {
 		return err
 	}
 	if err := ensureColumn(
@@ -640,6 +646,77 @@ func ensurePlanWorkspacesColumns(
 		"CREATE INDEX IF NOT EXISTS idx_plan_workspaces_lifecycle_activity ON plan_workspaces (qrspi_lifecycle, artifact_updated_at DESC, plan_dir_rel) WHERE archived_at IS NULL",
 		"CREATE INDEX IF NOT EXISTS idx_plan_workspaces_project_active_activity ON plan_workspaces (project_id, artifact_updated_at DESC, plan_dir_rel) WHERE archived_at IS NULL",
 		"CREATE INDEX IF NOT EXISTS idx_plan_workspaces_project_lifecycle_activity ON plan_workspaces (project_id, qrspi_lifecycle, artifact_updated_at DESC, plan_dir_rel) WHERE archived_at IS NULL",
+	} {
+		if err := ensureIndex(ctx, database, indexSQL); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func ensurePlanWorkspaceRelationshipTables(ctx context.Context, database *sql.DB) error {
+	if _, err := database.ExecContext(ctx, `
+CREATE TABLE IF NOT EXISTS plan_workspace_projects (
+plan_dir_rel TEXT NOT NULL REFERENCES plan_workspaces (plan_dir_rel),
+project_id TEXT NOT NULL DEFAULT '',
+role TEXT NOT NULL CHECK (role IN ('primary', 'related')),
+declared_source TEXT NOT NULL DEFAULT '',
+declared_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+last_discovered_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+archived_at DATETIME,
+PRIMARY KEY (plan_dir_rel, project_id)
+)`); err != nil {
+		return err
+	}
+	if _, err := database.ExecContext(ctx, `
+CREATE TABLE IF NOT EXISTS plan_workspace_impl_bindings (
+plan_dir_rel TEXT NOT NULL REFERENCES plan_workspaces (plan_dir_rel),
+project_id TEXT NOT NULL DEFAULT '',
+workspace_slug TEXT,
+checkout_path TEXT,
+url TEXT,
+status TEXT NOT NULL DEFAULT 'planned' CHECK (status IN ('planned', 'active', 'missing', 'merged', 'cleaned_up')),
+binding_source TEXT NOT NULL DEFAULT 'metadata' CHECK (binding_source IN ('metadata', 'expected_path', 'binding_file', 'synced_plan_dir', 'manual')),
+impl_project_id TEXT,
+impl_workspace_slug TEXT,
+discovered_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+last_discovered_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+archived_at DATETIME,
+PRIMARY KEY (plan_dir_rel, project_id),
+FOREIGN KEY (impl_project_id, impl_workspace_slug)
+REFERENCES impl_workspaces (project_id, workspace_slug)
+)`); err != nil {
+		return err
+	}
+	for _, column := range []struct {
+		tableName  string
+		name       string
+		definition string
+	}{
+		{tableName: "plan_workspace_projects", name: "declared_source", definition: "TEXT NOT NULL DEFAULT ''"},
+		{tableName: "plan_workspace_projects", name: "declared_at", definition: "DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP"},
+		{tableName: "plan_workspace_projects", name: "last_discovered_at", definition: "DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP"},
+		{tableName: "plan_workspace_projects", name: "archived_at", definition: "DATETIME"},
+		{tableName: "plan_workspace_impl_bindings", name: "workspace_slug", definition: "TEXT"},
+		{tableName: "plan_workspace_impl_bindings", name: "checkout_path", definition: "TEXT"},
+		{tableName: "plan_workspace_impl_bindings", name: "url", definition: "TEXT"},
+		{tableName: "plan_workspace_impl_bindings", name: "status", definition: "TEXT NOT NULL DEFAULT 'planned'"},
+		{tableName: "plan_workspace_impl_bindings", name: "binding_source", definition: "TEXT NOT NULL DEFAULT 'metadata'"},
+		{tableName: "plan_workspace_impl_bindings", name: "impl_project_id", definition: "TEXT"},
+		{tableName: "plan_workspace_impl_bindings", name: "impl_workspace_slug", definition: "TEXT"},
+		{tableName: "plan_workspace_impl_bindings", name: "discovered_at", definition: "DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP"},
+		{tableName: "plan_workspace_impl_bindings", name: "last_discovered_at", definition: "DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP"},
+		{tableName: "plan_workspace_impl_bindings", name: "archived_at", definition: "DATETIME"},
+	} {
+		if err := ensureColumn(ctx, database, column.tableName, column.name, column.definition); err != nil {
+			return err
+		}
+	}
+	for _, indexSQL := range []string{
+		`CREATE UNIQUE INDEX IF NOT EXISTS idx_plan_workspace_projects_one_primary ON plan_workspace_projects (plan_dir_rel) WHERE archived_at IS NULL AND role = 'primary'`,
+		`CREATE INDEX IF NOT EXISTS idx_plan_workspace_projects_project_active ON plan_workspace_projects (project_id, role, plan_dir_rel) WHERE archived_at IS NULL`,
+		`CREATE INDEX IF NOT EXISTS idx_plan_workspace_impl_bindings_project_active ON plan_workspace_impl_bindings (project_id, status, plan_dir_rel) WHERE archived_at IS NULL`,
+		`CREATE INDEX IF NOT EXISTS idx_plan_workspace_impl_bindings_impl_workspace ON plan_workspace_impl_bindings (impl_project_id, impl_workspace_slug) WHERE archived_at IS NULL AND impl_workspace_slug IS NOT NULL`,
 	} {
 		if err := ensureIndex(ctx, database, indexSQL); err != nil {
 			return err

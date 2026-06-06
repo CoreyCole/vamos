@@ -602,6 +602,23 @@ func hostFromBaseURL(raw string) string {
 	return u.Host
 }
 
+func workspaceDomainFromPublicBaseURL(publicBaseURL, slug string) string {
+	host := hostFromBaseURL(publicBaseURL)
+	if host == "" {
+		return ""
+	}
+	if withoutPort, _, err := net.SplitHostPort(host); err == nil {
+		host = withoutPort
+	}
+	host = strings.Trim(strings.ToLower(strings.TrimSpace(host)), ".")
+	slug = strings.Trim(strings.ToLower(strings.TrimSpace(slug)), ".")
+	prefix := slug + "."
+	if slug == "" || !strings.HasPrefix(host, prefix) {
+		return ""
+	}
+	return strings.Trim(strings.TrimPrefix(host, prefix), ".")
+}
+
 func validateWorkspaceConfig(cfg Config) error {
 	switch cfg.WorkspaceMode {
 	case "standalone", "manager", "child":
@@ -1308,9 +1325,12 @@ func main() {
 
 	// Create auth middleware
 	authMiddleware := authmw.AuthMiddleware(authService, authmw.AuthRedirectConfig{
-		ManagerURL:      workspaceManagerURL,
-		WorkspaceDomain: cfg.WorkspaceDomain,
-		CurrentSlug:     cfg.WorkspaceSlug,
+		ManagerURL: workspaceManagerURL,
+		WorkspaceDomain: firstNonEmpty(
+			cfg.WorkspaceDomain,
+			workspaceDomainFromPublicBaseURL(cfg.PublicBaseURL, cfg.WorkspaceSlug),
+		),
+		CurrentSlug: cfg.WorkspaceSlug,
 	})
 	var workspaceHandler *workspaces.Handler
 	if cfg.WorkspaceMode != "standalone" || workspaceManager != nil {
