@@ -1234,6 +1234,9 @@ func main() {
 		agentchat.HandlerOptions{
 			InternalToken:         cfg.InternalAgentChatToken,
 			InternalAllowLoopback: cfg.InternalAgentChatAllowLoopback,
+			MachineCredentials:    agentBrowserMachineCredentials,
+			ProjectsConfig:        hostCfg.Projects,
+			PublicBaseURL:         cfg.PublicBaseURL,
 		},
 	).WithLayoutPreferenceService(layoutPrefsService)
 	workspaceSyncRefreshResultFromAgentChat := func(result agentchat.SyncWorkspacesResult) workspaces.WorkspaceSyncRefreshResult {

@@ -25,7 +25,9 @@ import (
 	"github.com/CoreyCole/vamos/pkg/agents/workflows/qrspi"
 	workspace "github.com/CoreyCole/vamos/pkg/agents/workspace"
 	"github.com/CoreyCole/vamos/pkg/db"
+	servercfg "github.com/CoreyCole/vamos/server"
 	"github.com/CoreyCole/vamos/server/layouts/workbench"
+	serverauth "github.com/CoreyCole/vamos/server/services/auth"
 	"github.com/CoreyCole/vamos/server/services/commentui"
 	"github.com/CoreyCole/vamos/server/services/docs"
 	"github.com/CoreyCole/vamos/server/services/layoutprefs"
@@ -51,11 +53,17 @@ type Handler struct {
 	layoutPrefs           *layoutprefs.Service
 	internalToken         string
 	internalAllowLoopback bool
+	machineCredentials    serverauth.MachineCredentialStore
+	projectsConfig        servercfg.ProjectsConfig
+	publicBaseURL         string
 }
 
 type HandlerOptions struct {
 	InternalToken         string
 	InternalAllowLoopback bool
+	MachineCredentials    serverauth.MachineCredentialStore
+	ProjectsConfig        servercfg.ProjectsConfig
+	PublicBaseURL         string
 }
 
 type planSidebarSubscription struct {
@@ -78,6 +86,9 @@ func NewHandler(
 		themeService:          themeService,
 		internalToken:         strings.TrimSpace(options.InternalToken),
 		internalAllowLoopback: options.InternalAllowLoopback,
+		machineCredentials:    options.MachineCredentials,
+		projectsConfig:        options.ProjectsConfig,
+		publicBaseURL:         strings.TrimRight(strings.TrimSpace(options.PublicBaseURL), "/"),
 	}
 }
 
@@ -113,6 +124,7 @@ func (h *Handler) notFoundAgentChatPage(c echo.Context) error {
 // visible Agent Chat page surface moves under the Thoughts workbench.
 // TODO(slice-5-runtime-rehome): move these endpoints under /thoughts/chat/*.
 func (h *Handler) RegisterRuntimeRoutes(g *echo.Group) {
+	g.POST("/api/runs", h.PostCLIChatRun)
 	g.GET("/thread/:thread_id/stream", h.StreamThread)
 	g.GET("/thread/:thread_id/slash-commands", h.ListThreadSlashCommands)
 	g.POST("/thread/:thread_id/resume", h.ResumeThreadByPath)
