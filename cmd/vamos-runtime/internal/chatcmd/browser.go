@@ -18,10 +18,14 @@ type BrowserAutomation interface {
 }
 
 type ChatRunRef struct {
-	WorkspaceID   string
-	ThreadID      string
-	RunID         string
-	ChatSessionID string
+	ProjectID     string `json:"project_id,omitempty"`
+	WorkspaceID   string `json:"workspace_id,omitempty"`
+	ThreadID      string `json:"thread_id,omitempty"`
+	RunID         string `json:"run_id,omitempty"`
+	ChatSessionID string `json:"chat_session_id,omitempty"`
+	WebURL        string `json:"web_url,omitempty"`
+	CWD           string `json:"cwd,omitempty"`
+	EventAfter    int64  `json:"event_after,omitempty"`
 }
 
 type PlaywrightBrowser struct {

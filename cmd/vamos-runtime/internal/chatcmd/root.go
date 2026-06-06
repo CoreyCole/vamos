@@ -30,8 +30,29 @@ type Options struct {
 	Cwd        string
 }
 
+type StartOptions struct {
+	ManagerURL string
+	ProjectID  string
+	Prompt     string
+	Profile    string
+	Cwd        string
+	Timeout    time.Duration
+}
+
+type SteerOptions struct {
+	ManagerURL string
+	ThreadID   string
+	Prompt     string
+	Profile    string
+	Cwd        string
+	Timeout    time.Duration
+}
+
 type deps struct {
-	Store      authcmd.CredentialStore
+	Store        authcmd.CredentialStore
+	APIClientNew func(managerURL string) APIClient
+
+	// Retained for legacy browser helpers/tests outside the command surface.
 	Client     authcmd.AgentAuthClient
 	BrowserNew func(Options) (BrowserAutomation, error)
 	WatcherNew func(*http.Client) CompletionWatcher
@@ -44,32 +65,62 @@ type CompletionWatcher interface {
 func NewCommand() *cobra.Command { return newCommand(deps{}) }
 
 func newCommand(d deps) *cobra.Command {
-	opts := Options{Timeout: 10 * time.Minute, Headless: true, Profile: "default"}
 	cmd := &cobra.Command{
-		Use:   "chat --slug <slug> --email <email> <prompt>",
-		Short: "Send a prompt through Agent Chat UI and wait for SSE completion",
-		Args:  cobra.MinimumNArgs(1),
+		Use:   "chat",
+		Short: "Start or steer Agent Chat runs",
+		Args: func(cmd *cobra.Command, args []string) error {
+			if len(args) > 0 {
+				return errors.New("use an explicit subcommand: start or steer")
+			}
+			return nil
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
-			opts.Prompt = strings.Join(args, " ")
-			return Run(cmd.Context(), opts, d, cmd.OutOrStdout())
+			return errors.New("use an explicit subcommand: start or steer")
 		},
 	}
-	cmd.Flags().StringVar(&opts.ManagerURL, "manager-url", "", "workspace manager URL")
-	cmd.Flags().StringVar(&opts.Slug, "slug", "", "workspace slug")
-	cmd.Flags().StringVar(&opts.Email, "email", "", "actor email for browser session")
-	cmd.Flags().DurationVar(&opts.Timeout, "timeout", 10*time.Minute, "maximum time to wait for chat completion")
-	cmd.Flags().BoolVar(&opts.Headless, "headless", true, "run browser headlessly")
-	cmd.Flags().StringVar(&opts.Profile, "profile", "default", "credential profile name")
-	cmd.Flags().StringVar(&opts.BaseURL, "base-url", "", "workspace base URL; defaults to slug under manager domain")
+	cmd.AddCommand(newStartCommand(d), newSteerCommand(d))
 	return cmd
 }
 
-func Run(ctx context.Context, opts Options, d deps, out io.Writer) error {
-	if strings.TrimSpace(opts.Slug) == "" {
-		return errors.New("slug is required")
+func newStartCommand(d deps) *cobra.Command {
+	opts := StartOptions{Timeout: 10 * time.Minute, Profile: "default"}
+	cmd := &cobra.Command{
+		Use:   "start --project <project_id> <prompt>",
+		Short: "Start an Agent Chat run and stream NDJSON",
+		Args:  cobra.MinimumNArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			opts.Prompt = strings.Join(args, " ")
+			return RunStart(cmd.Context(), opts, d, cmd.OutOrStdout())
+		},
 	}
-	if strings.TrimSpace(opts.Email) == "" {
-		return errors.New("email is required")
+	cmd.Flags().StringVar(&opts.ManagerURL, "manager-url", "", "workspace manager URL")
+	cmd.Flags().StringVar(&opts.ProjectID, "project", "", "configured project ID to run in")
+	cmd.Flags().DurationVar(&opts.Timeout, "timeout", 10*time.Minute, "maximum time to wait for chat completion")
+	cmd.Flags().StringVar(&opts.Profile, "profile", "default", "credential profile name")
+	return cmd
+}
+
+func newSteerCommand(d deps) *cobra.Command {
+	opts := SteerOptions{Timeout: 10 * time.Minute, Profile: "default"}
+	cmd := &cobra.Command{
+		Use:   "steer --thread <thread_id> <guidance>",
+		Short: "Start a follow-up run in an existing Agent Chat thread",
+		Args:  cobra.MinimumNArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			opts.Prompt = strings.Join(args, " ")
+			return RunSteer(cmd.Context(), opts, d, cmd.OutOrStdout())
+		},
+	}
+	cmd.Flags().StringVar(&opts.ManagerURL, "manager-url", "", "workspace manager URL")
+	cmd.Flags().StringVar(&opts.ThreadID, "thread", "", "Agent Chat thread ID to steer")
+	cmd.Flags().DurationVar(&opts.Timeout, "timeout", 10*time.Minute, "maximum time to wait for chat completion")
+	cmd.Flags().StringVar(&opts.Profile, "profile", "default", "credential profile name")
+	return cmd
+}
+
+func RunStart(ctx context.Context, opts StartOptions, d deps, out io.Writer) error {
+	if strings.TrimSpace(opts.ProjectID) == "" {
+		return errors.New("project is required")
 	}
 	if strings.TrimSpace(opts.Prompt) == "" {
 		return errors.New("prompt is required")
@@ -80,7 +131,6 @@ func Run(ctx context.Context, opts Options, d deps, out io.Writer) error {
 	if out == nil {
 		out = os.Stdout
 	}
-
 	profile, secret, err := loadProfile(d.Store, opts.Profile)
 	if err != nil {
 		return err
@@ -89,68 +139,65 @@ func Run(ctx context.Context, opts Options, d deps, out io.Writer) error {
 	if err != nil {
 		return err
 	}
-	baseURL, err := resolveBaseURL(opts.BaseURL, managerURL, opts.Slug)
+	client := newAPIClient(d, managerURL)
+	resp, err := client.Start(ctx, profile.KeyID, secret, ChatStartRequest{ProjectID: opts.ProjectID, Prompt: opts.Prompt})
 	if err != nil {
 		return err
 	}
-	client := d.Client
-	if client == nil {
-		client = authcmd.Client{ManagerURL: managerURL}
+	if resp.Type != "started" || strings.TrimSpace(resp.Ref.ChatSessionID) == "" || strings.TrimSpace(resp.Ref.RunID) == "" {
+		return fmt.Errorf("invalid start response")
 	}
-	minted, err := client.MintBrowserToken(ctx, profile.KeyID, secret, authcmd.MintRequest{
-		Slug:         opts.Slug,
-		Purpose:      purposeHermesChat,
-		Email:        opts.Email,
-		RedirectPath: "/agent-chat",
-		TTLSeconds:   int64((5 * time.Minute) / time.Second),
-	})
-	if err != nil {
+	if err := WriteNDJSON(out, ChatNDJSONEvent{Type: "started", Ref: resp.Ref}); err != nil {
 		return err
-	}
-	loginURL, err := agentBrowserLoginURL(baseURL, minted.Token, "/agent-chat")
-	if err != nil {
-		return err
-	}
-
-	browserNew := d.BrowserNew
-	if browserNew == nil {
-		browserNew = NewPlaywrightBrowser
-	}
-	browser, err := browserNew(opts)
-	if err != nil {
-		return err
-	}
-	defer browser.Close(context.Background())
-	if err := browser.Login(ctx, loginURL); err != nil {
-		return err
-	}
-	runRef, err := browser.SubmitComposerPrompt(ctx, opts.Prompt)
-	if err != nil {
-		return err
-	}
-	if strings.TrimSpace(runRef.ChatSessionID) == "" {
-		return fmt.Errorf("chat session id was not discoverable after UI submit")
-	}
-	cookies, err := browser.Cookies(ctx, baseURL)
-	if err != nil {
-		return err
-	}
-	watcherClient := httpClientWithCookies(cookies)
-	watcherNew := d.WatcherNew
-	if watcherNew == nil {
-		watcherNew = func(client *http.Client) CompletionWatcher { return ChatSessionWatcher{HTTPClient: client} }
 	}
 	watchCtx, cancel := context.WithTimeout(ctx, opts.Timeout)
 	defer cancel()
-	completion, err := watcherNew(watcherClient).WatchUntilComplete(watchCtx, baseURL, runRef.ChatSessionID, 0)
+	return StreamRunNDJSON(watchCtx, client, profile.KeyID, secret, resp.Ref, out)
+}
+
+func RunSteer(ctx context.Context, opts SteerOptions, d deps, out io.Writer) error {
+	if strings.TrimSpace(opts.ThreadID) == "" {
+		return errors.New("thread is required")
+	}
+	if strings.TrimSpace(opts.Prompt) == "" {
+		return errors.New("prompt is required")
+	}
+	if opts.Timeout <= 0 {
+		opts.Timeout = 10 * time.Minute
+	}
+	if out == nil {
+		out = os.Stdout
+	}
+	profile, secret, err := loadProfile(d.Store, opts.Profile)
 	if err != nil {
 		return err
 	}
-	if completion.Failed {
-		return fmt.Errorf("chat run failed: %s", completion.Error)
+	managerURL, err := authcmd.ResolveManagerURL(opts.ManagerURL, opts.Cwd, profile)
+	if err != nil {
+		return err
 	}
-	_, err = fmt.Fprintln(out, completion.Response)
-	return err
+	client := newAPIClient(d, managerURL)
+	resp, err := client.Steer(ctx, profile.KeyID, secret, ChatSteerRequest{ThreadID: opts.ThreadID, Prompt: opts.Prompt})
+	if err != nil {
+		return err
+	}
+	line := ChatNDJSONEvent{Type: resp.Type, Ref: resp.Ref, Error: resp.Error, LatestThreadID: resp.LatestThreadID, LatestWebURL: resp.LatestWebURL, InfluencesLatest: resp.InfluencesLatest}
+	if err := WriteNDJSON(out, line); err != nil {
+		return err
+	}
+	if resp.Type != "steer_accepted" {
+		return nil
+	}
+	watchCtx, cancel := context.WithTimeout(ctx, opts.Timeout)
+	defer cancel()
+	return StreamRunNDJSON(watchCtx, client, profile.KeyID, secret, resp.Ref, out)
+}
+
+func newAPIClient(d deps, managerURL string) APIClient {
+	if d.APIClientNew != nil {
+		return d.APIClientNew(managerURL)
+	}
+	return HTTPAPIClient{ManagerURL: managerURL}
 }
 
 func loadProfile(store authcmd.CredentialStore, profileName string) (authcmd.Profile, string, error) {

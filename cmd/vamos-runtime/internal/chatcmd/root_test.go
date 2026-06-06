@@ -3,11 +3,14 @@ package chatcmd
 import (
 	"bytes"
 	"context"
+	"encoding/json"
+	"io"
 	"net/http"
 	"strings"
 	"testing"
 
 	"github.com/CoreyCole/vamos/cmd/vamos-runtime/internal/authcmd"
+	"github.com/CoreyCole/vamos/pkg/agents/chatsession"
 )
 
 type fakeStore struct{}
@@ -17,65 +20,114 @@ func (fakeStore) Load(string) (authcmd.Profile, string, error) {
 	return authcmd.Profile{ManagerURL: "https://main.workspaces.test", KeyID: "machine-1"}, "secret-1", nil
 }
 
-type fakeClient struct{ got authcmd.MintRequest }
+type fakeAPI struct {
+	startReq    ChatStartRequest
+	eventAfters []int64
+	streams     []string
+}
 
-func (f *fakeClient) MintBrowserToken(_ context.Context, keyID, secret string, req authcmd.MintRequest) (authcmd.MintResponse, error) {
+func (f *fakeAPI) Start(_ context.Context, keyID, secret string, req ChatStartRequest) (ChatAPIResponse, error) {
 	if keyID != "machine-1" || secret != "secret-1" {
-		return authcmd.MintResponse{}, context.Canceled
+		return ChatAPIResponse{}, context.Canceled
 	}
-	f.got = req
-	return authcmd.MintResponse{Token: "browser-token"}, nil
-}
-func (f *fakeClient) Status(context.Context, string, string, authcmd.MintRequest) error { return nil }
-
-type fakeBrowser struct {
-	loginURL string
-	prompt   string
+	f.startReq = req
+	return ChatAPIResponse{Type: "started", Ref: ChatRunRef{ProjectID: req.ProjectID, WorkspaceID: "ws-1", ThreadID: "thread-1", RunID: "run-1", ChatSessionID: "session-1", WebURL: "https://main.test/thoughts/?context=chat&thread=thread-1&run=run-1", CWD: "/repo", EventAfter: 0}}, nil
 }
 
-func (b *fakeBrowser) Login(_ context.Context, loginURL string) error {
-	b.loginURL = loginURL
-	return nil
-}
-func (b *fakeBrowser) SubmitComposerPrompt(_ context.Context, prompt string) (ChatRunRef, error) {
-	b.prompt = prompt
-	return ChatRunRef{ChatSessionID: "session-1", RunID: "run-1"}, nil
-}
-func (b *fakeBrowser) Cookies(context.Context, string) ([]*http.Cookie, error) {
-	return []*http.Cookie{{Name: "thoughts_session", Value: "s1"}}, nil
-}
-func (b *fakeBrowser) Close(context.Context) error { return nil }
-
-type fakeWatcher struct{}
-
-func (fakeWatcher) WatchUntilComplete(context.Context, string, string, int64) (ChatCompletion, error) {
-	return ChatCompletion{RunID: "run-1", Response: "assistant done"}, nil
+func (f *fakeAPI) Steer(context.Context, string, string, ChatSteerRequest) (ChatAPIResponse, error) {
+	return ChatAPIResponse{Type: "steer_rejected", Ref: ChatRunRef{ThreadID: "thread-1"}}, nil
 }
 
-func TestRunMintsHermesTokenSubmitsBrowserPromptAndPrintsResponse(t *testing.T) {
-	client := &fakeClient{}
-	browser := &fakeBrowser{}
+func (f *fakeAPI) Snapshot(context.Context, string, string, string) (snapshotResponse, error) {
+	return snapshotResponse{Projection: chatsession.ChatProjection{Messages: []chatsession.ProjectedMessage{{Role: "assistant", Content: "assistant done", RunID: "run-1"}}}, LastSeq: 3}, nil
+}
+
+func (f *fakeAPI) Events(_ context.Context, _ string, _ string, _ string, after int64) (*http.Response, error) {
+	f.eventAfters = append(f.eventAfters, after)
+	body := "event: chat-session-event\nid: 1\ndata: {\"EventType\":\"run.progress\",\"Seq\":1,\"RunID\":\"run-1\"}\n\n" +
+		"event: chat-session-event\nid: 2\ndata: {\"EventType\":\"run.completed\",\"Seq\":2,\"RunID\":\"run-1\"}\n\n"
+	if len(f.streams) > 0 {
+		body = f.streams[0]
+		f.streams = f.streams[1:]
+	}
+	return &http.Response{StatusCode: 200, Body: io.NopCloser(strings.NewReader(body))}, nil
+}
+
+func TestCommandExposesExplicitStartAndSteer(t *testing.T) {
+	cmd := newCommand(deps{})
+	var help bytes.Buffer
+	cmd.SetOut(&help)
+	cmd.SetArgs([]string{"--help"})
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("help: %v", err)
+	}
+	text := help.String()
+	for _, want := range []string{"start", "steer"} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("help missing %q:\n%s", want, text)
+		}
+	}
+
+	cmd = newCommand(deps{})
+	cmd.SetArgs([]string{"hello"})
+	if err := cmd.Execute(); err == nil || !strings.Contains(err.Error(), "explicit subcommand") {
+		t.Fatalf("top-level prompt err = %v", err)
+	}
+}
+
+func TestRunStartPrintsStartedEventAndTerminalResult(t *testing.T) {
+	api := &fakeAPI{}
 	var out bytes.Buffer
-	err := Run(context.Background(), Options{Slug: "stage", Email: "lead@example.test", Prompt: "continue plan", Profile: "default"}, deps{
-		Store:      fakeStore{},
-		Client:     client,
-		BrowserNew: func(Options) (BrowserAutomation, error) { return browser, nil },
-		WatcherNew: func(*http.Client) CompletionWatcher { return fakeWatcher{} },
+	err := RunStart(context.Background(), StartOptions{ManagerURL: "https://main.workspaces.test", ProjectID: "github.com/coreycole/vamos", Prompt: "continue plan", Profile: "default"}, deps{
+		Store: fakeStore{},
+		APIClientNew: func(managerURL string) APIClient {
+			if managerURL != "https://main.workspaces.test" {
+				t.Fatalf("managerURL = %q", managerURL)
+			}
+			return api
+		},
 	}, &out)
 	if err != nil {
-		t.Fatalf("Run() error = %v", err)
+		t.Fatalf("RunStart() error = %v", err)
 	}
-	if client.got.Purpose != purposeHermesChat || client.got.RedirectPath != "/agent-chat" || client.got.Email != "lead@example.test" {
-		t.Fatalf("mint request = %+v", client.got)
+	if api.startReq.ProjectID != "github.com/coreycole/vamos" || api.startReq.Prompt != "continue plan" {
+		t.Fatalf("start request = %+v", api.startReq)
 	}
-	if !strings.Contains(browser.loginURL, "/internal/agent-auth/browser-login") || !strings.Contains(browser.loginURL, "purpose=hermes_chat") {
-		t.Fatalf("login URL = %q", browser.loginURL)
+	lines := strings.Split(strings.TrimSpace(out.String()), "\n")
+	if len(lines) != 4 {
+		t.Fatalf("lines = %d: %q", len(lines), out.String())
 	}
-	if browser.prompt != "continue plan" {
-		t.Fatalf("prompt = %q", browser.prompt)
+	var first ChatNDJSONEvent
+	if err := json.Unmarshal([]byte(lines[0]), &first); err != nil || first.Type != "started" || first.Ref.RunID != "run-1" {
+		t.Fatalf("first = %+v err=%v", first, err)
 	}
-	if strings.TrimSpace(out.String()) != "assistant done" {
-		t.Fatalf("output = %q", out.String())
+	var last ChatNDJSONEvent
+	if err := json.Unmarshal([]byte(lines[3]), &last); err != nil || last.Type != "result" || last.Status != "complete" || last.Response != "assistant done" {
+		t.Fatalf("last = %+v err=%v", last, err)
+	}
+}
+
+func TestStreamRunNDJSONReconnectsWithLastSeq(t *testing.T) {
+	api := &fakeAPI{streams: []string{
+		"event: chat-session-event\nid: 7\ndata: {\"EventType\":\"run.progress\",\"Seq\":7,\"RunID\":\"run-1\"}\n\n",
+		"event: chat-session-event\nid: 8\ndata: {\"EventType\":\"run.completed\",\"Seq\":8,\"RunID\":\"run-1\"}\n\n",
+	}}
+	var out bytes.Buffer
+	err := StreamRunNDJSON(context.Background(), api, "machine-1", "secret-1", ChatRunRef{RunID: "run-1", ChatSessionID: "session-1", EventAfter: 5}, &out)
+	if err != nil {
+		t.Fatalf("StreamRunNDJSON() error = %v", err)
+	}
+	if got, want := api.eventAfters, []int64{5, 7}; len(got) != len(want) || got[0] != want[0] || got[1] != want[1] {
+		t.Fatalf("event afters = %v want %v", got, want)
+	}
+}
+
+func TestRunStartRejectsBlankProjectAndPrompt(t *testing.T) {
+	if err := RunStart(context.Background(), StartOptions{Prompt: "x"}, deps{}, io.Discard); err == nil || !strings.Contains(err.Error(), "project") {
+		t.Fatalf("blank project err = %v", err)
+	}
+	if err := RunStart(context.Background(), StartOptions{ProjectID: "p"}, deps{}, io.Discard); err == nil || !strings.Contains(err.Error(), "prompt") {
+		t.Fatalf("blank prompt err = %v", err)
 	}
 }
 

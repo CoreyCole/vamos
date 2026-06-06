@@ -29,6 +29,141 @@ type snapshotResponse struct {
 	LastSeq    int64                      `json:"last_seq"`
 }
 
+type StreamEvent struct {
+	ID        int64
+	Name      string
+	ChatEvent chatsession.ChatEvent
+	Raw       json.RawMessage
+}
+
+func StreamRunNDJSON(ctx context.Context, client APIClient, keyID, secret string, ref ChatRunRef, out io.Writer) error {
+	after := ref.EventAfter
+	for {
+		resp, err := client.Events(ctx, keyID, secret, ref.ChatSessionID, after)
+		if err != nil {
+			return err
+		}
+		err = ReadSSEEvents(ctx, resp.Body, func(streamEvent StreamEvent) error {
+			if streamEvent.ID > 0 {
+				after = streamEvent.ID
+			}
+			if streamEvent.Name != "chat-session-event" {
+				return nil
+			}
+			event := streamEvent.ChatEvent
+			if event.Seq > 0 {
+				after = event.Seq
+			}
+			if err := WriteNDJSON(out, ndjsonFromChatEvent(event, ref)); err != nil {
+				return err
+			}
+			if !isTerminalRunEvent(event, ref.RunID) {
+				return nil
+			}
+			snapshot, snapErr := client.Snapshot(ctx, keyID, secret, ref.ChatSessionID)
+			if snapErr != nil {
+				return snapErr
+			}
+			status := "complete"
+			errText := ""
+			if event.EventType == chatsession.EventRunFailed {
+				status = "failed"
+				errText = eventError(event.PayloadJSON)
+			}
+			if err := WriteNDJSON(out, terminalNDJSON(status, ref, snapshot, event.RunID, errText)); err != nil {
+				return err
+			}
+			return errTerminalSeen
+		})
+		_ = resp.Body.Close()
+		if err == nil || err == io.ErrUnexpectedEOF {
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			default:
+			}
+			continue
+		}
+		if errorsIsTerminalSeen(err) {
+			return nil
+		}
+		return err
+	}
+}
+
+var errTerminalSeen = fmt.Errorf("terminal chat run event seen")
+
+func errorsIsTerminalSeen(err error) bool { return err == errTerminalSeen }
+
+func isTerminalRunEvent(event chatsession.ChatEvent, runID string) bool {
+	if event.EventType != chatsession.EventRunCompleted && event.EventType != chatsession.EventRunFailed {
+		return false
+	}
+	return strings.TrimSpace(runID) == "" || strings.TrimSpace(event.RunID) == "" || event.RunID == runID
+}
+
+func ReadSSEEvents(ctx context.Context, r io.Reader, emit func(StreamEvent) error) error {
+	scanner := bufio.NewScanner(r)
+	var eventName string
+	var data strings.Builder
+	var id int64
+	flush := func() error {
+		if strings.TrimSpace(eventName) == "" && strings.TrimSpace(data.String()) == "" {
+			return nil
+		}
+		streamEvent := StreamEvent{Name: strings.TrimSpace(eventName), ID: id, Raw: json.RawMessage(strings.TrimSpace(data.String()))}
+		if streamEvent.Name == "chat-session-event" && len(streamEvent.Raw) > 0 {
+			if err := json.Unmarshal(streamEvent.Raw, &streamEvent.ChatEvent); err != nil {
+				return err
+			}
+			if streamEvent.ID == 0 {
+				streamEvent.ID = streamEvent.ChatEvent.Seq
+			}
+		}
+		return emit(streamEvent)
+	}
+	for scanner.Scan() {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+		}
+		line := scanner.Text()
+		if line == "" {
+			if err := flush(); err != nil {
+				return err
+			}
+			eventName = ""
+			data.Reset()
+			id = 0
+			continue
+		}
+		if strings.HasPrefix(line, "event:") {
+			eventName = strings.TrimSpace(strings.TrimPrefix(line, "event:"))
+			continue
+		}
+		if strings.HasPrefix(line, "id:") {
+			_, _ = fmt.Sscan(strings.TrimSpace(strings.TrimPrefix(line, "id:")), &id)
+			continue
+		}
+		if strings.HasPrefix(line, "data:") {
+			if data.Len() > 0 {
+				data.WriteByte('\n')
+			}
+			data.WriteString(strings.TrimSpace(strings.TrimPrefix(line, "data:")))
+		}
+	}
+	if err := scanner.Err(); err != nil {
+		return err
+	}
+	if strings.TrimSpace(eventName) != "" || strings.TrimSpace(data.String()) != "" {
+		if err := flush(); err != nil {
+			return err
+		}
+	}
+	return io.ErrUnexpectedEOF
+}
+
 func (w ChatSessionWatcher) WatchUntilComplete(ctx context.Context, baseURL, sessionID string, afterSeq int64) (ChatCompletion, error) {
 	client := w.HTTPClient
 	if client == nil {
@@ -93,43 +228,26 @@ func (w ChatSessionWatcher) Snapshot(ctx context.Context, baseURL, sessionID str
 }
 
 func readCompletionEvent(ctx context.Context, r io.Reader) (ChatCompletion, error) {
-	scanner := bufio.NewScanner(r)
-	var eventName string
-	var data strings.Builder
-	for scanner.Scan() {
-		select {
-		case <-ctx.Done():
-			return ChatCompletion{}, ctx.Err()
+	var completion ChatCompletion
+	err := ReadSSEEvents(ctx, r, func(streamEvent StreamEvent) error {
+		if streamEvent.Name != "chat-session-event" {
+			return nil
+		}
+		switch streamEvent.ChatEvent.EventType {
+		case chatsession.EventRunCompleted:
+			completion = ChatCompletion{RunID: streamEvent.ChatEvent.RunID}
+			return errTerminalSeen
+		case chatsession.EventRunFailed:
+			completion = ChatCompletion{RunID: streamEvent.ChatEvent.RunID, Failed: true, Error: eventError(streamEvent.ChatEvent.PayloadJSON)}
+			return errTerminalSeen
 		default:
+			return nil
 		}
-		line := scanner.Text()
-		if line == "" {
-			completion, done, err := completionFromSSE(eventName, data.String())
-			if err != nil {
-				return ChatCompletion{}, err
-			}
-			if done {
-				return completion, nil
-			}
-			eventName = ""
-			data.Reset()
-			continue
-		}
-		if strings.HasPrefix(line, "event:") {
-			eventName = strings.TrimSpace(strings.TrimPrefix(line, "event:"))
-			continue
-		}
-		if strings.HasPrefix(line, "data:") {
-			if data.Len() > 0 {
-				data.WriteByte('\n')
-			}
-			data.WriteString(strings.TrimSpace(strings.TrimPrefix(line, "data:")))
-		}
+	})
+	if errorsIsTerminalSeen(err) {
+		return completion, nil
 	}
-	if err := scanner.Err(); err != nil {
-		return ChatCompletion{}, err
-	}
-	return ChatCompletion{}, io.ErrUnexpectedEOF
+	return ChatCompletion{}, err
 }
 
 func completionFromSSE(eventName, data string) (ChatCompletion, bool, error) {
