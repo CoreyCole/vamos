@@ -15,7 +15,7 @@ qrspi_result:
   next:
     steps:
       - action: "read_skill"
-        param: "~/.agents/skills/q-workspace/SKILL.md"
+        param: ".pi/skills/q-workspace/SKILL.md"
       - action: "start_stage"
         param: "q-workspace"
 ```

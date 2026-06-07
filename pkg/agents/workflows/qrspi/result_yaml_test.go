@@ -293,4 +293,9 @@ func TestDefinition(t *testing.T) {
 			t.Fatalf("missing node %q", node)
 		}
 	}
+	for id, node := range def.Nodes {
+		if node.Kind == wruntime.NodeKindAgent && strings.Contains(node.Prompt.SkillPath, "~/.agents/skills/q-") {
+			t.Fatalf("node %s uses global q-skill path %q", id, node.Prompt.SkillPath)
+		}
+	}
 }

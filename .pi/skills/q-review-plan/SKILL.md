@@ -1,0 +1,379 @@
+---
+name: q-review-plan
+description: LLM review for QRSPI planning artifacts before implementation. Use after outline or plan creation to review and directly fix design.md, optional design-product.md, outline.md, and plan.md; creates research follow-up questions only when codebase facts are missing.
+---
+
+# QRSPI Planning Review
+
+> **Pipeline overview:** `.pi/skills/qrspi-planning/SKILL.md`
+
+## Runtime YAML contract
+
+Every response that completes a QRSPI workflow node must include a fenced `yaml` block with top-level `qrspi_result`, followed by a mandatory concise human summary. Do not use prose-only `Artifact` / `Summary` / `Next` completion responses.
+
+Required shape:
+
+```yaml
+qrspi_result:
+  project: "github.com/CoreyCole/vamos"
+  related_projects: []
+  stage: "[canonical node id]"
+  status: "complete"
+  outcome: "complete"
+  workspace: "[absolute active QRSPI plan/ticket directory before q-workspace; omit after implementation workspace exists]"
+  workspace_metadata:
+    plan_workspace: "[absolute active QRSPI plan/ticket directory]"
+    implementation_workspace: "[absolute implementation workspace when known]"
+    trunk_branch: "main"
+    stack_bottom_branch: ""
+    parent_branch: ""
+    current_branch: ""
+  policy:
+    advance_mode: "guided"
+    auto_mode: false
+    enable_plan_reviews: true
+    invalid_result_retry_limit: 1
+  summary:
+    plan_goal: "[overall goal]"
+    stage_completed: "[specific work completed]"
+    key_decisions: "[decisions, risks, follow-up, or why next step is safe]"
+  artifact: "thoughts/..."
+  artifacts:
+    - role: "related"
+      path: "thoughts/..."
+  next:
+    steps:
+      - action: "read_skill"
+        param: ".pi/skills/qrspi-planning/SKILL.md"
+      - action: "read_skill"
+        param: ".pi/skills/[concrete next-stage]/SKILL.md"
+      - action: "read_artifact"
+        param: "thoughts/..."
+      - action: "start_stage"
+        param: "[concrete next-stage]"
+```
+
+`status` is lifecycle. `outcome` selects the graph branch. Before `/q-workspace`, use top-level ``workspace`` only for normal parent plans that need a new implementation copy. If the reviewed `plan.md` is in a review plan dir (`.../reviews/*/plan.md`), an implementation-review follow-up, any nested review plan inside a prepared workspace, or the human says to implement in the current workspace, omit top-level ``workspace`` and put both ``plan_workspace`` and ``implementation_workspace`` inside ``workspace_metadata``. ``next.steps`` is an ordered instruction block for the next agent: read `qrspi-planning`, read the next stage skill, read the appropriate artifact, then start the next stage immediately unless a named human/safety gate blocks. Runtime transitions remain graph-authoritative and may validate/rewrite the steps. Complete results must include ``outcome``. Review stages must use explicit node IDs (`review-outline`, `review-plan`, or `review-implementation`), never `review`.
+
+> **Review rubric:** `~/.pi/agent/skills/review-rubric/SKILL.md`
+
+Every planning-review session starts by reading `.pi/skills/qrspi-planning/SKILL.md`, then `q-review`, then this focused skill, then immediately running the review. Do not answer “ready to proceed.”
+
+Do not read `q-workspace` to decide whether to skip workspace creation. This focused planning review owns the branch choice: normal parent `plan.md` routes to `/q-workspace`; review-dir/same-workspace `plan.md` routes directly to `/q-implement` with outcome `ready-for-implement`.
+
+Review pre-implementation artifacts and make the planning docs better. This is an LLM review gate, not a passive report and not the human design/product-design interview. Findings should usually become direct edits to `design.md`, optional `design-product.md`, `outline.md`, or `plan.md`.
+
+## Review Target
+
+Load the planning artifacts that exist for the provided plan directory:
+
+- Always review `design.md` when present.
+- Review `design-product.md` when present. Missing `design-product.md` is not itself a finding for internal tools, bugfixes, refactors, or other low product-risk work.
+- Always review `outline.md` when present.
+- Review `plan.md` when present, especially when the input is `plan.md` or the plan has already been written.
+
+Run this skill after `outline.md` is written and again after `plan.md` is written. The first pass gets the design and outline ready for `/q-plan`; the second pass gets the full implementation plan ready for `/q-implement`.
+
+## Finding Classification
+
+Classify every real finding into exactly one bucket:
+
+| Bucket | Meaning | Action |
+|---|---|---|
+| `obvious_doc_fix` | The issue and fix are clear from the existing docs/code you already verified. | Edit `design.md`, `design-product.md`, `outline.md`, or `plan.md` immediately. |
+| `needs_codebase_research` | The review found a likely issue, but the right doc change depends on facts not yet researched. | Automatically create a research questions doc under the review directory. Next step is `/skill:q-research-for-review`; do not ask the human for permission. |
+| `needs_human_judgment` | The issue depends on product/business intent, risk tolerance, a tradeoff not settled in prior QRSPI artifacts, or whether humans agree a legacy behavior/code path can be deleted. This should be rare outside `review-outline` cleanup alignment. | Ask via `/answer`; then apply the decision to the docs. |
+
+Do not use research follow-up for questions you can answer with targeted reads during the review. Do the reads yourself first.
+
+## Artifact Locations
+
+Create one timestamped review directory under the parent plan:
+
+```text
+[plan_dir]/reviews/YYYY-MM-DD_HH-MM-SS_[plan-name]_[outline|plan]-review/
+  review.md
+  questions/    # only when needs_codebase_research findings exist
+  research/     # q-research-for-review writes here later
+  context/
+    research/   # research locator/analyzer artifacts
+```
+
+Use `outline-review` when `plan.md` does not exist or was not part of the review. Use `plan-review` when `plan.md` is reviewed.
+
+The canonical review artifact is always:
+
+```text
+[review_dir]/review.md
+```
+
+Research follow-up question docs go directly under:
+
+```text
+[review_dir]/questions/YYYY-MM-DD_HH-MM-SS_[plan-name]_review-followup-questions.md
+```
+
+The review directory is a lightweight research workspace for planning-review follow-up. It does not get its own `design.md`, `design-product.md`, `outline.md`, or `plan.md`; `q-address-review-research` applies the researched fixes back to the parent planning docs.
+
+## Load Context
+
+1. Read `.pi/skills/qrspi-planning/SKILL.md`.
+1. Read `~/.pi/agent/skills/review-rubric/SKILL.md`.
+1. Resolve `plan_dir` from the input artifact or directory.
+1. Read:
+   - `[plan_dir]/AGENTS.md`
+   - `[plan_dir]/design.md` if present
+   - `[plan_dir]/design-product.md` if present
+   - `[plan_dir]/outline.md` if present
+   - `[plan_dir]/plan.md` if present and in scope
+   - relevant `questions/*.md`, `context/brainstorms/*.md`, `research/*.md`, `prds/*`, and `context/{design,design-product,outline,plan}/*`
+   - code/files explicitly referenced by the planning docs, plus any files needed to verify claims
+   - relevant project guidance surfaced by the focused project-guidance lane, including root/package `AGENTS.md`, `.agents/rules/`, `.cursor/rules/`, local skills, and docs referenced by the plan or touched files
+   - doc health findings surfaced by the focused docs-health lane, including docs that should be corrected, simplified, or made more concise
+1. If no planning artifact exists, stop and ask for a valid plan directory or artifact path.
+
+## Focused Review Lanes
+
+For tiny local planning changes, review directly. For broader plans, use the existing lane selector and focused lane prompts from `q-review/agents/`.
+
+Run the selector with planning mode:
+
+```bash
+uv run .pi/skills/q-review/bin/select-lanes.py \
+  --mode outline \
+  --plan-dir [plan_dir] \
+  --reviewed-artifact [outline.md-or-plan.md] \
+  --review-dir [review_dir] \
+  --pretty
+```
+
+Use the selector's `subagent_tool_args` directly with the `subagent` tool. It disables the builtin reviewer defaults for `reads` and `progress` so focused lanes do not create root `plan.md` / `progress.md` files. Planning reviews route from `design.md`, `design-product.md`, `outline.md`, and `plan.md` only. Do not route lanes from `questions/`, `research/`, or `context/` paths.
+
+Focused lane reports are advisory. Verify every candidate finding yourself before including it in `review.md` or changing docs.
+
+## Process
+
+1. Run `~/dotfiles/spec_metadata.sh` before creating `review_dir` or writing markdown.
+1. Resolve `review_kind`:
+   - `outline-review` if reviewing only design and outline.
+   - `plan-review` if reviewing `plan.md` too.
+1. Build understanding before judging:
+   - Identify touched components, interfaces, data models, tests, migrations, rollout concerns, and nearby patterns.
+   - Summarize the current planned design/approach at a high level.
+   - Check alignment with PRDs, ticket text, question docs, `context/brainstorms/`, research findings, and approved plan-memory constraints.
+   - Verify major named references and assumptions in the codebase.
+1. Review planning docs for:
+   - fidelity to approved questions/research/design and optional product design
+   - hidden scope drift or missing requirements, especially product Critical Findings when present
+   - vertical slice quality and sequencing
+   - concrete file paths, interfaces, migrations, rollback, observability, and invariants
+   - legacy cleanup targets created by the planned change: dead code, compatibility shims, duplicate routes, unused graph nodes, old adapters, stale tests, stale docs, and parallel old/new code paths that should be deleted instead of preserved
+   - explicit human agreement points for cleanup at `review-outline`: if the outline makes legacy behavior unnecessary, flag the deletion in `review.md` and edit `outline.md` so the next `/q-plan` treats deletion as intended scope, not optional cleanup
+   - test checkpoints that prove removed legacy paths are gone and the canonical replacement covers their behavior
+   - plan steps that are too vague for a coding agent
+   - docs that should be corrected, simplified, or made more concise
+   - local codebase rules and project guidance under `AGENTS.md`, `.agents/rules/`, `.cursor/rules/`, local skills, and relevant docs when the plan touches areas covered by repo-specific advice
+   - conflicting relevant guidance; preserve each conflict as `IMPORTANT: needs human attention` until a human chooses which source to follow
+1. Run focused lanes when useful, then read every focused-lane output artifact before synthesis.
+   - Treat a lane output as failed if it is empty, only contains raw tool-call markup/JSON such as `<tool_call>` or `{"cmd": ...}`, lacks the required lane report sections, or contains no evidence for its findings.
+   - Rerun each failed lane once with the same task plus an explicit reminder to actually use tools and return only the markdown lane report.
+   - If the rerun still fails, record the lane as unavailable in `review.md` and continue with your own targeted verification instead of trusting it.
+   - local codebase rules under `.agents/rules/`, especially Go utility-package rules (`pkg/pointers.To`, `pkg/collections.Set`, nullable `Ptr()`, `pkg/checked`) when the plan writes Go files
+1. Run focused lanes when useful, then synthesize and verify candidate findings.
+1. Classify findings into `obvious_doc_fix`, `needs_codebase_research`, or `needs_human_judgment`. Treat conflicting relevant project guidance as `needs_human_judgment` and label it `IMPORTANT: needs human attention` in `review.md` and the user-facing question. At `review-outline`, prefer surfacing planned legacy deletion decisions now: if deletion follows clearly from approved design/research, edit `outline.md` directly; if human agreement is needed to delete old behavior, record the exact deletion question as `needs_human_judgment`. Only flag a missing `design-product.md` when the work is product-critical, high-stakes, user-facing with unclear PRD coverage, compliance/security sensitive, or changes irreversible user/data behavior.
+1. Apply all `obvious_doc_fix` edits directly to `design.md`, `design-product.md`, `outline.md`, and/or `plan.md`.
+1. For each `needs_codebase_research` finding, create `[review_dir]/questions/`, `[review_dir]/research/`, and `[review_dir]/context/research/`, then write neutral research questions under `[review_dir]/questions/`. Questions must link to `[review_dir]/review.md`, the affected parent docs, and exact file refs.
+1. For each `needs_human_judgment` finding, write a self-contained `Questions for /answer` item. Use `/answer`, then apply the answer to the docs when possible.
+1. Re-read edited docs and ensure `review.md` describes the post-edit state.
+1. Write or update `[review_dir]/review.md`.
+1. If durable decisions or review learnings should survive context resets, update `[plan_dir]/AGENTS.md`.
+
+## Review Artifact Template
+
+```markdown
+---
+date: [ISO datetime with timezone]
+reviewer: [git_username]
+git_commit: [current commit hash]
+branch: [current branch]
+repository: [repository name]
+plan_dir: [exact parent plan dir path]
+review_dir: [exact review dir path]
+review_mode: planning
+review_kind: [outline-review|plan-review]
+reviewed_artifacts:
+  - [design.md path or none]
+  - [design-product.md path or none]
+  - [outline.md path or none]
+  - [plan.md path or none]
+status: complete
+type: planning_review
+verdict: [correct|needs_attention]
+---
+
+# Planning Review: [plan name]
+
+## Summary
+[Short assessment of the reviewed planning docs after direct edits.]
+
+## Current Design / Plan
+[High-level summary of what the current design/outline/plan proposes.]
+
+## Requirements Alignment
+- PRD/ticket requirements: [aligned/gaps, with refs]
+- Brainstormed requirements and decisions: [aligned/gaps, with refs to `context/brainstorms/`]
+- Research/design constraints: [aligned/gaps, with refs]
+
+## Findings Summary
+- [Finding summary, or `None.`]
+
+## Findings
+### Finding 1: [Title]
+- Classification: [obvious_doc_fix|needs_codebase_research|needs_human_judgment]
+- Priority: [P0|P1|P2|P3]
+- References: [doc path and code refs]
+- Issue: [What was wrong.]
+- Example: [Concrete scenario showing why it matters.]
+- Resolution: [Edited docs, research questions doc, or human decision needed.]
+
+## Focused Review Lanes
+- [Lane summaries, including project-guidance lane results, or `Not used; review was small/localized.`]
+
+## Conflicting Guidance
+- IMPORTANT: needs human attention — [conflict summary with exact source refs and decision needed, or `None.`]
+
+## Applied Doc Edits
+- `[path]` — [what changed]
+
+## Research Follow-up Needed
+- [Finding numbers and question doc path, or `None.`]
+
+## Human Decisions Needed
+- [Questions asked or `None.`]
+
+## Follow-up Questions Doc
+[Exact questions doc path or `None.`]
+
+## Verification
+- [Commands/reads performed and outcome.]
+
+## Recommended Next Steps
+[Next command.]
+```yaml
+qrspi_result:
+  project: "github.com/CoreyCole/vamos"
+  related_projects: []
+  stage: "[canonical node id]"
+  status: "complete"
+  outcome: "complete"
+  workspace: "[absolute active QRSPI plan/ticket directory before q-workspace; omit after implementation workspace exists]"
+  workspace_metadata:
+    plan_workspace: "[absolute active QRSPI plan/ticket directory]"
+    implementation_workspace: "[absolute implementation workspace when known]"
+    trunk_branch: "main"
+    stack_bottom_branch: ""
+    parent_branch: ""
+    current_branch: ""
+  policy:
+    advance_mode: "guided"
+    auto_mode: false
+    enable_plan_reviews: true
+    invalid_result_retry_limit: 1
+  summary:
+    plan_goal: "[overall goal]"
+    stage_completed: "[specific work completed]"
+    key_decisions: "[decisions, risks, follow-up, or why next step is safe]"
+  artifact: "thoughts/..."
+  artifacts:
+    - role: "related"
+      path: "thoughts/..."
+  next:
+    steps:
+      - action: "read_skill"
+        param: ".pi/skills/qrspi-planning/SKILL.md"
+      - action: "read_skill"
+        param: ".pi/skills/[concrete next-stage]/SKILL.md"
+      - action: "read_artifact"
+        param: "thoughts/..."
+      - action: "start_stage"
+        param: "[concrete next-stage]"
+```yaml
+qrspi_result:
+  stage: "[canonical node id]"
+  status: "complete"
+  outcome: "complete"
+  policy:
+    advance_mode: "guided"
+    auto_mode: false
+    enable_plan_reviews: true
+    invalid_result_retry_limit: 1
+  summary:
+    plan_goal: "[overall goal]"
+    stage_completed: "[specific work completed]"
+    key_decisions: "[decisions, risks, follow-up, or why next step is safe]"
+  artifact: "thoughts/..."
+  artifacts:
+    - role: "related"
+      path: "thoughts/..."
+  next:
+    steps:
+      - action: "read_skill"
+        param: ".pi/skills/qrspi-planning/SKILL.md"
+      - action: "read_artifact"
+        param: "thoughts/..."
+      - action: "start_stage"
+        param: "[concrete next-stage]"
+```
+
+Outcome mapping:
+
+- `review-outline` ready to plan: ``outcome`ready-for-plan`outcome`` and ``next.steps`` steps for `qrspi-planning`, `q-plan`, `design.md`, `design-product.md` if it exists, `outline.md`, and immediate `/q-plan` start.
+  - Do not emit ``next.steps`human-review-outline`next.steps`` or any plan-writing approval prompt. Human approval for the design/outline direction already happened in `/q-outline` before `outline.md` was written.
+  - The ``summary.key_decisions`` for `review-outline` must instruct the next agent/runtime behavior: `Next stage should start immediately: /q-plan [outline.md]`; `/q-plan` reads relevant code files and writes `plan.md` without another human approval prompt.
+- `review-plan` ready for normal workspace prep: only for normal parent plans that are not under another plan's `reviews/` tree, use ``outcome`ready-for-workspace`outcome`` and ``next.steps`` steps for `qrspi-planning`, `q-workspace`, `plan.md`, and immediate `/q-workspace` start. Its ``summary.key_decisions`` must say `Next stage should start immediately: /q-workspace [plan.md]`. Its post-YAML summary must end with `Next: start /q-workspace now.`
+- `review-plan` ready for same-workspace implementation: if the reviewed `plan.md` is inside a review plan dir (`.../reviews/*/plan.md`), inside `[parent]/reviews/*_implementation-review/`, inside any nested review directory under an already prepared implementation workspace, or the human explicitly says to implement in the current workspace, skip `/q-workspace`. Use ``outcome`ready-for-implement`outcome``, omit top-level ``workspace``, set ``plan_workspace`` to the review-dir plan workspace, set ``implementation_workspace`` to the current/original implementation workspace path, and put ``next.steps`` steps for `qrspi-planning`, `q-implement`, `plan.md`, and immediate `/q-implement` start. Its ``summary.key_decisions`` must say `Next stage should start immediately: /q-implement [plan.md] in the existing implementation workspace; do not create a fresh copy or reset to trunk.` If this is an implementation-review follow-up, also say to stack review-fix branches on the reviewed head. Its post-YAML summary must end with `Next: start /q-implement now.`
+
+If codebase research is needed before the review can pass, the next research-for-review stage should start immediately; do not ask for permission:
+
+```yaml
+qrspi_result:
+  stage: "[canonical node id]"
+  status: "complete"
+  outcome: "complete"
+  policy:
+    advance_mode: "guided"
+    auto_mode: false
+    enable_plan_reviews: true
+    invalid_result_retry_limit: 1
+  summary:
+    plan_goal: "[overall goal]"
+    stage_completed: "[specific work completed]"
+    key_decisions: "[decisions, risks, follow-up, or why next step is safe]"
+  artifact: "thoughts/..."
+  artifacts:
+    - role: "related"
+      path: "thoughts/..."
+  next:
+    steps:
+      - action: "read_skill"
+        param: ".pi/skills/qrspi-planning/SKILL.md"
+      - action: "read_artifact"
+        param: "thoughts/..."
+      - action: "start_stage"
+        param: "[concrete next-stage]"
+```
+
+If human judgment is required, use ``status`needs_human`status`` and omit ``outcome``.
+
+## Rules
+
+- Planning review is an LLM review gate, not the human design review.
+- Address clear findings directly in `design.md`, `design-product.md`, `outline.md`, and `plan.md`.
+- Review `plan.md` after `/q-plan`; the old rule that the plan is never reviewed no longer applies.
+- Do not leave obvious documentation fixes as passive findings.
+- Do not ask the human about `needs_codebase_research` findings; create the research questions doc automatically.
+- Use `needs_human_judgment` only for genuine business/product decisions not settled by prior QRSPI artifacts, or for conflicting relevant project guidance that requires a human to choose the authoritative instruction.
+- Never edit implementation code in planning review.
+- Do not create a full nested QRSPI design/outline/plan for planning-review research follow-up. Use `q-address-review-research` to apply researched fixes back to the parent docs.
+- In `review.md`, summarize the current design/plan at a high level and state how it aligns with PRDs, tickets, brainstormed requirements, research findings, and approved constraints.
+- In the post-YAML user summary, use `Found: ... Fixed: ...`; for successful normal parent-plan `review-plan`, include `Next: start /q-workspace now.` For successful review-plan-dir, same-workspace review-dir, or implementation-review follow-up `review-plan`, include `Next: start /q-implement now.` Do not summarize artifact paths there.
