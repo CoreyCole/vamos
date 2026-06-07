@@ -11,6 +11,28 @@ import (
 	"strings"
 )
 
+const clearInvalidImplWorkspacePlanRefs = `-- name: ClearInvalidImplWorkspacePlanRefs :execrows
+UPDATE impl_workspaces
+SET
+    plan_dir_rel = NULL,
+    plan_dir = NULL
+WHERE
+    plan_dir_rel IS NOT NULL
+    AND NOT EXISTS (
+        SELECT 1
+        FROM plan_workspaces
+        WHERE plan_workspaces.plan_dir_rel = impl_workspaces.plan_dir_rel
+    )
+`
+
+func (q *Queries) ClearInvalidImplWorkspacePlanRefs(ctx context.Context) (int64, error) {
+	result, err := q.db.ExecContext(ctx, clearInvalidImplWorkspacePlanRefs)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
 const getImplWorkspace = `-- name: GetImplWorkspace :one
 SELECT project_id, workspace_slug, checkout_role, checkout_path, display_name, host, url, plan_dir_rel, plan_dir, status, branch, commit_hash, trunk_branch, top_branch, bottom_branch, bottom_parent_branch, base_branch, ahead_count, behind_count, merged_at, cleaned_up_at, merge_evidence, cleanup_proof_kind, cleanup_proof_source_ref, cleanup_proof_target_commit, cleanup_proof_at, cleanup_risk_reason, env_last_repaired_at, env_last_error, git_detail, activity_hash, activity_checked_at, discovered_at, last_discovered_at, updated_at
 FROM impl_workspaces
@@ -351,6 +373,36 @@ func (q *Queries) MarkMissingImplWorkspacesCleanedUp(ctx context.Context, worksp
 		query = strings.Replace(query, "/*SLICE:workspace_slugs*/?", "NULL", 1)
 	}
 	result, err := q.db.ExecContext(ctx, query, queryParams...)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
+const reassignImplWorkspaceCheckoutPathIdentity = `-- name: ReassignImplWorkspaceCheckoutPathIdentity :execrows
+;
+
+UPDATE impl_workspaces
+SET project_id = ?1,
+workspace_slug = ?2
+WHERE impl_workspaces.checkout_path = ?3
+AND NOT (project_id = ?1 AND workspace_slug = ?2)
+AND NOT EXISTS (
+SELECT 1
+FROM impl_workspaces target
+WHERE target.project_id = ?1
+AND target.workspace_slug = ?2
+)
+`
+
+type ReassignImplWorkspaceCheckoutPathIdentityParams struct {
+	ProjectID     string `json:"project_id"`
+	WorkspaceSlug string `json:"workspace_slug"`
+	CheckoutPath  string `json:"checkout_path"`
+}
+
+func (q *Queries) ReassignImplWorkspaceCheckoutPathIdentity(ctx context.Context, arg ReassignImplWorkspaceCheckoutPathIdentityParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, reassignImplWorkspaceCheckoutPathIdentity, arg.ProjectID, arg.WorkspaceSlug, arg.CheckoutPath)
 	if err != nil {
 		return 0, err
 	}

@@ -132,6 +132,19 @@ func Discover(cfg DiscoveryConfig) ([]Workspace, error) {
 			bySlug[ws.Slug] = existing
 			continue
 		}
+		if existingSlug, existing, exists := configuredWorkspaceByCheckoutPath(bySlug, ws.CheckoutPath); exists && existingSlug != ws.Slug {
+			switch {
+			case preferConfiguredWorkspace(ws, existing):
+				delete(bySlug, existingSlug)
+			case preferConfiguredWorkspace(existing, ws):
+				continue
+			default:
+				existing.Status = StatusInvalid
+				existing.Error = fmt.Sprintf("duplicate checkout path %q", ws.CheckoutPath)
+				bySlug[existingSlug] = existing
+				continue
+			}
+		}
 		bySlug[ws.Slug] = ws
 	}
 
@@ -141,6 +154,24 @@ func Discover(cfg DiscoveryConfig) ([]Workspace, error) {
 	}
 	sortWorkspaces(out)
 	return out, nil
+}
+
+func configuredWorkspaceByCheckoutPath(workspaces map[string]Workspace, checkoutPath string) (string, Workspace, bool) {
+	for slug, ws := range workspaces {
+		if samePath(ws.CheckoutPath, checkoutPath) {
+			return slug, ws, true
+		}
+	}
+	return "", Workspace{}, false
+}
+
+func preferConfiguredWorkspace(candidate, existing Workspace) bool {
+	candidateProtected := IsProtectedCheckoutRole(candidate.CheckoutRole) || candidate.IsMain
+	existingProtected := IsProtectedCheckoutRole(existing.CheckoutRole) || existing.IsMain
+	if candidateProtected != existingProtected {
+		return candidateProtected
+	}
+	return candidate.IsConfigured && !existing.IsConfigured
 }
 
 func workspaceFromConfiguredCheckout(

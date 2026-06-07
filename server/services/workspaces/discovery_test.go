@@ -146,6 +146,42 @@ func TestDiscoverIncludesConfiguredCheckoutWithStableSlug(t *testing.T) {
 	}
 }
 
+func TestDiscoverPrefersProtectedConfiguredCheckoutForDuplicatePath(t *testing.T) {
+	parent := t.TempDir()
+	checkout := makeCheckout(t, parent, "vamos")
+
+	for name, configured := range map[string]map[string]ConfiguredCheckout{
+		"protected first": {
+			"stage": {RootPath: checkout, DisplayName: "Stage", Role: CheckoutRoleStage, ProjectID: "vamos"},
+			"local": {RootPath: checkout, DisplayName: "Local", ProjectID: "vamos"},
+		},
+		"protected second": {
+			"local": {RootPath: checkout, DisplayName: "Local", ProjectID: "vamos"},
+			"stage": {RootPath: checkout, DisplayName: "Stage", Role: CheckoutRoleStage, ProjectID: "vamos"},
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			got, err := Discover(DiscoveryConfig{
+				ParentDir:           parent,
+				Domain:              "workspaces.example.test",
+				CheckoutPrefixes:    []string{"vamos"},
+				MainCheckoutName:    "vamos-main",
+				MainCheckoutPath:    filepath.Join(parent, "vamos-main"),
+				ConfiguredCheckouts: configured,
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(got) != 1 {
+				t.Fatalf("discovered %d workspace(s): %#v", len(got), got)
+			}
+			if got[0].Slug != "stage" || got[0].CheckoutRole != CheckoutRoleStage || got[0].CheckoutPath != checkout {
+				t.Fatalf("workspace = %#v, want protected stage checkout", got[0])
+			}
+		})
+	}
+}
+
 func TestDiscoverWarnsWhenDatastarProAssetMissing(t *testing.T) {
 	parent := t.TempDir()
 	makeCheckout(t, parent, "vamos")

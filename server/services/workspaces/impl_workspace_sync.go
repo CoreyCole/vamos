@@ -82,6 +82,10 @@ func (s *ImplWorkspaceSyncer) Sync(
 		return ImplWorkspaceSyncResult{}, err
 	}
 
+	if _, err := s.Queries.ClearInvalidImplWorkspacePlanRefs(ctx); err != nil {
+		return ImplWorkspaceSyncResult{}, err
+	}
+
 	result := ImplWorkspaceSyncResult{
 		Scanned:    len(discovered),
 		Discovered: len(discovered),
@@ -107,6 +111,13 @@ func (s *ImplWorkspaceSyncer) Sync(
 		}
 		binding := readBestEffortPlanBinding(ws.CheckoutPath)
 		params := implWorkspaceUpsertParams(projectID, ws, gitState, binding)
+		if _, err := s.Queries.ReassignImplWorkspaceCheckoutPathIdentity(ctx, db.ReassignImplWorkspaceCheckoutPathIdentityParams{
+			ProjectID:     params.ProjectID,
+			WorkspaceSlug: params.WorkspaceSlug,
+			CheckoutPath:  params.CheckoutPath,
+		}); err != nil {
+			return ImplWorkspaceSyncResult{}, err
+		}
 		row, err := s.Queries.UpsertDiscoveredImplWorkspace(ctx, params)
 		if err != nil {
 			return ImplWorkspaceSyncResult{}, err

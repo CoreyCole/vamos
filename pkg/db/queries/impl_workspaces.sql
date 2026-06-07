@@ -24,6 +24,19 @@ WHERE
     project_id = sqlc.arg('project_id')
     AND workspace_slug = sqlc.arg('workspace_slug');
 
+-- name: ClearInvalidImplWorkspacePlanRefs :execrows
+UPDATE impl_workspaces
+SET
+    plan_dir_rel = NULL,
+    plan_dir = NULL
+WHERE
+    plan_dir_rel IS NOT NULL
+    AND NOT EXISTS (
+        SELECT 1
+        FROM plan_workspaces
+        WHERE plan_workspaces.plan_dir_rel = impl_workspaces.plan_dir_rel
+    );
+
 -- name: UpsertDiscoveredImplWorkspace :one
 INSERT INTO impl_workspaces (
     project_id,
@@ -141,6 +154,19 @@ ELSE impl_workspaces.updated_at
 END,
 activity_hash = excluded.activity_hash
 RETURNING * ;
+
+-- name: ReassignImplWorkspaceCheckoutPathIdentity :execrows
+UPDATE impl_workspaces
+SET project_id = sqlc.arg ('project_id'),
+workspace_slug = sqlc.arg ('workspace_slug')
+WHERE impl_workspaces.checkout_path = sqlc.arg ('checkout_path')
+AND NOT (project_id = sqlc.arg ('project_id') AND workspace_slug = sqlc.arg ('workspace_slug'))
+AND NOT EXISTS (
+SELECT 1
+FROM impl_workspaces target
+WHERE target.project_id = sqlc.arg ('project_id')
+AND target.workspace_slug = sqlc.arg ('workspace_slug')
+) ;
 
 -- name: MarkImplWorkspaceCleanedUp :execrows
 UPDATE impl_workspaces

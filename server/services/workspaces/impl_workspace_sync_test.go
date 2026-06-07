@@ -3,6 +3,7 @@ package workspaces
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -176,6 +177,57 @@ func TestImplWorkspaceCleanedUpMarksMergedRows(t *testing.T) {
 	}
 	if row.Status != string(ImplWorkspaceStatusCleanedUp) || !row.CleanedUpAt.Valid {
 		t.Fatalf("row status=%q cleaned_up_at=%v, want cleaned_up with timestamp", row.Status, row.CleanedUpAt)
+	}
+}
+
+func TestImplWorkspaceSyncReclaimsCheckoutPathForRenamedConfiguredWorkspace(t *testing.T) {
+	ctx := context.Background()
+	parent := t.TempDir()
+	workDir := makeImplSyncCheckout(t, t.TempDir(), "editable-vamos")
+	queries := openImplSyncTestQueries(t)
+
+	_, err := queries.UpsertDiscoveredImplWorkspace(ctx, db.UpsertDiscoveredImplWorkspaceParams{
+		ProjectID:     "vamos",
+		WorkspaceSlug: "local",
+		CheckoutPath:  workDir,
+		DisplayName:   "Local checkout",
+		Host:          "local.workspaces.example.test",
+		Url:           "https://local.workspaces.example.test/",
+		Status:        string(ImplWorkspaceStatusActive),
+	})
+	if err != nil {
+		t.Fatalf("seed local workspace: %v", err)
+	}
+
+	result, err := (&ImplWorkspaceSyncer{Queries: queries}).Sync(ctx, ImplWorkspaceSyncInput{
+		Discovery: ImplWorkspaceDiscoveryConfig{
+			ParentDir: parent,
+			Domain:    "workspaces.example.test",
+			ConfiguredCheckouts: map[string]ConfiguredCheckout{
+				"stage": {
+					RootPath:    workDir,
+					DisplayName: "Stage checkout",
+					Role:        CheckoutRoleStage,
+					ProjectID:   "vamos",
+				},
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("Sync: %v", err)
+	}
+	if result.Upserted != 1 {
+		t.Fatalf("result = %+v, want one upsert", result)
+	}
+	row, err := queries.GetImplWorkspace(ctx, db.GetImplWorkspaceParams{ProjectID: "vamos", WorkspaceSlug: "stage"})
+	if err != nil {
+		t.Fatalf("GetImplWorkspace(stage): %v", err)
+	}
+	if row.CheckoutPath != workDir || row.CheckoutRole != string(CheckoutRoleStage) || row.DisplayName != "Stage checkout" {
+		t.Fatalf("row = %+v, want stage identity on existing checkout path", row)
+	}
+	if _, err := queries.GetImplWorkspace(ctx, db.GetImplWorkspaceParams{ProjectID: "vamos", WorkspaceSlug: "local"}); !errors.Is(err, sql.ErrNoRows) {
+		t.Fatalf("GetImplWorkspace(local) err = %v, want sql.ErrNoRows", err)
 	}
 }
 
