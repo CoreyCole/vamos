@@ -408,33 +408,35 @@ func TestBuildPlanSidebarStateShowsRelatedProjectBindingStatus(t *testing.T) {
 	}
 }
 
-func TestAdoptThreadProjectForRunUsesXMLBeforeFrontmatterWrites(t *testing.T) {
+func TestAdoptThreadProjectForRunUsesYAMLBeforeFrontmatterWrites(t *testing.T) {
 	service := newTestAgentChatService(t)
 	alphaPlan := filepath.Join(service.thoughtsRoot, "user", "plans", "alpha")
 	mustWriteFile(t, filepath.Join(alphaPlan, "AGENTS.md"), "---\nproject: example.com/alpha/app\n---\n# Alpha\n")
-	thread := mustCreateAgentThread(t, service, "project-thread-xml", "user@example.com", service.projectRoot, "lineage-project-xml")
+	thread := mustCreateAgentThread(t, service, "project-thread-yaml", "user@example.com", service.projectRoot, "lineage-project-yaml")
 	entries := []db.AgentEntry{
 		{EntryID: "call-1", PayloadJson: `{"type":"message","id":"call-1","message":{"role":"assistant","content":[{"type":"toolCall","id":"write-1","name":"write","arguments":{"path":"` + filepath.ToSlash(filepath.Join(alphaPlan, "plan.md")) + `"}}]}}`},
 		{EntryID: "tool-1", PayloadJson: `{"type":"message","id":"tool-1","message":{"role":"toolResult","toolCallId":"write-1","toolName":"write","content":"Wrote file","isError":false}}`},
 	}
-	assistantText := `<qrspi-result>
-  <project>example.com/beta/app</project>
-  <stage>plan</stage>
-  <status>complete</status>
-  <outcome>complete</outcome>
-  <summary>
-    <plan-goal>Test project adoption.</plan-goal>
-    <stage-completed>Done.</stage-completed>
-    <key-decisions>XML wins.</key-decisions>
-  </summary>
-</qrspi-result>`
+	assistantText := strings.Join([]string{
+		"```yaml",
+		"qrspi_result:",
+		"  project: \"example.com/beta/app\"",
+		"  stage: \"plan\"",
+		"  status: \"complete\"",
+		"  outcome: \"complete\"",
+		"  summary:",
+		"    plan_goal: \"Test project adoption.\"",
+		"    stage_completed: \"Done.\"",
+		"    key_decisions: \"YAML wins.\"",
+		"```",
+	}, "\n")
 
 	projectID, err := service.AdoptThreadProjectForRun(t.Context(), thread, entries, assistantText)
 	if err != nil {
 		t.Fatalf("AdoptThreadProjectForRun() error = %v", err)
 	}
 	if projectID != "example.com/beta/app" {
-		t.Fatalf("projectID = %q, want XML project", projectID)
+		t.Fatalf("projectID = %q, want YAML project", projectID)
 	}
 	updated, err := service.queries.GetAgentThread(t.Context(), thread.ID)
 	if err != nil {

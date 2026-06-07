@@ -59,8 +59,8 @@ func (s *Service) AdoptThreadWorkspacesForRun(ctx context.Context, input ThreadW
 	if err != nil {
 		return ThreadWorkspaceAdoptionResult{}, err
 	}
-	xmlRoots := s.resolveAttachableRootsFromQRSPIXML(ctx, assistantText, thread.Cwd)
-	primary, related := choosePrimaryAndRelatedRoots(xmlRoots, writeRoots)
+	resultRoots := s.resolveAttachableRootsFromQRSPIResult(ctx, assistantText, thread.Cwd)
+	primary, related := choosePrimaryAndRelatedRoots(resultRoots, writeRoots)
 	if primary.RelPath == "" {
 		return ThreadWorkspaceAdoptionResult{ProjectID: projectID}, nil
 	}
@@ -85,7 +85,7 @@ func (s *Service) AdoptThreadWorkspacesForRun(ctx context.Context, input ThreadW
 		}
 		out.RelatedWorkspaceIDs = append(out.RelatedWorkspaceIDs, workspace.ID)
 	}
-	if strings.Contains(assistantText, "<qrspi-result>") && headEntryID != "" && !run.WorkflowNodeID.Valid {
+	if hasQRSPIResultYAML(assistantText) && headEntryID != "" && !run.WorkflowNodeID.Valid {
 		applied, err := s.ApplyQRSPIResultToAdoptedWorkspace(ctx, primaryWorkspace.ID, thread.ID, headEntryID)
 		if err != nil {
 			return out, err
@@ -96,7 +96,7 @@ func (s *Service) AdoptThreadWorkspacesForRun(ctx context.Context, input ThreadW
 }
 
 func (s *Service) AdoptThreadProjectForRun(ctx context.Context, thread db.AgentThread, entries []db.AgentEntry, assistantText string) (string, error) {
-	projectID := s.projectFromQRSPIXML(assistantText)
+	projectID := s.projectFromQRSPIResult(assistantText)
 	if projectID == "" {
 		projectID = s.projectFromSuccessfulQRSPIWrites(entries, thread.Cwd)
 	}
@@ -113,19 +113,21 @@ func (s *Service) AdoptThreadProjectForRun(ctx context.Context, thread db.AgentT
 	})
 }
 
-func (s *Service) projectFromQRSPIXML(text string) string {
-	if !strings.Contains(text, "<qrspi-result>") {
-		return ""
-	}
-	parsedAny, err := qrspi.QRSPIXMLParser{}.Parse(text, wruntime.ParseContext{})
+func (s *Service) projectFromQRSPIResult(text string) string {
+	parsedAny, err := qrspi.QRSPIResultParser{}.Parse(text, wruntime.ParseContext{})
 	if err != nil {
 		return ""
 	}
-	parsed, ok := parsedAny.(qrspi.ResultXML)
+	parsed, ok := parsedAny.(qrspi.Result)
 	if !ok {
 		return ""
 	}
 	return qrspi.QRSPIResultProject(parsed)
+}
+
+func hasQRSPIResultYAML(text string) bool {
+	_, err := qrspi.QRSPIResultParser{}.Parse(text, wruntime.ParseContext{})
+	return err == nil
 }
 
 func (s *Service) projectFromSuccessfulQRSPIWrites(entries []db.AgentEntry, cwd string) string {
@@ -282,20 +284,17 @@ func agentEntryToPiSessionEntry(row db.AgentEntry) (PiSessionEntry, bool) {
 	return entry, true
 }
 
-func (s *Service) ResolveAttachableRootsFromQRSPIXML(ctx context.Context, text string) []AttachablePlanRoot {
-	return s.resolveAttachableRootsFromQRSPIXML(ctx, text, "")
+func (s *Service) ResolveAttachableRootsFromQRSPIResult(ctx context.Context, text string) []AttachablePlanRoot {
+	return s.resolveAttachableRootsFromQRSPIResult(ctx, text, "")
 }
 
-func (s *Service) resolveAttachableRootsFromQRSPIXML(ctx context.Context, text string, cwd string) []AttachablePlanRoot {
+func (s *Service) resolveAttachableRootsFromQRSPIResult(ctx context.Context, text string, cwd string) []AttachablePlanRoot {
 	_ = ctx
-	if !strings.Contains(text, "<qrspi-result>") {
-		return nil
-	}
-	parsedAny, err := qrspi.QRSPIXMLParser{}.Parse(text, wruntime.ParseContext{})
+	parsedAny, err := qrspi.QRSPIResultParser{}.Parse(text, wruntime.ParseContext{})
 	if err != nil {
 		return nil
 	}
-	parsed, ok := parsedAny.(qrspi.ResultXML)
+	parsed, ok := parsedAny.(qrspi.Result)
 	if !ok {
 		return nil
 	}
@@ -333,8 +332,8 @@ func (s *Service) resolveAttachableRootsFromQRSPIXML(ctx context.Context, text s
 	return roots
 }
 
-func choosePrimaryAndRelatedRoots(xmlRoots, writeRoots []AttachablePlanRoot) (AttachablePlanRoot, []AttachablePlanRoot) {
-	ordered := append([]AttachablePlanRoot{}, xmlRoots...)
+func choosePrimaryAndRelatedRoots(resultRoots, writeRoots []AttachablePlanRoot) (AttachablePlanRoot, []AttachablePlanRoot) {
+	ordered := append([]AttachablePlanRoot{}, resultRoots...)
 	ordered = append(ordered, writeRoots...)
 	seen := map[string]struct{}{}
 	var primary AttachablePlanRoot

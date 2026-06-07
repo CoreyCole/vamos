@@ -78,7 +78,7 @@ func TestStartQRSPIWorkflowCreatesWorkspaceThreadAndFirstNodeRun(t *testing.T) {
 		t.Fatalf("WorkflowAttempt = %d, want 1", run.WorkflowAttempt)
 	}
 	if !strings.Contains(run.PromptText, "q-question/SKILL.md") ||
-		!strings.Contains(run.PromptText, "<stage>question</stage>") {
+		!strings.Contains(run.PromptText, "stage: question") {
 		t.Fatalf("prompt = %q, want q-question skill and question stage", run.PromptText)
 	}
 

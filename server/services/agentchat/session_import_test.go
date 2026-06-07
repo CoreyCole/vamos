@@ -398,15 +398,25 @@ func TestImportAdoptablePiSessionsImportsTerminalQRSPIWorkspace(t *testing.T) {
 		sessionPath,
 		piSessionWithQRSPIResult(
 			planDir,
-			`<qrspi-result>
-  <stage>question</stage>
-  <status>complete</status>
-  <outcome>complete</outcome>
-  <policy><autoMode>false</autoMode><enablePlanReviews>true</enablePlanReviews><invalidResultRetryLimit>1</invalidResultRetryLimit></policy>
-  <summary><plan-goal>Goal.</plan-goal><stage-completed>Questions done.</stage-completed><key-decisions>Research next.</key-decisions></summary>
-  <artifact>questions/research.md</artifact>
-  <next>/q-research questions/research.md</next>
-</qrspi-result>`,
+			strings.Join([]string{
+				"qrspi_result:",
+				"  stage: \"question\"",
+				"  status: \"complete\"",
+				"  outcome: \"complete\"",
+				"  policy:",
+				"    auto_mode: false",
+				"    enable_plan_reviews: true",
+				"    invalid_result_retry_limit: 1",
+				"  summary:",
+				"    plan_goal: \"Goal.\"",
+				"    stage_completed: \"Questions done.\"",
+				"    key_decisions: \"Research next.\"",
+				"  artifact: \"questions/research.md\"",
+				"  next:",
+				"    steps:",
+				"      - action: \"start_stage\"",
+				"        param: \"q-research\"",
+			}, "\n"),
 		)...,
 	)
 
@@ -490,15 +500,25 @@ func TestImportAdoptablePiSessionsAdoptsLatestQRSPIResult(t *testing.T) {
 		sessionPath,
 		piSessionWithQRSPIResult(
 			planDir,
-			`<qrspi-result>
-  <stage>review-outline</stage>
-  <status>complete</status>
-  <outcome>ready-for-human-review</outcome>
-  <policy><autoMode>true</autoMode><enablePlanReviews>true</enablePlanReviews><invalidResultRetryLimit>1</invalidResultRetryLimit></policy>
-  <summary><plan-goal>Goal.</plan-goal><stage-completed>Outline reviewed.</stage-completed><key-decisions>Plan next.</key-decisions></summary>
-  <artifact>reviews/outline-review/review.md</artifact>
-  <next>/q-plan outline.md</next>
-</qrspi-result>`,
+			strings.Join([]string{
+				"qrspi_result:",
+				"  stage: \"review-outline\"",
+				"  status: \"complete\"",
+				"  outcome: \"ready-for-plan\"",
+				"  policy:",
+				"    auto_mode: true",
+				"    enable_plan_reviews: true",
+				"    invalid_result_retry_limit: 1",
+				"  summary:",
+				"    plan_goal: \"Goal.\"",
+				"    stage_completed: \"Outline reviewed.\"",
+				"    key_decisions: \"Plan next.\"",
+				"  artifact: \"reviews/outline-review/review.md\"",
+				"  next:",
+				"    steps:",
+				"      - action: \"start_stage\"",
+				"        param: \"q-plan\"",
+			}, "\n"),
 		)...,
 	)
 
@@ -517,8 +537,8 @@ func TestImportAdoptablePiSessionsAdoptsLatestQRSPIResult(t *testing.T) {
 	if err := json.Unmarshal([]byte(stored.WorkflowStateJson.String), &got); err != nil {
 		t.Fatalf("Unmarshal(workflow state): %v", err)
 	}
-	if got.CurrentNodeID != qrspi.NodePlan || got.Nodes[qrspi.NodeHumanReviewOutline].Status != wruntime.NodeStatusBypassed {
-		t.Fatalf("state = %+v, want auto-approved outline review and plan current", got)
+	if got.CurrentNodeID != qrspi.NodePlan || got.Nodes[qrspi.NodeReviewOutline].Status != wruntime.NodeStatusComplete {
+		t.Fatalf("state = %+v, want outline review complete and plan current", got)
 	}
 }
 

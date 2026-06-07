@@ -203,22 +203,20 @@ func (s *Service) latestAssistantTextForThread(ctx context.Context, thread db.Ag
 	return "", fmt.Errorf("thread has no assistant message")
 }
 
-func extractFirstQRSPIResultXML(text string) string {
-	start := strings.Index(text, "<qrspi-result>")
-	end := strings.Index(text, "</qrspi-result>")
-	if start < 0 || end < start {
-		return ""
-	}
-	end += len("</qrspi-result>")
-	return strings.TrimSpace(text[start:end])
-}
-
-func qrspiImplementationWorkspaceFromText(xmlText string) string {
-	parsed, err := (qrspi.QRSPIXMLParser{}).Parse(xmlText, wruntime.ParseContext{})
+func extractFirstQRSPIResultYAML(text string) string {
+	yamlText, err := qrspi.ExtractQRSPIResultYAML(text)
 	if err != nil {
 		return ""
 	}
-	result, ok := parsed.(qrspi.ResultXML)
+	return yamlText
+}
+
+func qrspiImplementationWorkspaceFromText(resultText string) string {
+	parsed, err := (qrspi.QRSPIResultParser{}).Parse(resultText, wruntime.ParseContext{})
+	if err != nil {
+		return ""
+	}
+	result, ok := parsed.(qrspi.Result)
 	if !ok {
 		return ""
 	}
@@ -232,11 +230,11 @@ func qrspiImplementationWorkspaceFromText(xmlText string) string {
 	return ""
 }
 
-func nextQRSPIThreadContext(sourceThreadID, workspaceID, cwd, resultXML string) string {
+func nextQRSPIThreadContext(sourceThreadID, workspaceID, cwd, resultYAML string) string {
 	return strings.TrimSpace(fmt.Sprintf(`Continuing QRSPI from previous thread %s.
 Primary workspace: %s
 Pi cwd: %s
 
-Prior result XML:
-%s`, sourceThreadID, workspaceID, cwd, resultXML))
+Prior result YAML:
+%s`, sourceThreadID, workspaceID, cwd, resultYAML))
 }

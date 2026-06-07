@@ -44,7 +44,7 @@ func skillPrompt(
 	)
 	_, _ = fmt.Fprintf(
 		&b,
-		"Load the current workflow state and prior artifacts from the Agent Chat workspace. Emit the required QRSPI XML footer with `<stage>%s</stage>`.\n",
+		"Load the current workflow state and prior artifacts from the Agent Chat workspace. Emit the required fenced YAML QRSPI result with `stage: %s` under top-level `qrspi_result`.\n",
 		node.ID,
 	)
 	if state.LastResult != nil {
@@ -104,7 +104,7 @@ func researchForReviewPrompt(nodeID wruntime.NodeID, state wruntime.State) strin
 Use /skill:q-research-for-review on the review questions artifact.
 Review artifact: %s
 Questions artifact: %s
-Emit <stage>%s</stage> and include the research artifact plus the source review/questions artifacts in <artifacts>.`, review, questions, nodeID)
+Emit fenced YAML with qrspi_result.stage: %s and include the research artifact plus the source review/questions artifacts in artifacts.`, review, questions, nodeID)
 }
 
 func addressReviewResearchPrompt(nodeID wruntime.NodeID, state wruntime.State) string {
@@ -120,7 +120,7 @@ func addressReviewResearchPrompt(nodeID wruntime.NodeID, state wruntime.State) s
 Use /skill:q-address-review-research with the review artifact and review-research artifact.
 Review artifact: %s
 Research artifact: %s
-Emit <stage>%s</stage> after editing parent planning docs and include all modified planning artifacts.`, review, research, nodeID)
+Emit fenced YAML with qrspi_result.stage: %s after editing parent planning docs and include all modified planning artifacts.`, review, research, nodeID)
 }
 
 func artifactByRole(result *wruntime.WorkflowResultSnapshot, roles ...string) string {

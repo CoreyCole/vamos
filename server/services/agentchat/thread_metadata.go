@@ -46,7 +46,7 @@ func (s *Service) BuildThreadMetadataView(
 		Label: "Freeform blank thread",
 	})
 	if text, err := s.latestAssistantTextForThread(ctx, thread); err == nil {
-		if impl := qrspiImplementationWorkspaceFromText(extractFirstQRSPIResultXML(text)); impl != "" {
+		if impl := qrspiImplementationWorkspaceFromText(extractFirstQRSPIResultYAML(text)); impl != "" {
 			view.ImplementationWorkspace = impl
 			view.PiCwd = impl
 		}

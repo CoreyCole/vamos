@@ -559,21 +559,25 @@ func mustQRSPIWorkflowPolicy(t *testing.T, policy qrspi.Policy) []byte {
 }
 
 func validQuestionResultXML() string {
-	return `<qrspi-result>
-  <stage>question</stage>
-  <status>complete</status>
-  <outcome>complete</outcome>
-  <policy>
-    <autoMode>false</autoMode>
-    <enablePlanReviews>true</enablePlanReviews>
-    <invalidResultRetryLimit>1</invalidResultRetryLimit>
-  </policy>
-  <summary>
-    <plan-goal>Build Agent Chat-native generic workflow runtime; QRSPI first.</plan-goal>
-    <stage-completed>Created research questions for runtime integration.</stage-completed>
-    <key-decisions>Proceed to research.</key-decisions>
-  </summary>
-  <artifact>thoughts/creative-mode-agent/plans/example/questions/runtime.md</artifact>
-  <next>/q-research thoughts/creative-mode-agent/plans/example/questions/runtime.md</next>
-</qrspi-result>`
+	return strings.Join([]string{
+		"```yaml",
+		"qrspi_result:",
+		"  stage: \"question\"",
+		"  status: \"complete\"",
+		"  outcome: \"complete\"",
+		"  policy:",
+		"    auto_mode: false",
+		"    enable_plan_reviews: true",
+		"    invalid_result_retry_limit: 1",
+		"  summary:",
+		"    plan_goal: \"Build Agent Chat-native generic workflow runtime; QRSPI first.\"",
+		"    stage_completed: \"Created research questions for runtime integration.\"",
+		"    key_decisions: \"Proceed to research.\"",
+		"  artifact: \"thoughts/creative-mode-agent/plans/example/questions/runtime.md\"",
+		"  next:",
+		"    steps:",
+		"      - action: \"start_stage\"",
+		"        param: \"q-research\"",
+		"```",
+	}, "\n")
 }

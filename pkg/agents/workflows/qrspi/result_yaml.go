@@ -209,6 +209,10 @@ func (QRSPIResultParser) CorrectionPrompt(err error, attempt int) string {
 
 var fencedYAMLPattern = regexp.MustCompile("(?s)```(?:yaml|yml)\\s*\\n(.*?)\\n?```")
 
+func ExtractQRSPIResultYAML(output string) (string, error) {
+	return extractQRSPIResultYAML(output)
+}
+
 func extractQRSPIResultYAML(output string) (string, error) {
 	for _, match := range fencedYAMLPattern.FindAllStringSubmatch(output, -1) {
 		candidate := strings.TrimSpace(match[1])

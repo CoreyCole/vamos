@@ -54,22 +54,6 @@ func TestQRSPIEndToEndPlanningPath(t *testing.T) {
 		"complete",
 		"reviews/outline-review/review.md",
 	)
-	assertWaitingHuman(
-		t,
-		store,
-		qrspi.NodeHumanReviewOutline,
-		qrspi.NodeReviewOutline,
-		"reviews/outline-review/review.md",
-	)
-	advanceQRSPIIntegrationGate(t, svc, store, runner, qrspi.NodeHumanReviewOutline)
-	completeQRSPIIntegrationNode(
-		t,
-		svc,
-		store,
-		qrspi.NodeHumanReviewOutline,
-		"complete",
-		"outline.md",
-	)
 	assertCurrentNode(t, store, runner, qrspi.NodePlan)
 
 	completeQRSPIIntegrationNode(t, svc, store, qrspi.NodePlan, "complete", "plan.md")
@@ -169,29 +153,13 @@ func TestQRSPIUpdatedPolicyWhileWaitingHumanDoesNotReselectCurrentGate(t *testin
 		"complete",
 		"reviews/outline-review/review.md",
 	)
-	assertWaitingHuman(
-		t,
-		store,
-		qrspi.NodeHumanReviewOutline,
-		qrspi.NodeReviewOutline,
-		"reviews/outline-review/review.md",
-	)
+	assertCurrentNode(t, store, runner, qrspi.NodePlan)
 
 	store.state.Policy = mustQRSPIIntegrationPolicy(t, qrspi.Policy{
 		AutoMode:                true,
 		EnablePlanReviews:       false,
 		InvalidResultRetryLimit: 1,
 	})
-
-	advanceQRSPIIntegrationGate(t, svc, store, runner, qrspi.NodeHumanReviewOutline)
-	completeQRSPIIntegrationNode(
-		t,
-		svc,
-		store,
-		qrspi.NodeHumanReviewOutline,
-		"complete",
-		"outline.md",
-	)
 	assertCurrentNode(t, store, runner, qrspi.NodePlan)
 }
 
@@ -399,13 +367,6 @@ func TestQRSPIAutoModeSkipsAutoApprovablePlanningGateOnly(t *testing.T) {
 		"reviews/outline-review/review.md",
 	)
 	assertCurrentNode(t, store, runner, qrspi.NodePlan)
-	if store.state.Nodes[qrspi.NodeHumanReviewOutline].Status != wruntime.NodeStatusBypassed {
-		t.Fatalf(
-			"human-review-outline state = %#v, want bypassed",
-			store.state.Nodes[qrspi.NodeHumanReviewOutline],
-		)
-	}
-
 	moveQRSPIIntegrationState(t, store, qrspi.NodeReviewImplementation)
 	completeQRSPIIntegrationNode(
 		t,
@@ -703,7 +664,7 @@ func TestQRSPIPlanningReviewResearchAddressLoops(t *testing.T) {
 			reviewNode:   qrspi.NodeReviewOutline,
 			researchNode: qrspi.NodeResearchForReviewOutline,
 			addressNode:  qrspi.NodeAddressReviewResearchOutline,
-			readyOutcome: wruntime.OutcomeReadyForHumanReview,
+			readyOutcome: wruntime.OutcomeReadyForPlan,
 		},
 		{
 			name:         "plan",
@@ -1149,39 +1110,36 @@ func qRSPIIntegrationResultXMLWithWorkspaceAndArtifacts(
 	workspace string,
 	artifacts ...wruntime.ArtifactRef,
 ) string {
-	var related strings.Builder
-	if len(artifacts) > 0 {
-		related.WriteString("\n  <artifacts>")
-		for _, artifact := range artifacts {
-			related.WriteString(fmt.Sprintf(
-				"\n    <artifact role=\"%s\">%s</artifact>",
-				artifact.Role,
-				artifact.Path,
-			))
-		}
-		related.WriteString("\n  </artifacts>")
-	}
-	workspaceXML := ""
+	var b strings.Builder
+	b.WriteString("```yaml\nqrspi_result:\n")
+	b.WriteString(fmt.Sprintf("  stage: %q\n", string(node)))
+	b.WriteString(fmt.Sprintf("  status: %q\n", status))
+	b.WriteString(fmt.Sprintf("  outcome: %q\n", string(outcome)))
 	if strings.TrimSpace(workspace) != "" {
-		workspaceXML = fmt.Sprintf("\n  <workspace>%s</workspace>", workspace)
+		b.WriteString(fmt.Sprintf("  workspace: %q\n", workspace))
 	}
-	return fmt.Sprintf(`<qrspi-result>
-  <stage>%s</stage>
-  <status>%s</status>
-  <outcome>%s</outcome>%s
-  <policy>
-    <autoMode>false</autoMode>
-    <enablePlanReviews>true</enablePlanReviews>
-    <invalidResultRetryLimit>1</invalidResultRetryLimit>
-  </policy>
-  <summary>
-    <plan-goal>Build Agent Chat-native generic workflow runtime; QRSPI first.</plan-goal>
-    <stage-completed>Completed %s for runtime parity.</stage-completed>
-    <key-decisions>Continue along the registered QRSPI graph.</key-decisions>
-  </summary>
-  <artifact>%s</artifact>%s
-  <next>%s</next>
-</qrspi-result>`, node, status, outcome, workspaceXML, node, artifact, related.String(), next)
+	b.WriteString("  policy:\n")
+	b.WriteString("    auto_mode: false\n")
+	b.WriteString("    enable_plan_reviews: true\n")
+	b.WriteString("    invalid_result_retry_limit: 1\n")
+	b.WriteString("  summary:\n")
+	b.WriteString("    plan_goal: \"Build Agent Chat-native generic workflow runtime; QRSPI first.\"\n")
+	b.WriteString(fmt.Sprintf("    stage_completed: %q\n", fmt.Sprintf("Completed %s for runtime parity.", node)))
+	b.WriteString("    key_decisions: \"Continue along the registered QRSPI graph.\"\n")
+	b.WriteString(fmt.Sprintf("  artifact: %q\n", artifact))
+	if len(artifacts) > 0 {
+		b.WriteString("  artifacts:\n")
+		for _, artifact := range artifacts {
+			b.WriteString(fmt.Sprintf("    - role: %q\n", artifact.Role))
+			b.WriteString(fmt.Sprintf("      path: %q\n", artifact.Path))
+		}
+	}
+	b.WriteString("  next:\n")
+	b.WriteString("    steps:\n")
+	b.WriteString("      - action: \"start_stage\"\n")
+	b.WriteString(fmt.Sprintf("        param: %q\n", next))
+	b.WriteString("```")
+	return b.String()
 }
 
 func hasWorkflowEvent(events []wruntime.Event, eventType string) bool {
@@ -1207,7 +1165,9 @@ func mustQRSPIIntegrationPolicy(t *testing.T, policy qrspi.Policy) []byte {
 
 func qRSPIIntegrationOutcome(node wruntime.NodeID) wruntime.ResultOutcome {
 	switch node {
-	case qrspi.NodeReviewOutline, qrspi.NodeReviewImplementation:
+	case qrspi.NodeReviewOutline:
+		return wruntime.OutcomeReadyForPlan
+	case qrspi.NodeReviewImplementation:
 		return wruntime.OutcomeReadyForHumanReview
 	case qrspi.NodeReviewPlan:
 		return wruntime.OutcomeReadyForWorkspace
