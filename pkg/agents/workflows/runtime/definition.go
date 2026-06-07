@@ -31,6 +31,7 @@ const (
 const (
 	OutcomeComplete            ResultOutcome = "complete"
 	OutcomeReadyForOutline     ResultOutcome = "ready-for-outline"
+	OutcomeReadyForPlan        ResultOutcome = "ready-for-plan"
 	OutcomeReadyForHumanReview ResultOutcome = "ready-for-human-review"
 	OutcomeReadyForWorkspace   ResultOutcome = "ready-for-workspace"
 	OutcomeNeedsReviewResearch ResultOutcome = "needs-review-research"

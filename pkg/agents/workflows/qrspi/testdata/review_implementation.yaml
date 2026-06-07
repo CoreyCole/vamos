@@ -1,0 +1,21 @@
+```yaml
+qrspi_result:
+  stage: "review-implementation"
+  status: "complete"
+  outcome: "ready-for-human-review"
+  policy:
+    auto_mode: false
+    enable_plan_reviews: true
+    invalid_result_retry_limit: 1
+  summary:
+    plan_goal: "Move QRSPI result contract from XML to YAML."
+    stage_completed: "Reviewed implementation and found clean."
+    key_decisions: "Next stage should start immediately: q-verify."
+  artifact: "thoughts/example/reviews/implementation-review/review.md"
+  next:
+    steps:
+      - action: "read_skill"
+        param: "~/.agents/skills/q-verify/SKILL.md"
+      - action: "start_stage"
+        param: "q-verify"
+```

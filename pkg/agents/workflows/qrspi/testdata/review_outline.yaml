@@ -1,0 +1,21 @@
+```yaml
+qrspi_result:
+  stage: "review-outline"
+  status: "complete"
+  outcome: "ready-for-plan"
+  policy:
+    auto_mode: false
+    enable_plan_reviews: true
+    invalid_result_retry_limit: 1
+  summary:
+    plan_goal: "Move QRSPI result contract from XML to YAML."
+    stage_completed: "Reviewed outline and fixed planning docs."
+    key_decisions: "Next stage should start immediately: q-plan."
+  artifact: "thoughts/example/reviews/outline-review/review.md"
+  next:
+    steps:
+      - action: "read_skill"
+        param: "~/.agents/skills/q-plan/SKILL.md"
+      - action: "start_stage"
+        param: "q-plan"
+```

@@ -52,9 +52,7 @@ func TestQRSPITransitions(t *testing.T) {
 	state = assertStartsNext(t, def, state, NodeResearch, NodeDesign)
 	state = assertStartsNext(t, def, state, NodeDesign, NodeOutline)
 	state = assertStartsNext(t, def, state, NodeOutline, NodeReviewOutline)
-	state = assertWaitsHuman(t, def, state, NodeReviewOutline, NodeHumanReviewOutline)
-	state = advanceHumanGate(state)
-	state = assertStartsNext(t, def, state, NodeHumanReviewOutline, NodePlan)
+	state = assertStartsNext(t, def, state, NodeReviewOutline, NodePlan)
 	state = assertStartsNext(t, def, state, NodePlan, NodeReviewPlan)
 	state = assertStartsNext(t, def, state, NodeReviewPlan, NodeWorkspace)
 	state = assertStartsNext(t, def, state, NodeWorkspace, NodeImplement)
@@ -117,6 +115,28 @@ func TestQRSPIOutcomeTransitionTable(t *testing.T) {
 	}
 }
 
+func TestQRSPIReviewOutlineReadyForPlanTransition(t *testing.T) {
+	def, err := Definition()
+	if err != nil {
+		t.Fatal(err)
+	}
+	state, err := wruntime.InitialState(def, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	state.CurrentNodeID = NodeReviewOutline
+
+	result := qrspiResult(NodeReviewOutline, wruntime.StatusComplete)
+	result.Outcome = wruntime.OutcomeReadyForPlan
+	decision, err := wruntime.DecideTransition(def, state, result)
+	if err != nil {
+		t.Fatalf("DecideTransition() error = %v", err)
+	}
+	if !decision.StartNext || decision.WaitingHuman || decision.NextNodeID != NodePlan {
+		t.Fatalf("decision = %+v, want direct plan start", decision)
+	}
+}
+
 func TestQRSPITransitionOutcomesMustBeDeclared(t *testing.T) {
 	_, err := wruntime.New[struct{}]("bad").
 		Start("start").
@@ -142,7 +162,7 @@ func TestQRSPIWorkflowRenderersExposeReviewBranches(t *testing.T) {
 	mermaid := wruntime.RenderMermaid(def)
 	for _, want := range []string{
 		"design -- outcome=complete --> outline",
-		"review-outline -- outcome=ready-for-human-review --> human-review-outline",
+		"review-outline -- outcome=ready-for-plan --> plan",
 		"review-plan -- outcome=ready-for-workspace --> workspace",
 		"review-implementation -- outcome=needs-followup --> question",
 	} {
@@ -254,7 +274,9 @@ func qrspiResult(
 
 func defaultOutcome(node wruntime.NodeID) wruntime.ResultOutcome {
 	switch node {
-	case NodeReviewOutline, NodeReviewImplementation:
+	case NodeReviewOutline:
+		return wruntime.OutcomeReadyForPlan
+	case NodeReviewImplementation:
 		return wruntime.OutcomeReadyForHumanReview
 	case NodeReviewPlan:
 		return wruntime.OutcomeReadyForWorkspace

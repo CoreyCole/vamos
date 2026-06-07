@@ -53,7 +53,7 @@ func Definition() (wruntime.Definition, error) {
 		RequiresPrimaryArtifact().
 		Agent(NodeReviewOutline, Skill("~/.agents/skills/q-review/SKILL.md")).
 		Statuses(wruntime.StatusComplete, wruntime.StatusNeedsHuman, wruntime.StatusBlocked, wruntime.StatusError).
-		Outcomes(wruntime.OutcomeReadyForHumanReview, wruntime.OutcomeNeedsReviewResearch).
+		Outcomes(wruntime.OutcomeReadyForPlan, wruntime.OutcomeNeedsReviewResearch).
 		RequiresPrimaryArtifact().
 		HumanReview(NodeHumanReviewOutline, "outline approved by human").
 		Statuses(wruntime.StatusComplete, wruntime.StatusBlocked, wruntime.StatusError).
@@ -108,7 +108,7 @@ func Definition() (wruntime.Definition, error) {
 		From(NodeReviewOutline).
 		On(wruntime.OutcomeNeedsReviewResearch).GoTo(NodeResearchForReviewOutline).
 		From(NodeReviewOutline).
-		On(wruntime.OutcomeReadyForHumanReview).GoTo(NodeHumanReviewOutline).
+		On(wruntime.OutcomeReadyForPlan).GoTo(NodePlan).
 		From(NodeHumanReviewOutline).On(wruntime.OutcomeComplete).GoTo(NodePlan).
 		From(NodeResearchForReviewOutline).
 		On(wruntime.OutcomeComplete).GoTo(NodeAddressReviewResearchOutline).
@@ -130,7 +130,7 @@ func Definition() (wruntime.Definition, error) {
 		From(NodeReviewImplementation).
 		On(wruntime.OutcomeReadyForHumanReview).GoTo(NodeHumanReviewImplementation).
 		From(NodeHumanReviewImplementation).On(wruntime.OutcomeComplete).GoTo(NodeDone).
-		ResultParser(QRSPIXMLParser{}).
+		ResultParser(QRSPIResultParser{}).
 		ResultConverter(QRSPIResultConverter{}).
 		Build()
 }
