@@ -203,7 +203,7 @@ func WorkspaceWorkflowPanel(state WorkspaceWorkflowState) templ.Component {
 					return templ_7745c5c3_Err
 				}
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 22, ">Discuss — pause after valid XML</option> <option value=\"guided\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 22, ">Discuss — pause after valid YAML</option> <option value=\"guided\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -239,7 +239,7 @@ func WorkspaceWorkflowPanel(state WorkspaceWorkflowState) templ.Component {
 					return templ_7745c5c3_Err
 				}
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 29, "> <span>Run planning reviews</span></label> <label class=\"mt-2 block text-xs text-muted-foreground\">Invalid XML retries</label> <input class=\"mt-1 w-20 rounded-md border border-input bg-background px-2 py-1 text-sm\" type=\"number\" min=\"0\" name=\"invalidResultRetryLimit\" value=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 29, "> <span>Run planning reviews</span></label> <label class=\"mt-2 block text-xs text-muted-foreground\">Invalid YAML retries</label> <input class=\"mt-1 w-20 rounded-md border border-input bg-background px-2 py-1 text-sm\" type=\"number\" min=\"0\" name=\"invalidResultRetryLimit\" value=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}

@@ -420,20 +420,30 @@ VALUES (?, 'playwright@localhost', 'E2E freeform project adoption', ?, 'freeform
 		execSQL(t, database, `INSERT INTO agent_threads (id, user_email, title, cwd, lineage_id, head_entry_id, project_id)
 VALUES (?, 'playwright@localhost', 'E2E freeform project thread', ?, ?, ?, ?)`, threadID, ctx.Config.RepoRoot, lineageID, entryID, projectID)
 		attachE2EThreadWorkspace(t, database, threadID, workspaceID)
-		assistantText := fmt.Sprintf(`E2E freeform QRSPI project result
-
-<qrspi-result>
-  <project>%s</project>
-  <stage>plan</stage>
-  <status>complete</status>
-  <outcome>complete</outcome>
-  <summary>
-    <plan-goal>E2E project filtering.</plan-goal>
-    <stage-completed>Seeded freeform project adoption.</stage-completed>
-    <key-decisions>Project filters plan sidebar.</key-decisions>
-  </summary>
-  <artifact>thoughts/creative-mode-agent/plans/2026-05-20_23-02-59_vamos-e2e-story-playwright-go/plan.md</artifact>
-</qrspi-result>`, projectID)
+		assistantText := fmt.Sprintf(strings.Join([]string{
+			"E2E freeform QRSPI project result",
+			"",
+			"```yaml",
+			"qrspi_result:",
+			"  project: %q",
+			"  stage: \"plan\"",
+			"  status: \"complete\"",
+			"  outcome: \"complete\"",
+			"  policy:",
+			"    auto_mode: false",
+			"    enable_plan_reviews: true",
+			"    invalid_result_retry_limit: 1",
+			"  summary:",
+			"    plan_goal: \"E2E project filtering.\"",
+			"    stage_completed: \"Seeded freeform project adoption.\"",
+			"    key_decisions: \"Project filters plan sidebar.\"",
+			"  artifact: \"thoughts/creative-mode-agent/plans/2026-05-20_23-02-59_vamos-e2e-story-playwright-go/plan.md\"",
+			"  next:",
+			"    steps:",
+			"      - action: \"start_stage\"",
+			"        param: \"q-plan\"",
+			"```",
+		}, "\n"), projectID)
 		payload := fmt.Sprintf(`{"type":"message","id":%q,"parentId":null,"message":{"role":"assistant","content":%q}}`, entryID, assistantText)
 		execSQL(t, database, `INSERT INTO agent_entries (lineage_id, entry_id, parent_entry_id, entry_type, origin_order, payload_json, origin_thread_id, session_timestamp)
 VALUES (?, ?, NULL, 'message', 1, ?, ?, CURRENT_TIMESTAMP)`, lineageID, entryID, payload, threadID)
@@ -537,44 +547,48 @@ func StartQRSPIQuestionToResearchWorkspace() spec.Step {
 
 func qrspiQuestionToResearchPrompt(marker, artifactPath string) string {
 	planPath := path.Dir(path.Dir(artifactPath))
-	return fmt.Sprintf(`E2E TEST MODE.
-Do not ask follow-up questions. Do not inspect files. Do not explain.
-The questions artifact already exists at %s and contains marker %s.
-Reply with only this raw XML. No markdown fence. No prose.
-
-<qrspi-result>
-  <stage>question</stage>
-  <status>complete</status>
-  <outcome>complete</outcome>
-  <project>github.com/coreycole/vamos</project>
-  <relatedProjects></relatedProjects>
-  <workspace>%s</workspace>
-  <workspaceMetadata>
-    <planWorkspace>%s</planWorkspace>
-    <implementationWorkspace></implementationWorkspace>
-    <trunkBranch>main</trunkBranch>
-    <stackBottomBranch></stackBottomBranch>
-    <parentBranch></parentBranch>
-    <currentBranch></currentBranch>
-  </workspaceMetadata>
-  <policy>
-    <autoMode>false</autoMode>
-    <enablePlanReviews>true</enablePlanReviews>
-    <invalidResultRetryLimit>1</invalidResultRetryLimit>
-  </policy>
-  <summary>
-    <plan-goal>Advance the E2E QRSPI q-question to q-research using the existing questions artifact.</plan-goal>
-    <stage-completed>Verified existing question artifact marker %s.</stage-completed>
-    <key-decisions>Next stage should start immediately: q-research.</key-decisions>
-  </summary>
-  <artifact>%s</artifact>
-  <next>
-    <step>Read ~/.agents/skills/qrspi-planning/SKILL.md.</step>
-    <step>Read ~/.agents/skills/q-research/SKILL.md.</step>
-    <step>Read %s.</step>
-    <step>Start /q-research immediately unless blocked by an explicit human/safety gate.</step>
-  </next>
-</qrspi-result>`, artifactPath, marker, planPath, planPath, marker, artifactPath, artifactPath)
+	return fmt.Sprintf(strings.Join([]string{
+		"E2E TEST MODE.",
+		"Do not ask follow-up questions. Do not inspect files. Do not explain.",
+		"The questions artifact already exists at %s and contains marker %s.",
+		"Reply with only this fenced YAML qrspi_result. No prose.",
+		"",
+		"```yaml",
+		"qrspi_result:",
+		"  stage: \"question\"",
+		"  status: \"complete\"",
+		"  outcome: \"complete\"",
+		"  project: \"github.com/coreycole/vamos\"",
+		"  related_projects: []",
+		"  workspace: %q",
+		"  workspace_metadata:",
+		"    plan_workspace: %q",
+		"    implementation_workspace: \"\"",
+		"    trunk_branch: \"main\"",
+		"    stack_bottom_branch: \"\"",
+		"    parent_branch: \"\"",
+		"    current_branch: \"\"",
+		"  policy:",
+		"    auto_mode: false",
+		"    enable_plan_reviews: true",
+		"    invalid_result_retry_limit: 1",
+		"  summary:",
+		"    plan_goal: \"Advance the E2E QRSPI q-question to q-research using the existing questions artifact.\"",
+		"    stage_completed: \"Verified existing question artifact marker %s.\"",
+		"    key_decisions: \"Next stage should start immediately: q-research.\"",
+		"  artifact: %q",
+		"  next:",
+		"    steps:",
+		"      - action: \"read_skill\"",
+		"        param: \".pi/skills/qrspi-planning/SKILL.md\"",
+		"      - action: \"read_skill\"",
+		"        param: \".pi/skills/q-research/SKILL.md\"",
+		"      - action: \"read_artifact\"",
+		"        param: %q",
+		"      - action: \"start_stage\"",
+		"        param: \"q-research\"",
+		"```",
+	}, "\n"), artifactPath, marker, planPath, planPath, marker, artifactPath, artifactPath)
 }
 
 type workflowRunSnapshot struct {
@@ -822,7 +836,7 @@ func SetFirstTranscriptMessageHash() spec.Step {
 
 func WorkflowCardShowsNextSteps() expectation {
 	return expectation{customStep("workflow card shows next steps", func(t testing.TB, ctx *duiruntime.Context) {
-		if err := ctx.Page.Locator("article").Filter(playwright.LocatorFilterOptions{HasText: "XML next steps"}).WaitFor(); err != nil {
+		if err := ctx.Page.Locator("article").Filter(playwright.LocatorFilterOptions{HasText: "Next steps"}).WaitFor(); err != nil {
 			t.Fatalf("workflow card next steps missing: %v", err)
 		}
 	})}

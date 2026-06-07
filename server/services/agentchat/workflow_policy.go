@@ -153,7 +153,7 @@ func presetForPolicy(policy qrspi.Policy) WorkflowPolicyPreset {
 func policyModeLabel(policy qrspi.Policy) string {
 	switch policy.EffectiveAdvanceMode() {
 	case qrspi.AdvanceModeDiscuss:
-		return "Discuss: pause after valid XML"
+		return "Discuss: pause after valid YAML"
 	case qrspi.AdvanceModeAutopilot:
 		return "Autopilot: auto-continue safe gates"
 	default:

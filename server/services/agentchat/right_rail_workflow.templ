@@ -60,7 +60,7 @@ templ WorkspaceWorkflowPanel(state WorkspaceWorkflowState) {
 					<form data-on:submit={ workflowPolicyAction(state) }>
 						<label class="block text-xs text-muted-foreground">Advance mode</label>
 						<select class="mt-1 w-full rounded-md border border-input bg-background px-2 py-1 text-sm" name="advanceMode" disabled?={ !state.Policy.Editable }>
-							<option value="discuss" selected?={ state.Policy.AdvanceMode == "discuss" }>Discuss — pause after valid XML</option>
+							<option value="discuss" selected?={ state.Policy.AdvanceMode == "discuss" }>Discuss — pause after valid YAML</option>
 							<option value="guided" selected?={ state.Policy.AdvanceMode == "guided" }>Guided — continue safe steps</option>
 							<option value="autopilot" selected?={ state.Policy.AdvanceMode == "autopilot" }>Autopilot — auto-approve safe gates</option>
 						</select>
@@ -68,7 +68,7 @@ templ WorkspaceWorkflowPanel(state WorkspaceWorkflowState) {
 							<input type="checkbox" name="enablePlanReviews" checked?={ state.Policy.EnablePlanReviews } disabled?={ !state.Policy.Editable }/>
 							<span>Run planning reviews</span>
 						</label>
-						<label class="mt-2 block text-xs text-muted-foreground">Invalid XML retries</label>
+						<label class="mt-2 block text-xs text-muted-foreground">Invalid YAML retries</label>
 						<input class="mt-1 w-20 rounded-md border border-input bg-background px-2 py-1 text-sm" type="number" min="0" name="invalidResultRetryLimit" value={ fmt.Sprintf("%d", state.Policy.InvalidResultRetryLimit) } disabled?={ !state.Policy.Editable }/>
 						<p class="mt-2 text-xs text-muted-foreground">{ state.Policy.TimingCopy }</p>
 						<p class="mt-1 text-xs text-muted-foreground">Final implementation review always waits for you.</p>

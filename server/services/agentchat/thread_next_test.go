@@ -77,7 +77,7 @@ func TestCreateThreadFromWorkspaceTargets(t *testing.T) {
 		t.Fatalf("GetAgentEntry() error = %v", err)
 	}
 	contextText := assistantTextFromPayload(entry.PayloadJson)
-	if !strings.Contains(contextText, "<qrspi-context>") || strings.Contains(contextText, "<qrspi-result>") {
+	if !strings.Contains(contextText, "<qrspi-context>") || strings.Contains(contextText, "qrspi_result:") {
 		t.Fatalf("context starter = %q, want qrspi-context only", contextText)
 	}
 

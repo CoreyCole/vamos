@@ -12,20 +12,20 @@ import (
 	_ "modernc.org/sqlite"
 )
 
-func TestConsumeSSEStoppedWithValidXML(t *testing.T) {
+func TestConsumeSSEStoppedWithValidYAML(t *testing.T) {
 	result := consumeFixture(
 		t,
-		completedFixture(validXML("review-design")),
+		completedFixture(validYAML("review-design")),
 		options{run: "run-1", stage: "review-design"},
 	)
 	if result.ExitCode != exitOK {
 		t.Fatalf("ExitCode = %d, diagnostic = %s", result.ExitCode, result.Diagnostic)
 	}
-	if !strings.Contains(result.XML, "<stage>review-design</stage>") {
-		t.Fatalf("stdout XML missing expected stage: %s", result.XML)
+	if !strings.Contains(result.Result, `stage: "review-design"`) {
+		t.Fatalf("stdout YAML missing expected stage: %s", result.Result)
 	}
-	if strings.Contains(result.XML, "event:") || strings.Contains(result.XML, "data:") {
-		t.Fatalf("stdout should be XML only, got %s", result.XML)
+	if strings.Contains(result.Result, "event:") || strings.Contains(result.Result, "data:") {
+		t.Fatalf("stdout should be YAML only, got %s", result.Result)
 	}
 }
 
@@ -33,7 +33,7 @@ func TestConsumeSSEHandlesMultilineDataAndComments(t *testing.T) {
 	fixture := ": heartbeat\n" +
 		"event: datastar-patch-elements\n" +
 		sseData(
-			"<div id=\"agent-chat-run-session-panel\"><p>run-1</p>\n<p>complete</p><pre>"+validXML(
+			"<div id=\"agent-chat-run-session-panel\"><p>run-1</p>\n<p>complete</p><pre>"+validYAML(
 				"design",
 			)+"</pre></div>",
 		) + "\n"
@@ -43,7 +43,7 @@ func TestConsumeSSEHandlesMultilineDataAndComments(t *testing.T) {
 	}
 }
 
-func TestConsumeSSEStoppedWithoutXML(t *testing.T) {
+func TestConsumeSSEStoppedWithoutYAML(t *testing.T) {
 	result := consumeFixture(
 		t,
 		completedFixture("plain assistant text"),
@@ -52,29 +52,29 @@ func TestConsumeSSEStoppedWithoutXML(t *testing.T) {
 	if result.ExitCode != exitInvalid {
 		t.Fatalf("ExitCode = %d, want %d", result.ExitCode, exitInvalid)
 	}
-	if !strings.Contains(result.Diagnostic, "missing <qrspi-result>") {
+	if !strings.Contains(result.Diagnostic, "missing fenced YAML qrspi_result") {
 		t.Fatalf("diagnostic missing parser error: %s", result.Diagnostic)
 	}
 }
 
-func TestConsumeSSEMalformedXML(t *testing.T) {
+func TestConsumeSSEMalformedYAML(t *testing.T) {
 	result := consumeFixture(
 		t,
-		completedFixture(`<qrspi-result><stage>review-design</stage>`),
+		completedFixture("```yaml\nqrspi_result:\n  stage: [\n```"),
 		options{run: "run-1", stage: "review-design"},
 	)
 	if result.ExitCode != exitInvalid {
 		t.Fatalf("ExitCode = %d, want %d", result.ExitCode, exitInvalid)
 	}
-	if !strings.Contains(result.Diagnostic, "valid QRSPI XML") {
-		t.Fatalf("diagnostic missing valid XML context: %s", result.Diagnostic)
+	if !strings.Contains(result.Diagnostic, "valid QRSPI YAML") {
+		t.Fatalf("diagnostic missing valid YAML context: %s", result.Diagnostic)
 	}
 }
 
 func TestConsumeSSEStageMismatch(t *testing.T) {
 	result := consumeFixture(
 		t,
-		completedFixture(validXML("review-outline")),
+		completedFixture(validYAML("review-outline")),
 		options{run: "run-1", stage: "review-design"},
 	)
 	if result.ExitCode != exitInvalid {
@@ -117,7 +117,7 @@ func TestWaitFromDatabaseCompletedRunUsesFinalPage(t *testing.T) {
 			thread:    "thread-1",
 			stage:     "outline",
 		},
-		func() (string, error) { return validXML("outline"), nil },
+		func() (string, error) { return validYAML("outline"), nil },
 	)
 	if result == nil {
 		t.Fatalf("waitFromDatabase() = nil, want completed result")
@@ -125,8 +125,8 @@ func TestWaitFromDatabaseCompletedRunUsesFinalPage(t *testing.T) {
 	if result.ExitCode != exitOK {
 		t.Fatalf("ExitCode = %d, diagnostic = %s", result.ExitCode, result.Diagnostic)
 	}
-	if !strings.Contains(result.XML, "<stage>outline</stage>") {
-		t.Fatalf("unexpected XML: %s", result.XML)
+	if !strings.Contains(result.Result, `stage: "outline"`) {
+		t.Fatalf("unexpected YAML: %s", result.Result)
 	}
 }
 
@@ -147,7 +147,7 @@ func TestWaitFromDatabaseFailedRunReturnsFailure(t *testing.T) {
 			workspace: "workspace-1",
 			thread:    "thread-1",
 		},
-		func() (string, error) { return validXML("outline"), nil },
+		func() (string, error) { return validYAML("outline"), nil },
 	)
 	if result == nil {
 		t.Fatalf("waitFromDatabase() = nil, want failed result")
@@ -177,7 +177,7 @@ func TestWaitFromDatabaseRunningRunFallsBackToSSE(t *testing.T) {
 			workspace: "workspace-1",
 			thread:    "thread-1",
 		},
-		func() (string, error) { return validXML("outline"), nil },
+		func() (string, error) { return validYAML("outline"), nil },
 	)
 	if result != nil {
 		t.Fatalf("waitFromDatabase() = %#v, want nil for running run", result)
@@ -211,35 +211,44 @@ func TestConsumeSSETimeoutBeforeStop(t *testing.T) {
 	}
 }
 
-func TestExtractAndValidateXMLUnescapesHTML(t *testing.T) {
-	escaped := strings.NewReplacer("<", "&lt;", ">", "&gt;").Replace(validXML("plan"))
-	xmlText, err := extractAndValidateXML(`<code>`+escaped+`</code>`, "plan")
+func TestExtractAndValidateYAMLUnescapesHTML(t *testing.T) {
+	escaped := strings.NewReplacer("<", "&lt;", ">", "&gt;").Replace(validYAML("plan"))
+	yamlText, err := extractAndValidateYAML(`<code>`+escaped+`</code>`, "plan")
 	if err != nil {
-		t.Fatalf("extractAndValidateXML() error = %v", err)
+		t.Fatalf("extractAndValidateYAML() error = %v", err)
 	}
-	if !strings.Contains(xmlText, "<stage>plan</stage>") {
-		t.Fatalf("unexpected xml: %s", xmlText)
+	if !strings.Contains(yamlText, `stage: "plan"`) {
+		t.Fatalf("unexpected YAML: %s", yamlText)
 	}
 }
 
-func TestExtractAndValidateXMLFromChromaHTML(t *testing.T) {
-	highlighted := `<span class="o">&lt;</span><span class="n">qrspi</span><span class="o">-</span><span class="n">result</span><span class="o">&gt;</span>
-<span class="o">&lt;</span><span class="n">stage</span><span class="o">&gt;</span>design<span class="o">&lt;/</span><span class="n">stage</span><span class="o">&gt;</span>
-<span class="o">&lt;</span><span class="n">status</span><span class="o">&gt;</span>complete<span class="o">&lt;/</span><span class="n">status</span><span class="o">&gt;</span>
-<span class="o">&lt;</span><span class="n">outcome</span><span class="o">&gt;</span>complete<span class="o">&lt;/</span><span class="n">outcome</span><span class="o">&gt;</span>
-<span class="o">&lt;</span><span class="n">policy</span><span class="o">&gt;</span><span class="o">&lt;</span><span class="n">autoMode</span><span class="o">&gt;</span>false<span class="o">&lt;/</span><span class="n">autoMode</span><span class="o">&gt;</span><span class="o">&lt;</span><span class="n">enablePlanReviews</span><span class="o">&gt;</span>true<span class="o">&lt;/</span><span class="n">enablePlanReviews</span><span class="o">&gt;</span><span class="o">&lt;</span><span class="n">invalidResultRetryLimit</span><span class="o">&gt;</span>1<span class="o">&lt;/</span><span class="n">invalidResultRetryLimit</span><span class="o">&gt;</span><span class="o">&lt;/</span><span class="n">policy</span><span class="o">&gt;</span>
-<span class="o">&lt;</span><span class="n">summary</span><span class="o">&gt;</span>Done<span class="o">&lt;/</span><span class="n">summary</span><span class="o">&gt;</span>
-<span class="o">&lt;</span><span class="n">artifact</span><span class="o">&gt;</span>thoughts/example/design.md<span class="o">&lt;/</span><span class="n">artifact</span><span class="o">&gt;</span>
-<span class="o">&lt;</span><span class="n">next</span><span class="o">&gt;</span>/q-outline thoughts/example/design.md<span class="o">&lt;/</span><span class="n">next</span><span class="o">&gt;</span>
-<span class="o">&lt;/</span><span class="n">qrspi</span><span class="o">-</span><span class="n">result</span><span class="o">&gt;</span>`
-	xmlText, err := extractAndValidateXML(highlighted, "design")
+func TestExtractAndValidateYAMLFromChromaHTML(t *testing.T) {
+	highlighted := `<span class="s">&#96;&#96;&#96;yaml</span>
+<span class="nt">qrspi_result</span><span class="p">:</span>
+  <span class="nt">stage</span><span class="p">:</span> <span class="s">"design"</span>
+  <span class="nt">status</span><span class="p">:</span> <span class="s">"complete"</span>
+  <span class="nt">outcome</span><span class="p">:</span> <span class="s">"complete"</span>
+  <span class="nt">policy</span><span class="p">:</span>
+    <span class="nt">auto_mode</span><span class="p">:</span> <span class="kc">false</span>
+    <span class="nt">enable_plan_reviews</span><span class="p">:</span> <span class="kc">true</span>
+    <span class="nt">invalid_result_retry_limit</span><span class="p">:</span> <span class="m">1</span>
+  <span class="nt">summary</span><span class="p">:</span>
+    <span class="nt">plan_goal</span><span class="p">:</span> <span class="s">"Goal."</span>
+    <span class="nt">stage_completed</span><span class="p">:</span> <span class="s">"Completed."</span>
+    <span class="nt">key_decisions</span><span class="p">:</span> <span class="s">"None."</span>
+  <span class="nt">artifact</span><span class="p">:</span> <span class="s">"thoughts/example/design.md"</span>
+  <span class="nt">next</span><span class="p">:</span>
+    <span class="nt">steps</span><span class="p">:</span>
+      - <span class="nt">action</span><span class="p">:</span> <span class="s">"start_stage"</span>
+        <span class="nt">param</span><span class="p">:</span> <span class="s">"q-outline"</span>
+<span class="s">&#96;&#96;&#96;</span>`
+	yamlText, err := extractAndValidateYAML(highlighted, "design")
 	if err != nil {
-		t.Fatalf("extractAndValidateXML() error = %v", err)
+		t.Fatalf("extractAndValidateYAML() error = %v", err)
 	}
-	if !strings.Contains(xmlText, "<qrspi-result>") ||
-		!strings.Contains(xmlText, "<stage>") ||
-		!strings.Contains(xmlText, "design") {
-		t.Fatalf("unexpected xml: %s", xmlText)
+	if !strings.Contains(yamlText, "qrspi_result:") ||
+		!strings.Contains(yamlText, `stage: "design"`) {
+		t.Fatalf("unexpected YAML: %s", yamlText)
 	}
 }
 
@@ -306,22 +315,23 @@ func sseData(value string) string {
 	return strings.Join(lines, "\n") + "\n"
 }
 
-func validXML(stage string) string {
-	return `<qrspi-result>
-  <stage>` + stage + `</stage>
-  <status>complete</status>
-  <outcome>complete</outcome>
-  <policy>
-    <autoMode>false</autoMode>
-    <enablePlanReviews>true</enablePlanReviews>
-    <invalidResultRetryLimit>1</invalidResultRetryLimit>
-  </policy>
-  <summary>
-    <plan-goal>Goal.</plan-goal>
-    <stage-completed>Completed.</stage-completed>
-    <key-decisions>None.</key-decisions>
-  </summary>
-  <artifact>thoughts/example/review.md</artifact>
-  <next>/q-review thoughts/example/review.md</next>
-</qrspi-result>`
+func validYAML(stage string) string {
+	return "```yaml\n" + `qrspi_result:
+  stage: "` + stage + `"
+  status: "complete"
+  outcome: "complete"
+  policy:
+    auto_mode: false
+    enable_plan_reviews: true
+    invalid_result_retry_limit: 1
+  summary:
+    plan_goal: "Goal."
+    stage_completed: "Completed."
+    key_decisions: "None."
+  artifact: "thoughts/example/review.md"
+  next:
+    steps:
+      - action: "start_stage"
+        param: "q-review"
+` + "```"
 }

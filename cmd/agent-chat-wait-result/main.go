@@ -56,7 +56,7 @@ func (h *headerFlags) Set(value string) error {
 }
 
 type waitResult struct {
-	XML        string
+	Result     string
 	ExitCode   int
 	Diagnostic string
 }
@@ -77,8 +77,8 @@ func main() {
 	defer cancel()
 
 	result := waitForResult(ctx, opts)
-	if result.XML != "" {
-		fmt.Fprintln(os.Stdout, result.XML)
+	if result.Result != "" {
+		fmt.Fprintln(os.Stdout, result.Result)
 	}
 	if result.Diagnostic != "" {
 		fmt.Fprintln(os.Stderr, result.Diagnostic)
@@ -517,17 +517,17 @@ func finalizeStoppedRun(
 	opts options,
 	fetchFinal func() (string, error),
 ) waitResult {
-	xmlText, err := extractAndValidateXML(accumulated, opts.stage)
+	yamlText, err := extractAndValidateYAML(accumulated, opts.stage)
 	if err == nil {
-		return waitResult{ExitCode: exitOK, XML: xmlText}
+		return waitResult{ExitCode: exitOK, Result: yamlText}
 	}
 
 	if fetchFinal != nil {
 		finalHTML, fetchErr := fetchFinal()
 		if fetchErr == nil && strings.TrimSpace(finalHTML) != "" {
-			xmlText, err = extractAndValidateXML(accumulated+"\n"+finalHTML, opts.stage)
+			yamlText, err = extractAndValidateYAML(accumulated+"\n"+finalHTML, opts.stage)
 			if err == nil {
-				return waitResult{ExitCode: exitOK, XML: xmlText}
+				return waitResult{ExitCode: exitOK, Result: yamlText}
 			}
 		} else if fetchErr != nil {
 			err = fmt.Errorf("%w; final page fetch failed: %v", err, fetchErr)
@@ -536,31 +536,31 @@ func finalizeStoppedRun(
 	return waitResult{
 		ExitCode: exitInvalid,
 		Diagnostic: fmt.Sprintf(
-			"Agent Chat run stopped without valid QRSPI XML: %v\nLast observed output: %s",
+			"Agent Chat run stopped without valid QRSPI YAML: %v\nLast observed output: %s",
 			err,
 			compactDiagnostic(accumulated),
 		),
 	}
 }
 
-var qrspiResultPattern = regexp.MustCompile(`(?s)<qrspi-result\b[^>]*>.*?</qrspi-result>`)
+var qrspiYAMLBlockPattern = regexp.MustCompile("(?s)```(?:yaml|yml)\\s*\\n.*?qrspi_result:.*?\\n?```")
 
-func extractAndValidateXML(text, expectedStage string) (string, error) {
-	candidates := []string{text, html.UnescapeString(text), renderedHTMLText(text)}
+func extractAndValidateYAML(text, expectedStage string) (string, error) {
+	candidates := []string{text, html.UnescapeString(text), renderedHTMLCodeText(text), renderedHTMLText(text)}
 	var lastErr error
 	for _, candidate := range candidates {
-		matches := qrspiResultPattern.FindAllString(candidate, -1)
+		matches := qrspiYAMLBlockPattern.FindAllString(candidate, -1)
 		for i := len(matches) - 1; i >= 0; i-- {
-			xmlText := strings.TrimSpace(matches[i])
-			parser := qrspi.QRSPIXMLParser{}
+			yamlText := strings.TrimSpace(matches[i])
+			parser := qrspi.QRSPIResultParser{}
 			_, err := parser.Parse(
-				xmlText,
+				yamlText,
 				wruntime.ParseContext{
 					ExpectedNodeID: wruntime.NodeID(strings.TrimSpace(expectedStage)),
 				},
 			)
 			if err == nil {
-				return xmlText, nil
+				return yamlText, nil
 			}
 			lastErr = err
 		}
@@ -568,7 +568,14 @@ func extractAndValidateXML(text, expectedStage string) (string, error) {
 	if lastErr != nil {
 		return "", lastErr
 	}
-	return "", fmt.Errorf("missing <qrspi-result> XML")
+	return "", fmt.Errorf("missing fenced YAML qrspi_result")
+}
+
+func renderedHTMLCodeText(text string) string {
+	text = regexp.MustCompile(`(?i)<br\s*/?>`).ReplaceAllString(text, "\n")
+	text = regexp.MustCompile(`(?i)</(div|p|pre|code)>`).ReplaceAllString(text, "\n")
+	text = regexp.MustCompile(`<[^>]+>`).ReplaceAllString(text, "")
+	return html.UnescapeString(text)
 }
 
 func renderedHTMLText(text string) string {

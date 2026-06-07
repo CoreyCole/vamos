@@ -1295,7 +1295,7 @@ func TestOpenPlanWorkspaceQRSPIIgnoresPromptOverrideWithoutE2EEnv(t *testing.T) 
 	if strings.Contains(run.PromptText, override) {
 		t.Fatalf("prompt contains disabled E2E override marker: %q", run.PromptText)
 	}
-	if !strings.Contains(run.PromptText, "~/.agents/skills/q-question/SKILL.md") {
+	if !strings.Contains(run.PromptText, ".pi/skills/q-question/SKILL.md") {
 		t.Fatalf("prompt = %q, want normal q-question prompt", run.PromptText)
 	}
 	if run.WorkflowNodeID.String != "question" {

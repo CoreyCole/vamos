@@ -28,7 +28,7 @@ func TestOnRunCompleteValidQRSPIResultAdvancesWorkflow(t *testing.T) {
 	}
 	store := &fakeStore{
 		state:          state,
-		assistantText:  validQuestionResultXML(),
+		assistantText:  validQuestionResultYAML(),
 		artifactExists: true,
 		run: db.AgentRun{
 			ID:          "run-1",
@@ -90,7 +90,7 @@ func TestOnRunCompleteFallsBackToPersistedResultHeadEntry(t *testing.T) {
 	}
 	store := &fakeStore{
 		state:          state,
-		assistantText:  validQuestionResultXML(),
+		assistantText:  validQuestionResultYAML(),
 		artifactExists: true,
 		run: db.AgentRun{
 			ID:          "run-1",
@@ -263,7 +263,7 @@ func TestAdvanceHumanGateRejectsWhenNotWaiting(t *testing.T) {
 	}
 }
 
-func TestOnRunCompleteInvalidXMLStartsCorrectionRun(t *testing.T) {
+func TestOnRunCompleteInvalidYAMLStartsCorrectionRun(t *testing.T) {
 	t.Parallel()
 
 	def, err := qrspi.Definition()
@@ -280,7 +280,7 @@ func TestOnRunCompleteInvalidXMLStartsCorrectionRun(t *testing.T) {
 	}
 	store := &fakeStore{
 		state:         state,
-		assistantText: "not xml",
+		assistantText: "not yaml",
 		run: db.AgentRun{
 			ID:          "run-1",
 			WorkspaceID: sql.NullString{String: "workspace-1", Valid: true},
@@ -313,7 +313,7 @@ func TestOnRunCompleteInvalidXMLStartsCorrectionRun(t *testing.T) {
 	}
 }
 
-func TestOnRunCompleteInvalidXMLUsesUpdatedRetryLimitPolicy(t *testing.T) {
+func TestOnRunCompleteInvalidYAMLUsesUpdatedRetryLimitPolicy(t *testing.T) {
 	t.Parallel()
 
 	def, err := qrspi.Definition()
@@ -339,7 +339,7 @@ func TestOnRunCompleteInvalidXMLUsesUpdatedRetryLimitPolicy(t *testing.T) {
 	}
 	store := &fakeStore{
 		state:         state,
-		assistantText: "not xml",
+		assistantText: "not yaml",
 		run: db.AgentRun{
 			ID:          "run-1",
 			WorkspaceID: sql.NullString{String: "workspace-1", Valid: true},
@@ -375,7 +375,7 @@ func TestOnRunCompleteInvalidXMLUsesUpdatedRetryLimitPolicy(t *testing.T) {
 	}
 }
 
-func TestOnRunCompleteInvalidXMLExhaustionSetsWorkspaceError(t *testing.T) {
+func TestOnRunCompleteInvalidYAMLExhaustionSetsWorkspaceError(t *testing.T) {
 	t.Parallel()
 
 	def, err := qrspi.Definition()
@@ -393,7 +393,7 @@ func TestOnRunCompleteInvalidXMLExhaustionSetsWorkspaceError(t *testing.T) {
 	}
 	store := &fakeStore{
 		state:         state,
-		assistantText: "not xml",
+		assistantText: "not yaml",
 		run: db.AgentRun{
 			ID:              "run-1",
 			WorkspaceID:     sql.NullString{String: "workspace-1", Valid: true},
@@ -558,7 +558,7 @@ func mustQRSPIWorkflowPolicy(t *testing.T, policy qrspi.Policy) []byte {
 	return encoded
 }
 
-func validQuestionResultXML() string {
+func validQuestionResultYAML() string {
 	return strings.Join([]string{
 		"```yaml",
 		"qrspi_result:",
