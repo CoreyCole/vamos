@@ -109,7 +109,14 @@ func (s *ImplWorkspaceSyncer) Sync(
 		if beforeErr == nil {
 			gitState = applyCachedMergeProof(gitState, before)
 		}
-		binding := readBestEffortPlanBinding(ws.CheckoutPath)
+		binding, err := resolvePlanWorkspaceBinding(
+			ctx,
+			s.Queries,
+			readBestEffortPlanBinding(ws.CheckoutPath),
+		)
+		if err != nil {
+			return ImplWorkspaceSyncResult{}, err
+		}
 		params := implWorkspaceUpsertParams(projectID, ws, gitState, binding)
 		if _, err := s.Queries.ReassignImplWorkspaceCheckoutPathIdentity(ctx, db.ReassignImplWorkspaceCheckoutPathIdentityParams{
 			ProjectID:     params.ProjectID,
@@ -237,6 +244,72 @@ func readBestEffortPlanBinding(checkoutPath string) PlanWorkspaceBinding {
 		return PlanWorkspaceBinding{}
 	}
 	return binding
+}
+
+func resolvePlanWorkspaceBinding(
+	ctx context.Context,
+	q *db.Queries,
+	binding PlanWorkspaceBinding,
+) (PlanWorkspaceBinding, error) {
+	planDirRel, err := canonicalPlanDirRelForBinding(ctx, q, binding.PlanDir)
+	if err != nil {
+		return PlanWorkspaceBinding{}, err
+	}
+	binding.PlanDir = planDirRel
+	return binding, nil
+}
+
+func canonicalPlanDirRelForBinding(
+	ctx context.Context,
+	q *db.Queries,
+	planDir string,
+) (string, error) {
+	for _, candidate := range planDirRelCandidates(planDir) {
+		row, err := q.GetPlanWorkspace(ctx, candidate)
+		if err == nil {
+			return row.PlanDirRel, nil
+		}
+		if !errors.Is(err, sql.ErrNoRows) {
+			return "", err
+		}
+	}
+	return "", nil
+}
+
+func planDirRelCandidates(planDir string) []string {
+	candidate := normalizePlanDir(planDir)
+	if candidate == "" {
+		return nil
+	}
+	candidates := []string{candidate}
+	if strings.HasPrefix(candidate, "thoughts/") {
+		candidates = append(candidates, strings.TrimPrefix(candidate, "thoughts/"))
+	}
+	if idx := strings.LastIndex(candidate, "/thoughts/"); idx >= 0 {
+		candidates = append(candidates, candidate[idx+len("/thoughts/"):])
+	}
+	out := make([]string, 0, len(candidates)*2)
+	seen := collections.NewSet[string]()
+	for _, value := range candidates {
+		for _, normalized := range []string{value, stripPlanArtifactFilename(value)} {
+			normalized = normalizePlanDir(normalized)
+			if normalized == "" || seen.Has(normalized) {
+				continue
+			}
+			seen.Add(normalized)
+			out = append(out, normalized)
+		}
+	}
+	return out
+}
+
+func stripPlanArtifactFilename(planDir string) string {
+	switch filepath.Base(planDir) {
+	case "plan.md", "outline.md", "design.md", "design-product.md", "verify.md", "review.md":
+		return filepath.Dir(planDir)
+	default:
+		return planDir
+	}
 }
 
 func upsertPlanBindingForImplWorkspace(

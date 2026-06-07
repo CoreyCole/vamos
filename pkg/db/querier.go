@@ -19,6 +19,7 @@ type Querier interface {
 	BackfillAgentRunsWorkspaceForThread(ctx context.Context, arg BackfillAgentRunsWorkspaceForThreadParams) error
 	BackfillAgentSessionsWorkspaceForThread(ctx context.Context, arg BackfillAgentSessionsWorkspaceForThreadParams) error
 	ClaimNextPendingReleaseQueueItem(ctx context.Context) (ReleaseQueueItem, error)
+	ClearInvalidImplWorkspacePlanRefs(ctx context.Context) (int64, error)
 	CompleteAgentRun(ctx context.Context, arg CompleteAgentRunParams) error
 	CountUnresolvedWorkspaceComments(ctx context.Context, workspaceRoot string) (int64, error)
 	CreateAgentEntry(ctx context.Context, arg CreateAgentEntryParams) error
@@ -155,6 +156,7 @@ type Querier interface {
 	MarkReleaseQueueItemRunning(ctx context.Context, arg MarkReleaseQueueItemRunningParams) (ReleaseQueueItem, error)
 	MarkReleaseQueueItemTerminal(ctx context.Context, arg MarkReleaseQueueItemTerminalParams) (ReleaseQueueItem, error)
 	MarkWorkspaceDocDeleted(ctx context.Context, arg MarkWorkspaceDocDeletedParams) error
+	ReassignImplWorkspaceCheckoutPathIdentity(ctx context.Context, arg ReassignImplWorkspaceCheckoutPathIdentityParams) (int64, error)
 	RecordImplWorkspaceEnvError(ctx context.Context, arg RecordImplWorkspaceEnvErrorParams) error
 	RecordImplWorkspaceEnvRepair(ctx context.Context, arg RecordImplWorkspaceEnvRepairParams) error
 	ReopenDocumentComment(ctx context.Context, id string) error

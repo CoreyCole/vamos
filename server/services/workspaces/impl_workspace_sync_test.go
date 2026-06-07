@@ -1017,6 +1017,110 @@ func TestImplWorkspaceSyncerAttachesPlanBinding(t *testing.T) {
 	}
 }
 
+func TestImplWorkspaceSyncerCanonicalizesAbsolutePlanBinding(t *testing.T) {
+	ctx := context.Background()
+	parent := t.TempDir()
+	checkout := makeImplSyncCheckout(
+		t,
+		parent,
+		"cn-agents-2026-05-20_20-18-45_workspace-discovery-sync",
+	)
+	dbConn, queries := openImplSyncTestDB(t)
+	if _, err := dbConn.Exec("PRAGMA foreign_keys = ON"); err != nil {
+		t.Fatalf("enable foreign keys: %v", err)
+	}
+	planDir := "creative-mode-agent/plans/2026-05-20_20-18-45_workspace-discovery-sync"
+	_, err := queries.UpsertDiscoveredPlanWorkspace(ctx, db.UpsertDiscoveredPlanWorkspaceParams{
+		PlanDirRel:        planDir,
+		ProjectID:         "vamos",
+		PlanDir:           filepath.Join(parent, "thoughts", planDir),
+		Label:             "workspace discovery sync",
+		ArtifactUpdatedAt: time.Now(),
+		QrspiLifecycle:    "implement",
+	})
+	if err != nil {
+		t.Fatalf("UpsertDiscoveredPlanWorkspace: %v", err)
+	}
+	if err := WritePlanWorkspaceBinding(
+		PlanWorkspaceBindingPath(checkout),
+		PlanWorkspaceBinding{
+			PlanDir:       filepath.Join(parent, "thoughts", planDir, "plan.md"),
+			WorkspaceSlug: "2026-05-20-20-18-45-workspace-discovery-sync",
+			CheckoutPath:  checkout,
+		},
+	); err != nil {
+		t.Fatalf("WritePlanWorkspaceBinding: %v", err)
+	}
+
+	_, err = (&ImplWorkspaceSyncer{Queries: queries}).Sync(ctx, ImplWorkspaceSyncInput{
+		ProjectID: "vamos",
+		Discovery: ImplWorkspaceDiscoveryConfig{
+			ParentDir: parent,
+			Domain:    "workspaces.example.test",
+		},
+	})
+	if err != nil {
+		t.Fatalf("Sync: %v", err)
+	}
+	row, err := queries.GetImplWorkspace(ctx, db.GetImplWorkspaceParams{ProjectID: "vamos", WorkspaceSlug: "2026-05-20-20-18-45-workspace-discovery-sync"})
+	if err != nil {
+		t.Fatalf("GetImplWorkspace: %v", err)
+	}
+	if !row.PlanDirRel.Valid || row.PlanDirRel.String != planDir {
+		t.Fatalf("plan_dir_rel = %+v, want %q", row.PlanDirRel, planDir)
+	}
+}
+
+func TestImplWorkspaceSyncerIgnoresMissingPlanBindingWithForeignKeys(t *testing.T) {
+	ctx := context.Background()
+	parent := t.TempDir()
+	checkout := makeImplSyncCheckout(
+		t,
+		parent,
+		"cn-agents-2026-05-20_20-18-45_workspace-discovery-sync",
+	)
+	dbConn, queries := openImplSyncTestDB(t)
+	if _, err := dbConn.Exec("PRAGMA foreign_keys = ON"); err != nil {
+		t.Fatalf("enable foreign keys: %v", err)
+	}
+	if err := WritePlanWorkspaceBinding(
+		PlanWorkspaceBindingPath(checkout),
+		PlanWorkspaceBinding{
+			PlanDir:       "thoughts/creative-mode-agent/plans/missing-plan",
+			WorkspaceSlug: "2026-05-20-20-18-45-workspace-discovery-sync",
+			CheckoutPath:  checkout,
+		},
+	); err != nil {
+		t.Fatalf("WritePlanWorkspaceBinding: %v", err)
+	}
+
+	_, err := (&ImplWorkspaceSyncer{Queries: queries}).Sync(ctx, ImplWorkspaceSyncInput{
+		ProjectID: "vamos",
+		Discovery: ImplWorkspaceDiscoveryConfig{
+			ParentDir: parent,
+			Domain:    "workspaces.example.test",
+		},
+	})
+	if err != nil {
+		t.Fatalf("Sync: %v", err)
+	}
+	row, err := queries.GetImplWorkspace(ctx, db.GetImplWorkspaceParams{ProjectID: "vamos", WorkspaceSlug: "2026-05-20-20-18-45-workspace-discovery-sync"})
+	if err != nil {
+		t.Fatalf("GetImplWorkspace: %v", err)
+	}
+	if row.PlanDirRel.Valid || row.PlanDir.Valid {
+		t.Fatalf("plan binding = rel:%+v dir:%+v, want cleared missing plan", row.PlanDirRel, row.PlanDir)
+	}
+	violations, err := dbConn.QueryContext(ctx, "PRAGMA foreign_key_check")
+	if err != nil {
+		t.Fatalf("foreign_key_check: %v", err)
+	}
+	defer violations.Close()
+	if violations.Next() {
+		t.Fatal("foreign_key_check reported violations")
+	}
+}
+
 func openImplSyncTestQueries(t *testing.T) *db.Queries {
 	t.Helper()
 	_, queries := openImplSyncTestDB(t)
