@@ -87,7 +87,7 @@ func TestQRSPIWorkflowCardViewDoesNotRenderDisplayNextAsCommand(t *testing.T) {
 		},
 		JumpCurrentHref: "/thoughts/example?context=chat&thread=thread-1#msg-current",
 		JumpNextEndHref: "/thoughts/example?context=chat&thread=thread-1#msg-next",
-		RawXML:          "<qrspi-result><stage>outline</stage></qrspi-result>",
+		RawResult:       "```yaml\nqrspi_result:\n  stage: outline\n```",
 		Cwd: WorkspaceCwdProjection{
 			Label: "planning",
 			Scope: "planning_checkout",
@@ -119,7 +119,7 @@ func TestQRSPIWorkflowCardViewDoesNotRenderDisplayNextAsCommand(t *testing.T) {
 		t.Fatalf("rendered card leaked workspace action URL: %s", rendered)
 	}
 	for _, want := range []string{
-		"XML next steps",
+		"Next steps",
 		"Start q-review immediately.",
 		"Progress",
 		"waiting_human · human-review-outline",

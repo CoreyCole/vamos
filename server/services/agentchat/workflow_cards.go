@@ -27,7 +27,7 @@ type QRSPIWorkflowCard struct {
 	Policy          WorkspaceWorkflowPolicyProjection
 	WaitingHuman    bool
 	CanContinue     bool
-	RawXML          string
+	RawResult       string
 }
 
 type AgentProgress struct {
@@ -53,14 +53,14 @@ func ProjectQRSPIWorkflowCard(
 	if strings.TrimSpace(string(runResult.SourceNodeID)) == "" {
 		return nil, nil
 	}
-	rawXML := ""
+	rawResult := ""
 	if len(runResult.Raw) > 0 && string(runResult.Raw) != "null" {
 		var raw any
 		if err := json.Unmarshal(runResult.Raw, &raw); err == nil {
 			pretty, _ := json.MarshalIndent(raw, "", "  ")
-			rawXML = string(pretty)
+			rawResult = string(pretty)
 		} else {
-			rawXML = string(runResult.Raw)
+			rawResult = string(runResult.Raw)
 		}
 	}
 	threadID = strings.TrimSpace(threadID)
@@ -84,7 +84,7 @@ func ProjectQRSPIWorkflowCard(
 		Policy:          policy,
 		WaitingHuman:    state.Status == wruntime.WorkspaceStatusWaitingHuman,
 		CanContinue:     state.PendingNextNodeID != "" && state.Status == wruntime.WorkspaceStatusIdle,
-		RawXML:          rawXML,
+		RawResult:       rawResult,
 	}, nil
 }
 
