@@ -15,13 +15,13 @@ import (
 func TestConsumeSSEStoppedWithValidYAML(t *testing.T) {
 	result := consumeFixture(
 		t,
-		completedFixture(validYAML("review-design")),
-		options{run: "run-1", stage: "review-design"},
+		completedFixture(validYAML("design")),
+		options{run: "run-1", stage: "design"},
 	)
 	if result.ExitCode != exitOK {
 		t.Fatalf("ExitCode = %d, diagnostic = %s", result.ExitCode, result.Diagnostic)
 	}
-	if !strings.Contains(result.Result, `stage: "review-design"`) {
+	if !strings.Contains(result.Result, `stage: "design"`) {
 		t.Fatalf("stdout YAML missing expected stage: %s", result.Result)
 	}
 	if strings.Contains(result.Result, "event:") || strings.Contains(result.Result, "data:") {
@@ -47,7 +47,7 @@ func TestConsumeSSEStoppedWithoutYAML(t *testing.T) {
 	result := consumeFixture(
 		t,
 		completedFixture("plain assistant text"),
-		options{run: "run-1", stage: "review-design"},
+		options{run: "run-1", stage: "design"},
 	)
 	if result.ExitCode != exitInvalid {
 		t.Fatalf("ExitCode = %d, want %d", result.ExitCode, exitInvalid)
@@ -61,7 +61,7 @@ func TestConsumeSSEMalformedYAML(t *testing.T) {
 	result := consumeFixture(
 		t,
 		completedFixture("```yaml\nqrspi_result:\n  stage: [\n```"),
-		options{run: "run-1", stage: "review-design"},
+		options{run: "run-1", stage: "design"},
 	)
 	if result.ExitCode != exitInvalid {
 		t.Fatalf("ExitCode = %d, want %d", result.ExitCode, exitInvalid)
@@ -75,7 +75,7 @@ func TestConsumeSSEStageMismatch(t *testing.T) {
 	result := consumeFixture(
 		t,
 		completedFixture(validYAML("review-outline")),
-		options{run: "run-1", stage: "review-design"},
+		options{run: "run-1", stage: "design"},
 	)
 	if result.ExitCode != exitInvalid {
 		t.Fatalf("ExitCode = %d, want %d", result.ExitCode, exitInvalid)
@@ -88,7 +88,7 @@ func TestConsumeSSEStageMismatch(t *testing.T) {
 func TestConsumeSSEFailedRunPatch(t *testing.T) {
 	fixture := "event: datastar-patch-elements\n" +
 		"data: <div id=\"agent-chat-run-session-panel\"><p>run-1</p><p>failed</p><p>boom</p></div>\n\n"
-	result := consumeFixture(t, fixture, options{run: "run-1", stage: "review-design"})
+	result := consumeFixture(t, fixture, options{run: "run-1", stage: "design"})
 	if result.ExitCode != exitFailed {
 		t.Fatalf(
 			"ExitCode = %d, want %d, diagnostic=%s",
@@ -205,7 +205,7 @@ func TestConsumeSSETimeoutBeforeStop(t *testing.T) {
 	defer writer.Close()
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Millisecond)
 	defer cancel()
-	result := consumeSSE(ctx, reader, options{run: "run-1", stage: "review-design"}, nil)
+	result := consumeSSE(ctx, reader, options{run: "run-1", stage: "design"}, nil)
 	if result.ExitCode != exitTimeout {
 		t.Fatalf("ExitCode = %d, want %d", result.ExitCode, exitTimeout)
 	}

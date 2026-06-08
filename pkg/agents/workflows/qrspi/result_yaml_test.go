@@ -187,9 +187,13 @@ func TestQRSPIResultParserAcceptsCanonicalStagesAndOutcomes(t *testing.T) {
 }
 
 func TestQRSPIResultParserRejectsAmbiguousReviewStage(t *testing.T) {
-	_, err := (QRSPIResultParser{}).Parse(validResultYAMLWithOutcome("review", string(wruntime.OutcomeComplete)), wruntime.ParseContext{})
-	if err == nil || !strings.Contains(err.Error(), "ambiguous qrspi review stage") {
-		t.Fatalf("Parse() error = %v, want ambiguous review stage", err)
+	for _, stage := range []string{"review", "review-design"} {
+		t.Run(stage, func(t *testing.T) {
+			_, err := (QRSPIResultParser{}).Parse(validResultYAMLWithOutcome(stage, string(wruntime.OutcomeComplete)), wruntime.ParseContext{})
+			if err == nil || !strings.Contains(err.Error(), "ambiguous qrspi review stage") {
+				t.Fatalf("Parse() error = %v, want ambiguous review stage", err)
+			}
+		})
 	}
 }
 

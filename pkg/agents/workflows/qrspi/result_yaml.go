@@ -257,7 +257,7 @@ func validateQRSPIResult(parsed Result, ctx wruntime.ParseContext) error {
 	if parsed.Stage == "" {
 		return fmt.Errorf("qrspi result stage is required")
 	}
-	if parsed.Stage == "review" {
+	if parsed.Stage == "review" || unsupportedReviewStage(parsed.Stage) {
 		return fmt.Errorf(
 			"ambiguous qrspi review stage %q; emit review-outline, review-plan, or review-implementation",
 			parsed.Stage,
@@ -288,6 +288,18 @@ func validateQRSPIResult(parsed Result, ctx wruntime.ParseContext) error {
 		}
 	}
 	return nil
+}
+
+func unsupportedReviewStage(stage string) bool {
+	if !strings.HasPrefix(stage, "review-") {
+		return false
+	}
+	switch wruntime.NodeID(stage) {
+	case NodeReviewOutline, NodeReviewPlan, NodeReviewImplementation:
+		return false
+	default:
+		return true
+	}
 }
 
 func trimQRSPIResult(parsed Result) Result {
