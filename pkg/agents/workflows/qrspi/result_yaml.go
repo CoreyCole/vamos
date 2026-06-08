@@ -10,16 +10,6 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// Deprecated compatibility aliases are kept until parser tests and downstream helpers
-// are migrated from XML names to YAML result names in later slices.
-type ResultXML = Result
-type WorkspaceMetadataXML = WorkspaceMetadata
-type PolicyXML = PolicyYAML
-type SummaryXML = Summary
-type ArtifactXML = Artifact
-type NextXML = Next
-type QRSPIXMLParser = QRSPIResultParser
-
 type Result struct {
 	Project           string            `yaml:"project" json:"project,omitempty"`
 	RelatedProjects   []string          `yaml:"related_projects" json:"relatedProjects,omitempty"`

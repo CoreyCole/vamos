@@ -75,26 +75,27 @@ The runtime decodes the persisted config through the definition's config spec be
 
 Human review nodes are normal graph nodes with `NodeKindHumanReview`. `AutoApprovable(true)` means a generic auto-mode config may bypass that gate; `AutoApprovable(false)` always waits for a human. QRSPI marks planning outline review auto-approvable but final implementation review non-auto-approvable.
 
-## Agent result XML
+## Agent result YAML
 
-Agent-facing workflows can use XML footers like QRSPI. The parser converts XML into `WorkflowResult`; the graph, not `<next>`, selects the following node.
+Agent-facing workflows can use fenced YAML footers like QRSPI. The parser converts YAML into `WorkflowResult`; the graph, not `next.steps`, selects the following node.
 
-```xml
-<qrspi-result>
-  <stage>review-plan</stage>
-  <status>complete</status>
-  <outcome>ready-for-workspace</outcome>
-  <summary>
-    <plan-goal>Make QRSPI runtime-safe and graph-validated.</plan-goal>
-    <stage-completed>Plan review passed after doc fixes.</stage-completed>
-    <key-decisions>Proceed to workspace prep.</key-decisions>
-  </summary>
-  <artifact>thoughts/example/reviews/plan-review/review.md</artifact>
-  <next>/q-workspace thoughts/example/plan.md</next>
-</qrspi-result>
+```yaml
+qrspi_result:
+  stage: "review-plan"
+  status: "complete"
+  outcome: "ready-for-workspace"
+  summary:
+    plan_goal: "Make QRSPI runtime-safe and graph-validated."
+    stage_completed: "Plan review passed after doc fixes."
+    key_decisions: "Proceed to workspace prep."
+  artifact: "thoughts/example/reviews/plan-review/review.md"
+  next:
+    steps:
+      - action: "start_stage"
+        param: "q-workspace"
 ```
 
-Keep `<next>` compatible with the graph for readability, but do not rely on it for routing. If it disagrees with the selected edge, the service can record a warning or start correction without executing the command.
+Keep `next.steps` compatible with the graph for readability, but do not rely on it for routing. If it disagrees with the selected edge, the service can record a warning or start correction without executing the command.
 
 ## Graph inspection
 

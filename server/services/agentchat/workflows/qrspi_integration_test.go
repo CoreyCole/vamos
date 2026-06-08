@@ -407,7 +407,7 @@ func TestQRSPIWorkspaceStageRunsBeforeImplement(t *testing.T) {
 	assertCurrentNode(t, store, runner, qrspi.NodeWorkspace)
 
 	store.run = qRSPIIntegrationRun(qrspi.NodeWorkspace)
-	store.assistantText = qRSPIIntegrationResultXMLWithWorkspace(
+	store.assistantText = qRSPIIntegrationResultYAMLWithWorkspace(
 		qrspi.NodeWorkspace,
 		"complete",
 		"plan.md",
@@ -438,7 +438,7 @@ func TestQRSPIImplementationReviewFollowupUsesReviewDirContext(t *testing.T) {
 	parentReview := "thoughts/creative-mode-agent/plans/2026-05-13_17-19-50_qrspi-auto-mode-review-looping/reviews/2026-05-14_19-00-00_qrspi-auto-mode-review-looping_implementation-review/review.md"
 	followupPlan := "thoughts/creative-mode-agent/plans/2026-05-13_17-19-50_qrspi-auto-mode-review-looping/reviews/2026-05-14_19-00-00_qrspi-auto-mode-review-looping_implementation-review/plan.md"
 	store.run = qRSPIIntegrationRun(qrspi.NodeReviewImplementation)
-	store.assistantText = qRSPIIntegrationResultXMLWithArtifacts(
+	store.assistantText = qRSPIIntegrationResultYAMLWithArtifacts(
 		qrspi.NodeReviewImplementation,
 		"complete",
 		wruntime.OutcomeNeedsFollowup,
@@ -496,7 +496,7 @@ func TestQRSPIImplementationReviewFollowupReturnsToParentReview(t *testing.T) {
 	}
 	moveQRSPIIntegrationState(t, store, qrspi.NodeReviewImplementation)
 	store.run = qRSPIIntegrationRun(qrspi.NodeReviewImplementation)
-	store.assistantText = qRSPIIntegrationResultXMLWithArtifacts(
+	store.assistantText = qRSPIIntegrationResultYAMLWithArtifacts(
 		qrspi.NodeReviewImplementation,
 		"complete",
 		wruntime.OutcomeReadyForHumanReview,
@@ -559,7 +559,7 @@ func TestQRSPIOutcomeRequiredArtifactsDoNotAdvance(t *testing.T) {
 			svc, store, runner := newQRSPIIntegrationHarness(t, nil)
 			moveQRSPIIntegrationState(t, store, tc.node)
 			store.run = qRSPIIntegrationRun(tc.node)
-			store.assistantText = qRSPIIntegrationResultXMLWithArtifacts(
+			store.assistantText = qRSPIIntegrationResultYAMLWithArtifacts(
 				tc.node,
 				"complete",
 				tc.outcome,
@@ -593,7 +593,7 @@ func TestQRSPIArtifactMissingDoesNotAdvance(t *testing.T) {
 	svc, store, runner := newQRSPIIntegrationHarness(t, nil)
 	store.artifactExists = false
 	store.run = qRSPIIntegrationRun(qrspi.NodeQuestion)
-	store.assistantText = qRSPIIntegrationResultXML(
+	store.assistantText = qRSPIIntegrationResultYAML(
 		qrspi.NodeQuestion,
 		"complete",
 		"missing.md",
@@ -627,7 +627,7 @@ func TestQRSPIPlanningReviewQuestionsRoutesToResearchForReview(t *testing.T) {
 		"reviews/outline-review/questions/followup.md": true,
 	}
 	store.run = qRSPIIntegrationRun(qrspi.NodeReviewOutline)
-	store.assistantText = qRSPIIntegrationResultXMLWithArtifacts(
+	store.assistantText = qRSPIIntegrationResultYAMLWithArtifacts(
 		qrspi.NodeReviewOutline,
 		"complete",
 		wruntime.OutcomeNeedsReviewResearch,
@@ -685,7 +685,7 @@ func TestQRSPIPlanningReviewResearchAddressLoops(t *testing.T) {
 			researchPath := fmt.Sprintf("reviews/%s-review/research/followup.md", tc.name)
 
 			store.run = qRSPIIntegrationRun(tc.reviewNode)
-			store.assistantText = qRSPIIntegrationResultXMLWithArtifacts(
+			store.assistantText = qRSPIIntegrationResultYAMLWithArtifacts(
 				tc.reviewNode,
 				"complete",
 				wruntime.OutcomeNeedsReviewResearch,
@@ -713,7 +713,7 @@ func TestQRSPIPlanningReviewResearchAddressLoops(t *testing.T) {
 			)
 
 			store.run = qRSPIIntegrationRun(tc.researchNode)
-			store.assistantText = qRSPIIntegrationResultXMLWithArtifacts(
+			store.assistantText = qRSPIIntegrationResultYAMLWithArtifacts(
 				tc.researchNode,
 				"complete",
 				wruntime.OutcomeComplete,
@@ -742,7 +742,7 @@ func TestQRSPIPlanningReviewResearchAddressLoops(t *testing.T) {
 			)
 
 			store.run = qRSPIIntegrationRun(tc.addressNode)
-			store.assistantText = qRSPIIntegrationResultXMLWithArtifacts(
+			store.assistantText = qRSPIIntegrationResultYAMLWithArtifacts(
 				tc.addressNode,
 				"complete",
 				wruntime.OutcomeComplete,
@@ -762,7 +762,7 @@ func TestQRSPIPlanningReviewResearchAddressLoops(t *testing.T) {
 			assertCurrentNode(t, store, runner, tc.reviewNode)
 
 			store.run = qRSPIIntegrationRun(tc.reviewNode)
-			store.assistantText = qRSPIIntegrationResultXMLWithArtifacts(
+			store.assistantText = qRSPIIntegrationResultYAMLWithArtifacts(
 				tc.reviewNode,
 				"complete",
 				tc.readyOutcome,
@@ -791,7 +791,7 @@ func TestQRSPIValidatesRelatedArtifacts(t *testing.T) {
 		"reviews/outline-review/questions/followup.md": false,
 	}
 	store.run = qRSPIIntegrationRun(qrspi.NodeReviewOutline)
-	store.assistantText = qRSPIIntegrationResultXMLWithArtifacts(
+	store.assistantText = qRSPIIntegrationResultYAMLWithArtifacts(
 		qrspi.NodeReviewOutline,
 		"complete",
 		wruntime.OutcomeNeedsReviewResearch,
@@ -825,7 +825,7 @@ func TestQRSPIValidatesRelatedArtifacts(t *testing.T) {
 func TestQRSPIDisplayNextMismatchDoesNotDriveTransition(t *testing.T) {
 	svc, store, runner := newQRSPIIntegrationHarness(t, nil)
 	store.run = qRSPIIntegrationRun(qrspi.NodeQuestion)
-	store.assistantText = qRSPIIntegrationResultXMLWithArtifacts(
+	store.assistantText = qRSPIIntegrationResultYAMLWithArtifacts(
 		qrspi.NodeQuestion,
 		"complete",
 		wruntime.OutcomeComplete,
@@ -851,7 +851,7 @@ func TestQRSPIDisplayNextMismatchDoesNotDriveTransition(t *testing.T) {
 func TestQRSPIStageMismatchStartsCorrectionFlow(t *testing.T) {
 	svc, store, runner := newQRSPIIntegrationHarness(t, nil)
 	store.run = qRSPIIntegrationRun(qrspi.NodeQuestion)
-	store.assistantText = qRSPIIntegrationResultXML(
+	store.assistantText = qRSPIIntegrationResultYAML(
 		qrspi.NodeResearch,
 		"complete",
 		"research/runtime.md",
@@ -912,14 +912,14 @@ func completeQRSPIIntegrationNode(
 	}
 	store.run = qRSPIIntegrationRun(node)
 	if node == qrspi.NodeWorkspace {
-		store.assistantText = qRSPIIntegrationResultXMLWithWorkspace(
+		store.assistantText = qRSPIIntegrationResultYAMLWithWorkspace(
 			node,
 			status,
 			artifact,
 			t.TempDir(),
 		)
 	} else {
-		store.assistantText = qRSPIIntegrationResultXML(node, status, artifact)
+		store.assistantText = qRSPIIntegrationResultYAML(node, status, artifact)
 	}
 	if err := svc.OnRunComplete(
 		context.Background(),
@@ -1056,8 +1056,8 @@ func qRSPIIntegrationRun(node wruntime.NodeID) db.AgentRun {
 	}
 }
 
-func qRSPIIntegrationResultXML(node wruntime.NodeID, status, artifact string) string {
-	return qRSPIIntegrationResultXMLWithArtifacts(
+func qRSPIIntegrationResultYAML(node wruntime.NodeID, status, artifact string) string {
+	return qRSPIIntegrationResultYAMLWithArtifacts(
 		node,
 		status,
 		qRSPIIntegrationOutcome(node),
@@ -1066,7 +1066,7 @@ func qRSPIIntegrationResultXML(node wruntime.NodeID, status, artifact string) st
 	)
 }
 
-func qRSPIIntegrationResultXMLWithArtifacts(
+func qRSPIIntegrationResultYAMLWithArtifacts(
 	node wruntime.NodeID,
 	status string,
 	outcome wruntime.ResultOutcome,
@@ -1074,7 +1074,7 @@ func qRSPIIntegrationResultXMLWithArtifacts(
 	next string,
 	artifacts ...wruntime.ArtifactRef,
 ) string {
-	return qRSPIIntegrationResultXMLWithWorkspaceAndArtifacts(
+	return qRSPIIntegrationResultYAMLWithWorkspaceAndArtifacts(
 		node,
 		status,
 		outcome,
@@ -1085,13 +1085,13 @@ func qRSPIIntegrationResultXMLWithArtifacts(
 	)
 }
 
-func qRSPIIntegrationResultXMLWithWorkspace(
+func qRSPIIntegrationResultYAMLWithWorkspace(
 	node wruntime.NodeID,
 	status string,
 	artifact string,
 	workspace string,
 ) string {
-	return qRSPIIntegrationResultXMLWithWorkspaceAndArtifacts(
+	return qRSPIIntegrationResultYAMLWithWorkspaceAndArtifacts(
 		node,
 		status,
 		qRSPIIntegrationOutcome(node),
@@ -1101,7 +1101,7 @@ func qRSPIIntegrationResultXMLWithWorkspace(
 	)
 }
 
-func qRSPIIntegrationResultXMLWithWorkspaceAndArtifacts(
+func qRSPIIntegrationResultYAMLWithWorkspaceAndArtifacts(
 	node wruntime.NodeID,
 	status string,
 	outcome wruntime.ResultOutcome,
