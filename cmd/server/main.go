@@ -303,6 +303,63 @@ func firstNonEmpty(values ...string) string {
 	return ""
 }
 
+func mergeProjectCheckoutsIntoDiscovery(
+	discovery *workspaces.DiscoveryConfig,
+	projects server.ProjectsConfig,
+) {
+	if discovery.ConfiguredCheckouts == nil {
+		discovery.ConfiguredCheckouts = map[string]workspaces.ConfiguredCheckout{}
+	}
+	for projectID, repo := range projects.Repos {
+		for checkoutName, checkout := range repo.Checkouts {
+			if strings.TrimSpace(checkout.RootPath) == "" {
+				continue
+			}
+			if configuredCheckoutPathExists(discovery.ConfiguredCheckouts, checkout.RootPath) {
+				continue
+			}
+			slug := checkoutName
+			if existing, exists := discovery.ConfiguredCheckouts[slug]; exists && strings.TrimSpace(existing.ProjectID) != "" && strings.TrimSpace(existing.ProjectID) != projectID {
+				slug = workspaces.ProjectScopedCheckoutSlug(projectID, checkoutName)
+			}
+			discovery.ConfiguredCheckouts[slug] = workspaces.ConfiguredCheckout{
+				RootPath:    checkout.RootPath,
+				DisplayName: firstNonEmpty(checkout.Purpose, checkoutName),
+				IsMain:      checkout.Role == server.CheckoutRoleMain || checkoutName == projects.DefaultCheckout || checkoutName == repo.DefaultCheckout,
+				Role:        workspaces.CheckoutRole(checkout.Role),
+				ProjectID:   projectID,
+			}
+		}
+	}
+}
+
+func configuredCheckoutPathExists(
+	configured map[string]workspaces.ConfiguredCheckout,
+	rootPath string,
+) bool {
+	for _, existing := range configured {
+		if sameFilesystemPath(existing.RootPath, rootPath) {
+			return true
+		}
+	}
+	return false
+}
+
+func sameFilesystemPath(a, b string) bool {
+	a = strings.TrimSpace(a)
+	b = strings.TrimSpace(b)
+	if a == "" || b == "" {
+		return false
+	}
+	absA, errA := filepath.Abs(a)
+	absB, errB := filepath.Abs(b)
+	if errA == nil && errB == nil {
+		a = absA
+		b = absB
+	}
+	return filepath.Clean(a) == filepath.Clean(b)
+}
+
 type pathPolicy int
 
 const (
@@ -871,29 +928,7 @@ func main() {
 				}
 			}
 		}
-		if len(hostCfg.Projects.Repos) > 0 {
-			if workspaceDiscovery.ConfiguredCheckouts == nil {
-				workspaceDiscovery.ConfiguredCheckouts = map[string]workspaces.ConfiguredCheckout{}
-			}
-			for projectID, repo := range hostCfg.Projects.Repos {
-				for checkoutName, checkout := range repo.Checkouts {
-					if strings.TrimSpace(checkout.RootPath) == "" {
-						continue
-					}
-					slug := checkoutName
-					if existing, exists := workspaceDiscovery.ConfiguredCheckouts[slug]; exists && strings.TrimSpace(existing.ProjectID) != "" && strings.TrimSpace(existing.ProjectID) != projectID {
-						slug = workspaces.ProjectScopedCheckoutSlug(projectID, checkoutName)
-					}
-					workspaceDiscovery.ConfiguredCheckouts[slug] = workspaces.ConfiguredCheckout{
-						RootPath:    checkout.RootPath,
-						DisplayName: firstNonEmpty(checkout.Purpose, checkoutName),
-						IsMain:      checkout.Role == server.CheckoutRoleMain || checkoutName == hostCfg.Projects.DefaultCheckout || checkoutName == repo.DefaultCheckout,
-						Role:        workspaces.CheckoutRole(checkout.Role),
-						ProjectID:   projectID,
-					}
-				}
-			}
-		}
+		mergeProjectCheckoutsIntoDiscovery(&workspaceDiscovery, hostCfg.Projects)
 	}
 	workspaceManagerURL := strings.TrimRight(cfg.PublicBaseURL, "/")
 	if cfg.WorkspaceMode == "child" && strings.TrimSpace(cfg.WorkspaceManagerURL) != "" {

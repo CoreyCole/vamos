@@ -14,9 +14,54 @@ import (
 
 	"github.com/labstack/echo/v4"
 
+	"github.com/CoreyCole/vamos/server"
 	"github.com/CoreyCole/vamos/server/services/agentchat"
 	"github.com/CoreyCole/vamos/server/services/workspaces"
 )
+
+func TestMergeProjectCheckoutsPreservesWorkspaceConfiguredPath(t *testing.T) {
+	discovery := workspaces.DiscoveryConfig{
+		ConfiguredCheckouts: map[string]workspaces.ConfiguredCheckout{
+			"stage": {
+				RootPath:    "/repo/vamos",
+				DisplayName: "Stage",
+				Role:        workspaces.CheckoutRoleStage,
+				ProjectID:   "vamos",
+			},
+		},
+	}
+	mergeProjectCheckoutsIntoDiscovery(&discovery, server.ProjectsConfig{
+		DefaultCheckout: "local",
+		Repos: map[string]server.RepoConfig{
+			"vamos": {
+				DefaultCheckout: "local",
+				Checkouts: map[string]server.CheckoutConfig{
+					"local": {
+						RootPath: "/repo/vamos",
+						Purpose:  "working",
+					},
+					"vamos-main": {
+						RootPath: "/repo/vamos-main",
+						Purpose:  "baseline",
+						Role:     server.CheckoutRoleMain,
+					},
+				},
+			},
+		},
+	})
+
+	if _, exists := discovery.ConfiguredCheckouts["local"]; exists {
+		t.Fatalf("local checkout duplicated configured stage path: %#v", discovery.ConfiguredCheckouts)
+	}
+	stage := discovery.ConfiguredCheckouts["stage"]
+	if stage.RootPath != "/repo/vamos" || stage.Role != workspaces.CheckoutRoleStage || stage.ProjectID != "vamos" {
+		t.Fatalf("stage checkout = %#v, want preserved configured stage", stage)
+	}
+	main := discovery.ConfiguredCheckouts["vamos-main"]
+	if main.RootPath != "/repo/vamos-main" || !main.IsMain || main.ProjectID != "vamos" {
+		t.Fatalf("main checkout = %#v, want linked baseline", main)
+	}
+}
 
 func TestRootUsesAuthenticatedChatWorkbench(t *testing.T) {
 	t.Parallel()
