@@ -137,6 +137,25 @@ This gate checks current SQLite projection invariants only:
 
 It does not start Temporal, trigger scheduled sync, restart a workspace, or run browser checks. Scheduled-sync success and `SQLITE_BUSY` recovery classification belong to E2E/deploy verification such as `/vamos-merge`.
 
+## Deploy-time workspace sync health
+
+Deploy verification must prove both HTTP route health and workspace projection health. `/login` returning 200 is not enough.
+
+After restarting a stage/main manager, verify:
+
+```bash
+scripts/workspace-db-verify/verify.sh --database-path <agents.db> --format text
+rg -n "workspace_sync_refresh_complete|workspace sync.*complete|SyncWorkspaces" <fresh-log-window>
+rg -n "FOREIGN KEY constraint failed|UNIQUE constraint failed|SQLITE_BUSY|database is locked" <fresh-log-window>
+```
+
+Rules:
+
+- FK/UNIQUE/projection verifier failures block merge/approval.
+- Fresh `FOREIGN KEY constraint failed` or `UNIQUE constraint failed` logs block merge/approval.
+- `SQLITE_BUSY` / `database is locked` is tolerated only when the same fresh window shows later successful workspace sync evidence.
+- If no fresh sync success evidence exists, treat deploy verification as blocked even when HTTP smoke checks pass.
+
 For a feature branch handoff to a human tester, use the feature checkout root:
 
 ```bash

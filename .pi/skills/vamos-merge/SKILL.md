@@ -195,12 +195,32 @@ cd ../vamos
 git branch --show-current # must be main
 git status --short        # tracked files must be clean; .vamos runtime state is gitignored
 
+stage_log="log/vamos.log"
+stage_error_log="log/vamos.error.log"
+stage_log_start=$(wc -l <"$stage_log" 2>/dev/null || echo 0)
+stage_error_log_start=$(wc -l <"$stage_error_log" 2>/dev/null || echo 0)
+
 just build --no-restart
 sleep 5
 curl -ksS -D /tmp/vamos-stage.headers https://stage.workspaces.creative-mode.ai/login \
   -o /tmp/vamos-stage-login.html -m 20
 head -10 /tmp/vamos-stage.headers
 rg -n "<title>|<h1" /tmp/vamos-stage-login.html
+
+stage_db=".vamos/run/agents.db"
+test -f "$stage_db"
+scripts/workspace-db-verify/verify.sh --database-path "$stage_db" --format text
+
+stage_fresh=/tmp/vamos-stage-fresh.log
+{ tail -n +$((stage_log_start + 1)) "$stage_log" 2>/dev/null || true; tail -n +$((stage_error_log_start + 1)) "$stage_error_log" 2>/dev/null || true; } | tee "$stage_fresh"
+rg -n "workspace_sync_refresh_complete|workspace sync.*complete|SyncWorkspaces" "$stage_fresh"
+if rg -n "FOREIGN KEY constraint failed|UNIQUE constraint failed" "$stage_fresh"; then
+  echo "hard workspace DB constraint failure in fresh stage logs" >&2
+  exit 1
+fi
+if rg -n "SQLITE_BUSY|database is locked" "$stage_fresh"; then
+  rg -n "workspace_sync_refresh_complete|workspace sync.*complete|SyncWorkspaces" "$stage_fresh" >/dev/null
+fi
 ```
 
 Success criteria:
@@ -208,6 +228,10 @@ Success criteria:
 - `../vamos` is the durable stage lane checkout for this host setup.
 - `just build --no-restart` succeeds and the workspace restart/start hook does not fail.
 - `https://stage.workspaces.creative-mode.ai/login` returns HTTP 200 or expected auth redirect, **not** 503.
+- Stage `.vamos/run/agents.db` passes `scripts/workspace-db-verify/verify.sh`.
+- Fresh stage logs after the build/restart window contain workspace sync success evidence.
+- Fresh `FOREIGN KEY constraint failed` or `UNIQUE constraint failed` lines block immediately.
+- Fresh `SQLITE_BUSY` / `database is locked` lines are tolerated only when followed by workspace sync success in the same fresh window.
 - If the authenticated main manager switches to stage while stage is already running, the redirect should be immediate; if stage was stopped, the manager should auto-start it and then redirect. If stage cannot start, the main manager should route to `/workspaces/errors?workspace=stage` instead of a dead stage host.
 
 If any stage verification step fails, stop here. Do **not** fast-forward `../vamos-main` and do **not** push merged runtime commits to `origin/main` until stage is healthy.
@@ -241,6 +265,11 @@ git merge-base --is-ancestor HEAD FETCH_HEAD
 git update-ref refs/heads/main FETCH_HEAD
 git read-tree --reset -u HEAD
 
+main_log="log/vamos.log"
+main_error_log="log/vamos.error.log"
+main_log_start=$(wc -l <"$main_log" 2>/dev/null || echo 0)
+main_error_log_start=$(wc -l <"$main_error_log" 2>/dev/null || echo 0)
+
 just build --no-restart
 just install-systemd
 systemctl --user daemon-reload
@@ -271,8 +300,23 @@ curl -ksS -D /tmp/vamos-main.headers https://main.workspaces.creative-mode.ai/lo
 head -10 /tmp/vamos-main.headers
 rg -n "<title>|<h1" /tmp/vamos-main-login.html
 
-tail -80 ../cn-agents-main/log/vamos.error.log
-tail -80 ../cn-agents-main/log/vamos.log
+main_db=".vamos/run/agents.db"
+test -f "$main_db"
+../vamos-main/scripts/workspace-db-verify/verify.sh --database-path "$main_db" --format text
+
+main_fresh=/tmp/vamos-main-fresh.log
+{ tail -n +$((main_log_start + 1)) "$main_log" 2>/dev/null || true; tail -n +$((main_error_log_start + 1)) "$main_error_log" 2>/dev/null || true; } | tee "$main_fresh"
+rg -n "workspace_sync_refresh_complete|workspace sync.*complete|SyncWorkspaces" "$main_fresh"
+if rg -n "FOREIGN KEY constraint failed|UNIQUE constraint failed" "$main_fresh"; then
+  echo "hard workspace DB constraint failure in fresh main logs" >&2
+  exit 1
+fi
+if rg -n "SQLITE_BUSY|database is locked" "$main_fresh"; then
+  rg -n "workspace_sync_refresh_complete|workspace sync.*complete|SyncWorkspaces" "$main_fresh" >/dev/null
+fi
+
+tail -80 "$main_error_log"
+tail -80 "$main_log"
 ```
 
 Success criteria:
@@ -280,6 +324,10 @@ Success criteria:
 - HTTP 200 or expected auth redirect for the tested route.
 - Page content reflects expected app config/feature.
 - `vamos.service` remains active after the request.
+- Browser-visible main `.vamos/run/agents.db` passes `../vamos-main/scripts/workspace-db-verify/verify.sh`.
+- Fresh main logs after the rebuild/restart window contain workspace sync success evidence.
+- Fresh `FOREIGN KEY constraint failed` or `UNIQUE constraint failed` lines block immediately.
+- Fresh `SQLITE_BUSY` / `database is locked` lines are tolerated only when followed by workspace sync success in the same fresh window.
 - No fresh startup errors in `log/vamos.error.log`.
 
 ## Step 9: Push
