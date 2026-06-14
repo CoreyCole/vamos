@@ -47,7 +47,7 @@ This is the standard Vamos verification entrypoint. `/q-verify` must read this f
      go test ./pkg/e2e/tests -list Test
      go test ./pkg/e2e/vamos ./pkg/e2e/tests -run '^$'
      ```
-     Then run the single live Pi/Temporal continuation story with `VAMOS_E2E_QRSPI_PROMPT_OVERRIDE=1 just e2e --base-url <feature-url> --story agentchat-qrspi-question-completion-auto-starts-design`; keep cheaper card/reload/sidebar coverage in fixture stories.
+     Then run the single live Pi/Temporal continuation story with `VAMOS_E2E_QRSPI_PROMPT_OVERRIDE=1 just e2e --base-url <feature-url> --story agent-chat-q-r-s-p-i-question-completion-auto-starts-design`; keep cheaper card/reload/sidebar coverage in fixture stories.
 
 1. **Manual human testing**
 

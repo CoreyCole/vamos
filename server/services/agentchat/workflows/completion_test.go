@@ -151,6 +151,26 @@ func TestApplyQRSPIWorkspaceResultRejectsPlanningCheckoutCwd(t *testing.T) {
 	}
 }
 
+func TestEffectiveNodeCwdIncludesImplementationVerification(t *testing.T) {
+	t.Parallel()
+
+	state := wruntime.State{ExecutionCwd: "/tmp/vamos-implementation"}
+	for _, nodeID := range []wruntime.NodeID{
+		qrspi.NodeImplement,
+		qrspi.NodeReviewImplementation,
+		qrspi.NodeVerify,
+		qrspi.NodeHumanReviewImplementation,
+		qrspi.NodeDone,
+	} {
+		if got := effectiveNodeCwd(state, nodeID); got != state.ExecutionCwd {
+			t.Fatalf("effectiveNodeCwd(%q) = %q, want %q", nodeID, got, state.ExecutionCwd)
+		}
+	}
+	if got := effectiveNodeCwd(state, qrspi.NodePlan); got != "" {
+		t.Fatalf("effectiveNodeCwd(plan) = %q, want empty planning cwd", got)
+	}
+}
+
 func TestOnRunCompleteIgnoresDuplicateWorkflowResult(t *testing.T) {
 	def, err := qrspi.Definition()
 	if err != nil {

@@ -11,6 +11,7 @@ import (
 	"strings"
 	"sync"
 	"syscall"
+	"time"
 )
 
 type childProcess struct {
@@ -246,4 +247,85 @@ func processEnv(pid int) (map[string]string, error) {
 		}
 	}
 	return out, nil
+}
+
+func processCmdline(pid int) (string, error) {
+	data, err := os.ReadFile(filepath.Join("/proc", strconv.Itoa(pid), "cmdline"))
+	if err != nil {
+		return "", err
+	}
+	return strings.ReplaceAll(strings.TrimRight(string(data), "\x00"), "\x00", " "), nil
+}
+
+func workspaceRuntimePIDs(ws Workspace, paths WorkspaceRuntimePaths) map[BundleComponent][]int {
+	out := map[BundleComponent][]int{}
+	entries, err := os.ReadDir("/proc")
+	if err != nil {
+		return out
+	}
+	self := os.Getpid()
+	temporalDB := filepath.Clean(paths.TemporalDB)
+	webBinary := filepath.Clean(filepath.Join(ws.PackagePath, "agents-server"))
+	for _, entry := range entries {
+		if !entry.IsDir() {
+			continue
+		}
+		pid, err := strconv.Atoi(entry.Name())
+		if err != nil || pid <= 0 || pid == self {
+			continue
+		}
+		cmdline, err := processCmdline(pid)
+		if err != nil || cmdline == "" {
+			continue
+		}
+		switch {
+		case temporalDB != "." && strings.Contains(cmdline, temporalDB):
+			out[ComponentTemporal] = append(out[ComponentTemporal], pid)
+		case webBinary != "." && strings.Contains(cmdline, webBinary):
+			out[ComponentWeb] = append(out[ComponentWeb], pid)
+		case strings.Contains(cmdline, "dist/pkg/agents/temporal/workers/ts/worker.js") &&
+			processMatchesWorkspace(ws, pid):
+			out[ComponentTSWorker] = append(out[ComponentTSWorker], pid)
+		}
+	}
+	return out
+}
+
+func terminateProcessGroup(ctx context.Context, component BundleComponent, pid int) error {
+	if pid <= 0 || !processAlive(pid) {
+		return nil
+	}
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	default:
+	}
+	_ = syscall.Kill(-pid, syscall.SIGTERM)
+	if waitForPIDExit(ctx, pid, componentStopGracePeriod) {
+		return nil
+	}
+	_ = syscall.Kill(-pid, syscall.SIGKILL)
+	if waitForPIDExit(ctx, pid, componentKillWaitPeriod) {
+		return nil
+	}
+	return fmt.Errorf("stop %s: process %d did not exit", component, pid)
+}
+
+func waitForPIDExit(ctx context.Context, pid int, timeout time.Duration) bool {
+	deadline := time.NewTimer(timeout)
+	defer deadline.Stop()
+	ticker := time.NewTicker(50 * time.Millisecond)
+	defer ticker.Stop()
+	for {
+		if !processAlive(pid) {
+			return true
+		}
+		select {
+		case <-ctx.Done():
+			return false
+		case <-deadline.C:
+			return !processAlive(pid)
+		case <-ticker.C:
+		}
+	}
 }

@@ -82,6 +82,7 @@ type Service struct {
 	detailCollapseLineLimit     int
 	liveMu                      sync.RWMutex
 	liveThreads                 map[string]*liveThreadState
+	callbackWriteMu             sync.Mutex
 	liveFlush                   *agentworkspace.LiveFlushLoop
 	appendWorkspaceEventForTest func(context.Context, *db.Queries, AppendWorkspaceEventInput) (db.WorkspaceEvent, error)
 	workflowService             workflowCompletionService
@@ -2375,6 +2376,8 @@ func (s *Service) ApplyLiveAgentEvent(
 	if !ok {
 		return nil
 	}
+	s.callbackWriteMu.Lock()
+	defer s.callbackWriteMu.Unlock()
 	_, err := appendSemanticEventTx(ctx, s.queries, input)
 	return err
 }
@@ -2521,6 +2524,9 @@ func (s *Service) BuildSnapshot(
 }
 
 func (s *Service) ApplyCheckpoint(ctx context.Context, cp conversation.Checkpoint) error {
+	s.callbackWriteMu.Lock()
+	defer s.callbackWriteMu.Unlock()
+
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return err
@@ -2651,8 +2657,10 @@ func (s *Service) ApplyCheckpoint(ctx context.Context, cp conversation.Checkpoin
 }
 
 func (s *Service) FinalizeRun(ctx context.Context, result conversation.RunResult) error {
+	s.callbackWriteMu.Lock()
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
+		s.callbackWriteMu.Unlock()
 		return err
 	}
 	defer func() { _ = tx.Rollback() }()
@@ -2660,11 +2668,14 @@ func (s *Service) FinalizeRun(ctx context.Context, result conversation.RunResult
 	q := s.queries.WithTx(tx)
 	run, event, err := s.finalizeRunInTx(ctx, q, result)
 	if err != nil {
+		s.callbackWriteMu.Unlock()
 		return err
 	}
 	if err := tx.Commit(); err != nil {
+		s.callbackWriteMu.Unlock()
 		return err
 	}
+	s.callbackWriteMu.Unlock()
 
 	s.resetLiveThread(run.ThreadID)
 	if event != nil {
@@ -2747,8 +2758,10 @@ func (s *Service) finalizeRunInTx(
 }
 
 func (s *Service) FailRun(ctx context.Context, failure conversation.RunFailure) error {
+	s.callbackWriteMu.Lock()
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
+		s.callbackWriteMu.Unlock()
 		return err
 	}
 	defer func() { _ = tx.Rollback() }()
@@ -2756,11 +2769,14 @@ func (s *Service) FailRun(ctx context.Context, failure conversation.RunFailure) 
 	q := s.queries.WithTx(tx)
 	run, event, err := s.failRunInTx(ctx, q, failure)
 	if err != nil {
+		s.callbackWriteMu.Unlock()
 		return err
 	}
 	if err := tx.Commit(); err != nil {
+		s.callbackWriteMu.Unlock()
 		return err
 	}
+	s.callbackWriteMu.Unlock()
 
 	s.resetLiveThread(run.ThreadID)
 	if event != nil {
@@ -2848,8 +2864,10 @@ func (s *Service) FailRunIfRunning(
 	ctx context.Context,
 	failure conversation.RunFailure,
 ) error {
+	s.callbackWriteMu.Lock()
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
+		s.callbackWriteMu.Unlock()
 		return err
 	}
 	defer func() { _ = tx.Rollback() }()
@@ -2857,11 +2875,14 @@ func (s *Service) FailRunIfRunning(
 	q := s.queries.WithTx(tx)
 	run, event, err := s.failRunIfRunningInTx(ctx, q, failure)
 	if err != nil {
+		s.callbackWriteMu.Unlock()
 		return err
 	}
 	if err := tx.Commit(); err != nil {
+		s.callbackWriteMu.Unlock()
 		return err
 	}
+	s.callbackWriteMu.Unlock()
 
 	s.resetLiveThread(run.ThreadID)
 	if event != nil {

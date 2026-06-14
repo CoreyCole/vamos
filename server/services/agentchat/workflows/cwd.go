@@ -54,6 +54,7 @@ func effectiveNodeCwd(state wruntime.State, nodeID wruntime.NodeID) string {
 	switch nodeID {
 	case qrspi.NodeImplement,
 		qrspi.NodeReviewImplementation,
+		qrspi.NodeVerify,
 		qrspi.NodeHumanReviewImplementation,
 		qrspi.NodeDone:
 		return strings.TrimSpace(state.ExecutionCwd)

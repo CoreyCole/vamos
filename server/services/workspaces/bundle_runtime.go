@@ -52,6 +52,9 @@ func (r *WorkspaceRuntime) StartBundle(
 	if err := EnsureRuntimeDirs(paths); err != nil {
 		return ws, nil, err
 	}
+	if err := r.stopWorkspaceRuntimeProcesses(ctx, ws, paths, nil, nil); err != nil {
+		return ws, nil, err
+	}
 	ports, err := r.allocatePorts()
 	if err != nil {
 		return ws, nil, err
@@ -238,6 +241,9 @@ func (r *WorkspaceRuntime) StopBundle(
 			stopErr = fmt.Errorf("stop %s: %w", component, err)
 		}
 	}
+	if err := r.stopWorkspaceRuntimeProcesses(ctx, ws, paths, nil, nil); err != nil && stopErr == nil {
+		stopErr = err
+	}
 	_ = os.Remove(paths.WebPID)
 	_ = os.Remove(paths.TemporalPID)
 	_ = os.Remove(paths.TSWorkerPID)
@@ -324,6 +330,9 @@ func (r *WorkspaceRuntime) RestartComponents(
 			RestartToken: rt.RestartToken,
 		},
 	); err != nil {
+		return ws, handles, err
+	}
+	if err := r.stopWorkspaceRuntimeProcesses(ctx, ws, paths, handles, ws.PIDs); err != nil {
 		return ws, handles, err
 	}
 	if handles == nil {
@@ -558,6 +567,38 @@ func (r *WorkspaceRuntime) stopStarted(ctx context.Context, handles BundleHandle
 		); err != nil &&
 			stopErr == nil {
 			stopErr = err
+		}
+	}
+	return stopErr
+}
+
+func (r *WorkspaceRuntime) stopWorkspaceRuntimeProcesses(
+	ctx context.Context,
+	ws Workspace,
+	paths WorkspaceRuntimePaths,
+	preserveHandles BundleHandles,
+	preservePIDs map[BundleComponent]int,
+) error {
+	seen := map[int]bool{}
+	for _, handle := range preserveHandles {
+		if pid := handle.pid(); pid != 0 {
+			seen[pid] = true
+		}
+	}
+	for _, pid := range preservePIDs {
+		if pid != 0 {
+			seen[pid] = true
+		}
+	}
+	var stopErr error
+	for component, pids := range workspaceRuntimePIDs(ws, paths) {
+		for _, pid := range pids {
+			if seen[pid] || !processMatchesWorkspace(ws, pid) {
+				continue
+			}
+			if err := terminateProcessGroup(ctx, component, pid); err != nil && stopErr == nil {
+				stopErr = err
+			}
 		}
 	}
 	return stopErr
