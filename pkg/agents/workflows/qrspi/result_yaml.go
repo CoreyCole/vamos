@@ -197,7 +197,10 @@ func (QRSPIResultParser) CorrectionPrompt(err error, attempt int) string {
 	)
 }
 
-var fencedYAMLPattern = regexp.MustCompile("(?s)```(?:yaml|yml)\\s*\\n(.*?)\\n?```")
+var (
+	fencedYAMLPattern      = regexp.MustCompile("(?s)```(?:yaml|yml)\\s*\\n(.*?)\\n?```")
+	qrspiResultRootPattern = regexp.MustCompile(`(?m)^\s*qrspi_result\s*:`)
+)
 
 func ExtractQRSPIResultYAML(output string) (string, error) {
 	return extractQRSPIResultYAML(output)
@@ -209,7 +212,7 @@ func extractQRSPIResultYAML(output string) (string, error) {
 		if candidate == "" {
 			continue
 		}
-		if hasQRSPIResultRoot(candidate) {
+		if hasQRSPIResultRoot(candidate) || qrspiResultRootPattern.MatchString(candidate) {
 			return candidate, nil
 		}
 	}

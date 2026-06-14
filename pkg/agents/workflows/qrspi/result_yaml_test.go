@@ -1,6 +1,7 @@
 package qrspi
 
 import (
+	"encoding/json"
 	"errors"
 	"os"
 	"strings"
@@ -118,6 +119,61 @@ func TestQRSPIResultParserWholeOutputYAMLOnlyWhenUnambiguous(t *testing.T) {
 	_, err = (QRSPIResultParser{}).Parse("other: true\n"+validResultYAMLBody("plan", string(wruntime.OutcomeComplete)), wruntime.ParseContext{ExpectedNodeID: NodePlan})
 	if err == nil || !strings.Contains(err.Error(), "missing fenced YAML qrspi_result") {
 		t.Fatalf("Parse() error = %v, want ambiguous whole-output rejection", err)
+	}
+}
+
+func TestQRSPIResultParserFindsLaterFencedResult(t *testing.T) {
+	output := strings.Join([]string{
+		"```yaml",
+		"not_qrspi: true",
+		"```",
+		"Some prose between blocks.",
+		validResultYAML("plan"),
+	}, "\n")
+
+	got, err := (QRSPIResultParser{}).Parse(output, wruntime.ParseContext{ExpectedNodeID: NodePlan})
+	if err != nil {
+		t.Fatalf("Parse() error = %v", err)
+	}
+	if got.(Result).Stage != string(NodePlan) {
+		t.Fatalf("stage = %q, want %q", got.(Result).Stage, NodePlan)
+	}
+}
+
+func TestQRSPIResultParserInvalidFencedResultReturnsConcreteError(t *testing.T) {
+	output := strings.Join([]string{
+		"```yaml",
+		"qrspi_result:",
+		"  stage: [not: valid",
+		"```",
+	}, "\n")
+
+	_, err := (QRSPIResultParser{}).Parse(output, wruntime.ParseContext{ExpectedNodeID: NodePlan})
+	if err == nil || !strings.Contains(err.Error(), "parse qrspi result YAML") {
+		t.Fatalf("Parse() error = %v, want concrete YAML parse error", err)
+	}
+}
+
+func TestQRSPIResultParserProjectsAdvanceMode(t *testing.T) {
+	yamlText := strings.Replace(validResultYAML("question"), `advance_mode: "guided"`, `advance_mode: "discuss"`, 1)
+	parsedAny, err := (QRSPIResultParser{}).Parse(yamlText, wruntime.ParseContext{ExpectedNodeID: NodeQuestion})
+	if err != nil {
+		t.Fatalf("Parse() error = %v", err)
+	}
+	parsed := parsedAny.(Result)
+	if parsed.Policy.AdvanceMode != AdvanceModeDiscuss {
+		t.Fatalf("parsed advance_mode = %q, want %q", parsed.Policy.AdvanceMode, AdvanceModeDiscuss)
+	}
+	result, err := (QRSPIResultConverter{}).ToWorkflowResult(parsed, wruntime.ParseContext{WorkflowType: string(AgentChatWorkflowType)})
+	if err != nil {
+		t.Fatalf("ToWorkflowResult() error = %v", err)
+	}
+	var policy Policy
+	if err := json.Unmarshal(result.Policy, &policy); err != nil {
+		t.Fatalf("decode policy: %v", err)
+	}
+	if policy.AdvanceMode != AdvanceModeDiscuss {
+		t.Fatalf("projected advanceMode = %q, want %q", policy.AdvanceMode, AdvanceModeDiscuss)
 	}
 }
 
