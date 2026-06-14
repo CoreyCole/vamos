@@ -1334,6 +1334,10 @@ func main() {
 	// Static files. Resolve relative to the runtime package when the host
 	// binary is launched from a wrapper checkout with a different working dir.
 	staticRoot := resolveStaticRoot()
+	_, datastarProErr := os.Stat(filepath.Join(staticRoot, "js", "datastar-pro-v1.js"))
+	layouts.SetDatastarProAvailable(datastarProErr == nil)
+	_, datastarInspectorErr := os.Stat(filepath.Join(staticRoot, "js", "datastar-inspector.js"))
+	layouts.SetDatastarInspectorAvailable(datastarInspectorErr == nil)
 	e.Static("/static", staticRoot)
 	e.Static("/css", filepath.Join(staticRoot, "css"))
 	e.Static("/js", filepath.Join(staticRoot, "js"))

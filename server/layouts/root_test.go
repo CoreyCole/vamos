@@ -7,11 +7,92 @@ import (
 	"bytes"
 	"context"
 	"io"
+	"os"
 	"strings"
 	"testing"
 
 	"github.com/a-h/templ"
 )
+
+func TestRootLoadsDatastarPolyfillsWhenProUnavailable(t *testing.T) {
+	SetDatastarProAvailable(false)
+
+	body := renderLayoutComponent(t, Root(RootArgs{}))
+	for _, want := range []string{
+		"Datastar Pro asset unavailable; falling back to public Datastar bundle",
+		"https://cdn.jsdelivr.net/gh/starfederation/datastar@v1.0.1/bundles/datastar.js",
+		"/js/vamos-datastar-polyfills.js",
+		"polyfills.install(datastar)",
+	} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("Root() missing %q in:\n%s", want, body)
+		}
+	}
+	if strings.Contains(body, `src="/js/datastar-pro-v1.js"`) {
+		t.Fatalf("Root() loaded Pro asset when fallback expected:\n%s", body)
+	}
+}
+
+func TestRootLoadsDatastarProDirectlyWhenAvailable(t *testing.T) {
+	SetDatastarProAvailable(true)
+	t.Cleanup(func() { SetDatastarProAvailable(false) })
+
+	body := renderLayoutComponent(t, Root(RootArgs{}))
+	for _, want := range []string{
+		`src="/js/datastar-pro-v1.js"`,
+	} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("Root() missing %q in:\n%s", want, body)
+		}
+	}
+	if strings.Contains(body, "falling back to public Datastar bundle") {
+		t.Fatalf("Root() rendered fallback when Pro expected:\n%s", body)
+	}
+}
+
+func TestRootSkipsDatastarInspectorWhenAssetUnavailable(t *testing.T) {
+	SetDatastarInspectorAvailable(false)
+
+	body := renderLayoutComponent(t, Root(RootArgs{}))
+	if strings.Contains(body, `/js/datastar-inspector.js`) {
+		t.Fatalf("Root() rendered missing inspector asset:\n%s", body)
+	}
+}
+
+func TestRootLoadsDatastarInspectorWhenAssetAvailable(t *testing.T) {
+	SetDatastarInspectorAvailable(true)
+	t.Cleanup(func() { SetDatastarInspectorAvailable(false) })
+
+	body := renderLayoutComponent(t, Root(RootArgs{}))
+	if !strings.Contains(body, `/js/datastar-inspector.js`) {
+		t.Fatalf("Root() missing inspector asset when available:\n%s", body)
+	}
+}
+
+func TestVamosDatastarPolyfillAssetContainsSafetyContracts(t *testing.T) {
+	t.Parallel()
+
+	contents, err := os.ReadFile("../../static/js/vamos-datastar-polyfills.js")
+	if err != nil {
+		t.Fatalf("ReadFile(vamos-datastar-polyfills.js) error = %v", err)
+	}
+	js := string(contents)
+	for _, want := range []string{
+		"export function install(datastar)",
+		"installClipboard(datastar)",
+		"installReplaceURL(datastar)",
+		"export function resolveSameOriginURL",
+		"url.origin !== window.location.origin",
+		"history.replaceState",
+		"MutationObserver",
+		"@clipboard",
+		"stopImmediatePropagation",
+	} {
+		if !strings.Contains(js, want) {
+			t.Fatalf("polyfill missing %q in:\n%s", want, js)
+		}
+	}
+}
 
 func TestHeaderVisibleNavIsMinimal(t *testing.T) {
 	t.Parallel()

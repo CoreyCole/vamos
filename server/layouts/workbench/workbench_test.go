@@ -522,7 +522,7 @@ func TestWorkbenchResizeJSShowsHandlesForVisibleAdjacentRegions(t *testing.T) {
 		"before && after && isVisible(before) && isVisible(after)",
 		"const content = visible.filter((region) => region !== navigation)",
 		"if (!navigation || content.length === 0) return null",
-		"const datastarModule = import(\"/js/datastar-pro-v1.js\").catch",
+		"const datastarModule =",
 		"https://cdn.jsdelivr.net/gh/starfederation/datastar@v1.0.1/bundles/datastar.js",
 		"collapseRegion(root, navigationGroup.navigation)",
 		"regionSlot(region) !== \"primary\"",

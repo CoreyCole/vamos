@@ -54,10 +54,20 @@ type Branding struct {
 type GitHubLinkProvider func(currentPath string) string
 
 var (
-	workspaceNavProvider WorkspaceNavProvider
-	currentBranding      = Branding{AppName: "Vamos"}
-	githubLinkProvider   GitHubLinkProvider
+	workspaceNavProvider       WorkspaceNavProvider
+	currentBranding            = Branding{AppName: "Vamos"}
+	githubLinkProvider         GitHubLinkProvider
+	datastarProAvailable       bool
+	datastarInspectorAvailable bool
 )
+
+func SetDatastarProAvailable(available bool) {
+	datastarProAvailable = available
+}
+
+func SetDatastarInspectorAvailable(available bool) {
+	datastarInspectorAvailable = available
+}
 
 func SetBranding(branding Branding) {
 	if strings.TrimSpace(branding.AppName) != "" {
@@ -268,23 +278,25 @@ templ Root(args RootArgs) {
 				document.addEventListener("DOMContentLoaded", syncAppViewportShell);
 			</script>
 			<!-- Datastar library for reactive components -->
-			<script type="module">
-				import("/js/datastar-pro-v1.js").catch(async (error) => {
+			if datastarProAvailable {
+				<script type="module" src="/js/datastar-pro-v1.js"></script>
+			} else {
+				<script type="module">
 					console.warn(
 						"Datastar Pro asset unavailable; falling back to public Datastar bundle",
-						error,
 					);
 					const datastar = await import(
 						"https://cdn.jsdelivr.net/gh/starfederation/datastar@v1.0.1/bundles/datastar.js"
 					);
 					const polyfills = await import("/js/vamos-datastar-polyfills.js");
 					polyfills.install(datastar);
-					return datastar;
-				});
-			</script>
+				</script>
+			}
 			<meta name="view-transition" content="same-origin"/>
-			<!-- Datastar Inspector diagnostics. Hidden by default; toggle from the avatar menu. -->
-			<script type="module" defer src="/js/datastar-inspector.js"></script>
+			if datastarInspectorAvailable {
+				<!-- Datastar Inspector diagnostics. Hidden by default; toggle from the avatar menu. -->
+				<script type="module" defer src="/js/datastar-inspector.js"></script>
+			}
 		</head>
 		<body class="fixed inset-0 overflow-hidden bg-background font-sans antialiased" data-signals={ fmt.Sprintf(`{"theme": "%s", "_datastarInspectorEnabled": false}`, theme) }>
 			<div id="app-viewport-shell" class="fixed inset-x-0 top-0 flex h-[100svh] min-h-0 flex-col overflow-hidden">

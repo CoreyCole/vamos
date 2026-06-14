@@ -1,10 +1,5 @@
-const datastarModule = import("/js/datastar-pro-v1.js").catch((error) => {
-  console.warn(
-    "Datastar Pro asset unavailable; falling back to public Datastar bundle",
-    error,
-  );
-  return import("https://cdn.jsdelivr.net/gh/starfederation/datastar@v1.0.1/bundles/datastar.js");
-});
+const datastarModule =
+  import("https://cdn.jsdelivr.net/gh/starfederation/datastar@v1.0.1/bundles/datastar.js");
 
 async function mergeWorkbenchPaths(patches) {
   const { mergePaths } = await datastarModule;
