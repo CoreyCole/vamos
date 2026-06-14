@@ -11,6 +11,7 @@ import (
 
 type WorkspaceMetadata struct {
 	Slug         string
+	ProjectID    string
 	CheckoutPath string
 	ManagerURL   string
 	RestartToken string `json:"-"`
@@ -32,8 +33,9 @@ func WriteMetadata(path string, meta WorkspaceMetadata) error {
 		databasePath = RuntimePaths(meta.CheckoutPath).AgentsDB
 	}
 	content := fmt.Sprintf(
-		"VAMOS_WORKSPACE_SLUG=%s\nVAMOS_WORKSPACE_CHECKOUT=%s\nVAMOS_WORKSPACE_MANAGER_URL=%s\nVAMOS_WORKSPACE_RESTART_TOKEN=%s\nVAMOS_DATABASE_PATH=%s\nVAMOS_WORKSPACE_PID=%d\nVAMOS_WORKSPACE_PORT=%d\n",
+		"VAMOS_WORKSPACE_SLUG=%s\nVAMOS_WORKSPACE_PROJECT_ID=%s\nVAMOS_WORKSPACE_CHECKOUT=%s\nVAMOS_WORKSPACE_MANAGER_URL=%s\nVAMOS_WORKSPACE_RESTART_TOKEN=%s\nVAMOS_DATABASE_PATH=%s\nVAMOS_WORKSPACE_PID=%d\nVAMOS_WORKSPACE_PORT=%d\n",
 		shellValue(meta.Slug),
+		shellValue(meta.ProjectID),
 		shellValue(meta.CheckoutPath),
 		shellValue(meta.ManagerURL),
 		shellValue(meta.RestartToken),
@@ -72,6 +74,7 @@ func ReadMetadata(path string) (WorkspaceMetadata, error) {
 	port, _ := strconv.Atoi(vals["VAMOS_WORKSPACE_PORT"])
 	return WorkspaceMetadata{
 		Slug:         vals["VAMOS_WORKSPACE_SLUG"],
+		ProjectID:    vals["VAMOS_WORKSPACE_PROJECT_ID"],
 		CheckoutPath: vals["VAMOS_WORKSPACE_CHECKOUT"],
 		ManagerURL:   vals["VAMOS_WORKSPACE_MANAGER_URL"],
 		RestartToken: vals["VAMOS_WORKSPACE_RESTART_TOKEN"],

@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"database/sql"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -33,6 +34,29 @@ const (
 	ImplWorkspaceEnvActionSkipped  ImplWorkspaceEnvAction = "skipped"
 )
 
+type WorkspaceDiagnosticSource string
+
+const (
+	WorkspaceDiagnosticSourceSync WorkspaceDiagnosticSource = "scheduled_sync_diagnostics"
+)
+
+type WorkspaceDiagnosticSeverity string
+
+const (
+	WorkspaceDiagnosticWarning WorkspaceDiagnosticSeverity = "warning"
+)
+
+type WorkspaceDiagnostic struct {
+	Source        WorkspaceDiagnosticSource   `json:"source"`
+	Severity      WorkspaceDiagnosticSeverity `json:"severity"`
+	Code          string                      `json:"code"`
+	Message       string                      `json:"message"`
+	Detail        string                      `json:"detail,omitempty"`
+	ProjectID     string                      `json:"project_id,omitempty"`
+	WorkspaceSlug string                      `json:"workspace_slug,omitempty"`
+	CheckoutPath  string                      `json:"checkout_path,omitempty"`
+}
+
 type ImplWorkspaceSyncer struct {
 	Queries *db.Queries
 	Now     func() time.Time
@@ -47,24 +71,38 @@ type ImplWorkspaceSyncInput struct {
 }
 
 type ImplWorkspaceSyncResult struct {
-	Scanned     int
-	Discovered  int
-	Upserted    int
-	RepairedEnv int
-	CleanedUp   int
-	Merged      int
-	Changed     bool
+	Scanned     int                   `json:"scanned"`
+	Discovered  int                   `json:"discovered"`
+	Upserted    int                   `json:"upserted"`
+	RepairedEnv int                   `json:"repaired_env"`
+	CleanedUp   int                   `json:"cleaned_up"`
+	Merged      int                   `json:"merged"`
+	Changed     bool                  `json:"changed"`
+	Warnings    []WorkspaceDiagnostic `json:"warnings,omitempty"`
 }
 
 func (s *ImplWorkspaceSyncer) Sync(
 	ctx context.Context,
 	input ImplWorkspaceSyncInput,
-) (ImplWorkspaceSyncResult, error) {
+) (result ImplWorkspaceSyncResult, err error) {
 	if s == nil || s.Queries == nil {
 		return ImplWorkspaceSyncResult{}, errors.New(
 			"impl workspace syncer requires queries",
 		)
 	}
+	started := s.now()
+	defer func() {
+		recordErr := s.recordSyncDiagnostic(ctx, input, started, result, err)
+		if recordErr == nil {
+			return
+		}
+		if err != nil {
+			err = fmt.Errorf("%w; additionally failed to record workspace sync diagnostic: %v", err, recordErr)
+			return
+		}
+		err = recordErr
+	}()
+
 	discoveryProjectID := firstNonEmpty(input.Discovery.ProjectID, input.ProjectID)
 	discovered, err := Discover(DiscoveryConfig{
 		ProjectID:           discoveryProjectID,
@@ -86,7 +124,7 @@ func (s *ImplWorkspaceSyncer) Sync(
 		return ImplWorkspaceSyncResult{}, err
 	}
 
-	result := ImplWorkspaceSyncResult{
+	result = ImplWorkspaceSyncResult{
 		Scanned:    len(discovered),
 		Discovered: len(discovered),
 	}
@@ -157,6 +195,16 @@ func (s *ImplWorkspaceSyncer) Sync(
 			}
 		}
 		if repairErr != nil {
+			result.Warnings = append(result.Warnings, WorkspaceDiagnostic{
+				Source:        WorkspaceDiagnosticSourceSync,
+				Severity:      WorkspaceDiagnosticWarning,
+				Code:          "workspace_env_repair_failed",
+				Message:       "Scheduled sync could not repair workspace.env.",
+				Detail:        repairErr.Error(),
+				ProjectID:     key.ProjectID,
+				WorkspaceSlug: key.Slug,
+				CheckoutPath:  ws.CheckoutPath,
+			})
 			if err := s.Queries.RecordImplWorkspaceEnvError(
 				ctx,
 				db.RecordImplWorkspaceEnvErrorParams{
@@ -170,16 +218,59 @@ func (s *ImplWorkspaceSyncer) Sync(
 		}
 	}
 
-	cleaned, merged, missingChanged, err := s.reconcileMissing(ctx, input, seen)
+	cleaned, merged, missingChanged, warnings, err := s.reconcileMissing(ctx, input, seen)
 	if err != nil {
 		return ImplWorkspaceSyncResult{}, err
 	}
 	result.CleanedUp = cleaned
 	result.Merged += merged
+	result.Warnings = append(result.Warnings, warnings...)
 	if cleaned > 0 || merged > 0 || missingChanged {
 		result.Changed = true
 	}
 	return result, nil
+}
+
+func (s *ImplWorkspaceSyncer) now() time.Time {
+	if s != nil && s.Now != nil {
+		return s.Now()
+	}
+	return time.Now()
+}
+
+func (s *ImplWorkspaceSyncer) recordSyncDiagnostic(ctx context.Context, input ImplWorkspaceSyncInput, started time.Time, result ImplWorkspaceSyncResult, syncErr error) error {
+	finished := s.now()
+	status := "ok"
+	errorText := ""
+	if syncErr != nil {
+		status = "error"
+		errorText = syncErr.Error()
+	}
+	warnings := result.Warnings
+	if warnings == nil {
+		warnings = []WorkspaceDiagnostic{}
+	}
+	warningsJSON, err := json.Marshal(warnings)
+	if err != nil {
+		return err
+	}
+	projectID := firstNonEmpty(input.Discovery.ProjectID, input.ProjectID)
+	return s.Queries.UpsertWorkspaceSyncDiagnostic(ctx, db.UpsertWorkspaceSyncDiagnosticParams{
+		ProjectID:    projectID,
+		SyncKind:     "impl_workspaces",
+		StartedAt:    started,
+		FinishedAt:   sql.NullTime{Time: finished, Valid: true},
+		Status:       status,
+		Error:        errorText,
+		Scanned:      int64(result.Scanned),
+		Discovered:   int64(result.Discovered),
+		Upserted:     int64(result.Upserted),
+		RepairedEnv:  int64(result.RepairedEnv),
+		Merged:       int64(result.Merged),
+		CleanedUp:    int64(result.CleanedUp),
+		Changed:      result.Changed,
+		WarningsJson: string(warningsJSON),
+	})
 }
 
 func ReconcileWorkspaceEnv(
@@ -196,6 +287,7 @@ func ReconcileWorkspaceEnv(
 	}
 	expected := WorkspaceMetadata{
 		Slug:         ws.Slug,
+		ProjectID:    ws.ProjectID,
 		CheckoutPath: ws.CheckoutPath,
 		ManagerURL:   managerURL,
 		RestartToken: restartToken,
@@ -224,6 +316,7 @@ func ReconcileWorkspaceEnv(
 
 func workspaceMetadataMatches(existing, expected WorkspaceMetadata) bool {
 	return strings.TrimSpace(existing.Slug) == strings.TrimSpace(expected.Slug) &&
+		strings.TrimSpace(existing.ProjectID) == strings.TrimSpace(expected.ProjectID) &&
 		cleanPathKey(existing.CheckoutPath) == cleanPathKey(expected.CheckoutPath) &&
 		strings.TrimSpace(
 			existing.ManagerURL,
@@ -502,10 +595,10 @@ func (s *ImplWorkspaceSyncer) reconcileMissing(
 	ctx context.Context,
 	input ImplWorkspaceSyncInput,
 	activeSlugs collections.Set[string],
-) (cleaned, merged int, changed bool, err error) {
+) (cleaned, merged int, changed bool, warnings []WorkspaceDiagnostic, err error) {
 	rows, err := s.Queries.ListImplWorkspaces(ctx, firstNonEmpty(input.Discovery.ProjectID, input.ProjectID))
 	if err != nil {
-		return 0, 0, false, err
+		return 0, 0, false, nil, err
 	}
 	configured := configuredCheckoutSlugs(input.Discovery)
 	for _, row := range rows {
@@ -536,7 +629,7 @@ func (s *ImplWorkspaceSyncer) reconcileMissing(
 				},
 			)
 			if err != nil {
-				return cleaned, merged, changed, err
+				return cleaned, merged, changed, warnings, err
 			}
 			merged += int(n)
 			changed = changed || n > 0
@@ -550,11 +643,23 @@ func (s *ImplWorkspaceSyncer) reconcileMissing(
 			MergeEvidence:         nullableString(proof.RiskReason),
 		})
 		if err != nil {
-			return cleaned, merged, changed, err
+			return cleaned, merged, changed, warnings, err
+		}
+		if n > 0 {
+			warnings = append(warnings, WorkspaceDiagnostic{
+				Source:        WorkspaceDiagnosticSourceSync,
+				Severity:      WorkspaceDiagnosticWarning,
+				Code:          "merge_proof_unknown",
+				Message:       "Scheduled sync could not prove this missing checkout is merged.",
+				Detail:        firstNonEmpty(proof.RiskReason, proof.Detail, "merge proof unavailable"),
+				ProjectID:     row.ProjectID,
+				WorkspaceSlug: row.WorkspaceSlug,
+				CheckoutPath:  row.CheckoutPath,
+			})
 		}
 		changed = changed || n > 0
 	}
-	return cleaned, merged, changed, nil
+	return cleaned, merged, changed, warnings, nil
 }
 
 func implWorkspaceSeenKey(key ImplWorkspaceKey) string {

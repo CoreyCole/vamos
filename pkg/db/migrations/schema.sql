@@ -300,6 +300,28 @@ WHERE plan_dir_rel IS NOT NULL ;
 CREATE UNIQUE INDEX IF NOT EXISTS idx_impl_workspaces_checkout_path
 ON impl_workspaces (checkout_path) ;
 
+CREATE TABLE IF NOT EXISTS workspace_sync_diagnostics (
+project_id TEXT NOT NULL DEFAULT '',
+sync_kind TEXT NOT NULL,
+started_at DATETIME NOT NULL,
+finished_at DATETIME,
+status TEXT NOT NULL CHECK (status IN ('running', 'ok', 'error')),
+error TEXT NOT NULL DEFAULT '',
+scanned INTEGER NOT NULL DEFAULT 0,
+discovered INTEGER NOT NULL DEFAULT 0,
+upserted INTEGER NOT NULL DEFAULT 0,
+repaired_env INTEGER NOT NULL DEFAULT 0,
+merged INTEGER NOT NULL DEFAULT 0,
+cleaned_up INTEGER NOT NULL DEFAULT 0,
+changed BOOLEAN NOT NULL DEFAULT false,
+warnings_json TEXT NOT NULL DEFAULT '[]',
+updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+PRIMARY KEY (project_id, sync_kind)
+) ;
+
+CREATE INDEX IF NOT EXISTS idx_workspace_sync_diagnostics_updated
+ON workspace_sync_diagnostics (project_id, updated_at DESC) ;
+
 CREATE TABLE IF NOT EXISTS plan_workspace_impl_bindings (
 plan_dir_rel TEXT NOT NULL REFERENCES plan_workspaces (plan_dir_rel),
 project_id TEXT NOT NULL DEFAULT '',

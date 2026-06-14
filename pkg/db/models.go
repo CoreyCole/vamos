@@ -536,3 +536,21 @@ type WorkspaceEvent struct {
 	EventKey    sql.NullString `json:"event_key"`
 	CreatedAt   time.Time      `json:"created_at"`
 }
+
+type WorkspaceSyncDiagnostic struct {
+	ProjectID    string       `json:"project_id"`
+	SyncKind     string       `json:"sync_kind"`
+	StartedAt    time.Time    `json:"started_at"`
+	FinishedAt   sql.NullTime `json:"finished_at"`
+	Status       string       `json:"status"`
+	Error        string       `json:"error"`
+	Scanned      int64        `json:"scanned"`
+	Discovered   int64        `json:"discovered"`
+	Upserted     int64        `json:"upserted"`
+	RepairedEnv  int64        `json:"repaired_env"`
+	Merged       int64        `json:"merged"`
+	CleanedUp    int64        `json:"cleaned_up"`
+	Changed      bool         `json:"changed"`
+	WarningsJson string       `json:"warnings_json"`
+	UpdatedAt    time.Time    `json:"updated_at"`
+}

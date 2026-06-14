@@ -3,6 +3,7 @@ package workspaces
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"os"
 	"os/exec"
@@ -418,9 +419,97 @@ func TestImplWorkspaceSyncerCreatesRowsAndWorkspaceEnv(t *testing.T) {
 	}
 
 	metadata := readImplSyncMetadata(t, featureCheckout)
-	if metadata.Slug != row.WorkspaceSlug || metadata.CheckoutPath != featureCheckout ||
+	if metadata.Slug != row.WorkspaceSlug || metadata.ProjectID != row.ProjectID || metadata.CheckoutPath != featureCheckout ||
 		metadata.ManagerURL != "https://main.workspaces.example.test" || metadata.RestartToken != "secret-token" {
 		t.Fatalf("metadata = %+v", metadata)
+	}
+}
+
+func TestImplWorkspaceSyncRecordsDiagnosticSuccess(t *testing.T) {
+	ctx := context.Background()
+	parent := t.TempDir()
+	mainCheckout := makeImplSyncCheckout(t, parent, "vamos")
+	featureCheckout := makeImplSyncCheckout(t, parent, "vamos-2026-06-07_20-29-40_workspace-status-debuggability")
+	queries := openImplSyncTestQueries(t)
+	now := time.Date(2026, 6, 14, 15, 0, 0, 0, time.UTC)
+
+	result, err := (&ImplWorkspaceSyncer{Queries: queries, Now: func() time.Time { return now }}).Sync(ctx, ImplWorkspaceSyncInput{
+		ProjectID: "github.com/coreycole/vamos",
+		Discovery: ImplWorkspaceDiscoveryConfig{
+			MainCheckoutPath: mainCheckout,
+			ParentDir:        parent,
+			Domain:           "workspaces.example.test",
+		},
+		ManagerURL:   "https://main.workspaces.example.test",
+		RestartToken: "secret-token",
+		TrunkBranch:  "main",
+	})
+	if err != nil {
+		t.Fatalf("Sync: %v", err)
+	}
+	if result.Upserted != 2 || result.RepairedEnv != 2 || len(result.Warnings) != 0 {
+		t.Fatalf("result = %+v, want two upserts, two env repairs, no warnings", result)
+	}
+
+	row, err := queries.GetWorkspaceSyncDiagnostic(ctx, db.GetWorkspaceSyncDiagnosticParams{ProjectID: "github.com/coreycole/vamos", SyncKind: "impl_workspaces"})
+	if err != nil {
+		t.Fatalf("GetWorkspaceSyncDiagnostic: %v", err)
+	}
+	if row.Status != "ok" || row.Error != "" || !row.FinishedAt.Valid {
+		t.Fatalf("diagnostic status/error/finished = %q/%q/%+v, want ok empty valid", row.Status, row.Error, row.FinishedAt)
+	}
+	if row.Scanned != 2 || row.Discovered != 2 || row.Upserted != 2 || row.RepairedEnv != 2 || !row.Changed {
+		t.Fatalf("diagnostic counts = %+v, want discovered/upserted/repaired/changed", row)
+	}
+	if row.WarningsJson != "[]" {
+		t.Fatalf("warnings_json = %q, want []", row.WarningsJson)
+	}
+	metadata := readImplSyncMetadata(t, featureCheckout)
+	if metadata.ProjectID != "github.com/coreycole/vamos" {
+		t.Fatalf("metadata project id = %q, want github.com/coreycole/vamos", metadata.ProjectID)
+	}
+}
+
+func TestImplWorkspaceSyncRecordsEnvRepairWarning(t *testing.T) {
+	ctx := context.Background()
+	parent := t.TempDir()
+	checkout := makeImplSyncCheckout(t, parent, "vamos-2026-06-07_20-29-40_workspace-status-debuggability")
+	queries := openImplSyncTestQueries(t)
+	metadataPath := WorkspaceMetadataPath(checkout)
+	if err := os.MkdirAll(metadataPath, 0o755); err != nil {
+		t.Fatalf("mkdir workspace.env path: %v", err)
+	}
+
+	result, err := (&ImplWorkspaceSyncer{Queries: queries}).Sync(ctx, ImplWorkspaceSyncInput{
+		ProjectID: "github.com/coreycole/vamos",
+		Discovery: ImplWorkspaceDiscoveryConfig{
+			ParentDir: parent,
+			Domain:    "workspaces.example.test",
+		},
+		ManagerURL:   "https://main.workspaces.example.test",
+		RestartToken: "secret-token",
+	})
+	if err != nil {
+		t.Fatalf("Sync: %v", err)
+	}
+	if len(result.Warnings) != 1 || result.Warnings[0].Code != "workspace_env_repair_failed" {
+		t.Fatalf("warnings = %+v, want workspace_env_repair_failed", result.Warnings)
+	}
+
+	row, err := queries.GetWorkspaceSyncDiagnostic(ctx, db.GetWorkspaceSyncDiagnosticParams{ProjectID: "github.com/coreycole/vamos", SyncKind: "impl_workspaces"})
+	if err != nil {
+		t.Fatalf("GetWorkspaceSyncDiagnostic: %v", err)
+	}
+	var warnings []WorkspaceDiagnostic
+	if err := json.Unmarshal([]byte(row.WarningsJson), &warnings); err != nil {
+		t.Fatalf("unmarshal warnings_json %q: %v", row.WarningsJson, err)
+	}
+	if len(warnings) != 1 {
+		t.Fatalf("warnings = %+v, want one", warnings)
+	}
+	warning := warnings[0]
+	if warning.Code != "workspace_env_repair_failed" || warning.ProjectID != "github.com/coreycole/vamos" || warning.WorkspaceSlug != "2026-06-07-20-29-40-workspace-status-debuggability" || warning.CheckoutPath != checkout {
+		t.Fatalf("warning = %+v, want target fields", warning)
 	}
 }
 

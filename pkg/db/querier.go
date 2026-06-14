@@ -96,6 +96,7 @@ type Querier interface {
 	GetWorkspaceDoc(ctx context.Context, arg GetWorkspaceDocParams) (WorkspaceDoc, error)
 	GetWorkspaceEventByKey(ctx context.Context, arg GetWorkspaceEventByKeyParams) (WorkspaceEvent, error)
 	GetWorkspaceForUser(ctx context.Context, arg GetWorkspaceForUserParams) (Workspace, error)
+	GetWorkspaceSyncDiagnostic(ctx context.Context, arg GetWorkspaceSyncDiagnosticParams) (WorkspaceSyncDiagnostic, error)
 	InsertSnapshotProcess(ctx context.Context, arg InsertSnapshotProcessParams) error
 	InsertSystemSnapshot(ctx context.Context, arg InsertSystemSnapshotParams) (SystemSnapshot, error)
 	LinkExternalAgentSession(ctx context.Context, arg LinkExternalAgentSessionParams) (ChatSessionExternalLink, error)
@@ -144,6 +145,7 @@ type Querier interface {
 	ListWorkspaceDocumentComments(ctx context.Context, arg ListWorkspaceDocumentCommentsParams) ([]DocumentComment, error)
 	ListWorkspaceEvents(ctx context.Context, arg ListWorkspaceEventsParams) ([]WorkspaceEvent, error)
 	ListWorkspaceEventsAfter(ctx context.Context, arg ListWorkspaceEventsAfterParams) ([]WorkspaceEvent, error)
+	ListWorkspaceSyncDiagnostics(ctx context.Context, projectID string) ([]WorkspaceSyncDiagnostic, error)
 	ListWorkspaces(ctx context.Context, limit int64) ([]Workspace, error)
 	ListWorkspacesForUser(ctx context.Context, arg ListWorkspacesForUserParams) ([]Workspace, error)
 	LogAuthAttempt(ctx context.Context, arg LogAuthAttemptParams) (AuthAttempt, error)
@@ -214,6 +216,7 @@ type Querier interface {
 	UpsertUserPreferences(ctx context.Context, arg UpsertUserPreferencesParams) (UserPreference, error)
 	UpsertWorkspaceDoc(ctx context.Context, arg UpsertWorkspaceDocParams) error
 	UpsertWorkspaceErrorEvent(ctx context.Context, arg UpsertWorkspaceErrorEventParams) (WorkspaceErrorEvent, error)
+	UpsertWorkspaceSyncDiagnostic(ctx context.Context, arg UpsertWorkspaceSyncDiagnosticParams) error
 }
 
 var _ Querier = (*Queries)(nil)

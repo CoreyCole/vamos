@@ -77,7 +77,7 @@ func TestSyncWorkspacesWorkflowRunsSyncActivity(t *testing.T) {
 	if err := env.GetWorkflowResult(&got); err != nil {
 		t.Fatalf("GetWorkflowResult() error = %v", err)
 	}
-	if got != wantResult {
+	if !reflect.DeepEqual(got, wantResult) {
 		t.Fatalf("workflow result=%#v want %#v", got, wantResult)
 	}
 	if calls != 1 {
@@ -126,7 +126,7 @@ func TestWorkspaceSyncActivityCallsCompletionHookWhenEnabled(t *testing.T) {
 	if err != nil {
 		t.Fatalf("SyncWorkspaces() error = %v", err)
 	}
-	if result != wantResult || gotResult != wantResult || gotErr != nil || !called {
+	if !reflect.DeepEqual(result, wantResult) || !reflect.DeepEqual(gotResult, wantResult) || gotErr != nil || !called {
 		t.Fatalf(
 			"completion called=%t result=%#v got=%#v err=%v",
 			called,

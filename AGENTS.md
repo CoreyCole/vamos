@@ -4,6 +4,17 @@ Vamos Agents is a reusable Go/templ/Datastar server for private agentic software
 
 Agent Chat is fully multiplayer/shared. There is no per-user/private-workspace visibility model for plan-owned sessions. `user_email` and `workspace_id` should be populated when known for provenance, attribution, routing, and attachment metadata, but they must not gate sidebar/history visibility or hydration of plan-owned `.sessions/<agent>` artifacts.
 
+### Workspace vocabulary
+
+Use human-facing vocabulary before internal table names:
+
+- **Main workspace / manager host**: authoritative service that tracks workspace inventory and lifecycle.
+- **Staging workspace / `../vamos`**: durable staging checkout used after merging feature checkouts to test and fix before pushing `origin/main` and rebuilding/syncing the clean `../vamos-main` baseline.
+- **Main baseline / `../vamos-main`**: clean/latest baseline checkout rebuilt after staging is verified and pushed; do not edit directly.
+- **Manager DB lifecycle / implementation workspace record**: authoritative DB projection for feature/implementation checkout state (active, merged, cleaned, unknown). The implementation uses `impl_workspaces` internally, but docs/plans should not lead with that table name.
+- **Feature checkout / implementation checkout**: copied source checkout where agents implement a plan before merging into staging.
+- **Local runtime diagnostics**: checkout-local `.vamos/run/*` files such as `status.json`, `desired.json`, `runtime-env.json`, and `workspace.env`; useful for process/build/debug state, not authoritative lifecycle truth.
+
 Vamos is pre-release OSS: optimize for clean long-term design, not legacy DB compatibility. The filesystem `thoughts/` tree and plan-owned `.sessions/<agent>` JSONL files are durable source of truth; the DB is rebuildable index/projection/cache. If the scheduled sync workflow can rebuild correct state from filesystem artifacts, it is acceptable to drop old DB rows, replace columns, or migrate destructively rather than preserving legacy code paths or tech debt.
 
 ### Long-term product architecture philosophy
@@ -33,8 +44,9 @@ For all future Vamos planning and implementation involving `thoughts/` artifacts
 - Prefer the best long-term schema over compatibility with old DB rows.
 - Big schema changes are OK when they simplify the durable domain model and eliminate complexity from legacy decisions.
 - Destructive migrations, dropped columns, renamed columns, table replacement, and full row rebuilds are acceptable when the scheduled filesystem-to-DB sync can rebuild from `thoughts/`.
-- "Scheduled sync" means the scheduled Temporal filesystem-to-DB indexing/projection workflow that reads disk artifacts and writes DB rows. It does not mean `just sync-thoughts` or any thoughts durable-cloud-storage persistence step.
-- The scheduled filesystem-to-DB sync must rebuild correct DB state from filesystem artifacts instead of preserving stale projection state.
+- `just sync-thoughts` is the docs/artifact sync: it formats and pushes/syncs `thoughts/...` files to durable storage. It does not rebuild manager DB lifecycle state.
+- "Scheduled sync" means the scheduled Temporal filesystem-to-DB indexing/projection workflow that reads `thoughts/...` artifacts plus configured project/workspace files and writes DB rows. It does not mean `just sync-thoughts` or any thoughts durable-cloud-storage persistence step.
+- The scheduled filesystem-to-DB sync must rebuild correct DB state from `thoughts/...` artifacts and config files instead of preserving stale projection state.
 - Do not add compatibility shims for legacy absolute paths or owner/workspace visibility when a clean re-index from disk is possible.
 - For plan-owned artifacts, `user_email` and `workspace_id` are provenance/routing/attachment metadata only; never authorization or visibility gates.
 
@@ -70,13 +82,13 @@ When a feature is deterministic, agentic, multi-step, stateful, or needs human/a
 ## Development checkout model
 
 - For the local dogfood project map, configured workspace hosts, Caddy/Coredns notes, and cross-project checkout roles, read `docs/vamos-manifest.md`. Put setup-specific notes there instead of general OSS docs.
-- `../vamos` is the working checkout for human/agent edits. Run Pi sessions and normal feature development here.
-- In the current Chestnut dogfood host setup, the durable `stage` lane points at `../vamos`. Use that stage host for fast runtime iteration, quick fixes, and pre-merge verification.
-- `../vamos-main` is the clean/latest baseline checkout. In the current host setup, durable `main` points at `../vamos-main`. Keep it clean, on `main`, and do not edit it directly.
+- `../vamos` is the staging/working checkout for human/agent edits. Feature checkout stacks merge here first; test and fix here before pushing to `origin/main` and rebuilding/syncing `../vamos-main`.
+- In the current Chestnut dogfood host setup, the durable `stage` lane points at `../vamos`. Use that stage host for fast runtime iteration, quick fixes after feature merges, and pre-main verification.
+- `../vamos-main` is the clean/latest baseline checkout. In the current host setup, durable `main` points at `../vamos-main`. Keep it clean, on `main`, and do not edit it directly; update it only after staging is verified and main is pushed/synced.
 - Feature branches use Graphite stacks from the working checkout. Preserve stack commit shape; do not squash or patch-apply branch contents into `main`.
 - For substantial planned work, use the QRSPI skills (`/q-question`, `/q-research`, `/q-design`, `/q-outline`, `/q-plan`, `/q-review`, `/q-workspace`, `/q-implement`, `/q-review-implementation`, `/q-verify`) rather than ad hoc planning or implementation.
 - `.agents` is committed as a symlink to `../.agents` when this repo is hosted beside a shared agent-config directory. Put broadly useful cross-repository skills there; commit the symlink only, never the target files.
-- In the local dogfood setup, `thoughts/` is a symlink to separate durable artifact storage and is not tracked by Vamos git. Use `just sync-thoughts` to run formatting and push/sync those thoughts artifacts to durable storage.
+- In the local dogfood setup, `thoughts/` is a symlink to separate durable artifact storage and is not tracked by Vamos git. Use `just sync-thoughts` to run formatting and push/sync those thoughts artifacts to durable storage; the scheduled Temporal sync separately rebuilds manager DB state from `thoughts/...` artifacts and config files.
 - `.pi/` is a real project-local directory for Vamos-specific Pi resources: skills, prompts, and extensions that should travel with this repository.
 - Use `/vamos-merge` when a workspace branch is ready. It verifies `stage` from `../vamos`, fast-forwards `../vamos-main`, then runs the configured host rebuild/restart verification.
 
