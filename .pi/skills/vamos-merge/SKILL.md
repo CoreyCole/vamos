@@ -200,7 +200,7 @@ stage_error_log="log/vamos.error.log"
 stage_log_start=$(wc -l <"$stage_log" 2>/dev/null || echo 0)
 stage_error_log_start=$(wc -l <"$stage_error_log" 2>/dev/null || echo 0)
 
-just build --no-restart
+just build
 sleep 5
 curl -ksS -D /tmp/vamos-stage.headers https://stage.workspaces.creative-mode.ai/login \
   -o /tmp/vamos-stage-login.html -m 20
@@ -226,7 +226,7 @@ fi
 Success criteria:
 
 - `../vamos` is the durable stage lane checkout for this host setup.
-- `just build --no-restart` succeeds and the workspace restart/start hook does not fail.
+- `just build` succeeds and the workspace restart/start hook does not fail.
 - `https://stage.workspaces.creative-mode.ai/login` returns HTTP 200 or expected auth redirect, **not** 503.
 - Stage `.vamos/run/agents.db` passes `scripts/workspace-db-verify/verify.sh`.
 - Fresh stage logs after the build/restart window contain workspace sync success evidence.
