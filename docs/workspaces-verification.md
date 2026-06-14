@@ -114,6 +114,29 @@ just verify-workspaces slug=multi-checkout-dev-workspaces start=true restart=tru
 just verify-workspaces slug=multi-checkout-dev-workspaces start=true restart=true stop=true browser=true agent_chat_probe=true
 ```
 
+## Fast workspace DB invariant gate
+
+For fast local/QRSPI phase checks, run the DB-only verifier against the current checkout database:
+
+```bash
+just verify-workspace-db db=.vamos/run/agents.db
+# or
+scripts/workspace-db-verify/verify.sh --database-path .vamos/run/agents.db --format text
+```
+
+This gate checks current SQLite projection invariants only:
+
+- `PRAGMA foreign_keys` is enabled on the verifier connection
+- `PRAGMA foreign_key_check` has no rows
+- no duplicate `impl_workspaces.checkout_path`
+- no `impl_workspaces.plan_dir_rel` without a `plan_workspaces` target
+- no active binding rows with missing plan target
+- no active binding rows with missing impl workspace target
+- no more than one active primary project row per plan
+- protected `main`/`stage` rows are not `merged` or `cleaned_up`
+
+It does not start Temporal, trigger scheduled sync, restart a workspace, or run browser checks. Scheduled-sync success and `SQLITE_BUSY` recovery classification belong to E2E/deploy verification such as `/vamos-merge`.
+
 For a feature branch handoff to a human tester, use the feature checkout root:
 
 ```bash
@@ -155,6 +178,7 @@ go run ./cmd/vamos-runtime ctl verify workspaces \
 
 | Layer | What it proves |
 | --- | --- |
+| `workspace-db` | Current SQLite workspace projection has valid FKs, checkout identity, bindings, primary-project rows, and protected lane status. |
 | `config` | Required env/flags are present and internally consistent. |
 | `dns` | Manager and child public hostnames resolve from the verifier machine. |
 | `tls` | Public HTTPS reaches a TLS terminator, not plain Go HTTP. |

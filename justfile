@@ -7,6 +7,12 @@ e2e *args:
 sync-thoughts:
   @cd .. && just sync-thoughts
 
+verify-workspace-db db=".vamos/run/agents.db" format="text":
+  @set -eu; \
+    db="{{db}}"; db="${db#db=}"; \
+    format="{{format}}"; format="${format#format=}"; \
+    scripts/workspace-db-verify/verify.sh --database-path "$db" --format "$format"
+
 verify-workspaces slug start="true" restart="true" stop="true" browser="false" agent_chat_probe="false" report="" remote="" dns_server="" expect_ip="" require_remote="false":
   @set -eu; \
     slug="{{slug}}"; slug="${slug#slug=}"; \

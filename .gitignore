@@ -11,6 +11,7 @@ static/css/out.css
 static/css/out.*.css
 static/js/datastar*.js
 static/js/datastar*.js.map
+scripts/workspace-db-verify/workspace-db-verify-*
 # Pi project-local runtime state
 .pi/sessions/
 .pi/git/
