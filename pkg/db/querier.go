@@ -162,6 +162,7 @@ type Querier interface {
 	RecordImplWorkspaceEnvError(ctx context.Context, arg RecordImplWorkspaceEnvErrorParams) error
 	RecordImplWorkspaceEnvRepair(ctx context.Context, arg RecordImplWorkspaceEnvRepairParams) error
 	ReopenDocumentComment(ctx context.Context, id string) error
+	RepairProtectedImplWorkspaceTerminalStatuses(ctx context.Context, projectID string) (int64, error)
 	ReserveChatSessionSeq(ctx context.Context, sessionID string) (int64, error)
 	ResolveChatAnnotation(ctx context.Context, id string) error
 	ResolveDocumentComment(ctx context.Context, arg ResolveDocumentCommentParams) error

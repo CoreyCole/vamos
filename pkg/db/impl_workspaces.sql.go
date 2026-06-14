@@ -449,6 +449,39 @@ func (q *Queries) RecordImplWorkspaceEnvRepair(ctx context.Context, arg RecordIm
 	return err
 }
 
+const repairProtectedImplWorkspaceTerminalStatuses = `-- name: RepairProtectedImplWorkspaceTerminalStatuses :execrows
+UPDATE impl_workspaces
+SET
+    status = 'active',
+    merged_at = NULL,
+    cleaned_up_at = NULL,
+    merge_evidence = NULL,
+    cleanup_proof_kind = 'unknown',
+    cleanup_proof_source_ref = NULL,
+    cleanup_proof_target_commit = NULL,
+    cleanup_proof_at = NULL,
+    cleanup_risk_reason = NULL,
+    updated_at = CURRENT_TIMESTAMP
+WHERE
+    (
+        CAST(?1 AS TEXT) = ''
+        OR project_id = CAST(?1 AS TEXT)
+    )
+    AND (
+        workspace_slug IN ('main', 'stage')
+        OR checkout_role IN ('main', 'stage')
+    )
+    AND status IN ('merged', 'cleaned_up')
+`
+
+func (q *Queries) RepairProtectedImplWorkspaceTerminalStatuses(ctx context.Context, projectID string) (int64, error) {
+	result, err := q.db.ExecContext(ctx, repairProtectedImplWorkspaceTerminalStatuses, projectID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
 const upsertDiscoveredImplWorkspace = `-- name: UpsertDiscoveredImplWorkspace :one
 INSERT INTO impl_workspaces (
     project_id,

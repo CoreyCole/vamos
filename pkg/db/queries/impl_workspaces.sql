@@ -37,6 +37,30 @@ WHERE
         WHERE plan_workspaces.plan_dir_rel = impl_workspaces.plan_dir_rel
     );
 
+-- name: RepairProtectedImplWorkspaceTerminalStatuses :execrows
+UPDATE impl_workspaces
+SET
+    status = 'active',
+    merged_at = NULL,
+    cleaned_up_at = NULL,
+    merge_evidence = NULL,
+    cleanup_proof_kind = 'unknown',
+    cleanup_proof_source_ref = NULL,
+    cleanup_proof_target_commit = NULL,
+    cleanup_proof_at = NULL,
+    cleanup_risk_reason = NULL,
+    updated_at = CURRENT_TIMESTAMP
+WHERE
+    (
+        CAST(sqlc.arg('project_id') AS TEXT) = ''
+        OR project_id = CAST(sqlc.arg('project_id') AS TEXT)
+    )
+    AND (
+        workspace_slug IN ('main', 'stage')
+        OR checkout_role IN ('main', 'stage')
+    )
+    AND status IN ('merged', 'cleaned_up');
+
 -- name: UpsertDiscoveredImplWorkspace :one
 INSERT INTO impl_workspaces (
     project_id,

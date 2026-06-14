@@ -573,9 +573,16 @@ func (s *ImplWorkspaceSyncer) reconcileMissing(
 	input ImplWorkspaceSyncInput,
 	activeSlugs collections.Set[string],
 ) (cleaned, merged int, changed bool, warnings []WorkspaceDiagnostic, err error) {
-	rows, err := s.Queries.ListImplWorkspaces(ctx, firstNonEmpty(input.Discovery.ProjectID, input.ProjectID))
+	projectID := firstNonEmpty(input.Discovery.ProjectID, input.ProjectID)
+	repaired, err := s.Queries.RepairProtectedImplWorkspaceTerminalStatuses(ctx, projectID)
 	if err != nil {
 		return 0, 0, false, nil, err
+	}
+	changed = changed || repaired > 0
+
+	rows, err := s.Queries.ListImplWorkspaces(ctx, projectID)
+	if err != nil {
+		return 0, 0, changed, nil, err
 	}
 	configured := configuredCheckoutSlugs(input.Discovery)
 	for _, row := range rows {
