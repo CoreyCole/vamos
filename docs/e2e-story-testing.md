@@ -62,11 +62,11 @@ just e2e \
   --scenario freeform-chat-started-from-thoughts-root-survives-refresh-and-resume
 ```
 
-The live QRSPI continuation browser check is intentionally singular and expensive: `agentchat qrspi question completion auto starts research` starts a real Pi/Temporal `question` workflow-node run and asserts the runtime starts `research`. Keep card rendering, reload, and sidebar coverage in fixture stories such as `agentchat qrspi continuation`.
+The live QRSPI continuation browser check is intentionally singular and expensive: `agentchat qrspi question completion auto starts design` starts a real Pi/Temporal `question` workflow-node run, asserts the runtime starts `research`, lets the real `research` run follow a seeded fast-path fixture, and asserts the runtime starts `design`. Keep card rendering, reload, and sidebar coverage in fixture stories such as `agentchat qrspi continuation`.
 
 ```bash
 VAMOS_E2E_QRSPI_PROMPT_OVERRIDE=1 \
-  just e2e --base-url <feature-url> --story agentchat-qrspi-question-completion-auto-starts-research
+  just e2e --base-url <feature-url> --story agentchat-qrspi-question-completion-auto-starts-design
 ```
 
 ### Workspaces page stories on feature child hosts

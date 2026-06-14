@@ -41,7 +41,13 @@ This is the standard Vamos verification entrypoint. `/q-verify` must read this f
    - Recommended sequence: managed restart -> confirm public URL healthy -> browser-enabled `vamos ctl verify workspaces` -> `just e2e --base-url <same-public-url> --story <story>` -> human tests `<same-public-url>`.
    - Use `docs/e2e-story-testing.md` for command details, auth, fixture safety, artifacts, and story selection.
    - For Agent Chat, Thoughts chat, URL-state, route, transcript, or QRSPI-next changes, run relevant `durable-session-chat` scenarios at minimum; add `thoughts-workbench` scenarios when document workbench URL/navigation behavior changed.
-   - For QRSPI runtime continuation changes, run the single live Pi/Temporal continuation story with `VAMOS_E2E_QRSPI_PROMPT_OVERRIDE=1 just e2e --base-url <feature-url> --story agentchat-qrspi-question-completion-auto-starts-research`; keep cheaper card/reload/sidebar coverage in fixture stories.
+   - For QRSPI runtime continuation changes, first run focused deterministic coverage:
+     ```bash
+     go test ./pkg/agents/workflows/qrspi ./pkg/agents/workflows/runtime ./server/services/agentchat ./server/services/agentchat/workflows
+     go test ./pkg/e2e/tests -list Test
+     go test ./pkg/e2e/vamos ./pkg/e2e/tests -run '^$'
+     ```
+     Then run the single live Pi/Temporal continuation story with `VAMOS_E2E_QRSPI_PROMPT_OVERRIDE=1 just e2e --base-url <feature-url> --story agentchat-qrspi-question-completion-auto-starts-design`; keep cheaper card/reload/sidebar coverage in fixture stories.
 
 1. **Manual human testing**
 
