@@ -264,14 +264,14 @@ func Root(args RootArgs) templ.Component {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 9, "<!-- Popover API Polyfill --><script type=\"module\">\n\t\t\t\tif (!('popover' in HTMLElement.prototype)) {\n\t\t\t\t\tconsole.log('Loading Popover API polyfill...');\n\t\t\t\t\timport(\n\t\t\t\t\t\t'https://cdn.jsdelivr.net/npm/@oddbird/popover-polyfill@latest'\n\t\t\t\t\t);\n\t\t\t\t}\n\t\t\t</script><!-- CSS Anchor Positioning Polyfill --><script type=\"module\">\n\t\t\t\tif (!('anchorName' in document.documentElement.style)) {\n\t\t\t\t\tconsole.log('🔧 CSS Anchor Positioning is not natively supported');\n\t\t\t\t\tconsole.log(\n\t\t\t\t\t\t'📦 Loading CSS Anchor Positioning polyfill from jsDelivr...',\n\t\t\t\t\t);\n\t\t\t\t\twindow.CSS_ANCHOR_POLYFILL_LOADING = true;\n\n\t\t\t\t\timport(\n\t\t\t\t\t\t'https://cdn.jsdelivr.net/npm/@oddbird/css-anchor-positioning@latest/dist/css-anchor-positioning.js'\n\t\t\t\t\t)\n\t\t\t\t\t\t.then(() => {\n\t\t\t\t\t\t\tconsole.log(\n\t\t\t\t\t\t\t\t'✅ CSS Anchor Positioning polyfill loaded successfully!',\n\t\t\t\t\t\t\t);\n\t\t\t\t\t\t\twindow.CSS_ANCHOR_POLYFILL_LOADED = true;\n\t\t\t\t\t\t\twindow.CSS_ANCHOR_POLYFILL_LOADING = false;\n\n\t\t\t\t\t\t\t// Dispatch custom event to notify components\n\t\t\t\t\t\t\twindow.dispatchEvent(\n\t\t\t\t\t\t\t\tnew CustomEvent('css-anchor-polyfill-loaded'),\n\t\t\t\t\t\t\t);\n\t\t\t\t\t\t})\n\t\t\t\t\t\t.catch((error) => {\n\t\t\t\t\t\t\tconsole.error(\n\t\t\t\t\t\t\t\t'❌ Failed to load CSS Anchor Positioning polyfill:',\n\t\t\t\t\t\t\t\terror,\n\t\t\t\t\t\t\t);\n\t\t\t\t\t\t\twindow.CSS_ANCHOR_POLYFILL_LOADING = false;\n\t\t\t\t\t\t});\n\t\t\t\t} else {\n\t\t\t\t\tconsole.log(\n\t\t\t\t\t\t'✅ CSS Anchor Positioning is natively supported - no polyfill needed',\n\t\t\t\t\t);\n\t\t\t\t\twindow.CSS_ANCHOR_POLYFILL_LOADED = false;\n\t\t\t\t}\n\t\t\t</script><script>\n\t\t\t\tfunction syncAppViewportShell() {\n\t\t\t\t\tconst shell = document.getElementById('app-viewport-shell');\n\t\t\t\t\tif (!shell) return;\n\t\t\t\t\tconst viewport = window.visualViewport;\n\t\t\t\t\tconst height = viewport ? viewport.height : window.innerHeight;\n\t\t\t\t\tconst top = viewport ? viewport.offsetTop : 0;\n\t\t\t\t\tshell.style.height = `${height}px`;\n\t\t\t\t\tshell.style.transform = `translateY(${top}px)`;\n\t\t\t\t}\n\t\t\t\twindow.addEventListener('resize', syncAppViewportShell, { passive: true });\n\t\t\t\twindow.addEventListener('orientationchange', syncAppViewportShell, { passive: true });\n\t\t\t\twindow.visualViewport?.addEventListener('resize', syncAppViewportShell, { passive: true });\n\t\t\t\twindow.visualViewport?.addEventListener('scroll', syncAppViewportShell, { passive: true });\n\t\t\t\tdocument.addEventListener('DOMContentLoaded', syncAppViewportShell);\n\t\t\t</script><!-- Datastar library for reactive components --><script type=\"module\">\n\t\t\t\timport('/js/datastar-pro-v1.js').catch((error) => {\n\t\t\t\t\tconsole.warn('Datastar Pro asset unavailable; falling back to public Datastar bundle', error);\n\t\t\t\t\treturn import('https://cdn.jsdelivr.net/gh/starfederation/datastar@v1.0.1/bundles/datastar.js');\n\t\t\t\t});\n\t\t\t</script><meta name=\"view-transition\" content=\"same-origin\"><!-- Datastar Inspector diagnostics. Hidden by default; toggle from the avatar menu. --><script type=\"module\" defer src=\"/js/datastar-inspector.js\"></script></head><body class=\"fixed inset-0 overflow-hidden bg-background font-sans antialiased\" data-signals=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 9, "<!-- Popover API Polyfill --><script type=\"module\">\n\t\t\t\tif (!(\"popover\" in HTMLElement.prototype)) {\n\t\t\t\t\tconsole.log(\"Loading Popover API polyfill...\");\n\t\t\t\t\timport(\n\t\t\t\t\t\t\"https://cdn.jsdelivr.net/npm/@oddbird/popover-polyfill@latest\"\n\t\t\t\t\t);\n\t\t\t\t}\n\t\t\t</script><!-- CSS Anchor Positioning Polyfill --><script type=\"module\">\n\t\t\t\tif (!(\"anchorName\" in document.documentElement.style)) {\n\t\t\t\t\tconsole.log(\"🔧 CSS Anchor Positioning is not natively supported\");\n\t\t\t\t\tconsole.log(\n\t\t\t\t\t\t\"📦 Loading CSS Anchor Positioning polyfill from jsDelivr...\",\n\t\t\t\t\t);\n\t\t\t\t\twindow.CSS_ANCHOR_POLYFILL_LOADING = true;\n\n\t\t\t\t\timport(\n\t\t\t\t\t\t\"https://cdn.jsdelivr.net/npm/@oddbird/css-anchor-positioning@latest/dist/css-anchor-positioning.js\"\n\t\t\t\t\t)\n\t\t\t\t\t\t.then(() => {\n\t\t\t\t\t\t\tconsole.log(\n\t\t\t\t\t\t\t\t\"✅ CSS Anchor Positioning polyfill loaded successfully!\",\n\t\t\t\t\t\t\t);\n\t\t\t\t\t\t\twindow.CSS_ANCHOR_POLYFILL_LOADED = true;\n\t\t\t\t\t\t\twindow.CSS_ANCHOR_POLYFILL_LOADING = false;\n\n\t\t\t\t\t\t\t// Dispatch custom event to notify components\n\t\t\t\t\t\t\twindow.dispatchEvent(\n\t\t\t\t\t\t\t\tnew CustomEvent(\"css-anchor-polyfill-loaded\"),\n\t\t\t\t\t\t\t);\n\t\t\t\t\t\t})\n\t\t\t\t\t\t.catch((error) => {\n\t\t\t\t\t\t\tconsole.error(\n\t\t\t\t\t\t\t\t\"❌ Failed to load CSS Anchor Positioning polyfill:\",\n\t\t\t\t\t\t\t\terror,\n\t\t\t\t\t\t\t);\n\t\t\t\t\t\t\twindow.CSS_ANCHOR_POLYFILL_LOADING = false;\n\t\t\t\t\t\t});\n\t\t\t\t} else {\n\t\t\t\t\tconsole.log(\n\t\t\t\t\t\t\"✅ CSS Anchor Positioning is natively supported - no polyfill needed\",\n\t\t\t\t\t);\n\t\t\t\t\twindow.CSS_ANCHOR_POLYFILL_LOADED = false;\n\t\t\t\t}\n\t\t\t</script><script>\n\t\t\t\tfunction syncAppViewportShell() {\n\t\t\t\t\tconst shell = document.getElementById(\"app-viewport-shell\");\n\t\t\t\t\tif (!shell) return;\n\t\t\t\t\tconst viewport = window.visualViewport;\n\t\t\t\t\tconst height = viewport ? viewport.height : window.innerHeight;\n\t\t\t\t\tconst top = viewport ? viewport.offsetTop : 0;\n\t\t\t\t\tshell.style.height = `${height}px`;\n\t\t\t\t\tshell.style.transform = `translateY(${top}px)`;\n\t\t\t\t}\n\t\t\t\twindow.addEventListener(\"resize\", syncAppViewportShell, {\n\t\t\t\t\tpassive: true,\n\t\t\t\t});\n\t\t\t\twindow.addEventListener(\"orientationchange\", syncAppViewportShell, {\n\t\t\t\t\tpassive: true,\n\t\t\t\t});\n\t\t\t\twindow.visualViewport?.addEventListener(\n\t\t\t\t\t\"resize\",\n\t\t\t\t\tsyncAppViewportShell,\n\t\t\t\t\t{ passive: true },\n\t\t\t\t);\n\t\t\t\twindow.visualViewport?.addEventListener(\n\t\t\t\t\t\"scroll\",\n\t\t\t\t\tsyncAppViewportShell,\n\t\t\t\t\t{ passive: true },\n\t\t\t\t);\n\t\t\t\tdocument.addEventListener(\"DOMContentLoaded\", syncAppViewportShell);\n\t\t\t</script><!-- Datastar library for reactive components --><script type=\"module\">\n\t\t\t\timport(\"/js/datastar-pro-v1.js\").catch(async (error) => {\n\t\t\t\t\tconsole.warn(\n\t\t\t\t\t\t\"Datastar Pro asset unavailable; falling back to public Datastar bundle\",\n\t\t\t\t\t\terror,\n\t\t\t\t\t);\n\t\t\t\t\tconst datastar = await import(\n\t\t\t\t\t\t\"https://cdn.jsdelivr.net/gh/starfederation/datastar@v1.0.1/bundles/datastar.js\"\n\t\t\t\t\t);\n\t\t\t\t\tconst polyfills = await import(\"/js/vamos-datastar-polyfills.js\");\n\t\t\t\t\tpolyfills.install(datastar);\n\t\t\t\t\treturn datastar;\n\t\t\t\t});\n\t\t\t</script><meta name=\"view-transition\" content=\"same-origin\"><!-- Datastar Inspector diagnostics. Hidden by default; toggle from the avatar menu. --><script type=\"module\" defer src=\"/js/datastar-inspector.js\"></script></head><body class=\"fixed inset-0 overflow-hidden bg-background font-sans antialiased\" data-signals=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var7 string
 		templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf(`{"theme": "%s", "_datastarInspectorEnabled": false}`, theme))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/layouts/root.templ`, Line: 269, Col: 170}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/layouts/root.templ`, Line: 289, Col: 170}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var7))
 		if templ_7745c5c3_Err != nil {
@@ -400,7 +400,7 @@ func Header(args RootArgs) templ.Component {
 									var templ_7745c5c3_Var13 string
 									templ_7745c5c3_Var13, templ_7745c5c3_Err = templ.JoinStringErrs(crumb.Label)
 									if templ_7745c5c3_Err != nil {
-										return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/layouts/root.templ`, Line: 304, Col: 26}
+										return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/layouts/root.templ`, Line: 324, Col: 26}
 									}
 									_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var13))
 									if templ_7745c5c3_Err != nil {
@@ -428,7 +428,7 @@ func Header(args RootArgs) templ.Component {
 									var templ_7745c5c3_Var15 string
 									templ_7745c5c3_Var15, templ_7745c5c3_Err = templ.JoinStringErrs(crumb.Label)
 									if templ_7745c5c3_Err != nil {
-										return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/layouts/root.templ`, Line: 308, Col: 26}
+										return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/layouts/root.templ`, Line: 328, Col: 26}
 									}
 									_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var15))
 									if templ_7745c5c3_Err != nil {
@@ -562,7 +562,7 @@ func HeaderAvatarMenu(args RootArgs, githubURL string, workspaceItems []Workspac
 					var templ_7745c5c3_Var20 string
 					templ_7745c5c3_Var20, templ_7745c5c3_Err = templ.JoinStringErrs(avatarhelpers.GetInitials(avatarhelpers.GetEmailBasename(args.UserEmail)))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/layouts/root.templ`, Line: 339, Col: 115}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/layouts/root.templ`, Line: 359, Col: 115}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var20))
 					if templ_7745c5c3_Err != nil {
@@ -615,7 +615,7 @@ func HeaderAvatarMenu(args RootArgs, githubURL string, workspaceItems []Workspac
 					var templ_7745c5c3_Var23 string
 					templ_7745c5c3_Var23, templ_7745c5c3_Err = templ.JoinStringErrs(args.UserEmail)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/layouts/root.templ`, Line: 344, Col: 20}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/layouts/root.templ`, Line: 364, Col: 20}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var23))
 					if templ_7745c5c3_Err != nil {
@@ -679,7 +679,7 @@ func HeaderAvatarMenu(args RootArgs, githubURL string, workspaceItems []Workspac
 							var templ_7745c5c3_Var26 templ.SafeURL
 							templ_7745c5c3_Var26, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(ws.URL))
 							if templ_7745c5c3_Err != nil {
-								return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/layouts/root.templ`, Line: 355, Col: 35}
+								return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/layouts/root.templ`, Line: 375, Col: 35}
 							}
 							_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var26))
 							if templ_7745c5c3_Err != nil {
@@ -705,7 +705,7 @@ func HeaderAvatarMenu(args RootArgs, githubURL string, workspaceItems []Workspac
 							var templ_7745c5c3_Var28 string
 							templ_7745c5c3_Var28, templ_7745c5c3_Err = templ.JoinStringErrs(ws.Label)
 							if templ_7745c5c3_Err != nil {
-								return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/layouts/root.templ`, Line: 361, Col: 23}
+								return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/layouts/root.templ`, Line: 381, Col: 23}
 							}
 							_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var28))
 							if templ_7745c5c3_Err != nil {
@@ -742,7 +742,7 @@ func HeaderAvatarMenu(args RootArgs, githubURL string, workspaceItems []Workspac
 					var templ_7745c5c3_Var29 templ.SafeURL
 					templ_7745c5c3_Var29, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(workspaceManager + "/workspaces"))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/layouts/root.templ`, Line: 369, Col: 61}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/layouts/root.templ`, Line: 389, Col: 61}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var29))
 					if templ_7745c5c3_Err != nil {
@@ -930,7 +930,7 @@ func HeaderAvatarNavLink(dropdownID string, href string, label string, active bo
 		var templ_7745c5c3_Var33 templ.SafeURL
 		templ_7745c5c3_Var33, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(href))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/layouts/root.templ`, Line: 412, Col: 28}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/layouts/root.templ`, Line: 432, Col: 28}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var33))
 		if templ_7745c5c3_Err != nil {
@@ -943,7 +943,7 @@ func HeaderAvatarNavLink(dropdownID string, href string, label string, active bo
 		var templ_7745c5c3_Var34 string
 		templ_7745c5c3_Var34, templ_7745c5c3_Err = templ.JoinStringErrs("$" + dropdownID + ".open = false")
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/layouts/root.templ`, Line: 413, Col: 52}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/layouts/root.templ`, Line: 433, Col: 52}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var34))
 		if templ_7745c5c3_Err != nil {
@@ -969,7 +969,7 @@ func HeaderAvatarNavLink(dropdownID string, href string, label string, active bo
 		var templ_7745c5c3_Var36 string
 		templ_7745c5c3_Var36, templ_7745c5c3_Err = templ.JoinStringErrs(label)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/layouts/root.templ`, Line: 420, Col: 9}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/layouts/root.templ`, Line: 440, Col: 9}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var36))
 		if templ_7745c5c3_Err != nil {
@@ -1011,7 +1011,7 @@ func HeaderAvatarPersistedThemeAction(dropdownID string) templ.Component {
 		var templ_7745c5c3_Var38 string
 		templ_7745c5c3_Var38, templ_7745c5c3_Err = templ.JoinStringErrs("$theme = $theme === 'dark' ? 'light' : 'dark'; document.documentElement.classList.toggle('dark', $theme === 'dark'); localStorage.setItem('theme', $theme); @post('/api/theme'); $" + dropdownID + ".open = false")
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/layouts/root.templ`, Line: 426, Col: 229}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/layouts/root.templ`, Line: 446, Col: 229}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var38))
 		if templ_7745c5c3_Err != nil {
@@ -1053,7 +1053,7 @@ func HeaderAvatarDatastarInspectorAction(dropdownID string) templ.Component {
 		var templ_7745c5c3_Var40 string
 		templ_7745c5c3_Var40, templ_7745c5c3_Err = templ.JoinStringErrs("$_datastarInspectorEnabled = !$_datastarInspectorEnabled; $" + dropdownID + ".open = false")
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/layouts/root.templ`, Line: 438, Col: 110}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/layouts/root.templ`, Line: 458, Col: 110}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var40))
 		if templ_7745c5c3_Err != nil {
@@ -1095,7 +1095,7 @@ func HeaderAvatarCopyAction(dropdownID string, clipboardContent string) templ.Co
 		var templ_7745c5c3_Var42 string
 		templ_7745c5c3_Var42, templ_7745c5c3_Err = templ.JoinStringErrs(clipboardContent)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/layouts/root.templ`, Line: 449, Col: 59}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/layouts/root.templ`, Line: 469, Col: 59}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var42))
 		if templ_7745c5c3_Err != nil {
@@ -1108,7 +1108,7 @@ func HeaderAvatarCopyAction(dropdownID string, clipboardContent string) templ.Co
 		var templ_7745c5c3_Var43 string
 		templ_7745c5c3_Var43, templ_7745c5c3_Err = templ.JoinStringErrs("navigator.clipboard.writeText(document.getElementById('clipboard-content-avatar').content.textContent); $" + dropdownID + ".open = false")
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/layouts/root.templ`, Line: 451, Col: 156}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/layouts/root.templ`, Line: 471, Col: 156}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var43))
 		if templ_7745c5c3_Err != nil {
@@ -1150,7 +1150,7 @@ func HeaderAvatarGitHubLink(dropdownID string, githubURL string) templ.Component
 		var templ_7745c5c3_Var45 templ.SafeURL
 		templ_7745c5c3_Var45, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(githubURL))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/layouts/root.templ`, Line: 463, Col: 33}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/layouts/root.templ`, Line: 483, Col: 33}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var45))
 		if templ_7745c5c3_Err != nil {
@@ -1163,7 +1163,7 @@ func HeaderAvatarGitHubLink(dropdownID string, githubURL string) templ.Component
 		var templ_7745c5c3_Var46 string
 		templ_7745c5c3_Var46, templ_7745c5c3_Err = templ.JoinStringErrs("$" + dropdownID + ".open = false")
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/layouts/root.templ`, Line: 466, Col: 52}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/layouts/root.templ`, Line: 486, Col: 52}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var46))
 		if templ_7745c5c3_Err != nil {
@@ -1205,7 +1205,7 @@ func HeaderBrand(args RootArgs) templ.Component {
 		var templ_7745c5c3_Var48 string
 		templ_7745c5c3_Var48, templ_7745c5c3_Err = templ.JoinStringErrs(AppName())
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/layouts/root.templ`, Line: 478, Col: 57}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/layouts/root.templ`, Line: 498, Col: 57}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var48))
 		if templ_7745c5c3_Err != nil {
@@ -1308,7 +1308,7 @@ func HeaderProductNavItem(args RootArgs, item headerNavItem) templ.Component {
 		var templ_7745c5c3_Var53 templ.SafeURL
 		templ_7745c5c3_Var53, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(item.Href))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/layouts/root.templ`, Line: 498, Col: 33}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/layouts/root.templ`, Line: 518, Col: 33}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var53))
 		if templ_7745c5c3_Err != nil {
@@ -1321,7 +1321,7 @@ func HeaderProductNavItem(args RootArgs, item headerNavItem) templ.Component {
 		var templ_7745c5c3_Var54 string
 		templ_7745c5c3_Var54, templ_7745c5c3_Err = templ.JoinStringErrs(item.Label)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/layouts/root.templ`, Line: 500, Col: 14}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/layouts/root.templ`, Line: 520, Col: 14}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var54))
 		if templ_7745c5c3_Err != nil {

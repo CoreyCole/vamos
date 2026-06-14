@@ -6,11 +6,11 @@ import (
 	"path/filepath"
 	"strings"
 
-	avatarhelpers "github.com/CoreyCole/vamos/server/components/avatar"
-	"github.com/CoreyCole/vamos/server/components/syntaxthemeselector"
 	"github.com/CoreyCole/vamos/pkg/datastarui/components/avatar"
 	"github.com/CoreyCole/vamos/pkg/datastarui/components/breadcrumb"
 	"github.com/CoreyCole/vamos/pkg/datastarui/components/dropdown"
+	avatarhelpers "github.com/CoreyCole/vamos/server/components/avatar"
+	"github.com/CoreyCole/vamos/server/components/syntaxthemeselector"
 )
 
 type BreadcrumbLinkState struct {
@@ -194,54 +194,54 @@ templ Root(args RootArgs) {
 			}
 			<!-- Popover API Polyfill -->
 			<script type="module">
-				if (!('popover' in HTMLElement.prototype)) {
-					console.log('Loading Popover API polyfill...');
+				if (!("popover" in HTMLElement.prototype)) {
+					console.log("Loading Popover API polyfill...");
 					import(
-						'https://cdn.jsdelivr.net/npm/@oddbird/popover-polyfill@latest'
+						"https://cdn.jsdelivr.net/npm/@oddbird/popover-polyfill@latest"
 					);
 				}
 			</script>
 			<!-- CSS Anchor Positioning Polyfill -->
 			<script type="module">
-				if (!('anchorName' in document.documentElement.style)) {
-					console.log('🔧 CSS Anchor Positioning is not natively supported');
+				if (!("anchorName" in document.documentElement.style)) {
+					console.log("🔧 CSS Anchor Positioning is not natively supported");
 					console.log(
-						'📦 Loading CSS Anchor Positioning polyfill from jsDelivr...',
+						"📦 Loading CSS Anchor Positioning polyfill from jsDelivr...",
 					);
 					window.CSS_ANCHOR_POLYFILL_LOADING = true;
 
 					import(
-						'https://cdn.jsdelivr.net/npm/@oddbird/css-anchor-positioning@latest/dist/css-anchor-positioning.js'
+						"https://cdn.jsdelivr.net/npm/@oddbird/css-anchor-positioning@latest/dist/css-anchor-positioning.js"
 					)
 						.then(() => {
 							console.log(
-								'✅ CSS Anchor Positioning polyfill loaded successfully!',
+								"✅ CSS Anchor Positioning polyfill loaded successfully!",
 							);
 							window.CSS_ANCHOR_POLYFILL_LOADED = true;
 							window.CSS_ANCHOR_POLYFILL_LOADING = false;
 
 							// Dispatch custom event to notify components
 							window.dispatchEvent(
-								new CustomEvent('css-anchor-polyfill-loaded'),
+								new CustomEvent("css-anchor-polyfill-loaded"),
 							);
 						})
 						.catch((error) => {
 							console.error(
-								'❌ Failed to load CSS Anchor Positioning polyfill:',
+								"❌ Failed to load CSS Anchor Positioning polyfill:",
 								error,
 							);
 							window.CSS_ANCHOR_POLYFILL_LOADING = false;
 						});
 				} else {
 					console.log(
-						'✅ CSS Anchor Positioning is natively supported - no polyfill needed',
+						"✅ CSS Anchor Positioning is natively supported - no polyfill needed",
 					);
 					window.CSS_ANCHOR_POLYFILL_LOADED = false;
 				}
 			</script>
 			<script>
 				function syncAppViewportShell() {
-					const shell = document.getElementById('app-viewport-shell');
+					const shell = document.getElementById("app-viewport-shell");
 					if (!shell) return;
 					const viewport = window.visualViewport;
 					const height = viewport ? viewport.height : window.innerHeight;
@@ -249,17 +249,37 @@ templ Root(args RootArgs) {
 					shell.style.height = `${height}px`;
 					shell.style.transform = `translateY(${top}px)`;
 				}
-				window.addEventListener('resize', syncAppViewportShell, { passive: true });
-				window.addEventListener('orientationchange', syncAppViewportShell, { passive: true });
-				window.visualViewport?.addEventListener('resize', syncAppViewportShell, { passive: true });
-				window.visualViewport?.addEventListener('scroll', syncAppViewportShell, { passive: true });
-				document.addEventListener('DOMContentLoaded', syncAppViewportShell);
+				window.addEventListener("resize", syncAppViewportShell, {
+					passive: true,
+				});
+				window.addEventListener("orientationchange", syncAppViewportShell, {
+					passive: true,
+				});
+				window.visualViewport?.addEventListener(
+					"resize",
+					syncAppViewportShell,
+					{ passive: true },
+				);
+				window.visualViewport?.addEventListener(
+					"scroll",
+					syncAppViewportShell,
+					{ passive: true },
+				);
+				document.addEventListener("DOMContentLoaded", syncAppViewportShell);
 			</script>
 			<!-- Datastar library for reactive components -->
 			<script type="module">
-				import('/js/datastar-pro-v1.js').catch((error) => {
-					console.warn('Datastar Pro asset unavailable; falling back to public Datastar bundle', error);
-					return import('https://cdn.jsdelivr.net/gh/starfederation/datastar@v1.0.1/bundles/datastar.js');
+				import("/js/datastar-pro-v1.js").catch(async (error) => {
+					console.warn(
+						"Datastar Pro asset unavailable; falling back to public Datastar bundle",
+						error,
+					);
+					const datastar = await import(
+						"https://cdn.jsdelivr.net/gh/starfederation/datastar@v1.0.1/bundles/datastar.js"
+					);
+					const polyfills = await import("/js/vamos-datastar-polyfills.js");
+					polyfills.install(datastar);
+					return datastar;
 				});
 			</script>
 			<meta name="view-transition" content="same-origin"/>
