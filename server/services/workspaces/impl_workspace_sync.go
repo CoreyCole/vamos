@@ -34,29 +34,6 @@ const (
 	ImplWorkspaceEnvActionSkipped  ImplWorkspaceEnvAction = "skipped"
 )
 
-type WorkspaceDiagnosticSource string
-
-const (
-	WorkspaceDiagnosticSourceSync WorkspaceDiagnosticSource = "scheduled_sync_diagnostics"
-)
-
-type WorkspaceDiagnosticSeverity string
-
-const (
-	WorkspaceDiagnosticWarning WorkspaceDiagnosticSeverity = "warning"
-)
-
-type WorkspaceDiagnostic struct {
-	Source        WorkspaceDiagnosticSource   `json:"source"`
-	Severity      WorkspaceDiagnosticSeverity `json:"severity"`
-	Code          string                      `json:"code"`
-	Message       string                      `json:"message"`
-	Detail        string                      `json:"detail,omitempty"`
-	ProjectID     string                      `json:"project_id,omitempty"`
-	WorkspaceSlug string                      `json:"workspace_slug,omitempty"`
-	CheckoutPath  string                      `json:"checkout_path,omitempty"`
-}
-
 type ImplWorkspaceSyncer struct {
 	Queries *db.Queries
 	Now     func() time.Time

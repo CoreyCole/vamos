@@ -15,6 +15,7 @@ type ImplWorkspaceView struct {
 	ReleaseActions []ReleaseActionView
 	Workflow       WorkspaceWorkflowSummary
 	Cleanup        CleanupReadiness
+	Diagnostics    WorkspaceLifecycleDiagnostic
 	Plan           PlanWorkspaceView
 }
 
@@ -46,6 +47,7 @@ type ImplWorkspaceViewOption func(*implWorkspaceViewOptions)
 type implWorkspaceViewOptions struct {
 	releaseActions map[string][]ReleaseActionView
 	workflows      map[string]WorkspaceWorkflowSummary
+	syncDiagnostic WorkspaceSyncDiagnostic
 }
 
 func WithWorkspaceReleaseActions(actions map[string][]ReleaseActionView) ImplWorkspaceViewOption {
@@ -54,6 +56,10 @@ func WithWorkspaceReleaseActions(actions map[string][]ReleaseActionView) ImplWor
 
 func WithWorkspaceWorkflowSummaries(summaries map[string]WorkspaceWorkflowSummary) ImplWorkspaceViewOption {
 	return func(opts *implWorkspaceViewOptions) { opts.workflows = summaries }
+}
+
+func WithWorkspaceSyncDiagnostic(sync WorkspaceSyncDiagnostic) ImplWorkspaceViewOption {
+	return func(opts *implWorkspaceViewOptions) { opts.syncDiagnostic = sync }
 }
 
 func BuildImplWorkspaceViews(
@@ -91,6 +97,7 @@ func BuildImplWorkspaceViews(
 			HasRuntime: true,
 			IsMain:     true,
 		}
+		view.Diagnostics = BuildWorkspaceLifecycleDiagnostic(view.Row, view.Runtime, view.HasRuntime, options.syncDiagnostic)
 		applyImplWorkspaceViewOptions(&view, options)
 		views = append(views, view)
 	}
@@ -131,6 +138,7 @@ func BuildImplWorkspaceViews(
 				},
 			}, WorkspaceLifecycleState{})
 		}
+		view.Diagnostics = BuildWorkspaceLifecycleDiagnostic(view.Row, view.Runtime, view.HasRuntime, options.syncDiagnostic)
 		applyImplWorkspaceViewOptions(&view, options)
 		views = append(views, view)
 	}
@@ -173,6 +181,7 @@ func applyOptionsToImplWorkspaceViews(views []ImplWorkspaceView, opts ...ImplWor
 		for i := range items {
 			applyImplWorkspaceViewOptions(&items[i], options)
 			items[i].Cleanup = workspaceCleanupReadiness(items[i])
+			items[i].Diagnostics = BuildWorkspaceLifecycleDiagnostic(items[i].Row, items[i].Runtime, items[i].HasRuntime, options.syncDiagnostic)
 			items[i].Children = append([]ImplWorkspaceView(nil), items[i].Children...)
 			apply(items[i].Children)
 		}
@@ -186,6 +195,20 @@ func applyCleanupReadiness(views []ImplWorkspaceView) {
 		views[i].Cleanup = workspaceCleanupReadiness(views[i])
 		applyCleanupReadiness(views[i].Children)
 	}
+}
+
+func AttachWorkspaceDiagnostics(views []ImplWorkspaceView, sync WorkspaceSyncDiagnostic) []ImplWorkspaceView {
+	out := append([]ImplWorkspaceView(nil), views...)
+	var attach func([]ImplWorkspaceView)
+	attach = func(items []ImplWorkspaceView) {
+		for i := range items {
+			items[i].Diagnostics = BuildWorkspaceLifecycleDiagnostic(items[i].Row, items[i].Runtime, items[i].HasRuntime, sync)
+			items[i].Children = append([]ImplWorkspaceView(nil), items[i].Children...)
+			attach(items[i].Children)
+		}
+	}
+	attach(out)
+	return out
 }
 
 func orderReleaseLaneViewsFirst(

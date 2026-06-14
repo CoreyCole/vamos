@@ -2,6 +2,7 @@ package workspaces
 
 import (
 	"database/sql"
+	"strings"
 	"testing"
 
 	"github.com/CoreyCole/vamos/pkg/db"
@@ -426,6 +427,131 @@ func TestBuildImplWorkspaceViewsPreservesCleanedUpMergedRowsAsHistory(t *testing
 		got[1].Row.Status != string(ImplWorkspaceStatusMerged) ||
 		got[1].Cleanup.Group != CleanupGroupSafeToCleanup {
 		t.Fatalf("got = %+v", got)
+	}
+}
+
+func TestDetectLifecycleRuntimeConflictsMergedRunning(t *testing.T) {
+	row := db.ImplWorkspace{
+		ProjectID:     "github.com/coreycole/vamos",
+		WorkspaceSlug: "feature",
+		CheckoutPath:  "/repo/feature",
+		Status:        string(ImplWorkspaceStatusMerged),
+	}
+	runtime := snapshotFromState(Workspace{
+		ProjectID:    row.ProjectID,
+		Slug:         row.WorkspaceSlug,
+		CheckoutPath: row.CheckoutPath,
+		Status:       StatusRunning,
+	}, WorkspaceLifecycleState{DesiredState: WorkspaceDesiredRunning})
+
+	got := DetectLifecycleRuntimeConflicts(row, runtime, true)
+	if len(got) != 1 {
+		t.Fatalf("len(got) = %d, want 1: %+v", len(got), got)
+	}
+	if got[0].Source != WorkspaceDiagnosticSourceLocalRun || got[0].Severity != WorkspaceDiagnosticWarning {
+		t.Fatalf("diagnostic = %+v, want local runtime warning", got[0])
+	}
+	if got[0].ProjectID != row.ProjectID || got[0].WorkspaceSlug != row.WorkspaceSlug || got[0].CheckoutPath != row.CheckoutPath {
+		t.Fatalf("diagnostic target = %+v, want row target", got[0])
+	}
+	if !strings.Contains(got[0].Message, "stale") || !strings.Contains(got[0].Detail, "manager DB lifecycle=merged") {
+		t.Fatalf("diagnostic copy = %+v, want stale manager lifecycle detail", got[0])
+	}
+}
+
+func TestDetectLifecycleRuntimeConflictsCleanedCrashed(t *testing.T) {
+	row := db.ImplWorkspace{
+		WorkspaceSlug: "feature",
+		CheckoutPath:  "/repo/feature",
+		Status:        string(ImplWorkspaceStatusCleanedUp),
+	}
+	runtime := snapshotFromState(Workspace{
+		Slug:         row.WorkspaceSlug,
+		CheckoutPath: row.CheckoutPath,
+		Status:       StatusCrashed,
+	}, WorkspaceLifecycleState{})
+
+	got := BuildWorkspaceLifecycleDiagnostic(row, runtime, true, WorkspaceSyncDiagnostic{})
+	if got.Lifecycle != ImplWorkspaceStatusCleanedUp || got.RuntimeStatus != string(StatusCrashed) {
+		t.Fatalf("diagnostic = %+v, want cleaned lifecycle and crashed runtime", got)
+	}
+	if len(got.Diagnostics) != 1 || got.Diagnostics[0].Code != "local_runtime_conflicts_with_manager_lifecycle" {
+		t.Fatalf("diagnostics = %+v, want conflict warning", got.Diagnostics)
+	}
+	if !strings.Contains(got.CleanupMessage, "human approval") {
+		t.Fatalf("cleanup message = %q, want human approval warning", got.CleanupMessage)
+	}
+}
+
+func TestBuildWorkspaceLifecycleDiagnosticDoesNotOverrideLifecycle(t *testing.T) {
+	row := db.ImplWorkspace{
+		ProjectID:     "github.com/coreycole/vamos",
+		WorkspaceSlug: "feature",
+		CheckoutPath:  "/repo/feature",
+		Status:        string(ImplWorkspaceStatusMerged),
+	}
+	runtime := snapshotFromState(Workspace{
+		ProjectID:    row.ProjectID,
+		Slug:         row.WorkspaceSlug,
+		CheckoutPath: row.CheckoutPath,
+		Status:       StatusRunning,
+	}, WorkspaceLifecycleState{})
+
+	got := BuildWorkspaceLifecycleDiagnostic(row, runtime, true, WorkspaceSyncDiagnostic{})
+	if got.Lifecycle != ImplWorkspaceStatusMerged || got.LifecycleSource != WorkspaceDiagnosticSourceManagerDB {
+		t.Fatalf("lifecycle = %q source %q, want merged from manager DB", got.Lifecycle, got.LifecycleSource)
+	}
+	if got.RuntimeStatus != string(StatusRunning) || got.RuntimeSource != WorkspaceDiagnosticSourceLocalRun {
+		t.Fatalf("runtime = %q source %q, want running local diagnostics", got.RuntimeStatus, got.RuntimeSource)
+	}
+}
+
+func TestBuildWorkspaceLifecycleDiagnosticFiltersSyncWarningsByTarget(t *testing.T) {
+	row := db.ImplWorkspace{
+		ProjectID:     "github.com/coreycole/vamos",
+		WorkspaceSlug: "feature",
+		CheckoutPath:  "/repo/feature",
+		Status:        string(ImplWorkspaceStatusActive),
+	}
+	sync := WorkspaceSyncDiagnostic{Warnings: []WorkspaceDiagnostic{
+		{Source: WorkspaceDiagnosticSourceSync, Severity: WorkspaceDiagnosticWarning, Code: "match_slug", ProjectID: row.ProjectID, WorkspaceSlug: row.WorkspaceSlug},
+		{Source: WorkspaceDiagnosticSourceSync, Severity: WorkspaceDiagnosticWarning, Code: "match_path", CheckoutPath: row.CheckoutPath},
+		{Source: WorkspaceDiagnosticSourceSync, Severity: WorkspaceDiagnosticWarning, Code: "other", ProjectID: row.ProjectID, WorkspaceSlug: "other", CheckoutPath: "/repo/other"},
+	}}
+
+	got := BuildWorkspaceLifecycleDiagnostic(row, WorkspaceLifecycleSnapshot{}, false, sync)
+	if len(got.Diagnostics) != 2 {
+		t.Fatalf("diagnostics = %+v, want two matching warnings", got.Diagnostics)
+	}
+	codes := map[string]bool{}
+	for _, diagnostic := range got.Diagnostics {
+		codes[diagnostic.Code] = true
+	}
+	if !codes["match_slug"] || !codes["match_path"] || codes["other"] {
+		t.Fatalf("codes = %+v, want only matching warnings", codes)
+	}
+}
+
+func TestBuildImplWorkspaceViewsAttachesDiagnostics(t *testing.T) {
+	rows := []db.ImplWorkspace{{
+		ProjectID:     "github.com/coreycole/vamos",
+		WorkspaceSlug: "feature",
+		CheckoutPath:  "/repo/feature",
+		Status:        string(ImplWorkspaceStatusMerged),
+	}}
+	runtime := []WorkspaceLifecycleSnapshot{snapshotFromState(Workspace{
+		ProjectID:    rows[0].ProjectID,
+		Slug:         rows[0].WorkspaceSlug,
+		CheckoutPath: rows[0].CheckoutPath,
+		Status:       StatusRunning,
+	}, WorkspaceLifecycleState{})}
+
+	got := BuildImplWorkspaceViews(rows, runtime, WorkspaceLifecycleSnapshot{})
+	if len(got) != 1 {
+		t.Fatalf("len(got) = %d, want 1", len(got))
+	}
+	if got[0].Diagnostics.Lifecycle != ImplWorkspaceStatusMerged || len(got[0].Diagnostics.Diagnostics) != 1 {
+		t.Fatalf("diagnostics = %+v, want merged lifecycle conflict", got[0].Diagnostics)
 	}
 }
 
