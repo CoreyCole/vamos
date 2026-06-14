@@ -31,9 +31,9 @@ Reverse proxy, TLS, DNS, and workspace domains are host responsibilities.
 
 Google OAuth and access policy are host-owned:
 
-- `google_credentials_file`: path to the Google OAuth web client JSON.
-- `whitelisted_emails`: explicit individual email allowlist, best for first local runs or small teams.
-- `allowed_domains`: team/domain allowlist for deployments.
+- `google_credentials_file` / `GOOGLE_CREDENTIALS_FILE`: path to the Google OAuth web client JSON.
+- `whitelisted_emails` / `AUTH_WHITELISTED_EMAILS`: explicit individual email allowlist, best for first local runs or small teams.
+- `allowed_domains` / `AUTH_ALLOWED_DOMAINS`: team/domain allowlist for deployments.
 
 Use one whitelisted email for the first local quickstart. Add allowed domains only when the host is ready to grant team access.
 
@@ -64,7 +64,7 @@ Deployment config points to host-owned service names and restart/rebuild hooks. 
 
 ## Datastar assets
 
-A licensed Datastar Pro bundle is optional. If `VAMOS_DATASTAR_PRO_ASSET` is unset and no local Pro bundle exists, the browser uses public Datastar plus `/js/vamos-datastar-polyfills.js` for the small Pro contracts Vamos uses.
+A licensed Datastar Pro bundle is optional. Set `VAMOS_DATASTAR_PRO_ASSET` only when the host has a licensed local bundle. If it is unset and no local Pro bundle exists, the browser uses public Datastar plus `/js/vamos-datastar-polyfills.js` for the small Pro contracts Vamos uses.
 
 ## Generic host repo layout
 

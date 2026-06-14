@@ -26,7 +26,7 @@ cp config.example.yml config.local.yml
 cp .env.example .env
 ```
 
-Set these values in `config.local.yml` or environment variables:
+Set these values in `config.local.yml`:
 
 ```yaml
 auth:
@@ -35,6 +35,8 @@ auth:
     - developer@example.com
   allowed_domains: []
 ```
+
+Equivalent environment overrides are `GOOGLE_CREDENTIALS_FILE`, `AUTH_WHITELISTED_EMAILS`, and `AUTH_ALLOWED_DOMAINS`.
 
 Use one `whitelisted_emails` entry for the first local run. Leave `allowed_domains` empty until configuring a team deployment.
 
@@ -54,7 +56,7 @@ Open `http://localhost:4200` and sign in with the whitelisted email.
 
 ## 5. Datastar Pro optional path
 
-No Pro asset is required for the quickstart. Missing `static/js/datastar-pro-v1.js` may produce a warning; the browser falls back to public Datastar and `/js/vamos-datastar-polyfills.js`.
+No Pro asset is required for the quickstart. Leave `VAMOS_DATASTAR_PRO_ASSET` unset unless you have a licensed bundle. Missing `static/js/datastar-pro-v1.js` may produce a warning; the browser falls back to public Datastar and `/js/vamos-datastar-polyfills.js`.
 
 If you have a licensed Pro bundle:
 
