@@ -45,6 +45,17 @@ func newVerifyCommand() *cobra.Command {
 			return verifycmd.Main(args)
 		},
 	})
+	cmd.AddCommand(&cobra.Command{
+		Use:                "db-workspaces",
+		Short:              "Verify workspace SQLite DB projection invariants",
+		DisableFlagParsing: true,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if wantsHelp(args) {
+				return cmd.Help()
+			}
+			return verifycmd.MainDBWorkspaces(args)
+		},
+	})
 	return cmd
 }
 
