@@ -672,6 +672,51 @@ CREATE TABLE plan_workspace_impl_bindings (
 			t.Fatalf("plan_workspace_impl_bindings.%s was not added", column)
 		}
 	}
+	_, err = database.ExecContext(t.Context(), `
+INSERT INTO plan_workspaces (plan_dir_rel, project_id, plan_dir, label, artifact_updated_at)
+VALUES ('thoughts/test/plans/migration', 'vamos', '/thoughts/test/plans/migration', 'Migration', CURRENT_TIMESTAMP);
+INSERT INTO impl_workspaces (project_id, workspace_slug, checkout_role, checkout_path, display_name, plan_dir_rel, status)
+VALUES ('vamos', 'stage', 'stage', '/repo/vamos-stage', 'Stage', 'thoughts/test/plans/migration', 'active');
+INSERT INTO plan_workspace_projects (plan_dir_rel, project_id, role)
+VALUES ('thoughts/test/plans/migration', 'vamos', 'primary');
+INSERT INTO plan_workspace_impl_bindings (plan_dir_rel, project_id, status, impl_project_id, impl_workspace_slug)
+VALUES ('thoughts/test/plans/migration', 'vamos', 'active', 'vamos', 'stage');`)
+	if err != nil {
+		t.Fatalf("seed migrated workspace projection rows: %v", err)
+	}
+	assertMigratedWorkspaceDBInvariants(t, database)
+}
+
+func TestRunRuntimeMigrationsFailsDuplicateWorkspaceCheckoutPaths(t *testing.T) {
+	t.Parallel()
+
+	database := openMigratorTestDB(t)
+	createOldShapeAgentChatTables(t, database)
+	_, err := database.ExecContext(t.Context(), `
+CREATE TABLE impl_workspaces (
+	project_id TEXT NOT NULL DEFAULT '',
+	workspace_slug TEXT NOT NULL,
+	checkout_path TEXT NOT NULL,
+	display_name TEXT NOT NULL,
+	plan_dir_rel TEXT,
+	status TEXT NOT NULL DEFAULT 'active',
+	updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+	PRIMARY KEY (project_id, workspace_slug)
+);
+INSERT INTO impl_workspaces (project_id, workspace_slug, checkout_path, display_name, status)
+VALUES ('vamos', 'stage', '/repo/vamos', 'Stage', 'active'),
+       ('vamos', 'local', '/repo/vamos', 'Local', 'active');`)
+	if err != nil {
+		t.Fatalf("seed duplicate workspace checkout paths: %v", err)
+	}
+
+	err = runRuntimeMigrations(t.Context(), database)
+	if err == nil {
+		t.Fatal("runRuntimeMigrations() error = nil, want duplicate checkout path failure")
+	}
+	if !strings.Contains(err.Error(), "idx_impl_workspaces_checkout_path") && !strings.Contains(err.Error(), "UNIQUE") {
+		t.Fatalf("runRuntimeMigrations() error = %v, want checkout path uniqueness failure", err)
+	}
 }
 
 func TestRunRuntimeMigrationsRemovesAgentThreadWorkspaceID(t *testing.T) {
@@ -1079,6 +1124,43 @@ CREATE TABLE agent_runs (
 );`)
 	if err != nil {
 		t.Fatalf("create old-shape tables: %v", err)
+	}
+}
+
+func assertMigratedWorkspaceDBInvariants(t *testing.T, database *sql.DB) {
+	t.Helper()
+	for _, indexName := range []string{"idx_impl_workspaces_checkout_path", "idx_plan_workspace_projects_one_primary"} {
+		if !indexExists(t, database, indexName) {
+			t.Fatalf("indexExists(%s) = false, want true", indexName)
+		}
+	}
+	for _, tc := range []struct {
+		name  string
+		query string
+	}{
+		{name: "foreign key violations", query: "PRAGMA foreign_key_check"},
+		{name: "duplicate checkout paths", query: `select checkout_path from impl_workspaces group by checkout_path having count(*) > 1`},
+		{name: "orphan impl plan refs", query: `select plan_dir_rel from impl_workspaces where plan_dir_rel is not null and not exists (select 1 from plan_workspaces p where p.plan_dir_rel = impl_workspaces.plan_dir_rel)`},
+		{name: "active bindings missing plan", query: `select plan_dir_rel from plan_workspace_impl_bindings b where archived_at is null and not exists (select 1 from plan_workspaces p where p.plan_dir_rel = b.plan_dir_rel)`},
+		{name: "active bindings missing impl", query: `select plan_dir_rel from plan_workspace_impl_bindings b where archived_at is null and status = 'active' and impl_workspace_slug is not null and not exists (select 1 from impl_workspaces i where i.project_id = b.impl_project_id and i.workspace_slug = b.impl_workspace_slug)`},
+		{name: "protected terminal workspaces", query: `select project_id, workspace_slug from impl_workspaces where (workspace_slug in ('main', 'stage') or checkout_role in ('main', 'stage')) and status in ('merged', 'cleaned_up')`},
+	} {
+		assertMigratedWorkspaceDBNoRows(t, database, tc.name, tc.query)
+	}
+}
+
+func assertMigratedWorkspaceDBNoRows(t *testing.T, database *sql.DB, name, query string) {
+	t.Helper()
+	rows, err := database.QueryContext(t.Context(), query)
+	if err != nil {
+		t.Fatalf("%s query: %v", name, err)
+	}
+	defer rows.Close()
+	if rows.Next() {
+		t.Fatalf("%s returned unexpected rows", name)
+	}
+	if err := rows.Err(); err != nil {
+		t.Fatalf("%s rows: %v", name, err)
 	}
 }
 

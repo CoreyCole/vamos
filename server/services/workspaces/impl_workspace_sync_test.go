@@ -185,7 +185,7 @@ func TestImplWorkspaceSyncReclaimsCheckoutPathForRenamedConfiguredWorkspace(t *t
 	ctx := context.Background()
 	parent := t.TempDir()
 	workDir := makeImplSyncCheckout(t, t.TempDir(), "editable-vamos")
-	queries := openImplSyncTestQueries(t)
+	dbConn, queries := openImplSyncTestDB(t)
 
 	_, err := queries.UpsertDiscoveredImplWorkspace(ctx, db.UpsertDiscoveredImplWorkspaceParams{
 		ProjectID:     "vamos",
@@ -230,6 +230,7 @@ func TestImplWorkspaceSyncReclaimsCheckoutPathForRenamedConfiguredWorkspace(t *t
 	if _, err := queries.GetImplWorkspace(ctx, db.GetImplWorkspaceParams{ProjectID: "vamos", WorkspaceSlug: "local"}); !errors.Is(err, sql.ErrNoRows) {
 		t.Fatalf("GetImplWorkspace(local) err = %v, want sql.ErrNoRows", err)
 	}
+	assertImplWorkspaceSyncDBInvariants(t, dbConn)
 }
 
 func TestImplWorkspaceSyncIncludesConfiguredCheckouts(t *testing.T) {
@@ -1048,7 +1049,7 @@ func TestImplWorkspaceSyncerAttachesPlanBinding(t *testing.T) {
 		parent,
 		"cn-agents-2026-05-20_20-18-45_workspace-discovery-sync",
 	)
-	queries := openImplSyncTestQueries(t)
+	dbConn, queries := openImplSyncTestDB(t)
 	planDir := "thoughts/creative-mode-agent/plans/2026-05-20_20-18-45_workspace-discovery-sync"
 	_, err := queries.UpsertDiscoveredPlanWorkspace(ctx, db.UpsertDiscoveredPlanWorkspaceParams{
 		PlanDirRel:        planDir,
@@ -1104,6 +1105,7 @@ func TestImplWorkspaceSyncerAttachesPlanBinding(t *testing.T) {
 	if len(bindings) != 1 || bindings[0].ProjectID != "vamos" || bindings[0].Status != "active" || bindings[0].BindingSource != "binding_file" {
 		t.Fatalf("plan workspace impl bindings = %#v", bindings)
 	}
+	assertImplWorkspaceSyncDBInvariants(t, dbConn)
 }
 
 func TestImplWorkspaceSyncerCanonicalizesAbsolutePlanBinding(t *testing.T) {
@@ -1200,14 +1202,7 @@ func TestImplWorkspaceSyncerIgnoresMissingPlanBindingWithForeignKeys(t *testing.
 	if row.PlanDirRel.Valid || row.PlanDir.Valid {
 		t.Fatalf("plan binding = rel:%+v dir:%+v, want cleared missing plan", row.PlanDirRel, row.PlanDir)
 	}
-	violations, err := dbConn.QueryContext(ctx, "PRAGMA foreign_key_check")
-	if err != nil {
-		t.Fatalf("foreign_key_check: %v", err)
-	}
-	defer violations.Close()
-	if violations.Next() {
-		t.Fatal("foreign_key_check reported violations")
-	}
+	assertImplWorkspaceSyncDBInvariants(t, dbConn)
 }
 
 func openImplSyncTestQueries(t *testing.T) *db.Queries {
@@ -1228,10 +1223,90 @@ func openImplSyncTestDB(t *testing.T) (*sql.DB, *db.Queries) {
 	if err != nil {
 		t.Fatalf("read schema %s: %v", schemaPath, err)
 	}
-	if _, err := dbConn.Exec(string(schema)); err != nil {
+	if _, err := dbConn.ExecContext(t.Context(), "PRAGMA foreign_keys = ON"); err != nil {
+		t.Fatalf("enable foreign keys: %v", err)
+	}
+	if _, err := dbConn.ExecContext(t.Context(), string(schema)); err != nil {
 		t.Fatalf("exec schema: %v", err)
 	}
 	return dbConn, db.New(dbConn)
+}
+
+func assertImplWorkspaceSyncDBInvariants(t *testing.T, database *sql.DB) {
+	t.Helper()
+	assertImplWorkspaceSyncNoRows(t, database, "foreign key violations", "PRAGMA foreign_key_check")
+	for _, tc := range []struct {
+		name  string
+		query string
+	}{
+		{
+			name: "duplicate checkout paths",
+			query: `select checkout_path
+from impl_workspaces
+where checkout_path <> ''
+group by checkout_path
+having count(*) > 1`,
+		},
+		{
+			name: "orphan impl plan refs",
+			query: `select plan_dir_rel
+from impl_workspaces
+where plan_dir_rel is not null
+  and not exists (select 1 from plan_workspaces p where p.plan_dir_rel = impl_workspaces.plan_dir_rel)`,
+		},
+		{
+			name: "active bindings missing plan",
+			query: `select plan_dir_rel
+from plan_workspace_impl_bindings b
+where archived_at is null
+  and not exists (select 1 from plan_workspaces p where p.plan_dir_rel = b.plan_dir_rel)`,
+		},
+		{
+			name: "active bindings missing impl",
+			query: `select plan_dir_rel
+from plan_workspace_impl_bindings b
+where archived_at is null
+  and status = 'active'
+  and impl_workspace_slug is not null
+  and not exists (
+    select 1 from impl_workspaces i
+    where i.project_id = b.impl_project_id
+      and i.workspace_slug = b.impl_workspace_slug
+  )`,
+		},
+		{
+			name: "duplicate active primary plan project",
+			query: `select plan_dir_rel
+from plan_workspace_projects
+where archived_at is null and role = 'primary'
+group by plan_dir_rel
+having count(*) > 1`,
+		},
+		{
+			name: "protected terminal workspaces",
+			query: `select project_id, workspace_slug
+from impl_workspaces
+where (workspace_slug in ('main', 'stage') or checkout_role in ('main', 'stage'))
+  and status in ('merged', 'cleaned_up')`,
+		},
+	} {
+		assertImplWorkspaceSyncNoRows(t, database, tc.name, tc.query)
+	}
+}
+
+func assertImplWorkspaceSyncNoRows(t *testing.T, database *sql.DB, name, query string) {
+	t.Helper()
+	rows, err := database.QueryContext(t.Context(), query)
+	if err != nil {
+		t.Fatalf("%s query: %v", name, err)
+	}
+	defer rows.Close()
+	if rows.Next() {
+		t.Fatalf("%s returned unexpected rows", name)
+	}
+	if err := rows.Err(); err != nil {
+		t.Fatalf("%s rows: %v", name, err)
+	}
 }
 
 func makeImplSyncCheckout(t *testing.T, parent, name string) string {
