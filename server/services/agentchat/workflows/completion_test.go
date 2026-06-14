@@ -263,6 +263,53 @@ func TestAdvanceHumanGateRejectsWhenNotWaiting(t *testing.T) {
 	}
 }
 
+func TestOnRunCompleteInvalidFencedQRSPIResultCorrectionIncludesParserError(t *testing.T) {
+	t.Parallel()
+
+	def, err := qrspi.Definition()
+	if err != nil {
+		t.Fatalf("qrspi.Definition() error = %v", err)
+	}
+	state, err := wruntime.InitialState(def, nil)
+	if err != nil {
+		t.Fatalf("InitialState() error = %v", err)
+	}
+	registry := wruntime.NewRegistry()
+	if err := registry.Register(def); err != nil {
+		t.Fatalf("Register() error = %v", err)
+	}
+	store := &fakeStore{
+		state: state,
+		assistantText: strings.Join([]string{
+			"```yaml",
+			"qrspi_result:",
+			"  stage: [not: valid",
+			"```",
+		}, "\n"),
+		run: db.AgentRun{
+			ID:          "run-1",
+			WorkspaceID: sql.NullString{String: "workspace-1", Valid: true},
+			ThreadID:    "thread-1",
+			WorkflowNodeID: sql.NullString{
+				String: string(qrspi.NodeQuestion),
+				Valid:  true,
+			},
+		},
+	}
+	runner := &fakeRunner{}
+
+	err = (&Service{Definitions: registry, Store: store, Runner: runner}).OnRunComplete(
+		t.Context(),
+		conversation.RunResult{RunID: "run-1", HeadEntryID: "assistant-1"},
+	)
+	if err != nil {
+		t.Fatalf("OnRunComplete() error = %v", err)
+	}
+	if len(runner.starts) != 1 || !strings.Contains(runner.starts[0].Prompt, "parse qrspi result YAML") {
+		t.Fatalf("correction prompt = %q, want concrete parser error", runner.starts[0].Prompt)
+	}
+}
+
 func TestOnRunCompleteInvalidYAMLStartsCorrectionRun(t *testing.T) {
 	t.Parallel()
 

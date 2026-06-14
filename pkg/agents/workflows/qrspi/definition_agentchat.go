@@ -23,6 +23,7 @@ const (
 	NodeWorkspace                 wruntime.NodeID = "workspace"
 	NodeImplement                 wruntime.NodeID = "implement"
 	NodeReviewImplementation      wruntime.NodeID = "review-implementation"
+	NodeVerify                    wruntime.NodeID = "verify"
 	NodeHumanReviewImplementation wruntime.NodeID = "human-review-implementation"
 	NodeDone                      wruntime.NodeID = "done"
 )
@@ -95,6 +96,10 @@ func Definition() (wruntime.Definition, error) {
 		Statuses(wruntime.StatusComplete, wruntime.StatusNeedsHuman, wruntime.StatusBlocked, wruntime.StatusError).
 		Outcomes(wruntime.OutcomeReadyForHumanReview, wruntime.OutcomeNeedsFollowup).
 		RequiresPrimaryArtifact().
+		Agent(NodeVerify, Skill(".pi/skills/q-verify/SKILL.md")).
+		Statuses(wruntime.StatusComplete, wruntime.StatusNeedsHuman, wruntime.StatusBlocked, wruntime.StatusError).
+		Outcomes(wruntime.OutcomeComplete).
+		RequiresPrimaryArtifact().
 		HumanReview(NodeHumanReviewImplementation, "implementation approved by human").
 		Statuses(wruntime.StatusComplete, wruntime.StatusBlocked, wruntime.StatusError).
 		Outcomes(wruntime.OutcomeComplete).
@@ -128,7 +133,8 @@ func Definition() (wruntime.Definition, error) {
 		From(NodeReviewImplementation).
 		On(wruntime.OutcomeNeedsFollowup).GoTo(NodeQuestion).
 		From(NodeReviewImplementation).
-		On(wruntime.OutcomeReadyForHumanReview).GoTo(NodeHumanReviewImplementation).
+		On(wruntime.OutcomeReadyForHumanReview).GoTo(NodeVerify).
+		From(NodeVerify).On(wruntime.OutcomeComplete).GoTo(NodeHumanReviewImplementation).
 		From(NodeHumanReviewImplementation).On(wruntime.OutcomeComplete).GoTo(NodeDone).
 		ResultParser(QRSPIResultParser{}).
 		ResultConverter(QRSPIResultConverter{}).

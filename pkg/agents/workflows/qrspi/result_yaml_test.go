@@ -226,6 +226,7 @@ func TestQRSPIResultParserAcceptsCanonicalStagesAndOutcomes(t *testing.T) {
 		{NodeWorkspace, wruntime.OutcomeComplete},
 		{NodeImplement, wruntime.OutcomeComplete},
 		{NodeReviewImplementation, wruntime.OutcomeReadyForHumanReview},
+		{NodeVerify, wruntime.OutcomeComplete},
 		{NodeHumanReviewImplementation, wruntime.OutcomeComplete},
 	}
 	for _, tt := range tests {
@@ -348,7 +349,7 @@ func TestDefinition(t *testing.T) {
 	if def.ID != AgentChatWorkflowType || def.Start != NodeQuestion {
 		t.Fatalf("definition ID/start = %q/%q", def.ID, def.Start)
 	}
-	for _, node := range []wruntime.NodeID{NodeQuestion, NodeResearch, NodeDesign, NodeOutline, NodeReviewOutline, NodeHumanReviewOutline, NodeResearchForReviewOutline, NodeAddressReviewResearchOutline, NodePlan, NodeReviewPlan, NodeResearchForReviewPlan, NodeAddressReviewResearchPlan, NodeWorkspace, NodeImplement, NodeReviewImplementation, NodeHumanReviewImplementation, NodeDone} {
+	for _, node := range []wruntime.NodeID{NodeQuestion, NodeResearch, NodeDesign, NodeOutline, NodeReviewOutline, NodeHumanReviewOutline, NodeResearchForReviewOutline, NodeAddressReviewResearchOutline, NodePlan, NodeReviewPlan, NodeResearchForReviewPlan, NodeAddressReviewResearchPlan, NodeWorkspace, NodeImplement, NodeReviewImplementation, NodeVerify, NodeHumanReviewImplementation, NodeDone} {
 		if _, ok := def.Nodes[node]; !ok {
 			t.Fatalf("missing node %q", node)
 		}

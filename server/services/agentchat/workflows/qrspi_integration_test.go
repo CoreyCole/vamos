@@ -3,6 +3,7 @@ package workflows
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"testing"
@@ -93,12 +94,21 @@ func TestQRSPIEndToEndPlanningPath(t *testing.T) {
 		"complete",
 		"reviews/implementation-review/review.md",
 	)
+	assertCurrentNode(t, store, runner, qrspi.NodeVerify)
+	completeQRSPIIntegrationNode(
+		t,
+		svc,
+		store,
+		qrspi.NodeVerify,
+		"complete",
+		"verify.md",
+	)
 	assertWaitingHuman(
 		t,
 		store,
 		qrspi.NodeHumanReviewImplementation,
-		qrspi.NodeReviewImplementation,
-		"reviews/implementation-review/review.md",
+		qrspi.NodeVerify,
+		"verify.md",
 	)
 	advanceQRSPIIntegrationGate(
 		t,
@@ -119,6 +129,64 @@ func TestQRSPIEndToEndPlanningPath(t *testing.T) {
 	completeQRSPIIntegrationNode(t, svc, store, qrspi.NodeDone, "done", "done.md")
 	if store.state.Status != wruntime.WorkspaceStatusDone {
 		t.Fatalf("status = %q, want done", store.state.Status)
+	}
+}
+
+func TestQRSPIAdvanceModeDiscussDoesNotStartNextRun(t *testing.T) {
+	policy := mustQRSPIIntegrationPolicy(t, qrspi.Policy{
+		AdvanceMode:             qrspi.AdvanceModeDiscuss,
+		AutoMode:                false,
+		EnablePlanReviews:       true,
+		InvalidResultRetryLimit: 1,
+	})
+	svc, store, runner := newQRSPIIntegrationHarness(t, policy)
+
+	completeQRSPIIntegrationNode(t, svc, store, qrspi.NodeQuestion, "complete", "questions/runtime.md")
+
+	if store.state.PendingNextNodeID != qrspi.NodeResearch ||
+		store.state.CurrentNodeID != qrspi.NodeResearch ||
+		store.state.Status != wruntime.WorkspaceStatusIdle {
+		t.Fatalf("state = %#v, want idle research with pending manual start", store.state)
+	}
+	if len(runner.starts) != 0 {
+		t.Fatalf("starts = %#v, want no auto-start in discuss mode", runner.starts)
+	}
+}
+
+func TestQRSPIAdvanceModeGuidedStartsNonHumanNextRun(t *testing.T) {
+	policy := mustQRSPIIntegrationPolicy(t, qrspi.Policy{
+		AdvanceMode:             qrspi.AdvanceModeGuided,
+		AutoMode:                false,
+		EnablePlanReviews:       true,
+		InvalidResultRetryLimit: 1,
+	})
+	svc, store, runner := newQRSPIIntegrationHarness(t, policy)
+
+	completeQRSPIIntegrationNode(t, svc, store, qrspi.NodeQuestion, "complete", "questions/runtime.md")
+
+	assertCurrentNode(t, store, runner, qrspi.NodeResearch)
+}
+
+func TestQRSPIAdvanceModeAutopilotDoesNotBypassFinalImplementationHumanGate(t *testing.T) {
+	policy := mustQRSPIIntegrationPolicy(t, qrspi.Policy{
+		AdvanceMode:             qrspi.AdvanceModeAutopilot,
+		AutoMode:                true,
+		EnablePlanReviews:       true,
+		InvalidResultRetryLimit: 1,
+	})
+	svc, store, runner := newQRSPIIntegrationHarness(t, policy)
+	moveQRSPIIntegrationState(t, store, qrspi.NodeReviewOutline)
+
+	completeQRSPIIntegrationNode(t, svc, store, qrspi.NodeReviewOutline, "complete", "reviews/outline-review/review.md")
+	assertCurrentNode(t, store, runner, qrspi.NodePlan)
+
+	moveQRSPIIntegrationState(t, store, qrspi.NodeReviewImplementation)
+	completeQRSPIIntegrationNode(t, svc, store, qrspi.NodeReviewImplementation, "complete", "reviews/implementation-review/review.md")
+	assertCurrentNode(t, store, runner, qrspi.NodeVerify)
+	completeQRSPIIntegrationNode(t, svc, store, qrspi.NodeVerify, "complete", "verify.md")
+	assertWaitingHuman(t, store, qrspi.NodeHumanReviewImplementation, qrspi.NodeVerify, "verify.md")
+	if store.state.Nodes[qrspi.NodeHumanReviewImplementation].Status == wruntime.NodeStatusBypassed {
+		t.Fatalf("human-review-implementation state = %#v, want not bypassed", store.state.Nodes[qrspi.NodeHumanReviewImplementation])
 	}
 }
 
@@ -277,7 +345,7 @@ func TestQRSPIHumanReviewLoadsAutomatedReviewContext(t *testing.T) {
 	assertCurrentNode(t, store, runner, qrspi.NodeOutline)
 }
 
-func TestQRSPIHumanReviewImplementationBeforeDone(t *testing.T) {
+func TestQRSPIVerifyBeforeHumanReviewImplementationBeforeDone(t *testing.T) {
 	svc, store, runner := newQRSPIIntegrationHarness(t, nil)
 	moveQRSPIIntegrationState(t, store, qrspi.NodeImplement)
 	completeQRSPIIntegrationNode(
@@ -297,12 +365,21 @@ func TestQRSPIHumanReviewImplementationBeforeDone(t *testing.T) {
 		"complete",
 		"reviews/implementation-review/review.md",
 	)
+	assertCurrentNode(t, store, runner, qrspi.NodeVerify)
+	completeQRSPIIntegrationNode(
+		t,
+		svc,
+		store,
+		qrspi.NodeVerify,
+		"complete",
+		"verify.md",
+	)
 	assertWaitingHuman(
 		t,
 		store,
 		qrspi.NodeHumanReviewImplementation,
-		qrspi.NodeReviewImplementation,
-		"reviews/implementation-review/review.md",
+		qrspi.NodeVerify,
+		"verify.md",
 	)
 	advanceQRSPIIntegrationGate(
 		t,
@@ -376,12 +453,21 @@ func TestQRSPIAutoModeSkipsAutoApprovablePlanningGateOnly(t *testing.T) {
 		"complete",
 		"reviews/implementation-review/review.md",
 	)
+	assertCurrentNode(t, store, runner, qrspi.NodeVerify)
+	completeQRSPIIntegrationNode(
+		t,
+		svc,
+		store,
+		qrspi.NodeVerify,
+		"complete",
+		"verify.md",
+	)
 	assertWaitingHuman(
 		t,
 		store,
 		qrspi.NodeHumanReviewImplementation,
-		qrspi.NodeReviewImplementation,
-		"reviews/implementation-review/review.md",
+		qrspi.NodeVerify,
+		"verify.md",
 	)
 	if store.state.Nodes[qrspi.NodeHumanReviewImplementation].Status == wruntime.NodeStatusBypassed {
 		t.Fatalf(
@@ -1153,14 +1239,11 @@ func hasWorkflowEvent(events []wruntime.Event, eventType string) bool {
 
 func mustQRSPIIntegrationPolicy(t *testing.T, policy qrspi.Policy) []byte {
 	t.Helper()
-	return []byte(
-		fmt.Sprintf(
-			`{"autoMode":%t,"enablePlanReviews":%t,"invalidResultRetryLimit":%d}`,
-			policy.AutoMode,
-			policy.EnablePlanReviews,
-			policy.InvalidResultRetryLimit,
-		),
-	)
+	encoded, err := json.Marshal(policy)
+	if err != nil {
+		t.Fatalf("Marshal(policy) error = %v", err)
+	}
+	return encoded
 }
 
 func qRSPIIntegrationOutcome(node wruntime.NodeID) wruntime.ResultOutcome {

@@ -57,11 +57,12 @@ func TestQRSPITransitions(t *testing.T) {
 	state = assertStartsNext(t, def, state, NodeReviewPlan, NodeWorkspace)
 	state = assertStartsNext(t, def, state, NodeWorkspace, NodeImplement)
 	state = assertStartsNext(t, def, state, NodeImplement, NodeReviewImplementation)
+	state = assertStartsNext(t, def, state, NodeReviewImplementation, NodeVerify)
 	state = assertWaitsHuman(
 		t,
 		def,
 		state,
-		NodeReviewImplementation,
+		NodeVerify,
 		NodeHumanReviewImplementation,
 	)
 	state = advanceHumanGate(state)
@@ -165,6 +166,8 @@ func TestQRSPIWorkflowRenderersExposeReviewBranches(t *testing.T) {
 		"review-outline -- outcome=ready-for-plan --> plan",
 		"review-plan -- outcome=ready-for-workspace --> workspace",
 		"review-implementation -- outcome=needs-followup --> question",
+		"review-implementation -- outcome=ready-for-human-review --> verify",
+		"verify -- outcome=complete --> human-review-implementation",
 	} {
 		if !strings.Contains(mermaid, want) {
 			t.Fatalf("RenderMermaid() = %q, want %q", mermaid, want)
