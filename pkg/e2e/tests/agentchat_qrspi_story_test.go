@@ -28,17 +28,20 @@ func TestAgentChatQRSPIContinuationStory(t *testing.T) {
 		Run()
 }
 
-func TestAgentChatQRSPIQuestionCompletionAutoStartsResearch(t *testing.T) {
-	spec.Story(t, "agentchat qrspi question completion auto starts research").
+func TestAgentChatQRSPIQuestionCompletionAutoStartsDesign(t *testing.T) {
+	spec.Story(t, "agentchat qrspi question completion auto starts design").
 		App(vamos.App()).
 		As(vamos.Robot).
-		Do(vamos.StartQRSPIQuestionToResearchWorkspace()).
+		Do(vamos.StartQRSPIQuestionToDesignWorkspace()).
 		Expect(vamos.WaitForWorkflowRunResult("question")).
 		Expect(vamos.WaitForWorkflowRunStarted("research")).
-		Expect(vamos.ExpectWorkflowCurrentNode("research")).
 		Expect(vamos.ExpectDistinctWorkflowRuns("question", "research")).
+		Expect(vamos.WaitForWorkflowRunResult("research")).
+		Expect(vamos.ExpectWorkflowArtifactExists("qrspi_q_to_d_research_artifact_abs", "VAMOS_E2E_QRSPI_Q_TO_D_")).
+		Expect(vamos.ExpectWorkflowRunResultContains("research", "research")).
+		Expect(vamos.WaitForWorkflowRunStarted("design")).
+		Expect(vamos.ExpectWorkflowCurrentNode("design")).
 		Do(vamos.ReloadChat()).
-		Expect(vamos.ExpectWorkflowCurrentNode("research")).
-		Expect(vamos.ExpectResearchRunVisible()).
+		Expect(vamos.ExpectWorkflowCurrentNode("design")).
 		Run()
 }

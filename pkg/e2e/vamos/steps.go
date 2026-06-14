@@ -504,27 +504,40 @@ func OpenQRSPIContinuationWorkspaceChat() spec.Step {
 	})
 }
 
-func StartQRSPIQuestionToResearchWorkspace() spec.Step {
-	return customStep("start qrspi question to research workspace", func(t testing.TB, ctx *duiruntime.Context) {
+func StartQRSPIQuestionToDesignWorkspace() spec.Step {
+	return customStep("start qrspi question to design workspace", func(t testing.TB, ctx *duiruntime.Context) {
 		ensureMemory(ctx)
 		stamp := time.Now().UTC().Format("20060102T150405.000000000")
-		marker := "VAMOS_E2E_QRSPI_Q_TO_R_" + stamp
-		planRel := path.Join("creative-mode-agent", "plans", "e2e-qrspi-q-to-r-"+stamp)
-		artifactRel := path.Join("thoughts", planRel, "questions", stamp+"_questions.md")
+		marker := "VAMOS_E2E_QRSPI_Q_TO_D_" + stamp
+		planRel := path.Join("creative-mode-agent", "plans", "e2e-qrspi-q-to-d-"+stamp)
+		questionRel := path.Join("thoughts", planRel, "questions", stamp+"_questions.md")
+		fixtureRel := path.Join("thoughts", planRel, "context", "e2e", stamp+"_research_fast_path.md")
+		researchRel := path.Join("thoughts", planRel, "research", stamp+"_research.md")
 		planAbs := filepath.Join(thoughtsRoot(ctx), filepath.FromSlash(planRel))
-		if err := os.MkdirAll(filepath.Join(planAbs, "questions"), 0o755); err != nil {
+		for _, dir := range []string{
+			filepath.Join(planAbs, "questions"),
+			filepath.Join(planAbs, "context", "e2e"),
+			filepath.Join(planAbs, "research"),
+		} {
+			if err := os.MkdirAll(dir, 0o755); err != nil {
+				t.Fatal(err)
+			}
+		}
+		if err := os.WriteFile(filepath.Join(planAbs, "AGENTS.md"), []byte("# E2E QRSPI Question To Design\n"), 0o644); err != nil {
 			t.Fatal(err)
 		}
-		if err := os.WriteFile(filepath.Join(planAbs, "AGENTS.md"), []byte("# E2E QRSPI Question To Research\n"), 0o644); err != nil {
-			t.Fatal(err)
-		}
-		if err := os.WriteFile(filepath.Join(planAbs, "plan.md"), []byte("# E2E QRSPI Question To Research\n"), 0o644); err != nil {
+		if err := os.WriteFile(filepath.Join(planAbs, "plan.md"), []byte("# E2E QRSPI Question To Design\n"), 0o644); err != nil {
 			t.Fatal(err)
 		}
 		if err := os.WriteFile(filepath.Join(planAbs, "questions", stamp+"_questions.md"), []byte("# E2E placeholder\n"+marker+"\n"), 0o644); err != nil {
 			t.Fatal(err)
 		}
-		prompt := qrspiQuestionToResearchPrompt(marker, artifactRel)
+		fixture := qrspiResearchFastPathFixture(marker, "thoughts/"+planRel, researchRel)
+		if err := os.WriteFile(filepath.Join(planAbs, "context", "e2e", stamp+"_research_fast_path.md"), []byte(fixture), 0o644); err != nil {
+			t.Fatal(err)
+		}
+
+		prompt := qrspiQuestionToDesignPrompt(marker, questionRel, fixtureRel)
 		values := url.Values{}
 		values.Set("workflow_type", "qrspi")
 		values.Set("policy_preset", "assisted")
@@ -534,23 +547,29 @@ func StartQRSPIQuestionToResearchWorkspace() spec.Step {
 
 		workspaceID, _ := latestPlanWorkspaceByRootDocPath(t, ctx, planAbs)
 		if workspaceID == "" {
-			t.Fatal("qrspi question-to-research workspace not created")
+			t.Fatal("qrspi question-to-design workspace not created")
 		}
-		ctx.Memory["qrspi_q_to_r_workspace_id"] = workspaceID
+		ctx.Memory["qrspi_workflow_workspace_id"] = workspaceID
+		ctx.Memory["qrspi_q_to_d_workspace_id"] = workspaceID
+		ctx.Memory["qrspi_q_to_d_marker"] = marker
+		ctx.Memory["qrspi_q_to_d_question_artifact"] = questionRel
+		ctx.Memory["qrspi_q_to_d_fixture_artifact"] = fixtureRel
+		ctx.Memory["qrspi_q_to_d_research_artifact"] = researchRel
+		ctx.Memory["qrspi_q_to_d_research_artifact_abs"] = filepath.Join(thoughtsRoot(ctx), filepath.FromSlash(strings.TrimPrefix(researchRel, "thoughts/")))
+
 		question := waitForWorkflowRunForNode(t, ctx, "question", false)
-		ctx.Memory["qrspi_q_to_r_thread_id"] = question.ThreadID
-		ctx.Memory["qrspi_q_to_r_marker"] = marker
-		ctx.Memory["qrspi_q_to_r_artifact"] = artifactRel
+		ctx.Memory["qrspi_q_to_d_thread_id"] = question.ThreadID
 		visit(t, ctx, thoughtsChatURL(path.Join("thoughts", planRel, "plan.md"), workspaceID, question.ThreadID))
 	})
 }
 
-func qrspiQuestionToResearchPrompt(marker, artifactPath string) string {
-	planPath := path.Dir(path.Dir(artifactPath))
+func qrspiQuestionToDesignPrompt(marker, questionArtifactPath, fixtureArtifactPath string) string {
+	planPath := path.Dir(path.Dir(questionArtifactPath))
 	return fmt.Sprintf(strings.Join([]string{
 		"E2E TEST MODE.",
 		"Do not ask follow-up questions. Do not inspect files. Do not explain.",
 		"The questions artifact already exists at %s and contains marker %s.",
+		"The research fast-path fixture exists at %s and must be read by the next research run.",
 		"Reply with only this fenced YAML qrspi_result. No prose.",
 		"",
 		"```yaml",
@@ -558,7 +577,7 @@ func qrspiQuestionToResearchPrompt(marker, artifactPath string) string {
 		"  stage: \"question\"",
 		"  status: \"complete\"",
 		"  outcome: \"complete\"",
-		"  project: \"github.com/coreycole/vamos\"",
+		"  project: \"github.com/CoreyCole/vamos\"",
 		"  related_projects: []",
 		"  workspace: %q",
 		"  workspace_metadata:",
@@ -569,14 +588,18 @@ func qrspiQuestionToResearchPrompt(marker, artifactPath string) string {
 		"    parent_branch: \"\"",
 		"    current_branch: \"\"",
 		"  policy:",
+		"    advance_mode: \"guided\"",
 		"    auto_mode: false",
 		"    enable_plan_reviews: true",
 		"    invalid_result_retry_limit: 1",
 		"  summary:",
-		"    plan_goal: \"Advance the E2E QRSPI q-question to q-research using the existing questions artifact.\"",
+		"    plan_goal: \"Advance the E2E QRSPI workflow from question through research to design.\"",
 		"    stage_completed: \"Verified existing question artifact marker %s.\"",
-		"    key_decisions: \"Next stage should start immediately: q-research.\"",
+		"    key_decisions: \"Next stage should start immediately: q-research using the seeded fixture.\"",
 		"  artifact: %q",
+		"  artifacts:",
+		"    - role: \"e2e-fixture\"",
+		"      path: %q",
 		"  next:",
 		"    steps:",
 		"      - action: \"read_skill\"",
@@ -588,7 +611,57 @@ func qrspiQuestionToResearchPrompt(marker, artifactPath string) string {
 		"      - action: \"start_stage\"",
 		"        param: \"q-research\"",
 		"```",
-	}, "\n"), artifactPath, marker, planPath, planPath, marker, artifactPath, artifactPath)
+	}, "\n"), questionArtifactPath, marker, fixtureArtifactPath, planPath, planPath, marker, questionArtifactPath, fixtureArtifactPath, fixtureArtifactPath)
+}
+
+func qrspiResearchFastPathFixture(marker, planRel, researchArtifactRel string) string {
+	return fmt.Sprintf(strings.Join([]string{
+		"# E2E QRSPI Research Fast Path",
+		"",
+		"This is an E2E fixture. Follow exactly.",
+		"",
+		"- Do not inspect additional files unless absolutely required.",
+		"- Write the research artifact at `%s`.",
+		"- The file content must include marker `%s` and say `dummy research complete`.",
+		"- Then reply with only the fenced YAML block below, no prose.",
+		"",
+		"```yaml",
+		"qrspi_result:",
+		"  stage: \"research\"",
+		"  status: \"complete\"",
+		"  outcome: \"complete\"",
+		"  project: \"github.com/CoreyCole/vamos\"",
+		"  related_projects: []",
+		"  workspace: %q",
+		"  workspace_metadata:",
+		"    plan_workspace: %q",
+		"    implementation_workspace: \"\"",
+		"    trunk_branch: \"main\"",
+		"    stack_bottom_branch: \"\"",
+		"    parent_branch: \"\"",
+		"    current_branch: \"\"",
+		"  policy:",
+		"    advance_mode: \"guided\"",
+		"    auto_mode: false",
+		"    enable_plan_reviews: true",
+		"    invalid_result_retry_limit: 1",
+		"  summary:",
+		"    plan_goal: \"Advance the E2E QRSPI workflow from research to design.\"",
+		"    stage_completed: \"Wrote dummy E2E research artifact with marker %s.\"",
+		"    key_decisions: \"Next stage should start immediately: q-design.\"",
+		"  artifact: %q",
+		"  next:",
+		"    steps:",
+		"      - action: \"read_skill\"",
+		"        param: \".pi/skills/qrspi-planning/SKILL.md\"",
+		"      - action: \"read_skill\"",
+		"        param: \".pi/skills/q-design/SKILL.md\"",
+		"      - action: \"read_artifact\"",
+		"        param: %q",
+		"      - action: \"start_stage\"",
+		"        param: \"q-design\"",
+		"```",
+	}, "\n"), researchArtifactRel, marker, planRel, planRel, marker, researchArtifactRel, researchArtifactRel)
 }
 
 type workflowRunSnapshot struct {
@@ -636,12 +709,21 @@ func latestWorkflowRunForNode(ctx context.Context, queries *db.Queries, workspac
 	return snapshot, true, nil
 }
 
+func workflowWorkspaceID(t testing.TB, ctx *duiruntime.Context) string {
+	t.Helper()
+	if id := ctx.Memory["qrspi_workflow_workspace_id"]; id != "" {
+		return id
+	}
+	if id := ctx.Memory["qrspi_q_to_d_workspace_id"]; id != "" {
+		return id
+	}
+	t.Fatal("qrspi workflow workspace id missing")
+	return ""
+}
+
 func waitForWorkflowRunForNode(t testing.TB, ctx *duiruntime.Context, nodeID string, requireResult bool) workflowRunSnapshot {
 	t.Helper()
-	workspaceID := ctx.Memory["qrspi_q_to_r_workspace_id"]
-	if workspaceID == "" {
-		t.Fatal("qrspi question-to-research workspace id missing")
-	}
+	workspaceID := workflowWorkspaceID(t, ctx)
 	database := openDB(t, ctx)
 	defer database.Close()
 	queries := db.New(database)
@@ -792,7 +874,7 @@ func WaitForWorkflowRunStarted(nodeID string) expectation {
 
 func ExpectWorkflowCurrentNode(nodeID string) expectation {
 	return expectation{customStep("workflow current node "+nodeID, func(t testing.TB, ctx *duiruntime.Context) {
-		got := workflowCurrentNode(t, ctx, ctx.Memory["qrspi_q_to_r_workspace_id"])
+		got := workflowCurrentNode(t, ctx, workflowWorkspaceID(t, ctx))
 		if got != nodeID {
 			t.Fatalf("workflow current node = %q, want %q", got, nodeID)
 		}
@@ -808,6 +890,35 @@ func ExpectDistinctWorkflowRuns(firstNodeID, secondNodeID string) expectation {
 		}
 		if first.ThreadID == "" || second.ThreadID == "" {
 			t.Fatalf("workflow runs missing thread ids: first=%+v second=%+v", first, second)
+		}
+	})}
+}
+
+func ExpectWorkflowArtifactExists(memoryKey, marker string) expectation {
+	return expectation{customStep("workflow artifact exists "+memoryKey, func(t testing.TB, ctx *duiruntime.Context) {
+		artifactPath := ctx.Memory[memoryKey]
+		if artifactPath == "" {
+			t.Fatalf("memory %s missing", memoryKey)
+		}
+		deadline := time.Now().Add(fileChangeTimeout)
+		var content []byte
+		var err error
+		for time.Now().Before(deadline) {
+			content, err = os.ReadFile(artifactPath)
+			if err == nil && strings.Contains(string(content), marker) {
+				return
+			}
+			time.Sleep(fileChangePollTime)
+		}
+		t.Fatalf("artifact %s missing marker %q; last err=%v content=%q", artifactPath, marker, err, string(content))
+	})}
+}
+
+func ExpectWorkflowRunResultContains(nodeID string, want string) expectation {
+	return expectation{customStep("workflow run result contains "+nodeID, func(t testing.TB, ctx *duiruntime.Context) {
+		snapshot := waitForWorkflowRunForNode(t, ctx, nodeID, true)
+		if !strings.Contains(snapshot.WorkflowResultJSON, want) {
+			t.Fatalf("workflow result for %s = %s, want contains %q", nodeID, snapshot.WorkflowResultJSON, want)
 		}
 	})}
 }
