@@ -29,6 +29,65 @@ func TestRuntimeNextNodeLabelUsesPendingGateNotDisplayNext(t *testing.T) {
 	}
 }
 
+func TestProjectQRSPIWorkflowCardCanContinueIdlePendingNext(t *testing.T) {
+	card, err := ProjectQRSPIWorkflowCard(
+		wruntime.State{
+			Status:            wruntime.WorkspaceStatusIdle,
+			CurrentNodeID:     qrspi.NodeQuestion,
+			PendingNextNodeID: qrspi.NodeResearch,
+		},
+		wruntime.WorkflowResult{
+			SourceNodeID:    qrspi.NodeQuestion,
+			Status:          wruntime.StatusComplete,
+			Outcome:         wruntime.OutcomeComplete,
+			Summary:         "Question complete.",
+			PrimaryArtifact: "thoughts/example/questions/runtime.md",
+		},
+		WorkspaceWorkflowPolicyProjection{},
+		WorkspaceCwdProjection{},
+		"Research",
+		"workspace-1",
+		"thread-1",
+	)
+	if err != nil {
+		t.Fatalf("ProjectQRSPIWorkflowCard() error = %v", err)
+	}
+	if card == nil || !card.CanContinue || card.WaitingHuman || card.RuntimeNextStep != "Research" {
+		t.Fatalf("card = %#v, want idle continue to Research", card)
+	}
+	if card.AgentProgress.CurrentNodeID != string(qrspi.NodeResearch) {
+		t.Fatalf("progress current = %q, want pending research", card.AgentProgress.CurrentNodeID)
+	}
+}
+
+func TestProjectQRSPIWorkflowCardWaitingHumanDistinctFromIdleContinue(t *testing.T) {
+	card, err := ProjectQRSPIWorkflowCard(
+		wruntime.State{
+			Status:        wruntime.WorkspaceStatusWaitingHuman,
+			CurrentNodeID: qrspi.NodeVerify,
+			HumanGate:     &wruntime.HumanGateState{To: qrspi.NodeHumanReviewImplementation},
+		},
+		wruntime.WorkflowResult{
+			SourceNodeID:    qrspi.NodeVerify,
+			Status:          wruntime.StatusComplete,
+			Outcome:         wruntime.OutcomeComplete,
+			Summary:         "Verify complete.",
+			PrimaryArtifact: "thoughts/example/verify.md",
+		},
+		WorkspaceWorkflowPolicyProjection{},
+		WorkspaceCwdProjection{},
+		"Human Review Implementation",
+		"workspace-1",
+		"thread-1",
+	)
+	if err != nil {
+		t.Fatalf("ProjectQRSPIWorkflowCard() error = %v", err)
+	}
+	if card == nil || !card.WaitingHuman || card.CanContinue {
+		t.Fatalf("card = %#v, want waiting human without idle continue", card)
+	}
+}
+
 func TestProjectQRSPIWorkflowCardUsesRuntimeProjection(t *testing.T) {
 	policy := WorkspaceWorkflowPolicyProjection{
 		AutoMode:          true,
