@@ -435,10 +435,58 @@ func workspaceQRSPIBadge(view ImplWorkspaceView) string {
 }
 
 func workspaceRuntimeLabel(view ImplWorkspaceView) string {
+	if view.Diagnostics.RuntimeStatus != "" {
+		return view.Diagnostics.RuntimeStatus
+	}
 	if isHistoricalImplWorkspaceView(view, nil) {
 		return workspaceImplStatusBadge(view)
 	}
 	return workspaceTransitionLabel(view.Runtime)
+}
+
+func workspaceLifecycleDiagnosticLabel(view ImplWorkspaceView) string {
+	lifecycle := strings.TrimSpace(string(view.Diagnostics.Lifecycle))
+	if lifecycle == "" {
+		lifecycle = strings.TrimSpace(view.Row.Status)
+	}
+	if lifecycle == "" {
+		lifecycle = string(ImplWorkspaceStatusActive)
+	}
+	return workspaceTitleCase(strings.ReplaceAll(lifecycle, "_", " "))
+}
+
+func workspaceSyncDiagnosticLabel(sync WorkspaceSyncDiagnostic) string {
+	status := strings.TrimSpace(sync.Status)
+	if status == "" {
+		status = "unknown"
+	}
+	parts := []string{status}
+	if !sync.LastFinishedAt.IsZero() {
+		parts = append(parts, "last finished "+sync.LastFinishedAt.Format("Jan 2, 15:04"))
+	}
+	warningCount := len(sync.Warnings)
+	if warningCount > 0 {
+		parts = append(parts, fmt.Sprintf("warnings: %d", warningCount))
+	}
+	return strings.Join(parts, "; ")
+}
+
+func workspaceDiagnosticBadgeClass(severity WorkspaceDiagnosticSeverity) string {
+	switch severity {
+	case WorkspaceDiagnosticError:
+		return "rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive"
+	case WorkspaceDiagnosticWarning:
+		return "rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-200"
+	default:
+		return "rounded-md border bg-muted/30 p-3 text-sm text-muted-foreground"
+	}
+}
+
+func workspaceRuntimeDiagnosticSourceLabel(view ImplWorkspaceView) string {
+	if view.HasRuntime {
+		return "source: .vamos/run/status.json; diagnostic only"
+	}
+	return "source: .vamos/run/status.json unavailable; diagnostic only"
 }
 
 func workspaceBranchLabel(view ImplWorkspaceView) string {

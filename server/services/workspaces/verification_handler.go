@@ -190,7 +190,54 @@ func (h *Handler) HandleWorkspaceDiagnostics(c echo.Context) error {
 	if err != nil {
 		return err
 	}
+	if lifecycle, ok, err := h.workspaceLifecycleDiagnosticForDiagnostics(c.Request().Context(), c.QueryParam("project_id"), diagnostics); err != nil {
+		return err
+	} else if ok {
+		diagnostics.LifecycleDiagnostic = &lifecycle
+	}
 	return c.JSON(http.StatusOK, diagnostics)
+}
+
+func (h *Handler) workspaceLifecycleDiagnosticForDiagnostics(
+	ctx context.Context,
+	projectID string,
+	diagnostics WorkspaceDiagnostics,
+) (WorkspaceLifecycleDiagnostic, bool, error) {
+	projectID = strings.TrimSpace(projectID)
+	if projectID == "" {
+		return WorkspaceLifecycleDiagnostic{}, false, nil
+	}
+	row, ok, err := h.findImplWorkspaceRow(ctx, projectID, diagnostics.Workspace.Slug)
+	if err != nil || !ok {
+		return WorkspaceLifecycleDiagnostic{}, false, err
+	}
+	syncDiagnostic := h.latestImplWorkspaceSyncDiagnostic(ctx, projectID)
+	runtime := workspaceLifecycleSnapshotFromDiagnostics(diagnostics)
+	return BuildWorkspaceLifecycleDiagnostic(row, runtime, true, syncDiagnostic), true, nil
+}
+
+func workspaceLifecycleSnapshotFromDiagnostics(diagnostics WorkspaceDiagnostics) WorkspaceLifecycleSnapshot {
+	workspace := diagnostics.Workspace
+	state := WorkspaceLifecycleState{}
+	if diagnostics.DesiredState != nil {
+		state.DesiredState = WorkspaceDesiredState(diagnostics.DesiredState.Desired)
+	}
+	if diagnostics.RuntimeState != nil {
+		workspace.Status = diagnostics.RuntimeState.Status
+		workspace.Phase = diagnostics.RuntimeState.Phase
+		workspace.BuildStatus = diagnostics.RuntimeState.Build
+		workspace.Ports = diagnostics.RuntimeState.Ports
+		workspace.PIDs = diagnostics.RuntimeState.PIDs
+		state.ObservedState = WorkspaceObservedState(diagnostics.RuntimeState.Status)
+		state.Error = diagnostics.RuntimeState.Error
+	}
+	if state.ObservedState == "" {
+		state.ObservedState = WorkspaceObservedState(workspace.Status)
+	}
+	if state.DesiredState == "" && workspace.Status == StatusRunning {
+		state.DesiredState = WorkspaceDesiredRunning
+	}
+	return snapshotFromState(workspace, state)
 }
 
 func tailLines(c echo.Context) int {

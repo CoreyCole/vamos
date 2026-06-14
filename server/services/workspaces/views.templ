@@ -373,11 +373,21 @@ templ WorkspaceTableRow(view ImplWorkspaceView, managerURL string, showHistorica
 			@PlanWorkspaceRoleBadges(view.Plan)
 		</td>
 		<td class="px-3 py-2 align-top">{ workspaceQRSPIBadge(view) }</td>
-		<td class="px-3 py-2 align-top">{ workspaceRuntimeLabel(view) }</td>
+		<td class="px-3 py-2 align-top">
+			@WorkspaceDiagnosticBadges(view)
+		</td>
 		<td class="px-3 py-2 align-top font-mono text-xs">{ workspaceBranchLabel(view) }</td>
 		<td class="px-3 py-2 align-top font-mono text-xs">{ shortCommit(workspaceCommit(view)) }</td>
 		<td class="px-3 py-2 align-top">{ workspaceReleaseSummary(view) }</td>
 	</tr>
+}
+
+templ WorkspaceDiagnosticBadges(view ImplWorkspaceView) {
+	<div class="flex flex-col gap-1 text-xs">
+		<span class="rounded-full border px-2 py-1">Manager lifecycle: { workspaceLifecycleDiagnosticLabel(view) } <span class="text-muted-foreground">(source: manager DB)</span></span>
+		<span class="rounded-full border px-2 py-1">Scheduled sync: { workspaceSyncDiagnosticLabel(view.Diagnostics.Sync) }</span>
+		<span class="rounded-full border px-2 py-1">Local runtime diagnostics: { workspaceRuntimeLabel(view) } <span class="text-muted-foreground">({ workspaceRuntimeDiagnosticSourceLabel(view) })</span></span>
+	</div>
 }
 
 templ WorkspaceDetailDialog(view ImplWorkspaceView, managerURL string, showHistorical bool, projectFilter WorkspacesFilter) {
@@ -547,9 +557,29 @@ templ ImplWorkspaceCard(view ImplWorkspaceView, managerURL string, showHistorica
 				</ul>
 			</div>
 		}
+		if len(view.Diagnostics.Diagnostics) > 0 {
+			<div class="grid gap-2">
+				for _, diagnostic := range view.Diagnostics.Diagnostics {
+					<div class={ workspaceDiagnosticBadgeClass(diagnostic.Severity) }>
+						<p class="font-medium">{ diagnostic.Message }</p>
+						if diagnostic.Detail != "" {
+							<p class="mt-1 text-xs">{ diagnostic.Detail }</p>
+						}
+					</div>
+				}
+			</div>
+		}
 		<dl class="grid gap-x-4 gap-y-2 text-sm md:grid-cols-[max-content_minmax(0,1fr)]">
-			<dt class="text-xs font-medium uppercase tracking-wide text-muted-foreground">Status</dt>
-			<dd class="min-w-0 break-words">{ workspaceImplStatusBadge(view) }</dd>
+			<dt class="text-xs font-medium uppercase tracking-wide text-muted-foreground">Manager lifecycle</dt>
+			<dd class="min-w-0 break-words">{ workspaceLifecycleDiagnosticLabel(view) } <span class="text-xs text-muted-foreground">(source: manager DB)</span></dd>
+			<dt class="text-xs font-medium uppercase tracking-wide text-muted-foreground">Scheduled sync</dt>
+			<dd class="min-w-0 break-words">{ workspaceSyncDiagnosticLabel(view.Diagnostics.Sync) }</dd>
+			<dt class="text-xs font-medium uppercase tracking-wide text-muted-foreground">Local runtime diagnostics</dt>
+			<dd class="min-w-0 break-words">{ workspaceRuntimeLabel(view) } <span class="text-xs text-muted-foreground">({ workspaceRuntimeDiagnosticSourceLabel(view) })</span></dd>
+			if view.Diagnostics.CleanupMessage != "" {
+				<dt class="text-xs font-medium uppercase tracking-wide text-muted-foreground">Cleanup</dt>
+				<dd class="min-w-0 break-words text-sm text-amber-700 dark:text-amber-300">{ view.Diagnostics.CleanupMessage }</dd>
+			}
 			if len(view.Plan.Projects) > 0 {
 				<dt class="text-xs font-medium uppercase tracking-wide text-muted-foreground">Plan projects</dt>
 				<dd class="min-w-0">

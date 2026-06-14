@@ -2,6 +2,7 @@ package workspaces
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"log"
 	"net/http"
@@ -40,6 +41,11 @@ type PlanWorkspaceLister interface {
 
 type ImplWorkspaceLister interface {
 	ListImplWorkspaces(ctx context.Context, projectID string) ([]db.ImplWorkspace, error)
+}
+
+type WorkspaceSyncDiagnosticGetter interface {
+	GetWorkspaceSyncDiagnostic(ctx context.Context, arg db.GetWorkspaceSyncDiagnosticParams) (db.WorkspaceSyncDiagnostic, error)
+	ListWorkspaceSyncDiagnostics(ctx context.Context, projectID string) ([]db.WorkspaceSyncDiagnostic, error)
 }
 
 const (
@@ -119,6 +125,7 @@ type Handler struct {
 	lifecycle                  LifecycleManager
 	planWorkspaces             PlanWorkspaceLister
 	implWorkspaces             ImplWorkspaceLister
+	workspaceSyncDiagnostics   WorkspaceSyncDiagnosticGetter
 	workspaceSyncRefresh       WorkspaceSyncRefreshFunc
 	workspaceSyncComplete      WorkspaceSyncCompletionFunc
 	workflowSummaries          WorkspaceWorkflowSummaryResolver
@@ -202,6 +209,12 @@ func WithPlanWorkspaces(source PlanWorkspaceLister) HandlerOption {
 func WithImplWorkspaces(source ImplWorkspaceLister) HandlerOption {
 	return func(h *Handler) {
 		h.implWorkspaces = source
+	}
+}
+
+func WithWorkspaceSyncDiagnostics(source WorkspaceSyncDiagnosticGetter) HandlerOption {
+	return func(h *Handler) {
+		h.workspaceSyncDiagnostics = source
 	}
 }
 
@@ -1250,7 +1263,53 @@ func (h *Handler) listImplWorkspaceViews(
 		return nil, err
 	}
 	main, nonMain := splitMainSnapshot(runtime)
-	return BuildImplWorkspaceViews(rows, nonMain, main), nil
+	syncDiagnostic := h.latestImplWorkspaceSyncDiagnostic(ctx, filter.ProjectQueryValue())
+	return BuildImplWorkspaceViews(rows, nonMain, main, WithWorkspaceSyncDiagnostic(syncDiagnostic)), nil
+}
+
+func (h *Handler) latestImplWorkspaceSyncDiagnostic(ctx context.Context, projectID string) WorkspaceSyncDiagnostic {
+	if h.workspaceSyncDiagnostics == nil {
+		return WorkspaceSyncDiagnostic{Status: "unknown"}
+	}
+	projectID = strings.TrimSpace(projectID)
+	var row db.WorkspaceSyncDiagnostic
+	var err error
+	if projectID != "" {
+		row, err = h.workspaceSyncDiagnostics.GetWorkspaceSyncDiagnostic(ctx, db.GetWorkspaceSyncDiagnosticParams{ProjectID: projectID, SyncKind: "impl_workspaces"})
+	} else {
+		var rows []db.WorkspaceSyncDiagnostic
+		rows, err = h.workspaceSyncDiagnostics.ListWorkspaceSyncDiagnostics(ctx, "")
+		if err == nil && len(rows) > 0 {
+			row = rows[0]
+		} else if err == nil {
+			err = sql.ErrNoRows
+		}
+	}
+	if err != nil {
+		return WorkspaceSyncDiagnostic{Status: "unknown"}
+	}
+	return WorkspaceSyncDiagnosticFromRow(row)
+}
+
+func (h *Handler) findImplWorkspaceRow(ctx context.Context, projectID, slug string) (db.ImplWorkspace, bool, error) {
+	if h.implWorkspaces == nil {
+		return db.ImplWorkspace{}, false, nil
+	}
+	projectID = strings.TrimSpace(projectID)
+	slug = strings.TrimSpace(slug)
+	if projectID == "" || slug == "" {
+		return db.ImplWorkspace{}, false, nil
+	}
+	rows, err := h.implWorkspaces.ListImplWorkspaces(ctx, projectID)
+	if err != nil {
+		return db.ImplWorkspace{}, false, err
+	}
+	for _, row := range rows {
+		if strings.TrimSpace(row.ProjectID) == projectID && strings.TrimSpace(row.WorkspaceSlug) == slug {
+			return row, true, nil
+		}
+	}
+	return db.ImplWorkspace{}, false, nil
 }
 
 func filterLifecycleSnapshotsByProject(items []WorkspaceLifecycleSnapshot, filter WorkspacesFilter) []WorkspaceLifecycleSnapshot {
