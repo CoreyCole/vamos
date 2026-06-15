@@ -150,6 +150,90 @@ func TestWorkspaceSyncActivitySkipsCompletionHookWhenDisabled(t *testing.T) {
 	}
 }
 
+func TestWorkspaceSyncGuardSkipsConcurrentRuns(t *testing.T) {
+	guard := NewWorkspaceSyncGuard()
+	entered := make(chan struct{})
+	release := make(chan struct{})
+	done := make(chan error, 1)
+	go func() {
+		_, err := guard.TryRun(context.Background(), WorkspaceSyncRunScheduled, func(context.Context) error {
+			close(entered)
+			<-release
+			return nil
+		})
+		done <- err
+	}()
+	<-entered
+	result, err := guard.TryRun(context.Background(), WorkspaceSyncRunManual, nil)
+	if !errors.Is(err, ErrWorkspaceSyncInProgress) {
+		t.Fatalf("TryRun() error = %v, want ErrWorkspaceSyncInProgress", err)
+	}
+	if result.Acquired || !strings.Contains(result.Reason, "scheduled") || result.Kind != WorkspaceSyncRunManual {
+		t.Fatalf("TryRun() result = %#v", result)
+	}
+	close(release)
+	if err := <-done; err != nil {
+		t.Fatalf("first TryRun() error = %v", err)
+	}
+	if guard.InProgress() {
+		t.Fatal("guard still in progress after release")
+	}
+}
+
+func TestWorkspaceSyncGuardPropagatesAcquiredRunError(t *testing.T) {
+	guard := NewWorkspaceSyncGuard()
+	wantErr := errors.New("boom")
+	result, err := guard.TryRun(context.Background(), WorkspaceSyncRunScheduled, func(context.Context) error {
+		return wantErr
+	})
+	if !errors.Is(err, wantErr) {
+		t.Fatalf("TryRun() error = %v, want %v", err, wantErr)
+	}
+	if !result.Acquired || result.Kind != WorkspaceSyncRunScheduled {
+		t.Fatalf("TryRun() result = %#v", result)
+	}
+	if guard.InProgress() {
+		t.Fatal("guard still in progress after callback error")
+	}
+}
+
+func TestWorkspaceSyncerReturnsSkippedWhenGuardBusy(t *testing.T) {
+	guard := NewWorkspaceSyncGuard()
+	entered := make(chan struct{})
+	release := make(chan struct{})
+	done := make(chan error, 1)
+	go func() {
+		_, err := guard.TryRun(context.Background(), WorkspaceSyncRunScheduled, func(context.Context) error {
+			close(entered)
+			<-release
+			return nil
+		})
+		done <- err
+	}()
+	<-entered
+	result, err := (&WorkspaceSyncer{Guard: guard}).Sync(context.Background(), SyncWorkspacesInput{})
+	if err != nil {
+		t.Fatalf("Sync() error = %v", err)
+	}
+	if !result.Skipped || !strings.Contains(result.SkipReason, "scheduled") || result.Changed {
+		t.Fatalf("Sync() result = %#v", result)
+	}
+	close(release)
+	if err := <-done; err != nil {
+		t.Fatalf("guard holder error = %v", err)
+	}
+}
+
+func TestWorkspaceSyncerNilGuardPreservesSyncBehavior(t *testing.T) {
+	result, err := (&WorkspaceSyncer{}).Sync(context.Background(), SyncWorkspacesInput{})
+	if err != nil {
+		t.Fatalf("Sync() error = %v", err)
+	}
+	if result.Skipped || result.Changed {
+		t.Fatalf("Sync() result = %#v", result)
+	}
+}
+
 func TestWorkspaceSyncerRunsPlanAndImplSync(t *testing.T) {
 	service := newTestAgentChatService(t)
 	root := t.TempDir()
@@ -382,6 +466,36 @@ func TestPlanWorkspaceDiscoveryActivityRequiresSyncer(t *testing.T) {
 	)
 	if err == nil || !strings.Contains(err.Error(), "requires syncer") {
 		t.Fatalf("SyncPlanWorkspaces() error = %v, want requires syncer", err)
+	}
+}
+
+func TestPlanWorkspaceDiscoveryActivityNoOpsWhenGuardBusy(t *testing.T) {
+	guard := NewWorkspaceSyncGuard()
+	entered := make(chan struct{})
+	release := make(chan struct{})
+	done := make(chan error, 1)
+	go func() {
+		_, err := guard.TryRun(context.Background(), WorkspaceSyncRunScheduled, func(context.Context) error {
+			close(entered)
+			<-release
+			return nil
+		})
+		done <- err
+	}()
+	<-entered
+	result, err := (&PlanWorkspaceDiscoveryActivities{
+		Syncer: &PlanWorkspaceSyncer{},
+		Guard:  guard,
+	}).SyncPlanWorkspaces(context.Background(), PlanWorkspaceDiscoveryInput{})
+	if err != nil {
+		t.Fatalf("SyncPlanWorkspaces() error = %v", err)
+	}
+	if result != (PlanWorkspaceDiscoveryResult{}) {
+		t.Fatalf("SyncPlanWorkspaces() result = %#v, want zero", result)
+	}
+	close(release)
+	if err := <-done; err != nil {
+		t.Fatalf("guard holder error = %v", err)
 	}
 }
 

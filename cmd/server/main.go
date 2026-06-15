@@ -1240,6 +1240,9 @@ func main() {
 			PublicBaseURL:         cfg.PublicBaseURL,
 		},
 	).WithLayoutPreferenceService(layoutPrefsService)
+	workspaceSyncGuard := agentchat.NewWorkspaceSyncGuard()
+	workspaceSyncer := agentChatService.WorkspaceSyncer()
+	workspaceSyncer.Guard = workspaceSyncGuard
 	workspaceSyncRefreshResultFromAgentChat := func(result agentchat.SyncWorkspacesResult) workspaces.WorkspaceSyncRefreshResult {
 		return workspaces.WorkspaceSyncRefreshResult{
 			PlanUpserted:    result.Plan.Upserted,
@@ -1268,13 +1271,17 @@ func main() {
 		goWorker.RegisterWorkflow(agentchat.PlanWorkspaceDiscoveryWorkflow)
 		goWorker.RegisterActivity(agentChatService.FailConversationRunAfterActivityError)
 		goWorker.RegisterActivity(&agentchat.WorkspaceSyncActivities{
-			Syncer: agentChatService.WorkspaceSyncer(),
+			Syncer: workspaceSyncer,
 			OnComplete: func(ctx context.Context, result agentchat.SyncWorkspacesResult, err error) {
+				if result.Skipped {
+					log.Printf("workspace_sync_skipped mode=schedule reason=%q", result.SkipReason)
+				}
 				workspaceSyncCompleteForSchedule(ctx, workspaceSyncRefreshResultFromAgentChat(result), err)
 			},
 		})
 		goWorker.RegisterActivity(&agentchat.PlanWorkspaceDiscoveryActivities{
 			Syncer: agentChatService.PlanWorkspaceDiscoverySyncer(),
+			Guard:  workspaceSyncGuard,
 		})
 	}
 	if temporalManager != nil {
@@ -1293,6 +1300,16 @@ func main() {
 			log.Printf(
 				"Agent Chat workspace sync schedule ensured for %s",
 				input.ProjectInstanceKey,
+			)
+		}
+		if err := agentchat.DeleteDeprecatedPlanWorkspaceDiscoverySchedule(
+			runtimeCtx,
+			temporalManager.Client(),
+			input.ProjectInstanceKey,
+		); err != nil {
+			log.Printf(
+				"Warning: failed to delete deprecated plan workspace discovery schedule: %v",
+				err,
 			)
 		}
 	} else {
@@ -1396,10 +1413,13 @@ func main() {
 			workspaces.WithWorkspaceSyncRefresh(func(ctx context.Context) (workspaces.WorkspaceSyncRefreshResult, error) {
 				input := agentChatService.WorkspaceSyncInput()
 				if temporalManager == nil {
-					result, err := agentChatService.WorkspaceSyncer().Sync(ctx, input)
+					result, err := workspaceSyncer.Sync(ctx, input)
 					mapped := workspaceSyncRefreshResultFromAgentChat(result)
 					if err != nil {
 						return mapped, err
+					}
+					if result.Skipped {
+						log.Printf("workspace_sync_skipped mode=direct reason=%q", result.SkipReason)
 					}
 					log.Printf(
 						"workspace_sync_refresh_complete mode=direct plan_upserted=%d plan_archived=%d impl_upserted=%d impl_repaired_env=%d impl_cleaned_up=%d impl_merged=%d changed=%t",
@@ -1435,6 +1455,9 @@ func main() {
 					return workspaceSyncRefreshResultFromAgentChat(result), err
 				}
 				mapped := workspaceSyncRefreshResultFromAgentChat(result)
+				if result.Skipped {
+					log.Printf("workspace_sync_skipped mode=temporal reason=%q", result.SkipReason)
+				}
 				log.Printf(
 					"workspace_sync_refresh_complete mode=temporal plan_upserted=%d plan_archived=%d impl_upserted=%d impl_repaired_env=%d impl_cleaned_up=%d impl_merged=%d changed=%t",
 					mapped.PlanUpserted,

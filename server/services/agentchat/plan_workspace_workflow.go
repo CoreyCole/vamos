@@ -11,6 +11,7 @@ import (
 
 type PlanWorkspaceDiscoveryActivities struct {
 	Syncer *PlanWorkspaceSyncer
+	Guard  *WorkspaceSyncGuard
 }
 
 // Deprecated: use SyncWorkspacesWorkflow.
@@ -45,5 +46,17 @@ func (a *PlanWorkspaceDiscoveryActivities) SyncPlanWorkspaces(
 			"plan workspace discovery activity requires syncer",
 		)
 	}
-	return a.Syncer.Sync(ctx, input)
+	if a.Guard == nil {
+		return a.Syncer.Sync(ctx, input)
+	}
+	var result PlanWorkspaceDiscoveryResult
+	_, err := a.Guard.TryRun(ctx, WorkspaceSyncRunDeprecated, func(ctx context.Context) error {
+		var syncErr error
+		result, syncErr = a.Syncer.Sync(ctx, input)
+		return syncErr
+	})
+	if errors.Is(err, ErrWorkspaceSyncInProgress) {
+		return PlanWorkspaceDiscoveryResult{}, nil
+	}
+	return result, err
 }

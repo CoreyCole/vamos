@@ -44,6 +44,22 @@ func EnsurePlanWorkspaceDiscoverySchedule(
 	return err
 }
 
+func DeleteDeprecatedPlanWorkspaceDiscoverySchedule(
+	ctx context.Context,
+	temporalClient client.Client,
+	projectInstanceKey string,
+) error {
+	if temporalClient == nil {
+		return nil
+	}
+	scheduleID := PlanWorkspaceDiscoveryScheduleID(projectInstanceKey)
+	handle := temporalClient.ScheduleClient().GetHandle(ctx, scheduleID)
+	if described, err := handle.Describe(ctx); err != nil || described == nil {
+		return nil
+	}
+	return handle.Delete(ctx)
+}
+
 func planWorkspaceDiscoverySchedule(input PlanWorkspaceDiscoveryInput) *client.Schedule {
 	return &client.Schedule{
 		Spec:   ptr(planWorkspaceDiscoverySpec()),

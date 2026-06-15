@@ -21,14 +21,17 @@ type SyncWorkspacesInput struct {
 }
 
 type SyncWorkspacesResult struct {
-	Plan    PlanWorkspaceDiscoveryResult
-	Impl    workspaces.ImplWorkspaceSyncResult
-	Changed bool
+	Plan       PlanWorkspaceDiscoveryResult
+	Impl       workspaces.ImplWorkspaceSyncResult
+	Changed    bool
+	Skipped    bool
+	SkipReason string
 }
 
 type WorkspaceSyncer struct {
 	PlanSyncer *PlanWorkspaceSyncer
 	ImplSyncer *workspaces.ImplWorkspaceSyncer
+	Guard      *WorkspaceSyncGuard
 }
 
 func (s *WorkspaceSyncer) Sync(
@@ -38,6 +41,29 @@ func (s *WorkspaceSyncer) Sync(
 	if s == nil {
 		return SyncWorkspacesResult{}, errors.New("workspace syncer is nil")
 	}
+	kind := WorkspaceSyncRunScheduled
+	if !input.RunCompletionHook {
+		kind = WorkspaceSyncRunManual
+	}
+	var result SyncWorkspacesResult
+	guardResult, err := s.Guard.TryRun(ctx, kind, func(ctx context.Context) error {
+		var syncErr error
+		result, syncErr = s.syncUnlocked(ctx, input)
+		return syncErr
+	})
+	if errors.Is(err, ErrWorkspaceSyncInProgress) {
+		return SyncWorkspacesResult{
+			Skipped:    true,
+			SkipReason: guardResult.Reason,
+		}, nil
+	}
+	return result, err
+}
+
+func (s *WorkspaceSyncer) syncUnlocked(
+	ctx context.Context,
+	input SyncWorkspacesInput,
+) (SyncWorkspacesResult, error) {
 	var result SyncWorkspacesResult
 	if s.PlanSyncer != nil {
 		plan, err := s.PlanSyncer.Sync(ctx, PlanWorkspaceDiscoveryInput{
