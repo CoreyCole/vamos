@@ -3,7 +3,13 @@ package workspaces
 import (
 	"context"
 	"errors"
+	"net/http"
+	"net/http/httptest"
+	"net/url"
+	"strings"
 	"testing"
+
+	"github.com/labstack/echo/v4"
 
 	"github.com/CoreyCole/vamos/pkg/agents/workflows/runtime"
 	"github.com/CoreyCole/vamos/pkg/db"
@@ -136,6 +142,79 @@ func TestResolveReleaseActionFindsRowAction(t *testing.T) {
 	}
 }
 
+func TestReleaseProjectionCheapModeDoesNotRunGit(t *testing.T) {
+	reg := testReleaseRegistry(t)
+	inspector := &fakeGitInspector{
+		head:   map[string]string{"/stage": "stage-2", "/main": "main-1"},
+		clean:  map[string]bool{"/main": false},
+		detail: map[string]string{"/main": " M file.go"},
+	}
+	projector := &ReleaseProjector{Registry: reg, Git: inspector}
+	views := lifecycleSnapshotsToImplViews([]WorkspaceLifecycleSnapshot{
+		snapshotFromState(Workspace{Slug: "integration", CheckoutPath: "/stage", Commit: "stage-1"}, WorkspaceLifecycleState{}),
+		snapshotFromState(Workspace{Slug: "trunk", CheckoutPath: "/main", Commit: "main-1", IsMain: true}, WorkspaceLifecycleState{}),
+	})
+
+	panel, _, err := projector.BuildWorkspaceProjection(context.Background(), views)
+	if err != nil {
+		t.Fatalf("BuildWorkspaceProjection: %v", err)
+	}
+	if inspector.calls != 0 {
+		t.Fatalf("git inspector calls = %d, want 0", inspector.calls)
+	}
+	var found bool
+	for _, lane := range panel.Lanes {
+		for _, action := range lane.Actions {
+			if action.FlowID == "release_to_main" {
+				found = true
+				if action.Disabled {
+					t.Fatalf("cheap projection disabled action via git preflight: %+v", action)
+				}
+			}
+		}
+	}
+	if !found {
+		t.Fatalf("release_to_main action missing: %+v", panel)
+	}
+}
+
+func TestReleaseProjectionPreflightModeRunsGit(t *testing.T) {
+	reg := testReleaseRegistry(t)
+	inspector := &fakeGitInspector{
+		head:   map[string]string{"/stage": "stage-1", "/main": "main-1"},
+		clean:  map[string]bool{"/main": false},
+		detail: map[string]string{"/main": " M file.go"},
+		behind: 1,
+	}
+	projector := &ReleaseProjector{Registry: reg, Git: inspector}
+	views := lifecycleSnapshotsToImplViews([]WorkspaceLifecycleSnapshot{
+		snapshotFromState(Workspace{Slug: "integration", CheckoutPath: "/stage", Commit: "stage-1"}, WorkspaceLifecycleState{}),
+		snapshotFromState(Workspace{Slug: "trunk", CheckoutPath: "/main", Commit: "main-1", IsMain: true}, WorkspaceLifecycleState{}),
+	})
+
+	panel, _, err := projector.BuildWorkspaceProjection(context.Background(), views, ReleaseProjectionOptions{Mode: ReleaseProjectionPreflight})
+	if err != nil {
+		t.Fatalf("BuildWorkspaceProjection: %v", err)
+	}
+	if inspector.calls == 0 {
+		t.Fatal("git inspector was not called in preflight mode")
+	}
+	var found bool
+	for _, lane := range panel.Lanes {
+		for _, action := range lane.Actions {
+			if action.FlowID == "release_to_main" {
+				found = true
+				if !action.Disabled || action.DisabledReason != "target checkout is dirty: M file.go" {
+					t.Fatalf("preflight action = %+v", action)
+				}
+			}
+		}
+	}
+	if !found {
+		t.Fatalf("release_to_main action missing: %+v", panel)
+	}
+}
+
 func TestBuildPanelDisablesActionsWhenQueueActive(t *testing.T) {
 	reg := testReleaseRegistry(t)
 	store := fakeReleaseQueueStore{active: []ReleaseQueueItem{{ID: "item-1", Status: ReleaseQueueStatusRunning}}}
@@ -161,6 +240,96 @@ func TestBuildPanelDisablesActionsWhenQueueActive(t *testing.T) {
 	}
 	if len(panel.Queue.Active) != 1 {
 		t.Fatalf("active queue = %+v", panel.Queue.Active)
+	}
+}
+
+func TestHandleEnqueueReleaseRunsPreflightAndBlocksDirtyTarget(t *testing.T) {
+	t.Parallel()
+
+	reg := testReleaseRegistry(t)
+	store := &recordingReleaseQueueStore{}
+	starter := &recordingReleaseStarter{}
+	handler := NewHandler(
+		&fakeLifecycleManager{snapshots: releaseTestSnapshots()},
+		"https://main.test",
+		"trunk",
+		WithReleaseQueue(&ReleaseProjector{Registry: reg, Store: store, Git: &fakeGitInspector{
+			head:   map[string]string{"/stage": "stage-1", "/main": "main-1"},
+			clean:  map[string]bool{"/main": false},
+			detail: map[string]string{"/main": " M file.go"},
+			behind: 1,
+		}}, store, starter),
+	)
+
+	err := handler.HandleEnqueueRelease(releaseEnqueueContext("integration", "stage-1", "main-1"))
+	if err == nil {
+		t.Fatal("HandleEnqueueRelease succeeded, want conflict")
+	}
+	httpErr, ok := err.(*echo.HTTPError)
+	if !ok || httpErr.Code != http.StatusConflict {
+		t.Fatalf("error = %#v, want HTTP 409", err)
+	}
+	if store.createCalls != 0 || starter.calls != 0 {
+		t.Fatalf("queue create/start calls = %d/%d, want 0/0", store.createCalls, starter.calls)
+	}
+}
+
+func TestHandleEnqueueReleaseBlocksChangedPreflightCommits(t *testing.T) {
+	t.Parallel()
+
+	reg := testReleaseRegistry(t)
+	store := &recordingReleaseQueueStore{}
+	starter := &recordingReleaseStarter{}
+	handler := NewHandler(
+		&fakeLifecycleManager{snapshots: releaseTestSnapshots()},
+		"https://main.test",
+		"trunk",
+		WithReleaseQueue(&ReleaseProjector{Registry: reg, Store: store, Git: &fakeGitInspector{
+			head:   map[string]string{"/stage": "stage-2", "/main": "main-1"},
+			clean:  map[string]bool{"/main": true},
+			behind: 1,
+		}}, store, starter),
+	)
+
+	err := handler.HandleEnqueueRelease(releaseEnqueueContext("integration", "stage-1", "main-1"))
+	if err == nil {
+		t.Fatal("HandleEnqueueRelease succeeded, want conflict")
+	}
+	httpErr, ok := err.(*echo.HTTPError)
+	if !ok || httpErr.Code != http.StatusConflict {
+		t.Fatalf("error = %#v, want HTTP 409", err)
+	}
+	if store.createCalls != 0 || starter.calls != 0 {
+		t.Fatalf("queue create/start calls = %d/%d, want 0/0", store.createCalls, starter.calls)
+	}
+}
+
+func TestHandleEnqueueReleaseStoresPreflightCommits(t *testing.T) {
+	t.Parallel()
+
+	reg := testReleaseRegistry(t)
+	store := &recordingReleaseQueueStore{}
+	starter := &recordingReleaseStarter{}
+	handler := NewHandler(
+		&fakeLifecycleManager{snapshots: releaseTestSnapshots("stage-long", "main-long")},
+		"https://main.test",
+		"trunk",
+		WithReleaseQueue(&ReleaseProjector{Registry: reg, Store: store, Git: &fakeGitInspector{
+			head:   map[string]string{"/stage": "stage-long", "/main": "main-long"},
+			clean:  map[string]bool{"/main": true},
+			behind: 1,
+		}}, store, starter),
+	)
+
+	c := releaseEnqueueContext("integration", "stage", "main")
+	if err := handler.HandleEnqueueRelease(c); err != nil {
+		t.Fatalf("HandleEnqueueRelease: %v", err)
+	}
+	if store.createCalls != 1 || starter.calls != 1 {
+		t.Fatalf("queue create/start calls = %d/%d, want 1/1", store.createCalls, starter.calls)
+	}
+	if store.created.ExpectedSourceCommit != "stage-long" || store.created.ExpectedTargetCommit != "main-long" {
+		t.Fatalf("created commits = %q/%q", store.created.ExpectedSourceCommit, store.created.ExpectedTargetCommit)
 	}
 }
 
@@ -293,23 +462,28 @@ type fakeGitInspector struct {
 	detail           map[string]string
 	behind           int
 	aheadBehindError bool
+	calls            int
 }
 
 var errFakeGit = errors.New("fake git error")
 
 func (f *fakeGitInspector) Head(_ context.Context, checkout string) (string, error) {
+	f.calls++
 	return f.head[checkout], nil
 }
 
 func (f *fakeGitInspector) IsClean(_ context.Context, checkout string) (bool, string, error) {
+	f.calls++
 	return f.clean[checkout], f.detail[checkout], nil
 }
 
 func (f *fakeGitInspector) IsAncestor(_ context.Context, checkout string, ancestor string, descendant string) (bool, error) {
+	f.calls++
 	return true, nil
 }
 
 func (f *fakeGitInspector) AheadBehind(_ context.Context, checkout string, left string, right string) (int, int, error) {
+	f.calls++
 	if f.aheadBehindError {
 		return 0, 0, errFakeGit
 	}
@@ -344,4 +518,75 @@ func (f fakeReleaseQueueStore) AppendReleaseQueueEvent(context.Context, AppendRe
 }
 func (f fakeReleaseQueueStore) ListReleaseQueueEvents(context.Context, string, int) ([]ReleaseQueueEvent, error) {
 	return nil, nil
+}
+
+func releaseTestSnapshots(commits ...string) []WorkspaceLifecycleSnapshot {
+	stageCommit := "stage-1"
+	mainCommit := "main-1"
+	if len(commits) > 0 {
+		stageCommit = commits[0]
+	}
+	if len(commits) > 1 {
+		mainCommit = commits[1]
+	}
+	return []WorkspaceLifecycleSnapshot{
+		snapshotFromState(Workspace{Slug: "integration", CheckoutPath: "/stage", Commit: stageCommit}, WorkspaceLifecycleState{}),
+		snapshotFromState(Workspace{Slug: "trunk", CheckoutPath: "/main", Commit: mainCommit, IsMain: true}, WorkspaceLifecycleState{}),
+	}
+}
+
+func releaseEnqueueContext(sourceSlug, sourceCommit, targetCommit string) echo.Context {
+	form := url.Values{}
+	form.Set("definition_id", "default")
+	form.Set("definition_version", "v1")
+	form.Set("flow_id", "release_to_main")
+	form.Set("source_slug", sourceSlug)
+	form.Set("expected_source_commit", sourceCommit)
+	form.Set("expected_target_commit", targetCommit)
+	req := httptest.NewRequest(http.MethodPost, "/workspaces/release/enqueue", strings.NewReader(form.Encode()))
+	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationForm)
+	rec := httptest.NewRecorder()
+	return echo.New().NewContext(req, rec)
+}
+
+type recordingReleaseQueueStore struct {
+	created     CreateReleaseQueueItemParams
+	createCalls int
+}
+
+func (s *recordingReleaseQueueStore) CreateReleaseQueueItem(_ context.Context, arg CreateReleaseQueueItemParams) (ReleaseQueueItem, error) {
+	s.createCalls++
+	s.created = arg
+	return ReleaseQueueItem{ID: arg.ID}, nil
+}
+func (s *recordingReleaseQueueStore) GetReleaseQueueItem(context.Context, string) (ReleaseQueueItem, error) {
+	return ReleaseQueueItem{}, nil
+}
+func (s *recordingReleaseQueueStore) ListActiveReleaseQueueItems(context.Context) ([]ReleaseQueueItem, error) {
+	return nil, nil
+}
+func (s *recordingReleaseQueueStore) ListRecentReleaseQueueItems(context.Context, int) ([]ReleaseQueueItem, error) {
+	return nil, nil
+}
+func (s *recordingReleaseQueueStore) ClaimNextPendingReleaseQueueItem(context.Context) (ReleaseQueueItem, bool, error) {
+	return ReleaseQueueItem{}, false, nil
+}
+func (s *recordingReleaseQueueStore) MarkReleaseQueueItemRunning(context.Context, string, runtime.NodeID) error {
+	return nil
+}
+func (s *recordingReleaseQueueStore) MarkReleaseQueueItemTerminal(context.Context, string, ReleaseQueueStatus, string) error {
+	return nil
+}
+func (s *recordingReleaseQueueStore) AppendReleaseQueueEvent(context.Context, AppendReleaseQueueEventParams) error {
+	return nil
+}
+func (s *recordingReleaseQueueStore) ListReleaseQueueEvents(context.Context, string, int) ([]ReleaseQueueEvent, error) {
+	return nil, nil
+}
+
+type recordingReleaseStarter struct{ calls int }
+
+func (s *recordingReleaseStarter) EnqueueRelease(context.Context, string) error {
+	s.calls++
+	return nil
 }

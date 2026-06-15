@@ -32,7 +32,21 @@ func (h *Handler) HandleEnqueueRelease(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusConflict, releaseDisabledReason(action))
 	}
 	flow := def.Flows[action.FlowID]
-	if action.ExpectedSourceCommit != req.ExpectedSourceCommit || action.ExpectedTargetCommit != req.ExpectedTargetCommit {
+	if !sameCommitRef(action.ExpectedSourceCommit, req.ExpectedSourceCommit) || !sameCommitRef(action.ExpectedTargetCommit, req.ExpectedTargetCommit) {
+		return echo.NewHTTPError(http.StatusConflict, "release action has stale expected commits")
+	}
+	source, target, ok := releaseWorkspacesForAction(def, action, model.Views)
+	if !ok {
+		return echo.NewHTTPError(http.StatusConflict, "release action workspaces are unavailable")
+	}
+	preflight := InspectReleasePreconditions(c.Request().Context(), h.releaseProjector.Git, def, flow, source, target)
+	if !preflight.OK {
+		return echo.NewHTTPError(http.StatusConflict, preflight.DisabledReason)
+	}
+	if preflight.SourceCommit != "" && !sameCommitRef(req.ExpectedSourceCommit, preflight.SourceCommit) {
+		return echo.NewHTTPError(http.StatusConflict, "release action has stale expected commits")
+	}
+	if preflight.TargetCommit != "" && !sameCommitRef(req.ExpectedTargetCommit, preflight.TargetCommit) {
 		return echo.NewHTTPError(http.StatusConflict, "release action has stale expected commits")
 	}
 	itemID, err := newReleaseQueueItemID()
@@ -48,8 +62,8 @@ func (h *Handler) HandleEnqueueRelease(c echo.Context) error {
 		FlowID:               flow.ID,
 		SourceSlug:           action.SourceSlug,
 		TargetLane:           string(action.TargetLane),
-		ExpectedSourceCommit: req.ExpectedSourceCommit,
-		ExpectedTargetCommit: req.ExpectedTargetCommit,
+		ExpectedSourceCommit: firstNonEmpty(preflight.SourceCommit, req.ExpectedSourceCommit),
+		ExpectedTargetCommit: firstNonEmpty(preflight.TargetCommit, req.ExpectedTargetCommit),
 		ActorEmail:           userEmailFromContext(c),
 	})
 	if err != nil {
@@ -103,6 +117,24 @@ func resolveReleaseAction(panel ReleasePanelModel, views []ImplWorkspaceView, re
 		}
 	}
 	return release.Definition{}, ReleaseActionView{}, false
+}
+
+func releaseWorkspacesForAction(def release.Definition, action ReleaseActionView, views []ImplWorkspaceView) (Workspace, Workspace, bool) {
+	flow, ok := def.Flows[action.FlowID]
+	if !ok {
+		return Workspace{}, Workspace{}, false
+	}
+	workspaces := flattenImplWorkspaceViews(views)
+	lanes := matchReleaseLanes(def, workspaces)
+	var source Workspace
+	for _, ws := range workspaces {
+		if ws.Slug == action.SourceSlug {
+			source = ws
+			break
+		}
+	}
+	target := lanes[flow.TargetLane]
+	return source, target, strings.TrimSpace(source.Slug) != "" && strings.TrimSpace(target.Slug) != ""
 }
 
 func releaseProjectedActions(panel ReleasePanelModel, views []ImplWorkspaceView) []ReleaseActionView {

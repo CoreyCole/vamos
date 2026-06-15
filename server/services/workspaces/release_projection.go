@@ -35,12 +35,31 @@ type ReleasePreflightResult struct {
 	Checks               []ReleasePreflightCheck
 }
 
+type ReleaseProjectionMode string
+
+const (
+	ReleaseProjectionCheap     ReleaseProjectionMode = "cheap"
+	ReleaseProjectionPreflight ReleaseProjectionMode = "preflight"
+)
+
+type ReleaseProjectionOptions struct {
+	Mode ReleaseProjectionMode
+}
+
+func normalizeReleaseProjectionOptions(opts []ReleaseProjectionOptions) ReleaseProjectionOptions {
+	if len(opts) == 0 || opts[0].Mode == "" {
+		return ReleaseProjectionOptions{Mode: ReleaseProjectionCheap}
+	}
+	return opts[0]
+}
+
 func (p *ReleaseProjector) BuildPanel(ctx context.Context, views []ImplWorkspaceView) (ReleasePanelModel, error) {
 	panel, _, err := p.BuildWorkspaceProjection(ctx, views)
 	return panel, err
 }
 
-func (p *ReleaseProjector) BuildWorkspaceProjection(ctx context.Context, views []ImplWorkspaceView) (ReleasePanelModel, map[string][]ReleaseActionView, error) {
+func (p *ReleaseProjector) BuildWorkspaceProjection(ctx context.Context, views []ImplWorkspaceView, opts ...ReleaseProjectionOptions) (ReleasePanelModel, map[string][]ReleaseActionView, error) {
+	options := normalizeReleaseProjectionOptions(opts)
 	if p == nil || p.Registry == nil {
 		return ReleasePanelModel{Enabled: false}, nil, nil
 	}
@@ -66,14 +85,14 @@ func (p *ReleaseProjector) BuildWorkspaceProjection(ctx context.Context, views [
 		lanes := matchReleaseLanes(def, workspaces)
 		for _, lane := range sortedLaneDefinitions(def) {
 			ws := lanes[lane.ID]
-			actions := p.evaluateActions(ctx, def, lanes, ws, active)
+			actions := p.evaluateActions(ctx, def, lanes, ws, active, options)
 			panel.Lanes = append(panel.Lanes, ReleaseLaneView{ID: lane.ID, Label: lane.Label, Workspace: ws, Actions: actions})
 		}
 		for _, ws := range workspaces {
 			if workspaceIsReleaseLane(lanes, ws) {
 				continue
 			}
-			actions := p.evaluateActions(ctx, def, lanes, ws, active)
+			actions := p.evaluateActions(ctx, def, lanes, ws, active, options)
 			for _, action := range actions {
 				if action.SourceSlug != "" {
 					action = gateWorkspaceReleaseAction(action, workflows[action.SourceSlug])
@@ -100,7 +119,7 @@ func (p *ReleaseProjector) releaseQueue(ctx context.Context) ([]ReleaseQueueItem
 	return active, history, nil
 }
 
-func (p *ReleaseProjector) evaluateActions(ctx context.Context, def release.Definition, lanes map[release.LaneID]Workspace, ws Workspace, active []ReleaseQueueItem) []ReleaseActionView {
+func (p *ReleaseProjector) evaluateActions(ctx context.Context, def release.Definition, lanes map[release.LaneID]Workspace, ws Workspace, active []ReleaseQueueItem, opts ReleaseProjectionOptions) []ReleaseActionView {
 	actions := EvaluateReleaseActions(p.Registry, lanes, ws)
 	for i := range actions {
 		if hasActiveReleaseQueueItem(active) {
@@ -108,7 +127,7 @@ func (p *ReleaseProjector) evaluateActions(ctx context.Context, def release.Defi
 			actions[i].DisabledReason = "release queue already has active work"
 			continue
 		}
-		if p.Git == nil || actions[i].Disabled {
+		if opts.Mode != ReleaseProjectionPreflight || p.Git == nil || actions[i].Disabled {
 			continue
 		}
 		flow, ok := def.Flows[actions[i].FlowID]
