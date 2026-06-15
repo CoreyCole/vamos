@@ -687,6 +687,123 @@ VALUES ('thoughts/test/plans/migration', 'vamos', 'active', 'vamos', 'stage');`)
 	assertMigratedWorkspaceDBInvariants(t, database)
 }
 
+func TestRunRuntimeMigrationsRepairsProtectedImplWorkspaceTerminalStatuses(t *testing.T) {
+	t.Parallel()
+
+	database := openMigratorTestDB(t)
+	createOldShapeAgentChatTables(t, database)
+	_, err := database.ExecContext(t.Context(), `
+CREATE TABLE plan_workspaces (
+	plan_dir_rel TEXT PRIMARY KEY,
+	project_id TEXT NOT NULL DEFAULT '',
+	plan_dir TEXT NOT NULL,
+	label TEXT NOT NULL,
+	artifact_updated_at DATETIME NOT NULL,
+	qrspi_lifecycle TEXT NOT NULL DEFAULT 'question',
+	qrspi_closed_reason TEXT NOT NULL DEFAULT '',
+	last_discovered_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+	archived_at DATETIME
+);
+CREATE TABLE impl_workspaces (
+	project_id TEXT NOT NULL DEFAULT '',
+	workspace_slug TEXT NOT NULL,
+	checkout_role TEXT NOT NULL DEFAULT '',
+	checkout_path TEXT NOT NULL,
+	display_name TEXT NOT NULL,
+	plan_dir_rel TEXT,
+	status TEXT NOT NULL DEFAULT 'active',
+	merged_at DATETIME,
+	cleaned_up_at DATETIME,
+	merge_evidence TEXT,
+	cleanup_proof_kind TEXT NOT NULL DEFAULT 'unknown',
+	cleanup_proof_source_ref TEXT,
+	cleanup_proof_target_commit TEXT,
+	cleanup_proof_at DATETIME,
+	cleanup_risk_reason TEXT,
+	updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+	PRIMARY KEY (project_id, workspace_slug)
+);
+INSERT INTO impl_workspaces (
+	project_id, workspace_slug, checkout_role, checkout_path, display_name, status,
+	merged_at, cleaned_up_at, merge_evidence, cleanup_proof_kind,
+	cleanup_proof_source_ref, cleanup_proof_target_commit, cleanup_proof_at,
+	cleanup_risk_reason
+)
+VALUES
+	('vamos', 'stage', 'stage', '/repo/vamos-stage', 'Stage', 'merged',
+	 CURRENT_TIMESTAMP, NULL, 'stale merge', 'ancestor', 'origin/main', 'abc123', CURRENT_TIMESTAMP, 'stale risk'),
+	('vamos', 'durable-stage', 'stage', '/repo/vamos-durable-stage', 'Durable stage', 'cleaned_up',
+	 CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 'stale cleanup', 'ancestor', 'origin/main', 'def456', CURRENT_TIMESTAMP, 'stale cleanup risk'),
+	('vamos', 'feature', '', '/repo/vamos-feature', 'Feature', 'merged',
+	 CURRENT_TIMESTAMP, NULL, 'feature merge', 'ancestor', 'origin/main', 'fedcba', CURRENT_TIMESTAMP, NULL);`)
+	if err != nil {
+		t.Fatalf("seed impl_workspaces: %v", err)
+	}
+
+	if err := runRuntimeMigrations(t.Context(), database); err != nil {
+		t.Fatalf("runRuntimeMigrations() error = %v", err)
+	}
+
+	rows, err := database.QueryContext(t.Context(), `
+SELECT workspace_slug, status, merged_at, cleaned_up_at, merge_evidence,
+       cleanup_proof_kind, cleanup_proof_source_ref, cleanup_proof_target_commit,
+       cleanup_proof_at, cleanup_risk_reason
+FROM impl_workspaces
+WHERE workspace_slug IN ('stage', 'durable-stage', 'feature')
+ORDER BY workspace_slug`)
+	if err != nil {
+		t.Fatalf("query repaired rows: %v", err)
+	}
+	defer rows.Close()
+
+	type migratedWorkspaceStatus struct {
+		status        string
+		mergedAt      sql.NullTime
+		cleanedUpAt   sql.NullTime
+		mergeEvidence sql.NullString
+		proofKind     string
+		sourceRef     sql.NullString
+		targetCommit  sql.NullString
+		proofAt       sql.NullTime
+		riskReason    sql.NullString
+	}
+	got := map[string]migratedWorkspaceStatus{}
+	for rows.Next() {
+		var slug string
+		var row migratedWorkspaceStatus
+		if err := rows.Scan(
+			&slug,
+			&row.status,
+			&row.mergedAt,
+			&row.cleanedUpAt,
+			&row.mergeEvidence,
+			&row.proofKind,
+			&row.sourceRef,
+			&row.targetCommit,
+			&row.proofAt,
+			&row.riskReason,
+		); err != nil {
+			t.Fatalf("scan repaired row: %v", err)
+		}
+		got[slug] = row
+	}
+	if err := rows.Err(); err != nil {
+		t.Fatalf("rows: %v", err)
+	}
+
+	for _, slug := range []string{"stage", "durable-stage"} {
+		row := got[slug]
+		if row.status != "active" || row.mergedAt.Valid || row.cleanedUpAt.Valid || row.mergeEvidence.Valid ||
+			row.proofKind != "unknown" || row.sourceRef.Valid || row.targetCommit.Valid || row.proofAt.Valid || row.riskReason.Valid {
+			t.Fatalf("%s = %+v, want active with cleared terminal metadata", slug, row)
+		}
+	}
+	if got["feature"].status != "merged" {
+		t.Fatalf("feature status = %q, want unprotected terminal row unchanged", got["feature"].status)
+	}
+	assertMigratedWorkspaceDBInvariants(t, database)
+}
+
 func TestRunRuntimeMigrationsFailsDuplicateWorkspaceCheckoutPaths(t *testing.T) {
 	t.Parallel()
 
