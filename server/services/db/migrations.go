@@ -8,6 +8,10 @@ import (
 	"strings"
 )
 
+type execer interface {
+	ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error)
+}
+
 func enableSQLiteForeignKeys(ctx context.Context, database *sql.DB) error {
 	_, err := database.ExecContext(ctx, "PRAGMA foreign_keys = ON")
 	return err
@@ -334,6 +338,9 @@ func ensureImplWorkspaceCleanupProofColumnsIfTableExists(
 	}{
 		{name: "project_id", definition: "TEXT NOT NULL DEFAULT ''"},
 		{name: "checkout_role", definition: "TEXT NOT NULL DEFAULT '' CHECK (checkout_role IN ('', 'main', 'stage'))"},
+		{name: "merged_at", definition: "DATETIME"},
+		{name: "cleaned_up_at", definition: "DATETIME"},
+		{name: "merge_evidence", definition: "TEXT"},
 		{name: "cleanup_proof_kind", definition: "TEXT NOT NULL DEFAULT 'unknown' CHECK (cleanup_proof_kind IN ('ancestor', 'patch_equivalent', 'cached', 'unknown'))"},
 		{name: "cleanup_proof_source_ref", definition: "TEXT"},
 		{name: "cleanup_proof_target_commit", definition: "TEXT"},
@@ -349,6 +356,9 @@ func ensureImplWorkspaceCleanupProofColumnsIfTableExists(
 	if err := ensureImplWorkspaceCompositePrimaryKey(ctx, database); err != nil {
 		return err
 	}
+	if _, err := repairProtectedImplWorkspaceTerminalStatuses(ctx, database); err != nil {
+		return err
+	}
 	for _, indexSQL := range []string{
 		`CREATE INDEX IF NOT EXISTS idx_impl_workspaces_project_status_updated ON impl_workspaces (project_id, status, updated_at DESC)`,
 		`CREATE INDEX IF NOT EXISTS idx_impl_workspaces_plan_dir_rel ON impl_workspaces (plan_dir_rel) WHERE plan_dir_rel IS NOT NULL`,
@@ -359,6 +369,29 @@ func ensureImplWorkspaceCleanupProofColumnsIfTableExists(
 		}
 	}
 	return nil
+}
+
+func repairProtectedImplWorkspaceTerminalStatuses(ctx context.Context, database execer) (int64, error) {
+	result, err := database.ExecContext(ctx, `
+UPDATE impl_workspaces
+SET
+	status = 'active',
+	merged_at = NULL,
+	cleaned_up_at = NULL,
+	merge_evidence = NULL,
+	cleanup_proof_kind = 'unknown',
+	cleanup_proof_source_ref = NULL,
+	cleanup_proof_target_commit = NULL,
+	cleanup_proof_at = NULL,
+	cleanup_risk_reason = NULL,
+	updated_at = CURRENT_TIMESTAMP
+WHERE
+	(workspace_slug IN ('main', 'stage') OR checkout_role IN ('main', 'stage'))
+	AND status IN ('merged', 'cleaned_up')`)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
 }
 
 func ensureImplWorkspaceCompositePrimaryKey(ctx context.Context, database *sql.DB) error {
