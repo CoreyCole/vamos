@@ -15,6 +15,7 @@ type Querier interface {
 	ArchiveAllActivePlanWorkspaces(ctx context.Context) (int64, error)
 	ArchiveMissingPlanWorkspaceProjects(ctx context.Context, arg ArchiveMissingPlanWorkspaceProjectsParams) (int64, error)
 	ArchiveMissingPlanWorkspaces(ctx context.Context, planDirRels []string) (int64, error)
+	ArchivePlanWorkspacePrimaryProjectsExcept(ctx context.Context, arg ArchivePlanWorkspacePrimaryProjectsExceptParams) (int64, error)
 	AttachThreadToWorkspace(ctx context.Context, arg AttachThreadToWorkspaceParams) error
 	BackfillAgentRunsWorkspaceForThread(ctx context.Context, arg BackfillAgentRunsWorkspaceForThreadParams) error
 	BackfillAgentSessionsWorkspaceForThread(ctx context.Context, arg BackfillAgentSessionsWorkspaceForThreadParams) error

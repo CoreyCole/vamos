@@ -89,6 +89,30 @@ func (q *Queries) ArchiveMissingPlanWorkspaces(ctx context.Context, planDirRels 
 	return result.RowsAffected()
 }
 
+const archivePlanWorkspacePrimaryProjectsExcept = `-- name: ArchivePlanWorkspacePrimaryProjectsExcept :execrows
+;
+
+UPDATE plan_workspace_projects
+SET archived_at = CURRENT_TIMESTAMP
+WHERE plan_dir_rel = ?1
+AND archived_at IS NULL
+AND role = 'primary'
+AND NOT (project_id = ?2)
+`
+
+type ArchivePlanWorkspacePrimaryProjectsExceptParams struct {
+	PlanDirRel string `json:"plan_dir_rel"`
+	ProjectID  string `json:"project_id"`
+}
+
+func (q *Queries) ArchivePlanWorkspacePrimaryProjectsExcept(ctx context.Context, arg ArchivePlanWorkspacePrimaryProjectsExceptParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, archivePlanWorkspacePrimaryProjectsExcept, arg.PlanDirRel, arg.ProjectID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
 const getPlanWorkspace = `-- name: GetPlanWorkspace :one
 SELECT plan_dir_rel, project_id, plan_dir, label, artifact_updated_at, qrspi_lifecycle, qrspi_lifecycle_updated_at, qrspi_closed_reason, discovered_at, last_discovered_at, archived_at
 FROM plan_workspaces

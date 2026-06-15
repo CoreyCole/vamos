@@ -849,6 +849,12 @@ func syncPlanWorkspaceProjects(
 	primary := strings.TrimSpace(item.ProjectID)
 	if primary != "" {
 		projectIDs = append(projectIDs, primary)
+		if _, err := q.ArchivePlanWorkspacePrimaryProjectsExcept(ctx, db.ArchivePlanWorkspacePrimaryProjectsExceptParams{
+			PlanDirRel: item.PlanDirRel,
+			ProjectID:  primary,
+		}); err != nil {
+			return false, err
+		}
 		if _, err := q.UpsertPlanWorkspaceProject(ctx, db.UpsertPlanWorkspaceProjectParams{
 			PlanDirRel:     item.PlanDirRel,
 			ProjectID:      primary,

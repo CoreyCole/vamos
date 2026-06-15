@@ -93,6 +93,14 @@ WHERE plan_dir_rel = sqlc.arg ('plan_dir_rel')
 AND archived_at IS NULL
 ORDER BY CASE role WHEN 'primary' THEN 0 ELSE 1 END, project_id ;
 
+-- name: ArchivePlanWorkspacePrimaryProjectsExcept :execrows
+UPDATE plan_workspace_projects
+SET archived_at = CURRENT_TIMESTAMP
+WHERE plan_dir_rel = sqlc.arg ('plan_dir_rel')
+AND archived_at IS NULL
+AND role = 'primary'
+AND NOT (project_id = sqlc.arg ('project_id')) ;
+
 -- name: UpsertPlanWorkspaceProject :one
 INSERT INTO plan_workspace_projects (
 plan_dir_rel,

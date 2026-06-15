@@ -357,6 +357,27 @@ func TestPlanWorkspaceSyncerSyncsProjectRolesFromMetadata(t *testing.T) {
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("roles after archive = %#v, want %#v", got, want)
 	}
+
+	writePlanWorkspaceMarkdown(t, planDir, "plan.md", "---\nproject: cn-agents\nrelated_projects: [datastarui]\n---\n# Plan\n")
+	result, err = syncer.Sync(context.Background(), PlanWorkspaceDiscoveryInput{})
+	if err != nil {
+		t.Fatalf("third Sync() error = %v", err)
+	}
+	if !result.Changed || notifier.count != 3 {
+		t.Fatalf("third result = %#v notifier=%d, want changed", result, notifier.count)
+	}
+	roles, err = service.queries.ListPlanWorkspaceProjects(context.Background(), "agent/plans/project-roles")
+	if err != nil {
+		t.Fatalf("ListPlanWorkspaceProjects(third) error = %v", err)
+	}
+	got = got[:0]
+	for _, role := range roles {
+		got = append(got, role.ProjectID+":"+role.Role)
+	}
+	want = []string{"cn-agents:primary", "datastarui:related"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("roles after primary change = %#v, want %#v", got, want)
+	}
 }
 
 func TestPlanWorkspaceSyncerDoesNotUsePrimarySyncedCheckoutForRelatedBinding(t *testing.T) {
