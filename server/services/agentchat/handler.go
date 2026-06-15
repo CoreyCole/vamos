@@ -278,9 +278,8 @@ func (h *Handler) OpenPlanWorkspace(c echo.Context) error {
 	if !ok {
 		return echo.NewHTTPError(http.StatusBadRequest, "invalid plan workspace")
 	}
-	if WorkspaceWorkflowType(
-		strings.TrimSpace(c.QueryParam("workflow_type")),
-	) != WorkspaceWorkflowQRSPI {
+	workflowType := WorkspaceWorkflowType(strings.TrimSpace(c.QueryParam("workflow_type")))
+	if !isQRSPIWorkflowType(workflowType) {
 		workspaceRecord, err := h.service.GetOrCreateWorkspaceForRootDocPath(
 			c.Request().Context(),
 			markdown.ChatWorkspaceOpenInput{
@@ -310,7 +309,7 @@ func (h *Handler) OpenPlanWorkspace(c echo.Context) error {
 		Title:          planWorkspaceLabel(planDir),
 		RootDocPath:    planDir,
 		Cwd:            h.service.defaultCwd,
-		WorkflowType:   WorkspaceWorkflowQRSPI,
+		WorkflowType:   workflowType,
 		Policy:         policyJSON,
 		PromptOverride: e2eQRSPIStartPromptOverride(c),
 	})

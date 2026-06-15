@@ -1082,7 +1082,7 @@ func PlanSidebarQRSPIStartControls(node PlanSidebarNode) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 71, "\"> <input type=\"hidden\" name=\"workflow_type\" value=\"qrspi\"><p class=\"text-[10px] font-semibold uppercase tracking-wide text-muted-foreground\">QRSPI operating mode</p><label class=\"mt-2 flex items-start gap-2 text-xs text-foreground\"><input class=\"mt-0.5\" type=\"radio\" name=\"policy_preset\" value=\"manual\" checked> <span><span class=\"font-medium\">Manual</span><span class=\"block text-[10px] text-muted-foreground\">Stop at human gates; run planning reviews.</span></span></label> <label class=\"mt-2 flex items-start gap-2 text-xs text-foreground\"><input class=\"mt-0.5\" type=\"radio\" name=\"policy_preset\" value=\"assisted\"> <span><span class=\"font-medium\">Assisted</span><span class=\"block text-[10px] text-muted-foreground\">Auto-continue safe gates; final implementation review still waits.</span></span></label> <label class=\"mt-2 flex items-start gap-2 text-xs text-foreground\"><input class=\"mt-0.5\" type=\"radio\" name=\"policy_preset\" value=\"fast_draft\"> <span><span class=\"font-medium\">Fast draft</span><span class=\"block text-[10px] text-muted-foreground\">Skip planning reviews for exploratory drafts; final implementation review still waits.</span></span></label> <button type=\"submit\" class=\"mt-3 rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90\">Start QRSPI</button></form>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 71, "\"><p class=\"text-[10px] font-semibold uppercase tracking-wide text-muted-foreground\">QRSPI operating mode</p><label class=\"mt-2 flex items-start gap-2 text-xs text-foreground\"><input class=\"mt-0.5\" type=\"radio\" name=\"policy_preset\" value=\"manual\" checked> <span><span class=\"font-medium\">Manual</span><span class=\"block text-[10px] text-muted-foreground\">Stop at human gates; run planning reviews.</span></span></label> <label class=\"mt-2 flex items-start gap-2 text-xs text-foreground\"><input class=\"mt-0.5\" type=\"radio\" name=\"policy_preset\" value=\"assisted\"> <span><span class=\"font-medium\">Assisted</span><span class=\"block text-[10px] text-muted-foreground\">Auto-continue safe gates; final implementation review still waits.</span></span></label> <label class=\"mt-2 flex items-start gap-2 text-xs text-foreground\"><input class=\"mt-0.5\" type=\"radio\" name=\"policy_preset\" value=\"fast_draft\"> <span><span class=\"font-medium\">Fast draft</span><span class=\"block text-[10px] text-muted-foreground\">Skip planning reviews for exploratory drafts; final implementation review still waits.</span></span></label><div class=\"mt-3 flex flex-wrap gap-2\"><button type=\"submit\" name=\"workflow_type\" value=\"qrspi\" class=\"rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90\">Start QRSPI</button> <button type=\"submit\" name=\"workflow_type\" value=\"qrspi-project-planning\" class=\"rounded-md border border-border px-3 py-1.5 text-xs font-medium text-foreground hover:bg-muted\">Start project planning</button></div></form>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -1118,7 +1118,7 @@ func PlanSidebarNodeContent(node PlanSidebarNode) templ.Component {
 		var templ_7745c5c3_Var48 string
 		templ_7745c5c3_Var48, templ_7745c5c3_Err = templ.JoinStringErrs(node.Label)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/sidebar.templ`, Line: 280, Col: 70}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/sidebar.templ`, Line: 282, Col: 70}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var48))
 		if templ_7745c5c3_Err != nil {
@@ -1146,7 +1146,7 @@ func PlanSidebarNodeContent(node PlanSidebarNode) templ.Component {
 			var templ_7745c5c3_Var49 string
 			templ_7745c5c3_Var49, templ_7745c5c3_Err = templ.JoinStringErrs(node.LatestSourceLabel)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/sidebar.templ`, Line: 287, Col: 127}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/sidebar.templ`, Line: 289, Col: 127}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var49))
 			if templ_7745c5c3_Err != nil {
@@ -1165,7 +1165,7 @@ func PlanSidebarNodeContent(node PlanSidebarNode) templ.Component {
 			var templ_7745c5c3_Var50 string
 			templ_7745c5c3_Var50, templ_7745c5c3_Err = templ.JoinStringErrs(node.PrimaryProject)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/sidebar.templ`, Line: 290, Col: 139}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/sidebar.templ`, Line: 292, Col: 139}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var50))
 			if templ_7745c5c3_Err != nil {
@@ -1184,7 +1184,7 @@ func PlanSidebarNodeContent(node PlanSidebarNode) templ.Component {
 			var templ_7745c5c3_Var51 string
 			templ_7745c5c3_Var51, templ_7745c5c3_Err = templ.JoinStringErrs(project)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/sidebar.templ`, Line: 293, Col: 85}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/sidebar.templ`, Line: 295, Col: 85}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var51))
 			if templ_7745c5c3_Err != nil {
@@ -1203,7 +1203,7 @@ func PlanSidebarNodeContent(node PlanSidebarNode) templ.Component {
 			var templ_7745c5c3_Var52 string
 			templ_7745c5c3_Var52, templ_7745c5c3_Err = templ.JoinStringErrs(node.MatchedRole)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/sidebar.templ`, Line: 296, Col: 109}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/sidebar.templ`, Line: 298, Col: 109}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var52))
 			if templ_7745c5c3_Err != nil {
@@ -1222,7 +1222,7 @@ func PlanSidebarNodeContent(node PlanSidebarNode) templ.Component {
 			var templ_7745c5c3_Var53 string
 			templ_7745c5c3_Var53, templ_7745c5c3_Err = templ.JoinStringErrs(binding.ProjectID)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/sidebar.templ`, Line: 299, Col: 86}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/sidebar.templ`, Line: 301, Col: 86}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var53))
 			if templ_7745c5c3_Err != nil {
@@ -1235,7 +1235,7 @@ func PlanSidebarNodeContent(node PlanSidebarNode) templ.Component {
 			var templ_7745c5c3_Var54 string
 			templ_7745c5c3_Var54, templ_7745c5c3_Err = templ.JoinStringErrs(binding.Status)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/sidebar.templ`, Line: 299, Col: 106}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/sidebar.templ`, Line: 301, Col: 106}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var54))
 			if templ_7745c5c3_Err != nil {
@@ -1254,7 +1254,7 @@ func PlanSidebarNodeContent(node PlanSidebarNode) templ.Component {
 			var templ_7745c5c3_Var55 string
 			templ_7745c5c3_Var55, templ_7745c5c3_Err = templ.JoinStringErrs(planSidebarTimestampLabel(node))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/sidebar.templ`, Line: 302, Col: 59}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/sidebar.templ`, Line: 304, Col: 59}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var55))
 			if templ_7745c5c3_Err != nil {
@@ -1273,7 +1273,7 @@ func PlanSidebarNodeContent(node PlanSidebarNode) templ.Component {
 			var templ_7745c5c3_Var56 string
 			templ_7745c5c3_Var56, templ_7745c5c3_Err = templ.JoinStringErrs(planSidebarCountLabel(node))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/sidebar.templ`, Line: 305, Col: 55}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/sidebar.templ`, Line: 307, Col: 55}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var56))
 			if templ_7745c5c3_Err != nil {
@@ -1320,7 +1320,7 @@ func AgentChatMobileSidebarTrigger() templ.Component {
 		var templ_7745c5c3_Var58 string
 		templ_7745c5c3_Var58, templ_7745c5c3_Err = templ.JoinStringErrs(agentChatThreadSheetID)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/sidebar.templ`, Line: 316, Col: 40}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/sidebar.templ`, Line: 318, Col: 40}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var58))
 		if templ_7745c5c3_Err != nil {
@@ -1372,7 +1372,7 @@ func AgentChatMobileSidebarSheet(title string, body templ.Component) templ.Compo
 		var templ_7745c5c3_Var60 string
 		templ_7745c5c3_Var60, templ_7745c5c3_Err = templ.JoinStringErrs(signals.Signal("open"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/sidebar.templ`, Line: 342, Col: 37}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/sidebar.templ`, Line: 344, Col: 37}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var60))
 		if templ_7745c5c3_Err != nil {
@@ -1385,7 +1385,7 @@ func AgentChatMobileSidebarSheet(title string, body templ.Component) templ.Compo
 		var templ_7745c5c3_Var61 string
 		templ_7745c5c3_Var61, templ_7745c5c3_Err = templ.JoinStringErrs(backdropDataClass)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/sidebar.templ`, Line: 343, Col: 33}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/sidebar.templ`, Line: 345, Col: 33}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var61))
 		if templ_7745c5c3_Err != nil {
@@ -1398,7 +1398,7 @@ func AgentChatMobileSidebarSheet(title string, body templ.Component) templ.Compo
 		var templ_7745c5c3_Var62 string
 		templ_7745c5c3_Var62, templ_7745c5c3_Err = templ.JoinStringErrs(sheetHandler.BuildBackdropClickHandler())
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/sidebar.templ`, Line: 344, Col: 59}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/sidebar.templ`, Line: 346, Col: 59}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var62))
 		if templ_7745c5c3_Err != nil {
@@ -1411,7 +1411,7 @@ func AgentChatMobileSidebarSheet(title string, body templ.Component) templ.Compo
 		var templ_7745c5c3_Var63 string
 		templ_7745c5c3_Var63, templ_7745c5c3_Err = templ.JoinStringErrs(agentChatThreadSheetID)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/sidebar.templ`, Line: 349, Col: 30}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/sidebar.templ`, Line: 351, Col: 30}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var63))
 		if templ_7745c5c3_Err != nil {
@@ -1424,7 +1424,7 @@ func AgentChatMobileSidebarSheet(title string, body templ.Component) templ.Compo
 		var templ_7745c5c3_Var64 string
 		templ_7745c5c3_Var64, templ_7745c5c3_Err = templ.JoinStringErrs(signals.Signal("open"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/sidebar.templ`, Line: 350, Col: 37}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/sidebar.templ`, Line: 352, Col: 37}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var64))
 		if templ_7745c5c3_Err != nil {
@@ -1437,7 +1437,7 @@ func AgentChatMobileSidebarSheet(title string, body templ.Component) templ.Compo
 		var templ_7745c5c3_Var65 string
 		templ_7745c5c3_Var65, templ_7745c5c3_Err = templ.JoinStringErrs(panelDataClass)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/sidebar.templ`, Line: 351, Col: 30}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/sidebar.templ`, Line: 353, Col: 30}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var65))
 		if templ_7745c5c3_Err != nil {
@@ -1450,7 +1450,7 @@ func AgentChatMobileSidebarSheet(title string, body templ.Component) templ.Compo
 		var templ_7745c5c3_Var66 string
 		templ_7745c5c3_Var66, templ_7745c5c3_Err = templ.JoinStringErrs(sheetHandler.BuildEscapeHandler())
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/sidebar.templ`, Line: 357, Col: 62}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/sidebar.templ`, Line: 359, Col: 62}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var66))
 		if templ_7745c5c3_Err != nil {
@@ -1463,7 +1463,7 @@ func AgentChatMobileSidebarSheet(title string, body templ.Component) templ.Compo
 		var templ_7745c5c3_Var67 string
 		templ_7745c5c3_Var67, templ_7745c5c3_Err = templ.JoinStringErrs(title)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/sidebar.templ`, Line: 363, Col: 106}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/sidebar.templ`, Line: 365, Col: 106}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var67))
 		if templ_7745c5c3_Err != nil {
@@ -1613,7 +1613,7 @@ func WorkspaceSidebarGroup(state WorkspaceSidebarState, group ThreadSidebarGroup
 		var templ_7745c5c3_Var73 string
 		templ_7745c5c3_Var73, templ_7745c5c3_Err = templ.JoinStringErrs("{'bg-background shadow-sm': " + workspaceSidebarGroupOpenExpression(group) + ", 'bg-transparent shadow-none': !" + workspaceSidebarGroupOpenExpression(group) + " && " + strconv.FormatBool(!group.IsActive) + "}")
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/sidebar.templ`, Line: 400, Col: 227}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/sidebar.templ`, Line: 402, Col: 227}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var73))
 		if templ_7745c5c3_Err != nil {
@@ -1626,7 +1626,7 @@ func WorkspaceSidebarGroup(state WorkspaceSidebarState, group ThreadSidebarGroup
 		var templ_7745c5c3_Var74 string
 		templ_7745c5c3_Var74, templ_7745c5c3_Err = templ.JoinStringErrs(workspaceSidebarGroupSetExpression(group))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/sidebar.templ`, Line: 405, Col: 61}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/sidebar.templ`, Line: 407, Col: 61}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var74))
 		if templ_7745c5c3_Err != nil {
@@ -1639,7 +1639,7 @@ func WorkspaceSidebarGroup(state WorkspaceSidebarState, group ThreadSidebarGroup
 		var templ_7745c5c3_Var75 string
 		templ_7745c5c3_Var75, templ_7745c5c3_Err = templ.JoinStringErrs(workspaceSidebarGroupOpenExpression(group) + " ? 'true' : 'false'")
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/sidebar.templ`, Line: 406, Col: 96}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/sidebar.templ`, Line: 408, Col: 96}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var75))
 		if templ_7745c5c3_Err != nil {
@@ -1677,7 +1677,7 @@ func WorkspaceSidebarGroup(state WorkspaceSidebarState, group ThreadSidebarGroup
 		var templ_7745c5c3_Var78 string
 		templ_7745c5c3_Var78, templ_7745c5c3_Err = templ.JoinStringErrs("{'bg-background text-foreground': " + workspaceSidebarGroupOpenExpression(group) + "}")
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/sidebar.templ`, Line: 414, Col: 105}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/sidebar.templ`, Line: 416, Col: 105}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var78))
 		if templ_7745c5c3_Err != nil {
@@ -1690,7 +1690,7 @@ func WorkspaceSidebarGroup(state WorkspaceSidebarState, group ThreadSidebarGroup
 		var templ_7745c5c3_Var79 string
 		templ_7745c5c3_Var79, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("%d", group.ThreadCount))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/sidebar.templ`, Line: 416, Col: 43}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/sidebar.templ`, Line: 418, Col: 43}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var79))
 		if templ_7745c5c3_Err != nil {
@@ -1703,7 +1703,7 @@ func WorkspaceSidebarGroup(state WorkspaceSidebarState, group ThreadSidebarGroup
 		var templ_7745c5c3_Var80 string
 		templ_7745c5c3_Var80, templ_7745c5c3_Err = templ.JoinStringErrs(group.KindLabel)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/sidebar.templ`, Line: 420, Col: 115}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/sidebar.templ`, Line: 422, Col: 115}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var80))
 		if templ_7745c5c3_Err != nil {
@@ -1726,7 +1726,7 @@ func WorkspaceSidebarGroup(state WorkspaceSidebarState, group ThreadSidebarGroup
 		var templ_7745c5c3_Var81 string
 		templ_7745c5c3_Var81, templ_7745c5c3_Err = templ.JoinStringErrs(group.Label)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/sidebar.templ`, Line: 425, Col: 79}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/sidebar.templ`, Line: 427, Col: 79}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var81))
 		if templ_7745c5c3_Err != nil {
@@ -1744,7 +1744,7 @@ func WorkspaceSidebarGroup(state WorkspaceSidebarState, group ThreadSidebarGroup
 			var templ_7745c5c3_Var82 string
 			templ_7745c5c3_Var82, templ_7745c5c3_Err = templ.JoinStringErrs(group.Timestamp)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/sidebar.templ`, Line: 427, Col: 84}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/sidebar.templ`, Line: 429, Col: 84}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var82))
 			if templ_7745c5c3_Err != nil {
@@ -1767,7 +1767,7 @@ func WorkspaceSidebarGroup(state WorkspaceSidebarState, group ThreadSidebarGroup
 			var templ_7745c5c3_Var83 templ.SafeURL
 			templ_7745c5c3_Var83, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(group.WorkspaceHref))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/sidebar.templ`, Line: 432, Col: 48}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/sidebar.templ`, Line: 434, Col: 48}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var83))
 			if templ_7745c5c3_Err != nil {
@@ -1785,7 +1785,7 @@ func WorkspaceSidebarGroup(state WorkspaceSidebarState, group ThreadSidebarGroup
 		var templ_7745c5c3_Var84 string
 		templ_7745c5c3_Var84, templ_7745c5c3_Err = templ.JoinStringErrs(workspaceSidebarGroupOpenExpression(group))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/sidebar.templ`, Line: 435, Col: 61}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/sidebar.templ`, Line: 437, Col: 61}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var84))
 		if templ_7745c5c3_Err != nil {
@@ -1846,7 +1846,7 @@ func ThreadSidebarThreadRow(thread ThreadSidebarThread) templ.Component {
 			var templ_7745c5c3_Var87 templ.SafeURL
 			templ_7745c5c3_Var87, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(thread.Href))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/sidebar.templ`, Line: 446, Col: 36}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/sidebar.templ`, Line: 448, Col: 36}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var87))
 			if templ_7745c5c3_Err != nil {
@@ -1940,7 +1940,7 @@ func WorkspaceSidebarThreadRow(workspaceID string, thread ThreadSidebarThread) t
 			var templ_7745c5c3_Var91 templ.SafeURL
 			templ_7745c5c3_Var91, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(thread.Href))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/sidebar.templ`, Line: 471, Col: 36}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/sidebar.templ`, Line: 473, Col: 36}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var91))
 			if templ_7745c5c3_Err != nil {
@@ -2027,7 +2027,7 @@ func PiSessionOpenSidebarForm(thread ThreadSidebarThread, buttonClasses string) 
 		var templ_7745c5c3_Var94 string
 		templ_7745c5c3_Var94, templ_7745c5c3_Err = templ.JoinStringErrs(thread.OpenPiSessionAction)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/sidebar.templ`, Line: 496, Col: 64}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/sidebar.templ`, Line: 498, Col: 64}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var94))
 		if templ_7745c5c3_Err != nil {
@@ -2040,7 +2040,7 @@ func PiSessionOpenSidebarForm(thread ThreadSidebarThread, buttonClasses string) 
 		var templ_7745c5c3_Var95 string
 		templ_7745c5c3_Var95, templ_7745c5c3_Err = templ.JoinStringErrs(thread.SessionPath)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/sidebar.templ`, Line: 497, Col: 69}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/sidebar.templ`, Line: 499, Col: 69}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var95))
 		if templ_7745c5c3_Err != nil {
@@ -2053,7 +2053,7 @@ func PiSessionOpenSidebarForm(thread ThreadSidebarThread, buttonClasses string) 
 		var templ_7745c5c3_Var96 string
 		templ_7745c5c3_Var96, templ_7745c5c3_Err = templ.JoinStringErrs(thread.WorkspaceDir)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/sidebar.templ`, Line: 498, Col: 71}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/sidebar.templ`, Line: 500, Col: 71}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var96))
 		if templ_7745c5c3_Err != nil {
@@ -2088,7 +2088,7 @@ func PiSessionOpenSidebarForm(thread ThreadSidebarThread, buttonClasses string) 
 		var templ_7745c5c3_Var99 string
 		templ_7745c5c3_Var99, templ_7745c5c3_Err = templ.JoinStringErrs(indicator)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/sidebar.templ`, Line: 502, Col: 29}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/sidebar.templ`, Line: 504, Col: 29}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var99))
 		if templ_7745c5c3_Err != nil {
@@ -2101,7 +2101,7 @@ func PiSessionOpenSidebarForm(thread ThreadSidebarThread, buttonClasses string) 
 		var templ_7745c5c3_Var100 string
 		templ_7745c5c3_Var100, templ_7745c5c3_Err = templ.JoinStringErrs(indicatorSignal)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/sidebar.templ`, Line: 503, Col: 39}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/sidebar.templ`, Line: 505, Col: 39}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var100))
 		if templ_7745c5c3_Err != nil {
@@ -2114,7 +2114,7 @@ func PiSessionOpenSidebarForm(thread ThreadSidebarThread, buttonClasses string) 
 		var templ_7745c5c3_Var101 string
 		templ_7745c5c3_Var101, templ_7745c5c3_Err = templ.JoinStringErrs("!" + indicatorSignal)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/sidebar.templ`, Line: 505, Col: 41}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/sidebar.templ`, Line: 507, Col: 41}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var101))
 		if templ_7745c5c3_Err != nil {
@@ -2135,7 +2135,7 @@ func PiSessionOpenSidebarForm(thread ThreadSidebarThread, buttonClasses string) 
 		var templ_7745c5c3_Var102 string
 		templ_7745c5c3_Var102, templ_7745c5c3_Err = templ.JoinStringErrs(indicatorSignal)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/sidebar.templ`, Line: 508, Col: 35}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/sidebar.templ`, Line: 510, Col: 35}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var102))
 		if templ_7745c5c3_Err != nil {
@@ -2153,7 +2153,7 @@ func PiSessionOpenSidebarForm(thread ThreadSidebarThread, buttonClasses string) 
 			var templ_7745c5c3_Var103 string
 			templ_7745c5c3_Var103, templ_7745c5c3_Err = templ.JoinStringErrs(thread.SourceLabel)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/sidebar.templ`, Line: 511, Col: 161}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/sidebar.templ`, Line: 513, Col: 161}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var103))
 			if templ_7745c5c3_Err != nil {
@@ -2176,7 +2176,7 @@ func PiSessionOpenSidebarForm(thread ThreadSidebarThread, buttonClasses string) 
 			var templ_7745c5c3_Var104 string
 			templ_7745c5c3_Var104, templ_7745c5c3_Err = templ.JoinStringErrs(indicatorSignal)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/sidebar.templ`, Line: 515, Col: 34}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/sidebar.templ`, Line: 517, Col: 34}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var104))
 			if templ_7745c5c3_Err != nil {
@@ -2189,7 +2189,7 @@ func PiSessionOpenSidebarForm(thread ThreadSidebarThread, buttonClasses string) 
 			var templ_7745c5c3_Var105 string
 			templ_7745c5c3_Var105, templ_7745c5c3_Err = templ.JoinStringErrs(thread.CwdLabel)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/sidebar.templ`, Line: 515, Col: 106}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/sidebar.templ`, Line: 517, Col: 106}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var105))
 			if templ_7745c5c3_Err != nil {
@@ -2236,7 +2236,7 @@ func WorkspaceSidebarThreadContent(thread ThreadSidebarThread) templ.Component {
 		var templ_7745c5c3_Var107 string
 		templ_7745c5c3_Var107, templ_7745c5c3_Err = templ.JoinStringErrs(thread.Title)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/sidebar.templ`, Line: 523, Col: 57}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/sidebar.templ`, Line: 525, Col: 57}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var107))
 		if templ_7745c5c3_Err != nil {
@@ -2254,7 +2254,7 @@ func WorkspaceSidebarThreadContent(thread ThreadSidebarThread) templ.Component {
 			var templ_7745c5c3_Var108 string
 			templ_7745c5c3_Var108, templ_7745c5c3_Err = templ.JoinStringErrs(thread.SourceLabel)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/sidebar.templ`, Line: 525, Col: 159}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/sidebar.templ`, Line: 527, Col: 159}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var108))
 			if templ_7745c5c3_Err != nil {
@@ -2277,7 +2277,7 @@ func WorkspaceSidebarThreadContent(thread ThreadSidebarThread) templ.Component {
 			var templ_7745c5c3_Var109 string
 			templ_7745c5c3_Var109, templ_7745c5c3_Err = templ.JoinStringErrs(thread.CwdLabel)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/sidebar.templ`, Line: 529, Col: 74}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/sidebar.templ`, Line: 531, Col: 74}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var109))
 			if templ_7745c5c3_Err != nil {
@@ -2333,7 +2333,7 @@ func WorkspaceHeader(projection WorkspaceProjection, state workbench.WorkbenchSt
 		var templ_7745c5c3_Var111 string
 		templ_7745c5c3_Var111, templ_7745c5c3_Err = templ.JoinStringErrs(header.Title)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/sidebar.templ`, Line: 548, Col: 74}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/sidebar.templ`, Line: 550, Col: 74}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var111))
 		if templ_7745c5c3_Err != nil {
@@ -2356,7 +2356,7 @@ func WorkspaceHeader(projection WorkspaceProjection, state workbench.WorkbenchSt
 				var templ_7745c5c3_Var112 string
 				templ_7745c5c3_Var112, templ_7745c5c3_Err = templ.JoinStringErrs(header.ModelLabel)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/sidebar.templ`, Line: 552, Col: 32}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/sidebar.templ`, Line: 554, Col: 32}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var112))
 				if templ_7745c5c3_Err != nil {
@@ -2381,7 +2381,7 @@ func WorkspaceHeader(projection WorkspaceProjection, state workbench.WorkbenchSt
 				var templ_7745c5c3_Var113 string
 				templ_7745c5c3_Var113, templ_7745c5c3_Err = templ.JoinStringErrs(header.ThinkingLabel)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/sidebar.templ`, Line: 558, Col: 35}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/sidebar.templ`, Line: 560, Col: 35}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var113))
 				if templ_7745c5c3_Err != nil {

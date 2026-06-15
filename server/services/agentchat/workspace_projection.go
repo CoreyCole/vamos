@@ -958,6 +958,8 @@ func workspaceWorkflowSidebarLabel(workflowType string) string {
 	switch WorkspaceWorkflowType(strings.TrimSpace(workflowType)) {
 	case WorkspaceWorkflowQRSPI:
 		return "QRSPI"
+	case WorkspaceWorkflowQRSPIProjectPlanning:
+		return "QRSPI Project Planning"
 	case WorkspaceWorkflowFreeform:
 		return "Freeform"
 	default:
@@ -1381,8 +1383,11 @@ func (s *Service) BuildWorkspaceWorkflowState(
 		CurrentStep: "Freeform",
 		Status:      "active",
 	}
-	if workflowType == WorkspaceWorkflowQRSPI {
+	if isQRSPIWorkflowType(workflowType) {
 		state.CurrentStep = "question"
+		if workflowType == WorkspaceWorkflowQRSPIProjectPlanning {
+			state.CurrentStep = string(qrspi.NodeMilestoneQuestion)
+		}
 		state.Status = "pending"
 		state.Mermaid = defaultQRSPIWorkflowMermaid()
 		if def, ok := s.workflowDefinition(wruntime.WorkflowID(workflowType)); ok {
@@ -1411,7 +1416,7 @@ func (s *Service) BuildWorkspaceWorkflowState(
 			state.NextDisplay = runtimeState.LastResult.DisplayNext
 		}
 		state.BypassedNodes = bypassedWorkflowNodes(runtimeState)
-		if state.Type == WorkspaceWorkflowQRSPI {
+		if isQRSPIWorkflowType(state.Type) {
 			policy, err := ProjectWorkspaceWorkflowPolicy(runtimeState)
 			if err != nil {
 				return WorkspaceWorkflowState{}, err
@@ -1422,7 +1427,7 @@ func (s *Service) BuildWorkspaceWorkflowState(
 		if def, ok := s.workflowDefinition(wruntime.WorkflowID(runtimeState.Type)); ok {
 			state.Mermaid = mermaidForDefinition(def)
 			state.RuntimeNextStep = RuntimeNextNodeLabel(def, runtimeState)
-			if runtimeState.LastResult != nil && state.Type == WorkspaceWorkflowQRSPI {
+			if runtimeState.LastResult != nil && isQRSPIWorkflowType(state.Type) {
 				result := wruntime.WorkflowResult{
 					WorkflowType: runtimeState.Type,
 					SourceNodeID: runtimeState.LastResult.SourceNodeID,
@@ -1503,10 +1508,11 @@ func ProjectWorkspaceCwd(
 ) WorkspaceCwdProjection {
 	executionCwd := strings.TrimSpace(state.ExecutionCwd)
 	current := state.CurrentNodeID
-	needsImplementation := current == qrspi.NodeImplement ||
-		current == qrspi.NodeReviewImplementation ||
-		current == qrspi.NodeHumanReviewImplementation ||
-		current == qrspi.NodeDone
+	needsImplementation := wruntime.WorkflowID(state.Type) == qrspi.AgentChatWorkflowType &&
+		(current == qrspi.NodeImplement ||
+			current == qrspi.NodeReviewImplementation ||
+			current == qrspi.NodeHumanReviewImplementation ||
+			current == qrspi.NodeDone)
 	if needsImplementation {
 		if executionCwd == "" {
 			return WorkspaceCwdProjection{

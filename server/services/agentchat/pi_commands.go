@@ -41,7 +41,7 @@ type PiCommandDiscovery interface {
 }
 
 func (s *Service) WorkspaceSlashCommandCwd(workspace db.Workspace) string {
-	if WorkspaceWorkflowType(workspace.WorkflowType) == WorkspaceWorkflowQRSPI &&
+	if isQRSPIWorkflowType(WorkspaceWorkflowType(workspace.WorkflowType)) &&
 		workspace.WorkflowStateJson.Valid && strings.TrimSpace(workspace.WorkflowStateJson.String) != "" {
 		var state wruntime.State
 		if err := json.Unmarshal(

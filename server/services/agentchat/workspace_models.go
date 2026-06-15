@@ -11,9 +11,19 @@ import (
 type WorkspaceWorkflowType string
 
 const (
-	WorkspaceWorkflowFreeform WorkspaceWorkflowType = "freeform"
-	WorkspaceWorkflowQRSPI    WorkspaceWorkflowType = "qrspi"
+	WorkspaceWorkflowFreeform             WorkspaceWorkflowType = "freeform"
+	WorkspaceWorkflowQRSPI                WorkspaceWorkflowType = "qrspi"
+	WorkspaceWorkflowQRSPIProjectPlanning WorkspaceWorkflowType = "qrspi-project-planning"
 )
+
+func isQRSPIWorkflowType(workflowType WorkspaceWorkflowType) bool {
+	switch workflowType {
+	case WorkspaceWorkflowQRSPI, WorkspaceWorkflowQRSPIProjectPlanning:
+		return true
+	default:
+		return false
+	}
+}
 
 type WorkspaceSource string
 

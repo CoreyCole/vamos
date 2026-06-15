@@ -237,6 +237,13 @@ func initializeWorkflowRuntime(
 	if err := registry.Register(def); err != nil {
 		return nil, err
 	}
+	projectPlanningDef, err := qrspi.ProjectPlanningDefinition()
+	if err != nil {
+		return nil, err
+	}
+	if err := registry.Register(projectPlanningDef); err != nil {
+		return nil, err
+	}
 	svc.workflowService = &agentchatworkflows.Service{
 		Definitions: registry,
 		Store:       agentchatworkflows.NewDBStore(queries),

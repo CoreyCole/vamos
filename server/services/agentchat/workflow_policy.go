@@ -199,7 +199,7 @@ func (s *Service) UpdateWorkspaceWorkflowPolicy(
 	if err != nil {
 		return WorkspaceWorkflowState{}, err
 	}
-	if WorkspaceWorkflowType(workspace.WorkflowType) != WorkspaceWorkflowQRSPI {
+	if !isQRSPIWorkflowType(WorkspaceWorkflowType(workspace.WorkflowType)) {
 		return WorkspaceWorkflowState{}, errors.New(
 			"workflow policy is only supported for QRSPI workspaces",
 		)
