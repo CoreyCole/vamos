@@ -834,7 +834,7 @@ func TestWorkspacesPageRendersWorkspaceTableAndDialogs(t *testing.T) {
 			t.Fatalf("WorkspacesPage missing %q: %s", want, html)
 		}
 	}
-	for _, absent := range []string{"Plan workspaces", "No impl workspace yet"} {
+	for _, absent := range []string{"Plan workspaces", "No impl workspace yet", "<dialog"} {
 		if strings.Contains(html, absent) {
 			t.Fatalf("WorkspacesPage unexpectedly contained %q: %s", absent, html)
 		}

@@ -7,6 +7,7 @@ import (
 
 	button "github.com/CoreyCole/vamos/pkg/datastarui/components/button"
 	card "github.com/CoreyCole/vamos/pkg/datastarui/components/card"
+	dialog "github.com/CoreyCole/vamos/pkg/datastarui/components/dialog"
 	dropdown "github.com/CoreyCole/vamos/pkg/datastarui/components/dropdown"
 	selectcomponent "github.com/CoreyCole/vamos/pkg/datastarui/components/select"
 
@@ -366,7 +367,9 @@ templ WorkspaceTableRow(view ImplWorkspaceView, managerURL string, showHistorica
 			@WorkspaceActionsMenu(view, managerURL, showHistorical, projectFilter, "row")
 		</td>
 		<td class="px-3 py-2 align-top">
-			<button type="button" class="font-medium hover:underline" data-on:click={ "document.getElementById('workspace-dialog-" + slug + "').showModal()" }>{ workspaceViewLabel(view) }</button>
+			@dialog.DialogTrigger(dialog.DialogTriggerArgs{DialogID: "workspace-dialog-" + slug, Class: "font-medium hover:underline"}) {
+				{ workspaceViewLabel(view) }
+			}
 			if slug != "" {
 				<p class="break-all font-mono text-xs text-muted-foreground">{ slug }</p>
 			}
@@ -392,16 +395,19 @@ templ WorkspaceDiagnosticBadges(view ImplWorkspaceView) {
 
 templ WorkspaceDetailDialog(view ImplWorkspaceView, managerURL string, showHistorical bool, projectFilter WorkspacesFilter) {
 	{{ slug := workspaceViewSlug(view) }}
-	<dialog id={ "workspace-dialog-" + slug } class="w-full max-w-4xl rounded-xl bg-background p-0 text-foreground shadow-xl backdrop:bg-background/70">
-		<div class="max-h-[85vh] overflow-y-auto p-4">
-			<div class="mb-3 flex justify-end">
-				<form method="dialog">
-					<button class="inline-flex h-9 items-center rounded-md border px-3 text-sm font-medium hover:bg-accent">Close</button>
-				</form>
-			</div>
+	@dialog.Dialog(dialog.DialogArgs{ID: "workspace-dialog-" + slug, Class: "max-w-4xl p-4"}) {
+		@dialog.DialogHeader(dialog.DialogHeaderArgs{Class: "mb-3 flex-row items-center justify-between gap-3"}) {
+			@dialog.DialogTitle(dialog.DialogTitleArgs{}) {
+				Workspace details
+			}
+			@dialog.DialogClose(dialog.DialogCloseArgs{DialogID: "workspace-dialog-" + slug, Variant: "outline", Class: "h-9"}) {
+				Close
+			}
+		}
+		<div class="max-h-[75vh] overflow-y-auto">
 			@ImplWorkspaceCard(view, managerURL, showHistorical, projectFilter)
 		</div>
-	</dialog>
+	}
 }
 
 templ WorkspaceRecovery(model RecoveryModel) {
@@ -717,6 +723,11 @@ func workspaceActionsDropdownID(slug string, instance string) string {
 	return id
 }
 
+func workspaceDialogOpenExpression(slug string) string {
+	replacer := strings.NewReplacer("-", "_", ".", "_", "/", "_")
+	return "$" + replacer.Replace("workspace-dialog-"+slug) + ".open = true"
+}
+
 func workspaceDropdownActionClass(destructive bool) string {
 	if destructive {
 		return "w-full justify-start text-xs text-destructive"
@@ -732,7 +743,7 @@ templ WorkspaceActionsMenu(view ImplWorkspaceView, managerURL string, showHistor
 			Actions
 		}
 		@dropdown.DropdownMenuContent(dropdown.DropdownMenuContentArgs{ID: dropdownID, Align: "start", Side: "bottom", SideOffset: 2, Class: "min-w-44 overflow-visible p-1 text-xs"}) {
-			@dropdown.DropdownMenuItem(dropdown.DropdownMenuItemArgs{ID: dropdownID, Class: "text-xs", OnClick: "document.getElementById('workspace-dialog-" + slug + "').showModal()"}) {
+			@dropdown.DropdownMenuItem(dropdown.DropdownMenuItemArgs{ID: dropdownID, Class: "text-xs", OnClick: workspaceDialogOpenExpression(slug)}) {
 				Details
 			}
 			if workspaceVerifyHTMLURL(view) != "" {
