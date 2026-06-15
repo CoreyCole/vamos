@@ -653,6 +653,53 @@ func TestHandleWorkspacesStreamNotificationRendersUpdatedList(t *testing.T) {
 	}
 }
 
+func TestHandleWorkspacesStreamNotifierErrorContinues(t *testing.T) {
+	manager := &fakeLifecycleManager{
+		snapshots: []WorkspaceLifecycleSnapshot{
+			{
+				Workspace: Workspace{
+					Slug:        "feature",
+					DisplayName: "feature",
+					Status:      StatusRunning,
+				},
+				DesiredState:  WorkspaceDesiredRunning,
+				ObservedState: WorkspaceObservedRunning,
+			},
+		},
+	}
+	notifier := NewLifecycleNotifier()
+	handler := NewHandler(
+		manager,
+		"https://main.cn-agents.test",
+		"main",
+		WithLifecycleNotifier(notifier),
+	)
+	e := echo.New()
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	req := httptest.NewRequest(http.MethodGet, "/workspaces/stream", nil).WithContext(ctx)
+	rec := httptest.NewRecorder()
+	done := make(chan error, 1)
+	go func() {
+		done <- handler.HandleWorkspacesStream(e.NewContext(req, rec))
+	}()
+	waitForBodyContains(t, rec, done, "feature")
+	waitForSubscriberCount(t, notifier, 1)
+
+	manager.listErr = errors.New("temporary model build failure")
+	notifier.Notify("feature")
+
+	select {
+	case err := <-done:
+		t.Fatalf("HandleWorkspacesStream() returned after notifier error: %v", err)
+	case <-time.After(25 * time.Millisecond):
+	}
+	cancel()
+	if err := <-done; err != nil {
+		t.Fatalf("HandleWorkspacesStream() error after cancel = %v", err)
+	}
+}
+
 func TestHandleWorkspaceErrorsPageRendersEmptyState(t *testing.T) {
 	manager := &fakeLifecycleManager{snapshots: []WorkspaceLifecycleSnapshot{{Workspace: Workspace{Slug: "feature", Status: StatusRunning}}}}
 	handler := NewHandler(manager, "https://main.cn-agents.test", "main")
@@ -2530,6 +2577,19 @@ func waitForBodyContains(
 	}
 }
 
+func waitForSubscriberCount(t *testing.T, notifier *LifecycleNotifier, want int) {
+	t.Helper()
+	deadline := time.After(time.Second)
+	for notifier.SubscriberCount() != want {
+		select {
+		case <-deadline:
+			t.Fatalf("timed out waiting for notifier subscribers = %d, got %d", want, notifier.SubscriberCount())
+		default:
+			time.Sleep(time.Millisecond)
+		}
+	}
+}
+
 type fakeImplWorkspaceLister struct {
 	rows []db.ImplWorkspace
 	err  error
@@ -2610,6 +2670,7 @@ type fakeLifecycleManager struct {
 	startResult   Workspace
 	startErr      error
 	startCalls    int
+	listErr       error
 }
 
 func (f *fakeLifecycleManager) Refresh(context.Context) error {
@@ -2680,6 +2741,9 @@ func (f *fakeLifecycleManager) RequestLifecycle(
 func (f *fakeLifecycleManager) ListLifecycle(
 	context.Context,
 ) ([]WorkspaceLifecycleSnapshot, error) {
+	if f.listErr != nil {
+		return nil, f.listErr
+	}
 	return append([]WorkspaceLifecycleSnapshot(nil), f.snapshots...), nil
 }
 

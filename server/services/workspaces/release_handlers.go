@@ -179,16 +179,18 @@ func (h *Handler) patchWorkspaces(c echo.Context, views []ImplWorkspaceView) err
 	if len(rowActions) > 0 {
 		views = applyOptionsToImplWorkspaceViews(views, WithWorkspaceReleaseActions(rowActions))
 	}
-	groups := h.workspaceGroups(views, filter)
+	filter = filter.WithDefaults()
+	model := workspacesPageModel{
+		Views:          views,
+		ReleasePanel:   panel,
+		Filter:         filter,
+		ProjectOptions: projectOptionsFromViews(views, filter.ProjectQueryValue()),
+		GroupOptions:   workspacesGroupOptions(filter.Group),
+		SortOptions:    workspacesSortOptions(filter.Sort),
+	}
 	sse := datastar.NewSSE(c.Response().Writer, c.Request())
 	c.Response().WriteHeader(http.StatusAccepted)
-	if err := sse.PatchElementTempl(WorkspacesHeader(h.refreshState(), filter, projectOptionsFromViews(views, filter.ProjectQueryValue()), workspacesGroupOptions(filter.Group), workspacesSortOptions(filter.Sort)), datastar.WithSelectorID("workspaces-header"), datastar.WithModeOuter()); err != nil {
-		return err
-	}
-	if err := sse.PatchElementTempl(ReleasePanel(panel), datastar.WithSelectorID("release-queue-panel"), datastar.WithModeOuter()); err != nil {
-		return err
-	}
-	return sse.PatchElementTempl(WorkspacesList(groups, h.managerURL, filter), datastar.WithSelectorID("workspaces-list"), datastar.WithModeOuter())
+	return h.patchWorkspacesModel(sse, model, filter)
 }
 
 func (h *Handler) patchWorkspacesFresh(c echo.Context) error {

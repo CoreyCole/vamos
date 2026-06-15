@@ -612,33 +612,7 @@ func (h *Handler) HandleWorkspacesStream(c echo.Context) error {
 	}
 	filter := WorkspacesFilterFromRequest(c.Request())
 	sse := datastar.NewSSE(c.Response().Writer, c.Request())
-	send := func() error {
-		model, err := h.buildWorkspacesPageModel(c.Request().Context(), filter)
-		if err != nil {
-			return err
-		}
-		groups := h.workspaceGroups(model.Views, filter)
-		if err := sse.PatchElementTempl(
-			WorkspacesHeader(h.refreshState(), filter, model.ProjectOptions, model.GroupOptions, model.SortOptions),
-			datastar.WithSelectorID("workspaces-header"),
-			datastar.WithModeOuter(),
-		); err != nil {
-			return err
-		}
-		if err := sse.PatchElementTempl(
-			ReleasePanel(model.ReleasePanel),
-			datastar.WithSelectorID("release-queue-panel"),
-			datastar.WithModeOuter(),
-		); err != nil {
-			return err
-		}
-		return sse.PatchElementTempl(
-			WorkspacesList(groups, h.managerURL, filter),
-			datastar.WithSelectorID("workspaces-list"),
-			datastar.WithModeOuter(),
-		)
-	}
-	if err := send(); err != nil {
+	if err := h.buildAndPatchWorkspaces(c.Request().Context(), sse, filter, "initial"); err != nil {
 		return err
 	}
 	ch, unsubscribe := h.notifier.Subscribe()
@@ -648,11 +622,63 @@ func (h *Handler) HandleWorkspacesStream(c echo.Context) error {
 		case <-c.Request().Context().Done():
 			return nil
 		case <-ch:
-			if err := send(); err != nil {
-				return err
+			if err := h.buildAndPatchWorkspaces(c.Request().Context(), sse, filter, "notify"); err != nil {
+				log.Printf("workspaces_stream_notify_patch_failed: %v", err)
+				continue
 			}
 		}
 	}
+}
+
+func (h *Handler) buildAndPatchWorkspaces(
+	ctx context.Context,
+	sse *datastar.ServerSentEventGenerator,
+	filter WorkspacesFilter,
+	source string,
+) error {
+	started := time.Now()
+	model, err := h.buildWorkspacesPageModel(ctx, filter)
+	h.logWorkspacesModelBuild(started, source, err)
+	if err != nil {
+		return err
+	}
+	return h.patchWorkspacesModel(sse, model, filter)
+}
+
+func (h *Handler) patchWorkspacesModel(
+	sse *datastar.ServerSentEventGenerator,
+	model workspacesPageModel,
+	filter WorkspacesFilter,
+) error {
+	groups := h.workspaceGroups(model.Views, filter)
+	if err := sse.PatchElementTempl(
+		WorkspacesHeader(h.refreshState(), filter, model.ProjectOptions, model.GroupOptions, model.SortOptions),
+		datastar.WithSelectorID("workspaces-header"),
+		datastar.WithModeOuter(),
+	); err != nil {
+		return err
+	}
+	if err := sse.PatchElementTempl(
+		ReleasePanel(model.ReleasePanel),
+		datastar.WithSelectorID("release-queue-panel"),
+		datastar.WithModeOuter(),
+	); err != nil {
+		return err
+	}
+	return sse.PatchElementTempl(
+		WorkspacesList(groups, h.managerURL, filter),
+		datastar.WithSelectorID("workspaces-list"),
+		datastar.WithModeOuter(),
+	)
+}
+
+func (h *Handler) logWorkspacesModelBuild(start time.Time, source string, err error) {
+	duration := time.Since(start)
+	if err != nil {
+		log.Printf("workspaces_model_build_failed source=%s duration=%s error=%v", source, duration, err)
+		return
+	}
+	log.Printf("workspaces_model_build_complete source=%s duration=%s", source, duration)
 }
 
 func (h *Handler) HandleWorkspaceHostAction(c echo.Context) error {
