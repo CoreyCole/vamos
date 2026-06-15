@@ -1379,6 +1379,7 @@ func main() {
 			workspaces.WithLifecycleNotifier(workspaceNotifier),
 			workspaces.WithPlanWorkspaces(dbService.Queries),
 			workspaces.WithImplWorkspaces(dbService.Queries),
+			workspaces.WithWorkspaceSyncDiagnostics(dbService.Queries),
 			workspaces.WithWorkspaceWorkflowSummaryResolver(agentChatService),
 			workspaces.WithWorkspaceProvisionStarter(provisionStarter),
 			workspaces.WithWorkspaceCleanupStarter(cleanupStarter),
