@@ -236,6 +236,11 @@ func runLocked(
 	dirtyDeps := map[StepName]bool{}
 	results := make([]StepResult, 0, len(BuildSteps(opts)))
 	checkoutPath := findCheckoutRoot(opts.RepoRoot)
+	_, _ = TryPrintWorkspacePreflight(ctx, WorkspaceDiagnosticsOptions{
+		CheckoutPath: checkoutPath,
+		Stdout:       opts.Stdout,
+		Timeout:      defaultWorkspaceDiagnosticsTimeout,
+	})
 	for _, step := range BuildSteps(opts) {
 		result, err := ExecuteStep(ctx, &state, step, dirtyDeps, opts, hasher, runner)
 		if err != nil {
@@ -285,6 +290,11 @@ func runLocked(
 	_ = WriteWorkspaceBuildStatus(ctx, checkoutPath, WorkspaceBuildStatus{
 		LastSuccessAt: finishedAt,
 		LogPath:       workspaceRuntimePaths(checkoutPath).buildLog,
+	})
+	_, _ = TryPrintWorkspaceFinalStatus(ctx, WorkspaceDiagnosticsOptions{
+		CheckoutPath: checkoutPath,
+		Stdout:       opts.Stdout,
+		Timeout:      defaultWorkspaceDiagnosticsTimeout,
 	})
 	if err := store.Save(ctx, state); err != nil {
 		return state, results, err
