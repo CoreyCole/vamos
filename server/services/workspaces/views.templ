@@ -363,7 +363,7 @@ templ WorkspaceTableRow(view ImplWorkspaceView, managerURL string, showHistorica
 	{{ slug := workspaceViewSlug(view) }}
 	<tr data-workspace-row={ slug } class="hover:bg-muted/40">
 		<td class="px-3 py-2 align-top">
-			@WorkspaceActionsMenu(view, managerURL, showHistorical, projectFilter)
+			@WorkspaceActionsMenu(view, managerURL, showHistorical, projectFilter, "row")
 		</td>
 		<td class="px-3 py-2 align-top">
 			<button type="button" class="font-medium hover:underline" data-on:click={ "document.getElementById('workspace-dialog-" + slug + "').showModal()" }>{ workspaceViewLabel(view) }</button>
@@ -664,7 +664,7 @@ templ ImplWorkspaceCard(view ImplWorkspaceView, managerURL string, showHistorica
 			</div>
 		}
 		<div class="mt-auto flex flex-wrap justify-start gap-2 pt-2">
-			@WorkspaceActionsMenu(view, managerURL, showHistorical, projectFilter)
+			@WorkspaceActionsMenu(view, managerURL, showHistorical, projectFilter, "card")
 		</div>
 	}
 }
@@ -708,9 +708,13 @@ templ WorkspaceProofDiagnostics(view ImplWorkspaceView) {
 	}
 }
 
-func workspaceActionsDropdownID(slug string) string {
+func workspaceActionsDropdownID(slug string, instance string) string {
 	replacer := strings.NewReplacer("-", "_", ".", "_", "/", "_")
-	return "workspace_actions_" + replacer.Replace(slug)
+	id := "workspace_actions_" + replacer.Replace(slug)
+	if instance != "" {
+		id += "_" + replacer.Replace(instance)
+	}
+	return id
 }
 
 func workspaceDropdownActionClass(destructive bool) string {
@@ -720,9 +724,9 @@ func workspaceDropdownActionClass(destructive bool) string {
 	return "w-full justify-start text-xs"
 }
 
-templ WorkspaceActionsMenu(view ImplWorkspaceView, managerURL string, showHistorical bool, projectFilter WorkspacesFilter) {
+templ WorkspaceActionsMenu(view ImplWorkspaceView, managerURL string, showHistorical bool, projectFilter WorkspacesFilter, instance string) {
 	{{ slug := workspaceViewSlug(view) }}
-	{{ dropdownID := workspaceActionsDropdownID(slug) }}
+	{{ dropdownID := workspaceActionsDropdownID(slug, instance) }}
 	@dropdown.DropdownMenu(dropdown.DropdownMenuArgs{ID: dropdownID, Class: "relative inline-block"}) {
 		@dropdown.DropdownMenuTrigger(dropdown.DropdownMenuTriggerArgs{ID: dropdownID, Class: "inline-flex h-8 cursor-pointer items-center rounded-md border px-2 text-xs font-medium hover:bg-accent"}) {
 			Actions

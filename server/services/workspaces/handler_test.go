@@ -1654,11 +1654,12 @@ func TestWorkspaceActionsMenuUsesFlowSafeForms(t *testing.T) {
 		"https://manager.test",
 		true,
 		WorkspacesFilter{ProjectID: "example.com/alpha/app", History: WorkspacesHistoryAll},
+		"row",
 	).Render(t.Context(), &body); err != nil {
 		t.Fatalf("WorkspaceActionsMenu() error = %v", err)
 	}
 	html := body.String()
-	for _, want := range []string{`data-slot="dropdown-menu"`, `data-signals=`, `data-on:click=`, `data-show="$workspace_actions_feature.open"`} {
+	for _, want := range []string{`data-slot="dropdown-menu"`, `data-signals=`, `data-on:click=`, `data-show="$workspace_actions_feature_row.open"`} {
 		if !strings.Contains(html, want) {
 			t.Fatalf("actions menu missing DatastarUI dropdown marker %q: %s", want, html)
 		}
@@ -1688,7 +1689,7 @@ func TestWorkspaceActionsMenuPreservesCleanupFields(t *testing.T) {
 	}}, nil, WorkspaceLifecycleSnapshot{})[0]
 
 	var body bytes.Buffer
-	if err := WorkspaceActionsMenu(view, "https://manager.test", false, WorkspacesFilter{}).Render(t.Context(), &body); err != nil {
+	if err := WorkspaceActionsMenu(view, "https://manager.test", false, WorkspacesFilter{}, "row").Render(t.Context(), &body); err != nil {
 		t.Fatalf("WorkspaceActionsMenu() error = %v", err)
 	}
 	html := body.String()
