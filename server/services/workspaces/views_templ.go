@@ -3689,7 +3689,7 @@ func WorkspaceActionsMenu(view ImplWorkspaceView, managerURL string, showHistori
 				}
 				return nil
 			})
-			templ_7745c5c3_Err = dropdown.DropdownMenuContent(dropdown.DropdownMenuContentArgs{ID: dropdownID, Align: "end", Side: "bottom", SideOffset: 2, Class: "min-w-44 overflow-visible p-1 text-xs"}).Render(templ.WithChildren(ctx, templ_7745c5c3_Var166), templ_7745c5c3_Buffer)
+			templ_7745c5c3_Err = dropdown.DropdownMenuContent(dropdown.DropdownMenuContentArgs{ID: dropdownID, Align: "start", Side: "bottom", SideOffset: 2, Class: "min-w-44 overflow-visible p-1 text-xs"}).Render(templ.WithChildren(ctx, templ_7745c5c3_Var166), templ_7745c5c3_Buffer)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}

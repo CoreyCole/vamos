@@ -731,7 +731,7 @@ templ WorkspaceActionsMenu(view ImplWorkspaceView, managerURL string, showHistor
 		@dropdown.DropdownMenuTrigger(dropdown.DropdownMenuTriggerArgs{ID: dropdownID, Class: "inline-flex h-8 cursor-pointer items-center rounded-md border px-2 text-xs font-medium hover:bg-accent"}) {
 			Actions
 		}
-		@dropdown.DropdownMenuContent(dropdown.DropdownMenuContentArgs{ID: dropdownID, Align: "end", Side: "bottom", SideOffset: 2, Class: "min-w-44 overflow-visible p-1 text-xs"}) {
+		@dropdown.DropdownMenuContent(dropdown.DropdownMenuContentArgs{ID: dropdownID, Align: "start", Side: "bottom", SideOffset: 2, Class: "min-w-44 overflow-visible p-1 text-xs"}) {
 			@dropdown.DropdownMenuItem(dropdown.DropdownMenuItemArgs{ID: dropdownID, Class: "text-xs", OnClick: "document.getElementById('workspace-dialog-" + slug + "').showModal()"}) {
 				Details
 			}

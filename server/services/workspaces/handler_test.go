@@ -1659,7 +1659,7 @@ func TestWorkspaceActionsMenuUsesFlowSafeForms(t *testing.T) {
 		t.Fatalf("WorkspaceActionsMenu() error = %v", err)
 	}
 	html := body.String()
-	for _, want := range []string{`data-slot="dropdown-menu"`, `data-signals=`, `data-on:click=`, `data-show="$workspace_actions_feature_row.open"`} {
+	for _, want := range []string{`data-slot="dropdown-menu"`, `data-signals=`, `data-on:click=`, `data-show="$workspace_actions_feature_row.open"`, `id="workspace_actions_feature_row-content"`, `fixed`, `data-align="start"`, `top: calc(var(--dui-dropdown-trigger-bottom, 0px) + 0.50rem)`, `left: var(--dui-dropdown-trigger-left, 0px)`} {
 		if !strings.Contains(html, want) {
 			t.Fatalf("actions menu missing DatastarUI dropdown marker %q: %s", want, html)
 		}
