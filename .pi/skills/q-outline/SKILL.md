@@ -104,7 +104,7 @@ Use this mode when the user has a clear, bounded task and wants to skip earlier 
    - frontmatter fields (`date`, `researcher`, `git_commit`, `branch`, `repository`)
 1. Create a new plan directory under:
    - `thoughts/[git_username]/plans/[timestamp]_[plan-slug]/`
-1. Copy `AGENTS.md` into the plan dir from `~/.agents/skills/qrspi-planning/_AGENTS.md` if missing.
+1. Copy `AGENTS.md` into the plan dir from `.pi/skills/qrspi-planning/_AGENTS.md` if missing.
 1. Ensure `context/{question,research,design,design-product,outline,plan,implement}/` exists in the new plan directory.
 1. Treat user-provided task + referenced files as source material.
 1. Read all referenced files fully.

@@ -120,7 +120,7 @@ Then wait for input.
 
 1. **Ensure scaffolding exists**:
 
-   - Copy `AGENTS.md` into plan dir from `~/.agents/skills/qrspi-planning/_AGENTS.md` if missing
+   - Copy `AGENTS.md` into plan dir from `.pi/skills/qrspi-planning/_AGENTS.md` if missing
    - Ensure `[plan_dir]/prds/`, `[plan_dir]/questions/`, `[plan_dir]/research/`, `[plan_dir]/adrs/`, `[plan_dir]/handoffs/`, and `[plan_dir]/reviews/` exist
    - For normal top-level plans and implementation-review follow-up plans, also ensure `[plan_dir]/context/{brainstorms,question,research,design,design-product,outline,plan,implement}/` exists
    - For planning-review research workspaces, ensure `[plan_dir]/context/{brainstorms,research}/` exists for brainstorm notes and `/skill:q-research-for-review` locator/analyzer artifacts

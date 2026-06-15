@@ -199,15 +199,15 @@ For cross-project plans, preserve machine-readable frontmatter and YAML project 
 
 ## Nested project planning
 
-For epics/projects that use QRSPI to plan milestones and create future tickets, load `~/.agents/skills/qrspi-project-planning/SKILL.md`. Use milestone-specific skills instead of forcing normal `/q-outline` and `/q-plan` onto milestone meta-planning:
+For epics/projects that use QRSPI to plan milestones and create future tickets, load `.pi/skills/qrspi-project-planning/SKILL.md`. Use the Vamos-local milestone-specific skills instead of forcing normal `/q-outline` and `/q-plan` onto milestone meta-planning:
 
-- `/q-milestone-question`
-- `/q-milestone-research`
-- `/q-milestone-design`
-- `/q-milestone-review`
-- `/q-milestone-create-tickets`
+- `.pi/skills/q-milestone-question/SKILL.md`
+- `.pi/skills/q-milestone-research/SKILL.md`
+- `.pi/skills/q-milestone-design/SKILL.md`
+- `.pi/skills/q-milestone-review/SKILL.md`
+- `.pi/skills/q-milestone-create-tickets/SKILL.md`
 
-Legacy milestone skills `/q-milestone-outline` and `/q-milestone-plan` exist only to finish old in-flight milestone flows.
+Legacy milestone skills `/q-milestone-outline` and `/q-milestone-plan` are retired and are not migrated into Vamos for new milestone planning.
 
 # QRSPI Planning Pipeline
 

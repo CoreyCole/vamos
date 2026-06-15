@@ -176,7 +176,7 @@ Use the selector's `subagent_tool_args` directly with the `subagent` tool. It di
    - Run the specific verification command for each fix.
    - Commit only files changed by these fixes when project workflow expects committed slices.
 1. For `needs_followup_qrspi` findings, initialize `review_dir` as a normal QRSPI plan:
-   - copy `AGENTS.md` from `~/.agents/skills/qrspi-planning/_AGENTS.md` if missing
+   - copy `AGENTS.md` from `.pi/skills/qrspi-planning/_AGENTS.md` if missing
    - create `prds/`, `questions/`, `research/`, `adrs/`, `handoffs/`, `reviews/`, and `context/{brainstorms,question,research,design,design-product,outline,plan,implement}/`
    - write `prds/source-review.md` pointing to `review.md`
    - write neutral research questions under `questions/`
