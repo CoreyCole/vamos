@@ -66,7 +66,31 @@ Agents must keep workspace status sources separate:
 - **Scheduled sync diagnostics**: latest filesystem-to-DB indexing result, counts, errors, and warnings. This is separate from `just sync-thoughts`, which syncs documentation/artifacts and does not rebuild manager DB lifecycle state.
 - **Local runtime diagnostics**: checkout-local `.vamos/run/status.json`, `desired.json`, `runtime-env.json`, and logs. Useful for current child process/build debugging and human-test readiness evidence; not authoritative for merge or cleanup lifecycle.
 
-`just build` from a managed checkout and the manager Workspaces page show source-labeled lifecycle, scheduled sync, and local runtime diagnostics when the manager is reachable. Local-only CLI commands can read `.vamos/run/*`, but they cannot prove manager DB lifecycle.
+`just build` from a managed checkout and the manager Workspaces page show source-labeled lifecycle, scheduled sync, and local runtime diagnostics when the manager is reachable. `vamos ctl workspace doctor` is the focused checkout repair tool: it reads `.vamos/run/*`, calls the manager diagnostics endpoint when `workspace.env` has a manager URL/token/slug, compares manager checkout and runtime-env identity against the current checkout, checks PID/port liveness, and prints concrete recovery commands. Local-only CLI commands can read `.vamos/run/*`, but only doctor/`just build` with manager diagnostics can distinguish healthy child routing from stale runtime metadata.
+
+## Workspace doctor and recovery loop
+
+Use this loop when `just build` fails to restart, the public slug shows Workspace recovery/503, or local status says `running` but the child host is not reachable:
+
+```bash
+# From the feature implementation checkout.
+go run ./cmd/vamos-runtime ctl workspace doctor --tail 80
+
+# If doctor reports stale checkout/slug/runtime-env metadata, re-register the checkout.
+go run ./cmd/vamos-runtime ctl workspace register-current \
+  --project github.com/CoreyCole/vamos \
+  --plan-dir thoughts/<owner>/plans/<plan-dir>
+
+# Restart through the manager, not by manually running the server on a port.
+just build
+
+# Confirm the public slug reaches the child app.
+slug=$(grep '^VAMOS_WORKSPACE_SLUG=' .vamos/run/workspace.env | cut -d= -f2- | tr -d "'\"")
+curl -k -sS -D - --max-time 15 "https://${slug}.workspaces.creative-mode.ai/" \
+  -o /tmp/vamos-feature-home.html
+```
+
+Healthy auth-protected feature hosts usually return HTTP `307` to manager switch/login or HTTP `200` app content. HTTP `503`, `Workspace recovery`, `Unknown workspace`, a runtime-env slug such as `stage`/`main`, log paths outside the current checkout, or dead PIDs mean the workspace is not ready for browser E2E or human testing.
 
 ## Feature Workspaces page read-only mode
 

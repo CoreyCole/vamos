@@ -188,6 +188,9 @@ func (s *Service) LastFreeformEmbeddedChatSelection(
 			selection.WorkspaceID,
 		)
 		if err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				continue
+			}
 			return EmbeddedChatSelection{}, err
 		}
 		if WorkspaceWorkflowType(strings.TrimSpace(workspace.WorkflowType)) == WorkspaceWorkflowFreeform {

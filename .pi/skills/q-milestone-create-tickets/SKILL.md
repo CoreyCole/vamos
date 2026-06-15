@@ -1,6 +1,6 @@
 ---
 name: q-milestone-create-tickets
-description: Create Linear tickets from a reviewed milestone design. Use after milestone design review and human approval. Summarizes each proposed ticket one by one for human refinement, writes provider-ready ticket descriptions, then creates Linear tickets/status docs only after explicit mutation approval.
+description: Create provider tickets from a reviewed milestone design. Use after milestone design review and human approval. Summarizes each proposed ticket one by one for human refinement, writes provider-ready ticket descriptions, then creates provider tickets/status docs only after explicit mutation approval.
 ---
 
 # Milestone Create Tickets — Turn Reviewed Design Into Provider Issues
@@ -21,9 +21,17 @@ Read:
 1. latest design review and `review-human.md`
 1. milestone `AGENTS.md` and optional `milestone.md`
 1. project status/routing artifact named by project `AGENTS.md`
-1. Linear defaults/project log named by project `AGENTS.md`
+1. thoughts root `AGENTS.md` host manifest for `qrspi_ticket_provider` and `qrspi_ticket_provider_config`
+1. provider defaults/project log named by project `AGENTS.md`
 
 Stop if design review or human approval is missing.
+
+Validate provider config before preparing mutations:
+
+- If `qrspi_ticket_provider` is missing, emit `status: needs_human` and ask for host provider config.
+- If the provider is not `linear`, emit `status: blocked` unless this skill has been extended for that provider.
+- If provider is `linear`, require manifest values for `linear_base_url`, workspace/team/project routing, milestone/default fields needed by the current milestone, and thoughts-viewer link construction.
+- Do not create provider tickets until each proposed ticket has been approved one by one and the human explicitly approves mutation.
 
 ## Step 2: Align on ticket-set structure
 
@@ -109,7 +117,7 @@ Keep the title in the provider issue title, not as a body heading. Do not includ
 
 After all ticket drafts are approved one by one:
 
-1. Create Linear tickets directly from the approved description docs in the repo. Do not create separate `/tmp` markdown bodies, hidden transformed copies, or frontmatter-stripped temp files. The approved doc must already be exactly the provider issue body.
+1. Create provider tickets directly from the approved description docs in the repo. Do not create separate `/tmp` markdown bodies, hidden transformed copies, or frontmatter-stripped temp files. The approved doc must already be exactly the provider issue body.
 1. Apply project/milestone/default fields. Created implementation/spec tickets must be assigned to the Linear project milestone and must not be children of the milestone planning ticket.
 1. Add relations/blockers.
 1. Comment on the milestone planning ticket with markdown links to the created tickets, key relations, and thoughts docs/assets. For Linear, bare issue IDs may not auto-expand reliably, so use explicit markdown links built from manifest config for created tickets.
@@ -120,7 +128,7 @@ After all ticket drafts are approved one by one:
 1. Create ticket directories only after provider issue IDs exist using the provider key plus slug, e.g. `eng-0000-short-slug/`; do not add numeric ordering prefixes.
 1. Write routing-only ticket `AGENTS.md` files.
 1. Write a ticket-root `index.md` that links the provider issue, approved description doc, canonical docs, and next QRSPI command.
-1. Comment on each created ticket with a fenced QRSPI XML result. The XML `<workspace>` must be that ticket directory, `<artifact>` must point to the approved ticket description doc, and `<next>` must be `/q-question [ticket-dir]`.
+1. Comment on each created ticket with a fenced YAML `qrspi_result` block. Set `workspace` to that ticket directory, `artifact` to the approved ticket description doc, and `next.steps` to read QRSPI/question skills, read the ticket artifact, then start `q-question`.
 1. Run `just sync-thoughts` when available.
 
 ## Response

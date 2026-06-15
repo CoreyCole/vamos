@@ -377,6 +377,32 @@ func TestResolveEmbeddedChatSelectionIgnoresPersistedOutsideChatContext(t *testi
 	}
 }
 
+func TestResolveEmbeddedChatSelectionIgnoresStalePersistedFreeformWorkspace(t *testing.T) {
+	service := newTestAgentChatService(t)
+	if err := service.PersistEmbeddedChatSelection(
+		t.Context(),
+		"user@example.com",
+		EmbeddedChatSelection{
+			WorkspaceID: "missing-workspace",
+			Scope:       EmbeddedChatSelectionScopeFreeform,
+		},
+	); err != nil {
+		t.Fatalf("PersistEmbeddedChatSelection() error = %v", err)
+	}
+
+	selection, err := service.ResolveEmbeddedChatSelection(
+		t.Context(),
+		"user@example.com",
+		EmbeddedChatURLState{Context: ThoughtsChatContext},
+	)
+	if err != nil {
+		t.Fatalf("ResolveEmbeddedChatSelection() error = %v", err)
+	}
+	if selection != (EmbeddedChatSelection{}) {
+		t.Fatalf("selection = %+v, want empty", selection)
+	}
+}
+
 func TestRenderEmbeddedChatPanelUsesFreeformRendererForPersistedFreeformWorkspace(t *testing.T) {
 	service := newTestAgentChatService(t)
 	workspace, thread := mustCreateWorkspaceThreadForHandlerTest(

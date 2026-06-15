@@ -252,6 +252,48 @@ func TestRunRestartPrintsWorkspaceURL(t *testing.T) {
 	}
 }
 
+func TestRunDoctorReportsManagerDiagnosticsMismatch(t *testing.T) {
+	cfg := testConfig(t)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/internal/workspaces/feature/diagnostics" {
+			t.Errorf("path = %s", r.URL.Path)
+		}
+		if got := r.Header.Get("X-Vamos-Workspace-Restart-Token"); got != "secret" {
+			t.Errorf("restart token = %q", got)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{
+			"workspace":{"Slug":"feature","Status":"crashed","CheckoutPath":"/other","URL":"https://feature.workspaces.test/","Error":"workspace process is not alive"},
+			"runtime_env_snapshot":{"workspace_slug":"stage","checkout_path":"/stage","web":{"public_base_url":"https://stage.workspaces.test","default_cwd":"/stage"}},
+			"pid_alive":false,
+			"port_open":false,
+			"latest_error":"workspace process is not alive"
+		}`))
+	}))
+	defer server.Close()
+	cfg.ManagerURL = server.URL
+	cfg.Metadata.ManagerURL = server.URL
+
+	var out bytes.Buffer
+	if err := RunDoctor(t.Context(), cfg, 0, &out); err != nil {
+		t.Fatalf("RunDoctor: %v", err)
+	}
+	text := out.String()
+	for _, want := range []string{
+		"Manager diagnostics:",
+		"manager_workspace_status: crashed",
+		"runtime_env.workspace_slug: stage",
+		"manager checkout \"/other\" does not match current checkout",
+		"runtime env snapshot slug \"stage\" does not match workspace slug \"feature\"",
+		"go run ./cmd/vamos-runtime ctl workspace register-current --project github.com/CoreyCole/vamos",
+		"just build",
+	} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("doctor output missing %q:\n%s", want, text)
+		}
+	}
+}
+
 func TestWorkspaceURLFromResponseInfersFromMainManagerURL(t *testing.T) {
 	got := workspaceURLFromResponse(
 		[]byte(`{"status":"complete","workspace_slug":"2026-05-24-10-46-22-workspace-visibility-registration"}`),
