@@ -881,6 +881,86 @@ func TestImplWorkspaceSyncerKeepsConfiguredStageRoleActiveWhenHeadIsMerged(t *te
 	}
 }
 
+func TestImplWorkspaceSyncerRepairsStaleProtectedTerminalRows(t *testing.T) {
+	ctx := context.Background()
+	dbConn, queries := openImplSyncTestDB(t)
+	parent := t.TempDir()
+
+	seed := func(projectID, slug, role, status string) {
+		t.Helper()
+		_, err := queries.UpsertDiscoveredImplWorkspace(ctx, db.UpsertDiscoveredImplWorkspaceParams{
+			ProjectID:                projectID,
+			WorkspaceSlug:            slug,
+			CheckoutRole:             role,
+			CheckoutPath:             filepath.Join(parent, projectID, slug),
+			DisplayName:              slug,
+			Host:                     slug + ".workspaces.example.test",
+			Url:                      "https://" + slug + ".workspaces.example.test/",
+			Status:                   status,
+			MergeEvidence:            nullableString("stale terminal proof"),
+			CleanupProofKind:         string(MergeProofAncestor),
+			CleanupProofSourceRef:    nullableString("origin/main"),
+			CleanupProofTargetCommit: nullableString("abc123"),
+			CleanupProofAt:           sql.NullTime{Time: time.Now().UTC(), Valid: true},
+			CleanupRiskReason:        nullableString("stale risk"),
+			ActivityHash:             "seed-" + slug,
+		})
+		if err != nil {
+			t.Fatalf("seed %s/%s: %v", projectID, slug, err)
+		}
+	}
+
+	seed("vamos", "stage", "", string(ImplWorkspaceStatusMerged))
+	seed("vamos", "durable-stage", string(CheckoutRoleStage), string(ImplWorkspaceStatusMerged))
+	if _, err := queries.MarkImplWorkspaceCleanedUp(ctx, db.MarkImplWorkspaceCleanedUpParams{ProjectID: "vamos", WorkspaceSlug: "durable-stage"}); err != nil {
+		t.Fatalf("MarkImplWorkspaceCleanedUp(durable-stage): %v", err)
+	}
+	seed("other", "stage", string(CheckoutRoleStage), string(ImplWorkspaceStatusMerged))
+	seed("vamos", "feature", "", string(ImplWorkspaceStatusMerged))
+
+	result, err := (&ImplWorkspaceSyncer{Queries: queries}).Sync(ctx, ImplWorkspaceSyncInput{
+		Discovery: ImplWorkspaceDiscoveryConfig{
+			ParentDir: parent,
+			Domain:    "workspaces.example.test",
+		},
+	})
+	if err != nil {
+		t.Fatalf("Sync: %v", err)
+	}
+	if !result.Changed {
+		t.Fatalf("result = %+v, want repair change", result)
+	}
+
+	for _, key := range []db.GetImplWorkspaceParams{
+		{ProjectID: "vamos", WorkspaceSlug: "stage"},
+		{ProjectID: "vamos", WorkspaceSlug: "durable-stage"},
+		{ProjectID: "other", WorkspaceSlug: "stage"},
+	} {
+		row, err := queries.GetImplWorkspace(ctx, key)
+		if err != nil {
+			t.Fatalf("GetImplWorkspace(%+v): %v", key, err)
+		}
+		if row.Status != string(ImplWorkspaceStatusActive) || row.MergedAt.Valid || row.CleanedUpAt.Valid ||
+			row.MergeEvidence.Valid || row.CleanupProofKind != string(MergeProofUnknown) ||
+			row.CleanupProofSourceRef.Valid || row.CleanupProofTargetCommit.Valid || row.CleanupProofAt.Valid ||
+			row.CleanupRiskReason.Valid {
+			t.Fatalf("row %+v = status %q terminal fields merged=%v cleaned=%v evidence=%+v proof=%q/%+v/%+v/%v risk=%+v; want active with cleared terminal metadata",
+				key, row.Status, row.MergedAt, row.CleanedUpAt, row.MergeEvidence, row.CleanupProofKind,
+				row.CleanupProofSourceRef, row.CleanupProofTargetCommit, row.CleanupProofAt, row.CleanupRiskReason)
+		}
+	}
+
+	feature, err := queries.GetImplWorkspace(ctx, db.GetImplWorkspaceParams{ProjectID: "vamos", WorkspaceSlug: "feature"})
+	if err != nil {
+		t.Fatalf("GetImplWorkspace(feature): %v", err)
+	}
+	if feature.Status != string(ImplWorkspaceStatusMerged) {
+		t.Fatalf("feature status = %q, want unprotected terminal row unchanged", feature.Status)
+	}
+
+	assertImplWorkspaceSyncDBInvariants(t, dbConn)
+}
+
 func TestImplWorkspaceSyncerDoesNotReportUnchangedDiscoveredMerged(t *testing.T) {
 	isolateImplSyncGitPath(t)
 	ctx := context.Background()
