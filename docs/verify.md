@@ -31,7 +31,8 @@ This is the standard Vamos verification entrypoint. `/q-verify` must read this f
 
    - Required before browser E2E and before asking a human to test a managed feature URL.
    - Use `docs/workspaces-verification.md`.
-   - `just build --no-restart` is not enough for browser or human testing. Restart the managed child (`just build` or manager restart action) and verify the public URL reaches the child app, not workspace recovery.
+   - From a managed checkout, `just build` prints manager DB lifecycle, scheduled sync diagnostics, and local runtime diagnostics when the manager is reachable.
+   - `just build --no-restart` is not enough for browser or human testing. It is compile-only and does not restart the child runtime. Restart the managed child (`just build` or manager restart action) and verify the public URL reaches the child app, not workspace recovery.
 
 1. **Browser E2E runs**
 
@@ -52,7 +53,7 @@ This is the standard Vamos verification entrypoint. `/q-verify` must read this f
 1. **Manual human testing**
 
    - `/q-verify` must ask the user to test the running workspace after automated checks pass and before marking verification complete.
-   - Before asking, ensure the feature-slug server for the implementation checkout is actually running and serving the committed code. If needed, run plain `just build` from the feature checkout (not `just build --no-restart`) or the manager restart action, then verify `.vamos/run/status.json` is running and `.vamos/run/workspace.env` contains the feature `VAMOS_WORKSPACE_SLUG`.
+   - Before asking, ensure the feature-slug server for the implementation checkout is actually running and serving the committed code. If needed, run plain `just build` from the feature checkout (not `just build --no-restart`) or the manager restart action, then verify local runtime diagnostics in `.vamos/run/status.json` are running and `.vamos/run/workspace.env` contains the feature `VAMOS_WORKSPACE_SLUG`.
    - Include the exact feature URL (`https://<feature-slug>.<workspace-domain>/`) and concise flows to inspect. Do not ask the human to test `main` or a stopped/recovery workspace.
 
 ## Required `/q-verify` behavior
@@ -63,4 +64,4 @@ This is the standard Vamos verification entrypoint. `/q-verify` must read this f
   - `docs/workspaces-verification.md`
 - Record commands, artifacts, failures, and skipped checks in `verify.md`.
 - If browser E2E or managed restart cannot run, record `blocked` instead of treating static checks as sufficient.
-- Do not request human testing until verify-stage fixes are committed and the feature-slug server for this implementation checkout is confirmed running and serving the committed code. For managed workspaces, plain `just build` from the feature checkout is the normal way to build and restart the child server; `just build --no-restart` is compile-only and is not enough for human verification.
+- Do not request human testing until verify-stage fixes are committed and the feature-slug server for this implementation checkout is confirmed running and serving the committed code. For managed workspaces, plain `just build` from the feature checkout is the normal way to build, print source-labeled diagnostics, and restart the child server; `just build --no-restart` is compile-only and is not enough for human verification.

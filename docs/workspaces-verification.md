@@ -58,6 +58,16 @@ External setup must also be in place:
 
 Before sending a feature workspace to a human for manual testing, make the child runtime current and reachable. A build with `--no-restart` proves compilation only; it can leave the public feature host serving the previous process or the manager recovery page. Run a managed restart (`just build` from the feature checkout, or the manager restart action), then verify the public feature URL reaches the child app before handing it off.
 
+## Status source model
+
+Agents must keep workspace status sources separate:
+
+- **Manager DB lifecycle / implementation workspace record**: authoritative for active, merged, cleaned-up, merge proof, and cleanup proof.
+- **Scheduled sync diagnostics**: latest filesystem-to-DB indexing result, counts, errors, and warnings. This is separate from `just sync-thoughts`, which syncs documentation/artifacts and does not rebuild manager DB lifecycle state.
+- **Local runtime diagnostics**: checkout-local `.vamos/run/status.json`, `desired.json`, `runtime-env.json`, and logs. Useful for current child process/build debugging and human-test readiness evidence; not authoritative for merge or cleanup lifecycle.
+
+`just build` from a managed checkout and the manager Workspaces page show source-labeled lifecycle, scheduled sync, and local runtime diagnostics when the manager is reachable. Local-only CLI commands can read `.vamos/run/*`, but they cannot prove manager DB lifecycle.
+
 ## Feature Workspaces page read-only mode
 
 Feature child hosts are still not real workspace managers. They mount only the read-only Workspaces page and Datastar stream (`/workspaces`, `/workspaces/stream`) backed by the workspace-local database selected by `.vamos/run/workspace.env`. Real lifecycle/provision/release/cleanup actions remain manager-owned and unavailable on child Workspaces routes.
@@ -191,13 +201,13 @@ Before telling a human to test a feature URL, record these checks in `verify.md`
 - `just build` (without `--no-restart`) completed from the feature checkout after the final committed changes.
 - The feature URL `https://<slug>.<domain>/` returns the child app. For auth-protected deployments, an unauthenticated `307` to `/login?redirect=%2F` is healthy.
 - The feature URL does **not** return the manager Workspace recovery page or HTTP `503`.
-- `.vamos/run/runtime-env.json` has `workspace_slug`, `checkout_path`, `database_path`, and `default_cwd` for the feature checkout, not `stage`, `main`, or another checkout.
-- `.vamos/run/status.json` has `status: running` and log paths under the feature checkout.
+- Local runtime diagnostics in `.vamos/run/runtime-env.json` have `workspace_slug`, `checkout_path`, `database_path`, and `default_cwd` for the feature checkout, not `stage`, `main`, or another checkout.
+- Local runtime diagnostics in `.vamos/run/status.json` have `status: running` and log paths under the feature checkout.
 - Recent `web.log` includes the current child `server_startup` line with the feature slug and public base URL.
 
-If the public URL shows Workspace recovery while status says running, suspect stale runtime metadata or a child process from another checkout. Restart via `just build` from the feature checkout or the manager restart action, then re-check the URL and runtime env. Do not ask for human testing until the public host reaches the child app.
+If the public URL shows Workspace recovery while local runtime diagnostics say running, suspect stale runtime metadata or a child process from another checkout. Restart via `just build` from the feature checkout or the manager restart action, then re-check the URL and runtime env. Do not ask for human testing until the public host reaches the child app.
 
-The workspace error queue may include old Temporal shutdown/restart warnings such as `context canceled`, `connect: connection refused`, `graceful_stop`, or `max_age`. Treat them as diagnostic context, not current blockers, when they predate the latest successful child startup and the public URL is healthy. Current `web.log`, `.vamos/run/runtime-env.json`, and the public feature URL are the source of truth for human-test readiness.
+The workspace error queue may include old Temporal shutdown/restart warnings such as `context canceled`, `connect: connection refused`, `graceful_stop`, or `max_age`. Treat them as diagnostic context, not current blockers, when they predate the latest successful child startup and the public URL is healthy. Current `web.log`, `.vamos/run/runtime-env.json`, and the public feature URL are required human-test readiness evidence.
 
 ## Acceptance rule
 

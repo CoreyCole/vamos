@@ -27,6 +27,7 @@ func TestLoadConfigWalksUpFromPkgAgents(t *testing.T) {
 		)
 	}
 	if cfg.Metadata.Slug != "feature" ||
+		cfg.Metadata.ProjectID != "github.com/coreycole/vamos" ||
 		cfg.ManagerURL != "https://main.vamos.test" ||
 		cfg.RestartToken != "secret" {
 		t.Fatalf("metadata = %+v", cfg.Metadata)
@@ -66,6 +67,9 @@ func TestRunStatus(t *testing.T) {
 		"slug: feature",
 		"checkout: " + cfg.CheckoutPath,
 		"manager_url: https://main.vamos.test",
+		"manager_lifecycle: unavailable from local-only command",
+		"manager_lifecycle_hint: use just build from a managed checkout or the manager Workspaces page",
+		"local_runtime_diagnostics: source .vamos/run/status.json; diagnostic only",
 		"status: running",
 		"phase: ready",
 		"ports.web: 4217",
@@ -314,6 +318,7 @@ func writeWorkspaceFixture(t *testing.T) string {
 	}
 	env := "VAMOS_WORKSPACE_SLUG=feature\n" +
 		"VAMOS_WORKSPACE_CHECKOUT=" + root + "\n" +
+		"VAMOS_WORKSPACE_PROJECT_ID=github.com/coreycole/vamos\n" +
 		"VAMOS_WORKSPACE_MANAGER_URL=https://main.vamos.test\n" +
 		"VAMOS_WORKSPACE_RESTART_TOKEN=secret\n"
 	if err := os.WriteFile(

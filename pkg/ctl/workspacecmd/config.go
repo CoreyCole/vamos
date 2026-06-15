@@ -22,6 +22,7 @@ type WorkspaceCLIConfig struct {
 
 type WorkspaceMetadata struct {
 	Slug         string
+	ProjectID    string
 	CheckoutPath string
 	ManagerURL   string
 	RestartToken string
@@ -117,6 +118,7 @@ func readWorkspaceMetadata(path string) (WorkspaceMetadata, error) {
 	}
 	return WorkspaceMetadata{
 		Slug:         vals["VAMOS_WORKSPACE_SLUG"],
+		ProjectID:    vals["VAMOS_WORKSPACE_PROJECT_ID"],
 		CheckoutPath: vals["VAMOS_WORKSPACE_CHECKOUT"],
 		ManagerURL:   vals["VAMOS_WORKSPACE_MANAGER_URL"],
 		RestartToken: vals["VAMOS_WORKSPACE_RESTART_TOKEN"],

@@ -10,8 +10,14 @@ import (
 func RunStatus(ctx context.Context, cfg WorkspaceCLIConfig, out io.Writer) error {
 	_ = ctx
 	fmt.Fprintf(out, "slug: %s\n", cfg.Metadata.Slug)
+	if cfg.Metadata.ProjectID != "" {
+		fmt.Fprintf(out, "project_id: %s\n", cfg.Metadata.ProjectID)
+	}
 	fmt.Fprintf(out, "checkout: %s\n", cfg.Metadata.CheckoutPath)
 	fmt.Fprintf(out, "manager_url: %s\n", cfg.ManagerURL)
+	fmt.Fprintln(out, "manager_lifecycle: unavailable from local-only command")
+	fmt.Fprintln(out, "manager_lifecycle_hint: use just build from a managed checkout or the manager Workspaces page for source-labeled lifecycle and scheduled sync diagnostics")
+	fmt.Fprintln(out, "local_runtime_diagnostics: source .vamos/run/status.json; diagnostic only")
 	fmt.Fprintf(out, "status: %s\n", cfg.Status.Status)
 	if cfg.Status.Phase != "" {
 		fmt.Fprintf(out, "phase: %s\n", cfg.Status.Phase)

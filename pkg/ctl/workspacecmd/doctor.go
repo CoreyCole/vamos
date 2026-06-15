@@ -19,6 +19,7 @@ func RunDoctor(
 	out io.Writer,
 ) error {
 	fmt.Fprintln(out, "workspace doctor")
+	fmt.Fprintln(out, "scope: local runtime diagnostics and logs; manager DB lifecycle is not queried by this command")
 	_ = RunStatus(ctx, cfg, out)
 	if branch := gitOutput(
 		ctx,
