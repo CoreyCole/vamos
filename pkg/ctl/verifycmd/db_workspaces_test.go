@@ -83,6 +83,28 @@ VALUES ('thoughts/test/plans/example', 'vamos', 'feature', '/repo/vamos-feature'
 	}
 }
 
+func TestRunDBWorkspacesVerifyPassesNullImplProjectIDForDefaultProject(t *testing.T) {
+	t.Parallel()
+
+	path := openCanonicalWorkspaceVerifyFixture(t, `
+INSERT INTO plan_workspaces (plan_dir_rel, project_id, plan_dir, label, artifact_updated_at)
+VALUES ('thoughts/test/plans/example', 'vamos', '/thoughts/test/plans/example', 'Example', CURRENT_TIMESTAMP);
+INSERT INTO plan_workspace_projects (plan_dir_rel, project_id, role)
+VALUES ('thoughts/test/plans/example', 'vamos', 'primary');
+INSERT INTO impl_workspaces (project_id, workspace_slug, checkout_role, checkout_path, display_name, status, plan_dir_rel)
+VALUES ('', 'feature', '', '/repo/vamos-feature', 'Feature', 'active', 'thoughts/test/plans/example');
+INSERT INTO plan_workspace_impl_bindings (plan_dir_rel, project_id, workspace_slug, checkout_path, status, binding_source, impl_project_id, impl_workspace_slug)
+VALUES ('thoughts/test/plans/example', 'vamos', 'feature', '/repo/vamos-feature', 'active', 'binding_file', NULL, 'feature');`)
+
+	report, err := RunDBWorkspacesVerify(t.Context(), DBWorkspacesVerifyConfig{DatabasePath: path, Format: VerifyOutputText})
+	if err != nil {
+		t.Fatalf("RunDBWorkspacesVerify() error = %v; report = %#v", err, report)
+	}
+	if report.Status != statusPassed {
+		t.Fatalf("report.Status = %q, want %q", report.Status, statusPassed)
+	}
+}
+
 func TestRunDBWorkspacesVerifyFailsForeignKeyCheck(t *testing.T) {
 	t.Parallel()
 

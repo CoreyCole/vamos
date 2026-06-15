@@ -99,7 +99,7 @@ where b.archived_at is null
   and b.impl_workspace_slug is not null
   and not exists (
     select 1 from impl_workspaces i
-    where i.project_id = b.impl_project_id
+    where i.project_id = COALESCE(b.impl_project_id, '')
       and i.workspace_slug = b.impl_workspace_slug
   )`,
 	},
