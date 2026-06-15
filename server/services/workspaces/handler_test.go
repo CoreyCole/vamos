@@ -1726,7 +1726,73 @@ func TestWorkspaceActionsMenuUsesFlowSafeForms(t *testing.T) {
 	}
 }
 
-func TestWorkspaceActionsMenuPreservesCleanupFields(t *testing.T) {
+func TestWorkspaceActionsDropdownIDsAreScoped(t *testing.T) {
+	view := BuildImplWorkspaceViews([]db.ImplWorkspace{{
+		ProjectID:     "example.com/alpha/app",
+		WorkspaceSlug: "feature",
+		CheckoutPath:  "/repo/feature",
+		DisplayName:   "Feature Workspace",
+		Status:        string(ImplWorkspaceStatusActive),
+	}}, nil, WorkspaceLifecycleSnapshot{})[0]
+
+	var row bytes.Buffer
+	if err := WorkspaceActionsMenu(view, "https://manager.test", false, WorkspacesFilter{}, "row").Render(t.Context(), &row); err != nil {
+		t.Fatalf("row WorkspaceActionsMenu() error = %v", err)
+	}
+	rowHTML := row.String()
+	for _, want := range []string{`data-show="$workspace_actions_feature_row.open"`, `id="workspace_actions_feature_row-content"`, `workspace_cleanup_confirm_feature_row`} {
+		if !strings.Contains(rowHTML, want) {
+			t.Fatalf("row actions menu missing %q: %s", want, rowHTML)
+		}
+	}
+
+	var dialog bytes.Buffer
+	if err := WorkspaceActionsMenu(view, "https://manager.test", false, WorkspacesFilter{}, "dialog").Render(t.Context(), &dialog); err != nil {
+		t.Fatalf("dialog WorkspaceActionsMenu() error = %v", err)
+	}
+	dialogHTML := dialog.String()
+	for _, want := range []string{`data-show="$workspace_actions_feature_dialog.open"`, `id="workspace_actions_feature_dialog-content"`, `workspace_cleanup_confirm_feature_dialog`} {
+		if !strings.Contains(dialogHTML, want) {
+			t.Fatalf("dialog actions menu missing %q: %s", want, dialogHTML)
+		}
+	}
+	if strings.Contains(dialogHTML, `workspace_actions_feature_row`) {
+		t.Fatalf("dialog menu reused row signal: %s", dialogHTML)
+	}
+}
+
+func TestWorkspacesTableKeepsActionsOutsideOverflowScroll(t *testing.T) {
+	view := BuildImplWorkspaceViews([]db.ImplWorkspace{{
+		ProjectID:     "example.com/alpha/app",
+		WorkspaceSlug: "feature",
+		CheckoutPath:  "/repo/feature",
+		DisplayName:   "Feature Workspace",
+		Status:        string(ImplWorkspaceStatusActive),
+	}}, nil, WorkspaceLifecycleSnapshot{})[0]
+
+	var body bytes.Buffer
+	if err := WorkspacesTable([]ImplWorkspaceView{view}, "https://manager.test", false, WorkspacesFilter{}).Render(t.Context(), &body); err != nil {
+		t.Fatalf("WorkspacesTable() error = %v", err)
+	}
+	html := body.String()
+	rowIdx := strings.Index(html, `data-workspace-row="feature"`)
+	if rowIdx < 0 {
+		t.Fatalf("table missing workspace row: %s", html)
+	}
+	actionIdx := strings.Index(html[rowIdx:], `workspace_actions_feature_row`)
+	if actionIdx < 0 {
+		t.Fatalf("table missing row actions menu: %s", html)
+	}
+	overflowIdx := strings.Index(html[rowIdx:], `overflow-x-auto`)
+	if overflowIdx < 0 {
+		t.Fatalf("table missing details overflow wrapper: %s", html)
+	}
+	if actionIdx > overflowIdx {
+		t.Fatalf("row actions menu rendered inside/after overflow wrapper: %s", html[rowIdx:])
+	}
+}
+
+func TestWorkspaceCleanupRequiresConfirmationDialog(t *testing.T) {
 	view := BuildImplWorkspaceViews([]db.ImplWorkspace{{
 		ProjectID:     "example.com/alpha/app",
 		WorkspaceSlug: "feature",
@@ -1740,10 +1806,18 @@ func TestWorkspaceActionsMenuPreservesCleanupFields(t *testing.T) {
 		t.Fatalf("WorkspaceActionsMenu() error = %v", err)
 	}
 	html := body.String()
+	for _, want := range []string{`workspace_cleanup_confirm_feature_row`, `Deletes checkout/runtime files; thoughts and plan docs remain.`, `Confirm close workspace`, `Cancel`} {
+		if !strings.Contains(html, want) {
+			t.Fatalf("cleanup confirmation missing %q: %s", want, html)
+		}
+	}
+	if strings.Count(html, `action="/workspaces/cleanup"`) != 1 {
+		t.Fatalf("cleanup should render exactly one confirmation form: %s", html)
+	}
 	form := formFragment(t, html, `action="/workspaces/cleanup"`)
 	for _, want := range []string{`name="slug" value="feature"`, `name="project" value="example.com/alpha/app"`, `name="confirmed" value="true"`} {
 		if !strings.Contains(form, want) {
-			t.Fatalf("cleanup form missing %q: %s", want, form)
+			t.Fatalf("cleanup confirmation form missing %q: %s", want, form)
 		}
 	}
 }
@@ -2099,6 +2173,37 @@ func TestHandleCleanupWorkspaceRejectsMergedUnknownProof(t *testing.T) {
 	}
 	if len(starter.inputs) != 0 {
 		t.Fatalf("unsafe merged cleanup started workflow: %#v", starter.inputs)
+	}
+}
+
+func TestHandleCleanupWorkspaceRejectsUnconfirmedActiveCleanup(t *testing.T) {
+	starter := &fakeCleanupStarter{}
+	handler := NewHandler(
+		&fakeLifecycleManager{snapshots: []WorkspaceLifecycleSnapshot{
+			snapshotFromState(Workspace{Slug: "active", CheckoutPath: "/repo/active", Status: StatusRunning}, WorkspaceLifecycleState{}),
+		}},
+		"https://main.cn-agents.test",
+		"main",
+		WithImplWorkspaces(fakeImplWorkspaceLister{rows: []db.ImplWorkspace{{
+			WorkspaceSlug: "active",
+			CheckoutPath:  "/repo/active",
+			DisplayName:   "Active Workspace",
+			Status:        string(ImplWorkspaceStatusActive),
+		}}}),
+		WithWorkspaceCleanupStarter(starter),
+	)
+	e := echo.New()
+	req := httptest.NewRequest(http.MethodPost, "/workspaces/cleanup", strings.NewReader("slug=active"))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	rec := httptest.NewRecorder()
+
+	err := handler.HandleCleanupWorkspace(e.NewContext(req, rec))
+	httpErr, ok := err.(*echo.HTTPError)
+	if !ok || httpErr.Code != http.StatusBadRequest {
+		t.Fatalf("HandleCleanupWorkspace() err = %#v, want bad request", err)
+	}
+	if len(starter.inputs) != 0 {
+		t.Fatalf("unconfirmed cleanup started workflow: %#v", starter.inputs)
 	}
 }
 

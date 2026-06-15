@@ -1682,7 +1682,7 @@ func WorkspacesTable(items []ImplWorkspaceView, managerURL string, showHistorica
 			templ_7745c5c3_Var75 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 106, "<div class=\"overflow-x-auto\"><table class=\"w-full text-sm\"><thead class=\"bg-muted/50 text-left text-xs uppercase tracking-wide text-muted-foreground\"><tr><th class=\"px-3 py-2\">Actions</th><th class=\"px-3 py-2\">Workspace</th><th class=\"px-3 py-2\">QRSPI</th><th class=\"px-3 py-2\">Runtime</th><th class=\"px-3 py-2\">Branch</th><th class=\"px-3 py-2\">Commit</th><th class=\"px-3 py-2\">Release</th></tr></thead> <tbody class=\"divide-y\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 106, "<div class=\"space-y-2 overflow-visible p-2\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -1698,7 +1698,7 @@ func WorkspacesTable(items []ImplWorkspaceView, managerURL string, showHistorica
 				}
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 107, "</tbody></table></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 107, "</div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -1740,20 +1740,20 @@ func WorkspaceTableRow(view ImplWorkspaceView, managerURL string, showHistorical
 		}
 		ctx = templ.ClearChildren(ctx)
 		slug := workspaceViewSlug(view)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 108, "<tr data-workspace-row=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 108, "<div data-workspace-row=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var77 string
 		templ_7745c5c3_Var77, templ_7745c5c3_Err = templ.JoinStringErrs(slug)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 365, Col: 30}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 350, Col: 31}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var77))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 109, "\" class=\"hover:bg-muted/40\"><td class=\"px-3 py-2 align-top\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 109, "\" class=\"grid gap-3 rounded-lg border bg-background p-3 text-sm hover:bg-muted/20 md:grid-cols-[auto_minmax(0,1fr)]\"><div class=\"overflow-visible\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -1761,7 +1761,7 @@ func WorkspaceTableRow(view ImplWorkspaceView, managerURL string, showHistorical
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 110, "</td><td class=\"px-3 py-2 align-top\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 110, "</div><div class=\"min-w-0 overflow-x-auto\"><table class=\"w-full text-sm\"><thead class=\"text-left text-xs uppercase tracking-wide text-muted-foreground\"><tr><th class=\"px-3 py-2\">Workspace</th><th class=\"px-3 py-2\">QRSPI</th><th class=\"px-3 py-2\">Runtime</th><th class=\"px-3 py-2\">Branch</th><th class=\"px-3 py-2\">Commit</th><th class=\"px-3 py-2\">Release</th></tr></thead> <tbody><tr><td class=\"px-3 py-2 align-top\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -1780,7 +1780,7 @@ func WorkspaceTableRow(view ImplWorkspaceView, managerURL string, showHistorical
 			var templ_7745c5c3_Var79 string
 			templ_7745c5c3_Var79, templ_7745c5c3_Err = templ.JoinStringErrs(workspaceViewLabel(view))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 371, Col: 30}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 370, Col: 34}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var79))
 			if templ_7745c5c3_Err != nil {
@@ -1800,7 +1800,7 @@ func WorkspaceTableRow(view ImplWorkspaceView, managerURL string, showHistorical
 			var templ_7745c5c3_Var80 string
 			templ_7745c5c3_Var80, templ_7745c5c3_Err = templ.JoinStringErrs(slug)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 374, Col: 71}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 373, Col: 75}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var80))
 			if templ_7745c5c3_Err != nil {
@@ -1822,7 +1822,7 @@ func WorkspaceTableRow(view ImplWorkspaceView, managerURL string, showHistorical
 		var templ_7745c5c3_Var81 string
 		templ_7745c5c3_Var81, templ_7745c5c3_Err = templ.JoinStringErrs(workspaceQRSPIBadge(view))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 378, Col: 61}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 377, Col: 65}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var81))
 		if templ_7745c5c3_Err != nil {
@@ -1843,7 +1843,7 @@ func WorkspaceTableRow(view ImplWorkspaceView, managerURL string, showHistorical
 		var templ_7745c5c3_Var82 string
 		templ_7745c5c3_Var82, templ_7745c5c3_Err = templ.JoinStringErrs(workspaceBranchLabel(view))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 382, Col: 80}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 381, Col: 84}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var82))
 		if templ_7745c5c3_Err != nil {
@@ -1856,7 +1856,7 @@ func WorkspaceTableRow(view ImplWorkspaceView, managerURL string, showHistorical
 		var templ_7745c5c3_Var83 string
 		templ_7745c5c3_Var83, templ_7745c5c3_Err = templ.JoinStringErrs(shortCommit(workspaceCommit(view)))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 383, Col: 88}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 382, Col: 92}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var83))
 		if templ_7745c5c3_Err != nil {
@@ -1869,13 +1869,13 @@ func WorkspaceTableRow(view ImplWorkspaceView, managerURL string, showHistorical
 		var templ_7745c5c3_Var84 string
 		templ_7745c5c3_Var84, templ_7745c5c3_Err = templ.JoinStringErrs(workspaceReleaseSummary(view))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 384, Col: 65}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 383, Col: 69}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var84))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 118, "</td></tr>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 118, "</td></tr></tbody></table></div></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -1911,7 +1911,7 @@ func WorkspaceDiagnosticBadges(view ImplWorkspaceView) templ.Component {
 		var templ_7745c5c3_Var86 string
 		templ_7745c5c3_Var86, templ_7745c5c3_Err = templ.JoinStringErrs(workspaceLifecycleDiagnosticLabel(view))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 390, Col: 106}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 393, Col: 106}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var86))
 		if templ_7745c5c3_Err != nil {
@@ -1924,7 +1924,7 @@ func WorkspaceDiagnosticBadges(view ImplWorkspaceView) templ.Component {
 		var templ_7745c5c3_Var87 string
 		templ_7745c5c3_Var87, templ_7745c5c3_Err = templ.JoinStringErrs(workspaceSyncDiagnosticLabel(view.Diagnostics.Sync))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 391, Col: 115}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 394, Col: 115}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var87))
 		if templ_7745c5c3_Err != nil {
@@ -1937,7 +1937,7 @@ func WorkspaceDiagnosticBadges(view ImplWorkspaceView) templ.Component {
 		var templ_7745c5c3_Var88 string
 		templ_7745c5c3_Var88, templ_7745c5c3_Err = templ.JoinStringErrs(workspaceRuntimeLabel(view))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 392, Col: 102}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 395, Col: 102}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var88))
 		if templ_7745c5c3_Err != nil {
@@ -1950,7 +1950,7 @@ func WorkspaceDiagnosticBadges(view ImplWorkspaceView) templ.Component {
 		var templ_7745c5c3_Var89 string
 		templ_7745c5c3_Var89, templ_7745c5c3_Err = templ.JoinStringErrs(workspaceRuntimeDiagnosticSourceLabel(view))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 392, Col: 187}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 395, Col: 187}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var89))
 		if templ_7745c5c3_Err != nil {
@@ -2114,7 +2114,7 @@ func WorkspaceRecovery(model RecoveryModel) templ.Component {
 		var templ_7745c5c3_Var96 string
 		templ_7745c5c3_Var96, templ_7745c5c3_Err = templ.JoinStringErrs(recoveryDisplayName(model))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 419, Col: 95}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 422, Col: 95}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var96))
 		if templ_7745c5c3_Err != nil {
@@ -2132,7 +2132,7 @@ func WorkspaceRecovery(model RecoveryModel) templ.Component {
 			var templ_7745c5c3_Var97 string
 			templ_7745c5c3_Var97, templ_7745c5c3_Err = templ.JoinStringErrs(model.Workspace.Slug)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 421, Col: 89}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 424, Col: 89}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var97))
 			if templ_7745c5c3_Err != nil {
@@ -2150,7 +2150,7 @@ func WorkspaceRecovery(model RecoveryModel) templ.Component {
 		var templ_7745c5c3_Var98 string
 		templ_7745c5c3_Var98, templ_7745c5c3_Err = templ.JoinStringErrs(string(model.Status.Status))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 424, Col: 87}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 427, Col: 87}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var98))
 		if templ_7745c5c3_Err != nil {
@@ -2168,7 +2168,7 @@ func WorkspaceRecovery(model RecoveryModel) templ.Component {
 			var templ_7745c5c3_Var99 string
 			templ_7745c5c3_Var99, templ_7745c5c3_Err = templ.JoinStringErrs(string(model.Status.Phase))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 426, Col: 86}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 429, Col: 86}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var99))
 			if templ_7745c5c3_Err != nil {
@@ -2187,7 +2187,7 @@ func WorkspaceRecovery(model RecoveryModel) templ.Component {
 			var templ_7745c5c3_Var100 string
 			templ_7745c5c3_Var100, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("127.0.0.1:%d", model.Workspace.Port))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 429, Col: 102}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 432, Col: 102}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var100))
 			if templ_7745c5c3_Err != nil {
@@ -2210,7 +2210,7 @@ func WorkspaceRecovery(model RecoveryModel) templ.Component {
 			var templ_7745c5c3_Var101 templ.SafeURL
 			templ_7745c5c3_Var101, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(recoverySwitchURL(model)))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 435, Col: 55}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 438, Col: 55}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var101))
 			if templ_7745c5c3_Err != nil {
@@ -2233,7 +2233,7 @@ func WorkspaceRecovery(model RecoveryModel) templ.Component {
 		var templ_7745c5c3_Var102 templ.SafeURL
 		templ_7745c5c3_Var102, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(recoveryManagerWorkspacesURL(model.ManagerURL)))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 439, Col: 76}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 442, Col: 76}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var102))
 		if templ_7745c5c3_Err != nil {
@@ -2257,7 +2257,7 @@ func WorkspaceRecovery(model RecoveryModel) templ.Component {
 			var templ_7745c5c3_Var103 string
 			templ_7745c5c3_Var103, templ_7745c5c3_Err = templ.JoinStringErrs(model.Status.Error)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 446, Col: 129}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 449, Col: 129}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var103))
 			if templ_7745c5c3_Err != nil {
@@ -2276,7 +2276,7 @@ func WorkspaceRecovery(model RecoveryModel) templ.Component {
 			var templ_7745c5c3_Var104 string
 			templ_7745c5c3_Var104, templ_7745c5c3_Err = templ.JoinStringErrs(model.Status.Build.Error)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 449, Col: 207}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 452, Col: 207}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var104))
 			if templ_7745c5c3_Err != nil {
@@ -2327,7 +2327,7 @@ func WorkspaceRecovery(model RecoveryModel) templ.Component {
 			var templ_7745c5c3_Var105 string
 			templ_7745c5c3_Var105, templ_7745c5c3_Err = templ.JoinStringErrs(string(component))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 472, Col: 68}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 475, Col: 68}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var105))
 			if templ_7745c5c3_Err != nil {
@@ -2345,7 +2345,7 @@ func WorkspaceRecovery(model RecoveryModel) templ.Component {
 				var templ_7745c5c3_Var106 string
 				templ_7745c5c3_Var106, templ_7745c5c3_Err = templ.JoinStringErrs(recoveryLogPath(model, component))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 474, Col: 107}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 477, Col: 107}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var106))
 				if templ_7745c5c3_Err != nil {
@@ -2368,7 +2368,7 @@ func WorkspaceRecovery(model RecoveryModel) templ.Component {
 				var templ_7745c5c3_Var107 string
 				templ_7745c5c3_Var107, templ_7745c5c3_Err = templ.JoinStringErrs(model.LogTails[component])
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 478, Col: 129}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 481, Col: 129}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var107))
 				if templ_7745c5c3_Err != nil {
@@ -2431,7 +2431,7 @@ func PlanWorkspaceRoleBadges(plan PlanWorkspaceView) templ.Component {
 				var templ_7745c5c3_Var109 string
 				templ_7745c5c3_Var109, templ_7745c5c3_Err = templ.JoinStringErrs(primaryPlanWorkspaceProject(plan.Projects))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 493, Col: 156}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 496, Col: 156}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var109))
 				if templ_7745c5c3_Err != nil {
@@ -2450,7 +2450,7 @@ func PlanWorkspaceRoleBadges(plan PlanWorkspaceView) templ.Component {
 				var templ_7745c5c3_Var110 string
 				templ_7745c5c3_Var110, templ_7745c5c3_Err = templ.JoinStringErrs(project.ProjectID)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 496, Col: 75}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 499, Col: 75}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var110))
 				if templ_7745c5c3_Err != nil {
@@ -2469,7 +2469,7 @@ func PlanWorkspaceRoleBadges(plan PlanWorkspaceView) templ.Component {
 				var templ_7745c5c3_Var111 string
 				templ_7745c5c3_Var111, templ_7745c5c3_Err = templ.JoinStringErrs(plan.MatchedRole)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 499, Col: 89}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 502, Col: 89}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var111))
 				if templ_7745c5c3_Err != nil {
@@ -2523,7 +2523,7 @@ func PlanWorkspaceBindingBadges(plan PlanWorkspaceView) templ.Component {
 				var templ_7745c5c3_Var113 string
 				templ_7745c5c3_Var113, templ_7745c5c3_Err = templ.JoinStringErrs(binding.ProjectID)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 509, Col: 66}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 512, Col: 66}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var113))
 				if templ_7745c5c3_Err != nil {
@@ -2536,7 +2536,7 @@ func PlanWorkspaceBindingBadges(plan PlanWorkspaceView) templ.Component {
 				var templ_7745c5c3_Var114 string
 				templ_7745c5c3_Var114, templ_7745c5c3_Err = templ.JoinStringErrs(binding.Status)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 509, Col: 86}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 512, Col: 86}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var114))
 				if templ_7745c5c3_Err != nil {
@@ -2586,7 +2586,7 @@ func WorkspaceRecoveryActionForm(model RecoveryModel, action string, label strin
 		var templ_7745c5c3_Var116 string
 		templ_7745c5c3_Var116, templ_7745c5c3_Err = templ.JoinStringErrs(model.Workspace.Slug)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 519, Col: 63}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 522, Col: 63}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var116))
 		if templ_7745c5c3_Err != nil {
@@ -2599,7 +2599,7 @@ func WorkspaceRecoveryActionForm(model RecoveryModel, action string, label strin
 		var templ_7745c5c3_Var117 string
 		templ_7745c5c3_Var117, templ_7745c5c3_Err = templ.JoinStringErrs(action)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 520, Col: 51}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 523, Col: 51}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var117))
 		if templ_7745c5c3_Err != nil {
@@ -2612,7 +2612,7 @@ func WorkspaceRecoveryActionForm(model RecoveryModel, action string, label strin
 		var templ_7745c5c3_Var118 string
 		templ_7745c5c3_Var118, templ_7745c5c3_Err = templ.JoinStringErrs(model.ReturnTo)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 521, Col: 62}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 524, Col: 62}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var118))
 		if templ_7745c5c3_Err != nil {
@@ -2625,7 +2625,7 @@ func WorkspaceRecoveryActionForm(model RecoveryModel, action string, label strin
 		var templ_7745c5c3_Var119 string
 		templ_7745c5c3_Var119, templ_7745c5c3_Err = templ.JoinStringErrs(indicator)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 522, Col: 195}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 525, Col: 195}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var119))
 		if templ_7745c5c3_Err != nil {
@@ -2638,7 +2638,7 @@ func WorkspaceRecoveryActionForm(model RecoveryModel, action string, label strin
 		var templ_7745c5c3_Var120 string
 		templ_7745c5c3_Var120, templ_7745c5c3_Err = templ.JoinStringErrs(indicatorSignal)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 522, Col: 306}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 525, Col: 306}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var120))
 		if templ_7745c5c3_Err != nil {
@@ -2651,7 +2651,7 @@ func WorkspaceRecoveryActionForm(model RecoveryModel, action string, label strin
 		var templ_7745c5c3_Var121 string
 		templ_7745c5c3_Var121, templ_7745c5c3_Err = templ.JoinStringErrs("!" + indicatorSignal)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 523, Col: 42}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 526, Col: 42}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var121))
 		if templ_7745c5c3_Err != nil {
@@ -2664,7 +2664,7 @@ func WorkspaceRecoveryActionForm(model RecoveryModel, action string, label strin
 		var templ_7745c5c3_Var122 string
 		templ_7745c5c3_Var122, templ_7745c5c3_Err = templ.JoinStringErrs(label)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 523, Col: 52}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 526, Col: 52}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var122))
 		if templ_7745c5c3_Err != nil {
@@ -2682,7 +2682,7 @@ func WorkspaceRecoveryActionForm(model RecoveryModel, action string, label strin
 			var templ_7745c5c3_Var123 string
 			templ_7745c5c3_Var123, templ_7745c5c3_Err = templ.JoinStringErrs(indicatorSignal)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 525, Col: 37}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 528, Col: 37}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var123))
 			if templ_7745c5c3_Err != nil {
@@ -2700,7 +2700,7 @@ func WorkspaceRecoveryActionForm(model RecoveryModel, action string, label strin
 			var templ_7745c5c3_Var124 string
 			templ_7745c5c3_Var124, templ_7745c5c3_Err = templ.JoinStringErrs(indicatorSignal)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 527, Col: 37}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 530, Col: 37}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var124))
 			if templ_7745c5c3_Err != nil {
@@ -2763,7 +2763,7 @@ func ImplWorkspaceCard(view ImplWorkspaceView, managerURL string, showHistorical
 				var templ_7745c5c3_Var127 string
 				templ_7745c5c3_Var127, templ_7745c5c3_Err = templ.JoinStringErrs(workspaceViewActivity(view))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 539, Col: 175}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 542, Col: 175}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var127))
 				if templ_7745c5c3_Err != nil {
@@ -2781,7 +2781,7 @@ func ImplWorkspaceCard(view ImplWorkspaceView, managerURL string, showHistorical
 				var templ_7745c5c3_Var128 string
 				templ_7745c5c3_Var128, templ_7745c5c3_Err = templ.JoinStringErrs(workspaceCardTimestamp(ws))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 541, Col: 165}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 544, Col: 165}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var128))
 				if templ_7745c5c3_Err != nil {
@@ -2814,7 +2814,7 @@ func ImplWorkspaceCard(view ImplWorkspaceView, managerURL string, showHistorical
 			var templ_7745c5c3_Var129 string
 			templ_7745c5c3_Var129, templ_7745c5c3_Err = templ.JoinStringErrs(workspaceViewTitle(view))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 551, Col: 78}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 554, Col: 78}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var129))
 			if templ_7745c5c3_Err != nil {
@@ -2832,7 +2832,7 @@ func ImplWorkspaceCard(view ImplWorkspaceView, managerURL string, showHistorical
 				var templ_7745c5c3_Var130 string
 				templ_7745c5c3_Var130, templ_7745c5c3_Err = templ.JoinStringErrs(slug)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 553, Col: 71}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 556, Col: 71}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var130))
 				if templ_7745c5c3_Err != nil {
@@ -2860,7 +2860,7 @@ func ImplWorkspaceCard(view ImplWorkspaceView, managerURL string, showHistorical
 					var templ_7745c5c3_Var131 string
 					templ_7745c5c3_Var131, templ_7745c5c3_Err = templ.JoinStringErrs(warning)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 561, Col: 19}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 564, Col: 19}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var131))
 					if templ_7745c5c3_Err != nil {
@@ -2911,7 +2911,7 @@ func ImplWorkspaceCard(view ImplWorkspaceView, managerURL string, showHistorical
 					var templ_7745c5c3_Var134 string
 					templ_7745c5c3_Var134, templ_7745c5c3_Err = templ.JoinStringErrs(diagnostic.Message)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 570, Col: 49}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 573, Col: 49}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var134))
 					if templ_7745c5c3_Err != nil {
@@ -2929,7 +2929,7 @@ func ImplWorkspaceCard(view ImplWorkspaceView, managerURL string, showHistorical
 						var templ_7745c5c3_Var135 string
 						templ_7745c5c3_Var135, templ_7745c5c3_Err = templ.JoinStringErrs(diagnostic.Detail)
 						if templ_7745c5c3_Err != nil {
-							return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 572, Col: 50}
+							return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 575, Col: 50}
 						}
 						_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var135))
 						if templ_7745c5c3_Err != nil {
@@ -2957,7 +2957,7 @@ func ImplWorkspaceCard(view ImplWorkspaceView, managerURL string, showHistorical
 			var templ_7745c5c3_Var136 string
 			templ_7745c5c3_Var136, templ_7745c5c3_Err = templ.JoinStringErrs(workspaceLifecycleDiagnosticLabel(view))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 580, Col: 76}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 583, Col: 76}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var136))
 			if templ_7745c5c3_Err != nil {
@@ -2970,7 +2970,7 @@ func ImplWorkspaceCard(view ImplWorkspaceView, managerURL string, showHistorical
 			var templ_7745c5c3_Var137 string
 			templ_7745c5c3_Var137, templ_7745c5c3_Err = templ.JoinStringErrs(workspaceSyncDiagnosticLabel(view.Diagnostics.Sync))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 582, Col: 88}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 585, Col: 88}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var137))
 			if templ_7745c5c3_Err != nil {
@@ -2983,7 +2983,7 @@ func ImplWorkspaceCard(view ImplWorkspaceView, managerURL string, showHistorical
 			var templ_7745c5c3_Var138 string
 			templ_7745c5c3_Var138, templ_7745c5c3_Err = templ.JoinStringErrs(workspaceRuntimeLabel(view))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 584, Col: 64}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 587, Col: 64}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var138))
 			if templ_7745c5c3_Err != nil {
@@ -2996,7 +2996,7 @@ func ImplWorkspaceCard(view ImplWorkspaceView, managerURL string, showHistorical
 			var templ_7745c5c3_Var139 string
 			templ_7745c5c3_Var139, templ_7745c5c3_Err = templ.JoinStringErrs(workspaceRuntimeDiagnosticSourceLabel(view))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 584, Col: 157}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 587, Col: 157}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var139))
 			if templ_7745c5c3_Err != nil {
@@ -3014,7 +3014,7 @@ func ImplWorkspaceCard(view ImplWorkspaceView, managerURL string, showHistorical
 				var templ_7745c5c3_Var140 string
 				templ_7745c5c3_Var140, templ_7745c5c3_Err = templ.JoinStringErrs(view.Diagnostics.CleanupMessage)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 587, Col: 112}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 590, Col: 112}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var140))
 				if templ_7745c5c3_Err != nil {
@@ -3061,7 +3061,7 @@ func ImplWorkspaceCard(view ImplWorkspaceView, managerURL string, showHistorical
 				var templ_7745c5c3_Var141 string
 				templ_7745c5c3_Var141, templ_7745c5c3_Err = templ.JoinStringErrs(workspaceViewActivity(view))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 603, Col: 95}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 606, Col: 95}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var141))
 				if templ_7745c5c3_Err != nil {
@@ -3080,7 +3080,7 @@ func ImplWorkspaceCard(view ImplWorkspaceView, managerURL string, showHistorical
 				var templ_7745c5c3_Var142 string
 				templ_7745c5c3_Var142, templ_7745c5c3_Err = templ.JoinStringErrs(workspacePlanBindingLabel(view))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 607, Col: 107}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 610, Col: 107}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var142))
 				if templ_7745c5c3_Err != nil {
@@ -3099,7 +3099,7 @@ func ImplWorkspaceCard(view ImplWorkspaceView, managerURL string, showHistorical
 				var templ_7745c5c3_Var143 string
 				templ_7745c5c3_Var143, templ_7745c5c3_Err = templ.JoinStringErrs(workspaceViewCheckoutPath(view))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 611, Col: 107}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 614, Col: 107}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var143))
 				if templ_7745c5c3_Err != nil {
@@ -3118,7 +3118,7 @@ func ImplWorkspaceCard(view ImplWorkspaceView, managerURL string, showHistorical
 				var templ_7745c5c3_Var144 templ.SafeURL
 				templ_7745c5c3_Var144, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(workspaceDirectPublicURL(view)))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 615, Col: 165}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 618, Col: 165}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var144))
 				if templ_7745c5c3_Err != nil {
@@ -3131,7 +3131,7 @@ func ImplWorkspaceCard(view ImplWorkspaceView, managerURL string, showHistorical
 				var templ_7745c5c3_Var145 string
 				templ_7745c5c3_Var145, templ_7745c5c3_Err = templ.JoinStringErrs(workspaceDirectPublicURL(view))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 615, Col: 233}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 618, Col: 233}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var145))
 				if templ_7745c5c3_Err != nil {
@@ -3150,7 +3150,7 @@ func ImplWorkspaceCard(view ImplWorkspaceView, managerURL string, showHistorical
 				var templ_7745c5c3_Var146 templ.SafeURL
 				templ_7745c5c3_Var146, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(workspaceVerifyHTMLURL(view)))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 619, Col: 163}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 622, Col: 163}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var146))
 				if templ_7745c5c3_Err != nil {
@@ -3169,7 +3169,7 @@ func ImplWorkspaceCard(view ImplWorkspaceView, managerURL string, showHistorical
 				var templ_7745c5c3_Var147 string
 				templ_7745c5c3_Var147, templ_7745c5c3_Err = templ.JoinStringErrs(workspaceTrunkBranch(ws))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 623, Col: 100}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 626, Col: 100}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var147))
 				if templ_7745c5c3_Err != nil {
@@ -3188,7 +3188,7 @@ func ImplWorkspaceCard(view ImplWorkspaceView, managerURL string, showHistorical
 				var templ_7745c5c3_Var148 string
 				templ_7745c5c3_Var148, templ_7745c5c3_Err = templ.JoinStringErrs(workspaceBottomBranch(ws))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 627, Col: 101}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 630, Col: 101}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var148))
 				if templ_7745c5c3_Err != nil {
@@ -3207,7 +3207,7 @@ func ImplWorkspaceCard(view ImplWorkspaceView, managerURL string, showHistorical
 				var templ_7745c5c3_Var149 string
 				templ_7745c5c3_Var149, templ_7745c5c3_Err = templ.JoinStringErrs(workspaceTopBranch(ws))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 631, Col: 98}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 634, Col: 98}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var149))
 				if templ_7745c5c3_Err != nil {
@@ -3226,7 +3226,7 @@ func ImplWorkspaceCard(view ImplWorkspaceView, managerURL string, showHistorical
 				var templ_7745c5c3_Var150 string
 				templ_7745c5c3_Var150, templ_7745c5c3_Err = templ.JoinStringErrs(ws.Branch)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 635, Col: 85}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 638, Col: 85}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var150))
 				if templ_7745c5c3_Err != nil {
@@ -3245,7 +3245,7 @@ func ImplWorkspaceCard(view ImplWorkspaceView, managerURL string, showHistorical
 				var templ_7745c5c3_Var151 string
 				templ_7745c5c3_Var151, templ_7745c5c3_Err = templ.JoinStringErrs(ws.Commit)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 639, Col: 85}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 642, Col: 85}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var151))
 				if templ_7745c5c3_Err != nil {
@@ -3264,7 +3264,7 @@ func ImplWorkspaceCard(view ImplWorkspaceView, managerURL string, showHistorical
 				var templ_7745c5c3_Var152 string
 				templ_7745c5c3_Var152, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("%d ahead · %d behind", view.Row.AheadCount, view.Row.BehindCount))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 643, Col: 147}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 646, Col: 147}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var152))
 				if templ_7745c5c3_Err != nil {
@@ -3287,7 +3287,7 @@ func ImplWorkspaceCard(view ImplWorkspaceView, managerURL string, showHistorical
 				var templ_7745c5c3_Var153 string
 				templ_7745c5c3_Var153, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("127.0.0.1:%d", ws.Port))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 648, Col: 102}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 651, Col: 102}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var153))
 				if templ_7745c5c3_Err != nil {
@@ -3306,7 +3306,7 @@ func ImplWorkspaceCard(view ImplWorkspaceView, managerURL string, showHistorical
 				var templ_7745c5c3_Var154 string
 				templ_7745c5c3_Var154, templ_7745c5c3_Err = templ.JoinStringErrs(ws.LogPath)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 652, Col: 86}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 655, Col: 86}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var154))
 				if templ_7745c5c3_Err != nil {
@@ -3325,7 +3325,7 @@ func ImplWorkspaceCard(view ImplWorkspaceView, managerURL string, showHistorical
 				var templ_7745c5c3_Var155 string
 				templ_7745c5c3_Var155, templ_7745c5c3_Err = templ.JoinStringErrs(snap.Error)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 656, Col: 73}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 659, Col: 73}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var155))
 				if templ_7745c5c3_Err != nil {
@@ -3343,7 +3343,7 @@ func ImplWorkspaceCard(view ImplWorkspaceView, managerURL string, showHistorical
 				var templ_7745c5c3_Var156 string
 				templ_7745c5c3_Var156, templ_7745c5c3_Err = templ.JoinStringErrs(ws.Error)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 659, Col: 71}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 662, Col: 71}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var156))
 				if templ_7745c5c3_Err != nil {
@@ -3378,7 +3378,7 @@ func ImplWorkspaceCard(view ImplWorkspaceView, managerURL string, showHistorical
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = WorkspaceActionsMenu(view, managerURL, showHistorical, projectFilter, "card").Render(ctx, templ_7745c5c3_Buffer)
+			templ_7745c5c3_Err = WorkspaceActionsMenu(view, managerURL, showHistorical, projectFilter, "dialog").Render(ctx, templ_7745c5c3_Buffer)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -3429,7 +3429,7 @@ func WorkspaceProofDiagnostics(view ImplWorkspaceView) templ.Component {
 			var templ_7745c5c3_Var158 string
 			templ_7745c5c3_Var158, templ_7745c5c3_Err = templ.JoinStringErrs(readiness.Summary)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 685, Col: 53}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 688, Col: 53}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var158))
 			if templ_7745c5c3_Err != nil {
@@ -3448,7 +3448,7 @@ func WorkspaceProofDiagnostics(view ImplWorkspaceView) templ.Component {
 			var templ_7745c5c3_Var159 string
 			templ_7745c5c3_Var159, templ_7745c5c3_Err = templ.JoinStringErrs(string(readiness.ProofKind))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 689, Col: 103}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 692, Col: 103}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var159))
 			if templ_7745c5c3_Err != nil {
@@ -3467,7 +3467,7 @@ func WorkspaceProofDiagnostics(view ImplWorkspaceView) templ.Component {
 			var templ_7745c5c3_Var160 string
 			templ_7745c5c3_Var160, templ_7745c5c3_Err = templ.JoinStringErrs(readiness.SourceRef)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 693, Col: 93}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 696, Col: 93}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var160))
 			if templ_7745c5c3_Err != nil {
@@ -3486,7 +3486,7 @@ func WorkspaceProofDiagnostics(view ImplWorkspaceView) templ.Component {
 			var templ_7745c5c3_Var161 string
 			templ_7745c5c3_Var161, templ_7745c5c3_Err = templ.JoinStringErrs(readiness.TargetCommit)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 697, Col: 96}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 700, Col: 96}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var161))
 			if templ_7745c5c3_Err != nil {
@@ -3505,7 +3505,7 @@ func WorkspaceProofDiagnostics(view ImplWorkspaceView) templ.Component {
 			var templ_7745c5c3_Var162 string
 			templ_7745c5c3_Var162, templ_7745c5c3_Err = templ.JoinStringErrs(readiness.ProvenAt.Format("Jan 2, 2006 · 3:04 PM"))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 701, Col: 105}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 704, Col: 105}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var162))
 			if templ_7745c5c3_Err != nil {
@@ -3524,7 +3524,7 @@ func WorkspaceProofDiagnostics(view ImplWorkspaceView) templ.Component {
 			var templ_7745c5c3_Var163 string
 			templ_7745c5c3_Var163, templ_7745c5c3_Err = templ.JoinStringErrs(readiness.RiskReason)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 705, Col: 99}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 708, Col: 99}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var163))
 			if templ_7745c5c3_Err != nil {
@@ -3543,7 +3543,7 @@ func WorkspaceProofDiagnostics(view ImplWorkspaceView) templ.Component {
 			var templ_7745c5c3_Var164 string
 			templ_7745c5c3_Var164, templ_7745c5c3_Err = templ.JoinStringErrs(view.Row.MergeEvidence.String)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 709, Col: 95}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 712, Col: 95}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var164))
 			if templ_7745c5c3_Err != nil {
@@ -3562,7 +3562,7 @@ func WorkspaceProofDiagnostics(view ImplWorkspaceView) templ.Component {
 			var templ_7745c5c3_Var165 string
 			templ_7745c5c3_Var165, templ_7745c5c3_Err = templ.JoinStringErrs(view.Row.GitDetail.String)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 713, Col: 91}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 716, Col: 91}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var165))
 			if templ_7745c5c3_Err != nil {
@@ -3577,13 +3577,22 @@ func WorkspaceProofDiagnostics(view ImplWorkspaceView) templ.Component {
 	})
 }
 
-func workspaceActionsDropdownID(slug string, instance string) string {
+func workspaceActionsDropdownID(slug string, scope string) string {
 	replacer := strings.NewReplacer("-", "_", ".", "_", "/", "_")
-	id := "workspace_actions_" + replacer.Replace(slug)
-	if instance != "" {
-		id += "_" + replacer.Replace(instance)
+	scope = replacer.Replace(strings.TrimSpace(scope))
+	if scope == "" {
+		scope = "row"
 	}
-	return id
+	return "workspace_actions_" + replacer.Replace(slug) + "_" + scope
+}
+
+func workspaceCleanupConfirmDialogID(slug string, scope string) string {
+	replacer := strings.NewReplacer("-", "_", ".", "_", "/", "_")
+	scope = replacer.Replace(strings.TrimSpace(scope))
+	if scope == "" {
+		scope = "row"
+	}
+	return "workspace_cleanup_confirm_" + replacer.Replace(slug) + "_" + scope
 }
 
 func workspaceDialogOpenExpression(slug string) string {
@@ -3598,7 +3607,7 @@ func workspaceDropdownActionClass(destructive bool) string {
 	return "w-full justify-start text-xs"
 }
 
-func WorkspaceActionsMenu(view ImplWorkspaceView, managerURL string, showHistorical bool, projectFilter WorkspacesFilter, instance string) templ.Component {
+func WorkspaceActionsMenu(view ImplWorkspaceView, managerURL string, showHistorical bool, projectFilter WorkspacesFilter, scope string) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
@@ -3620,7 +3629,8 @@ func WorkspaceActionsMenu(view ImplWorkspaceView, managerURL string, showHistori
 		}
 		ctx = templ.ClearChildren(ctx)
 		slug := workspaceViewSlug(view)
-		dropdownID := workspaceActionsDropdownID(slug, instance)
+		dropdownID := workspaceActionsDropdownID(slug, scope)
+		cleanupAction := workspaceCleanupAction(view)
 		templ_7745c5c3_Var167 := templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 			templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 			templ_7745c5c3_Buffer, templ_7745c5c3_IsBuffer := templruntime.GetBuffer(templ_7745c5c3_W)
@@ -3753,7 +3763,7 @@ func WorkspaceActionsMenu(view ImplWorkspaceView, managerURL string, showHistori
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = WorkspaceCleanupDropdownItem(workspaceCleanupAction(view), dropdownID, projectFilter).Render(ctx, templ_7745c5c3_Buffer)
+				templ_7745c5c3_Err = WorkspaceCleanupDropdownItem(cleanupAction, dropdownID, projectFilter, scope).Render(ctx, templ_7745c5c3_Buffer)
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
@@ -3776,6 +3786,12 @@ func WorkspaceActionsMenu(view ImplWorkspaceView, managerURL string, showHistori
 		templ_7745c5c3_Err = dropdown.DropdownMenu(dropdown.DropdownMenuArgs{ID: dropdownID, Class: "relative inline-block"}).Render(templ.WithChildren(ctx, templ_7745c5c3_Var167), templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
+		}
+		if cleanupAction.Slug != "" && !cleanupAction.Disabled && cleanupAction.RequiresConfirm {
+			templ_7745c5c3_Err = WorkspaceCleanupConfirmDialog(cleanupAction, projectFilter, scope).Render(ctx, templ_7745c5c3_Buffer)
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
 		}
 		return nil
 	})
@@ -3926,7 +3942,7 @@ func WorkspaceLifecycleDropdownForm(dropdownID string, slug string, action strin
 			var templ_7745c5c3_Var178 templ.SafeURL
 			templ_7745c5c3_Var178, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(actionPath))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 800, Col: 56}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 816, Col: 56}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var178))
 			if templ_7745c5c3_Err != nil {
@@ -3939,7 +3955,7 @@ func WorkspaceLifecycleDropdownForm(dropdownID string, slug string, action strin
 			var templ_7745c5c3_Var179 string
 			templ_7745c5c3_Var179, templ_7745c5c3_Err = templ.JoinStringErrs(indicator)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 800, Col: 85}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 816, Col: 85}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var179))
 			if templ_7745c5c3_Err != nil {
@@ -3952,7 +3968,7 @@ func WorkspaceLifecycleDropdownForm(dropdownID string, slug string, action strin
 			var templ_7745c5c3_Var180 string
 			templ_7745c5c3_Var180, templ_7745c5c3_Err = templ.JoinStringErrs("@post('" + actionPath + "', {contentType: 'form'})")
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 800, Col: 157}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 816, Col: 157}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var180))
 			if templ_7745c5c3_Err != nil {
@@ -3970,7 +3986,7 @@ func WorkspaceLifecycleDropdownForm(dropdownID string, slug string, action strin
 				var templ_7745c5c3_Var181 string
 				templ_7745c5c3_Var181, templ_7745c5c3_Err = templ.JoinStringErrs(projectFilter.ProjectQueryValue())
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 802, Col: 81}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 818, Col: 81}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var181))
 				if templ_7745c5c3_Err != nil {
@@ -3989,7 +4005,7 @@ func WorkspaceLifecycleDropdownForm(dropdownID string, slug string, action strin
 				var templ_7745c5c3_Var182 string
 				templ_7745c5c3_Var182, templ_7745c5c3_Err = templ.JoinStringErrs(projectFilter.QueryValue())
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 805, Col: 68}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 821, Col: 68}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var182))
 				if templ_7745c5c3_Err != nil {
@@ -4014,7 +4030,7 @@ func WorkspaceLifecycleDropdownForm(dropdownID string, slug string, action strin
 				var templ_7745c5c3_Var183 string
 				templ_7745c5c3_Var183, templ_7745c5c3_Err = templ.JoinStringErrs(string(projectFilter.Group))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 811, Col: 73}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 827, Col: 73}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var183))
 				if templ_7745c5c3_Err != nil {
@@ -4033,7 +4049,7 @@ func WorkspaceLifecycleDropdownForm(dropdownID string, slug string, action strin
 				var templ_7745c5c3_Var184 string
 				templ_7745c5c3_Var184, templ_7745c5c3_Err = templ.JoinStringErrs(string(projectFilter.Sort))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 814, Col: 71}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 830, Col: 71}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var184))
 				if templ_7745c5c3_Err != nil {
@@ -4063,7 +4079,7 @@ func WorkspaceLifecycleDropdownForm(dropdownID string, slug string, action strin
 				var templ_7745c5c3_Var186 string
 				templ_7745c5c3_Var186, templ_7745c5c3_Err = templ.JoinStringErrs("!" + indicatorSignal)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 817, Col: 43}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 833, Col: 43}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var186))
 				if templ_7745c5c3_Err != nil {
@@ -4076,7 +4092,7 @@ func WorkspaceLifecycleDropdownForm(dropdownID string, slug string, action strin
 				var templ_7745c5c3_Var187 string
 				templ_7745c5c3_Var187, templ_7745c5c3_Err = templ.JoinStringErrs(label)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 817, Col: 53}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 833, Col: 53}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var187))
 				if templ_7745c5c3_Err != nil {
@@ -4089,7 +4105,7 @@ func WorkspaceLifecycleDropdownForm(dropdownID string, slug string, action strin
 				var templ_7745c5c3_Var188 string
 				templ_7745c5c3_Var188, templ_7745c5c3_Err = templ.JoinStringErrs(indicatorSignal)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 818, Col: 37}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 834, Col: 37}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var188))
 				if templ_7745c5c3_Err != nil {
@@ -4102,7 +4118,7 @@ func WorkspaceLifecycleDropdownForm(dropdownID string, slug string, action strin
 				var templ_7745c5c3_Var189 string
 				templ_7745c5c3_Var189, templ_7745c5c3_Err = templ.JoinStringErrs(loadingLabel)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 818, Col: 54}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 834, Col: 54}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var189))
 				if templ_7745c5c3_Err != nil {
@@ -4132,7 +4148,7 @@ func WorkspaceLifecycleDropdownForm(dropdownID string, slug string, action strin
 	})
 }
 
-func WorkspaceCleanupDropdownItem(action WorkspaceCleanupAction, dropdownID string, projectFilter WorkspacesFilter) templ.Component {
+func WorkspaceCleanupDropdownItem(action WorkspaceCleanupAction, dropdownID string, projectFilter WorkspacesFilter, scope string) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
@@ -4158,6 +4174,7 @@ func WorkspaceCleanupDropdownItem(action WorkspaceCleanupAction, dropdownID stri
 			indicator := workspaceActionIndicator(action.Slug, "cleanup")
 			indicatorSignal := workspaceActionIndicatorSignal(action.Slug, "cleanup")
 			if action.RequiresConfirm {
+				dialogID := workspaceCleanupConfirmDialogID(action.Slug, scope)
 				templ_7745c5c3_Var191 := templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 					templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 					templ_7745c5c3_Buffer, templ_7745c5c3_IsBuffer := templruntime.GetBuffer(templ_7745c5c3_W)
@@ -4170,143 +4187,7 @@ func WorkspaceCleanupDropdownItem(action WorkspaceCleanupAction, dropdownID stri
 						}()
 					}
 					ctx = templ.InitializeContext(ctx)
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 308, "<p class=\"text-xs font-medium text-destructive\">")
-					if templ_7745c5c3_Err != nil {
-						return templ_7745c5c3_Err
-					}
-					var templ_7745c5c3_Var192 string
-					templ_7745c5c3_Var192, templ_7745c5c3_Err = templ.JoinStringErrs(action.Label)
-					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 831, Col: 66}
-					}
-					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var192))
-					if templ_7745c5c3_Err != nil {
-						return templ_7745c5c3_Err
-					}
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 309, "</p><p class=\"mt-2 text-xs text-amber-700 dark:text-amber-300\">")
-					if templ_7745c5c3_Err != nil {
-						return templ_7745c5c3_Err
-					}
-					var templ_7745c5c3_Var193 string
-					templ_7745c5c3_Var193, templ_7745c5c3_Err = templ.JoinStringErrs(action.Warning)
-					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 832, Col: 79}
-					}
-					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var193))
-					if templ_7745c5c3_Err != nil {
-						return templ_7745c5c3_Err
-					}
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 310, "</p><form method=\"post\" action=\"/workspaces/cleanup\" class=\"mt-2\" data-indicator=\"")
-					if templ_7745c5c3_Err != nil {
-						return templ_7745c5c3_Err
-					}
-					var templ_7745c5c3_Var194 string
-					templ_7745c5c3_Var194, templ_7745c5c3_Err = templ.JoinStringErrs(indicator)
-					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 833, Col: 92}
-					}
-					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var194))
-					if templ_7745c5c3_Err != nil {
-						return templ_7745c5c3_Err
-					}
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 311, "\" data-on:submit=\"@post('/workspaces/cleanup', {contentType: 'form'})\"><input type=\"hidden\" name=\"slug\" value=\"")
-					if templ_7745c5c3_Err != nil {
-						return templ_7745c5c3_Err
-					}
-					var templ_7745c5c3_Var195 string
-					templ_7745c5c3_Var195, templ_7745c5c3_Err = templ.JoinStringErrs(action.Slug)
-					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 834, Col: 57}
-					}
-					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var195))
-					if templ_7745c5c3_Err != nil {
-						return templ_7745c5c3_Err
-					}
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 312, "\"> <input type=\"hidden\" name=\"project\" value=\"")
-					if templ_7745c5c3_Err != nil {
-						return templ_7745c5c3_Err
-					}
-					var templ_7745c5c3_Var196 string
-					templ_7745c5c3_Var196, templ_7745c5c3_Err = templ.JoinStringErrs(firstNonEmpty(projectFilter.ProjectQueryValue(), action.ProjectID))
-					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 835, Col: 115}
-					}
-					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var196))
-					if templ_7745c5c3_Err != nil {
-						return templ_7745c5c3_Err
-					}
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 313, "\"> ")
-					if templ_7745c5c3_Err != nil {
-						return templ_7745c5c3_Err
-					}
-					if projectFilter.QueryValue() != "" {
-						templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 314, "<input type=\"hidden\" name=\"q\" value=\"")
-						if templ_7745c5c3_Err != nil {
-							return templ_7745c5c3_Err
-						}
-						var templ_7745c5c3_Var197 string
-						templ_7745c5c3_Var197, templ_7745c5c3_Err = templ.JoinStringErrs(projectFilter.QueryValue())
-						if templ_7745c5c3_Err != nil {
-							return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 837, Col: 70}
-						}
-						_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var197))
-						if templ_7745c5c3_Err != nil {
-							return templ_7745c5c3_Err
-						}
-						templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 315, "\"> ")
-						if templ_7745c5c3_Err != nil {
-							return templ_7745c5c3_Err
-						}
-					}
-					if projectFilter.ShowHistorical() {
-						templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 316, "<input type=\"hidden\" name=\"history\" value=\"all\"> ")
-						if templ_7745c5c3_Err != nil {
-							return templ_7745c5c3_Err
-						}
-					}
-					if projectFilter.Group != WorkspacesGroupAll {
-						templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 317, "<input type=\"hidden\" name=\"group\" value=\"")
-						if templ_7745c5c3_Err != nil {
-							return templ_7745c5c3_Err
-						}
-						var templ_7745c5c3_Var198 string
-						templ_7745c5c3_Var198, templ_7745c5c3_Err = templ.JoinStringErrs(string(projectFilter.Group))
-						if templ_7745c5c3_Err != nil {
-							return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 843, Col: 75}
-						}
-						_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var198))
-						if templ_7745c5c3_Err != nil {
-							return templ_7745c5c3_Err
-						}
-						templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 318, "\"> ")
-						if templ_7745c5c3_Err != nil {
-							return templ_7745c5c3_Err
-						}
-					}
-					if projectFilter.Sort != WorkspacesSortUpdatedDesc {
-						templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 319, "<input type=\"hidden\" name=\"sort\" value=\"")
-						if templ_7745c5c3_Err != nil {
-							return templ_7745c5c3_Err
-						}
-						var templ_7745c5c3_Var199 string
-						templ_7745c5c3_Var199, templ_7745c5c3_Err = templ.JoinStringErrs(string(projectFilter.Sort))
-						if templ_7745c5c3_Err != nil {
-							return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 846, Col: 73}
-						}
-						_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var199))
-						if templ_7745c5c3_Err != nil {
-							return templ_7745c5c3_Err
-						}
-						templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 320, "\"> ")
-						if templ_7745c5c3_Err != nil {
-							return templ_7745c5c3_Err
-						}
-					}
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 321, "<input type=\"hidden\" name=\"confirmed\" value=\"true\">")
-					if templ_7745c5c3_Err != nil {
-						return templ_7745c5c3_Err
-					}
-					templ_7745c5c3_Var200 := templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
+					templ_7745c5c3_Var192 := templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 						templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 						templ_7745c5c3_Buffer, templ_7745c5c3_IsBuffer := templruntime.GetBuffer(templ_7745c5c3_W)
 						if !templ_7745c5c3_IsBuffer {
@@ -4318,54 +4199,29 @@ func WorkspaceCleanupDropdownItem(action WorkspaceCleanupAction, dropdownID stri
 							}()
 						}
 						ctx = templ.InitializeContext(ctx)
-						templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 322, "<span data-show=\"")
+						var templ_7745c5c3_Var193 string
+						templ_7745c5c3_Var193, templ_7745c5c3_Err = templ.JoinStringErrs(action.Label)
 						if templ_7745c5c3_Err != nil {
-							return templ_7745c5c3_Err
+							return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 849, Col: 19}
 						}
-						var templ_7745c5c3_Var201 string
-						templ_7745c5c3_Var201, templ_7745c5c3_Err = templ.JoinStringErrs("!" + indicatorSignal)
-						if templ_7745c5c3_Err != nil {
-							return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 850, Col: 45}
-						}
-						_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var201))
-						if templ_7745c5c3_Err != nil {
-							return templ_7745c5c3_Err
-						}
-						templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 323, "\">Confirm close</span> <span data-show=\"")
-						if templ_7745c5c3_Err != nil {
-							return templ_7745c5c3_Err
-						}
-						var templ_7745c5c3_Var202 string
-						templ_7745c5c3_Var202, templ_7745c5c3_Err = templ.JoinStringErrs(indicatorSignal)
-						if templ_7745c5c3_Err != nil {
-							return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 851, Col: 39}
-						}
-						_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var202))
-						if templ_7745c5c3_Err != nil {
-							return templ_7745c5c3_Err
-						}
-						templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 324, "\">Working...</span>")
+						_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var193))
 						if templ_7745c5c3_Err != nil {
 							return templ_7745c5c3_Err
 						}
 						return nil
 					})
-					templ_7745c5c3_Err = button.Button(button.ButtonArgs{Type: "submit", Variant: "outline", Size: "sm", Class: "border-destructive/40 text-destructive hover:bg-destructive/10", Attributes: templ.Attributes{"data-attr:disabled": indicatorSignal}}).Render(templ.WithChildren(ctx, templ_7745c5c3_Var200), templ_7745c5c3_Buffer)
-					if templ_7745c5c3_Err != nil {
-						return templ_7745c5c3_Err
-					}
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 325, "</form>")
+					templ_7745c5c3_Err = dialog.DialogTrigger(dialog.DialogTriggerArgs{DialogID: dialogID, Class: "flex w-full cursor-pointer items-center rounded-sm px-2 py-1.5 text-xs text-destructive outline-none hover:bg-accent hover:text-accent-foreground"}).Render(templ.WithChildren(ctx, templ_7745c5c3_Var192), templ_7745c5c3_Buffer)
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
 					return nil
 				})
-				templ_7745c5c3_Err = dropdown.DropdownMenuCustomItem(dropdown.DropdownMenuCustomItemArgs{ID: dropdownID, Class: "block max-w-xs p-2"}).Render(templ.WithChildren(ctx, templ_7745c5c3_Var191), templ_7745c5c3_Buffer)
+				templ_7745c5c3_Err = dropdown.DropdownMenuCustomItem(dropdown.DropdownMenuCustomItemArgs{ID: dropdownID, Class: "p-0"}).Render(templ.WithChildren(ctx, templ_7745c5c3_Var191), templ_7745c5c3_Buffer)
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 			} else {
-				templ_7745c5c3_Var203 := templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
+				templ_7745c5c3_Var194 := templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 					templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 					templ_7745c5c3_Buffer, templ_7745c5c3_IsBuffer := templruntime.GetBuffer(templ_7745c5c3_W)
 					if !templ_7745c5c3_IsBuffer {
@@ -4377,113 +4233,113 @@ func WorkspaceCleanupDropdownItem(action WorkspaceCleanupAction, dropdownID stri
 						}()
 					}
 					ctx = templ.InitializeContext(ctx)
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 326, "<form method=\"post\" action=\"/workspaces/cleanup\" data-indicator=\"")
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 308, "<form method=\"post\" action=\"/workspaces/cleanup\" data-indicator=\"")
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
-					var templ_7745c5c3_Var204 string
-					templ_7745c5c3_Var204, templ_7745c5c3_Err = templ.JoinStringErrs(indicator)
+					var templ_7745c5c3_Var195 string
+					templ_7745c5c3_Var195, templ_7745c5c3_Err = templ.JoinStringErrs(indicator)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 857, Col: 79}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 854, Col: 79}
 					}
-					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var204))
-					if templ_7745c5c3_Err != nil {
-						return templ_7745c5c3_Err
-					}
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 327, "\" data-on:submit=\"@post('/workspaces/cleanup', {contentType: 'form'})\"><input type=\"hidden\" name=\"slug\" value=\"")
+					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var195))
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
-					var templ_7745c5c3_Var205 string
-					templ_7745c5c3_Var205, templ_7745c5c3_Err = templ.JoinStringErrs(action.Slug)
-					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 858, Col: 57}
-					}
-					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var205))
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 309, "\" data-on:submit=\"@post('/workspaces/cleanup', {contentType: 'form'})\"><input type=\"hidden\" name=\"slug\" value=\"")
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 328, "\"> <input type=\"hidden\" name=\"project\" value=\"")
+					var templ_7745c5c3_Var196 string
+					templ_7745c5c3_Var196, templ_7745c5c3_Err = templ.JoinStringErrs(action.Slug)
+					if templ_7745c5c3_Err != nil {
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 855, Col: 57}
+					}
+					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var196))
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
-					var templ_7745c5c3_Var206 string
-					templ_7745c5c3_Var206, templ_7745c5c3_Err = templ.JoinStringErrs(firstNonEmpty(projectFilter.ProjectQueryValue(), action.ProjectID))
-					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 859, Col: 115}
-					}
-					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var206))
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 310, "\"> <input type=\"hidden\" name=\"project\" value=\"")
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 329, "\"> ")
+					var templ_7745c5c3_Var197 string
+					templ_7745c5c3_Var197, templ_7745c5c3_Err = templ.JoinStringErrs(firstNonEmpty(projectFilter.ProjectQueryValue(), action.ProjectID))
+					if templ_7745c5c3_Err != nil {
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 856, Col: 115}
+					}
+					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var197))
+					if templ_7745c5c3_Err != nil {
+						return templ_7745c5c3_Err
+					}
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 311, "\"> ")
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
 					if projectFilter.QueryValue() != "" {
-						templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 330, "<input type=\"hidden\" name=\"q\" value=\"")
+						templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 312, "<input type=\"hidden\" name=\"q\" value=\"")
 						if templ_7745c5c3_Err != nil {
 							return templ_7745c5c3_Err
 						}
-						var templ_7745c5c3_Var207 string
-						templ_7745c5c3_Var207, templ_7745c5c3_Err = templ.JoinStringErrs(projectFilter.QueryValue())
+						var templ_7745c5c3_Var198 string
+						templ_7745c5c3_Var198, templ_7745c5c3_Err = templ.JoinStringErrs(projectFilter.QueryValue())
 						if templ_7745c5c3_Err != nil {
-							return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 861, Col: 70}
+							return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 858, Col: 70}
 						}
-						_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var207))
+						_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var198))
 						if templ_7745c5c3_Err != nil {
 							return templ_7745c5c3_Err
 						}
-						templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 331, "\"> ")
+						templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 313, "\"> ")
 						if templ_7745c5c3_Err != nil {
 							return templ_7745c5c3_Err
 						}
 					}
 					if projectFilter.ShowHistorical() {
-						templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 332, "<input type=\"hidden\" name=\"history\" value=\"all\"> ")
+						templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 314, "<input type=\"hidden\" name=\"history\" value=\"all\"> ")
 						if templ_7745c5c3_Err != nil {
 							return templ_7745c5c3_Err
 						}
 					}
 					if projectFilter.Group != WorkspacesGroupAll {
-						templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 333, "<input type=\"hidden\" name=\"group\" value=\"")
+						templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 315, "<input type=\"hidden\" name=\"group\" value=\"")
 						if templ_7745c5c3_Err != nil {
 							return templ_7745c5c3_Err
 						}
-						var templ_7745c5c3_Var208 string
-						templ_7745c5c3_Var208, templ_7745c5c3_Err = templ.JoinStringErrs(string(projectFilter.Group))
+						var templ_7745c5c3_Var199 string
+						templ_7745c5c3_Var199, templ_7745c5c3_Err = templ.JoinStringErrs(string(projectFilter.Group))
 						if templ_7745c5c3_Err != nil {
-							return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 867, Col: 75}
+							return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 864, Col: 75}
 						}
-						_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var208))
+						_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var199))
 						if templ_7745c5c3_Err != nil {
 							return templ_7745c5c3_Err
 						}
-						templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 334, "\"> ")
+						templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 316, "\"> ")
 						if templ_7745c5c3_Err != nil {
 							return templ_7745c5c3_Err
 						}
 					}
 					if projectFilter.Sort != WorkspacesSortUpdatedDesc {
-						templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 335, "<input type=\"hidden\" name=\"sort\" value=\"")
+						templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 317, "<input type=\"hidden\" name=\"sort\" value=\"")
 						if templ_7745c5c3_Err != nil {
 							return templ_7745c5c3_Err
 						}
-						var templ_7745c5c3_Var209 string
-						templ_7745c5c3_Var209, templ_7745c5c3_Err = templ.JoinStringErrs(string(projectFilter.Sort))
+						var templ_7745c5c3_Var200 string
+						templ_7745c5c3_Var200, templ_7745c5c3_Err = templ.JoinStringErrs(string(projectFilter.Sort))
 						if templ_7745c5c3_Err != nil {
-							return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 870, Col: 73}
+							return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 867, Col: 73}
 						}
-						_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var209))
+						_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var200))
 						if templ_7745c5c3_Err != nil {
 							return templ_7745c5c3_Err
 						}
-						templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 336, "\">")
+						templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 318, "\">")
 						if templ_7745c5c3_Err != nil {
 							return templ_7745c5c3_Err
 						}
 					}
-					templ_7745c5c3_Var210 := templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
+					templ_7745c5c3_Var201 := templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 						templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 						templ_7745c5c3_Buffer, templ_7745c5c3_IsBuffer := templruntime.GetBuffer(templ_7745c5c3_W)
 						if !templ_7745c5c3_IsBuffer {
@@ -4495,66 +4351,390 @@ func WorkspaceCleanupDropdownItem(action WorkspaceCleanupAction, dropdownID stri
 							}()
 						}
 						ctx = templ.InitializeContext(ctx)
-						templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 337, "<span data-show=\"")
+						templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 319, "<span data-show=\"")
 						if templ_7745c5c3_Err != nil {
 							return templ_7745c5c3_Err
 						}
-						var templ_7745c5c3_Var211 string
-						templ_7745c5c3_Var211, templ_7745c5c3_Err = templ.JoinStringErrs("!" + indicatorSignal)
+						var templ_7745c5c3_Var202 string
+						templ_7745c5c3_Var202, templ_7745c5c3_Err = templ.JoinStringErrs("!" + indicatorSignal)
 						if templ_7745c5c3_Err != nil {
-							return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 873, Col: 45}
+							return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 870, Col: 45}
 						}
-						_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var211))
-						if templ_7745c5c3_Err != nil {
-							return templ_7745c5c3_Err
-						}
-						templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 338, "\">")
+						_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var202))
 						if templ_7745c5c3_Err != nil {
 							return templ_7745c5c3_Err
 						}
-						var templ_7745c5c3_Var212 string
-						templ_7745c5c3_Var212, templ_7745c5c3_Err = templ.JoinStringErrs(action.Label)
-						if templ_7745c5c3_Err != nil {
-							return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 873, Col: 62}
-						}
-						_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var212))
+						templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 320, "\">")
 						if templ_7745c5c3_Err != nil {
 							return templ_7745c5c3_Err
 						}
-						templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 339, "</span> <span data-show=\"")
+						var templ_7745c5c3_Var203 string
+						templ_7745c5c3_Var203, templ_7745c5c3_Err = templ.JoinStringErrs(action.Label)
+						if templ_7745c5c3_Err != nil {
+							return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 870, Col: 62}
+						}
+						_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var203))
 						if templ_7745c5c3_Err != nil {
 							return templ_7745c5c3_Err
 						}
-						var templ_7745c5c3_Var213 string
-						templ_7745c5c3_Var213, templ_7745c5c3_Err = templ.JoinStringErrs(indicatorSignal)
-						if templ_7745c5c3_Err != nil {
-							return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 874, Col: 39}
-						}
-						_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var213))
+						templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 321, "</span> <span data-show=\"")
 						if templ_7745c5c3_Err != nil {
 							return templ_7745c5c3_Err
 						}
-						templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 340, "\">Working...</span>")
+						var templ_7745c5c3_Var204 string
+						templ_7745c5c3_Var204, templ_7745c5c3_Err = templ.JoinStringErrs(indicatorSignal)
+						if templ_7745c5c3_Err != nil {
+							return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 871, Col: 39}
+						}
+						_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var204))
+						if templ_7745c5c3_Err != nil {
+							return templ_7745c5c3_Err
+						}
+						templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 322, "\">Working...</span>")
 						if templ_7745c5c3_Err != nil {
 							return templ_7745c5c3_Err
 						}
 						return nil
 					})
-					templ_7745c5c3_Err = button.Button(button.ButtonArgs{Type: "submit", Variant: "ghost", Size: "sm", Class: "w-full justify-start text-xs", Attributes: templ.Attributes{"data-attr:disabled": indicatorSignal}}).Render(templ.WithChildren(ctx, templ_7745c5c3_Var210), templ_7745c5c3_Buffer)
+					templ_7745c5c3_Err = button.Button(button.ButtonArgs{Type: "submit", Variant: "ghost", Size: "sm", Class: "w-full justify-start text-xs", Attributes: templ.Attributes{"data-attr:disabled": indicatorSignal}}).Render(templ.WithChildren(ctx, templ_7745c5c3_Var201), templ_7745c5c3_Buffer)
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 341, "</form>")
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 323, "</form>")
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
 					return nil
 				})
-				templ_7745c5c3_Err = dropdown.DropdownMenuCustomItem(dropdown.DropdownMenuCustomItemArgs{ID: dropdownID, Class: "p-0"}).Render(templ.WithChildren(ctx, templ_7745c5c3_Var203), templ_7745c5c3_Buffer)
+				templ_7745c5c3_Err = dropdown.DropdownMenuCustomItem(dropdown.DropdownMenuCustomItemArgs{ID: dropdownID, Class: "p-0"}).Render(templ.WithChildren(ctx, templ_7745c5c3_Var194), templ_7745c5c3_Buffer)
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 			}
+		}
+		return nil
+	})
+}
+
+func WorkspaceCleanupConfirmDialog(action WorkspaceCleanupAction, projectFilter WorkspacesFilter, scope string) templ.Component {
+	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
+		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
+		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
+			return templ_7745c5c3_CtxErr
+		}
+		templ_7745c5c3_Buffer, templ_7745c5c3_IsBuffer := templruntime.GetBuffer(templ_7745c5c3_W)
+		if !templ_7745c5c3_IsBuffer {
+			defer func() {
+				templ_7745c5c3_BufErr := templruntime.ReleaseBuffer(templ_7745c5c3_Buffer)
+				if templ_7745c5c3_Err == nil {
+					templ_7745c5c3_Err = templ_7745c5c3_BufErr
+				}
+			}()
+		}
+		ctx = templ.InitializeContext(ctx)
+		templ_7745c5c3_Var205 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var205 == nil {
+			templ_7745c5c3_Var205 = templ.NopComponent
+		}
+		ctx = templ.ClearChildren(ctx)
+		projectFilter = projectFilter.WithDefaults()
+		dialogID := workspaceCleanupConfirmDialogID(action.Slug, scope)
+		indicator := workspaceActionIndicator(action.Slug, "cleanup")
+		indicatorSignal := workspaceActionIndicatorSignal(action.Slug, "cleanup")
+		templ_7745c5c3_Var206 := templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
+			templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
+			templ_7745c5c3_Buffer, templ_7745c5c3_IsBuffer := templruntime.GetBuffer(templ_7745c5c3_W)
+			if !templ_7745c5c3_IsBuffer {
+				defer func() {
+					templ_7745c5c3_BufErr := templruntime.ReleaseBuffer(templ_7745c5c3_Buffer)
+					if templ_7745c5c3_Err == nil {
+						templ_7745c5c3_Err = templ_7745c5c3_BufErr
+					}
+				}()
+			}
+			ctx = templ.InitializeContext(ctx)
+			templ_7745c5c3_Var207 := templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
+				templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
+				templ_7745c5c3_Buffer, templ_7745c5c3_IsBuffer := templruntime.GetBuffer(templ_7745c5c3_W)
+				if !templ_7745c5c3_IsBuffer {
+					defer func() {
+						templ_7745c5c3_BufErr := templruntime.ReleaseBuffer(templ_7745c5c3_Buffer)
+						if templ_7745c5c3_Err == nil {
+							templ_7745c5c3_Err = templ_7745c5c3_BufErr
+						}
+					}()
+				}
+				ctx = templ.InitializeContext(ctx)
+				templ_7745c5c3_Var208 := templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
+					templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
+					templ_7745c5c3_Buffer, templ_7745c5c3_IsBuffer := templruntime.GetBuffer(templ_7745c5c3_W)
+					if !templ_7745c5c3_IsBuffer {
+						defer func() {
+							templ_7745c5c3_BufErr := templruntime.ReleaseBuffer(templ_7745c5c3_Buffer)
+							if templ_7745c5c3_Err == nil {
+								templ_7745c5c3_Err = templ_7745c5c3_BufErr
+							}
+						}()
+					}
+					ctx = templ.InitializeContext(ctx)
+					var templ_7745c5c3_Var209 string
+					templ_7745c5c3_Var209, templ_7745c5c3_Err = templ.JoinStringErrs(action.Label)
+					if templ_7745c5c3_Err != nil {
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 887, Col: 18}
+					}
+					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var209))
+					if templ_7745c5c3_Err != nil {
+						return templ_7745c5c3_Err
+					}
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 324, " workspace")
+					if templ_7745c5c3_Err != nil {
+						return templ_7745c5c3_Err
+					}
+					return nil
+				})
+				templ_7745c5c3_Err = dialog.DialogTitle(dialog.DialogTitleArgs{Class: "text-lg"}).Render(templ.WithChildren(ctx, templ_7745c5c3_Var208), templ_7745c5c3_Buffer)
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 325, " ")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				templ_7745c5c3_Var210 := templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
+					templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
+					templ_7745c5c3_Buffer, templ_7745c5c3_IsBuffer := templruntime.GetBuffer(templ_7745c5c3_W)
+					if !templ_7745c5c3_IsBuffer {
+						defer func() {
+							templ_7745c5c3_BufErr := templruntime.ReleaseBuffer(templ_7745c5c3_Buffer)
+							if templ_7745c5c3_Err == nil {
+								templ_7745c5c3_Err = templ_7745c5c3_BufErr
+							}
+						}()
+					}
+					ctx = templ.InitializeContext(ctx)
+					var templ_7745c5c3_Var211 string
+					templ_7745c5c3_Var211, templ_7745c5c3_Err = templ.JoinStringErrs(action.Slug)
+					if templ_7745c5c3_Err != nil {
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 890, Col: 17}
+					}
+					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var211))
+					if templ_7745c5c3_Err != nil {
+						return templ_7745c5c3_Err
+					}
+					return nil
+				})
+				templ_7745c5c3_Err = dialog.DialogDescription(dialog.DialogDescriptionArgs{Class: "text-sm"}).Render(templ.WithChildren(ctx, templ_7745c5c3_Var210), templ_7745c5c3_Buffer)
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				return nil
+			})
+			templ_7745c5c3_Err = dialog.DialogHeader(dialog.DialogHeaderArgs{Class: "mb-3"}).Render(templ.WithChildren(ctx, templ_7745c5c3_Var207), templ_7745c5c3_Buffer)
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 326, " <div class=\"rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-200\">")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			var templ_7745c5c3_Var212 string
+			templ_7745c5c3_Var212, templ_7745c5c3_Err = templ.JoinStringErrs(action.Warning)
+			if templ_7745c5c3_Err != nil {
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 894, Col: 19}
+			}
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var212))
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 327, "</div><form method=\"post\" action=\"/workspaces/cleanup\" class=\"mt-4 flex flex-wrap justify-end gap-2\" data-indicator=\"")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			var templ_7745c5c3_Var213 string
+			templ_7745c5c3_Var213, templ_7745c5c3_Err = templ.JoinStringErrs(indicator)
+			if templ_7745c5c3_Err != nil {
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 896, Col: 123}
+			}
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var213))
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 328, "\" data-on:submit=\"@post('/workspaces/cleanup', {contentType: 'form'})\"><input type=\"hidden\" name=\"slug\" value=\"")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			var templ_7745c5c3_Var214 string
+			templ_7745c5c3_Var214, templ_7745c5c3_Err = templ.JoinStringErrs(action.Slug)
+			if templ_7745c5c3_Err != nil {
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 897, Col: 55}
+			}
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var214))
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 329, "\"> <input type=\"hidden\" name=\"project\" value=\"")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			var templ_7745c5c3_Var215 string
+			templ_7745c5c3_Var215, templ_7745c5c3_Err = templ.JoinStringErrs(firstNonEmpty(projectFilter.ProjectQueryValue(), action.ProjectID))
+			if templ_7745c5c3_Err != nil {
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 898, Col: 113}
+			}
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var215))
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 330, "\"> ")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			if projectFilter.QueryValue() != "" {
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 331, "<input type=\"hidden\" name=\"q\" value=\"")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				var templ_7745c5c3_Var216 string
+				templ_7745c5c3_Var216, templ_7745c5c3_Err = templ.JoinStringErrs(projectFilter.QueryValue())
+				if templ_7745c5c3_Err != nil {
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 900, Col: 68}
+				}
+				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var216))
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 332, "\"> ")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+			}
+			if projectFilter.ShowHistorical() {
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 333, "<input type=\"hidden\" name=\"history\" value=\"all\"> ")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+			}
+			if projectFilter.Group != WorkspacesGroupAll {
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 334, "<input type=\"hidden\" name=\"group\" value=\"")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				var templ_7745c5c3_Var217 string
+				templ_7745c5c3_Var217, templ_7745c5c3_Err = templ.JoinStringErrs(string(projectFilter.Group))
+				if templ_7745c5c3_Err != nil {
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 906, Col: 73}
+				}
+				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var217))
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 335, "\"> ")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+			}
+			if projectFilter.Sort != WorkspacesSortUpdatedDesc {
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 336, "<input type=\"hidden\" name=\"sort\" value=\"")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				var templ_7745c5c3_Var218 string
+				templ_7745c5c3_Var218, templ_7745c5c3_Err = templ.JoinStringErrs(string(projectFilter.Sort))
+				if templ_7745c5c3_Err != nil {
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 909, Col: 71}
+				}
+				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var218))
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 337, "\"> ")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 338, "<input type=\"hidden\" name=\"confirmed\" value=\"true\">")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Var219 := templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
+				templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
+				templ_7745c5c3_Buffer, templ_7745c5c3_IsBuffer := templruntime.GetBuffer(templ_7745c5c3_W)
+				if !templ_7745c5c3_IsBuffer {
+					defer func() {
+						templ_7745c5c3_BufErr := templruntime.ReleaseBuffer(templ_7745c5c3_Buffer)
+						if templ_7745c5c3_Err == nil {
+							templ_7745c5c3_Err = templ_7745c5c3_BufErr
+						}
+					}()
+				}
+				ctx = templ.InitializeContext(ctx)
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 339, "Cancel")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				return nil
+			})
+			templ_7745c5c3_Err = dialog.DialogClose(dialog.DialogCloseArgs{DialogID: dialogID, Variant: "outline", Class: "h-9"}).Render(templ.WithChildren(ctx, templ_7745c5c3_Var219), templ_7745c5c3_Buffer)
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Var220 := templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
+				templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
+				templ_7745c5c3_Buffer, templ_7745c5c3_IsBuffer := templruntime.GetBuffer(templ_7745c5c3_W)
+				if !templ_7745c5c3_IsBuffer {
+					defer func() {
+						templ_7745c5c3_BufErr := templruntime.ReleaseBuffer(templ_7745c5c3_Buffer)
+						if templ_7745c5c3_Err == nil {
+							templ_7745c5c3_Err = templ_7745c5c3_BufErr
+						}
+					}()
+				}
+				ctx = templ.InitializeContext(ctx)
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 340, "<span data-show=\"")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				var templ_7745c5c3_Var221 string
+				templ_7745c5c3_Var221, templ_7745c5c3_Err = templ.JoinStringErrs("!" + indicatorSignal)
+				if templ_7745c5c3_Err != nil {
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 916, Col: 43}
+				}
+				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var221))
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 341, "\">Confirm close workspace</span> <span data-show=\"")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				var templ_7745c5c3_Var222 string
+				templ_7745c5c3_Var222, templ_7745c5c3_Err = templ.JoinStringErrs(indicatorSignal)
+				if templ_7745c5c3_Err != nil {
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/workspaces/views.templ`, Line: 917, Col: 37}
+				}
+				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var222))
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 342, "\">Working...</span>")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				return nil
+			})
+			templ_7745c5c3_Err = button.Button(button.ButtonArgs{Type: "submit", Variant: "outline", Size: "sm", Class: "border-destructive/40 text-destructive hover:bg-destructive/10", Attributes: templ.Attributes{"data-attr:disabled": indicatorSignal}}).Render(templ.WithChildren(ctx, templ_7745c5c3_Var220), templ_7745c5c3_Buffer)
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 343, "</form>")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			return nil
+		})
+		templ_7745c5c3_Err = dialog.Dialog(dialog.DialogArgs{ID: dialogID, Class: "max-w-md p-4"}).Render(templ.WithChildren(ctx, templ_7745c5c3_Var206), templ_7745c5c3_Buffer)
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
 		}
 		return nil
 	})

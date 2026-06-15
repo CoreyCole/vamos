@@ -329,28 +329,13 @@ templ WorkspaceGroupSection(title string, description string, items []ImplWorksp
 }
 
 templ WorkspacesTable(items []ImplWorkspaceView, managerURL string, showHistorical bool, projectFilter WorkspacesFilter) {
-	<div class="overflow-x-auto">
-		<table class="w-full text-sm">
-			<thead class="bg-muted/50 text-left text-xs uppercase tracking-wide text-muted-foreground">
-				<tr>
-					<th class="px-3 py-2">Actions</th>
-					<th class="px-3 py-2">Workspace</th>
-					<th class="px-3 py-2">QRSPI</th>
-					<th class="px-3 py-2">Runtime</th>
-					<th class="px-3 py-2">Branch</th>
-					<th class="px-3 py-2">Commit</th>
-					<th class="px-3 py-2">Release</th>
-				</tr>
-			</thead>
-			<tbody class="divide-y">
-				for _, view := range items {
-					@WorkspaceTableRow(view, managerURL, showHistorical, projectFilter)
-					for _, child := range view.Children {
-						@WorkspaceTableRow(child, managerURL, showHistorical, projectFilter)
-					}
-				}
-			</tbody>
-		</table>
+	<div class="space-y-2 overflow-visible p-2">
+		for _, view := range items {
+			@WorkspaceTableRow(view, managerURL, showHistorical, projectFilter)
+			for _, child := range view.Children {
+				@WorkspaceTableRow(child, managerURL, showHistorical, projectFilter)
+			}
+		}
 	</div>
 	for _, view := range items {
 		@WorkspaceDetailDialog(view, managerURL, showHistorical, projectFilter)
@@ -362,27 +347,45 @@ templ WorkspacesTable(items []ImplWorkspaceView, managerURL string, showHistoric
 
 templ WorkspaceTableRow(view ImplWorkspaceView, managerURL string, showHistorical bool, projectFilter WorkspacesFilter) {
 	{{ slug := workspaceViewSlug(view) }}
-	<tr data-workspace-row={ slug } class="hover:bg-muted/40">
-		<td class="px-3 py-2 align-top">
+	<div data-workspace-row={ slug } class="grid gap-3 rounded-lg border bg-background p-3 text-sm hover:bg-muted/20 md:grid-cols-[auto_minmax(0,1fr)]">
+		<div class="overflow-visible">
 			@WorkspaceActionsMenu(view, managerURL, showHistorical, projectFilter, "row")
-		</td>
-		<td class="px-3 py-2 align-top">
-			@dialog.DialogTrigger(dialog.DialogTriggerArgs{DialogID: "workspace-dialog-" + slug, Class: "font-medium hover:underline"}) {
-				{ workspaceViewLabel(view) }
-			}
-			if slug != "" {
-				<p class="break-all font-mono text-xs text-muted-foreground">{ slug }</p>
-			}
-			@PlanWorkspaceRoleBadges(view.Plan)
-		</td>
-		<td class="px-3 py-2 align-top">{ workspaceQRSPIBadge(view) }</td>
-		<td class="px-3 py-2 align-top">
-			@WorkspaceDiagnosticBadges(view)
-		</td>
-		<td class="px-3 py-2 align-top font-mono text-xs">{ workspaceBranchLabel(view) }</td>
-		<td class="px-3 py-2 align-top font-mono text-xs">{ shortCommit(workspaceCommit(view)) }</td>
-		<td class="px-3 py-2 align-top">{ workspaceReleaseSummary(view) }</td>
-	</tr>
+		</div>
+		<div class="min-w-0 overflow-x-auto">
+			<table class="w-full text-sm">
+				<thead class="text-left text-xs uppercase tracking-wide text-muted-foreground">
+					<tr>
+						<th class="px-3 py-2">Workspace</th>
+						<th class="px-3 py-2">QRSPI</th>
+						<th class="px-3 py-2">Runtime</th>
+						<th class="px-3 py-2">Branch</th>
+						<th class="px-3 py-2">Commit</th>
+						<th class="px-3 py-2">Release</th>
+					</tr>
+				</thead>
+				<tbody>
+					<tr>
+						<td class="px-3 py-2 align-top">
+							@dialog.DialogTrigger(dialog.DialogTriggerArgs{DialogID: "workspace-dialog-" + slug, Class: "font-medium hover:underline"}) {
+								{ workspaceViewLabel(view) }
+							}
+							if slug != "" {
+								<p class="break-all font-mono text-xs text-muted-foreground">{ slug }</p>
+							}
+							@PlanWorkspaceRoleBadges(view.Plan)
+						</td>
+						<td class="px-3 py-2 align-top">{ workspaceQRSPIBadge(view) }</td>
+						<td class="px-3 py-2 align-top">
+							@WorkspaceDiagnosticBadges(view)
+						</td>
+						<td class="px-3 py-2 align-top font-mono text-xs">{ workspaceBranchLabel(view) }</td>
+						<td class="px-3 py-2 align-top font-mono text-xs">{ shortCommit(workspaceCommit(view)) }</td>
+						<td class="px-3 py-2 align-top">{ workspaceReleaseSummary(view) }</td>
+					</tr>
+				</tbody>
+			</table>
+		</div>
+	</div>
 }
 
 templ WorkspaceDiagnosticBadges(view ImplWorkspaceView) {
@@ -670,7 +673,7 @@ templ ImplWorkspaceCard(view ImplWorkspaceView, managerURL string, showHistorica
 			</div>
 		}
 		<div class="mt-auto flex flex-wrap justify-start gap-2 pt-2">
-			@WorkspaceActionsMenu(view, managerURL, showHistorical, projectFilter, "card")
+			@WorkspaceActionsMenu(view, managerURL, showHistorical, projectFilter, "dialog")
 		</div>
 	}
 }
@@ -714,13 +717,22 @@ templ WorkspaceProofDiagnostics(view ImplWorkspaceView) {
 	}
 }
 
-func workspaceActionsDropdownID(slug string, instance string) string {
+func workspaceActionsDropdownID(slug string, scope string) string {
 	replacer := strings.NewReplacer("-", "_", ".", "_", "/", "_")
-	id := "workspace_actions_" + replacer.Replace(slug)
-	if instance != "" {
-		id += "_" + replacer.Replace(instance)
+	scope = replacer.Replace(strings.TrimSpace(scope))
+	if scope == "" {
+		scope = "row"
 	}
-	return id
+	return "workspace_actions_" + replacer.Replace(slug) + "_" + scope
+}
+
+func workspaceCleanupConfirmDialogID(slug string, scope string) string {
+	replacer := strings.NewReplacer("-", "_", ".", "_", "/", "_")
+	scope = replacer.Replace(strings.TrimSpace(scope))
+	if scope == "" {
+		scope = "row"
+	}
+	return "workspace_cleanup_confirm_" + replacer.Replace(slug) + "_" + scope
 }
 
 func workspaceDialogOpenExpression(slug string) string {
@@ -735,9 +747,10 @@ func workspaceDropdownActionClass(destructive bool) string {
 	return "w-full justify-start text-xs"
 }
 
-templ WorkspaceActionsMenu(view ImplWorkspaceView, managerURL string, showHistorical bool, projectFilter WorkspacesFilter, instance string) {
+templ WorkspaceActionsMenu(view ImplWorkspaceView, managerURL string, showHistorical bool, projectFilter WorkspacesFilter, scope string) {
 	{{ slug := workspaceViewSlug(view) }}
-	{{ dropdownID := workspaceActionsDropdownID(slug, instance) }}
+	{{ dropdownID := workspaceActionsDropdownID(slug, scope) }}
+	{{ cleanupAction := workspaceCleanupAction(view) }}
 	@dropdown.DropdownMenu(dropdown.DropdownMenuArgs{ID: dropdownID, Class: "relative inline-block"}) {
 		@dropdown.DropdownMenuTrigger(dropdown.DropdownMenuTriggerArgs{ID: dropdownID, Class: "inline-flex h-8 cursor-pointer items-center rounded-md border px-2 text-xs font-medium hover:bg-accent"}) {
 			Actions
@@ -756,9 +769,12 @@ templ WorkspaceActionsMenu(view ImplWorkspaceView, managerURL string, showHistor
 					Open public URL
 				}
 			}
-			@WorkspaceCleanupDropdownItem(workspaceCleanupAction(view), dropdownID, projectFilter)
+			@WorkspaceCleanupDropdownItem(cleanupAction, dropdownID, projectFilter, scope)
 			@WorkspaceLifecycleDropdownItems(view, managerURL, showHistorical, projectFilter, dropdownID)
 		}
+	}
+	if cleanupAction.Slug != "" && !cleanupAction.Disabled && cleanupAction.RequiresConfirm {
+		@WorkspaceCleanupConfirmDialog(cleanupAction, projectFilter, scope)
 	}
 }
 
@@ -821,36 +837,17 @@ templ WorkspaceLifecycleDropdownForm(dropdownID string, slug string, action stri
 	}
 }
 
-templ WorkspaceCleanupDropdownItem(action WorkspaceCleanupAction, dropdownID string, projectFilter WorkspacesFilter) {
+templ WorkspaceCleanupDropdownItem(action WorkspaceCleanupAction, dropdownID string, projectFilter WorkspacesFilter, scope string) {
 	{{ projectFilter = projectFilter.WithDefaults() }}
 	if action.Slug != "" && !action.Disabled {
 		{{ indicator := workspaceActionIndicator(action.Slug, "cleanup") }}
 		{{ indicatorSignal := workspaceActionIndicatorSignal(action.Slug, "cleanup") }}
 		if action.RequiresConfirm {
-			@dropdown.DropdownMenuCustomItem(dropdown.DropdownMenuCustomItemArgs{ID: dropdownID, Class: "block max-w-xs p-2"}) {
-				<p class="text-xs font-medium text-destructive">{ action.Label }</p>
-				<p class="mt-2 text-xs text-amber-700 dark:text-amber-300">{ action.Warning }</p>
-				<form method="post" action="/workspaces/cleanup" class="mt-2" data-indicator={ indicator } data-on:submit="@post('/workspaces/cleanup', {contentType: 'form'})">
-					<input type="hidden" name="slug" value={ action.Slug }/>
-					<input type="hidden" name="project" value={ firstNonEmpty(projectFilter.ProjectQueryValue(), action.ProjectID) }/>
-					if projectFilter.QueryValue() != "" {
-						<input type="hidden" name="q" value={ projectFilter.QueryValue() }/>
-					}
-					if projectFilter.ShowHistorical() {
-						<input type="hidden" name="history" value="all"/>
-					}
-					if projectFilter.Group != WorkspacesGroupAll {
-						<input type="hidden" name="group" value={ string(projectFilter.Group) }/>
-					}
-					if projectFilter.Sort != WorkspacesSortUpdatedDesc {
-						<input type="hidden" name="sort" value={ string(projectFilter.Sort) }/>
-					}
-					<input type="hidden" name="confirmed" value="true"/>
-					@button.Button(button.ButtonArgs{Type: "submit", Variant: "outline", Size: "sm", Class: "border-destructive/40 text-destructive hover:bg-destructive/10", Attributes: templ.Attributes{"data-attr:disabled": indicatorSignal}}) {
-						<span data-show={ "!" + indicatorSignal }>Confirm close</span>
-						<span data-show={ indicatorSignal }>Working...</span>
-					}
-				</form>
+			{{ dialogID := workspaceCleanupConfirmDialogID(action.Slug, scope) }}
+			@dropdown.DropdownMenuCustomItem(dropdown.DropdownMenuCustomItemArgs{ID: dropdownID, Class: "p-0"}) {
+				@dialog.DialogTrigger(dialog.DialogTriggerArgs{DialogID: dialogID, Class: "flex w-full cursor-pointer items-center rounded-sm px-2 py-1.5 text-xs text-destructive outline-none hover:bg-accent hover:text-accent-foreground"}) {
+					{ action.Label }
+				}
 			}
 		} else {
 			@dropdown.DropdownMenuCustomItem(dropdown.DropdownMenuCustomItemArgs{ID: dropdownID, Class: "p-0"}) {
@@ -876,5 +873,49 @@ templ WorkspaceCleanupDropdownItem(action WorkspaceCleanupAction, dropdownID str
 				</form>
 			}
 		}
+	}
+}
+
+templ WorkspaceCleanupConfirmDialog(action WorkspaceCleanupAction, projectFilter WorkspacesFilter, scope string) {
+	{{ projectFilter = projectFilter.WithDefaults() }}
+	{{ dialogID := workspaceCleanupConfirmDialogID(action.Slug, scope) }}
+	{{ indicator := workspaceActionIndicator(action.Slug, "cleanup") }}
+	{{ indicatorSignal := workspaceActionIndicatorSignal(action.Slug, "cleanup") }}
+	@dialog.Dialog(dialog.DialogArgs{ID: dialogID, Class: "max-w-md p-4"}) {
+		@dialog.DialogHeader(dialog.DialogHeaderArgs{Class: "mb-3"}) {
+			@dialog.DialogTitle(dialog.DialogTitleArgs{Class: "text-lg"}) {
+				{ action.Label } workspace
+			}
+			@dialog.DialogDescription(dialog.DialogDescriptionArgs{Class: "text-sm"}) {
+				{ action.Slug }
+			}
+		}
+		<div class="rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-200">
+			{ action.Warning }
+		</div>
+		<form method="post" action="/workspaces/cleanup" class="mt-4 flex flex-wrap justify-end gap-2" data-indicator={ indicator } data-on:submit="@post('/workspaces/cleanup', {contentType: 'form'})">
+			<input type="hidden" name="slug" value={ action.Slug }/>
+			<input type="hidden" name="project" value={ firstNonEmpty(projectFilter.ProjectQueryValue(), action.ProjectID) }/>
+			if projectFilter.QueryValue() != "" {
+				<input type="hidden" name="q" value={ projectFilter.QueryValue() }/>
+			}
+			if projectFilter.ShowHistorical() {
+				<input type="hidden" name="history" value="all"/>
+			}
+			if projectFilter.Group != WorkspacesGroupAll {
+				<input type="hidden" name="group" value={ string(projectFilter.Group) }/>
+			}
+			if projectFilter.Sort != WorkspacesSortUpdatedDesc {
+				<input type="hidden" name="sort" value={ string(projectFilter.Sort) }/>
+			}
+			<input type="hidden" name="confirmed" value="true"/>
+			@dialog.DialogClose(dialog.DialogCloseArgs{DialogID: dialogID, Variant: "outline", Class: "h-9"}) {
+				Cancel
+			}
+			@button.Button(button.ButtonArgs{Type: "submit", Variant: "outline", Size: "sm", Class: "border-destructive/40 text-destructive hover:bg-destructive/10", Attributes: templ.Attributes{"data-attr:disabled": indicatorSignal}}) {
+				<span data-show={ "!" + indicatorSignal }>Confirm close workspace</span>
+				<span data-show={ indicatorSignal }>Working...</span>
+			}
+		</form>
 	}
 }
