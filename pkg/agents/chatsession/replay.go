@@ -15,7 +15,11 @@ func (s *Service) Snapshot(
 ) (ChatProjection, error) {
 	row, err := s.q.GetChatSessionProjection(ctx, sessionID)
 	if err == nil {
-		return projectionFromRow(row)
+		proj, err := projectionFromRow(row)
+		if err != nil {
+			return ChatProjection{}, err
+		}
+		return s.hydrateVolatileProjectionFields(ctx, sessionID, proj)
 	}
 	if !errors.Is(err, sql.ErrNoRows) {
 		return ChatProjection{}, err
@@ -65,6 +69,23 @@ func (s *Service) saveProjection(ctx context.Context, proj ChatProjection) error
 			CurrentProjectionSeq: proj.LastSeq,
 		},
 	)
+}
+
+func (s *Service) hydrateVolatileProjectionFields(
+	ctx context.Context,
+	sessionID string,
+	proj ChatProjection,
+) (ChatProjection, error) {
+	events, err := s.EventsAfter(ctx, sessionID, 0, 100000)
+	if err != nil {
+		return ChatProjection{}, err
+	}
+	rebuilt, err := RebuildProjection(events, nil)
+	if err != nil {
+		return ChatProjection{}, err
+	}
+	proj.Tools = rebuilt.Tools
+	return proj, nil
 }
 
 func projectionParams(proj ChatProjection) db.UpsertChatSessionProjectionParams {

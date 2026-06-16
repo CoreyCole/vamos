@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 	"strings"
+	"time"
 
 	conversation "github.com/CoreyCole/vamos/pkg/agents/conversation"
 	"github.com/CoreyCole/vamos/pkg/agents/workflows/qrspi"
@@ -123,7 +124,7 @@ func (s *Service) OnRunComplete(
 		return err
 	}
 	if decision.StartNext {
-		nextRunID, startErr := s.startNodeRun(ctx, def, decision.State, StartNodeRunInput{
+		nextRunID, startErr := s.startNodeRunWithSQLiteBusyRetry(ctx, def, decision.State, StartNodeRunInput{
 			WorkspaceID: workspaceID,
 			ThreadID:    run.ThreadID,
 			NodeID:      decision.NextNodeID,
@@ -150,6 +151,38 @@ func (s *Service) OnRunComplete(
 		}
 	}
 	return nil
+}
+
+func (s *Service) startNodeRunWithSQLiteBusyRetry(
+	ctx context.Context,
+	def wruntime.Definition,
+	state wruntime.State,
+	input StartNodeRunInput,
+) (string, error) {
+	const attempts = 4
+	var err error
+	for attempt := 1; attempt <= attempts; attempt++ {
+		var runID string
+		runID, err = s.startNodeRun(ctx, def, state, input)
+		if err == nil || !isSQLiteBusyError(err) || attempt == attempts {
+			return runID, err
+		}
+		select {
+		case <-ctx.Done():
+			return "", ctx.Err()
+		case <-time.After(time.Duration(attempt) * 100 * time.Millisecond):
+		}
+	}
+	return "", err
+}
+
+func isSQLiteBusyError(err error) bool {
+	if err == nil {
+		return false
+	}
+	message := strings.ToLower(err.Error())
+	return strings.Contains(message, "sqlite_busy") ||
+		strings.Contains(message, "database is locked")
 }
 
 func (s *Service) startNodeRun(

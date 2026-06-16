@@ -501,6 +501,7 @@ func OpenQRSPIContinuationWorkspaceChat() spec.Step {
 			t.Fatal("qrspi continuation workspace not seeded")
 		}
 		visit(t, ctx, thoughtsChatURL(filepath.Join(rootDocPath, "plan.md"), workspaceID, threadID))
+		ensureRegionReachable(t, ctx, Thoughts.RightRail())
 	})
 }
 
@@ -1214,6 +1215,7 @@ func ReloadChat() spec.Step {
 		if _, err := ctx.Page.Reload(playwright.PageReloadOptions{WaitUntil: playwright.WaitUntilStateDomcontentloaded}); err != nil {
 			t.Fatal(err)
 		}
+		ensureRegionReachable(t, ctx, Thoughts.RightRail())
 	})
 }
 
@@ -1565,21 +1567,21 @@ func seedQRSPIContinuationWorkspace(t testing.TB, ctx *duiruntime.Context, datab
 	workflowState := `{"type":"qrspi","version":"v1","current_node_id":"review-plan","status":"idle","policy":{"advanceMode":"guided","enablePlanReviews":true,"invalidResultRetryLimit":1},"executionCwd":"` + ctx.Config.RepoRoot + `","attempts":{"plan":1},"nodes":{"plan":{"status":"complete","attempts":1,"last_run_id":"run-` + stamp + `"},"review-plan":{"status":"pending"}},"last_result":{"source_node_id":"plan","status":"complete","summary":"E2E QRSPI plan complete.","primary_artifact":"thoughts/creative-mode-agent/plans/e2e-qrspi-continuation-` + stamp + `/plan.md","display_next":"Read ~/.agents/skills/qrspi-planning/SKILL.md.\nRead ~/.agents/skills/q-review/SKILL.md.\nRead thoughts/creative-mode-agent/plans/e2e-qrspi-continuation-` + stamp + `/plan.md.\nStart /q-review immediately unless blocked.","outcome":"complete"},"pending_next_node_id":"review-plan"}`
 	execSQL(t, database, `INSERT INTO workspaces (id, user_email, title, root_doc_path, workflow_type, source, selected_thread_id, current_session_id, current_branch_id, workflow_state_json)
 VALUES (?, 'playwright@localhost', 'E2E QRSPI continuation', ?, 'qrspi', 'imported', ?, ?, ?, ?)`, workspaceID, rootDocPath, threadID, threadID, branchID, workflowState)
-	execSQL(t, database, `INSERT INTO agent_threads (id, user_email, title, cwd, lineage_id, head_entry_id) VALUES (?, 'playwright@localhost', 'E2E QRSPI continuation thread', ?, ?, ?)`, threadID, ctx.Config.RepoRoot, threadID, "e2e-qrspi-assistant-"+stamp)
+	execSQL(t, database, `INSERT INTO agent_threads (id, user_email, title, cwd, lineage_id, head_entry_id) VALUES (?, 'playwright@localhost', 'E2E QRSPI continuation thread', ?, ?, ?)`, threadID, ctx.Config.RepoRoot, threadID, "e2e-qrspi-final-"+stamp)
 	userEntryPayload := fmt.Sprintf(`{"type":"message","id":%q,"parentId":null,"message":{"role":"user","content":"VAMOS_E2E_QRSPI_CONTINUATION_PROMPT"}}`, "e2e-qrspi-user-"+stamp)
-	assistantEntryPayload := fmt.Sprintf(`{"type":"message","id":%q,"parentId":%q,"message":{"role":"assistant","content":%q}}`, "e2e-qrspi-assistant-"+stamp, "e2e-qrspi-user-"+stamp, "QRSPI continuation ready\n\nbash ran continuation smoke check\n\nfile write e2e/created.txt\nfile edit e2e/updated.txt")
+	assistantEntryPayload := fmt.Sprintf(`{"type":"message","id":%q,"parentId":%q,"message":{"role":"assistant","content":%q}}`, "e2e-qrspi-assistant-"+stamp, "e2e-qrspi-user-"+stamp, "bash ran continuation smoke check\n\nfile write e2e/created.txt\nfile edit e2e/updated.txt")
+	finalEntryPayload := fmt.Sprintf(`{"type":"message","id":%q,"parentId":%q,"message":{"role":"assistant","content":%q}}`, "e2e-qrspi-final-"+stamp, "e2e-qrspi-assistant-"+stamp, "QRSPI continuation ready")
 	execSQL(t, database, `INSERT INTO agent_entries (lineage_id, entry_id, parent_entry_id, entry_type, origin_order, payload_json, origin_thread_id, session_timestamp) VALUES (?, ?, NULL, 'message', 1, ?, ?, CURRENT_TIMESTAMP)`, threadID, "e2e-qrspi-user-"+stamp, userEntryPayload, threadID)
 	execSQL(t, database, `INSERT INTO agent_entries (lineage_id, entry_id, parent_entry_id, entry_type, origin_order, payload_json, origin_thread_id, session_timestamp) VALUES (?, ?, ?, 'message', 2, ?, ?, CURRENT_TIMESTAMP)`, threadID, "e2e-qrspi-assistant-"+stamp, "e2e-qrspi-user-"+stamp, assistantEntryPayload, threadID)
+	execSQL(t, database, `INSERT INTO agent_entries (lineage_id, entry_id, parent_entry_id, entry_type, origin_order, payload_json, origin_thread_id, session_timestamp) VALUES (?, ?, ?, 'message', 6, ?, ?, CURRENT_TIMESTAMP)`, threadID, "e2e-qrspi-final-"+stamp, "e2e-qrspi-assistant-"+stamp, finalEntryPayload, threadID)
 	attachE2EThreadWorkspace(t, database, threadID, workspaceID)
-	execSQL(t, database, `INSERT INTO chat_sessions (id, workspace_id, created_by_user_email, branch_id, topology_kind, current_projection_seq) VALUES (?, ?, 'playwright@localhost', ?, 'root', 5)`, threadID, workspaceID, branchID)
+	execSQL(t, database, `INSERT INTO chat_sessions (id, workspace_id, created_by_user_email, branch_id, topology_kind, current_projection_seq) VALUES (?, ?, 'playwright@localhost', ?, 'root', 6)`, threadID, workspaceID, branchID)
 	execSQL(t, database, `INSERT INTO chat_session_events (session_id, seq, event_type, actor_participant_id, payload_json) VALUES (?, 1, 'message.completed', 'user', ?)`, threadID, fmt.Sprintf(`{"id":"e2e-prompt-%s","role":"user","content":"VAMOS_E2E_QRSPI_CONTINUATION_PROMPT"}`, stamp))
-	execSQL(t, database, `INSERT INTO chat_session_events (session_id, seq, event_type, actor_participant_id, payload_json) VALUES (?, 2, 'message.completed', 'assistant', ?)`, threadID, fmt.Sprintf(`{"id":"e2e-assistant-%s","role":"assistant","content":"QRSPI continuation ready"}`, stamp))
+	execSQL(t, database, `INSERT INTO chat_session_events (session_id, seq, event_type, actor_participant_id, payload_json) VALUES (?, 2, 'message.completed', 'assistant', ?)`, threadID, fmt.Sprintf(`{"id":"e2e-assistant-%s","role":"assistant","content":"bash ran continuation smoke check\n\nfile write e2e/created.txt\nfile edit e2e/updated.txt"}`, stamp))
 	execSQL(t, database, `INSERT INTO chat_session_events (session_id, seq, event_type, payload_json) VALUES (?, 3, 'tool.completed', ?)`, threadID, fmt.Sprintf(`{"tool_call_id":"tool-%s","tool_name":"bash","summary":"ran continuation smoke check"}`, stamp))
 	execSQL(t, database, `INSERT INTO chat_session_events (session_id, seq, event_type, payload_json) VALUES (?, 4, 'file.written', '{"path":"e2e/created.txt"}')`, threadID)
 	execSQL(t, database, `INSERT INTO chat_session_events (session_id, seq, event_type, payload_json) VALUES (?, 5, 'file.edited', '{"path":"e2e/updated.txt"}')`, threadID)
-	messages := fmt.Sprintf(`[{"id":"e2e-prompt-%s","seq":1,"role":"user","content":"VAMOS_E2E_QRSPI_CONTINUATION_PROMPT"},{"id":"e2e-assistant-%s","seq":2,"role":"assistant","content":%q}]`, stamp, stamp, "QRSPI continuation ready\n\nbash ran continuation smoke check")
-	artifacts := `[{"path":"e2e/created.txt","kind":"written","seq":4},{"path":"e2e/updated.txt","kind":"edited","seq":5}]`
-	execSQL(t, database, `INSERT INTO chat_session_projections (session_id, last_seq, messages_json, runs_json, participants_json, artifacts_json, topology_json) VALUES (?, 5, ?, '[]', '[{"id":"user","label":"User","kind":"user"},{"id":"assistant","label":"Assistant","kind":"assistant"}]', ?, '{}')`, threadID, messages, artifacts)
+	execSQL(t, database, `INSERT INTO chat_session_events (session_id, seq, event_type, actor_participant_id, payload_json) VALUES (?, 6, 'message.completed', 'assistant', ?)`, threadID, fmt.Sprintf(`{"id":"e2e-final-%s","role":"assistant","content":"QRSPI continuation ready"}`, stamp))
 	execSQL(t, database, `UPDATE workspaces SET updated_at = CURRENT_TIMESTAMP WHERE id = ?`, workspaceID)
 	ensureMemory(ctx)
 	ctx.Memory["qrspi_continuation_workspace_id"] = workspaceID

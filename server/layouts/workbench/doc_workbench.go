@@ -132,7 +132,7 @@ func BuildDocWorkbenchState(input WorkbenchDocContext) (WorkbenchState, error) {
 		},
 	}
 
-	return BuildWorkbenchState(BuildWorkbenchStateInput{
+	state, err := BuildWorkbenchState(BuildWorkbenchStateInput{
 		UserEmail:     input.UserEmail,
 		Page:          page,
 		View:          view,
@@ -157,6 +157,29 @@ func BuildDocWorkbenchState(input WorkbenchDocContext) (WorkbenchState, error) {
 			},
 		},
 	})
+	if err != nil {
+		return WorkbenchState{}, err
+	}
+	if input.InitialSidebarOpen {
+		forceDocWorkbenchRegionVisible(&state, "doc-workbench-sidebar")
+	}
+	if input.InitialRailOpen {
+		forceDocWorkbenchRegionVisible(&state, "doc-workbench-right")
+	}
+	return state, ValidateWorkbenchConfig(state.Config)
+}
+
+func forceDocWorkbenchRegionVisible(state *WorkbenchState, id string) {
+	for i := range state.Regions {
+		if state.Regions[i].ID == id {
+			state.Regions[i].Visible = true
+		}
+	}
+	for i := range state.Config.Regions {
+		if state.Config.Regions[i].ID == id {
+			state.Config.Regions[i].Visible = true
+		}
+	}
 }
 
 func rightRailKind(tab RightRailTab) RegionKind {

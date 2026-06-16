@@ -157,6 +157,45 @@ func TestSubmitCommandPersistsSemanticCommandEvents(t *testing.T) {
 	}
 }
 
+func TestSnapshotHydratesToolsFromEventsWhenProjectionRowExists(t *testing.T) {
+	ctx := context.Background()
+	dbConn, q := openTestDB(t)
+	insertServiceTestFixtures(t, ctx, q)
+	svc := NewService(dbConn, q)
+
+	if _, err := svc.AppendEvent(ctx, AppendEventInput{
+		SessionID:          "session-1",
+		EventType:          EventMessageCompleted,
+		ActorParticipantID: "user",
+		PayloadJSON:        []byte(`{"id":"msg-1","role":"user","content":"hello"}`),
+	}); err != nil {
+		t.Fatalf("append message: %v", err)
+	}
+	if _, err := svc.AppendEvent(ctx, AppendEventInput{
+		SessionID:          "session-1",
+		EventType:          EventToolCompleted,
+		ActorParticipantID: "assistant",
+		PayloadJSON:        []byte(`{"tool_call_id":"tool-1","tool_name":"bash","summary":"ran command"}`),
+	}); err != nil {
+		t.Fatalf("append tool: %v", err)
+	}
+
+	first, err := svc.Snapshot(ctx, "session-1")
+	if err != nil {
+		t.Fatalf("first snapshot: %v", err)
+	}
+	if len(first.Tools) != 1 || first.Tools[0].Name != "bash" {
+		t.Fatalf("first tools = %+v, want bash", first.Tools)
+	}
+	second, err := svc.Snapshot(ctx, "session-1")
+	if err != nil {
+		t.Fatalf("second snapshot: %v", err)
+	}
+	if len(second.Tools) != 1 || second.Tools[0].Name != "bash" {
+		t.Fatalf("second tools = %+v, want bash after projection row load", second.Tools)
+	}
+}
+
 func TestAppendEventConcurrentWriters(t *testing.T) {
 	ctx := context.Background()
 	dbConn, q := openTestDB(t)

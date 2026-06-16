@@ -108,6 +108,45 @@ func TestBuildDocWorkbenchStateKeepsDocumentActiveWhenRailInitiallyOpen(t *testi
 	}
 }
 
+func TestBuildDocWorkbenchStateContextOpenOverridesSavedHiddenRail(t *testing.T) {
+	t.Parallel()
+
+	saved := WorkbenchConfig{
+		Version:       1,
+		Page:          WorkbenchPageThoughts,
+		View:          WorkbenchViewSplit,
+		ViewportClass: ViewportDesktopFull,
+		Regions: []RegionSpec{
+			{ID: "doc-workbench-sidebar", Slot: WorkbenchSlotNavigation, Kind: RegionThoughtsTree, Ratio: 0.18, Visible: false},
+			{ID: "doc-workbench-center", Slot: WorkbenchSlotPrimary, Kind: RegionDocument, Ratio: 0.49, Visible: true},
+			{ID: "doc-workbench-right", Slot: WorkbenchSlotContext, Kind: RegionChat, Ratio: 0.33, Visible: false},
+		},
+		Mobile: MobileSpec{ActiveRegionID: "doc-workbench-center"},
+	}
+
+	state, err := BuildDocWorkbenchState(WorkbenchDocContext{
+		EntryMode:       DocEntryModeThoughts,
+		SelectedPath:    "plans/demo/design.md",
+		View:            WorkbenchViewSplit,
+		ViewportClass:   ViewportDesktopFull,
+		SavedConfig:     &saved,
+		InitialRailOpen: true,
+		Center:          CenterDocPaneArgs{Document: templ.Raw("<p>doc</p>")},
+		RightRail: RightRailArgs{
+			ActiveTab: RightRailTabChat,
+			Chat:      templ.Raw("<p>chat</p>"),
+		},
+	})
+	if err != nil {
+		t.Fatalf("BuildDocWorkbenchState error = %v", err)
+	}
+
+	assertRegionVisible(t, state, "doc-workbench-right", true)
+	if !regionSpecByID(state.Config, "doc-workbench-right").Visible {
+		t.Fatal("saved config kept right rail hidden despite explicit chat context")
+	}
+}
+
 func TestBuildDocWorkbenchStateAppliesSavedConfig(t *testing.T) {
 	t.Parallel()
 

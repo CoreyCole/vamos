@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"strings"
 	"testing"
 
@@ -72,6 +73,51 @@ func TestOnRunCompleteValidQRSPIResultAdvancesWorkflow(t *testing.T) {
 	if len(runner.starts) != 1 || runner.starts[0].NodeID != qrspi.NodeResearch ||
 		runner.starts[0].WorkspaceID != "workspace-1" {
 		t.Fatalf("starts = %#v", runner.starts)
+	}
+}
+
+func TestOnRunCompleteRetriesSQLiteBusyWhenStartingNextRun(t *testing.T) {
+	def, err := qrspi.Definition()
+	if err != nil {
+		t.Fatalf("qrspi.Definition() error = %v", err)
+	}
+	state, err := wruntime.InitialState(def, nil)
+	if err != nil {
+		t.Fatalf("InitialState() error = %v", err)
+	}
+	registry := wruntime.NewRegistry()
+	if err := registry.Register(def); err != nil {
+		t.Fatalf("Register() error = %v", err)
+	}
+	store := &fakeStore{
+		state:          state,
+		assistantText:  validQuestionResultYAML(),
+		artifactExists: true,
+		run: db.AgentRun{
+			ID:          "run-1",
+			WorkspaceID: sql.NullString{String: "workspace-1", Valid: true},
+			ThreadID:    "thread-1",
+			SessionID:   sql.NullString{String: "session-1", Valid: true},
+			WorkflowNodeID: sql.NullString{
+				String: string(qrspi.NodeQuestion),
+				Valid:  true,
+			},
+		},
+	}
+	runner := &fakeRunner{errors: []error{errors.New("database is locked (5) (SQLITE_BUSY)")}}
+
+	err = (&Service{Definitions: registry, Store: store, Runner: runner}).OnRunComplete(
+		context.Background(),
+		conversation.RunResult{RunID: "run-1", ThreadID: "thread-1", HeadEntryID: "assistant-1"},
+	)
+	if err != nil {
+		t.Fatalf("OnRunComplete() error = %v", err)
+	}
+	if len(runner.starts) != 2 || runner.starts[1].NodeID != qrspi.NodeResearch {
+		t.Fatalf("starts = %#v, want retry then research start", runner.starts)
+	}
+	if hasWorkflowNodeEvent(store.events, "workflow_next_start_failed", qrspi.NodeResearch) {
+		t.Fatalf("events = %#v, want no failure after successful retry", store.events)
 	}
 }
 
@@ -597,6 +643,7 @@ func (s *fakeStore) WorkspacePlanningCwd(context.Context, string) (string, error
 
 type fakeRunner struct {
 	starts []StartNodeRunInput
+	errors []error
 }
 
 func (r *fakeRunner) StartNodeRun(
@@ -604,6 +651,11 @@ func (r *fakeRunner) StartNodeRun(
 	input StartNodeRunInput,
 ) (string, error) {
 	r.starts = append(r.starts, input)
+	if len(r.errors) > 0 {
+		err := r.errors[0]
+		r.errors = r.errors[1:]
+		return "", err
+	}
 	return "next-run", nil
 }
 

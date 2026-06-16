@@ -95,7 +95,7 @@ func (s *Service) ApplyExternalWorkflowResult(
 		return wruntime.TransitionDecision{}, false, err
 	}
 	if decision.StartNext {
-		_, err = s.startNodeRun(ctx, def, decision.State, StartNodeRunInput{
+		_, err = s.startNodeRunWithSQLiteBusyRetry(ctx, def, decision.State, StartNodeRunInput{
 			WorkspaceID: workspaceID,
 			ThreadID:    threadID,
 			NodeID:      decision.NextNodeID,
