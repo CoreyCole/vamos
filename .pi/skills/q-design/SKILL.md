@@ -53,7 +53,7 @@ qrspi_result:
         param: "[concrete next-stage]"
 ```
 
-`status` is lifecycle. `outcome` selects the graph branch. Optional ``project`` and `related_projects` carry primary/related project participation metadata only; they do not change singular workspace execution rules. ``next.steps`` is an ordered instruction block containing only `step` children: read `qrspi-planning`, read the next stage skill, read the artifact(s) needed by that stage, then start the next stage immediately unless blocked by an explicit human/safety gate. Runtime transitions are graph-authoritative. Complete results must include ``outcome``. Review stages must use explicit node IDs (`review-outline`, `review-plan`, or `review-implementation`), never `review`.
+`status` is lifecycle. `outcome` selects the graph branch. Optional `project` and `related_projects` carry primary/related project participation metadata only; they do not change singular workspace execution rules. `next.steps` is an ordered instruction block containing only `step` children: read `qrspi-planning`, read the next stage skill, read the artifact(s) needed by that stage, then start the next stage immediately unless blocked by an explicit human/safety gate. Runtime transitions are graph-authoritative. Complete results must include `outcome`. Review stages must use explicit node IDs (`review-outline`, `review-plan`, or `review-implementation`), never `review`.
 
 ## Project participation metadata
 
@@ -61,7 +61,7 @@ For cross-project plans, preserve machine-readable frontmatter and YAML project 
 
 - `project`: singular primary project owner.
 - `related_projects`: zero/many supporting project IDs.
-- ``project`` in ``qrspi_result`` mirrors frontmatter `project`.
+- `project` in `qrspi_result` mirrors frontmatter `project`.
 - `related_projects` mirrors frontmatter `related_projects`.
 - Related projects are plan participation metadata only. They do not imply multiple execution cwd values.
 - `workspace_metadata.plan_workspace` and `workspace_metadata.implementation_workspace` remain singular.
@@ -104,7 +104,19 @@ Then wait for input.
 1. **Read the original ticket / PRD context** if referenced in question docs or stored in `prds/`.
 1. **Read key files** identified in research findings and context artifacts.
 1. **If current-state validation is still missing or stale, run `codebase-locator`** with a narrowly scoped refresh task and, if needed, `codebase-analyzer` on the surfaced files or flows. Write the resulting timestamped artifact(s) under `[plan_dir]/context/design/`.
+1. **Create the design brainstorm artifact before interviewing** at `[plan_dir]/context/design/YYYY-MM-DD_HH-MM-SS_[topic-name]-design-brainstorm.md`.
+   - Gather metadata with `~/dotfiles/spec_metadata.sh` for timestamp/frontmatter.
+   - Start it with sections for `Confirmed q-question alignment`, `Research-backed problem`, `Decision branches`, `Interview log`, `Current running summary`, `ADR candidate disposition`, and `Rationale to preserve for outline`.
+   - Keep it structured by decision topic, not chronological append-only chat transcript.
+   - Use `Interview log` subsections grouped by topic. For each topic, record:
+     - `Prompt` — the question/recommendation posed, in one line.
+     - `User decision` — confirmed/rejected/adjusted guidance.
+     - `Rationale` — why this matters for design/outline.
+     - `Next implication` — what branch this unlocks or closes.
+   - Maintain `Current running summary` with confirmed decisions, assumptions still open, codebase questions researched, and risks/tradeoffs.
+   - Update it after each confirmed lead-engineer decision or clarification, plus investigation summaries that materially change the next design question. Do not record tentative discussion as settled context.
 1. **Run the design brainstorm interview before writing the first design draft.** Use the loaded research, q-question Language / Alignment context, and `ADR candidates for design` to stress-test only unresolved design-direction choices with the user one question at a time. Do not repeat q-question's full alignment interview unless research invalidated a premise. Do not write `design.md` or ADRs until the key goals, scope, constraints, decisions, risks, and next step are clear, or the user explicitly says to stop the interview and draft.
+1. **Before drafting, finalize the design brainstorm artifact** with concise `ADR candidate disposition` and `Rationale to preserve for outline` sections. The design doc should summarize what was decided; the brainstorm artifact preserves the reasoning and rejected branches.
 1. **Draft the design artifacts:**
    - `design.md` stays lean and default-loadable:
      - Current state
@@ -138,6 +150,7 @@ After loading research and validating current state, stress-test the design dire
 1. **Ask one question at a time.** Each interview turn must contain exactly one direct question, unless the user explicitly asks for a batch. Include your recommended answer and concise reasoning.
 1. **Resolve upstream decisions before downstream details.** If an answer changes a premise, revisit dependent branches before moving on.
 1. **Track a concise running summary** across turns: confirmed decisions, assumptions still unverified, codebase questions researched, and open risks/tradeoffs.
+1. **Update the design brainstorm artifact after each confirmed decision or clarification.** Rewrite/merge sections as understanding changes; do not append a raw transcript.
 1. **Exit the interview only when shared understanding is reached** on the remaining design-direction choices and ADR-candidate disposition, or the user explicitly asks you to draft now.
 
 Use this question format for each interview turn:
@@ -172,6 +185,7 @@ related_adrs:
   - "thoughts/[git_username]/plans/[timestamp]_[plan-name]/adrs/YYYY-MM-DD_HH-MM-SS_decision-slug.md"
 brainstorm_docs:
   - "thoughts/[git_username]/plans/[timestamp]_[plan-name]/questions/YYYY-MM-DD_HH-MM-SS_questions.md"
+  - "thoughts/[git_username]/plans/[timestamp]_[plan-name]/context/design/YYYY-MM-DD_HH-MM-SS_topic-name-design-brainstorm.md"
 ---
 
 # Design: [Feature Name]
@@ -253,7 +267,7 @@ Accepted
 
 ## Response
 
-When `design.md` is written, emit this fenced YAML result, followed by the mandatory concise human summary. Design does not run automated `/q-review`; it advances to `/q-outline` unless product coverage warrants `/q-design-product`. ``next.steps`` must be ordered `step` children.
+When `design.md` is written, emit this fenced YAML result, followed by the mandatory concise human summary. Design does not run automated `/q-review`; it advances to `/q-outline` unless product coverage warrants `/q-design-product`. `next.steps` must be ordered `step` children.
 
 Post-YAML natural summary format for this stage: key direction only. Caveman speak. Few words. Most important words only. Prefer `Design: reuse X; add Y; avoid Z.` over sentences.
 
@@ -285,12 +299,16 @@ qrspi_result:
         param: "[concrete next-stage]"
 ```
 
-If product coverage is warranted, set ``next.steps`` steps to read `qrspi-planning`, read `q-design-product`, read `[design.md]`, then start `/q-design-product`. If product coverage is not warranted, set ``next.steps`` steps to read `qrspi-planning`, read `q-outline`, read `[design.md]`, read `[design-product.md if it exists]`, then start `/q-outline`; `/q-outline` must first summarize key design decisions for human approval, then write `outline.md` after `go`/`vamos`/`yes`/equivalent approval. Always include the complete `thoughts/.../design.md` path.
+If product coverage is warranted, set `next.steps` steps to read `qrspi-planning`, read `q-design-product`, read `[design.md]`, then start `/q-design-product`. If product coverage is not warranted, set `next.steps` steps to read `qrspi-planning`, read `q-outline`, read `[design.md]`, read `[design-product.md if it exists]`, then start `/q-outline`; `/q-outline` must first summarize key design decisions for human approval, then write `outline.md` after `go`/`vamos`/`yes`/equivalent approval. Always include the complete `thoughts/.../design.md` path.
 
 ## Rules
 
 - Target ~200-300 lines for `design.md`. Keep each ADR concise and decision-focused.
 - Output artifact style: be extremely concise. Sacrifice grammar for the sake of concision.
+- Always create and maintain `[plan_dir]/context/design/YYYY-MM-DD_HH-MM-SS_[topic-name]-design-brainstorm.md` during the design brainstorm/interview before writing `design.md`.
+- Keep design brainstorm artifacts organized by decision topic, not chronological append-only bullets. Rewrite sections to stay readable as the interview evolves.
+- Update the design brainstorm artifact after each confirmed lead-engineer decision or clarification, not after every tentative discussion turn.
+- Include the design brainstorm artifact in `design.md` frontmatter `brainstorm_docs`.
 - Do not write the first `design.md` draft before the design brainstorm interview reaches shared understanding or the user explicitly asks you to draft now.
 - For review follow-up work, `design.md` means `reviews/*/design.md` in the timestamped review directory. Never fold implementation-review follow-up decisions into the parent plan's original `design.md` unless the user explicitly asks for a parent-plan revision.
 - Include brief representative snippets only.
@@ -301,5 +319,5 @@ If product coverage is warranted, set ``next.steps`` steps to read `qrspi-planni
 - Prefer the simplified ADR body format: 1-3 sentences, optional sections only when valuable.
 - Present to user BEFORE finalizing.
 - Write for teammate alignment.
-- Completion responses must be the fenced YAML ``qrspi_result`` block required by the runtime contract, followed by the mandatory concise human summary.
+- Completion responses must be the fenced YAML `qrspi_result` block required by the runtime contract, followed by the mandatory concise human summary.
 - Post-YAML summary for design stage: only key direction/chosen design. Caveman clear. No rationale dump.
