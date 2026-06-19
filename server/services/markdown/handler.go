@@ -82,8 +82,8 @@ func (s *Service) ServeMarkdown(c echo.Context) error {
 		}).Render(c.Request().Context(), c.Response().Writer)
 	}
 
-	// Process markdown file
-	pageArgs, err := s.ProcessMarkdownFile(requestPath)
+	// Render document file
+	pageArgs, err := s.RenderThoughtsDocument(c.Request().Context(), requestPath)
 	if err != nil {
 		// Try directory listing if file not found or if path is a directory
 		if strings.Contains(err.Error(), "not found") ||
@@ -177,36 +177,9 @@ func (s *Service) ServeMarkdown(c echo.Context) error {
 		}
 	}
 	pageArgs.WorkspaceContext = workspaceCtx
-	pageArgs.CommentUI = commentui.CommentableMarkdownArgs{
-		Surface:     commentui.CommentSurfaceThoughts,
-		IDPrefix:    commentui.SafeCommentTargetSlug("thoughts", pageArgs.FilePath),
-		DocPath:     pageArgs.FilePath,
-		HTML:        pageArgs.ViewerArgs.HTMLContent,
-		Sections:    commentSectionsFromMarkdown(pageArgs.ViewerArgs.Sections),
-		Frontmatter: commentFrontmatterFromMarkdown(pageArgs.ViewerArgs.Frontmatter),
-		Comments:    threads,
-		UserEmail:   userEmail,
-		Routes: commentui.CommentRoutes{
-			Show:          "/forms/comments/show",
-			Create:        "/forms/comments",
-			Cancel:        "/forms/comments/cancel",
-			Expand:        "/forms/comments/expand",
-			SelectComment: "/thoughts/actions/select-comment",
-			Reply: func(string) string {
-				return "/forms/replies"
-			},
-			Resolve: func(string) string {
-				return "/forms/resolve"
-			},
-		},
-		HiddenFields: map[string]string{"doc_path": pageArgs.FilePath},
-		SelectionSignals: commentui.SelectionSignalArgs{
-			Prefix:          "comment_selection",
-			ExcludeSelector: "#comment-sidebar, [data-comment-target=true], [id^=comment-target-], [id^=section-comments-]",
-			ShowRoute:       "/forms/comments/show",
-			HiddenFields:    map[string]string{"doc_path": pageArgs.FilePath},
-			ContainerID:     "thoughts-markdown-scroll-region",
-		},
+	pageArgs.CommentUI = s.buildCommentUI(pageArgs, userEmail, threads)
+	if pageArgs.ViewerArgs.CommentMode == "" || pageArgs.ViewerArgs.CommentMode == CommentModeSections {
+		pageArgs.ViewerArgs.BodyComponent = commentui.CommentableMarkdown(pageArgs.CommentUI)
 	}
 
 	// Always create SectionsWithComments if sections exist (even if comments failed to
@@ -265,6 +238,48 @@ func thoughtsContextMode(c echo.Context) string {
 	}
 	mode, _ = c.Get("thoughts_context_mode").(string)
 	return strings.TrimSpace(mode)
+}
+
+func (s *Service) buildCommentUI(
+	pageArgs *PageArgs,
+	userEmail string,
+	threads []commentui.CommentThreadView,
+) commentui.CommentableMarkdownArgs {
+	selection := commentui.SelectionSignalArgs{}
+	if pageArgs.ViewerArgs.CommentMode == "" || pageArgs.ViewerArgs.CommentMode == CommentModeSections {
+		selection = commentui.SelectionSignalArgs{
+			Prefix:          "comment_selection",
+			ExcludeSelector: "#comment-sidebar, [data-comment-target=true], [id^=comment-target-], [id^=section-comments-]",
+			ShowRoute:       "/forms/comments/show",
+			HiddenFields:    map[string]string{"doc_path": pageArgs.FilePath},
+			ContainerID:     "thoughts-markdown-scroll-region",
+		}
+	}
+	return commentui.CommentableMarkdownArgs{
+		Surface:     commentui.CommentSurfaceThoughts,
+		IDPrefix:    commentui.SafeCommentTargetSlug("thoughts", pageArgs.FilePath),
+		DocPath:     pageArgs.FilePath,
+		HTML:        pageArgs.ViewerArgs.HTMLContent,
+		Sections:    commentSectionsFromMarkdown(pageArgs.ViewerArgs.Sections),
+		Frontmatter: commentFrontmatterFromMarkdown(pageArgs.ViewerArgs.Frontmatter),
+		Comments:    threads,
+		UserEmail:   userEmail,
+		Routes: commentui.CommentRoutes{
+			Show:          "/forms/comments/show",
+			Create:        "/forms/comments",
+			Cancel:        "/forms/comments/cancel",
+			Expand:        "/forms/comments/expand",
+			SelectComment: "/thoughts/actions/select-comment",
+			Reply: func(string) string {
+				return "/forms/replies"
+			},
+			Resolve: func(string) string {
+				return "/forms/resolve"
+			},
+		},
+		HiddenFields:     map[string]string{"doc_path": pageArgs.FilePath},
+		SelectionSignals: selection,
+	}
 }
 
 func viewportClassForRequest(c echo.Context) workbench.ViewportClass {
@@ -641,7 +656,7 @@ func (s *Service) selectDocumentAndPatch(
 	if err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 	}
-	pageArgs, err := s.ProcessMarkdownFile(docPath)
+	pageArgs, err := s.RenderThoughtsDocument(c.Request().Context(), docPath)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusNotFound, err.Error())
 	}
@@ -694,36 +709,9 @@ func (s *Service) selectDocumentAndPatch(
 		pageArgs.Comments = commentsResp
 		threads = thoughtsCommentThreads(commentsResp.Comments)
 	}
-	pageArgs.CommentUI = commentui.CommentableMarkdownArgs{
-		Surface:     commentui.CommentSurfaceThoughts,
-		IDPrefix:    commentui.SafeCommentTargetSlug("thoughts", pageArgs.FilePath),
-		DocPath:     pageArgs.FilePath,
-		HTML:        pageArgs.ViewerArgs.HTMLContent,
-		Sections:    commentSectionsFromMarkdown(pageArgs.ViewerArgs.Sections),
-		Frontmatter: commentFrontmatterFromMarkdown(pageArgs.ViewerArgs.Frontmatter),
-		Comments:    threads,
-		UserEmail:   userEmail,
-		Routes: commentui.CommentRoutes{
-			Show:          "/forms/comments/show",
-			Create:        "/forms/comments",
-			Cancel:        "/forms/comments/cancel",
-			Expand:        "/forms/comments/expand",
-			SelectComment: "/thoughts/actions/select-comment",
-			Reply: func(string) string {
-				return "/forms/replies"
-			},
-			Resolve: func(string) string {
-				return "/forms/resolve"
-			},
-		},
-		HiddenFields: map[string]string{"doc_path": pageArgs.FilePath},
-		SelectionSignals: commentui.SelectionSignalArgs{
-			Prefix:          "comment_selection",
-			ExcludeSelector: "#comment-sidebar, [data-comment-target=true], [id^=comment-target-], [id^=section-comments-]",
-			ShowRoute:       "/forms/comments/show",
-			HiddenFields:    map[string]string{"doc_path": pageArgs.FilePath},
-			ContainerID:     "thoughts-markdown-scroll-region",
-		},
+	pageArgs.CommentUI = s.buildCommentUI(pageArgs, userEmail, threads)
+	if pageArgs.ViewerArgs.CommentMode == "" || pageArgs.ViewerArgs.CommentMode == CommentModeSections {
+		pageArgs.ViewerArgs.BodyComponent = commentui.CommentableMarkdown(pageArgs.CommentUI)
 	}
 	sse := datastar.NewSSE(c.Response().Writer, c.Request())
 	workbenchState, err := s.buildThoughtsWorkbenchState(c, pageArgs)

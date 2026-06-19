@@ -13,7 +13,6 @@ import (
 	"time"
 
 	"github.com/gomarkdown/markdown/ast"
-	"github.com/gomarkdown/markdown/parser"
 	"github.com/labstack/echo/v4"
 	"gopkg.in/yaml.v3"
 
@@ -91,12 +90,17 @@ func NewServiceWithOptions(
 		return nil, fmt.Errorf("failed to create markdown renderer: %w", err)
 	}
 
-	return &Service{
+	service := &Service{
 		renderer:       renderer,
 		basePath:       basePath,
 		commentService: commentService,
 		themeService:   themeService,
-	}, nil
+	}
+	service.documentRenderers = NewDocumentRendererRegistry(
+		UnsupportedRenderer{},
+		NewMarkdownDocumentRenderer(service, renderer, opts.Projects),
+	)
+	return service, nil
 }
 
 func (s *Service) WithWorkspaceResolver(resolver DocumentWorkspaceResolver) *Service {
@@ -246,92 +250,9 @@ func parseDate(dateStr string) time.Time {
 	return time.Time{}
 }
 
-// ProcessMarkdownFile handles all markdown processing logic
+// ProcessMarkdownFile handles markdown processing through the document renderer registry.
 func (s *Service) ProcessMarkdownFile(requestPath string) (*PageArgs, error) {
-	// Clean and validate the path
-	cleanPath, err := CanonicalThoughtsDocPath(requestPath)
-	if err != nil {
-		return nil, err
-	}
-	fullPath := filepath.Join(s.basePath, filepath.FromSlash(cleanPath))
-
-	// Security check: ensure the path doesn't escape the base directory
-	if !strings.HasPrefix(filepath.Clean(fullPath), filepath.Clean(s.basePath)) {
-		return nil, errors.New("access denied: path escapes base directory")
-	}
-
-	// Check if file exists
-	fileInfo, err := os.Stat(fullPath)
-	if err != nil {
-		// Try adding .md extension
-		mdPath := fullPath + ".md"
-		if mdInfo, err := os.Stat(mdPath); err == nil && !mdInfo.IsDir() {
-			fullPath = mdPath
-			fileInfo = mdInfo
-		} else {
-			return nil, fmt.Errorf("file not found: %s", requestPath)
-		}
-	}
-
-	if fileInfo.IsDir() {
-		return nil, fmt.Errorf("path is a directory: %s", requestPath)
-	}
-
-	// Read the markdown file
-	content, err := os.ReadFile(fullPath)
-	if err != nil {
-		return nil, fmt.Errorf("error reading file: %w", err)
-	}
-
-	// Parse frontmatter if present
-	frontmatter, markdownContent, err := parseFrontmatter(content)
-	if err != nil {
-		return nil, fmt.Errorf("error parsing frontmatter: %w", err)
-	}
-
-	// Parse markdown to extract table of contents
-	parser := parser.NewWithExtensions(parser.CommonExtensions | parser.AutoHeadingIDs)
-	doc := parser.Parse(markdownContent)
-	toc := s.extractTableOfContents(doc)
-
-	// Render markdown to sections
-	sections := s.renderer.RenderToSections(markdownContent)
-
-	// Also render full HTML for fallback
-	htmlContent := s.renderer.MarkdownBytesToHTML(markdownContent)
-
-	// Post-process: link code file paths to GitHub if frontmatter resolves to a GitHub repository.
-	if frontmatter != nil {
-		gh := s.renderer.ResolveGitHubRepo(githubRepoKeyForFrontmatter(frontmatter))
-		if gh != nil {
-			htmlContent = LinkCodePathsToGitHub(htmlContent, gh)
-			for i := range sections {
-				sections[i].HeadingHTML = LinkCodePathsToGitHub(
-					sections[i].HeadingHTML,
-					gh,
-				)
-				sections[i].BodyHTML = LinkCodePathsToGitHub(sections[i].BodyHTML, gh)
-				sections[i].HTMLContent = LinkCodePathsToGitHub(
-					sections[i].HTMLContent,
-					gh,
-				)
-			}
-		}
-	}
-
-	// Build page args
-	// Prepend "thoughts/" to match the full URL path structure
-	fullFilePath := "thoughts/" + cleanPath
-	return &PageArgs{
-		ViewerArgs: ViewerArgs{
-			HTMLContent: htmlContent,
-			Frontmatter: frontmatter,
-			Sections:    sections,
-			RawMarkdown: string(markdownContent),
-		},
-		TableOfContents: toc,
-		FilePath:        fullFilePath,
-	}, nil
+	return s.RenderThoughtsDocument(context.Background(), requestPath)
 }
 
 // extractDateFromFilename attempts to extract a date from the beginning of a filename

@@ -42,6 +42,7 @@ type RenderedDocument struct {
 	Frontmatter   *Frontmatter
 	TOC           []TocItem
 	Sections      []Section
+	HTMLContent   string
 	ClipboardText string
 	Component     templ.Component
 	CommentMode   CommentMode
@@ -136,7 +137,7 @@ func (s *Service) resolveThoughtsDocumentRequest(requestPath string) (DocumentRe
 func pageArgsFromRenderedDocument(doc RenderedDocument) *PageArgs {
 	return &PageArgs{
 		ViewerArgs: ViewerArgs{
-			HTMLContent:   "",
+			HTMLContent:   doc.HTMLContent,
 			Frontmatter:   doc.Frontmatter,
 			Sections:      doc.Sections,
 			RawMarkdown:   doc.ClipboardText,
