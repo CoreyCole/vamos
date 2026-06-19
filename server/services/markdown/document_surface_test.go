@@ -5,6 +5,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/a-h/templ"
+
 	"github.com/CoreyCole/vamos/server/services/commentui"
 )
 
@@ -36,11 +38,33 @@ func TestBuildThoughtsDocumentCarriesDocumentModel(t *testing.T) {
 	if len(doc.Sections) != 1 || len(doc.TOC) != 1 {
 		t.Fatalf("document did not carry sections/toc: %+v", doc)
 	}
+	if doc.Kind != DocumentKindMarkdown {
+		t.Fatalf("doc.Kind=%q", doc.Kind)
+	}
+	if doc.Component == nil {
+		t.Fatal("doc.Component nil")
+	}
 	if len(doc.Actions) != 0 {
 		t.Fatalf("Thoughts document actions = %#v, want none", doc.Actions)
 	}
 	if doc.CommentUI.DocPath != args.FilePath || doc.PageSessionID != "page-1" {
 		t.Fatalf("document did not carry comment UI/session: %+v", doc)
+	}
+}
+
+func TestDocumentSurfaceRendersRendererComponent(t *testing.T) {
+	doc := WorkbenchDocument{
+		Path:          "thoughts/example.csv",
+		PageSessionID: "page-1",
+		Component:     templ.Raw(`<div id="csv-doc">csv</div>`),
+	}
+
+	var buf bytes.Buffer
+	if err := DocumentSurface(doc, nil).Render(t.Context(), &buf); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(buf.String(), `id="csv-doc"`) {
+		t.Fatalf("missing renderer component: %s", buf.String())
 	}
 }
 

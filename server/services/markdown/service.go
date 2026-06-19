@@ -62,6 +62,7 @@ type ServiceOptions struct {
 
 type Service struct {
 	renderer              *Renderer
+	documentRenderers     *DocumentRendererRegistry
 	basePath              string
 	commentService        *comments.Service
 	themeService          ThemeProvider

@@ -37,10 +37,13 @@ type Frontmatter struct {
 
 // ViewerArgs for the markdown content renderer
 type ViewerArgs struct {
-	HTMLContent string
-	Frontmatter *Frontmatter
-	Sections    []Section // Parsed sections with metadata for layout
-	RawMarkdown string    // Original markdown content for clipboard
+	HTMLContent   string
+	Frontmatter   *Frontmatter
+	Sections      []Section // Parsed sections with metadata for layout
+	RawMarkdown   string    // Original markdown content for clipboard
+	DocumentKind  DocumentKind
+	CommentMode   CommentMode
+	BodyComponent templ.Component
 }
 
 // PageArgs for the full markdown page

@@ -14,7 +14,11 @@ templ DocumentSurface(doc WorkbenchDocument, workspaceTree *workbench.WorkspaceD
 		<div id="thoughts-open-chat-result" class="hidden" aria-hidden="true"></div>
 		<div id="thoughts-markdown-scroll-region" class="min-h-0 flex-1 overflow-y-auto p-4 md:p-10">
 			@QRSPIArtifactContext(doc.QRSPIMetadata, workspaceTree)
-			@commentui.CommentableMarkdown(doc.CommentUI)
+			if doc.Component != nil {
+				@doc.Component
+			} else {
+				@commentui.CommentableMarkdown(doc.CommentUI)
+			}
 		</div>
 		<div class="hidden" aria-hidden="true">
 			@commentui.MobileSectionCommentTarget()
