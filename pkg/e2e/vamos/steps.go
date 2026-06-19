@@ -23,8 +23,10 @@ import (
 	duiruntime "github.com/coreycole/datastarui/e2e/runtime"
 	"github.com/coreycole/datastarui/e2e/spec"
 
+	"github.com/CoreyCole/vamos/pkg/collections"
 	"github.com/CoreyCole/vamos/pkg/db"
 	"github.com/CoreyCole/vamos/pkg/e2e/fixtures"
+	"github.com/CoreyCole/vamos/server/services/agentchat"
 )
 
 const (
@@ -930,6 +932,75 @@ func WaitForWorkflowRunResult(nodeID string) expectation {
 func WaitForWorkflowRunStarted(nodeID string) expectation {
 	return expectation{customStep("wait for workflow run started "+nodeID, func(t testing.TB, ctx *duiruntime.Context) {
 		_ = waitForWorkflowRunForNode(t, ctx, nodeID, false)
+	})}
+}
+
+func ExpectNoWorkflowRunStarted(nodeID string) expectation {
+	return expectation{customStep("no workflow run started "+nodeID, func(t testing.TB, ctx *duiruntime.Context) {
+		workspaceID := workflowWorkspaceID(t, ctx)
+		database := openDB(t, ctx)
+		defer database.Close()
+		queries := db.New(database)
+		deadline := time.Now().Add(5 * time.Second)
+		for time.Now().Before(deadline) {
+			if snapshot, ok, err := latestWorkflowRunForNode(t.Context(), queries, workspaceID, nodeID); err != nil {
+				t.Fatalf("latest workflow run for node %s: %v", nodeID, err)
+			} else if ok {
+				t.Fatalf("workflow node %s unexpectedly started: %+v", nodeID, snapshot)
+			}
+			time.Sleep(chatPollInterval)
+		}
+	})}
+}
+
+func expectedQRSPIQuestionToDesignCheckoutPaths(ctx *duiruntime.Context) []string {
+	planRel := ctx.Memory["qrspi_q_to_d_plan_rel"]
+	stamp := ctx.Memory["qrspi_q_to_d_stamp"]
+	if planRel == "" || stamp == "" {
+		return nil
+	}
+	parent := filepath.Dir(ctx.Config.RepoRoot)
+	checkoutName := agentchat.CheckoutNameForPlan("vamos", path.Join("thoughts", planRel))
+	paths := []string{
+		filepath.Join(parent, checkoutName),
+		filepath.Join(parent, "vamos-e2e-qrspi-q-to-d-"+stamp),
+	}
+	matches, _ := filepath.Glob(filepath.Join(parent, "vamos*e2e-qrspi-q-to-d-*"+stamp+"*"))
+	paths = append(paths, matches...)
+	return uniqueFilepaths(paths)
+}
+
+func uniqueFilepaths(values []string) []string {
+	seen := collections.NewSet[string]()
+	out := make([]string, 0, len(values))
+	for _, value := range values {
+		value = filepath.Clean(value)
+		if value == "." || seen.Has(value) {
+			continue
+		}
+		seen.Add(value)
+		out = append(out, value)
+	}
+	return out
+}
+
+func ExpectNoQRSPIQuestionToDesignCheckout() expectation {
+	return expectation{customStep("no qrspi question-to-design checkout", func(t testing.TB, ctx *duiruntime.Context) {
+		paths := expectedQRSPIQuestionToDesignCheckoutPaths(ctx)
+		if len(paths) == 0 {
+			t.Fatal("qrspi q-to-d checkout expectation missing fixture memory")
+		}
+		deadline := time.Now().Add(5 * time.Second)
+		for time.Now().Before(deadline) {
+			for _, candidate := range paths {
+				if _, err := os.Stat(candidate); err == nil {
+					t.Fatalf("unexpected QRSPI Q-to-D implementation checkout exists: %s", candidate)
+				} else if !errors.Is(err, os.ErrNotExist) {
+					t.Fatalf("stat QRSPI Q-to-D checkout candidate %s: %v", candidate, err)
+				}
+			}
+			time.Sleep(chatPollInterval)
+		}
 	})}
 }
 
