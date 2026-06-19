@@ -33,6 +33,8 @@ const (
 	chatPollInterval        = time.Second / 2
 	fileChangeTimeout       = 120 * time.Second
 	fileChangePollTime      = 500 * time.Millisecond
+
+	envPreserveQRSPIQToDFixture = "VAMOS_E2E_QRSPI_PRESERVE_FIXTURE"
 )
 
 func FollowFirstSidebarDocumentLink() spec.Step {
@@ -505,62 +507,120 @@ func OpenQRSPIContinuationWorkspaceChat() spec.Step {
 	})
 }
 
+type qrspiQuestionToDesignFixture struct {
+	Stamp       string
+	Marker      string
+	PlanRel     string
+	PlanDocRel  string
+	PlanAbs     string
+	QuestionRel string
+	FixtureRel  string
+	ResearchRel string
+	ResearchAbs string
+	FixtureRoot string
+}
+
+func preserveQRSPIQuestionToDesignFixture() bool {
+	value := strings.TrimSpace(strings.ToLower(os.Getenv(envPreserveQRSPIQToDFixture)))
+	return value == "1" || value == "true" || value == "yes" || value == "y" || value == "on"
+}
+
+func qrspiQuestionToDesignFixtureRoot(t testing.TB, ctx *duiruntime.Context) string {
+	t.Helper()
+	root := strings.TrimSpace(thoughtsRoot(ctx))
+	if root == "" {
+		t.Fatal("thoughts root is empty")
+	}
+	return root
+}
+
+func createQRSPIQuestionToDesignFixture(t testing.TB, ctx *duiruntime.Context) qrspiQuestionToDesignFixture {
+	t.Helper()
+	root := qrspiQuestionToDesignFixtureRoot(t, ctx)
+	stamp := time.Now().UTC().Format("20060102T150405.000000000")
+	marker := "VAMOS_E2E_QRSPI_Q_TO_D_" + stamp
+	planRel := path.Join("creative-mode-agent", "plans", "e2e-qrspi-q-to-d-"+stamp)
+	planAbs := filepath.Join(root, filepath.FromSlash(planRel))
+	fixture := qrspiQuestionToDesignFixture{
+		Stamp:       stamp,
+		Marker:      marker,
+		PlanRel:     planRel,
+		PlanDocRel:  path.Join("thoughts", planRel, "plan.md"),
+		PlanAbs:     planAbs,
+		QuestionRel: path.Join("thoughts", planRel, "questions", stamp+"_questions.md"),
+		FixtureRel:  path.Join("thoughts", planRel, "context", "e2e", stamp+"_research_fast_path.md"),
+		ResearchRel: path.Join("thoughts", planRel, "research", stamp+"_research.md"),
+		FixtureRoot: filepath.Dir(planAbs),
+	}
+	fixture.ResearchAbs = filepath.Join(root, filepath.FromSlash(strings.TrimPrefix(fixture.ResearchRel, "thoughts/")))
+
+	for _, dir := range []string{
+		filepath.Join(planAbs, "questions"),
+		filepath.Join(planAbs, "context", "e2e"),
+		filepath.Join(planAbs, "research"),
+	} {
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := os.WriteFile(filepath.Join(planAbs, "AGENTS.md"), []byte("# E2E QRSPI Question To Design\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(planAbs, "plan.md"), []byte("# E2E QRSPI Question To Design\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(planAbs, "questions", stamp+"_questions.md"), []byte("# E2E placeholder\n"+marker+"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	fastPath := qrspiResearchFastPathFixture(marker, "thoughts/"+planRel, fixture.ResearchRel)
+	if err := os.WriteFile(filepath.Join(planAbs, "context", "e2e", stamp+"_research_fast_path.md"), []byte(fastPath), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	if preserveQRSPIQuestionToDesignFixture() {
+		t.Logf("preserving QRSPI Q-to-D fixture at %s because %s is truthy", planAbs, envPreserveQRSPIQToDFixture)
+	} else {
+		t.Cleanup(func() {
+			if err := os.RemoveAll(planAbs); err != nil {
+				t.Logf("cleanup QRSPI Q-to-D fixture %s failed: %v", planAbs, err)
+			}
+		})
+	}
+	return fixture
+}
+
 func StartQRSPIQuestionToDesignWorkspace() spec.Step {
 	return customStep("start qrspi question to design workspace", func(t testing.TB, ctx *duiruntime.Context) {
 		ensureMemory(ctx)
-		stamp := time.Now().UTC().Format("20060102T150405.000000000")
-		marker := "VAMOS_E2E_QRSPI_Q_TO_D_" + stamp
-		planRel := path.Join("creative-mode-agent", "plans", "e2e-qrspi-q-to-d-"+stamp)
-		questionRel := path.Join("thoughts", planRel, "questions", stamp+"_questions.md")
-		fixtureRel := path.Join("thoughts", planRel, "context", "e2e", stamp+"_research_fast_path.md")
-		researchRel := path.Join("thoughts", planRel, "research", stamp+"_research.md")
-		planAbs := filepath.Join(thoughtsRoot(ctx), filepath.FromSlash(planRel))
-		for _, dir := range []string{
-			filepath.Join(planAbs, "questions"),
-			filepath.Join(planAbs, "context", "e2e"),
-			filepath.Join(planAbs, "research"),
-		} {
-			if err := os.MkdirAll(dir, 0o755); err != nil {
-				t.Fatal(err)
-			}
-		}
-		if err := os.WriteFile(filepath.Join(planAbs, "AGENTS.md"), []byte("# E2E QRSPI Question To Design\n"), 0o644); err != nil {
-			t.Fatal(err)
-		}
-		if err := os.WriteFile(filepath.Join(planAbs, "plan.md"), []byte("# E2E QRSPI Question To Design\n"), 0o644); err != nil {
-			t.Fatal(err)
-		}
-		if err := os.WriteFile(filepath.Join(planAbs, "questions", stamp+"_questions.md"), []byte("# E2E placeholder\n"+marker+"\n"), 0o644); err != nil {
-			t.Fatal(err)
-		}
-		fixture := qrspiResearchFastPathFixture(marker, "thoughts/"+planRel, researchRel)
-		if err := os.WriteFile(filepath.Join(planAbs, "context", "e2e", stamp+"_research_fast_path.md"), []byte(fixture), 0o644); err != nil {
-			t.Fatal(err)
-		}
-
-		prompt := qrspiQuestionToDesignPrompt(marker, questionRel, fixtureRel)
+		fixture := createQRSPIQuestionToDesignFixture(t, ctx)
+		prompt := qrspiQuestionToDesignPrompt(fixture.Marker, fixture.QuestionRel, fixture.FixtureRel)
 		values := url.Values{}
 		values.Set("workflow_type", "qrspi")
 		values.Set("policy_preset", "assisted")
-		values.Set("plan_dir", "thoughts/"+planRel)
+		values.Set("plan_dir", "thoughts/"+fixture.PlanRel)
 		values.Set("e2e_qrspi_start_prompt", prompt)
 		visit(t, ctx, "/agent-chat/plan-workspace?"+values.Encode())
 
-		workspaceID, _ := latestPlanWorkspaceByRootDocPath(t, ctx, planAbs)
+		workspaceID, _ := latestPlanWorkspaceByRootDocPath(t, ctx, fixture.PlanAbs)
 		if workspaceID == "" {
 			t.Fatal("qrspi question-to-design workspace not created")
 		}
 		ctx.Memory["qrspi_workflow_workspace_id"] = workspaceID
 		ctx.Memory["qrspi_q_to_d_workspace_id"] = workspaceID
-		ctx.Memory["qrspi_q_to_d_marker"] = marker
-		ctx.Memory["qrspi_q_to_d_question_artifact"] = questionRel
-		ctx.Memory["qrspi_q_to_d_fixture_artifact"] = fixtureRel
-		ctx.Memory["qrspi_q_to_d_research_artifact"] = researchRel
-		ctx.Memory["qrspi_q_to_d_research_artifact_abs"] = filepath.Join(thoughtsRoot(ctx), filepath.FromSlash(strings.TrimPrefix(researchRel, "thoughts/")))
+		ctx.Memory["qrspi_q_to_d_stamp"] = fixture.Stamp
+		ctx.Memory["qrspi_q_to_d_plan_rel"] = fixture.PlanRel
+		ctx.Memory["qrspi_q_to_d_plan_abs"] = fixture.PlanAbs
+		ctx.Memory["qrspi_q_to_d_plan_doc_rel"] = fixture.PlanDocRel
+		ctx.Memory["qrspi_q_to_d_fixture_root"] = fixture.FixtureRoot
+		ctx.Memory["qrspi_q_to_d_marker"] = fixture.Marker
+		ctx.Memory["qrspi_q_to_d_question_artifact"] = fixture.QuestionRel
+		ctx.Memory["qrspi_q_to_d_fixture_artifact"] = fixture.FixtureRel
+		ctx.Memory["qrspi_q_to_d_research_artifact"] = fixture.ResearchRel
+		ctx.Memory["qrspi_q_to_d_research_artifact_abs"] = fixture.ResearchAbs
 
 		question := waitForWorkflowRunForNode(t, ctx, "question", false)
 		ctx.Memory["qrspi_q_to_d_thread_id"] = question.ThreadID
-		visit(t, ctx, thoughtsChatURL(path.Join("thoughts", planRel, "plan.md"), workspaceID, question.ThreadID))
+		visit(t, ctx, thoughtsChatURL(fixture.PlanDocRel, workspaceID, question.ThreadID))
 	})
 }
 
