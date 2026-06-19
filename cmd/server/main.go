@@ -1591,6 +1591,7 @@ func main() {
 		"/chat/:workspace_id/slash-commands",
 		agentChatHandler.ListWorkspaceSlashCommands,
 	)
+	thoughtsGroup.GET("/_render/html/*", markdownService.ServeHTMLApplet)
 	thoughtsGroup.GET("/*", markdownService.ServeMarkdown)
 
 	// Temporal UI routes (auth-protected)

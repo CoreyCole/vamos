@@ -99,6 +99,7 @@ func NewServiceWithOptions(
 	service.documentRenderers = NewDocumentRendererRegistry(
 		UnsupportedRenderer{},
 		NewMarkdownDocumentRenderer(service, renderer, opts.Projects),
+		HTMLAppletRenderer{},
 	)
 	return service, nil
 }

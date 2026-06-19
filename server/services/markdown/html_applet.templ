@@ -1,0 +1,16 @@
+package markdown
+
+templ HTMLAppletFrame(docPath string, src string) {
+	<section class="mx-auto flex min-h-[70vh] w-full max-w-6xl flex-col gap-3">
+		<div class="rounded-lg border border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
+			HTML applet: <span class="font-mono text-foreground">{ docPath }</span>
+		</div>
+		<iframe
+			title={ "HTML applet " + docPath }
+			src={ templ.SafeURL(src) }
+			sandbox="allow-scripts allow-forms allow-downloads"
+			class="min-h-[70vh] w-full flex-1 rounded-lg border border-border bg-background"
+			referrerpolicy="same-origin"
+		></iframe>
+	</section>
+}
