@@ -54,6 +54,41 @@ func TestChildHTMLHeadersSetContainmentHeaders(t *testing.T) {
 	}
 }
 
+func TestServeHTMLAppletStreamsRawHTML(t *testing.T) {
+	root := t.TempDir()
+	mustWriteFile(t, filepath.Join(root, "demo.html"), []byte("<h1>Demo</h1>"))
+
+	svc, err := NewService(root, nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	e := echo.New()
+	req := httptest.NewRequest(http.MethodGet, "/thoughts/_render/html/demo.html", nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	c.SetParamNames("*")
+	c.SetParamValues("demo.html")
+
+	if err := svc.ServeHTMLApplet(c); err != nil {
+		t.Fatal(err)
+	}
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status=%d body=%s", rec.Code, rec.Body.String())
+	}
+	if got := rec.Body.String(); got != "<h1>Demo</h1>" {
+		t.Fatalf("body=%q", got)
+	}
+	if strings.Contains(rec.Body.String(), "doc-workbench") || strings.Contains(rec.Body.String(), "thoughts-markdown-scroll-region") {
+		t.Fatalf("child route returned workbench: %s", rec.Body.String())
+	}
+	if ct := rec.Header().Get("Content-Type"); !strings.Contains(ct, "text/html") {
+		t.Fatalf("Content-Type=%q", ct)
+	}
+	if rec.Header().Get("X-Content-Type-Options") != "nosniff" {
+		t.Fatal("missing nosniff")
+	}
+}
+
 func TestHTMLAppletRendererReturnsSandboxedFrame(t *testing.T) {
 	root := t.TempDir()
 	mustWriteFile(t, filepath.Join(root, "demo.html"), []byte("<h1>Demo</h1>"))

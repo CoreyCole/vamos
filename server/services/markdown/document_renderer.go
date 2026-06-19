@@ -86,7 +86,7 @@ func (r UnsupportedRenderer) Render(_ context.Context, req DocumentRequest) (Ren
 		Path:        docPath,
 		Title:       DocumentTitle(docPath, nil),
 		Kind:        DocumentKindUnsupported,
-		Component:   templ.Raw(fmt.Sprintf(`<div class="mx-auto max-w-3xl rounded-lg border border-border bg-background p-6 text-sm">Unsupported document type: %s</div>`, req.Extension)),
+		Component:   UnsupportedDocument(req.Extension, docPath),
 		CommentMode: CommentModeDocumentOnly,
 	}, nil
 }

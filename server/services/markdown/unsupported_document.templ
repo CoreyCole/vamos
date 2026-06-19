@@ -1,0 +1,10 @@
+package markdown
+
+templ UnsupportedDocument(extension string, docPath string) {
+	<section class="mx-auto max-w-3xl rounded-lg border border-border bg-background p-6 text-sm">
+		<h1 class="text-lg font-semibold text-foreground">Unsupported document type</h1>
+		<p class="mt-2 text-muted-foreground">
+			Vamos found <span class="font-mono text-foreground">{ docPath }</span>, but no renderer exists yet for <span class="font-mono text-foreground">{ extension }</span>.
+		</p>
+	</section>
+}

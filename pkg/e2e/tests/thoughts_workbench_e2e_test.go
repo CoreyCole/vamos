@@ -1,6 +1,9 @@
 package tests
 
 import (
+	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 
 	duiruntime "github.com/coreycole/datastarui/e2e/runtime"
@@ -47,6 +50,45 @@ func TestThoughtsWorkbench_BreadcrumbParentNavigationWorks(t *testing.T) {
 		Do(vamos.FollowFirstBreadcrumbLink()).
 		Expect(spec.ExpectStep(spec.URLContains("/thoughts/"))).
 		Expect(vamos.Thoughts.CenterPaneVisible()).
+		Run()
+}
+
+func TestThoughtsWorkbench_RendererFormatsShowExpectedWorkbenchStates(t *testing.T) {
+	spec.Story(t, "thoughts workbench renderer formats show expected states").
+		App(vamos.App()).
+		As(vamos.Robot).
+		With(vamos.WorkspaceFixture("thoughts-workbench.basic")).
+		Do(seedRendererThoughtsFiles()).
+		Visit(vamos.Pages.Path("/thoughts/renderer-demo.md?context=chat")).
+		Expect(vamos.Thoughts.Ready()).
+		Expect(spec.TextContains(vamos.Thoughts.CenterPane(), "Renderer Markdown Demo")).
+		Visit(vamos.Pages.Path("/thoughts/renderer-demo.html?context=chat")).
+		Expect(vamos.Thoughts.Ready()).
+		Expect(spec.ExpectStep(spec.Visible(spec.CSS("iframe[src='/thoughts/_render/html/renderer-demo.html']")))).
+		Expect(iframeSandboxOmitsSameOrigin()).
+		Visit(vamos.Pages.Path("/thoughts/renderer-demo.csv?context=chat")).
+		Expect(vamos.Thoughts.Ready()).
+		Expect(spec.TextContains(vamos.Thoughts.CenterPane(), "CSV table")).
+		Expect(spec.TextContains(vamos.Thoughts.CenterPane(), "<script>")).
+		Visit(vamos.Pages.Path("/thoughts/renderer-demo.json?context=chat")).
+		Expect(vamos.Thoughts.Ready()).
+		Expect(spec.TextContains(vamos.Thoughts.CenterPane(), "Unsupported document type")).
+		Expect(vamos.Console.Clean()).
+		Run()
+}
+
+func TestThoughtsWorkbench_HTMLChildRouteServesAppletContent(t *testing.T) {
+	spec.Story(t, "thoughts workbench HTML child route serves applet content").
+		App(vamos.App()).
+		As(vamos.Robot).
+		With(vamos.WorkspaceFixture("thoughts-workbench.basic")).
+		Do(seedRendererThoughtsFiles()).
+		Visit(vamos.Pages.Path("/thoughts/_render/html/renderer-demo.html")).
+		Expect(spec.ExpectStep(spec.TextAbsent("HTML applet:"))).
+		Expect(spec.ExpectStep(spec.TextAbsent("thoughts-markdown-scroll-region"))).
+		Expect(spec.TextContains(spec.CSS("body"), "Renderer HTML Applet")).
+		Expect(spec.TextContains(spec.CSS("body"), "Datastar explicit import placeholder")).
+		Expect(vamos.Console.Clean()).
 		Run()
 }
 
@@ -163,6 +205,65 @@ func TestThoughtsWorkbench_SavedMobileActiveStateDoesNotPinDesktopRefreshMobileT
 
 func TestThoughtsWorkbench_SavedMobileActiveStateDoesNotPinDesktopRefreshDesktopFullThoughtsExampleMdContextChat(t *testing.T) {
 	runSavedMobileActiveStateDoesNotPinDesktopRefresh(t, duiruntime.ViewportDesktopFull)
+}
+
+func seedRendererThoughtsFiles() spec.Step {
+	return spec.Custom("seed renderer thoughts files", func(t testing.TB, ctx *duiruntime.Context) {
+		t.Helper()
+		root := strings.TrimSpace(os.Getenv("VAMOS_E2E_THOUGHTS_ROOT"))
+		if root == "" {
+			root = filepath.Join(ctx.Config.RepoRoot, "thoughts")
+		}
+		if err := os.MkdirAll(root, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		files := map[string]string{
+			"renderer-demo.md":   "# Renderer Markdown Demo\n\nMarkdown parity content.\n",
+			"renderer-demo.csv":  "name,value\n<script>,escaped text\n",
+			"renderer-demo.json": `{"unsupported": true}`,
+			"renderer-demo.html": `<!doctype html>
+<html>
+<head>
+  <title>Renderer HTML Applet</title>
+  <style>body { background: rgb(1, 2, 3); }</style>
+  <script type="module" src="/js/datastar-pro-v1.js"></script>
+</head>
+<body>
+  <h1>Renderer HTML Applet</h1>
+  <p>Datastar explicit import placeholder</p>
+  <script>
+    try { window.parent.document.body.dataset.htmlAppletEscape = "bad" } catch (e) { document.body.dataset.parentBlocked = "true" }
+  </script>
+</body>
+</html>
+`,
+		}
+		for name, content := range files {
+			if err := os.WriteFile(filepath.Join(root, name), []byte(content), 0o644); err != nil {
+				t.Fatal(err)
+			}
+		}
+	})
+}
+
+func iframeSandboxOmitsSameOrigin() spec.Expectation {
+	return spec.ExpectStep(spec.Custom("iframe sandbox omits allow-same-origin", func(t testing.TB, ctx *duiruntime.Context) {
+		t.Helper()
+		iframe := ctx.Page.Locator("iframe[src='/thoughts/_render/html/renderer-demo.html']").First()
+		if err := iframe.WaitFor(); err != nil {
+			t.Fatal(err)
+		}
+		sandbox, err := iframe.GetAttribute("sandbox")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !strings.Contains(sandbox, "allow-scripts") {
+			t.Fatalf("sandbox=%q missing allow-scripts", sandbox)
+		}
+		if strings.Contains(sandbox, "allow-same-origin") {
+			t.Fatalf("sandbox=%q permits same-origin", sandbox)
+		}
+	}))
 }
 
 func runWorkbenchRegionsRemainUsable(t *testing.T, viewport duiruntime.ViewportClass, p string) {
