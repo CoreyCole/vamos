@@ -5,9 +5,41 @@ package markdown
 
 import (
 	"bytes"
+	"path/filepath"
 	"strings"
 	"testing"
 )
+
+func TestGetDirectoryListingIncludesRenderableFormats(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	mustWriteFile(t, filepath.Join(root, "note.md"), []byte("# Note"))
+	mustWriteFile(t, filepath.Join(root, "app.html"), []byte("<h1>App</h1>"))
+	mustWriteFile(t, filepath.Join(root, "legacy.htm"), []byte("<h1>Legacy</h1>"))
+	mustWriteFile(t, filepath.Join(root, "data.csv"), []byte("a,b\n1,2"))
+	mustWriteFile(t, filepath.Join(root, "image.png"), []byte("skip"))
+	service, err := NewService(root, nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	listing, err := service.GetDirectoryListing("")
+	if err != nil {
+		t.Fatal(err)
+	}
+	names := map[string]bool{}
+	for _, item := range listing.Items {
+		names[item.Name] = true
+	}
+	for _, want := range []string{"note", "app.html", "legacy.htm", "data.csv"} {
+		if !names[want] {
+			t.Fatalf("missing %q in %#v", want, listing.Items)
+		}
+	}
+	if names["image.png"] {
+		t.Fatalf("image should be skipped: %#v", listing.Items)
+	}
+}
 
 func TestDirectoryPrimaryPanelRendersAnchors(t *testing.T) {
 	t.Parallel()

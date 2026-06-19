@@ -15,6 +15,9 @@ func TestBuildWorkspaceDocTreeFromRootUsesFilesystemFallback(t *testing.T) {
 	mustWriteFile(t, filepath.Join(planRoot, "outline.md"), []byte("# Outline"))
 	mustWriteFile(t, filepath.Join(planRoot, "plan.md"), []byte("# Implementation"))
 	mustWriteFile(t, filepath.Join(planRoot, "notes.txt"), []byte("include"))
+	mustWriteFile(t, filepath.Join(planRoot, "data.csv"), []byte("a,b\n1,2"))
+	mustWriteFile(t, filepath.Join(planRoot, "demo.html"), []byte("<h1>Demo</h1>"))
+	mustWriteFile(t, filepath.Join(planRoot, "legacy.htm"), []byte("<h1>Legacy</h1>"))
 	mustWriteFile(t, filepath.Join(planRoot, "image.png"), []byte("skip"))
 	mustMkdirAll(t, filepath.Join(planRoot, "context"))
 	mustWriteFile(t, filepath.Join(planRoot, "context", "design.md"), []byte("# Design"))
@@ -42,7 +45,7 @@ func TestBuildWorkspaceDocTreeFromRootUsesFilesystemFallback(t *testing.T) {
 			labels[child.Label] = true
 		}
 	}
-	for _, want := range []string{"AGENTS.md", "outline.md", "plan.md", "notes.txt", "context"} {
+	for _, want := range []string{"AGENTS.md", "outline.md", "plan.md", "notes.txt", "data.csv", "demo.html", "legacy.htm", "context"} {
 		if !labels[want] {
 			t.Fatalf("missing label %q in nodes %#v", want, nodes)
 		}

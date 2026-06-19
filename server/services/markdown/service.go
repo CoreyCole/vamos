@@ -100,6 +100,7 @@ func NewServiceWithOptions(
 		UnsupportedRenderer{},
 		NewMarkdownDocumentRenderer(service, renderer, opts.Projects),
 		HTMLAppletRenderer{},
+		CSVRenderer{MaxRows: 500},
 	)
 	return service, nil
 }
@@ -308,11 +309,10 @@ func (s *Service) GetDirectoryListing(dirPath string) (*DirectoryArgs, error) {
 				},
 				date: extractDateFromFilename(name),
 			})
-		} else if strings.HasSuffix(name, ".md") {
-			displayName := strings.TrimSuffix(name, ".md")
+		} else if isThoughtsRenderableFile(name) {
 			itemsWithDate = append(itemsWithDate, itemWithDate{
 				item: DirectoryItem{
-					Name:  displayName,
+					Name:  displayDocumentName(name),
 					Path:  filepath.Join(dirPath, name),
 					IsDir: false,
 				},
@@ -513,29 +513,45 @@ func skipWorkspaceDocTreeEntry(name string, isDir bool) bool {
 	}
 }
 
-func isWorkspaceDocTreeFile(name string) bool {
+func isThoughtsRenderableFile(name string) bool {
 	switch strings.ToLower(filepath.Ext(name)) {
 	case ".md",
+		".markdown",
 		".mdx",
+		".html",
+		".htm",
+		".csv",
 		".txt",
+		".json",
+		".yaml",
+		".yml",
+		".toml",
 		".go",
 		".templ",
 		".ts",
 		".tsx",
 		".js",
 		".jsx",
-		".json",
-		".yaml",
-		".yml",
-		".toml",
 		".sql",
 		".css",
-		".html",
 		".sh":
 		return true
 	default:
 		return false
 	}
+}
+
+func displayDocumentName(name string) string {
+	switch strings.ToLower(filepath.Ext(name)) {
+	case ".md", ".markdown":
+		return strings.TrimSuffix(name, filepath.Ext(name))
+	default:
+		return name
+	}
+}
+
+func isWorkspaceDocTreeFile(name string) bool {
+	return isThoughtsRenderableFile(name)
 }
 
 func (s *Service) buildTree(relDir, activePath string) []FileTreeNode {
@@ -554,7 +570,7 @@ func (s *Service) buildTree(relDir, activePath string) []FileTreeNode {
 		}
 		if e.IsDir() {
 			dirs = append(dirs, e)
-		} else if strings.HasSuffix(name, ".md") {
+		} else if isThoughtsRenderableFile(name) {
 			files = append(files, e)
 		}
 	}
@@ -592,9 +608,8 @@ func (s *Service) buildTree(relDir, activePath string) []FileTreeNode {
 
 	for _, f := range files {
 		filePath := filepath.Join(relDir, f.Name())
-		displayName := strings.TrimSuffix(f.Name(), ".md")
 		nodes = append(nodes, FileTreeNode{
-			Name:  displayName,
+			Name:  displayDocumentName(f.Name()),
 			Path:  filePath,
 			IsDir: false,
 			IsActive: cleanActive == filePath ||

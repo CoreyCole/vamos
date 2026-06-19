@@ -1,0 +1,40 @@
+package markdown
+
+templ CSVTableDocument(docPath string, table CSVTable) {
+	<section class="mx-auto w-full max-w-6xl space-y-3">
+		<div class="rounded-lg border border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
+			CSV table: <span class="font-mono text-foreground">{ docPath }</span>
+			if table.Truncated {
+				<span class="ml-2 rounded border border-border px-2 py-0.5">truncated</span>
+			}
+		</div>
+		if len(table.Headers) == 0 {
+			<p class="text-sm text-muted-foreground">Empty CSV file.</p>
+		} else {
+			<div class="table-wrapper">
+				<table>
+					<thead>
+						<tr>
+							for _, header := range table.Headers {
+								<th class="px-4 py-3 text-left text-sm font-semibold text-foreground">{ header }</th>
+							}
+						</tr>
+					</thead>
+					<tbody>
+						for _, row := range table.Rows {
+							<tr>
+								for i := 0; i < len(table.Headers); i++ {
+									if i < len(row) {
+										<td class="px-4 py-3 text-sm text-foreground">{ row[i] }</td>
+									} else {
+										<td class="px-4 py-3 text-sm text-muted-foreground"></td>
+									}
+								}
+							</tr>
+						}
+					</tbody>
+				</table>
+			</div>
+		}
+	</section>
+}
