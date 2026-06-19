@@ -422,7 +422,7 @@ templ CommentsContextPanel(args CommentsPanelArgs) {
 		<div class="shrink-0 border-b border-border px-3 py-2">
 			<p class="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Comments</p>
 			if args.ActiveSectionID != "" {
-				<p class="truncate text-sm text-foreground">{ args.ActiveSectionID }</p>
+				<p class="truncate text-sm text-foreground">{ args.ActiveSectionLabel }</p>
 			} else if args.DocPath != "" {
 				<p class="truncate text-sm text-muted-foreground">{ args.DocPath }</p>
 			}
@@ -451,8 +451,12 @@ templ MobileSectionCommentTarget() {
 }
 
 templ CommentThreadCard(view CommentThreadView, target CommentTargetView, opts CommentThreadOptions) {
-	{{ _ = opts }}
-	@CommentCard(view, target)
+	<div class="space-y-1.5">
+		if opts.ShowSection {
+			<p class="truncate px-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">{ CommentSectionLabel(view) }</p>
+		}
+		@CommentCard(view, target)
+	</div>
 }
 
 templ CommentCard(view CommentThreadView, target CommentTargetView) {

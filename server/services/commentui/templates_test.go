@@ -345,6 +345,46 @@ func TestCommentSharedPatchTargetsRenderStableIDs(t *testing.T) {
 	}
 }
 
+func TestCommentsContextPanelShowsAllSectionsWithSectionTitles(t *testing.T) {
+	t.Parallel()
+
+	args := BuildCommentsPanelArgs(CommentableMarkdownArgs{
+		Surface:  CommentSurfaceThoughts,
+		IDPrefix: SafeCommentTargetSlug("thoughts", "thoughts/plan.md"),
+		DocPath:  "thoughts/plan.md",
+		Comments: []CommentThreadView{
+			{
+				ID:          "comment-1",
+				AuthorEmail: "a@example.com",
+				Body:        "first",
+				SectionID:   "section-13",
+				HeadingHint: "Launch Readiness",
+			},
+			{
+				ID:          "comment-2",
+				AuthorEmail: "b@example.com",
+				Body:        "second",
+				SectionID:   "section-14",
+				HeadingHint: "Follow-up",
+			},
+		},
+	}, "section-13")
+
+	var buf bytes.Buffer
+	if err := CommentsContextPanel(args).Render(t.Context(), &buf); err != nil {
+		t.Fatalf("Render() error = %v", err)
+	}
+	html := buf.String()
+	for _, want := range []string{`first`, `second`, `Launch Readiness`, `Follow-up`} {
+		if !strings.Contains(html, want) {
+			t.Fatalf("context panel missing %q: %s", want, html)
+		}
+	}
+	if strings.Contains(html, `>section-13<`) || strings.Contains(html, `>section-14<`) {
+		t.Fatalf("context panel rendered section ids instead of titles: %s", html)
+	}
+}
+
 func TestCommentsContextPanelRendersFullSelectedQuote(t *testing.T) {
 	t.Parallel()
 

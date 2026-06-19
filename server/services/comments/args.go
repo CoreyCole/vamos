@@ -14,6 +14,7 @@ type CreateCommentRequest struct {
 	EndLine      int    `json:"end_line"`
 	EndColumn    int    `json:"end_column"`
 	SectionID    string `json:"section_id"` // Section identifier for layout
+	HeadingHint  string `json:"heading_hint"`
 }
 
 // CreateReplyRequest represents a reply creation request

@@ -217,6 +217,68 @@ func TestThoughtsCommentCreatePatchesInlineTarget(t *testing.T) {
 	}
 }
 
+func TestThoughtsCommentExpandOpensRightRail(t *testing.T) {
+	t.Parallel()
+	markdownBase := t.TempDir()
+	if err := os.WriteFile(
+		filepath.Join(markdownBase, "plan.md"),
+		[]byte("# Overview\n\nIntro text.\n\n## Implementation Notes\n\nBody.\n\n## Risks\n\nRisk body."),
+		0o644,
+	); err != nil {
+		t.Fatalf("write markdown fixture: %v", err)
+	}
+	svc := newTestCommentsServiceWithBase(t, markdownBase)
+	if _, err := svc.createCommentInternal(
+		t.Context(),
+		"user@example.com",
+		CreateCommentRequest{
+			FilePath:    "thoughts/plan.md",
+			CommentText: "Question",
+			SectionID:   "section-1",
+		},
+	); err != nil {
+		t.Fatalf("createCommentInternal() error = %v", err)
+	}
+	if _, err := svc.createCommentInternal(
+		t.Context(),
+		"user@example.com",
+		CreateCommentRequest{
+			FilePath:    "thoughts/plan.md",
+			CommentText: "Question in another section",
+			SectionID:   "section-2",
+		},
+	); err != nil {
+		t.Fatalf("createCommentInternal() second comment error = %v", err)
+	}
+	form := url.Values{}
+	form.Set("doc_path", "thoughts/plan.md")
+	form.Set("section_hint", "section-1")
+	form.Set("heading_hint", "Implementation Notes")
+	c, rec := newCommentFormRequest(t, "/forms/comments/expand", form)
+
+	if err := svc.HandleExpandSectionComments(c); err != nil {
+		t.Fatalf("HandleExpandSectionComments() error = %v", err)
+	}
+	body := rec.Body.String()
+	for _, want := range []string{
+		`Question`,
+		`Question in another section`,
+		commentui.CommentsContextPanelID,
+		`rightRailActiveTab`,
+		`docWorkbenchRight`,
+		`visible`,
+		`Implementation Notes`,
+		`Risks`,
+	} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("response missing %q: %s", want, body)
+		}
+	}
+	if strings.Contains(body, "PatchElementsNoTargetsFound") {
+		t.Fatalf("response contains Datastar target error: %s", body)
+	}
+}
+
 func TestThoughtsCommentReplyPatchesInlineTarget(t *testing.T) {
 	t.Parallel()
 	svc := newTestCommentsService(t)

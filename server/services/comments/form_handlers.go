@@ -113,6 +113,20 @@ func thoughtsCommentThreads(items []CommentWithReplies) []commentui.CommentThrea
 	return commentui.BuildThreadViews(sources)
 }
 
+func (s *Service) thoughtsCommentThreadsWithSectionTitles(
+	filePath string,
+	comments []CommentWithReplies,
+) []commentui.CommentThreadView {
+	threads := thoughtsCommentThreads(comments)
+	titles := s.sectionTitlesForFile(filePath)
+	for i := range threads {
+		if strings.TrimSpace(threads[i].HeadingHint) == "" {
+			threads[i].HeadingHint = titles[normalizeSectionID(threads[i].SectionID)]
+		}
+	}
+	return threads
+}
+
 func thoughtsCommentTarget(
 	filePath, sectionID, headingHint, userEmail string,
 	comments []CommentWithReplies,
@@ -160,27 +174,37 @@ func patchThoughtsCommentTargetWithForm(
 }
 
 func patchOpenCommentsSignal(sse *datastar.ServerSentEventGenerator) error {
-	return sse.MarshalAndPatchSignals(map[string]any{"rightRailActiveTab": "comments"})
+	return sse.MarshalAndPatchSignals(map[string]any{
+		"rightRailActiveTab": "comments",
+		"workbench": map[string]any{
+			"focused": false,
+			"regions": map[string]any{
+				"docWorkbenchRight": map[string]any{"visible": true},
+			},
+		},
+	})
 }
 
-func patchThoughtsCommentsPanel(
+func (s *Service) patchThoughtsCommentsPanel(
 	sse *datastar.ServerSentEventGenerator,
-	filePath, userEmail, activeSectionID string,
+	filePath, userEmail, activeSectionID, activeSectionLabel string,
 	items []CommentWithReplies,
 ) error {
 	args := commentui.CommentableMarkdownArgs{
 		Surface:      commentui.CommentSurfaceThoughts,
 		IDPrefix:     commentui.SafeCommentTargetSlug("thoughts", filePath),
 		DocPath:      filePath,
-		Comments:     thoughtsCommentThreads(items),
+		Comments:     s.thoughtsCommentThreadsWithSectionTitles(filePath, items),
 		Routes:       thoughtsCommentRoutes(),
 		HiddenFields: map[string]string{"doc_path": filePath, "context_panel": "1"},
 		UserEmail:    userEmail,
 	}
+	panelArgs := commentui.BuildCommentsPanelArgs(args, activeSectionID)
+	if label := strings.TrimSpace(activeSectionLabel); label != "" {
+		panelArgs.ActiveSectionLabel = label
+	}
 	return sse.PatchElementTempl(
-		commentui.CommentsContextPanel(
-			commentui.BuildCommentsPanelArgs(args, activeSectionID),
-		),
+		commentui.CommentsContextPanel(panelArgs),
 		datastar.WithSelectorID(commentui.CommentsContextPanelID),
 	)
 }
@@ -209,11 +233,12 @@ func (s *Service) HandleCancelCommentForm(c echo.Context) error {
 	if err := patchThoughtsCommentTarget(sse, target); err != nil {
 		return err
 	}
-	if err := patchThoughtsCommentsPanel(
+	if err := s.patchThoughtsCommentsPanel(
 		sse,
 		data.FilePath,
 		userEmail,
 		data.SectionID,
+		data.HeadingHint,
 		response.Comments,
 	); err != nil {
 		return err
@@ -248,6 +273,7 @@ func (s *Service) HandleCommentForm(c echo.Context) error {
 			EndLine:      data.EndLine,
 			EndColumn:    data.EndColumn,
 			SectionID:    data.SectionID,
+			HeadingHint:  data.HeadingHint,
 		},
 	)
 	if err != nil {
@@ -283,11 +309,12 @@ func (s *Service) renderFormError(
 	if err := patchThoughtsCommentTargetWithForm(sse, target, data, errMsg); err != nil {
 		return err
 	}
-	if err := patchThoughtsCommentsPanel(
+	if err := s.patchThoughtsCommentsPanel(
 		sse,
 		data.FilePath,
 		userEmail,
 		data.SectionID,
+		data.HeadingHint,
 		response.Comments,
 	); err != nil {
 		return err
@@ -333,11 +360,12 @@ func (s *Service) renderCommentSuccess(
 	if err := patchThoughtsCommentTarget(sse, target); err != nil {
 		return err
 	}
-	if err := patchThoughtsCommentsPanel(
+	if err := s.patchThoughtsCommentsPanel(
 		sse,
 		comment.DocPath,
 		userEmail,
 		sectionID,
+		comment.HeadingHint.String,
 		response.Comments,
 	); err != nil {
 		return err
@@ -443,11 +471,12 @@ func (s *Service) renderReplySectionTarget(
 	if err := patchThoughtsCommentTarget(sse, target); err != nil {
 		return err
 	}
-	if err := patchThoughtsCommentsPanel(
+	if err := s.patchThoughtsCommentsPanel(
 		sse,
 		filePath,
 		userEmail,
 		sectionID,
+		parentComment.HeadingHint.String,
 		response.Comments,
 	); err != nil {
 		return err
@@ -514,11 +543,12 @@ func (s *Service) HandleResolveComment(c echo.Context) error {
 	if err := patchThoughtsCommentTarget(sse, target); err != nil {
 		return err
 	}
-	if err := patchThoughtsCommentsPanel(
+	if err := s.patchThoughtsCommentsPanel(
 		sse,
 		filePath,
 		userEmail,
 		sectionID,
+		comment.HeadingHint.String,
 		response.Comments,
 	); err != nil {
 		return err
@@ -532,6 +562,7 @@ func (s *Service) HandleExpandSectionComments(c echo.Context) error {
 	userEmail, _ := c.Get("user_email").(string)
 
 	sectionID := normalizeSectionID(c.FormValue("section_hint"))
+	headingHint := c.FormValue("heading_hint")
 	filePath := c.FormValue("doc_path")
 
 	// Fetch comments for the file
@@ -543,11 +574,12 @@ func (s *Service) HandleExpandSectionComments(c echo.Context) error {
 
 	sse := datastar.NewSSE(c.Response().Writer, c.Request())
 
-	if err := patchThoughtsCommentsPanel(
+	if err := s.patchThoughtsCommentsPanel(
 		sse,
 		filePath,
 		userEmail,
 		sectionID,
+		headingHint,
 		response.Comments,
 	); err != nil {
 		return err
@@ -596,11 +628,12 @@ func (s *Service) HandleShowCommentForm(c echo.Context) error {
 		c.Logger().Errorf("Failed to patch shared comment target: %v", err)
 		return err
 	}
-	if err := patchThoughtsCommentsPanel(
+	if err := s.patchThoughtsCommentsPanel(
 		sse,
 		data.FilePath,
 		userEmail,
 		data.SectionID,
+		data.HeadingHint,
 		response.Comments,
 	); err != nil {
 		return err

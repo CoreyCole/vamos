@@ -131,14 +131,15 @@ type CommentFormView struct {
 }
 
 type CommentsPanelArgs struct {
-	Surface         CommentSurface
-	TargetPrefix    string
-	DocPath         string
-	Threads         []CommentThreadView
-	ActiveSectionID string
-	Routes          CommentRoutes
-	HiddenFields    map[string]string
-	UserEmail       string
+	Surface            CommentSurface
+	TargetPrefix       string
+	DocPath            string
+	Threads            []CommentThreadView
+	ActiveSectionID    string
+	ActiveSectionLabel string
+	Routes             CommentRoutes
+	HiddenFields       map[string]string
+	UserEmail          string
 }
 
 type CommentThreadOptions struct {
@@ -151,21 +152,27 @@ func BuildCommentsPanelArgs(
 	args CommentableMarkdownArgs,
 	activeSectionID string,
 ) CommentsPanelArgs {
-	threads := args.Comments
-	if activeSectionID != "" {
-		activeSectionID = sectionOrDocument(activeSectionID)
-		threads = CommentsForSection(args.Comments, activeSectionID, "")
-	}
+	_ = activeSectionID
 	return CommentsPanelArgs{
-		Surface:         args.Surface,
-		TargetPrefix:    args.IDPrefix,
-		DocPath:         args.DocPath,
-		Threads:         threads,
-		ActiveSectionID: activeSectionID,
-		Routes:          args.Routes,
-		HiddenFields:    args.HiddenFields,
-		UserEmail:       args.UserEmail,
+		Surface:      args.Surface,
+		TargetPrefix: args.IDPrefix,
+		DocPath:      args.DocPath,
+		Threads:      args.Comments,
+		Routes:       args.Routes,
+		HiddenFields: args.HiddenFields,
+		UserEmail:    args.UserEmail,
 	}
+}
+
+func CommentSectionLabel(thread CommentThreadView) string {
+	if label := strings.TrimSpace(thread.HeadingHint); label != "" {
+		return label
+	}
+	sectionID := strings.TrimSpace(sectionOrDocument(thread.SectionID))
+	if sectionID == "document" {
+		return "Document"
+	}
+	return sectionID
 }
 
 type CommentPopoverPlacement string

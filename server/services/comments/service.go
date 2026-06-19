@@ -7,6 +7,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"github.com/gofrs/uuid"
@@ -78,6 +79,10 @@ func (s *Service) createCommentInternal(
 			SectionHint: sql.NullString{
 				String: req.SectionID,
 				Valid:  req.SectionID != "",
+			},
+			HeadingHint: sql.NullString{
+				String: strings.TrimSpace(req.HeadingHint),
+				Valid:  strings.TrimSpace(req.HeadingHint) != "",
 			},
 			StartLine:   int64(req.StartLine),
 			StartColumn: int64(req.StartColumn),
@@ -179,6 +184,87 @@ func (s *Service) ResolveCommentScope(
 		RootDocPath: root,
 		CurrentPath: documentPath,
 	}, nil
+}
+
+func (s *Service) sectionTitlesForFile(filePath string) map[string]string {
+	titles := map[string]string{}
+	documentPath, err := canonicalThoughtsPath(filePath)
+	if err != nil || strings.TrimSpace(s.markdownBasePath) == "" {
+		return titles
+	}
+	cleanDoc := strings.Trim(
+		strings.TrimPrefix(strings.Trim(documentPath, "/"), "thoughts/"),
+		"/",
+	)
+	base, err := filepath.Abs(s.markdownBasePath)
+	if err != nil {
+		return titles
+	}
+	abs := filepath.Join(base, filepath.FromSlash(cleanDoc))
+	rel, err := filepath.Rel(base, abs)
+	if err != nil || rel == "." || strings.HasPrefix(rel, "..") {
+		return titles
+	}
+	data, err := os.ReadFile(abs)
+	if err != nil {
+		return titles
+	}
+	return markdownSectionTitles(data)
+}
+
+func markdownSectionTitles(data []byte) map[string]string {
+	titles := map[string]string{}
+	lines := strings.Split(string(data), "\n")
+	inFence := false
+	inFrontmatter := false
+	if len(lines) > 0 && strings.TrimSpace(lines[0]) == "---" {
+		inFrontmatter = true
+	}
+	sectionID := 0
+	contentBeforeHeading := false
+	for i, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if inFrontmatter {
+			if i > 0 && trimmed == "---" {
+				inFrontmatter = false
+			}
+			continue
+		}
+		if strings.HasPrefix(trimmed, "```") || strings.HasPrefix(trimmed, "~~~") {
+			inFence = !inFence
+			continue
+		}
+		if inFence || trimmed == "" {
+			continue
+		}
+		if title, ok := markdownHeadingTitle(trimmed); ok {
+			if contentBeforeHeading {
+				sectionID++
+				contentBeforeHeading = false
+			}
+			titles["section-"+strconv.Itoa(sectionID)] = title
+			sectionID++
+			continue
+		}
+		if len(titles) == 0 {
+			contentBeforeHeading = true
+		}
+	}
+	return titles
+}
+
+func markdownHeadingTitle(trimmed string) (string, bool) {
+	level := 0
+	for level < len(trimmed) && trimmed[level] == '#' {
+		level++
+	}
+	if level == 0 || level > 6 || level >= len(trimmed) || trimmed[level] != ' ' {
+		return "", false
+	}
+	title := strings.TrimSpace(trimmed[level:])
+	title = strings.TrimSpace(strings.TrimRight(title, "#"))
+	title = strings.Trim(title, "`*_ ")
+	return title, title != ""
 }
 
 func (s *Service) inferWorkspaceRoot(documentPath string) (string, bool) {
