@@ -41,6 +41,8 @@ func TestAgentChatQRSPIQuestionCompletionAutoStartsDesign(t *testing.T) {
 		Expect(vamos.ExpectWorkflowRunResultContains("research", "research")).
 		Expect(vamos.WaitForWorkflowRunStarted("design")).
 		Expect(vamos.ExpectWorkflowCurrentNode("design")).
+		Do(vamos.SetQRSPIWorkflowPolicyDiscuss()).
+		Expect(vamos.ExpectWorkflowCurrentNode("design")).
 		Do(vamos.ReloadChat()).
 		Expect(vamos.ExpectWorkflowCurrentNode("design")).
 		Run()

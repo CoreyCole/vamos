@@ -942,6 +942,66 @@ func ExpectWorkflowCurrentNode(nodeID string) expectation {
 	})}
 }
 
+func SetQRSPIWorkflowPolicyDiscuss() spec.Step {
+	return customStep("set qrspi workflow policy discuss", func(t testing.TB, ctx *duiruntime.Context) {
+		threadID := ctx.Memory["qrspi_q_to_d_thread_id"]
+		if threadID == "" {
+			t.Fatal("qrspi_q_to_d_thread_id missing")
+		}
+		values := url.Values{}
+		values.Set("advanceMode", "discuss")
+		values.Set("enablePlanReviews", "on")
+		values.Set("invalidResultRetryLimit", "1")
+		postThreadWorkflowPolicy(t, ctx, threadID, values)
+		expectWorkflowPolicy(t, ctx, workflowWorkspaceID(t, ctx), "discuss", false, true, 1)
+	})
+}
+
+func postThreadWorkflowPolicy(t testing.TB, ctx *duiruntime.Context, threadID string, values url.Values) {
+	t.Helper()
+	endpoint := "/agent-chat/thread/" + url.PathEscape(threadID) + "/workflow/policy"
+	_, err := ctx.Page.Evaluate(`async ({url, body}) => {
+		const response = await fetch(url, {
+			method: "POST",
+			headers: {"Content-Type": "application/x-www-form-urlencoded"},
+			body,
+		});
+		if (!response.ok) {
+			throw new Error(`+"`"+`workflow policy POST failed ${response.status}: ${await response.text()}`+"`"+`);
+		}
+	}`, map[string]any{
+		"url":  strings.TrimRight(ctx.Config.BaseURL, "/") + endpoint,
+		"body": values.Encode(),
+	})
+	if err != nil {
+		t.Fatalf("post workflow policy: %v", err)
+	}
+}
+
+func expectWorkflowPolicy(t testing.TB, ctx *duiruntime.Context, workspaceID, advanceMode string, autoMode, reviews bool, retryLimit int) {
+	t.Helper()
+	database := openDB(t, ctx)
+	defer database.Close()
+	workspace, err := db.New(database).GetWorkspace(t.Context(), workspaceID)
+	if err != nil {
+		t.Fatalf("get workspace %s: %v", workspaceID, err)
+	}
+	var state struct {
+		Policy struct {
+			AdvanceMode             string `json:"advanceMode"`
+			AutoMode                bool   `json:"autoMode"`
+			EnablePlanReviews       bool   `json:"enablePlanReviews"`
+			InvalidResultRetryLimit int    `json:"invalidResultRetryLimit"`
+		} `json:"policy"`
+	}
+	if err := json.Unmarshal([]byte(workspace.WorkflowStateJson.String), &state); err != nil {
+		t.Fatalf("decode workflow state policy: %v", err)
+	}
+	if state.Policy.AdvanceMode != advanceMode || state.Policy.AutoMode != autoMode || state.Policy.EnablePlanReviews != reviews || state.Policy.InvalidResultRetryLimit != retryLimit {
+		t.Fatalf("workflow policy = %+v, want advanceMode=%s autoMode=%v reviews=%v retry=%d", state.Policy, advanceMode, autoMode, reviews, retryLimit)
+	}
+}
+
 func ExpectDistinctWorkflowRuns(firstNodeID, secondNodeID string) expectation {
 	return expectation{customStep("distinct workflow runs "+firstNodeID+" "+secondNodeID, func(t testing.TB, ctx *duiruntime.Context) {
 		first := waitForWorkflowRunForNode(t, ctx, firstNodeID, true)
