@@ -2,10 +2,57 @@ package markdown
 
 import (
 	"bytes"
+	"net/http"
+	"net/http/httptest"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/labstack/echo/v4"
 )
+
+func TestResolveHTMLAppletAssetStaysUnderDocumentDirectory(t *testing.T) {
+	root := t.TempDir()
+	mustMkdirAll(t, filepath.Join(root, "plans", "demo", "assets"))
+	mustWriteFile(t, filepath.Join(root, "plans", "demo", "assets", "app.js"), []byte("console.log('ok')"))
+
+	got, err := resolveHTMLAppletAsset(root, "thoughts/plans/demo/app.html", "plans/demo/assets/app.js")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.HasSuffix(got, filepath.Join("plans", "demo", "assets", "app.js")) {
+		t.Fatalf("asset=%q", got)
+	}
+}
+
+func TestResolveHTMLAppletAssetRejectsEscapes(t *testing.T) {
+	root := t.TempDir()
+	mustMkdirAll(t, filepath.Join(root, "plans", "demo"))
+	mustWriteFile(t, filepath.Join(root, "secret.js"), []byte("bad"))
+
+	for _, asset := range []string{"../secret.js", "secret.js", "plans/other/app.js"} {
+		if _, err := resolveHTMLAppletAsset(root, "thoughts/plans/demo/app.html", asset); err == nil {
+			t.Fatalf("asset %q unexpectedly allowed", asset)
+		}
+	}
+}
+
+func TestChildHTMLHeadersSetContainmentHeaders(t *testing.T) {
+	e := echo.New()
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+
+	childHTMLHeaders(c)
+
+	if rec.Header().Get("X-Content-Type-Options") != "nosniff" {
+		t.Fatal("missing nosniff")
+	}
+	csp := rec.Header().Get("Content-Security-Policy")
+	if !strings.Contains(csp, "frame-ancestors 'self'") {
+		t.Fatalf("bad CSP: %s", csp)
+	}
+}
 
 func TestHTMLAppletRendererReturnsSandboxedFrame(t *testing.T) {
 	root := t.TempDir()
