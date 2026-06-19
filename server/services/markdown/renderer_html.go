@@ -74,7 +74,7 @@ func resolveHTMLAppletAsset(basePath, docPath, assetPath string) (string, error)
 	if assetRel == "." || assetRel == "" || strings.HasPrefix(assetRel, "../") {
 		return "", fmt.Errorf("invalid asset path")
 	}
-	if assetRel != docDir && !strings.HasPrefix(assetRel, docDir+"/") {
+	if docDir != "." && assetRel != docDir && !strings.HasPrefix(assetRel, docDir+"/") {
 		return "", fmt.Errorf("asset escapes applet directory")
 	}
 	abs := filepath.Join(basePath, filepath.FromSlash(assetRel))

@@ -25,6 +25,19 @@ func TestResolveHTMLAppletAssetStaysUnderDocumentDirectory(t *testing.T) {
 	}
 }
 
+func TestResolveHTMLAppletAssetAllowsRootDocumentAssets(t *testing.T) {
+	root := t.TempDir()
+	mustWriteFile(t, filepath.Join(root, "app.css"), []byte("body { color: red; }"))
+
+	got, err := resolveHTMLAppletAsset(root, "thoughts/demo.html", "app.css")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.HasSuffix(got, "app.css") {
+		t.Fatalf("asset=%q", got)
+	}
+}
+
 func TestResolveHTMLAppletAssetRejectsEscapes(t *testing.T) {
 	root := t.TempDir()
 	mustMkdirAll(t, filepath.Join(root, "plans", "demo"))
