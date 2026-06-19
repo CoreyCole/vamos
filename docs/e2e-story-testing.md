@@ -62,7 +62,7 @@ just e2e \
   --scenario freeform-chat-started-from-thoughts-root-survives-refresh-and-resume
 ```
 
-The live QRSPI continuation browser check is intentionally singular and expensive: `agentchat qrspi question completion auto starts design` starts a real Pi/Temporal `question` workflow-node run, asserts the runtime starts `research`, lets the real `research` run follow a seeded fast-path fixture, and asserts the runtime starts `design`. Keep card rendering, reload, and sidebar coverage in fixture stories such as `agentchat qrspi continuation`.
+The live QRSPI continuation browser check is intentionally singular and expensive: `agentchat qrspi question completion auto starts design` starts a real Pi/Temporal `question` workflow-node run with legacy `assisted`/autopilot, asserts the runtime starts `research`, lets the real `research` run follow a seeded fast-path fixture, and asserts the runtime starts `design`. Once design is current, the story downgrades the workflow policy to `discuss` so later QRSPI nodes do not auto-start, then verifies no `workspace` node run or sibling implementation checkout was created. The generated Q-to-D plan fixture lives under the served thoughts root (`VAMOS_E2E_THOUGHTS_ROOT` when set, otherwise the checkout `thoughts/`) so plan-workspace validation passes; it is removed at test cleanup unless `VAMOS_E2E_QRSPI_PRESERVE_FIXTURE=1` is set for debugging. Keep card rendering, reload, and sidebar coverage in fixture stories such as `agentchat qrspi continuation`.
 
 ```bash
 VAMOS_E2E_QRSPI_PROMPT_OVERRIDE=1 \
@@ -104,6 +104,15 @@ After automated browser checks pass against the same URL, `/q-verify` must stop 
 - Vamos repair/fix policy is bounded to typed app helpers and authored Go Story tests unless a human explicitly approves wider changes.
 
 ## Run artifacts
+
+To inspect old leaked Q-to-D fixtures before manual cleanup:
+
+```bash
+find thoughts/creative-mode-agent/plans -maxdepth 1 -type d -name 'e2e-qrspi-q-to-d-*' -print
+find .. -maxdepth 1 -type d \( -name 'vamos-*e2e-qrspi-q-to-d*' -o -name 'vamos-e2e-qrspi-q-to-d-*' \) -print
+```
+
+Only delete generated `e2e-qrspi-q-to-d-*` fixture directories/checkouts after confirming no human needs them for debugging. Never match/delete the real plan directory `2026-06-17_10-52-01_e2e-qrspi-q-to-d-boundary`.
 
 `just e2e` / `datastarui e2e run` writes browser artifacts under `--artifacts-dir` or the config `artifacts_dir`, grouped by run timestamp, feature, scenario, and viewport.
 
