@@ -7,6 +7,7 @@ import (
 	"github.com/CoreyCole/vamos/cmd/vamos-runtime/internal/chatcmd"
 	"github.com/CoreyCole/vamos/cmd/vamos-runtime/internal/ctlcmd"
 	"github.com/CoreyCole/vamos/cmd/vamos-runtime/internal/e2ecmd"
+	"github.com/CoreyCole/vamos/cmd/vamos-runtime/internal/qrspicmd"
 )
 
 func NewCommand() *cobra.Command {
@@ -19,5 +20,6 @@ func NewCommand() *cobra.Command {
 	cmd.AddCommand(chatcmd.NewCommand())
 	cmd.AddCommand(ctlcmd.NewCommand())
 	cmd.AddCommand(e2ecmd.NewCommand())
+	cmd.AddCommand(qrspicmd.NewCommand())
 	return cmd
 }

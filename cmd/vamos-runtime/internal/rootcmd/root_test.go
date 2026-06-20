@@ -8,9 +8,9 @@ import (
 	"testing"
 )
 
-func TestRootCommandContainsAuthChatCtlAndE2E(t *testing.T) {
+func TestRootCommandContainsExpectedSubcommands(t *testing.T) {
 	cmd := NewCommand()
-	for _, name := range []string{"auth", "chat", "ctl", "e2e"} {
+	for _, name := range []string{"auth", "chat", "ctl", "e2e", "qrspi"} {
 		found := false
 		for _, child := range cmd.Commands() {
 			if child.Name() == name {
