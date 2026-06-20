@@ -114,6 +114,7 @@ func ChildEnv(
 	env = appendEnv(env, "OPENCLAW_STATE_DIR", paths.OpenClawDir)
 	env = appendEnv(env, "VAMOS_WORKSPACE_MODE", "child")
 	env = appendEnv(env, "VAMOS_WORKSPACE_SLUG", ws.Slug)
+	env = appendEnv(env, "VAMOS_WORKSPACE_PROJECT_ID", ws.ProjectID)
 	env = appendEnv(env, "VAMOS_WORKSPACE_MANAGER_URL", rt.ManagerURL)
 	env = appendEnv(env, "VAMOS_WORKSPACE_RESTART_TOKEN", rt.RestartToken)
 	env = appendEnv(env, "VAMOS_DEV_AUTH_VERIFY_KEY", rt.DevAuthVerifyKey)

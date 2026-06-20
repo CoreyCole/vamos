@@ -54,11 +54,19 @@ func RunRegisterCurrent(
 	status, statusErr := readRuntimeStatus(paths.StatusJSON)
 	needsStoppedState := stale || os.IsNotExist(statusErr) ||
 		status.Status == "failed" || status.Status == "invalid"
+	projectID := strings.TrimSpace(opts.ProjectID)
+	if projectID == "" {
+		projectID = oldMeta.ProjectID
+	}
 	if err := workspaces.WriteMetadata(paths.WorkspaceEnv, workspaces.WorkspaceMetadata{
 		Slug:         slug,
+		ProjectID:    projectID,
 		CheckoutPath: checkout,
 		ManagerURL:   managerURL,
 		RestartToken: restartToken,
+		DatabasePath: oldMeta.DatabasePath,
+		PID:          oldMeta.PID,
+		Port:         oldMeta.Port,
 	}); err != nil {
 		return err
 	}

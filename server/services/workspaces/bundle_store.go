@@ -73,6 +73,7 @@ func (s FileBundleStore) ReadWorkspaceEnv(ws Workspace) (WorkspaceEnv, error) {
 	}
 	return WorkspaceEnv{
 		Slug:         meta.Slug,
+		ProjectID:    meta.ProjectID,
 		CheckoutPath: meta.CheckoutPath,
 		ManagerURL:   meta.ManagerURL,
 		RestartToken: meta.RestartToken,
@@ -83,6 +84,7 @@ func (s FileBundleStore) ReadWorkspaceEnv(ws Workspace) (WorkspaceEnv, error) {
 func (s FileBundleStore) WriteWorkspaceEnv(ws Workspace, env WorkspaceEnv) error {
 	return WriteMetadata(s.Paths(ws).WorkspaceEnv, WorkspaceMetadata{
 		Slug:         env.Slug,
+		ProjectID:    env.ProjectID,
 		CheckoutPath: env.CheckoutPath,
 		ManagerURL:   env.ManagerURL,
 		RestartToken: env.RestartToken,

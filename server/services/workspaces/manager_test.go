@@ -49,6 +49,7 @@ func TestChildEnv(t *testing.T) {
 	t.Setenv("CN_AGENTS_DEV_AUTH_SECRET", "old-secret-must-not-leak-from-os-env")
 
 	ws := Workspace{
+		ProjectID:    "github.com/coreycole/vamos",
 		Slug:         "foo",
 		CheckoutPath: "/tmp/cn-agents-foo",
 		URL:          "https://foo.cn-agents.test/",
@@ -89,6 +90,7 @@ func TestChildEnv(t *testing.T) {
 	assertEnv(t, env, "OPENCLAW_STATE_DIR", RuntimePaths(ws.CheckoutPath).OpenClawDir)
 	assertEnv(t, env, "VAMOS_WORKSPACE_MODE", "child")
 	assertEnv(t, env, "VAMOS_WORKSPACE_SLUG", ws.Slug)
+	assertEnv(t, env, "VAMOS_WORKSPACE_PROJECT_ID", ws.ProjectID)
 	assertEnv(t, env, "VAMOS_WORKSPACE_MANAGER_URL", rt.ManagerURL)
 	assertEnv(t, env, "VAMOS_WORKSPACE_RESTART_TOKEN", rt.RestartToken)
 	assertEnv(t, env, "VAMOS_DEV_AUTH_VERIFY_KEY", rt.DevAuthVerifyKey)

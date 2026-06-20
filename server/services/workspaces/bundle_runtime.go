@@ -75,6 +75,7 @@ func (r *WorkspaceRuntime) StartBundle(
 		ws,
 		WorkspaceEnv{
 			Slug:         ws.Slug,
+			ProjectID:    ws.ProjectID,
 			CheckoutPath: ws.CheckoutPath,
 			ManagerURL:   rt.ManagerURL,
 			RestartToken: rt.RestartToken,
@@ -325,6 +326,7 @@ func (r *WorkspaceRuntime) RestartComponents(
 		ws,
 		WorkspaceEnv{
 			Slug:         ws.Slug,
+			ProjectID:    ws.ProjectID,
 			CheckoutPath: ws.CheckoutPath,
 			ManagerURL:   rt.ManagerURL,
 			RestartToken: rt.RestartToken,

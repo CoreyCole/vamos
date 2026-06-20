@@ -107,7 +107,7 @@ func (a *WorkspaceProvisionActivities) provision(
 	if err := store.WriteLifecycle(ws, WorkspaceLifecycleState{DesiredState: WorkspaceDesiredStopped, ObservedState: WorkspaceObservedStopped}); err != nil {
 		return WorkspaceProvisionResult{}, err
 	}
-	if err := store.WriteWorkspaceEnv(ws, WorkspaceEnv{Slug: input.WorkspaceSlug, CheckoutPath: input.RequestedPath, ManagerURL: a.ManagerURL, RestartToken: a.RestartToken, DatabasePath: paths.AgentsDB}); err != nil {
+	if err := store.WriteWorkspaceEnv(ws, WorkspaceEnv{Slug: input.WorkspaceSlug, ProjectID: input.ProjectID, CheckoutPath: input.RequestedPath, ManagerURL: a.ManagerURL, RestartToken: a.RestartToken, DatabasePath: paths.AgentsDB}); err != nil {
 		return WorkspaceProvisionResult{}, err
 	}
 	if err := syncProvisionPlanDir(input, input.RequestedPath); err != nil {

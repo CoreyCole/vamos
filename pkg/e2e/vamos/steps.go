@@ -222,7 +222,7 @@ func ExpectWorkspaceHidden(label string) expectation {
 
 func ExpectWorkspacesInOrder(labels ...string) expectation {
 	return expectation{customStep("workspaces in order", func(t testing.TB, ctx *duiruntime.Context) {
-		rows := ctx.Page.Locator("#workspaces-list tr[data-workspace-row]")
+		rows := ctx.Page.Locator("#workspaces-list [data-workspace-row]")
 		count, err := rows.Count()
 		if err != nil {
 			t.Fatal(err)
@@ -1278,6 +1278,12 @@ func openThreadMetadata(t testing.TB, ctx *duiruntime.Context) {
 
 func SwitchTab(key string) spec.Step {
 	return customStep("switch tab "+key, func(t testing.TB, ctx *duiruntime.Context) {
+		switch {
+		case strings.HasPrefix(key, "thoughts.sidebar."):
+			ensureRegionReachable(t, ctx, Thoughts.Sidebar())
+		case strings.HasPrefix(key, "thoughts.rightRail."):
+			ensureRegionReachable(t, ctx, Thoughts.RightRail())
+		}
 		if err := resolveLocator(t, ctx, locatorForKey(key)).First().Click(); err != nil {
 			t.Fatal(err)
 		}
@@ -1286,7 +1292,11 @@ func SwitchTab(key string) spec.Step {
 
 func ToggleRegion(key string) spec.Step {
 	return customStep("toggle region "+key, func(t testing.TB, ctx *duiruntime.Context) {
-		region := resolveLocator(t, ctx, locatorForKey(key)).First()
+		locator := locatorForKey(key)
+		if strings.HasPrefix(key, "thoughts.workbench.") {
+			ensureRegionReachable(t, ctx, locator)
+		}
+		region := resolveLocator(t, ctx, locator).First()
 		button := region.Locator("button[aria-expanded], button[data-workbench-save-on-click], button").First()
 		if err := button.Click(); err != nil {
 			t.Fatal(err)

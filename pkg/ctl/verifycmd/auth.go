@@ -61,6 +61,10 @@ func EnsureE2EAuthToken(ctx context.Context, cfg WorkspaceVerifyConfig) (string,
 	)); token != "" {
 		return token, nil
 	}
+	return MintFreshE2EAuthToken(ctx, cfg)
+}
+
+func MintFreshE2EAuthToken(ctx context.Context, cfg WorkspaceVerifyConfig) (string, error) {
 	return managerE2ETokenMinter{}.MintE2EToken(ctx, cfg)
 }
 

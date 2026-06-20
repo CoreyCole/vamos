@@ -9,6 +9,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/CoreyCole/vamos/server/services/workspaces"
 )
 
 func TestLoadConfigWalksUpFromPkgAgents(t *testing.T) {
@@ -249,6 +251,31 @@ func TestRunRestartPrintsWorkspaceURL(t *testing.T) {
 	}
 	if want := "workspace URL: https://feature.workspaces.creative-mode.ai/"; !strings.Contains(out.String(), want) {
 		t.Fatalf("output missing %q:\n%s", want, out.String())
+	}
+}
+
+func TestRunRegisterCurrentPersistsProjectIDAndRuntimeMetadata(t *testing.T) {
+	root := writeWorkspaceFixture(t)
+	if err := os.Rename(root, filepath.Join(filepath.Dir(root), "vamos-feature")); err != nil {
+		t.Fatalf("rename fixture: %v", err)
+	}
+	root = filepath.Join(filepath.Dir(root), "vamos-feature")
+
+	var out bytes.Buffer
+	err := RunRegisterCurrent(t.Context(), root, RegisterOptions{
+		PlanDir:   "thoughts/owner/plans/demo",
+		ProjectID: "github.com/CoreyCole/vamos",
+	}, &out)
+	if err != nil {
+		t.Fatalf("RunRegisterCurrent: %v", err)
+	}
+
+	meta, err := workspaces.ReadMetadata(filepath.Join(root, ".vamos", "run", "workspace.env"))
+	if err != nil {
+		t.Fatalf("ReadMetadata: %v", err)
+	}
+	if meta.ProjectID != "github.com/CoreyCole/vamos" {
+		t.Fatalf("project id = %q", meta.ProjectID)
 	}
 }
 

@@ -1350,6 +1350,10 @@ func main() {
 	layouts.SetDatastarInspectorAvailable(datastarInspectorErr == nil)
 	e.Static("/static", staticRoot)
 	e.Static("/css", filepath.Join(staticRoot, "css"))
+	e.GET("/js/datastar-pro-v1.js", func(c echo.Context) error {
+		c.Response().Header().Set("Access-Control-Allow-Origin", "*")
+		return c.File(filepath.Join(staticRoot, "js", "datastar-pro-v1.js"))
+	})
 	e.Static("/js", filepath.Join(staticRoot, "js"))
 	e.Static("/img", filepath.Join(staticRoot, "img"))
 	e.File("/manifest.json", filepath.Join(staticRoot, "manifest.json"))

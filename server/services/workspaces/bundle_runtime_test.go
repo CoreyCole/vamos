@@ -667,6 +667,7 @@ func TestWorkspaceRuntimeRestartTSWorkerUpdatesRuntimeEnvSnapshot(t *testing.T) 
 
 func TestWorkspaceRuntimeRestartComponentsRewritesWorkspaceEnv(t *testing.T) {
 	ws := bundleTestWorkspace(t)
+	ws.ProjectID = "github.com/coreycole/vamos"
 	ws.Status = StatusRunning
 	ws.Ports = map[BundleComponent]int{ComponentWeb: 4300, ComponentTemporal: 7234}
 	stale := WorkspaceEnv{
@@ -700,9 +701,9 @@ func TestWorkspaceRuntimeRestartComponentsRewritesWorkspaceEnv(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got.Slug != ws.Slug || got.ManagerURL != "https://main.example.test" ||
+	if got.Slug != ws.Slug || got.ProjectID != ws.ProjectID || got.ManagerURL != "https://main.example.test" ||
 		got.RestartToken != "new-token" {
-		t.Fatalf("workspace env = %#v, want current slug/manager/token", got)
+		t.Fatalf("workspace env = %#v, want current slug/project/manager/token", got)
 	}
 }
 

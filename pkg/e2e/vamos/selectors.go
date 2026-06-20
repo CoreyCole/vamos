@@ -1,6 +1,11 @@
 package vamos
 
-import "github.com/coreycole/datastarui/e2e/spec"
+import (
+	"testing"
+
+	duiruntime "github.com/coreycole/datastarui/e2e/runtime"
+	"github.com/coreycole/datastarui/e2e/spec"
+)
 
 type expectation struct{ step spec.Step }
 
@@ -18,19 +23,26 @@ type thoughtsFeature struct{}
 
 func (thoughtsFeature) Page() page { return Pages.Thoughts() }
 func (thoughtsFeature) Ready() expectation {
-	return expectation{spec.All(spec.Visible(Thoughts.Sidebar()), spec.Visible(Thoughts.CenterPane()))}
+	return expectation{customStep("thoughts workbench ready", func(t testing.TB, ctx *duiruntime.Context) {
+		ensureRegionReachable(t, ctx, Thoughts.CenterPane())
+	})}
 }
 func (thoughtsFeature) SidebarVisible() expectation {
-	return expectation{spec.Visible(Thoughts.Sidebar())}
+	return expectation{reachableRegion("thoughts sidebar visible", Thoughts.Sidebar())}
 }
 func (thoughtsFeature) CenterPaneVisible() expectation {
-	return expectation{spec.Visible(Thoughts.CenterPane())}
+	return expectation{reachableRegion("thoughts center pane visible", Thoughts.CenterPane())}
 }
 func (thoughtsFeature) RightRailVisible() expectation {
-	return expectation{spec.Visible(Thoughts.RightRail())}
+	return expectation{reachableRegion("thoughts right rail visible", Thoughts.RightRail())}
 }
 func (thoughtsFeature) RightRailChatTabVisible() expectation {
-	return expectation{spec.Visible(Thoughts.RightRailChatTab())}
+	return expectation{customStep("thoughts right rail chat tab visible", func(t testing.TB, ctx *duiruntime.Context) {
+		ensureRegionReachable(t, ctx, Thoughts.RightRail())
+		if err := resolveLocator(t, ctx, Thoughts.RightRailChatTab()).First().WaitFor(); err != nil {
+			t.Fatal(err)
+		}
+	})}
 }
 func (thoughtsFeature) Document(title string) expectation {
 	return expectation{spec.Visible(spec.Text(title))}
@@ -49,6 +61,12 @@ func (thoughtsFeature) RightRailChatTab() spec.Locator {
 }
 func (thoughtsFeature) WorkspacesTab() spec.Locator {
 	return spec.CSS("[role='tab'][aria-controls*='workspace'], button:has-text('Workspaces'), [data-e2e='thoughts.sidebar.workspaces']")
+}
+
+func reachableRegion(label string, locator spec.Locator) spec.Step {
+	return customStep(label, func(t testing.TB, ctx *duiruntime.Context) {
+		ensureRegionReachable(t, ctx, locator)
+	})
 }
 
 type agentChatFeature struct{}

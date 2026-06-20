@@ -103,6 +103,7 @@ func TestThoughtsWorkbench_WorkbenchReloadPreservesDbLayoutState(t *testing.T) {
 		Do(vamos.SwitchTab("thoughts.rightRail.chat")).
 		Do(vamos.ToggleRegion("thoughts.workbench.sidebar")).
 		Do(vamos.FollowFirstSidebarDocumentLink()).
+		Do(vamos.SwitchTab("thoughts.sidebar.workspaces")).
 		Expect(spec.ExpectStep(spec.Visible(vamos.Thoughts.WorkspacesTab()))).
 		Expect(vamos.Thoughts.RightRailChatTabVisible()).
 		Expect(vamos.Thoughts.CenterPaneVisible()).

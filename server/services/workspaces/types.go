@@ -185,6 +185,7 @@ type WorkspaceTransitionResult struct {
 
 type WorkspaceEnv struct {
 	Slug         string `json:"slug"`
+	ProjectID    string `json:"project_id"`
 	CheckoutPath string `json:"checkout_path"`
 	ManagerURL   string `json:"manager_url"`
 	RestartToken string `json:"restart_token"`
