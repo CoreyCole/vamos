@@ -22,9 +22,11 @@ func TestPickleballSelfModifyingStory(t *testing.T) {
 		Do(seedPickleballStoryState()).
 		Visit(vamos.Pages.Path("/examples/pickleball")).
 		Expect(spec.ExpectStep(spec.Visible(spec.Text("Self-modifying pickleball")))).
+		Do(spec.Click(spec.CSS("button[aria-controls='pickleball-chat-region']"))).
 		Expect(spec.ExpectStep(spec.Visible(spec.CSS("#pickleball-prompt-form textarea[name='prompt']")))).
 		Do(spec.Fill(spec.CSS("#pickleball-prompt"), "Add a CSV column explaining skill totals.")).
 		Expect(spec.InputValue(spec.CSS("#pickleball-prompt"), "Add a CSV column explaining skill totals.")).
+		Do(spec.Click(spec.CSS("button[aria-controls='pickleball-state-region']"))).
 		Expect(spec.ExpectStep(spec.Visible(spec.CSS("#pickleball-preview iframe[src*='/thoughts/_render/html/']")))).
 		Expect(spec.ExpectStep(spec.Visible(spec.CSS("#pickleball-preview-link")))).
 		Expect(spec.ExpectStep(spec.Visible(spec.CSS("#pickleball-csv-link")))).
