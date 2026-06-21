@@ -7,9 +7,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"time"
 )
 
@@ -98,8 +100,25 @@ func (s FileStateStore) AcquireLock(ctx context.Context, key LockKey, owner stri
 		return Lock{}, errors.New("lock owner is required")
 	}
 	path := LockPath(s.Root, key)
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return Lock{}, err
+	}
+	file, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE, 0o644)
+	if err != nil {
+		return Lock{}, err
+	}
+	defer file.Close()
+	if err := syscall.Flock(int(file.Fd()), syscall.LOCK_EX); err != nil {
+		return Lock{}, err
+	}
+	defer syscall.Flock(int(file.Fd()), syscall.LOCK_UN)
+
 	now := s.now()
-	if data, err := os.ReadFile(path); err == nil {
+	data, err := io.ReadAll(file)
+	if err != nil {
+		return Lock{}, err
+	}
+	if len(strings.TrimSpace(string(data))) > 0 {
 		var existing Lock
 		if err := json.Unmarshal(data, &existing); err != nil {
 			return Lock{}, err
@@ -107,11 +126,9 @@ func (s FileStateStore) AcquireLock(ctx context.Context, key LockKey, owner stri
 		if existing.ExpiresAt > now.Unix() && existing.Owner != owner {
 			return Lock{}, LockConflictError{Existing: existing}
 		}
-	} else if !os.IsNotExist(err) {
-		return Lock{}, err
 	}
 	lock := Lock{Key: key, Owner: owner, Path: path, ExpiresAt: now.Add(ttl).Unix()}
-	if err := writeJSONAtomically(path, lock); err != nil {
+	if err := writeLockedJSON(file, lock); err != nil {
 		return Lock{}, err
 	}
 	return lock, nil
@@ -153,4 +170,19 @@ func writeJSONAtomically(path string, v any) error {
 		return err
 	}
 	return nil
+}
+
+func writeLockedJSON(file *os.File, v any) error {
+	if err := file.Truncate(0); err != nil {
+		return err
+	}
+	if _, err := file.Seek(0, 0); err != nil {
+		return err
+	}
+	enc := json.NewEncoder(file)
+	enc.SetIndent("", "  ")
+	if err := enc.Encode(v); err != nil {
+		return err
+	}
+	return file.Sync()
 }

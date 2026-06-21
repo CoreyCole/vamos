@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 )
@@ -135,6 +136,42 @@ func TestAcquireLockReplacesExpiredLock(t *testing.T) {
 	}
 	if lock.Owner != "owner-b" {
 		t.Fatalf("lock owner = %q, want owner-b", lock.Owner)
+	}
+}
+
+func TestAcquireLockAllowsOnlyOneConcurrentOwner(t *testing.T) {
+	store := FileStateStore{Root: t.TempDir(), Clock: fixedClock(time.Unix(100, 0))}
+	key := LockKey{RepoID: "repo", CanonicalPlanDir: "plan"}
+	start := make(chan struct{})
+	var wg sync.WaitGroup
+	var mu sync.Mutex
+	successes := make([]string, 0, 1)
+	conflicts := 0
+	for _, owner := range []string{"owner-a", "owner-b", "owner-c", "owner-d"} {
+		owner := owner
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			<-start
+			_, err := store.AcquireLock(context.Background(), key, owner, time.Hour)
+			mu.Lock()
+			defer mu.Unlock()
+			if err == nil {
+				successes = append(successes, owner)
+				return
+			}
+			var conflict LockConflictError
+			if errors.As(err, &conflict) {
+				conflicts++
+				return
+			}
+			t.Errorf("AcquireLock(%s) error = %v", owner, err)
+		}()
+	}
+	close(start)
+	wg.Wait()
+	if len(successes) != 1 || conflicts != 3 {
+		t.Fatalf("successes=%v conflicts=%d, want one success and three conflicts", successes, conflicts)
 	}
 }
 
