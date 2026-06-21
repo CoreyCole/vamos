@@ -5,15 +5,16 @@ import wruntime "github.com/CoreyCole/vamos/pkg/agents/workflows/runtime"
 const schemaVersion = 1
 
 type ManagerState struct {
-	SchemaVersion     int            `json:"schemaVersion"`
-	RepoID            string         `json:"repoId"`
-	CanonicalPlanDir  string         `json:"canonicalPlanDir"`
-	ManagerRunID      string         `json:"managerRunId"`
-	SourceCwd         string         `json:"sourceCwd"`
-	ImplementationCwd string         `json:"implementationCwd,omitempty"`
-	ManagerPaneID     string         `json:"managerPaneId,omitempty"`
-	ActiveChild       *ChildRunRef   `json:"activeChild,omitempty"`
-	Workflow          wruntime.State `json:"workflow"`
+	SchemaVersion       int            `json:"schemaVersion"`
+	RepoID              string         `json:"repoId"`
+	CanonicalPlanDir    string         `json:"canonicalPlanDir"`
+	ManagerRunID        string         `json:"managerRunId"`
+	SourceCwd           string         `json:"sourceCwd"`
+	ImplementationCwd   string         `json:"implementationCwd,omitempty"`
+	ManagerPaneID       string         `json:"managerPaneId,omitempty"`
+	ActiveChild         *ChildRunRef   `json:"activeChild,omitempty"`
+	PendingCleanupChild *ChildRunRef   `json:"pendingCleanupChild,omitempty"`
+	Workflow            wruntime.State `json:"workflow"`
 }
 
 type ChildRunRef struct {

@@ -290,6 +290,23 @@ func RunChild(ctx context.Context, opts RunChildOptions, d deps, out io.Writer) 
 	if err := WriteNDJSON(out, Event{Type: "child_started", Ref: childRef(state.ActiveChild)}); err != nil {
 		return err
 	}
+	if state.PendingCleanupChild != nil {
+		pending := state.PendingCleanupChild
+		cleaned, cleanupErr := cleanupPendingChildAfterNextStart(ctx, state, d.Tmux)
+		if cleanupErr != nil {
+			if err := WriteNDJSON(out, Event{Type: "child_cleanup_failed", Ref: childRef(pending), Error: cleanupErr.Error()}); err != nil {
+				return err
+			}
+		} else {
+			state = cleaned
+			if err := store.Save(opts.StateFile, state); err != nil {
+				return err
+			}
+			if err := WriteNDJSON(out, Event{Type: "child_cleaned", Ref: childRef(pending)}); err != nil {
+				return err
+			}
+		}
+	}
 	if opts.Timeout == 0 {
 		return nil
 	}
@@ -422,7 +439,9 @@ func RunDecideNext(ctx context.Context, opts DecideNextOptions, d deps, out io.W
 	}
 	state.Workflow = parsed.Decision.State
 	state = UpdateImplementationCwd(state, parsed.Result)
-	state.ActiveChild = nil
+	if parsed.Decision.StartNext {
+		state = markPendingCleanup(state)
+	}
 	if err := store.Save(opts.StateFile, state); err != nil {
 		return err
 	}
@@ -586,6 +605,32 @@ func CaptureManagerPaneID(explicit string) string {
 		return pane
 	}
 	return strings.TrimSpace(os.Getenv("TMUX_PANE"))
+}
+
+func markPendingCleanup(state ManagerState) ManagerState {
+	if state.ActiveChild != nil {
+		state.PendingCleanupChild = state.ActiveChild
+	}
+	return state
+}
+
+func cleanupPendingChildAfterNextStart(ctx context.Context, state ManagerState, tmux TmuxClient) (ManagerState, error) {
+	ref := state.PendingCleanupChild
+	if ref == nil {
+		return state, nil
+	}
+	if strings.TrimSpace(ref.TmuxPaneID) == "" {
+		state.PendingCleanupChild = nil
+		return state, nil
+	}
+	if tmux == nil {
+		tmux = ShellTmuxClient{}
+	}
+	if err := tmux.KillPane(ctx, TmuxPane{ID: ref.TmuxPaneID}); err != nil {
+		return state, err
+	}
+	state.PendingCleanupChild = nil
+	return state, nil
 }
 
 func normalizeSplit(split string) string {

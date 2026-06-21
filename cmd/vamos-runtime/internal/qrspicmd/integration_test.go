@@ -41,6 +41,52 @@ func TestManagerFlowQuestionToResearch(t *testing.T) {
 	}
 }
 
+func TestDecideNextMarksOldChildPendingCleanupWhenStartNext(t *testing.T) {
+	fixture := newManagerFlowFixture(t)
+	stateFile := fixture.init(t)
+	state := loadManagerState(t, stateFile)
+	sessionPath := filepath.Join(fixture.dir, "old-session.jsonl")
+	old := &ChildRunRef{ID: "old", Stage: "question", Cwd: fixture.projectRoot, TmuxPaneID: "%old", SessionID: "old-session", SessionDir: fixture.dir, SessionPath: sessionPath}
+	state.ActiveChild = old
+	saveManagerState(t, stateFile, state)
+	writeSessionTestFile(t, sessionPath, sessionHeader(old.SessionID, fixture.projectRoot)+"\n"+assistantLine(testResultYAML("question", "complete", "complete", "thoughts/example/questions/q.md", ""))+"\n")
+
+	var decideOut strings.Builder
+	if err := RunDecideNext(t.Context(), DecideNextOptions{StateFile: stateFile, PlanDir: fixture.planDir}, deps{}, &decideOut); err != nil {
+		t.Fatalf("RunDecideNext error = %v", err)
+	}
+	loaded := loadManagerState(t, stateFile)
+	if loaded.PendingCleanupChild == nil || loaded.PendingCleanupChild.TmuxPaneID != "%old" {
+		t.Fatalf("pending cleanup = %#v, want old child", loaded.PendingCleanupChild)
+	}
+	if loaded.ActiveChild == nil || loaded.ActiveChild.TmuxPaneID != "%old" {
+		t.Fatalf("active child = %#v, want preserved old child", loaded.ActiveChild)
+	}
+	if !strings.Contains(decideOut.String(), `"startNext":true`) {
+		t.Fatalf("decide output = %q", decideOut.String())
+	}
+}
+
+func TestDecideNextHumanGatePreservesOldChildWithoutPendingCleanup(t *testing.T) {
+	fixture := newManagerFlowFixture(t)
+	stateFile := filepath.Join(fixture.stateRoot, "design-state.json")
+	sessionPath := filepath.Join(fixture.dir, "design-session.jsonl")
+	old := &ChildRunRef{ID: "old", Stage: "design", Cwd: fixture.projectRoot, TmuxPaneID: "%old", SessionID: "design-session", SessionDir: fixture.dir, SessionPath: sessionPath}
+	saveManagerState(t, stateFile, ManagerState{ActiveChild: old, Workflow: testWorkflowState(t, qrspi.NodeDesign, nil)})
+	writeSessionTestFile(t, sessionPath, sessionHeader(old.SessionID, fixture.projectRoot)+"\n"+assistantLine(testResultYAML("design", "needs_human", "", "thoughts/example/design.md", ""))+"\n")
+
+	if err := RunDecideNext(t.Context(), DecideNextOptions{StateFile: stateFile, PlanDir: fixture.planDir}, deps{}, &bytes.Buffer{}); err != nil {
+		t.Fatalf("RunDecideNext error = %v", err)
+	}
+	loaded := loadManagerState(t, stateFile)
+	if loaded.PendingCleanupChild != nil {
+		t.Fatalf("pending cleanup = %#v, want nil", loaded.PendingCleanupChild)
+	}
+	if loaded.ActiveChild == nil || loaded.ActiveChild.TmuxPaneID != "%old" {
+		t.Fatalf("active child = %#v, want preserved old child", loaded.ActiveChild)
+	}
+}
+
 func TestManagerFlowWorkspaceSwitchesImplementationCwd(t *testing.T) {
 	fixture := newManagerFlowFixture(t)
 	impl := filepath.Join(fixture.dir, "impl")

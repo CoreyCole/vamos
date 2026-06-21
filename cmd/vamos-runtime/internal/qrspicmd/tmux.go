@@ -46,12 +46,23 @@ func (ShellTmuxClient) PasteText(ctx context.Context, pane TmuxPane, text string
 	return exec.CommandContext(ctx, "tmux", pasteBufferArgs("q-manager-wake", pane.ID)...).Run()
 }
 
+func (ShellTmuxClient) KillPane(ctx context.Context, pane TmuxPane) error {
+	if strings.TrimSpace(pane.ID) == "" {
+		return errors.New("tmux pane ID is required")
+	}
+	return exec.CommandContext(ctx, "tmux", killPaneArgs(pane.ID)...).Run()
+}
+
 func setBufferArgs(name, text string) []string {
 	return []string{"set-buffer", "-b", name, text}
 }
 
 func pasteBufferArgs(name, paneID string) []string {
 	return []string{"paste-buffer", "-b", name, "-t", paneID}
+}
+
+func killPaneArgs(paneID string) []string {
+	return []string{"kill-pane", "-t", paneID}
 }
 
 func shellquote(args []string) []string {

@@ -37,3 +37,10 @@ func TestPasteBufferArgsTargetExactPane(t *testing.T) {
 		t.Fatalf("paste args = %v", paste)
 	}
 }
+
+func TestKillPaneArgsTargetExactPane(t *testing.T) {
+	kill := strings.Join(killPaneArgs("%18"), " ")
+	if !strings.Contains(kill, "kill-pane -t %18") {
+		t.Fatalf("kill args = %v", kill)
+	}
+}

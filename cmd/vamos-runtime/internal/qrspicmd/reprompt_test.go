@@ -13,6 +13,7 @@ import (
 type recordingTmux struct {
 	pastes []recordedPaste
 	keys   []recordedKeys
+	kills  []TmuxPane
 }
 
 type recordedPaste struct {
@@ -36,6 +37,11 @@ func (r *recordingTmux) SendKeys(ctx context.Context, pane TmuxPane, keys []stri
 
 func (r *recordingTmux) PasteText(ctx context.Context, pane TmuxPane, text string) error {
 	r.pastes = append(r.pastes, recordedPaste{pane: pane, text: text})
+	return nil
+}
+
+func (r *recordingTmux) KillPane(ctx context.Context, pane TmuxPane) error {
+	r.kills = append(r.kills, pane)
 	return nil
 }
 

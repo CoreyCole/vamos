@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -160,6 +161,33 @@ func TestRunChildTimeoutKeepsActiveChildRefs(t *testing.T) {
 	}
 }
 
+func TestRunChildCleansPendingAfterNewStart(t *testing.T) {
+	fixture := newRunChildFixture(t, true)
+	old := &ChildRunRef{ID: "old", Stage: "question", TmuxPaneID: "%old"}
+	state := fixture.loadState(t)
+	state.ActiveChild = old
+	state.PendingCleanupChild = old
+	fixture.saveState(t, state)
+	tmux := &recordingTmux{}
+	var out bytes.Buffer
+	if err := RunChild(t.Context(), fixture.options(), deps{Clock: fixture.clock, Runner: fixture.runner, Tmux: tmux}, &out); err != nil {
+		t.Fatalf("RunChild error = %v", err)
+	}
+	loaded := fixture.loadState(t)
+	if loaded.PendingCleanupChild != nil {
+		t.Fatalf("pending cleanup = %#v, want nil", loaded.PendingCleanupChild)
+	}
+	if loaded.ActiveChild == nil || loaded.ActiveChild.TmuxPaneID != "%9" {
+		t.Fatalf("active child = %#v, want new %%9", loaded.ActiveChild)
+	}
+	if len(tmux.kills) != 1 || tmux.kills[0].ID != "%old" {
+		t.Fatalf("kills = %#v, want %%old", tmux.kills)
+	}
+	if !strings.Contains(out.String(), `"type":"child_started"`) || !strings.Contains(out.String(), `"type":"child_cleaned"`) {
+		t.Fatalf("output = %q", out.String())
+	}
+}
+
 func TestRunChildRejectsMissingPromptFile(t *testing.T) {
 	fixture := newRunChildFixture(t, true)
 	opts := fixture.options()
@@ -170,12 +198,38 @@ func TestRunChildRejectsMissingPromptFile(t *testing.T) {
 	}
 }
 
+func TestRunChildStartFailurePreservesPendingOldPane(t *testing.T) {
+	fixture := newRunChildFixture(t, true)
+	state := fixture.loadState(t)
+	old := &ChildRunRef{ID: "old", Stage: "question", TmuxPaneID: "%old"}
+	state.ActiveChild = old
+	state.PendingCleanupChild = old
+	fixture.saveState(t, state)
+	fixture.runner.startErr = errors.New("split failed")
+
+	err := RunChild(t.Context(), fixture.options(), deps{Clock: fixture.clock, Runner: fixture.runner, Tmux: &recordingTmux{}}, &bytes.Buffer{})
+	if err == nil || !strings.Contains(err.Error(), "split failed") {
+		t.Fatalf("expected split error, got %v", err)
+	}
+	loaded := fixture.loadState(t)
+	if loaded.PendingCleanupChild == nil || loaded.PendingCleanupChild.TmuxPaneID != "%old" {
+		t.Fatalf("pending cleanup changed: %#v", loaded.PendingCleanupChild)
+	}
+	if loaded.ActiveChild == nil || loaded.ActiveChild.TmuxPaneID != "%old" {
+		t.Fatalf("active child changed before start succeeded: %#v", loaded.ActiveChild)
+	}
+}
+
 type fakeChildRunner struct {
 	writeResult bool
+	startErr    error
 	started     []ChildRunRequest
 }
 
 func (f *fakeChildRunner) Start(ctx context.Context, req ChildRunRequest) (ChildRun, error) {
+	if f.startErr != nil {
+		return ChildRun{}, f.startErr
+	}
 	f.started = append(f.started, req)
 	return ChildRun{ID: req.ID, Pane: TmuxPane{ID: "%9"}, OutputPath: req.OutputPath, SessionID: req.SessionID, SessionDir: req.SessionDir, DonePath: req.DonePath, StatusPath: req.StatusPath}, nil
 }
