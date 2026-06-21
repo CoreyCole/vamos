@@ -1,0 +1,63 @@
+package pickleball
+
+import (
+	"strconv"
+
+	"github.com/CoreyCole/vamos/server/layouts"
+)
+
+templ Page(vm PickleballViewModel) {
+	@layouts.Root(layouts.RootArgs{
+		Title:      "Pickleball Self-Modifying App",
+		ShowHeader: true,
+		PageType:   layouts.PageTypeMarkdown,
+	}) {
+		<main id="pickleball-app" class="min-h-screen bg-background" data-init={ "@get('/examples/pickleball/state?session=" + vm.SessionID + "')" }>
+			@StatePanel(vm)
+		</main>
+	}
+}
+
+templ Header(vm PickleballViewModel) {
+	<header class="flex flex-col gap-3 rounded-3xl border border-border bg-card p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+		<div>
+			<p class="text-sm font-medium uppercase tracking-wide text-primary">Vamos example</p>
+			<h1 class="text-2xl font-semibold tracking-tight text-foreground">Self-modifying pickleball</h1>
+			<p class="mt-1 max-w-2xl text-sm text-muted-foreground">Prompt a Go bundle. Vamos rebuilds it and previews generated HTML + CSV safely through Thoughts.</p>
+		</div>
+		<span class={ stateChipClass(vm.State) }>{ stateLabel(vm.State) }</span>
+	</header>
+}
+
+func stateLabel(state AppState) string {
+	switch state {
+	case AppStateGenerating:
+		return "Generating"
+	case AppStateBuilding:
+		return "Building"
+	case AppStateSucceeded:
+		return "Ready"
+	case AppStateFailed:
+		return "Needs prompt"
+	default:
+		return "Idle"
+	}
+}
+
+func stateChipClass(state AppState) string {
+	base := "inline-flex w-fit items-center rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-wide"
+	switch state {
+	case AppStateGenerating, AppStateBuilding:
+		return base + " bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-200"
+	case AppStateSucceeded:
+		return base + " bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-200"
+	case AppStateFailed:
+		return base + " bg-destructive/10 text-destructive"
+	default:
+		return base + " bg-muted text-muted-foreground"
+	}
+}
+
+func jsString(value string) string {
+	return strconv.Quote(value)
+}

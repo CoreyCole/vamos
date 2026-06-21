@@ -1,0 +1,62 @@
+package pickleball
+
+templ StatePanel(vm PickleballViewModel) {
+	<section id="pickleball-state" class="mx-auto flex w-full max-w-5xl flex-col gap-4 px-4 pb-32 pt-4 sm:px-6 sm:pb-8 lg:px-8">
+		@Header(vm)
+		@PreviewCard(vm)
+		@StatusCard(vm)
+		@PromptComposer(vm)
+		if vm.State == AppStateSucceeded && vm.Current != nil {
+			@BuildToast(vm)
+		}
+	</section>
+}
+
+templ StatusCard(vm PickleballViewModel) {
+	<section id="pickleball-status" class="rounded-3xl border border-border bg-card p-4 shadow-sm">
+		<div class="flex items-start justify-between gap-3">
+			<div>
+				<h2 class="text-base font-semibold text-foreground">Build status</h2>
+				<p class="mt-1 text-sm text-muted-foreground">Backend state is source of truth. Prompt writes return fast; this panel updates from the SSE stream.</p>
+			</div>
+			<span class={ stateChipClass(vm.State) }>{ stateLabel(vm.State) }</span>
+		</div>
+		if vm.ErrorMessage != "" {
+			<div class="mt-4 rounded-2xl border border-destructive/20 bg-destructive/10 p-3 text-sm text-destructive">
+				<p class="font-medium">Last build failed. Last-good preview preserved.</p>
+				<p class="mt-1">{ vm.ErrorMessage }</p>
+			</div>
+		}
+		if vm.LogTail != "" {
+			<pre class="mt-3 max-h-40 overflow-auto rounded-2xl bg-muted p-3 text-xs text-muted-foreground">{ vm.LogTail }</pre>
+		}
+	</section>
+}
+
+templ PromptComposer(vm PickleballViewModel) {
+	<form id="pickleball-prompt-form" class="fixed inset-x-0 bottom-0 z-20 border-t border-border bg-background/95 p-3 backdrop-blur sm:static sm:rounded-3xl sm:border sm:bg-card sm:p-4 sm:shadow-sm">
+		<input type="hidden" name="session_id" value={ vm.SessionID }/>
+		<label for="pickleball-prompt" class="text-sm font-medium text-foreground">Ask the app to change</label>
+		<div class="mt-2 flex flex-col gap-2 sm:flex-row">
+			<textarea id="pickleball-prompt" name="prompt" rows="3" data-ignore-morph class="min-h-24 flex-1 rounded-2xl border border-input bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring" placeholder="Add a CSV column explaining skill totals."></textarea>
+			<button type="button" data-indicator="_pickleballSubmitting" data-attr-disabled="$_pickleballSubmitting" data-on-click="@post('/examples/pickleball/prompts', {contentType: 'form'})" class="inline-flex items-center justify-center rounded-2xl bg-primary px-5 py-3 text-sm font-semibold text-primary-foreground shadow-sm transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60">
+				<span data-show="!$_pickleballSubmitting">Generate</span>
+				<span data-show="$_pickleballSubmitting">Sending…</span>
+			</button>
+		</div>
+		<div class="mt-3 flex flex-wrap gap-2">
+			for _, example := range vm.PromptExamples {
+				<button type="button" class="rounded-full border border-border px-3 py-1 text-xs text-muted-foreground hover:bg-muted" data-on-click={ "document.getElementById('pickleball-prompt').value = " + jsString(example) }>{ example }</button>
+			}
+		</div>
+	</form>
+}
+
+templ BuildToast(vm PickleballViewModel) {
+	<div id="pickleball-build-toast" class="fixed right-4 top-20 z-30 max-w-sm rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900 shadow-lg dark:border-emerald-900 dark:bg-emerald-950 dark:text-emerald-100">
+		<p class="font-semibold">New build ready</p>
+		if vm.Share.PreviewURL != "" {
+			<a class="mt-2 inline-flex font-medium underline" href={ vm.Share.PreviewURL }>Open preview</a>
+		}
+	</div>
+}

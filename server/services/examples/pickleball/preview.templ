@@ -1,0 +1,68 @@
+package pickleball
+
+import "strings"
+
+templ PreviewCard(vm PickleballViewModel) {
+	{{ snapshot := previewSnapshot(vm) }}
+	<section id="pickleball-preview" class="overflow-hidden rounded-3xl border border-border bg-card shadow-sm">
+		<div class="flex flex-col gap-3 border-b border-border p-4 sm:flex-row sm:items-center sm:justify-between">
+			<div>
+				<h2 class="text-lg font-semibold text-foreground">Current build preview</h2>
+				if snapshot != nil {
+					<p class="text-sm text-muted-foreground">{ snapshot.PromptSummary }</p>
+				} else {
+					<p class="text-sm text-muted-foreground">No build yet. Send a prompt to create the first generated preview.</p>
+				}
+			</div>
+			if snapshot != nil {
+				<div class="flex flex-wrap gap-2">
+					<a class="inline-flex items-center justify-center rounded-full bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground hover:bg-primary/90" href={ thoughtsURL(snapshot.HTMLThoughtsPath) }>Open HTML</a>
+					<a class="inline-flex items-center justify-center rounded-full border border-border px-3 py-2 text-xs font-semibold text-foreground hover:bg-muted" href={ thoughtsURL(snapshot.CSVThoughtsPath) }>Open CSV</a>
+				</div>
+			}
+		</div>
+		if snapshot != nil {
+			<div class="grid gap-0 lg:grid-cols-[minmax(0,1fr)_18rem]">
+				<div class="bg-muted/40 p-3">
+					<div class="overflow-hidden rounded-2xl border border-border bg-background shadow-inner">
+						<iframe title="Generated pickleball app preview" class="h-[28rem] w-full bg-background" sandbox="allow-scripts allow-forms allow-downloads" src={ htmlRenderURL(snapshot.HTMLThoughtsPath) }></iframe>
+					</div>
+				</div>
+				<aside class="flex flex-col gap-3 border-t border-border p-4 lg:border-l lg:border-t-0">
+					<div>
+						<p class="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Build</p>
+						<p class="mt-1 break-all text-sm text-foreground">{ snapshot.BuildID }</p>
+					</div>
+					<a class="inline-flex items-center justify-center rounded-2xl border border-border px-3 py-2 text-sm font-medium hover:bg-muted" href={ thoughtsURL(snapshot.CSVThoughtsPath) }>View CSV table</a>
+					if vm.Share.CSVDownloadURL != "" {
+						<a class="inline-flex items-center justify-center rounded-2xl border border-border px-3 py-2 text-sm font-medium hover:bg-muted" href={ vm.Share.CSVDownloadURL }>Download CSV</a>
+					}
+					<p class="text-xs text-muted-foreground">Generated HTML stays inside an iframe. CSV opens through the Thoughts renderer.</p>
+				</aside>
+			</div>
+		} else {
+			<div class="flex min-h-72 items-center justify-center bg-muted/40 p-6 text-center text-sm text-muted-foreground">
+				<div>
+					<p class="font-medium text-foreground">Seed bundle waiting</p>
+					<p class="mt-1">Try: “Prioritize new partner pairings over skill balance.”</p>
+				</div>
+			</div>
+		}
+	</section>
+}
+
+func previewSnapshot(vm PickleballViewModel) *BuildSnapshot {
+	if vm.Current != nil {
+		return vm.Current
+	}
+	return vm.LastGood
+}
+
+func htmlRenderURL(path string) string {
+	path = cleanRelativePath(path)
+	path = strings.TrimPrefix(path, "thoughts/")
+	if path == "" || path == "." {
+		return ""
+	}
+	return "/thoughts/_render/html/" + path
+}

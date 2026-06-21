@@ -43,6 +43,7 @@ import (
 	"github.com/CoreyCole/vamos/server/services/auth"
 	"github.com/CoreyCole/vamos/server/services/comments"
 	"github.com/CoreyCole/vamos/server/services/db"
+	"github.com/CoreyCole/vamos/server/services/examples/pickleball"
 	"github.com/CoreyCole/vamos/server/services/layoutprefs"
 	"github.com/CoreyCole/vamos/server/services/markdown"
 	"github.com/CoreyCole/vamos/server/services/storybook"
@@ -1534,6 +1535,15 @@ func main() {
 	// AgentChat entry routes. `/agent-chat` is the canonical route namespace;
 	// `/` redirects there as app-root convenience.
 	registerAgentChatEntryRoutes(e, authMiddleware, agentChatHandler, markdownService)
+
+	pickleballService, err := pickleball.NewService(pickleball.Options{
+		ThoughtsRoot:  cfg.MarkdownBasePath,
+		SeedBundleDir: filepath.Join("examples", "pickleball", "seed-bundle"),
+	})
+	if err != nil {
+		log.Fatal("Failed to initialize pickleball example service:", err)
+	}
+	pickleballService.RegisterRoutes(e, authMiddleware)
 
 	// Protected form routes - require authentication
 	formsGroup := e.Group("/forms")

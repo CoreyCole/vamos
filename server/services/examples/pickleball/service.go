@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/CoreyCole/vamos/pkg/agents/generatedgo"
@@ -45,6 +46,9 @@ type Service struct {
 	store  *StateStore
 	opts   Options
 	runner Runner
+
+	subscribersMu sync.Mutex
+	subscribers   map[string]map[chan struct{}]struct{}
 }
 
 func NewService(opts Options) (*Service, error) {
@@ -64,7 +68,12 @@ func NewService(opts Options) (*Service, error) {
 		opts.SeedBundleDir = defaultSeedDir
 	}
 	root := filepath.Join(opts.ThoughtsRoot, filepath.FromSlash(opts.ExampleRoot))
-	return &Service{store: NewStateStore(root), opts: opts, runner: opts.Runner}, nil
+	return &Service{
+		store:       NewStateStore(root),
+		opts:        opts,
+		runner:      opts.Runner,
+		subscribers: make(map[string]map[chan struct{}]struct{}),
+	}, nil
 }
 
 func (s *Service) EnsureSession(ctx context.Context, userEmail string) (PickleballSession, error) {
@@ -202,6 +211,35 @@ func (s *Service) notify(sessionID string) {
 	if s.opts.Notifier != nil {
 		s.opts.Notifier.NotifyPickleballSession(sessionID)
 	}
+	s.subscribersMu.Lock()
+	defer s.subscribersMu.Unlock()
+	for ch := range s.subscribers[sessionID] {
+		select {
+		case ch <- struct{}{}:
+		default:
+		}
+	}
+}
+
+func (s *Service) subscribe(sessionID string) chan struct{} {
+	ch := make(chan struct{}, 1)
+	s.subscribersMu.Lock()
+	defer s.subscribersMu.Unlock()
+	if s.subscribers[sessionID] == nil {
+		s.subscribers[sessionID] = make(map[chan struct{}]struct{})
+	}
+	s.subscribers[sessionID][ch] = struct{}{}
+	return ch
+}
+
+func (s *Service) unsubscribe(sessionID string, ch chan struct{}) {
+	s.subscribersMu.Lock()
+	defer s.subscribersMu.Unlock()
+	delete(s.subscribers[sessionID], ch)
+	if len(s.subscribers[sessionID]) == 0 {
+		delete(s.subscribers, sessionID)
+	}
+	close(ch)
 }
 
 func isActive(state AppState) bool {
