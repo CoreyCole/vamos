@@ -4,29 +4,69 @@ import (
 	"strconv"
 
 	"github.com/CoreyCole/vamos/server/layouts"
+	"github.com/CoreyCole/vamos/server/layouts/workbench"
 )
 
 templ Page(vm PickleballViewModel) {
 	@layouts.Root(layouts.RootArgs{
 		Title:      "Pickleball Self-Modifying App",
 		ShowHeader: true,
-		PageType:   layouts.PageTypeMarkdown,
+		PageType:   layouts.PageTypeAgentChat,
 	}) {
-		<main id="pickleball-app" class="min-h-screen bg-background" data-init={ "@get('/examples/pickleball/state?session=" + vm.SessionID + "')" }>
-			@StatePanel(vm)
-		</main>
+		<div id="pickleball-app" class="h-full min-h-0 overflow-hidden" data-init={ "@get('/examples/pickleball/state?session=" + vm.SessionID + "')" }>
+			@workbench.Workbench(buildPickleballWorkbench(vm))
+		</div>
 	}
 }
 
-templ Header(vm PickleballViewModel) {
-	<header class="flex flex-col gap-3 rounded-3xl border border-border bg-card p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
-		<div>
-			<p class="text-sm font-medium uppercase tracking-wide text-primary">Vamos example</p>
-			<h1 class="text-2xl font-semibold tracking-tight text-foreground">Self-modifying pickleball</h1>
-			<p class="mt-1 max-w-2xl text-sm text-muted-foreground">Prompt a Go bundle. Vamos rebuilds it and previews generated HTML + CSV safely through Thoughts.</p>
-		</div>
-		<span class={ stateChipClass(vm.State) }>{ stateLabel(vm.State) }</span>
-	</header>
+func buildPickleballWorkbench(vm PickleballViewModel) workbench.WorkbenchState {
+	state, _ := workbench.BuildWorkbenchState(workbench.BuildWorkbenchStateInput{
+		Page:       workbench.WorkbenchPageAgentChat,
+		View:       workbench.WorkbenchViewSplit,
+		ActivePath: vm.SessionID,
+		RouteHref:  "/examples/pickleball",
+		Regions: []workbench.WorkbenchRegion{
+			{
+				ID:        "pickleball-workbench-guide",
+				Slot:      workbench.WorkbenchSlotNavigation,
+				Kind:      workbench.RegionWorkflow,
+				Ratio:     0.22,
+				MinRem:    14,
+				Visible:   true,
+				TargetID:  "pickleball-workbench-guide-region",
+				Title:     "Workbench",
+				Component: PickleballWorkbenchGuide(vm),
+			},
+			{
+				ID:        "pickleball-preview-workspace",
+				Slot:      workbench.WorkbenchSlotPrimary,
+				Kind:      workbench.RegionDoc,
+				Ratio:     0.48,
+				MinRem:    26,
+				Visible:   true,
+				TargetID:  "pickleball-state-region",
+				Title:     "Preview",
+				Component: StatePanel(vm),
+			},
+			{
+				ID:        "pickleball-chat-workspace",
+				Slot:      workbench.WorkbenchSlotContext,
+				Kind:      workbench.RegionChat,
+				Ratio:     0.30,
+				MinRem:    20,
+				Visible:   true,
+				TargetID:  "pickleball-chat-region",
+				Title:     "Chat",
+				Component: ChatToModifyPanel(vm),
+			},
+		},
+		NormalRegions: []workbench.RegionNormalState{
+			{SignalKey: "pickleball-workbench-guide", Available: true, Visible: true},
+			{SignalKey: "pickleball-preview-workspace", Available: true, Visible: true},
+			{SignalKey: "pickleball-chat-workspace", Available: true, Visible: true},
+		},
+	})
+	return state
 }
 
 func stateLabel(state AppState) string {

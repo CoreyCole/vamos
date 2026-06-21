@@ -40,6 +40,33 @@ func TestPageRendersMobileShell(t *testing.T) {
 	}
 }
 
+func TestPreviewRendersManualCopyFallback(t *testing.T) {
+	t.Parallel()
+	snapshot := BuildSnapshot{
+		BuildID:          "build-1",
+		PromptSummary:    "seed",
+		HTMLThoughtsPath: "creative-mode-agent/examples/pickleball/sessions/player/snapshots/build-1/app.html",
+		CSVThoughtsPath:  "creative-mode-agent/examples/pickleball/sessions/player/snapshots/build-1/results.csv",
+	}
+	body := renderComponent(t, PreviewCard(PickleballViewModel{
+		SessionID: "player",
+		Current:   &snapshot,
+		Share:     shareModelForSnapshot(snapshot),
+	}))
+	for _, want := range []string{
+		`sandbox="allow-forms allow-downloads"`,
+		`id="pickleball-preview-url"`,
+		`readonly`,
+		`/thoughts/creative-mode-agent/examples/pickleball/sessions/player/snapshots/build-1/app.html`,
+		`Copy preview link`,
+		`el.select()`,
+	} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("preview missing %q:\n%s", want, body)
+		}
+	}
+}
+
 func TestPromptHandlerValidationAndAccepted(t *testing.T) {
 	t.Parallel()
 	svc := newTestService(t, &fakeWorkflowStarter{}, nil)
@@ -52,7 +79,9 @@ func TestPromptHandlerValidationAndAccepted(t *testing.T) {
 	bad := httptest.NewRequest(http.MethodPost, "/examples/pickleball/prompts", strings.NewReader(url.Values{"session_id": {session.ID}}.Encode()))
 	bad.Header.Set(echo.HeaderContentType, echo.MIMEApplicationForm)
 	badRec := httptest.NewRecorder()
-	if err := svc.HandleSubmitPrompt(e.NewContext(bad, badRec)); err == nil {
+	badCtx := e.NewContext(bad, badRec)
+	badCtx.Set("user_email", "player@example.com")
+	if err := svc.HandleSubmitPrompt(badCtx); err == nil {
 		t.Fatal("HandleSubmitPrompt empty prompt expected error")
 	}
 
@@ -60,11 +89,37 @@ func TestPromptHandlerValidationAndAccepted(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/examples/pickleball/prompts", strings.NewReader(form.Encode()))
 	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationForm)
 	rec := httptest.NewRecorder()
-	if err := svc.HandleSubmitPrompt(e.NewContext(req, rec)); err != nil {
+	reqCtx := e.NewContext(req, rec)
+	reqCtx.Set("user_email", "player@example.com")
+	if err := svc.HandleSubmitPrompt(reqCtx); err != nil {
 		t.Fatalf("HandleSubmitPrompt: %v", err)
 	}
 	if rec.Code != http.StatusAccepted {
 		t.Fatalf("status = %d", rec.Code)
+	}
+}
+
+func TestHandlersRejectMismatchedSession(t *testing.T) {
+	t.Parallel()
+	svc := newTestService(t, &fakeWorkflowStarter{}, nil)
+	other, err := svc.EnsureSession(context.Background(), "other@example.com")
+	if err != nil {
+		t.Fatalf("EnsureSession other: %v", err)
+	}
+	e := echo.New()
+	form := url.Values{"session_id": {other.ID}, "prompt": {"Add skill totals"}}
+	req := httptest.NewRequest(http.MethodPost, "/examples/pickleball/prompts", strings.NewReader(form.Encode()))
+	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationForm)
+	rec := httptest.NewRecorder()
+	ctx := e.NewContext(req, rec)
+	ctx.Set("user_email", "player@example.com")
+	err = svc.HandleSubmitPrompt(ctx)
+	if err == nil {
+		t.Fatal("HandleSubmitPrompt mismatched session expected error")
+	}
+	httpErr, ok := err.(*echo.HTTPError)
+	if !ok || httpErr.Code != http.StatusForbidden {
+		t.Fatalf("error = %#v", err)
 	}
 }
 
@@ -80,8 +135,10 @@ func TestStateStreamInitialPatch(t *testing.T) {
 	defer cancel()
 	req := httptest.NewRequest(http.MethodGet, "/examples/pickleball/state?session="+session.ID, nil).WithContext(ctx)
 	rec := httptest.NewRecorder()
+	streamCtx := e.NewContext(req, rec)
+	streamCtx.Set("user_email", "player@example.com")
 	done := make(chan error, 1)
-	go func() { done <- svc.HandleStateStream(e.NewContext(req, rec)) }()
+	go func() { done <- svc.HandleStateStream(streamCtx) }()
 	time.Sleep(20 * time.Millisecond)
 	cancel()
 	select {

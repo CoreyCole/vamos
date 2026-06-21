@@ -12,6 +12,7 @@ import (
 	"strconv"
 
 	"github.com/CoreyCole/vamos/server/layouts"
+	"github.com/CoreyCole/vamos/server/layouts/workbench"
 )
 
 func Page(vm PickleballViewModel) templ.Component {
@@ -47,14 +48,14 @@ func Page(vm PickleballViewModel) templ.Component {
 				}()
 			}
 			ctx = templ.InitializeContext(ctx)
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<main id=\"pickleball-app\" class=\"min-h-screen bg-background\" data-init=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<div id=\"pickleball-app\" class=\"h-full min-h-0 overflow-hidden\" data-init=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var3 string
 			templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.JoinStringErrs("@get('/examples/pickleball/state?session=" + vm.SessionID + "')")
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/examples/pickleball/page.templ`, Line: 15, Col: 140}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/examples/pickleball/page.templ`, Line: 16, Col: 143}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var3))
 			if templ_7745c5c3_Err != nil {
@@ -64,11 +65,11 @@ func Page(vm PickleballViewModel) templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = StatePanel(vm).Render(ctx, templ_7745c5c3_Buffer)
+			templ_7745c5c3_Err = workbench.Workbench(buildPickleballWorkbench(vm)).Render(ctx, templ_7745c5c3_Buffer)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "</main>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "</div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -77,7 +78,7 @@ func Page(vm PickleballViewModel) templ.Component {
 		templ_7745c5c3_Err = layouts.Root(layouts.RootArgs{
 			Title:      "Pickleball Self-Modifying App",
 			ShowHeader: true,
-			PageType:   layouts.PageTypeMarkdown,
+			PageType:   layouts.PageTypeAgentChat,
 		}).Render(templ.WithChildren(ctx, templ_7745c5c3_Var2), templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
@@ -86,68 +87,54 @@ func Page(vm PickleballViewModel) templ.Component {
 	})
 }
 
-func Header(vm PickleballViewModel) templ.Component {
-	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
-		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
-		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
-			return templ_7745c5c3_CtxErr
-		}
-		templ_7745c5c3_Buffer, templ_7745c5c3_IsBuffer := templruntime.GetBuffer(templ_7745c5c3_W)
-		if !templ_7745c5c3_IsBuffer {
-			defer func() {
-				templ_7745c5c3_BufErr := templruntime.ReleaseBuffer(templ_7745c5c3_Buffer)
-				if templ_7745c5c3_Err == nil {
-					templ_7745c5c3_Err = templ_7745c5c3_BufErr
-				}
-			}()
-		}
-		ctx = templ.InitializeContext(ctx)
-		templ_7745c5c3_Var4 := templ.GetChildren(ctx)
-		if templ_7745c5c3_Var4 == nil {
-			templ_7745c5c3_Var4 = templ.NopComponent
-		}
-		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "<header class=\"flex flex-col gap-3 rounded-3xl border border-border bg-card p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between\"><div><p class=\"text-sm font-medium uppercase tracking-wide text-primary\">Vamos example</p><h1 class=\"text-2xl font-semibold tracking-tight text-foreground\">Self-modifying pickleball</h1><p class=\"mt-1 max-w-2xl text-sm text-muted-foreground\">Prompt a Go bundle. Vamos rebuilds it and previews generated HTML + CSV safely through Thoughts.</p></div>")
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		var templ_7745c5c3_Var5 = []any{stateChipClass(vm.State)}
-		templ_7745c5c3_Err = templ.RenderCSSItems(ctx, templ_7745c5c3_Buffer, templ_7745c5c3_Var5...)
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, "<span class=\"")
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		var templ_7745c5c3_Var6 string
-		templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.JoinStringErrs(templ.CSSClasses(templ_7745c5c3_Var5).String())
-		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/examples/pickleball/page.templ`, Line: 1, Col: 0}
-		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var6))
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, "\">")
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		var templ_7745c5c3_Var7 string
-		templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.JoinStringErrs(stateLabel(vm.State))
-		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/examples/pickleball/page.templ`, Line: 28, Col: 65}
-		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var7))
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, "</span></header>")
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		return nil
+func buildPickleballWorkbench(vm PickleballViewModel) workbench.WorkbenchState {
+	state, _ := workbench.BuildWorkbenchState(workbench.BuildWorkbenchStateInput{
+		Page:       workbench.WorkbenchPageAgentChat,
+		View:       workbench.WorkbenchViewSplit,
+		ActivePath: vm.SessionID,
+		RouteHref:  "/examples/pickleball",
+		Regions: []workbench.WorkbenchRegion{
+			{
+				ID:        "pickleball-workbench-guide",
+				Slot:      workbench.WorkbenchSlotNavigation,
+				Kind:      workbench.RegionWorkflow,
+				Ratio:     0.22,
+				MinRem:    14,
+				Visible:   true,
+				TargetID:  "pickleball-workbench-guide-region",
+				Title:     "Workbench",
+				Component: PickleballWorkbenchGuide(vm),
+			},
+			{
+				ID:        "pickleball-preview-workspace",
+				Slot:      workbench.WorkbenchSlotPrimary,
+				Kind:      workbench.RegionDoc,
+				Ratio:     0.48,
+				MinRem:    26,
+				Visible:   true,
+				TargetID:  "pickleball-state-region",
+				Title:     "Preview",
+				Component: StatePanel(vm),
+			},
+			{
+				ID:        "pickleball-chat-workspace",
+				Slot:      workbench.WorkbenchSlotContext,
+				Kind:      workbench.RegionChat,
+				Ratio:     0.30,
+				MinRem:    20,
+				Visible:   true,
+				TargetID:  "pickleball-chat-region",
+				Title:     "Chat",
+				Component: ChatToModifyPanel(vm),
+			},
+		},
+		NormalRegions: []workbench.RegionNormalState{
+			{SignalKey: "pickleball-workbench-guide", Available: true, Visible: true},
+			{SignalKey: "pickleball-preview-workspace", Available: true, Visible: true},
+			{SignalKey: "pickleball-chat-workspace", Available: true, Visible: true},
+		},
 	})
+	return state
 }
 
 func stateLabel(state AppState) string {

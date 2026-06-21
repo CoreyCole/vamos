@@ -127,6 +127,53 @@ func TestSelfModifyActivitiesEditAndPromoteSnapshot(t *testing.T) {
 	}
 }
 
+func TestPromptPatchGeneratorUpdatesRepeatedPrompts(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	svc := newWorkflowTestService(t, nil, nil)
+	session, err := svc.EnsureSession(ctx, "player@example.com")
+	if err != nil {
+		t.Fatalf("EnsureSession: %v", err)
+	}
+	mainPath := filepath.Join(session.WorkspacePath, "main.go")
+	seed := `package main
+
+type Matchup struct { Reason string }
+type Manifest struct { PromptSummary string }
+
+func GenerateMatchups() []Matchup {
+	return []Matchup{{Reason: "Balanced total skill by pairing high+low."}}
+}
+
+func WriteManifest() Manifest {
+	return Manifest{PromptSummary: "Seed balanced matchup generator"}
+}
+`
+	if err := os.WriteFile(mainPath, []byte(seed), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	generator := PromptPatchGenerator{}
+	if err := generator.ApplyPrompt(ctx, AIGenerateInput{WorkspacePath: session.WorkspacePath, Prompt: "Add skill totals"}); err != nil {
+		t.Fatalf("ApplyPrompt first: %v", err)
+	}
+	if err := generator.ApplyPrompt(ctx, AIGenerateInput{WorkspacePath: session.WorkspacePath, Prompt: "Prioritize partners"}); err != nil {
+		t.Fatalf("ApplyPrompt second: %v", err)
+	}
+	data, err := os.ReadFile(mainPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	source := string(data)
+	for _, want := range []string{"Prioritize partners", "fresh partner pairings"} {
+		if !strings.Contains(source, want) {
+			t.Fatalf("patched source missing %q:\n%s", want, source)
+		}
+	}
+	if strings.Contains(source, "Add skill totals") || strings.Contains(source, "Seed balanced") {
+		t.Fatalf("old prompt text remained after second patch:\n%s", source)
+	}
+}
+
 func TestBuildAndSnapshotFailurePreservesLastGood(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()

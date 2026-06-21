@@ -21,21 +21,24 @@ func (s *Service) HandlePage(c echo.Context) error {
 }
 
 func (s *Service) HandleStateStream(c echo.Context) error {
-	sessionID := strings.TrimSpace(c.QueryParam("session"))
-	if sessionID == "" {
-		session, err := s.EnsureSession(c.Request().Context(), userEmail(c))
-		if err != nil {
-			return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
-		}
-		sessionID = session.ID
+	session, err := s.requestSession(c, c.QueryParam("session"))
+	if err != nil {
+		return err
 	}
+	sessionID := session.ID
 	sse := datastar.NewSSE(c.Response().Writer, c.Request())
 	patch := func() error {
 		vm, err := s.GetState(c.Request().Context(), sessionID)
 		if err != nil {
 			return err
 		}
-		return sse.PatchElementTempl(StatePanel(vm))
+		if err := sse.PatchElementTempl(PickleballWorkbenchGuide(vm)); err != nil {
+			return err
+		}
+		if err := sse.PatchElementTempl(StatePanel(vm)); err != nil {
+			return err
+		}
+		return sse.PatchElementTempl(ChatToModifyPanel(vm))
 	}
 	if err := patch(); err != nil {
 		return err
@@ -55,8 +58,12 @@ func (s *Service) HandleStateStream(c echo.Context) error {
 }
 
 func (s *Service) HandleSubmitPrompt(c echo.Context) error {
+	session, err := s.requestSession(c, c.FormValue("session_id"))
+	if err != nil {
+		return err
+	}
 	req := PromptRequest{
-		SessionID: strings.TrimSpace(c.FormValue("session_id")),
+		SessionID: session.ID,
 		Prompt:    c.FormValue("prompt"),
 		UserEmail: userEmail(c),
 	}
@@ -67,30 +74,41 @@ func (s *Service) HandleSubmitPrompt(c echo.Context) error {
 }
 
 func (s *Service) HandleShare(c echo.Context) error {
-	sessionID := strings.TrimSpace(c.FormValue("session_id"))
-	if sessionID == "" {
-		session, err := s.EnsureSession(c.Request().Context(), userEmail(c))
-		if err != nil {
-			return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
-		}
-		sessionID = session.ID
+	session, err := s.requestSession(c, c.FormValue("session_id"))
+	if err != nil {
+		return err
 	}
-	if _, err := s.ShareModel(c.Request().Context(), sessionID); err != nil {
+	if _, err := s.ShareModel(c.Request().Context(), session.ID); err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 	}
 	return c.NoContent(http.StatusNoContent)
 }
 
 func (s *Service) HandleDebugRestore(c echo.Context) error {
-	sessionID := strings.TrimSpace(c.FormValue("session_id"))
-	buildID := strings.TrimSpace(c.FormValue("build_id"))
-	if sessionID == "" || buildID == "" {
-		return echo.NewHTTPError(http.StatusBadRequest, "session_id and build_id are required")
+	session, err := s.requestSession(c, c.FormValue("session_id"))
+	if err != nil {
+		return err
 	}
-	if err := s.RestoreSnapshotForAI(c.Request().Context(), sessionID, buildID); err != nil {
+	buildID := strings.TrimSpace(c.FormValue("build_id"))
+	if buildID == "" {
+		return echo.NewHTTPError(http.StatusBadRequest, "build_id is required")
+	}
+	if err := s.RestoreSnapshotForAI(c.Request().Context(), session.ID, buildID); err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 	}
 	return c.NoContent(http.StatusNoContent)
+}
+
+func (s *Service) requestSession(c echo.Context, requestedID string) (PickleballSession, error) {
+	session, err := s.EnsureSession(c.Request().Context(), userEmail(c))
+	if err != nil {
+		return PickleballSession{}, echo.NewHTTPError(http.StatusInternalServerError, err.Error())
+	}
+	requestedID = strings.TrimSpace(requestedID)
+	if requestedID != "" && requestedID != session.ID {
+		return PickleballSession{}, echo.NewHTTPError(http.StatusForbidden, "session_id does not match current user")
+	}
+	return session, nil
 }
 
 func userEmail(c echo.Context) string {

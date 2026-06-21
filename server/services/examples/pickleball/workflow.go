@@ -318,15 +318,8 @@ func (PromptPatchGenerator) ApplyPrompt(ctx context.Context, input AIGenerateInp
 		return fmt.Errorf("read generated bundle: %w", err)
 	}
 	source := string(data)
-	changes := []struct{ old, new string }{
-		{`PromptSummary: "Seed balanced matchup generator",`, fmt.Sprintf("PromptSummary: %q,", promptSummary(input.Prompt))},
-		{`Reason: "Balanced total skill by pairing high+low.",`, fmt.Sprintf("Reason: %q,", reasonForPrompt(input.Prompt))},
-	}
-	for _, change := range changes {
-		if strings.Contains(source, change.old) {
-			source = strings.Replace(source, change.old, change.new, 1)
-		}
-	}
+	source = replaceFirstStringField(source, "PromptSummary", promptSummary(input.Prompt))
+	source = replaceFirstStringField(source, "Reason", reasonForPrompt(input.Prompt))
 	if strings.Contains(strings.ToLower(input.Prompt), "color") {
 		source = strings.ReplaceAll(source, "#0f766e", "#7c3aed")
 		source = strings.ReplaceAll(source, "#14b8a6", "#f97316")
@@ -335,6 +328,15 @@ func (PromptPatchGenerator) ApplyPrompt(ctx context.Context, input AIGenerateInp
 		return fmt.Errorf("write generated bundle: %w", err)
 	}
 	return nil
+}
+
+func replaceFirstStringField(source, field, value string) string {
+	re := regexp.MustCompile(`(` + regexp.QuoteMeta(field) + `\s*:\s*)"[^"\\]*(?:\\.[^"\\]*)*"(\s*,?)`)
+	loc := re.FindStringSubmatchIndex(source)
+	if loc == nil {
+		return source
+	}
+	return source[:loc[0]] + source[loc[2]:loc[3]] + fmt.Sprintf("%q", value) + source[loc[4]:loc[5]] + source[loc[1]:]
 }
 
 func reasonForPrompt(prompt string) string {
