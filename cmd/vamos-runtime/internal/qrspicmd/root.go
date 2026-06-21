@@ -35,6 +35,7 @@ func newCommand(d deps) *cobra.Command {
 	}
 	cmd.AddCommand(
 		newInitCommand(d),
+		newStartNextCommand(d),
 		newRunChildCommand(d),
 		newValidateResultCommand(d),
 		newDecideNextCommand(d),
@@ -61,6 +62,34 @@ func newInitCommand(d deps) *cobra.Command {
 	cmd.Flags().StringVar(&opts.NodeID, "stage", "", "alias for --node")
 	cmd.Flags().StringVar(&opts.ImplementationCwd, "implementation-cwd", "", "implementation workspace cwd for implementation/review/verify stages")
 	cmd.Flags().StringVar(&opts.ManagerPane, "manager-pane", "", "tmux pane ID for the parent q-manager session")
+	cmd.Flags().BoolVar(&opts.Force, "force", false, "replace existing expired/inactive state")
+	return cmd
+}
+
+func newStartNextCommand(d deps) *cobra.Command {
+	opts := StartNextOptions{Split: "right", Timeout: 0, Output: "text"}
+	cmd := &cobra.Command{
+		Use:   "start-next --plan-dir <path> --project-root <path>",
+		Short: "Initialize or resume q-manager state and launch the graph-selected child",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			_, err := RunStartNext(cmd.Context(), opts, d, cmd.OutOrStdout())
+			return err
+		},
+	}
+	cmd.Flags().StringVar(&opts.PlanDir, "plan-dir", "", "QRSPI plan directory")
+	cmd.Flags().StringVar(&opts.ProjectRoot, "project-root", "", "project repository root")
+	cmd.Flags().StringVar(&opts.StateFile, "state-file", "", "q-manager state file")
+	cmd.Flags().StringVar(&opts.PolicyFile, "policy-file", "", "optional policy JSON file")
+	cmd.Flags().StringVar(&opts.NodeID, "node", "", "QRSPI node ID override")
+	cmd.Flags().StringVar(&opts.NodeID, "stage", "", "alias for --node")
+	cmd.Flags().StringVar(&opts.ImplementationCwd, "implementation-cwd", "", "implementation workspace cwd for implementation/review/verify stages")
+	cmd.Flags().StringVar(&opts.ManagerPane, "manager-pane", "", "tmux pane ID for the parent q-manager session")
+	cmd.Flags().StringVar(&opts.LatestResultFile, "latest-result-file", "", "file containing latest fenced qrspi_result YAML")
+	cmd.Flags().BoolVar(&opts.LatestResultStdin, "latest-result-stdin", false, "read latest fenced qrspi_result YAML from stdin")
+	cmd.Flags().StringVar(&opts.Cwd, "cwd", "", "child cwd override")
+	cmd.Flags().StringVar(&opts.Split, "split", "right", "tmux split direction")
+	cmd.Flags().DurationVar(&opts.Timeout, "timeout", 0, "maximum time to wait for child; 0 returns after launch")
+	cmd.Flags().StringVar(&opts.Output, "output", "text", "output format: text or ndjson")
 	cmd.Flags().BoolVar(&opts.Force, "force", false, "replace existing expired/inactive state")
 	return cmd
 }
@@ -228,6 +257,231 @@ func RunInit(ctx context.Context, opts InitOptions, d deps, out io.Writer) error
 			"currentNode":  state.Workflow.CurrentNodeID,
 		},
 	})
+}
+
+func RunStartNext(ctx context.Context, opts StartNextOptions, d deps, out io.Writer) (*StartNextResult, error) {
+	out = ensureWriter(out)
+	if strings.TrimSpace(opts.StateFile) == "" && strings.TrimSpace(opts.PlanDir) == "" {
+		return nil, errors.New("plan-dir is required")
+	}
+	clock := d.Clock
+	if clock == nil {
+		clock = time.Now
+	}
+	state, stateFile, err := resolveOrInitStartState(ctx, opts, d)
+	if err != nil {
+		return nil, err
+	}
+	result := StartNextResult{StateFile: stateFile}
+	if state.ActiveChild != nil {
+		result.ActiveChild = state.ActiveChild
+		result.CurrentNode = state.ActiveChild.Stage
+		result.StopReason = "active child already running"
+		result.NextCommand = continueCommand(stateFile)
+		result.FeedbackCommand = feedbackCommand(stateFile)
+		return &result, writeStartNextOutput(out, result, opts.Output)
+	}
+	store := stateStore(d, "", clock)
+	if seed, err := readLatestResultSeed(opts); err != nil {
+		return nil, err
+	} else if strings.TrimSpace(seed) != "" {
+		parsed, err := applyLatestResultSeed(&state, seed)
+		if err != nil {
+			return nil, err
+		}
+		if err := store.Save(stateFile, state); err != nil {
+			return nil, err
+		}
+		result.CurrentNode = string(parsed.Result.SourceNodeID)
+		result.StopReason = parsed.Decision.StopReason
+		if parsed.Decision.WaitingHuman {
+			result.StopReason = "result requested human input"
+			result.NextCommand = feedbackCommand(stateFile)
+			return &result, writeStartNextOutput(out, result, opts.Output)
+		}
+		if !parsed.Decision.StartNext {
+			if result.StopReason == "" {
+				result.StopReason = "next node ready; advance mode does not auto-launch"
+			}
+			if parsed.Decision.NextNodeID != "" {
+				result.CurrentNode = string(parsed.Decision.NextNodeID)
+			}
+			result.NextCommand = fmt.Sprintf("vamos qrspi start-next --state-file %s", stateFile)
+			return &result, writeStartNextOutput(out, result, opts.Output)
+		}
+	}
+	node, err := selectLaunchNode(state, opts)
+	if err != nil {
+		return nil, err
+	}
+	result.CurrentNode = string(node.ID)
+	promptFile, err := WriteStagePromptFile(ctx, state, node, PromptFileOptions{StateFile: stateFile, NodeID: string(node.ID), Timestamp: clock()})
+	if err != nil {
+		return nil, err
+	}
+	result.PromptFile = promptFile
+	cwd, err := defaultChildCwd(state, node.ID, opts.Cwd)
+	if err != nil {
+		return nil, err
+	}
+	runOut := io.Writer(io.Discard)
+	if strings.EqualFold(opts.Output, "ndjson") {
+		runOut = out
+	}
+	if err := RunChild(ctx, RunChildOptions{
+		PlanDir:    planDirForStart(state, opts),
+		Stage:      string(node.ID),
+		Cwd:        cwd,
+		PromptFile: promptFile,
+		StateFile:  stateFile,
+		Split:      opts.Split,
+		Timeout:    opts.Timeout,
+	}, d, runOut); err != nil {
+		return nil, err
+	}
+	launched, err := store.Load(stateFile)
+	if err != nil {
+		return nil, err
+	}
+	result.ActiveChild = launched.ActiveChild
+	result.NextCommand = continueCommand(stateFile)
+	result.FeedbackCommand = feedbackCommand(stateFile)
+	return &result, writeStartNextOutput(out, result, opts.Output)
+}
+
+func readLatestResultSeed(opts StartNextOptions) (string, error) {
+	if opts.LatestResultStdin && strings.TrimSpace(opts.LatestResultFile) != "" {
+		return "", errors.New("use only one of --latest-result-stdin or --latest-result-file")
+	}
+	if strings.TrimSpace(opts.LatestResultFile) != "" {
+		data, err := os.ReadFile(opts.LatestResultFile)
+		if err != nil {
+			return "", err
+		}
+		return string(data), nil
+	}
+	if opts.LatestResultStdin {
+		data, err := io.ReadAll(os.Stdin)
+		if err != nil {
+			return "", err
+		}
+		return string(data), nil
+	}
+	return "", nil
+}
+
+func applyLatestResultSeed(state *ManagerState, resultText string) (*ParsedDecision, error) {
+	if state == nil {
+		return nil, errors.New("state is required")
+	}
+	parsed, err := ParseValidateDecide(resultText, state.Workflow, wruntime.ParseContext{ExpectedNodeID: state.Workflow.CurrentNodeID})
+	if err != nil {
+		return nil, err
+	}
+	state.Workflow = parsed.Decision.State
+	*state = UpdateImplementationCwd(*state, parsed.Result)
+	if parsed.Decision.StartNext {
+		*state = markPendingCleanup(*state)
+	}
+	return &parsed, nil
+}
+
+func writeStartNextOutput(out io.Writer, result StartNextResult, mode string) error {
+	if strings.EqualFold(mode, "ndjson") {
+		return WriteNDJSON(out, Event{Type: "start_next", Ref: startNextRef(result)})
+	}
+	return writeStartNextText(out, result)
+}
+
+func writeStartNextText(out io.Writer, result StartNextResult) error {
+	if result.StateFile != "" {
+		if _, err := fmt.Fprintf(out, "state: %s\n", result.StateFile); err != nil {
+			return err
+		}
+	}
+	if result.ActiveChild != nil && result.StopReason == "active child already running" {
+		if _, err := fmt.Fprintf(out, "active child: %s (%s), session %s\n", result.ActiveChild.Stage, result.ActiveChild.TmuxPaneID, emptyAsPending(result.ActiveChild.SessionID)); err != nil {
+			return err
+		}
+		_, err := fmt.Fprintln(out, "next: wait for validated wake or inspect active child; do not launch duplicate child")
+		return err
+	}
+	if result.CurrentNode != "" {
+		if _, err := fmt.Fprintf(out, "node: %s\n", result.CurrentNode); err != nil {
+			return err
+		}
+	}
+	if result.PromptFile != "" {
+		if _, err := fmt.Fprintf(out, "prompt: %s\n", result.PromptFile); err != nil {
+			return err
+		}
+	}
+	if result.ActiveChild != nil {
+		if _, err := fmt.Fprintf(out, "started child: %s (%s)\n", result.ActiveChild.Stage, result.ActiveChild.TmuxPaneID); err != nil {
+			return err
+		}
+	}
+	if result.StopReason != "" && result.ActiveChild == nil {
+		if _, err := fmt.Fprintf(out, "stop: %s\n", result.StopReason); err != nil {
+			return err
+		}
+	}
+	if result.NextCommand != "" {
+		if _, err := fmt.Fprintf(out, "next: %s\n", result.NextCommand); err != nil {
+			return err
+		}
+	}
+	if result.FeedbackCommand != "" {
+		if _, err := fmt.Fprintf(out, "feedback: %s\n", result.FeedbackCommand); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func startNextRef(result StartNextResult) map[string]any {
+	ref := map[string]any{"stateFile": result.StateFile}
+	if result.CurrentNode != "" {
+		ref["currentNode"] = result.CurrentNode
+	}
+	if result.PromptFile != "" {
+		ref["promptFile"] = result.PromptFile
+	}
+	if result.ActiveChild != nil {
+		ref["activeChild"] = childRef(result.ActiveChild)
+	}
+	if result.StopReason != "" {
+		ref["stopReason"] = result.StopReason
+	}
+	if result.NextCommand != "" {
+		ref["nextCommand"] = result.NextCommand
+	}
+	if result.FeedbackCommand != "" {
+		ref["feedbackCommand"] = result.FeedbackCommand
+	}
+	return ref
+}
+
+func continueCommand(stateFile string) string {
+	return fmt.Sprintf("vamos qrspi continue --state-file %s", stateFile)
+}
+
+func feedbackCommand(stateFile string) string {
+	return fmt.Sprintf("vamos qrspi steer-child --state-file %s --feedback-file <file>", stateFile)
+}
+
+func planDirForStart(state ManagerState, opts StartNextOptions) string {
+	if strings.TrimSpace(opts.PlanDir) != "" {
+		return opts.PlanDir
+	}
+	return state.CanonicalPlanDir
+}
+
+func emptyAsPending(value string) string {
+	if strings.TrimSpace(value) == "" {
+		return "pending"
+	}
+	return value
 }
 
 func RunChild(ctx context.Context, opts RunChildOptions, d deps, out io.Writer) error {
