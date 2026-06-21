@@ -82,6 +82,20 @@ func TestSubmitPromptStartsWorkflowAndMarksGenerating(t *testing.T) {
 	}
 }
 
+func TestShareURLsUseThoughtsWorkbenchRoutes(t *testing.T) {
+	t.Parallel()
+	snapshot := BuildSnapshot{
+		HTMLThoughtsPath: "creative-mode-agent/examples/pickleball/sessions/player/snapshots/build-1/app.html",
+		CSVThoughtsPath:  "thoughts/creative-mode-agent/examples/pickleball/sessions/player/snapshots/build-1/results.csv",
+	}
+	if got := LatestPreviewURL(snapshot); got != "/thoughts/creative-mode-agent/examples/pickleball/sessions/player/snapshots/build-1/app.html" {
+		t.Fatalf("LatestPreviewURL = %q", got)
+	}
+	if got := CSVDownloadURL(snapshot); got != "/thoughts/creative-mode-agent/examples/pickleball/sessions/player/snapshots/build-1/results.csv" {
+		t.Fatalf("CSVDownloadURL = %q", got)
+	}
+}
+
 func TestPromoteSnapshotAndFailurePreservesLastGood(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
@@ -118,6 +132,81 @@ func TestPromoteSnapshotAndFailurePreservesLastGood(t *testing.T) {
 	}
 	if vm.Share.PreviewURL != "/thoughts/creative-mode-agent/examples/pickleball/sessions/player/snapshots/build-1/app.html" {
 		t.Fatalf("preview URL = %q", vm.Share.PreviewURL)
+	}
+}
+
+func TestShareModelLoadsCurrentOrLastGoodBuild(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	svc := newTestService(t, nil, nil)
+	session, err := svc.EnsureSession(ctx, "player@example.com")
+	if err != nil {
+		t.Fatalf("EnsureSession: %v", err)
+	}
+	snapshot := BuildSnapshot{
+		BuildID:          "build-1",
+		HTMLThoughtsPath: "creative-mode-agent/examples/pickleball/sessions/player/snapshots/build-1/app.html",
+		CSVThoughtsPath:  "creative-mode-agent/examples/pickleball/sessions/player/snapshots/build-1/results.csv",
+	}
+	if err := svc.PromoteSnapshot(ctx, session.ID, snapshot); err != nil {
+		t.Fatalf("PromoteSnapshot: %v", err)
+	}
+	share, err := svc.ShareModel(ctx, session.ID)
+	if err != nil {
+		t.Fatalf("ShareModel: %v", err)
+	}
+	if share.PreviewURL == "" || share.CSVDownloadURL == "" {
+		t.Fatalf("share = %+v", share)
+	}
+}
+
+func TestRestoreSnapshotForAICopiesSourceWithoutMovingCurrentPointer(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	svc := newTestService(t, nil, nil)
+	session, err := svc.EnsureSession(ctx, "player@example.com")
+	if err != nil {
+		t.Fatalf("EnsureSession: %v", err)
+	}
+	snapshot := BuildSnapshot{
+		BuildID:          "build-1",
+		PromptSummary:    "seed",
+		SnapshotPath:     "creative-mode-agent/examples/pickleball/sessions/" + session.ID + "/snapshots/build-1",
+		HTMLThoughtsPath: "creative-mode-agent/examples/pickleball/sessions/" + session.ID + "/snapshots/build-1/app.html",
+		CSVThoughtsPath:  "creative-mode-agent/examples/pickleball/sessions/" + session.ID + "/snapshots/build-1/results.csv",
+	}
+	if err := svc.PromoteSnapshot(ctx, session.ID, snapshot); err != nil {
+		t.Fatalf("PromoteSnapshot: %v", err)
+	}
+	sourceDir := filepath.Join(svc.store.Root(), "sessions", session.ID, "snapshots", "build-1", "source")
+	if err := os.MkdirAll(sourceDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(sourceDir, "main.go"), []byte("package main\n// restored\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(session.WorkspacePath, "extra.txt"), []byte("remove me"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := svc.RestoreSnapshotForAI(ctx, session.ID, "build-1"); err != nil {
+		t.Fatalf("RestoreSnapshotForAI: %v", err)
+	}
+	restored, err := os.ReadFile(filepath.Join(session.WorkspacePath, "main.go"))
+	if err != nil {
+		t.Fatalf("read restored source: %v", err)
+	}
+	if !strings.Contains(string(restored), "restored") {
+		t.Fatalf("workspace was not restored: %s", restored)
+	}
+	if _, err := os.Stat(filepath.Join(session.WorkspacePath, "extra.txt")); !os.IsNotExist(err) {
+		t.Fatalf("extra workspace file should be removed, err=%v", err)
+	}
+	loaded, err := svc.store.LoadSession(ctx, session.ID)
+	if err != nil {
+		t.Fatalf("LoadSession: %v", err)
+	}
+	if loaded.CurrentBuildID != "build-1" || loaded.LastGoodBuildID != "build-1" || loaded.State != AppStateIdle {
+		t.Fatalf("loaded after restore = %+v", loaded)
 	}
 }
 

@@ -70,22 +70,22 @@ func PreviewCard(vm PickleballViewModel) templ.Component {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var3 templ.SafeURL
-			templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.JoinURLErrs(thoughtsURL(snapshot.HTMLThoughtsPath))
+			templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.JoinURLErrs(LatestPreviewURL(*snapshot))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/examples/pickleball/preview.templ`, Line: 19, Col: 201}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/examples/pickleball/preview.templ`, Line: 19, Col: 190}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var3))
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, "\">Open HTML</a> <a class=\"inline-flex items-center justify-center rounded-full border border-border px-3 py-2 text-xs font-semibold text-foreground hover:bg-muted\" href=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, "\">Open preview</a> <a class=\"inline-flex items-center justify-center rounded-full border border-border px-3 py-2 text-xs font-semibold text-foreground hover:bg-muted\" href=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var4 templ.SafeURL
-			templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.JoinURLErrs(thoughtsURL(snapshot.CSVThoughtsPath))
+			templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.JoinURLErrs(CSVDownloadURL(*snapshot))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/examples/pickleball/preview.templ`, Line: 20, Col: 197}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/examples/pickleball/preview.templ`, Line: 20, Col: 185}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var4))
 			if templ_7745c5c3_Err != nil {
@@ -114,66 +114,98 @@ func PreviewCard(vm PickleballViewModel) templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 11, "\"></iframe></div></div><aside class=\"flex flex-col gap-3 border-t border-border p-4 lg:border-l lg:border-t-0\"><div><p class=\"text-xs font-semibold uppercase tracking-wide text-muted-foreground\">Build</p><p class=\"mt-1 break-all text-sm text-foreground\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 11, "\"></iframe></div></div><aside class=\"flex flex-col gap-3 border-t border-border p-4 lg:border-l lg:border-t-0\"><div><p class=\"text-xs font-semibold uppercase tracking-wide text-muted-foreground\">Share</p><p class=\"mt-1 text-sm text-foreground\">Send the latest preview or CSV. Native browser share can use these same links when available.</p></div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			var templ_7745c5c3_Var6 string
-			templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.JoinStringErrs(snapshot.BuildID)
-			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/examples/pickleball/preview.templ`, Line: 34, Col: 74}
-			}
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var6))
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 12, "</p></div><a class=\"inline-flex items-center justify-center rounded-2xl border border-border px-3 py-2 text-sm font-medium hover:bg-muted\" href=\"")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			var templ_7745c5c3_Var7 templ.SafeURL
-			templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.JoinURLErrs(thoughtsURL(snapshot.CSVThoughtsPath))
-			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/examples/pickleball/preview.templ`, Line: 36, Col: 178}
-			}
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var7))
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 13, "\">View CSV table</a> ")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
+			if vm.Share.PreviewURL != "" {
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 12, "<a id=\"pickleball-preview-link\" class=\"inline-flex items-center justify-center rounded-2xl border border-border px-3 py-2 text-sm font-medium hover:bg-muted\" href=\"")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				var templ_7745c5c3_Var6 templ.SafeURL
+				templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.JoinURLErrs(vm.Share.PreviewURL)
+				if templ_7745c5c3_Err != nil {
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/examples/pickleball/preview.templ`, Line: 37, Col: 190}
+				}
+				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var6))
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 13, "\">Preview link</a> <button type=\"button\" class=\"inline-flex items-center justify-center rounded-2xl border border-border px-3 py-2 text-sm font-medium hover:bg-muted\" data-on-click=\"")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				var templ_7745c5c3_Var7 string
+				templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.JoinStringErrs("navigator.clipboard && navigator.clipboard.writeText(" + jsString(vm.Share.PreviewURL) + ")")
+				if templ_7745c5c3_Err != nil {
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/examples/pickleball/preview.templ`, Line: 38, Col: 263}
+				}
+				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var7))
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 14, "\">Copy preview link</button> ")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
 			}
 			if vm.Share.CSVDownloadURL != "" {
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 14, "<a class=\"inline-flex items-center justify-center rounded-2xl border border-border px-3 py-2 text-sm font-medium hover:bg-muted\" href=\"")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 15, "<a id=\"pickleball-csv-link\" class=\"inline-flex items-center justify-center rounded-2xl border border-border px-3 py-2 text-sm font-medium hover:bg-muted\" href=\"")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 				var templ_7745c5c3_Var8 templ.SafeURL
 				templ_7745c5c3_Var8, templ_7745c5c3_Err = templ.JoinURLErrs(vm.Share.CSVDownloadURL)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/examples/pickleball/preview.templ`, Line: 38, Col: 165}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/examples/pickleball/preview.templ`, Line: 41, Col: 190}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var8))
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 15, "\">Download CSV</a>")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 16, "\">Download CSV</a> ")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 16, "<p class=\"text-xs text-muted-foreground\">Generated HTML stays inside an iframe. CSV opens through the Thoughts renderer.</p></aside></div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 17, "<details class=\"rounded-2xl border border-dashed border-border p-3 text-xs text-muted-foreground\"><summary class=\"cursor-pointer font-medium text-foreground\">Debug recovery</summary><p class=\"mt-2\">Restore source for AI editing only. Current preview pointer stays on latest good build.</p><form class=\"mt-3 flex flex-col gap-2\"><input type=\"hidden\" name=\"session_id\" value=\"")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			var templ_7745c5c3_Var9 string
+			templ_7745c5c3_Var9, templ_7745c5c3_Err = templ.JoinStringErrs(vm.SessionID)
+			if templ_7745c5c3_Err != nil {
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/examples/pickleball/preview.templ`, Line: 47, Col: 66}
+			}
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var9))
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 18, "\"> <input type=\"hidden\" name=\"build_id\" value=\"")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			var templ_7745c5c3_Var10 string
+			templ_7745c5c3_Var10, templ_7745c5c3_Err = templ.JoinStringErrs(snapshot.BuildID)
+			if templ_7745c5c3_Err != nil {
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/examples/pickleball/preview.templ`, Line: 48, Col: 68}
+			}
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var10))
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 19, "\"> <button type=\"button\" class=\"inline-flex items-center justify-center rounded-xl border border-border px-3 py-2 text-xs font-medium hover:bg-muted\" data-on-click=\"@post('/examples/pickleball/debug/restore', {contentType: 'form'})\">Restore source for AI</button></form></details><p class=\"text-xs text-muted-foreground\">Generated HTML stays inside an iframe. CSV opens through the Thoughts renderer.</p></aside></div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		} else {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 17, "<div class=\"flex min-h-72 items-center justify-center bg-muted/40 p-6 text-center text-sm text-muted-foreground\"><div><p class=\"font-medium text-foreground\">Seed bundle waiting</p><p class=\"mt-1\">Try: “Prioritize new partner pairings over skill balance.”</p></div></div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 20, "<div class=\"flex min-h-72 items-center justify-center bg-muted/40 p-6 text-center text-sm text-muted-foreground\"><div><p class=\"font-medium text-foreground\">Seed bundle waiting</p><p class=\"mt-1\">Try: “Prioritize new partner pairings over skill balance.”</p></div></div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 18, "</section>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 21, "</section>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

@@ -107,7 +107,7 @@ func (s *Service) GetState(ctx context.Context, sessionID string) (PickleballVie
 			return PickleballViewModel{}, err
 		}
 		vm.Current = &snapshot
-		vm.Share = shareModel(snapshot)
+		vm.Share = shareModelForSnapshot(snapshot)
 	}
 	if session.LastGoodBuildID != "" {
 		snapshot, err := s.store.LoadSnapshot(ctx, session.ID, session.LastGoodBuildID)
@@ -116,7 +116,7 @@ func (s *Service) GetState(ctx context.Context, sessionID string) (PickleballVie
 		}
 		vm.LastGood = &snapshot
 		if vm.Current == nil {
-			vm.Share = shareModel(snapshot)
+			vm.Share = shareModelForSnapshot(snapshot)
 		}
 	}
 	return vm, nil
@@ -208,6 +208,63 @@ func (s *Service) SnapshotHistoryForPrompt(ctx context.Context, sessionID string
 	return s.store.ListSnapshots(ctx, sessionID)
 }
 
+func (s *Service) ShareModel(ctx context.Context, sessionID string) (ShareModel, error) {
+	session, err := s.store.LoadSession(ctx, strings.TrimSpace(sessionID))
+	if err != nil {
+		return ShareModel{}, err
+	}
+	buildID := session.CurrentBuildID
+	if buildID == "" {
+		buildID = session.LastGoodBuildID
+	}
+	if buildID == "" {
+		return ShareModel{}, fmt.Errorf("no build is available to share")
+	}
+	snapshot, err := s.store.LoadSnapshot(ctx, session.ID, buildID)
+	if err != nil {
+		return ShareModel{}, err
+	}
+	return shareModelForSnapshot(snapshot), nil
+}
+
+func (s *Service) RestoreSnapshotForAI(ctx context.Context, sessionID, buildID string) error {
+	session, err := s.store.LoadSession(ctx, strings.TrimSpace(sessionID))
+	if err != nil {
+		return err
+	}
+	snapshot, err := s.store.LoadSnapshot(ctx, session.ID, strings.TrimSpace(buildID))
+	if err != nil {
+		return err
+	}
+	sourceDir := filepath.Join(s.opts.ThoughtsRoot, filepath.FromSlash(cleanRelativePath(snapshot.SnapshotPath)), "source")
+	if !pathWithinRoot(sourceDir, s.store.Root()) {
+		return fmt.Errorf("snapshot source escapes example root")
+	}
+	if info, err := os.Stat(sourceDir); err != nil {
+		return fmt.Errorf("restore source: %w", err)
+	} else if !info.IsDir() {
+		return fmt.Errorf("restore source is not a directory")
+	}
+	if strings.TrimSpace(session.WorkspacePath) == "" || !pathWithinRoot(session.WorkspacePath, s.store.Root()) {
+		return fmt.Errorf("session workspace path is invalid")
+	}
+	if err := os.RemoveAll(session.WorkspacePath); err != nil {
+		return fmt.Errorf("clear workspace: %w", err)
+	}
+	if err := copyDir(sourceDir, session.WorkspacePath); err != nil {
+		return fmt.Errorf("restore workspace: %w", err)
+	}
+	session.State = AppStateIdle
+	session.ActiveRunID = ""
+	session.ErrorMessage = ""
+	session.LogTail = ""
+	if err := s.store.SaveSession(ctx, session); err != nil {
+		return err
+	}
+	s.notify(session.ID)
+	return nil
+}
+
 func (s *Service) notify(sessionID string) {
 	if s.opts.Notifier != nil {
 		s.opts.Notifier.NotifyPickleballSession(sessionID)
@@ -255,11 +312,19 @@ func promptExamples() []string {
 	}
 }
 
-func shareModel(snapshot BuildSnapshot) ShareModel {
+func shareModelForSnapshot(snapshot BuildSnapshot) ShareModel {
 	return ShareModel{
-		PreviewURL:     thoughtsURL(snapshot.HTMLThoughtsPath),
-		CSVDownloadURL: thoughtsURL(snapshot.CSVThoughtsPath),
+		PreviewURL:     LatestPreviewURL(snapshot),
+		CSVDownloadURL: CSVDownloadURL(snapshot),
 	}
+}
+
+func LatestPreviewURL(snapshot BuildSnapshot) string {
+	return thoughtsURL(snapshot.HTMLThoughtsPath)
+}
+
+func CSVDownloadURL(snapshot BuildSnapshot) string {
+	return thoughtsURL(snapshot.CSVThoughtsPath)
 }
 
 func thoughtsURL(path string) string {
@@ -268,6 +333,12 @@ func thoughtsURL(path string) string {
 		return ""
 	}
 	return "/thoughts/" + path
+}
+
+func pathWithinRoot(path, root string) bool {
+	p := filepath.Clean(path)
+	r := filepath.Clean(root)
+	return p == r || strings.HasPrefix(p, r+string(os.PathSeparator))
 }
 
 func sessionIDForUser(userEmail string) string {

@@ -67,11 +67,30 @@ func (s *Service) HandleSubmitPrompt(c echo.Context) error {
 }
 
 func (s *Service) HandleShare(c echo.Context) error {
+	sessionID := strings.TrimSpace(c.FormValue("session_id"))
+	if sessionID == "" {
+		session, err := s.EnsureSession(c.Request().Context(), userEmail(c))
+		if err != nil {
+			return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
+		}
+		sessionID = session.ID
+	}
+	if _, err := s.ShareModel(c.Request().Context(), sessionID); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
+	}
 	return c.NoContent(http.StatusNoContent)
 }
 
 func (s *Service) HandleDebugRestore(c echo.Context) error {
-	return echo.NewHTTPError(http.StatusNotImplemented, "debug restore is not implemented yet")
+	sessionID := strings.TrimSpace(c.FormValue("session_id"))
+	buildID := strings.TrimSpace(c.FormValue("build_id"))
+	if sessionID == "" || buildID == "" {
+		return echo.NewHTTPError(http.StatusBadRequest, "session_id and build_id are required")
+	}
+	if err := s.RestoreSnapshotForAI(c.Request().Context(), sessionID, buildID); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
+	}
+	return c.NoContent(http.StatusNoContent)
 }
 
 func userEmail(c echo.Context) string {
