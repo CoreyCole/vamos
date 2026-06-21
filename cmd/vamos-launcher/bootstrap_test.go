@@ -4,7 +4,9 @@ import (
 	"context"
 	"errors"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -153,11 +155,124 @@ func TestAcquireFileLockReleaseRemovesFiles(t *testing.T) {
 	}
 }
 
+func TestLauncherInstalledOutsideRepoUsesConfiguredRuntimeRoot(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping launcher process integration in short mode")
+	}
+	repoRoot := repoRootForTest(t)
+	binPath := filepath.Join(t.TempDir(), "bin", "vamos")
+	cmd := exec.Command("go", "build", "-o", binPath, "./cmd/vamos-launcher")
+	cmd.Dir = repoRoot
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("build launcher: %v\n%s", err, out)
+	}
+
+	configPath := filepath.Join(t.TempDir(), "state", "launcher.json")
+	cacheDir := filepath.Join(t.TempDir(), "cache")
+	env := append(os.Environ(), "VAMOS_LAUNCHER_CONFIG="+configPath, "VAMOS_LAUNCHER_CACHE="+cacheDir)
+
+	configure := exec.Command(binPath, "launcher", "configure", "--runtime-source-root", repoRoot)
+	configure.Env = env
+	configure.Dir = t.TempDir()
+	if out, err := configure.CombinedOutput(); err != nil {
+		t.Fatalf("launcher configure: %v\n%s", err, out)
+	}
+
+	run := exec.Command(binPath, "qrspi", "--help")
+	run.Env = env
+	run.Dir = t.TempDir()
+	out, err := run.CombinedOutput()
+	if err != nil {
+		t.Fatalf("launcher qrspi --help outside repo: %v\n%s", err, out)
+	}
+	if !strings.Contains(string(out), "qrspi") {
+		t.Fatalf("qrspi help output missing command name: %s", out)
+	}
+}
+
+func TestLauncherReusesManagedRuntimeWhenFingerprintUnchanged(t *testing.T) {
+	root := fakeRuntimeFingerprintRoot(t)
+	source := RuntimeSource{Root: root, SourceKey: sourceRootKey(root), SourceFrom: "test"}
+	fp := mustFingerprint(t, source)
+	cacheDir := t.TempDir()
+	target := managedRuntimePath(cacheDir, source, fp)
+	var builds atomic.Int32
+	withBuildRuntimeFunc(t, func(_ context.Context, _ string, outputPath string) error {
+		builds.Add(1)
+		writeFile(t, outputPath, "runtime")
+		return nil
+	})
+
+	if err := ensureManagedRuntime(context.Background(), source, target); err != nil {
+		t.Fatalf("first ensureManagedRuntime: %v", err)
+	}
+	if err := ensureManagedRuntime(context.Background(), source, target); err != nil {
+		t.Fatalf("second ensureManagedRuntime: %v", err)
+	}
+	if builds.Load() != 1 {
+		t.Fatalf("build count = %d, want 1", builds.Load())
+	}
+
+	writeFile(t, filepath.Join(root, "docs", "notes.md"), "excluded docs change\n")
+	unchanged := mustFingerprint(t, source)
+	if unchanged.Value != fp.Value {
+		t.Fatalf("excluded docs edit changed fingerprint: got %s want %s", unchanged.Value, fp.Value)
+	}
+	if err := ensureManagedRuntime(context.Background(), source, managedRuntimePath(cacheDir, source, unchanged)); err != nil {
+		t.Fatalf("ensure after excluded edit: %v", err)
+	}
+	if builds.Load() != 1 {
+		t.Fatalf("build count after excluded edit = %d, want 1", builds.Load())
+	}
+}
+
+func TestLauncherRebuildsWhenRuntimeFingerprintChanges(t *testing.T) {
+	root := fakeRuntimeFingerprintRoot(t)
+	source := RuntimeSource{Root: root, SourceKey: sourceRootKey(root), SourceFrom: "test"}
+	cacheDir := t.TempDir()
+	var builds atomic.Int32
+	withBuildRuntimeFunc(t, func(_ context.Context, _ string, outputPath string) error {
+		builds.Add(1)
+		writeFile(t, outputPath, "runtime")
+		return nil
+	})
+
+	first := mustFingerprint(t, source)
+	if err := ensureManagedRuntime(context.Background(), source, managedRuntimePath(cacheDir, source, first)); err != nil {
+		t.Fatalf("first ensureManagedRuntime: %v", err)
+	}
+
+	writeFile(t, filepath.Join(root, "cmd", "vamos-runtime", "main.go"), "package main\nfunc main() { println(\"changed\") }\n")
+	changed := mustFingerprint(t, source)
+	if changed.Value == first.Value {
+		t.Fatalf("runtime source edit did not change fingerprint")
+	}
+	if err := ensureManagedRuntime(context.Background(), source, managedRuntimePath(cacheDir, source, changed)); err != nil {
+		t.Fatalf("second ensureManagedRuntime: %v", err)
+	}
+	if builds.Load() != 2 {
+		t.Fatalf("build count = %d, want 2", builds.Load())
+	}
+}
+
 func testManagedRuntime(t *testing.T) ManagedRuntime {
 	t.Helper()
 	cache := t.TempDir()
 	source := RuntimeSource{Root: filepath.Join(t.TempDir(), "source"), SourceKey: "sourcekey", SourceFrom: "test"}
 	return managedRuntimePath(cache, source, Fingerprint{Value: "fingerprint"})
+}
+
+func repoRootForTest(t *testing.T) string {
+	t.Helper()
+	cwd, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	root, err := filepath.EvalSymlinks(filepath.Join(cwd, "..", ".."))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return root
 }
 
 func withBuildRuntimeFunc(t *testing.T, fn func(context.Context, string, string) error) {
