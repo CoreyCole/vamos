@@ -36,6 +36,10 @@ SELECT COUNT(*)
 FROM agent_sessions
 WHERE artifact_path = sqlc.arg('artifact_path');
 
+-- name: TestSupportCountAgentEntries :one
+SELECT COUNT(*)
+FROM agent_entries;
+
 -- name: TestSupportCountWorkspaces :one
 SELECT COUNT(*)
 FROM workspaces;

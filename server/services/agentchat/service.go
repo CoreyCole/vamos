@@ -86,6 +86,7 @@ type Service struct {
 	liveFlush                           *agentworkspace.LiveFlushLoop
 	appendWorkspaceEventForTest         func(context.Context, *db.Queries, AppendWorkspaceEventInput) (db.WorkspaceEvent, error)
 	terminalMetadataBeforeCommitForTest func() error
+	qrspiProjectionBeforeApplyForTest   func() error
 	workflowService                     workflowCompletionService
 	devWorkspaceManager                 devWorkspaceManager
 	implWorkspaceDiscovery              workspaces.ImplWorkspaceDiscoveryConfig

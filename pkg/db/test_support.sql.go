@@ -10,6 +10,18 @@ import (
 	"database/sql"
 )
 
+const testSupportCountAgentEntries = `-- name: TestSupportCountAgentEntries :one
+SELECT COUNT(*)
+FROM agent_entries
+`
+
+func (q *Queries) TestSupportCountAgentEntries(ctx context.Context) (int64, error) {
+	row := q.db.QueryRowContext(ctx, testSupportCountAgentEntries)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const testSupportCountAgentSessions = `-- name: TestSupportCountAgentSessions :one
 SELECT COUNT(*)
 FROM agent_sessions

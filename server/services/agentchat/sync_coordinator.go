@@ -214,10 +214,3 @@ func skippedPhaseDiagnostic(phase string) SyncPhaseDiagnostic {
 		CompletedAt: now,
 	}
 }
-
-func (s *Service) ApplyQRSPIProjections(
-	context.Context,
-	QRSPIProjectionApplyInput,
-) (QRSPIProjectionApplyResult, error) {
-	return QRSPIProjectionApplyResult{}, nil
-}

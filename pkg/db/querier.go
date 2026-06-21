@@ -176,6 +176,7 @@ type Querier interface {
 	ResolveWorkspaceForDocPath(ctx context.Context, arg ResolveWorkspaceForDocPathParams) (ResolveWorkspaceForDocPathRow, error)
 	RevokeMachineCredential(ctx context.Context, arg RevokeMachineCredentialParams) (int64, error)
 	SoftDeleteDocumentComment(ctx context.Context, id string) error
+	TestSupportCountAgentEntries(ctx context.Context) (int64, error)
 	TestSupportCountAgentSessions(ctx context.Context) (int64, error)
 	TestSupportCountAgentSessionsByPath(ctx context.Context, artifactPath sql.NullString) (int64, error)
 	TestSupportCountChatSessionEvents(ctx context.Context, sessionID string) (int64, error)
