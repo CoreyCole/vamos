@@ -81,6 +81,7 @@ type Querier interface {
 	GetLatestUserChatSelectionByScope(ctx context.Context, arg GetLatestUserChatSelectionByScopeParams) (UserChatSelection, error)
 	GetLayoutPreference(ctx context.Context, arg GetLayoutPreferenceParams) (LayoutPreference, error)
 	GetMachineCredential(ctx context.Context, id string) (MachineCredential, error)
+	GetPiMetadataCursor(ctx context.Context, sourcePath string) (PiMetadataCursor, error)
 	GetPlanWorkspace(ctx context.Context, planDirRel string) (PlanWorkspace, error)
 	GetPrimaryWorkspaceForThread(ctx context.Context, arg GetPrimaryWorkspaceForThreadParams) (Workspace, error)
 	GetRecentAuthAttempts(ctx context.Context, arg GetRecentAuthAttemptsParams) ([]AuthAttempt, error)
@@ -126,6 +127,7 @@ type Querier interface {
 	ListImplWorkspaces(ctx context.Context, projectID string) ([]ImplWorkspace, error)
 	ListMachineCredentials(ctx context.Context) ([]MachineCredential, error)
 	ListOpenChatAnnotationsByIDs(ctx context.Context, ids []string) ([]ChatAnnotation, error)
+	ListPendingQRSPIProjections(ctx context.Context, limit int64) ([]QrspiSessionProjection, error)
 	ListPlanOwnedSessionArtifactsByPlanDir(ctx context.Context, planDir sql.NullString) ([]AgentSession, error)
 	ListPlanOwnedSessionArtifactsByPlanDirPrefix(ctx context.Context, arg ListPlanOwnedSessionArtifactsByPlanDirPrefixParams) ([]AgentSession, error)
 	ListPlanWorkspaceImplBindings(ctx context.Context, planDirRel string) ([]PlanWorkspaceImplBinding, error)
@@ -156,6 +158,10 @@ type Querier interface {
 	MarkImplWorkspaceMergeUnknown(ctx context.Context, arg MarkImplWorkspaceMergeUnknownParams) (int64, error)
 	MarkImplWorkspaceMerged(ctx context.Context, arg MarkImplWorkspaceMergedParams) (int64, error)
 	MarkMissingImplWorkspacesCleanedUp(ctx context.Context, workspaceSlugs []string) (int64, error)
+	MarkPiMetadataCursorFailed(ctx context.Context, arg MarkPiMetadataCursorFailedParams) error
+	MarkQRSPIProjectionApplied(ctx context.Context, id string) error
+	MarkQRSPIProjectionFailed(ctx context.Context, arg MarkQRSPIProjectionFailedParams) error
+	MarkQRSPIProjectionSkipped(ctx context.Context, arg MarkQRSPIProjectionSkippedParams) error
 	MarkReleaseQueueItemRunning(ctx context.Context, arg MarkReleaseQueueItemRunningParams) (ReleaseQueueItem, error)
 	MarkReleaseQueueItemTerminal(ctx context.Context, arg MarkReleaseQueueItemTerminalParams) (ReleaseQueueItem, error)
 	MarkWorkspaceDocDeleted(ctx context.Context, arg MarkWorkspaceDocDeletedParams) error
@@ -211,8 +217,10 @@ type Querier interface {
 	UpsertDiscoveredImplWorkspace(ctx context.Context, arg UpsertDiscoveredImplWorkspaceParams) (ImplWorkspace, error)
 	UpsertDiscoveredPlanWorkspace(ctx context.Context, arg UpsertDiscoveredPlanWorkspaceParams) (PlanWorkspace, error)
 	UpsertLayoutPreference(ctx context.Context, arg UpsertLayoutPreferenceParams) (LayoutPreference, error)
+	UpsertPiMetadataCursorAdvanced(ctx context.Context, arg UpsertPiMetadataCursorAdvancedParams) (PiMetadataCursor, error)
 	UpsertPlanWorkspaceImplBinding(ctx context.Context, arg UpsertPlanWorkspaceImplBindingParams) (PlanWorkspaceImplBinding, error)
 	UpsertPlanWorkspaceProject(ctx context.Context, arg UpsertPlanWorkspaceProjectParams) (PlanWorkspaceProject, error)
+	UpsertQRSPIProjectionPending(ctx context.Context, arg UpsertQRSPIProjectionPendingParams) (QrspiSessionProjection, error)
 	UpsertThreadWorkspaceAssociation(ctx context.Context, arg UpsertThreadWorkspaceAssociationParams) error
 	UpsertUserChatSelection(ctx context.Context, arg UpsertUserChatSelectionParams) (UserChatSelection, error)
 	UpsertUserPreferences(ctx context.Context, arg UpsertUserPreferencesParams) (UserPreference, error)

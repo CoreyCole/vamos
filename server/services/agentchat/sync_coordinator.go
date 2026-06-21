@@ -215,13 +215,6 @@ func skippedPhaseDiagnostic(phase string) SyncPhaseDiagnostic {
 	}
 }
 
-func (s *Service) IndexTerminalMetadata(
-	context.Context,
-	TerminalMetadataIndexInput,
-) (TerminalMetadataIndexResult, error) {
-	return TerminalMetadataIndexResult{}, nil
-}
-
 func (s *Service) ApplyQRSPIProjections(
 	context.Context,
 	QRSPIProjectionApplyInput,

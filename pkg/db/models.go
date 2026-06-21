@@ -351,6 +351,18 @@ type MachineCredential struct {
 	LastUsedAt             sql.NullTime `json:"last_used_at"`
 }
 
+type PiMetadataCursor struct {
+	SourcePath     string         `json:"source_path"`
+	SourceIdentity sql.NullString `json:"source_identity"`
+	ByteOffset     int64          `json:"byte_offset"`
+	LastEventID    sql.NullString `json:"last_event_id"`
+	LastEventTime  sql.NullTime   `json:"last_event_time"`
+	Status         string         `json:"status"`
+	LastError      sql.NullString `json:"last_error"`
+	CreatedAt      time.Time      `json:"created_at"`
+	UpdatedAt      time.Time      `json:"updated_at"`
+}
+
 type PlanWorkspace struct {
 	PlanDirRel              string       `json:"plan_dir_rel"`
 	ProjectID               string       `json:"project_id"`
@@ -388,6 +400,26 @@ type PlanWorkspaceProject struct {
 	DeclaredAt       time.Time    `json:"declared_at"`
 	LastDiscoveredAt time.Time    `json:"last_discovered_at"`
 	ArchivedAt       sql.NullTime `json:"archived_at"`
+}
+
+type QrspiSessionProjection struct {
+	ID                  string         `json:"id"`
+	SourceEventID       string         `json:"source_event_id"`
+	SessionID           sql.NullString `json:"session_id"`
+	SessionArtifactPath sql.NullString `json:"session_artifact_path"`
+	PlanDir             string         `json:"plan_dir"`
+	WorkflowNodeID      sql.NullString `json:"workflow_node_id"`
+	Stage               sql.NullString `json:"stage"`
+	Status              sql.NullString `json:"status"`
+	Outcome             sql.NullString `json:"outcome"`
+	Artifact            sql.NullString `json:"artifact"`
+	ResultJson          string         `json:"result_json"`
+	ProjectionState     string         `json:"projection_state"`
+	AppliedAt           sql.NullTime   `json:"applied_at"`
+	LastError           sql.NullString `json:"last_error"`
+	EventTime           time.Time      `json:"event_time"`
+	CreatedAt           time.Time      `json:"created_at"`
+	UpdatedAt           time.Time      `json:"updated_at"`
 }
 
 type ReleaseQueueEvent struct {

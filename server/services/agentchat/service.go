@@ -64,34 +64,35 @@ var ErrThreadRunInProgress = errors.New("thread already has an active run")
 const transcriptRoleUser = "user"
 
 type Service struct {
-	db                          *sql.DB
-	queries                     *db.Queries
-	notifier                    *Notifier
-	temporal                    TemporalStarter
-	themeService                ThemeProvider
-	renderer                    *markdown.Renderer
-	projectRoot                 string
-	projectName                 string
-	defaultCwd                  string
-	thoughtsRoot                string
-	piSessionsDir               string
-	piIndexMu                   sync.Mutex
-	piIndexRunning              map[string]bool
-	piIndexQueued               map[string]PiSessionIndexRequest
-	callbackBaseURL             string
-	detailCollapseLineLimit     int
-	liveMu                      sync.RWMutex
-	liveThreads                 map[string]*liveThreadState
-	callbackWriteMu             sync.Mutex
-	liveFlush                   *agentworkspace.LiveFlushLoop
-	appendWorkspaceEventForTest func(context.Context, *db.Queries, AppendWorkspaceEventInput) (db.WorkspaceEvent, error)
-	workflowService             workflowCompletionService
-	devWorkspaceManager         devWorkspaceManager
-	implWorkspaceDiscovery      workspaces.ImplWorkspaceDiscoveryConfig
-	workspaceManagerURL         string
-	workspaceRestartToken       string
-	piCommandDiscovery          PiCommandDiscovery
-	chatSessions                *chatsession.Service
+	db                                  *sql.DB
+	queries                             *db.Queries
+	notifier                            *Notifier
+	temporal                            TemporalStarter
+	themeService                        ThemeProvider
+	renderer                            *markdown.Renderer
+	projectRoot                         string
+	projectName                         string
+	defaultCwd                          string
+	thoughtsRoot                        string
+	piSessionsDir                       string
+	piIndexMu                           sync.Mutex
+	piIndexRunning                      map[string]bool
+	piIndexQueued                       map[string]PiSessionIndexRequest
+	callbackBaseURL                     string
+	detailCollapseLineLimit             int
+	liveMu                              sync.RWMutex
+	liveThreads                         map[string]*liveThreadState
+	callbackWriteMu                     sync.Mutex
+	liveFlush                           *agentworkspace.LiveFlushLoop
+	appendWorkspaceEventForTest         func(context.Context, *db.Queries, AppendWorkspaceEventInput) (db.WorkspaceEvent, error)
+	terminalMetadataBeforeCommitForTest func() error
+	workflowService                     workflowCompletionService
+	devWorkspaceManager                 devWorkspaceManager
+	implWorkspaceDiscovery              workspaces.ImplWorkspaceDiscoveryConfig
+	workspaceManagerURL                 string
+	workspaceRestartToken               string
+	piCommandDiscovery                  PiCommandDiscovery
+	chatSessions                        *chatsession.Service
 }
 
 type liveThreadState struct {
