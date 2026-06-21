@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -192,8 +193,63 @@ func RunChild(ctx context.Context, opts RunChildOptions, d deps, out io.Writer) 
 	if strings.TrimSpace(opts.PromptFile) == "" {
 		return errors.New("prompt-file is required")
 	}
-	ensureWriter(out)
-	return ErrNotImplemented
+	if strings.TrimSpace(opts.StateFile) == "" {
+		return errors.New("state-file is required")
+	}
+	if _, err := os.Stat(opts.PromptFile); err != nil {
+		if os.IsNotExist(err) {
+			return fmt.Errorf("prompt-file does not exist: %s", opts.PromptFile)
+		}
+		return err
+	}
+	out = ensureWriter(out)
+	clock := d.Clock
+	if clock == nil {
+		clock = time.Now
+	}
+	store := stateStore(d, "", clock)
+	state, err := store.Load(opts.StateFile)
+	if err != nil {
+		return err
+	}
+	childID := childRunID(opts.Stage, clock())
+	runRoot := filepath.Dir(opts.StateFile)
+	req := ChildRunRequest{
+		ID:         childID,
+		Stage:      opts.Stage,
+		Cwd:        opts.Cwd,
+		PromptFile: opts.PromptFile,
+		OutputPath: OutputPath(runRoot, childID),
+		ResultPath: ResultPath(runRoot, childID),
+		Split:      normalizeSplit(opts.Split),
+	}
+	if err := ensureRunFiles(req); err != nil {
+		return err
+	}
+	runner := childRunner(d)
+	run, err := runner.Start(ctx, req)
+	if err != nil {
+		return err
+	}
+	state.ActiveChild = &ChildRunRef{ID: childID, Stage: opts.Stage, Cwd: opts.Cwd, TmuxPaneID: run.Pane.ID, OutputPath: req.OutputPath, ResultPath: req.ResultPath}
+	if err := store.Save(opts.StateFile, state); err != nil {
+		return err
+	}
+	if err := WriteNDJSON(out, Event{Type: "child_started", Ref: childRef(state.ActiveChild)}); err != nil {
+		return err
+	}
+	if opts.Timeout == 0 {
+		return nil
+	}
+	waitCtx, cancel := context.WithTimeout(ctx, opts.Timeout)
+	defer cancel()
+	if _, err := runner.Wait(waitCtx, run); err != nil {
+		return err
+	}
+	if err := waitForResult(waitCtx, req.ResultPath, 100*time.Millisecond); err != nil {
+		return fmt.Errorf("timed out waiting for child result %s (pane %s, output %s): %w", req.ResultPath, run.Pane.ID, req.OutputPath, err)
+	}
+	return WriteNDJSON(out, Event{Type: "child_finished", Ref: childRef(state.ActiveChild)})
 }
 
 func RunValidateResult(ctx context.Context, opts ValidateResultOptions, d deps, out io.Writer) error {
@@ -350,4 +406,68 @@ func stateStore(d deps, root string, clock func() time.Time) StateStore {
 		return d.StateStore
 	}
 	return FileStateStore{Root: root, Clock: clock}
+}
+
+func childRunner(d deps) ChildRunner {
+	if d.Runner != nil {
+		return d.Runner
+	}
+	tmux := d.Tmux
+	if tmux == nil {
+		tmux = ShellTmuxClient{}
+	}
+	return TmuxChildRunner{Tmux: tmux}
+}
+
+func childRunID(stage string, t time.Time) string {
+	clean := strings.NewReplacer("/", "-", " ", "-", "_", "-").Replace(strings.TrimSpace(stage))
+	if clean == "" {
+		clean = "child"
+	}
+	return fmt.Sprintf("%s-%s-%09d", clean, t.Format("20060102150405"), t.Nanosecond())
+}
+
+func normalizeSplit(split string) string {
+	switch strings.TrimSpace(split) {
+	case "", "right":
+		return "right"
+	case "down":
+		return "down"
+	default:
+		return split
+	}
+}
+
+func waitForResult(ctx context.Context, path string, interval time.Duration) error {
+	if interval <= 0 {
+		interval = 100 * time.Millisecond
+	}
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+	for {
+		if info, err := os.Stat(path); err == nil && !info.IsDir() {
+			return nil
+		} else if err != nil && !os.IsNotExist(err) {
+			return err
+		}
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-ticker.C:
+		}
+	}
+}
+
+func childRef(ref *ChildRunRef) map[string]any {
+	if ref == nil {
+		return nil
+	}
+	return map[string]any{
+		"childId":    ref.ID,
+		"stage":      ref.Stage,
+		"cwd":        ref.Cwd,
+		"tmuxPaneId": ref.TmuxPaneID,
+		"outputPath": ref.OutputPath,
+		"resultPath": ref.ResultPath,
+	}
 }

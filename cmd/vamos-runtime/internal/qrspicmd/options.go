@@ -59,25 +59,14 @@ type StateStore interface {
 	AcquireLock(ctx context.Context, key LockKey, owner string, ttl time.Duration) (Lock, error)
 }
 
-// ChildRunner is implemented by the visible tmux/Pi runner in a later slice.
+// ChildRunner starts visible child QRSPI sessions and observes their result file.
 type ChildRunner interface {
 	Start(ctx context.Context, req ChildRunRequest) (ChildRun, error)
 	Wait(ctx context.Context, run ChildRun) (ChildRunResult, error)
 }
 
-// TmuxClient is implemented by the shell tmux adapter in a later slice.
+// TmuxClient adapts tmux pane operations for visible child sessions.
 type TmuxClient interface {
 	SplitPane(ctx context.Context, req TmuxSplitRequest) (TmuxPane, error)
 	SendKeys(ctx context.Context, pane TmuxPane, keys []string) error
 }
-
-// The concrete fields move to dedicated child files in follow-up slices.
-type ChildRunRequest struct{}
-
-type ChildRun struct{}
-
-type ChildRunResult struct{}
-
-type TmuxSplitRequest struct{}
-
-type TmuxPane struct{}

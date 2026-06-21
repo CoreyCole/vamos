@@ -72,9 +72,7 @@ func TestRunChildRequiresStageCwdPrompt(t *testing.T) {
 	}
 
 	err := executeForError("run-child", "--plan-dir", "thoughts/example", "--stage", "design", "--cwd", ".", "--prompt-file", "/tmp/prompt.txt")
-	if !errors.Is(err, ErrNotImplemented) {
-		t.Fatalf("expected ErrNotImplemented after required flags, got %v", err)
-	}
+	assertErrorContains(t, err, "state-file is required")
 }
 
 func TestValidateResultRequiresStateAndResult(t *testing.T) {
