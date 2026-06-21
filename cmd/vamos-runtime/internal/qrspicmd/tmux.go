@@ -2,6 +2,7 @@ package qrspicmd
 
 import (
 	"context"
+	"errors"
 	"os"
 	"os/exec"
 	"strings"
@@ -33,6 +34,24 @@ func splitPaneArgs(req TmuxSplitRequest, targetPane string) []string {
 func (ShellTmuxClient) SendKeys(ctx context.Context, pane TmuxPane, keys []string) error {
 	args := append([]string{"send-keys", "-t", pane.ID}, keys...)
 	return exec.CommandContext(ctx, "tmux", args...).Run()
+}
+
+func (ShellTmuxClient) PasteText(ctx context.Context, pane TmuxPane, text string) error {
+	if strings.TrimSpace(pane.ID) == "" {
+		return errors.New("tmux pane ID is required")
+	}
+	if err := exec.CommandContext(ctx, "tmux", setBufferArgs("q-manager-wake", text)...).Run(); err != nil {
+		return err
+	}
+	return exec.CommandContext(ctx, "tmux", pasteBufferArgs("q-manager-wake", pane.ID)...).Run()
+}
+
+func setBufferArgs(name, text string) []string {
+	return []string{"set-buffer", "-b", name, text}
+}
+
+func pasteBufferArgs(name, paneID string) []string {
+	return []string{"paste-buffer", "-b", name, "-t", paneID}
 }
 
 func shellquote(args []string) []string {

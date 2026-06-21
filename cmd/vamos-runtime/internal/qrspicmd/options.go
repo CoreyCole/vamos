@@ -82,4 +82,5 @@ type ChildRunner interface {
 type TmuxClient interface {
 	SplitPane(ctx context.Context, req TmuxSplitRequest) (TmuxPane, error)
 	SendKeys(ctx context.Context, pane TmuxPane, keys []string) error
+	PasteText(ctx context.Context, pane TmuxPane, text string) error
 }

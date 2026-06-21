@@ -52,6 +52,18 @@ type ChildStatus struct {
 	FinishedAt string `json:"finishedAt,omitempty"`
 }
 
+type ChildTurnStatus struct {
+	Event      string `json:"event"`
+	Stage      string `json:"stage"`
+	ChildID    string `json:"childId"`
+	StateFile  string `json:"stateFile"`
+	PlanDir    string `json:"planDir"`
+	SessionID  string `json:"sessionId"`
+	SessionDir string `json:"sessionDir"`
+	FinishedAt string `json:"finishedAt"`
+	WakeTarget string `json:"wakeTarget"`
+}
+
 type TmuxSplitRequest struct {
 	Cwd       string
 	Direction string

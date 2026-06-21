@@ -56,9 +56,14 @@ func TestResolveChildExtensionPathWritesEmbeddedAsset(t *testing.T) {
 		t.Fatalf("read extension asset: %v", err)
 	}
 	text := string(data)
-	for _, want := range []string{"export default function qManagerChildExtension", `pi.on("agent_end"`} {
+	for _, want := range []string{"export default function qManagerChildExtension", `pi.on("agent_end"`, "Q_MANAGER_STATUS_PATH", "Q_MANAGER_DONE_PATH", "Q_MANAGER_PARENT_PANE", "paste-buffer", "validate-result", "decide-next"} {
 		if !strings.Contains(text, want) {
 			t.Fatalf("extension asset missing %q: %s", want, text)
+		}
+	}
+	for _, forbidden := range []string{"qrspi_result", "Decision", "RunDecideNext", "RunValidateResult"} {
+		if strings.Contains(text, forbidden) {
+			t.Fatalf("extension asset contains graph authority marker %q: %s", forbidden, text)
 		}
 	}
 }

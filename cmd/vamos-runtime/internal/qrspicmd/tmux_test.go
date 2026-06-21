@@ -25,3 +25,15 @@ func TestSplitPaneArgsOmitsTargetOutsideTmuxPane(t *testing.T) {
 		t.Fatalf("split args missing vertical split: %v", args)
 	}
 }
+
+func TestPasteBufferArgsTargetExactPane(t *testing.T) {
+	set := strings.Join(setBufferArgs("q-manager-wake", "hello"), " ")
+	if !strings.Contains(set, "set-buffer -b q-manager-wake hello") {
+		t.Fatalf("set buffer args = %v", set)
+	}
+
+	paste := strings.Join(pasteBufferArgs("q-manager-wake", "%18"), " ")
+	if !strings.Contains(paste, "paste-buffer -b q-manager-wake -t %18") {
+		t.Fatalf("paste args = %v", paste)
+	}
+}
