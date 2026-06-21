@@ -44,6 +44,15 @@ type DecideNextOptions struct {
 	PlanDir     string
 }
 
+type RepromptChildOptions struct {
+	StateFile string
+	PlanDir   string
+	Stage     string
+	Attempt   int
+	ErrorText string
+	ErrorFile string
+}
+
 type ResultSourceOptions struct {
 	ResultFile  string
 	SessionFile string

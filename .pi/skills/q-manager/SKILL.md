@@ -35,16 +35,18 @@ Supervise QRSPI from a main Pi manager session. Launch focused child Pi sessions
 1. Resolve plan dir and project root.
 1. Run `vamos qrspi init --plan-dir <plan-dir> --project-root <repo-root>` for a new graph, or add `--node <node>` / `--implementation-cwd <cwd>` to resume/test from a specific implementation, review, or verify stage.
 1. Render prompt for current/next node: `vamos qrspi render-prompt --state-file <state> --node <node> --plan-dir <plan-dir>`.
-1. Start child and wait for done/status marker: `vamos qrspi run-child --state-file <state> --plan-dir <plan-dir> --stage <node> --cwd <cwd> --prompt-file <prompt> --split right --timeout 12h`.
+1. Start visible child and return immediately: `vamos qrspi run-child --state-file <state> --plan-dir <plan-dir> --stage <node> --cwd <cwd> --prompt-file <prompt> --split right --timeout 0`.
+1. Wait for pasted parent wake: `q-manager child finished: <node>`.
 1. Validate from active child session JSONL: `vamos qrspi validate-result --state-file <state> --stage <node> --plan-dir <plan-dir>`.
-1. Decide from active child session JSONL: `vamos qrspi decide-next --state-file <state> --plan-dir <plan-dir>`.
-1. If decision starts next, repeat. If decision stops, report concise reason and next human action.
+1. Invalid result with retry budget: write validation error to a file, then run `vamos qrspi reprompt-child --state-file <state> --plan-dir <plan-dir> --stage <node> --attempt <n> --error-file <validation-error-file>` to correct the same child pane/session.
+1. Valid result: decide from active child session JSONL: `vamos qrspi decide-next --state-file <state> --plan-dir <plan-dir>`.
+1. If decision starts next, render and run the graph-selected next child. If decision stops, report concise reason and next human action.
 
 Manual/debug overrides: `--session-file <jsonl>` validates a specific child session JSONL. `--result-file <path>` is deprecated fallback for plaintext result files only when no active child session refs are available.
 
 ## Result retry
 
-If validation fails and policy retry budget remains, send the correction prompt from the QRSPI parser to the same child pane. If retry budget is exhausted, stop and ask the human.
+If validation fails and policy retry budget remains, run `reprompt-child` with the validation error file. It pastes the canonical QRSPI parser correction prompt into the same active child pane/session; do not create a new child ID/session. If retry budget is exhausted, stop and ask the human.
 
 ## Human gates
 

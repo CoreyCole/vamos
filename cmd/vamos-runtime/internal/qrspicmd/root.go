@@ -38,6 +38,7 @@ func newCommand(d deps) *cobra.Command {
 		newRunChildCommand(d),
 		newValidateResultCommand(d),
 		newDecideNextCommand(d),
+		newRepromptChildCommand(d),
 		newRenderPromptCommand(d),
 	)
 	return cmd
@@ -116,6 +117,24 @@ func newDecideNextCommand(d deps) *cobra.Command {
 	cmd.Flags().StringVar(&opts.SessionFile, "session-file", "", "explicit child Pi session JSONL file")
 	cmd.Flags().StringVar(&opts.ResultFile, "result-file", "", "deprecated debug fallback: plaintext child result file")
 	cmd.Flags().StringVar(&opts.PlanDir, "plan-dir", "", "QRSPI plan directory")
+	return cmd
+}
+
+func newRepromptChildCommand(d deps) *cobra.Command {
+	opts := RepromptChildOptions{Attempt: 1}
+	cmd := &cobra.Command{
+		Use:   "reprompt-child --state-file <file> --plan-dir <path> --stage <node> --attempt <n>",
+		Short: "Paste QRSPI correction prompt into the active child pane",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return RunRepromptChild(cmd.Context(), opts, d, cmd.OutOrStdout())
+		},
+	}
+	cmd.Flags().StringVar(&opts.StateFile, "state-file", "", "q-manager state file")
+	cmd.Flags().StringVar(&opts.PlanDir, "plan-dir", "", "QRSPI plan directory")
+	cmd.Flags().StringVar(&opts.Stage, "stage", "", "QRSPI node ID being retried")
+	cmd.Flags().IntVar(&opts.Attempt, "attempt", 1, "validation retry attempt number")
+	cmd.Flags().StringVar(&opts.ErrorText, "error", "", "validation error text")
+	cmd.Flags().StringVar(&opts.ErrorFile, "error-file", "", "file containing validation error text")
 	return cmd
 }
 
@@ -319,6 +338,64 @@ func RunValidateResult(ctx context.Context, opts ValidateResultOptions, d deps, 
 		return err
 	}
 	return WriteNDJSON(out, Event{Type: "validated", Decision: &parsed})
+}
+
+func RunRepromptChild(ctx context.Context, opts RepromptChildOptions, d deps, out io.Writer) error {
+	if strings.TrimSpace(opts.StateFile) == "" {
+		return errors.New("state-file is required")
+	}
+	if strings.TrimSpace(opts.PlanDir) == "" {
+		return errors.New("plan-dir is required")
+	}
+	if strings.TrimSpace(opts.Stage) == "" {
+		return errors.New("stage is required")
+	}
+	out = ensureWriter(out)
+	store := stateStore(d, "", time.Now)
+	state, err := store.Load(opts.StateFile)
+	if err != nil {
+		return err
+	}
+	if state.ActiveChild == nil {
+		return errors.New("no active child to reprompt")
+	}
+	if state.ActiveChild.Stage != opts.Stage {
+		return fmt.Errorf("active child stage %q does not match requested stage %q", state.ActiveChild.Stage, opts.Stage)
+	}
+	if strings.TrimSpace(state.ActiveChild.TmuxPaneID) == "" {
+		return errors.New("active child has no tmux pane ID")
+	}
+	errText, err := repromptErrorText(opts)
+	if err != nil {
+		return err
+	}
+	prompt := CorrectionPrompt(errors.New(errText), opts.Attempt)
+	tmux := d.Tmux
+	if tmux == nil {
+		tmux = ShellTmuxClient{}
+	}
+	pane := TmuxPane{ID: state.ActiveChild.TmuxPaneID}
+	if err := tmux.PasteText(ctx, pane, prompt); err != nil {
+		return err
+	}
+	if err := tmux.SendKeys(ctx, pane, []string{"Enter"}); err != nil {
+		return err
+	}
+	return WriteNDJSON(out, Event{Type: "child_reprompted", Ref: childRef(state.ActiveChild)})
+}
+
+func repromptErrorText(opts RepromptChildOptions) (string, error) {
+	if strings.TrimSpace(opts.ErrorText) != "" {
+		return opts.ErrorText, nil
+	}
+	if strings.TrimSpace(opts.ErrorFile) != "" {
+		data, err := os.ReadFile(opts.ErrorFile)
+		if err != nil {
+			return "", err
+		}
+		return string(data), nil
+	}
+	return "child result failed QRSPI validation", nil
 }
 
 func RunDecideNext(ctx context.Context, opts DecideNextOptions, d deps, out io.Writer) error {

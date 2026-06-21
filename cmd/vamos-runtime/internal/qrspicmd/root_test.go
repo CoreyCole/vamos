@@ -23,7 +23,7 @@ func TestRootRequiresExplicitSubcommand(t *testing.T) {
 
 func TestSubcommandsExist(t *testing.T) {
 	cmd := NewCommand()
-	for _, name := range []string{"init", "run-child", "validate-result", "decide-next", "render-prompt"} {
+	for _, name := range []string{"init", "run-child", "validate-result", "decide-next", "reprompt-child", "render-prompt"} {
 		found := false
 		for _, child := range cmd.Commands() {
 			if child.Name() == name {
@@ -141,6 +141,23 @@ func TestDecideNextRequiresStateAndPlan(t *testing.T) {
 	err := executeForError("decide-next", "--state-file", "/tmp/state.json", "--result-file", "/tmp/result.txt", "--plan-dir", "thoughts/example")
 	if errors.Is(err, ErrNotImplemented) {
 		t.Fatalf("decide-next should be implemented after required flags, got %v", err)
+	}
+}
+
+func TestRepromptChildRequiresStatePlanAndStage(t *testing.T) {
+	cases := []struct {
+		name string
+		args []string
+		want string
+	}{
+		{"state", []string{"reprompt-child"}, "state-file is required"},
+		{"plan", []string{"reprompt-child", "--state-file", "/tmp/state.json"}, "plan-dir is required"},
+		{"stage", []string{"reprompt-child", "--state-file", "/tmp/state.json", "--plan-dir", "thoughts/example"}, "stage is required"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			assertErrorContains(t, executeForError(tc.args...), tc.want)
+		})
 	}
 }
 
