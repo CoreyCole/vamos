@@ -13,22 +13,53 @@ import (
 
 func TestBuildChildCommandUsesInteractivePiSessionAndDoneEnv(t *testing.T) {
 	req := ChildRunRequest{
-		PromptFile:  "/tmp/prompt.txt",
-		OutputPath:  "/tmp/output.txt",
-		SessionID:   "question-1",
-		SessionDir:  "/tmp/sessions",
-		SessionName: "q-manager question",
-		DonePath:    "/tmp/done",
-		StatusPath:  "/tmp/status.json",
+		ID:            "child-1",
+		Stage:         "question-1",
+		PromptFile:    "/tmp/prompt.txt",
+		OutputPath:    "/tmp/output.txt",
+		SessionID:     "question-1",
+		SessionDir:    "/tmp/sessions",
+		SessionName:   "q-manager question",
+		DonePath:      "/tmp/done",
+		StatusPath:    "/tmp/status.json",
+		ParentPaneID:  "%18",
+		StateFile:     "/tmp/state.json",
+		PlanDir:       "thoughts/example",
+		ExtensionPath: "/tmp/q_manager_child_extension.js",
 	}
 	cmd := strings.Join(BuildChildCommand(req), " ")
-	for _, want := range []string{"PROMPT_FILE=/tmp/prompt.txt", "OUTPUT_PATH=/tmp/output.txt", "SESSION_ID=question-1", "SESSION_DIR=/tmp/sessions", "--session-id", "--session-dir", "--name", "@$PROMPT_FILE", "capture-pane", "STATUS_PATH", "DONE_PATH", "interactive Pi"} {
+	for _, want := range []string{"PROMPT_FILE=/tmp/prompt.txt", "OUTPUT_PATH=/tmp/output.txt", "SESSION_ID=question-1", "SESSION_DIR=/tmp/sessions", "Q_MANAGER_PARENT_PANE=%18", "Q_MANAGER_STATE_FILE=/tmp/state.json", "Q_MANAGER_PLAN_DIR=thoughts/example", "Q_MANAGER_STAGE=question-1", "Q_MANAGER_CHILD_ID=child-1", "Q_MANAGER_CHILD_EXTENSION=/tmp/q_manager_child_extension.js", "--extension", "--session-id", "--session-dir", "--name", "@$PROMPT_FILE", "capture-pane", "STATUS_PATH", "DONE_PATH", "interactive Pi"} {
 		if !strings.Contains(cmd, want) {
 			t.Fatalf("command missing %q: %v", want, BuildChildCommand(req))
 		}
 	}
 	if strings.Contains(cmd, "--print") || strings.Contains(cmd, "tee") || strings.Contains(cmd, "RESULT_PATH") || strings.Contains(cmd, "cp \"$OUTPUT_PATH\"") {
 		t.Fatalf("command kept authoritative result file: %s", cmd)
+	}
+}
+
+func TestBuildChildCommandOmitsEmptyExtension(t *testing.T) {
+	req := ChildRunRequest{PromptFile: "/tmp/prompt.txt", OutputPath: "/tmp/output.txt", SessionID: "question-1", SessionDir: "/tmp/sessions", SessionName: "q-manager question", DonePath: "/tmp/done", StatusPath: "/tmp/status.json"}
+	cmd := strings.Join(BuildChildCommand(req), " ")
+	if strings.Contains(cmd, "--extension") {
+		t.Fatalf("empty extension path should not add --extension: %s", cmd)
+	}
+}
+
+func TestResolveChildExtensionPathWritesEmbeddedAsset(t *testing.T) {
+	path, err := ResolveChildExtensionPath(t.TempDir())
+	if err != nil {
+		t.Fatalf("ResolveChildExtensionPath error = %v", err)
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read extension asset: %v", err)
+	}
+	text := string(data)
+	for _, want := range []string{"export default function qManagerChildExtension", `pi.on("agent_end"`} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("extension asset missing %q: %s", want, text)
+		}
 	}
 }
 
@@ -61,7 +92,7 @@ func TestRunChildStartsRightSplitAndSavesActiveChild(t *testing.T) {
 		t.Fatalf("started = %d, want 1", got)
 	}
 	req := fixture.runner.started[0]
-	if req.Split != "right" || req.Cwd != fixture.cwd {
+	if req.Split != "right" || req.Cwd != fixture.cwd || req.ParentPaneID != "%parent" || req.StateFile != fixture.stateFile || req.PlanDir != "thoughts/example" || req.ExtensionPath == "" {
 		t.Fatalf("request = %+v", req)
 	}
 	state := fixture.loadState(t)
@@ -184,7 +215,7 @@ func newRunChildFixture(t *testing.T, writeResult bool) runChildFixture {
 		t.Fatal(err)
 	}
 	stateFile := filepath.Join(dir, "state", "key", "run.json")
-	state := ManagerState{RepoID: cwd, CanonicalPlanDir: filepath.Join(cwd, "thoughts/example"), ManagerRunID: "run", SourceCwd: cwd}
+	state := ManagerState{RepoID: cwd, CanonicalPlanDir: filepath.Join(cwd, "thoughts/example"), ManagerRunID: "run", SourceCwd: cwd, ManagerPaneID: "%parent"}
 	if err := (FileStateStore{}).Save(stateFile, state); err != nil {
 		t.Fatal(err)
 	}

@@ -58,6 +58,7 @@ func newInitCommand(d deps) *cobra.Command {
 	cmd.Flags().StringVar(&opts.NodeID, "node", "", "initial QRSPI node ID (defaults to graph start)")
 	cmd.Flags().StringVar(&opts.NodeID, "stage", "", "alias for --node")
 	cmd.Flags().StringVar(&opts.ImplementationCwd, "implementation-cwd", "", "implementation workspace cwd for implementation/review/verify stages")
+	cmd.Flags().StringVar(&opts.ManagerPane, "manager-pane", "", "tmux pane ID for the parent q-manager session")
 	cmd.Flags().BoolVar(&opts.Force, "force", false, "replace existing expired/inactive state")
 	return cmd
 }
@@ -78,6 +79,7 @@ func newRunChildCommand(d deps) *cobra.Command {
 	cmd.Flags().StringVar(&opts.StateFile, "state-file", "", "q-manager state file")
 	cmd.Flags().StringVar(&opts.Split, "split", "right", "tmux split direction")
 	cmd.Flags().StringVar(&opts.ManagerRunID, "manager-run-id", "", "manager run ID")
+	cmd.Flags().StringVar(&opts.ManagerPane, "manager-pane", "", "tmux pane ID for the parent q-manager session")
 	cmd.Flags().DurationVar(&opts.Timeout, "timeout", 12*time.Hour, "maximum time to wait for child done marker")
 	return cmd
 }
@@ -157,6 +159,7 @@ func RunInit(ctx context.Context, opts InitOptions, d deps, out io.Writer) error
 	if err := ApplyInitOverrides(&state, InitOverrides{NodeID: opts.NodeID, ImplementationCwd: opts.ImplementationCwd}); err != nil {
 		return err
 	}
+	state.ManagerPaneID = CaptureManagerPaneID(opts.ManagerPane)
 	clock := d.Clock
 	if clock == nil {
 		clock = time.Now
@@ -220,20 +223,38 @@ func RunChild(ctx context.Context, opts RunChildOptions, d deps, out io.Writer) 
 	if err != nil {
 		return err
 	}
+	parentPaneID := strings.TrimSpace(opts.ManagerPane)
+	if parentPaneID == "" {
+		parentPaneID = strings.TrimSpace(state.ManagerPaneID)
+	}
+	if parentPaneID == "" {
+		parentPaneID = CaptureManagerPaneID("")
+	}
+	if parentPaneID != "" && state.ManagerPaneID == "" {
+		state.ManagerPaneID = parentPaneID
+	}
 	childID := childRunID(opts.Stage, clock())
 	runRoot := filepath.Dir(opts.StateFile)
+	extensionPath, err := ResolveChildExtensionPath(runRoot)
+	if err != nil {
+		return err
+	}
 	req := ChildRunRequest{
-		ID:          childID,
-		Stage:       opts.Stage,
-		Cwd:         opts.Cwd,
-		PromptFile:  opts.PromptFile,
-		OutputPath:  OutputPath(runRoot, childID),
-		SessionID:   ChildSessionID(childID),
-		SessionDir:  SessionDir(runRoot, childID),
-		SessionName: fmt.Sprintf("q-manager %s %s", opts.Stage, childID),
-		DonePath:    DonePath(runRoot, childID),
-		StatusPath:  StatusPath(runRoot, childID),
-		Split:       normalizeSplit(opts.Split),
+		ID:            childID,
+		Stage:         opts.Stage,
+		Cwd:           opts.Cwd,
+		PromptFile:    opts.PromptFile,
+		OutputPath:    OutputPath(runRoot, childID),
+		SessionID:     ChildSessionID(childID),
+		SessionDir:    SessionDir(runRoot, childID),
+		SessionName:   fmt.Sprintf("q-manager %s %s", opts.Stage, childID),
+		DonePath:      DonePath(runRoot, childID),
+		StatusPath:    StatusPath(runRoot, childID),
+		Split:         normalizeSplit(opts.Split),
+		ParentPaneID:  parentPaneID,
+		StateFile:     opts.StateFile,
+		PlanDir:       opts.PlanDir,
+		ExtensionPath: extensionPath,
 	}
 	if err := ensureRunFiles(req); err != nil {
 		return err
@@ -481,6 +502,13 @@ func childRunID(stage string, t time.Time) string {
 		clean = "child"
 	}
 	return fmt.Sprintf("%s-%s-%09d", clean, t.Format("20060102150405"), t.Nanosecond())
+}
+
+func CaptureManagerPaneID(explicit string) string {
+	if pane := strings.TrimSpace(explicit); pane != "" {
+		return pane
+	}
+	return strings.TrimSpace(os.Getenv("TMUX_PANE"))
 }
 
 func normalizeSplit(split string) string {

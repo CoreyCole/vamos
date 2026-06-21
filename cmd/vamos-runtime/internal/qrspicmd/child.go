@@ -9,17 +9,21 @@ import (
 )
 
 type ChildRunRequest struct {
-	ID          string
-	Stage       string
-	Cwd         string
-	PromptFile  string
-	OutputPath  string
-	SessionID   string
-	SessionDir  string
-	SessionName string
-	DonePath    string
-	StatusPath  string
-	Split       string
+	ID            string
+	Stage         string
+	Cwd           string
+	PromptFile    string
+	OutputPath    string
+	SessionID     string
+	SessionDir    string
+	SessionName   string
+	DonePath      string
+	StatusPath    string
+	Split         string
+	ParentPaneID  string
+	StateFile     string
+	PlanDir       string
+	ExtensionPath string
 }
 
 type ChildRun struct {
@@ -81,6 +85,10 @@ func ChildSessionID(childID string) string {
 }
 
 func BuildChildCommand(req ChildRunRequest) []string {
+	piCommand := `pi --session-id "$SESSION_ID" --session-dir "$SESSION_DIR" --name "$SESSION_NAME" "@$PROMPT_FILE"`
+	if strings.TrimSpace(req.ExtensionPath) != "" {
+		piCommand = `pi --extension "$Q_MANAGER_CHILD_EXTENSION" --session-id "$SESSION_ID" --session-dir "$SESSION_DIR" --name "$SESSION_NAME" "@$PROMPT_FILE"`
+	}
 	script := `set -o pipefail
 printf 'q-manager child starting\n'
 printf 'stage: %s\n' "$STAGE"
@@ -91,7 +99,7 @@ printf 'prompt: %s\n' "$PROMPT_FILE"
 printf 'output: %s\n' "$OUTPUT_PATH"
 printf 'mode: interactive Pi; exit child Pi after final qrspi_result so q-manager can validate\n\n'
 : > "$OUTPUT_PATH"
-pi --session-id "$SESSION_ID" --session-dir "$SESSION_DIR" --name "$SESSION_NAME" "@$PROMPT_FILE"
+` + piCommand + `
 status=$?
 if [ -n "${TMUX_PANE:-}" ]; then
   tmux capture-pane -p -t "$TMUX_PANE" -S - > "$OUTPUT_PATH" 2>/dev/null || true
@@ -109,6 +117,16 @@ exit "$status"`
 		"SESSION_NAME=" + req.SessionName,
 		"DONE_PATH=" + req.DonePath,
 		"STATUS_PATH=" + req.StatusPath,
+		"Q_MANAGER_PARENT_PANE=" + req.ParentPaneID,
+		"Q_MANAGER_STATE_FILE=" + req.StateFile,
+		"Q_MANAGER_PLAN_DIR=" + req.PlanDir,
+		"Q_MANAGER_STAGE=" + req.Stage,
+		"Q_MANAGER_CHILD_ID=" + req.ID,
+		"Q_MANAGER_DONE_PATH=" + req.DonePath,
+		"Q_MANAGER_STATUS_PATH=" + req.StatusPath,
+		"Q_MANAGER_SESSION_ID=" + req.SessionID,
+		"Q_MANAGER_SESSION_DIR=" + req.SessionDir,
+		"Q_MANAGER_CHILD_EXTENSION=" + req.ExtensionPath,
 		"bash",
 		"-lc",
 		script,

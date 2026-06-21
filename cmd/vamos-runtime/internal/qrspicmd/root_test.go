@@ -54,6 +54,32 @@ func TestInitRequiresPlanDir(t *testing.T) {
 	}
 }
 
+func TestInitCapturesExplicitManagerPane(t *testing.T) {
+	out := &bytes.Buffer{}
+	root := t.TempDir()
+	err := executeForErrorWithDeps(out, deps{
+		StateRoot: func() (string, error) { return root, nil },
+		Clock:     func() time.Time { return time.Unix(100, 123) },
+	}, "init", "--plan-dir", "thoughts/example", "--project-root", t.TempDir(), "--manager-pane", "%18")
+	if err != nil {
+		t.Fatalf("init error = %v", err)
+	}
+	state := loadManagerState(t, eventRefString(t, out.String(), "stateFile"))
+	if state.ManagerPaneID != "%18" {
+		t.Fatalf("ManagerPaneID = %q, want %%18", state.ManagerPaneID)
+	}
+}
+
+func TestCaptureManagerPaneIDUsesExplicitBeforeEnv(t *testing.T) {
+	t.Setenv("TMUX_PANE", "%env")
+	if got := CaptureManagerPaneID("%explicit"); got != "%explicit" {
+		t.Fatalf("explicit pane = %q", got)
+	}
+	if got := CaptureManagerPaneID(""); got != "%env" {
+		t.Fatalf("env pane = %q", got)
+	}
+}
+
 func TestRunChildRequiresStageCwdPrompt(t *testing.T) {
 	cases := []struct {
 		name string

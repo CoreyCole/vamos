@@ -11,6 +11,7 @@ type InitOptions struct {
 	PolicyFile        string
 	NodeID            string
 	ImplementationCwd string
+	ManagerPane       string
 	Force             bool
 }
 
@@ -22,6 +23,7 @@ type RunChildOptions struct {
 	StateFile    string
 	Split        string
 	ManagerRunID string
+	ManagerPane  string
 	Timeout      time.Duration
 }
 

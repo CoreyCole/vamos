@@ -11,6 +11,7 @@ type ManagerState struct {
 	ManagerRunID      string         `json:"managerRunId"`
 	SourceCwd         string         `json:"sourceCwd"`
 	ImplementationCwd string         `json:"implementationCwd,omitempty"`
+	ManagerPaneID     string         `json:"managerPaneId,omitempty"`
 	ActiveChild       *ChildRunRef   `json:"activeChild,omitempty"`
 	Workflow          wruntime.State `json:"workflow"`
 }
