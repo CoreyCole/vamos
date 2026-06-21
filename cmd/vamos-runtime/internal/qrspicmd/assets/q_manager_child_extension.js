@@ -28,10 +28,23 @@ function tmux(args) {
   });
 }
 
+function yamlString(value) {
+  return JSON.stringify(value || "");
+}
+
 function wakeMessage() {
   const stage = process.env.Q_MANAGER_STAGE || "unknown";
   const stateFile = process.env.Q_MANAGER_STATE_FILE || "";
-  return `q-manager child finished: ${stage} | state_file=${stateFile} | next=vamos qrspi continue --state-file ${stateFile}`;
+  const command = `vamos qrspi continue --state-file ${stateFile}`;
+  return [
+    "q_manager_child_wake:",
+    `  stage: ${yamlString(stage)}`,
+    `  state_file: ${yamlString(stateFile)}`,
+    "  next:",
+    "    steps:",
+    '      - action: "run_command"',
+    `        param: ${yamlString(command)}`,
+  ].join("\n");
 }
 
 async function wakeParent(pane, text) {

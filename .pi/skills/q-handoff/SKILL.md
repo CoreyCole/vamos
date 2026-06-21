@@ -71,6 +71,7 @@ You are creating a handoff document to preserve your working context within a QR
 
 - **(no argument)** — checkpoint the current stage as `in_progress`.
 - **`continue`** — mark the current stage as `complete` and move to the next stage.
+- **manager operational handoff** — not a normal pipeline stage handoff. Use q-manager's handoff flow: write a manager-control markdown handoff first, then emit `qrspi_result.status: handoff` pointing at it.
 
 ## Stage order
 
@@ -87,6 +88,8 @@ You are creating a handoff document to preserve your working context within a QR
 | 9 | verify | `/q-verify` | `verify.md` |
 
 `review` is the post-implementation handoff target, not a core planning stage. Only when `implement` is fully complete should `continue` create a review-ready handoff and point to `/q-review`. Intermediate implementation checkpoints must stay on `/q-resume`. `/q-review` writes the canonical review artifact to `[plan_dir]/reviews/`; clean review routes to `/q-verify` before the final human implementation gate.
+
+Manager operational handoffs are a special control-plane case. Prefer the q-manager skill's Manager session handoff flow for them. If `/q-handoff` is used to help create one, write a markdown artifact under `[plan_dir]/handoffs/` that clearly labels local/ephemeral manager refs (`stateFile`, pane IDs, session dirs), then emit a fenced `qrspi_result` with `status: handoff`, no `outcome`, `artifact` pointing to that manager handoff, and `next.steps` that read q-manager, read the handoff, and start `q-manager continue`. Do not put local manager refs as structured fields in `qrspi_result` YAML.
 
 **Human handoff wording hard rule:** the lead engineer does not care about slice numbers. In all human-facing handoff prose, never write `slice 1`, `slice 2`, `next slice`, or similar. Use exactly `Done:` and `Next:`. Describe behavior/files/outcome only. If the plan checkbox has a slice number, translate it into what changed and what remains.
 
@@ -105,6 +108,7 @@ Implementation handoffs must record branch/commit state, not define commit-messa
 - Before context reset mid-stage (no argument)
 - At end of a stage before handing off (`continue`)
 - Any time you want a checkpoint
+- Before handing the parent q-manager session to a new manager agent; use the q-manager operational handoff rules, not a normal implementation handoff.
 
 ## Process
 
@@ -148,6 +152,7 @@ If unknown, ask the user.
 - checkpoint: set handoff document frontmatter `status: in_progress`.
   - For QRSPI result YAML during non-final implementation checkpoints, use runtime `status: handoff` (not `blocked`, not `complete`, no `outcome`). This is valid for the `implement` node and keeps the workflow resumable without marking it blocked/error.
   - Use this for any non-final implementation checkpoint so the next step remains `/q-resume`.
+- manager operational handoff: set handoff document frontmatter `status: in_progress` and `handoff_type: q-manager-operational`; use QRSPI result YAML `status: handoff`, omit `outcome`, point `artifact` at the manager handoff, and route `next.steps` to q-manager continue.
 
 ### 4. Capture key learnings and refresh long-term memory only if essential
 
@@ -315,6 +320,7 @@ Next routing:
 
 - For `continue` mode from `implement`, use `status: complete`, `outcome: complete`, `/q-review` in YAML `next.steps`, and make `summary.key_decisions` say `Next stage should start immediately: /q-review ...`.
 - For non-final implementation checkpoints, use `status: handoff`, omit `outcome`, use `/q-resume` in YAML `next.steps`, and make `summary.key_decisions` say the next session should read `qrspi-planning`, then `/q-resume`, then exact `design.md`, exact `outline.md`, exact `plan.md`, exact handoff path, then resume implementation in the same workspace.
+- For manager operational handoffs, use `status: handoff`, omit `outcome`, use q-manager in YAML `next.steps`, and make `summary.key_decisions` say the next manager should read the manager handoff and run `qrspi continue --state-file ...` using the state file recorded in that markdown handoff. The `stateFile` belongs in the markdown handoff, not as a structured YAML field.
 - For all other handoffs, use `/q-resume` in YAML `next.steps` and make `summary.key_decisions` say the next session should read `qrspi-planning`, then `/q-resume`, then exact `design.md`, exact `outline.md`, exact `plan.md`, exact handoff path, then start the resumed stage immediately.
 
 Never abbreviate paths.

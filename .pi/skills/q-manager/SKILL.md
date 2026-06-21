@@ -95,9 +95,9 @@ After `run-child`, do not poll. Wait for the pasted wake, then run `go run ./cmd
 
 q-manager loads a project-local child Pi extension only for q-manager child sessions. On `agent_end`, the extension writes `status.json`, touches `done`, and pastes the wake text to the captured parent tmux pane. The wake means “child turn ended,” not “graph result is valid.” The manager normally runs one `continue` command before any advancement.
 
-The manager CLI/extension owns the exact wake text so it stays deterministic, testable, and versioned with runtime behavior. The skill should only define the semantic contract: wake is one parent prompt/one line, includes the finished node, includes enough local recovery context to find the manager state (for example `state_file`), and points to the single continue command. Do not let the skill become the source of truth for copy/paste wake templates.
+The manager CLI/extension owns the exact wake text so it stays deterministic, testable, and versioned with runtime behavior. The skill should only define the semantic contract: wake is one atomic parent prompt, includes the finished node, includes enough local recovery context to find the manager state (for example `state_file`), and points to the single continue command. Do not let the skill become the source of truth for copy/paste wake templates.
 
-The wake may include `state_file` because that is ephemeral manager control context needed to continue the local run. This value belongs in the wake/manager transcript, not in durable QRSPI artifacts or `qrspi_result` YAML. The wake must not paste multiline blocks into the parent manager session; multiline wake text can split into multiple manager prompts and pollute context.
+The wake may include `state_file` because that is ephemeral manager control context needed to continue the local run. This value belongs in the wake/manager transcript, not in durable QRSPI artifacts or `qrspi_result` YAML. A multiline wake must be pasted as one buffered/atomic prompt (the same style q-manager uses when injecting blocks into child panes), not sent line-by-line as raw tmux keystrokes.
 
 ## Result retry
 
@@ -112,35 +112,40 @@ If validation fails and policy retry budget remains, run `reprompt-child` with t
 
 ## Manager session handoff
 
-Use this when the parent manager Pi context is getting full, before auto-compaction or session loss. This is separate from QRSPI stage handoff: it transfers manager control context, not implementation work.
+Use this when the parent manager Pi context is getting full, before auto-compaction or session loss. This is separate from a QRSPI implementation handoff: it transfers manager control context, not implementation reasoning.
 
-Do not rely on chat history. Write a short manager handoff doc or pasteable handoff block that contains enough local recovery refs for a fresh manager session to resume from deterministic sources.
+A manager handoff has two outputs, in this order:
 
-Include:
+1. A markdown handoff artifact under the active plan directory, usually `[plan_dir]/handoffs/YYYY-MM-DD_HH-MM-SS_q-manager-operational-handoff.md`.
+1. A fenced `yaml` `qrspi_result` response in the current manager chat that points at that handoff artifact.
+
+Do not rely on chat history. The markdown handoff must contain enough local recovery refs for a fresh manager session to resume from deterministic sources. Include:
 
 - Plan dir absolute path and `thoughts/...` relative path.
 - Project root / source checkout cwd.
 - Implementation cwd when known.
 - Current graph node and last completed stage.
 - Latest durable `qrspi_result` YAML or path to the artifact containing it.
-- Manager `stateFile` absolute path.
+- Manager `stateFile` absolute path, explicitly labeled local/ephemeral.
 - Active child refs from state when a child is running: stage, pane ID, session ID, session dir/path, status path, done path, output/transcript path.
-- Whether the manager is waiting for child wake, needs `continue`, needs a lower-level recovery command, or is stopped at a human gate.
+- Whether the manager is waiting for child wake, should run `qrspi continue`, needs a lower-level recovery command, or is stopped at a human gate.
 - Exact next command, using `go run ./cmd/vamos-runtime ...` when testing from checkout.
 
-Manager handoff may include `stateFile` because it is an operational recovery note for the same local machine. Do not put `stateFile` in durable `qrspi_result` YAML. If writing the handoff under `thoughts/`, label these fields as local/ephemeral and keep durable plan identity (`thoughts/...` paths, artifact paths, latest result) separate from local recovery refs.
+Manager handoff may include `stateFile` because it is an operational recovery note for the same local machine. Do not put `stateFile`, pane IDs, session dirs, or run IDs in durable `qrspi_result` YAML. In the markdown handoff, label those fields as local/ephemeral and keep durable plan identity (`thoughts/...` paths, artifact paths, latest result) separate from local recovery refs.
 
-Prefer a dedicated `q-manager-handoff` skill/helper over overloading `/q-handoff`. `/q-handoff` is a QRSPI stage artifact for work continuity and should stay portable. A manager handoff is control-plane recovery and intentionally includes machine-local refs. If no dedicated helper exists, create a concise markdown note under the plan's `handoffs/` or paste it into the next manager session with a clear title: `q-manager operational handoff`.
+The final manager response must be a normal QRSPI-style YAML block so the next manager can discover the handoff artifact. Use `status: handoff`, omit `outcome`, set `artifact` to the manager handoff path, and include `next.steps` that read q-manager, read the handoff, then start `q-manager continue`. The YAML may mention `stateFile` in `summary.key_decisions` only as prose if needed, but must not include machine-local refs as structured fields.
+
+Prefer a dedicated `q-manager-handoff` skill/helper over overloading `/q-handoff`. `/q-handoff` is a QRSPI stage artifact for work continuity and should stay portable. A manager handoff is control-plane recovery and intentionally includes machine-local refs. If no dedicated helper exists, create the markdown note yourself under the plan's `handoffs/`, run `just sync-thoughts` when appropriate, then emit the required fenced `qrspi_result` pointing at it.
 
 Fresh manager resume shape:
 
 ```bash
-# read q-manager skill, docs/q-manager.md, plan AGENTS.md, latest result/handoff first
+# read q-manager skill, docs/q-manager.md, plan AGENTS.md, manager handoff first
 STATE=<stateFile-from-manager-handoff>
 go run ./cmd/vamos-runtime qrspi continue --state-file "$STATE"
 ```
 
-If the handoff says “waiting for child wake,” do not validate until wake arrives unless manually inspecting recovery state. If no active child exists, resume by rendering and running the graph-selected/current node from the saved state.
+If the handoff says “waiting for child wake,” do not continue/validate until wake arrives unless manually inspecting recovery state. If no active child exists, resume by rendering and running the graph-selected/current node from the saved state.
 
 ## Human gates
 

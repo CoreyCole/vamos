@@ -327,6 +327,46 @@ func TestContinueValidResultStartsNextChildAndCleansOldPane(t *testing.T) {
 	}
 }
 
+func TestContinueBlockedResultPrintsConciseStop(t *testing.T) {
+	fixture := newManagerFlowFixture(t)
+	stateFile := filepath.Join(fixture.stateRoot, "verify-state.json")
+	sessionPath := filepath.Join(fixture.dir, "verify-session.jsonl")
+	active := &ChildRunRef{ID: "verify-child", Stage: "verify", Cwd: fixture.projectRoot, TmuxPaneID: "%old", SessionID: "verify-session", SessionDir: fixture.dir, SessionPath: sessionPath}
+	state := ManagerState{
+		RepoID:           fixture.projectRoot,
+		CanonicalPlanDir: fixture.planDir,
+		ManagerRunID:     "verify-run",
+		SourceCwd:        fixture.projectRoot,
+		ActiveChild:      active,
+		Workflow:         testWorkflowState(t, qrspi.NodeVerify, nil),
+	}
+	saveManagerState(t, stateFile, state)
+	writeSessionTestFile(t, sessionPath, sessionHeader(active.SessionID, fixture.projectRoot)+"\n"+assistantLine(testResultYAML("verify", "blocked", "", "thoughts/example/verify.md", ""))+"\n")
+
+	runner := &fakeChildRunner{panes: []string{"%new"}}
+	continueOut, err := executeManagerCommand(deps{Clock: fixture.clock, Runner: runner}, "continue", "--state-file", stateFile, "--plan-dir", fixture.planDir)
+	if err != nil {
+		t.Fatalf("continue command error = %v", err)
+	}
+	for _, want := range []string{"validated: verify blocked", "artifact: thoughts/example/verify.md", "stop: result blocked"} {
+		if !strings.Contains(continueOut, want) {
+			t.Fatalf("continue output missing %q: %q", want, continueOut)
+		}
+	}
+	for _, forbidden := range []string{"rawYaml", "workflow", "started child"} {
+		if strings.Contains(continueOut, forbidden) {
+			t.Fatalf("continue output contains %q: %q", forbidden, continueOut)
+		}
+	}
+	loaded := loadManagerState(t, stateFile)
+	if loaded.ActiveChild == nil || loaded.ActiveChild.TmuxPaneID != "%old" {
+		t.Fatalf("active child = %#v, want preserved old child", loaded.ActiveChild)
+	}
+	if len(runner.started) != 0 {
+		t.Fatalf("runner starts = %d, want none", len(runner.started))
+	}
+}
+
 func TestContinueCommandInvalidResultRepromptsSameChild(t *testing.T) {
 	fixture := newManagerFlowFixture(t)
 	runner := &fakeChildRunner{panes: []string{"%old"}}
