@@ -6,10 +6,12 @@ import (
 )
 
 type InitOptions struct {
-	PlanDir     string
-	ProjectRoot string
-	PolicyFile  string
-	Force       bool
+	PlanDir           string
+	ProjectRoot       string
+	PolicyFile        string
+	NodeID            string
+	ImplementationCwd string
+	Force             bool
 }
 
 type RunChildOptions struct {

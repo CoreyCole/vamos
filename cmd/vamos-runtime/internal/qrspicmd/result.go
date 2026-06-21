@@ -15,6 +15,11 @@ type ParsedDecision struct {
 	RawYAML  string                      `json:"rawYaml,omitempty"`
 }
 
+type InitOverrides struct {
+	NodeID            string
+	ImplementationCwd string
+}
+
 func Definition() (wruntime.Definition, error) {
 	return qrspi.Definition()
 }
@@ -44,6 +49,26 @@ func InitialManagerState(planDir, projectRoot string, policy json.RawMessage) (M
 		SourceCwd:        projectRoot,
 		Workflow:         workflow,
 	}, nil
+}
+
+func ApplyInitOverrides(state *ManagerState, opts InitOverrides) error {
+	if state == nil {
+		return nil
+	}
+	if nodeID := wruntime.NodeID(strings.TrimSpace(opts.NodeID)); nodeID != "" {
+		def, err := Definition()
+		if err != nil {
+			return err
+		}
+		if _, ok := def.Nodes[nodeID]; !ok {
+			return fmt.Errorf("node %q is not in QRSPI definition", nodeID)
+		}
+		state.Workflow.CurrentNodeID = nodeID
+	}
+	if implementationCwd := strings.TrimSpace(opts.ImplementationCwd); implementationCwd != "" {
+		state.ImplementationCwd = implementationCwd
+	}
+	return nil
 }
 
 func ParseValidateDecide(output string, state wruntime.State, ctx wruntime.ParseContext) (ParsedDecision, error) {

@@ -33,7 +33,7 @@ Supervise QRSPI from a main Pi manager session. Launch focused child Pi sessions
 ## Start flow
 
 1. Resolve plan dir and project root.
-1. Run `vamos qrspi init --plan-dir <plan-dir> --project-root <repo-root>`.
+1. Run `vamos qrspi init --plan-dir <plan-dir> --project-root <repo-root>` for a new graph, or add `--node <node>` / `--implementation-cwd <cwd>` to resume/test from a specific implementation, review, or verify stage.
 1. Render prompt for current/next node: `vamos qrspi render-prompt --state-file <state> --node <node> --plan-dir <plan-dir>`.
 1. Start child and wait for done/status marker: `vamos qrspi run-child --state-file <state> --plan-dir <plan-dir> --stage <node> --cwd <cwd> --prompt-file <prompt> --split right --timeout 12h`.
 1. Validate from active child session JSONL: `vamos qrspi validate-result --state-file <state> --stage <node> --plan-dir <plan-dir>`.

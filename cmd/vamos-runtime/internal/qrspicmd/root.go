@@ -55,6 +55,9 @@ func newInitCommand(d deps) *cobra.Command {
 	cmd.Flags().StringVar(&opts.PlanDir, "plan-dir", "", "QRSPI plan directory")
 	cmd.Flags().StringVar(&opts.ProjectRoot, "project-root", "", "project repository root")
 	cmd.Flags().StringVar(&opts.PolicyFile, "policy-file", "", "optional policy JSON file")
+	cmd.Flags().StringVar(&opts.NodeID, "node", "", "initial QRSPI node ID (defaults to graph start)")
+	cmd.Flags().StringVar(&opts.NodeID, "stage", "", "alias for --node")
+	cmd.Flags().StringVar(&opts.ImplementationCwd, "implementation-cwd", "", "implementation workspace cwd for implementation/review/verify stages")
 	cmd.Flags().BoolVar(&opts.Force, "force", false, "replace existing expired/inactive state")
 	return cmd
 }
@@ -149,6 +152,9 @@ func RunInit(ctx context.Context, opts InitOptions, d deps, out io.Writer) error
 	}
 	state, err := InitialManagerState(opts.PlanDir, projectRoot, policy)
 	if err != nil {
+		return err
+	}
+	if err := ApplyInitOverrides(&state, InitOverrides{NodeID: opts.NodeID, ImplementationCwd: opts.ImplementationCwd}); err != nil {
 		return err
 	}
 	clock := d.Clock

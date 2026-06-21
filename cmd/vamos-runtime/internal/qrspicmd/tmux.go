@@ -2,6 +2,7 @@ package qrspicmd
 
 import (
 	"context"
+	"os"
 	"os/exec"
 	"strings"
 )
@@ -9,16 +10,24 @@ import (
 type ShellTmuxClient struct{}
 
 func (ShellTmuxClient) SplitPane(ctx context.Context, req TmuxSplitRequest) (TmuxPane, error) {
-	args := []string{"split-window", "-P", "-F", "#{pane_id}", "-h", "-c", req.Cwd}
-	if req.Direction == "down" {
-		args = []string{"split-window", "-P", "-F", "#{pane_id}", "-v", "-c", req.Cwd}
-	}
-	args = append(args, strings.Join(shellquote(req.Command), " "))
-	out, err := exec.CommandContext(ctx, "tmux", args...).Output()
+	out, err := exec.CommandContext(ctx, "tmux", splitPaneArgs(req, os.Getenv("TMUX_PANE"))...).Output()
 	if err != nil {
 		return TmuxPane{}, err
 	}
 	return TmuxPane{ID: strings.TrimSpace(string(out))}, nil
+}
+
+func splitPaneArgs(req TmuxSplitRequest, targetPane string) []string {
+	args := []string{"split-window", "-P", "-F", "#{pane_id}"}
+	if strings.TrimSpace(targetPane) != "" {
+		args = append(args, "-t", targetPane)
+	}
+	if req.Direction == "down" {
+		args = append(args, "-v")
+	} else {
+		args = append(args, "-h")
+	}
+	return append(args, "-c", req.Cwd, strings.Join(shellquote(req.Command), " "))
 }
 
 func (ShellTmuxClient) SendKeys(ctx context.Context, pane TmuxPane, keys []string) error {

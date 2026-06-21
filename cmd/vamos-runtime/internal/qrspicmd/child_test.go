@@ -11,7 +11,7 @@ import (
 	"time"
 )
 
-func TestBuildChildCommandUsesPromptTranscriptSessionAndDoneEnv(t *testing.T) {
+func TestBuildChildCommandUsesInteractivePiSessionAndDoneEnv(t *testing.T) {
 	req := ChildRunRequest{
 		PromptFile:  "/tmp/prompt.txt",
 		OutputPath:  "/tmp/output.txt",
@@ -22,12 +22,12 @@ func TestBuildChildCommandUsesPromptTranscriptSessionAndDoneEnv(t *testing.T) {
 		StatusPath:  "/tmp/status.json",
 	}
 	cmd := strings.Join(BuildChildCommand(req), " ")
-	for _, want := range []string{"PROMPT_FILE=/tmp/prompt.txt", "OUTPUT_PATH=/tmp/output.txt", "SESSION_ID=question-1", "SESSION_DIR=/tmp/sessions", "--session-id", "--session-dir", "--name", "tee", "STATUS_PATH", "DONE_PATH"} {
+	for _, want := range []string{"PROMPT_FILE=/tmp/prompt.txt", "OUTPUT_PATH=/tmp/output.txt", "SESSION_ID=question-1", "SESSION_DIR=/tmp/sessions", "--session-id", "--session-dir", "--name", "@$PROMPT_FILE", "capture-pane", "STATUS_PATH", "DONE_PATH", "interactive Pi"} {
 		if !strings.Contains(cmd, want) {
 			t.Fatalf("command missing %q: %v", want, BuildChildCommand(req))
 		}
 	}
-	if strings.Contains(cmd, "RESULT_PATH") || strings.Contains(cmd, "cp \"$OUTPUT_PATH\"") {
+	if strings.Contains(cmd, "--print") || strings.Contains(cmd, "tee") || strings.Contains(cmd, "RESULT_PATH") || strings.Contains(cmd, "cp \"$OUTPUT_PATH\"") {
 		t.Fatalf("command kept authoritative result file: %s", cmd)
 	}
 }
@@ -146,7 +146,7 @@ func (f *fakeChildRunner) Start(ctx context.Context, req ChildRunRequest) (Child
 
 func (f *fakeChildRunner) Wait(ctx context.Context, run ChildRun) (ChildRunResult, error) {
 	if f.writeResult {
-		sessionPath := filepath.Join(run.SessionDir, encodePiSessionCWD(f.started[len(f.started)-1].Cwd), "session.jsonl")
+		sessionPath := filepath.Join(run.SessionDir, "session.jsonl")
 		session := sessionHeader(run.SessionID, f.started[len(f.started)-1].Cwd) + "\n" + assistantLine("```yaml\nqrspi_result:\n  stage: plan\n```") + "\n"
 		if err := os.MkdirAll(filepath.Dir(sessionPath), 0o755); err != nil {
 			return ChildRunResult{}, err

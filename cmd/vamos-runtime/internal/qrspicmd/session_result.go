@@ -34,48 +34,42 @@ func ResolveSessionPath(sessionDir, sessionID, cwd string) (string, error) {
 		return "", errors.New("session dir and session id are required")
 	}
 
-	searchDir := sessionDir
-	if strings.TrimSpace(cwd) != "" {
-		searchDir = filepath.Join(sessionDir, encodePiSessionCWD(cwd))
-	}
-
-	entries, err := os.ReadDir(searchDir)
-	if err != nil {
+	if _, err := os.Stat(sessionDir); err != nil {
 		if os.IsNotExist(err) {
-			return "", fmt.Errorf("session %q not found in %s", sessionID, searchDir)
+			return "", fmt.Errorf("session %q not found in %s", sessionID, sessionDir)
 		}
 		return "", err
 	}
 
 	var matches []string
-	for _, entry := range entries {
-		if entry.IsDir() || filepath.Ext(entry.Name()) != ".jsonl" {
-			continue
+	walkErr := filepath.WalkDir(sessionDir, func(path string, entry os.DirEntry, err error) error {
+		if err != nil {
+			return err
 		}
-		path := filepath.Join(searchDir, entry.Name())
+		if entry.IsDir() || filepath.Ext(entry.Name()) != ".jsonl" {
+			return nil
+		}
 		header, err := readSessionHeader(path)
 		if err != nil {
-			continue
+			return nil
 		}
 		if header.Type == "session" && header.ID == sessionID && (strings.TrimSpace(cwd) == "" || header.Cwd == cwd) {
 			matches = append(matches, path)
 		}
+		return nil
+	})
+	if walkErr != nil {
+		return "", walkErr
 	}
 
 	switch len(matches) {
 	case 1:
 		return matches[0], nil
 	case 0:
-		return "", fmt.Errorf("session %q not found in %s", sessionID, searchDir)
+		return "", fmt.Errorf("session %q not found in %s", sessionID, sessionDir)
 	default:
-		return "", fmt.Errorf("session %q matched multiple files in %s", sessionID, searchDir)
+		return "", fmt.Errorf("session %q matched multiple files in %s", sessionID, sessionDir)
 	}
-}
-
-func encodePiSessionCWD(cwd string) string {
-	clean := strings.TrimLeft(cwd, `/\\`)
-	replacer := strings.NewReplacer("/", "-", `\`, "-", ":", "-")
-	return "--" + replacer.Replace(clean) + "--"
 }
 
 func readSessionHeader(path string) (sessionEntry, error) {

@@ -82,13 +82,26 @@ func ChildSessionID(childID string) string {
 
 func BuildChildCommand(req ChildRunRequest) []string {
 	script := `set -o pipefail
-pi --print --session-id "$SESSION_ID" --session-dir "$SESSION_DIR" --name "$SESSION_NAME" < "$PROMPT_FILE" 2>&1 | tee "$OUTPUT_PATH"
-status=${PIPESTATUS[0]}
+printf 'q-manager child starting\n'
+printf 'stage: %s\n' "$STAGE"
+printf 'cwd: %s\n' "$PWD"
+printf 'session id: %s\n' "$SESSION_ID"
+printf 'session dir: %s\n' "$SESSION_DIR"
+printf 'prompt: %s\n' "$PROMPT_FILE"
+printf 'output: %s\n' "$OUTPUT_PATH"
+printf 'mode: interactive Pi; exit child Pi after final qrspi_result so q-manager can validate\n\n'
+: > "$OUTPUT_PATH"
+pi --session-id "$SESSION_ID" --session-dir "$SESSION_DIR" --name "$SESSION_NAME" "@$PROMPT_FILE"
+status=$?
+if [ -n "${TMUX_PANE:-}" ]; then
+  tmux capture-pane -p -t "$TMUX_PANE" -S - > "$OUTPUT_PATH" 2>/dev/null || true
+fi
 printf '{"exitCode":%d,"finishedAt":"%s"}\n' "$status" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "$STATUS_PATH"
 touch "$DONE_PATH"
 exit "$status"`
 	return []string{
 		"env",
+		"STAGE=" + req.Stage,
 		"PROMPT_FILE=" + req.PromptFile,
 		"OUTPUT_PATH=" + req.OutputPath,
 		"SESSION_ID=" + req.SessionID,

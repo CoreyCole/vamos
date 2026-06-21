@@ -81,6 +81,33 @@ func TestManagerFlowWorkspaceSwitchesImplementationCwd(t *testing.T) {
 	}
 }
 
+func TestRunInitCanStartAtAnyStage(t *testing.T) {
+	fixture := newManagerFlowFixture(t)
+	impl := filepath.Join(fixture.dir, "impl")
+	var out bytes.Buffer
+	if err := RunInit(t.Context(), InitOptions{PlanDir: fixture.planDir, ProjectRoot: fixture.projectRoot, NodeID: string(qrspi.NodeReviewImplementation), ImplementationCwd: impl}, deps{StateRoot: fixture.stateRootFunc, Clock: fixture.clock}, &out); err != nil {
+		t.Fatalf("RunInit error = %v", err)
+	}
+	state := loadManagerState(t, eventRefString(t, out.String(), "stateFile"))
+	if state.Workflow.CurrentNodeID != qrspi.NodeReviewImplementation {
+		t.Fatalf("current node = %q, want %q", state.Workflow.CurrentNodeID, qrspi.NodeReviewImplementation)
+	}
+	if state.ImplementationCwd != impl {
+		t.Fatalf("implementation cwd = %q, want %q", state.ImplementationCwd, impl)
+	}
+	if !strings.Contains(out.String(), `"currentNode":"review-implementation"`) {
+		t.Fatalf("init output = %q", out.String())
+	}
+}
+
+func TestRunInitRejectsUnknownStage(t *testing.T) {
+	fixture := newManagerFlowFixture(t)
+	err := RunInit(t.Context(), InitOptions{PlanDir: fixture.planDir, ProjectRoot: fixture.projectRoot, NodeID: "nope"}, deps{StateRoot: fixture.stateRootFunc, Clock: fixture.clock}, &bytes.Buffer{})
+	if err == nil || !strings.Contains(err.Error(), `node "nope" is not in QRSPI definition`) {
+		t.Fatalf("expected unknown node error, got %v", err)
+	}
+}
+
 func TestManagerLockConflictStops(t *testing.T) {
 	fixture := newManagerFlowFixture(t)
 	key := LockKey{RepoID: fixture.projectRoot, CanonicalPlanDir: filepath.Join(fixture.projectRoot, fixture.planDir)}

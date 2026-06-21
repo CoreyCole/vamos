@@ -8,11 +8,25 @@ import (
 	"testing"
 )
 
-func TestResolveSessionPathMatchesExactIDAndCwdSubdir(t *testing.T) {
+func TestResolveSessionPathMatchesExactIDInCustomSessionDir(t *testing.T) {
 	root := t.TempDir()
 	cwd := filepath.Join(root, "repo")
 	want := writePiSession(t, root, "target.jsonl", "session-1", cwd)
 	writePiSession(t, root, "other.jsonl", "session-2", cwd)
+
+	got, err := ResolveSessionPath(root, "session-1", cwd)
+	if err != nil {
+		t.Fatalf("ResolveSessionPath error = %v", err)
+	}
+	if got != want {
+		t.Fatalf("path = %q, want %q", got, want)
+	}
+}
+
+func TestResolveSessionPathFindsPiCwdSubdirectory(t *testing.T) {
+	root := t.TempDir()
+	cwd := "/tmp/repo"
+	want := writePiSession(t, filepath.Join(root, "--tmp-repo--"), "target.jsonl", "session-1", cwd)
 
 	got, err := ResolveSessionPath(root, "session-1", cwd)
 	if err != nil {
@@ -36,15 +50,14 @@ func TestResolveSessionPathRejectsMissingOrDuplicate(t *testing.T) {
 	}
 }
 
-func TestResolveSessionPathDoesNotScanGlobalOrSiblingCWDDirs(t *testing.T) {
+func TestResolveSessionPathDoesNotAcceptSiblingCWD(t *testing.T) {
 	root := t.TempDir()
 	cwd := "/tmp/repo"
-	writeSessionTestFile(t, filepath.Join(root, "global.jsonl"), sessionHeader("target", cwd)+"\n")
 	writePiSession(t, root, "sibling.jsonl", "target", "/tmp/other")
 
 	_, err := ResolveSessionPath(root, "target", cwd)
 	if err == nil || !strings.Contains(err.Error(), "not found") {
-		t.Fatalf("expected not found without sibling/global scan, got %v", err)
+		t.Fatalf("expected not found for wrong cwd, got %v", err)
 	}
 }
 
@@ -110,7 +123,7 @@ func TestTextBlocksFromAssistantMessageAcceptsStringContent(t *testing.T) {
 
 func writePiSession(t *testing.T, sessionRoot, name, sessionID, cwd string, lines ...string) string {
 	t.Helper()
-	path := filepath.Join(sessionRoot, encodePiSessionCWD(cwd), name)
+	path := filepath.Join(sessionRoot, name)
 	content := append([]string{sessionHeader(sessionID, cwd)}, lines...)
 	writeSessionTestFile(t, path, strings.Join(content, "\n")+"\n")
 	return path
