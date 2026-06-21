@@ -65,10 +65,10 @@ func TestRunChildStartsRightSplitAndSavesActiveChild(t *testing.T) {
 		t.Fatalf("request = %+v", req)
 	}
 	state := fixture.loadState(t)
-	if state.ActiveChild == nil || state.ActiveChild.TmuxPaneID != "%9" {
+	if state.ActiveChild == nil || state.ActiveChild.TmuxPaneID != "%9" || state.ActiveChild.SessionPath == "" {
 		t.Fatalf("active child = %+v", state.ActiveChild)
 	}
-	if !strings.Contains(out.String(), `"type":"child_started"`) || !strings.Contains(out.String(), `"type":"child_finished"`) {
+	if !strings.Contains(out.String(), `"type":"child_started"`) || !strings.Contains(out.String(), `"type":"child_finished"`) || !strings.Contains(out.String(), `"sessionPath"`) {
 		t.Fatalf("output = %q", out.String())
 	}
 }
@@ -141,6 +141,14 @@ func (f *fakeChildRunner) Start(ctx context.Context, req ChildRunRequest) (Child
 
 func (f *fakeChildRunner) Wait(ctx context.Context, run ChildRun) (ChildRunResult, error) {
 	if f.writeResult {
+		sessionPath := filepath.Join(run.SessionDir, encodePiSessionCWD(f.started[len(f.started)-1].Cwd), "session.jsonl")
+		session := sessionHeader(run.SessionID, f.started[len(f.started)-1].Cwd) + "\n" + assistantLine("```yaml\nqrspi_result:\n  stage: plan\n```") + "\n"
+		if err := os.MkdirAll(filepath.Dir(sessionPath), 0o755); err != nil {
+			return ChildRunResult{}, err
+		}
+		if err := os.WriteFile(sessionPath, []byte(session), 0o644); err != nil {
+			return ChildRunResult{}, err
+		}
 		if err := os.WriteFile(run.StatusPath, []byte(`{"exitCode":0,"finishedAt":"1970-01-01T00:00:00Z"}`), 0o644); err != nil {
 			return ChildRunResult{}, err
 		}

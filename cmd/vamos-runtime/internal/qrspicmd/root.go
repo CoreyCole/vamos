@@ -253,6 +253,14 @@ func RunChild(ctx context.Context, opts RunChildOptions, d deps, out io.Writer) 
 	if err := waitForDone(waitCtx, req.DonePath, 100*time.Millisecond); err != nil {
 		return fmt.Errorf("timed out waiting for child done marker %s (pane %s, output %s, sessionDir %s, sessionID %s): %w", req.DonePath, run.Pane.ID, req.OutputPath, req.SessionDir, req.SessionID, err)
 	}
+	sessionPath, err := ResolveSessionPath(req.SessionDir, req.SessionID, req.Cwd)
+	if err != nil {
+		return fmt.Errorf("resolve child session path after done marker %s (pane %s, output %s, sessionDir %s, sessionID %s): %w", req.DonePath, run.Pane.ID, req.OutputPath, req.SessionDir, req.SessionID, err)
+	}
+	state.ActiveChild.SessionPath = sessionPath
+	if err := store.Save(opts.StateFile, state); err != nil {
+		return err
+	}
 	return WriteNDJSON(out, Event{Type: "child_finished", Ref: childRef(state.ActiveChild)})
 }
 
