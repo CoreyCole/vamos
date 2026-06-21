@@ -2414,7 +2414,7 @@ func TestHandleRefreshWorkspacesRecordsResultAndNotifies(t *testing.T) {
 	}
 }
 
-func TestHandleRefreshWorkspacesPatchesAfterManagerRefreshAndTerminalAdoption(t *testing.T) {
+func TestHandleRefreshWorkspacesPatchesAfterManagerRefresh(t *testing.T) {
 	managerRefreshes := 0
 	manager := &fakeLifecycleManager{
 		beforeRefresh: func() { managerRefreshes++ },
@@ -2443,8 +2443,6 @@ func TestHandleRefreshWorkspacesPatchesAfterManagerRefreshAndTerminalAdoption(t 
 				return result
 			}
 			_ = manager.Refresh(ctx)
-			result.ImportedPiSessions = 1
-			result.AdoptedQRSPIWorkspaces = 1
 			result.Changed = true
 			return result
 		}),
@@ -2470,9 +2468,14 @@ func TestHandleRefreshWorkspacesPatchesAfterManagerRefreshAndTerminalAdoption(t 
 		t.Fatalf("HandleWorkspacesPage() error = %v", err)
 	}
 	html := pageRec.Body.String()
-	for _, want := range []string{"Adopted Workspace", "env repaired 1", "terminal imported 1", "QRSPI adopted 1"} {
+	for _, want := range []string{"Adopted Workspace", "env repaired 1"} {
 		if !strings.Contains(html, want) {
 			t.Fatalf("page missing %q after refresh completion: %s", want, html)
+		}
+	}
+	for _, notWant := range []string{"terminal imported", "QRSPI adopted"} {
+		if strings.Contains(html, notWant) {
+			t.Fatalf("page unexpectedly includes terminal adoption summary %q: %s", notWant, html)
 		}
 	}
 }
@@ -2511,10 +2514,8 @@ func TestHandleWorkspacesPageRendersRefreshResultSummary(t *testing.T) {
 		"main",
 	)
 	handler.recordWorkspaceSyncRefresh(WorkspaceSyncRefreshResult{
-		ImplUpserted:           1,
-		ImportedPiSessions:     2,
-		AdoptedQRSPIWorkspaces: 1,
-		Changed:                true,
+		ImplUpserted: 1,
+		Changed:      true,
 	}, nil, time.Date(2026, 5, 24, 12, 34, 56, 0, time.UTC))
 	e := echo.New()
 	req := httptest.NewRequest(http.MethodGet, "/workspaces", nil)
@@ -2523,9 +2524,14 @@ func TestHandleWorkspacesPageRendersRefreshResultSummary(t *testing.T) {
 		t.Fatalf("HandleWorkspacesPage() error = %v", err)
 	}
 	html := rec.Body.String()
-	for _, want := range []string{"Last refresh:", "workspaces 1", "terminal imported 2", "QRSPI adopted 1", "12:34:56"} {
+	for _, want := range []string{"Last refresh:", "workspaces 1", "12:34:56"} {
 		if !strings.Contains(html, want) {
 			t.Fatalf("page missing refresh summary %q: %s", want, html)
+		}
+	}
+	for _, notWant := range []string{"terminal imported", "QRSPI adopted"} {
+		if strings.Contains(html, notWant) {
+			t.Fatalf("page unexpectedly includes terminal adoption summary %q: %s", notWant, html)
 		}
 	}
 }

@@ -56,15 +56,13 @@ const (
 type WorkspaceSyncRefreshFunc func(ctx context.Context) (WorkspaceSyncRefreshResult, error)
 
 type WorkspaceSyncRefreshResult struct {
-	PlanUpserted           int
-	PlanArchived           int
-	ImplUpserted           int
-	ImplRepairedEnv        int
-	ImportedPiSessions     int
-	AdoptedQRSPIWorkspaces int
-	ImplCleanedUp          int
-	ImplMerged             int
-	Changed                bool
+	PlanUpserted    int
+	PlanArchived    int
+	ImplUpserted    int
+	ImplRepairedEnv int
+	ImplCleanedUp   int
+	ImplMerged      int
+	Changed         bool
 }
 
 type WorkspaceRefreshState struct {
@@ -76,37 +74,16 @@ type WorkspaceRefreshState struct {
 
 type WorkspaceSyncCompletionFunc func(ctx context.Context, result WorkspaceSyncRefreshResult, err error) WorkspaceSyncRefreshResult
 
-type TerminalSessionAdopter interface {
-	ImportAdoptablePiSessions(ctx context.Context) (TerminalSessionAdoptionResult, error)
-}
-
-type TerminalSessionAdoptionResult struct {
-	ImportedSessions       int
-	AdoptedQRSPIWorkspaces int
-	Changed                bool
-}
-
 func NewWorkspaceSyncCompletion(
 	manager Registry,
 	workspaceNotifier WorkspaceLifecycleNotifier,
 	agentChatNotifier func(),
-	adopter TerminalSessionAdopter,
 ) WorkspaceSyncCompletionFunc {
 	return func(ctx context.Context, result WorkspaceSyncRefreshResult, err error) WorkspaceSyncRefreshResult {
 		if err == nil {
 			if manager != nil {
 				if refreshErr := manager.Refresh(ctx); refreshErr != nil {
 					log.Printf("workspace_manager_refresh_after_sync_failed: %v", refreshErr)
-				}
-			}
-			if adopter != nil {
-				adoption, adoptionErr := adopter.ImportAdoptablePiSessions(ctx)
-				if adoptionErr != nil {
-					log.Printf("terminal_session_adoption_after_sync_failed: %v", adoptionErr)
-				} else {
-					result.ImportedPiSessions += adoption.ImportedSessions
-					result.AdoptedQRSPIWorkspaces += adoption.AdoptedQRSPIWorkspaces
-					result.Changed = result.Changed || adoption.Changed
 				}
 			}
 			if agentChatNotifier != nil {

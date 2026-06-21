@@ -383,12 +383,6 @@ func workspaceRefreshSummary(state WorkspaceRefreshState) string {
 	if result.ImplRepairedEnv > 0 {
 		parts = append(parts, fmt.Sprintf("env repaired %d", result.ImplRepairedEnv))
 	}
-	if result.ImportedPiSessions > 0 {
-		parts = append(parts, fmt.Sprintf("terminal imported %d", result.ImportedPiSessions))
-	}
-	if result.AdoptedQRSPIWorkspaces > 0 {
-		parts = append(parts, fmt.Sprintf("QRSPI adopted %d", result.AdoptedQRSPIWorkspaces))
-	}
 	if result.ImplCleanedUp > 0 {
 		parts = append(parts, fmt.Sprintf("cleaned %d", result.ImplCleanedUp))
 	}

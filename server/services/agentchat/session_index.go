@@ -16,7 +16,6 @@ import (
 
 	"github.com/CoreyCole/vamos/pkg/collections"
 	"github.com/CoreyCole/vamos/pkg/db"
-	"github.com/CoreyCole/vamos/server/services/workspaces"
 )
 
 func (s *Service) RequestPiSessionIndex(req PiSessionIndexRequest) {
@@ -213,25 +212,31 @@ func (s *Service) indexPiSessionFile(
 	})
 }
 
+type TerminalSessionAdoptionResult struct {
+	ImportedSessions       int
+	AdoptedQRSPIWorkspaces int
+	Changed                bool
+}
+
 func (s *Service) ImportAdoptablePiSessions(
 	ctx context.Context,
-) (workspaces.TerminalSessionAdoptionResult, error) {
+) (TerminalSessionAdoptionResult, error) {
 	root := strings.TrimSpace(s.piSessionsDir)
 	if root == "" {
-		return workspaces.TerminalSessionAdoptionResult{}, nil
+		return TerminalSessionAdoptionResult{}, nil
 	}
 	info, err := os.Stat(root)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
-			return workspaces.TerminalSessionAdoptionResult{}, nil
+			return TerminalSessionAdoptionResult{}, nil
 		}
-		return workspaces.TerminalSessionAdoptionResult{}, err
+		return TerminalSessionAdoptionResult{}, err
 	}
 	if !info.IsDir() {
-		return workspaces.TerminalSessionAdoptionResult{}, nil
+		return TerminalSessionAdoptionResult{}, nil
 	}
 
-	result := workspaces.TerminalSessionAdoptionResult{}
+	result := TerminalSessionAdoptionResult{}
 	affectedWorkspaces := collections.NewSet[string]()
 	err = filepath.WalkDir(root, func(path string, d fs.DirEntry, walkErr error) error {
 		if walkErr != nil {
