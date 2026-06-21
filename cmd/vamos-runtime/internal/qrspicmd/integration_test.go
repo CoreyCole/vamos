@@ -169,6 +169,14 @@ func TestEndToEndCommandSurface(t *testing.T) {
 	if !strings.Contains(runOut, `"type":"child_started"`) || !strings.Contains(runOut, `"type":"child_finished"`) {
 		t.Fatalf("run-child output = %q", runOut)
 	}
+	for _, want := range []string{`"outputPath"`, `"sessionId"`, `"sessionDir"`, `"sessionPath"`, `"donePath"`, `"statusPath"`} {
+		if !strings.Contains(runOut, want) {
+			t.Fatalf("run-child output missing %s: %q", want, runOut)
+		}
+	}
+	if strings.Contains(runOut, `"resultPath"`) {
+		t.Fatalf("run-child output exposed default resultPath: %q", runOut)
+	}
 	state := loadManagerState(t, stateFile)
 	if state.ActiveChild == nil {
 		t.Fatalf("active child missing after run-child")

@@ -68,8 +68,13 @@ func TestRunChildStartsRightSplitAndSavesActiveChild(t *testing.T) {
 	if state.ActiveChild == nil || state.ActiveChild.TmuxPaneID != "%9" || state.ActiveChild.SessionPath == "" {
 		t.Fatalf("active child = %+v", state.ActiveChild)
 	}
-	if !strings.Contains(out.String(), `"type":"child_started"`) || !strings.Contains(out.String(), `"type":"child_finished"`) || !strings.Contains(out.String(), `"sessionPath"`) {
-		t.Fatalf("output = %q", out.String())
+	for _, want := range []string{`"type":"child_started"`, `"type":"child_finished"`, `"outputPath"`, `"sessionId"`, `"sessionDir"`, `"sessionPath"`, `"donePath"`, `"statusPath"`} {
+		if !strings.Contains(out.String(), want) {
+			t.Fatalf("output missing %s: %q", want, out.String())
+		}
+	}
+	if strings.Contains(out.String(), `"resultPath"`) {
+		t.Fatalf("output exposed default resultPath: %q", out.String())
 	}
 }
 

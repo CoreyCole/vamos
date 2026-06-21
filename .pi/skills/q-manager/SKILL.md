@@ -27,17 +27,20 @@ Supervise QRSPI from a main Pi manager session. Launch focused child Pi sessions
 - Respect `advanceMode`: `discuss` stops after valid result; `guided` starts graph-safe non-human edges; `autopilot` can auto-approve only graph-marked safe gates.
 - Stop on human gates, blocked/error results, invalid result retry exhaustion, lock conflict, or ambiguous project judgment named by `docs/q-manager.md`.
 - After `/q-workspace`, run implementation/review/verify child stages in `workspace_metadata.implementation_workspace` when graph semantics require implementation cwd.
-- Pi session metadata redesign is out of scope; rely on explicit child output/result capture paths or stable current session output APIs only.
+- Pi session metadata redesign is out of scope; q-manager assigns exact child `--session-id` / `--session-dir` using current Pi flags.
+- Child session JSONL is authoritative for result parsing. tmux transcript/output is diagnostic.
 
 ## Start flow
 
 1. Resolve plan dir and project root.
 1. Run `vamos qrspi init --plan-dir <plan-dir> --project-root <repo-root>`.
 1. Render prompt for current/next node: `vamos qrspi render-prompt --state-file <state> --node <node> --plan-dir <plan-dir>`.
-1. Start child and wait for its result file: `vamos qrspi run-child --state-file <state> --plan-dir <plan-dir> --stage <node> --cwd <cwd> --prompt-file <prompt> --split right --timeout 12h`.
-1. Validate: `vamos qrspi validate-result --state-file <state> --stage <node> --result-file <result> --plan-dir <plan-dir>`.
-1. Decide: `vamos qrspi decide-next --state-file <state> --result-file <result> --plan-dir <plan-dir>`.
+1. Start child and wait for done/status marker: `vamos qrspi run-child --state-file <state> --plan-dir <plan-dir> --stage <node> --cwd <cwd> --prompt-file <prompt> --split right --timeout 12h`.
+1. Validate from active child session JSONL: `vamos qrspi validate-result --state-file <state> --stage <node> --plan-dir <plan-dir>`.
+1. Decide from active child session JSONL: `vamos qrspi decide-next --state-file <state> --plan-dir <plan-dir>`.
 1. If decision starts next, repeat. If decision stops, report concise reason and next human action.
+
+Manual/debug overrides: `--session-file <jsonl>` validates a specific child session JSONL. `--result-file <path>` is deprecated fallback for plaintext result files only when no active child session refs are available.
 
 ## Result retry
 

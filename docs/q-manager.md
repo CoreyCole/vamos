@@ -22,15 +22,15 @@ Before `/q-workspace`, child stages run in the planning/source checkout. After `
 
 ## Visible child-session rule
 
-Child QRSPI work runs in a visible tmux pane, usually a right split. Humans must be able to watch, interrupt, and steer.
+Child QRSPI work runs in a visible tmux pane, usually a right split. Humans must be able to watch, interrupt, and steer. Recovery refs must identify the pane/transcript plus `sessionId`, `sessionDir`, `sessionPath` when resolved, `donePath`, and `statusPath`.
 
 ## Session metadata boundary
 
-Do not require Pi session metadata schema/API changes. Prefer explicit output/result files owned by the manager helper or stable existing Pi output/session APIs.
+Do not require Pi session metadata schema/API changes. q-manager assigns exact child `--session-id` values inside manager-owned `--session-dir` directories and treats the resulting Pi session JSONL as the authoritative child result source. tmux/stdout transcripts and plaintext result files are diagnostics only; `--result-file` is a deprecated debug fallback, not the manager default.
 
 ## Deterministic reload sources
 
-Reload from this manifest, `.pi/skills/q-manager/SKILL.md`, `.pi/skills/qrspi-planning/SKILL.md`, plan `AGENTS.md`, latest stage artifact/result, and manager state file.
+Reload from this manifest, `.pi/skills/q-manager/SKILL.md`, `.pi/skills/qrspi-planning/SKILL.md`, plan `AGENTS.md`, latest stage artifact/result, and manager state file. Manager state `ActiveChild` refs are the recovery anchor for pane, transcript, session JSONL, done marker, and status marker.
 
 ## Verification and merge habits
 
