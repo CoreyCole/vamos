@@ -17,6 +17,13 @@ Supervise QRSPI from a main Pi manager session. Launch focused child Pi sessions
 1. Read the latest QRSPI result artifact or user-provided result YAML.
 1. Use `vamos qrspi render-prompt` to render the next child-stage prompt when available.
 
+## General guiding principles
+
+- Capture generalized manager learnings in this q-manager skill. Capture project-specific manager policy, escalation preferences, or domain workflow rules in the target project’s `docs/q-manager.md` instead.
+- Prefer deterministic self-recovery over human escalation when the failure is mechanical and evidence is sufficient. If a child did the right stage work but emitted invalid QRSPI YAML (for example wrong outcome label, invalid `next.steps` action, missing required field), inspect the child session/artifact, identify the canonical graph-valid correction, and unblock through CLI-managed validation/continuation or by steering the same child to emit the corrected result. Do not ask the human to debug parser/graph mechanics.
+- Escalate to the human only when intent, product judgment, safety, workspace replacement, merge policy, or project-specific decision is ambiguous. Do not escalate merely because the manager needs to map an obvious child result to a canonical outcome.
+- Keep self-recovery evidence-based: cite the child artifact/session and the graph rule being corrected in manager prose/diagnostics. Do not invent stage results without durable child work/artifacts to back them.
+
 ## Rules
 
 - Existing QRSPI graph is canonical. Do not infer transitions from YAML text alone.
@@ -31,7 +38,10 @@ Supervise QRSPI from a main Pi manager session. Launch focused child Pi sessions
 - For implementation-review follow-up/review-dir plans that already have `workspace_metadata.implementation_workspace`, do not imply a fresh workspace/copy/reset. Prompts for `/q-plan` and planning review must state that implementation should stack in the existing implementation workspace on the reviewed head. If the current graph forces a `workspace` node anyway, that node must preserve/reaffirm the existing workspace and continue to implementation; do not create a new copy.
 - Pi session metadata redesign is out of scope; q-manager assigns exact child `--session-id` / `--session-dir` using current Pi flags.
 - Child session JSONL is authoritative for result parsing. tmux transcript/output is diagnostic.
-- Never paste multiline manager prompts into an interactive child pane as raw tmux keystrokes. Newlines can submit as separate child prompts. For initial stage prompts, write a prompt file and launch via `run-child --prompt-file`. For follow-up steering, prefer a CLI helper that injects one bracketed/atomic prompt; if unavailable, paste a single-line instruction pointing at a file path the child should read.
+- Stay high-level as manager. When an active child has adequate stage context, do not edit that child’s plan/design/outline artifacts yourself; gather human feedback and steer the same child to apply it. Manager-owned edits should be limited to manager operational notes/skills unless explicitly asked otherwise.
+- Treat human feedback as first-class child input. If the human says important context, corrections, priorities, approvals, or objections to the manager, decide whether it is relevant to the active child’s current task. If relevant, enrich it with minimal routing context and forward it to the same child via the q-manager CLI steering path. Do not keep important task context trapped in the manager transcript.
+- YAML/result formatting errors are normally CLI/extension work. The q-manager CLI and Pi child extension own detection, correction prompts, retries, and parser-specific feedback for invalid `qrspi_result` YAML. The manager should run `continue` and report concise retry/exhaustion state; it should not handcraft parser correction prompts or mix parser correction with human/task feedback. If retry support fails or is exhausted but the correction is deterministic from child artifact + graph (for example `review-plan` used `outcome: complete` but graph requires `ready-for-workspace`), the manager may self-recover by steering the same child to emit the canonical corrected YAML or by using a future CLI correction/apply-result helper, without human intervention.
+- Never paste multiline manager prompts into an interactive child pane as raw tmux keystrokes. Newlines can submit as separate child prompts. For initial stage prompts, write a prompt file and launch via `run-child --prompt-file`. For follow-up steering, use a q-manager CLI helper that injects one bracketed/atomic prompt from a message/feedback file. If that helper does not exist, stop and record that CLI support is missing; do not silently fall back to direct tmux as the normal path.
 - Do not poll or sleep on child `done` as the normal control loop. `done`/`status.json` are recovery diagnostics; the primary manager trigger is the child wake pasted into the parent pane.
 - Do not put manager `stateFile`, run IDs, pane IDs, session dirs, or other disposable q-manager control refs in durable `qrspi_result` YAML. Report them in manager prose/diagnostics only. Durable YAML should keep plan/workspace/artifact identity, not machine-local manager state.
 - When testing the runtime CLI from a Vamos checkout, use `go run ./cmd/vamos-runtime ...` in place of installed `vamos ...`.
@@ -151,3 +161,11 @@ If the handoff says “waiting for child wake,” do not continue/validate until
 ## Human gates
 
 Ask the human one direct question. Preserve graph decision, latest result, and any human answer in manager session context. Do not rewrite workflow state by hand.
+
+If a child stops for a graph-valid human gate, keep the child pane/session active. Summarize the child’s question to the human, then steer the same child with the answer. Preferred shape is a CLI helper that injects one atomic prompt, for example:
+
+```bash
+vamos qrspi steer-child --state-file "$STATE" --feedback-file /path/to/human-feedback.md
+```
+
+The steering command should be human/task feedback first-class, separate from YAML validation retry. It should preserve active child refs, write/accept a feedback file, inject one atomic child prompt, and let the child update artifacts or ask follow-up. If no steering helper exists yet, stop and say the CLI is missing required steering support. Do not edit the child’s design/outline/plan artifacts directly when the child can incorporate the feedback. Do not use parser `reprompt-child` for human feedback.

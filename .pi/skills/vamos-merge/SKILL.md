@@ -26,6 +26,7 @@ Merge a completed `../vamos` branch into `main` plus any paired `../datastarui` 
 - Preserve paired DatastarUI stack shape too. If DatastarUI changes are part of the work, do not squash or patch-copy them into Vamos. Merge/push DatastarUI through its own Graphite stack, then update/verify Vamos against the merged DatastarUI result.
 - Do **not** check out or fetch a copied workspace feature branch into `../vamos` until that feature branch stack has already been synced/restacked onto latest `origin/main` in its own source checkout.
 - The sync/restack phase is the same procedure as `.pi/skills/vamos-sync/SKILL.md`; use that skill for conflict handling details.
+- After pushing merged Vamos runtime changes to remote, update the dotfiles/context Vamos skill source checkout (`~/dotfiles/context/vamos`) so future Pi agents load the latest committed `.pi` skills, prompts, and q-manager guidance. This is especially important when the merge changes `.pi/skills/*`.
 
 ## Step 1: Preflight
 
@@ -339,6 +340,20 @@ cd ../vamos
 git push origin main
 ```
 
+Then sync the dotfiles/context Vamos checkout that Pi uses for durable skill context:
+
+```bash
+if test -d ~/dotfiles/context/vamos/.git; then
+  cd ~/dotfiles/context/vamos
+  git fetch origin +refs/heads/main:refs/remotes/origin/main
+  git switch main
+  git status --short # must be clean before pull/reset; stop if dirty
+  git pull --ff-only origin main
+fi
+```
+
+If `~/dotfiles/context/vamos` is dirty, stop and ask before overwriting it. Do not leave it stale after a successful remote push, or subsequent Pi agents may load old q-manager/vamos skill instructions.
+
 If host-only follow-up fixes were required, commit them on working `../cn-agents/main`, fast-forward `../cn-agents-main`, and push that repo separately as part of the same merge flow after its verification passes.
 
 ## Completion response
@@ -373,3 +388,4 @@ Then report:
 - stage verification URL/result
 - verification URL/result
 - push status for DatastarUI when applicable, and Vamos
+- `~/dotfiles/context/vamos` sync status/HEAD after pull
