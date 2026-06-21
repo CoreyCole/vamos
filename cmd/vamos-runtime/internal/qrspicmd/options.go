@@ -29,6 +29,39 @@ type RunChildOptions struct {
 	Timeout      time.Duration
 }
 
+type StartNextOptions struct {
+	PlanDir           string
+	ProjectRoot       string
+	StateFile         string
+	PolicyFile        string
+	NodeID            string
+	ImplementationCwd string
+	ManagerPane       string
+	LatestResultFile  string
+	LatestResultStdin bool
+	Cwd               string
+	Split             string
+	Timeout           time.Duration
+	Output            string
+	Force             bool
+}
+
+type StartNextResult struct {
+	StateFile       string
+	CurrentNode     string
+	PromptFile      string
+	ActiveChild     *ChildRunRef
+	StopReason      string
+	NextCommand     string
+	FeedbackCommand string
+}
+
+type PromptFileOptions struct {
+	StateFile string
+	NodeID    string
+	Timestamp time.Time
+}
+
 type ValidateResultOptions struct {
 	Stage       string
 	StateFile   string

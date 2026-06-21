@@ -597,12 +597,9 @@ func startNextChildFromDecision(ctx context.Context, state ManagerState, decisio
 	if err != nil {
 		return state, err
 	}
-	cwd := strings.TrimSpace(opts.Cwd)
-	if cwd == "" {
-		cwd = defaultContinueCwd(state, nodeID)
-	}
-	if cwd == "" {
-		return state, errors.New("next child cwd is required")
+	cwd, err := defaultChildCwd(state, nodeID, opts.Cwd)
+	if err != nil {
+		return state, err
 	}
 	runOut := io.Writer(io.Discard)
 	if strings.EqualFold(opts.Output, "ndjson") {
@@ -624,17 +621,14 @@ func startNextChildFromDecision(ctx context.Context, state ManagerState, decisio
 }
 
 func defaultContinueCwd(state ManagerState, node wruntime.NodeID) string {
-	switch node {
-	case "implement", "review-implementation", "verify":
-		if strings.TrimSpace(state.ImplementationCwd) != "" {
-			return state.ImplementationCwd
-		}
+	cwd, err := defaultChildCwd(state, node, "")
+	if err != nil {
+		return ""
 	}
-	return state.SourceCwd
+	return cwd
 }
 
 func renderContinuePromptFile(ctx context.Context, state ManagerState, nodeID wruntime.NodeID, opts ContinueOptions) (string, error) {
-	_ = ctx
 	def, err := Definition()
 	if err != nil {
 		return "", err
@@ -643,27 +637,7 @@ func renderContinuePromptFile(ctx context.Context, state ManagerState, nodeID wr
 	if !ok {
 		return "", fmt.Errorf("node %q is not in QRSPI definition", nodeID)
 	}
-	manifest, err := LoadManifest(state.SourceCwd)
-	if err != nil {
-		return "", err
-	}
-	prompt, err := RenderStagePrompt(PromptContext{Node: node, State: state, PlanDir: opts.PlanDir, Manifest: manifest, LastResult: state.Workflow.LastResult})
-	if err != nil {
-		return "", err
-	}
-	path := ""
-	if state.ActiveChild != nil && strings.TrimSpace(state.ActiveChild.OutputPath) != "" {
-		path = filepath.Join(filepath.Dir(state.ActiveChild.OutputPath), "next-"+string(nodeID)+"-prompt.md")
-	} else {
-		path = filepath.Join(filepath.Dir(opts.StateFile), "prompts", string(nodeID)+".md")
-	}
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		return "", err
-	}
-	if err := os.WriteFile(path, []byte(prompt), 0o644); err != nil {
-		return "", err
-	}
-	return path, nil
+	return WriteStagePromptFile(ctx, state, node, PromptFileOptions{StateFile: opts.StateFile, NodeID: string(nodeID), Timestamp: time.Now()})
 }
 
 func writeContinueOutput(out io.Writer, opts ContinueOptions, result ContinueResult) error {
