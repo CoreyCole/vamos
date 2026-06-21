@@ -29,6 +29,8 @@ func maybeReexecManaged(ctx context.Context) error {
 	return execRuntime(target.BinaryPath, os.Args[1:], os.Environ())
 }
 
+var buildRuntimeFunc = buildRuntime
+
 func buildRuntime(ctx context.Context, sourceRoot, outputPath string) error {
 	if err := os.MkdirAll(filepath.Dir(outputPath), 0o755); err != nil {
 		return fmt.Errorf("create managed runtime output dir for %q: %w", outputPath, err)
