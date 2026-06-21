@@ -10,7 +10,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/CoreyCole/vamos/pkg/agents/workflows/qrspi"
 	wruntime "github.com/CoreyCole/vamos/pkg/agents/workflows/runtime"
 	"github.com/spf13/cobra"
 )
@@ -145,7 +144,7 @@ func RunInit(ctx context.Context, opts InitOptions, d deps, out io.Writer) error
 	if err != nil {
 		return err
 	}
-	state, err := initialManagerState(opts.PlanDir, projectRoot, policy)
+	state, err := InitialManagerState(opts.PlanDir, projectRoot, policy)
 	if err != nil {
 		return err
 	}
@@ -210,8 +209,25 @@ func RunValidateResult(ctx context.Context, opts ValidateResultOptions, d deps, 
 	if strings.TrimSpace(opts.PlanDir) == "" {
 		return errors.New("plan-dir is required")
 	}
-	ensureWriter(out)
-	return ErrNotImplemented
+	out = ensureWriter(out)
+	store := stateStore(d, "", time.Now)
+	state, err := store.Load(opts.StateFile)
+	if err != nil {
+		return err
+	}
+	data, err := os.ReadFile(opts.ResultFile)
+	if err != nil {
+		return err
+	}
+	parsed, err := ParseValidateDecide(string(data), state.Workflow, wruntime.ParseContext{
+		ExpectedNodeID: wruntime.NodeID(opts.Stage),
+		RunID:          opts.RunID,
+		SessionID:      opts.SessionID,
+	})
+	if err != nil {
+		return err
+	}
+	return WriteNDJSON(out, Event{Type: "validated", Decision: &parsed})
 }
 
 func RunDecideNext(ctx context.Context, opts DecideNextOptions, d deps, out io.Writer) error {
@@ -224,8 +240,37 @@ func RunDecideNext(ctx context.Context, opts DecideNextOptions, d deps, out io.W
 	if strings.TrimSpace(opts.PlanDir) == "" {
 		return errors.New("plan-dir is required")
 	}
-	ensureWriter(out)
-	return ErrNotImplemented
+	out = ensureWriter(out)
+	store := stateStore(d, "", time.Now)
+	state, err := store.Load(opts.StateFile)
+	if err != nil {
+		return err
+	}
+	data, err := os.ReadFile(opts.ResultFile)
+	if err != nil {
+		return err
+	}
+	parsed, err := ParseValidateDecide(string(data), state.Workflow, wruntime.ParseContext{ExpectedNodeID: state.Workflow.CurrentNodeID})
+	if err != nil {
+		return err
+	}
+	state.Workflow = parsed.Decision.State
+	state = UpdateImplementationCwd(state, parsed.Result)
+	state.ActiveChild = nil
+	if err := store.Save(opts.StateFile, state); err != nil {
+		return err
+	}
+	return WriteNDJSON(out, Event{
+		Type:     "decided",
+		Decision: &parsed,
+		Ref: map[string]any{
+			"nextNode":          parsed.Decision.NextNodeID,
+			"startNext":         parsed.Decision.StartNext,
+			"waitingHuman":      parsed.Decision.WaitingHuman,
+			"stopReason":        parsed.Decision.StopReason,
+			"implementationCwd": state.ImplementationCwd,
+		},
+	})
 }
 
 func RunRenderPrompt(ctx context.Context, opts RenderPromptOptions, d deps, out io.Writer) error {
@@ -258,33 +303,6 @@ func readPolicyFile(path string) (json.RawMessage, error) {
 		return nil, err
 	}
 	return json.RawMessage(data), nil
-}
-
-func initialManagerState(planDir, projectRoot string, policy json.RawMessage) (ManagerState, error) {
-	def, err := qrspi.Definition()
-	if err != nil {
-		return ManagerState{}, err
-	}
-	workflow, err := wruntime.InitialState(def, policy)
-	if err != nil {
-		return ManagerState{}, err
-	}
-	canonicalPlanDir, err := CanonicalPlanDir(projectRoot, planDir)
-	if err != nil {
-		return ManagerState{}, err
-	}
-	repoID, err := RepoID(projectRoot)
-	if err != nil {
-		return ManagerState{}, err
-	}
-	workflow.ExecutionCwd = projectRoot
-	return ManagerState{
-		SchemaVersion:    schemaVersion,
-		RepoID:           repoID,
-		CanonicalPlanDir: canonicalPlanDir,
-		SourceCwd:        projectRoot,
-		Workflow:         workflow,
-	}, nil
 }
 
 func managerRunID(t time.Time) string {

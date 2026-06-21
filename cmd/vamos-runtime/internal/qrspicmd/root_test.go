@@ -94,8 +94,8 @@ func TestValidateResultRequiresStateAndResult(t *testing.T) {
 	}
 
 	err := executeForError("validate-result", "--stage", "design", "--state-file", "/tmp/state.json", "--result-file", "/tmp/result.txt", "--plan-dir", "thoughts/example")
-	if !errors.Is(err, ErrNotImplemented) {
-		t.Fatalf("expected ErrNotImplemented after required flags, got %v", err)
+	if errors.Is(err, ErrNotImplemented) {
+		t.Fatalf("validate-result should be implemented after required flags, got %v", err)
 	}
 }
 
@@ -116,8 +116,8 @@ func TestDecideNextRequiresStateAndResult(t *testing.T) {
 	}
 
 	err := executeForError("decide-next", "--state-file", "/tmp/state.json", "--result-file", "/tmp/result.txt", "--plan-dir", "thoughts/example")
-	if !errors.Is(err, ErrNotImplemented) {
-		t.Fatalf("expected ErrNotImplemented after required flags, got %v", err)
+	if errors.Is(err, ErrNotImplemented) {
+		t.Fatalf("decide-next should be implemented after required flags, got %v", err)
 	}
 }
 
