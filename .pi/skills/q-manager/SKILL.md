@@ -15,14 +15,16 @@ Supervise QRSPI from a main Pi manager session. Launch focused child Pi sessions
 1. Read `docs/q-manager.md` when present for manager behavior only; do not stuff manager instructions into child stage prompts.
 1. Read the target plan `AGENTS.md`.
 1. Read the latest QRSPI result artifact or user-provided result YAML.
-1. Use `vamos qrspi render-prompt` to render the next child-stage prompt when available.
+1. Use `vamos qrspi start-next` for normal launch/resume. Use `init`, `render-prompt`, `run-child`, `validate-result`, `decide-next`, and `reprompt-child` only for debug/recovery.
 
 ## General guiding principles
 
 - Capture generalized manager learnings in this q-manager skill. Capture project-specific manager policy, escalation preferences, or domain workflow rules in the target project’s `docs/q-manager.md` instead.
 - Prefer deterministic self-recovery over human escalation when the failure is mechanical and evidence is sufficient. If a child did the right stage work but emitted invalid QRSPI YAML (for example wrong outcome label, invalid `next.steps` action, missing required field), inspect the child session/artifact, identify the canonical graph-valid correction, and unblock through CLI-managed validation/continuation or by steering the same child to emit the corrected result. Do not ask the human to debug parser/graph mechanics.
+- If manager state seems invalid or desynced, inspect it and help the pipeline recover instead of blocking. Compare `activeChild.stage`, child session/result, `workflow.current_node_id`, latest durable artifact, and graph intent. If evidence is deterministic (for example active child is `implement` and the child emitted an implementation handoff while graph cursor is stale at `review-plan` after a manual skip), repair local/ephemeral manager state or use the closest CLI recovery path, then continue. Do not mutate durable QRSPI artifacts to hide manager-state bugs.
 - Escalate to the human only when intent, product judgment, safety, workspace replacement, merge policy, or project-specific decision is ambiguous. Do not escalate merely because the manager needs to map an obvious child result to a canonical outcome.
 - Keep self-recovery evidence-based: cite the child artifact/session and the graph rule being corrected in manager prose/diagnostics. Do not invent stage results without durable child work/artifacts to back them.
+- Log q-manager recovery incidents, but do not block the pipeline merely to write a perfect report. Append a concise note to a local incident log under the manager state directory when available (for example `<state-dir>/incidents.log`) with timestamp, symptom, evidence, action taken, and follow-up needed. Incident logs are local/ephemeral diagnostics; keep durable artifacts focused on workflow truth.
 
 ## Rules
 
@@ -33,6 +35,7 @@ Supervise QRSPI from a main Pi manager session. Launch focused child Pi sessions
 - QRSPI artifacts and fenced `qrspi_result` YAML remain durable truth.
 - Respect `advanceMode`: `discuss` stops after valid result; `guided` starts graph-safe non-human edges, including implementation `status: handoff` checkpoints that should launch the next fresh implementation/resume child; `autopilot` can auto-approve only graph-marked safe gates.
 - Stop on human gates, implementation complete/review-ready results, blocked/error results, invalid result retry exhaustion, lock conflict, or ambiguous project judgment named by `docs/q-manager.md`. Do not stop merely because an implementation child emitted `status: handoff`; in guided/autopilot, start the next fresh child for the same implement/resume work.
+- Treat a normal wake as validated manager-needed state, not raw child turn end. Expect `q_manager_child_wake.validated=true` for graph-valid states or `retry_exhausted=true` when automated result repair failed. Ignore raw `agent_end`, `done`, and `status.json` as normal manager triggers.
 - Before raising a blocked result to the human, diagnose the blockage from deterministic evidence: read the blocker artifact, reproduce the failing command when safe, compare against a clean/main baseline when feasible, distinguish stack-caused vs baseline/environment failures, and report a concise summary plus recommended next action. Do not simply echo `status: blocked`.
 - After `/q-workspace`, run implementation/review/verify child stages in `workspace_metadata.implementation_workspace` when graph semantics require implementation cwd.
 - For implementation-review follow-up/review-dir plans that already have `workspace_metadata.implementation_workspace`, do not imply a fresh workspace/copy/reset. Prompts for `/q-plan` and planning review must state that implementation should stack in the existing implementation workspace on the reviewed head. If the current graph forces a `workspace` node anyway, that node must preserve/reaffirm the existing workspace and continue to implementation; do not create a new copy.
@@ -41,7 +44,7 @@ Supervise QRSPI from a main Pi manager session. Launch focused child Pi sessions
 - Stay high-level as manager. When an active child has adequate stage context, do not edit that child’s plan/design/outline artifacts yourself; gather human feedback and steer the same child to apply it. Manager-owned edits should be limited to manager operational notes/skills unless explicitly asked otherwise.
 - Treat human feedback as first-class child input. If the human says important context, corrections, priorities, approvals, or objections to the manager, decide whether it is relevant to the active child’s current task. If relevant, enrich it with minimal routing context and forward it to the same child via the q-manager CLI steering path. Do not keep important task context trapped in the manager transcript.
 - YAML/result formatting errors are normally CLI/extension work. The q-manager CLI and Pi child extension own detection, correction prompts, retries, and parser-specific feedback for invalid `qrspi_result` YAML. The manager should run `continue` and report concise retry/exhaustion state; it should not handcraft parser correction prompts or mix parser correction with human/task feedback. If retry support fails or is exhausted but the correction is deterministic from child artifact + graph (for example `review-plan` used `outcome: complete` but graph requires `ready-for-workspace`), the manager may self-recover by steering the same child to emit the canonical corrected YAML or by using a future CLI correction/apply-result helper, without human intervention.
-- Never paste multiline manager prompts into an interactive child pane as raw tmux keystrokes. Newlines can submit as separate child prompts. For initial stage prompts, write a prompt file and launch via `run-child --prompt-file`. For follow-up steering, use a q-manager CLI helper that injects one bracketed/atomic prompt from a message/feedback file. If that helper does not exist, stop and record that CLI support is missing; do not silently fall back to direct tmux as the normal path.
+- Never paste multiline manager prompts into an interactive child pane as raw tmux keystrokes. Newlines can submit as separate child prompts. For initial stage prompts, use `start-next`; it writes a prompt file and launches the child. For follow-up steering, use `steer-child` with a feedback file. Do not silently fall back to direct tmux as the normal path.
 - Do not poll or sleep on child `done` as the normal control loop. `done`/`status.json` are recovery diagnostics; the primary manager trigger is the child wake pasted into the parent pane.
 - Do not put manager `stateFile`, run IDs, pane IDs, session dirs, or other disposable q-manager control refs in durable `qrspi_result` YAML. Report them in manager prose/diagnostics only. Durable YAML should keep plan/workspace/artifact identity, not machine-local manager state.
 - When testing the runtime CLI from a Vamos checkout, use `go run ./cmd/vamos-runtime ...` in place of installed `vamos ...`.
@@ -51,37 +54,32 @@ Supervise QRSPI from a main Pi manager session. Launch focused child Pi sessions
 
 ## Wake-driven manager loop
 
-Primary loop: launch child, then wait for pasted wake. Do **not** block this manager session in `sleep`/poll loops. The extension wake is the normal event; marker files are only fallback diagnostics.
+Primary loop: launch/resume child with `start-next`, then wait for a validated pasted wake. Do **not** block this manager session in `sleep`/poll loops. The extension wake is the normal event; marker files are only fallback diagnostics.
 
 1. Resolve plan dir and project root.
-1. Initialize or resume graph state and capture `stateFile` from JSON:
+1. Start or resume the graph-selected child with one command:
    ```bash
-   STATE=$(vamos qrspi init --plan-dir <plan-dir> --project-root <repo-root> --manager-pane "$TMUX_PANE" | jq -r '.ref.stateFile')
+   vamos qrspi start-next --plan-dir <plan-dir> --project-root <repo-root> --manager-pane "$TMUX_PANE"
    ```
-   Add `--node <node>` / `--implementation-cwd <cwd>` only when deliberately resuming or testing a specific implementation, review, or verify stage.
-1. Render prompt for the current graph node to a prompt file:
-   ```bash
-   PROMPT="$(dirname "$STATE")/<node>-prompt.md"
-   vamos qrspi render-prompt --state-file "$STATE" --node <node> --plan-dir <plan-dir> > "$PROMPT"
-   ```
-   The rendered prompt should include the previous stage's `qrspi_result` YAML as the canonical handoff context when available. If the user provided latest result YAML in chat, pass it as latest result context. Do not hand-infer graph transitions from it.
-   For review-dir / implementation-review follow-up plans, same-workspace routing should come from the previous `qrspi_result.workspace_metadata` and plan docs. If the CLI detects and summarizes it, keep the summary child-safe and minimal: do not create a new implementation copy or reset to trunk; stack follow-up implementation on the existing implementation workspace/head.
-1. Start the visible child and return immediately:
-   ```bash
-   vamos qrspi run-child --state-file "$STATE" --plan-dir <plan-dir> --stage <node> --cwd <cwd> --prompt-file "$PROMPT" --split right --timeout 0
-   ```
-1. Stop issuing commands and wait for the child extension to paste the parent wake. The wake means “child turn ended,” not “valid result.”
+   Add `--node <node>` / `--implementation-cwd <cwd>` only when deliberately resuming or testing a specific implementation, review, or verify stage. If the parent already has a latest fenced result, pass it with `--latest-result-stdin` or `--latest-result-file`; the CLI validates/persists it before prompt embedding.
+1. Capture `stateFile` and active child refs from concise output/NDJSON. The CLI writes the child prompt file atomically and launches the visible child; do not hand-render or paste prompts on the happy path.
+1. Stop issuing commands and wait for the child extension to paste a validated `q_manager_child_wake`. The wake should include `validated`, `manager_needed`, `retry_exhausted`, stage/status/artifact when known, and the exact `continue` command.
 1. Run the single normal manager continuation command from the wake:
    ```bash
    vamos qrspi continue --state-file "$STATE"
    ```
-   `continue` validates the active child session JSONL, reprompts the same child when retry remains, persists canonical graph decisions for valid results, launches graph-selected next child when safe, and reports concise stop reasons. Do not paste raw validate/decide NDJSON into manager chat, and do not handcraft child correction prose.
+   `continue` validates the active child session JSONL, reprompts the same child while retry remains, persists canonical graph decisions for valid results, launches graph-selected next child when safe, and reports concise stop reasons. Do not paste raw validate/decide NDJSON into manager chat, and do not handcraft child correction prose.
+
+For review-dir / implementation-review follow-up plans, same-workspace routing should come from previous `qrspi_result.workspace_metadata` and plan docs. If the CLI detects and summarizes it, keep the summary child-safe and minimal: do not create a new implementation copy or reset to trunk; stack follow-up implementation on the existing implementation workspace/head.
 
 ### Manual/debug lower-level commands
 
-Use these only for recovery or debugging when `continue` is insufficient:
+Use these only for recovery or debugging when `start-next` / `continue` is insufficient:
 
 ```bash
+vamos qrspi init --plan-dir <plan-dir> --project-root <repo-root> --manager-pane "$TMUX_PANE"
+vamos qrspi render-prompt --state-file "$STATE" --node <node> --plan-dir <plan-dir> > /tmp/child-prompt.md
+vamos qrspi run-child --state-file "$STATE" --plan-dir <plan-dir> --stage <node> --cwd <cwd> --prompt-file /tmp/child-prompt.md --split right --timeout 0
 vamos qrspi validate-result --state-file "$STATE" --stage <node> --plan-dir <plan-dir>
 vamos qrspi reprompt-child --state-file "$STATE" --plan-dir <plan-dir> --stage <node> --attempt <n> --error-file <validation-error-file>
 vamos qrspi decide-next --state-file "$STATE" --plan-dir <plan-dir>
@@ -94,25 +92,24 @@ Manual/debug overrides: `--session-file <jsonl>` validates a specific child sess
 When the user asks to test the runtime CLI before the installed `vamos` binary includes a command, prefix commands with `go run ./cmd/vamos-runtime`. Keep the same wake-driven shape:
 
 ```bash
-STATE=$(go run ./cmd/vamos-runtime qrspi init --plan-dir "$PLAN" --project-root "$PWD" --manager-pane "$TMUX_PANE" --node <node> --implementation-cwd "$PWD" --force | jq -r '.ref.stateFile')
-PROMPT="$(dirname "$STATE")/<node>-prompt.md"
-go run ./cmd/vamos-runtime qrspi render-prompt --state-file "$STATE" --node <node> --plan-dir "$PLAN" > "$PROMPT"
-go run ./cmd/vamos-runtime qrspi run-child --state-file "$STATE" --plan-dir "$PLAN" --stage <node> --cwd "$PWD" --prompt-file "$PROMPT" --split right --timeout 0
+go run ./cmd/vamos-runtime qrspi start-next --plan-dir "$PLAN" --project-root "$PWD" --manager-pane "$TMUX_PANE" --node <node> --implementation-cwd "$PWD"
 ```
 
-After `run-child`, do not poll. Wait for the pasted wake, then run `go run ./cmd/vamos-runtime qrspi continue --state-file "$STATE"`.
+After `start-next`, do not poll. Wait for the validated pasted wake, then run `go run ./cmd/vamos-runtime qrspi continue --state-file "$STATE"`.
 
 ## Child wake contract
 
-q-manager loads a project-local child Pi extension only for q-manager child sessions. On `agent_end`, the extension writes `status.json`, touches `done`, and pastes the wake text to the captured parent tmux pane. The wake means “child turn ended,” not “graph result is valid.” The manager normally runs one `continue` command before any advancement.
+q-manager loads a project-local child Pi extension only for q-manager child sessions. The extension/CLI should wake the manager only after validated manager-needed state exists: a graph-valid result, a human/block/error stop, a safe next action, or retry exhaustion. Intermediate invalid/missing YAML, parser retries, and Codex/SSE header noise are local child/CLI retry state, not manager wakes.
 
-The manager CLI/extension owns the exact wake text so it stays deterministic, testable, and versioned with runtime behavior. The skill should only define the semantic contract: wake is one atomic parent prompt, includes the finished node, includes enough local recovery context to find the manager state (for example `state_file`), and points to the single continue command. Do not let the skill become the source of truth for copy/paste wake templates.
+The manager CLI/extension owns the exact wake text so it stays deterministic, testable, and versioned with runtime behavior. The skill should only define the semantic contract: wake is one atomic parent prompt, includes validation flags (`validated`, `manager_needed`, `retry_exhausted`), includes stage/status/outcome/artifact when known, includes enough local recovery context to find the manager state (`state_file`), and points to the single continue command. Do not let the skill become the source of truth for copy/paste wake templates.
+
+`retry_exhausted=true` means automated correction failed. The manager should inspect child output/artifacts, recover or steer deterministically when evidence is sufficient, and ask the human only when intent, safety, product judgment, workspace replacement, merge policy, or external authority is required.
 
 The wake may include `state_file` because that is ephemeral manager control context needed to continue the local run. This value belongs in the wake/manager transcript, not in durable QRSPI artifacts or `qrspi_result` YAML. A multiline wake must be pasted as one buffered/atomic prompt (the same style q-manager uses when injecting blocks into child panes), not sent line-by-line as raw tmux keystrokes.
 
 ## Result retry
 
-If validation fails and policy retry budget remains, run `reprompt-child` with the validation error file. It pastes/injects the canonical QRSPI parser correction prompt into the same active child pane/session as one atomic prompt; do not create a new child ID/session and do not manually paste extra multiline correction prose. If retry budget is exhausted, stop and ask the human.
+If validation fails and policy retry budget remains, `continue`/CLI retry support should run `reprompt-child` with the validation error file. It pastes/injects the canonical QRSPI parser correction prompt into the same active child pane/session as one atomic prompt; do not create a new child ID/session and do not manually paste extra multiline correction prose. If retry budget is exhausted, emit one manager-needed retry-exhausted notice with deterministic-recovery-first guidance; inspect/steer/recover before asking the human.
 
 ## Cleanup and recovery
 
@@ -162,10 +159,10 @@ If the handoff says “waiting for child wake,” do not continue/validate until
 
 Ask the human one direct question. Preserve graph decision, latest result, and any human answer in manager session context. Do not rewrite workflow state by hand.
 
-If a child stops for a graph-valid human gate, keep the child pane/session active. Summarize the child’s question to the human, then steer the same child with the answer. Preferred shape is a CLI helper that injects one atomic prompt, for example:
+If a child stops for a graph-valid human gate, keep the child pane/session active. Summarize the child’s question to the human, then steer the same child with the answer. Use the CLI helper that injects one atomic prompt:
 
 ```bash
 vamos qrspi steer-child --state-file "$STATE" --feedback-file /path/to/human-feedback.md
 ```
 
-The steering command should be human/task feedback first-class, separate from YAML validation retry. It should preserve active child refs, write/accept a feedback file, inject one atomic child prompt, and let the child update artifacts or ask follow-up. If no steering helper exists yet, stop and say the CLI is missing required steering support. Do not edit the child’s design/outline/plan artifacts directly when the child can incorporate the feedback. Do not use parser `reprompt-child` for human feedback.
+The steering command is human/task feedback first-class, separate from YAML validation retry. It preserves active child refs, accepts a feedback file, injects one atomic child prompt, and lets the child update artifacts or ask follow-up. Do not edit the child’s design/outline/plan artifacts directly when the child can incorporate the feedback. Do not use parser `reprompt-child` for human feedback.
