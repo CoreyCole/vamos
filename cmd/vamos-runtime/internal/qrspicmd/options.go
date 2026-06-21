@@ -3,8 +3,6 @@ package qrspicmd
 import (
 	"context"
 	"time"
-
-	wruntime "github.com/CoreyCole/vamos/pkg/agents/workflows/runtime"
 )
 
 type InitOptions struct {
@@ -73,15 +71,7 @@ type TmuxClient interface {
 	SendKeys(ctx context.Context, pane TmuxPane, keys []string) error
 }
 
-// The concrete fields move to dedicated state/child files in follow-up slices.
-type ManagerState struct {
-	Workflow wruntime.State `json:"workflow"`
-}
-
-type LockKey struct{}
-
-type Lock struct{}
-
+// The concrete fields move to dedicated child files in follow-up slices.
 type ChildRunRequest struct{}
 
 type ChildRun struct{}

@@ -2,12 +2,16 @@ package qrspicmd
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"strings"
 	"time"
 
+	"github.com/CoreyCole/vamos/pkg/agents/workflows/qrspi"
+	wruntime "github.com/CoreyCole/vamos/pkg/agents/workflows/runtime"
 	"github.com/spf13/cobra"
 )
 
@@ -127,8 +131,53 @@ func RunInit(ctx context.Context, opts InitOptions, d deps, out io.Writer) error
 	if strings.TrimSpace(opts.PlanDir) == "" {
 		return errors.New("plan-dir is required")
 	}
-	ensureWriter(out)
-	return ErrNotImplemented
+	out = ensureWriter(out)
+
+	projectRoot := strings.TrimSpace(opts.ProjectRoot)
+	if projectRoot == "" {
+		cwd, err := os.Getwd()
+		if err != nil {
+			return err
+		}
+		projectRoot = cwd
+	}
+	policy, err := readPolicyFile(opts.PolicyFile)
+	if err != nil {
+		return err
+	}
+	state, err := initialManagerState(opts.PlanDir, projectRoot, policy)
+	if err != nil {
+		return err
+	}
+	clock := d.Clock
+	if clock == nil {
+		clock = time.Now
+	}
+	state.ManagerRunID = managerRunID(clock())
+
+	root, err := stateRoot(d)
+	if err != nil {
+		return err
+	}
+	store := stateStore(d, root, clock)
+	key := LockKey{RepoID: state.RepoID, CanonicalPlanDir: state.CanonicalPlanDir}
+	lock, err := store.AcquireLock(ctx, key, state.ManagerRunID, lockTTL)
+	if err != nil {
+		return err
+	}
+	stateFile := StatePath(root, key, state.ManagerRunID)
+	if err := store.Save(stateFile, state); err != nil {
+		return err
+	}
+	return WriteNDJSON(out, Event{
+		Type: "initialized",
+		Ref: map[string]any{
+			"stateFile":    stateFile,
+			"lockFile":     lock.Path,
+			"managerRunId": state.ManagerRunID,
+			"currentNode":  state.Workflow.CurrentNodeID,
+		},
+	})
 }
 
 func RunChild(ctx context.Context, opts RunChildOptions, d deps, out io.Writer) error {
@@ -198,4 +247,60 @@ func ensureWriter(out io.Writer) io.Writer {
 		return os.Stdout
 	}
 	return out
+}
+
+func readPolicyFile(path string) (json.RawMessage, error) {
+	if strings.TrimSpace(path) == "" {
+		return nil, nil
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	return json.RawMessage(data), nil
+}
+
+func initialManagerState(planDir, projectRoot string, policy json.RawMessage) (ManagerState, error) {
+	def, err := qrspi.Definition()
+	if err != nil {
+		return ManagerState{}, err
+	}
+	workflow, err := wruntime.InitialState(def, policy)
+	if err != nil {
+		return ManagerState{}, err
+	}
+	canonicalPlanDir, err := CanonicalPlanDir(projectRoot, planDir)
+	if err != nil {
+		return ManagerState{}, err
+	}
+	repoID, err := RepoID(projectRoot)
+	if err != nil {
+		return ManagerState{}, err
+	}
+	workflow.ExecutionCwd = projectRoot
+	return ManagerState{
+		SchemaVersion:    schemaVersion,
+		RepoID:           repoID,
+		CanonicalPlanDir: canonicalPlanDir,
+		SourceCwd:        projectRoot,
+		Workflow:         workflow,
+	}, nil
+}
+
+func managerRunID(t time.Time) string {
+	return fmt.Sprintf("%s-%09d", t.Format("20060102150405"), t.Nanosecond())
+}
+
+func stateRoot(d deps) (string, error) {
+	if d.StateRoot != nil {
+		return d.StateRoot()
+	}
+	return DefaultStateRoot()
+}
+
+func stateStore(d deps, root string, clock func() time.Time) StateStore {
+	if d.StateStore != nil {
+		return d.StateStore
+	}
+	return FileStateStore{Root: root, Clock: clock}
 }

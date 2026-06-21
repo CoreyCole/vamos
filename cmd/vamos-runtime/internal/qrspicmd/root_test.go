@@ -5,6 +5,7 @@ import (
 	"errors"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestRootRequiresExplicitSubcommand(t *testing.T) {
@@ -39,9 +40,16 @@ func TestInitRequiresPlanDir(t *testing.T) {
 	err := executeForError("init")
 	assertErrorContains(t, err, "plan-dir is required")
 
-	err = executeForError("init", "--plan-dir", "thoughts/example")
-	if !errors.Is(err, ErrNotImplemented) {
-		t.Fatalf("expected ErrNotImplemented after required flags, got %v", err)
+	out := &bytes.Buffer{}
+	err = executeForErrorWithDeps(out, deps{
+		StateRoot: func() (string, error) { return t.TempDir(), nil },
+		Clock:     func() time.Time { return time.Unix(100, 123) },
+	}, "init", "--plan-dir", "thoughts/example", "--project-root", t.TempDir())
+	if err != nil {
+		t.Fatalf("init with required flags error = %v", err)
+	}
+	if !strings.Contains(out.String(), `"type":"initialized"`) {
+		t.Fatalf("init output = %q, want initialized event", out.String())
 	}
 }
 
@@ -136,8 +144,12 @@ func TestRenderPromptRequiresStateAndNode(t *testing.T) {
 }
 
 func executeForError(args ...string) error {
-	cmd := NewCommand()
-	cmd.SetOut(&bytes.Buffer{})
+	return executeForErrorWithDeps(&bytes.Buffer{}, deps{}, args...)
+}
+
+func executeForErrorWithDeps(out *bytes.Buffer, d deps, args ...string) error {
+	cmd := newCommand(d)
+	cmd.SetOut(out)
 	cmd.SetErr(&bytes.Buffer{})
 	cmd.SetArgs(args)
 	return cmd.Execute()
