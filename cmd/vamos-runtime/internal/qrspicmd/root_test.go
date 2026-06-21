@@ -3,6 +3,7 @@ package qrspicmd
 import (
 	"bytes"
 	"errors"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -137,9 +138,18 @@ func TestRenderPromptRequiresStateAndNode(t *testing.T) {
 		})
 	}
 
-	err := executeForError("render-prompt", "--state-file", "/tmp/state.json", "--node", "design", "--plan-dir", "thoughts/example")
-	if !errors.Is(err, ErrNotImplemented) {
-		t.Fatalf("expected ErrNotImplemented after required flags, got %v", err)
+	dir := t.TempDir()
+	stateFile := filepath.Join(dir, "state.json")
+	if err := (FileStateStore{}).Save(stateFile, ManagerState{SourceCwd: dir, Workflow: testWorkflowState(t, "design", nil)}); err != nil {
+		t.Fatal(err)
+	}
+	out := &bytes.Buffer{}
+	err := executeForErrorWithDeps(out, deps{}, "render-prompt", "--state-file", stateFile, "--node", "design", "--plan-dir", "thoughts/example")
+	if err != nil {
+		t.Fatalf("render-prompt with required flags error = %v", err)
+	}
+	if !strings.Contains(out.String(), ".pi/skills/q-design/SKILL.md") {
+		t.Fatalf("render-prompt output = %q", out.String())
 	}
 }
 

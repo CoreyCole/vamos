@@ -283,8 +283,37 @@ func RunRenderPrompt(ctx context.Context, opts RenderPromptOptions, d deps, out 
 	if strings.TrimSpace(opts.PlanDir) == "" {
 		return errors.New("plan-dir is required")
 	}
-	ensureWriter(out)
-	return ErrNotImplemented
+	_ = ctx
+	out = ensureWriter(out)
+	store := stateStore(d, "", time.Now)
+	state, err := store.Load(opts.StateFile)
+	if err != nil {
+		return err
+	}
+	def, err := Definition()
+	if err != nil {
+		return err
+	}
+	node, ok := def.Nodes[wruntime.NodeID(opts.NodeID)]
+	if !ok {
+		return fmt.Errorf("node %q is not in QRSPI definition", opts.NodeID)
+	}
+	manifest, err := LoadManifest(state.SourceCwd)
+	if err != nil {
+		return err
+	}
+	prompt, err := RenderStagePrompt(PromptContext{
+		Node:       node,
+		State:      state,
+		PlanDir:    opts.PlanDir,
+		Manifest:   manifest,
+		LastResult: state.Workflow.LastResult,
+	})
+	if err != nil {
+		return err
+	}
+	_, err = io.WriteString(out, prompt)
+	return err
 }
 
 func ensureWriter(out io.Writer) io.Writer {
