@@ -27,6 +27,7 @@ type Options struct {
 	SeedBundleDir   string
 	Runner          Runner
 	WorkflowStarter WorkflowStarter
+	AIGenerator     AIGenerator
 	Notifier        Notifier
 }
 
@@ -140,12 +141,12 @@ func (s *Service) SubmitPrompt(ctx context.Context, req PromptRequest) (PromptAc
 	if isActive(session.State) && session.ActiveRunID != "" {
 		return PromptAccepted{SessionID: session.ID, RunID: session.ActiveRunID, State: session.State}, nil
 	}
-	runID := ""
-	if s.opts.WorkflowStarter != nil {
-		runID, err = s.opts.WorkflowStarter.StartPickleballSelfModify(ctx, req)
-		if err != nil {
-			return PromptAccepted{}, err
-		}
+	if s.opts.WorkflowStarter == nil {
+		return PromptAccepted{}, fmt.Errorf("pickleball self-modify workflow is disabled")
+	}
+	runID, err := s.opts.WorkflowStarter.StartPickleballSelfModify(ctx, req)
+	if err != nil {
+		return PromptAccepted{}, err
 	}
 	session.State = AppStateGenerating
 	session.ActiveRunID = runID

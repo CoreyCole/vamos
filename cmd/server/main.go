@@ -1328,7 +1328,22 @@ func main() {
 			"Agent Chat workspace sync degraded: Temporal unavailable or disabled; workspace data remains DB-only until sync runs",
 		)
 	}
+	var pickleballWorkflowStarter pickleball.WorkflowStarter
+	if temporalManager != nil {
+		pickleballWorkflowStarter = pickleball.NewTemporalWorkflowStarter(temporalManager.Client())
+	}
+	pickleballService, err := pickleball.NewService(pickleball.Options{
+		ThoughtsRoot:    cfg.MarkdownBasePath,
+		SeedBundleDir:   filepath.Join("examples", "pickleball", "seed-bundle"),
+		WorkflowStarter: pickleballWorkflowStarter,
+		AIGenerator:     pickleball.PromptPatchGenerator{},
+	})
+	if err != nil {
+		log.Fatal("Failed to initialize pickleball example service:", err)
+	}
 	if goWorker != nil {
+		goWorker.RegisterWorkflow(pickleball.SelfModifyWorkflow)
+		goWorker.RegisterActivity(&pickleball.SelfModifyActivities{Service: pickleballService})
 		go func() {
 			if err := goWorker.Run(runtimeCtx); err != nil {
 				log.Printf("Go worker error: %v", err)
@@ -1536,13 +1551,6 @@ func main() {
 	// `/` redirects there as app-root convenience.
 	registerAgentChatEntryRoutes(e, authMiddleware, agentChatHandler, markdownService)
 
-	pickleballService, err := pickleball.NewService(pickleball.Options{
-		ThoughtsRoot:  cfg.MarkdownBasePath,
-		SeedBundleDir: filepath.Join("examples", "pickleball", "seed-bundle"),
-	})
-	if err != nil {
-		log.Fatal("Failed to initialize pickleball example service:", err)
-	}
 	pickleballService.RegisterRoutes(e, authMiddleware)
 
 	// Protected form routes - require authentication

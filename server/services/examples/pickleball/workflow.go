@@ -2,15 +2,30 @@ package pickleball
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 
 	"github.com/CoreyCole/vamos/pkg/agents/generatedgo"
+	temporalmgr "github.com/CoreyCole/vamos/pkg/agents/temporal"
+	"go.temporal.io/api/enums/v1"
+	"go.temporal.io/api/serviceerror"
+	"go.temporal.io/sdk/client"
+	"go.temporal.io/sdk/temporal"
+	"go.temporal.io/sdk/workflow"
 )
 
-const WorkflowPickleballSelfModify = "pickleball-self-modify"
+const (
+	WorkflowPickleballSelfModify    = "pickleball-self-modify"
+	ActivityPickleballRunAIEdits    = "RunAIEdits"
+	ActivityPickleballBuildSnapshot = "BuildAndSnapshot"
+	generatedBuildIDTimestampLayout = "20060102-150405"
+	maxPromptSummaryLength          = 96
+)
 
 type AIGenerateInput struct {
 	SessionID     string
@@ -21,6 +36,138 @@ type AIGenerateInput struct {
 
 type AIGenerator interface {
 	ApplyPrompt(ctx context.Context, input AIGenerateInput) error
+}
+
+type SelfModifyWorkflowInput struct {
+	SessionID string
+	Prompt    string
+	UserEmail string
+}
+
+type SelfModifyActivities struct {
+	Service *Service
+}
+
+type temporalWorkflowStarter struct {
+	client client.Client
+}
+
+type generatedRunner struct{}
+
+func NewTemporalWorkflowStarter(c client.Client) WorkflowStarter {
+	return temporalWorkflowStarter{client: c}
+}
+
+func (s temporalWorkflowStarter) StartPickleballSelfModify(ctx context.Context, req PromptRequest) (string, error) {
+	if s.client == nil {
+		return "", fmt.Errorf("temporal client is required")
+	}
+	now := time.Now().UTC()
+	runID := fmt.Sprintf("%s-%d", now.Format(generatedBuildIDTimestampLayout), now.UnixNano())
+	workflowID := fmt.Sprintf("%s:%s:%s", WorkflowPickleballSelfModify, cleanWorkflowIDPart(req.SessionID), runID)
+	run, err := s.client.ExecuteWorkflow(ctx, client.StartWorkflowOptions{
+		ID:                    workflowID,
+		TaskQueue:             temporalmgr.GoTaskQueue,
+		WorkflowIDReusePolicy: enums.WORKFLOW_ID_REUSE_POLICY_ALLOW_DUPLICATE_FAILED_ONLY,
+	}, SelfModifyWorkflow, SelfModifyWorkflowInput{SessionID: req.SessionID, Prompt: req.Prompt, UserEmail: req.UserEmail})
+	if err != nil {
+		var alreadyStarted *serviceerror.WorkflowExecutionAlreadyStarted
+		if errors.As(err, &alreadyStarted) {
+			return "", nil
+		}
+		return "", fmt.Errorf("start pickleball workflow: %w", err)
+	}
+	return run.GetRunID(), nil
+}
+
+func SelfModifyWorkflow(ctx workflow.Context, input SelfModifyWorkflowInput) error {
+	editCtx := workflow.WithActivityOptions(ctx, workflow.ActivityOptions{
+		StartToCloseTimeout: 30 * time.Minute,
+		HeartbeatTimeout:    time.Minute,
+		RetryPolicy:         &temporal.RetryPolicy{MaximumAttempts: 1},
+	})
+	if err := workflow.ExecuteActivity(editCtx, ActivityPickleballRunAIEdits, input).Get(editCtx, nil); err != nil {
+		return err
+	}
+
+	buildCtx := workflow.WithActivityOptions(ctx, workflow.ActivityOptions{
+		StartToCloseTimeout: 5 * time.Minute,
+		RetryPolicy:         &temporal.RetryPolicy{MaximumAttempts: 1},
+	})
+	return workflow.ExecuteActivity(buildCtx, ActivityPickleballBuildSnapshot, input).Get(buildCtx, nil)
+}
+
+func (a *SelfModifyActivities) RunAIEdits(ctx context.Context, input SelfModifyWorkflowInput) error {
+	if a == nil || a.Service == nil {
+		return fmt.Errorf("pickleball service is required")
+	}
+	session, err := a.Service.store.LoadSession(ctx, input.SessionID)
+	if err != nil {
+		return err
+	}
+	if err := SeedOrUpdateGeneratedWorkspace(ctx, session, a.Service.opts.SeedBundleDir); err != nil {
+		return err
+	}
+	history, err := a.Service.SnapshotHistoryForPrompt(ctx, session.ID)
+	if err != nil {
+		return err
+	}
+	generator := a.Service.opts.AIGenerator
+	if generator == nil {
+		generator = PromptPatchGenerator{}
+	}
+	return generator.ApplyPrompt(ctx, AIGenerateInput{SessionID: session.ID, Prompt: input.Prompt, WorkspacePath: session.WorkspacePath, History: history})
+}
+
+func (a *SelfModifyActivities) BuildAndSnapshot(ctx context.Context, input SelfModifyWorkflowInput) error {
+	if a == nil || a.Service == nil {
+		return fmt.Errorf("pickleball service is required")
+	}
+	svc := a.Service
+	session, err := svc.markBuilding(ctx, input.SessionID)
+	if err != nil {
+		return err
+	}
+	buildID := newBuildID(input.Prompt)
+	outputDir, err := os.MkdirTemp("", "vamos-pickleball-output-*")
+	if err != nil {
+		_ = svc.MarkFailed(ctx, session.ID, err, "")
+		return fmt.Errorf("create generated output dir: %w", err)
+	}
+	defer os.RemoveAll(outputDir)
+
+	runner := svc.runner
+	if runner == nil {
+		runner = generatedRunner{}
+	}
+	result, err := runner.BuildAndRun(ctx, BuildOneShotRunnerInput(session, buildID, outputDir))
+	if err != nil {
+		_ = svc.MarkFailed(ctx, session.ID, err, result.StdoutTail+result.StderrTail)
+		return err
+	}
+
+	snapshotRel := pathJoinSlash(svc.opts.ExampleRoot, "sessions", session.ID, "snapshots", buildID)
+	snapshotAbs := filepath.Join(svc.store.Root(), "sessions", session.ID, "snapshots", buildID)
+	snapshotResult, err := generatedgo.CopySnapshot(generatedgo.SnapshotInput{
+		SourceDir:   session.WorkspacePath,
+		OutputDir:   outputDir,
+		SnapshotDir: snapshotAbs,
+		Allowlist:   []string{"app.html", "results.csv", "manifest.json"},
+	})
+	if err != nil {
+		_ = svc.MarkFailed(ctx, session.ID, err, result.StdoutTail+result.StderrTail)
+		return err
+	}
+	result.SourceHash = snapshotResult.SourceHash
+	for key, hash := range snapshotResult.ArtifactHashes {
+		result.ArtifactHashes[key] = hash
+	}
+	snapshot := BuildSnapshotFromRunner(session, result, snapshotRel)
+	if err := svc.PromoteSnapshot(ctx, session.ID, snapshot); err != nil {
+		_ = svc.MarkFailed(ctx, session.ID, err, result.StdoutTail+result.StderrTail)
+		return err
+	}
+	return nil
 }
 
 func BuildAIPrompt(req PromptRequest, history []BuildSnapshot) string {
@@ -95,6 +242,25 @@ func BuildSnapshotFromRunner(session PickleballSession, result generatedgo.Runne
 	}
 }
 
+func (g generatedRunner) BuildAndRun(ctx context.Context, input generatedgo.RunnerInput) (generatedgo.RunnerResult, error) {
+	return generatedgo.BuildAndRun(ctx, input)
+}
+
+func (s *Service) markBuilding(ctx context.Context, sessionID string) (PickleballSession, error) {
+	session, err := s.store.LoadSession(ctx, sessionID)
+	if err != nil {
+		return PickleballSession{}, err
+	}
+	session.State = AppStateBuilding
+	session.ErrorMessage = ""
+	session.LogTail = ""
+	if err := s.store.SaveSession(ctx, session); err != nil {
+		return PickleballSession{}, err
+	}
+	s.notify(session.ID)
+	return session, nil
+}
+
 func pathJoinSlash(parts ...string) string {
 	clean := make([]string, 0, len(parts))
 	for _, part := range parts {
@@ -104,4 +270,83 @@ func pathJoinSlash(parts ...string) string {
 		}
 	}
 	return filepath.ToSlash(filepath.Join(clean...))
+}
+
+func newBuildID(prompt string) string {
+	slug := strings.ToLower(regexp.MustCompile(`[^a-zA-Z0-9]+`).ReplaceAllString(strings.TrimSpace(prompt), "-"))
+	slug = strings.Trim(slug, "-")
+	if slug == "" {
+		slug = "build"
+	}
+	if len(slug) > 32 {
+		slug = strings.Trim(slug[:32], "-")
+	}
+	return fmt.Sprintf("%s_%s", time.Now().UTC().Format(generatedBuildIDTimestampLayout), slug)
+}
+
+func cleanWorkflowIDPart(value string) string {
+	value = regexp.MustCompile(`[^a-zA-Z0-9_-]+`).ReplaceAllString(strings.TrimSpace(value), "-")
+	value = strings.Trim(value, "-")
+	if value == "" {
+		return "default"
+	}
+	return value
+}
+
+func promptSummary(prompt string) string {
+	prompt = strings.Join(strings.Fields(prompt), " ")
+	if prompt == "" {
+		return "Prompted pickleball app update"
+	}
+	if len(prompt) > maxPromptSummaryLength {
+		return strings.TrimSpace(prompt[:maxPromptSummaryLength-1]) + "…"
+	}
+	return prompt
+}
+
+// PromptPatchGenerator is the built-in local edit adapter for the reusable demo.
+// Hosts can replace it with an Agent Chat/Pi-backed generator through Options.
+type PromptPatchGenerator struct{}
+
+func (PromptPatchGenerator) ApplyPrompt(ctx context.Context, input AIGenerateInput) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	mainPath := filepath.Join(input.WorkspacePath, "main.go")
+	data, err := os.ReadFile(mainPath)
+	if err != nil {
+		return fmt.Errorf("read generated bundle: %w", err)
+	}
+	source := string(data)
+	changes := []struct{ old, new string }{
+		{`PromptSummary: "Seed balanced matchup generator",`, fmt.Sprintf("PromptSummary: %q,", promptSummary(input.Prompt))},
+		{`Reason: "Balanced total skill by pairing high+low.",`, fmt.Sprintf("Reason: %q,", reasonForPrompt(input.Prompt))},
+	}
+	for _, change := range changes {
+		if strings.Contains(source, change.old) {
+			source = strings.Replace(source, change.old, change.new, 1)
+		}
+	}
+	if strings.Contains(strings.ToLower(input.Prompt), "color") {
+		source = strings.ReplaceAll(source, "#0f766e", "#7c3aed")
+		source = strings.ReplaceAll(source, "#14b8a6", "#f97316")
+	}
+	if err := os.WriteFile(mainPath, []byte(source), 0o644); err != nil {
+		return fmt.Errorf("write generated bundle: %w", err)
+	}
+	return nil
+}
+
+func reasonForPrompt(prompt string) string {
+	lower := strings.ToLower(prompt)
+	switch {
+	case strings.Contains(lower, "partner"):
+		return "Prompt update: prefer fresh partner pairings while keeping games close."
+	case strings.Contains(lower, "skill"):
+		return "Prompt update: show skill totals clearly while balancing each court."
+	case strings.Contains(lower, "csv"):
+		return "Prompt update: keep CSV-friendly matchup explanations for review."
+	default:
+		return "Prompt update: generated bundle changed from the latest user request."
+	}
 }
