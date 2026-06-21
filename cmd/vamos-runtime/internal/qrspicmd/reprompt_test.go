@@ -187,9 +187,13 @@ func TestContinueInvalidResultRepromptsSameActiveChild(t *testing.T) {
 		t.Fatalf("retry state = count %d attempt %d, want 1/1", loaded.ActiveChild.ValidationRetryCount, loaded.ActiveChild.LastRepromptAttempt)
 	}
 
-	err = RunContinue(t.Context(), ContinueOptions{StateFile: stateFile}, deps{Tmux: tmux, Runner: runner}, &strings.Builder{})
-	if err == nil {
-		t.Fatalf("expected retry exhaustion error")
+	var exhaustedOut strings.Builder
+	err = RunContinue(t.Context(), ContinueOptions{StateFile: stateFile}, deps{Tmux: tmux, Runner: runner}, &exhaustedOut)
+	if err != nil {
+		t.Fatalf("RunContinue retry exhaustion error = %v", err)
+	}
+	if !strings.Contains(exhaustedOut.String(), "retry: exhausted") || !strings.Contains(exhaustedOut.String(), "guidance: Inspect child output/artifacts") {
+		t.Fatalf("retry exhaustion output = %q", exhaustedOut.String())
 	}
 	if len(tmux.pastes) != 1 {
 		t.Fatalf("duplicate reprompt pasted: %#v", tmux.pastes)

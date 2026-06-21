@@ -56,6 +56,37 @@ type StartNextResult struct {
 	FeedbackCommand string
 }
 
+type ManagerNotice struct {
+	Kind            string `json:"kind,omitempty"`
+	Validated       bool   `json:"validated"`
+	ManagerNeeded   bool   `json:"managerNeeded"`
+	RetryExhausted  bool   `json:"retryExhausted"`
+	StateFile       string `json:"stateFile,omitempty"`
+	Stage           string `json:"stage,omitempty"`
+	Status          string `json:"status,omitempty"`
+	Outcome         string `json:"outcome,omitempty"`
+	Artifact        string `json:"artifact,omitempty"`
+	ChildPane       string `json:"childPane,omitempty"`
+	Summary         string `json:"summary,omitempty"`
+	ManagerGuidance string `json:"managerGuidance,omitempty"`
+	NextCommand     string `json:"nextCommand,omitempty"`
+	FeedbackCommand string `json:"feedbackCommand,omitempty"`
+}
+
+type ValidationRecoveryLog struct {
+	Timestamp        time.Time `json:"timestamp"`
+	StateFile        string    `json:"stateFile,omitempty"`
+	PlanDir          string    `json:"planDir,omitempty"`
+	CurrentNode      string    `json:"currentNode,omitempty"`
+	ActiveChildStage string    `json:"activeChildStage,omitempty"`
+	ResultStage      string    `json:"resultStage,omitempty"`
+	ResultStatus     string    `json:"resultStatus,omitempty"`
+	ResultOutcome    string    `json:"resultOutcome,omitempty"`
+	Recovered        bool      `json:"recovered"`
+	RecoveryAction   string    `json:"recoveryAction,omitempty"`
+	Reason           string    `json:"reason,omitempty"`
+}
+
 type PromptFileOptions struct {
 	StateFile string
 	NodeID    string

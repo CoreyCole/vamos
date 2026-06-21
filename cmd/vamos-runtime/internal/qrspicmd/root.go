@@ -406,10 +406,38 @@ func applyLatestResultSeed(state *ManagerState, resultText string) (*ParsedDecis
 }
 
 func writeStartNextOutput(out io.Writer, result StartNextResult, mode string) error {
+	notice := startNextNotice(result)
 	if strings.EqualFold(mode, "ndjson") {
-		return WriteNDJSON(out, Event{Type: "start_next", Ref: startNextRef(result)})
+		return writeManagerNotice(out, notice, mode)
 	}
 	return writeStartNextText(out, result)
+}
+
+func startNextNotice(result StartNextResult) ManagerNotice {
+	notice := ManagerNotice{
+		Kind:            "launched",
+		StateFile:       result.StateFile,
+		Stage:           result.CurrentNode,
+		Summary:         result.StopReason,
+		NextCommand:     result.NextCommand,
+		FeedbackCommand: result.FeedbackCommand,
+	}
+	if result.ActiveChild != nil {
+		notice.ChildPane = result.ActiveChild.TmuxPaneID
+		if notice.Stage == "" {
+			notice.Stage = result.ActiveChild.Stage
+		}
+	}
+	if result.ActiveChild != nil && result.StopReason == "active child already running" {
+		notice.Kind = "active_child"
+		notice.Summary = "active child already running; do not launch duplicate child"
+	}
+	if result.StopReason != "" && result.ActiveChild == nil {
+		notice.Kind = "validated"
+		notice.Validated = true
+		notice.ManagerNeeded = true
+	}
+	return notice
 }
 
 func writeStartNextText(out io.Writer, result StartNextResult) error {
@@ -487,6 +515,133 @@ func continueCommand(stateFile string) string {
 
 func feedbackCommand(stateFile string) string {
 	return fmt.Sprintf("vamos qrspi steer-child --state-file %s --feedback-file <file>", stateFile)
+}
+
+func debugCommandForState(stateFile string, action string) string {
+	action = strings.TrimSpace(action)
+	if action == "" {
+		action = "continue"
+	}
+	return fmt.Sprintf("vamos qrspi %s --state-file %s", action, stateFile)
+}
+
+func writeManagerNotice(out io.Writer, notice ManagerNotice, mode string) error {
+	if strings.EqualFold(mode, "ndjson") {
+		return WriteNDJSON(out, Event{Type: "manager_notice", Ref: noticeRef(notice)})
+	}
+	if notice.Validated {
+		if _, err := fmt.Fprintf(out, "validated: %s %s\n", notice.Stage, notice.Status); err != nil {
+			return err
+		}
+		if notice.Outcome != "" {
+			if _, err := fmt.Fprintf(out, "outcome: %s\n", notice.Outcome); err != nil {
+				return err
+			}
+		}
+	}
+	if notice.Artifact != "" {
+		if _, err := fmt.Fprintf(out, "artifact: %s\n", notice.Artifact); err != nil {
+			return err
+		}
+	}
+	if notice.ChildPane != "" && notice.Kind == "active_child" {
+		if _, err := fmt.Fprintf(out, "active child: %s (%s)\n", notice.Stage, notice.ChildPane); err != nil {
+			return err
+		}
+	}
+	if notice.RetryExhausted {
+		if _, err := fmt.Fprintln(out, "retry: exhausted"); err != nil {
+			return err
+		}
+	}
+	if notice.Summary != "" {
+		if _, err := fmt.Fprintf(out, "stop: %s\n", notice.Summary); err != nil {
+			return err
+		}
+	}
+	if notice.ManagerGuidance != "" {
+		if _, err := fmt.Fprintf(out, "guidance: %s\n", notice.ManagerGuidance); err != nil {
+			return err
+		}
+	}
+	if notice.NextCommand != "" {
+		if _, err := fmt.Fprintf(out, "next: %s\n", notice.NextCommand); err != nil {
+			return err
+		}
+	}
+	if notice.FeedbackCommand != "" {
+		if _, err := fmt.Fprintf(out, "feedback: %s\n", notice.FeedbackCommand); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func noticeRef(notice ManagerNotice) map[string]any {
+	ref := map[string]any{
+		"kind":           notice.Kind,
+		"validated":      notice.Validated,
+		"managerNeeded":  notice.ManagerNeeded,
+		"retryExhausted": notice.RetryExhausted,
+	}
+	if notice.StateFile != "" {
+		ref["stateFile"] = notice.StateFile
+	}
+	if notice.Stage != "" {
+		ref["stage"] = notice.Stage
+	}
+	if notice.Status != "" {
+		ref["status"] = notice.Status
+	}
+	if notice.Outcome != "" {
+		ref["outcome"] = notice.Outcome
+	}
+	if notice.Artifact != "" {
+		ref["artifact"] = notice.Artifact
+	}
+	if notice.ChildPane != "" {
+		ref["childPane"] = notice.ChildPane
+	}
+	if notice.Summary != "" {
+		ref["summary"] = notice.Summary
+	}
+	if notice.ManagerGuidance != "" {
+		ref["managerGuidance"] = notice.ManagerGuidance
+	}
+	if notice.NextCommand != "" {
+		ref["nextCommand"] = notice.NextCommand
+	}
+	if notice.FeedbackCommand != "" {
+		ref["feedbackCommand"] = notice.FeedbackCommand
+	}
+	return ref
+}
+
+func appendValidationRecoveryLog(stateFile string, entry ValidationRecoveryLog) error {
+	stateFile = strings.TrimSpace(stateFile)
+	if stateFile == "" {
+		return nil
+	}
+	if entry.Timestamp.IsZero() {
+		entry.Timestamp = time.Now()
+	}
+	path := filepath.Join(filepath.Dir(stateFile), "validation-recoveries.jsonl")
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return err
+	}
+	file, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+	data, err := json.Marshal(entry)
+	if err != nil {
+		return err
+	}
+	if _, err := file.Write(append(data, '\n')); err != nil {
+		return err
+	}
+	return nil
 }
 
 func planDirForStart(state ManagerState, opts StartNextOptions) string {
@@ -859,6 +1014,10 @@ func RunContinue(ctx context.Context, opts ContinueOptions, d deps, out io.Write
 			result.StopReason = "invalid result; reprompted active child"
 			return writeContinueOutput(out, opts, result)
 		}
+		if isRetryExhaustedValidationError(state, opts, err) {
+			result.StopReason = err.Error()
+			return writeRetryExhaustedNotice(out, opts, state, err)
+		}
 		return err
 	}
 	result.Validated = &parsed
@@ -921,6 +1080,53 @@ func shouldRepromptAfterValidationError(state ManagerState, opts ContinueOptions
 		return false
 	}
 	return state.ActiveChild.ValidationRetryCount < invalidResultRetryLimit(state)
+}
+
+func isRetryExhaustedValidationError(state ManagerState, opts ContinueOptions, err error) bool {
+	if err == nil || state.ActiveChild == nil {
+		return false
+	}
+	if state.ActiveChild.Stage != opts.Stage {
+		return false
+	}
+	return state.ActiveChild.ValidationRetryCount >= invalidResultRetryLimit(state)
+}
+
+func writeRetryExhaustedNotice(out io.Writer, opts ContinueOptions, state ManagerState, validationErr error) error {
+	stage := strings.TrimSpace(opts.Stage)
+	if stage == "" && state.ActiveChild != nil {
+		stage = state.ActiveChild.Stage
+	}
+	pane := ""
+	attempt := invalidResultRetryLimit(state)
+	if state.ActiveChild != nil {
+		pane = state.ActiveChild.TmuxPaneID
+		attempt = state.ActiveChild.ValidationRetryCount
+	}
+	guidance := "Inspect child output/artifacts; recover or steer deterministically before asking human."
+	notice := ManagerNotice{
+		Kind:            "retry_exhausted",
+		Validated:       false,
+		ManagerNeeded:   true,
+		RetryExhausted:  true,
+		StateFile:       opts.StateFile,
+		Stage:           stage,
+		Status:          "invalid_result",
+		ChildPane:       pane,
+		Summary:         fmt.Sprintf("invalid result after retry limit (%d): %s", attempt, validationErr.Error()),
+		ManagerGuidance: guidance,
+		NextCommand:     debugCommandForState(opts.StateFile, "continue"),
+		FeedbackCommand: feedbackCommand(opts.StateFile),
+	}
+	_ = appendValidationRecoveryLog(opts.StateFile, ValidationRecoveryLog{
+		StateFile:        opts.StateFile,
+		PlanDir:          opts.PlanDir,
+		CurrentNode:      string(state.Workflow.CurrentNodeID),
+		ActiveChildStage: stage,
+		Recovered:        false,
+		Reason:           validationErr.Error(),
+	})
+	return writeManagerNotice(out, notice, opts.Output)
 }
 
 func continueReprompt(ctx context.Context, state ManagerState, opts ContinueOptions, d deps, out io.Writer, validationErr error) error {
@@ -1077,8 +1283,22 @@ func writeContinueText(out io.Writer, result ContinueResult) error {
 	}
 	if result.StopReason != "" && result.StartedChild == nil {
 		fmt.Fprintf(out, "stop: %s\n", result.StopReason)
+		if result.Validated != nil && managerGuidanceForStatus(string(result.Validated.Result.Status)) != "" {
+			fmt.Fprintf(out, "guidance: %s\n", managerGuidanceForStatus(string(result.Validated.Result.Status)))
+		}
 	}
 	return nil
+}
+
+func managerGuidanceForStatus(status string) string {
+	switch strings.ToLower(strings.TrimSpace(status)) {
+	case "blocked", "error":
+		return "diagnose child artifact/session first; steer or continue if deterministic; ask human only for judgment or authority."
+	case "invalid_result":
+		return "inspect child output/artifacts; recover or steer deterministically before asking human."
+	default:
+		return ""
+	}
 }
 
 func continueRef(result ContinueResult) map[string]any {
@@ -1087,6 +1307,10 @@ func continueRef(result ContinueResult) map[string]any {
 		ref["validated"] = true
 		ref["stage"] = result.Validated.Result.SourceNodeID
 		ref["status"] = result.Validated.Result.Status
+		if guidance := managerGuidanceForStatus(string(result.Validated.Result.Status)); guidance != "" {
+			ref["managerNeeded"] = true
+			ref["managerGuidance"] = guidance
+		}
 	}
 	if result.WaitingHuman {
 		ref["managerNeeded"] = true

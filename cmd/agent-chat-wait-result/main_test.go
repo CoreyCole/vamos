@@ -57,6 +57,22 @@ func TestConsumeSSEStoppedWithoutYAML(t *testing.T) {
 	}
 }
 
+func TestConsumeSSEIgnoresHeaderNoiseUntilTerminalPatch(t *testing.T) {
+	fixture := "event: datastar-patch-elements\n" +
+		sseData("HTTP/2 200 response headers\ncontent-type: text/event-stream\nrun-1 complete") + "\n" +
+		"event: datastar-patch-elements\n" +
+		sseData("<div id=\"agent-chat-run-session-panel\"><p>run-1</p><p>running</p></div>") + "\n" +
+		"event: datastar-patch-elements\n" +
+		sseData("<div id=\"agent-chat-run-session-panel\"><p>run-1</p><p>complete</p><pre>"+validYAML("design")+"</pre></div>") + "\n"
+	result := consumeFixture(t, fixture, options{run: "run-1", stage: "design"})
+	if result.ExitCode != exitOK {
+		t.Fatalf("ExitCode = %d, diagnostic = %s", result.ExitCode, result.Diagnostic)
+	}
+	if strings.Contains(strings.ToLower(result.Result), "response headers") {
+		t.Fatalf("stdout leaked header noise: %s", result.Result)
+	}
+}
+
 func TestConsumeSSEMalformedYAML(t *testing.T) {
 	result := consumeFixture(
 		t,

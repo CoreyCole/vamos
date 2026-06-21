@@ -467,6 +467,29 @@ func TestContinueCommandInvalidResultRepromptsSameChild(t *testing.T) {
 	}
 }
 
+func TestContinueInvalidResultRetryExhaustionEmitsManagerNotice(t *testing.T) {
+	fixture := newManagerFlowFixture(t)
+	stateFile := filepath.Join(fixture.stateRoot, "retry-exhausted-state.json")
+	sessionPath := filepath.Join(fixture.dir, "retry-exhausted-session.jsonl")
+	active := &ChildRunRef{ID: "plan-child", Stage: "plan", Cwd: fixture.projectRoot, TmuxPaneID: "%old", SessionID: "plan-session", SessionDir: fixture.dir, SessionPath: sessionPath, ValidationRetryCount: 1, LastRepromptAttempt: 1}
+	state := ManagerState{RepoID: fixture.projectRoot, CanonicalPlanDir: fixture.planDir, ManagerRunID: "retry-run", SourceCwd: fixture.projectRoot, ActiveChild: active, Workflow: testWorkflowState(t, qrspi.NodePlan, nil)}
+	saveManagerState(t, stateFile, state)
+	writeSessionTestFile(t, sessionPath, sessionHeader(active.SessionID, fixture.projectRoot)+"\n"+assistantLine("HTTP/2 200 response headers, no fenced result")+"\n")
+
+	continueOut, err := executeManagerCommand(deps{Clock: fixture.clock}, "continue", "--state-file", stateFile, "--plan-dir", fixture.planDir)
+	if err != nil {
+		t.Fatalf("continue command error = %v", err)
+	}
+	for _, want := range []string{"retry: exhausted", "stop: invalid result after retry limit", "guidance: Inspect child output/artifacts", "next: vamos qrspi continue --state-file " + stateFile, "feedback: vamos qrspi steer-child --state-file " + stateFile + " --feedback-file <file>"} {
+		if !strings.Contains(continueOut, want) {
+			t.Fatalf("continue output missing %q: %q", want, continueOut)
+		}
+	}
+	if _, err := os.Stat(filepath.Join(filepath.Dir(stateFile), "validation-recoveries.jsonl")); err != nil {
+		t.Fatalf("validation recovery log missing: %v", err)
+	}
+}
+
 func TestEndToEndCommandSurface(t *testing.T) {
 	fixture := newManagerFlowFixture(t)
 	runner := &fakeChildRunner{writeResult: true}

@@ -353,6 +353,9 @@ func consumeSSE(
 				stopped = true
 			} else {
 				payload := frame.Event + "\n" + frame.Data
+				if isIgnorableStreamNoise(payload) {
+					continue
+				}
 				accumulated.WriteString("\n")
 				accumulated.WriteString(payload)
 				if isFailurePatch(payload, opts.run) {
@@ -416,6 +419,26 @@ func parseSSE(reader io.Reader, out chan<- sseFrame) error {
 	}
 	dispatch()
 	return nil
+}
+
+func isIgnorableStreamNoise(payload string) bool {
+	lower := strings.ToLower(strings.TrimSpace(html.UnescapeString(payload)))
+	if lower == "" {
+		return true
+	}
+	if strings.HasPrefix(lower, "http/") || strings.HasPrefix(lower, "http ") {
+		return true
+	}
+	if strings.Contains(lower, "response headers") || strings.Contains(lower, "request headers") {
+		return true
+	}
+	if strings.Contains(lower, "content-type:") && strings.Contains(lower, "text/event-stream") {
+		return true
+	}
+	if strings.Contains(lower, "x-request-id:") || strings.Contains(lower, "cf-ray:") {
+		return true
+	}
+	return false
 }
 
 func isStoppedPatch(payload, runID string) bool {
