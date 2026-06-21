@@ -75,7 +75,7 @@ func newRunChildCommand(d deps) *cobra.Command {
 	cmd.Flags().StringVar(&opts.StateFile, "state-file", "", "q-manager state file")
 	cmd.Flags().StringVar(&opts.Split, "split", "right", "tmux split direction")
 	cmd.Flags().StringVar(&opts.ManagerRunID, "manager-run-id", "", "manager run ID")
-	cmd.Flags().DurationVar(&opts.Timeout, "timeout", 12*time.Hour, "maximum time to wait for child result")
+	cmd.Flags().DurationVar(&opts.Timeout, "timeout", 12*time.Hour, "maximum time to wait for child done marker")
 	return cmd
 }
 
@@ -215,13 +215,17 @@ func RunChild(ctx context.Context, opts RunChildOptions, d deps, out io.Writer) 
 	childID := childRunID(opts.Stage, clock())
 	runRoot := filepath.Dir(opts.StateFile)
 	req := ChildRunRequest{
-		ID:         childID,
-		Stage:      opts.Stage,
-		Cwd:        opts.Cwd,
-		PromptFile: opts.PromptFile,
-		OutputPath: OutputPath(runRoot, childID),
-		ResultPath: ResultPath(runRoot, childID),
-		Split:      normalizeSplit(opts.Split),
+		ID:          childID,
+		Stage:       opts.Stage,
+		Cwd:         opts.Cwd,
+		PromptFile:  opts.PromptFile,
+		OutputPath:  OutputPath(runRoot, childID),
+		SessionID:   ChildSessionID(childID),
+		SessionDir:  SessionDir(runRoot, childID),
+		SessionName: fmt.Sprintf("q-manager %s %s", opts.Stage, childID),
+		DonePath:    DonePath(runRoot, childID),
+		StatusPath:  StatusPath(runRoot, childID),
+		Split:       normalizeSplit(opts.Split),
 	}
 	if err := ensureRunFiles(req); err != nil {
 		return err
@@ -231,7 +235,7 @@ func RunChild(ctx context.Context, opts RunChildOptions, d deps, out io.Writer) 
 	if err != nil {
 		return err
 	}
-	state.ActiveChild = &ChildRunRef{ID: childID, Stage: opts.Stage, Cwd: opts.Cwd, TmuxPaneID: run.Pane.ID, OutputPath: req.OutputPath, ResultPath: req.ResultPath}
+	state.ActiveChild = &ChildRunRef{ID: childID, Stage: opts.Stage, Cwd: opts.Cwd, TmuxPaneID: run.Pane.ID, OutputPath: req.OutputPath, SessionID: req.SessionID, SessionDir: req.SessionDir, DonePath: req.DonePath, StatusPath: req.StatusPath}
 	if err := store.Save(opts.StateFile, state); err != nil {
 		return err
 	}
@@ -246,8 +250,8 @@ func RunChild(ctx context.Context, opts RunChildOptions, d deps, out io.Writer) 
 	if _, err := runner.Wait(waitCtx, run); err != nil {
 		return err
 	}
-	if err := waitForResult(waitCtx, req.ResultPath, 100*time.Millisecond); err != nil {
-		return fmt.Errorf("timed out waiting for child result %s (pane %s, output %s): %w", req.ResultPath, run.Pane.ID, req.OutputPath, err)
+	if err := waitForDone(waitCtx, req.DonePath, 100*time.Millisecond); err != nil {
+		return fmt.Errorf("timed out waiting for child done marker %s (pane %s, output %s, sessionDir %s, sessionID %s): %w", req.DonePath, run.Pane.ID, req.OutputPath, req.SessionDir, req.SessionID, err)
 	}
 	return WriteNDJSON(out, Event{Type: "child_finished", Ref: childRef(state.ActiveChild)})
 }
@@ -438,7 +442,7 @@ func normalizeSplit(split string) string {
 	}
 }
 
-func waitForResult(ctx context.Context, path string, interval time.Duration) error {
+func waitForDone(ctx context.Context, path string, interval time.Duration) error {
 	if interval <= 0 {
 		interval = 100 * time.Millisecond
 	}
@@ -462,12 +466,22 @@ func childRef(ref *ChildRunRef) map[string]any {
 	if ref == nil {
 		return nil
 	}
-	return map[string]any{
+	out := map[string]any{
 		"childId":    ref.ID,
 		"stage":      ref.Stage,
 		"cwd":        ref.Cwd,
 		"tmuxPaneId": ref.TmuxPaneID,
 		"outputPath": ref.OutputPath,
-		"resultPath": ref.ResultPath,
+		"sessionId":  ref.SessionID,
+		"sessionDir": ref.SessionDir,
+		"donePath":   ref.DonePath,
+		"statusPath": ref.StatusPath,
 	}
+	if strings.TrimSpace(ref.SessionPath) != "" {
+		out["sessionPath"] = ref.SessionPath
+	}
+	if strings.TrimSpace(ref.ResultPath) != "" {
+		out["resultPath"] = ref.ResultPath
+	}
+	return out
 }

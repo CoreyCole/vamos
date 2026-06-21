@@ -16,12 +16,17 @@ type ManagerState struct {
 }
 
 type ChildRunRef struct {
-	ID         string `json:"id"`
-	Stage      string `json:"stage"`
-	Cwd        string `json:"cwd"`
-	TmuxPaneID string `json:"tmuxPaneId,omitempty"`
-	OutputPath string `json:"outputPath"`
-	ResultPath string `json:"resultPath"`
+	ID          string `json:"id"`
+	Stage       string `json:"stage"`
+	Cwd         string `json:"cwd"`
+	TmuxPaneID  string `json:"tmuxPaneId,omitempty"`
+	OutputPath  string `json:"outputPath"`
+	SessionID   string `json:"sessionId"`
+	SessionDir  string `json:"sessionDir"`
+	SessionPath string `json:"sessionPath,omitempty"`
+	DonePath    string `json:"donePath"`
+	StatusPath  string `json:"statusPath"`
+	ResultPath  string `json:"resultPath,omitempty"`
 }
 
 type LockKey struct {

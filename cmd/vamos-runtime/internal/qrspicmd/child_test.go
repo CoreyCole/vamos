@@ -11,13 +11,24 @@ import (
 	"time"
 )
 
-func TestBuildChildCommandUsesPromptOutputAndResultEnv(t *testing.T) {
-	req := ChildRunRequest{PromptFile: "/tmp/prompt.txt", OutputPath: "/tmp/output.txt", ResultPath: "/tmp/result.txt"}
+func TestBuildChildCommandUsesPromptTranscriptSessionAndDoneEnv(t *testing.T) {
+	req := ChildRunRequest{
+		PromptFile:  "/tmp/prompt.txt",
+		OutputPath:  "/tmp/output.txt",
+		SessionID:   "question-1",
+		SessionDir:  "/tmp/sessions",
+		SessionName: "q-manager question",
+		DonePath:    "/tmp/done",
+		StatusPath:  "/tmp/status.json",
+	}
 	cmd := strings.Join(BuildChildCommand(req), " ")
-	for _, want := range []string{"PROMPT_FILE=/tmp/prompt.txt", "OUTPUT_PATH=/tmp/output.txt", "RESULT_PATH=/tmp/result.txt", "pi --print", "tee"} {
+	for _, want := range []string{"PROMPT_FILE=/tmp/prompt.txt", "OUTPUT_PATH=/tmp/output.txt", "SESSION_ID=question-1", "SESSION_DIR=/tmp/sessions", "--session-id", "--session-dir", "--name", "tee", "STATUS_PATH", "DONE_PATH"} {
 		if !strings.Contains(cmd, want) {
 			t.Fatalf("command missing %q: %v", want, BuildChildCommand(req))
 		}
+	}
+	if strings.Contains(cmd, "RESULT_PATH") || strings.Contains(cmd, "cp \"$OUTPUT_PATH\"") {
+		t.Fatalf("command kept authoritative result file: %s", cmd)
 	}
 }
 
@@ -26,7 +37,10 @@ func TestResultAndOutputPathsOutsideRepo(t *testing.T) {
 	root := filepath.Join(t.TempDir(), "state")
 	result := ResultPath(root, "child")
 	output := OutputPath(root, "child")
-	for _, path := range []string{result, output} {
+	sessionDir := SessionDir(root, "child")
+	done := DonePath(root, "child")
+	status := StatusPath(root, "child")
+	for _, path := range []string{result, output, sessionDir, done, status} {
 		if !strings.HasPrefix(path, root) {
 			t.Fatalf("path %s not under state root %s", path, root)
 		}
@@ -77,14 +91,17 @@ func TestRunChildUsesImplementationCwdWhenRequestedExplicitly(t *testing.T) {
 	}
 }
 
-func TestRunChildWaitsForResultByDefault(t *testing.T) {
+func TestRunChildWaitsForDoneByDefault(t *testing.T) {
 	fixture := newRunChildFixture(t, true)
 	if err := RunChild(t.Context(), fixture.options(), deps{Clock: fixture.clock, Runner: fixture.runner}, &bytes.Buffer{}); err != nil {
 		t.Fatalf("RunChild error = %v", err)
 	}
 	state := fixture.loadState(t)
-	if _, err := os.Stat(state.ActiveChild.ResultPath); err != nil {
-		t.Fatalf("result not written: %v", err)
+	if _, err := os.Stat(state.ActiveChild.DonePath); err != nil {
+		t.Fatalf("done marker not written: %v", err)
+	}
+	if _, err := os.Stat(state.ActiveChild.StatusPath); err != nil {
+		t.Fatalf("status not written: %v", err)
 	}
 }
 
@@ -93,11 +110,11 @@ func TestRunChildTimeoutKeepsActiveChildRefs(t *testing.T) {
 	opts := fixture.options()
 	opts.Timeout = time.Nanosecond
 	err := RunChild(t.Context(), opts, deps{Clock: fixture.clock, Runner: fixture.runner}, &bytes.Buffer{})
-	if err == nil || !strings.Contains(err.Error(), "timed out waiting for child result") {
+	if err == nil || !strings.Contains(err.Error(), "timed out waiting for child done marker") {
 		t.Fatalf("expected timeout, got %v", err)
 	}
 	state := fixture.loadState(t)
-	if state.ActiveChild == nil || state.ActiveChild.ResultPath == "" || state.ActiveChild.OutputPath == "" {
+	if state.ActiveChild == nil || state.ActiveChild.DonePath == "" || state.ActiveChild.StatusPath == "" || state.ActiveChild.OutputPath == "" || state.ActiveChild.SessionID == "" || state.ActiveChild.SessionDir == "" {
 		t.Fatalf("active child refs not preserved: %+v", state.ActiveChild)
 	}
 }
@@ -119,16 +136,19 @@ type fakeChildRunner struct {
 
 func (f *fakeChildRunner) Start(ctx context.Context, req ChildRunRequest) (ChildRun, error) {
 	f.started = append(f.started, req)
-	return ChildRun{ID: req.ID, Pane: TmuxPane{ID: "%9"}, OutputPath: req.OutputPath, ResultPath: req.ResultPath}, nil
+	return ChildRun{ID: req.ID, Pane: TmuxPane{ID: "%9"}, OutputPath: req.OutputPath, SessionID: req.SessionID, SessionDir: req.SessionDir, DonePath: req.DonePath, StatusPath: req.StatusPath}, nil
 }
 
 func (f *fakeChildRunner) Wait(ctx context.Context, run ChildRun) (ChildRunResult, error) {
 	if f.writeResult {
-		if err := os.WriteFile(run.ResultPath, []byte("result"), 0o644); err != nil {
+		if err := os.WriteFile(run.StatusPath, []byte(`{"exitCode":0,"finishedAt":"1970-01-01T00:00:00Z"}`), 0o644); err != nil {
+			return ChildRunResult{}, err
+		}
+		if err := os.WriteFile(run.DonePath, []byte(""), 0o644); err != nil {
 			return ChildRunResult{}, err
 		}
 	}
-	return ChildRunResult{ID: run.ID, OutputPath: run.OutputPath, ResultPath: run.ResultPath}, nil
+	return ChildRunResult{ID: run.ID, OutputPath: run.OutputPath, SessionID: run.SessionID, SessionDir: run.SessionDir, DonePath: run.DonePath, StatusPath: run.StatusPath}, nil
 }
 
 type runChildFixture struct {

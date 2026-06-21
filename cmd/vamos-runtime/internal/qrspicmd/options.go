@@ -59,7 +59,7 @@ type StateStore interface {
 	AcquireLock(ctx context.Context, key LockKey, owner string, ttl time.Duration) (Lock, error)
 }
 
-// ChildRunner starts visible child QRSPI sessions and observes their result file.
+// ChildRunner starts visible child QRSPI sessions and observes their done marker/session refs.
 type ChildRunner interface {
 	Start(ctx context.Context, req ChildRunRequest) (ChildRun, error)
 	Wait(ctx context.Context, run ChildRun) (ChildRunResult, error)
