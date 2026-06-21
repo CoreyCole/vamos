@@ -9,21 +9,22 @@ import (
 )
 
 type ChildRunRequest struct {
-	ID            string
-	Stage         string
-	Cwd           string
-	PromptFile    string
-	OutputPath    string
-	SessionID     string
-	SessionDir    string
-	SessionName   string
-	DonePath      string
-	StatusPath    string
-	Split         string
-	ParentPaneID  string
-	StateFile     string
-	PlanDir       string
-	ExtensionPath string
+	ID                   string
+	Stage                string
+	Cwd                  string
+	PromptFile           string
+	OutputPath           string
+	SessionID            string
+	SessionDir           string
+	SessionName          string
+	DonePath             string
+	StatusPath           string
+	ValidationStatusPath string
+	Split                string
+	ParentPaneID         string
+	StateFile            string
+	PlanDir              string
+	ExtensionPath        string
 }
 
 type ChildRun struct {
@@ -87,6 +88,9 @@ func DonePath(root, childID string) string {
 func StatusPath(root, childID string) string {
 	return filepath.Join(root, "runs", childID, "status.json")
 }
+func ValidationStatusPath(root, childID string) string {
+	return filepath.Join(root, "runs", childID, "validation-status.json")
+}
 func ChildSessionID(childID string) string {
 	clean := strings.NewReplacer("/", "-", " ", "-", "_", "-").Replace(strings.TrimSpace(childID))
 	clean = strings.Trim(clean, "-.")
@@ -136,6 +140,8 @@ exit "$status"`
 		"Q_MANAGER_CHILD_ID=" + req.ID,
 		"Q_MANAGER_DONE_PATH=" + req.DonePath,
 		"Q_MANAGER_STATUS_PATH=" + req.StatusPath,
+		"Q_MANAGER_VALIDATED_STATUS_PATH=" + req.ValidationStatusPath,
+		"Q_MANAGER_WAKE_MODE=validated-only",
 		"Q_MANAGER_SESSION_ID=" + req.SessionID,
 		"Q_MANAGER_SESSION_DIR=" + req.SessionDir,
 		"Q_MANAGER_CHILD_EXTENSION=" + req.ExtensionPath,
@@ -168,7 +174,7 @@ func (r TmuxChildRunner) Wait(ctx context.Context, run ChildRun) (ChildRunResult
 }
 
 func ensureRunFiles(req ChildRunRequest) error {
-	for _, dir := range []string{filepath.Dir(req.OutputPath), req.SessionDir, filepath.Dir(req.DonePath), filepath.Dir(req.StatusPath)} {
+	for _, dir := range []string{filepath.Dir(req.OutputPath), req.SessionDir, filepath.Dir(req.DonePath), filepath.Dir(req.StatusPath), filepath.Dir(req.ValidationStatusPath)} {
 		if err := os.MkdirAll(dir, 0o755); err != nil {
 			return err
 		}

@@ -14,22 +14,23 @@ import (
 
 func TestBuildChildCommandUsesInteractivePiSessionAndDoneEnv(t *testing.T) {
 	req := ChildRunRequest{
-		ID:            "child-1",
-		Stage:         "question-1",
-		PromptFile:    "/tmp/prompt.txt",
-		OutputPath:    "/tmp/output.txt",
-		SessionID:     "question-1",
-		SessionDir:    "/tmp/sessions",
-		SessionName:   "q-manager question",
-		DonePath:      "/tmp/done",
-		StatusPath:    "/tmp/status.json",
-		ParentPaneID:  "%18",
-		StateFile:     "/tmp/state.json",
-		PlanDir:       "thoughts/example",
-		ExtensionPath: "/tmp/q_manager_child_extension.js",
+		ID:                   "child-1",
+		Stage:                "question-1",
+		PromptFile:           "/tmp/prompt.txt",
+		OutputPath:           "/tmp/output.txt",
+		SessionID:            "question-1",
+		SessionDir:           "/tmp/sessions",
+		SessionName:          "q-manager question",
+		DonePath:             "/tmp/done",
+		StatusPath:           "/tmp/status.json",
+		ValidationStatusPath: "/tmp/validation-status.json",
+		ParentPaneID:         "%18",
+		StateFile:            "/tmp/state.json",
+		PlanDir:              "thoughts/example",
+		ExtensionPath:        "/tmp/q_manager_child_extension.js",
 	}
 	cmd := strings.Join(BuildChildCommand(req), " ")
-	for _, want := range []string{"PROMPT_FILE=/tmp/prompt.txt", "OUTPUT_PATH=/tmp/output.txt", "SESSION_ID=question-1", "SESSION_DIR=/tmp/sessions", "Q_MANAGER_PARENT_PANE=%18", "Q_MANAGER_STATE_FILE=/tmp/state.json", "Q_MANAGER_PLAN_DIR=thoughts/example", "Q_MANAGER_STAGE=question-1", "Q_MANAGER_CHILD_ID=child-1", "Q_MANAGER_CHILD_EXTENSION=/tmp/q_manager_child_extension.js", "--extension", "--session-id", "--session-dir", "--name", "@$PROMPT_FILE", "capture-pane", "STATUS_PATH", "DONE_PATH", "interactive Pi"} {
+	for _, want := range []string{"PROMPT_FILE=/tmp/prompt.txt", "OUTPUT_PATH=/tmp/output.txt", "SESSION_ID=question-1", "SESSION_DIR=/tmp/sessions", "Q_MANAGER_PARENT_PANE=%18", "Q_MANAGER_STATE_FILE=/tmp/state.json", "Q_MANAGER_PLAN_DIR=thoughts/example", "Q_MANAGER_STAGE=question-1", "Q_MANAGER_CHILD_ID=child-1", "Q_MANAGER_CHILD_EXTENSION=/tmp/q_manager_child_extension.js", "Q_MANAGER_VALIDATED_STATUS_PATH=/tmp/validation-status.json", "Q_MANAGER_WAKE_MODE=validated-only", "--extension", "--session-id", "--session-dir", "--name", "@$PROMPT_FILE", "capture-pane", "STATUS_PATH", "DONE_PATH", "interactive Pi"} {
 		if !strings.Contains(cmd, want) {
 			t.Fatalf("command missing %q: %v", want, BuildChildCommand(req))
 		}
@@ -57,12 +58,12 @@ func TestResolveChildExtensionPathWritesEmbeddedAsset(t *testing.T) {
 		t.Fatalf("read extension asset: %v", err)
 	}
 	text := string(data)
-	for _, want := range []string{"export default function qManagerChildExtension", `pi.on("agent_end"`, "Q_MANAGER_STATUS_PATH", "Q_MANAGER_DONE_PATH", "Q_MANAGER_PARENT_PANE", "paste-buffer", `"-p", "-r"`, "```yaml", "q_manager_child_wake:", "state_file:", "steps:", "action:", "param:", "vamos qrspi continue --state-file"} {
+	for _, want := range []string{"export default function qManagerChildExtension", `pi.on("agent_end"`, "Q_MANAGER_STATUS_PATH", "Q_MANAGER_DONE_PATH", "Q_MANAGER_PARENT_PANE", "Q_MANAGER_VALIDATED_STATUS_PATH", "Q_MANAGER_WAKE_MODE", "validated-only", "shouldWakeManager", "validated:", "manager_needed:", "retry_exhausted:", "manager_guidance:", "paste-buffer", `"-p", "-r"`, "```yaml", "q_manager_child_wake:", "state_file:", "steps:", "action:", "param:", "vamos qrspi continue --state-file"} {
 		if !strings.Contains(text, want) {
 			t.Fatalf("extension asset missing %q: %s", want, text)
 		}
 	}
-	for _, forbidden := range []string{"qrspi_result", "Decision", "RunDecideNext", "RunValidateResult"} {
+	for _, forbidden := range []string{"Decision", "RunDecideNext", "RunValidateResult"} {
 		if strings.Contains(text, forbidden) {
 			t.Fatalf("extension asset contains graph authority marker %q: %s", forbidden, text)
 		}
@@ -77,7 +78,8 @@ func TestResultAndOutputPathsOutsideRepo(t *testing.T) {
 	sessionDir := SessionDir(root, "child")
 	done := DonePath(root, "child")
 	status := StatusPath(root, "child")
-	for _, path := range []string{result, output, sessionDir, done, status} {
+	validationStatus := ValidationStatusPath(root, "child")
+	for _, path := range []string{result, output, sessionDir, done, status, validationStatus} {
 		if !strings.HasPrefix(path, root) {
 			t.Fatalf("path %s not under state root %s", path, root)
 		}

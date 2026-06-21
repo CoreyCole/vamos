@@ -279,21 +279,22 @@ func RunChild(ctx context.Context, opts RunChildOptions, d deps, out io.Writer) 
 		return err
 	}
 	req := ChildRunRequest{
-		ID:            childID,
-		Stage:         opts.Stage,
-		Cwd:           opts.Cwd,
-		PromptFile:    opts.PromptFile,
-		OutputPath:    OutputPath(runRoot, childID),
-		SessionID:     ChildSessionID(childID),
-		SessionDir:    SessionDir(runRoot, childID),
-		SessionName:   fmt.Sprintf("q-manager %s %s", opts.Stage, childID),
-		DonePath:      DonePath(runRoot, childID),
-		StatusPath:    StatusPath(runRoot, childID),
-		Split:         normalizeSplit(opts.Split),
-		ParentPaneID:  parentPaneID,
-		StateFile:     opts.StateFile,
-		PlanDir:       opts.PlanDir,
-		ExtensionPath: extensionPath,
+		ID:                   childID,
+		Stage:                opts.Stage,
+		Cwd:                  opts.Cwd,
+		PromptFile:           opts.PromptFile,
+		OutputPath:           OutputPath(runRoot, childID),
+		SessionID:            ChildSessionID(childID),
+		SessionDir:           SessionDir(runRoot, childID),
+		SessionName:          fmt.Sprintf("q-manager %s %s", opts.Stage, childID),
+		DonePath:             DonePath(runRoot, childID),
+		StatusPath:           StatusPath(runRoot, childID),
+		ValidationStatusPath: ValidationStatusPath(runRoot, childID),
+		Split:                normalizeSplit(opts.Split),
+		ParentPaneID:         parentPaneID,
+		StateFile:            opts.StateFile,
+		PlanDir:              opts.PlanDir,
+		ExtensionPath:        extensionPath,
 	}
 	if err := ensureRunFiles(req); err != nil {
 		return err
