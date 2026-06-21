@@ -14,15 +14,19 @@ func maybeReexecManaged(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	binaryPath := filepath.Join(source.Root, ".vamos", "launcher-dev", "vamos-runtime")
-	if _, err := os.Stat(binaryPath); os.IsNotExist(err) {
-		if err := buildRuntime(ctx, source.Root, binaryPath); err != nil {
-			return err
-		}
-	} else if err != nil {
-		return fmt.Errorf("stat managed runtime %q: %w", binaryPath, err)
+	fp, err := computeRuntimeFingerprint(ctx, source)
+	if err != nil {
+		return err
 	}
-	return execRuntime(binaryPath, os.Args[1:], os.Environ())
+	cacheDir, err := defaultLauncherCacheDir()
+	if err != nil {
+		return err
+	}
+	target := managedRuntimePath(cacheDir, source, fp)
+	if err := ensureManagedRuntime(ctx, source, target); err != nil {
+		return err
+	}
+	return execRuntime(target.BinaryPath, os.Args[1:], os.Environ())
 }
 
 func buildRuntime(ctx context.Context, sourceRoot, outputPath string) error {
