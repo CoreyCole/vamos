@@ -1268,18 +1268,27 @@ func main() {
 		nil,
 		nil,
 	)
+	workspaceSyncCoordinator := agentchat.NewSyncCoordinator(agentchat.SyncCoordinatorOptions{
+		WorkspaceSync: workspaceSyncer,
+		TerminalIndex: agentChatService,
+		QRSPIApply:    agentChatService,
+		OnWorkspaceComplete: func(ctx context.Context, result agentchat.SyncWorkspacesResult, err error) {
+			if result.Skipped {
+				log.Printf("workspace_sync_skipped mode=schedule reason=%q", result.SkipReason)
+			}
+			workspaceSyncCompleteForSchedule(ctx, workspaceSyncRefreshResultFromAgentChat(result), err)
+		},
+	})
 	if goWorker != nil {
+		goWorker.RegisterWorkflow(agentchat.SyncCoordinatorWorkflow)
 		goWorker.RegisterWorkflow(agentchat.SyncWorkspacesWorkflow)
 		goWorker.RegisterWorkflow(agentchat.PlanWorkspaceDiscoveryWorkflow)
 		goWorker.RegisterActivity(agentChatService.FailConversationRunAfterActivityError)
+		goWorker.RegisterActivity(&agentchat.SyncCoordinatorActivities{
+			Coordinator: workspaceSyncCoordinator,
+		})
 		goWorker.RegisterActivity(&agentchat.WorkspaceSyncActivities{
 			Syncer: workspaceSyncer,
-			OnComplete: func(ctx context.Context, result agentchat.SyncWorkspacesResult, err error) {
-				if result.Skipped {
-					log.Printf("workspace_sync_skipped mode=schedule reason=%q", result.SkipReason)
-				}
-				workspaceSyncCompleteForSchedule(ctx, workspaceSyncRefreshResultFromAgentChat(result), err)
-			},
 		})
 		goWorker.RegisterActivity(&agentchat.PlanWorkspaceDiscoveryActivities{
 			Syncer: agentChatService.PlanWorkspaceDiscoverySyncer(),
@@ -1288,11 +1297,10 @@ func main() {
 	}
 	if temporalManager != nil {
 		input := agentChatService.WorkspaceSyncInput()
-		input.RunCompletionHook = true
 		if err := agentchat.EnsureSyncWorkspacesSchedule(
 			runtimeCtx,
 			temporalManager.Client(),
-			input,
+			agentchat.DefaultSyncCoordinatorInput(input),
 		); err != nil {
 			log.Printf(
 				"Warning: failed to ensure Agent Chat workspace sync schedule: %v",

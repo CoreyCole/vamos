@@ -14,6 +14,10 @@ type WorkspaceSyncActivities struct {
 	OnComplete func(context.Context, SyncWorkspacesResult, error)
 }
 
+type SyncCoordinatorActivities struct {
+	Coordinator *SyncCoordinator
+}
+
 type workspaceSyncRunner interface {
 	Sync(context.Context, SyncWorkspacesInput) (SyncWorkspacesResult, error)
 }
@@ -37,6 +41,39 @@ func SyncWorkspacesWorkflow(
 	err := workflow.ExecuteActivity(activityCtx, "SyncWorkspaces", input).
 		Get(ctx, &result)
 	return result, err
+}
+
+func SyncCoordinatorWorkflow(
+	ctx workflow.Context,
+	input SyncCoordinatorInput,
+) (SyncCoordinatorResult, error) {
+	activityCtx := workflow.WithActivityOptions(ctx, workflow.ActivityOptions{
+		StartToCloseTimeout: 3 * time.Minute,
+		HeartbeatTimeout:    30 * time.Second,
+		RetryPolicy: &temporal.RetryPolicy{
+			InitialInterval:    time.Second,
+			BackoffCoefficient: 2,
+			MaximumInterval:    10 * time.Second,
+			MaximumAttempts:    3,
+		},
+	})
+
+	var result SyncCoordinatorResult
+	err := workflow.ExecuteActivity(activityCtx, "RunSyncCoordinator", input).
+		Get(ctx, &result)
+	return result, err
+}
+
+func (a *SyncCoordinatorActivities) RunSyncCoordinator(
+	ctx context.Context,
+	input SyncCoordinatorInput,
+) (SyncCoordinatorResult, error) {
+	if a == nil || a.Coordinator == nil {
+		return SyncCoordinatorResult{}, errors.New(
+			"sync coordinator activity requires coordinator",
+		)
+	}
+	return a.Coordinator.Run(ctx, input)
 }
 
 func (a *WorkspaceSyncActivities) SyncWorkspaces(

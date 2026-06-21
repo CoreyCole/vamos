@@ -2,6 +2,9 @@ package agentchat
 
 import (
 	"context"
+	"reflect"
+	"runtime"
+	"strings"
 	"time"
 
 	enumspb "go.temporal.io/api/enums/v1"
@@ -15,19 +18,24 @@ const defaultWorkspaceSyncInterval = time.Minute
 func EnsureSyncWorkspacesSchedule(
 	ctx context.Context,
 	temporalClient client.Client,
-	input SyncWorkspacesInput,
+	input SyncCoordinatorInput,
 ) error {
 	if temporalClient == nil {
 		return nil
 	}
 
-	scheduleID := SyncWorkspacesScheduleID(input.ProjectInstanceKey)
+	scheduleID := SyncWorkspacesScheduleID(input.Workspace.ProjectInstanceKey)
 	handle := temporalClient.ScheduleClient().GetHandle(ctx, scheduleID)
 	if described, err := handle.Describe(ctx); err == nil && described != nil {
-		// The schedule already exists for this workspace. Trigger it instead of
-		// updating in place: the Temporal Go SDK can panic while converting a
-		// partial ScheduleUpdate for existing schedules in local workspace runs.
-		return handle.Trigger(ctx, client.ScheduleTriggerOptions{})
+		if syncWorkspacesScheduleUsesCoordinator(described.Schedule) {
+			// The schedule already exists for this workspace. Trigger it instead of
+			// updating in place: the Temporal Go SDK can panic while converting a
+			// partial ScheduleUpdate for existing schedules in local workspace runs.
+			return handle.Trigger(ctx, client.ScheduleTriggerOptions{})
+		}
+		if err := handle.Delete(ctx); err != nil {
+			return err
+		}
 	}
 
 	_, err := temporalClient.ScheduleClient().Create(ctx, client.ScheduleOptions{
@@ -40,7 +48,7 @@ func EnsureSyncWorkspacesSchedule(
 	return err
 }
 
-func syncWorkspacesSchedule(input SyncWorkspacesInput) *client.Schedule {
+func syncWorkspacesSchedule(input SyncCoordinatorInput) *client.Schedule {
 	return &client.Schedule{
 		Spec:   ptr(syncWorkspacesSpec()),
 		Action: syncWorkspacesAction(input),
@@ -58,13 +66,29 @@ func syncWorkspacesSpec() client.ScheduleSpec {
 	}
 }
 
-func syncWorkspacesAction(input SyncWorkspacesInput) *client.ScheduleWorkflowAction {
+func syncWorkspacesAction(input SyncCoordinatorInput) *client.ScheduleWorkflowAction {
 	return &client.ScheduleWorkflowAction{
-		ID:        SyncWorkspacesWorkflowID(input.ProjectInstanceKey),
-		Workflow:  SyncWorkspacesWorkflow,
+		ID:        SyncWorkspacesWorkflowID(input.Workspace.ProjectInstanceKey),
+		Workflow:  SyncCoordinatorWorkflow,
 		Args:      []any{input},
 		TaskQueue: temporalmgr.GoTaskQueue,
 	}
+}
+
+func syncWorkspacesScheduleUsesCoordinator(schedule client.Schedule) bool {
+	action, ok := schedule.Action.(*client.ScheduleWorkflowAction)
+	if !ok || action == nil {
+		return false
+	}
+	if workflowName, ok := action.Workflow.(string); ok {
+		return workflowName == "SyncCoordinatorWorkflow"
+	}
+	workflowValue := reflect.ValueOf(action.Workflow)
+	if workflowValue.Kind() != reflect.Func {
+		return false
+	}
+	workflowFunc := runtime.FuncForPC(workflowValue.Pointer())
+	return workflowFunc != nil && strings.HasSuffix(workflowFunc.Name(), ".SyncCoordinatorWorkflow")
 }
 
 func SyncWorkspacesScheduleID(projectInstanceKey string) string {

@@ -85,6 +85,114 @@ func TestSyncWorkspacesWorkflowRunsSyncActivity(t *testing.T) {
 	}
 }
 
+func TestSyncCoordinatorWorkflowRunsCoordinatorActivity(t *testing.T) {
+	var suite testsuite.WorkflowTestSuite
+	env := suite.NewTestWorkflowEnvironment()
+	calls := 0
+	wantInput := DefaultSyncCoordinatorInput(SyncWorkspacesInput{
+		ProjectName:        "cn-agents",
+		ProjectInstanceKey: "cn-agents-abc123",
+		ProjectRoot:        "/tmp/cn-agents",
+		ThoughtsRoot:       "/tmp/cn-agents/thoughts",
+	})
+	wantResult := SyncCoordinatorResult{
+		Workspace: SyncWorkspacesResult{Changed: true},
+		Terminal:  TerminalMetadataIndexResult{EventsRead: 1, Changed: true},
+		Changed:   true,
+	}
+	env.RegisterActivityWithOptions(
+		func(input SyncCoordinatorInput) (SyncCoordinatorResult, error) {
+			calls++
+			if !reflect.DeepEqual(input, wantInput) {
+				t.Fatalf("input=%#v want %#v", input, wantInput)
+			}
+			return wantResult, nil
+		},
+		activity.RegisterOptions{Name: "RunSyncCoordinator"},
+	)
+
+	env.ExecuteWorkflow(SyncCoordinatorWorkflow, wantInput)
+
+	if !env.IsWorkflowCompleted() {
+		t.Fatal("workflow did not complete")
+	}
+	if err := env.GetWorkflowError(); err != nil {
+		t.Fatalf("workflow error=%v", err)
+	}
+	var got SyncCoordinatorResult
+	if err := env.GetWorkflowResult(&got); err != nil {
+		t.Fatalf("GetWorkflowResult() error = %v", err)
+	}
+	if !reflect.DeepEqual(got, wantResult) {
+		t.Fatalf("workflow result=%#v want %#v", got, wantResult)
+	}
+	if calls != 1 {
+		t.Fatalf("activity calls=%d want 1", calls)
+	}
+}
+
+func TestSyncCoordinatorRunsWorkspaceBeforeTerminalAndQRSPI(t *testing.T) {
+	var order []string
+	coordinator := NewSyncCoordinator(SyncCoordinatorOptions{
+		WorkspaceSync: fakeWorkspaceSyncRunner{
+			result: SyncWorkspacesResult{Changed: true},
+			onSync: func() { order = append(order, "workspace") },
+		},
+		TerminalIndex: fakeTerminalMetadataIndexer{
+			onIndex: func() { order = append(order, "terminal") },
+		},
+		QRSPIApply: fakeQRSPIProjectionApplier{
+			onApply: func() { order = append(order, "qrspi") },
+		},
+		OnWorkspaceComplete: func(context.Context, SyncWorkspacesResult, error) {
+			order = append(order, "completion")
+		},
+	})
+
+	result, err := coordinator.Run(context.Background(), SyncCoordinatorInput{})
+	if err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+	wantOrder := []string{"workspace", "completion", "terminal", "qrspi"}
+	if !reflect.DeepEqual(order, wantOrder) {
+		t.Fatalf("order=%v want %v", order, wantOrder)
+	}
+	if !result.Changed || len(result.Diagnostics) != 3 {
+		t.Fatalf("result=%#v", result)
+	}
+}
+
+func TestSyncCoordinatorTerminalFailureDoesNotFailWorkspaceResult(t *testing.T) {
+	terminalErr := errors.New("database is locked")
+	coordinator := NewSyncCoordinator(SyncCoordinatorOptions{
+		WorkspaceSync: fakeWorkspaceSyncRunner{result: SyncWorkspacesResult{Changed: true}},
+		TerminalIndex: fakeTerminalMetadataIndexer{err: terminalErr},
+		QRSPIApply:    fakeQRSPIProjectionApplier{result: QRSPIProjectionApplyResult{Changed: true}},
+	})
+
+	result, err := coordinator.Run(context.Background(), SyncCoordinatorInput{})
+	if err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+	if !result.Workspace.Changed || !result.QRSPI.Changed || !result.Changed {
+		t.Fatalf("result=%#v", result)
+	}
+	if len(result.Diagnostics) != 3 || result.Diagnostics[1].Status != SyncPhaseStatusFailed || result.Diagnostics[1].Error != terminalErr.Error() {
+		t.Fatalf("diagnostics=%#v", result.Diagnostics)
+	}
+}
+
+func TestSyncCoordinatorActivityRequiresCoordinator(t *testing.T) {
+	_, err := (&SyncCoordinatorActivities{}).RunSyncCoordinator(
+		context.Background(),
+		SyncCoordinatorInput{},
+	)
+	if err == nil ||
+		!strings.Contains(err.Error(), "sync coordinator activity requires coordinator") {
+		t.Fatalf("RunSyncCoordinator() error = %v, want coordinator", err)
+	}
+}
+
 func TestSyncWorkspacesActivityRequiresSyncer(t *testing.T) {
 	_, err := (&WorkspaceSyncActivities{}).SyncWorkspaces(
 		context.Background(),
@@ -99,9 +207,45 @@ func TestSyncWorkspacesActivityRequiresSyncer(t *testing.T) {
 type fakeWorkspaceSyncRunner struct {
 	result SyncWorkspacesResult
 	err    error
+	onSync func()
 }
 
 func (f fakeWorkspaceSyncRunner) Sync(context.Context, SyncWorkspacesInput) (SyncWorkspacesResult, error) {
+	if f.onSync != nil {
+		f.onSync()
+	}
+	return f.result, f.err
+}
+
+type fakeTerminalMetadataIndexer struct {
+	result  TerminalMetadataIndexResult
+	err     error
+	onIndex func()
+}
+
+func (f fakeTerminalMetadataIndexer) IndexTerminalMetadata(
+	context.Context,
+	TerminalMetadataIndexInput,
+) (TerminalMetadataIndexResult, error) {
+	if f.onIndex != nil {
+		f.onIndex()
+	}
+	return f.result, f.err
+}
+
+type fakeQRSPIProjectionApplier struct {
+	result  QRSPIProjectionApplyResult
+	err     error
+	onApply func()
+}
+
+func (f fakeQRSPIProjectionApplier) ApplyQRSPIProjections(
+	context.Context,
+	QRSPIProjectionApplyInput,
+) (QRSPIProjectionApplyResult, error) {
+	if f.onApply != nil {
+		f.onApply()
+	}
 	return f.result, f.err
 }
 
@@ -333,12 +477,13 @@ func TestProjectInstanceKeyAndSyncWorkspacesScheduleIDsAreDeterministic(t *testi
 }
 
 func TestEnsureSyncWorkspacesScheduleShape(t *testing.T) {
-	input := SyncWorkspacesInput{
+	workspaceInput := SyncWorkspacesInput{
 		ProjectName:        "CN Agents",
 		ProjectInstanceKey: "CN Agents / Workspace",
 		ProjectRoot:        "/tmp/cn-agents",
 		ThoughtsRoot:       "/tmp/cn-agents/thoughts",
 	}
+	input := DefaultSyncCoordinatorInput(workspaceInput)
 	if defaultWorkspaceSyncInterval != time.Minute {
 		t.Fatalf(
 			"defaultWorkspaceSyncInterval = %v, want %v",
@@ -360,8 +505,11 @@ func TestEnsureSyncWorkspacesScheduleShape(t *testing.T) {
 	if !ok || scheduleAction == nil {
 		t.Fatalf("schedule action = %#v", schedule.Action)
 	}
-	if scheduleAction.ID != SyncWorkspacesWorkflowID(input.ProjectInstanceKey) {
+	if scheduleAction.ID != SyncWorkspacesWorkflowID(input.Workspace.ProjectInstanceKey) {
 		t.Fatalf("action ID = %q", scheduleAction.ID)
+	}
+	if !syncWorkspacesScheduleUsesCoordinator(*schedule) {
+		t.Fatalf("schedule action should use SyncCoordinatorWorkflow: %#v", scheduleAction.Workflow)
 	}
 	if scheduleAction.TaskQueue != temporalmgr.GoTaskQueue {
 		t.Fatalf(
@@ -373,9 +521,21 @@ func TestEnsureSyncWorkspacesScheduleShape(t *testing.T) {
 	if len(scheduleAction.Args) != 1 {
 		t.Fatalf("action args = %#v", scheduleAction.Args)
 	}
-	if got, ok := scheduleAction.Args[0].(SyncWorkspacesInput); !ok ||
+	if got, ok := scheduleAction.Args[0].(SyncCoordinatorInput); !ok ||
 		!reflect.DeepEqual(got, input) {
 		t.Fatalf("action args[0] = %#v", scheduleAction.Args[0])
+	}
+}
+
+func TestSyncWorkspacesScheduleUsesCoordinator(t *testing.T) {
+	if !syncWorkspacesScheduleUsesCoordinator(client.Schedule{Action: &client.ScheduleWorkflowAction{Workflow: SyncCoordinatorWorkflow}}) {
+		t.Fatal("coordinator workflow function should match")
+	}
+	if !syncWorkspacesScheduleUsesCoordinator(client.Schedule{Action: &client.ScheduleWorkflowAction{Workflow: "SyncCoordinatorWorkflow"}}) {
+		t.Fatal("coordinator workflow name should match")
+	}
+	if syncWorkspacesScheduleUsesCoordinator(client.Schedule{Action: &client.ScheduleWorkflowAction{Workflow: SyncWorkspacesWorkflow}}) {
+		t.Fatal("old sync workflow should not match coordinator schedule")
 	}
 }
 
