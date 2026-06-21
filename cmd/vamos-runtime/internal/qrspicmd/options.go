@@ -125,6 +125,15 @@ type ContinueResult struct {
 	WaitingHuman    bool
 	NextNodeID      wruntime.NodeID
 	PrimaryArtifact string
+	HumanPrompt     HumanPromptContext
+}
+
+type HumanPromptContext struct {
+	Stage                    string
+	Status                   string
+	Summary                  string
+	Artifact                 string
+	SuggestedFeedbackCommand string
 }
 
 type ResultSourceOptions struct {

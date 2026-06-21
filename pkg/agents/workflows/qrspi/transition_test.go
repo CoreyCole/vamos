@@ -70,6 +70,31 @@ func TestQRSPITransitions(t *testing.T) {
 	state = assertTerminal(t, def, state, NodeDone)
 }
 
+func TestQRSPIOutlineNeedsHumanWaitsWithoutAdvancing(t *testing.T) {
+	def, err := Definition()
+	if err != nil {
+		t.Fatal(err)
+	}
+	state, err := wruntime.InitialState(def, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	state.CurrentNodeID = NodeOutline
+
+	result := qrspiResult(NodeOutline, wruntime.StatusNeedsHuman)
+	result.Outcome = ""
+	decision, err := wruntime.DecideTransition(def, state, result)
+	if err != nil {
+		t.Fatalf("DecideTransition() error = %v", err)
+	}
+	if !decision.WaitingHuman || decision.StartNext || decision.State.Status != wruntime.WorkspaceStatusWaitingHuman {
+		t.Fatalf("decision = %+v, want waiting human stop", decision)
+	}
+	if decision.State.CurrentNodeID != NodeOutline || decision.State.PendingNextNodeID != "" {
+		t.Fatalf("state = %+v, want current outline without pending next", decision.State)
+	}
+}
+
 func TestQRSPIImplementHandoffQueuesResumeWithoutBlocking(t *testing.T) {
 	def, err := Definition()
 	if err != nil {
@@ -193,6 +218,10 @@ func TestQRSPIWorkflowRenderersExposeReviewBranches(t *testing.T) {
 		"design -- outcome=complete --> outline",
 		"review-outline -- outcome=ready-for-plan --> plan",
 		"review-plan -- outcome=ready-for-workspace --> workspace",
+		"review-plan -- outcome=ready-for-implement --> implement",
+		"review-plan -- outcome=ready-for-implementation --> implement",
+		"workspace -- outcome=ready-for-implement --> implement",
+		"workspace -- outcome=ready-for-implementation --> implement",
 		"review-implementation -- outcome=needs-followup --> question",
 		"review-implementation -- outcome=ready-for-human-review --> verify",
 		"verify -- outcome=complete --> human-review-implementation",

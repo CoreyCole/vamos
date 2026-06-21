@@ -49,7 +49,7 @@ func Definition() (wruntime.Definition, error) {
 		Outcomes(wruntime.OutcomeComplete).
 		RequiresPrimaryArtifact().
 		Agent(NodeOutline, Skill(".pi/skills/q-outline/SKILL.md")).
-		Statuses(wruntime.StatusComplete, wruntime.StatusBlocked, wruntime.StatusError).
+		Statuses(wruntime.StatusComplete, wruntime.StatusNeedsHuman, wruntime.StatusBlocked, wruntime.StatusError).
 		Outcomes(wruntime.OutcomeComplete).
 		RequiresPrimaryArtifact().
 		Agent(NodeReviewOutline, Skill(".pi/skills/q-review/SKILL.md")).
@@ -74,7 +74,7 @@ func Definition() (wruntime.Definition, error) {
 		RequiresPrimaryArtifact().
 		Agent(NodeReviewPlan, Skill(".pi/skills/q-review/SKILL.md")).
 		Statuses(wruntime.StatusComplete, wruntime.StatusNeedsHuman, wruntime.StatusBlocked, wruntime.StatusError).
-		Outcomes(wruntime.OutcomeReadyForWorkspace, wruntime.OutcomeNeedsReviewResearch).
+		Outcomes(wruntime.OutcomeReadyForWorkspace, wruntime.OutcomeReadyForImplement, wruntime.OutcomeReadyForImplementation, wruntime.OutcomeNeedsReviewResearch).
 		RequiresPrimaryArtifact().
 		Agent(NodeResearchForReviewPlan, Skill(".pi/skills/q-research-for-review/SKILL.md")).
 		Statuses(wruntime.StatusComplete, wruntime.StatusBlocked, wruntime.StatusError).
@@ -86,7 +86,7 @@ func Definition() (wruntime.Definition, error) {
 		RequiresPrimaryArtifact().
 		Agent(NodeWorkspace, Skill(".pi/skills/q-workspace/SKILL.md")).
 		Statuses(wruntime.StatusComplete, wruntime.StatusBlocked, wruntime.StatusError).
-		Outcomes(wruntime.OutcomeComplete).
+		Outcomes(wruntime.OutcomeComplete, wruntime.OutcomeReadyForImplement, wruntime.OutcomeReadyForImplementation).
 		RequiresPrimaryArtifact().
 		Agent(NodeImplement, Skill(".pi/skills/q-implement/SKILL.md")).
 		Statuses(wruntime.StatusComplete, wruntime.StatusHandoff, wruntime.StatusBlocked, wruntime.StatusError).
@@ -124,11 +124,15 @@ func Definition() (wruntime.Definition, error) {
 		From(NodeReviewPlan).
 		On(wruntime.OutcomeNeedsReviewResearch).GoTo(NodeResearchForReviewPlan).
 		From(NodeReviewPlan).On(wruntime.OutcomeReadyForWorkspace).GoTo(NodeWorkspace).
+		From(NodeReviewPlan).On(wruntime.OutcomeReadyForImplement).GoTo(NodeImplement).
+		From(NodeReviewPlan).On(wruntime.OutcomeReadyForImplementation).GoTo(NodeImplement).
 		From(NodeResearchForReviewPlan).
 		On(wruntime.OutcomeComplete).GoTo(NodeAddressReviewResearchPlan).
 		From(NodeAddressReviewResearchPlan).
 		On(wruntime.OutcomeComplete).GoTo(NodeReviewPlan).
 		From(NodeWorkspace).On(wruntime.OutcomeComplete).GoTo(NodeImplement).
+		From(NodeWorkspace).On(wruntime.OutcomeReadyForImplement).GoTo(NodeImplement).
+		From(NodeWorkspace).On(wruntime.OutcomeReadyForImplementation).GoTo(NodeImplement).
 		From(NodeImplement).On(wruntime.OutcomeComplete).GoTo(NodeReviewImplementation).
 		From(NodeReviewImplementation).
 		On(wruntime.OutcomeNeedsFollowup).GoTo(NodeQuestion).

@@ -28,6 +28,20 @@ func TestParseValidateDecideDesignToOutline(t *testing.T) {
 	}
 }
 
+func TestParseValidateDecideOutlineNeedsHuman(t *testing.T) {
+	state := testWorkflowState(t, qrspi.NodeOutline, nil)
+	parsed, err := ParseValidateDecide(testResultYAML("outline", "needs_human", "", "thoughts/example/design.md", ""), state, wruntime.ParseContext{})
+	if err != nil {
+		t.Fatalf("ParseValidateDecide error = %v", err)
+	}
+	if !parsed.Decision.WaitingHuman || parsed.Decision.StartNext {
+		t.Fatalf("decision waiting/start = %v/%v, want true/false", parsed.Decision.WaitingHuman, parsed.Decision.StartNext)
+	}
+	if parsed.Decision.StopReason != "result requested human input" {
+		t.Fatalf("stop reason = %q", parsed.Decision.StopReason)
+	}
+}
+
 func TestParseValidateDecideReviewOutlineReadyForPlan(t *testing.T) {
 	state := testWorkflowState(t, qrspi.NodeReviewOutline, nil)
 	parsed, err := ParseValidateDecide(testResultYAML("review-outline", "complete", "ready-for-plan", "thoughts/example/reviews/outline/review.md", ""), state, wruntime.ParseContext{})
@@ -36,6 +50,17 @@ func TestParseValidateDecideReviewOutlineReadyForPlan(t *testing.T) {
 	}
 	if parsed.Decision.NextNodeID != qrspi.NodePlan || !parsed.Decision.StartNext {
 		t.Fatalf("decision next/start = %q/%v, want plan/true", parsed.Decision.NextNodeID, parsed.Decision.StartNext)
+	}
+}
+
+func TestParseValidateDecideReviewOutlineNeedsHumanStillValid(t *testing.T) {
+	state := testWorkflowState(t, qrspi.NodeReviewOutline, nil)
+	parsed, err := ParseValidateDecide(testResultYAML("review-outline", "needs_human", "", "thoughts/example/reviews/outline/review.md", ""), state, wruntime.ParseContext{})
+	if err != nil {
+		t.Fatalf("ParseValidateDecide error = %v", err)
+	}
+	if !parsed.Decision.WaitingHuman || parsed.Decision.StartNext {
+		t.Fatalf("decision waiting/start = %v/%v, want true/false", parsed.Decision.WaitingHuman, parsed.Decision.StartNext)
 	}
 }
 
@@ -62,14 +87,18 @@ func TestUpdateImplementationCwdFromWorkspaceResult(t *testing.T) {
 	}
 }
 
-func TestReviewPlanReadyForImplementRejectedByCanonicalGraph(t *testing.T) {
+func TestReviewPlanReadyForImplementStartsImplement(t *testing.T) {
 	state := testWorkflowState(t, qrspi.NodeReviewPlan, nil)
-	_, err := ParseValidateDecide(testResultYAML("review-plan", "complete", "ready-for-implement", "thoughts/example/reviews/plan/review.md", ""), state, wruntime.ParseContext{})
-	if err == nil {
-		t.Fatal("expected ready-for-implement rejection")
-	}
-	if !strings.Contains(err.Error(), "canonical QRSPI graph rejected result") || !strings.Contains(err.Error(), "outcome \"ready-for-implement\" is not valid for node \"review-plan\"") {
-		t.Fatalf("error = %v", err)
+	for _, outcome := range []string{"ready-for-implement", "ready-for-implementation"} {
+		t.Run(outcome, func(t *testing.T) {
+			parsed, err := ParseValidateDecide(testResultYAML("review-plan", "complete", outcome, "thoughts/example/reviews/plan/review.md", ""), state, wruntime.ParseContext{})
+			if err != nil {
+				t.Fatalf("ParseValidateDecide error = %v", err)
+			}
+			if parsed.Decision.NextNodeID != qrspi.NodeImplement || !parsed.Decision.StartNext {
+				t.Fatalf("decision next/start = %q/%v, want implement/true", parsed.Decision.NextNodeID, parsed.Decision.StartNext)
+			}
+		})
 	}
 }
 

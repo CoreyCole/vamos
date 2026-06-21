@@ -195,7 +195,7 @@ func TestDiscussPolicyDoesNotAutoStartCommandFlow(t *testing.T) {
 	}
 }
 
-func TestInvalidReviewPlanReadyForImplementStopsClearly(t *testing.T) {
+func TestReviewPlanReadyForImplementContinuesToImplementation(t *testing.T) {
 	fixture := newManagerFlowFixture(t)
 	stateFile := filepath.Join(fixture.stateRoot, "review-plan-state.json")
 	state := ManagerState{Workflow: testWorkflowState(t, qrspi.NodeReviewPlan, nil)}
@@ -203,13 +203,16 @@ func TestInvalidReviewPlanReadyForImplementStopsClearly(t *testing.T) {
 	resultFile := filepath.Join(fixture.dir, "review-plan-result.txt")
 	writeFile(t, resultFile, testResultYAML("review-plan", "complete", "ready-for-implement", "thoughts/example/reviews/plan/review.md", ""))
 
-	err := RunDecideNext(t.Context(), DecideNextOptions{StateFile: stateFile, ResultFile: resultFile, PlanDir: fixture.planDir}, deps{}, &bytes.Buffer{})
-	if err == nil || !strings.Contains(err.Error(), "canonical QRSPI graph rejected result") || !strings.Contains(err.Error(), `outcome "ready-for-implement" is not valid`) {
-		t.Fatalf("expected graph rejection, got %v", err)
+	var out bytes.Buffer
+	if err := RunDecideNext(t.Context(), DecideNextOptions{StateFile: stateFile, ResultFile: resultFile, PlanDir: fixture.planDir}, deps{}, &out); err != nil {
+		t.Fatalf("RunDecideNext error = %v", err)
+	}
+	if !strings.Contains(out.String(), `"nextNode":"implement"`) || !strings.Contains(out.String(), `"startNext":true`) {
+		t.Fatalf("decide output = %q", out.String())
 	}
 	loaded := loadManagerState(t, stateFile)
-	if loaded.Workflow.CurrentNodeID != qrspi.NodeReviewPlan {
-		t.Fatalf("current node mutated to %q", loaded.Workflow.CurrentNodeID)
+	if loaded.Workflow.CurrentNodeID != qrspi.NodeImplement {
+		t.Fatalf("current node = %q, want implement", loaded.Workflow.CurrentNodeID)
 	}
 }
 
@@ -324,6 +327,66 @@ func TestContinueValidResultStartsNextChildAndCleansOldPane(t *testing.T) {
 	}
 	if len(tmux.kills) != 1 || tmux.kills[0].ID != "%old" {
 		t.Fatalf("kills = %#v, want %%old", tmux.kills)
+	}
+}
+
+func TestContinueOutlineNeedsHumanPrintsSteeringGuidance(t *testing.T) {
+	fixture := newManagerFlowFixture(t)
+	stateFile := filepath.Join(fixture.stateRoot, "outline-state.json")
+	sessionPath := filepath.Join(fixture.dir, "outline-session.jsonl")
+	active := &ChildRunRef{ID: "outline-child", Stage: "outline", Cwd: fixture.projectRoot, TmuxPaneID: "%old", SessionID: "outline-session", SessionDir: fixture.dir, SessionPath: sessionPath}
+	state := ManagerState{
+		RepoID:           fixture.projectRoot,
+		CanonicalPlanDir: fixture.planDir,
+		ManagerRunID:     "outline-run",
+		SourceCwd:        fixture.projectRoot,
+		ActiveChild:      active,
+		Workflow:         testWorkflowState(t, qrspi.NodeOutline, nil),
+	}
+	saveManagerState(t, stateFile, state)
+	writeSessionTestFile(t, sessionPath, sessionHeader(active.SessionID, fixture.projectRoot)+"\n"+assistantLine(testResultYAML("outline", "needs_human", "", "thoughts/example/design.md", ""))+"\n")
+
+	runner := &fakeChildRunner{panes: []string{"%new"}}
+	continueOut, err := executeManagerCommand(deps{Clock: fixture.clock, Runner: runner}, "continue", "--state-file", stateFile, "--plan-dir", fixture.planDir)
+	if err != nil {
+		t.Fatalf("continue command error = %v", err)
+	}
+	for _, want := range []string{"validated: outline needs_human", "artifact: thoughts/example/design.md", "stop: waiting human", "question: test goal", "feedback: vamos qrspi steer-child --state-file " + stateFile + " --feedback-file <file>"} {
+		if !strings.Contains(continueOut, want) {
+			t.Fatalf("continue output missing %q: %q", want, continueOut)
+		}
+	}
+	for _, forbidden := range []string{"rawYaml", "workflow", "started child"} {
+		if strings.Contains(continueOut, forbidden) {
+			t.Fatalf("continue output contains %q: %q", forbidden, continueOut)
+		}
+	}
+	loaded := loadManagerState(t, stateFile)
+	if loaded.ActiveChild == nil || loaded.ActiveChild.TmuxPaneID != "%old" {
+		t.Fatalf("active child = %#v, want preserved old child", loaded.ActiveChild)
+	}
+	if len(runner.started) != 0 {
+		t.Fatalf("runner starts = %d, want none", len(runner.started))
+	}
+}
+
+func TestContinueOutlineNeedsHumanNDJSONIncludesManagerRefs(t *testing.T) {
+	fixture := newManagerFlowFixture(t)
+	stateFile := filepath.Join(fixture.stateRoot, "outline-ndjson-state.json")
+	sessionPath := filepath.Join(fixture.dir, "outline-ndjson-session.jsonl")
+	active := &ChildRunRef{ID: "outline-child", Stage: "outline", Cwd: fixture.projectRoot, TmuxPaneID: "%old", SessionID: "outline-session", SessionDir: fixture.dir, SessionPath: sessionPath}
+	state := ManagerState{RepoID: fixture.projectRoot, CanonicalPlanDir: fixture.planDir, ManagerRunID: "outline-run", SourceCwd: fixture.projectRoot, ActiveChild: active, Workflow: testWorkflowState(t, qrspi.NodeOutline, nil)}
+	saveManagerState(t, stateFile, state)
+	writeSessionTestFile(t, sessionPath, sessionHeader(active.SessionID, fixture.projectRoot)+"\n"+assistantLine(testResultYAML("outline", "needs_human", "", "thoughts/example/design.md", ""))+"\n")
+
+	continueOut, err := executeManagerCommand(deps{Clock: fixture.clock}, "continue", "--state-file", stateFile, "--plan-dir", fixture.planDir, "--output", "ndjson")
+	if err != nil {
+		t.Fatalf("continue command error = %v", err)
+	}
+	for _, want := range []string{`"validated":true`, `"managerNeeded":true`, `"waitingHuman":true`, `"artifact":"thoughts/example/design.md"`, `"SuggestedFeedbackCommand":"vamos qrspi steer-child --state-file ` + stateFile + ` --feedback-file \u003cfile\u003e"`} {
+		if !strings.Contains(continueOut, want) {
+			t.Fatalf("continue NDJSON missing %q: %q", want, continueOut)
+		}
 	}
 }
 

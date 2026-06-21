@@ -872,6 +872,9 @@ func RunContinue(ctx context.Context, opts ContinueOptions, d deps, out io.Write
 	result.NextNodeID = parsed.Decision.NextNodeID
 	result.WaitingHuman = parsed.Decision.WaitingHuman
 	result.StopReason = parsed.Decision.StopReason
+	if result.WaitingHuman {
+		result.HumanPrompt = humanPromptContext(state, opts.StateFile, parsed)
+	}
 
 	if parsed.Decision.StartNext {
 		launched, err := startNextChildFromDecision(ctx, nextState, parsed.Decision, opts, d, out)
@@ -1022,6 +1025,17 @@ func renderContinuePromptFile(ctx context.Context, state ManagerState, nodeID wr
 	return WriteStagePromptFile(ctx, state, node, PromptFileOptions{StateFile: opts.StateFile, NodeID: string(nodeID), Timestamp: time.Now()})
 }
 
+func humanPromptContext(state ManagerState, stateFile string, parsed ParsedDecision) HumanPromptContext {
+	result := parsed.Result
+	return HumanPromptContext{
+		Stage:                    string(result.SourceNodeID),
+		Status:                   string(result.Status),
+		Summary:                  strings.TrimSpace(result.Summary),
+		Artifact:                 result.PrimaryArtifact,
+		SuggestedFeedbackCommand: feedbackCommand(stateFile),
+	}
+}
+
 func writeContinueOutput(out io.Writer, opts ContinueOptions, result ContinueResult) error {
 	if strings.EqualFold(opts.Output, "ndjson") {
 		return WriteNDJSON(out, Event{Type: "continued", Decision: result.Validated, Ref: continueRef(result)})
@@ -1050,8 +1064,16 @@ func writeContinueText(out io.Writer, result ContinueResult) error {
 		fmt.Fprintf(out, "started child: %s (%s)\n", result.StartedChild.Stage, result.StartedChild.TmuxPaneID)
 	}
 	if result.WaitingHuman {
-		_, err := fmt.Fprintln(out, "stop: waiting human")
-		return err
+		if _, err := fmt.Fprintln(out, "stop: waiting human"); err != nil {
+			return err
+		}
+		if result.HumanPrompt.Summary != "" {
+			fmt.Fprintf(out, "question: %s\n", result.HumanPrompt.Summary)
+		}
+		if result.HumanPrompt.SuggestedFeedbackCommand != "" {
+			fmt.Fprintf(out, "feedback: %s\n", result.HumanPrompt.SuggestedFeedbackCommand)
+		}
+		return nil
 	}
 	if result.StopReason != "" && result.StartedChild == nil {
 		fmt.Fprintf(out, "stop: %s\n", result.StopReason)
@@ -1061,6 +1083,15 @@ func writeContinueText(out io.Writer, result ContinueResult) error {
 
 func continueRef(result ContinueResult) map[string]any {
 	ref := map[string]any{"reprompted": result.Reprompted, "waitingHuman": result.WaitingHuman}
+	if result.Validated != nil {
+		ref["validated"] = true
+		ref["stage"] = result.Validated.Result.SourceNodeID
+		ref["status"] = result.Validated.Result.Status
+	}
+	if result.WaitingHuman {
+		ref["managerNeeded"] = true
+		ref["humanPrompt"] = result.HumanPrompt
+	}
 	if result.NextNodeID != "" {
 		ref["nextNode"] = result.NextNodeID
 	}

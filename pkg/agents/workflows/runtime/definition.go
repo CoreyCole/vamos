@@ -30,13 +30,15 @@ const (
 )
 
 const (
-	OutcomeComplete            ResultOutcome = "complete"
-	OutcomeReadyForOutline     ResultOutcome = "ready-for-outline"
-	OutcomeReadyForPlan        ResultOutcome = "ready-for-plan"
-	OutcomeReadyForHumanReview ResultOutcome = "ready-for-human-review"
-	OutcomeReadyForWorkspace   ResultOutcome = "ready-for-workspace"
-	OutcomeNeedsReviewResearch ResultOutcome = "needs-review-research"
-	OutcomeNeedsFollowup       ResultOutcome = "needs-followup"
+	OutcomeComplete               ResultOutcome = "complete"
+	OutcomeReadyForOutline        ResultOutcome = "ready-for-outline"
+	OutcomeReadyForPlan           ResultOutcome = "ready-for-plan"
+	OutcomeReadyForHumanReview    ResultOutcome = "ready-for-human-review"
+	OutcomeReadyForWorkspace      ResultOutcome = "ready-for-workspace"
+	OutcomeReadyForImplement      ResultOutcome = "ready-for-implement"
+	OutcomeReadyForImplementation ResultOutcome = "ready-for-implementation"
+	OutcomeNeedsReviewResearch    ResultOutcome = "needs-review-research"
+	OutcomeNeedsFollowup          ResultOutcome = "needs-followup"
 )
 
 type Definition struct {
