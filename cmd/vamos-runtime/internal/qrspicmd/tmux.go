@@ -68,7 +68,7 @@ func setBufferArgs(name, text string) []string {
 }
 
 func pasteBufferArgs(name, paneID string) []string {
-	return []string{"paste-buffer", "-b", name, "-t", paneID}
+	return []string{"paste-buffer", "-p", "-r", "-b", name, "-t", paneID}
 }
 
 func killPaneArgs(paneID string) []string {

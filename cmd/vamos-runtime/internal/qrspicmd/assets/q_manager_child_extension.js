@@ -37,6 +37,7 @@ function wakeMessage() {
   const stateFile = process.env.Q_MANAGER_STATE_FILE || "";
   const command = `vamos qrspi continue --state-file ${stateFile}`;
   return [
+    "```yaml",
     "q_manager_child_wake:",
     `  stage: ${yamlString(stage)}`,
     `  state_file: ${yamlString(stateFile)}`,
@@ -44,6 +45,7 @@ function wakeMessage() {
     "    steps:",
     '      - action: "run_command"',
     `        param: ${yamlString(command)}`,
+    "```",
   ].join("\n");
 }
 
@@ -51,7 +53,7 @@ async function wakeParent(pane, text) {
   if (!pane) return;
   const buffer = `q-manager-wake-${process.env.Q_MANAGER_CHILD_ID || Date.now()}`;
   await tmux(["set-buffer", "-b", buffer, text]);
-  await tmux(["paste-buffer", "-b", buffer, "-t", pane]);
+  await tmux(["paste-buffer", "-p", "-r", "-b", buffer, "-t", pane]);
   await tmux(["send-keys", "-t", pane, "Enter"]);
 }
 

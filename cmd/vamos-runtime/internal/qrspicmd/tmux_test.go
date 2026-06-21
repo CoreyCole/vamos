@@ -33,7 +33,7 @@ func TestPasteBufferArgsTargetExactPane(t *testing.T) {
 	}
 
 	paste := strings.Join(pasteBufferArgs("q-manager-wake", "%18"), " ")
-	if !strings.Contains(paste, "paste-buffer -b q-manager-wake -t %18") {
+	if !strings.Contains(paste, "paste-buffer -p -r -b q-manager-wake -t %18") {
 		t.Fatalf("paste args = %v", paste)
 	}
 }

@@ -57,7 +57,7 @@ func TestResolveChildExtensionPathWritesEmbeddedAsset(t *testing.T) {
 		t.Fatalf("read extension asset: %v", err)
 	}
 	text := string(data)
-	for _, want := range []string{"export default function qManagerChildExtension", `pi.on("agent_end"`, "Q_MANAGER_STATUS_PATH", "Q_MANAGER_DONE_PATH", "Q_MANAGER_PARENT_PANE", "paste-buffer", "q_manager_child_wake:", "state_file:", "steps:", "action:", "param:", "vamos qrspi continue --state-file"} {
+	for _, want := range []string{"export default function qManagerChildExtension", `pi.on("agent_end"`, "Q_MANAGER_STATUS_PATH", "Q_MANAGER_DONE_PATH", "Q_MANAGER_PARENT_PANE", "paste-buffer", `"-p", "-r"`, "```yaml", "q_manager_child_wake:", "state_file:", "steps:", "action:", "param:", "vamos qrspi continue --state-file"} {
 		if !strings.Contains(text, want) {
 			t.Fatalf("extension asset missing %q: %s", want, text)
 		}
