@@ -157,6 +157,31 @@ func TestDecideTransitionStopStatuses(t *testing.T) {
 	}
 }
 
+func TestDecideTransitionHandoffStopsWithoutBlocking(t *testing.T) {
+	def := transitionDefinition(t)
+	state, err := InitialState(def, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	result := completeResult("start")
+	result.Status = StatusHandoff
+	result.Outcome = ""
+
+	decision, err := DecideTransition(def, state, result)
+	if err != nil {
+		t.Fatalf("DecideTransition() error = %v", err)
+	}
+	if decision.StartNext || decision.NextNodeID != "start" || decision.StopReason != "result handoff" {
+		t.Fatalf("decision = %+v", decision)
+	}
+	if decision.State.Status != WorkspaceStatusIdle || decision.State.PendingNextNodeID != "start" {
+		t.Fatalf("state = %+v", decision.State)
+	}
+	if got := decision.State.Nodes["start"].Status; got != NodeStatusPending {
+		t.Fatalf("node status = %q, want pending", got)
+	}
+}
+
 func TestDecideTransitionTerminalDone(t *testing.T) {
 	def := transitionDefinition(t)
 	state, err := InitialState(def, nil)

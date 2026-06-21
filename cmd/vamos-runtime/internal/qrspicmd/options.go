@@ -3,6 +3,8 @@ package qrspicmd
 import (
 	"context"
 	"time"
+
+	wruntime "github.com/CoreyCole/vamos/pkg/agents/workflows/runtime"
 )
 
 type InitOptions struct {
@@ -51,6 +53,28 @@ type RepromptChildOptions struct {
 	Attempt   int
 	ErrorText string
 	ErrorFile string
+}
+
+type ContinueOptions struct {
+	StateFile string
+	PlanDir   string
+	Stage     string
+	Cwd       string
+	Split     string
+	Timeout   time.Duration
+	Output    string
+}
+
+type ContinueResult struct {
+	Validated       *ParsedDecision
+	Reprompted      bool
+	Decided         bool
+	StartedChild    *ChildRunRef
+	CleanedChild    *ChildRunRef
+	StopReason      string
+	WaitingHuman    bool
+	NextNodeID      wruntime.NodeID
+	PrimaryArtifact string
 }
 
 type ResultSourceOptions struct {

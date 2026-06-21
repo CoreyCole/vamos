@@ -68,6 +68,15 @@ func DecideTransition(
 				{Type: "workflow_waiting_human", NodeID: result.SourceNodeID},
 			},
 		}, nil
+	case StatusHandoff:
+		state.Status = WorkspaceStatusIdle
+		state.PendingNextNodeID = result.SourceNodeID
+		return TransitionDecision{
+			State:      state,
+			NextNodeID: result.SourceNodeID,
+			StopReason: "result handoff",
+			Events:     []Event{{Type: "workflow_handoff", NodeID: result.SourceNodeID}},
+		}, nil
 	case StatusBlocked:
 		nodeState.Status = NodeStatusBlocked
 		state.Nodes[result.SourceNodeID] = nodeState

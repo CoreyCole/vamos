@@ -286,6 +286,47 @@ func TestWakeDrivenManagerLoopCleansOldPaneAfterNextLaunch(t *testing.T) {
 	}
 }
 
+func TestContinueValidResultStartsNextChildAndCleansOldPane(t *testing.T) {
+	fixture := newManagerFlowFixture(t)
+	runner := &fakeChildRunner{panes: []string{"%old", "%new"}}
+	initOut, err := executeManagerCommand(deps{StateRoot: fixture.stateRootFunc, Clock: fixture.clock, Runner: runner}, "init", "--plan-dir", fixture.planDir, "--project-root", fixture.projectRoot, "--manager-pane", "%parent")
+	if err != nil {
+		t.Fatalf("init command error = %v", err)
+	}
+	stateFile := eventRefString(t, initOut, "stateFile")
+
+	promptFile := filepath.Join(fixture.dir, "prompt.txt")
+	writeFile(t, promptFile, "question prompt")
+	if _, err := executeManagerCommand(deps{Clock: fixture.clock, Runner: runner}, "run-child", "--state-file", stateFile, "--plan-dir", fixture.planDir, "--stage", "question", "--cwd", fixture.projectRoot, "--prompt-file", promptFile, "--timeout", "0"); err != nil {
+		t.Fatalf("run-child command error = %v", err)
+	}
+	state := loadManagerState(t, stateFile)
+	writeFile(t, state.ActiveChild.StatusPath, `{"event":"agent_end","stage":"question","childId":"`+state.ActiveChild.ID+`","wakeTarget":"%parent"}`)
+	writeFile(t, state.ActiveChild.DonePath, "")
+	writeSessionTestFile(t, filepath.Join(state.ActiveChild.SessionDir, "session.jsonl"), sessionHeader(state.ActiveChild.SessionID, fixture.projectRoot)+"\n"+assistantLine(testResultYAML("question", "complete", "complete", "thoughts/example/questions/q.md", ""))+"\n")
+
+	tmux := &recordingTmux{}
+	continueOut, err := executeManagerCommand(deps{Clock: fixture.clock, Runner: runner, Tmux: tmux}, "continue", "--state-file", stateFile, "--plan-dir", fixture.planDir)
+	if err != nil {
+		t.Fatalf("continue command error = %v", err)
+	}
+	for _, want := range []string{"validated: question complete", "next: research", "started child: research"} {
+		if !strings.Contains(continueOut, want) {
+			t.Fatalf("continue output missing %q: %q", want, continueOut)
+		}
+	}
+	if strings.Contains(continueOut, "rawYaml") || strings.Contains(continueOut, "workflow") {
+		t.Fatalf("continue output exposed raw decision dump: %q", continueOut)
+	}
+	state = loadManagerState(t, stateFile)
+	if state.ActiveChild == nil || state.ActiveChild.Stage != "research" || state.ActiveChild.TmuxPaneID != "%new" || state.PendingCleanupChild != nil {
+		t.Fatalf("state after continue = %+v", state)
+	}
+	if len(tmux.kills) != 1 || tmux.kills[0].ID != "%old" {
+		t.Fatalf("kills = %#v, want %%old", tmux.kills)
+	}
+}
+
 func TestEndToEndCommandSurface(t *testing.T) {
 	fixture := newManagerFlowFixture(t)
 	runner := &fakeChildRunner{writeResult: true}

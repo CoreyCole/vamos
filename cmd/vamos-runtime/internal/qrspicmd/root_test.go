@@ -23,7 +23,7 @@ func TestRootRequiresExplicitSubcommand(t *testing.T) {
 
 func TestSubcommandsExist(t *testing.T) {
 	cmd := NewCommand()
-	for _, name := range []string{"init", "run-child", "validate-result", "decide-next", "reprompt-child", "render-prompt"} {
+	for _, name := range []string{"init", "run-child", "validate-result", "decide-next", "reprompt-child", "continue", "render-prompt"} {
 		found := false
 		for _, child := range cmd.Commands() {
 			if child.Name() == name {
@@ -159,6 +159,18 @@ func TestRepromptChildRequiresStatePlanAndStage(t *testing.T) {
 			assertErrorContains(t, executeForError(tc.args...), tc.want)
 		})
 	}
+}
+
+func TestContinueRequiresStateAndActiveChild(t *testing.T) {
+	assertErrorContains(t, executeForError("continue"), "state-file is required")
+
+	dir := t.TempDir()
+	stateFile := filepath.Join(dir, "state.json")
+	if err := (FileStateStore{}).Save(stateFile, ManagerState{CanonicalPlanDir: "thoughts/example", Workflow: testWorkflowState(t, "question", nil)}); err != nil {
+		t.Fatal(err)
+	}
+	err := executeForError("continue", "--state-file", stateFile)
+	assertErrorContains(t, err, "no active child to continue")
 }
 
 func TestRenderPromptRequiresStateAndNode(t *testing.T) {

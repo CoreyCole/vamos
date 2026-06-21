@@ -24,6 +24,7 @@ const (
 	StatusComplete   ResultStatus = "complete"
 	StatusDone       ResultStatus = "done"
 	StatusNeedsHuman ResultStatus = "needs_human"
+	StatusHandoff    ResultStatus = "handoff"
 	StatusBlocked    ResultStatus = "blocked"
 	StatusError      ResultStatus = "error"
 )
@@ -100,7 +101,7 @@ func (c ResultContract) AllowsOutcome(outcome ResultOutcome) bool {
 
 func isKnownStatus(status ResultStatus) bool {
 	switch status {
-	case StatusComplete, StatusDone, StatusNeedsHuman, StatusBlocked, StatusError:
+	case StatusComplete, StatusDone, StatusNeedsHuman, StatusHandoff, StatusBlocked, StatusError:
 		return true
 	default:
 		return false

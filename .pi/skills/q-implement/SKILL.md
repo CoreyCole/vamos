@@ -19,11 +19,11 @@ QRSPI has a canonical advancement mode plus separate review/retry policy:
 
 ## QRSPI YAML summary contract
 
-The ``summary`` element is used by humans to understand workflow state before asking follow-up questions or advancing. It must be structured, specific, self-contained, not a generic completion label. Use these child elements inside ``summary``:
+The `summary` element is used by humans to understand workflow state before asking follow-up questions or advancing. It must be structured, specific, self-contained, not a generic completion label. Use these child elements inside `summary`:
 
-- ``plan_goal``: overall plan/workflow goal in plain language; not just current stage label.
-- ``stage_completed``: what this stage/session did and how it moves toward the goal. Extremely concise; sacrifice grammar for concision.
-- ``key_decisions``: direction we are headed; significant tradeoffs, risks, open questions, follow-up, or why next step is safe. Use `None.` only when truly none.
+- `plan_goal`: overall plan/workflow goal in plain language; not just current stage label.
+- `stage_completed`: what this stage/session did and how it moves toward the goal. Extremely concise; sacrifice grammar for concision.
+- `key_decisions`: direction we are headed; significant tradeoffs, risks, open questions, follow-up, or why next step is safe. Use `None.` only when truly none.
 
 Keep each child element short: 1-2 concise lines max.
 
@@ -31,11 +31,13 @@ For review stages, always include both: (1) what the entire implementation/plan 
 
 ## QRSPI footer instructions
 
-When more than one artifact is relevant, keep ``artifact`` as the primary next-command artifact and also include ``artifacts`` with every important artifact path, including review records, done summaries, handoffs, ADRs, and follow-up questions.
+When more than one artifact is relevant, keep `artifact` as the primary next-command artifact and also include `artifacts` with every important artifact path, including review records, done summaries, handoffs, ADRs, and follow-up questions.
 
-Do not duplicate artifact lists or machine-control details in prose outside the YAML result result. For normal QRSPI stage completion, the response must be the fenced `yaml` ``qrspi_result`` block followed by a mandatory concise human summary; make both summaries specific enough for humans.
+Do not duplicate artifact lists or machine-control details in prose outside the YAML result result. For normal QRSPI stage completion, the response must be the fenced `yaml` `qrspi_result` block followed by a mandatory concise human summary; make both summaries specific enough for humans.
 
-Runtime completion for the `implement` node happens only when implementation is ready for automated implementation review. Use ``status`complete`status``, ``outcome`complete`outcome``, the final implementation-complete handoff as ``artifact``, and ``next.steps`` steps that read `qrspi-planning`, read `q-review`, read design/outline/plan, read the final handoff, then start `/q-review`. For non-final checkpoint handoffs, still emit a fenced ``qrspi_result`` response, but use ``status`handoff`status`` with no ``outcome`` so the runtime does not advance; set ``artifact`` to the handoff and ``next.steps`` steps that read `qrspi-planning`, read `q-resume`, read design/outline/plan, read the handoff, then start `/q-resume`.
+Runtime completion for the `implement` node happens only when implementation is ready for automated implementation review. Use `status: complete`, `outcome: complete`, the final implementation-complete handoff as `artifact`, and `next.steps` steps that read `qrspi-planning`, read `q-review`, read design/outline/plan, read the final handoff, then start `/q-review`.
+
+For non-final implementation checkpoint handoffs, `status: handoff` is a valid canonical runtime status for the `implement` node. Use `status: handoff` with no `outcome`; the runtime records the checkpoint, keeps the workflow on `implement`, and stops without marking it blocked/error. Set `artifact` to the handoff and `next.steps` steps that read `qrspi-planning`, read `q-resume`, read design/outline/plan, read the handoff, then start `/q-resume`.
 
 ```yaml
 qrspi_result:
@@ -127,7 +129,7 @@ qrspi_result:
         param: "[concrete next-stage]"
 ```
 
-`status` is lifecycle. `outcome` selects the graph branch. After `/q-workspace`, omit top-level ``workspace`` and keep both ``plan_workspace`` and ``implementation_workspace`` inside ``workspace_metadata``. ``workspace_metadata`` records workspace identity plus branch context for humans and runtime handoff/debugging: `trunk_branch` is usually `main`; `stack_bottom_branch` is the lowest Graphite branch above trunk; `parent_branch` is the branch immediately below the chunk of work just completed; `current_branch` is the branch created/updated for the chunk. Use empty elements when not in a Graphite repo or the value is unknowable. ``next.steps`` is an ordered instruction block containing only `step` children. Complete results must include ``outcome``. Review stages must use explicit node IDs (`review-outline`, `review-plan`, or `review-implementation`), never `review`.
+`status` is lifecycle. `outcome` selects the graph branch. After `/q-workspace`, omit top-level `workspace` and keep both `plan_workspace` and `implementation_workspace` inside `workspace_metadata`. `workspace_metadata` records workspace identity plus branch context for humans and runtime handoff/debugging: `trunk_branch` is usually `main`; `stack_bottom_branch` is the lowest Graphite branch above trunk; `parent_branch` is the branch immediately below the chunk of work just completed; `current_branch` is the branch created/updated for the chunk. Use empty elements when not in a Graphite repo or the value is unknowable. `next.steps` is an ordered instruction block containing only `step` children. Complete results must include `outcome`. Review stages must use explicit node IDs (`review-outline`, `review-plan`, or `review-implementation`), never `review`.
 
 You are the seventh stage of the QRSPI pipeline. You execute exactly one unchecked slice per invocation, update status checkboxes, create a handoff after every verified slice, and then stop. Each slice should leave the engineer with a concrete, reviewable/testable increment: code diff, behavior, verification command, and artifact/handoff evidence. Only after **all slices are complete** may the final handoff send implementation to `/q-review`, which writes the canonical implementation review artifact to `[plan_dir]/reviews/`. Never prompt for review after an intermediate slice. The plan and the handoffs are your roadmap and your recovery mechanism when the context window resets.
 
@@ -169,7 +171,7 @@ Then wait for input.
 
 1. **Use the implementation workspace created or repaired by `/q-workspace`:**
 
-   - Implementation must run inside the absolute path recorded by `/q-workspace` in the latest QRSPI ``implementation_workspace`` metadata element and in `plan.md`'s `Implementation Workspace Prep` section.
+   - Implementation must run inside the absolute path recorded by `/q-workspace` in the latest QRSPI `implementation_workspace` metadata element and in `plan.md`'s `Implementation Workspace Prep` section.
    - Do not create another fresh copy during `/q-implement`. If the recorded workspace path is missing, inaccessible, dirty in an unexpected way, or does not contain `[plan_dir]/plan.md`, stop and ask rather than silently creating a second implementation copy.
    - Never use `git worktree` for `/q-implement` work.
    - If invoked from the planning/source checkout, switch to the recorded workspace before branch setup and code edits.
@@ -209,7 +211,7 @@ Then wait for input.
      i. After `gt create`/`gt modify`, capture workspace branch metadata for the handoff and response YAML: `current_branch` from `git branch --show-current`, `parent_branch` as the Graphite branch immediately below the current/just-created branch, `stack_bottom_branch` as the lowest branch above trunk in `gt log short`, and `trunk_branch` as the trunk branch from that stack (usually `main`).
      j. Create the required implementation handoff **after branch creation** so it records the final branch names. Set handoff frontmatter `branch` to the new/current slice branch. For `git_commit`, use the current pre-handoff branch hash plus a note in the handoff that the branch is amended after handoff creation; the final branch-head hash belongs in the QRSPI YAML response after the amend.
      k. Stage the handoff and amend the slice with `gt modify --no-interactive` (or `gt modify --no-interactive -m "$(cat /tmp/slice-commit-message.txt)"` if the message needs to be preserved/updated). Do **not** use `gt modify --commit` for post-create handoff/content fixes; `gt modify` amends by default and `--commit` creates an additional commit. Capture the final branch-head hash with `git rev-parse --short HEAD` for the response YAML only. Do not amend solely to chase the final self-referential hash inside the handoff.
-     l. Commit messages must follow Conventional Commits 1.0.0: ``type`[optional scope]: `description`` as the subject, optional explanatory body, then footer section. Include the QRSPI YAML as a footer after a blank line, wrapped in fenced YAML `qrspi_commit` and containing `plan`, `stage`, `slice`, `summary`, and `artifacts` entries for exact design, outline, and plan paths. If the slice's `### Commit Message` block is missing, non-conventional, or lacks the YAML result block, update `plan.md` before committing.
+     l. Commit messages must follow Conventional Commits 1.0.0: `` type`[optional scope]: `description `` as the subject, optional explanatory body, then footer section. Include the QRSPI YAML as a footer after a blank line, wrapped in fenced YAML `qrspi_commit` and containing `plan`, `stage`, `slice`, `summary`, and `artifacts` entries for exact design, outline, and plan paths. If the slice's `### Commit Message` block is missing, non-conventional, or lacks the YAML result block, update `plan.md` before committing.
      m. If additional edit work remains unchecked after this work, do **not** pre-create the next branch. The checkpoint handoff should use `Done: ...` and `Next: ...`, not reference slice number. It should tell the next `/q-resume` agent to implement the next work on the current top branch and run `gt create <slug>_slice-N` only after that work is implemented and verified. Do **not** mention `/q-review` yet.
      n. If only verification-only work remains, do not pre-create a branch for it. The checkpoint handoff should point to `/q-resume`; the resumed agent will run the verification-only work in the current implementation workspace.
      o. If this was the last unchecked slice, do the final verification pass, create/modify the final slice branch first when tracked edits exist, then write a concise finished-implementation summary and review handoff via `/q-handoff continue`; stage that handoff and amend the final slice. For verification-only completion with no tracked changes, write the review handoff without a new branch/commit.
@@ -232,7 +234,7 @@ Then wait for input.
 
 If your context window resets mid-implementation:
 
-1. Confirm you are in the implementation workspace recorded by `/q-workspace` and not a `git worktree`. Use the recorded workspace path from the latest QRSPI ``implementation_workspace`` metadata element or `plan.md`'s `Implementation Workspace Prep`; do not recreate it unless the user explicitly approves replacement. For implementation-review follow-up plans under `reviews/*_implementation-review/`, verify this is the same original workspace that was reviewed and that the reviewed implementation head recorded by `/q-workspace` is an ancestor of the current branch.
+1. Confirm you are in the implementation workspace recorded by `/q-workspace` and not a `git worktree`. Use the recorded workspace path from the latest QRSPI `implementation_workspace` metadata element or `plan.md`'s `Implementation Workspace Prep`; do not recreate it unless the user explicitly approves replacement. For implementation-review follow-up plans under `reviews/*_implementation-review/`, verify this is the same original workspace that was reviewed and that the reviewed implementation head recorded by `/q-workspace` is an ancestor of the current branch.
 1. Read `[plan_dir]/AGENTS.md`
 1. Read `[plan_dir]/design-product.md` if present
 1. Read `[plan_dir]/plan.md`
@@ -247,15 +249,15 @@ This is why the checkboxes and handoffs exist. Keep them updated.
 
 After completing planned work, create the required `/q-handoff` artifact first. Do not include separate `Implemented:`, `Verification:`, `Artifact path:`, or `Next command:` prose lines. In the handoff, use only `Done:` and `Next:` for the human summary; no slice numbers. End `Done:` with `([finished]/[total])` progress.
 
-For non-final implementation work, write the handoff artifact and emit the fenced YAML response with ``stage`implement`stage``, ``status`handoff`status``, no ``outcome``, ``artifact`` set to the new handoff, and ``next.steps`` steps that read `qrspi-planning`, read `q-resume`, read exact `design.md`, exact `outline.md`, exact `plan.md`, exact handoff path, then start `/q-resume`. This records the checkpoint without advancing the runtime `implement` node. Handoff content must use `Done: ...` and `Next: ...`; do not identify work by slice number. For final implementation work, emit the fenced YAML result block described above with ``status`complete`status``, ``outcome`complete`outcome``, ``workspace_metadata`` populated from the post-commit branch stack, the final completion handoff as ``artifact``, and ``next.steps`` steps that read `q-review`, design, outline, plan, final handoff, then start `/q-review`. Put what changed, engineer-test/review instructions, verification commands/results, completed work, and next-step rationale in the YAML ``summary`` and ``artifacts`` as needed.
+For non-final implementation work, write the handoff artifact and emit the fenced YAML response with `stage: implement`, `status: handoff`, no `outcome`, `artifact` set to the new handoff, and `next.steps` steps that read `qrspi-planning`, read `q-resume`, read exact `design.md`, exact `outline.md`, exact `plan.md`, exact handoff path, then start `/q-resume`. This records the checkpoint without advancing the runtime `implement` node or marking it blocked/error. Handoff content must use `Done: ...` and `Next: ...`; do not identify work by slice number. For final implementation work, emit the fenced YAML result block described above with `status: complete`, `outcome: complete`, `workspace_metadata` populated from the post-commit branch stack, the final completion handoff as `artifact`, and `next.steps` steps that read `q-review`, design, outline, plan, final handoff, then start `/q-review`. Put what changed, engineer-test/review instructions, verification commands/results, completed work, and next-step rationale in the YAML `summary` and `artifacts` as needed.
 
-Final response format is strict for both checkpoint and complete implementation results: first a fenced `yaml` block containing the ``qrspi_result``, then exactly one concise natural-language summary line or 1-3 short bullets. Do not include any prose before the YAML result result. Do not include separate `Implemented:`, `Verification:`, `Artifact path:`, `Next command:`, or other headings outside the YAML result result.
+Final response format is strict for both checkpoint and complete implementation results: first a fenced `yaml` block containing the `qrspi_result`, then exactly one concise natural-language summary line or 1-3 short bullets. Do not include any prose before the YAML result result. Do not include separate `Implemented:`, `Verification:`, `Artifact path:`, `Next command:`, or other headings outside the YAML result result.
 
 ## Rules
 
 - Implement exactly one slice per invocation. Never roll directly into the next slice after finishing one.
 - Every implementation and review-fix slice should be independently reviewable/testable by the engineer. Include the diff/branch context, behavior to inspect, and exact verification/manual test command or UI scenario in the handoff/YAML summary.
-- Always do `/q-implement` work in the fresh filesystem copy created/repaired by `/q-workspace` and recorded in ``implementation_workspace`` / `plan.md`. Never use `git worktree`.
+- Always do `/q-implement` work in the fresh filesystem copy created/repaired by `/q-workspace` and recorded in `implementation_workspace` / `plan.md`. Never use `git worktree`.
 - Do not create a second normal implementation copy in `/q-implement`; stop and ask if the recorded workspace is missing or unusable.
 - Run the verify step after EVERY slice. Do not skip verification.
 - Update the plan's status checkboxes as you complete slices — this is mandatory, not optional.
@@ -270,9 +272,9 @@ Final response format is strict for both checkpoint and complete implementation 
 - For non-final implementation work, do not end with `plan.md` as the primary artifact and do not suggest `/q-implement [plan_dir]` as the canonical next step. The canonical next step is `/q-resume [new handoff path]`. Handoff prose must use `Done: ...` and `Next: ...`, not slice number.
 - Before writing any implementation handoff, rewrite any phrase like `Completed slice N` or `Next slice N` into `Done: [behavior/files/outcome] ([finished]/[total])` and `Next: [behavior/files/outcome]`.
 - When implementation is complete, the completion handoff must target `/q-review` and summarize the finished implementation, not just the last slice.
-- End every successful workflow-node response with the required fenced `yaml` ``qrspi_result`` footer followed by the mandatory concise human summary; put implementation, verification, artifact, and next-step details in the YAML ``summary``, ``artifact``, ``artifacts``, and ``next.steps`` elements.
-- Do not include top-level ``workspace`` in implementation result YAML after `/q-workspace`; instead include ``workspace_metadata`` immediately after ``outcome`` in complete results (or after ``status`` for non-complete results that omit ``outcome``).
-- Include both ``plan_workspace`` and ``implementation_workspace`` as the first children of ``workspace_metadata``, then branch metadata. For Graphite repos, fill `trunk_branch`, `stack_bottom_branch`, `parent_branch`, and `current_branch` after branch creation/modification. For verification-only or non-Graphite work, include empty elements for unknown values and preserve `current_branch` when known.
+- End every successful workflow-node response with the required fenced `yaml` `qrspi_result` footer followed by the mandatory concise human summary; put implementation, verification, artifact, and next-step details in the YAML `summary`, `artifact`, `artifacts`, and `next.steps` elements.
+- Do not include top-level `workspace` in implementation result YAML after `/q-workspace`; instead include `workspace_metadata` immediately after `outcome` in complete results (or after `status` for non-complete results that omit `outcome`).
+- Include both `plan_workspace` and `implementation_workspace` as the first children of `workspace_metadata`, then branch metadata. For Graphite repos, fill `trunk_branch`, `stack_bottom_branch`, `parent_branch`, and `current_branch` after branch creation/modification. For verification-only or non-Graphite work, include empty elements for unknown values and preserve `current_branch` when known.
 - Never push or open a pull request as part of this skill unless the user explicitly asks for it.
 - If you hit a problem not covered by the plan, update the plan before continuing. The plan stays alive.
 - Read the code you're about to modify before changing it — the codebase may have evolved since the plan was written.

@@ -70,6 +70,34 @@ func TestQRSPITransitions(t *testing.T) {
 	state = assertTerminal(t, def, state, NodeDone)
 }
 
+func TestQRSPIImplementHandoffStopsWithoutBlocking(t *testing.T) {
+	def, err := Definition()
+	if err != nil {
+		t.Fatal(err)
+	}
+	state, err := wruntime.InitialState(def, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	state.CurrentNodeID = NodeImplement
+
+	result := qrspiResult(NodeImplement, wruntime.StatusHandoff)
+	result.Outcome = ""
+	decision, err := wruntime.DecideTransition(def, state, result)
+	if err != nil {
+		t.Fatalf("DecideTransition() error = %v", err)
+	}
+	if decision.StartNext || decision.NextNodeID != NodeImplement || decision.StopReason != "result handoff" {
+		t.Fatalf("decision = %+v", decision)
+	}
+	if decision.State.Status != wruntime.WorkspaceStatusIdle || decision.State.PendingNextNodeID != NodeImplement {
+		t.Fatalf("state = %+v", decision.State)
+	}
+	if got := decision.State.Nodes[NodeImplement].Status; got != wruntime.NodeStatusPending {
+		t.Fatalf("implement node status = %q, want pending", got)
+	}
+}
+
 func TestQRSPIPlanReviewsDisabledUsesConfigEdges(t *testing.T) {
 	def, err := Definition()
 	if err != nil {

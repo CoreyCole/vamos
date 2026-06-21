@@ -39,6 +39,7 @@ func newCommand(d deps) *cobra.Command {
 		newValidateResultCommand(d),
 		newDecideNextCommand(d),
 		newRepromptChildCommand(d),
+		newContinueCommand(d),
 		newRenderPromptCommand(d),
 	)
 	return cmd
@@ -135,6 +136,25 @@ func newRepromptChildCommand(d deps) *cobra.Command {
 	cmd.Flags().IntVar(&opts.Attempt, "attempt", 1, "validation retry attempt number")
 	cmd.Flags().StringVar(&opts.ErrorText, "error", "", "validation error text")
 	cmd.Flags().StringVar(&opts.ErrorFile, "error-file", "", "file containing validation error text")
+	return cmd
+}
+
+func newContinueCommand(d deps) *cobra.Command {
+	opts := ContinueOptions{Split: "right", Timeout: 0, Output: "text"}
+	cmd := &cobra.Command{
+		Use:   "continue --state-file <file>",
+		Short: "Validate active child and continue the QRSPI graph when safe",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return RunContinue(cmd.Context(), opts, d, cmd.OutOrStdout())
+		},
+	}
+	cmd.Flags().StringVar(&opts.StateFile, "state-file", "", "q-manager state file")
+	cmd.Flags().StringVar(&opts.PlanDir, "plan-dir", "", "QRSPI plan directory; defaults from state")
+	cmd.Flags().StringVar(&opts.Stage, "stage", "", "expected active child node; defaults from state")
+	cmd.Flags().StringVar(&opts.Cwd, "cwd", "", "next child cwd override")
+	cmd.Flags().StringVar(&opts.Split, "split", "right", "tmux split direction for next child")
+	cmd.Flags().DurationVar(&opts.Timeout, "timeout", 0, "maximum time to wait for next child; 0 returns after launch")
+	cmd.Flags().StringVar(&opts.Output, "output", "text", "output format: text or ndjson")
 	return cmd
 }
 
@@ -413,6 +433,214 @@ func repromptErrorText(opts RepromptChildOptions) (string, error) {
 		return string(data), nil
 	}
 	return "child result failed QRSPI validation", nil
+}
+
+func RunContinue(ctx context.Context, opts ContinueOptions, d deps, out io.Writer) error {
+	if strings.TrimSpace(opts.StateFile) == "" {
+		return errors.New("state-file is required")
+	}
+	out = ensureWriter(out)
+	clock := d.Clock
+	if clock == nil {
+		clock = time.Now
+	}
+	store := stateStore(d, "", clock)
+	state, err := store.Load(opts.StateFile)
+	if err != nil {
+		return err
+	}
+	if strings.TrimSpace(opts.PlanDir) == "" {
+		opts.PlanDir = state.CanonicalPlanDir
+	}
+	if strings.TrimSpace(opts.PlanDir) == "" {
+		return errors.New("plan-dir is required")
+	}
+	if state.ActiveChild == nil {
+		return errors.New("no active child to continue")
+	}
+	if strings.TrimSpace(opts.Stage) == "" {
+		opts.Stage = state.ActiveChild.Stage
+	}
+	if strings.TrimSpace(opts.Stage) == "" {
+		return errors.New("stage is required")
+	}
+
+	result := ContinueResult{}
+	parsed, err := validateActiveChild(ctx, state, opts)
+	if err != nil {
+		return err
+	}
+	result.Validated = &parsed
+	result.PrimaryArtifact = parsed.Result.PrimaryArtifact
+
+	nextState, err := decideValidatedResult(ctx, state, parsed, opts, store)
+	if err != nil {
+		return err
+	}
+	result.Decided = true
+	result.NextNodeID = parsed.Decision.NextNodeID
+	result.WaitingHuman = parsed.Decision.WaitingHuman
+	result.StopReason = parsed.Decision.StopReason
+
+	if parsed.Decision.StartNext {
+		launched, err := startNextChildFromDecision(ctx, nextState, parsed.Decision, opts, d, out)
+		if err != nil {
+			return err
+		}
+		result.StartedChild = launched.ActiveChild
+	}
+	return writeContinueOutput(out, opts, result)
+}
+
+func validateActiveChild(ctx context.Context, state ManagerState, opts ContinueOptions) (ParsedDecision, error) {
+	_ = ctx
+	text, parseCtx, err := ReadChildResultText(state, ResultSourceOptions{})
+	if err != nil {
+		return ParsedDecision{}, err
+	}
+	parseCtx.ExpectedNodeID = wruntime.NodeID(opts.Stage)
+	return ParseValidateDecide(text, state.Workflow, parseCtx)
+}
+
+func decideValidatedResult(ctx context.Context, state ManagerState, parsed ParsedDecision, opts ContinueOptions, store StateStore) (ManagerState, error) {
+	_ = ctx
+	state.Workflow = parsed.Decision.State
+	state = UpdateImplementationCwd(state, parsed.Result)
+	if parsed.Decision.StartNext {
+		state = markPendingCleanup(state)
+	}
+	if err := store.Save(opts.StateFile, state); err != nil {
+		return ManagerState{}, err
+	}
+	return state, nil
+}
+
+func startNextChildFromDecision(ctx context.Context, state ManagerState, decision wruntime.TransitionDecision, opts ContinueOptions, d deps, out io.Writer) (ManagerState, error) {
+	nodeID := decision.NextNodeID
+	if nodeID == "" {
+		return state, errors.New("transition has no next node")
+	}
+	promptFile, err := renderContinuePromptFile(ctx, state, nodeID, opts)
+	if err != nil {
+		return state, err
+	}
+	cwd := strings.TrimSpace(opts.Cwd)
+	if cwd == "" {
+		cwd = defaultContinueCwd(state, nodeID)
+	}
+	if cwd == "" {
+		return state, errors.New("next child cwd is required")
+	}
+	runOut := io.Writer(io.Discard)
+	if strings.EqualFold(opts.Output, "ndjson") {
+		runOut = out
+	}
+	if err := RunChild(ctx, RunChildOptions{
+		PlanDir:    opts.PlanDir,
+		Stage:      string(nodeID),
+		Cwd:        cwd,
+		PromptFile: promptFile,
+		StateFile:  opts.StateFile,
+		Split:      opts.Split,
+		Timeout:    opts.Timeout,
+	}, d, runOut); err != nil {
+		return state, err
+	}
+	store := stateStore(d, "", time.Now)
+	return store.Load(opts.StateFile)
+}
+
+func defaultContinueCwd(state ManagerState, node wruntime.NodeID) string {
+	switch node {
+	case "implement", "review-implementation", "verify":
+		if strings.TrimSpace(state.ImplementationCwd) != "" {
+			return state.ImplementationCwd
+		}
+	}
+	return state.SourceCwd
+}
+
+func renderContinuePromptFile(ctx context.Context, state ManagerState, nodeID wruntime.NodeID, opts ContinueOptions) (string, error) {
+	_ = ctx
+	def, err := Definition()
+	if err != nil {
+		return "", err
+	}
+	node, ok := def.Nodes[nodeID]
+	if !ok {
+		return "", fmt.Errorf("node %q is not in QRSPI definition", nodeID)
+	}
+	manifest, err := LoadManifest(state.SourceCwd)
+	if err != nil {
+		return "", err
+	}
+	prompt, err := RenderStagePrompt(PromptContext{Node: node, State: state, PlanDir: opts.PlanDir, Manifest: manifest, LastResult: state.Workflow.LastResult})
+	if err != nil {
+		return "", err
+	}
+	path := ""
+	if state.ActiveChild != nil && strings.TrimSpace(state.ActiveChild.OutputPath) != "" {
+		path = filepath.Join(filepath.Dir(state.ActiveChild.OutputPath), "next-"+string(nodeID)+"-prompt.md")
+	} else {
+		path = filepath.Join(filepath.Dir(opts.StateFile), "prompts", string(nodeID)+".md")
+	}
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return "", err
+	}
+	if err := os.WriteFile(path, []byte(prompt), 0o644); err != nil {
+		return "", err
+	}
+	return path, nil
+}
+
+func writeContinueOutput(out io.Writer, opts ContinueOptions, result ContinueResult) error {
+	if strings.EqualFold(opts.Output, "ndjson") {
+		return WriteNDJSON(out, Event{Type: "continued", Decision: result.Validated, Ref: continueRef(result)})
+	}
+	return writeContinueText(out, result)
+}
+
+func writeContinueText(out io.Writer, result ContinueResult) error {
+	if result.Validated != nil {
+		fmt.Fprintf(out, "validated: %s %s\n", result.Validated.Result.SourceNodeID, result.Validated.Result.Status)
+		if result.Validated.Result.Outcome != "" {
+			fmt.Fprintf(out, "outcome: %s\n", result.Validated.Result.Outcome)
+		}
+	}
+	if result.PrimaryArtifact != "" {
+		fmt.Fprintf(out, "artifact: %s\n", result.PrimaryArtifact)
+	}
+	if result.NextNodeID != "" {
+		fmt.Fprintf(out, "next: %s\n", result.NextNodeID)
+	}
+	if result.StartedChild != nil {
+		fmt.Fprintf(out, "started child: %s (%s)\n", result.StartedChild.Stage, result.StartedChild.TmuxPaneID)
+	}
+	if result.WaitingHuman {
+		_, err := fmt.Fprintln(out, "stop: waiting human")
+		return err
+	}
+	if result.StopReason != "" && result.StartedChild == nil {
+		fmt.Fprintf(out, "stop: %s\n", result.StopReason)
+	}
+	return nil
+}
+
+func continueRef(result ContinueResult) map[string]any {
+	ref := map[string]any{"reprompted": result.Reprompted, "waitingHuman": result.WaitingHuman}
+	if result.NextNodeID != "" {
+		ref["nextNode"] = result.NextNodeID
+	}
+	if result.PrimaryArtifact != "" {
+		ref["artifact"] = result.PrimaryArtifact
+	}
+	if result.StopReason != "" {
+		ref["stopReason"] = result.StopReason
+	}
+	if result.StartedChild != nil {
+		ref["startedChild"] = childRef(result.StartedChild)
+	}
+	return ref
 }
 
 func RunDecideNext(ctx context.Context, opts DecideNextOptions, d deps, out io.Writer) error {

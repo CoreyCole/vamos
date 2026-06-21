@@ -53,9 +53,9 @@ qrspi_result:
         param: "[concrete next-stage]"
 ```
 
-`status` is lifecycle. `outcome` selects the graph branch. Before `/q-workspace`, top-level ``workspace`` is the absolute active QRSPI plan/ticket directory. After `/q-workspace`, omit top-level ``workspace`` and record both ``plan_workspace`` and ``implementation_workspace`` inside ``workspace_metadata``. ``workspace_metadata`` records workspace identity plus branch context for humans and runtime handoff/debugging: `trunk_branch` is usually `main`; `stack_bottom_branch` is the lowest Graphite branch above trunk; `parent_branch` is the branch immediately below the chunk of work just completed; `current_branch` is the branch created/updated for the chunk. Use empty elements when a value is unknowable. For resume handoffs, ``next.steps`` is an ordered instruction block: read `qrspi-planning`, read `q-resume`, read `design.md`, read `outline.md`, read `plan.md`, read the handoff, then start `/q-resume` immediately unless blocked. Runtime transitions remain graph-authoritative and may validate/rewrite the steps. Complete results must include ``outcome``. Review stages must use explicit node IDs (`review-outline`, `review-plan`, or `review-implementation`), never `review`.
+`status` is lifecycle. `outcome` selects the graph branch. Before `/q-workspace`, top-level `workspace` is the absolute active QRSPI plan/ticket directory. After `/q-workspace`, omit top-level `workspace` and record both `plan_workspace` and `implementation_workspace` inside `workspace_metadata`. `workspace_metadata` records workspace identity plus branch context for humans and runtime handoff/debugging: `trunk_branch` is usually `main`; `stack_bottom_branch` is the lowest Graphite branch above trunk; `parent_branch` is the branch immediately below the chunk of work just completed; `current_branch` is the branch created/updated for the chunk. Use empty elements when a value is unknowable. For resume handoffs, `next.steps` is an ordered instruction block: read `qrspi-planning`, read `q-resume`, read `design.md`, read `outline.md`, read `plan.md`, read the handoff, then start `/q-resume` immediately unless blocked. Runtime transitions remain graph-authoritative and may validate/rewrite the steps. Complete results must include `outcome`. Review stages must use explicit node IDs (`review-outline`, `review-plan`, or `review-implementation`), never `review`.
 
-Every `/q-handoff` session starts by reading `.pi/skills/qrspi-planning/SKILL.md`, then this skill, then immediately writing the handoff. A later continuation session must read `qrspi-planning`, then the skill named by ``next.steps``, then start that stage immediately unless a safety/human gate blocks.
+Every `/q-handoff` session starts by reading `.pi/skills/qrspi-planning/SKILL.md`, then this skill, then immediately writing the handoff. A later continuation session must read `qrspi-planning`, then the skill named by `next.steps`, then start that stage immediately unless a safety/human gate blocks.
 
 You are creating a handoff document to preserve your working context within a QRSPI planning pipeline. This handoff will be used by a future session to continue working on the same stage, or to pick up at the next stage.
 
@@ -145,7 +145,8 @@ If unknown, ask the user.
 - `continue`: set `status: complete`, compute `next_stage`
   - For `question` through `plan`, point the user to `/q-resume` so the next QRSPI stage can begin immediately. The next session must read `qrspi-planning`, read the next stage skill from the resumed graph state, and start that stage; do not say “ready to proceed.”
   - For `implement`, use this only when all implementation slices are complete; then set `next_stage: review` and point the user directly to `/q-review`, which should start immediately.
-- checkpoint: set `status: in_progress`
+- checkpoint: set handoff document frontmatter `status: in_progress`.
+  - For QRSPI result YAML during non-final implementation checkpoints, use runtime `status: handoff` (not `blocked`, not `complete`, no `outcome`). This is valid for the `implement` node and keeps the workflow resumable without marking it blocked/error.
   - Use this for any non-final implementation checkpoint so the next step remains `/q-resume`.
 
 ### 4. Capture key learnings and refresh long-term memory only if essential
@@ -232,7 +233,7 @@ For non-implementation stages, run `just sync-thoughts` from the normal source c
 
 For implementation handoffs from a fresh copied repo, first check the current branch:
 
-```bash
+````bash
 git branch --show-current
 git status --short
 ```yaml
@@ -299,20 +300,21 @@ qrspi_result:
         param: "thoughts/..."
       - action: "start_stage"
         param: "[concrete next-stage]"
-```
+````
 
-Line-quality requirements still apply inside ``summary``:
+Line-quality requirements still apply inside `summary`:
 
-- Before `/q-workspace`, top-level ``workspace`` must be present and point at the absolute active plan/ticket directory.
-- After `/q-workspace`, top-level ``workspace`` must be omitted; ``workspace_metadata`` must include both ``plan_workspace`` and ``implementation_workspace`` before branch metadata.
-- ``workspace_metadata`` must be present. For implementation handoffs after Graphite branch creation, fill `trunk_branch`, `stack_bottom_branch`, `parent_branch`, and `current_branch`; for non-Graphite/planning contexts, include empty elements except `current_branch` when known.
-- ``stage_completed`` must describe the actual work, not generic `stage complete`.
-- ``key_decisions`` must include verification evidence when known, or say why verification was not run.
+- Before `/q-workspace`, top-level `workspace` must be present and point at the absolute active plan/ticket directory.
+- After `/q-workspace`, top-level `workspace` must be omitted; `workspace_metadata` must include both `plan_workspace` and `implementation_workspace` before branch metadata.
+- `workspace_metadata` must be present. For implementation handoffs after Graphite branch creation, fill `trunk_branch`, `stack_bottom_branch`, `parent_branch`, and `current_branch`; for non-Graphite/planning contexts, include empty elements except `current_branch` when known.
+- `stage_completed` must describe the actual work, not generic `stage complete`.
+- `key_decisions` must include verification evidence when known, or say why verification was not run.
 - Never abbreviate artifact paths.
 
 Next routing:
 
-- For `continue` mode from `implement`, use `/q-review` in YAML ``next.steps`` and make ``summary.key_decisions`` say `Next stage should start immediately: /q-review ...`.
-- For all other handoffs, use `/q-resume` in YAML ``next.steps`` and make ``summary.key_decisions`` say the next session should read `qrspi-planning`, then `/q-resume`, then exact `design.md`, exact `outline.md`, exact `plan.md`, exact handoff path, then start the resumed stage immediately.
+- For `continue` mode from `implement`, use `status: complete`, `outcome: complete`, `/q-review` in YAML `next.steps`, and make `summary.key_decisions` say `Next stage should start immediately: /q-review ...`.
+- For non-final implementation checkpoints, use `status: handoff`, omit `outcome`, use `/q-resume` in YAML `next.steps`, and make `summary.key_decisions` say the next session should read `qrspi-planning`, then `/q-resume`, then exact `design.md`, exact `outline.md`, exact `plan.md`, exact handoff path, then resume implementation in the same workspace.
+- For all other handoffs, use `/q-resume` in YAML `next.steps` and make `summary.key_decisions` say the next session should read `qrspi-planning`, then `/q-resume`, then exact `design.md`, exact `outline.md`, exact `plan.md`, exact handoff path, then start the resumed stage immediately.
 
 Never abbreviate paths.

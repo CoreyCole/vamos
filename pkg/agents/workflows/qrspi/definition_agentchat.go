@@ -89,7 +89,7 @@ func Definition() (wruntime.Definition, error) {
 		Outcomes(wruntime.OutcomeComplete).
 		RequiresPrimaryArtifact().
 		Agent(NodeImplement, Skill(".pi/skills/q-implement/SKILL.md")).
-		Statuses(wruntime.StatusComplete, wruntime.StatusBlocked, wruntime.StatusError).
+		Statuses(wruntime.StatusComplete, wruntime.StatusHandoff, wruntime.StatusBlocked, wruntime.StatusError).
 		Outcomes(wruntime.OutcomeComplete).
 		RequiresPrimaryArtifact().
 		Agent(NodeReviewImplementation, Skill(".pi/skills/q-review/SKILL.md")).
