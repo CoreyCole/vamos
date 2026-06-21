@@ -213,6 +213,76 @@ func TestInvalidReviewPlanReadyForImplementStopsClearly(t *testing.T) {
 	}
 }
 
+func TestWakeDrivenManagerLoopCleansOldPaneAfterNextLaunch(t *testing.T) {
+	fixture := newManagerFlowFixture(t)
+	runner := &fakeChildRunner{panes: []string{"%old", "%new"}}
+	initOut, err := executeManagerCommand(deps{StateRoot: fixture.stateRootFunc, Clock: fixture.clock, Runner: runner}, "init", "--plan-dir", fixture.planDir, "--project-root", fixture.projectRoot, "--manager-pane", "%parent")
+	if err != nil {
+		t.Fatalf("init command error = %v", err)
+	}
+	stateFile := eventRefString(t, initOut, "stateFile")
+
+	renderOut, err := executeManagerCommand(deps{}, "render-prompt", "--state-file", stateFile, "--node", "question", "--plan-dir", fixture.planDir)
+	if err != nil {
+		t.Fatalf("render command error = %v", err)
+	}
+	promptFile := filepath.Join(fixture.dir, "prompt.txt")
+	writeFile(t, promptFile, renderOut)
+
+	runOut, err := executeManagerCommand(deps{Clock: fixture.clock, Runner: runner}, "run-child", "--state-file", stateFile, "--plan-dir", fixture.planDir, "--stage", "question", "--cwd", fixture.projectRoot, "--prompt-file", promptFile, "--timeout", "0")
+	if err != nil {
+		t.Fatalf("run-child command error = %v", err)
+	}
+	if !strings.Contains(runOut, `"type":"child_started"`) || strings.Contains(runOut, `"type":"child_finished"`) {
+		t.Fatalf("timeout 0 run output = %q", runOut)
+	}
+	state := loadManagerState(t, stateFile)
+	if state.ManagerPaneID != "%parent" || state.ActiveChild == nil || state.ActiveChild.TmuxPaneID != "%old" {
+		t.Fatalf("state after child start = %+v", state)
+	}
+	writeFile(t, state.ActiveChild.StatusPath, `{"event":"agent_end","stage":"question","childId":"`+state.ActiveChild.ID+`","wakeTarget":"%parent"}`)
+	writeFile(t, state.ActiveChild.DonePath, "")
+	writeSessionTestFile(t, filepath.Join(state.ActiveChild.SessionDir, "session.jsonl"), sessionHeader(state.ActiveChild.SessionID, fixture.projectRoot)+"\n"+assistantLine(testResultYAML("question", "complete", "complete", "thoughts/example/questions/q.md", ""))+"\n")
+
+	validateOut, err := executeManagerCommand(deps{}, "validate-result", "--state-file", stateFile, "--stage", "question", "--plan-dir", fixture.planDir)
+	if err != nil {
+		t.Fatalf("validate command error = %v", err)
+	}
+	if !strings.Contains(validateOut, `"type":"validated"`) {
+		t.Fatalf("validate output = %q", validateOut)
+	}
+
+	decideOut, err := executeManagerCommand(deps{}, "decide-next", "--state-file", stateFile, "--plan-dir", fixture.planDir)
+	if err != nil {
+		t.Fatalf("decide command error = %v", err)
+	}
+	if !strings.Contains(decideOut, `"nextNode":"research"`) || !strings.Contains(decideOut, `"startNext":true`) {
+		t.Fatalf("decide output = %q", decideOut)
+	}
+	state = loadManagerState(t, stateFile)
+	if state.PendingCleanupChild == nil || state.PendingCleanupChild.TmuxPaneID != "%old" {
+		t.Fatalf("pending cleanup after decide = %#v", state.PendingCleanupChild)
+	}
+
+	nextPromptFile := filepath.Join(fixture.dir, "research-prompt.txt")
+	writeFile(t, nextPromptFile, "research prompt")
+	tmux := &recordingTmux{}
+	nextOut, err := executeManagerCommand(deps{Clock: fixture.clock, Runner: runner, Tmux: tmux}, "run-child", "--state-file", stateFile, "--plan-dir", fixture.planDir, "--stage", "research", "--cwd", fixture.projectRoot, "--prompt-file", nextPromptFile, "--timeout", "0")
+	if err != nil {
+		t.Fatalf("next run-child command error = %v", err)
+	}
+	if !strings.Contains(nextOut, `"type":"child_started"`) || !strings.Contains(nextOut, `"type":"child_cleaned"`) {
+		t.Fatalf("next run output = %q", nextOut)
+	}
+	state = loadManagerState(t, stateFile)
+	if state.ActiveChild == nil || state.ActiveChild.Stage != "research" || state.ActiveChild.TmuxPaneID != "%new" || state.PendingCleanupChild != nil {
+		t.Fatalf("state after next launch = %+v", state)
+	}
+	if len(tmux.kills) != 1 || tmux.kills[0].ID != "%old" {
+		t.Fatalf("kills = %#v, want %%old", tmux.kills)
+	}
+}
+
 func TestEndToEndCommandSurface(t *testing.T) {
 	fixture := newManagerFlowFixture(t)
 	runner := &fakeChildRunner{writeResult: true}

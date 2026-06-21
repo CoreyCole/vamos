@@ -30,23 +30,56 @@ Supervise QRSPI from a main Pi manager session. Launch focused child Pi sessions
 - Pi session metadata redesign is out of scope; q-manager assigns exact child `--session-id` / `--session-dir` using current Pi flags.
 - Child session JSONL is authoritative for result parsing. tmux transcript/output is diagnostic.
 
-## Start flow
+## Wake-driven manager loop
 
 1. Resolve plan dir and project root.
-1. Run `vamos qrspi init --plan-dir <plan-dir> --project-root <repo-root>` for a new graph, or add `--node <node>` / `--implementation-cwd <cwd>` to resume/test from a specific implementation, review, or verify stage.
-1. Render prompt for current/next node: `vamos qrspi render-prompt --state-file <state> --node <node> --plan-dir <plan-dir>`.
-1. Start visible child and return immediately: `vamos qrspi run-child --state-file <state> --plan-dir <plan-dir> --stage <node> --cwd <cwd> --prompt-file <prompt> --split right --timeout 0`.
-1. Wait for pasted parent wake: `q-manager child finished: <node>`.
-1. Validate from active child session JSONL: `vamos qrspi validate-result --state-file <state> --stage <node> --plan-dir <plan-dir>`.
-1. Invalid result with retry budget: write validation error to a file, then run `vamos qrspi reprompt-child --state-file <state> --plan-dir <plan-dir> --stage <node> --attempt <n> --error-file <validation-error-file>` to correct the same child pane/session.
-1. Valid result: decide from active child session JSONL: `vamos qrspi decide-next --state-file <state> --plan-dir <plan-dir>`.
-1. If decision starts next, render and run the graph-selected next child. If decision stops, report concise reason and next human action.
+1. Initialize or resume graph state:
+   ```bash
+   vamos qrspi init --plan-dir <plan-dir> --project-root <repo-root> --manager-pane "$TMUX_PANE"
+   ```
+   Add `--node <node>` / `--implementation-cwd <cwd>` only when deliberately resuming or testing a specific implementation, review, or verify stage.
+1. Render prompt for the current graph node:
+   ```bash
+   vamos qrspi render-prompt --state-file <state> --node <node> --plan-dir <plan-dir>
+   ```
+1. Start the visible child and return immediately:
+   ```bash
+   vamos qrspi run-child --state-file <state> --plan-dir <plan-dir> --stage <node> --cwd <cwd> --prompt-file <prompt> --split right --timeout 0
+   ```
+1. Wait for the child extension to paste the parent wake:
+   ```text
+   q-manager child finished: <node>
+   ```
+1. Validate from the active child session JSONL:
+   ```bash
+   vamos qrspi validate-result --state-file <state> --stage <node> --plan-dir <plan-dir>
+   ```
+1. Invalid result with retry budget: save the validation error, then reprompt the same pane/session:
+   ```bash
+   vamos qrspi reprompt-child --state-file <state> --plan-dir <plan-dir> --stage <node> --attempt <n> --error-file <validation-error-file>
+   ```
+1. Valid result: decide through the canonical graph:
+   ```bash
+   vamos qrspi decide-next --state-file <state> --plan-dir <plan-dir>
+   ```
+1. If `startNext=true`, render and run the graph-selected next child. Old child pane cleanup happens only after the new child pane starts successfully. If the decision stops, report the concise stop reason and next human action.
 
 Manual/debug overrides: `--session-file <jsonl>` validates a specific child session JSONL. `--result-file <path>` is deprecated fallback for plaintext result files only when no active child session refs are available.
+
+## Child wake contract
+
+q-manager loads a project-local child Pi extension only for q-manager child sessions. On `agent_end`, the extension writes `status.json`, touches `done`, and pastes the wake text to the captured parent tmux pane. The wake means “child turn ended,” not “graph result is valid.” The manager still runs `validate-result` and `decide-next` before any advancement.
 
 ## Result retry
 
 If validation fails and policy retry budget remains, run `reprompt-child` with the validation error file. It pastes the canonical QRSPI parser correction prompt into the same active child pane/session; do not create a new child ID/session. If retry budget is exhausted, stop and ask the human.
+
+## Cleanup and recovery
+
+- Invalid result: keep active child pane/session and reprompt in place while retry remains.
+- Human gate, blocked, error, or retry exhaustion: keep pane/session for inspection and human steering.
+- Valid transition with `startNext=true`: mark old child pending cleanup; start next child; kill old pane only after the new active child is saved.
+- Next-child launch failure or cleanup failure: preserve refs in manager state for recovery.
 
 ## Human gates
 

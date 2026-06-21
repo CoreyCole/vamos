@@ -24,6 +24,18 @@ Before `/q-workspace`, child stages run in the planning/source checkout. After `
 
 Child QRSPI work runs in a visible tmux pane, usually a right split. Humans must be able to watch, interrupt, and steer. Recovery refs must identify the pane/transcript plus `sessionId`, `sessionDir`, `sessionPath` when resolved, `donePath`, and `statusPath`.
 
+## Child wake contract
+
+q-manager child sessions load a local Pi extension that observes `agent_end`. On each completed child agent turn, the extension writes child `status.json`, touches `done`, and pastes a wake message into the captured parent manager pane:
+
+```text
+q-manager child finished: <node>
+state_file: <state-file>
+next: run validate-result; if valid run decide-next; if invalid reprompt same child while retry remains
+```
+
+The wake is only a turn-complete signal. It does not validate YAML, decide transitions, mutate graph state, or imply workflow success. The manager must still run `validate-result` against the active child session JSONL and `decide-next` through the canonical QRSPI runtime before advancement.
+
 ## Session metadata boundary
 
 Do not require Pi session metadata schema/API changes. q-manager assigns exact child `--session-id` values inside manager-owned `--session-dir` directories and treats the resulting Pi session JSONL as the authoritative child result source. tmux/stdout transcripts and plaintext result files are diagnostics only; `--result-file` is a deprecated debug fallback, not the manager default.
@@ -31,6 +43,32 @@ Do not require Pi session metadata schema/API changes. q-manager assigns exact c
 ## Deterministic reload sources
 
 Reload from this manifest, `.pi/skills/q-manager/SKILL.md`, `.pi/skills/qrspi-planning/SKILL.md`, plan `AGENTS.md`, latest stage artifact/result, and manager state file. Manager state `ActiveChild` refs are the recovery anchor for pane, transcript, session JSONL, done marker, and status marker.
+
+## Recovery and cleanup policy
+
+- Invalid result: reprompt the same child pane/session while retry budget remains; do not create a replacement child.
+- Human gate, blocked, error, or retry exhaustion: keep the child pane and session refs for inspection and recovery.
+- Valid transition with `startNext=true`: mark the old child pending cleanup, launch the next graph-selected child, save the new active child, then kill the old pane.
+- Next launch failure: preserve the old pane/session and pending cleanup refs.
+- Cleanup failure: keep the new active child and retain pending cleanup state for later recovery.
+
+## Manual tmux smoke path
+
+1. Start the manager Pi session inside tmux.
+1. Initialize q-manager with the exact parent pane:
+   ```bash
+   vamos qrspi init --plan-dir <plan> --project-root "$PWD" --manager-pane "$TMUX_PANE"
+   ```
+1. Render a small child prompt that produces a valid `qrspi_result`.
+1. Launch the visible child:
+   ```bash
+   vamos qrspi run-child --state-file <state> --plan-dir <plan> --stage <node> --cwd "$PWD" --prompt-file <prompt> --split right --timeout 0
+   ```
+1. Confirm the child pane is visible and launch refs include `--session-id`, `--session-dir`, and `--extension`.
+1. When the child finishes, confirm the parent pane receives `q-manager child finished: <node>`.
+1. Confirm child `status.json` has `event=agent_end` and the `done` marker exists under the child run directory.
+1. Run `validate-result`, then `decide-next`.
+1. If the graph starts a next child, confirm the old pane is killed only after the new pane exists.
 
 ## Verification and merge habits
 

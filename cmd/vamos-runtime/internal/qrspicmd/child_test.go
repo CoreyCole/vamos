@@ -223,6 +223,7 @@ func TestRunChildStartFailurePreservesPendingOldPane(t *testing.T) {
 type fakeChildRunner struct {
 	writeResult bool
 	startErr    error
+	panes       []string
 	started     []ChildRunRequest
 }
 
@@ -230,8 +231,12 @@ func (f *fakeChildRunner) Start(ctx context.Context, req ChildRunRequest) (Child
 	if f.startErr != nil {
 		return ChildRun{}, f.startErr
 	}
+	paneID := "%9"
+	if len(f.started) < len(f.panes) {
+		paneID = f.panes[len(f.started)]
+	}
 	f.started = append(f.started, req)
-	return ChildRun{ID: req.ID, Pane: TmuxPane{ID: "%9"}, OutputPath: req.OutputPath, SessionID: req.SessionID, SessionDir: req.SessionDir, DonePath: req.DonePath, StatusPath: req.StatusPath}, nil
+	return ChildRun{ID: req.ID, Pane: TmuxPane{ID: paneID}, OutputPath: req.OutputPath, SessionID: req.SessionID, SessionDir: req.SessionDir, DonePath: req.DonePath, StatusPath: req.StatusPath}, nil
 }
 
 func (f *fakeChildRunner) Wait(ctx context.Context, run ChildRun) (ChildRunResult, error) {
