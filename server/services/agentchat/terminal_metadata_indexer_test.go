@@ -140,6 +140,56 @@ func TestIndexTerminalMetadataDoesNotAdvanceCursorOnTransactionError(t *testing.
 	}
 }
 
+func TestIndexTerminalMetadataKeepsExistingCursorOnBusyCommitError(t *testing.T) {
+	service := newTestAgentChatService(t)
+	logPath := filepath.Join(t.TempDir(), "events.jsonl")
+	firstSessionPath := filepath.Join(t.TempDir(), "session-1.jsonl")
+	writeTerminalMetadataEvents(t, logPath, terminalMetadataEventLine("event-session-1", "session_start", firstSessionPath, ""))
+
+	first, err := service.IndexTerminalMetadata(t.Context(), TerminalMetadataIndexInput{EventLogPath: logPath})
+	if err != nil {
+		t.Fatalf("IndexTerminalMetadata(first) error = %v", err)
+	}
+	if !first.CursorAdvanced {
+		t.Fatalf("IndexTerminalMetadata(first) = %+v, want cursor advanced", first)
+	}
+	oldCursor, err := service.queries.GetPiMetadataCursor(t.Context(), logPath)
+	if err != nil {
+		t.Fatalf("GetPiMetadataCursor(old) error = %v", err)
+	}
+
+	secondSessionPath := filepath.Join(t.TempDir(), "session-2.jsonl")
+	f, err := os.OpenFile(logPath, os.O_APPEND|os.O_WRONLY, 0o600)
+	if err != nil {
+		t.Fatalf("OpenFile(events) error = %v", err)
+	}
+	if _, err := fmt.Fprintln(f, terminalMetadataEventLine("event-session-2", "session_start", secondSessionPath, "")); err != nil {
+		t.Fatalf("append event error = %v", err)
+	}
+	if err := f.Close(); err != nil {
+		t.Fatalf("Close(events) error = %v", err)
+	}
+
+	service.terminalMetadataBeforeCommitForTest = func() error { return errors.New("database is locked") }
+	result, err := service.IndexTerminalMetadata(t.Context(), TerminalMetadataIndexInput{EventLogPath: logPath})
+	if err == nil || !strings.Contains(err.Error(), "database is locked") {
+		t.Fatalf("IndexTerminalMetadata(second) error = %v, want database is locked", err)
+	}
+	if result.CursorAdvanced {
+		t.Fatalf("IndexTerminalMetadata(second) = %+v, want no cursor advancement", result)
+	}
+	newCursor, err := service.queries.GetPiMetadataCursor(t.Context(), logPath)
+	if err != nil {
+		t.Fatalf("GetPiMetadataCursor(new) error = %v", err)
+	}
+	if newCursor.ByteOffset != oldCursor.ByteOffset || newCursor.LastEventID.String != oldCursor.LastEventID.String {
+		t.Fatalf("cursor = %+v, want unchanged from %+v", newCursor, oldCursor)
+	}
+	if _, err := service.queries.GetAgentSessionByPath(context.Background(), nullableString(secondSessionPath)); !errors.Is(err, sql.ErrNoRows) {
+		t.Fatalf("GetAgentSessionByPath(second) error = %v, want rollback", err)
+	}
+}
+
 func writeTerminalMetadataEvents(t *testing.T, path string, lines ...string) {
 	t.Helper()
 	if err := os.WriteFile(path, []byte(strings.Join(lines, "\n")+"\n"), 0o600); err != nil {

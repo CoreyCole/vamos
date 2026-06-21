@@ -164,21 +164,57 @@ func TestSyncCoordinatorRunsWorkspaceBeforeTerminalAndQRSPI(t *testing.T) {
 
 func TestSyncCoordinatorTerminalFailureDoesNotFailWorkspaceResult(t *testing.T) {
 	terminalErr := errors.New("database is locked")
+	var completionCalled bool
 	coordinator := NewSyncCoordinator(SyncCoordinatorOptions{
-		WorkspaceSync: fakeWorkspaceSyncRunner{result: SyncWorkspacesResult{Changed: true}},
+		WorkspaceSync: fakeWorkspaceSyncRunner{result: SyncWorkspacesResult{
+			Impl:    workspaces.ImplWorkspaceSyncResult{Upserted: 1},
+			Changed: true,
+		}},
 		TerminalIndex: fakeTerminalMetadataIndexer{err: terminalErr},
 		QRSPIApply:    fakeQRSPIProjectionApplier{result: QRSPIProjectionApplyResult{Changed: true}},
+		OnWorkspaceComplete: func(context.Context, SyncWorkspacesResult, error) {
+			completionCalled = true
+		},
 	})
 
 	result, err := coordinator.Run(context.Background(), SyncCoordinatorInput{})
 	if err != nil {
 		t.Fatalf("Run() error = %v", err)
 	}
-	if !result.Workspace.Changed || !result.QRSPI.Changed || !result.Changed {
+	if !completionCalled {
+		t.Fatal("workspace completion hook was not called before optional terminal failure handling")
+	}
+	if result.Workspace.Impl.Upserted != 1 || !result.Workspace.Changed || !result.QRSPI.Changed || !result.Changed {
 		t.Fatalf("result=%#v", result)
 	}
 	if len(result.Diagnostics) != 3 || result.Diagnostics[1].Status != SyncPhaseStatusFailed || result.Diagnostics[1].Error != terminalErr.Error() {
 		t.Fatalf("diagnostics=%#v", result.Diagnostics)
+	}
+}
+
+func TestSyncCoordinatorWorkspaceCompletesWhenTerminalMetadataBusy(t *testing.T) {
+	terminalErr := errors.New("sqlite busy: database is locked")
+	coordinator := NewSyncCoordinator(SyncCoordinatorOptions{
+		WorkspaceSync: fakeWorkspaceSyncRunner{result: SyncWorkspacesResult{
+			Plan:    PlanWorkspaceDiscoveryResult{Upserted: 1},
+			Impl:    workspaces.ImplWorkspaceSyncResult{Upserted: 1},
+			Changed: true,
+		}},
+		TerminalIndex: fakeTerminalMetadataIndexer{err: terminalErr},
+	})
+
+	result, err := coordinator.Run(context.Background(), SyncCoordinatorInput{})
+	if err != nil {
+		t.Fatalf("Run() error = %v, want workspace success despite terminal contention", err)
+	}
+	if !result.Workspace.Changed || result.Workspace.Plan.Upserted != 1 || result.Workspace.Impl.Upserted != 1 || !result.Changed {
+		t.Fatalf("workspace result = %#v, want lifecycle changes preserved", result.Workspace)
+	}
+	if len(result.Diagnostics) != 3 {
+		t.Fatalf("diagnostics len = %d, want workspace/terminal/qrspi", len(result.Diagnostics))
+	}
+	if result.Diagnostics[0].Status != SyncPhaseStatusOK || result.Diagnostics[1].Status != SyncPhaseStatusFailed || result.Diagnostics[1].Error != terminalErr.Error() {
+		t.Fatalf("diagnostics = %#v", result.Diagnostics)
 	}
 }
 
