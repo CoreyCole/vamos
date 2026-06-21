@@ -1,6 +1,7 @@
 package qrspicmd
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -31,6 +32,17 @@ func TestLoadManifestMissingReturnsEmpty(t *testing.T) {
 }
 
 func TestRenderStagePromptIncludesRequiredContext(t *testing.T) {
+	previousRaw, err := json.Marshal(qrspi.Result{
+		Project:  "github.com/CoreyCole/vamos",
+		Stage:    string(qrspi.NodeReviewOutline),
+		Status:   string(wruntime.StatusComplete),
+		Outcome:  string(wruntime.OutcomeReadyForPlan),
+		Summary:  qrspi.Summary{PlanGoal: "goal", StageCompleted: "outline reviewed", KeyDecisions: "plan next"},
+		Artifact: "thoughts/example/reviews/outline/review.md",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
 	def, err := Definition()
 	if err != nil {
 		t.Fatal(err)
@@ -48,6 +60,7 @@ func TestRenderStagePromptIncludesRequiredContext(t *testing.T) {
 			Outcome:         wruntime.OutcomeReadyForPlan,
 			Summary:         "outline reviewed",
 			PrimaryArtifact: "thoughts/example/reviews/outline/review.md",
+			Raw:             previousRaw,
 		},
 	})
 	if err != nil {
@@ -56,11 +69,12 @@ func TestRenderStagePromptIncludesRequiredContext(t *testing.T) {
 	for _, want := range []string{
 		".pi/skills/qrspi-planning/SKILL.md",
 		".pi/skills/q-plan/SKILL.md",
-		"docs/q-manager.md",
 		"thoughts/example/AGENTS.md",
 		"thoughts/example/reviews/outline/review.md",
 		"Current node: plan",
 		"Implementation cwd: /repo-impl",
+		"Previous QRSPI result",
+		"qrspi_result:",
 		"outline reviewed",
 	} {
 		if !strings.Contains(prompt, want) {
@@ -69,7 +83,7 @@ func TestRenderStagePromptIncludesRequiredContext(t *testing.T) {
 	}
 }
 
-func TestRenderStagePromptIncludesManifestWhenPresent(t *testing.T) {
+func TestRenderStagePromptDoesNotDumpManagerManifest(t *testing.T) {
 	def, err := Definition()
 	if err != nil {
 		t.Fatal(err)
@@ -83,12 +97,23 @@ func TestRenderStagePromptIncludesManifestWhenPresent(t *testing.T) {
 	if err != nil {
 		t.Fatalf("RenderStagePrompt error = %v", err)
 	}
-	if !strings.Contains(prompt, "Project manifest excerpt") || !strings.Contains(prompt, "Project-specific rules.") {
-		t.Fatalf("prompt missing manifest:\n%s", prompt)
+	if strings.Contains(prompt, "Project manifest excerpt") || strings.Contains(prompt, "Project-specific rules.") {
+		t.Fatalf("prompt should not dump manager manifest:\n%s", prompt)
 	}
 }
 
 func TestRunRenderPromptWritesPrompt(t *testing.T) {
+	previousRaw, err := json.Marshal(qrspi.Result{
+		Project:  "github.com/CoreyCole/vamos",
+		Stage:    string(qrspi.NodePlan),
+		Status:   string(wruntime.StatusComplete),
+		Outcome:  string(wruntime.OutcomeComplete),
+		Summary:  qrspi.Summary{PlanGoal: "goal", StageCompleted: "plan ready", KeyDecisions: "review next"},
+		Artifact: "thoughts/example/plan.md",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
 	dir := t.TempDir()
 	projectRoot := filepath.Join(dir, "repo")
 	if err := os.MkdirAll(filepath.Join(projectRoot, "docs"), 0o755); err != nil {
@@ -108,6 +133,7 @@ func TestRunRenderPromptWritesPrompt(t *testing.T) {
 				Outcome:         wruntime.OutcomeComplete,
 				Summary:         "plan ready",
 				PrimaryArtifact: "thoughts/example/plan.md",
+				Raw:             previousRaw,
 			},
 		},
 	}
@@ -115,13 +141,16 @@ func TestRunRenderPromptWritesPrompt(t *testing.T) {
 		t.Fatal(err)
 	}
 	var out strings.Builder
-	err := RunRenderPrompt(t.Context(), RenderPromptOptions{StateFile: stateFile, NodeID: "review-plan", PlanDir: "thoughts/example"}, deps{}, &out)
+	err = RunRenderPrompt(t.Context(), RenderPromptOptions{StateFile: stateFile, NodeID: "review-plan", PlanDir: "thoughts/example"}, deps{}, &out)
 	if err != nil {
 		t.Fatalf("RunRenderPrompt error = %v", err)
 	}
-	for _, want := range []string{".pi/skills/q-review/SKILL.md", "# q-manager Manifest", "thoughts/example/plan.md", "plan ready"} {
+	for _, want := range []string{".pi/skills/q-review/SKILL.md", "Previous QRSPI result", "qrspi_result:", "thoughts/example/plan.md", "plan ready"} {
 		if !strings.Contains(out.String(), want) {
 			t.Fatalf("output missing %q:\n%s", want, out.String())
 		}
+	}
+	if strings.Contains(out.String(), "# q-manager Manifest") {
+		t.Fatalf("output should not dump manager manifest:\n%s", out.String())
 	}
 }

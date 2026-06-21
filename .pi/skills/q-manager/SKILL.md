@@ -12,7 +12,7 @@ Supervise QRSPI from a main Pi manager session. Launch focused child Pi sessions
 ## Required context load
 
 1. Read `.pi/skills/qrspi-planning/SKILL.md`.
-1. Read `docs/q-manager.md` when present.
+1. Read `docs/q-manager.md` when present for manager behavior only; do not stuff manager instructions into child stage prompts.
 1. Read the target plan `AGENTS.md`.
 1. Read the latest QRSPI result artifact or user-provided result YAML.
 1. Use `vamos qrspi render-prompt` to render the next child-stage prompt when available.
@@ -34,6 +34,9 @@ Supervise QRSPI from a main Pi manager session. Launch focused child Pi sessions
 - Do not poll or sleep on child `done` as the normal control loop. `done`/`status.json` are recovery diagnostics; the primary manager trigger is the child wake pasted into the parent pane.
 - Do not put manager `stateFile`, run IDs, pane IDs, session dirs, or other disposable q-manager control refs in durable `qrspi_result` YAML. Report them in manager prose/diagnostics only. Durable YAML should keep plan/workspace/artifact identity, not machine-local manager state.
 - When testing the runtime CLI from a Vamos checkout, use `go run ./cmd/vamos-runtime ...` in place of installed `vamos ...`.
+- Child prompts should be stage-work prompts, not manager runbooks. The primary child context should be the previous stage's fenced `qrspi_result` YAML plus minimal routing metadata needed to read planning docs and start the selected stage. The CLI should pass that YAML directly to the child prompt from manager state/session JSONL; do not paste the YAML into the parent manager chat.
+- Manager-specific instructions from `docs/q-manager.md` are for the parent manager/CLI. Do not embed the full manager manifest in every child prompt. If the CLI needs manifest-derived child context, render a small normalized child-safe summary, not raw docs.
+- q-manager may accept extra operator context for a child, but that context should be explicit and additive. A valid previous `qrspi_result` should normally be sufficient for the child to read the plan docs and proceed.
 
 ## Wake-driven manager loop
 
@@ -50,8 +53,8 @@ Primary loop: launch child, then wait for pasted wake. Do **not** block this man
    PROMPT="$(dirname "$STATE")/<node>-prompt.md"
    vamos qrspi render-prompt --state-file "$STATE" --node <node> --plan-dir <plan-dir> > "$PROMPT"
    ```
-   If the user provided latest result YAML in chat, append it to the prompt or otherwise provide it to the child as latest result context. Do not hand-infer graph transitions from it.
-   For review-dir / implementation-review follow-up plans, ensure the child prompt clearly says same-workspace routing: do not create a new implementation copy or reset to trunk; stack follow-up implementation on the existing implementation workspace/head. This should be emitted by `render-prompt` when it can detect review-dir metadata, not handwritten differently per manager.
+   The rendered prompt should include the previous stage's `qrspi_result` YAML as the canonical handoff context when available. If the user provided latest result YAML in chat, pass it as latest result context. Do not hand-infer graph transitions from it.
+   For review-dir / implementation-review follow-up plans, same-workspace routing should come from the previous `qrspi_result.workspace_metadata` and plan docs. If the CLI detects and summarizes it, keep the summary child-safe and minimal: do not create a new implementation copy or reset to trunk; stack follow-up implementation on the existing implementation workspace/head.
 1. Start the visible child and return immediately:
    ```bash
    vamos qrspi run-child --state-file "$STATE" --plan-dir <plan-dir> --stage <node> --cwd <cwd> --prompt-file "$PROMPT" --split right --timeout 0
@@ -95,9 +98,9 @@ After `run-child`, do not poll. Wait for the pasted wake, then validate/decide w
 
 q-manager loads a project-local child Pi extension only for q-manager child sessions. On `agent_end`, the extension writes `status.json`, touches `done`, and pastes the wake text to the captured parent tmux pane. The wake means “child turn ended,” not “graph result is valid.” The manager still runs `validate-result` and `decide-next` before any advancement.
 
-The manager CLI/extension owns the exact wake text so it stays deterministic, testable, and versioned with runtime behavior. The skill should only define the semantic contract: wake includes the finished node, enough local recovery context to find the manager state (for example `state_file`), and concise next-action reminders matching the runtime's actual commands. Do not let the skill become the source of truth for copy/paste wake templates.
+The manager CLI/extension owns the exact wake text so it stays deterministic, testable, and versioned with runtime behavior. The skill should only define the semantic contract: wake is one parent prompt/one line, includes the finished node, includes enough local recovery context to find the manager state (for example `state_file`), and points to the single continue command. Do not let the skill become the source of truth for copy/paste wake templates.
 
-The wake may include `state_file:` because that is ephemeral manager control context needed to continue the local run. This value belongs in the wake/manager transcript, not in durable QRSPI artifacts or `qrspi_result` YAML.
+The wake may include `state_file` because that is ephemeral manager control context needed to continue the local run. This value belongs in the wake/manager transcript, not in durable QRSPI artifacts or `qrspi_result` YAML. The wake must not paste multiline blocks into the parent manager session; multiline wake text can split into multiple manager prompts and pollute context.
 
 ## Result retry
 

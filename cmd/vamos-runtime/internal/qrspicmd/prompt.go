@@ -1,12 +1,15 @@
 package qrspicmd
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 
+	"github.com/CoreyCole/vamos/pkg/agents/workflows/qrspi"
 	wruntime "github.com/CoreyCole/vamos/pkg/agents/workflows/runtime"
+	"gopkg.in/yaml.v3"
 )
 
 type PromptContext struct {
@@ -46,13 +49,12 @@ func RenderStagePrompt(ctx PromptContext) (string, error) {
 	b.WriteString("Read in order:\n")
 	b.WriteString("1. .pi/skills/qrspi-planning/SKILL.md\n")
 	fmt.Fprintf(&b, "2. %s\n", skillPath)
-	b.WriteString("3. docs/q-manager.md (provided below or from project root)\n")
-	fmt.Fprintf(&b, "4. %s/AGENTS.md\n", strings.TrimRight(planDir, "/"))
+	fmt.Fprintf(&b, "3. %s/AGENTS.md\n", strings.TrimRight(planDir, "/"))
 	latestArtifact := latestPrimaryArtifact(ctx.LastResult)
 	if latestArtifact != "" {
-		fmt.Fprintf(&b, "5. %s\n", latestArtifact)
+		fmt.Fprintf(&b, "4. %s\n", latestArtifact)
 	} else {
-		b.WriteString("5. Latest primary artifact: none yet\n")
+		b.WriteString("4. Latest primary artifact: none yet\n")
 	}
 	b.WriteString("\nStart stage immediately unless the loaded stage skill names a human/safety gate.\n")
 	b.WriteString("Do not answer ready-to-proceed.\n")
@@ -68,12 +70,10 @@ func RenderStagePrompt(ctx PromptContext) (string, error) {
 	} else {
 		b.WriteString("- Implementation cwd: not set yet; before /q-workspace, use source/planning cwd.\n")
 	}
-	if strings.TrimSpace(ctx.Manifest) != "" {
-		b.WriteString("\nProject manifest excerpt:\n```markdown\n")
-		b.WriteString(strings.TrimSpace(ctx.Manifest))
+	if previousYAML := previousQRSPIResultYAML(ctx.LastResult); previousYAML != "" {
+		b.WriteString("\nPrevious QRSPI result (canonical child handoff context):\n```yaml\n")
+		b.WriteString(previousYAML)
 		b.WriteString("\n```\n")
-	} else {
-		b.WriteString("\nProject manifest excerpt: docs/q-manager.md not found.\n")
 	}
 	if ctx.LastResult != nil {
 		b.WriteString("\nLatest result summary:\n")
@@ -99,4 +99,19 @@ func latestPrimaryArtifact(result *wruntime.WorkflowResultSnapshot) string {
 		return ""
 	}
 	return strings.TrimSpace(result.PrimaryArtifact)
+}
+
+func previousQRSPIResultYAML(result *wruntime.WorkflowResultSnapshot) string {
+	if result == nil || len(result.Raw) == 0 {
+		return ""
+	}
+	var parsed qrspi.Result
+	if err := json.Unmarshal(result.Raw, &parsed); err != nil {
+		return ""
+	}
+	data, err := yaml.Marshal(map[string]qrspi.Result{"qrspi_result": parsed})
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(string(data))
 }

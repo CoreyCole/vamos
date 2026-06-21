@@ -327,6 +327,43 @@ func TestContinueValidResultStartsNextChildAndCleansOldPane(t *testing.T) {
 	}
 }
 
+func TestContinueCommandInvalidResultRepromptsSameChild(t *testing.T) {
+	fixture := newManagerFlowFixture(t)
+	runner := &fakeChildRunner{panes: []string{"%old"}}
+	initOut, err := executeManagerCommand(deps{StateRoot: fixture.stateRootFunc, Clock: fixture.clock, Runner: runner}, "init", "--plan-dir", fixture.planDir, "--project-root", fixture.projectRoot, "--manager-pane", "%parent")
+	if err != nil {
+		t.Fatalf("init command error = %v", err)
+	}
+	stateFile := eventRefString(t, initOut, "stateFile")
+	promptFile := filepath.Join(fixture.dir, "prompt.txt")
+	writeFile(t, promptFile, "design prompt")
+	if _, err := executeManagerCommand(deps{Clock: fixture.clock, Runner: runner}, "run-child", "--state-file", stateFile, "--plan-dir", fixture.planDir, "--stage", "question", "--cwd", fixture.projectRoot, "--prompt-file", promptFile, "--timeout", "0"); err != nil {
+		t.Fatalf("run-child command error = %v", err)
+	}
+	state := loadManagerState(t, stateFile)
+	writeFile(t, state.ActiveChild.DonePath, "")
+	writeSessionTestFile(t, filepath.Join(state.ActiveChild.SessionDir, "session.jsonl"), sessionHeader(state.ActiveChild.SessionID, fixture.projectRoot)+"\n"+assistantLine("plain invalid result")+"\n")
+
+	tmux := &recordingTmux{}
+	continueOut, err := executeManagerCommand(deps{Clock: fixture.clock, Runner: runner, Tmux: tmux}, "continue", "--state-file", stateFile)
+	if err != nil {
+		t.Fatalf("continue command error = %v", err)
+	}
+	if !strings.Contains(continueOut, "retry: reprompted active child") {
+		t.Fatalf("continue output = %q", continueOut)
+	}
+	if len(tmux.pastes) != 1 || tmux.pastes[0].pane.ID != "%old" {
+		t.Fatalf("pastes = %#v, want one paste to %%old", tmux.pastes)
+	}
+	if len(runner.started) != 1 {
+		t.Fatalf("runner starts = %d, want only initial child", len(runner.started))
+	}
+	loaded := loadManagerState(t, stateFile)
+	if loaded.ActiveChild == nil || loaded.ActiveChild.ID != state.ActiveChild.ID || loaded.ActiveChild.TmuxPaneID != "%old" {
+		t.Fatalf("active child changed: %+v", loaded.ActiveChild)
+	}
+}
+
 func TestEndToEndCommandSurface(t *testing.T) {
 	fixture := newManagerFlowFixture(t)
 	runner := &fakeChildRunner{writeResult: true}

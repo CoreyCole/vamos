@@ -468,6 +468,14 @@ func RunContinue(ctx context.Context, opts ContinueOptions, d deps, out io.Write
 	result := ContinueResult{}
 	parsed, err := validateActiveChild(ctx, state, opts)
 	if err != nil {
+		if shouldRepromptAfterValidationError(state, opts, err) {
+			if repromptErr := continueReprompt(ctx, state, opts, d, out, err); repromptErr != nil {
+				return repromptErr
+			}
+			result.Reprompted = true
+			result.StopReason = "invalid result; reprompted active child"
+			return writeContinueOutput(out, opts, result)
+		}
 		return err
 	}
 	result.Validated = &parsed
@@ -500,6 +508,70 @@ func validateActiveChild(ctx context.Context, state ManagerState, opts ContinueO
 	}
 	parseCtx.ExpectedNodeID = wruntime.NodeID(opts.Stage)
 	return ParseValidateDecide(text, state.Workflow, parseCtx)
+}
+
+func invalidResultRetryLimit(state ManagerState) int {
+	limit := 1
+	if len(state.Workflow.Policy) == 0 {
+		return limit
+	}
+	var cfg struct {
+		InvalidResultRetryLimit *int `json:"invalidResultRetryLimit"`
+	}
+	if json.Unmarshal(state.Workflow.Policy, &cfg) == nil && cfg.InvalidResultRetryLimit != nil {
+		return *cfg.InvalidResultRetryLimit
+	}
+	return limit
+}
+
+func shouldRepromptAfterValidationError(state ManagerState, opts ContinueOptions, err error) bool {
+	if err == nil || state.ActiveChild == nil {
+		return false
+	}
+	if state.ActiveChild.Stage != opts.Stage {
+		return false
+	}
+	if strings.TrimSpace(state.ActiveChild.TmuxPaneID) == "" {
+		return false
+	}
+	return state.ActiveChild.ValidationRetryCount < invalidResultRetryLimit(state)
+}
+
+func continueReprompt(ctx context.Context, state ManagerState, opts ContinueOptions, d deps, out io.Writer, validationErr error) error {
+	_ = out
+	attempt := state.ActiveChild.ValidationRetryCount + 1
+	if state.ActiveChild.LastRepromptAttempt >= attempt {
+		return fmt.Errorf("reprompt attempt %d already sent for active child %s", attempt, state.ActiveChild.ID)
+	}
+	if strings.TrimSpace(state.ActiveChild.DonePath) != "" {
+		if err := os.Remove(state.ActiveChild.DonePath); err != nil && !os.IsNotExist(err) {
+			return err
+		}
+	}
+	if err := RunRepromptChild(ctx, RepromptChildOptions{
+		StateFile: opts.StateFile,
+		PlanDir:   opts.PlanDir,
+		Stage:     opts.Stage,
+		Attempt:   attempt,
+		ErrorText: validationErr.Error(),
+	}, d, io.Discard); err != nil {
+		return err
+	}
+	clock := d.Clock
+	if clock == nil {
+		clock = time.Now
+	}
+	store := stateStore(d, "", clock)
+	latest, err := store.Load(opts.StateFile)
+	if err != nil {
+		return err
+	}
+	if latest.ActiveChild == nil || latest.ActiveChild.ID != state.ActiveChild.ID {
+		return errors.New("active child changed during reprompt")
+	}
+	latest.ActiveChild.ValidationRetryCount = attempt
+	latest.ActiveChild.LastRepromptAttempt = attempt
+	return store.Save(opts.StateFile, latest)
 }
 
 func decideValidatedResult(ctx context.Context, state ManagerState, parsed ParsedDecision, opts ContinueOptions, store StateStore) (ManagerState, error) {
@@ -609,6 +681,10 @@ func writeContinueText(out io.Writer, result ContinueResult) error {
 	}
 	if result.PrimaryArtifact != "" {
 		fmt.Fprintf(out, "artifact: %s\n", result.PrimaryArtifact)
+	}
+	if result.Reprompted {
+		_, err := fmt.Fprintln(out, "retry: reprompted active child")
+		return err
 	}
 	if result.NextNodeID != "" {
 		fmt.Fprintf(out, "next: %s\n", result.NextNodeID)

@@ -127,3 +127,71 @@ func TestRunRepromptChildRejectsMissingActiveChild(t *testing.T) {
 		t.Fatalf("expected missing active child error, got %v", err)
 	}
 }
+
+func TestContinueInvalidResultRepromptsSameActiveChild(t *testing.T) {
+	dir := t.TempDir()
+	stateFile := filepath.Join(dir, "state.json")
+	sessionPath := filepath.Join(dir, "sessions", "session.jsonl")
+	donePath := filepath.Join(dir, "done")
+	initial := ManagerState{
+		CanonicalPlanDir: "thoughts/example",
+		SourceCwd:        filepath.Join(dir, "repo"),
+		Workflow:         testWorkflowState(t, qrspi.NodeDesign, nil),
+		ActiveChild: &ChildRunRef{
+			ID:          "child-1",
+			Stage:       "design",
+			Cwd:         filepath.Join(dir, "repo"),
+			TmuxPaneID:  "%9",
+			SessionID:   "session-1",
+			SessionDir:  filepath.Join(dir, "sessions"),
+			SessionPath: sessionPath,
+			DonePath:    donePath,
+			StatusPath:  filepath.Join(dir, "status.json"),
+		},
+	}
+	saveManagerState(t, stateFile, initial)
+	writeSessionTestFile(t, sessionPath, sessionHeader("session-1", initial.ActiveChild.Cwd)+"\n"+assistantLine("I finished this without the required YAML.")+"\n")
+	writeFile(t, donePath, "")
+
+	tmux := &recordingTmux{}
+	runner := &fakeChildRunner{startErr: os.ErrInvalid}
+	var out strings.Builder
+	err := RunContinue(t.Context(), ContinueOptions{StateFile: stateFile}, deps{Tmux: tmux, Runner: runner}, &out)
+	if err != nil {
+		t.Fatalf("RunContinue error = %v", err)
+	}
+	if len(tmux.pastes) != 1 || tmux.pastes[0].pane.ID != "%9" {
+		t.Fatalf("pastes = %#v, want one paste to %%9", tmux.pastes)
+	}
+	if !strings.Contains(tmux.pastes[0].text, "required QRSPI") && !strings.Contains(tmux.pastes[0].text, "qrspi_result") {
+		t.Fatalf("correction prompt missing validation context: %q", tmux.pastes[0].text)
+	}
+	if len(tmux.keys) != 1 || tmux.keys[0].pane.ID != "%9" || strings.Join(tmux.keys[0].keys, ",") != "Enter" {
+		t.Fatalf("keys = %#v, want Enter to %%9", tmux.keys)
+	}
+	if len(runner.started) != 0 {
+		t.Fatalf("runner started = %#v, want none", runner.started)
+	}
+	if !strings.Contains(out.String(), "retry: reprompted active child") {
+		t.Fatalf("continue output = %q", out.String())
+	}
+	if _, err := os.Stat(donePath); !os.IsNotExist(err) {
+		t.Fatalf("done marker stat err = %v, want removed", err)
+	}
+
+	loaded := loadManagerState(t, stateFile)
+	if loaded.ActiveChild == nil || loaded.ActiveChild.ID != initial.ActiveChild.ID || loaded.ActiveChild.SessionID != initial.ActiveChild.SessionID || loaded.ActiveChild.TmuxPaneID != initial.ActiveChild.TmuxPaneID {
+		t.Fatalf("active child changed: %#v", loaded.ActiveChild)
+	}
+	if loaded.ActiveChild.ValidationRetryCount != 1 || loaded.ActiveChild.LastRepromptAttempt != 1 {
+		t.Fatalf("retry state = count %d attempt %d, want 1/1", loaded.ActiveChild.ValidationRetryCount, loaded.ActiveChild.LastRepromptAttempt)
+	}
+
+	err = RunContinue(t.Context(), ContinueOptions{StateFile: stateFile}, deps{Tmux: tmux, Runner: runner}, &strings.Builder{})
+	if err == nil {
+		t.Fatalf("expected retry exhaustion error")
+	}
+	if len(tmux.pastes) != 1 {
+		t.Fatalf("duplicate reprompt pasted: %#v", tmux.pastes)
+	}
+}

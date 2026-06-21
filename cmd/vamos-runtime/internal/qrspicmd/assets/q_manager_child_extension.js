@@ -31,11 +31,7 @@ function tmux(args) {
 function wakeMessage() {
   const stage = process.env.Q_MANAGER_STAGE || "unknown";
   const stateFile = process.env.Q_MANAGER_STATE_FILE || "";
-  return [
-    `q-manager child finished: ${stage}`,
-    `state_file: ${stateFile}`,
-    "next: run validate-result; if valid run decide-next; if invalid reprompt same child while retry remains",
-  ].join("\n");
+  return `q-manager child finished: ${stage} | state_file=${stateFile} | next=qrspi continue --state-file ${stateFile}`;
 }
 
 async function wakeParent(pane, text) {
