@@ -36,6 +36,7 @@ func newCommand(d deps) *cobra.Command {
 	cmd.AddCommand(
 		newInitCommand(d),
 		newStartNextCommand(d),
+		newSteerChildCommand(d),
 		newRunChildCommand(d),
 		newValidateResultCommand(d),
 		newDecideNextCommand(d),
@@ -91,6 +92,24 @@ func newStartNextCommand(d deps) *cobra.Command {
 	cmd.Flags().DurationVar(&opts.Timeout, "timeout", 0, "maximum time to wait for child; 0 returns after launch")
 	cmd.Flags().StringVar(&opts.Output, "output", "text", "output format: text or ndjson")
 	cmd.Flags().BoolVar(&opts.Force, "force", false, "replace existing expired/inactive state")
+	return cmd
+}
+
+func newSteerChildCommand(d deps) *cobra.Command {
+	opts := SteerChildOptions{Output: "text", RequireActive: true}
+	cmd := &cobra.Command{
+		Use:   "steer-child --state-file <file> (--feedback-file <file> | --feedback <text>)",
+		Short: "Send human or task feedback to the active q-manager child",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			_, err := RunSteerChild(cmd.Context(), opts, d, cmd.OutOrStdout())
+			return err
+		},
+	}
+	cmd.Flags().StringVar(&opts.StateFile, "state-file", "", "q-manager state file")
+	cmd.Flags().StringVar(&opts.FeedbackFile, "feedback-file", "", "file containing feedback for the active child")
+	cmd.Flags().StringVar(&opts.Feedback, "feedback", "", "inline feedback for the active child")
+	cmd.Flags().StringVar(&opts.Stage, "stage", "", "expected active child node")
+	cmd.Flags().StringVar(&opts.Output, "output", "text", "output format: text or ndjson")
 	return cmd
 }
 
@@ -674,6 +693,115 @@ func RunRepromptChild(ctx context.Context, opts RepromptChildOptions, d deps, ou
 		return err
 	}
 	return WriteNDJSON(out, Event{Type: "child_reprompted", Ref: childRef(state.ActiveChild)})
+}
+
+func RunSteerChild(ctx context.Context, opts SteerChildOptions, d deps, out io.Writer) (*SteerChildResult, error) {
+	if strings.TrimSpace(opts.StateFile) == "" {
+		return nil, errors.New("state-file is required")
+	}
+	feedback, feedbackPath, err := readFeedback(opts)
+	if err != nil {
+		return nil, err
+	}
+	out = ensureWriter(out)
+	store := stateStore(d, "", time.Now)
+	state, err := store.Load(opts.StateFile)
+	if err != nil {
+		return nil, err
+	}
+	if state.ActiveChild == nil {
+		return nil, fmt.Errorf("no active child to steer; next: %s or %s", fmt.Sprintf("vamos qrspi start-next --state-file %s", opts.StateFile), continueCommand(opts.StateFile))
+	}
+	child := *state.ActiveChild
+	if strings.TrimSpace(opts.Stage) != "" && child.Stage != opts.Stage {
+		return nil, fmt.Errorf("active child stage %q does not match requested stage %q", child.Stage, opts.Stage)
+	}
+	if strings.TrimSpace(child.TmuxPaneID) == "" {
+		return nil, errors.New("active child has no tmux pane ID")
+	}
+	prompt := buildChildSteerPrompt(state, child, feedback, feedbackPath)
+	tmux := d.Tmux
+	if tmux == nil {
+		tmux = ShellTmuxClient{}
+	}
+	pane := TmuxPane{ID: child.TmuxPaneID}
+	if err := tmux.PasteText(ctx, pane, prompt); err != nil {
+		return nil, err
+	}
+	if err := tmux.SendKeys(ctx, pane, []string{"Enter"}); err != nil {
+		return nil, err
+	}
+	result := &SteerChildResult{StateFile: opts.StateFile, Stage: child.Stage, PaneID: child.TmuxPaneID, FeedbackPath: feedbackPath, NextCommand: continueCommand(opts.StateFile)}
+	return result, writeSteerChildOutput(out, *result, opts.Output)
+}
+
+func readFeedback(opts SteerChildOptions) (string, string, error) {
+	if strings.TrimSpace(opts.FeedbackFile) != "" && strings.TrimSpace(opts.Feedback) != "" {
+		return "", "", errors.New("use only one of --feedback-file or --feedback")
+	}
+	if strings.TrimSpace(opts.FeedbackFile) != "" {
+		data, err := os.ReadFile(opts.FeedbackFile)
+		if err != nil {
+			return "", "", err
+		}
+		if strings.TrimSpace(string(data)) == "" {
+			return "", "", errors.New("feedback is required")
+		}
+		return string(data), opts.FeedbackFile, nil
+	}
+	if strings.TrimSpace(opts.Feedback) != "" {
+		return opts.Feedback, "", nil
+	}
+	return "", "", errors.New("feedback-file or feedback is required")
+}
+
+func buildChildSteerPrompt(state ManagerState, child ChildRunRef, feedback string, feedbackPath string) string {
+	var b strings.Builder
+	b.WriteString("q-manager steering feedback\n")
+	b.WriteString("source: human_feedback\n")
+	if strings.TrimSpace(child.Stage) != "" {
+		fmt.Fprintf(&b, "stage: %s\n", child.Stage)
+	}
+	if strings.TrimSpace(feedbackPath) != "" {
+		fmt.Fprintf(&b, "feedback_file: %s\n", feedbackPath)
+	}
+	if strings.TrimSpace(state.CanonicalPlanDir) != "" {
+		fmt.Fprintf(&b, "plan_dir: %s\n", state.CanonicalPlanDir)
+	}
+	b.WriteString("\n")
+	b.WriteString(strings.TrimSpace(feedback))
+	b.WriteString("\n\n")
+	b.WriteString("Instruction: incorporate this feedback into your current QRSPI stage. Update artifacts if needed. Then emit the required fenced YAML result when complete or ask one concise follow-up if still blocked.\n")
+	return b.String()
+}
+
+func writeSteerChildOutput(out io.Writer, result SteerChildResult, mode string) error {
+	if strings.EqualFold(mode, "ndjson") {
+		return WriteNDJSON(out, Event{Type: "child_steered", Ref: steerChildRef(result)})
+	}
+	if _, err := fmt.Fprintf(out, "steered child: %s (%s)\n", result.Stage, result.PaneID); err != nil {
+		return err
+	}
+	if result.FeedbackPath != "" {
+		if _, err := fmt.Fprintf(out, "feedback: %s\n", result.FeedbackPath); err != nil {
+			return err
+		}
+	}
+	_, err := fmt.Fprintf(out, "next: %s\n", result.NextCommand)
+	return err
+}
+
+func steerChildRef(result SteerChildResult) map[string]any {
+	ref := map[string]any{
+		"stateFile":   result.StateFile,
+		"stage":       result.Stage,
+		"paneId":      result.PaneID,
+		"nextCommand": result.NextCommand,
+	}
+	if result.FeedbackPath != "" {
+		ref["feedbackPath"] = result.FeedbackPath
+	}
+	return ref
 }
 
 func repromptErrorText(opts RepromptChildOptions) (string, error) {

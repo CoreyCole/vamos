@@ -62,6 +62,23 @@ type PromptFileOptions struct {
 	Timestamp time.Time
 }
 
+type SteerChildOptions struct {
+	StateFile     string
+	FeedbackFile  string
+	Feedback      string
+	Stage         string
+	Output        string
+	RequireActive bool
+}
+
+type SteerChildResult struct {
+	StateFile    string
+	Stage        string
+	PaneID       string
+	FeedbackPath string
+	NextCommand  string
+}
+
 type ValidateResultOptions struct {
 	Stage       string
 	StateFile   string
