@@ -72,7 +72,6 @@ func TestRenderStagePromptIncludesRequiredContext(t *testing.T) {
 		"thoughts/example/AGENTS.md",
 		"thoughts/example/reviews/outline/review.md",
 		"Current node: plan",
-		"Implementation cwd: /repo-impl",
 		"Previous QRSPI result",
 		"qrspi_result:",
 		"outline reviewed",

@@ -15,8 +15,8 @@ type Result struct {
 	RelatedProjects   []string          `yaml:"related_projects" json:"relatedProjects,omitempty"`
 	Stage             string            `yaml:"stage" json:"stage"`
 	Status            string            `yaml:"status" json:"status"`
-	Outcome           string            `yaml:"outcome" json:"outcome,omitempty"`
-	Workspace         string            `yaml:"workspace" json:"workspace,omitempty"`
+	Outcome           string            `yaml:"outcome,omitempty" json:"outcome,omitempty"`
+	Workspace         string            `yaml:"workspace,omitempty" json:"workspace,omitempty"`
 	WorkspaceMetadata WorkspaceMetadata `yaml:"workspace_metadata" json:"workspaceMetadata,omitempty"`
 	Policy            PolicyYAML        `yaml:"policy" json:"policy"`
 	Summary           Summary           `yaml:"summary" json:"summary"`

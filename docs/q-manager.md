@@ -29,12 +29,10 @@ Child QRSPI work runs in a visible tmux pane, usually a right split. Humans must
 q-manager child sessions load a local Pi extension that observes `agent_end`. On each completed child agent turn, the extension writes child `status.json`, touches `done`, and pastes a wake message into the captured parent manager pane:
 
 ```text
-q-manager child finished: <node>
-state_file: <state-file>
-next: run validate-result; if valid run decide-next; if invalid reprompt same child while retry remains
+q-manager child finished: <node> | state_file=<state-file> | next=vamos qrspi continue --state-file <state-file>
 ```
 
-The wake is only a turn-complete signal. It does not validate YAML, decide transitions, mutate graph state, or imply workflow success. The manager must still run `validate-result` against the active child session JSONL and `decide-next` through the canonical QRSPI runtime before advancement.
+The wake is only a turn-complete signal. It does not validate YAML, decide transitions, mutate graph state, or imply workflow success. The manager normally runs `continue`, which validates the active child session JSONL, reprompts the same child when retry remains, persists the canonical graph decision for valid results, starts the graph-selected next child when safe, and cleans the old pane only after the next child exists.
 
 ## Session metadata boundary
 
@@ -65,9 +63,10 @@ Reload from this manifest, `.pi/skills/q-manager/SKILL.md`, `.pi/skills/qrspi-pl
    vamos qrspi run-child --state-file <state> --plan-dir <plan> --stage <node> --cwd "$PWD" --prompt-file <prompt> --split right --timeout 0
    ```
 1. Confirm the child pane is visible and launch refs include `--session-id`, `--session-dir`, and `--extension`.
-1. When the child finishes, confirm the parent pane receives `q-manager child finished: <node>`.
+1. When the child finishes, confirm the parent pane receives `q-manager child finished: <node>` with `next=vamos qrspi continue --state-file <state>`.
 1. Confirm child `status.json` has `event=agent_end` and the `done` marker exists under the child run directory.
-1. Run `validate-result`, then `decide-next`.
+1. Run the exact `continue --state-file <state>` command from the wake.
+1. Confirm concise output and next child start or stop reason.
 1. If the graph starts a next child, confirm the old pane is killed only after the new pane exists.
 
 ## Verification and merge habits

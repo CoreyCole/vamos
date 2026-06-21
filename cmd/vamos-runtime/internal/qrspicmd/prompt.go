@@ -62,34 +62,19 @@ func RenderStagePrompt(ctx PromptContext) (string, error) {
 	fmt.Fprintf(&b, "Plan dir: %s\n", planDir)
 	fmt.Fprintf(&b, "Current node: %s\n", ctx.Node.ID)
 	fmt.Fprintf(&b, "Graph-selected skill: %s\n", skillPath)
-	b.WriteString("\nWorkspace routing:\n")
-	fmt.Fprintf(&b, "- Source cwd: %s\n", ctx.State.SourceCwd)
-	if strings.TrimSpace(ctx.State.ImplementationCwd) != "" {
-		fmt.Fprintf(&b, "- Implementation cwd: %s\n", ctx.State.ImplementationCwd)
-		b.WriteString("- For implementation/review/verify stages, use implementation cwd when graph semantics require it.\n")
-	} else {
-		b.WriteString("- Implementation cwd: not set yet; before /q-workspace, use source/planning cwd.\n")
-	}
-	if previousYAML := previousQRSPIResultYAML(ctx.LastResult); previousYAML != "" {
-		b.WriteString("\nPrevious QRSPI result (canonical child handoff context):\n```yaml\n")
+	previousYAML := previousQRSPIResultYAML(ctx.LastResult)
+	if previousYAML != "" {
+		b.WriteString("\nPrevious QRSPI result (canonical child handoff context; use for workspace routing and next artifacts):\n```yaml\n")
 		b.WriteString(previousYAML)
 		b.WriteString("\n```\n")
-	}
-	if ctx.LastResult != nil {
-		b.WriteString("\nLatest result summary:\n")
-		fmt.Fprintf(&b, "- Source node: %s\n", ctx.LastResult.SourceNodeID)
-		fmt.Fprintf(&b, "- Status: %s\n", ctx.LastResult.Status)
-		if ctx.LastResult.Outcome != "" {
-			fmt.Fprintf(&b, "- Outcome: %s\n", ctx.LastResult.Outcome)
-		}
-		if strings.TrimSpace(ctx.LastResult.Summary) != "" {
-			fmt.Fprintf(&b, "- Summary: %s\n", ctx.LastResult.Summary)
-		}
-		if latestArtifact != "" {
-			fmt.Fprintf(&b, "- Latest artifact: %s\n", latestArtifact)
-		}
 	} else {
-		b.WriteString("\nLatest result summary: none yet.\n")
+		b.WriteString("\nWorkspace routing:\n")
+		fmt.Fprintf(&b, "- Source cwd: %s\n", ctx.State.SourceCwd)
+		if strings.TrimSpace(ctx.State.ImplementationCwd) != "" {
+			fmt.Fprintf(&b, "- Implementation cwd: %s\n", ctx.State.ImplementationCwd)
+		} else {
+			b.WriteString("- Implementation cwd: not set yet; before /q-workspace, use source/planning cwd.\n")
+		}
 	}
 	return b.String(), nil
 }

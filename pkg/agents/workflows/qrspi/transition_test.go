@@ -70,7 +70,7 @@ func TestQRSPITransitions(t *testing.T) {
 	state = assertTerminal(t, def, state, NodeDone)
 }
 
-func TestQRSPIImplementHandoffStopsWithoutBlocking(t *testing.T) {
+func TestQRSPIImplementHandoffQueuesResumeWithoutBlocking(t *testing.T) {
 	def, err := Definition()
 	if err != nil {
 		t.Fatal(err)
@@ -87,7 +87,7 @@ func TestQRSPIImplementHandoffStopsWithoutBlocking(t *testing.T) {
 	if err != nil {
 		t.Fatalf("DecideTransition() error = %v", err)
 	}
-	if decision.StartNext || decision.NextNodeID != NodeImplement || decision.StopReason != "result handoff" {
+	if !decision.StartNext || decision.NextNodeID != NodeImplement || decision.StopReason != "result handoff" {
 		t.Fatalf("decision = %+v", decision)
 	}
 	if decision.State.Status != wruntime.WorkspaceStatusIdle || decision.State.PendingNextNodeID != NodeImplement {

@@ -24,8 +24,8 @@ Supervise QRSPI from a main Pi manager session. Launch focused child Pi sessions
 - Child work must be visible and interruptible in tmux. No hidden background child runner as primary UX.
 - Manager state is disposable control state under user state dir, keyed by canonical `plan_dir`; never use repo-local `.vamos/q-manager`.
 - QRSPI artifacts and fenced `qrspi_result` YAML remain durable truth.
-- Respect `advanceMode`: `discuss` stops after valid result; `guided` starts graph-safe non-human edges; `autopilot` can auto-approve only graph-marked safe gates.
-- Stop on human gates, blocked/error results, invalid result retry exhaustion, lock conflict, or ambiguous project judgment named by `docs/q-manager.md`.
+- Respect `advanceMode`: `discuss` stops after valid result; `guided` starts graph-safe non-human edges, including implementation `status: handoff` checkpoints that should launch the next fresh implementation/resume child; `autopilot` can auto-approve only graph-marked safe gates.
+- Stop on human gates, implementation complete/review-ready results, blocked/error results, invalid result retry exhaustion, lock conflict, or ambiguous project judgment named by `docs/q-manager.md`. Do not stop merely because an implementation child emitted `status: handoff`; in guided/autopilot, start the next fresh child for the same implement/resume work.
 - After `/q-workspace`, run implementation/review/verify child stages in `workspace_metadata.implementation_workspace` when graph semantics require implementation cwd.
 - For implementation-review follow-up/review-dir plans that already have `workspace_metadata.implementation_workspace`, do not imply a fresh workspace/copy/reset. Prompts for `/q-plan` and planning review must state that implementation should stack in the existing implementation workspace on the reviewed head. If the current graph forces a `workspace` node anyway, that node must preserve/reaffirm the existing workspace and continue to implementation; do not create a new copy.
 - Pi session metadata redesign is out of scope; q-manager assigns exact child `--session-id` / `--session-dir` using current Pi flags.
@@ -59,25 +59,22 @@ Primary loop: launch child, then wait for pasted wake. Do **not** block this man
    ```bash
    vamos qrspi run-child --state-file "$STATE" --plan-dir <plan-dir> --stage <node> --cwd <cwd> --prompt-file "$PROMPT" --split right --timeout 0
    ```
-1. Stop issuing commands and wait for the child extension to paste the parent wake:
-   ```text
-   q-manager child finished: <node>
-   state_file: <state-file>
-   ```
-   The wake means “child turn ended,” not “valid result.”
-1. Validate from the active child session JSONL:
+1. Stop issuing commands and wait for the child extension to paste the parent wake. The wake means “child turn ended,” not “valid result.”
+1. Run the single normal manager continuation command from the wake:
    ```bash
-   vamos qrspi validate-result --state-file "$STATE" --stage <node> --plan-dir <plan-dir>
+   vamos qrspi continue --state-file "$STATE"
    ```
-1. Invalid result with retry budget: save the validation error, then reprompt the same pane/session:
-   ```bash
-   vamos qrspi reprompt-child --state-file "$STATE" --plan-dir <plan-dir> --stage <node> --attempt <n> --error-file <validation-error-file>
-   ```
-1. Valid result: decide through the canonical graph:
-   ```bash
-   vamos qrspi decide-next --state-file "$STATE" --plan-dir <plan-dir>
-   ```
-1. If `startNext=true`, render and run the graph-selected next child. Old child pane cleanup happens only after the new child pane starts successfully. If the decision stops, report the concise stop reason and next human action.
+   `continue` validates the active child session JSONL, reprompts the same child when retry remains, persists canonical graph decisions for valid results, launches graph-selected next child when safe, and reports concise stop reasons. Do not paste raw validate/decide NDJSON into manager chat, and do not handcraft child correction prose.
+
+### Manual/debug lower-level commands
+
+Use these only for recovery or debugging when `continue` is insufficient:
+
+```bash
+vamos qrspi validate-result --state-file "$STATE" --stage <node> --plan-dir <plan-dir>
+vamos qrspi reprompt-child --state-file "$STATE" --plan-dir <plan-dir> --stage <node> --attempt <n> --error-file <validation-error-file>
+vamos qrspi decide-next --state-file "$STATE" --plan-dir <plan-dir>
+```
 
 Manual/debug overrides: `--session-file <jsonl>` validates a specific child session JSONL. `--result-file <path>` is deprecated fallback for plaintext result files only when no active child session refs are available.
 
@@ -92,11 +89,11 @@ go run ./cmd/vamos-runtime qrspi render-prompt --state-file "$STATE" --node <nod
 go run ./cmd/vamos-runtime qrspi run-child --state-file "$STATE" --plan-dir "$PLAN" --stage <node> --cwd "$PWD" --prompt-file "$PROMPT" --split right --timeout 0
 ```
 
-After `run-child`, do not poll. Wait for the pasted wake, then validate/decide with the same `go run ./cmd/vamos-runtime ...` prefix.
+After `run-child`, do not poll. Wait for the pasted wake, then run `go run ./cmd/vamos-runtime qrspi continue --state-file "$STATE"`.
 
 ## Child wake contract
 
-q-manager loads a project-local child Pi extension only for q-manager child sessions. On `agent_end`, the extension writes `status.json`, touches `done`, and pastes the wake text to the captured parent tmux pane. The wake means “child turn ended,” not “graph result is valid.” The manager still runs `validate-result` and `decide-next` before any advancement.
+q-manager loads a project-local child Pi extension only for q-manager child sessions. On `agent_end`, the extension writes `status.json`, touches `done`, and pastes the wake text to the captured parent tmux pane. The wake means “child turn ended,” not “graph result is valid.” The manager normally runs one `continue` command before any advancement.
 
 The manager CLI/extension owns the exact wake text so it stays deterministic, testable, and versioned with runtime behavior. The skill should only define the semantic contract: wake is one parent prompt/one line, includes the finished node, includes enough local recovery context to find the manager state (for example `state_file`), and points to the single continue command. Do not let the skill become the source of truth for copy/paste wake templates.
 
@@ -128,7 +125,7 @@ Include:
 - Latest durable `qrspi_result` YAML or path to the artifact containing it.
 - Manager `stateFile` absolute path.
 - Active child refs from state when a child is running: stage, pane ID, session ID, session dir/path, status path, done path, output/transcript path.
-- Whether the manager is waiting for child wake, needs `validate-result`, needs `decide-next`, or is stopped at a human gate.
+- Whether the manager is waiting for child wake, needs `continue`, needs a lower-level recovery command, or is stopped at a human gate.
 - Exact next command, using `go run ./cmd/vamos-runtime ...` when testing from checkout.
 
 Manager handoff may include `stateFile` because it is an operational recovery note for the same local machine. Do not put `stateFile` in durable `qrspi_result` YAML. If writing the handoff under `thoughts/`, label these fields as local/ephemeral and keep durable plan identity (`thoughts/...` paths, artifact paths, latest result) separate from local recovery refs.
@@ -140,8 +137,7 @@ Fresh manager resume shape:
 ```bash
 # read q-manager skill, docs/q-manager.md, plan AGENTS.md, latest result/handoff first
 STATE=<stateFile-from-manager-handoff>
-go run ./cmd/vamos-runtime qrspi validate-result --state-file "$STATE" --stage <node> --plan-dir <plan-dir>
-go run ./cmd/vamos-runtime qrspi decide-next --state-file "$STATE" --plan-dir <plan-dir>
+go run ./cmd/vamos-runtime qrspi continue --state-file "$STATE"
 ```
 
 If the handoff says “waiting for child wake,” do not validate until wake arrives unless manually inspecting recovery state. If no active child exists, resume by rendering and running the graph-selected/current node from the saved state.

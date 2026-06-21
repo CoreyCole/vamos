@@ -37,7 +37,7 @@ Do not duplicate artifact lists or machine-control details in prose outside the 
 
 Runtime completion for the `implement` node happens only when implementation is ready for automated implementation review. Use `status: complete`, `outcome: complete`, the final implementation-complete handoff as `artifact`, and `next.steps` steps that read `qrspi-planning`, read `q-review`, read design/outline/plan, read the final handoff, then start `/q-review`.
 
-For non-final implementation checkpoint handoffs, `status: handoff` is a valid canonical runtime status for the `implement` node. Use `status: handoff` with no `outcome`; the runtime records the checkpoint, keeps the workflow on `implement`, and stops without marking it blocked/error. Set `artifact` to the handoff and `next.steps` steps that read `qrspi-planning`, read `q-resume`, read design/outline/plan, read the handoff, then start `/q-resume`.
+For non-final implementation checkpoint handoffs, `status: handoff` is a valid canonical runtime status for the `implement` node. Use `status: handoff` with no `outcome`; the runtime records the checkpoint, keeps the workflow on `implement`, and in guided/autopilot lets q-manager launch a fresh implementation/resume child without marking it blocked/error. Set `artifact` to the handoff and `next.steps` steps that read `qrspi-planning`, read `q-resume`, read design/outline/plan, read the handoff, then start `/q-resume`.
 
 ```yaml
 qrspi_result:

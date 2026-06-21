@@ -69,11 +69,16 @@ func DecideTransition(
 			},
 		}, nil
 	case StatusHandoff:
+		config, err := decodeTransitionConfig(def, state)
+		if err != nil {
+			return TransitionDecision{}, err
+		}
 		state.Status = WorkspaceStatusIdle
 		state.PendingNextNodeID = result.SourceNodeID
 		return TransitionDecision{
 			State:      state,
 			NextNodeID: result.SourceNodeID,
+			StartNext:  shouldStartNonHumanEdge(config),
 			StopReason: "result handoff",
 			Events:     []Event{{Type: "workflow_handoff", NodeID: result.SourceNodeID}},
 		}, nil
