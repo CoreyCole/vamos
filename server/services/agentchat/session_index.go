@@ -109,16 +109,7 @@ func (s *Service) indexPiSessions(
 	affectedPlans := collections.NewSet[string]()
 	affectedWorkspaces := collections.NewSet[string]()
 
-	err = filepath.WalkDir(root, func(path string, d fs.DirEntry, walkErr error) error {
-		if walkErr != nil {
-			return walkErr
-		}
-		if err := ctx.Err(); err != nil {
-			return err
-		}
-		if d.IsDir() || filepath.Ext(path) != jsonlExtension {
-			return nil
-		}
+	err = walkPiSessionFilesBounded(ctx, root, 0, 0, 0, func(path string, _ fs.FileInfo) error {
 		record, indexErr := s.indexPiSessionFile(ctx, user, path)
 		if indexErr != nil {
 			result.Failed++
@@ -218,8 +209,25 @@ type TerminalSessionAdoptionResult struct {
 	Changed                bool
 }
 
+type LegacyPiSessionScanInput struct {
+	UserEmail   string
+	MaxFiles    int
+	MaxBytes    int64
+	MaxDuration time.Duration
+	Force       bool
+}
+
 func (s *Service) ImportAdoptablePiSessions(
 	ctx context.Context,
+) (TerminalSessionAdoptionResult, error) {
+	return s.ImportAdoptablePiSessionsWithInput(ctx, LegacyPiSessionScanInput{})
+}
+
+// ImportAdoptablePiSessionsWithInput is a manual/backfill fallback only. Scheduled sync
+// must use IndexTerminalMetadata and ApplyQRSPIProjections instead of transcript import.
+func (s *Service) ImportAdoptablePiSessionsWithInput(
+	ctx context.Context,
+	input LegacyPiSessionScanInput,
 ) (TerminalSessionAdoptionResult, error) {
 	root := strings.TrimSpace(s.piSessionsDir)
 	if root == "" {
@@ -238,29 +246,27 @@ func (s *Service) ImportAdoptablePiSessions(
 
 	result := TerminalSessionAdoptionResult{}
 	affectedWorkspaces := collections.NewSet[string]()
-	err = filepath.WalkDir(root, func(path string, d fs.DirEntry, walkErr error) error {
-		if walkErr != nil {
-			return walkErr
-		}
-		if err := ctx.Err(); err != nil {
-			return err
-		}
-		if d.IsDir() || filepath.Ext(path) != jsonlExtension {
+	err = walkPiSessionFilesBounded(
+		ctx,
+		root,
+		input.MaxFiles,
+		input.MaxBytes,
+		input.MaxDuration,
+		func(path string, _ fs.FileInfo) error {
+			adopted, importErr := s.importAdoptablePiSession(ctx, path)
+			if importErr != nil {
+				log.Printf("terminal_session_auto_import_failed path=%q: %v", path, importErr)
+				return nil
+			}
+			if adopted.WorkspaceID != "" {
+				affectedWorkspaces.Add(adopted.WorkspaceID)
+			}
+			result.ImportedSessions += adopted.ImportedSessions
+			result.AdoptedQRSPIWorkspaces += adopted.AdoptedQRSPIWorkspaces
+			result.Changed = result.Changed || adopted.Changed
 			return nil
-		}
-		adopted, importErr := s.importAdoptablePiSession(ctx, path)
-		if importErr != nil {
-			log.Printf("terminal_session_auto_import_failed path=%q: %v", path, importErr)
-			return nil
-		}
-		if adopted.WorkspaceID != "" {
-			affectedWorkspaces.Add(adopted.WorkspaceID)
-		}
-		result.ImportedSessions += adopted.ImportedSessions
-		result.AdoptedQRSPIWorkspaces += adopted.AdoptedQRSPIWorkspaces
-		result.Changed = result.Changed || adopted.Changed
-		return nil
-	})
+		},
+	)
 	if err != nil {
 		return result, err
 	}
@@ -348,6 +354,49 @@ func (s *Service) importAdoptablePiSession(
 		fileResult.Changed = true
 	}
 	return fileResult, nil
+}
+
+func walkPiSessionFilesBounded(
+	ctx context.Context,
+	root string,
+	maxFiles int,
+	maxBytes int64,
+	maxDuration time.Duration,
+	visit func(path string, info fs.FileInfo) error,
+) error {
+	if visit == nil {
+		return nil
+	}
+	started := time.Now()
+	var files int
+	var bytes int64
+	return filepath.WalkDir(root, func(path string, d fs.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
+		}
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		if maxDuration > 0 && time.Since(started) >= maxDuration {
+			return fs.SkipAll
+		}
+		if d.IsDir() || filepath.Ext(path) != jsonlExtension {
+			return nil
+		}
+		info, err := d.Info()
+		if err != nil {
+			return nil
+		}
+		if maxFiles > 0 && files >= maxFiles {
+			return fs.SkipAll
+		}
+		if maxBytes > 0 && bytes+info.Size() > maxBytes {
+			return fs.SkipAll
+		}
+		files++
+		bytes += info.Size()
+		return visit(path, info)
+	})
 }
 
 func (s *Service) remapPiSessionScanInference(

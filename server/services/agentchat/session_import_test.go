@@ -367,6 +367,45 @@ func TestValidatePiSessionPathRejectsSymlinkEscape(t *testing.T) {
 	}
 }
 
+func TestLegacyPiSessionScanRespectsMaxFiles(t *testing.T) {
+	root := t.TempDir()
+	for i := 0; i < 10; i++ {
+		if err := os.WriteFile(filepath.Join(root, fmt.Sprintf("session-%02d.jsonl", i)), []byte("{}\n"), 0o644); err != nil {
+			t.Fatalf("WriteFile(session): %v", err)
+		}
+	}
+	var visited int
+	if err := walkPiSessionFilesBounded(t.Context(), root, 2, 0, 0, func(string, os.FileInfo) error {
+		visited++
+		return nil
+	}); err != nil {
+		t.Fatalf("walkPiSessionFilesBounded() error = %v", err)
+	}
+	if visited != 2 {
+		t.Fatalf("visited = %d, want 2", visited)
+	}
+}
+
+func TestLegacyPiSessionScanRespectsDuration(t *testing.T) {
+	root := t.TempDir()
+	for i := 0; i < 10; i++ {
+		if err := os.WriteFile(filepath.Join(root, fmt.Sprintf("session-%02d.jsonl", i)), []byte("{}\n"), 0o644); err != nil {
+			t.Fatalf("WriteFile(session): %v", err)
+		}
+	}
+	var visited int
+	if err := walkPiSessionFilesBounded(t.Context(), root, 0, 0, time.Millisecond, func(string, os.FileInfo) error {
+		visited++
+		time.Sleep(2 * time.Millisecond)
+		return nil
+	}); err != nil {
+		t.Fatalf("walkPiSessionFilesBounded() error = %v", err)
+	}
+	if visited == 0 || visited >= 10 {
+		t.Fatalf("visited = %d, want bounded nonzero count", visited)
+	}
+}
+
 func TestImportAdoptablePiSessionsImportsTerminalQRSPIWorkspace(t *testing.T) {
 	service := newTestAgentChatService(t)
 	service.workflowService.(*agentchatworkflows.Service).Runner = agentchatworkflows.NoopRunner{}
