@@ -1254,14 +1254,18 @@ func main() {
 			Changed:         result.Changed,
 		}
 	}
+	var workspaceSyncRegistry workspaces.Registry
+	if workspaceManager != nil {
+		workspaceSyncRegistry = workspaceManager
+	}
 	workspaceSyncCompleteForSchedule := workspaces.NewWorkspaceSyncCompletion(
-		workspaceManager,
+		workspaceSyncRegistry,
 		workspaceNotifier,
 		nil,
 		agentChatService,
 	)
 	workspaceSyncCompleteForManualRefresh := workspaces.NewWorkspaceSyncCompletion(
-		workspaceManager,
+		workspaceSyncRegistry,
 		nil,
 		nil,
 		agentChatService,
