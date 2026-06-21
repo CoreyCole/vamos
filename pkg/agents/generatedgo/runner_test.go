@@ -3,6 +3,7 @@ package generatedgo
 import (
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -204,6 +205,43 @@ func TestCopySnapshotCopiesSourceAndArtifacts(t *testing.T) {
 	}
 }
 
+func TestPickleballSeedBundle(t *testing.T) {
+	seedDir := filepath.Clean(filepath.Join("..", "..", "..", "examples", "pickleball", "seed-bundle"))
+	workspace := filepath.Join(t.TempDir(), "seed-bundle")
+	copyDir(t, seedDir, workspace)
+
+	output := t.TempDir()
+	result, err := BuildAndRun(context.Background(), RunnerInput{
+		WorkspaceDir:      workspace,
+		OutputDir:         output,
+		CompileTimeout:    30 * time.Second,
+		RunTimeout:        5 * time.Second,
+		ArtifactAllowlist: []string{"app.html", "results.csv"},
+		EnvAllowlist:      map[string]string{"VAMOS_GENERATED_BUILD_ID": "test-seed-build"},
+	})
+	if err != nil {
+		t.Fatalf("BuildAndRun(seed bundle) error = %v", err)
+	}
+	if result.Manifest.BuildID != "test-seed-build" {
+		t.Fatalf("build id = %q", result.Manifest.BuildID)
+	}
+	for _, name := range []string{"app.html", "results.csv", "manifest.json"} {
+		if result.ArtifactHashes[name] == "" {
+			t.Fatalf("missing hash for %s: %#v", name, result.ArtifactHashes)
+		}
+		if _, err := os.Stat(filepath.Join(output, name)); err != nil {
+			t.Fatalf("output %s: %v", name, err)
+		}
+	}
+	csvData, err := os.ReadFile(filepath.Join(output, "results.csv"))
+	if err != nil {
+		t.Fatalf("read results.csv: %v", err)
+	}
+	if !strings.Contains(string(csvData), "court,team_a,team_b,reason") {
+		t.Fatalf("results.csv = %q", string(csvData))
+	}
+}
+
 func writeModule(t *testing.T, main string) string {
 	t.Helper()
 	workspace := t.TempDir()
@@ -277,5 +315,44 @@ func writeExecutable(t *testing.T, path string, data string) {
 	writeFile(t, path, data)
 	if err := os.Chmod(path, 0o755); err != nil {
 		t.Fatalf("chmod %s: %v", path, err)
+	}
+}
+
+func copyDir(t *testing.T, src, dst string) {
+	t.Helper()
+	entries, err := os.ReadDir(src)
+	if err != nil {
+		t.Fatalf("read dir %s: %v", src, err)
+	}
+	if err := os.MkdirAll(dst, 0o755); err != nil {
+		t.Fatalf("mkdir %s: %v", dst, err)
+	}
+	for _, entry := range entries {
+		srcPath := filepath.Join(src, entry.Name())
+		dstPath := filepath.Join(dst, entry.Name())
+		if entry.IsDir() {
+			copyDir(t, srcPath, dstPath)
+			continue
+		}
+		in, err := os.Open(srcPath)
+		if err != nil {
+			t.Fatalf("open %s: %v", srcPath, err)
+		}
+		out, err := os.OpenFile(dstPath, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o644)
+		if err != nil {
+			_ = in.Close()
+			t.Fatalf("create %s: %v", dstPath, err)
+		}
+		if _, err := io.Copy(out, in); err != nil {
+			_ = in.Close()
+			_ = out.Close()
+			t.Fatalf("copy %s: %v", srcPath, err)
+		}
+		if err := in.Close(); err != nil {
+			t.Fatalf("close %s: %v", srcPath, err)
+		}
+		if err := out.Close(); err != nil {
+			t.Fatalf("close %s: %v", dstPath, err)
+		}
 	}
 }
