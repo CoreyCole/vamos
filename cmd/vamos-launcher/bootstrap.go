@@ -10,6 +10,10 @@ import (
 )
 
 func maybeReexecManaged(ctx context.Context) error {
+	if handled, err := maybeHandleLauncherCommand(ctx, os.Args[1:], os.Stdout); handled || err != nil {
+		return err
+	}
+
 	source, err := resolveRuntimeSource(ctx)
 	if err != nil {
 		return err
