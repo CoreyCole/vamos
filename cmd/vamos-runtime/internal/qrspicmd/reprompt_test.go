@@ -11,9 +11,10 @@ import (
 )
 
 type recordingTmux struct {
-	pastes []recordedPaste
-	keys   []recordedKeys
-	kills  []TmuxPane
+	pastes  []recordedPaste
+	keys    []recordedKeys
+	kills   []TmuxPane
+	layouts []recordedLayout
 }
 
 type recordedPaste struct {
@@ -24,6 +25,11 @@ type recordedPaste struct {
 type recordedKeys struct {
 	pane TmuxPane
 	keys []string
+}
+
+type recordedLayout struct {
+	pane   TmuxPane
+	layout string
 }
 
 func (r *recordingTmux) SplitPane(ctx context.Context, req TmuxSplitRequest) (TmuxPane, error) {
@@ -42,6 +48,11 @@ func (r *recordingTmux) PasteText(ctx context.Context, pane TmuxPane, text strin
 
 func (r *recordingTmux) KillPane(ctx context.Context, pane TmuxPane) error {
 	r.kills = append(r.kills, pane)
+	return nil
+}
+
+func (r *recordingTmux) SelectLayout(ctx context.Context, pane TmuxPane, layout string) error {
+	r.layouts = append(r.layouts, recordedLayout{pane: pane, layout: layout})
 	return nil
 }
 

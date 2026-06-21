@@ -93,4 +93,5 @@ type TmuxClient interface {
 	SendKeys(ctx context.Context, pane TmuxPane, keys []string) error
 	PasteText(ctx context.Context, pane TmuxPane, text string) error
 	KillPane(ctx context.Context, pane TmuxPane) error
+	SelectLayout(ctx context.Context, pane TmuxPane, layout string) error
 }

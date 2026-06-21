@@ -281,6 +281,9 @@ func TestWakeDrivenManagerLoopCleansOldPaneAfterNextLaunch(t *testing.T) {
 	if len(tmux.kills) != 1 || tmux.kills[0].ID != "%old" {
 		t.Fatalf("kills = %#v, want %%old", tmux.kills)
 	}
+	if len(tmux.layouts) != 1 || tmux.layouts[0].pane.ID != "%new" || tmux.layouts[0].layout != "even-horizontal" {
+		t.Fatalf("layouts = %#v, want even-horizontal on %%new", tmux.layouts)
+	}
 }
 
 func TestEndToEndCommandSurface(t *testing.T) {

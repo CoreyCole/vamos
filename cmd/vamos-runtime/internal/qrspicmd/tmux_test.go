@@ -44,3 +44,10 @@ func TestKillPaneArgsTargetExactPane(t *testing.T) {
 		t.Fatalf("kill args = %v", kill)
 	}
 }
+
+func TestSelectLayoutArgsTargetExactPane(t *testing.T) {
+	layout := strings.Join(selectLayoutArgs("%18", "even-horizontal"), " ")
+	if !strings.Contains(layout, "select-layout -t %18 even-horizontal") {
+		t.Fatalf("select-layout args = %v", layout)
+	}
+}

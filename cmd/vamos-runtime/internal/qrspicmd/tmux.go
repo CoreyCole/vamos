@@ -53,6 +53,16 @@ func (ShellTmuxClient) KillPane(ctx context.Context, pane TmuxPane) error {
 	return exec.CommandContext(ctx, "tmux", killPaneArgs(pane.ID)...).Run()
 }
 
+func (ShellTmuxClient) SelectLayout(ctx context.Context, pane TmuxPane, layout string) error {
+	if strings.TrimSpace(pane.ID) == "" {
+		return errors.New("tmux pane ID is required")
+	}
+	if strings.TrimSpace(layout) == "" {
+		return errors.New("tmux layout is required")
+	}
+	return exec.CommandContext(ctx, "tmux", selectLayoutArgs(pane.ID, layout)...).Run()
+}
+
 func setBufferArgs(name, text string) []string {
 	return []string{"set-buffer", "-b", name, text}
 }
@@ -63,6 +73,10 @@ func pasteBufferArgs(name, paneID string) []string {
 
 func killPaneArgs(paneID string) []string {
 	return []string{"kill-pane", "-t", paneID}
+}
+
+func selectLayoutArgs(paneID, layout string) []string {
+	return []string{"select-layout", "-t", paneID, layout}
 }
 
 func shellquote(args []string) []string {

@@ -629,6 +629,11 @@ func cleanupPendingChildAfterNextStart(ctx context.Context, state ManagerState, 
 	if err := tmux.KillPane(ctx, TmuxPane{ID: ref.TmuxPaneID}); err != nil {
 		return state, err
 	}
+	if state.ActiveChild != nil && strings.TrimSpace(state.ActiveChild.TmuxPaneID) != "" {
+		if err := tmux.SelectLayout(ctx, TmuxPane{ID: state.ActiveChild.TmuxPaneID}, "even-horizontal"); err != nil {
+			return state, err
+		}
+	}
 	state.PendingCleanupChild = nil
 	return state, nil
 }
