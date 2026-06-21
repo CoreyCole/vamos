@@ -75,7 +75,7 @@ func TestRunChildRequiresStageCwdPrompt(t *testing.T) {
 	assertErrorContains(t, err, "state-file is required")
 }
 
-func TestValidateResultRequiresStateAndResult(t *testing.T) {
+func TestValidateResultRequiresStateAndPlan(t *testing.T) {
 	cases := []struct {
 		name string
 		args []string
@@ -83,8 +83,7 @@ func TestValidateResultRequiresStateAndResult(t *testing.T) {
 	}{
 		{"stage", []string{"validate-result"}, "stage is required"},
 		{"state", []string{"validate-result", "--stage", "design"}, "state-file is required"},
-		{"result", []string{"validate-result", "--stage", "design", "--state-file", "/tmp/state.json"}, "result-file is required"},
-		{"plan", []string{"validate-result", "--stage", "design", "--state-file", "/tmp/state.json", "--result-file", "/tmp/result.txt"}, "plan-dir is required"},
+		{"plan", []string{"validate-result", "--stage", "design", "--state-file", "/tmp/state.json"}, "plan-dir is required"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -98,15 +97,14 @@ func TestValidateResultRequiresStateAndResult(t *testing.T) {
 	}
 }
 
-func TestDecideNextRequiresStateAndResult(t *testing.T) {
+func TestDecideNextRequiresStateAndPlan(t *testing.T) {
 	cases := []struct {
 		name string
 		args []string
 		want string
 	}{
 		{"state", []string{"decide-next"}, "state-file is required"},
-		{"result", []string{"decide-next", "--state-file", "/tmp/state.json"}, "result-file is required"},
-		{"plan", []string{"decide-next", "--state-file", "/tmp/state.json", "--result-file", "/tmp/result.txt"}, "plan-dir is required"},
+		{"plan", []string{"decide-next", "--state-file", "/tmp/state.json"}, "plan-dir is required"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

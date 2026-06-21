@@ -173,9 +173,9 @@ func TestEndToEndCommandSurface(t *testing.T) {
 	if state.ActiveChild == nil {
 		t.Fatalf("active child missing after run-child")
 	}
-	writeFile(t, state.ActiveChild.ResultPath, testResultYAML("question", "complete", "complete", "thoughts/example/questions/q.md", ""))
+	writeSessionTestFile(t, state.ActiveChild.SessionPath, sessionHeader(state.ActiveChild.SessionID, fixture.projectRoot)+"\n"+assistantLine(testResultYAML("question", "complete", "complete", "thoughts/example/questions/q.md", ""))+"\n")
 
-	validateOut, err := executeManagerCommand(deps{}, "validate-result", "--state-file", stateFile, "--stage", "question", "--result-file", state.ActiveChild.ResultPath, "--plan-dir", fixture.planDir)
+	validateOut, err := executeManagerCommand(deps{}, "validate-result", "--state-file", stateFile, "--stage", "question", "--plan-dir", fixture.planDir)
 	if err != nil {
 		t.Fatalf("validate command error = %v", err)
 	}
@@ -183,7 +183,7 @@ func TestEndToEndCommandSurface(t *testing.T) {
 		t.Fatalf("validate output = %q", validateOut)
 	}
 
-	decideOut, err := executeManagerCommand(deps{}, "decide-next", "--state-file", stateFile, "--result-file", state.ActiveChild.ResultPath, "--plan-dir", fixture.planDir)
+	decideOut, err := executeManagerCommand(deps{}, "decide-next", "--state-file", stateFile, "--plan-dir", fixture.planDir)
 	if err != nil {
 		t.Fatalf("decide command error = %v", err)
 	}

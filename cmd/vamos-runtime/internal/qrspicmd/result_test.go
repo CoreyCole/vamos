@@ -110,12 +110,62 @@ func TestRunValidateResultWritesValidatedEvent(t *testing.T) {
 	}
 }
 
+func TestRunValidateResultDefaultsToActiveChildSession(t *testing.T) {
+	dir := t.TempDir()
+	stateFile := filepath.Join(dir, "state.json")
+	sessionDir := filepath.Join(dir, "sessions")
+	cwd := filepath.Join(dir, "repo")
+	sessionPath := writePiSession(t, sessionDir, "child.jsonl", "session-1", cwd, assistantLine(testResultYAML("design", "complete", "complete", "thoughts/example/design.md", "")))
+	state := ManagerState{
+		Workflow: testWorkflowState(t, qrspi.NodeDesign, nil),
+		ActiveChild: &ChildRunRef{
+			ID:          "run-1",
+			Stage:       "design",
+			Cwd:         cwd,
+			SessionID:   "session-1",
+			SessionDir:  sessionDir,
+			SessionPath: sessionPath,
+		},
+	}
+	if err := (FileStateStore{}).Save(stateFile, state); err != nil {
+		t.Fatal(err)
+	}
+
+	var out strings.Builder
+	err := RunValidateResult(t.Context(), ValidateResultOptions{Stage: "design", StateFile: stateFile, PlanDir: "thoughts/example"}, deps{}, &out)
+	if err != nil {
+		t.Fatalf("RunValidateResult error = %v", err)
+	}
+	if !strings.Contains(out.String(), `"type":"validated"`) {
+		t.Fatalf("output = %q", out.String())
+	}
+}
+
+func TestRunValidateResultAcceptsExplicitSessionFile(t *testing.T) {
+	dir := t.TempDir()
+	stateFile := filepath.Join(dir, "state.json")
+	sessionPath := writePiSession(t, filepath.Join(dir, "sessions"), "manual.jsonl", "manual-session", filepath.Join(dir, "repo"), assistantLine(testResultYAML("design", "complete", "complete", "thoughts/example/design.md", "")))
+	state := ManagerState{Workflow: testWorkflowState(t, qrspi.NodeDesign, nil)}
+	if err := (FileStateStore{}).Save(stateFile, state); err != nil {
+		t.Fatal(err)
+	}
+
+	var out strings.Builder
+	err := RunValidateResult(t.Context(), ValidateResultOptions{Stage: "design", StateFile: stateFile, SessionFile: sessionPath, PlanDir: "thoughts/example"}, deps{}, &out)
+	if err != nil {
+		t.Fatalf("RunValidateResult error = %v", err)
+	}
+	if !strings.Contains(out.String(), `"type":"validated"`) {
+		t.Fatalf("output = %q", out.String())
+	}
+}
+
 func TestRunDecideNextPersistsDecisionAndImplementationCwd(t *testing.T) {
 	dir := t.TempDir()
 	stateFile := filepath.Join(dir, "state.json")
 	resultFile := filepath.Join(dir, "result.txt")
 	store := FileStateStore{}
-	state := ManagerState{Workflow: testWorkflowState(t, qrspi.NodeWorkspace, nil), ActiveChild: &ChildRunRef{ID: "child"}}
+	state := ManagerState{Workflow: testWorkflowState(t, qrspi.NodeWorkspace, nil)}
 	if err := store.Save(stateFile, state); err != nil {
 		t.Fatal(err)
 	}

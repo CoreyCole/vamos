@@ -82,7 +82,7 @@ func newRunChildCommand(d deps) *cobra.Command {
 func newValidateResultCommand(d deps) *cobra.Command {
 	opts := ValidateResultOptions{}
 	cmd := &cobra.Command{
-		Use:   "validate-result --stage <node> --state-file <file> --result-file <file> --plan-dir <path>",
+		Use:   "validate-result --stage <node> --state-file <file> --plan-dir <path>",
 		Short: "Validate a child QRSPI result against the canonical graph",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return RunValidateResult(cmd.Context(), opts, d, cmd.OutOrStdout())
@@ -90,7 +90,8 @@ func newValidateResultCommand(d deps) *cobra.Command {
 	}
 	cmd.Flags().StringVar(&opts.Stage, "stage", "", "expected QRSPI node ID")
 	cmd.Flags().StringVar(&opts.StateFile, "state-file", "", "q-manager state file")
-	cmd.Flags().StringVar(&opts.ResultFile, "result-file", "", "child result file")
+	cmd.Flags().StringVar(&opts.SessionFile, "session-file", "", "explicit child Pi session JSONL file")
+	cmd.Flags().StringVar(&opts.ResultFile, "result-file", "", "deprecated debug fallback: plaintext child result file")
 	cmd.Flags().StringVar(&opts.PlanDir, "plan-dir", "", "QRSPI plan directory")
 	cmd.Flags().StringVar(&opts.RunID, "run-id", "", "child run ID")
 	cmd.Flags().StringVar(&opts.SessionID, "session-id", "", "child session ID")
@@ -100,14 +101,15 @@ func newValidateResultCommand(d deps) *cobra.Command {
 func newDecideNextCommand(d deps) *cobra.Command {
 	opts := DecideNextOptions{}
 	cmd := &cobra.Command{
-		Use:   "decide-next --state-file <file> --result-file <file> --plan-dir <path>",
+		Use:   "decide-next --state-file <file> --plan-dir <path>",
 		Short: "Persist the transition decision for a validated QRSPI result",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return RunDecideNext(cmd.Context(), opts, d, cmd.OutOrStdout())
 		},
 	}
 	cmd.Flags().StringVar(&opts.StateFile, "state-file", "", "q-manager state file")
-	cmd.Flags().StringVar(&opts.ResultFile, "result-file", "", "child result file")
+	cmd.Flags().StringVar(&opts.SessionFile, "session-file", "", "explicit child Pi session JSONL file")
+	cmd.Flags().StringVar(&opts.ResultFile, "result-file", "", "deprecated debug fallback: plaintext child result file")
 	cmd.Flags().StringVar(&opts.PlanDir, "plan-dir", "", "QRSPI plan directory")
 	return cmd
 }
@@ -271,9 +273,6 @@ func RunValidateResult(ctx context.Context, opts ValidateResultOptions, d deps, 
 	if strings.TrimSpace(opts.StateFile) == "" {
 		return errors.New("state-file is required")
 	}
-	if strings.TrimSpace(opts.ResultFile) == "" {
-		return errors.New("result-file is required")
-	}
 	if strings.TrimSpace(opts.PlanDir) == "" {
 		return errors.New("plan-dir is required")
 	}
@@ -283,15 +282,12 @@ func RunValidateResult(ctx context.Context, opts ValidateResultOptions, d deps, 
 	if err != nil {
 		return err
 	}
-	data, err := os.ReadFile(opts.ResultFile)
+	text, parseCtx, err := ReadChildResultText(state, ResultSourceOptions{ResultFile: opts.ResultFile, SessionFile: opts.SessionFile, SessionID: opts.SessionID, RunID: opts.RunID})
 	if err != nil {
 		return err
 	}
-	parsed, err := ParseValidateDecide(string(data), state.Workflow, wruntime.ParseContext{
-		ExpectedNodeID: wruntime.NodeID(opts.Stage),
-		RunID:          opts.RunID,
-		SessionID:      opts.SessionID,
-	})
+	parseCtx.ExpectedNodeID = wruntime.NodeID(opts.Stage)
+	parsed, err := ParseValidateDecide(text, state.Workflow, parseCtx)
 	if err != nil {
 		return err
 	}
@@ -302,9 +298,6 @@ func RunDecideNext(ctx context.Context, opts DecideNextOptions, d deps, out io.W
 	if strings.TrimSpace(opts.StateFile) == "" {
 		return errors.New("state-file is required")
 	}
-	if strings.TrimSpace(opts.ResultFile) == "" {
-		return errors.New("result-file is required")
-	}
 	if strings.TrimSpace(opts.PlanDir) == "" {
 		return errors.New("plan-dir is required")
 	}
@@ -314,11 +307,12 @@ func RunDecideNext(ctx context.Context, opts DecideNextOptions, d deps, out io.W
 	if err != nil {
 		return err
 	}
-	data, err := os.ReadFile(opts.ResultFile)
+	text, parseCtx, err := ReadChildResultText(state, ResultSourceOptions{ResultFile: opts.ResultFile, SessionFile: opts.SessionFile})
 	if err != nil {
 		return err
 	}
-	parsed, err := ParseValidateDecide(string(data), state.Workflow, wruntime.ParseContext{ExpectedNodeID: state.Workflow.CurrentNodeID})
+	parseCtx.ExpectedNodeID = state.Workflow.CurrentNodeID
+	parsed, err := ParseValidateDecide(text, state.Workflow, parseCtx)
 	if err != nil {
 		return err
 	}
@@ -339,6 +333,50 @@ func RunDecideNext(ctx context.Context, opts DecideNextOptions, d deps, out io.W
 			"implementationCwd": state.ImplementationCwd,
 		},
 	})
+}
+
+func ReadChildResultText(state ManagerState, opts ResultSourceOptions) (string, wruntime.ParseContext, error) {
+	ctx := wruntime.ParseContext{RunID: opts.RunID, SessionID: opts.SessionID}
+	if strings.TrimSpace(opts.SessionFile) != "" {
+		text, err := ExtractFinalAssistantTextFromSession(opts.SessionFile)
+		if err != nil {
+			return "", ctx, err
+		}
+		if ctx.SessionID == "" && state.ActiveChild != nil {
+			ctx.SessionID = state.ActiveChild.SessionID
+		}
+		return text, ctx, nil
+	}
+	if state.ActiveChild != nil {
+		ref := state.ActiveChild
+		sessionPath := strings.TrimSpace(ref.SessionPath)
+		if sessionPath == "" {
+			resolved, err := ResolveSessionPath(ref.SessionDir, ref.SessionID, ref.Cwd)
+			if err != nil {
+				return "", ctx, err
+			}
+			sessionPath = resolved
+		}
+		text, err := ExtractFinalAssistantTextFromSession(sessionPath)
+		if err != nil {
+			return "", ctx, err
+		}
+		if ctx.RunID == "" {
+			ctx.RunID = ref.ID
+		}
+		if ctx.SessionID == "" {
+			ctx.SessionID = ref.SessionID
+		}
+		return text, ctx, nil
+	}
+	if strings.TrimSpace(opts.ResultFile) != "" {
+		data, err := os.ReadFile(opts.ResultFile)
+		if err != nil {
+			return "", ctx, err
+		}
+		return string(data), ctx, nil
+	}
+	return "", ctx, errors.New("no child result source: provide --session-file, keep active child session refs, or pass deprecated --result-file")
 }
 
 func RunRenderPrompt(ctx context.Context, opts RenderPromptOptions, d deps, out io.Writer) error {

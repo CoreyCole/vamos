@@ -24,18 +24,27 @@ type RunChildOptions struct {
 }
 
 type ValidateResultOptions struct {
-	Stage      string
-	StateFile  string
-	ResultFile string
-	PlanDir    string
-	RunID      string
-	SessionID  string
+	Stage       string
+	StateFile   string
+	ResultFile  string // deprecated/debug fallback
+	SessionFile string
+	PlanDir     string
+	RunID       string
+	SessionID   string
 }
 
 type DecideNextOptions struct {
-	StateFile  string
-	ResultFile string
-	PlanDir    string
+	StateFile   string
+	ResultFile  string // deprecated/debug fallback
+	SessionFile string
+	PlanDir     string
+}
+
+type ResultSourceOptions struct {
+	ResultFile  string
+	SessionFile string
+	SessionID   string
+	RunID       string
 }
 
 type RenderPromptOptions struct {
