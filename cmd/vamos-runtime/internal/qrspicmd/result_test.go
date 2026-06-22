@@ -87,6 +87,30 @@ func TestUpdateImplementationCwdFromWorkspaceResult(t *testing.T) {
 	}
 }
 
+func TestParseNormalizeValidateDecideNormalizesReviewPlanPositiveOutcome(t *testing.T) {
+	state := ManagerState{Workflow: testWorkflowState(t, qrspi.NodeReviewPlan, nil), CanonicalPlanDir: filepath.Join("tmp", "plan")}
+	parsed, err := ParseNormalizeValidateDecide(testResultYAML("review-plan", "complete", "complete", "thoughts/example/reviews/plan/review.md", ""), state, wruntime.ParseContext{})
+	if err != nil {
+		t.Fatalf("ParseNormalizeValidateDecide parent error = %v", err)
+	}
+	if parsed.Result.Outcome != wruntime.OutcomeReadyForWorkspace || parsed.Decision.NextNodeID != qrspi.NodeWorkspace {
+		t.Fatalf("parent outcome/next = %q/%q", parsed.Result.Outcome, parsed.Decision.NextNodeID)
+	}
+	if len(parsed.Normalizations) != 1 || parsed.Normalizations[0].Canonical != string(wruntime.OutcomeReadyForWorkspace) {
+		t.Fatalf("parent normalizations = %+v", parsed.Normalizations)
+	}
+
+	state.CanonicalPlanDir = filepath.Join("tmp", "plan", "reviews", "implementation-review")
+	state.ImplementationCwd = "/tmp/impl"
+	parsed, err = ParseNormalizeValidateDecide(testResultYAML("review-plan", "complete", "done", "thoughts/example/reviews/plan/review.md", ""), state, wruntime.ParseContext{})
+	if err != nil {
+		t.Fatalf("ParseNormalizeValidateDecide review-dir error = %v", err)
+	}
+	if parsed.Result.Outcome != wruntime.OutcomeReadyForImplement || parsed.Decision.NextNodeID != qrspi.NodeImplement {
+		t.Fatalf("review-dir outcome/next = %q/%q", parsed.Result.Outcome, parsed.Decision.NextNodeID)
+	}
+}
+
 func TestReviewPlanReadyForImplementStartsImplement(t *testing.T) {
 	state := testWorkflowState(t, qrspi.NodeReviewPlan, nil)
 	for _, outcome := range []string{"ready-for-implement", "ready-for-implementation"} {

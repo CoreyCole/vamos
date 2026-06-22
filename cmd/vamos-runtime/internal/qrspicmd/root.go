@@ -38,6 +38,7 @@ func newCommand(d deps) *cobra.Command {
 		newStartNextCommand(d),
 		newSteerChildCommand(d),
 		newRunChildCommand(d),
+		newChildCompleteCommand(d),
 		newValidateResultCommand(d),
 		newDecideNextCommand(d),
 		newRepromptChildCommand(d),
@@ -131,6 +132,22 @@ func newRunChildCommand(d deps) *cobra.Command {
 	cmd.Flags().StringVar(&opts.ManagerRunID, "manager-run-id", "", "manager run ID")
 	cmd.Flags().StringVar(&opts.ManagerPane, "manager-pane", "", "tmux pane ID for the parent q-manager session")
 	cmd.Flags().DurationVar(&opts.Timeout, "timeout", 12*time.Hour, "maximum time to wait for child done marker")
+	return cmd
+}
+
+func newChildCompleteCommand(d deps) *cobra.Command {
+	opts := ChildCompletionOptions{Output: "text"}
+	cmd := &cobra.Command{
+		Use:   "child-complete --state-file <file> [--child-id <id>]",
+		Short: "Validate active child completion and write q-manager validation status",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			_, err := RunChildComplete(cmd.Context(), opts, d, cmd.OutOrStdout())
+			return err
+		},
+	}
+	cmd.Flags().StringVar(&opts.StateFile, "state-file", "", "q-manager state file")
+	cmd.Flags().StringVar(&opts.ChildID, "child-id", "", "expected active child ID")
+	cmd.Flags().StringVar(&opts.Output, "output", "text", "output format: text or json")
 	return cmd
 }
 
@@ -732,7 +749,7 @@ func RunChild(ctx context.Context, opts RunChildOptions, d deps, out io.Writer) 
 	if err != nil {
 		return err
 	}
-	state.ActiveChild = &ChildRunRef{ID: childID, Stage: opts.Stage, Cwd: opts.Cwd, TmuxPaneID: run.Pane.ID, OutputPath: req.OutputPath, SessionID: req.SessionID, SessionDir: req.SessionDir, DonePath: req.DonePath, StatusPath: req.StatusPath}
+	state.ActiveChild = &ChildRunRef{ID: childID, Stage: opts.Stage, Cwd: opts.Cwd, TmuxPaneID: run.Pane.ID, OutputPath: req.OutputPath, SessionID: req.SessionID, SessionDir: req.SessionDir, DonePath: req.DonePath, StatusPath: req.StatusPath, ValidationStatusPath: req.ValidationStatusPath, LifecycleStatus: "running", Generation: 1}
 	if err := store.Save(opts.StateFile, state); err != nil {
 		return err
 	}
@@ -776,6 +793,149 @@ func RunChild(ctx context.Context, opts RunChildOptions, d deps, out io.Writer) 
 		return err
 	}
 	return WriteNDJSON(out, Event{Type: "child_finished", Ref: childRef(state.ActiveChild)})
+}
+
+func RunChildComplete(ctx context.Context, opts ChildCompletionOptions, d deps, out io.Writer) (*ChildCompletionStatus, error) {
+	if strings.TrimSpace(opts.StateFile) == "" {
+		return nil, errors.New("state-file is required")
+	}
+	out = ensureWriter(out)
+	clock := d.Clock
+	if clock == nil {
+		clock = time.Now
+	}
+	store := stateStore(d, "", clock)
+	state, err := store.Load(opts.StateFile)
+	if err != nil {
+		return nil, err
+	}
+	if state.ActiveChild == nil {
+		return nil, errors.New("no active child to complete")
+	}
+	if strings.TrimSpace(opts.ChildID) != "" && state.ActiveChild.ID != strings.TrimSpace(opts.ChildID) {
+		return nil, fmt.Errorf("active child %q does not match requested child %q", state.ActiveChild.ID, opts.ChildID)
+	}
+	child := state.ActiveChild
+	text, parseCtx, err := ReadChildResultText(state, ResultSourceOptions{})
+	status := ChildCompletionStatus{ChildID: child.ID, Attempt: child.ValidationRetryCount, RetryLimit: invalidResultRetryLimit(state)}
+	if err == nil {
+		parseCtx.ExpectedNodeID = wruntime.NodeID(child.Stage)
+		parsed, parseErr := ParseNormalizeValidateDecide(text, state, parseCtx)
+		if parseErr == nil {
+			status.Validated = true
+			status.DeliveryID = childCompletionDeliveryID(*child, &parsed, false)
+			status.Result = childCompletionResult(parsed.Result)
+			status.ManagerNeeded = childCompletionManagerNeeded(status.Result.Status)
+			status.Normalizations = parsed.Normalizations
+			status.Wake = childCompletionWake(opts.StateFile, state, status)
+			state.ActiveChild.LifecycleStatus = "completed"
+			state.ActiveChild.LastDeliveryID = status.DeliveryID
+			state.Delivery.LastDeliveryID = status.DeliveryID
+			err = nil
+		} else {
+			err = parseErr
+		}
+	}
+	if err != nil {
+		if shouldRepromptAfterValidationError(state, ContinueOptions{StateFile: opts.StateFile, PlanDir: state.CanonicalPlanDir, Stage: child.Stage}, err) {
+			attempt := child.ValidationRetryCount + 1
+			if repromptErr := continueReprompt(ctx, state, ContinueOptions{StateFile: opts.StateFile, PlanDir: state.CanonicalPlanDir, Stage: child.Stage}, d, io.Discard, err); repromptErr != nil {
+				return nil, repromptErr
+			}
+			latest, loadErr := store.Load(opts.StateFile)
+			if loadErr != nil {
+				return nil, loadErr
+			}
+			state = latest
+			child = state.ActiveChild
+			status.ChildID = child.ID
+			status.Attempt = attempt
+			status.RetryLimit = invalidResultRetryLimit(state)
+			status.Reason = "retryable_invalid_result"
+			status.Wake = WakeDeliveryInstruction{Mode: "suppress", Reason: "retryable_invalid_result"}
+		} else if isRetryExhaustedValidationError(state, ContinueOptions{StateFile: opts.StateFile, PlanDir: state.CanonicalPlanDir, Stage: child.Stage}, err) {
+			status.Validated = false
+			status.ManagerNeeded = true
+			status.RetryExhausted = true
+			status.DeliveryID = childCompletionDeliveryID(*child, nil, true)
+			status.Result = ChildCompletionResult{Stage: child.Stage, Status: "invalid_result", Summary: err.Error()}
+			status.Reason = err.Error()
+			status.Wake = childCompletionWake(opts.StateFile, state, status)
+			state.ActiveChild.LifecycleStatus = "awaiting_manager"
+			state.ActiveChild.LastDeliveryID = status.DeliveryID
+			state.Delivery.LastDeliveryID = status.DeliveryID
+		} else {
+			return nil, err
+		}
+	}
+	if state.ActiveChild != nil && strings.TrimSpace(state.ActiveChild.ValidationStatusPath) != "" {
+		if writeErr := writeValidationStatus(state.ActiveChild.ValidationStatusPath, status); writeErr != nil {
+			return nil, writeErr
+		}
+	}
+	if saveErr := store.Save(opts.StateFile, state); saveErr != nil {
+		return nil, saveErr
+	}
+	if strings.EqualFold(opts.Output, "json") {
+		enc := json.NewEncoder(out)
+		enc.SetIndent("", "  ")
+		if err := enc.Encode(status); err != nil {
+			return nil, err
+		}
+	} else {
+		if _, err := fmt.Fprintf(out, "child completion: %s\nwake: %s\n", status.Result.Status, status.Wake.Mode); err != nil {
+			return nil, err
+		}
+	}
+	return &status, nil
+}
+
+func childCompletionResult(result wruntime.WorkflowResult) ChildCompletionResult {
+	return ChildCompletionResult{Stage: string(result.SourceNodeID), Status: string(result.Status), Outcome: string(result.Outcome), Artifact: result.PrimaryArtifact, Summary: result.Summary}
+}
+
+func childCompletionDeliveryID(child ChildRunRef, parsed *ParsedDecision, exhausted bool) string {
+	parts := []string{child.ID, fmt.Sprintf("%d", child.Generation)}
+	if exhausted || parsed == nil {
+		parts = append(parts, "invalid_result")
+	} else {
+		parts = append(parts, string(parsed.Result.SourceNodeID), string(parsed.Result.Status), string(parsed.Result.Outcome), parsed.Result.PrimaryArtifact)
+	}
+	return strings.Join(parts, ":")
+}
+
+func childCompletionManagerNeeded(status string) bool {
+	return status == string(wruntime.StatusNeedsHuman) || status == string(wruntime.StatusBlocked) || status == string(wruntime.StatusError) || status == "invalid_result"
+}
+
+func childCompletionWake(stateFile string, state ManagerState, status ChildCompletionStatus) WakeDeliveryInstruction {
+	if status.DeliveryID != "" && state.Delivery.LastDeliveryID == status.DeliveryID {
+		return WakeDeliveryInstruction{Mode: "suppress", Reason: "duplicate_delivery"}
+	}
+	return WakeDeliveryInstruction{Mode: "deliver", Payload: childCompletionWakePayload(stateFile, status)}
+}
+
+func childCompletionWakePayload(stateFile string, status ChildCompletionStatus) string {
+	managerNeeded := status.ManagerNeeded || status.RetryExhausted || childCompletionManagerNeeded(status.Result.Status)
+	return fmt.Sprintf("```yaml\nq_manager_child_wake:\n  validated: %t\n  manager_needed: %t\n  retry_exhausted: %t\n  stage: %q\n  status: %q\n  outcome: %q\n  artifact: %q\n  child_id: %q\n  state_file: %q\n  reason: %q\n  next:\n    - action: run_command\n      param: %q\n```", status.Validated, managerNeeded, status.RetryExhausted, status.Result.Stage, status.Result.Status, status.Result.Outcome, status.Result.Artifact, status.ChildID, stateFile, status.Reason, continueCommand(stateFile))
+}
+
+func writeValidationStatus(path string, status ChildCompletionStatus) error {
+	if strings.TrimSpace(path) == "" {
+		return nil
+	}
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return err
+	}
+	data, err := json.MarshalIndent(status, "", "  ")
+	if err != nil {
+		return err
+	}
+	tmp := path + ".tmp"
+	if err := os.WriteFile(tmp, append(data, '\n'), 0o644); err != nil {
+		return err
+	}
+	return os.Rename(tmp, path)
 }
 
 func RunValidateResult(ctx context.Context, opts ValidateResultOptions, d deps, out io.Writer) error {
@@ -1052,7 +1212,7 @@ func validateActiveChild(ctx context.Context, state ManagerState, opts ContinueO
 		return ParsedDecision{}, err
 	}
 	parseCtx.ExpectedNodeID = wruntime.NodeID(opts.Stage)
-	return ParseValidateDecide(text, state.Workflow, parseCtx)
+	return ParseNormalizeValidateDecide(text, state, parseCtx)
 }
 
 func invalidResultRetryLimit(state ManagerState) int {
@@ -1605,6 +1765,15 @@ func childRef(ref *ChildRunRef) map[string]any {
 	}
 	if strings.TrimSpace(ref.ResultPath) != "" {
 		out["resultPath"] = ref.ResultPath
+	}
+	if strings.TrimSpace(ref.ValidationStatusPath) != "" {
+		out["validationStatusPath"] = ref.ValidationStatusPath
+	}
+	if strings.TrimSpace(ref.LifecycleStatus) != "" {
+		out["lifecycleStatus"] = ref.LifecycleStatus
+	}
+	if ref.Generation != 0 {
+		out["generation"] = ref.Generation
 	}
 	return out
 }

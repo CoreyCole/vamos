@@ -243,6 +243,48 @@ func TestQRSPIResultParserAcceptsCanonicalStagesAndOutcomes(t *testing.T) {
 	}
 }
 
+func TestQRSPIResultParserNormalizesDeterministicPositiveReviewOutcomes(t *testing.T) {
+	tests := []struct {
+		name    string
+		stage   wruntime.NodeID
+		outcome string
+		want    wruntime.ResultOutcome
+	}{
+		{name: "review-outline complete", stage: NodeReviewOutline, outcome: "complete", want: wruntime.OutcomeReadyForPlan},
+		{name: "review-implementation done", stage: NodeReviewImplementation, outcome: "done", want: wruntime.OutcomeReadyForHumanReview},
+		{name: "review-implementation approved", stage: NodeReviewImplementation, outcome: "approved", want: wruntime.OutcomeReadyForHumanReview},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := (QRSPIResultParser{}).Parse(validResultYAMLWithOutcome(string(tt.stage), tt.outcome), wruntime.ParseContext{ExpectedNodeID: tt.stage})
+			if err != nil {
+				t.Fatalf("Parse() error = %v", err)
+			}
+			parsed := got.(Result)
+			if parsed.Outcome != string(tt.want) {
+				t.Fatalf("outcome = %q, want %q", parsed.Outcome, tt.want)
+			}
+			if len(parsed.Normalizations) != 1 || parsed.Normalizations[0].Original != tt.outcome {
+				t.Fatalf("normalizations = %+v", parsed.Normalizations)
+			}
+		})
+	}
+}
+
+func TestQRSPIResultParserDoesNotNormalizeNegativeOrAmbiguousOutcomes(t *testing.T) {
+	_, err := (QRSPIResultParser{}).Parse(validResultYAMLWithOutcome(string(NodeReviewOutline), string(wruntime.OutcomeNeedsReviewResearch)), wruntime.ParseContext{ExpectedNodeID: NodeReviewOutline})
+	if err != nil {
+		t.Fatalf("negative review outcome should remain valid: %v", err)
+	}
+	parsedAny, err := (QRSPIResultParser{}).Parse(validResultYAMLWithOutcome(string(NodeReviewPlan), "complete"), wruntime.ParseContext{ExpectedNodeID: NodeReviewPlan})
+	if err != nil {
+		t.Fatalf("review-plan parser should leave ambiguous positive outcome unchanged before graph validation: %v", err)
+	}
+	if parsedAny.(Result).Outcome != "complete" || len(parsedAny.(Result).Normalizations) != 0 {
+		t.Fatalf("review-plan parsed = %+v", parsedAny.(Result))
+	}
+}
+
 func TestQRSPIResultParserRejectsAmbiguousReviewStage(t *testing.T) {
 	for _, stage := range []string{"review", "review-design"} {
 		t.Run(stage, func(t *testing.T) {

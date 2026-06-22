@@ -23,6 +23,14 @@ type Result struct {
 	Artifact          string            `yaml:"artifact" json:"artifact"`
 	Artifacts         []Artifact        `yaml:"artifacts" json:"artifacts,omitempty"`
 	Next              Next              `yaml:"next" json:"next"`
+	Normalizations    []Normalization   `yaml:"-" json:"normalizations,omitempty"`
+}
+
+type Normalization struct {
+	Field     string `json:"field"`
+	Original  string `json:"original"`
+	Canonical string `json:"canonical"`
+	Reason    string `json:"reason"`
 }
 
 type resultEnvelope struct {
@@ -183,6 +191,7 @@ func (QRSPIResultParser) Parse(output string, ctx wruntime.ParseContext) (any, e
 		return nil, err
 	}
 	parsed = trimQRSPIResult(parsed)
+	parsed = normalizeDeterministicPositiveResult(parsed, ctx)
 	if err := validateQRSPIResult(parsed, ctx); err != nil {
 		return nil, err
 	}
@@ -291,6 +300,51 @@ func validateQRSPIResult(parsed Result, ctx wruntime.ParseContext) error {
 		}
 	}
 	return nil
+}
+
+func normalizeDeterministicPositiveResult(parsed Result, ctx wruntime.ParseContext) Result {
+	if parsed.Status != string(wruntime.StatusComplete) || strings.TrimSpace(parsed.Outcome) == "" {
+		return parsed
+	}
+	original := strings.ToLower(strings.TrimSpace(parsed.Outcome))
+	if !isPositiveOutcomeSynonym(original) {
+		return parsed
+	}
+	canonical, ok := deterministicPositiveOutcomeForNode(wruntime.NodeID(parsed.Stage), ctx)
+	if !ok || canonical == wruntime.ResultOutcome(original) {
+		return parsed
+	}
+	parsed.Outcome = string(canonical)
+	parsed.Normalizations = append(parsed.Normalizations, Normalization{
+		Field:     "outcome",
+		Original:  original,
+		Canonical: string(canonical),
+		Reason:    "status complete plus current node has deterministic positive transition",
+	})
+	return parsed
+}
+
+func isPositiveOutcomeSynonym(value string) bool {
+	switch strings.ReplaceAll(strings.ToLower(strings.TrimSpace(value)), "_", "-") {
+	case "complete", "completed", "done", "success", "succeeded", "ok", "ready", "approved", "ready-to-plan", "ready-for-planning", "ready-to-implement", "ready-to-implementation", "ready-to-workspace", "ready-for-workspaces":
+		return true
+	default:
+		return false
+	}
+}
+
+func deterministicPositiveOutcomeForNode(node wruntime.NodeID, ctx wruntime.ParseContext) (wruntime.ResultOutcome, bool) {
+	if node == "" {
+		node = ctx.ExpectedNodeID
+	}
+	switch node {
+	case NodeReviewOutline:
+		return wruntime.OutcomeReadyForPlan, true
+	case NodeReviewImplementation:
+		return wruntime.OutcomeReadyForHumanReview, true
+	default:
+		return "", false
+	}
 }
 
 func unsupportedReviewStage(stage string) bool {

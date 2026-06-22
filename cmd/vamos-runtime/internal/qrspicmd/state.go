@@ -5,16 +5,35 @@ import wruntime "github.com/CoreyCole/vamos/pkg/agents/workflows/runtime"
 const schemaVersion = 1
 
 type ManagerState struct {
-	SchemaVersion       int            `json:"schemaVersion"`
-	RepoID              string         `json:"repoId"`
-	CanonicalPlanDir    string         `json:"canonicalPlanDir"`
-	ManagerRunID        string         `json:"managerRunId"`
-	SourceCwd           string         `json:"sourceCwd"`
-	ImplementationCwd   string         `json:"implementationCwd,omitempty"`
-	ManagerPaneID       string         `json:"managerPaneId,omitempty"`
-	ActiveChild         *ChildRunRef   `json:"activeChild,omitempty"`
-	PendingCleanupChild *ChildRunRef   `json:"pendingCleanupChild,omitempty"`
-	Workflow            wruntime.State `json:"workflow"`
+	SchemaVersion       int                  `json:"schemaVersion"`
+	RepoID              string               `json:"repoId"`
+	CanonicalPlanDir    string               `json:"canonicalPlanDir"`
+	ManagerRunID        string               `json:"managerRunId"`
+	SourceCwd           string               `json:"sourceCwd"`
+	ImplementationCwd   string               `json:"implementationCwd,omitempty"`
+	ManagerPaneID       string               `json:"managerPaneId,omitempty"`
+	ManagerSessionPath  string               `json:"managerSessionPath,omitempty"`
+	Delivery            ManagerDeliveryState `json:"delivery,omitempty"`
+	LastActionCard      *ManagerActionCard   `json:"lastActionCard,omitempty"`
+	ActiveChild         *ChildRunRef         `json:"activeChild,omitempty"`
+	PendingCleanupChild *ChildRunRef         `json:"pendingCleanupChild,omitempty"`
+	Workflow            wruntime.State       `json:"workflow"`
+}
+
+type ManagerDeliveryState struct {
+	Status         string      `json:"status,omitempty"`
+	ManagerPaneID  string      `json:"managerPaneId,omitempty"`
+	QueuedWake     *QueuedWake `json:"queuedWake,omitempty"`
+	LastDeliveryID string      `json:"lastDeliveryId,omitempty"`
+}
+
+type QueuedWake struct {
+	DeliveryID      string `json:"deliveryId"`
+	ChildID         string `json:"childId"`
+	ChildGeneration int    `json:"childGeneration"`
+	Payload         string `json:"payload"`
+	QueuedAt        string `json:"queuedAt"`
+	DeliveredAt     string `json:"deliveredAt,omitempty"`
 }
 
 type ChildRunRef struct {
@@ -29,6 +48,10 @@ type ChildRunRef struct {
 	DonePath             string `json:"donePath"`
 	StatusPath           string `json:"statusPath"`
 	ResultPath           string `json:"resultPath,omitempty"`
+	ValidationStatusPath string `json:"validationStatusPath,omitempty"`
+	LastDeliveryID       string `json:"lastDeliveryId,omitempty"`
+	LifecycleStatus      string `json:"lifecycleStatus,omitempty"`
+	Generation           int    `json:"generation,omitempty"`
 	ValidationRetryCount int    `json:"validationRetryCount,omitempty"`
 	LastRepromptAttempt  int    `json:"lastRepromptAttempt,omitempty"`
 }

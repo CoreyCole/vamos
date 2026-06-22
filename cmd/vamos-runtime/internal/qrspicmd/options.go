@@ -73,6 +73,61 @@ type ManagerNotice struct {
 	FeedbackCommand string `json:"feedbackCommand,omitempty"`
 }
 
+type ChildCompletionOptions struct {
+	StateFile string
+	ChildID   string
+	Output    string
+}
+
+type ChildCompletionStatus struct {
+	Validated      bool                    `json:"validated"`
+	ManagerNeeded  bool                    `json:"managerNeeded"`
+	RetryExhausted bool                    `json:"retryExhausted"`
+	ChildID        string                  `json:"childId"`
+	DeliveryID     string                  `json:"deliveryId"`
+	Result         ChildCompletionResult   `json:"result,omitempty"`
+	Wake           WakeDeliveryInstruction `json:"wake"`
+	ActionCard     *ManagerActionCard      `json:"actionCard,omitempty"`
+	Normalizations []ResultNormalization   `json:"normalizations,omitempty"`
+	Reason         string                  `json:"reason,omitempty"`
+	Attempt        int                     `json:"attempt,omitempty"`
+	RetryLimit     int                     `json:"retryLimit,omitempty"`
+}
+
+type ResultNormalization struct {
+	Field     string `json:"field"`
+	Original  string `json:"original"`
+	Canonical string `json:"canonical"`
+	Reason    string `json:"reason"`
+}
+
+type ChildCompletionResult struct {
+	Stage    string `json:"stage,omitempty"`
+	Status   string `json:"status,omitempty"`
+	Outcome  string `json:"outcome,omitempty"`
+	Artifact string `json:"artifact,omitempty"`
+	Summary  string `json:"summary,omitempty"`
+}
+
+type WakeDeliveryInstruction struct {
+	Mode    string `json:"mode"`
+	Payload string `json:"payload,omitempty"`
+	Reason  string `json:"reason,omitempty"`
+}
+
+type ManagerActionCard struct {
+	Kind              string   `json:"kind"`
+	Severity          string   `json:"severity"`
+	Summary           string   `json:"summary"`
+	Evidence          []string `json:"evidence,omitempty"`
+	RecommendedAction string   `json:"recommendedAction"`
+	ReviewSummary     string   `json:"reviewSummary,omitempty"`
+	SafeCommand       string   `json:"safeCommand,omitempty"`
+	ContinueCommand   string   `json:"continueCommand,omitempty"`
+	RequiresHuman     bool     `json:"requiresHuman"`
+	RecoveryLogPath   string   `json:"recoveryLogPath,omitempty"`
+}
+
 type ValidationRecoveryLog struct {
 	Timestamp        time.Time `json:"timestamp"`
 	StateFile        string    `json:"stateFile,omitempty"`
