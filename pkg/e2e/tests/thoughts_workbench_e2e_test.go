@@ -5,11 +5,18 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	duiruntime "github.com/coreycole/datastarui/e2e/runtime"
 	"github.com/coreycole/datastarui/e2e/spec"
+	"github.com/playwright-community/playwright-go"
 
 	"github.com/CoreyCole/vamos/pkg/e2e/vamos"
+)
+
+const (
+	rendererDemoAppletFrameSelector = `iframe[data-vamos-html-applet][src^='/thoughts/_render/html/renderer-demo.html?theme=']`
+	styledAppletFrameSelector       = `iframe[data-vamos-html-applet][src^='/thoughts/_render/html/styled-applet.html?theme=']`
 )
 
 func TestThoughtsWorkbench_RootOpensDocumentWorkbenchWithChat(t *testing.T) {
@@ -64,7 +71,7 @@ func TestThoughtsWorkbench_RendererFormatsShowExpectedWorkbenchStates(t *testing
 		Expect(spec.TextContains(vamos.Thoughts.CenterPane(), "Renderer Markdown Demo")).
 		Visit(vamos.Pages.Path("/thoughts/renderer-demo.html?context=chat")).
 		Expect(vamos.Thoughts.Ready()).
-		Expect(spec.ExpectStep(spec.Visible(spec.CSS("iframe[src='/thoughts/_render/html/renderer-demo.html']")))).
+		Expect(spec.ExpectStep(spec.Visible(spec.CSS(rendererDemoAppletFrameSelector)))).
 		Expect(iframeSandboxOmitsSameOrigin()).
 		Visit(vamos.Pages.Path("/thoughts/renderer-demo.csv?context=chat")).
 		Expect(vamos.Thoughts.Ready()).
@@ -88,6 +95,25 @@ func TestThoughtsWorkbench_HTMLChildRouteServesAppletContent(t *testing.T) {
 		Expect(spec.ExpectStep(spec.TextAbsent("thoughts-markdown-scroll-region"))).
 		Expect(spec.TextContains(spec.CSS("body"), "Renderer HTML Applet")).
 		Expect(spec.TextContains(spec.CSS("body"), "Datastar explicit import placeholder")).
+		Expect(vamos.Console.Clean()).
+		Run()
+}
+
+func TestThoughtsWorkbench_HTMLAppletUsesVamosStylesAndTheme(t *testing.T) {
+	spec.Story(t, "thoughts workbench HTML applet uses Vamos styles and theme").
+		App(vamos.App()).
+		As(vamos.Robot).
+		With(vamos.WorkspaceFixture("thoughts-workbench.basic")).
+		Do(seedStyledHTMLAppletFile()).
+		Visit(vamos.Pages.Path("/thoughts/styled-applet.html?context=chat")).
+		Expect(vamos.Thoughts.Ready()).
+		Expect(htmlAppletFrameHasThemeQuery()).
+		Expect(htmlAppletChildHasInitialTheme()).
+		Expect(htmlAppletUsesSharedStyles()).
+		Expect(htmlAppletLocalOverrideWins()).
+		Do(toggleThemeFromAvatar()).
+		Expect(htmlAppletChildThemeChanged()).
+		Expect(iframeSandboxOmitsSameOriginFor(styledAppletFrameSelector)).
 		Expect(vamos.Console.Clean()).
 		Run()
 }
@@ -247,10 +273,171 @@ func seedRendererThoughtsFiles() spec.Step {
 	})
 }
 
+func seedStyledHTMLAppletFile() spec.Step {
+	return spec.Custom("seed styled HTML applet file", func(t testing.TB, ctx *duiruntime.Context) {
+		t.Helper()
+		root := strings.TrimSpace(os.Getenv("VAMOS_E2E_THOUGHTS_ROOT"))
+		if root == "" {
+			root = filepath.Join(ctx.Config.RepoRoot, "thoughts")
+		}
+		if err := os.MkdirAll(root, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		content := `<!doctype html>
+<html>
+<head>
+  <title>Styled HTML Applet</title>
+  <link rel="stylesheet" href="/css/out.css">
+  <script type="module" src="/js/vamos-html-applet.js"></script>
+  <style>
+    #override-check { color: rgb(12, 34, 56); }
+  </style>
+</head>
+<body>
+  <main class="bg-background text-foreground">
+    <h1>Styled HTML Applet</h1>
+    <p id="token-check" class="text-foreground">Token styled text</p>
+    <p id="override-check" class="text-foreground">Override wins</p>
+    <script>
+      try { window.parent.document.body.dataset.htmlAppletEscape = "bad" }
+      catch (e) { document.body.dataset.parentBlocked = "true" }
+    </script>
+  </main>
+</body>
+</html>
+`
+		if err := os.WriteFile(filepath.Join(root, "styled-applet.html"), []byte(content), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	})
+}
+
+func htmlAppletFrameHasThemeQuery() spec.Expectation {
+	return spec.ExpectStep(spec.Custom("HTML applet frame has theme query", func(t testing.TB, ctx *duiruntime.Context) {
+		t.Helper()
+		src := htmlAppletFrameSrc(t, ctx, styledAppletFrameSelector)
+		if !strings.Contains(src, "theme=dark") && !strings.Contains(src, "theme=light") {
+			t.Fatalf("iframe src missing theme query: %q", src)
+		}
+	}))
+}
+
+func htmlAppletChildHasInitialTheme() spec.Expectation {
+	return spec.ExpectStep(spec.Custom("HTML applet child applies initial theme", func(t testing.TB, ctx *duiruntime.Context) {
+		t.Helper()
+		src := htmlAppletFrameSrc(t, ctx, styledAppletFrameSelector)
+		wantDark := strings.Contains(src, "theme=dark")
+		if wantDark {
+			if err := ctx.Page.FrameLocator(styledAppletFrameSelector).Locator("html.dark").WaitFor(); err != nil {
+				t.Fatalf("child did not apply initial dark theme from %q: %v", src, err)
+			}
+		}
+		gotDark := htmlAppletChildDark(t, ctx, styledAppletFrameSelector)
+		if gotDark != wantDark {
+			t.Fatalf("child dark=%v, want %v from %q", gotDark, wantDark, src)
+		}
+		if err := ctx.Page.FrameLocator(styledAppletFrameSelector).Locator("body[data-parent-blocked='true']").WaitFor(); err != nil {
+			t.Fatalf("child did not record blocked parent DOM access: %v", err)
+		}
+	}))
+}
+
+func htmlAppletUsesSharedStyles() spec.Expectation {
+	return spec.ExpectStep(spec.Custom("HTML applet uses shared Vamos styles", func(t testing.TB, ctx *duiruntime.Context) {
+		t.Helper()
+		background, err := ctx.Page.FrameLocator(styledAppletFrameSelector).Locator("main").Evaluate("el => getComputedStyle(el).backgroundColor", nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := background.(string); got == "" || got == "rgba(0, 0, 0, 0)" {
+			t.Fatalf("shared bg-background style did not resolve, background=%q", got)
+		}
+	}))
+}
+
+func htmlAppletLocalOverrideWins() spec.Expectation {
+	return spec.ExpectStep(spec.Custom("HTML applet local override wins", func(t testing.TB, ctx *duiruntime.Context) {
+		t.Helper()
+		color, err := ctx.Page.FrameLocator(styledAppletFrameSelector).Locator("#override-check").Evaluate("el => getComputedStyle(el).color", nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := color.(string); got != "rgb(12, 34, 56)" {
+			t.Fatalf("override color=%q, want rgb(12, 34, 56)", got)
+		}
+	}))
+}
+
+func toggleThemeFromAvatar() spec.Step {
+	return spec.Custom("toggle parent theme", func(t testing.TB, ctx *duiruntime.Context) {
+		t.Helper()
+		initial := htmlAppletChildDark(t, ctx, styledAppletFrameSelector)
+		ctx.Memory["styled_applet_initial_dark"] = boolString(initial)
+		trigger := ctx.Page.Locator("header [data-slot='dropdown-menu-trigger'][data-on\\:click*='user_profile']").First()
+		if err := trigger.Click(); err != nil {
+			t.Fatal(err)
+		}
+		content := ctx.Page.Locator("[data-slot='dropdown-menu-content'][data-show='$user_profile.open']").First()
+		if err := content.WaitFor(playwright.LocatorWaitForOptions{State: playwright.WaitForSelectorStateVisible}); err != nil {
+			t.Fatalf("avatar menu did not become visible: %v", err)
+		}
+		if err := content.GetByText("Toggle theme").First().Click(); err != nil {
+			t.Fatal(err)
+		}
+	})
+}
+
+func htmlAppletChildThemeChanged() spec.Expectation {
+	return spec.ExpectStep(spec.Custom("HTML applet child follows parent theme toggle", func(t testing.TB, ctx *duiruntime.Context) {
+		t.Helper()
+		initial := ctx.Memory["styled_applet_initial_dark"] == "true"
+		for i := 0; i < 20; i++ {
+			if got := htmlAppletChildDark(t, ctx, styledAppletFrameSelector); got != initial {
+				return
+			}
+			time.Sleep(100 * time.Millisecond)
+		}
+		t.Fatalf("child dark class did not change from %v after parent toggle", initial)
+	}))
+}
+
+func htmlAppletFrameSrc(t testing.TB, ctx *duiruntime.Context, selector string) string {
+	t.Helper()
+	iframe := ctx.Page.Locator(selector).First()
+	if err := iframe.WaitFor(); err != nil {
+		t.Fatal(err)
+	}
+	src, err := iframe.GetAttribute("src")
+	if err != nil {
+		t.Fatal(err)
+	}
+	return src
+}
+
+func htmlAppletChildDark(t testing.TB, ctx *duiruntime.Context, selector string) bool {
+	t.Helper()
+	value, err := ctx.Page.FrameLocator(selector).Locator("html").Evaluate("el => el.classList.contains('dark')", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return value.(bool)
+}
+
+func boolString(value bool) string {
+	if value {
+		return "true"
+	}
+	return "false"
+}
+
 func iframeSandboxOmitsSameOrigin() spec.Expectation {
+	return iframeSandboxOmitsSameOriginFor(rendererDemoAppletFrameSelector)
+}
+
+func iframeSandboxOmitsSameOriginFor(selector string) spec.Expectation {
 	return spec.ExpectStep(spec.Custom("iframe sandbox omits allow-same-origin", func(t testing.TB, ctx *duiruntime.Context) {
 		t.Helper()
-		iframe := ctx.Page.Locator("iframe[src='/thoughts/_render/html/renderer-demo.html']").First()
+		iframe := ctx.Page.Locator(selector).First()
 		if err := iframe.WaitFor(); err != nil {
 			t.Fatal(err)
 		}
