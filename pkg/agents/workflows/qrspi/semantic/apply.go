@@ -68,6 +68,10 @@ func Apply(ctx context.Context, input ApplyInput) (ApplyResult, error) {
 		if err != nil {
 			return ApplyResult{}, err
 		}
+	} else {
+		var more []Normalization
+		workflowResult, more = NormalizeWorkflowResultContextAware(workflowResult, input.Context)
+		norms = append(norms, more...)
 	}
 	if err := qrspi.ValidateOutcomeArtifacts(workflowResult); err != nil {
 		return ApplyResult{}, err

@@ -737,6 +737,62 @@ func TestQRSPIPlanningReviewQuestionsRoutesToResearchForReview(t *testing.T) {
 	assertCurrentNode(t, store, runner, qrspi.NodeResearchForReviewOutline)
 }
 
+func TestQRSPIExternalReviewPlanPositiveUsesSemanticRouting(t *testing.T) {
+	for _, tc := range []struct {
+		name              string
+		implementationCwd string
+		followups         []wruntime.FollowupContext
+		want              wruntime.NodeID
+	}{
+		{name: "parent plan routes to workspace", want: qrspi.NodeWorkspace},
+		{
+			name:              "existing implementation workspace routes to implement",
+			implementationCwd: t.TempDir(),
+			want:              qrspi.NodeImplement,
+		},
+		{
+			name: "review followup routes to implement",
+			followups: []wruntime.FollowupContext{{
+				ParentPlanDir:      "thoughts/CoreyCole/plans/parent",
+				FollowupPlanDir:    "thoughts/CoreyCole/plans/parent/reviews/review_implementation-review",
+				ParentReviewNodeID: qrspi.NodeReviewImplementation,
+				ParentReviewPath:   "thoughts/CoreyCole/plans/parent/reviews/review_implementation-review/review.md",
+			}},
+			want: qrspi.NodeImplement,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			svc, store, runner := newQRSPIIntegrationHarness(t, nil)
+			moveQRSPIIntegrationState(t, store, qrspi.NodeReviewPlan)
+			store.state.ExecutionCwd = tc.implementationCwd
+			store.state.Followups = tc.followups
+
+			decision, applied, err := svc.ApplyExternalWorkflowResult(context.Background(), ExternalWorkflowResultInput{
+				WorkspaceID: "workspace-1",
+				ThreadID:    "thread-1",
+				State:       store.state,
+				Result: wruntime.WorkflowResult{
+					WorkflowType:    string(qrspi.AgentChatWorkflowType),
+					SourceNodeID:    qrspi.NodeReviewPlan,
+					Status:          wruntime.StatusComplete,
+					Outcome:         wruntime.OutcomeComplete,
+					Summary:         "Review-plan complete.",
+					PrimaryArtifact: "reviews/plan-review/review.md",
+				},
+			})
+			if err != nil || !applied {
+				t.Fatalf("ApplyExternalWorkflowResult() applied=%v error=%v", applied, err)
+			}
+			if decision.NextNodeID != tc.want || store.state.CurrentNodeID != tc.want {
+				t.Fatalf("decision/state next = %s/%s, want %s", decision.NextNodeID, store.state.CurrentNodeID, tc.want)
+			}
+			if len(runner.starts) == 0 || runner.starts[len(runner.starts)-1].NodeID != tc.want {
+				t.Fatalf("starts = %#v, want latest %s", runner.starts, tc.want)
+			}
+		})
+	}
+}
+
 func TestQRSPIPlanningReviewResearchAddressLoops(t *testing.T) {
 	for _, tc := range []struct {
 		name         string

@@ -9,6 +9,7 @@ import (
 
 	conversation "github.com/CoreyCole/vamos/pkg/agents/conversation"
 	"github.com/CoreyCole/vamos/pkg/agents/workflows/qrspi"
+	"github.com/CoreyCole/vamos/pkg/agents/workflows/qrspi/semantic"
 	wruntime "github.com/CoreyCole/vamos/pkg/agents/workflows/runtime"
 	"github.com/CoreyCole/vamos/pkg/db"
 )
@@ -71,84 +72,141 @@ func (s *Service) OnRunComplete(
 	); err != nil {
 		return err
 	}
-	if wruntime.WorkflowID(state.Type) == qrspi.AgentChatWorkflowType {
-		if err := qrspi.ValidateOutcomeArtifacts(workflowResult); err != nil {
-			return err
-		}
-		planningCwd := ""
-		if workflowResult.SourceNodeID == qrspi.NodeWorkspace {
-			planningCwd, err = s.Store.WorkspacePlanningCwd(ctx, workspaceID)
-			if err != nil {
-				return err
-			}
-		}
-		state, err = applyQRSPIWorkspaceResult(state, workflowResult, planningCwd)
-		if err != nil {
-			return err
-		}
-	}
-
-	decision, err := wruntime.DecideTransition(def, state, workflowResult)
+	applied, err := s.applyQRSPICompletion(ctx, def, state, run, parseCtx, parsed)
 	if err != nil {
 		return err
 	}
-	if wruntime.WorkflowID(state.Type) == qrspi.AgentChatWorkflowType {
-		decision = maybeExitImplementationFollowup(state, decision, workflowResult)
-		decision, err = maybeEnterImplementationFollowup(decision, workflowResult)
+	decision, err := s.prepareQRSPIApplyDecision(ctx, workspaceID, state, applied)
+	if err != nil {
+		return err
+	}
+	if err := s.persistQRSPIApplyResult(ctx, workspaceID, run, applied.WorkflowResult, decision); err != nil {
+		return err
+	}
+	if err := s.startQRSPIApplyNext(ctx, workspaceID, run.ThreadID, run, def, decision); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *Service) applyQRSPICompletion(
+	ctx context.Context,
+	def wruntime.Definition,
+	state wruntime.State,
+	run db.AgentRun,
+	parseCtx wruntime.ParseContext,
+	parsed any,
+) (semantic.ApplyResult, error) {
+	qrspiParsed, ok := parsed.(qrspi.Result)
+	if !ok {
+		return semantic.ApplyResult{}, fmt.Errorf("expected qrspi Result, got %T", parsed)
+	}
+	return semantic.Apply(ctx, semantic.ApplyInput{
+		Definition:   def,
+		ParsedResult: &qrspiParsed,
+		ParseContext: parseCtx,
+		Context: semantic.Context{
+			WorkflowType:      wruntime.WorkflowID(state.Type),
+			State:             state,
+			ExpectedNodeID:    parseCtx.ExpectedNodeID,
+			Source:            semantic.SourceRunCompletion,
+			ImplementationCwd: strings.TrimSpace(state.ExecutionCwd),
+			RunID:             run.ID,
+		},
+	})
+}
+
+func (s *Service) prepareQRSPIApplyDecision(
+	ctx context.Context,
+	workspaceID string,
+	state wruntime.State,
+	applied semantic.ApplyResult,
+) (wruntime.TransitionDecision, error) {
+	decision := applied.Decision
+	result := applied.WorkflowResult
+	if wruntime.WorkflowID(state.Type) != qrspi.AgentChatWorkflowType {
+		return decision, nil
+	}
+	planningCwd := ""
+	var err error
+	if result.SourceNodeID == qrspi.NodeWorkspace {
+		planningCwd, err = s.Store.WorkspacePlanningCwd(ctx, workspaceID)
 		if err != nil {
-			return err
+			return decision, err
 		}
-		if warning := displayNextCompatibilityWarning(
-			decision,
-			workflowResult,
-		); warning != "" {
-			decision.Events = append(decision.Events, wruntime.Event{
-				Type:    "workflow_display_next_mismatch",
-				NodeID:  workflowResult.SourceNodeID,
-				Message: warning,
-			})
+		decision.State, err = applyQRSPIWorkspaceResult(decision.State, result, planningCwd)
+		if err != nil {
+			return decision, err
 		}
 	}
-	if err := s.Store.SaveRunResult(ctx, run.ID, workflowResult); err != nil {
-		return err
+	decision = maybeExitImplementationFollowup(state, decision, result)
+	decision, err = maybeEnterImplementationFollowup(decision, result)
+	if err != nil {
+		return decision, err
+	}
+	if warning := displayNextCompatibilityWarning(decision, result); warning != "" {
+		decision.Events = append(decision.Events, wruntime.Event{
+			Type:    "workflow_display_next_mismatch",
+			NodeID:  result.SourceNodeID,
+			Message: warning,
+		})
+	}
+	return decision, nil
+}
+
+func (s *Service) persistQRSPIApplyResult(
+	ctx context.Context,
+	workspaceID string,
+	run db.AgentRun,
+	result wruntime.WorkflowResult,
+	decision wruntime.TransitionDecision,
+) error {
+	if strings.TrimSpace(run.ID) != "" {
+		if err := s.Store.SaveRunResult(ctx, run.ID, result); err != nil {
+			return err
+		}
 	}
 	if err := s.Store.SaveWorkspaceState(ctx, workspaceID, decision.State); err != nil {
 		return err
 	}
-	if err := s.Store.AppendWorkflowEvents(
-		ctx,
-		workspaceID,
-		run,
-		decision.Events,
-	); err != nil {
-		return err
+	return s.Store.AppendWorkflowEvents(ctx, workspaceID, run, decision.Events)
+}
+
+func (s *Service) startQRSPIApplyNext(
+	ctx context.Context,
+	workspaceID string,
+	threadID string,
+	run db.AgentRun,
+	def wruntime.Definition,
+	decision wruntime.TransitionDecision,
+) error {
+	if !decision.StartNext {
+		return nil
 	}
-	if decision.StartNext {
-		nextRunID, startErr := s.startNodeRunWithSQLiteBusyRetry(ctx, def, decision.State, StartNodeRunInput{
-			WorkspaceID: workspaceID,
-			ThreadID:    run.ThreadID,
-			NodeID:      decision.NextNodeID,
-			Attempt:     decision.State.Attempts[decision.NextNodeID] + 1,
-			Cwd:         effectiveNodeCwd(decision.State, decision.NextNodeID),
-		})
-		if startErr != nil {
-			_ = s.Store.AppendWorkflowEvents(ctx, workspaceID, run, []wruntime.Event{{
-				Type:    "workflow_next_start_failed",
-				NodeID:  decision.NextNodeID,
-				Message: startErr.Error(),
-			}})
-			return startErr
-		}
-		if strings.TrimSpace(nextRunID) != "" {
-			_ = s.Store.AppendWorkflowEvents(ctx, workspaceID, db.AgentRun{
-				ID:          nextRunID,
-				WorkspaceID: sql.NullString{String: workspaceID, Valid: true},
-			}, []wruntime.Event{{
-				Type:    "workflow_next_started",
-				NodeID:  decision.NextNodeID,
-				Message: nextRunID,
-			}})
-		}
+	nextRunID, startErr := s.startNodeRunWithSQLiteBusyRetry(ctx, def, decision.State, StartNodeRunInput{
+		WorkspaceID: workspaceID,
+		ThreadID:    threadID,
+		NodeID:      decision.NextNodeID,
+		Attempt:     decision.State.Attempts[decision.NextNodeID] + 1,
+		Cwd:         effectiveNodeCwd(decision.State, decision.NextNodeID),
+	})
+	if startErr != nil {
+		_ = s.Store.AppendWorkflowEvents(ctx, workspaceID, run, []wruntime.Event{{
+			Type:    "workflow_next_start_failed",
+			NodeID:  decision.NextNodeID,
+			Message: startErr.Error(),
+		}})
+		return startErr
+	}
+	if strings.TrimSpace(nextRunID) != "" {
+		_ = s.Store.AppendWorkflowEvents(ctx, workspaceID, db.AgentRun{
+			ID:          nextRunID,
+			WorkspaceID: sql.NullString{String: workspaceID, Valid: true},
+		}, []wruntime.Event{{
+			Type:    "workflow_next_started",
+			NodeID:  decision.NextNodeID,
+			Message: nextRunID,
+		}})
 	}
 	return nil
 }

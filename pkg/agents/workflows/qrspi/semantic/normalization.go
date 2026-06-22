@@ -15,12 +15,29 @@ func NormalizeContextAware(result qrspi.Result, context Context) (qrspi.Result, 
 	}
 	original := result.Outcome
 	result.Outcome = string(target)
-	return result, []Normalization{{
+	return result, []Normalization{reviewPlanOutcomeNormalization(original, string(target))}
+}
+
+func NormalizeWorkflowResultContextAware(result wruntime.WorkflowResult, context Context) (wruntime.WorkflowResult, []Normalization) {
+	if result.Status != wruntime.StatusComplete || !positiveOutcome(string(result.Outcome)) || result.SourceNodeID != qrspi.NodeReviewPlan {
+		return result, nil
+	}
+	target, ok := ReviewPlanPositiveOutcome(context)
+	if !ok || result.Outcome == target {
+		return result, nil
+	}
+	original := string(result.Outcome)
+	result.Outcome = target
+	return result, []Normalization{reviewPlanOutcomeNormalization(original, string(target))}
+}
+
+func reviewPlanOutcomeNormalization(original, target string) Normalization {
+	return Normalization{
 		Field:     "outcome",
 		Original:  original,
-		Canonical: string(target),
+		Canonical: target,
 		Reason:    "review-plan positive result normalized from workflow context",
-	}}
+	}
 }
 
 func qrspiNormalizations(in []qrspi.Normalization) []Normalization {
