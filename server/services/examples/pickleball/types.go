@@ -69,6 +69,7 @@ type AppletEditResult struct {
 	ChatSessionID      string
 	ThreadID           string
 	RunID              string
+	WebURL             string
 	ChangedFiles       []string
 	UserSummary        string
 	FailureUserMessage string

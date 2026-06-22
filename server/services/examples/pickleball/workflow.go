@@ -49,10 +49,6 @@ type AIGenerator interface {
 	ApplyPrompt(ctx context.Context, input AIGenerateInput) error
 }
 
-type AppletEditor interface {
-	ApplyPrompt(ctx context.Context, input AppletEditInput) (AppletEditResult, error)
-}
-
 type SelfModifyWorkflowInput struct {
 	SessionID string
 	Prompt    string
@@ -68,8 +64,6 @@ type temporalWorkflowStarter struct {
 }
 
 type generatedRunner struct{}
-
-type promptPatchAppletEditor struct{}
 
 func NewTemporalWorkflowStarter(c client.Client) WorkflowStarter {
 	return temporalWorkflowStarter{client: c}
@@ -153,7 +147,7 @@ func (a *SelfModifyActivities) RunAppletEdit(ctx context.Context, input SelfModi
 	}
 	editor := svc.opts.AppletEditor
 	if editor == nil {
-		editor = promptPatchAppletEditor{}
+		return AppletEditResult{}, fmt.Errorf("pickleball applet editor is not configured")
 	}
 	result, err := editor.ApplyPrompt(ctx, AppletEditInput{
 		Prompt:        input.Prompt,
@@ -514,29 +508,6 @@ func (PromptPatchGenerator) ApplyPrompt(ctx context.Context, input AIGenerateInp
 		return fmt.Errorf("write generated bundle: %w", err)
 	}
 	return nil
-}
-
-func (promptPatchAppletEditor) ApplyPrompt(ctx context.Context, input AppletEditInput) (AppletEditResult, error) {
-	if err := ctx.Err(); err != nil {
-		return AppletEditResult{}, err
-	}
-	mainPath := filepath.Join(input.IterationDir, "main.go")
-	data, err := os.ReadFile(mainPath)
-	if err != nil {
-		return AppletEditResult{}, fmt.Errorf("read applet source: %w", err)
-	}
-	source := string(data)
-	marker := "// Last friendly prompt: " + promptSummary(input.Prompt) + "\n"
-	if strings.Contains(source, "// Last friendly prompt:") {
-		re := regexp.MustCompile(`(?m)^// Last friendly prompt:.*\n`)
-		source = re.ReplaceAllString(source, marker)
-	} else {
-		source = marker + source
-	}
-	if err := os.WriteFile(mainPath, []byte(source), 0o644); err != nil {
-		return AppletEditResult{}, fmt.Errorf("write applet source: %w", err)
-	}
-	return AppletEditResult{ChangedFiles: []string{"apps/current/main.go"}, UserSummary: "Done — I updated the app and files."}, nil
 }
 
 func replaceFirstStringField(source, field, value string) string {

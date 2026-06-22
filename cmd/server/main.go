@@ -40,6 +40,7 @@ import (
 	"github.com/CoreyCole/vamos/server/layouts"
 	authmw "github.com/CoreyCole/vamos/server/middleware"
 	"github.com/CoreyCole/vamos/server/services/agentchat"
+	"github.com/CoreyCole/vamos/server/services/appletruntime"
 	"github.com/CoreyCole/vamos/server/services/auth"
 	"github.com/CoreyCole/vamos/server/services/comments"
 	"github.com/CoreyCole/vamos/server/services/db"
@@ -1337,6 +1338,12 @@ func main() {
 		SeedBundleDir:   filepath.Join("examples", "pickleball", "seed-bundle"),
 		WorkflowStarter: pickleballWorkflowStarter,
 		AIGenerator:     pickleball.PromptPatchGenerator{},
+		AppletEditor: pickleball.AgentChatEditor{
+			Starter:       agentChatService,
+			ProjectID:     firstNonEmpty(hostCfg.Projects.DefaultRepo, "github.com/CoreyCole/vamos"),
+			PublicBaseURL: cfg.PublicBaseURL,
+		},
+		AppletRuntime: appletruntime.NewManager(filepath.Join(cfg.MarkdownBasePath, ".vamos", "applets", "logs")),
 	})
 	if err != nil {
 		log.Fatal("Failed to initialize pickleball example service:", err)

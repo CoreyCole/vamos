@@ -23,18 +23,19 @@ const (
 )
 
 type Options struct {
-	ThoughtsRoot    string
-	ExampleRoot     string
-	SeedBundleDir   string
-	Runner          Runner
-	WorkflowStarter WorkflowStarter
-	AIGenerator     AIGenerator
-	AppletEditor    AppletEditor
-	AppletRuntime   appletruntime.Manager
-	FilesRoot       string
-	CurrentAppDir   string
-	IterationsDir   string
-	Notifier        Notifier
+	ThoughtsRoot       string
+	ExampleRoot        string
+	SeedBundleDir      string
+	Runner             Runner
+	WorkflowStarter    WorkflowStarter
+	AIGenerator        AIGenerator
+	AppletEditor       AppletEditor
+	AllowFixtureEditor bool
+	AppletRuntime      appletruntime.Manager
+	FilesRoot          string
+	CurrentAppDir      string
+	IterationsDir      string
+	Notifier           Notifier
 }
 
 type Runner interface {
@@ -91,6 +92,9 @@ func NewService(opts Options) (*Service, error) {
 	}
 	if opts.IterationsDir, err = filepath.Abs(opts.IterationsDir); err != nil {
 		return nil, fmt.Errorf("resolve iterations dir: %w", err)
+	}
+	if opts.AppletEditor == nil && opts.AllowFixtureEditor {
+		opts.AppletEditor = FixtureEditor{Enabled: true}
 	}
 	root := filepath.Join(opts.ThoughtsRoot, filepath.FromSlash(opts.ExampleRoot))
 	return &Service{
