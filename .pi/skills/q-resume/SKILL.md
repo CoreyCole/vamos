@@ -184,4 +184,6 @@ For `implement` resumes, ``artifact`` should normally be the newly created hando
 
 If the handoff indicates the next stage should begin immediately, continue directly rather than stopping to explain the handoff.
 
+When a parent/orchestrator delegates that continuation to a Pi background process, include the complete fenced `qrspi_result` YAML from the previous stage/handoff verbatim in the next prompt. Do not pass only paths or prose summaries; downstream stages need prior `workspace_metadata`, `policy`, `artifact(s)`, and `next.steps` to preserve graph state across isolated Pi sessions.
+
 During implementation, prefer `/q-resume [new handoff path]` as the next command after each non-final slice. Use `/q-review [handoff path]` only for the final implementation completion handoff.
