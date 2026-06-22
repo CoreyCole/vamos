@@ -60,10 +60,11 @@
     font-size: 0.875rem;
   }
 
-  /* Table styles for markdown viewer
+  /* Table styles for document content.
      Uses foreground with opacity for borders/headers so they're visible
      in both light and dark mode (--border is too close to bg in dark mode) */
-  .markdown-viewer .table-wrapper {
+  .markdown-viewer .table-wrapper,
+  .document-table-content .table-wrapper {
     margin: 1.5rem 0;
     width: fit-content;
     overflow: hidden;
@@ -71,30 +72,37 @@
     border: 1px solid hsl(var(--foreground) / 0.2);
   }
 
-  .markdown-viewer table {
+  .markdown-viewer table,
+  .document-table-content table {
     border-collapse: collapse;
   }
 
-  .markdown-viewer thead {
+  .markdown-viewer thead,
+  .document-table-content thead {
     background-color: hsl(var(--foreground) / 0.06);
   }
 
-  .markdown-viewer tbody tr {
+  .markdown-viewer tbody tr,
+  .document-table-content tbody tr {
     border-bottom: 1px solid hsl(var(--foreground) / 0.1);
   }
 
-  .markdown-viewer tbody tr:last-child {
+  .markdown-viewer tbody tr:last-child,
+  .document-table-content tbody tr:last-child {
     border-bottom: none;
   }
 
   .markdown-viewer th,
-  .markdown-viewer td {
+  .markdown-viewer td,
+  .document-table-content th,
+  .document-table-content td {
     padding: 0.75rem 1rem;
     font-size: 0.875rem;
     color: hsl(var(--foreground));
   }
 
-  .markdown-viewer th {
+  .markdown-viewer th,
+  .document-table-content th {
     font-weight: 600;
     text-align: left;
   }
