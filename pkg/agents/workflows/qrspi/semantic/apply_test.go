@@ -13,6 +13,7 @@ func TestSemanticApplyReviewPlanPositiveRouting(t *testing.T) {
 	tests := []struct {
 		name              string
 		context           Context
+		inputOutcome      string
 		wantOutcome       wruntime.ResultOutcome
 		wantNext          wruntime.NodeID
 		wantAction        NextActionKind
@@ -42,13 +43,26 @@ func TestSemanticApplyReviewPlanPositiveRouting(t *testing.T) {
 			wantAction:        NextActionStartNext,
 			wantNormalization: string(wruntime.OutcomeReadyForImplement),
 		},
+		{
+			name:              "implementation cwd corrects explicit workspace outcome",
+			inputOutcome:      string(wruntime.OutcomeReadyForWorkspace),
+			context:           Context{PlanDir: "thoughts/example/plans/parent", ImplementationCwd: "/tmp/impl"},
+			wantOutcome:       wruntime.OutcomeReadyForImplement,
+			wantNext:          qrspi.NodeImplement,
+			wantAction:        NextActionStartNext,
+			wantNormalization: string(wruntime.OutcomeReadyForImplement),
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			state := semanticTestState(t, qrspi.NodeReviewPlan)
 			tt.context.State = state
+			inputOutcome := tt.inputOutcome
+			if inputOutcome == "" {
+				inputOutcome = "complete"
+			}
 			got, err := Apply(context.Background(), ApplyInput{
-				RawOutput:    semanticResultYAML("review-plan", "complete", "complete", "thoughts/example/reviews/plan/review.md", ""),
+				RawOutput:    semanticResultYAML("review-plan", "complete", inputOutcome, "thoughts/example/reviews/plan/review.md", ""),
 				ParseContext: wruntime.ParseContext{ExpectedNodeID: qrspi.NodeReviewPlan},
 				Context:      tt.context,
 			})

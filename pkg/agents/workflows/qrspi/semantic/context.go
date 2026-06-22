@@ -56,7 +56,7 @@ func ExecutionCwdFromWorkspaceResult(result wruntime.WorkflowResult) string {
 
 func positiveOutcome(outcome string) bool {
 	switch strings.ReplaceAll(strings.ToLower(strings.TrimSpace(outcome)), "_", "-") {
-	case "complete", "completed", "done", "success", "succeeded", "ok", "ready", "approved", "ready-to-plan", "ready-for-planning", "ready-to-implement", "ready-to-implementation", "ready-to-workspace", "ready-for-workspaces":
+	case "complete", "completed", "done", "success", "succeeded", "ok", "ready", "approved", "ready-to-plan", "ready-for-planning", "ready-to-implement", "ready-to-implementation", "ready-to-workspace", "ready-for-workspace", "ready-for-workspaces":
 		return true
 	default:
 		return false
