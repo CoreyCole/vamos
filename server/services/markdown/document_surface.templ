@@ -12,7 +12,7 @@ templ DocumentSurface(doc WorkbenchDocument, workspaceTree *workbench.WorkspaceD
 	<div id="document-surface" class="flex h-full min-h-0 flex-col overflow-hidden bg-background" data-signals={ encodePageSignals(doc.PageSessionID) }>
 		<div id="thoughts-url-sync" class="hidden" aria-hidden="true"></div>
 		<div id="thoughts-open-chat-result" class="hidden" aria-hidden="true"></div>
-		<div id="thoughts-markdown-scroll-region" class="min-h-0 flex-1 overflow-y-auto p-4 md:p-10">
+		<div id="thoughts-markdown-scroll-region" class={ documentScrollRegionClass(doc.Kind) }>
 			@QRSPIArtifactContext(doc.QRSPIMetadata, workspaceTree)
 			if doc.Component != nil {
 				@doc.Component
@@ -125,6 +125,13 @@ func hasOpenChatAction(actions []DocumentAction) bool {
 		}
 	}
 	return false
+}
+
+func documentScrollRegionClass(kind DocumentKind) string {
+	if kind == DocumentKindHTMLApplet {
+		return "min-h-0 flex-1 overflow-hidden"
+	}
+	return "min-h-0 flex-1 overflow-y-auto p-4 md:p-10"
 }
 
 func documentActionButtonClass(action DocumentAction) string {

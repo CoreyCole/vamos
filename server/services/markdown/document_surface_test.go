@@ -68,6 +68,27 @@ func TestDocumentSurfaceRendersRendererComponent(t *testing.T) {
 	}
 }
 
+func TestDocumentSurfaceRendersHTMLAppletEdgeToEdge(t *testing.T) {
+	doc := WorkbenchDocument{
+		Path:          "thoughts/example.html",
+		Kind:          DocumentKindHTMLApplet,
+		PageSessionID: "page-1",
+		Component:     templ.Raw(`<iframe data-vamos-html-applet></iframe>`),
+	}
+
+	var buf bytes.Buffer
+	if err := DocumentSurface(doc, nil).Render(t.Context(), &buf); err != nil {
+		t.Fatal(err)
+	}
+	html := buf.String()
+	if !strings.Contains(html, `id="thoughts-markdown-scroll-region" class="min-h-0 flex-1 overflow-hidden"`) {
+		t.Fatalf("HTML document surface is not edge-to-edge: %s", html)
+	}
+	if strings.Contains(html, `p-4 md:p-10`) || strings.Contains(html, `overflow-y-auto`) {
+		t.Fatalf("HTML document surface kept padded scroll wrapper: %s", html)
+	}
+}
+
 func TestDocumentSurfaceRendersSharedChromeWithoutDuplicateActions(t *testing.T) {
 	doc := WorkbenchDocument{
 		Path:          "thoughts/example/design.md",
