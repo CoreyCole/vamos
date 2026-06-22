@@ -105,6 +105,27 @@ func NewService(opts Options) (*Service, error) {
 	}, nil
 }
 
+func (s *Service) EnsureCurrentApplet(ctx context.Context) error {
+	runtime := s.opts.AppletRuntime
+	if runtime == nil {
+		return nil
+	}
+	if _, ok := runtime.ProxyTarget("pickleball"); ok {
+		return nil
+	}
+	_, err := runtime.Start(ctx, appletruntime.RuntimeConfig{
+		AppID:        "pickleball",
+		FilesRoot:    s.opts.FilesRoot,
+		SourceDir:    s.opts.CurrentAppDir,
+		StartCommand: []string{"go", "run", "."},
+		HealthPath:   "/healthz",
+	})
+	if err != nil {
+		return fmt.Errorf("start current pickleball applet: %w", err)
+	}
+	return nil
+}
+
 func (s *Service) EnsureSession(ctx context.Context, userEmail string) (PickleballSession, error) {
 	id := sessionIDForUser(userEmail)
 	session, err := s.store.EnsureSession(ctx, id, strings.TrimSpace(userEmail))

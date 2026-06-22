@@ -1,6 +1,9 @@
 package pickleball
 
-import "github.com/labstack/echo/v4"
+import (
+	"github.com/CoreyCole/vamos/server/services/appletruntime"
+	"github.com/labstack/echo/v4"
+)
 
 func (s *Service) RegisterRoutes(e *echo.Echo, auth echo.MiddlewareFunc) {
 	group := e.Group("/examples/pickleball")
@@ -12,4 +15,7 @@ func (s *Service) RegisterRoutes(e *echo.Echo, auth echo.MiddlewareFunc) {
 	group.POST("/prompts", s.HandleSubmitPrompt)
 	group.POST("/share", s.HandleShare)
 	group.POST("/debug/restore", s.HandleDebugRestore)
+	if s.opts.AppletRuntime != nil {
+		group.Any("/app/*", echo.WrapHandler(appletruntime.NewAppletProxy(s.opts.AppletRuntime, "pickleball", "/examples/pickleball/app")))
+	}
 }

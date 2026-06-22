@@ -9,6 +9,9 @@ import (
 )
 
 func (s *Service) HandlePage(c echo.Context) error {
+	if err := s.EnsureCurrentApplet(c.Request().Context()); err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
+	}
 	session, err := s.EnsureSession(c.Request().Context(), userEmail(c))
 	if err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
