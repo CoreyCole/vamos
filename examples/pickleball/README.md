@@ -1,34 +1,35 @@
 # Self-modifying pickleball example
 
-This example demonstrates Vamos as a framework for mobile-friendly Go + templ + Datastar apps that can modify a generated bundle through AI prompts.
+This example demonstrates Vamos as a framework for mobile-friendly Go + templ + Datastar applets that a non-technical person can change through chat.
 
-The reusable pattern is:
+The product pattern is:
 
-1. A normal Vamos shell owns prompt UI, workflow state, preview links, sharing, and failure display.
-2. An AI edits the generated bundle workspace, not the live Vamos source tree.
-3. `pkg/agents/generatedgo` compiles and runs the bundle once with bounded time, env, output, and artifact rules.
-4. Successful runs publish immutable snapshots under Thoughts.
-5. Generated `app.html` and `results.csv` render through the Thoughts HTML iframe and CSV table renderers.
+1. A stable Vamos workbench shows **Files** and **Chat**.
+1. The user asks for app behavior in plain language.
+1. Vamos uses Temporal + Pi/Agent Chat to edit a hidden applet iteration.
+1. Vamos builds, health-checks, and promotes a safe iteration behind the scenes.
+1. The current app stays available if a change fails.
 
-The seed bundle in `seed-bundle/` is deliberately standard-library-only so agents and humans can inspect or rewrite it quickly.
+User-visible files live in `files/`. The committed starter applet lives in `files/apps/current/`. Generated iterations live in `files/apps/iterations/` and are hidden from normal users.
 
-## Try the seed bundle
+## Try the starter applet
 
-From this directory's parent checkout:
+From this checkout:
 
 ```bash
-rm -rf /tmp/vamos-pickleball-seed
-mkdir -p /tmp/vamos-pickleball-seed
-(cd examples/pickleball/seed-bundle && VAMOS_GENERATED_OUTPUT_DIR=/tmp/vamos-pickleball-seed go run .)
-ls /tmp/vamos-pickleball-seed/app.html /tmp/vamos-pickleball-seed/results.csv /tmp/vamos-pickleball-seed/manifest.json
+cd examples/pickleball/files/apps/current
+go test ./...
+PORT=8080 VAMOS_APP_FILES_ROOT="$OLDPWD/examples/pickleball/files" go run .
 ```
+
+Open <http://127.0.0.1:8080/>. The app reads `players.csv`, writes `matchups.csv`, and updates `tournament.html` inside `examples/pickleball/files/`.
 
 ## Example prompts
 
 - `Prioritize new partner pairings over skill balance.`
-- `Make the preview more colorful and mobile-friendly.`
-- `Add a CSV column explaining skill totals.`
+- `Make the schedule easier to read on a phone.`
+- `Add a note explaining why each matchup was chosen.`
 
 ## Boundary
 
-The shell owns orchestration and user experience. The generated bundle owns matchup algorithm, CSV shape, and presentation HTML. V1 is one-shot only; long-running generated Datastar/SSE processes are reserved for a future runner mode.
+The Vamos shell owns chat, safety checks, build, health check, promotion, recovery, and friendly explanations. The applet owns pickleball rules, files, and presentation. Deterministic edits are only for tests/fixtures; the product path uses Temporal + Pi/Agent Chat.

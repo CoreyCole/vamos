@@ -12,6 +12,11 @@ static/css/out.*.css
 static/js/datastar*.js
 static/js/datastar*.js.map
 scripts/workspace-db-verify/workspace-db-verify-*
+/examples/pickleball/files/apps/iterations/*
+!/examples/pickleball/files/apps/iterations/.gitkeep
+/examples/pickleball/files/apps/current/*.bin
+/examples/pickleball/files/apps/current/tmp/
+/examples/pickleball/files/apps/current/*.log
 # Pi project-local runtime state
 .pi/sessions/
 .pi/git/
