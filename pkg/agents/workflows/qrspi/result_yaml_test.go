@@ -372,14 +372,26 @@ func TestQRSPIResultConverter(t *testing.T) {
 }
 
 func TestCorrectionPromptMentionsYAMLAndCanonicalReviewStages(t *testing.T) {
-	prompt := (QRSPIResultParser{}).CorrectionPrompt(errors.New("bad"), 1)
-	if !strings.Contains(prompt, "fenced YAML") || !strings.Contains(prompt, "qrspi_result") {
-		t.Fatalf("CorrectionPrompt() = %q, want YAML contract", prompt)
-	}
-	for _, stage := range []string{"review-outline", "review-plan", "review-implementation"} {
-		if !strings.Contains(prompt, stage) {
-			t.Fatalf("CorrectionPrompt() = %q, missing %q", prompt, stage)
+	prompt := (QRSPIResultParser{}).CorrectionPrompt(errors.New("session /tmp/x has no assistant text containing qrspi_result"), 1)
+	for _, want := range []string{
+		"Validation error:",
+		"has no assistant text containing qrspi_result",
+		"```yaml",
+		"qrspi_result:",
+		"workspace_metadata:",
+		"policy:",
+		"summary:",
+		"next:",
+		"review-outline",
+		"review-plan",
+		"review-implementation",
+	} {
+		if !strings.Contains(prompt, want) {
+			t.Fatalf("CorrectionPrompt() = %q, missing %q", prompt, want)
 		}
+	}
+	if _, err := (QRSPIResultParser{}).Parse(ExampleQRSPIResultYAML(), wruntime.ParseContext{ExpectedNodeID: NodePlan}); err != nil {
+		t.Fatalf("ExampleQRSPIResultYAML() does not parse: %v", err)
 	}
 }
 

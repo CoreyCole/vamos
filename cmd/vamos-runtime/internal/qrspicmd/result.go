@@ -3,10 +3,10 @@ package qrspicmd
 import (
 	"encoding/json"
 	"fmt"
-	"path/filepath"
 	"strings"
 
 	"github.com/CoreyCole/vamos/pkg/agents/workflows/qrspi"
+	"github.com/CoreyCole/vamos/pkg/agents/workflows/qrspi/semantic"
 	wruntime "github.com/CoreyCole/vamos/pkg/agents/workflows/runtime"
 )
 
@@ -90,74 +90,34 @@ func parseValidateDecide(output string, manager ManagerState, ctx wruntime.Parse
 	if ctx.ExpectedNodeID == "" {
 		ctx.ExpectedNodeID = manager.Workflow.CurrentNodeID
 	}
-	parsedAny, err := def.ResultParser.Parse(output, ctx)
-	if err != nil {
-		return ParsedDecision{}, err
+	semCtx := semantic.Context{
+		WorkflowType:      qrspi.AgentChatWorkflowType,
+		State:             manager.Workflow,
+		ExpectedNodeID:    ctx.ExpectedNodeID,
+		Source:            semantic.SourceCLIChildSession,
+		PlanDir:           manager.CanonicalPlanDir,
+		ImplementationCwd: manager.ImplementationCwd,
+		PlanningCwd:       manager.SourceCwd,
+		RunID:             ctx.RunID,
 	}
-	parsed := parsedAny
-	var norms []ResultNormalization
-	if qrspiResult, ok := parsedAny.(qrspi.Result); ok {
-		norms = append(norms, resultNormalizations(qrspiResult.Normalizations)...)
-		if managerAware {
-			var more []ResultNormalization
-			qrspiResult, more = normalizeManagerAwarePositiveOutcome(qrspiResult, manager)
-			norms = append(norms, more...)
-			parsed = qrspiResult
-		}
+	if !managerAware {
+		semCtx.PlanDir = ""
+		semCtx.ImplementationCwd = ""
 	}
-	result, err := def.ResultConverter.ToWorkflowResult(parsed, ctx)
-	if err != nil {
-		return ParsedDecision{}, err
-	}
-	if err := wruntime.ValidateWorkflowResult(def, manager.Workflow, result); err != nil {
-		return ParsedDecision{}, GraphContractError(err)
-	}
-	if err := qrspi.ValidateOutcomeArtifacts(result); err != nil {
-		return ParsedDecision{}, err
-	}
-	decision, err := wruntime.DecideTransition(def, manager.Workflow, result)
+	applied, err := semantic.Apply(nil, semantic.ApplyInput{
+		Definition:   def,
+		RawOutput:    output,
+		ParseContext: ctx,
+		Context:      semCtx,
+	})
 	if err != nil {
 		return ParsedDecision{}, GraphContractError(err)
 	}
 	rawYAML, _ := qrspi.ExtractQRSPIResultYAML(output)
-	return ParsedDecision{Result: result, Decision: decision, RawYAML: rawYAML, Normalizations: norms}, nil
+	return ParsedDecision{Result: applied.WorkflowResult, Decision: applied.Decision, RawYAML: rawYAML, Normalizations: resultNormalizations(applied.Normalizations)}, nil
 }
 
-func normalizeManagerAwarePositiveOutcome(parsed qrspi.Result, manager ManagerState) (qrspi.Result, []ResultNormalization) {
-	if parsed.Status != string(wruntime.StatusComplete) || !positiveOutcome(parsed.Outcome) || parsed.Stage != string(qrspi.NodeReviewPlan) {
-		return parsed, nil
-	}
-	target, ok := reviewPlanPositiveOutcome(manager)
-	if !ok || parsed.Outcome == string(target) {
-		return parsed, nil
-	}
-	original := parsed.Outcome
-	parsed.Outcome = string(target)
-	return parsed, []ResultNormalization{{
-		Field:     "outcome",
-		Original:  original,
-		Canonical: string(target),
-		Reason:    "review-plan positive result normalized from manager workspace context",
-	}}
-}
-
-func positiveOutcome(outcome string) bool {
-	switch strings.ReplaceAll(strings.ToLower(strings.TrimSpace(outcome)), "_", "-") {
-	case "complete", "completed", "done", "success", "succeeded", "ok", "ready", "approved", "ready-to-plan", "ready-for-planning", "ready-to-implement", "ready-to-implementation", "ready-to-workspace", "ready-for-workspaces":
-		return true
-	default:
-		return false
-	}
-}
-
-func reviewPlanPositiveOutcome(manager ManagerState) (wruntime.ResultOutcome, bool) {
-	if strings.TrimSpace(manager.ImplementationCwd) != "" || strings.Contains(filepath.ToSlash(manager.CanonicalPlanDir), "/reviews/") {
-		return wruntime.OutcomeReadyForImplement, true
-	}
-	return wruntime.OutcomeReadyForWorkspace, true
-}
-
-func resultNormalizations(in []qrspi.Normalization) []ResultNormalization {
+func resultNormalizations(in []semantic.Normalization) []ResultNormalization {
 	out := make([]ResultNormalization, 0, len(in))
 	for _, n := range in {
 		out = append(out, ResultNormalization{Field: n.Field, Original: n.Original, Canonical: n.Canonical, Reason: n.Reason})

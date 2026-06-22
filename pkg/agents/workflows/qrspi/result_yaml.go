@@ -198,12 +198,61 @@ func (QRSPIResultParser) Parse(output string, ctx wruntime.ParseContext) (any, e
 	return parsed, nil
 }
 
+func ExampleQRSPIResultYAML() string {
+	return strings.TrimSpace("```yaml\n" + `qrspi_result:
+  project: "github.com/CoreyCole/vamos"
+  related_projects: []
+  stage: "plan"
+  status: "complete"
+  outcome: "complete"
+  workspace: "/absolute/path/to/thoughts/CoreyCole/plans/YYYY-MM-DD_HH-MM-SS_plan-slug"
+  workspace_metadata:
+    plan_workspace: "/absolute/path/to/thoughts/CoreyCole/plans/YYYY-MM-DD_HH-MM-SS_plan-slug"
+    implementation_workspace: ""
+    trunk_branch: "main"
+    stack_bottom_branch: ""
+    parent_branch: ""
+    current_branch: "main"
+  policy:
+    advance_mode: "guided"
+    auto_mode: false
+    enable_plan_reviews: true
+    invalid_result_retry_limit: 1
+  summary:
+    plan_goal: "Overall goal in plain language."
+    stage_completed: "What this stage completed."
+    key_decisions: "Next stage should start immediately: /q-review plan.md."
+  artifact: "thoughts/CoreyCole/plans/YYYY-MM-DD_HH-MM-SS_plan-slug/plan.md"
+  artifacts:
+    - role: "design"
+      path: "thoughts/CoreyCole/plans/YYYY-MM-DD_HH-MM-SS_plan-slug/design.md"
+    - role: "outline"
+      path: "thoughts/CoreyCole/plans/YYYY-MM-DD_HH-MM-SS_plan-slug/outline.md"
+    - role: "plan"
+      path: "thoughts/CoreyCole/plans/YYYY-MM-DD_HH-MM-SS_plan-slug/plan.md"
+  next:
+    steps:
+      - action: "read_skill"
+        param: ".pi/skills/qrspi-planning/SKILL.md"
+      - action: "read_skill"
+        param: ".pi/skills/q-review/SKILL.md"
+      - action: "read_artifact"
+        param: "thoughts/CoreyCole/plans/YYYY-MM-DD_HH-MM-SS_plan-slug/plan.md"
+      - action: "start_stage"
+        param: "review-plan"` + "\n```")
+}
+
 func (QRSPIResultParser) CorrectionPrompt(err error, attempt int) string {
-	return fmt.Sprintf(
-		"Your previous response did not contain a valid QRSPI workflow result (%v). Re-emit only one corrected fenced YAML block with top-level qrspi_result for attempt %d. Review stages must use canonical stage IDs review-outline, review-plan, or review-implementation.",
-		err,
-		attempt,
-	)
+	return fmt.Sprintf(`Your previous response did not contain a valid QRSPI workflow result.
+
+Validation error: %v
+Attempt: %d
+
+Re-emit exactly one corrected fenced YAML block with top-level qrspi_result. Put no prose before it. Use canonical review stage IDs: review-outline, review-plan, review-implementation.
+
+Use this valid example shape, replacing placeholders with the current stage, outcome, artifact paths, workspace paths, and next steps:
+
+%s`, err, attempt, ExampleQRSPIResultYAML())
 }
 
 var (

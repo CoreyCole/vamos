@@ -88,8 +88,10 @@ func TestRunRepromptChildPastesCorrectionToActiveChild(t *testing.T) {
 	if tmux.pastes[0].pane.ID != "%9" {
 		t.Fatalf("paste pane = %q, want %%9", tmux.pastes[0].pane.ID)
 	}
-	if !strings.Contains(tmux.pastes[0].text, "missing qrspi_result") {
-		t.Fatalf("correction prompt missing validation error: %q", tmux.pastes[0].text)
+	for _, want := range []string{"Validation error:", "missing qrspi_result", "```yaml", "workspace_metadata:", "next:"} {
+		if !strings.Contains(tmux.pastes[0].text, want) {
+			t.Fatalf("correction prompt missing %q: %q", want, tmux.pastes[0].text)
+		}
 	}
 	if len(tmux.keys) != 1 || tmux.keys[0].pane.ID != "%9" || strings.Join(tmux.keys[0].keys, ",") != "Enter" {
 		t.Fatalf("keys = %#v, want Enter to %%9", tmux.keys)
