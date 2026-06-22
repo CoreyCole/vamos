@@ -306,7 +306,7 @@ func newValidateResultCommand(d deps) *cobra.Command {
 	cmd.Flags().StringVar(&opts.Stage, "stage", "", "expected QRSPI node ID")
 	cmd.Flags().StringVar(&opts.StateFile, "state-file", "", "q-manager state file")
 	cmd.Flags().StringVar(&opts.SessionFile, "session-file", "", "explicit child Pi session JSONL file")
-	cmd.Flags().StringVar(&opts.ResultFile, "result-file", "", "deprecated debug fallback: plaintext child result file")
+	cmd.Flags().StringVar(&opts.ResultFile, "result-file", "", "deprecated debug fallback only when session/latest-session recovery is unavailable")
 	cmd.Flags().StringVar(&opts.PlanDir, "plan-dir", "", "QRSPI plan directory")
 	cmd.Flags().StringVar(&opts.RunID, "run-id", "", "child run ID")
 	cmd.Flags().StringVar(&opts.SessionID, "session-id", "", "child session ID")
@@ -324,7 +324,7 @@ func newDecideNextCommand(d deps) *cobra.Command {
 	}
 	cmd.Flags().StringVar(&opts.StateFile, "state-file", "", "q-manager state file")
 	cmd.Flags().StringVar(&opts.SessionFile, "session-file", "", "explicit child Pi session JSONL file")
-	cmd.Flags().StringVar(&opts.ResultFile, "result-file", "", "deprecated debug fallback: plaintext child result file")
+	cmd.Flags().StringVar(&opts.ResultFile, "result-file", "", "deprecated debug fallback only when session/latest-session recovery is unavailable")
 	cmd.Flags().StringVar(&opts.PlanDir, "plan-dir", "", "QRSPI plan directory")
 	return cmd
 }
@@ -2252,7 +2252,7 @@ func ReadChildResultText(state ManagerState, opts ResultSourceOptions) (string, 
 		}
 		return string(data), ctx, nil
 	}
-	return "", ctx, errors.New("no child result source: provide --session-file, keep active child session refs, or pass deprecated --result-file")
+	return "", ctx, errors.New("no child result source: keep active child session refs, use latest-session recovery commands, pass --session-file for a specific JSONL, or use deprecated --result-file only as a debug fallback")
 }
 
 func RunRenderPrompt(ctx context.Context, opts RenderPromptOptions, d deps, out io.Writer) error {

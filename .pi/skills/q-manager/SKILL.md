@@ -120,6 +120,8 @@ If validation fails and policy retry budget remains, `continue`/CLI retry suppor
 
 ## Cleanup and recovery
 
+Supported manual interaction modes: normal managed child, `steer-child`, same-child chat, child `/new`, manual completion, retry exhaustion recovery, and stale wake supersession. Use recovery commands before state-file edits.
+
 - Invalid result: keep active child pane/session and reprompt in place while retry remains.
 - Human gate, blocked, error, or retry exhaustion: keep pane/session for inspection and human steering.
 - Action cards are the first-class manager UX for repairable failures: `state_desync`, `graph_outcome_mismatch`, `workspace_moved`, `active_child_conflict`, `human_gate`, `invalid_child_yaml`, `manual_child_steer`, and `superseded_queued_wake`.

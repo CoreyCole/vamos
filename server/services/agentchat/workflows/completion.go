@@ -144,13 +144,6 @@ func (s *Service) prepareQRSPIApplyDecision(
 	if err != nil {
 		return decision, err
 	}
-	if warning := displayNextCompatibilityWarning(decision, result); warning != "" {
-		decision.Events = append(decision.Events, wruntime.Event{
-			Type:    "workflow_display_next_mismatch",
-			NodeID:  result.SourceNodeID,
-			Message: warning,
-		})
-	}
 	return decision, nil
 }
 
@@ -326,27 +319,4 @@ func validateWorkflowArtifacts(
 		}
 	}
 	return nil
-}
-
-func displayNextCompatibilityWarning(
-	decision wruntime.TransitionDecision,
-	result wruntime.WorkflowResult,
-) string {
-	displayNext := strings.TrimSpace(result.DisplayNext)
-	if displayNext == "" || !decision.StartNext && !decision.WaitingHuman {
-		return ""
-	}
-	if decision.NextNodeID != "" &&
-		strings.Contains(displayNext, string(decision.NextNodeID)) {
-		return ""
-	}
-	if result.PrimaryArtifact != "" &&
-		strings.Contains(displayNext, result.PrimaryArtifact) {
-		return ""
-	}
-	return fmt.Sprintf(
-		"display next %q does not match graph-selected next node %q; graph transition was used",
-		displayNext,
-		decision.NextNodeID,
-	)
 }

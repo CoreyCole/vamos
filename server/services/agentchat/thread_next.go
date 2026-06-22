@@ -16,7 +16,7 @@ import (
 	"github.com/CoreyCole/vamos/pkg/db"
 )
 
-func (s *Service) CreateNextQRSPIThread(ctx context.Context, userEmail, sourceThreadID string) (db.AgentThread, error) {
+func (s *Service) AdvanceQRSPIWorkflow(ctx context.Context, userEmail, sourceThreadID string) (db.AgentThread, error) {
 	userEmail = strings.TrimSpace(userEmail)
 	sourceThreadID = strings.TrimSpace(sourceThreadID)
 	if userEmail == "" || sourceThreadID == "" {

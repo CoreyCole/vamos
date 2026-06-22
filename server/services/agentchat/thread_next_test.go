@@ -10,7 +10,7 @@ import (
 	"github.com/CoreyCole/vamos/pkg/db"
 )
 
-func TestCreateNextQRSPIThreadUsesRuntimePendingContinuation(t *testing.T) {
+func TestAdvanceQRSPIWorkflowUsesRuntimePendingContinuation(t *testing.T) {
 	service := newTestAgentChatService(t)
 	workspace := mustCreateWorkspaceForHandlerTest(t, service, "user@example.com")
 	thread := mustCreateAgentThread(t, service, "thread-1", "user@example.com", "/repo", "lineage-1")
@@ -20,9 +20,9 @@ func TestCreateNextQRSPIThreadUsesRuntimePendingContinuation(t *testing.T) {
 	fake := &fakeWorkflowCompletionService{}
 	service.workflowService = fake
 
-	next, err := service.CreateNextQRSPIThread(context.Background(), "user@example.com", thread.ID)
+	next, err := service.AdvanceQRSPIWorkflow(context.Background(), "user@example.com", thread.ID)
 	if err != nil {
-		t.Fatalf("CreateNextQRSPIThread() error = %v", err)
+		t.Fatalf("AdvanceQRSPIWorkflow() error = %v", err)
 	}
 	if next.ID != thread.ID {
 		t.Fatalf("next thread = %q, want source thread %q", next.ID, thread.ID)

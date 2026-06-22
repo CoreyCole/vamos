@@ -77,9 +77,13 @@ Self-heal commands are deterministic control-plane repairs, not durable artifact
 ```bash
 vamos qrspi repair-state --state-file <state> --align-active-child
 vamos qrspi mark-child-active --state-file <state> --child-id <id> --reason manual-reprompt
+vamos qrspi inspect --state-file <state> --sessions --latest
+vamos qrspi find-latest-child --state-file <state> --stage <node>
+vamos qrspi validate-latest --state-file <state> --stage <node> --apply-rebind
+vamos qrspi recover-manual --state-file <state> --mode latest-session --continue
 ```
 
-Use `repair-state` when active child/session/artifact evidence proves the workflow cursor is stale. Use `mark-child-active` after manual child steering/reprompting so queued wakes from an older child generation are superseded and `manager-ready` waits for the newer completion.
+Use `repair-state` when active child/session/artifact evidence proves the workflow cursor is stale. Use `mark-child-active` after manual child steering/reprompting so queued wakes from an older child generation are superseded and `manager-ready` waits for the newer completion. Use latest-session recovery for same-child chat, child `/new`, manual completion, retry exhaustion inspection, and stale wake supersession before editing manager JSON.
 
 ## Session metadata boundary
 

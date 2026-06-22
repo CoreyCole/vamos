@@ -152,7 +152,6 @@ func (h *Handler) RegisterRuntimeRoutes(g *echo.Group) {
 	g.POST("/document/open", h.OpenDocumentChat)
 	g.POST("/thread/:thread_id/workflow/advance", h.AdvanceThreadWorkflow)
 	g.POST("/thread/:thread_id/workflow/policy", h.UpdateThreadWorkflowPolicy)
-	g.POST("/thread/:thread_id/workflow/next", h.CreateNextQRSPIThread)
 	g.POST("/thread/:thread_id/new", h.CreateThreadFromTarget)
 	g.POST("/:workspace_id/send", h.SendWorkspacePrompt)
 	g.POST("/:workspace_id/workflow/advance", h.AdvanceWorkspaceWorkflow)
@@ -1753,19 +1752,6 @@ func (h *Handler) UpdateThreadWorkflowPolicy(c echo.Context) error {
 	}
 	sse := datastar.NewSSE(c.Response().Writer, c.Request())
 	return h.patchThread(c, sse, threadID, PatchThreadPage)
-}
-
-func (h *Handler) CreateNextQRSPIThread(c echo.Context) error {
-	userEmail, ok := c.Get("user_email").(string)
-	if !ok || userEmail == "" {
-		return echo.NewHTTPError(http.StatusUnauthorized, "not authenticated")
-	}
-	thread, err := h.service.CreateNextQRSPIThread(c.Request().Context(), userEmail, c.Param("thread_id"))
-	if err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
-	}
-	sse := datastar.NewSSE(c.Response().Writer, c.Request())
-	return sse.Redirect(h.threadRedirectURL(c.Request().Context(), userEmail, thread.ID))
 }
 
 func (h *Handler) CreateThreadFromTarget(c echo.Context) error {

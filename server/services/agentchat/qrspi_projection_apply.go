@@ -171,20 +171,9 @@ func (s *Service) ApplyQRSPIExternalResult(
 	if !ok || adapter == nil || adapter.Definitions == nil || adapter.Store == nil {
 		return false, nil
 	}
-	def, ok := adapter.Definitions.Get(qrspi.AgentChatWorkflowType)
-	if !ok {
-		return false, nil
-	}
-	state, err := adapter.Store.LoadWorkspaceState(ctx, workspaceID)
+	state, err := loadQRSPIWorkspaceStateOrInitial(ctx, adapter, workspaceID)
 	if err != nil {
-		policy, policyErr := json.Marshal(qrspi.DefaultPolicy())
-		if policyErr != nil {
-			return false, policyErr
-		}
-		state, err = wruntime.InitialState(def, policy)
-		if err != nil {
-			return false, err
-		}
+		return false, err
 	}
 	currentDef, ok := adapter.Definitions.Get(wruntime.WorkflowID(strings.TrimSpace(state.Type)))
 	if !ok {
@@ -376,65 +365,6 @@ func (s *Service) markQRSPIProjectionSkipped(ctx context.Context, id, message st
 		ID:        id,
 		LastError: nullString(message),
 	})
-}
-
-func (s *Service) applyParsedQRSPIWorkflowResult(
-	ctx context.Context,
-	workspaceID string,
-	threadID string,
-	headEntryID string,
-	state wruntime.State,
-	workflowResult wruntime.WorkflowResult,
-	selectThread bool,
-) (bool, error) {
-	adapter, ok := s.workflowService.(*agentchatworkflows.Service)
-	if !ok || adapter == nil {
-		return false, nil
-	}
-	_, applied, err := adapter.ApplyExternalWorkflowResult(ctx, agentchatworkflows.ExternalWorkflowResultInput{
-		WorkspaceID: workspaceID,
-		ThreadID:    threadID,
-		HeadEntryID: headEntryID,
-		State:       state,
-		Result:      workflowResult,
-	})
-	if err != nil {
-		return false, err
-	}
-	if applied && selectThread {
-		_ = s.queries.UpdateWorkspaceSelectedThread(ctx, db.UpdateWorkspaceSelectedThreadParams{
-			ID:               workspaceID,
-			SelectedThreadID: nullString(threadID),
-		})
-	}
-	return applied, nil
-}
-
-func (s *Service) parsedQRSPIWorkflowResultFromAssistant(
-	ctx context.Context,
-	adapter *agentchatworkflows.Service,
-	state wruntime.State,
-	threadID string,
-	headEntryID string,
-) (wruntime.WorkflowResult, error) {
-	currentDef, ok := adapter.Definitions.Get(wruntime.WorkflowID(strings.TrimSpace(state.Type)))
-	if !ok {
-		return wruntime.WorkflowResult{}, errors.New("workflow definition is not registered")
-	}
-	assistant, err := adapter.Store.FinalAssistantText(ctx, threadID, headEntryID)
-	if err != nil {
-		return wruntime.WorkflowResult{}, err
-	}
-	parseCtx := wruntime.ParseContext{
-		WorkflowType: strings.TrimSpace(state.Type),
-		ThreadID:     threadID,
-		HeadEntryID:  headEntryID,
-	}
-	parsed, err := currentDef.ResultParser.Parse(assistant, parseCtx)
-	if err != nil {
-		return wruntime.WorkflowResult{}, err
-	}
-	return currentDef.ResultConverter.ToWorkflowResult(parsed, parseCtx)
 }
 
 func loadQRSPIWorkspaceStateOrInitial(

@@ -964,7 +964,7 @@ func TestQRSPIValidatesRelatedArtifacts(t *testing.T) {
 	}
 }
 
-func TestQRSPIDisplayNextMismatchDoesNotDriveTransition(t *testing.T) {
+func TestQRSPIDisplayNextMismatchDoesNotDriveTransitionWithoutCompatibilityWarning(t *testing.T) {
 	svc, store, runner := newQRSPIIntegrationHarness(t, nil)
 	store.run = qRSPIIntegrationRun(qrspi.NodeQuestion)
 	store.assistantText = qRSPIIntegrationResultYAMLWithArtifacts(
@@ -985,8 +985,8 @@ func TestQRSPIDisplayNextMismatchDoesNotDriveTransition(t *testing.T) {
 		t.Fatalf("OnRunComplete() error = %v", err)
 	}
 	assertCurrentNode(t, store, runner, qrspi.NodeResearch)
-	if !hasWorkflowEvent(store.events, "workflow_display_next_mismatch") {
-		t.Fatalf("events = %#v, want display-next mismatch warning", store.events)
+	if hasWorkflowEvent(store.events, "workflow_display_next_mismatch") {
+		t.Fatalf("events = %#v, want display-next compatibility warning removed", store.events)
 	}
 }
 
