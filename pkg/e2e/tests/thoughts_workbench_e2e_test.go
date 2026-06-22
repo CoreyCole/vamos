@@ -71,12 +71,15 @@ func TestThoughtsWorkbench_RendererFormatsShowExpectedWorkbenchStates(t *testing
 		Expect(spec.TextContains(vamos.Thoughts.CenterPane(), "Renderer Markdown Demo")).
 		Visit(vamos.Pages.Path("/thoughts/renderer-demo.html?context=chat")).
 		Expect(vamos.Thoughts.Ready()).
+		Expect(spec.ExpectStep(spec.TextAbsent("HTML applet:"))).
 		Expect(spec.ExpectStep(spec.Visible(spec.CSS(rendererDemoAppletFrameSelector)))).
 		Expect(iframeSandboxOmitsSameOrigin()).
+		Expect(htmlAppletFillsDocumentSurface(rendererDemoAppletFrameSelector)).
 		Visit(vamos.Pages.Path("/thoughts/renderer-demo.csv?context=chat")).
 		Expect(vamos.Thoughts.Ready()).
-		Expect(spec.TextContains(vamos.Thoughts.CenterPane(), "CSV table")).
+		Expect(spec.ExpectStep(spec.TextAbsent("CSV table:"))).
 		Expect(spec.TextContains(vamos.Thoughts.CenterPane(), "<script>")).
+		Expect(csvRendererUsesDocumentTableStyles()).
 		Visit(vamos.Pages.Path("/thoughts/renderer-demo.json?context=chat")).
 		Expect(vamos.Thoughts.Ready()).
 		Expect(spec.TextContains(vamos.Thoughts.CenterPane(), "Unsupported document type")).
@@ -245,7 +248,7 @@ func seedRendererThoughtsFiles() spec.Step {
 			t.Fatal(err)
 		}
 		files := map[string]string{
-			"renderer-demo.md":   "# Renderer Markdown Demo\n\nMarkdown parity content.\n",
+			"renderer-demo.md":   "# Renderer Markdown Demo\n\nMarkdown parity content.\n\n| name | value |\n| --- | --- |\n| alpha | beta |\n",
 			"renderer-demo.csv":  "name,value\n<script>,escaped text\n",
 			"renderer-demo.json": `{"unsupported": true}`,
 			"renderer-demo.html": `<!doctype html>
@@ -310,6 +313,92 @@ func seedStyledHTMLAppletFile() spec.Step {
 			t.Fatal(err)
 		}
 	})
+}
+
+func csvRendererUsesDocumentTableStyles() spec.Expectation {
+	return spec.ExpectStep(spec.Custom("CSV table uses shared document table styles", func(t testing.TB, ctx *duiruntime.Context) {
+		t.Helper()
+		csvWrapper := ctx.Page.Locator(".document-table-content .table-wrapper").First()
+		if err := csvWrapper.WaitFor(); err != nil {
+			t.Fatalf("CSV table wrapper missing: %v", err)
+		}
+		borderRadius, err := csvWrapper.Evaluate("el => getComputedStyle(el).borderRadius", nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := borderRadius.(string); got == "" || got == "0px" {
+			t.Fatalf("CSV wrapper missing shared rounded style, borderRadius=%q", got)
+		}
+		borderWidth, err := csvWrapper.Evaluate("el => getComputedStyle(el).borderTopWidth", nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := borderWidth.(string); got == "" || got == "0px" {
+			t.Fatalf("CSV wrapper missing shared border style, borderTopWidth=%q", got)
+		}
+		headBackground, err := ctx.Page.Locator(".document-table-content thead").First().Evaluate("el => getComputedStyle(el).backgroundColor", nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := headBackground.(string); got == "" || got == "rgba(0, 0, 0, 0)" {
+			t.Fatalf("CSV header missing shared background style, background=%q", got)
+		}
+	}))
+}
+
+func htmlAppletFillsDocumentSurface(selector string) spec.Expectation {
+	return spec.ExpectStep(spec.Custom("HTML applet fills document surface", func(t testing.TB, ctx *duiruntime.Context) {
+		t.Helper()
+		iframe := ctx.Page.Locator(selector).First()
+		if err := iframe.WaitFor(); err != nil {
+			t.Fatal(err)
+		}
+		classes, err := iframe.GetAttribute("class")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if strings.Contains(classes, "max-w-6xl") || strings.Contains(classes, "mx-auto") {
+			t.Fatalf("iframe has capped layout classes: %q", classes)
+		}
+		metrics, err := iframe.Evaluate(`el => {
+			const iframe = el.getBoundingClientRect();
+			const scroll = document.querySelector('#thoughts-markdown-scroll-region').getBoundingClientRect();
+			return { iframeWidth: iframe.width, iframeHeight: iframe.height, scrollWidth: scroll.width, scrollHeight: scroll.height };
+		}`, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		m := metrics.(map[string]any)
+		iframeWidth := numberAsFloat64(t, m["iframeWidth"])
+		scrollWidth := numberAsFloat64(t, m["scrollWidth"])
+		iframeHeight := numberAsFloat64(t, m["iframeHeight"])
+		scrollHeight := numberAsFloat64(t, m["scrollHeight"])
+		if iframeWidth < scrollWidth*0.70 {
+			t.Fatalf("iframe too narrow: iframe=%f scroll=%f", iframeWidth, scrollWidth)
+		}
+		if iframeHeight < scrollHeight*0.50 {
+			t.Fatalf("iframe too short: iframe=%f scroll=%f", iframeHeight, scrollHeight)
+		}
+	}))
+}
+
+func numberAsFloat64(t testing.TB, value any) float64 {
+	t.Helper()
+	switch v := value.(type) {
+	case float64:
+		return v
+	case float32:
+		return float64(v)
+	case int:
+		return float64(v)
+	case int64:
+		return float64(v)
+	case int32:
+		return float64(v)
+	default:
+		t.Fatalf("expected numeric metric, got %T (%v)", value, value)
+		return 0
+	}
 }
 
 func htmlAppletFrameHasThemeQuery() spec.Expectation {
