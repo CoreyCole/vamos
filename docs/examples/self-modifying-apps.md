@@ -1,45 +1,32 @@
 # Self-modifying app pattern
 
-Vamos self-modifying examples separate a normal application shell from an AI-edited generated bundle.
+Vamos self-modifying examples separate a stable Vamos shell from an AI-edited applet. The flagship pickleball example is a non-technical Files/app + Chat workbench, not a developer-facing generated artifact demo.
 
-## Pattern
+## Flagship applet pattern
 
-1. **Shell is normal Vamos UI.** Build the page with Go, templ, Datastar CQRS, short POSTs, and SSE state streams.
-2. **AI edits a generated bundle workspace.** The mutable workspace is app data, not live Vamos source.
-3. **Runner builds and runs the bundle.** `pkg/agents/generatedgo` compiles and runs one-shot Go with cwd, env, timeout, output, manifest, and artifact guardrails.
-4. **Successful runs create immutable snapshots.** Snapshots copy generated source and artifacts under a Thoughts-relative directory.
-5. **Generated artifacts use Thoughts renderers.** `app.html` renders through the sandboxed HTML iframe renderer; `results.csv` renders through the CSV table renderer.
-6. **History is AI memory.** Snapshot summaries help the agent interpret prompts like “go back to the version where partners rotated more.” Normal users should not need run IDs or filesystem paths.
+1. **Shell stays stable.** Build the page with Go, templ, Datastar CQRS, short POSTs, and SSE state streams. The normal surface shows Files/app and Chat.
+1. **User asks in plain language.** The end user describes desired behavior, copy, layout, tournament rules, or file outputs. They do not manage code, builds, branches, runs, or promotion.
+1. **q-manager hides the technical work.** It decomposes the request, asks Pi/Agent Chat to edit a hidden iteration, runs safety checks, builds, health-checks, promotes, and recovers.
+1. **Files root is app data.** User-visible files live under the app's `files/` root. For pickleball this is `examples/pickleball/files/`.
+1. **Generated iterations are hidden.** The committed starter applet lives in `files/apps/current/`; generated attempts live under `files/apps/iterations/` and are not shown in the normal Files browser.
+1. **Last-good app remains available.** A failed edit keeps the current app running and reports a friendly unchanged message.
 
-## Generated bundle contract
+## Pickleball product path
 
-A v1 bundle is a one-shot Go program. It reads local seed data, writes outputs to `VAMOS_GENERATED_OUTPUT_DIR`, and exits.
+The pickleball app uses a long-running Go + Datastar/DatastarUI applet as the current target. Prompt edits should go through Vamos Temporal plus Pi/Agent Chat and return a non-technical summary for the user. Diagnostic refs, logs, run IDs, and changed-file details are for operators and agents, not the normal user surface.
 
-Required outputs:
+Deterministic patching is allowed only for tests and local fixtures. Fixture mode must not be described as product AI.
 
-- `app.html`
-- `results.csv`
-- `manifest.json`
+## One-shot generated bundles
 
-Required manifest fields:
+Older or simpler examples can still use the static one-shot pattern: AI edits a generated bundle workspace, `pkg/agents/generatedgo` compiles and runs a Go program once, and successful runs create immutable artifacts such as `app.html`, `results.csv`, and `manifest.json`.
 
-```json
-{
-  "schema_version": 1,
-  "build_id": "2026-06-20_17-13-32_abcd1234",
-  "mode": "one_shot",
-  "prompt_summary": "prioritize new partner pairings",
-  "artifacts": {
-    "html": "app.html",
-    "csv": "results.csv"
-  }
-}
-```
+That pattern is useful for constrained demos and renderer tests, but it is not the final pickleball product target.
 
 ## Guardrails
 
-The runner is a local developer/demo guardrail, not a production multi-tenant sandbox. It provides fixed Go build/run commands, compile/run timeouts, minimal environment, output-root validation, artifact allowlisting, stdout/stderr caps, manifest validation, and source/artifact hashes.
+Current generated-code guardrails are local developer/demo guardrails, not a production multi-tenant sandbox. They include fixed Go commands, compile/run timeouts, minimal environment, output-root validation, artifact allowlisting, stdout/stderr caps, manifest validation, source/artifact hashes, hidden diagnostics, and app-specific health checks.
 
-## Future seam
+## User-facing rule
 
-The manifest reserves future mode `sse_process` for long-running generated Datastar/SSE applets. V1 examples should not start or proxy generated servers.
+Normal users should see Files/app + Chat only. Hide workspaces, builds, plans, workflow state, promotion, iterations, schemas, processes, manifests, run IDs, filesystem paths, stack traces, and raw logs.

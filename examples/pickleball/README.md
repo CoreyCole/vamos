@@ -32,4 +32,4 @@ Open <http://127.0.0.1:8080/>. The app reads `players.csv`, writes `matchups.csv
 
 ## Boundary
 
-The Vamos shell owns chat, safety checks, build, health check, promotion, recovery, and friendly explanations. The applet owns pickleball rules, files, and presentation. Deterministic edits are only for tests/fixtures; the product path uses Temporal + Pi/Agent Chat.
+q-manager owns chat, technical planning, safety checks, build, health check, promotion, recovery, and friendly explanations. The applet owns pickleball rules, files, and presentation. Deterministic edits are only for tests/fixtures; the product path uses Temporal + Pi/Agent Chat.
