@@ -19,7 +19,7 @@ func FilterChildOutputTail(data []byte, maxLines int) []string {
 			continue
 		}
 		if inUsage {
-			if strings.HasPrefix(trimmed, "-") || strings.HasPrefix(trimmed, "--") || strings.HasPrefix(trimmed, "Flags:") || strings.HasPrefix(trimmed, "Global Flags:") {
+			if isUsageSyntaxLine(trimmed) || strings.HasPrefix(trimmed, "-") || strings.HasPrefix(trimmed, "--") || strings.HasPrefix(trimmed, "Flags:") || strings.HasPrefix(trimmed, "Global Flags:") {
 				continue
 			}
 			inUsage = false
@@ -32,7 +32,17 @@ func FilterChildOutputTail(data []byte, maxLines int) []string {
 	return lines
 }
 
+func FilterCobraUsage(lines []string) []string {
+	joined := strings.Join(lines, "\n")
+	return FilterChildOutputTail([]byte(joined), len(lines))
+}
+
 func isUsageBlockLine(line string) bool {
 	line = strings.TrimSpace(line)
 	return line == "Usage:" || strings.HasPrefix(line, "Usage: ") || strings.HasPrefix(line, "Flags:") || strings.HasPrefix(line, "Global Flags:")
+}
+
+func isUsageSyntaxLine(line string) bool {
+	line = strings.TrimSpace(line)
+	return strings.Contains(line, "[flags]") || strings.Contains(line, "[command]")
 }

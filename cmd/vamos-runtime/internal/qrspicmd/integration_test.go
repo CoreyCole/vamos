@@ -602,6 +602,63 @@ func TestContinueActionCardsAreConciseAndDeterministic(t *testing.T) {
 	}
 }
 
+func TestContinueChildLaunchFailedTextActionCard(t *testing.T) {
+	fixture := newManagerFlowFixture(t)
+	stateFile := filepath.Join(fixture.dir, "launch-failed-state.json")
+	active := childHealthRef(fixture.dir)
+	writeFile(t, active.StatusPath, `{"exitCode":1}`)
+	writeFile(t, active.DonePath, "")
+	writeFile(t, active.OutputPath, "Error: unknown option --session-id\nUsage:\n  pi [flags]\nFlags:\n  --session string\n  --name string\n")
+	saveManagerState(t, stateFile, ManagerState{CanonicalPlanDir: fixture.planDir, ActiveChild: active, Workflow: testWorkflowState(t, qrspi.NodeDesign, nil)})
+
+	out, err := executeManagerCommand(deps{Clock: fixture.clock, Tmux: &recordingTmux{missingPanes: map[string]bool{"%9": true}}}, "continue", "--state-file", stateFile, "--plan-dir", fixture.planDir)
+	if err != nil {
+		t.Fatalf("continue command error = %v", err)
+	}
+	for _, want := range []string{"action: child_launch_failed", "summary: child exited before qrspi_result", "evidence: exitCode: 1", "evidence: output tail: Error: unknown option --session-id", "evidence: full output: " + active.OutputPath, "safe command: vamos qrspi repair-state --state-file " + stateFile + " --clear-failed-child --relaunch"} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("launch-failed output missing %q: %q", want, out)
+		}
+	}
+	for _, forbidden := range []string{"Usage:", "pi [flags]", "--session string", "--name string"} {
+		if strings.Contains(out, forbidden) {
+			t.Fatalf("launch-failed output contains usage spam %q: %q", forbidden, out)
+		}
+	}
+}
+
+func TestContinueChildLaunchFailedNDJSONActionCard(t *testing.T) {
+	fixture := newManagerFlowFixture(t)
+	stateFile := filepath.Join(fixture.dir, "launch-failed-state.json")
+	active := childHealthRef(fixture.dir)
+	writeFile(t, active.StatusPath, `{"exitCode":1}`)
+	writeFile(t, active.DonePath, "")
+	writeFile(t, active.OutputPath, "Error: unknown option --session-id\nUsage:\n  pi [flags]\n")
+	saveManagerState(t, stateFile, ManagerState{CanonicalPlanDir: fixture.planDir, ActiveChild: active, Workflow: testWorkflowState(t, qrspi.NodeDesign, nil)})
+
+	out, err := executeManagerCommand(deps{Clock: fixture.clock, Tmux: &recordingTmux{missingPanes: map[string]bool{"%9": true}}}, "continue", "--state-file", stateFile, "--plan-dir", fixture.planDir, "--output", "ndjson")
+	if err != nil {
+		t.Fatalf("continue command error = %v", err)
+	}
+	var event Event
+	if err := json.NewDecoder(strings.NewReader(out)).Decode(&event); err != nil {
+		t.Fatalf("decode event from %q: %v", out, err)
+	}
+	if event.Type != "manager_action" || event.ActionCard == nil || event.ActionCard.Kind != ActionChildLaunchFailed {
+		t.Fatalf("event = %#v", event)
+	}
+	if !containsLine(event.ActionCard.Evidence, "exitCode: 1") || !containsLine(event.ActionCard.Evidence, "full output: "+active.OutputPath) || !containsLine(event.ActionCard.Evidence, "output tail: Error: unknown option --session-id") {
+		t.Fatalf("evidence = %#v", event.ActionCard.Evidence)
+	}
+}
+
+func TestBuildPreflightFailedCard(t *testing.T) {
+	card := BuildPreflightFailedCard(PiCompatibilityReport{OK: false, PiBinary: "pi", Problems: []PreflightProblem{{Summary: "Pi CLI missing required q-manager flag", Evidence: "--session-id"}}}, "/tmp/state.json")
+	if card == nil || card.Kind != ActionPiCompatibilityFailed || !strings.Contains(strings.Join(card.Evidence, "\n"), "--session-id") || !strings.Contains(card.SafeCommand, "doctor --state-file /tmp/state.json") {
+		t.Fatalf("card = %#v", card)
+	}
+}
+
 func TestEndToEndCommandSurface(t *testing.T) {
 	fixture := newManagerFlowFixture(t)
 	runner := &fakeChildRunner{writeResult: true}
