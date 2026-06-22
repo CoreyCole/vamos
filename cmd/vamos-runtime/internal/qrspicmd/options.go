@@ -2,8 +2,11 @@ package qrspicmd
 
 import (
 	"context"
+	"fmt"
+	"strings"
 	"time"
 
+	"github.com/CoreyCole/vamos/pkg/agents/workflows/qrspi/semantic"
 	wruntime "github.com/CoreyCole/vamos/pkg/agents/workflows/runtime"
 )
 
@@ -157,6 +160,70 @@ const (
 	ActionManualChildSteer     = "manual_child_steer"
 	ActionSupersededQueuedWake = "superseded_queued_wake"
 )
+
+func ProjectManagerActionCard(action semantic.NextAction, state ManagerState, stateFile string) *ManagerActionCard {
+	stateFile = strings.TrimSpace(stateFile)
+	continueCmd := continueCommand(stateFile)
+	evidence := append([]string{}, action.Evidence...)
+	if action.CurrentNodeID != "" {
+		evidence = append(evidence, fmt.Sprintf("stage: %s", action.CurrentNodeID))
+	}
+	if action.PrimaryArtifact != "" {
+		evidence = append(evidence, fmt.Sprintf("artifact: %s", action.PrimaryArtifact))
+	}
+	summary := strings.TrimSpace(action.RecoveryReason)
+	switch action.Kind {
+	case semantic.NextActionWaitHuman:
+		if summary == "" {
+			summary = "child requested human input"
+		}
+		return &ManagerActionCard{Kind: ActionHumanGate, Severity: severityOrDefault(action.Severity, "info"), Summary: summary, Evidence: evidence, RecommendedAction: "summarize the artifact/question for the human, then steer the same child", SafeCommand: fmt.Sprintf("vamos qrspi steer-child --state-file %s --feedback-file <file>", stateFile), ContinueCommand: continueCmd, RequiresHuman: true}
+	case semantic.NextActionInvalidRetry, semantic.NextActionInvalidExhausted:
+		if summary == "" {
+			summary = "child result needs deterministic repair"
+		}
+		return &ManagerActionCard{Kind: ActionInvalidChildYAML, Severity: severityOrDefault(action.Severity, "warning"), Summary: summary, Evidence: evidence, RecommendedAction: "reprompt or steer the active child with canonical YAML", SafeCommand: invalidActionSafeCommand(action, state, stateFile), ContinueCommand: continueCmd, RequiresHuman: false}
+	case semantic.NextActionBlocked:
+		if summary == "" {
+			summary = "child reported blocked"
+		}
+		return &ManagerActionCard{Kind: ActionGraphOutcomeMismatch, Severity: severityOrDefault(action.Severity, "warning"), Summary: summary, Evidence: evidence, RecommendedAction: "inspect the artifact/session, then steer or continue only if deterministic", SafeCommand: continueCmd, ContinueCommand: continueCmd, RequiresHuman: false}
+	case semantic.NextActionError:
+		if summary == "" {
+			summary = "child reported error"
+		}
+		return &ManagerActionCard{Kind: ActionGraphOutcomeMismatch, Severity: severityOrDefault(action.Severity, "error"), Summary: summary, Evidence: evidence, RecommendedAction: "diagnose the child artifact/session before continuing", SafeCommand: continueCmd, ContinueCommand: continueCmd, RequiresHuman: false}
+	case semantic.NextActionManualRecovery:
+		if summary == "" {
+			summary = "manual recovery needed"
+		}
+		return &ManagerActionCard{Kind: ActionManualChildSteer, Severity: severityOrDefault(action.Severity, "info"), Summary: summary, Evidence: evidence, RecommendedAction: "recover latest relevant child session", SafeCommand: fmt.Sprintf("vamos qrspi recover-manual --state-file %s --mode latest-session", stateFile), ContinueCommand: continueCmd, RequiresHuman: false}
+	default:
+		return nil
+	}
+}
+
+func severityOrDefault(severity, fallback string) string {
+	if strings.TrimSpace(severity) != "" {
+		return severity
+	}
+	return fallback
+}
+
+func invalidActionSafeCommand(action semantic.NextAction, state ManagerState, stateFile string) string {
+	stage := strings.TrimSpace(string(action.CurrentNodeID))
+	if stage == "" && state.ActiveChild != nil {
+		stage = state.ActiveChild.Stage
+	}
+	if action.Kind == semantic.NextActionInvalidExhausted {
+		return feedbackCommand(stateFile)
+	}
+	attempt := 1
+	if state.ActiveChild != nil {
+		attempt = state.ActiveChild.ValidationRetryCount + 1
+	}
+	return fmt.Sprintf("vamos qrspi reprompt-child --state-file %s --plan-dir %s --stage %s --attempt %d", stateFile, state.CanonicalPlanDir, stage, attempt)
+}
 
 type RepairStateOptions struct {
 	StateFile        string

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"strings"
 
+	"github.com/CoreyCole/vamos/pkg/agents/workflows/qrspi/semantic"
 	wruntime "github.com/CoreyCole/vamos/pkg/agents/workflows/runtime"
 )
 
@@ -50,6 +51,29 @@ func ProjectQRSPIWorkflowCard(
 	workspaceID string,
 	threadID string,
 ) (*QRSPIWorkflowCard, error) {
+	action := semantic.ProjectNextActionFromState(runResult, state)
+	return ProjectQRSPIWorkflowCardFromAction(
+		state,
+		runResult,
+		action,
+		policy,
+		cwd,
+		nextLabel,
+		workspaceID,
+		threadID,
+	)
+}
+
+func ProjectQRSPIWorkflowCardFromAction(
+	state wruntime.State,
+	runResult wruntime.WorkflowResult,
+	action semantic.NextAction,
+	policy WorkspaceWorkflowPolicyProjection,
+	cwd WorkspaceCwdProjection,
+	nextLabel string,
+	workspaceID string,
+	threadID string,
+) (*QRSPIWorkflowCard, error) {
 	if strings.TrimSpace(string(runResult.SourceNodeID)) == "" {
 		return nil, nil
 	}
@@ -65,6 +89,12 @@ func ProjectQRSPIWorkflowCard(
 	}
 	threadID = strings.TrimSpace(threadID)
 	progress := agentProgressForWorkflowState(state, threadID)
+	if action.NextNodeID != "" {
+		progress.CurrentNodeID = string(action.NextNodeID)
+	}
+	if strings.TrimSpace(nextLabel) == "" {
+		nextLabel = string(action.NextNodeID)
+	}
 	return &QRSPIWorkflowCard{
 		ThreadID:        threadID,
 		WorkspaceID:     workspaceID,
@@ -82,9 +112,10 @@ func ProjectQRSPIWorkflowCard(
 		JumpNextEndHref: progress.NextEndHref,
 		Cwd:             cwd,
 		Policy:          policy,
-		WaitingHuman:    state.Status == wruntime.WorkspaceStatusWaitingHuman,
-		CanContinue:     state.PendingNextNodeID != "" && state.Status == wruntime.WorkspaceStatusIdle,
-		RawResult:       rawResult,
+		WaitingHuman:    action.Kind == semantic.NextActionWaitHuman,
+		CanContinue: state.Status == wruntime.WorkspaceStatusIdle &&
+			(action.Kind == semantic.NextActionStartNext || action.Kind == semantic.NextActionContinuePending),
+		RawResult: rawResult,
 	}, nil
 }
 

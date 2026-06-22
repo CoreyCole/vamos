@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/CoreyCole/vamos/pkg/agents/workflows/qrspi"
+	"github.com/CoreyCole/vamos/pkg/agents/workflows/qrspi/semantic"
 	wruntime "github.com/CoreyCole/vamos/pkg/agents/workflows/runtime"
 )
 
@@ -126,6 +127,25 @@ func TestProjectQRSPIWorkflowCardUsesRuntimeProjection(t *testing.T) {
 		!card.WaitingHuman || card.Policy.ModeLabel != policy.ModeLabel ||
 		card.Cwd.Path != cwd.Path {
 		t.Fatalf("card = %#v, want runtime-derived projection", card)
+	}
+}
+
+func TestProjectQRSPIWorkflowCardFromSharedNextAction(t *testing.T) {
+	card, err := ProjectQRSPIWorkflowCardFromAction(
+		wruntime.State{Status: wruntime.WorkspaceStatusIdle, PendingNextNodeID: qrspi.NodeResearch},
+		wruntime.WorkflowResult{SourceNodeID: qrspi.NodeQuestion, Status: wruntime.StatusComplete, Outcome: wruntime.OutcomeComplete, PrimaryArtifact: "thoughts/example/questions/q.md"},
+		semantic.NextAction{Kind: semantic.NextActionContinuePending, Severity: "info", CurrentNodeID: qrspi.NodeQuestion, NextNodeID: qrspi.NodeResearch, PrimaryArtifact: "thoughts/example/questions/q.md"},
+		WorkspaceWorkflowPolicyProjection{},
+		WorkspaceCwdProjection{},
+		"Research",
+		"workspace-1",
+		"thread-1",
+	)
+	if err != nil {
+		t.Fatalf("ProjectQRSPIWorkflowCardFromAction() error = %v", err)
+	}
+	if card == nil || !card.CanContinue || card.WaitingHuman || card.RuntimeNextStep != "Research" || card.AgentProgress.CurrentNodeID != string(qrspi.NodeResearch) {
+		t.Fatalf("card = %#v, want shared continue action projection", card)
 	}
 }
 

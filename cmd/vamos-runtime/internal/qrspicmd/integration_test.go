@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/CoreyCole/vamos/pkg/agents/workflows/qrspi"
+	"github.com/CoreyCole/vamos/pkg/agents/workflows/qrspi/semantic"
 )
 
 func TestManagerFlowQuestionToResearch(t *testing.T) {
@@ -553,6 +554,21 @@ func TestValidatedWakeHappyPathEndToEnd(t *testing.T) {
 		if !strings.Contains(continueOut, want) {
 			t.Fatalf("continue output missing %q: %q", want, continueOut)
 		}
+	}
+}
+
+func TestProjectManagerActionCardFromSharedNextAction(t *testing.T) {
+	state := ManagerState{CanonicalPlanDir: "thoughts/example", ActiveChild: &ChildRunRef{Stage: "plan", ValidationRetryCount: 0}}
+	invalid := ProjectManagerActionCard(semantic.ProjectInvalidResultAction(qrspi.NodePlan, "missing qrspi_result", false), state, "/tmp/state.json")
+	if invalid == nil || invalid.Kind != ActionInvalidChildYAML || invalid.SafeCommand == "" || invalid.RequiresHuman {
+		t.Fatalf("invalid card = %#v", invalid)
+	}
+	human := ProjectManagerActionCard(semantic.NextAction{Kind: semantic.NextActionWaitHuman, Severity: "info", CurrentNodeID: qrspi.NodeOutline, Status: "needs_human", PrimaryArtifact: "thoughts/example/design.md", RecoveryReason: "child requested human input"}, state, "/tmp/state.json")
+	if human == nil || human.Kind != ActionHumanGate || !human.RequiresHuman || !strings.Contains(human.SafeCommand, "steer-child") {
+		t.Fatalf("human card = %#v", human)
+	}
+	if ProjectManagerActionCard(semantic.NextAction{Kind: semantic.NextActionStartNext}, state, "/tmp/state.json") != nil {
+		t.Fatalf("start-next action should not require a manager card")
 	}
 }
 

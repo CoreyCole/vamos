@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/CoreyCole/vamos/pkg/agents/workflows/qrspi/semantic"
 	wruntime "github.com/CoreyCole/vamos/pkg/agents/workflows/runtime"
 	"github.com/spf13/cobra"
 )
@@ -1889,11 +1890,20 @@ func humanGateActionCard(state ManagerState, stateFile string, prompt HumanPromp
 	if review == "" {
 		review = fmt.Sprintf("review %s artifact before steering feedback", prompt.Stage)
 	}
-	evidence := []string{fmt.Sprintf("stage: %s", prompt.Stage), fmt.Sprintf("status: %s", prompt.Status)}
-	if prompt.Artifact != "" {
-		evidence = append(evidence, fmt.Sprintf("artifact: %s", prompt.Artifact))
+	action := semantic.NextAction{
+		Kind:            semantic.NextActionWaitHuman,
+		Severity:        "info",
+		CurrentNodeID:   wruntime.NodeID(prompt.Stage),
+		Status:          wruntime.StatusNeedsHuman,
+		PrimaryArtifact: prompt.Artifact,
+		RecoveryReason:  "child requested human input",
 	}
-	return ManagerActionCard{Kind: ActionHumanGate, Severity: "info", Summary: "child requested human input", Evidence: evidence, RecommendedAction: "summarize the artifact/question for the human, then steer the same child", ReviewSummary: review, SafeCommand: fmt.Sprintf("vamos qrspi steer-child --state-file %s --feedback-file <file>", stateFile), ContinueCommand: continueCommand(stateFile), RequiresHuman: true}
+	card := ProjectManagerActionCard(action, state, stateFile)
+	if card == nil {
+		return ManagerActionCard{}
+	}
+	card.ReviewSummary = review
+	return *card
 }
 
 func manualChildSteerActionCard(state ManagerState, stateFile string) ManagerActionCard {
