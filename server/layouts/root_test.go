@@ -202,6 +202,36 @@ func TestHeaderBreadcrumbsAlignAfterThoughtsWithoutDuplicateRoot(t *testing.T) {
 	}
 }
 
+func TestRootIncludesHTMLAppletThemeBroadcastHelper(t *testing.T) {
+	t.Parallel()
+
+	body := renderLayoutComponent(t, Root(RootArgs{Title: "Test", CurrentTheme: "dark"}))
+	for _, want := range []string{
+		"function broadcastVamosHTMLAppletTheme(theme)",
+		"iframe[data-vamos-html-applet]",
+		"type: 'vamos:theme'",
+		"postMessage({ type: 'vamos:theme', theme }, '*')",
+	} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("Root() missing %q: %s", want, body)
+		}
+	}
+}
+
+func TestHeaderThemeToggleBroadcastsHTMLAppletTheme(t *testing.T) {
+	t.Parallel()
+
+	body := renderLayoutComponent(t, Header(RootArgs{UserEmail: "user@example.test"}))
+	for _, want := range []string{
+		"broadcastVamosHTMLAppletTheme($theme)",
+		"/api/theme",
+	} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("Header() missing %q: %s", want, body)
+		}
+	}
+}
+
 func TestHeaderAvatarContainsSecondaryActions(t *testing.T) {
 	SetGitHubLinkProvider(func(currentPath string) string {
 		return "https://github.example.test/acme/project/blob/main/" + strings.TrimSuffix(

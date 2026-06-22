@@ -250,6 +250,14 @@ templ Root(args RootArgs) {
 				}
 			</script>
 			<script>
+				function broadcastVamosHTMLAppletTheme(theme) {
+					if (theme !== 'dark' && theme !== 'light') return;
+					document.querySelectorAll('iframe[data-vamos-html-applet]').forEach((iframe) => {
+						iframe.contentWindow?.postMessage({ type: 'vamos:theme', theme }, '*');
+					});
+				}
+			</script>
+			<script>
 				function syncAppViewportShell() {
 					const shell = document.getElementById("app-viewport-shell");
 					if (!shell) return;
@@ -455,7 +463,7 @@ templ HeaderAvatarNavLink(dropdownID string, href string, label string, active b
 
 templ HeaderAvatarPersistedThemeAction(dropdownID string) {
 	<button
-		data-on:click={ "$theme = $theme === 'dark' ? 'light' : 'dark'; document.documentElement.classList.toggle('dark', $theme === 'dark'); localStorage.setItem('theme', $theme); @post('/api/theme'); $" + dropdownID + ".open = false" }
+		data-on:click={ "$theme = $theme === 'dark' ? 'light' : 'dark'; document.documentElement.classList.toggle('dark', $theme === 'dark'); localStorage.setItem('theme', $theme); broadcastVamosHTMLAppletTheme($theme); @post('/api/theme'); $" + dropdownID + ".open = false" }
 		class="relative flex w-full cursor-pointer select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none transition-colors hover:bg-accent focus:bg-accent focus:text-accent-foreground"
 	>
 		<svg class="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
