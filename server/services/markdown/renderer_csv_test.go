@@ -34,6 +34,39 @@ func TestCSVRendererEscapesCells(t *testing.T) {
 	if !strings.Contains(html, "&lt;script&gt;") {
 		t.Fatalf("escaped cell missing: %s", html)
 	}
+	if strings.Contains(html, "CSV table:") {
+		t.Fatalf("CSV renderer includes duplicate chrome: %s", html)
+	}
+	if strings.Contains(html, "max-w-6xl") || strings.Contains(html, "mx-auto") {
+		t.Fatalf("CSV renderer keeps capped wrapper classes: %s", html)
+	}
+	if !strings.Contains(html, "document-table-content") {
+		t.Fatalf("CSV renderer missing document table content wrapper: %s", html)
+	}
+	if !strings.Contains(html, `class="table-wrapper"`) {
+		t.Fatalf("CSV renderer missing table wrapper: %s", html)
+	}
+}
+
+func TestCSVTableDocumentShowsTruncationWithoutDocumentChrome(t *testing.T) {
+	t.Parallel()
+
+	var buf bytes.Buffer
+	table := CSVTable{
+		Headers:   []string{"name"},
+		Rows:      [][]string{{"a"}},
+		Truncated: true,
+	}
+	if err := CSVTableDocument("thoughts/data.csv", table).Render(t.Context(), &buf); err != nil {
+		t.Fatal(err)
+	}
+	html := buf.String()
+	if !strings.Contains(html, "truncated") {
+		t.Fatalf("missing truncation status: %s", html)
+	}
+	if strings.Contains(html, "thoughts/data.csv") || strings.Contains(html, "CSV table:") {
+		t.Fatalf("truncation status reintroduced document chrome: %s", html)
+	}
 }
 
 func TestParseCSVTableTruncatesRows(t *testing.T) {

@@ -1,16 +1,14 @@
 package markdown
 
 templ CSVTableDocument(docPath string, table CSVTable) {
-	<section class="mx-auto w-full max-w-6xl space-y-3">
-		<div class="rounded-lg border border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
-			CSV table: <span class="font-mono text-foreground">{ docPath }</span>
-			if table.Truncated {
-				<span class="ml-2 rounded border border-border px-2 py-0.5">truncated</span>
-			}
-		</div>
+	{{ _ = docPath }}
+	<section class="document-table-content w-full">
 		if len(table.Headers) == 0 {
 			<p class="text-sm text-muted-foreground">Empty CSV file.</p>
 		} else {
+			if table.Truncated {
+				<p class="mb-3 text-xs text-muted-foreground">Showing first rows; truncated.</p>
+			}
 			<div class="table-wrapper">
 				<table>
 					<thead>
