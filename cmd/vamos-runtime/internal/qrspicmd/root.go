@@ -71,10 +71,14 @@ func newInitCommand(d deps) *cobra.Command {
 
 func newStartNextCommand(d deps) *cobra.Command {
 	opts := StartNextOptions{Split: "right", Timeout: 0, Output: "text"}
+	var usagePercent float64
+	var usageTokens int
+	var usageWindow int
 	cmd := &cobra.Command{
 		Use:   "start-next --plan-dir <path> --project-root <path>",
 		Short: "Initialize or resume q-manager state and launch the graph-selected child",
 		RunE: func(cmd *cobra.Command, args []string) error {
+			opts.Usage = usageFromChangedFlags(cmd, usagePercent, usageTokens, usageWindow)
 			_, err := RunStartNext(cmd.Context(), opts, d, cmd.OutOrStdout())
 			return err
 		},
@@ -94,6 +98,9 @@ func newStartNextCommand(d deps) *cobra.Command {
 	cmd.Flags().DurationVar(&opts.Timeout, "timeout", 0, "maximum time to wait for child; 0 returns after launch")
 	cmd.Flags().StringVar(&opts.Output, "output", "text", "output format: text or ndjson")
 	cmd.Flags().BoolVar(&opts.Force, "force", false, "replace existing expired/inactive state")
+	cmd.Flags().Float64Var(&usagePercent, "manager-usage-percent", 0, "parent manager context usage percent for optional compaction")
+	cmd.Flags().IntVar(&usageTokens, "manager-usage-tokens", 0, "parent manager context token count for optional compaction")
+	cmd.Flags().IntVar(&usageWindow, "manager-usage-window", 0, "parent manager context window size for optional compaction")
 	return cmd
 }
 
@@ -222,10 +229,14 @@ func newRepromptChildCommand(d deps) *cobra.Command {
 
 func newContinueCommand(d deps) *cobra.Command {
 	opts := ContinueOptions{Split: "right", Timeout: 0, Output: "text"}
+	var usagePercent float64
+	var usageTokens int
+	var usageWindow int
 	cmd := &cobra.Command{
 		Use:   "continue --state-file <file>",
 		Short: "Validate active child and continue the QRSPI graph when safe",
 		RunE: func(cmd *cobra.Command, args []string) error {
+			opts.Usage = usageFromChangedFlags(cmd, usagePercent, usageTokens, usageWindow)
 			return RunContinue(cmd.Context(), opts, d, cmd.OutOrStdout())
 		},
 	}
@@ -236,6 +247,9 @@ func newContinueCommand(d deps) *cobra.Command {
 	cmd.Flags().StringVar(&opts.Split, "split", "right", "tmux split direction for next child")
 	cmd.Flags().DurationVar(&opts.Timeout, "timeout", 0, "maximum time to wait for next child; 0 returns after launch")
 	cmd.Flags().StringVar(&opts.Output, "output", "text", "output format: text or ndjson")
+	cmd.Flags().Float64Var(&usagePercent, "manager-usage-percent", 0, "parent manager context usage percent for optional compaction")
+	cmd.Flags().IntVar(&usageTokens, "manager-usage-tokens", 0, "parent manager context token count for optional compaction")
+	cmd.Flags().IntVar(&usageWindow, "manager-usage-window", 0, "parent manager context window size for optional compaction")
 	return cmd
 }
 
@@ -392,6 +406,10 @@ func RunStartNext(ctx context.Context, opts StartNextOptions, d deps, out io.Wri
 		return nil, err
 	}
 	launched, err := store.Load(stateFile)
+	if err != nil {
+		return nil, err
+	}
+	launched, _, err = maybeStartManagerCompaction(ctx, launched, stateFile, opts.Usage, d, out)
 	if err != nil {
 		return nil, err
 	}
@@ -1010,6 +1028,150 @@ func writeValidationStatus(path string, status ChildCompletionStatus) error {
 	return os.Rename(tmp, path)
 }
 
+func usageFromChangedFlags(cmd *cobra.Command, usagePercent float64, usageTokens int, usageWindow int) ManagerUsageInput {
+	var input ManagerUsageInput
+	if cmd.Flags().Changed("manager-usage-percent") {
+		input.UsagePercent = &usagePercent
+	}
+	if cmd.Flags().Changed("manager-usage-tokens") {
+		input.Tokens = &usageTokens
+	}
+	if cmd.Flags().Changed("manager-usage-window") {
+		input.Window = &usageWindow
+	}
+	return input
+}
+
+func managerUsagePercent(input ManagerUsageInput) (float64, bool) {
+	if input.UsagePercent != nil {
+		return *input.UsagePercent, true
+	}
+	if input.Tokens != nil && input.Window != nil && *input.Window > 0 {
+		return (float64(*input.Tokens) / float64(*input.Window)) * 100, true
+	}
+	return 0, false
+}
+
+func maybeStartManagerCompaction(ctx context.Context, state ManagerState, stateFile string, usage ManagerUsageInput, d deps, out io.Writer) (ManagerState, bool, error) {
+	_ = ctx
+	out = ensureWriter(out)
+	percent, ok := managerUsagePercent(usage)
+	if !ok {
+		return state, false, writeCompactionDiagnostic(out, "manager compaction: skipped; no explicit usage input", stateFile, "", false)
+	}
+	if percent <= 80 {
+		return state, false, writeCompactionDiagnostic(out, fmt.Sprintf("manager compaction: skipped; usage %.1f%% <= 80%%", percent), stateFile, "", false)
+	}
+	now := time.Now()
+	if d.Clock != nil {
+		now = d.Clock()
+	}
+	handoffPath, err := writeManagerOperationalHandoff(state, stateFile, now)
+	if err != nil {
+		return state, false, err
+	}
+	state.Delivery.Status = "compacting"
+	if strings.TrimSpace(state.Delivery.ManagerPaneID) == "" {
+		state.Delivery.ManagerPaneID = strings.TrimSpace(state.ManagerPaneID)
+	}
+	if err := stateStore(d, "", func() time.Time { return now }).Save(stateFile, state); err != nil {
+		return state, false, err
+	}
+	return state, true, writeCompactionDiagnostic(out, fmt.Sprintf("manager compaction: usage %.1f%% > 80%%; handoff written", percent), stateFile, handoffPath, true)
+}
+
+func writeCompactionDiagnostic(out io.Writer, summary string, stateFile string, handoffPath string, compacting bool) error {
+	if out == nil {
+		return nil
+	}
+	if compacting {
+		fmt.Fprintf(out, "%s\n", summary)
+		fmt.Fprintf(out, "handoff: %s\n", handoffPath)
+		fmt.Fprintf(out, "resume: pi @%s\n", handoffPath)
+		fmt.Fprintf(out, "ready: vamos qrspi manager-ready --state-file %s --manager-pane $TMUX_PANE\n", stateFile)
+		return nil
+	}
+	_, err := fmt.Fprintln(out, summary)
+	return err
+}
+
+func writeManagerOperationalHandoff(state ManagerState, stateFile string, now time.Time) (string, error) {
+	planDir := strings.TrimSpace(state.CanonicalPlanDir)
+	if planDir == "" {
+		return "", errors.New("canonical plan dir is required for manager handoff")
+	}
+	planPath := planDir
+	if !filepath.IsAbs(planPath) {
+		base := strings.TrimSpace(state.ImplementationCwd)
+		if base == "" {
+			base = strings.TrimSpace(state.SourceCwd)
+		}
+		if base == "" {
+			cwd, err := os.Getwd()
+			if err != nil {
+				return "", err
+			}
+			base = cwd
+		}
+		planPath = filepath.Join(base, planDir)
+	}
+	handoffDir := filepath.Join(planPath, "handoffs")
+	if err := os.MkdirAll(handoffDir, 0o755); err != nil {
+		return "", err
+	}
+	filename := now.Format("2006-01-02_15-04-05") + "_q-manager-operational-handoff.md"
+	path := filepath.Join(handoffDir, filename)
+	content := buildManagerOperationalHandoff(state, stateFile, now, path)
+	if err := writeFileAtomically(path, []byte(content), 0o644); err != nil {
+		return "", err
+	}
+	return path, nil
+}
+
+func buildManagerOperationalHandoff(state ManagerState, stateFile string, now time.Time, path string) string {
+	child := "none"
+	if state.ActiveChild != nil {
+		child = fmt.Sprintf("stage=%s childID=%s pane=%s sessionID=%s sessionPath=%s statusPath=%s donePath=%s", state.ActiveChild.Stage, state.ActiveChild.ID, state.ActiveChild.TmuxPaneID, state.ActiveChild.SessionID, state.ActiveChild.SessionPath, state.ActiveChild.StatusPath, state.ActiveChild.DonePath)
+	}
+	return fmt.Sprintf(`---
+date: %s
+stage: q-manager
+artifact: manager-operational-handoff
+---
+
+# q-manager operational handoff
+
+Done: parent manager usage exceeded compaction threshold after launching child; delivery marked compacting so child wake queues safely.
+
+Next: resume manager from this handoff, then mark manager ready to flush queued child wake.
+
+## Durable workflow refs
+
+- Plan dir: %s
+- Current graph node: %s
+- Implementation cwd: %s
+- Handoff path: %s
+
+## Local / ephemeral manager refs
+
+- State file: %s
+- Source cwd: %s
+- Manager run ID: %s
+- Manager pane: %s
+- Active child: %s
+
+## Exact next commands
+
+`+"```bash"+`
+# In the fresh manager session after reading this handoff:
+vamos qrspi manager-ready --state-file %q --manager-pane "$TMUX_PANE"
+
+# Then follow the flushed wake, or continue manually if already validated:
+vamos qrspi continue --state-file %q
+`+"```"+`
+`, now.Format(time.RFC3339), state.CanonicalPlanDir, state.Workflow.CurrentNodeID, state.ImplementationCwd, path, stateFile, state.SourceCwd, state.ManagerRunID, state.ManagerPaneID, child, stateFile, stateFile)
+}
+
 func RunManagerReady(ctx context.Context, opts ManagerReadyOptions, d deps, out io.Writer) error {
 	if strings.TrimSpace(opts.StateFile) == "" {
 		return errors.New("state-file is required")
@@ -1349,6 +1511,10 @@ func RunContinue(ctx context.Context, opts ContinueOptions, d deps, out io.Write
 
 	if parsed.Decision.StartNext {
 		launched, err := startNextChildFromDecision(ctx, nextState, parsed.Decision, opts, d, out)
+		if err != nil {
+			return err
+		}
+		launched, _, err = maybeStartManagerCompaction(ctx, launched, opts.StateFile, opts.Usage, d, out)
 		if err != nil {
 			return err
 		}

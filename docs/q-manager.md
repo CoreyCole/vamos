@@ -49,7 +49,7 @@ q_manager_child_wake:
 
 Intermediate invalid/missing `qrspi_result` turns, parser retries, and Codex/SSE header noise are suppressed from manager chat while deterministic repair remains possible. Retry exhaustion emits one manager-needed wake with `validated=false`, `retry_exhausted=true`, attempt/limit context, child refs, and deterministic-recovery-first guidance.
 
-The manager normally runs `continue`, which validates the active child session JSONL, reprompts the same child when retry remains, persists the canonical graph decision for valid results, starts the graph-selected next child when safe, and cleans the old pane only after the next child exists.
+The manager normally runs `continue`, which validates the active child session JSONL, reprompts the same child when retry remains, persists the canonical graph decision for valid results, starts the graph-selected next child when safe, and cleans the old pane only after the next child exists. `start-next` / `continue` may accept explicit manager usage flags (`--manager-usage-percent` or `--manager-usage-tokens` + `--manager-usage-window`); when usage is above 80%, q-manager writes an operational handoff, marks delivery `compacting`, and queues child wakes until `manager-ready` flushes them.
 
 Default `continue` output is concise text for manager chat, not the raw validate/decide NDJSON dump:
 
@@ -97,9 +97,10 @@ Reload from this manifest, `.pi/skills/q-manager/SKILL.md`, `.pi/skills/qrspi-pl
    ```bash
    vamos qrspi start-next --plan-dir <plan> --project-root "$PWD" --manager-pane "$TMUX_PANE"
    ```
+   Optional: pass explicit parent usage (`--manager-usage-percent 82` or token/window flags). Missing usage skips compaction; q-manager does not guess.
 1. Confirm the child pane is visible and launch refs include `--session-id`, `--session-dir`, and `--extension`.
 1. Confirm no parent wake appears for invalid/missing result turns while retry remains, including header-like SSE noise.
-1. When the child reaches a valid graph result or retry exhaustion, confirm the parent pane receives one buffered wake prompt with validation fields and `param: "vamos qrspi continue --state-file <state>"`.
+1. When the child reaches a valid graph result or retry exhaustion, confirm the parent pane receives one buffered wake prompt with validation fields and `param: "vamos qrspi continue --state-file <state>"`. If the manager was compacting, confirm no immediate paste occurs until `vamos qrspi manager-ready --state-file <state> --manager-pane "$TMUX_PANE"` flushes the queued wake.
 1. Run the exact `continue --state-file <state>` command from the wake.
 1. Confirm concise output and next child start or stop reason.
 1. If a human gate appears, write the answer to a file and run `vamos qrspi steer-child --state-file <state> --feedback-file <answer.md>`.

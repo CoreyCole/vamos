@@ -61,9 +61,9 @@ Primary loop: launch/resume child with `start-next`, then wait for a validated p
    ```bash
    vamos qrspi start-next --plan-dir <plan-dir> --project-root <repo-root> --manager-pane "$TMUX_PANE"
    ```
-   Add `--node <node>` / `--implementation-cwd <cwd>` only when deliberately resuming or testing a specific implementation, review, or verify stage. If the parent already has a latest fenced result, pass it with `--latest-result-stdin` or `--latest-result-file`; the CLI validates/persists it before prompt embedding.
+   Add `--node <node>` / `--implementation-cwd <cwd>` only when deliberately resuming or testing a specific implementation, review, or verify stage. If parent context usage is explicitly known, pass `--manager-usage-percent <n>` or `--manager-usage-tokens <n> --manager-usage-window <n>`; above 80%, the CLI writes a manager operational handoff, marks delivery compacting, and prints the exact `manager-ready` command. Missing usage skips compaction; do not guess from token totals alone. If the parent already has a latest fenced result, pass it with `--latest-result-stdin` or `--latest-result-file`; the CLI validates/persists it before prompt embedding.
 1. Capture `stateFile` and active child refs from concise output/NDJSON. The CLI writes the child prompt file atomically and launches the visible child; do not hand-render or paste prompts on the happy path.
-1. Stop issuing commands and wait for the child extension to paste a validated `q_manager_child_wake`. The wake should include `validated`, `manager_needed`, `retry_exhausted`, stage/status/artifact when known, and the exact `continue` command.
+1. Stop issuing commands and wait for the child extension/CLI to deliver a validated `q_manager_child_wake`. If manager delivery is `compacting`, the wake queues; after parent reset/restart, run the printed `vamos qrspi manager-ready --state-file "$STATE" --manager-pane "$TMUX_PANE"` command to mark ready and flush the queued wake exactly once. The wake should include `validated`, `manager_needed`, `retry_exhausted`, stage/status/artifact when known, and the exact `continue` command.
 1. Run the single normal manager continuation command from the wake:
    ```bash
    vamos qrspi continue --state-file "$STATE"
@@ -139,7 +139,7 @@ Do not rely on chat history. The markdown handoff must contain enough local reco
 - Whether the manager is waiting for child wake, should run `qrspi continue`, needs a lower-level recovery command, or is stopped at a human gate.
 - Exact next command, using `go run ./cmd/vamos-runtime ...` when testing from checkout.
 
-Manager handoff may include `stateFile` because it is an operational recovery note for the same local machine. Do not put `stateFile`, pane IDs, session dirs, or run IDs in durable `qrspi_result` YAML. In the markdown handoff, label those fields as local/ephemeral and keep durable plan identity (`thoughts/...` paths, artifact paths, latest result) separate from local recovery refs.
+Manager handoff may include `stateFile` because it is an operational recovery note for the same local machine. Do not put `stateFile`, pane IDs, session dirs, or run IDs in durable `qrspi_result` YAML. In the markdown handoff, label those fields as local/ephemeral and keep durable plan identity (`thoughts/...` paths, artifact paths, latest result) separate from local recovery refs. Auto-compaction handoffs are manager operational handoffs: resume from the handoff, then run `manager-ready` so any queued validated child wake flushes to the current parent pane.
 
 The final manager response must be a normal QRSPI-style YAML block so the next manager can discover the handoff artifact. Use `status: handoff`, omit `outcome`, set `artifact` to the manager handoff path, and include `next.steps` that read q-manager, read the handoff, then start `q-manager continue`. The YAML may mention `stateFile` in `summary.key_decisions` only as prose if needed, but must not include machine-local refs as structured fields.
 

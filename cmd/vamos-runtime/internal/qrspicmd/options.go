@@ -44,6 +44,7 @@ type StartNextOptions struct {
 	Timeout           time.Duration
 	Output            string
 	Force             bool
+	Usage             ManagerUsageInput
 }
 
 type StartNextResult struct {
@@ -83,6 +84,18 @@ type ManagerReadyOptions struct {
 	StateFile   string
 	ManagerPane string
 	Output      string
+}
+
+type ManagerUsageInput struct {
+	UsagePercent *float64 `json:"usagePercent,omitempty"`
+	Tokens       *int     `json:"tokens,omitempty"`
+	Window       *int     `json:"window,omitempty"`
+}
+
+type ManagerCompactionOptions struct {
+	StateFile string
+	Usage     ManagerUsageInput
+	Output    string
 }
 
 type ChildCompletionStatus struct {
@@ -205,6 +218,7 @@ type ContinueOptions struct {
 	Split     string
 	Timeout   time.Duration
 	Output    string
+	Usage     ManagerUsageInput
 }
 
 type ContinueResult struct {
