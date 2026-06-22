@@ -199,8 +199,35 @@ type DoctorReport struct {
 	Pi           PiCompatibilityReport
 	Tmux         TmuxHealthReport
 	StateRoot    StateRootReport
+	ActiveChild  *ActiveChildHealth
 	LatestStatus *ChildStatus
 	SafeCommand  string
+}
+
+type ActiveChildHealthStatus string
+
+const (
+	ActiveChildRunning                 ActiveChildHealthStatus = "running"
+	ActiveChildFinishedNeedsValidation ActiveChildHealthStatus = "finished_success_needs_result_validation"
+	ActiveChildLaunchFailed            ActiveChildHealthStatus = "launch_failed"
+	ActiveChildPaneMissing             ActiveChildHealthStatus = "pane_missing"
+	ActiveChildUnknown                 ActiveChildHealthStatus = "unknown"
+)
+
+type ActiveChildHealth struct {
+	Status      ActiveChildHealthStatus `json:"status"`
+	ChildID     string                  `json:"childId,omitempty"`
+	Stage       string                  `json:"stage,omitempty"`
+	PaneID      string                  `json:"paneId,omitempty"`
+	OutputPath  string                  `json:"outputPath,omitempty"`
+	StatusPath  string                  `json:"statusPath,omitempty"`
+	DonePath    string                  `json:"donePath,omitempty"`
+	SessionDir  string                  `json:"sessionDir,omitempty"`
+	SessionPath string                  `json:"sessionPath,omitempty"`
+	ExitCode    *int                    `json:"exitCode,omitempty"`
+	OutputTail  []string                `json:"outputTail,omitempty"`
+	Evidence    []string                `json:"evidence,omitempty"`
+	SafeCommand string                  `json:"safeCommand,omitempty"`
 }
 
 type TmuxHealthReport struct {
@@ -226,6 +253,7 @@ const (
 	ActionManualChildSteer      = "manual_child_steer"
 	ActionSupersededQueuedWake  = "superseded_queued_wake"
 	ActionPiCompatibilityFailed = "pi_compatibility_failed"
+	ActionChildLaunchFailed     = "child_launch_failed"
 )
 
 func ProjectManagerActionCard(action semantic.NextAction, state ManagerState, stateFile string) *ManagerActionCard {

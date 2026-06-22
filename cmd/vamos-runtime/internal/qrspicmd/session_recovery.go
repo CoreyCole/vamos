@@ -34,7 +34,6 @@ type LatestChildCandidate struct {
 }
 
 func RunInspect(ctx context.Context, opts InspectOptions, d deps, out io.Writer) error {
-	_ = ctx
 	if strings.TrimSpace(opts.StateFile) == "" {
 		return errors.New("state-file is required")
 	}
@@ -62,6 +61,9 @@ func RunInspect(ctx context.Context, opts InspectOptions, d deps, out io.Writer)
 	fmt.Fprintf(out, "implementation cwd: %s\n", state.ImplementationCwd)
 	if state.ActiveChild != nil {
 		fmt.Fprintf(out, "active child: %s stage=%s pane=%s session=%s\n", state.ActiveChild.ID, state.ActiveChild.Stage, state.ActiveChild.TmuxPaneID, firstNonEmpty(state.ActiveChild.SessionPath, state.ActiveChild.SessionID))
+		if health, err := InspectActiveChildHealth(ctx, state, opts.StateFile, d); err == nil {
+			fmt.Fprintf(out, "active child health: %s\n", health.Status)
+		}
 		if opts.Sessions {
 			fmt.Fprintf(out, "session dir: %s\n", state.ActiveChild.SessionDir)
 			fmt.Fprintf(out, "validation: %s\n", state.ActiveChild.ValidationStatusPath)

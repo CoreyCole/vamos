@@ -504,9 +504,24 @@ func RunStartNext(ctx context.Context, opts StartNextOptions, d deps, out io.Wri
 		}
 	}
 	if state.ActiveChild != nil {
+		health, err := InspectActiveChildHealth(ctx, state, stateFile, d)
+		if err != nil {
+			return nil, err
+		}
+		if opts.Force && IsTerminalFailedChild(health) {
+			card := BuildChildLaunchFailedCard(health, state, stateFile)
+			if card != nil {
+				state.LastActionCard = card
+				_ = stateStore(d, "", clock).Save(stateFile, state)
+				return nil, writeManagerActionCard(out, *card, opts.Output)
+			}
+		}
 		result.ActiveChild = state.ActiveChild
 		result.CurrentNode = state.ActiveChild.Stage
 		result.StopReason = "active child already running"
+		if health.Status != ActiveChildRunning {
+			result.StopReason = string(health.Status)
+		}
 		result.NextCommand = continueCommand(stateFile)
 		result.FeedbackCommand = feedbackCommand(stateFile)
 		return &result, writeStartNextOutput(out, result, opts.Output)
@@ -1725,6 +1740,18 @@ func RunContinue(ctx context.Context, opts ContinueOptions, d deps, out io.Write
 	}
 	if strings.TrimSpace(opts.Stage) == "" {
 		return errors.New("stage is required")
+	}
+	health, healthErr := InspectActiveChildHealth(ctx, state, opts.StateFile, d)
+	if healthErr != nil {
+		return healthErr
+	}
+	if IsTerminalFailedChild(health) {
+		card := BuildChildLaunchFailedCard(health, state, opts.StateFile)
+		if card != nil {
+			state.LastActionCard = card
+			_ = store.Save(opts.StateFile, state)
+			return writeManagerActionCard(out, *card, opts.Output)
+		}
 	}
 
 	result := ContinueResult{}

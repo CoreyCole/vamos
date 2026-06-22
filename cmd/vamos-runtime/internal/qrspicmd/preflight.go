@@ -141,6 +141,9 @@ func CheckQRSPIPreflight(ctx context.Context, state ManagerState, opts Preflight
 		SafeCommand: continueCommand(opts.StateFile),
 	}
 	if state.ActiveChild != nil {
+		if health, _ := InspectActiveChildHealth(ctx, state, opts.StateFile, d); health.Status != "" {
+			report.ActiveChild = &health
+		}
 		if status, _ := ReadChildStatus(state.ActiveChild.StatusPath); status != nil {
 			report.LatestStatus = status
 		}
@@ -179,6 +182,9 @@ func writeDoctorText(out io.Writer, report DoctorReport) {
 	}
 	fmt.Fprintf(out, "state root: %s\n", okText(report.StateRoot.OK))
 	fmt.Fprintf(out, "tmux: %s\n", okText(report.Tmux.OK))
+	if report.ActiveChild != nil {
+		fmt.Fprintf(out, "active child health: %s\n", report.ActiveChild.Status)
+	}
 	if report.LatestStatus != nil {
 		fmt.Fprintf(out, "latest status: exitCode=%d\n", report.LatestStatus.ExitCode)
 	}
@@ -229,4 +235,39 @@ func BuildPreflightFailedCard(report PiCompatibilityReport, stateFile string) *M
 		evidence = append(evidence, strings.TrimSpace(problem.Summary+": "+problem.Evidence))
 	}
 	return &ManagerActionCard{Kind: ActionPiCompatibilityFailed, Severity: "error", Summary: "Pi CLI incompatible with q-manager child launch", Evidence: evidence, RecommendedAction: "update Pi or adjust q-manager Pi command contract", SafeCommand: fmt.Sprintf("vamos qrspi doctor --state-file %s", stateFile), ContinueCommand: continueCommand(stateFile), RequiresHuman: false}
+}
+
+func BuildChildLaunchFailedCard(health ActiveChildHealth, state ManagerState, stateFile string) *ManagerActionCard {
+	if health.Status != ActiveChildLaunchFailed {
+		return nil
+	}
+	evidence := []string{
+		fmt.Sprintf("stage: %s", firstNonEmpty(health.Stage, string(state.Workflow.CurrentNodeID))),
+		fmt.Sprintf("child: %s", health.ChildID),
+	}
+	if health.PaneID != "" {
+		evidence = append(evidence, fmt.Sprintf("pane: %s", health.PaneID))
+	}
+	if health.ExitCode != nil {
+		evidence = append(evidence, fmt.Sprintf("exitCode: %d", *health.ExitCode))
+	}
+	if health.StatusPath != "" {
+		evidence = append(evidence, fmt.Sprintf("status: %s", health.StatusPath))
+	}
+	for _, line := range health.OutputTail {
+		evidence = append(evidence, "output tail: "+line)
+	}
+	if health.OutputPath != "" {
+		evidence = append(evidence, "full output: "+health.OutputPath)
+	}
+	return &ManagerActionCard{
+		Kind:              ActionChildLaunchFailed,
+		Severity:          "error",
+		Summary:           "child exited before qrspi_result",
+		Evidence:          evidence,
+		RecommendedAction: "clear failed child and relaunch same stage",
+		SafeCommand:       fmt.Sprintf("vamos qrspi repair-state --state-file %s --clear-failed-child --relaunch", stateFile),
+		ContinueCommand:   continueCommand(stateFile),
+		RequiresHuman:     false,
+	}
 }
