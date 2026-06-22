@@ -12,6 +12,7 @@ type ChildRunRequest struct {
 	ID                   string
 	Stage                string
 	Cwd                  string
+	ManagerRunID         string
 	PromptFile           string
 	OutputPath           string
 	SessionID            string
@@ -137,6 +138,7 @@ exit "$status"`
 		"Q_MANAGER_STATE_FILE=" + req.StateFile,
 		"Q_MANAGER_PLAN_DIR=" + req.PlanDir,
 		"Q_MANAGER_STAGE=" + req.Stage,
+		"Q_MANAGER_MANAGER_RUN_ID=" + req.ManagerRunID,
 		"Q_MANAGER_CHILD_ID=" + req.ID,
 		"Q_MANAGER_DONE_PATH=" + req.DonePath,
 		"Q_MANAGER_STATUS_PATH=" + req.StatusPath,

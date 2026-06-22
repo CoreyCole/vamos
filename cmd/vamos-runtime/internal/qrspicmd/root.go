@@ -43,6 +43,11 @@ func newCommand(d deps) *cobra.Command {
 		newManagerReadyCommand(d),
 		newRepairStateCommand(d),
 		newMarkChildActiveCommand(d),
+		newInspectCommand(d),
+		newFindLatestChildCommand(d),
+		newRebindChildCommand(d),
+		newValidateLatestCommand(d),
+		newRecoverManualCommand(d),
 		newValidateResultCommand(d),
 		newDecideNextCommand(d),
 		newRepromptChildCommand(d),
@@ -205,6 +210,87 @@ func newMarkChildActiveCommand(d deps) *cobra.Command {
 	cmd.Flags().StringVar(&opts.ChildID, "child-id", "", "active child ID")
 	cmd.Flags().StringVar(&opts.Reason, "reason", "manual-reprompt", "reason for marking child active")
 	cmd.Flags().StringVar(&opts.Output, "output", "text", "output format: text or ndjson")
+	return cmd
+}
+
+func newInspectCommand(d deps) *cobra.Command {
+	opts := InspectOptions{Output: "text"}
+	cmd := &cobra.Command{
+		Use:   "inspect --state-file <file>",
+		Short: "Inspect q-manager state and child linkage",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return RunInspect(cmd.Context(), opts, d, cmd.OutOrStdout())
+		},
+	}
+	cmd.Flags().StringVar(&opts.StateFile, "state-file", "", "q-manager state file")
+	cmd.Flags().BoolVar(&opts.Sessions, "sessions", false, "include active child session refs")
+	cmd.Flags().BoolVar(&opts.Latest, "latest", false, "include latest relevant session candidate")
+	cmd.Flags().StringVar(&opts.Output, "output", "text", "output format: text or json")
+	return cmd
+}
+
+func newFindLatestChildCommand(d deps) *cobra.Command {
+	opts := FindLatestChildOptions{Output: "text"}
+	cmd := &cobra.Command{
+		Use:   "find-latest-child --state-file <file>",
+		Short: "Find the latest relevant q-manager child session",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return RunFindLatestChild(cmd.Context(), opts, d, cmd.OutOrStdout())
+		},
+	}
+	cmd.Flags().StringVar(&opts.StateFile, "state-file", "", "q-manager state file")
+	cmd.Flags().StringVar(&opts.Stage, "stage", "", "expected QRSPI node ID")
+	cmd.Flags().StringVar(&opts.Output, "output", "text", "output format: text or json")
+	return cmd
+}
+
+func newRebindChildCommand(d deps) *cobra.Command {
+	opts := RebindChildOptions{Output: "text", Reason: "manual-new"}
+	cmd := &cobra.Command{
+		Use:   "rebind-child --state-file <file> --session-file <jsonl>",
+		Short: "Rebind active child to a manually advanced session",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return RunRebindChild(cmd.Context(), opts, d, cmd.OutOrStdout())
+		},
+	}
+	cmd.Flags().StringVar(&opts.StateFile, "state-file", "", "q-manager state file")
+	cmd.Flags().StringVar(&opts.SessionFile, "session-file", "", "child Pi session JSONL file")
+	cmd.Flags().StringVar(&opts.Stage, "stage", "", "expected QRSPI node ID")
+	cmd.Flags().StringVar(&opts.Reason, "reason", "manual-new", "rebind reason")
+	cmd.Flags().StringVar(&opts.Output, "output", "text", "output format: text or json")
+	return cmd
+}
+
+func newValidateLatestCommand(d deps) *cobra.Command {
+	opts := ValidateLatestOptions{Output: "text"}
+	cmd := &cobra.Command{
+		Use:   "validate-latest --state-file <file>",
+		Short: "Validate the latest relevant child session",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return RunValidateLatest(cmd.Context(), opts, d, cmd.OutOrStdout())
+		},
+	}
+	cmd.Flags().StringVar(&opts.StateFile, "state-file", "", "q-manager state file")
+	cmd.Flags().StringVar(&opts.Stage, "stage", "", "expected QRSPI node ID")
+	cmd.Flags().BoolVar(&opts.ApplyRebind, "apply-rebind", false, "rebind active child before validating")
+	cmd.Flags().BoolVar(&opts.Continue, "continue", false, "continue graph after validation")
+	cmd.Flags().StringVar(&opts.Output, "output", "text", "output format: text or json")
+	return cmd
+}
+
+func newRecoverManualCommand(d deps) *cobra.Command {
+	opts := RecoverManualOptions{Output: "text", Mode: "latest-session"}
+	cmd := &cobra.Command{
+		Use:   "recover-manual --state-file <file> --mode latest-session",
+		Short: "Recover q-manager after manual child interaction",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return RunRecoverManual(cmd.Context(), opts, d, cmd.OutOrStdout())
+		},
+	}
+	cmd.Flags().StringVar(&opts.StateFile, "state-file", "", "q-manager state file")
+	cmd.Flags().StringVar(&opts.Mode, "mode", "latest-session", "recovery mode")
+	cmd.Flags().BoolVar(&opts.Continue, "continue", false, "continue graph after rebind/validation")
+	cmd.Flags().StringVar(&opts.Output, "output", "text", "output format: text or json")
 	return cmd
 }
 
@@ -791,10 +877,15 @@ func RunChild(ctx context.Context, opts RunChildOptions, d deps, out io.Writer) 
 	if err != nil {
 		return err
 	}
+	managerRunID := strings.TrimSpace(opts.ManagerRunID)
+	if managerRunID == "" {
+		managerRunID = state.ManagerRunID
+	}
 	req := ChildRunRequest{
 		ID:                   childID,
 		Stage:                opts.Stage,
 		Cwd:                  opts.Cwd,
+		ManagerRunID:         managerRunID,
 		PromptFile:           opts.PromptFile,
 		OutputPath:           OutputPath(runRoot, childID),
 		SessionID:            ChildSessionID(childID),

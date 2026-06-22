@@ -84,10 +84,15 @@ vamos qrspi validate-result --state-file "$STATE" --stage <node> --plan-dir <pla
 vamos qrspi reprompt-child --state-file "$STATE" --plan-dir <plan-dir> --stage <node> --attempt <n> --error-file <validation-error-file>
 vamos qrspi repair-state --state-file "$STATE" --align-active-child
 vamos qrspi mark-child-active --state-file "$STATE" --child-id <id> --reason manual-reprompt
+vamos qrspi inspect --state-file "$STATE" --sessions --latest
+vamos qrspi find-latest-child --state-file "$STATE" --stage <node>
+vamos qrspi rebind-child --state-file "$STATE" --session-file <jsonl> --stage <node> --reason manual-new
+vamos qrspi validate-latest --state-file "$STATE" --stage <node> --apply-rebind
+vamos qrspi recover-manual --state-file "$STATE" --mode latest-session --continue
 vamos qrspi decide-next --state-file "$STATE" --plan-dir <plan-dir>
 ```
 
-Manual/debug overrides: `--session-file <jsonl>` validates a specific child session JSONL. `--result-file <path>` is deprecated fallback for plaintext result files only when no active child session refs are available.
+Manual/debug overrides: `--session-file <jsonl>` validates a specific child session JSONL. `--result-file <path>` is deprecated fallback for plaintext result files only when no active child session refs are available. Prefer latest-session recovery commands over state-file edits when a human chatted in the same child pane or used child `/new`.
 
 ### Runtime CLI testing with `go run`
 
@@ -119,7 +124,8 @@ If validation fails and policy retry budget remains, `continue`/CLI retry suppor
 - Human gate, blocked, error, or retry exhaustion: keep pane/session for inspection and human steering.
 - Action cards are the first-class manager UX for repairable failures: `state_desync`, `graph_outcome_mismatch`, `workspace_moved`, `active_child_conflict`, `human_gate`, `invalid_child_yaml`, `manual_child_steer`, and `superseded_queued_wake`.
 - If `repair-state --align-active-child` is offered, use it only when active child/session/artifact evidence proves the cursor is stale; then run the paired `continue` command.
-- If you manually steer/reprompt a child after a wake queued, run `mark-child-active` so the child generation increments and stale queued wakes are superseded; `manager-ready` should then wait for the newer completion instead of flushing stale payload.
+- If a human manually continued the active child or used child `/new`, run `inspect --latest` or `find-latest-child`, then `validate-latest --apply-rebind` or `recover-manual --mode latest-session --continue`. Do not edit manager JSON with jq/python.
+- If you manually steer/reprompt a child after a wake queued, run `mark-child-active` or rebind/recover the latest session so the child generation increments and stale queued wakes are superseded; `manager-ready` should then wait for the newer completion instead of flushing stale payload.
 - Valid transition with `startNext=true`: mark old child pending cleanup; start next child; kill old pane only after the new active child is saved.
 - Next-child launch failure or cleanup failure: preserve refs in manager state for recovery.
 

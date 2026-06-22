@@ -238,6 +238,42 @@ type MarkChildActiveOptions struct {
 	Output    string
 }
 
+type InspectOptions struct {
+	StateFile string
+	Sessions  bool
+	Latest    bool
+	Output    string
+}
+
+type FindLatestChildOptions struct {
+	StateFile string
+	Stage     string
+	Output    string
+}
+
+type RebindChildOptions struct {
+	StateFile   string
+	SessionFile string
+	Stage       string
+	Reason      string
+	Output      string
+}
+
+type ValidateLatestOptions struct {
+	StateFile   string
+	Stage       string
+	ApplyRebind bool
+	Continue    bool
+	Output      string
+}
+
+type RecoverManualOptions struct {
+	StateFile string
+	Mode      string
+	Continue  bool
+	Output    string
+}
+
 type ValidationRecoveryLog struct {
 	Timestamp        time.Time `json:"timestamp"`
 	StateFile        string    `json:"stateFile,omitempty"`
