@@ -103,7 +103,7 @@ After `start-next`, do not poll. Wait for the validated pasted wake, then run `g
 
 q-manager loads a project-local child Pi extension only for q-manager child sessions. The extension/CLI should wake the manager only after validated manager-needed state exists: a graph-valid result, a human/block/error stop, a safe next action, or retry exhaustion. Intermediate invalid/missing YAML, parser retries, and Codex/SSE header noise are local child/CLI retry state, not manager wakes.
 
-The manager CLI/extension owns the exact wake text so it stays deterministic, testable, and versioned with runtime behavior. The skill should only define the semantic contract: wake is one atomic parent prompt, includes validation flags (`validated`, `manager_needed`, `retry_exhausted`), includes stage/status/outcome/artifact when known, includes enough local recovery context to find the manager state (`state_file`), and points to the single continue command. Do not let the skill become the source of truth for copy/paste wake templates.
+The manager CLI/extension owns the exact wake text so it stays deterministic, testable, and versioned with runtime behavior. The Pi child extension invokes Go `qrspi child-complete`; Go is responsible for parsing, deterministic positive outcome normalization, `validation-status.json` generation, and deliver/queue/suppress decisions. The skill should only define the semantic contract: wake is one atomic parent prompt, includes validation flags (`validated`, `manager_needed`, `retry_exhausted`), includes stage/status/outcome/artifact when known, includes enough local recovery context to find the manager state (`state_file`), and points to the single continue command. Do not let the skill become the source of truth for copy/paste wake templates.
 
 `retry_exhausted=true` means automated correction failed. The manager should inspect child output/artifacts, recover or steer deterministically when evidence is sufficient, and ask the human only when intent, safety, product judgment, workspace replacement, merge policy, or external authority is required.
 
@@ -111,7 +111,7 @@ The wake may include `state_file` because that is ephemeral manager control cont
 
 ## Result retry
 
-If validation fails and policy retry budget remains, `continue`/CLI retry support should run `reprompt-child` with the validation error file. It pastes/injects the canonical QRSPI parser correction prompt into the same active child pane/session as one atomic prompt; do not create a new child ID/session and do not manually paste extra multiline correction prose. If retry budget is exhausted, emit one manager-needed retry-exhausted notice with deterministic-recovery-first guidance; inspect/steer/recover before asking the human.
+If validation fails and policy retry budget remains, `continue`/CLI retry support should run `reprompt-child` with the validation error file. It pastes/injects the canonical QRSPI parser correction prompt into the same active child pane/session as one atomic prompt; do not create a new child ID/session and do not manually paste extra multiline correction prose. If the only problem is deterministic positive wording, the CLI should normalize before retrying. If retry budget is exhausted, emit one manager-needed retry-exhausted notice with deterministic-recovery-first guidance; inspect/steer/recover before asking the human.
 
 ## Cleanup and recovery
 
@@ -119,7 +119,7 @@ If validation fails and policy retry budget remains, `continue`/CLI retry suppor
 - Human gate, blocked, error, or retry exhaustion: keep pane/session for inspection and human steering.
 - Action cards are the first-class manager UX for repairable failures: `state_desync`, `graph_outcome_mismatch`, `workspace_moved`, `active_child_conflict`, `human_gate`, `invalid_child_yaml`, `manual_child_steer`, and `superseded_queued_wake`.
 - If `repair-state --align-active-child` is offered, use it only when active child/session/artifact evidence proves the cursor is stale; then run the paired `continue` command.
-- If you manually steer/reprompt a child after a wake queued, run `mark-child-active` so the child generation increments and stale queued wakes are not flushed.
+- If you manually steer/reprompt a child after a wake queued, run `mark-child-active` so the child generation increments and stale queued wakes are superseded; `manager-ready` should then wait for the newer completion instead of flushing stale payload.
 - Valid transition with `startNext=true`: mark old child pending cleanup; start next child; kill old pane only after the new active child is saved.
 - Next-child launch failure or cleanup failure: preserve refs in manager state for recovery.
 

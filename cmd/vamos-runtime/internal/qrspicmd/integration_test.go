@@ -490,6 +490,76 @@ func TestContinueInvalidResultRetryExhaustionEmitsManagerNotice(t *testing.T) {
 	}
 }
 
+func TestValidatedWakeHappyPathEndToEnd(t *testing.T) {
+	fixture := newManagerFlowFixture(t)
+	runner := &fakeChildRunner{panes: []string{"%child", "%next"}}
+	start, err := RunStartNext(t.Context(), StartNextOptions{PlanDir: fixture.planDir, ProjectRoot: fixture.projectRoot, ManagerPane: "%parent"}, deps{StateRoot: fixture.stateRootFunc, Clock: fixture.clock, Runner: runner}, &bytes.Buffer{})
+	if err != nil {
+		t.Fatalf("RunStartNext error = %v", err)
+	}
+	state := loadManagerState(t, start.StateFile)
+	if state.ActiveChild == nil || state.ActiveChild.ValidationStatusPath == "" {
+		t.Fatalf("active child = %+v, want validation status path", state.ActiveChild)
+	}
+	sessionPath := state.ActiveChild.SessionPath
+	if sessionPath == "" {
+		sessionPath = filepath.Join(state.ActiveChild.SessionDir, "session.jsonl")
+	}
+	writeSessionTestFile(t, sessionPath, sessionHeader(state.ActiveChild.SessionID, fixture.projectRoot)+"\n"+assistantLine(testResultYAML("question", "complete", "complete", "thoughts/example/questions/q.md", ""))+"\n")
+
+	tmux := &recordingTmux{}
+	status, err := RunChildComplete(t.Context(), ChildCompletionOptions{StateFile: start.StateFile, ChildID: state.ActiveChild.ID}, deps{Tmux: tmux}, &bytes.Buffer{})
+	if err != nil {
+		t.Fatalf("RunChildComplete error = %v", err)
+	}
+	if !status.Validated || status.Wake.Mode != "deliver" || len(tmux.pastes) != 1 || !strings.Contains(tmux.pastes[0].text, "q_manager_child_wake") {
+		t.Fatalf("status=%+v pastes=%#v", status, tmux.pastes)
+	}
+	if _, err := os.Stat(state.ActiveChild.ValidationStatusPath); err != nil {
+		t.Fatalf("validation status not written: %v", err)
+	}
+
+	continueOut, err := executeManagerCommand(deps{Clock: fixture.clock, Runner: runner, Tmux: &recordingTmux{}}, "continue", "--state-file", start.StateFile, "--plan-dir", fixture.planDir)
+	if err != nil {
+		t.Fatalf("continue command error = %v", err)
+	}
+	for _, want := range []string{"validated: question complete", "next: research", "started child: research"} {
+		if !strings.Contains(continueOut, want) {
+			t.Fatalf("continue output missing %q: %q", want, continueOut)
+		}
+	}
+}
+
+func TestContinueActionCardsAreConciseAndDeterministic(t *testing.T) {
+	fixture := newManagerFlowFixture(t)
+	stateFile := filepath.Join(fixture.stateRoot, "desync-state.json")
+	state := ManagerState{
+		RepoID:           fixture.projectRoot,
+		CanonicalPlanDir: fixture.planDir,
+		SourceCwd:        fixture.projectRoot,
+		Workflow:         testWorkflowState(t, qrspi.NodeReviewPlan, nil),
+	}
+	saveManagerState(t, stateFile, state)
+	out, err := executeManagerCommand(deps{Clock: fixture.clock}, "continue", "--state-file", stateFile, "--plan-dir", fixture.planDir)
+	if err != nil {
+		t.Fatalf("continue command error = %v", err)
+	}
+	for _, want := range []string{"action: active_child_conflict", "recommended: start or inspect the graph-selected child", "safe command: vamos qrspi start-next --state-file " + stateFile} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("action card output missing %q: %q", want, out)
+		}
+	}
+	for _, forbidden := range []string{"rawYaml", "workflow:", "{\"type\":"} {
+		if strings.Contains(out, forbidden) {
+			t.Fatalf("action card output contains %q: %q", forbidden, out)
+		}
+	}
+	loaded := loadManagerState(t, stateFile)
+	if loaded.LastActionCard == nil || loaded.LastActionCard.Kind != ActionActiveChildConflict {
+		t.Fatalf("last action card = %+v", loaded.LastActionCard)
+	}
+}
+
 func TestEndToEndCommandSurface(t *testing.T) {
 	fixture := newManagerFlowFixture(t)
 	runner := &fakeChildRunner{writeResult: true}

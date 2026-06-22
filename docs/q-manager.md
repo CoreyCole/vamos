@@ -26,7 +26,7 @@ Child QRSPI work runs in a visible tmux pane, usually a right split. Humans must
 
 ## Child wake contract
 
-q-manager child sessions load a local Pi extension plus CLI validation loop. A normal parent wake is a validated manager-needed event, not raw `agent_end`. The extension may still write child `status.json` and touch `done` as diagnostics, but those files are not authoritative manager triggers.
+q-manager child sessions load a local Pi extension plus CLI validation loop. A normal parent wake is a validated manager-needed event, not raw `agent_end`. The extension invokes Go `qrspi child-complete`; Go reads the child session JSONL, validates/normalizes the result, generates `validation-status.json`, and delivers/queues the wake. The extension may still write child `status.json` and touch `done` as diagnostics, but those files are not authoritative manager triggers.
 
 Wake YAML includes validation state and resolved child result context:
 
@@ -47,9 +47,9 @@ q_manager_child_wake:
         param: "vamos qrspi continue --state-file <state-file>"
 ```
 
-Intermediate invalid/missing `qrspi_result` turns, parser retries, and Codex/SSE header noise are suppressed from manager chat while deterministic repair remains possible. Retry exhaustion emits one manager-needed wake with `validated=false`, `retry_exhausted=true`, attempt/limit context, child refs, and deterministic-recovery-first guidance.
+Intermediate invalid/missing `qrspi_result` turns, parser retries, and Codex/SSE header noise are suppressed from manager chat while deterministic repair remains possible. Retry exhaustion emits one manager-needed wake with `validated=false`, `retry_exhausted=true`, attempt/limit context, child refs, and deterministic-recovery-first guidance. Do not hand-author `validation-status.json`; it is generated runtime state for child-side logging and manager wake gating.
 
-The manager normally runs `continue`, which validates the active child session JSONL, reprompts the same child when retry remains, persists the canonical graph decision for valid results, starts the graph-selected next child when safe, and cleans the old pane only after the next child exists. `start-next` / `continue` may accept explicit manager usage flags (`--manager-usage-percent` or `--manager-usage-tokens` + `--manager-usage-window`); when usage is above 80%, q-manager writes an operational handoff, marks delivery `compacting`, and queues child wakes until `manager-ready` flushes them.
+The manager normally runs `continue`, which validates the active child session JSONL, reprompts the same child when retry remains, persists the canonical graph decision for valid results, starts the graph-selected next child when safe, and cleans the old pane only after the next child exists. Slight positive wording mistakes are normalized only when deterministic from node/status/workspace context, such as `review-outline` + `status: complete` + `outcome: complete` becoming `ready-for-plan`; ambiguous, negative, human, blocked, or follow-up outcomes still reprompt or stop. `start-next` / `continue` may accept explicit manager usage flags (`--manager-usage-percent` or `--manager-usage-tokens` + `--manager-usage-window`); when usage is above 80%, q-manager writes an operational handoff, marks delivery `compacting`, and queues child wakes until `manager-ready` flushes them.
 
 Default `continue` output is concise text for manager chat, not the raw validate/decide NDJSON dump:
 

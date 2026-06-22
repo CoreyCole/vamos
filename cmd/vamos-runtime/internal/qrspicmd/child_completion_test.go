@@ -78,6 +78,45 @@ func TestChildCompleteWritesValidatedStatus(t *testing.T) {
 	}
 }
 
+func TestLenientPositiveOutcomeEndToEnd(t *testing.T) {
+	dir := t.TempDir()
+	stateFile := filepath.Join(dir, "state.json")
+	repo := filepath.Join(dir, "repo")
+	sessionDir := filepath.Join(dir, "sessions")
+	sessionPath := writePiSession(t, sessionDir, "session.jsonl", "session-1", repo, assistantLine(testResultYAML("review-plan", "complete", "complete", "thoughts/example/reviews/plan/review.md", "")))
+	state := ManagerState{
+		CanonicalPlanDir: "thoughts/example",
+		ManagerPaneID:    "%parent",
+		Workflow:         testWorkflowState(t, qrspi.NodeReviewPlan, nil),
+		ActiveChild: &ChildRunRef{
+			ID:                   "child-1",
+			Stage:                "review-plan",
+			Cwd:                  repo,
+			SessionID:            "session-1",
+			SessionDir:           sessionDir,
+			SessionPath:          sessionPath,
+			ValidationStatusPath: filepath.Join(dir, "validation-status.json"),
+			Generation:           1,
+		},
+	}
+	saveManagerState(t, stateFile, state)
+
+	status, err := RunChildComplete(t.Context(), ChildCompletionOptions{StateFile: stateFile, ChildID: "child-1"}, deps{Tmux: &recordingTmux{}}, &strings.Builder{})
+	if err != nil {
+		t.Fatalf("RunChildComplete error = %v", err)
+	}
+	if !status.Validated || status.Result.Outcome != "ready-for-workspace" || len(status.Normalizations) != 1 {
+		t.Fatalf("status = %+v", status)
+	}
+	if status.Normalizations[0].Original != "complete" || status.Normalizations[0].Canonical != "ready-for-workspace" {
+		t.Fatalf("normalization = %+v", status.Normalizations[0])
+	}
+	loaded := loadManagerState(t, stateFile)
+	if loaded.Workflow.CurrentNodeID != qrspi.NodeReviewPlan {
+		t.Fatalf("child-complete advanced workflow to %q; want still review-plan", loaded.Workflow.CurrentNodeID)
+	}
+}
+
 func TestChildCompleteManagerAwareReviewPlanNormalization(t *testing.T) {
 	dir := t.TempDir()
 	stateFile := filepath.Join(dir, "state.json")
