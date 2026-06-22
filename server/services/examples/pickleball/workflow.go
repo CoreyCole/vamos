@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -12,6 +13,7 @@ import (
 
 	"github.com/CoreyCole/vamos/pkg/agents/generatedgo"
 	temporalmgr "github.com/CoreyCole/vamos/pkg/agents/temporal"
+	"github.com/CoreyCole/vamos/server/services/appletruntime"
 	"go.temporal.io/api/enums/v1"
 	"go.temporal.io/api/serviceerror"
 	"go.temporal.io/sdk/client"
@@ -20,9 +22,18 @@ import (
 )
 
 const (
-	WorkflowPickleballSelfModify    = "pickleball-self-modify"
+	WorkflowPickleballSelfModify       = "pickleball-self-modify"
+	ActivityPickleballCreateIteration  = "CreateIteration"
+	ActivityPickleballRunAppletEdit    = "RunAppletEdit"
+	ActivityPickleballBuildIteration   = "BuildIteration"
+	ActivityPickleballStartIteration   = "StartIteration"
+	ActivityPickleballPromoteIteration = "PromoteIteration"
+	ActivityPickleballFailIteration    = "FailIteration"
+
+	// Legacy activity names kept for cheap compatibility with older tests/registrations.
 	ActivityPickleballRunAIEdits    = "RunAIEdits"
 	ActivityPickleballBuildSnapshot = "BuildAndSnapshot"
+
 	generatedBuildIDTimestampLayout = "20060102-150405"
 	maxPromptSummaryLength          = 96
 )
@@ -36,6 +47,10 @@ type AIGenerateInput struct {
 
 type AIGenerator interface {
 	ApplyPrompt(ctx context.Context, input AIGenerateInput) error
+}
+
+type AppletEditor interface {
+	ApplyPrompt(ctx context.Context, input AppletEditInput) (AppletEditResult, error)
 }
 
 type SelfModifyWorkflowInput struct {
@@ -53,6 +68,8 @@ type temporalWorkflowStarter struct {
 }
 
 type generatedRunner struct{}
+
+type promptPatchAppletEditor struct{}
 
 func NewTemporalWorkflowStarter(c client.Client) WorkflowStarter {
 	return temporalWorkflowStarter{client: c}
@@ -81,20 +98,168 @@ func (s temporalWorkflowStarter) StartPickleballSelfModify(ctx context.Context, 
 }
 
 func SelfModifyWorkflow(ctx workflow.Context, input SelfModifyWorkflowInput) error {
-	editCtx := workflow.WithActivityOptions(ctx, workflow.ActivityOptions{
+	activityCtx := workflow.WithActivityOptions(ctx, workflow.ActivityOptions{
 		StartToCloseTimeout: 30 * time.Minute,
 		HeartbeatTimeout:    time.Minute,
 		RetryPolicy:         &temporal.RetryPolicy{MaximumAttempts: 1},
 	})
-	if err := workflow.ExecuteActivity(editCtx, ActivityPickleballRunAIEdits, input).Get(editCtx, nil); err != nil {
+
+	var spec IterationSpec
+	if err := workflow.ExecuteActivity(activityCtx, ActivityPickleballCreateIteration, input).Get(activityCtx, &spec); err != nil {
 		return err
 	}
+	var edit AppletEditResult
+	if err := workflow.ExecuteActivity(activityCtx, ActivityPickleballRunAppletEdit, input, spec).Get(activityCtx, &edit); err != nil {
+		_ = workflow.ExecuteActivity(activityCtx, ActivityPickleballFailIteration, input, err.Error()).Get(activityCtx, nil)
+		return err
+	}
+	if err := workflow.ExecuteActivity(activityCtx, ActivityPickleballBuildIteration, input, spec).Get(activityCtx, nil); err != nil {
+		_ = workflow.ExecuteActivity(activityCtx, ActivityPickleballFailIteration, input, err.Error()).Get(activityCtx, nil)
+		return err
+	}
+	var proc appletruntime.ProcessState
+	if err := workflow.ExecuteActivity(activityCtx, ActivityPickleballStartIteration, input, spec).Get(activityCtx, &proc); err != nil {
+		_ = workflow.ExecuteActivity(activityCtx, ActivityPickleballFailIteration, input, err.Error()).Get(activityCtx, nil)
+		return err
+	}
+	return workflow.ExecuteActivity(activityCtx, ActivityPickleballPromoteIteration, input, spec, edit, proc).Get(activityCtx, nil)
+}
 
-	buildCtx := workflow.WithActivityOptions(ctx, workflow.ActivityOptions{
-		StartToCloseTimeout: 5 * time.Minute,
-		RetryPolicy:         &temporal.RetryPolicy{MaximumAttempts: 1},
+func (a *SelfModifyActivities) CreateIteration(ctx context.Context, input SelfModifyWorkflowInput) (IterationSpec, error) {
+	svc, err := a.service()
+	if err != nil {
+		return IterationSpec{}, err
+	}
+	session, err := svc.markBuilding(ctx, input.SessionID)
+	if err != nil {
+		return IterationSpec{}, err
+	}
+	iterationID := newBuildID(input.Prompt)
+	iterationDir := filepath.Join(svc.opts.IterationsDir, iterationID)
+	if err := os.RemoveAll(iterationDir); err != nil {
+		return IterationSpec{}, fmt.Errorf("clear hidden iteration: %w", err)
+	}
+	if err := copyDir(svc.opts.CurrentAppDir, iterationDir); err != nil {
+		_ = svc.MarkFailed(ctx, session.ID, err, "")
+		return IterationSpec{}, fmt.Errorf("create hidden iteration: %w", err)
+	}
+	return IterationSpec{IterationID: iterationID, SourceDir: iterationDir, FilesRoot: svc.opts.FilesRoot}, nil
+}
+
+func (a *SelfModifyActivities) RunAppletEdit(ctx context.Context, input SelfModifyWorkflowInput, spec IterationSpec) (AppletEditResult, error) {
+	svc, err := a.service()
+	if err != nil {
+		return AppletEditResult{}, err
+	}
+	editor := svc.opts.AppletEditor
+	if editor == nil {
+		editor = promptPatchAppletEditor{}
+	}
+	result, err := editor.ApplyPrompt(ctx, AppletEditInput{
+		Prompt:        input.Prompt,
+		FilesRoot:     svc.opts.FilesRoot,
+		CurrentAppDir: svc.opts.CurrentAppDir,
+		IterationDir:  spec.SourceDir,
+		UserEmail:     input.UserEmail,
 	})
-	return workflow.ExecuteActivity(buildCtx, ActivityPickleballBuildSnapshot, input).Get(buildCtx, nil)
+	if err != nil {
+		return result, err
+	}
+	return result, nil
+}
+
+func (a *SelfModifyActivities) BuildIteration(ctx context.Context, _ SelfModifyWorkflowInput, spec IterationSpec) error {
+	if _, err := a.service(); err != nil {
+		return err
+	}
+	cmd := exec.CommandContext(ctx, "go", "test", "./...")
+	cmd.Dir = spec.SourceDir
+	cmd.Env = os.Environ()
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("check applet iteration: %w: %s", err, tailString(string(out), maxLogTailBytes))
+	}
+	return nil
+}
+
+func (a *SelfModifyActivities) StartIteration(ctx context.Context, _ SelfModifyWorkflowInput, spec IterationSpec) (appletruntime.ProcessState, error) {
+	svc, err := a.service()
+	if err != nil {
+		return appletruntime.ProcessState{}, err
+	}
+	runtime := svc.opts.AppletRuntime
+	if runtime == nil {
+		return appletruntime.ProcessState{}, fmt.Errorf("pickleball applet runtime is disabled")
+	}
+	return runtime.Start(ctx, appletruntime.RuntimeConfig{
+		AppID:        "pickleball",
+		FilesRoot:    svc.opts.FilesRoot,
+		SourceDir:    spec.SourceDir,
+		StartCommand: []string{"go", "run", "."},
+		HealthPath:   "/healthz",
+	})
+}
+
+func (a *SelfModifyActivities) PromoteIteration(ctx context.Context, input SelfModifyWorkflowInput, spec IterationSpec, edit AppletEditResult, _ appletruntime.ProcessState) error {
+	svc, err := a.service()
+	if err != nil {
+		return err
+	}
+	if err := replaceDir(spec.SourceDir, svc.opts.CurrentAppDir); err != nil {
+		_ = svc.MarkFailed(ctx, input.SessionID, err, "")
+		return fmt.Errorf("promote hidden iteration: %w", err)
+	}
+	message := strings.TrimSpace(edit.UserSummary)
+	if message == "" {
+		message = "Done — I updated the app and files."
+	}
+	return svc.PromoteIteration(ctx, input.SessionID, IterationResult{
+		IterationID:  spec.IterationID,
+		SourceDir:    spec.SourceDir,
+		ChangedFiles: edit.ChangedFiles,
+		UserMessage:  message,
+	})
+}
+
+func (a *SelfModifyActivities) FailIteration(ctx context.Context, input SelfModifyWorkflowInput, cause string) error {
+	svc, err := a.service()
+	if err != nil {
+		return err
+	}
+	return svc.MarkFailed(ctx, input.SessionID, errors.New(strings.TrimSpace(cause)), "")
+}
+
+func (a *SelfModifyActivities) service() (*Service, error) {
+	if a == nil || a.Service == nil {
+		return nil, fmt.Errorf("pickleball service is required")
+	}
+	return a.Service, nil
+}
+
+func (s *Service) PromoteIteration(ctx context.Context, sessionID string, result IterationResult) error {
+	if strings.TrimSpace(result.IterationID) == "" {
+		return fmt.Errorf("iteration id is required")
+	}
+	session, err := s.store.LoadSession(ctx, sessionID)
+	if err != nil {
+		return err
+	}
+	session.CurrentIterationID = result.IterationID
+	session.LastGoodIterationID = result.IterationID
+	session.State = AppStateSucceeded
+	session.ActiveRunID = ""
+	if strings.TrimSpace(result.UserMessage) == "" {
+		session.UserMessage = "Done — I updated the app and files."
+	} else {
+		session.UserMessage = result.UserMessage
+	}
+	session.ErrorMessage = ""
+	session.LogTail = ""
+	if err := s.store.SaveSession(ctx, session); err != nil {
+		return err
+	}
+	s.notify(session.ID)
+	return nil
 }
 
 func (a *SelfModifyActivities) RunAIEdits(ctx context.Context, input SelfModifyWorkflowInput) error {
@@ -252,6 +417,7 @@ func (s *Service) markBuilding(ctx context.Context, sessionID string) (Picklebal
 		return PickleballSession{}, err
 	}
 	session.State = AppStateBuilding
+	session.UserMessage = "I'm checking the new version. Your current app stays available."
 	session.ErrorMessage = ""
 	session.LogTail = ""
 	if err := s.store.SaveSession(ctx, session); err != nil {
@@ -259,6 +425,26 @@ func (s *Service) markBuilding(ctx context.Context, sessionID string) (Picklebal
 	}
 	s.notify(session.ID)
 	return session, nil
+}
+
+func replaceDir(src, dst string) error {
+	parent := filepath.Dir(dst)
+	tmp := filepath.Join(parent, "."+filepath.Base(dst)+"-promote-"+time.Now().UTC().Format("20060102150405.000000000"))
+	backup := filepath.Join(parent, "."+filepath.Base(dst)+"-previous-"+time.Now().UTC().Format("20060102150405.000000000"))
+	if err := copyDir(src, tmp); err != nil {
+		return err
+	}
+	if err := os.Rename(dst, backup); err != nil && !errors.Is(err, os.ErrNotExist) {
+		_ = os.RemoveAll(tmp)
+		return err
+	}
+	if err := os.Rename(tmp, dst); err != nil {
+		_ = os.Rename(backup, dst)
+		_ = os.RemoveAll(tmp)
+		return err
+	}
+	_ = os.RemoveAll(backup)
+	return nil
 }
 
 func pathJoinSlash(parts ...string) string {
@@ -304,8 +490,8 @@ func promptSummary(prompt string) string {
 	return prompt
 }
 
-// PromptPatchGenerator is the built-in local edit adapter for the reusable demo.
-// Hosts can replace it with an Agent Chat/Pi-backed generator through Options.
+// PromptPatchGenerator is the legacy one-shot local edit adapter. It remains for older tests only;
+// product applet editing is routed through AppletEditor.
 type PromptPatchGenerator struct{}
 
 func (PromptPatchGenerator) ApplyPrompt(ctx context.Context, input AIGenerateInput) error {
@@ -328,6 +514,29 @@ func (PromptPatchGenerator) ApplyPrompt(ctx context.Context, input AIGenerateInp
 		return fmt.Errorf("write generated bundle: %w", err)
 	}
 	return nil
+}
+
+func (promptPatchAppletEditor) ApplyPrompt(ctx context.Context, input AppletEditInput) (AppletEditResult, error) {
+	if err := ctx.Err(); err != nil {
+		return AppletEditResult{}, err
+	}
+	mainPath := filepath.Join(input.IterationDir, "main.go")
+	data, err := os.ReadFile(mainPath)
+	if err != nil {
+		return AppletEditResult{}, fmt.Errorf("read applet source: %w", err)
+	}
+	source := string(data)
+	marker := "// Last friendly prompt: " + promptSummary(input.Prompt) + "\n"
+	if strings.Contains(source, "// Last friendly prompt:") {
+		re := regexp.MustCompile(`(?m)^// Last friendly prompt:.*\n`)
+		source = re.ReplaceAllString(source, marker)
+	} else {
+		source = marker + source
+	}
+	if err := os.WriteFile(mainPath, []byte(source), 0o644); err != nil {
+		return AppletEditResult{}, fmt.Errorf("write applet source: %w", err)
+	}
+	return AppletEditResult{ChangedFiles: []string{"apps/current/main.go"}, UserSummary: "Done — I updated the app and files."}, nil
 }
 
 func replaceFirstStringField(source, field, value string) string {

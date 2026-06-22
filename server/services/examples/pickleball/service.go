@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/CoreyCole/vamos/pkg/agents/generatedgo"
+	"github.com/CoreyCole/vamos/server/services/appletruntime"
 )
 
 const (
@@ -28,6 +29,11 @@ type Options struct {
 	Runner          Runner
 	WorkflowStarter WorkflowStarter
 	AIGenerator     AIGenerator
+	AppletEditor    AppletEditor
+	AppletRuntime   appletruntime.Manager
+	FilesRoot       string
+	CurrentAppDir   string
+	IterationsDir   string
 	Notifier        Notifier
 }
 
@@ -68,6 +74,24 @@ func NewService(opts Options) (*Service, error) {
 	if strings.TrimSpace(opts.SeedBundleDir) == "" {
 		opts.SeedBundleDir = defaultSeedDir
 	}
+	if opts.FilesRoot == "" {
+		opts.FilesRoot = filepath.Join("examples", "pickleball", "files")
+	}
+	if opts.FilesRoot, err = filepath.Abs(opts.FilesRoot); err != nil {
+		return nil, fmt.Errorf("resolve pickleball files root: %w", err)
+	}
+	if opts.CurrentAppDir == "" {
+		opts.CurrentAppDir = filepath.Join(opts.FilesRoot, "apps", "current")
+	}
+	if opts.CurrentAppDir, err = filepath.Abs(opts.CurrentAppDir); err != nil {
+		return nil, fmt.Errorf("resolve current app dir: %w", err)
+	}
+	if opts.IterationsDir == "" {
+		opts.IterationsDir = filepath.Join(opts.FilesRoot, "apps", "iterations")
+	}
+	if opts.IterationsDir, err = filepath.Abs(opts.IterationsDir); err != nil {
+		return nil, fmt.Errorf("resolve iterations dir: %w", err)
+	}
 	root := filepath.Join(opts.ThoughtsRoot, filepath.FromSlash(opts.ExampleRoot))
 	return &Service{
 		store:       NewStateStore(root),
@@ -97,6 +121,8 @@ func (s *Service) GetState(ctx context.Context, sessionID string) (PickleballVie
 	vm := PickleballViewModel{
 		SessionID:      session.ID,
 		State:          session.State,
+		CurrentApplet:  session.CurrentIterationID,
+		UserMessage:    session.UserMessage,
 		ErrorMessage:   session.ErrorMessage,
 		LogTail:        session.LogTail,
 		PromptExamples: promptExamples(),
@@ -150,6 +176,7 @@ func (s *Service) SubmitPrompt(ctx context.Context, req PromptRequest) (PromptAc
 	}
 	session.State = AppStateGenerating
 	session.ActiveRunID = runID
+	session.UserMessage = "I'm working on that change. Your current app stays available."
 	session.ErrorMessage = ""
 	session.LogTail = ""
 	if err := s.store.SaveSession(ctx, session); err != nil {
@@ -177,6 +204,7 @@ func (s *Service) PromoteSnapshot(ctx context.Context, sessionID string, snapsho
 	session.LastGoodBuildID = snapshot.BuildID
 	session.State = AppStateSucceeded
 	session.ActiveRunID = ""
+	session.UserMessage = "Done — I updated the app and files."
 	session.ErrorMessage = ""
 	session.LogTail = ""
 	if err := s.store.SaveSession(ctx, session); err != nil {
@@ -193,6 +221,7 @@ func (s *Service) MarkFailed(ctx context.Context, sessionID string, cause error,
 	}
 	session.State = AppStateFailed
 	session.ActiveRunID = ""
+	session.UserMessage = "I couldn't make that change safely. Your app is unchanged."
 	if cause != nil {
 		session.ErrorMessage = cause.Error()
 	}

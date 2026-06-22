@@ -6,136 +6,152 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
-	"time"
 
-	"github.com/CoreyCole/vamos/pkg/agents/generatedgo"
+	"github.com/CoreyCole/vamos/server/services/appletruntime"
 	"go.temporal.io/sdk/activity"
 	"go.temporal.io/sdk/testsuite"
 )
 
-type fakeAIGenerator struct {
-	calls []AIGenerateInput
+type fakeAppletEditor struct {
+	calls []AppletEditInput
 	err   error
 }
 
-func (f *fakeAIGenerator) ApplyPrompt(_ context.Context, input AIGenerateInput) error {
+func (f *fakeAppletEditor) ApplyPrompt(_ context.Context, input AppletEditInput) (AppletEditResult, error) {
 	f.calls = append(f.calls, input)
-	return f.err
-}
-
-type fakeRunner struct {
-	calls []generatedgo.RunnerInput
-	err   error
-}
-
-func (f *fakeRunner) BuildAndRun(_ context.Context, input generatedgo.RunnerInput) (generatedgo.RunnerResult, error) {
-	f.calls = append(f.calls, input)
-	writeTestFile := func(name, content string) {
-		if err := os.WriteFile(filepath.Join(input.OutputDir, name), []byte(content), 0o644); err != nil {
-			panic(err)
-		}
+	if f.err != nil {
+		return AppletEditResult{FailureUserMessage: "I couldn't make that change safely. Your app is unchanged."}, f.err
 	}
-	writeTestFile("app.html", "<h1>Generated</h1>")
-	writeTestFile("results.csv", "court,team_a,team_b,reason\n1,A+B,C+D,prompted\n")
-	writeTestFile("manifest.json", `{"schema_version":1,"build_id":"`+input.EnvAllowlist["VAMOS_GENERATED_BUILD_ID"]+`","mode":"one_shot","prompt_summary":"Generated prompt","artifacts":{"html":"app.html","csv":"results.csv"}}`)
-	return generatedgo.RunnerResult{
-		Status:     generatedgo.BuildStatusSucceeded,
-		Manifest:   generatedgo.GeneratedManifest{SchemaVersion: 1, BuildID: input.EnvAllowlist["VAMOS_GENERATED_BUILD_ID"], Mode: generatedgo.RunnerModeOneShot, PromptSummary: "Generated prompt", Artifacts: generatedgo.GeneratedArtifacts{HTML: "app.html", CSV: "results.csv"}},
-		SourceHash: "sha256:source",
-		ArtifactHashes: map[string]string{
-			"app.html":      "sha256:html",
-			"results.csv":   "sha256:csv",
-			"manifest.json": "sha256:manifest",
-		},
-	}, f.err
+	if err := os.WriteFile(filepath.Join(input.IterationDir, "main.go"), []byte("package main\nfunc main(){}\n"), 0o644); err != nil {
+		return AppletEditResult{}, err
+	}
+	return AppletEditResult{ChangedFiles: []string{"main.go"}, UserSummary: "Done — I updated the schedule."}, nil
 }
 
-func TestSelfModifyWorkflowRunsEditThenBuildActivities(t *testing.T) {
+type fakeAppletRuntime struct {
+	starts []appletruntime.RuntimeConfig
+	err    error
+}
+
+func (f *fakeAppletRuntime) Start(_ context.Context, cfg appletruntime.RuntimeConfig) (appletruntime.ProcessState, error) {
+	f.starts = append(f.starts, cfg)
+	if f.err != nil {
+		return appletruntime.ProcessState{}, f.err
+	}
+	return appletruntime.ProcessState{AppID: cfg.AppID, SourceDir: cfg.SourceDir, BaseURL: "http://127.0.0.1:1", Healthy: true}, nil
+}
+
+func (f *fakeAppletRuntime) Stop(context.Context, string) error { return nil }
+func (f *fakeAppletRuntime) Health(context.Context, string) (appletruntime.ProcessState, error) {
+	return appletruntime.ProcessState{Healthy: true}, nil
+}
+func (f *fakeAppletRuntime) ProxyTarget(string) (string, bool) { return "http://127.0.0.1:1", true }
+
+func TestSelfModifyWorkflowRunsIterationActivities(t *testing.T) {
 	t.Parallel()
 	var suite testsuite.WorkflowTestSuite
 	env := suite.NewTestWorkflowEnvironment()
-	var editCalls, buildCalls int
-	env.RegisterActivityWithOptions(func(SelfModifyWorkflowInput) error {
-		editCalls++
+	var calls []string
+	env.RegisterActivityWithOptions(func(SelfModifyWorkflowInput) (IterationSpec, error) {
+		calls = append(calls, "create")
+		return IterationSpec{IterationID: "iter", SourceDir: "/tmp/iter", FilesRoot: "/tmp/files"}, nil
+	}, activity.RegisterOptions{Name: ActivityPickleballCreateIteration})
+	env.RegisterActivityWithOptions(func(SelfModifyWorkflowInput, IterationSpec) (AppletEditResult, error) {
+		calls = append(calls, "edit")
+		return AppletEditResult{UserSummary: "Done"}, nil
+	}, activity.RegisterOptions{Name: ActivityPickleballRunAppletEdit})
+	env.RegisterActivityWithOptions(func(SelfModifyWorkflowInput, IterationSpec) error {
+		calls = append(calls, "build")
 		return nil
-	}, activity.RegisterOptions{Name: ActivityPickleballRunAIEdits})
-	env.RegisterActivityWithOptions(func(SelfModifyWorkflowInput) error {
-		buildCalls++
+	}, activity.RegisterOptions{Name: ActivityPickleballBuildIteration})
+	env.RegisterActivityWithOptions(func(SelfModifyWorkflowInput, IterationSpec) (appletruntime.ProcessState, error) {
+		calls = append(calls, "start")
+		return appletruntime.ProcessState{Healthy: true}, nil
+	}, activity.RegisterOptions{Name: ActivityPickleballStartIteration})
+	env.RegisterActivityWithOptions(func(SelfModifyWorkflowInput, IterationSpec, AppletEditResult, appletruntime.ProcessState) error {
+		calls = append(calls, "promote")
 		return nil
-	}, activity.RegisterOptions{Name: ActivityPickleballBuildSnapshot})
+	}, activity.RegisterOptions{Name: ActivityPickleballPromoteIteration})
+	env.RegisterActivityWithOptions(func(SelfModifyWorkflowInput, string) error {
+		calls = append(calls, "fail")
+		return nil
+	}, activity.RegisterOptions{Name: ActivityPickleballFailIteration})
 
 	env.ExecuteWorkflow(SelfModifyWorkflow, SelfModifyWorkflowInput{SessionID: "default", Prompt: "Add skill totals"})
 
 	if !env.IsWorkflowCompleted() || env.GetWorkflowError() != nil {
 		t.Fatalf("workflow completed=%v err=%v", env.IsWorkflowCompleted(), env.GetWorkflowError())
 	}
-	if editCalls != 1 || buildCalls != 1 {
-		t.Fatalf("activity calls edit=%d build=%d", editCalls, buildCalls)
+	if got := strings.Join(calls, ","); got != "create,edit,build,start,promote" {
+		t.Fatalf("activity order = %s", got)
 	}
 }
 
-func TestSelfModifyWorkflowActivityNamesMatchStructRegistration(t *testing.T) {
-	t.Parallel()
-	var suite testsuite.WorkflowTestSuite
-	env := suite.NewTestWorkflowEnvironment()
-	env.RegisterActivity(&SelfModifyActivities{})
-
-	env.ExecuteWorkflow(SelfModifyWorkflow, SelfModifyWorkflowInput{SessionID: "default", Prompt: "Add skill totals"})
-
-	err := env.GetWorkflowError()
-	if err == nil || !strings.Contains(err.Error(), "pickleball service is required") {
-		t.Fatalf("workflow error = %v; activity names may not match struct registration", err)
-	}
-}
-
-func TestSelfModifyActivitiesEditAndPromoteSnapshot(t *testing.T) {
+func TestIterationActivitiesPromoteHiddenAppletAndPreserveCurrentOnFailure(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
-	ai := &fakeAIGenerator{}
-	runner := &fakeRunner{}
-	svc := newWorkflowTestService(t, ai, runner)
+	editor := &fakeAppletEditor{}
+	runtime := &fakeAppletRuntime{}
+	svc := newWorkflowTestService(t, editor, runtime)
 	session, err := svc.EnsureSession(ctx, "player@example.com")
 	if err != nil {
 		t.Fatalf("EnsureSession: %v", err)
 	}
 	activities := &SelfModifyActivities{Service: svc}
-	input := SelfModifyWorkflowInput{SessionID: session.ID, Prompt: "Add a CSV column explaining skill totals", UserEmail: "player@example.com"}
+	input := SelfModifyWorkflowInput{SessionID: session.ID, Prompt: "Make schedule prettier", UserEmail: "player@example.com"}
 
-	if err := activities.RunAIEdits(ctx, input); err != nil {
-		t.Fatalf("RunAIEdits: %v", err)
+	spec, err := activities.CreateIteration(ctx, input)
+	if err != nil {
+		t.Fatalf("CreateIteration: %v", err)
 	}
-	if len(ai.calls) != 1 || !strings.Contains(ai.calls[0].Prompt, "CSV column") || ai.calls[0].WorkspacePath != session.WorkspacePath {
-		t.Fatalf("ai calls = %+v", ai.calls)
+	if !strings.Contains(spec.SourceDir, filepath.Join("apps", "iterations")) {
+		t.Fatalf("iteration should be hidden under apps/iterations: %+v", spec)
 	}
-	if err := activities.BuildAndSnapshot(ctx, input); err != nil {
-		t.Fatalf("BuildAndSnapshot: %v", err)
+	edit, err := activities.RunAppletEdit(ctx, input, spec)
+	if err != nil {
+		t.Fatalf("RunAppletEdit: %v", err)
 	}
-	if len(runner.calls) != 1 || runner.calls[0].WorkspaceDir != session.WorkspacePath {
-		t.Fatalf("runner calls = %+v", runner.calls)
+	if len(editor.calls) != 1 || editor.calls[0].IterationDir != spec.SourceDir {
+		t.Fatalf("editor calls = %+v", editor.calls)
+	}
+	if err := activities.BuildIteration(ctx, input, spec); err != nil {
+		t.Fatalf("BuildIteration: %v", err)
+	}
+	proc, err := activities.StartIteration(ctx, input, spec)
+	if err != nil {
+		t.Fatalf("StartIteration: %v", err)
+	}
+	if len(runtime.starts) != 1 || runtime.starts[0].SourceDir != spec.SourceDir {
+		t.Fatalf("runtime starts = %+v", runtime.starts)
+	}
+	if err := activities.PromoteIteration(ctx, input, spec, edit, proc); err != nil {
+		t.Fatalf("PromoteIteration: %v", err)
 	}
 	vm, err := svc.GetState(ctx, session.ID)
 	if err != nil {
 		t.Fatalf("GetState: %v", err)
 	}
-	if vm.State != AppStateSucceeded || vm.Current == nil || vm.LastGood == nil {
+	if vm.State != AppStateSucceeded || vm.CurrentApplet != spec.IterationID || !strings.Contains(vm.UserMessage, "updated") {
 		t.Fatalf("vm = %+v", vm)
 	}
-	for _, rel := range []string{"app.html", "results.csv", "manifest.json", filepath.Join("source", "main.go")} {
-		if _, err := os.Stat(filepath.Join(svc.store.Root(), "sessions", session.ID, "snapshots", vm.Current.BuildID, rel)); err != nil {
-			t.Fatalf("snapshot file %s missing: %v", rel, err)
-		}
+
+	if err := activities.FailIteration(ctx, input, "compiler exploded at /tmp/hidden"); err != nil {
+		t.Fatalf("FailIteration: %v", err)
+	}
+	failed, err := svc.GetState(ctx, session.ID)
+	if err != nil {
+		t.Fatalf("GetState failed: %v", err)
+	}
+	if failed.State != AppStateFailed || failed.CurrentApplet != spec.IterationID || failed.UserMessage != "I couldn't make that change safely. Your app is unchanged." {
+		t.Fatalf("failed vm = %+v", failed)
 	}
 }
 
 func TestPromptPatchGeneratorUpdatesRepeatedPrompts(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
-	svc := newWorkflowTestService(t, nil, nil)
-	session, err := svc.EnsureSession(ctx, "player@example.com")
-	if err != nil {
-		t.Fatalf("EnsureSession: %v", err)
-	}
-	mainPath := filepath.Join(session.WorkspacePath, "main.go")
+	dir := t.TempDir()
+	mainPath := filepath.Join(dir, "main.go")
 	seed := `package main
 
 type Matchup struct { Reason string }
@@ -153,10 +169,10 @@ func WriteManifest() Manifest {
 		t.Fatal(err)
 	}
 	generator := PromptPatchGenerator{}
-	if err := generator.ApplyPrompt(ctx, AIGenerateInput{WorkspacePath: session.WorkspacePath, Prompt: "Add skill totals"}); err != nil {
+	if err := generator.ApplyPrompt(ctx, AIGenerateInput{WorkspacePath: dir, Prompt: "Add skill totals"}); err != nil {
 		t.Fatalf("ApplyPrompt first: %v", err)
 	}
-	if err := generator.ApplyPrompt(ctx, AIGenerateInput{WorkspacePath: session.WorkspacePath, Prompt: "Prioritize partners"}); err != nil {
+	if err := generator.ApplyPrompt(ctx, AIGenerateInput{WorkspacePath: dir, Prompt: "Prioritize partners"}); err != nil {
 		t.Fatalf("ApplyPrompt second: %v", err)
 	}
 	data, err := os.ReadFile(mainPath)
@@ -174,48 +190,27 @@ func WriteManifest() Manifest {
 	}
 }
 
-func TestBuildAndSnapshotFailurePreservesLastGood(t *testing.T) {
-	t.Parallel()
-	ctx := context.Background()
-	runner := &fakeRunner{err: os.ErrInvalid}
-	svc := newWorkflowTestService(t, &fakeAIGenerator{}, runner)
-	session, err := svc.EnsureSession(ctx, "player@example.com")
-	if err != nil {
-		t.Fatalf("EnsureSession: %v", err)
-	}
-	lastGood := BuildSnapshot{BuildID: "last-good", Status: "succeeded", HTMLThoughtsPath: "creative-mode-agent/examples/pickleball/sessions/player/snapshots/last-good/app.html", CreatedAt: time.Now().UTC()}
-	if err := svc.PromoteSnapshot(ctx, session.ID, lastGood); err != nil {
-		t.Fatalf("PromoteSnapshot: %v", err)
-	}
-	activities := &SelfModifyActivities{Service: svc}
-	if err := activities.BuildAndSnapshot(ctx, SelfModifyWorkflowInput{SessionID: session.ID, Prompt: "break it"}); err == nil {
-		t.Fatal("BuildAndSnapshot error = nil")
-	}
-	vm, err := svc.GetState(ctx, session.ID)
-	if err != nil {
-		t.Fatalf("GetState: %v", err)
-	}
-	if vm.State != AppStateFailed || vm.LastGood == nil || vm.LastGood.BuildID != "last-good" {
-		t.Fatalf("vm = %+v", vm)
-	}
-}
-
-func newWorkflowTestService(t *testing.T, ai AIGenerator, runner Runner) *Service {
+func newWorkflowTestService(t *testing.T, editor AppletEditor, runtime appletruntime.Manager) *Service {
 	t.Helper()
-	seedDir := filepath.Join(t.TempDir(), "seed")
+	root := t.TempDir()
+	filesRoot := filepath.Join(root, "files")
+	current := filepath.Join(filesRoot, "apps", "current")
 	for name, content := range map[string]string{
-		"go.mod":      "module seed\n\ngo 1.24\n",
-		"main.go":     "package main\nfunc main(){}\n",
-		"players.csv": "name,skill\nAvery,5\n",
+		"go.mod":  "module current\n\ngo 1.24\n",
+		"main.go": "package main\nfunc main(){}\n",
 	} {
-		if err := os.MkdirAll(filepath.Dir(filepath.Join(seedDir, name)), 0o755); err != nil {
+		if err := os.MkdirAll(filepath.Dir(filepath.Join(current, name)), 0o755); err != nil {
 			t.Fatal(err)
 		}
-		if err := os.WriteFile(filepath.Join(seedDir, name), []byte(content), 0o644); err != nil {
+		if err := os.WriteFile(filepath.Join(current, name), []byte(content), 0o644); err != nil {
 			t.Fatal(err)
 		}
 	}
-	svc, err := NewService(Options{ThoughtsRoot: t.TempDir(), SeedBundleDir: seedDir, AIGenerator: ai, Runner: runner, WorkflowStarter: &fakeWorkflowStarter{}})
+	seedDir := filepath.Join(root, "seed")
+	if err := copyDir(current, seedDir); err != nil {
+		t.Fatal(err)
+	}
+	svc, err := NewService(Options{ThoughtsRoot: filepath.Join(root, "thoughts"), SeedBundleDir: seedDir, FilesRoot: filesRoot, CurrentAppDir: current, IterationsDir: filepath.Join(filesRoot, "apps", "iterations"), AppletEditor: editor, AppletRuntime: runtime, WorkflowStarter: &fakeWorkflowStarter{}})
 	if err != nil {
 		t.Fatalf("NewService: %v", err)
 	}
