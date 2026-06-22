@@ -41,6 +41,7 @@ func newCommand(d deps) *cobra.Command {
 		newRunChildCommand(d),
 		newChildCompleteCommand(d),
 		newManagerReadyCommand(d),
+		newDoctorCommand(d),
 		newRepairStateCommand(d),
 		newMarkChildActiveCommand(d),
 		newInspectCommand(d),
@@ -179,6 +180,21 @@ func newManagerReadyCommand(d deps) *cobra.Command {
 	cmd.Flags().StringVar(&opts.StateFile, "state-file", "", "q-manager state file")
 	cmd.Flags().StringVar(&opts.ManagerPane, "manager-pane", "", "tmux pane ID for the resumed parent q-manager session")
 	cmd.Flags().StringVar(&opts.Output, "output", "text", "output format: text or ndjson")
+	return cmd
+}
+
+func newDoctorCommand(d deps) *cobra.Command {
+	opts := DoctorOptions{Output: "text"}
+	cmd := &cobra.Command{
+		Use:   "doctor",
+		Short: "Diagnose q-manager runtime dependencies and active child health",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return RunDoctor(cmd.Context(), opts, d, cmd.OutOrStdout())
+		},
+	}
+	cmd.Flags().StringVar(&opts.StateFile, "state-file", "", "q-manager state file")
+	cmd.Flags().StringVar(&opts.PlanDir, "plan-dir", "", "QRSPI plan directory")
+	cmd.Flags().StringVar(&opts.Output, "output", "text", "output format: text, ndjson, or json")
 	return cmd
 }
 
@@ -454,11 +470,39 @@ func RunStartNext(ctx context.Context, opts StartNextOptions, d deps, out io.Wri
 	if clock == nil {
 		clock = time.Now
 	}
+	if strings.TrimSpace(opts.StateFile) == "" {
+		root, err := stateRoot(d)
+		if err != nil {
+			return nil, err
+		}
+		preflight, err := CheckQRSPIPreflight(ctx, ManagerState{}, PreflightOptions{StateRootPath: root, UsesExtension: true}, d)
+		if err != nil {
+			return nil, err
+		}
+		if card := BuildPreflightFailedCard(preflight.Pi, ""); card != nil {
+			return nil, writeManagerActionCard(out, *card, opts.Output)
+		}
+		if !preflight.StateRoot.OK || !preflight.Tmux.OK {
+			card := ManagerActionCard{Kind: ActionPiCompatibilityFailed, Severity: "error", Summary: "q-manager preflight failed", Evidence: append(preflight.StateRoot.Evidence, preflight.Tmux.Evidence...), RecommendedAction: "fix q-manager runtime dependencies before launching child", SafeCommand: "vamos qrspi doctor", RequiresHuman: false}
+			return nil, writeManagerActionCard(out, card, opts.Output)
+		}
+	}
 	state, stateFile, err := resolveOrInitStartState(ctx, opts, d)
 	if err != nil {
 		return nil, err
 	}
 	result := StartNextResult{StateFile: stateFile}
+	if strings.TrimSpace(opts.StateFile) != "" {
+		preflight, err := CheckQRSPIPreflight(ctx, state, PreflightOptions{StateFile: stateFile, ManagerPaneID: state.ManagerPaneID, UsesExtension: true}, d)
+		if err != nil {
+			return nil, err
+		}
+		if card := BuildPreflightFailedCard(preflight.Pi, stateFile); card != nil {
+			state.LastActionCard = card
+			_ = stateStore(d, "", clock).Save(stateFile, state)
+			return nil, writeManagerActionCard(out, *card, opts.Output)
+		}
+	}
 	if state.ActiveChild != nil {
 		result.ActiveChild = state.ActiveChild
 		result.CurrentNode = state.ActiveChild.Stage
@@ -2338,11 +2382,14 @@ func childRunner(d deps) ChildRunner {
 	if d.Runner != nil {
 		return d.Runner
 	}
-	tmux := d.Tmux
-	if tmux == nil {
-		tmux = ShellTmuxClient{}
+	return TmuxChildRunner{Tmux: tmuxClient(d)}
+}
+
+func tmuxClient(d deps) TmuxClient {
+	if d.Tmux != nil {
+		return d.Tmux
 	}
-	return TmuxChildRunner{Tmux: tmux}
+	return ShellTmuxClient{}
 }
 
 func childRunID(stage string, t time.Time) string {

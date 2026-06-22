@@ -11,10 +11,11 @@ import (
 )
 
 type recordingTmux struct {
-	pastes  []recordedPaste
-	keys    []recordedKeys
-	kills   []TmuxPane
-	layouts []recordedLayout
+	pastes       []recordedPaste
+	keys         []recordedKeys
+	kills        []TmuxPane
+	layouts      []recordedLayout
+	missingPanes map[string]bool
 }
 
 type recordedPaste struct {
@@ -54,6 +55,13 @@ func (r *recordingTmux) KillPane(ctx context.Context, pane TmuxPane) error {
 func (r *recordingTmux) SelectLayout(ctx context.Context, pane TmuxPane, layout string) error {
 	r.layouts = append(r.layouts, recordedLayout{pane: pane, layout: layout})
 	return nil
+}
+
+func (r *recordingTmux) PaneExists(ctx context.Context, pane TmuxPane) (bool, error) {
+	if r.missingPanes != nil && r.missingPanes[pane.ID] {
+		return false, nil
+	}
+	return strings.TrimSpace(pane.ID) != "", nil
 }
 
 func TestRunRepromptChildPastesCorrectionToActiveChild(t *testing.T) {

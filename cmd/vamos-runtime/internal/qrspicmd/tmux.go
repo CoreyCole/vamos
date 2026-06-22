@@ -63,6 +63,16 @@ func (ShellTmuxClient) SelectLayout(ctx context.Context, pane TmuxPane, layout s
 	return exec.CommandContext(ctx, "tmux", selectLayoutArgs(pane.ID, layout)...).Run()
 }
 
+func (ShellTmuxClient) PaneExists(ctx context.Context, pane TmuxPane) (bool, error) {
+	if strings.TrimSpace(pane.ID) == "" {
+		return false, nil
+	}
+	if err := exec.CommandContext(ctx, "tmux", "display-message", "-p", "-t", pane.ID, "#{pane_id}").Run(); err != nil {
+		return false, nil
+	}
+	return true, nil
+}
+
 func setBufferArgs(name, text string) []string {
 	return []string{"set-buffer", "-b", name, text}
 }

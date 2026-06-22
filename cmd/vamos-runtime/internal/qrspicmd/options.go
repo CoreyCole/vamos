@@ -150,15 +150,82 @@ type ManagerActionCard struct {
 	RecoveryLogPath   string   `json:"recoveryLogPath,omitempty"`
 }
 
+type DoctorOptions struct {
+	StateFile string
+	PlanDir   string
+	Output    string
+}
+
+type PreflightOptions struct {
+	StateFile     string
+	StateRootPath string
+	PiBinary      string
+	UsesExtension bool
+	ManagerPaneID string
+}
+
+type CommandRunner interface {
+	Run(ctx context.Context, name string, args ...string) (CommandResult, error)
+}
+
+type CommandResult struct {
+	Stdout   string
+	Stderr   string
+	ExitCode int
+}
+
+type PiCompatibilityRequest struct {
+	PiBinary      string
+	UsesExtension bool
+}
+
+type PiCompatibilityReport struct {
+	OK       bool
+	PiBinary string
+	Version  string
+	Evidence []string
+	Problems []PreflightProblem
+}
+
+type PreflightProblem struct {
+	Kind     string
+	Severity string
+	Summary  string
+	Evidence string
+}
+
+type DoctorReport struct {
+	StateFile    string
+	Pi           PiCompatibilityReport
+	Tmux         TmuxHealthReport
+	StateRoot    StateRootReport
+	LatestStatus *ChildStatus
+	SafeCommand  string
+}
+
+type TmuxHealthReport struct {
+	OK       bool
+	PaneID   string
+	Evidence []string
+}
+
+type StateRootReport struct {
+	OK       bool
+	Path     string
+	Writable bool
+	Evidence []string
+}
+
 const (
-	ActionStateDesync          = "state_desync"
-	ActionGraphOutcomeMismatch = "graph_outcome_mismatch"
-	ActionWorkspaceMoved       = "workspace_moved"
-	ActionActiveChildConflict  = "active_child_conflict"
-	ActionHumanGate            = "human_gate"
-	ActionInvalidChildYAML     = "invalid_child_yaml"
-	ActionManualChildSteer     = "manual_child_steer"
-	ActionSupersededQueuedWake = "superseded_queued_wake"
+	ActionStateDesync           = "state_desync"
+	ActionGraphOutcomeMismatch  = "graph_outcome_mismatch"
+	ActionWorkspaceMoved        = "workspace_moved"
+	ActionActiveChildConflict   = "active_child_conflict"
+	ActionHumanGate             = "human_gate"
+	ActionInvalidChildYAML      = "invalid_child_yaml"
+	ActionManualChildSteer      = "manual_child_steer"
+	ActionSupersededQueuedWake  = "superseded_queued_wake"
+	ActionPiCompatibilityFailed = "pi_compatibility_failed"
 )
 
 func ProjectManagerActionCard(action semantic.NextAction, state ManagerState, stateFile string) *ManagerActionCard {
@@ -384,11 +451,12 @@ type RenderPromptOptions struct {
 }
 
 type deps struct {
-	StateStore StateStore
-	Runner     ChildRunner
-	Tmux       TmuxClient
-	Clock      func() time.Time
-	StateRoot  func() (string, error)
+	StateStore    StateStore
+	Runner        ChildRunner
+	Tmux          TmuxClient
+	CommandRunner CommandRunner
+	Clock         func() time.Time
+	StateRoot     func() (string, error)
 }
 
 // StateStore is implemented by the external q-manager state store in a later slice.
@@ -411,4 +479,5 @@ type TmuxClient interface {
 	PasteText(ctx context.Context, pane TmuxPane, text string) error
 	KillPane(ctx context.Context, pane TmuxPane) error
 	SelectLayout(ctx context.Context, pane TmuxPane, layout string) error
+	PaneExists(ctx context.Context, pane TmuxPane) (bool, error)
 }
