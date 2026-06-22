@@ -209,6 +209,8 @@ func newRepairStateCommand(d deps) *cobra.Command {
 	}
 	cmd.Flags().StringVar(&opts.StateFile, "state-file", "", "q-manager state file")
 	cmd.Flags().BoolVar(&opts.AlignActiveChild, "align-active-child", false, "align current workflow node to the active child stage when safe")
+	cmd.Flags().BoolVar(&opts.ClearFailedChild, "clear-failed-child", false, "clear active child only when status/output prove terminal launch failure")
+	cmd.Flags().BoolVar(&opts.Relaunch, "relaunch", false, "after clearing a terminal failed child, relaunch the same graph node")
 	cmd.Flags().StringVar(&opts.Output, "output", "text", "output format: text or ndjson")
 	return cmd
 }
@@ -503,30 +505,32 @@ func RunStartNext(ctx context.Context, opts StartNextOptions, d deps, out io.Wri
 			return nil, writeManagerActionCard(out, *card, opts.Output)
 		}
 	}
+	store := stateStore(d, "", clock)
 	if state.ActiveChild != nil {
 		health, err := InspectActiveChildHealth(ctx, state, stateFile, d)
 		if err != nil {
 			return nil, err
 		}
 		if opts.Force && IsTerminalFailedChild(health) {
-			card := BuildChildLaunchFailedCard(health, state, stateFile)
-			if card != nil {
-				state.LastActionCard = card
-				_ = stateStore(d, "", clock).Save(stateFile, state)
-				return nil, writeManagerActionCard(out, *card, opts.Output)
+			state, err = ClearFailedActiveChild(state, health)
+			if err != nil {
+				return nil, err
 			}
+			if err := store.Save(stateFile, state); err != nil {
+				return nil, err
+			}
+		} else {
+			result.ActiveChild = state.ActiveChild
+			result.CurrentNode = state.ActiveChild.Stage
+			result.StopReason = "active child already running"
+			if health.Status != ActiveChildRunning {
+				result.StopReason = string(health.Status)
+			}
+			result.NextCommand = continueCommand(stateFile)
+			result.FeedbackCommand = feedbackCommand(stateFile)
+			return &result, writeStartNextOutput(out, result, opts.Output)
 		}
-		result.ActiveChild = state.ActiveChild
-		result.CurrentNode = state.ActiveChild.Stage
-		result.StopReason = "active child already running"
-		if health.Status != ActiveChildRunning {
-			result.StopReason = string(health.Status)
-		}
-		result.NextCommand = continueCommand(stateFile)
-		result.FeedbackCommand = feedbackCommand(stateFile)
-		return &result, writeStartNextOutput(out, result, opts.Output)
 	}
-	store := stateStore(d, "", clock)
 	if seed, err := readLatestResultSeed(opts); err != nil {
 		return nil, err
 	} else if strings.TrimSpace(seed) != "" {
@@ -1437,12 +1441,8 @@ func supersedeQueuedWakeForActiveChild(state ManagerState, childID string, reaso
 }
 
 func RunRepairState(ctx context.Context, opts RepairStateOptions, d deps, out io.Writer) error {
-	_ = ctx
 	if strings.TrimSpace(opts.StateFile) == "" {
 		return errors.New("state-file is required")
-	}
-	if !opts.AlignActiveChild {
-		return errors.New("--align-active-child is required")
 	}
 	out = ensureWriter(out)
 	store := stateStore(d, "", time.Now)
@@ -1450,6 +1450,17 @@ func RunRepairState(ctx context.Context, opts RepairStateOptions, d deps, out io
 	if err != nil {
 		return err
 	}
+	switch {
+	case opts.AlignActiveChild:
+		return runAlignActiveChildRepair(opts, out, store, state)
+	case opts.ClearFailedChild:
+		return runClearFailedChildRepair(ctx, opts, d, out, store, state)
+	default:
+		return errors.New("one repair action is required: --align-active-child or --clear-failed-child")
+	}
+}
+
+func runAlignActiveChildRepair(opts RepairStateOptions, out io.Writer, store StateStore, state ManagerState) error {
 	if state.ActiveChild == nil || strings.TrimSpace(state.ActiveChild.Stage) == "" {
 		return errors.New("no active child evidence to align")
 	}
@@ -1467,6 +1478,49 @@ func RunRepairState(ctx context.Context, opts RepairStateOptions, d deps, out io
 	}
 	fmt.Fprintf(out, "repaired: aligned current node to active child %s\n", state.ActiveChild.Stage)
 	return writeManagerActionCard(out, card, opts.Output)
+}
+
+func runClearFailedChildRepair(ctx context.Context, opts RepairStateOptions, d deps, out io.Writer, store StateStore, state ManagerState) error {
+	health, err := InspectActiveChildHealth(ctx, state, opts.StateFile, d)
+	if err != nil {
+		return err
+	}
+	if !IsTerminalFailedChild(health) {
+		return fmt.Errorf("active child is not terminal failed: %s", health.Status)
+	}
+	cleared, err := ClearFailedActiveChild(state, health)
+	if err != nil {
+		return err
+	}
+	card := BuildChildLaunchFailedCard(health, state, opts.StateFile)
+	if card == nil {
+		return errors.New("failed child action card could not be built")
+	}
+	cleared.LastActionCard = card
+	if err := appendRecoveryIncident(opts.StateFile, *card, true); err != nil {
+		return err
+	}
+	if err := store.Save(opts.StateFile, cleared); err != nil {
+		return err
+	}
+	fmt.Fprintf(out, "repaired: cleared failed child %s\n", health.ChildID)
+	if !opts.Relaunch {
+		return writeManagerActionCard(out, *card, opts.Output)
+	}
+	_, err = RunStartNext(ctx, StartNextOptions{StateFile: opts.StateFile, Output: opts.Output, Force: true}, d, out)
+	return err
+}
+
+func ClearFailedActiveChild(state ManagerState, health ActiveChildHealth) (ManagerState, error) {
+	if !IsTerminalFailedChild(health) {
+		return state, fmt.Errorf("refusing to clear non-terminal child: %s", health.Status)
+	}
+	if state.ActiveChild == nil || state.ActiveChild.ID != health.ChildID {
+		return state, errors.New("active child changed while inspecting health")
+	}
+	state.PendingCleanupChild = state.ActiveChild
+	state.ActiveChild = nil
+	return state, nil
 }
 
 func RunMarkChildActive(ctx context.Context, opts MarkChildActiveOptions, d deps, out io.Writer) error {

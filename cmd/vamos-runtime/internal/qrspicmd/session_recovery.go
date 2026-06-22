@@ -59,10 +59,14 @@ func RunInspect(ctx context.Context, opts InspectOptions, d deps, out io.Writer)
 	fmt.Fprintf(out, "current node: %s\n", state.Workflow.CurrentNodeID)
 	fmt.Fprintf(out, "plan: %s\n", state.CanonicalPlanDir)
 	fmt.Fprintf(out, "implementation cwd: %s\n", state.ImplementationCwd)
+	failedChildSafeCommand := ""
 	if state.ActiveChild != nil {
 		fmt.Fprintf(out, "active child: %s stage=%s pane=%s session=%s\n", state.ActiveChild.ID, state.ActiveChild.Stage, state.ActiveChild.TmuxPaneID, firstNonEmpty(state.ActiveChild.SessionPath, state.ActiveChild.SessionID))
 		if health, err := InspectActiveChildHealth(ctx, state, opts.StateFile, d); err == nil {
 			fmt.Fprintf(out, "active child health: %s\n", health.Status)
+			if IsTerminalFailedChild(health) {
+				failedChildSafeCommand = health.SafeCommand
+			}
 		}
 		if opts.Sessions {
 			fmt.Fprintf(out, "session dir: %s\n", state.ActiveChild.SessionDir)
@@ -74,7 +78,11 @@ func RunInspect(ctx context.Context, opts InspectOptions, d deps, out io.Writer)
 	if latest != nil {
 		fmt.Fprintf(out, "latest: %s (%s)\n", latest.SessionPath, latest.Classification)
 	}
-	fmt.Fprintf(out, "safe command: %s\n", continueCommand(opts.StateFile))
+	if failedChildSafeCommand != "" {
+		fmt.Fprintf(out, "safe command: %s\n", failedChildSafeCommand)
+	} else {
+		fmt.Fprintf(out, "safe command: %s\n", continueCommand(opts.StateFile))
+	}
 	return nil
 }
 

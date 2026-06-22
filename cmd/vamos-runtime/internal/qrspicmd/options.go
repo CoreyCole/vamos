@@ -323,6 +323,8 @@ func invalidActionSafeCommand(action semantic.NextAction, state ManagerState, st
 type RepairStateOptions struct {
 	StateFile        string
 	AlignActiveChild bool
+	ClearFailedChild bool
+	Relaunch         bool
 	Output           string
 }
 
