@@ -144,6 +144,31 @@ func TestStartRejectsSourceOutsideFilesRoot(t *testing.T) {
 	}
 }
 
+func TestStartRejectsSymlinkedSourceOutsideFilesRoot(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("symlink permissions vary on windows")
+	}
+	root := t.TempDir()
+	outside := t.TempDir()
+	link := filepath.Join(root, "apps", "current")
+	if err := os.MkdirAll(filepath.Dir(link), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(outside, link); err != nil {
+		t.Fatal(err)
+	}
+	manager := NewManager(t.TempDir())
+	_, err := manager.Start(context.Background(), RuntimeConfig{
+		AppID:        "pickleball",
+		FilesRoot:    root,
+		SourceDir:    link,
+		StartCommand: []string{"go", "version"},
+	})
+	if err == nil || !strings.Contains(err.Error(), "source dir must be inside files root") {
+		t.Fatalf("Start() error = %v", err)
+	}
+}
+
 func writeAppletSource(t *testing.T, mainGo string) (filesRoot, sourceDir, bin string) {
 	t.Helper()
 	filesRoot = t.TempDir()

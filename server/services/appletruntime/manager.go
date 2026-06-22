@@ -179,6 +179,24 @@ func validateConfig(cfg RuntimeConfig) error {
 	} else if !info.IsDir() {
 		return fmt.Errorf("source dir is not a directory")
 	}
+	if err := rejectRuntimeSymlinkEscape(filesRoot, sourceDir); err != nil {
+		return err
+	}
+	return nil
+}
+
+func rejectRuntimeSymlinkEscape(root, candidate string) error {
+	realRoot, err := filepath.EvalSymlinks(root)
+	if err != nil {
+		return fmt.Errorf("files root: %w", err)
+	}
+	realCandidate, err := filepath.EvalSymlinks(candidate)
+	if err != nil {
+		return fmt.Errorf("source dir: %w", err)
+	}
+	if !pathWithinRoot(realRoot, realCandidate) {
+		return fmt.Errorf("source dir must be inside files root")
+	}
 	return nil
 }
 

@@ -43,6 +43,13 @@ func TestSafeOpenPathRejectsSymlinkEscape(t *testing.T) {
 	if _, err := SafeOpenPath(root, "secret-link"); err == nil {
 		t.Fatal("symlink escape succeeded, want error")
 	}
+
+	if err := os.Symlink(outside, filepath.Join(root, "outside-dir")); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := SafeOpenPath(root, "outside-dir/secret.txt"); err == nil {
+		t.Fatal("parent symlink escape succeeded, want error")
+	}
 }
 
 func TestIsHiddenMatchesPathSubtrees(t *testing.T) {

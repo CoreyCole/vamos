@@ -27,16 +27,32 @@ func SafeOpenPath(root, relPath string) (string, error) {
 	if !PathWithinRoot(root, candidate) {
 		return "", fmt.Errorf("file is outside this app")
 	}
-	if info, err := os.Lstat(candidate); err == nil && info.Mode()&os.ModeSymlink != 0 {
-		target, err := filepath.EvalSymlinks(candidate)
-		if err != nil {
-			return "", err
-		}
-		if !PathWithinRoot(root, target) {
-			return "", fmt.Errorf("file is outside this app")
-		}
+	if err := rejectSymlinkEscape(root, candidate); err != nil {
+		return "", err
 	}
 	return candidate, nil
+}
+
+func rejectSymlinkEscape(root, candidate string) error {
+	realRoot, err := filepath.EvalSymlinks(root)
+	if err != nil {
+		return err
+	}
+	realCandidate, err := filepath.EvalSymlinks(candidate)
+	if err != nil {
+		if !os.IsNotExist(err) {
+			return err
+		}
+		realParent, parentErr := filepath.EvalSymlinks(filepath.Dir(candidate))
+		if parentErr != nil {
+			return parentErr
+		}
+		realCandidate = filepath.Join(realParent, filepath.Base(candidate))
+	}
+	if !PathWithinRoot(realRoot, realCandidate) {
+		return fmt.Errorf("file is outside this app")
+	}
+	return nil
 }
 
 func PathWithinRoot(root, candidate string) bool {
