@@ -477,7 +477,7 @@ func applyLatestResultSeed(state *ManagerState, resultText string) (*ParsedDecis
 	if state == nil {
 		return nil, errors.New("state is required")
 	}
-	parsed, err := ParseValidateDecide(resultText, state.Workflow, wruntime.ParseContext{ExpectedNodeID: state.Workflow.CurrentNodeID})
+	parsed, err := ParseNormalizeValidateDecide(resultText, *state, wruntime.ParseContext{ExpectedNodeID: state.Workflow.CurrentNodeID})
 	if err != nil {
 		return nil, err
 	}
@@ -1381,7 +1381,7 @@ func RunValidateResult(ctx context.Context, opts ValidateResultOptions, d deps, 
 		return err
 	}
 	parseCtx.ExpectedNodeID = wruntime.NodeID(opts.Stage)
-	parsed, err := ParseValidateDecide(text, state.Workflow, parseCtx)
+	parsed, err := ParseNormalizeValidateDecide(text, state, parseCtx)
 	if err != nil {
 		return err
 	}
@@ -2085,7 +2085,7 @@ func RunDecideNext(ctx context.Context, opts DecideNextOptions, d deps, out io.W
 		return err
 	}
 	parseCtx.ExpectedNodeID = state.Workflow.CurrentNodeID
-	parsed, err := ParseValidateDecide(text, state.Workflow, parseCtx)
+	parsed, err := ParseNormalizeValidateDecide(text, state, parseCtx)
 	if err != nil {
 		return err
 	}

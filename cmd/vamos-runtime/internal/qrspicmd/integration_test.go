@@ -216,6 +216,32 @@ func TestReviewPlanReadyForImplementContinuesToImplementation(t *testing.T) {
 	}
 }
 
+func TestReviewPlanGenericPositiveNormalizesAcrossManagerCommands(t *testing.T) {
+	fixture := newManagerFlowFixture(t)
+	stateFile := filepath.Join(fixture.stateRoot, "review-plan-normalize-state.json")
+	state := ManagerState{CanonicalPlanDir: fixture.planDir, SourceCwd: fixture.projectRoot, Workflow: testWorkflowState(t, qrspi.NodeReviewPlan, nil)}
+	saveManagerState(t, stateFile, state)
+	resultFile := filepath.Join(fixture.dir, "review-plan-generic-result.txt")
+	writeFile(t, resultFile, testResultYAML("review-plan", "complete", "complete", "thoughts/example/reviews/plan/review.md", ""))
+
+	var out bytes.Buffer
+	if err := RunDecideNext(t.Context(), DecideNextOptions{StateFile: stateFile, ResultFile: resultFile, PlanDir: fixture.planDir}, deps{}, &out); err != nil {
+		t.Fatalf("RunDecideNext generic positive error = %v", err)
+	}
+	if !strings.Contains(out.String(), `"nextNode":"workspace"`) || !strings.Contains(out.String(), `"startNext":true`) {
+		t.Fatalf("decide output = %q", out.String())
+	}
+
+	seedState := ManagerState{CanonicalPlanDir: fixture.planDir, SourceCwd: fixture.projectRoot, Workflow: testWorkflowState(t, qrspi.NodeReviewPlan, nil)}
+	parsed, err := applyLatestResultSeed(&seedState, testResultYAML("review-plan", "complete", "complete", "thoughts/example/reviews/plan/review.md", ""))
+	if err != nil {
+		t.Fatalf("applyLatestResultSeed generic positive error = %v", err)
+	}
+	if parsed.Result.Outcome != "ready-for-workspace" || seedState.Workflow.CurrentNodeID != qrspi.NodeWorkspace {
+		t.Fatalf("outcome/current = %q/%q, want ready-for-workspace/workspace", parsed.Result.Outcome, seedState.Workflow.CurrentNodeID)
+	}
+}
+
 func TestWakeDrivenManagerLoopCleansOldPaneAfterNextLaunch(t *testing.T) {
 	fixture := newManagerFlowFixture(t)
 	runner := &fakeChildRunner{panes: []string{"%old", "%new"}}
