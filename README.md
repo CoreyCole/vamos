@@ -44,3 +44,4 @@ If a licensed Datastar Pro bundle is available, set `VAMOS_DATASTAR_PRO_ASSET` o
 - [Host configuration](docs/host-configuration.md) — map YAML/env fields to host responsibilities.
 - [Deployment](docs/deployment.md) — production host checklist.
 - [Contributing](docs/contributing.md) — build, tests, generated files, E2E pointers.
+- [HTML Applets](docs/html-applets.md) — trusted `.html` Thoughts documents, shared CSS, theme helper, and sandbox boundary.
