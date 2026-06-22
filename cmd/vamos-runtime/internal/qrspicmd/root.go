@@ -55,6 +55,16 @@ func newCommand(d deps) *cobra.Command {
 		newContinueCommand(d),
 		newRenderPromptCommand(d),
 	)
+	suppressRuntimeUsage(cmd)
+	return cmd
+}
+
+func suppressRuntimeUsage(cmd *cobra.Command) *cobra.Command {
+	cmd.SilenceUsage = true
+	cmd.SilenceErrors = true
+	for _, child := range cmd.Commands() {
+		suppressRuntimeUsage(child)
+	}
 	return cmd
 }
 

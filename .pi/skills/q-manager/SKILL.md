@@ -68,7 +68,7 @@ Primary loop: launch/resume child with `start-next`, then wait for a validated p
    ```bash
    vamos qrspi continue --state-file "$STATE"
    ```
-   `continue` validates the active child session JSONL, reprompts the same child while retry remains, persists canonical graph decisions for valid results, launches graph-selected next child when safe, and reports concise stop reasons. Repairable failures return action cards with evidence and exact safe commands such as `repair-state --align-active-child && continue`; run those commands when evidence is deterministic. Do not paste raw validate/decide NDJSON into manager chat, and do not handcraft child correction prose.
+   `continue` validates the active child session JSONL, reconciles active-child health from tmux/status/session evidence before YAML retry, reprompts the same child while retry remains, persists canonical graph decisions for valid results, launches graph-selected next child when safe, and reports concise stop reasons. Repairable failures return action cards with evidence and exact safe commands such as `repair-state --align-active-child && continue` or `repair-state --clear-failed-child --relaunch`; run those commands when evidence is deterministic. Do not paste raw validate/decide NDJSON into manager chat, and do not handcraft child correction prose.
 
 For review-dir / implementation-review follow-up plans, same-workspace routing should come from previous `qrspi_result.workspace_metadata` and plan docs. If the CLI detects and summarizes it, keep the summary child-safe and minimal: do not create a new implementation copy or reset to trunk; stack follow-up implementation on the existing implementation workspace/head.
 
@@ -78,11 +78,13 @@ Use these only for recovery or debugging when `start-next` / `continue` is insuf
 
 ```bash
 vamos qrspi init --plan-dir <plan-dir> --project-root <repo-root> --manager-pane "$TMUX_PANE"
+vamos qrspi doctor --state-file "$STATE" --output text
 vamos qrspi render-prompt --state-file "$STATE" --node <node> --plan-dir <plan-dir> > /tmp/child-prompt.md
 vamos qrspi run-child --state-file "$STATE" --plan-dir <plan-dir> --stage <node> --cwd <cwd> --prompt-file /tmp/child-prompt.md --split right --timeout 0
 vamos qrspi validate-result --state-file "$STATE" --stage <node> --plan-dir <plan-dir>
 vamos qrspi reprompt-child --state-file "$STATE" --plan-dir <plan-dir> --stage <node> --attempt <n> --error-file <validation-error-file>
 vamos qrspi repair-state --state-file "$STATE" --align-active-child
+vamos qrspi repair-state --state-file "$STATE" --clear-failed-child --relaunch
 vamos qrspi mark-child-active --state-file "$STATE" --child-id <id> --reason manual-reprompt
 vamos qrspi inspect --state-file "$STATE" --sessions --latest
 vamos qrspi find-latest-child --state-file "$STATE" --stage <node>
@@ -124,8 +126,10 @@ Supported manual interaction modes: normal managed child, `steer-child`, same-ch
 
 - Invalid result: keep active child pane/session and reprompt in place while retry remains.
 - Human gate, blocked, error, or retry exhaustion: keep pane/session for inspection and human steering.
-- Action cards are the first-class manager UX for repairable failures: `state_desync`, `graph_outcome_mismatch`, `workspace_moved`, `active_child_conflict`, `human_gate`, `invalid_child_yaml`, `manual_child_steer`, and `superseded_queued_wake`.
+- Action cards are the first-class manager UX for repairable failures: `state_desync`, `graph_outcome_mismatch`, `workspace_moved`, `active_child_conflict`, `human_gate`, `invalid_child_yaml`, `manual_child_steer`, `superseded_queued_wake`, `pi_compatibility_failed`, and `child_launch_failed`.
+- Run `vamos qrspi doctor --state-file "$STATE"` when launch compatibility, tmux, state-root, or active-child health is unclear; it summarizes Pi compatibility, manager state root writability, tmux health, active-child health, latest status, and safe recovery command.
 - If `repair-state --align-active-child` is offered, use it only when active child/session/artifact evidence proves the cursor is stale; then run the paired `continue` command.
+- If `repair-state --clear-failed-child --relaunch` is offered for `child_launch_failed`, use it only when the card/doctor proves a terminal failed child (nonzero status/done/no `qrspi_result`); it clears the failed active child and relaunches the same graph node. `start-next --force` may replace only terminal failed children and must still protect running/unknown children.
 - If a human manually continued the active child or used child `/new`, run `inspect --latest` or `find-latest-child`, then `validate-latest --apply-rebind` or `recover-manual --mode latest-session --continue`. Do not edit manager JSON with jq/python.
 - If you manually steer/reprompt a child after a wake queued, run `mark-child-active` or rebind/recover the latest session so the child generation increments and stale queued wakes are superseded; `manager-ready` should then wait for the newer completion instead of flushing stale payload.
 - Valid transition with `startNext=true`: mark old child pending cleanup; start next child; kill old pane only after the new active child is saved.

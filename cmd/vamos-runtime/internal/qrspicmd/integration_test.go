@@ -627,6 +627,30 @@ func TestContinueChildLaunchFailedTextActionCard(t *testing.T) {
 	}
 }
 
+func TestQRSPIRuntimeErrorsDoNotPrintUsage(t *testing.T) {
+	fixture := newManagerFlowFixture(t)
+	stateFile := filepath.Join(fixture.dir, "launch-failed-state.json")
+	active := childHealthRef(fixture.dir)
+	writeFile(t, active.StatusPath, `{"exitCode":1}`)
+	writeFile(t, active.DonePath, "")
+	writeFile(t, active.OutputPath, "Error: unknown option --session-id\nUsage:\n  pi [flags]\nFlags:\n  --session string\n")
+	saveManagerState(t, stateFile, ManagerState{CanonicalPlanDir: fixture.planDir, ActiveChild: active, Workflow: testWorkflowState(t, qrspi.NodeDesign, nil)})
+
+	stdout, stderr, err := executeManagerCommandWithErr(deps{Clock: fixture.clock, Tmux: &recordingTmux{missingPanes: map[string]bool{"%9": true}}}, "continue", "--state-file", stateFile, "--plan-dir", fixture.planDir)
+	if err != nil {
+		t.Fatalf("continue command error = %v", err)
+	}
+	combined := stdout + stderr
+	for _, forbidden := range []string{"Usage:", "Flags:", "--session string"} {
+		if strings.Contains(combined, forbidden) {
+			t.Fatalf("runtime command output contains usage spam %q: stdout=%q stderr=%q", forbidden, stdout, stderr)
+		}
+	}
+	if !strings.Contains(stdout, "action: child_launch_failed") {
+		t.Fatalf("stdout missing action card: %q", stdout)
+	}
+}
+
 func TestContinueChildLaunchFailedNDJSONActionCard(t *testing.T) {
 	fixture := newManagerFlowFixture(t)
 	stateFile := filepath.Join(fixture.dir, "launch-failed-state.json")
@@ -749,13 +773,19 @@ func (f managerFlowFixture) init(t *testing.T) string {
 }
 
 func executeManagerCommand(d deps, args ...string) (string, error) {
+	out, _, err := executeManagerCommandWithErr(d, args...)
+	return out, err
+}
+
+func executeManagerCommandWithErr(d deps, args ...string) (string, string, error) {
 	var out bytes.Buffer
+	var stderr bytes.Buffer
 	cmd := newCommand(d)
 	cmd.SetOut(&out)
-	cmd.SetErr(&bytes.Buffer{})
+	cmd.SetErr(&stderr)
 	cmd.SetArgs(args)
 	err := cmd.Execute()
-	return out.String(), err
+	return out.String(), stderr.String(), err
 }
 
 func eventRefString(t *testing.T, ndjson, key string) string {

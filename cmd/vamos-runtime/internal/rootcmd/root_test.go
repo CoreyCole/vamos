@@ -23,6 +23,13 @@ func TestRootCommandContainsExpectedSubcommands(t *testing.T) {
 	}
 }
 
+func TestRootCommandSuppressesUsageAndErrors(t *testing.T) {
+	cmd := NewCommand()
+	if !cmd.SilenceUsage || !cmd.SilenceErrors {
+		t.Fatalf("root silence flags = usage:%v errors:%v", cmd.SilenceUsage, cmd.SilenceErrors)
+	}
+}
+
 func TestNoLegacyCLIReferences(t *testing.T) {
 	root := repoRoot(t)
 	legacyName := "agents" + "ctl"

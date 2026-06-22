@@ -12,9 +12,11 @@ import (
 
 func NewCommand() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "vamos",
-		Short: "Vamos Agents developer CLI",
-		Long:  "Managed CLI for Vamos Agents workspace operations and story E2E workflows.",
+		Use:           "vamos",
+		Short:         "Vamos Agents developer CLI",
+		Long:          "Managed CLI for Vamos Agents workspace operations and story E2E workflows.",
+		SilenceUsage:  true,
+		SilenceErrors: true,
 	}
 	cmd.AddCommand(authcmd.NewCommand())
 	cmd.AddCommand(chatcmd.NewCommand())
