@@ -70,7 +70,16 @@ stop: result blocked
 next: diagnose artifact/session; steer or continue if deterministic before asking human
 ```
 
-Human gates should be summarized to the human, then sent back to the same child with `vamos qrspi steer-child --state-file <state> --feedback-file <answer.md>`. Blocked/error states should be diagnosed first; ask the human only when intent, product/safety judgment, workspace replacement, merge policy, or external authority is truly required.
+Human gates and repairable failures are surfaced as structured manager action cards. Cards include `kind`, evidence, recommended action, safe command, optional continue command, and for human gates a concise review summary to present to the human. Human gates should be summarized to the human, then sent back to the same child with `vamos qrspi steer-child --state-file <state> --feedback-file <answer.md>`. Blocked/error states should be diagnosed first; ask the human only when intent, product/safety judgment, workspace replacement, merge policy, or external authority is truly required.
+
+Self-heal commands are deterministic control-plane repairs, not durable artifact truth:
+
+```bash
+vamos qrspi repair-state --state-file <state> --align-active-child
+vamos qrspi mark-child-active --state-file <state> --child-id <id> --reason manual-reprompt
+```
+
+Use `repair-state` when active child/session/artifact evidence proves the workflow cursor is stale. Use `mark-child-active` after manual child steering/reprompting so queued wakes from an older child generation are superseded and `manager-ready` waits for the newer completion.
 
 ## Session metadata boundary
 
@@ -86,7 +95,7 @@ Reload from this manifest, `.pi/skills/q-manager/SKILL.md`, `.pi/skills/qrspi-pl
 - Retry exhaustion: wake once with `validated=false`, `manager_needed=true`, `retry_exhausted=true`, failure reason, attempts, child refs, and deterministic-recovery-first guidance.
 - Human gate, blocked, error, or retry exhaustion: keep the child pane and session refs for inspection and recovery.
 - Valid transition with `startNext=true`: mark the old child pending cleanup, launch the next graph-selected child, save the new active child, then kill the old pane.
-- Recoverable stale manager state/result mismatch: normalize state, append a local validation-recovery log, and continue instead of blocking the manager.
+- Recoverable stale manager state/result mismatch: emit a structured action card, normalize state with `repair-state` when evidence is deterministic, append a local validation-recovery log, and continue instead of blocking the manager.
 - Next launch failure: preserve the old pane/session and pending cleanup refs.
 - Cleanup failure: keep the new active child and retain pending cleanup state for later recovery.
 
@@ -103,7 +112,8 @@ Reload from this manifest, `.pi/skills/q-manager/SKILL.md`, `.pi/skills/qrspi-pl
 1. When the child reaches a valid graph result or retry exhaustion, confirm the parent pane receives one buffered wake prompt with validation fields and `param: "vamos qrspi continue --state-file <state>"`. If the manager was compacting, confirm no immediate paste occurs until `vamos qrspi manager-ready --state-file <state> --manager-pane "$TMUX_PANE"` flushes the queued wake.
 1. Run the exact `continue --state-file <state>` command from the wake.
 1. Confirm concise output and next child start or stop reason.
-1. If a human gate appears, write the answer to a file and run `vamos qrspi steer-child --state-file <state> --feedback-file <answer.md>`.
+1. If a human gate appears, confirm `action: human_gate` includes artifact/question summary, write the answer to a file, and run `vamos qrspi steer-child --state-file <state> --feedback-file <answer.md>`.
+1. If a repairable failure appears, confirm action cards include evidence and a safe command such as `repair-state --align-active-child && continue`, without launching duplicate children.
 1. If the graph starts a next child, confirm the old pane is killed only after the new pane exists.
 
 ## Verification and merge habits

@@ -20,11 +20,11 @@ Supervise QRSPI from a main Pi manager session. Launch focused child Pi sessions
 ## General guiding principles
 
 - Capture generalized manager learnings in this q-manager skill. Capture project-specific manager policy, escalation preferences, or domain workflow rules in the target project’s `docs/q-manager.md` instead.
-- Prefer deterministic self-recovery over human escalation when the failure is mechanical and evidence is sufficient. If a child did the right stage work but emitted invalid QRSPI YAML (for example wrong outcome label, invalid `next.steps` action, missing required field), inspect the child session/artifact, identify the canonical graph-valid correction, and unblock through CLI-managed validation/continuation or by steering the same child to emit the corrected result. Do not ask the human to debug parser/graph mechanics.
+- Prefer deterministic self-recovery over human escalation when the failure is mechanical and evidence is sufficient. If a child did the right stage work but emitted invalid QRSPI YAML (for example wrong outcome label, invalid `next.steps` action, missing required field), inspect the child session/artifact, identify the canonical graph-valid correction, and unblock through CLI-managed validation/continuation, action-card safe commands, or by steering the same child to emit the corrected result. Do not ask the human to debug parser/graph mechanics.
 - If manager state seems invalid or desynced, inspect it and help the pipeline recover instead of blocking. Compare `activeChild.stage`, child session/result, `workflow.current_node_id`, latest durable artifact, and graph intent. If evidence is deterministic (for example active child is `implement` and the child emitted an implementation handoff while graph cursor is stale at `review-plan` after a manual skip), repair local/ephemeral manager state or use the closest CLI recovery path, then continue. Do not mutate durable QRSPI artifacts to hide manager-state bugs.
 - Escalate to the human only when intent, product judgment, safety, workspace replacement, merge policy, or project-specific decision is ambiguous. Do not escalate merely because the manager needs to map an obvious child result to a canonical outcome.
 - Keep self-recovery evidence-based: cite the child artifact/session and the graph rule being corrected in manager prose/diagnostics. Do not invent stage results without durable child work/artifacts to back them.
-- Log q-manager recovery incidents, but do not block the pipeline merely to write a perfect report. Append a concise note to a local incident log under the manager state directory when available (for example `<state-dir>/incidents.log`) with timestamp, symptom, evidence, action taken, and follow-up needed. Incident logs are local/ephemeral diagnostics; keep durable artifacts focused on workflow truth.
+- Log q-manager recovery incidents, but do not block the pipeline merely to write a perfect report. CLI repair paths append local recovery records under the manager state directory when available. Incident logs are local/ephemeral diagnostics; keep durable artifacts focused on workflow truth.
 
 ## Rules
 
@@ -68,7 +68,7 @@ Primary loop: launch/resume child with `start-next`, then wait for a validated p
    ```bash
    vamos qrspi continue --state-file "$STATE"
    ```
-   `continue` validates the active child session JSONL, reprompts the same child while retry remains, persists canonical graph decisions for valid results, launches graph-selected next child when safe, and reports concise stop reasons. Do not paste raw validate/decide NDJSON into manager chat, and do not handcraft child correction prose.
+   `continue` validates the active child session JSONL, reprompts the same child while retry remains, persists canonical graph decisions for valid results, launches graph-selected next child when safe, and reports concise stop reasons. Repairable failures return action cards with evidence and exact safe commands such as `repair-state --align-active-child && continue`; run those commands when evidence is deterministic. Do not paste raw validate/decide NDJSON into manager chat, and do not handcraft child correction prose.
 
 For review-dir / implementation-review follow-up plans, same-workspace routing should come from previous `qrspi_result.workspace_metadata` and plan docs. If the CLI detects and summarizes it, keep the summary child-safe and minimal: do not create a new implementation copy or reset to trunk; stack follow-up implementation on the existing implementation workspace/head.
 
@@ -82,6 +82,8 @@ vamos qrspi render-prompt --state-file "$STATE" --node <node> --plan-dir <plan-d
 vamos qrspi run-child --state-file "$STATE" --plan-dir <plan-dir> --stage <node> --cwd <cwd> --prompt-file /tmp/child-prompt.md --split right --timeout 0
 vamos qrspi validate-result --state-file "$STATE" --stage <node> --plan-dir <plan-dir>
 vamos qrspi reprompt-child --state-file "$STATE" --plan-dir <plan-dir> --stage <node> --attempt <n> --error-file <validation-error-file>
+vamos qrspi repair-state --state-file "$STATE" --align-active-child
+vamos qrspi mark-child-active --state-file "$STATE" --child-id <id> --reason manual-reprompt
 vamos qrspi decide-next --state-file "$STATE" --plan-dir <plan-dir>
 ```
 
@@ -115,6 +117,9 @@ If validation fails and policy retry budget remains, `continue`/CLI retry suppor
 
 - Invalid result: keep active child pane/session and reprompt in place while retry remains.
 - Human gate, blocked, error, or retry exhaustion: keep pane/session for inspection and human steering.
+- Action cards are the first-class manager UX for repairable failures: `state_desync`, `graph_outcome_mismatch`, `workspace_moved`, `active_child_conflict`, `human_gate`, `invalid_child_yaml`, `manual_child_steer`, and `superseded_queued_wake`.
+- If `repair-state --align-active-child` is offered, use it only when active child/session/artifact evidence proves the cursor is stale; then run the paired `continue` command.
+- If you manually steer/reprompt a child after a wake queued, run `mark-child-active` so the child generation increments and stale queued wakes are not flushed.
 - Valid transition with `startNext=true`: mark old child pending cleanup; start next child; kill old pane only after the new active child is saved.
 - Next-child launch failure or cleanup failure: preserve refs in manager state for recovery.
 

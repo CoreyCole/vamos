@@ -40,6 +40,8 @@ func newCommand(d deps) *cobra.Command {
 		newRunChildCommand(d),
 		newChildCompleteCommand(d),
 		newManagerReadyCommand(d),
+		newRepairStateCommand(d),
+		newMarkChildActiveCommand(d),
 		newValidateResultCommand(d),
 		newDecideNextCommand(d),
 		newRepromptChildCommand(d),
@@ -170,6 +172,37 @@ func newManagerReadyCommand(d deps) *cobra.Command {
 	}
 	cmd.Flags().StringVar(&opts.StateFile, "state-file", "", "q-manager state file")
 	cmd.Flags().StringVar(&opts.ManagerPane, "manager-pane", "", "tmux pane ID for the resumed parent q-manager session")
+	cmd.Flags().StringVar(&opts.Output, "output", "text", "output format: text or ndjson")
+	return cmd
+}
+
+func newRepairStateCommand(d deps) *cobra.Command {
+	opts := RepairStateOptions{Output: "text"}
+	cmd := &cobra.Command{
+		Use:   "repair-state --state-file <file> --align-active-child",
+		Short: "Repair q-manager workflow state from active child evidence",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return RunRepairState(cmd.Context(), opts, d, cmd.OutOrStdout())
+		},
+	}
+	cmd.Flags().StringVar(&opts.StateFile, "state-file", "", "q-manager state file")
+	cmd.Flags().BoolVar(&opts.AlignActiveChild, "align-active-child", false, "align current workflow node to the active child stage when safe")
+	cmd.Flags().StringVar(&opts.Output, "output", "text", "output format: text or ndjson")
+	return cmd
+}
+
+func newMarkChildActiveCommand(d deps) *cobra.Command {
+	opts := MarkChildActiveOptions{Output: "text"}
+	cmd := &cobra.Command{
+		Use:   "mark-child-active --state-file <file> --child-id <id>",
+		Short: "Mark an active child as manually reprompted and supersede stale queued wakes",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return RunMarkChildActive(cmd.Context(), opts, d, cmd.OutOrStdout())
+		},
+	}
+	cmd.Flags().StringVar(&opts.StateFile, "state-file", "", "q-manager state file")
+	cmd.Flags().StringVar(&opts.ChildID, "child-id", "", "active child ID")
+	cmd.Flags().StringVar(&opts.Reason, "reason", "manual-reprompt", "reason for marking child active")
 	cmd.Flags().StringVar(&opts.Output, "output", "text", "output format: text or ndjson")
 	return cmd
 }
@@ -1221,7 +1254,7 @@ func flushQueuedWake(ctx context.Context, state ManagerState, pane string, d dep
 	}
 	if state.ActiveChild != nil {
 		if queued.ChildGeneration != activeChildGeneration(state) || state.ActiveChild.LifecycleStatus == "running" || state.ActiveChild.LifecycleStatus == "manual_reprompt" {
-			state.LastActionCard = &ManagerActionCard{Kind: "superseded_queued_wake", Severity: "info", Summary: "queued child wake superseded by active child generation", RecommendedAction: "wait for newer child completion", RequiresHuman: false}
+			state.LastActionCard = &ManagerActionCard{Kind: ActionSupersededQueuedWake, Severity: "info", Summary: "queued child wake superseded by active child generation", RecommendedAction: "wait for newer child completion", RequiresHuman: false}
 			state.Delivery.QueuedWake = nil
 			return state, false, nil
 		}
@@ -1248,8 +1281,83 @@ func supersedeQueuedWakeForActiveChild(state ManagerState, childID string, reaso
 		return state
 	}
 	state.Delivery.QueuedWake = nil
-	state.LastActionCard = &ManagerActionCard{Kind: "superseded_queued_wake", Severity: "info", Summary: reason, RecommendedAction: "wait for newer child completion", RequiresHuman: false}
+	state.LastActionCard = &ManagerActionCard{Kind: ActionSupersededQueuedWake, Severity: "info", Summary: reason, RecommendedAction: "wait for newer child completion", RequiresHuman: false}
 	return state
+}
+
+func RunRepairState(ctx context.Context, opts RepairStateOptions, d deps, out io.Writer) error {
+	_ = ctx
+	if strings.TrimSpace(opts.StateFile) == "" {
+		return errors.New("state-file is required")
+	}
+	if !opts.AlignActiveChild {
+		return errors.New("--align-active-child is required")
+	}
+	out = ensureWriter(out)
+	store := stateStore(d, "", time.Now)
+	state, err := store.Load(opts.StateFile)
+	if err != nil {
+		return err
+	}
+	if state.ActiveChild == nil || strings.TrimSpace(state.ActiveChild.Stage) == "" {
+		return errors.New("no active child evidence to align")
+	}
+	card := buildStateDesyncActionCard(state, opts.StateFile, fmt.Errorf("workflow cursor %s differs from active child %s", state.Workflow.CurrentNodeID, state.ActiveChild.Stage))
+	state.Workflow.CurrentNodeID = wruntime.NodeID(state.ActiveChild.Stage)
+	state.LastActionCard = &card
+	if err := appendRecoveryIncident(opts.StateFile, card, true); err != nil {
+		return err
+	}
+	if err := store.Save(opts.StateFile, state); err != nil {
+		return err
+	}
+	if strings.EqualFold(opts.Output, "ndjson") {
+		return writeManagerActionCard(out, card, opts.Output)
+	}
+	fmt.Fprintf(out, "repaired: aligned current node to active child %s\n", state.ActiveChild.Stage)
+	return writeManagerActionCard(out, card, opts.Output)
+}
+
+func RunMarkChildActive(ctx context.Context, opts MarkChildActiveOptions, d deps, out io.Writer) error {
+	_ = ctx
+	if strings.TrimSpace(opts.StateFile) == "" {
+		return errors.New("state-file is required")
+	}
+	if strings.TrimSpace(opts.ChildID) == "" {
+		return errors.New("child-id is required")
+	}
+	out = ensureWriter(out)
+	store := stateStore(d, "", time.Now)
+	state, err := store.Load(opts.StateFile)
+	if err != nil {
+		return err
+	}
+	if state.ActiveChild == nil || state.ActiveChild.ID != strings.TrimSpace(opts.ChildID) {
+		return fmt.Errorf("active child does not match requested child %q", opts.ChildID)
+	}
+	state.ActiveChild.LifecycleStatus = "manual_reprompt"
+	state.ActiveChild.Generation = activeChildGeneration(state) + 1
+	state = supersedeQueuedWakeForActiveChild(state, state.ActiveChild.ID, markChildActiveReason(opts.Reason))
+	if state.LastActionCard == nil {
+		card := manualChildSteerActionCard(state, opts.StateFile)
+		state.LastActionCard = &card
+	}
+	if err := store.Save(opts.StateFile, state); err != nil {
+		return err
+	}
+	if strings.EqualFold(opts.Output, "ndjson") {
+		return WriteNDJSON(out, Event{Type: "child_marked_active", ActionCard: state.LastActionCard, Ref: childRef(state.ActiveChild)})
+	}
+	fmt.Fprintf(out, "child active: %s generation %d\n", state.ActiveChild.ID, state.ActiveChild.Generation)
+	return writeManagerActionCard(out, *state.LastActionCard, opts.Output)
+}
+
+func markChildActiveReason(reason string) string {
+	reason = strings.TrimSpace(reason)
+	if reason == "" {
+		reason = "manual reprompt marked child active"
+	}
+	return reason
 }
 
 func RunValidateResult(ctx context.Context, opts ValidateResultOptions, d deps, out io.Writer) error {
@@ -1468,6 +1576,12 @@ func RunContinue(ctx context.Context, opts ContinueOptions, d deps, out io.Write
 		return errors.New("plan-dir is required")
 	}
 	if state.ActiveChild == nil {
+		card := buildContinueActionCard(state, opts, errors.New("no active child to continue"))
+		state.LastActionCard = card
+		_ = store.Save(opts.StateFile, state)
+		if card != nil {
+			return writeManagerActionCard(out, *card, opts.Output)
+		}
 		return errors.New("no active child to continue")
 	}
 	if strings.TrimSpace(opts.Stage) == "" {
@@ -1490,7 +1604,18 @@ func RunContinue(ctx context.Context, opts ContinueOptions, d deps, out io.Write
 		}
 		if isRetryExhaustedValidationError(state, opts, err) {
 			result.StopReason = err.Error()
+			card := buildContinueActionCard(state, opts, err)
+			if card != nil {
+				state.LastActionCard = card
+				_ = store.Save(opts.StateFile, state)
+			}
 			return writeRetryExhaustedNotice(out, opts, state, err)
+		}
+		card := buildContinueActionCard(state, opts, err)
+		if card != nil {
+			state.LastActionCard = card
+			_ = store.Save(opts.StateFile, state)
+			return writeManagerActionCard(out, *card, opts.Output)
 		}
 		return err
 	}
@@ -1507,6 +1632,10 @@ func RunContinue(ctx context.Context, opts ContinueOptions, d deps, out io.Write
 	result.StopReason = parsed.Decision.StopReason
 	if result.WaitingHuman {
 		result.HumanPrompt = humanPromptContext(state, opts.StateFile, parsed)
+		card := humanGateActionCard(state, opts.StateFile, result.HumanPrompt)
+		result.ActionCard = &card
+		nextState.LastActionCard = &card
+		_ = store.Save(opts.StateFile, nextState)
 	}
 
 	if parsed.Decision.StartNext {
@@ -1720,11 +1849,137 @@ func humanPromptContext(state ManagerState, stateFile string, parsed ParsedDecis
 	}
 }
 
+func buildContinueActionCard(state ManagerState, opts ContinueOptions, err error) *ManagerActionCard {
+	if state.ActiveChild == nil {
+		return &ManagerActionCard{Kind: ActionActiveChildConflict, Severity: "warning", Summary: "no active child to continue", Evidence: []string{fmt.Sprintf("current node: %s", state.Workflow.CurrentNodeID)}, RecommendedAction: "start or inspect the graph-selected child", SafeCommand: fmt.Sprintf("vamos qrspi start-next --state-file %s", opts.StateFile), ContinueCommand: continueCommand(opts.StateFile), RequiresHuman: false}
+	}
+	if err == nil {
+		return nil
+	}
+	if state.ActiveChild.Stage != string(state.Workflow.CurrentNodeID) {
+		card := buildStateDesyncActionCard(state, opts.StateFile, err)
+		return &card
+	}
+	if looksWorkspaceMoved(state, err) {
+		return &ManagerActionCard{Kind: ActionWorkspaceMoved, Severity: "warning", Summary: "implementation workspace differs from current child cwd", Evidence: workspaceMovedEvidence(state), RecommendedAction: "run q-manager continue from the recorded implementation workspace", SafeCommand: fmt.Sprintf("cd %q && vamos qrspi continue --state-file %s", state.ImplementationCwd, opts.StateFile), ContinueCommand: continueCommand(opts.StateFile), RequiresHuman: false}
+	}
+	kind := ActionInvalidChildYAML
+	if strings.Contains(strings.ToLower(err.Error()), "canonical qrspi graph rejected") || strings.Contains(strings.ToLower(err.Error()), "outcome") {
+		kind = ActionGraphOutcomeMismatch
+	}
+	return &ManagerActionCard{Kind: kind, Severity: "warning", Summary: "child result needs deterministic repair", Evidence: []string{err.Error(), fmt.Sprintf("active child stage: %s", state.ActiveChild.Stage), fmt.Sprintf("retry: %d/%d", state.ActiveChild.ValidationRetryCount, invalidResultRetryLimit(state))}, RecommendedAction: "reprompt or steer the active child with canonical YAML", SafeCommand: fmt.Sprintf("vamos qrspi reprompt-child --state-file %s --plan-dir %s --stage %s --attempt %d", opts.StateFile, opts.PlanDir, state.ActiveChild.Stage, state.ActiveChild.ValidationRetryCount+1), ContinueCommand: continueCommand(opts.StateFile), RequiresHuman: false}
+}
+
+func buildStateDesyncActionCard(state ManagerState, stateFile string, err error) ManagerActionCard {
+	evidence := []string{fmt.Sprintf("current node: %s", state.Workflow.CurrentNodeID)}
+	if state.ActiveChild != nil {
+		evidence = append(evidence, fmt.Sprintf("active child stage: %s", state.ActiveChild.Stage), fmt.Sprintf("active child id: %s", state.ActiveChild.ID))
+		if state.ActiveChild.SessionPath != "" {
+			evidence = append(evidence, fmt.Sprintf("session: %s", state.ActiveChild.SessionPath))
+		}
+	}
+	if err != nil {
+		evidence = append(evidence, err.Error())
+	}
+	return ManagerActionCard{Kind: ActionStateDesync, Severity: "warning", Summary: "workflow cursor and active child are out of sync", Evidence: evidence, RecommendedAction: "align active child, then continue", SafeCommand: fmt.Sprintf("vamos qrspi repair-state --state-file %s --align-active-child && vamos qrspi continue --state-file %s", stateFile, stateFile), ContinueCommand: continueCommand(stateFile), RequiresHuman: false}
+}
+
+func humanGateActionCard(state ManagerState, stateFile string, prompt HumanPromptContext) ManagerActionCard {
+	review := strings.TrimSpace(prompt.Summary)
+	if review == "" {
+		review = fmt.Sprintf("review %s artifact before steering feedback", prompt.Stage)
+	}
+	evidence := []string{fmt.Sprintf("stage: %s", prompt.Stage), fmt.Sprintf("status: %s", prompt.Status)}
+	if prompt.Artifact != "" {
+		evidence = append(evidence, fmt.Sprintf("artifact: %s", prompt.Artifact))
+	}
+	return ManagerActionCard{Kind: ActionHumanGate, Severity: "info", Summary: "child requested human input", Evidence: evidence, RecommendedAction: "summarize the artifact/question for the human, then steer the same child", ReviewSummary: review, SafeCommand: fmt.Sprintf("vamos qrspi steer-child --state-file %s --feedback-file <file>", stateFile), ContinueCommand: continueCommand(stateFile), RequiresHuman: true}
+}
+
+func manualChildSteerActionCard(state ManagerState, stateFile string) ManagerActionCard {
+	evidence := []string{}
+	if state.ActiveChild != nil {
+		evidence = append(evidence, fmt.Sprintf("active child: %s", state.ActiveChild.ID), fmt.Sprintf("generation: %d", activeChildGeneration(state)))
+	}
+	return ManagerActionCard{Kind: ActionManualChildSteer, Severity: "info", Summary: "child marked active after manual steering", Evidence: evidence, RecommendedAction: "wait for newer completion before flushing queued wakes", SafeCommand: continueCommand(stateFile), ContinueCommand: continueCommand(stateFile), RequiresHuman: false}
+}
+
+func looksWorkspaceMoved(state ManagerState, err error) bool {
+	if strings.TrimSpace(state.ImplementationCwd) == "" || state.ActiveChild == nil {
+		return false
+	}
+	if state.ActiveChild.Cwd != "" && filepath.Clean(state.ActiveChild.Cwd) != filepath.Clean(state.ImplementationCwd) {
+		return true
+	}
+	return strings.Contains(strings.ToLower(err.Error()), "workspace") || strings.Contains(strings.ToLower(err.Error()), "cwd")
+}
+
+func workspaceMovedEvidence(state ManagerState) []string {
+	evidence := []string{fmt.Sprintf("implementation workspace: %s", state.ImplementationCwd)}
+	if state.ActiveChild != nil {
+		evidence = append(evidence, fmt.Sprintf("active child cwd: %s", state.ActiveChild.Cwd))
+	}
+	return evidence
+}
+
+func writeManagerActionCard(out io.Writer, card ManagerActionCard, mode string) error {
+	if strings.EqualFold(mode, "ndjson") || strings.EqualFold(mode, "json") {
+		return WriteNDJSON(out, Event{Type: "manager_action", ActionCard: &card})
+	}
+	if card.Kind != "" {
+		fmt.Fprintf(out, "action: %s\n", card.Kind)
+	}
+	if card.Summary != "" {
+		fmt.Fprintf(out, "summary: %s\n", card.Summary)
+	}
+	for _, evidence := range card.Evidence {
+		fmt.Fprintf(out, "evidence: %s\n", evidence)
+	}
+	if card.ReviewSummary != "" {
+		fmt.Fprintf(out, "review: %s\n", card.ReviewSummary)
+	}
+	if card.RecommendedAction != "" {
+		fmt.Fprintf(out, "recommended: %s\n", card.RecommendedAction)
+	}
+	if card.SafeCommand != "" {
+		fmt.Fprintf(out, "safe command: %s\n", card.SafeCommand)
+	}
+	if card.ContinueCommand != "" {
+		fmt.Fprintf(out, "continue: %s\n", card.ContinueCommand)
+	}
+	return nil
+}
+
+func appendRecoveryIncident(stateFile string, card ManagerActionCard, recovered bool) error {
+	if strings.TrimSpace(stateFile) == "" {
+		return nil
+	}
+	entry := ValidationRecoveryLog{Timestamp: time.Now(), StateFile: stateFile, Recovered: recovered, RecoveryAction: card.Kind, Reason: card.Summary}
+	data, err := json.Marshal(entry)
+	if err != nil {
+		return err
+	}
+	path := filepath.Join(filepath.Dir(stateFile), "validation-recoveries.jsonl")
+	f, err := os.OpenFile(path, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	_, err = f.Write(append(data, '\n'))
+	return err
+}
+
 func writeContinueOutput(out io.Writer, opts ContinueOptions, result ContinueResult) error {
 	if strings.EqualFold(opts.Output, "ndjson") {
-		return WriteNDJSON(out, Event{Type: "continued", Decision: result.Validated, Ref: continueRef(result)})
+		return WriteNDJSON(out, Event{Type: "continued", Decision: result.Validated, ActionCard: result.ActionCard, Ref: continueRef(result)})
 	}
-	return writeContinueText(out, result)
+	if err := writeContinueText(out, result); err != nil {
+		return err
+	}
+	if result.ActionCard != nil {
+		return writeManagerActionCard(out, *result.ActionCard, opts.Output)
+	}
+	return nil
 }
 
 func writeContinueText(out io.Writer, result ContinueResult) error {
@@ -1802,6 +2057,9 @@ func continueRef(result ContinueResult) map[string]any {
 	}
 	if result.StopReason != "" {
 		ref["stopReason"] = result.StopReason
+	}
+	if result.ActionCard != nil {
+		ref["actionCardKind"] = result.ActionCard.Kind
 	}
 	if result.StartedChild != nil {
 		ref["startedChild"] = childRef(result.StartedChild)

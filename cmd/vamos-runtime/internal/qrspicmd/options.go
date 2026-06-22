@@ -147,6 +147,30 @@ type ManagerActionCard struct {
 	RecoveryLogPath   string   `json:"recoveryLogPath,omitempty"`
 }
 
+const (
+	ActionStateDesync          = "state_desync"
+	ActionGraphOutcomeMismatch = "graph_outcome_mismatch"
+	ActionWorkspaceMoved       = "workspace_moved"
+	ActionActiveChildConflict  = "active_child_conflict"
+	ActionHumanGate            = "human_gate"
+	ActionInvalidChildYAML     = "invalid_child_yaml"
+	ActionManualChildSteer     = "manual_child_steer"
+	ActionSupersededQueuedWake = "superseded_queued_wake"
+)
+
+type RepairStateOptions struct {
+	StateFile        string
+	AlignActiveChild bool
+	Output           string
+}
+
+type MarkChildActiveOptions struct {
+	StateFile string
+	ChildID   string
+	Reason    string
+	Output    string
+}
+
 type ValidationRecoveryLog struct {
 	Timestamp        time.Time `json:"timestamp"`
 	StateFile        string    `json:"stateFile,omitempty"`
@@ -232,6 +256,7 @@ type ContinueResult struct {
 	NextNodeID      wruntime.NodeID
 	PrimaryArtifact string
 	HumanPrompt     HumanPromptContext
+	ActionCard      *ManagerActionCard
 }
 
 type HumanPromptContext struct {

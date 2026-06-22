@@ -23,7 +23,7 @@ func TestRootRequiresExplicitSubcommand(t *testing.T) {
 
 func TestSubcommandsExist(t *testing.T) {
 	cmd := NewCommand()
-	for _, name := range []string{"init", "start-next", "steer-child", "run-child", "validate-result", "decide-next", "reprompt-child", "continue", "render-prompt"} {
+	for _, name := range []string{"init", "start-next", "steer-child", "run-child", "child-complete", "manager-ready", "repair-state", "mark-child-active", "validate-result", "decide-next", "reprompt-child", "continue", "render-prompt"} {
 		found := false
 		for _, child := range cmd.Commands() {
 			if child.Name() == name {
@@ -169,8 +169,14 @@ func TestContinueRequiresStateAndActiveChild(t *testing.T) {
 	if err := (FileStateStore{}).Save(stateFile, ManagerState{CanonicalPlanDir: "thoughts/example", Workflow: testWorkflowState(t, "question", nil)}); err != nil {
 		t.Fatal(err)
 	}
-	err := executeForError("continue", "--state-file", stateFile)
-	assertErrorContains(t, err, "no active child to continue")
+	out := &bytes.Buffer{}
+	err := executeForErrorWithDeps(out, deps{}, "continue", "--state-file", stateFile)
+	if err != nil {
+		t.Fatalf("continue without active child should emit action card, got %v", err)
+	}
+	if !strings.Contains(out.String(), "action: active_child_conflict") || !strings.Contains(out.String(), "start-next --state-file") {
+		t.Fatalf("continue output = %q", out.String())
+	}
 }
 
 func TestRenderPromptRequiresStateAndNode(t *testing.T) {

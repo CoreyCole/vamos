@@ -6,10 +6,11 @@ import (
 )
 
 type Event struct {
-	Type     string          `json:"type"`
-	Ref      map[string]any  `json:"ref,omitempty"`
-	Decision *ParsedDecision `json:"decision,omitempty"`
-	Error    string          `json:"error,omitempty"`
+	Type       string             `json:"type"`
+	Ref        map[string]any     `json:"ref,omitempty"`
+	Decision   *ParsedDecision    `json:"decision,omitempty"`
+	ActionCard *ManagerActionCard `json:"actionCard,omitempty"`
+	Error      string             `json:"error,omitempty"`
 }
 
 func WriteNDJSON(out io.Writer, event Event) error {
