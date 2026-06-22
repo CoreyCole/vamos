@@ -186,4 +186,16 @@ func TestHTMLAppletRendererReturnsSandboxedFrame(t *testing.T) {
 	if strings.Contains(html, "allow-same-origin") {
 		t.Fatalf("sandbox permits same-origin: %s", html)
 	}
+	if strings.Contains(html, "HTML applet:") {
+		t.Fatalf("HTML renderer includes duplicate chrome: %s", html)
+	}
+	if strings.Contains(html, "max-w-6xl") || strings.Contains(html, "mx-auto") {
+		t.Fatalf("HTML renderer keeps capped wrapper classes: %s", html)
+	}
+	if !strings.Contains(html, `referrerpolicy="same-origin"`) {
+		t.Fatalf("missing referrer policy: %s", html)
+	}
+	if !strings.Contains(html, `class="min-h-[70vh] w-full flex-1`) {
+		t.Fatalf("iframe no longer fills available width/height: %s", html)
+	}
 }

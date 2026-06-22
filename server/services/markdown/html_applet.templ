@@ -1,10 +1,7 @@
 package markdown
 
 templ HTMLAppletFrame(docPath string, src string) {
-	<section class="mx-auto flex min-h-[70vh] w-full max-w-6xl flex-col gap-3">
-		<div class="rounded-lg border border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
-			HTML applet: <span class="font-mono text-foreground">{ docPath }</span>
-		</div>
+	<section class="flex min-h-[70vh] w-full flex-1 flex-col">
 		<iframe
 			data-vamos-html-applet
 			title={ "HTML applet " + docPath }
