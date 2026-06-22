@@ -7,81 +7,23 @@ import (
 	"github.com/CoreyCole/vamos/pkg/datastarui/components/textarea"
 )
 
-templ PickleballWorkbenchGuide(vm PickleballViewModel) {
-	<aside id="pickleball-workbench-guide-panel" class="flex h-full min-h-0 flex-col bg-card/40">
-		<div class="shrink-0 border-b border-border px-4 py-3">
-			<p class="text-xs font-semibold uppercase tracking-wide text-primary">Vamos workbench</p>
-			<h2 class="mt-1 text-base font-semibold text-foreground">Self-modifying app</h2>
-			<p class="mt-1 text-xs text-muted-foreground">Chat edits a generated Go bundle. Runner snapshots safe HTML + CSV artifacts.</p>
-		</div>
-		<div class="min-h-0 flex-1 overflow-y-auto p-3">
-			@card.Card(card.CardArgs{}) {
-				@card.CardHeader(card.CardHeaderArgs{Class: "pb-2"}) {
-					@card.CardTitle(card.CardTitleArgs{Class: "text-sm"}) {
-						Workbench loop
-					}
-					@card.CardDescription(card.CardDescriptionArgs{}) {
-						Backend state drives preview and chat panels.
-					}
-				}
-				@card.CardContent(card.CardContentArgs{Class: "space-y-3 text-sm"}) {
-					@WorkbenchStep("1", "Prompt", "Ask for matchup, CSV, or visual changes.", vm.State == AppStateGenerating)
-					@WorkbenchStep("2", "Build", "Vamos runs the generated Go bundle with guardrails.", vm.State == AppStateBuilding)
-					@WorkbenchStep("3", "Preview", "Latest successful snapshot renders through Thoughts.", vm.State == AppStateSucceeded)
-				}
-			}
-			@card.Card(card.CardArgs{Class: "mt-3"}) {
-				@card.CardHeader(card.CardHeaderArgs{Class: "pb-2"}) {
-					@card.CardTitle(card.CardTitleArgs{Class: "text-sm"}) {
-						Current workspace
-					}
-					@card.CardDescription(card.CardDescriptionArgs{}) {
-						Generated bundle state
-					}
-				}
-				@card.CardContent(card.CardContentArgs{Class: "space-y-2 text-xs text-muted-foreground"}) {
-					<div class="flex items-center justify-between gap-2">
-						<span>Status</span>
-						<span class={ stateChipClass(vm.State) }>{ stateLabel(vm.State) }</span>
-					</div>
-					if previewSnapshot(vm) != nil {
-						<p>Last good build ready for share and restore-to-AI.</p>
-					} else {
-						<p>No snapshot yet. Send a chat prompt to create the first build.</p>
-					}
-				}
-			}
-		</div>
-	</aside>
-}
-
-templ WorkbenchStep(number string, title string, description string, active bool) {
-	<div class={ "flex gap-3 rounded-lg border border-border p-3", templ.KV("bg-primary/10 border-primary/40", active) }>
-		<span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-semibold text-muted-foreground">{ number }</span>
-		<div class="min-w-0">
-			<p class="font-medium text-foreground">{ title }</p>
-			<p class="text-xs text-muted-foreground">{ description }</p>
-		</div>
-	</div>
-}
-
 templ StatePanel(vm PickleballViewModel) {
 	<section id="pickleball-state" class="flex h-full min-h-0 flex-col overflow-hidden bg-background">
 		<header class="shrink-0 border-b border-border px-4 py-3">
 			<div class="flex items-start justify-between gap-3">
 				<div class="min-w-0">
-					<p class="text-xs font-semibold uppercase tracking-wide text-primary">Generated preview</p>
-					<h1 class="truncate text-xl font-semibold tracking-tight text-foreground">Self-modifying pickleball</h1>
-					<p class="mt-1 text-sm text-muted-foreground">Inspect the last successful generated HTML applet and CSV output.</p>
+					<p class="text-xs font-semibold uppercase tracking-wide text-primary">Files</p>
+					<h1 class="truncate text-xl font-semibold tracking-tight text-foreground">Pickleball tournament app</h1>
+					<p class="mt-1 text-sm text-muted-foreground">Open your tournament files and use the app here.</p>
 				</div>
 				<span class={ stateChipClass(vm.State) }>{ stateLabel(vm.State) }</span>
 			</div>
 		</header>
 		<div class="min-h-0 flex-1 space-y-4 overflow-y-auto p-3 md:p-4">
+			@UserNoticePanel(vm)
 			@PreviewCard(vm)
-			@StatusCard(vm)
 		</div>
-		if vm.State == AppStateSucceeded && vm.Current != nil {
+		if vm.State == AppStateSucceeded {
 			@BuildToast(vm)
 		}
 	</section>
@@ -90,9 +32,9 @@ templ StatePanel(vm PickleballViewModel) {
 templ ChatToModifyPanel(vm PickleballViewModel) {
 	<aside id="pickleball-chat-panel" class="flex h-full min-h-0 flex-col bg-card">
 		<div class="shrink-0 border-b border-border px-4 py-3">
-			<p class="text-xs font-semibold uppercase tracking-wide text-primary">Agent chat</p>
-			<h2 class="text-base font-semibold text-foreground">Chat to self-modify</h2>
-			<p class="mt-1 text-xs text-muted-foreground">Your prompt edits the mutable generated bundle, then Vamos builds a new snapshot.</p>
+			<p class="text-xs font-semibold uppercase tracking-wide text-primary">Chat</p>
+			<h2 class="text-base font-semibold text-foreground">Ask for changes</h2>
+			<p class="mt-1 text-xs text-muted-foreground">Describe what you want the tournament app to do next.</p>
 		</div>
 		<div class="min-h-0 flex-1 overflow-y-auto p-3">
 			@card.Card(card.CardArgs{}) {
@@ -101,24 +43,24 @@ templ ChatToModifyPanel(vm PickleballViewModel) {
 						Conversation
 					}
 					@card.CardDescription(card.CardDescriptionArgs{}) {
-						Tell the app what to change next.
+						Plain-language requests are enough.
 					}
 				}
 				@card.CardContent(card.CardContentArgs{Class: "space-y-3 text-sm"}) {
 					<div class="rounded-2xl bg-muted px-3 py-2 text-muted-foreground">
 						<p class="font-medium text-foreground">Pi</p>
-						<p>Ask for a rule, CSV, or visual change. I will rewrite the generated Go bundle and keep the previous good preview safe.</p>
+						<p>Tell me what to change: pairings, rules, schedule files, colors, wording, or layout.</p>
 					</div>
 					if vm.State == AppStateGenerating || vm.State == AppStateBuilding {
 						<div class="rounded-2xl border border-primary/30 bg-primary/10 px-3 py-2 text-primary">
 							<p class="font-medium">Working</p>
-							<p>{ stateLabel(vm.State) } latest prompt…</p>
+							<p>I'm working on that change. Your current app stays available.</p>
 						</div>
 					}
-					if vm.ErrorMessage != "" {
-						<div class="rounded-2xl border border-destructive/20 bg-destructive/10 px-3 py-2 text-destructive">
-							<p class="font-medium">Build failed</p>
-							<p>{ vm.ErrorMessage }</p>
+					if vm.State == AppStateFailed {
+						<div class="rounded-2xl border border-amber-300 bg-amber-50 px-3 py-2 text-amber-900 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-100">
+							<p class="font-medium">App unchanged</p>
+							<p>{ friendlyFailureMessage(vm) }</p>
 						</div>
 					}
 				}
@@ -130,31 +72,12 @@ templ ChatToModifyPanel(vm PickleballViewModel) {
 	</aside>
 }
 
-templ StatusCard(vm PickleballViewModel) {
-	@card.Card(card.CardArgs{Attributes: templ.Attributes{"id": "pickleball-status"}}) {
-		@card.CardHeader(card.CardHeaderArgs{}) {
-			@card.CardTitle(card.CardTitleArgs{Class: "flex items-center justify-between gap-3 text-base"}) {
-				<span>Build status</span>
-				<span class={ stateChipClass(vm.State) }>{ stateLabel(vm.State) }</span>
-			}
-			@card.CardDescription(card.CardDescriptionArgs{}) {
-				Backend source of truth. Short prompt writes; SSE morphs confirmed state.
-			}
-		}
-		@card.CardContent(card.CardContentArgs{}) {
-			if vm.ErrorMessage != "" {
-				<div class="rounded-2xl border border-destructive/20 bg-destructive/10 p-3 text-sm text-destructive">
-					<p class="font-medium">Last build failed. Last-good preview preserved.</p>
-					<p class="mt-1">{ vm.ErrorMessage }</p>
-				</div>
-			}
-			if vm.LogTail != "" {
-				<pre class="mt-3 max-h-40 overflow-auto rounded-2xl bg-muted p-3 text-xs text-muted-foreground">{ vm.LogTail }</pre>
-			}
-			if vm.ErrorMessage == "" && vm.LogTail == "" {
-				<p class="text-sm text-muted-foreground">No errors. Last successful snapshot remains available while new builds run.</p>
-			}
-		}
+templ UserNoticePanel(vm PickleballViewModel) {
+	{{ message := userNoticeMessage(vm) }}
+	if message != "" {
+		<div id="pickleball-user-notice" class={ noticeClass(vm.State) }>
+			{ message }
+		</div>
 	}
 }
 
@@ -174,14 +97,14 @@ templ PromptComposer(vm PickleballViewModel) {
 				ID:          "pickleball-prompt",
 				Name:        "prompt",
 				Rows:        4,
-				Placeholder: "Add a CSV column explaining skill totals.",
+				Placeholder: "Make teams fairer and add a printable schedule.",
 				Class:       "min-h-28 resize-none",
 				Attributes: templ.Attributes{
 					"data-ignore-morph": true,
 				},
 			})
 			@form.FormDescription(form.FormDescriptionArgs{}) {
-				Try changing pairings, CSV columns, colors, or mobile layout.
+				Try changing pairings, files, colors, wording, or mobile layout.
 			}
 		}
 		<div class="flex items-center justify-end gap-2">
@@ -193,7 +116,7 @@ templ PromptComposer(vm PickleballViewModel) {
 					"data-attr-disabled": "$fetching",
 				},
 			}) {
-				<span data-show="!$fetching">Send to Pi</span>
+				<span data-show="!$fetching">Send</span>
 				<span data-show="$fetching">Sending…</span>
 			}
 		</div>
@@ -217,9 +140,45 @@ templ PromptComposer(vm PickleballViewModel) {
 
 templ BuildToast(vm PickleballViewModel) {
 	<div id="pickleball-build-toast" class="fixed right-4 top-20 z-30 max-w-sm rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900 shadow-lg dark:border-emerald-900 dark:bg-emerald-950 dark:text-emerald-100">
-		<p class="font-semibold">New build ready</p>
-		if vm.Share.PreviewURL != "" {
-			<a class="mt-2 inline-flex font-medium underline" href={ vm.Share.PreviewURL }>Open preview</a>
-		}
+		<p class="font-semibold">App updated</p>
+		<p class="mt-1">Done — I updated the app and files.</p>
 	</div>
+}
+
+func userNoticeMessage(vm PickleballViewModel) string {
+	if vm.State == AppStateFailed {
+		return friendlyFailureMessage(vm)
+	}
+	if vm.UserMessage != "" {
+		return vm.UserMessage
+	}
+	switch vm.State {
+	case AppStateGenerating, AppStateBuilding:
+		return "I'm working on that change. Your current app stays available."
+	case AppStateSucceeded:
+		return "Done — I updated the app and files."
+	default:
+		return ""
+	}
+}
+
+func friendlyFailureMessage(vm PickleballViewModel) string {
+	if vm.UserMessage != "" {
+		return vm.UserMessage
+	}
+	return "I couldn't make that change safely. Your app is unchanged."
+}
+
+func noticeClass(state AppState) string {
+	base := "rounded-2xl border px-4 py-3 text-sm"
+	switch state {
+	case AppStateFailed:
+		return base + " border-amber-300 bg-amber-50 text-amber-900 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-100"
+	case AppStateSucceeded:
+		return base + " border-emerald-200 bg-emerald-50 text-emerald-900 dark:border-emerald-900 dark:bg-emerald-950 dark:text-emerald-100"
+	case AppStateGenerating, AppStateBuilding:
+		return base + " border-blue-200 bg-blue-50 text-blue-900 dark:border-blue-900 dark:bg-blue-950 dark:text-blue-100"
+	default:
+		return base + " border-border bg-muted text-muted-foreground"
+	}
 }

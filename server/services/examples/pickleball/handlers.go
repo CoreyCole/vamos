@@ -32,9 +32,6 @@ func (s *Service) HandleStateStream(c echo.Context) error {
 		if err != nil {
 			return err
 		}
-		if err := sse.PatchElementTempl(PickleballWorkbenchGuide(vm)); err != nil {
-			return err
-		}
 		if err := sse.PatchElementTempl(StatePanel(vm)); err != nil {
 			return err
 		}

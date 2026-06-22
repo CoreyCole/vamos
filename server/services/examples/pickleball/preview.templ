@@ -5,105 +5,43 @@ import (
 
 	"github.com/CoreyCole/vamos/pkg/datastarui/components/button"
 	"github.com/CoreyCole/vamos/pkg/datastarui/components/card"
-	"github.com/CoreyCole/vamos/pkg/datastarui/components/input"
 )
 
 templ PreviewCard(vm PickleballViewModel) {
-	{{ snapshot := previewSnapshot(vm) }}
 	@card.Card(card.CardArgs{Attributes: templ.Attributes{"id": "pickleball-preview"}, Class: "overflow-hidden"}) {
 		@card.CardHeader(card.CardHeaderArgs{Class: "border-b border-border"}) {
 			<div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
 				<div>
 					@card.CardTitle(card.CardTitleArgs{Class: "text-lg"}) {
-						Current build preview
+						Files and app
 					}
 					@card.CardDescription(card.CardDescriptionArgs{}) {
-						if snapshot != nil {
-							{ snapshot.PromptSummary }
-						} else {
-							No build yet. Send a chat prompt to create the first generated preview.
-						}
+						Your tournament files and live app stay here while changes are prepared.
 					}
 				</div>
-				if snapshot != nil {
-					<div class="flex flex-wrap gap-2">
-						@button.LinkButton(button.LinkButtonArgs{Href: LatestPreviewURL(*snapshot), Size: "sm"}) {
-							Open preview
-						}
-						@button.LinkButton(button.LinkButtonArgs{Href: CSVDownloadURL(*snapshot), Variant: "outline", Size: "sm"}) {
-							Open CSV
-						}
-					</div>
-				}
+				<div class="flex flex-wrap gap-2">
+					@button.LinkButton(button.LinkButtonArgs{Href: "/examples/pickleball/app/", Size: "sm"}) {
+						Open app
+					}
+				</div>
 			</div>
 		}
-		if snapshot != nil {
-			<div class="grid min-h-[34rem] gap-0 lg:grid-cols-[minmax(0,1fr)_18rem]">
-				<div class="bg-muted/40 p-3">
-					<div class="h-full overflow-hidden rounded-2xl border border-border bg-background shadow-inner">
-						<iframe title="Generated pickleball app preview" class="h-[32rem] w-full bg-background lg:h-full" sandbox="allow-forms allow-downloads" src={ htmlRenderURL(snapshot.HTMLThoughtsPath) }></iframe>
-					</div>
+		<div class="grid min-h-[34rem] gap-0 lg:grid-cols-[16rem_minmax(0,1fr)]">
+			<aside class="border-b border-border p-4 lg:border-b-0 lg:border-r">
+				<p class="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Files</p>
+				<ul class="mt-3 space-y-2 text-sm text-foreground" aria-label="Files">
+					<li class="rounded-lg bg-muted/50 px-3 py-2">players.csv</li>
+					<li class="rounded-lg bg-muted/50 px-3 py-2">matchups.csv</li>
+					<li class="rounded-lg bg-muted/50 px-3 py-2">tournament.html</li>
+				</ul>
+				<p class="mt-3 text-xs text-muted-foreground">Ask in Chat to change rules, pairings, files, or how the app looks.</p>
+			</aside>
+			<div class="bg-muted/40 p-3">
+				<div class="h-full overflow-hidden rounded-2xl border border-border bg-background shadow-inner">
+					<iframe title="Pickleball tournament app" class="h-[32rem] w-full bg-background lg:h-full" sandbox="allow-forms allow-downloads allow-scripts allow-same-origin" src="/examples/pickleball/app/"></iframe>
 				</div>
-				<aside class="flex flex-col gap-3 border-t border-border p-4 lg:border-l lg:border-t-0">
-					<div>
-						<p class="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Share</p>
-						<p class="mt-1 text-sm text-foreground">Send the latest preview or CSV. Native browser share can use these same links when available.</p>
-					</div>
-					if vm.Share.PreviewURL != "" {
-						@button.LinkButton(button.LinkButtonArgs{Href: vm.Share.PreviewURL, Variant: "outline", Size: "sm", Class: "w-full", Attributes: templ.Attributes{"id": "pickleball-preview-link"}}) {
-							Preview link
-						}
-						<label for="pickleball-preview-url" class="text-xs font-medium text-muted-foreground">Preview URL</label>
-						@input.Input(input.InputArgs{
-							ID:    "pickleball-preview-url",
-							Type:  "text",
-							Value: vm.Share.PreviewURL,
-							Class: "text-xs text-muted-foreground",
-							Attributes: templ.Attributes{
-								"readonly":      true,
-								"data-on:focus": "el.select()",
-								"data-on:click": "el.select()",
-							},
-						})
-						@button.Button(button.ButtonArgs{
-							Type:    "button",
-							Variant: "outline",
-							Size:    "sm",
-							Class:   "w-full",
-							Attributes: templ.Attributes{
-								"data-on:click": copyLinkExpression("pickleball-preview-url", vm.Share.PreviewURL),
-							},
-						}) {
-							Copy preview link
-						}
-					}
-					if vm.Share.CSVDownloadURL != "" {
-						@button.LinkButton(button.LinkButtonArgs{Href: vm.Share.CSVDownloadURL, Variant: "outline", Size: "sm", Class: "w-full", Attributes: templ.Attributes{"id": "pickleball-csv-link"}}) {
-							Download CSV
-						}
-					}
-					<details class="rounded-2xl border border-dashed border-border p-3 text-xs text-muted-foreground">
-						<summary class="cursor-pointer font-medium text-foreground">Debug recovery</summary>
-						<p class="mt-2">Restore source for AI editing only. Current preview pointer stays on latest good build.</p>
-						<form class="mt-3 flex flex-col gap-2" data-on:submit="@post('/examples/pickleball/debug/restore', {contentType: 'form'})">
-							<input type="hidden" name="session_id" value={ vm.SessionID }/>
-							<input type="hidden" name="build_id" value={ snapshot.BuildID }/>
-							@button.Button(button.ButtonArgs{Type: "submit", Variant: "outline", Size: "sm", Class: "w-full text-xs"}) {
-								Restore source for AI
-							}
-						</form>
-					</details>
-					<p class="text-xs text-muted-foreground">Generated HTML stays inside a script-disabled iframe. CSV opens through the Thoughts renderer.</p>
-				</aside>
 			</div>
-		} else {
-			@card.CardContent(card.CardContentArgs{Class: "flex min-h-72 items-center justify-center bg-muted/40 p-6 text-center text-sm text-muted-foreground"}) {
-				<div>
-					<p class="font-medium text-foreground">Seed bundle waiting</p>
-					<p class="mt-1">Try: “Prioritize new partner pairings over skill balance.”</p>
-				</div>
-			}
-		}
+		</div>
 	}
 }
 

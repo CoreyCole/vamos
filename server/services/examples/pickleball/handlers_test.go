@@ -40,31 +40,22 @@ func TestPageRendersMobileShell(t *testing.T) {
 	}
 }
 
-func TestPreviewRendersManualCopyFallback(t *testing.T) {
+func TestPreviewRendersFilesAndLiveAppOnly(t *testing.T) {
 	t.Parallel()
-	snapshot := BuildSnapshot{
-		BuildID:          "build-1",
-		PromptSummary:    "seed",
-		HTMLThoughtsPath: "creative-mode-agent/examples/pickleball/sessions/player/snapshots/build-1/app.html",
-		CSVThoughtsPath:  "creative-mode-agent/examples/pickleball/sessions/player/snapshots/build-1/results.csv",
-	}
-	body := renderComponent(t, PreviewCard(PickleballViewModel{
-		SessionID: "player",
-		Current:   &snapshot,
-		Share:     shareModelForSnapshot(snapshot),
-	}))
+	body := renderComponent(t, PreviewCard(PickleballViewModel{SessionID: "player"}))
 	for _, want := range []string{
-		`sandbox="allow-forms allow-downloads"`,
-		`id="pickleball-preview-url"`,
-		`readonly`,
-		`/thoughts/creative-mode-agent/examples/pickleball/sessions/player/snapshots/build-1/app.html`,
-		`Copy preview link`,
-		`el.select()`,
+		`Files and app`,
+		`players.csv`,
+		`matchups.csv`,
+		`tournament.html`,
+		`src="/examples/pickleball/app/"`,
+		`Open app`,
 	} {
 		if !strings.Contains(body, want) {
 			t.Fatalf("preview missing %q:\n%s", want, body)
 		}
 	}
+	assertNoTechnicalPickleballTerms(t, body)
 }
 
 func TestPromptHandlerValidationAndAccepted(t *testing.T) {
@@ -151,6 +142,47 @@ func TestStateStreamInitialPatch(t *testing.T) {
 	}
 	if !strings.Contains(rec.Body.String(), "pickleball-state") {
 		t.Fatalf("stream body missing state patch:\n%s", rec.Body.String())
+	}
+}
+
+func TestNormalPageHidesTechnicalMechanics(t *testing.T) {
+	t.Parallel()
+	body := renderComponent(t, Page(PickleballViewModel{
+		SessionID:    "player",
+		State:        AppStateFailed,
+		UserMessage:  "I couldn't make that change safely. Your app is unchanged.",
+		ErrorMessage: "exec failed: /tmp/app/main.go: panic stack trace",
+		LogTail:      "raw hidden diagnostics",
+	}))
+	for _, want := range []string{"Files", "Chat", "pickleball", `id="pickleball-prompt-form"`, "Your app is unchanged"} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("page missing %q:\n%s", want, body)
+		}
+	}
+	assertNoTechnicalPickleballTerms(t, body)
+}
+
+func assertNoTechnicalPickleballTerms(t *testing.T, body string) {
+	t.Helper()
+	if idx := strings.Index(body, `id="pickleball-app"`); idx >= 0 {
+		body = body[idx:]
+	}
+	lower := strings.ToLower(body)
+	for _, forbidden := range []string{
+		"workspace",
+		"build status",
+		"run id",
+		"manifest",
+		"promotion",
+		"iteration",
+		"filesystem",
+		"stack trace",
+		"restore source",
+		"snapshot",
+	} {
+		if strings.Contains(lower, forbidden) {
+			t.Fatalf("normal UI leaked %q:\n%s", forbidden, body)
+		}
 	}
 }
 

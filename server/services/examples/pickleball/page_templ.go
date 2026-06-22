@@ -111,16 +111,14 @@ func buildPickleballWorkbench(vm PickleballViewModel) workbench.WorkbenchState {
 
 func stateLabel(state AppState) string {
 	switch state {
-	case AppStateGenerating:
-		return "Generating"
-	case AppStateBuilding:
-		return "Building"
+	case AppStateGenerating, AppStateBuilding:
+		return "Working"
 	case AppStateSucceeded:
 		return "Ready"
 	case AppStateFailed:
-		return "Needs prompt"
+		return "Unchanged"
 	default:
-		return "Idle"
+		return "Ready"
 	}
 }
 
