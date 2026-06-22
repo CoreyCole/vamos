@@ -39,6 +39,7 @@ func newCommand(d deps) *cobra.Command {
 		newSteerChildCommand(d),
 		newRunChildCommand(d),
 		newChildCompleteCommand(d),
+		newManagerReadyCommand(d),
 		newValidateResultCommand(d),
 		newDecideNextCommand(d),
 		newRepromptChildCommand(d),
@@ -148,6 +149,21 @@ func newChildCompleteCommand(d deps) *cobra.Command {
 	cmd.Flags().StringVar(&opts.StateFile, "state-file", "", "q-manager state file")
 	cmd.Flags().StringVar(&opts.ChildID, "child-id", "", "expected active child ID")
 	cmd.Flags().StringVar(&opts.Output, "output", "text", "output format: text or json")
+	return cmd
+}
+
+func newManagerReadyCommand(d deps) *cobra.Command {
+	opts := ManagerReadyOptions{Output: "text"}
+	cmd := &cobra.Command{
+		Use:   "manager-ready --state-file <file>",
+		Short: "Mark q-manager ready and flush any queued validated child wake",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return RunManagerReady(cmd.Context(), opts, d, cmd.OutOrStdout())
+		},
+	}
+	cmd.Flags().StringVar(&opts.StateFile, "state-file", "", "q-manager state file")
+	cmd.Flags().StringVar(&opts.ManagerPane, "manager-pane", "", "tmux pane ID for the resumed parent q-manager session")
+	cmd.Flags().StringVar(&opts.Output, "output", "text", "output format: text or ndjson")
 	return cmd
 }
 
@@ -827,11 +843,12 @@ func RunChildComplete(ctx context.Context, opts ChildCompletionOptions, d deps, 
 			status.Result = childCompletionResult(parsed.Result)
 			status.ManagerNeeded = childCompletionManagerNeeded(status.Result.Status)
 			status.Normalizations = parsed.Normalizations
-			status.Wake = childCompletionWake(opts.StateFile, state, status)
 			state.ActiveChild.LifecycleStatus = "completed"
 			state.ActiveChild.LastDeliveryID = status.DeliveryID
-			state.Delivery.LastDeliveryID = status.DeliveryID
-			err = nil
+			state, status.Wake, err = queueOrDeliverWake(ctx, opts.StateFile, state, status, d)
+			if err != nil {
+				return nil, err
+			}
 		} else {
 			err = parseErr
 		}
@@ -860,10 +877,12 @@ func RunChildComplete(ctx context.Context, opts ChildCompletionOptions, d deps, 
 			status.DeliveryID = childCompletionDeliveryID(*child, nil, true)
 			status.Result = ChildCompletionResult{Stage: child.Stage, Status: "invalid_result", Summary: err.Error()}
 			status.Reason = err.Error()
-			status.Wake = childCompletionWake(opts.StateFile, state, status)
 			state.ActiveChild.LifecycleStatus = "awaiting_manager"
 			state.ActiveChild.LastDeliveryID = status.DeliveryID
-			state.Delivery.LastDeliveryID = status.DeliveryID
+			state, status.Wake, err = queueOrDeliverWake(ctx, opts.StateFile, state, status, d)
+			if err != nil {
+				return nil, err
+			}
 		} else {
 			return nil, err
 		}
@@ -908,6 +927,59 @@ func childCompletionManagerNeeded(status string) bool {
 	return status == string(wruntime.StatusNeedsHuman) || status == string(wruntime.StatusBlocked) || status == string(wruntime.StatusError) || status == "invalid_result"
 }
 
+func queueOrDeliverWake(ctx context.Context, stateFile string, state ManagerState, status ChildCompletionStatus, d deps) (ManagerState, WakeDeliveryInstruction, error) {
+	if status.Wake.Mode == "suppress" {
+		return state, status.Wake, nil
+	}
+	if strings.TrimSpace(status.DeliveryID) == "" {
+		return state, WakeDeliveryInstruction{Mode: "suppress", Reason: "missing_delivery_id"}, nil
+	}
+	if state.Delivery.LastDeliveryID == status.DeliveryID {
+		return state, WakeDeliveryInstruction{Mode: "suppress", Reason: "duplicate_delivery"}, nil
+	}
+	payload := childCompletionWakePayload(stateFile, status)
+	if strings.EqualFold(state.Delivery.Status, "compacting") {
+		state.Delivery.QueuedWake = &QueuedWake{DeliveryID: status.DeliveryID, ChildID: status.ChildID, ChildGeneration: activeChildGeneration(state), Payload: payload, QueuedAt: time.Now().Format(time.RFC3339)}
+		return state, WakeDeliveryInstruction{Mode: "queue", Payload: payload, Reason: "manager_compacting"}, nil
+	}
+	paneID := managerDeliveryPane(state)
+	if paneID == "" {
+		state.Delivery.QueuedWake = &QueuedWake{DeliveryID: status.DeliveryID, ChildID: status.ChildID, ChildGeneration: activeChildGeneration(state), Payload: payload, QueuedAt: time.Now().Format(time.RFC3339)}
+		return state, WakeDeliveryInstruction{Mode: "queue", Payload: payload, Reason: "manager_pane_missing"}, nil
+	}
+	if err := pasteWake(ctx, d, paneID, payload); err != nil {
+		return state, WakeDeliveryInstruction{}, err
+	}
+	state.Delivery.LastDeliveryID = status.DeliveryID
+	return state, WakeDeliveryInstruction{Mode: "deliver", Payload: payload}, nil
+}
+
+func managerDeliveryPane(state ManagerState) string {
+	if strings.TrimSpace(state.Delivery.ManagerPaneID) != "" {
+		return strings.TrimSpace(state.Delivery.ManagerPaneID)
+	}
+	return strings.TrimSpace(state.ManagerPaneID)
+}
+
+func activeChildGeneration(state ManagerState) int {
+	if state.ActiveChild == nil || state.ActiveChild.Generation == 0 {
+		return 1
+	}
+	return state.ActiveChild.Generation
+}
+
+func pasteWake(ctx context.Context, d deps, paneID string, payload string) error {
+	tmux := d.Tmux
+	if tmux == nil {
+		tmux = ShellTmuxClient{}
+	}
+	pane := TmuxPane{ID: paneID}
+	if err := tmux.PasteText(ctx, pane, payload); err != nil {
+		return err
+	}
+	return tmux.SendKeys(ctx, pane, []string{"Enter"})
+}
+
 func childCompletionWake(stateFile string, state ManagerState, status ChildCompletionStatus) WakeDeliveryInstruction {
 	if status.DeliveryID != "" && state.Delivery.LastDeliveryID == status.DeliveryID {
 		return WakeDeliveryInstruction{Mode: "suppress", Reason: "duplicate_delivery"}
@@ -936,6 +1008,86 @@ func writeValidationStatus(path string, status ChildCompletionStatus) error {
 		return err
 	}
 	return os.Rename(tmp, path)
+}
+
+func RunManagerReady(ctx context.Context, opts ManagerReadyOptions, d deps, out io.Writer) error {
+	if strings.TrimSpace(opts.StateFile) == "" {
+		return errors.New("state-file is required")
+	}
+	out = ensureWriter(out)
+	store := stateStore(d, "", time.Now)
+	state, err := store.Load(opts.StateFile)
+	if err != nil {
+		return err
+	}
+	pane := strings.TrimSpace(opts.ManagerPane)
+	if pane == "" {
+		pane = CaptureManagerPaneID("")
+	}
+	state.Delivery.Status = "ready"
+	if pane != "" {
+		state.Delivery.ManagerPaneID = pane
+		state.ManagerPaneID = pane
+	}
+	var flushed bool
+	state, flushed, err = flushQueuedWake(ctx, state, pane, d)
+	if err != nil {
+		return err
+	}
+	if err := store.Save(opts.StateFile, state); err != nil {
+		return err
+	}
+	if strings.EqualFold(opts.Output, "ndjson") {
+		return WriteNDJSON(out, Event{Type: "manager_ready", Ref: map[string]any{"flushed": flushed, "stateFile": opts.StateFile}})
+	}
+	if flushed {
+		_, err = fmt.Fprintln(out, "manager ready: flushed queued wake")
+	} else {
+		_, err = fmt.Fprintln(out, "manager ready: no queued wake")
+	}
+	return err
+}
+
+func flushQueuedWake(ctx context.Context, state ManagerState, pane string, d deps) (ManagerState, bool, error) {
+	queued := state.Delivery.QueuedWake
+	if queued == nil {
+		return state, false, nil
+	}
+	if queued.DeliveryID == "" || queued.DeliveryID == state.Delivery.LastDeliveryID {
+		state.Delivery.QueuedWake = nil
+		return state, false, nil
+	}
+	if state.ActiveChild != nil {
+		if queued.ChildGeneration != activeChildGeneration(state) || state.ActiveChild.LifecycleStatus == "running" || state.ActiveChild.LifecycleStatus == "manual_reprompt" {
+			state.LastActionCard = &ManagerActionCard{Kind: "superseded_queued_wake", Severity: "info", Summary: "queued child wake superseded by active child generation", RecommendedAction: "wait for newer child completion", RequiresHuman: false}
+			state.Delivery.QueuedWake = nil
+			return state, false, nil
+		}
+	}
+	paneID := strings.TrimSpace(pane)
+	if paneID == "" {
+		paneID = managerDeliveryPane(state)
+	}
+	if paneID == "" {
+		return state, false, errors.New("manager pane is required to flush queued wake")
+	}
+	if err := pasteWake(ctx, d, paneID, queued.Payload); err != nil {
+		return state, false, err
+	}
+	now := time.Now().Format(time.RFC3339)
+	queued.DeliveredAt = now
+	state.Delivery.LastDeliveryID = queued.DeliveryID
+	state.Delivery.QueuedWake = nil
+	return state, true, nil
+}
+
+func supersedeQueuedWakeForActiveChild(state ManagerState, childID string, reason string) ManagerState {
+	if state.Delivery.QueuedWake == nil || state.Delivery.QueuedWake.ChildID != childID {
+		return state
+	}
+	state.Delivery.QueuedWake = nil
+	state.LastActionCard = &ManagerActionCard{Kind: "superseded_queued_wake", Severity: "info", Summary: reason, RecommendedAction: "wait for newer child completion", RequiresHuman: false}
+	return state
 }
 
 func RunValidateResult(ctx context.Context, opts ValidateResultOptions, d deps, out io.Writer) error {

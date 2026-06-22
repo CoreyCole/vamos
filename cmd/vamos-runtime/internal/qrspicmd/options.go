@@ -79,6 +79,12 @@ type ChildCompletionOptions struct {
 	Output    string
 }
 
+type ManagerReadyOptions struct {
+	StateFile   string
+	ManagerPane string
+	Output      string
+}
+
 type ChildCompletionStatus struct {
 	Validated      bool                    `json:"validated"`
 	ManagerNeeded  bool                    `json:"managerNeeded"`

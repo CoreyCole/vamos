@@ -18,6 +18,7 @@ func TestChildCompleteWritesValidatedStatus(t *testing.T) {
 	sessionPath := writePiSession(t, sessionDir, "session.jsonl", "session-1", filepath.Join(dir, "repo"), assistantLine(testResultYAML("review-outline", "complete", "complete", "thoughts/example/reviews/outline/review.md", "")))
 	state := ManagerState{
 		CanonicalPlanDir: "thoughts/example",
+		ManagerPaneID:    "%parent",
 		Workflow:         testWorkflowState(t, qrspi.NodeReviewOutline, nil),
 		ActiveChild: &ChildRunRef{
 			ID:                   "child-1",
@@ -34,7 +35,8 @@ func TestChildCompleteWritesValidatedStatus(t *testing.T) {
 	saveManagerState(t, stateFile, state)
 
 	var out strings.Builder
-	status, err := RunChildComplete(t.Context(), ChildCompletionOptions{StateFile: stateFile, ChildID: "child-1", Output: "json"}, deps{}, &out)
+	tmux := &recordingTmux{}
+	status, err := RunChildComplete(t.Context(), ChildCompletionOptions{StateFile: stateFile, ChildID: "child-1", Output: "json"}, deps{Tmux: tmux}, &out)
 	if err != nil {
 		t.Fatalf("RunChildComplete error = %v", err)
 	}
@@ -67,7 +69,7 @@ func TestChildCompleteWritesValidatedStatus(t *testing.T) {
 		t.Fatalf("loaded active child = %+v", loaded.ActiveChild)
 	}
 
-	status, err = RunChildComplete(t.Context(), ChildCompletionOptions{StateFile: stateFile, ChildID: "child-1"}, deps{}, &strings.Builder{})
+	status, err = RunChildComplete(t.Context(), ChildCompletionOptions{StateFile: stateFile, ChildID: "child-1"}, deps{Tmux: tmux}, &strings.Builder{})
 	if err != nil {
 		t.Fatalf("RunChildComplete duplicate error = %v", err)
 	}
@@ -84,6 +86,7 @@ func TestChildCompleteManagerAwareReviewPlanNormalization(t *testing.T) {
 	state := ManagerState{
 		CanonicalPlanDir:  filepath.Join(dir, "thoughts", "plan", "reviews", "impl-review"),
 		ImplementationCwd: filepath.Join(dir, "repo"),
+		ManagerPaneID:     "%parent",
 		Workflow:          testWorkflowState(t, qrspi.NodeReviewPlan, nil),
 		ActiveChild: &ChildRunRef{
 			ID:                   "child-1",
@@ -98,7 +101,7 @@ func TestChildCompleteManagerAwareReviewPlanNormalization(t *testing.T) {
 	}
 	saveManagerState(t, stateFile, state)
 
-	status, err := RunChildComplete(t.Context(), ChildCompletionOptions{StateFile: stateFile, ChildID: "child-1"}, deps{}, &strings.Builder{})
+	status, err := RunChildComplete(t.Context(), ChildCompletionOptions{StateFile: stateFile, ChildID: "child-1"}, deps{Tmux: &recordingTmux{}}, &strings.Builder{})
 	if err != nil {
 		t.Fatalf("RunChildComplete error = %v", err)
 	}
@@ -114,6 +117,7 @@ func TestChildCompleteInvalidResultSuppressesThenExhausts(t *testing.T) {
 	sessionPath := writePiSession(t, filepath.Join(dir, "sessions"), "session.jsonl", "session-1", filepath.Join(dir, "repo"), assistantLine("not yaml"))
 	state := ManagerState{
 		CanonicalPlanDir: "thoughts/example",
+		ManagerPaneID:    "%parent",
 		Workflow:         testWorkflowState(t, qrspi.NodeDesign, nil),
 		ActiveChild: &ChildRunRef{
 			ID:                   "child-1",

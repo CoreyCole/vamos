@@ -58,12 +58,12 @@ func TestResolveChildExtensionPathWritesEmbeddedAsset(t *testing.T) {
 		t.Fatalf("read extension asset: %v", err)
 	}
 	text := string(data)
-	for _, want := range []string{"export default function qManagerChildExtension", `pi.on("agent_end"`, "Q_MANAGER_STATUS_PATH", "Q_MANAGER_DONE_PATH", "Q_MANAGER_PARENT_PANE", "Q_MANAGER_VALIDATED_STATUS_PATH", "Q_MANAGER_WAKE_MODE", "validated-only", "shouldWakeManager", "validated:", "manager_needed:", "retry_exhausted:", "manager_guidance:", "paste-buffer", `"-p", "-r"`, "```yaml", "q_manager_child_wake:", "state_file:", "steps:", "action:", "param:", "vamos qrspi continue --state-file"} {
+	for _, want := range []string{"export default function qManagerChildExtension", `pi.on("agent_end"`, "runChildComplete", "qrspi", "child-complete", "--state-file", "--child-id", "Q_MANAGER_STATUS_PATH", "Q_MANAGER_DONE_PATH", "Q_MANAGER_PARENT_PANE", "Q_MANAGER_VALIDATED_STATUS_PATH", "Q_MANAGER_WAKE_MODE", "validated-only", "shouldWakeManager", "wakeDeliveryMode"} {
 		if !strings.Contains(text, want) {
 			t.Fatalf("extension asset missing %q: %s", want, text)
 		}
 	}
-	for _, forbidden := range []string{"Decision", "RunDecideNext", "RunValidateResult"} {
+	for _, forbidden := range []string{"Decision", "RunDecideNext", "RunValidateResult", "paste-buffer", "send-keys", "q_manager_child_wake:"} {
 		if strings.Contains(text, forbidden) {
 			t.Fatalf("extension asset contains graph authority marker %q: %s", forbidden, text)
 		}
