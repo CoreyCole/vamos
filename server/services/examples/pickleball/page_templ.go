@@ -13,6 +13,7 @@ import (
 
 	"github.com/CoreyCole/vamos/server/layouts"
 	"github.com/CoreyCole/vamos/server/layouts/workbench"
+	"github.com/CoreyCole/vamos/server/services/applets"
 )
 
 func Page(vm PickleballViewModel) templ.Component {
@@ -55,7 +56,7 @@ func Page(vm PickleballViewModel) templ.Component {
 			var templ_7745c5c3_Var3 string
 			templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.JoinStringErrs("@get('/examples/pickleball/state?session=" + vm.SessionID + "')")
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/examples/pickleball/page.templ`, Line: 16, Col: 143}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/examples/pickleball/page.templ`, Line: 17, Col: 143}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var3))
 			if templ_7745c5c3_Err != nil {
@@ -88,53 +89,24 @@ func Page(vm PickleballViewModel) templ.Component {
 }
 
 func buildPickleballWorkbench(vm PickleballViewModel) workbench.WorkbenchState {
-	state, _ := workbench.BuildWorkbenchState(workbench.BuildWorkbenchStateInput{
-		Page:       workbench.WorkbenchPageAgentChat,
-		View:       workbench.WorkbenchViewSplit,
-		ActivePath: vm.SessionID,
-		RouteHref:  "/examples/pickleball",
-		Regions: []workbench.WorkbenchRegion{
-			{
-				ID:        "pickleball-workbench-guide",
-				Slot:      workbench.WorkbenchSlotNavigation,
-				Kind:      workbench.RegionWorkflow,
-				Ratio:     0.22,
-				MinRem:    14,
-				Visible:   true,
-				TargetID:  "pickleball-workbench-guide-region",
-				Title:     "Workbench",
-				Component: PickleballWorkbenchGuide(vm),
-			},
-			{
-				ID:        "pickleball-preview-workspace",
-				Slot:      workbench.WorkbenchSlotPrimary,
-				Kind:      workbench.RegionDoc,
-				Ratio:     0.48,
-				MinRem:    26,
-				Visible:   true,
-				TargetID:  "pickleball-state-region",
-				Title:     "Preview",
-				Component: StatePanel(vm),
-			},
-			{
-				ID:        "pickleball-chat-workspace",
-				Slot:      workbench.WorkbenchSlotContext,
-				Kind:      workbench.RegionChat,
-				Ratio:     0.30,
-				MinRem:    20,
-				Visible:   true,
-				TargetID:  "pickleball-chat-region",
-				Title:     "Chat",
-				Component: ChatToModifyPanel(vm),
+	return applets.BuildWorkbenchState(nil, applets.WorkbenchState{
+		Config: applets.AppletConfig{
+			ID:          "pickleball",
+			DisplayName: "Pickleball",
+			UserLabels: applets.AppletLabels{
+				FilesTitle: "Files",
+				ChatTitle:  "Chat",
 			},
 		},
-		NormalRegions: []workbench.RegionNormalState{
-			{SignalKey: "pickleball-workbench-guide", Available: true, Visible: true},
-			{SignalKey: "pickleball-preview-workspace", Available: true, Visible: true},
-			{SignalKey: "pickleball-chat-workspace", Available: true, Visible: true},
+		Files: applets.FilesViewModel{
+			Title:     "Files",
+			Component: StatePanel(vm),
+		},
+		Chat: applets.ChatViewModel{
+			Title:     "Chat",
+			Component: ChatToModifyPanel(vm),
 		},
 	})
-	return state
 }
 
 func stateLabel(state AppState) string {

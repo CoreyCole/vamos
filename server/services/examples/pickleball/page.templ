@@ -5,6 +5,7 @@ import (
 
 	"github.com/CoreyCole/vamos/server/layouts"
 	"github.com/CoreyCole/vamos/server/layouts/workbench"
+	"github.com/CoreyCole/vamos/server/services/applets"
 )
 
 templ Page(vm PickleballViewModel) {
@@ -20,53 +21,24 @@ templ Page(vm PickleballViewModel) {
 }
 
 func buildPickleballWorkbench(vm PickleballViewModel) workbench.WorkbenchState {
-	state, _ := workbench.BuildWorkbenchState(workbench.BuildWorkbenchStateInput{
-		Page:       workbench.WorkbenchPageAgentChat,
-		View:       workbench.WorkbenchViewSplit,
-		ActivePath: vm.SessionID,
-		RouteHref:  "/examples/pickleball",
-		Regions: []workbench.WorkbenchRegion{
-			{
-				ID:        "pickleball-workbench-guide",
-				Slot:      workbench.WorkbenchSlotNavigation,
-				Kind:      workbench.RegionWorkflow,
-				Ratio:     0.22,
-				MinRem:    14,
-				Visible:   true,
-				TargetID:  "pickleball-workbench-guide-region",
-				Title:     "Workbench",
-				Component: PickleballWorkbenchGuide(vm),
-			},
-			{
-				ID:        "pickleball-preview-workspace",
-				Slot:      workbench.WorkbenchSlotPrimary,
-				Kind:      workbench.RegionDoc,
-				Ratio:     0.48,
-				MinRem:    26,
-				Visible:   true,
-				TargetID:  "pickleball-state-region",
-				Title:     "Preview",
-				Component: StatePanel(vm),
-			},
-			{
-				ID:        "pickleball-chat-workspace",
-				Slot:      workbench.WorkbenchSlotContext,
-				Kind:      workbench.RegionChat,
-				Ratio:     0.30,
-				MinRem:    20,
-				Visible:   true,
-				TargetID:  "pickleball-chat-region",
-				Title:     "Chat",
-				Component: ChatToModifyPanel(vm),
+	return applets.BuildWorkbenchState(nil, applets.WorkbenchState{
+		Config: applets.AppletConfig{
+			ID:          "pickleball",
+			DisplayName: "Pickleball",
+			UserLabels: applets.AppletLabels{
+				FilesTitle: "Files",
+				ChatTitle:  "Chat",
 			},
 		},
-		NormalRegions: []workbench.RegionNormalState{
-			{SignalKey: "pickleball-workbench-guide", Available: true, Visible: true},
-			{SignalKey: "pickleball-preview-workspace", Available: true, Visible: true},
-			{SignalKey: "pickleball-chat-workspace", Available: true, Visible: true},
+		Files: applets.FilesViewModel{
+			Title:     "Files",
+			Component: StatePanel(vm),
+		},
+		Chat: applets.ChatViewModel{
+			Title:     "Chat",
+			Component: ChatToModifyPanel(vm),
 		},
 	})
-	return state
 }
 
 func stateLabel(state AppState) string {
