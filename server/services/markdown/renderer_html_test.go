@@ -102,6 +102,50 @@ func TestServeHTMLAppletStreamsRawHTML(t *testing.T) {
 	}
 }
 
+func TestIframeSrcForHTMLAppletAddsNormalizedTheme(t *testing.T) {
+	tests := []struct {
+		name    string
+		docPath string
+		theme   string
+		want    string
+	}{
+		{"dark", "thoughts/demo.html", "dark", "/thoughts/_render/html/demo.html?theme=dark"},
+		{"light", "thoughts/demo.html", "light", "/thoughts/_render/html/demo.html?theme=light"},
+		{"default", "thoughts/demo.html", "", "/thoughts/_render/html/demo.html?theme=dark"},
+		{"nested", "thoughts/plans/demo report.html", "light", "/thoughts/_render/html/plans/demo%20report.html?theme=light"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := iframeSrcForHTMLApplet(tt.docPath, tt.theme); got != tt.want {
+				t.Fatalf("iframeSrcForHTMLApplet()=%q want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestServeHTMLAppletIgnoresThemeQueryAndStreamsRawHTML(t *testing.T) {
+	root := t.TempDir()
+	mustWriteFile(t, filepath.Join(root, "demo.html"), []byte("<h1>Demo</h1>"))
+
+	svc, err := NewService(root, nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	e := echo.New()
+	req := httptest.NewRequest(http.MethodGet, "/thoughts/_render/html/demo.html?theme=light", nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	c.SetParamNames("*")
+	c.SetParamValues("demo.html")
+
+	if err := svc.ServeHTMLApplet(c); err != nil {
+		t.Fatal(err)
+	}
+	if got := rec.Body.String(); got != "<h1>Demo</h1>" {
+		t.Fatalf("body=%q", got)
+	}
+}
+
 func TestHTMLAppletRendererReturnsSandboxedFrame(t *testing.T) {
 	root := t.TempDir()
 	mustWriteFile(t, filepath.Join(root, "demo.html"), []byte("<h1>Demo</h1>"))
@@ -110,7 +154,11 @@ func TestHTMLAppletRendererReturnsSandboxedFrame(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	page, err := svc.RenderThoughtsDocument(t.Context(), "demo.html")
+	page, err := svc.RenderThoughtsDocumentWithOptions(
+		t.Context(),
+		"demo.html",
+		DocumentRenderOptions{CurrentTheme: "light"},
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -126,7 +174,10 @@ func TestHTMLAppletRendererReturnsSandboxedFrame(t *testing.T) {
 		t.Fatal(err)
 	}
 	html := buf.String()
-	if !strings.Contains(html, `src="/thoughts/_render/html/demo.html"`) {
+	if !strings.Contains(html, `data-vamos-html-applet`) {
+		t.Fatalf("missing applet marker: %s", html)
+	}
+	if !strings.Contains(html, `src="/thoughts/_render/html/demo.html?theme=light"`) {
 		t.Fatalf("missing iframe src: %s", html)
 	}
 	if !strings.Contains(html, `sandbox="allow-scripts allow-forms allow-downloads"`) {

@@ -83,7 +83,11 @@ func (s *Service) ServeMarkdown(c echo.Context) error {
 	}
 
 	// Render document file
-	pageArgs, err := s.RenderThoughtsDocument(c.Request().Context(), requestPath)
+	pageArgs, err := s.RenderThoughtsDocumentWithOptions(
+		c.Request().Context(),
+		requestPath,
+		DocumentRenderOptions{CurrentTheme: currentThemeMode},
+	)
 	if err != nil {
 		// Try directory listing if file not found or if path is a directory
 		if strings.Contains(err.Error(), "not found") ||
@@ -656,7 +660,15 @@ func (s *Service) selectDocumentAndPatch(
 	if err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 	}
-	pageArgs, err := s.RenderThoughtsDocument(c.Request().Context(), docPath)
+	currentThemeMode := ""
+	if s.themeService != nil {
+		currentThemeMode = s.themeService.GetCurrentThemeMode(c)
+	}
+	pageArgs, err := s.RenderThoughtsDocumentWithOptions(
+		c.Request().Context(),
+		docPath,
+		DocumentRenderOptions{CurrentTheme: currentThemeMode},
+	)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusNotFound, err.Error())
 	}

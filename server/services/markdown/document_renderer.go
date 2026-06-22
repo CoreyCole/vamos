@@ -28,11 +28,16 @@ const (
 	CommentModeNone         CommentMode = "none"
 )
 
+type DocumentRenderOptions struct {
+	CurrentTheme string
+}
+
 type DocumentRequest struct {
-	RequestPath string
-	CleanPath   string
-	FullPath    string
-	Extension   string
+	RequestPath  string
+	CleanPath    string
+	FullPath     string
+	Extension    string
+	CurrentTheme string
 }
 
 type RenderedDocument struct {
@@ -92,10 +97,15 @@ func (r UnsupportedRenderer) Render(_ context.Context, req DocumentRequest) (Ren
 }
 
 func (s *Service) RenderThoughtsDocument(ctx context.Context, requestPath string) (*PageArgs, error) {
+	return s.RenderThoughtsDocumentWithOptions(ctx, requestPath, DocumentRenderOptions{})
+}
+
+func (s *Service) RenderThoughtsDocumentWithOptions(ctx context.Context, requestPath string, opts DocumentRenderOptions) (*PageArgs, error) {
 	req, err := s.resolveThoughtsDocumentRequest(requestPath)
 	if err != nil {
 		return nil, err
 	}
+	req.CurrentTheme = normalizeHTMLAppletTheme(opts.CurrentTheme)
 	doc, err := s.documentRenderers.Select(req).Render(ctx, req)
 	if err != nil {
 		return nil, err

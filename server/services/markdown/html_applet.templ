@@ -6,6 +6,7 @@ templ HTMLAppletFrame(docPath string, src string) {
 			HTML applet: <span class="font-mono text-foreground">{ docPath }</span>
 		</div>
 		<iframe
+			data-vamos-html-applet
 			title={ "HTML applet " + docPath }
 			src={ templ.SafeURL(src) }
 			sandbox="allow-scripts allow-forms allow-downloads"

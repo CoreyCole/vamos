@@ -30,14 +30,35 @@ func (r HTMLAppletRenderer) Render(_ context.Context, req DocumentRequest) (Rend
 		Path:        docPath,
 		Title:       DocumentTitle(docPath, nil),
 		Kind:        DocumentKindHTMLApplet,
-		Component:   HTMLAppletFrame(docPath, iframeSrcForHTMLApplet(docPath)),
+		Component:   HTMLAppletFrame(docPath, iframeSrcForHTMLApplet(docPath, req.CurrentTheme)),
 		CommentMode: CommentModeDocumentOnly,
 	}, nil
 }
 
-func iframeSrcForHTMLApplet(docPath string) string {
+func normalizeHTMLAppletTheme(theme string) string {
+	switch strings.TrimSpace(theme) {
+	case "dark":
+		return "dark"
+	case "light":
+		return "light"
+	default:
+		return "dark"
+	}
+}
+
+func iframeSrcForHTMLApplet(docPath string, theme string) string {
 	rel := NormalizeWorkspaceDocPath(docPath)
-	return htmlAppletRenderPrefix + path.Clean("/" + rel)[1:]
+	src := htmlAppletRenderPrefix + escapeHTMLAppletPath(path.Clean("/" + rel)[1:])
+	values := url.Values{"theme": []string{normalizeHTMLAppletTheme(theme)}}
+	return src + "?" + values.Encode()
+}
+
+func escapeHTMLAppletPath(rel string) string {
+	parts := strings.Split(rel, "/")
+	for i, part := range parts {
+		parts[i] = url.PathEscape(part)
+	}
+	return strings.Join(parts, "/")
 }
 
 func (s *Service) ServeHTMLApplet(c echo.Context) error {
