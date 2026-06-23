@@ -12,7 +12,11 @@ import (
 	wruntime "github.com/CoreyCole/vamos/pkg/agents/workflows/runtime"
 )
 
-func resolveOrInitStartState(ctx context.Context, opts StartNextOptions, d deps) (ManagerState, string, error) {
+func resolveOrInitStartState(
+	ctx context.Context,
+	opts StartNextOptions,
+	d deps,
+) (ManagerState, string, error) {
 	clock := d.Clock
 	if clock == nil {
 		clock = time.Now
@@ -22,6 +26,12 @@ func resolveOrInitStartState(ctx context.Context, opts StartNextOptions, d deps)
 		state, err := store.Load(opts.StateFile)
 		if err != nil {
 			return ManagerState{}, "", err
+		}
+		if piModel := strings.TrimSpace(opts.PiModel); piModel != "" {
+			state.PiModel = piModel
+			if err := store.Save(opts.StateFile, state); err != nil {
+				return ManagerState{}, "", err
+			}
 		}
 		return state, opts.StateFile, nil
 	}
@@ -40,7 +50,14 @@ func resolveOrInitStartState(ctx context.Context, opts StartNextOptions, d deps)
 	if err != nil {
 		return ManagerState{}, "", err
 	}
-	if err := ApplyInitOverrides(&state, InitOverrides{NodeID: opts.NodeID, ImplementationCwd: opts.ImplementationCwd}); err != nil {
+	if err := ApplyInitOverrides(
+		&state,
+		InitOverrides{
+			NodeID:            opts.NodeID,
+			ImplementationCwd: opts.ImplementationCwd,
+			PiModel:           opts.PiModel,
+		},
+	); err != nil {
 		return ManagerState{}, "", err
 	}
 	state.ManagerPaneID = CaptureManagerPaneID(opts.ManagerPane)
@@ -80,7 +97,11 @@ func selectLaunchNode(state ManagerState, opts StartNextOptions) (wruntime.Node,
 	return node, nil
 }
 
-func defaultChildCwd(state ManagerState, nodeID wruntime.NodeID, override string) (string, error) {
+func defaultChildCwd(
+	state ManagerState,
+	nodeID wruntime.NodeID,
+	override string,
+) (string, error) {
 	if cwd := strings.TrimSpace(override); cwd != "" {
 		return cwd, nil
 	}
@@ -96,7 +117,11 @@ func defaultChildCwd(state ManagerState, nodeID wruntime.NodeID, override string
 	return "", errors.New("child cwd is required")
 }
 
-func renderPromptForNode(state ManagerState, node wruntime.Node, planDir string) (string, error) {
+func renderPromptForNode(
+	state ManagerState,
+	node wruntime.Node,
+	planDir string,
+) (string, error) {
 	manifest, err := LoadManifest(state.SourceCwd)
 	if err != nil {
 		return "", err
@@ -110,7 +135,12 @@ func renderPromptForNode(state ManagerState, node wruntime.Node, planDir string)
 	})
 }
 
-func WriteStagePromptFile(ctx context.Context, state ManagerState, node wruntime.Node, opts PromptFileOptions) (string, error) {
+func WriteStagePromptFile(
+	ctx context.Context,
+	state ManagerState,
+	node wruntime.Node,
+	opts PromptFileOptions,
+) (string, error) {
 	select {
 	case <-ctx.Done():
 		return "", ctx.Err()
@@ -133,7 +163,11 @@ func WriteStagePromptFile(ctx context.Context, state ManagerState, node wruntime
 
 func promptPathFor(stateFile string, nodeID wruntime.NodeID, timestamp time.Time) string {
 	stamp := timestamp.UTC().Format("20060102T150405.000000000Z")
-	return filepath.Join(filepath.Dir(stateFile), "prompts", fmt.Sprintf("%s-%s.md", nodeID, stamp))
+	return filepath.Join(
+		filepath.Dir(stateFile),
+		"prompts",
+		fmt.Sprintf("%s-%s.md", nodeID, stamp),
+	)
 }
 
 func writeFileAtomically(path string, data []byte, perm os.FileMode) error {

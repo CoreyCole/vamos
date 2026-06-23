@@ -11,6 +11,7 @@ type ManagerState struct {
 	ManagerRunID        string               `json:"managerRunId"`
 	SourceCwd           string               `json:"sourceCwd"`
 	ImplementationCwd   string               `json:"implementationCwd,omitempty"`
+	PiModel             string               `json:"piModel,omitempty"`
 	ManagerPaneID       string               `json:"managerPaneId,omitempty"`
 	ManagerSessionPath  string               `json:"managerSessionPath,omitempty"`
 	Delivery            ManagerDeliveryState `json:"delivery,omitempty"`

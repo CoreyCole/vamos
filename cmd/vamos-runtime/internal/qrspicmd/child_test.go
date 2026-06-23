@@ -28,20 +28,31 @@ func TestBuildChildCommandUsesInteractivePiSessionAndDoneEnv(t *testing.T) {
 		StateFile:            "/tmp/state.json",
 		PlanDir:              "thoughts/example",
 		ExtensionPath:        "/tmp/q_manager_child_extension.js",
+		PiModel:              "anthropic/claude-opus-4-5:high",
 	}
 	cmd := strings.Join(BuildChildCommand(req), " ")
-	for _, want := range []string{"PROMPT_FILE=/tmp/prompt.txt", "OUTPUT_PATH=/tmp/output.txt", "SESSION_ID=question-1", "SESSION_DIR=/tmp/sessions", "Q_MANAGER_PARENT_PANE=%18", "Q_MANAGER_STATE_FILE=/tmp/state.json", "Q_MANAGER_PLAN_DIR=thoughts/example", "Q_MANAGER_STAGE=question-1", "Q_MANAGER_CHILD_ID=child-1", "Q_MANAGER_CHILD_EXTENSION=/tmp/q_manager_child_extension.js", "Q_MANAGER_VALIDATED_STATUS_PATH=/tmp/validation-status.json", "Q_MANAGER_WAKE_MODE=validated-only", "--extension", "--session-id", "--session-dir", "--name", "@$PROMPT_FILE", "capture-pane", "STATUS_PATH", "DONE_PATH", "interactive Pi"} {
+	for _, want := range []string{"PROMPT_FILE=/tmp/prompt.txt", "OUTPUT_PATH=/tmp/output.txt", "SESSION_ID=question-1", "SESSION_DIR=/tmp/sessions", "Q_MANAGER_PARENT_PANE=%18", "Q_MANAGER_STATE_FILE=/tmp/state.json", "Q_MANAGER_PLAN_DIR=thoughts/example", "Q_MANAGER_STAGE=question-1", "Q_MANAGER_CHILD_ID=child-1", "Q_MANAGER_CHILD_EXTENSION=/tmp/q_manager_child_extension.js", "Q_MANAGER_VALIDATED_STATUS_PATH=/tmp/validation-status.json", "Q_MANAGER_WAKE_MODE=validated-only", "VAMOS_PI_MODEL=anthropic/claude-opus-4-5:high", "PI_MODEL_ARGS=(--model", "--extension", "--session-id", "--session-dir", "--name", "@$PROMPT_FILE", "capture-pane", "STATUS_PATH", "DONE_PATH", "interactive Pi"} {
 		if !strings.Contains(cmd, want) {
 			t.Fatalf("command missing %q: %v", want, BuildChildCommand(req))
 		}
 	}
-	if strings.Contains(cmd, "--print") || strings.Contains(cmd, "tee") || strings.Contains(cmd, "RESULT_PATH") || strings.Contains(cmd, "cp \"$OUTPUT_PATH\"") {
+	if strings.Contains(cmd, "--print") || strings.Contains(cmd, "tee") ||
+		strings.Contains(cmd, "RESULT_PATH") ||
+		strings.Contains(cmd, "cp \"$OUTPUT_PATH\"") {
 		t.Fatalf("command kept authoritative result file: %s", cmd)
 	}
 }
 
 func TestBuildChildCommandOmitsEmptyExtension(t *testing.T) {
-	req := ChildRunRequest{PromptFile: "/tmp/prompt.txt", OutputPath: "/tmp/output.txt", SessionID: "question-1", SessionDir: "/tmp/sessions", SessionName: "q-manager question", DonePath: "/tmp/done", StatusPath: "/tmp/status.json"}
+	req := ChildRunRequest{
+		PromptFile:  "/tmp/prompt.txt",
+		OutputPath:  "/tmp/output.txt",
+		SessionID:   "question-1",
+		SessionDir:  "/tmp/sessions",
+		SessionName: "q-manager question",
+		DonePath:    "/tmp/done",
+		StatusPath:  "/tmp/status.json",
+	}
 	cmd := strings.Join(BuildChildCommand(req), " ")
 	if strings.Contains(cmd, "--extension") {
 		t.Fatalf("empty extension path should not add --extension: %s", cmd)
@@ -65,7 +76,11 @@ func TestResolveChildExtensionPathWritesEmbeddedAsset(t *testing.T) {
 	}
 	for _, forbidden := range []string{"Decision", "RunDecideNext", "RunValidateResult", "paste-buffer", "send-keys", "q_manager_child_wake:"} {
 		if strings.Contains(text, forbidden) {
-			t.Fatalf("extension asset contains graph authority marker %q: %s", forbidden, text)
+			t.Fatalf(
+				"extension asset contains graph authority marker %q: %s",
+				forbidden,
+				text,
+			)
 		}
 	}
 }
@@ -92,7 +107,12 @@ func TestResultAndOutputPathsOutsideRepo(t *testing.T) {
 func TestRunChildStartsRightSplitAndSavesActiveChild(t *testing.T) {
 	fixture := newRunChildFixture(t, true)
 	out := &bytes.Buffer{}
-	err := RunChild(t.Context(), fixture.options(), deps{Clock: fixture.clock, Runner: fixture.runner}, out)
+	err := RunChild(
+		t.Context(),
+		fixture.options(),
+		deps{Clock: fixture.clock, Runner: fixture.runner},
+		out,
+	)
 	if err != nil {
 		t.Fatalf("RunChild error = %v", err)
 	}
@@ -100,11 +120,15 @@ func TestRunChildStartsRightSplitAndSavesActiveChild(t *testing.T) {
 		t.Fatalf("started = %d, want 1", got)
 	}
 	req := fixture.runner.started[0]
-	if req.Split != "right" || req.Cwd != fixture.cwd || req.ParentPaneID != "%parent" || req.StateFile != fixture.stateFile || req.PlanDir != "thoughts/example" || req.ExtensionPath == "" {
+	if req.Split != "right" || req.Cwd != fixture.cwd || req.ParentPaneID != "%parent" ||
+		req.StateFile != fixture.stateFile ||
+		req.PlanDir != "thoughts/example" ||
+		req.ExtensionPath == "" {
 		t.Fatalf("request = %+v", req)
 	}
 	state := fixture.loadState(t)
-	if state.ActiveChild == nil || state.ActiveChild.TmuxPaneID != "%9" || state.ActiveChild.SessionPath == "" {
+	if state.ActiveChild == nil || state.ActiveChild.TmuxPaneID != "%9" ||
+		state.ActiveChild.SessionPath == "" {
 		t.Fatalf("active child = %+v", state.ActiveChild)
 	}
 	for _, want := range []string{`"type":"child_started"`, `"type":"child_finished"`, `"outputPath"`, `"sessionId"`, `"sessionDir"`, `"sessionPath"`, `"donePath"`, `"statusPath"`} {
@@ -114,6 +138,27 @@ func TestRunChildStartsRightSplitAndSavesActiveChild(t *testing.T) {
 	}
 	if strings.Contains(out.String(), `"resultPath"`) {
 		t.Fatalf("output exposed default resultPath: %q", out.String())
+	}
+}
+
+func TestRunChildPassesModelOverrideToPi(t *testing.T) {
+	fixture := newRunChildFixture(t, true)
+	opts := fixture.options()
+	opts.PiModel = "openai/gpt-5"
+	if err := RunChild(
+		t.Context(),
+		opts,
+		deps{Clock: fixture.clock, Runner: fixture.runner},
+		&bytes.Buffer{},
+	); err != nil {
+		t.Fatalf("RunChild error = %v", err)
+	}
+	if got := fixture.runner.started[0].PiModel; got != "openai/gpt-5" {
+		t.Fatalf("PiModel = %q, want openai/gpt-5", got)
+	}
+	state := fixture.loadState(t)
+	if state.PiModel != "openai/gpt-5" {
+		t.Fatalf("state.PiModel = %q, want openai/gpt-5", state.PiModel)
 	}
 }
 
@@ -127,7 +172,12 @@ func TestRunChildUsesImplementationCwdWhenRequestedExplicitly(t *testing.T) {
 	if err := os.MkdirAll(impl, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := RunChild(t.Context(), fixture.options(), deps{Clock: fixture.clock, Runner: fixture.runner}, &bytes.Buffer{}); err != nil {
+	if err := RunChild(
+		t.Context(),
+		fixture.options(),
+		deps{Clock: fixture.clock, Runner: fixture.runner},
+		&bytes.Buffer{},
+	); err != nil {
 		t.Fatalf("RunChild error = %v", err)
 	}
 	if got := fixture.runner.started[0].Cwd; got != impl {
@@ -137,7 +187,12 @@ func TestRunChildUsesImplementationCwdWhenRequestedExplicitly(t *testing.T) {
 
 func TestRunChildWaitsForDoneByDefault(t *testing.T) {
 	fixture := newRunChildFixture(t, true)
-	if err := RunChild(t.Context(), fixture.options(), deps{Clock: fixture.clock, Runner: fixture.runner}, &bytes.Buffer{}); err != nil {
+	if err := RunChild(
+		t.Context(),
+		fixture.options(),
+		deps{Clock: fixture.clock, Runner: fixture.runner},
+		&bytes.Buffer{},
+	); err != nil {
 		t.Fatalf("RunChild error = %v", err)
 	}
 	state := fixture.loadState(t)
@@ -153,12 +208,22 @@ func TestRunChildTimeoutKeepsActiveChildRefs(t *testing.T) {
 	fixture := newRunChildFixture(t, false)
 	opts := fixture.options()
 	opts.Timeout = time.Nanosecond
-	err := RunChild(t.Context(), opts, deps{Clock: fixture.clock, Runner: fixture.runner}, &bytes.Buffer{})
-	if err == nil || !strings.Contains(err.Error(), "timed out waiting for child done marker") {
+	err := RunChild(
+		t.Context(),
+		opts,
+		deps{Clock: fixture.clock, Runner: fixture.runner},
+		&bytes.Buffer{},
+	)
+	if err == nil ||
+		!strings.Contains(err.Error(), "timed out waiting for child done marker") {
 		t.Fatalf("expected timeout, got %v", err)
 	}
 	state := fixture.loadState(t)
-	if state.ActiveChild == nil || state.ActiveChild.DonePath == "" || state.ActiveChild.StatusPath == "" || state.ActiveChild.OutputPath == "" || state.ActiveChild.SessionID == "" || state.ActiveChild.SessionDir == "" {
+	if state.ActiveChild == nil || state.ActiveChild.DonePath == "" ||
+		state.ActiveChild.StatusPath == "" ||
+		state.ActiveChild.OutputPath == "" ||
+		state.ActiveChild.SessionID == "" ||
+		state.ActiveChild.SessionDir == "" {
 		t.Fatalf("active child refs not preserved: %+v", state.ActiveChild)
 	}
 }
@@ -172,7 +237,12 @@ func TestRunChildCleansPendingAfterNewStart(t *testing.T) {
 	fixture.saveState(t, state)
 	tmux := &recordingTmux{}
 	var out bytes.Buffer
-	if err := RunChild(t.Context(), fixture.options(), deps{Clock: fixture.clock, Runner: fixture.runner, Tmux: tmux}, &out); err != nil {
+	if err := RunChild(
+		t.Context(),
+		fixture.options(),
+		deps{Clock: fixture.clock, Runner: fixture.runner, Tmux: tmux},
+		&out,
+	); err != nil {
 		t.Fatalf("RunChild error = %v", err)
 	}
 	loaded := fixture.loadState(t)
@@ -185,7 +255,8 @@ func TestRunChildCleansPendingAfterNewStart(t *testing.T) {
 	if len(tmux.kills) != 1 || tmux.kills[0].ID != "%old" {
 		t.Fatalf("kills = %#v, want %%old", tmux.kills)
 	}
-	if !strings.Contains(out.String(), `"type":"child_started"`) || !strings.Contains(out.String(), `"type":"child_cleaned"`) {
+	if !strings.Contains(out.String(), `"type":"child_started"`) ||
+		!strings.Contains(out.String(), `"type":"child_cleaned"`) {
 		t.Fatalf("output = %q", out.String())
 	}
 }
@@ -194,7 +265,12 @@ func TestRunChildRejectsMissingPromptFile(t *testing.T) {
 	fixture := newRunChildFixture(t, true)
 	opts := fixture.options()
 	opts.PromptFile = filepath.Join(fixture.dir, "missing.txt")
-	err := RunChild(t.Context(), opts, deps{Clock: fixture.clock, Runner: fixture.runner}, &bytes.Buffer{})
+	err := RunChild(
+		t.Context(),
+		opts,
+		deps{Clock: fixture.clock, Runner: fixture.runner},
+		&bytes.Buffer{},
+	)
 	if err == nil || !strings.Contains(err.Error(), "prompt-file does not exist") {
 		t.Fatalf("expected prompt missing error, got %v", err)
 	}
@@ -209,12 +285,18 @@ func TestRunChildStartFailurePreservesPendingOldPane(t *testing.T) {
 	fixture.saveState(t, state)
 	fixture.runner.startErr = errors.New("split failed")
 
-	err := RunChild(t.Context(), fixture.options(), deps{Clock: fixture.clock, Runner: fixture.runner, Tmux: &recordingTmux{}}, &bytes.Buffer{})
+	err := RunChild(
+		t.Context(),
+		fixture.options(),
+		deps{Clock: fixture.clock, Runner: fixture.runner, Tmux: &recordingTmux{}},
+		&bytes.Buffer{},
+	)
 	if err == nil || !strings.Contains(err.Error(), "split failed") {
 		t.Fatalf("expected split error, got %v", err)
 	}
 	loaded := fixture.loadState(t)
-	if loaded.PendingCleanupChild == nil || loaded.PendingCleanupChild.TmuxPaneID != "%old" {
+	if loaded.PendingCleanupChild == nil ||
+		loaded.PendingCleanupChild.TmuxPaneID != "%old" {
 		t.Fatalf("pending cleanup changed: %#v", loaded.PendingCleanupChild)
 	}
 	if loaded.ActiveChild == nil || loaded.ActiveChild.TmuxPaneID != "%old" {
@@ -229,7 +311,10 @@ type fakeChildRunner struct {
 	started     []ChildRunRequest
 }
 
-func (f *fakeChildRunner) Start(ctx context.Context, req ChildRunRequest) (ChildRun, error) {
+func (f *fakeChildRunner) Start(
+	ctx context.Context,
+	req ChildRunRequest,
+) (ChildRun, error) {
 	if f.startErr != nil {
 		return ChildRun{}, f.startErr
 	}
@@ -238,27 +323,54 @@ func (f *fakeChildRunner) Start(ctx context.Context, req ChildRunRequest) (Child
 		paneID = f.panes[len(f.started)]
 	}
 	f.started = append(f.started, req)
-	return ChildRun{ID: req.ID, Pane: TmuxPane{ID: paneID}, OutputPath: req.OutputPath, SessionID: req.SessionID, SessionDir: req.SessionDir, DonePath: req.DonePath, StatusPath: req.StatusPath}, nil
+	return ChildRun{
+		ID:         req.ID,
+		Pane:       TmuxPane{ID: paneID},
+		OutputPath: req.OutputPath,
+		SessionID:  req.SessionID,
+		SessionDir: req.SessionDir,
+		DonePath:   req.DonePath,
+		StatusPath: req.StatusPath,
+	}, nil
 }
 
-func (f *fakeChildRunner) Wait(ctx context.Context, run ChildRun) (ChildRunResult, error) {
+func (f *fakeChildRunner) Wait(
+	ctx context.Context,
+	run ChildRun,
+) (ChildRunResult, error) {
 	if f.writeResult {
 		sessionPath := filepath.Join(run.SessionDir, "session.jsonl")
-		session := sessionHeader(run.SessionID, f.started[len(f.started)-1].Cwd) + "\n" + assistantLine("```yaml\nqrspi_result:\n  stage: plan\n```") + "\n"
+		session := sessionHeader(
+			run.SessionID,
+			f.started[len(f.started)-1].Cwd,
+		) + "\n" + assistantLine(
+			"```yaml\nqrspi_result:\n  stage: plan\n```",
+		) + "\n"
 		if err := os.MkdirAll(filepath.Dir(sessionPath), 0o755); err != nil {
 			return ChildRunResult{}, err
 		}
 		if err := os.WriteFile(sessionPath, []byte(session), 0o644); err != nil {
 			return ChildRunResult{}, err
 		}
-		if err := os.WriteFile(run.StatusPath, []byte(`{"exitCode":0,"finishedAt":"1970-01-01T00:00:00Z"}`), 0o644); err != nil {
+		if err := os.WriteFile(
+			run.StatusPath,
+			[]byte(`{"exitCode":0,"finishedAt":"1970-01-01T00:00:00Z"}`),
+			0o644,
+		); err != nil {
 			return ChildRunResult{}, err
 		}
 		if err := os.WriteFile(run.DonePath, []byte(""), 0o644); err != nil {
 			return ChildRunResult{}, err
 		}
 	}
-	return ChildRunResult{ID: run.ID, OutputPath: run.OutputPath, SessionID: run.SessionID, SessionDir: run.SessionDir, DonePath: run.DonePath, StatusPath: run.StatusPath}, nil
+	return ChildRunResult{
+		ID:         run.ID,
+		OutputPath: run.OutputPath,
+		SessionID:  run.SessionID,
+		SessionDir: run.SessionDir,
+		DonePath:   run.DonePath,
+		StatusPath: run.StatusPath,
+	}, nil
 }
 
 type runChildFixture struct {
@@ -281,15 +393,34 @@ func newRunChildFixture(t *testing.T, writeResult bool) runChildFixture {
 		t.Fatal(err)
 	}
 	stateFile := filepath.Join(dir, "state", "key", "run.json")
-	state := ManagerState{RepoID: cwd, CanonicalPlanDir: filepath.Join(cwd, "thoughts/example"), ManagerRunID: "run", SourceCwd: cwd, ManagerPaneID: "%parent"}
+	state := ManagerState{
+		RepoID:           cwd,
+		CanonicalPlanDir: filepath.Join(cwd, "thoughts/example"),
+		ManagerRunID:     "run",
+		SourceCwd:        cwd,
+		ManagerPaneID:    "%parent",
+	}
 	if err := (FileStateStore{}).Save(stateFile, state); err != nil {
 		t.Fatal(err)
 	}
-	return runChildFixture{dir: dir, cwd: cwd, stateFile: stateFile, prompt: prompt, runner: &fakeChildRunner{writeResult: writeResult}}
+	return runChildFixture{
+		dir:       dir,
+		cwd:       cwd,
+		stateFile: stateFile,
+		prompt:    prompt,
+		runner:    &fakeChildRunner{writeResult: writeResult},
+	}
 }
 
 func (f runChildFixture) options() RunChildOptions {
-	return RunChildOptions{PlanDir: "thoughts/example", Stage: "plan", Cwd: f.cwd, PromptFile: f.prompt, StateFile: f.stateFile, Timeout: time.Second}
+	return RunChildOptions{
+		PlanDir:    "thoughts/example",
+		Stage:      "plan",
+		Cwd:        f.cwd,
+		PromptFile: f.prompt,
+		StateFile:  f.stateFile,
+		Timeout:    time.Second,
+	}
 }
 
 func (f runChildFixture) clock() time.Time { return time.Unix(100, 123) }

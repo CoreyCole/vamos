@@ -11,9 +11,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/spf13/cobra"
+
 	"github.com/CoreyCole/vamos/pkg/agents/workflows/qrspi/semantic"
 	wruntime "github.com/CoreyCole/vamos/pkg/agents/workflows/runtime"
-	"github.com/spf13/cobra"
 )
 
 var ErrNotImplemented = errors.New("qrspi command behavior not implemented")
@@ -78,13 +79,21 @@ func newInitCommand(d deps) *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVar(&opts.PlanDir, "plan-dir", "", "QRSPI plan directory")
-	cmd.Flags().StringVar(&opts.ProjectRoot, "project-root", "", "project repository root")
-	cmd.Flags().StringVar(&opts.PolicyFile, "policy-file", "", "optional policy JSON file")
-	cmd.Flags().StringVar(&opts.NodeID, "node", "", "initial QRSPI node ID (defaults to graph start)")
+	cmd.Flags().
+		StringVar(&opts.ProjectRoot, "project-root", "", "project repository root")
+	cmd.Flags().
+		StringVar(&opts.PolicyFile, "policy-file", "", "optional policy JSON file")
+	cmd.Flags().
+		StringVar(&opts.NodeID, "node", "", "initial QRSPI node ID (defaults to graph start)")
 	cmd.Flags().StringVar(&opts.NodeID, "stage", "", "alias for --node")
-	cmd.Flags().StringVar(&opts.ImplementationCwd, "implementation-cwd", "", "implementation workspace cwd for implementation/review/verify stages")
-	cmd.Flags().StringVar(&opts.ManagerPane, "manager-pane", "", "tmux pane ID for the parent q-manager session")
-	cmd.Flags().BoolVar(&opts.Force, "force", false, "replace existing expired/inactive state")
+	cmd.Flags().
+		StringVar(&opts.ImplementationCwd, "implementation-cwd", "", "implementation workspace cwd for implementation/review/verify stages")
+	cmd.Flags().
+		StringVar(&opts.ManagerPane, "manager-pane", "", "tmux pane ID for the parent q-manager session")
+	cmd.Flags().
+		StringVar(&opts.PiModel, "model", "", "Pi model pattern or ID for child sessions (passed to pi --model)")
+	cmd.Flags().
+		BoolVar(&opts.Force, "force", false, "replace existing expired/inactive state")
 	return cmd
 }
 
@@ -97,29 +106,47 @@ func newStartNextCommand(d deps) *cobra.Command {
 		Use:   "start-next --plan-dir <path> --project-root <path>",
 		Short: "Initialize or resume q-manager state and launch the graph-selected child",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			opts.Usage = usageFromChangedFlags(cmd, usagePercent, usageTokens, usageWindow)
+			opts.Usage = usageFromChangedFlags(
+				cmd,
+				usagePercent,
+				usageTokens,
+				usageWindow,
+			)
 			_, err := RunStartNext(cmd.Context(), opts, d, cmd.OutOrStdout())
 			return err
 		},
 	}
 	cmd.Flags().StringVar(&opts.PlanDir, "plan-dir", "", "QRSPI plan directory")
-	cmd.Flags().StringVar(&opts.ProjectRoot, "project-root", "", "project repository root")
+	cmd.Flags().
+		StringVar(&opts.ProjectRoot, "project-root", "", "project repository root")
 	cmd.Flags().StringVar(&opts.StateFile, "state-file", "", "q-manager state file")
-	cmd.Flags().StringVar(&opts.PolicyFile, "policy-file", "", "optional policy JSON file")
+	cmd.Flags().
+		StringVar(&opts.PolicyFile, "policy-file", "", "optional policy JSON file")
 	cmd.Flags().StringVar(&opts.NodeID, "node", "", "QRSPI node ID override")
 	cmd.Flags().StringVar(&opts.NodeID, "stage", "", "alias for --node")
-	cmd.Flags().StringVar(&opts.ImplementationCwd, "implementation-cwd", "", "implementation workspace cwd for implementation/review/verify stages")
-	cmd.Flags().StringVar(&opts.ManagerPane, "manager-pane", "", "tmux pane ID for the parent q-manager session")
-	cmd.Flags().StringVar(&opts.LatestResultFile, "latest-result-file", "", "file containing latest fenced qrspi_result YAML")
-	cmd.Flags().BoolVar(&opts.LatestResultStdin, "latest-result-stdin", false, "read latest fenced qrspi_result YAML from stdin")
+	cmd.Flags().
+		StringVar(&opts.ImplementationCwd, "implementation-cwd", "", "implementation workspace cwd for implementation/review/verify stages")
+	cmd.Flags().
+		StringVar(&opts.ManagerPane, "manager-pane", "", "tmux pane ID for the parent q-manager session")
+	cmd.Flags().
+		StringVar(&opts.PiModel, "model", "", "Pi model pattern or ID for child sessions (passed to pi --model)")
+	cmd.Flags().
+		StringVar(&opts.LatestResultFile, "latest-result-file", "", "file containing latest fenced qrspi_result YAML")
+	cmd.Flags().
+		BoolVar(&opts.LatestResultStdin, "latest-result-stdin", false, "read latest fenced qrspi_result YAML from stdin")
 	cmd.Flags().StringVar(&opts.Cwd, "cwd", "", "child cwd override")
 	cmd.Flags().StringVar(&opts.Split, "split", "right", "tmux split direction")
-	cmd.Flags().DurationVar(&opts.Timeout, "timeout", 0, "maximum time to wait for child; 0 returns after launch")
+	cmd.Flags().
+		DurationVar(&opts.Timeout, "timeout", 0, "maximum time to wait for child; 0 returns after launch")
 	cmd.Flags().StringVar(&opts.Output, "output", "text", "output format: text or ndjson")
-	cmd.Flags().BoolVar(&opts.Force, "force", false, "replace existing expired/inactive state")
-	cmd.Flags().Float64Var(&usagePercent, "manager-usage-percent", 0, "parent manager context usage percent for optional compaction")
-	cmd.Flags().IntVar(&usageTokens, "manager-usage-tokens", 0, "parent manager context token count for optional compaction")
-	cmd.Flags().IntVar(&usageWindow, "manager-usage-window", 0, "parent manager context window size for optional compaction")
+	cmd.Flags().
+		BoolVar(&opts.Force, "force", false, "replace existing expired/inactive state")
+	cmd.Flags().
+		Float64Var(&usagePercent, "manager-usage-percent", 0, "parent manager context usage percent for optional compaction")
+	cmd.Flags().
+		IntVar(&usageTokens, "manager-usage-tokens", 0, "parent manager context token count for optional compaction")
+	cmd.Flags().
+		IntVar(&usageWindow, "manager-usage-window", 0, "parent manager context window size for optional compaction")
 	return cmd
 }
 
@@ -134,8 +161,10 @@ func newSteerChildCommand(d deps) *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVar(&opts.StateFile, "state-file", "", "q-manager state file")
-	cmd.Flags().StringVar(&opts.FeedbackFile, "feedback-file", "", "file containing feedback for the active child")
-	cmd.Flags().StringVar(&opts.Feedback, "feedback", "", "inline feedback for the active child")
+	cmd.Flags().
+		StringVar(&opts.FeedbackFile, "feedback-file", "", "file containing feedback for the active child")
+	cmd.Flags().
+		StringVar(&opts.Feedback, "feedback", "", "inline feedback for the active child")
 	cmd.Flags().StringVar(&opts.Stage, "stage", "", "expected active child node")
 	cmd.Flags().StringVar(&opts.Output, "output", "text", "output format: text or ndjson")
 	return cmd
@@ -153,12 +182,17 @@ func newRunChildCommand(d deps) *cobra.Command {
 	cmd.Flags().StringVar(&opts.PlanDir, "plan-dir", "", "QRSPI plan directory")
 	cmd.Flags().StringVar(&opts.Stage, "stage", "", "QRSPI node ID to run")
 	cmd.Flags().StringVar(&opts.Cwd, "cwd", "", "child process working directory")
-	cmd.Flags().StringVar(&opts.PromptFile, "prompt-file", "", "rendered child prompt file")
+	cmd.Flags().
+		StringVar(&opts.PromptFile, "prompt-file", "", "rendered child prompt file")
 	cmd.Flags().StringVar(&opts.StateFile, "state-file", "", "q-manager state file")
 	cmd.Flags().StringVar(&opts.Split, "split", "right", "tmux split direction")
 	cmd.Flags().StringVar(&opts.ManagerRunID, "manager-run-id", "", "manager run ID")
-	cmd.Flags().StringVar(&opts.ManagerPane, "manager-pane", "", "tmux pane ID for the parent q-manager session")
-	cmd.Flags().DurationVar(&opts.Timeout, "timeout", 12*time.Hour, "maximum time to wait for child done marker")
+	cmd.Flags().
+		StringVar(&opts.ManagerPane, "manager-pane", "", "tmux pane ID for the parent q-manager session")
+	cmd.Flags().
+		StringVar(&opts.PiModel, "model", "", "Pi model pattern or ID for this child session (passed to pi --model)")
+	cmd.Flags().
+		DurationVar(&opts.Timeout, "timeout", 12*time.Hour, "maximum time to wait for child done marker")
 	return cmd
 }
 
@@ -188,7 +222,8 @@ func newManagerReadyCommand(d deps) *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVar(&opts.StateFile, "state-file", "", "q-manager state file")
-	cmd.Flags().StringVar(&opts.ManagerPane, "manager-pane", "", "tmux pane ID for the resumed parent q-manager session")
+	cmd.Flags().
+		StringVar(&opts.ManagerPane, "manager-pane", "", "tmux pane ID for the resumed parent q-manager session")
 	cmd.Flags().StringVar(&opts.Output, "output", "text", "output format: text or ndjson")
 	return cmd
 }
@@ -218,7 +253,8 @@ func newRepairStateCommand(d deps) *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVar(&opts.StateFile, "state-file", "", "q-manager state file")
-	cmd.Flags().BoolVar(&opts.AlignActiveChild, "align-active-child", false, "align current workflow node to the active child stage when safe")
+	cmd.Flags().
+		BoolVar(&opts.AlignActiveChild, "align-active-child", false, "align current workflow node to the active child stage when safe")
 	cmd.Flags().BoolVar(&opts.ClearFailedChild, "clear-failed-child", false, "clear active child only when status/output prove terminal launch failure")
 	cmd.Flags().BoolVar(&opts.Relaunch, "relaunch", false, "after clearing a terminal failed child, relaunch the same graph node")
 	cmd.Flags().StringVar(&opts.Output, "output", "text", "output format: text or ndjson")
@@ -236,7 +272,8 @@ func newMarkChildActiveCommand(d deps) *cobra.Command {
 	}
 	cmd.Flags().StringVar(&opts.StateFile, "state-file", "", "q-manager state file")
 	cmd.Flags().StringVar(&opts.ChildID, "child-id", "", "active child ID")
-	cmd.Flags().StringVar(&opts.Reason, "reason", "manual-reprompt", "reason for marking child active")
+	cmd.Flags().
+		StringVar(&opts.Reason, "reason", "manual-reprompt", "reason for marking child active")
 	cmd.Flags().StringVar(&opts.Output, "output", "text", "output format: text or ndjson")
 	return cmd
 }
@@ -251,8 +288,10 @@ func newInspectCommand(d deps) *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVar(&opts.StateFile, "state-file", "", "q-manager state file")
-	cmd.Flags().BoolVar(&opts.Sessions, "sessions", false, "include active child session refs")
-	cmd.Flags().BoolVar(&opts.Latest, "latest", false, "include latest relevant session candidate")
+	cmd.Flags().
+		BoolVar(&opts.Sessions, "sessions", false, "include active child session refs")
+	cmd.Flags().
+		BoolVar(&opts.Latest, "latest", false, "include latest relevant session candidate")
 	cmd.Flags().StringVar(&opts.Output, "output", "text", "output format: text or json")
 	return cmd
 }
@@ -282,7 +321,8 @@ func newRebindChildCommand(d deps) *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVar(&opts.StateFile, "state-file", "", "q-manager state file")
-	cmd.Flags().StringVar(&opts.SessionFile, "session-file", "", "child Pi session JSONL file")
+	cmd.Flags().
+		StringVar(&opts.SessionFile, "session-file", "", "child Pi session JSONL file")
 	cmd.Flags().StringVar(&opts.Stage, "stage", "", "expected QRSPI node ID")
 	cmd.Flags().StringVar(&opts.Reason, "reason", "manual-new", "rebind reason")
 	cmd.Flags().StringVar(&opts.Output, "output", "text", "output format: text or json")
@@ -300,8 +340,10 @@ func newValidateLatestCommand(d deps) *cobra.Command {
 	}
 	cmd.Flags().StringVar(&opts.StateFile, "state-file", "", "q-manager state file")
 	cmd.Flags().StringVar(&opts.Stage, "stage", "", "expected QRSPI node ID")
-	cmd.Flags().BoolVar(&opts.ApplyRebind, "apply-rebind", false, "rebind active child before validating")
-	cmd.Flags().BoolVar(&opts.Continue, "continue", false, "continue graph after validation")
+	cmd.Flags().
+		BoolVar(&opts.ApplyRebind, "apply-rebind", false, "rebind active child before validating")
+	cmd.Flags().
+		BoolVar(&opts.Continue, "continue", false, "continue graph after validation")
 	cmd.Flags().StringVar(&opts.Output, "output", "text", "output format: text or json")
 	return cmd
 }
@@ -317,7 +359,8 @@ func newRecoverManualCommand(d deps) *cobra.Command {
 	}
 	cmd.Flags().StringVar(&opts.StateFile, "state-file", "", "q-manager state file")
 	cmd.Flags().StringVar(&opts.Mode, "mode", "latest-session", "recovery mode")
-	cmd.Flags().BoolVar(&opts.Continue, "continue", false, "continue graph after rebind/validation")
+	cmd.Flags().
+		BoolVar(&opts.Continue, "continue", false, "continue graph after rebind/validation")
 	cmd.Flags().StringVar(&opts.Output, "output", "text", "output format: text or json")
 	return cmd
 }
@@ -333,8 +376,10 @@ func newValidateResultCommand(d deps) *cobra.Command {
 	}
 	cmd.Flags().StringVar(&opts.Stage, "stage", "", "expected QRSPI node ID")
 	cmd.Flags().StringVar(&opts.StateFile, "state-file", "", "q-manager state file")
-	cmd.Flags().StringVar(&opts.SessionFile, "session-file", "", "explicit child Pi session JSONL file")
-	cmd.Flags().StringVar(&opts.ResultFile, "result-file", "", "deprecated debug fallback only when session/latest-session recovery is unavailable")
+	cmd.Flags().
+		StringVar(&opts.SessionFile, "session-file", "", "explicit child Pi session JSONL file")
+	cmd.Flags().
+		StringVar(&opts.ResultFile, "result-file", "", "deprecated debug fallback only when session/latest-session recovery is unavailable")
 	cmd.Flags().StringVar(&opts.PlanDir, "plan-dir", "", "QRSPI plan directory")
 	cmd.Flags().StringVar(&opts.RunID, "run-id", "", "child run ID")
 	cmd.Flags().StringVar(&opts.SessionID, "session-id", "", "child session ID")
@@ -351,8 +396,10 @@ func newDecideNextCommand(d deps) *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVar(&opts.StateFile, "state-file", "", "q-manager state file")
-	cmd.Flags().StringVar(&opts.SessionFile, "session-file", "", "explicit child Pi session JSONL file")
-	cmd.Flags().StringVar(&opts.ResultFile, "result-file", "", "deprecated debug fallback only when session/latest-session recovery is unavailable")
+	cmd.Flags().
+		StringVar(&opts.SessionFile, "session-file", "", "explicit child Pi session JSONL file")
+	cmd.Flags().
+		StringVar(&opts.ResultFile, "result-file", "", "deprecated debug fallback only when session/latest-session recovery is unavailable")
 	cmd.Flags().StringVar(&opts.PlanDir, "plan-dir", "", "QRSPI plan directory")
 	return cmd
 }
@@ -371,7 +418,8 @@ func newRepromptChildCommand(d deps) *cobra.Command {
 	cmd.Flags().StringVar(&opts.Stage, "stage", "", "QRSPI node ID being retried")
 	cmd.Flags().IntVar(&opts.Attempt, "attempt", 1, "validation retry attempt number")
 	cmd.Flags().StringVar(&opts.ErrorText, "error", "", "validation error text")
-	cmd.Flags().StringVar(&opts.ErrorFile, "error-file", "", "file containing validation error text")
+	cmd.Flags().
+		StringVar(&opts.ErrorFile, "error-file", "", "file containing validation error text")
 	return cmd
 }
 
@@ -384,20 +432,34 @@ func newContinueCommand(d deps) *cobra.Command {
 		Use:   "continue --state-file <file>",
 		Short: "Validate active child and continue the QRSPI graph when safe",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			opts.Usage = usageFromChangedFlags(cmd, usagePercent, usageTokens, usageWindow)
+			opts.Usage = usageFromChangedFlags(
+				cmd,
+				usagePercent,
+				usageTokens,
+				usageWindow,
+			)
 			return RunContinue(cmd.Context(), opts, d, cmd.OutOrStdout())
 		},
 	}
 	cmd.Flags().StringVar(&opts.StateFile, "state-file", "", "q-manager state file")
-	cmd.Flags().StringVar(&opts.PlanDir, "plan-dir", "", "QRSPI plan directory; defaults from state")
-	cmd.Flags().StringVar(&opts.Stage, "stage", "", "expected active child node; defaults from state")
+	cmd.Flags().
+		StringVar(&opts.PlanDir, "plan-dir", "", "QRSPI plan directory; defaults from state")
+	cmd.Flags().
+		StringVar(&opts.Stage, "stage", "", "expected active child node; defaults from state")
 	cmd.Flags().StringVar(&opts.Cwd, "cwd", "", "next child cwd override")
-	cmd.Flags().StringVar(&opts.Split, "split", "right", "tmux split direction for next child")
-	cmd.Flags().DurationVar(&opts.Timeout, "timeout", 0, "maximum time to wait for next child; 0 returns after launch")
+	cmd.Flags().
+		StringVar(&opts.Split, "split", "right", "tmux split direction for next child")
+	cmd.Flags().
+		StringVar(&opts.PiModel, "model", "", "Pi model pattern or ID for child sessions (passed to pi --model)")
+	cmd.Flags().
+		DurationVar(&opts.Timeout, "timeout", 0, "maximum time to wait for next child; 0 returns after launch")
 	cmd.Flags().StringVar(&opts.Output, "output", "text", "output format: text or ndjson")
-	cmd.Flags().Float64Var(&usagePercent, "manager-usage-percent", 0, "parent manager context usage percent for optional compaction")
-	cmd.Flags().IntVar(&usageTokens, "manager-usage-tokens", 0, "parent manager context token count for optional compaction")
-	cmd.Flags().IntVar(&usageWindow, "manager-usage-window", 0, "parent manager context window size for optional compaction")
+	cmd.Flags().
+		Float64Var(&usagePercent, "manager-usage-percent", 0, "parent manager context usage percent for optional compaction")
+	cmd.Flags().
+		IntVar(&usageTokens, "manager-usage-tokens", 0, "parent manager context token count for optional compaction")
+	cmd.Flags().
+		IntVar(&usageWindow, "manager-usage-window", 0, "parent manager context window size for optional compaction")
 	return cmd
 }
 
@@ -438,7 +500,14 @@ func RunInit(ctx context.Context, opts InitOptions, d deps, out io.Writer) error
 	if err != nil {
 		return err
 	}
-	if err := ApplyInitOverrides(&state, InitOverrides{NodeID: opts.NodeID, ImplementationCwd: opts.ImplementationCwd}); err != nil {
+	if err := ApplyInitOverrides(
+		&state,
+		InitOverrides{
+			NodeID:            opts.NodeID,
+			ImplementationCwd: opts.ImplementationCwd,
+			PiModel:           opts.PiModel,
+		},
+	); err != nil {
 		return err
 	}
 	state.ManagerPaneID = CaptureManagerPaneID(opts.ManagerPane)
@@ -473,7 +542,12 @@ func RunInit(ctx context.Context, opts InitOptions, d deps, out io.Writer) error
 	})
 }
 
-func RunStartNext(ctx context.Context, opts StartNextOptions, d deps, out io.Writer) (*StartNextResult, error) {
+func RunStartNext(
+	ctx context.Context,
+	opts StartNextOptions,
+	d deps,
+	out io.Writer,
+) (*StartNextResult, error) {
 	out = ensureWriter(out)
 	if strings.TrimSpace(opts.StateFile) == "" && strings.TrimSpace(opts.PlanDir) == "" {
 		return nil, errors.New("plan-dir is required")
@@ -565,7 +639,10 @@ func RunStartNext(ctx context.Context, opts StartNextOptions, d deps, out io.Wri
 			if parsed.Decision.NextNodeID != "" {
 				result.CurrentNode = string(parsed.Decision.NextNodeID)
 			}
-			result.NextCommand = fmt.Sprintf("vamos qrspi start-next --state-file %s", stateFile)
+			result.NextCommand = fmt.Sprintf(
+				"vamos qrspi start-next --state-file %s",
+				stateFile,
+			)
 			return &result, writeStartNextOutput(out, result, opts.Output)
 		}
 	}
@@ -574,7 +651,16 @@ func RunStartNext(ctx context.Context, opts StartNextOptions, d deps, out io.Wri
 		return nil, err
 	}
 	result.CurrentNode = string(node.ID)
-	promptFile, err := WriteStagePromptFile(ctx, state, node, PromptFileOptions{StateFile: stateFile, NodeID: string(node.ID), Timestamp: clock()})
+	promptFile, err := WriteStagePromptFile(
+		ctx,
+		state,
+		node,
+		PromptFileOptions{
+			StateFile: stateFile,
+			NodeID:    string(node.ID),
+			Timestamp: clock(),
+		},
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -594,6 +680,7 @@ func RunStartNext(ctx context.Context, opts StartNextOptions, d deps, out io.Wri
 		PromptFile: promptFile,
 		StateFile:  stateFile,
 		Split:      opts.Split,
+		PiModel:    resolvePiModel(opts.PiModel, state.PiModel),
 		Timeout:    opts.Timeout,
 	}, d, runOut); err != nil {
 		return nil, err
@@ -602,7 +689,14 @@ func RunStartNext(ctx context.Context, opts StartNextOptions, d deps, out io.Wri
 	if err != nil {
 		return nil, err
 	}
-	launched, _, err = maybeStartManagerCompaction(ctx, launched, stateFile, opts.Usage, d, out)
+	launched, _, err = maybeStartManagerCompaction(
+		ctx,
+		launched,
+		stateFile,
+		opts.Usage,
+		d,
+		out,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -614,7 +708,9 @@ func RunStartNext(ctx context.Context, opts StartNextOptions, d deps, out io.Wri
 
 func readLatestResultSeed(opts StartNextOptions) (string, error) {
 	if opts.LatestResultStdin && strings.TrimSpace(opts.LatestResultFile) != "" {
-		return "", errors.New("use only one of --latest-result-stdin or --latest-result-file")
+		return "", errors.New(
+			"use only one of --latest-result-stdin or --latest-result-file",
+		)
 	}
 	if strings.TrimSpace(opts.LatestResultFile) != "" {
 		data, err := os.ReadFile(opts.LatestResultFile)
@@ -633,11 +729,18 @@ func readLatestResultSeed(opts StartNextOptions) (string, error) {
 	return "", nil
 }
 
-func applyLatestResultSeed(state *ManagerState, resultText string) (*ParsedDecision, error) {
+func applyLatestResultSeed(
+	state *ManagerState,
+	resultText string,
+) (*ParsedDecision, error) {
 	if state == nil {
 		return nil, errors.New("state is required")
 	}
-	parsed, err := ParseNormalizeValidateDecide(resultText, *state, wruntime.ParseContext{ExpectedNodeID: state.Workflow.CurrentNodeID})
+	parsed, err := ParseNormalizeValidateDecide(
+		resultText,
+		*state,
+		wruntime.ParseContext{ExpectedNodeID: state.Workflow.CurrentNodeID},
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -691,10 +794,19 @@ func writeStartNextText(out io.Writer, result StartNextResult) error {
 		}
 	}
 	if result.ActiveChild != nil && result.StopReason == "active child already running" {
-		if _, err := fmt.Fprintf(out, "active child: %s (%s), session %s\n", result.ActiveChild.Stage, result.ActiveChild.TmuxPaneID, emptyAsPending(result.ActiveChild.SessionID)); err != nil {
+		if _, err := fmt.Fprintf(
+			out,
+			"active child: %s (%s), session %s\n",
+			result.ActiveChild.Stage,
+			result.ActiveChild.TmuxPaneID,
+			emptyAsPending(result.ActiveChild.SessionID),
+		); err != nil {
 			return err
 		}
-		_, err := fmt.Fprintln(out, "next: wait for validated wake or inspect active child; do not launch duplicate child")
+		_, err := fmt.Fprintln(
+			out,
+			"next: wait for validated wake or inspect active child; do not launch duplicate child",
+		)
 		return err
 	}
 	if result.CurrentNode != "" {
@@ -708,7 +820,12 @@ func writeStartNextText(out io.Writer, result StartNextResult) error {
 		}
 	}
 	if result.ActiveChild != nil {
-		if _, err := fmt.Fprintf(out, "started child: %s (%s)\n", result.ActiveChild.Stage, result.ActiveChild.TmuxPaneID); err != nil {
+		if _, err := fmt.Fprintf(
+			out,
+			"started child: %s (%s)\n",
+			result.ActiveChild.Stage,
+			result.ActiveChild.TmuxPaneID,
+		); err != nil {
 			return err
 		}
 	}
@@ -723,7 +840,11 @@ func writeStartNextText(out io.Writer, result StartNextResult) error {
 		}
 	}
 	if result.FeedbackCommand != "" {
-		if _, err := fmt.Fprintf(out, "feedback: %s\n", result.FeedbackCommand); err != nil {
+		if _, err := fmt.Fprintf(
+			out,
+			"feedback: %s\n",
+			result.FeedbackCommand,
+		); err != nil {
 			return err
 		}
 	}
@@ -758,10 +879,13 @@ func continueCommand(stateFile string) string {
 }
 
 func feedbackCommand(stateFile string) string {
-	return fmt.Sprintf("vamos qrspi steer-child --state-file %s --feedback-file <file>", stateFile)
+	return fmt.Sprintf(
+		"vamos qrspi steer-child --state-file %s --feedback-file <file>",
+		stateFile,
+	)
 }
 
-func debugCommandForState(stateFile string, action string) string {
+func debugCommandForState(stateFile, action string) string {
 	action = strings.TrimSpace(action)
 	if action == "" {
 		action = "continue"
@@ -774,7 +898,12 @@ func writeManagerNotice(out io.Writer, notice ManagerNotice, mode string) error 
 		return WriteNDJSON(out, Event{Type: "manager_notice", Ref: noticeRef(notice)})
 	}
 	if notice.Validated {
-		if _, err := fmt.Fprintf(out, "validated: %s %s\n", notice.Stage, notice.Status); err != nil {
+		if _, err := fmt.Fprintf(
+			out,
+			"validated: %s %s\n",
+			notice.Stage,
+			notice.Status,
+		); err != nil {
 			return err
 		}
 		if notice.Outcome != "" {
@@ -789,7 +918,12 @@ func writeManagerNotice(out io.Writer, notice ManagerNotice, mode string) error 
 		}
 	}
 	if notice.ChildPane != "" && notice.Kind == "active_child" {
-		if _, err := fmt.Fprintf(out, "active child: %s (%s)\n", notice.Stage, notice.ChildPane); err != nil {
+		if _, err := fmt.Fprintf(
+			out,
+			"active child: %s (%s)\n",
+			notice.Stage,
+			notice.ChildPane,
+		); err != nil {
 			return err
 		}
 	}
@@ -804,7 +938,11 @@ func writeManagerNotice(out io.Writer, notice ManagerNotice, mode string) error 
 		}
 	}
 	if notice.ManagerGuidance != "" {
-		if _, err := fmt.Fprintf(out, "guidance: %s\n", notice.ManagerGuidance); err != nil {
+		if _, err := fmt.Fprintf(
+			out,
+			"guidance: %s\n",
+			notice.ManagerGuidance,
+		); err != nil {
 			return err
 		}
 	}
@@ -814,7 +952,11 @@ func writeManagerNotice(out io.Writer, notice ManagerNotice, mode string) error 
 		}
 	}
 	if notice.FeedbackCommand != "" {
-		if _, err := fmt.Fprintf(out, "feedback: %s\n", notice.FeedbackCommand); err != nil {
+		if _, err := fmt.Fprintf(
+			out,
+			"feedback: %s\n",
+			notice.FeedbackCommand,
+		); err != nil {
 			return err
 		}
 	}
@@ -902,6 +1044,13 @@ func emptyAsPending(value string) string {
 	return value
 }
 
+func resolvePiModel(preferred, fallback string) string {
+	if model := strings.TrimSpace(preferred); model != "" {
+		return model
+	}
+	return strings.TrimSpace(fallback)
+}
+
 func RunChild(ctx context.Context, opts RunChildOptions, d deps, out io.Writer) error {
 	if strings.TrimSpace(opts.PlanDir) == "" {
 		return errors.New("plan-dir is required")
@@ -933,6 +1082,10 @@ func RunChild(ctx context.Context, opts RunChildOptions, d deps, out io.Writer) 
 	state, err := store.Load(opts.StateFile)
 	if err != nil {
 		return err
+	}
+	piModel := resolvePiModel(opts.PiModel, state.PiModel)
+	if strings.TrimSpace(opts.PiModel) != "" {
+		state.PiModel = piModel
 	}
 	parentPaneID := strings.TrimSpace(opts.ManagerPane)
 	if parentPaneID == "" {
@@ -972,6 +1125,7 @@ func RunChild(ctx context.Context, opts RunChildOptions, d deps, out io.Writer) 
 		StateFile:            opts.StateFile,
 		PlanDir:              opts.PlanDir,
 		ExtensionPath:        extensionPath,
+		PiModel:              piModel,
 	}
 	if err := ensureRunFiles(req); err != nil {
 		return err
@@ -981,18 +1135,41 @@ func RunChild(ctx context.Context, opts RunChildOptions, d deps, out io.Writer) 
 	if err != nil {
 		return err
 	}
-	state.ActiveChild = &ChildRunRef{ID: childID, Stage: opts.Stage, Cwd: opts.Cwd, TmuxPaneID: run.Pane.ID, OutputPath: req.OutputPath, SessionID: req.SessionID, SessionDir: req.SessionDir, DonePath: req.DonePath, StatusPath: req.StatusPath, ValidationStatusPath: req.ValidationStatusPath, LifecycleStatus: "running", Generation: 1}
+	state.ActiveChild = &ChildRunRef{
+		ID:                   childID,
+		Stage:                opts.Stage,
+		Cwd:                  opts.Cwd,
+		TmuxPaneID:           run.Pane.ID,
+		OutputPath:           req.OutputPath,
+		SessionID:            req.SessionID,
+		SessionDir:           req.SessionDir,
+		DonePath:             req.DonePath,
+		StatusPath:           req.StatusPath,
+		ValidationStatusPath: req.ValidationStatusPath,
+		LifecycleStatus:      "running",
+		Generation:           1,
+	}
 	if err := store.Save(opts.StateFile, state); err != nil {
 		return err
 	}
-	if err := WriteNDJSON(out, Event{Type: "child_started", Ref: childRef(state.ActiveChild)}); err != nil {
+	if err := WriteNDJSON(
+		out,
+		Event{Type: "child_started", Ref: childRef(state.ActiveChild)},
+	); err != nil {
 		return err
 	}
 	if state.PendingCleanupChild != nil {
 		pending := state.PendingCleanupChild
 		cleaned, cleanupErr := cleanupPendingChildAfterNextStart(ctx, state, d.Tmux)
 		if cleanupErr != nil {
-			if err := WriteNDJSON(out, Event{Type: "child_cleanup_failed", Ref: childRef(pending), Error: cleanupErr.Error()}); err != nil {
+			if err := WriteNDJSON(
+				out,
+				Event{
+					Type:  "child_cleanup_failed",
+					Ref:   childRef(pending),
+					Error: cleanupErr.Error(),
+				},
+			); err != nil {
 				return err
 			}
 		} else {
@@ -1000,7 +1177,10 @@ func RunChild(ctx context.Context, opts RunChildOptions, d deps, out io.Writer) 
 			if err := store.Save(opts.StateFile, state); err != nil {
 				return err
 			}
-			if err := WriteNDJSON(out, Event{Type: "child_cleaned", Ref: childRef(pending)}); err != nil {
+			if err := WriteNDJSON(
+				out,
+				Event{Type: "child_cleaned", Ref: childRef(pending)},
+			); err != nil {
 				return err
 			}
 		}
@@ -1014,20 +1194,44 @@ func RunChild(ctx context.Context, opts RunChildOptions, d deps, out io.Writer) 
 		return err
 	}
 	if err := waitForDone(waitCtx, req.DonePath, 100*time.Millisecond); err != nil {
-		return fmt.Errorf("timed out waiting for child done marker %s (pane %s, output %s, sessionDir %s, sessionID %s): %w", req.DonePath, run.Pane.ID, req.OutputPath, req.SessionDir, req.SessionID, err)
+		return fmt.Errorf(
+			"timed out waiting for child done marker %s (pane %s, output %s, sessionDir %s, sessionID %s): %w",
+			req.DonePath,
+			run.Pane.ID,
+			req.OutputPath,
+			req.SessionDir,
+			req.SessionID,
+			err,
+		)
 	}
 	sessionPath, err := ResolveSessionPath(req.SessionDir, req.SessionID, req.Cwd)
 	if err != nil {
-		return fmt.Errorf("resolve child session path after done marker %s (pane %s, output %s, sessionDir %s, sessionID %s): %w", req.DonePath, run.Pane.ID, req.OutputPath, req.SessionDir, req.SessionID, err)
+		return fmt.Errorf(
+			"resolve child session path after done marker %s (pane %s, output %s, sessionDir %s, sessionID %s): %w",
+			req.DonePath,
+			run.Pane.ID,
+			req.OutputPath,
+			req.SessionDir,
+			req.SessionID,
+			err,
+		)
 	}
 	state.ActiveChild.SessionPath = sessionPath
 	if err := store.Save(opts.StateFile, state); err != nil {
 		return err
 	}
-	return WriteNDJSON(out, Event{Type: "child_finished", Ref: childRef(state.ActiveChild)})
+	return WriteNDJSON(
+		out,
+		Event{Type: "child_finished", Ref: childRef(state.ActiveChild)},
+	)
 }
 
-func RunChildComplete(ctx context.Context, opts ChildCompletionOptions, d deps, out io.Writer) (*ChildCompletionStatus, error) {
+func RunChildComplete(
+	ctx context.Context,
+	opts ChildCompletionOptions,
+	d deps,
+	out io.Writer,
+) (*ChildCompletionStatus, error) {
 	if strings.TrimSpace(opts.StateFile) == "" {
 		return nil, errors.New("state-file is required")
 	}
@@ -1044,12 +1248,21 @@ func RunChildComplete(ctx context.Context, opts ChildCompletionOptions, d deps, 
 	if state.ActiveChild == nil {
 		return nil, errors.New("no active child to complete")
 	}
-	if strings.TrimSpace(opts.ChildID) != "" && state.ActiveChild.ID != strings.TrimSpace(opts.ChildID) {
-		return nil, fmt.Errorf("active child %q does not match requested child %q", state.ActiveChild.ID, opts.ChildID)
+	if strings.TrimSpace(opts.ChildID) != "" &&
+		state.ActiveChild.ID != strings.TrimSpace(opts.ChildID) {
+		return nil, fmt.Errorf(
+			"active child %q does not match requested child %q",
+			state.ActiveChild.ID,
+			opts.ChildID,
+		)
 	}
 	child := state.ActiveChild
 	text, parseCtx, err := ReadChildResultText(state, ResultSourceOptions{})
-	status := ChildCompletionStatus{ChildID: child.ID, Attempt: child.ValidationRetryCount, RetryLimit: invalidResultRetryLimit(state)}
+	status := ChildCompletionStatus{
+		ChildID:    child.ID,
+		Attempt:    child.ValidationRetryCount,
+		RetryLimit: invalidResultRetryLimit(state),
+	}
 	if err == nil {
 		parseCtx.ExpectedNodeID = wruntime.NodeID(child.Stage)
 		parsed, parseErr := ParseNormalizeValidateDecide(text, state, parseCtx)
@@ -1061,7 +1274,13 @@ func RunChildComplete(ctx context.Context, opts ChildCompletionOptions, d deps, 
 			status.Normalizations = parsed.Normalizations
 			state.ActiveChild.LifecycleStatus = "completed"
 			state.ActiveChild.LastDeliveryID = status.DeliveryID
-			state, status.Wake, err = queueOrDeliverWake(ctx, opts.StateFile, state, status, d)
+			state, status.Wake, err = queueOrDeliverWake(
+				ctx,
+				opts.StateFile,
+				state,
+				status,
+				d,
+			)
 			if err != nil {
 				return nil, err
 			}
@@ -1070,9 +1289,28 @@ func RunChildComplete(ctx context.Context, opts ChildCompletionOptions, d deps, 
 		}
 	}
 	if err != nil {
-		if shouldRepromptAfterValidationError(state, ContinueOptions{StateFile: opts.StateFile, PlanDir: state.CanonicalPlanDir, Stage: child.Stage}, err) {
+		if shouldRepromptAfterValidationError(
+			state,
+			ContinueOptions{
+				StateFile: opts.StateFile,
+				PlanDir:   state.CanonicalPlanDir,
+				Stage:     child.Stage,
+			},
+			err,
+		) {
 			attempt := child.ValidationRetryCount + 1
-			if repromptErr := continueReprompt(ctx, state, ContinueOptions{StateFile: opts.StateFile, PlanDir: state.CanonicalPlanDir, Stage: child.Stage}, d, io.Discard, err); repromptErr != nil {
+			if repromptErr := continueReprompt(
+				ctx,
+				state,
+				ContinueOptions{
+					StateFile: opts.StateFile,
+					PlanDir:   state.CanonicalPlanDir,
+					Stage:     child.Stage,
+				},
+				d,
+				io.Discard,
+				err,
+			); repromptErr != nil {
 				return nil, repromptErr
 			}
 			latest, loadErr := store.Load(opts.StateFile)
@@ -1085,17 +1323,38 @@ func RunChildComplete(ctx context.Context, opts ChildCompletionOptions, d deps, 
 			status.Attempt = attempt
 			status.RetryLimit = invalidResultRetryLimit(state)
 			status.Reason = "retryable_invalid_result"
-			status.Wake = WakeDeliveryInstruction{Mode: "suppress", Reason: "retryable_invalid_result"}
-		} else if isRetryExhaustedValidationError(state, ContinueOptions{StateFile: opts.StateFile, PlanDir: state.CanonicalPlanDir, Stage: child.Stage}, err) {
+			status.Wake = WakeDeliveryInstruction{
+				Mode:   "suppress",
+				Reason: "retryable_invalid_result",
+			}
+		} else if isRetryExhaustedValidationError(
+			state,
+			ContinueOptions{
+				StateFile: opts.StateFile,
+				PlanDir:   state.CanonicalPlanDir,
+				Stage:     child.Stage,
+			},
+			err,
+		) {
 			status.Validated = false
 			status.ManagerNeeded = true
 			status.RetryExhausted = true
 			status.DeliveryID = childCompletionDeliveryID(*child, nil, true)
-			status.Result = ChildCompletionResult{Stage: child.Stage, Status: "invalid_result", Summary: err.Error()}
+			status.Result = ChildCompletionResult{
+				Stage:   child.Stage,
+				Status:  "invalid_result",
+				Summary: err.Error(),
+			}
 			status.Reason = err.Error()
 			state.ActiveChild.LifecycleStatus = "awaiting_manager"
 			state.ActiveChild.LastDeliveryID = status.DeliveryID
-			state, status.Wake, err = queueOrDeliverWake(ctx, opts.StateFile, state, status, d)
+			state, status.Wake, err = queueOrDeliverWake(
+				ctx,
+				opts.StateFile,
+				state,
+				status,
+				d,
+			)
 			if err != nil {
 				return nil, err
 			}
@@ -1103,8 +1362,12 @@ func RunChildComplete(ctx context.Context, opts ChildCompletionOptions, d deps, 
 			return nil, err
 		}
 	}
-	if state.ActiveChild != nil && strings.TrimSpace(state.ActiveChild.ValidationStatusPath) != "" {
-		if writeErr := writeValidationStatus(state.ActiveChild.ValidationStatusPath, status); writeErr != nil {
+	if state.ActiveChild != nil &&
+		strings.TrimSpace(state.ActiveChild.ValidationStatusPath) != "" {
+		if writeErr := writeValidationStatus(
+			state.ActiveChild.ValidationStatusPath,
+			status,
+		); writeErr != nil {
 			return nil, writeErr
 		}
 	}
@@ -1118,7 +1381,12 @@ func RunChildComplete(ctx context.Context, opts ChildCompletionOptions, d deps, 
 			return nil, err
 		}
 	} else {
-		if _, err := fmt.Fprintf(out, "child completion: %s\nwake: %s\n", status.Result.Status, status.Wake.Mode); err != nil {
+		if _, err := fmt.Fprintf(
+			out,
+			"child completion: %s\nwake: %s\n",
+			status.Result.Status,
+			status.Wake.Mode,
+		); err != nil {
 			return nil, err
 		}
 	}
@@ -1126,42 +1394,93 @@ func RunChildComplete(ctx context.Context, opts ChildCompletionOptions, d deps, 
 }
 
 func childCompletionResult(result wruntime.WorkflowResult) ChildCompletionResult {
-	return ChildCompletionResult{Stage: string(result.SourceNodeID), Status: string(result.Status), Outcome: string(result.Outcome), Artifact: result.PrimaryArtifact, Summary: result.Summary}
+	return ChildCompletionResult{
+		Stage:    string(result.SourceNodeID),
+		Status:   string(result.Status),
+		Outcome:  string(result.Outcome),
+		Artifact: result.PrimaryArtifact,
+		Summary:  result.Summary,
+	}
 }
 
-func childCompletionDeliveryID(child ChildRunRef, parsed *ParsedDecision, exhausted bool) string {
+func childCompletionDeliveryID(
+	child ChildRunRef,
+	parsed *ParsedDecision,
+	exhausted bool,
+) string {
 	parts := []string{child.ID, fmt.Sprintf("%d", child.Generation)}
 	if exhausted || parsed == nil {
 		parts = append(parts, "invalid_result")
 	} else {
-		parts = append(parts, string(parsed.Result.SourceNodeID), string(parsed.Result.Status), string(parsed.Result.Outcome), parsed.Result.PrimaryArtifact)
+		parts = append(
+			parts,
+			string(parsed.Result.SourceNodeID),
+			string(parsed.Result.Status),
+			string(parsed.Result.Outcome),
+			parsed.Result.PrimaryArtifact,
+		)
 	}
 	return strings.Join(parts, ":")
 }
 
 func childCompletionManagerNeeded(status string) bool {
-	return status == string(wruntime.StatusNeedsHuman) || status == string(wruntime.StatusBlocked) || status == string(wruntime.StatusError) || status == "invalid_result"
+	return status == string(wruntime.StatusNeedsHuman) ||
+		status == string(wruntime.StatusBlocked) ||
+		status == string(wruntime.StatusError) ||
+		status == "invalid_result"
 }
 
-func queueOrDeliverWake(ctx context.Context, stateFile string, state ManagerState, status ChildCompletionStatus, d deps) (ManagerState, WakeDeliveryInstruction, error) {
+func queueOrDeliverWake(
+	ctx context.Context,
+	stateFile string,
+	state ManagerState,
+	status ChildCompletionStatus,
+	d deps,
+) (ManagerState, WakeDeliveryInstruction, error) {
 	if status.Wake.Mode == "suppress" {
 		return state, status.Wake, nil
 	}
 	if strings.TrimSpace(status.DeliveryID) == "" {
-		return state, WakeDeliveryInstruction{Mode: "suppress", Reason: "missing_delivery_id"}, nil
+		return state, WakeDeliveryInstruction{
+			Mode:   "suppress",
+			Reason: "missing_delivery_id",
+		}, nil
 	}
 	if state.Delivery.LastDeliveryID == status.DeliveryID {
-		return state, WakeDeliveryInstruction{Mode: "suppress", Reason: "duplicate_delivery"}, nil
+		return state, WakeDeliveryInstruction{
+			Mode:   "suppress",
+			Reason: "duplicate_delivery",
+		}, nil
 	}
 	payload := childCompletionWakePayload(stateFile, status)
 	if strings.EqualFold(state.Delivery.Status, "compacting") {
-		state.Delivery.QueuedWake = &QueuedWake{DeliveryID: status.DeliveryID, ChildID: status.ChildID, ChildGeneration: activeChildGeneration(state), Payload: payload, QueuedAt: time.Now().Format(time.RFC3339)}
-		return state, WakeDeliveryInstruction{Mode: "queue", Payload: payload, Reason: "manager_compacting"}, nil
+		state.Delivery.QueuedWake = &QueuedWake{
+			DeliveryID:      status.DeliveryID,
+			ChildID:         status.ChildID,
+			ChildGeneration: activeChildGeneration(state),
+			Payload:         payload,
+			QueuedAt:        time.Now().Format(time.RFC3339),
+		}
+		return state, WakeDeliveryInstruction{
+			Mode:    "queue",
+			Payload: payload,
+			Reason:  "manager_compacting",
+		}, nil
 	}
 	paneID := managerDeliveryPane(state)
 	if paneID == "" {
-		state.Delivery.QueuedWake = &QueuedWake{DeliveryID: status.DeliveryID, ChildID: status.ChildID, ChildGeneration: activeChildGeneration(state), Payload: payload, QueuedAt: time.Now().Format(time.RFC3339)}
-		return state, WakeDeliveryInstruction{Mode: "queue", Payload: payload, Reason: "manager_pane_missing"}, nil
+		state.Delivery.QueuedWake = &QueuedWake{
+			DeliveryID:      status.DeliveryID,
+			ChildID:         status.ChildID,
+			ChildGeneration: activeChildGeneration(state),
+			Payload:         payload,
+			QueuedAt:        time.Now().Format(time.RFC3339),
+		}
+		return state, WakeDeliveryInstruction{
+			Mode:    "queue",
+			Payload: payload,
+			Reason:  "manager_pane_missing",
+		}, nil
 	}
 	if err := pasteWake(ctx, d, paneID, payload); err != nil {
 		return state, WakeDeliveryInstruction{}, err
@@ -1184,7 +1503,7 @@ func activeChildGeneration(state ManagerState) int {
 	return state.ActiveChild.Generation
 }
 
-func pasteWake(ctx context.Context, d deps, paneID string, payload string) error {
+func pasteWake(ctx context.Context, d deps, paneID, payload string) error {
 	tmux := d.Tmux
 	if tmux == nil {
 		tmux = ShellTmuxClient{}
@@ -1196,16 +1515,37 @@ func pasteWake(ctx context.Context, d deps, paneID string, payload string) error
 	return tmux.SendKeys(ctx, pane, []string{"Enter"})
 }
 
-func childCompletionWake(stateFile string, state ManagerState, status ChildCompletionStatus) WakeDeliveryInstruction {
+func childCompletionWake(
+	stateFile string,
+	state ManagerState,
+	status ChildCompletionStatus,
+) WakeDeliveryInstruction {
 	if status.DeliveryID != "" && state.Delivery.LastDeliveryID == status.DeliveryID {
 		return WakeDeliveryInstruction{Mode: "suppress", Reason: "duplicate_delivery"}
 	}
-	return WakeDeliveryInstruction{Mode: "deliver", Payload: childCompletionWakePayload(stateFile, status)}
+	return WakeDeliveryInstruction{
+		Mode:    "deliver",
+		Payload: childCompletionWakePayload(stateFile, status),
+	}
 }
 
 func childCompletionWakePayload(stateFile string, status ChildCompletionStatus) string {
-	managerNeeded := status.ManagerNeeded || status.RetryExhausted || childCompletionManagerNeeded(status.Result.Status)
-	return fmt.Sprintf("```yaml\nq_manager_child_wake:\n  validated: %t\n  manager_needed: %t\n  retry_exhausted: %t\n  stage: %q\n  status: %q\n  outcome: %q\n  artifact: %q\n  child_id: %q\n  state_file: %q\n  reason: %q\n  next:\n    - action: run_command\n      param: %q\n```", status.Validated, managerNeeded, status.RetryExhausted, status.Result.Stage, status.Result.Status, status.Result.Outcome, status.Result.Artifact, status.ChildID, stateFile, status.Reason, continueCommand(stateFile))
+	managerNeeded := status.ManagerNeeded || status.RetryExhausted ||
+		childCompletionManagerNeeded(status.Result.Status)
+	return fmt.Sprintf(
+		"```yaml\nq_manager_child_wake:\n  validated: %t\n  manager_needed: %t\n  retry_exhausted: %t\n  stage: %q\n  status: %q\n  outcome: %q\n  artifact: %q\n  child_id: %q\n  state_file: %q\n  reason: %q\n  next:\n    - action: run_command\n      param: %q\n```",
+		status.Validated,
+		managerNeeded,
+		status.RetryExhausted,
+		status.Result.Stage,
+		status.Result.Status,
+		status.Result.Outcome,
+		status.Result.Artifact,
+		status.ChildID,
+		stateFile,
+		status.Reason,
+		continueCommand(stateFile),
+	)
 }
 
 func writeValidationStatus(path string, status ChildCompletionStatus) error {
@@ -1226,7 +1566,11 @@ func writeValidationStatus(path string, status ChildCompletionStatus) error {
 	return os.Rename(tmp, path)
 }
 
-func usageFromChangedFlags(cmd *cobra.Command, usagePercent float64, usageTokens int, usageWindow int) ManagerUsageInput {
+func usageFromChangedFlags(
+	cmd *cobra.Command,
+	usagePercent float64,
+	usageTokens, usageWindow int,
+) ManagerUsageInput {
 	var input ManagerUsageInput
 	if cmd.Flags().Changed("manager-usage-percent") {
 		input.UsagePercent = &usagePercent
@@ -1250,15 +1594,34 @@ func managerUsagePercent(input ManagerUsageInput) (float64, bool) {
 	return 0, false
 }
 
-func maybeStartManagerCompaction(ctx context.Context, state ManagerState, stateFile string, usage ManagerUsageInput, d deps, out io.Writer) (ManagerState, bool, error) {
+func maybeStartManagerCompaction(
+	ctx context.Context,
+	state ManagerState,
+	stateFile string,
+	usage ManagerUsageInput,
+	d deps,
+	out io.Writer,
+) (ManagerState, bool, error) {
 	_ = ctx
 	out = ensureWriter(out)
 	percent, ok := managerUsagePercent(usage)
 	if !ok {
-		return state, false, writeCompactionDiagnostic(out, "manager compaction: skipped; no explicit usage input", stateFile, "", false)
+		return state, false, writeCompactionDiagnostic(
+			out,
+			"manager compaction: skipped; no explicit usage input",
+			stateFile,
+			"",
+			false,
+		)
 	}
 	if percent <= 80 {
-		return state, false, writeCompactionDiagnostic(out, fmt.Sprintf("manager compaction: skipped; usage %.1f%% <= 80%%", percent), stateFile, "", false)
+		return state, false, writeCompactionDiagnostic(
+			out,
+			fmt.Sprintf("manager compaction: skipped; usage %.1f%% <= 80%%", percent),
+			stateFile,
+			"",
+			false,
+		)
 	}
 	now := time.Now()
 	if d.Clock != nil {
@@ -1272,13 +1635,27 @@ func maybeStartManagerCompaction(ctx context.Context, state ManagerState, stateF
 	if strings.TrimSpace(state.Delivery.ManagerPaneID) == "" {
 		state.Delivery.ManagerPaneID = strings.TrimSpace(state.ManagerPaneID)
 	}
-	if err := stateStore(d, "", func() time.Time { return now }).Save(stateFile, state); err != nil {
+	if err := stateStore(
+		d,
+		"",
+		func() time.Time { return now },
+	).Save(stateFile, state); err != nil {
 		return state, false, err
 	}
-	return state, true, writeCompactionDiagnostic(out, fmt.Sprintf("manager compaction: usage %.1f%% > 80%%; handoff written", percent), stateFile, handoffPath, true)
+	return state, true, writeCompactionDiagnostic(
+		out,
+		fmt.Sprintf("manager compaction: usage %.1f%% > 80%%; handoff written", percent),
+		stateFile,
+		handoffPath,
+		true,
+	)
 }
 
-func writeCompactionDiagnostic(out io.Writer, summary string, stateFile string, handoffPath string, compacting bool) error {
+func writeCompactionDiagnostic(
+	out io.Writer,
+	summary, stateFile, handoffPath string,
+	compacting bool,
+) error {
 	if out == nil {
 		return nil
 	}
@@ -1286,14 +1663,22 @@ func writeCompactionDiagnostic(out io.Writer, summary string, stateFile string, 
 		fmt.Fprintf(out, "%s\n", summary)
 		fmt.Fprintf(out, "handoff: %s\n", handoffPath)
 		fmt.Fprintf(out, "resume: pi @%s\n", handoffPath)
-		fmt.Fprintf(out, "ready: vamos qrspi manager-ready --state-file %s --manager-pane $TMUX_PANE\n", stateFile)
+		fmt.Fprintf(
+			out,
+			"ready: vamos qrspi manager-ready --state-file %s --manager-pane $TMUX_PANE\n",
+			stateFile,
+		)
 		return nil
 	}
 	_, err := fmt.Fprintln(out, summary)
 	return err
 }
 
-func writeManagerOperationalHandoff(state ManagerState, stateFile string, now time.Time) (string, error) {
+func writeManagerOperationalHandoff(
+	state ManagerState,
+	stateFile string,
+	now time.Time,
+) (string, error) {
 	planDir := strings.TrimSpace(state.CanonicalPlanDir)
 	if planDir == "" {
 		return "", errors.New("canonical plan dir is required for manager handoff")
@@ -1326,10 +1711,24 @@ func writeManagerOperationalHandoff(state ManagerState, stateFile string, now ti
 	return path, nil
 }
 
-func buildManagerOperationalHandoff(state ManagerState, stateFile string, now time.Time, path string) string {
+func buildManagerOperationalHandoff(
+	state ManagerState,
+	stateFile string,
+	now time.Time,
+	path string,
+) string {
 	child := "none"
 	if state.ActiveChild != nil {
-		child = fmt.Sprintf("stage=%s childID=%s pane=%s sessionID=%s sessionPath=%s statusPath=%s donePath=%s", state.ActiveChild.Stage, state.ActiveChild.ID, state.ActiveChild.TmuxPaneID, state.ActiveChild.SessionID, state.ActiveChild.SessionPath, state.ActiveChild.StatusPath, state.ActiveChild.DonePath)
+		child = fmt.Sprintf(
+			"stage=%s childID=%s pane=%s sessionID=%s sessionPath=%s statusPath=%s donePath=%s",
+			state.ActiveChild.Stage,
+			state.ActiveChild.ID,
+			state.ActiveChild.TmuxPaneID,
+			state.ActiveChild.SessionID,
+			state.ActiveChild.SessionPath,
+			state.ActiveChild.StatusPath,
+			state.ActiveChild.DonePath,
+		)
 	}
 	return fmt.Sprintf(`---
 date: %s
@@ -1370,7 +1769,12 @@ vamos qrspi continue --state-file %q
 `, now.Format(time.RFC3339), state.CanonicalPlanDir, state.Workflow.CurrentNodeID, state.ImplementationCwd, path, stateFile, state.SourceCwd, state.ManagerRunID, state.ManagerPaneID, child, stateFile, stateFile)
 }
 
-func RunManagerReady(ctx context.Context, opts ManagerReadyOptions, d deps, out io.Writer) error {
+func RunManagerReady(
+	ctx context.Context,
+	opts ManagerReadyOptions,
+	d deps,
+	out io.Writer,
+) error {
 	if strings.TrimSpace(opts.StateFile) == "" {
 		return errors.New("state-file is required")
 	}
@@ -1398,7 +1802,13 @@ func RunManagerReady(ctx context.Context, opts ManagerReadyOptions, d deps, out 
 		return err
 	}
 	if strings.EqualFold(opts.Output, "ndjson") {
-		return WriteNDJSON(out, Event{Type: "manager_ready", Ref: map[string]any{"flushed": flushed, "stateFile": opts.StateFile}})
+		return WriteNDJSON(
+			out,
+			Event{
+				Type: "manager_ready",
+				Ref:  map[string]any{"flushed": flushed, "stateFile": opts.StateFile},
+			},
+		)
 	}
 	if flushed {
 		_, err = fmt.Fprintln(out, "manager ready: flushed queued wake")
@@ -1408,7 +1818,12 @@ func RunManagerReady(ctx context.Context, opts ManagerReadyOptions, d deps, out 
 	return err
 }
 
-func flushQueuedWake(ctx context.Context, state ManagerState, pane string, d deps) (ManagerState, bool, error) {
+func flushQueuedWake(
+	ctx context.Context,
+	state ManagerState,
+	pane string,
+	d deps,
+) (ManagerState, bool, error) {
 	queued := state.Delivery.QueuedWake
 	if queued == nil {
 		return state, false, nil
@@ -1418,8 +1833,16 @@ func flushQueuedWake(ctx context.Context, state ManagerState, pane string, d dep
 		return state, false, nil
 	}
 	if state.ActiveChild != nil {
-		if queued.ChildGeneration != activeChildGeneration(state) || state.ActiveChild.LifecycleStatus == "running" || state.ActiveChild.LifecycleStatus == "manual_reprompt" {
-			state.LastActionCard = &ManagerActionCard{Kind: ActionSupersededQueuedWake, Severity: "info", Summary: "queued child wake superseded by active child generation", RecommendedAction: "wait for newer child completion", RequiresHuman: false}
+		if queued.ChildGeneration != activeChildGeneration(state) ||
+			state.ActiveChild.LifecycleStatus == "running" ||
+			state.ActiveChild.LifecycleStatus == "manual_reprompt" {
+			state.LastActionCard = &ManagerActionCard{
+				Kind:              ActionSupersededQueuedWake,
+				Severity:          "info",
+				Summary:           "queued child wake superseded by active child generation",
+				RecommendedAction: "wait for newer child completion",
+				RequiresHuman:     false,
+			}
 			state.Delivery.QueuedWake = nil
 			return state, false, nil
 		}
@@ -1441,16 +1864,30 @@ func flushQueuedWake(ctx context.Context, state ManagerState, pane string, d dep
 	return state, true, nil
 }
 
-func supersedeQueuedWakeForActiveChild(state ManagerState, childID string, reason string) ManagerState {
+func supersedeQueuedWakeForActiveChild(
+	state ManagerState,
+	childID, reason string,
+) ManagerState {
 	if state.Delivery.QueuedWake == nil || state.Delivery.QueuedWake.ChildID != childID {
 		return state
 	}
 	state.Delivery.QueuedWake = nil
-	state.LastActionCard = &ManagerActionCard{Kind: ActionSupersededQueuedWake, Severity: "info", Summary: reason, RecommendedAction: "wait for newer child completion", RequiresHuman: false}
+	state.LastActionCard = &ManagerActionCard{
+		Kind:              ActionSupersededQueuedWake,
+		Severity:          "info",
+		Summary:           reason,
+		RecommendedAction: "wait for newer child completion",
+		RequiresHuman:     false,
+	}
 	return state
 }
 
-func RunRepairState(ctx context.Context, opts RepairStateOptions, d deps, out io.Writer) error {
+func RunRepairState(
+	ctx context.Context,
+	opts RepairStateOptions,
+	d deps,
+	out io.Writer,
+) error {
 	if strings.TrimSpace(opts.StateFile) == "" {
 		return errors.New("state-file is required")
 	}
@@ -1474,7 +1911,15 @@ func runAlignActiveChildRepair(opts RepairStateOptions, out io.Writer, store Sta
 	if state.ActiveChild == nil || strings.TrimSpace(state.ActiveChild.Stage) == "" {
 		return errors.New("no active child evidence to align")
 	}
-	card := buildStateDesyncActionCard(state, opts.StateFile, fmt.Errorf("workflow cursor %s differs from active child %s", state.Workflow.CurrentNodeID, state.ActiveChild.Stage))
+	card := buildStateDesyncActionCard(
+		state,
+		opts.StateFile,
+		fmt.Errorf(
+			"workflow cursor %s differs from active child %s",
+			state.Workflow.CurrentNodeID,
+			state.ActiveChild.Stage,
+		),
+	)
 	state.Workflow.CurrentNodeID = wruntime.NodeID(state.ActiveChild.Stage)
 	state.LastActionCard = &card
 	if err := appendRecoveryIncident(opts.StateFile, card, true); err != nil {
@@ -1486,7 +1931,11 @@ func runAlignActiveChildRepair(opts RepairStateOptions, out io.Writer, store Sta
 	if strings.EqualFold(opts.Output, "ndjson") {
 		return writeManagerActionCard(out, card, opts.Output)
 	}
-	fmt.Fprintf(out, "repaired: aligned current node to active child %s\n", state.ActiveChild.Stage)
+	fmt.Fprintf(
+		out,
+		"repaired: aligned current node to active child %s\n",
+		state.ActiveChild.Stage,
+	)
 	return writeManagerActionCard(out, card, opts.Output)
 }
 
@@ -1533,7 +1982,12 @@ func ClearFailedActiveChild(state ManagerState, health ActiveChildHealth) (Manag
 	return state, nil
 }
 
-func RunMarkChildActive(ctx context.Context, opts MarkChildActiveOptions, d deps, out io.Writer) error {
+func RunMarkChildActive(
+	ctx context.Context,
+	opts MarkChildActiveOptions,
+	d deps,
+	out io.Writer,
+) error {
 	_ = ctx
 	if strings.TrimSpace(opts.StateFile) == "" {
 		return errors.New("state-file is required")
@@ -1547,12 +2001,17 @@ func RunMarkChildActive(ctx context.Context, opts MarkChildActiveOptions, d deps
 	if err != nil {
 		return err
 	}
-	if state.ActiveChild == nil || state.ActiveChild.ID != strings.TrimSpace(opts.ChildID) {
+	if state.ActiveChild == nil ||
+		state.ActiveChild.ID != strings.TrimSpace(opts.ChildID) {
 		return fmt.Errorf("active child does not match requested child %q", opts.ChildID)
 	}
 	state.ActiveChild.LifecycleStatus = "manual_reprompt"
 	state.ActiveChild.Generation = activeChildGeneration(state) + 1
-	state = supersedeQueuedWakeForActiveChild(state, state.ActiveChild.ID, markChildActiveReason(opts.Reason))
+	state = supersedeQueuedWakeForActiveChild(
+		state,
+		state.ActiveChild.ID,
+		markChildActiveReason(opts.Reason),
+	)
 	if state.LastActionCard == nil {
 		card := manualChildSteerActionCard(state, opts.StateFile)
 		state.LastActionCard = &card
@@ -1561,9 +2020,21 @@ func RunMarkChildActive(ctx context.Context, opts MarkChildActiveOptions, d deps
 		return err
 	}
 	if strings.EqualFold(opts.Output, "ndjson") {
-		return WriteNDJSON(out, Event{Type: "child_marked_active", ActionCard: state.LastActionCard, Ref: childRef(state.ActiveChild)})
+		return WriteNDJSON(
+			out,
+			Event{
+				Type:       "child_marked_active",
+				ActionCard: state.LastActionCard,
+				Ref:        childRef(state.ActiveChild),
+			},
+		)
 	}
-	fmt.Fprintf(out, "child active: %s generation %d\n", state.ActiveChild.ID, state.ActiveChild.Generation)
+	fmt.Fprintf(
+		out,
+		"child active: %s generation %d\n",
+		state.ActiveChild.ID,
+		state.ActiveChild.Generation,
+	)
 	return writeManagerActionCard(out, *state.LastActionCard, opts.Output)
 }
 
@@ -1575,7 +2046,12 @@ func markChildActiveReason(reason string) string {
 	return reason
 }
 
-func RunValidateResult(ctx context.Context, opts ValidateResultOptions, d deps, out io.Writer) error {
+func RunValidateResult(
+	ctx context.Context,
+	opts ValidateResultOptions,
+	d deps,
+	out io.Writer,
+) error {
 	if strings.TrimSpace(opts.Stage) == "" {
 		return errors.New("stage is required")
 	}
@@ -1591,7 +2067,15 @@ func RunValidateResult(ctx context.Context, opts ValidateResultOptions, d deps, 
 	if err != nil {
 		return err
 	}
-	text, parseCtx, err := ReadChildResultText(state, ResultSourceOptions{ResultFile: opts.ResultFile, SessionFile: opts.SessionFile, SessionID: opts.SessionID, RunID: opts.RunID})
+	text, parseCtx, err := ReadChildResultText(
+		state,
+		ResultSourceOptions{
+			ResultFile:  opts.ResultFile,
+			SessionFile: opts.SessionFile,
+			SessionID:   opts.SessionID,
+			RunID:       opts.RunID,
+		},
+	)
 	if err != nil {
 		return err
 	}
@@ -1603,7 +2087,12 @@ func RunValidateResult(ctx context.Context, opts ValidateResultOptions, d deps, 
 	return WriteNDJSON(out, Event{Type: "validated", Decision: &parsed})
 }
 
-func RunRepromptChild(ctx context.Context, opts RepromptChildOptions, d deps, out io.Writer) error {
+func RunRepromptChild(
+	ctx context.Context,
+	opts RepromptChildOptions,
+	d deps,
+	out io.Writer,
+) error {
 	if strings.TrimSpace(opts.StateFile) == "" {
 		return errors.New("state-file is required")
 	}
@@ -1623,7 +2112,11 @@ func RunRepromptChild(ctx context.Context, opts RepromptChildOptions, d deps, ou
 		return errors.New("no active child to reprompt")
 	}
 	if state.ActiveChild.Stage != opts.Stage {
-		return fmt.Errorf("active child stage %q does not match requested stage %q", state.ActiveChild.Stage, opts.Stage)
+		return fmt.Errorf(
+			"active child stage %q does not match requested stage %q",
+			state.ActiveChild.Stage,
+			opts.Stage,
+		)
 	}
 	if strings.TrimSpace(state.ActiveChild.TmuxPaneID) == "" {
 		return errors.New("active child has no tmux pane ID")
@@ -1644,10 +2137,18 @@ func RunRepromptChild(ctx context.Context, opts RepromptChildOptions, d deps, ou
 	if err := tmux.SendKeys(ctx, pane, []string{"Enter"}); err != nil {
 		return err
 	}
-	return WriteNDJSON(out, Event{Type: "child_reprompted", Ref: childRef(state.ActiveChild)})
+	return WriteNDJSON(
+		out,
+		Event{Type: "child_reprompted", Ref: childRef(state.ActiveChild)},
+	)
 }
 
-func RunSteerChild(ctx context.Context, opts SteerChildOptions, d deps, out io.Writer) (*SteerChildResult, error) {
+func RunSteerChild(
+	ctx context.Context,
+	opts SteerChildOptions,
+	d deps,
+	out io.Writer,
+) (*SteerChildResult, error) {
 	if strings.TrimSpace(opts.StateFile) == "" {
 		return nil, errors.New("state-file is required")
 	}
@@ -1662,11 +2163,19 @@ func RunSteerChild(ctx context.Context, opts SteerChildOptions, d deps, out io.W
 		return nil, err
 	}
 	if state.ActiveChild == nil {
-		return nil, fmt.Errorf("no active child to steer; next: %s or %s", fmt.Sprintf("vamos qrspi start-next --state-file %s", opts.StateFile), continueCommand(opts.StateFile))
+		return nil, fmt.Errorf(
+			"no active child to steer; next: %s or %s",
+			fmt.Sprintf("vamos qrspi start-next --state-file %s", opts.StateFile),
+			continueCommand(opts.StateFile),
+		)
 	}
 	child := *state.ActiveChild
 	if strings.TrimSpace(opts.Stage) != "" && child.Stage != opts.Stage {
-		return nil, fmt.Errorf("active child stage %q does not match requested stage %q", child.Stage, opts.Stage)
+		return nil, fmt.Errorf(
+			"active child stage %q does not match requested stage %q",
+			child.Stage,
+			opts.Stage,
+		)
 	}
 	if strings.TrimSpace(child.TmuxPaneID) == "" {
 		return nil, errors.New("active child has no tmux pane ID")
@@ -1683,12 +2192,19 @@ func RunSteerChild(ctx context.Context, opts SteerChildOptions, d deps, out io.W
 	if err := tmux.SendKeys(ctx, pane, []string{"Enter"}); err != nil {
 		return nil, err
 	}
-	result := &SteerChildResult{StateFile: opts.StateFile, Stage: child.Stage, PaneID: child.TmuxPaneID, FeedbackPath: feedbackPath, NextCommand: continueCommand(opts.StateFile)}
+	result := &SteerChildResult{
+		StateFile:    opts.StateFile,
+		Stage:        child.Stage,
+		PaneID:       child.TmuxPaneID,
+		FeedbackPath: feedbackPath,
+		NextCommand:  continueCommand(opts.StateFile),
+	}
 	return result, writeSteerChildOutput(out, *result, opts.Output)
 }
 
 func readFeedback(opts SteerChildOptions) (string, string, error) {
-	if strings.TrimSpace(opts.FeedbackFile) != "" && strings.TrimSpace(opts.Feedback) != "" {
+	if strings.TrimSpace(opts.FeedbackFile) != "" &&
+		strings.TrimSpace(opts.Feedback) != "" {
 		return "", "", errors.New("use only one of --feedback-file or --feedback")
 	}
 	if strings.TrimSpace(opts.FeedbackFile) != "" {
@@ -1707,7 +2223,11 @@ func readFeedback(opts SteerChildOptions) (string, string, error) {
 	return "", "", errors.New("feedback-file or feedback is required")
 }
 
-func buildChildSteerPrompt(state ManagerState, child ChildRunRef, feedback string, feedbackPath string) string {
+func buildChildSteerPrompt(
+	state ManagerState,
+	child ChildRunRef,
+	feedback, feedbackPath string,
+) string {
 	var b strings.Builder
 	b.WriteString("q-manager steering feedback\n")
 	b.WriteString("source: human_feedback\n")
@@ -1723,7 +2243,9 @@ func buildChildSteerPrompt(state ManagerState, child ChildRunRef, feedback strin
 	b.WriteString("\n")
 	b.WriteString(strings.TrimSpace(feedback))
 	b.WriteString("\n\n")
-	b.WriteString("Instruction: incorporate this feedback into your current QRSPI stage. Update artifacts if needed. Then emit the required fenced YAML result when complete or ask one concise follow-up if still blocked.\n")
+	b.WriteString(
+		"Instruction: incorporate this feedback into your current QRSPI stage. Update artifacts if needed. Then emit the required fenced YAML result when complete or ask one concise follow-up if still blocked.\n",
+	)
 	return b.String()
 }
 
@@ -1731,7 +2253,12 @@ func writeSteerChildOutput(out io.Writer, result SteerChildResult, mode string) 
 	if strings.EqualFold(mode, "ndjson") {
 		return WriteNDJSON(out, Event{Type: "child_steered", Ref: steerChildRef(result)})
 	}
-	if _, err := fmt.Fprintf(out, "steered child: %s (%s)\n", result.Stage, result.PaneID); err != nil {
+	if _, err := fmt.Fprintf(
+		out,
+		"steered child: %s (%s)\n",
+		result.Stage,
+		result.PaneID,
+	); err != nil {
 		return err
 	}
 	if result.FeedbackPath != "" {
@@ -1784,6 +2311,12 @@ func RunContinue(ctx context.Context, opts ContinueOptions, d deps, out io.Write
 	if err != nil {
 		return err
 	}
+	if piModel := strings.TrimSpace(opts.PiModel); piModel != "" {
+		state.PiModel = piModel
+		if err := store.Save(opts.StateFile, state); err != nil {
+			return err
+		}
+	}
 	if strings.TrimSpace(opts.PlanDir) == "" {
 		opts.PlanDir = state.CanonicalPlanDir
 	}
@@ -1791,7 +2324,11 @@ func RunContinue(ctx context.Context, opts ContinueOptions, d deps, out io.Write
 		return errors.New("plan-dir is required")
 	}
 	if state.ActiveChild == nil {
-		card := buildContinueActionCard(state, opts, errors.New("no active child to continue"))
+		card := buildContinueActionCard(
+			state,
+			opts,
+			errors.New("no active child to continue"),
+		)
 		state.LastActionCard = card
 		_ = store.Save(opts.StateFile, state)
 		if card != nil {
@@ -1822,7 +2359,14 @@ func RunContinue(ctx context.Context, opts ContinueOptions, d deps, out io.Write
 	parsed, err := validateActiveChild(ctx, state, opts)
 	if err != nil {
 		if shouldRepromptAfterValidationError(state, opts, err) {
-			if repromptErr := continueReprompt(ctx, state, opts, d, out, err); repromptErr != nil {
+			if repromptErr := continueReprompt(
+				ctx,
+				state,
+				opts,
+				d,
+				out,
+				err,
+			); repromptErr != nil {
 				return repromptErr
 			}
 			result.Reprompted = true
@@ -1866,11 +2410,25 @@ func RunContinue(ctx context.Context, opts ContinueOptions, d deps, out io.Write
 	}
 
 	if parsed.Decision.StartNext {
-		launched, err := startNextChildFromDecision(ctx, nextState, parsed.Decision, opts, d, out)
+		launched, err := startNextChildFromDecision(
+			ctx,
+			nextState,
+			parsed.Decision,
+			opts,
+			d,
+			out,
+		)
 		if err != nil {
 			return err
 		}
-		launched, _, err = maybeStartManagerCompaction(ctx, launched, opts.StateFile, opts.Usage, d, out)
+		launched, _, err = maybeStartManagerCompaction(
+			ctx,
+			launched,
+			opts.StateFile,
+			opts.Usage,
+			d,
+			out,
+		)
 		if err != nil {
 			return err
 		}
@@ -1879,7 +2437,11 @@ func RunContinue(ctx context.Context, opts ContinueOptions, d deps, out io.Write
 	return writeContinueOutput(out, opts, result)
 }
 
-func validateActiveChild(ctx context.Context, state ManagerState, opts ContinueOptions) (ParsedDecision, error) {
+func validateActiveChild(
+	ctx context.Context,
+	state ManagerState,
+	opts ContinueOptions,
+) (ParsedDecision, error) {
 	_ = ctx
 	text, parseCtx, err := ReadChildResultText(state, ResultSourceOptions{})
 	if err != nil {
@@ -1897,13 +2459,18 @@ func invalidResultRetryLimit(state ManagerState) int {
 	var cfg struct {
 		InvalidResultRetryLimit *int `json:"invalidResultRetryLimit"`
 	}
-	if json.Unmarshal(state.Workflow.Policy, &cfg) == nil && cfg.InvalidResultRetryLimit != nil {
+	if json.Unmarshal(state.Workflow.Policy, &cfg) == nil &&
+		cfg.InvalidResultRetryLimit != nil {
 		return *cfg.InvalidResultRetryLimit
 	}
 	return limit
 }
 
-func shouldRepromptAfterValidationError(state ManagerState, opts ContinueOptions, err error) bool {
+func shouldRepromptAfterValidationError(
+	state ManagerState,
+	opts ContinueOptions,
+	err error,
+) bool {
 	if err == nil || state.ActiveChild == nil {
 		return false
 	}
@@ -1916,7 +2483,11 @@ func shouldRepromptAfterValidationError(state ManagerState, opts ContinueOptions
 	return state.ActiveChild.ValidationRetryCount < invalidResultRetryLimit(state)
 }
 
-func isRetryExhaustedValidationError(state ManagerState, opts ContinueOptions, err error) bool {
+func isRetryExhaustedValidationError(
+	state ManagerState,
+	opts ContinueOptions,
+	err error,
+) bool {
 	if err == nil || state.ActiveChild == nil {
 		return false
 	}
@@ -1926,7 +2497,12 @@ func isRetryExhaustedValidationError(state ManagerState, opts ContinueOptions, e
 	return state.ActiveChild.ValidationRetryCount >= invalidResultRetryLimit(state)
 }
 
-func writeRetryExhaustedNotice(out io.Writer, opts ContinueOptions, state ManagerState, validationErr error) error {
+func writeRetryExhaustedNotice(
+	out io.Writer,
+	opts ContinueOptions,
+	state ManagerState,
+	validationErr error,
+) error {
 	stage := strings.TrimSpace(opts.Stage)
 	if stage == "" && state.ActiveChild != nil {
 		stage = state.ActiveChild.Stage
@@ -1939,15 +2515,19 @@ func writeRetryExhaustedNotice(out io.Writer, opts ContinueOptions, state Manage
 	}
 	guidance := "Inspect child output/artifacts; recover or steer deterministically before asking human."
 	notice := ManagerNotice{
-		Kind:            "retry_exhausted",
-		Validated:       false,
-		ManagerNeeded:   true,
-		RetryExhausted:  true,
-		StateFile:       opts.StateFile,
-		Stage:           stage,
-		Status:          "invalid_result",
-		ChildPane:       pane,
-		Summary:         fmt.Sprintf("invalid result after retry limit (%d): %s", attempt, validationErr.Error()),
+		Kind:           "retry_exhausted",
+		Validated:      false,
+		ManagerNeeded:  true,
+		RetryExhausted: true,
+		StateFile:      opts.StateFile,
+		Stage:          stage,
+		Status:         "invalid_result",
+		ChildPane:      pane,
+		Summary: fmt.Sprintf(
+			"invalid result after retry limit (%d): %s",
+			attempt,
+			validationErr.Error(),
+		),
 		ManagerGuidance: guidance,
 		NextCommand:     debugCommandForState(opts.StateFile, "continue"),
 		FeedbackCommand: feedbackCommand(opts.StateFile),
@@ -1963,14 +2543,28 @@ func writeRetryExhaustedNotice(out io.Writer, opts ContinueOptions, state Manage
 	return writeManagerNotice(out, notice, opts.Output)
 }
 
-func continueReprompt(ctx context.Context, state ManagerState, opts ContinueOptions, d deps, out io.Writer, validationErr error) error {
+func continueReprompt(
+	ctx context.Context,
+	state ManagerState,
+	opts ContinueOptions,
+	d deps,
+	out io.Writer,
+	validationErr error,
+) error {
 	_ = out
 	attempt := state.ActiveChild.ValidationRetryCount + 1
 	if state.ActiveChild.LastRepromptAttempt >= attempt {
-		return fmt.Errorf("reprompt attempt %d already sent for active child %s", attempt, state.ActiveChild.ID)
+		return fmt.Errorf(
+			"reprompt attempt %d already sent for active child %s",
+			attempt,
+			state.ActiveChild.ID,
+		)
 	}
 	if strings.TrimSpace(state.ActiveChild.DonePath) != "" {
-		if err := os.Remove(state.ActiveChild.DonePath); err != nil && !os.IsNotExist(err) {
+		if err := os.Remove(
+			state.ActiveChild.DonePath,
+		); err != nil &&
+			!os.IsNotExist(err) {
 			return err
 		}
 	}
@@ -2000,7 +2594,13 @@ func continueReprompt(ctx context.Context, state ManagerState, opts ContinueOpti
 	return store.Save(opts.StateFile, latest)
 }
 
-func decideValidatedResult(ctx context.Context, state ManagerState, parsed ParsedDecision, opts ContinueOptions, store StateStore) (ManagerState, error) {
+func decideValidatedResult(
+	ctx context.Context,
+	state ManagerState,
+	parsed ParsedDecision,
+	opts ContinueOptions,
+	store StateStore,
+) (ManagerState, error) {
 	_ = ctx
 	state.Workflow = parsed.Decision.State
 	state = UpdateImplementationCwd(state, parsed.Result)
@@ -2013,7 +2613,14 @@ func decideValidatedResult(ctx context.Context, state ManagerState, parsed Parse
 	return state, nil
 }
 
-func startNextChildFromDecision(ctx context.Context, state ManagerState, decision wruntime.TransitionDecision, opts ContinueOptions, d deps, out io.Writer) (ManagerState, error) {
+func startNextChildFromDecision(
+	ctx context.Context,
+	state ManagerState,
+	decision wruntime.TransitionDecision,
+	opts ContinueOptions,
+	d deps,
+	out io.Writer,
+) (ManagerState, error) {
 	nodeID := decision.NextNodeID
 	if nodeID == "" {
 		return state, errors.New("transition has no next node")
@@ -2037,6 +2644,7 @@ func startNextChildFromDecision(ctx context.Context, state ManagerState, decisio
 		PromptFile: promptFile,
 		StateFile:  opts.StateFile,
 		Split:      opts.Split,
+		PiModel:    resolvePiModel(opts.PiModel, state.PiModel),
 		Timeout:    opts.Timeout,
 	}, d, runOut); err != nil {
 		return state, err
@@ -2053,7 +2661,12 @@ func defaultContinueCwd(state ManagerState, node wruntime.NodeID) string {
 	return cwd
 }
 
-func renderContinuePromptFile(ctx context.Context, state ManagerState, nodeID wruntime.NodeID, opts ContinueOptions) (string, error) {
+func renderContinuePromptFile(
+	ctx context.Context,
+	state ManagerState,
+	nodeID wruntime.NodeID,
+	opts ContinueOptions,
+) (string, error) {
 	def, err := Definition()
 	if err != nil {
 		return "", err
@@ -2062,10 +2675,23 @@ func renderContinuePromptFile(ctx context.Context, state ManagerState, nodeID wr
 	if !ok {
 		return "", fmt.Errorf("node %q is not in QRSPI definition", nodeID)
 	}
-	return WriteStagePromptFile(ctx, state, node, PromptFileOptions{StateFile: opts.StateFile, NodeID: string(nodeID), Timestamp: time.Now()})
+	return WriteStagePromptFile(
+		ctx,
+		state,
+		node,
+		PromptFileOptions{
+			StateFile: opts.StateFile,
+			NodeID:    string(nodeID),
+			Timestamp: time.Now(),
+		},
+	)
 }
 
-func humanPromptContext(state ManagerState, stateFile string, parsed ParsedDecision) HumanPromptContext {
+func humanPromptContext(
+	state ManagerState,
+	stateFile string,
+	parsed ParsedDecision,
+) HumanPromptContext {
 	result := parsed.Result
 	return HumanPromptContext{
 		Stage:                    string(result.SourceNodeID),
@@ -2076,9 +2702,27 @@ func humanPromptContext(state ManagerState, stateFile string, parsed ParsedDecis
 	}
 }
 
-func buildContinueActionCard(state ManagerState, opts ContinueOptions, err error) *ManagerActionCard {
+func buildContinueActionCard(
+	state ManagerState,
+	opts ContinueOptions,
+	err error,
+) *ManagerActionCard {
 	if state.ActiveChild == nil {
-		return &ManagerActionCard{Kind: ActionActiveChildConflict, Severity: "warning", Summary: "no active child to continue", Evidence: []string{fmt.Sprintf("current node: %s", state.Workflow.CurrentNodeID)}, RecommendedAction: "start or inspect the graph-selected child", SafeCommand: fmt.Sprintf("vamos qrspi start-next --state-file %s", opts.StateFile), ContinueCommand: continueCommand(opts.StateFile), RequiresHuman: false}
+		return &ManagerActionCard{
+			Kind:     ActionActiveChildConflict,
+			Severity: "warning",
+			Summary:  "no active child to continue",
+			Evidence: []string{
+				fmt.Sprintf("current node: %s", state.Workflow.CurrentNodeID),
+			},
+			RecommendedAction: "start or inspect the graph-selected child",
+			SafeCommand: fmt.Sprintf(
+				"vamos qrspi start-next --state-file %s",
+				opts.StateFile,
+			),
+			ContinueCommand: continueCommand(opts.StateFile),
+			RequiresHuman:   false,
+		}
 	}
 	if err == nil {
 		return nil
@@ -2088,30 +2732,95 @@ func buildContinueActionCard(state ManagerState, opts ContinueOptions, err error
 		return &card
 	}
 	if looksWorkspaceMoved(state, err) {
-		return &ManagerActionCard{Kind: ActionWorkspaceMoved, Severity: "warning", Summary: "implementation workspace differs from current child cwd", Evidence: workspaceMovedEvidence(state), RecommendedAction: "run q-manager continue from the recorded implementation workspace", SafeCommand: fmt.Sprintf("cd %q && vamos qrspi continue --state-file %s", state.ImplementationCwd, opts.StateFile), ContinueCommand: continueCommand(opts.StateFile), RequiresHuman: false}
+		return &ManagerActionCard{
+			Kind:              ActionWorkspaceMoved,
+			Severity:          "warning",
+			Summary:           "implementation workspace differs from current child cwd",
+			Evidence:          workspaceMovedEvidence(state),
+			RecommendedAction: "run q-manager continue from the recorded implementation workspace",
+			SafeCommand: fmt.Sprintf(
+				"cd %q && vamos qrspi continue --state-file %s",
+				state.ImplementationCwd,
+				opts.StateFile,
+			),
+			ContinueCommand: continueCommand(opts.StateFile),
+			RequiresHuman:   false,
+		}
 	}
 	kind := ActionInvalidChildYAML
-	if strings.Contains(strings.ToLower(err.Error()), "canonical qrspi graph rejected") || strings.Contains(strings.ToLower(err.Error()), "outcome") {
+	if strings.Contains(strings.ToLower(err.Error()), "canonical qrspi graph rejected") ||
+		strings.Contains(strings.ToLower(err.Error()), "outcome") {
 		kind = ActionGraphOutcomeMismatch
 	}
-	return &ManagerActionCard{Kind: kind, Severity: "warning", Summary: "child result needs deterministic repair", Evidence: []string{err.Error(), fmt.Sprintf("active child stage: %s", state.ActiveChild.Stage), fmt.Sprintf("retry: %d/%d", state.ActiveChild.ValidationRetryCount, invalidResultRetryLimit(state))}, RecommendedAction: "reprompt or steer the active child with canonical YAML", SafeCommand: fmt.Sprintf("vamos qrspi reprompt-child --state-file %s --plan-dir %s --stage %s --attempt %d", opts.StateFile, opts.PlanDir, state.ActiveChild.Stage, state.ActiveChild.ValidationRetryCount+1), ContinueCommand: continueCommand(opts.StateFile), RequiresHuman: false}
+	return &ManagerActionCard{
+		Kind:     kind,
+		Severity: "warning",
+		Summary:  "child result needs deterministic repair",
+		Evidence: []string{
+			err.Error(),
+			fmt.Sprintf("active child stage: %s", state.ActiveChild.Stage),
+			fmt.Sprintf(
+				"retry: %d/%d",
+				state.ActiveChild.ValidationRetryCount,
+				invalidResultRetryLimit(state),
+			),
+		},
+		RecommendedAction: "reprompt or steer the active child with canonical YAML",
+		SafeCommand: fmt.Sprintf(
+			"vamos qrspi reprompt-child --state-file %s --plan-dir %s --stage %s --attempt %d",
+			opts.StateFile,
+			opts.PlanDir,
+			state.ActiveChild.Stage,
+			state.ActiveChild.ValidationRetryCount+1,
+		),
+		ContinueCommand: continueCommand(opts.StateFile),
+		RequiresHuman:   false,
+	}
 }
 
-func buildStateDesyncActionCard(state ManagerState, stateFile string, err error) ManagerActionCard {
+func buildStateDesyncActionCard(
+	state ManagerState,
+	stateFile string,
+	err error,
+) ManagerActionCard {
 	evidence := []string{fmt.Sprintf("current node: %s", state.Workflow.CurrentNodeID)}
 	if state.ActiveChild != nil {
-		evidence = append(evidence, fmt.Sprintf("active child stage: %s", state.ActiveChild.Stage), fmt.Sprintf("active child id: %s", state.ActiveChild.ID))
+		evidence = append(
+			evidence,
+			fmt.Sprintf("active child stage: %s", state.ActiveChild.Stage),
+			fmt.Sprintf("active child id: %s", state.ActiveChild.ID),
+		)
 		if state.ActiveChild.SessionPath != "" {
-			evidence = append(evidence, fmt.Sprintf("session: %s", state.ActiveChild.SessionPath))
+			evidence = append(
+				evidence,
+				fmt.Sprintf("session: %s", state.ActiveChild.SessionPath),
+			)
 		}
 	}
 	if err != nil {
 		evidence = append(evidence, err.Error())
 	}
-	return ManagerActionCard{Kind: ActionStateDesync, Severity: "warning", Summary: "workflow cursor and active child are out of sync", Evidence: evidence, RecommendedAction: "align active child, then continue", SafeCommand: fmt.Sprintf("vamos qrspi repair-state --state-file %s --align-active-child && vamos qrspi continue --state-file %s", stateFile, stateFile), ContinueCommand: continueCommand(stateFile), RequiresHuman: false}
+	return ManagerActionCard{
+		Kind:              ActionStateDesync,
+		Severity:          "warning",
+		Summary:           "workflow cursor and active child are out of sync",
+		Evidence:          evidence,
+		RecommendedAction: "align active child, then continue",
+		SafeCommand: fmt.Sprintf(
+			"vamos qrspi repair-state --state-file %s --align-active-child && vamos qrspi continue --state-file %s",
+			stateFile,
+			stateFile,
+		),
+		ContinueCommand: continueCommand(stateFile),
+		RequiresHuman:   false,
+	}
 }
 
-func humanGateActionCard(state ManagerState, stateFile string, prompt HumanPromptContext) ManagerActionCard {
+func humanGateActionCard(
+	state ManagerState,
+	stateFile string,
+	prompt HumanPromptContext,
+) ManagerActionCard {
 	review := strings.TrimSpace(prompt.Summary)
 	if review == "" {
 		review = fmt.Sprintf("review %s artifact before steering feedback", prompt.Stage)
@@ -2135,25 +2844,45 @@ func humanGateActionCard(state ManagerState, stateFile string, prompt HumanPromp
 func manualChildSteerActionCard(state ManagerState, stateFile string) ManagerActionCard {
 	evidence := []string{}
 	if state.ActiveChild != nil {
-		evidence = append(evidence, fmt.Sprintf("active child: %s", state.ActiveChild.ID), fmt.Sprintf("generation: %d", activeChildGeneration(state)))
+		evidence = append(
+			evidence,
+			fmt.Sprintf("active child: %s", state.ActiveChild.ID),
+			fmt.Sprintf("generation: %d", activeChildGeneration(state)),
+		)
 	}
-	return ManagerActionCard{Kind: ActionManualChildSteer, Severity: "info", Summary: "child marked active after manual steering", Evidence: evidence, RecommendedAction: "wait for newer completion before flushing queued wakes", SafeCommand: continueCommand(stateFile), ContinueCommand: continueCommand(stateFile), RequiresHuman: false}
+	return ManagerActionCard{
+		Kind:              ActionManualChildSteer,
+		Severity:          "info",
+		Summary:           "child marked active after manual steering",
+		Evidence:          evidence,
+		RecommendedAction: "wait for newer completion before flushing queued wakes",
+		SafeCommand:       continueCommand(stateFile),
+		ContinueCommand:   continueCommand(stateFile),
+		RequiresHuman:     false,
+	}
 }
 
 func looksWorkspaceMoved(state ManagerState, err error) bool {
 	if strings.TrimSpace(state.ImplementationCwd) == "" || state.ActiveChild == nil {
 		return false
 	}
-	if state.ActiveChild.Cwd != "" && filepath.Clean(state.ActiveChild.Cwd) != filepath.Clean(state.ImplementationCwd) {
+	if state.ActiveChild.Cwd != "" &&
+		filepath.Clean(state.ActiveChild.Cwd) != filepath.Clean(state.ImplementationCwd) {
 		return true
 	}
-	return strings.Contains(strings.ToLower(err.Error()), "workspace") || strings.Contains(strings.ToLower(err.Error()), "cwd")
+	return strings.Contains(strings.ToLower(err.Error()), "workspace") ||
+		strings.Contains(strings.ToLower(err.Error()), "cwd")
 }
 
 func workspaceMovedEvidence(state ManagerState) []string {
-	evidence := []string{fmt.Sprintf("implementation workspace: %s", state.ImplementationCwd)}
+	evidence := []string{
+		fmt.Sprintf("implementation workspace: %s", state.ImplementationCwd),
+	}
 	if state.ActiveChild != nil {
-		evidence = append(evidence, fmt.Sprintf("active child cwd: %s", state.ActiveChild.Cwd))
+		evidence = append(
+			evidence,
+			fmt.Sprintf("active child cwd: %s", state.ActiveChild.Cwd),
+		)
 	}
 	return evidence
 }
@@ -2186,11 +2915,21 @@ func writeManagerActionCard(out io.Writer, card ManagerActionCard, mode string) 
 	return nil
 }
 
-func appendRecoveryIncident(stateFile string, card ManagerActionCard, recovered bool) error {
+func appendRecoveryIncident(
+	stateFile string,
+	card ManagerActionCard,
+	recovered bool,
+) error {
 	if strings.TrimSpace(stateFile) == "" {
 		return nil
 	}
-	entry := ValidationRecoveryLog{Timestamp: time.Now(), StateFile: stateFile, Recovered: recovered, RecoveryAction: card.Kind, Reason: card.Summary}
+	entry := ValidationRecoveryLog{
+		Timestamp:      time.Now(),
+		StateFile:      stateFile,
+		Recovered:      recovered,
+		RecoveryAction: card.Kind,
+		Reason:         card.Summary,
+	}
 	data, err := json.Marshal(entry)
 	if err != nil {
 		return err
@@ -2205,9 +2944,21 @@ func appendRecoveryIncident(stateFile string, card ManagerActionCard, recovered 
 	return err
 }
 
-func writeContinueOutput(out io.Writer, opts ContinueOptions, result ContinueResult) error {
+func writeContinueOutput(
+	out io.Writer,
+	opts ContinueOptions,
+	result ContinueResult,
+) error {
 	if strings.EqualFold(opts.Output, "ndjson") {
-		return WriteNDJSON(out, Event{Type: "continued", Decision: result.Validated, ActionCard: result.ActionCard, Ref: continueRef(result)})
+		return WriteNDJSON(
+			out,
+			Event{
+				Type:       "continued",
+				Decision:   result.Validated,
+				ActionCard: result.ActionCard,
+				Ref:        continueRef(result),
+			},
+		)
 	}
 	if err := writeContinueText(out, result); err != nil {
 		return err
@@ -2220,7 +2971,12 @@ func writeContinueOutput(out io.Writer, opts ContinueOptions, result ContinueRes
 
 func writeContinueText(out io.Writer, result ContinueResult) error {
 	if result.Validated != nil {
-		fmt.Fprintf(out, "validated: %s %s\n", result.Validated.Result.SourceNodeID, result.Validated.Result.Status)
+		fmt.Fprintf(
+			out,
+			"validated: %s %s\n",
+			result.Validated.Result.SourceNodeID,
+			result.Validated.Result.Status,
+		)
 		if result.Validated.Result.Outcome != "" {
 			fmt.Fprintf(out, "outcome: %s\n", result.Validated.Result.Outcome)
 		}
@@ -2236,7 +2992,12 @@ func writeContinueText(out io.Writer, result ContinueResult) error {
 		fmt.Fprintf(out, "next: %s\n", result.NextNodeID)
 	}
 	if result.StartedChild != nil {
-		fmt.Fprintf(out, "started child: %s (%s)\n", result.StartedChild.Stage, result.StartedChild.TmuxPaneID)
+		fmt.Fprintf(
+			out,
+			"started child: %s (%s)\n",
+			result.StartedChild.Stage,
+			result.StartedChild.TmuxPaneID,
+		)
 	}
 	if result.WaitingHuman {
 		if _, err := fmt.Fprintln(out, "stop: waiting human"); err != nil {
@@ -2246,14 +3007,23 @@ func writeContinueText(out io.Writer, result ContinueResult) error {
 			fmt.Fprintf(out, "question: %s\n", result.HumanPrompt.Summary)
 		}
 		if result.HumanPrompt.SuggestedFeedbackCommand != "" {
-			fmt.Fprintf(out, "feedback: %s\n", result.HumanPrompt.SuggestedFeedbackCommand)
+			fmt.Fprintf(
+				out,
+				"feedback: %s\n",
+				result.HumanPrompt.SuggestedFeedbackCommand,
+			)
 		}
 		return nil
 	}
 	if result.StopReason != "" && result.StartedChild == nil {
 		fmt.Fprintf(out, "stop: %s\n", result.StopReason)
-		if result.Validated != nil && managerGuidanceForStatus(string(result.Validated.Result.Status)) != "" {
-			fmt.Fprintf(out, "guidance: %s\n", managerGuidanceForStatus(string(result.Validated.Result.Status)))
+		if result.Validated != nil &&
+			managerGuidanceForStatus(string(result.Validated.Result.Status)) != "" {
+			fmt.Fprintf(
+				out,
+				"guidance: %s\n",
+				managerGuidanceForStatus(string(result.Validated.Result.Status)),
+			)
 		}
 	}
 	return nil
@@ -2271,12 +3041,17 @@ func managerGuidanceForStatus(status string) string {
 }
 
 func continueRef(result ContinueResult) map[string]any {
-	ref := map[string]any{"reprompted": result.Reprompted, "waitingHuman": result.WaitingHuman}
+	ref := map[string]any{
+		"reprompted":   result.Reprompted,
+		"waitingHuman": result.WaitingHuman,
+	}
 	if result.Validated != nil {
 		ref["validated"] = true
 		ref["stage"] = result.Validated.Result.SourceNodeID
 		ref["status"] = result.Validated.Result.Status
-		if guidance := managerGuidanceForStatus(string(result.Validated.Result.Status)); guidance != "" {
+		if guidance := managerGuidanceForStatus(
+			string(result.Validated.Result.Status),
+		); guidance != "" {
 			ref["managerNeeded"] = true
 			ref["managerGuidance"] = guidance
 		}
@@ -2303,7 +3078,12 @@ func continueRef(result ContinueResult) map[string]any {
 	return ref
 }
 
-func RunDecideNext(ctx context.Context, opts DecideNextOptions, d deps, out io.Writer) error {
+func RunDecideNext(
+	ctx context.Context,
+	opts DecideNextOptions,
+	d deps,
+	out io.Writer,
+) error {
 	if strings.TrimSpace(opts.StateFile) == "" {
 		return errors.New("state-file is required")
 	}
@@ -2316,7 +3096,10 @@ func RunDecideNext(ctx context.Context, opts DecideNextOptions, d deps, out io.W
 	if err != nil {
 		return err
 	}
-	text, parseCtx, err := ReadChildResultText(state, ResultSourceOptions{ResultFile: opts.ResultFile, SessionFile: opts.SessionFile})
+	text, parseCtx, err := ReadChildResultText(
+		state,
+		ResultSourceOptions{ResultFile: opts.ResultFile, SessionFile: opts.SessionFile},
+	)
 	if err != nil {
 		return err
 	}
@@ -2346,7 +3129,10 @@ func RunDecideNext(ctx context.Context, opts DecideNextOptions, d deps, out io.W
 	})
 }
 
-func ReadChildResultText(state ManagerState, opts ResultSourceOptions) (string, wruntime.ParseContext, error) {
+func ReadChildResultText(
+	state ManagerState,
+	opts ResultSourceOptions,
+) (string, wruntime.ParseContext, error) {
 	ctx := wruntime.ParseContext{RunID: opts.RunID, SessionID: opts.SessionID}
 	if strings.TrimSpace(opts.SessionFile) != "" {
 		text, err := ExtractFinalAssistantTextFromSession(opts.SessionFile)
@@ -2387,10 +3173,17 @@ func ReadChildResultText(state ManagerState, opts ResultSourceOptions) (string, 
 		}
 		return string(data), ctx, nil
 	}
-	return "", ctx, errors.New("no child result source: keep active child session refs, use latest-session recovery commands, pass --session-file for a specific JSONL, or use deprecated --result-file only as a debug fallback")
+	return "", ctx, errors.New(
+		"no child result source: keep active child session refs, use latest-session recovery commands, pass --session-file for a specific JSONL, or use deprecated --result-file only as a debug fallback",
+	)
 }
 
-func RunRenderPrompt(ctx context.Context, opts RenderPromptOptions, d deps, out io.Writer) error {
+func RunRenderPrompt(
+	ctx context.Context,
+	opts RenderPromptOptions,
+	d deps,
+	out io.Writer,
+) error {
 	if strings.TrimSpace(opts.StateFile) == "" {
 		return errors.New("state-file is required")
 	}
@@ -2484,7 +3277,8 @@ func tmuxClient(d deps) TmuxClient {
 }
 
 func childRunID(stage string, t time.Time) string {
-	clean := strings.NewReplacer("/", "-", " ", "-", "_", "-").Replace(strings.TrimSpace(stage))
+	clean := strings.NewReplacer("/", "-", " ", "-", "_", "-").
+		Replace(strings.TrimSpace(stage))
 	if clean == "" {
 		clean = "child"
 	}
@@ -2505,7 +3299,11 @@ func markPendingCleanup(state ManagerState) ManagerState {
 	return state
 }
 
-func cleanupPendingChildAfterNextStart(ctx context.Context, state ManagerState, tmux TmuxClient) (ManagerState, error) {
+func cleanupPendingChildAfterNextStart(
+	ctx context.Context,
+	state ManagerState,
+	tmux TmuxClient,
+) (ManagerState, error) {
 	ref := state.PendingCleanupChild
 	if ref == nil {
 		return state, nil
@@ -2521,7 +3319,11 @@ func cleanupPendingChildAfterNextStart(ctx context.Context, state ManagerState, 
 		return state, err
 	}
 	if state.ActiveChild != nil && strings.TrimSpace(state.ActiveChild.TmuxPaneID) != "" {
-		if err := tmux.SelectLayout(ctx, TmuxPane{ID: state.ActiveChild.TmuxPaneID}, "even-horizontal"); err != nil {
+		if err := tmux.SelectLayout(
+			ctx,
+			TmuxPane{ID: state.ActiveChild.TmuxPaneID},
+			"even-horizontal",
+		); err != nil {
 			return state, err
 		}
 	}

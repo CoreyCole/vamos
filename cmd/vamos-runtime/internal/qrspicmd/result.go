@@ -20,13 +20,17 @@ type ParsedDecision struct {
 type InitOverrides struct {
 	NodeID            string
 	ImplementationCwd string
+	PiModel           string
 }
 
 func Definition() (wruntime.Definition, error) {
 	return qrspi.Definition()
 }
 
-func InitialManagerState(planDir, projectRoot string, policy json.RawMessage) (ManagerState, error) {
+func InitialManagerState(
+	planDir, projectRoot string,
+	policy json.RawMessage,
+) (ManagerState, error) {
 	def, err := Definition()
 	if err != nil {
 		return ManagerState{}, err
@@ -67,21 +71,39 @@ func ApplyInitOverrides(state *ManagerState, opts InitOverrides) error {
 		}
 		state.Workflow.CurrentNodeID = nodeID
 	}
-	if implementationCwd := strings.TrimSpace(opts.ImplementationCwd); implementationCwd != "" {
+	if implementationCwd := strings.TrimSpace(
+		opts.ImplementationCwd,
+	); implementationCwd != "" {
 		state.ImplementationCwd = implementationCwd
+	}
+	if piModel := strings.TrimSpace(opts.PiModel); piModel != "" {
+		state.PiModel = piModel
 	}
 	return nil
 }
 
-func ParseValidateDecide(output string, state wruntime.State, ctx wruntime.ParseContext) (ParsedDecision, error) {
+func ParseValidateDecide(
+	output string,
+	state wruntime.State,
+	ctx wruntime.ParseContext,
+) (ParsedDecision, error) {
 	return parseValidateDecide(output, ManagerState{Workflow: state}, ctx, false)
 }
 
-func ParseNormalizeValidateDecide(output string, manager ManagerState, ctx wruntime.ParseContext) (ParsedDecision, error) {
+func ParseNormalizeValidateDecide(
+	output string,
+	manager ManagerState,
+	ctx wruntime.ParseContext,
+) (ParsedDecision, error) {
 	return parseValidateDecide(output, manager, ctx, true)
 }
 
-func parseValidateDecide(output string, manager ManagerState, ctx wruntime.ParseContext, managerAware bool) (ParsedDecision, error) {
+func parseValidateDecide(
+	output string,
+	manager ManagerState,
+	ctx wruntime.ParseContext,
+	managerAware bool,
+) (ParsedDecision, error) {
 	def, err := Definition()
 	if err != nil {
 		return ParsedDecision{}, err
@@ -114,19 +136,37 @@ func parseValidateDecide(output string, manager ManagerState, ctx wruntime.Parse
 		return ParsedDecision{}, GraphContractError(err)
 	}
 	rawYAML, _ := qrspi.ExtractQRSPIResultYAML(output)
-	return ParsedDecision{Result: applied.WorkflowResult, Decision: applied.Decision, RawYAML: rawYAML, Normalizations: resultNormalizations(applied.Normalizations)}, nil
+	return ParsedDecision{
+		Result:         applied.WorkflowResult,
+		Decision:       applied.Decision,
+		RawYAML:        rawYAML,
+		Normalizations: resultNormalizations(applied.Normalizations),
+	}, nil
 }
 
 func resultNormalizations(in []semantic.Normalization) []ResultNormalization {
 	out := make([]ResultNormalization, 0, len(in))
 	for _, n := range in {
-		out = append(out, ResultNormalization{Field: n.Field, Original: n.Original, Canonical: n.Canonical, Reason: n.Reason})
+		out = append(
+			out,
+			ResultNormalization{
+				Field:     n.Field,
+				Original:  n.Original,
+				Canonical: n.Canonical,
+				Reason:    n.Reason,
+			},
+		)
 	}
 	return out
 }
 
-func UpdateImplementationCwd(state ManagerState, result wruntime.WorkflowResult) ManagerState {
-	implementation := strings.TrimSpace(qrspi.WorkflowResultImplementationWorkspace(result))
+func UpdateImplementationCwd(
+	state ManagerState,
+	result wruntime.WorkflowResult,
+) ManagerState {
+	implementation := strings.TrimSpace(
+		qrspi.WorkflowResultImplementationWorkspace(result),
+	)
 	if implementation != "" {
 		state.ImplementationCwd = implementation
 	}

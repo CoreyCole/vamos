@@ -26,6 +26,7 @@ type ChildRunRequest struct {
 	StateFile            string
 	PlanDir              string
 	ExtensionPath        string
+	PiModel              string
 }
 
 type ChildRun struct {
@@ -74,26 +75,33 @@ type TmuxSplitRequest struct {
 
 type TmuxPane struct{ ID string }
 
-func ResultPath(root string, childID string) string {
+func ResultPath(root, childID string) string {
 	return filepath.Join(root, "runs", childID, "result.txt")
 }
-func OutputPath(root string, childID string) string {
+
+func OutputPath(root, childID string) string {
 	return filepath.Join(root, "runs", childID, "output.txt")
 }
+
 func SessionDir(root, childID string) string {
 	return filepath.Join(root, "runs", childID, "sessions")
 }
+
 func DonePath(root, childID string) string {
 	return filepath.Join(root, "runs", childID, "done")
 }
+
 func StatusPath(root, childID string) string {
 	return filepath.Join(root, "runs", childID, "status.json")
 }
+
 func ValidationStatusPath(root, childID string) string {
 	return filepath.Join(root, "runs", childID, "validation-status.json")
 }
+
 func ChildSessionID(childID string) string {
-	clean := strings.NewReplacer("/", "-", " ", "-", "_", "-").Replace(strings.TrimSpace(childID))
+	clean := strings.NewReplacer("/", "-", " ", "-", "_", "-").
+		Replace(strings.TrimSpace(childID))
 	clean = strings.Trim(clean, "-.")
 	if clean == "" {
 		return "q-manager-child"
@@ -102,9 +110,9 @@ func ChildSessionID(childID string) string {
 }
 
 func BuildChildCommand(req ChildRunRequest) []string {
-	piCommand := `pi --session-id "$SESSION_ID" --session-dir "$SESSION_DIR" --name "$SESSION_NAME" "@$PROMPT_FILE"`
+	piCommand := `pi "${PI_MODEL_ARGS[@]}" --session-id "$SESSION_ID" --session-dir "$SESSION_DIR" --name "$SESSION_NAME" "@$PROMPT_FILE"`
 	if strings.TrimSpace(req.ExtensionPath) != "" {
-		piCommand = `pi --extension "$Q_MANAGER_CHILD_EXTENSION" --session-id "$SESSION_ID" --session-dir "$SESSION_DIR" --name "$SESSION_NAME" "@$PROMPT_FILE"`
+		piCommand = `pi "${PI_MODEL_ARGS[@]}" --extension "$Q_MANAGER_CHILD_EXTENSION" --session-id "$SESSION_ID" --session-dir "$SESSION_DIR" --name "$SESSION_NAME" "@$PROMPT_FILE"`
 	}
 	script := `set -o pipefail
 printf 'q-manager child starting\n'
@@ -115,6 +123,11 @@ printf 'session dir: %s\n' "$SESSION_DIR"
 printf 'prompt: %s\n' "$PROMPT_FILE"
 printf 'output: %s\n' "$OUTPUT_PATH"
 printf 'mode: interactive Pi; exit child Pi after final qrspi_result so q-manager can validate\n\n'
+PI_MODEL_ARGS=()
+if [ -n "${VAMOS_PI_MODEL:-}" ]; then
+  PI_MODEL_ARGS=(--model "$VAMOS_PI_MODEL")
+  printf 'pi model: %s\n' "$VAMOS_PI_MODEL"
+fi
 : > "$OUTPUT_PATH"
 ` + piCommand + `
 status=$?
@@ -147,6 +160,7 @@ exit "$status"`
 		"Q_MANAGER_SESSION_ID=" + req.SessionID,
 		"Q_MANAGER_SESSION_DIR=" + req.SessionDir,
 		"Q_MANAGER_CHILD_EXTENSION=" + req.ExtensionPath,
+		"VAMOS_PI_MODEL=" + strings.TrimSpace(req.PiModel),
 		"bash",
 		"-lc",
 		script,
@@ -155,15 +169,33 @@ exit "$status"`
 
 type TmuxChildRunner struct{ Tmux TmuxClient }
 
-func (r TmuxChildRunner) Start(ctx context.Context, req ChildRunRequest) (ChildRun, error) {
+func (r TmuxChildRunner) Start(
+	ctx context.Context,
+	req ChildRunRequest,
+) (ChildRun, error) {
 	if r.Tmux == nil {
 		return ChildRun{}, errors.New("tmux client is required")
 	}
-	pane, err := r.Tmux.SplitPane(ctx, TmuxSplitRequest{Cwd: req.Cwd, Direction: req.Split, Command: BuildChildCommand(req)})
+	pane, err := r.Tmux.SplitPane(
+		ctx,
+		TmuxSplitRequest{
+			Cwd:       req.Cwd,
+			Direction: req.Split,
+			Command:   BuildChildCommand(req),
+		},
+	)
 	if err != nil {
 		return ChildRun{}, err
 	}
-	return ChildRun{ID: req.ID, Pane: pane, OutputPath: req.OutputPath, SessionID: req.SessionID, SessionDir: req.SessionDir, DonePath: req.DonePath, StatusPath: req.StatusPath}, nil
+	return ChildRun{
+		ID:         req.ID,
+		Pane:       pane,
+		OutputPath: req.OutputPath,
+		SessionID:  req.SessionID,
+		SessionDir: req.SessionDir,
+		DonePath:   req.DonePath,
+		StatusPath: req.StatusPath,
+	}, nil
 }
 
 func (r TmuxChildRunner) Wait(ctx context.Context, run ChildRun) (ChildRunResult, error) {
@@ -172,7 +204,14 @@ func (r TmuxChildRunner) Wait(ctx context.Context, run ChildRun) (ChildRunResult
 		return ChildRunResult{}, ctx.Err()
 	default:
 	}
-	return ChildRunResult{ID: run.ID, OutputPath: run.OutputPath, SessionID: run.SessionID, SessionDir: run.SessionDir, DonePath: run.DonePath, StatusPath: run.StatusPath}, nil
+	return ChildRunResult{
+		ID:         run.ID,
+		OutputPath: run.OutputPath,
+		SessionID:  run.SessionID,
+		SessionDir: run.SessionDir,
+		DonePath:   run.DonePath,
+		StatusPath: run.StatusPath,
+	}, nil
 }
 
 func ensureRunFiles(req ChildRunRequest) error {

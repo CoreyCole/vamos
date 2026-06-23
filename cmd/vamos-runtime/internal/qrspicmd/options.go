@@ -17,6 +17,7 @@ type InitOptions struct {
 	NodeID            string
 	ImplementationCwd string
 	ManagerPane       string
+	PiModel           string
 	Force             bool
 }
 
@@ -29,6 +30,7 @@ type RunChildOptions struct {
 	Split        string
 	ManagerRunID string
 	ManagerPane  string
+	PiModel      string
 	Timeout      time.Duration
 }
 
@@ -40,6 +42,7 @@ type StartNextOptions struct {
 	NodeID            string
 	ImplementationCwd string
 	ManagerPane       string
+	PiModel           string
 	LatestResultFile  string
 	LatestResultStdin bool
 	Cwd               string
@@ -256,7 +259,11 @@ const (
 	ActionChildLaunchFailed     = "child_launch_failed"
 )
 
-func ProjectManagerActionCard(action semantic.NextAction, state ManagerState, stateFile string) *ManagerActionCard {
+func ProjectManagerActionCard(
+	action semantic.NextAction,
+	state ManagerState,
+	stateFile string,
+) *ManagerActionCard {
 	stateFile = strings.TrimSpace(stateFile)
 	continueCmd := continueCommand(stateFile)
 	evidence := append([]string{}, action.Evidence...)
@@ -272,27 +279,78 @@ func ProjectManagerActionCard(action semantic.NextAction, state ManagerState, st
 		if summary == "" {
 			summary = "child requested human input"
 		}
-		return &ManagerActionCard{Kind: ActionHumanGate, Severity: severityOrDefault(action.Severity, "info"), Summary: summary, Evidence: evidence, RecommendedAction: "summarize the artifact/question for the human, then steer the same child", SafeCommand: fmt.Sprintf("vamos qrspi steer-child --state-file %s --feedback-file <file>", stateFile), ContinueCommand: continueCmd, RequiresHuman: true}
+		return &ManagerActionCard{
+			Kind:              ActionHumanGate,
+			Severity:          severityOrDefault(action.Severity, "info"),
+			Summary:           summary,
+			Evidence:          evidence,
+			RecommendedAction: "summarize the artifact/question for the human, then steer the same child",
+			SafeCommand: fmt.Sprintf(
+				"vamos qrspi steer-child --state-file %s --feedback-file <file>",
+				stateFile,
+			),
+			ContinueCommand: continueCmd,
+			RequiresHuman:   true,
+		}
 	case semantic.NextActionInvalidRetry, semantic.NextActionInvalidExhausted:
 		if summary == "" {
 			summary = "child result needs deterministic repair"
 		}
-		return &ManagerActionCard{Kind: ActionInvalidChildYAML, Severity: severityOrDefault(action.Severity, "warning"), Summary: summary, Evidence: evidence, RecommendedAction: "reprompt or steer the active child with canonical YAML", SafeCommand: invalidActionSafeCommand(action, state, stateFile), ContinueCommand: continueCmd, RequiresHuman: false}
+		return &ManagerActionCard{
+			Kind:              ActionInvalidChildYAML,
+			Severity:          severityOrDefault(action.Severity, "warning"),
+			Summary:           summary,
+			Evidence:          evidence,
+			RecommendedAction: "reprompt or steer the active child with canonical YAML",
+			SafeCommand:       invalidActionSafeCommand(action, state, stateFile),
+			ContinueCommand:   continueCmd,
+			RequiresHuman:     false,
+		}
 	case semantic.NextActionBlocked:
 		if summary == "" {
 			summary = "child reported blocked"
 		}
-		return &ManagerActionCard{Kind: ActionGraphOutcomeMismatch, Severity: severityOrDefault(action.Severity, "warning"), Summary: summary, Evidence: evidence, RecommendedAction: "inspect the artifact/session, then steer or continue only if deterministic", SafeCommand: continueCmd, ContinueCommand: continueCmd, RequiresHuman: false}
+		return &ManagerActionCard{
+			Kind:              ActionGraphOutcomeMismatch,
+			Severity:          severityOrDefault(action.Severity, "warning"),
+			Summary:           summary,
+			Evidence:          evidence,
+			RecommendedAction: "inspect the artifact/session, then steer or continue only if deterministic",
+			SafeCommand:       continueCmd,
+			ContinueCommand:   continueCmd,
+			RequiresHuman:     false,
+		}
 	case semantic.NextActionError:
 		if summary == "" {
 			summary = "child reported error"
 		}
-		return &ManagerActionCard{Kind: ActionGraphOutcomeMismatch, Severity: severityOrDefault(action.Severity, "error"), Summary: summary, Evidence: evidence, RecommendedAction: "diagnose the child artifact/session before continuing", SafeCommand: continueCmd, ContinueCommand: continueCmd, RequiresHuman: false}
+		return &ManagerActionCard{
+			Kind:              ActionGraphOutcomeMismatch,
+			Severity:          severityOrDefault(action.Severity, "error"),
+			Summary:           summary,
+			Evidence:          evidence,
+			RecommendedAction: "diagnose the child artifact/session before continuing",
+			SafeCommand:       continueCmd,
+			ContinueCommand:   continueCmd,
+			RequiresHuman:     false,
+		}
 	case semantic.NextActionManualRecovery:
 		if summary == "" {
 			summary = "manual recovery needed"
 		}
-		return &ManagerActionCard{Kind: ActionManualChildSteer, Severity: severityOrDefault(action.Severity, "info"), Summary: summary, Evidence: evidence, RecommendedAction: "recover latest relevant child session", SafeCommand: fmt.Sprintf("vamos qrspi recover-manual --state-file %s --mode latest-session", stateFile), ContinueCommand: continueCmd, RequiresHuman: false}
+		return &ManagerActionCard{
+			Kind:              ActionManualChildSteer,
+			Severity:          severityOrDefault(action.Severity, "info"),
+			Summary:           summary,
+			Evidence:          evidence,
+			RecommendedAction: "recover latest relevant child session",
+			SafeCommand: fmt.Sprintf(
+				"vamos qrspi recover-manual --state-file %s --mode latest-session",
+				stateFile,
+			),
+			ContinueCommand: continueCmd,
+			RequiresHuman:   false,
+		}
 	default:
 		return nil
 	}
@@ -305,7 +363,11 @@ func severityOrDefault(severity, fallback string) string {
 	return fallback
 }
 
-func invalidActionSafeCommand(action semantic.NextAction, state ManagerState, stateFile string) string {
+func invalidActionSafeCommand(
+	action semantic.NextAction,
+	state ManagerState,
+	stateFile string,
+) string {
 	stage := strings.TrimSpace(string(action.CurrentNodeID))
 	if stage == "" && state.ActiveChild != nil {
 		stage = state.ActiveChild.Stage
@@ -317,7 +379,13 @@ func invalidActionSafeCommand(action semantic.NextAction, state ManagerState, st
 	if state.ActiveChild != nil {
 		attempt = state.ActiveChild.ValidationRetryCount + 1
 	}
-	return fmt.Sprintf("vamos qrspi reprompt-child --state-file %s --plan-dir %s --stage %s --attempt %d", stateFile, state.CanonicalPlanDir, stage, attempt)
+	return fmt.Sprintf(
+		"vamos qrspi reprompt-child --state-file %s --plan-dir %s --stage %s --attempt %d",
+		stateFile,
+		state.CanonicalPlanDir,
+		stage,
+		attempt,
+	)
 }
 
 type RepairStateOptions struct {
@@ -440,6 +508,7 @@ type ContinueOptions struct {
 	Stage     string
 	Cwd       string
 	Split     string
+	PiModel   string
 	Timeout   time.Duration
 	Output    string
 	Usage     ManagerUsageInput
@@ -493,7 +562,12 @@ type deps struct {
 type StateStore interface {
 	Load(path string) (ManagerState, error)
 	Save(path string, state ManagerState) error
-	AcquireLock(ctx context.Context, key LockKey, owner string, ttl time.Duration) (Lock, error)
+	AcquireLock(
+		ctx context.Context,
+		key LockKey,
+		owner string,
+		ttl time.Duration,
+	) (Lock, error)
 }
 
 // ChildRunner starts visible child QRSPI sessions and observes their done marker/session refs.
