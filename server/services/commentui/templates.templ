@@ -211,9 +211,10 @@ templ CommentableMarkdown(args CommentableMarkdownArgs) {
 }
 
 templ CommentableSelectionHTML(args CommentableMarkdownArgs) {
+	{{ selection := SelectionOnlySignalArgs(args) }}
 	<div class="relative flex-1 h-full min-h-full" data-signals="{}">
-		<div class="relative flex-1 h-full min-h-full min-w-0" data-commentui-container="true" data-on:keydown__window={ selectionKeydownExpr(args.SelectionSignals) } data-on:mouseup__debounce.500ms.leading={ selectionMouseupExpr(args.SelectionSignals) }>
-			<div class="h-full min-h-full w-full">
+		<div class="relative flex-1 h-full min-h-full min-w-0" data-commentui-container="true" data-on:keydown__window={ selectionKeydownExpr(selection) } data-on:mouseup__debounce.500ms.leading={ selectionMouseupExpr(selection) }>
+			<div class="flex flex-1 h-full min-h-full w-full">
 				@templ.Raw(args.HTML)
 			</div>
 			@CommentTarget(CommentTargetView{
@@ -225,11 +226,11 @@ templ CommentableSelectionHTML(args CommentableMarkdownArgs) {
 				UserEmail:    args.UserEmail,
 				Threads:      DocumentComments(args.Comments),
 				Routes:       args.Routes,
-				HiddenFields: MergeHidden(args.HiddenFields, map[string]string{"section_hint": "document", "heading_hint": ""}),
+				HiddenFields: MergeHidden(selection.HiddenFields, map[string]string{"section_hint": "document", "heading_hint": ""}),
 				Chrome:       CommentTargetChromePatchOnly,
-				SelectionSignalPrefix: args.SelectionSignals.Prefix,
+				SelectionSignalPrefix: selection.Prefix,
 			})
-			@SelectedTextTrigger(args.SelectionSignals)
+			@SelectedTextTrigger(selection)
 		</div>
 	</div>
 }

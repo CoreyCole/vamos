@@ -156,7 +156,7 @@ func TestCommentableSelectionHTMLRendersSelectionOnlyChrome(t *testing.T) {
 		t.Fatalf("Render() error = %v", err)
 	}
 	html := buf.String()
-	for _, want := range []string{`data-commentui-container="true"`, `data-on:mouseup__debounce.500ms.leading=`, `id="` + TargetID(SafeCommentTargetSlug("thoughts", "source.go"), "document") + `"`, `data-comment-target="true"`, `commentui-anchor relative`, `commentui-selection-trigger`, `data-style=`, `comment_selection.top`, `comment_selection.left`, `id="comment_selection-inline-comment-trigger"`, `data-section-id="document"`, `/show`} {
+	for _, want := range []string{`data-commentui-container="true"`, `data-on:mouseup__debounce.500ms.leading=`, `id="` + TargetID(SafeCommentTargetSlug("thoughts", "source.go"), "document") + `"`, `data-comment-target="true"`, `commentui-anchor relative`, `commentui-selection-trigger`, `data-style=`, `comment_selection.top`, `comment_selection.left`, `name="comment_target_chrome" value="patch-only"`, `name="comment_selection_prefix" value="comment_selection"`, `id="comment_selection-inline-comment-trigger"`, `data-section-id="document"`, `/show`} {
 		if !strings.Contains(html, want) {
 			t.Fatalf("selection-only render missing %q in %s", want, html)
 		}

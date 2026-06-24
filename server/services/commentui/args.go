@@ -224,6 +224,20 @@ func SelectionTriggerClass() string {
 	return "commentui-selection-trigger"
 }
 
+func SelectionOnlySignalArgs(args CommentableMarkdownArgs) SelectionSignalArgs {
+	selection := args.SelectionSignals
+	hidden := MergeHidden(args.HiddenFields, selection.HiddenFields)
+	if hidden == nil {
+		hidden = map[string]string{}
+	}
+	hidden["comment_target_chrome"] = string(CommentTargetChromePatchOnly)
+	if selection.Prefix != "" {
+		hidden["comment_selection_prefix"] = selection.Prefix
+	}
+	selection.HiddenFields = hidden
+	return selection
+}
+
 func SelectionStyleExpr(prefix string) string {
 	if prefix == "" {
 		return ""

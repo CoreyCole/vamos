@@ -418,14 +418,15 @@ func CommentableSelectionHTML(args CommentableMarkdownArgs) templ.Component {
 			templ_7745c5c3_Var9 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
+		selection := SelectionOnlySignalArgs(args)
 		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 20, "<div class=\"relative flex-1 h-full min-h-full\" data-signals=\"{}\"><div class=\"relative flex-1 h-full min-h-full min-w-0\" data-commentui-container=\"true\" data-on:keydown__window=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var10 string
-		templ_7745c5c3_Var10, templ_7745c5c3_Err = templ.JoinStringErrs(selectionKeydownExpr(args.SelectionSignals))
+		templ_7745c5c3_Var10, templ_7745c5c3_Err = templ.JoinStringErrs(selectionKeydownExpr(selection))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/commentui/templates.templ`, Line: 215, Col: 158}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/commentui/templates.templ`, Line: 216, Col: 146}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var10))
 		if templ_7745c5c3_Err != nil {
@@ -436,15 +437,15 @@ func CommentableSelectionHTML(args CommentableMarkdownArgs) templ.Component {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var11 string
-		templ_7745c5c3_Var11, templ_7745c5c3_Err = templ.JoinStringErrs(selectionMouseupExpr(args.SelectionSignals))
+		templ_7745c5c3_Var11, templ_7745c5c3_Err = templ.JoinStringErrs(selectionMouseupExpr(selection))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/commentui/templates.templ`, Line: 215, Col: 246}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/commentui/templates.templ`, Line: 216, Col: 222}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var11))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 22, "\"><div class=\"h-full min-h-full w-full\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 22, "\"><div class=\"flex flex-1 h-full min-h-full w-full\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -465,14 +466,14 @@ func CommentableSelectionHTML(args CommentableMarkdownArgs) templ.Component {
 			UserEmail:             args.UserEmail,
 			Threads:               DocumentComments(args.Comments),
 			Routes:                args.Routes,
-			HiddenFields:          MergeHidden(args.HiddenFields, map[string]string{"section_hint": "document", "heading_hint": ""}),
+			HiddenFields:          MergeHidden(selection.HiddenFields, map[string]string{"section_hint": "document", "heading_hint": ""}),
 			Chrome:                CommentTargetChromePatchOnly,
-			SelectionSignalPrefix: args.SelectionSignals.Prefix,
+			SelectionSignalPrefix: selection.Prefix,
 		}).Render(ctx, templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = SelectedTextTrigger(args.SelectionSignals).Render(ctx, templ_7745c5c3_Buffer)
+		templ_7745c5c3_Err = SelectedTextTrigger(selection).Render(ctx, templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -518,7 +519,7 @@ func CommentTarget(args CommentTargetView) templ.Component {
 			var templ_7745c5c3_Var14 string
 			templ_7745c5c3_Var14, templ_7745c5c3_Err = templ.JoinStringErrs(args.ID)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/commentui/templates.templ`, Line: 239, Col: 19}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/commentui/templates.templ`, Line: 240, Col: 19}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var14))
 			if templ_7745c5c3_Err != nil {
@@ -544,7 +545,7 @@ func CommentTarget(args CommentTargetView) templ.Component {
 			var templ_7745c5c3_Var16 string
 			templ_7745c5c3_Var16, templ_7745c5c3_Err = templ.JoinStringErrs(SelectionStyleExpr(args.SelectionSignalPrefix))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/commentui/templates.templ`, Line: 239, Col: 184}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/commentui/templates.templ`, Line: 240, Col: 184}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var16))
 			if templ_7745c5c3_Err != nil {
@@ -562,7 +563,7 @@ func CommentTarget(args CommentTargetView) templ.Component {
 			var templ_7745c5c3_Var17 string
 			templ_7745c5c3_Var17, templ_7745c5c3_Err = templ.JoinStringErrs(args.ID)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/commentui/templates.templ`, Line: 241, Col: 19}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/commentui/templates.templ`, Line: 242, Col: 19}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var17))
 			if templ_7745c5c3_Err != nil {
@@ -625,7 +626,7 @@ func CommentTargetWithForm(args CommentTargetView, view CommentFormView) templ.C
 			var templ_7745c5c3_Var20 string
 			templ_7745c5c3_Var20, templ_7745c5c3_Err = templ.JoinStringErrs(args.ID)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/commentui/templates.templ`, Line: 252, Col: 19}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/commentui/templates.templ`, Line: 253, Col: 19}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var20))
 			if templ_7745c5c3_Err != nil {
@@ -651,7 +652,7 @@ func CommentTargetWithForm(args CommentTargetView, view CommentFormView) templ.C
 			var templ_7745c5c3_Var22 string
 			templ_7745c5c3_Var22, templ_7745c5c3_Err = templ.JoinStringErrs(SelectionStyleExpr(args.SelectionSignalPrefix))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/commentui/templates.templ`, Line: 252, Col: 208}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/commentui/templates.templ`, Line: 253, Col: 208}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var22))
 			if templ_7745c5c3_Err != nil {
@@ -664,7 +665,7 @@ func CommentTargetWithForm(args CommentTargetView, view CommentFormView) templ.C
 			var templ_7745c5c3_Var23 string
 			templ_7745c5c3_Var23, templ_7745c5c3_Err = templ.JoinStringErrs(clickOutsideCancelExpr(args))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/commentui/templates.templ`, Line: 252, Col: 290}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/commentui/templates.templ`, Line: 253, Col: 290}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var23))
 			if templ_7745c5c3_Err != nil {
@@ -725,7 +726,7 @@ func CommentTargetWithForm(args CommentTargetView, view CommentFormView) templ.C
 			var templ_7745c5c3_Var27 string
 			templ_7745c5c3_Var27, templ_7745c5c3_Err = templ.JoinStringErrs(args.ID)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/commentui/templates.templ`, Line: 263, Col: 19}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/commentui/templates.templ`, Line: 264, Col: 19}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var27))
 			if templ_7745c5c3_Err != nil {
@@ -751,7 +752,7 @@ func CommentTargetWithForm(args CommentTargetView, view CommentFormView) templ.C
 			var templ_7745c5c3_Var29 string
 			templ_7745c5c3_Var29, templ_7745c5c3_Err = templ.JoinStringErrs(clickOutsideCancelExpr(args))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/commentui/templates.templ`, Line: 263, Col: 200}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/commentui/templates.templ`, Line: 264, Col: 200}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var29))
 			if templ_7745c5c3_Err != nil {
@@ -845,7 +846,7 @@ func CommentsSidebar(view CommentSidebarView) templ.Component {
 		var templ_7745c5c3_Var34 string
 		templ_7745c5c3_Var34, templ_7745c5c3_Err = templ.JoinStringErrs(view.ID)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/commentui/templates.templ`, Line: 279, Col: 14}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/commentui/templates.templ`, Line: 280, Col: 14}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var34))
 		if templ_7745c5c3_Err != nil {
@@ -871,7 +872,7 @@ func CommentsSidebar(view CommentSidebarView) templ.Component {
 		var templ_7745c5c3_Var36 string
 		templ_7745c5c3_Var36, templ_7745c5c3_Err = templ.JoinStringErrs("{'w-80': $" + view.SignalName + ", 'w-10': !$" + view.SignalName + "}")
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/commentui/templates.templ`, Line: 281, Col: 86}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/commentui/templates.templ`, Line: 282, Col: 86}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var36))
 		if templ_7745c5c3_Err != nil {
@@ -884,7 +885,7 @@ func CommentsSidebar(view CommentSidebarView) templ.Component {
 		var templ_7745c5c3_Var37 string
 		templ_7745c5c3_Var37, templ_7745c5c3_Err = templ.JoinStringErrs(view.ID + "-minimized")
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/commentui/templates.templ`, Line: 284, Col: 34}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/commentui/templates.templ`, Line: 285, Col: 34}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var37))
 		if templ_7745c5c3_Err != nil {
@@ -897,7 +898,7 @@ func CommentsSidebar(view CommentSidebarView) templ.Component {
 		var templ_7745c5c3_Var38 string
 		templ_7745c5c3_Var38, templ_7745c5c3_Err = templ.JoinStringErrs("!$" + view.SignalName)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/commentui/templates.templ`, Line: 284, Col: 71}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/commentui/templates.templ`, Line: 285, Col: 71}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var38))
 		if templ_7745c5c3_Err != nil {
@@ -918,7 +919,7 @@ func CommentsSidebar(view CommentSidebarView) templ.Component {
 		var templ_7745c5c3_Var39 string
 		templ_7745c5c3_Var39, templ_7745c5c3_Err = templ.JoinStringErrs(view.ID + "-expanded")
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/commentui/templates.templ`, Line: 287, Col: 33}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/commentui/templates.templ`, Line: 288, Col: 33}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var39))
 		if templ_7745c5c3_Err != nil {
@@ -931,7 +932,7 @@ func CommentsSidebar(view CommentSidebarView) templ.Component {
 		var templ_7745c5c3_Var40 string
 		templ_7745c5c3_Var40, templ_7745c5c3_Err = templ.JoinStringErrs("$" + view.SignalName)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/commentui/templates.templ`, Line: 287, Col: 69}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/commentui/templates.templ`, Line: 288, Col: 69}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var40))
 		if templ_7745c5c3_Err != nil {
@@ -981,7 +982,7 @@ func MinimizedCommentRail(view CommentSidebarView) templ.Component {
 		var templ_7745c5c3_Var42 string
 		templ_7745c5c3_Var42, templ_7745c5c3_Err = templ.JoinStringErrs("$" + view.SignalName + " = true")
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/commentui/templates.templ`, Line: 297, Col: 51}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/commentui/templates.templ`, Line: 298, Col: 51}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var42))
 		if templ_7745c5c3_Err != nil {
@@ -994,7 +995,7 @@ func MinimizedCommentRail(view CommentSidebarView) templ.Component {
 		var templ_7745c5c3_Var43 string
 		templ_7745c5c3_Var43, templ_7745c5c3_Err = templ.JoinStringErrs("$" + view.SignalName + " ? 'true' : 'false'")
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/commentui/templates.templ`, Line: 298, Col: 73}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/commentui/templates.templ`, Line: 299, Col: 73}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var43))
 		if templ_7745c5c3_Err != nil {
@@ -1007,7 +1008,7 @@ func MinimizedCommentRail(view CommentSidebarView) templ.Component {
 		var templ_7745c5c3_Var44 string
 		templ_7745c5c3_Var44, templ_7745c5c3_Err = templ.JoinStringErrs(view.ID + "-expanded")
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/commentui/templates.templ`, Line: 299, Col: 39}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/commentui/templates.templ`, Line: 300, Col: 39}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var44))
 		if templ_7745c5c3_Err != nil {
@@ -1064,7 +1065,7 @@ func ExpandedCommentSidebar(view CommentSidebarView) templ.Component {
 		var templ_7745c5c3_Var46 string
 		templ_7745c5c3_Var46, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("%d total", totalThreadCount(view.Threads)))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/commentui/templates.templ`, Line: 317, Col: 106}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/commentui/templates.templ`, Line: 318, Col: 106}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var46))
 		if templ_7745c5c3_Err != nil {
@@ -1077,7 +1078,7 @@ func ExpandedCommentSidebar(view CommentSidebarView) templ.Component {
 		var templ_7745c5c3_Var47 string
 		templ_7745c5c3_Var47, templ_7745c5c3_Err = templ.JoinStringErrs("$" + view.SignalName + " = false")
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/commentui/templates.templ`, Line: 319, Col: 201}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/commentui/templates.templ`, Line: 320, Col: 201}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var47))
 		if templ_7745c5c3_Err != nil {
@@ -1090,7 +1091,7 @@ func ExpandedCommentSidebar(view CommentSidebarView) templ.Component {
 		var templ_7745c5c3_Var48 string
 		templ_7745c5c3_Var48, templ_7745c5c3_Err = templ.JoinStringErrs("$" + view.SignalName + " ? 'true' : 'false'")
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/commentui/templates.templ`, Line: 319, Col: 275}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/commentui/templates.templ`, Line: 320, Col: 275}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var48))
 		if templ_7745c5c3_Err != nil {
@@ -1103,7 +1104,7 @@ func ExpandedCommentSidebar(view CommentSidebarView) templ.Component {
 		var templ_7745c5c3_Var49 string
 		templ_7745c5c3_Var49, templ_7745c5c3_Err = templ.JoinStringErrs(view.ID + "-expanded")
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/commentui/templates.templ`, Line: 319, Col: 315}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/commentui/templates.templ`, Line: 320, Col: 315}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var49))
 		if templ_7745c5c3_Err != nil {
@@ -1176,7 +1177,7 @@ func StackedCommentAvatars(view CommentAuthorsView, avatarClass string) templ.Co
 			var templ_7745c5c3_Var53 string
 			templ_7745c5c3_Var53, templ_7745c5c3_Err = templ.JoinStringErrs(author)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/commentui/templates.templ`, Line: 331, Col: 174}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/commentui/templates.templ`, Line: 332, Col: 174}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var53))
 			if templ_7745c5c3_Err != nil {
@@ -1189,7 +1190,7 @@ func StackedCommentAvatars(view CommentAuthorsView, avatarClass string) templ.Co
 			var templ_7745c5c3_Var54 string
 			templ_7745c5c3_Var54, templ_7745c5c3_Err = templ.JoinStringErrs(commentInitial(author))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/commentui/templates.templ`, Line: 331, Col: 201}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/commentui/templates.templ`, Line: 332, Col: 201}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var54))
 			if templ_7745c5c3_Err != nil {
@@ -1226,7 +1227,7 @@ func StackedCommentAvatars(view CommentAuthorsView, avatarClass string) templ.Co
 			var templ_7745c5c3_Var57 string
 			templ_7745c5c3_Var57, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("%d", view.RemainingCount))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/commentui/templates.templ`, Line: 334, Col: 205}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/commentui/templates.templ`, Line: 335, Col: 205}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var57))
 			if templ_7745c5c3_Err != nil {
@@ -1274,7 +1275,7 @@ func CompactCommentMarker(args CommentTargetView) templ.Component {
 		var templ_7745c5c3_Var59 string
 		templ_7745c5c3_Var59, templ_7745c5c3_Err = templ.JoinStringErrs("comment-toggle-" + args.SignalKey)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/commentui/templates.templ`, Line: 342, Col: 41}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/commentui/templates.templ`, Line: 343, Col: 41}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var59))
 		if templ_7745c5c3_Err != nil {
@@ -1287,7 +1288,7 @@ func CompactCommentMarker(args CommentTargetView) templ.Component {
 		var templ_7745c5c3_Var60 string
 		templ_7745c5c3_Var60, templ_7745c5c3_Err = templ.JoinStringErrs("$comment_" + args.SignalKey + "_expanded = !$comment_" + args.SignalKey + "_expanded; if ($comment_" + args.SignalKey + "_expanded) { $comment_zindex_counter = ($comment_zindex_counter || 0) + 1; $comment_" + args.SignalKey + "_zindex = $comment_zindex_counter }")
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/commentui/templates.templ`, Line: 345, Col: 282}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/commentui/templates.templ`, Line: 346, Col: 282}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var60))
 		if templ_7745c5c3_Err != nil {
@@ -1300,7 +1301,7 @@ func CompactCommentMarker(args CommentTargetView) templ.Component {
 		var templ_7745c5c3_Var61 string
 		templ_7745c5c3_Var61, templ_7745c5c3_Err = templ.JoinStringErrs("$comment_" + args.SignalKey + "_expanded ? 'true' : 'false'")
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/commentui/templates.templ`, Line: 346, Col: 89}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/commentui/templates.templ`, Line: 347, Col: 89}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var61))
 		if templ_7745c5c3_Err != nil {
@@ -1313,7 +1314,7 @@ func CompactCommentMarker(args CommentTargetView) templ.Component {
 		var templ_7745c5c3_Var62 string
 		templ_7745c5c3_Var62, templ_7745c5c3_Err = templ.JoinStringErrs("comment-expanded-" + args.SignalKey)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/commentui/templates.templ`, Line: 347, Col: 54}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/commentui/templates.templ`, Line: 348, Col: 54}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var62))
 		if templ_7745c5c3_Err != nil {
@@ -1326,7 +1327,7 @@ func CompactCommentMarker(args CommentTargetView) templ.Component {
 		var templ_7745c5c3_Var63 string
 		templ_7745c5c3_Var63, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("%d comments", authors.TotalCount))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/commentui/templates.templ`, Line: 348, Col: 61}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/commentui/templates.templ`, Line: 349, Col: 61}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var63))
 		if templ_7745c5c3_Err != nil {
@@ -1347,7 +1348,7 @@ func CompactCommentMarker(args CommentTargetView) templ.Component {
 		var templ_7745c5c3_Var64 string
 		templ_7745c5c3_Var64, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("%d", authors.TotalCount))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/commentui/templates.templ`, Line: 351, Col: 73}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/commentui/templates.templ`, Line: 352, Col: 73}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var64))
 		if templ_7745c5c3_Err != nil {
@@ -1442,7 +1443,7 @@ func SidebarResolvedThreadChip(thread CommentThreadView, target CommentTargetVie
 		var templ_7745c5c3_Var67 string
 		templ_7745c5c3_Var67, templ_7745c5c3_Err = templ.JoinStringErrs(commentActorName(thread.AuthorEmail))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/commentui/templates.templ`, Line: 374, Col: 78}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/commentui/templates.templ`, Line: 375, Col: 78}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var67))
 		if templ_7745c5c3_Err != nil {
@@ -1484,7 +1485,7 @@ func SectionMenu(args CommentTargetView) templ.Component {
 		var templ_7745c5c3_Var69 string
 		templ_7745c5c3_Var69, templ_7745c5c3_Err = templ.JoinStringErrs("@post('" + args.Routes.Show + "', {contentType: 'form'})")
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/commentui/templates.templ`, Line: 385, Col: 84}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/commentui/templates.templ`, Line: 386, Col: 84}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var69))
 		if templ_7745c5c3_Err != nil {
@@ -1554,7 +1555,7 @@ func CommentToggle(args CommentTargetView) templ.Component {
 			var templ_7745c5c3_Var73 string
 			templ_7745c5c3_Var73, templ_7745c5c3_Err = templ.JoinStringErrs("{'z-index': $comment_" + args.SignalKey + "_expanded ? $comment_" + args.SignalKey + "_zindex : 0}")
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/commentui/templates.templ`, Line: 397, Col: 165}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/commentui/templates.templ`, Line: 398, Col: 165}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var73))
 			if templ_7745c5c3_Err != nil {
@@ -1567,7 +1568,7 @@ func CommentToggle(args CommentTargetView) templ.Component {
 			var templ_7745c5c3_Var74 string
 			templ_7745c5c3_Var74, templ_7745c5c3_Err = templ.JoinStringErrs(clickOutsideCollapseExpr(args))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/commentui/templates.templ`, Line: 397, Col: 222}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/commentui/templates.templ`, Line: 398, Col: 222}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var74))
 			if templ_7745c5c3_Err != nil {
@@ -1589,7 +1590,7 @@ func CommentToggle(args CommentTargetView) templ.Component {
 				var templ_7745c5c3_Var75 string
 				templ_7745c5c3_Var75, templ_7745c5c3_Err = templ.JoinStringErrs("@post('" + args.Routes.Expand + "', {contentType: 'form'})")
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/commentui/templates.templ`, Line: 400, Col: 117}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/commentui/templates.templ`, Line: 401, Col: 117}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var75))
 				if templ_7745c5c3_Err != nil {
@@ -1610,7 +1611,7 @@ func CommentToggle(args CommentTargetView) templ.Component {
 				var templ_7745c5c3_Var76 string
 				templ_7745c5c3_Var76, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("%d", count))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/commentui/templates.templ`, Line: 402, Col: 152}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/commentui/templates.templ`, Line: 403, Col: 152}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var76))
 				if templ_7745c5c3_Err != nil {
@@ -1633,7 +1634,7 @@ func CommentToggle(args CommentTargetView) templ.Component {
 			var templ_7745c5c3_Var78 string
 			templ_7745c5c3_Var78, templ_7745c5c3_Err = templ.JoinStringErrs("comment-expanded-" + args.SignalKey)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/commentui/templates.templ`, Line: 405, Col: 49}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/commentui/templates.templ`, Line: 406, Col: 49}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var78))
 			if templ_7745c5c3_Err != nil {
@@ -1659,7 +1660,7 @@ func CommentToggle(args CommentTargetView) templ.Component {
 			var templ_7745c5c3_Var80 string
 			templ_7745c5c3_Var80, templ_7745c5c3_Err = templ.JoinStringErrs("$comment_" + args.SignalKey + "_expanded")
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/commentui/templates.templ`, Line: 405, Col: 188}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/commentui/templates.templ`, Line: 406, Col: 188}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var80))
 			if templ_7745c5c3_Err != nil {
@@ -1710,7 +1711,7 @@ func CommentToggle(args CommentTargetView) templ.Component {
 				var templ_7745c5c3_Var83 string
 				templ_7745c5c3_Var83, templ_7745c5c3_Err = templ.JoinStringErrs("@post('" + args.Routes.Expand + "', {contentType: 'form'})")
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/commentui/templates.templ`, Line: 414, Col: 107}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/commentui/templates.templ`, Line: 415, Col: 107}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var83))
 				if templ_7745c5c3_Err != nil {
@@ -1731,7 +1732,7 @@ func CommentToggle(args CommentTargetView) templ.Component {
 				var templ_7745c5c3_Var84 string
 				templ_7745c5c3_Var84, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("Open %d comments in context pane", count))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/commentui/templates.templ`, Line: 416, Col: 248}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/commentui/templates.templ`, Line: 417, Col: 248}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var84))
 				if templ_7745c5c3_Err != nil {
@@ -1752,7 +1753,7 @@ func CommentToggle(args CommentTargetView) templ.Component {
 				var templ_7745c5c3_Var85 string
 				templ_7745c5c3_Var85, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("%d", count))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/commentui/templates.templ`, Line: 418, Col: 64}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/commentui/templates.templ`, Line: 419, Col: 64}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var85))
 				if templ_7745c5c3_Err != nil {
@@ -1890,7 +1891,7 @@ func CommentForm(view CommentFormView) templ.Component {
 		var templ_7745c5c3_Var92 string
 		templ_7745c5c3_Var92, templ_7745c5c3_Err = templ.JoinStringErrs(view.ID + "-container")
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/commentui/templates.templ`, Line: 442, Col: 33}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/commentui/templates.templ`, Line: 443, Col: 33}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var92))
 		if templ_7745c5c3_Err != nil {
@@ -1923,7 +1924,7 @@ func CommentForm(view CommentFormView) templ.Component {
 			var templ_7745c5c3_Var94 string
 			templ_7745c5c3_Var94, templ_7745c5c3_Err = templ.JoinStringErrs(view.SelectedText)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/commentui/templates.templ`, Line: 445, Col: 70}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/commentui/templates.templ`, Line: 446, Col: 70}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var94))
 			if templ_7745c5c3_Err != nil {
@@ -1941,7 +1942,7 @@ func CommentForm(view CommentFormView) templ.Component {
 				var templ_7745c5c3_Var95 string
 				templ_7745c5c3_Var95, templ_7745c5c3_Err = templ.JoinStringErrs(view.Error)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/commentui/templates.templ`, Line: 447, Col: 90}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/commentui/templates.templ`, Line: 448, Col: 90}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var95))
 				if templ_7745c5c3_Err != nil {
@@ -1964,7 +1965,7 @@ func CommentForm(view CommentFormView) templ.Component {
 				var templ_7745c5c3_Var96 string
 				templ_7745c5c3_Var96, templ_7745c5c3_Err = templ.JoinStringErrs(view.SelectedText)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/commentui/templates.templ`, Line: 450, Col: 189}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/commentui/templates.templ`, Line: 451, Col: 189}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var96))
 				if templ_7745c5c3_Err != nil {
@@ -1990,7 +1991,7 @@ func CommentForm(view CommentFormView) templ.Component {
 			var templ_7745c5c3_Var97 string
 			templ_7745c5c3_Var97, templ_7745c5c3_Err = templ.JoinStringErrs("@post('" + view.Target.Routes.Cancel + "', {contentType: 'form'})")
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/commentui/templates.templ`, Line: 454, Col: 185}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/commentui/templates.templ`, Line: 455, Col: 185}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var97))
 			if templ_7745c5c3_Err != nil {
@@ -2042,7 +2043,7 @@ func CommentsContextPanel(args CommentsPanelArgs) templ.Component {
 		var templ_7745c5c3_Var99 string
 		templ_7745c5c3_Var99, templ_7745c5c3_Err = templ.JoinStringErrs(CommentsContextPanelID)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/commentui/templates.templ`, Line: 462, Col: 35}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/commentui/templates.templ`, Line: 463, Col: 35}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var99))
 		if templ_7745c5c3_Err != nil {
@@ -2060,7 +2061,7 @@ func CommentsContextPanel(args CommentsPanelArgs) templ.Component {
 			var templ_7745c5c3_Var100 string
 			templ_7745c5c3_Var100, templ_7745c5c3_Err = templ.JoinStringErrs(args.ActiveSectionLabel)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/commentui/templates.templ`, Line: 466, Col: 73}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/commentui/templates.templ`, Line: 467, Col: 73}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var100))
 			if templ_7745c5c3_Err != nil {
@@ -2078,7 +2079,7 @@ func CommentsContextPanel(args CommentsPanelArgs) templ.Component {
 			var templ_7745c5c3_Var101 string
 			templ_7745c5c3_Var101, templ_7745c5c3_Err = templ.JoinStringErrs(args.DocPath)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/commentui/templates.templ`, Line: 468, Col: 68}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/commentui/templates.templ`, Line: 469, Col: 68}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var101))
 			if templ_7745c5c3_Err != nil {
@@ -2096,7 +2097,7 @@ func CommentsContextPanel(args CommentsPanelArgs) templ.Component {
 		var templ_7745c5c3_Var102 string
 		templ_7745c5c3_Var102, templ_7745c5c3_Err = templ.JoinStringErrs(CommentsContextThreadListID)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/commentui/templates.templ`, Line: 471, Col: 39}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/commentui/templates.templ`, Line: 472, Col: 39}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var102))
 		if templ_7745c5c3_Err != nil {
@@ -2161,7 +2162,7 @@ func MobileSectionCommentTarget() templ.Component {
 		var templ_7745c5c3_Var104 string
 		templ_7745c5c3_Var104, templ_7745c5c3_Err = templ.JoinStringErrs(MobileSectionCommentContentID)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/commentui/templates.templ`, Line: 487, Col: 40}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/commentui/templates.templ`, Line: 488, Col: 40}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var104))
 		if templ_7745c5c3_Err != nil {
@@ -2208,7 +2209,7 @@ func CommentThreadCard(view CommentThreadView, target CommentTargetView, opts Co
 			var templ_7745c5c3_Var106 string
 			templ_7745c5c3_Var106, templ_7745c5c3_Err = templ.JoinStringErrs(CommentSectionLabel(view))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/commentui/templates.templ`, Line: 497, Col: 125}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/commentui/templates.templ`, Line: 498, Col: 125}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var106))
 			if templ_7745c5c3_Err != nil {
@@ -2259,7 +2260,7 @@ func CommentCard(view CommentThreadView, target CommentTargetView) templ.Compone
 		var templ_7745c5c3_Var108 string
 		templ_7745c5c3_Var108, templ_7745c5c3_Err = templ.JoinStringErrs("comment-thread-" + view.ID)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/commentui/templates.templ`, Line: 504, Col: 42}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/commentui/templates.templ`, Line: 505, Col: 42}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var108))
 		if templ_7745c5c3_Err != nil {
@@ -2272,7 +2273,7 @@ func CommentCard(view CommentThreadView, target CommentTargetView) templ.Compone
 		var templ_7745c5c3_Var109 string
 		templ_7745c5c3_Var109, templ_7745c5c3_Err = templ.JoinStringErrs(view.AuthorEmail)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/commentui/templates.templ`, Line: 507, Col: 61}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/commentui/templates.templ`, Line: 508, Col: 61}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var109))
 		if templ_7745c5c3_Err != nil {
@@ -2290,7 +2291,7 @@ func CommentCard(view CommentThreadView, target CommentTargetView) templ.Compone
 			var templ_7745c5c3_Var110 string
 			templ_7745c5c3_Var110, templ_7745c5c3_Err = templ.JoinStringErrs(view.ActorLabel)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/commentui/templates.templ`, Line: 509, Col: 55}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/commentui/templates.templ`, Line: 510, Col: 55}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var110))
 			if templ_7745c5c3_Err != nil {
@@ -2303,7 +2304,7 @@ func CommentCard(view CommentThreadView, target CommentTargetView) templ.Compone
 			var templ_7745c5c3_Var111 string
 			templ_7745c5c3_Var111, templ_7745c5c3_Err = templ.JoinStringErrs(formatCommentDate(view.CreatedAt))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/commentui/templates.templ`, Line: 509, Col: 96}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/commentui/templates.templ`, Line: 510, Col: 96}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var111))
 			if templ_7745c5c3_Err != nil {
@@ -2321,7 +2322,7 @@ func CommentCard(view CommentThreadView, target CommentTargetView) templ.Compone
 			var templ_7745c5c3_Var112 string
 			templ_7745c5c3_Var112, templ_7745c5c3_Err = templ.JoinStringErrs(formatCommentDate(view.CreatedAt))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/commentui/templates.templ`, Line: 511, Col: 73}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/commentui/templates.templ`, Line: 512, Col: 73}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var112))
 			if templ_7745c5c3_Err != nil {
@@ -2344,7 +2345,7 @@ func CommentCard(view CommentThreadView, target CommentTargetView) templ.Compone
 			var templ_7745c5c3_Var113 string
 			templ_7745c5c3_Var113, templ_7745c5c3_Err = templ.JoinStringErrs("@post('" + target.Routes.SelectComment + "', {contentType: 'form'})")
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/commentui/templates.templ`, Line: 516, Col: 97}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/commentui/templates.templ`, Line: 517, Col: 97}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var113))
 			if templ_7745c5c3_Err != nil {
@@ -2365,7 +2366,7 @@ func CommentCard(view CommentThreadView, target CommentTargetView) templ.Compone
 			var templ_7745c5c3_Var114 string
 			templ_7745c5c3_Var114, templ_7745c5c3_Err = templ.JoinStringErrs(view.ID)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/commentui/templates.templ`, Line: 518, Col: 60}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/commentui/templates.templ`, Line: 519, Col: 60}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var114))
 			if templ_7745c5c3_Err != nil {
@@ -2399,7 +2400,7 @@ func CommentCard(view CommentThreadView, target CommentTargetView) templ.Compone
 			var templ_7745c5c3_Var115 string
 			templ_7745c5c3_Var115, templ_7745c5c3_Err = templ.JoinStringErrs(view.SelectedText)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/commentui/templates.templ`, Line: 532, Col: 166}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/commentui/templates.templ`, Line: 533, Col: 166}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var115))
 			if templ_7745c5c3_Err != nil {
@@ -2417,7 +2418,7 @@ func CommentCard(view CommentThreadView, target CommentTargetView) templ.Compone
 		var templ_7745c5c3_Var116 string
 		templ_7745c5c3_Var116, templ_7745c5c3_Err = templ.JoinStringErrs(view.Body)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/commentui/templates.templ`, Line: 534, Col: 60}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/commentui/templates.templ`, Line: 535, Col: 60}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var116))
 		if templ_7745c5c3_Err != nil {
@@ -2477,7 +2478,7 @@ func ReplyItem(reply CommentReplyView) templ.Component {
 		var templ_7745c5c3_Var118 string
 		templ_7745c5c3_Var118, templ_7745c5c3_Err = templ.JoinStringErrs(reply.AuthorEmail)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/commentui/templates.templ`, Line: 545, Col: 54}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/commentui/templates.templ`, Line: 546, Col: 54}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var118))
 		if templ_7745c5c3_Err != nil {
@@ -2490,7 +2491,7 @@ func ReplyItem(reply CommentReplyView) templ.Component {
 		var templ_7745c5c3_Var119 string
 		templ_7745c5c3_Var119, templ_7745c5c3_Err = templ.JoinStringErrs(formatCommentDate(reply.CreatedAt))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/commentui/templates.templ`, Line: 545, Col: 96}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/commentui/templates.templ`, Line: 546, Col: 96}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var119))
 		if templ_7745c5c3_Err != nil {
@@ -2503,7 +2504,7 @@ func ReplyItem(reply CommentReplyView) templ.Component {
 		var templ_7745c5c3_Var120 string
 		templ_7745c5c3_Var120, templ_7745c5c3_Err = templ.JoinStringErrs(reply.Body)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/commentui/templates.templ`, Line: 546, Col: 61}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/commentui/templates.templ`, Line: 547, Col: 61}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var120))
 		if templ_7745c5c3_Err != nil {
@@ -2546,7 +2547,7 @@ func ReplyForm(view CommentThreadView, target CommentTargetView) templ.Component
 			var templ_7745c5c3_Var122 string
 			templ_7745c5c3_Var122, templ_7745c5c3_Err = templ.JoinStringErrs("@post('" + replyRoute(target.Routes, view.ID) + "', {contentType: 'form'})")
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/commentui/templates.templ`, Line: 552, Col: 132}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/commentui/templates.templ`, Line: 553, Col: 132}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var122))
 			if templ_7745c5c3_Err != nil {
@@ -2567,7 +2568,7 @@ func ReplyForm(view CommentThreadView, target CommentTargetView) templ.Component
 			var templ_7745c5c3_Var123 string
 			templ_7745c5c3_Var123, templ_7745c5c3_Err = templ.JoinStringErrs("reply-" + view.ID)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/commentui/templates.templ`, Line: 554, Col: 68}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/commentui/templates.templ`, Line: 555, Col: 68}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var123))
 			if templ_7745c5c3_Err != nil {
@@ -2612,7 +2613,7 @@ func ActionForms(view CommentThreadView, target CommentTargetView) templ.Compone
 				var templ_7745c5c3_Var125 string
 				templ_7745c5c3_Var125, templ_7745c5c3_Err = templ.JoinStringErrs("@post('" + reopenRoute(target.Routes, view.ID) + "', {contentType: 'form'})")
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/commentui/templates.templ`, Line: 564, Col: 103}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/commentui/templates.templ`, Line: 565, Col: 103}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var125))
 				if templ_7745c5c3_Err != nil {
@@ -2633,7 +2634,7 @@ func ActionForms(view CommentThreadView, target CommentTargetView) templ.Compone
 				var templ_7745c5c3_Var126 string
 				templ_7745c5c3_Var126, templ_7745c5c3_Err = templ.JoinStringErrs("reopen-" + view.ID)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/commentui/templates.templ`, Line: 566, Col: 70}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/commentui/templates.templ`, Line: 567, Col: 70}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var126))
 				if templ_7745c5c3_Err != nil {
@@ -2653,7 +2654,7 @@ func ActionForms(view CommentThreadView, target CommentTargetView) templ.Compone
 				var templ_7745c5c3_Var127 string
 				templ_7745c5c3_Var127, templ_7745c5c3_Err = templ.JoinStringErrs("@post('" + resolveRoute(target.Routes, view.ID) + "', {contentType: 'form'})")
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/commentui/templates.templ`, Line: 572, Col: 104}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/commentui/templates.templ`, Line: 573, Col: 104}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var127))
 				if templ_7745c5c3_Err != nil {
@@ -2674,7 +2675,7 @@ func ActionForms(view CommentThreadView, target CommentTargetView) templ.Compone
 				var templ_7745c5c3_Var128 string
 				templ_7745c5c3_Var128, templ_7745c5c3_Err = templ.JoinStringErrs("resolve-" + view.ID)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/commentui/templates.templ`, Line: 574, Col: 71}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/commentui/templates.templ`, Line: 575, Col: 71}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var128))
 				if templ_7745c5c3_Err != nil {
@@ -2725,7 +2726,7 @@ func SelectedTextTrigger(args SelectionSignalArgs) templ.Component {
 			var templ_7745c5c3_Var131 string
 			templ_7745c5c3_Var131, templ_7745c5c3_Err = templ.JoinStringErrs(args.Prefix + "-inline-comment-trigger")
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/commentui/templates.templ`, Line: 584, Col: 52}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/commentui/templates.templ`, Line: 585, Col: 52}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var131))
 			if templ_7745c5c3_Err != nil {
@@ -2751,7 +2752,7 @@ func SelectedTextTrigger(args SelectionSignalArgs) templ.Component {
 			var templ_7745c5c3_Var133 string
 			templ_7745c5c3_Var133, templ_7745c5c3_Err = templ.JoinStringErrs(showExpression)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/commentui/templates.templ`, Line: 584, Col: 127}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/commentui/templates.templ`, Line: 585, Col: 127}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var133))
 			if templ_7745c5c3_Err != nil {
@@ -2764,7 +2765,7 @@ func SelectedTextTrigger(args SelectionSignalArgs) templ.Component {
 			var templ_7745c5c3_Var134 string
 			templ_7745c5c3_Var134, templ_7745c5c3_Err = templ.JoinStringErrs("{'hidden': !(" + showExpression + ")}")
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/commentui/templates.templ`, Line: 584, Col: 182}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/commentui/templates.templ`, Line: 585, Col: 182}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var134))
 			if templ_7745c5c3_Err != nil {
@@ -2777,7 +2778,7 @@ func SelectedTextTrigger(args SelectionSignalArgs) templ.Component {
 			var templ_7745c5c3_Var135 string
 			templ_7745c5c3_Var135, templ_7745c5c3_Err = templ.JoinStringErrs("{'--commentui-selection-top': ($" + args.Prefix + ".top || 0) + 'px', '--commentui-selection-left': ($" + args.Prefix + ".left || 0) + 'px'}")
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/commentui/templates.templ`, Line: 584, Col: 340}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/commentui/templates.templ`, Line: 585, Col: 340}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var135))
 			if templ_7745c5c3_Err != nil {
@@ -2790,7 +2791,7 @@ func SelectedTextTrigger(args SelectionSignalArgs) templ.Component {
 			var templ_7745c5c3_Var136 string
 			templ_7745c5c3_Var136, templ_7745c5c3_Err = templ.JoinStringErrs("@post('" + args.ShowRoute + "', {contentType: 'form'})")
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/commentui/templates.templ`, Line: 584, Col: 416}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/commentui/templates.templ`, Line: 585, Col: 416}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var136))
 			if templ_7745c5c3_Err != nil {
@@ -2811,7 +2812,7 @@ func SelectedTextTrigger(args SelectionSignalArgs) templ.Component {
 			var templ_7745c5c3_Var137 string
 			templ_7745c5c3_Var137, templ_7745c5c3_Err = templ.JoinStringErrs(args.Prefix + ".sectionId")
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/commentui/templates.templ`, Line: 586, Col: 82}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/commentui/templates.templ`, Line: 587, Col: 82}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var137))
 			if templ_7745c5c3_Err != nil {
@@ -2824,7 +2825,7 @@ func SelectedTextTrigger(args SelectionSignalArgs) templ.Component {
 			var templ_7745c5c3_Var138 string
 			templ_7745c5c3_Var138, templ_7745c5c3_Err = templ.JoinStringErrs(args.Prefix + ".headingHint")
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/commentui/templates.templ`, Line: 587, Col: 84}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/commentui/templates.templ`, Line: 588, Col: 84}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var138))
 			if templ_7745c5c3_Err != nil {
@@ -2837,7 +2838,7 @@ func SelectedTextTrigger(args SelectionSignalArgs) templ.Component {
 			var templ_7745c5c3_Var139 string
 			templ_7745c5c3_Var139, templ_7745c5c3_Err = templ.JoinStringErrs(args.Prefix + ".text")
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/commentui/templates.templ`, Line: 588, Col: 78}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/commentui/templates.templ`, Line: 589, Col: 78}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var139))
 			if templ_7745c5c3_Err != nil {

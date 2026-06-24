@@ -91,6 +91,18 @@
     z-index: 50;
   }
 
+  .source-code-block,
+  .source-code-block .chroma,
+  .source-code-block pre,
+  .source-code-block code {
+    min-height: 100%;
+  }
+
+  .source-code-block .chroma,
+  .source-code-block pre {
+    background: hsl(var(--muted) / 0.2) !important;
+  }
+
   @supports not (anchor-name: --commentui-target) {
     .commentui-popover-selection {
       top: 100%;
