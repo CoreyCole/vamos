@@ -138,8 +138,8 @@ templ HiddenFields(fields map[string]string) {
 }
 
 templ CommentableMarkdown(args CommentableMarkdownArgs) {
-	<div class="relative" data-signals="{}">
-		<div class="min-w-0 relative" data-commentui-container="true" data-on:keydown__window={ selectionKeydownExpr(args.SelectionSignals) } data-on:mouseup__debounce.500ms.leading={ selectionMouseupExpr(args.SelectionSignals) }>
+	<div class="relative min-h-full" data-signals="{}">
+		<div class="min-w-0 relative min-h-full" data-commentui-container="true" data-on:keydown__window={ selectionKeydownExpr(args.SelectionSignals) } data-on:mouseup__debounce.500ms.leading={ selectionMouseupExpr(args.SelectionSignals) }>
 			if len(args.Sections) > 0 {
 				{{ documentThreads := DocumentComments(args.Comments) }}
 				if len(documentThreads) > 0 {
@@ -190,7 +190,7 @@ templ CommentableMarkdown(args CommentableMarkdownArgs) {
 					</section>
 				}
 			} else {
-				<div class="markdown-viewer prose prose-invert max-w-none">
+				<div class="markdown-viewer prose prose-invert max-w-none min-h-full">
 					@templ.Raw(args.HTML)
 				</div>
 				@CommentTarget(CommentTargetView{

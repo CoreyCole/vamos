@@ -24,18 +24,14 @@ func TestSourceRendererRendersJSONAsSource(t *testing.T) {
 	if page.ViewerArgs.DocumentKind != DocumentKindSource {
 		t.Fatalf("DocumentKind=%q, want %q", page.ViewerArgs.DocumentKind, DocumentKindSource)
 	}
-	if page.ViewerArgs.CommentMode != CommentModeDocumentOnly {
-		t.Fatalf("CommentMode=%q, want %q", page.ViewerArgs.CommentMode, CommentModeDocumentOnly)
+	if page.ViewerArgs.CommentMode != CommentModeSections {
+		t.Fatalf("CommentMode=%q, want %q", page.ViewerArgs.CommentMode, CommentModeSections)
 	}
 	if page.ViewerArgs.RawMarkdown != string(content) {
 		t.Fatalf("RawMarkdown=%q", page.ViewerArgs.RawMarkdown)
 	}
 
-	var buf bytes.Buffer
-	if err := page.ViewerArgs.BodyComponent.Render(t.Context(), &buf); err != nil {
-		t.Fatal(err)
-	}
-	html := buf.String()
+	html := page.ViewerArgs.HTMLContent
 	for _, want := range []string{"source-document-content", "source-code-block", `id="L1"`, `class="ln"`, "ok"} {
 		if !strings.Contains(html, want) {
 			t.Fatalf("source component missing %q: %s", want, html)
@@ -59,11 +55,7 @@ func TestSourceRendererEscapesSourceHTML(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	var buf bytes.Buffer
-	if err := page.ViewerArgs.BodyComponent.Render(t.Context(), &buf); err != nil {
-		t.Fatal(err)
-	}
-	html := buf.String()
+	html := page.ViewerArgs.HTMLContent
 	if strings.Contains(html, "<script>") {
 		t.Fatalf("source HTML was not escaped: %s", html)
 	}

@@ -68,20 +68,26 @@ func (r SourceRenderer) Render(_ context.Context, req DocumentRequest) (Rendered
 		highlightedHTML = escapeSourceHTML(content)
 	}
 
+	sourceDoc := SourceDocument{
+		Path:      docPath,
+		Extension: req.Extension,
+		Language:  language,
+		Content:   content,
+		HTML:      highlightedHTML,
+		LineCount: sourceLineCount(content),
+	}
+	var component bytes.Buffer
+	if err := SourceDocumentView(sourceDoc).Render(context.Background(), &component); err != nil {
+		return RenderedDocument{}, err
+	}
+
 	return RenderedDocument{
 		Path:          docPath,
 		Title:         DocumentTitle(docPath, nil),
 		Kind:          DocumentKindSource,
 		ClipboardText: content,
-		Component: SourceDocumentView(SourceDocument{
-			Path:      docPath,
-			Extension: req.Extension,
-			Language:  language,
-			Content:   content,
-			HTML:      highlightedHTML,
-			LineCount: sourceLineCount(content),
-		}),
-		CommentMode: CommentModeDocumentOnly,
+		HTMLContent:   component.String(),
+		CommentMode:   CommentModeSections,
 	}, nil
 }
 

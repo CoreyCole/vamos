@@ -102,11 +102,48 @@ func TestDocumentSurfaceRendersSourceEdgeToEdge(t *testing.T) {
 		t.Fatal(err)
 	}
 	html := buf.String()
-	if !strings.Contains(html, `id="thoughts-markdown-scroll-region" class="min-h-0 flex-1 overflow-hidden"`) {
-		t.Fatalf("Source document surface is not edge-to-edge: %s", html)
+	if !strings.Contains(html, `id="thoughts-markdown-scroll-region" class="min-h-0 flex-1 overflow-auto bg-muted/20"`) {
+		t.Fatalf("Source document surface is not edge-to-edge and scrollable: %s", html)
 	}
-	if strings.Contains(html, `p-4 md:p-10`) || strings.Contains(html, `overflow-y-auto`) {
+	if strings.Contains(html, `p-4 md:p-10`) {
 		t.Fatalf("Source document surface kept padded scroll wrapper: %s", html)
+	}
+}
+
+func TestDocumentSurfaceRendersSourceCommentSelectionChrome(t *testing.T) {
+	doc := WorkbenchDocument{
+		Path:          "thoughts/example.go",
+		Kind:          DocumentKindSource,
+		PageSessionID: "page-1",
+		CommentUI: commentui.CommentableMarkdownArgs{
+			Surface:  commentui.CommentSurfaceThoughts,
+			IDPrefix: "doc",
+			DocPath:  "thoughts/example.go",
+			HTML:     `<section class="source-document-content" data-section-id="document">code</section>`,
+			SelectionSignals: commentui.SelectionSignalArgs{
+				Prefix:      "comment_selection",
+				ShowRoute:   "/forms/comments/show",
+				HiddenFields: map[string]string{"doc_path": "thoughts/example.go"},
+				ContainerID:  "thoughts-markdown-scroll-region",
+			},
+		},
+	}
+
+	var buf bytes.Buffer
+	if err := DocumentSurface(doc, nil).Render(t.Context(), &buf); err != nil {
+		t.Fatal(err)
+	}
+	html := buf.String()
+	for _, want := range []string{
+		`data-commentui-container="true"`,
+		`data-on:mouseup__debounce.500ms.leading=`,
+		`id="comment_selection-inline-comment-trigger"`,
+		`data-section-id="document"`,
+		`/forms/comments/show`,
+	} {
+		if !strings.Contains(html, want) {
+			t.Fatalf("Source document comment chrome missing %q: %s", want, html)
+		}
 	}
 }
 
