@@ -57,7 +57,7 @@ func TestCSVTableDocumentShowsTruncationWithoutDocumentChrome(t *testing.T) {
 		Rows:      [][]string{{"a"}},
 		Truncated: true,
 	}
-	if err := CSVTableDocument("thoughts/data.csv", table).Render(t.Context(), &buf); err != nil {
+	if err := CSVTableDocument("thoughts/data.csv", table, "CSV").Render(t.Context(), &buf); err != nil {
 		t.Fatal(err)
 	}
 	html := buf.String()
@@ -81,5 +81,49 @@ func TestParseCSVTableTruncatesRows(t *testing.T) {
 	}
 	if len(table.Rows) != 1 || table.Rows[0][0] != "1" {
 		t.Fatalf("rows=%#v", table.Rows)
+	}
+}
+
+func TestDelimitedRendererParsesTSV(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	mustWriteFile(t, filepath.Join(root, "data.tsv"), []byte("name\tvalue\nAda\t1\nGrace\t2"))
+	service, err := NewService(root, nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	page, err := service.RenderThoughtsDocument(t.Context(), "data.tsv")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if page.ViewerArgs.DocumentKind != DocumentKindCSVTable {
+		t.Fatalf("DocumentKind=%q, want %q", page.ViewerArgs.DocumentKind, DocumentKindCSVTable)
+	}
+	if page.ViewerArgs.RawMarkdown != "name\tvalue\nAda\t1\nGrace\t2" {
+		t.Fatalf("RawMarkdown=%q", page.ViewerArgs.RawMarkdown)
+	}
+	var buf bytes.Buffer
+	if err := page.ViewerArgs.BodyComponent.Render(t.Context(), &buf); err != nil {
+		t.Fatal(err)
+	}
+	html := buf.String()
+	for _, want := range []string{"Ada", "Grace", "document-table-content", `class="table-wrapper"`} {
+		if !strings.Contains(html, want) {
+			t.Fatalf("missing %q: %s", want, html)
+		}
+	}
+}
+
+func TestParseDelimitedTableUsesTabDelimiter(t *testing.T) {
+	t.Parallel()
+
+	format, _ := delimitedFormatForExtension(".tsv")
+	table, err := parseDelimitedTable([]byte("a\tb\n1\t2"), format, 500)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(table.Headers) != 2 || table.Headers[0] != "a" || table.Rows[0][1] != "2" {
+		t.Fatalf("table=%#v", table)
 	}
 }

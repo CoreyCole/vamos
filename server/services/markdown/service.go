@@ -521,6 +521,7 @@ func isThoughtsRenderableFile(name string) bool {
 		".html",
 		".htm",
 		".csv",
+		".tsv",
 		".txt",
 		".json",
 		".yaml",
