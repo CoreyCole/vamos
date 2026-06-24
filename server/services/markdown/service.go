@@ -96,11 +96,13 @@ func NewServiceWithOptions(
 		commentService: commentService,
 		themeService:   themeService,
 	}
+	sourceRenderer := SourceRenderer{MaxBytes: sourceDisplayMaxBytes, Renderer: renderer}
 	service.documentRenderers = NewDocumentRendererRegistry(
 		UnsupportedRenderer{},
 		NewMarkdownDocumentRenderer(service, renderer, opts.Projects),
 		HTMLAppletRenderer{},
 		CSVRenderer{MaxRows: 500},
+		sourceRenderer,
 	)
 	return service, nil
 }

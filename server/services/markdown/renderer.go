@@ -78,6 +78,14 @@ func (m Renderer) MarkdownBytesToHTML(md []byte) string {
 	return string(htmlBytes)
 }
 
+func (m Renderer) HighlightSource(source, lang string) (string, error) {
+	var buf bytes.Buffer
+	if err := htmlHighlight(&buf, source, lang, "", m.highlightStyle, m.htmlFormatter); err != nil {
+		return "", err
+	}
+	return buf.String(), nil
+}
+
 func renderableMarkdown(md []byte) []byte {
 	frontmatter, body, ok := splitYAMLFrontmatter(md)
 	if !ok {

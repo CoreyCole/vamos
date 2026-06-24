@@ -1,0 +1,24 @@
+package markdown
+
+import "fmt"
+
+templ SourceDocumentView(doc SourceDocument) {
+	<section class="source-document-content w-full">
+		<div class="mb-3 flex items-center justify-between gap-3 text-xs text-muted-foreground">
+			<span class="font-mono">{ doc.Path }</span>
+			if doc.Language != "" {
+				<span class="rounded border border-border px-2 py-1 font-mono uppercase">{ doc.Language }</span>
+			}
+		</div>
+		<div class="grid grid-cols-[auto_minmax(0,1fr)] overflow-x-auto rounded-lg border border-border bg-muted/20 text-sm">
+			<div class="select-none border-r border-border px-3 py-3 text-right font-mono text-xs leading-6 text-muted-foreground">
+				for i := 1; i <= doc.LineCount; i++ {
+					<div id={ fmt.Sprintf("L%d", i) } data-source-line-number={ fmt.Sprintf("%d", i) }>{ fmt.Sprintf("%d", i) }</div>
+				}
+			</div>
+			<div class="min-w-0 px-3 py-3 font-mono leading-6 [&_pre]:m-0 [&_pre]:whitespace-pre">
+				@templ.Raw(doc.HTML)
+			</div>
+		</div>
+	</section>
+}

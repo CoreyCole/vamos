@@ -7,20 +7,20 @@ import (
 	"testing"
 )
 
-func TestUnsupportedRendererHandlesKnownExactFile(t *testing.T) {
+func TestUnsupportedRendererHandlesUnsafeExactFile(t *testing.T) {
 	t.Parallel()
 
 	root := t.TempDir()
-	mustWriteFile(t, filepath.Join(root, "data.json"), []byte(`{"ok":true}`))
+	mustWriteFile(t, filepath.Join(root, "data.bin"), []byte{'V', 'A', 0, 'M', 'O'})
 	service, err := NewService(root, nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	page, err := service.RenderThoughtsDocument(t.Context(), "data.json")
+	page, err := service.RenderThoughtsDocument(t.Context(), "data.bin")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if page.FilePath != "thoughts/data.json" {
+	if page.FilePath != "thoughts/data.bin" {
 		t.Fatalf("FilePath=%q", page.FilePath)
 	}
 	if page.ViewerArgs.DocumentKind != DocumentKindUnsupported {
@@ -35,10 +35,13 @@ func TestUnsupportedRendererHandlesKnownExactFile(t *testing.T) {
 		t.Fatal(err)
 	}
 	html := buf.String()
-	for _, want := range []string{"Unsupported document type", "thoughts/data.json", ".json"} {
+	for _, want := range []string{"Unsupported document type", "thoughts/data.bin", ".bin", "File is binary"} {
 		if !strings.Contains(html, want) {
 			t.Fatalf("unsupported component missing %q: %s", want, html)
 		}
+	}
+	if strings.Contains(html, root) {
+		t.Fatalf("unsupported component exposed temp root: %s", html)
 	}
 }
 

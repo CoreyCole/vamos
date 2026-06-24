@@ -17,6 +17,7 @@ const (
 	DocumentKindMarkdown    DocumentKind = "markdown"
 	DocumentKindHTMLApplet  DocumentKind = "html-applet"
 	DocumentKindCSVTable    DocumentKind = "csv-table"
+	DocumentKindSource      DocumentKind = "source"
 	DocumentKindUnsupported DocumentKind = "unsupported"
 )
 

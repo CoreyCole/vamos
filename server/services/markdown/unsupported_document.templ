@@ -1,10 +1,20 @@
 package markdown
 
 templ UnsupportedDocument(extension string, docPath string) {
+	@UnsupportedDocumentWithReason(extension, docPath, "No renderer exists yet for this document type.")
+}
+
+templ UnsupportedDocumentWithReason(extension string, docPath string, reason string) {
 	<section class="mx-auto max-w-3xl rounded-lg border border-border bg-background p-6 text-sm">
 		<h1 class="text-lg font-semibold text-foreground">Unsupported document type</h1>
 		<p class="mt-2 text-muted-foreground">
-			Vamos found <span class="font-mono text-foreground">{ docPath }</span>, but no renderer exists yet for <span class="font-mono text-foreground">{ extension }</span>.
+			Vamos found <span class="font-mono text-foreground">{ docPath }</span>, but cannot render it inline.
 		</p>
+		if extension != "" {
+			<p class="mt-2 text-muted-foreground">Extension: <span class="font-mono text-foreground">{ extension }</span></p>
+		}
+		if reason != "" {
+			<p class="mt-3 rounded-md border border-border bg-muted/30 p-3 text-muted-foreground">{ reason }</p>
+		}
 	</section>
 }
