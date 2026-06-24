@@ -80,7 +80,17 @@ func TestThoughtsWorkbench_RendererFormatsShowExpectedWorkbenchStates(t *testing
 		Expect(spec.ExpectStep(spec.TextAbsent("CSV table:"))).
 		Expect(spec.TextContains(vamos.Thoughts.CenterPane(), "<script>")).
 		Expect(csvRendererUsesDocumentTableStyles()).
+		Visit(vamos.Pages.Path("/thoughts/renderer-demo.tsv?context=chat")).
+		Expect(vamos.Thoughts.Ready()).
+		Expect(spec.TextContains(vamos.Thoughts.CenterPane(), "Ada")).
+		Expect(spec.TextContains(vamos.Thoughts.CenterPane(), "tabbed text")).
+		Expect(csvRendererUsesDocumentTableStyles()).
 		Visit(vamos.Pages.Path("/thoughts/renderer-demo.json?context=chat")).
+		Expect(vamos.Thoughts.Ready()).
+		Expect(spec.ExpectStep(spec.TextAbsent("Unsupported document type"))).
+		Expect(spec.TextContains(vamos.Thoughts.CenterPane(), "source")).
+		Expect(sourceRendererShowsLineNumbers()).
+		Visit(vamos.Pages.Path("/thoughts/renderer-demo.bin?context=chat")).
 		Expect(vamos.Thoughts.Ready()).
 		Expect(spec.TextContains(vamos.Thoughts.CenterPane(), "Unsupported document type")).
 		Expect(vamos.Console.Clean()).
@@ -250,7 +260,8 @@ func seedRendererThoughtsFiles() spec.Step {
 		files := map[string]string{
 			"renderer-demo.md":   "# Renderer Markdown Demo\n\nMarkdown parity content.\n\n| name | value |\n| --- | --- |\n| alpha | beta |\n",
 			"renderer-demo.csv":  "name,value\n<script>,escaped text\n",
-			"renderer-demo.json": `{"unsupported": true}`,
+			"renderer-demo.tsv":  "name\tvalue\nAda\ttabbed text\nGrace\thopper\n",
+			"renderer-demo.json": `{"source": true, "escaped": "<script>"}`,
 			"renderer-demo.html": `<!doctype html>
 <html>
 <head>
@@ -272,6 +283,9 @@ func seedRendererThoughtsFiles() spec.Step {
 			if err := os.WriteFile(filepath.Join(root, name), []byte(content), 0o644); err != nil {
 				t.Fatal(err)
 			}
+		}
+		if err := os.WriteFile(filepath.Join(root, "renderer-demo.bin"), []byte{'V', 'A', 0, 'M', 'O', 'S'}, 0o644); err != nil {
+			t.Fatal(err)
 		}
 	})
 }
@@ -313,6 +327,16 @@ func seedStyledHTMLAppletFile() spec.Step {
 			t.Fatal(err)
 		}
 	})
+}
+
+func sourceRendererShowsLineNumbers() spec.Expectation {
+	return spec.ExpectStep(spec.Custom("source renderer shows line numbers", func(t testing.TB, ctx *duiruntime.Context) {
+		t.Helper()
+		lineNumber := ctx.Page.Locator(".source-document-content [data-source-line-number='1']").First()
+		if err := lineNumber.WaitFor(); err != nil {
+			t.Fatalf("source line number missing: %v", err)
+		}
+	}))
 }
 
 func csvRendererUsesDocumentTableStyles() spec.Expectation {
