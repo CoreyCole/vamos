@@ -39,7 +39,12 @@ func BuildThoughtsDocument(pageArgs *PageArgs) WorkbenchDocument {
 	}
 	component := pageArgs.ViewerArgs.BodyComponent
 	if component == nil {
-		component = commentui.CommentableMarkdown(pageArgs.CommentUI)
+		switch pageArgs.ViewerArgs.CommentMode {
+		case CommentModeSelectionOnly:
+			component = commentui.CommentableSelectionHTML(pageArgs.CommentUI)
+		default:
+			component = commentui.CommentableMarkdown(pageArgs.CommentUI)
+		}
 	}
 	return WorkbenchDocument{
 		Path:          pageArgs.FilePath,

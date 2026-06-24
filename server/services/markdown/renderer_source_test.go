@@ -24,8 +24,8 @@ func TestSourceRendererRendersJSONAsSource(t *testing.T) {
 	if page.ViewerArgs.DocumentKind != DocumentKindSource {
 		t.Fatalf("DocumentKind=%q, want %q", page.ViewerArgs.DocumentKind, DocumentKindSource)
 	}
-	if page.ViewerArgs.CommentMode != CommentModeSections {
-		t.Fatalf("CommentMode=%q, want %q", page.ViewerArgs.CommentMode, CommentModeSections)
+	if page.ViewerArgs.CommentMode != CommentModeSelectionOnly {
+		t.Fatalf("CommentMode=%q, want %q", page.ViewerArgs.CommentMode, CommentModeSelectionOnly)
 	}
 	if page.ViewerArgs.RawMarkdown != string(content) {
 		t.Fatalf("RawMarkdown=%q", page.ViewerArgs.RawMarkdown)

@@ -110,10 +110,11 @@ func TestDocumentSurfaceRendersSourceEdgeToEdge(t *testing.T) {
 	}
 }
 
-func TestDocumentSurfaceRendersSourceCommentSelectionChrome(t *testing.T) {
+func TestDocumentSurfaceRendersSourceSelectionOnlyWithoutCommentTarget(t *testing.T) {
 	doc := WorkbenchDocument{
 		Path:          "thoughts/example.go",
 		Kind:          DocumentKindSource,
+		CommentMode:   CommentModeSelectionOnly,
 		PageSessionID: "page-1",
 		CommentUI: commentui.CommentableMarkdownArgs{
 			Surface:  commentui.CommentSurfaceThoughts,
@@ -143,6 +144,15 @@ func TestDocumentSurfaceRendersSourceCommentSelectionChrome(t *testing.T) {
 	} {
 		if !strings.Contains(html, want) {
 			t.Fatalf("Source document comment chrome missing %q: %s", want, html)
+		}
+	}
+	for _, unwanted := range []string{
+		`data-comment-target="true"`,
+		`Add comment`,
+		`aria-label="Section actions"`,
+	} {
+		if strings.Contains(html, unwanted) {
+			t.Fatalf("Source document selection-only chrome should not include %q: %s", unwanted, html)
 		}
 	}
 }

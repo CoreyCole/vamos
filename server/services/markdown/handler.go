@@ -182,9 +182,7 @@ func (s *Service) ServeMarkdown(c echo.Context) error {
 	}
 	pageArgs.WorkspaceContext = workspaceCtx
 	pageArgs.CommentUI = s.buildCommentUI(pageArgs, userEmail, threads)
-	if pageArgs.ViewerArgs.CommentMode == "" || pageArgs.ViewerArgs.CommentMode == CommentModeSections {
-		pageArgs.ViewerArgs.BodyComponent = commentui.CommentableMarkdown(pageArgs.CommentUI)
-	}
+	pageArgs.ViewerArgs.BodyComponent = commentComponentForMode(pageArgs.ViewerArgs.CommentMode, pageArgs.CommentUI, pageArgs.ViewerArgs.BodyComponent)
 
 	// Always create SectionsWithComments if sections exist (even if comments failed to
 	// load)
@@ -250,7 +248,7 @@ func (s *Service) buildCommentUI(
 	threads []commentui.CommentThreadView,
 ) commentui.CommentableMarkdownArgs {
 	selection := commentui.SelectionSignalArgs{}
-	if pageArgs.ViewerArgs.CommentMode == "" || pageArgs.ViewerArgs.CommentMode == CommentModeSections {
+	if commentModeHasSelection(pageArgs.ViewerArgs.CommentMode) {
 		selection = commentui.SelectionSignalArgs{
 			Prefix:          "comment_selection",
 			ExcludeSelector: "#comment-sidebar, [data-comment-target=true], [id^=comment-target-], [id^=section-comments-]",
@@ -283,6 +281,21 @@ func (s *Service) buildCommentUI(
 		},
 		HiddenFields:     map[string]string{"doc_path": pageArgs.FilePath},
 		SelectionSignals: selection,
+	}
+}
+
+func commentModeHasSelection(mode CommentMode) bool {
+	return mode == "" || mode == CommentModeSections || mode == CommentModeSelectionOnly
+}
+
+func commentComponentForMode(mode CommentMode, args commentui.CommentableMarkdownArgs, existing templ.Component) templ.Component {
+	switch mode {
+	case "", CommentModeSections:
+		return commentui.CommentableMarkdown(args)
+	case CommentModeSelectionOnly:
+		return commentui.CommentableSelectionHTML(args)
+	default:
+		return existing
 	}
 }
 
@@ -722,9 +735,7 @@ func (s *Service) selectDocumentAndPatch(
 		threads = thoughtsCommentThreads(commentsResp.Comments)
 	}
 	pageArgs.CommentUI = s.buildCommentUI(pageArgs, userEmail, threads)
-	if pageArgs.ViewerArgs.CommentMode == "" || pageArgs.ViewerArgs.CommentMode == CommentModeSections {
-		pageArgs.ViewerArgs.BodyComponent = commentui.CommentableMarkdown(pageArgs.CommentUI)
-	}
+	pageArgs.ViewerArgs.BodyComponent = commentComponentForMode(pageArgs.ViewerArgs.CommentMode, pageArgs.CommentUI, pageArgs.ViewerArgs.BodyComponent)
 	sse := datastar.NewSSE(c.Response().Writer, c.Request())
 	workbenchState, err := s.buildThoughtsWorkbenchState(c, pageArgs)
 	if err != nil {

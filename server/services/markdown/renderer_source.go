@@ -87,7 +87,7 @@ func (r SourceRenderer) Render(_ context.Context, req DocumentRequest) (Rendered
 		Kind:          DocumentKindSource,
 		ClipboardText: content,
 		HTMLContent:   component.String(),
-		CommentMode:   CommentModeSections,
+		CommentMode:   CommentModeSelectionOnly,
 	}, nil
 }
 

@@ -85,6 +85,11 @@ func DocumentSurface(doc WorkbenchDocument, workspaceTree *workbench.WorkspaceDo
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
+		} else if doc.CommentMode == CommentModeSelectionOnly {
+			templ_7745c5c3_Err = commentui.CommentableSelectionHTML(doc.CommentUI).Render(ctx, templ_7745c5c3_Buffer)
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
 		} else {
 			templ_7745c5c3_Err = commentui.CommentableMarkdown(doc.CommentUI).Render(ctx, templ_7745c5c3_Buffer)
 			if templ_7745c5c3_Err != nil {
@@ -136,7 +141,7 @@ func ThoughtsTitleContent(title string) templ.Component {
 			var templ_7745c5c3_Var6 string
 			templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.JoinStringErrs(title)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/markdown/document_surface.templ`, Line: 31, Col: 65}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/markdown/document_surface.templ`, Line: 33, Col: 65}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var6))
 			if templ_7745c5c3_Err != nil {
@@ -185,7 +190,7 @@ func QRSPIArtifactContext(meta QRSPIMetadata, workspaceTree *workbench.Workspace
 				var templ_7745c5c3_Var8 string
 				templ_7745c5c3_Var8, templ_7745c5c3_Err = templ.JoinStringErrs(meta.PlanTitle)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/markdown/document_surface.templ`, Line: 40, Col: 114}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/markdown/document_surface.templ`, Line: 42, Col: 114}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var8))
 				if templ_7745c5c3_Err != nil {
@@ -204,7 +209,7 @@ func QRSPIArtifactContext(meta QRSPIMetadata, workspaceTree *workbench.Workspace
 				var templ_7745c5c3_Var9 string
 				templ_7745c5c3_Var9, templ_7745c5c3_Err = templ.JoinStringErrs(meta.PlanDate)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/markdown/document_surface.templ`, Line: 43, Col: 76}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/markdown/document_surface.templ`, Line: 45, Col: 76}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var9))
 				if templ_7745c5c3_Err != nil {
@@ -223,7 +228,7 @@ func QRSPIArtifactContext(meta QRSPIMetadata, workspaceTree *workbench.Workspace
 				var templ_7745c5c3_Var10 string
 				templ_7745c5c3_Var10, templ_7745c5c3_Err = templ.JoinStringErrs(meta.PlanTime)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/markdown/document_surface.templ`, Line: 46, Col: 76}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/markdown/document_surface.templ`, Line: 48, Col: 76}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var10))
 				if templ_7745c5c3_Err != nil {
@@ -242,7 +247,7 @@ func QRSPIArtifactContext(meta QRSPIMetadata, workspaceTree *workbench.Workspace
 				var templ_7745c5c3_Var11 string
 				templ_7745c5c3_Var11, templ_7745c5c3_Err = templ.JoinStringErrs(meta.Ticket)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/markdown/document_surface.templ`, Line: 49, Col: 74}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/markdown/document_surface.templ`, Line: 51, Col: 74}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var11))
 				if templ_7745c5c3_Err != nil {
@@ -261,7 +266,7 @@ func QRSPIArtifactContext(meta QRSPIMetadata, workspaceTree *workbench.Workspace
 				var templ_7745c5c3_Var12 string
 				templ_7745c5c3_Var12, templ_7745c5c3_Err = templ.JoinStringErrs(meta.Repository)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/markdown/document_surface.templ`, Line: 52, Col: 78}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/markdown/document_surface.templ`, Line: 54, Col: 78}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var12))
 				if templ_7745c5c3_Err != nil {
@@ -280,7 +285,7 @@ func QRSPIArtifactContext(meta QRSPIMetadata, workspaceTree *workbench.Workspace
 				var templ_7745c5c3_Var13 string
 				templ_7745c5c3_Var13, templ_7745c5c3_Err = templ.JoinStringErrs(formatDate(meta.UpdatedAt))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/markdown/document_surface.templ`, Line: 55, Col: 97}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/markdown/document_surface.templ`, Line: 57, Col: 97}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var13))
 				if templ_7745c5c3_Err != nil {
@@ -319,7 +324,7 @@ func QRSPIArtifactContext(meta QRSPIMetadata, workspaceTree *workbench.Workspace
 						var templ_7745c5c3_Var14 string
 						templ_7745c5c3_Var14, templ_7745c5c3_Err = templ.JoinStringErrs(item.Label)
 						if templ_7745c5c3_Err != nil {
-							return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/markdown/document_surface.templ`, Line: 69, Col: 79}
+							return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/markdown/document_surface.templ`, Line: 71, Col: 79}
 						}
 						_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var14))
 						if templ_7745c5c3_Err != nil {
@@ -342,7 +347,7 @@ func QRSPIArtifactContext(meta QRSPIMetadata, workspaceTree *workbench.Workspace
 						var templ_7745c5c3_Var16 templ.SafeURL
 						templ_7745c5c3_Var16, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(item.Href))
 						if templ_7745c5c3_Err != nil {
-							return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/markdown/document_surface.templ`, Line: 71, Col: 41}
+							return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/markdown/document_surface.templ`, Line: 73, Col: 41}
 						}
 						_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var16))
 						if templ_7745c5c3_Err != nil {
@@ -368,7 +373,7 @@ func QRSPIArtifactContext(meta QRSPIMetadata, workspaceTree *workbench.Workspace
 						var templ_7745c5c3_Var18 string
 						templ_7745c5c3_Var18, templ_7745c5c3_Err = templ.JoinStringErrs(item.Label)
 						if templ_7745c5c3_Err != nil {
-							return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/markdown/document_surface.templ`, Line: 71, Col: 236}
+							return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/markdown/document_surface.templ`, Line: 73, Col: 236}
 						}
 						_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var18))
 						if templ_7745c5c3_Err != nil {
@@ -493,7 +498,7 @@ func DocumentActionControl(action DocumentAction) templ.Component {
 			var templ_7745c5c3_Var22 templ.SafeURL
 			templ_7745c5c3_Var22, templ_7745c5c3_Err = templ.JoinURLErrs(templ.URL(action.Href))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/markdown/document_surface.templ`, Line: 102, Col: 34}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/markdown/document_surface.templ`, Line: 104, Col: 34}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var22))
 			if templ_7745c5c3_Err != nil {
@@ -519,7 +524,7 @@ func DocumentActionControl(action DocumentAction) templ.Component {
 			var templ_7745c5c3_Var24 string
 			templ_7745c5c3_Var24, templ_7745c5c3_Err = templ.JoinStringErrs(label)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/markdown/document_surface.templ`, Line: 102, Col: 99}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/markdown/document_surface.templ`, Line: 104, Col: 99}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var24))
 			if templ_7745c5c3_Err != nil {
@@ -532,7 +537,7 @@ func DocumentActionControl(action DocumentAction) templ.Component {
 			var templ_7745c5c3_Var25 string
 			templ_7745c5c3_Var25, templ_7745c5c3_Err = templ.JoinStringErrs(label)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/markdown/document_surface.templ`, Line: 102, Col: 115}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/markdown/document_surface.templ`, Line: 104, Col: 115}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var25))
 			if templ_7745c5c3_Err != nil {
@@ -545,7 +550,7 @@ func DocumentActionControl(action DocumentAction) templ.Component {
 			var templ_7745c5c3_Var26 string
 			templ_7745c5c3_Var26, templ_7745c5c3_Err = templ.JoinStringErrs(documentActionIcon(action))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/markdown/document_surface.templ`, Line: 102, Col: 146}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/markdown/document_surface.templ`, Line: 104, Col: 146}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var26))
 			if templ_7745c5c3_Err != nil {
@@ -563,7 +568,7 @@ func DocumentActionControl(action DocumentAction) templ.Component {
 			var templ_7745c5c3_Var27 templ.SafeURL
 			templ_7745c5c3_Var27, templ_7745c5c3_Err = templ.JoinURLErrs(action.FormAction)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/markdown/document_surface.templ`, Line: 104, Col: 48}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/markdown/document_surface.templ`, Line: 106, Col: 48}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var27))
 			if templ_7745c5c3_Err != nil {
@@ -576,7 +581,7 @@ func DocumentActionControl(action DocumentAction) templ.Component {
 			var templ_7745c5c3_Var28 string
 			templ_7745c5c3_Var28, templ_7745c5c3_Err = templ.JoinStringErrs("@post('" + action.FormAction + "', {contentType: 'form'})")
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/markdown/document_surface.templ`, Line: 104, Col: 127}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/markdown/document_surface.templ`, Line: 106, Col: 127}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var28))
 			if templ_7745c5c3_Err != nil {
@@ -594,7 +599,7 @@ func DocumentActionControl(action DocumentAction) templ.Component {
 				var templ_7745c5c3_Var29 string
 				templ_7745c5c3_Var29, templ_7745c5c3_Err = templ.JoinStringErrs(name)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/markdown/document_surface.templ`, Line: 106, Col: 36}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/markdown/document_surface.templ`, Line: 108, Col: 36}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var29))
 				if templ_7745c5c3_Err != nil {
@@ -607,7 +612,7 @@ func DocumentActionControl(action DocumentAction) templ.Component {
 				var templ_7745c5c3_Var30 string
 				templ_7745c5c3_Var30, templ_7745c5c3_Err = templ.JoinStringErrs(value)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/markdown/document_surface.templ`, Line: 106, Col: 52}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/markdown/document_surface.templ`, Line: 108, Col: 52}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var30))
 				if templ_7745c5c3_Err != nil {
@@ -643,7 +648,7 @@ func DocumentActionControl(action DocumentAction) templ.Component {
 			var templ_7745c5c3_Var33 string
 			templ_7745c5c3_Var33, templ_7745c5c3_Err = templ.JoinStringErrs(label)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/markdown/document_surface.templ`, Line: 108, Col: 87}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/markdown/document_surface.templ`, Line: 110, Col: 87}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var33))
 			if templ_7745c5c3_Err != nil {
@@ -656,7 +661,7 @@ func DocumentActionControl(action DocumentAction) templ.Component {
 			var templ_7745c5c3_Var34 string
 			templ_7745c5c3_Var34, templ_7745c5c3_Err = templ.JoinStringErrs(label)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/markdown/document_surface.templ`, Line: 108, Col: 103}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/markdown/document_surface.templ`, Line: 110, Col: 103}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var34))
 			if templ_7745c5c3_Err != nil {
@@ -669,7 +674,7 @@ func DocumentActionControl(action DocumentAction) templ.Component {
 			var templ_7745c5c3_Var35 string
 			templ_7745c5c3_Var35, templ_7745c5c3_Err = templ.JoinStringErrs(documentActionIcon(action))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/markdown/document_surface.templ`, Line: 108, Col: 134}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/markdown/document_surface.templ`, Line: 110, Col: 134}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var35))
 			if templ_7745c5c3_Err != nil {
@@ -751,7 +756,7 @@ func OpenChatComposerAttachments(docPath string) templ.Component {
 		var templ_7745c5c3_Var37 string
 		templ_7745c5c3_Var37, templ_7745c5c3_Err = templ.JoinStringErrs(docPath)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/markdown/document_surface.templ`, Line: 154, Col: 62}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/markdown/document_surface.templ`, Line: 156, Col: 62}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var37))
 		if templ_7745c5c3_Err != nil {
@@ -764,7 +769,7 @@ func OpenChatComposerAttachments(docPath string) templ.Component {
 		var templ_7745c5c3_Var38 string
 		templ_7745c5c3_Var38, templ_7745c5c3_Err = templ.JoinStringErrs(filepath.Base(docPath))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/markdown/document_surface.templ`, Line: 156, Col: 126}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/markdown/document_surface.templ`, Line: 158, Col: 126}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var38))
 		if templ_7745c5c3_Err != nil {

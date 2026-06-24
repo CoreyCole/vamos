@@ -131,6 +131,43 @@ func TestCommentableMarkdownRendersStableTargetsAndHiddenFields(t *testing.T) {
 	}
 }
 
+func TestCommentableSelectionHTMLRendersSelectionOnlyChrome(t *testing.T) {
+	t.Parallel()
+
+	var buf bytes.Buffer
+	err := CommentableSelectionHTML(CommentableMarkdownArgs{
+		Surface:  CommentSurfaceThoughts,
+		IDPrefix: SafeCommentTargetSlug("thoughts", "source.go"),
+		DocPath:  "source.go",
+		HTML:     `<section class="source-document-content" data-section-id="document">code</section>`,
+		Routes: CommentRoutes{
+			Show:   "/show",
+			Create: "/create",
+			Cancel: "/cancel",
+		},
+		HiddenFields: map[string]string{"doc_path": "source.go"},
+		SelectionSignals: SelectionSignalArgs{
+			Prefix:       "comment_selection",
+			ShowRoute:    "/show",
+			HiddenFields: map[string]string{"doc_path": "source.go"},
+		},
+	}).Render(t.Context(), &buf)
+	if err != nil {
+		t.Fatalf("Render() error = %v", err)
+	}
+	html := buf.String()
+	for _, want := range []string{`data-commentui-container="true"`, `data-on:mouseup__debounce.500ms.leading=`, `id="comment_selection-inline-comment-trigger"`, `data-section-id="document"`, `/show`} {
+		if !strings.Contains(html, want) {
+			t.Fatalf("selection-only render missing %q in %s", want, html)
+		}
+	}
+	for _, unwanted := range []string{`data-comment-target="true"`, `Add comment`, `aria-label="Section actions"`} {
+		if strings.Contains(html, unwanted) {
+			t.Fatalf("selection-only render included %q in %s", unwanted, html)
+		}
+	}
+}
+
 func TestCommentableMarkdownDoesNotRenderFrontmatterSummaryCard(t *testing.T) {
 	t.Parallel()
 

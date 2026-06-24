@@ -210,6 +210,17 @@ templ CommentableMarkdown(args CommentableMarkdownArgs) {
 	</div>
 }
 
+templ CommentableSelectionHTML(args CommentableMarkdownArgs) {
+	<div class="relative h-full min-h-full" data-signals="{}">
+		<div class="relative h-full min-h-full min-w-0" data-commentui-container="true" data-on:keydown__window={ selectionKeydownExpr(args.SelectionSignals) } data-on:mouseup__debounce.500ms.leading={ selectionMouseupExpr(args.SelectionSignals) }>
+			<div class="h-full min-h-full w-full">
+				@templ.Raw(args.HTML)
+			</div>
+			@SelectedTextTrigger(args.SelectionSignals)
+		</div>
+	</div>
+}
+
 templ CommentTarget(args CommentTargetView) {
 	<div id={ args.ID } class="commentui-target flex items-center gap-1" data-comment-target="true">
 		if len(args.Threads) > 0 {

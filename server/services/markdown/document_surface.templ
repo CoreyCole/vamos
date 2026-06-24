@@ -16,6 +16,8 @@ templ DocumentSurface(doc WorkbenchDocument, workspaceTree *workbench.WorkspaceD
 			@QRSPIArtifactContext(doc.QRSPIMetadata, workspaceTree)
 			if doc.Component != nil {
 				@doc.Component
+			} else if doc.CommentMode == CommentModeSelectionOnly {
+				@commentui.CommentableSelectionHTML(doc.CommentUI)
 			} else {
 				@commentui.CommentableMarkdown(doc.CommentUI)
 			}

@@ -24,9 +24,10 @@ const (
 type CommentMode string
 
 const (
-	CommentModeSections     CommentMode = "sections"
-	CommentModeDocumentOnly CommentMode = "document-only"
-	CommentModeNone         CommentMode = "none"
+	CommentModeSections      CommentMode = "sections"
+	CommentModeDocumentOnly  CommentMode = "document-only"
+	CommentModeSelectionOnly CommentMode = "selection-only"
+	CommentModeNone          CommentMode = "none"
 )
 
 type DocumentRenderOptions struct {
