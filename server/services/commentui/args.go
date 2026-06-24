@@ -105,6 +105,7 @@ type CommentTargetView struct {
 	Routes       CommentRoutes
 	HiddenFields map[string]string
 	Chrome       CommentTargetChrome
+	SelectionSignalPrefix string
 }
 
 const (
@@ -212,8 +213,23 @@ func CommentPopoverClass(placement CommentPopoverPlacement) string {
 	}
 }
 
+func CommentPopoverPlacementForTarget(target CommentTargetView) CommentPopoverPlacement {
+	if TargetChromeOrVisible(target.Chrome) == CommentTargetChromePatchOnly {
+		return CommentPopoverPlacementSelection
+	}
+	return CommentPopoverPlacementTarget
+}
+
 func SelectionTriggerClass() string {
 	return "commentui-selection-trigger"
+}
+
+func SelectionStyleExpr(prefix string) string {
+	if prefix == "" {
+		return ""
+	}
+	p := "$" + prefix
+	return "{'--commentui-selection-top': (" + p + ".top || 0) + 'px', '--commentui-selection-left': (" + p + ".left || 0) + 'px'}"
 }
 
 func TargetChromeOrVisible(chrome CommentTargetChrome) CommentTargetChrome {

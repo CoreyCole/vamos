@@ -250,6 +250,7 @@ func (s *Service) buildCommentUI(
 	hiddenFields := map[string]string{"doc_path": pageArgs.FilePath}
 	if pageArgs.ViewerArgs.CommentMode == CommentModeSelectionOnly {
 		hiddenFields["comment_target_chrome"] = string(commentui.CommentTargetChromePatchOnly)
+		hiddenFields["comment_selection_prefix"] = "comment_selection"
 	}
 	selection := commentui.SelectionSignalArgs{}
 	if commentModeHasSelection(pageArgs.ViewerArgs.CommentMode) {

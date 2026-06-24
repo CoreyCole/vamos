@@ -24,6 +24,7 @@ type commentFormData struct {
 	EndLine      int
 	EndColumn    int
 	TargetChrome commentui.CommentTargetChrome
+	SelectionPrefix string
 }
 
 func parseCommentForm(c echo.Context) commentFormData {
@@ -42,7 +43,13 @@ func parseCommentForm(c echo.Context) commentFormData {
 		EndLine:      parseFormInt(c, "end_line"),
 		EndColumn:    parseFormInt(c, "end_column"),
 		TargetChrome: commentui.CommentTargetChrome(c.FormValue("comment_target_chrome")),
+		SelectionPrefix: c.FormValue("comment_selection_prefix"),
 	}
+}
+
+type thoughtsCommentTargetOptions struct {
+	Chrome          commentui.CommentTargetChrome
+	SelectionPrefix string
 }
 
 func parseFormInt(c echo.Context, name string) int {
@@ -132,10 +139,19 @@ func (s *Service) thoughtsCommentThreadsWithSectionTitles(
 func thoughtsCommentTarget(
 	filePath, sectionID, headingHint, userEmail string,
 	comments []CommentWithReplies,
-	chrome ...commentui.CommentTargetChrome,
+	options ...thoughtsCommentTargetOptions,
 ) commentui.CommentTargetView {
 	sectionID = normalizeSectionID(sectionID)
 	prefix := commentui.SafeCommentTargetSlug("thoughts", filePath)
+	hiddenFields := map[string]string{"doc_path": filePath}
+	if len(options) > 0 {
+		if options[0].Chrome != "" {
+			hiddenFields["comment_target_chrome"] = string(options[0].Chrome)
+		}
+		if options[0].SelectionPrefix != "" {
+			hiddenFields["comment_selection_prefix"] = options[0].SelectionPrefix
+		}
+	}
 	target := commentui.BuildTargetView(commentui.TargetInput{
 		Surface:      commentui.CommentSurfaceThoughts,
 		IDPrefix:     prefix,
@@ -145,10 +161,11 @@ func thoughtsCommentTarget(
 		UserEmail:    userEmail,
 		Threads:      thoughtsCommentThreads(comments),
 		Routes:       thoughtsCommentRoutes(),
-		HiddenFields: map[string]string{"doc_path": filePath},
+		HiddenFields: hiddenFields,
 	})
-	if len(chrome) > 0 {
-		target.Chrome = chrome[0]
+	if len(options) > 0 {
+		target.Chrome = options[0].Chrome
+		target.SelectionSignalPrefix = options[0].SelectionPrefix
 	}
 	return target
 }
@@ -234,7 +251,7 @@ func (s *Service) HandleCancelCommentForm(c echo.Context) error {
 		data.HeadingHint,
 		userEmail,
 		sectionComments,
-		data.TargetChrome,
+		thoughtsCommentTargetOptions{Chrome: data.TargetChrome, SelectionPrefix: data.SelectionPrefix},
 	)
 
 	sse := datastar.NewSSE(c.Response().Writer, c.Request())
@@ -290,7 +307,7 @@ func (s *Service) HandleCommentForm(c echo.Context) error {
 	}
 
 	// Success - patch sidebar, remove form, and reset signals via SSE
-	return s.renderCommentSuccess(c, comment, userEmail, data.TargetChrome)
+	return s.renderCommentSuccess(c, comment, userEmail, data.TargetChrome, data.SelectionPrefix)
 }
 
 // renderFormError re-renders the form with an error message via SSE
@@ -313,7 +330,7 @@ func (s *Service) renderFormError(
 		data.HeadingHint,
 		userEmail,
 		sectionComments,
-		data.TargetChrome,
+		thoughtsCommentTargetOptions{Chrome: data.TargetChrome, SelectionPrefix: data.SelectionPrefix},
 	)
 	if err := patchThoughtsCommentTargetWithForm(sse, target, data, errMsg); err != nil {
 		return err
@@ -338,6 +355,7 @@ func (s *Service) renderCommentSuccess(
 	comment *db.WorkspaceDocComment,
 	userEmail string,
 	targetChrome commentui.CommentTargetChrome,
+	selectionPrefix string,
 ) error {
 	sse := datastar.NewSSE(c.Response().Writer, c.Request())
 
@@ -366,7 +384,7 @@ func (s *Service) renderCommentSuccess(
 		"",
 		userEmail,
 		sectionComments,
-		targetChrome,
+		thoughtsCommentTargetOptions{Chrome: targetChrome, SelectionPrefix: selectionPrefix},
 	)
 	if err := patchThoughtsCommentTarget(sse, target); err != nil {
 		return err
@@ -634,7 +652,7 @@ func (s *Service) HandleShowCommentForm(c echo.Context) error {
 		data.HeadingHint,
 		userEmail,
 		sectionComments,
-		data.TargetChrome,
+		thoughtsCommentTargetOptions{Chrome: data.TargetChrome, SelectionPrefix: data.SelectionPrefix},
 	)
 	if err := patchThoughtsCommentTargetWithForm(sse, target, data, ""); err != nil {
 		c.Logger().Errorf("Failed to patch shared comment target: %v", err)

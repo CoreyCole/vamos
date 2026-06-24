@@ -195,6 +195,7 @@ func TestThoughtsCommentShowFormPatchOnlyTargetOmitsVisibleSectionChrome(t *test
 	form.Set("heading_hint", "Document")
 	form.Set("selected_text", "Selected paragraph")
 	form.Set("comment_target_chrome", string(commentui.CommentTargetChromePatchOnly))
+	form.Set("comment_selection_prefix", "comment_selection")
 	c, rec := newCommentFormRequest(t, "/forms/comments/show", form)
 
 	if err := svc.HandleShowCommentForm(c); err != nil {
@@ -203,7 +204,9 @@ func TestThoughtsCommentShowFormPatchOnlyTargetOmitsVisibleSectionChrome(t *test
 	body := rec.Body.String()
 	for _, want := range []string{
 		`name="selected_text" value="Selected paragraph"`,
-		`commentui-popover-target`,
+		`commentui-popover-selection`,
+		`comment_selection.top`,
+		`comment_selection.left`,
 		commentui.TargetID(commentui.SafeCommentTargetSlug("thoughts", "thoughts/source.go"), "document"),
 	} {
 		if !strings.Contains(body, want) {
@@ -227,6 +230,7 @@ func TestThoughtsCommentCreatePatchOnlyTargetDoesNotReintroduceSectionChrome(t *
 	form.Set("selected_text", "Selected paragraph")
 	form.Set("comment_text", "Please clarify")
 	form.Set("comment_target_chrome", string(commentui.CommentTargetChromePatchOnly))
+	form.Set("comment_selection_prefix", "comment_selection")
 	c, rec := newCommentFormRequest(t, "/forms/comments", form)
 
 	if err := svc.HandleCommentForm(c); err != nil {

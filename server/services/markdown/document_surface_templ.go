@@ -711,7 +711,7 @@ func documentScrollRegionClass(kind DocumentKind) string {
 	case DocumentKindHTMLApplet:
 		return "min-h-0 flex-1 overflow-hidden"
 	case DocumentKindSource:
-		return "min-h-0 flex-1 overflow-auto bg-muted/20"
+		return "min-h-0 flex-1 overflow-auto bg-muted/20 flex flex-col"
 	default:
 		return "min-h-0 flex-1 overflow-y-auto p-4 md:p-10"
 	}

@@ -102,7 +102,7 @@ func TestDocumentSurfaceRendersSourceEdgeToEdge(t *testing.T) {
 		t.Fatal(err)
 	}
 	html := buf.String()
-	if !strings.Contains(html, `id="thoughts-markdown-scroll-region" class="min-h-0 flex-1 overflow-auto bg-muted/20"`) {
+	if !strings.Contains(html, `id="thoughts-markdown-scroll-region" class="min-h-0 flex-1 overflow-auto bg-muted/20 flex flex-col"`) {
 		t.Fatalf("Source document surface is not edge-to-edge and scrollable: %s", html)
 	}
 	if strings.Contains(html, `p-4 md:p-10`) {
