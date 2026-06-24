@@ -23,6 +23,7 @@ type commentFormData struct {
 	StartColumn  int
 	EndLine      int
 	EndColumn    int
+	TargetChrome commentui.CommentTargetChrome
 }
 
 func parseCommentForm(c echo.Context) commentFormData {
@@ -40,6 +41,7 @@ func parseCommentForm(c echo.Context) commentFormData {
 		StartColumn:  parseFormInt(c, "start_column"),
 		EndLine:      parseFormInt(c, "end_line"),
 		EndColumn:    parseFormInt(c, "end_column"),
+		TargetChrome: commentui.CommentTargetChrome(c.FormValue("comment_target_chrome")),
 	}
 }
 
@@ -130,10 +132,11 @@ func (s *Service) thoughtsCommentThreadsWithSectionTitles(
 func thoughtsCommentTarget(
 	filePath, sectionID, headingHint, userEmail string,
 	comments []CommentWithReplies,
+	chrome ...commentui.CommentTargetChrome,
 ) commentui.CommentTargetView {
 	sectionID = normalizeSectionID(sectionID)
 	prefix := commentui.SafeCommentTargetSlug("thoughts", filePath)
-	return commentui.BuildTargetView(commentui.TargetInput{
+	target := commentui.BuildTargetView(commentui.TargetInput{
 		Surface:      commentui.CommentSurfaceThoughts,
 		IDPrefix:     prefix,
 		DocPath:      filePath,
@@ -144,6 +147,10 @@ func thoughtsCommentTarget(
 		Routes:       thoughtsCommentRoutes(),
 		HiddenFields: map[string]string{"doc_path": filePath},
 	})
+	if len(chrome) > 0 {
+		target.Chrome = chrome[0]
+	}
+	return target
 }
 
 func patchThoughtsCommentTarget(
@@ -227,6 +234,7 @@ func (s *Service) HandleCancelCommentForm(c echo.Context) error {
 		data.HeadingHint,
 		userEmail,
 		sectionComments,
+		data.TargetChrome,
 	)
 
 	sse := datastar.NewSSE(c.Response().Writer, c.Request())
@@ -282,7 +290,7 @@ func (s *Service) HandleCommentForm(c echo.Context) error {
 	}
 
 	// Success - patch sidebar, remove form, and reset signals via SSE
-	return s.renderCommentSuccess(c, comment, userEmail)
+	return s.renderCommentSuccess(c, comment, userEmail, data.TargetChrome)
 }
 
 // renderFormError re-renders the form with an error message via SSE
@@ -305,6 +313,7 @@ func (s *Service) renderFormError(
 		data.HeadingHint,
 		userEmail,
 		sectionComments,
+		data.TargetChrome,
 	)
 	if err := patchThoughtsCommentTargetWithForm(sse, target, data, errMsg); err != nil {
 		return err
@@ -328,6 +337,7 @@ func (s *Service) renderCommentSuccess(
 	c echo.Context,
 	comment *db.WorkspaceDocComment,
 	userEmail string,
+	targetChrome commentui.CommentTargetChrome,
 ) error {
 	sse := datastar.NewSSE(c.Response().Writer, c.Request())
 
@@ -356,6 +366,7 @@ func (s *Service) renderCommentSuccess(
 		"",
 		userEmail,
 		sectionComments,
+		targetChrome,
 	)
 	if err := patchThoughtsCommentTarget(sse, target); err != nil {
 		return err
@@ -623,6 +634,7 @@ func (s *Service) HandleShowCommentForm(c echo.Context) error {
 		data.HeadingHint,
 		userEmail,
 		sectionComments,
+		data.TargetChrome,
 	)
 	if err := patchThoughtsCommentTargetWithForm(sse, target, data, ""); err != nil {
 		c.Logger().Errorf("Failed to patch shared comment target: %v", err)

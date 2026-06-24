@@ -86,6 +86,13 @@ type CommentReplyView struct {
 	Body        string
 }
 
+type CommentTargetChrome string
+
+const (
+	CommentTargetChromeVisible   CommentTargetChrome = "visible"
+	CommentTargetChromePatchOnly CommentTargetChrome = "patch-only"
+)
+
 type CommentTargetView struct {
 	ID           string
 	SignalKey    string
@@ -97,6 +104,7 @@ type CommentTargetView struct {
 	Threads      []CommentThreadView
 	Routes       CommentRoutes
 	HiddenFields map[string]string
+	Chrome       CommentTargetChrome
 }
 
 const (
@@ -206,6 +214,13 @@ func CommentPopoverClass(placement CommentPopoverPlacement) string {
 
 func SelectionTriggerClass() string {
 	return "commentui-selection-trigger"
+}
+
+func TargetChromeOrVisible(chrome CommentTargetChrome) CommentTargetChrome {
+	if chrome == "" {
+		return CommentTargetChromeVisible
+	}
+	return chrome
 }
 
 var slugUnsafe = regexp.MustCompile(`[^a-zA-Z0-9_-]+`)

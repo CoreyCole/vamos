@@ -216,18 +216,34 @@ templ CommentableSelectionHTML(args CommentableMarkdownArgs) {
 			<div class="h-full min-h-full w-full">
 				@templ.Raw(args.HTML)
 			</div>
+			@CommentTarget(CommentTargetView{
+				ID:           TargetID(args.IDPrefix, "document"),
+				SignalKey:    SignalKey(args.IDPrefix, "document"),
+				Surface:      args.Surface,
+				DocPath:      args.DocPath,
+				SectionID:    "document",
+				UserEmail:    args.UserEmail,
+				Threads:      DocumentComments(args.Comments),
+				Routes:       args.Routes,
+				HiddenFields: MergeHidden(args.HiddenFields, map[string]string{"section_hint": "document", "heading_hint": ""}),
+				Chrome:       CommentTargetChromePatchOnly,
+			})
 			@SelectedTextTrigger(args.SelectionSignals)
 		</div>
 	</div>
 }
 
 templ CommentTarget(args CommentTargetView) {
-	<div id={ args.ID } class="commentui-target flex items-center gap-1" data-comment-target="true">
-		if len(args.Threads) > 0 {
-			@CommentToggle(args)
-		}
-		@SectionMenu(args)
-	</div>
+	if TargetChromeOrVisible(args.Chrome) == CommentTargetChromePatchOnly {
+		<div id={ args.ID } class={ CommentAnchorClass(args.SignalKey) + " h-0 w-0 overflow-visible" } data-comment-target="true" aria-hidden="true"></div>
+	} else {
+		<div id={ args.ID } class="commentui-target flex items-center gap-1" data-comment-target="true">
+			if len(args.Threads) > 0 {
+				@CommentToggle(args)
+			}
+			@SectionMenu(args)
+		</div>
+	}
 }
 
 templ CommentTargetWithForm(args CommentTargetView, view CommentFormView) {
@@ -240,7 +256,9 @@ templ CommentTargetWithForm(args CommentTargetView, view CommentFormView) {
 				}
 			}
 		</div>
-		@SectionMenu(args)
+		if TargetChromeOrVisible(args.Chrome) != CommentTargetChromePatchOnly {
+			@SectionMenu(args)
+		}
 	</div>
 }
 

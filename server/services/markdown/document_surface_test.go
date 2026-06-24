@@ -140,6 +140,8 @@ func TestDocumentSurfaceRendersSourceSelectionOnlyWithoutCommentTarget(t *testin
 		`data-on:mouseup__debounce.500ms.leading=`,
 		`id="comment_selection-inline-comment-trigger"`,
 		`data-section-id="document"`,
+		`data-comment-target="true"`,
+		`commentui-anchor relative`,
 		`/forms/comments/show`,
 	} {
 		if !strings.Contains(html, want) {
@@ -147,7 +149,6 @@ func TestDocumentSurfaceRendersSourceSelectionOnlyWithoutCommentTarget(t *testin
 		}
 	}
 	for _, unwanted := range []string{
-		`data-comment-target="true"`,
 		`Add comment`,
 		`aria-label="Section actions"`,
 	} {

@@ -247,13 +247,17 @@ func (s *Service) buildCommentUI(
 	userEmail string,
 	threads []commentui.CommentThreadView,
 ) commentui.CommentableMarkdownArgs {
+	hiddenFields := map[string]string{"doc_path": pageArgs.FilePath}
+	if pageArgs.ViewerArgs.CommentMode == CommentModeSelectionOnly {
+		hiddenFields["comment_target_chrome"] = string(commentui.CommentTargetChromePatchOnly)
+	}
 	selection := commentui.SelectionSignalArgs{}
 	if commentModeHasSelection(pageArgs.ViewerArgs.CommentMode) {
 		selection = commentui.SelectionSignalArgs{
 			Prefix:          "comment_selection",
 			ExcludeSelector: "#comment-sidebar, [data-comment-target=true], [id^=comment-target-], [id^=section-comments-]",
 			ShowRoute:       "/forms/comments/show",
-			HiddenFields:    map[string]string{"doc_path": pageArgs.FilePath},
+			HiddenFields:    hiddenFields,
 			ContainerID:     "thoughts-markdown-scroll-region",
 		}
 	}
@@ -279,7 +283,7 @@ func (s *Service) buildCommentUI(
 				return "/forms/resolve"
 			},
 		},
-		HiddenFields:     map[string]string{"doc_path": pageArgs.FilePath},
+		HiddenFields:     hiddenFields,
 		SelectionSignals: selection,
 	}
 }
