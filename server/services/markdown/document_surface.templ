@@ -128,10 +128,12 @@ func hasOpenChatAction(actions []DocumentAction) bool {
 }
 
 func documentScrollRegionClass(kind DocumentKind) string {
-	if kind == DocumentKindHTMLApplet {
+	switch kind {
+	case DocumentKindHTMLApplet, DocumentKindSource:
 		return "min-h-0 flex-1 overflow-hidden"
+	default:
+		return "min-h-0 flex-1 overflow-y-auto p-4 md:p-10"
 	}
-	return "min-h-0 flex-1 overflow-y-auto p-4 md:p-10"
 }
 
 func documentActionButtonClass(action DocumentAction) string {

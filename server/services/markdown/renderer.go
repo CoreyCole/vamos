@@ -26,10 +26,11 @@ const (
 )
 
 type Renderer struct {
-	highlightStyle *chroma.Style
-	htmlFormatter  *html.Formatter
-	mdhtmlRenderer *mdhtml.Renderer
-	projects       server.ProjectsConfig
+	highlightStyle       *chroma.Style
+	htmlFormatter        *html.Formatter
+	sourceHTMLFormatter  *html.Formatter
+	mdhtmlRenderer       *mdhtml.Renderer
+	projects             server.ProjectsConfig
 }
 
 func NewRenderer(highlightStyleString string) (*Renderer, error) {
@@ -58,12 +59,22 @@ func NewRendererWithProjects(
 	if htmlFormatter == nil {
 		return nil, errors.New("couldn't create html formatter")
 	}
+	sourceHTMLFormatter := html.New(
+		html.WithClasses(true),
+		html.TabWidth(2),
+		html.WithLineNumbers(true),
+		html.WithLinkableLineNumbers(true, "L"),
+	)
+	if sourceHTMLFormatter == nil {
+		return nil, errors.New("couldn't create source html formatter")
+	}
 	mdhtmlRenderer := mdhtmlRenderer(highlightStyle, htmlFormatter)
 	return &Renderer{
-		highlightStyle: highlightStyle,
-		htmlFormatter:  htmlFormatter,
-		mdhtmlRenderer: mdhtmlRenderer,
-		projects:       projects,
+		highlightStyle:      highlightStyle,
+		htmlFormatter:       htmlFormatter,
+		sourceHTMLFormatter: sourceHTMLFormatter,
+		mdhtmlRenderer:      mdhtmlRenderer,
+		projects:            projects,
 	}, nil
 }
 
@@ -80,7 +91,11 @@ func (m Renderer) MarkdownBytesToHTML(md []byte) string {
 
 func (m Renderer) HighlightSource(source, lang string) (string, error) {
 	var buf bytes.Buffer
-	if err := htmlHighlight(&buf, source, lang, "", m.highlightStyle, m.htmlFormatter); err != nil {
+	formatter := m.sourceHTMLFormatter
+	if formatter == nil {
+		formatter = m.htmlFormatter
+	}
+	if err := htmlHighlight(&buf, source, lang, "", m.highlightStyle, formatter); err != nil {
 		return "", err
 	}
 	return buf.String(), nil

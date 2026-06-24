@@ -1,24 +1,9 @@
 package markdown
 
-import "fmt"
-
 templ SourceDocumentView(doc SourceDocument) {
-	<section class="source-document-content w-full">
-		<div class="mb-3 flex items-center justify-between gap-3 text-xs text-muted-foreground">
-			<span class="font-mono">{ doc.Path }</span>
-			if doc.Language != "" {
-				<span class="rounded border border-border px-2 py-1 font-mono uppercase">{ doc.Language }</span>
-			}
-		</div>
-		<div class="grid grid-cols-[auto_minmax(0,1fr)] overflow-x-auto rounded-lg border border-border bg-muted/20 text-sm">
-			<div class="select-none border-r border-border px-3 py-3 text-right font-mono text-xs leading-6 text-muted-foreground">
-				for i := 1; i <= doc.LineCount; i++ {
-					<div id={ fmt.Sprintf("L%d", i) } data-source-line-number={ fmt.Sprintf("%d", i) }>{ fmt.Sprintf("%d", i) }</div>
-				}
-			</div>
-			<div class="min-w-0 px-3 py-3 font-mono leading-6 [&_pre]:m-0 [&_pre]:whitespace-pre">
-				@templ.Raw(doc.HTML)
-			</div>
+	<section class="source-document-content min-h-full w-full bg-muted/20">
+		<div class="source-code-block overflow-x-auto text-sm [&_.chroma]:bg-transparent [&_.cl]:pl-4 [&_.line]:block [&_.ln]:inline-block [&_.ln]:w-12 [&_.ln]:select-none [&_.ln]:border-r [&_.ln]:border-border [&_.ln]:pr-3 [&_.ln]:text-right [&_.ln]:font-mono [&_.ln]:text-xs [&_.ln]:text-muted-foreground [&_.lnlinks]:outline-none [&_.lnlinks]:no-underline [&_.lnlinks]:text-inherit [&_code]:block [&_pre]:m-0 [&_pre]:min-h-full [&_pre]:px-0 [&_pre]:py-4 [&_pre]:font-mono [&_pre]:leading-6 [&_pre]:whitespace-pre">
+			@templ.Raw(doc.HTML)
 		</div>
 	</section>
 }

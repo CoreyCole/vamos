@@ -702,10 +702,12 @@ func hasOpenChatAction(actions []DocumentAction) bool {
 }
 
 func documentScrollRegionClass(kind DocumentKind) string {
-	if kind == DocumentKindHTMLApplet {
+	switch kind {
+	case DocumentKindHTMLApplet, DocumentKindSource:
 		return "min-h-0 flex-1 overflow-hidden"
+	default:
+		return "min-h-0 flex-1 overflow-y-auto p-4 md:p-10"
 	}
-	return "min-h-0 flex-1 overflow-y-auto p-4 md:p-10"
 }
 
 func documentActionButtonClass(action DocumentAction) string {
@@ -747,7 +749,7 @@ func OpenChatComposerAttachments(docPath string) templ.Component {
 		var templ_7745c5c3_Var37 string
 		templ_7745c5c3_Var37, templ_7745c5c3_Err = templ.JoinStringErrs(docPath)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/markdown/document_surface.templ`, Line: 150, Col: 62}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/markdown/document_surface.templ`, Line: 152, Col: 62}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var37))
 		if templ_7745c5c3_Err != nil {
@@ -760,7 +762,7 @@ func OpenChatComposerAttachments(docPath string) templ.Component {
 		var templ_7745c5c3_Var38 string
 		templ_7745c5c3_Var38, templ_7745c5c3_Err = templ.JoinStringErrs(filepath.Base(docPath))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/markdown/document_surface.templ`, Line: 152, Col: 126}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/markdown/document_surface.templ`, Line: 154, Col: 126}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var38))
 		if templ_7745c5c3_Err != nil {

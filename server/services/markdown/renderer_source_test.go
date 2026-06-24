@@ -36,10 +36,13 @@ func TestSourceRendererRendersJSONAsSource(t *testing.T) {
 		t.Fatal(err)
 	}
 	html := buf.String()
-	for _, want := range []string{"source-document-content", "thoughts/data.json", "json", `data-source-line-number="1"`, "ok"} {
+	for _, want := range []string{"source-document-content", "source-code-block", `id="L1"`, `class="ln"`, "ok"} {
 		if !strings.Contains(html, want) {
 			t.Fatalf("source component missing %q: %s", want, html)
 		}
+	}
+	if strings.Contains(html, "thoughts/data.json") {
+		t.Fatalf("source component should not repeat document path already present in URL: %s", html)
 	}
 }
 
