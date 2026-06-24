@@ -56,6 +56,7 @@ type StartWorkflowInput struct {
 	Cwd            string
 	WorkflowType   WorkspaceWorkflowType
 	Policy         json.RawMessage
+	StartNodeID    wruntime.NodeID
 	PromptOverride string
 }
 
@@ -460,11 +461,20 @@ func (s *Service) StartWorkflow(
 	if err != nil {
 		return "", err
 	}
+	startNodeID := input.StartNodeID
+	if startNodeID == "" {
+		startNodeID = def.Start
+	}
+	node, ok := def.Nodes[startNodeID]
+	if !ok {
+		return "", fmt.Errorf("workflow node %q is not registered", startNodeID)
+	}
+	state.CurrentNodeID = startNodeID
+	state.PendingNextNodeID = startNodeID
 	stateJSON, err := json.Marshal(state)
 	if err != nil {
 		return "", err
 	}
-	node := def.Nodes[def.Start]
 	prompt, err := agentchatworkflows.RenderNodePrompt(ctx, def, node, state)
 	if err != nil {
 		return "", err
@@ -486,7 +496,7 @@ func (s *Service) StartWorkflow(
 	}
 	return s.StartNodeRun(ctx, agentchatworkflows.StartNodeRunInput{
 		WorkspaceID: workspaceRecord.ID,
-		NodeID:      def.Start,
+		NodeID:      startNodeID,
 		Prompt:      prompt,
 		Attempt:     1,
 	})

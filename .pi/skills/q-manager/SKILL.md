@@ -15,7 +15,7 @@ Supervise QRSPI from a main Pi manager session. Launch focused child Pi sessions
 1. Read `docs/q-manager.md` when present for manager behavior only; do not stuff manager instructions into child stage prompts.
 1. Read the target plan `AGENTS.md`.
 1. Read the latest QRSPI result artifact or user-provided result YAML.
-1. Use `vamos qrspi start-next` for normal launch/resume. Use `init`, `render-prompt`, `run-child`, `validate-result`, `decide-next`, and `reprompt-child` only for debug/recovery.
+1. Use `vamos qrspi start-next` for normal launch/resume. Use default concise text output for normal manager commands; reserve `--output ndjson` for debug/recovery when structured output is specifically needed. Use `init`, `render-prompt`, `run-child`, `validate-result`, `decide-next`, and `reprompt-child` only for debug/recovery.
 
 ## General guiding principles
 
@@ -33,13 +33,13 @@ Supervise QRSPI from a main Pi manager session. Launch focused child Pi sessions
 - Child work must be visible and interruptible in tmux. No hidden background child runner as primary UX.
 - Manager state is disposable control state under user state dir, keyed by canonical `plan_dir`; never use repo-local `.vamos/q-manager`.
 - QRSPI artifacts and fenced `qrspi_result` YAML remain durable truth.
-- Respect `advanceMode`: `discuss` stops after valid result; `guided` starts graph-safe non-human edges, including implementation `status: handoff` checkpoints that should launch the next fresh implementation/resume child; `autopilot` can auto-approve only graph-marked safe gates.
+- Respect manager-owned policy. `guided` is the default. `advanceMode`: `discuss` stops after valid result; `guided` starts graph-safe non-human edges, including implementation `status: handoff` checkpoints that should launch the next fresh implementation/resume child; `autopilot` can auto-approve only graph-marked safe gates. Plan reviews are controlled independently by `enablePlanReviews`, so both autopilot with reviews on and autopilot with reviews off are valid. Child-emitted `qrspi_result.policy` is informational only; it must not change manager policy or fail validation merely because it differs from manager state.
 - Stop on human gates, implementation complete/review-ready results, blocked/error results, invalid result retry exhaustion, lock conflict, or ambiguous project judgment named by `docs/q-manager.md`. Do not stop merely because an implementation child emitted `status: handoff`; in guided/autopilot, start the next fresh child for the same implement/resume work.
 - Treat a normal wake as validated manager-needed state, not raw child turn end. Expect `q_manager_child_wake.validated=true` for graph-valid states or `retry_exhausted=true` when automated result repair failed. Ignore raw `agent_end`, `done`, and `status.json` as normal manager triggers.
 - Before raising a blocked result to the human, diagnose the blockage from deterministic evidence: read the blocker artifact, reproduce the failing command when safe, compare against a clean/main baseline when feasible, distinguish stack-caused vs baseline/environment failures, and report a concise summary plus recommended next action. Do not simply echo `status: blocked`.
 - After `/q-workspace`, run implementation/review/verify child stages in `workspace_metadata.implementation_workspace` when graph semantics require implementation cwd.
 - For implementation-review follow-up/review-dir plans that already have `workspace_metadata.implementation_workspace`, do not imply a fresh workspace/copy/reset. Prompts for `/q-plan` and planning review must state that implementation should stack in the existing implementation workspace on the reviewed head. If the current graph forces a `workspace` node anyway, that node must preserve/reaffirm the existing workspace and continue to implementation; do not create a new copy.
-- Pi session metadata redesign is out of scope; q-manager assigns exact child `--session-id` / `--session-dir` using current Pi flags.
+- Pi session metadata redesign is out of scope; q-manager assigns exact child `--session-id` / `--session-dir` using current Pi flags. Child Pi sessions belong in the plan workspace `.sessions/pi/` directory, not the local manager state directory, so humans can easily inspect and `pi --resume` a stage session from the workspace.
 - Child session JSONL is authoritative for result parsing. tmux transcript/output is diagnostic.
 - Stay high-level as manager. When an active child has adequate stage context, do not edit that child’s plan/design/outline artifacts yourself; gather human feedback and steer the same child to apply it. Manager-owned edits should be limited to manager operational notes/skills unless explicitly asked otherwise.
 - Treat human feedback as first-class child input. If the human says important context, corrections, priorities, approvals, or objections to the manager, decide whether it is relevant to the active child’s current task. If relevant, enrich it with minimal routing context and forward it to the same child via the q-manager CLI steering path. Do not keep important task context trapped in the manager transcript.
@@ -51,6 +51,8 @@ Supervise QRSPI from a main Pi manager session. Launch focused child Pi sessions
 - Child prompts should be stage-work prompts, not manager runbooks. The primary child context should be the previous stage's fenced `qrspi_result` YAML plus minimal routing metadata needed to read planning docs and start the selected stage. The CLI should pass that YAML directly to the child prompt from manager state/session JSONL; do not paste the YAML into the parent manager chat.
 - Manager-specific instructions from `docs/q-manager.md` are for the parent manager/CLI. Do not embed the full manager manifest in every child prompt. If the CLI needs manifest-derived child context, render a small normalized child-safe summary, not raw docs.
 - q-manager may accept extra operator context for a child, but that context should be explicit and additive. A valid previous `qrspi_result` should normally be sufficient for the child to read the plan docs and proceed.
+- Keep manager context lean. Do not request verbose machine output such as `--output ndjson` on normal `start-next`, `continue`, or `steer-child` commands. Use the default text output in the wake-driven loop; switch to NDJSON only for targeted debugging, parser/graph recovery, or when a recovery command explicitly requires structured fields.
+- If the human wants a faster/different child model, pass `--model` on `start-next`, `continue`, or `run-child`. Prefer provider-qualified IDs such as `openai-codex/gpt-5.4` instead of bare `gpt-5.4`; bare names may route to the wrong provider and trigger auth errors (for example Azure API key errors).
 
 ## Wake-driven manager loop
 
@@ -61,13 +63,16 @@ Primary loop: launch/resume child with `start-next`, then wait for a validated p
    ```bash
    vamos qrspi start-next --plan-dir <plan-dir> --project-root <repo-root> --manager-pane "$TMUX_PANE"
    ```
+   For fast outline-first work where the human aligns on the outline and then q-manager should go straight through plan -> implement with plan reviews off, launch with `--node outline --policy-preset fast`.
+   If the human requests a specific child model, add `--model <provider/model>` such as `--model openai-codex/gpt-5.4`.
    Add `--node <node>` / `--implementation-cwd <cwd>` only when deliberately resuming or testing a specific implementation, review, or verify stage. If parent context usage is explicitly known, pass `--manager-usage-percent <n>` or `--manager-usage-tokens <n> --manager-usage-window <n>`; above 80%, the CLI writes a manager operational handoff, marks delivery compacting, and prints the exact `manager-ready` command. Missing usage skips compaction; do not guess from token totals alone. If the parent already has a latest fenced result, pass it with `--latest-result-stdin` or `--latest-result-file`; the CLI validates/persists it before prompt embedding.
-1. Capture `stateFile` and active child refs from concise output/NDJSON. The CLI writes the child prompt file atomically and launches the visible child; do not hand-render or paste prompts on the happy path.
-1. Stop issuing commands and wait for the child extension/CLI to deliver a validated `q_manager_child_wake`. If manager delivery is `compacting`, the wake queues; after parent reset/restart, run the printed `vamos qrspi manager-ready --state-file "$STATE" --manager-pane "$TMUX_PANE"` command to mark ready and flush the queued wake exactly once. The wake should include `validated`, `manager_needed`, `retry_exhausted`, stage/status/artifact when known, and the exact `continue` command.
+1. Capture `stateFile` and active child refs from the concise default text output. The CLI writes the child prompt file atomically and launches the visible child; do not hand-render or paste prompts on the happy path. Do not add `--output ndjson` on the happy path; it bloats the manager context.
+1. Stop issuing commands and wait for the child extension/CLI to deliver a validated `q_manager_child_wake`. If manager delivery is `compacting`, the wake queues; after parent reset/restart, run the printed `vamos qrspi manager-ready --state-file "$STATE" --manager-pane "$TMUX_PANE"` command to mark ready and flush the queued wake exactly once. The wake should include `validated`, `manager_needed`, `retry_exhausted`, stage/status/artifact when known, active manager policy, child summary lines, next-child context (`stage`, `skill`, `cwd`, `working_on`), and the exact `continue` command.
 1. Run the single normal manager continuation command from the wake:
    ```bash
    vamos qrspi continue --state-file "$STATE"
    ```
+   If the human requested a model override for future children, keep passing it here too, for example `--model openai-codex/gpt-5.4`.
    `continue` validates the active child session JSONL, reconciles active-child health from tmux/status/session evidence before YAML retry, reprompts the same child while retry remains, persists canonical graph decisions for valid results, launches graph-selected next child when safe, and reports concise stop reasons. Repairable failures return action cards with evidence and exact safe commands such as `repair-state --align-active-child && continue` or `repair-state --clear-failed-child --relaunch`; run those commands when evidence is deterministic. Do not paste raw validate/decide NDJSON into manager chat, and do not handcraft child correction prose.
 
 For review-dir / implementation-review follow-up plans, same-workspace routing should come from previous `qrspi_result.workspace_metadata` and plan docs. If the CLI detects and summarizes it, keep the summary child-safe and minimal: do not create a new implementation copy or reset to trunk; stack follow-up implementation on the existing implementation workspace/head.
@@ -86,6 +91,11 @@ vamos qrspi reprompt-child --state-file "$STATE" --plan-dir <plan-dir> --stage <
 vamos qrspi repair-state --state-file "$STATE" --align-active-child
 vamos qrspi repair-state --state-file "$STATE" --clear-failed-child --relaunch
 vamos qrspi mark-child-active --state-file "$STATE" --child-id <id> --reason manual-reprompt
+vamos qrspi set-policy --state-file "$STATE" --preset guided
+vamos qrspi set-policy --state-file "$STATE" --preset autopilot
+vamos qrspi set-policy --state-file "$STATE" --preset autopilot-no-plan-reviews
+vamos qrspi set-policy --state-file "$STATE" --preset fast
+vamos qrspi set-policy --state-file "$STATE" --advance-mode autopilot --enable-plan-reviews=true
 vamos qrspi inspect --state-file "$STATE" --sessions --latest
 vamos qrspi find-latest-child --state-file "$STATE" --stage <node>
 vamos qrspi rebind-child --state-file "$STATE" --session-file <jsonl> --stage <node> --reason manual-new

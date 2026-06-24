@@ -14,6 +14,7 @@ type InitOptions struct {
 	PlanDir           string
 	ProjectRoot       string
 	PolicyFile        string
+	PolicyPreset      string
 	NodeID            string
 	ImplementationCwd string
 	ManagerPane       string
@@ -39,6 +40,7 @@ type StartNextOptions struct {
 	ProjectRoot       string
 	StateFile         string
 	PolicyFile        string
+	PolicyPreset      string
 	NodeID            string
 	ImplementationCwd string
 	ManagerPane       string
@@ -64,20 +66,36 @@ type StartNextResult struct {
 }
 
 type ManagerNotice struct {
-	Kind            string `json:"kind,omitempty"`
-	Validated       bool   `json:"validated"`
-	ManagerNeeded   bool   `json:"managerNeeded"`
-	RetryExhausted  bool   `json:"retryExhausted"`
-	StateFile       string `json:"stateFile,omitempty"`
-	Stage           string `json:"stage,omitempty"`
-	Status          string `json:"status,omitempty"`
-	Outcome         string `json:"outcome,omitempty"`
-	Artifact        string `json:"artifact,omitempty"`
-	ChildPane       string `json:"childPane,omitempty"`
-	Summary         string `json:"summary,omitempty"`
-	ManagerGuidance string `json:"managerGuidance,omitempty"`
-	NextCommand     string `json:"nextCommand,omitempty"`
-	FeedbackCommand string `json:"feedbackCommand,omitempty"`
+	Kind            string        `json:"kind,omitempty"`
+	Validated       bool          `json:"validated"`
+	ManagerNeeded   bool          `json:"managerNeeded"`
+	RetryExhausted  bool          `json:"retryExhausted"`
+	StateFile       string        `json:"stateFile,omitempty"`
+	Stage           string        `json:"stage,omitempty"`
+	Status          string        `json:"status,omitempty"`
+	Outcome         string        `json:"outcome,omitempty"`
+	Artifact        string        `json:"artifact,omitempty"`
+	ChildPane       string        `json:"childPane,omitempty"`
+	Summary         string        `json:"summary,omitempty"`
+	ManagerGuidance string        `json:"managerGuidance,omitempty"`
+	Policy          PolicySummary `json:"policy,omitempty"`
+	NextChild       NextChildInfo `json:"nextChild,omitempty"`
+	NextCommand     string        `json:"nextCommand,omitempty"`
+	FeedbackCommand string        `json:"feedbackCommand,omitempty"`
+}
+
+type PolicySummary struct {
+	AdvanceMode             string `json:"advanceMode,omitempty"`
+	AutoMode                bool   `json:"autoMode,omitempty"`
+	EnablePlanReviews       bool   `json:"enablePlanReviews"`
+	InvalidResultRetryLimit int    `json:"invalidResultRetryLimit,omitempty"`
+}
+
+type NextChildInfo struct {
+	Stage     string `json:"stage,omitempty"`
+	Skill     string `json:"skill,omitempty"`
+	Cwd       string `json:"cwd,omitempty"`
+	WorkingOn string `json:"workingOn,omitempty"`
 }
 
 type ChildCompletionOptions struct {
@@ -111,6 +129,7 @@ type ChildCompletionStatus struct {
 	ChildID        string                  `json:"childId"`
 	DeliveryID     string                  `json:"deliveryId"`
 	Result         ChildCompletionResult   `json:"result,omitempty"`
+	NextChild      NextChildInfo           `json:"nextChild,omitempty"`
 	Wake           WakeDeliveryInstruction `json:"wake"`
 	ActionCard     *ManagerActionCard      `json:"actionCard,omitempty"`
 	Normalizations []ResultNormalization   `json:"normalizations,omitempty"`
@@ -127,11 +146,15 @@ type ResultNormalization struct {
 }
 
 type ChildCompletionResult struct {
-	Stage    string `json:"stage,omitempty"`
-	Status   string `json:"status,omitempty"`
-	Outcome  string `json:"outcome,omitempty"`
-	Artifact string `json:"artifact,omitempty"`
-	Summary  string `json:"summary,omitempty"`
+	Stage          string        `json:"stage,omitempty"`
+	Status         string        `json:"status,omitempty"`
+	Outcome        string        `json:"outcome,omitempty"`
+	Artifact       string        `json:"artifact,omitempty"`
+	Summary        string        `json:"summary,omitempty"`
+	PlanGoal       string        `json:"planGoal,omitempty"`
+	StageCompleted string        `json:"stageCompleted,omitempty"`
+	KeyDecisions   string        `json:"keyDecisions,omitempty"`
+	ChildPolicy    PolicySummary `json:"childPolicy,omitempty"`
 }
 
 type WakeDeliveryInstruction struct {
@@ -514,6 +537,17 @@ type ContinueOptions struct {
 	Usage     ManagerUsageInput
 }
 
+type SetPolicyOptions struct {
+	StateFile               string
+	Preset                  string
+	AdvanceMode             string
+	EnablePlanReviews       bool
+	EnablePlanReviewsSet    bool
+	InvalidResultRetryLimit int
+	InvalidRetryLimitSet    bool
+	Output                  string
+}
+
 type ContinueResult struct {
 	Validated       *ParsedDecision
 	Reprompted      bool
@@ -524,6 +558,8 @@ type ContinueResult struct {
 	WaitingHuman    bool
 	NextNodeID      wruntime.NodeID
 	PrimaryArtifact string
+	Policy          PolicySummary
+	NextChild       NextChildInfo
 	HumanPrompt     HumanPromptContext
 	ActionCard      *ManagerActionCard
 }

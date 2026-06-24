@@ -598,7 +598,7 @@ func StartQRSPIQuestionToDesignWorkspace() spec.Step {
 		prompt := qrspiQuestionToDesignPrompt(fixture.Marker, fixture.QuestionRel, fixture.FixtureRel)
 		values := url.Values{}
 		values.Set("workflow_type", "qrspi")
-		values.Set("policy_preset", "assisted")
+		values.Set("policy_preset", "autopilot")
 		values.Set("plan_dir", "thoughts/"+fixture.PlanRel)
 		values.Set("e2e_qrspi_start_prompt", prompt)
 		visit(t, ctx, "/agent-chat/plan-workspace?"+values.Encode())

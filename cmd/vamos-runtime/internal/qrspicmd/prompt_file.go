@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/CoreyCole/vamos/pkg/agents/workflows/qrspi"
 	wruntime "github.com/CoreyCole/vamos/pkg/agents/workflows/runtime"
 )
 
@@ -42,13 +43,16 @@ func resolveOrInitStartState(
 	if projectRoot == "" {
 		projectRoot = "."
 	}
-	policy, err := readPolicyFile(opts.PolicyFile)
+	policy, err := initialPolicy(opts.PolicyFile, opts.PolicyPreset)
 	if err != nil {
 		return ManagerState{}, "", err
 	}
 	state, err := InitialManagerState(opts.PlanDir, projectRoot, policy)
 	if err != nil {
 		return ManagerState{}, "", err
+	}
+	if isFastPolicyPreset(opts.PolicyPreset) && strings.TrimSpace(opts.NodeID) == "" {
+		opts.NodeID = string(qrspi.NodeOutline)
 	}
 	if err := ApplyInitOverrides(
 		&state,

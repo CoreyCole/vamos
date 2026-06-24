@@ -57,7 +57,10 @@ Default `continue` output is concise text for manager chat, not the raw validate
 validated: review-implementation complete
 outcome: ready-for-human-review
 artifact: thoughts/.../review.md
+policy: autopilot, plan reviews on, retries 1
 next: verify
+next child: verify
+working on: Run verification, inspect artifacts, and produce verify.md.
 started child: verify (%144)
 ```
 
@@ -79,6 +82,11 @@ vamos qrspi doctor --state-file <state> --output text
 vamos qrspi repair-state --state-file <state> --align-active-child
 vamos qrspi repair-state --state-file <state> --clear-failed-child --relaunch
 vamos qrspi mark-child-active --state-file <state> --child-id <id> --reason manual-reprompt
+vamos qrspi set-policy --state-file <state> --preset guided
+vamos qrspi set-policy --state-file <state> --preset autopilot
+vamos qrspi set-policy --state-file <state> --preset autopilot-no-plan-reviews
+vamos qrspi set-policy --state-file <state> --preset fast
+vamos qrspi set-policy --state-file <state> --advance-mode autopilot --enable-plan-reviews=true
 vamos qrspi inspect --state-file <state> --sessions --latest
 vamos qrspi find-latest-child --state-file <state> --stage <node>
 vamos qrspi validate-latest --state-file <state> --stage <node> --apply-rebind
@@ -89,7 +97,7 @@ Use `doctor` when launch compatibility, state-root writability, tmux health, lat
 
 ## Session metadata boundary
 
-Do not require Pi session metadata schema/API changes. q-manager assigns exact child `--session-id` values inside manager-owned `--session-dir` directories and treats the resulting Pi session JSONL as the authoritative child result source. tmux/stdout transcripts and plaintext result files are diagnostics only; `--result-file` is a deprecated debug fallback, not the manager default.
+Do not require Pi session metadata schema/API changes. q-manager assigns exact child `--session-id` values and stores child Pi JSONL under the plan workspace `.sessions/pi/` directory, not under the local manager state directory, so humans can discover and `pi --resume` stage sessions from the workspace. q-manager treats the resulting Pi session JSONL as the authoritative child result source. tmux/stdout transcripts and plaintext result files are diagnostics only; `--result-file` is a deprecated debug fallback, not the manager default.
 
 ## Deterministic reload sources
 
@@ -115,7 +123,7 @@ Reload from this manifest, `.pi/skills/q-manager/SKILL.md`, `.pi/skills/qrspi-pl
    vamos qrspi start-next --plan-dir <plan> --project-root "$PWD" --manager-pane "$TMUX_PANE"
    ```
    Optional: pass explicit parent usage (`--manager-usage-percent 82` or token/window flags). Missing usage skips compaction; q-manager does not guess.
-1. Confirm the child pane is visible and launch refs include `--session-id`, `--session-dir`, and `--extension`.
+1. Confirm the child pane is visible and launch refs include `--session-id`, `--session-dir`, and `--extension`; `--session-dir` should point at the plan workspace `.sessions/pi/` directory.
 1. Confirm no parent wake appears for invalid/missing result turns while retry remains, including header-like SSE noise.
 1. When the child reaches a valid graph result or retry exhaustion, confirm the parent pane receives one buffered wake prompt with validation fields and `param: "vamos qrspi continue --state-file <state>"`. If the manager was compacting, confirm no immediate paste occurs until `vamos qrspi manager-ready --state-file <state> --manager-pane "$TMUX_PANE"` flushes the queued wake.
 1. Run the exact `continue --state-file <state>` command from the wake.

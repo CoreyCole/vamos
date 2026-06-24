@@ -19,14 +19,7 @@ const (
 	WorkflowPolicyPresetDiscuss   WorkflowPolicyPreset = "discuss"
 	WorkflowPolicyPresetGuided    WorkflowPolicyPreset = "guided"
 	WorkflowPolicyPresetAutopilot WorkflowPolicyPreset = "autopilot"
-	WorkflowPolicyPresetFastDraft WorkflowPolicyPreset = "fast_draft"
-)
-
-const (
-	legacyWorkflowPolicyPresetManual   WorkflowPolicyPreset = "manual"
-	legacyWorkflowPolicyPresetAssisted WorkflowPolicyPreset = "assisted"
-	WorkflowPolicyPresetManual         WorkflowPolicyPreset = WorkflowPolicyPresetGuided
-	WorkflowPolicyPresetAssisted       WorkflowPolicyPreset = WorkflowPolicyPresetAutopilot
+	WorkflowPolicyPresetFast      WorkflowPolicyPreset = "fast"
 )
 
 type WorkspaceWorkflowPolicyProjection struct {
@@ -67,7 +60,7 @@ func PolicyForPreset(preset WorkflowPolicyPreset) qrspi.Policy {
 			EnablePlanReviews:       true,
 			InvalidResultRetryLimit: 1,
 		}
-	case WorkflowPolicyPresetFastDraft:
+	case WorkflowPolicyPresetFast:
 		return qrspi.Policy{
 			AdvanceMode:             qrspi.AdvanceModeAutopilot,
 			AutoMode:                true,
@@ -81,14 +74,14 @@ func PolicyForPreset(preset WorkflowPolicyPreset) qrspi.Policy {
 
 func parseWorkflowPolicyPreset(value string) (WorkflowPolicyPreset, error) {
 	switch WorkflowPolicyPreset(strings.TrimSpace(value)) {
-	case "", WorkflowPolicyPresetGuided, legacyWorkflowPolicyPresetManual:
+	case "", WorkflowPolicyPresetGuided:
 		return WorkflowPolicyPresetGuided, nil
 	case WorkflowPolicyPresetDiscuss:
 		return WorkflowPolicyPresetDiscuss, nil
-	case WorkflowPolicyPresetAutopilot, legacyWorkflowPolicyPresetAssisted:
+	case WorkflowPolicyPresetAutopilot:
 		return WorkflowPolicyPresetAutopilot, nil
-	case WorkflowPolicyPresetFastDraft:
-		return WorkflowPolicyPresetFastDraft, nil
+	case WorkflowPolicyPresetFast:
+		return WorkflowPolicyPresetFast, nil
 	default:
 		return "", fmt.Errorf("unknown workflow policy preset %q", value)
 	}
@@ -144,7 +137,7 @@ func presetForPolicy(policy qrspi.Policy) WorkflowPolicyPreset {
 	case policy.EffectiveAdvanceMode() == qrspi.AdvanceModeAutopilot && policy.EnablePlanReviews && policy.InvalidResultRetryLimit == 1:
 		return WorkflowPolicyPresetAutopilot
 	case policy.EffectiveAdvanceMode() == qrspi.AdvanceModeAutopilot && !policy.EnablePlanReviews && policy.InvalidResultRetryLimit == 1:
-		return WorkflowPolicyPresetFastDraft
+		return WorkflowPolicyPresetFast
 	default:
 		return ""
 	}
@@ -165,7 +158,7 @@ func policyReviewLabel(policy qrspi.Policy) string {
 	if policy.EnablePlanReviews {
 		return "Planning reviews on"
 	}
-	return "Fast draft: planning reviews skipped"
+	return "Fast: planning reviews skipped"
 }
 
 func policyTimingCopy(status wruntime.WorkspaceStatus) (bool, string) {

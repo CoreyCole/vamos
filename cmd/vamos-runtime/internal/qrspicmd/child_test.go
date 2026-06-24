@@ -123,6 +123,12 @@ func TestRunChildStartsRightSplitAndSavesActiveChild(t *testing.T) {
 	if req.Split != "right" || req.Cwd != fixture.cwd || req.ParentPaneID != "%parent" ||
 		req.StateFile != fixture.stateFile ||
 		req.PlanDir != "thoughts/example" ||
+		req.SessionDir != filepath.Join(
+			fixture.cwd,
+			"thoughts/example",
+			".sessions",
+			"pi",
+		) ||
 		req.ExtensionPath == "" {
 		t.Fatalf("request = %+v", req)
 	}

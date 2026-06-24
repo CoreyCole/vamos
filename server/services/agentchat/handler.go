@@ -303,6 +303,10 @@ func (h *Handler) OpenPlanWorkspace(c echo.Context) error {
 	if err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 	}
+	startNodeID := qrspi.NodeQuestion
+	if workflowType == WorkspaceWorkflowQRSPI && preset == WorkflowPolicyPresetFast {
+		startNodeID = qrspi.NodeOutline
+	}
 	runID, err := h.service.StartWorkflow(c.Request().Context(), StartWorkflowInput{
 		UserEmail:      userEmail,
 		Title:          planWorkspaceLabel(planDir),
@@ -310,6 +314,7 @@ func (h *Handler) OpenPlanWorkspace(c echo.Context) error {
 		Cwd:            h.service.defaultCwd,
 		WorkflowType:   workflowType,
 		Policy:         policyJSON,
+		StartNodeID:    startNodeID,
 		PromptOverride: e2eQRSPIStartPromptOverride(c),
 	})
 	if err != nil {

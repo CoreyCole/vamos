@@ -13,6 +13,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/CoreyCole/vamos/pkg/agents/workflows/qrspi"
 	"github.com/CoreyCole/vamos/pkg/agents/workflows/qrspi/semantic"
 	wruntime "github.com/CoreyCole/vamos/pkg/agents/workflows/runtime"
 )
@@ -39,6 +40,7 @@ func newCommand(d deps) *cobra.Command {
 		newInitCommand(d),
 		newStartNextCommand(d),
 		newSteerChildCommand(d),
+		newSetPolicyCommand(d),
 		newRunChildCommand(d),
 		newChildCompleteCommand(d),
 		newManagerReadyCommand(d),
@@ -84,6 +86,8 @@ func newInitCommand(d deps) *cobra.Command {
 	cmd.Flags().
 		StringVar(&opts.PolicyFile, "policy-file", "", "optional policy JSON file")
 	cmd.Flags().
+		StringVar(&opts.PolicyPreset, "policy-preset", "", "policy preset: discuss, guided, autopilot, autopilot-no-plan-reviews, fast")
+	cmd.Flags().
 		StringVar(&opts.NodeID, "node", "", "initial QRSPI node ID (defaults to graph start)")
 	cmd.Flags().StringVar(&opts.NodeID, "stage", "", "alias for --node")
 	cmd.Flags().
@@ -122,6 +126,8 @@ func newStartNextCommand(d deps) *cobra.Command {
 	cmd.Flags().StringVar(&opts.StateFile, "state-file", "", "q-manager state file")
 	cmd.Flags().
 		StringVar(&opts.PolicyFile, "policy-file", "", "optional policy JSON file")
+	cmd.Flags().
+		StringVar(&opts.PolicyPreset, "policy-preset", "", "policy preset: discuss, guided, autopilot, autopilot-no-plan-reviews, fast")
 	cmd.Flags().StringVar(&opts.NodeID, "node", "", "QRSPI node ID override")
 	cmd.Flags().StringVar(&opts.NodeID, "stage", "", "alias for --node")
 	cmd.Flags().
@@ -166,6 +172,30 @@ func newSteerChildCommand(d deps) *cobra.Command {
 	cmd.Flags().
 		StringVar(&opts.Feedback, "feedback", "", "inline feedback for the active child")
 	cmd.Flags().StringVar(&opts.Stage, "stage", "", "expected active child node")
+	cmd.Flags().StringVar(&opts.Output, "output", "text", "output format: text or ndjson")
+	return cmd
+}
+
+func newSetPolicyCommand(d deps) *cobra.Command {
+	opts := SetPolicyOptions{Output: "text"}
+	cmd := &cobra.Command{
+		Use:   "set-policy --state-file <file> [--preset <name>]",
+		Short: "Update q-manager QRSPI policy for future transitions",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			opts.EnablePlanReviewsSet = cmd.Flags().Changed("enable-plan-reviews")
+			opts.InvalidRetryLimitSet = cmd.Flags().Changed("invalid-result-retry-limit")
+			return RunSetPolicy(cmd.Context(), opts, d, cmd.OutOrStdout())
+		},
+	}
+	cmd.Flags().StringVar(&opts.StateFile, "state-file", "", "q-manager state file")
+	cmd.Flags().
+		StringVar(&opts.Preset, "preset", "", "policy preset: discuss, guided, autopilot, autopilot-no-plan-reviews, fast")
+	cmd.Flags().
+		StringVar(&opts.AdvanceMode, "advance-mode", "", "advance mode: discuss, guided, autopilot")
+	cmd.Flags().
+		BoolVar(&opts.EnablePlanReviews, "enable-plan-reviews", true, "run planning review stages")
+	cmd.Flags().
+		IntVar(&opts.InvalidResultRetryLimit, "invalid-result-retry-limit", 0, "invalid result retry limit")
 	cmd.Flags().StringVar(&opts.Output, "output", "text", "output format: text or ndjson")
 	return cmd
 }
@@ -239,7 +269,8 @@ func newDoctorCommand(d deps) *cobra.Command {
 	}
 	cmd.Flags().StringVar(&opts.StateFile, "state-file", "", "q-manager state file")
 	cmd.Flags().StringVar(&opts.PlanDir, "plan-dir", "", "QRSPI plan directory")
-	cmd.Flags().StringVar(&opts.Output, "output", "text", "output format: text, ndjson, or json")
+	cmd.Flags().
+		StringVar(&opts.Output, "output", "text", "output format: text, ndjson, or json")
 	return cmd
 }
 
@@ -255,8 +286,10 @@ func newRepairStateCommand(d deps) *cobra.Command {
 	cmd.Flags().StringVar(&opts.StateFile, "state-file", "", "q-manager state file")
 	cmd.Flags().
 		BoolVar(&opts.AlignActiveChild, "align-active-child", false, "align current workflow node to the active child stage when safe")
-	cmd.Flags().BoolVar(&opts.ClearFailedChild, "clear-failed-child", false, "clear active child only when status/output prove terminal launch failure")
-	cmd.Flags().BoolVar(&opts.Relaunch, "relaunch", false, "after clearing a terminal failed child, relaunch the same graph node")
+	cmd.Flags().
+		BoolVar(&opts.ClearFailedChild, "clear-failed-child", false, "clear active child only when status/output prove terminal launch failure")
+	cmd.Flags().
+		BoolVar(&opts.Relaunch, "relaunch", false, "after clearing a terminal failed child, relaunch the same graph node")
 	cmd.Flags().StringVar(&opts.Output, "output", "text", "output format: text or ndjson")
 	return cmd
 }
@@ -492,13 +525,16 @@ func RunInit(ctx context.Context, opts InitOptions, d deps, out io.Writer) error
 		}
 		projectRoot = cwd
 	}
-	policy, err := readPolicyFile(opts.PolicyFile)
+	policy, err := initialPolicy(opts.PolicyFile, opts.PolicyPreset)
 	if err != nil {
 		return err
 	}
 	state, err := InitialManagerState(opts.PlanDir, projectRoot, policy)
 	if err != nil {
 		return err
+	}
+	if isFastPolicyPreset(opts.PolicyPreset) && strings.TrimSpace(opts.NodeID) == "" {
+		opts.NodeID = string(qrspi.NodeOutline)
 	}
 	if err := ApplyInitOverrides(
 		&state,
@@ -561,7 +597,12 @@ func RunStartNext(
 		if err != nil {
 			return nil, err
 		}
-		preflight, err := CheckQRSPIPreflight(ctx, ManagerState{}, PreflightOptions{StateRootPath: root, UsesExtension: true}, d)
+		preflight, err := CheckQRSPIPreflight(
+			ctx,
+			ManagerState{},
+			PreflightOptions{StateRootPath: root, UsesExtension: true},
+			d,
+		)
 		if err != nil {
 			return nil, err
 		}
@@ -569,7 +610,17 @@ func RunStartNext(
 			return nil, writeManagerActionCard(out, *card, opts.Output)
 		}
 		if !preflight.StateRoot.OK || !preflight.Tmux.OK {
-			card := ManagerActionCard{Kind: ActionPiCompatibilityFailed, Severity: "error", Summary: "q-manager preflight failed", Evidence: append(preflight.StateRoot.Evidence, preflight.Tmux.Evidence...), RecommendedAction: "fix q-manager runtime dependencies before launching child", SafeCommand: "vamos qrspi doctor", RequiresHuman: false}
+			card := ManagerActionCard{
+				Kind:     ActionPiCompatibilityFailed,
+				Severity: "error",
+				Summary:  "q-manager preflight failed",
+				Evidence: append(
+					preflight.StateRoot.Evidence,
+					preflight.Tmux.Evidence...),
+				RecommendedAction: "fix q-manager runtime dependencies before launching child",
+				SafeCommand:       "vamos qrspi doctor",
+				RequiresHuman:     false,
+			}
 			return nil, writeManagerActionCard(out, card, opts.Output)
 		}
 	}
@@ -579,7 +630,16 @@ func RunStartNext(
 	}
 	result := StartNextResult{StateFile: stateFile}
 	if strings.TrimSpace(opts.StateFile) != "" {
-		preflight, err := CheckQRSPIPreflight(ctx, state, PreflightOptions{StateFile: stateFile, ManagerPaneID: state.ManagerPaneID, UsesExtension: true}, d)
+		preflight, err := CheckQRSPIPreflight(
+			ctx,
+			state,
+			PreflightOptions{
+				StateFile:     stateFile,
+				ManagerPaneID: state.ManagerPaneID,
+				UsesExtension: true,
+			},
+			d,
+		)
 		if err != nil {
 			return nil, err
 		}
@@ -885,6 +945,138 @@ func feedbackCommand(stateFile string) string {
 	)
 }
 
+func RunSetPolicy(
+	ctx context.Context,
+	opts SetPolicyOptions,
+	d deps,
+	out io.Writer,
+) error {
+	_ = ctx
+	if strings.TrimSpace(opts.StateFile) == "" {
+		return errors.New("state-file is required")
+	}
+	out = ensureWriter(out)
+	store := stateStore(d, "", time.Now)
+	state, err := store.Load(opts.StateFile)
+	if err != nil {
+		return err
+	}
+	policy, err := policyFromSetOptions(opts, qrspi.ParsePolicy(state.Workflow.Policy))
+	if err != nil {
+		return err
+	}
+	encoded, err := json.Marshal(policy)
+	if err != nil {
+		return err
+	}
+	state.Workflow.Policy = encoded
+	if err := store.Save(opts.StateFile, state); err != nil {
+		return err
+	}
+	summary := policySummary(policy)
+	if strings.EqualFold(opts.Output, "ndjson") {
+		return WriteNDJSON(
+			out,
+			Event{Type: "policy_updated", Ref: map[string]any{"policy": summary}},
+		)
+	}
+	fmt.Fprintf(
+		out,
+		"policy: %s, plan reviews %s, retries %d\n",
+		summary.AdvanceMode,
+		onOff(summary.EnablePlanReviews),
+		summary.InvalidResultRetryLimit,
+	)
+	fmt.Fprintf(out, "next: %s\n", continueCommand(opts.StateFile))
+	return nil
+}
+
+func isFastPolicyPreset(preset string) bool {
+	return strings.TrimSpace(strings.ToLower(preset)) == "fast"
+}
+
+func policyFromSetOptions(
+	opts SetPolicyOptions,
+	current qrspi.Policy,
+) (qrspi.Policy, error) {
+	policy := current
+	switch strings.TrimSpace(strings.ToLower(opts.Preset)) {
+	case "":
+	case "discuss":
+		policy = qrspi.Policy{
+			AdvanceMode:             qrspi.AdvanceModeDiscuss,
+			EnablePlanReviews:       true,
+			InvalidResultRetryLimit: 1,
+		}
+	case "guided":
+		policy = qrspi.DefaultPolicy()
+	case "autopilot":
+		policy = qrspi.Policy{
+			AdvanceMode:             qrspi.AdvanceModeAutopilot,
+			AutoMode:                true,
+			EnablePlanReviews:       true,
+			InvalidResultRetryLimit: 1,
+		}
+	case "fast", "autopilot-no-plan-reviews", "autopilot_no_plan_reviews":
+		policy = qrspi.Policy{
+			AdvanceMode:             qrspi.AdvanceModeAutopilot,
+			AutoMode:                true,
+			EnablePlanReviews:       false,
+			InvalidResultRetryLimit: 1,
+		}
+	default:
+		return qrspi.Policy{}, fmt.Errorf("unknown policy preset %q", opts.Preset)
+	}
+	if mode := strings.TrimSpace(opts.AdvanceMode); mode != "" {
+		policy.AdvanceMode = qrspi.AdvanceMode(mode)
+	}
+	if opts.EnablePlanReviewsSet {
+		policy.EnablePlanReviews = opts.EnablePlanReviews
+	}
+	if opts.InvalidRetryLimitSet {
+		policy.InvalidResultRetryLimit = opts.InvalidResultRetryLimit
+	}
+	policy.AutoMode = policy.EffectiveAdvanceMode() == qrspi.AdvanceModeAutopilot
+	if err := qrspi.ValidateConfig(policy); err != nil {
+		return qrspi.Policy{}, err
+	}
+	return policy, nil
+}
+
+func policySummary(policy qrspi.Policy) PolicySummary {
+	return PolicySummary{
+		AdvanceMode:             string(policy.EffectiveAdvanceMode()),
+		AutoMode:                policy.IsAutoMode(),
+		EnablePlanReviews:       policy.EnablePlanReviews,
+		InvalidResultRetryLimit: policy.InvalidResultRetryLimit,
+	}
+}
+
+func activePolicySummary(state ManagerState) PolicySummary {
+	return policySummary(qrspi.ParsePolicy(state.Workflow.Policy))
+}
+
+func onOff(enabled bool) string {
+	if enabled {
+		return "on"
+	}
+	return "off"
+}
+
+func ChildWorkspaceSessionDir(state ManagerState, opts RunChildOptions) string {
+	planDir := strings.TrimSpace(state.CanonicalPlanDir)
+	if planDir == "" {
+		planDir = strings.TrimSpace(opts.PlanDir)
+	}
+	if planDir != "" {
+		return filepath.Join(planDir, ".sessions", "pi")
+	}
+	if cwd := strings.TrimSpace(opts.Cwd); cwd != "" {
+		return filepath.Join(cwd, ".sessions", "pi")
+	}
+	return SessionDir(filepath.Dir(opts.StateFile), childRunID(opts.Stage, time.Now()))
+}
+
 func debugCommandForState(stateFile, action string) string {
 	action = strings.TrimSpace(action)
 	if action == "" {
@@ -917,6 +1109,40 @@ func writeManagerNotice(out io.Writer, notice ManagerNotice, mode string) error 
 			return err
 		}
 	}
+	if notice.Policy.AdvanceMode != "" {
+		if _, err := fmt.Fprintf(
+			out,
+			"policy: %s, plan reviews %s, retries %d\n",
+			notice.Policy.AdvanceMode,
+			onOff(notice.Policy.EnablePlanReviews),
+			notice.Policy.InvalidResultRetryLimit,
+		); err != nil {
+			return err
+		}
+	}
+	if notice.NextChild.Stage != "" {
+		if _, err := fmt.Fprintf(
+			out,
+			"next child: %s\n",
+			notice.NextChild.Stage,
+		); err != nil {
+			return err
+		}
+		if notice.NextChild.WorkingOn != "" {
+			if _, err := fmt.Fprintf(
+				out,
+				"working on: %s\n",
+				notice.NextChild.WorkingOn,
+			); err != nil {
+				return err
+			}
+		}
+		if notice.NextChild.Cwd != "" {
+			if _, err := fmt.Fprintf(out, "cwd: %s\n", notice.NextChild.Cwd); err != nil {
+				return err
+			}
+		}
+	}
 	if notice.ChildPane != "" && notice.Kind == "active_child" {
 		if _, err := fmt.Fprintf(
 			out,
@@ -934,6 +1160,11 @@ func writeManagerNotice(out io.Writer, notice ManagerNotice, mode string) error 
 	}
 	if notice.Summary != "" {
 		if _, err := fmt.Fprintf(out, "stop: %s\n", notice.Summary); err != nil {
+			return err
+		}
+	}
+	if notice.Summary != "" && notice.Validated {
+		if _, err := fmt.Fprintf(out, "summary: %s\n", notice.Summary); err != nil {
 			return err
 		}
 	}
@@ -981,6 +1212,12 @@ func noticeRef(notice ManagerNotice) map[string]any {
 	}
 	if notice.Outcome != "" {
 		ref["outcome"] = notice.Outcome
+	}
+	if notice.Policy.AdvanceMode != "" {
+		ref["policy"] = notice.Policy
+	}
+	if notice.NextChild.Stage != "" {
+		ref["nextChild"] = notice.NextChild
 	}
 	if notice.Artifact != "" {
 		ref["artifact"] = notice.Artifact
@@ -1107,6 +1344,7 @@ func RunChild(ctx context.Context, opts RunChildOptions, d deps, out io.Writer) 
 	if managerRunID == "" {
 		managerRunID = state.ManagerRunID
 	}
+	sessionDir := ChildWorkspaceSessionDir(state, opts)
 	req := ChildRunRequest{
 		ID:                   childID,
 		Stage:                opts.Stage,
@@ -1115,7 +1353,7 @@ func RunChild(ctx context.Context, opts RunChildOptions, d deps, out io.Writer) 
 		PromptFile:           opts.PromptFile,
 		OutputPath:           OutputPath(runRoot, childID),
 		SessionID:            ChildSessionID(childID),
-		SessionDir:           SessionDir(runRoot, childID),
+		SessionDir:           sessionDir,
 		SessionName:          fmt.Sprintf("q-manager %s %s", opts.Stage, childID),
 		DonePath:             DonePath(runRoot, childID),
 		StatusPath:           StatusPath(runRoot, childID),
@@ -1270,6 +1508,7 @@ func RunChildComplete(
 			status.Validated = true
 			status.DeliveryID = childCompletionDeliveryID(*child, &parsed, false)
 			status.Result = childCompletionResult(parsed.Result)
+			status.NextChild = nextChildInfo(state, parsed.Decision.NextNodeID)
 			status.ManagerNeeded = childCompletionManagerNeeded(status.Result.Status)
 			status.Normalizations = parsed.Normalizations
 			state.ActiveChild.LifecycleStatus = "completed"
@@ -1394,13 +1633,26 @@ func RunChildComplete(
 }
 
 func childCompletionResult(result wruntime.WorkflowResult) ChildCompletionResult {
-	return ChildCompletionResult{
+	out := ChildCompletionResult{
 		Stage:    string(result.SourceNodeID),
 		Status:   string(result.Status),
 		Outcome:  string(result.Outcome),
 		Artifact: result.PrimaryArtifact,
 		Summary:  result.Summary,
 	}
+	var parsed qrspi.Result
+	if len(result.Raw) > 0 && json.Unmarshal(result.Raw, &parsed) == nil {
+		out.PlanGoal = parsed.Summary.PlanGoal
+		out.StageCompleted = parsed.Summary.StageCompleted
+		out.KeyDecisions = parsed.Summary.KeyDecisions
+		out.ChildPolicy = policySummary(qrspi.Policy{
+			AdvanceMode:             parsed.Policy.AdvanceMode,
+			AutoMode:                parsed.Policy.AutoMode,
+			EnablePlanReviews:       parsed.Policy.EnablePlanReviews,
+			InvalidResultRetryLimit: parsed.Policy.InvalidResultRetryLimit,
+		})
+	}
+	return out
 }
 
 func childCompletionDeliveryID(
@@ -1421,6 +1673,54 @@ func childCompletionDeliveryID(
 		)
 	}
 	return strings.Join(parts, ":")
+}
+
+func nextChildInfo(state ManagerState, node wruntime.NodeID) NextChildInfo {
+	if node == "" {
+		return NextChildInfo{}
+	}
+	info := NextChildInfo{
+		Stage:     string(node),
+		Cwd:       defaultContinueCwd(state, node),
+		WorkingOn: nextChildWorkingOn(node),
+	}
+	if def, err := Definition(); err == nil {
+		if graphNode, ok := def.Nodes[node]; ok {
+			info.Skill = graphNode.Prompt.SkillPath
+		}
+	}
+	return info
+}
+
+func nextChildWorkingOn(node wruntime.NodeID) string {
+	switch node {
+	case qrspi.NodeQuestion:
+		return "Decompose the task into QRSPI research questions or follow-up questions."
+	case qrspi.NodeResearch:
+		return "Answer the research questions with factual codebase evidence."
+	case qrspi.NodeDesign:
+		return "Create or update design.md and make aligned assumptions unless truly blocked."
+	case qrspi.NodeOutline:
+		return "Create the structured implementation outline from approved design context."
+	case qrspi.NodeReviewOutline:
+		return "Review outline.md for readiness before plan creation."
+	case qrspi.NodePlan:
+		return "Expand the reviewed outline into tactical plan.md."
+	case qrspi.NodeReviewPlan:
+		return "Review plan.md for workspace/implementation readiness."
+	case qrspi.NodeWorkspace:
+		return "Prepare or confirm the implementation workspace and branch routing."
+	case qrspi.NodeImplement:
+		return "Execute the next implementation slice in the implementation workspace."
+	case qrspi.NodeReviewImplementation:
+		return "Review completed implementation and identify follow-up work or human-review readiness."
+	case qrspi.NodeVerify:
+		return "Run verification, inspect artifacts, and produce verify.md."
+	case qrspi.NodeHumanReviewImplementation:
+		return "Wait for final human implementation approval."
+	default:
+		return "Run the next graph-selected QRSPI stage."
+	}
 }
 
 func childCompletionManagerNeeded(status string) bool {
@@ -1452,7 +1752,7 @@ func queueOrDeliverWake(
 			Reason: "duplicate_delivery",
 		}, nil
 	}
-	payload := childCompletionWakePayload(stateFile, status)
+	payload := childCompletionWakePayload(stateFile, state, status)
 	if strings.EqualFold(state.Delivery.Status, "compacting") {
 		state.Delivery.QueuedWake = &QueuedWake{
 			DeliveryID:      status.DeliveryID,
@@ -1525,15 +1825,20 @@ func childCompletionWake(
 	}
 	return WakeDeliveryInstruction{
 		Mode:    "deliver",
-		Payload: childCompletionWakePayload(stateFile, status),
+		Payload: childCompletionWakePayload(stateFile, state, status),
 	}
 }
 
-func childCompletionWakePayload(stateFile string, status ChildCompletionStatus) string {
+func childCompletionWakePayload(
+	stateFile string,
+	state ManagerState,
+	status ChildCompletionStatus,
+) string {
 	managerNeeded := status.ManagerNeeded || status.RetryExhausted ||
 		childCompletionManagerNeeded(status.Result.Status)
+	policy := activePolicySummary(state)
 	return fmt.Sprintf(
-		"```yaml\nq_manager_child_wake:\n  validated: %t\n  manager_needed: %t\n  retry_exhausted: %t\n  stage: %q\n  status: %q\n  outcome: %q\n  artifact: %q\n  child_id: %q\n  state_file: %q\n  reason: %q\n  next:\n    - action: run_command\n      param: %q\n```",
+		"```yaml\nq_manager_child_wake:\n  validated: %t\n  manager_needed: %t\n  retry_exhausted: %t\n  stage: %q\n  status: %q\n  outcome: %q\n  artifact: %q\n  child_id: %q\n  state_file: %q\n  reason: %q\n  policy:\n    advance_mode: %q\n    auto_mode: %t\n    enable_plan_reviews: %t\n    invalid_result_retry_limit: %d\n    note: %q\n  summary:\n    plan_goal: %q\n    stage_completed: %q\n    key_decisions: %q\n  next_child:\n    stage: %q\n    skill: %q\n    cwd: %q\n    working_on: %q\n  next:\n    - action: run_command\n      param: %q\n```",
 		status.Validated,
 		managerNeeded,
 		status.RetryExhausted,
@@ -1544,6 +1849,18 @@ func childCompletionWakePayload(stateFile string, status ChildCompletionStatus) 
 		status.ChildID,
 		stateFile,
 		status.Reason,
+		policy.AdvanceMode,
+		policy.AutoMode,
+		policy.EnablePlanReviews,
+		policy.InvalidResultRetryLimit,
+		"manager policy is authoritative; child-emitted policy is ignored for transitions",
+		status.Result.PlanGoal,
+		status.Result.StageCompleted,
+		status.Result.KeyDecisions,
+		status.NextChild.Stage,
+		status.NextChild.Skill,
+		status.NextChild.Cwd,
+		status.NextChild.WorkingOn,
 		continueCommand(stateFile),
 	)
 }
@@ -1903,11 +2220,18 @@ func RunRepairState(
 	case opts.ClearFailedChild:
 		return runClearFailedChildRepair(ctx, opts, d, out, store, state)
 	default:
-		return errors.New("one repair action is required: --align-active-child or --clear-failed-child")
+		return errors.New(
+			"one repair action is required: --align-active-child or --clear-failed-child",
+		)
 	}
 }
 
-func runAlignActiveChildRepair(opts RepairStateOptions, out io.Writer, store StateStore, state ManagerState) error {
+func runAlignActiveChildRepair(
+	opts RepairStateOptions,
+	out io.Writer,
+	store StateStore,
+	state ManagerState,
+) error {
 	if state.ActiveChild == nil || strings.TrimSpace(state.ActiveChild.Stage) == "" {
 		return errors.New("no active child evidence to align")
 	}
@@ -1939,7 +2263,14 @@ func runAlignActiveChildRepair(opts RepairStateOptions, out io.Writer, store Sta
 	return writeManagerActionCard(out, card, opts.Output)
 }
 
-func runClearFailedChildRepair(ctx context.Context, opts RepairStateOptions, d deps, out io.Writer, store StateStore, state ManagerState) error {
+func runClearFailedChildRepair(
+	ctx context.Context,
+	opts RepairStateOptions,
+	d deps,
+	out io.Writer,
+	store StateStore,
+	state ManagerState,
+) error {
 	health, err := InspectActiveChildHealth(ctx, state, opts.StateFile, d)
 	if err != nil {
 		return err
@@ -1966,13 +2297,24 @@ func runClearFailedChildRepair(ctx context.Context, opts RepairStateOptions, d d
 	if !opts.Relaunch {
 		return writeManagerActionCard(out, *card, opts.Output)
 	}
-	_, err = RunStartNext(ctx, StartNextOptions{StateFile: opts.StateFile, Output: opts.Output, Force: true}, d, out)
+	_, err = RunStartNext(
+		ctx,
+		StartNextOptions{StateFile: opts.StateFile, Output: opts.Output, Force: true},
+		d,
+		out,
+	)
 	return err
 }
 
-func ClearFailedActiveChild(state ManagerState, health ActiveChildHealth) (ManagerState, error) {
+func ClearFailedActiveChild(
+	state ManagerState,
+	health ActiveChildHealth,
+) (ManagerState, error) {
 	if !IsTerminalFailedChild(health) {
-		return state, fmt.Errorf("refusing to clear non-terminal child: %s", health.Status)
+		return state, fmt.Errorf(
+			"refusing to clear non-terminal child: %s",
+			health.Status,
+		)
 	}
 	if state.ActiveChild == nil || state.ActiveChild.ID != health.ChildID {
 		return state, errors.New("active child changed while inspecting health")
@@ -2399,6 +2741,8 @@ func RunContinue(ctx context.Context, opts ContinueOptions, d deps, out io.Write
 	}
 	result.Decided = true
 	result.NextNodeID = parsed.Decision.NextNodeID
+	result.Policy = activePolicySummary(nextState)
+	result.NextChild = nextChildInfo(nextState, parsed.Decision.NextNodeID)
 	result.WaitingHuman = parsed.Decision.WaitingHuman
 	result.StopReason = parsed.Decision.StopReason
 	if result.WaitingHuman {
@@ -2984,12 +3328,42 @@ func writeContinueText(out io.Writer, result ContinueResult) error {
 	if result.PrimaryArtifact != "" {
 		fmt.Fprintf(out, "artifact: %s\n", result.PrimaryArtifact)
 	}
+	if result.Validated != nil {
+		summary := childCompletionResult(result.Validated.Result)
+		if summary.PlanGoal != "" {
+			fmt.Fprintf(out, "plan goal: %s\n", summary.PlanGoal)
+		}
+		if summary.StageCompleted != "" {
+			fmt.Fprintf(out, "stage completed: %s\n", summary.StageCompleted)
+		}
+		if summary.KeyDecisions != "" {
+			fmt.Fprintf(out, "key decisions: %s\n", summary.KeyDecisions)
+		}
+	}
 	if result.Reprompted {
 		_, err := fmt.Fprintln(out, "retry: reprompted active child")
 		return err
 	}
+	if result.Policy.AdvanceMode != "" {
+		fmt.Fprintf(
+			out,
+			"policy: %s, plan reviews %s, retries %d\n",
+			result.Policy.AdvanceMode,
+			onOff(result.Policy.EnablePlanReviews),
+			result.Policy.InvalidResultRetryLimit,
+		)
+	}
 	if result.NextNodeID != "" {
 		fmt.Fprintf(out, "next: %s\n", result.NextNodeID)
+	}
+	if result.NextChild.Stage != "" {
+		fmt.Fprintf(out, "next child: %s\n", result.NextChild.Stage)
+		if result.NextChild.WorkingOn != "" {
+			fmt.Fprintf(out, "working on: %s\n", result.NextChild.WorkingOn)
+		}
+		if result.NextChild.Cwd != "" {
+			fmt.Fprintf(out, "cwd: %s\n", result.NextChild.Cwd)
+		}
 	}
 	if result.StartedChild != nil {
 		fmt.Fprintf(
@@ -3062,6 +3436,12 @@ func continueRef(result ContinueResult) map[string]any {
 	}
 	if result.NextNodeID != "" {
 		ref["nextNode"] = result.NextNodeID
+	}
+	if result.Policy.AdvanceMode != "" {
+		ref["policy"] = result.Policy
+	}
+	if result.NextChild.Stage != "" {
+		ref["nextChild"] = result.NextChild
 	}
 	if result.PrimaryArtifact != "" {
 		ref["artifact"] = result.PrimaryArtifact
@@ -3231,6 +3611,27 @@ func ensureWriter(out io.Writer) io.Writer {
 		return os.Stdout
 	}
 	return out
+}
+
+func initialPolicy(path, preset string) (json.RawMessage, error) {
+	if strings.TrimSpace(path) != "" && strings.TrimSpace(preset) != "" {
+		return nil, errors.New("use either --policy-file or --policy-preset, not both")
+	}
+	if strings.TrimSpace(preset) != "" {
+		policy, err := policyFromSetOptions(
+			SetPolicyOptions{Preset: preset},
+			qrspi.DefaultPolicy(),
+		)
+		if err != nil {
+			return nil, err
+		}
+		encoded, err := json.Marshal(policy)
+		if err != nil {
+			return nil, err
+		}
+		return encoded, nil
+	}
+	return readPolicyFile(path)
 }
 
 func readPolicyFile(path string) (json.RawMessage, error) {

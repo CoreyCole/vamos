@@ -4870,10 +4870,10 @@ func TestBuildWorkspaceWorkflowStateProjectsPolicy(t *testing.T) {
 	if err != nil {
 		t.Fatalf("BuildWorkspaceWorkflowState() error = %v", err)
 	}
-	if projected.Policy.Preset != WorkflowPolicyPresetFastDraft ||
+	if projected.Policy.Preset != WorkflowPolicyPresetFast ||
 		projected.Policy.ModeLabel == "" ||
 		projected.Policy.ReviewLabel == "" {
-		t.Fatalf("Policy projection = %#v, want fast draft labels", projected.Policy)
+		t.Fatalf("Policy projection = %#v, want fast labels", projected.Policy)
 	}
 	if !strings.Contains(projected.Policy.TimingCopy, "current agent run") {
 		t.Fatalf("TimingCopy = %q, want running copy", projected.Policy.TimingCopy)

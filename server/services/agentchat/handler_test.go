@@ -1221,7 +1221,7 @@ func TestOpenPlanWorkspaceQRSPIStartsWorkflowWithPolicyPreset(t *testing.T) {
 	planDir := mustCreateHandlerTestPlanWorkspace(
 		t,
 		service,
-		"2026-05-16_qrspi-assisted-plan",
+		"2026-05-16_qrspi-autopilot-plan",
 	)
 
 	location := invokeOpenPlanWorkspaceWithQuery(
@@ -1230,12 +1230,12 @@ func TestOpenPlanWorkspaceQRSPIStartsWorkflowWithPolicyPreset(t *testing.T) {
 		url.Values{
 			"plan_dir":      {planDir},
 			"workflow_type": {string(WorkspaceWorkflowQRSPI)},
-			"policy_preset": {string(WorkflowPolicyPresetAssisted)},
+			"policy_preset": {string(WorkflowPolicyPresetAutopilot)},
 		},
 		"alice@example.com",
 		http.StatusSeeOther,
 	)
-	if location != "/thoughts/creative-mode-agent/plans/2026-05-16_qrspi-assisted-plan" {
+	if location != "/thoughts/creative-mode-agent/plans/2026-05-16_qrspi-autopilot-plan" {
 		t.Fatalf("Location = %q, want thoughts plan URL", location)
 	}
 
@@ -1257,7 +1257,7 @@ func TestOpenPlanWorkspaceQRSPIStartsWorkflowWithPolicyPreset(t *testing.T) {
 	policy := qrspi.ParsePolicy(state.Policy)
 	if !policy.AutoMode || !policy.EnablePlanReviews ||
 		policy.InvalidResultRetryLimit != 1 {
-		t.Fatalf("policy = %#v, want assisted preset", policy)
+		t.Fatalf("policy = %#v, want autopilot preset", policy)
 	}
 }
 
@@ -1343,14 +1343,14 @@ func TestOpenPlanWorkspaceQRSPIUsesPromptOverrideWithE2EEnv(t *testing.T) {
 	}
 }
 
-func TestOpenPlanWorkspaceQRSPIFastDraftSkipsPlanningReviews(t *testing.T) {
+func TestOpenPlanWorkspaceQRSPIFastStartsAtOutlineAndSkipsPlanningReviews(t *testing.T) {
 	service := newTestAgentChatService(t)
 	service.temporal = &fakeTemporalStarter{}
 	handler := NewHandler(service, nil)
 	planDir := mustCreateHandlerTestPlanWorkspace(
 		t,
 		service,
-		"2026-05-16_qrspi-fast-draft-plan",
+		"2026-05-16_qrspi-fast-plan",
 	)
 
 	invokeOpenPlanWorkspaceWithQuery(
@@ -1359,7 +1359,7 @@ func TestOpenPlanWorkspaceQRSPIFastDraftSkipsPlanningReviews(t *testing.T) {
 		url.Values{
 			"plan_dir":      {planDir},
 			"workflow_type": {string(WorkspaceWorkflowQRSPI)},
-			"policy_preset": {string(WorkflowPolicyPresetFastDraft)},
+			"policy_preset": {string(WorkflowPolicyPresetFast)},
 		},
 		"alice@example.com",
 		http.StatusSeeOther,
@@ -1375,7 +1375,20 @@ func TestOpenPlanWorkspaceQRSPIFastDraftSkipsPlanningReviews(t *testing.T) {
 	policy := qrspi.ParsePolicy(state.Policy)
 	if !policy.AutoMode || policy.EnablePlanReviews ||
 		policy.InvalidResultRetryLimit != 1 {
-		t.Fatalf("policy = %#v, want fast draft preset", policy)
+		t.Fatalf("policy = %#v, want fast preset", policy)
+	}
+	if state.CurrentNodeID != qrspi.NodeOutline {
+		t.Fatalf("current = %q, want outline", state.CurrentNodeID)
+	}
+	run, err := service.queries.GetLatestAgentRunByWorkspaceNode(t.Context(), db.GetLatestAgentRunByWorkspaceNodeParams{
+		WorkspaceID:    sql.NullString{String: workspace.ID, Valid: true},
+		WorkflowNodeID: sql.NullString{String: string(qrspi.NodeOutline), Valid: true},
+	})
+	if err != nil {
+		t.Fatalf("GetLatestAgentRunByWorkspaceNode(outline) error = %v", err)
+	}
+	if run.WorkflowNodeID.String != string(qrspi.NodeOutline) || !strings.Contains(run.PromptText, ".pi/skills/q-outline/SKILL.md") {
+		t.Fatalf("outline run = %#v prompt=%q", run, run.PromptText)
 	}
 }
 
@@ -1416,7 +1429,7 @@ func TestOpenPlanWorkspaceFreeformPreservesExistingBehaviorWithPresetParam(t *te
 		handler,
 		url.Values{
 			"plan_dir":      {planDir},
-			"policy_preset": {string(WorkflowPolicyPresetAssisted)},
+			"policy_preset": {string(WorkflowPolicyPresetAutopilot)},
 		},
 		"alice@example.com",
 		http.StatusSeeOther,
@@ -2735,7 +2748,7 @@ func TestUpdateWorkspaceWorkflowPolicyHandlerPersistsAndPatchesPanel(t *testing.
 	policy := qrspi.ParsePolicy(state.Policy)
 	if !policy.AutoMode || policy.EnablePlanReviews ||
 		policy.InvalidResultRetryLimit != 0 {
-		t.Fatalf("policy = %#v, want auto fast-draft with zero retries", policy)
+		t.Fatalf("policy = %#v, want autopilot with plan reviews off and zero retries", policy)
 	}
 }
 

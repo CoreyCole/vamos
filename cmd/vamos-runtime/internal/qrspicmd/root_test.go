@@ -23,7 +23,7 @@ func TestRootRequiresExplicitSubcommand(t *testing.T) {
 
 func TestSubcommandsExist(t *testing.T) {
 	cmd := NewCommand()
-	for _, name := range []string{"init", "start-next", "steer-child", "run-child", "child-complete", "manager-ready", "repair-state", "mark-child-active", "validate-result", "decide-next", "reprompt-child", "continue", "render-prompt"} {
+	for _, name := range []string{"init", "start-next", "steer-child", "set-policy", "run-child", "child-complete", "manager-ready", "repair-state", "mark-child-active", "validate-result", "decide-next", "reprompt-child", "continue", "render-prompt"} {
 		found := false
 		for _, child := range cmd.Commands() {
 			if child.Name() == name {
