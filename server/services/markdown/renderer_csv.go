@@ -21,7 +21,8 @@ type DelimitedFormat struct {
 }
 
 type CSVRenderer struct {
-	MaxRows int
+	MaxRows        int
+	SourceFallback *SourceRenderer
 }
 
 func (r CSVRenderer) Match(req DocumentRequest) bool {
@@ -29,7 +30,7 @@ func (r CSVRenderer) Match(req DocumentRequest) bool {
 	return ok
 }
 
-func (r CSVRenderer) Render(_ context.Context, req DocumentRequest) (RenderedDocument, error) {
+func (r CSVRenderer) Render(ctx context.Context, req DocumentRequest) (RenderedDocument, error) {
 	content, err := os.ReadFile(req.FullPath)
 	if err != nil {
 		return RenderedDocument{}, fmt.Errorf("read delimited table: %w", err)
@@ -44,6 +45,9 @@ func (r CSVRenderer) Render(_ context.Context, req DocumentRequest) (RenderedDoc
 	}
 	table, err := parseDelimitedTable(content, format, maxRows)
 	if err != nil {
+		if r.SourceFallback != nil {
+			return renderSourceFallback(ctx, req, *r.SourceFallback)
+		}
 		return RenderedDocument{}, err
 	}
 	docPath := "thoughts/" + req.CleanPath

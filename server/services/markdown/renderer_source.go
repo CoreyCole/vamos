@@ -152,6 +152,10 @@ func sourceLanguageForExtension(ext string) string {
 	}
 }
 
+func renderSourceFallback(ctx context.Context, req DocumentRequest, source SourceRenderer) (RenderedDocument, error) {
+	return source.Render(ctx, req)
+}
+
 func unsupportedDocumentForReason(req DocumentRequest, reason string) RenderedDocument {
 	docPath := "thoughts/" + req.CleanPath
 	return RenderedDocument{

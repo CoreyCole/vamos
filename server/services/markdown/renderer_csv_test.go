@@ -127,3 +127,53 @@ func TestParseDelimitedTableUsesTabDelimiter(t *testing.T) {
 		t.Fatalf("table=%#v", table)
 	}
 }
+
+func TestDelimitedRendererFallsBackToSourceOnMalformedSafeText(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	mustWriteFile(t, filepath.Join(root, "bad.tsv"), []byte("name\tvalue\n\"unterminated"))
+	service, err := NewService(root, nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	page, err := service.RenderThoughtsDocument(t.Context(), "bad.tsv")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if page.ViewerArgs.DocumentKind != DocumentKindSource {
+		t.Fatalf("DocumentKind=%q, want %q", page.ViewerArgs.DocumentKind, DocumentKindSource)
+	}
+	if !strings.Contains(page.ViewerArgs.RawMarkdown, "unterminated") {
+		t.Fatalf("RawMarkdown=%q", page.ViewerArgs.RawMarkdown)
+	}
+}
+
+func TestDelimitedRendererParseFallbackKeepsUnsafeContentUnsupported(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	mustWriteFile(t, filepath.Join(root, "bad.csv"), []byte{'n', 'a', 'm', 'e', ',', 'v', 'a', 'l', 'u', 'e', '\n', '"', 'u', 'n', 't', 'e', 'r', 'm', 'i', 'n', 'a', 't', 'e', 'd', 0})
+	service, err := NewService(root, nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	page, err := service.RenderThoughtsDocument(t.Context(), "bad.csv")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if page.ViewerArgs.DocumentKind != DocumentKindUnsupported {
+		t.Fatalf("DocumentKind=%q, want %q", page.ViewerArgs.DocumentKind, DocumentKindUnsupported)
+	}
+	var buf bytes.Buffer
+	if err := page.ViewerArgs.BodyComponent.Render(t.Context(), &buf); err != nil {
+		t.Fatal(err)
+	}
+	html := buf.String()
+	if !strings.Contains(html, "File is binary") {
+		t.Fatalf("unsafe reason missing: %s", html)
+	}
+	if strings.Contains(html, root) {
+		t.Fatalf("unsupported output exposed temp root: %s", html)
+	}
+}
