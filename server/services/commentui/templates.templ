@@ -84,14 +84,14 @@ func selectionMouseupExpr(args SelectionSignalArgs) string {
 	containerLookup := "element.closest('[data-commentui-container=true]')"
 	p := "$" + args.Prefix
 	clear := p + ".text = ''; " + p + ".sectionId = ''; " + p + ".headingHint = ''; " + p + ".top = 0; " + p + ".left = 0;"
-	return "const selection = window.getSelection(); const text = selection.toString().trim(); if (text && selection.rangeCount > 0) { const range = selection.getRangeAt(0); const container = range.commonAncestorContainer; const element = container.nodeType === 3 ? container.parentElement : container; const inCommentArea = element.closest('" + exclude + "'); if (inCommentArea) { " + clear + " } else { const rect = range.getBoundingClientRect(); const section = element.closest('[data-section-id]'); const sectionId = section ? section.dataset.sectionId : ''; const headingHint = section ? (section.dataset.headingHint || '') : ''; const containerEl = " + containerLookup + "; const containerRect = containerEl ? containerEl.getBoundingClientRect() : {top: 0, left: 0}; " + p + ".text = text; " + p + ".sectionId = sectionId; " + p + ".headingHint = headingHint; " + p + ".top = rect.bottom - containerRect.top + (containerEl ? containerEl.scrollTop : window.scrollY); " + p + ".left = rect.left - containerRect.left + (containerEl ? containerEl.scrollLeft : 0); } } else { " + clear + " }"
+	return "const selection = window.getSelection(); const text = selection.toString().trim(); const eventTarget = evt && evt.target ? evt.target : null; const eventElement = eventTarget && eventTarget.nodeType === 3 ? eventTarget.parentElement : eventTarget; if (eventElement && eventElement.closest('" + exclude + "')) { return; } if (text && selection.rangeCount > 0) { const range = selection.getRangeAt(0); const container = range.commonAncestorContainer; const element = container.nodeType === 3 ? container.parentElement : container; const inCommentArea = element.closest('" + exclude + "'); if (inCommentArea) { return; } else { const rect = range.getBoundingClientRect(); const section = element.closest('[data-section-id]'); const sectionId = section ? section.dataset.sectionId : ''; const headingHint = section ? (section.dataset.headingHint || '') : ''; const containerEl = " + containerLookup + "; const containerRect = containerEl ? containerEl.getBoundingClientRect() : {top: 0, left: 0}; " + p + ".text = text; " + p + ".sectionId = sectionId; " + p + ".headingHint = headingHint; " + p + ".top = rect.top - containerRect.top + (containerEl ? containerEl.scrollTop : window.scrollY); " + p + ".left = rect.left - containerRect.left + (containerEl ? containerEl.scrollLeft : 0); } } else { " + clear + " }"
 }
 
 func clickOutsideCollapseExpr(args CommentTargetView) string {
 	if args.SignalKey == "" {
 		return ""
 	}
-	return "if (!el.contains(event.target)) { $comment_" + args.SignalKey + "_expanded = false }"
+	return "if (!el.contains(evt.target)) { $comment_" + args.SignalKey + "_expanded = false }"
 }
 
 func clickOutsideCancelExpr(args CommentTargetView) string {
@@ -106,7 +106,7 @@ func clickOutsideCancelExpr(args CommentTargetView) string {
 	if encoded := values.Encode(); encoded != "" {
 		cancelURL += "?" + encoded
 	}
-	return "if (!el.contains(event.target)) { @post('" + cancelURL + "') }"
+	return "if (!el.contains(evt.target)) { @post('" + cancelURL + "') }"
 }
 
 func panelThreadTarget(args CommentsPanelArgs, thread CommentThreadView) CommentTargetView {
@@ -212,22 +212,23 @@ templ CommentableMarkdown(args CommentableMarkdownArgs) {
 
 templ CommentableSelectionHTML(args CommentableMarkdownArgs) {
 	{{ selection := SelectionOnlySignalArgs(args) }}
-	<div class="relative flex-1 h-full min-h-full" data-signals="{}">
-		<div class="relative flex-1 h-full min-h-full min-w-0" data-commentui-container="true" data-on:keydown__window={ selectionKeydownExpr(selection) } data-on:mouseup__debounce.500ms.leading={ selectionMouseupExpr(selection) }>
-			<div class="flex flex-1 h-full min-h-full w-full">
+	<div class="relative h-full min-h-full" data-signals="{}">
+		<div class="relative h-full min-h-full min-w-0" data-commentui-container="true" data-on:keydown__window={ selectionKeydownExpr(selection) } data-on:mouseup__debounce.500ms.leading={ selectionMouseupExpr(selection) }>
+			<div class="h-full min-h-full w-full">
 				@templ.Raw(args.HTML)
 			</div>
 			@CommentTarget(CommentTargetView{
-				ID:           TargetID(args.IDPrefix, "document"),
-				SignalKey:    SignalKey(args.IDPrefix, "document"),
-				Surface:      args.Surface,
-				DocPath:      args.DocPath,
-				SectionID:    "document",
-				UserEmail:    args.UserEmail,
-				Threads:      DocumentComments(args.Comments),
-				Routes:       args.Routes,
-				HiddenFields: MergeHidden(selection.HiddenFields, map[string]string{"section_hint": "document", "heading_hint": ""}),
-				Chrome:       CommentTargetChromePatchOnly,
+				ID:                    TargetID(args.IDPrefix, "document"),
+				SignalKey:             SignalKey(args.IDPrefix, "document"),
+				Surface:               args.Surface,
+				DocPath:               args.DocPath,
+				SectionID:             "document",
+				HeadingHint:           "Document",
+				UserEmail:             args.UserEmail,
+				Threads:               DocumentComments(args.Comments),
+				Routes:                args.Routes,
+				HiddenFields:          MergeHidden(selection.HiddenFields, map[string]string{"section_hint": "document", "heading_hint": "Document"}),
+				Chrome:                CommentTargetChromePatchOnly,
 				SelectionSignalPrefix: selection.Prefix,
 			})
 			@SelectedTextTrigger(selection)
@@ -237,7 +238,7 @@ templ CommentableSelectionHTML(args CommentableMarkdownArgs) {
 
 templ CommentTarget(args CommentTargetView) {
 	if TargetChromeOrVisible(args.Chrome) == CommentTargetChromePatchOnly {
-		<div id={ args.ID } class={ CommentAnchorClass(args.SignalKey) + " commentui-selection-trigger h-0 w-0 overflow-visible" } data-style={ SelectionStyleExpr(args.SelectionSignalPrefix) } data-comment-target="true" aria-hidden="true"></div>
+		<div id={ args.ID } class={ CommentAnchorClass(args.SignalKey) + " commentui-selection-target-right h-0 w-0 overflow-visible" } data-style={ SelectionStyleExpr(args.SelectionSignalPrefix) } data-comment-target="true" aria-hidden="true"></div>
 	} else {
 		<div id={ args.ID } class="commentui-target flex items-center gap-1" data-comment-target="true">
 			if len(args.Threads) > 0 {
@@ -249,30 +250,19 @@ templ CommentTarget(args CommentTargetView) {
 }
 
 templ CommentTargetWithForm(args CommentTargetView, view CommentFormView) {
-	if TargetChromeOrVisible(args.Chrome) == CommentTargetChromePatchOnly {
-		<div id={ args.ID } class={ CommentAnchorClass(args.SignalKey) + " commentui-selection-trigger commentui-target flex items-center gap-1 z-[100]" } data-style={ SelectionStyleExpr(args.SelectionSignalPrefix) } data-comment-target="true" data-on:click__window={ clickOutsideCancelExpr(args) }>
-			<div class={ CommentPopoverClass(CommentPopoverPlacementForTarget(args)) + " ring-1 ring-primary/30" }>
-				@CommentForm(view)
-				if args.Surface == CommentSurfaceArtifact {
-					for _, thread := range args.Threads {
-						@CommentCard(thread, args)
-					}
+	<div id={ args.ID } class={ CommentAnchorClass(args.SignalKey) + " commentui-target flex items-center gap-1 z-[100] " + patchOnlyTargetClass(args) } data-style={ SelectionStyleExpr(args.SelectionSignalPrefix) } data-comment-target="true" data-on:click__window={ clickOutsideCancelExpr(args) }>
+		<div class={ CommentPopoverClass(CommentPopoverPlacementForTarget(args)) + " ring-1 ring-primary/30" }>
+			@CommentForm(view)
+			if args.Surface == CommentSurfaceArtifact {
+				for _, thread := range args.Threads {
+					@CommentCard(thread, args)
 				}
-			</div>
+			}
 		</div>
-	} else {
-		<div id={ args.ID } class={ CommentAnchorClass(args.SignalKey) + " commentui-target flex items-center gap-1 z-[100]" } data-comment-target="true" data-on:click__window={ clickOutsideCancelExpr(args) }>
-			<div class={ CommentPopoverClass(CommentPopoverPlacementForTarget(args)) + " ring-1 ring-primary/30" }>
-				@CommentForm(view)
-				if args.Surface == CommentSurfaceArtifact {
-					for _, thread := range args.Threads {
-						@CommentCard(thread, args)
-					}
-				}
-			</div>
+		if TargetChromeOrVisible(args.Chrome) != CommentTargetChromePatchOnly {
 			@SectionMenu(args)
-		</div>
-	}
+		}
+	</div>
 }
 
 templ CommentsSidebar(view CommentSidebarView) {

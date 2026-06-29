@@ -14,16 +14,16 @@ import (
 )
 
 type commentFormData struct {
-	FilePath     string
-	CommentText  string
-	SelectedText string
-	SectionID    string
-	HeadingHint  string
-	StartLine    int
-	StartColumn  int
-	EndLine      int
-	EndColumn    int
-	TargetChrome commentui.CommentTargetChrome
+	FilePath        string
+	CommentText     string
+	SelectedText    string
+	SectionID       string
+	HeadingHint     string
+	StartLine       int
+	StartColumn     int
+	EndLine         int
+	EndColumn       int
+	TargetChrome    commentui.CommentTargetChrome
 	SelectionPrefix string
 }
 
@@ -33,16 +33,16 @@ func parseCommentForm(c echo.Context) commentFormData {
 		documentPath = c.FormValue("file_path")
 	}
 	return commentFormData{
-		FilePath:     documentPath,
-		CommentText:  c.FormValue("comment_text"),
-		SelectedText: c.FormValue("selected_text"),
-		SectionID:    normalizeSectionID(c.FormValue("section_hint")),
-		HeadingHint:  c.FormValue("heading_hint"),
-		StartLine:    parseFormInt(c, "start_line"),
-		StartColumn:  parseFormInt(c, "start_column"),
-		EndLine:      parseFormInt(c, "end_line"),
-		EndColumn:    parseFormInt(c, "end_column"),
-		TargetChrome: commentui.CommentTargetChrome(c.FormValue("comment_target_chrome")),
+		FilePath:        documentPath,
+		CommentText:     c.FormValue("comment_text"),
+		SelectedText:    c.FormValue("selected_text"),
+		SectionID:       normalizeSectionID(c.FormValue("section_hint")),
+		HeadingHint:     c.FormValue("heading_hint"),
+		StartLine:       parseFormInt(c, "start_line"),
+		StartColumn:     parseFormInt(c, "start_column"),
+		EndLine:         parseFormInt(c, "end_line"),
+		EndColumn:       parseFormInt(c, "end_column"),
+		TargetChrome:    commentui.CommentTargetChrome(c.FormValue("comment_target_chrome")),
 		SelectionPrefix: c.FormValue("comment_selection_prefix"),
 	}
 }
@@ -144,12 +144,14 @@ func thoughtsCommentTarget(
 	sectionID = normalizeSectionID(sectionID)
 	prefix := commentui.SafeCommentTargetSlug("thoughts", filePath)
 	hiddenFields := map[string]string{"doc_path": filePath}
+	var opts thoughtsCommentTargetOptions
 	if len(options) > 0 {
-		if options[0].Chrome != "" {
-			hiddenFields["comment_target_chrome"] = string(options[0].Chrome)
+		opts = options[0]
+		if opts.Chrome != "" {
+			hiddenFields["comment_target_chrome"] = string(opts.Chrome)
 		}
-		if options[0].SelectionPrefix != "" {
-			hiddenFields["comment_selection_prefix"] = options[0].SelectionPrefix
+		if opts.SelectionPrefix != "" {
+			hiddenFields["comment_selection_prefix"] = opts.SelectionPrefix
 		}
 	}
 	target := commentui.BuildTargetView(commentui.TargetInput{
@@ -163,10 +165,8 @@ func thoughtsCommentTarget(
 		Routes:       thoughtsCommentRoutes(),
 		HiddenFields: hiddenFields,
 	})
-	if len(options) > 0 {
-		target.Chrome = options[0].Chrome
-		target.SelectionSignalPrefix = options[0].SelectionPrefix
-	}
+	target.Chrome = opts.Chrome
+	target.SelectionSignalPrefix = opts.SelectionPrefix
 	return target
 }
 

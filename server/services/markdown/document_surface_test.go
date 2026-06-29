@@ -102,7 +102,7 @@ func TestDocumentSurfaceRendersSourceEdgeToEdge(t *testing.T) {
 		t.Fatal(err)
 	}
 	html := buf.String()
-	if !strings.Contains(html, `id="thoughts-markdown-scroll-region" class="min-h-0 flex-1 overflow-auto bg-muted/20 flex flex-col"`) {
+	if !strings.Contains(html, `id="thoughts-markdown-scroll-region" class="min-h-0 flex-1 overflow-auto bg-muted/20"`) {
 		t.Fatalf("Source document surface is not edge-to-edge and scrollable: %s", html)
 	}
 	if strings.Contains(html, `p-4 md:p-10`) {
@@ -122,8 +122,8 @@ func TestDocumentSurfaceRendersSourceSelectionOnlyWithoutCommentTarget(t *testin
 			DocPath:  "thoughts/example.go",
 			HTML:     `<section class="source-document-content" data-section-id="document">code</section>`,
 			SelectionSignals: commentui.SelectionSignalArgs{
-				Prefix:      "comment_selection",
-				ShowRoute:   "/forms/comments/show",
+				Prefix:       "comment_selection",
+				ShowRoute:    "/forms/comments/show",
 				HiddenFields: map[string]string{"doc_path": "thoughts/example.go"},
 				ContainerID:  "thoughts-markdown-scroll-region",
 			},
@@ -140,9 +140,11 @@ func TestDocumentSurfaceRendersSourceSelectionOnlyWithoutCommentTarget(t *testin
 		`data-on:mouseup__debounce.500ms.leading=`,
 		`id="comment_selection-inline-comment-trigger"`,
 		`data-section-id="document"`,
-		`data-comment-target="true"`,
-		`commentui-anchor relative`,
 		`/forms/comments/show`,
+		`data-comment-target="true"`,
+		`commentui-selection-target-right`,
+		`name="comment_target_chrome" value="patch-only"`,
+		`name="comment_selection_prefix" value="comment_selection"`,
 	} {
 		if !strings.Contains(html, want) {
 			t.Fatalf("Source document comment chrome missing %q: %s", want, html)

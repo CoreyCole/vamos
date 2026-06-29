@@ -79,6 +79,30 @@
     margin-top: 0.5rem;
   }
 
+  .commentui-selection-target-right {
+    position: absolute;
+    top: var(--commentui-selection-top, 0px);
+    right: 0.75rem;
+    z-index: 100;
+  }
+
+  .source-code-block {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .source-code-block pre.chroma {
+    display: block !important;
+    flex: 1 1 auto !important;
+    height: 100% !important;
+    min-height: 100% !important;
+  }
+
+  .source-code-block pre.chroma code {
+    display: block !important;
+    min-height: 100% !important;
+  }
+
   .commentui-thread-quote {
     max-height: none;
     overflow: visible;
@@ -89,18 +113,6 @@
     left: var(--commentui-selection-left, 0px);
     top: var(--commentui-selection-top, 0px);
     z-index: 50;
-  }
-
-  .source-code-block,
-  .source-code-block .chroma,
-  .source-code-block pre,
-  .source-code-block code {
-    min-height: 100%;
-  }
-
-  .source-code-block .chroma,
-  .source-code-block pre {
-    background: hsl(var(--muted) / 0.2) !important;
   }
 
   @supports not (anchor-name: --commentui-target) {

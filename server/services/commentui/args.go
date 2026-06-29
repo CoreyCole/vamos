@@ -94,17 +94,17 @@ const (
 )
 
 type CommentTargetView struct {
-	ID           string
-	SignalKey    string
-	Surface      CommentSurface
-	DocPath      string
-	SectionID    string
-	HeadingHint  string
-	UserEmail    string
-	Threads      []CommentThreadView
-	Routes       CommentRoutes
-	HiddenFields map[string]string
-	Chrome       CommentTargetChrome
+	ID                    string
+	SignalKey             string
+	Surface               CommentSurface
+	DocPath               string
+	SectionID             string
+	HeadingHint           string
+	UserEmail             string
+	Threads               []CommentThreadView
+	Routes                CommentRoutes
+	HiddenFields          map[string]string
+	Chrome                CommentTargetChrome
 	SelectionSignalPrefix string
 }
 
@@ -214,9 +214,6 @@ func CommentPopoverClass(placement CommentPopoverPlacement) string {
 }
 
 func CommentPopoverPlacementForTarget(target CommentTargetView) CommentPopoverPlacement {
-	if TargetChromeOrVisible(target.Chrome) == CommentTargetChromePatchOnly {
-		return CommentPopoverPlacementSelection
-	}
 	return CommentPopoverPlacementTarget
 }
 
@@ -224,18 +221,11 @@ func SelectionTriggerClass() string {
 	return "commentui-selection-trigger"
 }
 
-func SelectionOnlySignalArgs(args CommentableMarkdownArgs) SelectionSignalArgs {
-	selection := args.SelectionSignals
-	hidden := MergeHidden(args.HiddenFields, selection.HiddenFields)
-	if hidden == nil {
-		hidden = map[string]string{}
+func patchOnlyTargetClass(target CommentTargetView) string {
+	if TargetChromeOrVisible(target.Chrome) == CommentTargetChromePatchOnly {
+		return "commentui-selection-target-right"
 	}
-	hidden["comment_target_chrome"] = string(CommentTargetChromePatchOnly)
-	if selection.Prefix != "" {
-		hidden["comment_selection_prefix"] = selection.Prefix
-	}
-	selection.HiddenFields = hidden
-	return selection
+	return ""
 }
 
 func SelectionStyleExpr(prefix string) string {
@@ -251,6 +241,20 @@ func TargetChromeOrVisible(chrome CommentTargetChrome) CommentTargetChrome {
 		return CommentTargetChromeVisible
 	}
 	return chrome
+}
+
+func SelectionOnlySignalArgs(args CommentableMarkdownArgs) SelectionSignalArgs {
+	selection := args.SelectionSignals
+	hidden := MergeHidden(args.HiddenFields, selection.HiddenFields)
+	if hidden == nil {
+		hidden = map[string]string{}
+	}
+	hidden["comment_target_chrome"] = string(CommentTargetChromePatchOnly)
+	if selection.Prefix != "" {
+		hidden["comment_selection_prefix"] = selection.Prefix
+	}
+	selection.HiddenFields = hidden
+	return selection
 }
 
 var slugUnsafe = regexp.MustCompile(`[^a-zA-Z0-9_-]+`)
