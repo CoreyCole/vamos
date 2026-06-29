@@ -1,0 +1,87 @@
+package main
+
+templ Page() {
+	<!DOCTYPE html>
+	<html lang="en">
+		<head>
+			<meta charset="utf-8"/>
+			<meta name="viewport" content="width=device-width, initial-scale=1"/>
+			<title>Server Wordle</title>
+			<script type="module" src="https://cdn.jsdelivr.net/gh/starfederation/datastar@main/bundles/datastar.js"></script>
+			<style>
+				:root { color-scheme: light; font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+				body { margin: 0; min-height: 100vh; background: linear-gradient(135deg, #f8fafc, #dcfce7); color: #0f172a; }
+				main { max-width: 680px; margin: 0 auto; padding: 24px 16px 44px; }
+				header { display: grid; gap: 10px; text-align: center; margin-bottom: 18px; }
+				h1 { margin: 0; font-size: clamp(2.5rem, 12vw, 5.5rem); line-height: .9; letter-spacing: -0.08em; }
+				p { margin: 0; color: #475569; }
+				.panel { border: 1px solid rgba(15, 23, 42, .12); border-radius: 28px; background: rgba(255,255,255,.88); box-shadow: 0 18px 45px rgba(15, 23, 42, .08); padding: 18px; }
+				.board { display: grid; gap: 8px; margin: 16px 0; }
+				.row { display: grid; grid-template-columns: repeat(5, minmax(42px, 1fr)); gap: 8px; }
+				.tile { aspect-ratio: 1; border: 2px solid #cbd5e1; border-radius: 12px; display: grid; place-items: center; font-size: clamp(1.35rem, 9vw, 2.35rem); font-weight: 900; }
+				.empty { background: #f8fafc; color: #94a3b8; }
+				.green { background: #16a34a; border-color: #15803d; color: white; }
+				.yellow { background: #ca8a04; border-color: #a16207; color: white; }
+				.gray { background: #64748b; border-color: #475569; color: white; }
+				form { display: flex; gap: 10px; margin-top: 14px; }
+				input { flex: 1; min-width: 0; border: 1px solid #cbd5e1; border-radius: 999px; padding: 12px 16px; font-size: 1.1rem; text-transform: uppercase; }
+				button { border: 0; border-radius: 999px; background: #0f172a; color: white; font-weight: 800; padding: 12px 16px; cursor: pointer; }
+				button.secondary { background: #15803d; }
+				.help { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 14px; font-size: .9rem; }
+				.help span { border-radius: 999px; color: white; font-weight: 800; padding: 7px 10px; text-align: center; }
+			</style>
+		</head>
+		<body>
+			<main data-init="@get('/events')">
+				<header>
+					<h1>Server Wordle</h1>
+					<p>The answer, validation, repeated-letter scoring, and history all live in the Go server.</p>
+				</header>
+				<section id="game" class="panel" aria-live="polite">
+					Loading the board…
+				</section>
+			</main>
+		</body>
+	</html>
+}
+
+templ GameView(game Game) {
+	<section id="game" class="panel" aria-live="polite">
+		<p id="status">{ game.Message }</p>
+		<div class="board" aria-label="Wordle guesses">
+			for _, guess := range game.Guesses {
+				<div class="row" aria-label={ "Guess " + guess.Word }>
+					for _, letter := range guess.Letters {
+						<div class={ "tile " + string(letter.Mark) } title={ string(letter.Mark) }>{ letter.Letter }</div>
+					}
+				</div>
+			}
+			if !game.Over {
+				for i := len(game.Guesses); i < maxAttempts; i++ {
+					<div class="row" aria-hidden="true">
+						<div class="tile empty">&nbsp;</div>
+						<div class="tile empty">&nbsp;</div>
+						<div class="tile empty">&nbsp;</div>
+						<div class="tile empty">&nbsp;</div>
+						<div class="tile empty">&nbsp;</div>
+					</div>
+				}
+			}
+		</div>
+		if game.Over {
+			<form id="new-game-form">
+				<button class="secondary" type="button" data-on:click="@post('/new', {contentType: 'form'})">New game</button>
+			</form>
+		} else {
+			<form id="guess-form" autocomplete="off">
+				<input name="guess" maxlength="5" minlength="5" pattern="[A-Za-z]{5}" placeholder="CRANE" aria-label="Five-letter guess" autofocus/>
+				<button type="button" data-on:click="@post('/guess', {contentType: 'form'})">Guess</button>
+			</form>
+		}
+		<div class="help" aria-label="Color key">
+			<span class="green">Green: right spot</span>
+			<span class="yellow">Yellow: wrong spot</span>
+			<span class="gray">Gray: absent</span>
+		</div>
+	</section>
+}
