@@ -253,9 +253,13 @@ git status --short
 
 Do not edit `../vamos-main`; after host rebuilds, verify it remains clean.
 
-## Step 7: Fast-forward ../cn-agents-main and restart host
+## Step 7: Fast-forward host checkout and restart host
 
-Because the browser-visible host imports and launches `../vamos-main`, every merged Vamos runtime change needs `../vamos-main` fast-forwarded first, then a host rebuild from clean `../cn-agents-main`.
+Because the browser-visible host imports and launches `../vamos-main`, every merged Vamos runtime change needs `../vamos-main` fast-forwarded first, then the active host rebuilt/restarted.
+
+### Linux/systemd clean-host topology
+
+Use this when `../cn-agents-main` exists and systemd is the active host topology:
 
 ```bash
 cd ../cn-agents-main
@@ -292,6 +296,23 @@ Expected:
 - `vamos` executable is `.../vamos-main/agents-server`.
 - `../vamos-main` remains git-clean after build/restart.
 - `cn-agents.service`, `cn-agents-ts-worker.service`, and `cn-temporal.service` are inactive after cutover.
+
+### macOS LaunchAgent / cn-agents-prod test topology
+
+Use this when `../cn-agents-main` is absent and the active browser-visible site is a LaunchAgent such as `dev.chestnut.cn-agents` running a wrapper under `~/Library/Application Support/cn-agents/` with `REPO_DIR=.../cn-agents-prod`. See `references/macos-cn-agents-prod-local-testing.md` for the detailed local-test recipe and backup/verification commands.
+
+1. Verify the active process before changing anything:
+   ```bash
+   launchctl list | grep -E 'dev\.chestnut\.cn-agents($|-ts-worker|-ngrok)'
+   ps -p $(launchctl list | awk '/dev.chestnut.cn-agents$/ {print $1}') -o pid=,command=
+   ```
+2. Build `../vamos-main` via the host wrapper checkout. If plain `just build` fails only because a non-active `dev.vamos-ts-worker` LaunchAgent is missing, run `just build --no-restart` and record that restart was manual.
+3. If the active LaunchAgent executes `.../cn-agents-prod/pkg/agents/agents-server`, copy the freshly built `../vamos-main/agents-server` to that exact binary path, preserving a backup outside git if needed.
+4. Restart with launchd, not systemd:
+   ```bash
+   launchctl kickstart -k gui/$(id -u)/dev.chestnut.cn-agents
+   ```
+5. Verify local and public URLs return login/redirect responses, and verify the test paths the user needs. Do not claim browser-visible testing until the active process command points at the updated binary and `curl` confirms the site is reachable.
 
 ## Step 8: Verify browser-visible server
 

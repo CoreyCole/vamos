@@ -9,6 +9,21 @@ description: Manage QRSPI stage sessions from a main Pi/tmux manager session. Us
 
 Supervise QRSPI from a main Pi manager session. Launch focused child Pi sessions in visible tmux panes, capture the child result, validate through canonical Vamos QRSPI graph helpers, then advance or stop according to graph decision and QRSPI policy.
 
+## Hermes manager fallback
+
+This skill is designed for a Pi manager running in tmux. When Hermes is acting as the manager instead of a Pi/tmux parent, be explicit that this is **Hermes-managed background orchestration**, not true q-manager CLI/tmux mode:
+
+- Hermes cannot create the intended visible child terminal split or receive `q_manager_child_wake` events.
+- If the user says “you are the q-manager” from a Hermes session, state the mode clearly up front: Hermes will manage background Pi processes, not the Pi q-manager/tmux UI, unless the operator explicitly starts a Pi manager/tmux session.
+- Start each QRSPI stage with Hermes `terminal(background=true, notify_on_complete=true)` running `pi -p ...` from the correct repo/workspace cwd. Put large stage prompts in `/tmp/...` files and invoke Pi with `@/tmp/...` so full prior `qrspi_result` YAML is preserved.
+- Track readiness/completion through Hermes process IDs with `process(action="poll"|"log")`, not through q-manager child wakes. Notification snippets can be truncated; always read the full process log before extracting stage results or launching the next stage. A stage is ready/done only when the process exits successfully and the full log contains valid fenced `qrspi_result` YAML.
+- After each stage completes, extract the complete fenced `qrspi_result` YAML from the full log and pass that YAML verbatim into the next graph-safe stage prompt.
+- Continue graph-safe stages immediately under the delegated-background QRSPI contract; for implementation `status: handoff`, start a fresh `/q-resume` background Pi process with the full handoff YAML instead of pausing merely because a handoff exists.
+- Pause only for `needs_human`, `blocked`, `error`, invalid YAML/artifacts, failed process exit, or a real safety/lost-work decision.
+- Do not claim a Pi manager/tmux child split is running unless `vamos qrspi start-next` (or equivalent q-manager CLI) actually launched one.
+- On the first status update after starting a Hermes-managed stage, name the mode and readiness signal explicitly: `Hermes-managed background Pi process`, process ID, cwd, prompt file when useful, and `ready/done = process exit + full process log parsed`.
+- If the user specifically asks for visible Pi/tmux child panes, stop using the Hermes fallback and instruct them to run a real Pi manager/tmux session, or use `vamos qrspi start-next` only when a valid manager pane is available.
+
 ## Required context load
 
 1. Read `.pi/skills/qrspi-planning/SKILL.md`.
@@ -30,7 +45,8 @@ Supervise QRSPI from a main Pi manager session. Launch focused child Pi sessions
 
 - Existing QRSPI graph is canonical. Do not infer transitions from YAML text alone.
 - Use `cmd/vamos-runtime` helpers, not a new binary.
-- Child work must be visible and interruptible in tmux. No hidden background child runner as primary UX.
+- Child work must be visible and interruptible in tmux. No hidden background child runner as primary UX when using the q-manager runtime/CLI flow.
+- Explicit user-requested background Pi delegation is a separate orchestration mode: if the user says to run `/q-question` (or another QRSPI stage) in a background Pi process and delegate, load `qrspi-planning` `references/background-pi-stage-delegation.md`, write a prompt file with cwd/project/source request/stage skills, start `pi -p` via a tracked background process with completion notification, and report the process/session handle. Do not force the tmux `start-next` flow in that case unless the user asked for q-manager runtime control.
 - Manager state is disposable control state under user state dir, keyed by canonical `plan_dir`; never use repo-local `.vamos/q-manager`.
 - QRSPI artifacts and fenced `qrspi_result` YAML remain durable truth.
 - Respect manager-owned policy. `guided` is the default. `advanceMode`: `discuss` stops after valid result; `guided` starts graph-safe non-human edges, including implementation `status: handoff` checkpoints that should launch the next fresh implementation/resume child; `autopilot` can auto-approve only graph-marked safe gates. Plan reviews are controlled independently by `enablePlanReviews`, so both autopilot with reviews on and autopilot with reviews off are valid. Child-emitted `qrspi_result.policy` is informational only; it must not change manager policy or fail validation merely because it differs from manager state.

@@ -338,7 +338,8 @@ Always include the complete `thoughts/.../questions/YYYY-MM-DD_HH-MM-SS_topic-na
 - Include opportunistic `Language / Domain Model`, `Alignment`, and `ADR candidates for design` sections in the brainstorm artifact; write `None yet.` when they do not apply.
 - Update the brainstorm artifact after each confirmed lead-engineer decision or clarification, not after every tentative discussion turn.
 - Always start with a short creative brainstorm before converging on the final questions.
-- Always ask the lead engineer before proceeding to write the question doc.
+- Always ask the lead engineer before proceeding to write the question doc in interactive/manual q-question sessions.
+- In explicit delegated/background q-question mode (for example the user asks the manager to run `/q-question` in a background Pi process), treat the user's source prompt as the initial lead-engineer alignment, investigate lightweight code context, infer reasonable defaults, and write the question artifacts without pausing for routine interview turns. Emit `needs_human` with one exact question only when a real product/tradeoff/safety decision cannot be deferred to research/design.
 - Ask interview questions one at a time by default; use `/answer` only when batching independent questions is genuinely clearer.
 - For each human-judgment question, include your recommended answer and concise reasoning.
 - Walk down decision-tree branches and resolve dependencies between decisions before finalizing questions.
