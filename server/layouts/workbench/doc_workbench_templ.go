@@ -84,14 +84,14 @@ func CenterDocPane(args CenterDocPaneArgs) templ.Component {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, "<div id=\"doc-workbench-viewer-region\" class=\"min-h-0 flex-1 overflow-hidden\" data-view-transition-name=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, "<div id=\"doc-workbench-viewer-region\" class=\"min-h-0 flex-1 overflow-hidden\" style=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var3 string
-		templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.JoinStringErrs(ViewTransitionName("doc", "viewer"))
+		templ_7745c5c3_Var3, templ_7745c5c3_Err = templruntime.SanitizeStyleAttributeValues("view-transition-name: " + ViewTransitionName("doc", "viewer"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/layouts/workbench/doc_workbench.templ`, Line: 24, Col: 142}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/layouts/workbench/doc_workbench.templ`, Line: 24, Col: 149}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var3))
 		if templ_7745c5c3_Err != nil {

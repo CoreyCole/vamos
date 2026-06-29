@@ -67,7 +67,7 @@ func TestRoutesRenderAndAcceptGuess(t *testing.T) {
 	}
 	body, _ := io.ReadAll(resp.Body)
 	_ = resp.Body.Close()
-	if resp.StatusCode != http.StatusOK || !strings.Contains(string(body), "Server Wordle") {
+	if resp.StatusCode != http.StatusOK || !strings.Contains(string(body), "Server Wordle") || !strings.Contains(string(body), "@get('events')") {
 		t.Fatalf("GET / status=%d body=%q", resp.StatusCode, string(body))
 	}
 
@@ -76,11 +76,26 @@ func TestRoutesRenderAndAcceptGuess(t *testing.T) {
 		t.Fatal(err)
 	}
 	_ = postResp.Body.Close()
-	if postResp.StatusCode != http.StatusNoContent {
-		t.Fatalf("POST /guess status = %d", postResp.StatusCode)
+	if postResp.StatusCode != http.StatusOK {
+		t.Fatalf("POST /guess final status = %d", postResp.StatusCode)
 	}
 	if len(app.State().Guesses) != 1 {
 		t.Fatalf("guesses recorded = %d, want 1", len(app.State().Guesses))
+	}
+
+	req, err := http.NewRequest(http.MethodPost, server.URL+"/guess", strings.NewReader("guess=crane"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set("Accept", "text/event-stream")
+	ssePostResp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = ssePostResp.Body.Close()
+	if ssePostResp.StatusCode != http.StatusNoContent {
+		t.Fatalf("Datastar POST /guess status = %d, want %d", ssePostResp.StatusCode, http.StatusNoContent)
 	}
 }
 

@@ -44,7 +44,9 @@ import (
 	"github.com/CoreyCole/vamos/server/services/auth"
 	"github.com/CoreyCole/vamos/server/services/comments"
 	"github.com/CoreyCole/vamos/server/services/db"
+	genericexamples "github.com/CoreyCole/vamos/server/services/examples/generic"
 	"github.com/CoreyCole/vamos/server/services/examples/pickleball"
+	"github.com/CoreyCole/vamos/server/services/examples/wordle"
 	"github.com/CoreyCole/vamos/server/services/layoutprefs"
 	"github.com/CoreyCole/vamos/server/services/markdown"
 	"github.com/CoreyCole/vamos/server/services/storybook"
@@ -78,6 +80,38 @@ func resolveStaticRoot() string {
 		}
 	}
 	return "static"
+}
+
+func resolveExampleRoot(mainCheckoutPath, exampleID string) string {
+	if root := exampleRootFromBase(".", exampleID); root != "" {
+		return root
+	}
+	exe, err := os.Executable()
+	if err == nil {
+		if resolved, err := filepath.EvalSymlinks(exe); err == nil {
+			exe = resolved
+		}
+		if root := exampleRootFromBase(filepath.Dir(exe), exampleID); root != "" {
+			return root
+		}
+	}
+	base := strings.TrimSpace(mainCheckoutPath)
+	if base == "" {
+		base = "."
+	}
+	return filepath.Join(base, "examples", exampleID)
+}
+
+func exampleRootFromBase(base, exampleID string) string {
+	candidate := filepath.Join(base, "examples", exampleID)
+	if _, err := os.Stat(candidate); err == nil {
+		return candidate
+	}
+	return ""
+}
+
+func resolvePickleballExampleRoot(mainCheckoutPath string) string {
+	return resolveExampleRoot(mainCheckoutPath, "pickleball")
 }
 
 func workspaceReleaseHandlerOptions(
@@ -845,6 +879,7 @@ func main() {
 			corsAllowedOrigins = []string{hostCfg.Web.PublicBaseURL}
 		}
 	}
+	corsAllowedOrigins = append(corsAllowedOrigins, "null")
 	e.Use(middleware.CORSWithConfig(middleware.CORSConfig{
 		AllowOrigins: corsAllowedOrigins,
 		AllowMethods: []string{
@@ -855,9 +890,11 @@ func main() {
 			http.MethodOptions,
 		},
 		AllowHeaders: []string{
+			"Accept",
 			"Content-Type",
 			"Authorization",
 			"Connect-Protocol-Version",
+			"Datastar-Request",
 		},
 		AllowCredentials: true,
 	}))
@@ -1333,9 +1370,11 @@ func main() {
 	if temporalManager != nil {
 		pickleballWorkflowStarter = pickleball.NewTemporalWorkflowStarter(temporalManager.Client())
 	}
+	pickleballExampleRoot := resolvePickleballExampleRoot(workspaceDiscovery.MainCheckoutPath)
 	pickleballService, err := pickleball.NewService(pickleball.Options{
 		ThoughtsRoot:    cfg.MarkdownBasePath,
-		SeedBundleDir:   filepath.Join("examples", "pickleball", "seed-bundle"),
+		SeedBundleDir:   filepath.Join(pickleballExampleRoot, "seed-bundle"),
+		FilesRoot:       filepath.Join(pickleballExampleRoot, "files"),
 		WorkflowStarter: pickleballWorkflowStarter,
 		AIGenerator:     pickleball.PromptPatchGenerator{},
 		AppletEditor: pickleball.AgentChatEditor{
@@ -1347,6 +1386,20 @@ func main() {
 	})
 	if err != nil {
 		log.Fatal("Failed to initialize pickleball example service:", err)
+	}
+	wordleExampleRoot := resolveExampleRoot(workspaceDiscovery.MainCheckoutPath, "wordle")
+	wordleService, err := wordle.NewService(wordle.Options{
+		FilesRoot:     filepath.Join(wordleExampleRoot, "files"),
+		AppletRuntime: appletruntime.NewManager(filepath.Join(cfg.MarkdownBasePath, ".vamos", "applets", "logs")),
+	})
+	if err != nil {
+		log.Fatal("Failed to initialize wordle example service:", err)
+	}
+	examplesService, err := genericexamples.NewService(genericexamples.Options{
+		ExamplesRoot: filepath.Dir(resolveExampleRoot(workspaceDiscovery.MainCheckoutPath, "todo")),
+	})
+	if err != nil {
+		log.Fatal("Failed to initialize generic examples service:", err)
 	}
 	if goWorker != nil {
 		goWorker.RegisterWorkflow(pickleball.SelfModifyWorkflow)
@@ -1368,7 +1421,8 @@ func main() {
 	// binary is launched from a wrapper checkout with a different working dir.
 	staticRoot := resolveStaticRoot()
 	_, datastarProErr := os.Stat(filepath.Join(staticRoot, "js", "datastar-pro-v1.js"))
-	layouts.SetDatastarProAvailable(datastarProErr == nil)
+	_ = datastarProErr
+	layouts.SetDatastarProAvailable(false)
 	_, datastarInspectorErr := os.Stat(filepath.Join(staticRoot, "js", "datastar-inspector.js"))
 	layouts.SetDatastarInspectorAvailable(datastarInspectorErr == nil)
 	e.Static("/static", staticRoot)
@@ -1433,7 +1487,7 @@ func main() {
 	if cfg.WorkspaceMode != "standalone" || workspaceManager != nil {
 		handlerOptions := []workspaces.HandlerOption{
 			workspaces.WithDevAuth(authService, handoffSigner),
-			workspaces.WithRestartAPI(cfg.WorkspaceRestartToken, cfg.RepoPath),
+			workspaces.WithRestartAPI(cfg.WorkspaceRestartToken, workspaceDiscovery.MainCheckoutPath),
 			workspaces.WithLifecycleNotifier(workspaceNotifier),
 			workspaces.WithPlanWorkspaces(dbService.Queries),
 			workspaces.WithImplWorkspaces(dbService.Queries),
@@ -1559,6 +1613,8 @@ func main() {
 	registerAgentChatEntryRoutes(e, authMiddleware, agentChatHandler, markdownService)
 
 	pickleballService.RegisterRoutes(e, authMiddleware)
+	wordleService.RegisterRoutes(e, authMiddleware)
+	examplesService.RegisterRoutes(e, authMiddleware)
 
 	// Protected form routes - require authentication
 	formsGroup := e.Group("/forms")

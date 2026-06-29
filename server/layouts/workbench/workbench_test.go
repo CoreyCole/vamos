@@ -522,8 +522,7 @@ func TestWorkbenchResizeJSShowsHandlesForVisibleAdjacentRegions(t *testing.T) {
 		"before && after && isVisible(before) && isVisible(after)",
 		"const content = visible.filter((region) => region !== navigation)",
 		"if (!navigation || content.length === 0) return null",
-		"const datastarModule =",
-		"https://cdn.jsdelivr.net/gh/starfederation/datastar@v1.0.1/bundles/datastar.js",
+		"const datastarModule = import(\"@vamos/datastar\");",
 		"collapseRegion(root, navigationGroup.navigation)",
 		"regionSlot(region) !== \"primary\"",
 		"attributeFilter: [\"class\", \"style\", \"data-workbench-focused\"]",
@@ -1046,7 +1045,7 @@ func TestSharedDocWorkbenchViewerHasStableViewTransitionName(t *testing.T) {
 	html := body.String()
 	for _, want := range []string{
 		`id="doc-workbench-viewer-region"`,
-		`data-view-transition-name="doc-viewer"`,
+		`style="view-transition-name: doc-viewer;"`,
 	} {
 		if !strings.Contains(html, want) {
 			t.Fatalf("CenterDocPane html = %s, want %q", html, want)

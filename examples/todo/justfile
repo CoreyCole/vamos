@@ -1,0 +1,47 @@
+set dotenv-load := false
+
+port := env_var_or_default("PORT", "8080")
+backend_port := env_var_or_default("BACKEND_PORT", "18080")
+
+build:
+  @just install
+  @just generate
+  @go test ./...
+  @go build -o ./.bin/app ./cmd/app
+  @go build -o ./.bin/devproxy ./cmd/devproxy
+  @just restart
+  @just health
+  @just status
+
+install:
+  @pnpm install --frozen-lockfile
+
+generate:
+  @sqlc generate
+  @templ generate
+  @pnpm exec tailwindcss -i ./internal/ui/app.css -o ./static/app.css
+
+restart:
+  @mkdir -p .run .bin files
+  @just stop
+  @BACKEND_URL="http://127.0.0.1:${BACKEND_PORT:-{{backend_port}}}" DEV_PROXY_ADDR="0.0.0.0:${PORT:-{{port}}}" nohup ./.bin/devproxy > .run/proxy.log 2>&1 & echo $! > .run/proxy.pid
+  @VAMOS_APP_FILES_ROOT="${VAMOS_APP_FILES_ROOT:-./files}" BACKEND_PORT="${BACKEND_PORT:-{{backend_port}}}" nohup air -c .air.toml > .run/air.log 2>&1 & echo $! > .run/air.pid
+  @sleep 1
+
+stop:
+  @if [ -f .run/air.pid ]; then kill "$(cat .run/air.pid)" 2>/dev/null || true; rm -f .run/air.pid; fi
+  @if [ -f .run/proxy.pid ]; then kill "$(cat .run/proxy.pid)" 2>/dev/null || true; rm -f .run/proxy.pid; fi
+  @sleep 0.2
+
+health:
+  @curl -fsS "http://127.0.0.1:${PORT:-{{port}}}/healthz"
+
+status:
+  @mkdir -p .run
+  @health="$(curl -fsS http://127.0.0.1:${PORT:-{{port}}}/healthz 2>/dev/null || echo down)"; \
+    printf '{"port":"%s","backend_port":"%s","health":"%s","air_pid":"%s","proxy_pid":"%s"}\n' "${PORT:-{{port}}}" "${BACKEND_PORT:-{{backend_port}}}" "$health" "$(cat .run/air.pid 2>/dev/null || true)" "$(cat .run/proxy.pid 2>/dev/null || true)" | tee .run/status.json
+  @tail -12 .run/proxy.log 2>/dev/null || true
+  @tail -12 .run/air.log 2>/dev/null || true
+
+logs:
+  @tail -f .run/proxy.log .run/air.log

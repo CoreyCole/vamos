@@ -116,6 +116,27 @@ func TestAgentChatPageRoutesNotFound(t *testing.T) {
 	}
 }
 
+func TestResolvePickleballExampleRootUsesCurrentCheckoutWhenPresent(t *testing.T) {
+	root := t.TempDir()
+	exampleRoot := filepath.Join(root, "examples", "pickleball")
+	if err := os.MkdirAll(exampleRoot, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	oldWD, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chdir(root); err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = os.Chdir(oldWD) }()
+
+	got := resolvePickleballExampleRoot("/repo/vamos-main")
+	if got != filepath.Join(".", "examples", "pickleball") {
+		t.Fatalf("example root = %q", got)
+	}
+}
+
 func TestWorkspaceDomainFromPublicBaseURL(t *testing.T) {
 	t.Parallel()
 

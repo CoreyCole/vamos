@@ -316,8 +316,8 @@ var pageTemplate = template.Must(template.New("page").Funcs(template.FuncMap{"te
       <h1>Tonight's pickleball courts</h1>
       <p id="tournament-status">{{.Message}}</p>
       <div class="actions">
-        <a class="pill" href="/events" data-on-click="@get('/events')">Refresh schedule</a>
-        <a class="pill" href="/matchups.csv">Download matchups</a>
+        <a class="pill" href="events" data-on-click="@get('events')">Refresh schedule</a>
+        <a class="pill" href="matchups.csv">Download matchups</a>
       </div>
     </header>
     <section class="grid" aria-label="Pickleball matchup cards">

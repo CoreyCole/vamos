@@ -52,6 +52,14 @@ func TestRootLoadsDatastarProDirectlyWhenAvailable(t *testing.T) {
 	if strings.Contains(body, "falling back to public Datastar bundle") {
 		t.Fatalf("Root() rendered fallback when Pro expected:\n%s", body)
 	}
+	for _, forbidden := range []string{
+		`/js/vamos-datastar-polyfills.js`,
+		`polyfills.install(datastar)`,
+	} {
+		if strings.Contains(body, forbidden) {
+			t.Fatalf("Root() rendered fallback polyfill %q when Pro expected:\n%s", forbidden, body)
+		}
+	}
 }
 
 func TestRootSkipsDatastarInspectorWhenAssetUnavailable(t *testing.T) {

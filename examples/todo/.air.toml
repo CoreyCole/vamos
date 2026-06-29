@@ -1,0 +1,22 @@
+root = "."
+tmp_dir = ".air"
+
+[build]
+cmd = "just generate && go build -o ./.bin/app ./cmd/app"
+full_bin = "sh -c 'VAMOS_APP_FILES_ROOT=\"${VAMOS_APP_FILES_ROOT:-./files}\" ADDR=\"127.0.0.1:${BACKEND_PORT:-18080}\" ./.bin/app'"
+include_ext = ["go", "templ", "sql", "css", "html"]
+exclude_dir = [".bin", ".run", ".air", "context", "files", "node_modules", "static"]
+exclude_regex = ["_templ.go", "internal/store/dbgen/.*"]
+send_interrupt = true
+kill_delay = "500ms"
+stop_on_error = true
+
+[log]
+time = true
+
+[screen]
+clear_on_rebuild = false
+keep_scroll = true
+
+[misc]
+clean_on_exit = true

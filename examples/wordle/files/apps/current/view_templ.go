@@ -8,7 +8,7 @@ package main
 import "github.com/a-h/templ"
 import templruntime "github.com/a-h/templ/runtime"
 
-func Page() templ.Component {
+func Page(game Game) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
@@ -29,7 +29,15 @@ func Page() templ.Component {
 			templ_7745c5c3_Var1 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"><title>Server Wordle</title><script type=\"module\" src=\"https://cdn.jsdelivr.net/gh/starfederation/datastar@main/bundles/datastar.js\"></script><style>\n\t\t\t\t:root { color-scheme: light; font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif; }\n\t\t\t\tbody { margin: 0; min-height: 100vh; background: linear-gradient(135deg, #f8fafc, #dcfce7); color: #0f172a; }\n\t\t\t\tmain { max-width: 680px; margin: 0 auto; padding: 24px 16px 44px; }\n\t\t\t\theader { display: grid; gap: 10px; text-align: center; margin-bottom: 18px; }\n\t\t\t\th1 { margin: 0; font-size: clamp(2.5rem, 12vw, 5.5rem); line-height: .9; letter-spacing: -0.08em; }\n\t\t\t\tp { margin: 0; color: #475569; }\n\t\t\t\t.panel { border: 1px solid rgba(15, 23, 42, .12); border-radius: 28px; background: rgba(255,255,255,.88); box-shadow: 0 18px 45px rgba(15, 23, 42, .08); padding: 18px; }\n\t\t\t\t.board { display: grid; gap: 8px; margin: 16px 0; }\n\t\t\t\t.row { display: grid; grid-template-columns: repeat(5, minmax(42px, 1fr)); gap: 8px; }\n\t\t\t\t.tile { aspect-ratio: 1; border: 2px solid #cbd5e1; border-radius: 12px; display: grid; place-items: center; font-size: clamp(1.35rem, 9vw, 2.35rem); font-weight: 900; }\n\t\t\t\t.empty { background: #f8fafc; color: #94a3b8; }\n\t\t\t\t.green { background: #16a34a; border-color: #15803d; color: white; }\n\t\t\t\t.yellow { background: #ca8a04; border-color: #a16207; color: white; }\n\t\t\t\t.gray { background: #64748b; border-color: #475569; color: white; }\n\t\t\t\tform { display: flex; gap: 10px; margin-top: 14px; }\n\t\t\t\tinput { flex: 1; min-width: 0; border: 1px solid #cbd5e1; border-radius: 999px; padding: 12px 16px; font-size: 1.1rem; text-transform: uppercase; }\n\t\t\t\tbutton { border: 0; border-radius: 999px; background: #0f172a; color: white; font-weight: 800; padding: 12px 16px; cursor: pointer; }\n\t\t\t\tbutton.secondary { background: #15803d; }\n\t\t\t\t.help { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 14px; font-size: .9rem; }\n\t\t\t\t.help span { border-radius: 999px; color: white; font-weight: 800; padding: 7px 10px; text-align: center; }\n\t\t\t</style></head><body><main data-init=\"@get('/events')\"><header><h1>Server Wordle</h1><p>The answer, validation, repeated-letter scoring, and history all live in the Go server.</p></header><section id=\"game\" class=\"panel\" aria-live=\"polite\">Loading the board…</section></main></body></html>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"><title>Server Wordle</title><script type=\"module\" src=\"https://cdn.jsdelivr.net/gh/starfederation/datastar@v1.0.1/bundles/datastar.js\"></script><style>\n\t\t\t\t:root { color-scheme: light; font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif; }\n\t\t\t\tbody { margin: 0; min-height: 100vh; background: linear-gradient(135deg, #f8fafc, #dcfce7); color: #0f172a; }\n\t\t\t\tmain { max-width: 680px; margin: 0 auto; padding: 24px 16px 44px; }\n\t\t\t\theader { display: grid; gap: 10px; text-align: center; margin-bottom: 18px; }\n\t\t\t\th1 { margin: 0; font-size: clamp(2.5rem, 12vw, 5.5rem); line-height: .9; letter-spacing: -0.08em; }\n\t\t\t\tp { margin: 0; color: #475569; }\n\t\t\t\t.panel { border: 1px solid rgba(15, 23, 42, .12); border-radius: 28px; background: rgba(255,255,255,.88); box-shadow: 0 18px 45px rgba(15, 23, 42, .08); padding: 18px; }\n\t\t\t\t.board { display: grid; gap: 8px; margin: 16px 0; }\n\t\t\t\t.row { display: grid; grid-template-columns: repeat(5, minmax(42px, 1fr)); gap: 8px; }\n\t\t\t\t.tile { aspect-ratio: 1; border: 2px solid #cbd5e1; border-radius: 12px; display: grid; place-items: center; font-size: clamp(1.35rem, 9vw, 2.35rem); font-weight: 900; }\n\t\t\t\t.empty { background: #f8fafc; color: #94a3b8; }\n\t\t\t\t.green { background: #16a34a; border-color: #15803d; color: white; }\n\t\t\t\t.yellow { background: #ca8a04; border-color: #a16207; color: white; }\n\t\t\t\t.gray { background: #64748b; border-color: #475569; color: white; }\n\t\t\t\tform { display: flex; gap: 10px; margin-top: 14px; }\n\t\t\t\tinput { flex: 1; min-width: 0; border: 1px solid #cbd5e1; border-radius: 999px; padding: 12px 16px; font-size: 1.1rem; text-transform: uppercase; }\n\t\t\t\tbutton { border: 0; border-radius: 999px; background: #0f172a; color: white; font-weight: 800; padding: 12px 16px; cursor: pointer; }\n\t\t\t\tbutton.secondary { background: #15803d; }\n\t\t\t\t.help { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 14px; font-size: .9rem; }\n\t\t\t\t.help span { border-radius: 999px; color: white; font-weight: 800; padding: 7px 10px; text-align: center; }\n\t\t\t</style></head><body><main data-init=\"@get('events')\"><header><h1>Server Wordle</h1><p>The answer, validation, repeated-letter scoring, and history all live in the Go server.</p></header>")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = GameView(game).Render(ctx, templ_7745c5c3_Buffer)
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "</main></body></html>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -58,38 +66,38 @@ func GameView(game Game) templ.Component {
 			templ_7745c5c3_Var2 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "<section id=\"game\" class=\"panel\" aria-live=\"polite\"><p id=\"status\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "<section id=\"game\" class=\"panel\" aria-live=\"polite\"><p id=\"status\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var3 string
 		templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.JoinStringErrs(game.Message)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `examples/wordle/files/apps/current/view.templ`, Line: 50, Col: 31}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `examples/wordle/files/apps/current/view.templ`, Line: 48, Col: 31}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var3))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "</p><div class=\"board\" aria-label=\"Wordle guesses\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "</p><div class=\"board\" aria-label=\"Wordle guesses\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		for _, guess := range game.Guesses {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "<div class=\"row\" aria-label=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, "<div class=\"row\" aria-label=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var4 string
 			templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.JoinStringErrs("Guess " + guess.Word)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `examples/wordle/files/apps/current/view.templ`, Line: 53, Col: 55}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `examples/wordle/files/apps/current/view.templ`, Line: 51, Col: 55}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var4))
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, "\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, "\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -99,7 +107,7 @@ func GameView(game Game) templ.Component {
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, "<div class=\"")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, "<div class=\"")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
@@ -112,66 +120,66 @@ func GameView(game Game) templ.Component {
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, "\" title=\"")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 8, "\" title=\"")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 				var templ_7745c5c3_Var7 string
 				templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.JoinStringErrs(string(letter.Mark))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `examples/wordle/files/apps/current/view.templ`, Line: 55, Col: 78}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `examples/wordle/files/apps/current/view.templ`, Line: 53, Col: 78}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var7))
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 8, "\">")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 9, "\">")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 				var templ_7745c5c3_Var8 string
 				templ_7745c5c3_Var8, templ_7745c5c3_Err = templ.JoinStringErrs(letter.Letter)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `examples/wordle/files/apps/current/view.templ`, Line: 55, Col: 96}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `examples/wordle/files/apps/current/view.templ`, Line: 53, Col: 96}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var8))
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 9, "</div>")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 10, "</div>")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 10, "</div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 11, "</div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		}
 		if !game.Over {
 			for i := len(game.Guesses); i < maxAttempts; i++ {
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 11, "<div class=\"row\" aria-hidden=\"true\"><div class=\"tile empty\">&nbsp;</div><div class=\"tile empty\">&nbsp;</div><div class=\"tile empty\">&nbsp;</div><div class=\"tile empty\">&nbsp;</div><div class=\"tile empty\">&nbsp;</div></div>")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 12, "<div class=\"row\" aria-hidden=\"true\"><div class=\"tile empty\">&nbsp;</div><div class=\"tile empty\">&nbsp;</div><div class=\"tile empty\">&nbsp;</div><div class=\"tile empty\">&nbsp;</div><div class=\"tile empty\">&nbsp;</div></div>")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 12, "</div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 13, "</div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		if game.Over {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 13, "<form id=\"new-game-form\"><button class=\"secondary\" type=\"button\" data-on:click=\"@post('/new', {contentType: 'form'})\">New game</button></form>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 14, "<form id=\"new-game-form\" method=\"post\" action=\"new\" data-on:submit=\"@post('new', {contentType: 'form'})\"><button class=\"secondary\" type=\"submit\">New game</button></form>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		} else {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 14, "<form id=\"guess-form\" autocomplete=\"off\"><input name=\"guess\" maxlength=\"5\" minlength=\"5\" pattern=\"[A-Za-z]{5}\" placeholder=\"CRANE\" aria-label=\"Five-letter guess\" autofocus> <button type=\"button\" data-on:click=\"@post('/guess', {contentType: 'form'})\">Guess</button></form>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 15, "<form id=\"guess-form\" method=\"post\" action=\"guess\" autocomplete=\"off\" data-on:submit=\"@post('guess', {contentType: 'form'})\"><input name=\"guess\" maxlength=\"5\" minlength=\"5\" pattern=\"[A-Za-z]{5}\" placeholder=\"CRANE\" aria-label=\"Five-letter guess\" autofocus> <button type=\"submit\">Guess</button></form>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 15, "<div class=\"help\" aria-label=\"Color key\"><span class=\"green\">Green: right spot</span> <span class=\"yellow\">Yellow: wrong spot</span> <span class=\"gray\">Gray: absent</span></div></section>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 16, "<div class=\"help\" aria-label=\"Color key\"><span class=\"green\">Green: right spot</span> <span class=\"yellow\">Yellow: wrong spot</span> <span class=\"gray\">Gray: absent</span></div></section>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

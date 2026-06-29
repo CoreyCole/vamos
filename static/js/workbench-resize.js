@@ -268,6 +268,20 @@ function startResize(event) {
 
   const onMove = (moveEvent) => {
     const dx = moveEvent.clientX - startX;
+    const navigationGroup = resizeGroupForHandle(root, before, after);
+    if (navigationGroup) {
+      const navigationStart =
+        navigationGroup.navigation === before ? beforeStart : afterStart;
+      const navigationNext =
+        navigationGroup.navigation === before
+          ? navigationStart + dx
+          : navigationStart - dx;
+      if (navigationNext <= regionMinWidth(navigationGroup.navigation) / 2) {
+        collapseRegion(root, navigationGroup.navigation);
+        return;
+      }
+    }
+
     const beforeIsPrimary = regionSlot(before) === "primary";
     const afterIsPrimary = regionSlot(after) === "primary";
 
@@ -336,5 +350,5 @@ new MutationObserver(init).observe(document.documentElement, {
   childList: true,
   subtree: true,
   attributes: true,
-  attributeFilter: ["class", "data-workbench-focused"],
+  attributeFilter: ["class", "style", "data-workbench-focused"],
 });

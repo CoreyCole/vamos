@@ -1,0 +1,67 @@
+package wordle
+
+import (
+	"github.com/CoreyCole/vamos/server/layouts"
+	"github.com/CoreyCole/vamos/server/layouts/workbench"
+	"github.com/CoreyCole/vamos/server/services/applets"
+)
+
+templ Page() {
+	@layouts.Root(layouts.RootArgs{
+		Title:      "Wordle Applet",
+		ShowHeader: true,
+		PageType:   layouts.PageTypeAgentChat,
+	}) {
+		@workbench.Workbench(buildWordleWorkbench())
+	}
+}
+
+func buildWordleWorkbench() workbench.WorkbenchState {
+	return applets.BuildWorkbenchState(nil, applets.WorkbenchState{
+		Config: applets.AppletConfig{
+			ID:          "wordle",
+			DisplayName: "Wordle",
+			UserLabels: applets.AppletLabels{
+				FilesTitle: "Wordle app",
+				ChatTitle:  "Applet notes",
+			},
+		},
+		Files: applets.FilesViewModel{
+			Title:     "Wordle app",
+			Component: WordleAppPanel(),
+		},
+		Chat: applets.ChatViewModel{
+			Title:     "Applet notes",
+			Component: WordleNotesPanel(),
+		},
+	})
+}
+
+templ WordleAppPanel() {
+	<section id="wordle-state" class="flex h-full min-h-0 flex-col overflow-hidden bg-background">
+		<header class="shrink-0 border-b border-border px-4 py-3">
+			<p class="text-xs font-semibold uppercase tracking-wide text-primary">Long-running applet</p>
+			<h1 class="text-xl font-semibold tracking-tight text-foreground">Server Wordle</h1>
+			<p class="mt-1 text-sm text-muted-foreground">The hidden word, validation, scoring, and game history live in the Go applet process.</p>
+		</header>
+		<div class="min-h-0 flex-1 bg-muted/40 p-3">
+			<div class="h-full overflow-hidden rounded-2xl border border-border bg-background shadow-inner">
+				<iframe title="Server Wordle app" class="h-[32rem] w-full bg-background lg:h-full" sandbox="allow-same-origin allow-forms allow-downloads allow-scripts" src="/examples/wordle/app/"></iframe>
+			</div>
+		</div>
+	</section>
+}
+
+templ WordleNotesPanel() {
+	<aside id="wordle-chat-panel" class="flex h-full min-h-0 flex-col bg-card">
+		<div class="shrink-0 border-b border-border px-4 py-3">
+			<p class="text-xs font-semibold uppercase tracking-wide text-primary">Notes</p>
+			<h2 class="text-base font-semibold text-foreground">Applet directory</h2>
+			<p class="mt-1 text-xs text-muted-foreground">This is a first pass at rendering a long-running app binary in the shared Workbench.</p>
+		</div>
+		<div class="min-h-0 flex-1 space-y-3 overflow-y-auto p-4 text-sm text-muted-foreground">
+			<p>The applet source lives under <code>examples/wordle/files/apps/current</code>.</p>
+			<p>Next step: discover applet directories from AGENTS.md frontmatter and render them from the Thoughts browser instead of bespoke example routes.</p>
+		</div>
+	</aside>
+}

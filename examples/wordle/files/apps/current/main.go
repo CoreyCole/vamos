@@ -134,7 +134,7 @@ func (a *App) HandleHome(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	if err := Page().Render(r.Context(), w); err != nil {
+	if err := Page(a.State()).Render(r.Context(), w); err != nil {
 		http.Error(w, "I couldn't draw the game board safely.", http.StatusInternalServerError)
 	}
 }
@@ -168,7 +168,11 @@ func (a *App) HandleGuess(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	a.SubmitGuess(r.FormValue("guess"))
-	w.WriteHeader(http.StatusNoContent)
+	if wantsDatastar(r) {
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+	http.Redirect(w, r, ".", http.StatusSeeOther)
 }
 
 func (a *App) HandleNewGame(w http.ResponseWriter, r *http.Request) {
@@ -177,7 +181,15 @@ func (a *App) HandleNewGame(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	a.ResetGame()
-	w.WriteHeader(http.StatusNoContent)
+	if wantsDatastar(r) {
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+	http.Redirect(w, r, ".", http.StatusSeeOther)
+}
+
+func wantsDatastar(r *http.Request) bool {
+	return strings.Contains(r.Header.Get("Accept"), "text/event-stream")
 }
 
 func (a *App) SubmitGuess(raw string) {
