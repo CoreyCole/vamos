@@ -1,5 +1,4 @@
-const datastarModule =
-  import("https://cdn.jsdelivr.net/gh/starfederation/datastar@v1.0.1/bundles/datastar.js");
+const datastarModule = import("@vamos/datastar");
 
 async function mergeWorkbenchPaths(patches) {
   const { mergePaths } = await datastarModule;
@@ -141,15 +140,37 @@ function applyRegionRatios(root) {
   const regions = visibleRegions(root);
   const availableWidth = availableRegionWidth(root);
   if (availableWidth <= 0) return;
-  const total =
-    regions.reduce(
-      (sum, region) => sum + Number(region.dataset.workbenchRatio || 0),
-      0,
-    ) || 1;
-  for (const region of regions) {
-    const ratio = Number(region.dataset.workbenchRatio || 0) / total;
-    setRegionWidth(region, ratio * availableWidth);
+
+  const primary = regions.find((region) => regionSlot(region) === "primary");
+  if (!primary) {
+    const total =
+      regions.reduce(
+        (sum, region) => sum + Number(region.dataset.workbenchRatio || 0),
+        0,
+      ) || 1;
+    for (const region of regions) {
+      const ratio = Number(region.dataset.workbenchRatio || 0) / total;
+      setRegionWidth(region, ratio * availableWidth);
+    }
+    return;
   }
+
+  let fixedWidth = 0;
+  for (const region of regions) {
+    if (region === primary) continue;
+    const storedWidth = Number(region.dataset.workbenchWidthPx || 0);
+    const ratioWidth =
+      Number(region.dataset.workbenchRatio || 0) * availableWidth;
+    const width = clamp(
+      storedWidth > 0 ? storedWidth : ratioWidth,
+      0,
+      availableWidth,
+    );
+    region.dataset.workbenchWidthPx = width.toFixed(2);
+    fixedWidth += width;
+    setRegionWidth(region, width);
+  }
+  setRegionWidth(primary, Math.max(0, availableWidth - fixedWidth));
 }
 
 function updateHandles(root) {
@@ -243,83 +264,36 @@ function startResize(event) {
   const beforeStart = regionWidth(before);
   const afterStart = regionWidth(after);
   const pairWidth = beforeStart + afterStart;
-  const beforeMin = regionMinWidth(before);
-  const afterMin = regionMinWidth(after);
-  const navigationGroup = resizeGroupForHandle(root, before, after);
-  const navigationStart = navigationGroup
-    ? regionWidth(navigationGroup.navigation)
-    : 0;
-  const contentStarts = navigationGroup
-    ? navigationGroup.content.map(regionWidth)
-    : [];
-  const contentStartTotal = contentStarts.reduce(
-    (sum, width) => sum + width,
-    0,
-  );
-  const contentShares = contentStarts.map((width) =>
-    contentStartTotal > 0
-      ? width / contentStartTotal
-      : 1 / contentStarts.length,
-  );
-  const contentMin = navigationGroup
-    ? navigationGroup.content.reduce(
-        (sum, region) => sum + regionMinWidth(region),
-        0,
-      )
-    : 0;
   const startX = event.clientX;
 
   const onMove = (moveEvent) => {
     const dx = moveEvent.clientX - startX;
-    if (navigationGroup) {
-      const direction = navigationGroup.navigation === before ? 1 : -1;
-      const rawNavigation = navigationStart + dx * direction;
-      const minNavigation = regionMinWidth(navigationGroup.navigation);
-      if (rawNavigation < minNavigation) {
-        collapseRegion(root, navigationGroup.navigation);
-        onUp();
-        return;
-      }
-      const maxNavigation = Math.max(
-        minNavigation,
-        availableWidth - contentMin,
-      );
-      const nextNavigation = clamp(rawNavigation, minNavigation, maxNavigation);
-      const nextContentTotal = availableWidth - nextNavigation;
+    const beforeIsPrimary = regionSlot(before) === "primary";
+    const afterIsPrimary = regionSlot(after) === "primary";
 
-      navigationGroup.navigation.dataset.workbenchRatio = (
-        nextNavigation / availableWidth
-      ).toFixed(4);
-      setRegionWidth(navigationGroup.navigation, nextNavigation);
-      navigationGroup.content.forEach((region, index) => {
-        const width = nextContentTotal * contentShares[index];
-        region.dataset.workbenchRatio = (width / availableWidth).toFixed(4);
-        setRegionWidth(region, width);
-      });
+    if (beforeIsPrimary && !afterIsPrimary) {
+      const nextAfter = clamp(afterStart - dx, 0, availableWidth);
+      after.dataset.workbenchRatio = (nextAfter / availableWidth).toFixed(4);
+      after.dataset.workbenchWidthPx = nextAfter.toFixed(2);
+      applyRegionRatios(root);
+      return;
+    }
+
+    if (!beforeIsPrimary && afterIsPrimary) {
+      const nextBefore = clamp(beforeStart + dx, 0, availableWidth);
+      before.dataset.workbenchRatio = (nextBefore / availableWidth).toFixed(4);
+      before.dataset.workbenchWidthPx = nextBefore.toFixed(2);
+      applyRegionRatios(root);
       return;
     }
 
     const rawBefore = beforeStart + dx;
-    const rawAfter = pairWidth - rawBefore;
-    if (rawBefore < beforeMin && canAutoCollapse(before)) {
-      collapseRegion(root, before);
-      onUp();
-      return;
-    }
-    if (rawAfter < afterMin && canAutoCollapse(after)) {
-      collapseRegion(root, after);
-      onUp();
-      return;
-    }
-    const minBefore = beforeMin;
-    const maxBefore = Math.max(minBefore, pairWidth - afterMin);
-    const nextBefore = clamp(rawBefore, minBefore, maxBefore);
+    const nextBefore = clamp(rawBefore, 0, pairWidth);
     const nextAfter = pairWidth - nextBefore;
-    const beforeRatio = nextBefore / availableWidth;
-    const afterRatio = nextAfter / availableWidth;
-
-    before.dataset.workbenchRatio = beforeRatio.toFixed(4);
-    after.dataset.workbenchRatio = afterRatio.toFixed(4);
+    before.dataset.workbenchRatio = (nextBefore / availableWidth).toFixed(4);
+    after.dataset.workbenchRatio = (nextAfter / availableWidth).toFixed(4);
+    before.dataset.workbenchWidthPx = nextBefore.toFixed(2);
+    after.dataset.workbenchWidthPx = nextAfter.toFixed(2);
     setRegionWidth(before, nextBefore);
     setRegionWidth(after, nextAfter);
   };
@@ -362,5 +336,5 @@ new MutationObserver(init).observe(document.documentElement, {
   childList: true,
   subtree: true,
   attributes: true,
-  attributeFilter: ["class", "style", "data-workbench-focused"],
+  attributeFilter: ["class", "data-workbench-focused"],
 });

@@ -28,8 +28,11 @@ func TestRootLoadsDatastarPolyfillsWhenProUnavailable(t *testing.T) {
 			t.Fatalf("Root() missing %q in:\n%s", want, body)
 		}
 	}
-	if strings.Contains(body, `src="/js/datastar-pro-v1.js"`) {
-		t.Fatalf("Root() loaded Pro asset when fallback expected:\n%s", body)
+	if !strings.Contains(body, `"@vamos/datastar":"https://cdn.jsdelivr.net/gh/starfederation/datastar@v1.0.1/bundles/datastar.js"`) {
+		t.Fatalf("Root() missing fallback Datastar import map:\n%s", body)
+	}
+	if strings.Contains(body, `"@vamos/datastar":"/js/datastar-pro-v1.js"`) {
+		t.Fatalf("Root() mapped Pro asset when fallback expected:\n%s", body)
 	}
 }
 
@@ -39,7 +42,8 @@ func TestRootLoadsDatastarProDirectlyWhenAvailable(t *testing.T) {
 
 	body := renderLayoutComponent(t, Root(RootArgs{}))
 	for _, want := range []string{
-		`src="/js/datastar-pro-v1.js"`,
+		`"@vamos/datastar":"/js/datastar-pro-v1.js"`,
+		`await import("@vamos/datastar")`,
 	} {
 		if !strings.Contains(body, want) {
 			t.Fatalf("Root() missing %q in:\n%s", want, body)
@@ -66,6 +70,22 @@ func TestRootLoadsDatastarInspectorWhenAssetAvailable(t *testing.T) {
 	body := renderLayoutComponent(t, Root(RootArgs{}))
 	if !strings.Contains(body, `/js/datastar-inspector.js`) {
 		t.Fatalf("Root() missing inspector asset when available:\n%s", body)
+	}
+}
+
+func TestWorkbenchResizeImportsSelectedDatastarModuleSpecifier(t *testing.T) {
+	t.Parallel()
+
+	contents, err := os.ReadFile("../../static/js/workbench-resize.js")
+	if err != nil {
+		t.Fatalf("ReadFile(workbench-resize.js) error = %v", err)
+	}
+	js := string(contents)
+	if !strings.Contains(js, `import("@vamos/datastar")`) {
+		t.Fatalf("workbench resize must import the root import-map Datastar specifier, got:\n%s", js)
+	}
+	if strings.Contains(js, "cdn.jsdelivr.net/gh/starfederation/datastar") {
+		t.Fatalf("workbench resize must not hard-code public Datastar separately from root import map")
 	}
 }
 

@@ -202,6 +202,16 @@ templ Root(args RootArgs) {
 			} else {
 				<link id="syntax-theme" rel="stylesheet" href="/css/syntax-github-dark.css"/>
 			}
+			<!-- Datastar import map must precede every module script, including polyfills. -->
+			if datastarProAvailable {
+				<script type="importmap">
+					{"imports":{"@vamos/datastar":"/js/datastar-pro-v1.js"}}
+				</script>
+			} else {
+				<script type="importmap">
+					{"imports":{"@vamos/datastar":"https://cdn.jsdelivr.net/gh/starfederation/datastar@v1.0.1/bundles/datastar.js"}}
+				</script>
+			}
 			<!-- Popover API Polyfill -->
 			<script type="module">
 				if (!("popover" in HTMLElement.prototype)) {
@@ -287,15 +297,15 @@ templ Root(args RootArgs) {
 			</script>
 			<!-- Datastar library for reactive components -->
 			if datastarProAvailable {
-				<script type="module" src="/js/datastar-pro-v1.js"></script>
+				<script type="module">
+					await import("@vamos/datastar");
+				</script>
 			} else {
 				<script type="module">
 					console.warn(
 						"Datastar Pro asset unavailable; falling back to public Datastar bundle",
 					);
-					const datastar = await import(
-						"https://cdn.jsdelivr.net/gh/starfederation/datastar@v1.0.1/bundles/datastar.js"
-					);
+					const datastar = await import("@vamos/datastar");
 					const polyfills = await import("/js/vamos-datastar-polyfills.js");
 					polyfills.install(datastar);
 				</script>
