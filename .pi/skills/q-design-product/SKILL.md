@@ -9,7 +9,7 @@ description: Creates concise product-facing `design-product.md` after approved Q
 
 ## Runtime YAML contract
 
-Every response that completes a QRSPI workflow node must include a fenced `yaml` block containing ``qrspi_result``, followed by a mandatory concise human summary. Do not use prose-only `Artifact` / `Summary` / `Next` completion responses.
+Every response that completes a QRSPI workflow node must include a fenced `yaml` block containing `qrspi_result`, followed by a mandatory concise human summary. Do not use prose-only `Artifact` / `Summary` / `Next` completion responses.
 
 Required shape:
 
@@ -135,6 +135,7 @@ Question: [one direct confirm/reject/adjust question]
 1. **Compare design against product requirements**. Mark coverage mechanically in matrix.
 1. **Inspect code only to verify current behavior, constraints, or feasibility.** Write notes under `context/design-product/` only when writing a file.
 1. **Surface gaps**: user end-state, demo assumptions, E2E paths, roles/tenants, data visibility/migrations, empty/loading/error states, rollout/rollback/support.
+1. **Surface product/engineering tradeoffs**: product behavior adding complexity, engineering simplicity constraining product behavior, and whether the tradeoff is accepted.
 1. **Draft `design-product.md` only after alignment resolves.**
 1. If `Blocked`, make each blocker actionable: product decision, design change, accepted non-goal, or override.
 1. Present summary; if user gives feedback, update doc and re-emit response shape.
@@ -145,7 +146,7 @@ Question: [one direct confirm/reject/adjust question]
 
 Write to `[plan_dir]/design-product.md`.
 
-Output artifact style: be extremely concise. Sacrifice grammar for concision.
+Output artifact style: 1-2 pages, product/stakeholder readable, terse, declarative end-state language. Sacrifice grammar for concision. This is a product decision memo, not a second PRD or implementation plan.
 
 ```markdown
 ---
@@ -163,49 +164,37 @@ verdict: [Pass|Blocked|Pass with accepted non-goals]
 
 # Product Design: [Feature Name]
 
-## Executive Summary
-[3-5 sentences. Product goal, main coverage result, critical risk, gate verdict.]
+## Product Outcomes
+- [Outcome users/stakeholders get]
+- [Operational outcome]
+- [Approval/gate outcome if relevant]
 
-## Product Source Inputs
-- [captured source path in `prds/` or `context/*/`, plus original URL/ID when useful]
-
-## Design Inputs
-- [design.md path and relevant ADR/context paths]
-
-## Product Goal
-[Non-technical outcome. Who gets what value.]
-
-## PRD Coverage Matrix
-
-| Requirement | Source | Design Coverage | Gap / Risk | Verdict |
-|---|---|---|---|---|
-| [short requirement] | [source] | [where design covers it] | [gap/risk or none] | [Covered/Gap/Ambiguous/Accepted non-goal] |
-
-## User End State
-- [What users can do after this ships]
+## User-Facing Behavior
+- [End-state behavior users see]
 - [Changed workflows, permissions, data visibility, or support/admin behavior]
+- Edge behavior: [important empty/loading/error/permission/data-state behavior]
 
-## Demo Implications
-- [Happy path demo]
-- [Setup/data assumptions]
-- [Demo risk]
+## Product Alignment
 
-## E2E Edge Cases / Hidden Complexities
-- [Edge case]: [expected product behavior or unresolved gap]
+| Product expectation | End-state behavior | Alignment |
+|---|---|---|
+| [plain-language product expectation] | [what users/system will do] | [Aligned/Accepted non-goal/Needs decision + note] |
 
-## Assumptions
-- [Assumption]
+## Product / Engineering Tradeoffs
+- [Product behavior chosen]: [engineering simplicity/cost tradeoff, or why added complexity is justified]
 
-## Accepted Non-Goals / Overrides
-- [Accepted non-goal or override, with engineer decision source]
+## Decisions / Non-Goals
+- Decision: [product behavior decision]
+- Non-goal: [accepted non-goal]
+- Assumption: [assumption]
 
-## Gate Verdict
-**Verdict:** [Pass|Blocked|Pass with accepted non-goals]
+## Demo / Rollout Notes
+- Demo path: [happy path]
+- Setup/data: [required data or setup]
+- Risk: [demo/rollout/support risk]
 
-[1-3 sentences explaining why this may or may not advance to outline.]
-
-## Critical Findings
-- [Finding with required downstream action]
+## Blocking Gaps
+- [None, or specific product decision/design change/override required]
 ```
 
 ## Response
@@ -251,11 +240,14 @@ If blocked, use `<status>blocked</status>` with the blocker in `<summary>` and o
 - Treat question-stage captures such as `context/question/linear/issue.json` as valid product source inputs.
 - Missing PRD/ticket/product source or missing design blocks document creation.
 - `Gap` or `Ambiguous` rows block unless explicitly accepted as non-goals or overridden.
-- Do not bury blockers in prose; surface them in matrix, Gate Verdict, and Critical Findings.
+- Do not bury blockers in prose; surface them in Source Coverage, Verdict, and Blocking Gaps.
 - Do not write technical signatures, package structures, or implementation slices. That belongs in `/q-outline`.
-- Do not duplicate the PRD; audit coverage.
+- Do not duplicate the PRD; translate Notion/product intent into clear end-state behavior.
+- Do not write before/after migration narration in the artifact; state the approved product end state.
+- Do not cite internal capture paths as a standalone Source column; if source traceability is useful, mention Notion/Linear/Figma by human name inside Alignment notes.
+- Do record engineering simplicity as a product tradeoff when it changes user-facing behavior, rollout, support, or future flexibility.
 - Every captured source file needs frontmatter pointing back to the original source document/link/ID.
 - Every requirement row needs a captured source path when available; otherwise cite original source and explain why not captured.
 - Every blocker needs a next decision or design change.
 - Present to user before finalizing.
-- Completion responses must be the fenced YAML ``qrspi_result`` block required by the runtime contract, followed by the mandatory concise human summary.
+- Completion responses must be the fenced YAML `qrspi_result` block required by the runtime contract, followed by the mandatory concise human summary.
