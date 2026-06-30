@@ -220,38 +220,40 @@ func (s *Service) loadOrCreateToday(
 func (s *Service) recordGuess(
 	ctx context.Context,
 	username, timezoneName, rawGuess string,
-) (string, error) {
-	guess, err := NormalizeGuess(rawGuess)
-	if err != nil {
-		return err.Error(), nil
-	}
-	if !s.words.Contains(guess) {
-		return "Not in word list.", nil
-	}
+) (GuessResult, error) {
 	state, err := s.loadOrCreateToday(ctx, username, timezoneName)
 	if err != nil {
-		return "", err
+		return GuessResult{}, err
+	}
+	rowIndex := currentRowIndex(state)
+	guess, err := NormalizeGuess(rawGuess)
+	if err != nil {
+		return rejectedGuess(err.Error(), rowIndex, state.Status), nil
+	}
+	if !s.words.Contains(guess) {
+		return rejectedGuess("Not in word list.", rowIndex, state.Status), nil
 	}
 	if state.Status != StatusActive {
-		return "Game already finished.", nil
+		return rejectedGuess("Game already finished.", rowIndex, state.Status), nil
 	}
 	if len(state.Guesses) >= maxAttempts {
-		return "No guesses left.", nil
+		return rejectedGuess("No guesses left.", rowIndex, state.Status), nil
 	}
+	rowIndex = len(state.Guesses)
 	tiles := ScoreGuess(state.Answer, guess)
 	payload, err := json.Marshal(tiles)
 	if err != nil {
-		return "", err
+		return GuessResult{}, err
 	}
 	_, err = s.queries.InsertGuess(ctx, dbgen.InsertGuessParams{
 		Username:   username,
 		PuzzleDate: state.Date,
-		RowIndex:   int64(len(state.Guesses)),
+		RowIndex:   int64(rowIndex),
 		Guess:      guess,
 		ResultJson: string(payload),
 	})
 	if err != nil {
-		return "Already guessed.", nil
+		return rejectedGuess("Already guessed.", rowIndex, state.Status), nil
 	}
 	status := StatusActive
 	if guess == state.Answer {
@@ -266,10 +268,36 @@ func (s *Service) recordGuess(
 			Username:   username,
 			PuzzleDate: state.Date,
 		}); err != nil {
-			return "", err
+			return GuessResult{}, err
 		}
 	}
-	return "Guess recorded.", nil
+	return GuessResult{
+		Outcome: GuessAccepted,
+		Message: "Guess recorded.",
+		Row:     rowIndex,
+		Status:  status,
+	}, nil
+}
+
+func rejectedGuess(message string, row int, status GameStatus) GuessResult {
+	return GuessResult{Outcome: GuessRejected, Message: message, Row: row, Status: status}
+}
+
+func newRenderEvent(username string, result GuessResult) renderEvent {
+	kind := "shake"
+	if result.Outcome == GuessAccepted {
+		kind = "reveal"
+		if result.Status == StatusWon {
+			kind = "win"
+		}
+	}
+	return renderEvent{
+		ID:       fmt.Sprintf("%d", time.Now().UnixNano()),
+		Username: username,
+		Kind:     kind,
+		RowIndex: result.Row,
+		Message:  result.Message,
+	}
 }
 
 func (s *Service) requestLocation(timezoneName string) *time.Location {

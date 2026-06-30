@@ -1,6 +1,9 @@
 package app
 
 import (
+	"context"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 )
@@ -150,6 +153,119 @@ func TestKeyboardRowsUseWordleLayoutAndBestKnownState(t *testing.T) {
 	if !aKeyFound {
 		t.Fatal("a key not found")
 	}
+}
+
+func TestRecordGuessRejectsInvalidWithoutAttempt(t *testing.T) {
+	t.Parallel()
+	service := newTestService(t)
+	result, err := service.recordGuess(context.Background(), "alice", "UTC", "zzzzz")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Outcome != GuessRejected || result.Message != "Not in word list." ||
+		result.Row != 0 {
+		t.Fatalf("result = %#v, want rejected not-in-list row 0", result)
+	}
+	state, err := service.loadOrCreateToday(context.Background(), "alice", "UTC")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(state.Guesses) != 0 {
+		t.Fatalf("guesses len = %d, want 0", len(state.Guesses))
+	}
+}
+
+func TestRecordGuessAcceptedConsumesAttempt(t *testing.T) {
+	t.Parallel()
+	service := newTestService(t)
+	result, err := service.recordGuess(context.Background(), "alice", "UTC", "alert")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Outcome != GuessAccepted || result.Message != "Guess recorded." ||
+		result.Row != 0 {
+		t.Fatalf("result = %#v, want accepted row 0", result)
+	}
+	state, err := service.loadOrCreateToday(context.Background(), "alice", "UTC")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(state.Guesses) != 1 || state.Guesses[0].Word != "alert" {
+		t.Fatalf("guesses = %#v, want one alert", state.Guesses)
+	}
+}
+
+func TestRecordGuessDuplicateRejected(t *testing.T) {
+	t.Parallel()
+	service := newTestService(t)
+	if _, err := service.recordGuess(
+		context.Background(),
+		"alice",
+		"UTC",
+		"alert",
+	); err != nil {
+		t.Fatal(err)
+	}
+	result, err := service.recordGuess(context.Background(), "alice", "UTC", "alert")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Outcome != GuessRejected || result.Message != "Already guessed." ||
+		result.Row != 1 {
+		t.Fatalf("result = %#v, want duplicate rejected row 1", result)
+	}
+	state, err := service.loadOrCreateToday(context.Background(), "alice", "UTC")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(state.Guesses) != 1 {
+		t.Fatalf("guesses len = %d, want 1", len(state.Guesses))
+	}
+}
+
+func TestRenderEventMapsOutcome(t *testing.T) {
+	t.Parallel()
+	if got := newRenderEvent(
+		"alice",
+		GuessResult{Outcome: GuessRejected, Row: 2},
+	).Kind; got != "shake" {
+		t.Fatalf("rejected kind = %q, want shake", got)
+	}
+	if got := newRenderEvent(
+		"alice",
+		GuessResult{Outcome: GuessAccepted, Status: StatusActive},
+	).Kind; got != "reveal" {
+		t.Fatalf("accepted kind = %q, want reveal", got)
+	}
+	if got := newRenderEvent(
+		"alice",
+		GuessResult{Outcome: GuessAccepted, Status: StatusWon},
+	).Kind; got != "win" {
+		t.Fatalf("won kind = %q, want win", got)
+	}
+}
+
+type fixedClock struct{ now time.Time }
+
+func (c fixedClock) Now() time.Time { return c.now }
+
+func newTestService(t *testing.T) *Service {
+	t.Helper()
+	wordFile := filepath.Join(t.TempDir(), "words.txt")
+	if err := os.WriteFile(wordFile, []byte("apple\nalert\ncrane\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	service, err := New(Config{
+		FilesRoot: t.TempDir(),
+		WordFile:  wordFile,
+		Location:  time.UTC,
+		Clock:     fixedClock{now: time.Date(2026, 6, 29, 12, 0, 0, 0, time.UTC)},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = service.Close() })
+	return service
 }
 
 func TestPuzzleDateUsesLocation(t *testing.T) {

@@ -37,6 +37,9 @@ func (s *Service) patchPanel(
 	if event.Username != "" && event.Username != username {
 		event = renderEvent{}
 	}
+	if message == "" && event.Message != "" && event.Username == username {
+		message = event.Message
+	}
 	data, err := s.pageData(c.Request().Context(), username, tz, message, event)
 	if err != nil {
 		data = ui.PageData{Message: "The app could not load state safely."}

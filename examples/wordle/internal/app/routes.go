@@ -84,18 +84,22 @@ func (s *Service) handleGuess(c echo.Context) error {
 		return c.NoContent(http.StatusNoContent)
 	}
 	tz, _ := readCookie(c, timezoneCookie)
-	_, err := s.recordGuess(
+	result, err := s.recordGuess(
 		c.Request().Context(),
 		username,
 		tz,
 		c.FormValue("guess"),
 	)
-	s.notifier.notify(notifierEvent{})
 	if err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, "record guess")
 	}
-	return datastar.NewSSE(c.Response().Writer, c.Request()).
-		ExecuteScript("document.getElementById('guess-form')?.reset()")
+	event := newRenderEvent(username, result)
+	s.notifier.notify(notifierEvent{Username: username, Event: event})
+	sse := datastar.NewSSE(c.Response().Writer, c.Request())
+	if result.Outcome == GuessAccepted {
+		return sse.MarshalAndPatchSignals(map[string]any{"guess": ""})
+	}
+	return sse.ExecuteScript("document.getElementById('wordle-panel')?.focus()")
 }
 
 func readCookie(c echo.Context, name string) (string, bool) {
