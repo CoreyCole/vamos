@@ -11,7 +11,7 @@ templ Page() {
 			<link rel="stylesheet" href="static/app.css"/>
 		</head>
 		<body class="min-h-screen bg-slate-950 text-slate-100">
-			<main class="mx-auto flex min-h-screen max-w-3xl flex-col gap-8 px-5 py-10" data-init="@get('events')">
+			<main class="mx-auto flex min-h-screen max-w-3xl flex-col gap-8 px-5 py-10" data-init="@get('/events')">
 				<header class="space-y-3 text-center">
 					<p class="text-sm font-semibold uppercase tracking-[0.3em] text-emerald-300">Datastar daily game</p>
 					<h1 class="text-4xl font-black tracking-tight text-white sm:text-6xl">Daily Wordle</h1>
@@ -53,7 +53,7 @@ templ LoginPanel(message string) {
 }
 
 templ GamePanel(data PageData) {
-	<div class="space-y-6">
+	<div class="space-y-6" data-signals="{guess: ''}">
 		<div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
 			<div>
 				<h2 class="text-2xl font-bold text-white">{ data.Game.PuzzleDate }</h2>
@@ -67,38 +67,58 @@ templ GamePanel(data PageData) {
 				</form>
 			</div>
 		</div>
-		@Board(data.Game.Rows)
+		@Board(data.Game)
 		if data.Game.CanGuess {
-			<form id="guess-form" class="flex gap-3" autocomplete="off" data-on:submit__prevent="@post('guesses', {contentType: 'form'})">
-				<input class="min-w-0 flex-1 rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3 text-center text-xl font-black uppercase tracking-[0.4em] text-white outline-none ring-emerald-300/0 placeholder:tracking-normal placeholder:text-slate-500 focus:border-emerald-300 focus:ring-4 focus:ring-emerald-300/15" name="guess" placeholder="guess" autofocus/>
-				<button class="rounded-2xl bg-emerald-300 px-5 py-3 font-bold text-slate-950 transition hover:bg-emerald-200" type="submit">Enter</button>
-			</form>
+			@GuessForm(data.Game)
 		} else {
 			<div class="rounded-2xl border border-white/10 bg-slate-950/50 p-4 text-center">
 				<p class="text-sm uppercase tracking-[0.3em] text-slate-400">Answer</p>
 				<p class="text-3xl font-black text-white">{ data.Game.Answer }</p>
 			</div>
 		}
-		@Keyboard(data.Game.Keyboard)
+		@Keyboard(data.Game.KeyboardRows)
 	</div>
 }
 
-templ Board(rows []GuessRow) {
-	<div class="mx-auto grid w-fit gap-2">
-		for _, row := range rows {
-			<div class="grid grid-cols-5 gap-2">
-				for _, tile := range row.Tiles {
-					<div class={ tileClass(tile.State) }>{ tile.Letter }</div>
-				}
-			</div>
+templ Board(data GameView) {
+	<div class="mx-auto grid w-fit gap-2" aria-label="Wordle board">
+		for _, row := range data.Rows {
+			@BoardRow(row)
 		}
 	</div>
 }
 
-templ Keyboard(keys []KeyboardKey) {
-	<div class="mx-auto flex max-w-xl flex-wrap justify-center gap-1.5">
-		for _, key := range keys {
-			<span class={ keyClass(key.State) }>{ key.Letter }</span>
+templ BoardRow(row GuessRow) {
+	<div class={ rowClass(row) }>
+		for _, tile := range row.Tiles {
+			@Tile(tile)
+		}
+	</div>
+}
+
+templ Tile(tile TileView) {
+	<div class={ tileClass(tile.State) } { tileAttrs(tile)... } aria-label={ tileAriaLabel(tile) }>
+		if tile.Letter != "" {
+			{ tile.Letter }
+		}
+	</div>
+}
+
+templ GuessForm(data GameView) {
+	<form id="guess-form" class="flex justify-center" autocomplete="off" data-on:submit__prevent="if ($guess.length === 5) { @post('/guesses', {contentType: 'form'}) }">
+		<input type="hidden" name="guess" data-bind="guess"/>
+		<button class="rounded-2xl bg-emerald-300 px-5 py-3 font-bold text-slate-950 transition hover:bg-emerald-200 disabled:cursor-not-allowed disabled:opacity-50" type="submit" data-attr:disabled="$guess.length !== 5">Enter</button>
+	</form>
+}
+
+templ Keyboard(rows []KeyboardRow) {
+	<div class="mx-auto grid max-w-xl gap-2" aria-label="Wordle keyboard">
+		for _, row := range rows {
+			<div class="flex justify-center gap-1.5">
+				for _, key := range row.Keys {
+					<span class={ keyClass(key.State) }>{ key.Label }</span>
+				}
+			</div>
 		}
 	</div>
 }

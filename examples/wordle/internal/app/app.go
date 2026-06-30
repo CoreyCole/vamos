@@ -324,7 +324,7 @@ func boardRows(guesses []ScoredGuess, event renderEvent) []ui.GuessRow {
 		} else {
 			row.Current = rowIndex == len(guesses)
 			row.Animation = currentRowAnimation(row.Current, event)
-			row.Tiles = emptyTiles()
+			row.Tiles = emptyTiles(row.Current)
 		}
 		rows = append(rows, row)
 	}
@@ -364,10 +364,14 @@ func submittedTiles(guess ScoredGuess, animation string) []ui.TileView {
 	return tiles
 }
 
-func emptyTiles() []ui.TileView {
+func emptyTiles(current bool) []ui.TileView {
+	state := "empty"
+	if current {
+		state = "tbd"
+	}
 	tiles := make([]ui.TileView, 0, 5)
 	for index := range 5 {
-		tiles = append(tiles, ui.TileView{Index: index, State: "empty"})
+		tiles = append(tiles, ui.TileView{Index: index, State: state})
 	}
 	return tiles
 }
