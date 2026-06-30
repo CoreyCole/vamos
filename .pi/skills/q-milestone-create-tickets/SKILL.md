@@ -60,12 +60,13 @@ milestone-plan/context/create-tickets/drafts/tkt-NN-short-slug.md
 
 The draft file is the exact Linear body: no frontmatter, no title heading, no suggested next command, no agent-only notes. The provider issue title lives outside the body.
 
-Show exactly one ticket at a time:
+Review exactly one ticket at a time:
 
-1. Present the exact title and exact Markdown body from the draft file.
+1. Present the exact title, draft file path, and a concise scope summary only.
+1. Do not paste the full draft body unless the human explicitly asks; they can inspect the file.
 1. Ask the human whether to approve, change, or drop it.
 1. Apply requested edits to the draft file.
-1. Re-show the edited title/body after material changes.
+1. After material changes, re-show the title, draft path, and concise change summary only.
 1. Human approval means: create this Linear ticket now.
 
 ### Template selection
@@ -117,6 +118,19 @@ Implementation/test ticket (`feat(...)`, `fix(...)`, `test(...)`, mixed docs+cod
 ```
 
 Do not include operator-only creation guards, internal planning caveats, vague architecture-consumer language, or invented implementation details. Ticket-level QRSPI owns exact design and implementation.
+
+### E2E / Ranger verification tickets
+
+For any ticket whose primary purpose is E2E, Ranger, browser verification, or deployed/manual proof, make the `### E2E` strategy explicit enough to guide future ticket-level QRSPI:
+
+- name the exact scenario/debug flow the test uses
+- name setup workflows it depends on, such as ingestion testing workflow fixtures
+- name fast-forward or state-advance controls needed to avoid waiting for scheduled jobs
+- list the user-visible assertions Ranger must make
+- list negative assertions for skipped paths, hidden tabs/actions, and no runtime errors
+- state what evidence to capture and link from the ticket deliverable
+
+If the scenario intentionally skips payout/ledger behavior, explicitly assert the payout UI is hidden/unavailable and no payout approval or ledger posting path runs.
 
 Use markdown links for docs/assets according to thoughts root `AGENTS.md`. Do not link local absolute paths.
 
