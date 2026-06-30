@@ -23,6 +23,7 @@ type GameView struct {
 	CanGuess     bool
 	Answer       string
 	CurrentRow   int
+	CurrentGuess string
 	RenderEvent  RenderEventView
 }
 

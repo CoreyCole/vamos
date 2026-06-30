@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -17,7 +18,24 @@ import (
 	"example.com/vamos-wordle/internal/ui"
 )
 
-const maxAttempts = 6
+const (
+	maxAttempts      = 6
+	wordLength       = 5
+	animationDelayMS = 100
+
+	uiStateCorrect = "correct"
+	uiStatePresent = "present"
+	uiStateAbsent  = "absent"
+	uiStateEmpty   = "empty"
+	uiStateTBD     = "tbd"
+	renderShake    = "shake"
+	renderReveal   = "reveal"
+	renderWin      = "win"
+	animationFlip  = "flip"
+	keyEnter       = "enter"
+	keyBackspace   = "backspace"
+	messageAlready = "Already guessed."
+)
 
 type Clock interface {
 	Now() time.Time
@@ -73,6 +91,7 @@ type renderEvent struct {
 	Kind     string
 	RowIndex int
 	Message  string
+	Guess    string
 }
 
 type notifierEvent struct {
@@ -155,6 +174,7 @@ func (s *Service) pageData(
 			CanGuess:     state.Status == StatusActive,
 			Answer:       revealAnswer(state),
 			CurrentRow:   currentRowIndex(state),
+			CurrentGuess: event.Guess,
 			RenderEvent:  renderEventView(event),
 		},
 		Message: message,
@@ -245,15 +265,19 @@ func (s *Service) recordGuess(
 	if err != nil {
 		return GuessResult{}, err
 	}
-	_, err = s.queries.InsertGuess(ctx, dbgen.InsertGuessParams{
+	for _, previous := range state.Guesses {
+		if previous.Word == guess {
+			return rejectedGuess(messageAlready, rowIndex, state.Status), nil
+		}
+	}
+	if _, err := s.queries.InsertGuess(ctx, dbgen.InsertGuessParams{
 		Username:   username,
 		PuzzleDate: state.Date,
 		RowIndex:   int64(rowIndex),
 		Guess:      guess,
 		ResultJson: string(payload),
-	})
-	if err != nil {
-		return rejectedGuess("Already guessed.", rowIndex, state.Status), nil
+	}); err != nil {
+		return GuessResult{}, err
 	}
 	status := StatusActive
 	if guess == state.Answer {
@@ -283,20 +307,23 @@ func rejectedGuess(message string, row int, status GameStatus) GuessResult {
 	return GuessResult{Outcome: GuessRejected, Message: message, Row: row, Status: status}
 }
 
-func newRenderEvent(username string, result GuessResult) renderEvent {
-	kind := "shake"
+func newRenderEvent(username string, result GuessResult, rawGuess string) renderEvent {
+	kind := renderShake
+	guess := strings.ToLower(strings.TrimSpace(rawGuess))
 	if result.Outcome == GuessAccepted {
-		kind = "reveal"
+		kind = renderReveal
+		guess = ""
 		if result.Status == StatusWon {
-			kind = "win"
+			kind = renderWin
 		}
 	}
 	return renderEvent{
-		ID:       fmt.Sprintf("%d", time.Now().UnixNano()),
+		ID:       strconv.FormatInt(time.Now().UnixNano(), 10),
 		Username: username,
 		Kind:     kind,
 		RowIndex: result.Row,
 		Message:  result.Message,
+		Guess:    guess,
 	}
 }
 
@@ -329,15 +356,15 @@ func renderEventView(event renderEvent) ui.RenderEventView {
 func tileState(state TileState) string {
 	switch state {
 	case TileGreen:
-		return "correct"
+		return uiStateCorrect
 	case TileYellow:
-		return "present"
+		return uiStatePresent
 	case TileGray:
-		return "absent"
+		return uiStateAbsent
 	case TileUnknown:
-		return "empty"
+		return uiStateEmpty
 	default:
-		return "empty"
+		return uiStateEmpty
 	}
 }
 
@@ -363,30 +390,30 @@ func submittedRowAnimation(rowIndex int, event renderEvent) string {
 	if event.RowIndex != rowIndex {
 		return ""
 	}
-	if event.Kind == "reveal" || event.Kind == "win" {
+	if event.Kind == renderReveal || event.Kind == renderWin {
 		return event.Kind
 	}
 	return ""
 }
 
 func currentRowAnimation(current bool, event renderEvent) string {
-	if current && event.Kind == "shake" {
-		return "shake"
+	if current && event.Kind == renderShake {
+		return renderShake
 	}
 	return ""
 }
 
 func submittedTiles(guess ScoredGuess, animation string) []ui.TileView {
-	tiles := make([]ui.TileView, 0, 5)
+	tiles := make([]ui.TileView, 0, wordLength)
 	for index, tile := range guess.Tiles {
 		view := ui.TileView{
 			Index:  index,
 			Letter: strings.ToUpper(tile.Letter),
 			State:  tileState(tile.State),
 		}
-		if animation == "reveal" || animation == "win" {
-			view.DelayMS = index * 100
-			view.Animation = "flip"
+		if animation == renderReveal || animation == renderWin {
+			view.DelayMS = index * animationDelayMS
+			view.Animation = animationFlip
 		}
 		tiles = append(tiles, view)
 	}
@@ -394,12 +421,12 @@ func submittedTiles(guess ScoredGuess, animation string) []ui.TileView {
 }
 
 func emptyTiles(current bool) []ui.TileView {
-	state := "empty"
+	state := uiStateEmpty
 	if current {
-		state = "tbd"
+		state = uiStateTBD
 	}
-	tiles := make([]ui.TileView, 0, 5)
-	for index := range 5 {
+	tiles := make([]ui.TileView, 0, wordLength)
+	for index := range wordLength {
 		tiles = append(tiles, ui.TileView{Index: index, State: state})
 	}
 	return tiles
@@ -412,10 +439,10 @@ func keyboardRows(guesses []ScoredGuess, event renderEvent) []ui.KeyboardRow {
 		keysFromLetters("qwertyuiop"),
 		keysFromLetters("asdfghjkl"),
 		append(
-			[]ui.KeyboardKey{{Label: "Enter", Value: "enter", Wide: true}},
+			[]ui.KeyboardKey{{Label: "Enter", Value: keyEnter, Wide: true}},
 			append(
 				keysFromLetters("zxcvbnm"),
-				ui.KeyboardKey{Label: "⌫", Value: "backspace", Wide: true},
+				ui.KeyboardKey{Label: "⌫", Value: keyBackspace, Wide: true},
 			)...),
 	}
 	rows := make([]ui.KeyboardRow, 0, len(layouts))
@@ -448,7 +475,7 @@ func keysFromLetters(letters string) []ui.KeyboardKey {
 
 func keyboardDelays(guesses []ScoredGuess, event renderEvent) map[string]int {
 	delays := map[string]int{}
-	if event.Kind != "reveal" && event.Kind != "win" {
+	if event.Kind != renderReveal && event.Kind != renderWin {
 		return delays
 	}
 	if event.RowIndex < 0 || event.RowIndex >= len(guesses) {
@@ -457,7 +484,7 @@ func keyboardDelays(guesses []ScoredGuess, event renderEvent) map[string]int {
 	for index, tile := range guesses[event.RowIndex].Tiles {
 		letter := strings.ToLower(tile.Letter)
 		if _, exists := delays[letter]; !exists {
-			delays[letter] = index * 100
+			delays[letter] = index * animationDelayMS
 		}
 	}
 	return delays

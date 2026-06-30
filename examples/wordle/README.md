@@ -8,6 +8,10 @@ Go + templ + Datastar Wordle clone with SQLite persistence and hot reload.
 - The user's timezone determines the daily boundary.
 - Same vendored word file is used for answer selection and valid guesses.
 - Username-only login resumes the same user's daily board on another device.
+- The current unsubmitted guess is a browser-local Datastar signal rendered into the board tiles.
+- Durable guesses, validation, scoring, answer reveal, and keyboard colors stay backend/SQLite-owned.
+- Accepted guesses clear the local input after server confirmation; rejected guesses keep input and shake the row.
+- Animation events are transient SSE updates for current subscribers and are not replayed after refresh.
 
 ## Run
 

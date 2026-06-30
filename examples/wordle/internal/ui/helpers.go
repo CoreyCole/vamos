@@ -1,11 +1,34 @@
 package ui
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 
 	"github.com/a-h/templ"
 )
+
+const (
+	stateCorrect = "correct"
+	statePresent = "present"
+	stateAbsent  = "absent"
+	stateTBD     = "tbd"
+
+	animationShake = "shake"
+	animationWin   = "win"
+	animationKey   = "key"
+	keyEnter       = "enter"
+	keyBackspace   = "backspace"
+)
+
+func gameSignals(data GameView) string {
+	signals := map[string]string{"guess": data.CurrentGuess}
+	encoded, err := json.Marshal(signals)
+	if err != nil {
+		return `{"guess":""}`
+	}
+	return string(encoded)
+}
 
 func rowClass(row GuessRow) string {
 	base := "grid grid-cols-5 gap-2"
@@ -21,10 +44,10 @@ func rowAttrs(row GuessRow) templ.Attributes {
 		attrs["data-wordle-row"] = "current"
 	}
 	switch row.Animation {
-	case "shake":
-		attrs["data-wordle-animation"] = "shake"
-	case "win":
-		attrs["data-wordle-animation"] = "win"
+	case animationShake:
+		attrs["data-wordle-animation"] = animationShake
+	case animationWin:
+		attrs["data-wordle-animation"] = animationWin
 	}
 	return attrs
 }
@@ -32,13 +55,13 @@ func rowAttrs(row GuessRow) templ.Attributes {
 func tileClass(state string) string {
 	base := "grid size-14 place-items-center rounded-xl border text-2xl font-black uppercase sm:size-16 sm:text-3xl"
 	switch state {
-	case "correct":
+	case stateCorrect:
 		return base + " border-emerald-300 bg-emerald-500 text-white"
-	case "present":
+	case statePresent:
 		return base + " border-amber-300 bg-amber-500 text-white"
-	case "absent":
+	case stateAbsent:
 		return base + " border-slate-500 bg-slate-700 text-white"
-	case "tbd":
+	case stateTBD:
 		return base + " border-white/25 bg-slate-900/80 text-white"
 	default:
 		return base + " border-white/15 bg-slate-950/60 text-slate-400"
@@ -47,7 +70,7 @@ func tileClass(state string) string {
 
 func tileAttrs(tile TileView) templ.Attributes {
 	attrs := templ.Attributes{}
-	if tile.State == "tbd" {
+	if tile.State == stateTBD {
 		attrs["data-text"] = fmt.Sprintf("($guess[%d] || '').toUpperCase()", tile.Index)
 	}
 	if tile.DelayMS > 0 {
@@ -72,7 +95,7 @@ func tileAriaLabel(tile TileView) string {
 
 func physicalKeyboardHandler(canGuess bool) string {
 	if !canGuess {
-		return ""
+		return "return"
 	}
 	return "if (/^[a-zA-Z]$/.test(evt.key) && $guess.length < 5) { $guess = ($guess + evt.key.toLowerCase()).slice(0, 5) } else if (evt.key === 'Backspace') { $guess = $guess.slice(0, -1) } else if (evt.key === 'Enter' && $guess.length === 5) { document.getElementById('guess-form')?.requestSubmit() }"
 }
@@ -99,9 +122,9 @@ func keyClass(key KeyboardKey) string {
 func keyAttrs(key KeyboardKey) templ.Attributes {
 	attrs := templ.Attributes{}
 	switch key.Value {
-	case "enter":
+	case keyEnter:
 		attrs["data-on:click"] = "if ($guess.length === 5) { document.getElementById('guess-form')?.requestSubmit() }"
-	case "backspace":
+	case keyBackspace:
 		attrs["data-on:click"] = "$guess = $guess.slice(0, -1)"
 	default:
 		if len(key.Value) == 1 {
@@ -113,22 +136,22 @@ func keyAttrs(key KeyboardKey) templ.Attributes {
 	}
 	if key.DelayMS > 0 {
 		attrs["style"] = fmt.Sprintf("animation-delay: %dms", key.DelayMS)
-		attrs["data-wordle-animation"] = "key"
+		attrs["data-wordle-animation"] = animationKey
 	}
 	return attrs
 }
 
 func keyAriaLabel(key KeyboardKey) string {
 	switch key.Value {
-	case "enter":
+	case keyEnter:
 		return "Submit guess"
-	case "backspace":
+	case keyBackspace:
 		return "Delete letter"
 	default:
 		return "Letter " + key.Label
 	}
 }
 
-func guessCount(used, max int) string {
-	return fmt.Sprintf("%d/%d", used, max)
+func guessCount(used, total int) string {
+	return fmt.Sprintf("%d/%d", used, total)
 }

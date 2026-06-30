@@ -1,7 +1,6 @@
 package app
 
 import (
-	"context"
 	"os"
 	"path/filepath"
 	"testing"
@@ -101,12 +100,12 @@ func TestBoardRowsMarksCurrentAndSubmitted(t *testing.T) {
 func TestBoardRowsAppliesTransientEvent(t *testing.T) {
 	t.Parallel()
 	guesses := []ScoredGuess{{Tiles: ScoreGuess("apple", "apple")}}
-	rows := boardRows(guesses, renderEvent{Kind: "reveal", RowIndex: 0})
-	if rows[0].Animation != "reveal" {
+	rows := boardRows(guesses, renderEvent{Kind: renderReveal, RowIndex: 0})
+	if rows[0].Animation != renderReveal {
 		t.Fatalf("animation = %q, want reveal", rows[0].Animation)
 	}
 	for index, tile := range rows[0].Tiles {
-		if want := index * 100; tile.DelayMS != want {
+		if want := index * animationDelayMS; tile.DelayMS != want {
 			t.Fatalf("tile %d delay = %d, want %d", index, tile.DelayMS, want)
 		}
 	}
@@ -142,11 +141,12 @@ func TestKeyboardRowsUseWordleLayoutAndBestKnownState(t *testing.T) {
 	var aKeyFound bool
 	for _, row := range rows {
 		for _, key := range row.Keys {
-			if key.Value == "a" {
-				aKeyFound = true
-				if key.State != "correct" {
-					t.Fatalf("a key state = %q, want correct", key.State)
-				}
+			if key.Value != "a" {
+				continue
+			}
+			aKeyFound = true
+			if key.State != uiStateCorrect {
+				t.Fatalf("a key state = %q, want correct", key.State)
 			}
 		}
 	}
@@ -158,7 +158,7 @@ func TestKeyboardRowsUseWordleLayoutAndBestKnownState(t *testing.T) {
 func TestRecordGuessRejectsInvalidWithoutAttempt(t *testing.T) {
 	t.Parallel()
 	service := newTestService(t)
-	result, err := service.recordGuess(context.Background(), "alice", "UTC", "zzzzz")
+	result, err := service.recordGuess(t.Context(), "alice", "UTC", "zzzzz")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -166,7 +166,7 @@ func TestRecordGuessRejectsInvalidWithoutAttempt(t *testing.T) {
 		result.Row != 0 {
 		t.Fatalf("result = %#v, want rejected not-in-list row 0", result)
 	}
-	state, err := service.loadOrCreateToday(context.Background(), "alice", "UTC")
+	state, err := service.loadOrCreateToday(t.Context(), "alice", "UTC")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -178,7 +178,7 @@ func TestRecordGuessRejectsInvalidWithoutAttempt(t *testing.T) {
 func TestRecordGuessAcceptedConsumesAttempt(t *testing.T) {
 	t.Parallel()
 	service := newTestService(t)
-	result, err := service.recordGuess(context.Background(), "alice", "UTC", "alert")
+	result, err := service.recordGuess(t.Context(), "alice", "UTC", "alert")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -186,7 +186,7 @@ func TestRecordGuessAcceptedConsumesAttempt(t *testing.T) {
 		result.Row != 0 {
 		t.Fatalf("result = %#v, want accepted row 0", result)
 	}
-	state, err := service.loadOrCreateToday(context.Background(), "alice", "UTC")
+	state, err := service.loadOrCreateToday(t.Context(), "alice", "UTC")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -199,14 +199,14 @@ func TestRecordGuessDuplicateRejected(t *testing.T) {
 	t.Parallel()
 	service := newTestService(t)
 	if _, err := service.recordGuess(
-		context.Background(),
+		t.Context(),
 		"alice",
 		"UTC",
 		"alert",
 	); err != nil {
 		t.Fatal(err)
 	}
-	result, err := service.recordGuess(context.Background(), "alice", "UTC", "alert")
+	result, err := service.recordGuess(t.Context(), "alice", "UTC", "alert")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -214,7 +214,7 @@ func TestRecordGuessDuplicateRejected(t *testing.T) {
 		result.Row != 1 {
 		t.Fatalf("result = %#v, want duplicate rejected row 1", result)
 	}
-	state, err := service.loadOrCreateToday(context.Background(), "alice", "UTC")
+	state, err := service.loadOrCreateToday(t.Context(), "alice", "UTC")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -225,22 +225,29 @@ func TestRecordGuessDuplicateRejected(t *testing.T) {
 
 func TestRenderEventMapsOutcome(t *testing.T) {
 	t.Parallel()
-	if got := newRenderEvent(
+	rejected := newRenderEvent(
 		"alice",
 		GuessResult{Outcome: GuessRejected, Row: 2},
-	).Kind; got != "shake" {
-		t.Fatalf("rejected kind = %q, want shake", got)
+		"Zzzzz",
+	)
+	if rejected.Kind != renderShake {
+		t.Fatalf("rejected kind = %q, want shake", rejected.Kind)
+	}
+	if rejected.Guess != "zzzzz" {
+		t.Fatalf("rejected guess = %q, want zzzzz", rejected.Guess)
 	}
 	if got := newRenderEvent(
 		"alice",
 		GuessResult{Outcome: GuessAccepted, Status: StatusActive},
-	).Kind; got != "reveal" {
+		"alert",
+	).Kind; got != renderReveal {
 		t.Fatalf("accepted kind = %q, want reveal", got)
 	}
 	if got := newRenderEvent(
 		"alice",
 		GuessResult{Outcome: GuessAccepted, Status: StatusWon},
-	).Kind; got != "win" {
+		"alert",
+	).Kind; got != renderWin {
 		t.Fatalf("won kind = %q, want win", got)
 	}
 }
@@ -252,7 +259,7 @@ func (c fixedClock) Now() time.Time { return c.now }
 func newTestService(t *testing.T) *Service {
 	t.Helper()
 	wordFile := filepath.Join(t.TempDir(), "words.txt")
-	if err := os.WriteFile(wordFile, []byte("apple\nalert\ncrane\n"), 0o644); err != nil {
+	if err := os.WriteFile(wordFile, []byte("apple\nalert\ncrane\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	service, err := New(Config{

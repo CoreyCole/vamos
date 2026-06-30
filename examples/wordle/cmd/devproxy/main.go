@@ -15,6 +15,12 @@ import (
 	"github.com/starfederation/datastar-go/datastar"
 )
 
+const (
+	copyBufferSize    = 32 * 1024
+	backendPollDelay  = 100 * time.Millisecond
+	readHeaderTimeout = 5 * time.Second
+)
+
 func main() {
 	publicAddr := envDefault("DEV_PROXY_ADDR", "0.0.0.0:"+envDefault("PORT", "8080"))
 	backendURL, err := url.Parse(envDefault("BACKEND_URL", "http://127.0.0.1:18080"))
@@ -27,11 +33,13 @@ func main() {
 	mux.HandleFunc("/events", proxy.handleEvents)
 	mux.HandleFunc("/", proxy.reverseProxy.ServeHTTP)
 
-	log.Printf("dev proxy listening on http://%s -> %s", publicAddr, backendURL)
-	if err := http.ListenAndServe(
-		publicAddr,
-		mux,
-	); err != nil &&
+	server := &http.Server{
+		Addr:              publicAddr,
+		Handler:           mux,
+		ReadHeaderTimeout: readHeaderTimeout,
+	}
+	log.Println("dev proxy listening on", "http://"+publicAddr, "->", backendURL)
+	if err := server.ListenAndServe(); err != nil &&
 		!errors.Is(err, http.ErrServerClosed) {
 		log.Fatalf("serve dev proxy: %v", err)
 	}
@@ -73,7 +81,12 @@ func (p *proxyServer) handleEvents(w http.ResponseWriter, r *http.Request) {
 
 func (p *proxyServer) bridgeEvents(w http.ResponseWriter, r *http.Request) error {
 	u := p.backend.ResolveReference(&url.URL{Path: "/events", RawQuery: r.URL.RawQuery})
-	req, err := http.NewRequestWithContext(r.Context(), http.MethodGet, u.String(), nil)
+	req, err := http.NewRequestWithContext(
+		r.Context(),
+		http.MethodGet,
+		u.String(),
+		http.NoBody,
+	)
 	if err != nil {
 		return err
 	}
@@ -103,7 +116,7 @@ func copyRequestHeaders(dst, src http.Header) {
 }
 
 func copyFlush(dst http.ResponseWriter, src io.Reader) (int64, error) {
-	buf := make([]byte, 32*1024)
+	buf := make([]byte, copyBufferSize)
 	var written int64
 	for {
 		n, er := src.Read(buf)
@@ -127,7 +140,7 @@ func copyFlush(dst http.ResponseWriter, src io.Reader) (int64, error) {
 }
 
 func (p *proxyServer) waitForBackend(ctx context.Context) bool {
-	ticker := time.NewTicker(100 * time.Millisecond)
+	ticker := time.NewTicker(backendPollDelay)
 	defer ticker.Stop()
 	for {
 		select {
@@ -143,7 +156,7 @@ func (p *proxyServer) waitForBackend(ctx context.Context) bool {
 
 func (p *proxyServer) backendHealthy(ctx context.Context) bool {
 	u := p.backend.ResolveReference(&url.URL{Path: "/healthz"})
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), http.NoBody)
 	if err != nil {
 		return false
 	}

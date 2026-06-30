@@ -36,6 +36,13 @@ type ScoredGuess struct {
 	Tiles []TileResult `json:"tiles"`
 }
 
+const (
+	rankGreen  = 3
+	rankYellow = 2
+	rankGray   = 1
+	rankEmpty  = 0
+)
+
 var usernamePattern = regexp.MustCompile(`^[a-z0-9_-]{3,32}$`)
 
 func NormalizeUsername(raw string) (string, error) {
@@ -50,7 +57,7 @@ func NormalizeUsername(raw string) (string, error) {
 
 func NormalizeGuess(raw string) (string, error) {
 	guess := strings.ToLower(strings.TrimSpace(raw))
-	if len(guess) != 5 {
+	if len(guess) != wordLength {
 		return "", errors.New("guess must be 5 letters")
 	}
 	for _, r := range guess {
@@ -125,14 +132,14 @@ func KeyboardState(guesses []ScoredGuess) map[string]TileState {
 func stateRank(state TileState) int {
 	switch state {
 	case TileGreen:
-		return 3
+		return rankGreen
 	case TileYellow:
-		return 2
+		return rankYellow
 	case TileGray:
-		return 1
+		return rankGray
 	case TileUnknown:
-		return 0
+		return rankEmpty
 	default:
-		return 0
+		return rankEmpty
 	}
 }

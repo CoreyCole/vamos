@@ -18,7 +18,6 @@ func main() {
 	if err != nil {
 		log.Fatalf("initialize app: %v", err)
 	}
-	defer service.Close()
 
 	addr := strings.TrimSpace(os.Getenv("ADDR"))
 	if addr == "" {
@@ -30,9 +29,13 @@ func main() {
 	}
 
 	e := service.Routes()
-	log.Printf("daily wordle listening on http://%s", addr)
+	log.Println("daily wordle starting")
 	if err := e.Start(addr); err != nil && !errors.Is(err, http.ErrServerClosed) {
+		_ = service.Close()
 		log.Fatalf("serve: %v", err)
+	}
+	if err := service.Close(); err != nil {
+		log.Fatalf("close service: %v", err)
 	}
 }
 

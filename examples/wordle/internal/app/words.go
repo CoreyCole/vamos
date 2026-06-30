@@ -3,6 +3,7 @@ package app
 import (
 	"bufio"
 	"crypto/sha256"
+	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -41,7 +42,7 @@ func LoadWordList(path string) (WordList, error) {
 		return WordList{}, fmt.Errorf("read word list: %w", err)
 	}
 	if len(ordered) == 0 {
-		return WordList{}, fmt.Errorf("word list is empty")
+		return WordList{}, errors.New("word list is empty")
 	}
 	return WordList{
 		Ordered: ordered,

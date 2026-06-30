@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/labstack/echo/v4"
-	"github.com/labstack/echo/v4/middleware"
 	"github.com/starfederation/datastar-go/datastar"
 
 	"example.com/vamos-wordle/internal/ui"
@@ -21,9 +20,6 @@ func (s *Service) Routes() *echo.Echo {
 	e := echo.New()
 	e.HideBanner = true
 	e.HidePort = true
-	e.Use(middleware.LoggerWithConfig(middleware.LoggerConfig{
-		Format: `${time_rfc3339} method=${method} uri=${uri} status=${status} error="${error}" latency=${latency_human}` + "\n",
-	}))
 	e.Static("/static", "static")
 	e.GET("/favicon.ico", s.handleFavicon)
 	e.GET("/healthz", s.handleHealth)
@@ -84,16 +80,17 @@ func (s *Service) handleGuess(c echo.Context) error {
 		return c.NoContent(http.StatusNoContent)
 	}
 	tz, _ := readCookie(c, timezoneCookie)
+	rawGuess := c.FormValue("guess")
 	result, err := s.recordGuess(
 		c.Request().Context(),
 		username,
 		tz,
-		c.FormValue("guess"),
+		rawGuess,
 	)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, "record guess")
 	}
-	event := newRenderEvent(username, result)
+	event := newRenderEvent(username, result, rawGuess)
 	s.notifier.notify(notifierEvent{Username: username, Event: event})
 	sse := datastar.NewSSE(c.Response().Writer, c.Request())
 	if result.Outcome == GuessAccepted {
