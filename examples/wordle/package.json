@@ -1,0 +1,13 @@
+{
+  "name": "vamos-wordle",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "css": "tailwindcss -i ./internal/ui/app.css -o ./static/app.css"
+  },
+  "devDependencies": {
+    "@tailwindcss/cli": "^4.1.12",
+    "tailwindcss": "^4.1.12"
+  },
+  "packageManager": "pnpm@10.30.3"
+}

@@ -1,31 +1,40 @@
-# Self-modifying Wordle example
+# Daily Wordle Applet
 
-This example demonstrates a mobile-friendly Go + Datastar applet whose game state and rules live on the server.
+Go + templ + Datastar Wordle clone with SQLite persistence and hot reload.
 
-The applet is a long-running Go HTTP server. The browser renders server-sent HTML, submits guesses through short POST requests, and keeps only tiny UI interaction state in Datastar.
+## Behavior
 
-## Try the starter applet
+- One deterministic answer per local calendar date.
+- The user's timezone determines the daily boundary.
+- Same vendored word file is used for answer selection and valid guesses.
+- Username-only login resumes the same user's daily board on another device.
 
-From this checkout:
+## Run
 
 ```bash
-cd examples/wordle/files/apps/current
-go test ./...
-PORT=8080 VAMOS_APP_FILES_ROOT="$OLDPWD/examples/wordle/files" go run .
+just build
+just status
 ```
 
-Open <http://127.0.0.1:8080/>.
+Open <http://127.0.0.1:8081/>.
 
-## Gameplay
+`just build` starts:
 
-Wordle gives you six attempts to guess a hidden five-letter word.
+- stable dev proxy: `0.0.0.0:${PORT:-8081}`
+- Air backend: `127.0.0.1:${BACKEND_PORT:-18081}`
 
-- **Green**: the letter is in the word and in the correct spot.
-- **Yellow**: the letter is in the word, but in the wrong spot.
-- **Gray**: the letter is not in the word at all.
+Logs live in `.run/proxy.log` and `.run/air.log`. Durable applet files live under `VAMOS_APP_FILES_ROOT`, defaulting to `./files`.
 
-The backend validates guesses against `valid_words.txt`, seeded with NYT Wordle Helper-compatible five-letter words. The browser does not know the answer and does not score guesses.
+## Word list
 
-## Boundary
+Vendored source:
 
-q-manager owns chat, technical planning, safety checks, build, health check, promotion, recovery, and friendly explanations. The applet owns Wordle rules, server state, dictionary files, and presentation.
+```text
+https://gist.githubusercontent.com/puls/9fa72925b4527c636bf1de575006fb9a/raw/e18d17f9e21f0701b11754a483d88d6eee34733c/words.txt
+```
+
+Refresh manually:
+
+```bash
+curl -fsSL 'https://gist.githubusercontent.com/puls/9fa72925b4527c636bf1de575006fb9a/raw/e18d17f9e21f0701b11754a483d88d6eee34733c/words.txt' -o internal/words/words.txt
+```

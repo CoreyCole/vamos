@@ -1,0 +1,8 @@
+.bin/
+.run/
+.air/
+context/
+node_modules/
+static/app.css
+files/*.db
+files/*.db-*
