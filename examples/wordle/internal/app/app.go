@@ -386,6 +386,7 @@ func submittedTiles(guess ScoredGuess, animation string) []ui.TileView {
 		}
 		if animation == "reveal" || animation == "win" {
 			view.DelayMS = index * 100
+			view.Animation = "flip"
 		}
 		tiles = append(tiles, view)
 	}

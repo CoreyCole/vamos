@@ -89,7 +89,7 @@ templ Board(data GameView) {
 }
 
 templ BoardRow(row GuessRow) {
-	<div class={ rowClass(row) }>
+	<div class={ rowClass(row) } { rowAttrs(row)... }>
 		for _, tile := range row.Tiles {
 			@Tile(tile)
 		}

@@ -15,6 +15,20 @@ func rowClass(row GuessRow) string {
 	return base
 }
 
+func rowAttrs(row GuessRow) templ.Attributes {
+	attrs := templ.Attributes{}
+	if row.Current {
+		attrs["data-wordle-row"] = "current"
+	}
+	switch row.Animation {
+	case "shake":
+		attrs["data-wordle-animation"] = "shake"
+	case "win":
+		attrs["data-wordle-animation"] = "win"
+	}
+	return attrs
+}
+
 func tileClass(state string) string {
 	base := "grid size-14 place-items-center rounded-xl border text-2xl font-black uppercase sm:size-16 sm:text-3xl"
 	switch state {
@@ -35,6 +49,12 @@ func tileAttrs(tile TileView) templ.Attributes {
 	attrs := templ.Attributes{}
 	if tile.State == "tbd" {
 		attrs["data-text"] = fmt.Sprintf("($guess[%d] || '').toUpperCase()", tile.Index)
+	}
+	if tile.DelayMS > 0 {
+		attrs["style"] = fmt.Sprintf("animation-delay: %dms", tile.DelayMS)
+	}
+	if tile.Animation != "" {
+		attrs["data-wordle-animation"] = tile.Animation
 	}
 	return attrs
 }
@@ -90,6 +110,10 @@ func keyAttrs(key KeyboardKey) templ.Attributes {
 				strings.ToLower(key.Value),
 			)
 		}
+	}
+	if key.DelayMS > 0 {
+		attrs["style"] = fmt.Sprintf("animation-delay: %dms", key.DelayMS)
+		attrs["data-wordle-animation"] = "key"
 	}
 	return attrs
 }

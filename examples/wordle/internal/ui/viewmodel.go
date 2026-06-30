@@ -35,10 +35,11 @@ type GuessRow struct {
 }
 
 type TileView struct {
-	Index   int
-	Letter  string
-	State   string
-	DelayMS int
+	Index     int
+	Letter    string
+	State     string
+	DelayMS   int
+	Animation string
 }
 
 type KeyboardRow struct {
