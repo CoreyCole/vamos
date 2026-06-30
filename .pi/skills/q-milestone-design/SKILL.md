@@ -23,11 +23,21 @@ Read:
 1. milestone `milestone.md`
 1. project plan `AGENTS.md` only for canonical pointers/invariants
 
-## Step 2: Run design interview
+## Step 2: Run collaborative design interview
 
-Ask one question at a time. Use loaded research to avoid asking factual questions.
+Milestone design is a human alignment gate. Do **not** write `design.md`, update milestone memory, or emit a complete YAML result until the interview reaches shared understanding or the human explicitly says to draft now.
 
-Resolve:
+Work like `/q-design` + `/grill-me`:
+
+1. Create a timestamped design brainstorm artifact under `milestone-plan/context/design/` before asking the first design question.
+1. Restate the loaded research in 3-5 bullets: current support, gaps, likely ticket-shaping pressure.
+1. Walk the design tree one branch at a time. Ask exactly one direct question per turn, with your recommended answer and why.
+1. If a question is answerable from code/docs/artifacts, inspect those instead of asking. Summarize the fact, then ask the next human-judgment question.
+1. Update the brainstorm artifact after each confirmed decision or correction. Record prompt, user decision, rationale, and next implication. Do not raw-transcript tentative discussion.
+1. Before drafting, summarize the proposed milestone direction and ask for approval to write `design.md`.
+1. Only after approval, write `design.md` from the confirmed decisions.
+
+Resolve these branches before drafting:
 
 - vertical milestone shape: named product path/scenario/user path, smallest testable/demoable path, and why it is sequenced now; milestone name should use product/domain language, not "Vertical"
 - milestone ownership and non-goals
@@ -41,11 +51,11 @@ Resolve:
 - taxonomy change proposals, if any
 - what must be deferred to ticket-level QRSPI
 
-## Step 3: Write design artifacts
+## Step 3: Write design artifacts after approval
 
-Use `~/dotfiles/spec_metadata.sh` before writing.
+Use `~/dotfiles/spec_metadata.sh` immediately before writing.
 
-Write `design.md` in the milestone-plan directory. Target ~200-300 lines. Keep concise; tables/fragments preferred. Product outcomes and proposed ticket boundaries belong here as approved direction.
+Write `design.md` in the milestone-plan directory only after explicit approval from Step 2. Target ~200-300 lines. Keep concise; tables/fragments preferred. Product outcomes and proposed ticket boundaries belong here as approved direction.
 
 Required sections:
 
@@ -71,11 +81,13 @@ Write ADRs only for accepted durable decisions that are hard to reverse or surpr
 
 ## Step 4: Update memory
 
-If approved design introduces durable invariants, update `milestone-plan/AGENTS.md` with short pointers to `design.md` or ADRs. Do not duplicate design content.
+If approved design introduces durable invariants, update `milestone-plan/AGENTS.md` with short pointers to `design.md`, the design brainstorm artifact, or ADRs. Do not duplicate design content.
 
 ## Response
 
-Use fenced YAML `qrspi_result` blocks for all stage results. Required fields: `project`, `related_projects`, `stage`, `status`, `outcome` for complete results, `workspace`, `workspace_metadata`, `policy`, `summary`, `artifact`, `artifacts`, and structured `next.steps`.
+During the interview, do not emit a completion YAML block. Ask the next one-question design prompt.
+
+Use fenced YAML `qrspi_result` blocks for completed, blocked, or needs-human stage results. Required fields for complete results: `project`, `related_projects`, `stage`, `status`, `outcome`, `workspace`, `workspace_metadata`, `policy`, `summary`, `artifact`, `artifacts`, and structured `next.steps`.
 
 Completed stage example:
 
