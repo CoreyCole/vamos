@@ -50,9 +50,21 @@ func tileAriaLabel(tile TileView) string {
 	return fmt.Sprintf("%s %s", tile.Letter, state)
 }
 
-func keyClass(state string) string {
-	base := "rounded-lg px-2 py-2 text-xs font-black sm:px-3"
-	switch state {
+func physicalKeyboardHandler(canGuess bool) string {
+	if !canGuess {
+		return ""
+	}
+	return "if (/^[a-zA-Z]$/.test(evt.key) && $guess.length < 5) { $guess = ($guess + evt.key.toLowerCase()).slice(0, 5) } else if (evt.key === 'Backspace') { $guess = $guess.slice(0, -1) } else if (evt.key === 'Enter' && $guess.length === 5) { document.getElementById('guess-form')?.requestSubmit() }"
+}
+
+func keyClass(key KeyboardKey) string {
+	base := "rounded-lg py-2 text-xs font-black uppercase transition active:scale-95 disabled:opacity-50 "
+	if key.Wide {
+		base += "px-3 sm:px-5"
+	} else {
+		base += "min-w-8 px-2 sm:min-w-10 sm:px-3"
+	}
+	switch key.State {
 	case "correct":
 		return base + " bg-emerald-500 text-white"
 	case "present":
@@ -60,7 +72,36 @@ func keyClass(state string) string {
 	case "absent":
 		return base + " bg-slate-700 text-slate-300"
 	default:
-		return base + " bg-white/10 text-slate-200"
+		return base + " bg-white/10 text-slate-200 hover:bg-white/15"
+	}
+}
+
+func keyAttrs(key KeyboardKey) templ.Attributes {
+	attrs := templ.Attributes{}
+	switch key.Value {
+	case "enter":
+		attrs["data-on:click"] = "if ($guess.length === 5) { document.getElementById('guess-form')?.requestSubmit() }"
+	case "backspace":
+		attrs["data-on:click"] = "$guess = $guess.slice(0, -1)"
+	default:
+		if len(key.Value) == 1 {
+			attrs["data-on:click"] = fmt.Sprintf(
+				"$guess = ($guess + '%s').slice(0, 5)",
+				strings.ToLower(key.Value),
+			)
+		}
+	}
+	return attrs
+}
+
+func keyAriaLabel(key KeyboardKey) string {
+	switch key.Value {
+	case "enter":
+		return "Submit guess"
+	case "backspace":
+		return "Delete letter"
+	default:
+		return "Letter " + key.Label
 	}
 }
 
