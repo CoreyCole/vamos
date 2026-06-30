@@ -1,15 +1,15 @@
 ---
 name: q-milestone-create-tickets
-description: Create provider tickets from a reviewed milestone design. Use after milestone design review and human approval. Summarizes each proposed ticket one by one for human refinement, writes concise provider-ready descriptions, then confirms each exact title/body before creating that ticket.
+description: Create provider tickets from a reviewed milestone design. Use after milestone design review. Summarizes the proposal, gets human approval in chat, drafts ticket bodies one by one in the plan dir, creates Linear issues after each approved body, then updates routing/status artifacts.
 ---
 
 # Milestone Create Tickets — Turn Reviewed Design Into Provider Issues
 
-Use this after `/q-milestone-review [design.md]` and human design approval. This replaces the old milestone `outline -> review -> plan -> review` flow.
+Use after `/q-milestone-review [design.md]`. This replaces the old milestone `outline -> review -> plan -> review` flow.
 
-Goal: convert the reviewed milestone design into a small set of concise provider tickets, with human refinement one ticket at a time. Tickets should preserve vertical delivery: each ticket should either move the named product path/scenario closer to end-to-end verification or be a narrowly scoped enabler for that path. Before drafting individual tickets, align with the human on the overall ticket-set structure and vertical slices/workstreams. Before creating each provider ticket, show the exact title and description body and get human approval for that ticket.
+Goal: convert a reviewed milestone `design.md` into a small set of provider tickets. Preserve vertical delivery: each ticket either advances the named product path/scenario or is a narrow enabler for that path.
 
-## Step 1: Load baseline workflow
+## Step 1: Load context
 
 Read:
 
@@ -18,111 +18,169 @@ Read:
 1. `.pi/skills/q-milestone-question/references/milestone-planning-common.md`
 1. milestone-plan `AGENTS.md`
 1. milestone-plan `design.md`
-1. latest design review and `review-human.md`
+1. latest automated design review `review.md`
 1. milestone `AGENTS.md` and optional `milestone.md`
 1. project status/routing artifact named by project `AGENTS.md`
-1. thoughts root `AGENTS.md` host manifest for `qrspi_ticket_provider` and `qrspi_ticket_provider_config`
+1. thoughts root `AGENTS.md` for host link policy
 1. provider defaults/project log named by project `AGENTS.md`
 
-Stop if design review or human approval is missing.
+Stop only if `design.md` or automated `review.md` is missing. Do **not** require `review-human.md`; human approval happens in this skill's chat flow.
 
-Validate provider config before preparing mutations:
+Provider routing:
 
-- If `qrspi_ticket_provider` is missing, emit `status: needs_human` and ask for host provider config.
-- If the provider is not `linear`, emit `status: blocked` unless this skill has been extended for that provider.
-- If provider is `linear`, require manifest values for `linear_base_url`, workspace/team/project routing, milestone/default fields needed by the current milestone, and thoughts-viewer link construction.
-- Do not create a provider ticket until that ticket's exact title and description body have been shown to the human and approved for creation.
+- Resolve Linear/project/milestone/defaults from existing docs and the milestone planning issue first.
+- If any required value is missing, ask the human for the missing links/IDs.
+- Drafting can proceed before provider routing is complete; Linear creation cannot.
+- Created implementation/spec tickets must be assigned to the Linear project milestone and must not be children of the milestone planning ticket.
 
-## Step 2: Align on ticket-set structure
+## Step 2: Get ticket-set approval
 
-Before presenting individual provider drafts, extract the whole proposed set from reviewed `design.md` and present a concise structure overview:
-
-- milestone spine: named product path/scenario/user path this ticket set proves
-- vertical slices/workstreams: grouped proposed work, sequence, and what each group proves
-- ticket list: tentative titles in order, with each ticket's role in the sequence
-- defer map: what belongs to later milestones, especially final E2E / readiness backstops
-- risk check: any ticket that looks horizontal/enabling and the vertical path it unlocks
-
-Ask the human to approve or adjust the structure before drafting ticket 1. If the human changes structure, update the candidate list first. Do not start one-by-one ticket refinement until this structure is approved.
-
-## Step 3: Extract candidate tickets
-
-From the approved structure and reviewed `design.md`, summarize each proposed ticket in the tighter provider-ready format:
-
-- title in Conventional Commit style, e.g. `feat(domain): add ordered first scenario selection`
-- goal: one or two sentences naming the concrete outcome
-- scope: bullets for the specific behavior/path to cover
-- acceptance criteria: testable bullets only
-- dependencies: blockers/blocks/related tickets
-- docs: markdown links to source design/review artifacts
-
-Do not include user-story filler, process jargon, vague architecture-consumer language, or invented implementation details. Ticket-level QRSPI owns exact design and implementation.
-
-## Step 4: Refine tickets one by one
-
-Show exactly one candidate ticket at a time.
-
-For each ticket:
-
-1. Present the concise provider-ready title and exact Markdown body.
-1. Ask the human whether to approve, change, or drop it.
-1. Apply requested edits.
-1. Re-show the edited title/body if changes were material.
-1. Do not proceed to the next ticket until the current ticket description is approved.
-
-Do not include operator-only creation guards, internal planning caveats, user-story filler, or "known limitations" phrasing when concrete deferrals can be named.
-
-## Step 5: Update ticket description docs
-
-After a ticket is approved, update the proposed ticket description docs created earlier from the design/ticket-shaping work. Prefer existing docs in their original location; do not create duplicate approved-description trees unless no docs exist yet. If no docs exist, create them under:
+Summarize the reviewed design and automated review verdict, then present this concise structure:
 
 ```text
-milestone-plan/context/create-tickets/provider-ticket-descriptions/tkt-01-short-slug.md
+Ticket-set proposal:
+- Spine: [named product path/scenario]
+- Tickets:
+  1. [type: docs/spec|implementation/test] [tentative title] — [role/proves]
+  2. ...
+- Deferred: [later milestones/follow-ups]
+- Risk check: [horizontal/enabling tickets and the vertical path they unlock]
+Approve structure, or changes?
 ```
 
-These approved provider issue bodies are supporting create-ticket artifacts, so they may live under `context/create-tickets/`. Actual ticket deliverables created later must live at the ticket directory root and be linked from ticket `index.md`.
+Do not draft individual ticket bodies until the structure is approved. If the human changes ticket count/scope materially, edit `design.md` so it matches the approved structure before creating Linear tickets.
 
-Ticket description docs must be exactly the Markdown body that goes into Linear: no frontmatter, no metadata-only title heading, no suggested next command, no agent-only notes. The provider issue title lives outside the body, in the create command/status artifact.
+## Step 3: Draft tickets one by one
 
-Each description must be concise and provider-ready, using these sections in this order:
+For each approved ticket, write the exact provider body to:
 
-1. Goal
-1. Scope
-1. Acceptance criteria
-1. Dependencies
-1. Docs
+```text
+milestone-plan/context/create-tickets/drafts/tkt-NN-short-slug.md
+```
 
-Use Conventional Commit style for provider issue titles, e.g. `feat(domain): add first product path` or `test(domain): verify demo flow`.
+The draft file is the exact Linear body: no frontmatter, no title heading, no suggested next command, no agent-only notes. The provider issue title lives outside the body.
 
-Record each ticket title, description doc path, created provider issue ID, URL, and routing dir in `milestone-plan/AGENTS.md`. Do not create a separate ticket manifest unless the milestone memory becomes too large.
+Show exactly one ticket at a time:
 
-Use markdown links for docs/assets according to the thoughts root `AGENTS.md` host manifest. Prefer repo-local asset paths under the milestone-plan directory; do not link to local absolute screenshot paths.
+1. Present the exact title and exact Markdown body from the draft file.
+1. Ask the human whether to approve, change, or drop it.
+1. Apply requested edits to the draft file.
+1. Re-show the edited title/body after material changes.
+1. Human approval means: create this Linear ticket now.
 
-Keep the title in the provider issue title, not as a body heading. Do not include suggested next commands in the provider description body; those belong in routing-only ticket `AGENTS.md` after the issue exists.
+### Template selection
 
-## Step 6: Execute and update repo routing
+Classify each ticket in the structure proposal.
 
-After all ticket description docs are approved one by one, create tickets one at a time:
+Docs/spec ticket (`docs(...)`, strategy/spec/audit/docs-only deliverable) uses:
 
-1. For the next ticket, show the exact provider title and the exact Markdown body from the approved description doc, then ask: "Create this provider ticket now?" Do not create it until the human approves that specific ticket.
-1. Create the provider ticket directly from the approved description doc in the repo. Do not create separate `/tmp` markdown bodies, hidden transformed copies, or frontmatter-stripped temp files. The approved doc must already be exactly the provider issue body.
-1. Apply project/milestone/default fields. Created implementation/spec tickets must be assigned to the Linear project milestone and must not be children of the milestone planning ticket.
-1. Add relations/blockers when the related issue already exists; otherwise record the pending relation and add it after the dependent ticket is created.
-1. Repeat the approval-and-create loop for each remaining ticket.
-1. Comment on the milestone planning ticket with markdown links to the created tickets, key relations, and thoughts docs/assets. For Linear, bare issue IDs may not auto-expand reliably, so use explicit markdown links built from manifest config for created tickets.
-1. Move the milestone planning ticket to the configured review/status value when available after implementation/spec tickets are created; do not mark it `Done` until the human/project owner has reviewed the created ticket set.
+```markdown
+## Goal
+
+## Scope
+
+## Acceptance criteria
+
+## Dependencies / relations
+
+## Docs
+```
+
+Implementation/test ticket (`feat(...)`, `fix(...)`, `test(...)`, mixed docs+code, or production/test code change) uses:
+
+```markdown
+## Vertical path
+
+## Role in ticket-set structure
+
+## Goal
+
+## User stories
+
+## Where we are today
+
+## Gaps we need to fill
+
+## Expected outcome
+
+## Testing strategy
+
+### Unit
+
+### Integration
+
+### E2E
+
+## Dependencies / relations
+
+## Docs
+```
+
+Do not include operator-only creation guards, internal planning caveats, vague architecture-consumer language, or invented implementation details. Ticket-level QRSPI owns exact design and implementation.
+
+Use markdown links for docs/assets according to thoughts root `AGENTS.md`. Do not link local absolute paths.
+
+## Step 4: Create each approved ticket
+
+After a ticket body is approved:
+
+1. Create the provider ticket directly from the approved draft file.
+
+1. Create routing dir only after the provider issue exists:
+
+   ```text
+   tickets/pro-####-short-slug/
+   ```
+
+1. Move the draft file to `tickets/pro-####-short-slug/ticket.md`; do not leave a duplicate provider body in `milestone-plan/context/create-tickets/drafts/`.
+
+1. Write routing-only `AGENTS.md`.
+
+1. Write ticket-root `index.md` linking the provider issue, `ticket.md`, canonical docs, and next `/q-question` command.
+
+1. Comment on the created ticket with fenced YAML `qrspi_result`. Set `workspace` to the ticket directory, `artifact` to `ticket.md`, and `next.steps` to read QRSPI/question skills, read `ticket.md`, then start `q-question`.
+
+1. Update `milestone-plan/AGENTS.md` create-ticket status with title, `ticket.md` path, created issue ID/URL, routing dir, and next ticket.
+
+1. Move to the next ticket.
+
+## Step 5: Post-pass after all tickets exist
+
+After all tickets are created:
+
+1. Add blocker/related relations in a post-pass.
+1. Comment on the milestone planning ticket with markdown links to created tickets, key relations, and thoughts docs/assets.
+1. Move the milestone planning ticket to the configured review/status value when available; do not mark it `Done`.
 1. Update project provider ticket log.
 1. Update milestone planning status artifact.
 1. Update milestone `AGENTS.md` and optional `milestone.md`.
-1. Create ticket directories only after provider issue IDs exist using the provider key plus slug, e.g. `eng-0000-short-slug/`; do not add numeric ordering prefixes.
-1. Write routing-only ticket `AGENTS.md` files.
-1. Write a ticket-root `index.md` that links the provider issue, approved description doc, canonical docs, and next QRSPI command.
-1. Comment on each created ticket with a fenced YAML `qrspi_result` block. Set `workspace` to that ticket directory, `artifact` to the approved ticket description doc, and `next.steps` to read QRSPI/question skills, read the ticket artifact, then start `q-question`.
+1. Ensure `milestone-plan/AGENTS.md` has a create-ticket status table and pending/created relations.
 1. Run `just sync-thoughts` when available.
+
+Use `milestone-plan/AGENTS.md` as the durable create-ticket status/recovery artifact. Do not create a separate manifest unless the table becomes too large.
+
+Suggested status section:
+
+```markdown
+## Create-tickets status
+
+| Order | Title | Type | Ticket body | Linear issue | Status |
+|---|---|---|---|---|---|
+| 1 | ... | docs/spec | `../tickets/pro-1234-slug/ticket.md` | PRO-1234 | created |
+
+Relations:
+- PRO-1234 blocks PRO-1235
+```
 
 ## Response
 
 Use fenced YAML `qrspi_result` blocks for all stage results. Required fields: `project`, `related_projects`, `stage`, `status`, `outcome` for complete results, `workspace`, `workspace_metadata`, `policy`, `summary`, `artifact`, `artifacts`, and structured `next.steps`.
+
+Final completion:
+
+- `artifact`: `milestone-plan/AGENTS.md`
+- Include artifacts for project log, milestone planning status, created ticket `index.md` files, and `ticket.md` bodies.
+- `summary.key_decisions`: name the first ticket-level `/q-question` that should start immediately, or state completion if no next ticket work should start.
 
 Completed stage example:
 
@@ -148,20 +206,20 @@ qrspi_result:
     invalid_result_retry_limit: 1
   summary:
     plan_goal: "Plan milestone tickets from reviewed requirements."
-    stage_completed: "Milestone tickets complete."
-    key_decisions: "Next stage should start immediately: /done."
-  artifact: "thoughts/.../created ticket/status artifact path"
+    stage_completed: "Milestone tickets created and routing docs updated."
+    key_decisions: "Next stage should start immediately: /q-question for the first created ticket."
+  artifact: "thoughts/.../milestone-plan/AGENTS.md"
   artifacts:
-    - role: "primary"
-      path: "thoughts/.../created ticket/status artifact path"
+    - role: "ticket"
+      path: "thoughts/.../tickets/pro-1234-slug/index.md"
   next:
     steps:
       - action: "read_skill"
         param: ".pi/skills/qrspi-planning/SKILL.md"
       - action: "read_skill"
-        param: ".pi/skills/done/SKILL.md"
+        param: ".pi/skills/q-question/SKILL.md"
       - action: "read_artifact"
-        param: "thoughts/.../created ticket/status artifact path"
+        param: "thoughts/.../tickets/pro-1234-slug/ticket.md"
       - action: "start_stage"
-        param: "done"
+        param: "q-question"
 ```

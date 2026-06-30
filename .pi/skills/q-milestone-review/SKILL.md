@@ -1,11 +1,11 @@
 ---
 name: q-milestone-review
-description: Review milestone-level QRSPI design artifacts for nested project planning. Use when running /q-milestone-review on milestone design.md before ticket creation. Checks artifact ownership, requirement traceability, current-state evidence, architecture-spec readiness, ticket boundaries, dependencies, and readiness for one-by-one ticket creation.
+description: Review milestone-level QRSPI design artifacts for nested project planning. Use when running /q-milestone-review on milestone design.md before ticket creation. Checks artifact ownership, requirement traceability, current-state evidence, architecture-spec readiness, ticket boundaries, dependencies, and readiness for q-milestone-create-tickets.
 ---
 
-# Milestone Review — Is This Ready for the Next Gate?
+# Milestone Review — Is This Ready for Ticket Creation?
 
-Use this as the Review stage for milestone-level QRSPI. It reviews milestone `design.md` before ticket creation. It replaces the old outline/plan review gates for new milestone planning.
+Use this as the automated Review stage for milestone-level QRSPI. It reviews milestone `design.md` before `/q-milestone-create-tickets`. It replaces the old outline/plan review gates for new milestone planning.
 
 ## Step 1: Load baseline workflow
 
@@ -46,14 +46,14 @@ Check:
 - taxonomy changes proposed, not silently applied
 - implementation details not over-specified
 
-Next after clean automated review: human writes `review-human.md`, then `/q-milestone-create-tickets [design.md]`.
+Next after clean automated review: `/q-milestone-create-tickets [design.md]`. Do **not** require or write `review-human.md`; create-tickets handles human approval in chat by summarizing the design, review verdict, and ticket-set proposal.
 
 ## Step 3: Write review artifact
 
 Create:
 
 ```text
-reviews/YYYY-MM-DD_HH-MM-SS_[slug]_[design|outline|plan]-review/review.md
+reviews/YYYY-MM-DD_HH-MM-SS_[slug]_design-review/review.md
 ```
 
 Use q-review-plan finding categories when useful:
@@ -63,16 +63,6 @@ Use q-review-plan finding categories when useful:
 - `needs_human_judgment` — ask via `/answer`
 
 For clear doc fixes, update parent milestone-planning docs directly and run `just sync-thoughts` when available/appropriate.
-
-## Step 4: Human approval convention
-
-Do not write `review-human.md` yourself unless the user explicitly gives the approval decision. When approval is given, record it beside `review.md`:
-
-```text
-reviews/.../review-human.md
-```
-
-Include approver, date, decision, notes, applied/deferred edits, and pointer to reviewed artifact.
 
 ## Response
 
@@ -102,20 +92,24 @@ qrspi_result:
     invalid_result_retry_limit: 1
   summary:
     plan_goal: "Plan milestone tickets from reviewed requirements."
-    stage_completed: "Milestone review complete."
-    key_decisions: "Next stage should start immediately: /human-review-design."
-  artifact: "thoughts/.../review.md path"
+    stage_completed: "Automated milestone review complete."
+    key_decisions: "Next stage should start immediately: /q-milestone-create-tickets; human approval happens there."
+  artifact: "thoughts/.../review.md"
   artifacts:
     - role: "primary"
-      path: "thoughts/.../review.md path"
+      path: "thoughts/.../review.md"
+    - role: "reviewed-design"
+      path: "thoughts/.../design.md"
   next:
     steps:
       - action: "read_skill"
         param: ".pi/skills/qrspi-planning/SKILL.md"
       - action: "read_skill"
-        param: ".pi/skills/human-review-design/SKILL.md"
+        param: ".pi/skills/q-milestone-create-tickets/SKILL.md"
       - action: "read_artifact"
-        param: "thoughts/.../review.md path"
+        param: "thoughts/.../design.md"
+      - action: "read_artifact"
+        param: "thoughts/.../review.md"
       - action: "start_stage"
-        param: "human-review-design"
+        param: "q-milestone-create-tickets"
 ```
