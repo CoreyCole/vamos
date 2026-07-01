@@ -22,18 +22,47 @@ const (
 
 // Service handles GitHub webhook events
 type Service struct {
-	secret        string
-	repoPath      string
-	rebuildScript string
+	secret       string
+	defaultRoute RepoRoute
+	routes       map[string]RepoRoute
 }
 
-// NewService creates a new webhook service
+type RepoRoute struct {
+	GitHubRepo    string
+	RepoPath      string
+	RebuildScript string
+	SyncThoughts  bool
+}
+
+// NewService creates a new webhook service.
 func NewService(secret, repoPath, rebuildScript string) *Service {
-	return &Service{
-		secret:        secret,
-		repoPath:      repoPath,
-		rebuildScript: rebuildScript,
+	return NewServiceWithRoutes(secret, RepoRoute{
+		RepoPath:      repoPath,
+		RebuildScript: rebuildScript,
+		SyncThoughts:  true,
+	}, nil)
+}
+
+func NewServiceWithRoutes(secret string, defaultRoute RepoRoute, routes []RepoRoute) *Service {
+	s := &Service{
+		secret:       secret,
+		defaultRoute: defaultRoute,
+		routes:       map[string]RepoRoute{},
 	}
+	for _, route := range routes {
+		key := strings.ToLower(strings.TrimSpace(route.GitHubRepo))
+		if key == "" {
+			continue
+		}
+		if route.RepoPath == "" {
+			route.RepoPath = defaultRoute.RepoPath
+		}
+		if route.RebuildScript == "" {
+			route.RebuildScript = defaultRoute.RebuildScript
+		}
+		s.routes[key] = route
+	}
+	return s
 }
 
 // PushEvent represents the relevant fields from a GitHub push webhook payload
@@ -57,18 +86,28 @@ func (s *Service) HandlePush(ctx context.Context, payload []byte) error {
 		return fmt.Errorf("failed to parse push event: %w", err)
 	}
 
+	route, ok := s.routeFor(event.Repository.FullName)
+	if !ok {
+		s.logEvent("webhook_repo_ignored", map[string]any{
+			"ref":        event.Ref,
+			"repository": event.Repository.FullName,
+		})
+		return nil
+	}
+
 	s.logEvent("webhook_received", map[string]any{
 		"ref":        event.Ref,
 		"before":     event.Before,
 		"after":      event.After,
 		"repository": event.Repository.FullName,
+		"repo_path":  route.RepoPath,
 		"pusher":     event.Pusher.Name,
 	})
 
 	// Capture HEAD before any local thoughts sync. The sync step may pull/rebase
 	// while publishing local thoughts; comparing against this original commit keeps
 	// code changes from that pull eligible for rebuild.
-	beforeCommit, err := git.GetCurrentCommit(ctx, s.repoPath)
+	beforeCommit, err := git.GetCurrentCommit(ctx, route.RepoPath)
 	if err != nil {
 		s.logEvent("git_error", map[string]any{
 			"operation": "get_commit_before",
@@ -80,17 +119,19 @@ func (s *Service) HandlePush(ctx context.Context, payload []byte) error {
 	// Publish local thoughts before refusing a dirty tree. Thought artifacts are
 	// expected to accumulate locally; sync-thoughts formats, commits, rebases, and
 	// pushes them so webhook deploys are not blocked by thoughts-only changes.
-	if err := s.runThoughtsSync(ctx); err != nil {
-		s.logEvent("thoughts_sync_error", map[string]any{
-			"error": err.Error(),
-		})
+	if route.SyncThoughts {
+		if err := s.runThoughtsSync(ctx, route); err != nil {
+			s.logEvent("thoughts_sync_error", map[string]any{
+				"error": err.Error(),
+			})
+		}
 	}
 
 	// Never stash local changes from the webhook path. This repository often has
 	// agent/user work in progress, and hiding it in git stash makes the deploy
 	// side effect hard to notice. Refuse to pull instead after thoughts had a
 	// chance to sync cleanly.
-	if dirty, err := s.getDirtyFiles(ctx); err != nil {
+	if dirty, err := s.getDirtyFiles(ctx, route); err != nil {
 		s.logEvent("git_error", map[string]any{
 			"operation": "status",
 			"error":     err.Error(),
@@ -106,7 +147,7 @@ func (s *Service) HandlePush(ctx context.Context, payload []byte) error {
 	}
 
 	// Pull latest changes
-	output, err := git.Pull(ctx, s.repoPath)
+	output, err := git.Pull(ctx, route.RepoPath)
 	if err != nil {
 		s.logEvent("git_error", map[string]any{
 			"operation": "pull",
@@ -121,7 +162,7 @@ func (s *Service) HandlePush(ctx context.Context, payload []byte) error {
 	})
 
 	// Get new HEAD after pull
-	afterCommit, err := git.GetCurrentCommit(ctx, s.repoPath)
+	afterCommit, err := git.GetCurrentCommit(ctx, route.RepoPath)
 	if err != nil {
 		s.logEvent("git_error", map[string]any{
 			"operation": "get_commit_after",
@@ -139,7 +180,7 @@ func (s *Service) HandlePush(ctx context.Context, payload []byte) error {
 	}
 
 	// Get list of changed files
-	changedFiles, err := git.GetChangedFiles(ctx, s.repoPath, beforeCommit, afterCommit)
+	changedFiles, err := git.GetChangedFiles(ctx, route.RepoPath, beforeCommit, afterCommit)
 	if err != nil {
 		s.logEvent("git_error", map[string]any{
 			"operation": "get_changed_files",
@@ -160,13 +201,13 @@ func (s *Service) HandlePush(ctx context.Context, payload []byte) error {
 
 	if needsRebuild {
 		s.logEvent("rebuild_triggered", map[string]any{
-			"script": s.rebuildScript,
+			"script": route.RebuildScript,
 		})
 
 		// Run rebuild in background so we can return HTTP response immediately
 		// (nix develop can take a long time)
 		go func() {
-			if err := s.runRebuildScript(); err != nil {
+			if err := s.runRebuildScript(route); err != nil {
 				s.logEvent("rebuild_error", map[string]any{
 					"error": err.Error(),
 				})
@@ -183,8 +224,17 @@ func (s *Service) HandlePush(ctx context.Context, payload []byte) error {
 	return nil
 }
 
-func (s *Service) runThoughtsSync(ctx context.Context) error {
-	script := filepath.Join(s.repoPath, "scripts", "sync-thoughts.sh")
+func (s *Service) routeFor(fullName string) (RepoRoute, bool) {
+	key := strings.ToLower(strings.TrimSpace(fullName))
+	if len(s.routes) == 0 {
+		return s.defaultRoute, true
+	}
+	route, ok := s.routes[key]
+	return route, ok
+}
+
+func (s *Service) runThoughtsSync(ctx context.Context, route RepoRoute) error {
+	script := filepath.Join(route.RepoPath, "scripts", "sync-thoughts.sh")
 	if _, err := os.Stat(script); err != nil {
 		if os.IsNotExist(err) {
 			s.logEvent("thoughts_sync_skipped", map[string]any{
@@ -201,7 +251,7 @@ func (s *Service) runThoughtsSync(ctx context.Context) error {
 
 	//nolint:gosec // script path is derived from configured repoPath, not request input.
 	cmd := exec.CommandContext(syncCtx, "/bin/bash", script)
-	cmd.Dir = s.repoPath
+	cmd.Dir = route.RepoPath
 	output, err := cmd.CombinedOutput()
 	s.logEvent("thoughts_sync_output", map[string]any{
 		"output": string(output),
@@ -212,7 +262,7 @@ func (s *Service) runThoughtsSync(ctx context.Context) error {
 	return nil
 }
 
-func (s *Service) getDirtyFiles(ctx context.Context) ([]string, error) {
+func (s *Service) getDirtyFiles(ctx context.Context, route RepoRoute) ([]string, error) {
 	statusCtx, cancel := context.WithTimeout(ctx, gitStatusTimeout)
 	defer cancel()
 
@@ -221,7 +271,7 @@ func (s *Service) getDirtyFiles(ctx context.Context) ([]string, error) {
 		statusCtx,
 		git.Binary(),
 		"-C",
-		s.repoPath,
+		route.RepoPath,
 		"status",
 		"--porcelain",
 	)
@@ -254,13 +304,13 @@ func (s *Service) hasCodeChanges(files []string) bool {
 }
 
 // runRebuildScript executes the rebuild script
-func (s *Service) runRebuildScript() error {
+func (s *Service) runRebuildScript(route RepoRoute) error {
 	ctx, cancel := context.WithTimeout(context.Background(), rebuildTimeout)
 	defer cancel()
 
 	//nolint:gosec // rebuildScript is configured by the server owner, not request input.
-	cmd := exec.CommandContext(ctx, "/bin/bash", s.rebuildScript)
-	cmd.Dir = s.repoPath
+	cmd := exec.CommandContext(ctx, "/bin/bash", route.RebuildScript)
+	cmd.Dir = route.RepoPath
 	output, err := cmd.CombinedOutput()
 
 	s.logEvent("rebuild_output", map[string]any{

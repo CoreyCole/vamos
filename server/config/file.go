@@ -294,6 +294,23 @@ func RejectLegacyConfig(environ []string) error {
 }
 
 func expandFileConfigPaths(cfg FileConfig) (FileConfig, error) {
+	for i, repo := range cfg.Deploy.WebhookRepos {
+		if strings.TrimSpace(repo.RepoPath) != "" {
+			expanded, err := ExpandPath(repo.RepoPath)
+			if err != nil {
+				return FileConfig{}, fmt.Errorf("deploy.webhook_repos.%d.repo_path: %w", i, err)
+			}
+			repo.RepoPath = expanded
+		}
+		if strings.TrimSpace(repo.RebuildScript) != "" {
+			expanded, err := ExpandPath(repo.RebuildScript)
+			if err != nil {
+				return FileConfig{}, fmt.Errorf("deploy.webhook_repos.%d.rebuild_script: %w", i, err)
+			}
+			repo.RebuildScript = expanded
+		}
+		cfg.Deploy.WebhookRepos[i] = repo
+	}
 	for repoName, repo := range cfg.Projects.Repos {
 		for checkoutName, checkout := range repo.Checkouts {
 			root, err := ExpandPath(checkout.RootPath)

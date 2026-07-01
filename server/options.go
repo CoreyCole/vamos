@@ -156,12 +156,20 @@ type WorkspaceProcessCommands struct {
 }
 
 type DeployConfig struct {
-	WebServiceName      string `yaml:"web_service_name"`
-	TSWorkerServiceName string `yaml:"ts_worker_service_name"`
-	RebuildScript       string `yaml:"rebuild_script"`
-	WebhookSecret       string `yaml:"webhook_secret"`
-	ThoughtsBaseURL     string `yaml:"thoughts_base_url"`
-	GitHubBaseURL       string `yaml:"github_base_url"`
+	WebServiceName      string              `yaml:"web_service_name"`
+	TSWorkerServiceName string              `yaml:"ts_worker_service_name"`
+	RebuildScript       string              `yaml:"rebuild_script"`
+	WebhookSecret       string              `yaml:"webhook_secret"`
+	WebhookRepos        []WebhookRepoConfig `yaml:"webhook_repos"`
+	ThoughtsBaseURL     string              `yaml:"thoughts_base_url"`
+	GitHubBaseURL       string              `yaml:"github_base_url"`
+}
+
+type WebhookRepoConfig struct {
+	GitHubRepo    string `yaml:"github_repo"`
+	RepoPath      string `yaml:"repo_path"`
+	RebuildScript string `yaml:"rebuild_script"`
+	SyncThoughts  *bool  `yaml:"sync_thoughts"`
 }
 
 func MustRun(opts Options) {

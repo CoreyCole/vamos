@@ -206,27 +206,28 @@ func newPrefixStrippingProxy(
 
 // Config holds environment configuration
 type Config struct {
-	ListenAddress           string   `envconfig:"CN_AGENTS_LISTEN_ADDRESS"             default:":4200"`
-	PublicBaseURL           string   `envconfig:"CN_AGENTS_PUBLIC_BASE_URL"            default:"http://localhost:4200"`
-	InternalCallbackBaseURL string   `envconfig:"CN_AGENTS_INTERNAL_CALLBACK_BASE_URL" default:""`
-	WorkspaceMode           string   `envconfig:"CN_AGENTS_WORKSPACE_MODE"             default:"standalone"`
-	WorkspaceDomain         string   `envconfig:"CN_AGENTS_WORKSPACE_DOMAIN"           default:""`
-	WorkspaceParentDir      string   `envconfig:"CN_AGENTS_WORKSPACE_PARENT_DIR"       default:""`
-	WorkspaceStateDir       string   `envconfig:"CN_AGENTS_WORKSPACE_STATE_DIR"        default:"~/.local/state/cn-agents/workspaces"`
-	WorkspaceSlug           string   `envconfig:"CN_AGENTS_WORKSPACE_SLUG"                default:"main"`
-	WorkspaceManagerURL     string   `envconfig:"CN_AGENTS_WORKSPACE_MANAGER_URL"         default:""`
-	WorkspaceRestartToken   string   `envconfig:"CN_AGENTS_WORKSPACE_RESTART_TOKEN"       default:""`
-	DevAuthSigningKey       string   `envconfig:"CN_AGENTS_DEV_AUTH_SIGNING_KEY"       default:""`
-	DevAuthVerifyKey        string   `envconfig:"CN_AGENTS_DEV_AUTH_VERIFY_KEY"        default:""`
-	MarkdownBasePath        string   `envconfig:"MARKDOWN_BASE_PATH"                   default:""`
-	DatabasePath            string   `envconfig:"DATABASE_PATH"                        default:"~/.local/state/cn-agents/agents.db"`
-	GoogleCredentialsFile   string   `envconfig:"GOOGLE_CREDENTIALS_FILE"              default:""`
-	RepoPath                string   `envconfig:"REPO_PATH"                            default:""`
-	ThoughtsBaseURL         string   `envconfig:"THOUGHTS_BASE_URL"                    default:""`
-	GitHubBaseURL           string   `envconfig:"GITHUB_BASE_URL"                      default:""`
-	ConfigPath              string   `envconfig:"CN_AGENTS_CONFIG"                     default:""`
-	WebhookSecret           string   `envconfig:"WEBHOOK_SECRET"                       default:""`
-	RebuildScript           string   `envconfig:"REBUILD_SCRIPT"                       default:"scripts/webhook-rebuild.sh"`
+	ListenAddress           string `envconfig:"CN_AGENTS_LISTEN_ADDRESS"             default:":4200"`
+	PublicBaseURL           string `envconfig:"CN_AGENTS_PUBLIC_BASE_URL"            default:"http://localhost:4200"`
+	InternalCallbackBaseURL string `envconfig:"CN_AGENTS_INTERNAL_CALLBACK_BASE_URL" default:""`
+	WorkspaceMode           string `envconfig:"CN_AGENTS_WORKSPACE_MODE"             default:"standalone"`
+	WorkspaceDomain         string `envconfig:"CN_AGENTS_WORKSPACE_DOMAIN"           default:""`
+	WorkspaceParentDir      string `envconfig:"CN_AGENTS_WORKSPACE_PARENT_DIR"       default:""`
+	WorkspaceStateDir       string `envconfig:"CN_AGENTS_WORKSPACE_STATE_DIR"        default:"~/.local/state/cn-agents/workspaces"`
+	WorkspaceSlug           string `envconfig:"CN_AGENTS_WORKSPACE_SLUG"                default:"main"`
+	WorkspaceManagerURL     string `envconfig:"CN_AGENTS_WORKSPACE_MANAGER_URL"         default:""`
+	WorkspaceRestartToken   string `envconfig:"CN_AGENTS_WORKSPACE_RESTART_TOKEN"       default:""`
+	DevAuthSigningKey       string `envconfig:"CN_AGENTS_DEV_AUTH_SIGNING_KEY"       default:""`
+	DevAuthVerifyKey        string `envconfig:"CN_AGENTS_DEV_AUTH_VERIFY_KEY"        default:""`
+	MarkdownBasePath        string `envconfig:"MARKDOWN_BASE_PATH"                   default:""`
+	DatabasePath            string `envconfig:"DATABASE_PATH"                        default:"~/.local/state/cn-agents/agents.db"`
+	GoogleCredentialsFile   string `envconfig:"GOOGLE_CREDENTIALS_FILE"              default:""`
+	RepoPath                string `envconfig:"REPO_PATH"                            default:""`
+	ThoughtsBaseURL         string `envconfig:"THOUGHTS_BASE_URL"                    default:""`
+	GitHubBaseURL           string `envconfig:"GITHUB_BASE_URL"                      default:""`
+	ConfigPath              string `envconfig:"CN_AGENTS_CONFIG"                     default:""`
+	WebhookSecret           string `envconfig:"WEBHOOK_SECRET"                       default:""`
+	RebuildScript           string `envconfig:"REBUILD_SCRIPT"                       default:"scripts/webhook-rebuild.sh"`
+	WebhookRepos            []server.WebhookRepoConfig
 	TemporalUIBaseURL       string   `envconfig:"TEMPORAL_UI_BASE_URL"                 default:"http://127.0.0.1:8233"`
 	AuthAllowedDomains      []string `envconfig:"AUTH_ALLOWED_DOMAINS"                 default:""`
 	AuthWhitelistedEmails   []string `envconfig:"AUTH_WHITELISTED_EMAILS"              default:""`
@@ -322,6 +323,7 @@ func applyHostConfigToLegacyConfig(cfg Config, host server.HostConfig) Config {
 	)
 	cfg.WebhookSecret = firstNonEmpty(host.Deploy.WebhookSecret, cfg.WebhookSecret)
 	cfg.RebuildScript = firstNonEmpty(host.Deploy.RebuildScript, cfg.RebuildScript)
+	cfg.WebhookRepos = host.Deploy.WebhookRepos
 	cfg.ThoughtsBaseURL = firstNonEmpty(
 		host.Deploy.ThoughtsBaseURL,
 		cfg.ThoughtsBaseURL,
@@ -1437,10 +1439,23 @@ func main() {
 
 	// Setup webhook service (only when secret is configured)
 	if cfg.WebhookSecret != "" {
-		webhookService := webhook.NewService(
+		webhookRoutes := make([]webhook.RepoRoute, 0, len(cfg.WebhookRepos))
+		for _, repo := range cfg.WebhookRepos {
+			syncThoughts := false
+			if repo.SyncThoughts != nil {
+				syncThoughts = *repo.SyncThoughts
+			}
+			webhookRoutes = append(webhookRoutes, webhook.RepoRoute{
+				GitHubRepo:    repo.GitHubRepo,
+				RepoPath:      repo.RepoPath,
+				RebuildScript: repo.RebuildScript,
+				SyncThoughts:  syncThoughts,
+			})
+		}
+		webhookService := webhook.NewServiceWithRoutes(
 			cfg.WebhookSecret,
-			cfg.RepoPath,
-			cfg.RebuildScript,
+			webhook.RepoRoute{RepoPath: cfg.RepoPath, RebuildScript: cfg.RebuildScript, SyncThoughts: true},
+			webhookRoutes,
 		)
 		webhookHandler := webhook.NewHandler(webhookService)
 		webhookHandler.RegisterRoutes(e)
