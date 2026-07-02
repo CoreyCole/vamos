@@ -9,21 +9,6 @@ description: Manage QRSPI stage sessions from a main Pi/tmux manager session. Us
 
 Supervise QRSPI from a main Pi manager session. Launch focused child Pi sessions in visible tmux panes, capture the child result, validate through canonical Vamos QRSPI graph helpers, then advance or stop according to graph decision and QRSPI policy.
 
-## Hermes manager fallback
-
-This skill is designed for a Pi manager running in tmux. When Hermes is acting as the manager instead of a Pi/tmux parent, be explicit that this is **Hermes-managed background orchestration**, not true q-manager CLI/tmux mode:
-
-- Hermes cannot create the intended visible child terminal split or receive `q_manager_child_wake` events.
-- If the user says “you are the q-manager” from a Hermes session, state the mode clearly up front: Hermes will manage background Pi processes, not the Pi q-manager/tmux UI, unless the operator explicitly starts a Pi manager/tmux session.
-- Start each QRSPI stage with Hermes `terminal(background=true, notify_on_complete=true)` running `pi -p ...` from the correct repo/workspace cwd. Put large stage prompts in `/tmp/...` files and invoke Pi with `@/tmp/...` so full prior `qrspi_result` YAML is preserved.
-- Track readiness/completion through Hermes process IDs with `process(action="poll"|"log")`, not through q-manager child wakes. Notification snippets can be truncated; always read the full process log before extracting stage results or launching the next stage. A stage is ready/done only when the process exits successfully and the full log contains valid fenced `qrspi_result` YAML.
-- After each stage completes, extract the complete fenced `qrspi_result` YAML from the full log and pass that YAML verbatim into the next graph-safe stage prompt.
-- Continue graph-safe stages immediately under the delegated-background QRSPI contract; for implementation `status: handoff`, start a fresh `/q-resume` background Pi process with the full handoff YAML instead of pausing merely because a handoff exists.
-- Pause only for `needs_human`, `blocked`, `error`, invalid YAML/artifacts, failed process exit, or a real safety/lost-work decision.
-- Do not claim a Pi manager/tmux child split is running unless `vamos qrspi start-next` (or equivalent q-manager CLI) actually launched one.
-- On the first status update after starting a Hermes-managed stage, name the mode and readiness signal explicitly: `Hermes-managed background Pi process`, process ID, cwd, prompt file when useful, and `ready/done = process exit + full process log parsed`.
-- If the user specifically asks for visible Pi/tmux child panes, stop using the Hermes fallback and instruct them to run a real Pi manager/tmux session, or use `vamos qrspi start-next` only when a valid manager pane is available.
-
 ## Required context load
 
 1. Read `.pi/skills/qrspi-planning/SKILL.md`.
@@ -41,12 +26,36 @@ This skill is designed for a Pi manager running in tmux. When Hermes is acting a
 - Keep self-recovery evidence-based: cite the child artifact/session and the graph rule being corrected in manager prose/diagnostics. Do not invent stage results without durable child work/artifacts to back them.
 - Log q-manager recovery incidents, but do not block the pipeline merely to write a perfect report. CLI repair paths append local recovery records under the manager state directory when available. Incident logs are local/ephemeral diagnostics; keep durable artifacts focused on workflow truth.
 
+## Linear ticket artifact comments
+
+When the active QRSPI plan is operating on a Linear ticket, move the ticket to In Progress and add concise progress comments as stage artifacts are produced.
+
+1. Detect the Linear issue from durable plan context, preferring `[plan_dir]/context/question/linear/issue.json`, then `ticket.md`, `AGENTS.md`, or prior captured QRSPI artifacts. Do not guess an issue ID when none is recorded.
+1. Before launching the first child stage for that ticket, move the issue to In Progress. Use `linear-cli issues update <ISSUE_ID> --state "In Progress"`; use `linear-cli issues start <ISSUE_ID>` only when assigning the ticket to the current Linear user is also intended.
+1. After `continue` validates a child result, summarize the stage in 1-4 bullets and include markdown links to the produced/updated artifacts from `qrspi_result.artifact` and `qrspi_result.artifacts`.
+1. Use durable links only: provider/web URLs when available, or thoughts-relative artifact paths formatted as markdown links. Do not link machine-local absolute paths, q-manager state files, tmux panes, session JSONL, prompt files, or other ephemeral control refs.
+1. Post with `linear-cli comments create <ISSUE_ID> --body "$(cat /tmp/q-manager-linear-comment.md)"`. If replying to an existing manager thread is explicitly recorded, include `--parent-id <COMMENT_ID>`; otherwise create a normal ticket comment.
+1. Keep comments human-readable and non-spammy. One comment per validated stage result is enough; include stage, status/outcome, artifact links, and next stage. Do not paste full `qrspi_result` YAML unless the ticket workflow explicitly requires it.
+1. If Linear CLI/auth fails for state move or comment posting, report the failure and continue QRSPI unless the human made Linear updates a hard requirement.
+
+Comment shape:
+
+```markdown
+QRSPI update: `q-plan` complete
+
+- Wrote implementation plan: [plan.md](thoughts/.../plan.md)
+- Review notes: [plan review](thoughts/.../reviews/.../review.md)
+- Next: `/q-workspace` now
+```
+
 ## Rules
 
 - Existing QRSPI graph is canonical. Do not infer transitions from YAML text alone.
 - Use `cmd/vamos-runtime` helpers, not a new binary.
 - Child work must be visible and interruptible in tmux. No hidden background child runner as primary UX when using the q-manager runtime/CLI flow.
-- Explicit user-requested background Pi delegation is a separate orchestration mode: if the user says to run `/q-question` (or another QRSPI stage) in a background Pi process and delegate, load `qrspi-planning` `references/background-pi-stage-delegation.md`, write a prompt file with cwd/project/source request/stage skills, start `pi -p` via a tracked background process with completion notification, and report the process/session handle. Do not force the tmux `start-next` flow in that case unless the user asked for q-manager runtime control.
+- Non-tmux/background-process orchestration is out of scope for this skill. Use a dedicated wrapper skill for background managers; q-manager itself should use the tmux `start-next` flow and visible child panes.
+- Do not manually launch child stages with raw `tmux split-window` or `pi -p` as a substitute for `vamos qrspi start-next`. Raw splits bypass q-manager state, child session wiring, validation, and wake delivery. `pi -p` is non-interactive and is not the visible child-pane UX.
+- If a raw tmux split is required only for emergency debugging, always target the manager pane explicitly with `tmux split-window -t "$TMUX_PANE" ...`; otherwise tmux may split a different selected window/pane than the manager. Label it diagnostic, do not expect a q-manager wake, and recover through `rebind-child` / `validate-latest` / `recover-manual` before continuing.
 - Manager state is disposable control state under user state dir, keyed by canonical `plan_dir`; never use repo-local `.vamos/q-manager`.
 - QRSPI artifacts and fenced `qrspi_result` YAML remain durable truth.
 - Respect manager-owned policy. `guided` is the default. `advanceMode`: `discuss` stops after valid result; `guided` starts graph-safe non-human edges, including implementation `status: handoff` checkpoints that should launch the next fresh implementation/resume child; `autopilot` can auto-approve only graph-marked safe gates. Plan reviews are controlled independently by `enablePlanReviews`, so both autopilot with reviews on and autopilot with reviews off are valid. Child-emitted `qrspi_result.policy` is informational only; it must not change manager policy or fail validation merely because it differs from manager state.
@@ -79,10 +88,11 @@ Primary loop: launch/resume child with `start-next`, then wait for a validated p
    ```bash
    vamos qrspi start-next --plan-dir <plan-dir> --project-root <repo-root> --manager-pane "$TMUX_PANE"
    ```
+   This is the only happy-path child launch. It must be run from the manager Pi/tmux pane so `$TMUX_PANE` identifies the pane to split beside and wake later. If `$TMUX_PANE` is missing or stale, stop and fix the manager tmux context instead of falling back to raw `tmux split-window`.
    For fast outline-first work where the human aligns on the outline and then q-manager should go straight through plan -> implement with plan reviews off, launch with `--node outline --policy-preset fast`.
    If the human requests a specific child model, add `--model <provider/model>` such as `--model openai-codex/gpt-5.4`.
    Add `--node <node>` / `--implementation-cwd <cwd>` only when deliberately resuming or testing a specific implementation, review, or verify stage. If parent context usage is explicitly known, pass `--manager-usage-percent <n>` or `--manager-usage-tokens <n> --manager-usage-window <n>`; above 80%, the CLI writes a manager operational handoff, marks delivery compacting, and prints the exact `manager-ready` command. Missing usage skips compaction; do not guess from token totals alone. If the parent already has a latest fenced result, pass it with `--latest-result-stdin` or `--latest-result-file`; the CLI validates/persists it before prompt embedding.
-1. Capture `stateFile` and active child refs from the concise default text output. The CLI writes the child prompt file atomically and launches the visible child; do not hand-render or paste prompts on the happy path. Do not add `--output ndjson` on the happy path; it bloats the manager context.
+1. Capture `stateFile` and active child refs from the concise default text output. The CLI writes the child prompt file atomically and launches the visible child next to the manager pane; do not hand-render prompts, paste prompts, run `pi @prompt` yourself, or launch raw tmux panes on the happy path. Do not add `--output ndjson` on the happy path; it bloats the manager context.
 1. Stop issuing commands and wait for the child extension/CLI to deliver a validated `q_manager_child_wake`. If manager delivery is `compacting`, the wake queues; after parent reset/restart, run the printed `vamos qrspi manager-ready --state-file "$STATE" --manager-pane "$TMUX_PANE"` command to mark ready and flush the queued wake exactly once. The wake should include `validated`, `manager_needed`, `retry_exhausted`, stage/status/artifact when known, active manager policy, child summary lines, next-child context (`stage`, `skill`, `cwd`, `working_on`), and the exact `continue` command.
 1. Run the single normal manager continuation command from the wake:
    ```bash
@@ -95,7 +105,7 @@ For review-dir / implementation-review follow-up plans, same-workspace routing s
 
 ### Manual/debug lower-level commands
 
-Use these only for recovery or debugging when `start-next` / `continue` is insufficient:
+Use these only for recovery or debugging when `start-next` / `continue` is insufficient. Prefer `run-child` over raw `tmux split-window`; it preserves q-manager refs and wake behavior.
 
 ```bash
 vamos qrspi init --plan-dir <plan-dir> --project-root <repo-root> --manager-pane "$TMUX_PANE"

@@ -117,7 +117,7 @@ Implementation/test ticket (`feat(...)`, `fix(...)`, `test(...)`, mixed docs+cod
 ## Docs
 ```
 
-Do not include operator-only creation guards, internal planning caveats, vague architecture-consumer language, or invented implementation details. Ticket-level QRSPI owns exact design and implementation.
+Do not include operator-only creation guards, internal planning caveats, vague architecture-consumer language, invented implementation details, or uncertainty placeholders (`if`, `likely`, `probably`, `maybe`, `where practical`, `when available`). Resolve ambiguity with the lead engineer during create-tickets, then write the ticket as decided scope. Ticket-level QRSPI owns exact design and implementation, not whether an approved deliverable exists.
 
 ### E2E / Ranger verification tickets
 
