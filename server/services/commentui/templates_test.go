@@ -627,6 +627,9 @@ func TestCommentToggleWithFormUsesPopoverPlacementClass(t *testing.T) {
 			t.Fatalf("render contains forbidden %q in %s", forbidden, html)
 		}
 	}
+	if strings.Contains(html, `data-style=""`) {
+		t.Fatalf("render contains empty Datastar style expression: %s", html)
+	}
 }
 
 func TestBuildThreadViewsCopiesThreadsAndReplies(t *testing.T) {

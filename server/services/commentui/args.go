@@ -230,7 +230,7 @@ func patchOnlyTargetClass(target CommentTargetView) string {
 
 func SelectionStyleExpr(prefix string) string {
 	if prefix == "" {
-		return ""
+		return "{}"
 	}
 	p := "$" + prefix
 	return "{'--commentui-selection-top': (" + p + ".top || 0) + 'px', '--commentui-selection-left': (" + p + ".left || 0) + 'px'}"
