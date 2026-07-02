@@ -550,6 +550,11 @@ func (s *Service) renderReplySectionTarget(
 	); err != nil {
 		return err
 	}
+	if err := sse.MarshalAndPatchSignals(map[string]any{
+		commentui.ReplyTextSignalKey(parentComment.ID): "",
+	}); err != nil {
+		return err
+	}
 	return patchOpenCommentsSignal(sse)
 }
 

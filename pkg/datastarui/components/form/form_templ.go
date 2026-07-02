@@ -111,7 +111,8 @@ func Form(args FormArgs) templ.Component {
 				submitHandler = fmt.Sprintf("@post('%s', {contentType: '%s'%s})", templ.SafeURL(args.Action), contentType, target)
 			}
 
-			formAttrs["data-on:submit"] = submitHandler
+			formAttrs["data-on:submit__prevent"] = submitHandler
+			formAttrs["method"] = "post"
 			formAttrs["data-indicator-fetching"] = ""
 		}
 
@@ -303,7 +304,7 @@ func FormDescription(args FormDescriptionArgs) templ.Component {
 			var templ_7745c5c3_Var9 string
 			templ_7745c5c3_Var9, templ_7745c5c3_Err = templ.JoinStringErrs(args.ID)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `pkg/datastarui/components/form/form.templ`, Line: 135, Col: 15}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `pkg/datastarui/components/form/form.templ`, Line: 136, Col: 15}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var9))
 			if templ_7745c5c3_Err != nil {
@@ -392,7 +393,7 @@ func FormMessage(args FormMessageArgs) templ.Component {
 				var templ_7745c5c3_Var13 string
 				templ_7745c5c3_Var13, templ_7745c5c3_Err = templ.JoinStringErrs(args.ID)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `pkg/datastarui/components/form/form.templ`, Line: 151, Col: 16}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `pkg/datastarui/components/form/form.templ`, Line: 152, Col: 16}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var13))
 				if templ_7745c5c3_Err != nil {
@@ -432,7 +433,7 @@ func FormMessage(args FormMessageArgs) templ.Component {
 				var templ_7745c5c3_Var15 string
 				templ_7745c5c3_Var15, templ_7745c5c3_Err = templ.JoinStringErrs(args.Message)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `pkg/datastarui/components/form/form.templ`, Line: 157, Col: 18}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `pkg/datastarui/components/form/form.templ`, Line: 158, Col: 18}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var15))
 				if templ_7745c5c3_Err != nil {

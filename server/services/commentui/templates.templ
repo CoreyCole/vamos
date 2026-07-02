@@ -44,6 +44,13 @@ func uniqueAuthors(threads []CommentThreadView) []string {
 	return authors
 }
 
+func preventSubmitPostExpr(route string) string {
+	if route == "" {
+		return ""
+	}
+	return "@post('" + route + "', {contentType: 'form'})"
+}
+
 func replyRoute(routes CommentRoutes, commentID string) string {
 	if routes.Reply == nil {
 		return ""
@@ -373,7 +380,7 @@ templ SectionMenu(args CommentTargetView) {
 			<svg class="h-4 w-4 text-muted-foreground" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="5" r="2"></circle><circle cx="12" cy="12" r="2"></circle><circle cx="12" cy="19" r="2"></circle></svg>
 		</summary>
 		<div class="absolute right-0 z-50 mt-2 min-w-36 rounded-md border border-border bg-popover p-1 text-popover-foreground shadow-md">
-			<form data-on:submit={ "@post('" + args.Routes.Show + "', {contentType: 'form'})" } class="flex w-full items-center">
+			<form data-on:submit__prevent={ preventSubmitPostExpr(args.Routes.Show) } class="flex w-full items-center">
 				@HiddenFields(args.HiddenFields)
 				<input type="hidden" name="selected_text" value=""/>
 				<button type="submit" class="flex w-full items-center rounded-sm px-2 py-1.5 text-sm hover:bg-accent hover:text-accent-foreground"><span class="whitespace-nowrap">Add comment</span></button>
@@ -388,7 +395,7 @@ templ CommentToggle(args CommentTargetView) {
 		<div class={ CommentAnchorClass(args.SignalKey) } data-style={ "{'z-index': $comment_" + args.SignalKey + "_expanded ? $comment_" + args.SignalKey + "_zindex : 0}" } data-on:click__window={ clickOutsideCollapseExpr(args) }>
 			@CompactCommentMarker(args)
 			if args.Routes.Expand != "" {
-				<form class="inline-flex md:hidden" data-on:submit={ "@post('" + args.Routes.Expand + "', {contentType: 'form'})" }>
+				<form class="inline-flex md:hidden" data-on:submit__prevent={ preventSubmitPostExpr(args.Routes.Expand) }>
 					@HiddenFields(args.HiddenFields)
 					<button type="submit" class="rounded-full border border-border/50 bg-muted/50 px-3 py-1.5 text-xs text-muted-foreground">{ fmt.Sprintf("%d", count) }</button>
 				</form>
@@ -402,7 +409,7 @@ templ CommentToggle(args CommentTargetView) {
 	} else {
 		<div class={ CommentAnchorClass(args.SignalKey) }>
 			if args.Routes.Expand != "" {
-				<form class="inline-flex" data-on:submit={ "@post('" + args.Routes.Expand + "', {contentType: 'form'})" }>
+				<form class="inline-flex" data-on:submit__prevent={ preventSubmitPostExpr(args.Routes.Expand) }>
 					@HiddenFields(MergeHidden(args.HiddenFields, map[string]string{"context_panel": "1"}))
 					<button type="submit" class="inline-flex h-8 items-center rounded-full border border-border/50 bg-muted/50 px-2 text-xs text-muted-foreground transition-colors hover:bg-muted" aria-label={ fmt.Sprintf("Open %d comments in context pane", count) }>
 						@StackedCommentAvatars(commentAuthorsView(args.Threads, 3), "h-6 w-6 text-[10px]")
@@ -500,7 +507,7 @@ templ CommentCard(view CommentThreadView, target CommentTargetView) {
 			</div>
 			<div class="flex shrink-0 items-center gap-2">
 				if target.Routes.SelectComment != "" {
-					<form data-on:submit={ "@post('" + target.Routes.SelectComment + "', {contentType: 'form'})" }>
+					<form data-on:submit__prevent={ preventSubmitPostExpr(target.Routes.SelectComment) }>
 						@HiddenFields(MergeHidden(target.HiddenFields, view.HiddenFields))
 						<input type="hidden" name="comment_id" value={ view.ID }/>
 						<button type="submit" class="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground" aria-label="Open comment in document" title="Open comment in document">
@@ -536,10 +543,11 @@ templ ReplyItem(reply CommentReplyView) {
 
 templ ReplyForm(view CommentThreadView, target CommentTargetView) {
 	if replyRoute(target.Routes, view.ID) != "" {
-		<form class="flex items-start gap-2" data-on:submit={ "@post('" + replyRoute(target.Routes, view.ID) + "', {contentType: 'form'})" }>
+		{{ replyTextSignal := ReplyTextSignalKey(view.ID) }}
+		<form class="flex items-start gap-2" method="post" data-signals={ "{" + replyTextSignal + ": ''}" } data-on:submit__prevent={ preventSubmitPostExpr(replyRoute(target.Routes, view.ID)) }>
 			@HiddenFields(MergeHidden(target.HiddenFields, view.HiddenFields))
 			<input type="hidden" name="request_id" value={ "reply-" + view.ID }/>
-			<textarea name="reply_text" class="min-h-12 flex-1 resize-none rounded-md border border-input bg-background px-2 py-1 text-xs text-foreground" placeholder="Reply..."></textarea>
+			<textarea name="reply_text" data-bind={ replyTextSignal } class="min-h-12 flex-1 resize-none rounded-md border border-input bg-background px-2 py-1 text-xs text-foreground" placeholder="Reply..."></textarea>
 			<button type="submit" class="rounded-md px-2 py-1 text-xs hover:bg-muted">Reply</button>
 		</form>
 	}
@@ -548,7 +556,7 @@ templ ReplyForm(view CommentThreadView, target CommentTargetView) {
 templ ActionForms(view CommentThreadView, target CommentTargetView) {
 	if view.Resolved {
 		if reopenRoute(target.Routes, view.ID) != "" {
-			<form data-on:submit={ "@post('" + reopenRoute(target.Routes, view.ID) + "', {contentType: 'form'})" }>
+			<form data-on:submit__prevent={ preventSubmitPostExpr(reopenRoute(target.Routes, view.ID)) }>
 				@HiddenFields(MergeHidden(target.HiddenFields, view.HiddenFields))
 				<input type="hidden" name="request_id" value={ "reopen-" + view.ID }/>
 				<button type="submit" class="text-xs text-muted-foreground hover:text-foreground">Reopen</button>
@@ -556,7 +564,7 @@ templ ActionForms(view CommentThreadView, target CommentTargetView) {
 		}
 	} else {
 		if resolveRoute(target.Routes, view.ID) != "" {
-			<form data-on:submit={ "@post('" + resolveRoute(target.Routes, view.ID) + "', {contentType: 'form'})" }>
+			<form data-on:submit__prevent={ preventSubmitPostExpr(resolveRoute(target.Routes, view.ID)) }>
 				@HiddenFields(MergeHidden(target.HiddenFields, view.HiddenFields))
 				<input type="hidden" name="request_id" value={ "resolve-" + view.ID }/>
 				<button type="submit" class="text-xs text-muted-foreground hover:text-foreground">Resolve</button>
@@ -568,7 +576,7 @@ templ ActionForms(view CommentThreadView, target CommentTargetView) {
 templ SelectedTextTrigger(args SelectionSignalArgs) {
 	if args.Prefix != "" && args.ShowRoute != "" {
 		{{ showExpression := "$" + args.Prefix + ".text && $" + args.Prefix + ".sectionId != ''" }}
-		<form id={ args.Prefix + "-inline-comment-trigger" } class={ SelectionTriggerClass() + " hidden" } data-show={ showExpression } data-class={ "{'hidden': !(" + showExpression + ")}" } data-style={ "{'--commentui-selection-top': ($" + args.Prefix + ".top || 0) + 'px', '--commentui-selection-left': ($" + args.Prefix + ".left || 0) + 'px'}" } data-on:submit={ "@post('" + args.ShowRoute + "', {contentType: 'form'})" }>
+		<form id={ args.Prefix + "-inline-comment-trigger" } class={ SelectionTriggerClass() + " hidden" } data-show={ showExpression } data-class={ "{'hidden': !(" + showExpression + ")}" } data-style={ "{'--commentui-selection-top': ($" + args.Prefix + ".top || 0) + 'px', '--commentui-selection-left': ($" + args.Prefix + ".left || 0) + 'px'}" } data-on:submit__prevent={ preventSubmitPostExpr(args.ShowRoute) }>
 			@HiddenFields(args.HiddenFields)
 			<input type="hidden" name="section_hint" data-bind={ args.Prefix + ".sectionId" }/>
 			<input type="hidden" name="heading_hint" data-bind={ args.Prefix + ".headingHint" }/>

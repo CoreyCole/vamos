@@ -291,6 +291,10 @@ func SignalKey(prefix, sectionID string) string {
 	)
 }
 
+func ReplyTextSignalKey(commentID string) string {
+	return "reply_text_" + safeSignalIdentifier(SafeCommentTargetSlug(commentID))
+}
+
 func CommentsForSection(
 	threads []CommentThreadView,
 	sectionID, headingHint string,
