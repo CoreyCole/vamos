@@ -132,8 +132,8 @@ func panelThreadTarget(args CommentsPanelArgs, thread CommentThreadView) Comment
 }
 
 templ HiddenFields(fields map[string]string) {
-	for name, value := range fields {
-		<input type="hidden" name={ name } value={ value }/>
+	for _, name := range hiddenFieldNames(fields) {
+		<input id={ hiddenFieldID(fields, name) } type="hidden" name={ name } value={ fields[name] }/>
 	}
 }
 
@@ -362,7 +362,7 @@ templ SidebarResolvedThreadChip(thread CommentThreadView, target CommentTargetVi
 	{{ _ = target }}
 	<div class="flex items-center gap-2 rounded-md border border-border/70 bg-muted/30 px-2 py-1.5 text-xs text-muted-foreground">
 		<span class="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-emerald-500/10 text-[10px] font-medium text-emerald-200">✓</span>
-		<span class="min-w-0 flex-1 truncate">{ commentActorName(thread.AuthorEmail) }</span>
+		<span class="min-w-0 flex-1 truncate">{ commentDisplayName(thread) }</span>
 		<span class="text-[11px] text-emerald-200">Resolved</span>
 	</div>
 }
@@ -495,12 +495,8 @@ templ CommentCard(view CommentThreadView, target CommentTargetView) {
 	<article id={ "comment-thread-" + view.ID } class="space-y-2 rounded-lg border border-border/70 bg-card p-3 text-xs shadow-sm">
 		<div class="flex items-start justify-between gap-3">
 			<div class="min-w-0">
-				<p class="font-medium text-foreground">{ view.AuthorEmail }</p>
-				if view.ActorLabel != "" {
-					<p class="text-muted-foreground">{ view.ActorLabel } · { formatCommentDate(view.CreatedAt) }</p>
-				} else {
-					<p class="text-muted-foreground">{ formatCommentDate(view.CreatedAt) }</p>
-				}
+				<p class="font-medium text-foreground">{ commentDisplayName(view) }</p>
+				<p class="text-muted-foreground">{ formatCommentDate(view.CreatedAt) }</p>
 			</div>
 			<div class="flex shrink-0 items-center gap-2">
 				if target.Routes.SelectComment != "" {
@@ -533,7 +529,7 @@ templ CommentCard(view CommentThreadView, target CommentTargetView) {
 
 templ ReplyItem(reply CommentReplyView) {
 	<div class="pl-4">
-		<p class="text-muted-foreground">{ reply.AuthorEmail } · { formatCommentDate(reply.CreatedAt) }</p>
+		<p class="text-muted-foreground">{ replyDisplayName(reply) } · { formatCommentDate(reply.CreatedAt) }</p>
 		<p class="whitespace-pre-wrap text-foreground">{ reply.Body }</p>
 	</div>
 }
@@ -543,7 +539,7 @@ templ ReplyForm(view CommentThreadView, target CommentTargetView) {
 		<form class="flex items-start gap-2" data-on:submit={ "@post('" + replyRoute(target.Routes, view.ID) + "', {contentType: 'form'})" }>
 			@HiddenFields(MergeHidden(target.HiddenFields, view.HiddenFields))
 			<input type="hidden" name="request_id" value={ "reply-" + view.ID }/>
-			<textarea name="reply_text" class="min-h-12 flex-1 resize-none rounded-md border border-input bg-background px-2 py-1 text-xs text-foreground" data-ignore-morph placeholder="Reply..."></textarea>
+			<textarea name="reply_text" class="min-h-12 flex-1 resize-none rounded-md border border-input bg-background px-2 py-1 text-xs text-foreground" placeholder="Reply..."></textarea>
 			<button type="submit" class="rounded-md px-2 py-1 text-xs hover:bg-muted">Reply</button>
 		</form>
 	}

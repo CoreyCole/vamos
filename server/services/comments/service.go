@@ -33,6 +33,7 @@ type Service struct {
 	gitCommit        string
 	githubBaseURL    string
 	markdownBasePath string
+	allowedDomains   []string
 }
 
 // NewService creates a comment service with cached git commit.
@@ -51,6 +52,13 @@ func NewService(
 		githubBaseURL:    githubBaseURL,
 		markdownBasePath: basePath,
 	}
+}
+
+// WithAllowedDomains configures organization email domains used for display-only
+// identity shortening. Access control remains owned by the auth service.
+func (s *Service) WithAllowedDomains(domains []string) *Service {
+	s.allowedDomains = normalizeEmailDomains(domains)
+	return s
 }
 
 // createCommentInternal creates a new document-scoped comment.

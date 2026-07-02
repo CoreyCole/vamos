@@ -84,7 +84,7 @@ func thoughtsCommentRoutes() commentui.CommentRoutes {
 	}
 }
 
-func thoughtsCommentThreads(items []CommentWithReplies) []commentui.CommentThreadView {
+func (s *Service) thoughtsCommentThreads(items []CommentWithReplies) []commentui.CommentThreadView {
 	sources := make([]commentui.ThreadSource, 0, len(items))
 	for _, item := range items {
 		sectionID := normalizeSectionID(item.Comment.SectionHint.String)
@@ -99,6 +99,7 @@ func thoughtsCommentThreads(items []CommentWithReplies) []commentui.CommentThrea
 		for _, reply := range item.Replies {
 			replies = append(replies, commentui.ReplySource{
 				AuthorEmail: reply.UserEmail,
+				ActorLabel:  s.commentDisplayName(reply.UserEmail),
 				CreatedAt:   reply.CreatedAt,
 				Body:        reply.ReplyText,
 			})
@@ -106,6 +107,7 @@ func thoughtsCommentThreads(items []CommentWithReplies) []commentui.CommentThrea
 		sources = append(sources, commentui.ThreadSource{
 			ID:           item.Comment.ID,
 			AuthorEmail:  item.Comment.UserEmail,
+			ActorLabel:   s.commentDisplayName(item.Comment.UserEmail),
 			CreatedAt:    item.Comment.CreatedAt,
 			Body:         item.Comment.CommentText,
 			SelectedText: item.Comment.SelectedText,
@@ -126,7 +128,7 @@ func (s *Service) thoughtsCommentThreadsWithSectionTitles(
 	filePath string,
 	comments []CommentWithReplies,
 ) []commentui.CommentThreadView {
-	threads := thoughtsCommentThreads(comments)
+	threads := s.thoughtsCommentThreads(comments)
 	titles := s.sectionTitlesForFile(filePath)
 	for i := range threads {
 		if strings.TrimSpace(threads[i].HeadingHint) == "" {
@@ -136,7 +138,7 @@ func (s *Service) thoughtsCommentThreadsWithSectionTitles(
 	return threads
 }
 
-func thoughtsCommentTarget(
+func (s *Service) thoughtsCommentTarget(
 	filePath, sectionID, headingHint, userEmail string,
 	comments []CommentWithReplies,
 	options ...thoughtsCommentTargetOptions,
@@ -161,7 +163,7 @@ func thoughtsCommentTarget(
 		SectionID:    sectionID,
 		HeadingHint:  headingHint,
 		UserEmail:    userEmail,
-		Threads:      thoughtsCommentThreads(comments),
+		Threads:      s.thoughtsCommentThreads(comments),
 		Routes:       thoughtsCommentRoutes(),
 		HiddenFields: hiddenFields,
 	})
@@ -245,7 +247,7 @@ func (s *Service) HandleCancelCommentForm(c echo.Context) error {
 	}
 
 	sectionComments := filterCommentsBySection(response.Comments, data.SectionID)
-	target := thoughtsCommentTarget(
+	target := s.thoughtsCommentTarget(
 		data.FilePath,
 		data.SectionID,
 		data.HeadingHint,
@@ -324,7 +326,7 @@ func (s *Service) renderFormError(
 	sectionComments := filterCommentsBySection(response.Comments, data.SectionID)
 
 	sse := datastar.NewSSE(c.Response().Writer, c.Request())
-	target := thoughtsCommentTarget(
+	target := s.thoughtsCommentTarget(
 		data.FilePath,
 		data.SectionID,
 		data.HeadingHint,
@@ -378,7 +380,7 @@ func (s *Service) renderCommentSuccess(
 	// Filter to just this section's comments
 	sectionComments := filterCommentsBySection(response.Comments, sectionID)
 
-	target := thoughtsCommentTarget(
+	target := s.thoughtsCommentTarget(
 		comment.DocPath,
 		sectionID,
 		"",
@@ -420,6 +422,43 @@ func extractFilePathFromReferer(referer string) string {
 	return strings.TrimPrefix(parsed.Path, "/")
 }
 
+func (s *Service) recoverReplyFormValues(c echo.Context, commentID, filePath string) (string, string) {
+	if _, err := s.queries.GetDocumentComment(c.Request().Context(), commentID); err == nil {
+		if _, pathErr := canonicalThoughtsPath(filePath); pathErr == nil {
+			return commentID, filePath
+		}
+	}
+	if err := c.Request().ParseForm(); err != nil {
+		return commentID, filePath
+	}
+	var recoveredCommentID string
+	var recoveredFilePath string
+	for _, values := range c.Request().Form {
+		for _, value := range values {
+			value = strings.TrimSpace(value)
+			if recoveredFilePath == "" {
+				if path, err := canonicalThoughtsPath(value); err == nil {
+					recoveredFilePath = path
+				}
+			}
+			if recoveredCommentID == "" {
+				if _, err := s.queries.GetDocumentComment(c.Request().Context(), value); err == nil {
+					recoveredCommentID = value
+				}
+			}
+		}
+	}
+	if recoveredCommentID != "" && recoveredCommentID != commentID {
+		c.Logger().Warnf("Recovered reply comment_id from morphed hidden fields: %q -> %q", commentID, recoveredCommentID)
+		commentID = recoveredCommentID
+	}
+	if recoveredFilePath != "" && recoveredFilePath != filePath {
+		c.Logger().Warnf("Recovered reply doc_path from morphed hidden fields: %q -> %q", filePath, recoveredFilePath)
+		filePath = recoveredFilePath
+	}
+	return commentID, filePath
+}
+
 // HandleReplyForm handles reply creation from the Datastar form
 func (s *Service) HandleReplyForm(c echo.Context) error {
 	userEmail, ok := c.Get("user_email").(string)
@@ -430,6 +469,7 @@ func (s *Service) HandleReplyForm(c echo.Context) error {
 	commentID := c.FormValue("comment_id")
 	filePath := c.FormValue("doc_path")
 	replyText := c.FormValue("reply_text")
+	commentID, filePath = s.recoverReplyFormValues(c, commentID, filePath)
 	if filePath == "" {
 		c.Logger().
 			Warnf("Reply form validation failed: missing file path (user: %s)", userEmail)
@@ -496,7 +536,7 @@ func (s *Service) renderReplySectionTarget(
 	// Filter to just this section's comments
 	sectionComments := filterCommentsBySection(response.Comments, sectionID)
 
-	target := thoughtsCommentTarget(filePath, sectionID, "", userEmail, sectionComments)
+	target := s.thoughtsCommentTarget(filePath, sectionID, "", userEmail, sectionComments)
 	if err := patchThoughtsCommentTarget(sse, target); err != nil {
 		return err
 	}
@@ -568,7 +608,7 @@ func (s *Service) HandleResolveComment(c echo.Context) error {
 	// Use SSE to patch the specific section target
 	sse := datastar.NewSSE(c.Response().Writer, c.Request())
 
-	target := thoughtsCommentTarget(filePath, sectionID, "", userEmail, sectionComments)
+	target := s.thoughtsCommentTarget(filePath, sectionID, "", userEmail, sectionComments)
 	if err := patchThoughtsCommentTarget(sse, target); err != nil {
 		return err
 	}
@@ -646,7 +686,7 @@ func (s *Service) HandleShowCommentForm(c echo.Context) error {
 	sectionComments := filterCommentsBySection(response.Comments, data.SectionID)
 
 	sse := datastar.NewSSE(c.Response().Writer, c.Request())
-	target := thoughtsCommentTarget(
+	target := s.thoughtsCommentTarget(
 		data.FilePath,
 		data.SectionID,
 		data.HeadingHint,

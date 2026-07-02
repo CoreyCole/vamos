@@ -4,6 +4,7 @@ import (
 	"crypto/sha1"
 	"encoding/hex"
 	"regexp"
+	"sort"
 	"strings"
 	"time"
 )
@@ -427,6 +428,20 @@ func commentActorName(email string) string {
 	return trimmed
 }
 
+func commentDisplayName(thread CommentThreadView) string {
+	if label := strings.TrimSpace(thread.ActorLabel); label != "" {
+		return label
+	}
+	return commentActorName(thread.AuthorEmail)
+}
+
+func replyDisplayName(reply CommentReplyView) string {
+	if label := strings.TrimSpace(reply.ActorLabel); label != "" {
+		return label
+	}
+	return commentActorName(reply.AuthorEmail)
+}
+
 func commentInitial(name string) string {
 	actor := commentActorName(name)
 	runes := []rune(actor)
@@ -445,6 +460,26 @@ func MergeHidden(base, extra map[string]string) map[string]string {
 		merged[k] = v
 	}
 	return merged
+}
+
+func hiddenFieldNames(fields map[string]string) []string {
+	names := make([]string, 0, len(fields))
+	for name := range fields {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	return names
+}
+
+func hiddenFieldID(fields map[string]string, name string) string {
+	namespace := fields["request_id"]
+	if namespace == "" {
+		namespace = fields["comment_id"]
+	}
+	if namespace == "" {
+		namespace = fields["doc_path"] + ":" + fields["section_hint"]
+	}
+	return "comment-hidden-" + SafeCommentTargetSlug(namespace, name)
 }
 
 func sectionOrDocument(sectionID string) string {

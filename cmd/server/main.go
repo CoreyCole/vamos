@@ -1096,7 +1096,7 @@ func main() {
 		gitCommit,
 		thoughtsBaseURL(cfg),
 		cfg.MarkdownBasePath,
-	)
+	).WithAllowedDomains(cfg.AuthAllowedDomains)
 	commentHandler := comments.NewHandler(commentService)
 
 	fmt.Printf("Comment service initialized with git commit: %s\n", gitCommit)

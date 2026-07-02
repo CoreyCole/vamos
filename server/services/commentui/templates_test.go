@@ -22,6 +22,29 @@ func TestSafeHelpersDoNotExposeRawPaths(t *testing.T) {
 	}
 }
 
+func TestHiddenFieldsUseStablePerFieldIDs(t *testing.T) {
+	t.Parallel()
+
+	var buf bytes.Buffer
+	fields := map[string]string{
+		"doc_path":      "thoughts/example.md",
+		"comment_id":    "comment-1",
+		"section_hint":  "section-1",
+		"heading_hint":  "Example",
+		"context_panel": "1",
+	}
+	if err := HiddenFields(fields).Render(t.Context(), &buf); err != nil {
+		t.Fatalf("Render() error = %v", err)
+	}
+	html := buf.String()
+	for _, name := range []string{"comment_id", "context_panel", "doc_path", "heading_hint", "section_hint"} {
+		if !strings.Contains(html, `id="comment-hidden-`) ||
+			!strings.Contains(html, `name="`+name+`" value="`+fields[name]+`"`) {
+			t.Fatalf("hidden field %q not rendered with stable id/name/value in %s", name, html)
+		}
+	}
+}
+
 func TestSafeSelectionSignalsUseDotNotationIdentifiers(t *testing.T) {
 	t.Parallel()
 

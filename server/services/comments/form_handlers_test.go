@@ -315,6 +315,39 @@ func TestThoughtsCommentReplyPatchesInlineTarget(t *testing.T) {
 	}
 }
 
+func TestThoughtsCommentReplyRecoversMorphedHiddenFields(t *testing.T) {
+	t.Parallel()
+	svc := newTestCommentsService(t)
+	comment, err := svc.createCommentInternal(
+		t.Context(),
+		"user@example.com",
+		CreateCommentRequest{
+			FilePath:    "thoughts/plan.md",
+			CommentText: "Question",
+			SectionID:   "section-1",
+			HeadingHint: "Heading",
+		},
+	)
+	if err != nil {
+		t.Fatalf("createCommentInternal() error = %v", err)
+	}
+	form := url.Values{}
+	form.Set("comment_id", "thoughts/plan.md")
+	form.Set("context_panel", comment.ID)
+	form.Set("doc_path", "section-1")
+	form.Set("heading_hint", "Heading")
+	form.Set("section_hint", "1")
+	form.Set("reply_text", "Reply from recovered form")
+	c, rec := newCommentFormRequest(t, "/forms/replies", form)
+
+	if err := svc.HandleReplyForm(c); err != nil {
+		t.Fatalf("HandleReplyForm() error = %v", err)
+	}
+	if body := rec.Body.String(); !strings.Contains(body, `Reply from recovered form`) {
+		t.Fatalf("response missing recovered reply: %s", body)
+	}
+}
+
 func TestThoughtsCommentResolvePatchesInlineTarget(t *testing.T) {
 	t.Parallel()
 	svc := newTestCommentsService(t)
