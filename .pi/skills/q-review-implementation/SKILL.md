@@ -123,6 +123,7 @@ Later stages write `design.md`, optional `design-product.md`, `outline.md`, and 
    - the implement-complete handoff
    - `[plan_dir]/plan.md`
    - code files changed by implementation, using handoff sections, `git status`, `git diff`, `git show`, or the known branch range
+   - each changed concrete file with the read tool (or the nearest existing neighboring file for newly created paths) so path-scoped `AGENTS.md` context is loaded before judging or applying review fixes
    - verification evidence from the handoff
    - relevant project guidance surfaced by the focused project-guidance lane, including root/package `AGENTS.md`, `.agents/rules/`, `.cursor/rules/`, local skills, and docs referenced by the plan or changed files
    - doc health findings surfaced by the focused docs-health lane, including docs that should be corrected, simplified, or made more concise
@@ -160,8 +161,9 @@ Use the selector's `subagent_tool_args` directly with the `subagent` tool. It di
 1. Run `~/dotfiles/spec_metadata.sh` before creating `review_dir` or writing markdown.
 1. Create `review_dir` and write `review.md` there.
 1. Build understanding from the handoff, changed files, verification evidence, and relevant plan requirements.
+1. Enumerate changed file paths from git and handoff evidence; read each changed file or nearest neighboring file so all applicable `AGENTS.md` guidance for those paths is loaded before review.
 1. Summarize the implemented behavior at a high level and check alignment with PRDs, ticket text, question docs, `context/brainstorms/`, research findings, design/outline/plan, and approved plan-memory constraints.
-1. Review actual code for correctness, regressions, security, invariants, tests, operations, maintainability, doc health, and compliance with relevant project guidance (`AGENTS.md`, `.agents/rules/`, `.cursor/rules/`, local skills, and docs). Preserve conflicting relevant guidance as `IMPORTANT: needs human attention`; do not silently choose between conflicting instructions.
+1. Review actual code for correctness, regressions, security, invariants, tests, operations, maintainability, doc health, and compliance with relevant project guidance (`AGENTS.md`, `.agents/rules/`, `.cursor/rules/`, local skills, and docs). Explicitly verify the implementation follows the repo guidance loaded for the changed paths. Preserve conflicting relevant guidance as `IMPORTANT: needs human attention`; do not silently choose between conflicting instructions.
 1. Run focused lanes when useful; read every lane report; verify candidate findings yourself.
    - Treat a lane output as failed if it is empty, only contains raw tool-call markup/JSON such as `<tool_call>` or `{"cmd": ...}`, lacks the required lane report sections, or contains no evidence for its findings.
    - Rerun each failed lane once with the same task plus an explicit reminder to actually use tools and return only the markdown lane report.
@@ -242,7 +244,7 @@ verdict: [correct|needs_attention]
 - Findings included: [finding numbers or `None.`]
 
 ## Verification
-- [Commands and outcomes.]
+- [Commands and outcomes, including the changed files read to load applicable `AGENTS.md` guidance and whether the implementation follows it.]
 
 ## Recommended Next Steps
 [Next command.]

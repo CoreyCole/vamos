@@ -128,6 +128,7 @@ The review directory is a lightweight research workspace for planning-review fol
    - `[plan_dir]/plan.md` if present and in scope
    - relevant `questions/*.md`, `context/brainstorms/*.md`, `research/*.md`, `prds/*`, and `context/{design,design-product,outline,plan}/*`
    - code/files explicitly referenced by the planning docs, plus any files needed to verify claims
+   - every concrete repo file the outline or plan says the implementation will change when practical; when a planned path does not exist yet, read the nearest existing file in that directory/package. This is required to load path-scoped `AGENTS.md` context before judging whether the plan follows repo guidance.
    - relevant project guidance surfaced by the focused project-guidance lane, including root/package `AGENTS.md`, `.agents/rules/`, `.cursor/rules/`, local skills, and docs referenced by the plan or touched files
    - doc health findings surfaced by the focused docs-health lane, including docs that should be corrected, simplified, or made more concise
 1. If no planning artifact exists, stop and ask for a valid plan directory or artifact path.
@@ -159,6 +160,7 @@ Focused lane reports are advisory. Verify every candidate finding yourself befor
    - `plan-review` if reviewing `plan.md` too.
 1. Build understanding before judging:
    - Identify touched components, interfaces, data models, tests, migrations, rollout concerns, and nearby patterns.
+   - Enumerate intended changed file paths from `outline.md` / `plan.md`; read the relevant existing files or nearest neighboring files so all applicable `AGENTS.md` guidance for those paths is loaded before review.
    - Summarize the current planned design/approach at a high level.
    - Check alignment with PRDs, ticket text, question docs, `context/brainstorms/`, research findings, and approved plan-memory constraints.
    - Verify major named references and assumptions in the codebase.
@@ -172,7 +174,7 @@ Focused lane reports are advisory. Verify every candidate finding yourself befor
    - test checkpoints that prove removed legacy paths are gone and the canonical replacement covers their behavior
    - plan steps that are too vague for a coding agent
    - docs that should be corrected, simplified, or made more concise
-   - local codebase rules and project guidance under `AGENTS.md`, `.agents/rules/`, `.cursor/rules/`, local skills, and relevant docs when the plan touches areas covered by repo-specific advice
+   - local codebase rules and project guidance under `AGENTS.md`, `.agents/rules/`, `.cursor/rules/`, local skills, and relevant docs when the plan touches areas covered by repo-specific advice; verify the outline/plan explicitly follows that guidance
    - conflicting relevant guidance; preserve each conflict as `IMPORTANT: needs human attention` until a human chooses which source to follow
 1. Run focused lanes when useful, then read every focused-lane output artifact before synthesis.
    - Treat a lane output as failed if it is empty, only contains raw tool-call markup/JSON such as `<tool_call>` or `{"cmd": ...}`, lacks the required lane report sections, or contains no evidence for its findings.
@@ -255,7 +257,7 @@ verdict: [correct|needs_attention]
 [Exact questions doc path or `None.`]
 
 ## Verification
-- [Commands/reads performed and outcome.]
+- [Commands/reads performed and outcome, including the intended changed files read to load applicable `AGENTS.md` guidance and whether the outline/plan follows it.]
 
 ## Recommended Next Steps
 [Next command.]
