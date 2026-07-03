@@ -23,7 +23,7 @@ When the user invokes `/q-hermes-manager` or asks Hermes to manage a QRSPI flow,
 1. Read `docs/q-manager.md` when present for manager behavior only; do not stuff manager instructions into child stage prompts.
 1. Read the target plan `AGENTS.md`.
 1. Read the latest QRSPI result artifact or user-provided result YAML.
-1. Use `vamos qrspi start-next` for normal launch/resume. Use default concise text output for normal manager commands; reserve `--output ndjson` for debug/recovery when structured output is specifically needed. Use `init`, `render-prompt`, `run-child`, `validate-result`, `decide-next`, and `reprompt-child` only for debug/recovery.
+1. Use parent Pi `/q-manager start-next|continue` for normal launch/resume so live usage is sampled and native parent compaction can run safely. Use raw `vamos qrspi start-next|continue` only for debug/manual fallback. Use default concise text output for normal manager commands; reserve `--output ndjson` for debug/recovery when structured output is specifically needed. Use `init`, `render-prompt`, `run-child`, `validate-result`, `decide-next`, and `reprompt-child` only for debug/recovery.
 
 ## General guiding principles
 
@@ -93,22 +93,22 @@ QRSPI update: `q-plan` complete
 Primary loop: launch/resume child with `start-next`, then wait for a validated pasted wake. Do **not** block this manager session in `sleep`/poll loops. The extension wake is the normal event; marker files are only fallback diagnostics.
 
 1. Resolve plan dir and project root.
-1. Start or resume the graph-selected child with one command:
-   ```bash
-   vamos qrspi start-next --plan-dir <plan-dir> --project-root <repo-root> --manager-pane "$TMUX_PANE"
+1. Start or resume the graph-selected child with one parent Pi command:
+   ```text
+   /q-manager start-next --plan-dir <plan-dir> --project-root <repo-root> --manager-pane "$TMUX_PANE"
    ```
-   This is the only happy-path child launch. It must be run from the manager Pi/tmux pane so `$TMUX_PANE` identifies the pane to split beside and wake later. If `$TMUX_PANE` is missing or stale, stop and fix the manager tmux context instead of falling back to raw `tmux split-window`.
+   This is the happy-path child launch. It must be run from the manager Pi/tmux pane so `$TMUX_PANE` identifies the pane to split beside and wake later. If `$TMUX_PANE` is missing or stale, stop and fix the manager tmux context instead of falling back to raw `tmux split-window`.
    For fast outline-first work where the human aligns on the outline and then q-manager should go straight through plan -> implement with plan reviews off, launch with `--node outline --policy-preset fast`.
    If the human requests a specific child model, add `--model <provider/model>` such as `--model openai-codex/gpt-5.4`.
-   Add `--node <node>` / `--implementation-cwd <cwd>` only when deliberately resuming or testing a specific implementation, review, or verify stage. If parent context usage is explicitly known, pass `--manager-usage-percent <n>` or `--manager-usage-tokens <n> --manager-usage-window <n>`; above 80%, the CLI writes a manager operational handoff, marks delivery compacting, and prints the exact `manager-ready` command. Missing usage skips compaction; do not guess from token totals alone. If the parent already has a latest fenced result, pass it with `--latest-result-stdin` or `--latest-result-file`; the CLI validates/persists it before prompt embedding.
+   Add `--node <node>` / `--implementation-cwd <cwd>` only when deliberately resuming or testing a specific implementation, review, or verify stage. The parent wrapper samples `ctx.getContextUsage()` and passes fresh `--manager-usage-*` flags to the CLI; the Go CLI must not scan parent Pi JSONL for usage. Fresh parent usage `>=90%` makes the CLI write an operational handoff, save delivery `compacting`, and print the exact `manager-ready` command; only after that stable signal does the wrapper call native `ctx.compact()`. Raw `vamos qrspi start-next ... --manager-usage-*` remains a debug/manual seam. Missing usage skips compaction; do not guess from token totals alone. If the parent already has a latest fenced result, pass it with `--latest-result-stdin` or `--latest-result-file`; the CLI validates/persists it before prompt embedding.
 1. Capture `stateFile` and active child refs from the concise default text output. The CLI writes the child prompt file atomically and launches the visible child next to the manager pane; do not hand-render prompts, paste prompts, run `pi @prompt` yourself, or launch raw tmux panes on the happy path. Do not add `--output ndjson` on the happy path; it bloats the manager context.
-1. Stop issuing commands and wait for the child extension/CLI to deliver a validated `q_manager_child_wake`. If manager delivery is `compacting`, the wake queues; after parent reset/restart, run the printed `vamos qrspi manager-ready --state-file "$STATE" --manager-pane "$TMUX_PANE"` command to mark ready and flush the queued wake exactly once. The wake should include `validated`, `manager_needed`, `retry_exhausted`, stage/status/artifact when known, active manager policy, child summary lines, next-child context (`stage`, `skill`, `cwd`, `working_on`), and the exact `continue` command.
-1. Run the single normal manager continuation command from the wake:
-   ```bash
-   vamos qrspi continue --state-file "$STATE"
+1. Stop issuing commands and wait for the child extension/CLI to deliver a validated `q_manager_child_wake`. If manager delivery is `compacting`, the wake queues; after parent reset/restart, run the printed `vamos qrspi manager-ready --state-file "$STATE" --manager-pane "$TMUX_PANE"` command once to mark ready and flush exactly one current-generation wake. The wake should include `validated`, `manager_needed`, `retry_exhausted`, stage/status/artifact when known, active manager policy, child summary lines, next-child context (`stage`, `skill`, `cwd`, `working_on`), and the exact raw CLI `continue` command.
+1. Run the single normal parent Pi continuation command from the wake's state file:
+   ```text
+   /q-manager continue --state-file "$STATE"
    ```
-   If the human requested a model override for future children, keep passing it here too, for example `--model openai-codex/gpt-5.4`.
-   `continue` validates the active child session JSONL, reconciles active-child health from tmux/status/session evidence before YAML retry, reprompts the same child while retry remains, persists canonical graph decisions for valid results, launches graph-selected next child when safe, and reports concise stop reasons. Repairable failures return action cards with evidence and exact safe commands such as `repair-state --align-active-child && continue` or `repair-state --clear-failed-child --relaunch`; run those commands when evidence is deterministic. Do not paste raw validate/decide NDJSON into manager chat, and do not handcraft child correction prose.
+   Raw `vamos qrspi continue --state-file "$STATE"` is the debug/manual fallback and does not invoke native parent compaction by itself. If the human requested a model override for future children, keep passing it here too, for example `--model openai-codex/gpt-5.4`.
+   `continue` validates the active child session JSONL, reconciles active-child health from tmux/status/session evidence before YAML retry, reprompts the same child while retry remains, persists canonical graph decisions for valid results, launches graph-selected next child when safe, and reports concise stop reasons. Repairable failures return action cards with evidence and exact safe commands such as `repair-state --align-active-child && continue`, `repair-state --clear-failed-child --relaunch`, or context-exhaustion recovery; run those commands when evidence is deterministic. Do not paste raw validate/decide NDJSON into manager chat, and do not handcraft child correction prose.
 
 For review-dir / implementation-review follow-up plans, same-workspace routing should come from previous `qrspi_result.workspace_metadata` and plan docs. If the CLI detects and summarizes it, keep the summary child-safe and minimal: do not create a new implementation copy or reset to trunk; stack follow-up implementation on the existing implementation workspace/head.
 
@@ -171,11 +171,12 @@ Supported manual interaction modes: normal managed child, `steer-child`, same-ch
 
 - Invalid result: keep active child pane/session and reprompt in place while retry remains.
 - Human gate, blocked, error, or retry exhaustion: keep pane/session for inspection and human steering.
-- Action cards are the first-class manager UX for repairable failures: `state_desync`, `graph_outcome_mismatch`, `workspace_moved`, `active_child_conflict`, `human_gate`, `invalid_child_yaml`, `manual_child_steer`, `superseded_queued_wake`, `pi_compatibility_failed`, and `child_launch_failed`.
+- Action cards are the first-class manager UX for repairable failures: `state_desync`, `graph_outcome_mismatch`, `workspace_moved`, `active_child_conflict`, `human_gate`, `invalid_child_yaml`, `manual_child_steer`, `superseded_queued_wake`, `pi_compatibility_failed`, `child_launch_failed`, and `child_context_exhausted`.
 - Run `vamos qrspi doctor --state-file "$STATE"` when launch compatibility, tmux, state-root, or active-child health is unclear; it summarizes Pi compatibility, manager state root writability, tmux health, active-child health, latest status, and safe recovery command.
 - If `repair-state --align-active-child` is offered, use it only when active child/session/artifact evidence proves the cursor is stale; then run the paired `continue` command.
 - If `repair-state --clear-failed-child --relaunch` is offered for `child_launch_failed`, use it only when the card/doctor proves a terminal failed child (nonzero status/done/no `qrspi_result`); it clears the failed active child and relaunches the same graph node. `start-next --force` may replace only terminal failed children and must still protect running/unknown children.
 - If a human manually continued the active child or used child `/new`, run `inspect --latest` or `find-latest-child`, then `validate-latest --apply-rebind` or `recover-manual --mode latest-session --continue`. Do not edit manager JSON with jq/python.
+- If an action card reports `child_context_exhausted`, distinguish it from no-wake. No-wake with valid result uses latest-session recovery. Context-exhausted/no-result children keep refs, use child `/compact` or `pi --resume <session>` only when context-limit evidence is real, steer/resume/rebind to obtain valid YAML when possible, or relaunch the same graph node only after no trustworthy result/artifact can be salvaged. Never invent YAML or advance from artifacts alone.
 - If you manually steer/reprompt a child after a wake queued, run `mark-child-active` or rebind/recover the latest session so the child generation increments and stale queued wakes are superseded; `manager-ready` should then wait for the newer completion instead of flushing stale payload.
 - Valid transition with `startNext=true`: mark old child pending cleanup; start next child; kill old pane only after the new active child is saved.
 - Next-child launch failure or cleanup failure: preserve refs in manager state for recovery.
