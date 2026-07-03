@@ -35,6 +35,37 @@ func NewHTTPService(opts ServiceOptions) *Service {
 	return &Service{resolver: opts.Resolver, manager: opts.Manager}
 }
 
+func (s *Service) RegisterThoughtsRoutes(g *echo.Group) {
+	g.GET("/_render/app/:token", s.HandleAppletPage)
+	g.GET("/_render/app/:token/status", s.HandleAppletStatus)
+	g.OPTIONS("/_render/app/:token/app", s.HandleAppletOptions)
+	g.OPTIONS("/_render/app/:token/app/*", s.HandleAppletOptions)
+	g.Any("/_render/app/:token/app", s.HandleAppletProxy)
+	g.Any("/_render/app/:token/app/*", s.HandleAppletProxy)
+}
+
+func (s *Service) RegisterExampleRoutes(e *echo.Echo, auth echo.MiddlewareFunc) {
+	// Sandboxed applets have origin "null", so Datastar performs CORS
+	// preflights without auth cookies. Answer app-route OPTIONS outside the
+	// authenticated group; authenticated GET/POST still go through the group.
+	e.OPTIONS("/examples/:id/app", s.HandleAppletOptions)
+	e.OPTIONS("/examples/:id/app/*", s.HandleAppletOptions)
+	e.Any("/examples/:id/app", s.HandleAppletProxy)
+	e.Any("/examples/:id/app/*", s.HandleAppletProxy)
+
+	group := e.Group("/examples")
+	if auth != nil {
+		group.Use(auth)
+	}
+	group.GET("/:id", s.HandleAppletPage)
+	group.GET("/:id/status", s.HandleAppletStatus)
+}
+
+func (s *Service) RegisterFormRoutes(g *echo.Group) {
+	g.POST("/applets/:token/stop", s.HandleAppletStop)
+	g.POST("/applets/:token/restart", s.HandleAppletRestart)
+}
+
 func BuildWorkbenchState(_ context.Context, state WorkbenchState) workbench.WorkbenchState {
 	appID := strings.TrimSpace(state.Config.ID)
 	if appID == "" {
@@ -175,6 +206,31 @@ func (s *Service) HandleAppletStatus(c echo.Context) error {
 	}
 }
 
+func (s *Service) HandleAppletOptions(c echo.Context) error {
+	setAppletCORS(c.Response().Header())
+	c.Response().Before(func() { setAppletCORS(c.Response().Header()) })
+	return c.NoContent(http.StatusNoContent)
+}
+
+func (s *Service) HandleAppletProxy(c echo.Context) error {
+	setAppletCORS(c.Response().Header())
+	c.Response().Before(func() { setAppletCORS(c.Response().Header()) })
+	if c.Request().Method == http.MethodOptions {
+		return c.NoContent(http.StatusNoContent)
+	}
+	applet, err := s.resolveAppletFromRequest(c)
+	if err != nil {
+		return err
+	}
+	if err := s.ensure(c, applet); err != nil {
+		return err
+	}
+	match := appletruntime.AppletProxyMatch{AppID: applet.RuntimeKey, StripPrefix: strings.TrimRight(applet.IFrameSrc, "/")}
+	proxy := appletruntime.NewAppletProxy(s.manager, match, proxyOptions())
+	proxy.ServeHTTP(c.Response(), c.Request())
+	return nil
+}
+
 func (s *Service) HandleAppletStop(c echo.Context) error {
 	if s.manager == nil {
 		return echo.NewHTTPError(http.StatusBadGateway, "applet runtime is unavailable")
@@ -183,7 +239,7 @@ func (s *Service) HandleAppletStop(c echo.Context) error {
 	if err != nil {
 		return err
 	}
-	if err := s.manager.Stop(c.Request().Context(), applet.Manifest.ID); err != nil {
+	if err := s.manager.Stop(c.Request().Context(), applet.RuntimeKey); err != nil {
 		return echo.NewHTTPError(http.StatusBadGateway, err.Error())
 	}
 	return c.Redirect(http.StatusSeeOther, applet.RouteHref)
@@ -197,7 +253,7 @@ func (s *Service) HandleAppletRestart(c echo.Context) error {
 	if err != nil {
 		return err
 	}
-	_ = s.manager.Stop(c.Request().Context(), applet.Manifest.ID)
+	_ = s.manager.Stop(c.Request().Context(), applet.RuntimeKey)
 	if _, err := s.manager.EnsureStarted(c.Request().Context(), RuntimeConfigFromManifest(applet)); err != nil {
 		return echo.NewHTTPError(http.StatusBadGateway, err.Error())
 	}
@@ -214,6 +270,15 @@ func (s *Service) EnsureAppletAsync(ctx context.Context, applet AppletContext) {
 }
 
 func (s *Service) resolveAppletFromRequest(c echo.Context) (AppletContext, error) {
+	if token := strings.TrimSpace(c.Param("token")); token != "" {
+		if s.resolver.ThoughtsRoot != "" {
+			identity, err := DecodeAppletIdentity(token)
+			if err == nil && strings.HasPrefix(identity, "thoughts/") {
+				return s.resolver.ResolveThoughtsApplet(c.Request().Context(), identity)
+			}
+		}
+		return s.resolver.ResolveExampleApplet(c.Request().Context(), token)
+	}
 	if s.resolver.ThoughtsRoot != "" {
 		if docPath := strings.TrimSpace(firstNonEmpty(c.QueryParam("doc_path"), c.QueryParam("path"))); docPath != "" {
 			return s.resolver.ResolveThoughtsApplet(c.Request().Context(), docPath)
@@ -221,7 +286,7 @@ func (s *Service) resolveAppletFromRequest(c echo.Context) (AppletContext, error
 	}
 	id := strings.TrimSpace(c.Param("id"))
 	if id == "" {
-		return AppletContext{}, echo.NewHTTPError(http.StatusBadRequest, "applet id is required")
+		return AppletContext{}, echo.NewHTTPError(http.StatusBadRequest, "applet identity is required")
 	}
 	return s.resolver.ResolveExampleApplet(c.Request().Context(), id)
 }
@@ -234,16 +299,16 @@ func appletUserEmail(c echo.Context) string {
 }
 
 func (s *Service) currentProcess(ctx context.Context, applet AppletContext) appletruntime.AppletProcessState {
-	stopped := appletruntime.AppletProcessState{AppID: applet.Manifest.ID, Status: appletruntime.ProcessStatusStopped}
+	stopped := appletruntime.AppletProcessState{AppID: applet.RuntimeKey, Status: appletruntime.ProcessStatusStopped}
 	if s.manager == nil {
 		return stopped
 	}
-	state, err := s.manager.Health(ctx, applet.Manifest.ID)
+	state, err := s.manager.Health(ctx, applet.RuntimeKey)
 	if err != nil {
 		if errors.Is(err, context.Canceled) {
 			return stopped
 		}
-		state.AppID = applet.Manifest.ID
+		state.AppID = applet.RuntimeKey
 		if state.Status == "" {
 			state.Status = appletruntime.ProcessStatusStopped
 		}
@@ -257,6 +322,27 @@ func (s *Service) currentProcess(ctx context.Context, applet AppletContext) appl
 		}
 	}
 	return state
+}
+
+func (s *Service) ensure(c echo.Context, applet AppletContext) error {
+	if s.manager == nil {
+		return echo.NewHTTPError(http.StatusBadGateway, "applet runtime is unavailable")
+	}
+	if _, err := s.manager.EnsureStarted(c.Request().Context(), RuntimeConfigFromManifest(applet)); err != nil {
+		return echo.NewHTTPError(http.StatusBadGateway, err.Error())
+	}
+	return nil
+}
+
+func proxyOptions() appletruntime.ProxyOptions {
+	return appletruntime.ProxyOptions{FlushSSE: true, RewriteCookiePath: true, AllowNullOriginCORS: true}
+}
+
+func setAppletCORS(header http.Header) {
+	header.Set("Access-Control-Allow-Origin", "null")
+	header.Set("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
+	header.Set("Access-Control-Allow-Headers", "Content-Type, Accept, Datastar-Request")
+	header.Set("Access-Control-Max-Age", "600")
 }
 
 func EmptyRegion(message string) templ.Component { return emptyRegion(message) }

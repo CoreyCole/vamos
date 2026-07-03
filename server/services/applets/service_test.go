@@ -198,3 +198,152 @@ func (m *sequenceManager) Touch(string, int)                 {}
 func (m *sequenceManager) SweepInactive(context.Context, time.Time) ([]appletruntime.AppletProcessState, error) {
 	return nil, nil
 }
+
+func TestHandleThoughtsAppletPageUsesDurableIdentity(t *testing.T) {
+	thoughtsRoot := t.TempDir()
+	identity := writeThoughtsAppletManifest(t, thoughtsRoot, "plans/demo", "demo")
+	token := EncodeAppletIdentity(identity)
+	service := NewHTTPService(ServiceOptions{
+		Resolver: Resolver{ThoughtsRoot: thoughtsRoot},
+		Manager:  &recordingManager{state: appletruntime.AppletProcessState{Status: appletruntime.ProcessStatusHealthy}},
+	})
+
+	e := echo.New()
+	req := httptest.NewRequest(http.MethodGet, "/thoughts/_render/app/"+token, nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	c.SetParamNames("token")
+	c.SetParamValues(token)
+
+	if err := service.HandleAppletPage(c); err != nil {
+		t.Fatalf("HandleAppletPage() error = %v", err)
+	}
+	html := rec.Body.String()
+	for _, want := range []string{identity, "/thoughts/_render/app/" + token + "/app/", "doc-workbench-sidebar"} {
+		if !strings.Contains(html, want) {
+			t.Fatalf("page HTML missing %q:\n%s", want, html)
+		}
+	}
+}
+
+func TestHandleThoughtsAppletProxyUsesRuntimeKey(t *testing.T) {
+	thoughtsRoot := t.TempDir()
+	identity := writeThoughtsAppletManifest(t, thoughtsRoot, "plans/demo", "demo")
+	token := EncodeAppletIdentity(identity)
+	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(r.URL.Path))
+	}))
+	defer backend.Close()
+	manager := &recordingManager{target: backend.URL}
+	service := NewHTTPService(ServiceOptions{Resolver: Resolver{ThoughtsRoot: thoughtsRoot}, Manager: manager})
+
+	e := echo.New()
+	req := httptest.NewRequest(http.MethodGet, "/thoughts/_render/app/"+token+"/app/events", nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	c.SetParamNames("token", "*")
+	c.SetParamValues(token, "events")
+
+	if err := service.HandleAppletProxy(c); err != nil {
+		t.Fatalf("HandleAppletProxy() error = %v", err)
+	}
+	if got := strings.TrimSpace(rec.Body.String()); got != "/events" {
+		t.Fatalf("proxied path = %q, want /events", got)
+	}
+	if manager.ensureConfig.AppID != token {
+		t.Fatalf("EnsureStarted AppID = %q, want token %q", manager.ensureConfig.AppID, token)
+	}
+	if manager.proxyTargetAppID != token {
+		t.Fatalf("ProxyTarget AppID = %q, want token %q", manager.proxyTargetAppID, token)
+	}
+}
+
+func TestHandleThoughtsAppletFormsUseRuntimeKey(t *testing.T) {
+	thoughtsRoot := t.TempDir()
+	identity := writeThoughtsAppletManifest(t, thoughtsRoot, "plans/demo", "demo")
+	token := EncodeAppletIdentity(identity)
+	manager := &recordingManager{state: appletruntime.AppletProcessState{Status: appletruntime.ProcessStatusHealthy}}
+	service := NewHTTPService(ServiceOptions{Resolver: Resolver{ThoughtsRoot: thoughtsRoot}, Manager: manager})
+
+	e := echo.New()
+	req := httptest.NewRequest(http.MethodPost, "/forms/applets/"+token+"/stop", nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	c.SetParamNames("token")
+	c.SetParamValues(token)
+	if err := service.HandleAppletStop(c); err != nil {
+		t.Fatalf("HandleAppletStop() error = %v", err)
+	}
+	if manager.stoppedAppID != token {
+		t.Fatalf("Stop AppID = %q, want token %q", manager.stoppedAppID, token)
+	}
+
+	req = httptest.NewRequest(http.MethodPost, "/forms/applets/"+token+"/restart", nil)
+	rec = httptest.NewRecorder()
+	c = e.NewContext(req, rec)
+	c.SetParamNames("token")
+	c.SetParamValues(token)
+	if err := service.HandleAppletRestart(c); err != nil {
+		t.Fatalf("HandleAppletRestart() error = %v", err)
+	}
+	if manager.ensureConfig.AppID != token {
+		t.Fatalf("restart EnsureStarted AppID = %q, want token %q", manager.ensureConfig.AppID, token)
+	}
+}
+
+func writeThoughtsAppletManifest(t *testing.T, root, relDir, id string) string {
+	t.Helper()
+	dir := filepath.Join(root, filepath.FromSlash(relDir))
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	body := "---\nvamos_artifact: applet\napplet:\n  id: " + id + "\n  kind: datastar\n  title: Demo\n  app_dir: .\n  start_command: [just, build]\n---\n"
+	if err := os.WriteFile(filepath.Join(dir, "AGENTS.md"), []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	return "thoughts/" + strings.Trim(strings.TrimPrefix(filepath.ToSlash(relDir), "thoughts/"), "/") + "/AGENTS.md"
+}
+
+type recordingManager struct {
+	target           string
+	state            appletruntime.AppletProcessState
+	ensureConfig     appletruntime.RuntimeConfig
+	stoppedAppID     string
+	proxyTargetAppID string
+}
+
+func (m *recordingManager) EnsureStarted(_ context.Context, cfg appletruntime.RuntimeConfig) (appletruntime.AppletProcessState, error) {
+	m.ensureConfig = cfg
+	state := m.state
+	if state.Status == "" {
+		state.Status = appletruntime.ProcessStatusHealthy
+	}
+	state.AppID = cfg.AppID
+	return state, nil
+}
+func (m *recordingManager) Start(ctx context.Context, cfg appletruntime.RuntimeConfig) (appletruntime.ProcessState, error) {
+	return m.EnsureStarted(ctx, cfg)
+}
+func (m *recordingManager) Stop(_ context.Context, appID string) error {
+	m.stoppedAppID = appID
+	return nil
+}
+func (m *recordingManager) Health(_ context.Context, appID string) (appletruntime.AppletProcessState, error) {
+	state := m.state
+	if state.Status == "" {
+		state.Status = appletruntime.ProcessStatusStopped
+	}
+	state.AppID = appID
+	return state, nil
+}
+func (m *recordingManager) ProxyTarget(appID string) (string, bool) {
+	m.proxyTargetAppID = appID
+	if m.target == "" {
+		return "", false
+	}
+	return m.target, true
+}
+func (m *recordingManager) Touch(string, int) {}
+func (m *recordingManager) SweepInactive(context.Context, time.Time) ([]appletruntime.AppletProcessState, error) {
+	return nil, nil
+}

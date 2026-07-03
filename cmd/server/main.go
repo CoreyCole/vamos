@@ -41,6 +41,7 @@ import (
 	authmw "github.com/CoreyCole/vamos/server/middleware"
 	"github.com/CoreyCole/vamos/server/services/agentchat"
 	"github.com/CoreyCole/vamos/server/services/appletruntime"
+	"github.com/CoreyCole/vamos/server/services/applets"
 	"github.com/CoreyCole/vamos/server/services/auth"
 	"github.com/CoreyCole/vamos/server/services/comments"
 	"github.com/CoreyCole/vamos/server/services/db"
@@ -1389,9 +1390,15 @@ func main() {
 		log.Fatal("Failed to initialize pickleball example service:", err)
 	}
 	sharedAppletRuntime := appletruntime.NewManager(filepath.Join(cfg.MarkdownBasePath, ".vamos", "applets", "logs"))
+	examplesRoot := filepath.Dir(resolveExampleRoot(workspaceDiscovery.MainCheckoutPath, "todo"))
+	sharedAppletService := applets.NewHTTPService(applets.ServiceOptions{
+		Resolver: applets.Resolver{ThoughtsRoot: cfg.MarkdownBasePath, ExamplesRoot: examplesRoot},
+		Manager:  sharedAppletRuntime,
+	})
 	examplesService, err := genericexamples.NewService(genericexamples.Options{
-		ExamplesRoot:  filepath.Dir(resolveExampleRoot(workspaceDiscovery.MainCheckoutPath, "todo")),
+		ExamplesRoot:  examplesRoot,
 		AppletRuntime: sharedAppletRuntime,
+		AppletService: sharedAppletService,
 	})
 	if err != nil {
 		log.Fatal("Failed to initialize generic examples service:", err)
@@ -1632,8 +1639,7 @@ func main() {
 	formsGroup.POST("/comments/cancel", commentService.HandleCancelCommentForm)
 	formsGroup.POST("/replies", commentService.HandleReplyForm)
 	formsGroup.POST("/resolve", commentService.HandleResolveComment)
-	formsGroup.POST("/applets/:id/stop", examplesService.HandleStop)
-	formsGroup.POST("/applets/:id/restart", examplesService.HandleRestart)
+	sharedAppletService.RegisterFormRoutes(formsGroup)
 
 	// Protected routes - require authentication
 	thoughtsGroup := e.Group("/thoughts")
@@ -1685,6 +1691,7 @@ func main() {
 		"/chat/:workspace_id/slash-commands",
 		agentChatHandler.ListWorkspaceSlashCommands,
 	)
+	sharedAppletService.RegisterThoughtsRoutes(thoughtsGroup)
 	thoughtsGroup.GET("/_assets/*", markdownService.ServeThoughtsAsset)
 	thoughtsGroup.GET("/_render/html/*", markdownService.ServeHTMLApplet)
 	thoughtsGroup.GET("/*", markdownService.ServeMarkdown)

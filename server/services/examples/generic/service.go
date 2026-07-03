@@ -51,27 +51,12 @@ func NewService(opts Options) (*Service, error) {
 }
 
 func (s *Service) RegisterRoutes(e *echo.Echo, auth echo.MiddlewareFunc) {
-	// Sandboxed applets have origin "null", so Datastar performs CORS
-	// preflights without auth cookies. Answer app-route OPTIONS outside the
-	// authenticated group; authenticated GET/POST still go through the group.
-	e.OPTIONS("/examples/:id/app", s.HandleAppOptions)
-	e.OPTIONS("/examples/:id/app/*", s.HandleAppOptions)
-	e.Any("/examples/:id/app", s.HandleApp)
-	e.Any("/examples/:id/app/*", s.HandleApp)
+	s.applets.RegisterExampleRoutes(e, auth)
 	s.registerRootAliases(e)
-
-	group := e.Group("/examples")
-	if auth != nil {
-		group.Use(auth)
-	}
-	group.GET("/:id", s.HandlePage)
-	group.GET("/:id/status", s.HandleStatus)
 }
 
 func (s *Service) HandleAppOptions(c echo.Context) error {
-	setAppletCORS(c.Response().Header())
-	c.Response().Before(func() { setAppletCORS(c.Response().Header()) })
-	return c.NoContent(http.StatusNoContent)
+	return s.applets.HandleAppletOptions(c)
 }
 
 func (s *Service) HandlePage(c echo.Context) error {
@@ -91,22 +76,7 @@ func (s *Service) HandleRestart(c echo.Context) error {
 }
 
 func (s *Service) HandleApp(c echo.Context) error {
-	setAppletCORS(c.Response().Header())
-	c.Response().Before(func() { setAppletCORS(c.Response().Header()) })
-	if c.Request().Method == http.MethodOptions {
-		return c.NoContent(http.StatusNoContent)
-	}
-	applet, err := s.resolver.ResolveExampleApplet(c.Request().Context(), c.Param("id"))
-	if err != nil {
-		return err
-	}
-	if err := s.ensure(c, applet); err != nil {
-		return err
-	}
-	match := appletruntime.AppletProxyMatch{AppID: applet.Manifest.ID, StripPrefix: strings.TrimRight(applet.IFrameSrc, "/")}
-	proxy := appletruntime.NewAppletProxy(s.runtime, match, proxyOptions())
-	proxy.ServeHTTP(c.Response(), c.Request())
-	return nil
+	return s.applets.HandleAppletProxy(c)
 }
 
 func (s *Service) HandleAlias(c echo.Context) error {
@@ -176,7 +146,7 @@ func aliasRegistration(ctx applets.AppletContext) appletruntime.AliasRegistratio
 	for _, alias := range ctx.Manifest.RootAliases {
 		aliases = append(aliases, appletruntime.RouteAlias{Pattern: alias.Pattern, Methods: alias.Methods})
 	}
-	return appletruntime.AliasRegistration{AppID: ctx.Manifest.ID, Aliases: aliases}
+	return appletruntime.AliasRegistration{AppID: ctx.RuntimeKey, Aliases: aliases}
 }
 
 func echoRoute(pattern string) string {
