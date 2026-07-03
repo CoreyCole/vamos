@@ -361,6 +361,43 @@ func TestHandleThoughtsAppletPageUsesDurableIdentity(t *testing.T) {
 	}
 }
 
+func TestHandleExampleAppletProxyFansOutCookiesToRootAliases(t *testing.T) {
+	examplesRoot := t.TempDir()
+	writeExampleAppletManifestWithAliases(t, examplesRoot, "wordle", []RouteAlias{
+		{Pattern: "/events", Methods: []string{http.MethodGet}},
+		{Pattern: "/guesses", Methods: []string{http.MethodPost}},
+	})
+	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Add("Set-Cookie", "wordle_user=e2e; Path=/; HttpOnly")
+		_, _ = w.Write([]byte("ok"))
+	}))
+	defer backend.Close()
+	service := NewHTTPService(ServiceOptions{
+		Resolver: Resolver{ExamplesRoot: examplesRoot},
+		Manager:  &recordingManager{target: backend.URL},
+	})
+
+	e := echo.New()
+	req := httptest.NewRequest(http.MethodGet, "/examples/wordle/app/login", nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	c.SetParamNames("id", "*")
+	c.SetParamValues("wordle", "login")
+
+	if err := service.HandleAppletProxy(c); err != nil {
+		t.Fatalf("HandleAppletProxy() error = %v", err)
+	}
+	cookies := rec.Result().Header.Values("Set-Cookie")
+	for _, want := range []string{"Path=/examples/wordle/app", "Path=/events", "Path=/guesses"} {
+		if !setCookiesContain(cookies, "wordle_user=e2e", want) {
+			t.Fatalf("cookies missing %s: %#v", want, cookies)
+		}
+	}
+	if setCookiesContain(cookies, "wordle_user=e2e", "Path=/") {
+		t.Fatalf("root cookie leaked unchanged: %#v", cookies)
+	}
+}
+
 func TestHandleThoughtsAppletProxyUsesRuntimeKey(t *testing.T) {
 	thoughtsRoot := t.TempDir()
 	identity := writeThoughtsAppletManifest(t, thoughtsRoot, "plans/demo", "demo")
@@ -585,6 +622,20 @@ func writeExampleAppletManifestWithAliases(t *testing.T, root, id string, aliase
 	if err := os.WriteFile(filepath.Join(dir, "AGENTS.md"), []byte(manifestBody(id, "Wordle", aliases)), 0o644); err != nil {
 		t.Fatal(err)
 	}
+}
+
+func setCookiesContain(cookies []string, prefix, attr string) bool {
+	for _, cookie := range cookies {
+		if !strings.HasPrefix(cookie, prefix) {
+			continue
+		}
+		for _, part := range strings.Split(cookie, ";") {
+			if strings.EqualFold(strings.TrimSpace(part), attr) {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func manifestBody(id, title string, aliases []RouteAlias) string {

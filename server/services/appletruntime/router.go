@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+
+	"github.com/CoreyCole/vamos/pkg/collections"
 )
 
 type RouteAlias struct {
@@ -17,9 +19,10 @@ type AliasRegistration struct {
 }
 
 type AppletProxyMatch struct {
-	AppID       string
-	StripPrefix string
-	Alias       bool
+	AppID            string
+	StripPrefix      string
+	Alias            bool
+	AliasCookiePaths []string
 }
 
 type AliasRegistry struct {
@@ -71,6 +74,31 @@ func (r *AliasRegistry) Match(req *http.Request) (AppletProxyMatch, bool) {
 		return AppletProxyMatch{AppID: alias.appID, Alias: true}, true
 	}
 	return AppletProxyMatch{}, false
+}
+
+func RootAliasCookiePaths(aliases []RouteAlias) []string {
+	seen := collections.NewSet[string]()
+	paths := make([]string, 0, len(aliases))
+	for _, alias := range aliases {
+		path := aliasCookiePath(alias.Pattern)
+		if path == "" || seen.Has(path) {
+			continue
+		}
+		seen.Add(path)
+		paths = append(paths, path)
+	}
+	return paths
+}
+
+func aliasCookiePath(pattern string) string {
+	pattern = normalizeAliasPattern(pattern)
+	if pattern == "" || pattern == "/" || pattern == "/*" {
+		return ""
+	}
+	if strings.HasSuffix(pattern, "/*") {
+		return strings.TrimSuffix(pattern, "/*")
+	}
+	return pattern
 }
 
 func ValidateAliasConflicts(aliases []RouteAlias, reserved []string) error {

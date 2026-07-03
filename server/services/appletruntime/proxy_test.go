@@ -152,6 +152,54 @@ func TestRewriteCookiePath(t *testing.T) {
 	}
 }
 
+func TestRewriteAppletCookiePathsFansOutRootCookiesToAliases(t *testing.T) {
+	header := http.Header{}
+	header.Add("Set-Cookie", "wordle_user=e2e; Path=/; HttpOnly")
+	header.Add("Set-Cookie", "theme=dark; Path=/keep; Secure")
+
+	RewriteAppletCookiePaths(header, CookieRewriteConfig{
+		ScopedPrefix: "/examples/wordle/app/",
+		AliasPaths:   []string{"/events", "/guesses", "/events"},
+	})
+
+	cookies := header.Values("Set-Cookie")
+	assertCookiePath(t, cookies, "wordle_user=e2e", "/examples/wordle/app")
+	assertCookiePath(t, cookies, "wordle_user=e2e", "/events")
+	assertCookiePath(t, cookies, "wordle_user=e2e", "/guesses")
+	assertCookiePath(t, cookies, "theme=dark", "/keep")
+	if containsCookiePath(cookies, "theme=dark", "/events") {
+		t.Fatalf("non-root cookie fanned out to alias: %#v", cookies)
+	}
+	if containsCookiePath(cookies, "wordle_user=e2e", "/") {
+		t.Fatalf("root cookie leaked through unchanged: %#v", cookies)
+	}
+}
+
+func TestAppletProxyScopedRouteFansOutAliasCookies(t *testing.T) {
+	child := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Add("Set-Cookie", "sid=1; Path=/; HttpOnly")
+		_, _ = w.Write([]byte("ok"))
+	}))
+	defer child.Close()
+
+	server := httptest.NewServer(NewAppletProxy(
+		&proxyTestManager{target: child.URL},
+		AppletProxyMatch{AppID: "wordle", StripPrefix: "/examples/wordle/app", AliasCookiePaths: []string{"/events", "/guesses"}},
+		ProxyOptions{RewriteCookiePath: true},
+	))
+	defer server.Close()
+
+	resp, err := http.Get(server.URL + "/examples/wordle/app/login")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	cookies := resp.Header.Values("Set-Cookie")
+	assertCookiePath(t, cookies, "sid=1", "/examples/wordle/app")
+	assertCookiePath(t, cookies, "sid=1", "/events")
+	assertCookiePath(t, cookies, "sid=1", "/guesses")
+}
+
 func TestAppletProxyPreservesUpgradeHeaders(t *testing.T) {
 	seen := make(chan http.Header, 1)
 	child := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -183,6 +231,27 @@ func TestAppletProxyPreservesUpgradeHeaders(t *testing.T) {
 	case <-time.After(time.Second):
 		t.Fatal("child did not receive request")
 	}
+}
+
+func assertCookiePath(t *testing.T, cookies []string, prefix, path string) {
+	t.Helper()
+	if !containsCookiePath(cookies, prefix, path) {
+		t.Fatalf("cookies missing %s with Path=%s: %#v", prefix, path, cookies)
+	}
+}
+
+func containsCookiePath(cookies []string, prefix, path string) bool {
+	for _, cookie := range cookies {
+		if !strings.HasPrefix(cookie, prefix) {
+			continue
+		}
+		for _, part := range strings.Split(cookie, ";") {
+			if strings.EqualFold(strings.TrimSpace(part), "Path="+path) {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 type proxyTestManager struct {

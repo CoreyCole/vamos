@@ -334,7 +334,11 @@ func (s *Service) HandleAppletProxy(c echo.Context) error {
 	if err := s.ensure(c, applet); err != nil {
 		return err
 	}
-	match := appletruntime.AppletProxyMatch{AppID: applet.RuntimeKey, StripPrefix: strings.TrimRight(applet.IFrameSrc, "/")}
+	match := appletruntime.AppletProxyMatch{
+		AppID:            applet.RuntimeKey,
+		StripPrefix:      strings.TrimRight(applet.IFrameSrc, "/"),
+		AliasCookiePaths: rootAliasCookiePaths(applet),
+	}
 	proxy := appletruntime.NewAppletProxy(s.manager, match, proxyOptions())
 	proxy.ServeHTTP(c.Response(), c.Request())
 	return nil
@@ -501,6 +505,10 @@ func aliasRegistration(ctx AppletContext) appletruntime.AliasRegistration {
 		aliases = append(aliases, appletruntime.RouteAlias{Pattern: alias.Pattern, Methods: alias.Methods})
 	}
 	return appletruntime.AliasRegistration{AppID: ctx.RuntimeKey, Aliases: aliases}
+}
+
+func rootAliasCookiePaths(ctx AppletContext) []string {
+	return appletruntime.RootAliasCookiePaths(aliasRegistration(ctx).Aliases)
 }
 
 func echoRoute(pattern string) string {

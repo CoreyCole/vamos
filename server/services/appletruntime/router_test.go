@@ -44,6 +44,30 @@ func TestAliasRegistryMatchesGlobAlias(t *testing.T) {
 	}
 }
 
+func TestRootAliasCookiePathsUsesExactAndWildcardBases(t *testing.T) {
+	paths := RootAliasCookiePaths([]RouteAlias{
+		{Pattern: "/events"},
+		{Pattern: "/guesses"},
+		{Pattern: "/_stcore/*"},
+		{Pattern: "/vendor/*"},
+		{Pattern: "/events"},
+	})
+	for _, want := range []string{"/events", "/guesses", "/_stcore", "/vendor"} {
+		if !hasString(paths, want) {
+			t.Fatalf("paths = %#v, missing %s", paths, want)
+		}
+	}
+}
+
+func hasString(values []string, want string) bool {
+	for _, value := range values {
+		if value == want {
+			return true
+		}
+	}
+	return false
+}
+
 func TestAliasRegistryRejectsDuplicateAlias(t *testing.T) {
 	registry := NewAliasRegistry(nil)
 	if err := registry.Register(AliasRegistration{AppID: "wordle", Aliases: []RouteAlias{{Pattern: "/events"}}}); err != nil {

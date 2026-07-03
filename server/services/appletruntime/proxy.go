@@ -7,6 +7,8 @@ import (
 	"net/http/httputil"
 	"net/url"
 	"strings"
+
+	"github.com/CoreyCole/vamos/pkg/collections"
 )
 
 const clientClosedRequestStatus = 499
@@ -15,6 +17,11 @@ type ProxyOptions struct {
 	FlushSSE            bool
 	RewriteCookiePath   bool
 	AllowNullOriginCORS bool
+}
+
+type CookieRewriteConfig struct {
+	ScopedPrefix string
+	AliasPaths   []string
 }
 
 func NewAppletProxy(manager Manager, match AppletProxyMatch, opts ProxyOptions) http.Handler {
@@ -48,7 +55,10 @@ func NewAppletProxy(manager Manager, match AppletProxyMatch, opts ProxyOptions) 
 		}
 		proxy.ModifyResponse = func(resp *http.Response) error {
 			if opts.RewriteCookiePath && !match.Alias {
-				RewriteCookiePath(resp.Header, match.StripPrefix)
+				RewriteAppletCookiePaths(resp.Header, CookieRewriteConfig{
+					ScopedPrefix: match.StripPrefix,
+					AliasPaths:   match.AliasCookiePaths,
+				})
 			}
 			if opts.AllowNullOriginCORS {
 				setNullOriginCORS(resp.Header)
@@ -66,9 +76,10 @@ func NewAppletProxy(manager Manager, match AppletProxyMatch, opts ProxyOptions) 
 	})
 }
 
-func RewriteCookiePath(header http.Header, scopedPrefix string) {
-	scopedPrefix = normalizedProxyPrefix(scopedPrefix)
-	if scopedPrefix == "" {
+func RewriteAppletCookiePaths(header http.Header, cfg CookieRewriteConfig) {
+	scopedPrefix := normalizedProxyPrefix(cfg.ScopedPrefix)
+	aliasPaths := normalizedCookieAliasPaths(cfg.AliasPaths, scopedPrefix)
+	if scopedPrefix == "" && len(aliasPaths) == 0 {
 		return
 	}
 	cookies := header.Values("Set-Cookie")
@@ -77,8 +88,46 @@ func RewriteCookiePath(header http.Header, scopedPrefix string) {
 	}
 	header.Del("Set-Cookie")
 	for _, cookie := range cookies {
-		header.Add("Set-Cookie", rewriteCookiePath(cookie, scopedPrefix))
+		if scopedPrefix != "" {
+			header.Add("Set-Cookie", rewriteCookiePath(cookie, scopedPrefix))
+		} else {
+			header.Add("Set-Cookie", cookie)
+		}
+		if !cookieHasRootPath(cookie) {
+			continue
+		}
+		for _, aliasPath := range aliasPaths {
+			header.Add("Set-Cookie", rewriteCookiePath(cookie, aliasPath))
+		}
 	}
+}
+
+func RewriteCookiePath(header http.Header, scopedPrefix string) {
+	RewriteAppletCookiePaths(header, CookieRewriteConfig{ScopedPrefix: scopedPrefix})
+}
+
+func normalizedCookieAliasPaths(paths []string, scopedPrefix string) []string {
+	seen := collections.NewSet[string]()
+	out := make([]string, 0, len(paths))
+	for _, path := range paths {
+		path = normalizedProxyPrefix(path)
+		if path == "" || path == scopedPrefix || seen.Has(path) {
+			continue
+		}
+		seen.Add(path)
+		out = append(out, path)
+	}
+	return out
+}
+
+func cookieHasRootPath(cookie string) bool {
+	parts := strings.Split(cookie, ";")
+	for _, part := range parts[1:] {
+		if strings.EqualFold(strings.TrimSpace(part), "Path=/") {
+			return true
+		}
+	}
+	return false
 }
 
 func SetForwardedHeaders(req *http.Request, original *http.Request, prefix string) {
