@@ -110,10 +110,29 @@ type ManagerReadyOptions struct {
 	Output      string
 }
 
+const managerCompactionThresholdPercent = 90.0
+
 type ManagerUsageInput struct {
 	UsagePercent *float64 `json:"usagePercent,omitempty"`
 	Tokens       *int     `json:"tokens,omitempty"`
 	Window       *int     `json:"window,omitempty"`
+	Source       string   `json:"source,omitempty"`
+}
+
+type ManagerUsageSample struct {
+	Percent   *float64 `json:"percent,omitempty"`
+	Tokens    *int     `json:"tokens,omitempty"`
+	Window    *int     `json:"window,omitempty"`
+	Source    string   `json:"source"`
+	SampledAt string   `json:"sampledAt"`
+}
+
+type ManagerCompactionStatus struct {
+	Started      bool   `json:"started"`
+	Reason       string `json:"reason,omitempty"`
+	UsagePercent string `json:"usagePercent,omitempty"`
+	HandoffPath  string `json:"handoffPath,omitempty"`
+	ReadyCommand string `json:"readyCommand,omitempty"`
 }
 
 type ManagerCompactionOptions struct {

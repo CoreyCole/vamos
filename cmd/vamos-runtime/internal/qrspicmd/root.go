@@ -106,6 +106,7 @@ func newStartNextCommand(d deps) *cobra.Command {
 	var usagePercent float64
 	var usageTokens int
 	var usageWindow int
+	var usageSource string
 	cmd := &cobra.Command{
 		Use:   "start-next --plan-dir <path> --project-root <path>",
 		Short: "Initialize or resume q-manager state and launch the graph-selected child",
@@ -115,6 +116,7 @@ func newStartNextCommand(d deps) *cobra.Command {
 				usagePercent,
 				usageTokens,
 				usageWindow,
+				usageSource,
 			)
 			_, err := RunStartNext(cmd.Context(), opts, d, cmd.OutOrStdout())
 			return err
@@ -153,6 +155,9 @@ func newStartNextCommand(d deps) *cobra.Command {
 		IntVar(&usageTokens, "manager-usage-tokens", 0, "parent manager context token count for optional compaction")
 	cmd.Flags().
 		IntVar(&usageWindow, "manager-usage-window", 0, "parent manager context window size for optional compaction")
+	cmd.Flags().
+		StringVar(&usageSource, "manager-usage-source", "", "diagnostic source for parent manager context usage")
+	_ = cmd.Flags().MarkHidden("manager-usage-source")
 	return cmd
 }
 
@@ -461,6 +466,7 @@ func newContinueCommand(d deps) *cobra.Command {
 	var usagePercent float64
 	var usageTokens int
 	var usageWindow int
+	var usageSource string
 	cmd := &cobra.Command{
 		Use:   "continue --state-file <file>",
 		Short: "Validate active child and continue the QRSPI graph when safe",
@@ -470,6 +476,7 @@ func newContinueCommand(d deps) *cobra.Command {
 				usagePercent,
 				usageTokens,
 				usageWindow,
+				usageSource,
 			)
 			return RunContinue(cmd.Context(), opts, d, cmd.OutOrStdout())
 		},
@@ -493,6 +500,9 @@ func newContinueCommand(d deps) *cobra.Command {
 		IntVar(&usageTokens, "manager-usage-tokens", 0, "parent manager context token count for optional compaction")
 	cmd.Flags().
 		IntVar(&usageWindow, "manager-usage-window", 0, "parent manager context window size for optional compaction")
+	cmd.Flags().
+		StringVar(&usageSource, "manager-usage-source", "", "diagnostic source for parent manager context usage")
+	_ = cmd.Flags().MarkHidden("manager-usage-source")
 	return cmd
 }
 
@@ -1887,6 +1897,7 @@ func usageFromChangedFlags(
 	cmd *cobra.Command,
 	usagePercent float64,
 	usageTokens, usageWindow int,
+	usageSource string,
 ) ManagerUsageInput {
 	var input ManagerUsageInput
 	if cmd.Flags().Changed("manager-usage-percent") {
@@ -1897,6 +1908,9 @@ func usageFromChangedFlags(
 	}
 	if cmd.Flags().Changed("manager-usage-window") {
 		input.Window = &usageWindow
+	}
+	if strings.TrimSpace(usageSource) != "" {
+		input.Source = strings.TrimSpace(usageSource)
 	}
 	return input
 }
@@ -1911,6 +1925,30 @@ func managerUsagePercent(input ManagerUsageInput) (float64, bool) {
 	return 0, false
 }
 
+func managerUsageSample(input ManagerUsageInput, now time.Time) *ManagerUsageSample {
+	percent, hasPercent := managerUsagePercent(input)
+	if !hasPercent && input.Tokens == nil && input.Window == nil {
+		return nil
+	}
+	sample := &ManagerUsageSample{
+		Tokens:    input.Tokens,
+		Window:    input.Window,
+		Source:    firstNonEmpty(strings.TrimSpace(input.Source), "cli-explicit"),
+		SampledAt: now.Format(time.RFC3339),
+	}
+	if hasPercent {
+		sample.Percent = &percent
+	}
+	return sample
+}
+
+func readyCommand(stateFile string) string {
+	return fmt.Sprintf(
+		"vamos qrspi manager-ready --state-file %s --manager-pane $TMUX_PANE",
+		stateFile,
+	)
+}
+
 func maybeStartManagerCompaction(
 	ctx context.Context,
 	state ManagerState,
@@ -1918,35 +1956,35 @@ func maybeStartManagerCompaction(
 	usage ManagerUsageInput,
 	d deps,
 	out io.Writer,
-) (ManagerState, bool, error) {
+) (ManagerState, ManagerCompactionStatus, error) {
 	_ = ctx
 	out = ensureWriter(out)
-	percent, ok := managerUsagePercent(usage)
-	if !ok {
-		return state, false, writeCompactionDiagnostic(
-			out,
-			"manager compaction: skipped; no explicit usage input",
-			stateFile,
-			"",
-			false,
-		)
-	}
-	if percent <= 80 {
-		return state, false, writeCompactionDiagnostic(
-			out,
-			fmt.Sprintf("manager compaction: skipped; usage %.1f%% <= 80%%", percent),
-			stateFile,
-			"",
-			false,
-		)
-	}
 	now := time.Now()
 	if d.Clock != nil {
 		now = d.Clock()
 	}
+	if sample := managerUsageSample(usage, now); sample != nil {
+		state.LastManagerUsage = sample
+	}
+
+	percent, ok := managerUsagePercent(usage)
+	if !ok {
+		status := ManagerCompactionStatus{Reason: "no_explicit_usage_input"}
+		saveUsageDiagnosticIfNeeded(d, stateFile, state, now)
+		return state, status, writeCompactionDiagnostic(out, status)
+	}
+	if percent < managerCompactionThresholdPercent {
+		status := ManagerCompactionStatus{
+			Reason:       "below_threshold",
+			UsagePercent: fmt.Sprintf("%.1f", percent),
+		}
+		saveUsageDiagnosticIfNeeded(d, stateFile, state, now)
+		return state, status, writeCompactionDiagnostic(out, status)
+	}
+
 	handoffPath, err := writeManagerOperationalHandoff(state, stateFile, now)
 	if err != nil {
-		return state, false, err
+		return state, ManagerCompactionStatus{}, err
 	}
 	state.Delivery.Status = "compacting"
 	if strings.TrimSpace(state.Delivery.ManagerPaneID) == "" {
@@ -1957,38 +1995,78 @@ func maybeStartManagerCompaction(
 		"",
 		func() time.Time { return now },
 	).Save(stateFile, state); err != nil {
-		return state, false, err
+		return state, ManagerCompactionStatus{}, err
 	}
-	return state, true, writeCompactionDiagnostic(
-		out,
-		fmt.Sprintf("manager compaction: usage %.1f%% > 80%%; handoff written", percent),
-		stateFile,
-		handoffPath,
-		true,
-	)
+	status := ManagerCompactionStatus{
+		Started:      true,
+		Reason:       "threshold_met",
+		UsagePercent: fmt.Sprintf("%.1f", percent),
+		HandoffPath:  handoffPath,
+		ReadyCommand: readyCommand(stateFile),
+	}
+	return state, status, writeCompactionDiagnostic(out, status)
 }
 
-func writeCompactionDiagnostic(
-	out io.Writer,
-	summary, stateFile, handoffPath string,
-	compacting bool,
-) error {
+func saveUsageDiagnosticIfNeeded(
+	d deps,
+	stateFile string,
+	state ManagerState,
+	now time.Time,
+) {
+	if strings.TrimSpace(stateFile) == "" || state.LastManagerUsage == nil {
+		return
+	}
+	if _, err := os.Stat(stateFile); err != nil {
+		return
+	}
+	_ = stateStore(d, "", func() time.Time { return now }).Save(stateFile, state)
+}
+
+func writeCompactionDiagnostic(out io.Writer, status ManagerCompactionStatus) error {
 	if out == nil {
 		return nil
 	}
-	if compacting {
-		fmt.Fprintf(out, "%s\n", summary)
-		fmt.Fprintf(out, "handoff: %s\n", handoffPath)
-		fmt.Fprintf(out, "resume: pi @%s\n", handoffPath)
-		fmt.Fprintf(
+	if status.Started {
+		if _, err := fmt.Fprintf(
 			out,
-			"ready: vamos qrspi manager-ready --state-file %s --manager-pane $TMUX_PANE\n",
-			stateFile,
-		)
-		return nil
+			"manager compaction: started; usage %s%% >= %.0f%%; handoff written\n",
+			status.UsagePercent,
+			managerCompactionThresholdPercent,
+		); err != nil {
+			return err
+		}
+		if _, err := fmt.Fprintln(out, "q-manager-parent-compact: started"); err != nil {
+			return err
+		}
+		if _, err := fmt.Fprintf(out, "handoff: %s\n", status.HandoffPath); err != nil {
+			return err
+		}
+		if _, err := fmt.Fprintf(
+			out,
+			"resume: pi @%s\n",
+			status.HandoffPath,
+		); err != nil {
+			return err
+		}
+		_, err := fmt.Fprintf(out, "ready: %s\n", status.ReadyCommand)
+		return err
 	}
-	_, err := fmt.Fprintln(out, summary)
-	return err
+	switch status.Reason {
+	case "below_threshold":
+		_, err := fmt.Fprintf(
+			out,
+			"manager compaction: skipped; usage %s%% < %.0f%%\n",
+			status.UsagePercent,
+			managerCompactionThresholdPercent,
+		)
+		return err
+	default:
+		_, err := fmt.Fprintln(
+			out,
+			"manager compaction: skipped; no explicit usage input",
+		)
+		return err
+	}
 }
 
 func writeManagerOperationalHandoff(
@@ -2055,7 +2133,7 @@ artifact: manager-operational-handoff
 
 # q-manager operational handoff
 
-Done: parent manager usage exceeded compaction threshold after launching child; delivery marked compacting so child wake queues safely.
+Done: parent manager usage met native compaction threshold after launching child; delivery marked compacting so child wake queues safely before parent Pi ctx.compact() runs.
 
 Next: resume manager from this handoff, then mark manager ready to flush queued child wake.
 

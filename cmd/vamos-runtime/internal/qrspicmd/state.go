@@ -14,6 +14,7 @@ type ManagerState struct {
 	PiModel             string               `json:"piModel,omitempty"`
 	ManagerPaneID       string               `json:"managerPaneId,omitempty"`
 	ManagerSessionPath  string               `json:"managerSessionPath,omitempty"`
+	LastManagerUsage    *ManagerUsageSample  `json:"lastManagerUsage,omitempty"`
 	Delivery            ManagerDeliveryState `json:"delivery,omitempty"`
 	LastActionCard      *ManagerActionCard   `json:"lastActionCard,omitempty"`
 	ActiveChild         *ChildRunRef         `json:"activeChild,omitempty"`
