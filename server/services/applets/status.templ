@@ -1,0 +1,7 @@
+package applets
+
+import "github.com/CoreyCole/vamos/server/services/appletruntime"
+
+templ AppletStatusFragment(applet AppletContext, process appletruntime.AppletProcessState) {
+	@AppletFrame(applet, process)
+}

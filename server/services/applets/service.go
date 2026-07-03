@@ -2,10 +2,16 @@ package applets
 
 import (
 	"context"
+	"errors"
+	"net/http"
 	"strings"
+	"time"
 
 	"github.com/CoreyCole/vamos/server/layouts/workbench"
+	"github.com/CoreyCole/vamos/server/services/appletruntime"
 	"github.com/a-h/templ"
+	"github.com/labstack/echo/v4"
+	"github.com/starfederation/datastar-go/datastar"
 )
 
 const (
@@ -13,9 +19,21 @@ const (
 	chatSuffix     = "chat"
 )
 
-type Service struct{}
+type Service struct {
+	resolver Resolver
+	manager  appletruntime.Manager
+}
+
+type ServiceOptions struct {
+	Resolver Resolver
+	Manager  appletruntime.Manager
+}
 
 func NewService() *Service { return &Service{} }
+
+func NewHTTPService(opts ServiceOptions) *Service {
+	return &Service{resolver: opts.Resolver, manager: opts.Manager}
+}
 
 func BuildWorkbenchState(_ context.Context, state WorkbenchState) workbench.WorkbenchState {
 	appID := strings.TrimSpace(state.Config.ID)
@@ -87,6 +105,129 @@ func BuildWorkbenchState(_ context.Context, state WorkbenchState) workbench.Work
 		},
 	})
 	return wb
+}
+
+func (s *Service) HandleAppletPage(c echo.Context) error {
+	applet, err := s.resolveAppletFromRequest(c)
+	if err != nil {
+		return err
+	}
+	process := s.currentProcess(c.Request().Context(), applet)
+	if process.Status != appletruntime.ProcessStatusHealthy {
+		s.EnsureAppletAsync(c.Request().Context(), applet)
+	}
+	return s.RenderAppletPage(c, applet, process)
+}
+
+func (s *Service) RenderAppletPage(c echo.Context, applet AppletContext, process appletruntime.AppletProcessState) error {
+	state, err := BuildAppletWorkbenchState(AppletWorkbenchInput{
+		UserEmail: appletUserEmail(c),
+		Context:   applet,
+		Process:   process,
+		Sidebar: workbench.WorkbenchSidebarArgs{
+			Tabs:  workbench.DefaultSidebarTabs(),
+			Files: workbench.FilesPanelModel{CurrentPath: applet.IdentityPath},
+			Workspaces: workbench.WorkspacesPanelModel{
+				EmptyLabel: "Workspaces will appear here.",
+			},
+		},
+		RightRail: workbench.RightRailArgs{
+			Chat:     EmptyRegion("Chat will appear here."),
+			Comments: EmptyRegion("Comments will appear here."),
+		},
+	})
+	if err != nil {
+		return err
+	}
+	return workbench.Workbench(state).Render(c.Request().Context(), c.Response().Writer)
+}
+
+func (s *Service) HandleAppletStatus(c echo.Context) error {
+	applet, err := s.resolveAppletFromRequest(c)
+	if err != nil {
+		return err
+	}
+	sse := datastar.NewSSE(c.Response().Writer, c.Request())
+	ticker := time.NewTicker(250 * time.Millisecond)
+	defer ticker.Stop()
+
+	var lastStatus appletruntime.ProcessStatus
+	for {
+		process := s.currentProcess(c.Request().Context(), applet)
+		if process.Status != lastStatus {
+			if err := sse.PatchElementTempl(
+				AppletStatusFragment(applet, process),
+				datastar.WithSelectorID("applet-frame-"+applet.Manifest.ID),
+				datastar.WithModeOuter(),
+			); err != nil {
+				return err
+			}
+			lastStatus = process.Status
+		}
+		if process.Status == appletruntime.ProcessStatusHealthy {
+			return sse.ExecuteScript("window.location.reload();")
+		}
+		select {
+		case <-c.Request().Context().Done():
+			return nil
+		case <-ticker.C:
+		}
+	}
+}
+
+func (s *Service) EnsureAppletAsync(ctx context.Context, applet AppletContext) {
+	if s.manager == nil {
+		return
+	}
+	go func() {
+		_, _ = s.manager.EnsureStarted(context.WithoutCancel(ctx), RuntimeConfigFromManifest(applet))
+	}()
+}
+
+func (s *Service) resolveAppletFromRequest(c echo.Context) (AppletContext, error) {
+	if s.resolver.ThoughtsRoot != "" {
+		if docPath := strings.TrimSpace(firstNonEmpty(c.QueryParam("doc_path"), c.QueryParam("path"))); docPath != "" {
+			return s.resolver.ResolveThoughtsApplet(c.Request().Context(), docPath)
+		}
+	}
+	id := strings.TrimSpace(c.Param("id"))
+	if id == "" {
+		return AppletContext{}, echo.NewHTTPError(http.StatusBadRequest, "applet id is required")
+	}
+	return s.resolver.ResolveExampleApplet(c.Request().Context(), id)
+}
+
+func appletUserEmail(c echo.Context) string {
+	if value, ok := c.Get("user_email").(string); ok {
+		return strings.TrimSpace(value)
+	}
+	return ""
+}
+
+func (s *Service) currentProcess(ctx context.Context, applet AppletContext) appletruntime.AppletProcessState {
+	stopped := appletruntime.AppletProcessState{AppID: applet.Manifest.ID, Status: appletruntime.ProcessStatusStopped}
+	if s.manager == nil {
+		return stopped
+	}
+	state, err := s.manager.Health(ctx, applet.Manifest.ID)
+	if err != nil {
+		if errors.Is(err, context.Canceled) {
+			return stopped
+		}
+		state.AppID = applet.Manifest.ID
+		if state.Status == "" {
+			state.Status = appletruntime.ProcessStatusStopped
+		}
+		return state
+	}
+	if state.Status == "" {
+		if state.Healthy {
+			state.Status = appletruntime.ProcessStatusHealthy
+		} else {
+			state.Status = appletruntime.ProcessStatusStopped
+		}
+	}
+	return state
 }
 
 func EmptyRegion(message string) templ.Component { return emptyRegion(message) }
