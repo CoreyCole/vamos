@@ -60,8 +60,28 @@ applet:
 	if contains(patterns, "/static/*") {
 		t.Fatalf("streamlit aliases should not default /static/*: %#v", patterns)
 	}
-	if manifest.HealthPath != "/healthz" {
+	if manifest.HealthPath != "/_stcore/health" {
 		t.Fatalf("health path = %q", manifest.HealthPath)
+	}
+}
+
+func TestParseAppletManifestStreamlitPreservesExplicitHealthPath(t *testing.T) {
+	body := []byte(`---
+vamos_artifact: applet
+applet:
+  id: custom_streamlit
+  kind: streamlit
+  source_dir: dashboards/custom
+  start_command: ["streamlit", "run", "app.py"]
+  health_path: /healthz
+---
+`)
+	manifest, err := ParseAppletManifest(body)
+	if err != nil {
+		t.Fatalf("ParseAppletManifest() error = %v", err)
+	}
+	if manifest.HealthPath != "/healthz" {
+		t.Fatalf("explicit health path = %q", manifest.HealthPath)
 	}
 }
 

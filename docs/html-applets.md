@@ -2,6 +2,8 @@
 
 Vamos can render trusted `.html` Thoughts documents as sandboxed applets inside the Thoughts workbench. The applet owns its HTML, CSS, and JavaScript; Vamos provides stable shared assets for applets that want to match the app shell.
 
+For process-backed Datastar, Streamlit, Go, or Python apps, use [HTTP Applets](http-applets.md). HTTP applets run a managed local server behind the same Workbench shell instead of serving static HTML bytes.
+
 ## Default prelude
 
 Use this prelude for authored applets that should look native and follow the parent theme:

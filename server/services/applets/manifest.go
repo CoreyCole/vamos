@@ -68,7 +68,7 @@ func ApplyKindDefaults(manifest AppletManifest) AppletManifest {
 		manifest.Kind = AppletKindHTTP
 	}
 	if manifest.HealthPath == "" {
-		manifest.HealthPath = "/healthz"
+		manifest.HealthPath = defaultHealthPath(manifest.Kind)
 	}
 	if manifest.Kind == AppletKindStreamlit && len(manifest.RootAliases) == 0 {
 		manifest.RootAliases = StreamlitDefaultAliases()
@@ -133,6 +133,13 @@ func StreamlitDefaultAliases() []RouteAlias {
 		{Pattern: "/_stcore/*"},
 		{Pattern: "/vendor/*"},
 	}
+}
+
+func defaultHealthPath(kind AppletKind) string {
+	if kind == AppletKindStreamlit {
+		return "/_stcore/health"
+	}
+	return "/healthz"
 }
 
 func parseAppletFrontmatter(body []byte) (appletFrontmatter, error) {
