@@ -45,7 +45,8 @@ export default function qManagerParentExtension(pi: ExtensionAPI): void {
 			}
 
 			const usageFlags = usageFlagsFromContext(ctx.getContextUsage());
-			const result = await runQManagerCLI(parsed.action, parsed.passthrough, usageFlags, ctx.cwd);
+			const passthrough = parsed.passthrough.map((arg) => expandShellVariables(arg, ctx.cwd));
+			const result = await runQManagerCLI(parsed.action, passthrough, usageFlags, ctx.cwd);
 			publishCLIResult(ctx, result);
 
 			if (result.exitCode !== 0) {
@@ -109,6 +110,14 @@ function splitArgs(input: string): string[] {
 	if (quote) throw new Error("unterminated quoted argument");
 	if (current !== "") args.push(current);
 	return args;
+}
+
+function expandShellVariables(arg: string, cwd: string): string {
+	return arg.replace(/\$\{([A-Za-z_][A-Za-z0-9_]*)\}|\$([A-Za-z_][A-Za-z0-9_]*)/g, (match, braced, bare) => {
+		const name = String(braced ?? bare);
+		if (name === "PWD") return cwd;
+		return process.env[name] ?? "";
+	});
 }
 
 function usageFlagsFromContext(usage: ContextUsage | undefined): string[] {
