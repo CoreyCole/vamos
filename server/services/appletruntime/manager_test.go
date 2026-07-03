@@ -45,7 +45,11 @@ func main() {
 		t.Fatalf("unexpected process state: %+v", state)
 	}
 
-	server := httptest.NewServer(NewAppletProxy(manager, "pickleball", "/examples/pickleball/app"))
+	server := httptest.NewServer(NewAppletProxy(
+		manager,
+		AppletProxyMatch{AppID: "pickleball", StripPrefix: "/examples/pickleball/app"},
+		ProxyOptions{FlushSSE: true},
+	))
 	defer server.Close()
 	resp, err := http.Get(server.URL + "/examples/pickleball/app/echo/rounds")
 	if err != nil {

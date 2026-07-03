@@ -16,6 +16,10 @@ func (s *Service) RegisterRoutes(e *echo.Echo, auth echo.MiddlewareFunc) {
 	group.POST("/share", s.HandleShare)
 	group.POST("/debug/restore", s.HandleDebugRestore)
 	if s.opts.AppletRuntime != nil {
-		group.Any("/app/*", echo.WrapHandler(appletruntime.NewAppletProxy(s.opts.AppletRuntime, "pickleball", "/examples/pickleball/app")))
+		group.Any("/app/*", echo.WrapHandler(appletruntime.NewAppletProxy(
+			s.opts.AppletRuntime,
+			appletruntime.AppletProxyMatch{AppID: "pickleball", StripPrefix: "/examples/pickleball/app"},
+			appletruntime.ProxyOptions{FlushSSE: true, RewriteCookiePath: true, AllowNullOriginCORS: true},
+		)))
 	}
 }

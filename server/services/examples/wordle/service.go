@@ -51,7 +51,11 @@ func (s *Service) RegisterRoutes(e *echo.Echo, auth echo.MiddlewareFunc) {
 	}
 	group.GET("", s.HandlePage)
 	if s.opts.AppletRuntime != nil {
-		proxy := echo.WrapHandler(appletruntime.NewAppletProxy(s.opts.AppletRuntime, "wordle", "/examples/wordle/app"))
+		proxy := echo.WrapHandler(appletruntime.NewAppletProxy(
+			s.opts.AppletRuntime,
+			appletruntime.AppletProxyMatch{AppID: "wordle", StripPrefix: "/examples/wordle/app"},
+			appletruntime.ProxyOptions{FlushSSE: true, RewriteCookiePath: true, AllowNullOriginCORS: true},
+		))
 		group.Any("/app", proxy)
 		group.Any("/app/*", proxy)
 	}

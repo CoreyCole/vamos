@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/CoreyCole/vamos/server/services/appletruntime"
 	"go.temporal.io/sdk/activity"
@@ -33,6 +34,10 @@ type fakeAppletRuntime struct {
 	err    error
 }
 
+func (f *fakeAppletRuntime) EnsureStarted(ctx context.Context, cfg appletruntime.RuntimeConfig) (appletruntime.AppletProcessState, error) {
+	return f.Start(ctx, cfg)
+}
+
 func (f *fakeAppletRuntime) Start(_ context.Context, cfg appletruntime.RuntimeConfig) (appletruntime.ProcessState, error) {
 	f.starts = append(f.starts, cfg)
 	if f.err != nil {
@@ -46,6 +51,10 @@ func (f *fakeAppletRuntime) Health(context.Context, string) (appletruntime.Proce
 	return appletruntime.ProcessState{Healthy: true}, nil
 }
 func (f *fakeAppletRuntime) ProxyTarget(string) (string, bool) { return "http://127.0.0.1:1", true }
+func (f *fakeAppletRuntime) Touch(string, int)                 {}
+func (f *fakeAppletRuntime) SweepInactive(context.Context, time.Time) ([]appletruntime.AppletProcessState, error) {
+	return nil, nil
+}
 
 func TestSelfModifyWorkflowRunsIterationActivities(t *testing.T) {
 	t.Parallel()
