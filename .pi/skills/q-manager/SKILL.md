@@ -9,6 +9,14 @@ description: Manage QRSPI stage sessions from a main Pi/tmux manager session. Us
 
 Supervise QRSPI from a main Pi manager session. Launch focused child Pi sessions in visible tmux panes, capture the child result, validate through canonical Vamos QRSPI graph helpers, then advance or stop according to graph decision and QRSPI policy.
 
+## `/q-hermes-manager` / Hermes-managed orchestration
+
+When the user invokes `/q-hermes-manager` or asks Hermes to manage a QRSPI flow, treat that as Hermes-managed background orchestration, not true Pi q-manager/tmux mode. Hermes should run tracked background Pi processes, parse full process logs for fenced `qrspi_result` YAML, and pass the complete previous YAML verbatim into the next graph-safe stage.
+
+- If the user explicitly names an initial stage such as “delegate `/q-question` first”, launch that stage first before starting research/design/implementation.
+- For research-only or document-only requests, stop after the requested artifact exists and provide a thoughts-viewer Markdown link; do not continue into design/outline/implementation unless the user requested a full QRSPI pipeline.
+- Use the plan result’s `next.steps` to choose the next stage, but respect explicit user scope such as “create a research document” as the terminal human-review point.
+
 ## Required context load
 
 1. Read `.pi/skills/qrspi-planning/SKILL.md`.

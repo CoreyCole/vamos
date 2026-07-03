@@ -301,6 +301,25 @@ Expected:
 
 Use this when `../cn-agents-main` is absent and the active browser-visible site is a LaunchAgent such as `dev.chestnut.cn-agents` running a wrapper under `~/Library/Application Support/cn-agents/` with `REPO_DIR=.../cn-agents-prod`. See `references/macos-cn-agents-prod-local-testing.md` for the detailed local-test recipe and backup/verification commands.
 
+### macOS direct-runtime hotfix checklist
+
+When a Vamos runtime hotfix is developed directly in `../vamos/main` for immediate cn-agents-prod testing, use the normal macOS topology but keep these extra guards:
+
+1. Commit task-owned runtime changes in `../vamos` before syncing `../vamos-main`; do not leave the hotfix only as a dirty working tree.
+2. If `git push origin main` is rejected as non-fast-forward, fetch/rebase onto `origin/main`, rerun targeted tests, push again, then re-sync `../vamos-main` from the rebased `../vamos` head. A successful pre-rebase prod restart is not enough because the final commit SHA changed.
+3. After every re-sync of `../vamos-main`, rebuild from the host wrapper checkout and restart the LaunchAgent again:
+   ```bash
+   cd ../cn-agents-prod
+   just build --no-restart
+   launchctl kickstart -k gui/$(id -u)/dev.chestnut.cn-agents
+   ```
+4. Verify both the active process and the feature behavior:
+   ```bash
+   ps -p $(launchctl list | awk '/dev.chestnut.cn-agents$/ {print $1}') -o pid=,command=
+   curl -fsS http://127.0.0.1:4200/manifest.json >/dev/null
+   ```
+   For Datastar UI fixes, also run a browser-console check against `localhost:4200`/the ngrok target for the exact JS error being fixed, not just the HTTP health check.
+
 1. Verify the active process before changing anything:
    ```bash
    launchctl list | grep -E 'dev\.chestnut\.cn-agents($|-ts-worker|-ngrok)'

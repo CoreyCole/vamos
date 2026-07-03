@@ -21,6 +21,7 @@ Load these before acting:
 1. `.pi/skills/qrspi-planning/references/background-pi-stage-delegation.md`.
 1. Target plan `AGENTS.md` when present.
 1. Latest QRSPI result artifact or user-provided fenced `qrspi_result` YAML.
+1. For a concrete example of notification parsing, artifact-path preservation, and direct-outline missing-artifact pitfalls, see `references/webhook-forwarding-run-2026-07-02.md`.
 
 Do not use `vamos qrspi start-next` as the primary path. That command belongs to the tmux `q-manager` skill.
 
@@ -78,12 +79,20 @@ When complete, emit the required fenced yaml qrspi_result followed by the concis
 
 For the first stage when no previous result exists, include the user's request, plan directory, repo cwd, desired starting stage, and the same QRSPI skill-loading requirements.
 
+If the user asks to "delegate the remaining review/implementation" after a QRSPI result was produced earlier in the conversation, reconstruct the latest valid fenced `qrspi_result` from the chat and launch the next graph stage immediately. Example: after `stage: outline` with `next.steps` ending in `review-outline`, write a review-outline prompt that includes the full outline result YAML, run from the project repo cwd, and start the background Pi process without asking for another approval.
+
 ## Step 4: Launch the background Pi process
 
 From the selected cwd, start Pi in a Hermes background process with completion notification. In Hermes, use `terminal(background=true, notify_on_complete=true)` or the equivalent background-process tool:
 
 ```bash
 pi -p @/tmp/q-hermes-manager-[stage]-prompt.md
+```
+
+If the user's environment has a known absolute Pi path, prefer it over relying on cron/shell PATH. On swarm machines, use:
+
+```bash
+/Users/swarm/.npm-global/bin/pi -p @/tmp/q-hermes-manager-[stage]-prompt.md
 ```
 
 Track completion with the returned process ID using process polling/log tools such as `process(action="poll")` and `process(action="log")` when available.
@@ -102,10 +111,14 @@ Do not claim a tmux child pane or q-manager wake exists. This mode does not use 
 
 When a process completes:
 
+1. Treat Hermes' `[IMPORTANT: Background process ... completed]` user-delivered notification as a real completion signal, but do not trust the truncated notification body as the whole result.
 1. Read the full process log through the process log tool, not just the notification snippet.
 1. Confirm the process exited successfully.
 1. Extract the complete fenced `qrspi_result` YAML.
+   - If the full log contains a complete top-level `qrspi_result:` block but the wrapper stripped the opening fence, accept it only when indentation is coherent and all required fields are present.
 1. Validate that stage/status/outcome/artifact/next route are coherent enough to continue.
+1. Preserve artifact paths exactly from the YAML when constructing the next prompt. Do not reconstruct paths from memory or shorten them; a single missing `reviews/` segment can send the next agent to the wrong artifact.
+1. If `next.steps` references optional artifacts that may not exist in direct-outline workflows (especially `design.md`), keep the step in the preserved YAML but explicitly tell the next Pi prompt not to block if that optional artifact is absent and the plan/outline/handoff are sufficient.
 1. If valid and graph-safe, immediately launch the next background Pi process before giving a long prose update.
 
 If invalid or failed, stop and summarize:

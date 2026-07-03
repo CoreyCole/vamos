@@ -111,6 +111,7 @@ Use this mode when the user has a clear, bounded task and wants to skip earlier 
 1. Read relevant codebase files needed to produce an accurate outline. If current-state discovery is still needed, run `codebase-locator` and, if needed, `codebase-analyzer`, then write timestamped artifact(s) under `[plan_dir]/context/outline/`.
 1. Write `outline.md` in the new plan directory.
 1. If helpful, you may add lightweight supporting artifacts (`research/`, `design.md`) for your own structure, but this is optional.
+1. If you do not create `design.md`, make the direct-outline absence explicit in `outline.md` or plan `AGENTS.md`, and do not add `design.md` as a required next-stage artifact. Downstream QRSPI prompts should not block on a missing design artifact when direct mode intentionally skipped it.
 
 ### If no useful input was provided
 
