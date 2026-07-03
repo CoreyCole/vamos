@@ -28,6 +28,12 @@ Set `web.cors_allowed_origins` to the public host and any workspace origins that
 
 Put OAuth credentials, webhook secrets, internal tokens, and deploy credentials in environment variables or a secret manager. Do not commit them to reusable Vamos code or public examples.
 
+## Webhook fanout
+
+For private staging hosts that cannot receive public GitHub traffic, configure the public host with `deploy.webhook_forwards` to POST verified push payloads to the private host's `/api/webhook/github` URL. Keep forwarding best-effort for staging/dev fanout unless GitHub delivery should be marked failed when the downstream host is unavailable. Do not expose private staging directly just to receive GitHub webhooks.
+
+When the downstream host shares the same GitHub webhook secret, leave the forward route `secret` empty so Vamos preserves the original `X-Hub-Signature-256`. Set a route-specific `secret` only when the downstream host should verify a different HMAC signature.
+
 ## Reverse proxy
 
 Configure TLS termination, request size limits, and buffering rules that support server-sent events. Avoid proxy buffering for event streams used by reactive UI and agent workflow updates.

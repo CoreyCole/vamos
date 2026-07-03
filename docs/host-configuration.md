@@ -62,6 +62,26 @@ Workspace domains, checkout parent directories, lane names, and module markers a
 
 Deployment config points to host-owned service names and restart/rebuild hooks. Host executors own private commands. Reusable Vamos must not hardcode service names, domains, or organization-specific deploy policy.
 
+`deploy.webhook_forwards` lets a public Vamos host fan out verified GitHub push webhooks to private hosts over localhost, VPN, or tailnet URLs. Forwarding is push-only: `events` defaults to `[push]`, and config validation rejects other event names. Leave `secret` empty when the downstream host shares the same `webhook_secret` and should receive the original `X-Hub-Signature-256`; set `secret` only when the downstream host verifies with a different secret.
+
+```yaml
+deploy:
+  web_service_name: vamos
+  ts_worker_service_name: vamos-ts-worker
+  # webhook_secret: ${render in private config or env}
+  webhook_forwards:
+    - url: http://127.0.0.1:4301/api/webhook/github
+      github_repos:
+        - owner/repo
+      events: [push]
+      # Empty secret preserves the original X-Hub-Signature-256.
+      secret: ""
+      timeout: 15s
+      best_effort: true
+```
+
+Use `best_effort: true` for staging/dev fanout when the public GitHub delivery should still succeed if a private downstream host is offline. Use `best_effort: false` only when downstream delivery failure should make the public webhook response report an error.
+
 ## Datastar assets
 
 A licensed Datastar Pro bundle is optional. Set `VAMOS_DATASTAR_PRO_ASSET` only when the host has a licensed local bundle. If it is unset and no local Pro bundle exists, the browser uses public Datastar plus `/js/vamos-datastar-polyfills.js` for the small Pro contracts Vamos uses.
