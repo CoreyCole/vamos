@@ -114,10 +114,17 @@ func (m *ManagerImpl) Start(ctx context.Context, cfg RuntimeConfig) (ProcessStat
 			return failCandidate("build", err)
 		}
 	}
+	if err := candidate.startCanceled(); err != nil {
+		return ProcessState{}, err
+	}
 
 	logFile, err := openLog(logPath)
 	if err != nil {
 		return failCandidate("open log for", err)
+	}
+	if err := candidate.startCanceled(); err != nil {
+		_ = logFile.Close()
+		return ProcessState{}, err
 	}
 	cmd := exec.Command(cfg.StartCommand[0], cfg.StartCommand[1:]...)
 	cmd.Dir = cfg.SourceDir
@@ -137,6 +144,10 @@ func (m *ManagerImpl) Start(ctx context.Context, cfg RuntimeConfig) (ProcessStat
 	candidate.state.LogPath = logPath
 	candidate.state.LastSeenAt = time.Now()
 	go m.reap(appID, candidate)
+	if err := candidate.startCanceled(); err != nil {
+		_ = stopProcess(candidate)
+		return ProcessState{}, err
+	}
 
 	if err := waitHealthy(ctx, candidate.state.BaseURL+cfg.HealthPath); err != nil {
 		return failCandidate("health check", err)
@@ -450,6 +461,18 @@ func (p *activeProcess) finishStart(err error) {
 		p.startErr = err
 		close(p.ready)
 	})
+}
+
+func (p *activeProcess) startCanceled() error {
+	if p == nil || p.ready == nil {
+		return nil
+	}
+	select {
+	case <-p.ready:
+		return p.startErr
+	default:
+		return nil
+	}
 }
 
 func waitForProcessReady(ctx context.Context, proc *activeProcess) (AppletProcessState, error) {

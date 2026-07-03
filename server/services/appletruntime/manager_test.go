@@ -184,6 +184,75 @@ func main() {
 	defer manager.Stop(context.Background(), "pickleball")
 }
 
+func TestStopDuringStartingPreventsLateProcessLaunch(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("test uses bash")
+	}
+	filesRoot := t.TempDir()
+	sourceDir := filepath.Join(filesRoot, "apps", "current")
+	if err := os.MkdirAll(sourceDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	scratch := t.TempDir()
+	releasePath := filepath.Join(scratch, "release")
+	counterPath := filepath.Join(scratch, "started")
+	manager := NewManager(t.TempDir())
+	cfg := RuntimeConfig{
+		AppID:        "pickleball",
+		FilesRoot:    filesRoot,
+		SourceDir:    sourceDir,
+		BuildCommand: []string{"bash", "-c", "while [ ! -f \"$RELEASE_PATH\" ]; do sleep 0.02; done"},
+		StartCommand: []string{"bash", "-c", "printf started >> \"$COUNTER_PATH\"; while true; do sleep 1; done"},
+		HealthPath:   "/healthz",
+		Env: map[string]string{
+			"COUNTER_PATH": counterPath,
+			"RELEASE_PATH": releasePath,
+		},
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	done := make(chan error, 1)
+	go func() {
+		_, err := manager.EnsureStarted(ctx, cfg)
+		done <- err
+	}()
+
+	deadline := time.After(time.Second)
+	for {
+		state, err := manager.Health(context.Background(), "pickleball")
+		if err == nil && state.Status == ProcessStatusStarting {
+			break
+		}
+		select {
+		case <-deadline:
+			t.Fatalf("Health() never reported starting before stop; last state=%+v err=%v", state, err)
+		case <-time.After(25 * time.Millisecond):
+		}
+	}
+	if err := manager.Stop(context.Background(), "pickleball"); err != nil {
+		t.Fatalf("Stop() error = %v", err)
+	}
+	if err := os.WriteFile(releasePath, []byte("release"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case err := <-done:
+		if err == nil {
+			t.Fatal("EnsureStarted() unexpectedly succeeded after stop")
+		}
+	case <-time.After(time.Second):
+		t.Fatal("EnsureStarted() did not return after stopped start was released")
+	}
+	if _, err := os.Stat(counterPath); err == nil {
+		t.Fatalf("start command ran after Stop during starting; counter %q exists", counterPath)
+	} else if !os.IsNotExist(err) {
+		t.Fatalf("stat counter: %v", err)
+	}
+	if _, ok := manager.ProxyTarget("pickleball"); ok {
+		t.Fatal("ProxyTarget active after Stop during starting")
+	}
+}
+
 func TestFailedFirstStartRemovesStartingCandidate(t *testing.T) {
 	filesRoot, sourceDir, bin := writeAppletSource(t, `
 package main

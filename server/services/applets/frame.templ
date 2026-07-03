@@ -46,12 +46,12 @@ templ AppletStartingPanel(applet AppletContext, process appletruntime.AppletProc
 
 templ AppletControls(applet AppletContext, process appletruntime.AppletProcessState) {
 	<div class="flex items-center gap-2">
-		<form method="post" action={ "/forms/applets/" + applet.Manifest.ID + "/restart" }>
+		<form method="post" action={ "/forms/applets/" + applet.RuntimeKey + "/restart" }>
 			<input type="hidden" name="identity_path" value={ applet.IdentityPath }/>
 			<button type="submit" class="rounded-md border border-border px-2 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">Restart</button>
 		</form>
 		if process.Status == appletruntime.ProcessStatusHealthy || process.Status == appletruntime.ProcessStatusUnhealthy {
-			<form method="post" action={ "/forms/applets/" + applet.Manifest.ID + "/stop" }>
+			<form method="post" action={ "/forms/applets/" + applet.RuntimeKey + "/stop" }>
 				<input type="hidden" name="identity_path" value={ applet.IdentityPath }/>
 				<button type="submit" class="rounded-md border border-border px-2 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">Stop</button>
 			</form>

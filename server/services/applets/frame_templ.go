@@ -252,9 +252,9 @@ func AppletControls(applet AppletContext, process appletruntime.AppletProcessSta
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var13 templ.SafeURL
-		templ_7745c5c3_Var13, templ_7745c5c3_Err = templ.JoinURLErrs("/forms/applets/" + applet.Manifest.ID + "/restart")
+		templ_7745c5c3_Var13, templ_7745c5c3_Err = templ.JoinURLErrs("/forms/applets/" + applet.RuntimeKey + "/restart")
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/applets/frame.templ`, Line: 49, Col: 82}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/applets/frame.templ`, Line: 49, Col: 81}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var13))
 		if templ_7745c5c3_Err != nil {
@@ -283,9 +283,9 @@ func AppletControls(applet AppletContext, process appletruntime.AppletProcessSta
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var15 templ.SafeURL
-			templ_7745c5c3_Var15, templ_7745c5c3_Err = templ.JoinURLErrs("/forms/applets/" + applet.Manifest.ID + "/stop")
+			templ_7745c5c3_Var15, templ_7745c5c3_Err = templ.JoinURLErrs("/forms/applets/" + applet.RuntimeKey + "/stop")
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/applets/frame.templ`, Line: 54, Col: 80}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/applets/frame.templ`, Line: 54, Col: 79}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var15))
 			if templ_7745c5c3_Err != nil {

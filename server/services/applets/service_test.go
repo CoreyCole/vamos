@@ -109,6 +109,25 @@ func TestAppletFrameRendersIframeWhenHealthy(t *testing.T) {
 	}
 }
 
+func TestAppletFrameControlsUseRuntimeKeyForFormActions(t *testing.T) {
+	applet := appletTestContext()
+	applet.Manifest.ID = "demo"
+	applet.RuntimeKey = EncodeAppletIdentity(applet.IdentityPath)
+	var body bytes.Buffer
+	if err := AppletFrame(applet, appletruntime.AppletProcessState{Status: appletruntime.ProcessStatusHealthy}).Render(t.Context(), &body); err != nil {
+		t.Fatalf("AppletFrame.Render() error = %v", err)
+	}
+	html := body.String()
+	for _, want := range []string{"/forms/applets/" + applet.RuntimeKey + "/restart", "/forms/applets/" + applet.RuntimeKey + "/stop"} {
+		if !strings.Contains(html, want) {
+			t.Fatalf("AppletFrame html missing runtime-key form action %q: %s", want, html)
+		}
+	}
+	if strings.Contains(html, "/forms/applets/demo/") {
+		t.Fatalf("AppletFrame html still uses display ID form action: %s", html)
+	}
+}
+
 func TestAppletFrameRendersStartingPanelWithStatusStream(t *testing.T) {
 	var body bytes.Buffer
 	err := AppletFrame(appletTestContext(), appletruntime.AppletProcessState{Status: appletruntime.ProcessStatusStarting, LogPath: "/tmp/app.log"}).Render(t.Context(), &body)
@@ -150,6 +169,7 @@ func appletTestContext() AppletContext {
 	return AppletContext{
 		Manifest:     AppletManifest{ID: "wordle", Kind: AppletKindDatastar, Title: "Wordle"},
 		IdentityPath: "thoughts/apps/wordle.md",
+		RuntimeKey:   "wordle",
 		RouteHref:    "/thoughts/_render/app/wordle",
 		IFrameSrc:    "/thoughts/_render/app/wordle/app/",
 		StatusURL:    "/thoughts/_render/app/wordle/status",
