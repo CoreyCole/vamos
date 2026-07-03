@@ -98,6 +98,7 @@ func RuntimeConfigFromManifest(applet AppletContext) appletruntime.RuntimeConfig
 		BuildCommand: append([]string(nil), manifest.BuildCommand...),
 		StartCommand: append([]string(nil), manifest.StartCommand...),
 		HealthPath:   manifest.HealthPath,
+		IdleTimeout:  manifest.IdleTimeout,
 		Env:          cloneStringMap(manifest.Env),
 	}
 }

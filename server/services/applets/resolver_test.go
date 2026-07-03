@@ -74,10 +74,11 @@ func TestRuntimeConfigFromManifest(t *testing.T) {
 		BuildCommand: []string{"go", "build"},
 		StartCommand: []string{"demo"},
 		HealthPath:   "/healthz",
+		IdleTimeout:  5,
 		Env:          map[string]string{"A": "B"},
 	}}
 	cfg := RuntimeConfigFromManifest(ctx)
-	if cfg.AppID != "demo" || cfg.FilesRoot != "/files" || cfg.SourceDir != "/files/apps/demo" || cfg.HealthPath != "/healthz" {
+	if cfg.AppID != "demo" || cfg.FilesRoot != "/files" || cfg.SourceDir != "/files/apps/demo" || cfg.HealthPath != "/healthz" || cfg.IdleTimeout != 5 {
 		t.Fatalf("unexpected config: %+v", cfg)
 	}
 	if len(cfg.BuildCommand) != 2 || cfg.BuildCommand[0] != "go" || len(cfg.StartCommand) != 1 || cfg.StartCommand[0] != "demo" {
