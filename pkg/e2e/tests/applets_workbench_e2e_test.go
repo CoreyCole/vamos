@@ -23,6 +23,7 @@ func TestAppletsWorkbench_WordleRendersWorkbenchShell(t *testing.T) {
 		Visit(vamos.Pages.Path("/examples/wordle?context=chat")).
 		Expect(vamos.Thoughts.Ready()).
 		Expect(spec.ExpectStep(expectWorkbenchDatastarImportMapPresent())).
+		Expect(spec.ExpectStep(expectOpenAppletInNewTabLink())).
 		Expect(vamos.Thoughts.SidebarVisible()).
 		Expect(vamos.Thoughts.CenterPaneVisible()).
 		Expect(vamos.Thoughts.RightRailVisible()).
@@ -83,6 +84,26 @@ func expectWorkbenchDatastarImportMapPresent() spec.Step {
 		}
 		if resizeIndex := int(data["resizeIndex"].(float64)); resizeIndex >= 0 && mapIndex > resizeIndex {
 			t.Fatalf("Datastar import map after Workbench module: %#v", data)
+		}
+	})
+}
+
+func expectOpenAppletInNewTabLink() spec.Step {
+	return spec.Custom("Open in new tab uses proxied app route", func(t testing.TB, ctx *duiruntime.Context) {
+		t.Helper()
+		link := ctx.Page.GetByRole(*playwright.AriaRoleLink, playwright.PageGetByRoleOptions{Name: "Open in new tab"}).First()
+		if err := link.WaitFor(playwright.LocatorWaitForOptions{Timeout: playwright.Float(30_000)}); err != nil {
+			t.Fatalf("open-new-tab link missing: %v", err)
+		}
+		href, err := link.GetAttribute("href")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !strings.Contains(href, "/examples/wordle/app/") {
+			t.Fatalf("open-new-tab href = %q, want proxied /examples/wordle/app/", href)
+		}
+		if strings.Contains(href, "localhost") || strings.Contains(href, "127.0.0.1") {
+			t.Fatalf("open-new-tab href exposes raw backend: %q", href)
 		}
 	})
 }

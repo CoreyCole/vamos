@@ -128,6 +128,24 @@ func TestAppletFrameControlsUseRuntimeKeyForFormActions(t *testing.T) {
 	}
 }
 
+func TestAppletFrameControlsIncludeProxiedNewTabLink(t *testing.T) {
+	applet := appletTestContext()
+	applet.IFrameSrc = "/examples/wordle/app/"
+	var body bytes.Buffer
+	if err := AppletFrame(applet, appletruntime.AppletProcessState{Status: appletruntime.ProcessStatusStarting}).Render(t.Context(), &body); err != nil {
+		t.Fatalf("AppletFrame.Render() error = %v", err)
+	}
+	html := body.String()
+	for _, want := range []string{`href="/examples/wordle/app/"`, `target="_blank"`, `rel="noopener"`, "Open in new tab"} {
+		if !strings.Contains(html, want) {
+			t.Fatalf("new-tab control missing %q: %s", want, html)
+		}
+	}
+	if strings.Contains(html, "127.0.0.1") || strings.Contains(html, "localhost") {
+		t.Fatalf("new-tab control exposed raw backend URL: %s", html)
+	}
+}
+
 func TestAppletFrameRendersStartingPanelWithStatusStream(t *testing.T) {
 	var body bytes.Buffer
 	err := AppletFrame(appletTestContext(), appletruntime.AppletProcessState{Status: appletruntime.ProcessStatusStarting, LogPath: "/tmp/app.log"}).Render(t.Context(), &body)

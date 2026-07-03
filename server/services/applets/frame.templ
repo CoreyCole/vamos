@@ -46,6 +46,12 @@ templ AppletStartingPanel(applet AppletContext, process appletruntime.AppletProc
 
 templ AppletControls(applet AppletContext, process appletruntime.AppletProcessState) {
 	<div class="flex items-center gap-2">
+		<a
+			href={ applet.IFrameSrc }
+			target="_blank"
+			rel="noopener"
+			class="rounded-md border border-border px-2 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+		>Open in new tab</a>
 		<form method="post" action={ "/forms/applets/" + applet.RuntimeKey + "/restart" }>
 			<input type="hidden" name="identity_path" value={ applet.IdentityPath }/>
 			<button type="submit" class="rounded-md border border-border px-2 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">Restart</button>
