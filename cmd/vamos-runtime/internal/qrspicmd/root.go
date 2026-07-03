@@ -2766,6 +2766,14 @@ func RunContinue(ctx context.Context, opts ContinueOptions, d deps, out io.Write
 	if healthErr != nil {
 		return healthErr
 	}
+	if IsRecoverableNoResultChild(health) {
+		card := BuildChildContextExhaustedCard(health, state, opts.StateFile)
+		if card != nil {
+			state.LastActionCard = card
+			_ = store.Save(opts.StateFile, state)
+			return writeManagerActionCard(out, *card, opts.Output)
+		}
+	}
 	if IsTerminalFailedChild(health) {
 		card := BuildChildLaunchFailedCard(health, state, opts.StateFile)
 		if card != nil {
@@ -2857,6 +2865,45 @@ func RunContinue(ctx context.Context, opts ContinueOptions, d deps, out io.Write
 		result.StartedChild = launched.ActiveChild
 	}
 	return writeContinueOutput(out, opts, result)
+}
+
+func BuildChildContextExhaustedCard(
+	health ActiveChildHealth,
+	state ManagerState,
+	stateFile string,
+) *ManagerActionCard {
+	if health.Status != ActiveChildContextExhausted {
+		return nil
+	}
+	evidence := []string{
+		fmt.Sprintf(
+			"child: %s stage=%s",
+			health.ChildID,
+			firstNonEmpty(health.Stage, string(state.Workflow.CurrentNodeID)),
+		),
+		fmt.Sprintf("session: %s", firstNonEmpty(health.SessionPath, health.SessionDir)),
+		fmt.Sprintf("status: %s", health.Status),
+	}
+	evidence = append(evidence, health.Evidence...)
+	for _, line := range health.OutputTail {
+		evidence = append(evidence, "output tail: "+line)
+	}
+	return &ManagerActionCard{
+		Kind:              ActionChildContextExhausted,
+		Severity:          "warning",
+		Summary:           "child ended without valid qrspi_result after context-limit evidence",
+		Evidence:          evidence,
+		RecommendedAction: "resume the same child and compact only if context-limit evidence is real; otherwise validate/rebind latest session or relaunch the same graph node",
+		SafeCommand: fmt.Sprintf(
+			"vamos qrspi inspect --state-file %s --sessions --latest",
+			stateFile,
+		),
+		ContinueCommand: fmt.Sprintf(
+			"vamos qrspi recover-manual --state-file %s --mode latest-session --continue",
+			stateFile,
+		),
+		RequiresHuman: false,
+	}
 }
 
 func validateActiveChild(

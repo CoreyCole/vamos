@@ -10,8 +10,15 @@ import (
 )
 
 func TestInspectActiveChildHealthRunning(t *testing.T) {
-	state := ManagerState{ActiveChild: &ChildRunRef{ID: "child-1", Stage: "design", TmuxPaneID: "%9"}}
-	health, err := InspectActiveChildHealth(t.Context(), state, "state.json", deps{Tmux: &recordingTmux{}})
+	state := ManagerState{
+		ActiveChild: &ChildRunRef{ID: "child-1", Stage: "design", TmuxPaneID: "%9"},
+	}
+	health, err := InspectActiveChildHealth(
+		t.Context(),
+		state,
+		"state.json",
+		deps{Tmux: &recordingTmux{}},
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -26,11 +33,17 @@ func TestInspectActiveChildHealthFinishedSuccessNeedsValidation(t *testing.T) {
 	writeFile(t, active.StatusPath, `{"exitCode":0}`)
 	writeFile(t, active.DonePath, "")
 	state := ManagerState{ActiveChild: active}
-	health, err := InspectActiveChildHealth(t.Context(), state, "state.json", deps{Tmux: &recordingTmux{}})
+	health, err := InspectActiveChildHealth(
+		t.Context(),
+		state,
+		"state.json",
+		deps{Tmux: &recordingTmux{}},
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if health.Status != ActiveChildFinishedNeedsValidation || health.ExitCode == nil || *health.ExitCode != 0 {
+	if health.Status != ActiveChildFinishedNeedsValidation || health.ExitCode == nil ||
+		*health.ExitCode != 0 {
 		t.Fatalf("health = %+v, want success-needs-validation", health)
 	}
 }
@@ -40,16 +53,27 @@ func TestInspectActiveChildHealthLaunchFailed(t *testing.T) {
 	active := childHealthRef(dir)
 	writeFile(t, active.StatusPath, `{"exitCode":1}`)
 	writeFile(t, active.DonePath, "")
-	writeFile(t, active.OutputPath, "Error: unknown option --session-id\nUsage:\n  pi [flags]\nFlags:\n  --session string\n")
+	writeFile(
+		t,
+		active.OutputPath,
+		"Error: unknown option --session-id\nUsage:\n  pi [flags]\nFlags:\n  --session string\n",
+	)
 	state := ManagerState{ActiveChild: active}
-	health, err := InspectActiveChildHealth(t.Context(), state, "state.json", deps{Tmux: &recordingTmux{missingPanes: map[string]bool{"%9": true}}})
+	health, err := InspectActiveChildHealth(
+		t.Context(),
+		state,
+		"state.json",
+		deps{Tmux: &recordingTmux{missingPanes: map[string]bool{"%9": true}}},
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if health.Status != ActiveChildLaunchFailed || health.ExitCode == nil || *health.ExitCode != 1 {
+	if health.Status != ActiveChildLaunchFailed || health.ExitCode == nil ||
+		*health.ExitCode != 1 {
 		t.Fatalf("health = %+v, want launch failed exit 1", health)
 	}
-	if !containsLine(health.OutputTail, "Error: unknown option --session-id") || containsLine(health.OutputTail, "Usage:") {
+	if !containsLine(health.OutputTail, "Error: unknown option --session-id") ||
+		containsLine(health.OutputTail, "Usage:") {
 		t.Fatalf("output tail = %#v", health.OutputTail)
 	}
 }
@@ -61,25 +85,142 @@ func TestInspectActiveChildHealthDoesNotMarkFailureWhenSessionHasResult(t *testi
 	active.SessionPath = filepath.Join(active.SessionDir, "session.jsonl")
 	writeFile(t, active.StatusPath, `{"exitCode":1}`)
 	writeFile(t, active.DonePath, "")
-	writeSessionTestFile(t, active.SessionPath, sessionHeader(active.SessionID, active.Cwd)+"\n"+assistantLine(testResultYAML("design", "complete", "complete", "thoughts/example/design.md", ""))+"\n")
+	writeSessionTestFile(
+		t,
+		active.SessionPath,
+		sessionHeader(
+			active.SessionID,
+			active.Cwd,
+		)+"\n"+assistantLine(
+			testResultYAML(
+				"design",
+				"complete",
+				"complete",
+				"thoughts/example/design.md",
+				"",
+			),
+		)+"\n",
+	)
 	state := ManagerState{ActiveChild: active}
-	health, err := InspectActiveChildHealth(t.Context(), state, "state.json", deps{Tmux: &recordingTmux{missingPanes: map[string]bool{"%9": true}}})
+	health, err := InspectActiveChildHealth(
+		t.Context(),
+		state,
+		"state.json",
+		deps{Tmux: &recordingTmux{missingPanes: map[string]bool{"%9": true}}},
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if health.Status != ActiveChildFinishedNeedsValidation {
-		t.Fatalf("status = %s, want %s", health.Status, ActiveChildFinishedNeedsValidation)
+		t.Fatalf(
+			"status = %s, want %s",
+			health.Status,
+			ActiveChildFinishedNeedsValidation,
+		)
 	}
 }
 
 func TestInspectActiveChildHealthPaneMissing(t *testing.T) {
-	state := ManagerState{ActiveChild: &ChildRunRef{ID: "child-1", Stage: "design", TmuxPaneID: "%missing"}}
-	health, err := InspectActiveChildHealth(t.Context(), state, "state.json", deps{Tmux: &recordingTmux{missingPanes: map[string]bool{"%missing": true}}})
+	state := ManagerState{
+		ActiveChild: &ChildRunRef{ID: "child-1", Stage: "design", TmuxPaneID: "%missing"},
+	}
+	health, err := InspectActiveChildHealth(
+		t.Context(),
+		state,
+		"state.json",
+		deps{Tmux: &recordingTmux{missingPanes: map[string]bool{"%missing": true}}},
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if health.Status != ActiveChildPaneMissing {
 		t.Fatalf("status = %s, want %s", health.Status, ActiveChildPaneMissing)
+	}
+}
+
+func TestInspectActiveChildHealthDetectsContextExhaustionNoResult(t *testing.T) {
+	dir := t.TempDir()
+	active := childHealthRef(dir)
+	active.SessionPath = filepath.Join(active.SessionDir, "session.jsonl")
+	writeFile(t, active.StatusPath, `{"exitCode":1}`)
+	writeFile(t, active.DonePath, "")
+	writeSessionTestFile(
+		t,
+		active.SessionPath,
+		sessionHeader(
+			active.SessionID,
+			active.Cwd,
+		)+"\n"+assistantLine(
+			"provider error: context length exceeded before required fenced YAML emitted",
+		)+"\n",
+	)
+	state := ManagerState{ActiveChild: active}
+
+	health, err := InspectActiveChildHealth(
+		t.Context(),
+		state,
+		"state.json",
+		deps{Tmux: &recordingTmux{missingPanes: map[string]bool{"%9": true}}},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if health.Status != ActiveChildContextExhausted {
+		t.Fatalf("health = %+v, want context exhausted", health)
+	}
+	if health.SessionPath != active.SessionPath ||
+		!strings.Contains(health.SafeCommand, "pi --resume") {
+		t.Fatalf("health session/safe command = %+v", health)
+	}
+}
+
+func TestContinueContextExhaustionWritesActionCardWithoutAdvance(t *testing.T) {
+	dir := t.TempDir()
+	stateFile := filepath.Join(dir, "state.json")
+	active := childHealthRef(dir)
+	active.SessionPath = filepath.Join(active.SessionDir, "session.jsonl")
+	writeFile(t, active.StatusPath, `{"exitCode":1}`)
+	writeFile(t, active.DonePath, "")
+	writeSessionTestFile(
+		t,
+		active.SessionPath,
+		sessionHeader(
+			active.SessionID,
+			active.Cwd,
+		)+"\n"+assistantLine(
+			"compaction failed after maximum context window; no result available",
+		)+"\n",
+	)
+	state := ManagerState{
+		CanonicalPlanDir: "thoughts/example",
+		ActiveChild:      active,
+		Workflow:         testWorkflowState(t, qrspi.NodeDesign, nil),
+	}
+	saveManagerState(t, stateFile, state)
+
+	var out bytes.Buffer
+	if err := RunContinue(
+		t.Context(),
+		ContinueOptions{
+			StateFile: stateFile,
+			PlanDir:   "thoughts/example",
+			Output:    "text",
+		},
+		deps{Tmux: &recordingTmux{missingPanes: map[string]bool{"%9": true}}},
+		&out,
+	); err != nil {
+		t.Fatal(err)
+	}
+	text := out.String()
+	if !strings.Contains(text, "action: child_context_exhausted") ||
+		!strings.Contains(text, "safe command: vamos qrspi inspect") {
+		t.Fatalf("output = %s", text)
+	}
+	loaded := loadManagerState(t, stateFile)
+	if loaded.Workflow.CurrentNodeID != qrspi.NodeDesign || loaded.ActiveChild == nil ||
+		loaded.LastActionCard == nil ||
+		loaded.LastActionCard.Kind != ActionChildContextExhausted {
+		t.Fatalf("loaded state = %+v", loaded)
 	}
 }
 
@@ -89,15 +230,33 @@ func TestContinueStopsWithLaunchFailedBeforeYAMLReprompt(t *testing.T) {
 	active := childHealthRef(dir)
 	writeFile(t, active.StatusPath, `{"exitCode":1}`)
 	writeFile(t, active.DonePath, "")
-	writeFile(t, active.OutputPath, "Error: unknown option --session-id\nUsage:\n  pi [flags]\n")
-	state := ManagerState{CanonicalPlanDir: "thoughts/example", ActiveChild: active, Workflow: testWorkflowState(t, qrspi.NodeDesign, nil)}
+	writeFile(
+		t,
+		active.OutputPath,
+		"Error: unknown option --session-id\nUsage:\n  pi [flags]\n",
+	)
+	state := ManagerState{
+		CanonicalPlanDir: "thoughts/example",
+		ActiveChild:      active,
+		Workflow:         testWorkflowState(t, qrspi.NodeDesign, nil),
+	}
 	saveManagerState(t, stateFile, state)
 	var out bytes.Buffer
-	if err := RunContinue(t.Context(), ContinueOptions{StateFile: stateFile, PlanDir: "thoughts/example", Output: "text"}, deps{Tmux: &recordingTmux{missingPanes: map[string]bool{"%9": true}}}, &out); err != nil {
+	if err := RunContinue(
+		t.Context(),
+		ContinueOptions{
+			StateFile: stateFile,
+			PlanDir:   "thoughts/example",
+			Output:    "text",
+		},
+		deps{Tmux: &recordingTmux{missingPanes: map[string]bool{"%9": true}}},
+		&out,
+	); err != nil {
 		t.Fatal(err)
 	}
 	text := out.String()
-	if !strings.Contains(text, "action: child_launch_failed") || !strings.Contains(text, "safe command: vamos qrspi repair-state") {
+	if !strings.Contains(text, "action: child_launch_failed") ||
+		!strings.Contains(text, "safe command: vamos qrspi repair-state") {
 		t.Fatalf("output = %s", text)
 	}
 	loaded := loadManagerState(t, stateFile)

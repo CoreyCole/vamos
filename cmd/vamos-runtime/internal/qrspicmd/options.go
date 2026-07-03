@@ -255,6 +255,7 @@ const (
 	ActiveChildRunning                 ActiveChildHealthStatus = "running"
 	ActiveChildFinishedNeedsValidation ActiveChildHealthStatus = "finished_success_needs_result_validation"
 	ActiveChildLaunchFailed            ActiveChildHealthStatus = "launch_failed"
+	ActiveChildContextExhausted        ActiveChildHealthStatus = "context_exhausted_no_result"
 	ActiveChildPaneMissing             ActiveChildHealthStatus = "pane_missing"
 	ActiveChildUnknown                 ActiveChildHealthStatus = "unknown"
 )
@@ -299,6 +300,7 @@ const (
 	ActionSupersededQueuedWake  = "superseded_queued_wake"
 	ActionPiCompatibilityFailed = "pi_compatibility_failed"
 	ActionChildLaunchFailed     = "child_launch_failed"
+	ActionChildContextExhausted = "child_context_exhausted"
 )
 
 func ProjectManagerActionCard(

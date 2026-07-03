@@ -119,6 +119,34 @@ func IsChildProviderError(err error) bool {
 }
 
 func ExtractFinalAssistantTextFromSession(path string) (string, error) {
+	last, err := extractLastAssistantTextFromSession(path, true)
+	if err != nil {
+		return "", err
+	}
+	if last == "" {
+		return "", fmt.Errorf(
+			"session %s has no assistant text containing qrspi_result",
+			path,
+		)
+	}
+	return last, nil
+}
+
+func ExtractLastAssistantTextFromSession(path string) (string, error) {
+	last, err := extractLastAssistantTextFromSession(path, false)
+	if err != nil {
+		return "", err
+	}
+	if last == "" {
+		return "", fmt.Errorf("session %s has no assistant text", path)
+	}
+	return last, nil
+}
+
+func extractLastAssistantTextFromSession(
+	path string,
+	requireQRSPIResult bool,
+) (string, error) {
 	file, err := os.Open(path)
 	if err != nil {
 		return "", err
@@ -142,29 +170,26 @@ func ExtractFinalAssistantTextFromSession(path string) (string, error) {
 			entry.Message.Role != "assistant" {
 			continue
 		}
-		if entry.Message.StopReason == "error" {
+		if requireQRSPIResult && entry.Message.StopReason == "error" {
 			sawProviderError = true
 			continue
 		}
-		if entry.Message.StopReason == "aborted" {
+		if requireQRSPIResult && entry.Message.StopReason == "aborted" {
 			continue
 		}
 		text := textBlocksFromAssistantMessage(*entry.Message)
-		if strings.Contains(text, "qrspi_result") {
+		if strings.TrimSpace(text) == "" {
+			continue
+		}
+		if !requireQRSPIResult || strings.Contains(text, "qrspi_result") {
 			last = text
 		}
 	}
 	if err := scanner.Err(); err != nil {
 		return "", err
 	}
-	if last == "" {
-		if sawProviderError {
-			return "", ChildProviderError{SessionPath: path}
-		}
-		return "", fmt.Errorf(
-			"session %s has no assistant text containing qrspi_result",
-			path,
-		)
+	if last == "" && sawProviderError {
+		return "", ChildProviderError{SessionPath: path}
 	}
 	return last, nil
 }
