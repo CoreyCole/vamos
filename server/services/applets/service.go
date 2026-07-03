@@ -239,7 +239,7 @@ func (s *Service) HandleAppletPage(c echo.Context) error {
 	}
 	process := s.currentProcess(c.Request().Context(), applet)
 	if process.Status != appletruntime.ProcessStatusHealthy {
-		s.EnsureAppletAsync(c.Request().Context(), applet)
+		s.EnsureAppletAsync(c.Request().Context(), applet, process)
 	}
 	return s.RenderAppletPage(c, applet, process)
 }
@@ -286,9 +286,14 @@ func (s *Service) HandleAppletStatus(c echo.Context) error {
 	ticker := time.NewTicker(250 * time.Millisecond)
 	defer ticker.Stop()
 
+	triggeredStart := false
 	var lastStatus appletruntime.ProcessStatus
 	for {
 		process := s.currentProcess(c.Request().Context(), applet)
+		if !triggeredStart && (shouldDemandStartFromStatus(process) || shouldRestartFromStatus(process)) {
+			triggeredStart = true
+			s.EnsureAppletAsync(c.Request().Context(), applet, process)
+		}
 		if process.Status != lastStatus {
 			if err := sse.PatchElementTempl(
 				AppletStatusFragment(applet, process),
@@ -386,12 +391,24 @@ func (s *Service) HandleAppletRestart(c echo.Context) error {
 	return c.Redirect(http.StatusSeeOther, applet.RouteHref)
 }
 
-func (s *Service) EnsureAppletAsync(ctx context.Context, applet AppletContext) {
+func shouldDemandStartFromStatus(process appletruntime.AppletProcessState) bool {
+	return process.Status == "" || process.Status == appletruntime.ProcessStatusStopped
+}
+
+func shouldRestartFromStatus(process appletruntime.AppletProcessState) bool {
+	return process.Status == appletruntime.ProcessStatusUnhealthy
+}
+
+func (s *Service) EnsureAppletAsync(ctx context.Context, applet AppletContext, process appletruntime.AppletProcessState) {
 	if s.manager == nil {
 		return
 	}
 	go func() {
-		_, _ = s.manager.EnsureStarted(context.WithoutCancel(ctx), RuntimeConfigFromManifest(applet))
+		runCtx := context.WithoutCancel(ctx)
+		if shouldRestartFromStatus(process) {
+			_ = s.manager.Stop(runCtx, applet.RuntimeKey)
+		}
+		_, _ = s.manager.EnsureStarted(runCtx, RuntimeConfigFromManifest(applet))
 	}()
 }
 

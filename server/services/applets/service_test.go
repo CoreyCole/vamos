@@ -143,26 +143,106 @@ func TestAppletFrameRendersStartingPanelWithStatusStream(t *testing.T) {
 }
 
 func TestHandleAppletStatusExecutesReloadWhenHealthy(t *testing.T) {
+	service := statusTestService(t, &sequenceManager{states: []appletruntime.AppletProcessState{{Status: appletruntime.ProcessStatusStarting}, {Status: appletruntime.ProcessStatusHealthy}}})
+	rec := callStatus(t, service)
+	if body := rec.Body.String(); !strings.Contains(body, "window.location.reload") {
+		t.Fatalf("status stream body = %s", body)
+	}
+}
+
+func TestHandleAppletStatusDemandStartsStoppedApplet(t *testing.T) {
+	manager := newAsyncRecordingManager([]appletruntime.AppletProcessState{
+		{Status: appletruntime.ProcessStatusStopped},
+		{Status: appletruntime.ProcessStatusHealthy},
+	})
+	service := statusTestService(t, manager)
+	callStatus(t, service)
+
+	select {
+	case cfg := <-manager.ensureCalled:
+		if cfg.AppID != "wordle" {
+			t.Fatalf("EnsureStarted AppID = %q", cfg.AppID)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("status stream did not demand-start stopped applet")
+	}
+}
+
+func TestHandleAppletStatusRestartsUnhealthyAppletBeforeEnsure(t *testing.T) {
+	manager := newAsyncRecordingManager([]appletruntime.AppletProcessState{
+		{Status: appletruntime.ProcessStatusUnhealthy},
+		{Status: appletruntime.ProcessStatusHealthy},
+	})
+	service := statusTestService(t, manager)
+	callStatus(t, service)
+
+	select {
+	case appID := <-manager.stopCalled:
+		if appID != "wordle" {
+			t.Fatalf("Stop AppID = %q", appID)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("status stream did not stop unhealthy applet")
+	}
+	select {
+	case cfg := <-manager.ensureCalled:
+		if cfg.AppID != "wordle" {
+			t.Fatalf("EnsureStarted AppID = %q", cfg.AppID)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("status stream did not ensure after unhealthy stop")
+	}
+}
+
+func statusTestService(t *testing.T, manager appletruntime.Manager) *Service {
+	t.Helper()
 	examplesRoot := t.TempDir()
 	writeAppletManifest(t, examplesRoot, "wordle")
-	service := NewHTTPService(ServiceOptions{
-		Resolver: Resolver{ExamplesRoot: examplesRoot},
-		Manager:  &sequenceManager{states: []appletruntime.AppletProcessState{{Status: appletruntime.ProcessStatusStarting}, {Status: appletruntime.ProcessStatusHealthy}}},
-	})
+	return NewHTTPService(ServiceOptions{Resolver: Resolver{ExamplesRoot: examplesRoot}, Manager: manager})
+}
 
+func callStatus(t *testing.T, service *Service) *httptest.ResponseRecorder {
+	t.Helper()
 	e := echo.New()
 	req := httptest.NewRequest(http.MethodGet, "/examples/wordle/status", nil)
 	rec := httptest.NewRecorder()
 	c := e.NewContext(req, rec)
 	c.SetParamNames("id")
 	c.SetParamValues("wordle")
-
 	if err := service.HandleAppletStatus(c); err != nil {
 		t.Fatalf("HandleAppletStatus() error = %v", err)
 	}
-	if body := rec.Body.String(); !strings.Contains(body, "window.location.reload") {
-		t.Fatalf("status stream body = %s", body)
+	return rec
+}
+
+type asyncRecordingManager struct {
+	sequenceManager
+	ensureCalled chan appletruntime.RuntimeConfig
+	stopCalled   chan string
+}
+
+func newAsyncRecordingManager(states []appletruntime.AppletProcessState) *asyncRecordingManager {
+	return &asyncRecordingManager{
+		sequenceManager: sequenceManager{states: states},
+		ensureCalled:    make(chan appletruntime.RuntimeConfig, 1),
+		stopCalled:      make(chan string, 1),
 	}
+}
+
+func (m *asyncRecordingManager) EnsureStarted(_ context.Context, cfg appletruntime.RuntimeConfig) (appletruntime.AppletProcessState, error) {
+	select {
+	case m.ensureCalled <- cfg:
+	default:
+	}
+	return appletruntime.AppletProcessState{AppID: cfg.AppID, Status: appletruntime.ProcessStatusHealthy, Healthy: true}, nil
+}
+
+func (m *asyncRecordingManager) Stop(_ context.Context, appID string) error {
+	select {
+	case m.stopCalled <- appID:
+	default:
+	}
+	return nil
 }
 
 func appletTestContext() AppletContext {
