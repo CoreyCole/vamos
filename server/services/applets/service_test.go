@@ -258,6 +258,57 @@ func TestHandleThoughtsAppletProxyUsesRuntimeKey(t *testing.T) {
 	}
 }
 
+func TestRegisteredThoughtsRoutesUseDurableIdentityBeforeCatchAll(t *testing.T) {
+	thoughtsRoot := t.TempDir()
+	identity := writeThoughtsAppletManifest(t, thoughtsRoot, "plans/demo", "demo")
+	token := EncodeAppletIdentity(identity)
+	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(r.URL.Path))
+	}))
+	defer backend.Close()
+	manager := &recordingManager{
+		target: backend.URL,
+		state:  appletruntime.AppletProcessState{Status: appletruntime.ProcessStatusHealthy},
+	}
+	service := NewHTTPService(ServiceOptions{Resolver: Resolver{ThoughtsRoot: thoughtsRoot}, Manager: manager})
+
+	e := echo.New()
+	thoughtsGroup := e.Group("/thoughts")
+	service.RegisterThoughtsRoutes(thoughtsGroup)
+	thoughtsGroup.GET("/*", func(c echo.Context) error { return c.String(http.StatusTeapot, "markdown catch-all") })
+	formsGroup := e.Group("/forms")
+	service.RegisterFormRoutes(formsGroup)
+
+	rec := httptest.NewRecorder()
+	e.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/thoughts/_render/app/"+token, nil))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("page status = %d body=%q", rec.Code, rec.Body.String())
+	}
+	for _, want := range []string{identity, "/thoughts/_render/app/" + token + "/app/"} {
+		if !strings.Contains(rec.Body.String(), want) {
+			t.Fatalf("page HTML missing %q:\n%s", want, rec.Body.String())
+		}
+	}
+
+	rec = httptest.NewRecorder()
+	e.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/thoughts/_render/app/"+token+"/app/events", nil))
+	if rec.Code != http.StatusOK || strings.TrimSpace(rec.Body.String()) != "/events" {
+		t.Fatalf("proxy response status=%d body=%q", rec.Code, rec.Body.String())
+	}
+	if manager.ensureConfig.AppID != token || manager.proxyTargetAppID != token {
+		t.Fatalf("proxy used ensure=%q target=%q, want token %q", manager.ensureConfig.AppID, manager.proxyTargetAppID, token)
+	}
+
+	rec = httptest.NewRecorder()
+	e.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/forms/applets/"+token+"/stop", nil))
+	if rec.Code != http.StatusSeeOther {
+		t.Fatalf("stop status = %d body=%q", rec.Code, rec.Body.String())
+	}
+	if manager.stoppedAppID != token {
+		t.Fatalf("Stop AppID = %q, want token %q", manager.stoppedAppID, token)
+	}
+}
+
 func TestRegisterStartupAliasesRejectsReservedStaticConflict(t *testing.T) {
 	thoughtsRoot := t.TempDir()
 	writeThoughtsAppletManifestWithAliases(t, thoughtsRoot, "plans/demo", "demo", []RouteAlias{{Pattern: "/static/demo"}})

@@ -38,19 +38,25 @@ applet:
 
 Fields:
 
-- `id`: lowercase applet identifier used for manager/runtime routing.
+- `id`: lowercase display identifier. For Thoughts applets, this is a label only; runtime identity is the encoded manifest path.
 - `kind`: `datastar`, `streamlit`, or `http`.
 - `title`: Workbench title.
-- `source_dir`: app source directory resolved under the configured files root.
+- `source_dir`: app source directory. Relative values resolve from the manifest directory.
 - `start_command`: explicit command that starts the HTTP app; Vamos supplies a local `PORT`.
 - `health_path`: app health check path. Defaults to `/healthz`, except Streamlit defaults to `/_stcore/health`.
 - `root_aliases`: explicit root-relative app paths that Vamos may forward to the app process.
+
+## Identity and routes
+
+Thoughts applets use the canonical manifest artifact path as durable identity. Opening a directory applet resolves to `thoughts/.../AGENTS.md`; opening a file applet uses that `thoughts/.../*.md` file. Vamos encodes this path into the `/thoughts/_render/app/:token` URL and uses the same token as the runtime key. `applet.id` and `title` remain human labels and may duplicate across Thoughts directories without colliding.
+
+Examples use the same route semantics but live in repo-tracked sample directories such as `examples/wordle/AGENTS.md`. Their stable compatibility route remains `/examples/:id`.
 
 ## Standalone app rule
 
 App code should stay standalone. It may keep root-relative routes such as `/events`, `/guesses`, or `/_stcore/stream`. The manifest declares which root paths belong to the applet so Vamos can forward those requests while the app is embedded.
 
-Vamos does not install a global root catch-all. Aliases are explicit and conflict checked.
+Vamos does not install a global root catch-all. Aliases are explicit and conflict checked. Root aliases are mounted during server startup; if a new Thoughts applet is added while the server is already running, scoped iframe routes work immediately but root aliases need a restart/startup indexing pass.
 
 ## Datastar example
 
@@ -106,7 +112,9 @@ The applet proxy is designed for Datastar SSE and Streamlit streaming endpoints:
 
 ## Lifecycle
 
-HTTP applets are demand-started. When a stopped applet page is opened, the Workbench renders a starting panel and subscribes to an applet status SSE stream. Once the process is healthy, the page refreshes or replaces the frame so the app loads. Idle applets can be stopped by the sweeper, but active SSE/WebSocket connections keep the process alive.
+HTTP applets are demand-started. When a stopped applet page is opened, the Workbench renders a starting panel and subscribes to an applet status SSE stream. Concurrent page/proxy requests share the same in-flight start so the manager reports truthful `starting` state instead of spawning duplicate processes. Once the process is healthy, the page refreshes or replaces the frame so the app loads.
+
+The server starts one idle sweeper for the shared applet runtime. It stops only healthy applets whose idle timeout has elapsed and whose active proxy/SSE/WebSocket connection count is zero. Processes with active proxied requests, zero idle timeout, or non-healthy status are left alone.
 
 ## Security limits
 
