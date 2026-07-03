@@ -1390,6 +1390,10 @@ func main() {
 		log.Fatal("Failed to initialize pickleball example service:", err)
 	}
 	sharedAppletRuntime := appletruntime.NewManager(filepath.Join(cfg.MarkdownBasePath, ".vamos", "applets", "logs"))
+	go appletruntime.StartAppletSweeper(runtimeCtx, sharedAppletRuntime, appletruntime.SweepOptions{
+		Interval: time.Minute,
+		Logger:   log.Default(),
+	})
 	examplesRoot := filepath.Dir(resolveExampleRoot(workspaceDiscovery.MainCheckoutPath, "todo"))
 	sharedAppletService := applets.NewHTTPService(applets.ServiceOptions{
 		Resolver: applets.Resolver{ThoughtsRoot: cfg.MarkdownBasePath, ExamplesRoot: examplesRoot},
