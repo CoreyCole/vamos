@@ -58,6 +58,8 @@ App code should stay standalone. It may keep root-relative routes such as `/even
 
 Vamos does not install a global root catch-all. Aliases are explicit and conflict checked. Root aliases are mounted during server startup; if a new Thoughts applet is added while the server is already running, scoped iframe routes work immediately but root aliases need a restart/startup indexing pass.
 
+Workbench controls expose an `Open in new tab` action that opens the same scoped app route used by the iframe, for example `/examples/wordle/app/`. It is still a Vamos proxy URL, so it demand-starts the applet and never exposes the raw local backend port.
+
 ## Datastar example
 
 Datastar apps often use one SSE read route and short POST write routes:
@@ -98,6 +100,8 @@ applet:
 
 Do not rely on default `/static/*` forwarding. Vamos owns manager `/static` assets. If an app truly needs root `/static/*`, declare it explicitly only when the alias registry can prove it will not shadow manager assets. Prefer scoped applet asset paths.
 
+Streamlit proof covers both scoped app routes and root aliases for `/_stcore/*` WebSocket endpoints and `/vendor/*` assets. `/static/*` remains excluded from defaults because Vamos owns manager `/static`; explicit `/static/*` aliases fail conflict checks unless policy changes deliberately.
+
 ## Proxy behavior
 
 The applet proxy is designed for Datastar SSE and Streamlit streaming endpoints:
@@ -108,7 +112,7 @@ The applet proxy is designed for Datastar SSE and Streamlit streaming endpoints:
 - `X-Forwarded-Host`, `X-Forwarded-Proto`, `X-Forwarded-Prefix`, and `X-Vamos-Applet-Proxy` are set;
 - SSE uses immediate flush;
 - WebSocket upgrade headers are preserved;
-- root-path cookies can be rewritten to the scoped applet path.
+- root-path cookies from scoped app responses are rewritten to the scoped applet path and, for manifest-declared root aliases, to those explicit alias paths. Vamos does not keep a blanket `Path=/` app cookie.
 
 ## Lifecycle
 

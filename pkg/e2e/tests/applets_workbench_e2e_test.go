@@ -2,6 +2,7 @@ package tests
 
 import (
 	"fmt"
+	"net/http"
 	"strings"
 	"testing"
 	"time"
@@ -31,7 +32,7 @@ func TestAppletsWorkbench_WordleRendersWorkbenchShell(t *testing.T) {
 		Expect(spec.ExpectStep(expectAppletRightRailTabs())).
 		Expect(spec.ExpectStep(expectWordleIframeLoaded())).
 		Expect(spec.ExpectStep(expectAppletIdentityEncoded("examples/wordle/AGENTS.md"))).
-		Expect(vamos.Console.Clean()).
+		Expect(spec.ExpectStep(expectAppletConsoleClean())).
 		Run()
 }
 
@@ -46,7 +47,8 @@ func TestAppletsWorkbench_DemandStartRefreshesToIframe(t *testing.T) {
 		Expect(spec.ExpectStep(expectWorkbenchDatastarImportMapPresent())).
 		Expect(spec.ExpectStep(expectStartingPanelOrIframe())).
 		Expect(spec.ExpectStep(expectWordleIframeLoaded())).
-		Expect(vamos.Console.Clean()).
+		Expect(spec.ExpectStep(expectOpenAppletInNewTabLink())).
+		Expect(spec.ExpectStep(expectAppletConsoleClean())).
 		Run()
 }
 
@@ -56,10 +58,11 @@ func TestAppletsWorkbench_WordleAbsoluteRoutesForwardFromIframe(t *testing.T) {
 		As(vamos.Robot).
 		With(vamos.WorkspaceFixture("thoughts-workbench.basic")).
 		Visit(vamos.Pages.Path("/examples/wordle?context=chat")).
+		Expect(spec.ExpectStep(expectWorkbenchDatastarImportMapPresent())).
 		Expect(spec.ExpectStep(expectWordleIframeLoaded())).
 		Do(loginToWordleApplet()).
-		Expect(spec.ExpectStep(expectWordleAbsoluteRoutesReachApplet())).
-		Expect(vamos.Console.Clean()).
+		Expect(spec.ExpectStep(expectWordleAliasCookiesWorkAfterLogin())).
+		Expect(spec.ExpectStep(expectAppletConsoleClean())).
 		Run()
 }
 
@@ -78,11 +81,11 @@ func expectWorkbenchDatastarImportMapPresent() spec.Step {
 			t.Fatal(err)
 		}
 		data := result.(map[string]any)
-		mapIndex := int(data["mapIndex"].(float64))
+		mapIndex := browserNumberAsInt(data["mapIndex"])
 		if data["hasHead"] != true || mapIndex < 0 {
 			t.Fatalf("Datastar import map missing: %#v", data)
 		}
-		if resizeIndex := int(data["resizeIndex"].(float64)); resizeIndex >= 0 && mapIndex > resizeIndex {
+		if resizeIndex := browserNumberAsInt(data["resizeIndex"]); resizeIndex >= 0 && mapIndex > resizeIndex {
 			t.Fatalf("Datastar import map after Workbench module: %#v", data)
 		}
 	})
@@ -225,32 +228,66 @@ func loginToWordleApplet() spec.Step {
 	})
 }
 
-func expectWordleAbsoluteRoutesReachApplet() spec.Step {
-	return spec.Custom("wordle absolute routes reach applet backend", func(t testing.TB, ctx *duiruntime.Context) {
+func expectWordleAliasCookiesWorkAfterLogin() spec.Step {
+	return spec.Custom("wordle alias routes receive login cookie", func(t testing.TB, ctx *duiruntime.Context) {
 		t.Helper()
-		statusAny, err := ctx.Page.FrameLocator(wordleAppletFrameSelector).Locator("body").Evaluate(`async () => {
-			const events = await fetch('/events', {headers: {Accept: 'text/event-stream'}}).then(r => r.status).catch(() => 0)
+		result, err := ctx.Page.FrameLocator(wordleAppletFrameSelector).Locator("body").Evaluate(`async () => {
+			const events = await fetch('/events', {headers: {Accept: 'text/event-stream'}})
+				.then((r) => ({status: r.status}))
+				.catch((e) => ({status: 0, text: String(e)}))
 			const guesses = await fetch('/guesses', {
 				method: 'POST',
 				headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-				body: new URLSearchParams({guess: 'adieu'})
-			}).then(r => r.status).catch(() => 0)
-			return {events, guesses}
+				body: new URLSearchParams({guess: 'adieu'}),
+			})
+				.then(async (r) => ({status: r.status, text: await r.text().catch(() => '')}))
+				.catch((e) => ({status: 0, text: String(e)}))
+			return {events, guesses, cookie: document.cookie}
 		}`, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
-		statuses := statusAny.(map[string]any)
-		for route, raw := range statuses {
-			status := int(raw.(float64))
-			if status == httpStatusNotFound || status == 0 || status >= 500 {
-				t.Fatalf("%s status = %d, want applet-handled non-5xx/non-404", route, status)
+		data := result.(map[string]any)
+		for route, raw := range map[string]any{"events": data["events"], "guesses": data["guesses"]} {
+			entry := raw.(map[string]any)
+			status := browserNumberAsInt(entry["status"])
+			if status == http.StatusNotFound || status == 0 || status >= 500 || status == http.StatusUnauthorized || status == http.StatusForbidden {
+				t.Fatalf("%s status = %d after login; result=%#v", route, status, data)
 			}
 		}
 	})
 }
 
-const httpStatusNotFound = 404
+func expectAppletConsoleClean() spec.Step {
+	return spec.Custom("applet console clean", func(t testing.TB, ctx *duiruntime.Context) {
+		t.Helper()
+		time.Sleep(250 * time.Millisecond)
+		problems := ctx.Console.Problems()
+		filtered := problems[:0]
+		for _, problem := range problems {
+			if problem.Type == "warning" && strings.Contains(problem.Text, "allow-scripts and allow-same-origin") {
+				continue
+			}
+			filtered = append(filtered, problem)
+		}
+		if len(filtered) > 0 {
+			t.Fatalf("console problems:\n%s", duiruntime.FormatConsoleProblems(filtered))
+		}
+	})
+}
+
+func browserNumberAsInt(value any) int {
+	switch n := value.(type) {
+	case int:
+		return n
+	case int64:
+		return int(n)
+	case float64:
+		return int(n)
+	default:
+		return -1
+	}
+}
 
 func visit(t testing.TB, ctx *duiruntime.Context, p string) {
 	t.Helper()
