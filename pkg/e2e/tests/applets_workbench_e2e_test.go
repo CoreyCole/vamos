@@ -22,6 +22,7 @@ func TestAppletsWorkbench_WordleRendersWorkbenchShell(t *testing.T) {
 		With(vamos.WorkspaceFixture("thoughts-workbench.basic")).
 		Visit(vamos.Pages.Path("/examples/wordle?context=chat")).
 		Expect(vamos.Thoughts.Ready()).
+		Expect(spec.ExpectStep(expectWorkbenchDatastarImportMapPresent())).
 		Expect(vamos.Thoughts.SidebarVisible()).
 		Expect(vamos.Thoughts.CenterPaneVisible()).
 		Expect(vamos.Thoughts.RightRailVisible()).
@@ -41,6 +42,7 @@ func TestAppletsWorkbench_DemandStartRefreshesToIframe(t *testing.T) {
 		Do(stopWordleAppletIfRunning()).
 		Visit(vamos.Pages.Path("/examples/wordle?context=chat")).
 		Expect(vamos.Thoughts.Ready()).
+		Expect(spec.ExpectStep(expectWorkbenchDatastarImportMapPresent())).
 		Expect(spec.ExpectStep(expectStartingPanelOrIframe())).
 		Expect(spec.ExpectStep(expectWordleIframeLoaded())).
 		Expect(vamos.Console.Clean()).
@@ -58,6 +60,31 @@ func TestAppletsWorkbench_WordleAbsoluteRoutesForwardFromIframe(t *testing.T) {
 		Expect(spec.ExpectStep(expectWordleAbsoluteRoutesReachApplet())).
 		Expect(vamos.Console.Clean()).
 		Run()
+}
+
+func expectWorkbenchDatastarImportMapPresent() spec.Step {
+	return spec.Custom("Workbench page has Datastar import map before modules", func(t testing.TB, ctx *duiruntime.Context) {
+		t.Helper()
+		result, err := ctx.Page.Evaluate(`() => {
+			const scripts = [...document.scripts]
+			const maps = [...document.querySelectorAll('script[type="importmap"]')].map((el) => el.textContent || '')
+			const resize = document.querySelector('script[src^="/js/workbench-resize.js"]')
+			const resizeIndex = resize ? scripts.indexOf(resize) : -1
+			const mapIndex = scripts.findIndex((el) => el.type === 'importmap' && (el.textContent || '').includes('@vamos/datastar'))
+			return {hasHead: !!document.head, maps, mapIndex, resizeIndex}
+		}`, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		data := result.(map[string]any)
+		mapIndex := int(data["mapIndex"].(float64))
+		if data["hasHead"] != true || mapIndex < 0 {
+			t.Fatalf("Datastar import map missing: %#v", data)
+		}
+		if resizeIndex := int(data["resizeIndex"].(float64)); resizeIndex >= 0 && mapIndex > resizeIndex {
+			t.Fatalf("Datastar import map after Workbench module: %#v", data)
+		}
+	})
 }
 
 func expectAppletSidebarTabs() spec.Step {

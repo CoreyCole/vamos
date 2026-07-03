@@ -10,6 +10,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/CoreyCole/vamos/server/layouts"
 	"github.com/CoreyCole/vamos/server/layouts/workbench"
 	"github.com/CoreyCole/vamos/server/services/appletruntime"
 	"github.com/a-h/templ"
@@ -263,7 +264,17 @@ func (s *Service) RenderAppletPage(c echo.Context, applet AppletContext, process
 	if err != nil {
 		return err
 	}
-	return workbench.Workbench(state).Render(c.Request().Context(), c.Response().Writer)
+	rootArgs := layouts.RootArgs{
+		Title:       applet.Manifest.Title + " Applet",
+		CurrentPath: applet.IdentityPath,
+		PageType:    layouts.PageTypeMarkdown,
+		ShowHeader:  true,
+		UserEmail:   appletUserEmail(c),
+	}
+	return layouts.Root(rootArgs).Render(
+		templ.WithChildren(c.Request().Context(), workbench.Workbench(state)),
+		c.Response().Writer,
+	)
 }
 
 func (s *Service) HandleAppletStatus(c echo.Context) error {

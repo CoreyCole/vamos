@@ -219,6 +219,41 @@ func (m *sequenceManager) SweepInactive(context.Context, time.Time) ([]appletrun
 	return nil, nil
 }
 
+func TestRenderAppletPageIncludesRootImportMapBeforeWorkbenchModules(t *testing.T) {
+	examplesRoot := t.TempDir()
+	writeExampleAppletManifestWithAliases(t, examplesRoot, "wordle", []RouteAlias{{Pattern: "/events", Methods: []string{http.MethodGet}}})
+	service := NewHTTPService(ServiceOptions{
+		Resolver: Resolver{ExamplesRoot: examplesRoot},
+		Manager:  &recordingManager{state: appletruntime.AppletProcessState{Status: appletruntime.ProcessStatusStopped}},
+	})
+
+	e := echo.New()
+	req := httptest.NewRequest(http.MethodGet, "/examples/wordle?context=chat", nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	c.SetParamNames("id")
+	c.SetParamValues("wordle")
+
+	if err := service.HandleAppletPage(c); err != nil {
+		t.Fatalf("HandleAppletPage() error = %v", err)
+	}
+	html := rec.Body.String()
+	importMapIndex := strings.Index(html, `<script type="importmap">`)
+	workbenchScriptIndex := strings.Index(html, `/js/workbench-resize.js`)
+	if importMapIndex < 0 || !strings.Contains(html, `"@vamos/datastar"`) {
+		t.Fatalf("page missing Root Datastar import map:\n%s", html)
+	}
+	if workbenchScriptIndex < 0 {
+		t.Fatalf("page missing Workbench resize module:\n%s", html)
+	}
+	if importMapIndex > workbenchScriptIndex {
+		t.Fatalf("import map appears after Workbench module: importMap=%d resize=%d", importMapIndex, workbenchScriptIndex)
+	}
+	if !strings.Contains(html, "<head") || !strings.Contains(html, "</head>") {
+		t.Fatalf("page did not render Root head:\n%s", html)
+	}
+}
+
 func TestHandleThoughtsAppletPageUsesDurableIdentity(t *testing.T) {
 	thoughtsRoot := t.TempDir()
 	identity := writeThoughtsAppletManifest(t, thoughtsRoot, "plans/demo", "demo")
@@ -239,7 +274,7 @@ func TestHandleThoughtsAppletPageUsesDurableIdentity(t *testing.T) {
 		t.Fatalf("HandleAppletPage() error = %v", err)
 	}
 	html := rec.Body.String()
-	for _, want := range []string{identity, "/thoughts/_render/app/" + token + "/app/", "doc-workbench-sidebar"} {
+	for _, want := range []string{identity, "/thoughts/_render/app/" + token + "/app/", "doc-workbench-sidebar", `"@vamos/datastar"`, "/js/workbench-resize.js"} {
 		if !strings.Contains(html, want) {
 			t.Fatalf("page HTML missing %q:\n%s", want, html)
 		}
