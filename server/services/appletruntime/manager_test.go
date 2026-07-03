@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 )
@@ -66,6 +67,147 @@ func main() {
 	}
 	if _, ok := manager.ProxyTarget("pickleball"); ok {
 		t.Fatal("ProxyTarget still active after Stop")
+	}
+}
+
+func TestEnsureStartedDedupesConcurrentStarts(t *testing.T) {
+	filesRoot, sourceDir, bin := writeAppletSource(t, `
+package main
+import (
+  "fmt"
+  "net/http"
+  "os"
+  "time"
+)
+func main() {
+  if path := os.Getenv("COUNTER_PATH"); path != "" {
+    f, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
+    if err == nil { _, _ = f.WriteString("1\n"); _ = f.Close() }
+  }
+  port := os.Getenv("PORT")
+  started := time.Now()
+  http.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
+    if time.Since(started) < 250*time.Millisecond { http.Error(w, "starting", http.StatusServiceUnavailable); return }
+    fmt.Fprint(w, "ok")
+  })
+  if err := http.ListenAndServe("127.0.0.1:"+port, nil); err != nil { panic(err) }
+}
+`)
+	counterPath := filepath.Join(t.TempDir(), "starts.log")
+	manager := NewManager(t.TempDir())
+	cfg := RuntimeConfig{
+		AppID:        "pickleball",
+		FilesRoot:    filesRoot,
+		SourceDir:    sourceDir,
+		BuildCommand: []string{"go", "build", "-o", bin, "."},
+		StartCommand: []string{bin},
+		HealthPath:   "/healthz",
+		IdleTimeout:  time.Minute,
+		Env:          map[string]string{"COUNTER_PATH": counterPath},
+	}
+	const callers = 5
+	states := make([]AppletProcessState, callers)
+	errs := make([]error, callers)
+	var wg sync.WaitGroup
+	for i := range callers {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			states[i], errs[i] = manager.EnsureStarted(context.Background(), cfg)
+		}(i)
+	}
+	wg.Wait()
+	defer manager.Stop(context.Background(), "pickleball")
+	for i, err := range errs {
+		if err != nil {
+			t.Fatalf("EnsureStarted[%d]() error = %v", i, err)
+		}
+		if states[i].PID != states[0].PID || states[i].Port != states[0].Port || states[i].Status != ProcessStatusHealthy {
+			t.Fatalf("EnsureStarted[%d]() = %+v, want same healthy process as %+v", i, states[i], states[0])
+		}
+	}
+	content, err := os.ReadFile(counterPath)
+	if err != nil {
+		t.Fatalf("read counter: %v", err)
+	}
+	if starts := strings.Count(string(content), "1\n"); starts != 1 {
+		t.Fatalf("process starts = %d, want 1; counter=%q", starts, content)
+	}
+}
+
+func TestHealthReportsStartingWhileProcessBoots(t *testing.T) {
+	filesRoot, sourceDir, bin := writeAppletSource(t, `
+package main
+import (
+  "fmt"
+  "net/http"
+  "os"
+  "time"
+)
+func main() {
+  time.Sleep(500*time.Millisecond)
+  port := os.Getenv("PORT")
+  http.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) { fmt.Fprint(w, "ok") })
+  if err := http.ListenAndServe("127.0.0.1:"+port, nil); err != nil { panic(err) }
+}
+`)
+	manager := NewManager(t.TempDir())
+	cfg := RuntimeConfig{
+		AppID:        "pickleball",
+		FilesRoot:    filesRoot,
+		SourceDir:    sourceDir,
+		BuildCommand: []string{"go", "build", "-o", bin, "."},
+		StartCommand: []string{bin},
+		HealthPath:   "/healthz",
+		IdleTimeout:  time.Minute,
+	}
+	done := make(chan error, 1)
+	go func() {
+		_, err := manager.EnsureStarted(context.Background(), cfg)
+		done <- err
+	}()
+	deadline := time.After(5 * time.Second)
+	for {
+		state, err := manager.Health(context.Background(), "pickleball")
+		if err == nil && state.Status == ProcessStatusStarting && !state.Healthy {
+			break
+		}
+		select {
+		case <-deadline:
+			t.Fatalf("Health() never reported starting; last state=%+v err=%v", state, err)
+		case <-time.After(25 * time.Millisecond):
+		}
+	}
+	if err := <-done; err != nil {
+		t.Fatalf("EnsureStarted() error = %v", err)
+	}
+	defer manager.Stop(context.Background(), "pickleball")
+}
+
+func TestFailedFirstStartRemovesStartingCandidate(t *testing.T) {
+	filesRoot, sourceDir, bin := writeAppletSource(t, `
+package main
+func main() { select{} }
+`)
+	manager := NewManager(t.TempDir())
+	ctx, cancel := context.WithTimeout(context.Background(), 300*time.Millisecond)
+	defer cancel()
+	_, err := manager.EnsureStarted(ctx, RuntimeConfig{
+		AppID:        "pickleball",
+		FilesRoot:    filesRoot,
+		SourceDir:    sourceDir,
+		BuildCommand: []string{"go", "build", "-o", bin, "."},
+		StartCommand: []string{bin},
+		HealthPath:   "/healthz",
+	})
+	if err == nil {
+		t.Fatal("EnsureStarted() unexpectedly succeeded")
+	}
+	if state, err := manager.Health(context.Background(), "pickleball"); err == nil || state.Status != "" {
+		t.Fatalf("Health() after failed first start = %+v, %v", state, err)
+	}
+	if _, ok := manager.ProxyTarget("pickleball"); ok {
+		t.Fatal("ProxyTarget active after failed first start")
 	}
 }
 

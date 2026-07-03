@@ -27,9 +27,12 @@ type activeProcess struct {
 	cmd        *exec.Cmd
 	log        *os.File
 	healthPath string
+	ready      chan struct{}
 	done       chan struct{}
 	once       sync.Once
+	readyOnce  sync.Once
 	waitErr    error
+	startErr   error
 }
 
 // ManagerImpl supervises local generated applet processes.
@@ -48,17 +51,8 @@ func (m *ManagerImpl) EnsureStarted(ctx context.Context, cfg RuntimeConfig) (App
 	m.mu.Lock()
 	proc := m.active[appID]
 	m.mu.Unlock()
-	if proc != nil && waitHealthy(ctx, proc.state.BaseURL+proc.healthPath) == nil {
-		m.mu.Lock()
-		if m.active[appID] == proc {
-			proc.state.Status = ProcessStatusHealthy
-			proc.state.Healthy = true
-			proc.state.LastSeenAt = time.Now()
-			state := proc.state
-			m.mu.Unlock()
-			return state, nil
-		}
-		m.mu.Unlock()
+	if proc != nil {
+		return waitForProcessReady(ctx, proc)
 	}
 	return m.Start(ctx, cfg)
 }
@@ -70,23 +64,60 @@ func (m *ManagerImpl) Start(ctx context.Context, cfg RuntimeConfig) (ProcessStat
 	if cfg.HealthPath == "" {
 		cfg.HealthPath = defaultHealthPath
 	}
+	appID := strings.TrimSpace(cfg.AppID)
+
+	m.mu.Lock()
+	previous := m.active[appID]
+	candidate := &activeProcess{state: AppletProcessState{
+		AppID:       appID,
+		SourceDir:   cfg.SourceDir,
+		Status:      ProcessStatusStarting,
+		Healthy:     false,
+		LastSeenAt:  time.Now(),
+		IdleTimeout: cfg.IdleTimeout,
+	}, healthPath: cfg.HealthPath, ready: make(chan struct{}), done: make(chan struct{})}
+	reserved := previous == nil
+	if previous != nil && previous.state.Status == ProcessStatusStarting {
+		m.mu.Unlock()
+		return waitForProcessReady(ctx, previous)
+	}
+	if reserved {
+		m.active[appID] = candidate
+	}
+	m.mu.Unlock()
+
+	failCandidate := func(stage string, err error) (ProcessState, error) {
+		wrapped := fmt.Errorf("%s applet %q: %w", stage, appID, err)
+		candidate.state.Status = ProcessStatusUnhealthy
+		candidate.state.Healthy = false
+		candidate.finishStart(wrapped)
+		if reserved {
+			m.mu.Lock()
+			if m.active[appID] == candidate {
+				delete(m.active, appID)
+			}
+			m.mu.Unlock()
+		}
+		_ = stopProcess(candidate)
+		return ProcessState{}, wrapped
+	}
 
 	port, err := allocateLocalPort()
 	if err != nil {
-		return ProcessState{}, err
+		return failCandidate("allocate port for", err)
 	}
 	env := appletEnv(cfg, port)
-	logPath := m.logPath(cfg.AppID)
+	logPath := m.logPath(appID)
 
 	if len(cfg.BuildCommand) > 0 {
 		if err := runCommand(ctx, cfg.SourceDir, cfg.BuildCommand, env, nil); err != nil {
-			return ProcessState{}, fmt.Errorf("build applet %q: %w", cfg.AppID, err)
+			return failCandidate("build", err)
 		}
 	}
 
 	logFile, err := openLog(logPath)
 	if err != nil {
-		return ProcessState{}, err
+		return failCandidate("open log for", err)
 	}
 	cmd := exec.Command(cfg.StartCommand[0], cfg.StartCommand[1:]...)
 	cmd.Dir = cfg.SourceDir
@@ -95,39 +126,38 @@ func (m *ManagerImpl) Start(ctx context.Context, cfg RuntimeConfig) (ProcessStat
 	cmd.Stderr = logFile
 	if err := cmd.Start(); err != nil {
 		_ = logFile.Close()
-		return ProcessState{}, fmt.Errorf("start applet %q: %w", cfg.AppID, err)
+		return failCandidate("start", err)
 	}
 
-	now := time.Now()
-	candidate := &activeProcess{state: AppletProcessState{
-		AppID:       cfg.AppID,
-		SourceDir:   cfg.SourceDir,
-		Status:      ProcessStatusStarting,
-		Port:        port,
-		PID:         cmd.Process.Pid,
-		BaseURL:     "http://127.0.0.1:" + strconv.Itoa(port),
-		Healthy:     false,
-		LogPath:     logPath,
-		LastSeenAt:  now,
-		IdleTimeout: cfg.IdleTimeout,
-	}, cmd: cmd, log: logFile, healthPath: cfg.HealthPath, done: make(chan struct{})}
+	candidate.cmd = cmd
+	candidate.log = logFile
+	candidate.state.Port = port
+	candidate.state.PID = cmd.Process.Pid
+	candidate.state.BaseURL = "http://127.0.0.1:" + strconv.Itoa(port)
+	candidate.state.LogPath = logPath
+	candidate.state.LastSeenAt = time.Now()
+	go m.reap(appID, candidate)
 
 	if err := waitHealthy(ctx, candidate.state.BaseURL+cfg.HealthPath); err != nil {
-		stopProcess(candidate)
-		return ProcessState{}, fmt.Errorf("health check applet %q: %w", cfg.AppID, err)
+		return failCandidate("health check", err)
 	}
 	candidate.state.Status = ProcessStatusHealthy
 	candidate.state.Healthy = true
 	candidate.state.LastSeenAt = time.Now()
+	candidate.finishStart(nil)
 
 	m.mu.Lock()
-	previous := m.active[cfg.AppID]
-	m.active[cfg.AppID] = candidate
+	if reserved {
+		if m.active[appID] == candidate {
+			m.active[appID] = candidate
+		}
+	} else if m.active[appID] == previous {
+		m.active[appID] = candidate
+	}
 	m.mu.Unlock()
-	if previous != nil {
+	if previous != nil && previous != candidate {
 		stopProcess(previous)
 	}
-	go m.reap(cfg.AppID, candidate)
 	return candidate.state, nil
 }
 
@@ -146,10 +176,16 @@ func (m *ManagerImpl) Stop(_ context.Context, appID string) error {
 func (m *ManagerImpl) Health(ctx context.Context, appID string) (AppletProcessState, error) {
 	m.mu.Lock()
 	proc := m.active[strings.TrimSpace(appID)]
-	m.mu.Unlock()
 	if proc == nil {
+		m.mu.Unlock()
 		return AppletProcessState{}, fmt.Errorf("unknown applet %q", appID)
 	}
+	if proc.state.Status == ProcessStatusStarting {
+		state := proc.state
+		m.mu.Unlock()
+		return state, nil
+	}
+	m.mu.Unlock()
 	if err := waitHealthy(ctx, proc.state.BaseURL+proc.healthPath); err != nil {
 		m.mu.Lock()
 		if m.active[strings.TrimSpace(appID)] == proc {
@@ -361,7 +397,13 @@ func healthCheck(ctx context.Context, endpoint string) error {
 }
 
 func stopProcess(proc *activeProcess) error {
-	if proc == nil || proc.cmd == nil || proc.cmd.Process == nil {
+	if proc == nil {
+		return nil
+	}
+	if proc.state.Status == ProcessStatusStarting {
+		proc.finishStart(errors.New("applet stopped while starting"))
+	}
+	if proc.cmd == nil || proc.cmd.Process == nil {
 		return nil
 	}
 	if runtime.GOOS == "windows" {
@@ -398,6 +440,38 @@ func (p *activeProcess) startWait() {
 			close(p.done)
 		}()
 	})
+}
+
+func (p *activeProcess) finishStart(err error) {
+	if p == nil || p.ready == nil {
+		return
+	}
+	p.readyOnce.Do(func() {
+		p.startErr = err
+		close(p.ready)
+	})
+}
+
+func waitForProcessReady(ctx context.Context, proc *activeProcess) (AppletProcessState, error) {
+	if proc == nil {
+		return AppletProcessState{}, errors.New("applet process is unavailable")
+	}
+	state := proc.state
+	if state.Status == ProcessStatusHealthy {
+		return state, nil
+	}
+	if proc.ready == nil {
+		return state, nil
+	}
+	select {
+	case <-proc.ready:
+		if proc.startErr != nil {
+			return proc.state, proc.startErr
+		}
+		return proc.state, nil
+	case <-ctx.Done():
+		return state, ctx.Err()
+	}
 }
 
 func openLog(path string) (*os.File, error) {
