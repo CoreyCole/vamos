@@ -78,15 +78,15 @@ func TestHandleAliasProxiesRootAliasThroughRuntime(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewService() error = %v", err)
 	}
-	service.registerRootAliases(echo.New())
-
 	e := echo.New()
+	if err := service.applets.RegisterStartupAliases(e); err != nil {
+		t.Fatalf("RegisterStartupAliases() error = %v", err)
+	}
 	req := httptest.NewRequest(http.MethodPost, "/guesses", nil)
 	rec := httptest.NewRecorder()
-	c := e.NewContext(req, rec)
-
-	if err := service.HandleAlias(c); err != nil {
-		t.Fatalf("HandleAlias() error = %v", err)
+	e.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("alias status = %d body=%q", rec.Code, rec.Body.String())
 	}
 	if got := strings.TrimSpace(rec.Body.String()); got != "POST /guesses" {
 		t.Fatalf("alias proxy = %q, want POST /guesses", got)

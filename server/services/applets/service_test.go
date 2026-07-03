@@ -258,6 +258,88 @@ func TestHandleThoughtsAppletProxyUsesRuntimeKey(t *testing.T) {
 	}
 }
 
+func TestRegisterStartupAliasesRejectsReservedStaticConflict(t *testing.T) {
+	thoughtsRoot := t.TempDir()
+	writeThoughtsAppletManifestWithAliases(t, thoughtsRoot, "plans/demo", "demo", []RouteAlias{{Pattern: "/static/demo"}})
+	service := NewHTTPService(ServiceOptions{Resolver: Resolver{ThoughtsRoot: thoughtsRoot}})
+
+	if err := service.RegisterStartupAliases(echo.New()); err == nil || !strings.Contains(err.Error(), "reserved Vamos prefix") {
+		t.Fatalf("RegisterStartupAliases() error = %v, want reserved prefix conflict", err)
+	}
+}
+
+func TestRegisterStartupAliasesRejectsDuplicateExampleAndThoughtsAlias(t *testing.T) {
+	examplesRoot := t.TempDir()
+	writeExampleAppletManifestWithAliases(t, examplesRoot, "wordle", []RouteAlias{{Pattern: "/events"}})
+	thoughtsRoot := t.TempDir()
+	writeThoughtsAppletManifestWithAliases(t, thoughtsRoot, "plans/demo", "demo", []RouteAlias{{Pattern: "/events"}})
+	service := NewHTTPService(ServiceOptions{Resolver: Resolver{ExamplesRoot: examplesRoot, ThoughtsRoot: thoughtsRoot}})
+
+	if err := service.RegisterStartupAliases(echo.New()); err == nil || !strings.Contains(err.Error(), "already registered") {
+		t.Fatalf("RegisterStartupAliases() error = %v, want duplicate alias conflict", err)
+	}
+}
+
+func TestRegisterStartupAliasesMountsThoughtsAliasRoute(t *testing.T) {
+	thoughtsRoot := t.TempDir()
+	identity := writeThoughtsAppletManifestWithAliases(t, thoughtsRoot, "plans/demo", "demo", []RouteAlias{{Pattern: "/events", Methods: []string{http.MethodGet}}})
+	token := EncodeAppletIdentity(identity)
+	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(r.URL.Path))
+	}))
+	defer backend.Close()
+	manager := &recordingManager{target: backend.URL}
+	service := NewHTTPService(ServiceOptions{Resolver: Resolver{ThoughtsRoot: thoughtsRoot}, Manager: manager})
+	e := echo.New()
+
+	if err := service.RegisterStartupAliases(e); err != nil {
+		t.Fatalf("RegisterStartupAliases() error = %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/events", nil)
+	rec := httptest.NewRecorder()
+	e.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("alias status = %d body=%q", rec.Code, rec.Body.String())
+	}
+	if got := strings.TrimSpace(rec.Body.String()); got != "/events" {
+		t.Fatalf("alias proxy body = %q, want /events", got)
+	}
+	if manager.ensureConfig.AppID != token {
+		t.Fatalf("alias EnsureStarted AppID = %q, want token %q", manager.ensureConfig.AppID, token)
+	}
+
+	rec = httptest.NewRecorder()
+	e.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/not-registered", nil))
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("unregistered route status = %d, want 404", rec.Code)
+	}
+}
+
+func TestRegisterStartupAliasesMountsExampleAliasRoute(t *testing.T) {
+	examplesRoot := t.TempDir()
+	writeExampleAppletManifestWithAliases(t, examplesRoot, "wordle", []RouteAlias{{Pattern: "/guesses", Methods: []string{http.MethodPost}}})
+	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(r.URL.Path))
+	}))
+	defer backend.Close()
+	manager := &recordingManager{target: backend.URL}
+	service := NewHTTPService(ServiceOptions{Resolver: Resolver{ExamplesRoot: examplesRoot}, Manager: manager})
+	e := echo.New()
+
+	if err := service.RegisterStartupAliases(e); err != nil {
+		t.Fatalf("RegisterStartupAliases() error = %v", err)
+	}
+	rec := httptest.NewRecorder()
+	e.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/guesses", nil))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("alias status = %d body=%q", rec.Code, rec.Body.String())
+	}
+	if manager.ensureConfig.AppID != "wordle" {
+		t.Fatalf("example alias EnsureStarted AppID = %q, want wordle", manager.ensureConfig.AppID)
+	}
+}
+
 func TestHandleThoughtsAppletFormsUseRuntimeKey(t *testing.T) {
 	thoughtsRoot := t.TempDir()
 	identity := writeThoughtsAppletManifest(t, thoughtsRoot, "plans/demo", "demo")
@@ -292,16 +374,60 @@ func TestHandleThoughtsAppletFormsUseRuntimeKey(t *testing.T) {
 }
 
 func writeThoughtsAppletManifest(t *testing.T, root, relDir, id string) string {
+	return writeThoughtsAppletManifestWithAliases(t, root, relDir, id, nil)
+}
+
+func writeThoughtsAppletManifestWithAliases(t *testing.T, root, relDir, id string, aliases []RouteAlias) string {
 	t.Helper()
 	dir := filepath.Join(root, filepath.FromSlash(relDir))
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	body := "---\nvamos_artifact: applet\napplet:\n  id: " + id + "\n  kind: datastar\n  title: Demo\n  app_dir: .\n  start_command: [just, build]\n---\n"
+	body := manifestBody(id, "Demo", aliases)
 	if err := os.WriteFile(filepath.Join(dir, "AGENTS.md"), []byte(body), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	return "thoughts/" + strings.Trim(strings.TrimPrefix(filepath.ToSlash(relDir), "thoughts/"), "/") + "/AGENTS.md"
+}
+
+func writeExampleAppletManifestWithAliases(t *testing.T, root, id string, aliases []RouteAlias) {
+	t.Helper()
+	dir := filepath.Join(root, id)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "AGENTS.md"), []byte(manifestBody(id, "Wordle", aliases)), 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func manifestBody(id, title string, aliases []RouteAlias) string {
+	var b strings.Builder
+	b.WriteString("---\nvamos_artifact: applet\napplet:\n  id: ")
+	b.WriteString(id)
+	b.WriteString("\n  kind: datastar\n  title: ")
+	b.WriteString(title)
+	b.WriteString("\n  app_dir: .\n  start_command: [just, build]\n")
+	if len(aliases) > 0 {
+		b.WriteString("  root_aliases:\n")
+		for _, alias := range aliases {
+			b.WriteString("    - pattern: ")
+			b.WriteString(alias.Pattern)
+			b.WriteString("\n")
+			if len(alias.Methods) > 0 {
+				b.WriteString("      methods: [")
+				for i, method := range alias.Methods {
+					if i > 0 {
+						b.WriteString(", ")
+					}
+					b.WriteString(method)
+				}
+				b.WriteString("]\n")
+			}
+		}
+	}
+	b.WriteString("---\n")
+	return b.String()
 }
 
 type recordingManager struct {

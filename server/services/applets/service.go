@@ -4,7 +4,10 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/CoreyCole/vamos/server/layouts/workbench"
@@ -19,20 +22,31 @@ const (
 	chatSuffix     = "chat"
 )
 
+var reservedAliasPrefixes = []string{"/api", "/forms", "/thoughts", "/agent-chat", "/static"}
+
 type Service struct {
 	resolver Resolver
 	manager  appletruntime.Manager
+	aliases  *appletruntime.AliasRegistry
+
+	aliasMu     sync.Mutex
+	aliasRoutes map[string]struct{}
 }
 
 type ServiceOptions struct {
 	Resolver Resolver
 	Manager  appletruntime.Manager
+	Aliases  *appletruntime.AliasRegistry
 }
 
-func NewService() *Service { return &Service{} }
+func NewService() *Service { return NewHTTPService(ServiceOptions{}) }
 
 func NewHTTPService(opts ServiceOptions) *Service {
-	return &Service{resolver: opts.Resolver, manager: opts.Manager}
+	aliases := opts.Aliases
+	if aliases == nil {
+		aliases = appletruntime.NewAliasRegistry(reservedAliasPrefixes)
+	}
+	return &Service{resolver: opts.Resolver, manager: opts.Manager, aliases: aliases, aliasRoutes: map[string]struct{}{}}
 }
 
 func (s *Service) RegisterThoughtsRoutes(g *echo.Group) {
@@ -64,6 +78,85 @@ func (s *Service) RegisterExampleRoutes(e *echo.Echo, auth echo.MiddlewareFunc) 
 func (s *Service) RegisterFormRoutes(g *echo.Group) {
 	g.POST("/applets/:token/stop", s.HandleAppletStop)
 	g.POST("/applets/:token/restart", s.HandleAppletRestart)
+}
+
+func (s *Service) RegisterStartupAliases(e *echo.Echo) error {
+	if err := s.registerExampleStartupAliases(e); err != nil {
+		return err
+	}
+	return s.registerThoughtsStartupAliases(e)
+}
+
+func (s *Service) registerExampleStartupAliases(e *echo.Echo) error {
+	root := strings.TrimSpace(s.resolver.ExamplesRoot)
+	if root == "" {
+		return nil
+	}
+	manifests, err := filepath.Glob(filepath.Join(root, "*", "AGENTS.md"))
+	if err != nil {
+		return err
+	}
+	for _, manifestPath := range manifests {
+		id := filepath.Base(filepath.Dir(manifestPath))
+		ctx, err := s.resolver.ResolveExampleApplet(nil, id)
+		if err != nil || len(ctx.Manifest.RootAliases) == 0 {
+			continue
+		}
+		if err := s.registerAppletAliasesDuringStartup(e, ctx); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (s *Service) registerThoughtsStartupAliases(e *echo.Echo) error {
+	root := strings.TrimSpace(s.resolver.ThoughtsRoot)
+	if root == "" {
+		return nil
+	}
+	return filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
+		if err != nil || d == nil || d.IsDir() || d.Name() != "AGENTS.md" {
+			return nil
+		}
+		rel, err := filepath.Rel(root, path)
+		if err != nil {
+			return nil
+		}
+		ctx, err := s.resolver.ResolveThoughtsApplet(nil, "thoughts/"+filepath.ToSlash(rel))
+		if err != nil || len(ctx.Manifest.RootAliases) == 0 {
+			return nil
+		}
+		return s.registerAppletAliasesDuringStartup(e, ctx)
+	})
+}
+
+func (s *Service) registerAppletAliasesDuringStartup(e *echo.Echo, ctx AppletContext) error {
+	reg := aliasRegistration(ctx)
+	if len(reg.Aliases) == 0 {
+		return nil
+	}
+	s.aliasMu.Lock()
+	defer s.aliasMu.Unlock()
+	if err := s.aliases.Register(reg); err != nil {
+		return err
+	}
+	for _, alias := range reg.Aliases {
+		s.registerAliasRouteLocked(e, alias)
+	}
+	return nil
+}
+
+func (s *Service) registerAliasRouteLocked(e *echo.Echo, alias appletruntime.RouteAlias) {
+	route := echoRoute(alias.Pattern)
+	if route == "" {
+		return
+	}
+	if _, ok := s.aliasRoutes[route]; ok {
+		return
+	}
+	s.aliasRoutes[route] = struct{}{}
+	e.OPTIONS(route, s.HandleAppletOptions)
+	e.Any(route, s.HandleAlias)
 }
 
 func BuildWorkbenchState(_ context.Context, state WorkbenchState) workbench.WorkbenchState {
@@ -231,6 +324,28 @@ func (s *Service) HandleAppletProxy(c echo.Context) error {
 	return nil
 }
 
+func (s *Service) HandleAlias(c echo.Context) error {
+	setAppletCORS(c.Response().Header())
+	c.Response().Before(func() { setAppletCORS(c.Response().Header()) })
+	if c.Request().Method == http.MethodOptions {
+		return c.NoContent(http.StatusNoContent)
+	}
+	match, ok := s.aliases.Match(c.Request())
+	if !ok {
+		return echo.NewHTTPError(http.StatusNotFound, "unknown applet alias")
+	}
+	applet, err := s.resolveAppletFromRuntimeKey(c.Request().Context(), match.AppID)
+	if err != nil {
+		return err
+	}
+	if err := s.ensure(c, applet); err != nil {
+		return err
+	}
+	proxy := appletruntime.NewAppletProxy(s.manager, match, proxyOptions())
+	proxy.ServeHTTP(c.Response(), c.Request())
+	return nil
+}
+
 func (s *Service) HandleAppletStop(c echo.Context) error {
 	if s.manager == nil {
 		return echo.NewHTTPError(http.StatusBadGateway, "applet runtime is unavailable")
@@ -291,6 +406,13 @@ func (s *Service) resolveAppletFromRequest(c echo.Context) (AppletContext, error
 	return s.resolver.ResolveExampleApplet(c.Request().Context(), id)
 }
 
+func (s *Service) resolveAppletFromRuntimeKey(ctx context.Context, runtimeKey string) (AppletContext, error) {
+	if identity, err := DecodeAppletIdentity(runtimeKey); err == nil && strings.HasPrefix(identity, "thoughts/") && s.resolver.ThoughtsRoot != "" {
+		return s.resolver.ResolveThoughtsApplet(ctx, identity)
+	}
+	return s.resolver.ResolveExampleApplet(ctx, runtimeKey)
+}
+
 func appletUserEmail(c echo.Context) string {
 	if value, ok := c.Get("user_email").(string); ok {
 		return strings.TrimSpace(value)
@@ -343,6 +465,25 @@ func setAppletCORS(header http.Header) {
 	header.Set("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
 	header.Set("Access-Control-Allow-Headers", "Content-Type, Accept, Datastar-Request")
 	header.Set("Access-Control-Max-Age", "600")
+}
+
+func aliasRegistration(ctx AppletContext) appletruntime.AliasRegistration {
+	aliases := make([]appletruntime.RouteAlias, 0, len(ctx.Manifest.RootAliases))
+	for _, alias := range ctx.Manifest.RootAliases {
+		aliases = append(aliases, appletruntime.RouteAlias{Pattern: alias.Pattern, Methods: alias.Methods})
+	}
+	return appletruntime.AliasRegistration{AppID: ctx.RuntimeKey, Aliases: aliases}
+}
+
+func echoRoute(pattern string) string {
+	pattern = strings.TrimSpace(pattern)
+	if pattern == "" || pattern == "/" || pattern == "/*" {
+		return ""
+	}
+	if strings.HasSuffix(pattern, "/*") {
+		return strings.TrimSuffix(pattern, "/*") + "/*"
+	}
+	return pattern
 }
 
 func EmptyRegion(message string) templ.Component { return emptyRegion(message) }
