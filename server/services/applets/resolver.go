@@ -2,6 +2,7 @@ package applets
 
 import (
 	"context"
+	"encoding/base64"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -10,9 +11,18 @@ import (
 	"github.com/CoreyCole/vamos/server/services/appletruntime"
 )
 
+type AppletSourceKind string
+
+const (
+	AppletSourceThoughts AppletSourceKind = "thoughts"
+	AppletSourceExample  AppletSourceKind = "example"
+)
+
 type AppletContext struct {
 	Manifest     AppletManifest
+	SourceKind   AppletSourceKind
 	IdentityPath string
+	RuntimeKey   string
 	RouteHref    string
 	IFrameSrc    string
 	StatusURL    string
@@ -23,19 +33,26 @@ type Resolver struct {
 	ExamplesRoot string
 }
 
+func EncodeAppletIdentity(identityPath string) string {
+	return base64.RawURLEncoding.EncodeToString([]byte(cleanSlashPath(identityPath)))
+}
+
+func DecodeAppletIdentity(token string) (string, error) {
+	decoded, err := base64.RawURLEncoding.DecodeString(strings.TrimSpace(token))
+	if err != nil {
+		return "", fmt.Errorf("decode applet identity: %w", err)
+	}
+	raw := filepath.ToSlash(strings.TrimSpace(string(decoded)))
+	if unsafeAppletIdentity(raw) {
+		return "", fmt.Errorf("invalid applet identity %q", raw)
+	}
+	return cleanSlashPath(raw), nil
+}
+
 func (r Resolver) ResolveThoughtsApplet(_ context.Context, docPath string) (AppletContext, error) {
-	identity := cleanSlashPath(docPath)
-	if identity == "" || strings.HasPrefix(identity, "../") || strings.Contains(identity, "/../") || filepath.IsAbs(docPath) {
-		return AppletContext{}, fmt.Errorf("invalid thoughts applet path %q", docPath)
-	}
-	root, err := filepath.Abs(strings.TrimSpace(r.ThoughtsRoot))
-	if err != nil || root == "" {
-		return AppletContext{}, fmt.Errorf("resolve thoughts root: %w", err)
-	}
-	rel := strings.TrimPrefix(identity, "thoughts/")
-	absPath := filepath.Join(root, filepath.FromSlash(rel))
-	if !pathWithinRoot(root, absPath) {
-		return AppletContext{}, fmt.Errorf("thoughts applet path escapes root")
+	identity, absPath, err := canonicalThoughtsManifestPath(r.ThoughtsRoot, docPath)
+	if err != nil {
+		return AppletContext{}, err
 	}
 	body, err := os.ReadFile(absPath)
 	if err != nil {
@@ -46,10 +63,23 @@ func (r Resolver) ResolveThoughtsApplet(_ context.Context, docPath string) (Appl
 		return AppletContext{}, err
 	}
 	manifest = DefaultAppletManifest(manifest.ID, manifest)
+	manifest = resolveManifestRelativePaths(manifest, absPath)
 	if err := ValidateAppletManifest(manifest); err != nil {
 		return AppletContext{}, err
 	}
-	return appletContext(identity, manifest, "/thoughts/_render/app/"+manifest.ID), nil
+	token := EncodeAppletIdentity(identity)
+	return appletContext(AppletSourceThoughts, identity, token, manifest, "/thoughts/_render/app/"+token), nil
+}
+
+func (r Resolver) ResolveThoughtsAppletToken(ctx context.Context, token string) (AppletContext, error) {
+	identity, err := DecodeAppletIdentity(token)
+	if err != nil {
+		return AppletContext{}, err
+	}
+	if !strings.HasPrefix(identity, "thoughts/") {
+		return AppletContext{}, fmt.Errorf("applet identity %q is not a thoughts path", identity)
+	}
+	return r.ResolveThoughtsApplet(ctx, identity)
 }
 
 func (r Resolver) ResolveExampleApplet(_ context.Context, id string) (AppletContext, error) {
@@ -86,13 +116,17 @@ func (r Resolver) ResolveExampleApplet(_ context.Context, id string) (AppletCont
 	if err := ValidateAppletManifest(manifest); err != nil {
 		return AppletContext{}, err
 	}
-	return appletContext("examples/"+id+"/AGENTS.md", manifest, "/examples/"+id), nil
+	return appletContext(AppletSourceExample, "examples/"+id+"/AGENTS.md", id, manifest, "/examples/"+id), nil
 }
 
 func RuntimeConfigFromManifest(applet AppletContext) appletruntime.RuntimeConfig {
 	manifest := applet.Manifest
+	appID := strings.TrimSpace(applet.RuntimeKey)
+	if appID == "" {
+		appID = manifest.ID
+	}
 	return appletruntime.RuntimeConfig{
-		AppID:        manifest.ID,
+		AppID:        appID,
 		FilesRoot:    manifest.FilesRoot,
 		SourceDir:    manifest.SourceDir,
 		BuildCommand: append([]string(nil), manifest.BuildCommand...),
@@ -103,18 +137,63 @@ func RuntimeConfigFromManifest(applet AppletContext) appletruntime.RuntimeConfig
 	}
 }
 
-func appletContext(identity string, manifest AppletManifest, routeHref string) AppletContext {
+func appletContext(sourceKind AppletSourceKind, identity, runtimeKey string, manifest AppletManifest, routeHref string) AppletContext {
 	routeHref = strings.TrimRight(routeHref, "/")
 	if manifest.AppRoute == "" {
 		manifest.AppRoute = routeHref + "/app/"
 	}
 	return AppletContext{
 		Manifest:     manifest,
+		SourceKind:   sourceKind,
 		IdentityPath: identity,
+		RuntimeKey:   runtimeKey,
 		RouteHref:    routeHref,
 		IFrameSrc:    strings.TrimRight(manifest.AppRoute, "/") + "/",
 		StatusURL:    routeHref + "/status",
 	}
+}
+
+func canonicalThoughtsManifestPath(thoughtsRoot, requested string) (string, string, error) {
+	raw := filepath.ToSlash(strings.TrimSpace(requested))
+	if unsafeAppletIdentity(raw) {
+		return "", "", fmt.Errorf("invalid thoughts applet path %q", requested)
+	}
+	identity := cleanSlashPath(raw)
+	if !strings.HasPrefix(identity, "thoughts/") {
+		identity = "thoughts/" + strings.TrimPrefix(identity, "/")
+	}
+	root, err := filepath.Abs(strings.TrimSpace(thoughtsRoot))
+	if err != nil || root == "" {
+		return "", "", fmt.Errorf("resolve thoughts root: %w", err)
+	}
+	rel := strings.TrimPrefix(identity, "thoughts/")
+	candidate := filepath.Join(root, filepath.FromSlash(rel))
+	if !pathWithinRoot(root, candidate) {
+		return "", "", fmt.Errorf("thoughts applet path escapes root")
+	}
+	if info, statErr := os.Stat(candidate); statErr == nil && info.IsDir() {
+		identity = strings.TrimRight(identity, "/") + "/AGENTS.md"
+		candidate = filepath.Join(candidate, "AGENTS.md")
+	}
+	if !pathWithinRoot(root, candidate) {
+		return "", "", fmt.Errorf("thoughts applet path escapes root")
+	}
+	return identity, candidate, nil
+}
+
+func resolveManifestRelativePaths(manifest AppletManifest, manifestAbsPath string) AppletManifest {
+	base := filepath.Dir(manifestAbsPath)
+	if manifest.SourceDir != "" && !filepath.IsAbs(manifest.SourceDir) {
+		manifest.SourceDir = filepath.Join(base, filepath.FromSlash(manifest.SourceDir))
+	}
+	if manifest.FilesRoot != "" && !filepath.IsAbs(manifest.FilesRoot) {
+		manifest.FilesRoot = filepath.Join(base, filepath.FromSlash(manifest.FilesRoot))
+	}
+	return manifest
+}
+
+func unsafeAppletIdentity(path string) bool {
+	return path == "" || path == "." || filepath.IsAbs(path) || strings.HasPrefix(path, "../") || strings.Contains(path, "/../") || strings.HasSuffix(path, "/..")
 }
 
 func cleanSlashPath(path string) string {
