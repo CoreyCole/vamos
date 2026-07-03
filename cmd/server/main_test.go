@@ -532,6 +532,10 @@ func TestExpandRuntimePathsResolvesRelativeRebuildScriptUnderModuleCWD(t *testin
 	if err := os.Chdir(cwd); err != nil {
 		t.Fatalf("Chdir() error = %v", err)
 	}
+	actualCwd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("Getwd() after Chdir error = %v", err)
+	}
 	t.Cleanup(func() { _ = os.Chdir(oldCwd) })
 
 	cfg, err := expandRuntimePaths(Config{
@@ -542,7 +546,7 @@ func TestExpandRuntimePathsResolvesRelativeRebuildScriptUnderModuleCWD(t *testin
 	if err != nil {
 		t.Fatalf("expandRuntimePaths() error = %v", err)
 	}
-	want := filepath.Join(cwd, "scripts", "webhook-rebuild.sh")
+	want := filepath.Join(actualCwd, "scripts", "webhook-rebuild.sh")
 	if cfg.RebuildScript != want {
 		t.Fatalf("RebuildScript = %q, want %q", cfg.RebuildScript, want)
 	}

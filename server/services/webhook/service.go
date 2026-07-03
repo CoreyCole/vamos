@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -25,6 +26,7 @@ type Service struct {
 	secret       string
 	defaultRoute RepoRoute
 	routes       map[string]RepoRoute
+	forwards     []ForwardRoute
 }
 
 type RepoRoute struct {
@@ -40,14 +42,20 @@ func NewService(secret, repoPath, rebuildScript string) *Service {
 		RepoPath:      repoPath,
 		RebuildScript: rebuildScript,
 		SyncThoughts:  true,
-	}, nil)
+	}, nil, nil)
 }
 
-func NewServiceWithRoutes(secret string, defaultRoute RepoRoute, routes []RepoRoute) *Service {
+func NewServiceWithRoutes(
+	secret string,
+	defaultRoute RepoRoute,
+	routes []RepoRoute,
+	forwards []ForwardRoute,
+) *Service {
 	s := &Service{
 		secret:       secret,
 		defaultRoute: defaultRoute,
 		routes:       map[string]RepoRoute{},
+		forwards:     forwards,
 	}
 	for _, route := range routes {
 		key := strings.ToLower(strings.TrimSpace(route.GitHubRepo))
@@ -79,22 +87,61 @@ type PushEvent struct {
 	} `json:"pusher"`
 }
 
-// HandlePush processes a GitHub push webhook event
-func (s *Service) HandlePush(ctx context.Context, payload []byte) error {
-	var event PushEvent
-	if err := json.Unmarshal(payload, &event); err != nil {
-		return fmt.Errorf("failed to parse push event: %w", err)
+type RequestMeta struct {
+	EventType  string
+	Headers    http.Header
+	Repository string
+}
+
+// HandlePush processes a GitHub push webhook event.
+func (s *Service) HandlePush(ctx context.Context, payload []byte, meta RequestMeta) error {
+	meta.EventType = strings.ToLower(strings.TrimSpace(meta.EventType))
+	if meta.EventType == "" {
+		meta.EventType = "push"
+	}
+	return s.HandleVerifiedEvent(ctx, payload, meta)
+}
+
+func (s *Service) HandleVerifiedEvent(ctx context.Context, payload []byte, meta RequestMeta) error {
+	if meta.EventType != "push" {
+		s.logEvent("webhook_event_ignored", map[string]any{"event_type": meta.EventType})
+		return nil
 	}
 
-	route, ok := s.routeFor(event.Repository.FullName)
-	if !ok {
+	event, err := parsePushEvent(payload)
+	if err != nil {
+		return err
+	}
+	if strings.TrimSpace(meta.Repository) == "" {
+		meta.Repository = event.Repository.FullName
+	}
+
+	var localErr error
+	if route, ok := s.routeForLocalSync(event.Repository.FullName); ok {
+		localErr = s.handlePushRoute(ctx, event, route)
+	} else {
 		s.logEvent("webhook_repo_ignored", map[string]any{
 			"ref":        event.Ref,
 			"repository": event.Repository.FullName,
 		})
-		return nil
 	}
 
+	forwardErr := s.forwardWebhook(ctx, meta, payload)
+	if localErr != nil {
+		return localErr
+	}
+	return forwardErr
+}
+
+func parsePushEvent(payload []byte) (PushEvent, error) {
+	var event PushEvent
+	if err := json.Unmarshal(payload, &event); err != nil {
+		return event, fmt.Errorf("failed to parse push event: %w", err)
+	}
+	return event, nil
+}
+
+func (s *Service) handlePushRoute(ctx context.Context, event PushEvent, route RepoRoute) error {
 	s.logEvent("webhook_received", map[string]any{
 		"ref":        event.Ref,
 		"before":     event.Before,
@@ -146,7 +193,6 @@ func (s *Service) HandlePush(ctx context.Context, payload []byte) error {
 		)
 	}
 
-	// Pull latest changes
 	output, err := git.Pull(ctx, route.RepoPath)
 	if err != nil {
 		s.logEvent("git_error", map[string]any{
@@ -161,7 +207,6 @@ func (s *Service) HandlePush(ctx context.Context, payload []byte) error {
 		"output": output,
 	})
 
-	// Get new HEAD after pull
 	afterCommit, err := git.GetCurrentCommit(ctx, route.RepoPath)
 	if err != nil {
 		s.logEvent("git_error", map[string]any{
@@ -171,7 +216,6 @@ func (s *Service) HandlePush(ctx context.Context, payload []byte) error {
 		return fmt.Errorf("failed to get new commit: %w", err)
 	}
 
-	// Check if anything changed
 	if beforeCommit == afterCommit {
 		s.logEvent("no_changes", map[string]any{
 			"commit": beforeCommit,
@@ -179,14 +223,12 @@ func (s *Service) HandlePush(ctx context.Context, payload []byte) error {
 		return nil
 	}
 
-	// Get list of changed files
 	changedFiles, err := git.GetChangedFiles(ctx, route.RepoPath, beforeCommit, afterCommit)
 	if err != nil {
 		s.logEvent("git_error", map[string]any{
 			"operation": "get_changed_files",
 			"error":     err.Error(),
 		})
-		// Continue anyway - we'll rebuild to be safe
 	}
 
 	s.logEvent("files_changed", map[string]any{
@@ -196,7 +238,6 @@ func (s *Service) HandlePush(ctx context.Context, payload []byte) error {
 		"files":         changedFiles,
 	})
 
-	// Check if any non-thoughts files changed (code changes requiring rebuild)
 	needsRebuild := s.hasCodeChanges(changedFiles)
 
 	if needsRebuild {
@@ -204,8 +245,6 @@ func (s *Service) HandlePush(ctx context.Context, payload []byte) error {
 			"script": route.RebuildScript,
 		})
 
-		// Run rebuild in background so we can return HTTP response immediately
-		// (nix develop can take a long time)
 		go func() {
 			if err := s.runRebuildScript(route); err != nil {
 				s.logEvent("rebuild_error", map[string]any{
@@ -224,13 +263,54 @@ func (s *Service) HandlePush(ctx context.Context, payload []byte) error {
 	return nil
 }
 
-func (s *Service) routeFor(fullName string) (RepoRoute, bool) {
+func (s *Service) routeForLocalSync(fullName string) (RepoRoute, bool) {
 	key := strings.ToLower(strings.TrimSpace(fullName))
 	if len(s.routes) == 0 {
+		if strings.TrimSpace(s.defaultRoute.RepoPath) == "" {
+			return RepoRoute{}, false
+		}
 		return s.defaultRoute, true
 	}
 	route, ok := s.routes[key]
 	return route, ok
+}
+
+func (s *Service) forwardWebhook(ctx context.Context, meta RequestMeta, payload []byte) error {
+	var requiredErrs []string
+	for _, route := range s.forwards {
+		if !route.Matches(meta.Repository, meta.EventType) {
+			continue
+		}
+		result := Forward(ctx, ForwardRequest{
+			URL:           route.URL,
+			Body:          payload,
+			GitHubHeaders: meta.Headers,
+			Secret:        route.Secret,
+			Timeout:       route.Timeout,
+			BestEffort:    route.BestEffort,
+		})
+		logData := map[string]any{
+			"url":         result.URL,
+			"status_code": result.StatusCode,
+			"duration_ms": result.Duration.Milliseconds(),
+			"repository":  meta.Repository,
+			"event_type":  meta.EventType,
+			"best_effort": route.BestEffort,
+		}
+		if result.Error != "" {
+			logData["error"] = result.Error
+			s.logEvent("webhook_forward_error", logData)
+			if !route.BestEffort {
+				requiredErrs = append(requiredErrs, fmt.Sprintf("%s: %s", route.URL, result.Error))
+			}
+			continue
+		}
+		s.logEvent("webhook_forward_success", logData)
+	}
+	if len(requiredErrs) > 0 {
+		return fmt.Errorf("webhook forward failed: %s", strings.Join(requiredErrs, "; "))
+	}
+	return nil
 }
 
 func (s *Service) runThoughtsSync(ctx context.Context, route RepoRoute) error {

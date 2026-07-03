@@ -235,6 +235,7 @@ type Config struct {
 	WebhookSecret           string `envconfig:"WEBHOOK_SECRET"                       default:""`
 	RebuildScript           string `envconfig:"REBUILD_SCRIPT"                       default:"scripts/webhook-rebuild.sh"`
 	WebhookRepos            []server.WebhookRepoConfig
+	WebhookForwards         []server.WebhookForwardConfig
 	TemporalUIBaseURL       string   `envconfig:"TEMPORAL_UI_BASE_URL"                 default:"http://127.0.0.1:8233"`
 	AuthAllowedDomains      []string `envconfig:"AUTH_ALLOWED_DOMAINS"                 default:""`
 	AuthWhitelistedEmails   []string `envconfig:"AUTH_WHITELISTED_EMAILS"              default:""`
@@ -331,6 +332,7 @@ func applyHostConfigToLegacyConfig(cfg Config, host server.HostConfig) Config {
 	cfg.WebhookSecret = firstNonEmpty(host.Deploy.WebhookSecret, cfg.WebhookSecret)
 	cfg.RebuildScript = firstNonEmpty(host.Deploy.RebuildScript, cfg.RebuildScript)
 	cfg.WebhookRepos = host.Deploy.WebhookRepos
+	cfg.WebhookForwards = host.Deploy.WebhookForwards
 	cfg.ThoughtsBaseURL = firstNonEmpty(
 		host.Deploy.ThoughtsBaseURL,
 		cfg.ThoughtsBaseURL,
@@ -1462,10 +1464,44 @@ func main() {
 				SyncThoughts:  syncThoughts,
 			})
 		}
+		webhookForwards := make([]webhook.ForwardRoute, 0, len(cfg.WebhookForwards))
+		for _, forward := range cfg.WebhookForwards {
+			timeout, err := time.ParseDuration(forward.Timeout)
+			if err != nil {
+				log.Fatal(err)
+			}
+			repos := make(map[string]bool, len(forward.GitHubRepos))
+			for _, repo := range forward.GitHubRepos {
+				repo = strings.ToLower(strings.TrimSpace(repo))
+				if repo != "" {
+					repos[repo] = true
+				}
+			}
+			events := make(map[string]bool, len(forward.Events))
+			for _, event := range forward.Events {
+				event = strings.ToLower(strings.TrimSpace(event))
+				if event != "" {
+					events[event] = true
+				}
+			}
+			bestEffort := true
+			if forward.BestEffort != nil {
+				bestEffort = *forward.BestEffort
+			}
+			webhookForwards = append(webhookForwards, webhook.ForwardRoute{
+				URL:         forward.URL,
+				GitHubRepos: repos,
+				Events:      events,
+				Secret:      forward.Secret,
+				Timeout:     timeout,
+				BestEffort:  bestEffort,
+			})
+		}
 		webhookService := webhook.NewServiceWithRoutes(
 			cfg.WebhookSecret,
 			webhook.RepoRoute{RepoPath: cfg.RepoPath, RebuildScript: cfg.RebuildScript, SyncThoughts: true},
 			webhookRoutes,
+			webhookForwards,
 		)
 		webhookHandler := webhook.NewHandler(webhookService)
 		webhookHandler.RegisterRoutes(e)

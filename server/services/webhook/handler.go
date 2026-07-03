@@ -53,7 +53,10 @@ func (h *Handler) HandleGitHubWebhook(c echo.Context) error {
 	}
 
 	// Process the push event
-	if err := h.service.HandlePush(c.Request().Context(), body); err != nil {
+	if err := h.service.HandlePush(c.Request().Context(), body, RequestMeta{
+		EventType: eventType,
+		Headers:   c.Request().Header.Clone(),
+	}); err != nil {
 		// Log the error but return 200 OK to GitHub
 		// (GitHub will retry on non-2xx which we don't want)
 		h.service.logEvent("webhook_processing_error", map[string]any{
