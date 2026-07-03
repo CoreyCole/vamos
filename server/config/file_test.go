@@ -68,6 +68,16 @@ auth:
   google_credentials_file: ~/client-secret.json
 web:
   listen_address: :4200
+deploy:
+  webhook_forwards:
+    - url: http://127.0.0.1:4301/api/webhook/github
+      github_repos:
+        - premiumlabs/cn-agents
+        - CoreyCole/vamos
+      events: [push]
+      secret: downstream-secret
+      timeout: 30s
+      best_effort: false
 projects:
   default_repo: vamos
   default_checkout: local
@@ -119,6 +129,73 @@ projects:
 	if gotCheckout.WebhookSyncBranch != "main" || !gotCheckout.MustBeClean ||
 		!gotCheckout.MustBeLatest {
 		t.Fatalf("baseline checkout = %+v, want webhook/clean/latest", gotCheckout)
+	}
+	if len(cfg.Deploy.WebhookForwards) != 1 {
+		t.Fatalf("WebhookForwards = %#v, want one forward", cfg.Deploy.WebhookForwards)
+	}
+	forward := cfg.Deploy.WebhookForwards[0]
+	if forward.URL != "http://127.0.0.1:4301/api/webhook/github" ||
+		forward.Secret != "downstream-secret" || forward.Timeout != "30s" {
+		t.Fatalf("WebhookForward = %+v, want YAML values preserved", forward)
+	}
+	if forward.BestEffort == nil || *forward.BestEffort {
+		t.Fatalf("BestEffort = %v, want false pointer", forward.BestEffort)
+	}
+	if len(forward.GitHubRepos) != 2 || forward.GitHubRepos[0] != "premiumlabs/cn-agents" ||
+		forward.Events[0] != "push" {
+		t.Fatalf("WebhookForward filters = %+v, want repo filters and push", forward)
+	}
+}
+
+func TestValidateHostConfigNormalizesWebhookForwards(t *testing.T) {
+	cfg := serverlessHostConfig(t.TempDir())
+	cfg.Deploy.WebhookForwards = []server.WebhookForwardConfig{{
+		URL:         "http://127.0.0.1:4301/api/webhook/github",
+		GitHubRepos: []string{"premiumlabs/cn-agents", "CoreyCole/vamos"},
+	}}
+
+	got, err := ValidateHostConfig(cfg)
+	if err != nil {
+		t.Fatalf("ValidateHostConfig() error = %v", err)
+	}
+	forward := got.Deploy.WebhookForwards[0]
+	if forward.Timeout != "15s" {
+		t.Fatalf("Timeout = %q, want 15s", forward.Timeout)
+	}
+	if forward.BestEffort == nil || !*forward.BestEffort {
+		t.Fatalf("BestEffort = %v, want true pointer", forward.BestEffort)
+	}
+	if len(forward.Events) != 1 || forward.Events[0] != "push" {
+		t.Fatalf("Events = %#v, want [push]", forward.Events)
+	}
+}
+
+func TestValidateHostConfigRejectsUnsupportedWebhookForwardEvent(t *testing.T) {
+	cfg := serverlessHostConfig(t.TempDir())
+	cfg.Deploy.WebhookForwards = []server.WebhookForwardConfig{{
+		URL:    "http://127.0.0.1:4301/api/webhook/github",
+		Events: []string{"ping"},
+	}}
+
+	_, err := ValidateHostConfig(cfg)
+	if err == nil {
+		t.Fatal("ValidateHostConfig() error = nil, want unsupported event error")
+	}
+	if !strings.Contains(err.Error(), "only supports push") {
+		t.Fatalf("ValidateHostConfig() error = %v, want push-only context", err)
+	}
+}
+
+func TestValidateHostConfigRejectsInvalidWebhookForwardURL(t *testing.T) {
+	cfg := serverlessHostConfig(t.TempDir())
+	cfg.Deploy.WebhookForwards = []server.WebhookForwardConfig{{URL: "localhost:4301/hook"}}
+
+	_, err := ValidateHostConfig(cfg)
+	if err == nil {
+		t.Fatal("ValidateHostConfig() error = nil, want URL error")
+	}
+	if !strings.Contains(err.Error(), "absolute HTTP(S) URL") {
+		t.Fatalf("ValidateHostConfig() error = %v, want URL context", err)
 	}
 }
 

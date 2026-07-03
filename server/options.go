@@ -156,13 +156,14 @@ type WorkspaceProcessCommands struct {
 }
 
 type DeployConfig struct {
-	WebServiceName      string              `yaml:"web_service_name"`
-	TSWorkerServiceName string              `yaml:"ts_worker_service_name"`
-	RebuildScript       string              `yaml:"rebuild_script"`
-	WebhookSecret       string              `yaml:"webhook_secret"`
-	WebhookRepos        []WebhookRepoConfig `yaml:"webhook_repos"`
-	ThoughtsBaseURL     string              `yaml:"thoughts_base_url"`
-	GitHubBaseURL       string              `yaml:"github_base_url"`
+	WebServiceName      string                 `yaml:"web_service_name"`
+	TSWorkerServiceName string                 `yaml:"ts_worker_service_name"`
+	RebuildScript       string                 `yaml:"rebuild_script"`
+	WebhookSecret       string                 `yaml:"webhook_secret"`
+	WebhookRepos        []WebhookRepoConfig    `yaml:"webhook_repos"`
+	WebhookForwards     []WebhookForwardConfig `yaml:"webhook_forwards"`
+	ThoughtsBaseURL     string                 `yaml:"thoughts_base_url"`
+	GitHubBaseURL       string                 `yaml:"github_base_url"`
 }
 
 type WebhookRepoConfig struct {
@@ -170,6 +171,15 @@ type WebhookRepoConfig struct {
 	RepoPath      string `yaml:"repo_path"`
 	RebuildScript string `yaml:"rebuild_script"`
 	SyncThoughts  *bool  `yaml:"sync_thoughts"`
+}
+
+type WebhookForwardConfig struct {
+	URL         string   `yaml:"url"`
+	GitHubRepos []string `yaml:"github_repos"`
+	Events      []string `yaml:"events"`
+	Secret      string   `yaml:"secret"`
+	Timeout     string   `yaml:"timeout"`
+	BestEffort  *bool    `yaml:"best_effort"`
 }
 
 func MustRun(opts Options) {

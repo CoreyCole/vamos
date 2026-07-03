@@ -55,3 +55,13 @@ workspaces:
 deploy:
   web_service_name: vamos
   ts_worker_service_name: vamos-ts-worker
+  # webhook_secret: ${render in private config or env}
+  # webhook_forwards:
+  #   - url: http://127.0.0.1:4301/api/webhook/github
+  #     github_repos:
+  #       - owner/repo
+  #     events: [push]
+  #     # Empty secret preserves original X-Hub-Signature-256 and requires the downstream host to share webhook_secret.
+  #     secret: ""
+  #     timeout: 15s
+  #     best_effort: true

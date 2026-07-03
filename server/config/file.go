@@ -3,9 +3,11 @@ package config
 import (
 	"errors"
 	"fmt"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"gopkg.in/yaml.v3"
 
@@ -13,6 +15,11 @@ import (
 )
 
 const EnvConfigPath = "VAMOS_CONFIG"
+
+const (
+	defaultWebhookForwardTimeout = 15 * time.Second
+	githubPushEvent              = "push"
+)
 
 type FileConfig struct {
 	App        server.AppConfig       `yaml:"app"`
@@ -241,6 +248,13 @@ func ValidateHostConfig(cfg server.HostConfig) (server.HostConfig, error) {
 	if cfg.Deploy.TSWorkerServiceName == "" {
 		cfg.Deploy.TSWorkerServiceName = "vamos-ts-worker"
 	}
+	for i, forward := range cfg.Deploy.WebhookForwards {
+		normalized, err := normalizeWebhookForwardConfig(i, forward)
+		if err != nil {
+			return cfg, err
+		}
+		cfg.Deploy.WebhookForwards[i] = normalized
+	}
 	if cfg.Web.ListenAddress == "" {
 		cfg.Web.ListenAddress = ":4200"
 	}
@@ -267,6 +281,50 @@ func ValidateHostConfig(cfg server.HostConfig) (server.HostConfig, error) {
 		cfg.Projects.Repos[repoName] = repo
 	}
 	return cfg, nil
+}
+
+func normalizeWebhookForwardConfig(
+	index int,
+	in server.WebhookForwardConfig,
+) (server.WebhookForwardConfig, error) {
+	path := fmt.Sprintf("deploy.webhook_forwards.%d", index)
+	in.URL = strings.TrimSpace(in.URL)
+	if in.URL == "" {
+		return in, fmt.Errorf("%s.url is required", path)
+	}
+	parsed, err := url.Parse(in.URL)
+	if err != nil || !parsed.IsAbs() || parsed.Host == "" {
+		return in, fmt.Errorf("%s.url must be an absolute HTTP(S) URL", path)
+	}
+	switch parsed.Scheme {
+	case "http", "https":
+	default:
+		return in, fmt.Errorf("%s.url must use http or https; got %q", path, parsed.Scheme)
+	}
+
+	if len(in.Events) == 0 {
+		in.Events = []string{githubPushEvent}
+	}
+	for i, event := range in.Events {
+		event = strings.ToLower(strings.TrimSpace(event))
+		if event != githubPushEvent {
+			return in, fmt.Errorf("%s.events.%d only supports push; got %q", path, i, in.Events[i])
+		}
+		in.Events[i] = event
+	}
+
+	if strings.TrimSpace(in.Timeout) == "" {
+		in.Timeout = defaultWebhookForwardTimeout.String()
+	}
+	if _, err := time.ParseDuration(in.Timeout); err != nil {
+		return in, fmt.Errorf("%s.timeout must be a duration: %w", path, err)
+	}
+
+	if in.BestEffort == nil {
+		bestEffort := true
+		in.BestEffort = &bestEffort
+	}
+	return in, nil
 }
 
 func validateCheckoutRole(path string, role server.CheckoutRole) error {
