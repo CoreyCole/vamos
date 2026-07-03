@@ -23,7 +23,7 @@ const (
 )
 
 type activeProcess struct {
-	state      ProcessState
+	state      AppletProcessState
 	cmd        *exec.Cmd
 	log        *os.File
 	healthPath string
@@ -41,6 +41,26 @@ type ManagerImpl struct {
 
 func NewManager(logDir string) *ManagerImpl {
 	return &ManagerImpl{logDir: logDir, active: make(map[string]*activeProcess)}
+}
+
+func (m *ManagerImpl) EnsureStarted(ctx context.Context, cfg RuntimeConfig) (AppletProcessState, error) {
+	appID := strings.TrimSpace(cfg.AppID)
+	m.mu.Lock()
+	proc := m.active[appID]
+	m.mu.Unlock()
+	if proc != nil && waitHealthy(ctx, proc.state.BaseURL+proc.healthPath) == nil {
+		m.mu.Lock()
+		if m.active[appID] == proc {
+			proc.state.Status = ProcessStatusHealthy
+			proc.state.Healthy = true
+			proc.state.LastSeenAt = time.Now()
+			state := proc.state
+			m.mu.Unlock()
+			return state, nil
+		}
+		m.mu.Unlock()
+	}
+	return m.Start(ctx, cfg)
 }
 
 func (m *ManagerImpl) Start(ctx context.Context, cfg RuntimeConfig) (ProcessState, error) {
@@ -78,21 +98,27 @@ func (m *ManagerImpl) Start(ctx context.Context, cfg RuntimeConfig) (ProcessStat
 		return ProcessState{}, fmt.Errorf("start applet %q: %w", cfg.AppID, err)
 	}
 
-	candidate := &activeProcess{state: ProcessState{
-		AppID:     cfg.AppID,
-		SourceDir: cfg.SourceDir,
-		Port:      port,
-		PID:       cmd.Process.Pid,
-		BaseURL:   "http://127.0.0.1:" + strconv.Itoa(port),
-		Healthy:   false,
-		LogPath:   logPath,
+	now := time.Now()
+	candidate := &activeProcess{state: AppletProcessState{
+		AppID:       cfg.AppID,
+		SourceDir:   cfg.SourceDir,
+		Status:      ProcessStatusStarting,
+		Port:        port,
+		PID:         cmd.Process.Pid,
+		BaseURL:     "http://127.0.0.1:" + strconv.Itoa(port),
+		Healthy:     false,
+		LogPath:     logPath,
+		LastSeenAt:  now,
+		IdleTimeout: cfg.IdleTimeout,
 	}, cmd: cmd, log: logFile, healthPath: cfg.HealthPath, done: make(chan struct{})}
 
 	if err := waitHealthy(ctx, candidate.state.BaseURL+cfg.HealthPath); err != nil {
 		stopProcess(candidate)
 		return ProcessState{}, fmt.Errorf("health check applet %q: %w", cfg.AppID, err)
 	}
+	candidate.state.Status = ProcessStatusHealthy
 	candidate.state.Healthy = true
+	candidate.state.LastSeenAt = time.Now()
 
 	m.mu.Lock()
 	previous := m.active[cfg.AppID]
@@ -117,19 +143,40 @@ func (m *ManagerImpl) Stop(_ context.Context, appID string) error {
 	return stopProcess(proc)
 }
 
-func (m *ManagerImpl) Health(ctx context.Context, appID string) (ProcessState, error) {
+func (m *ManagerImpl) Health(ctx context.Context, appID string) (AppletProcessState, error) {
 	m.mu.Lock()
 	proc := m.active[strings.TrimSpace(appID)]
 	m.mu.Unlock()
 	if proc == nil {
-		return ProcessState{}, fmt.Errorf("unknown applet %q", appID)
+		return AppletProcessState{}, fmt.Errorf("unknown applet %q", appID)
 	}
 	if err := waitHealthy(ctx, proc.state.BaseURL+proc.healthPath); err != nil {
+		m.mu.Lock()
+		if m.active[strings.TrimSpace(appID)] == proc {
+			proc.state.Status = ProcessStatusUnhealthy
+			proc.state.Healthy = false
+			state := proc.state
+			m.mu.Unlock()
+			return state, err
+		}
+		m.mu.Unlock()
 		state := proc.state
+		state.Status = ProcessStatusUnhealthy
 		state.Healthy = false
 		return state, err
 	}
+	m.mu.Lock()
+	if m.active[strings.TrimSpace(appID)] == proc {
+		proc.state.Status = ProcessStatusHealthy
+		proc.state.Healthy = true
+		proc.state.LastSeenAt = time.Now()
+		state := proc.state
+		m.mu.Unlock()
+		return state, nil
+	}
+	m.mu.Unlock()
 	state := proc.state
+	state.Status = ProcessStatusHealthy
 	state.Healthy = true
 	return state, nil
 }
@@ -138,10 +185,60 @@ func (m *ManagerImpl) ProxyTarget(appID string) (string, bool) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	proc := m.active[strings.TrimSpace(appID)]
-	if proc == nil || !proc.state.Healthy || proc.state.BaseURL == "" {
+	if proc == nil || proc.state.Status != ProcessStatusHealthy || proc.state.BaseURL == "" {
 		return "", false
 	}
 	return proc.state.BaseURL, true
+}
+
+func (m *ManagerImpl) Touch(appID string, activeDelta int) {
+	appID = strings.TrimSpace(appID)
+	if appID == "" {
+		return
+	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	proc := m.active[appID]
+	if proc == nil {
+		return
+	}
+	proc.state.LastSeenAt = time.Now()
+	proc.state.ActiveConnections += activeDelta
+	if proc.state.ActiveConnections < 0 {
+		proc.state.ActiveConnections = 0
+	}
+}
+
+func (m *ManagerImpl) SweepInactive(ctx context.Context, now time.Time) ([]AppletProcessState, error) {
+	m.mu.Lock()
+	var idle []*activeProcess
+	for appID, proc := range m.active {
+		state := proc.state
+		if state.IdleTimeout <= 0 || state.ActiveConnections > 0 || state.Status != ProcessStatusHealthy {
+			continue
+		}
+		if now.Sub(state.LastSeenAt) >= state.IdleTimeout {
+			delete(m.active, appID)
+			idle = append(idle, proc)
+		}
+	}
+	m.mu.Unlock()
+
+	stopped := make([]AppletProcessState, 0, len(idle))
+	var errs []error
+	for _, proc := range idle {
+		state := proc.state
+		state.Status = ProcessStatusStopped
+		state.Healthy = false
+		stopped = append(stopped, state)
+		if err := stopProcess(proc); err != nil {
+			errs = append(errs, err)
+		}
+	}
+	if err := ctx.Err(); err != nil {
+		errs = append(errs, err)
+	}
+	return stopped, errors.Join(errs...)
 }
 
 func (m *ManagerImpl) reap(appID string, proc *activeProcess) {
@@ -232,6 +329,10 @@ func appletEnv(cfg RuntimeConfig, port int) []string {
 func waitHealthy(ctx context.Context, endpoint string) error {
 	ctx, cancel := context.WithTimeout(ctx, startTimeout)
 	defer cancel()
+	return healthCheck(ctx, endpoint)
+}
+
+func healthCheck(ctx context.Context, endpoint string) error {
 	ticker := time.NewTicker(healthPollEvery)
 	defer ticker.Stop()
 	client := &http.Client{Timeout: 500 * time.Millisecond}

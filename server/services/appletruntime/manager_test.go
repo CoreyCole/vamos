@@ -65,6 +65,132 @@ func main() {
 	}
 }
 
+func TestEnsureStartedReusesHealthyProcess(t *testing.T) {
+	filesRoot, sourceDir, bin := writeAppletSource(t, `
+package main
+import (
+  "fmt"
+  "net/http"
+  "os"
+)
+func main() {
+  port := os.Getenv("PORT")
+  http.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) { fmt.Fprint(w, "ok") })
+  if err := http.ListenAndServe("127.0.0.1:"+port, nil); err != nil { panic(err) }
+}
+`)
+	manager := NewManager(t.TempDir())
+	cfg := RuntimeConfig{
+		AppID:        "pickleball",
+		FilesRoot:    filesRoot,
+		SourceDir:    sourceDir,
+		BuildCommand: []string{"go", "build", "-o", bin, "."},
+		StartCommand: []string{bin},
+		HealthPath:   "/healthz",
+		IdleTimeout:  time.Minute,
+	}
+	first, err := manager.EnsureStarted(context.Background(), cfg)
+	if err != nil {
+		t.Fatalf("first EnsureStarted() error = %v", err)
+	}
+	second, err := manager.EnsureStarted(context.Background(), cfg)
+	if err != nil {
+		t.Fatalf("second EnsureStarted() error = %v", err)
+	}
+	defer manager.Stop(context.Background(), "pickleball")
+	if second.Port != first.Port || second.PID != first.PID || second.Status != ProcessStatusHealthy {
+		t.Fatalf("EnsureStarted() did not reuse healthy process: first=%+v second=%+v", first, second)
+	}
+}
+
+func TestTouchAndSweepInactive(t *testing.T) {
+	filesRoot, sourceDir, bin := writeAppletSource(t, `
+package main
+import (
+  "fmt"
+  "net/http"
+  "os"
+)
+func main() {
+  port := os.Getenv("PORT")
+  http.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) { fmt.Fprint(w, "ok") })
+  if err := http.ListenAndServe("127.0.0.1:"+port, nil); err != nil { panic(err) }
+}
+`)
+	manager := NewManager(t.TempDir())
+	state, err := manager.Start(context.Background(), RuntimeConfig{
+		AppID:        "pickleball",
+		FilesRoot:    filesRoot,
+		SourceDir:    sourceDir,
+		BuildCommand: []string{"go", "build", "-o", bin, "."},
+		StartCommand: []string{bin},
+		HealthPath:   "/healthz",
+		IdleTimeout:  time.Millisecond,
+	})
+	if err != nil {
+		t.Fatalf("Start() error = %v", err)
+	}
+	manager.Touch("pickleball", 1)
+	if active, err := manager.Health(context.Background(), "pickleball"); err != nil || active.ActiveConnections != 1 {
+		t.Fatalf("Health() after Touch(+1) = %+v, %v", active, err)
+	}
+	stopped, err := manager.SweepInactive(context.Background(), state.LastSeenAt.Add(time.Hour))
+	if err != nil {
+		t.Fatalf("SweepInactive() with active connection error = %v", err)
+	}
+	if len(stopped) != 0 {
+		t.Fatalf("SweepInactive() stopped active applet: %+v", stopped)
+	}
+	manager.Touch("pickleball", -2)
+	stopped, err = manager.SweepInactive(context.Background(), time.Now().Add(time.Hour))
+	if err != nil {
+		t.Fatalf("SweepInactive() error = %v", err)
+	}
+	if len(stopped) != 1 || stopped[0].Status != ProcessStatusStopped || stopped[0].AppID != "pickleball" {
+		t.Fatalf("SweepInactive() stopped = %+v", stopped)
+	}
+	if _, ok := manager.ProxyTarget("pickleball"); ok {
+		t.Fatal("ProxyTarget still active after idle sweep")
+	}
+}
+
+func TestSweepInactiveSkipsZeroTimeout(t *testing.T) {
+	filesRoot, sourceDir, bin := writeAppletSource(t, `
+package main
+import (
+  "fmt"
+  "net/http"
+  "os"
+)
+func main() {
+  port := os.Getenv("PORT")
+  http.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) { fmt.Fprint(w, "ok") })
+  if err := http.ListenAndServe("127.0.0.1:"+port, nil); err != nil { panic(err) }
+}
+`)
+	manager := NewManager(t.TempDir())
+	state, err := manager.Start(context.Background(), RuntimeConfig{
+		AppID:        "pickleball",
+		FilesRoot:    filesRoot,
+		SourceDir:    sourceDir,
+		BuildCommand: []string{"go", "build", "-o", bin, "."},
+		StartCommand: []string{bin},
+		HealthPath:   "/healthz",
+		IdleTimeout:  0,
+	})
+	if err != nil {
+		t.Fatalf("Start() error = %v", err)
+	}
+	defer manager.Stop(context.Background(), "pickleball")
+	stopped, err := manager.SweepInactive(context.Background(), state.LastSeenAt.Add(24*time.Hour))
+	if err != nil {
+		t.Fatalf("SweepInactive() error = %v", err)
+	}
+	if len(stopped) != 0 {
+		t.Fatalf("SweepInactive() stopped zero-timeout applet: %+v", stopped)
+	}
+}
+
 func TestFailedStartLeavesPreviousProcessActive(t *testing.T) {
 	filesRoot, sourceDir, bin := writeAppletSource(t, `
 package main
