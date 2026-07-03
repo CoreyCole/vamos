@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -67,6 +68,56 @@ func main() {
 	}
 	if _, ok := manager.ProxyTarget("pickleball"); ok {
 		t.Fatal("ProxyTarget still active after Stop")
+	}
+}
+
+func TestManagerKeepsHealthyTargetForSuccessfulLauncherCommand(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("shell launcher test uses POSIX sh")
+	}
+	filesRoot, sourceDir, bin := writeAppletSource(t, `
+package main
+import (
+  "fmt"
+  "net/http"
+  "os"
+)
+func main() {
+  port := os.Getenv("PORT")
+  http.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) { fmt.Fprint(w, "ok") })
+  http.HandleFunc("/echo", func(w http.ResponseWriter, r *http.Request) { fmt.Fprint(w, "ok") })
+  if err := http.ListenAndServe("127.0.0.1:"+port, nil); err != nil { panic(err) }
+}
+`)
+	if err := runCommand(context.Background(), sourceDir, []string{"go", "build", "-o", bin, "."}, nil, nil); err != nil {
+		t.Fatalf("build applet: %v", err)
+	}
+	pidPath := filepath.Join(sourceDir, "child.pid")
+	manager := NewManager(t.TempDir())
+	state, err := manager.Start(context.Background(), RuntimeConfig{
+		AppID:        "wordle",
+		FilesRoot:    filesRoot,
+		SourceDir:    sourceDir,
+		StartCommand: []string{"sh", "-c", fmt.Sprintf("%s & echo $! > %s", bin, pidPath)},
+		HealthPath:   "/healthz",
+	})
+	if err != nil {
+		t.Fatalf("Start() error = %v", err)
+	}
+	if state.Status != ProcessStatusHealthy {
+		t.Fatalf("state = %+v, want healthy", state)
+	}
+	t.Cleanup(func() {
+		if pidBytes, err := os.ReadFile(pidPath); err == nil {
+			pid := strings.TrimSpace(string(pidBytes))
+			if pid != "" {
+				_ = exec.Command("kill", pid).Run()
+			}
+		}
+	})
+	time.Sleep(50 * time.Millisecond)
+	if target, ok := manager.ProxyTarget("wordle"); !ok || target != state.BaseURL {
+		t.Fatalf("ProxyTarget() = %q, %v; want %q, true", target, ok, state.BaseURL)
 	}
 }
 
@@ -470,43 +521,51 @@ func main() { select{} }
 	}
 }
 
-func TestStartRejectsSourceOutsideFilesRoot(t *testing.T) {
-	root := t.TempDir()
-	outside := t.TempDir()
-	manager := NewManager(t.TempDir())
-	_, err := manager.Start(context.Background(), RuntimeConfig{
-		AppID:        "pickleball",
-		FilesRoot:    root,
-		SourceDir:    outside,
+func TestValidateConfigAllowsSourceOutsideFilesRoot(t *testing.T) {
+	filesRoot := t.TempDir()
+	sourceDir := t.TempDir()
+	err := validateConfig(RuntimeConfig{
+		AppID:        "wordle",
+		FilesRoot:    filesRoot,
+		SourceDir:    sourceDir,
 		StartCommand: []string{"go", "version"},
 	})
-	if err == nil || !strings.Contains(err.Error(), "source dir must be inside files root") {
-		t.Fatalf("Start() error = %v", err)
+	if err != nil {
+		t.Fatalf("validateConfig() error = %v", err)
 	}
 }
 
-func TestStartRejectsSymlinkedSourceOutsideFilesRoot(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip("symlink permissions vary on windows")
-	}
-	root := t.TempDir()
-	outside := t.TempDir()
-	link := filepath.Join(root, "apps", "current")
-	if err := os.MkdirAll(filepath.Dir(link), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.Symlink(outside, link); err != nil {
-		t.Fatal(err)
-	}
-	manager := NewManager(t.TempDir())
-	_, err := manager.Start(context.Background(), RuntimeConfig{
-		AppID:        "pickleball",
-		FilesRoot:    root,
-		SourceDir:    link,
+func TestValidateConfigCreatesMissingFilesRoot(t *testing.T) {
+	sourceDir := t.TempDir()
+	filesRoot := filepath.Join(t.TempDir(), "missing")
+	err := validateConfig(RuntimeConfig{
+		AppID:        "wordle",
+		FilesRoot:    filesRoot,
+		SourceDir:    sourceDir,
 		StartCommand: []string{"go", "version"},
 	})
-	if err == nil || !strings.Contains(err.Error(), "source dir must be inside files root") {
-		t.Fatalf("Start() error = %v", err)
+	if err != nil {
+		t.Fatalf("validateConfig() error = %v", err)
+	}
+	if info, err := os.Stat(filesRoot); err != nil || !info.IsDir() {
+		t.Fatalf("files root stat = %v, %v", info, err)
+	}
+}
+
+func TestValidateConfigRejectsFileAsFilesRoot(t *testing.T) {
+	sourceDir := t.TempDir()
+	filesRoot := filepath.Join(t.TempDir(), "file")
+	if err := os.WriteFile(filesRoot, []byte("not a dir"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	err := validateConfig(RuntimeConfig{
+		AppID:        "wordle",
+		FilesRoot:    filesRoot,
+		SourceDir:    sourceDir,
+		StartCommand: []string{"go", "version"},
+	})
+	if err == nil || !strings.Contains(err.Error(), "files root") {
+		t.Fatalf("validateConfig() error = %v", err)
 	}
 }
 

@@ -82,6 +82,13 @@ func resolveStaticRoot() string {
 	return "static"
 }
 
+func configureLayoutStaticAssets(staticRoot string) {
+	_, datastarProErr := os.Stat(filepath.Join(staticRoot, "js", "datastar-pro-v1.js"))
+	layouts.SetDatastarProAvailable(datastarProErr == nil)
+	_, datastarInspectorErr := os.Stat(filepath.Join(staticRoot, "js", "datastar-inspector.js"))
+	layouts.SetDatastarInspectorAvailable(datastarInspectorErr == nil)
+}
+
 func resolveExampleRoot(mainCheckoutPath, exampleID string) string {
 	if root := exampleRootFromBase(".", exampleID); root != "" {
 		return root
@@ -1426,11 +1433,7 @@ func main() {
 	// Static files. Resolve relative to the runtime package when the host
 	// binary is launched from a wrapper checkout with a different working dir.
 	staticRoot := resolveStaticRoot()
-	_, datastarProErr := os.Stat(filepath.Join(staticRoot, "js", "datastar-pro-v1.js"))
-	_ = datastarProErr
-	layouts.SetDatastarProAvailable(false)
-	_, datastarInspectorErr := os.Stat(filepath.Join(staticRoot, "js", "datastar-inspector.js"))
-	layouts.SetDatastarInspectorAvailable(datastarInspectorErr == nil)
+	configureLayoutStaticAssets(staticRoot)
 	e.Static("/static", staticRoot)
 	e.Static("/css", filepath.Join(staticRoot, "css"))
 	e.GET("/js/datastar-pro-v1.js", func(c echo.Context) error {

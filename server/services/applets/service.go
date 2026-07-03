@@ -482,7 +482,12 @@ func (s *Service) ensure(c echo.Context, applet AppletContext) error {
 	if s.manager == nil {
 		return echo.NewHTTPError(http.StatusBadGateway, "applet runtime is unavailable")
 	}
-	if _, err := s.manager.EnsureStarted(c.Request().Context(), RuntimeConfigFromManifest(applet)); err != nil {
+	ctx := c.Request().Context()
+	process := s.currentProcess(ctx, applet)
+	if shouldRestartFromStatus(process) {
+		_ = s.manager.Stop(ctx, applet.RuntimeKey)
+	}
+	if _, err := s.manager.EnsureStarted(ctx, RuntimeConfigFromManifest(applet)); err != nil {
 		return echo.NewHTTPError(http.StatusBadGateway, err.Error())
 	}
 	return nil

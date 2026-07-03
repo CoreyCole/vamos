@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"crypto/ed25519"
 	"encoding/base64"
@@ -15,9 +16,66 @@ import (
 	"github.com/labstack/echo/v4"
 
 	"github.com/CoreyCole/vamos/server"
+	"github.com/CoreyCole/vamos/server/layouts"
 	"github.com/CoreyCole/vamos/server/services/agentchat"
 	"github.com/CoreyCole/vamos/server/services/workspaces"
 )
+
+func TestConfigureLayoutStaticAssetsUsesLocalDatastarProWhenPresent(t *testing.T) {
+	staticRoot := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(staticRoot, "js"), 0o755); err != nil {
+		t.Fatalf("MkdirAll(js) error = %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(staticRoot, "js", "datastar-pro-v1.js"), []byte("export {};"), 0o644); err != nil {
+		t.Fatalf("WriteFile(datastar-pro-v1.js) error = %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(staticRoot, "js", "datastar-inspector.js"), []byte("export {};"), 0o644); err != nil {
+		t.Fatalf("WriteFile(datastar-inspector.js) error = %v", err)
+	}
+	t.Cleanup(func() {
+		layouts.SetDatastarProAvailable(false)
+		layouts.SetDatastarInspectorAvailable(false)
+	})
+
+	configureLayoutStaticAssets(staticRoot)
+
+	var body bytes.Buffer
+	if err := layouts.Root(layouts.RootArgs{}).Render(context.Background(), &body); err != nil {
+		t.Fatalf("Render(Root) error = %v", err)
+	}
+	html := body.String()
+	if !strings.Contains(html, `"@vamos/datastar":"/js/datastar-pro-v1.js"`) {
+		t.Fatalf("Root() did not map Datastar Pro asset when present:\n%s", html)
+	}
+	if strings.Contains(html, "falling back to public Datastar bundle") {
+		t.Fatalf("Root() rendered public Datastar fallback despite local asset:\n%s", html)
+	}
+	if !strings.Contains(html, `/js/datastar-inspector.js`) {
+		t.Fatalf("Root() did not enable inspector when asset present:\n%s", html)
+	}
+}
+
+func TestConfigureLayoutStaticAssetsFallsBackWhenLocalDatastarProMissing(t *testing.T) {
+	staticRoot := t.TempDir()
+	t.Cleanup(func() {
+		layouts.SetDatastarProAvailable(false)
+		layouts.SetDatastarInspectorAvailable(false)
+	})
+
+	configureLayoutStaticAssets(staticRoot)
+
+	var body bytes.Buffer
+	if err := layouts.Root(layouts.RootArgs{}).Render(context.Background(), &body); err != nil {
+		t.Fatalf("Render(Root) error = %v", err)
+	}
+	html := body.String()
+	if !strings.Contains(html, "falling back to public Datastar bundle") {
+		t.Fatalf("Root() did not render public Datastar fallback when local asset missing:\n%s", html)
+	}
+	if strings.Contains(html, `/js/datastar-inspector.js`) {
+		t.Fatalf("Root() enabled inspector when asset missing:\n%s", html)
+	}
+}
 
 func TestMergeProjectCheckoutsPreservesWorkspaceConfiguredPath(t *testing.T) {
 	discovery := workspaces.DiscoveryConfig{

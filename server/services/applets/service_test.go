@@ -581,6 +581,36 @@ func TestRegisterStartupAliasesMountsExampleAliasRoute(t *testing.T) {
 	}
 }
 
+func TestHandleAliasRestartsUnhealthyAppletBeforeProxy(t *testing.T) {
+	examplesRoot := t.TempDir()
+	writeExampleAppletManifestWithAliases(t, examplesRoot, "wordle", []RouteAlias{{Pattern: "/events", Methods: []string{http.MethodGet}}})
+	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(r.URL.Path))
+	}))
+	defer backend.Close()
+	manager := &recordingManager{
+		target: backend.URL,
+		state:  appletruntime.AppletProcessState{Status: appletruntime.ProcessStatusUnhealthy},
+	}
+	service := NewHTTPService(ServiceOptions{Resolver: Resolver{ExamplesRoot: examplesRoot}, Manager: manager})
+	e := echo.New()
+
+	if err := service.RegisterStartupAliases(e); err != nil {
+		t.Fatalf("RegisterStartupAliases() error = %v", err)
+	}
+	rec := httptest.NewRecorder()
+	e.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/events", nil))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("alias status = %d body=%q", rec.Code, rec.Body.String())
+	}
+	if manager.stoppedAppID != "wordle" {
+		t.Fatalf("Stop AppID = %q, want wordle", manager.stoppedAppID)
+	}
+	if manager.ensureConfig.AppID != "wordle" {
+		t.Fatalf("EnsureStarted AppID = %q, want wordle", manager.ensureConfig.AppID)
+	}
+}
+
 func TestHandleThoughtsAppletFormsUseRuntimeKey(t *testing.T) {
 	thoughtsRoot := t.TempDir()
 	identity := writeThoughtsAppletManifest(t, thoughtsRoot, "plans/demo", "demo")

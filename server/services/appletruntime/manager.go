@@ -291,7 +291,7 @@ func (m *ManagerImpl) SweepInactive(ctx context.Context, now time.Time) ([]Apple
 func (m *ManagerImpl) reap(appID string, proc *activeProcess) {
 	err := waitProcess(proc)
 	m.mu.Lock()
-	if m.active[appID] == proc {
+	if m.active[appID] == proc && err != nil {
 		delete(m.active, appID)
 	}
 	m.mu.Unlock()
@@ -315,31 +315,18 @@ func validateConfig(cfg RuntimeConfig) error {
 	if err != nil || sourceDir == "" {
 		return fmt.Errorf("source dir is required")
 	}
-	if !pathWithinRoot(filesRoot, sourceDir) {
-		return fmt.Errorf("source dir must be inside files root")
+	if err := os.MkdirAll(filesRoot, 0o755); err != nil {
+		return fmt.Errorf("files root: %w", err)
+	}
+	if info, err := os.Stat(filesRoot); err != nil {
+		return fmt.Errorf("files root: %w", err)
+	} else if !info.IsDir() {
+		return fmt.Errorf("files root is not a directory")
 	}
 	if info, err := os.Stat(sourceDir); err != nil {
 		return fmt.Errorf("source dir: %w", err)
 	} else if !info.IsDir() {
 		return fmt.Errorf("source dir is not a directory")
-	}
-	if err := rejectRuntimeSymlinkEscape(filesRoot, sourceDir); err != nil {
-		return err
-	}
-	return nil
-}
-
-func rejectRuntimeSymlinkEscape(root, candidate string) error {
-	realRoot, err := filepath.EvalSymlinks(root)
-	if err != nil {
-		return fmt.Errorf("files root: %w", err)
-	}
-	realCandidate, err := filepath.EvalSymlinks(candidate)
-	if err != nil {
-		return fmt.Errorf("source dir: %w", err)
-	}
-	if !pathWithinRoot(realRoot, realCandidate) {
-		return fmt.Errorf("source dir must be inside files root")
 	}
 	return nil
 }
