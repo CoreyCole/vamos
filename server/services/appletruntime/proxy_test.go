@@ -233,6 +233,66 @@ func TestAppletProxyPreservesUpgradeHeaders(t *testing.T) {
 	}
 }
 
+func TestAppletProxyAliasPreservesStreamlitWebSocketPath(t *testing.T) {
+	seen := make(chan *http.Request, 1)
+	child := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		seen <- r.Clone(r.Context())
+		w.WriteHeader(http.StatusSwitchingProtocols)
+	}))
+	defer child.Close()
+
+	server := httptest.NewServer(NewAppletProxy(
+		&proxyTestManager{target: child.URL},
+		AppletProxyMatch{AppID: "streamlit", Alias: true},
+		ProxyOptions{FlushSSE: true},
+	))
+	defer server.Close()
+
+	req, err := http.NewRequest(http.MethodGet, server.URL+"/_stcore/stream", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.Header.Set("Connection", "Upgrade")
+	req.Header.Set("Upgrade", "websocket")
+	_, _ = http.DefaultClient.Do(req)
+
+	select {
+	case got := <-seen:
+		if got.URL.Path != "/_stcore/stream" {
+			t.Fatalf("path = %q", got.URL.Path)
+		}
+		if !strings.EqualFold(got.Header.Get("Upgrade"), "websocket") {
+			t.Fatalf("Upgrade = %q", got.Header.Get("Upgrade"))
+		}
+	case <-time.After(time.Second):
+		t.Fatal("child did not receive Streamlit websocket alias request")
+	}
+}
+
+func TestAppletProxyAliasPreservesVendorAssetPath(t *testing.T) {
+	child := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(r.URL.Path))
+	}))
+	defer child.Close()
+
+	server := httptest.NewServer(NewAppletProxy(
+		&proxyTestManager{target: child.URL},
+		AppletProxyMatch{AppID: "streamlit", Alias: true},
+		ProxyOptions{FlushSSE: true},
+	))
+	defer server.Close()
+
+	resp, err := http.Get(server.URL + "/vendor/bootstrap.js")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	body, _ := io.ReadAll(resp.Body)
+	if string(body) != "/vendor/bootstrap.js" {
+		t.Fatalf("vendor path = %q", body)
+	}
+}
+
 func assertCookiePath(t *testing.T, cookies []string, prefix, path string) {
 	t.Helper()
 	if !containsCookiePath(cookies, prefix, path) {

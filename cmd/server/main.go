@@ -1632,7 +1632,9 @@ func main() {
 	registerAgentChatEntryRoutes(e, authMiddleware, agentChatHandler, markdownService)
 
 	pickleballService.RegisterRoutes(e, authMiddleware)
-	examplesService.RegisterRoutes(e, authMiddleware)
+	if err := examplesService.RegisterRoutes(e, authMiddleware); err != nil {
+		log.Fatal("Failed to register example applet routes:", err)
+	}
 
 	// Protected form routes - require authentication
 	formsGroup := e.Group("/forms")

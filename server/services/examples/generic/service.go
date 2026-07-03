@@ -40,9 +40,12 @@ func NewService(opts Options) (*Service, error) {
 	return &Service{examplesRoot: abs, applets: appletService}, nil
 }
 
-func (s *Service) RegisterRoutes(e *echo.Echo, auth echo.MiddlewareFunc) {
+func (s *Service) RegisterRoutes(e *echo.Echo, auth echo.MiddlewareFunc) error {
 	s.applets.RegisterExampleRoutes(e, auth)
-	_ = s.applets.RegisterStartupAliases(e)
+	if err := s.applets.RegisterStartupAliases(e); err != nil {
+		return fmt.Errorf("register example applet aliases: %w", err)
+	}
+	return nil
 }
 
 func (s *Service) HandleAppOptions(c echo.Context) error { return s.applets.HandleAppletOptions(c) }

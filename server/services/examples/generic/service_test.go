@@ -93,6 +93,37 @@ func TestHandleAliasProxiesRootAliasThroughRuntime(t *testing.T) {
 	}
 }
 
+func TestRegisterRoutesReturnsStartupAliasConflict(t *testing.T) {
+	root := t.TempDir()
+	dir := filepath.Join(root, "bad")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	body := `---
+vamos_artifact: applet
+applet:
+  id: bad
+  title: Bad Streamlit
+  kind: streamlit
+  source_dir: .
+  start_command: [streamlit, run, app.py]
+  root_aliases:
+    - pattern: /static/*
+---
+`
+	if err := os.WriteFile(filepath.Join(dir, "AGENTS.md"), []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	service, err := NewService(Options{ExamplesRoot: root, AppletRuntime: &fakeRuntime{}})
+	if err != nil {
+		t.Fatalf("NewService() error = %v", err)
+	}
+	err = service.RegisterRoutes(echo.New(), nil)
+	if err == nil || !strings.Contains(err.Error(), "reserved Vamos prefix") {
+		t.Fatalf("RegisterRoutes() error = %v, want reserved alias conflict", err)
+	}
+}
+
 func writeExampleManifest(t *testing.T) string {
 	t.Helper()
 	root := t.TempDir()
