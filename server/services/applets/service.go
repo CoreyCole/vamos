@@ -175,6 +175,35 @@ func (s *Service) HandleAppletStatus(c echo.Context) error {
 	}
 }
 
+func (s *Service) HandleAppletStop(c echo.Context) error {
+	if s.manager == nil {
+		return echo.NewHTTPError(http.StatusBadGateway, "applet runtime is unavailable")
+	}
+	applet, err := s.resolveAppletFromRequest(c)
+	if err != nil {
+		return err
+	}
+	if err := s.manager.Stop(c.Request().Context(), applet.Manifest.ID); err != nil {
+		return echo.NewHTTPError(http.StatusBadGateway, err.Error())
+	}
+	return c.Redirect(http.StatusSeeOther, applet.RouteHref)
+}
+
+func (s *Service) HandleAppletRestart(c echo.Context) error {
+	if s.manager == nil {
+		return echo.NewHTTPError(http.StatusBadGateway, "applet runtime is unavailable")
+	}
+	applet, err := s.resolveAppletFromRequest(c)
+	if err != nil {
+		return err
+	}
+	_ = s.manager.Stop(c.Request().Context(), applet.Manifest.ID)
+	if _, err := s.manager.EnsureStarted(c.Request().Context(), RuntimeConfigFromManifest(applet)); err != nil {
+		return echo.NewHTTPError(http.StatusBadGateway, err.Error())
+	}
+	return c.Redirect(http.StatusSeeOther, applet.RouteHref)
+}
+
 func (s *Service) EnsureAppletAsync(ctx context.Context, applet AppletContext) {
 	if s.manager == nil {
 		return

@@ -46,7 +46,6 @@ import (
 	"github.com/CoreyCole/vamos/server/services/db"
 	genericexamples "github.com/CoreyCole/vamos/server/services/examples/generic"
 	"github.com/CoreyCole/vamos/server/services/examples/pickleball"
-	"github.com/CoreyCole/vamos/server/services/examples/wordle"
 	"github.com/CoreyCole/vamos/server/services/layoutprefs"
 	"github.com/CoreyCole/vamos/server/services/markdown"
 	"github.com/CoreyCole/vamos/server/services/storybook"
@@ -1389,16 +1388,10 @@ func main() {
 	if err != nil {
 		log.Fatal("Failed to initialize pickleball example service:", err)
 	}
-	wordleExampleRoot := resolveExampleRoot(workspaceDiscovery.MainCheckoutPath, "wordle")
-	wordleService, err := wordle.NewService(wordle.Options{
-		FilesRoot:     filepath.Join(wordleExampleRoot, "files"),
-		AppletRuntime: appletruntime.NewManager(filepath.Join(cfg.MarkdownBasePath, ".vamos", "applets", "logs")),
-	})
-	if err != nil {
-		log.Fatal("Failed to initialize wordle example service:", err)
-	}
+	sharedAppletRuntime := appletruntime.NewManager(filepath.Join(cfg.MarkdownBasePath, ".vamos", "applets", "logs"))
 	examplesService, err := genericexamples.NewService(genericexamples.Options{
-		ExamplesRoot: filepath.Dir(resolveExampleRoot(workspaceDiscovery.MainCheckoutPath, "todo")),
+		ExamplesRoot:  filepath.Dir(resolveExampleRoot(workspaceDiscovery.MainCheckoutPath, "todo")),
+		AppletRuntime: sharedAppletRuntime,
 	})
 	if err != nil {
 		log.Fatal("Failed to initialize generic examples service:", err)
@@ -1628,7 +1621,6 @@ func main() {
 	registerAgentChatEntryRoutes(e, authMiddleware, agentChatHandler, markdownService)
 
 	pickleballService.RegisterRoutes(e, authMiddleware)
-	wordleService.RegisterRoutes(e, authMiddleware)
 	examplesService.RegisterRoutes(e, authMiddleware)
 
 	// Protected form routes - require authentication
@@ -1640,6 +1632,8 @@ func main() {
 	formsGroup.POST("/comments/cancel", commentService.HandleCancelCommentForm)
 	formsGroup.POST("/replies", commentService.HandleReplyForm)
 	formsGroup.POST("/resolve", commentService.HandleResolveComment)
+	formsGroup.POST("/applets/:id/stop", examplesService.HandleStop)
+	formsGroup.POST("/applets/:id/restart", examplesService.HandleRestart)
 
 	// Protected routes - require authentication
 	thoughtsGroup := e.Group("/thoughts")

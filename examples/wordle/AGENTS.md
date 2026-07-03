@@ -3,6 +3,7 @@ vamos_artifact: applet
 applet:
   id: wordle
   title: Daily Wordle
+  kind: datastar
   files_root: files
   app_dir: .
   route: /examples/wordle
@@ -11,6 +12,11 @@ applet:
   health_path: /healthz
   port: 8081
   backend_port: 18081
+  root_aliases:
+    - pattern: /events
+      methods: [GET]
+    - pattern: /guesses
+      methods: [POST]
 ---
 
 # Daily Wordle Applet

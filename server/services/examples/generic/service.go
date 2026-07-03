@@ -1,67 +1,30 @@
 package generic
 
 import (
-	"bytes"
-	"context"
-	"errors"
 	"fmt"
-	"io"
 	"net/http"
-	"net/http/httputil"
-	"net/url"
-	"os"
-	"os/exec"
 	"path/filepath"
-	"strconv"
 	"strings"
-	"sync"
-	"time"
 
+	"github.com/CoreyCole/vamos/server/services/appletruntime"
+	"github.com/CoreyCole/vamos/server/services/applets"
 	"github.com/labstack/echo/v4"
-	"gopkg.in/yaml.v3"
 )
 
+var reservedAliasPrefixes = []string{"/api", "/forms", "/thoughts", "/agent-chat", "/static"}
+
 type Options struct {
-	ExamplesRoot string
+	ExamplesRoot  string
+	AppletRuntime appletruntime.Manager
+	AppletService *applets.Service
 }
 
 type Service struct {
 	examplesRoot string
-	mu           sync.Mutex
-	starts       map[string]*sync.Mutex
-}
-
-type agentFrontmatter struct {
-	VamosArtifact string       `yaml:"vamos_artifact"`
-	Applet        AppletConfig `yaml:"applet"`
-}
-
-type AppletConfig struct {
-	ID            string   `yaml:"id"`
-	Title         string   `yaml:"title"`
-	FilesRoot     string   `yaml:"files_root"`
-	AppDir        string   `yaml:"app_dir"`
-	CurrentAppDir string   `yaml:"current_app_dir"`
-	Route         string   `yaml:"route"`
-	AppRoute      string   `yaml:"app_route"`
-	StartCommand  []string `yaml:"start_command"`
-	HealthPath    string   `yaml:"health_path"`
-	Port          int      `yaml:"port"`
-	BackendPort   int      `yaml:"backend_port"`
-}
-
-type resolvedApplet struct {
-	ID           string
-	Title        string
-	ExampleRoot  string
-	AppDir       string
-	FilesRoot    string
-	Route        string
-	AppRoute     string
-	StartCommand []string
-	HealthPath   string
-	Port         int
-	BackendPort  int
+	resolver     applets.Resolver
+	applets      *applets.Service
+	runtime      appletruntime.Manager
+	aliases      *appletruntime.AliasRegistry
 }
 
 func NewService(opts Options) (*Service, error) {
@@ -73,7 +36,18 @@ func NewService(opts Options) (*Service, error) {
 	if err != nil {
 		return nil, fmt.Errorf("resolve examples root: %w", err)
 	}
-	return &Service{examplesRoot: abs, starts: make(map[string]*sync.Mutex)}, nil
+	resolver := applets.Resolver{ExamplesRoot: abs}
+	appletService := opts.AppletService
+	if appletService == nil {
+		appletService = applets.NewHTTPService(applets.ServiceOptions{Resolver: resolver, Manager: opts.AppletRuntime})
+	}
+	return &Service{
+		examplesRoot: abs,
+		resolver:     resolver,
+		applets:      appletService,
+		runtime:      opts.AppletRuntime,
+		aliases:      appletruntime.NewAliasRegistry(reservedAliasPrefixes),
+	}, nil
 }
 
 func (s *Service) RegisterRoutes(e *echo.Echo, auth echo.MiddlewareFunc) {
@@ -84,12 +58,14 @@ func (s *Service) RegisterRoutes(e *echo.Echo, auth echo.MiddlewareFunc) {
 	e.OPTIONS("/examples/:id/app/*", s.HandleAppOptions)
 	e.Any("/examples/:id/app", s.HandleApp)
 	e.Any("/examples/:id/app/*", s.HandleApp)
+	s.registerRootAliases(e)
 
 	group := e.Group("/examples")
 	if auth != nil {
 		group.Use(auth)
 	}
 	group.GET("/:id", s.HandlePage)
+	group.GET("/:id/status", s.HandleStatus)
 }
 
 func (s *Service) HandleAppOptions(c echo.Context) error {
@@ -99,14 +75,19 @@ func (s *Service) HandleAppOptions(c echo.Context) error {
 }
 
 func (s *Service) HandlePage(c echo.Context) error {
-	app, err := s.load(c.Param("id"))
-	if err != nil {
-		return err
-	}
-	if err := s.ensure(c.Request().Context(), app); err != nil {
-		return echo.NewHTTPError(http.StatusBadGateway, err.Error())
-	}
-	return Page(PageModel{ID: app.ID, Title: app.Title, AppURL: strings.TrimRight(app.AppRoute, "/") + "/", AppDir: app.AppDir}).Render(c.Request().Context(), c.Response().Writer)
+	return s.applets.HandleAppletPage(c)
+}
+
+func (s *Service) HandleStatus(c echo.Context) error {
+	return s.applets.HandleAppletStatus(c)
+}
+
+func (s *Service) HandleStop(c echo.Context) error {
+	return s.applets.HandleAppletStop(c)
+}
+
+func (s *Service) HandleRestart(c echo.Context) error {
+	return s.applets.HandleAppletRestart(c)
 }
 
 func (s *Service) HandleApp(c echo.Context) error {
@@ -115,35 +96,102 @@ func (s *Service) HandleApp(c echo.Context) error {
 	if c.Request().Method == http.MethodOptions {
 		return c.NoContent(http.StatusNoContent)
 	}
-	app, err := s.load(c.Param("id"))
+	applet, err := s.resolver.ResolveExampleApplet(c.Request().Context(), c.Param("id"))
 	if err != nil {
 		return err
 	}
-	if err := s.ensure(c.Request().Context(), app); err != nil {
-		return echo.NewHTTPError(http.StatusBadGateway, err.Error())
+	if err := s.ensure(c, applet); err != nil {
+		return err
 	}
-	target, _ := url.Parse("http://127.0.0.1:" + strconv.Itoa(app.Port))
-	proxy := httputil.NewSingleHostReverseProxy(target)
-	prefix := strings.TrimRight(app.AppRoute, "/")
-	proxy.Director = func(req *http.Request) {
-		req.URL.Scheme = target.Scheme
-		req.URL.Host = target.Host
-		req.Host = target.Host
-		path := strings.TrimPrefix(req.URL.Path, prefix)
-		if path == "" {
-			path = "/"
-		}
-		if !strings.HasPrefix(path, "/") {
-			path = "/" + path
-		}
-		req.URL.Path = path
-	}
-	proxy.ModifyResponse = func(resp *http.Response) error {
-		setAppletCORS(resp.Header)
-		return nil
-	}
+	match := appletruntime.AppletProxyMatch{AppID: applet.Manifest.ID, StripPrefix: strings.TrimRight(applet.IFrameSrc, "/")}
+	proxy := appletruntime.NewAppletProxy(s.runtime, match, proxyOptions())
 	proxy.ServeHTTP(c.Response(), c.Request())
 	return nil
+}
+
+func (s *Service) HandleAlias(c echo.Context) error {
+	setAppletCORS(c.Response().Header())
+	c.Response().Before(func() { setAppletCORS(c.Response().Header()) })
+	if c.Request().Method == http.MethodOptions {
+		return c.NoContent(http.StatusNoContent)
+	}
+	match, ok := s.aliases.Match(c.Request())
+	if !ok {
+		return echo.NewHTTPError(http.StatusNotFound, "unknown applet alias")
+	}
+	applet, err := s.resolver.ResolveExampleApplet(c.Request().Context(), match.AppID)
+	if err != nil {
+		return err
+	}
+	if err := s.ensure(c, applet); err != nil {
+		return err
+	}
+	proxy := appletruntime.NewAppletProxy(s.runtime, match, proxyOptions())
+	proxy.ServeHTTP(c.Response(), c.Request())
+	return nil
+}
+
+func (s *Service) ensure(c echo.Context, applet applets.AppletContext) error {
+	if s.runtime == nil {
+		return echo.NewHTTPError(http.StatusBadGateway, "applet runtime is unavailable")
+	}
+	if _, err := s.runtime.EnsureStarted(c.Request().Context(), applets.RuntimeConfigFromManifest(applet)); err != nil {
+		return echo.NewHTTPError(http.StatusBadGateway, err.Error())
+	}
+	return nil
+}
+
+func (s *Service) registerRootAliases(e *echo.Echo) {
+	ids, err := filepath.Glob(filepath.Join(s.examplesRoot, "*", "AGENTS.md"))
+	if err != nil {
+		return
+	}
+	seenRoutes := map[string]struct{}{}
+	for _, agentsPath := range ids {
+		id := filepath.Base(filepath.Dir(agentsPath))
+		ctx, err := s.resolver.ResolveExampleApplet(nil, id)
+		if err != nil || len(ctx.Manifest.RootAliases) == 0 {
+			continue
+		}
+		if err := s.aliases.Register(aliasRegistration(ctx)); err != nil {
+			continue
+		}
+		for _, alias := range ctx.Manifest.RootAliases {
+			route := echoRoute(alias.Pattern)
+			if route == "" {
+				continue
+			}
+			if _, ok := seenRoutes[route]; ok {
+				continue
+			}
+			seenRoutes[route] = struct{}{}
+			e.OPTIONS(route, s.HandleAppOptions)
+			e.Any(route, s.HandleAlias)
+		}
+	}
+}
+
+func aliasRegistration(ctx applets.AppletContext) appletruntime.AliasRegistration {
+	aliases := make([]appletruntime.RouteAlias, 0, len(ctx.Manifest.RootAliases))
+	for _, alias := range ctx.Manifest.RootAliases {
+		aliases = append(aliases, appletruntime.RouteAlias{Pattern: alias.Pattern, Methods: alias.Methods})
+	}
+	return appletruntime.AliasRegistration{AppID: ctx.Manifest.ID, Aliases: aliases}
+}
+
+func echoRoute(pattern string) string {
+	pattern = strings.TrimSpace(pattern)
+	if pattern == "" || pattern == "/" || pattern == "/*" {
+		return ""
+	}
+	if strings.HasSuffix(pattern, "/*") {
+		return strings.TrimSuffix(pattern, "/*") + "/*"
+	}
+	return pattern
+}
+
+func proxyOptions() appletruntime.ProxyOptions {
+	return appletruntime.ProxyOptions{FlushSSE: true, RewriteCookiePath: true, AllowNullOriginCORS: true}
 }
 
 func setAppletCORS(header http.Header) {
@@ -151,164 +199,4 @@ func setAppletCORS(header http.Header) {
 	header.Set("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
 	header.Set("Access-Control-Allow-Headers", "Content-Type, Accept, Datastar-Request")
 	header.Set("Access-Control-Max-Age", "600")
-}
-
-func (s *Service) load(id string) (resolvedApplet, error) {
-	id = strings.TrimSpace(id)
-	if !safeID(id) {
-		return resolvedApplet{}, echo.NewHTTPError(http.StatusNotFound, "unknown example")
-	}
-	exampleRoot := filepath.Join(s.examplesRoot, id)
-	agentsPath := filepath.Join(exampleRoot, "AGENTS.md")
-	body, err := os.ReadFile(agentsPath)
-	if err != nil {
-		if errors.Is(err, os.ErrNotExist) {
-			return resolvedApplet{}, echo.NewHTTPError(http.StatusNotFound, "unknown example")
-		}
-		return resolvedApplet{}, err
-	}
-	fm, err := parseFrontmatter(body)
-	if err != nil {
-		return resolvedApplet{}, echo.NewHTTPError(http.StatusBadRequest, err.Error())
-	}
-	if fm.VamosArtifact != "applet" {
-		return resolvedApplet{}, echo.NewHTTPError(http.StatusNotFound, "unknown example")
-	}
-	cfg := fm.Applet
-	if cfg.ID == "" {
-		cfg.ID = id
-	}
-	if cfg.ID != id {
-		return resolvedApplet{}, echo.NewHTTPError(http.StatusBadRequest, "example id does not match AGENTS.md applet id")
-	}
-	if cfg.Title == "" {
-		cfg.Title = id
-	}
-	if cfg.AppDir == "" {
-		cfg.AppDir = cfg.CurrentAppDir
-	}
-	if cfg.AppDir == "" {
-		cfg.AppDir = "."
-	}
-	if cfg.FilesRoot == "" {
-		cfg.FilesRoot = "files"
-	}
-	if cfg.Route == "" {
-		cfg.Route = "/examples/" + id
-	}
-	if cfg.AppRoute == "" {
-		cfg.AppRoute = cfg.Route + "/app/"
-	}
-	if len(cfg.StartCommand) == 0 {
-		cfg.StartCommand = []string{"just", "build"}
-	}
-	if cfg.HealthPath == "" {
-		cfg.HealthPath = "/healthz"
-	}
-	if cfg.Port == 0 {
-		cfg.Port = 8080
-	}
-	if cfg.BackendPort == 0 {
-		cfg.BackendPort = 18080
-	}
-	return resolvedApplet{
-		ID: cfg.ID, Title: cfg.Title, ExampleRoot: exampleRoot,
-		AppDir: filepath.Join(exampleRoot, cfg.AppDir), FilesRoot: filepath.Join(exampleRoot, cfg.FilesRoot),
-		Route: cfg.Route, AppRoute: cfg.AppRoute, StartCommand: cfg.StartCommand,
-		HealthPath: cfg.HealthPath, Port: cfg.Port, BackendPort: cfg.BackendPort,
-	}, nil
-}
-
-func parseFrontmatter(body []byte) (agentFrontmatter, error) {
-	trimmed := bytes.TrimSpace(body)
-	if !bytes.HasPrefix(trimmed, []byte("---\n")) {
-		return agentFrontmatter{}, errors.New("AGENTS.md missing frontmatter")
-	}
-	rest := trimmed[len("---\n"):]
-	end := bytes.Index(rest, []byte("\n---"))
-	if end < 0 {
-		return agentFrontmatter{}, errors.New("AGENTS.md frontmatter is not closed")
-	}
-	var fm agentFrontmatter
-	if err := yaml.Unmarshal(rest[:end], &fm); err != nil {
-		return agentFrontmatter{}, err
-	}
-	return fm, nil
-}
-
-func (s *Service) ensure(ctx context.Context, app resolvedApplet) error {
-	if healthOK(ctx, app.Port, app.HealthPath) {
-		return nil
-	}
-	lock := s.startLock(app.ID)
-	lock.Lock()
-	defer lock.Unlock()
-	if healthOK(ctx, app.Port, app.HealthPath) {
-		return nil
-	}
-	if len(app.StartCommand) == 0 || app.StartCommand[0] == "" {
-		return fmt.Errorf("example %s has no start command", app.ID)
-	}
-	startCtx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
-	defer cancel()
-	cmd := exec.CommandContext(startCtx, app.StartCommand[0], app.StartCommand[1:]...)
-	cmd.Dir = app.AppDir
-	cmd.Env = append(os.Environ(),
-		"PORT="+strconv.Itoa(app.Port),
-		"BACKEND_PORT="+strconv.Itoa(app.BackendPort),
-		"VAMOS_APP_FILES_ROOT="+app.FilesRoot,
-	)
-	var out bytes.Buffer
-	cmd.Stdout = io.MultiWriter(&out)
-	cmd.Stderr = io.MultiWriter(&out)
-	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("start example %s: %w\n%s", app.ID, err, out.String())
-	}
-	if !healthOK(ctx, app.Port, app.HealthPath) {
-		return fmt.Errorf("example %s did not become healthy on port %d", app.ID, app.Port)
-	}
-	return nil
-}
-
-func (s *Service) startLock(id string) *sync.Mutex {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	lock := s.starts[id]
-	if lock == nil {
-		lock = &sync.Mutex{}
-		s.starts[id] = lock
-	}
-	return lock
-}
-
-func healthOK(ctx context.Context, port int, path string) bool {
-	if path == "" {
-		path = "/healthz"
-	}
-	reqCtx, cancel := context.WithTimeout(ctx, 500*time.Millisecond)
-	defer cancel()
-	req, err := http.NewRequestWithContext(reqCtx, http.MethodGet, "http://127.0.0.1:"+strconv.Itoa(port)+path, nil)
-	if err != nil {
-		return false
-	}
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return false
-	}
-	_, _ = io.Copy(io.Discard, resp.Body)
-	_ = resp.Body.Close()
-	return resp.StatusCode >= 200 && resp.StatusCode < 300
-}
-
-func safeID(id string) bool {
-	if id == "" || id == "." || id == ".." {
-		return false
-	}
-	for _, r := range id {
-		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') || r == '-' || r == '_' {
-			continue
-		}
-		return false
-	}
-	return true
 }

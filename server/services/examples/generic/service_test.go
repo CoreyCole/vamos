@@ -1,0 +1,161 @@
+package generic
+
+import (
+	"context"
+	"net/http"
+	"net/http/httptest"
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/CoreyCole/vamos/server/services/appletruntime"
+	"github.com/labstack/echo/v4"
+)
+
+func TestHandlePageRendersDocumentWorkbenchApplet(t *testing.T) {
+	root := writeExampleManifest(t)
+	service, err := NewService(Options{ExamplesRoot: root, AppletRuntime: &fakeRuntime{state: appletruntime.AppletProcessState{Status: appletruntime.ProcessStatusHealthy}}})
+	if err != nil {
+		t.Fatalf("NewService() error = %v", err)
+	}
+
+	e := echo.New()
+	req := httptest.NewRequest(http.MethodGet, "/examples/wordle", nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	c.SetParamNames("id")
+	c.SetParamValues("wordle")
+
+	if err := service.HandlePage(c); err != nil {
+		t.Fatalf("HandlePage() error = %v", err)
+	}
+	html := rec.Body.String()
+	for _, want := range []string{"doc-workbench-sidebar", "doc-workbench-center", "doc-workbench-right", "examples/wordle/AGENTS.md", "/examples/wordle/app/"} {
+		if !strings.Contains(html, want) {
+			t.Fatalf("page HTML missing %q:\n%s", want, html)
+		}
+	}
+	if strings.Contains(html, "wordle-files-app-region") {
+		t.Fatalf("page still rendered legacy two-region applet shell:\n%s", html)
+	}
+}
+
+func TestHandleAppProxiesScopedRouteThroughRuntime(t *testing.T) {
+	root := writeExampleManifest(t)
+	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(r.URL.Path))
+	}))
+	defer backend.Close()
+	service, err := NewService(Options{ExamplesRoot: root, AppletRuntime: &fakeRuntime{target: backend.URL}})
+	if err != nil {
+		t.Fatalf("NewService() error = %v", err)
+	}
+
+	e := echo.New()
+	req := httptest.NewRequest(http.MethodGet, "/examples/wordle/app/events", nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	c.SetParamNames("id")
+	c.SetParamValues("wordle")
+
+	if err := service.HandleApp(c); err != nil {
+		t.Fatalf("HandleApp() error = %v", err)
+	}
+	if got := strings.TrimSpace(rec.Body.String()); got != "/events" {
+		t.Fatalf("proxied path = %q, want /events", got)
+	}
+}
+
+func TestHandleAliasProxiesRootAliasThroughRuntime(t *testing.T) {
+	root := writeExampleManifest(t)
+	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(r.Method + " " + r.URL.Path))
+	}))
+	defer backend.Close()
+	service, err := NewService(Options{ExamplesRoot: root, AppletRuntime: &fakeRuntime{target: backend.URL}})
+	if err != nil {
+		t.Fatalf("NewService() error = %v", err)
+	}
+	service.registerRootAliases(echo.New())
+
+	e := echo.New()
+	req := httptest.NewRequest(http.MethodPost, "/guesses", nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+
+	if err := service.HandleAlias(c); err != nil {
+		t.Fatalf("HandleAlias() error = %v", err)
+	}
+	if got := strings.TrimSpace(rec.Body.String()); got != "POST /guesses" {
+		t.Fatalf("alias proxy = %q, want POST /guesses", got)
+	}
+}
+
+func writeExampleManifest(t *testing.T) string {
+	t.Helper()
+	root := t.TempDir()
+	dir := filepath.Join(root, "wordle")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	body := `---
+vamos_artifact: applet
+applet:
+  id: wordle
+  title: Daily Wordle
+  kind: datastar
+  files_root: files
+  app_dir: .
+  start_command: [just, build]
+  root_aliases:
+    - pattern: /events
+      methods: [GET]
+    - pattern: /guesses
+      methods: [POST]
+---
+`
+	if err := os.WriteFile(filepath.Join(dir, "AGENTS.md"), []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	return root
+}
+
+type fakeRuntime struct {
+	target string
+	state  appletruntime.AppletProcessState
+}
+
+func (m *fakeRuntime) EnsureStarted(context.Context, appletruntime.RuntimeConfig) (appletruntime.AppletProcessState, error) {
+	if m.state.Status == "" {
+		m.state.Status = appletruntime.ProcessStatusHealthy
+	}
+	return m.state, nil
+}
+
+func (m *fakeRuntime) Start(ctx context.Context, cfg appletruntime.RuntimeConfig) (appletruntime.ProcessState, error) {
+	return m.EnsureStarted(ctx, cfg)
+}
+
+func (m *fakeRuntime) Stop(context.Context, string) error { return nil }
+
+func (m *fakeRuntime) Health(context.Context, string) (appletruntime.AppletProcessState, error) {
+	if m.state.Status == "" {
+		return appletruntime.AppletProcessState{Status: appletruntime.ProcessStatusHealthy}, nil
+	}
+	return m.state, nil
+}
+
+func (m *fakeRuntime) ProxyTarget(string) (string, bool) {
+	if m.target == "" {
+		return "", false
+	}
+	return m.target, true
+}
+
+func (m *fakeRuntime) Touch(string, int) {}
+
+func (m *fakeRuntime) SweepInactive(context.Context, time.Time) ([]appletruntime.AppletProcessState, error) {
+	return nil, nil
+}
