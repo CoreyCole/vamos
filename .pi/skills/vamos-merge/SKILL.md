@@ -392,7 +392,7 @@ if test -d ~/dotfiles/context/vamos/.git; then
 fi
 ```
 
-If `~/dotfiles/context/vamos` is dirty, stop and ask before overwriting it. Do not leave it stale after a successful remote push, or subsequent Pi agents may load old q-manager/vamos skill instructions.
+If `~/dotfiles/context/vamos` is dirty, stop before overwriting it. Inspect whether the dirty files are task-owned skill/runbook updates from the same session. If they are and the user authorizes committing them, stage only those skill files/support references, commit with a docs/runbook message, rebase/pull onto `origin/main`, push, and verify `HEAD == origin/main`. If ownership is unclear, ask rather than stashing or discarding. Do not leave it stale after a successful remote push, or subsequent Pi agents may load old q-manager/vamos skill instructions.
 
 If host-only follow-up fixes were required, commit them on working `../cn-agents/main`, fast-forward `../cn-agents-main`, and push that repo separately as part of the same merge flow after its verification passes.
 
