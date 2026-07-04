@@ -110,42 +110,47 @@ func TestAppletFrameRendersIframeWhenHealthy(t *testing.T) {
 			t.Fatalf("AppletFrame html missing %q: %s", want, html)
 		}
 	}
+	for _, forbidden := range []string{"datastar applet", "Open in new tab", "/forms/applets/wordle/restart", "/forms/applets/wordle/stop"} {
+		if strings.Contains(html, forbidden) {
+			t.Fatalf("AppletFrame still renders local control/chrome %q: %s", forbidden, html)
+		}
+	}
 }
 
-func TestAppletFrameControlsUseRuntimeKeyForFormActions(t *testing.T) {
+func TestAppletWorkbenchActionsUseRuntimeKeyForFormActions(t *testing.T) {
 	applet := appletTestContext()
 	applet.Manifest.ID = "demo"
 	applet.RuntimeKey = EncodeAppletIdentity(applet.IdentityPath)
 	var body bytes.Buffer
-	if err := AppletFrame(applet, appletruntime.AppletProcessState{Status: appletruntime.ProcessStatusHealthy}).Render(t.Context(), &body); err != nil {
-		t.Fatalf("AppletFrame.Render() error = %v", err)
+	if err := BuildAppletWorkbenchActions(applet, appletruntime.AppletProcessState{Status: appletruntime.ProcessStatusHealthy}).Render(t.Context(), &body); err != nil {
+		t.Fatalf("BuildAppletWorkbenchActions.Render() error = %v", err)
 	}
 	html := body.String()
 	for _, want := range []string{"/forms/applets/" + applet.RuntimeKey + "/restart", "/forms/applets/" + applet.RuntimeKey + "/stop"} {
 		if !strings.Contains(html, want) {
-			t.Fatalf("AppletFrame html missing runtime-key form action %q: %s", want, html)
+			t.Fatalf("applet actions missing runtime-key form action %q: %s", want, html)
 		}
 	}
 	if strings.Contains(html, "/forms/applets/demo/") {
-		t.Fatalf("AppletFrame html still uses display ID form action: %s", html)
+		t.Fatalf("applet actions still use display ID form action: %s", html)
 	}
 }
 
-func TestAppletFrameControlsIncludeProxiedNewTabLink(t *testing.T) {
+func TestAppletWorkbenchActionsIncludeProxiedNewTabLink(t *testing.T) {
 	applet := appletTestContext()
 	applet.IFrameSrc = "/examples/wordle/app/"
 	var body bytes.Buffer
-	if err := AppletFrame(applet, appletruntime.AppletProcessState{Status: appletruntime.ProcessStatusStarting}).Render(t.Context(), &body); err != nil {
-		t.Fatalf("AppletFrame.Render() error = %v", err)
+	if err := BuildAppletWorkbenchActions(applet, appletruntime.AppletProcessState{Status: appletruntime.ProcessStatusStarting}).Render(t.Context(), &body); err != nil {
+		t.Fatalf("BuildAppletWorkbenchActions.Render() error = %v", err)
 	}
 	html := body.String()
 	for _, want := range []string{`href="/examples/wordle/app/"`, `target="_blank"`, `rel="noopener"`, "Open in new tab"} {
 		if !strings.Contains(html, want) {
-			t.Fatalf("new-tab control missing %q: %s", want, html)
+			t.Fatalf("new-tab action missing %q: %s", want, html)
 		}
 	}
 	if strings.Contains(html, "127.0.0.1") || strings.Contains(html, "localhost") {
-		t.Fatalf("new-tab control exposed raw backend URL: %s", html)
+		t.Fatalf("new-tab action exposed raw backend URL: %s", html)
 	}
 }
 
@@ -159,6 +164,11 @@ func TestAppletFrameRendersStartingPanelWithStatusStream(t *testing.T) {
 	for _, want := range []string{"Starting Wordle", "@get(&#39;/thoughts/_render/app/wordle/status&#39;)", "/tmp/app.log"} {
 		if !strings.Contains(html, want) {
 			t.Fatalf("AppletFrame html missing %q: %s", want, html)
+		}
+	}
+	for _, forbidden := range []string{"Open in new tab", "/forms/applets/wordle/restart", "/forms/applets/wordle/stop"} {
+		if strings.Contains(html, forbidden) {
+			t.Fatalf("starting panel still renders local controls %q: %s", forbidden, html)
 		}
 	}
 }

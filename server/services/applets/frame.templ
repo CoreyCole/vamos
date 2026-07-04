@@ -17,19 +17,13 @@ templ AppletWorkbenchDocument(applet AppletContext, process appletruntime.Applet
 templ AppletFrame(applet AppletContext, process appletruntime.AppletProcessState) {
 	<div id={ "applet-frame-" + applet.Manifest.ID } class="flex h-full min-h-0 flex-col bg-background">
 		if process.Status == appletruntime.ProcessStatusHealthy {
-			<div class="flex min-h-0 flex-1 flex-col">
-				<div class="flex shrink-0 items-center justify-between gap-3 border-b border-border px-3 py-2 text-xs text-muted-foreground">
-					<span>{ applet.Manifest.Kind } applet</span>
-					@AppletControls(applet, process)
-				</div>
-				<iframe
-					class="min-h-0 flex-1 border-0 bg-background"
-					src={ applet.IFrameSrc }
-					title={ applet.Manifest.Title }
-					sandbox="allow-same-origin allow-forms allow-downloads allow-scripts"
-					referrerpolicy="same-origin"
-				></iframe>
-			</div>
+			<iframe
+				class="min-h-0 flex-1 border-0 bg-background"
+				src={ applet.IFrameSrc }
+				title={ applet.Manifest.Title }
+				sandbox="allow-same-origin allow-forms allow-downloads allow-scripts"
+				referrerpolicy="same-origin"
+			></iframe>
 		} else {
 			@AppletStartingPanel(applet, process)
 		}
@@ -49,30 +43,6 @@ templ AppletStartingPanel(applet AppletContext, process appletruntime.AppletProc
 			if process.LogPath != "" {
 				<p class="mt-2 break-all text-xs text-muted-foreground">Logs: { process.LogPath }</p>
 			}
-			<div class="mt-4 flex justify-center">
-				@AppletControls(applet, process)
-			</div>
 		</div>
-	</div>
-}
-
-templ AppletControls(applet AppletContext, process appletruntime.AppletProcessState) {
-	<div class="flex items-center gap-2">
-		<a
-			href={ applet.IFrameSrc }
-			target="_blank"
-			rel="noopener"
-			class="rounded-md border border-border px-2 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-		>Open in new tab</a>
-		<form method="post" action={ "/forms/applets/" + applet.RuntimeKey + "/restart" }>
-			<input type="hidden" name="identity_path" value={ applet.IdentityPath }/>
-			<button type="submit" class="rounded-md border border-border px-2 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">Restart</button>
-		</form>
-		if process.Status == appletruntime.ProcessStatusHealthy || process.Status == appletruntime.ProcessStatusUnhealthy {
-			<form method="post" action={ "/forms/applets/" + applet.RuntimeKey + "/stop" }>
-				<input type="hidden" name="identity_path" value={ applet.IdentityPath }/>
-				<button type="submit" class="rounded-md border border-border px-2 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">Stop</button>
-			</form>
-		}
 	</div>
 }

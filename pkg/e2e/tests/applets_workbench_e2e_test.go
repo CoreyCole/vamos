@@ -24,6 +24,7 @@ func TestAppletsWorkbench_WordleRendersWorkbenchShell(t *testing.T) {
 		Visit(vamos.Pages.Path("/examples/wordle?context=chat")).
 		Expect(vamos.Thoughts.Ready()).
 		Expect(spec.ExpectStep(expectWorkbenchDatastarImportMapPresent())).
+		Do(openWorkbenchOverflow()).
 		Expect(spec.ExpectStep(expectOpenAppletInNewTabLink())).
 		Expect(vamos.Thoughts.SidebarVisible()).
 		Expect(vamos.Thoughts.CenterPaneVisible()).
@@ -31,6 +32,7 @@ func TestAppletsWorkbench_WordleRendersWorkbenchShell(t *testing.T) {
 		Expect(spec.ExpectStep(expectAppletSidebarTabs())).
 		Expect(spec.ExpectStep(expectAppletRightRailTabs())).
 		Expect(spec.ExpectStep(expectWordleIframeLoaded())).
+		Expect(spec.ExpectStep(expectAppletLocalChromeRemoved())).
 		Expect(spec.ExpectStep(expectAppletIdentityEncoded("examples/wordle/AGENTS.md"))).
 		Expect(spec.ExpectStep(expectAppletConsoleClean())).
 		Run()
@@ -47,6 +49,7 @@ func TestAppletsWorkbench_DemandStartRefreshesToIframe(t *testing.T) {
 		Expect(spec.ExpectStep(expectWorkbenchDatastarImportMapPresent())).
 		Expect(spec.ExpectStep(expectStartingPanelOrIframe())).
 		Expect(spec.ExpectStep(expectWordleIframeLoaded())).
+		Do(openWorkbenchOverflow()).
 		Expect(spec.ExpectStep(expectOpenAppletInNewTabLink())).
 		Expect(spec.ExpectStep(expectAppletConsoleClean())).
 		Run()
@@ -87,6 +90,25 @@ func expectWorkbenchDatastarImportMapPresent() spec.Step {
 		}
 		if resizeIndex := browserNumberAsInt(data["resizeIndex"]); resizeIndex >= 0 && mapIndex > resizeIndex {
 			t.Fatalf("Datastar import map after Workbench module: %#v", data)
+		}
+	})
+}
+
+func openWorkbenchOverflow() spec.Step {
+	return spec.Custom("open workbench overflow", func(t testing.TB, ctx *duiruntime.Context) {
+		t.Helper()
+		trigger := ctx.Page.Locator("[data-testid='workbench-overflow-actions'] summary").First()
+		if err := trigger.WaitFor(playwright.LocatorWaitForOptions{Timeout: playwright.Float(30_000)}); err != nil {
+			t.Fatalf("workbench overflow trigger missing: %v", err)
+		}
+		open, err := trigger.Evaluate("el => el.parentElement.open", nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if open != true {
+			if err := trigger.Click(); err != nil {
+				t.Fatal(err)
+			}
 		}
 	})
 }
@@ -157,6 +179,21 @@ func expectWordleIframeLoaded() spec.Step {
 		}
 		if err := ctx.Page.FrameLocator(wordleAppletFrameSelector).GetByText("Daily Wordle").First().WaitFor(playwright.LocatorWaitForOptions{Timeout: playwright.Float(60_000)}); err != nil {
 			t.Fatalf("wordle iframe content did not load: %v", err)
+		}
+	})
+}
+
+func expectAppletLocalChromeRemoved() spec.Step {
+	return spec.Custom("healthy applet body omits local chrome", func(t testing.TB, ctx *duiruntime.Context) {
+		t.Helper()
+		html, err := ctx.Page.Locator("#applet-frame-wordle").Evaluate("el => el.innerHTML", nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, forbidden := range []string{"datastar applet", "Open in new tab", "/forms/applets/wordle/restart", "/forms/applets/wordle/stop"} {
+			if strings.Contains(fmt.Sprint(html), forbidden) {
+				t.Fatalf("local applet chrome/control still rendered %q", forbidden)
+			}
 		}
 	})
 }
