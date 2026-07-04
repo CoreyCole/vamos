@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -14,7 +15,64 @@ import (
 	"github.com/CoreyCole/vamos/pkg/e2e/vamos"
 )
 
-const wordleAppletFrameSelector = `iframe[src^='/examples/wordle/app/']`
+const (
+	wordleAppletFrameSelector    = `iframe[src^='/examples/wordle/app/']`
+	streamlitAppletFrameSelector = `iframe[src^='/examples/streamlit/app/']`
+)
+
+type streamlitBrowserProbe struct {
+	mu        sync.Mutex
+	urls      []string
+	errors    []string
+	responses []string
+}
+
+func (p *streamlitBrowserProbe) observeWebSocket(ws playwright.WebSocket) {
+	if !strings.Contains(ws.URL(), "_stcore/stream") {
+		return
+	}
+	p.mu.Lock()
+	p.urls = append(p.urls, ws.URL())
+	p.mu.Unlock()
+	ws.OnSocketError(func(message string) {
+		p.mu.Lock()
+		defer p.mu.Unlock()
+		p.errors = append(p.errors, ws.URL()+": "+message)
+	})
+}
+
+func (p *streamlitBrowserProbe) observeResponse(response playwright.Response) {
+	if !strings.Contains(response.URL(), "_stcore/") && !strings.Contains(response.URL(), "/examples/streamlit/app/") {
+		return
+	}
+	if status := response.Status(); status >= http.StatusBadRequest {
+		p.mu.Lock()
+		defer p.mu.Unlock()
+		p.responses = append(p.responses, fmt.Sprintf("%s -> %d", response.URL(), status))
+	}
+}
+
+func (p *streamlitBrowserProbe) observeRequestFailure(request playwright.Request) {
+	if !strings.Contains(request.URL(), "_stcore/") && request.ResourceType() != "websocket" {
+		return
+	}
+	failure := "request failed"
+	if err := request.Failure(); err != nil {
+		failure = err.Error()
+	}
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.errors = append(p.errors, request.URL()+": "+failure)
+}
+
+func observeStreamlitBrowserTraffic(probe *streamlitBrowserProbe) spec.Step {
+	return spec.Custom("observe Streamlit browser traffic", func(t testing.TB, ctx *duiruntime.Context) {
+		t.Helper()
+		ctx.Page.OnWebSocket(probe.observeWebSocket)
+		ctx.Page.OnResponse(probe.observeResponse)
+		ctx.Page.OnRequestFailed(probe.observeRequestFailure)
+	})
+}
 
 func TestAppletsWorkbench_WordleRendersWorkbenchShell(t *testing.T) {
 	spec.Story(t, "applets workbench renders wordle in document shell").
@@ -53,6 +111,24 @@ func TestAppletsWorkbench_DemandStartRefreshesToIframe(t *testing.T) {
 		Do(openWorkbenchOverflow()).
 		Expect(spec.ExpectStep(expectOpenAppletInNewTabLink())).
 		Expect(spec.ExpectStep(expectAppletConsoleClean())).
+		Run()
+}
+
+func TestAppletsWorkbench_StreamlitRendersEmbeddedAndNewTab(t *testing.T) {
+	probe := &streamlitBrowserProbe{}
+	spec.Story(t, "applets workbench renders streamlit embedded and in scoped new tab").
+		App(vamos.App()).
+		As(vamos.Robot).
+		With(vamos.WorkspaceFixture("thoughts-workbench.basic")).
+		Do(observeStreamlitBrowserTraffic(probe)).
+		Visit(vamos.Pages.Path("/examples/streamlit?context=chat")).
+		Expect(vamos.Thoughts.Ready()).
+		Expect(spec.ExpectStep(expectWorkbenchDatastarImportMapPresent())).
+		Expect(spec.ExpectStep(expectOpenStreamlitInNewTabLink())).
+		Expect(spec.ExpectStep(expectStreamlitIframeLoaded())).
+		Expect(spec.ExpectStep(expectStreamlitSessionCounterWorks())).
+		Expect(spec.ExpectStep(expectStreamlitOpenNewTabRenders())).
+		Expect(spec.ExpectStep(expectStreamlitNoWebSocketFailures(probe))).
 		Run()
 }
 
@@ -195,6 +271,115 @@ func expectAppletLocalChromeRemoved() spec.Step {
 			if strings.Contains(fmt.Sprint(html), forbidden) {
 				t.Fatalf("local applet chrome/control still rendered %q", forbidden)
 			}
+		}
+	})
+}
+
+func expectStreamlitIframeLoaded() spec.Step {
+	return spec.Custom("streamlit applet iframe loads", func(t testing.TB, ctx *duiruntime.Context) {
+		t.Helper()
+		frame := ctx.Page.Locator(streamlitAppletFrameSelector).First()
+		if err := frame.WaitFor(playwright.LocatorWaitForOptions{Timeout: playwright.Float(90_000)}); err != nil {
+			dumpBody(t, ctx, "streamlit iframe missing")
+		}
+		title, err := frame.GetAttribute("title")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !strings.Contains(title, "Streamlit") {
+			t.Fatalf("iframe title = %q, want Streamlit", title)
+		}
+		if err := ctx.Page.FrameLocator(streamlitAppletFrameSelector).GetByText("Streamlit applet smoke test").First().WaitFor(playwright.LocatorWaitForOptions{Timeout: playwright.Float(90_000)}); err != nil {
+			t.Fatalf("streamlit iframe content did not load: %v", err)
+		}
+	})
+}
+
+func expectStreamlitSessionCounterWorks() spec.Step {
+	return spec.Custom("streamlit session counter works", func(t testing.TB, ctx *duiruntime.Context) {
+		t.Helper()
+		app := ctx.Page.FrameLocator(streamlitAppletFrameSelector)
+		if err := app.GetByRole("button", playwright.FrameLocatorGetByRoleOptions{Name: "Increment Streamlit session counter"}).Click(); err != nil {
+			t.Fatal(err)
+		}
+		if err := app.GetByText("Session counter: 1").First().WaitFor(playwright.LocatorWaitForOptions{Timeout: playwright.Float(30_000)}); err != nil {
+			t.Fatalf("streamlit counter did not increment over websocket session: %v", err)
+		}
+	})
+}
+
+func expectOpenStreamlitInNewTabLink() spec.Step {
+	return spec.Custom("Open in new tab uses Streamlit scoped app route", func(t testing.TB, ctx *duiruntime.Context) {
+		t.Helper()
+		link := ctx.Page.GetByRole(*playwright.AriaRoleLink, playwright.PageGetByRoleOptions{Name: "Open in new tab"}).First()
+		if err := link.WaitFor(playwright.LocatorWaitForOptions{Timeout: playwright.Float(30_000)}); err != nil {
+			t.Fatalf("open-new-tab link missing: %v", err)
+		}
+		href, err := link.GetAttribute("href")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !strings.Contains(href, "/examples/streamlit/app/") {
+			t.Fatalf("open-new-tab href = %q, want proxied /examples/streamlit/app/", href)
+		}
+		if strings.Contains(href, "localhost") || strings.Contains(href, "127.0.0.1") {
+			t.Fatalf("open-new-tab href exposes raw backend: %q", href)
+		}
+	})
+}
+
+func expectStreamlitOpenNewTabRenders() spec.Step {
+	return spec.Custom("Streamlit scoped new tab renders", func(t testing.TB, ctx *duiruntime.Context) {
+		t.Helper()
+		link := ctx.Page.GetByRole(*playwright.AriaRoleLink, playwright.PageGetByRoleOptions{Name: "Open in new tab"}).First()
+		popup, err := ctx.Page.ExpectPopup(func() error { return link.Click() })
+		if err != nil {
+			t.Fatalf("open Streamlit popup: %v", err)
+		}
+		defer popup.Close()
+		if err := popup.WaitForLoadState(playwright.PageWaitForLoadStateOptions{State: playwright.LoadStateDomcontentloaded, Timeout: playwright.Float(60_000)}); err != nil {
+			t.Fatal(err)
+		}
+		if !strings.Contains(popup.URL(), "/examples/streamlit/app/") {
+			t.Fatalf("popup URL = %q", popup.URL())
+		}
+		if strings.Contains(popup.URL(), "localhost") || strings.Contains(popup.URL(), "127.0.0.1") {
+			t.Fatalf("popup exposes raw backend URL: %q", popup.URL())
+		}
+		if err := popup.GetByText("Streamlit applet smoke test").First().WaitFor(playwright.LocatorWaitForOptions{Timeout: playwright.Float(90_000)}); err != nil {
+			t.Fatalf("streamlit popup content did not load: %v", err)
+		}
+	})
+}
+
+func expectStreamlitNoWebSocketFailures(probe *streamlitBrowserProbe) spec.Step {
+	return spec.Custom("Streamlit websocket has no browser failures", func(t testing.TB, ctx *duiruntime.Context) {
+		t.Helper()
+		time.Sleep(500 * time.Millisecond)
+		probe.mu.Lock()
+		urls := append([]string(nil), probe.urls...)
+		errors := append([]string(nil), probe.errors...)
+		responses := append([]string(nil), probe.responses...)
+		probe.mu.Unlock()
+		if len(urls) == 0 {
+			t.Fatalf("no _stcore/stream websocket observed")
+		}
+		if len(errors) > 0 || len(responses) > 0 {
+			t.Fatalf("streamlit websocket/network errors: websocket=%v responses=%v", errors, responses)
+		}
+		problems := ctx.Console.Problems()
+		filtered := problems[:0]
+		for _, problem := range problems {
+			if problem.Type == "warning" && strings.Contains(problem.Text, "allow-scripts and allow-same-origin") {
+				continue
+			}
+			text := strings.ToLower(problem.Text)
+			if strings.Contains(text, "_stcore/stream") || strings.Contains(text, "websocket") || strings.Contains(text, "502") {
+				filtered = append(filtered, problem)
+			}
+		}
+		if len(filtered) > 0 {
+			t.Fatalf("streamlit websocket console problems:\n%s", duiruntime.FormatConsoleProblems(filtered))
 		}
 	})
 }
