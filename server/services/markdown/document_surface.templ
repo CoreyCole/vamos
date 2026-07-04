@@ -34,6 +34,13 @@ templ ThoughtsTitleContent(title string) {
 	}
 }
 
+templ DocumentOnlyCommentSurface(component templ.Component, comments commentui.CommentableMarkdownArgs) {
+	<div class="relative h-full min-h-full min-w-0" data-commentui-container="true">
+		@component
+		@commentui.DocumentPatchTarget(comments, "Document")
+	</div>
+}
+
 templ QRSPIArtifactContext(meta QRSPIMetadata, workspaceTree *workbench.WorkspaceDocTreeHeaderModel) {
 	if meta.Present {
 		<section class="mb-3 overflow-hidden rounded-lg border border-border bg-background">

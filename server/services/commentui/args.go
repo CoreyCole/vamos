@@ -315,6 +315,40 @@ func DocumentComments(threads []CommentThreadView) []CommentThreadView {
 	return CommentsForSection(threads, "document", "")
 }
 
+func DocumentTargetView(
+	args CommentableMarkdownArgs,
+	headingHint string,
+	chrome CommentTargetChrome,
+) CommentTargetView {
+	headingHint = strings.TrimSpace(headingHint)
+	if headingHint == "" {
+		headingHint = "Document"
+	}
+	hidden := MergeHidden(args.HiddenFields, map[string]string{
+		"doc_path":     args.DocPath,
+		"section_hint": "document",
+		"heading_hint": headingHint,
+	})
+	if TargetChromeOrVisible(chrome) == CommentTargetChromePatchOnly {
+		hidden = MergeHidden(hidden, map[string]string{
+			"comment_target_chrome": string(CommentTargetChromePatchOnly),
+		})
+	}
+	return CommentTargetView{
+		ID:           TargetID(args.IDPrefix, "document"),
+		SignalKey:    SignalKey(args.IDPrefix, "document"),
+		Surface:      args.Surface,
+		DocPath:      args.DocPath,
+		SectionID:    "document",
+		HeadingHint:  headingHint,
+		UserEmail:    args.UserEmail,
+		Threads:      DocumentComments(args.Comments),
+		Routes:       args.Routes,
+		HiddenFields: hidden,
+		Chrome:       chrome,
+	}
+}
+
 func BuildCommentSidebarView(args CommentableMarkdownArgs) CommentSidebarView {
 	target := CommentTargetView{
 		ID:        TargetID(args.IDPrefix, "document"),

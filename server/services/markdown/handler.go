@@ -294,6 +294,11 @@ func commentComponentForMode(mode CommentMode, args commentui.CommentableMarkdow
 		return commentui.CommentableMarkdown(args)
 	case CommentModeSelectionOnly:
 		return commentui.CommentableSelectionHTML(args)
+	case CommentModeDocumentOnly:
+		if existing == nil {
+			return commentui.CommentableMarkdown(args)
+		}
+		return DocumentOnlyCommentSurface(existing, args)
 	default:
 		return existing
 	}
@@ -365,7 +370,8 @@ func (s *Service) buildThoughtsWorkbenchState(
 		InitialSidebarOpen: false,
 		InitialRailOpen:    contextMode != "",
 		Center: workbench.CenterDocPaneArgs{
-			Title: DocumentTitle(pageArgs.FilePath, pageArgs.ViewerArgs.Frontmatter),
+			Title:   DocumentTitle(pageArgs.FilePath, pageArgs.ViewerArgs.Frontmatter),
+			Actions: BuildDocumentWorkbenchActions(pageArgs),
 			Document: DocumentPanel(
 				BuildDocumentPanelArgs(
 					pageArgs,

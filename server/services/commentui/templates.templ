@@ -144,6 +144,10 @@ templ HiddenFields(fields map[string]string) {
 	}
 }
 
+templ DocumentPatchTarget(args CommentableMarkdownArgs, headingHint string) {
+	@CommentTarget(DocumentTargetView(args, headingHint, CommentTargetChromePatchOnly))
+}
+
 templ CommentableMarkdown(args CommentableMarkdownArgs) {
 	<div class="relative min-h-full" data-signals="{}">
 		<div class="min-w-0 relative min-h-full" data-commentui-container="true" data-on:keydown__window={ selectionKeydownExpr(args.SelectionSignals) } data-on:mouseup__debounce.500ms.leading={ selectionMouseupExpr(args.SelectionSignals) }>
@@ -151,18 +155,10 @@ templ CommentableMarkdown(args CommentableMarkdownArgs) {
 				{{ documentThreads := DocumentComments(args.Comments) }}
 				if len(documentThreads) > 0 {
 					<div class="mb-2 flex justify-end">
-						@CommentTarget(CommentTargetView{
-							ID:           TargetID(args.IDPrefix, "document"),
-							SignalKey:    SignalKey(args.IDPrefix, "document"),
-							Surface:      args.Surface,
-							DocPath:      args.DocPath,
-							SectionID:    "document",
-							UserEmail:    args.UserEmail,
-							Threads:      documentThreads,
-							Routes:       args.Routes,
-							HiddenFields: MergeHidden(args.HiddenFields, map[string]string{"section_hint": "document", "heading_hint": ""}),
-						})
+						@CommentTarget(DocumentTargetView(args, "Document", CommentTargetChromeVisible))
 					</div>
+				} else {
+					@DocumentPatchTarget(args, "Document")
 				}
 				for _, section := range args.Sections {
 					{{
@@ -200,17 +196,7 @@ templ CommentableMarkdown(args CommentableMarkdownArgs) {
 				<div class="markdown-viewer prose prose-invert max-w-none min-h-full">
 					@templ.Raw(args.HTML)
 				</div>
-				@CommentTarget(CommentTargetView{
-					ID:           TargetID(args.IDPrefix, "document"),
-					SignalKey:    SignalKey(args.IDPrefix, "document"),
-					Surface:      args.Surface,
-					DocPath:      args.DocPath,
-					SectionID:    "document",
-					UserEmail:    args.UserEmail,
-					Threads:      DocumentComments(args.Comments),
-					Routes:       args.Routes,
-					HiddenFields: MergeHidden(args.HiddenFields, map[string]string{"section_hint": "document", "heading_hint": ""}),
-				})
+				@CommentTarget(DocumentTargetView(args, "Document", CommentTargetChromeVisible))
 			}
 			@SelectedTextTrigger(args.SelectionSignals)
 		</div>
@@ -218,26 +204,19 @@ templ CommentableMarkdown(args CommentableMarkdownArgs) {
 }
 
 templ CommentableSelectionHTML(args CommentableMarkdownArgs) {
-	{{ selection := SelectionOnlySignalArgs(args) }}
+	{{
+		selection := SelectionOnlySignalArgs(args)
+		documentArgs := args
+		documentArgs.HiddenFields = selection.HiddenFields
+		documentTarget := DocumentTargetView(documentArgs, "Document", CommentTargetChromePatchOnly)
+		documentTarget.SelectionSignalPrefix = selection.Prefix
+	}}
 	<div class="relative h-full min-h-full" data-signals="{}">
 		<div class="relative h-full min-h-full min-w-0" data-commentui-container="true" data-on:keydown__window={ selectionKeydownExpr(selection) } data-on:mouseup__debounce.500ms.leading={ selectionMouseupExpr(selection) }>
 			<div class="h-full min-h-full w-full">
 				@templ.Raw(args.HTML)
 			</div>
-			@CommentTarget(CommentTargetView{
-				ID:                    TargetID(args.IDPrefix, "document"),
-				SignalKey:             SignalKey(args.IDPrefix, "document"),
-				Surface:               args.Surface,
-				DocPath:               args.DocPath,
-				SectionID:             "document",
-				HeadingHint:           "Document",
-				UserEmail:             args.UserEmail,
-				Threads:               DocumentComments(args.Comments),
-				Routes:                args.Routes,
-				HiddenFields:          MergeHidden(selection.HiddenFields, map[string]string{"section_hint": "document", "heading_hint": "Document"}),
-				Chrome:                CommentTargetChromePatchOnly,
-				SelectionSignalPrefix: selection.Prefix,
-			})
+			@CommentTarget(documentTarget)
 			@SelectedTextTrigger(selection)
 		</div>
 	</div>
@@ -245,7 +224,9 @@ templ CommentableSelectionHTML(args CommentableMarkdownArgs) {
 
 templ CommentTarget(args CommentTargetView) {
 	if TargetChromeOrVisible(args.Chrome) == CommentTargetChromePatchOnly {
-		<div id={ args.ID } class={ CommentAnchorClass(args.SignalKey) + " commentui-selection-target-right h-0 w-0 overflow-visible" } data-style={ SelectionStyleExpr(args.SelectionSignalPrefix) } data-comment-target="true" aria-hidden="true"></div>
+		<div id={ args.ID } class={ CommentAnchorClass(args.SignalKey) + " commentui-selection-target-right h-0 w-0 overflow-visible" } data-style={ SelectionStyleExpr(args.SelectionSignalPrefix) } data-comment-target="true" aria-hidden="true">
+			@HiddenFields(args.HiddenFields)
+		</div>
 	} else {
 		<div id={ args.ID } class="commentui-target flex items-center gap-1" data-comment-target="true">
 			if len(args.Threads) > 0 {

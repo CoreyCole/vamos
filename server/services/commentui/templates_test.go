@@ -94,6 +94,28 @@ func TestCommentFormSelectedTextIsPreviewOnly(t *testing.T) {
 	}
 }
 
+func TestDocumentTargetViewBuildsPatchOnlyDocumentTarget(t *testing.T) {
+	t.Parallel()
+
+	target := DocumentTargetView(CommentableMarkdownArgs{
+		Surface:      CommentSurfaceThoughts,
+		IDPrefix:     "doc",
+		DocPath:      "thoughts/example.md",
+		HiddenFields: map[string]string{"workspace_id": "workspace-1"},
+	}, "", CommentTargetChromePatchOnly)
+
+	if target.SectionID != "document" || target.HeadingHint != "Document" {
+		t.Fatalf("unexpected target identity: %#v", target)
+	}
+	if target.HiddenFields["doc_path"] != "thoughts/example.md" ||
+		target.HiddenFields["section_hint"] != "document" ||
+		target.HiddenFields["heading_hint"] != "Document" ||
+		target.HiddenFields["comment_target_chrome"] != "patch-only" ||
+		target.HiddenFields["workspace_id"] != "workspace-1" {
+		t.Fatalf("unexpected hidden fields: %#v", target.HiddenFields)
+	}
+}
+
 func TestCommentableMarkdownRendersStableTargetsAndHiddenFields(t *testing.T) {
 	t.Parallel()
 
@@ -269,6 +291,80 @@ func TestCommentableMarkdownDoesNotRenderRightSidebar(t *testing.T) {
 	}
 	if strings.Contains(html, ` style="`) {
 		t.Fatalf("render kept inline style: %s", html)
+	}
+}
+
+func TestCommentableMarkdownMountsSingleDocumentPatchTargetForSectionedDocs(t *testing.T) {
+	t.Parallel()
+
+	args := CommentableMarkdownArgs{
+		Surface:  CommentSurfaceThoughts,
+		IDPrefix: "doc",
+		DocPath:  "thoughts/example.md",
+		Sections: []CommentSectionView{{
+			ID:       "section-1",
+			Title:    "Section 1",
+			BodyHTML: `<p>Body</p>`,
+		}},
+		Routes:       CommentRoutes{Show: "/show", Create: "/create", Cancel: "/cancel"},
+		HiddenFields: map[string]string{"doc_path": "thoughts/example.md"},
+	}
+	var buf bytes.Buffer
+	if err := CommentableMarkdown(args).Render(t.Context(), &buf); err != nil {
+		t.Fatalf("Render() error = %v", err)
+	}
+	html := buf.String()
+	documentID := `id="` + TargetID("doc", "document") + `"`
+	if strings.Count(html, documentID) != 1 {
+		t.Fatalf("document target count=%d, want 1 in %s", strings.Count(html, documentID), html)
+	}
+	for _, want := range []string{
+		`commentui-selection-target-right`,
+		`name="comment_target_chrome" value="patch-only"`,
+		`name="doc_path" value="thoughts/example.md"`,
+		`name="section_hint" value="document"`,
+	} {
+		if !strings.Contains(html, want) {
+			t.Fatalf("document patch target missing %q: %s", want, html)
+		}
+	}
+}
+
+func TestCommentableMarkdownKeepsSingleVisibleDocumentTargetWithThreads(t *testing.T) {
+	t.Parallel()
+
+	args := CommentableMarkdownArgs{
+		Surface:  CommentSurfaceThoughts,
+		IDPrefix: "doc",
+		DocPath:  "thoughts/example.md",
+		Sections: []CommentSectionView{{
+			ID:       "section-1",
+			Title:    "Section 1",
+			BodyHTML: `<p>Body</p>`,
+		}},
+		Comments: []CommentThreadView{{
+			ID:          "document-comment",
+			AuthorEmail: "a@example.com",
+			Body:        "document body",
+			SectionID:   "document",
+		}},
+		Routes:       CommentRoutes{Show: "/show", Create: "/create", Cancel: "/cancel"},
+		HiddenFields: map[string]string{"doc_path": "thoughts/example.md"},
+	}
+	var buf bytes.Buffer
+	if err := CommentableMarkdown(args).Render(t.Context(), &buf); err != nil {
+		t.Fatalf("Render() error = %v", err)
+	}
+	html := buf.String()
+	documentID := `id="` + TargetID("doc", "document") + `"`
+	if strings.Count(html, documentID) != 1 {
+		t.Fatalf("document target count=%d, want 1 in %s", strings.Count(html, documentID), html)
+	}
+	if strings.Contains(html, `commentui-selection-target-right`) {
+		t.Fatalf("visible document target should not render patch-only duplicate: %s", html)
+	}
+	if !strings.Contains(html, `aria-label="1 comments"`) {
+		t.Fatalf("visible document target missing thread toggle: %s", html)
 	}
 }
 

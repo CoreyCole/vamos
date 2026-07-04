@@ -68,6 +68,36 @@ func TestDocumentSurfaceRendersRendererComponent(t *testing.T) {
 	}
 }
 
+func TestBuildDocumentWorkbenchActionsRendersWholeDocumentComment(t *testing.T) {
+	args := &PageArgs{
+		FilePath: "thoughts/example/design.md",
+		ViewerArgs: ViewerArgs{
+			CommentMode: CommentModeSections,
+			Frontmatter: &Frontmatter{Topic: "Design Doc"},
+		},
+	}
+
+	var buf bytes.Buffer
+	if err := BuildDocumentWorkbenchActions(args).Render(t.Context(), &buf); err != nil {
+		t.Fatal(err)
+	}
+	html := buf.String()
+	for _, want := range []string{
+		`data-testid="workbench-overflow-actions"`,
+		`Document actions`,
+		`Comment`,
+		`data-on:submit__prevent="@post(&#39;/forms/comments/show&#39;, {contentType: &#39;form&#39;})"`,
+		`name="doc_path" value="thoughts/example/design.md"`,
+		`name="section_hint" value="document"`,
+		`name="heading_hint" value="Design Doc"`,
+		`name="comment_target_chrome" value="patch-only"`,
+	} {
+		if !strings.Contains(html, want) {
+			t.Fatalf("document workbench actions missing %q: %s", want, html)
+		}
+	}
+}
+
 func TestDocumentSurfaceRendersHTMLAppletEdgeToEdge(t *testing.T) {
 	doc := WorkbenchDocument{
 		Path:          "thoughts/example.html",
@@ -107,6 +137,36 @@ func TestDocumentSurfaceRendersSourceEdgeToEdge(t *testing.T) {
 	}
 	if strings.Contains(html, `p-4 md:p-10`) {
 		t.Fatalf("Source document surface kept padded scroll wrapper: %s", html)
+	}
+}
+
+func TestCommentComponentForDocumentOnlyWrapsExistingComponentWithPatchTarget(t *testing.T) {
+	component := commentComponentForMode(CommentModeDocumentOnly, commentui.CommentableMarkdownArgs{
+		Surface:      commentui.CommentSurfaceThoughts,
+		IDPrefix:     "doc",
+		DocPath:      "thoughts/example.html",
+		HiddenFields: map[string]string{"doc_path": "thoughts/example.html"},
+	}, templ.Raw(`<iframe data-vamos-html-applet></iframe>`))
+	if component == nil {
+		t.Fatal("component nil")
+	}
+
+	var buf bytes.Buffer
+	if err := component.Render(t.Context(), &buf); err != nil {
+		t.Fatal(err)
+	}
+	html := buf.String()
+	for _, want := range []string{
+		`data-vamos-html-applet`,
+		`data-commentui-container="true"`,
+		`id="` + commentui.TargetID("doc", "document") + `"`,
+		`commentui-selection-target-right`,
+		`name="comment_target_chrome" value="patch-only"`,
+		`name="doc_path" value="thoughts/example.html"`,
+	} {
+		if !strings.Contains(html, want) {
+			t.Fatalf("document-only component missing %q: %s", want, html)
+		}
 	}
 }
 
