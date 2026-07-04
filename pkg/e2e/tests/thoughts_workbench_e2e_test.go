@@ -1,6 +1,8 @@
 package tests
 
 import (
+	"encoding/base64"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -93,6 +95,57 @@ func TestThoughtsWorkbench_RendererFormatsShowExpectedWorkbenchStates(t *testing
 		Visit(vamos.Pages.Path("/thoughts/renderer-demo.bin?context=chat")).
 		Expect(vamos.Thoughts.Ready()).
 		Expect(spec.TextContains(vamos.Thoughts.CenterPane(), "Unsupported document type")).
+		Expect(vamos.Console.Clean()).
+		Run()
+}
+
+func TestThoughtsWorkbench_WorkbenchOverflowWholeDocumentComments(t *testing.T) {
+	commentText := fmt.Sprintf("e2e whole-document comment %d", time.Now().UnixNano())
+
+	spec.Story(t, "thoughts workbench overflow creates whole-document comments across renderers").
+		App(vamos.App()).
+		As(vamos.Robot).
+		With(vamos.WorkspaceFixture("thoughts-workbench.basic")).
+		Do(seedRendererThoughtsFiles()).
+		Visit(vamos.Pages.Path("/thoughts/renderer-demo.md?context=chat")).
+		Expect(vamos.Thoughts.Ready()).
+		Do(openWorkbenchOverflow()).
+		Expect(spec.ExpectStep(expectWorkbenchOverflowAction("Comment"))).
+		Do(submitWholeDocumentComment(commentText + " markdown")).
+		Expect(spec.ExpectStep(expectCommentsRailShows(commentText + " markdown"))).
+		Visit(vamos.Pages.Path("/thoughts/renderer-demo.json?context=chat")).
+		Expect(vamos.Thoughts.Ready()).
+		Do(openWorkbenchOverflow()).
+		Expect(spec.ExpectStep(expectWorkbenchOverflowAction("Comment"))).
+		Do(submitWholeDocumentComment(commentText + " source")).
+		Expect(spec.ExpectStep(expectCommentsRailShows(commentText + " source"))).
+		Visit(vamos.Pages.Path("/thoughts/renderer-demo.html?context=chat")).
+		Expect(vamos.Thoughts.Ready()).
+		Expect(spec.ExpectStep(spec.Visible(spec.CSS(rendererDemoAppletFrameSelector)))).
+		Do(openWorkbenchOverflow()).
+		Expect(spec.ExpectStep(expectWorkbenchOverflowAction("Comment"))).
+		Do(submitWholeDocumentComment(commentText + " html")).
+		Expect(spec.ExpectStep(expectCommentsRailShows(commentText + " html"))).
+		Expect(vamos.Console.Clean()).
+		Run()
+}
+
+func TestThoughtsWorkbench_ThoughtsAppletOverflowComment(t *testing.T) {
+	commentText := fmt.Sprintf("e2e applet comment %d", time.Now().UnixNano())
+	identity := "thoughts/e2e-wordle/AGENTS.md"
+	token := base64.RawURLEncoding.EncodeToString([]byte(identity))
+
+	spec.Story(t, "thoughts applet workbench overflow creates whole-applet comment").
+		App(vamos.App()).
+		As(vamos.Robot).
+		With(vamos.WorkspaceFixture("thoughts-workbench.basic")).
+		Do(seedThoughtsAppletManifest()).
+		Visit(vamos.Pages.Path("/thoughts/_render/app/" + token + "?context=chat")).
+		Expect(vamos.Thoughts.Ready()).
+		Do(openWorkbenchOverflow()).
+		Expect(spec.ExpectStep(expectWorkbenchOverflowAction("Comment"))).
+		Do(submitWholeDocumentComment(commentText)).
+		Expect(spec.ExpectStep(expectCommentsRailShows(commentText))).
 		Expect(vamos.Console.Clean()).
 		Run()
 }
@@ -290,6 +343,36 @@ func seedRendererThoughtsFiles() spec.Step {
 	})
 }
 
+func seedThoughtsAppletManifest() spec.Step {
+	return spec.Custom("seed thoughts applet manifest", func(t testing.TB, ctx *duiruntime.Context) {
+		t.Helper()
+		root := strings.TrimSpace(os.Getenv("VAMOS_E2E_THOUGHTS_ROOT"))
+		if root == "" {
+			root = filepath.Join(ctx.Config.RepoRoot, "thoughts")
+		}
+		appletDir := filepath.Join(root, "e2e-wordle")
+		if err := os.MkdirAll(appletDir, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		sourceDir := filepath.ToSlash(filepath.Join(ctx.Config.RepoRoot, "examples", "wordle"))
+		content := fmt.Sprintf(`---
+vamos_artifact: applet
+applet:
+  id: e2e-thoughts-wordle
+  kind: datastar
+  title: E2E Thoughts Wordle
+  source_dir: %s
+  files_root: files
+  start_command: [just, build]
+---
+# E2E Thoughts Wordle
+`, sourceDir)
+		if err := os.WriteFile(filepath.Join(appletDir, "AGENTS.md"), []byte(content), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	})
+}
+
 func seedStyledHTMLAppletFile() spec.Step {
 	return spec.Custom("seed styled HTML applet file", func(t testing.TB, ctx *duiruntime.Context) {
 		t.Helper()
@@ -325,6 +408,64 @@ func seedStyledHTMLAppletFile() spec.Step {
 `
 		if err := os.WriteFile(filepath.Join(root, "styled-applet.html"), []byte(content), 0o644); err != nil {
 			t.Fatal(err)
+		}
+	})
+}
+
+func expectWorkbenchOverflowAction(label string) spec.Step {
+	return spec.Custom("workbench overflow has "+label+" action", func(t testing.TB, ctx *duiruntime.Context) {
+		t.Helper()
+		menu := ctx.Page.Locator("[data-testid='workbench-overflow-actions']").First()
+		if err := menu.GetByRole(*playwright.AriaRoleButton, playwright.LocatorGetByRoleOptions{Name: label}).First().WaitFor(playwright.LocatorWaitForOptions{Timeout: playwright.Float(30_000)}); err != nil {
+			t.Fatalf("workbench overflow action %q missing: %v", label, err)
+		}
+	})
+}
+
+func expectNoWorkbenchOverflowAction(label string) spec.Step {
+	return spec.Custom("workbench overflow omits "+label+" action", func(t testing.TB, ctx *duiruntime.Context) {
+		t.Helper()
+		menu := ctx.Page.Locator("[data-testid='workbench-overflow-actions']").First()
+		if count, err := menu.GetByRole(*playwright.AriaRoleButton, playwright.LocatorGetByRoleOptions{Name: label}).Count(); err != nil {
+			t.Fatal(err)
+		} else if count > 0 {
+			t.Fatalf("workbench overflow action %q present, want absent", label)
+		}
+	})
+}
+
+func submitWholeDocumentComment(text string) spec.Step {
+	return spec.Custom("submit whole-document comment", func(t testing.TB, ctx *duiruntime.Context) {
+		t.Helper()
+		menu := ctx.Page.Locator("[data-testid='workbench-overflow-actions']").First()
+		button := menu.GetByRole(*playwright.AriaRoleButton, playwright.LocatorGetByRoleOptions{Name: "Comment"}).First()
+		if err := button.Click(); err != nil {
+			t.Fatal(err)
+		}
+		form := ctx.Page.Locator("form:has(textarea[name='comment_text'])").First()
+		textarea := form.Locator("textarea[name='comment_text']").First()
+		if err := textarea.WaitFor(playwright.LocatorWaitForOptions{Timeout: playwright.Float(30_000)}); err != nil {
+			t.Fatalf("comment textarea missing: %v", err)
+		}
+		if err := textarea.Fill(text); err != nil {
+			t.Fatal(err)
+		}
+		if err := form.GetByRole(*playwright.AriaRoleButton, playwright.LocatorGetByRoleOptions{Name: "Comment"}).First().Click(); err != nil {
+			t.Fatal(err)
+		}
+	})
+}
+
+func expectCommentsRailShows(text string) spec.Step {
+	return spec.Custom("comments rail shows submitted comment", func(t testing.TB, ctx *duiruntime.Context) {
+		t.Helper()
+		panel := ctx.Page.Locator("#comments-context-panel").First()
+		if err := panel.WaitFor(playwright.LocatorWaitForOptions{Timeout: playwright.Float(30_000)}); err != nil {
+			t.Fatalf("comments panel missing: %v", err)
+		}
+		comment := panel.GetByText(text, playwright.LocatorGetByTextOptions{Exact: playwright.Bool(true)}).First()
+		if err := comment.WaitFor(playwright.LocatorWaitForOptions{State: playwright.WaitForSelectorStateVisible, Timeout: playwright.Float(30_000)}); err != nil {
+			t.Fatalf("comments rail missing submitted comment %q: %v", text, err)
 		}
 	})
 }

@@ -26,6 +26,7 @@ func TestAppletsWorkbench_WordleRendersWorkbenchShell(t *testing.T) {
 		Expect(spec.ExpectStep(expectWorkbenchDatastarImportMapPresent())).
 		Do(openWorkbenchOverflow()).
 		Expect(spec.ExpectStep(expectOpenAppletInNewTabLink())).
+		Expect(spec.ExpectStep(expectNoWorkbenchOverflowAction("Comment"))).
 		Expect(vamos.Thoughts.SidebarVisible()).
 		Expect(vamos.Thoughts.CenterPaneVisible()).
 		Expect(vamos.Thoughts.RightRailVisible()).
