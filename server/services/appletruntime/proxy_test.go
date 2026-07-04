@@ -1,11 +1,19 @@
 package appletruntime
 
 import (
+	"bufio"
 	"context"
+	"crypto/rand"
+	"crypto/sha1"
+	"encoding/base64"
+	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 )
@@ -43,9 +51,7 @@ func TestAppletProxyStripsScopedPrefixAndPreservesQuery(t *testing.T) {
 	if string(body) != "ok" {
 		t.Fatalf("body = %q", body)
 	}
-	if manager.active != 0 {
-		t.Fatalf("active connections after request = %d", manager.active)
-	}
+	waitForActiveConnections(t, manager, 0)
 }
 
 func TestAppletProxyAliasKeepsRootPath(t *testing.T) {
@@ -233,6 +239,74 @@ func TestAppletProxyPreservesUpgradeHeaders(t *testing.T) {
 	}
 }
 
+func TestAppletProxyScopedStreamlitWebSocketExchangesFrames(t *testing.T) {
+	backend := newWebSocketProofBackend(t)
+	defer backend.Close()
+
+	manager := &proxyTestManager{target: backend.URL}
+	server := httptest.NewServer(NewAppletProxy(
+		manager,
+		AppletProxyMatch{AppID: "streamlit", StripPrefix: "/examples/streamlit/app"},
+		ProxyOptions{},
+	))
+	defer server.Close()
+
+	conn := dialRawWebSocket(t, server.URL+"/examples/streamlit/app/_stcore/stream?proof=scoped", nil)
+	defer conn.Close()
+	writeMaskedTextFrame(t, conn, "ping")
+	if got := readTextFrame(t, conn); got != "echo:ping" {
+		t.Fatalf("websocket response = %q", got)
+	}
+	_ = conn.Close()
+
+	seen := backend.SeenRequest(t)
+	if seen.URL.RequestURI() != "/_stcore/stream?proof=scoped" {
+		t.Fatalf("backend URI = %q", seen.URL.RequestURI())
+	}
+	if got := seen.Header.Get("X-Forwarded-Prefix"); got != "/examples/streamlit/app" {
+		t.Fatalf("X-Forwarded-Prefix = %q", got)
+	}
+	assertStreamlitForwardedProxyHeaders(t, seen.Header)
+	if !manager.sawActive(1) {
+		t.Fatalf("active history never reached 1: %#v", manager.activeSnapshot())
+	}
+	waitForActiveConnections(t, manager, 0)
+}
+
+func TestAppletProxyAliasStreamlitWebSocketExchangesFrames(t *testing.T) {
+	backend := newWebSocketProofBackend(t)
+	defer backend.Close()
+
+	manager := &proxyTestManager{target: backend.URL}
+	server := httptest.NewServer(NewAppletProxy(
+		manager,
+		AppletProxyMatch{AppID: "streamlit", Alias: true},
+		ProxyOptions{},
+	))
+	defer server.Close()
+
+	conn := dialRawWebSocket(t, server.URL+"/_stcore/stream?proof=alias", nil)
+	defer conn.Close()
+	writeMaskedTextFrame(t, conn, "ping")
+	if got := readTextFrame(t, conn); got != "echo:ping" {
+		t.Fatalf("websocket response = %q", got)
+	}
+	_ = conn.Close()
+
+	seen := backend.SeenRequest(t)
+	if seen.URL.RequestURI() != "/_stcore/stream?proof=alias" {
+		t.Fatalf("backend URI = %q", seen.URL.RequestURI())
+	}
+	if got := seen.Header.Get("X-Forwarded-Prefix"); got != "" {
+		t.Fatalf("alias X-Forwarded-Prefix = %q", got)
+	}
+	assertStreamlitForwardedProxyHeaders(t, seen.Header)
+	if !manager.sawActive(1) {
+		t.Fatalf("active history never reached 1: %#v", manager.activeSnapshot())
+	}
+	waitForActiveConnections(t, manager, 0)
+}
+
 func TestAppletProxyAliasPreservesStreamlitWebSocketPath(t *testing.T) {
 	seen := make(chan *http.Request, 1)
 	child := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -314,9 +388,205 @@ func containsCookiePath(cookies []string, prefix, path string) bool {
 	return false
 }
 
+type websocketProofBackend struct {
+	*httptest.Server
+	seen chan *http.Request
+}
+
+func newWebSocketProofBackend(t testing.TB) websocketProofBackend {
+	t.Helper()
+	backend := websocketProofBackend{seen: make(chan *http.Request, 1)}
+	backend.Server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		backend.seen <- r.Clone(r.Context())
+		hj, ok := w.(http.Hijacker)
+		if !ok {
+			t.Fatalf("response writer cannot hijack")
+		}
+		conn, rw, err := hj.Hijack()
+		if err != nil {
+			t.Fatalf("hijack: %v", err)
+		}
+		defer conn.Close()
+		accept := websocketAcceptKey(r.Header.Get("Sec-WebSocket-Key"))
+		fmt.Fprintf(rw, "HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: %s\r\n\r\n", accept)
+		if err := rw.Flush(); err != nil {
+			t.Fatalf("flush 101: %v", err)
+		}
+		payload := readTextFrame(t, conn)
+		writeServerTextFrame(t, conn, "echo:"+payload)
+	}))
+	return backend
+}
+
+func (b websocketProofBackend) SeenRequest(t testing.TB) *http.Request {
+	t.Helper()
+	select {
+	case req := <-b.seen:
+		return req
+	case <-time.After(time.Second):
+		t.Fatal("backend did not receive WebSocket request")
+		return nil
+	}
+}
+
+func websocketAcceptKey(key string) string {
+	sum := sha1.Sum([]byte(key + "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"))
+	return base64.StdEncoding.EncodeToString(sum[:])
+}
+
+type rawWebSocketConn struct {
+	net.Conn
+	reader *bufio.Reader
+}
+
+func (c *rawWebSocketConn) Read(p []byte) (int, error) {
+	return c.reader.Read(p)
+}
+
+func dialRawWebSocket(t testing.TB, rawURL string, headers http.Header) net.Conn {
+	t.Helper()
+	u, err := url.Parse(rawURL)
+	if err != nil {
+		t.Fatalf("parse websocket URL: %v", err)
+	}
+	conn, err := net.Dial("tcp", u.Host)
+	if err != nil {
+		t.Fatalf("dial websocket: %v", err)
+	}
+	key := make([]byte, 16)
+	if _, err := rand.Read(key); err != nil {
+		_ = conn.Close()
+		t.Fatalf("websocket key: %v", err)
+	}
+	path := u.RequestURI()
+	if path == "" {
+		path = "/"
+	}
+	fmt.Fprintf(conn, "GET %s HTTP/1.1\r\nHost: %s\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Key: %s\r\nSec-WebSocket-Version: 13\r\n", path, u.Host, base64.StdEncoding.EncodeToString(key))
+	for name, values := range headers {
+		for _, value := range values {
+			fmt.Fprintf(conn, "%s: %s\r\n", name, value)
+		}
+	}
+	_, _ = io.WriteString(conn, "\r\n")
+
+	reader := bufio.NewReader(conn)
+	status, err := reader.ReadString('\n')
+	if err != nil {
+		_ = conn.Close()
+		t.Fatalf("read websocket status: %v", err)
+	}
+	if !strings.Contains(status, " 101 ") {
+		_ = conn.Close()
+		t.Fatalf("websocket status = %q", strings.TrimSpace(status))
+	}
+	for {
+		line, err := reader.ReadString('\n')
+		if err != nil {
+			_ = conn.Close()
+			t.Fatalf("read websocket header: %v", err)
+		}
+		if line == "\r\n" {
+			break
+		}
+	}
+	return &rawWebSocketConn{Conn: conn, reader: reader}
+}
+
+func writeMaskedTextFrame(t testing.TB, conn net.Conn, payload string) {
+	t.Helper()
+	body := []byte(payload)
+	if len(body) >= 126 {
+		t.Fatalf("payload too long for test frame: %d", len(body))
+	}
+	mask := make([]byte, 4)
+	if _, err := rand.Read(mask); err != nil {
+		t.Fatalf("mask: %v", err)
+	}
+	frame := []byte{0x81, byte(0x80 | len(body))}
+	frame = append(frame, mask...)
+	for i, b := range body {
+		frame = append(frame, b^mask[i%4])
+	}
+	if _, err := conn.Write(frame); err != nil {
+		t.Fatalf("write websocket frame: %v", err)
+	}
+}
+
+func writeServerTextFrame(t testing.TB, conn net.Conn, payload string) {
+	t.Helper()
+	body := []byte(payload)
+	if len(body) >= 126 {
+		t.Fatalf("payload too long for test frame: %d", len(body))
+	}
+	frame := append([]byte{0x81, byte(len(body))}, body...)
+	if _, err := conn.Write(frame); err != nil {
+		t.Fatalf("write server websocket frame: %v", err)
+	}
+}
+
+func readTextFrame(t testing.TB, r io.Reader) string {
+	t.Helper()
+	header := make([]byte, 2)
+	if _, err := io.ReadFull(r, header); err != nil {
+		t.Fatalf("read websocket frame header: %v", err)
+	}
+	if header[0]&0x0f != 0x1 {
+		t.Fatalf("websocket opcode = %d, want text", header[0]&0x0f)
+	}
+	masked := header[1]&0x80 != 0
+	length := int(header[1] & 0x7f)
+	if length >= 126 {
+		t.Fatalf("unsupported websocket payload length = %d", length)
+	}
+	mask := []byte{0, 0, 0, 0}
+	if masked {
+		if _, err := io.ReadFull(r, mask); err != nil {
+			t.Fatalf("read websocket mask: %v", err)
+		}
+	}
+	payload := make([]byte, length)
+	if _, err := io.ReadFull(r, payload); err != nil {
+		t.Fatalf("read websocket payload: %v", err)
+	}
+	if masked {
+		for i := range payload {
+			payload[i] ^= mask[i%4]
+		}
+	}
+	return string(payload)
+}
+
+func assertStreamlitForwardedProxyHeaders(t testing.TB, header http.Header) {
+	t.Helper()
+	if got := header.Get("X-Vamos-Applet-Proxy"); got != "1" {
+		t.Fatalf("X-Vamos-Applet-Proxy = %q", got)
+	}
+	if got := header.Get("X-Forwarded-Host"); got == "" {
+		t.Fatal("X-Forwarded-Host is empty")
+	}
+	if got := header.Get("X-Forwarded-Proto"); got == "" {
+		t.Fatal("X-Forwarded-Proto is empty")
+	}
+}
+
+func waitForActiveConnections(t testing.TB, manager *proxyTestManager, want int) {
+	t.Helper()
+	deadline := time.Now().Add(time.Second)
+	for time.Now().Before(deadline) {
+		if got := manager.activeCount(); got == want {
+			return
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	t.Fatalf("active connections = %d, want %d", manager.activeCount(), want)
+}
+
 type proxyTestManager struct {
-	target string
-	active int
+	mu            sync.Mutex
+	target        string
+	active        int
+	activeHistory []int
 }
 
 func (m *proxyTestManager) EnsureStarted(context.Context, RuntimeConfig) (AppletProcessState, error) {
@@ -329,8 +599,40 @@ func (m *proxyTestManager) Stop(context.Context, string) error { return nil }
 func (m *proxyTestManager) Health(context.Context, string) (AppletProcessState, error) {
 	return AppletProcessState{}, nil
 }
-func (m *proxyTestManager) ProxyTarget(string) (string, bool) { return m.target, m.target != "" }
-func (m *proxyTestManager) Touch(_ string, activeDelta int)   { m.active += activeDelta }
+func (m *proxyTestManager) ProxyTarget(string) (string, bool) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.target, m.target != ""
+}
+func (m *proxyTestManager) Touch(_ string, activeDelta int) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.active += activeDelta
+	m.activeHistory = append(m.activeHistory, m.active)
+}
 func (m *proxyTestManager) SweepInactive(context.Context, time.Time) ([]AppletProcessState, error) {
 	return nil, nil
+}
+
+func (m *proxyTestManager) activeCount() int {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.active
+}
+
+func (m *proxyTestManager) sawActive(want int) bool {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	for _, got := range m.activeHistory {
+		if got == want {
+			return true
+		}
+	}
+	return false
+}
+
+func (m *proxyTestManager) activeSnapshot() []int {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return append([]int(nil), m.activeHistory...)
 }
