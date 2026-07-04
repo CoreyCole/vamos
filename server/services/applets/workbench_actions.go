@@ -50,7 +50,7 @@ func AppletCommentUI(ctx context.Context, applet AppletContext, userEmail string
 	}
 	return commentui.CommentableMarkdownArgs{
 		Surface:   commentui.CommentSurfaceThoughts,
-		IDPrefix:  commentui.SafeCommentTargetSlug("applet", applet.IdentityPath),
+		IDPrefix:  commentui.SafeCommentTargetSlug("thoughts", applet.IdentityPath),
 		DocPath:   applet.IdentityPath,
 		Comments:  threads,
 		UserEmail: strings.TrimSpace(userEmail),

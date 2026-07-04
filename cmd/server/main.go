@@ -1438,7 +1438,9 @@ func main() {
 	e.Static("/static", staticRoot)
 	e.Static("/css", filepath.Join(staticRoot, "css"))
 	e.GET("/js/datastar-pro-v1.js", func(c echo.Context) error {
-		c.Response().Header().Set("Access-Control-Allow-Origin", "*")
+		if cfg.WorkspaceMode == "child" && strings.EqualFold(c.Request().Header.Get("Origin"), "null") {
+			c.Response().Header().Del("Access-Control-Allow-Origin")
+		}
 		return c.File(filepath.Join(staticRoot, "js", "datastar-pro-v1.js"))
 	})
 	e.Static("/js", filepath.Join(staticRoot, "js"))

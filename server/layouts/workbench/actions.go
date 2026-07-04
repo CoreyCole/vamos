@@ -58,7 +58,7 @@ func overflowDatastarSubmit(action OverflowAction) string {
 	if formAction == "" {
 		return ""
 	}
-	return "@post('" + escapeDatastarString(formAction) + "', {contentType: 'form'})"
+	return "el.closest('details')?.removeAttribute('open'); @post('" + escapeDatastarString(formAction) + "', {contentType: 'form'})"
 }
 
 func overflowHiddenFieldNames(fields map[string]string) []string {

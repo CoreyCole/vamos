@@ -459,7 +459,7 @@ func submitWholeDocumentComment(text string) spec.Step {
 func expectCommentsRailShows(text string) spec.Step {
 	return spec.Custom("comments rail shows submitted comment", func(t testing.TB, ctx *duiruntime.Context) {
 		t.Helper()
-		panel := ctx.Page.Locator("#comments-context-panel").First()
+		panel := ctx.Page.Locator("#doc-right-comments-panel #comments-context-panel").First()
 		if err := panel.WaitFor(playwright.LocatorWaitForOptions{Timeout: playwright.Float(30_000)}); err != nil {
 			t.Fatalf("comments panel missing: %v", err)
 		}

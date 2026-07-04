@@ -16,6 +16,7 @@ import (
 	"github.com/CoreyCole/vamos/server/layouts/workbench"
 	"github.com/CoreyCole/vamos/server/services/appletruntime"
 	"github.com/CoreyCole/vamos/server/services/comments"
+	"github.com/CoreyCole/vamos/server/services/commentui"
 	"github.com/labstack/echo/v4"
 )
 
@@ -190,7 +191,7 @@ func TestThoughtsAppletPageRendersWorkbenchOverflowActions(t *testing.T) {
 		`>Restart</span>`,
 		`>Stop</span>`,
 		`>Open in new tab</span>`,
-		`data-on:submit__prevent="@post(&#39;/forms/comments/show&#39;, {contentType: &#39;form&#39;})"`,
+		`data-on:submit__prevent="el.closest(&#39;details&#39;)?.removeAttribute(&#39;open&#39;); @post(&#39;/forms/comments/show&#39;, {contentType: &#39;form&#39;})"`,
 		`name="doc_path" value="` + identity + `"`,
 		`name="section_hint" value="document"`,
 		`name="comment_target_chrome" value="patch-only"`,
@@ -214,7 +215,8 @@ func TestThoughtsAppletPageIncludesDocumentCommentPatchTarget(t *testing.T) {
 	})
 
 	html := renderThoughtsAppletPage(t, service, token)
-	for _, want := range []string{`data-comment-target="true"`, `commentui-selection-target-right`, `name="doc_path" value="` + identity + `"`} {
+	handlerCompatibleTargetID := commentui.TargetID(commentui.SafeCommentTargetSlug("thoughts", identity), "document")
+	for _, want := range []string{`data-comment-target="true"`, `commentui-selection-target-right`, `id="` + handlerCompatibleTargetID + `"`, `name="doc_path" value="` + identity + `"`} {
 		if !strings.Contains(html, want) {
 			t.Fatalf("thoughts applet page missing patch target %q:\n%s", want, html)
 		}
