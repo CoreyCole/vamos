@@ -84,19 +84,20 @@ The app can keep Datastar attributes like `data-init="@get('/events')"`. Vamos f
 
 Streamlit apps use `/_stcore/*` for health and streaming/WebSocket endpoints. Vamos defaults Streamlit applets to `health_path: /_stcore/health` and root aliases for `/_stcore/*` and `/vendor/*`.
 
+A runnable sample lives in `examples/streamlit` and is available at `/examples/streamlit`:
+
 ```yaml
 applet:
-  id: sales_dashboard
+  id: streamlit
   kind: streamlit
-  title: Sales Dashboard
-  source_dir: dashboards/sales
-  start_command:
-    - streamlit
-    - run
-    - app.py
-    - --server.address
-    - 127.0.0.1
+  title: Streamlit Smoke Test
+  source_dir: .
+  files_root: files
+  build_command: [uv, sync, --frozen]
+  start_command: [./start.sh]
 ```
+
+Its `start.sh` passes Vamos' `PORT` environment variable to `streamlit run app.py --server.port="$PORT"`.
 
 Do not rely on default `/static/*` forwarding. Vamos owns manager `/static` assets. If an app truly needs root `/static/*`, declare it explicitly only when the alias registry can prove it will not shadow manager assets. Prefer scoped applet asset paths.
 

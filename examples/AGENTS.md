@@ -1,18 +1,18 @@
 # Examples Development Guide
 
-Examples are small, long-running Go applets that demonstrate Vamos app patterns. Keep them portable, easy to run locally, and safe for non-technical users to modify through chat.
+Examples are small, long-running applets that demonstrate Vamos app patterns. Keep them portable, easy to run locally, and safe for non-technical users to modify through chat.
 
 ## UI and interaction pattern
 
-- Use the Datastar CQRS pattern:
+- For Datastar/Go examples, use the Datastar CQRS pattern:
   - one long-lived SSE stream for reads, usually opened with `data-init="@get('/events')"`;
   - short POST/PUT/PATCH/DELETE handlers for writes;
   - backend state is the source of truth;
   - send full server-rendered components and let Datastar morph by stable IDs;
   - do not put application state or scoring/business logic in frontend signals.
-- Use `templ` for HTML views/components. Commit both `.templ` source files and generated `*_templ.go` files for standalone example applets.
-- Use Tailwind utility classes for styling in new examples. Avoid bespoke inline CSS unless the example is intentionally demonstrating a no-build standalone constraint and documents that exception.
-- Use real HTML forms with `name` attributes for write actions. Prefer `@post('/path', {contentType: 'form'})` from a button inside the form.
+- Use `templ` for HTML views/components in Go examples. Commit both `.templ` source files and generated `*_templ.go` files for standalone Go applets.
+- Use Tailwind utility classes for styling in new Go/HTML examples. Streamlit examples may use native Streamlit components instead of Tailwind.
+- Use real HTML forms with `name` attributes for write actions in custom HTML/Datastar examples. Prefer `@post('/path', {contentType: 'form'})` from a button inside the form.
 
 ## Signals and ownership
 
@@ -37,6 +37,6 @@ Examples are small, long-running Go applets that demonstrate Vamos app patterns.
 ## Applet boundaries
 
 - Read and write user-visible files only inside `VAMOS_APP_FILES_ROOT` or the example's documented files root.
-- Keep applets as long-running Go HTTP servers with `/healthz` and `/`.
+- Keep Go applets as long-running HTTP servers with `/healthz` and `/`. Streamlit applets should use `kind: streamlit` so Vamos health-checks `/_stcore/health`.
 - Keep hidden implementation iterations under `files/apps/iterations/`; normal app code must not write there.
 - User-facing language should describe the domain, not builds, branches, logs, workspaces, or implementation machinery.

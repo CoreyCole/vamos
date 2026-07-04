@@ -14,6 +14,32 @@ import (
 	"github.com/labstack/echo/v4"
 )
 
+func TestRepositoryExampleManifestsRegister(t *testing.T) {
+	repoExamplesRoot := filepath.Clean(filepath.Join("..", "..", "..", "..", "examples"))
+	if _, err := os.Stat(filepath.Join(repoExamplesRoot, "streamlit", "AGENTS.md")); err != nil {
+		t.Skipf("repo examples root unavailable: %v", err)
+	}
+	service, err := NewService(Options{ExamplesRoot: repoExamplesRoot, AppletRuntime: &fakeRuntime{}})
+	if err != nil {
+		t.Fatalf("NewService() error = %v", err)
+	}
+	e := echo.New()
+	req := httptest.NewRequest(http.MethodGet, "/examples/streamlit", nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	c.SetParamNames("id")
+	c.SetParamValues("streamlit")
+	if err := service.HandlePage(c); err != nil {
+		t.Fatalf("HandlePage(streamlit) error = %v", err)
+	}
+	if !strings.Contains(rec.Body.String(), "/examples/streamlit/app/") {
+		t.Fatalf("streamlit page missing app iframe route:\n%s", rec.Body.String())
+	}
+	if err := service.RegisterRoutes(e, nil); err != nil {
+		t.Fatalf("RegisterRoutes() error = %v", err)
+	}
+}
+
 func TestHandlePageRendersDocumentWorkbenchApplet(t *testing.T) {
 	root := writeExampleManifest(t)
 	service, err := NewService(Options{ExamplesRoot: root, AppletRuntime: &fakeRuntime{state: appletruntime.AppletProcessState{Status: appletruntime.ProcessStatusHealthy}}})
