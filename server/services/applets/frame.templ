@@ -1,6 +1,18 @@
 package applets
 
-import "github.com/CoreyCole/vamos/server/services/appletruntime"
+import (
+	"github.com/CoreyCole/vamos/server/services/appletruntime"
+	"github.com/CoreyCole/vamos/server/services/commentui"
+)
+
+templ AppletWorkbenchDocument(applet AppletContext, process appletruntime.AppletProcessState, comments commentui.CommentableMarkdownArgs) {
+	<div class="relative h-full min-h-0">
+		@AppletFrame(applet, process)
+		if comments.DocPath != "" {
+			@commentui.DocumentPatchTarget(comments, applet.Manifest.Title)
+		}
+	</div>
+}
 
 templ AppletFrame(applet AppletContext, process appletruntime.AppletProcessState) {
 	<div id={ "applet-frame-" + applet.Manifest.ID } class="flex h-full min-h-0 flex-col bg-background">

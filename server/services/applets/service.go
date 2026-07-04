@@ -13,6 +13,7 @@ import (
 	"github.com/CoreyCole/vamos/server/layouts"
 	"github.com/CoreyCole/vamos/server/layouts/workbench"
 	"github.com/CoreyCole/vamos/server/services/appletruntime"
+	"github.com/CoreyCole/vamos/server/services/commentui"
 	"github.com/a-h/templ"
 	"github.com/labstack/echo/v4"
 	"github.com/starfederation/datastar-go/datastar"
@@ -29,6 +30,7 @@ type Service struct {
 	resolver Resolver
 	manager  appletruntime.Manager
 	aliases  *appletruntime.AliasRegistry
+	comments AppletCommentReader
 
 	aliasMu     sync.Mutex
 	aliasRoutes map[string]struct{}
@@ -38,6 +40,7 @@ type ServiceOptions struct {
 	Resolver Resolver
 	Manager  appletruntime.Manager
 	Aliases  *appletruntime.AliasRegistry
+	Comments AppletCommentReader
 }
 
 func NewService() *Service { return NewHTTPService(ServiceOptions{}) }
@@ -47,7 +50,7 @@ func NewHTTPService(opts ServiceOptions) *Service {
 	if aliases == nil {
 		aliases = appletruntime.NewAliasRegistry(reservedAliasPrefixes)
 	}
-	return &Service{resolver: opts.Resolver, manager: opts.Manager, aliases: aliases, aliasRoutes: map[string]struct{}{}}
+	return &Service{resolver: opts.Resolver, manager: opts.Manager, aliases: aliases, comments: opts.Comments, aliasRoutes: map[string]struct{}{}}
 }
 
 func (s *Service) RegisterThoughtsRoutes(g *echo.Group) {
@@ -245,10 +248,20 @@ func (s *Service) HandleAppletPage(c echo.Context) error {
 }
 
 func (s *Service) RenderAppletPage(c echo.Context, applet AppletContext, process appletruntime.AppletProcessState) error {
+	userEmail := appletUserEmail(c)
+	commentsPanel := EmptyRegion("Comments will appear here.")
+	var commentUI commentui.CommentableMarkdownArgs
+	if ui, ok, err := AppletCommentUI(c.Request().Context(), applet, userEmail, s.comments); err != nil {
+		c.Logger().Warnf("Failed to load applet comments for %s: %v", applet.IdentityPath, err)
+	} else if ok {
+		commentUI = ui
+		commentsPanel = commentui.CommentsContextPanel(commentui.BuildCommentsPanelArgs(ui, ""))
+	}
 	state, err := BuildAppletWorkbenchState(AppletWorkbenchInput{
-		UserEmail: appletUserEmail(c),
+		UserEmail: userEmail,
 		Context:   applet,
 		Process:   process,
+		CommentUI: commentUI,
 		Sidebar: workbench.WorkbenchSidebarArgs{
 			Tabs:  workbench.DefaultSidebarTabs(),
 			Files: workbench.FilesPanelModel{CurrentPath: applet.IdentityPath},
@@ -258,7 +271,7 @@ func (s *Service) RenderAppletPage(c echo.Context, applet AppletContext, process
 		},
 		RightRail: workbench.RightRailArgs{
 			Chat:     EmptyRegion("Chat will appear here."),
-			Comments: EmptyRegion("Comments will appear here."),
+			Comments: commentsPanel,
 		},
 	})
 	if err != nil {
@@ -269,7 +282,7 @@ func (s *Service) RenderAppletPage(c echo.Context, applet AppletContext, process
 		CurrentPath: applet.IdentityPath,
 		PageType:    layouts.PageTypeMarkdown,
 		ShowHeader:  true,
-		UserEmail:   appletUserEmail(c),
+		UserEmail:   userEmail,
 	}
 	return layouts.Root(rootArgs).Render(
 		templ.WithChildren(c.Request().Context(), workbench.Workbench(state)),

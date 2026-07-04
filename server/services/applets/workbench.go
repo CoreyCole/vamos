@@ -6,12 +6,14 @@ import (
 
 	"github.com/CoreyCole/vamos/server/layouts/workbench"
 	"github.com/CoreyCole/vamos/server/services/appletruntime"
+	"github.com/CoreyCole/vamos/server/services/commentui"
 )
 
 type AppletWorkbenchInput struct {
 	UserEmail     string
 	Context       AppletContext
 	Process       appletruntime.AppletProcessState
+	CommentUI     commentui.CommentableMarkdownArgs
 	Sidebar       workbench.WorkbenchSidebarArgs
 	RightRail     workbench.RightRailArgs
 	SavedConfig   *workbench.WorkbenchConfig
@@ -46,7 +48,8 @@ func BuildAppletWorkbenchState(input AppletWorkbenchInput) (workbench.WorkbenchS
 		InitialRailOpen:    false,
 		Center: workbench.CenterDocPaneArgs{
 			Title:    input.Context.Manifest.Title,
-			Document: AppletFrame(input.Context, input.Process),
+			Actions:  BuildAppletWorkbenchActions(input.Context, input.Process),
+			Document: AppletWorkbenchDocument(input.Context, input.Process, input.CommentUI),
 		},
 		RightRail: rightRail,
 	})

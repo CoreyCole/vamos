@@ -3,6 +3,7 @@ package applets
 import (
 	"bytes"
 	"context"
+	"database/sql"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -11,8 +12,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/CoreyCole/vamos/pkg/db"
 	"github.com/CoreyCole/vamos/server/layouts/workbench"
 	"github.com/CoreyCole/vamos/server/services/appletruntime"
+	"github.com/CoreyCole/vamos/server/services/comments"
 	"github.com/labstack/echo/v4"
 )
 
@@ -160,6 +163,116 @@ func TestAppletFrameRendersStartingPanelWithStatusStream(t *testing.T) {
 	}
 }
 
+func TestThoughtsAppletPageRendersWorkbenchOverflowActions(t *testing.T) {
+	thoughtsRoot := t.TempDir()
+	identity := writeThoughtsAppletManifest(t, thoughtsRoot, "plans/demo", "demo")
+	token := EncodeAppletIdentity(identity)
+	service := NewHTTPService(ServiceOptions{
+		Resolver: Resolver{ThoughtsRoot: thoughtsRoot},
+		Manager:  &recordingManager{state: appletruntime.AppletProcessState{Status: appletruntime.ProcessStatusHealthy}},
+		Comments: fakeAppletCommentReader{},
+	})
+
+	html := renderThoughtsAppletPage(t, service, token)
+	for _, want := range []string{
+		`data-testid="workbench-overflow-actions"`,
+		`>Comment</span>`,
+		`>Restart</span>`,
+		`>Stop</span>`,
+		`>Open in new tab</span>`,
+		`data-on:submit__prevent="@post(&#39;/forms/comments/show&#39;, {contentType: &#39;form&#39;})"`,
+		`name="doc_path" value="` + identity + `"`,
+		`name="section_hint" value="document"`,
+		`name="comment_target_chrome" value="patch-only"`,
+		`method="post" action="/forms/applets/` + token + `/restart"`,
+		`method="post" action="/forms/applets/` + token + `/stop"`,
+	} {
+		if !strings.Contains(html, want) {
+			t.Fatalf("thoughts applet page missing %q:\n%s", want, html)
+		}
+	}
+}
+
+func TestThoughtsAppletPageIncludesDocumentCommentPatchTarget(t *testing.T) {
+	thoughtsRoot := t.TempDir()
+	identity := writeThoughtsAppletManifest(t, thoughtsRoot, "plans/demo", "demo")
+	token := EncodeAppletIdentity(identity)
+	service := NewHTTPService(ServiceOptions{
+		Resolver: Resolver{ThoughtsRoot: thoughtsRoot},
+		Manager:  &recordingManager{state: appletruntime.AppletProcessState{Status: appletruntime.ProcessStatusHealthy}},
+		Comments: fakeAppletCommentReader{},
+	})
+
+	html := renderThoughtsAppletPage(t, service, token)
+	for _, want := range []string{`data-comment-target="true"`, `commentui-selection-target-right`, `name="doc_path" value="` + identity + `"`} {
+		if !strings.Contains(html, want) {
+			t.Fatalf("thoughts applet page missing patch target %q:\n%s", want, html)
+		}
+	}
+}
+
+func TestExampleAppletOmitsUnsupportedCommentAction(t *testing.T) {
+	examplesRoot := t.TempDir()
+	writeExampleAppletManifestWithAliases(t, examplesRoot, "wordle", nil)
+	service := NewHTTPService(ServiceOptions{
+		Resolver: Resolver{ExamplesRoot: examplesRoot},
+		Manager:  &recordingManager{state: appletruntime.AppletProcessState{Status: appletruntime.ProcessStatusHealthy}},
+		Comments: fakeAppletCommentReader{},
+	})
+
+	e := echo.New()
+	req := httptest.NewRequest(http.MethodGet, "/examples/wordle", nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	c.SetParamNames("id")
+	c.SetParamValues("wordle")
+	if err := service.HandleAppletPage(c); err != nil {
+		t.Fatalf("HandleAppletPage() error = %v", err)
+	}
+	html := rec.Body.String()
+	for _, want := range []string{`data-testid="workbench-overflow-actions"`, `>Restart</span>`, `>Stop</span>`, `>Open in new tab</span>`} {
+		if !strings.Contains(html, want) {
+			t.Fatalf("example applet page missing %q:\n%s", want, html)
+		}
+	}
+	for _, forbidden := range []string{`>Comment</span>`, `name="doc_path" value="examples/wordle/AGENTS.md"`, `data-on:submit__prevent="@post(&#39;/forms/comments/show&#39;`} {
+		if strings.Contains(html, forbidden) {
+			t.Fatalf("example applet page rendered unsupported comment affordance %q:\n%s", forbidden, html)
+		}
+	}
+}
+
+func TestThoughtsAppletCommentsPanelUsesRealCommentUI(t *testing.T) {
+	thoughtsRoot := t.TempDir()
+	identity := writeThoughtsAppletManifest(t, thoughtsRoot, "plans/demo", "demo")
+	token := EncodeAppletIdentity(identity)
+	service := NewHTTPService(ServiceOptions{
+		Resolver: Resolver{ThoughtsRoot: thoughtsRoot},
+		Manager:  &recordingManager{state: appletruntime.AppletProcessState{Status: appletruntime.ProcessStatusHealthy}},
+		Comments: fakeAppletCommentReader{response: &comments.GetCommentsResponse{Comments: []comments.CommentWithReplies{{
+			Comment: db.WorkspaceDocComment{
+				ID:          "comment-1",
+				DocPath:     identity,
+				UserEmail:   "agent@example.com",
+				CommentText: "applet note",
+				SectionHint: sql.NullString{String: "document", Valid: true},
+				HeadingHint: sql.NullString{String: "Demo", Valid: true},
+				CreatedAt:   time.Date(2026, 7, 4, 12, 0, 0, 0, time.UTC),
+			},
+		}}}},
+	})
+
+	html := renderThoughtsAppletPage(t, service, token)
+	for _, want := range []string{`comments-context-panel`, `applet note`, identity} {
+		if !strings.Contains(html, want) {
+			t.Fatalf("comments panel missing %q:\n%s", want, html)
+		}
+	}
+	if strings.Contains(html, "Comments will appear here.") {
+		t.Fatalf("comments panel still rendered placeholder:\n%s", html)
+	}
+}
+
 func TestHandleAppletStatusExecutesReloadWhenHealthy(t *testing.T) {
 	service := statusTestService(t, &sequenceManager{states: []appletruntime.AppletProcessState{{Status: appletruntime.ProcessStatusStarting}, {Status: appletruntime.ProcessStatusHealthy}}})
 	rec := callStatus(t, service)
@@ -210,6 +323,35 @@ func TestHandleAppletStatusRestartsUnhealthyAppletBeforeEnsure(t *testing.T) {
 	case <-time.After(time.Second):
 		t.Fatal("status stream did not ensure after unhealthy stop")
 	}
+}
+
+func renderThoughtsAppletPage(t *testing.T, service *Service, token string) string {
+	t.Helper()
+	e := echo.New()
+	req := httptest.NewRequest(http.MethodGet, "/thoughts/_render/app/"+token, nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	c.SetParamNames("token")
+	c.SetParamValues(token)
+	if err := service.HandleAppletPage(c); err != nil {
+		t.Fatalf("HandleAppletPage() error = %v", err)
+	}
+	return rec.Body.String()
+}
+
+type fakeAppletCommentReader struct {
+	response *comments.GetCommentsResponse
+	err      error
+}
+
+func (f fakeAppletCommentReader) GetCommentsForFileInternal(context.Context, string) (*comments.GetCommentsResponse, error) {
+	if f.err != nil {
+		return nil, f.err
+	}
+	if f.response != nil {
+		return f.response, nil
+	}
+	return &comments.GetCommentsResponse{}, nil
 }
 
 func statusTestService(t *testing.T, manager appletruntime.Manager) *Service {

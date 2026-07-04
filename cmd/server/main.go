@@ -1405,6 +1405,7 @@ func main() {
 	sharedAppletService := applets.NewHTTPService(applets.ServiceOptions{
 		Resolver: applets.Resolver{ThoughtsRoot: cfg.MarkdownBasePath, ExamplesRoot: examplesRoot},
 		Manager:  sharedAppletRuntime,
+		Comments: commentService,
 	})
 	examplesService, err := genericexamples.NewService(genericexamples.Options{
 		ExamplesRoot:  examplesRoot,
