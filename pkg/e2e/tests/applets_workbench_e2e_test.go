@@ -132,6 +132,23 @@ func TestAppletsWorkbench_StreamlitRendersEmbeddedAndNewTab(t *testing.T) {
 		Run()
 }
 
+func TestAppletsWorkbench_StreamlitRestartChangesProcessIdentity(t *testing.T) {
+	probe := &streamlitBrowserProbe{}
+	spec.Story(t, "applets workbench restarts streamlit and changes process identity").
+		App(vamos.App()).
+		As(vamos.Robot).
+		With(vamos.WorkspaceFixture("thoughts-workbench.basic")).
+		Do(observeStreamlitBrowserTraffic(probe)).
+		Do(stopStreamlitAppletIfRunning()).
+		Visit(vamos.Pages.Path("/examples/streamlit?context=chat")).
+		Expect(vamos.Thoughts.Ready()).
+		Expect(spec.ExpectStep(expectStreamlitStartingPanelOrIframe())).
+		Expect(spec.ExpectStep(expectStreamlitIframeLoaded())).
+		Expect(spec.ExpectStep(expectStreamlitRestartChangesIdentity())).
+		Expect(spec.ExpectStep(expectStreamlitNoWebSocketFailures(probe))).
+		Run()
+}
+
 func TestAppletsWorkbench_WordleAbsoluteRoutesForwardFromIframe(t *testing.T) {
 	spec.Story(t, "applets workbench forwards wordle absolute datastar routes from iframe").
 		App(vamos.App()).
@@ -382,6 +399,121 @@ func expectStreamlitNoWebSocketFailures(probe *streamlitBrowserProbe) spec.Step 
 			t.Fatalf("streamlit websocket console problems:\n%s", duiruntime.FormatConsoleProblems(filtered))
 		}
 	})
+}
+
+type streamlitProcessIdentity struct {
+	PID       string
+	RunID     string
+	StartedAt string
+	Text      string
+}
+
+func stopStreamlitAppletIfRunning() spec.Step {
+	return spec.Custom("stop streamlit applet if running", func(t testing.TB, ctx *duiruntime.Context) {
+		t.Helper()
+		visit(t, ctx, "/examples/streamlit")
+		_, _ = ctx.Page.Evaluate(`async () => {
+			await fetch('/forms/applets/streamlit/stop', {
+				method: 'POST',
+				headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+				body: new URLSearchParams({identity_path: 'examples/streamlit/AGENTS.md'}),
+				redirect: 'manual'
+			}).catch(() => null)
+		}`, nil)
+	})
+}
+
+func expectStreamlitStartingPanelOrIframe() spec.Step {
+	return spec.Custom("streamlit shows starting panel or iframe", func(t testing.TB, ctx *duiruntime.Context) {
+		t.Helper()
+		starting := ctx.Page.Locator("[id^='applet-status-streamlit']").First()
+		iframe := ctx.Page.Locator(streamlitAppletFrameSelector).First()
+		deadline := time.Now().Add(15 * time.Second)
+		for time.Now().Before(deadline) {
+			if count, _ := iframe.Count(); count > 0 {
+				return
+			}
+			if count, _ := starting.Count(); count > 0 {
+				return
+			}
+			time.Sleep(100 * time.Millisecond)
+		}
+		dumpBody(t, ctx, "streamlit starting panel or iframe missing")
+	})
+}
+
+func expectStreamlitRestartChangesIdentity() spec.Step {
+	return spec.Custom("streamlit restart changes process identity", func(t testing.TB, ctx *duiruntime.Context) {
+		t.Helper()
+		before, err := readStreamlitProcessIdentity(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if before.PID == "" && before.RunID == "" && before.StartedAt == "" {
+			t.Fatalf("empty streamlit identity before restart; body:\n%s", before.Text)
+		}
+		_, err = ctx.Page.Evaluate(`async () => {
+			await fetch('/forms/applets/streamlit/restart', {
+				method: 'POST',
+				headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+				body: new URLSearchParams({identity_path: 'examples/streamlit/AGENTS.md'}),
+				redirect: 'manual'
+			})
+		}`, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		visit(t, ctx, "/examples/streamlit?context=chat")
+		if err := ctx.Page.FrameLocator(streamlitAppletFrameSelector).GetByText("Streamlit applet smoke test").First().WaitFor(playwright.LocatorWaitForOptions{Timeout: playwright.Float(90_000)}); err != nil {
+			t.Fatalf("streamlit did not return after restart: %v", err)
+		}
+
+		var after streamlitProcessIdentity
+		deadline := time.Now().Add(45 * time.Second)
+		for time.Now().Before(deadline) {
+			after, err = readStreamlitProcessIdentity(ctx)
+			if err == nil && identityChanged(before, after) {
+				return
+			}
+			time.Sleep(500 * time.Millisecond)
+		}
+		t.Fatalf("streamlit identity did not change after restart\nbefore=%+v\nafter=%+v", before, after)
+	})
+}
+
+func readStreamlitProcessIdentity(ctx *duiruntime.Context) (streamlitProcessIdentity, error) {
+	raw, err := ctx.Page.FrameLocator(streamlitAppletFrameSelector).Locator("body").Evaluate(`(body) => {
+		const text = body.innerText || ''
+		const pick = (re) => {
+			const match = text.match(re)
+			return match ? match[1] : ''
+		}
+		return {
+			pid: pick(/Process PID\s+(\d+)/),
+			runID: pick(/"run_id"\s*:\s*"([^"]+)"/),
+			startedAt: pick(/"started_at"\s*:\s*"([^"]+)"/),
+			text,
+		}
+	}`, nil)
+	if err != nil {
+		return streamlitProcessIdentity{}, err
+	}
+	data, ok := raw.(map[string]any)
+	if !ok {
+		return streamlitProcessIdentity{Text: fmt.Sprint(raw)}, nil
+	}
+	return streamlitProcessIdentity{
+		PID:       fmt.Sprint(data["pid"]),
+		RunID:     fmt.Sprint(data["runID"]),
+		StartedAt: fmt.Sprint(data["startedAt"]),
+		Text:      fmt.Sprint(data["text"]),
+	}, nil
+}
+
+func identityChanged(before, after streamlitProcessIdentity) bool {
+	return (before.PID != "" && after.PID != "" && before.PID != after.PID) ||
+		(before.RunID != "" && after.RunID != "" && before.RunID != after.RunID) ||
+		(before.StartedAt != "" && after.StartedAt != "" && before.StartedAt != after.StartedAt)
 }
 
 func expectAppletIdentityEncoded(identity string) spec.Step {
