@@ -42,22 +42,26 @@ func ResolveSessionPath(sessionDir, sessionID, cwd string) (string, error) {
 	}
 
 	var matches []string
-	walkErr := filepath.WalkDir(sessionDir, func(path string, entry os.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
-		if entry.IsDir() || filepath.Ext(entry.Name()) != ".jsonl" {
+	walkErr := filepath.WalkDir(
+		sessionDir,
+		func(path string, entry os.DirEntry, err error) error {
+			if err != nil {
+				return err
+			}
+			if entry.IsDir() || filepath.Ext(entry.Name()) != ".jsonl" {
+				return nil
+			}
+			header, err := readSessionHeader(path)
+			if err != nil {
+				return nil
+			}
+			if header.Type == "session" && header.ID == sessionID &&
+				(strings.TrimSpace(cwd) == "" || header.Cwd == cwd) {
+				matches = append(matches, path)
+			}
 			return nil
-		}
-		header, err := readSessionHeader(path)
-		if err != nil {
-			return nil
-		}
-		if header.Type == "session" && header.ID == sessionID && (strings.TrimSpace(cwd) == "" || header.Cwd == cwd) {
-			matches = append(matches, path)
-		}
-		return nil
-	})
+		},
+	)
 	if walkErr != nil {
 		return "", walkErr
 	}
@@ -68,7 +72,11 @@ func ResolveSessionPath(sessionDir, sessionID, cwd string) (string, error) {
 	case 0:
 		return "", fmt.Errorf("session %q not found in %s", sessionID, sessionDir)
 	default:
-		return "", fmt.Errorf("session %q matched multiple files in %s", sessionID, sessionDir)
+		return "", fmt.Errorf(
+			"session %q matched multiple files in %s",
+			sessionID,
+			sessionDir,
+		)
 	}
 }
 
@@ -94,6 +102,22 @@ func readSessionHeader(path string) (sessionEntry, error) {
 	return header, nil
 }
 
+type ChildProviderError struct {
+	SessionPath string
+}
+
+func (e ChildProviderError) Error() string {
+	return fmt.Sprintf(
+		"session %s ended with provider error before qrspi_result",
+		e.SessionPath,
+	)
+}
+
+func IsChildProviderError(err error) bool {
+	var providerErr ChildProviderError
+	return errors.As(err, &providerErr)
+}
+
 func ExtractFinalAssistantTextFromSession(path string) (string, error) {
 	file, err := os.Open(path)
 	if err != nil {
@@ -102,6 +126,7 @@ func ExtractFinalAssistantTextFromSession(path string) (string, error) {
 	defer file.Close()
 
 	var last string
+	var sawProviderError bool
 	scanner := bufio.NewScanner(file)
 	scanner.Buffer(make([]byte, 64*1024), 1024*1024)
 	for scanner.Scan() {
@@ -113,10 +138,15 @@ func ExtractFinalAssistantTextFromSession(path string) (string, error) {
 		if err := json.Unmarshal(line, &entry); err != nil {
 			continue
 		}
-		if entry.Type != "message" || entry.Message == nil || entry.Message.Role != "assistant" {
+		if entry.Type != "message" || entry.Message == nil ||
+			entry.Message.Role != "assistant" {
 			continue
 		}
-		if entry.Message.StopReason == "error" || entry.Message.StopReason == "aborted" {
+		if entry.Message.StopReason == "error" {
+			sawProviderError = true
+			continue
+		}
+		if entry.Message.StopReason == "aborted" {
 			continue
 		}
 		text := textBlocksFromAssistantMessage(*entry.Message)
@@ -128,7 +158,13 @@ func ExtractFinalAssistantTextFromSession(path string) (string, error) {
 		return "", err
 	}
 	if last == "" {
-		return "", fmt.Errorf("session %s has no assistant text containing qrspi_result", path)
+		if sawProviderError {
+			return "", ChildProviderError{SessionPath: path}
+		}
+		return "", fmt.Errorf(
+			"session %s has no assistant text containing qrspi_result",
+			path,
+		)
 	}
 	return last, nil
 }

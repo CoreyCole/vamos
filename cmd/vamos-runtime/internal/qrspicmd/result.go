@@ -177,6 +177,36 @@ func CorrectionPrompt(err error, attempt int) string {
 	return qrspi.QRSPIResultParser{}.CorrectionPrompt(err, attempt)
 }
 
+func ChildRecoveryPrompt(err error, attempt int) string {
+	if IsChildProviderError(err) || isChildProviderErrorText(err) {
+		return providerErrorRecoveryPrompt(err, attempt)
+	}
+	return CorrectionPrompt(err, attempt)
+}
+
+func isChildProviderErrorText(err error) bool {
+	if err == nil {
+		return false
+	}
+	return strings.Contains(err.Error(), "ended with provider error before qrspi_result")
+}
+
+func providerErrorRecoveryPrompt(err error, attempt int) string {
+	return fmt.Sprintf(
+		`Your previous turn ended with a provider/runtime error, not a QRSPI stage result.
+
+Recovery reason: %s
+Attempt: %d
+
+Continue the same QRSPI stage from the last durable context and current workspace state. Do not emit a synthetic qrspi_result just to satisfy validation. Do not treat any previous YAML correction prompt as task guidance.
+
+When real stage work reaches a handoff, completion, blocker, or error, emit the required fenced yaml block with top-level qrspi_result. If work is still in progress, continue implementing now.
+`,
+		err.Error(),
+		attempt,
+	)
+}
+
 func GraphContractError(err error) error {
 	if err == nil {
 		return nil

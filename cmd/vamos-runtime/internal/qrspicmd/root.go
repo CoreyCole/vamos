@@ -2467,7 +2467,7 @@ func RunRepromptChild(
 	if err != nil {
 		return err
 	}
-	prompt := CorrectionPrompt(errors.New(errText), opts.Attempt)
+	prompt := ChildRecoveryPrompt(errors.New(errText), opts.Attempt)
 	tmux := d.Tmux
 	if tmux == nil {
 		tmux = ShellTmuxClient{}
