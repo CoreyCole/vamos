@@ -1,0 +1,79 @@
+package workbench
+
+templ OverflowActions(args OverflowActionsArgs) {
+	if len(args.Groups) > 0 {
+		<details class="relative" data-testid="workbench-overflow-actions">
+			<summary class="inline-flex h-8 w-8 cursor-pointer list-none items-center justify-center rounded-md border border-border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground" aria-label={ args.Label } title={ args.Label }>
+				<span class="sr-only">{ args.Label }</span>
+				@KebabVerticalIcon()
+			</summary>
+			<div class="absolute right-0 z-50 mt-2 min-w-48 overflow-hidden rounded-md border border-border bg-popover p-1 text-popover-foreground shadow-md">
+				for groupIndex, group := range args.Groups {
+					if group.Label != "" {
+						<p class="px-2 py-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">{ group.Label }</p>
+					}
+					for _, action := range group.Actions {
+						@overflowActionItem(action)
+					}
+					if groupIndex < len(args.Groups)-1 {
+						<div class="my-1 border-t border-border"></div>
+					}
+				}
+			</div>
+		</details>
+	}
+}
+
+templ overflowActionItem(action OverflowAction) {
+	if action.Disabled {
+		<button type="button" disabled class="flex w-full cursor-not-allowed flex-col rounded-sm px-2 py-1.5 text-left text-sm opacity-50">
+			<span>{ overflowActionLabel(action) }</span>
+			if action.Description != "" {
+				<span class="text-xs text-muted-foreground">{ action.Description }</span>
+			}
+		</button>
+	} else if action.Kind == OverflowActionLink || action.Href != "" {
+		<a href={ templ.URL(action.Href) } target={ action.Target } rel={ action.Rel } class="flex w-full flex-col rounded-sm px-2 py-1.5 text-sm hover:bg-accent hover:text-accent-foreground">
+			<span>{ overflowActionLabel(action) }</span>
+			if action.Description != "" {
+				<span class="text-xs text-muted-foreground">{ action.Description }</span>
+			}
+		</a>
+	} else if action.Kind == OverflowActionForm || action.FormAction != "" {
+		if action.SubmitMode == OverflowActionSubmitDatastar {
+			<form class="flex w-full" data-on:submit__prevent={ overflowDatastarSubmit(action) }>
+				@overflowHiddenFields(action.HiddenFields)
+				<button type="submit" class="flex w-full flex-col rounded-sm px-2 py-1.5 text-left text-sm hover:bg-accent hover:text-accent-foreground">
+					<span>{ overflowActionLabel(action) }</span>
+					if action.Description != "" {
+						<span class="text-xs text-muted-foreground">{ action.Description }</span>
+					}
+				</button>
+			</form>
+		} else {
+			<form class="flex w-full" method={ overflowFormMethod(action) } action={ action.FormAction }>
+				@overflowHiddenFields(action.HiddenFields)
+				<button type="submit" class="flex w-full flex-col rounded-sm px-2 py-1.5 text-left text-sm hover:bg-accent hover:text-accent-foreground">
+					<span>{ overflowActionLabel(action) }</span>
+					if action.Description != "" {
+						<span class="text-xs text-muted-foreground">{ action.Description }</span>
+					}
+				</button>
+			</form>
+		}
+	}
+}
+
+templ overflowHiddenFields(fields map[string]string) {
+	for _, name := range overflowHiddenFieldNames(fields) {
+		<input type="hidden" name={ name } value={ fields[name] }/>
+	}
+}
+
+templ KebabVerticalIcon() {
+	<svg class="h-4 w-4" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+		<circle cx="12" cy="5" r="2"></circle>
+		<circle cx="12" cy="12" r="2"></circle>
+		<circle cx="12" cy="19" r="2"></circle>
+	</svg>
+}
