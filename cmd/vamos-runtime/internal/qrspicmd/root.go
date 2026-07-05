@@ -1505,110 +1505,142 @@ func RunChildComplete(
 		)
 	}
 	child := state.ActiveChild
-	text, parseCtx, err := ReadChildResultText(state, ResultSourceOptions{})
 	status := ChildCompletionStatus{
 		ChildID:    child.ID,
 		Attempt:    child.ValidationRetryCount,
 		RetryLimit: invalidResultRetryLimit(state),
 	}
-	if err == nil {
-		parseCtx.ExpectedNodeID = wruntime.NodeID(child.Stage)
-		parsed, parseErr := ParseNormalizeValidateDecide(text, state, parseCtx)
-		if parseErr == nil {
-			status.Validated = true
-			status.DeliveryID = childCompletionDeliveryID(*child, &parsed, false)
-			status.Result = childCompletionResult(parsed.Result)
-			status.NextChild = nextChildInfo(state, parsed.Decision.NextNodeID)
-			status.ManagerNeeded = childCompletionManagerNeeded(status.Result.Status)
-			status.Normalizations = parsed.Normalizations
-			state.ActiveChild.LifecycleStatus = "completed"
-			state.ActiveChild.LastDeliveryID = status.DeliveryID
-			state, status.Wake, err = queueOrDeliverWake(
-				ctx,
-				opts.StateFile,
-				state,
-				status,
-				d,
-			)
-			if err != nil {
-				return nil, err
-			}
-		} else {
-			err = parseErr
+	if evidence, ok, evidenceErr := terminalEvidenceForActiveChildWithRefresh(
+		state,
+	); evidenceErr == nil && ok &&
+		evidence.ContextWindowError {
+		status = childCompletionStatusFromTerminalEvidence(state, *child, evidence)
+		state.ActiveChild.LifecycleStatus = "awaiting_manager"
+		state.ActiveChild.LastDeliveryID = status.DeliveryID
+		health := ActiveChildHealth{
+			Status:           ActiveChildProviderContextError,
+			ChildID:          child.ID,
+			Stage:            child.Stage,
+			PaneID:           child.TmuxPaneID,
+			SessionDir:       child.SessionDir,
+			SessionPath:      evidence.SessionPath,
+			TerminalEvidence: &evidence,
+			Evidence:         providerContextEvidenceLines(evidence),
 		}
-	}
-	if err != nil {
-		if shouldRepromptAfterValidationError(
+		status.ActionCard = BuildChildContextExhaustedCard(health, state, opts.StateFile)
+		state.LastActionCard = status.ActionCard
+		state, status.Wake, err = queueOrDeliverWake(
+			ctx,
+			opts.StateFile,
 			state,
-			ContinueOptions{
-				StateFile: opts.StateFile,
-				PlanDir:   state.CanonicalPlanDir,
-				Stage:     child.Stage,
-			},
-			err,
-		) {
-			attempt := child.ValidationRetryCount + 1
-			if repromptErr := continueReprompt(
-				ctx,
+			status,
+			d,
+		)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		text, parseCtx, readErr := ReadChildResultText(state, ResultSourceOptions{})
+		err = readErr
+		if err == nil {
+			parseCtx.ExpectedNodeID = wruntime.NodeID(child.Stage)
+			parsed, parseErr := ParseNormalizeValidateDecide(text, state, parseCtx)
+			if parseErr == nil {
+				status.Validated = true
+				status.DeliveryID = childCompletionDeliveryID(*child, &parsed, false)
+				status.Result = childCompletionResult(parsed.Result)
+				status.NextChild = nextChildInfo(state, parsed.Decision.NextNodeID)
+				status.ManagerNeeded = childCompletionManagerNeeded(status.Result.Status)
+				status.Normalizations = parsed.Normalizations
+				state.ActiveChild.LifecycleStatus = "completed"
+				state.ActiveChild.LastDeliveryID = status.DeliveryID
+				state, status.Wake, err = queueOrDeliverWake(
+					ctx,
+					opts.StateFile,
+					state,
+					status,
+					d,
+				)
+				if err != nil {
+					return nil, err
+				}
+			} else {
+				err = parseErr
+			}
+		}
+		if err != nil {
+			if shouldRepromptAfterValidationError(
 				state,
 				ContinueOptions{
 					StateFile: opts.StateFile,
 					PlanDir:   state.CanonicalPlanDir,
 					Stage:     child.Stage,
 				},
-				d,
-				io.Discard,
 				err,
-			); repromptErr != nil {
-				return nil, repromptErr
-			}
-			latest, loadErr := store.Load(opts.StateFile)
-			if loadErr != nil {
-				return nil, loadErr
-			}
-			state = latest
-			child = state.ActiveChild
-			status.ChildID = child.ID
-			status.Attempt = attempt
-			status.RetryLimit = invalidResultRetryLimit(state)
-			status.Reason = "retryable_invalid_result"
-			status.Wake = WakeDeliveryInstruction{
-				Mode:   "suppress",
-				Reason: "retryable_invalid_result",
-			}
-		} else if isRetryExhaustedValidationError(
-			state,
-			ContinueOptions{
-				StateFile: opts.StateFile,
-				PlanDir:   state.CanonicalPlanDir,
-				Stage:     child.Stage,
-			},
-			err,
-		) {
-			status.Validated = false
-			status.ManagerNeeded = true
-			status.RetryExhausted = true
-			status.DeliveryID = childCompletionDeliveryID(*child, nil, true)
-			status.Result = ChildCompletionResult{
-				Stage:   child.Stage,
-				Status:  "invalid_result",
-				Summary: err.Error(),
-			}
-			status.Reason = err.Error()
-			state.ActiveChild.LifecycleStatus = "awaiting_manager"
-			state.ActiveChild.LastDeliveryID = status.DeliveryID
-			state, status.Wake, err = queueOrDeliverWake(
-				ctx,
-				opts.StateFile,
+			) {
+				attempt := child.ValidationRetryCount + 1
+				if repromptErr := continueReprompt(
+					ctx,
+					state,
+					ContinueOptions{
+						StateFile: opts.StateFile,
+						PlanDir:   state.CanonicalPlanDir,
+						Stage:     child.Stage,
+					},
+					d,
+					io.Discard,
+					err,
+				); repromptErr != nil {
+					return nil, repromptErr
+				}
+				latest, loadErr := store.Load(opts.StateFile)
+				if loadErr != nil {
+					return nil, loadErr
+				}
+				state = latest
+				child = state.ActiveChild
+				status.ChildID = child.ID
+				status.Attempt = attempt
+				status.RetryLimit = invalidResultRetryLimit(state)
+				status.Reason = "retryable_invalid_result"
+				status.Wake = WakeDeliveryInstruction{
+					Mode:   "suppress",
+					Reason: "retryable_invalid_result",
+				}
+			} else if isRetryExhaustedValidationError(
 				state,
-				status,
-				d,
-			)
-			if err != nil {
+				ContinueOptions{
+					StateFile: opts.StateFile,
+					PlanDir:   state.CanonicalPlanDir,
+					Stage:     child.Stage,
+				},
+				err,
+			) {
+				status.Validated = false
+				status.ManagerNeeded = true
+				status.RetryExhausted = true
+				status.DeliveryID = childCompletionDeliveryID(*child, nil, true)
+				status.Result = ChildCompletionResult{
+					Stage:   child.Stage,
+					Status:  "invalid_result",
+					Summary: err.Error(),
+				}
+				status.Reason = err.Error()
+				state.ActiveChild.LifecycleStatus = "awaiting_manager"
+				state.ActiveChild.LastDeliveryID = status.DeliveryID
+				state, status.Wake, err = queueOrDeliverWake(
+					ctx,
+					opts.StateFile,
+					state,
+					status,
+					d,
+				)
+				if err != nil {
+					return nil, err
+				}
+			} else {
 				return nil, err
 			}
-		} else {
-			return nil, err
 		}
 	}
 	if state.ActiveChild != nil &&
@@ -1683,6 +1715,98 @@ func childCompletionDeliveryID(
 		)
 	}
 	return strings.Join(parts, ":")
+}
+
+func terminalEvidenceForActiveChildWithRefresh(
+	state ManagerState,
+) (AssistantTerminalEvidence, bool, error) {
+	var lastErr error
+	var latest AssistantTerminalEvidence
+	found := false
+	for attempt := 0; attempt < 4; attempt++ {
+		evidence, ok, err := LatestTerminalEvidenceForActiveChild(state)
+		if err == nil && ok {
+			latest = evidence
+			found = true
+			if evidence.ContextWindowError {
+				return evidence, true, nil
+			}
+		}
+		lastErr = err
+		if attempt < 3 {
+			time.Sleep(100 * time.Millisecond)
+		}
+	}
+	if found {
+		return latest, true, nil
+	}
+	return AssistantTerminalEvidence{}, false, lastErr
+}
+
+func childCompletionStatusFromTerminalEvidence(
+	state ManagerState,
+	child ChildRunRef,
+	evidence AssistantTerminalEvidence,
+) ChildCompletionStatus {
+	status := ChildCompletionStatus{
+		Validated:        false,
+		ManagerNeeded:    true,
+		RetryExhausted:   false,
+		ChildID:          child.ID,
+		DeliveryID:       childCompletionDeliveryIDForTerminalEvidence(child, evidence),
+		TerminalEvidence: &evidence,
+		Reason:           "provider_context_error",
+		Attempt:          child.ValidationRetryCount,
+		RetryLimit:       invalidResultRetryLimit(state),
+		Result: ChildCompletionResult{
+			Stage:          child.Stage,
+			Status:         ActionChildContextExhausted,
+			Summary:        providerContextSummary(evidence),
+			StageCompleted: providerContextSummary(evidence),
+		},
+	}
+	if prior := readPriorValidationStatus(child.ValidationStatusPath); prior != nil {
+		status.Result.Artifact = prior.Result.Artifact
+		status.Result.PlanGoal = prior.Result.PlanGoal
+		status.Result.KeyDecisions = prior.Result.KeyDecisions
+	}
+	return status
+}
+
+func childCompletionDeliveryIDForTerminalEvidence(
+	child ChildRunRef,
+	evidence AssistantTerminalEvidence,
+) string {
+	return strings.Join([]string{
+		child.ID,
+		fmt.Sprintf("%d", child.Generation),
+		"provider_context_error",
+		evidence.EvidenceID,
+	}, ":")
+}
+
+func providerContextSummary(e AssistantTerminalEvidence) string {
+	return fmt.Sprintf(
+		"child provider context-window error in %s line %d: %s",
+		firstNonEmpty(e.SessionID, filepath.Base(e.SessionPath)),
+		e.Line,
+		strings.TrimSpace(e.ErrorMessage),
+	)
+}
+
+func readPriorValidationStatus(path string) *ChildCompletionStatus {
+	if strings.TrimSpace(path) == "" {
+		return nil
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil
+	}
+	var status ChildCompletionStatus
+	if err := json.Unmarshal(data, &status); err != nil {
+		return nil
+	}
+	return &status
 }
 
 func nextChildInfo(state ManagerState, node wruntime.NodeID) NextChildInfo {

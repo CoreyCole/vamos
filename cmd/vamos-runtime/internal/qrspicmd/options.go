@@ -142,19 +142,20 @@ type ManagerCompactionOptions struct {
 }
 
 type ChildCompletionStatus struct {
-	Validated      bool                    `json:"validated"`
-	ManagerNeeded  bool                    `json:"managerNeeded"`
-	RetryExhausted bool                    `json:"retryExhausted"`
-	ChildID        string                  `json:"childId"`
-	DeliveryID     string                  `json:"deliveryId"`
-	Result         ChildCompletionResult   `json:"result,omitempty"`
-	NextChild      NextChildInfo           `json:"nextChild,omitempty"`
-	Wake           WakeDeliveryInstruction `json:"wake"`
-	ActionCard     *ManagerActionCard      `json:"actionCard,omitempty"`
-	Normalizations []ResultNormalization   `json:"normalizations,omitempty"`
-	Reason         string                  `json:"reason,omitempty"`
-	Attempt        int                     `json:"attempt,omitempty"`
-	RetryLimit     int                     `json:"retryLimit,omitempty"`
+	Validated        bool                       `json:"validated"`
+	ManagerNeeded    bool                       `json:"managerNeeded"`
+	RetryExhausted   bool                       `json:"retryExhausted"`
+	ChildID          string                     `json:"childId"`
+	DeliveryID       string                     `json:"deliveryId"`
+	Result           ChildCompletionResult      `json:"result,omitempty"`
+	NextChild        NextChildInfo              `json:"nextChild,omitempty"`
+	Wake             WakeDeliveryInstruction    `json:"wake"`
+	ActionCard       *ManagerActionCard         `json:"actionCard,omitempty"`
+	TerminalEvidence *AssistantTerminalEvidence `json:"terminalEvidence,omitempty"`
+	Normalizations   []ResultNormalization      `json:"normalizations,omitempty"`
+	Reason           string                     `json:"reason,omitempty"`
+	Attempt          int                        `json:"attempt,omitempty"`
+	RetryLimit       int                        `json:"retryLimit,omitempty"`
 }
 
 type ResultNormalization struct {

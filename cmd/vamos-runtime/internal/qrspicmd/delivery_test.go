@@ -84,6 +84,57 @@ func TestDeliveryReadyManagerReceivesOneWake(t *testing.T) {
 	}
 }
 
+func TestDeliveryProviderContextErrorBypassesOlderBlockedDelivery(t *testing.T) {
+	stateFile := filepath.Join(t.TempDir(), "state.json")
+	state := ManagerState{
+		ManagerPaneID: "%parent",
+		Delivery: ManagerDeliveryState{
+			LastDeliveryID: "child-1:1:verify:blocked::thoughts/example/verify.md",
+		},
+		ActiveChild: &ChildRunRef{ID: "child-1", Generation: 1},
+	}
+	status := ChildCompletionStatus{
+		Validated:     false,
+		ManagerNeeded: true,
+		ChildID:       "child-1",
+		DeliveryID:    "child-1:1:provider_context_error:abc123",
+		Reason:        "provider_context_error",
+		Result: ChildCompletionResult{
+			Stage:  "verify",
+			Status: ActionChildContextExhausted,
+		},
+	}
+	tmux := &recordingTmux{}
+	delivered, wake, err := queueOrDeliverWake(
+		t.Context(),
+		stateFile,
+		state,
+		status,
+		deps{Tmux: tmux},
+	)
+	if err != nil {
+		t.Fatalf("queueOrDeliverWake error = %v", err)
+	}
+	if wake.Mode != "deliver" || delivered.Delivery.LastDeliveryID != status.DeliveryID ||
+		len(tmux.pastes) != 1 {
+		t.Fatalf("wake=%+v state=%+v pastes=%#v", wake, delivered, tmux.pastes)
+	}
+	again, wake, err := queueOrDeliverWake(
+		t.Context(),
+		stateFile,
+		delivered,
+		status,
+		deps{Tmux: tmux},
+	)
+	if err != nil {
+		t.Fatalf("second queueOrDeliverWake error = %v", err)
+	}
+	if wake.Mode != "suppress" || wake.Reason != "duplicate_delivery" ||
+		again.Delivery.LastDeliveryID != status.DeliveryID || len(tmux.pastes) != 1 {
+		t.Fatalf("second wake=%+v state=%+v pastes=%#v", wake, again, tmux.pastes)
+	}
+}
+
 func TestDeliveryQueuesWhileCompactingAndManagerReadyFlushes(t *testing.T) {
 	dir := t.TempDir()
 	stateFile := filepath.Join(dir, "state.json")
