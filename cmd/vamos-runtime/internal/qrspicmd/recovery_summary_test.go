@@ -188,6 +188,56 @@ func TestRunRecoverSummaryJSONOutput(t *testing.T) {
 	}
 }
 
+func TestRunRecoverSummaryNonDryRunRequiresWrittenNote(t *testing.T) {
+	dir := t.TempDir()
+	planDir := filepath.Join(dir, "plan")
+	if err := os.MkdirAll(planDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	sessionPath := filepath.Join(dir, "session.jsonl")
+	writeSessionTestFile(
+		t,
+		sessionPath,
+		sessionHeader(
+			"session-1",
+			dir,
+		)+"\n"+providerContextErrorLine(
+			"context window exceeded",
+		)+"\n",
+	)
+	stateFile := filepath.Join(dir, "state.json")
+	saveManagerState(t, stateFile, ManagerState{
+		CanonicalPlanDir: planDir,
+		ActiveChild: &ChildRunRef{
+			ID:          "child-1",
+			Stage:       "verify",
+			SessionPath: sessionPath,
+		},
+		Workflow: testWorkflowState(t, qrspi.NodeVerify, nil),
+	})
+	promptPath := filepath.Join(
+		dir,
+		"prompts",
+		"recover-summary-20260705T010203.000000000Z.md",
+	)
+	_, err := executeManagerCommand(
+		deps{
+			Clock: func() time.Time { return time.Date(2026, 7, 5, 1, 2, 3, 0, time.UTC) },
+			CommandRunner: fakeCommandRunner{results: map[string]CommandResult{
+				"pi @" + promptPath: {ExitCode: 0},
+			}, errs: map[string]error{}},
+		},
+		"recover-summary",
+		"--state-file",
+		stateFile,
+		"--session-file",
+		sessionPath,
+	)
+	if err == nil || !strings.Contains(err.Error(), "did not write recovery note") {
+		t.Fatalf("expected missing note error, got %v", err)
+	}
+}
+
 func readFile(t *testing.T, path string) string {
 	t.Helper()
 	data, err := os.ReadFile(path)

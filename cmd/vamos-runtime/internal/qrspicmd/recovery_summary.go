@@ -104,6 +104,9 @@ func RunRecoverSummary(
 				promptPath,
 			)
 		}
+		if err := ensureRecoveryNoteWritten(notePath, promptPath, binary); err != nil {
+			return err
+		}
 	}
 	if strings.EqualFold(opts.Output, "json") ||
 		strings.EqualFold(opts.Output, "ndjson") {
@@ -117,6 +120,20 @@ func RunRecoverSummary(
 		fmt.Fprintf(out, "evidence id: %s\n", evidence.EvidenceID)
 	}
 	return nil
+}
+
+func ensureRecoveryNoteWritten(notePath, promptPath, binary string) error {
+	if _, err := os.Stat(notePath); err == nil {
+		return nil
+	} else if !os.IsNotExist(err) {
+		return err
+	}
+	return fmt.Errorf(
+		"run recovery summarizer %q did not write recovery note %s; prompt written at %s",
+		binary,
+		notePath,
+		promptPath,
+	)
 }
 
 func WriteRecoverySummaryPrompt(req RecoverySummaryRequest, promptPath string) error {
