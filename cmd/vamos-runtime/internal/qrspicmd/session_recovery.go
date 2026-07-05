@@ -44,7 +44,9 @@ func RunInspect(ctx context.Context, opts InspectOptions, d deps, out io.Writer)
 	}
 	var latest *LatestChildCandidate
 	if opts.Latest {
-		candidate, ok, err := FindLatestRelevantChildSession(latestQueryFromState(state, ""))
+		candidate, ok, err := FindLatestRelevantChildSession(
+			latestQueryFromState(state, ""),
+		)
 		if err != nil {
 			return err
 		}
@@ -52,8 +54,20 @@ func RunInspect(ctx context.Context, opts InspectOptions, d deps, out io.Writer)
 			latest = &candidate
 		}
 	}
+	var activeHealth *ActiveChildHealth
+	if state.ActiveChild != nil {
+		if health, err := InspectActiveChildHealth(
+			ctx,
+			state,
+			opts.StateFile,
+			d,
+		); err == nil {
+			activeHealth = &health
+		}
+	}
 	if strings.EqualFold(opts.Output, "json") {
-		return json.NewEncoder(out).Encode(map[string]any{"stateFile": opts.StateFile, "currentNode": state.Workflow.CurrentNodeID, "activeChild": state.ActiveChild, "latest": latest, "lastActionCard": state.LastActionCard})
+		return json.NewEncoder(out).
+			Encode(map[string]any{"stateFile": opts.StateFile, "currentNode": state.Workflow.CurrentNodeID, "activeChild": state.ActiveChild, "activeChildHealth": activeHealth, "latest": latest, "lastActionCard": state.LastActionCard})
 	}
 	fmt.Fprintf(out, "state: %s\n", opts.StateFile)
 	fmt.Fprintf(out, "current node: %s\n", state.Workflow.CurrentNodeID)
@@ -61,11 +75,22 @@ func RunInspect(ctx context.Context, opts InspectOptions, d deps, out io.Writer)
 	fmt.Fprintf(out, "implementation cwd: %s\n", state.ImplementationCwd)
 	failedChildSafeCommand := ""
 	if state.ActiveChild != nil {
-		fmt.Fprintf(out, "active child: %s stage=%s pane=%s session=%s\n", state.ActiveChild.ID, state.ActiveChild.Stage, state.ActiveChild.TmuxPaneID, firstNonEmpty(state.ActiveChild.SessionPath, state.ActiveChild.SessionID))
-		if health, err := InspectActiveChildHealth(ctx, state, opts.StateFile, d); err == nil {
-			fmt.Fprintf(out, "active child health: %s\n", health.Status)
-			if IsTerminalFailedChild(health) {
-				failedChildSafeCommand = health.SafeCommand
+		fmt.Fprintf(
+			out,
+			"active child: %s stage=%s pane=%s session=%s\n",
+			state.ActiveChild.ID,
+			state.ActiveChild.Stage,
+			state.ActiveChild.TmuxPaneID,
+			firstNonEmpty(state.ActiveChild.SessionPath, state.ActiveChild.SessionID),
+		)
+		if activeHealth != nil {
+			fmt.Fprintf(out, "active child health: %s\n", activeHealth.Status)
+			for _, line := range activeHealth.Evidence {
+				fmt.Fprintf(out, "evidence: %s\n", line)
+			}
+			if IsTerminalFailedChild(*activeHealth) ||
+				IsRecoverableNoResultChild(*activeHealth) {
+				failedChildSafeCommand = activeHealth.SafeCommand
 			}
 		}
 		if opts.Sessions {
@@ -86,7 +111,12 @@ func RunInspect(ctx context.Context, opts InspectOptions, d deps, out io.Writer)
 	return nil
 }
 
-func RunFindLatestChild(ctx context.Context, opts FindLatestChildOptions, d deps, out io.Writer) error {
+func RunFindLatestChild(
+	ctx context.Context,
+	opts FindLatestChildOptions,
+	d deps,
+	out io.Writer,
+) error {
 	_ = ctx
 	if strings.TrimSpace(opts.StateFile) == "" {
 		return errors.New("state-file is required")
@@ -96,7 +126,9 @@ func RunFindLatestChild(ctx context.Context, opts FindLatestChildOptions, d deps
 	if err != nil {
 		return err
 	}
-	candidate, ok, err := FindLatestRelevantChildSession(latestQueryFromState(state, opts.Stage))
+	candidate, ok, err := FindLatestRelevantChildSession(
+		latestQueryFromState(state, opts.Stage),
+	)
 	if err != nil {
 		return err
 	}
@@ -106,7 +138,12 @@ func RunFindLatestChild(ctx context.Context, opts FindLatestChildOptions, d deps
 	return writeLatestCandidate(out, candidate, opts.Output)
 }
 
-func RunRebindChild(ctx context.Context, opts RebindChildOptions, d deps, out io.Writer) error {
+func RunRebindChild(
+	ctx context.Context,
+	opts RebindChildOptions,
+	d deps,
+	out io.Writer,
+) error {
 	_ = ctx
 	if strings.TrimSpace(opts.StateFile) == "" {
 		return errors.New("state-file is required")
@@ -134,14 +171,25 @@ func RunRebindChild(ctx context.Context, opts RebindChildOptions, d deps, out io
 	if strings.EqualFold(opts.Output, "json") {
 		return json.NewEncoder(out).Encode(state.ActiveChild)
 	}
-	fmt.Fprintf(out, "rebound child: %s stage=%s session=%s\n", state.ActiveChild.ID, state.ActiveChild.Stage, state.ActiveChild.SessionPath)
+	fmt.Fprintf(
+		out,
+		"rebound child: %s stage=%s session=%s\n",
+		state.ActiveChild.ID,
+		state.ActiveChild.Stage,
+		state.ActiveChild.SessionPath,
+	)
 	if state.LastActionCard != nil {
 		return writeManagerActionCard(out, *state.LastActionCard, opts.Output)
 	}
 	return nil
 }
 
-func RunValidateLatest(ctx context.Context, opts ValidateLatestOptions, d deps, out io.Writer) error {
+func RunValidateLatest(
+	ctx context.Context,
+	opts ValidateLatestOptions,
+	d deps,
+	out io.Writer,
+) error {
 	if strings.TrimSpace(opts.StateFile) == "" {
 		return errors.New("state-file is required")
 	}
@@ -151,7 +199,9 @@ func RunValidateLatest(ctx context.Context, opts ValidateLatestOptions, d deps, 
 	if err != nil {
 		return err
 	}
-	candidate, ok, err := FindLatestRelevantChildSession(latestQueryFromState(state, opts.Stage))
+	candidate, ok, err := FindLatestRelevantChildSession(
+		latestQueryFromState(state, opts.Stage),
+	)
 	if err != nil {
 		return err
 	}
@@ -167,13 +217,44 @@ func RunValidateLatest(ctx context.Context, opts ValidateLatestOptions, d deps, 
 			return err
 		}
 	}
-	if opts.Continue {
-		if !opts.ApplyRebind && (state.ActiveChild == nil || filepath.Clean(strings.TrimSpace(state.ActiveChild.SessionPath)) != filepath.Clean(candidate.SessionPath)) {
-			return fmt.Errorf("latest session differs from active child; rerun with --apply-rebind or use rebind-child --session-file %s", candidate.SessionPath)
-		}
-		return RunContinue(ctx, ContinueOptions{StateFile: opts.StateFile, PlanDir: state.CanonicalPlanDir, Stage: string(wruntime.NodeID(candidate.Child.Stage)), Output: opts.Output}, d, out)
+	if handled, err := validateLatestTerminalProviderContext(
+		opts,
+		state,
+		candidate,
+		store,
+		out,
+	); handled ||
+		err != nil {
+		return err
 	}
-	text, parseCtx, err := ReadChildResultText(state, ResultSourceOptions{SessionFile: candidate.SessionPath, SessionID: candidate.SessionID, RunID: candidate.Child.ID})
+	if opts.Continue {
+		if !opts.ApplyRebind &&
+			(state.ActiveChild == nil || filepath.Clean(strings.TrimSpace(state.ActiveChild.SessionPath)) != filepath.Clean(candidate.SessionPath)) {
+			return fmt.Errorf(
+				"latest session differs from active child; rerun with --apply-rebind or use rebind-child --session-file %s",
+				candidate.SessionPath,
+			)
+		}
+		return RunContinue(
+			ctx,
+			ContinueOptions{
+				StateFile: opts.StateFile,
+				PlanDir:   state.CanonicalPlanDir,
+				Stage:     string(wruntime.NodeID(candidate.Child.Stage)),
+				Output:    opts.Output,
+			},
+			d,
+			out,
+		)
+	}
+	text, parseCtx, err := ReadChildResultText(
+		state,
+		ResultSourceOptions{
+			SessionFile: candidate.SessionPath,
+			SessionID:   candidate.SessionID,
+			RunID:       candidate.Child.ID,
+		},
+	)
 	if err != nil {
 		return err
 	}
@@ -187,20 +268,105 @@ func RunValidateLatest(ctx context.Context, opts ValidateLatestOptions, d deps, 
 		return err
 	}
 	if strings.EqualFold(opts.Output, "json") {
-		return json.NewEncoder(out).Encode(map[string]any{"candidate": candidate, "decision": parsed})
+		return json.NewEncoder(out).
+			Encode(map[string]any{"candidate": candidate, "decision": parsed})
 	}
-	fmt.Fprintf(out, "validated latest: %s %s\n", parsed.Result.SourceNodeID, parsed.Result.Status)
+	fmt.Fprintf(
+		out,
+		"validated latest: %s %s\n",
+		parsed.Result.SourceNodeID,
+		parsed.Result.Status,
+	)
 	if parsed.Decision.NextNodeID != "" {
 		fmt.Fprintf(out, "next: %s\n", parsed.Decision.NextNodeID)
 	}
 	fmt.Fprintf(out, "session: %s\n", candidate.SessionPath)
 	if candidate.SessionPath != strings.TrimSpace(activeSessionPath(state)) {
-		fmt.Fprintf(out, "safe command: vamos qrspi rebind-child --state-file %s --session-file %s --stage %s\n", opts.StateFile, candidate.SessionPath, stage)
+		fmt.Fprintf(
+			out,
+			"safe command: vamos qrspi rebind-child --state-file %s --session-file %s --stage %s\n",
+			opts.StateFile,
+			candidate.SessionPath,
+			stage,
+		)
 	}
 	return nil
 }
 
-func RunRecoverManual(ctx context.Context, opts RecoverManualOptions, d deps, out io.Writer) error {
+func validateLatestTerminalProviderContext(
+	opts ValidateLatestOptions,
+	state ManagerState,
+	candidate LatestChildCandidate,
+	store StateStore,
+	out io.Writer,
+) (bool, error) {
+	evidence, ok, err := LatestAssistantTerminalEvidence(candidate.SessionPath)
+	if err != nil || !ok || !evidence.ContextWindowError {
+		return false, err
+	}
+	if !opts.ApplyRebind &&
+		(state.ActiveChild == nil || filepath.Clean(strings.TrimSpace(state.ActiveChild.SessionPath)) != filepath.Clean(candidate.SessionPath)) {
+		return true, fmt.Errorf(
+			"latest session differs from active child; rerun with --apply-rebind or use rebind-child --session-file %s",
+			candidate.SessionPath,
+		)
+	}
+	childID := candidate.Child.ID
+	stage := candidate.Child.Stage
+	paneID := candidate.Child.TmuxPaneID
+	sessionDir := candidate.Child.SessionDir
+	if state.ActiveChild != nil &&
+		filepath.Clean(
+			strings.TrimSpace(state.ActiveChild.SessionPath),
+		) == filepath.Clean(
+			candidate.SessionPath,
+		) {
+		childID = firstNonEmpty(state.ActiveChild.ID, childID)
+		stage = firstNonEmpty(state.ActiveChild.Stage, stage)
+		paneID = firstNonEmpty(state.ActiveChild.TmuxPaneID, paneID)
+		sessionDir = firstNonEmpty(state.ActiveChild.SessionDir, sessionDir)
+	}
+	health := ActiveChildHealth{
+		Status:           ActiveChildProviderContextError,
+		ChildID:          childID,
+		Stage:            stage,
+		PaneID:           paneID,
+		SessionDir:       sessionDir,
+		SessionPath:      candidate.SessionPath,
+		TerminalEvidence: &evidence,
+		Evidence:         providerContextEvidenceLines(evidence),
+		SafeCommand: fmt.Sprintf(
+			"vamos qrspi inspect --state-file %s --sessions --latest",
+			opts.StateFile,
+		),
+	}
+	card := BuildChildContextExhaustedCard(health, state, opts.StateFile)
+	if card != nil {
+		state.LastActionCard = card
+		if err := store.Save(opts.StateFile, state); err != nil {
+			return true, err
+		}
+	}
+	if strings.EqualFold(opts.Output, "json") ||
+		strings.EqualFold(opts.Output, "ndjson") {
+		return true, json.NewEncoder(out).Encode(map[string]any{
+			"candidate":        candidate,
+			"terminalEvidence": evidence,
+			"actionCard":       card,
+		})
+	}
+	if card != nil {
+		return true, writeManagerActionCard(out, *card, opts.Output)
+	}
+	return true, nil
+}
+
+func RunRecoverManual(
+	ctx context.Context,
+	opts RecoverManualOptions,
+	d deps,
+	out io.Writer,
+) error {
 	if strings.TrimSpace(opts.StateFile) == "" {
 		return errors.New("state-file is required")
 	}
@@ -228,17 +394,38 @@ func RunRecoverManual(ctx context.Context, opts RecoverManualOptions, d deps, ou
 		return err
 	}
 	if opts.Continue {
-		return RunContinue(ctx, ContinueOptions{StateFile: opts.StateFile, PlanDir: state.CanonicalPlanDir, Stage: candidate.Child.Stage, Output: opts.Output}, d, out)
+		return RunContinue(
+			ctx,
+			ContinueOptions{
+				StateFile: opts.StateFile,
+				PlanDir:   state.CanonicalPlanDir,
+				Stage:     candidate.Child.Stage,
+				Output:    opts.Output,
+			},
+			d,
+			out,
+		)
 	}
 	if strings.EqualFold(opts.Output, "json") {
 		return json.NewEncoder(out).Encode(candidate)
 	}
-	fmt.Fprintf(out, "recovered manual child: %s (%s)\n", candidate.SessionPath, candidate.Classification)
-	fmt.Fprintf(out, "safe command: vamos qrspi validate-latest --state-file %s --apply-rebind --continue\n", opts.StateFile)
+	fmt.Fprintf(
+		out,
+		"recovered manual child: %s (%s)\n",
+		candidate.SessionPath,
+		candidate.Classification,
+	)
+	fmt.Fprintf(
+		out,
+		"safe command: vamos qrspi validate-latest --state-file %s --apply-rebind --continue\n",
+		opts.StateFile,
+	)
 	return nil
 }
 
-func FindLatestRelevantChildSession(query LatestChildQuery) (LatestChildCandidate, bool, error) {
+func FindLatestRelevantChildSession(
+	query LatestChildQuery,
+) (LatestChildCandidate, bool, error) {
 	sessionDir := strings.TrimSpace(query.SessionDir)
 	if sessionDir == "" && query.ActiveChild != nil {
 		sessionDir = strings.TrimSpace(query.ActiveChild.SessionDir)
@@ -247,39 +434,57 @@ func FindLatestRelevantChildSession(query LatestChildQuery) (LatestChildCandidat
 		return LatestChildCandidate{}, false, nil
 	}
 	var latest LatestChildCandidate
-	walkErr := filepath.WalkDir(sessionDir, func(path string, entry os.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
-		if entry.IsDir() || filepath.Ext(entry.Name()) != ".jsonl" {
+	walkErr := filepath.WalkDir(
+		sessionDir,
+		func(path string, entry os.DirEntry, err error) error {
+			if err != nil {
+				return err
+			}
+			if entry.IsDir() || filepath.Ext(entry.Name()) != ".jsonl" {
+				return nil
+			}
+			header, err := readSessionHeader(path)
+			if err != nil || header.Type != "session" {
+				return nil
+			}
+			if strings.TrimSpace(query.WorkspaceCwd) != "" &&
+				strings.TrimSpace(header.Cwd) != "" &&
+				filepath.Clean(header.Cwd) != filepath.Clean(query.WorkspaceCwd) {
+				return nil
+			}
+			info, err := entry.Info()
+			if err != nil {
+				return err
+			}
+			child := childFromQuery(query, header, path)
+			candidate := LatestChildCandidate{
+				Child:       child,
+				SessionPath: path,
+				SessionID:   header.ID,
+				ModTime:     info.ModTime(),
+			}
+			candidate.Classification, candidate.Reason = classifyLatestChild(
+				query,
+				candidate,
+			)
+			if latest.SessionPath == "" || candidate.ModTime.After(latest.ModTime) ||
+				(candidate.ModTime.Equal(latest.ModTime) && candidate.SessionPath > latest.SessionPath) {
+				latest = candidate
+			}
 			return nil
-		}
-		header, err := readSessionHeader(path)
-		if err != nil || header.Type != "session" {
-			return nil
-		}
-		if strings.TrimSpace(query.WorkspaceCwd) != "" && strings.TrimSpace(header.Cwd) != "" && filepath.Clean(header.Cwd) != filepath.Clean(query.WorkspaceCwd) {
-			return nil
-		}
-		info, err := entry.Info()
-		if err != nil {
-			return err
-		}
-		child := childFromQuery(query, header, path)
-		candidate := LatestChildCandidate{Child: child, SessionPath: path, SessionID: header.ID, ModTime: info.ModTime()}
-		candidate.Classification, candidate.Reason = classifyLatestChild(query, candidate)
-		if latest.SessionPath == "" || candidate.ModTime.After(latest.ModTime) || (candidate.ModTime.Equal(latest.ModTime) && candidate.SessionPath > latest.SessionPath) {
-			latest = candidate
-		}
-		return nil
-	})
+		},
+	)
 	if walkErr != nil {
 		return LatestChildCandidate{}, false, walkErr
 	}
 	return latest, latest.SessionPath != "", nil
 }
 
-func RebindActiveChild(state ManagerState, child ChildRunRef, reason string) (ManagerState, error) {
+func RebindActiveChild(
+	state ManagerState,
+	child ChildRunRef,
+	reason string,
+) (ManagerState, error) {
 	if strings.TrimSpace(child.SessionPath) == "" {
 		return state, errors.New("child session path is required")
 	}
@@ -287,14 +492,20 @@ func RebindActiveChild(state ManagerState, child ChildRunRef, reason string) (Ma
 		child.Stage = string(state.Workflow.CurrentNodeID)
 	}
 	if strings.TrimSpace(child.ID) == "" {
-		child.ID = "manual-" + strings.Trim(strings.ReplaceAll(child.SessionID, "/", "-"), "-")
+		child.ID = "manual-" + strings.Trim(
+			strings.ReplaceAll(child.SessionID, "/", "-"),
+			"-",
+		)
 	}
 	if state.ActiveChild != nil {
 		child.TmuxPaneID = firstNonEmpty(child.TmuxPaneID, state.ActiveChild.TmuxPaneID)
 		child.OutputPath = firstNonEmpty(child.OutputPath, state.ActiveChild.OutputPath)
 		child.DonePath = firstNonEmpty(child.DonePath, state.ActiveChild.DonePath)
 		child.StatusPath = firstNonEmpty(child.StatusPath, state.ActiveChild.StatusPath)
-		child.ValidationStatusPath = firstNonEmpty(child.ValidationStatusPath, state.ActiveChild.ValidationStatusPath)
+		child.ValidationStatusPath = firstNonEmpty(
+			child.ValidationStatusPath,
+			state.ActiveChild.ValidationStatusPath,
+		)
 		child.Generation = activeChildGeneration(state) + 1
 	} else {
 		child.Generation = 1
@@ -304,33 +515,60 @@ func RebindActiveChild(state ManagerState, child ChildRunRef, reason string) (Ma
 	child.LastRepromptAttempt = 0
 	state.ActiveChild = &child
 	state = SupersedeStaleQueuedWake(state, child)
-	action := semantic.NextAction{Kind: semantic.NextActionManualRecovery, Severity: "info", CurrentNodeID: wruntime.NodeID(child.Stage), RecoveryReason: fmt.Sprintf("active child rebound: %s", firstNonEmpty(reason, "manual recovery")), Evidence: []string{fmt.Sprintf("session: %s", child.SessionPath)}}
+	action := semantic.NextAction{
+		Kind:          semantic.NextActionManualRecovery,
+		Severity:      "info",
+		CurrentNodeID: wruntime.NodeID(child.Stage),
+		RecoveryReason: fmt.Sprintf(
+			"active child rebound: %s",
+			firstNonEmpty(reason, "manual recovery"),
+		),
+		Evidence: []string{fmt.Sprintf("session: %s", child.SessionPath)},
+	}
 	state.LastActionCard = ProjectManagerActionCard(action, state, "")
 	return state, nil
 }
 
-func ValidateLatestChildSession(opts ValidateResultOptions) (ChildCompletionStatus, error) {
+func ValidateLatestChildSession(
+	opts ValidateResultOptions,
+) (ChildCompletionStatus, error) {
 	state, err := FileStateStore{}.Load(opts.StateFile)
 	if err != nil {
 		return ChildCompletionStatus{}, err
 	}
-	candidate, ok, err := FindLatestRelevantChildSession(latestQueryFromState(state, opts.Stage))
+	candidate, ok, err := FindLatestRelevantChildSession(
+		latestQueryFromState(state, opts.Stage),
+	)
 	if err != nil {
 		return ChildCompletionStatus{}, err
 	}
 	if !ok {
 		return ChildCompletionStatus{}, errors.New("no relevant child sessions found")
 	}
-	text, parseCtx, err := ReadChildResultText(state, ResultSourceOptions{SessionFile: candidate.SessionPath, SessionID: candidate.SessionID, RunID: candidate.Child.ID})
+	text, parseCtx, err := ReadChildResultText(
+		state,
+		ResultSourceOptions{
+			SessionFile: candidate.SessionPath,
+			SessionID:   candidate.SessionID,
+			RunID:       candidate.Child.ID,
+		},
+	)
 	if err != nil {
 		return ChildCompletionStatus{}, err
 	}
-	parseCtx.ExpectedNodeID = wruntime.NodeID(firstNonEmpty(opts.Stage, candidate.Child.Stage))
+	parseCtx.ExpectedNodeID = wruntime.NodeID(
+		firstNonEmpty(opts.Stage, candidate.Child.Stage),
+	)
 	parsed, err := ParseNormalizeValidateDecide(text, state, parseCtx)
 	if err != nil {
 		return ChildCompletionStatus{}, err
 	}
-	return ChildCompletionStatus{Validated: true, ChildID: candidate.Child.ID, Result: childCompletionResult(parsed.Result), Normalizations: parsed.Normalizations}, nil
+	return ChildCompletionStatus{
+		Validated:      true,
+		ChildID:        candidate.Child.ID,
+		Result:         childCompletionResult(parsed.Result),
+		Normalizations: parsed.Normalizations,
+	}, nil
 }
 
 func SupersedeStaleQueuedWake(state ManagerState, child ChildRunRef) ManagerState {
@@ -340,7 +578,15 @@ func SupersedeStaleQueuedWake(state ManagerState, child ChildRunRef) ManagerStat
 	}
 	if queued.ChildID != child.ID || queued.ChildGeneration != child.Generation {
 		state.Delivery.QueuedWake = nil
-		state.LastActionCard = &ManagerActionCard{Kind: ActionSupersededQueuedWake, Severity: "info", Summary: "queued child wake superseded by recovered child session", Evidence: []string{fmt.Sprintf("session: %s", child.SessionPath)}, RecommendedAction: "continue from latest validated child session", SafeCommand: "vamos qrspi recover-manual --mode latest-session --continue", RequiresHuman: false}
+		state.LastActionCard = &ManagerActionCard{
+			Kind:              ActionSupersededQueuedWake,
+			Severity:          "info",
+			Summary:           "queued child wake superseded by recovered child session",
+			Evidence:          []string{fmt.Sprintf("session: %s", child.SessionPath)},
+			RecommendedAction: "continue from latest validated child session",
+			SafeCommand:       "vamos qrspi recover-manual --mode latest-session --continue",
+			RequiresHuman:     false,
+		}
 	}
 	return state
 }
@@ -354,11 +600,27 @@ func latestQueryFromState(state ManagerState, stage string) LatestChildQuery {
 	if strings.TrimSpace(stage) == "" && active != nil {
 		stage = active.Stage
 	}
-	return LatestChildQuery{ManagerRunID: state.ManagerRunID, PlanDir: state.CanonicalPlanDir, Stage: wruntime.NodeID(stage), WorkspaceCwd: workspace, ActiveChild: active}
+	return LatestChildQuery{
+		ManagerRunID: state.ManagerRunID,
+		PlanDir:      state.CanonicalPlanDir,
+		Stage:        wruntime.NodeID(stage),
+		WorkspaceCwd: workspace,
+		ActiveChild:  active,
+	}
 }
 
-func childFromQuery(query LatestChildQuery, header sessionEntry, path string) ChildRunRef {
-	child := ChildRunRef{Stage: string(query.Stage), Cwd: header.Cwd, SessionID: header.ID, SessionDir: filepath.Dir(path), SessionPath: path}
+func childFromQuery(
+	query LatestChildQuery,
+	header sessionEntry,
+	path string,
+) ChildRunRef {
+	child := ChildRunRef{
+		Stage:       string(query.Stage),
+		Cwd:         header.Cwd,
+		SessionID:   header.ID,
+		SessionDir:  filepath.Dir(path),
+		SessionPath: path,
+	}
 	if query.ActiveChild != nil {
 		base := *query.ActiveChild
 		base.SessionID = header.ID
@@ -379,21 +641,29 @@ func childFromQuery(query LatestChildQuery, header sessionEntry, path string) Ch
 	return child
 }
 
-func classifyLatestChild(query LatestChildQuery, candidate LatestChildCandidate) (string, string) {
+func classifyLatestChild(
+	query LatestChildQuery,
+	candidate LatestChildCandidate,
+) (string, string) {
 	if query.ActiveChild == nil {
 		return "manual_new", "no active child; session can seed manual recovery"
 	}
 	activePath := strings.TrimSpace(query.ActiveChild.SessionPath)
-	if activePath != "" && filepath.Clean(activePath) == filepath.Clean(candidate.SessionPath) {
+	if activePath != "" &&
+		filepath.Clean(activePath) == filepath.Clean(candidate.SessionPath) {
 		return "managed_same_session", "session matches active child"
 	}
-	if query.ActiveChild.SessionID != "" && query.ActiveChild.SessionID == candidate.SessionID {
+	if query.ActiveChild.SessionID != "" &&
+		query.ActiveChild.SessionID == candidate.SessionID {
 		return "manual_same_child_chat", "same session id at newer path"
 	}
 	return "manual_new", "newer child session in active child session directory"
 }
 
-func childRefFromSessionFile(state ManagerState, sessionFile, stage string) (ChildRunRef, error) {
+func childRefFromSessionFile(
+	state ManagerState,
+	sessionFile, stage string,
+) (ChildRunRef, error) {
 	header, err := readSessionHeader(sessionFile)
 	if err != nil {
 		return ChildRunRef{}, err
@@ -405,7 +675,11 @@ func childRefFromSessionFile(state ManagerState, sessionFile, stage string) (Chi
 	return childFromQuery(query, header, sessionFile), nil
 }
 
-func writeLatestCandidate(out io.Writer, candidate LatestChildCandidate, mode string) error {
+func writeLatestCandidate(
+	out io.Writer,
+	candidate LatestChildCandidate,
+	mode string,
+) error {
 	if strings.EqualFold(mode, "json") {
 		return json.NewEncoder(out).Encode(candidate)
 	}

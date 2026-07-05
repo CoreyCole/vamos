@@ -138,6 +138,44 @@ func TestInspectActiveChildHealthPaneMissing(t *testing.T) {
 	}
 }
 
+func TestInspectActiveChildHealthProviderContextErrorOutranksOlderResult(t *testing.T) {
+	dir := t.TempDir()
+	active := childHealthRef(dir)
+	active.Cwd = dir
+	active.SessionPath = filepath.Join(active.SessionDir, "session.jsonl")
+	writeFile(t, active.StatusPath, `{"exitCode":0}`)
+	writeFile(t, active.DonePath, "")
+	writeSessionWithBlockedResultThenProviderError(
+		t,
+		active.SessionPath,
+		active.SessionID,
+		active.Cwd,
+	)
+	state := ManagerState{ActiveChild: active}
+
+	health, err := InspectActiveChildHealth(
+		t.Context(),
+		state,
+		"state.json",
+		deps{Tmux: &recordingTmux{missingPanes: map[string]bool{"%9": true}}},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if health.Status != ActiveChildProviderContextError ||
+		health.TerminalEvidence == nil ||
+		!health.TerminalEvidence.ContextWindowError {
+		t.Fatalf("health = %+v, want provider context error", health)
+	}
+	if !containsLine(health.Evidence, "provider stopReason: error") ||
+		!strings.Contains(
+			strings.Join(health.Evidence, "\n"),
+			"input exceeds the context window",
+		) {
+		t.Fatalf("evidence = %#v", health.Evidence)
+	}
+}
+
 func TestInspectActiveChildHealthDetectsContextExhaustionNoResult(t *testing.T) {
 	dir := t.TempDir()
 	active := childHealthRef(dir)
@@ -171,6 +209,54 @@ func TestInspectActiveChildHealthDetectsContextExhaustionNoResult(t *testing.T) 
 	if health.SessionPath != active.SessionPath ||
 		!strings.Contains(health.SafeCommand, "pi --resume") {
 		t.Fatalf("health session/safe command = %+v", health)
+	}
+}
+
+func TestContinueProviderContextErrorWritesActionCardWithoutAdvance(t *testing.T) {
+	dir := t.TempDir()
+	stateFile := filepath.Join(dir, "state.json")
+	active := childHealthRef(dir)
+	active.Cwd = dir
+	active.SessionPath = filepath.Join(active.SessionDir, "session.jsonl")
+	writeFile(t, active.StatusPath, `{"exitCode":0}`)
+	writeFile(t, active.DonePath, "")
+	writeSessionWithBlockedResultThenProviderError(
+		t,
+		active.SessionPath,
+		active.SessionID,
+		active.Cwd,
+	)
+	state := ManagerState{
+		CanonicalPlanDir: "thoughts/example",
+		ActiveChild:      active,
+		Workflow:         testWorkflowState(t, qrspi.NodeDesign, nil),
+	}
+	saveManagerState(t, stateFile, state)
+
+	var out bytes.Buffer
+	if err := RunContinue(
+		t.Context(),
+		ContinueOptions{
+			StateFile: stateFile,
+			PlanDir:   "thoughts/example",
+			Output:    "text",
+		},
+		deps{Tmux: &recordingTmux{missingPanes: map[string]bool{"%9": true}}},
+		&out,
+	); err != nil {
+		t.Fatal(err)
+	}
+	text := out.String()
+	if !strings.Contains(text, "action: child_context_exhausted") ||
+		!strings.Contains(text, "provider_context_error") ||
+		!strings.Contains(text, "input exceeds the context window") {
+		t.Fatalf("output = %s", text)
+	}
+	loaded := loadManagerState(t, stateFile)
+	if loaded.Workflow.CurrentNodeID != qrspi.NodeDesign ||
+		loaded.LastActionCard == nil ||
+		loaded.LastActionCard.Kind != ActionChildContextExhausted {
+		t.Fatalf("loaded state = %+v", loaded)
 	}
 }
 
@@ -263,6 +349,28 @@ func TestContinueStopsWithLaunchFailedBeforeYAMLReprompt(t *testing.T) {
 	if loaded.ActiveChild == nil || loaded.ActiveChild.ValidationRetryCount != 0 {
 		t.Fatalf("active child changed/reprompted: %+v", loaded.ActiveChild)
 	}
+}
+
+func writeSessionWithBlockedResultThenProviderError(
+	t *testing.T,
+	path, sessionID, cwd string,
+) {
+	t.Helper()
+	writeSessionTestFile(t, path, strings.Join([]string{
+		sessionHeader(sessionID, cwd),
+		assistantLine(
+			testResultYAML(
+				"design",
+				"blocked",
+				"",
+				"thoughts/example/design.md",
+				"stale blocked",
+			),
+		),
+		providerContextErrorLine(
+			"Codex error: Your input exceeds the context window of this model. Please adjust your input and try again.",
+		),
+	}, "\n")+"\n")
 }
 
 func childHealthRef(dir string) *ChildRunRef {

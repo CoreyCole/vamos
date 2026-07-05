@@ -247,6 +247,143 @@ func TestRunValidateLatestCanApplyRebindAndContinue(t *testing.T) {
 	}
 }
 
+func TestRunValidateLatestApplyRebindProviderContextErrorDoesNotAcceptStaleResult(
+	t *testing.T,
+) {
+	dir := t.TempDir()
+	stateFile := filepath.Join(dir, "state.json")
+	sessionDir := filepath.Join(dir, "sessions")
+	cwd := filepath.Join(dir, "repo")
+	oldPath := writePiSession(
+		t,
+		sessionDir,
+		"old.jsonl",
+		"session-old",
+		cwd,
+		assistantLine("not final"),
+	)
+	newPath := filepath.Join(sessionDir, "new.jsonl")
+	writeSessionWithBlockedResultThenProviderError(t, newPath, "session-new", cwd)
+	oldTime := time.Date(2026, 6, 21, 1, 0, 0, 0, time.UTC)
+	chtimes(t, oldPath, oldTime)
+	chtimes(t, newPath, oldTime.Add(time.Minute))
+	state := ManagerState{
+		CanonicalPlanDir: "thoughts/example",
+		SourceCwd:        cwd,
+		Workflow:         testWorkflowState(t, qrspi.NodeDesign, nil),
+		ActiveChild: &ChildRunRef{
+			ID:          "child-1",
+			Stage:       "design",
+			Cwd:         cwd,
+			SessionID:   "session-old",
+			SessionDir:  sessionDir,
+			SessionPath: oldPath,
+			Generation:  1,
+		},
+	}
+	if err := (FileStateStore{}).Save(stateFile, state); err != nil {
+		t.Fatal(err)
+	}
+
+	var out strings.Builder
+	if err := RunValidateLatest(
+		t.Context(),
+		ValidateLatestOptions{
+			StateFile:   stateFile,
+			Stage:       "design",
+			ApplyRebind: true,
+			Output:      "text",
+		},
+		deps{},
+		&out,
+	); err != nil {
+		t.Fatalf("RunValidateLatest error = %v", err)
+	}
+	text := out.String()
+	if !strings.Contains(text, "action: child_context_exhausted") ||
+		!strings.Contains(text, "provider_context_error") ||
+		!strings.Contains(text, "input exceeds the context window") {
+		t.Fatalf("output = %q", text)
+	}
+	loaded := loadManagerState(t, stateFile)
+	if loaded.Workflow.CurrentNodeID != qrspi.NodeDesign {
+		t.Fatalf("current node = %q, want design", loaded.Workflow.CurrentNodeID)
+	}
+	if loaded.ActiveChild == nil || loaded.ActiveChild.SessionPath != newPath {
+		t.Fatalf(
+			"active child = %#v, want rebound latest provider session",
+			loaded.ActiveChild,
+		)
+	}
+	if loaded.LastActionCard == nil ||
+		loaded.LastActionCard.Kind != ActionChildContextExhausted {
+		t.Fatalf("last action card = %#v", loaded.LastActionCard)
+	}
+}
+
+func TestRunValidateLatestApplyRebindContinueProviderContextErrorDoesNotAdvance(
+	t *testing.T,
+) {
+	dir := t.TempDir()
+	stateFile := filepath.Join(dir, "state.json")
+	sessionDir := filepath.Join(dir, "sessions")
+	cwd := filepath.Join(dir, "repo")
+	oldPath := writePiSession(
+		t,
+		sessionDir,
+		"old.jsonl",
+		"session-old",
+		cwd,
+		assistantLine("not final"),
+	)
+	newPath := filepath.Join(sessionDir, "new.jsonl")
+	writeSessionWithBlockedResultThenProviderError(t, newPath, "session-new", cwd)
+	oldTime := time.Date(2026, 6, 21, 1, 0, 0, 0, time.UTC)
+	chtimes(t, oldPath, oldTime)
+	chtimes(t, newPath, oldTime.Add(time.Minute))
+	state := ManagerState{
+		CanonicalPlanDir: "thoughts/example",
+		SourceCwd:        cwd,
+		Workflow:         testWorkflowState(t, qrspi.NodeDesign, nil),
+		ActiveChild: &ChildRunRef{
+			ID:          "child-1",
+			Stage:       "design",
+			Cwd:         cwd,
+			SessionID:   "session-old",
+			SessionDir:  sessionDir,
+			SessionPath: oldPath,
+			Generation:  1,
+		},
+	}
+	if err := (FileStateStore{}).Save(stateFile, state); err != nil {
+		t.Fatal(err)
+	}
+
+	var out strings.Builder
+	if err := RunValidateLatest(
+		t.Context(),
+		ValidateLatestOptions{
+			StateFile:   stateFile,
+			Stage:       "design",
+			ApplyRebind: true,
+			Continue:    true,
+			Output:      "text",
+		},
+		deps{},
+		&out,
+	); err != nil {
+		t.Fatalf("RunValidateLatest error = %v", err)
+	}
+	if !strings.Contains(out.String(), "action: child_context_exhausted") {
+		t.Fatalf("output = %q", out.String())
+	}
+	loaded := loadManagerState(t, stateFile)
+	if loaded.Workflow.CurrentNodeID != qrspi.NodeDesign || loaded.ActiveChild == nil ||
+		loaded.ActiveChild.Stage != "design" {
+		t.Fatalf("loaded state advanced unexpectedly: %+v", loaded)
+	}
+}
+
 type recoveryFakeRunner struct{ paneID string }
 
 func (r recoveryFakeRunner) Start(

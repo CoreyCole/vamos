@@ -256,24 +256,26 @@ const (
 	ActiveChildFinishedNeedsValidation ActiveChildHealthStatus = "finished_success_needs_result_validation"
 	ActiveChildLaunchFailed            ActiveChildHealthStatus = "launch_failed"
 	ActiveChildContextExhausted        ActiveChildHealthStatus = "context_exhausted_no_result"
+	ActiveChildProviderContextError    ActiveChildHealthStatus = "provider_context_error"
 	ActiveChildPaneMissing             ActiveChildHealthStatus = "pane_missing"
 	ActiveChildUnknown                 ActiveChildHealthStatus = "unknown"
 )
 
 type ActiveChildHealth struct {
-	Status      ActiveChildHealthStatus `json:"status"`
-	ChildID     string                  `json:"childId,omitempty"`
-	Stage       string                  `json:"stage,omitempty"`
-	PaneID      string                  `json:"paneId,omitempty"`
-	OutputPath  string                  `json:"outputPath,omitempty"`
-	StatusPath  string                  `json:"statusPath,omitempty"`
-	DonePath    string                  `json:"donePath,omitempty"`
-	SessionDir  string                  `json:"sessionDir,omitempty"`
-	SessionPath string                  `json:"sessionPath,omitempty"`
-	ExitCode    *int                    `json:"exitCode,omitempty"`
-	OutputTail  []string                `json:"outputTail,omitempty"`
-	Evidence    []string                `json:"evidence,omitempty"`
-	SafeCommand string                  `json:"safeCommand,omitempty"`
+	Status           ActiveChildHealthStatus    `json:"status"`
+	ChildID          string                     `json:"childId,omitempty"`
+	Stage            string                     `json:"stage,omitempty"`
+	PaneID           string                     `json:"paneId,omitempty"`
+	OutputPath       string                     `json:"outputPath,omitempty"`
+	StatusPath       string                     `json:"statusPath,omitempty"`
+	DonePath         string                     `json:"donePath,omitempty"`
+	SessionDir       string                     `json:"sessionDir,omitempty"`
+	SessionPath      string                     `json:"sessionPath,omitempty"`
+	TerminalEvidence *AssistantTerminalEvidence `json:"terminalEvidence,omitempty"`
+	ExitCode         *int                       `json:"exitCode,omitempty"`
+	OutputTail       []string                   `json:"outputTail,omitempty"`
+	Evidence         []string                   `json:"evidence,omitempty"`
+	SafeCommand      string                     `json:"safeCommand,omitempty"`
 }
 
 type TmuxHealthReport struct {

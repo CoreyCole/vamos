@@ -48,6 +48,29 @@ func InspectActiveChildHealth(
 		health.OutputTail = FilterChildOutputTail(data, 8)
 	}
 
+	if strings.TrimSpace(health.SessionPath) == "" {
+		if resolved, err := resolveActiveChildSessionPath(child); err == nil {
+			health.SessionPath = resolved
+		}
+	}
+	if strings.TrimSpace(health.SessionPath) != "" {
+		if evidence, ok, err := LatestAssistantTerminalEvidence(
+			health.SessionPath,
+		); err == nil && ok &&
+			evidence.ContextWindowError {
+			health.Status = ActiveChildProviderContextError
+			health.TerminalEvidence = &evidence
+			health.Evidence = append(
+				health.Evidence,
+				providerContextEvidenceLines(evidence)...)
+			health.SafeCommand = fmt.Sprintf(
+				"vamos qrspi inspect --state-file %s --sessions --latest",
+				stateFile,
+			)
+			return health, nil
+		}
+	}
+
 	hasResult, sessionPath, resultErr := ChildHasQRSPIResult(state)
 	if hasResult {
 		health.Status = ActiveChildFinishedNeedsValidation
@@ -57,8 +80,6 @@ func InspectActiveChildHealth(
 	}
 	if strings.TrimSpace(sessionPath) != "" {
 		health.SessionPath = sessionPath
-	} else if resolved, err := resolveActiveChildSessionPath(child); err == nil {
-		health.SessionPath = resolved
 	}
 	sessionText := ""
 	if strings.TrimSpace(health.SessionPath) != "" {
@@ -127,6 +148,19 @@ func HasDoneMarker(path string) bool {
 	return err == nil
 }
 
+func LatestTerminalEvidenceForActiveChild(
+	state ManagerState,
+) (AssistantTerminalEvidence, bool, error) {
+	if state.ActiveChild == nil {
+		return AssistantTerminalEvidence{}, false, nil
+	}
+	path, err := resolveActiveChildSessionPath(state.ActiveChild)
+	if err != nil {
+		return AssistantTerminalEvidence{}, false, err
+	}
+	return LatestAssistantTerminalEvidence(path)
+}
+
 func ChildHasQRSPIResult(state ManagerState) (bool, string, error) {
 	text, parseCtx, err := ReadChildResultText(state, ResultSourceOptions{})
 	if err != nil {
@@ -150,6 +184,7 @@ func HasChildContextExhaustionEvidence(
 		"context_length_exceeded",
 		"maximum context",
 		"context limit",
+		"input exceeds",
 		"compaction failed",
 	}
 	for _, line := range lines {
@@ -173,10 +208,37 @@ func resolveActiveChildSessionPath(child *ChildRunRef) (string, error) {
 	return ResolveSessionPath(child.SessionDir, child.SessionID, child.Cwd)
 }
 
+func providerContextEvidenceLines(e AssistantTerminalEvidence) []string {
+	lines := []string{
+		fmt.Sprintf("provider stopReason: %s", e.StopReason),
+		fmt.Sprintf("provider error: %s", e.ErrorMessage),
+		fmt.Sprintf("evidence id: %s", e.EvidenceID),
+	}
+	if e.SessionPath != "" {
+		lines = append(lines, fmt.Sprintf("session: %s", e.SessionPath))
+	}
+	if e.SessionID != "" {
+		lines = append(lines, fmt.Sprintf("session id: %s", e.SessionID))
+	}
+	if e.Line > 0 {
+		lines = append(lines, fmt.Sprintf("line: %d", e.Line))
+	}
+	if e.Timestamp != "" {
+		lines = append(lines, fmt.Sprintf("timestamp: %s", e.Timestamp))
+	}
+	return lines
+}
+
 func IsTerminalFailedChild(health ActiveChildHealth) bool {
 	return health.Status == ActiveChildLaunchFailed
 }
 
+func IsTerminalProviderContextError(health ActiveChildHealth) bool {
+	return health.Status == ActiveChildProviderContextError ||
+		(health.TerminalEvidence != nil && health.TerminalEvidence.ContextWindowError)
+}
+
 func IsRecoverableNoResultChild(health ActiveChildHealth) bool {
-	return health.Status == ActiveChildContextExhausted
+	return health.Status == ActiveChildContextExhausted ||
+		IsTerminalProviderContextError(health)
 }

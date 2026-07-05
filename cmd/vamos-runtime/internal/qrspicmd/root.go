@@ -2872,7 +2872,8 @@ func BuildChildContextExhaustedCard(
 	state ManagerState,
 	stateFile string,
 ) *ManagerActionCard {
-	if health.Status != ActiveChildContextExhausted {
+	if health.Status != ActiveChildContextExhausted &&
+		health.Status != ActiveChildProviderContextError {
 		return nil
 	}
 	evidence := []string{
@@ -2888,12 +2889,16 @@ func BuildChildContextExhaustedCard(
 	for _, line := range health.OutputTail {
 		evidence = append(evidence, "output tail: "+line)
 	}
+	summary := "child ended without valid qrspi_result after context-limit evidence"
+	if IsTerminalProviderContextError(health) {
+		summary = "child ended with terminal provider context-window evidence; latest session outranks stale qrspi_result"
+	}
 	return &ManagerActionCard{
 		Kind:              ActionChildContextExhausted,
 		Severity:          "warning",
-		Summary:           "child ended without valid qrspi_result after context-limit evidence",
+		Summary:           summary,
 		Evidence:          evidence,
-		RecommendedAction: "resume the same child and compact only if context-limit evidence is real; otherwise validate/rebind latest session or relaunch the same graph node",
+		RecommendedAction: "inspect latest session evidence, then recover/relaunch the same graph node without inventing a qrspi_result",
 		SafeCommand: fmt.Sprintf(
 			"vamos qrspi inspect --state-file %s --sessions --latest",
 			stateFile,
