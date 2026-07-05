@@ -1972,7 +1972,7 @@ func childCompletionWakePayload(
 		childCompletionManagerNeeded(status.Result.Status)
 	policy := activePolicySummary(state)
 	return fmt.Sprintf(
-		"```yaml\nq_manager_child_wake:\n  validated: %t\n  manager_needed: %t\n  retry_exhausted: %t\n  stage: %q\n  status: %q\n  outcome: %q\n  artifact: %q\n  child_id: %q\n  state_file: %q\n  reason: %q\n  policy:\n    advance_mode: %q\n    auto_mode: %t\n    enable_plan_reviews: %t\n    invalid_result_retry_limit: %d\n    note: %q\n  summary:\n    plan_goal: %q\n    stage_completed: %q\n    key_decisions: %q\n  next_child:\n    stage: %q\n    skill: %q\n    cwd: %q\n    working_on: %q\n  next:\n    - action: run_command\n      param: %q\n```",
+		"```yaml\nq_manager_child_wake:\n  validated: %t\n  manager_needed: %t\n  retry_exhausted: %t\n  stage: %q\n  status: %q\n  outcome: %q\n  artifact: %q\n  child_id: %q\n  state_file: %q\n  reason: %q\n%s  policy:\n    advance_mode: %q\n    auto_mode: %t\n    enable_plan_reviews: %t\n    invalid_result_retry_limit: %d\n    note: %q\n  summary:\n    plan_goal: %q\n    stage_completed: %q\n    key_decisions: %q\n  next_child:\n    stage: %q\n    skill: %q\n    cwd: %q\n    working_on: %q\n  next:\n    - action: run_command\n      param: %q\n```",
 		status.Validated,
 		managerNeeded,
 		status.RetryExhausted,
@@ -1983,6 +1983,7 @@ func childCompletionWakePayload(
 		status.ChildID,
 		stateFile,
 		status.Reason,
+		childCompletionWakeTerminalEvidencePayload(status.TerminalEvidence),
 		policy.AdvanceMode,
 		policy.AutoMode,
 		policy.EnablePlanReviews,
@@ -1996,6 +1997,23 @@ func childCompletionWakePayload(
 		status.NextChild.Cwd,
 		status.NextChild.WorkingOn,
 		continueCommand(stateFile),
+	)
+}
+
+func childCompletionWakeTerminalEvidencePayload(e *AssistantTerminalEvidence) string {
+	if e == nil {
+		return ""
+	}
+	return fmt.Sprintf(
+		"  terminal_evidence:\n    session_path: %q\n    session_id: %q\n    line: %d\n    timestamp: %q\n    stop_reason: %q\n    error_message: %q\n    evidence_id: %q\n    context_window_error: %t\n",
+		e.SessionPath,
+		e.SessionID,
+		e.Line,
+		e.Timestamp,
+		e.StopReason,
+		e.ErrorMessage,
+		e.EvidenceID,
+		e.ContextWindowError,
 	)
 }
 
@@ -3017,21 +3035,23 @@ func BuildChildContextExhaustedCard(
 	if IsTerminalProviderContextError(health) {
 		summary = "child ended with terminal provider context-window evidence; latest session outranks stale qrspi_result"
 	}
+	if health.TerminalEvidence != nil {
+		if command := providerContextRecoverySummaryCommand(
+			stateFile,
+			*health.TerminalEvidence,
+		); command != "" {
+			evidence = append(evidence, "recovery summary: "+command)
+		}
+	}
 	return &ManagerActionCard{
 		Kind:              ActionChildContextExhausted,
 		Severity:          "warning",
 		Summary:           summary,
 		Evidence:          evidence,
 		RecommendedAction: "inspect latest session evidence, then recover/relaunch the same graph node without inventing a qrspi_result",
-		SafeCommand: fmt.Sprintf(
-			"vamos qrspi inspect --state-file %s --sessions --latest",
-			stateFile,
-		),
-		ContinueCommand: fmt.Sprintf(
-			"vamos qrspi recover-manual --state-file %s --mode latest-session --continue",
-			stateFile,
-		),
-		RequiresHuman: false,
+		SafeCommand:       providerContextRecoverySafeCommand(stateFile),
+		ContinueCommand:   providerContextRecoveryContinueCommand(stateFile),
+		RequiresHuman:     false,
 	}
 }
 

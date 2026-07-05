@@ -335,10 +335,7 @@ func validateLatestTerminalProviderContext(
 		SessionPath:      candidate.SessionPath,
 		TerminalEvidence: &evidence,
 		Evidence:         providerContextEvidenceLines(evidence),
-		SafeCommand: fmt.Sprintf(
-			"vamos qrspi inspect --state-file %s --sessions --latest",
-			opts.StateFile,
-		),
+		SafeCommand:      providerContextRecoverySafeCommand(opts.StateFile),
 	}
 	card := BuildChildContextExhaustedCard(health, state, opts.StateFile)
 	if card != nil {

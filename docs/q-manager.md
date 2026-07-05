@@ -73,7 +73,7 @@ stop: result blocked
 next: diagnose artifact/session; steer or continue if deterministic before asking human
 ```
 
-Human gates and repairable failures are surfaced as structured manager action cards. Cards include `kind`, evidence, recommended action, safe command, optional continue command, and for human gates a concise review summary to present to the human. `pi_compatibility_failed` means Pi/tmux/state preflight failed before launch state should be trusted; run `vamos qrspi doctor --state-file <state>` or the card's safe command. `child_launch_failed` means active-child diagnostics prove a terminal child process failure before a durable `qrspi_result`; run the card's `repair-state --clear-failed-child --relaunch` safe command only when evidence is deterministic. `child_context_exhausted` means the child ended with context-limit/no-result evidence; preserve refs, inspect latest session, compact/resume the same child only when the evidence is real, or relaunch the same graph node after salvage is impossible. Human gates should be summarized to the human, then sent back to the same child with `vamos qrspi steer-child --state-file <state> --feedback-file <answer.md>`. Blocked/error states should be diagnosed first; ask the human only when intent, product/safety judgment, workspace replacement, merge policy, or external authority is truly required.
+Human gates and repairable failures are surfaced as structured manager action cards. Cards include `kind`, evidence, recommended action, safe command, optional continue command, and for human gates a concise review summary to present to the human. `pi_compatibility_failed` means Pi/tmux/state preflight failed before launch state should be trusted; run `vamos qrspi doctor --state-file <state>` or the card's safe command. `child_launch_failed` means active-child diagnostics prove a terminal child process failure before a durable `qrspi_result`; run the card's `repair-state --clear-failed-child --relaunch` safe command only when evidence is deterministic. `child_context_exhausted` means the child ended with context-limit/no-result evidence; preserve refs, inspect latest session, compact/resume the same child only when the evidence is real, or relaunch the same graph node after salvage is impossible. `provider_context_error` is the deterministic child-context variant where the latest Pi JSONL terminal assistant message has `stopReason: "error"` plus a provider context-window `errorMessage`; latest terminal session evidence outranks older `validation-status.json` and older valid `qrspi_result` text in the same session. The action card and wake include session path/id, line/timestamp, evidence ID, provider error, inspect command, latest-session continue command, and optional `recover-summary` command; these are recovery refs only and never a fabricated `qrspi_result`. Human gates should be summarized to the human, then sent back to the same child with `vamos qrspi steer-child --state-file <state> --feedback-file <answer.md>`. Blocked/error states should be diagnosed first; ask the human only when intent, product/safety judgment, workspace replacement, merge policy, or external authority is truly required.
 
 Self-heal commands are deterministic control-plane repairs, not durable artifact truth:
 
@@ -91,9 +91,10 @@ vamos qrspi inspect --state-file <state> --sessions --latest
 vamos qrspi find-latest-child --state-file <state> --stage <node>
 vamos qrspi validate-latest --state-file <state> --stage <node> --apply-rebind
 vamos qrspi recover-manual --state-file <state> --mode latest-session --continue
+vamos qrspi recover-summary --state-file <state> --session-file <child.jsonl>
 ```
 
-Use `doctor` when launch compatibility, state-root writability, tmux health, latest status, or active-child health is unclear. Use `repair-state --align-active-child` when active child/session/artifact evidence proves the workflow cursor is stale. Use `repair-state --clear-failed-child --relaunch` only for terminal failed active children proven by status/done/output/session evidence; it clears local active-child state and relaunches the same graph node, not a new graph transition. Use `mark-child-active` after manual child steering/reprompting so queued wakes from an older child generation are superseded and `manager-ready` waits for the newer completion. Use latest-session recovery for same-child chat, child `/new`, manual completion, retry exhaustion inspection, no-wake recovery, and stale wake supersession before editing manager JSON. For child context exhaustion, do not invent YAML or advance from artifacts alone; recover a valid child result or relaunch the same node.
+Use `doctor` when launch compatibility, state-root writability, tmux health, latest status, or active-child health is unclear. Use `repair-state --align-active-child` when active child/session/artifact evidence proves the workflow cursor is stale. Use `repair-state --clear-failed-child --relaunch` only for terminal failed active children proven by status/done/output/session evidence; it clears local active-child state and relaunches the same graph node, not a new graph transition. Use `mark-child-active` after manual child steering/reprompting so queued wakes from an older child generation are superseded and `manager-ready` waits for the newer completion. Use latest-session recovery for same-child chat, child `/new`, manual completion, retry exhaustion inspection, no-wake recovery, and stale wake supersession before editing manager JSON. `validate-latest --apply-rebind` with or without `--continue` must surface a latest `provider_context_error` instead of accepting stale older YAML. `recover-summary` is an optional helper for context-window failures: it writes a same-stage recovery note from failed session evidence and must not emit `qrspi_result` or advance the graph. For child context exhaustion, do not invent YAML or advance from artifacts alone; recover a valid child result or relaunch the same node.
 
 ## Session metadata boundary
 
@@ -133,6 +134,19 @@ Reload from this manifest, `.pi/skills/q-manager/SKILL.md`, `.pi/skills/qrspi-pl
 1. If a repairable failure appears, confirm action cards include evidence and a safe command such as `repair-state --align-active-child && continue`, `repair-state --clear-failed-child --relaunch`, or child context-exhaustion recovery commands, without launching duplicate children or advancing without valid YAML.
 1. If a terminal failed child is present, confirm `start-next --force` replaces it but still protects running/unknown children.
 1. If the graph starts a next child, confirm the old pane is killed only after the new pane exists.
+
+### Provider context-window smoke
+
+Given a q-manager state with active child/session refs whose latest JSONL ends in provider context-window evidence after older YAML:
+
+```bash
+vamos qrspi inspect --state-file <state.json> --sessions --latest
+vamos qrspi validate-latest --state-file <state.json> --apply-rebind
+vamos qrspi child-complete --state-file <state.json> --child-id <child-id> --output json
+vamos qrspi continue --state-file <state.json>
+```
+
+Expected: all paths surface `provider_context_error` / `child_context_exhausted`, include session/evidence fields and safe recovery commands, and do not advance graph from stale older `qrspi_result`.
 
 ## Verification and merge habits
 

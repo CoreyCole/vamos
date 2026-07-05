@@ -388,7 +388,11 @@ func TestChildCompleteProviderContextErrorDeliversManagerWake(t *testing.T) {
 		t.Fatalf("status result did not preserve prior context = %+v", status.Result)
 	}
 	if len(tmux.pastes) != 1 ||
-		!strings.Contains(tmux.pastes[0].text, "q_manager_child_wake:") {
+		!strings.Contains(tmux.pastes[0].text, "q_manager_child_wake:") ||
+		!strings.Contains(tmux.pastes[0].text, "terminal_evidence:") ||
+		!strings.Contains(tmux.pastes[0].text, "context_window_error: true") ||
+		!strings.Contains(tmux.pastes[0].text, "evidence_id:") ||
+		!strings.Contains(tmux.pastes[0].text, "Your input exceeds the context window") {
 		t.Fatalf("pastes = %#v", tmux.pastes)
 	}
 	var disk ChildCompletionStatus

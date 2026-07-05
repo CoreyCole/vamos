@@ -249,7 +249,21 @@ func TestContinueProviderContextErrorWritesActionCardWithoutAdvance(t *testing.T
 	text := out.String()
 	if !strings.Contains(text, "action: child_context_exhausted") ||
 		!strings.Contains(text, "provider_context_error") ||
-		!strings.Contains(text, "input exceeds the context window") {
+		!strings.Contains(text, "input exceeds the context window") ||
+		!strings.Contains(text, "evidence id:") ||
+		!strings.Contains(text, active.SessionPath) ||
+		!strings.Contains(
+			text,
+			"safe command: vamos qrspi inspect --state-file "+stateFile+" --sessions --latest",
+		) ||
+		!strings.Contains(
+			text,
+			"continue: vamos qrspi recover-manual --state-file "+stateFile+" --mode latest-session --continue",
+		) ||
+		!strings.Contains(
+			text,
+			"recovery summary: vamos qrspi recover-summary --state-file "+stateFile+" --session-file "+active.SessionPath,
+		) {
 		t.Fatalf("output = %s", text)
 	}
 	loaded := loadManagerState(t, stateFile)
@@ -257,6 +271,52 @@ func TestContinueProviderContextErrorWritesActionCardWithoutAdvance(t *testing.T
 		loaded.LastActionCard == nil ||
 		loaded.LastActionCard.Kind != ActionChildContextExhausted {
 		t.Fatalf("loaded state = %+v", loaded)
+	}
+}
+
+func TestRunInspectProviderContextErrorShowsEvidenceAndSafeCommand(t *testing.T) {
+	dir := t.TempDir()
+	stateFile := filepath.Join(dir, "state.json")
+	active := childHealthRef(dir)
+	active.Cwd = dir
+	active.SessionPath = filepath.Join(active.SessionDir, "session.jsonl")
+	writeFile(t, active.StatusPath, `{"exitCode":0}`)
+	writeFile(t, active.DonePath, "")
+	writeSessionWithBlockedResultThenProviderError(
+		t,
+		active.SessionPath,
+		active.SessionID,
+		active.Cwd,
+	)
+	state := ManagerState{
+		CanonicalPlanDir: "thoughts/example",
+		ActiveChild:      active,
+		Workflow:         testWorkflowState(t, qrspi.NodeDesign, nil),
+	}
+	saveManagerState(t, stateFile, state)
+
+	var out bytes.Buffer
+	if err := RunInspect(
+		t.Context(),
+		InspectOptions{StateFile: stateFile, Sessions: true, Latest: true},
+		deps{Tmux: &recordingTmux{missingPanes: map[string]bool{"%9": true}}},
+		&out,
+	); err != nil {
+		t.Fatal(err)
+	}
+	text := out.String()
+	if !strings.Contains(text, "active child health: provider_context_error") ||
+		!strings.Contains(
+			text,
+			"provider error: Codex error: Your input exceeds the context window",
+		) ||
+		!strings.Contains(text, "evidence: evidence id:") ||
+		!strings.Contains(text, active.SessionPath) ||
+		!strings.Contains(
+			text,
+			"safe command: vamos qrspi inspect --state-file "+stateFile+" --sessions --latest",
+		) {
+		t.Fatalf("output = %s", text)
 	}
 }
 

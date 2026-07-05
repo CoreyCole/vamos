@@ -63,10 +63,7 @@ func InspectActiveChildHealth(
 			health.Evidence = append(
 				health.Evidence,
 				providerContextEvidenceLines(evidence)...)
-			health.SafeCommand = fmt.Sprintf(
-				"vamos qrspi inspect --state-file %s --sessions --latest",
-				stateFile,
-			)
+			health.SafeCommand = providerContextRecoverySafeCommand(stateFile)
 			return health, nil
 		}
 	}
@@ -227,6 +224,34 @@ func providerContextEvidenceLines(e AssistantTerminalEvidence) []string {
 		lines = append(lines, fmt.Sprintf("timestamp: %s", e.Timestamp))
 	}
 	return lines
+}
+
+func providerContextRecoverySafeCommand(stateFile string) string {
+	return fmt.Sprintf(
+		"vamos qrspi inspect --state-file %s --sessions --latest",
+		stateFile,
+	)
+}
+
+func providerContextRecoveryContinueCommand(stateFile string) string {
+	return fmt.Sprintf(
+		"vamos qrspi recover-manual --state-file %s --mode latest-session --continue",
+		stateFile,
+	)
+}
+
+func providerContextRecoverySummaryCommand(
+	stateFile string,
+	evidence AssistantTerminalEvidence,
+) string {
+	if strings.TrimSpace(evidence.SessionPath) == "" {
+		return ""
+	}
+	return fmt.Sprintf(
+		"vamos qrspi recover-summary --state-file %s --session-file %s",
+		stateFile,
+		evidence.SessionPath,
+	)
 }
 
 func IsTerminalFailedChild(health ActiveChildHealth) bool {
