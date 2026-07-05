@@ -146,7 +146,7 @@ vamos qrspi child-complete --state-file <state.json> --child-id <child-id> --out
 vamos qrspi continue --state-file <state.json>
 ```
 
-Expected: all paths surface `provider_context_error` / `child_context_exhausted`, include session/evidence fields and safe recovery commands, and do not advance graph from stale older `qrspi_result`.
+Expected: all paths surface `provider_context_error` / `child_context_exhausted`, include session/evidence fields and safe recovery commands, write fresh terminal validation status, bypass any older blocked-result delivery ID once, and do not advance graph from stale older `qrspi_result`.
 
 ## Verification and merge habits
 
