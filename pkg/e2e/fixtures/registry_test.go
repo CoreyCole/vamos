@@ -37,6 +37,37 @@ func TestDefaultRegistryResolvesBasicFixture(t *testing.T) {
 	}
 }
 
+func TestBuildThoughtsWorkbenchBasicClearsLegacyCurrentSession(t *testing.T) {
+	db, err := sql.Open("sqlite", filepath.Join(t.TempDir(), "agents.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	createThoughtsWorkbenchFixtureSchema(t, db)
+	if _, err := db.Exec(`INSERT INTO workspaces (id, root_doc_path, current_session_id) VALUES ('ws_1', ?, 'stale-thread-id')`, t.TempDir()); err != nil {
+		t.Fatal(err)
+	}
+	_, err = BuildThoughtsWorkbenchBasic(
+		context.Background(),
+		db,
+		Input{Workspace: WorkspaceIdentity{Slug: "feature-a", CheckoutPath: t.TempDir(), DBPath: filepath.Join(t.TempDir(), "agents.db")}},
+	)
+	if err != nil {
+		t.Fatalf("BuildThoughtsWorkbenchBasic() error = %v", err)
+	}
+	var selectedThread sql.NullString
+	var currentSession sql.NullString
+	if err := db.QueryRow(`SELECT selected_thread_id, current_session_id FROM workspaces WHERE id = 'ws_1'`).Scan(&selectedThread, &currentSession); err != nil {
+		t.Fatal(err)
+	}
+	if !selectedThread.Valid || selectedThread.String != "th_1" {
+		t.Fatalf("selected_thread_id=%+v want th_1", selectedThread)
+	}
+	if currentSession.Valid {
+		t.Fatalf("current_session_id=%q want NULL", currentSession.String)
+	}
+}
+
 func TestBuildThoughtsWorkbenchBasicKeepsWorkspaceRelativeThoughtsRoot(t *testing.T) {
 	root := t.TempDir()
 	shared := filepath.Join(t.TempDir(), "shared-thoughts")

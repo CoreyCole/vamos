@@ -198,6 +198,8 @@ git status --short        # tracked files must be clean; .vamos runtime state is
 
 stage_log="log/vamos.log"
 stage_error_log="log/vamos.error.log"
+if ! test -f "$stage_log" && test -f ".vamos/log/web.log"; then stage_log=".vamos/log/web.log"; fi
+if ! test -f "$stage_error_log" && test -f ".vamos/log/web.error.log"; then stage_error_log=".vamos/log/web.error.log"; fi
 stage_log_start=$(wc -l <"$stage_log" 2>/dev/null || echo 0)
 stage_error_log_start=$(wc -l <"$stage_error_log" 2>/dev/null || echo 0)
 
@@ -209,11 +211,42 @@ head -10 /tmp/vamos-stage.headers
 rg -n "<title>|<h1" /tmp/vamos-stage-login.html
 
 stage_db=".vamos/run/agents.db"
-test -f "$stage_db"
+if ! test -s "$stage_db" && test -s ".vamos/state/agents.db"; then stage_db=".vamos/state/agents.db"; fi
+test -s "$stage_db"
 scripts/workspace-db-verify/verify.sh --database-path "$stage_db" --format text
 
+# Prefer an explicit workspace sync refresh over sleeping for the schedule when the host exposes manager routes.
+# Child/read-only workspace hosts may not register POST /workspaces/refresh; in that case poll the fresh log window.
+if curl -ksS -o /tmp/vamos-stage-refresh.out -w '%{http_code}' -X POST \
+  https://stage.workspaces.creative-mode.ai/workspaces/refresh | rg -q '^(202|303)$'; then
+  echo "triggered stage workspace refresh"
+else
+  echo "stage workspace refresh route unavailable or unauthenticated; trying Temporal schedule trigger"
+  temporal_address="127.0.0.1:$(jq -r '.ports.temporal // empty' .vamos/run/status.json 2>/dev/null)"
+  if test "$temporal_address" != "127.0.0.1:"; then
+    temporal --address "$temporal_address" schedule list > /tmp/vamos-stage-schedules.txt
+    schedule_id=$(awk '/SyncCoordinatorWorkflow/ {print $1; exit}' /tmp/vamos-stage-schedules.txt)
+    if test -n "$schedule_id"; then
+      awk '/SyncWorkspacesWorkflow/ {print $1}' /tmp/vamos-stage-schedules.txt | while read -r legacy_schedule_id; do
+        test -n "$legacy_schedule_id" && printf 'y\n' | temporal --address "$temporal_address" schedule delete --schedule-id "$legacy_schedule_id"
+      done
+    else
+      schedule_id=$(awk '/agent-chat-sync-workspaces:/ {print $1; exit}' /tmp/vamos-stage-schedules.txt)
+    fi
+    if test -n "$schedule_id"; then
+      temporal --address "$temporal_address" schedule trigger --schedule-id "$schedule_id" --overlap-policy BufferOne
+    fi
+  fi
+fi
+
 stage_fresh=/tmp/vamos-stage-fresh.log
-{ tail -n +$((stage_log_start + 1)) "$stage_log" 2>/dev/null || true; tail -n +$((stage_error_log_start + 1)) "$stage_error_log" 2>/dev/null || true; } | tee "$stage_fresh"
+for i in $(seq 1 24); do
+  { tail -n +$((stage_log_start + 1)) "$stage_log" 2>/dev/null || true; tail -n +$((stage_error_log_start + 1)) "$stage_error_log" 2>/dev/null || true; } | tee "$stage_fresh" >/dev/null
+  if rg -n "workspace_sync_refresh_complete|workspace sync.*complete|SyncWorkspaces" "$stage_fresh" >/dev/null; then
+    break
+  fi
+  sleep 5
+done
 rg -n "workspace_sync_refresh_complete|workspace sync.*complete|SyncWorkspaces" "$stage_fresh"
 if rg -n "FOREIGN KEY constraint failed|UNIQUE constraint failed" "$stage_fresh"; then
   echo "hard workspace DB constraint failure in fresh stage logs" >&2
@@ -272,6 +305,8 @@ git read-tree --reset -u HEAD
 
 main_log="log/vamos.log"
 main_error_log="log/vamos.error.log"
+if ! test -f "$main_log" && test -f ".vamos/log/web.log"; then main_log=".vamos/log/web.log"; fi
+if ! test -f "$main_error_log" && test -f ".vamos/log/web.error.log"; then main_error_log=".vamos/log/web.error.log"; fi
 main_log_start=$(wc -l <"$main_log" 2>/dev/null || echo 0)
 main_error_log_start=$(wc -l <"$main_error_log" 2>/dev/null || echo 0)
 
@@ -306,32 +341,44 @@ Use this when `../cn-agents-main` is absent and the active browser-visible site 
 When a Vamos runtime hotfix is developed directly in `../vamos/main` for immediate cn-agents-prod testing, use the normal macOS topology but keep these extra guards:
 
 1. Commit task-owned runtime changes in `../vamos` before syncing `../vamos-main`; do not leave the hotfix only as a dirty working tree.
-2. If `git push origin main` is rejected as non-fast-forward, fetch/rebase onto `origin/main`, rerun targeted tests, push again, then re-sync `../vamos-main` from the rebased `../vamos` head. A successful pre-rebase prod restart is not enough because the final commit SHA changed.
-3. After every re-sync of `../vamos-main`, rebuild from the host wrapper checkout and restart the LaunchAgent again:
+
+1. If `git push origin main` is rejected as non-fast-forward, fetch/rebase onto `origin/main`, rerun targeted tests, push again, then re-sync `../vamos-main` from the rebased `../vamos` head. A successful pre-rebase prod restart is not enough because the final commit SHA changed.
+
+1. After every re-sync of `../vamos-main`, rebuild from the host wrapper checkout and restart the LaunchAgent again:
+
    ```bash
    cd ../cn-agents-prod
    just build --no-restart
    launchctl kickstart -k gui/$(id -u)/dev.chestnut.cn-agents
    ```
-4. Verify both the active process and the feature behavior:
+
+1. Verify both the active process and the feature behavior:
+
    ```bash
    ps -p $(launchctl list | awk '/dev.chestnut.cn-agents$/ {print $1}') -o pid=,command=
    curl -fsS http://127.0.0.1:4200/manifest.json >/dev/null
    ```
+
    For Datastar UI fixes, also run a browser-console check against `localhost:4200`/the ngrok target for the exact JS error being fixed, not just the HTTP health check.
 
 1. Verify the active process before changing anything:
+
    ```bash
    launchctl list | grep -E 'dev\.chestnut\.cn-agents($|-ts-worker|-ngrok)'
    ps -p $(launchctl list | awk '/dev.chestnut.cn-agents$/ {print $1}') -o pid=,command=
    ```
-2. Build `../vamos-main` via the host wrapper checkout. If plain `just build` fails only because a non-active `dev.vamos-ts-worker` LaunchAgent is missing, run `just build --no-restart` and record that restart was manual.
-3. If the active LaunchAgent executes `.../cn-agents-prod/pkg/agents/agents-server`, copy the freshly built `../vamos-main/agents-server` to that exact binary path, preserving a backup outside git if needed.
-4. Restart with launchd, not systemd:
+
+1. Build `../vamos-main` via the host wrapper checkout. If plain `just build` fails only because a non-active `dev.vamos-ts-worker` LaunchAgent is missing, run `just build --no-restart` and record that restart was manual.
+
+1. If the active LaunchAgent executes `.../cn-agents-prod/pkg/agents/agents-server`, copy the freshly built `../vamos-main/agents-server` to that exact binary path, preserving a backup outside git if needed.
+
+1. Restart with launchd, not systemd:
+
    ```bash
    launchctl kickstart -k gui/$(id -u)/dev.chestnut.cn-agents
    ```
-5. Verify local and public URLs return login/redirect responses, and verify the test paths the user needs. Do not claim browser-visible testing until the active process command points at the updated binary and `curl` confirms the site is reachable.
+
+1. Verify local and public URLs return login/redirect responses, and verify the test paths the user needs. Do not claim browser-visible testing until the active process command points at the updated binary and `curl` confirms the site is reachable.
 
 ## Step 8: Verify browser-visible server
 
@@ -342,11 +389,43 @@ head -10 /tmp/vamos-main.headers
 rg -n "<title>|<h1" /tmp/vamos-main-login.html
 
 main_db=".vamos/run/agents.db"
-test -f "$main_db"
+if ! test -s "$main_db" && test -s ".vamos/state/agents.db"; then main_db=".vamos/state/agents.db"; fi
+test -s "$main_db"
 ../vamos-main/scripts/workspace-db-verify/verify.sh --database-path "$main_db" --format text
 
+# Prefer an explicit workspace sync refresh over sleeping for the schedule when authenticated.
+# If this returns 401/403, authenticate in a browser and click Workspaces → Refresh, or mint a main-scoped browser token.
+if curl -ksS -o /tmp/vamos-main-refresh.out -w '%{http_code}' -X POST \
+  https://main.workspaces.creative-mode.ai/workspaces/refresh | rg -q '^(202|303)$'; then
+  echo "triggered main workspace refresh"
+else
+  echo "main workspace refresh route unavailable or unauthenticated; trying Temporal schedule trigger"
+  temporal_address="127.0.0.1:$(jq -r '.ports.temporal // empty' .vamos/run/status.json 2>/dev/null)"
+  if test "$temporal_address" = "127.0.0.1:"; then
+    temporal_address="127.0.0.1:7233"
+  fi
+  temporal --address "$temporal_address" schedule list > /tmp/vamos-main-schedules.txt
+  schedule_id=$(awk '/SyncCoordinatorWorkflow/ {print $1; exit}' /tmp/vamos-main-schedules.txt)
+  if test -n "$schedule_id"; then
+    awk '/SyncWorkspacesWorkflow/ {print $1}' /tmp/vamos-main-schedules.txt | while read -r legacy_schedule_id; do
+      test -n "$legacy_schedule_id" && printf 'y\n' | temporal --address "$temporal_address" schedule delete --schedule-id "$legacy_schedule_id"
+    done
+  else
+    schedule_id=$(awk '/agent-chat-sync-workspaces:/ {print $1; exit}' /tmp/vamos-main-schedules.txt)
+  fi
+  if test -n "$schedule_id"; then
+    temporal --address "$temporal_address" schedule trigger --schedule-id "$schedule_id" --overlap-policy BufferOne
+  fi
+fi
+
 main_fresh=/tmp/vamos-main-fresh.log
-{ tail -n +$((main_log_start + 1)) "$main_log" 2>/dev/null || true; tail -n +$((main_error_log_start + 1)) "$main_error_log" 2>/dev/null || true; } | tee "$main_fresh"
+for i in $(seq 1 24); do
+  { tail -n +$((main_log_start + 1)) "$main_log" 2>/dev/null || true; tail -n +$((main_error_log_start + 1)) "$main_error_log" 2>/dev/null || true; } | tee "$main_fresh" >/dev/null
+  if rg -n "workspace_sync_refresh_complete|workspace sync.*complete|SyncWorkspaces" "$main_fresh" >/dev/null; then
+    break
+  fi
+  sleep 5
+done
 rg -n "workspace_sync_refresh_complete|workspace sync.*complete|SyncWorkspaces" "$main_fresh"
 if rg -n "FOREIGN KEY constraint failed|UNIQUE constraint failed" "$main_fresh"; then
   echo "hard workspace DB constraint failure in fresh main logs" >&2

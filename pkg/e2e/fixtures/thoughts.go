@@ -109,8 +109,8 @@ func seedThoughtsWorkbenchChat(
 ) error {
 	if _, err := db.ExecContext(ctx, `
 INSERT INTO workspaces (id, user_email, title, root_doc_path, workflow_type, source, selected_thread_id, current_session_id)
-VALUES ('ws_1', 'playwright@localhost', 'E2E Thoughts Workbench', ?, 'qrspi', 'imported', 'th_1', 'th_1')
-ON CONFLICT(id) DO UPDATE SET user_email = excluded.user_email, root_doc_path = excluded.root_doc_path, selected_thread_id = 'th_1', current_session_id = 'th_1', updated_at = CURRENT_TIMESTAMP`, thoughtsRoot); err != nil {
+VALUES ('ws_1', 'playwright@localhost', 'E2E Thoughts Workbench', ?, 'qrspi', 'imported', 'th_1', NULL)
+ON CONFLICT(id) DO UPDATE SET user_email = excluded.user_email, root_doc_path = excluded.root_doc_path, selected_thread_id = 'th_1', current_session_id = NULL, updated_at = CURRENT_TIMESTAMP`, thoughtsRoot); err != nil {
 		if strings.Contains(err.Error(), "no such table") {
 			return nil
 		}

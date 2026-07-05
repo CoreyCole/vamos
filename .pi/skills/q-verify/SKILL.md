@@ -53,9 +53,11 @@ qrspi_result:
         param: "[concrete next-stage]"
 ```
 
-Post-YAML summary format: `Verified: ... Fixed: ... Evidence: ...` If no fixes: `Verified: ... Fixed: none. Evidence: ...`
+Post-YAML summary format: `Verified: ... Fixed: ... Evidence: ... URL: https://<feature-slug>.<workspace-domain>/` If no fixes: `Verified: ... Fixed: none. Evidence: ... URL: ...`
 
-If blocked by failing verification that cannot be safely fixed, use ``status`blocked`status``, omit ``outcome``, keep ``workspace_metadata`` with both workspace paths, write `verify.md`, and set ``next.steps`` steps to read `qrspi-planning`, read `q-resume`, read `verify.md` or handoff, then start `/q-resume`. On success, ``next.steps`` should use ordered `step` children that present final implementation evidence for human review; runtime transition remains graph-authoritative.
+For managed feature-branch workspaces, every verify result must include the exact feature workspace URL in the fenced YAML artifacts list as `role: "feature_url"` and in the post-YAML summary. The same URL must appear in `verify.md`. If UI/browser verification is required and the feature URL cannot be determined or shown to reach the child app, block instead of emitting an incomplete complete-result.
+
+If blocked by failing verification that cannot be safely fixed, use `status: "blocked"`, omit `outcome`, keep `workspace_metadata` with both workspace paths, write `verify.md`, and set `next.steps` steps to read `qrspi-planning`, read `q-resume`, read `verify.md` or handoff, then start `/q-resume`. On success, `next.steps` should use ordered `step` children that present final implementation evidence for human review; runtime transition remains graph-authoritative.
 
 ## Inputs
 
@@ -89,6 +91,7 @@ The project guide is authoritative for project-specific commands, E2E tools, scr
 1. For unclear product/UX changes, broad architecture changes, flaky infra, credential issues, or risky production behavior changes: do not guess; record blocker in `verify.md` and return blocked/needs_human as appropriate.
 1. Re-run the smallest verification that proves each fix, then required final verification if practical.
 1. Commit every fix applied during verify before requesting human manual testing. Use the repository's normal commit/stack workflow, include regenerated outputs, and keep the workspace clean except explicitly unrelated pre-existing changes. Do not ask the human to test uncommitted verification fixes.
+1. For managed feature-branch workspaces, derive and validate the exact feature URL from project CLI/server output or `.vamos/run/workspace.env` plus the workspace domain. Record that URL in `verify.md`, include it in the fenced YAML `artifacts` list with `role: "feature_url"`, and repeat it in the post-YAML summary.
 1. Before marking verification complete, prompt the user to manually test any running UI/workspace described by the project guide. Include the exact URL from the project CLI/server output and concise flows to inspect. Do not proceed to a complete `verify.md` until the user confirms manual testing passed; if the user cannot test or reports a problem, record `needs_human` or `blocked` with their findings.
 1. Write `[plan_dir]/verify.md`.
 1. Update `[plan_dir]/AGENTS.md` only for durable gotchas future sessions must load before handoffs.
@@ -138,6 +141,9 @@ verification_guide: [path]
 ## Commands Run
 - `[command]` — pass|fail|skipped, evidence path/log summary
 
+## Feature Workspace URL
+- [exact feature URL, or `N/A` for non-UI/non-managed verification]
+
 ## E2E / UI Evidence
 - [story/check] — [result, screenshot/artifact paths]
 
@@ -160,5 +166,6 @@ verification_guide: [path]
 - Verification evidence must be durable: prefer files under the plan dir or project-guide artifact locations.
 - If real browser/agent/worker services are required, use the guide's auth and service-management instructions. Do not invent credentials or hand-configure auth.
 - Commit verify-stage fixes before human testing so the running/manual-tested workspace corresponds to committed code.
+- For managed feature branches, always include the exact feature workspace URL in `verify.md`, `qrspi_result.artifacts` (`role: "feature_url"`), and the final user summary.
 - Keep final user summary short and evidence-focused.
 - Do not create a final implementation-review `done.md`; successful verify routes to `human-review-implementation`, and terminal completion/done artifacts belong only after final human approval.

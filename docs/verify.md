@@ -55,6 +55,7 @@ This is the standard Vamos verification entrypoint. `/q-verify` must read this f
    - `/q-verify` must ask the user to test the running workspace after automated checks pass and before marking verification complete.
    - Before asking, ensure the feature-slug server for the implementation checkout is actually running and serving the committed code. If needed, run plain `just build` from the feature checkout (not `just build --no-restart`) or the manager restart action, then verify local runtime diagnostics in `.vamos/run/status.json` are running and `.vamos/run/workspace.env` contains the feature `VAMOS_WORKSPACE_SLUG`.
    - Include the exact feature URL (`https://<feature-slug>.<workspace-domain>/`) and concise flows to inspect. Do not ask the human to test `main` or a stopped/recovery workspace.
+   - Every verify result for a managed feature branch must carry the exact feature workspace URL in three places: `verify.md` (`Feature Workspace URL` or `E2E / UI Evidence`), the fenced `qrspi_result.artifacts` list with `role: "feature_url"`, and the post-YAML human summary. If the URL is unavailable for browser/UI verification, treat verification as blocked instead of emitting an incomplete human-review result.
 
 ## Required `/q-verify` behavior
 
@@ -62,6 +63,7 @@ This is the standard Vamos verification entrypoint. `/q-verify` must read this f
 - Then read linked detailed guides relevant to the touched surface:
   - `docs/e2e-story-testing.md`
   - `docs/workspaces-verification.md`
-- Record commands, artifacts, failures, and skipped checks in `verify.md`.
+- Record commands, artifacts, failures, skipped checks, and the exact feature workspace URL in `verify.md`.
+- Include the same exact feature workspace URL in the fenced `qrspi_result` as an artifact entry (`role: "feature_url"`, `path: "https://<slug>.<domain>/"`) and in the concise post-YAML summary.
 - If browser E2E or managed restart cannot run, record `blocked` instead of treating static checks as sufficient.
 - Do not request human testing until verify-stage fixes are committed and the feature-slug server for this implementation checkout is confirmed running and serving the committed code. For managed workspaces, plain `just build` from the feature checkout is the normal way to build, print source-labeled diagnostics, and restart the child server; `just build --no-restart` is compile-only and is not enough for human verification.
