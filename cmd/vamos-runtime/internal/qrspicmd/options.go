@@ -486,6 +486,28 @@ type RecoverManualOptions struct {
 	Output    string
 }
 
+type RecoverSummaryOptions struct {
+	StateFile   string
+	SessionFile string
+	Stage       string
+	Output      string
+	PiBinary    string
+	DryRun      bool
+}
+
+type RecoverySummaryRequest struct {
+	StateFile         string                    `json:"stateFile,omitempty"`
+	PlanDir           string                    `json:"planDir,omitempty"`
+	ImplementationCwd string                    `json:"implementationCwd,omitempty"`
+	Stage             string                    `json:"stage,omitempty"`
+	ChildID           string                    `json:"childId,omitempty"`
+	SessionFile       string                    `json:"sessionFile,omitempty"`
+	Evidence          AssistantTerminalEvidence `json:"evidence,omitempty"`
+	LatestArtifact    string                    `json:"latestArtifact,omitempty"`
+	PromptPath        string                    `json:"promptPath,omitempty"`
+	NotePath          string                    `json:"notePath,omitempty"`
+}
+
 type ValidationRecoveryLog struct {
 	Timestamp        time.Time `json:"timestamp"`
 	StateFile        string    `json:"stateFile,omitempty"`

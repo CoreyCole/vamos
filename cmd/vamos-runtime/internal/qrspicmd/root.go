@@ -52,6 +52,7 @@ func newCommand(d deps) *cobra.Command {
 		newRebindChildCommand(d),
 		newValidateLatestCommand(d),
 		newRecoverManualCommand(d),
+		newRecoverSummaryCommand(d),
 		newValidateResultCommand(d),
 		newDecideNextCommand(d),
 		newRepromptChildCommand(d),
@@ -399,6 +400,27 @@ func newRecoverManualCommand(d deps) *cobra.Command {
 	cmd.Flags().StringVar(&opts.Mode, "mode", "latest-session", "recovery mode")
 	cmd.Flags().
 		BoolVar(&opts.Continue, "continue", false, "continue graph after rebind/validation")
+	cmd.Flags().StringVar(&opts.Output, "output", "text", "output format: text or json")
+	return cmd
+}
+
+func newRecoverSummaryCommand(d deps) *cobra.Command {
+	opts := RecoverSummaryOptions{Output: "text", PiBinary: "pi"}
+	cmd := &cobra.Command{
+		Use:   "recover-summary --state-file <file> --session-file <jsonl>",
+		Short: "Write a same-stage recovery summary prompt for a failed child session",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return RunRecoverSummary(cmd.Context(), opts, d, cmd.OutOrStdout())
+		},
+	}
+	cmd.Flags().StringVar(&opts.StateFile, "state-file", "", "q-manager state file")
+	cmd.Flags().
+		StringVar(&opts.SessionFile, "session-file", "", "failed child Pi session JSONL file")
+	cmd.Flags().StringVar(&opts.Stage, "stage", "", "QRSPI stage/node to recover")
+	cmd.Flags().
+		StringVar(&opts.PiBinary, "pi-binary", "pi", "Pi binary to launch for non-dry-run summarization")
+	cmd.Flags().
+		BoolVar(&opts.DryRun, "dry-run", false, "write prompt and recovery note target without launching Pi")
 	cmd.Flags().StringVar(&opts.Output, "output", "text", "output format: text or json")
 	return cmd
 }
