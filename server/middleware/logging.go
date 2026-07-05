@@ -1,10 +1,12 @@
 package middleware
 
 import (
+	"bufio"
 	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"strings"
 	"time"
@@ -92,6 +94,18 @@ type responseBodyWriter struct {
 func (w *responseBodyWriter) Write(b []byte) (int, error) {
 	w.body.Write(b)
 	return w.ResponseWriter.Write(b)
+}
+
+func (w *responseBodyWriter) Unwrap() http.ResponseWriter {
+	return w.ResponseWriter
+}
+
+func (w *responseBodyWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+	hijacker, ok := w.ResponseWriter.(http.Hijacker)
+	if !ok {
+		return nil, nil, fmt.Errorf("wrapped response writer %T does not implement http.Hijacker", w.ResponseWriter)
+	}
+	return hijacker.Hijack()
 }
 
 // Flush implements http.Flusher for SSE support

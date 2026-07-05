@@ -6,7 +6,7 @@ set -euo pipefail
 
 mkdir -p "$VAMOS_APP_FILES_ROOT"
 
-exec uv run --frozen streamlit run app.py \
+exec uv run --frozen python -m streamlit run app.py \
   --server.address=127.0.0.1 \
   --server.port="$PORT" \
   --server.headless=true \
