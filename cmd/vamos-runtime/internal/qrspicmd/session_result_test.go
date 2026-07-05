@@ -131,19 +131,71 @@ func TestExtractFinalAssistantTextFromSessionErrorsWithoutQRSPIResult(t *testing
 	}
 }
 
-func TestExtractFinalAssistantTextFromSessionDetectsProviderErrorWithoutResult(
-	t *testing.T,
-) {
+func TestLatestAssistantTerminalEvidenceDetectsProviderContextError(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "session.jsonl")
 	writeSessionTestFile(t, path, strings.Join([]string{
-		sessionHeader("s", "/tmp/repo"),
-		`{"type":"message","message":{"role":"assistant","stopReason":"toolUse","content":[{"type":"text","text":"working"}]}}`,
-		`{"type":"message","message":{"role":"assistant","stopReason":"error","content":[{"type":"text","text":"Codex error"}]}}`,
+		sessionHeader("verify-1", "/tmp/repo"),
+		assistantLine("older qrspi_result"),
+		providerContextErrorLine(
+			"Codex error: Your input exceeds the context window of this model. Please adjust your input and try again.",
+		),
 	}, "\n")+"\n")
 
+	got, ok, err := LatestAssistantTerminalEvidence(path)
+	if err != nil || !ok {
+		t.Fatalf("LatestAssistantTerminalEvidence = %+v %v %v", got, ok, err)
+	}
+	if got.SessionID != "verify-1" || got.Line != 3 ||
+		got.Timestamp != "2026-07-04T23:15:59.015Z" ||
+		got.StopReason != "error" ||
+		!got.ContextWindowError ||
+		got.EvidenceID == "" {
+		t.Fatalf("evidence = %+v", got)
+	}
+
+	again, ok, err := LatestAssistantTerminalEvidence(path)
+	if err != nil || !ok {
+		t.Fatalf("second LatestAssistantTerminalEvidence = %+v %v %v", again, ok, err)
+	}
+	if again.EvidenceID != got.EvidenceID {
+		t.Fatalf("evidence ID changed: %q != %q", again.EvidenceID, got.EvidenceID)
+	}
+}
+
+func TestLatestAssistantTerminalEvidenceKeepsExtractorStrict(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "session.jsonl")
+	writeSessionTestFile(
+		t,
+		path,
+		sessionHeader(
+			"s",
+			"/tmp/repo",
+		)+"\n"+providerContextErrorLine(
+			"context window exceeded",
+		)+"\n",
+	)
+
 	_, err := ExtractFinalAssistantTextFromSession(path)
-	if !IsChildProviderError(err) {
-		t.Fatalf("expected provider error, got %T %v", err, err)
+	if err == nil ||
+		!strings.Contains(err.Error(), "no assistant text containing qrspi_result") {
+		t.Fatalf("expected no result error, got %v", err)
+	}
+}
+
+func TestIsContextWindowErrorMessage(t *testing.T) {
+	for _, message := range []string{
+		"Codex error: Your input exceeds the context window of this model.",
+		"context length exceeded",
+		"context_length_exceeded",
+		"maximum context tokens exceeded",
+		"hit the context limit",
+	} {
+		if !IsContextWindowErrorMessage(message) {
+			t.Fatalf("expected context-window match for %q", message)
+		}
+	}
+	if IsContextWindowErrorMessage("network connection reset") {
+		t.Fatal("unexpected context-window match")
 	}
 }
 
@@ -191,6 +243,13 @@ func assistantLine(text string) string {
 	return fmt.Sprintf(
 		`{"type":"message","message":{"role":"assistant","stopReason":"endTurn","content":[{"type":"thinking","text":"hidden"},{"type":"text","text":%q}]}}`,
 		text,
+	)
+}
+
+func providerContextErrorLine(message string) string {
+	return fmt.Sprintf(
+		`{"type":"message","timestamp":"2026-07-04T23:15:59.015Z","message":{"role":"assistant","content":[],"provider":"openai-codex","model":"gpt-5.5","stopReason":"error","errorMessage":%q}}`,
+		message,
 	)
 }
 

@@ -3,6 +3,8 @@ package qrspicmd
 import (
 	"bufio"
 	"bytes"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -12,16 +14,29 @@ import (
 )
 
 type sessionEntry struct {
-	Type    string          `json:"type"`
-	ID      string          `json:"id,omitempty"`
-	Cwd     string          `json:"cwd,omitempty"`
-	Message *sessionMessage `json:"message,omitempty"`
+	Type      string          `json:"type"`
+	ID        string          `json:"id,omitempty"`
+	Cwd       string          `json:"cwd,omitempty"`
+	Timestamp string          `json:"timestamp,omitempty"`
+	Message   *sessionMessage `json:"message,omitempty"`
 }
 
 type sessionMessage struct {
-	Role       string          `json:"role"`
-	Content    json.RawMessage `json:"content"`
-	StopReason string          `json:"stopReason,omitempty"`
+	Role         string          `json:"role"`
+	Content      json.RawMessage `json:"content"`
+	StopReason   string          `json:"stopReason,omitempty"`
+	ErrorMessage string          `json:"errorMessage,omitempty"`
+}
+
+type AssistantTerminalEvidence struct {
+	SessionPath        string `json:"sessionPath,omitempty"`
+	SessionID          string `json:"sessionId,omitempty"`
+	Line               int    `json:"line,omitempty"`
+	Timestamp          string `json:"timestamp,omitempty"`
+	StopReason         string `json:"stopReason,omitempty"`
+	ErrorMessage       string `json:"errorMessage,omitempty"`
+	ContextWindowError bool   `json:"contextWindowError,omitempty"`
+	EvidenceID         string `json:"evidenceId,omitempty"`
 }
 
 type sessionContentBlock struct {
@@ -118,6 +133,94 @@ func IsChildProviderError(err error) bool {
 	return errors.As(err, &providerErr)
 }
 
+func LatestAssistantTerminalEvidence(
+	path string,
+) (AssistantTerminalEvidence, bool, error) {
+	file, err := os.Open(path)
+	if err != nil {
+		return AssistantTerminalEvidence{}, false, err
+	}
+	defer file.Close()
+
+	sessionID := ""
+	var latest AssistantTerminalEvidence
+	found := false
+	scanner := bufio.NewScanner(file)
+	scanner.Buffer(make([]byte, 64*1024), 1024*1024)
+	lineNo := 0
+	for scanner.Scan() {
+		lineNo++
+		line := bytes.TrimSpace(scanner.Bytes())
+		if len(line) == 0 {
+			continue
+		}
+		var entry sessionEntry
+		if err := json.Unmarshal(line, &entry); err != nil {
+			continue
+		}
+		if entry.Type == "session" && strings.TrimSpace(entry.ID) != "" {
+			sessionID = entry.ID
+			continue
+		}
+		if entry.Type != "message" || entry.Message == nil ||
+			entry.Message.Role != "assistant" {
+			continue
+		}
+		if strings.TrimSpace(entry.Message.StopReason) == "" &&
+			strings.TrimSpace(entry.Message.ErrorMessage) == "" {
+			continue
+		}
+		evidence := AssistantTerminalEvidence{
+			SessionPath:  path,
+			SessionID:    sessionID,
+			Line:         lineNo,
+			Timestamp:    entry.Timestamp,
+			StopReason:   entry.Message.StopReason,
+			ErrorMessage: entry.Message.ErrorMessage,
+		}
+		evidence.ContextWindowError = strings.EqualFold(evidence.StopReason, "error") &&
+			IsContextWindowErrorMessage(evidence.ErrorMessage)
+		evidence.EvidenceID = terminalEvidenceID(evidence)
+		latest = evidence
+		found = true
+	}
+	if err := scanner.Err(); err != nil {
+		return AssistantTerminalEvidence{}, false, err
+	}
+	return latest, found, nil
+}
+
+func IsContextWindowErrorMessage(message string) bool {
+	text := strings.ToLower(message)
+	needles := []string{
+		"context window",
+		"context length",
+		"context_length_exceeded",
+		"maximum context",
+		"context limit",
+		"input exceeds",
+	}
+	for _, needle := range needles {
+		if strings.Contains(text, needle) {
+			return true
+		}
+	}
+	return false
+}
+
+func terminalEvidenceID(e AssistantTerminalEvidence) string {
+	raw := strings.Join([]string{
+		strings.TrimSpace(e.SessionID),
+		filepath.Clean(strings.TrimSpace(e.SessionPath)),
+		fmt.Sprintf("%d", e.Line),
+		strings.TrimSpace(e.Timestamp),
+		strings.TrimSpace(e.StopReason),
+		strings.TrimSpace(e.ErrorMessage),
+	}, "\x00")
+	sum := sha256.Sum256([]byte(raw))
+	return hex.EncodeToString(sum[:])[:16]
+}
+
 func ExtractFinalAssistantTextFromSession(path string) (string, error) {
 	last, err := extractLastAssistantTextFromSession(path, true)
 	if err != nil {
@@ -154,7 +257,6 @@ func extractLastAssistantTextFromSession(
 	defer file.Close()
 
 	var last string
-	var sawProviderError bool
 	scanner := bufio.NewScanner(file)
 	scanner.Buffer(make([]byte, 64*1024), 1024*1024)
 	for scanner.Scan() {
@@ -171,7 +273,6 @@ func extractLastAssistantTextFromSession(
 			continue
 		}
 		if requireQRSPIResult && entry.Message.StopReason == "error" {
-			sawProviderError = true
 			continue
 		}
 		if requireQRSPIResult && entry.Message.StopReason == "aborted" {
@@ -187,9 +288,6 @@ func extractLastAssistantTextFromSession(
 	}
 	if err := scanner.Err(); err != nil {
 		return "", err
-	}
-	if last == "" && sawProviderError {
-		return "", ChildProviderError{SessionPath: path}
 	}
 	return last, nil
 }
