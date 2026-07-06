@@ -296,6 +296,47 @@ func TestManagerReadyCurrentPaneAdoptsUnavailableDeliveryAndFlushes(t *testing.T
 	}
 }
 
+func TestManagerReadyCurrentPaneAdoptsCompactingLiveDeliveryAndFlushes(t *testing.T) {
+	dir := t.TempDir()
+	stateFile := filepath.Join(dir, "state.json")
+	saveManagerState(t, stateFile, ManagerState{
+		ManagerPaneID: "%old",
+		Delivery: ManagerDeliveryState{
+			Status:        "compacting",
+			ManagerPaneID: "%old",
+			QueuedWake: &QueuedWake{
+				DeliveryID:      "wake-1",
+				ChildID:         "child-1",
+				ChildGeneration: 1,
+				Payload:         "wake",
+			},
+		},
+		ActiveChild: &ChildRunRef{
+			ID:              "child-1",
+			Generation:      1,
+			LifecycleStatus: "completed",
+		},
+	})
+	t.Setenv("TMUX_PANE", "%new")
+	tmux := &recordingTmux{}
+	if err := RunManagerReady(
+		t.Context(),
+		ManagerReadyOptions{StateFile: stateFile},
+		deps{Tmux: tmux},
+		&strings.Builder{},
+	); err != nil {
+		t.Fatal(err)
+	}
+	loaded := loadManagerState(t, stateFile)
+	if loaded.ManagerPaneID != "%new" || loaded.Delivery.ManagerPaneID != "%new" ||
+		loaded.Delivery.QueuedWake != nil || loaded.Delivery.LastDeliveryID != "wake-1" {
+		t.Fatalf("loaded = %+v", loaded)
+	}
+	if len(tmux.pastes) != 1 || tmux.pastes[0].pane.ID != "%new" {
+		t.Fatalf("pastes = %#v", tmux.pastes)
+	}
+}
+
 func TestManagerReadySupersedesStaleQueuedWake(t *testing.T) {
 	dir := t.TempDir()
 	stateFile := filepath.Join(dir, "state.json")

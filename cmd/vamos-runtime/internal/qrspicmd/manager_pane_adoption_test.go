@@ -112,6 +112,28 @@ func TestManagerPaneAdoptionDoesNotAdoptUnavailableCurrentPane(t *testing.T) {
 	}
 }
 
+func TestManagerPaneAdoptionCurrentPaneWhenDeliveryCompacting(t *testing.T) {
+	state := ManagerState{
+		ManagerPaneID: "%old",
+		Delivery: ManagerDeliveryState{
+			Status:        "compacting",
+			ManagerPaneID: "%old",
+		},
+	}
+	got, err := ResolveManagerPaneAdoption(t.Context(), state, ManagerPaneAdoptionOptions{
+		StateFile:   "state.json",
+		Command:     ManagerPaneAdoptionManagerReady,
+		CurrentPane: "%new",
+	}, deps{Tmux: &recordingTmux{}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !got.Changed || got.ActionCard != nil || got.State.ManagerPaneID != "%new" ||
+		got.State.Delivery.ManagerPaneID != "%new" {
+		t.Fatalf("adoption = %+v", got)
+	}
+}
+
 func TestContinueManagerPaneRebindsBeforeNextChildLaunch(t *testing.T) {
 	fixture := newManagerFlowFixture(t)
 	stateFile := filepath.Join(fixture.stateRoot, "state.json")

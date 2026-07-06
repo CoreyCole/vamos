@@ -102,7 +102,8 @@ func ResolveManagerPaneAdoption(
 		result.Reason = "current_matches_manager_pane"
 		return result, nil
 	}
-	if selected != "" && selectedLive.Exists {
+	canAutoAdopt := managerPaneAutoAdoptionAllowed(state, selectedLive)
+	if selected != "" && selectedLive.Exists && !canAutoAdopt {
 		result.ActionCard = buildManagerPaneActionCard(
 			state,
 			opts,
@@ -112,7 +113,7 @@ func ResolveManagerPaneAdoption(
 		result.Reason = "live_manager_pane_conflict"
 		return result, nil
 	}
-	if managerPaneAutoAdoptionAllowed(state, selectedLive) {
+	if canAutoAdopt {
 		result.State.ManagerPaneID = opts.CurrentPane
 		if shouldRebindDeliveryPane(state, opts.CurrentPane, false, selectedLive) {
 			result.State.Delivery.ManagerPaneID = opts.CurrentPane
@@ -128,6 +129,10 @@ func ResolveManagerPaneAdoption(
 }
 
 func managerPaneAutoAdoptionAllowed(state ManagerState, selected PaneLiveness) bool {
+	if strings.EqualFold(state.Delivery.Status, "compacting") ||
+		state.Delivery.QueuedWake != nil {
+		return true
+	}
 	selectedPane := strings.TrimSpace(selected.PaneID)
 	if selectedPane == "" {
 		return true
