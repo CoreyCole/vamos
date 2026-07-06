@@ -211,6 +211,91 @@ func TestDeliveryQueuesWhileCompactingAndManagerReadyFlushes(t *testing.T) {
 	}
 }
 
+func TestDeliveryQueuesWhenSelectedManagerPaneUnavailable(t *testing.T) {
+	dir := t.TempDir()
+	stateFile := filepath.Join(dir, "state.json")
+	state := ManagerState{
+		ManagerPaneID: "%dead",
+		ActiveChild: &ChildRunRef{
+			ID:              "child-1",
+			Generation:      1,
+			LifecycleStatus: "completed",
+		},
+	}
+	status := ChildCompletionStatus{
+		Validated:  true,
+		ChildID:    "child-1",
+		DeliveryID: "child-1:1:plan:complete:complete:artifact",
+		Result: ChildCompletionResult{
+			Stage:    "plan",
+			Status:   "complete",
+			Outcome:  "complete",
+			Artifact: "artifact",
+		},
+	}
+	tmux := &recordingTmux{missingPanes: map[string]bool{"%dead": true}}
+	queued, wake, err := queueOrDeliverWake(
+		t.Context(),
+		stateFile,
+		state,
+		status,
+		deps{Tmux: tmux},
+	)
+	if err != nil {
+		t.Fatalf("queueOrDeliverWake error = %v", err)
+	}
+	if wake.Mode != "queue" || wake.Reason != "manager_pane_unavailable" ||
+		queued.Delivery.QueuedWake == nil || len(tmux.pastes) != 0 {
+		t.Fatalf("wake=%+v state=%+v pastes=%#v", wake, queued, tmux.pastes)
+	}
+	if queued.LastActionCard == nil ||
+		queued.LastActionCard.Kind != ActionManagerPaneUnavailable ||
+		!strings.Contains(queued.LastActionCard.SafeCommand, "manager-ready") {
+		t.Fatalf("action card = %+v", queued.LastActionCard)
+	}
+}
+
+func TestManagerReadyCurrentPaneAdoptsUnavailableDeliveryAndFlushes(t *testing.T) {
+	dir := t.TempDir()
+	stateFile := filepath.Join(dir, "state.json")
+	saveManagerState(t, stateFile, ManagerState{
+		ManagerPaneID: "%dead",
+		Delivery: ManagerDeliveryState{
+			Status:        "compacting",
+			ManagerPaneID: "%dead",
+			QueuedWake: &QueuedWake{
+				DeliveryID:      "wake-1",
+				ChildID:         "child-1",
+				ChildGeneration: 1,
+				Payload:         "wake",
+			},
+		},
+		ActiveChild: &ChildRunRef{
+			ID:              "child-1",
+			Generation:      1,
+			LifecycleStatus: "completed",
+		},
+	})
+	t.Setenv("TMUX_PANE", "%new")
+	tmux := &recordingTmux{missingPanes: map[string]bool{"%dead": true}}
+	if err := RunManagerReady(
+		t.Context(),
+		ManagerReadyOptions{StateFile: stateFile},
+		deps{Tmux: tmux},
+		&strings.Builder{},
+	); err != nil {
+		t.Fatal(err)
+	}
+	loaded := loadManagerState(t, stateFile)
+	if loaded.ManagerPaneID != "%new" || loaded.Delivery.ManagerPaneID != "%new" ||
+		loaded.Delivery.QueuedWake != nil || loaded.Delivery.LastDeliveryID != "wake-1" {
+		t.Fatalf("loaded = %+v", loaded)
+	}
+	if len(tmux.pastes) != 1 || tmux.pastes[0].pane.ID != "%new" {
+		t.Fatalf("pastes = %#v", tmux.pastes)
+	}
+}
+
 func TestManagerReadySupersedesStaleQueuedWake(t *testing.T) {
 	dir := t.TempDir()
 	stateFile := filepath.Join(dir, "state.json")

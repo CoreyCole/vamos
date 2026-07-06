@@ -1967,13 +1967,7 @@ func queueOrDeliverWake(
 	}
 	payload := childCompletionWakePayload(stateFile, state, status)
 	if strings.EqualFold(state.Delivery.Status, "compacting") {
-		state.Delivery.QueuedWake = &QueuedWake{
-			DeliveryID:      status.DeliveryID,
-			ChildID:         status.ChildID,
-			ChildGeneration: activeChildGeneration(state),
-			Payload:         payload,
-			QueuedAt:        time.Now().Format(time.RFC3339),
-		}
+		state = queueManagerWake(state, status, payload)
 		return state, WakeDeliveryInstruction{
 			Mode:    "queue",
 			Payload: payload,
@@ -1982,17 +1976,42 @@ func queueOrDeliverWake(
 	}
 	paneID := managerDeliveryPane(state)
 	if paneID == "" {
-		state.Delivery.QueuedWake = &QueuedWake{
-			DeliveryID:      status.DeliveryID,
-			ChildID:         status.ChildID,
-			ChildGeneration: activeChildGeneration(state),
-			Payload:         payload,
-			QueuedAt:        time.Now().Format(time.RFC3339),
-		}
+		state = queueManagerWake(state, status, payload)
 		return state, WakeDeliveryInstruction{
 			Mode:    "queue",
 			Payload: payload,
 			Reason:  "manager_pane_missing",
+		}, nil
+	}
+	if live := managerPaneLiveness(ctx, paneID, d); live.Checked && !live.Exists {
+		evidence := managerPaneEvidence(
+			state,
+			ManagerPaneAdoptionOptions{
+				StateFile: stateFile,
+				Command:   ManagerPaneAdoptionManagerReady,
+			},
+			managerPaneLiveness(ctx, state.ManagerPaneID, d),
+			managerPaneLiveness(ctx, state.Delivery.ManagerPaneID, d),
+			PaneLiveness{},
+		)
+		evidence = append(
+			evidence,
+			fmt.Sprintf("selected manager pane unavailable: %s", paneID),
+		)
+		state = queueManagerWake(state, status, payload)
+		state.LastActionCard = buildManagerPaneActionCard(
+			state,
+			ManagerPaneAdoptionOptions{
+				StateFile: stateFile,
+				Command:   ManagerPaneAdoptionManagerReady,
+			},
+			evidence,
+			ActionManagerPaneUnavailable,
+		)
+		return state, WakeDeliveryInstruction{
+			Mode:    "queue",
+			Payload: payload,
+			Reason:  "manager_pane_unavailable",
 		}, nil
 	}
 	if err := pasteWake(ctx, d, paneID, payload); err != nil {
@@ -2000,6 +2019,21 @@ func queueOrDeliverWake(
 	}
 	state.Delivery.LastDeliveryID = status.DeliveryID
 	return state, WakeDeliveryInstruction{Mode: "deliver", Payload: payload}, nil
+}
+
+func queueManagerWake(
+	state ManagerState,
+	status ChildCompletionStatus,
+	payload string,
+) ManagerState {
+	state.Delivery.QueuedWake = &QueuedWake{
+		DeliveryID:      status.DeliveryID,
+		ChildID:         status.ChildID,
+		ChildGeneration: activeChildGeneration(state),
+		Payload:         payload,
+		QueuedAt:        time.Now().Format(time.RFC3339),
+	}
+	return state
 }
 
 func managerDeliveryPane(state ManagerState) string {
@@ -2400,15 +2434,36 @@ func RunManagerReady(
 	if err != nil {
 		return err
 	}
+	currentPane := CaptureManagerPaneID("")
+	var stopped bool
+	state, stopped, err = applyManagerPaneAdoption(
+		ctx,
+		opts.StateFile,
+		state,
+		ManagerPaneAdoptionOptions{
+			Command:      ManagerPaneAdoptionManagerReady,
+			ExplicitPane: opts.ManagerPane,
+			CurrentPane:  currentPane,
+		},
+		store,
+		d,
+		out,
+		opts.Output,
+	)
+	if err != nil {
+		return err
+	}
+	if stopped {
+		return nil
+	}
 	pane := strings.TrimSpace(opts.ManagerPane)
 	if pane == "" {
-		pane = CaptureManagerPaneID("")
+		pane = currentPane
+	}
+	if pane == "" {
+		pane = managerDeliveryPane(state)
 	}
 	state.Delivery.Status = "ready"
-	if pane != "" {
-		state.Delivery.ManagerPaneID = pane
-		state.ManagerPaneID = pane
-	}
 	var flushed bool
 	state, flushed, err = flushQueuedWake(ctx, state, pane, d)
 	if err != nil {
