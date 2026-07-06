@@ -188,11 +188,12 @@ func TestContinueCurrentPaneLiveConflictWritesActionCard(t *testing.T) {
 		},
 	})
 	t.Setenv("TMUX_PANE", "%new")
+	var out strings.Builder
 	if err := RunContinue(
 		t.Context(),
 		ContinueOptions{StateFile: stateFile},
 		deps{Clock: fixture.clock, Tmux: &recordingTmux{}},
-		&strings.Builder{},
+		&out,
 	); err != nil {
 		t.Fatalf("RunContinue error = %v", err)
 	}
@@ -201,5 +202,13 @@ func TestContinueCurrentPaneLiveConflictWritesActionCard(t *testing.T) {
 		loaded.LastActionCard.Kind != ActionManagerPaneAdoptionRequired ||
 		loaded.ManagerPaneID != "%old" {
 		t.Fatalf("loaded = %+v", loaded)
+	}
+	text := out.String()
+	if !strings.Contains(text, "action: manager_pane_adoption_required") ||
+		!strings.Contains(
+			text,
+			"safe command: vamos qrspi continue --state-file "+stateFile+" --manager-pane \"$TMUX_PANE\"",
+		) {
+		t.Fatalf("output = %q", text)
 	}
 }
