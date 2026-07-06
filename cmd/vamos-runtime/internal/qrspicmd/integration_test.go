@@ -752,6 +752,7 @@ type managerFlowFixture struct {
 
 func newManagerFlowFixture(t *testing.T) managerFlowFixture {
 	t.Helper()
+	t.Setenv("TMUX_PANE", "")
 	dir := t.TempDir()
 	projectRoot := filepath.Join(dir, "repo")
 	if err := os.MkdirAll(filepath.Join(projectRoot, "thoughts", "example"), 0o755); err != nil {

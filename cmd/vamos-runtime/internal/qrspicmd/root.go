@@ -514,6 +514,8 @@ func newContinueCommand(d deps) *cobra.Command {
 	cmd.Flags().
 		StringVar(&opts.PiModel, "model", "", "Pi model pattern or ID for child sessions (passed to pi --model)")
 	cmd.Flags().
+		StringVar(&opts.ManagerPane, "manager-pane", "", "tmux pane ID for the parent q-manager session")
+	cmd.Flags().
 		DurationVar(&opts.Timeout, "timeout", 0, "maximum time to wait for next child; 0 returns after launch")
 	cmd.Flags().StringVar(&opts.Output, "output", "text", "output format: text or ndjson")
 	cmd.Flags().
@@ -660,7 +662,31 @@ func RunStartNext(
 	if err != nil {
 		return nil, err
 	}
+	store := stateStore(d, "", clock)
 	result := StartNextResult{StateFile: stateFile}
+	if strings.TrimSpace(opts.StateFile) != "" {
+		var stopped bool
+		state, stopped, err = applyManagerPaneAdoption(
+			ctx,
+			stateFile,
+			state,
+			ManagerPaneAdoptionOptions{
+				Command:      ManagerPaneAdoptionStartNext,
+				ExplicitPane: opts.ManagerPane,
+				CurrentPane:  CaptureManagerPaneID(""),
+			},
+			store,
+			d,
+			out,
+			opts.Output,
+		)
+		if err != nil {
+			return nil, err
+		}
+		if stopped {
+			return nil, nil
+		}
+	}
 	if strings.TrimSpace(opts.StateFile) != "" {
 		preflight, err := CheckQRSPIPreflight(
 			ctx,
@@ -677,11 +703,10 @@ func RunStartNext(
 		}
 		if card := BuildPreflightFailedCard(preflight.Pi, stateFile); card != nil {
 			state.LastActionCard = card
-			_ = stateStore(d, "", clock).Save(stateFile, state)
+			_ = store.Save(stateFile, state)
 			return nil, writeManagerActionCard(out, *card, opts.Output)
 		}
 	}
-	store := stateStore(d, "", clock)
 	if state.ActiveChild != nil {
 		health, err := InspectActiveChildHealth(ctx, state, stateFile, d)
 		if err != nil {
@@ -766,14 +791,15 @@ func RunStartNext(
 		runOut = out
 	}
 	if err := RunChild(ctx, RunChildOptions{
-		PlanDir:    planDirForStart(state, opts),
-		Stage:      string(node.ID),
-		Cwd:        cwd,
-		PromptFile: promptFile,
-		StateFile:  stateFile,
-		Split:      opts.Split,
-		PiModel:    resolvePiModel(opts.PiModel, state.PiModel),
-		Timeout:    opts.Timeout,
+		PlanDir:     planDirForStart(state, opts),
+		Stage:       string(node.ID),
+		Cwd:         cwd,
+		PromptFile:  promptFile,
+		StateFile:   stateFile,
+		Split:       opts.Split,
+		PiModel:     resolvePiModel(opts.PiModel, state.PiModel),
+		ManagerPane: opts.ManagerPane,
+		Timeout:     opts.Timeout,
 	}, d, runOut); err != nil {
 		return nil, err
 	}
@@ -796,6 +822,37 @@ func RunStartNext(
 	result.NextCommand = continueCommand(stateFile)
 	result.FeedbackCommand = feedbackCommand(stateFile)
 	return &result, writeStartNextOutput(out, result, opts.Output)
+}
+
+func applyManagerPaneAdoption(
+	ctx context.Context,
+	stateFile string,
+	state ManagerState,
+	opts ManagerPaneAdoptionOptions,
+	store StateStore,
+	d deps,
+	out io.Writer,
+	output string,
+) (ManagerState, bool, error) {
+	opts.StateFile = stateFile
+	adoption, err := ResolveManagerPaneAdoption(ctx, state, opts, d)
+	if err != nil {
+		return state, false, err
+	}
+	state = adoption.State
+	if adoption.ActionCard != nil {
+		state.LastActionCard = adoption.ActionCard
+		if err := store.Save(stateFile, state); err != nil {
+			return state, true, err
+		}
+		return state, true, writeManagerActionCard(out, *adoption.ActionCard, output)
+	}
+	if adoption.Changed {
+		if err := store.Save(stateFile, state); err != nil {
+			return state, false, err
+		}
+	}
+	return state, false, nil
 }
 
 func readLatestResultSeed(opts StartNextOptions) (string, error) {
@@ -2907,6 +2964,27 @@ func RunContinue(ctx context.Context, opts ContinueOptions, d deps, out io.Write
 	if strings.TrimSpace(opts.PlanDir) == "" {
 		return errors.New("plan-dir is required")
 	}
+	var stopped bool
+	state, stopped, err = applyManagerPaneAdoption(
+		ctx,
+		opts.StateFile,
+		state,
+		ManagerPaneAdoptionOptions{
+			Command:      ManagerPaneAdoptionContinue,
+			ExplicitPane: opts.ManagerPane,
+			CurrentPane:  CaptureManagerPaneID(""),
+		},
+		store,
+		d,
+		out,
+		opts.Output,
+	)
+	if err != nil {
+		return err
+	}
+	if stopped {
+		return nil
+	}
 	if state.ActiveChild == nil {
 		card := buildContinueActionCard(
 			state,
@@ -3278,14 +3356,15 @@ func startNextChildFromDecision(
 		runOut = out
 	}
 	if err := RunChild(ctx, RunChildOptions{
-		PlanDir:    opts.PlanDir,
-		Stage:      string(nodeID),
-		Cwd:        cwd,
-		PromptFile: promptFile,
-		StateFile:  opts.StateFile,
-		Split:      opts.Split,
-		PiModel:    resolvePiModel(opts.PiModel, state.PiModel),
-		Timeout:    opts.Timeout,
+		PlanDir:     opts.PlanDir,
+		Stage:       string(nodeID),
+		Cwd:         cwd,
+		PromptFile:  promptFile,
+		StateFile:   opts.StateFile,
+		Split:       opts.Split,
+		PiModel:     resolvePiModel(opts.PiModel, state.PiModel),
+		ManagerPane: opts.ManagerPane,
+		Timeout:     opts.Timeout,
 	}, d, runOut); err != nil {
 		return state, err
 	}

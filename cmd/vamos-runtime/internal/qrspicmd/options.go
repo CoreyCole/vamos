@@ -574,15 +574,16 @@ type RepromptChildOptions struct {
 }
 
 type ContinueOptions struct {
-	StateFile string
-	PlanDir   string
-	Stage     string
-	Cwd       string
-	Split     string
-	PiModel   string
-	Timeout   time.Duration
-	Output    string
-	Usage     ManagerUsageInput
+	StateFile   string
+	PlanDir     string
+	Stage       string
+	Cwd         string
+	Split       string
+	PiModel     string
+	ManagerPane string
+	Timeout     time.Duration
+	Output      string
+	Usage       ManagerUsageInput
 }
 
 type SetPolicyOptions struct {

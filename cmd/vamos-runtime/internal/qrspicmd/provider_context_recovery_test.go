@@ -12,6 +12,7 @@ import (
 )
 
 func TestProviderContextRecoveryOriginalBugSequence(t *testing.T) {
+	t.Setenv("TMUX_PANE", "")
 	dir := t.TempDir()
 	stateFile := filepath.Join(dir, "state.json")
 	repo := filepath.Join(dir, "repo")
