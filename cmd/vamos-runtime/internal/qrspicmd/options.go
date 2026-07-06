@@ -293,17 +293,19 @@ type StateRootReport struct {
 }
 
 const (
-	ActionStateDesync           = "state_desync"
-	ActionGraphOutcomeMismatch  = "graph_outcome_mismatch"
-	ActionWorkspaceMoved        = "workspace_moved"
-	ActionActiveChildConflict   = "active_child_conflict"
-	ActionHumanGate             = "human_gate"
-	ActionInvalidChildYAML      = "invalid_child_yaml"
-	ActionManualChildSteer      = "manual_child_steer"
-	ActionSupersededQueuedWake  = "superseded_queued_wake"
-	ActionPiCompatibilityFailed = "pi_compatibility_failed"
-	ActionChildLaunchFailed     = "child_launch_failed"
-	ActionChildContextExhausted = "child_context_exhausted"
+	ActionStateDesync                 = "state_desync"
+	ActionGraphOutcomeMismatch        = "graph_outcome_mismatch"
+	ActionWorkspaceMoved              = "workspace_moved"
+	ActionActiveChildConflict         = "active_child_conflict"
+	ActionHumanGate                   = "human_gate"
+	ActionInvalidChildYAML            = "invalid_child_yaml"
+	ActionManualChildSteer            = "manual_child_steer"
+	ActionSupersededQueuedWake        = "superseded_queued_wake"
+	ActionPiCompatibilityFailed       = "pi_compatibility_failed"
+	ActionChildLaunchFailed           = "child_launch_failed"
+	ActionChildContextExhausted       = "child_context_exhausted"
+	ActionManagerPaneAdoptionRequired = "manager_pane_adoption_required"
+	ActionManagerPaneUnavailable      = "manager_pane_unavailable"
 )
 
 func ProjectManagerActionCard(
