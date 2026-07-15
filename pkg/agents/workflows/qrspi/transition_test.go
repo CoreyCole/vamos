@@ -43,7 +43,7 @@ func TestQRSPITransitions(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	for _, absent := range []wruntime.NodeID{"human-review-design", "review-design", "research-for-review-design", "address-review-research-design"} {
+	for _, absent := range []wruntime.NodeID{"review-design", "research-for-review-design", "address-review-research-design"} {
 		if _, ok := def.Nodes[absent]; ok {
 			t.Fatalf("%s should not be in canonical QRSPI graph", absent)
 		}
@@ -87,10 +87,12 @@ func TestQRSPIOutlineNeedsHumanWaitsWithoutAdvancing(t *testing.T) {
 	if err != nil {
 		t.Fatalf("DecideTransition() error = %v", err)
 	}
-	if !decision.WaitingHuman || decision.StartNext || decision.State.Status != wruntime.WorkspaceStatusWaitingHuman {
+	if !decision.WaitingHuman || decision.StartNext ||
+		decision.State.Status != wruntime.WorkspaceStatusWaitingHuman {
 		t.Fatalf("decision = %+v, want waiting human stop", decision)
 	}
-	if decision.State.CurrentNodeID != NodeOutline || decision.State.PendingNextNodeID != "" {
+	if decision.State.CurrentNodeID != NodeOutline ||
+		decision.State.PendingNextNodeID != "" {
 		t.Fatalf("state = %+v, want current outline without pending next", decision.State)
 	}
 }
@@ -112,10 +114,12 @@ func TestQRSPIImplementHandoffQueuesResumeWithoutBlocking(t *testing.T) {
 	if err != nil {
 		t.Fatalf("DecideTransition() error = %v", err)
 	}
-	if !decision.StartNext || decision.NextNodeID != NodeImplement || decision.StopReason != "result handoff" {
+	if !decision.StartNext || decision.NextNodeID != NodeImplement ||
+		decision.StopReason != "result handoff" {
 		t.Fatalf("decision = %+v", decision)
 	}
-	if decision.State.Status != wruntime.WorkspaceStatusIdle || decision.State.PendingNextNodeID != NodeImplement {
+	if decision.State.Status != wruntime.WorkspaceStatusIdle ||
+		decision.State.PendingNextNodeID != NodeImplement {
 		t.Fatalf("state = %+v", decision.State)
 	}
 	if got := decision.State.Nodes[NodeImplement].Status; got != wruntime.NodeStatusPending {

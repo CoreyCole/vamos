@@ -80,12 +80,11 @@ You are creating a handoff document to preserve your working context within a QR
 | 1 | question | `/q-question` | `questions/*.md` |
 | 2 | research | `/q-research` | `research/*.md` |
 | 3 | design | `/q-design` | `design.md` |
-| 4 | design-product | `/q-design-product` | `design-product.md` |
-| 5 | outline | `/q-outline` | `outline.md` |
-| 6 | plan | `/q-plan` | `plan.md` |
-| 7 | implement | `/q-implement` | code changes |
-| 8 | review-implementation | `/q-review` | `reviews/.../review.md` |
-| 9 | verify | `/q-verify` | `verify.md` |
+| 4 | outline | `/q-outline` | `outline.md` |
+| 5 | plan | `/q-plan` | `plan.md` |
+| 6 | implement | `/q-implement` | code changes |
+| 7 | review-implementation | `/q-review` | `reviews/.../review.md` |
+| 8 | verify | `/q-verify` | `verify.md` |
 
 `review` is the post-implementation handoff target, not a core planning stage. Only when `implement` is fully complete should `continue` create a review-ready handoff and point to `/q-review`. Intermediate implementation checkpoints must stay on `/q-resume`. `/q-review` writes the canonical review artifact to `[plan_dir]/reviews/`; clean review routes to `/q-verify` before the final human implementation gate.
 
@@ -190,7 +189,7 @@ last_updated_by: [git_username]
 git_commit: [current commit hash; for implementation handoffs amended into the current commit, use the pre-handoff branch hash and note the final hash is reported in YAML]
 branch: [current branch]
 repository: [repository name]
-stage: [question|research|design|design-product|outline|plan|implement]
+stage: [question|research|design|outline|plan|implement]
 ticket: "[ticket reference if any]"
 plan_dir: "thoughts/[git_username]/plans/[timestamp]_[plan-name]"
 status: [in_progress|complete]

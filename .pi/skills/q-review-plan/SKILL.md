@@ -53,7 +53,7 @@ qrspi_result:
         param: "[concrete next-stage]"
 ```
 
-`status` is lifecycle. `outcome` selects the graph branch. Before `/q-workspace`, use top-level ``workspace`` only for normal parent plans that need a new implementation copy. If the reviewed `plan.md` is in a review plan dir (`.../reviews/*/plan.md`), an implementation-review follow-up, any nested review plan inside a prepared workspace, or the human says to implement in the current workspace, omit top-level ``workspace`` and put both ``plan_workspace`` and ``implementation_workspace`` inside ``workspace_metadata``. ``next.steps`` is an ordered instruction block for the next agent: read `qrspi-planning`, read the next stage skill, read the appropriate artifact, then start the next stage immediately unless a named human/safety gate blocks. Runtime transitions remain graph-authoritative and may validate/rewrite the steps. Complete results must include ``outcome``. Review stages must use explicit node IDs (`review-outline`, `review-plan`, or `review-implementation`), never `review`.
+`status` is lifecycle. `outcome` selects the graph branch. Before `/q-workspace`, use top-level `workspace` only for normal parent plans that need a new implementation copy. If the reviewed `plan.md` is in a review plan dir (`.../reviews/*/plan.md`), an implementation-review follow-up, any nested review plan inside a prepared workspace, or the human says to implement in the current workspace, omit top-level `workspace` and put both `plan_workspace` and `implementation_workspace` inside `workspace_metadata`. `next.steps` is an ordered instruction block for the next agent: read `qrspi-planning`, read the next stage skill, read the appropriate artifact, then start the next stage immediately unless a named human/safety gate blocks. Runtime transitions remain graph-authoritative and may validate/rewrite the steps. Complete results must include `outcome`. Review stages must use explicit node IDs (`review-outline`, `review-plan`, or `review-implementation`), never `review`.
 
 > **Review rubric:** `~/.pi/agent/skills/review-rubric/SKILL.md`
 
@@ -182,7 +182,7 @@ Focused lane reports are advisory. Verify every candidate finding yourself befor
    - If the rerun still fails, record the lane as unavailable in `review.md` and continue with your own targeted verification instead of trusting it.
    - local codebase rules under `.agents/rules/`, especially Go utility-package rules (`pkg/pointers.To`, `pkg/collections.Set`, nullable `Ptr()`, `pkg/checked`) when the plan writes Go files
 1. Run focused lanes when useful, then synthesize and verify candidate findings.
-1. Classify findings into `obvious_doc_fix`, `needs_codebase_research`, or `needs_human_judgment`. Treat conflicting relevant project guidance as `needs_human_judgment` and label it `IMPORTANT: needs human attention` in `review.md` and the user-facing question. At `review-outline`, prefer surfacing planned legacy deletion decisions now: if deletion follows clearly from approved design/research, edit `outline.md` directly; if human agreement is needed to delete old behavior, record the exact deletion question as `needs_human_judgment`. Only flag a missing `design-product.md` when the work is product-critical, high-stakes, user-facing with unclear PRD coverage, compliance/security sensitive, or changes irreversible user/data behavior.
+1. Classify findings into `obvious_doc_fix`, `needs_codebase_research`, or `needs_human_judgment`. Treat conflicting relevant project guidance as `needs_human_judgment` and label it `IMPORTANT: needs human attention` in `review.md` and the user-facing question. At `review-outline`, prefer surfacing planned legacy deletion decisions now: if deletion follows clearly from approved design/research, edit `outline.md` directly; if human agreement is needed to delete old behavior, record the exact deletion question as `needs_human_judgment`. Product-design review is standalone and human-invoked only; never flag a missing `design-product.md` or suggest running that helper.
 1. Apply all `obvious_doc_fix` edits directly to `design.md`, `design-product.md`, `outline.md`, and/or `plan.md`.
 1. For each `needs_codebase_research` finding, create `[review_dir]/questions/`, `[review_dir]/research/`, and `[review_dir]/context/research/`, then write neutral research questions under `[review_dir]/questions/`. Questions must link to `[review_dir]/review.md`, the affected parent docs, and exact file refs.
 1. For each `needs_human_judgment` finding, write a self-contained `Questions for /answer` item. Use `/answer`, then apply the answer to the docs when possible.
@@ -192,7 +192,7 @@ Focused lane reports are advisory. Verify every candidate finding yourself befor
 
 ## Review Artifact Template
 
-```markdown
+````markdown
 ---
 date: [ISO datetime with timezone]
 reviewer: [git_username]
@@ -325,15 +325,15 @@ qrspi_result:
         param: "thoughts/..."
       - action: "start_stage"
         param: "[concrete next-stage]"
-```
+````
 
 Outcome mapping:
 
-- `review-outline` ready to plan: ``outcome`ready-for-plan`outcome`` and ``next.steps`` steps for `qrspi-planning`, `q-plan`, `design.md`, `design-product.md` if it exists, `outline.md`, and immediate `/q-plan` start.
-  - Do not emit ``next.steps`human-review-outline`next.steps`` or any plan-writing approval prompt. Human approval for the design/outline direction already happened in `/q-outline` before `outline.md` was written.
-  - The ``summary.key_decisions`` for `review-outline` must instruct the next agent/runtime behavior: `Next stage should start immediately: /q-plan [outline.md]`; `/q-plan` reads relevant code files and writes `plan.md` without another human approval prompt.
-- `review-plan` ready for normal workspace prep: only for normal parent plans that are not under another plan's `reviews/` tree, use ``outcome`ready-for-workspace`outcome`` and ``next.steps`` steps for `qrspi-planning`, `q-workspace`, `plan.md`, and immediate `/q-workspace` start. Its ``summary.key_decisions`` must say `Next stage should start immediately: /q-workspace [plan.md]`. Its post-YAML summary must end with `Next: start /q-workspace now.`
-- `review-plan` ready for same-workspace implementation: if the reviewed `plan.md` is inside a review plan dir (`.../reviews/*/plan.md`), inside `[parent]/reviews/*_implementation-review/`, inside any nested review directory under an already prepared implementation workspace, or the human explicitly says to implement in the current workspace, skip `/q-workspace`. Use ``outcome`ready-for-implement`outcome``, omit top-level ``workspace``, set ``plan_workspace`` to the review-dir plan workspace, set ``implementation_workspace`` to the current/original implementation workspace path, and put ``next.steps`` steps for `qrspi-planning`, `q-implement`, `plan.md`, and immediate `/q-implement` start. Its ``summary.key_decisions`` must say `Next stage should start immediately: /q-implement [plan.md] in the existing implementation workspace; do not create a fresh copy or reset to trunk.` If this is an implementation-review follow-up, also say to stack review-fix branches on the reviewed head. Its post-YAML summary must end with `Next: start /q-implement now.`
+- `review-outline` ready to plan: `` outcome`ready-for-plan`outcome `` and `next.steps` steps for `qrspi-planning`, `q-plan`, `design.md`, `design-product.md` if it exists, `outline.md`, and immediate `/q-plan` start.
+  - Do not emit `` next.steps`human-review-outline`next.steps `` or any plan-writing approval prompt. Human approval for the design/outline direction already happened in `/q-outline` before `outline.md` was written.
+  - The `summary.key_decisions` for `review-outline` must instruct the next agent/runtime behavior: `Next stage should start immediately: /q-plan [outline.md]`; `/q-plan` reads relevant code files and writes `plan.md` without another human approval prompt.
+- `review-plan` ready for normal workspace prep: only for normal parent plans that are not under another plan's `reviews/` tree, use `` outcome`ready-for-workspace`outcome `` and `next.steps` steps for `qrspi-planning`, `q-workspace`, `plan.md`, and immediate `/q-workspace` start. Its `summary.key_decisions` must say `Next stage should start immediately: /q-workspace [plan.md]`. Its post-YAML summary must end with `Next: start /q-workspace now.`
+- `review-plan` ready for same-workspace implementation: if the reviewed `plan.md` is inside a review plan dir (`.../reviews/*/plan.md`), inside `[parent]/reviews/*_implementation-review/`, inside any nested review directory under an already prepared implementation workspace, or the human explicitly says to implement in the current workspace, skip `/q-workspace`. Use `` outcome`ready-for-implement`outcome ``, omit top-level `workspace`, set `plan_workspace` to the review-dir plan workspace, set `implementation_workspace` to the current/original implementation workspace path, and put `next.steps` steps for `qrspi-planning`, `q-implement`, `plan.md`, and immediate `/q-implement` start. Its `summary.key_decisions` must say `Next stage should start immediately: /q-implement [plan.md] in the existing implementation workspace; do not create a fresh copy or reset to trunk.` If this is an implementation-review follow-up, also say to stack review-fix branches on the reviewed head. Its post-YAML summary must end with `Next: start /q-implement now.`
 
 If codebase research is needed before the review can pass, the next research-for-review stage should start immediately; do not ask for permission:
 
@@ -365,7 +365,7 @@ qrspi_result:
         param: "[concrete next-stage]"
 ```
 
-If human judgment is required, use ``status`needs_human`status`` and omit ``outcome``.
+If human judgment is required, use `` status`needs_human`status `` and omit `outcome`.
 
 ## Rules
 

@@ -46,7 +46,7 @@ Owns milestone-level QRSPI:
 - research agenda and factual current-state/source-doc research
 - milestone design: ownership, user stories, target behavior, current to target direction, architecture-spec inputs, gap map, proposed ticket list
 - create-tickets artifacts: per-ticket provider descriptions, approval notes, Linear creation/status-update execution
-- automated and human review artifacts
+- create-tickets approval artifacts
 
 Does not own implementation slices for future tickets, detailed code edit instructions, or final project-wide architecture narrative.
 
@@ -75,10 +75,10 @@ Owns whole-system architecture synthesis:
 - target system explanation
 - current implemented system explanation
 - critical path and milestone sequencing before detailed milestone planning when needed
-- current to target path organized by reviewed milestone designs when those designs exist
+- current to target path organized by milestone designs when those designs exist
 - cross-cutting technical decisions
 
-May challenge child milestone designs, but must not silently mutate them. Any scope/ticket-shape change routes back to affected milestone-plan design, automated review, and human approval.
+May challenge child milestone designs, but must not silently mutate them. Any scope/ticket-shape change routes back to affected milestone-plan design and create-tickets human confirmation.
 
 Architecture/spec deliverables normally live as root-level docs in the owning ticket directory, linked from ticket `index.md`. Do not hide primary deliverables under `context/`; reserve `context/` for supporting research/scratch/evidence.
 
@@ -131,20 +131,18 @@ Default milestone path:
 /q-milestone-question [milestone-plan-dir]
 /q-milestone-research [questions.md]
 /q-milestone-design [research.md]
-/q-milestone-review [design.md]
-# human writes review-human.md in design review dir
 /q-milestone-create-tickets [design.md]
-# refine each ticket one by one, then ask before Linear mutation
+# summarize design, confirm ticket-set structure, refine each ticket one by one, then ask before Linear mutation
 ```
 
 Human gates:
 
 - question alignment
-- design after automated design review
+- ticket-set structure approval during create-tickets
 - per-ticket approval during create-tickets
 - explicit provider-ticket mutation approval before creating/updating issues
 
-Planning reviews are agent-driven. Human approval gets recorded as `review-human.md` in the automated review directory.
+Create-tickets owns the design approval moment: it summarizes the milestone design and proposed ticket set, then waits for human confirmation before drafting or creating provider tickets.
 
 ## Output style
 

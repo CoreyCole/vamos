@@ -8,8 +8,6 @@ const (
 	NodeMilestoneQuestion      wruntime.NodeID = "milestone-question"
 	NodeMilestoneResearch      wruntime.NodeID = "milestone-research"
 	NodeMilestoneDesign        wruntime.NodeID = "milestone-design"
-	NodeMilestoneReview        wruntime.NodeID = "milestone-review"
-	NodeHumanReviewDesign      wruntime.NodeID = "human-review-design"
 	NodeMilestoneCreateTickets wruntime.NodeID = "milestone-create-tickets"
 )
 
@@ -29,24 +27,17 @@ func ProjectPlanningDefinition() (wruntime.Definition, error) {
 		Statuses(wruntime.StatusComplete, wruntime.StatusNeedsHuman, wruntime.StatusBlocked, wruntime.StatusError).
 		Outcomes(wruntime.OutcomeComplete).
 		RequiresPrimaryArtifact().
-		Agent(NodeMilestoneReview, Skill(".pi/skills/q-milestone-review/SKILL.md")).
-		Statuses(wruntime.StatusComplete, wruntime.StatusNeedsHuman, wruntime.StatusBlocked, wruntime.StatusError).
-		Outcomes(wruntime.OutcomeComplete).
-		RequiresPrimaryArtifact().
-		HumanReview(NodeHumanReviewDesign, "milestone design approved by human").
-		Statuses(wruntime.StatusComplete, wruntime.StatusBlocked, wruntime.StatusError).
-		Outcomes(wruntime.OutcomeComplete).
-		AutoApprovable(false).
 		Agent(NodeMilestoneCreateTickets, Skill(".pi/skills/q-milestone-create-tickets/SKILL.md")).
 		Statuses(wruntime.StatusComplete, wruntime.StatusNeedsHuman, wruntime.StatusBlocked, wruntime.StatusError).
 		Outcomes(wruntime.OutcomeComplete).
 		RequiresPrimaryArtifact().
 		Done(NodeDone).
-		From(NodeMilestoneQuestion).On(wruntime.OutcomeComplete).GoTo(NodeMilestoneResearch).
-		From(NodeMilestoneResearch).On(wruntime.OutcomeComplete).GoTo(NodeMilestoneDesign).
-		From(NodeMilestoneDesign).On(wruntime.OutcomeComplete).GoTo(NodeMilestoneReview).
-		From(NodeMilestoneReview).On(wruntime.OutcomeComplete).GoTo(NodeHumanReviewDesign).
-		From(NodeHumanReviewDesign).On(wruntime.OutcomeComplete).GoTo(NodeMilestoneCreateTickets).
+		From(NodeMilestoneQuestion).
+		On(wruntime.OutcomeComplete).GoTo(NodeMilestoneResearch).
+		From(NodeMilestoneResearch).
+		On(wruntime.OutcomeComplete).GoTo(NodeMilestoneDesign).
+		From(NodeMilestoneDesign).
+		On(wruntime.OutcomeComplete).GoTo(NodeMilestoneCreateTickets).
 		From(NodeMilestoneCreateTickets).On(wruntime.OutcomeComplete).GoTo(NodeDone).
 		ResultParser(QRSPIResultParser{}).
 		ResultConverter(QRSPIResultConverter{}).

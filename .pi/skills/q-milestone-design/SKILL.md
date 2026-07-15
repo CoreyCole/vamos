@@ -11,7 +11,6 @@ Use this as the Design stage for milestone-level QRSPI. It mirrors `/q-design`, 
 
 Read:
 
-1. `.pi/skills/qrspi-planning/SKILL.md`
 1. `.pi/skills/qrspi-project-planning/SKILL.md`
 1. `.pi/skills/q-design/SKILL.md`
 1. `.pi/skills/q-milestone-question/references/milestone-planning-common.md`
@@ -109,12 +108,12 @@ qrspi_result:
   policy:
     advance_mode: "guided"
     auto_mode: false
-    enable_plan_reviews: true
+    enable_plan_reviews: false
     invalid_result_retry_limit: 1
   summary:
-    plan_goal: "Plan milestone tickets from reviewed requirements."
+    plan_goal: "Plan milestone tickets from requirements."
     stage_completed: "Milestone design complete."
-    key_decisions: "Next stage should start immediately: /q-milestone-review."
+    key_decisions: "Next stage should start immediately: /q-milestone-create-tickets."
   artifact: "thoughts/.../design.md path"
   artifacts:
     - role: "primary"
@@ -122,11 +121,11 @@ qrspi_result:
   next:
     steps:
       - action: "read_skill"
-        param: ".pi/skills/qrspi-planning/SKILL.md"
+        param: ".pi/skills/qrspi-project-planning/SKILL.md"
       - action: "read_skill"
-        param: ".pi/skills/q-milestone-review/SKILL.md"
+        param: ".pi/skills/q-milestone-create-tickets/SKILL.md"
       - action: "read_artifact"
         param: "thoughts/.../design.md path"
       - action: "start_stage"
-        param: "q-milestone-review"
+        param: "q-milestone-create-tickets"
 ```

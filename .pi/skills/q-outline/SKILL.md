@@ -1,6 +1,6 @@
 ---
 name: q-outline
-description: Create a structured outline (~2 pages) from approved `design.md` and optional `design-product.md` — signatures, types, vertical slices, test checkpoints. Fifth stage of QRSPI pipeline. `/q-review` is the formal LLM planning review gate before `/q-plan`.
+description: Create a structured outline (~2 pages) from approved `design.md` — signatures, types, vertical slices, test checkpoints. Consumes `design-product.md` only when a human explicitly created it. Fourth QRSPI stage.
 ---
 
 # Structured Outline — How Do We Get There?
@@ -53,7 +53,7 @@ qrspi_result:
         param: "[concrete next-stage]"
 ```
 
-`status` is lifecycle. `outcome` selects the graph branch. Optional ``project`` and `related_projects` carry primary/related project participation metadata only; they do not change singular workspace execution rules. ``next.steps`` is an ordered instruction block containing only `step` children: read `qrspi-planning`, read the next stage skill, read the artifact(s) needed by that stage, then start the next stage immediately unless blocked by an explicit human/safety gate. Runtime transitions are graph-authoritative. Complete results must include ``outcome``. Review stages must use explicit node IDs (`review-outline`, `review-plan`, or `review-implementation`), never `review`.
+`status` is lifecycle. `outcome` selects the graph branch. Optional `project` and `related_projects` carry primary/related project participation metadata only; they do not change singular workspace execution rules. `next.steps` is an ordered instruction block containing only `step` children: read `qrspi-planning`, read the next stage skill, read the artifact(s) needed by that stage, then start the next stage immediately unless blocked by an explicit human/safety gate. Runtime transitions are graph-authoritative. Complete results must include `outcome`. Review stages must use explicit node IDs (`review-outline`, `review-plan`, or `review-implementation`), never `review`.
 
 ## Project participation metadata
 
@@ -61,13 +61,13 @@ For cross-project plans, preserve machine-readable frontmatter and YAML project 
 
 - `project`: singular primary project owner.
 - `related_projects`: zero/many supporting project IDs.
-- ``project`` in ``qrspi_result`` mirrors frontmatter `project`.
+- `project` in `qrspi_result` mirrors frontmatter `project`.
 - `related_projects` mirrors frontmatter `related_projects`.
 - Related projects are plan participation metadata only. They do not imply multiple execution cwd values.
 - `workspace_metadata.plan_workspace` and `workspace_metadata.implementation_workspace` remain singular.
 - Metadata authority for discovery is `plan.md`, then `outline.md`, then `design.md`, then `AGENTS.md`; do not merge conflicting related project lists across files.
 
-You are the fifth stage of the QRSPI pipeline. You answer the question **"how do we get there?"** in a structured outline that is the "C header file" for the implementation — signatures, types, phases, and test checkpoints. No full implementations. Standard mode starts from approved `design.md`; load `design-product.md` when present. Before writing `outline.md`, summarize the key design decisions for human alignment and wait for approval. After the outline is written, `/q-review` is the formal LLM planning review gate before `/q-plan`.
+You are the fourth stage of the QRSPI pipeline. You answer the question **"how do we get there?"** in a structured outline that is the "C header file" for the implementation — signatures, types, phases, and test checkpoints. No full implementations. Standard mode starts from approved `design.md`; load `design-product.md` when present. Before writing `outline.md`, summarize the key design decisions for human alignment and wait for approval. After the outline is written, `/q-review` is the formal LLM planning review gate before `/q-plan`.
 
 **Design vs. Outline vs. Plan:** The design says *what* we're building and *why*. The outline says *how* — type definitions, package structures, interface signatures, database schemas, API surfaces, vertical slices with test checkpoints. The plan expands the outline into full implementation code. If the design is the architecture review, the outline is the sprint planning. The plan is the coding agent's instructions.
 
@@ -134,10 +134,9 @@ Then wait for input.
 
 ### Standard mode
 
-1. **Verify artifacts are loaded**: `[plan_dir]/AGENTS.md`, all `questions/*.md`, `design.md`, ADRs from `design.md` frontmatter `related_adrs` (or `[plan_dir]/adrs/` fallback), optional `design-product.md`, all `research/*.md`, brainstorm docs from `design.md` frontmatter `brainstorm_docs`, relevant context artifacts in `context/research/`, `context/design/`, optional `context/design-product/`, and `context/outline/`, and any relevant files in `prds/`.
-   - Missing `design-product.md` is not a blocker for internal tools, bugfixes, refactors, or other low product-risk work.
-   - Stop if `design-product.md` exists and has verdict `Blocked`, unless the user explicitly accepts the blocker/override.
-   - If `design-product.md` is missing but product/PRD coverage is clearly needed, ask whether to run `/q-design-product [design.md]` first; otherwise proceed from `design.md`.
+1. **Verify artifacts are loaded**: `[plan_dir]/AGENTS.md`, all `questions/*.md`, `design.md`, ADRs from `design.md` frontmatter `related_adrs` (or `[plan_dir]/adrs/` fallback), optional existing `design-product.md`, all `research/*.md`, brainstorm docs from `design.md` frontmatter `brainstorm_docs`, relevant context artifacts in `context/research/`, `context/design/`, optional existing `context/design-product/`, and `context/outline/`, and any relevant files in `prds/`.
+   - Product-design review is not a QRSPI stage. Never suggest, require, or route to it. If the human explicitly created `design-product.md`, consume it; its absence is always normal.
+   - Stop if an existing `design-product.md` has verdict `Blocked`, unless the user explicitly accepts the blocker/override.
    - For review-directory follow-up plans, preserve the parent plan as historical context only. Do not overwrite or append to the parent plan's `outline.md`; write the follow-up outline to `[parent_plan_dir]/reviews/*/outline.md`.
 1. **Summarize design decisions for human alignment before outlining.** Present a concise summary of the key decisions from `design.md`, optional `design-product.md`, and ADRs. Include the selected direction, important constraints, out-of-scope boundaries, product/design caveats, and any decisions the outline will preserve. Ask the human to approve before writing `outline.md` unless the active user instruction explicitly says to delegate/auto-advance stages and not request approval unless human context is needed.
    - If the user replies with approval such as `go`, `vamos`, `yes`, `approved`, or equivalent, continue in the same session and write the outline; do not require a second nudge.
@@ -190,7 +189,7 @@ related_projects: []
 # Outline: [Feature Name]
 
 ## Overview
-[2-3 sentences. What we're building, the approved technical approach from design.md, and the product gate verdict from design-product.md if present (or note product design was not used because scope is internal/low product-risk; or direct-task context in direct mode).]
+[2-3 sentences. What we're building, the approved technical approach from design.md, and decisions from design-product.md only when that artifact exists; otherwise use direct-task context in direct mode.]
 
 ## Type Definitions
 Use fenced code blocks for structural content so it gets syntax highlighting.
@@ -340,5 +339,5 @@ Always include the complete `thoughts/.../outline.md` path.
 - Standard mode must preserve `design-product.md` Critical Findings in slices, test checkpoints, or Out of Scope when `design-product.md` exists.
 - Before outlining in standard mode, summarize key decisions from `design.md`/ADRs/product design and wait for human approval (`go`, `vamos`, `yes`, `approved`, or equivalent) before writing `outline.md`.
 - Present to the user BEFORE writing the final file. This is the last human review gate before LLM planning review.
-- Completion responses must be the fenced YAML ``qrspi_result`` block required by the runtime contract, followed by the mandatory concise human summary.
+- Completion responses must be the fenced YAML `qrspi_result` block required by the runtime contract, followed by the mandatory concise human summary.
 - Post-YAML summary for outline stage: one concise line per slice/part. Caveman clear. No implementation detail dump.

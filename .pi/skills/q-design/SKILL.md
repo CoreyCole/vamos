@@ -267,7 +267,7 @@ Accepted
 
 ## Response
 
-When `design.md` is written, emit this fenced YAML result, followed by the mandatory concise human summary. Design does not run automated `/q-review`; it advances to `/q-outline` unless product coverage warrants `/q-design-product`. `next.steps` must be ordered `step` children.
+When `design.md` is written, emit this fenced YAML result, followed by the mandatory concise human summary. Design does not run automated `/q-review`; it always advances to `/q-outline`. Product-design review is standalone and may run only when the human explicitly invokes it; never suggest, require, or route to it from this stage. `next.steps` must be ordered `step` children.
 
 Post-YAML natural summary format for this stage: key direction only. Caveman speak. Few words. Most important words only. Prefer `Design: reuse X; add Y; avoid Z.` over sentences.
 
@@ -299,7 +299,7 @@ qrspi_result:
         param: "[concrete next-stage]"
 ```
 
-If product coverage is warranted, set `next.steps` steps to read `qrspi-planning`, read `q-design-product`, read `[design.md]`, then start `/q-design-product`. If product coverage is not warranted, set `next.steps` steps to read `qrspi-planning`, read `q-outline`, read `[design.md]`, read `[design-product.md if it exists]`, then start `/q-outline`; `/q-outline` must first summarize key design decisions for human approval, then write `outline.md` after `go`/`vamos`/`yes`/equivalent approval. Always include the complete `thoughts/.../design.md` path.
+Set `next.steps` to read `qrspi-planning`, read `q-outline`, read `[design.md]`, read `[design-product.md]` only when that artifact already exists from an explicit human invocation, then start `/q-outline`. `/q-outline` must first summarize key design decisions for human approval, then write `outline.md` after `go`/`vamos`/`yes`/equivalent approval. Always include the complete `thoughts/.../design.md` path.
 
 ## Rules
 

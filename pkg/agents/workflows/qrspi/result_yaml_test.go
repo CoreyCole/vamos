@@ -104,10 +104,55 @@ func TestQRSPIResultParserStructuredNextActions(t *testing.T) {
 	if err == nil || !strings.Contains(err.Error(), "action") {
 		t.Fatalf("Parse() error = %v, want action validation", err)
 	}
+	for _, action := range []string{"read_skill", "read_artifact", "start_stage", "request_human_approval", "request_human_decision", "request_human_decisions"} {
+		if !strings.Contains(err.Error(), action) {
+			t.Fatalf("Parse() error = %v, missing allowed action %q", err, action)
+		}
+	}
 	missingParam := strings.Replace(validResultYAML("plan"), `param: "q-next"`, `param: ""`, 1)
 	_, err = (QRSPIResultParser{}).Parse(missingParam, wruntime.ParseContext{ExpectedNodeID: NodePlan})
 	if err == nil || !strings.Contains(err.Error(), "param") {
 		t.Fatalf("Parse() error = %v, want param validation", err)
+	}
+}
+
+func TestQRSPIResultParserAcceptsRequestHumanDecisionActions(t *testing.T) {
+	tests := map[string]string{
+		"request_human_decision":  "Request human decision: q-next",
+		"request_human_decisions": "Request human decisions: q-next",
+	}
+	for action, wantDisplay := range tests {
+		yamlText := strings.Replace(validResultYAML("address-review-research-outline"), `action: "start_stage"`, `action: "`+action+`"`, 1)
+		parsedAny, err := (QRSPIResultParser{}).Parse(yamlText, wruntime.ParseContext{ExpectedNodeID: NodeAddressReviewResearchOutline})
+		if err != nil {
+			t.Fatalf("Parse(%q) error = %v", action, err)
+		}
+		parsed := parsedAny.(Result)
+		if got := parsed.Next.Steps[1].DisplayText(); got != wantDisplay {
+			t.Fatalf("DisplayText() = %q, want %q", got, wantDisplay)
+		}
+	}
+}
+
+func TestQRSPIAddressReviewResearchAllowsNeedsHuman(t *testing.T) {
+	definition, err := Definition()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, node := range []wruntime.NodeID{NodeAddressReviewResearchOutline, NodeAddressReviewResearchPlan} {
+		state, err := wruntime.InitialState(definition, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		state.CurrentNodeID = node
+		result := wruntime.WorkflowResult{SourceNodeID: node, Status: wruntime.StatusNeedsHuman, Summary: "Human decision required.", PrimaryArtifact: "thoughts/example/review.md"}
+		decision, err := wruntime.DecideTransition(definition, state, result)
+		if err != nil {
+			t.Fatalf("DecideTransition(%q) error = %v", node, err)
+		}
+		if !decision.WaitingHuman || decision.StartNext {
+			t.Fatalf("DecideTransition(%q) = %+v, want human wait", node, decision)
+		}
 	}
 }
 
@@ -382,6 +427,8 @@ func TestCorrectionPromptMentionsYAMLAndCanonicalReviewStages(t *testing.T) {
 		"policy:",
 		"summary:",
 		"next:",
+		"Valid next.steps actions:",
+		"request_human_decisions",
 		"review-outline",
 		"review-plan",
 		"review-implementation",

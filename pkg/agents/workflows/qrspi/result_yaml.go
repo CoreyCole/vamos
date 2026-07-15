@@ -71,10 +71,12 @@ type Next struct {
 type NextAction string
 
 const (
-	NextActionReadSkill            NextAction = "read_skill"
-	NextActionReadArtifact         NextAction = "read_artifact"
-	NextActionStartStage           NextAction = "start_stage"
-	NextActionRequestHumanApproval NextAction = "request_human_approval"
+	NextActionReadSkill             NextAction = "read_skill"
+	NextActionReadArtifact          NextAction = "read_artifact"
+	NextActionStartStage            NextAction = "start_stage"
+	NextActionRequestHumanApproval  NextAction = "request_human_approval"
+	NextActionRequestHumanDecision  NextAction = "request_human_decision"
+	NextActionRequestHumanDecisions NextAction = "request_human_decisions"
 )
 
 type NextStep struct {
@@ -127,6 +129,10 @@ func (s NextStep) DisplayText() string {
 		return "Start stage: " + s.Param
 	case NextActionRequestHumanApproval:
 		return "Request human approval: " + s.Param
+	case NextActionRequestHumanDecision:
+		return "Request human decision: " + s.Param
+	case NextActionRequestHumanDecisions:
+		return "Request human decisions: " + s.Param
 	default:
 		return strings.TrimSpace(string(s.Action) + ": " + s.Param)
 	}
@@ -134,11 +140,22 @@ func (s NextStep) DisplayText() string {
 
 func (a NextAction) Valid() bool {
 	switch a {
-	case NextActionReadSkill, NextActionReadArtifact, NextActionStartStage, NextActionRequestHumanApproval:
+	case NextActionReadSkill, NextActionReadArtifact, NextActionStartStage, NextActionRequestHumanApproval, NextActionRequestHumanDecision, NextActionRequestHumanDecisions:
 		return true
 	default:
 		return false
 	}
+}
+
+func validNextActionText() string {
+	return strings.Join([]string{
+		string(NextActionReadSkill),
+		string(NextActionReadArtifact),
+		string(NextActionStartStage),
+		string(NextActionRequestHumanApproval),
+		string(NextActionRequestHumanDecision),
+		string(NextActionRequestHumanDecisions),
+	}, ", ")
 }
 
 func (s Summary) TextContent() string {
@@ -250,9 +267,11 @@ Attempt: %d
 
 Re-emit exactly one corrected fenced YAML block with top-level qrspi_result. Put no prose before it. Use canonical review stage IDs: review-outline, review-plan, review-implementation.
 
+Valid next.steps actions: %s.
+
 Use this valid example shape, replacing placeholders with the current stage, outcome, artifact paths, workspace paths, and next steps:
 
-%s`, err, attempt, ExampleQRSPIResultYAML())
+%s`, err, attempt, validNextActionText(), ExampleQRSPIResultYAML())
 }
 
 var (
@@ -342,7 +361,7 @@ func validateQRSPIResult(parsed Result, ctx wruntime.ParseContext) error {
 	}
 	for i, step := range parsed.Next.Steps {
 		if !step.Action.Valid() {
-			return fmt.Errorf("qrspi result next.steps[%d].action %q is invalid", i, step.Action)
+			return fmt.Errorf("qrspi result next.steps[%d].action %q is invalid; valid actions: %s", i, step.Action, validNextActionText())
 		}
 		if strings.TrimSpace(step.Param) == "" {
 			return fmt.Errorf("qrspi result next.steps[%d].param is required", i)

@@ -53,7 +53,7 @@ qrspi_result:
         param: "[concrete next-stage]"
 ```
 
-`status` is lifecycle. `outcome` selects the graph branch. Optional ``project`` and `related_projects` carry primary/related project participation metadata only; they do not change singular workspace execution rules. ``next.steps`` is an ordered instruction block containing only `step` children: read `qrspi-planning`, read the next stage skill, read the artifact(s) needed by that stage, then start the next stage immediately unless blocked by an explicit human/safety gate. Runtime transitions are graph-authoritative. Complete results must include ``outcome``. Review stages must use explicit node IDs (`review-outline`, `review-plan`, or `review-implementation`), never `review`.
+`status` is lifecycle. `outcome` selects the graph branch. Optional `project` and `related_projects` carry primary/related project participation metadata only; they do not change singular workspace execution rules. `next.steps` is an ordered instruction block containing only `step` children: read `qrspi-planning`, read the next stage skill, read the artifact(s) needed by that stage, then start the next stage immediately unless blocked by an explicit human/safety gate. Runtime transitions are graph-authoritative. Complete results must include `outcome`. Review stages must use explicit node IDs (`review-outline`, `review-plan`, or `review-implementation`), never `review`.
 
 ## Project participation metadata
 
@@ -61,13 +61,15 @@ For cross-project plans, capture and preserve machine-readable project intent:
 
 - `project`: singular primary project owner.
 - `related_projects`: zero/many supporting project IDs.
-- ``project`` in ``qrspi_result`` mirrors frontmatter `project`.
+- `project` in `qrspi_result` mirrors frontmatter `project`.
 - `related_projects` mirrors frontmatter `related_projects`.
 - Related projects are plan participation metadata only. They do not imply multiple execution cwd values.
 - `workspace_metadata.plan_workspace` and `workspace_metadata.implementation_workspace` remain singular.
 - During the interview, ask for primary vs related project intent when the user mentions cross-repo work.
 
-You are the first stage of the QRSPI pipeline. Convert an underspecified request into 3-7 specific, answerable research questions.
+You are the first stage of ticket-level QRSPI. Convert an underspecified request into 3-7 specific, answerable research questions.
+
+If the request is project planning, milestone planning, a planning ticket whose goal is to decide future tickets, or any artifact under a project `milestones/` tree, read `.pi/skills/qrspi-project-planning/SKILL.md` before proceeding. Use the milestone-specific skills when that doctrine says the work is milestone-level; do not force normal `/q-question` onto milestone meta-planning.
 
 ## Goal
 
@@ -77,6 +79,7 @@ Establish with ~95% confidence what the user actually wants. Start by investigat
 
 0. **Load context:**
    - Read `.pi/skills/qrspi-planning/SKILL.md` (pipeline overview)
+   - If the task is project/milestone planning or a planning ticket that creates future tickets, read `.pi/skills/qrspi-project-planning/SKILL.md` before deciding whether to continue here or switch to `/q-milestone-question`
    - If a plan directory was provided (follow-up pass), load existing artifacts:
      - `[plan_dir]/AGENTS.md`
      - All files in `[plan_dir]/questions/`
@@ -354,5 +357,5 @@ Always include the complete `thoughts/.../questions/YYYY-MM-DD_HH-MM-SS_topic-na
 - Do NOT turn `q-question` into a mapping pass or deep analysis stage.
 - Use extreme concision for the brainstorm/interview conversation, not as a special style rule for the final research questions doc.
 - Keep it short: questions, not essays.
-- Completion responses must be the fenced YAML ``qrspi_result`` block required by the runtime contract, followed by the mandatory concise human summary.
+- Completion responses must be the fenced YAML `qrspi_result` block required by the runtime contract, followed by the mandatory concise human summary.
 - Post-YAML summary for question stage: only concise question list; one question per line. Caveman clear. No extra explanation.

@@ -1,50 +1,16 @@
 ---
 name: q-design-product
-description: Creates concise product-facing `design-product.md` after approved QRSPI `design.md` when product risk warrants it; verifies PRD/ticket coverage, hidden complexities, user/demo implications, E2E edge cases, assumptions, critical findings, and gate verdict before `/q-outline`.
+description: Manually audits an approved technical design against product sources and writes `design-product.md`. Standalone opt-in helper; never part of automatic QRSPI routing.
+disable-model-invocation: true
 ---
 
-# Product Design — Did We Cover The Product?
+# Standalone Product Design Review
 
-> **Pipeline overview:** `.pi/skills/qrspi-planning/SKILL.md`
-
-## Runtime YAML contract
-
-Every response that completes a QRSPI workflow node must include a fenced `yaml` block containing `qrspi_result`, followed by a mandatory concise human summary. Do not use prose-only `Artifact` / `Summary` / `Next` completion responses.
-
-Required shape:
-
-```yaml
-qrspi_result:
-  stage: "design-product"
-  status: "complete"
-  outcome: "complete"
-  policy:
-    advance_mode: "guided"
-    auto_mode: false
-    enable_plan_reviews: true
-    invalid_result_retry_limit: 1
-  summary:
-    plan_goal: "[overall goal]"
-    stage_completed: "[product design coverage completed]"
-    key_decisions: "[product risks, assumptions, next step]"
-  artifact: "thoughts/.../design-product.md"
-  next:
-    steps:
-      - action: "read_skill"
-        param: ".pi/skills/qrspi-planning/SKILL.md"
-      - action: "read_skill"
-        param: ".pi/skills/q-outline/SKILL.md"
-      - action: "read_artifact"
-        param: "thoughts/.../design-product.md"
-      - action: "start_stage"
-        param: "q-outline"
-```
-
-`status` is lifecycle. `outcome` selects the graph branch. `<next>` is an ordered instruction block containing only `<step>` children: read `qrspi-planning`, read the next stage skill, read the artifact(s) needed by that stage, then start the next stage immediately unless blocked by an explicit human/safety gate. Runtime transitions are graph-authoritative. Complete results must include `<outcome>`. Review stages must use explicit node IDs (`review-outline`, `review-plan`, or `review-implementation`), never `review`.
+This helper runs only when the human explicitly invokes it. It is not a QRSPI stage, gate, prerequisite, or automatic recommendation. It may be invoked at any planning point; it must not choose or alter the caller's next QRSPI stage.
 
 Be extremely concise everywhere: alignment interview, summaries, and `design-product.md`. Sacrifice grammar for concision. Optimize for scan speed, low reading overhead, cheap output.
 
-You are the optional product-design gate of the QRSPI pipeline. Use this stage for product-critical, high-stakes, user-facing PRD-sensitive, compliance/security-sensitive, or irreversible user/data behavior changes; skip it for internal tools, bugfixes, refactors, and low product-risk work. You run after technical `design.md` is approved and before `/q-outline`. You answer: **is the approved technical design aligned with what product wants?** First run a concise alignment interview; then write `design-product.md`. Do not write another technical design.
+Answer: **is the approved technical design aligned with what product wants?** Run a concise alignment interview, then write `design-product.md`. Do not write another technical design.
 
 ## When Invoked
 
@@ -199,38 +165,7 @@ verdict: [Pass|Blocked|Pass with accepted non-goals]
 
 ## Response
 
-`q-design-product` is an optional planning helper and is not currently a distinct runtime graph node. When used inside an active QRSPI workflow, the runtime node remains the node that invoked it; otherwise, emit a normal YAML result for the surrounding stage or include the product-design path in the next stage's `<artifacts>`.
-
-If this skill is run manually and completes a product design artifact, prefer this fenced YAML result so downstream tools can parse it; do not emit the old prose response shape:
-
-```yaml
-qrspi_result:
-  stage: "design-product"
-  status: "complete"
-  outcome: "complete"
-  policy:
-    advance_mode: "guided"
-    auto_mode: false
-    enable_plan_reviews: true
-    invalid_result_retry_limit: 1
-  summary:
-    plan_goal: "[overall goal]"
-    stage_completed: "[product design coverage completed]"
-    key_decisions: "[product risks, assumptions, next step]"
-  artifact: "thoughts/.../design-product.md"
-  next:
-    steps:
-      - action: "read_skill"
-        param: ".pi/skills/qrspi-planning/SKILL.md"
-      - action: "read_skill"
-        param: ".pi/skills/q-outline/SKILL.md"
-      - action: "read_artifact"
-        param: "thoughts/.../design-product.md"
-      - action: "start_stage"
-        param: "q-outline"
-```
-
-If blocked, use `<status>blocked</status>` with the blocker in `<summary>` and omit `<outcome>`.
+Return the artifact path, verdict, critical findings, and blockers. Do not emit a `qrspi_result`, select a next stage, or modify QRSPI routing. The human decides what happens next.
 
 ## Rules
 

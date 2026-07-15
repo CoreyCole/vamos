@@ -1,6 +1,6 @@
 ---
 name: q-implement
-description: Execute one implementation slice per invocation. Seventh stage of QRSPI pipeline. Load `plan.md` and optional `design-product.md`, update status checkboxes, and create per-slice handoffs as you go — they are your context recovery mechanism.
+description: Execute one implementation slice per invocation. Seventh QRSPI stage. Load `plan.md`, update status checkboxes, and create per-slice handoffs as context recovery.
 ---
 
 ## QRSPI mode contract
@@ -12,7 +12,7 @@ QRSPI has a canonical advancement mode plus separate review/retry policy:
 - `advanceMode=autopilot`: auto-continue graph-safe non-human edges and auto-approve only human gates marked auto-approvable. Current `auto_mode=true` behavior.
 - Legacy compatibility: until runtime persists `advanceMode`, map `auto_mode=false` to `guided` and `auto_mode=true` to `autopilot`. `discuss` needs a distinct runtime policy value.
 - All modes still stop on `needs_human`, `blocked`, `error`, invalid artifact, disallowed transition, run failure, YAML retry exhaustion, or explicit safety gate.
-- `enable_plan_reviews=true`: run planning `/q-review` after outline and plan. Do not run `/q-review` immediately after design; design advances to `/q-outline` (or optional `/q-design-product`).
+- `enable_plan_reviews=true`: run planning `/q-review` after outline and plan. Do not run `/q-review` immediately after design; design advances directly to `/q-outline`.
 - `enable_plan_reviews=false`: skip planning `/q-review`; final implementation `/q-review` always runs.
 - Research never has its own human stop. Humans evaluate research in design/outline review.
 - Emit the QRSPI YAML result as a fenced `yaml` block with top-level `qrspi_result` code block for every completed QRSPI stage result so it is syntax highlighted, then add only the mandatory concise human summary after it.

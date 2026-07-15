@@ -65,7 +65,7 @@ func Definition() (wruntime.Definition, error) {
 		Outcomes(wruntime.OutcomeComplete).
 		RequiresPrimaryArtifact().
 		Agent(NodeAddressReviewResearchOutline, Skill(".pi/skills/q-address-review-research/SKILL.md")).
-		Statuses(wruntime.StatusComplete, wruntime.StatusBlocked, wruntime.StatusError).
+		Statuses(wruntime.StatusComplete, wruntime.StatusNeedsHuman, wruntime.StatusBlocked, wruntime.StatusError).
 		Outcomes(wruntime.OutcomeComplete).
 		RequiresPrimaryArtifact().
 		Agent(NodePlan, Skill(".pi/skills/q-plan/SKILL.md")).
@@ -81,7 +81,7 @@ func Definition() (wruntime.Definition, error) {
 		Outcomes(wruntime.OutcomeComplete).
 		RequiresPrimaryArtifact().
 		Agent(NodeAddressReviewResearchPlan, Skill(".pi/skills/q-address-review-research/SKILL.md")).
-		Statuses(wruntime.StatusComplete, wruntime.StatusBlocked, wruntime.StatusError).
+		Statuses(wruntime.StatusComplete, wruntime.StatusNeedsHuman, wruntime.StatusBlocked, wruntime.StatusError).
 		Outcomes(wruntime.OutcomeComplete).
 		RequiresPrimaryArtifact().
 		Agent(NodeWorkspace, Skill(".pi/skills/q-workspace/SKILL.md")).

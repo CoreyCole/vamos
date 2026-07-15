@@ -7,9 +7,19 @@ description: High-level doctrine for nested QRSPI project and epic planning. Use
 
 Use this doctrine when QRSPI is used above the single-ticket level: project plan directories contain milestone directories; milestone-level QRSPI decides what tickets should exist; ticket-level QRSPI decides how to complete one ticket.
 
+Read this skill before any concrete stage skill whenever the work is project planning, milestone planning, a planning ticket whose goal is to create future tickets, or an artifact under a project `milestones/` tree. This skill is the router for the project-planning skill landscape; it decides when work is project-level, milestone-level, or ready to hand off to ticket-level QRSPI.
+
 ## Mindset
 
 Project planning should uncover hidden complexity early, expose ambiguities before tickets are created, and give product/lead engineers a concise artifact they can sign off on: "yes, we are building in the right direction."
+
+Project-planning flow:
+
+1. MoSCoW/product framing: define project description, must/should/could/won't scope, success criteria, and milestone sequence.
+1. Milestone planning: determine vertically sliced checkpoints for the project.
+1. Milestone QRSPI: run `/q-milestone-question`, `/q-milestone-research`, and `/q-milestone-design` for each milestone.
+1. Ticket creation: run `/q-milestone-create-tickets` to summarize the design, outline the ticket set for human confirmation, then create concrete vertically sliced tickets.
+1. Ticket-level QRSPI: each created ticket starts normal `qrspi-planning` with `/q-question`.
 
 Project-planning work is normally **thoughts-only**: it creates and updates durable artifacts under `thoughts/` and syncs them with `just sync-thoughts`. It does not need `/q-workspace`, copied implementation directories, Graphite slice branches, or code-implementation handoffs unless a later ticket explicitly transitions into source-code changes.
 
@@ -23,7 +33,7 @@ Optimize for:
 - concise milestone designs that surface product/architecture risk and proposed ticket boundaries
 - detailed high-level current-state research for future planners
 - durable context without drowning future agents
-- human judgment at question/design approval points and before provider-ticket mutation
+- human judgment at question alignment, create-tickets structure approval, per-ticket approval, and before provider-ticket mutation
 
 Do not optimize for parallelizing human judgment. Agents can research and draft, but lead/product approval owns direction.
 
@@ -70,7 +80,7 @@ Owns milestone-level QRSPI:
 - gap map and architecture/spec inputs inside `design.md`
 - proposed ticket list inside `design.md`
 - one-by-one ticket description refinement under `context/create-tickets/`
-- automated and human review artifacts
+- create-tickets approval artifacts
 
 Milestone-level QRSPI answers: **what product outcomes does this milestone own, and what tickets should exist to deliver them?**
 
@@ -94,7 +104,7 @@ Important ticket deliverables live at the ticket root next to `index.md`; do not
 
 A project may have a whole-system architecture/spec ticket. It can run before detailed milestone planning when the team needs a concise high-level spec to align on the target system, critical path, milestone sequencing, and known cross-milestone seams.
 
-It may challenge child milestone designs, but must not silently mutate them. Scope/ticket-shape changes route back to the affected milestone design review and human approval.
+It may challenge child milestone designs, but must not silently mutate them. Scope/ticket-shape changes route back to the affected milestone design and create-tickets human confirmation.
 
 Architecture/spec synthesis tickets are thoughts-only unless their approved plan edits production source files. If the output is a living spec, project status doc, provider-ticket memory, milestone map, or other `thoughts/` artifact, the plan must say `execution_mode: thoughts-only`, omit `Implementation Workspace Prep`, and route after plan review directly to thoughts-only `/q-implement` in the current checkout. The implement stage edits `thoughts/...`, runs verification and `just sync-thoughts`, and does not create a copied workspace or Graphite slice branches.
 
@@ -120,8 +130,8 @@ Rules for this spec:
 
 - Keep the spec matter-of-fact: final decisions and accepted direction only.
 - Put reasoning, alternatives, user quotes, and unresolved debate in `context/brainstorms/` or research docs, then link them from the source index.
-- Rows are planning inputs, not final provider-ticket boundaries. A row can become zero, one, or many tickets after milestone design/review/human approval.
-- Do not create implementation/spec tickets directly from this table. `/q-milestone-create-tickets` owns final ticket creation after the milestone design is reviewed and human-approved.
+- Rows are planning inputs, not final provider-ticket boundaries. A row can become zero, one, or many tickets after milestone design and create-tickets human confirmation.
+- Do not create implementation/spec tickets directly from this table. `/q-milestone-create-tickets` owns design summarization, ticket-set confirmation, and final ticket creation after human approval in chat.
 - Each plan/product milestone owns its own deployed E2E/Ranger verification unless a human explicitly defines a separate shared verification milestone.
 - Do not invent generic final-readiness scope. The final readiness milestone should contain only named leftover requirements or lead-approved polish/backstop work.
 
@@ -133,20 +143,18 @@ Before running a milestone flow, check whether the milestone is vertical. A good
 /q-milestone-question [milestone-plan-dir]
 /q-milestone-research [question.md]
 /q-milestone-design [research.md]
-/q-milestone-review [design.md]
-# human approval: review-human.md beside automated design review
 /q-milestone-create-tickets [design.md]
-# skill presents/refines each ticket one by one, then asks before provider mutation
+# skill summarizes design, outlines tickets for confirmation, refines each ticket one by one, then asks before provider mutation
 ```
 
 Human gates:
 
 - question alignment
-- design approval after automated design review
+- ticket-set structure approval during create-tickets
 - per-ticket approval during create-tickets
 - explicit provider mutation approval before creating/updating issues
 
-Automated milestone review should improve the design, not just report issues.
+Create-tickets owns the design approval moment: it summarizes `design.md`, presents the proposed ticket set, and edits `design.md` if the human changes ticket count or scope before any provider tickets are created.
 
 ## Source of truth rules
 
@@ -156,10 +164,11 @@ Automated milestone review should improve the design, not just report issues.
 - Paths encode stable identity, not ordering. Milestone and ticket order belongs in `index.md`, status docs, or ticket lists.
 - Project status artifact owns exact paths, gates, and recovery state.
 - The configured ticket provider owns team-visible tracking: concise title, goal, acceptance criteria, status/assignee/priority/milestone, blockers, PR links, and links to canonical `thoughts/` docs.
+- Provider issue titles use conventional-commit style: `type(scope): imperative lowercase summary`. This applies to milestone-planning tickets created alongside provider milestones, e.g. `docs(audit-log): plan audit platform foundation`; do not create bare `Plan ...` titles.
 - `thoughts/` owns durable working memory: specs, designs, research, ADRs, field inventories, verification/load strategies, reviews, handoffs, and detailed plans.
 - Provider issue comments/descriptions should link back to repo artifacts instead of duplicating full tables or long designs.
 - `AGENTS.md` files are durable memory, not dashboards.
-- `review-human.md` records human approval at gates.
+- create-tickets chat records human approval at ticket-set and per-ticket gates.
 
 ## Milestone design purpose
 
@@ -181,9 +190,9 @@ Product outcomes come first. Engineer enablement can be a user story only when i
 
 ## Milestone create-tickets purpose
 
-Milestone create-tickets turns a reviewed and human-approved design into provider-ready ticket descriptions and then provider issues.
+Milestone create-tickets turns a milestone design into a human-approved ticket set, then provider-ready ticket descriptions and provider issues.
 
-It presents each proposed ticket one by one for human refinement. After all ticket drafts are approved, it asks for explicit mutation approval, creates provider tickets, applies relations/default fields from the thoughts root `AGENTS.md` manifest, updates status docs, and creates routing-only ticket directories after provider IDs exist. It should not become a code implementation plan or whole-system architecture spec.
+It first summarizes the design and presents the ticket-set outline for human confirmation before any ticket bodies are drafted or provider tickets are created. Then it presents each proposed ticket one by one for human refinement. After all ticket drafts are approved, it asks for explicit mutation approval, creates provider tickets, applies relations/default fields from the thoughts root `AGENTS.md` manifest, updates status docs, and creates routing-only ticket directories after provider IDs exist. It should not become a code implementation plan or whole-system architecture spec.
 
 Reusable Vamos project-planning skills do not embed private ticket-provider policy. Hosts configure provider behavior in thoughts root `AGENTS.md` frontmatter:
 
@@ -211,7 +220,6 @@ Load these references only when creating or reviewing the matching artifact:
 
 - `references/project-status-template.md` — project status/dependency artifact skeleton
 - `references/milestone-agents-template.md` — milestone `AGENTS.md` skeleton
-- `references/human-review-template.md` — `review-human.md` skeleton
 - `references/milestone-outline-contract.md` — legacy validity checklist for old milestone outlines
 - `references/milestone-plan-contract.md` — legacy validity checklist for old milestone plans
 
@@ -224,11 +232,11 @@ Avoid:
 - horizontal milestone taxonomies such as "DB first, then API, then frontend", "all reporting", "all overrides", or "all load testing" when a vertical product/demo path can prove value sooner
 - milestone names that expose process jargon such as "Vertical" instead of product/domain names
 - creating implementation/spec tickets directly from the project plan
-- forcing normal `/q-outline` or `/q-plan` onto milestone meta-planning
-- reviving milestone `outline.md`/`plan.md` as required gates instead of using reviewed design + create-tickets
+- forcing normal ticket-level `/q-question`, `/q-research`, `/q-design`, `/q-outline`, or `/q-plan` onto milestone meta-planning
+- reviving milestone `outline.md`/`plan.md` as required gates instead of using design + create-tickets
 - hiding live status in `AGENTS.md`
 - copying full PRDs/requirements into child dirs
-- treating clean LLM review as product/lead approval
+- treating generated ticket drafts as approved before create-tickets asks for explicit human confirmation
 - creating temp ticket dirs before provider IDs exist
 - using numeric ordering prefixes like `01-` or `02-` in milestone or ticket directory names
 - hiding important deliverables under `context/` instead of root-level docs linked from `index.md`
@@ -237,14 +245,13 @@ Avoid:
 
 ## Relationship to other skills
 
-Read `.pi/skills/qrspi-planning/SKILL.md` for base QRSPI stage mechanics and fenced YAML `qrspi_result` contract.
+Project-planning sessions start here, then read the concrete milestone-stage skill. Ticket-level `qrspi-planning` starts only after create-tickets creates a concrete provider ticket and routes that ticket to `/q-question`.
 
-Use milestone-specific skills for nested project planning:
+Use milestone-specific skills for nested project planning. Every milestone-stage completion YAML should include `.pi/skills/qrspi-project-planning/SKILL.md` in `next.steps` before the next concrete milestone skill:
 
 - `/q-milestone-question`
 - `/q-milestone-research`
 - `/q-milestone-design`
-- `/q-milestone-review`
 - `/q-milestone-create-tickets`
 
 Legacy skills `/q-milestone-outline` and `/q-milestone-plan` may exist for old artifacts, but new milestone planning should not use them.

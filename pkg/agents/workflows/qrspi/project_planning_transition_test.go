@@ -19,10 +19,13 @@ func TestQRSPIProjectPlanningTransitions(t *testing.T) {
 
 	state = assertStartsNext(t, def, state, NodeMilestoneQuestion, NodeMilestoneResearch)
 	state = assertStartsNext(t, def, state, NodeMilestoneResearch, NodeMilestoneDesign)
-	state = assertStartsNext(t, def, state, NodeMilestoneDesign, NodeMilestoneReview)
-	state = assertWaitsHuman(t, def, state, NodeMilestoneReview, NodeHumanReviewDesign)
-	state = advanceHumanGate(state)
-	state = assertStartsNext(t, def, state, NodeHumanReviewDesign, NodeMilestoneCreateTickets)
+	state = assertStartsNext(
+		t,
+		def,
+		state,
+		NodeMilestoneDesign,
+		NodeMilestoneCreateTickets,
+	)
 	state = assertStartsNext(t, def, state, NodeMilestoneCreateTickets, NodeDone)
 	state = assertTerminal(t, def, state, NodeDone)
 }
@@ -36,8 +39,8 @@ func TestQRSPIProjectPlanningWorkflowRenderers(t *testing.T) {
 	mermaid := wruntime.RenderMermaid(def)
 	for _, want := range []string{
 		"milestone-question -- outcome=complete --> milestone-research",
-		"milestone-review -- outcome=complete --> human-review-design",
-		"human-review-design -- outcome=complete --> milestone-create-tickets",
+		"milestone-research -- outcome=complete --> milestone-design",
+		"milestone-design -- outcome=complete --> milestone-create-tickets",
 		"milestone-create-tickets -- outcome=complete --> done",
 	} {
 		if !strings.Contains(mermaid, want) {
@@ -53,8 +56,8 @@ func TestQRSPIProjectPlanningWorkflowRenderers(t *testing.T) {
 	table := wruntime.RenderTransitionTable(def)
 	for _, want := range []string{
 		"| milestone-question | outcome=complete | milestone-research |",
-		"| milestone-review | outcome=complete | human-review-design |",
-		"| human-review-design | outcome=complete | milestone-create-tickets |",
+		"| milestone-research | outcome=complete | milestone-design |",
+		"| milestone-design | outcome=complete | milestone-create-tickets |",
 	} {
 		if !strings.Contains(table, want) {
 			t.Fatalf("RenderTransitionTable() = %q, want %q", table, want)
@@ -62,7 +65,11 @@ func TestQRSPIProjectPlanningWorkflowRenderers(t *testing.T) {
 	}
 	for _, forbidden := range []string{"milestone-outline", "milestone-plan"} {
 		if strings.Contains(table, forbidden) {
-			t.Fatalf("RenderTransitionTable() = %q, should not contain %q", table, forbidden)
+			t.Fatalf(
+				"RenderTransitionTable() = %q, should not contain %q",
+				table,
+				forbidden,
+			)
 		}
 	}
 }

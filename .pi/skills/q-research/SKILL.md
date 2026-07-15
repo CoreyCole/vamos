@@ -53,14 +53,17 @@ qrspi_result:
         param: "[concrete next-stage]"
 ```
 
-`status` is lifecycle. `outcome` selects the graph branch. ``next.steps`` is an ordered instruction block containing only `step` children: read `qrspi-planning`, read the next stage skill, read the artifact(s) needed by that stage, then start the next stage immediately unless blocked by an explicit human/safety gate. Runtime transitions are graph-authoritative. Complete results must include ``outcome``. Review stages must use explicit node IDs (`review-outline`, `review-plan`, or `review-implementation`), never `review`.
+`status` is lifecycle. `outcome` selects the graph branch. `next.steps` is an ordered instruction block containing only `step` children: read `qrspi-planning`, read the next stage skill, read the artifact(s) needed by that stage, then start the next stage immediately unless blocked by an explicit human/safety gate. Runtime transitions are graph-authoritative. Complete results must include `outcome`. Review stages must use explicit node IDs (`review-outline`, `review-plan`, or `review-implementation`), never `review`.
 
-You are the second stage of the QRSPI pipeline. You receive research questions and answer them with facts from the codebase.
+You are the second stage of ticket-level QRSPI. You receive research questions and answer them with facts from the codebase.
+
+If the question doc is for project or milestone planning, read `.pi/skills/qrspi-project-planning/SKILL.md` first and use `/q-milestone-research` when the doctrine says the work is milestone-level. Do not answer milestone-planning research with normal `/q-research`.
 
 ## When Invoked
 
 0. **Load context:**
    - Read `.pi/skills/qrspi-planning/SKILL.md` (pipeline overview)
+   - If the path or prompt is project/milestone planning, read `.pi/skills/qrspi-project-planning/SKILL.md` before deciding whether to continue here or switch to `/q-milestone-research`
    - If a specific `questions/*.md` path was provided, resolve the plan directory, read `[plan_dir]/AGENTS.md` if present, then read that question doc fully and begin the research process.
    - If continuing or deepening an existing research pass, read relevant files in `[plan_dir]/context/research/` only after the research agenda has been approved.
    - Use `AGENTS.md` and the question doc to understand what to look for. Do not treat them as proof of current behavior. Every factual answer must be grounded in current code/docs/tests with file:line references.
@@ -330,5 +333,5 @@ Always include the complete `thoughts/.../research/YYYY-MM-DD_HH-MM-SS_topic-nam
 - Keep answers factual and concise.
 - Within QRSPI, prefer `pi-codebase-locator` for discovery and `pi-codebase-analyzer` for detailed implementation tracing. Keep both narrowly scoped and factual.
 - Multiple research docs are expected; each invocation produces one file.
-- Completion responses must be the fenced YAML ``qrspi_result`` block required by the runtime contract, followed by the mandatory concise human summary.
+- Completion responses must be the fenced YAML `qrspi_result` block required by the runtime contract, followed by the mandatory concise human summary.
 - Post-YAML summary for research stage: only key findings and question answers; one per line when multiple. Caveman clear. No detailed evidence; evidence lives in artifact/YAML.

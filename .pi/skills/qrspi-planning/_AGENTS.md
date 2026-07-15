@@ -79,11 +79,12 @@ Keep only sections that earn their place:
 | `questions/*.md` | Question | `.pi/skills/q-question/SKILL.md` | Human |
 | `research/*.md` | Research | `.pi/skills/q-research/SKILL.md` | Human |
 | `design.md` | Design | `.pi/skills/q-design/SKILL.md` | Human |
-| `design-product.md` | Product Design | `.pi/skills/q-design-product/SKILL.md` | Optional human gate for product-critical/high-stakes work |
 | `outline.md` | Outline | `.pi/skills/q-outline/SKILL.md` | LLM review via `/q-review [outline.md]` |
 | `plan.md` | Plan | `.pi/skills/q-plan/SKILL.md` | LLM review via `/q-review [plan.md]` |
 | code changes | Implement | `.pi/skills/q-implement/SKILL.md` | LLM code review via `/q-review [handoff.md]` |
 | `reviews/*/review.md` | Review | `.pi/skills/q-review/SKILL.md` | Routes to planning or implementation review |
+
+Product-design review is a standalone human-invoked helper, not a QRSPI stage or gate. If the human explicitly creates `design-product.md`, later stages may consume it; its absence is always normal.
 
 ## Review Behavior
 

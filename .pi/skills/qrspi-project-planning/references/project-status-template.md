@@ -31,7 +31,7 @@ Canonical live status/dependency table for milestone planning. Update when miles
 ## Update Rules
 - Project `AGENTS.md` points here; do not copy this table into `AGENTS.md`.
 - Milestone sessions update their own row and dependency rows.
-- Human approvals link to `reviews/.../review-human.md`.
+- Human approvals from create-tickets link to ticket-set approval notes or created ticket bodies.
 - Architecture/spec work updates consumption status after using reviewed milestone outlines.
 - Linear mirrors high-level team-visible status only.
 

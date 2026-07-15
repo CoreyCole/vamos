@@ -11,7 +11,6 @@ Use this as the Question stage for milestone-level QRSPI. It mirrors `/q-questio
 
 Read:
 
-1. `.pi/skills/qrspi-planning/SKILL.md`
 1. `.pi/skills/qrspi-project-planning/SKILL.md`
 1. `.pi/skills/q-question/SKILL.md`
 1. `.pi/skills/q-milestone-question/references/milestone-planning-common.md`
@@ -62,7 +61,7 @@ Create the normal q-question outputs under the milestone-plan directory:
 
 Use `~/dotfiles/spec_metadata.sh` before writing.
 
-The question doc must ask for research that can support milestone design/outline:
+The question doc must ask for research that can support milestone design/ticket-set:
 
 1. Vertical slice hypothesis: named product path/scenario/user path, smallest testable/demoable outcome, and why this sequence comes before broader variants.
 1. Product Outcome Hypotheses and user-visible success criteria to validate.
@@ -113,10 +112,10 @@ qrspi_result:
   policy:
     advance_mode: "guided"
     auto_mode: false
-    enable_plan_reviews: true
+    enable_plan_reviews: false
     invalid_result_retry_limit: 1
   summary:
-    plan_goal: "Plan milestone tickets from reviewed requirements."
+    plan_goal: "Plan milestone tickets from requirements."
     stage_completed: "Milestone question complete."
     key_decisions: "Next stage should start immediately: /q-milestone-research."
   artifact: "thoughts/.../question doc path"
@@ -126,7 +125,7 @@ qrspi_result:
   next:
     steps:
       - action: "read_skill"
-        param: ".pi/skills/qrspi-planning/SKILL.md"
+        param: ".pi/skills/qrspi-project-planning/SKILL.md"
       - action: "read_skill"
         param: ".pi/skills/q-milestone-research/SKILL.md"
       - action: "read_artifact"
