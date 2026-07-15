@@ -9,6 +9,18 @@ description: Manage QRSPI stage sessions from a main Pi/tmux manager session. Us
 
 Supervise QRSPI from a main Pi manager session. Launch focused child Pi sessions in visible tmux panes, capture the child result, validate through canonical Vamos QRSPI graph helpers, then advance or stop according to graph decision and QRSPI policy.
 
+## Manager startup input
+
+Treat `/q-manager` as a conversational manager startup entrypoint. `start-next` and `continue` are optional direct-operation forms, not required startup syntax.
+
+- `/q-manager` with no arguments starts or resumes management from the current conversation, latest durable QRSPI result, manager wake, or operational handoff.
+- `/q-manager <fenced qrspi_result YAML>` accepts the complete pasted child result as startup input. Natural-language context may accompany it.
+- Never return a usage error merely because the first argument is not `start-next` or `continue`. Do not make the human translate a child result into q-manager flags.
+- Infer the plan directory, project root, implementation cwd, current graph node, and intended transition from the pasted/latest result plus durable artifacts. Validate that inference through the canonical graph and manager state; do not infer the transition from `next.steps` alone.
+- If the input contains a `q_manager_child_wake` or local `state_file`, inspect that state and choose `continue` or the graph-safe recovery action. If no manager state exists, initialize/start the manager at the canonical next node and seed it with the complete latest result through the CLI result-input seam.
+- Ask the human only when plan identity, intent, safety, or another human-owned judgment remains ambiguous after inspecting available context.
+- Once startup has resolved the concrete operation, use the direct `/q-manager start-next ...` or `/q-manager continue ...` parent wrapper when operator invocation is available. Raw `vamos qrspi ...` remains the tool-driven debug/recovery seam.
+
 ## `/q-hermes-manager` / Hermes-managed orchestration
 
 When the user invokes `/q-hermes-manager` or asks Hermes to manage a QRSPI flow, treat that as Hermes-managed background orchestration, not true Pi q-manager/tmux mode. Hermes should run tracked background Pi processes, parse full process logs for fenced `qrspi_result` YAML, and pass the complete previous YAML verbatim into the next graph-safe stage.
@@ -22,8 +34,8 @@ When the user invokes `/q-hermes-manager` or asks Hermes to manage a QRSPI flow,
 1. Read `.pi/skills/qrspi-planning/SKILL.md`.
 1. Read `docs/q-manager.md` when present for manager behavior only; do not stuff manager instructions into child stage prompts.
 1. Read the target plan `AGENTS.md`.
-1. Read the latest QRSPI result artifact or user-provided result YAML.
-1. Use parent Pi `/q-manager start-next|continue` for normal launch/resume so live usage is sampled and native parent compaction can run safely. Use raw `vamos qrspi start-next|continue` only for debug/manual fallback. Use default concise text output for normal manager commands; reserve `--output ndjson` for debug/recovery when structured output is specifically needed. Use `init`, `render-prompt`, `run-child`, `validate-result`, `decide-next`, and `reprompt-child` only for debug/recovery.
+1. Read the latest QRSPI result artifact or user-provided result YAML. A pasted result is sufficient startup input; do not require an action verb.
+1. After resolving startup intent, use parent Pi `/q-manager start-next|continue` for normal operator-driven launch/resume so live usage is sampled and native parent compaction can run safely. Use raw `vamos qrspi start-next|continue` only for tool-driven debug/manual fallback. Use default concise text output for normal manager commands; reserve `--output ndjson` for debug/recovery when structured output is specifically needed. Use `init`, `render-prompt`, `run-child`, `validate-result`, `decide-next`, and `reprompt-child` only for debug/recovery.
 
 ## General guiding principles
 
@@ -89,6 +101,8 @@ QRSPI update: `q-plan` complete
 - If the human wants a faster/different child model, pass `--model` on `start-next`, `continue`, or `run-child`. Prefer provider-qualified IDs such as `openai-codex/gpt-5.4` instead of bare `gpt-5.4`; bare names may route to the wrong provider and trigger auth errors (for example Azure API key errors).
 
 ## Wake-driven manager loop
+
+Startup may begin from a bare `/q-manager`, a pasted child `qrspi_result`, a manager wake, or an explicit direct operation. Resolve that input first; the steady-state loop below still uses the canonical `start-next` / `continue` operations internally.
 
 Primary loop: launch/resume child with `start-next`, then wait for a validated pasted wake. Do **not** block this manager session in `sleep`/poll loops. The extension wake is the normal event; marker files are only fallback diagnostics.
 

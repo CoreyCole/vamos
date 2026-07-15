@@ -125,14 +125,16 @@ func Definition() (wruntime.Definition, error) {
 		On(wruntime.OutcomeNeedsReviewResearch).GoTo(NodeResearchForReviewPlan).
 		From(NodeReviewPlan).On(wruntime.OutcomeReadyForWorkspace).GoTo(NodeWorkspace).
 		From(NodeReviewPlan).On(wruntime.OutcomeReadyForImplement).GoTo(NodeImplement).
-		From(NodeReviewPlan).On(wruntime.OutcomeReadyForImplementation).GoTo(NodeImplement).
+		From(NodeReviewPlan).
+		On(wruntime.OutcomeReadyForImplementation).GoTo(NodeImplement).
 		From(NodeResearchForReviewPlan).
 		On(wruntime.OutcomeComplete).GoTo(NodeAddressReviewResearchPlan).
 		From(NodeAddressReviewResearchPlan).
 		On(wruntime.OutcomeComplete).GoTo(NodeReviewPlan).
 		From(NodeWorkspace).On(wruntime.OutcomeComplete).GoTo(NodeImplement).
 		From(NodeWorkspace).On(wruntime.OutcomeReadyForImplement).GoTo(NodeImplement).
-		From(NodeWorkspace).On(wruntime.OutcomeReadyForImplementation).GoTo(NodeImplement).
+		From(NodeWorkspace).
+		On(wruntime.OutcomeReadyForImplementation).GoTo(NodeImplement).
 		From(NodeImplement).On(wruntime.OutcomeComplete).GoTo(NodeReviewImplementation).
 		From(NodeReviewImplementation).
 		On(wruntime.OutcomeNeedsFollowup).GoTo(NodeQuestion).

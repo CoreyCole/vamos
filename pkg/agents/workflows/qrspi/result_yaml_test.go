@@ -114,6 +114,11 @@ func TestQRSPIResultParserStructuredNextActions(t *testing.T) {
 	if err == nil || !strings.Contains(err.Error(), "param") {
 		t.Fatalf("Parse() error = %v, want param validation", err)
 	}
+	askHuman := strings.Replace(validResultYAML("design"), `action: "start_stage"`, `action: "ask_human"`, 1)
+	_, err = (QRSPIResultParser{}).Parse(askHuman, wruntime.ParseContext{ExpectedNodeID: NodeDesign})
+	if err != nil {
+		t.Fatalf("Parse() ask_human error = %v", err)
+	}
 }
 
 func TestQRSPIResultParserAcceptsRequestHumanDecisionActions(t *testing.T) {

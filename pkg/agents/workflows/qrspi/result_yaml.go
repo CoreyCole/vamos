@@ -6,24 +6,25 @@ import (
 	"regexp"
 	"strings"
 
-	wruntime "github.com/CoreyCole/vamos/pkg/agents/workflows/runtime"
 	"gopkg.in/yaml.v3"
+
+	wruntime "github.com/CoreyCole/vamos/pkg/agents/workflows/runtime"
 )
 
 type Result struct {
-	Project           string            `yaml:"project" json:"project,omitempty"`
-	RelatedProjects   []string          `yaml:"related_projects" json:"relatedProjects,omitempty"`
-	Stage             string            `yaml:"stage" json:"stage"`
-	Status            string            `yaml:"status" json:"status"`
-	Outcome           string            `yaml:"outcome,omitempty" json:"outcome,omitempty"`
+	Project           string            `yaml:"project"             json:"project,omitempty"`
+	RelatedProjects   []string          `yaml:"related_projects"    json:"relatedProjects,omitempty"`
+	Stage             string            `yaml:"stage"               json:"stage"`
+	Status            string            `yaml:"status"              json:"status"`
+	Outcome           string            `yaml:"outcome,omitempty"   json:"outcome,omitempty"`
 	Workspace         string            `yaml:"workspace,omitempty" json:"workspace,omitempty"`
-	WorkspaceMetadata WorkspaceMetadata `yaml:"workspace_metadata" json:"workspaceMetadata,omitempty"`
-	Policy            PolicyYAML        `yaml:"policy" json:"policy"`
-	Summary           Summary           `yaml:"summary" json:"summary"`
-	Artifact          string            `yaml:"artifact" json:"artifact"`
-	Artifacts         []Artifact        `yaml:"artifacts" json:"artifacts,omitempty"`
-	Next              Next              `yaml:"next" json:"next"`
-	Normalizations    []Normalization   `yaml:"-" json:"normalizations,omitempty"`
+	WorkspaceMetadata WorkspaceMetadata `yaml:"workspace_metadata"  json:"workspaceMetadata,omitempty"`
+	Policy            PolicyYAML        `yaml:"policy"              json:"policy"`
+	Summary           Summary           `yaml:"summary"             json:"summary"`
+	Artifact          string            `yaml:"artifact"            json:"artifact"`
+	Artifacts         []Artifact        `yaml:"artifacts"           json:"artifacts,omitempty"`
+	Next              Next              `yaml:"next"                json:"next"`
+	Normalizations    []Normalization   `yaml:"-"                   json:"normalizations,omitempty"`
 }
 
 type Normalization struct {
@@ -38,25 +39,25 @@ type resultEnvelope struct {
 }
 
 type WorkspaceMetadata struct {
-	PlanWorkspace           string `yaml:"plan_workspace" json:"planWorkspace,omitempty"`
+	PlanWorkspace           string `yaml:"plan_workspace"           json:"planWorkspace,omitempty"`
 	ImplementationWorkspace string `yaml:"implementation_workspace" json:"implementationWorkspace,omitempty"`
-	TrunkBranch             string `yaml:"trunk_branch" json:"trunkBranch,omitempty"`
-	StackBottomBranch       string `yaml:"stack_bottom_branch" json:"stackBottomBranch,omitempty"`
-	ParentBranch            string `yaml:"parent_branch" json:"parentBranch,omitempty"`
-	CurrentBranch           string `yaml:"current_branch" json:"currentBranch,omitempty"`
+	TrunkBranch             string `yaml:"trunk_branch"             json:"trunkBranch,omitempty"`
+	StackBottomBranch       string `yaml:"stack_bottom_branch"      json:"stackBottomBranch,omitempty"`
+	ParentBranch            string `yaml:"parent_branch"            json:"parentBranch,omitempty"`
+	CurrentBranch           string `yaml:"current_branch"           json:"currentBranch,omitempty"`
 }
 
 type PolicyYAML struct {
-	AdvanceMode             AdvanceMode `yaml:"advance_mode" json:"advanceMode,omitempty"`
-	AutoMode                bool        `yaml:"auto_mode" json:"autoMode"`
-	EnablePlanReviews       bool        `yaml:"enable_plan_reviews" json:"enablePlanReviews"`
+	AdvanceMode             AdvanceMode `yaml:"advance_mode"               json:"advanceMode,omitempty"`
+	AutoMode                bool        `yaml:"auto_mode"                  json:"autoMode"`
+	EnablePlanReviews       bool        `yaml:"enable_plan_reviews"        json:"enablePlanReviews"`
 	InvalidResultRetryLimit int         `yaml:"invalid_result_retry_limit" json:"invalidResultRetryLimit"`
 }
 
 type Summary struct {
-	PlanGoal       string `yaml:"plan_goal" json:"plan_goal,omitempty"`
+	PlanGoal       string `yaml:"plan_goal"       json:"plan_goal,omitempty"`
 	StageCompleted string `yaml:"stage_completed" json:"stage_completed,omitempty"`
-	KeyDecisions   string `yaml:"key_decisions" json:"key_decisions,omitempty"`
+	KeyDecisions   string `yaml:"key_decisions"   json:"key_decisions,omitempty"`
 }
 
 type Artifact struct {
@@ -74,6 +75,7 @@ const (
 	NextActionReadSkill             NextAction = "read_skill"
 	NextActionReadArtifact          NextAction = "read_artifact"
 	NextActionStartStage            NextAction = "start_stage"
+	NextActionAskHuman              NextAction = "ask_human"
 	NextActionRequestHumanApproval  NextAction = "request_human_approval"
 	NextActionRequestHumanDecision  NextAction = "request_human_decision"
 	NextActionRequestHumanDecisions NextAction = "request_human_decisions"
@@ -81,7 +83,7 @@ const (
 
 type NextStep struct {
 	Action NextAction `yaml:"action" json:"action"`
-	Param  string     `yaml:"param" json:"param"`
+	Param  string     `yaml:"param"  json:"param"`
 }
 
 func (m WorkspaceMetadata) Trimmed() WorkspaceMetadata {
@@ -127,6 +129,8 @@ func (s NextStep) DisplayText() string {
 		return "Read artifact: " + s.Param
 	case NextActionStartStage:
 		return "Start stage: " + s.Param
+	case NextActionAskHuman:
+		return "Ask human: " + s.Param
 	case NextActionRequestHumanApproval:
 		return "Request human approval: " + s.Param
 	case NextActionRequestHumanDecision:
@@ -140,7 +144,13 @@ func (s NextStep) DisplayText() string {
 
 func (a NextAction) Valid() bool {
 	switch a {
-	case NextActionReadSkill, NextActionReadArtifact, NextActionStartStage, NextActionRequestHumanApproval, NextActionRequestHumanDecision, NextActionRequestHumanDecisions:
+	case NextActionReadSkill,
+		NextActionReadArtifact,
+		NextActionStartStage,
+		NextActionAskHuman,
+		NextActionRequestHumanApproval,
+		NextActionRequestHumanDecision,
+		NextActionRequestHumanDecisions:
 		return true
 	default:
 		return false
@@ -152,6 +162,7 @@ func validNextActionText() string {
 		string(NextActionReadSkill),
 		string(NextActionReadArtifact),
 		string(NextActionStartStage),
+		string(NextActionAskHuman),
 		string(NextActionRequestHumanApproval),
 		string(NextActionRequestHumanDecision),
 		string(NextActionRequestHumanDecisions),
@@ -159,7 +170,9 @@ func validNextActionText() string {
 }
 
 func (s Summary) TextContent() string {
-	return normalizeResultText(strings.Join([]string{s.PlanGoal, s.StageCompleted, s.KeyDecisions}, " "))
+	return normalizeResultText(
+		strings.Join([]string{s.PlanGoal, s.StageCompleted, s.KeyDecisions}, " "),
+	)
 }
 
 func WorkflowResultProject(result wruntime.WorkflowResult) string {
@@ -260,18 +273,26 @@ func ExampleQRSPIResultYAML() string {
 }
 
 func (QRSPIResultParser) CorrectionPrompt(err error, attempt int) string {
-	return fmt.Sprintf(`Your previous response did not contain a valid QRSPI workflow result.
+	return fmt.Sprintf(
+		`Your previous response did not contain a valid QRSPI workflow result.
 
 Validation error: %v
 Attempt: %d
 
-Re-emit exactly one corrected fenced YAML block with top-level qrspi_result. Put no prose before it. Use canonical review stage IDs: review-outline, review-plan, review-implementation.
+Important: if your work is incomplete and you can safely proceed with your original task, ignore this validation error for now and continue that task. Do not emit a synthetic qrspi_result just to satisfy validation.
+
+If the stage work actually reached a handoff, completion, blocker, or error, re-emit exactly one corrected fenced YAML block with top-level qrspi_result. Put no prose before it. Use canonical review stage IDs: review-outline, review-plan, review-implementation.
 
 Valid next.steps actions: %s.
 
 Use this valid example shape, replacing placeholders with the current stage, outcome, artifact paths, workspace paths, and next steps:
 
-%s`, err, attempt, validNextActionText(), ExampleQRSPIResultYAML())
+%s`,
+		err,
+		attempt,
+		validNextActionText(),
+		ExampleQRSPIResultYAML(),
+	)
 }
 
 var (
@@ -289,7 +310,8 @@ func extractQRSPIResultYAML(output string) (string, error) {
 		if candidate == "" {
 			continue
 		}
-		if hasQRSPIResultRoot(candidate) || qrspiResultRootPattern.MatchString(candidate) {
+		if hasQRSPIResultRoot(candidate) ||
+			qrspiResultRootPattern.MatchString(candidate) {
 			return candidate, nil
 		}
 	}
@@ -307,7 +329,8 @@ func decodeQRSPIResultYAML(yamlText string) (Result, error) {
 	if err := decoder.Decode(&envelope); err != nil {
 		return Result{}, fmt.Errorf("parse qrspi result YAML: %w", err)
 	}
-	if strings.TrimSpace(envelope.Result.Stage) == "" && strings.TrimSpace(envelope.Result.Status) == "" {
+	if strings.TrimSpace(envelope.Result.Stage) == "" &&
+		strings.TrimSpace(envelope.Result.Status) == "" {
 		return Result{}, fmt.Errorf("missing top-level qrspi_result")
 	}
 	return envelope.Result, nil
@@ -361,7 +384,12 @@ func validateQRSPIResult(parsed Result, ctx wruntime.ParseContext) error {
 	}
 	for i, step := range parsed.Next.Steps {
 		if !step.Action.Valid() {
-			return fmt.Errorf("qrspi result next.steps[%d].action %q is invalid; valid actions: %s", i, step.Action, validNextActionText())
+			return fmt.Errorf(
+				"qrspi result next.steps[%d].action %q is invalid; valid actions: %s",
+				i,
+				step.Action,
+				validNextActionText(),
+			)
 		}
 		if strings.TrimSpace(step.Param) == "" {
 			return fmt.Errorf("qrspi result next.steps[%d].param is required", i)
@@ -370,15 +398,22 @@ func validateQRSPIResult(parsed Result, ctx wruntime.ParseContext) error {
 	return nil
 }
 
-func normalizeDeterministicPositiveResult(parsed Result, ctx wruntime.ParseContext) Result {
-	if parsed.Status != string(wruntime.StatusComplete) || strings.TrimSpace(parsed.Outcome) == "" {
+func normalizeDeterministicPositiveResult(
+	parsed Result,
+	ctx wruntime.ParseContext,
+) Result {
+	if parsed.Status != string(wruntime.StatusComplete) ||
+		strings.TrimSpace(parsed.Outcome) == "" {
 		return parsed
 	}
 	original := strings.ToLower(strings.TrimSpace(parsed.Outcome))
 	if !isPositiveOutcomeSynonym(original) {
 		return parsed
 	}
-	canonical, ok := deterministicPositiveOutcomeForNode(wruntime.NodeID(parsed.Stage), ctx)
+	canonical, ok := deterministicPositiveOutcomeForNode(
+		wruntime.NodeID(parsed.Stage),
+		ctx,
+	)
 	if !ok || canonical == wruntime.ResultOutcome(original) {
 		return parsed
 	}
@@ -394,14 +429,30 @@ func normalizeDeterministicPositiveResult(parsed Result, ctx wruntime.ParseConte
 
 func isPositiveOutcomeSynonym(value string) bool {
 	switch strings.ReplaceAll(strings.ToLower(strings.TrimSpace(value)), "_", "-") {
-	case "complete", "completed", "done", "success", "succeeded", "ok", "ready", "approved", "ready-to-plan", "ready-for-planning", "ready-to-implement", "ready-to-implementation", "ready-to-workspace", "ready-for-workspaces":
+	case "complete",
+		"completed",
+		"done",
+		"success",
+		"succeeded",
+		"ok",
+		"ready",
+		"approved",
+		"ready-to-plan",
+		"ready-for-planning",
+		"ready-to-implement",
+		"ready-to-implementation",
+		"ready-to-workspace",
+		"ready-for-workspaces":
 		return true
 	default:
 		return false
 	}
 }
 
-func deterministicPositiveOutcomeForNode(node wruntime.NodeID, ctx wruntime.ParseContext) (wruntime.ResultOutcome, bool) {
+func deterministicPositiveOutcomeForNode(
+	node wruntime.NodeID,
+	ctx wruntime.ParseContext,
+) (wruntime.ResultOutcome, bool) {
 	if node == "" {
 		node = ctx.ExpectedNodeID
 	}
@@ -437,7 +488,9 @@ func trimQRSPIResult(parsed Result) Result {
 	parsed.Outcome = strings.TrimSpace(parsed.Outcome)
 	parsed.Workspace = strings.TrimSpace(parsed.Workspace)
 	parsed.WorkspaceMetadata = parsed.WorkspaceMetadata.Trimmed()
-	parsed.Policy.AdvanceMode = AdvanceMode(strings.TrimSpace(string(parsed.Policy.AdvanceMode)))
+	parsed.Policy.AdvanceMode = AdvanceMode(
+		strings.TrimSpace(string(parsed.Policy.AdvanceMode)),
+	)
 	parsed.Summary.PlanGoal = strings.TrimSpace(parsed.Summary.PlanGoal)
 	parsed.Summary.StageCompleted = strings.TrimSpace(parsed.Summary.StageCompleted)
 	parsed.Summary.KeyDecisions = strings.TrimSpace(parsed.Summary.KeyDecisions)

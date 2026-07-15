@@ -57,7 +57,7 @@ qrspi_result:
         param: "[concrete next-stage]"
 ```
 
-`status` is lifecycle. `outcome` selects the graph branch. `/q-workspace` is the first result where an implementation workspace exists, so omit top-level ``workspace`` and put both ``plan_workspace`` and ``implementation_workspace`` inside ``workspace_metadata``. ``next.steps`` is an ordered instruction block for the next agent: read `qrspi-planning`, read the next stage skill, read the appropriate artifact, then start the next stage immediately unless a named human/safety gate blocks. Runtime transitions remain graph-authoritative and may validate/rewrite the steps. Complete results must include ``outcome``. Review stages must use explicit node IDs (`review-outline`, `review-plan`, or `review-implementation`), never `review`.
+`status` is lifecycle. `outcome` selects the graph branch. `/q-workspace` is the first result where an implementation workspace exists, so omit top-level `workspace` and put both `plan_workspace` and `implementation_workspace` inside `workspace_metadata`. `next.steps` is an ordered instruction block for the next agent: read `qrspi-planning`, read the next stage skill, read the appropriate artifact, then start the next stage immediately unless a named human/safety gate blocks. Runtime transitions remain graph-authoritative and may validate/rewrite the steps. Complete results must include `outcome`. Review stages must use explicit node IDs (`review-outline`, `review-plan`, or `review-implementation`), never `review`.
 
 ## Load
 
@@ -98,6 +98,7 @@ Before creating or repairing a workspace:
 - If an existing workspace has tracked changes, untracked files outside the synced `plan_dir`, or local commits not recorded in the plan/review, stop and ask.
 - Never delete or replace an existing workspace automatically.
 - Never use `git worktree`.
+- For Chestnut monorepo feature/PR feedback work, do not leave `/Users/swarm/cn/chestnut-flake/monorepo-swarm` on a feature branch. It is the canonical morning-sync checkout and must stay on `develop`; create a copied sibling workspace for stack/feedback work, then use `gt get --no-interactive <stack-top-branch>` there. See `references/monorepo-pr-feedback-workspaces.md`.
 - If the base branch/commit exists only in another copied workspace, copy from that workspace or fetch/cherry-pick only after proving the commit is reachable. Do not silently start from `main`.
 - For Graphite continuation work, run `gt stack submit --no-interactive` (or repo-approved submit equivalent) in the source checkout before preparing the target workspace so `gt get` can recover the exact stack top remotely.
 
@@ -202,7 +203,7 @@ qrspi_result:
 
 - `/q-workspace` is mandatory after successful normal parent-plan `/q-review [plan.md]` and before `/q-implement` only when no implementation workspace exists yet; when invoked with a valid reviewed normal parent `plan.md`, start workspace creation/repair immediately. If the reviewed plan is a same-workspace review-dir follow-up, stop before base selection/copy/repair and route to `/q-implement` in the existing workspace instead of creating another copy.
 - The post-YAML summary must say `Workspace: created/repaired. Next: start /q-implement now.` Never say “ready to proceed.”
-- The YAML must omit top-level ``workspace`` and include both ``plan_workspace`` and ``implementation_workspace`` inside ``workspace_metadata``.
+- The YAML must omit top-level `workspace` and include both `plan_workspace` and `implementation_workspace` inside `workspace_metadata`.
 - The YAML summary must state the chosen base branch/commit and why.
 - For review-fixes plans, never create a second workspace and never assume `main` is safe. Use the original implementation workspace that was reviewed, and prove the reviewed implementation head is still an ancestor of the workspace branch where follow-up slices will stack.
 - For normal continuation plans, never assume trunk is safe. If the work builds on the current unmerged Graphite stack, submit/sync that stack and make the target workspace contiguous with the stack top via `gt get`.

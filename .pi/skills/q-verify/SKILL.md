@@ -57,7 +57,9 @@ Post-YAML summary format: `Verified: ... Fixed: ... Evidence: ... URL: https://<
 
 For managed feature-branch workspaces, every verify result must include the exact feature workspace URL in the fenced YAML artifacts list as `role: "feature_url"` and in the post-YAML summary. The same URL must appear in `verify.md`. If UI/browser verification is required and the feature URL cannot be determined or shown to reach the child app, block instead of emitting an incomplete complete-result.
 
-If blocked by failing verification that cannot be safely fixed, use `status: "blocked"`, omit `outcome`, keep `workspace_metadata` with both workspace paths, write `verify.md`, and set `next.steps` steps to read `qrspi-planning`, read `q-resume`, read `verify.md` or handoff, then start `/q-resume`. On success, `next.steps` should use ordered `step` children that present final implementation evidence for human review; runtime transition remains graph-authoritative.
+If verification finds a recoverable follow-up or needs to hand off context before another verify pass, use `status: "handoff"`, omit `outcome`, keep `workspace_metadata` with both workspace paths, write `verify.md` or a handoff artifact, and set `next.steps` steps to read `qrspi-planning`, read `q-resume`, read `verify.md` or the handoff, then start `/q-resume`. The runtime keeps the workflow on `verify` and can launch a fresh verify/resume child.
+
+If blocked by failing verification that cannot be safely fixed or handed off for another verify pass, use `status: "blocked"`, omit `outcome`, keep `workspace_metadata` with both workspace paths, write `verify.md`, and set `next.steps` steps to read `qrspi-planning`, read `q-resume`, read `verify.md` or handoff, then start `/q-resume`. On success, `next.steps` should use ordered `step` children that present final implementation evidence for human review; runtime transition remains graph-authoritative.
 
 ## Inputs
 

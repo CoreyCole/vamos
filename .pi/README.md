@@ -13,7 +13,7 @@ Project-local skills:
 
 Project-local extensions:
 
-- `q-manager-parent` — `/q-manager start-next|continue` parent wrapper; samples live Pi context usage and triggers native parent compaction after q-manager delivery is queue-safe.
+- `q-manager-parent` — conversational `/q-manager` startup from pasted/current QRSPI context plus optional direct `start-next|continue` operations; direct operations sample live Pi context usage and trigger native parent compaction after delivery is queue-safe.
 
 Put broadly useful, cross-repository skills in `.agents/` instead. In local
 Chestnut development, `.agents` is a symlink to a shared agent configuration

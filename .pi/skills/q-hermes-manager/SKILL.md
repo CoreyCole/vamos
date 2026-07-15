@@ -22,6 +22,8 @@ Load these before acting:
 1. Target plan `AGENTS.md` when present.
 1. Latest QRSPI result artifact or user-provided fenced `qrspi_result` YAML.
 1. For a concrete example of notification parsing, artifact-path preservation, and direct-outline missing-artifact pitfalls, see `references/webhook-forwarding-run-2026-07-02.md`.
+1. For a concrete example of repeated implementation handoff auto-advance, mid-run lead-engineer corrections, and cross-repo reviewer-assignment planning/implementation, see `references/reviewer-context-routing-2026-07-08.md`.
+1. For a concrete example of a long direct-outline workflow with seven implementation handoffs, prompt-file reuse, truncated completion snippets, and exact next-target carry-forward, see `references/deterministic-morning-sync-cli-2026-07-14.md`.
 
 Do not use `vamos qrspi start-next` as the primary path. That command belongs to the tmux `q-manager` skill.
 
@@ -113,11 +115,13 @@ When a process completes:
 
 1. Treat Hermes' `[IMPORTANT: Background process ... completed]` user-delivered notification as a real completion signal, but do not trust the truncated notification body as the whole result.
 1. Read the full process log through the process log tool, not just the notification snippet.
+1. If the completion notification arrives in the same user turn as a lead-engineer correction or clarification, treat that correction as active guidance for the next stage. Preserve the prior full `qrspi_result`, but include the new clarification verbatim in the next prompt as settled alignment or as a required design constraint before launching the next graph-safe stage.
 1. Confirm the process exited successfully.
 1. Extract the complete fenced `qrspi_result` YAML.
    - If the full log contains a complete top-level `qrspi_result:` block but the wrapper stripped the opening fence, accept it only when indentation is coherent and all required fields are present.
 1. Validate that stage/status/outcome/artifact/next route are coherent enough to continue.
-1. Preserve artifact paths exactly from the YAML when constructing the next prompt. Do not reconstruct paths from memory or shorten them; a single missing `reviews/` segment can send the next agent to the wrong artifact.
+1. Preserve artifact paths exactly from the YAML when constructing the next prompt. Do not reconstruct paths from memory or shorten them; a single missing `reviews/` segment or plan-directory segment can send the next agent to the wrong artifact.
+1. Before launching the next prompt, sanity-check each artifact path against `workspace_metadata.plan_workspace`: relative paths should resolve under the plan workspace, and absolute paths should point at the recorded workspace. If a copied path is inconsistent, preserve the full previous YAML verbatim and add a prompt note telling the child to prefer the actual discovered path under `plan_workspace` and emit corrected exact paths in its new result.
 1. If `next.steps` references optional artifacts that may not exist in direct-outline workflows (especially `design.md`), keep the step in the preserved YAML but explicitly tell the next Pi prompt not to block if that optional artifact is absent and the plan/outline/handoff are sufficient.
 1. If valid and graph-safe, immediately launch the next background Pi process before giving a long prose update.
 
@@ -135,9 +139,22 @@ For implementation stages:
 - `/q-implement` and `/q-resume` should perform one unchecked implementation checkpoint per process.
 - Intermediate `status: handoff` is a recovery checkpoint, not a human gate.
 - Start the next `/q-resume` process with the full handoff YAML and exact handoff artifact path.
+- If the workflow spans multiple repositories, keep `implementation_workspace` as the primary workspace from q-workspace but allow the next-stage prompt to use cross-repo checkouts only when the plan/handoff explicitly calls for it. Tell the child to run checkout safety checks and preserve unrelated work before editing the related repo.
+- When a background implementation handoff names the next target (for example “docs/runbooks”, “regression matrix”, “bridge/wiring”, “Slack rendering/lint”, or “selective document publication”), include that exact target in the next prompt so the child does not waste context rediscovering the next checkpoint.
+- For long repeated `/q-resume` loops, it is acceptable to reuse a stable `/tmp/q-hermes-manager-q-resume-prompt.md` path only if you overwrite it with the newest full prior YAML, newest handoff path, and exact next target before each launch. Track continuity by process ID and handoff artifact, not by prompt filename.
+- If a direct-outline workflow intentionally lacks `design.md`, keep telling resume/review prompts not to block on absent optional design artifacts when AGENTS.md, outline, plan, and handoffs are sufficient.
 - Stop only when implementation is complete/review-ready, blocked, invalid, failed, or needs human input.
 
-## Step 7: Report concisely
+## Step 7: Incorporate mid-run human corrections
+
+If the user replies while orchestration is in progress with a clarification or correction:
+
+- Treat it as settled alignment for subsequent stages unless it conflicts with safety or plan invariants.
+- Patch the very next child prompt with the exact correction and label it as lead-engineer guidance.
+- Do not restart completed stages merely to restate the correction; carry it forward into research/design/plan/implementation prompts and artifacts.
+- Example: if the user clarifies an assignment invariant after q-question, pass it into q-research as settled alignment so design and implementation inherit it.
+
+## Step 8: Report concisely
 
 After starting or advancing a stage, report only useful manager state:
 

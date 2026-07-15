@@ -1,4 +1,6 @@
 import { execFile } from "node:child_process";
+import { readFile } from "node:fs/promises";
+import { dirname } from "node:path";
 import { promisify } from "node:util";
 import type { ContextUsage, ExtensionAPI, ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
 
@@ -29,18 +31,23 @@ type ExecError = Error & { code?: unknown; stdout?: unknown; stderr?: unknown };
 
 export default function qManagerParentExtension(pi: ExtensionAPI): void {
 	pi.registerCommand("q-manager", {
-		description: "Run q-manager start-next/continue with live parent usage sampling and native compaction",
+		description: "Start q-manager from conversation context, or run an explicit start-next/continue operation",
 		getArgumentCompletions: (prefix) => {
 			const actions = ["start-next", "continue"];
 			const matches = actions.filter((action) => action.startsWith(prefix.trim()));
 			return matches.length > 0 ? matches.map((action) => ({ value: action, label: action })) : null;
 		},
 		handler: async (args, ctx) => {
-			let parsed: ParsedArgs;
+			let parsed: ParsedArgs | undefined;
 			try {
 				parsed = parseArgs(args);
 			} catch (error) {
 				ctx.ui.notify(error instanceof Error ? error.message : String(error), "error");
+				return;
+			}
+
+			if (!parsed) {
+				await startManagerAgent(pi, args, ctx);
 				return;
 			}
 
@@ -60,13 +67,32 @@ export default function qManagerParentExtension(pi: ExtensionAPI): void {
 	});
 }
 
-function parseArgs(args: string): ParsedArgs {
-	const parts = splitArgs(args.trim());
-	const action = parts.shift();
-	if (action !== "start-next" && action !== "continue") {
-		throw new Error("usage: /q-manager start-next|continue [vamos qrspi flags]");
-	}
+function parseArgs(args: string): ParsedArgs | undefined {
+	const trimmed = args.trim();
+	const firstToken = trimmed.match(/^\S+/)?.[0];
+	if (firstToken !== "start-next" && firstToken !== "continue") return undefined;
+
+	const parts = splitArgs(trimmed);
+	const action = parts.shift() as QManagerAction;
 	return { action, passthrough: parts };
+}
+
+async function startManagerAgent(pi: ExtensionAPI, args: string, ctx: ExtensionCommandContext): Promise<void> {
+	const skill = pi.getCommands().find((command) => command.source === "skill" && command.name === "skill:q-manager");
+	if (!skill) throw new Error("q-manager skill is not loaded");
+
+	const skillText = await readFile(skill.sourceInfo.path, "utf8");
+	const skillBody = skillText.replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n?/, "").trim();
+	const startupInput =
+		args.trim() ||
+		"Start or resume q-manager from the current conversation. Infer the next graph-safe action from the latest available QRSPI result or manager wake.";
+	const prompt = `<skill name="q-manager" location="${skill.sourceInfo.path}">\nReferences are relative to ${dirname(skill.sourceInfo.path)}.\n\n${skillBody}\n</skill>\n\nManager startup input:\n${startupInput}`;
+
+	if (ctx.isIdle()) {
+		pi.sendUserMessage(prompt);
+	} else {
+		pi.sendUserMessage(prompt, { deliverAs: "steer" });
+	}
 }
 
 function splitArgs(input: string): string[] {

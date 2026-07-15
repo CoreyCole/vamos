@@ -1153,7 +1153,7 @@ func TestChildCompleteInvalidResultSuppressesThenExhausts(t *testing.T) {
 		"session.jsonl",
 		"session-1",
 		filepath.Join(dir, "repo"),
-		assistantLine("not yaml"),
+		assistantLine("```yaml\nqrspi_result:\n  stage: design\n```"),
 	)
 	state := ManagerState{
 		CanonicalPlanDir: "thoughts/example",
@@ -1205,5 +1205,57 @@ func TestChildCompleteInvalidResultSuppressesThenExhausts(t *testing.T) {
 		status.Result.Status != "invalid_result" ||
 		status.Wake.Mode != "deliver" {
 		t.Fatalf("exhausted status = %+v", status)
+	}
+}
+
+func TestChildCompleteNoQRSPIResultNotifiesManagerWithoutReprompt(t *testing.T) {
+	dir := t.TempDir()
+	stateFile := filepath.Join(dir, "state.json")
+	donePath := filepath.Join(dir, "done")
+	sessionPath := writePiSession(
+		t,
+		filepath.Join(dir, "sessions"),
+		"session.jsonl",
+		"session-1",
+		filepath.Join(dir, "repo"),
+		assistantLine("not yaml"),
+	)
+	state := ManagerState{
+		CanonicalPlanDir: "thoughts/example",
+		ManagerPaneID:    "%parent",
+		Workflow:         testWorkflowState(t, qrspi.NodeDesign, nil),
+		ActiveChild: &ChildRunRef{
+			ID:                   "child-1",
+			Stage:                "design",
+			Cwd:                  filepath.Join(dir, "repo"),
+			TmuxPaneID:           "%9",
+			SessionID:            "session-1",
+			SessionDir:           filepath.Join(dir, "sessions"),
+			SessionPath:          sessionPath,
+			DonePath:             donePath,
+			ValidationStatusPath: filepath.Join(dir, "validation-status.json"),
+			Generation:           1,
+		},
+	}
+	saveManagerState(t, stateFile, state)
+	writeFile(t, donePath, "")
+	tmux := &recordingTmux{}
+	status, err := RunChildComplete(
+		t.Context(),
+		ChildCompletionOptions{StateFile: stateFile, ChildID: "child-1"},
+		deps{Tmux: tmux},
+		&strings.Builder{},
+	)
+	if err != nil {
+		t.Fatalf("RunChildComplete error = %v", err)
+	}
+	if status.Validated || !status.ManagerNeeded || status.RetryExhausted ||
+		status.Result.Status != "no_result" || status.Wake.Mode != "deliver" {
+		t.Fatalf("no-result status = %+v", status)
+	}
+	for _, paste := range tmux.pastes {
+		if paste.pane.ID == "%9" {
+			t.Fatalf("pastes = %#v, want no child reprompt", tmux.pastes)
+		}
 	}
 }

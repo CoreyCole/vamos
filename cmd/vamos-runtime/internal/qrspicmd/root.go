@@ -1730,7 +1730,30 @@ func RunChildComplete(
 			}
 		}
 		if err != nil {
-			if shouldRepromptAfterValidationError(
+			if shouldNotifyManagerWithoutReprompt(err) {
+				status.Validated = false
+				status.ManagerNeeded = true
+				status.RetryExhausted = false
+				status.DeliveryID = childCompletionDeliveryID(*child, nil, false)
+				status.Result = ChildCompletionResult{
+					Stage:   child.Stage,
+					Status:  "no_result",
+					Summary: err.Error(),
+				}
+				status.Reason = err.Error()
+				state.ActiveChild.LifecycleStatus = "awaiting_manager"
+				state.ActiveChild.LastDeliveryID = status.DeliveryID
+				state, status.Wake, err = queueOrDeliverWake(
+					ctx,
+					opts.StateFile,
+					state,
+					status,
+					d,
+				)
+				if err != nil {
+					return nil, err
+				}
+			} else if shouldRepromptAfterValidationError(
 				state,
 				ContinueOptions{
 					StateFile: opts.StateFile,
@@ -3913,6 +3936,14 @@ func RunContinue(ctx context.Context, opts ContinueOptions, d deps, out io.Write
 	result := ContinueResult{}
 	parsed, err := validateActiveChild(ctx, state, opts)
 	if err != nil {
+		if shouldNotifyManagerWithoutReprompt(err) {
+			card := buildContinueActionCard(state, opts, err)
+			if card != nil {
+				state.LastActionCard = card
+				_ = store.Save(opts.StateFile, state)
+				return writeManagerActionCard(out, *card, opts.Output)
+			}
+		}
 		if shouldRepromptAfterValidationError(state, opts, err) {
 			if repromptErr := continueReprompt(
 				ctx,
@@ -4137,6 +4168,9 @@ func shouldRepromptAfterValidationError(
 	if err == nil || state.ActiveChild == nil {
 		return false
 	}
+	if shouldNotifyManagerWithoutReprompt(err) {
+		return false
+	}
 	if state.ActiveChild.Stage != opts.Stage {
 		return false
 	}
@@ -4154,10 +4188,23 @@ func isRetryExhaustedValidationError(
 	if err == nil || state.ActiveChild == nil {
 		return false
 	}
+	if shouldNotifyManagerWithoutReprompt(err) {
+		return false
+	}
 	if state.ActiveChild.Stage != opts.Stage {
 		return false
 	}
 	return state.ActiveChild.ValidationRetryCount >= invalidResultRetryLimit(state)
+}
+
+func shouldNotifyManagerWithoutReprompt(err error) bool {
+	if err == nil {
+		return false
+	}
+	return strings.Contains(
+		strings.ToLower(err.Error()),
+		"no assistant text containing qrspi_result",
+	)
 }
 
 func writeRetryExhaustedNotice(
@@ -4456,6 +4503,28 @@ func buildContinueActionCard(
 			),
 			ContinueCommand: continueCommand(opts.StateFile),
 			RequiresHuman:   false,
+		}
+	}
+	if shouldNotifyManagerWithoutReprompt(err) {
+		return &ManagerActionCard{
+			Kind:     ActionInvalidChildYAML,
+			Severity: "warning",
+			Summary:  "child stopped without a qrspi_result",
+			Evidence: []string{
+				err.Error(),
+				fmt.Sprintf("active child stage: %s", state.ActiveChild.Stage),
+				fmt.Sprintf(
+					"session: %s",
+					firstNonEmpty(
+						state.ActiveChild.SessionPath,
+						state.ActiveChild.SessionDir,
+					),
+				),
+			},
+			RecommendedAction: "inspect whether the child was interrupted; steer/resume the same child to continue the original task if safe",
+			SafeCommand:       feedbackCommand(opts.StateFile),
+			ContinueCommand:   continueCommand(opts.StateFile),
+			RequiresHuman:     false,
 		}
 	}
 	kind := ActionInvalidChildYAML

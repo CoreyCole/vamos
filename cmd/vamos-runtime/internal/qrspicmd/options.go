@@ -631,6 +631,7 @@ type SetPolicyOptions struct {
 type ContinueResult struct {
 	Validated       *ParsedDecision
 	Reprompted      bool
+	Relaunched      bool
 	Decided         bool
 	StartedChild    *ChildRunRef
 	CleanedChild    *ChildRunRef

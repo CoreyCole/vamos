@@ -19,22 +19,51 @@ func TestManagerFlowQuestionToResearch(t *testing.T) {
 	stateFile := fixture.init(t)
 
 	resultFile := filepath.Join(fixture.dir, "question-result.txt")
-	writeFile(t, resultFile, testResultYAML("question", "complete", "complete", "thoughts/example/questions/q.md", ""))
+	writeFile(
+		t,
+		resultFile,
+		testResultYAML(
+			"question",
+			"complete",
+			"complete",
+			"thoughts/example/questions/q.md",
+			"",
+		),
+	)
 
 	var decideOut strings.Builder
-	if err := RunDecideNext(t.Context(), DecideNextOptions{StateFile: stateFile, ResultFile: resultFile, PlanDir: fixture.planDir}, deps{}, &decideOut); err != nil {
+	if err := RunDecideNext(
+		t.Context(),
+		DecideNextOptions{
+			StateFile:  stateFile,
+			ResultFile: resultFile,
+			PlanDir:    fixture.planDir,
+		},
+		deps{},
+		&decideOut,
+	); err != nil {
 		t.Fatalf("RunDecideNext error = %v", err)
 	}
 	state := loadManagerState(t, stateFile)
 	if state.Workflow.CurrentNodeID != qrspi.NodeResearch {
 		t.Fatalf("current node = %q, want research", state.Workflow.CurrentNodeID)
 	}
-	if !strings.Contains(decideOut.String(), `"nextNode":"research"`) || !strings.Contains(decideOut.String(), `"startNext":true`) {
+	if !strings.Contains(decideOut.String(), `"nextNode":"research"`) ||
+		!strings.Contains(decideOut.String(), `"startNext":true`) {
 		t.Fatalf("decide output = %q", decideOut.String())
 	}
 
 	var promptOut strings.Builder
-	if err := RunRenderPrompt(t.Context(), RenderPromptOptions{StateFile: stateFile, NodeID: "research", PlanDir: fixture.planDir}, deps{}, &promptOut); err != nil {
+	if err := RunRenderPrompt(
+		t.Context(),
+		RenderPromptOptions{
+			StateFile: stateFile,
+			NodeID:    "research",
+			PlanDir:   fixture.planDir,
+		},
+		deps{},
+		&promptOut,
+	); err != nil {
 		t.Fatalf("RunRenderPrompt error = %v", err)
 	}
 	if !strings.Contains(promptOut.String(), ".pi/skills/q-research/SKILL.md") {
@@ -47,17 +76,46 @@ func TestDecideNextMarksOldChildPendingCleanupWhenStartNext(t *testing.T) {
 	stateFile := fixture.init(t)
 	state := loadManagerState(t, stateFile)
 	sessionPath := filepath.Join(fixture.dir, "old-session.jsonl")
-	old := &ChildRunRef{ID: "old", Stage: "question", Cwd: fixture.projectRoot, TmuxPaneID: "%old", SessionID: "old-session", SessionDir: fixture.dir, SessionPath: sessionPath}
+	old := &ChildRunRef{
+		ID:          "old",
+		Stage:       "question",
+		Cwd:         fixture.projectRoot,
+		TmuxPaneID:  "%old",
+		SessionID:   "old-session",
+		SessionDir:  fixture.dir,
+		SessionPath: sessionPath,
+	}
 	state.ActiveChild = old
 	saveManagerState(t, stateFile, state)
-	writeSessionTestFile(t, sessionPath, sessionHeader(old.SessionID, fixture.projectRoot)+"\n"+assistantLine(testResultYAML("question", "complete", "complete", "thoughts/example/questions/q.md", ""))+"\n")
+	writeSessionTestFile(
+		t,
+		sessionPath,
+		sessionHeader(
+			old.SessionID,
+			fixture.projectRoot,
+		)+"\n"+assistantLine(
+			testResultYAML(
+				"question",
+				"complete",
+				"complete",
+				"thoughts/example/questions/q.md",
+				"",
+			),
+		)+"\n",
+	)
 
 	var decideOut strings.Builder
-	if err := RunDecideNext(t.Context(), DecideNextOptions{StateFile: stateFile, PlanDir: fixture.planDir}, deps{}, &decideOut); err != nil {
+	if err := RunDecideNext(
+		t.Context(),
+		DecideNextOptions{StateFile: stateFile, PlanDir: fixture.planDir},
+		deps{},
+		&decideOut,
+	); err != nil {
 		t.Fatalf("RunDecideNext error = %v", err)
 	}
 	loaded := loadManagerState(t, stateFile)
-	if loaded.PendingCleanupChild == nil || loaded.PendingCleanupChild.TmuxPaneID != "%old" {
+	if loaded.PendingCleanupChild == nil ||
+		loaded.PendingCleanupChild.TmuxPaneID != "%old" {
 		t.Fatalf("pending cleanup = %#v, want old child", loaded.PendingCleanupChild)
 	}
 	if loaded.ActiveChild == nil || loaded.ActiveChild.TmuxPaneID != "%old" {
@@ -72,11 +130,40 @@ func TestDecideNextHumanGatePreservesOldChildWithoutPendingCleanup(t *testing.T)
 	fixture := newManagerFlowFixture(t)
 	stateFile := filepath.Join(fixture.stateRoot, "design-state.json")
 	sessionPath := filepath.Join(fixture.dir, "design-session.jsonl")
-	old := &ChildRunRef{ID: "old", Stage: "design", Cwd: fixture.projectRoot, TmuxPaneID: "%old", SessionID: "design-session", SessionDir: fixture.dir, SessionPath: sessionPath}
-	saveManagerState(t, stateFile, ManagerState{ActiveChild: old, Workflow: testWorkflowState(t, qrspi.NodeDesign, nil)})
-	writeSessionTestFile(t, sessionPath, sessionHeader(old.SessionID, fixture.projectRoot)+"\n"+assistantLine(testResultYAML("design", "needs_human", "", "thoughts/example/design.md", ""))+"\n")
+	old := &ChildRunRef{
+		ID:          "old",
+		Stage:       "design",
+		Cwd:         fixture.projectRoot,
+		TmuxPaneID:  "%old",
+		SessionID:   "design-session",
+		SessionDir:  fixture.dir,
+		SessionPath: sessionPath,
+	}
+	saveManagerState(
+		t,
+		stateFile,
+		ManagerState{
+			ActiveChild: old,
+			Workflow:    testWorkflowState(t, qrspi.NodeDesign, nil),
+		},
+	)
+	writeSessionTestFile(
+		t,
+		sessionPath,
+		sessionHeader(
+			old.SessionID,
+			fixture.projectRoot,
+		)+"\n"+assistantLine(
+			testResultYAML("design", "needs_human", "", "thoughts/example/design.md", ""),
+		)+"\n",
+	)
 
-	if err := RunDecideNext(t.Context(), DecideNextOptions{StateFile: stateFile, PlanDir: fixture.planDir}, deps{}, &bytes.Buffer{}); err != nil {
+	if err := RunDecideNext(
+		t.Context(),
+		DecideNextOptions{StateFile: stateFile, PlanDir: fixture.planDir},
+		deps{},
+		&bytes.Buffer{},
+	); err != nil {
 		t.Fatalf("RunDecideNext error = %v", err)
 	}
 	loaded := loadManagerState(t, stateFile)
@@ -104,9 +191,28 @@ func TestManagerFlowWorkspaceSwitchesImplementationCwd(t *testing.T) {
 	}
 	saveManagerState(t, stateFile, state)
 	resultFile := filepath.Join(fixture.dir, "workspace-result.txt")
-	writeFile(t, resultFile, testResultYAML("workspace", "complete", "complete", "thoughts/example/plan.md", "implementation_workspace: "+impl+"\n"))
+	writeFile(
+		t,
+		resultFile,
+		testResultYAML(
+			"workspace",
+			"complete",
+			"complete",
+			"thoughts/example/plan.md",
+			"implementation_workspace: "+impl+"\n",
+		),
+	)
 
-	if err := RunDecideNext(t.Context(), DecideNextOptions{StateFile: stateFile, ResultFile: resultFile, PlanDir: fixture.planDir}, deps{}, &bytes.Buffer{}); err != nil {
+	if err := RunDecideNext(
+		t.Context(),
+		DecideNextOptions{
+			StateFile:  stateFile,
+			ResultFile: resultFile,
+			PlanDir:    fixture.planDir,
+		},
+		deps{},
+		&bytes.Buffer{},
+	); err != nil {
 		t.Fatalf("RunDecideNext error = %v", err)
 	}
 	state = loadManagerState(t, stateFile)
@@ -120,7 +226,19 @@ func TestManagerFlowWorkspaceSwitchesImplementationCwd(t *testing.T) {
 	runner := &fakeChildRunner{writeResult: true}
 	promptFile := filepath.Join(fixture.dir, "prompt.txt")
 	writeFile(t, promptFile, "prompt")
-	if err := RunChild(t.Context(), RunChildOptions{PlanDir: fixture.planDir, Stage: "implement", Cwd: impl, PromptFile: promptFile, StateFile: stateFile, Timeout: time.Second}, deps{Clock: fixture.clock, Runner: runner}, &bytes.Buffer{}); err != nil {
+	if err := RunChild(
+		t.Context(),
+		RunChildOptions{
+			PlanDir:    fixture.planDir,
+			Stage:      "implement",
+			Cwd:        impl,
+			PromptFile: promptFile,
+			StateFile:  stateFile,
+			Timeout:    time.Second,
+		},
+		deps{Clock: fixture.clock, Runner: runner},
+		&bytes.Buffer{},
+	); err != nil {
 		t.Fatalf("RunChild error = %v", err)
 	}
 	if got := runner.started[0].Cwd; got != impl {
@@ -132,12 +250,26 @@ func TestRunInitCanStartAtAnyStage(t *testing.T) {
 	fixture := newManagerFlowFixture(t)
 	impl := filepath.Join(fixture.dir, "impl")
 	var out bytes.Buffer
-	if err := RunInit(t.Context(), InitOptions{PlanDir: fixture.planDir, ProjectRoot: fixture.projectRoot, NodeID: string(qrspi.NodeReviewImplementation), ImplementationCwd: impl}, deps{StateRoot: fixture.stateRootFunc, Clock: fixture.clock}, &out); err != nil {
+	if err := RunInit(
+		t.Context(),
+		InitOptions{
+			PlanDir:           fixture.planDir,
+			ProjectRoot:       fixture.projectRoot,
+			NodeID:            string(qrspi.NodeReviewImplementation),
+			ImplementationCwd: impl,
+		},
+		deps{StateRoot: fixture.stateRootFunc, Clock: fixture.clock},
+		&out,
+	); err != nil {
 		t.Fatalf("RunInit error = %v", err)
 	}
 	state := loadManagerState(t, eventRefString(t, out.String(), "stateFile"))
 	if state.Workflow.CurrentNodeID != qrspi.NodeReviewImplementation {
-		t.Fatalf("current node = %q, want %q", state.Workflow.CurrentNodeID, qrspi.NodeReviewImplementation)
+		t.Fatalf(
+			"current node = %q, want %q",
+			state.Workflow.CurrentNodeID,
+			qrspi.NodeReviewImplementation,
+		)
 	}
 	if state.ImplementationCwd != impl {
 		t.Fatalf("implementation cwd = %q, want %q", state.ImplementationCwd, impl)
@@ -149,22 +281,45 @@ func TestRunInitCanStartAtAnyStage(t *testing.T) {
 
 func TestRunInitRejectsUnknownStage(t *testing.T) {
 	fixture := newManagerFlowFixture(t)
-	err := RunInit(t.Context(), InitOptions{PlanDir: fixture.planDir, ProjectRoot: fixture.projectRoot, NodeID: "nope"}, deps{StateRoot: fixture.stateRootFunc, Clock: fixture.clock}, &bytes.Buffer{})
-	if err == nil || !strings.Contains(err.Error(), `node "nope" is not in QRSPI definition`) {
+	err := RunInit(
+		t.Context(),
+		InitOptions{
+			PlanDir:     fixture.planDir,
+			ProjectRoot: fixture.projectRoot,
+			NodeID:      "nope",
+		},
+		deps{StateRoot: fixture.stateRootFunc, Clock: fixture.clock},
+		&bytes.Buffer{},
+	)
+	if err == nil ||
+		!strings.Contains(err.Error(), `node "nope" is not in QRSPI definition`) {
 		t.Fatalf("expected unknown node error, got %v", err)
 	}
 }
 
 func TestManagerLockConflictStops(t *testing.T) {
 	fixture := newManagerFlowFixture(t)
-	key := LockKey{RepoID: fixture.projectRoot, CanonicalPlanDir: filepath.Join(fixture.projectRoot, fixture.planDir)}
+	key := LockKey{
+		RepoID:           fixture.projectRoot,
+		CanonicalPlanDir: filepath.Join(fixture.projectRoot, fixture.planDir),
+	}
 	store := FileStateStore{Root: fixture.stateRoot, Clock: fixture.clock}
-	if _, err := store.AcquireLock(t.Context(), key, "other-manager", time.Hour); err != nil {
+	if _, err := store.AcquireLock(
+		t.Context(),
+		key,
+		"other-manager",
+		time.Hour,
+	); err != nil {
 		t.Fatal(err)
 	}
 
 	var out bytes.Buffer
-	err := RunInit(t.Context(), InitOptions{PlanDir: fixture.planDir, ProjectRoot: fixture.projectRoot}, deps{StateRoot: fixture.stateRootFunc, Clock: fixture.clock}, &out)
+	err := RunInit(
+		t.Context(),
+		InitOptions{PlanDir: fixture.planDir, ProjectRoot: fixture.projectRoot},
+		deps{StateRoot: fixture.stateRootFunc, Clock: fixture.clock},
+		&out,
+	)
 	var conflict LockConflictError
 	if !errors.As(err, &conflict) {
 		t.Fatalf("expected LockConflictError, got %v (out %q)", err, out.String())
@@ -178,20 +333,53 @@ func TestManagerLockConflictStops(t *testing.T) {
 func TestDiscussPolicyDoesNotAutoStartCommandFlow(t *testing.T) {
 	fixture := newManagerFlowFixture(t)
 	policyFile := filepath.Join(fixture.dir, "policy.json")
-	writeFile(t, policyFile, `{"advanceMode":"discuss","enablePlanReviews":true,"invalidResultRetryLimit":1}`)
+	writeFile(
+		t,
+		policyFile,
+		`{"advanceMode":"discuss","enablePlanReviews":true,"invalidResultRetryLimit":1}`,
+	)
 	var initOut bytes.Buffer
-	if err := RunInit(t.Context(), InitOptions{PlanDir: fixture.planDir, ProjectRoot: fixture.projectRoot, PolicyFile: policyFile}, deps{StateRoot: fixture.stateRootFunc, Clock: fixture.clock}, &initOut); err != nil {
+	if err := RunInit(
+		t.Context(),
+		InitOptions{
+			PlanDir:     fixture.planDir,
+			ProjectRoot: fixture.projectRoot,
+			PolicyFile:  policyFile,
+		},
+		deps{StateRoot: fixture.stateRootFunc, Clock: fixture.clock},
+		&initOut,
+	); err != nil {
 		t.Fatalf("RunInit error = %v", err)
 	}
 	stateFile := eventRefString(t, initOut.String(), "stateFile")
 	resultFile := filepath.Join(fixture.dir, "question-result.txt")
-	writeFile(t, resultFile, testResultYAML("question", "complete", "complete", "thoughts/example/questions/q.md", ""))
+	writeFile(
+		t,
+		resultFile,
+		testResultYAML(
+			"question",
+			"complete",
+			"complete",
+			"thoughts/example/questions/q.md",
+			"",
+		),
+	)
 
 	var decideOut bytes.Buffer
-	if err := RunDecideNext(t.Context(), DecideNextOptions{StateFile: stateFile, ResultFile: resultFile, PlanDir: fixture.planDir}, deps{}, &decideOut); err != nil {
+	if err := RunDecideNext(
+		t.Context(),
+		DecideNextOptions{
+			StateFile:  stateFile,
+			ResultFile: resultFile,
+			PlanDir:    fixture.planDir,
+		},
+		deps{},
+		&decideOut,
+	); err != nil {
 		t.Fatalf("RunDecideNext error = %v", err)
 	}
-	if !strings.Contains(decideOut.String(), `"nextNode":"research"`) || !strings.Contains(decideOut.String(), `"startNext":false`) {
+	if !strings.Contains(decideOut.String(), `"nextNode":"research"`) ||
+		!strings.Contains(decideOut.String(), `"startNext":false`) {
 		t.Fatalf("decide output = %q", decideOut.String())
 	}
 }
@@ -202,13 +390,33 @@ func TestReviewPlanReadyForImplementContinuesToImplementation(t *testing.T) {
 	state := ManagerState{Workflow: testWorkflowState(t, qrspi.NodeReviewPlan, nil)}
 	saveManagerState(t, stateFile, state)
 	resultFile := filepath.Join(fixture.dir, "review-plan-result.txt")
-	writeFile(t, resultFile, testResultYAML("review-plan", "complete", "ready-for-implement", "thoughts/example/reviews/plan/review.md", ""))
+	writeFile(
+		t,
+		resultFile,
+		testResultYAML(
+			"review-plan",
+			"complete",
+			"ready-for-implement",
+			"thoughts/example/reviews/plan/review.md",
+			"",
+		),
+	)
 
 	var out bytes.Buffer
-	if err := RunDecideNext(t.Context(), DecideNextOptions{StateFile: stateFile, ResultFile: resultFile, PlanDir: fixture.planDir}, deps{}, &out); err != nil {
+	if err := RunDecideNext(
+		t.Context(),
+		DecideNextOptions{
+			StateFile:  stateFile,
+			ResultFile: resultFile,
+			PlanDir:    fixture.planDir,
+		},
+		deps{},
+		&out,
+	); err != nil {
 		t.Fatalf("RunDecideNext error = %v", err)
 	}
-	if !strings.Contains(out.String(), `"nextNode":"implement"`) || !strings.Contains(out.String(), `"startNext":true`) {
+	if !strings.Contains(out.String(), `"nextNode":"implement"`) ||
+		!strings.Contains(out.String(), `"startNext":true`) {
 		t.Fatalf("decide output = %q", out.String())
 	}
 	loaded := loadManagerState(t, stateFile)
@@ -220,61 +428,166 @@ func TestReviewPlanReadyForImplementContinuesToImplementation(t *testing.T) {
 func TestReviewPlanGenericPositiveNormalizesAcrossManagerCommands(t *testing.T) {
 	fixture := newManagerFlowFixture(t)
 	stateFile := filepath.Join(fixture.stateRoot, "review-plan-normalize-state.json")
-	state := ManagerState{CanonicalPlanDir: fixture.planDir, SourceCwd: fixture.projectRoot, Workflow: testWorkflowState(t, qrspi.NodeReviewPlan, nil)}
+	state := ManagerState{
+		CanonicalPlanDir: fixture.planDir,
+		SourceCwd:        fixture.projectRoot,
+		Workflow:         testWorkflowState(t, qrspi.NodeReviewPlan, nil),
+	}
 	saveManagerState(t, stateFile, state)
 	resultFile := filepath.Join(fixture.dir, "review-plan-generic-result.txt")
-	writeFile(t, resultFile, testResultYAML("review-plan", "complete", "complete", "thoughts/example/reviews/plan/review.md", ""))
+	writeFile(
+		t,
+		resultFile,
+		testResultYAML(
+			"review-plan",
+			"complete",
+			"complete",
+			"thoughts/example/reviews/plan/review.md",
+			"",
+		),
+	)
 
 	var out bytes.Buffer
-	if err := RunDecideNext(t.Context(), DecideNextOptions{StateFile: stateFile, ResultFile: resultFile, PlanDir: fixture.planDir}, deps{}, &out); err != nil {
+	if err := RunDecideNext(
+		t.Context(),
+		DecideNextOptions{
+			StateFile:  stateFile,
+			ResultFile: resultFile,
+			PlanDir:    fixture.planDir,
+		},
+		deps{},
+		&out,
+	); err != nil {
 		t.Fatalf("RunDecideNext generic positive error = %v", err)
 	}
-	if !strings.Contains(out.String(), `"nextNode":"workspace"`) || !strings.Contains(out.String(), `"startNext":true`) {
+	if !strings.Contains(out.String(), `"nextNode":"workspace"`) ||
+		!strings.Contains(out.String(), `"startNext":true`) {
 		t.Fatalf("decide output = %q", out.String())
 	}
 
-	seedState := ManagerState{CanonicalPlanDir: fixture.planDir, SourceCwd: fixture.projectRoot, Workflow: testWorkflowState(t, qrspi.NodeReviewPlan, nil)}
-	parsed, err := applyLatestResultSeed(&seedState, testResultYAML("review-plan", "complete", "complete", "thoughts/example/reviews/plan/review.md", ""))
+	seedState := ManagerState{
+		CanonicalPlanDir: fixture.planDir,
+		SourceCwd:        fixture.projectRoot,
+		Workflow:         testWorkflowState(t, qrspi.NodeReviewPlan, nil),
+	}
+	parsed, err := applyLatestResultSeed(
+		&seedState,
+		testResultYAML(
+			"review-plan",
+			"complete",
+			"complete",
+			"thoughts/example/reviews/plan/review.md",
+			"",
+		),
+	)
 	if err != nil {
 		t.Fatalf("applyLatestResultSeed generic positive error = %v", err)
 	}
-	if parsed.Result.Outcome != "ready-for-workspace" || seedState.Workflow.CurrentNodeID != qrspi.NodeWorkspace {
-		t.Fatalf("outcome/current = %q/%q, want ready-for-workspace/workspace", parsed.Result.Outcome, seedState.Workflow.CurrentNodeID)
+	if parsed.Result.Outcome != "ready-for-workspace" ||
+		seedState.Workflow.CurrentNodeID != qrspi.NodeWorkspace {
+		t.Fatalf(
+			"outcome/current = %q/%q, want ready-for-workspace/workspace",
+			parsed.Result.Outcome,
+			seedState.Workflow.CurrentNodeID,
+		)
 	}
 }
 
 func TestWakeDrivenManagerLoopCleansOldPaneAfterNextLaunch(t *testing.T) {
 	fixture := newManagerFlowFixture(t)
 	runner := &fakeChildRunner{panes: []string{"%old", "%new"}}
-	initOut, err := executeManagerCommand(deps{StateRoot: fixture.stateRootFunc, Clock: fixture.clock, Runner: runner}, "init", "--plan-dir", fixture.planDir, "--project-root", fixture.projectRoot, "--manager-pane", "%parent")
+	initOut, err := executeManagerCommand(
+		deps{StateRoot: fixture.stateRootFunc, Clock: fixture.clock, Runner: runner},
+		"init",
+		"--plan-dir",
+		fixture.planDir,
+		"--project-root",
+		fixture.projectRoot,
+		"--manager-pane",
+		"%parent",
+	)
 	if err != nil {
 		t.Fatalf("init command error = %v", err)
 	}
 	stateFile := eventRefString(t, initOut, "stateFile")
 
-	renderOut, err := executeManagerCommand(deps{}, "render-prompt", "--state-file", stateFile, "--node", "question", "--plan-dir", fixture.planDir)
+	renderOut, err := executeManagerCommand(
+		deps{},
+		"render-prompt",
+		"--state-file",
+		stateFile,
+		"--node",
+		"question",
+		"--plan-dir",
+		fixture.planDir,
+	)
 	if err != nil {
 		t.Fatalf("render command error = %v", err)
 	}
 	promptFile := filepath.Join(fixture.dir, "prompt.txt")
 	writeFile(t, promptFile, renderOut)
 
-	runOut, err := executeManagerCommand(deps{Clock: fixture.clock, Runner: runner}, "run-child", "--state-file", stateFile, "--plan-dir", fixture.planDir, "--stage", "question", "--cwd", fixture.projectRoot, "--prompt-file", promptFile, "--timeout", "0")
+	runOut, err := executeManagerCommand(
+		deps{Clock: fixture.clock, Runner: runner},
+		"run-child",
+		"--state-file",
+		stateFile,
+		"--plan-dir",
+		fixture.planDir,
+		"--stage",
+		"question",
+		"--cwd",
+		fixture.projectRoot,
+		"--prompt-file",
+		promptFile,
+		"--timeout",
+		"0",
+	)
 	if err != nil {
 		t.Fatalf("run-child command error = %v", err)
 	}
-	if !strings.Contains(runOut, `"type":"child_started"`) || strings.Contains(runOut, `"type":"child_finished"`) {
+	if !strings.Contains(runOut, `"type":"child_started"`) ||
+		strings.Contains(runOut, `"type":"child_finished"`) {
 		t.Fatalf("timeout 0 run output = %q", runOut)
 	}
 	state := loadManagerState(t, stateFile)
-	if state.ManagerPaneID != "%parent" || state.ActiveChild == nil || state.ActiveChild.TmuxPaneID != "%old" {
+	if state.ManagerPaneID != "%parent" || state.ActiveChild == nil ||
+		state.ActiveChild.TmuxPaneID != "%old" {
 		t.Fatalf("state after child start = %+v", state)
 	}
-	writeFile(t, state.ActiveChild.StatusPath, `{"event":"agent_end","stage":"question","childId":"`+state.ActiveChild.ID+`","wakeTarget":"%parent"}`)
+	writeFile(
+		t,
+		state.ActiveChild.StatusPath,
+		`{"event":"agent_end","stage":"question","childId":"`+state.ActiveChild.ID+`","wakeTarget":"%parent"}`,
+	)
 	writeFile(t, state.ActiveChild.DonePath, "")
-	writeSessionTestFile(t, filepath.Join(state.ActiveChild.SessionDir, "session.jsonl"), sessionHeader(state.ActiveChild.SessionID, fixture.projectRoot)+"\n"+assistantLine(testResultYAML("question", "complete", "complete", "thoughts/example/questions/q.md", ""))+"\n")
+	writeSessionTestFile(
+		t,
+		filepath.Join(state.ActiveChild.SessionDir, "session.jsonl"),
+		sessionHeader(
+			state.ActiveChild.SessionID,
+			fixture.projectRoot,
+		)+"\n"+assistantLine(
+			testResultYAML(
+				"question",
+				"complete",
+				"complete",
+				"thoughts/example/questions/q.md",
+				"",
+			),
+		)+"\n",
+	)
 
-	validateOut, err := executeManagerCommand(deps{}, "validate-result", "--state-file", stateFile, "--stage", "question", "--plan-dir", fixture.planDir)
+	validateOut, err := executeManagerCommand(
+		deps{},
+		"validate-result",
+		"--state-file",
+		stateFile,
+		"--stage",
+		"question",
+		"--plan-dir",
+		fixture.planDir,
+	)
 	if err != nil {
 		t.Fatalf("validate command error = %v", err)
 	}
@@ -282,36 +595,64 @@ func TestWakeDrivenManagerLoopCleansOldPaneAfterNextLaunch(t *testing.T) {
 		t.Fatalf("validate output = %q", validateOut)
 	}
 
-	decideOut, err := executeManagerCommand(deps{}, "decide-next", "--state-file", stateFile, "--plan-dir", fixture.planDir)
+	decideOut, err := executeManagerCommand(
+		deps{},
+		"decide-next",
+		"--state-file",
+		stateFile,
+		"--plan-dir",
+		fixture.planDir,
+	)
 	if err != nil {
 		t.Fatalf("decide command error = %v", err)
 	}
-	if !strings.Contains(decideOut, `"nextNode":"research"`) || !strings.Contains(decideOut, `"startNext":true`) {
+	if !strings.Contains(decideOut, `"nextNode":"research"`) ||
+		!strings.Contains(decideOut, `"startNext":true`) {
 		t.Fatalf("decide output = %q", decideOut)
 	}
 	state = loadManagerState(t, stateFile)
-	if state.PendingCleanupChild == nil || state.PendingCleanupChild.TmuxPaneID != "%old" {
+	if state.PendingCleanupChild == nil ||
+		state.PendingCleanupChild.TmuxPaneID != "%old" {
 		t.Fatalf("pending cleanup after decide = %#v", state.PendingCleanupChild)
 	}
 
 	nextPromptFile := filepath.Join(fixture.dir, "research-prompt.txt")
 	writeFile(t, nextPromptFile, "research prompt")
 	tmux := &recordingTmux{}
-	nextOut, err := executeManagerCommand(deps{Clock: fixture.clock, Runner: runner, Tmux: tmux}, "run-child", "--state-file", stateFile, "--plan-dir", fixture.planDir, "--stage", "research", "--cwd", fixture.projectRoot, "--prompt-file", nextPromptFile, "--timeout", "0")
+	nextOut, err := executeManagerCommand(
+		deps{Clock: fixture.clock, Runner: runner, Tmux: tmux},
+		"run-child",
+		"--state-file",
+		stateFile,
+		"--plan-dir",
+		fixture.planDir,
+		"--stage",
+		"research",
+		"--cwd",
+		fixture.projectRoot,
+		"--prompt-file",
+		nextPromptFile,
+		"--timeout",
+		"0",
+	)
 	if err != nil {
 		t.Fatalf("next run-child command error = %v", err)
 	}
-	if !strings.Contains(nextOut, `"type":"child_started"`) || !strings.Contains(nextOut, `"type":"child_cleaned"`) {
+	if !strings.Contains(nextOut, `"type":"child_started"`) ||
+		!strings.Contains(nextOut, `"type":"child_cleaned"`) {
 		t.Fatalf("next run output = %q", nextOut)
 	}
 	state = loadManagerState(t, stateFile)
-	if state.ActiveChild == nil || state.ActiveChild.Stage != "research" || state.ActiveChild.TmuxPaneID != "%new" || state.PendingCleanupChild != nil {
+	if state.ActiveChild == nil || state.ActiveChild.Stage != "research" ||
+		state.ActiveChild.TmuxPaneID != "%new" ||
+		state.PendingCleanupChild != nil {
 		t.Fatalf("state after next launch = %+v", state)
 	}
 	if len(tmux.kills) != 1 || tmux.kills[0].ID != "%old" {
 		t.Fatalf("kills = %#v, want %%old", tmux.kills)
 	}
-	if len(tmux.layouts) != 1 || tmux.layouts[0].pane.ID != "%new" || tmux.layouts[0].layout != "even-horizontal" {
+	if len(tmux.layouts) != 1 || tmux.layouts[0].pane.ID != "%new" ||
+		tmux.layouts[0].layout != "even-horizontal" {
 		t.Fatalf("layouts = %#v, want even-horizontal on %%new", tmux.layouts)
 	}
 }
@@ -345,7 +686,16 @@ func TestPendingCleanupTreatsMissingPaneAsSuccess(t *testing.T) {
 func TestContinueValidResultStartsNextChildAndCleansOldPane(t *testing.T) {
 	fixture := newManagerFlowFixture(t)
 	runner := &fakeChildRunner{panes: []string{"%old", "%new"}}
-	initOut, err := executeManagerCommand(deps{StateRoot: fixture.stateRootFunc, Clock: fixture.clock, Runner: runner}, "init", "--plan-dir", fixture.planDir, "--project-root", fixture.projectRoot, "--manager-pane", "%parent")
+	initOut, err := executeManagerCommand(
+		deps{StateRoot: fixture.stateRootFunc, Clock: fixture.clock, Runner: runner},
+		"init",
+		"--plan-dir",
+		fixture.planDir,
+		"--project-root",
+		fixture.projectRoot,
+		"--manager-pane",
+		"%parent",
+	)
 	if err != nil {
 		t.Fatalf("init command error = %v", err)
 	}
@@ -353,16 +703,57 @@ func TestContinueValidResultStartsNextChildAndCleansOldPane(t *testing.T) {
 
 	promptFile := filepath.Join(fixture.dir, "prompt.txt")
 	writeFile(t, promptFile, "question prompt")
-	if _, err := executeManagerCommand(deps{Clock: fixture.clock, Runner: runner}, "run-child", "--state-file", stateFile, "--plan-dir", fixture.planDir, "--stage", "question", "--cwd", fixture.projectRoot, "--prompt-file", promptFile, "--timeout", "0"); err != nil {
+	if _, err := executeManagerCommand(
+		deps{Clock: fixture.clock, Runner: runner},
+		"run-child",
+		"--state-file",
+		stateFile,
+		"--plan-dir",
+		fixture.planDir,
+		"--stage",
+		"question",
+		"--cwd",
+		fixture.projectRoot,
+		"--prompt-file",
+		promptFile,
+		"--timeout",
+		"0",
+	); err != nil {
 		t.Fatalf("run-child command error = %v", err)
 	}
 	state := loadManagerState(t, stateFile)
-	writeFile(t, state.ActiveChild.StatusPath, `{"event":"agent_end","stage":"question","childId":"`+state.ActiveChild.ID+`","wakeTarget":"%parent"}`)
+	writeFile(
+		t,
+		state.ActiveChild.StatusPath,
+		`{"event":"agent_end","stage":"question","childId":"`+state.ActiveChild.ID+`","wakeTarget":"%parent"}`,
+	)
 	writeFile(t, state.ActiveChild.DonePath, "")
-	writeSessionTestFile(t, filepath.Join(state.ActiveChild.SessionDir, "session.jsonl"), sessionHeader(state.ActiveChild.SessionID, fixture.projectRoot)+"\n"+assistantLine(testResultYAML("question", "complete", "complete", "thoughts/example/questions/q.md", ""))+"\n")
+	writeSessionTestFile(
+		t,
+		filepath.Join(state.ActiveChild.SessionDir, "session.jsonl"),
+		sessionHeader(
+			state.ActiveChild.SessionID,
+			fixture.projectRoot,
+		)+"\n"+assistantLine(
+			testResultYAML(
+				"question",
+				"complete",
+				"complete",
+				"thoughts/example/questions/q.md",
+				"",
+			),
+		)+"\n",
+	)
 
 	tmux := &recordingTmux{}
-	continueOut, err := executeManagerCommand(deps{Clock: fixture.clock, Runner: runner, Tmux: tmux}, "continue", "--state-file", stateFile, "--plan-dir", fixture.planDir)
+	continueOut, err := executeManagerCommand(
+		deps{Clock: fixture.clock, Runner: runner, Tmux: tmux},
+		"continue",
+		"--state-file",
+		stateFile,
+		"--plan-dir",
+		fixture.planDir,
+	)
 	if err != nil {
 		t.Fatalf("continue command error = %v", err)
 	}
@@ -371,11 +762,14 @@ func TestContinueValidResultStartsNextChildAndCleansOldPane(t *testing.T) {
 			t.Fatalf("continue output missing %q: %q", want, continueOut)
 		}
 	}
-	if strings.Contains(continueOut, "rawYaml") || strings.Contains(continueOut, "workflow") {
+	if strings.Contains(continueOut, "rawYaml") ||
+		strings.Contains(continueOut, "workflow") {
 		t.Fatalf("continue output exposed raw decision dump: %q", continueOut)
 	}
 	state = loadManagerState(t, stateFile)
-	if state.ActiveChild == nil || state.ActiveChild.Stage != "research" || state.ActiveChild.TmuxPaneID != "%new" || state.PendingCleanupChild != nil {
+	if state.ActiveChild == nil || state.ActiveChild.Stage != "research" ||
+		state.ActiveChild.TmuxPaneID != "%new" ||
+		state.PendingCleanupChild != nil {
 		t.Fatalf("state after continue = %+v", state)
 	}
 	if len(tmux.kills) != 1 || tmux.kills[0].ID != "%old" {
@@ -387,7 +781,15 @@ func TestContinueOutlineNeedsHumanPrintsSteeringGuidance(t *testing.T) {
 	fixture := newManagerFlowFixture(t)
 	stateFile := filepath.Join(fixture.stateRoot, "outline-state.json")
 	sessionPath := filepath.Join(fixture.dir, "outline-session.jsonl")
-	active := &ChildRunRef{ID: "outline-child", Stage: "outline", Cwd: fixture.projectRoot, TmuxPaneID: "%old", SessionID: "outline-session", SessionDir: fixture.dir, SessionPath: sessionPath}
+	active := &ChildRunRef{
+		ID:          "outline-child",
+		Stage:       "outline",
+		Cwd:         fixture.projectRoot,
+		TmuxPaneID:  "%old",
+		SessionID:   "outline-session",
+		SessionDir:  fixture.dir,
+		SessionPath: sessionPath,
+	}
 	state := ManagerState{
 		RepoID:           fixture.projectRoot,
 		CanonicalPlanDir: fixture.planDir,
@@ -397,10 +799,32 @@ func TestContinueOutlineNeedsHumanPrintsSteeringGuidance(t *testing.T) {
 		Workflow:         testWorkflowState(t, qrspi.NodeOutline, nil),
 	}
 	saveManagerState(t, stateFile, state)
-	writeSessionTestFile(t, sessionPath, sessionHeader(active.SessionID, fixture.projectRoot)+"\n"+assistantLine(testResultYAML("outline", "needs_human", "", "thoughts/example/design.md", ""))+"\n")
+	writeSessionTestFile(
+		t,
+		sessionPath,
+		sessionHeader(
+			active.SessionID,
+			fixture.projectRoot,
+		)+"\n"+assistantLine(
+			testResultYAML(
+				"outline",
+				"needs_human",
+				"",
+				"thoughts/example/design.md",
+				"",
+			),
+		)+"\n",
+	)
 
 	runner := &fakeChildRunner{panes: []string{"%new"}}
-	continueOut, err := executeManagerCommand(deps{Clock: fixture.clock, Runner: runner}, "continue", "--state-file", stateFile, "--plan-dir", fixture.planDir)
+	continueOut, err := executeManagerCommand(
+		deps{Clock: fixture.clock, Runner: runner},
+		"continue",
+		"--state-file",
+		stateFile,
+		"--plan-dir",
+		fixture.planDir,
+	)
 	if err != nil {
 		t.Fatalf("continue command error = %v", err)
 	}
@@ -427,12 +851,51 @@ func TestContinueOutlineNeedsHumanNDJSONIncludesManagerRefs(t *testing.T) {
 	fixture := newManagerFlowFixture(t)
 	stateFile := filepath.Join(fixture.stateRoot, "outline-ndjson-state.json")
 	sessionPath := filepath.Join(fixture.dir, "outline-ndjson-session.jsonl")
-	active := &ChildRunRef{ID: "outline-child", Stage: "outline", Cwd: fixture.projectRoot, TmuxPaneID: "%old", SessionID: "outline-session", SessionDir: fixture.dir, SessionPath: sessionPath}
-	state := ManagerState{RepoID: fixture.projectRoot, CanonicalPlanDir: fixture.planDir, ManagerRunID: "outline-run", SourceCwd: fixture.projectRoot, ActiveChild: active, Workflow: testWorkflowState(t, qrspi.NodeOutline, nil)}
+	active := &ChildRunRef{
+		ID:          "outline-child",
+		Stage:       "outline",
+		Cwd:         fixture.projectRoot,
+		TmuxPaneID:  "%old",
+		SessionID:   "outline-session",
+		SessionDir:  fixture.dir,
+		SessionPath: sessionPath,
+	}
+	state := ManagerState{
+		RepoID:           fixture.projectRoot,
+		CanonicalPlanDir: fixture.planDir,
+		ManagerRunID:     "outline-run",
+		SourceCwd:        fixture.projectRoot,
+		ActiveChild:      active,
+		Workflow:         testWorkflowState(t, qrspi.NodeOutline, nil),
+	}
 	saveManagerState(t, stateFile, state)
-	writeSessionTestFile(t, sessionPath, sessionHeader(active.SessionID, fixture.projectRoot)+"\n"+assistantLine(testResultYAML("outline", "needs_human", "", "thoughts/example/design.md", ""))+"\n")
+	writeSessionTestFile(
+		t,
+		sessionPath,
+		sessionHeader(
+			active.SessionID,
+			fixture.projectRoot,
+		)+"\n"+assistantLine(
+			testResultYAML(
+				"outline",
+				"needs_human",
+				"",
+				"thoughts/example/design.md",
+				"",
+			),
+		)+"\n",
+	)
 
-	continueOut, err := executeManagerCommand(deps{Clock: fixture.clock}, "continue", "--state-file", stateFile, "--plan-dir", fixture.planDir, "--output", "ndjson")
+	continueOut, err := executeManagerCommand(
+		deps{Clock: fixture.clock},
+		"continue",
+		"--state-file",
+		stateFile,
+		"--plan-dir",
+		fixture.planDir,
+		"--output",
+		"ndjson",
+	)
 	if err != nil {
 		t.Fatalf("continue command error = %v", err)
 	}
@@ -447,7 +910,15 @@ func TestContinueBlockedResultPrintsConciseStop(t *testing.T) {
 	fixture := newManagerFlowFixture(t)
 	stateFile := filepath.Join(fixture.stateRoot, "verify-state.json")
 	sessionPath := filepath.Join(fixture.dir, "verify-session.jsonl")
-	active := &ChildRunRef{ID: "verify-child", Stage: "verify", Cwd: fixture.projectRoot, TmuxPaneID: "%old", SessionID: "verify-session", SessionDir: fixture.dir, SessionPath: sessionPath}
+	active := &ChildRunRef{
+		ID:          "verify-child",
+		Stage:       "verify",
+		Cwd:         fixture.projectRoot,
+		TmuxPaneID:  "%old",
+		SessionID:   "verify-session",
+		SessionDir:  fixture.dir,
+		SessionPath: sessionPath,
+	}
 	state := ManagerState{
 		RepoID:           fixture.projectRoot,
 		CanonicalPlanDir: fixture.planDir,
@@ -457,10 +928,26 @@ func TestContinueBlockedResultPrintsConciseStop(t *testing.T) {
 		Workflow:         testWorkflowState(t, qrspi.NodeVerify, nil),
 	}
 	saveManagerState(t, stateFile, state)
-	writeSessionTestFile(t, sessionPath, sessionHeader(active.SessionID, fixture.projectRoot)+"\n"+assistantLine(testResultYAML("verify", "blocked", "", "thoughts/example/verify.md", ""))+"\n")
+	writeSessionTestFile(
+		t,
+		sessionPath,
+		sessionHeader(
+			active.SessionID,
+			fixture.projectRoot,
+		)+"\n"+assistantLine(
+			testResultYAML("verify", "blocked", "", "thoughts/example/verify.md", ""),
+		)+"\n",
+	)
 
 	runner := &fakeChildRunner{panes: []string{"%new"}}
-	continueOut, err := executeManagerCommand(deps{Clock: fixture.clock, Runner: runner}, "continue", "--state-file", stateFile, "--plan-dir", fixture.planDir)
+	continueOut, err := executeManagerCommand(
+		deps{Clock: fixture.clock, Runner: runner},
+		"continue",
+		"--state-file",
+		stateFile,
+		"--plan-dir",
+		fixture.planDir,
+	)
 	if err != nil {
 		t.Fatalf("continue command error = %v", err)
 	}
@@ -486,22 +973,60 @@ func TestContinueBlockedResultPrintsConciseStop(t *testing.T) {
 func TestContinueCommandInvalidResultRepromptsSameChild(t *testing.T) {
 	fixture := newManagerFlowFixture(t)
 	runner := &fakeChildRunner{panes: []string{"%old"}}
-	initOut, err := executeManagerCommand(deps{StateRoot: fixture.stateRootFunc, Clock: fixture.clock, Runner: runner}, "init", "--plan-dir", fixture.planDir, "--project-root", fixture.projectRoot, "--manager-pane", "%parent")
+	initOut, err := executeManagerCommand(
+		deps{StateRoot: fixture.stateRootFunc, Clock: fixture.clock, Runner: runner},
+		"init",
+		"--plan-dir",
+		fixture.planDir,
+		"--project-root",
+		fixture.projectRoot,
+		"--manager-pane",
+		"%parent",
+	)
 	if err != nil {
 		t.Fatalf("init command error = %v", err)
 	}
 	stateFile := eventRefString(t, initOut, "stateFile")
 	promptFile := filepath.Join(fixture.dir, "prompt.txt")
 	writeFile(t, promptFile, "design prompt")
-	if _, err := executeManagerCommand(deps{Clock: fixture.clock, Runner: runner}, "run-child", "--state-file", stateFile, "--plan-dir", fixture.planDir, "--stage", "question", "--cwd", fixture.projectRoot, "--prompt-file", promptFile, "--timeout", "0"); err != nil {
+	if _, err := executeManagerCommand(
+		deps{Clock: fixture.clock, Runner: runner},
+		"run-child",
+		"--state-file",
+		stateFile,
+		"--plan-dir",
+		fixture.planDir,
+		"--stage",
+		"question",
+		"--cwd",
+		fixture.projectRoot,
+		"--prompt-file",
+		promptFile,
+		"--timeout",
+		"0",
+	); err != nil {
 		t.Fatalf("run-child command error = %v", err)
 	}
 	state := loadManagerState(t, stateFile)
 	writeFile(t, state.ActiveChild.DonePath, "")
-	writeSessionTestFile(t, filepath.Join(state.ActiveChild.SessionDir, "session.jsonl"), sessionHeader(state.ActiveChild.SessionID, fixture.projectRoot)+"\n"+assistantLine("plain invalid result")+"\n")
+	writeSessionTestFile(
+		t,
+		filepath.Join(state.ActiveChild.SessionDir, "session.jsonl"),
+		sessionHeader(
+			state.ActiveChild.SessionID,
+			fixture.projectRoot,
+		)+"\n"+assistantLine(
+			"```yaml\nqrspi_result:\n  stage: question\n```",
+		)+"\n",
+	)
 
 	tmux := &recordingTmux{}
-	continueOut, err := executeManagerCommand(deps{Clock: fixture.clock, Runner: runner, Tmux: tmux}, "continue", "--state-file", stateFile)
+	continueOut, err := executeManagerCommand(
+		deps{Clock: fixture.clock, Runner: runner, Tmux: tmux},
+		"continue",
+		"--state-file",
+		stateFile,
+	)
 	if err != nil {
 		t.Fatalf("continue command error = %v", err)
 	}
@@ -515,7 +1040,8 @@ func TestContinueCommandInvalidResultRepromptsSameChild(t *testing.T) {
 		t.Fatalf("runner starts = %d, want only initial child", len(runner.started))
 	}
 	loaded := loadManagerState(t, stateFile)
-	if loaded.ActiveChild == nil || loaded.ActiveChild.ID != state.ActiveChild.ID || loaded.ActiveChild.TmuxPaneID != "%old" {
+	if loaded.ActiveChild == nil || loaded.ActiveChild.ID != state.ActiveChild.ID ||
+		loaded.ActiveChild.TmuxPaneID != "%old" {
 		t.Fatalf("active child changed: %+v", loaded.ActiveChild)
 	}
 }
@@ -524,12 +1050,45 @@ func TestContinueInvalidResultRetryExhaustionEmitsManagerNotice(t *testing.T) {
 	fixture := newManagerFlowFixture(t)
 	stateFile := filepath.Join(fixture.stateRoot, "retry-exhausted-state.json")
 	sessionPath := filepath.Join(fixture.dir, "retry-exhausted-session.jsonl")
-	active := &ChildRunRef{ID: "plan-child", Stage: "plan", Cwd: fixture.projectRoot, TmuxPaneID: "%old", SessionID: "plan-session", SessionDir: fixture.dir, SessionPath: sessionPath, ValidationRetryCount: 1, LastRepromptAttempt: 1}
-	state := ManagerState{RepoID: fixture.projectRoot, CanonicalPlanDir: fixture.planDir, ManagerRunID: "retry-run", SourceCwd: fixture.projectRoot, ActiveChild: active, Workflow: testWorkflowState(t, qrspi.NodePlan, nil)}
+	active := &ChildRunRef{
+		ID:                   "plan-child",
+		Stage:                "plan",
+		Cwd:                  fixture.projectRoot,
+		TmuxPaneID:           "%old",
+		SessionID:            "plan-session",
+		SessionDir:           fixture.dir,
+		SessionPath:          sessionPath,
+		ValidationRetryCount: 1,
+		LastRepromptAttempt:  1,
+	}
+	state := ManagerState{
+		RepoID:           fixture.projectRoot,
+		CanonicalPlanDir: fixture.planDir,
+		ManagerRunID:     "retry-run",
+		SourceCwd:        fixture.projectRoot,
+		ActiveChild:      active,
+		Workflow:         testWorkflowState(t, qrspi.NodePlan, nil),
+	}
 	saveManagerState(t, stateFile, state)
-	writeSessionTestFile(t, sessionPath, sessionHeader(active.SessionID, fixture.projectRoot)+"\n"+assistantLine("HTTP/2 200 response headers, no fenced result")+"\n")
+	writeSessionTestFile(
+		t,
+		sessionPath,
+		sessionHeader(
+			active.SessionID,
+			fixture.projectRoot,
+		)+"\n"+assistantLine(
+			"```yaml\nqrspi_result:\n  stage: plan\n```",
+		)+"\n",
+	)
 
-	continueOut, err := executeManagerCommand(deps{Clock: fixture.clock}, "continue", "--state-file", stateFile, "--plan-dir", fixture.planDir)
+	continueOut, err := executeManagerCommand(
+		deps{Clock: fixture.clock},
+		"continue",
+		"--state-file",
+		stateFile,
+		"--plan-dir",
+		fixture.planDir,
+	)
 	if err != nil {
 		t.Fatalf("continue command error = %v", err)
 	}
@@ -538,7 +1097,9 @@ func TestContinueInvalidResultRetryExhaustionEmitsManagerNotice(t *testing.T) {
 			t.Fatalf("continue output missing %q: %q", want, continueOut)
 		}
 	}
-	if _, err := os.Stat(filepath.Join(filepath.Dir(stateFile), "validation-recoveries.jsonl")); err != nil {
+	if _, err := os.Stat(
+		filepath.Join(filepath.Dir(stateFile), "validation-recoveries.jsonl"),
+	); err != nil {
 		t.Fatalf("validation recovery log missing: %v", err)
 	}
 }
@@ -546,7 +1107,16 @@ func TestContinueInvalidResultRetryExhaustionEmitsManagerNotice(t *testing.T) {
 func TestValidatedWakeHappyPathEndToEnd(t *testing.T) {
 	fixture := newManagerFlowFixture(t)
 	runner := &fakeChildRunner{panes: []string{"%child", "%next"}}
-	start, err := RunStartNext(t.Context(), StartNextOptions{PlanDir: fixture.planDir, ProjectRoot: fixture.projectRoot, ManagerPane: "%parent"}, deps{StateRoot: fixture.stateRootFunc, Clock: fixture.clock, Runner: runner}, &bytes.Buffer{})
+	start, err := RunStartNext(
+		t.Context(),
+		StartNextOptions{
+			PlanDir:     fixture.planDir,
+			ProjectRoot: fixture.projectRoot,
+			ManagerPane: "%parent",
+		},
+		deps{StateRoot: fixture.stateRootFunc, Clock: fixture.clock, Runner: runner},
+		&bytes.Buffer{},
+	)
 	if err != nil {
 		t.Fatalf("RunStartNext error = %v", err)
 	}
@@ -558,21 +1128,49 @@ func TestValidatedWakeHappyPathEndToEnd(t *testing.T) {
 	if sessionPath == "" {
 		sessionPath = filepath.Join(state.ActiveChild.SessionDir, "session.jsonl")
 	}
-	writeSessionTestFile(t, sessionPath, sessionHeader(state.ActiveChild.SessionID, fixture.projectRoot)+"\n"+assistantLine(testResultYAML("question", "complete", "complete", "thoughts/example/questions/q.md", ""))+"\n")
+	writeSessionTestFile(
+		t,
+		sessionPath,
+		sessionHeader(
+			state.ActiveChild.SessionID,
+			fixture.projectRoot,
+		)+"\n"+assistantLine(
+			testResultYAML(
+				"question",
+				"complete",
+				"complete",
+				"thoughts/example/questions/q.md",
+				"",
+			),
+		)+"\n",
+	)
 
 	tmux := &recordingTmux{}
-	status, err := RunChildComplete(t.Context(), ChildCompletionOptions{StateFile: start.StateFile, ChildID: state.ActiveChild.ID}, deps{Tmux: tmux}, &bytes.Buffer{})
+	status, err := RunChildComplete(
+		t.Context(),
+		ChildCompletionOptions{StateFile: start.StateFile, ChildID: state.ActiveChild.ID},
+		deps{Tmux: tmux},
+		&bytes.Buffer{},
+	)
 	if err != nil {
 		t.Fatalf("RunChildComplete error = %v", err)
 	}
-	if !status.Validated || status.Wake.Mode != "deliver" || len(tmux.pastes) != 1 || !strings.Contains(tmux.pastes[0].text, "q_manager_child_wake") {
+	if !status.Validated || status.Wake.Mode != "deliver" || len(tmux.pastes) != 1 ||
+		!strings.Contains(tmux.pastes[0].text, "q_manager_child_wake") {
 		t.Fatalf("status=%+v pastes=%#v", status, tmux.pastes)
 	}
 	if _, err := os.Stat(state.ActiveChild.ValidationStatusPath); err != nil {
 		t.Fatalf("validation status not written: %v", err)
 	}
 
-	continueOut, err := executeManagerCommand(deps{Clock: fixture.clock, Runner: runner, Tmux: &recordingTmux{}}, "continue", "--state-file", start.StateFile, "--plan-dir", fixture.planDir)
+	continueOut, err := executeManagerCommand(
+		deps{Clock: fixture.clock, Runner: runner, Tmux: &recordingTmux{}},
+		"continue",
+		"--state-file",
+		start.StateFile,
+		"--plan-dir",
+		fixture.planDir,
+	)
 	if err != nil {
 		t.Fatalf("continue command error = %v", err)
 	}
@@ -584,16 +1182,45 @@ func TestValidatedWakeHappyPathEndToEnd(t *testing.T) {
 }
 
 func TestProjectManagerActionCardFromSharedNextAction(t *testing.T) {
-	state := ManagerState{CanonicalPlanDir: "thoughts/example", ActiveChild: &ChildRunRef{Stage: "plan", ValidationRetryCount: 0}}
-	invalid := ProjectManagerActionCard(semantic.ProjectInvalidResultAction(qrspi.NodePlan, "missing qrspi_result", false), state, "/tmp/state.json")
-	if invalid == nil || invalid.Kind != ActionInvalidChildYAML || invalid.SafeCommand == "" || invalid.RequiresHuman {
+	state := ManagerState{
+		CanonicalPlanDir: "thoughts/example",
+		ActiveChild:      &ChildRunRef{Stage: "plan", ValidationRetryCount: 0},
+	}
+	invalid := ProjectManagerActionCard(
+		semantic.ProjectInvalidResultAction(
+			qrspi.NodePlan,
+			"missing qrspi_result",
+			false,
+		),
+		state,
+		"/tmp/state.json",
+	)
+	if invalid == nil || invalid.Kind != ActionInvalidChildYAML ||
+		invalid.SafeCommand == "" ||
+		invalid.RequiresHuman {
 		t.Fatalf("invalid card = %#v", invalid)
 	}
-	human := ProjectManagerActionCard(semantic.NextAction{Kind: semantic.NextActionWaitHuman, Severity: "info", CurrentNodeID: qrspi.NodeOutline, Status: "needs_human", PrimaryArtifact: "thoughts/example/design.md", RecoveryReason: "child requested human input"}, state, "/tmp/state.json")
-	if human == nil || human.Kind != ActionHumanGate || !human.RequiresHuman || !strings.Contains(human.SafeCommand, "steer-child") {
+	human := ProjectManagerActionCard(
+		semantic.NextAction{
+			Kind:            semantic.NextActionWaitHuman,
+			Severity:        "info",
+			CurrentNodeID:   qrspi.NodeOutline,
+			Status:          "needs_human",
+			PrimaryArtifact: "thoughts/example/design.md",
+			RecoveryReason:  "child requested human input",
+		},
+		state,
+		"/tmp/state.json",
+	)
+	if human == nil || human.Kind != ActionHumanGate || !human.RequiresHuman ||
+		!strings.Contains(human.SafeCommand, "steer-child") {
 		t.Fatalf("human card = %#v", human)
 	}
-	if ProjectManagerActionCard(semantic.NextAction{Kind: semantic.NextActionStartNext}, state, "/tmp/state.json") != nil {
+	if ProjectManagerActionCard(
+		semantic.NextAction{Kind: semantic.NextActionStartNext},
+		state,
+		"/tmp/state.json",
+	) != nil {
 		t.Fatalf("start-next action should not require a manager card")
 	}
 }
@@ -608,7 +1235,14 @@ func TestContinueActionCardsAreConciseAndDeterministic(t *testing.T) {
 		Workflow:         testWorkflowState(t, qrspi.NodeReviewPlan, nil),
 	}
 	saveManagerState(t, stateFile, state)
-	out, err := executeManagerCommand(deps{Clock: fixture.clock}, "continue", "--state-file", stateFile, "--plan-dir", fixture.planDir)
+	out, err := executeManagerCommand(
+		deps{Clock: fixture.clock},
+		"continue",
+		"--state-file",
+		stateFile,
+		"--plan-dir",
+		fixture.planDir,
+	)
 	if err != nil {
 		t.Fatalf("continue command error = %v", err)
 	}
@@ -623,7 +1257,8 @@ func TestContinueActionCardsAreConciseAndDeterministic(t *testing.T) {
 		}
 	}
 	loaded := loadManagerState(t, stateFile)
-	if loaded.LastActionCard == nil || loaded.LastActionCard.Kind != ActionActiveChildConflict {
+	if loaded.LastActionCard == nil ||
+		loaded.LastActionCard.Kind != ActionActiveChildConflict {
 		t.Fatalf("last action card = %+v", loaded.LastActionCard)
 	}
 }
@@ -634,10 +1269,32 @@ func TestContinueChildLaunchFailedTextActionCard(t *testing.T) {
 	active := childHealthRef(fixture.dir)
 	writeFile(t, active.StatusPath, `{"exitCode":1}`)
 	writeFile(t, active.DonePath, "")
-	writeFile(t, active.OutputPath, "Error: unknown option --session-id\nUsage:\n  pi [flags]\nFlags:\n  --session string\n  --name string\n")
-	saveManagerState(t, stateFile, ManagerState{CanonicalPlanDir: fixture.planDir, ActiveChild: active, Workflow: testWorkflowState(t, qrspi.NodeDesign, nil)})
+	writeFile(
+		t,
+		active.OutputPath,
+		"Error: unknown option --session-id\nUsage:\n  pi [flags]\nFlags:\n  --session string\n  --name string\n",
+	)
+	saveManagerState(
+		t,
+		stateFile,
+		ManagerState{
+			CanonicalPlanDir: fixture.planDir,
+			ActiveChild:      active,
+			Workflow:         testWorkflowState(t, qrspi.NodeDesign, nil),
+		},
+	)
 
-	out, err := executeManagerCommand(deps{Clock: fixture.clock, Tmux: &recordingTmux{missingPanes: map[string]bool{"%9": true}}}, "continue", "--state-file", stateFile, "--plan-dir", fixture.planDir)
+	out, err := executeManagerCommand(
+		deps{
+			Clock: fixture.clock,
+			Tmux:  &recordingTmux{missingPanes: map[string]bool{"%9": true}},
+		},
+		"continue",
+		"--state-file",
+		stateFile,
+		"--plan-dir",
+		fixture.planDir,
+	)
 	if err != nil {
 		t.Fatalf("continue command error = %v", err)
 	}
@@ -659,17 +1316,44 @@ func TestQRSPIRuntimeErrorsDoNotPrintUsage(t *testing.T) {
 	active := childHealthRef(fixture.dir)
 	writeFile(t, active.StatusPath, `{"exitCode":1}`)
 	writeFile(t, active.DonePath, "")
-	writeFile(t, active.OutputPath, "Error: unknown option --session-id\nUsage:\n  pi [flags]\nFlags:\n  --session string\n")
-	saveManagerState(t, stateFile, ManagerState{CanonicalPlanDir: fixture.planDir, ActiveChild: active, Workflow: testWorkflowState(t, qrspi.NodeDesign, nil)})
+	writeFile(
+		t,
+		active.OutputPath,
+		"Error: unknown option --session-id\nUsage:\n  pi [flags]\nFlags:\n  --session string\n",
+	)
+	saveManagerState(
+		t,
+		stateFile,
+		ManagerState{
+			CanonicalPlanDir: fixture.planDir,
+			ActiveChild:      active,
+			Workflow:         testWorkflowState(t, qrspi.NodeDesign, nil),
+		},
+	)
 
-	stdout, stderr, err := executeManagerCommandWithErr(deps{Clock: fixture.clock, Tmux: &recordingTmux{missingPanes: map[string]bool{"%9": true}}}, "continue", "--state-file", stateFile, "--plan-dir", fixture.planDir)
+	stdout, stderr, err := executeManagerCommandWithErr(
+		deps{
+			Clock: fixture.clock,
+			Tmux:  &recordingTmux{missingPanes: map[string]bool{"%9": true}},
+		},
+		"continue",
+		"--state-file",
+		stateFile,
+		"--plan-dir",
+		fixture.planDir,
+	)
 	if err != nil {
 		t.Fatalf("continue command error = %v", err)
 	}
 	combined := stdout + stderr
 	for _, forbidden := range []string{"Usage:", "Flags:", "--session string"} {
 		if strings.Contains(combined, forbidden) {
-			t.Fatalf("runtime command output contains usage spam %q: stdout=%q stderr=%q", forbidden, stdout, stderr)
+			t.Fatalf(
+				"runtime command output contains usage spam %q: stdout=%q stderr=%q",
+				forbidden,
+				stdout,
+				stderr,
+			)
 		}
 	}
 	if !strings.Contains(stdout, "action: child_launch_failed") {
@@ -683,10 +1367,34 @@ func TestContinueChildLaunchFailedNDJSONActionCard(t *testing.T) {
 	active := childHealthRef(fixture.dir)
 	writeFile(t, active.StatusPath, `{"exitCode":1}`)
 	writeFile(t, active.DonePath, "")
-	writeFile(t, active.OutputPath, "Error: unknown option --session-id\nUsage:\n  pi [flags]\n")
-	saveManagerState(t, stateFile, ManagerState{CanonicalPlanDir: fixture.planDir, ActiveChild: active, Workflow: testWorkflowState(t, qrspi.NodeDesign, nil)})
+	writeFile(
+		t,
+		active.OutputPath,
+		"Error: unknown option --session-id\nUsage:\n  pi [flags]\n",
+	)
+	saveManagerState(
+		t,
+		stateFile,
+		ManagerState{
+			CanonicalPlanDir: fixture.planDir,
+			ActiveChild:      active,
+			Workflow:         testWorkflowState(t, qrspi.NodeDesign, nil),
+		},
+	)
 
-	out, err := executeManagerCommand(deps{Clock: fixture.clock, Tmux: &recordingTmux{missingPanes: map[string]bool{"%9": true}}}, "continue", "--state-file", stateFile, "--plan-dir", fixture.planDir, "--output", "ndjson")
+	out, err := executeManagerCommand(
+		deps{
+			Clock: fixture.clock,
+			Tmux:  &recordingTmux{missingPanes: map[string]bool{"%9": true}},
+		},
+		"continue",
+		"--state-file",
+		stateFile,
+		"--plan-dir",
+		fixture.planDir,
+		"--output",
+		"ndjson",
+	)
 	if err != nil {
 		t.Fatalf("continue command error = %v", err)
 	}
@@ -694,17 +1402,37 @@ func TestContinueChildLaunchFailedNDJSONActionCard(t *testing.T) {
 	if err := json.NewDecoder(strings.NewReader(out)).Decode(&event); err != nil {
 		t.Fatalf("decode event from %q: %v", out, err)
 	}
-	if event.Type != "manager_action" || event.ActionCard == nil || event.ActionCard.Kind != ActionChildLaunchFailed {
+	if event.Type != "manager_action" || event.ActionCard == nil ||
+		event.ActionCard.Kind != ActionChildLaunchFailed {
 		t.Fatalf("event = %#v", event)
 	}
-	if !containsLine(event.ActionCard.Evidence, "exitCode: 1") || !containsLine(event.ActionCard.Evidence, "full output: "+active.OutputPath) || !containsLine(event.ActionCard.Evidence, "output tail: Error: unknown option --session-id") {
+	if !containsLine(event.ActionCard.Evidence, "exitCode: 1") ||
+		!containsLine(event.ActionCard.Evidence, "full output: "+active.OutputPath) ||
+		!containsLine(
+			event.ActionCard.Evidence,
+			"output tail: Error: unknown option --session-id",
+		) {
 		t.Fatalf("evidence = %#v", event.ActionCard.Evidence)
 	}
 }
 
 func TestBuildPreflightFailedCard(t *testing.T) {
-	card := BuildPreflightFailedCard(PiCompatibilityReport{OK: false, PiBinary: "pi", Problems: []PreflightProblem{{Summary: "Pi CLI missing required q-manager flag", Evidence: "--session-id"}}}, "/tmp/state.json")
-	if card == nil || card.Kind != ActionPiCompatibilityFailed || !strings.Contains(strings.Join(card.Evidence, "\n"), "--session-id") || !strings.Contains(card.SafeCommand, "doctor --state-file /tmp/state.json") {
+	card := BuildPreflightFailedCard(
+		PiCompatibilityReport{
+			OK:       false,
+			PiBinary: "pi",
+			Problems: []PreflightProblem{
+				{
+					Summary:  "Pi CLI missing required q-manager flag",
+					Evidence: "--session-id",
+				},
+			},
+		},
+		"/tmp/state.json",
+	)
+	if card == nil || card.Kind != ActionPiCompatibilityFailed ||
+		!strings.Contains(strings.Join(card.Evidence, "\n"), "--session-id") ||
+		!strings.Contains(card.SafeCommand, "doctor --state-file /tmp/state.json") {
 		t.Fatalf("card = %#v", card)
 	}
 }
@@ -712,7 +1440,14 @@ func TestBuildPreflightFailedCard(t *testing.T) {
 func TestEndToEndCommandSurface(t *testing.T) {
 	fixture := newManagerFlowFixture(t)
 	runner := &fakeChildRunner{writeResult: true}
-	initOut, err := executeManagerCommand(deps{StateRoot: fixture.stateRootFunc, Clock: fixture.clock, Runner: runner}, "init", "--plan-dir", fixture.planDir, "--project-root", fixture.projectRoot)
+	initOut, err := executeManagerCommand(
+		deps{StateRoot: fixture.stateRootFunc, Clock: fixture.clock, Runner: runner},
+		"init",
+		"--plan-dir",
+		fixture.planDir,
+		"--project-root",
+		fixture.projectRoot,
+	)
 	if err != nil {
 		t.Fatalf("init command error = %v", err)
 	}
@@ -721,7 +1456,16 @@ func TestEndToEndCommandSurface(t *testing.T) {
 		t.Fatalf("init output = %q", initOut)
 	}
 
-	renderOut, err := executeManagerCommand(deps{}, "render-prompt", "--state-file", stateFile, "--node", "question", "--plan-dir", fixture.planDir)
+	renderOut, err := executeManagerCommand(
+		deps{},
+		"render-prompt",
+		"--state-file",
+		stateFile,
+		"--node",
+		"question",
+		"--plan-dir",
+		fixture.planDir,
+	)
 	if err != nil {
 		t.Fatalf("render command error = %v", err)
 	}
@@ -731,11 +1475,27 @@ func TestEndToEndCommandSurface(t *testing.T) {
 	promptFile := filepath.Join(fixture.dir, "prompt.txt")
 	writeFile(t, promptFile, renderOut)
 
-	runOut, err := executeManagerCommand(deps{Clock: fixture.clock, Runner: runner}, "run-child", "--state-file", stateFile, "--plan-dir", fixture.planDir, "--stage", "question", "--cwd", fixture.projectRoot, "--prompt-file", promptFile, "--timeout", "1s")
+	runOut, err := executeManagerCommand(
+		deps{Clock: fixture.clock, Runner: runner},
+		"run-child",
+		"--state-file",
+		stateFile,
+		"--plan-dir",
+		fixture.planDir,
+		"--stage",
+		"question",
+		"--cwd",
+		fixture.projectRoot,
+		"--prompt-file",
+		promptFile,
+		"--timeout",
+		"1s",
+	)
 	if err != nil {
 		t.Fatalf("run-child command error = %v", err)
 	}
-	if !strings.Contains(runOut, `"type":"child_started"`) || !strings.Contains(runOut, `"type":"child_finished"`) {
+	if !strings.Contains(runOut, `"type":"child_started"`) ||
+		!strings.Contains(runOut, `"type":"child_finished"`) {
 		t.Fatalf("run-child output = %q", runOut)
 	}
 	for _, want := range []string{`"outputPath"`, `"sessionId"`, `"sessionDir"`, `"sessionPath"`, `"donePath"`, `"statusPath"`} {
@@ -750,9 +1510,33 @@ func TestEndToEndCommandSurface(t *testing.T) {
 	if state.ActiveChild == nil {
 		t.Fatalf("active child missing after run-child")
 	}
-	writeSessionTestFile(t, state.ActiveChild.SessionPath, sessionHeader(state.ActiveChild.SessionID, fixture.projectRoot)+"\n"+assistantLine(testResultYAML("question", "complete", "complete", "thoughts/example/questions/q.md", ""))+"\n")
+	writeSessionTestFile(
+		t,
+		state.ActiveChild.SessionPath,
+		sessionHeader(
+			state.ActiveChild.SessionID,
+			fixture.projectRoot,
+		)+"\n"+assistantLine(
+			testResultYAML(
+				"question",
+				"complete",
+				"complete",
+				"thoughts/example/questions/q.md",
+				"",
+			),
+		)+"\n",
+	)
 
-	validateOut, err := executeManagerCommand(deps{}, "validate-result", "--state-file", stateFile, "--stage", "question", "--plan-dir", fixture.planDir)
+	validateOut, err := executeManagerCommand(
+		deps{},
+		"validate-result",
+		"--state-file",
+		stateFile,
+		"--stage",
+		"question",
+		"--plan-dir",
+		fixture.planDir,
+	)
 	if err != nil {
 		t.Fatalf("validate command error = %v", err)
 	}
@@ -760,11 +1544,19 @@ func TestEndToEndCommandSurface(t *testing.T) {
 		t.Fatalf("validate output = %q", validateOut)
 	}
 
-	decideOut, err := executeManagerCommand(deps{}, "decide-next", "--state-file", stateFile, "--plan-dir", fixture.planDir)
+	decideOut, err := executeManagerCommand(
+		deps{},
+		"decide-next",
+		"--state-file",
+		stateFile,
+		"--plan-dir",
+		fixture.planDir,
+	)
 	if err != nil {
 		t.Fatalf("decide command error = %v", err)
 	}
-	if !strings.Contains(decideOut, `"type":"decided"`) || !strings.Contains(decideOut, `"nextNode":"research"`) {
+	if !strings.Contains(decideOut, `"type":"decided"`) ||
+		!strings.Contains(decideOut, `"nextNode":"research"`) {
 		t.Fatalf("decide output = %q", decideOut)
 	}
 }
@@ -781,10 +1573,18 @@ func newManagerFlowFixture(t *testing.T) managerFlowFixture {
 	t.Setenv("TMUX_PANE", "")
 	dir := t.TempDir()
 	projectRoot := filepath.Join(dir, "repo")
-	if err := os.MkdirAll(filepath.Join(projectRoot, "thoughts", "example"), 0o755); err != nil {
+	if err := os.MkdirAll(
+		filepath.Join(projectRoot, "thoughts", "example"),
+		0o755,
+	); err != nil {
 		t.Fatal(err)
 	}
-	return managerFlowFixture{dir: dir, projectRoot: projectRoot, stateRoot: filepath.Join(dir, "state"), planDir: "thoughts/example"}
+	return managerFlowFixture{
+		dir:         dir,
+		projectRoot: projectRoot,
+		stateRoot:   filepath.Join(dir, "state"),
+		planDir:     "thoughts/example",
+	}
 }
 
 func (f managerFlowFixture) clock() time.Time               { return time.Unix(100, 123) }
@@ -793,7 +1593,12 @@ func (f managerFlowFixture) stateRootFunc() (string, error) { return f.stateRoot
 func (f managerFlowFixture) init(t *testing.T) string {
 	t.Helper()
 	var out bytes.Buffer
-	if err := RunInit(t.Context(), InitOptions{PlanDir: f.planDir, ProjectRoot: f.projectRoot}, deps{StateRoot: f.stateRootFunc, Clock: f.clock}, &out); err != nil {
+	if err := RunInit(
+		t.Context(),
+		InitOptions{PlanDir: f.planDir, ProjectRoot: f.projectRoot},
+		deps{StateRoot: f.stateRootFunc, Clock: f.clock},
+		&out,
+	); err != nil {
 		t.Fatalf("RunInit error = %v", err)
 	}
 	return eventRefString(t, out.String(), "stateFile")
