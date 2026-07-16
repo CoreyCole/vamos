@@ -238,7 +238,9 @@ If the handoff says “waiting for child wake,” do not continue/validate until
 
 Ask the human one direct question. Preserve graph decision, latest result, and any human answer in manager session context. Do not rewrite workflow state by hand.
 
-If a child stops for a graph-valid human gate, keep the child pane/session active. Summarize the child’s question to the human, then steer the same child with the answer. Use the CLI helper that injects one atomic prompt:
+Before every approval question, provide a concise decision summary sufficient for the human to approve or correct the proposal. Never ask a bare `Approve?` or `Vamos?`. For outline alignment, summarize the proposed outline’s scope, parts or vertical slices, key invariants/tradeoffs, and explicit exclusions in a short bullet list, then ask `Vamos?`. When `outline.md` does not exist yet, summarize the child’s proposed outline/alignment from its latest assistant text and say that approval authorizes writing it; do not imply the artifact already exists.
+
+If a child stops for a graph-valid human gate, keep the child pane/session active. Summarize the child’s question and approval context to the human, then steer the same child with the answer. If an approval-seeking child turn produced no `qrspi_result`, inspect the authoritative child session, surface the same concise approval summary, and treat it as a human gate rather than exposing parser mechanics to the human. Use the CLI helper that injects one atomic prompt:
 
 ```bash
 vamos qrspi steer-child --state-file "$STATE" --feedback-file /path/to/human-feedback.md

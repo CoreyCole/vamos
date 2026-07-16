@@ -95,6 +95,12 @@ The project guide is authoritative for project-specific commands, E2E tools, scr
 1. Commit every fix applied during verify before requesting human manual testing. Use the repository's normal commit/stack workflow, include regenerated outputs, and keep the workspace clean except explicitly unrelated pre-existing changes. Do not ask the human to test uncommitted verification fixes.
 1. For managed feature-branch workspaces, derive and validate the exact feature URL from project CLI/server output or `.vamos/run/workspace.env` plus the workspace domain. Record that URL in `verify.md`, include it in the fenced YAML `artifacts` list with `role: "feature_url"`, and repeat it in the post-YAML summary.
 1. Before marking verification complete, prompt the user to manually test any running UI/workspace described by the project guide. Include the exact URL from the project CLI/server output and concise flows to inspect. Do not proceed to a complete `verify.md` until the user confirms manual testing passed; if the user cannot test or reports a problem, record `needs_human` or `blocked` with their findings.
+1. When verification pauses at a safety gate and later resumes in an isolated child process:
+   - pass the human's approval/instruction verbatim along with the complete previous `qrspi_result` YAML and `verify.md` path;
+   - keep the continuation inside the q-verify child rather than performing the verifier work ad hoc in the parent orchestrator;
+   - if the human explicitly requests a specialized verifier or review tracker (for example Ranger), load its skill and linked workflow docs, create or resume its review, run its required verification, and return its human-facing dashboard URL;
+   - record that review URL in `verify.md`, the YAML artifacts list, and the concise post-YAML summary so the orchestrator can link it immediately;
+   - after automated evidence is ready, remain `needs_human` until the same feature URLs receive the required manual confirmation.
 1. Write `[plan_dir]/verify.md`.
 1. Update `[plan_dir]/AGENTS.md` only for durable gotchas future sessions must load before handoffs.
 

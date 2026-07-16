@@ -24,6 +24,7 @@ Load these before acting:
 1. For a concrete example of notification parsing, artifact-path preservation, and direct-outline missing-artifact pitfalls, see `references/webhook-forwarding-run-2026-07-02.md`.
 1. For a concrete example of repeated implementation handoff auto-advance, mid-run lead-engineer corrections, and cross-repo reviewer-assignment planning/implementation, see `references/reviewer-context-routing-2026-07-08.md`.
 1. For a concrete example of a long direct-outline workflow with seven implementation handoffs, prompt-file reuse, truncated completion snippets, and exact next-target carry-forward, see `references/deterministic-morning-sync-cli-2026-07-14.md`.
+1. For a concrete example of direct-outline implementation with no `design.md`, repeated `/q-resume` handoffs, exact `Next:` target carry-forward, mid-run lead-engineer constraint propagation, and correcting malformed artifact paths in child prompts, see `references/premerge-review-slack-report-2026-07-15.md`.
 
 Do not use `vamos qrspi start-next` as the primary path. That command belongs to the tmux `q-manager` skill.
 
@@ -31,10 +32,24 @@ Do not use `vamos qrspi start-next` as the primary path. That command belongs to
 
 Use the latest validated `qrspi_result` as the source of truth for routing.
 
+### Interpreting human approval
+
+- Do not infer technical-design approval from a generic request to “do the ticket.”
+
+- A human reply that explicitly requests implementation of the just-presented concrete changes—such as “make a draft PR on top with these changes”—does approve that stated design direction. Record the approval in `design.md`/the next stage prompt and continue; do not ask them to approve the identical design again.
+
+- Preserve any delivery details in that approval (`draft`, named parent branch, exact `gt get`, workspace requirement) through every later prompt and `qrspi_result`, not only the immediate stage.
+
+- New tradeoffs discovered later still require a human gate when they materially change the approved design.
+
 - Preserve the full previous fenced YAML verbatim for the next prompt.
+
 - Follow `next.steps` and the QRSPI graph intent.
+
 - Use `workspace_metadata.implementation_workspace` as cwd after `/q-workspace` when implementation/review/verify semantics require it.
+
 - Use the plan workspace before `/q-workspace` and for planning artifacts.
+
 - For implementation `status: handoff`, route to `/q-resume` using the handoff artifact; do not pause just because a handoff exists.
 
 Pause only for:
@@ -44,6 +59,16 @@ Pause only for:
 - Failed background process exit.
 - Invalid artifact or impossible graph transition.
 - Real safety, lost-work, merge, manual-test, or product judgment decision.
+
+### Revalidate external stack dependencies
+
+Named parent PRs and remote branches are live dependencies, not immutable planning facts. They can close, merge, move, or be deleted while a long QRSPI run is in progress.
+
+- Before launching `/q-implement`, tell the child to verify the named parent PR state, remote branch existence, and expected head commit again—not only trust `/q-workspace` evidence.
+- Before any submit/delivery chunk, repeat that liveness check immediately before pushing or opening the child PR.
+- If the parent merged, route using the repository's normal merged-parent/restack rules.
+- If the parent closed unmerged or its branch disappeared, preserve the local workspace and commit DAG, stop with `needs_human`, and present concrete choices: restore/reopen the original parent; submit a standalone PR containing the base plus corrections; or stop. Never silently resurrect another engineer's branch, rewrite onto trunk, or claim the child PR was delivered.
+- Report this blocker as a delivery/base decision, not as lost implementation work. Include the safe local branch and commit when known, plus whether the canonical checkout remains clean.
 
 ## Step 3: Write the child prompt file
 

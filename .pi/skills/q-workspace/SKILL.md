@@ -90,6 +90,20 @@ Review follow-up plans must stack on top of the implementation they reviewed eve
 
 In Graphite repos, including `cn-agents`, the first review-plan slice branch created later by `/q-implement` must have `gt parent` equal to the reviewed implementation top branch (or the current descendant branch that already contains it). This applies to review-fix plans regardless of merge state. Normal continuation plans still use the selected unmerged stack top when they deliberately build on an existing stack.
 
+## Stacked PR correction workspaces
+
+When the human asks for a new PR on top of an existing unmerged Graphite PR/branch:
+
+1. Treat the named branch as the required implementation parent, not merely research context.
+2. Keep the canonical sync checkout on trunk and clean. Create a fresh copied sibling workspace first; never run `gt get` in the canonical sync checkout.
+3. In the fresh copy, run `gt get --no-interactive <named-parent-branch>` before any edits.
+4. Verify `git branch --show-current`, `git rev-parse HEAD`, `gt branch info`, and `gt parent`/stack metadata prove the workspace is at the named parent branch and current remote PR head.
+5. Record the named parent branch and exact commit in `plan.md`, `AGENTS.md`, and `workspace_metadata.parent_branch`.
+6. The implementation branch created later must be a child of that parent. After `gt create`, verify `gt parent` equals the named parent before submission.
+7. If the human requested a draft PR, preserve that as a delivery requirement through plan, implementation handoff, submit, and read-back verification; do not silently create a ready-for-review PR.
+
+A request such as “`gt get <branch>` in a `/q-workspace`” is explicit base-selection direction. Do not substitute trunk or ask the human to repeat it unless safety checks reveal a conflict or missing branch.
+
 ## No-work-loss checks
 
 Before creating or repairing a workspace:
