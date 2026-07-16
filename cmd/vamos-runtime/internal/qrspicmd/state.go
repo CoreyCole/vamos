@@ -5,21 +5,22 @@ import wruntime "github.com/CoreyCole/vamos/pkg/agents/workflows/runtime"
 const schemaVersion = 1
 
 type ManagerState struct {
-	SchemaVersion       int                  `json:"schemaVersion"`
-	RepoID              string               `json:"repoId"`
-	CanonicalPlanDir    string               `json:"canonicalPlanDir"`
-	ManagerRunID        string               `json:"managerRunId"`
-	SourceCwd           string               `json:"sourceCwd"`
-	ImplementationCwd   string               `json:"implementationCwd,omitempty"`
-	PiModel             string               `json:"piModel,omitempty"`
-	ManagerPaneID       string               `json:"managerPaneId,omitempty"`
-	ManagerSessionPath  string               `json:"managerSessionPath,omitempty"`
-	LastManagerUsage    *ManagerUsageSample  `json:"lastManagerUsage,omitempty"`
-	Delivery            ManagerDeliveryState `json:"delivery,omitempty"`
-	LastActionCard      *ManagerActionCard   `json:"lastActionCard,omitempty"`
-	ActiveChild         *ChildRunRef         `json:"activeChild,omitempty"`
-	PendingCleanupChild *ChildRunRef         `json:"pendingCleanupChild,omitempty"`
-	Workflow            wruntime.State       `json:"workflow"`
+	SchemaVersion       int                     `json:"schemaVersion"`
+	RepoID              string                  `json:"repoId"`
+	CanonicalPlanDir    string                  `json:"canonicalPlanDir"`
+	ManagerRunID        string                  `json:"managerRunId"`
+	SourceCwd           string                  `json:"sourceCwd"`
+	ImplementationCwd   string                  `json:"implementationCwd,omitempty"`
+	PiModel             string                  `json:"piModel,omitempty"`
+	ManagerPaneID       string                  `json:"managerPaneId,omitempty"`
+	ManagerSessionPath  string                  `json:"managerSessionPath,omitempty"`
+	LastManagerUsage    *ManagerUsageSample     `json:"lastManagerUsage,omitempty"`
+	Delivery            ManagerDeliveryState    `json:"delivery,omitempty"`
+	LastActionCard      *ManagerActionCard      `json:"lastActionCard,omitempty"`
+	LastStateAlignment  *StateAlignmentEvidence `json:"lastStateAlignment,omitempty"`
+	ActiveChild         *ChildRunRef            `json:"activeChild,omitempty"`
+	PendingCleanupChild *ChildRunRef            `json:"pendingCleanupChild,omitempty"`
+	Workflow            wruntime.State          `json:"workflow"`
 }
 
 type ManagerDeliveryState struct {

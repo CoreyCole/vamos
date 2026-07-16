@@ -1,7 +1,9 @@
 package qrspicmd
 
 import (
+	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/CoreyCole/vamos/pkg/agents/workflows/qrspi"
@@ -162,6 +164,59 @@ func TestGatherChildEvidenceUsesCurrentActiveBranchMessage(t *testing.T) {
 	}
 	if got := ClassifyChildIntent(evidence); got.Kind != ChildIntentManagerQuestion {
 		t.Fatalf("intent = %+v", got)
+	}
+}
+
+func TestDecidePivotAcceptsOnlyNestedThoughtsPlans(t *testing.T) {
+	dir := t.TempDir()
+	planDir := filepath.Join(dir, "thoughts", "user", "plans", "current")
+	nested := filepath.Join(planDir, "reviews", "followup")
+	if err := os.MkdirAll(nested, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	state := ManagerState{CanonicalPlanDir: planDir}
+	request := ChildManagerRequest{
+		Kind:          "pivot",
+		RequestedNode: qrspi.NodeQuestion,
+		PlanDir:       "thoughts/user/plans/current/reviews/followup",
+		Reason:        "verification found a bug",
+	}
+	card, err := DecidePivot(state, "/tmp/state.json", request)
+	if err != nil {
+		t.Fatalf("DecidePivot() error = %v", err)
+	}
+	if card.Kind != "child_followup_request" ||
+		!strings.Contains(card.SafeCommand, "inspect --state-file /tmp/state.json") ||
+		!strings.Contains(strings.Join(card.Evidence, "\n"), nested) {
+		t.Fatalf("card = %+v", card)
+	}
+
+	outside := filepath.Join(dir, "outside")
+	if err := os.MkdirAll(outside, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(outside, filepath.Join(planDir, "escape")); err != nil {
+		t.Fatal(err)
+	}
+	tests := []struct {
+		name string
+		edit func(*ChildManagerRequest)
+	}{
+		{name: "unknown node", edit: func(r *ChildManagerRequest) { r.RequestedNode = "unknown" }},
+		{name: "unknown kind", edit: func(r *ChildManagerRequest) { r.Kind = "launch" }},
+		{name: "absolute", edit: func(r *ChildManagerRequest) { r.PlanDir = nested }},
+		{name: "sibling", edit: func(r *ChildManagerRequest) { r.PlanDir = "thoughts/user/plans/sibling" }},
+		{name: "missing", edit: func(r *ChildManagerRequest) { r.PlanDir += "/missing" }},
+		{name: "symlink escape", edit: func(r *ChildManagerRequest) { r.PlanDir = "thoughts/user/plans/current/escape" }},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			candidate := request
+			tt.edit(&candidate)
+			if _, err := DecidePivot(state, "/tmp/state.json", candidate); err == nil {
+				t.Fatalf("DecidePivot(%+v) succeeded", candidate)
+			}
+		})
 	}
 }
 

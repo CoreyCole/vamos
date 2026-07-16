@@ -345,6 +345,7 @@ type StateRootReport struct {
 
 const (
 	ActionStateDesync                 = "state_desync"
+	ActionStateAlignment              = "state_alignment"
 	ActionGraphOutcomeMismatch        = "graph_outcome_mismatch"
 	ActionWorkspaceMoved              = "workspace_moved"
 	ActionActiveChildConflict         = "active_child_conflict"
@@ -493,11 +494,41 @@ func invalidActionSafeCommand(
 }
 
 type RepairStateOptions struct {
-	StateFile        string
-	AlignActiveChild bool
-	ClearFailedChild bool
-	Relaunch         bool
-	Output           string
+	StateFile         string
+	AlignActiveChild  bool
+	ClearFailedChild  bool
+	Relaunch          bool
+	SetNode           string
+	FromResult        string
+	FromSession       string
+	ImplementationCwd string
+	Reason            string
+	Output            string
+}
+
+type StateAlignmentEvidence struct {
+	AlignmentID         string                 `json:"alignmentId"`
+	PreviousNode        wruntime.NodeID        `json:"previousNode"`
+	EvidenceNode        wruntime.NodeID        `json:"evidenceNode"`
+	ResultingNode       wruntime.NodeID        `json:"resultingNode,omitempty"`
+	ResultStatus        wruntime.ResultStatus  `json:"resultStatus"`
+	ResultOutcome       wruntime.ResultOutcome `json:"resultOutcome,omitempty"`
+	EvidencePath        string                 `json:"evidencePath"`
+	EvidenceFingerprint string                 `json:"evidenceFingerprint"`
+	ImplementationCwd   string                 `json:"implementationCwd,omitempty"`
+	Reason              string                 `json:"reason"`
+	InvokedBy           string                 `json:"invokedBy,omitempty"`
+	Timestamp           string                 `json:"timestamp"`
+}
+
+type ValidatedStateAlignment struct {
+	Evidence StateAlignmentEvidence
+	Decision wruntime.TransitionDecision
+}
+
+type StateAlignmentAuditRecord struct {
+	State     string                 `json:"state"`
+	Alignment StateAlignmentEvidence `json:"alignment"`
 }
 
 type MarkChildActiveOptions struct {

@@ -1632,6 +1632,110 @@ func TestChildCompleteManagerIntentsDoNotConsumeRepairBudget(t *testing.T) {
 	}
 }
 
+func TestChildCompleteStructuredPivotCreatesDeduplicatedInspectCard(t *testing.T) {
+	dir := t.TempDir()
+	planDir := filepath.Join(dir, "thoughts", "user", "plans", "current")
+	followupDir := filepath.Join(planDir, "reviews", "followup")
+	if err := os.MkdirAll(followupDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	stateFile := filepath.Join(dir, "state.json")
+	sessionPath := writePiSession(
+		t,
+		filepath.Join(dir, "sessions"),
+		"session.jsonl",
+		"session-1",
+		dir,
+		assistantLine("```yaml\nq_manager_request:\n  kind: pivot\n  requested_node: question\n  plan_dir: thoughts/user/plans/current/reviews/followup\n  reason: verification found a bug\n```"),
+	)
+	state := ManagerState{
+		CanonicalPlanDir: planDir,
+		ManagerPaneID:    "%parent",
+		Workflow:         testWorkflowState(t, qrspi.NodeVerify, nil),
+		ActiveChild: &ChildRunRef{
+			ID: "child-1", Stage: "verify", Cwd: dir, TmuxPaneID: "%9",
+			SessionID: "session-1", SessionPath: sessionPath, Generation: 1,
+			ValidationStatusPath: filepath.Join(dir, "validation-status.json"),
+		},
+	}
+	saveManagerState(t, stateFile, state)
+	tmux := &recordingTmux{}
+	for attempt := 0; attempt < 2; attempt++ {
+		status, err := RunChildComplete(
+			t.Context(),
+			ChildCompletionOptions{StateFile: stateFile, ChildID: "child-1"},
+			deps{Tmux: tmux},
+			&strings.Builder{},
+		)
+		if err != nil {
+			t.Fatalf("RunChildComplete() attempt %d error = %v", attempt+1, err)
+		}
+		if status.Validated || status.RetryPrompt != "" || status.ActionCard == nil ||
+			status.ActionCard.Kind != "child_followup_request" {
+			t.Fatalf("status = %+v", status)
+		}
+		wantWake := "deliver"
+		if attempt == 1 {
+			wantWake = "suppress"
+		}
+		if status.Wake.Mode != wantWake {
+			t.Fatalf("attempt %d wake = %+v, want %s", attempt+1, status.Wake, wantWake)
+		}
+	}
+	loaded := loadManagerState(t, stateFile)
+	if loaded.Workflow.CurrentNodeID != qrspi.NodeVerify || loaded.ActiveChild == nil ||
+		loaded.ActiveChild.ID != "child-1" || loaded.ActiveChild.ValidationRetryCount != 0 {
+		t.Fatalf("loaded = %+v", loaded)
+	}
+	if len(tmux.pastes) != 1 {
+		t.Fatalf("pastes = %#v, want one", tmux.pastes)
+	}
+}
+
+func TestChildCompleteInvalidStructuredPivotProducesRefusalCard(t *testing.T) {
+	dir := t.TempDir()
+	planDir := filepath.Join(dir, "thoughts", "user", "plans", "current")
+	if err := os.MkdirAll(planDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	stateFile := filepath.Join(dir, "state.json")
+	sessionPath := writePiSession(
+		t,
+		filepath.Join(dir, "sessions"),
+		"session.jsonl",
+		"session-1",
+		dir,
+		assistantLine("```yaml\nq_manager_request:\n  kind: pivot\n  requested_node: question\n  plan_dir: /tmp/other-plan\n  reason: verification found a bug\n```"),
+	)
+	saveManagerState(t, stateFile, ManagerState{
+		CanonicalPlanDir: planDir,
+		ManagerPaneID:    "%parent",
+		Workflow:         testWorkflowState(t, qrspi.NodeVerify, nil),
+		ActiveChild: &ChildRunRef{
+			ID: "child-1", Stage: "verify", Cwd: dir, TmuxPaneID: "%9",
+			SessionID: "session-1", SessionPath: sessionPath, Generation: 1,
+			ValidationStatusPath: filepath.Join(dir, "validation-status.json"),
+		},
+	})
+	status, err := RunChildComplete(
+		t.Context(),
+		ChildCompletionOptions{StateFile: stateFile, ChildID: "child-1"},
+		deps{Tmux: &recordingTmux{}},
+		&strings.Builder{},
+	)
+	if err != nil {
+		t.Fatalf("RunChildComplete() error = %v", err)
+	}
+	if status.Intent != ChildIntentAmbiguousUnsafe || status.ActionCard == nil ||
+		!strings.Contains(status.ActionCard.Summary, "refused q_manager_request") ||
+		status.RetryPrompt != "" {
+		t.Fatalf("status = %+v", status)
+	}
+	if got := loadManagerState(t, stateFile).Workflow.CurrentNodeID; got != qrspi.NodeVerify {
+		t.Fatalf("current node = %s", got)
+	}
+}
+
 func TestChildCompleteCannotOverwriteNewSteerGeneration(t *testing.T) {
 	dir := t.TempDir()
 	stateFile := filepath.Join(dir, "state.json")

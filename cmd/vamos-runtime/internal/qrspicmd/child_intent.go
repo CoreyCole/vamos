@@ -413,3 +413,79 @@ func pathWithin(root, candidate string) bool {
 
 	return rel == "." || (rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator)))
 }
+
+func DecidePivot(
+	state ManagerState,
+	stateFile string,
+	request ChildManagerRequest,
+) (*ManagerActionCard, error) {
+	def, err := Definition()
+	if err != nil {
+		return nil, err
+	}
+	if _, ok := def.Nodes[request.RequestedNode]; !ok {
+		return nil, fmt.Errorf(
+			"requested node %q is not in QRSPI definition",
+			request.RequestedNode,
+		)
+	}
+	kind := strings.ToLower(strings.TrimSpace(request.Kind))
+	if kind != "pivot" && kind != "followup" && kind != "follow-up" {
+		return nil, fmt.Errorf("q_manager_request kind %q is not supported", request.Kind)
+	}
+	resolved, err := resolveThoughtsPathInsidePlan(state, request.PlanDir)
+	if err != nil {
+		return nil, err
+	}
+
+	return &ManagerActionCard{
+		Kind:     "child_followup_request",
+		Severity: "info",
+		Summary:  strings.TrimSpace(request.Reason),
+		Evidence: []string{
+			fmt.Sprintf("requested node: %s", request.RequestedNode),
+			fmt.Sprintf("plan: %s", resolved),
+		},
+		RecommendedAction: "inspect the requested follow-up, then explicitly start or align the intended plan",
+		SafeCommand: fmt.Sprintf(
+			"vamos qrspi inspect --state-file %s --sessions --latest",
+			stateFile,
+		),
+		RequiresHuman: false,
+	}, nil
+}
+
+func resolveThoughtsPathInsidePlan(state ManagerState, requested string) (string, error) {
+	rel := filepath.Clean(strings.TrimSpace(requested))
+	if rel == "." || filepath.IsAbs(rel) ||
+		(rel != "thoughts" && !strings.HasPrefix(rel, "thoughts"+string(filepath.Separator))) {
+		return "", fmt.Errorf("follow-up plan must be a thoughts-relative path")
+	}
+	planPath, err := filepath.EvalSymlinks(state.CanonicalPlanDir)
+	if err != nil {
+		return "", fmt.Errorf("resolve canonical plan directory: %w", err)
+	}
+	if !filepath.IsAbs(planPath) {
+		return "", fmt.Errorf("canonical plan directory must be absolute")
+	}
+	thoughtsRoot, ok := thoughtsRootForPlan(planPath)
+	if !ok {
+		return "", fmt.Errorf("canonical plan directory is not inside thoughts")
+	}
+	resolved, err := filepath.EvalSymlinks(filepath.Join(filepath.Dir(thoughtsRoot), rel))
+	if err != nil {
+		return "", fmt.Errorf("resolve follow-up plan: %w", err)
+	}
+	if !pathWithin(planPath, resolved) {
+		return "", fmt.Errorf("follow-up plan escapes the current plan tree")
+	}
+	info, err := os.Stat(resolved)
+	if err != nil {
+		return "", fmt.Errorf("stat follow-up plan: %w", err)
+	}
+	if !info.IsDir() {
+		return "", fmt.Errorf("follow-up plan is not a directory")
+	}
+
+	return resolved, nil
+}

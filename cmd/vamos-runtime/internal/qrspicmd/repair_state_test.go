@@ -2,6 +2,7 @@ package qrspicmd
 
 import (
 	"bytes"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -33,6 +34,265 @@ func TestRepairStateAlignsActiveChildAndLogsActionCard(t *testing.T) {
 	if _, err := filepath.Glob(filepath.Join(dir, "validation-recoveries.jsonl")); err != nil {
 		t.Fatalf("recovery log glob error = %v", err)
 	}
+}
+
+func TestRepairStateAppliesAuditedResultTransitionIdempotently(t *testing.T) {
+	dir := t.TempDir()
+	stateFile := filepath.Join(dir, "state.json")
+	resultFile := filepath.Join(dir, "implement-result.md")
+	implementationCwd := filepath.Join(dir, "implementation")
+	if err := os.MkdirAll(implementationCwd, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeFile(t, resultFile, testResultYAML(
+		"implement",
+		"complete",
+		"complete",
+		"thoughts/example/handoffs/complete.md",
+		"",
+	))
+	state := ManagerState{
+		CanonicalPlanDir: "thoughts/example",
+		Workflow:         testWorkflowState(t, qrspi.NodeQuestion, nil),
+		Delivery: ManagerDeliveryState{
+			QueuedWake:      &QueuedWake{DeliveryID: "queued"},
+			PendingDelivery: &QueuedWake{DeliveryID: "pending"},
+		},
+		ActiveChild: &ChildRunRef{ID: "old-child", Stage: "question"},
+	}
+	saveManagerState(t, stateFile, state)
+	opts := RepairStateOptions{
+		StateFile:         stateFile,
+		SetNode:           "implement",
+		FromResult:        resultFile,
+		ImplementationCwd: implementationCwd,
+		Reason:            "implementation completed outside the manager cursor",
+	}
+	for attempt := 0; attempt < 2; attempt++ {
+		var out bytes.Buffer
+		if err := RunRepairState(t.Context(), opts, deps{}, &out); err != nil {
+			t.Fatalf("RunRepairState() attempt %d error = %v", attempt+1, err)
+		}
+		if !strings.Contains(out.String(), "workflow now review-implementation") {
+			t.Fatalf("output = %q", out.String())
+		}
+	}
+	loaded := loadManagerState(t, stateFile)
+	resolvedImplementationCwd, err := filepath.EvalSymlinks(implementationCwd)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if loaded.Workflow.CurrentNodeID != qrspi.NodeReviewImplementation ||
+		loaded.ImplementationCwd != resolvedImplementationCwd || loaded.ActiveChild != nil ||
+		loaded.PendingCleanupChild == nil ||
+		loaded.PendingCleanupChild.LifecycleStatus != "superseded_manual_alignment" ||
+		loaded.Delivery.QueuedWake != nil || loaded.Delivery.PendingDelivery != nil ||
+		loaded.LastStateAlignment == nil ||
+		loaded.LastStateAlignment.EvidenceNode != qrspi.NodeImplement ||
+		loaded.LastStateAlignment.PreviousNode != qrspi.NodeQuestion {
+		t.Fatalf("loaded = %+v", loaded)
+	}
+	records := readAlignmentAuditRecords(t, stateFile)
+	if len(records) != 2 || records[0].State != "pending" || records[1].State != "applied" ||
+		records[0].Alignment.AlignmentID != records[1].Alignment.AlignmentID {
+		t.Fatalf("records = %+v", records)
+	}
+}
+
+func TestRepairStateConcurrentIdenticalAlignmentConverges(t *testing.T) {
+	dir := t.TempDir()
+	stateFile := filepath.Join(dir, "state.json")
+	resultFile := filepath.Join(dir, "result.md")
+	writeFile(t, resultFile, testResultYAML(
+		"implement",
+		"complete",
+		"complete",
+		"thoughts/example/handoff.md",
+		"",
+	))
+	saveManagerState(t, stateFile, ManagerState{
+		CanonicalPlanDir: "thoughts/example",
+		Workflow:         testWorkflowState(t, qrspi.NodeQuestion, nil),
+	})
+	opts := RepairStateOptions{
+		StateFile:  stateFile,
+		SetNode:    "implement",
+		FromResult: resultFile,
+		Reason:     "concurrent repair",
+	}
+	errs := make(chan error, 2)
+	for range 2 {
+		go func() {
+			errs <- RunRepairState(t.Context(), opts, deps{}, &bytes.Buffer{})
+		}()
+	}
+	for range 2 {
+		if err := <-errs; err != nil {
+			t.Fatalf("RunRepairState() error = %v", err)
+		}
+	}
+	if got := loadManagerState(t, stateFile).Workflow.CurrentNodeID; got != qrspi.NodeReviewImplementation {
+		t.Fatalf("current node = %s", got)
+	}
+	if records := readAlignmentAuditRecords(t, stateFile); len(records) != 2 {
+		t.Fatalf("records = %+v", records)
+	}
+}
+
+func TestRepairStatePreservesStopDecisionFromEvidence(t *testing.T) {
+	tests := []struct {
+		name       string
+		status     string
+		wantStatus string
+	}{
+		{name: "blocked", status: "blocked", wantStatus: "blocked"},
+		{name: "error", status: "error", wantStatus: "error"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			dir := t.TempDir()
+			stateFile := filepath.Join(dir, "state.json")
+			resultFile := filepath.Join(dir, "result.md")
+			writeFile(t, resultFile, testResultYAML(
+				"implement",
+				tt.status,
+				"",
+				"thoughts/example/handoffs/blocked.md",
+				"",
+			))
+			saveManagerState(t, stateFile, ManagerState{
+				CanonicalPlanDir: "thoughts/example",
+				Workflow:         testWorkflowState(t, qrspi.NodeQuestion, nil),
+			})
+			if err := RunRepairState(t.Context(), RepairStateOptions{
+				StateFile:  stateFile,
+				SetNode:    "implement",
+				FromResult: resultFile,
+				Reason:     "restore terminal implementation evidence",
+			}, deps{}, &bytes.Buffer{}); err != nil {
+				t.Fatalf("RunRepairState() error = %v", err)
+			}
+			loaded := loadManagerState(t, stateFile)
+			if string(loaded.Workflow.Status) != tt.wantStatus ||
+				loaded.Workflow.CurrentNodeID != qrspi.NodeImplement {
+				t.Fatalf("workflow = %+v", loaded.Workflow)
+			}
+		})
+	}
+}
+
+func TestRepairStateRejectsInvalidExplicitAlignmentWithoutMutation(t *testing.T) {
+	dir := t.TempDir()
+	stateFile := filepath.Join(dir, "state.json")
+	resultFile := filepath.Join(dir, "result.md")
+	writeFile(t, resultFile, testResultYAML(
+		"design",
+		"complete",
+		"complete",
+		"thoughts/example/design.md",
+		"",
+	))
+	original := ManagerState{
+		CanonicalPlanDir: "thoughts/example",
+		Workflow:         testWorkflowState(t, qrspi.NodeQuestion, nil),
+	}
+	saveManagerState(t, stateFile, original)
+	tests := []struct {
+		name string
+		opts RepairStateOptions
+	}{
+		{
+			name: "result source mismatch",
+			opts: RepairStateOptions{SetNode: "implement", FromResult: resultFile, Reason: "mismatch"},
+		},
+		{
+			name: "invalid node",
+			opts: RepairStateOptions{SetNode: "unknown", FromResult: resultFile, Reason: "invalid"},
+		},
+		{
+			name: "both evidence sources",
+			opts: RepairStateOptions{SetNode: "design", FromResult: resultFile, FromSession: resultFile, Reason: "both"},
+		},
+		{
+			name: "missing reason",
+			opts: RepairStateOptions{SetNode: "design", FromResult: resultFile},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			opts := tt.opts
+			opts.StateFile = stateFile
+			if err := RunRepairState(t.Context(), opts, deps{}, &bytes.Buffer{}); err == nil {
+				t.Fatal("RunRepairState() succeeded")
+			}
+			loaded := loadManagerState(t, stateFile)
+			if loaded.Workflow.CurrentNodeID != qrspi.NodeQuestion || loaded.LastStateAlignment != nil {
+				t.Fatalf("loaded = %+v", loaded)
+			}
+		})
+	}
+	if _, err := os.Stat(stateAlignmentAuditPath(stateFile)); !os.IsNotExist(err) {
+		t.Fatalf("audit stat error = %v, want not exist", err)
+	}
+}
+
+func TestRepairStateFromSessionUsesActiveBranchResult(t *testing.T) {
+	dir := t.TempDir()
+	stateFile := filepath.Join(dir, "state.json")
+	sessionPath := writePiSession(
+		t,
+		filepath.Join(dir, "sessions"),
+		"session.jsonl",
+		"session-1",
+		dir,
+		assistantLineWithIDs("root", "", "working"),
+		assistantLineWithIDs(
+			"abandoned",
+			"root",
+			testResultYAML("design", "complete", "complete", "thoughts/example/design.md", ""),
+		),
+		assistantLineWithIDs(
+			"active",
+			"root",
+			testResultYAML("implement", "complete", "complete", "thoughts/example/handoff.md", ""),
+		),
+	)
+	saveManagerState(t, stateFile, ManagerState{
+		CanonicalPlanDir: "thoughts/example",
+		Workflow:         testWorkflowState(t, qrspi.NodeQuestion, nil),
+	})
+	if err := RunRepairState(t.Context(), RepairStateOptions{
+		StateFile:   stateFile,
+		SetNode:     "implement",
+		FromSession: sessionPath,
+		Reason:      "use active branch implementation result",
+	}, deps{}, &bytes.Buffer{}); err != nil {
+		t.Fatalf("RunRepairState() error = %v", err)
+	}
+	if got := loadManagerState(t, stateFile).Workflow.CurrentNodeID; got != qrspi.NodeReviewImplementation {
+		t.Fatalf("current node = %s", got)
+	}
+}
+
+func readAlignmentAuditRecords(
+	t *testing.T,
+	stateFile string,
+) []StateAlignmentAuditRecord {
+	t.Helper()
+	data, err := os.ReadFile(stateAlignmentAuditPath(stateFile))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var records []StateAlignmentAuditRecord
+	for _, line := range strings.Split(strings.TrimSpace(string(data)), "\n") {
+		var record StateAlignmentAuditRecord
+		if err := json.Unmarshal([]byte(line), &record); err != nil {
+			t.Fatal(err)
+		}
+		records = append(records, record)
+	}
+
+	return records
 }
 
 func TestRepairStateClearFailedChildRequiresTerminalFailure(t *testing.T) {

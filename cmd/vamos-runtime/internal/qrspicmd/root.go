@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -292,7 +293,7 @@ func newDoctorCommand(d deps) *cobra.Command {
 func newRepairStateCommand(d deps) *cobra.Command {
 	opts := RepairStateOptions{Output: "text"}
 	cmd := &cobra.Command{
-		Use:   "repair-state --state-file <file> --align-active-child",
+		Use:   "repair-state --state-file <file> <repair-action>",
 		Short: "Repair q-manager workflow state from active child evidence",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return RunRepairState(cmd.Context(), opts, d, cmd.OutOrStdout())
@@ -305,6 +306,11 @@ func newRepairStateCommand(d deps) *cobra.Command {
 		BoolVar(&opts.ClearFailedChild, "clear-failed-child", false, "clear active child only when status/output prove terminal launch failure")
 	cmd.Flags().
 		BoolVar(&opts.Relaunch, "relaunch", false, "after clearing a terminal failed child, relaunch the same graph node")
+	cmd.Flags().StringVar(&opts.SetNode, "set-node", "", "source node for explicit result evidence")
+	cmd.Flags().StringVar(&opts.FromResult, "from-result", "", "result evidence file")
+	cmd.Flags().StringVar(&opts.FromSession, "from-session", "", "Pi session evidence file")
+	cmd.Flags().StringVar(&opts.ImplementationCwd, "implementation-cwd", "", "implementation workspace used while validating evidence")
+	cmd.Flags().StringVar(&opts.Reason, "reason", "", "operator reason for explicit state alignment")
 	cmd.Flags().StringVar(&opts.Output, "output", "text", "output format: text or ndjson")
 	return cmd
 }
@@ -1833,7 +1839,7 @@ func RunChildComplete(
 			}
 			status.ActionCard = BuildChildContextExhaustedCard(health, state, opts.StateFile)
 		} else {
-			status = childIntentManagerStatus(state, *child, intent)
+			status = childIntentManagerStatus(state, opts.StateFile, *child, intent)
 		}
 		state.ActiveChild.LifecycleStatus = "awaiting_manager"
 		state.ActiveChild.LastDeliveryID = status.DeliveryID
@@ -1843,7 +1849,7 @@ func RunChildComplete(
 		ChildIntentPivotRequest,
 		ChildIntentNoResultIncomplete,
 		ChildIntentAmbiguousUnsafe:
-		status = childIntentManagerStatus(state, *child, intent)
+		status = childIntentManagerStatus(state, opts.StateFile, *child, intent)
 		state.ActiveChild.LifecycleStatus = "awaiting_manager"
 		state.ActiveChild.LastDeliveryID = status.DeliveryID
 		state.LastActionCard = status.ActionCard
@@ -2611,6 +2617,7 @@ func childIntentDeliveryID(child ChildRunRef, intent ChildIntent) string {
 
 func childIntentManagerStatus(
 	state ManagerState,
+	stateFile string,
 	child ChildRunRef,
 	intent ChildIntent,
 ) ChildCompletionStatus {
@@ -2618,8 +2625,32 @@ func childIntentManagerStatus(
 	if reason == "" {
 		reason = string(intent.Kind)
 	}
+	effectiveKind := intent.Kind
+	card := defaultChildIntentActionCard(intent, reason)
+	if intent.Kind == ChildIntentPivotRequest {
+		if intent.Evidence.CurrentManagerRequest != nil {
+			validated, err := DecidePivot(
+				state,
+				stateFile,
+				*intent.Evidence.CurrentManagerRequest,
+			)
+			if err != nil {
+				effectiveKind = ChildIntentAmbiguousUnsafe
+				reason = "refused q_manager_request: " + err.Error()
+				card = refusedManagerRequestActionCard(intent, reason)
+			} else {
+				card = validated
+			}
+		} else {
+			card = naturalPivotActionCard(stateFile, intent)
+		}
+	}
+	if intent.Kind == ChildIntentAmbiguousUnsafe && intent.Evidence.ManagerRequestError != "" {
+		reason = "refused q_manager_request: " + intent.Evidence.ManagerRequestError
+		card = refusedManagerRequestActionCard(intent, reason)
+	}
 	status := ChildCompletionStatus{
-		Intent:              intent.Kind,
+		Intent:              effectiveKind,
 		Validated:           false,
 		ManagerNeeded:       true,
 		ChildID:             child.ID,
@@ -2633,31 +2664,70 @@ func childIntentManagerStatus(
 		RetryLimit:          invalidResultRetryLimit(state),
 		Result: ChildCompletionResult{
 			Stage:          child.Stage,
-			Status:         string(intent.Kind),
+			Status:         string(effectiveKind),
 			Summary:        reason,
 			StageCompleted: reason,
 		},
+		ActionCard: card,
 	}
 	if intent.Evidence.CurrentTerminal != nil {
 		status.TerminalEvidence = intent.Evidence.CurrentTerminal
 	}
-	status.ActionCard = &ManagerActionCard{
+
+	return status
+}
+
+func defaultChildIntentActionCard(intent ChildIntent, reason string) *ManagerActionCard {
+	card := &ManagerActionCard{
 		Kind:              string(intent.Kind),
 		Severity:          "warning",
 		Summary:           reason,
-		Evidence:          []string{intent.Evidence.CurrentMessage.Text},
+		Evidence:          nonEmptyEvidence(intent.Evidence.CurrentMessage.Text),
 		RecommendedAction: "inspect the current child evidence and choose the safe manager action",
 		RequiresHuman:     intent.Kind == ChildIntentManagerQuestion,
 	}
-	if intent.Kind == ChildIntentPivotRequest {
-		status.ActionCard.Severity = "info"
-		status.ActionCard.RecommendedAction = "inspect the requested follow-up; graph state remains unchanged"
-	}
 	if intent.Kind == ChildIntentNoResultIncomplete {
-		status.ActionCard.RecommendedAction = "inspect or relaunch the same graph node; no schema retry was sent"
+		card.RecommendedAction = "inspect or relaunch the same graph node; no schema retry was sent"
 	}
 
-	return status
+	return card
+}
+
+func naturalPivotActionCard(stateFile string, intent ChildIntent) *ManagerActionCard {
+	return &ManagerActionCard{
+		Kind:              "child_followup_request",
+		Severity:          "info",
+		Summary:           strings.TrimSpace(intent.Reason),
+		Evidence:          nonEmptyEvidence(intent.Evidence.CurrentMessage.Text),
+		RecommendedAction: "inspect the requested follow-up; prose carries no graph or plan-path authority",
+		SafeCommand: fmt.Sprintf(
+			"vamos qrspi inspect --state-file %s --sessions --latest",
+			stateFile,
+		),
+		RequiresHuman: false,
+	}
+}
+
+func refusedManagerRequestActionCard(intent ChildIntent, reason string) *ManagerActionCard {
+	return &ManagerActionCard{
+		Kind:              string(ChildIntentAmbiguousUnsafe),
+		Severity:          "warning",
+		Summary:           reason,
+		Evidence:          nonEmptyEvidence(intent.Evidence.CurrentMessage.Text),
+		RecommendedAction: "inspect the refused request; graph state remains unchanged",
+		RequiresHuman:     false,
+	}
+}
+
+func nonEmptyEvidence(values ...string) []string {
+	var evidence []string
+	for _, value := range values {
+		if value = strings.TrimSpace(value); value != "" {
+			evidence = append(evidence, value)
+		}
+	}
+
+	return evidence
 }
 
 func terminalEvidenceForActiveChildWithRefresh(
@@ -3879,16 +3949,437 @@ func RunRepairState(
 	if err != nil {
 		return err
 	}
+	explicitAlignment := strings.TrimSpace(opts.SetNode) != "" ||
+		strings.TrimSpace(opts.FromResult) != "" ||
+		strings.TrimSpace(opts.FromSession) != "" ||
+		strings.TrimSpace(opts.ImplementationCwd) != "" ||
+		strings.TrimSpace(opts.Reason) != ""
+	if explicitAlignment && (opts.AlignActiveChild || opts.ClearFailedChild || opts.Relaunch) {
+		return errors.New("explicit state alignment cannot be combined with another repair action")
+	}
 	switch {
+	case explicitAlignment:
+		return runExplicitStateAlignmentRepair(opts, d, out, store)
 	case opts.AlignActiveChild:
 		return runAlignActiveChildRepair(opts, out, store, state)
 	case opts.ClearFailedChild:
 		return runClearFailedChildRepair(ctx, opts, d, out, store, state)
 	default:
 		return errors.New(
-			"one repair action is required: --align-active-child or --clear-failed-child",
+			"one repair action is required: --set-node with evidence, --align-active-child, or --clear-failed-child",
 		)
 	}
+}
+
+func ValidateStateAlignment(
+	state ManagerState,
+	opts RepairStateOptions,
+) (ValidatedStateAlignment, error) {
+	return validateStateAlignmentAt(state, opts, time.Now())
+}
+
+func validateStateAlignmentAt(
+	state ManagerState,
+	opts RepairStateOptions,
+	now time.Time,
+) (ValidatedStateAlignment, error) {
+	evidenceNode := wruntime.NodeID(strings.TrimSpace(opts.SetNode))
+	def, err := Definition()
+	if err != nil {
+		return ValidatedStateAlignment{}, err
+	}
+	if _, ok := def.Nodes[evidenceNode]; !ok {
+		return ValidatedStateAlignment{}, fmt.Errorf(
+			"node %q is not in QRSPI definition",
+			evidenceNode,
+		)
+	}
+	if (strings.TrimSpace(opts.FromResult) == "") ==
+		(strings.TrimSpace(opts.FromSession) == "") {
+		return ValidatedStateAlignment{}, errors.New(
+			"use exactly one of --from-result or --from-session",
+		)
+	}
+	reason := strings.TrimSpace(opts.Reason)
+	if reason == "" {
+		return ValidatedStateAlignment{}, errors.New(
+			"reason is required for explicit state alignment",
+		)
+	}
+	cwd, err := validateAlignmentImplementationCwd(opts.ImplementationCwd)
+	if err != nil {
+		return ValidatedStateAlignment{}, err
+	}
+	text, evidencePath, err := readAlignmentResult(opts)
+	if err != nil {
+		return ValidatedStateAlignment{}, err
+	}
+	candidate := state
+	candidate.Workflow.CurrentNodeID = evidenceNode
+	candidate.Workflow.PendingNextNodeID = evidenceNode
+	candidate.Workflow.Status = wruntime.WorkspaceStatusIdle
+	candidate.Workflow.HumanGate = nil
+	if cwd != "" {
+		candidate.ImplementationCwd = cwd
+	}
+	parsed, err := ParseNormalizeValidateDecide(
+		text,
+		candidate,
+		wruntime.ParseContext{ExpectedNodeID: evidenceNode},
+	)
+	if err != nil {
+		return ValidatedStateAlignment{}, fmt.Errorf(
+			"alignment evidence is not valid for %s: %w",
+			evidenceNode,
+			err,
+		)
+	}
+	fingerprint := sessionEvidenceFingerprint(text)
+	alignmentID := sessionEvidenceFingerprint(
+		evidencePath,
+		fingerprint,
+		string(evidenceNode),
+		cwd,
+		reason,
+	)
+
+	return ValidatedStateAlignment{
+		Evidence: StateAlignmentEvidence{
+			AlignmentID:         alignmentID,
+			PreviousNode:        state.Workflow.CurrentNodeID,
+			EvidenceNode:        parsed.Result.SourceNodeID,
+			ResultingNode:       parsed.Decision.State.CurrentNodeID,
+			ResultStatus:        parsed.Result.Status,
+			ResultOutcome:       parsed.Result.Outcome,
+			EvidencePath:        evidencePath,
+			EvidenceFingerprint: fingerprint,
+			ImplementationCwd:   cwd,
+			Reason:              reason,
+			InvokedBy:           strings.TrimSpace(os.Getenv("USER")),
+			Timestamp:           now.Format(time.RFC3339Nano),
+		},
+		Decision: parsed.Decision,
+	}, nil
+}
+
+func ApplyStateAlignment(state *ManagerState, alignment ValidatedStateAlignment) {
+	state.Workflow = alignment.Decision.State
+	if alignment.Evidence.ImplementationCwd != "" {
+		state.ImplementationCwd = alignment.Evidence.ImplementationCwd
+	}
+	if state.ActiveChild != nil {
+		superseded := *state.ActiveChild
+		superseded.LifecycleStatus = "superseded_manual_alignment"
+		state.PendingCleanupChild = &superseded
+		state.ActiveChild = nil
+	}
+	state.Delivery.QueuedWake = nil
+	state.Delivery.PendingDelivery = nil
+	card := stateAlignmentActionCard(alignment.Evidence)
+	state.LastActionCard = &card
+	evidence := alignment.Evidence
+	state.LastStateAlignment = &evidence
+}
+
+func runExplicitStateAlignmentRepair(
+	opts RepairStateOptions,
+	d deps,
+	out io.Writer,
+	store StateStore,
+) error {
+	return withStateAlignmentLock(opts.StateFile, func() error {
+		latest, err := store.Load(opts.StateFile)
+		if err != nil {
+			return err
+		}
+
+		return runExplicitStateAlignmentRepairLocked(opts, d, out, store, latest)
+	})
+}
+
+func runExplicitStateAlignmentRepairLocked(
+	opts RepairStateOptions,
+	d deps,
+	out io.Writer,
+	store StateStore,
+	state ManagerState,
+) error {
+	now := time.Now()
+	if d.Clock != nil {
+		now = d.Clock()
+	}
+	alignment, err := validateStateAlignmentAt(state, opts, now)
+	if err != nil {
+		return err
+	}
+	audit, err := readStateAlignmentAudit(opts.StateFile)
+	if err != nil {
+		return err
+	}
+	pending, applied, recorded := stateAlignmentAuditStatus(
+		audit,
+		alignment.Evidence.AlignmentID,
+	)
+	if recorded != nil {
+		alignment.Evidence = *recorded
+	}
+	if !pending {
+		if err := appendStateAlignmentAuditRecord(
+			opts.StateFile,
+			StateAlignmentAuditRecord{State: "pending", Alignment: alignment.Evidence},
+		); err != nil {
+			return err
+		}
+	}
+	persisted, err := store.Mutate(opts.StateFile, nil, func(latest *ManagerState) error {
+		if !sameActiveChildEpoch(state.ActiveChild, latest.ActiveChild) {
+			return errors.New("active child changed during state alignment")
+		}
+		if latest.LastStateAlignment != nil &&
+			latest.LastStateAlignment.AlignmentID == alignment.Evidence.AlignmentID {
+			return nil
+		}
+		if latest.Workflow.CurrentNodeID != alignment.Evidence.PreviousNode {
+			return fmt.Errorf(
+				"workflow cursor changed during alignment: expected %s, found %s",
+				alignment.Evidence.PreviousNode,
+				latest.Workflow.CurrentNodeID,
+			)
+		}
+		ApplyStateAlignment(latest, alignment)
+
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+	if !applied {
+		if err := appendStateAlignmentAuditRecord(
+			opts.StateFile,
+			StateAlignmentAuditRecord{State: "applied", Alignment: alignment.Evidence},
+		); err != nil {
+			return err
+		}
+	}
+	card := stateAlignmentActionCard(alignment.Evidence)
+	if persisted.LastActionCard != nil &&
+		persisted.LastStateAlignment != nil &&
+		persisted.LastStateAlignment.AlignmentID == alignment.Evidence.AlignmentID {
+		card = *persisted.LastActionCard
+	}
+	if !strings.EqualFold(opts.Output, "ndjson") {
+		fmt.Fprintf(
+			out,
+			"repaired: applied %s evidence; workflow now %s\n",
+			alignment.Evidence.EvidenceNode,
+			alignment.Evidence.ResultingNode,
+		)
+	}
+
+	return writeManagerActionCard(out, card, opts.Output)
+}
+
+func sameActiveChildEpoch(expected, actual *ChildRunRef) bool {
+	if expected == nil || actual == nil {
+		return expected == nil && actual == nil
+	}
+
+	return expected.ID == actual.ID &&
+		activeChildGeneration(ManagerState{ActiveChild: expected}) ==
+			activeChildGeneration(ManagerState{ActiveChild: actual})
+}
+
+func withStateAlignmentLock(stateFile string, fn func() error) error {
+	lockPath := stateFile + ".alignment.lock"
+	if err := os.MkdirAll(filepath.Dir(lockPath), 0o755); err != nil {
+		return err
+	}
+	file, err := os.OpenFile(lockPath, os.O_RDWR|os.O_CREATE, 0o644)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+	if err := syscall.Flock(int(file.Fd()), syscall.LOCK_EX); err != nil {
+		return err
+	}
+	defer syscall.Flock(int(file.Fd()), syscall.LOCK_UN) //nolint:errcheck // process exit also releases the advisory lock
+
+	return fn()
+}
+
+func readAlignmentResult(opts RepairStateOptions) (string, string, error) {
+	path := strings.TrimSpace(opts.FromResult)
+	fromSession := false
+	if path == "" {
+		path = strings.TrimSpace(opts.FromSession)
+		fromSession = true
+	}
+	resolved, err := regularEvidencePath(path)
+	if err != nil {
+		return "", "", err
+	}
+	if !fromSession {
+		data, err := os.ReadFile(resolved)
+		if err != nil {
+			return "", "", err
+		}
+
+		return string(data), resolved, nil
+	}
+	messages, err := ExtractSessionEvidence(resolved)
+	if err != nil {
+		return "", "", err
+	}
+	for i := len(messages) - 1; i >= 0; i-- {
+		message := messages[i]
+		if isProviderTerminalMessage(message) {
+			continue
+		}
+		if _, err := extractCompleteQRSPIResult(message.Text); err == nil {
+			return message.Text, resolved, nil
+		}
+	}
+
+	return "", "", fmt.Errorf("session %s has no complete active-branch qrspi_result", resolved)
+}
+
+func regularEvidencePath(path string) (string, error) {
+	if strings.TrimSpace(path) == "" {
+		return "", errors.New("evidence path is required")
+	}
+	abs, err := filepath.Abs(path)
+	if err != nil {
+		return "", err
+	}
+	resolved, err := filepath.EvalSymlinks(abs)
+	if err != nil {
+		return "", fmt.Errorf("resolve evidence path: %w", err)
+	}
+	info, err := os.Stat(resolved)
+	if err != nil {
+		return "", err
+	}
+	if !info.Mode().IsRegular() {
+		return "", fmt.Errorf("evidence path is not a regular file: %s", resolved)
+	}
+
+	return resolved, nil
+}
+
+func validateAlignmentImplementationCwd(path string) (string, error) {
+	if strings.TrimSpace(path) == "" {
+		return "", nil
+	}
+	if !filepath.IsAbs(path) {
+		return "", errors.New("implementation-cwd must be absolute")
+	}
+	resolved, err := filepath.EvalSymlinks(filepath.Clean(path))
+	if err != nil {
+		return "", fmt.Errorf("resolve implementation-cwd: %w", err)
+	}
+	info, err := os.Stat(resolved)
+	if err != nil {
+		return "", err
+	}
+	if !info.IsDir() {
+		return "", errors.New("implementation-cwd must be a directory")
+	}
+
+	return resolved, nil
+}
+
+func stateAlignmentActionCard(evidence StateAlignmentEvidence) ManagerActionCard {
+	return ManagerActionCard{
+		Kind:     ActionStateAlignment,
+		Severity: "info",
+		Summary: fmt.Sprintf(
+			"workflow aligned from %s evidence to %s",
+			evidence.EvidenceNode,
+			evidence.ResultingNode,
+		),
+		Evidence: []string{
+			fmt.Sprintf("alignment: %s", evidence.AlignmentID),
+			fmt.Sprintf("previous node: %s", evidence.PreviousNode),
+			fmt.Sprintf("evidence: %s", evidence.EvidencePath),
+			fmt.Sprintf("reason: %s", evidence.Reason),
+		},
+		RecommendedAction: "inspect the applied transition, then continue from the resulting graph state",
+		RequiresHuman:     false,
+	}
+}
+
+func stateAlignmentAuditPath(stateFile string) string {
+	return filepath.Join(filepath.Dir(stateFile), "state-alignments.jsonl")
+}
+
+func appendStateAlignmentAuditRecord(
+	stateFile string,
+	record StateAlignmentAuditRecord,
+) error {
+	data, err := json.Marshal(record)
+	if err != nil {
+		return err
+	}
+	path := stateAlignmentAuditPath(stateFile)
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return err
+	}
+	file, err := os.OpenFile(path, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+	if _, err := file.Write(append(data, '\n')); err != nil {
+		return err
+	}
+
+	return file.Sync()
+}
+
+func readStateAlignmentAudit(stateFile string) ([]StateAlignmentAuditRecord, error) {
+	data, err := os.ReadFile(stateAlignmentAuditPath(stateFile))
+	if os.IsNotExist(err) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	var records []StateAlignmentAuditRecord
+	for i, line := range strings.Split(strings.TrimSpace(string(data)), "\n") {
+		if strings.TrimSpace(line) == "" {
+			continue
+		}
+		var record StateAlignmentAuditRecord
+		if err := json.Unmarshal([]byte(line), &record); err != nil {
+			return nil, fmt.Errorf("decode state alignment audit line %d: %w", i+1, err)
+		}
+		records = append(records, record)
+	}
+
+	return records, nil
+}
+
+func stateAlignmentAuditStatus(
+	records []StateAlignmentAuditRecord,
+	alignmentID string,
+) (bool, bool, *StateAlignmentEvidence) {
+	var pending, applied bool
+	var recorded *StateAlignmentEvidence
+	for _, record := range records {
+		if record.Alignment.AlignmentID != alignmentID {
+			continue
+		}
+		evidence := record.Alignment
+		recorded = &evidence
+		switch record.State {
+		case "pending":
+			pending = true
+		case "applied":
+			applied = true
+		}
+	}
+
+	return pending, applied, recorded
 }
 
 func runAlignActiveChildRepair(
@@ -4452,7 +4943,12 @@ func RunContinue(ctx context.Context, opts ContinueOptions, d deps, out io.Write
 				StopReason: "interactive child chat remains active; no result repair attempted",
 			})
 		}
-		status := childIntentManagerStatus(state, *state.ActiveChild, intent)
+		status := childIntentManagerStatus(
+			state,
+			opts.StateFile,
+			*state.ActiveChild,
+			intent,
+		)
 		state.LastActionCard = status.ActionCard
 		_ = store.Save(opts.StateFile, state)
 		if status.ActionCard != nil {
@@ -5107,19 +5603,37 @@ func buildStateDesyncActionCard(
 	if err != nil {
 		evidence = append(evidence, err.Error())
 	}
+	safeCommand := fmt.Sprintf(
+		"vamos qrspi repair-state --state-file %s --align-active-child && vamos qrspi continue --state-file %s",
+		stateFile,
+		stateFile,
+	)
+	recommended := "align active child, then continue"
+	if state.ActiveChild != nil && strings.TrimSpace(state.ActiveChild.SessionPath) != "" {
+		cwdFlag := ""
+		if strings.TrimSpace(state.ImplementationCwd) != "" {
+			cwdFlag = fmt.Sprintf(" --implementation-cwd %q", state.ImplementationCwd)
+		}
+		safeCommand = fmt.Sprintf(
+			"vamos qrspi repair-state --state-file %s --set-node %s --from-session %q%s --reason %q",
+			stateFile,
+			state.ActiveChild.Stage,
+			state.ActiveChild.SessionPath,
+			cwdFlag,
+			"align manager cursor from active child result evidence",
+		)
+		recommended = "validate the active child result and apply its transition decision"
+	}
+
 	return ManagerActionCard{
 		Kind:              ActionStateDesync,
 		Severity:          "warning",
 		Summary:           "workflow cursor and active child are out of sync",
 		Evidence:          evidence,
-		RecommendedAction: "align active child, then continue",
-		SafeCommand: fmt.Sprintf(
-			"vamos qrspi repair-state --state-file %s --align-active-child && vamos qrspi continue --state-file %s",
-			stateFile,
-			stateFile,
-		),
-		ContinueCommand: continueCommand(stateFile),
-		RequiresHuman:   false,
+		RecommendedAction: recommended,
+		SafeCommand:       safeCommand,
+		ContinueCommand:   continueCommand(stateFile),
+		RequiresHuman:     false,
 	}
 }
 
