@@ -11,6 +11,7 @@ import (
 )
 
 type recordingTmux struct {
+	splits        []TmuxSplitRequest
 	pastes        []recordedPaste
 	keys          []recordedKeys
 	kills         []TmuxPane
@@ -42,6 +43,7 @@ func (r *recordingTmux) SplitPane(
 	ctx context.Context,
 	req TmuxSplitRequest,
 ) (TmuxPane, error) {
+	r.splits = append(r.splits, req)
 	return TmuxPane{ID: "%new"}, nil
 }
 

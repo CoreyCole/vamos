@@ -59,6 +59,24 @@ func TestBuildChildCommandOmitsEmptyExtension(t *testing.T) {
 	}
 }
 
+func TestTmuxChildRunnerTargetsManagerPane(t *testing.T) {
+	tmux := &recordingTmux{}
+	_, err := (TmuxChildRunner{Tmux: tmux}).Start(
+		t.Context(),
+		ChildRunRequest{
+			Cwd:          "/repo",
+			Split:        "right",
+			ParentPaneID: "%manager",
+		},
+	)
+	if err != nil {
+		t.Fatalf("Start error = %v", err)
+	}
+	if len(tmux.splits) != 1 || tmux.splits[0].TargetPaneID != "%manager" {
+		t.Fatalf("split requests = %+v", tmux.splits)
+	}
+}
+
 func TestResolveChildExtensionPathWritesEmbeddedAsset(t *testing.T) {
 	path, err := ResolveChildExtensionPath(t.TempDir())
 	if err != nil {

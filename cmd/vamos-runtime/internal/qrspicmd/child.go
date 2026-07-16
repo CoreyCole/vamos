@@ -68,9 +68,10 @@ type ChildTurnStatus struct {
 }
 
 type TmuxSplitRequest struct {
-	Cwd       string
-	Direction string
-	Command   []string
+	Cwd          string
+	Direction    string
+	Command      []string
+	TargetPaneID string
 }
 
 type TmuxPane struct{ ID string }
@@ -179,9 +180,10 @@ func (r TmuxChildRunner) Start(
 	pane, err := r.Tmux.SplitPane(
 		ctx,
 		TmuxSplitRequest{
-			Cwd:       req.Cwd,
-			Direction: req.Split,
-			Command:   BuildChildCommand(req),
+			Cwd:          req.Cwd,
+			Direction:    req.Split,
+			Command:      BuildChildCommand(req),
+			TargetPaneID: req.ParentPaneID,
 		},
 	)
 	if err != nil {

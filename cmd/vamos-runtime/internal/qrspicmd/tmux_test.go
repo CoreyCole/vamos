@@ -15,6 +15,22 @@ func TestSplitPaneArgsTargetsCurrentPaneWhenAvailable(t *testing.T) {
 	}
 }
 
+func TestSplitPaneArgsPrefersExplicitTargetOverCurrentPane(t *testing.T) {
+	args := splitPaneArgs(
+		TmuxSplitRequest{
+			Cwd:          "/repo",
+			Direction:    "right",
+			Command:      []string{"echo"},
+			TargetPaneID: "%manager",
+		},
+		"%child",
+	)
+	joined := strings.Join(args, " ")
+	if !strings.Contains(joined, "-t %manager") || strings.Contains(joined, "%child") {
+		t.Fatalf("split args did not prefer manager target: %v", args)
+	}
+}
+
 func TestSplitPaneArgsOmitsTargetOutsideTmuxPane(t *testing.T) {
 	args := splitPaneArgs(TmuxSplitRequest{Cwd: "/repo", Direction: "down", Command: []string{"echo"}}, "")
 	joined := strings.Join(args, " ")

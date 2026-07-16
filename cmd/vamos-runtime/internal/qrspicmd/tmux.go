@@ -18,9 +18,13 @@ func (ShellTmuxClient) SplitPane(ctx context.Context, req TmuxSplitRequest) (Tmu
 	return TmuxPane{ID: strings.TrimSpace(string(out))}, nil
 }
 
-func splitPaneArgs(req TmuxSplitRequest, targetPane string) []string {
+func splitPaneArgs(req TmuxSplitRequest, fallbackTargetPane string) []string {
 	args := []string{"split-window", "-P", "-F", "#{pane_id}"}
-	if strings.TrimSpace(targetPane) != "" {
+	targetPane := strings.TrimSpace(req.TargetPaneID)
+	if targetPane == "" {
+		targetPane = strings.TrimSpace(fallbackTargetPane)
+	}
+	if targetPane != "" {
 		args = append(args, "-t", targetPane)
 	}
 	if req.Direction == "down" {
