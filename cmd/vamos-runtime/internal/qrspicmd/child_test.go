@@ -87,10 +87,25 @@ func TestResolveChildExtensionPathWritesEmbeddedAsset(t *testing.T) {
 		t.Fatalf("read extension asset: %v", err)
 	}
 	text := string(data)
-	for _, want := range []string{"export default function qManagerChildExtension", `pi.on("agent_end"`, "runChildComplete", "qrspi", "child-complete", "--state-file", "--child-id", "Q_MANAGER_STATUS_PATH", "Q_MANAGER_DONE_PATH", "Q_MANAGER_PARENT_PANE", "Q_MANAGER_VALIDATED_STATUS_PATH", "Q_MANAGER_WAKE_MODE", "validated-only", "shouldWakeManager", "wakeDeliveryMode"} {
+	for _, want := range []string{"export default function qManagerChildExtension", `pi.on("input"`, `pi.on("agent_end"`, `pi.on("agent_settled"`, "event.source", "event.streamingBehavior", "runChildComplete", "qrspi", "child-complete", "--state-file", "--child-id", "--boundary", "--interaction", "Q_MANAGER_STATUS_PATH", "Q_MANAGER_DONE_PATH", "Q_MANAGER_PARENT_PANE", "Q_MANAGER_VALIDATED_STATUS_PATH", "Q_MANAGER_WAKE_MODE", "validated-only", "shouldWakeManager", "wakeDeliveryMode", "pi.sendUserMessage"} {
 		if !strings.Contains(text, want) {
 			t.Fatalf("extension asset missing %q: %s", want, text)
 		}
+	}
+	agentEndStart := strings.Index(text, `pi.on("agent_end"`)
+	agentSettledStart := strings.Index(text, `pi.on("agent_settled"`)
+	if agentEndStart < 0 || agentSettledStart <= agentEndStart {
+		t.Fatalf("extension handlers missing or out of order: %s", text)
+	}
+	agentEndHandler := text[agentEndStart:agentSettledStart]
+	if strings.Contains(agentEndHandler, "runChildComplete") ||
+		strings.Contains(agentEndHandler, "Q_MANAGER_DONE_PATH") ||
+		strings.Contains(agentEndHandler, "touch(") {
+		t.Fatalf("agent_end performs terminal completion: %s", agentEndHandler)
+	}
+	settledHandler := text[agentSettledStart:]
+	if strings.Count(settledHandler, "runChildComplete(") != 1 {
+		t.Fatalf("runChildComplete must run once from agent_settled: %s", settledHandler)
 	}
 	for _, forbidden := range []string{"Decision", "RunDecideNext", "RunValidateResult", "paste-buffer", "send-keys", "q_manager_child_wake:"} {
 		if strings.Contains(text, forbidden) {

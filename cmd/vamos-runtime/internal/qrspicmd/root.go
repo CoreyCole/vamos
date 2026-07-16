@@ -237,16 +237,22 @@ func newRunChildCommand(d deps) *cobra.Command {
 
 func newChildCompleteCommand(d deps) *cobra.Command {
 	opts := ChildCompletionOptions{Output: "text"}
+	boundary := ""
+	interaction := ""
 	cmd := &cobra.Command{
 		Use:   "child-complete --state-file <file> [--child-id <id>]",
 		Short: "Validate active child completion and write q-manager validation status",
 		RunE: func(cmd *cobra.Command, args []string) error {
+			opts.Boundary = ChildBoundaryKind(boundary)
+			opts.Interaction = ChildInteractionMode(interaction)
 			_, err := RunChildComplete(cmd.Context(), opts, d, cmd.OutOrStdout())
 			return err
 		},
 	}
 	cmd.Flags().StringVar(&opts.StateFile, "state-file", "", "q-manager state file")
 	cmd.Flags().StringVar(&opts.ChildID, "child-id", "", "expected active child ID")
+	cmd.Flags().StringVar(&boundary, "boundary", "", "completion boundary")
+	cmd.Flags().StringVar(&interaction, "interaction", "", "child interaction mode")
 	cmd.Flags().StringVar(&opts.Output, "output", "text", "output format: text or json")
 	return cmd
 }
@@ -1569,6 +1575,32 @@ func RunChild(ctx context.Context, opts RunChildOptions, d deps, out io.Writer) 
 	)
 }
 
+func normalizeChildBoundary(value ChildBoundaryKind) (ChildBoundaryKind, error) {
+	if value == "" {
+		return ChildBoundaryAgentSettled, nil
+	}
+	switch value {
+	case ChildBoundaryAgentSettled, ChildBoundaryExplicitResult:
+		return value, nil
+	default:
+		return "", fmt.Errorf("unknown child completion boundary %q", value)
+	}
+}
+
+func normalizeChildInteraction(value ChildInteractionMode) (ChildInteractionMode, error) {
+	if value == "" {
+		return ChildInteractionStageWork, nil
+	}
+	switch value {
+	case ChildInteractionStageWork,
+		ChildInteractionInteractiveChat,
+		ChildInteractionManualSameChildChat:
+		return value, nil
+	default:
+		return "", fmt.Errorf("unknown child interaction mode %q", value)
+	}
+}
+
 func RunChildComplete(
 	ctx context.Context,
 	opts ChildCompletionOptions,
@@ -1578,6 +1610,16 @@ func RunChildComplete(
 	if strings.TrimSpace(opts.StateFile) == "" {
 		return nil, errors.New("state-file is required")
 	}
+	boundary, err := normalizeChildBoundary(opts.Boundary)
+	if err != nil {
+		return nil, err
+	}
+	interaction, err := normalizeChildInteraction(opts.Interaction)
+	if err != nil {
+		return nil, err
+	}
+	opts.Boundary = boundary
+	opts.Interaction = interaction
 	out = ensureWriter(out)
 	clock := d.Clock
 	if clock == nil {
@@ -1625,16 +1667,65 @@ func RunChildComplete(
 		)
 	}
 	child := state.ActiveChild
+	sessionPath := strings.TrimSpace(child.SessionPath)
+	if sessionPath == "" {
+		sessionPath, err = ResolveSessionPath(child.SessionDir, child.SessionID, child.Cwd)
+		if err != nil {
+			return nil, err
+		}
+		state.ActiveChild.SessionPath = sessionPath
+	}
+	sessionEvidence, err := ExtractSessionEvidence(sessionPath)
+	if err != nil {
+		return nil, err
+	}
+	latestEvidence, postCursorEvidence, err := latestSessionEvidenceAfter(
+		sessionEvidence,
+		child.EvidenceCursorMessageID,
+	)
+	if err != nil {
+		return nil, err
+	}
 	status := ChildCompletionStatus{
-		ChildID:    child.ID,
-		Attempt:    child.ValidationRetryCount,
-		RetryLimit: invalidResultRetryLimit(state),
+		ChildID:             child.ID,
+		ChildGeneration:     activeChildGeneration(state),
+		Interaction:         interaction,
+		EvidenceFingerprint: latestEvidence.Fingerprint,
+		Attempt:             child.ValidationRetryCount,
+		RetryLimit:          invalidResultRetryLimit(state),
+	}
+	state.ActiveChild.InteractionMode = string(interaction)
+	state.ActiveChild.LastEvidenceFingerprint = latestEvidence.Fingerprint
+	if interaction != ChildInteractionStageWork &&
+		!hasCompleteQRSPIResult(postCursorEvidence) {
+		status.Reason = string(ChildInteractionInteractiveChat)
+		status.Wake = WakeDeliveryInstruction{
+			Mode:   "suppress",
+			Reason: string(ChildInteractionInteractiveChat),
+		}
+		if latestEvidence.MessageID != "" {
+			state.ActiveChild.EvidenceCursorMessageID = latestEvidence.MessageID
+		}
+
+		return persistChildCompletionStatus(
+			store,
+			opts.StateFile,
+			state,
+			status,
+			child.ValidationStatusPath,
+			out,
+			opts.Output,
+		)
 	}
 	if evidence, ok, evidenceErr := terminalEvidenceForActiveChildWithRefresh(
 		state,
 	); evidenceErr == nil && ok &&
 		evidence.ContextWindowError {
 		status = childCompletionStatusFromTerminalEvidence(state, *child, evidence)
+		status.ChildGeneration = activeChildGeneration(state)
+		status.Interaction = interaction
+		status.EvidenceFingerprint = latestEvidence.Fingerprint
+		status.TerminalBoundary = true
 		state.ActiveChild.LifecycleStatus = "awaiting_manager"
 		state.ActiveChild.LastDeliveryID = status.DeliveryID
 		health := ActiveChildHealth{
@@ -1660,13 +1751,18 @@ func RunChildComplete(
 			return nil, err
 		}
 	} else {
-		text, parseCtx, readErr := ReadChildResultText(state, ResultSourceOptions{})
+		text, readErr := finalQRSPIResultText(sessionPath, sessionEvidence)
 		err = readErr
 		if err == nil {
-			parseCtx.ExpectedNodeID = wruntime.NodeID(child.Stage)
+			parseCtx := wruntime.ParseContext{
+				RunID:          child.ID,
+				SessionID:      child.SessionID,
+				ExpectedNodeID: wruntime.NodeID(child.Stage),
+			}
 			parsed, parseErr := ParseNormalizeValidateDecide(text, state, parseCtx)
 			if parseErr == nil {
 				status.Validated = true
+				status.TerminalBoundary = true
 				status.DeliveryID = childCompletionDeliveryID(*child, &parsed, false)
 				status.Result = childCompletionResult(parsed.Result)
 				status.NextChild = nextChildInfo(state, parsed.Decision.NextNodeID)
@@ -1763,30 +1859,16 @@ func RunChildComplete(
 				err,
 			) {
 				attempt := child.ValidationRetryCount + 1
-				if repromptErr := continueReprompt(
-					ctx,
-					state,
-					ContinueOptions{
-						StateFile: opts.StateFile,
-						PlanDir:   state.CanonicalPlanDir,
-						Stage:     child.Stage,
-					},
-					d,
-					io.Discard,
-					err,
-				); repromptErr != nil {
-					return nil, repromptErr
+				state.ActiveChild.ValidationRetryCount = attempt
+				state.ActiveChild.LastRepromptAttempt = attempt
+				state.ActiveChild.LifecycleStatus = "correction_pending"
+				if latestEvidence.MessageID != "" {
+					state.ActiveChild.EvidenceCursorMessageID = latestEvidence.MessageID
 				}
-				latest, loadErr := store.Load(opts.StateFile)
-				if loadErr != nil {
-					return nil, loadErr
-				}
-				state = latest
-				child = state.ActiveChild
-				status.ChildID = child.ID
 				status.Attempt = attempt
 				status.RetryLimit = invalidResultRetryLimit(state)
 				status.Reason = "retryable_invalid_result"
+				status.RetryPrompt = ChildRecoveryPrompt(err, attempt)
 				status.Wake = WakeDeliveryInstruction{
 					Mode:   "suppress",
 					Reason: "retryable_invalid_result",
@@ -1803,6 +1885,7 @@ func RunChildComplete(
 				status.Validated = false
 				status.ManagerNeeded = true
 				status.RetryExhausted = true
+				status.TerminalBoundary = true
 				status.DeliveryID = childCompletionDeliveryID(*child, nil, true)
 				status.Result = ChildCompletionResult{
 					Stage:   child.Stage,
@@ -1827,17 +1910,38 @@ func RunChildComplete(
 			}
 		}
 	}
-	if child != nil && strings.TrimSpace(child.ValidationStatusPath) != "" {
-		if writeErr := writeValidationStatus(child.ValidationStatusPath, status); writeErr != nil {
-			return nil, writeErr
+	return persistChildCompletionStatus(
+		store,
+		opts.StateFile,
+		state,
+		status,
+		child.ValidationStatusPath,
+		out,
+		opts.Output,
+	)
+}
+
+func persistChildCompletionStatus(
+	store StateStore,
+	stateFile string,
+	state ManagerState,
+	status ChildCompletionStatus,
+	validationStatusPath string,
+	out io.Writer,
+	output string,
+) (*ChildCompletionStatus, error) {
+	if strings.TrimSpace(validationStatusPath) != "" {
+		if err := writeValidationStatus(validationStatusPath, status); err != nil {
+			return nil, err
 		}
 	}
-	if saveErr := store.Save(opts.StateFile, state); saveErr != nil {
-		return nil, saveErr
-	}
-	if err := writeChildCompletionOutput(out, opts.Output, status); err != nil {
+	if err := store.Save(stateFile, state); err != nil {
 		return nil, err
 	}
+	if err := writeChildCompletionOutput(out, output, status); err != nil {
+		return nil, err
+	}
+
 	return &status, nil
 }
 

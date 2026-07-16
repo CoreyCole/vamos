@@ -11,11 +11,14 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/CoreyCole/vamos/pkg/agents/workflows/qrspi"
 )
 
 type sessionEntry struct {
 	Type      string          `json:"type"`
 	ID        string          `json:"id,omitempty"`
+	ParentID  string          `json:"parentId,omitempty"`
 	Cwd       string          `json:"cwd,omitempty"`
 	Timestamp string          `json:"timestamp,omitempty"`
 	Message   *sessionMessage `json:"message,omitempty"`
@@ -42,6 +45,188 @@ type AssistantTerminalEvidence struct {
 type sessionContentBlock struct {
 	Type string `json:"type"`
 	Text string `json:"text,omitempty"`
+}
+
+type SessionMessageEvidence struct {
+	MessageID    string `json:"messageId,omitempty"`
+	Line         int    `json:"line"`
+	Timestamp    string `json:"timestamp,omitempty"`
+	Text         string `json:"text,omitempty"`
+	StopReason   string `json:"stopReason,omitempty"`
+	ErrorMessage string `json:"errorMessage,omitempty"`
+	Fingerprint  string `json:"fingerprint"`
+}
+
+type indexedSessionEntry struct {
+	entry sessionEntry
+	line  int
+}
+
+func ExtractSessionEvidence(path string) ([]SessionMessageEvidence, error) {
+	file, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+
+	var entries []indexedSessionEntry
+	scanner := bufio.NewScanner(file)
+	scanner.Buffer(make([]byte, 64*1024), 1024*1024)
+	lineNo := 0
+	for scanner.Scan() {
+		lineNo++
+		var entry sessionEntry
+		if json.Unmarshal(bytes.TrimSpace(scanner.Bytes()), &entry) != nil {
+			continue
+		}
+		entries = append(entries, indexedSessionEntry{entry: entry, line: lineNo})
+	}
+	if err := scanner.Err(); err != nil {
+		return nil, err
+	}
+
+	activeIDs, indexed := activeSessionBranchIDs(entries)
+	var evidence []SessionMessageEvidence
+	for _, indexedEntry := range entries {
+		entry := indexedEntry.entry
+		if entry.Type != "message" || entry.Message == nil ||
+			entry.Message.Role != "assistant" {
+			continue
+		}
+		if indexed {
+			if _, ok := activeIDs[entry.ID]; !ok {
+				continue
+			}
+		}
+		text := textBlocksFromAssistantMessage(*entry.Message)
+		if strings.TrimSpace(text) == "" &&
+			strings.TrimSpace(entry.Message.StopReason) == "" &&
+			strings.TrimSpace(entry.Message.ErrorMessage) == "" {
+			continue
+		}
+		messageID := strings.TrimSpace(entry.ID)
+		if messageID == "" {
+			messageID = fmt.Sprintf("line:%d", indexedEntry.line)
+		}
+		item := SessionMessageEvidence{
+			MessageID:    messageID,
+			Line:         indexedEntry.line,
+			Timestamp:    entry.Timestamp,
+			Text:         text,
+			StopReason:   entry.Message.StopReason,
+			ErrorMessage: entry.Message.ErrorMessage,
+		}
+		item.Fingerprint = sessionEvidenceFingerprint(
+			item.Text,
+			item.StopReason,
+			item.ErrorMessage,
+		)
+		evidence = append(evidence, item)
+	}
+
+	return evidence, nil
+}
+
+func activeSessionBranchIDs(entries []indexedSessionEntry) (map[string]struct{}, bool) {
+	byID := make(map[string]sessionEntry)
+	leafID := ""
+	messageCount := 0
+	for _, indexedEntry := range entries {
+		entry := indexedEntry.entry
+		if entry.Type != "message" {
+			continue
+		}
+		if strings.TrimSpace(entry.ID) == "" ||
+			(messageCount > 0 && strings.TrimSpace(entry.ParentID) == "") {
+			return nil, false
+		}
+		messageCount++
+		byID[entry.ID] = entry
+		leafID = entry.ID
+	}
+	if leafID == "" {
+		return nil, false
+	}
+
+	active := make(map[string]struct{})
+	for leafID != "" {
+		if _, seen := active[leafID]; seen {
+			return nil, false
+		}
+		entry, ok := byID[leafID]
+		if !ok {
+			return nil, false
+		}
+		active[leafID] = struct{}{}
+		leafID = strings.TrimSpace(entry.ParentID)
+	}
+
+	return active, true
+}
+
+func latestSessionEvidenceAfter(
+	evidence []SessionMessageEvidence,
+	afterMessageID string,
+) (SessionMessageEvidence, []SessionMessageEvidence, error) {
+	start := 0
+	if strings.TrimSpace(afterMessageID) != "" {
+		found := false
+		for i := range evidence {
+			if evidence[i].MessageID == afterMessageID {
+				start = i + 1
+				found = true
+				break
+			}
+		}
+		if !found {
+			return SessionMessageEvidence{}, nil, fmt.Errorf(
+				"evidence cursor message %q is not on the active assistant branch",
+				afterMessageID,
+			)
+		}
+	}
+	if start >= len(evidence) {
+		return SessionMessageEvidence{}, nil, nil
+	}
+	postCursor := evidence[start:]
+
+	return postCursor[len(postCursor)-1], postCursor, nil
+}
+
+func hasCompleteQRSPIResult(evidence []SessionMessageEvidence) bool {
+	for _, item := range evidence {
+		if _, err := qrspi.ExtractQRSPIResultYAML(item.Text); err == nil {
+			return true
+		}
+	}
+
+	return false
+}
+
+func finalQRSPIResultText(
+	path string,
+	evidence []SessionMessageEvidence,
+) (string, error) {
+	for i := len(evidence) - 1; i >= 0; i-- {
+		item := evidence[i]
+		if item.StopReason == "error" || item.StopReason == "aborted" {
+			continue
+		}
+		if strings.Contains(item.Text, "qrspi_result") {
+			return item.Text, nil
+		}
+	}
+
+	return "", fmt.Errorf(
+		"session %s has no assistant text containing qrspi_result",
+		path,
+	)
+}
+
+func sessionEvidenceFingerprint(parts ...string) string {
+	sum := sha256.Sum256([]byte(strings.Join(parts, "\x00")))
+
+	return hex.EncodeToString(sum[:])[:16]
 }
 
 func ResolveSessionPath(sessionDir, sessionID, cwd string) (string, error) {

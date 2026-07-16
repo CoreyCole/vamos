@@ -1143,6 +1143,335 @@ func TestTerminalEvidenceRefreshDoesNotReturnEarlyForOlderResult(t *testing.T) {
 	}
 }
 
+func TestChildCompleteInterruptionChatSuppressesWithoutTerminalMutation(t *testing.T) {
+	tests := []struct {
+		name        string
+		interaction ChildInteractionMode
+		text        string
+	}{
+		{
+			name:        "plain answer",
+			interaction: ChildInteractionInteractiveChat,
+			text:        "The artifact is already present.",
+		},
+		{
+			name:        "partial result",
+			interaction: ChildInteractionManualSameChildChat,
+			text:        "```yaml\nqrspi_result:\n  stage: review-outline",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			dir := t.TempDir()
+			stateFile := filepath.Join(dir, "state.json")
+			donePath := filepath.Join(dir, "done")
+			sessionPath := writePiSession(
+				t,
+				filepath.Join(dir, "sessions"),
+				"session.jsonl",
+				"session-1",
+				filepath.Join(dir, "repo"),
+				assistantLineWithIDs("message-1", "", tt.text),
+			)
+			state := ManagerState{
+				CanonicalPlanDir: "thoughts/example",
+				Workflow:         testWorkflowState(t, qrspi.NodeReviewOutline, nil),
+				ActiveChild: &ChildRunRef{
+					ID:                   "child-1",
+					Stage:                "review-outline",
+					Cwd:                  filepath.Join(dir, "repo"),
+					SessionID:            "session-1",
+					SessionDir:           filepath.Join(dir, "sessions"),
+					SessionPath:          sessionPath,
+					DonePath:             donePath,
+					ValidationStatusPath: filepath.Join(dir, "validation-status.json"),
+					LifecycleStatus:      "running",
+					Generation:           1,
+				},
+			}
+			saveManagerState(t, stateFile, state)
+			writeFile(t, donePath, "existing")
+
+			status, err := RunChildComplete(
+				t.Context(),
+				ChildCompletionOptions{
+					StateFile:   stateFile,
+					ChildID:     "child-1",
+					Interaction: tt.interaction,
+				},
+				deps{Tmux: &recordingTmux{}},
+				&strings.Builder{},
+			)
+			if err != nil {
+				t.Fatalf("RunChildComplete error = %v", err)
+			}
+			if status.Validated || status.ManagerNeeded || status.RetryExhausted ||
+				status.TerminalBoundary || status.RetryPrompt != "" ||
+				status.Reason != string(ChildIntentInteractiveChat) ||
+				status.Wake.Mode != "suppress" ||
+				status.Wake.Reason != string(ChildIntentInteractiveChat) {
+				t.Fatalf("status = %+v", status)
+			}
+			loaded := loadManagerState(t, stateFile)
+			if loaded.ActiveChild.ValidationRetryCount != 0 ||
+				loaded.ActiveChild.LifecycleStatus != "running" ||
+				loaded.ActiveChild.EvidenceCursorMessageID != "message-1" ||
+				loaded.ActiveChild.InteractionMode != string(tt.interaction) ||
+				loaded.ActiveChild.LastEvidenceFingerprint == "" {
+				t.Fatalf("active child = %+v", loaded.ActiveChild)
+			}
+			if _, err := os.Stat(donePath); err != nil {
+				t.Fatalf("chat removed done marker: %v", err)
+			}
+		})
+	}
+}
+
+func TestChildCompleteLaterValidResultAfterInterruptionChat(t *testing.T) {
+	dir := t.TempDir()
+	stateFile := filepath.Join(dir, "state.json")
+	sessionPath := writePiSession(
+		t,
+		filepath.Join(dir, "sessions"),
+		"session.jsonl",
+		"session-1",
+		filepath.Join(dir, "repo"),
+		assistantLineWithIDs("chat-1", "", "Answering the interruption."),
+	)
+	state := ManagerState{
+		CanonicalPlanDir: "thoughts/example",
+		ManagerPaneID:    "%parent",
+		Workflow:         testWorkflowState(t, qrspi.NodeReviewOutline, nil),
+		ActiveChild: &ChildRunRef{
+			ID:                   "child-1",
+			Stage:                "review-outline",
+			Cwd:                  filepath.Join(dir, "repo"),
+			SessionID:            "session-1",
+			SessionDir:           filepath.Join(dir, "sessions"),
+			SessionPath:          sessionPath,
+			ValidationStatusPath: filepath.Join(dir, "validation-status.json"),
+			LifecycleStatus:      "running",
+			Generation:           1,
+		},
+	}
+	saveManagerState(t, stateFile, state)
+	if _, err := RunChildComplete(
+		t.Context(),
+		ChildCompletionOptions{
+			StateFile:   stateFile,
+			ChildID:     "child-1",
+			Interaction: ChildInteractionInteractiveChat,
+		},
+		deps{Tmux: &recordingTmux{}},
+		&strings.Builder{},
+	); err != nil {
+		t.Fatalf("chat completion error = %v", err)
+	}
+	file, err := os.OpenFile(sessionPath, os.O_APPEND|os.O_WRONLY, 0o644)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, writeErr := file.WriteString(assistantLineWithIDs(
+		"result-1",
+		"chat-1",
+		testResultYAML(
+			"review-outline",
+			"complete",
+			"complete",
+			"thoughts/example/reviews/outline/review.md",
+			"",
+		),
+	) + "\n")
+	closeErr := file.Close()
+	if writeErr != nil || closeErr != nil {
+		t.Fatalf("append result: write=%v close=%v", writeErr, closeErr)
+	}
+
+	status, err := RunChildComplete(
+		t.Context(),
+		ChildCompletionOptions{
+			StateFile:   stateFile,
+			ChildID:     "child-1",
+			Interaction: ChildInteractionInteractiveChat,
+		},
+		deps{Tmux: &recordingTmux{}},
+		&strings.Builder{},
+	)
+	if err != nil {
+		t.Fatalf("valid completion error = %v", err)
+	}
+	if !status.Validated || !status.TerminalBoundary ||
+		status.Result.Outcome != "ready-for-plan" || status.Wake.Mode != "deliver" {
+		t.Fatalf("status = %+v", status)
+	}
+}
+
+func TestChildCompleteDoesNotReuseResultBeforeChatCursor(t *testing.T) {
+	dir := t.TempDir()
+	stateFile := filepath.Join(dir, "state.json")
+	sessionPath := writePiSession(
+		t,
+		filepath.Join(dir, "sessions"),
+		"session.jsonl",
+		"session-1",
+		filepath.Join(dir, "repo"),
+		assistantLineWithIDs(
+			"old-result",
+			"",
+			testResultYAML(
+				"review-outline",
+				"complete",
+				"complete",
+				"thoughts/example/reviews/outline/review.md",
+				"",
+			),
+		),
+		assistantLineWithIDs("chat-1", "old-result", "No, that file is unchanged."),
+	)
+	state := ManagerState{
+		CanonicalPlanDir: "thoughts/example",
+		Workflow:         testWorkflowState(t, qrspi.NodeReviewOutline, nil),
+		ActiveChild: &ChildRunRef{
+			ID:                      "child-1",
+			Stage:                   "review-outline",
+			Cwd:                     filepath.Join(dir, "repo"),
+			SessionID:               "session-1",
+			SessionDir:              filepath.Join(dir, "sessions"),
+			SessionPath:             sessionPath,
+			ValidationStatusPath:    filepath.Join(dir, "validation-status.json"),
+			EvidenceCursorMessageID: "old-result",
+			Generation:              1,
+		},
+	}
+	saveManagerState(t, stateFile, state)
+
+	status, err := RunChildComplete(
+		t.Context(),
+		ChildCompletionOptions{
+			StateFile:   stateFile,
+			ChildID:     "child-1",
+			Interaction: ChildInteractionInteractiveChat,
+		},
+		deps{Tmux: &recordingTmux{}},
+		&strings.Builder{},
+	)
+	if err != nil {
+		t.Fatalf("RunChildComplete error = %v", err)
+	}
+	if status.Validated || status.TerminalBoundary ||
+		status.Reason != string(ChildIntentInteractiveChat) {
+		t.Fatalf("status = %+v", status)
+	}
+}
+
+func TestChildCompleteStageWorkReturnsCorrectionForExtensionDelivery(t *testing.T) {
+	dir := t.TempDir()
+	stateFile := filepath.Join(dir, "state.json")
+	sessionPath := writePiSession(
+		t,
+		filepath.Join(dir, "sessions"),
+		"session.jsonl",
+		"session-1",
+		filepath.Join(dir, "repo"),
+		assistantLineWithIDs("invalid-1", "", "not yaml"),
+	)
+	state := ManagerState{
+		CanonicalPlanDir: "thoughts/example",
+		Workflow:         testWorkflowState(t, qrspi.NodeDesign, nil),
+		ActiveChild: &ChildRunRef{
+			ID:                   "child-1",
+			Stage:                "design",
+			Cwd:                  filepath.Join(dir, "repo"),
+			TmuxPaneID:           "%9",
+			SessionID:            "session-1",
+			SessionDir:           filepath.Join(dir, "sessions"),
+			SessionPath:          sessionPath,
+			ValidationStatusPath: filepath.Join(dir, "validation-status.json"),
+			Generation:           1,
+		},
+	}
+	saveManagerState(t, stateFile, state)
+	tmux := &recordingTmux{}
+
+	status, err := RunChildComplete(
+		t.Context(),
+		ChildCompletionOptions{
+			StateFile:   stateFile,
+			ChildID:     "child-1",
+			Interaction: ChildInteractionStageWork,
+		},
+		deps{Tmux: tmux},
+		&strings.Builder{},
+	)
+	if err != nil {
+		t.Fatalf("RunChildComplete error = %v", err)
+	}
+	if status.RetryPrompt == "" || status.TerminalBoundary || len(tmux.pastes) != 0 {
+		t.Fatalf("status=%+v pastes=%#v", status, tmux.pastes)
+	}
+	loaded := loadManagerState(t, stateFile)
+	if loaded.ActiveChild.InteractionMode != string(ChildInteractionStageWork) ||
+		loaded.ActiveChild.ValidationRetryCount != 1 ||
+		loaded.ActiveChild.LifecycleStatus != "correction_pending" {
+		t.Fatalf("active child = %+v", loaded.ActiveChild)
+	}
+}
+
+func TestChildCompleteRejectsUnknownBoundaryAndInteractionBeforeMutation(t *testing.T) {
+	tests := []struct {
+		name string
+		opts ChildCompletionOptions
+		want string
+	}{
+		{
+			name: "boundary",
+			opts: ChildCompletionOptions{Boundary: ChildBoundaryKind("unknown")},
+			want: "unknown child completion boundary",
+		},
+		{
+			name: "interaction",
+			opts: ChildCompletionOptions{Interaction: ChildInteractionMode("unknown")},
+			want: "unknown child interaction mode",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			dir := t.TempDir()
+			stateFile := filepath.Join(dir, "state.json")
+			saveManagerState(t, stateFile, ManagerState{
+				Workflow: testWorkflowState(t, qrspi.NodeDesign, nil),
+				ActiveChild: &ChildRunRef{
+					ID:         "child-1",
+					Stage:      "design",
+					Generation: 1,
+				},
+			})
+			before, err := os.ReadFile(stateFile)
+			if err != nil {
+				t.Fatal(err)
+			}
+			tt.opts.StateFile = stateFile
+			tt.opts.ChildID = "child-1"
+			_, err = RunChildComplete(
+				t.Context(),
+				tt.opts,
+				deps{},
+				&strings.Builder{},
+			)
+			if err == nil || !strings.Contains(err.Error(), tt.want) {
+				t.Fatalf("error = %v, want %q", err, tt.want)
+			}
+			after, readErr := os.ReadFile(stateFile)
+			if readErr != nil {
+				t.Fatal(readErr)
+			}
+			if string(after) != string(before) {
+				t.Fatalf("state changed before validation\nbefore=%s\nafter=%s", before, after)
+			}
+		})
+	}
+}
+
 func TestChildCompleteInvalidResultSuppressesThenExhausts(t *testing.T) {
 	dir := t.TempDir()
 	stateFile := filepath.Join(dir, "state.json")
@@ -1188,8 +1517,9 @@ func TestChildCompleteInvalidResultSuppressesThenExhausts(t *testing.T) {
 		status.Reason != "retryable_invalid_result" {
 		t.Fatalf("retry status = %+v", status)
 	}
-	if len(tmux.pastes) != 1 {
-		t.Fatalf("pastes = %#v, want reprompt", tmux.pastes)
+	if len(tmux.pastes) != 0 || status.RetryPrompt == "" ||
+		status.TerminalBoundary {
+		t.Fatalf("retry status=%+v pastes=%#v, want deferred Pi correction", status, tmux.pastes)
 	}
 
 	status, err = RunChildComplete(

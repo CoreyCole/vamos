@@ -24,7 +24,7 @@ async function touch(path) {
   await writeFile(path, "", "utf8");
 }
 
-async function runChildComplete() {
+async function runChildComplete({ boundary, interaction }) {
   const stateFile = process.env.Q_MANAGER_STATE_FILE || "";
   const childID = process.env.Q_MANAGER_CHILD_ID || "";
   if (!stateFile || !childID) return null;
@@ -38,6 +38,10 @@ async function runChildComplete() {
         stateFile,
         "--child-id",
         childID,
+        "--boundary",
+        boundary,
+        "--interaction",
+        interaction,
         "--output",
         "json",
       ],
@@ -67,39 +71,76 @@ function shouldWakeManager(validation) {
   );
 }
 
+async function writeTurnStatus(validation, lowLevelRunEnded) {
+  const status = {
+    event: "agent_settled",
+    stage: process.env.Q_MANAGER_STAGE || "",
+    childId: process.env.Q_MANAGER_CHILD_ID || "",
+    managerRunId: process.env.Q_MANAGER_MANAGER_RUN_ID || "",
+    stateFile: process.env.Q_MANAGER_STATE_FILE || "",
+    planDir: process.env.Q_MANAGER_PLAN_DIR || "",
+    sessionId: process.env.Q_MANAGER_SESSION_ID || process.env.SESSION_ID || "",
+    sessionDir:
+      process.env.Q_MANAGER_SESSION_DIR || process.env.SESSION_DIR || "",
+    sessionPath: process.env.SESSION_PATH || "",
+    finishedAt: new Date().toISOString(),
+    wakeTarget: process.env.Q_MANAGER_PARENT_PANE || "",
+    wakeMode: process.env.Q_MANAGER_WAKE_MODE || "validated-only",
+    validationStatusPath: process.env.Q_MANAGER_VALIDATED_STATUS_PATH || "",
+    activeChildGeneration: validation?.childGeneration || "",
+    helperProducedStatus: validation !== null,
+    managerWakeSuppressed: !shouldWakeManager(validation),
+    wakeDeliveryMode: validation?.wake?.mode || "",
+    wakeDeliveryReason: validation?.wake?.reason || "",
+    lowLevelRunEnded,
+  };
+  await writeJson(process.env.Q_MANAGER_STATUS_PATH, status);
+}
+
 export default function qManagerChildExtension(pi) {
   const key = Symbol.for("vamos.q_manager_child_extension.loaded");
   if (globalThis[key]) return;
   globalThis[key] = true;
 
-  pi.on("agent_end", async () => {
-    const produced = await runChildComplete();
+  let interaction = "stage_work";
+  let lowLevelRunEnded = false;
+
+  pi.on("input", (event) => {
+    if (event.source === "extension") {
+      interaction = "stage_work";
+      return { action: "continue" };
+    }
+    interaction = event.streamingBehavior
+      ? "interactive_child_chat"
+      : "manual_same_child_chat";
+    return { action: "continue" };
+  });
+
+  pi.on("agent_end", () => {
+    lowLevelRunEnded = true;
+  });
+
+  pi.on("agent_settled", async (_event, ctx) => {
+    if (!ctx.isIdle() || ctx.hasPendingMessages()) return;
+
+    const produced = await runChildComplete({
+      boundary: "agent_settled",
+      interaction,
+    });
     const validation =
       produced ||
       (await readJson(process.env.Q_MANAGER_VALIDATED_STATUS_PATH || ""));
-    const status = {
-      event: "agent_end",
-      stage: process.env.Q_MANAGER_STAGE || "",
-      childId: process.env.Q_MANAGER_CHILD_ID || "",
-      managerRunId: process.env.Q_MANAGER_MANAGER_RUN_ID || "",
-      stateFile: process.env.Q_MANAGER_STATE_FILE || "",
-      planDir: process.env.Q_MANAGER_PLAN_DIR || "",
-      sessionId:
-        process.env.Q_MANAGER_SESSION_ID || process.env.SESSION_ID || "",
-      sessionDir:
-        process.env.Q_MANAGER_SESSION_DIR || process.env.SESSION_DIR || "",
-      sessionPath: process.env.SESSION_PATH || "",
-      finishedAt: new Date().toISOString(),
-      wakeTarget: process.env.Q_MANAGER_PARENT_PANE || "",
-      wakeMode: process.env.Q_MANAGER_WAKE_MODE || "validated-only",
-      validationStatusPath: process.env.Q_MANAGER_VALIDATED_STATUS_PATH || "",
-      activeChildGeneration: validation?.childGeneration || "",
-      helperProducedStatus: produced !== null,
-      managerWakeSuppressed: !shouldWakeManager(validation),
-      wakeDeliveryMode: validation?.wake?.mode || "",
-      wakeDeliveryReason: validation?.wake?.reason || "",
-    };
-    await writeJson(process.env.Q_MANAGER_STATUS_PATH, status);
-    await touch(process.env.Q_MANAGER_DONE_PATH);
+
+    if (validation?.retryPrompt) {
+      pi.sendUserMessage(validation.retryPrompt);
+    }
+
+    if (validation?.terminalBoundary) {
+      await writeTurnStatus(validation, lowLevelRunEnded);
+      await touch(process.env.Q_MANAGER_DONE_PATH);
+    }
+
+    interaction = "stage_work";
+    lowLevelRunEnded = false;
   });
 }

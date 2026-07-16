@@ -199,6 +199,48 @@ func TestIsContextWindowErrorMessage(t *testing.T) {
 	}
 }
 
+func TestExtractSessionEvidenceUsesActiveBranchAndStableIDs(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "session.jsonl")
+	writeSessionTestFile(t, path, strings.Join([]string{
+		sessionHeader("s", "/tmp/repo"),
+		assistantLineWithIDs("root", "", "root answer"),
+		assistantLineWithIDs("abandoned", "root", "abandoned qrspi_result"),
+		assistantLineWithIDs("active", "root", "active answer"),
+	}, "\n")+"\n")
+
+	evidence, err := ExtractSessionEvidence(path)
+	if err != nil {
+		t.Fatalf("ExtractSessionEvidence error = %v", err)
+	}
+	if len(evidence) != 2 || evidence[0].MessageID != "root" ||
+		evidence[1].MessageID != "active" ||
+		evidence[1].Fingerprint == "" {
+		t.Fatalf("evidence = %+v", evidence)
+	}
+	latest, after, err := latestSessionEvidenceAfter(evidence, "root")
+	if err != nil || latest.MessageID != "active" || len(after) != 1 {
+		t.Fatalf("latest=%+v after=%+v err=%v", latest, after, err)
+	}
+}
+
+func TestExtractSessionEvidenceKeepsLineFallbackForMinimalFixtures(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "session.jsonl")
+	writeSessionTestFile(t, path, strings.Join([]string{
+		sessionHeader("s", "/tmp/repo"),
+		assistantLine("first"),
+		assistantLine("second"),
+	}, "\n")+"\n")
+
+	evidence, err := ExtractSessionEvidence(path)
+	if err != nil {
+		t.Fatalf("ExtractSessionEvidence error = %v", err)
+	}
+	if len(evidence) != 2 || evidence[0].MessageID != "line:2" ||
+		evidence[1].MessageID != "line:3" {
+		t.Fatalf("evidence = %+v", evidence)
+	}
+}
+
 func TestTextBlocksFromAssistantMessageAcceptsStringContent(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "session.jsonl")
 	writeSessionTestFile(
@@ -242,6 +284,15 @@ func sessionHeader(sessionID, cwd string) string {
 func assistantLine(text string) string {
 	return fmt.Sprintf(
 		`{"type":"message","message":{"role":"assistant","stopReason":"endTurn","content":[{"type":"thinking","text":"hidden"},{"type":"text","text":%q}]}}`,
+		text,
+	)
+}
+
+func assistantLineWithIDs(id, parentID, text string) string {
+	return fmt.Sprintf(
+		`{"type":"message","id":%q,"parentId":%q,"message":{"role":"assistant","stopReason":"endTurn","content":[{"type":"thinking","text":"hidden"},{"type":"text","text":%q}]}}`,
+		id,
+		parentID,
 		text,
 	)
 }

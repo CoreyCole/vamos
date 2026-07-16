@@ -123,10 +123,31 @@ type NextChildInfo struct {
 	WorkingOn string `json:"workingOn,omitempty"`
 }
 
+type ChildBoundaryKind string
+
+const (
+	ChildBoundaryAgentSettled   ChildBoundaryKind = "agent_settled"
+	ChildBoundaryExplicitResult ChildBoundaryKind = "explicit_result"
+)
+
+type ChildInteractionMode string
+
+type ChildIntentKind string
+
+const ChildIntentInteractiveChat ChildIntentKind = "interactive_child_chat"
+
+const (
+	ChildInteractionStageWork           ChildInteractionMode = "stage_work"
+	ChildInteractionInteractiveChat     ChildInteractionMode = "interactive_child_chat"
+	ChildInteractionManualSameChildChat ChildInteractionMode = "manual_same_child_chat"
+)
+
 type ChildCompletionOptions struct {
-	StateFile string
-	ChildID   string
-	Output    string
+	StateFile   string
+	ChildID     string
+	Output      string
+	Boundary    ChildBoundaryKind
+	Interaction ChildInteractionMode
 }
 
 type ManagerReadyOptions struct {
@@ -172,6 +193,7 @@ type ChildCompletionStatus struct {
 	ContinuationStarted bool                       `json:"continuationStarted"`
 	RetryExhausted      bool                       `json:"retryExhausted"`
 	ChildID             string                     `json:"childId"`
+	ChildGeneration     int                        `json:"childGeneration,omitempty"`
 	DeliveryID          string                     `json:"deliveryId"`
 	Result              ChildCompletionResult      `json:"result,omitempty"`
 	NextChild           NextChildInfo              `json:"nextChild,omitempty"`
@@ -179,6 +201,10 @@ type ChildCompletionStatus struct {
 	ActionCard          *ManagerActionCard         `json:"actionCard,omitempty"`
 	TerminalEvidence    *AssistantTerminalEvidence `json:"terminalEvidence,omitempty"`
 	Normalizations      []ResultNormalization      `json:"normalizations,omitempty"`
+	RetryPrompt         string                     `json:"retryPrompt,omitempty"`
+	TerminalBoundary    bool                       `json:"terminalBoundary"`
+	Interaction         ChildInteractionMode       `json:"interaction,omitempty"`
+	EvidenceFingerprint string                     `json:"evidenceFingerprint,omitempty"`
 	Reason              string                     `json:"reason,omitempty"`
 	Attempt             int                        `json:"attempt,omitempty"`
 	RetryLimit          int                        `json:"retryLimit,omitempty"`
