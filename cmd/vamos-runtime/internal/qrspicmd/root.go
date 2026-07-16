@@ -3229,25 +3229,39 @@ func activeChildAssistantHead(state ManagerState) (string, error) {
 	return evidence[len(evidence)-1].MessageID, nil
 }
 
-func recordSteerDeliveryFailure(
+func recordSteerFailure(
 	store StateStore,
 	stateFile string,
 	epoch ChildEpoch,
-	deliveryErr error,
+	summary string,
+	steerErr error,
 ) {
 	_, _ = store.Mutate(stateFile, &epoch, func(state *ManagerState) error {
 		state.ActiveChild.LifecycleStatus = "steer_delivery_failed"
 		state.LastActionCard = &ManagerActionCard{
 			Kind:              ActionManualChildSteer,
 			Severity:          "warning",
-			Summary:           "child steering epoch persisted but feedback delivery failed",
-			Evidence:          []string{deliveryErr.Error()},
+			Summary:           summary,
+			Evidence:          []string{steerErr.Error()},
 			RecommendedAction: "inspect the child pane and retry steering in the current evidence epoch",
 			RequiresHuman:     false,
 		}
 
 		return nil
 	})
+}
+
+func clearChildTurnCompletionMarkers(child ChildRunRef) error {
+	for _, path := range []string{child.DonePath, child.ValidationStatusPath} {
+		if strings.TrimSpace(path) == "" {
+			continue
+		}
+		if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func pasteWake(ctx context.Context, d deps, paneID, payload string) error {
@@ -4699,18 +4713,41 @@ func RunSteerChild(
 	if err != nil {
 		return nil, err
 	}
+	if err := clearChildTurnCompletionMarkers(child); err != nil {
+		recordSteerFailure(
+			store,
+			opts.StateFile,
+			newEpoch,
+			"child steering epoch persisted but stale completion marker reset failed",
+			err,
+		)
+
+		return nil, err
+	}
 	tmux := d.Tmux
 	if tmux == nil {
 		tmux = ShellTmuxClient{}
 	}
 	pane := TmuxPane{ID: child.TmuxPaneID}
 	if err := tmux.PasteText(ctx, pane, prompt); err != nil {
-		recordSteerDeliveryFailure(store, opts.StateFile, newEpoch, err)
+		recordSteerFailure(
+			store,
+			opts.StateFile,
+			newEpoch,
+			"child steering epoch persisted but feedback delivery failed",
+			err,
+		)
 
 		return nil, err
 	}
 	if err := tmux.SendKeys(ctx, pane, []string{"Enter"}); err != nil {
-		recordSteerDeliveryFailure(store, opts.StateFile, newEpoch, err)
+		recordSteerFailure(
+			store,
+			opts.StateFile,
+			newEpoch,
+			"child steering epoch persisted but feedback delivery failed",
+			err,
+		)
 
 		return nil, err
 	}

@@ -130,17 +130,17 @@ func ExtractSessionEvidence(path string) ([]SessionMessageEvidence, error) {
 func activeSessionBranchIDs(entries []indexedSessionEntry) (map[string]struct{}, bool) {
 	byID := make(map[string]sessionEntry)
 	leafID := ""
-	messageCount := 0
+	entryCount := 0
 	for _, indexedEntry := range entries {
 		entry := indexedEntry.entry
-		if entry.Type != "message" {
+		if entry.Type == "session" {
 			continue
 		}
 		if strings.TrimSpace(entry.ID) == "" ||
-			(messageCount > 0 && strings.TrimSpace(entry.ParentID) == "") {
+			(entryCount > 0 && strings.TrimSpace(entry.ParentID) == "") {
 			return nil, false
 		}
-		messageCount++
+		entryCount++
 		byID[entry.ID] = entry
 		leafID = entry.ID
 	}

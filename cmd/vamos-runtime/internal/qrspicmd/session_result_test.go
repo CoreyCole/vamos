@@ -203,9 +203,12 @@ func TestExtractSessionEvidenceUsesActiveBranchAndStableIDs(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "session.jsonl")
 	writeSessionTestFile(t, path, strings.Join([]string{
 		sessionHeader("s", "/tmp/repo"),
-		assistantLineWithIDs("root", "", "root answer"),
+		sessionEntryLineWithIDs("session_info", "info", ""),
+		sessionEntryLineWithIDs("custom", "before-root", "info"),
+		assistantLineWithIDs("root", "before-root", "root answer"),
 		assistantLineWithIDs("abandoned", "root", "abandoned qrspi_result"),
-		assistantLineWithIDs("active", "root", "active answer"),
+		sessionEntryLineWithIDs("custom", "active-context", "root"),
+		assistantLineWithIDs("active", "active-context", "active answer"),
 	}, "\n")+"\n")
 
 	evidence, err := ExtractSessionEvidence(path)
@@ -294,6 +297,15 @@ func assistantLineWithIDs(id, parentID, text string) string {
 		id,
 		parentID,
 		text,
+	)
+}
+
+func sessionEntryLineWithIDs(entryType, id, parentID string) string {
+	return fmt.Sprintf(
+		`{"type":%q,"id":%q,"parentId":%q}`,
+		entryType,
+		id,
+		parentID,
 	)
 }
 

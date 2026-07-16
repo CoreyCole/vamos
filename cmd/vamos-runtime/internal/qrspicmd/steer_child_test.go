@@ -3,6 +3,7 @@ package qrspicmd
 import (
 	"bytes"
 	"errors"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -14,7 +15,11 @@ func TestSteerChildPastesFeedbackToActiveChild(t *testing.T) {
 	dir := t.TempDir()
 	stateFile := filepath.Join(dir, "state.json")
 	feedbackFile := filepath.Join(dir, "feedback.md")
+	donePath := filepath.Join(dir, "done")
+	validationStatusPath := filepath.Join(dir, "validation-status.json")
 	writeFile(t, feedbackFile, "please revise the outline before completing")
+	writeFile(t, donePath, "")
+	writeFile(t, validationStatusPath, `{"terminalBoundary":true}`)
 	saveManagerState(t, stateFile, ManagerState{
 		CanonicalPlanDir: "thoughts/example",
 		Workflow:         testWorkflowState(t, qrspi.NodeOutline, nil),
@@ -25,6 +30,8 @@ func TestSteerChildPastesFeedbackToActiveChild(t *testing.T) {
 			ID:                      "child-1",
 			Stage:                   "outline",
 			TmuxPaneID:              "%9",
+			DonePath:                donePath,
+			ValidationStatusPath:    validationStatusPath,
 			Generation:              1,
 			ValidationRetryCount:    1,
 			LastEvidenceFingerprint: "old",
@@ -65,6 +72,11 @@ func TestSteerChildPastesFeedbackToActiveChild(t *testing.T) {
 		loaded.ActiveChild.ValidationRetryCount != 0 || loaded.ActiveChild.LastEvidenceFingerprint != "" ||
 		loaded.Delivery.QueuedWake != nil {
 		t.Fatalf("steered state = %+v", loaded)
+	}
+	for _, path := range []string{donePath, validationStatusPath} {
+		if _, err := os.Stat(path); !os.IsNotExist(err) {
+			t.Fatalf("stale completion marker %s still exists: %v", path, err)
+		}
 	}
 }
 
