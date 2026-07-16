@@ -709,6 +709,7 @@ type StateStore interface {
 	Load(path string) (ManagerState, error)
 	Save(path string, state ManagerState) error
 	AcquireOperationLock(ctx context.Context, stateFile string) (StateOperationLock, error)
+	Mutate(path string, expected *ChildEpoch, fn StateMutation) (ManagerState, error)
 	AcquireLock(
 		ctx context.Context,
 		key LockKey,

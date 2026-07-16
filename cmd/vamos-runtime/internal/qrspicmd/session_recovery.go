@@ -304,6 +304,21 @@ func validateLatestTerminalProviderContext(
 	if err != nil || !ok || !evidence.ContextWindowError {
 		return false, err
 	}
+	classificationState := state
+	classificationState.ActiveChild = &candidate.Child
+	classificationState.ActiveChild.SessionPath = candidate.SessionPath
+	if state.ActiveChild != nil &&
+		filepath.Clean(strings.TrimSpace(state.ActiveChild.SessionPath)) == filepath.Clean(candidate.SessionPath) {
+		classificationState.ActiveChild = state.ActiveChild
+	}
+	childEvidence, gatherErr := GatherChildEvidence(classificationState, ChildCompletionOptions{
+		Boundary:    ChildBoundaryAgentSettled,
+		Interaction: ChildInteractionStageWork,
+	})
+	if gatherErr == nil &&
+		ClassifyChildIntentForState(classificationState, childEvidence).Kind == ChildIntentGraphValidResult {
+		return false, nil
+	}
 	if !opts.ApplyRebind &&
 		(state.ActiveChild == nil || filepath.Clean(strings.TrimSpace(state.ActiveChild.SessionPath)) != filepath.Clean(candidate.SessionPath)) {
 		return true, fmt.Errorf(

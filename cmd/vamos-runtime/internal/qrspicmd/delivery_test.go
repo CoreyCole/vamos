@@ -136,6 +136,52 @@ func TestDeliveryProviderContextErrorBypassesOlderBlockedDelivery(t *testing.T) 
 	}
 }
 
+func TestDeliveryIdentityUsesGenerationAndEvidenceContent(t *testing.T) {
+	child := ChildRunRef{ID: "child-1", Generation: 1}
+	first := ChildIntent{Kind: ChildIntentManagerQuestion, Evidence: ChildEvidence{ContentFingerprint: "one"}}
+	same := ChildIntent{Kind: ChildIntentManagerQuestion, Evidence: ChildEvidence{ContentFingerprint: "one"}}
+	changed := ChildIntent{Kind: ChildIntentManagerQuestion, Evidence: ChildEvidence{ContentFingerprint: "two"}}
+
+	firstID := childIntentDeliveryID(child, first)
+	if childIntentDeliveryID(child, same) != firstID {
+		t.Fatal("same generation and content produced a different delivery ID")
+	}
+	if childIntentDeliveryID(child, changed) == firstID {
+		t.Fatal("changed evidence content did not produce a fresh delivery ID")
+	}
+	child.Generation++
+	if childIntentDeliveryID(child, first) == firstID {
+		t.Fatal("new child generation did not produce a fresh delivery ID")
+	}
+}
+
+func TestManagerReadyRedeliversCrashUncertainPendingWake(t *testing.T) {
+	dir := t.TempDir()
+	stateFile := filepath.Join(dir, "state.json")
+	saveManagerState(t, stateFile, ManagerState{
+		ManagerPaneID: "%parent",
+		Delivery: ManagerDeliveryState{PendingDelivery: &QueuedWake{
+			DeliveryID: "wake-1", ChildID: "child-1", ChildGeneration: 1, Payload: "wake",
+		}},
+		ActiveChild: &ChildRunRef{ID: "child-1", Generation: 1, LifecycleStatus: "completed"},
+	})
+	tmux := &recordingTmux{}
+
+	if err := RunManagerReady(
+		t.Context(),
+		ManagerReadyOptions{StateFile: stateFile, ManagerPane: "%parent"},
+		deps{Tmux: tmux},
+		&strings.Builder{},
+	); err != nil {
+		t.Fatalf("RunManagerReady() error = %v", err)
+	}
+	state := loadManagerState(t, stateFile)
+	if state.Delivery.PendingDelivery != nil || state.Delivery.LastDeliveryID != "wake-1" ||
+		len(tmux.pastes) != 1 {
+		t.Fatalf("state = %+v, pastes = %#v", state.Delivery, tmux.pastes)
+	}
+}
+
 func TestDeliveryQueuesWhileCompactingAndManagerReadyFlushes(t *testing.T) {
 	dir := t.TempDir()
 	stateFile := filepath.Join(dir, "state.json")

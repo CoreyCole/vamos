@@ -67,6 +67,13 @@ func LockPath(root string, key LockKey) string {
 	return filepath.Join(root, keyID(key), "lock.json")
 }
 
+type ChildEpoch struct {
+	ID         string
+	Generation int
+}
+
+type StateMutation func(*ManagerState) error
+
 type FileStateStore struct {
 	Root  string
 	Clock func() time.Time
@@ -144,6 +151,49 @@ func (s FileStateStore) AcquireOperationLock(
 		case <-timer.C:
 		}
 	}
+}
+
+func (s FileStateStore) Mutate(
+	path string,
+	expected *ChildEpoch,
+	fn StateMutation,
+) (ManagerState, error) {
+	lockPath := path + ".mutation.lock"
+	if err := os.MkdirAll(filepath.Dir(lockPath), 0o755); err != nil {
+		return ManagerState{}, err
+	}
+	file, err := os.OpenFile(lockPath, os.O_RDWR|os.O_CREATE, 0o644)
+	if err != nil {
+		return ManagerState{}, err
+	}
+	defer file.Close()
+	if err := syscall.Flock(int(file.Fd()), syscall.LOCK_EX); err != nil {
+		return ManagerState{}, err
+	}
+	defer syscall.Flock(int(file.Fd()), syscall.LOCK_UN) //nolint:errcheck // releasing a process-local lock cannot recover usefully
+
+	state, err := s.Load(path)
+	if err != nil {
+		return ManagerState{}, err
+	}
+	if expected != nil {
+		actual, epochErr := currentChildEpoch(state)
+		if epochErr != nil || actual != *expected {
+			return ManagerState{}, fmt.Errorf(
+				"active child epoch changed: expected %s generation %d",
+				expected.ID,
+				expected.Generation,
+			)
+		}
+	}
+	if err := fn(&state); err != nil {
+		return ManagerState{}, err
+	}
+	if err := s.Save(path, state); err != nil {
+		return ManagerState{}, err
+	}
+
+	return state, nil
 }
 
 func (s FileStateStore) AcquireLock(ctx context.Context, key LockKey, owner string, ttl time.Duration) (Lock, error) {

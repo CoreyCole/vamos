@@ -260,4 +260,90 @@ func TestOperationLockReleaseIsIdempotent(t *testing.T) {
 	}
 }
 
+func TestFileStateStoreMutateSerializesUpdates(t *testing.T) {
+	store := FileStateStore{Root: t.TempDir()}
+	path := filepath.Join(store.Root, "state.json")
+	if err := store.Save(path, ManagerState{ActiveChild: &ChildRunRef{ID: "child-1", Generation: 1}}); err != nil {
+		t.Fatal(err)
+	}
+
+	start := make(chan struct{})
+	var wg sync.WaitGroup
+	for range 4 {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			<-start
+			_, err := store.Mutate(path, &ChildEpoch{ID: "child-1", Generation: 1}, func(state *ManagerState) error {
+				current := state.SchemaVersion
+				time.Sleep(time.Millisecond)
+				state.SchemaVersion = current + 1
+
+				return nil
+			})
+			if err != nil {
+				t.Errorf("Mutate() error = %v", err)
+			}
+		}()
+	}
+	close(start)
+	wg.Wait()
+
+	state, err := store.Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if state.SchemaVersion != 4 {
+		t.Fatalf("SchemaVersion = %d, want 4 serialized updates", state.SchemaVersion)
+	}
+}
+
+func TestFileStateStoreMutateRejectsStaleEpoch(t *testing.T) {
+	store := FileStateStore{Root: t.TempDir()}
+	path := filepath.Join(store.Root, "state.json")
+	if err := store.Save(path, ManagerState{ActiveChild: &ChildRunRef{ID: "child-1", Generation: 2}}); err != nil {
+		t.Fatal(err)
+	}
+
+	_, err := store.Mutate(path, &ChildEpoch{ID: "child-1", Generation: 1}, func(state *ManagerState) error {
+		state.SchemaVersion = 99
+
+		return nil
+	})
+	if err == nil || !strings.Contains(err.Error(), "active child epoch changed") {
+		t.Fatalf("Mutate() error = %v, want stale epoch refusal", err)
+	}
+	state, loadErr := store.Load(path)
+	if loadErr != nil {
+		t.Fatal(loadErr)
+	}
+	if state.SchemaVersion != 0 {
+		t.Fatalf("SchemaVersion = %d, stale mutation was saved", state.SchemaVersion)
+	}
+}
+
+func TestFileStateStoreMutateDoesNotSaveFailedMutation(t *testing.T) {
+	store := FileStateStore{Root: t.TempDir()}
+	path := filepath.Join(store.Root, "state.json")
+	if err := store.Save(path, ManagerState{SchemaVersion: 1}); err != nil {
+		t.Fatal(err)
+	}
+
+	_, err := store.Mutate(path, nil, func(state *ManagerState) error {
+		state.SchemaVersion = 99
+
+		return errors.New("stop")
+	})
+	if err == nil || err.Error() != "stop" {
+		t.Fatalf("Mutate() error = %v, want stop", err)
+	}
+	state, loadErr := store.Load(path)
+	if loadErr != nil {
+		t.Fatal(loadErr)
+	}
+	if state.SchemaVersion != 1 {
+		t.Fatalf("SchemaVersion = %d, failed mutation was saved", state.SchemaVersion)
+	}
+}
+
 func fixedClock(t time.Time) func() time.Time { return func() time.Time { return t } }

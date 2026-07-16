@@ -2,6 +2,8 @@ package qrspicmd
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
 
@@ -169,6 +171,27 @@ func extractCompleteQRSPIResult(text string) (string, error) {
 	return qrspi.ExtractQRSPIResultYAML(text)
 }
 
+func ClassifyChildIntentForState(state ManagerState, evidence ChildEvidence) ChildIntent {
+	if evidence.CurrentTerminal != nil &&
+		evidence.LatestGraphValidResult != nil &&
+		resultHasDurableArtifact(state, evidence.LatestGraphValidResult) {
+		result := evidence.LatestGraphValidResult
+		evidence.ContentFingerprint = sessionEvidenceFingerprint(
+			result.Message.Fingerprint,
+			evidence.CurrentMessage.Fingerprint,
+		)
+
+		return ChildIntent{
+			Kind:     ChildIntentGraphValidResult,
+			Evidence: evidence,
+			Parsed:   result.Parsed,
+			Reason:   "graph-valid result retained over later provider failure by durable artifact proof",
+		}
+	}
+
+	return ClassifyChildIntent(evidence)
+}
+
 func ClassifyChildIntent(evidence ChildEvidence) ChildIntent {
 	if evidence.CurrentResult != nil && evidence.CurrentResult.Parsed != nil {
 		return ChildIntent{
@@ -332,4 +355,61 @@ func isProviderTerminalMessage(message SessionMessageEvidence) bool {
 	return strings.TrimSpace(message.ErrorMessage) != "" ||
 		strings.EqualFold(message.StopReason, "error") ||
 		strings.EqualFold(message.StopReason, "aborted")
+}
+
+func resultHasDurableArtifact(state ManagerState, result *ResultEvidence) bool {
+	if result == nil || result.Parsed == nil {
+		return false
+	}
+	rel := filepath.Clean(strings.TrimSpace(result.Parsed.Result.PrimaryArtifact))
+	if rel == "." || filepath.IsAbs(rel) ||
+		(rel != "thoughts" && !strings.HasPrefix(rel, "thoughts"+string(filepath.Separator))) {
+		return false
+	}
+	planPath, err := filepath.EvalSymlinks(state.CanonicalPlanDir)
+	if err != nil || !filepath.IsAbs(planPath) {
+		return false
+	}
+	thoughtsRoot, ok := thoughtsRootForPlan(planPath)
+	if !ok {
+		return false
+	}
+	artifactPath, err := filepath.EvalSymlinks(filepath.Join(filepath.Dir(thoughtsRoot), rel))
+	if err != nil || !pathWithin(planPath, artifactPath) {
+		return false
+	}
+	info, err := os.Stat(artifactPath)
+	if err != nil || !info.Mode().IsRegular() {
+		return false
+	}
+	result.ResolvedArtifact = artifactPath
+	result.ArtifactVerified = true
+
+	return true
+}
+
+func thoughtsRootForPlan(planPath string) (string, bool) {
+	clean := filepath.Clean(planPath)
+	volume := filepath.VolumeName(clean)
+	rest := strings.TrimPrefix(clean, volume)
+	parts := strings.Split(strings.Trim(rest, string(filepath.Separator)), string(filepath.Separator))
+	for i, part := range parts {
+		if part != "thoughts" {
+			continue
+		}
+		root := filepath.Join(append([]string{volume + string(filepath.Separator)}, parts[:i+1]...)...)
+
+		return filepath.Clean(root), true
+	}
+
+	return "", false
+}
+
+func pathWithin(root, candidate string) bool {
+	rel, err := filepath.Rel(root, candidate)
+	if err != nil || filepath.IsAbs(rel) {
+		return false
+	}
+
+	return rel == "." || (rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator)))
 }

@@ -23,10 +23,11 @@ type ManagerState struct {
 }
 
 type ManagerDeliveryState struct {
-	Status         string      `json:"status,omitempty"`
-	ManagerPaneID  string      `json:"managerPaneId,omitempty"`
-	QueuedWake     *QueuedWake `json:"queuedWake,omitempty"`
-	LastDeliveryID string      `json:"lastDeliveryId,omitempty"`
+	Status          string      `json:"status,omitempty"`
+	ManagerPaneID   string      `json:"managerPaneId,omitempty"`
+	QueuedWake      *QueuedWake `json:"queuedWake,omitempty"`
+	LastDeliveryID  string      `json:"lastDeliveryId,omitempty"`
+	PendingDelivery *QueuedWake `json:"pendingDelivery,omitempty"`
 }
 
 type QueuedWakeDelivery string

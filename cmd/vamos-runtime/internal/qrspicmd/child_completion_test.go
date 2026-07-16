@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -1629,6 +1630,91 @@ func TestChildCompleteManagerIntentsDoNotConsumeRepairBudget(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestChildCompleteCannotOverwriteNewSteerGeneration(t *testing.T) {
+	dir := t.TempDir()
+	stateFile := filepath.Join(dir, "state.json")
+	sessionDir := filepath.Join(dir, "sessions")
+	sessionPath := writePiSession(
+		t,
+		sessionDir,
+		"session.jsonl",
+		"session-1",
+		dir,
+		assistantLine(testResultYAML(
+			"review-outline", "complete", "complete", "thoughts/example/review.md", "",
+		)),
+	)
+	baseStore := FileStateStore{}
+	if err := baseStore.Save(stateFile, ManagerState{
+		CanonicalPlanDir: "thoughts/example",
+		Workflow:         testWorkflowState(t, qrspi.NodeReviewOutline, nil),
+		ActiveChild: &ChildRunRef{
+			ID: "child-1", Stage: "review-outline", Cwd: dir, TmuxPaneID: "%9",
+			SessionID: "session-1", SessionDir: sessionDir, SessionPath: sessionPath,
+			ValidationStatusPath: filepath.Join(dir, "validation-status.json"), Generation: 1,
+		},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	store := &blockingFirstMutationStore{
+		FileStateStore: baseStore,
+		entered:        make(chan struct{}),
+		release:        make(chan struct{}),
+	}
+	completeErr := make(chan error, 1)
+	go func() {
+		_, err := RunChildComplete(
+			t.Context(),
+			ChildCompletionOptions{StateFile: stateFile, ChildID: "child-1"},
+			deps{StateStore: store, Tmux: &recordingTmux{}},
+			&strings.Builder{},
+		)
+		completeErr <- err
+	}()
+	<-store.entered
+
+	if _, err := RunSteerChild(
+		t.Context(),
+		SteerChildOptions{StateFile: stateFile, Feedback: "new direction"},
+		deps{StateStore: store, Tmux: &recordingTmux{}},
+		&strings.Builder{},
+	); err != nil {
+		t.Fatalf("RunSteerChild() error = %v", err)
+	}
+	close(store.release)
+	if err := <-completeErr; err == nil || !strings.Contains(err.Error(), "active child epoch changed") {
+		t.Fatalf("RunChildComplete() error = %v, want stale epoch refusal", err)
+	}
+	state, err := baseStore.Load(stateFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if state.ActiveChild.Generation != 2 || state.ActiveChild.LifecycleStatus != "steered" ||
+		state.Delivery.QueuedWake != nil || state.Delivery.PendingDelivery != nil {
+		t.Fatalf("state = %+v", state)
+	}
+}
+
+type blockingFirstMutationStore struct {
+	FileStateStore
+	calls   atomic.Int32
+	entered chan struct{}
+	release chan struct{}
+}
+
+func (s *blockingFirstMutationStore) Mutate(
+	path string,
+	expected *ChildEpoch,
+	fn StateMutation,
+) (ManagerState, error) {
+	if s.calls.Add(1) == 1 {
+		close(s.entered)
+		<-s.release
+	}
+
+	return s.FileStateStore.Mutate(path, expected, fn)
 }
 
 func TestChildCompleteNormalizesReviewImplementationVerifyAlias(t *testing.T) {

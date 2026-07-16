@@ -2,6 +2,7 @@ package qrspicmd
 
 import (
 	"bytes"
+	"errors"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -17,10 +18,16 @@ func TestSteerChildPastesFeedbackToActiveChild(t *testing.T) {
 	saveManagerState(t, stateFile, ManagerState{
 		CanonicalPlanDir: "thoughts/example",
 		Workflow:         testWorkflowState(t, qrspi.NodeOutline, nil),
+		Delivery: ManagerDeliveryState{QueuedWake: &QueuedWake{
+			DeliveryID: "old", ChildID: "child-1", ChildGeneration: 1,
+		}},
 		ActiveChild: &ChildRunRef{
-			ID:         "child-1",
-			Stage:      "outline",
-			TmuxPaneID: "%9",
+			ID:                      "child-1",
+			Stage:                   "outline",
+			TmuxPaneID:              "%9",
+			Generation:              1,
+			ValidationRetryCount:    1,
+			LastEvidenceFingerprint: "old",
 		},
 	})
 
@@ -52,6 +59,12 @@ func TestSteerChildPastesFeedbackToActiveChild(t *testing.T) {
 	}
 	if !strings.Contains(out.String(), "steered child: outline (%9)") || !strings.Contains(out.String(), "next: vamos qrspi continue --state-file "+stateFile) {
 		t.Fatalf("output = %q", out.String())
+	}
+	loaded := loadManagerState(t, stateFile)
+	if loaded.ActiveChild.Generation != 2 || loaded.ActiveChild.LifecycleStatus != "steered" ||
+		loaded.ActiveChild.ValidationRetryCount != 0 || loaded.ActiveChild.LastEvidenceFingerprint != "" ||
+		loaded.Delivery.QueuedWake != nil {
+		t.Fatalf("steered state = %+v", loaded)
 	}
 }
 
@@ -100,6 +113,31 @@ func TestSteerChildRejectsNoActiveChildWithNextCommand(t *testing.T) {
 	_, err := RunSteerChild(t.Context(), SteerChildOptions{StateFile: stateFile, Feedback: "feedback"}, deps{Tmux: &recordingTmux{}}, &bytes.Buffer{})
 	if err == nil || !strings.Contains(err.Error(), "no active child to steer") || !strings.Contains(err.Error(), "vamos qrspi start-next --state-file "+stateFile) {
 		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestSteerChildPersistsNewEpochBeforePasteFailure(t *testing.T) {
+	dir := t.TempDir()
+	stateFile := filepath.Join(dir, "state.json")
+	saveManagerState(t, stateFile, ManagerState{ActiveChild: &ChildRunRef{
+		ID: "child-1", Stage: "plan", TmuxPaneID: "%9", Generation: 1,
+	}})
+	tmux := &recordingTmux{pasteErr: errors.New("paste failed")}
+
+	_, err := RunSteerChild(
+		t.Context(),
+		SteerChildOptions{StateFile: stateFile, Feedback: "feedback"},
+		deps{Tmux: tmux},
+		&bytes.Buffer{},
+	)
+	if err == nil || !strings.Contains(err.Error(), "paste failed") {
+		t.Fatalf("RunSteerChild error = %v", err)
+	}
+	loaded := loadManagerState(t, stateFile)
+	if loaded.ActiveChild.Generation != 2 ||
+		loaded.ActiveChild.LifecycleStatus != "steer_delivery_failed" ||
+		loaded.LastActionCard == nil || loaded.LastActionCard.Kind != ActionManualChildSteer {
+		t.Fatalf("state after paste failure = %+v", loaded)
 	}
 }
 
