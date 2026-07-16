@@ -407,13 +407,14 @@ func normalizeDeterministicPositiveResult(
 		return parsed
 	}
 	original := strings.ToLower(strings.TrimSpace(parsed.Outcome))
-	if !isPositiveOutcomeSynonym(original) {
+	node := wruntime.NodeID(parsed.Stage)
+	if node == "" {
+		node = ctx.ExpectedNodeID
+	}
+	if !isPositiveOutcomeSynonymForNode(node, original) {
 		return parsed
 	}
-	canonical, ok := deterministicPositiveOutcomeForNode(
-		wruntime.NodeID(parsed.Stage),
-		ctx,
-	)
+	canonical, ok := deterministicPositiveOutcomeForNode(node, ctx)
 	if !ok || canonical == wruntime.ResultOutcome(original) {
 		return parsed
 	}
@@ -425,6 +426,18 @@ func normalizeDeterministicPositiveResult(
 		Reason:    "status complete plus current node has deterministic positive transition",
 	})
 	return parsed
+}
+
+func isPositiveOutcomeSynonymForNode(node wruntime.NodeID, value string) bool {
+	normalized := strings.ReplaceAll(strings.ToLower(strings.TrimSpace(value)), "_", "-")
+	if node == NodeReviewImplementation {
+		switch normalized {
+		case "ready-for-verify", "ready-to-verify", "ready-for-verification":
+			return true
+		}
+	}
+
+	return isPositiveOutcomeSynonym(normalized)
 }
 
 func isPositiveOutcomeSynonym(value string) bool {

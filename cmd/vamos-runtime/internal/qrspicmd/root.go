@@ -1675,70 +1675,177 @@ func RunChildComplete(
 		}
 		state.ActiveChild.SessionPath = sessionPath
 	}
-	sessionEvidence, err := ExtractSessionEvidence(sessionPath)
+	evidence, err := GatherChildEvidence(state, opts)
 	if err != nil {
 		return nil, err
 	}
-	latestEvidence, postCursorEvidence, err := latestSessionEvidenceAfter(
-		sessionEvidence,
-		child.EvidenceCursorMessageID,
-	)
-	if err != nil {
-		return nil, err
-	}
+	intent := ClassifyChildIntent(evidence)
 	status := ChildCompletionStatus{
+		Intent:              intent.Kind,
 		ChildID:             child.ID,
 		ChildGeneration:     activeChildGeneration(state),
 		Interaction:         interaction,
-		EvidenceFingerprint: latestEvidence.Fingerprint,
+		EvidenceFingerprint: evidence.ContentFingerprint,
 		Attempt:             child.ValidationRetryCount,
 		RetryLimit:          invalidResultRetryLimit(state),
+		Reason:              intent.Reason,
 	}
 	state.ActiveChild.InteractionMode = string(interaction)
-	state.ActiveChild.LastEvidenceFingerprint = latestEvidence.Fingerprint
-	if interaction != ChildInteractionStageWork &&
-		!hasCompleteQRSPIResult(postCursorEvidence) {
-		status.Reason = string(ChildInteractionInteractiveChat)
+	state.ActiveChild.LastEvidenceFingerprint = evidence.ContentFingerprint
+
+	switch intent.Kind {
+	case ChildIntentGraphValidResult:
+		parsed := *intent.Parsed
+		status.Validated = true
+		status.TerminalBoundary = true
+		status.DeliveryID = childCompletionDeliveryID(*child, &parsed, false)
+		status.Result = childCompletionResult(parsed.Result)
+		status.NextChild = nextChildInfo(state, parsed.Decision.NextNodeID)
+		status.ManagerNeeded = childCompletionManagerNeeded(status.Result.Status)
+		status.Normalizations = parsed.Normalizations
+		if parsed.Result.Status == wruntime.StatusHandoff && parsed.Decision.StartNext {
+			launchIntent, intentErr := deriveChildLaunchIntent(
+				state,
+				*child,
+				parsed.Result,
+				parsed.Decision,
+			)
+			if intentErr != nil {
+				status.ManagerNeeded = true
+				status.Reason = intentErr.Error()
+				status.ActionCard = buildInvalidHandoffArtifactCard(
+					opts.StateFile,
+					*child,
+					parsed.Result,
+					intentErr,
+				)
+				state.LastActionCard = status.ActionCard
+				state.ActiveChild.LifecycleStatus = "awaiting_manager"
+				state.ActiveChild.LastDeliveryID = status.DeliveryID
+				state, status.Wake, err = queueOrDeliverWake(
+					ctx,
+					opts.StateFile,
+					state,
+					status,
+					d,
+				)
+			} else {
+				state, status, err = completeHandoffContinuation(
+					ctx,
+					opts,
+					state,
+					*child,
+					parsed,
+					launchIntent,
+					store,
+					d,
+				)
+			}
+		} else {
+			if parsed.Result.Status == wruntime.StatusHandoff {
+				status.ManagerNeeded = true
+				status.Reason = "handoff_waiting_for_manager_policy"
+				state.ActiveChild.LifecycleStatus = "awaiting_manager"
+			} else {
+				state.ActiveChild.LifecycleStatus = "completed"
+			}
+			state.ActiveChild.LastDeliveryID = status.DeliveryID
+			state, status.Wake, err = queueOrDeliverWake(
+				ctx,
+				opts.StateFile,
+				state,
+				status,
+				d,
+			)
+		}
+		if err != nil {
+			return nil, err
+		}
+	case ChildIntentInteractiveChat:
 		status.Wake = WakeDeliveryInstruction{
 			Mode:   "suppress",
-			Reason: string(ChildInteractionInteractiveChat),
+			Reason: string(ChildIntentInteractiveChat),
 		}
-		if latestEvidence.MessageID != "" {
-			state.ActiveChild.EvidenceCursorMessageID = latestEvidence.MessageID
+		if evidence.CurrentMessage.MessageID != "" {
+			state.ActiveChild.EvidenceCursorMessageID = evidence.CurrentMessage.MessageID
 		}
-
-		return persistChildCompletionStatus(
-			store,
-			opts.StateFile,
-			state,
-			status,
-			child.ValidationStatusPath,
-			out,
-			opts.Output,
-		)
-	}
-	if evidence, ok, evidenceErr := terminalEvidenceForActiveChildWithRefresh(
-		state,
-	); evidenceErr == nil && ok &&
-		evidence.ContextWindowError {
-		status = childCompletionStatusFromTerminalEvidence(state, *child, evidence)
-		status.ChildGeneration = activeChildGeneration(state)
-		status.Interaction = interaction
-		status.EvidenceFingerprint = latestEvidence.Fingerprint
-		status.TerminalBoundary = true
+	case ChildIntentRepairableResult:
+		validationErr := errors.New(intent.Reason)
+		continueOpts := ContinueOptions{
+			StateFile: opts.StateFile,
+			PlanDir:   state.CanonicalPlanDir,
+			Stage:     child.Stage,
+		}
+		if shouldRepromptAfterValidationError(state, continueOpts, validationErr) {
+			attempt := child.ValidationRetryCount + 1
+			state.ActiveChild.ValidationRetryCount = attempt
+			state.ActiveChild.LastRepromptAttempt = attempt
+			state.ActiveChild.LifecycleStatus = "correction_pending"
+			if evidence.CurrentMessage.MessageID != "" {
+				state.ActiveChild.EvidenceCursorMessageID = evidence.CurrentMessage.MessageID
+			}
+			status.Attempt = attempt
+			status.Reason = "retryable_invalid_result"
+			status.RetryPrompt = CorrectionPrompt(validationErr, attempt)
+			status.Wake = WakeDeliveryInstruction{
+				Mode:   "suppress",
+				Reason: "retryable_invalid_result",
+			}
+		} else {
+			status.ManagerNeeded = true
+			status.RetryExhausted = isRetryExhaustedValidationError(
+				state,
+				continueOpts,
+				validationErr,
+			)
+			status.TerminalBoundary = true
+			status.DeliveryID = childIntentDeliveryID(*child, intent)
+			status.Result = ChildCompletionResult{
+				Stage:   child.Stage,
+				Status:  "invalid_result",
+				Summary: validationErr.Error(),
+			}
+			state.ActiveChild.LifecycleStatus = "awaiting_manager"
+			state.ActiveChild.LastDeliveryID = status.DeliveryID
+			state, status.Wake, err = queueOrDeliverWake(
+				ctx,
+				opts.StateFile,
+				state,
+				status,
+				d,
+			)
+			if err != nil {
+				return nil, err
+			}
+		}
+	case ChildIntentProviderFailure:
+		if evidence.CurrentTerminal != nil && evidence.CurrentTerminal.ContextWindowError {
+			status = childCompletionStatusFromTerminalEvidence(
+				state,
+				*child,
+				*evidence.CurrentTerminal,
+			)
+			status.Intent = intent.Kind
+			status.ChildGeneration = activeChildGeneration(state)
+			status.Interaction = interaction
+			status.EvidenceFingerprint = evidence.ContentFingerprint
+			status.TerminalBoundary = true
+			health := ActiveChildHealth{
+				Status:           ActiveChildProviderContextError,
+				ChildID:          child.ID,
+				Stage:            child.Stage,
+				PaneID:           child.TmuxPaneID,
+				SessionDir:       child.SessionDir,
+				SessionPath:      evidence.CurrentTerminal.SessionPath,
+				TerminalEvidence: evidence.CurrentTerminal,
+				Evidence:         providerContextEvidenceLines(*evidence.CurrentTerminal),
+			}
+			status.ActionCard = BuildChildContextExhaustedCard(health, state, opts.StateFile)
+		} else {
+			status = childIntentManagerStatus(state, *child, intent)
+		}
 		state.ActiveChild.LifecycleStatus = "awaiting_manager"
 		state.ActiveChild.LastDeliveryID = status.DeliveryID
-		health := ActiveChildHealth{
-			Status:           ActiveChildProviderContextError,
-			ChildID:          child.ID,
-			Stage:            child.Stage,
-			PaneID:           child.TmuxPaneID,
-			SessionDir:       child.SessionDir,
-			SessionPath:      evidence.SessionPath,
-			TerminalEvidence: &evidence,
-			Evidence:         providerContextEvidenceLines(evidence),
-		}
-		status.ActionCard = BuildChildContextExhaustedCard(health, state, opts.StateFile)
 		state.LastActionCard = status.ActionCard
 		state, status.Wake, err = queueOrDeliverWake(
 			ctx,
@@ -1750,165 +1857,26 @@ func RunChildComplete(
 		if err != nil {
 			return nil, err
 		}
-	} else {
-		text, readErr := finalQRSPIResultText(sessionPath, sessionEvidence)
-		err = readErr
-		if err == nil {
-			parseCtx := wruntime.ParseContext{
-				RunID:          child.ID,
-				SessionID:      child.SessionID,
-				ExpectedNodeID: wruntime.NodeID(child.Stage),
-			}
-			parsed, parseErr := ParseNormalizeValidateDecide(text, state, parseCtx)
-			if parseErr == nil {
-				status.Validated = true
-				status.TerminalBoundary = true
-				status.DeliveryID = childCompletionDeliveryID(*child, &parsed, false)
-				status.Result = childCompletionResult(parsed.Result)
-				status.NextChild = nextChildInfo(state, parsed.Decision.NextNodeID)
-				status.ManagerNeeded = childCompletionManagerNeeded(status.Result.Status)
-				status.Normalizations = parsed.Normalizations
-				if parsed.Result.Status == wruntime.StatusHandoff && parsed.Decision.StartNext {
-					intent, intentErr := deriveChildLaunchIntent(state, *child, parsed.Result, parsed.Decision)
-					if intentErr != nil {
-						status.ManagerNeeded = true
-						status.Reason = intentErr.Error()
-						status.ActionCard = buildInvalidHandoffArtifactCard(
-							opts.StateFile,
-							*child,
-							parsed.Result,
-							intentErr,
-						)
-						state.LastActionCard = status.ActionCard
-						state.ActiveChild.LifecycleStatus = "awaiting_manager"
-						state.ActiveChild.LastDeliveryID = status.DeliveryID
-						state, status.Wake, err = queueOrDeliverWake(
-							ctx,
-							opts.StateFile,
-							state,
-							status,
-							d,
-						)
-					} else {
-						state, status, err = completeHandoffContinuation(
-							ctx,
-							opts,
-							state,
-							*child,
-							parsed,
-							intent,
-							store,
-							d,
-						)
-					}
-				} else {
-					if parsed.Result.Status == wruntime.StatusHandoff {
-						status.ManagerNeeded = true
-						status.Reason = "handoff_waiting_for_manager_policy"
-						state.ActiveChild.LifecycleStatus = "awaiting_manager"
-					} else {
-						state.ActiveChild.LifecycleStatus = "completed"
-					}
-					state.ActiveChild.LastDeliveryID = status.DeliveryID
-					state, status.Wake, err = queueOrDeliverWake(
-						ctx,
-						opts.StateFile,
-						state,
-						status,
-						d,
-					)
-				}
-				if err != nil {
-					return nil, err
-				}
-			} else {
-				err = parseErr
-			}
-		}
+	case ChildIntentManagerQuestion,
+		ChildIntentPivotRequest,
+		ChildIntentNoResultIncomplete,
+		ChildIntentAmbiguousUnsafe:
+		status = childIntentManagerStatus(state, *child, intent)
+		state.ActiveChild.LifecycleStatus = "awaiting_manager"
+		state.ActiveChild.LastDeliveryID = status.DeliveryID
+		state.LastActionCard = status.ActionCard
+		state, status.Wake, err = queueOrDeliverWake(
+			ctx,
+			opts.StateFile,
+			state,
+			status,
+			d,
+		)
 		if err != nil {
-			if shouldNotifyManagerWithoutReprompt(err) {
-				status.Validated = false
-				status.ManagerNeeded = true
-				status.RetryExhausted = false
-				status.DeliveryID = childCompletionDeliveryID(*child, nil, false)
-				status.Result = ChildCompletionResult{
-					Stage:   child.Stage,
-					Status:  "no_result",
-					Summary: err.Error(),
-				}
-				status.Reason = err.Error()
-				state.ActiveChild.LifecycleStatus = "awaiting_manager"
-				state.ActiveChild.LastDeliveryID = status.DeliveryID
-				state, status.Wake, err = queueOrDeliverWake(
-					ctx,
-					opts.StateFile,
-					state,
-					status,
-					d,
-				)
-				if err != nil {
-					return nil, err
-				}
-			} else if shouldRepromptAfterValidationError(
-				state,
-				ContinueOptions{
-					StateFile: opts.StateFile,
-					PlanDir:   state.CanonicalPlanDir,
-					Stage:     child.Stage,
-				},
-				err,
-			) {
-				attempt := child.ValidationRetryCount + 1
-				state.ActiveChild.ValidationRetryCount = attempt
-				state.ActiveChild.LastRepromptAttempt = attempt
-				state.ActiveChild.LifecycleStatus = "correction_pending"
-				if latestEvidence.MessageID != "" {
-					state.ActiveChild.EvidenceCursorMessageID = latestEvidence.MessageID
-				}
-				status.Attempt = attempt
-				status.RetryLimit = invalidResultRetryLimit(state)
-				status.Reason = "retryable_invalid_result"
-				status.RetryPrompt = ChildRecoveryPrompt(err, attempt)
-				status.Wake = WakeDeliveryInstruction{
-					Mode:   "suppress",
-					Reason: "retryable_invalid_result",
-				}
-			} else if isRetryExhaustedValidationError(
-				state,
-				ContinueOptions{
-					StateFile: opts.StateFile,
-					PlanDir:   state.CanonicalPlanDir,
-					Stage:     child.Stage,
-				},
-				err,
-			) {
-				status.Validated = false
-				status.ManagerNeeded = true
-				status.RetryExhausted = true
-				status.TerminalBoundary = true
-				status.DeliveryID = childCompletionDeliveryID(*child, nil, true)
-				status.Result = ChildCompletionResult{
-					Stage:   child.Stage,
-					Status:  "invalid_result",
-					Summary: err.Error(),
-				}
-				status.Reason = err.Error()
-				state.ActiveChild.LifecycleStatus = "awaiting_manager"
-				state.ActiveChild.LastDeliveryID = status.DeliveryID
-				state, status.Wake, err = queueOrDeliverWake(
-					ctx,
-					opts.StateFile,
-					state,
-					status,
-					d,
-				)
-				if err != nil {
-					return nil, err
-				}
-			} else {
-				return nil, err
-			}
+			return nil, err
 		}
+	default:
+		return nil, fmt.Errorf("unsupported child intent %q", intent.Kind)
 	}
 	return persistChildCompletionStatus(
 		store,
@@ -2617,6 +2585,66 @@ func buildPendingChildCleanupFailureCard(
 	}
 }
 
+func childIntentDeliveryID(child ChildRunRef, intent ChildIntent) string {
+	return strings.Join([]string{
+		child.ID,
+		fmt.Sprintf("%d", child.Generation),
+		string(intent.Kind),
+		intent.Evidence.ContentFingerprint,
+	}, ":")
+}
+
+func childIntentManagerStatus(
+	state ManagerState,
+	child ChildRunRef,
+	intent ChildIntent,
+) ChildCompletionStatus {
+	reason := strings.TrimSpace(intent.Reason)
+	if reason == "" {
+		reason = string(intent.Kind)
+	}
+	status := ChildCompletionStatus{
+		Intent:              intent.Kind,
+		Validated:           false,
+		ManagerNeeded:       true,
+		ChildID:             child.ID,
+		ChildGeneration:     activeChildGeneration(state),
+		DeliveryID:          childIntentDeliveryID(child, intent),
+		TerminalBoundary:    true,
+		Interaction:         intent.Evidence.Interaction,
+		EvidenceFingerprint: intent.Evidence.ContentFingerprint,
+		Reason:              reason,
+		Attempt:             child.ValidationRetryCount,
+		RetryLimit:          invalidResultRetryLimit(state),
+		Result: ChildCompletionResult{
+			Stage:          child.Stage,
+			Status:         string(intent.Kind),
+			Summary:        reason,
+			StageCompleted: reason,
+		},
+	}
+	if intent.Evidence.CurrentTerminal != nil {
+		status.TerminalEvidence = intent.Evidence.CurrentTerminal
+	}
+	status.ActionCard = &ManagerActionCard{
+		Kind:              string(intent.Kind),
+		Severity:          "warning",
+		Summary:           reason,
+		Evidence:          []string{intent.Evidence.CurrentMessage.Text},
+		RecommendedAction: "inspect the current child evidence and choose the safe manager action",
+		RequiresHuman:     intent.Kind == ChildIntentManagerQuestion,
+	}
+	if intent.Kind == ChildIntentPivotRequest {
+		status.ActionCard.Severity = "info"
+		status.ActionCard.RecommendedAction = "inspect the requested follow-up; graph state remains unchanged"
+	}
+	if intent.Kind == ChildIntentNoResultIncomplete {
+		status.ActionCard.RecommendedAction = "inspect or relaunch the same graph node; no schema retry was sent"
+	}
+
+	return status
+}
+
 func terminalEvidenceForActiveChildWithRefresh(
 	state ManagerState,
 ) (AssistantTerminalEvidence, bool, error) {
@@ -2971,6 +2999,7 @@ func childCompletionWakePayload(
 	fmt.Fprintf(&payload, "  manager_needed: %t\n", managerNeeded)
 	fmt.Fprintf(&payload, "  continuation_started: %t\n", status.ContinuationStarted)
 	fmt.Fprintf(&payload, "  retry_exhausted: %t\n", status.RetryExhausted)
+	fmt.Fprintf(&payload, "  intent: %q\n", status.Intent)
 	fmt.Fprintf(&payload, "  stage: %q\n", status.Result.Stage)
 	fmt.Fprintf(&payload, "  status: %q\n", status.Result.Status)
 	fmt.Fprintf(&payload, "  outcome: %q\n", status.Result.Outcome)
@@ -4020,20 +4049,60 @@ func RunContinue(ctx context.Context, opts ContinueOptions, d deps, out io.Write
 	if healthErr != nil {
 		return healthErr
 	}
-	if IsRecoverableNoResultChild(health) {
-		card := BuildChildContextExhaustedCard(health, state, opts.StateFile)
-		if card != nil {
-			state.LastActionCard = card
-			_ = store.Save(opts.StateFile, state)
-			return writeManagerActionCard(out, *card, opts.Output)
-		}
-	}
 	if IsTerminalFailedChild(health) {
 		card := BuildChildLaunchFailedCard(health, state, opts.StateFile)
 		if card != nil {
 			state.LastActionCard = card
 			_ = store.Save(opts.StateFile, state)
+
 			return writeManagerActionCard(out, *card, opts.Output)
+		}
+	}
+	interaction := ChildInteractionStageWork
+	if state.ActiveChild.InteractionMode != "" {
+		interaction = ChildInteractionMode(state.ActiveChild.InteractionMode)
+	}
+	evidence, evidenceErr := GatherChildEvidence(state, ChildCompletionOptions{
+		StateFile:   opts.StateFile,
+		ChildID:     state.ActiveChild.ID,
+		Boundary:    ChildBoundaryAgentSettled,
+		Interaction: interaction,
+	})
+	if evidenceErr != nil {
+		if IsRecoverableNoResultChild(health) {
+			if card := BuildChildContextExhaustedCard(health, state, opts.StateFile); card != nil {
+				state.LastActionCard = card
+				_ = store.Save(opts.StateFile, state)
+
+				return writeManagerActionCard(out, *card, opts.Output)
+			}
+		}
+
+		return evidenceErr
+	}
+	intent := ClassifyChildIntent(evidence)
+	if IsRecoverableNoResultChild(health) &&
+		intent.Kind != ChildIntentGraphValidResult &&
+		intent.Kind != ChildIntentRepairableResult {
+		if card := BuildChildContextExhaustedCard(health, state, opts.StateFile); card != nil {
+			state.LastActionCard = card
+			_ = store.Save(opts.StateFile, state)
+
+			return writeManagerActionCard(out, *card, opts.Output)
+		}
+	}
+	if intent.Kind != ChildIntentGraphValidResult &&
+		intent.Kind != ChildIntentRepairableResult {
+		if intent.Kind == ChildIntentInteractiveChat {
+			return writeContinueOutput(out, opts, ContinueResult{
+				StopReason: "interactive child chat remains active; no result repair attempted",
+			})
+		}
+		status := childIntentManagerStatus(state, *state.ActiveChild, intent)
+		state.LastActionCard = status.ActionCard
+		_ = store.Save(opts.StateFile, state)
+		if status.ActionCard != nil {
+			return writeManagerActionCard(out, *status.ActionCard, opts.Output)
 		}
 	}
 

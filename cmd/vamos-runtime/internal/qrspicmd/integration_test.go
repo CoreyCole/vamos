@@ -1009,16 +1009,7 @@ func TestContinueCommandInvalidResultRepromptsSameChild(t *testing.T) {
 	}
 	state := loadManagerState(t, stateFile)
 	writeFile(t, state.ActiveChild.DonePath, "")
-	writeSessionTestFile(
-		t,
-		filepath.Join(state.ActiveChild.SessionDir, "session.jsonl"),
-		sessionHeader(
-			state.ActiveChild.SessionID,
-			fixture.projectRoot,
-		)+"\n"+assistantLine(
-			"```yaml\nqrspi_result:\n  stage: question\n```",
-		)+"\n",
-	)
+	writeSessionTestFile(t, filepath.Join(state.ActiveChild.SessionDir, "session.jsonl"), sessionHeader(state.ActiveChild.SessionID, fixture.projectRoot)+"\n"+assistantLine(testResultYAML("question", "complete", "not-valid", "thoughts/example/questions/q.md", ""))+"\n")
 
 	tmux := &recordingTmux{}
 	continueOut, err := executeManagerCommand(
@@ -1070,16 +1061,7 @@ func TestContinueInvalidResultRetryExhaustionEmitsManagerNotice(t *testing.T) {
 		Workflow:         testWorkflowState(t, qrspi.NodePlan, nil),
 	}
 	saveManagerState(t, stateFile, state)
-	writeSessionTestFile(
-		t,
-		sessionPath,
-		sessionHeader(
-			active.SessionID,
-			fixture.projectRoot,
-		)+"\n"+assistantLine(
-			"```yaml\nqrspi_result:\n  stage: plan\n```",
-		)+"\n",
-	)
+	writeSessionTestFile(t, sessionPath, sessionHeader(active.SessionID, fixture.projectRoot)+"\n"+assistantLine(testResultYAML("plan", "complete", "not-valid", "thoughts/example/plan.md", ""))+"\n")
 
 	continueOut, err := executeManagerCommand(
 		deps{Clock: fixture.clock},

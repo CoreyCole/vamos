@@ -435,46 +435,20 @@ func extractLastAssistantTextFromSession(
 	path string,
 	requireQRSPIResult bool,
 ) (string, error) {
-	file, err := os.Open(path)
+	evidence, err := ExtractSessionEvidence(path)
 	if err != nil {
 		return "", err
 	}
-	defer file.Close()
+	if requireQRSPIResult {
+		return finalQRSPIResultText(path, evidence)
+	}
+	for i := len(evidence) - 1; i >= 0; i-- {
+		if strings.TrimSpace(evidence[i].Text) != "" {
+			return evidence[i].Text, nil
+		}
+	}
 
-	var last string
-	scanner := bufio.NewScanner(file)
-	scanner.Buffer(make([]byte, 64*1024), 1024*1024)
-	for scanner.Scan() {
-		line := bytes.TrimSpace(scanner.Bytes())
-		if len(line) == 0 {
-			continue
-		}
-		var entry sessionEntry
-		if err := json.Unmarshal(line, &entry); err != nil {
-			continue
-		}
-		if entry.Type != "message" || entry.Message == nil ||
-			entry.Message.Role != "assistant" {
-			continue
-		}
-		if requireQRSPIResult && entry.Message.StopReason == "error" {
-			continue
-		}
-		if requireQRSPIResult && entry.Message.StopReason == "aborted" {
-			continue
-		}
-		text := textBlocksFromAssistantMessage(*entry.Message)
-		if strings.TrimSpace(text) == "" {
-			continue
-		}
-		if !requireQRSPIResult || strings.Contains(text, "qrspi_result") {
-			last = text
-		}
-	}
-	if err := scanner.Err(); err != nil {
-		return "", err
-	}
-	return last, nil
+	return "", nil
 }
 
 func textBlocksFromAssistantMessage(msg sessionMessage) string {

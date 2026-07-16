@@ -285,9 +285,13 @@ func TestContinueInvalidResultRepromptsSameActiveChild(t *testing.T) {
 		sessionHeader(
 			"session-1",
 			initial.ActiveChild.Cwd,
-		)+"\n"+assistantLine(
-			"```yaml\nqrspi_result:\n  stage: design\n```",
-		)+"\n",
+		)+"\n"+assistantLine(testResultYAML(
+			"design",
+			"complete",
+			"not-valid",
+			"thoughts/example/design.md",
+			"",
+		))+"\n",
 	)
 	writeFile(t, donePath, "")
 
@@ -361,12 +365,11 @@ func TestContinueInvalidResultRepromptsSameActiveChild(t *testing.T) {
 	}
 }
 
-func TestContinueNoQRSPIResultReturnsManagerActionCard(t *testing.T) {
+func TestContinueManagerQuestionDoesNotRepromptChild(t *testing.T) {
 	dir := t.TempDir()
 	stateFile := filepath.Join(dir, "state.json")
 	sessionPath := filepath.Join(dir, "sessions", "session.jsonl")
-	donePath := filepath.Join(dir, "done")
-	initial := ManagerState{
+	state := ManagerState{
 		CanonicalPlanDir: "thoughts/example",
 		SourceCwd:        filepath.Join(dir, "repo"),
 		Workflow:         testWorkflowState(t, qrspi.NodeDesign, nil),
@@ -378,40 +381,35 @@ func TestContinueNoQRSPIResultReturnsManagerActionCard(t *testing.T) {
 			SessionID:   "session-1",
 			SessionDir:  filepath.Join(dir, "sessions"),
 			SessionPath: sessionPath,
-			DonePath:    donePath,
+			DonePath:    filepath.Join(dir, "done"),
 			StatusPath:  filepath.Join(dir, "status.json"),
 		},
 	}
-	saveManagerState(t, stateFile, initial)
+	saveManagerState(t, stateFile, state)
 	writeSessionTestFile(
 		t,
 		sessionPath,
-		sessionHeader("session-1", initial.ActiveChild.Cwd)+"\n"+
-			assistantLine("I am still working; no result yet.")+"\n",
+		sessionHeader("session-1", state.ActiveChild.Cwd)+"\n"+
+			assistantLine("Which artifact should I inspect?")+"\n",
 	)
-	writeFile(t, donePath, "")
+	writeFile(t, state.ActiveChild.DonePath, "")
 
 	tmux := &recordingTmux{}
 	var out strings.Builder
-	err := RunContinue(
+	if err := RunContinue(
 		t.Context(),
 		ContinueOptions{StateFile: stateFile},
 		deps{Tmux: tmux},
 		&out,
-	)
-	if err != nil {
-		t.Fatalf("RunContinue error = %v", err)
+	); err != nil {
+		t.Fatalf("RunContinue() error = %v", err)
 	}
-	if len(tmux.pastes) != 0 {
-		t.Fatalf("pastes = %#v, want no validation reprompt", tmux.pastes)
+	if len(tmux.pastes) != 0 || !strings.Contains(out.String(), "action: manager_question") {
+		t.Fatalf("output=%q pastes=%#v", out.String(), tmux.pastes)
 	}
-	for _, want := range []string{
-		"action: invalid_child_yaml",
-		"summary: child stopped without a qrspi_result",
-		"recommended: inspect whether the child was interrupted",
-	} {
-		if !strings.Contains(out.String(), want) {
-			t.Fatalf("continue output missing %q: %q", want, out.String())
-		}
+	loaded := loadManagerState(t, stateFile)
+	if loaded.ActiveChild.ValidationRetryCount != 0 || loaded.LastActionCard == nil ||
+		loaded.LastActionCard.Kind != string(ChildIntentManagerQuestion) {
+		t.Fatalf("state = %+v", loaded)
 	}
 }

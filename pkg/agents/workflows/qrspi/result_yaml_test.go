@@ -303,6 +303,9 @@ func TestQRSPIResultParserNormalizesDeterministicPositiveReviewOutcomes(t *testi
 		{name: "review-outline complete", stage: NodeReviewOutline, outcome: "complete", want: wruntime.OutcomeReadyForPlan},
 		{name: "review-implementation done", stage: NodeReviewImplementation, outcome: "done", want: wruntime.OutcomeReadyForHumanReview},
 		{name: "review-implementation approved", stage: NodeReviewImplementation, outcome: "approved", want: wruntime.OutcomeReadyForHumanReview},
+		{name: "review-implementation ready for verify", stage: NodeReviewImplementation, outcome: "ready-for-verify", want: wruntime.OutcomeReadyForHumanReview},
+		{name: "review-implementation ready to verify", stage: NodeReviewImplementation, outcome: "ready-to-verify", want: wruntime.OutcomeReadyForHumanReview},
+		{name: "review-implementation ready for verification", stage: NodeReviewImplementation, outcome: "ready-for-verification", want: wruntime.OutcomeReadyForHumanReview},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -332,6 +335,26 @@ func TestQRSPIResultParserDoesNotNormalizeNegativeOrAmbiguousOutcomes(t *testing
 	}
 	if parsedAny.(Result).Outcome != "complete" || len(parsedAny.(Result).Normalizations) != 0 {
 		t.Fatalf("review-plan parsed = %+v", parsedAny.(Result))
+	}
+}
+
+func TestQRSPIResultParserDoesNotNormalizeVerifyAliasesForOtherNodes(t *testing.T) {
+	for _, stage := range []wruntime.NodeID{NodeReviewOutline, NodeReviewPlan, NodeVerify} {
+		for _, outcome := range []string{"ready-for-verify", "ready-to-verify", "ready-for-verification"} {
+			t.Run(string(stage)+"/"+outcome, func(t *testing.T) {
+				parsedAny, err := (QRSPIResultParser{}).Parse(
+					validResultYAMLWithOutcome(string(stage), outcome),
+					wruntime.ParseContext{ExpectedNodeID: stage},
+				)
+				if err != nil {
+					t.Fatalf("Parse() error = %v", err)
+				}
+				parsed := parsedAny.(Result)
+				if parsed.Outcome != outcome || len(parsed.Normalizations) != 0 {
+					t.Fatalf("parsed = %+v", parsed)
+				}
+			})
+		}
 	}
 }
 

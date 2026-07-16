@@ -1373,7 +1373,17 @@ func TestChildCompleteStageWorkReturnsCorrectionForExtensionDelivery(t *testing.
 		"session.jsonl",
 		"session-1",
 		filepath.Join(dir, "repo"),
-		assistantLineWithIDs("invalid-1", "", "not yaml"),
+		assistantLineWithIDs(
+			"invalid-1",
+			"",
+			testResultYAML(
+				"design",
+				"complete",
+				"not-valid",
+				"thoughts/example/design.md",
+				"",
+			),
+		),
 	)
 	state := ManagerState{
 		CanonicalPlanDir: "thoughts/example",
@@ -1482,7 +1492,13 @@ func TestChildCompleteInvalidResultSuppressesThenExhausts(t *testing.T) {
 		"session.jsonl",
 		"session-1",
 		filepath.Join(dir, "repo"),
-		assistantLine("```yaml\nqrspi_result:\n  stage: design\n```"),
+		assistantLine(testResultYAML(
+			"design",
+			"complete",
+			"not-valid",
+			"thoughts/example/design.md",
+			"",
+		)),
 	)
 	state := ManagerState{
 		CanonicalPlanDir: "thoughts/example",
@@ -1521,6 +1537,21 @@ func TestChildCompleteInvalidResultSuppressesThenExhausts(t *testing.T) {
 		status.TerminalBoundary {
 		t.Fatalf("retry status=%+v pastes=%#v, want deferred Pi correction", status, tmux.pastes)
 	}
+	file, err := os.OpenFile(sessionPath, os.O_APPEND|os.O_WRONLY, 0o644)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, writeErr := file.WriteString(assistantLine(testResultYAML(
+		"design",
+		"complete",
+		"still-not-valid",
+		"thoughts/example/design.md",
+		"",
+	)) + "\n")
+	closeErr := file.Close()
+	if writeErr != nil || closeErr != nil {
+		t.Fatalf("append invalid correction: write=%v close=%v", writeErr, closeErr)
+	}
 
 	status, err = RunChildComplete(
 		t.Context(),
@@ -1538,54 +1569,111 @@ func TestChildCompleteInvalidResultSuppressesThenExhausts(t *testing.T) {
 	}
 }
 
-func TestChildCompleteNoQRSPIResultNotifiesManagerWithoutReprompt(t *testing.T) {
+func TestChildCompleteManagerIntentsDoNotConsumeRepairBudget(t *testing.T) {
+	tests := []struct {
+		name string
+		line string
+		want ChildIntentKind
+	}{
+		{name: "question", line: assistantLine("Which artifact should I inspect?"), want: ChildIntentManagerQuestion},
+		{name: "pivot", line: assistantLine("Need follow-up research for this bug."), want: ChildIntentPivotRequest},
+		{name: "provider", line: providerContextErrorLine("provider unavailable"), want: ChildIntentProviderFailure},
+		{name: "no result", line: assistantLine(""), want: ChildIntentNoResultIncomplete},
+		{name: "ambiguous", line: assistantLine("I changed several things."), want: ChildIntentAmbiguousUnsafe},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			dir := t.TempDir()
+			stateFile := filepath.Join(dir, "state.json")
+			sessionPath := writePiSession(
+				t,
+				filepath.Join(dir, "sessions"),
+				"session.jsonl",
+				"session-1",
+				filepath.Join(dir, "repo"),
+				tt.line,
+			)
+			state := ManagerState{
+				CanonicalPlanDir: "thoughts/example",
+				ManagerPaneID:    "%parent",
+				Workflow:         testWorkflowState(t, qrspi.NodeDesign, nil),
+				ActiveChild: &ChildRunRef{
+					ID:                   "child-1",
+					Stage:                "design",
+					Cwd:                  filepath.Join(dir, "repo"),
+					TmuxPaneID:           "%9",
+					SessionID:            "session-1",
+					SessionPath:          sessionPath,
+					ValidationStatusPath: filepath.Join(dir, "validation-status.json"),
+					Generation:           1,
+				},
+			}
+			saveManagerState(t, stateFile, state)
+
+			status, err := RunChildComplete(
+				t.Context(),
+				ChildCompletionOptions{StateFile: stateFile, ChildID: "child-1"},
+				deps{Tmux: &recordingTmux{}},
+				&strings.Builder{},
+			)
+			if err != nil {
+				t.Fatalf("RunChildComplete() error = %v", err)
+			}
+			if status.Intent != tt.want || !status.ManagerNeeded ||
+				!status.TerminalBoundary || status.RetryPrompt != "" || status.RetryExhausted {
+				t.Fatalf("status = %+v", status)
+			}
+			loaded := loadManagerState(t, stateFile)
+			if loaded.ActiveChild.ValidationRetryCount != 0 {
+				t.Fatalf("active child = %+v", loaded.ActiveChild)
+			}
+		})
+	}
+}
+
+func TestChildCompleteNormalizesReviewImplementationVerifyAlias(t *testing.T) {
 	dir := t.TempDir()
 	stateFile := filepath.Join(dir, "state.json")
-	donePath := filepath.Join(dir, "done")
 	sessionPath := writePiSession(
 		t,
 		filepath.Join(dir, "sessions"),
 		"session.jsonl",
 		"session-1",
 		filepath.Join(dir, "repo"),
-		assistantLine("not yaml"),
+		assistantLine(testResultYAML(
+			"review-implementation",
+			"complete",
+			"ready-for-verify",
+			"thoughts/example/review.md",
+			"",
+		)),
 	)
 	state := ManagerState{
 		CanonicalPlanDir: "thoughts/example",
 		ManagerPaneID:    "%parent",
-		Workflow:         testWorkflowState(t, qrspi.NodeDesign, nil),
+		Workflow:         testWorkflowState(t, qrspi.NodeReviewImplementation, nil),
 		ActiveChild: &ChildRunRef{
-			ID:                   "child-1",
-			Stage:                "design",
-			Cwd:                  filepath.Join(dir, "repo"),
-			TmuxPaneID:           "%9",
-			SessionID:            "session-1",
-			SessionDir:           filepath.Join(dir, "sessions"),
-			SessionPath:          sessionPath,
-			DonePath:             donePath,
-			ValidationStatusPath: filepath.Join(dir, "validation-status.json"),
-			Generation:           1,
+			ID:          "child-1",
+			Stage:       "review-implementation",
+			Cwd:         filepath.Join(dir, "repo"),
+			SessionID:   "session-1",
+			SessionPath: sessionPath,
+			Generation:  1,
 		},
 	}
 	saveManagerState(t, stateFile, state)
-	writeFile(t, donePath, "")
-	tmux := &recordingTmux{}
+
 	status, err := RunChildComplete(
 		t.Context(),
 		ChildCompletionOptions{StateFile: stateFile, ChildID: "child-1"},
-		deps{Tmux: tmux},
+		deps{Tmux: &recordingTmux{}},
 		&strings.Builder{},
 	)
 	if err != nil {
-		t.Fatalf("RunChildComplete error = %v", err)
+		t.Fatalf("RunChildComplete() error = %v", err)
 	}
-	if status.Validated || !status.ManagerNeeded || status.RetryExhausted ||
-		status.Result.Status != "no_result" || status.Wake.Mode != "deliver" {
-		t.Fatalf("no-result status = %+v", status)
-	}
-	for _, paste := range tmux.pastes {
-		if paste.pane.ID == "%9" {
-			t.Fatalf("pastes = %#v, want no child reprompt", tmux.pastes)
-		}
+	if status.Intent != ChildIntentGraphValidResult || !status.Validated ||
+		status.Result.Outcome != "ready-for-human-review" || len(status.Normalizations) != 1 {
+		t.Fatalf("status = %+v", status)
 	}
 }

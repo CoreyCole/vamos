@@ -134,8 +134,6 @@ type ChildInteractionMode string
 
 type ChildIntentKind string
 
-const ChildIntentInteractiveChat ChildIntentKind = "interactive_child_chat"
-
 const (
 	ChildInteractionStageWork           ChildInteractionMode = "stage_work"
 	ChildInteractionInteractiveChat     ChildInteractionMode = "interactive_child_chat"
@@ -188,6 +186,7 @@ type ManagerCompactionOptions struct {
 }
 
 type ChildCompletionStatus struct {
+	Intent              ChildIntentKind            `json:"intent,omitempty"`
 	Validated           bool                       `json:"validated"`
 	ManagerNeeded       bool                       `json:"managerNeeded"`
 	ContinuationStarted bool                       `json:"continuationStarted"`
