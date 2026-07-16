@@ -46,16 +46,18 @@ type HandoffArtifact struct {
 }
 
 type RunChildOptions struct {
-	PlanDir      string
-	Stage        string
-	Cwd          string
-	PromptFile   string
-	StateFile    string
-	Split        string
-	ManagerRunID string
-	ManagerPane  string
-	PiModel      string
-	Timeout      time.Duration
+	PlanDir             string
+	Stage               string
+	Cwd                 string
+	PromptFile          string
+	StateFile           string
+	Split               string
+	ManagerRunID        string
+	ManagerPane         string
+	PiModel             string
+	Timeout             time.Duration
+	Launch              *ChildLaunchIntent
+	DeferPendingCleanup bool
 }
 
 type StartNextOptions struct {
@@ -165,20 +167,21 @@ type ManagerCompactionOptions struct {
 }
 
 type ChildCompletionStatus struct {
-	Validated        bool                       `json:"validated"`
-	ManagerNeeded    bool                       `json:"managerNeeded"`
-	RetryExhausted   bool                       `json:"retryExhausted"`
-	ChildID          string                     `json:"childId"`
-	DeliveryID       string                     `json:"deliveryId"`
-	Result           ChildCompletionResult      `json:"result,omitempty"`
-	NextChild        NextChildInfo              `json:"nextChild,omitempty"`
-	Wake             WakeDeliveryInstruction    `json:"wake"`
-	ActionCard       *ManagerActionCard         `json:"actionCard,omitempty"`
-	TerminalEvidence *AssistantTerminalEvidence `json:"terminalEvidence,omitempty"`
-	Normalizations   []ResultNormalization      `json:"normalizations,omitempty"`
-	Reason           string                     `json:"reason,omitempty"`
-	Attempt          int                        `json:"attempt,omitempty"`
-	RetryLimit       int                        `json:"retryLimit,omitempty"`
+	Validated           bool                       `json:"validated"`
+	ManagerNeeded       bool                       `json:"managerNeeded"`
+	ContinuationStarted bool                       `json:"continuationStarted"`
+	RetryExhausted      bool                       `json:"retryExhausted"`
+	ChildID             string                     `json:"childId"`
+	DeliveryID          string                     `json:"deliveryId"`
+	Result              ChildCompletionResult      `json:"result,omitempty"`
+	NextChild           NextChildInfo              `json:"nextChild,omitempty"`
+	Wake                WakeDeliveryInstruction    `json:"wake"`
+	ActionCard          *ManagerActionCard         `json:"actionCard,omitempty"`
+	TerminalEvidence    *AssistantTerminalEvidence `json:"terminalEvidence,omitempty"`
+	Normalizations      []ResultNormalization      `json:"normalizations,omitempty"`
+	Reason              string                     `json:"reason,omitempty"`
+	Attempt             int                        `json:"attempt,omitempty"`
+	RetryLimit          int                        `json:"retryLimit,omitempty"`
 }
 
 type ResultNormalization struct {
@@ -553,6 +556,7 @@ type PromptFileOptions struct {
 	StateFile string
 	NodeID    string
 	Timestamp time.Time
+	Launch    *ChildLaunchIntent
 }
 
 type SteerChildOptions struct {

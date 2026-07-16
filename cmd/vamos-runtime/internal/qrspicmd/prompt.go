@@ -18,6 +18,7 @@ type PromptContext struct {
 	PlanDir    string
 	Manifest   string
 	LastResult *wruntime.WorkflowResultSnapshot
+	Launch     *ChildLaunchIntent
 }
 
 func LoadManifest(projectRoot string) (string, error) {
@@ -37,6 +38,11 @@ func ResolveStageSkill(node wruntime.Node) string {
 
 func RenderStagePrompt(ctx PromptContext) (string, error) {
 	skillPath := ResolveStageSkill(ctx.Node)
+	latestArtifact := latestPrimaryArtifact(ctx.LastResult)
+	if ctx.Launch != nil && ctx.Launch.Kind == ChildLaunchResumeHandoff {
+		skillPath = strings.TrimSpace(ctx.Launch.SkillPath)
+		latestArtifact = strings.TrimSpace(ctx.Launch.PrimaryArtifact)
+	}
 	if skillPath == "" {
 		return "", fmt.Errorf("node %q does not define a stage skill path", ctx.Node.ID)
 	}
@@ -50,7 +56,6 @@ func RenderStagePrompt(ctx PromptContext) (string, error) {
 	b.WriteString("1. .pi/skills/qrspi-planning/SKILL.md\n")
 	fmt.Fprintf(&b, "2. %s\n", skillPath)
 	fmt.Fprintf(&b, "3. %s/AGENTS.md\n", strings.TrimRight(planDir, "/"))
-	latestArtifact := latestPrimaryArtifact(ctx.LastResult)
 	if latestArtifact != "" {
 		fmt.Fprintf(&b, "4. %s\n", latestArtifact)
 	} else {

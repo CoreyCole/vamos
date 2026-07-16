@@ -145,6 +145,48 @@ func TestDefaultChildCwd(t *testing.T) {
 	}
 }
 
+func TestPromptFileKeepsGraphNodeFilenameForResumeLaunch(t *testing.T) {
+	dir := t.TempDir()
+	stateFile := filepath.Join(dir, "state", "run.json")
+	state := ManagerState{
+		SourceCwd:        dir,
+		CanonicalPlanDir: filepath.Join(dir, "thoughts/example"),
+		Workflow:         testWorkflowState(t, qrspi.NodeResearch, nil),
+	}
+	def, err := Definition()
+	if err != nil {
+		t.Fatal(err)
+	}
+	path, err := WriteStagePromptFile(
+		t.Context(),
+		state,
+		def.Nodes[qrspi.NodeResearch],
+		PromptFileOptions{
+			StateFile: stateFile,
+			Timestamp: time.Unix(100, 123),
+			Launch: &ChildLaunchIntent{
+				Kind:            ChildLaunchResumeHandoff,
+				NodeID:          qrspi.NodeResearch,
+				SkillPath:       ".pi/skills/q-resume/SKILL.md",
+				PrimaryArtifact: "/repo/thoughts/example/handoffs/research.md",
+			},
+		},
+	)
+	if err != nil {
+		t.Fatalf("WriteStagePromptFile error = %v", err)
+	}
+	if !strings.HasPrefix(filepath.Base(path), "research-") {
+		t.Fatalf("prompt filename = %q, want research graph node prefix", path)
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(data), ".pi/skills/q-resume/SKILL.md") {
+		t.Fatalf("prompt missing q-resume skill:\n%s", data)
+	}
+}
+
 func TestPromptFileWritesAtomicallyUnderStateDir(t *testing.T) {
 	dir := t.TempDir()
 	stateFile := filepath.Join(dir, "state", "run.json")

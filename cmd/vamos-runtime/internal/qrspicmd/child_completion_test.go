@@ -345,6 +345,128 @@ func TestChildCompleteInvalidHandoffArtifactWaitsForManager(t *testing.T) {
 	}
 }
 
+func TestChildCompleteHandoffLaunchesFreshSameStageResumeChild(t *testing.T) {
+	dir := t.TempDir()
+	repo := filepath.Join(dir, "repo")
+	plan := filepath.Join(repo, "thoughts", "example")
+	handoffPath := filepath.Join(plan, "handoffs", "research.md")
+	writeHandoffFile(t, handoffPath, "research", "in_progress")
+	stateFile := filepath.Join(dir, "state.json")
+	sessionDir := filepath.Join(dir, "sessions")
+	validationPath := filepath.Join(dir, "runs", "source", "validation-status.json")
+	sessionPath := writePiSession(
+		t,
+		sessionDir,
+		"session.jsonl",
+		"session-1",
+		repo,
+		assistantLine(testResultYAML(
+			"research",
+			"handoff",
+			"",
+			"thoughts/example/handoffs/research.md",
+			"",
+		)),
+	)
+	state := ManagerState{
+		RepoID:           repo,
+		CanonicalPlanDir: plan,
+		SourceCwd:        repo,
+		ManagerPaneID:    "%parent",
+		Workflow:         testWorkflowState(t, qrspi.NodeResearch, nil),
+		ActiveChild: &ChildRunRef{
+			ID:                   "source-child",
+			Stage:                "research",
+			Cwd:                  repo,
+			TmuxPaneID:           "%old",
+			SessionID:            "session-1",
+			SessionDir:           sessionDir,
+			SessionPath:          sessionPath,
+			ValidationStatusPath: validationPath,
+			Generation:           1,
+		},
+	}
+	saveManagerState(t, stateFile, state)
+	runner := &fakeChildRunner{panes: []string{"%new"}}
+	tmux := &recordingTmux{}
+	status, err := RunChildComplete(
+		t.Context(),
+		ChildCompletionOptions{StateFile: stateFile, ChildID: "source-child"},
+		deps{Clock: func() time.Time { return time.Unix(200, 456) }, Runner: runner, Tmux: tmux},
+		&strings.Builder{},
+	)
+	if err != nil {
+		t.Fatalf("RunChildComplete error = %v", err)
+	}
+	if !status.Validated || status.ManagerNeeded || !status.ContinuationStarted ||
+		status.Reason != "handoff_auto_resumed" || status.Wake.Mode != "deliver" ||
+		status.NextChild.Stage != "research" ||
+		status.NextChild.Skill != ".pi/skills/q-resume/SKILL.md" {
+		t.Fatalf("status = %+v", status)
+	}
+	if len(runner.started) != 1 || runner.started[0].Stage != "research" ||
+		runner.started[0].Cwd != repo {
+		t.Fatalf("runner starts = %+v", runner.started)
+	}
+	prompt, err := os.ReadFile(runner.started[0].PromptFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	realHandoffPath, err := filepath.EvalSymlinks(handoffPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{
+		"2. .pi/skills/q-resume/SKILL.md",
+		"4. " + realHandoffPath,
+		"Current node: research",
+		"Previous QRSPI result",
+		"qrspi_result:",
+	} {
+		if !strings.Contains(string(prompt), want) {
+			t.Fatalf("resume prompt missing %q:\n%s", want, prompt)
+		}
+	}
+	loaded := loadManagerState(t, stateFile)
+	if loaded.Workflow.CurrentNodeID != qrspi.NodeResearch ||
+		loaded.ActiveChild == nil || loaded.ActiveChild.ID == "source-child" ||
+		loaded.ActiveChild.Stage != "research" ||
+		loaded.ActiveChild.LaunchKind != ChildLaunchResumeHandoff ||
+		loaded.ActiveChild.ContinuationOf != "source-child" ||
+		loaded.ActiveChild.ContinuationDeliveryID != status.DeliveryID ||
+		loaded.PendingCleanupChild == nil || loaded.PendingCleanupChild.ID != "source-child" {
+		t.Fatalf("loaded state = %+v", loaded)
+	}
+	if len(tmux.kills) != 0 {
+		t.Fatalf("old pane killed before deferred notification cleanup: %#v", tmux.kills)
+	}
+	var disk ChildCompletionStatus
+	data, err := os.ReadFile(validationPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := json.Unmarshal(data, &disk); err != nil {
+		t.Fatal(err)
+	}
+	if !disk.ContinuationStarted || disk.DeliveryID != status.DeliveryID {
+		t.Fatalf("source validation status = %+v", disk)
+	}
+
+	duplicate, err := RunChildComplete(
+		t.Context(),
+		ChildCompletionOptions{StateFile: stateFile, ChildID: "source-child"},
+		deps{Clock: func() time.Time { return time.Unix(201, 456) }, Runner: runner, Tmux: tmux},
+		&strings.Builder{},
+	)
+	if err != nil {
+		t.Fatalf("duplicate RunChildComplete error = %v", err)
+	}
+	if !duplicate.ContinuationStarted || duplicate.DeliveryID != status.DeliveryID ||
+		duplicate.Wake.Mode != "suppress" || len(runner.started) != 1 {
+		t.Fatalf("duplicate status = %+v; starts = %d", duplicate, len(runner.started))
+	}
+}
+
 func TestChildCompleteWritesValidatedStatus(t *testing.T) {
 	dir := t.TempDir()
 	stateFile := filepath.Join(dir, "state.json")

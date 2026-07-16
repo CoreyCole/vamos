@@ -1426,7 +1426,7 @@ func RunChild(ctx context.Context, opts RunChildOptions, d deps, out io.Writer) 
 	if parentPaneID != "" && state.ManagerPaneID == "" {
 		state.ManagerPaneID = parentPaneID
 	}
-	childID := childRunID(opts.Stage, clock())
+	childID := nextChildRunID(state, opts.Stage, clock())
 	runRoot := filepath.Dir(opts.StateFile)
 	extensionPath, err := ResolveChildExtensionPath(runRoot)
 	if err != nil {
@@ -1465,7 +1465,7 @@ func RunChild(ctx context.Context, opts RunChildOptions, d deps, out io.Writer) 
 	if err != nil {
 		return err
 	}
-	state.ActiveChild = &ChildRunRef{
+	replacement := &ChildRunRef{
 		ID:                   childID,
 		Stage:                opts.Stage,
 		Cwd:                  opts.Cwd,
@@ -1479,8 +1479,21 @@ func RunChild(ctx context.Context, opts RunChildOptions, d deps, out io.Writer) 
 		LifecycleStatus:      "running",
 		Generation:           1,
 	}
+	if opts.Launch != nil {
+		replacement.LaunchKind = opts.Launch.Kind
+		if opts.Launch.Kind == ChildLaunchResumeHandoff {
+			replacement.ContinuationOf = opts.Launch.SourceChildID
+			replacement.ContinuationArtifact = opts.Launch.PrimaryArtifact
+			replacement.ContinuationDeliveryID = opts.Launch.DeliveryID
+		}
+	}
+	state.ActiveChild = replacement
 	if err := store.Save(opts.StateFile, state); err != nil {
-		return err
+		cleanupErr := tmuxClient(d).KillPane(ctx, run.Pane)
+		if cleanupErr != nil {
+			return fmt.Errorf("persist started child: %w (cleanup untracked pane %s: %v)", err, run.Pane.ID, cleanupErr)
+		}
+		return fmt.Errorf("persist started child: %w", err)
 	}
 	if err := WriteNDJSON(
 		out,
@@ -1488,7 +1501,7 @@ func RunChild(ctx context.Context, opts RunChildOptions, d deps, out io.Writer) 
 	); err != nil {
 		return err
 	}
-	if state.PendingCleanupChild != nil {
+	if state.PendingCleanupChild != nil && !opts.DeferPendingCleanup {
 		pending := state.PendingCleanupChild
 		cleaned, cleanupErr := cleanupPendingChildAfterNextStart(ctx, state, d.Tmux)
 		if cleanupErr != nil {
@@ -1580,15 +1593,24 @@ func RunChildComplete(
 	if err != nil {
 		return nil, err
 	}
+	requestedChildID := strings.TrimSpace(opts.ChildID)
+	if requestedChildID != "" {
+		if continuation, ok := existingHandoffContinuationForSource(state, requestedChildID); ok {
+			status := handoffContinuationStatus(state, requestedChildID, *continuation)
+			if err := writeChildCompletionOutput(out, opts.Output, status); err != nil {
+				return nil, err
+			}
+			return &status, nil
+		}
+	}
 	if state.ActiveChild == nil {
 		return nil, errors.New("no active child to complete")
 	}
-	if strings.TrimSpace(opts.ChildID) != "" &&
-		state.ActiveChild.ID != strings.TrimSpace(opts.ChildID) {
+	if requestedChildID != "" && state.ActiveChild.ID != requestedChildID {
 		return nil, fmt.Errorf(
 			"active child %q does not match requested child %q",
 			state.ActiveChild.ID,
-			opts.ChildID,
+			requestedChildID,
 		)
 	}
 	child := state.ActiveChild
@@ -1640,7 +1662,8 @@ func RunChildComplete(
 				status.ManagerNeeded = childCompletionManagerNeeded(status.Result.Status)
 				status.Normalizations = parsed.Normalizations
 				if parsed.Result.Status == wruntime.StatusHandoff && parsed.Decision.StartNext {
-					if _, intentErr := deriveChildLaunchIntent(state, *child, parsed.Result, parsed.Decision); intentErr != nil {
+					intent, intentErr := deriveChildLaunchIntent(state, *child, parsed.Result, parsed.Decision)
+					if intentErr != nil {
 						status.ManagerNeeded = true
 						status.Reason = intentErr.Error()
 						status.ActionCard = buildInvalidHandoffArtifactCard(
@@ -1651,20 +1674,37 @@ func RunChildComplete(
 						)
 						state.LastActionCard = status.ActionCard
 						state.ActiveChild.LifecycleStatus = "awaiting_manager"
+						state.ActiveChild.LastDeliveryID = status.DeliveryID
+						state, status.Wake, err = queueOrDeliverWake(
+							ctx,
+							opts.StateFile,
+							state,
+							status,
+							d,
+						)
 					} else {
-						state.ActiveChild.LifecycleStatus = "completed"
+						state, status, err = completeHandoffContinuation(
+							ctx,
+							opts,
+							state,
+							*child,
+							parsed,
+							intent,
+							store,
+							d,
+						)
 					}
 				} else {
 					state.ActiveChild.LifecycleStatus = "completed"
+					state.ActiveChild.LastDeliveryID = status.DeliveryID
+					state, status.Wake, err = queueOrDeliverWake(
+						ctx,
+						opts.StateFile,
+						state,
+						status,
+						d,
+					)
 				}
-				state.ActiveChild.LastDeliveryID = status.DeliveryID
-				state, status.Wake, err = queueOrDeliverWake(
-					ctx,
-					opts.StateFile,
-					state,
-					status,
-					d,
-				)
 				if err != nil {
 					return nil, err
 				}
@@ -1747,35 +1787,197 @@ func RunChildComplete(
 			}
 		}
 	}
-	if state.ActiveChild != nil &&
-		strings.TrimSpace(state.ActiveChild.ValidationStatusPath) != "" {
-		if writeErr := writeValidationStatus(
-			state.ActiveChild.ValidationStatusPath,
-			status,
-		); writeErr != nil {
+	if child != nil && strings.TrimSpace(child.ValidationStatusPath) != "" {
+		if writeErr := writeValidationStatus(child.ValidationStatusPath, status); writeErr != nil {
 			return nil, writeErr
 		}
 	}
 	if saveErr := store.Save(opts.StateFile, state); saveErr != nil {
 		return nil, saveErr
 	}
-	if strings.EqualFold(opts.Output, "json") {
-		enc := json.NewEncoder(out)
-		enc.SetIndent("", "  ")
-		if err := enc.Encode(status); err != nil {
-			return nil, err
-		}
-	} else {
-		if _, err := fmt.Fprintf(
-			out,
-			"child completion: %s\nwake: %s\n",
-			status.Result.Status,
-			status.Wake.Mode,
-		); err != nil {
-			return nil, err
-		}
+	if err := writeChildCompletionOutput(out, opts.Output, status); err != nil {
+		return nil, err
 	}
 	return &status, nil
+}
+
+func writeChildCompletionOutput(
+	out io.Writer,
+	mode string,
+	status ChildCompletionStatus,
+) error {
+	if strings.EqualFold(mode, "json") {
+		enc := json.NewEncoder(out)
+		enc.SetIndent("", "  ")
+		return enc.Encode(status)
+	}
+	_, err := fmt.Fprintf(
+		out,
+		"child completion: %s\nwake: %s\n",
+		status.Result.Status,
+		status.Wake.Mode,
+	)
+	return err
+}
+
+func completeHandoffContinuation(
+	ctx context.Context,
+	opts ChildCompletionOptions,
+	state ManagerState,
+	source ChildRunRef,
+	parsed ParsedDecision,
+	intent ChildLaunchIntent,
+	store StateStore,
+	d deps,
+) (ManagerState, ChildCompletionStatus, error) {
+	status := ChildCompletionStatus{
+		Validated:           true,
+		ManagerNeeded:       false,
+		ContinuationStarted: true,
+		ChildID:             source.ID,
+		DeliveryID:          intent.DeliveryID,
+		Result:              childCompletionResult(parsed.Result),
+		NextChild:           nextChildInfoFromIntent(intent),
+		Normalizations:      parsed.Normalizations,
+		Reason:              "handoff_auto_resumed",
+		Attempt:             source.ValidationRetryCount,
+		RetryLimit:          invalidResultRetryLimit(state),
+	}
+	state.Workflow = parsed.Decision.State
+	state = UpdateImplementationCwd(state, parsed.Result)
+	if state.ActiveChild == nil || state.ActiveChild.ID != source.ID {
+		return state, ChildCompletionStatus{}, errors.New("source child changed before handoff continuation claim")
+	}
+	state.ActiveChild.LifecycleStatus = "continuing"
+	state.ActiveChild.LastDeliveryID = intent.DeliveryID
+	state = markPendingCleanup(state)
+	if err := store.Save(opts.StateFile, state); err != nil {
+		return state, ChildCompletionStatus{}, err
+	}
+
+	launched, err := startChildFromIntent(
+		ctx,
+		state,
+		intent,
+		ContinueOptions{
+			StateFile: opts.StateFile,
+			PlanDir:   state.CanonicalPlanDir,
+		},
+		true,
+		d,
+		io.Discard,
+	)
+	if err != nil {
+		return state, ChildCompletionStatus{}, err
+	}
+	if continuation, ok := existingHandoffContinuation(
+		launched,
+		source.ID,
+		intent.DeliveryID,
+	); !ok || continuation.ID == source.ID {
+		return launched, ChildCompletionStatus{}, errors.New("handoff replacement was not persisted with source lineage")
+	}
+	if err := writeValidationStatus(source.ValidationStatusPath, status); err != nil {
+		return launched, ChildCompletionStatus{}, err
+	}
+	launched, status.Wake, err = queueOrDeliverWake(
+		ctx,
+		opts.StateFile,
+		launched,
+		status,
+		d,
+	)
+	if err != nil {
+		return launched, ChildCompletionStatus{}, err
+	}
+	return launched, status, nil
+}
+
+func nextChildInfoFromIntent(intent ChildLaunchIntent) NextChildInfo {
+	return NextChildInfo{
+		Stage:     string(intent.NodeID),
+		Skill:     intent.SkillPath,
+		Cwd:       intent.Cwd,
+		WorkingOn: nextChildWorkingOn(intent.NodeID),
+	}
+}
+
+func existingHandoffContinuationForSource(
+	state ManagerState,
+	sourceChildID string,
+) (*ChildRunRef, bool) {
+	for _, candidate := range []*ChildRunRef{state.ActiveChild, state.PendingCleanupChild} {
+		if candidate == nil || candidate.LaunchKind != ChildLaunchResumeHandoff ||
+			candidate.ContinuationOf != sourceChildID ||
+			strings.TrimSpace(candidate.ContinuationDeliveryID) == "" {
+			continue
+		}
+		copy := *candidate
+		return &copy, true
+	}
+	return nil, false
+}
+
+func handoffContinuationStatus(
+	state ManagerState,
+	sourceChildID string,
+	continuation ChildRunRef,
+) ChildCompletionStatus {
+	status := ChildCompletionStatus{
+		Validated:           true,
+		ContinuationStarted: true,
+		ChildID:             sourceChildID,
+		DeliveryID:          continuation.ContinuationDeliveryID,
+		Result:              childCompletionResultFromSnapshot(state.Workflow.LastResult),
+		NextChild: NextChildInfo{
+			Stage:     continuation.Stage,
+			Skill:     ".pi/skills/q-resume/SKILL.md",
+			Cwd:       continuation.Cwd,
+			WorkingOn: nextChildWorkingOn(wruntime.NodeID(continuation.Stage)),
+		},
+		Wake: WakeDeliveryInstruction{
+			Mode:   "suppress",
+			Reason: "existing_handoff_continuation",
+		},
+		Reason:     "handoff_auto_resumed",
+		RetryLimit: invalidResultRetryLimit(state),
+	}
+	if status.Result.Artifact == "" {
+		status.Result = ChildCompletionResult{
+			Stage:    continuation.Stage,
+			Status:   string(wruntime.StatusHandoff),
+			Artifact: continuation.ContinuationArtifact,
+		}
+	}
+	return status
+}
+
+func childCompletionResultFromSnapshot(
+	snapshot *wruntime.WorkflowResultSnapshot,
+) ChildCompletionResult {
+	if snapshot == nil {
+		return ChildCompletionResult{}
+	}
+	out := ChildCompletionResult{
+		Stage:    string(snapshot.SourceNodeID),
+		Status:   string(snapshot.Status),
+		Outcome:  string(snapshot.Outcome),
+		Artifact: snapshot.PrimaryArtifact,
+		Summary:  snapshot.Summary,
+	}
+	var parsed qrspi.Result
+	if len(snapshot.Raw) > 0 && json.Unmarshal(snapshot.Raw, &parsed) == nil {
+		out.PlanGoal = parsed.Summary.PlanGoal
+		out.StageCompleted = parsed.Summary.StageCompleted
+		out.KeyDecisions = parsed.Summary.KeyDecisions
+		out.ChildPolicy = policySummary(qrspi.Policy{
+			AdvanceMode:             parsed.Policy.AdvanceMode,
+			AutoMode:                parsed.Policy.AutoMode,
+			EnablePlanReviews:       parsed.Policy.EnablePlanReviews,
+			InvalidResultRetryLimit: parsed.Policy.InvalidResultRetryLimit,
+		})
+	}
+	return out
 }
 
 func childCompletionResult(result wruntime.WorkflowResult) ChildCompletionResult {
@@ -3415,13 +3617,15 @@ func RunContinue(ctx context.Context, opts ContinueOptions, d deps, out io.Write
 	}
 	result.Validated = &parsed
 	result.PrimaryArtifact = parsed.Result.PrimaryArtifact
+	var launchIntent *ChildLaunchIntent
 	if parsed.Result.Status == wruntime.StatusHandoff && parsed.Decision.StartNext {
-		if _, intentErr := deriveChildLaunchIntent(
+		intent, intentErr := deriveChildLaunchIntent(
 			state,
 			*state.ActiveChild,
 			parsed.Result,
 			parsed.Decision,
-		); intentErr != nil {
+		)
+		if intentErr != nil {
 			card := buildInvalidHandoffArtifactCard(
 				opts.StateFile,
 				*state.ActiveChild,
@@ -3435,6 +3639,10 @@ func RunContinue(ctx context.Context, opts ContinueOptions, d deps, out io.Write
 			}
 			return writeManagerActionCard(out, *card, opts.Output)
 		}
+		if cwd := strings.TrimSpace(opts.Cwd); cwd != "" {
+			intent.Cwd = cwd
+		}
+		launchIntent = &intent
 	}
 
 	nextState, err := decideValidatedResult(ctx, state, parsed, opts, store)
@@ -3456,14 +3664,27 @@ func RunContinue(ctx context.Context, opts ContinueOptions, d deps, out io.Write
 	}
 
 	if parsed.Decision.StartNext {
-		launched, err := startNextChildFromDecision(
-			ctx,
-			nextState,
-			parsed.Decision,
-			opts,
-			d,
-			out,
-		)
+		var launched ManagerState
+		if launchIntent != nil {
+			launched, err = startChildFromIntent(
+				ctx,
+				nextState,
+				*launchIntent,
+				opts,
+				false,
+				d,
+				out,
+			)
+		} else {
+			launched, err = startNextChildFromDecision(
+				ctx,
+				nextState,
+				parsed.Decision,
+				opts,
+				d,
+				out,
+			)
+		}
 		if err != nil {
 			return err
 		}
@@ -3717,28 +3938,74 @@ func startNextChildFromDecision(
 	if nodeID == "" {
 		return state, errors.New("transition has no next node")
 	}
-	promptFile, err := renderContinuePromptFile(ctx, state, nodeID, opts)
+	def, err := Definition()
 	if err != nil {
 		return state, err
+	}
+	node, ok := def.Nodes[nodeID]
+	if !ok {
+		return state, fmt.Errorf("node %q is not in QRSPI definition", nodeID)
 	}
 	cwd, err := defaultChildCwd(state, nodeID, opts.Cwd)
 	if err != nil {
 		return state, err
+	}
+	return startChildFromIntent(
+		ctx,
+		state,
+		ChildLaunchIntent{
+			Kind:            ChildLaunchNormal,
+			NodeID:          nodeID,
+			SkillPath:       node.Prompt.SkillPath,
+			PrimaryArtifact: latestPrimaryArtifact(state.Workflow.LastResult),
+			Cwd:             cwd,
+		},
+		opts,
+		false,
+		d,
+		out,
+	)
+}
+
+func startChildFromIntent(
+	ctx context.Context,
+	state ManagerState,
+	intent ChildLaunchIntent,
+	opts ContinueOptions,
+	deferPendingCleanup bool,
+	d deps,
+	out io.Writer,
+) (ManagerState, error) {
+	if intent.NodeID == "" {
+		return state, errors.New("child launch intent has no node")
+	}
+	if strings.TrimSpace(intent.Cwd) == "" {
+		return state, errors.New("child launch intent has no cwd")
+	}
+	promptFile, err := renderLaunchPromptFile(ctx, state, intent, opts)
+	if err != nil {
+		return state, err
+	}
+	planDir := strings.TrimSpace(opts.PlanDir)
+	if planDir == "" {
+		planDir = state.CanonicalPlanDir
 	}
 	runOut := io.Writer(io.Discard)
 	if strings.EqualFold(opts.Output, "ndjson") {
 		runOut = out
 	}
 	if err := RunChild(ctx, RunChildOptions{
-		PlanDir:     opts.PlanDir,
-		Stage:       string(nodeID),
-		Cwd:         cwd,
-		PromptFile:  promptFile,
-		StateFile:   opts.StateFile,
-		Split:       opts.Split,
-		PiModel:     resolvePiModel(opts.PiModel, state.PiModel),
-		ManagerPane: opts.ManagerPane,
-		Timeout:     opts.Timeout,
+		PlanDir:             planDir,
+		Stage:               string(intent.NodeID),
+		Cwd:                 intent.Cwd,
+		PromptFile:          promptFile,
+		StateFile:           opts.StateFile,
+		Split:               opts.Split,
+		PiModel:             resolvePiModel(opts.PiModel, state.PiModel),
+		ManagerPane:         opts.ManagerPane,
+		Timeout:             opts.Timeout,
+		Launch:              &intent,
+		DeferPendingCleanup: deferPendingCleanup,
 	}, d, runOut); err != nil {
 		return state, err
 	}
@@ -3754,19 +4021,19 @@ func defaultContinueCwd(state ManagerState, node wruntime.NodeID) string {
 	return cwd
 }
 
-func renderContinuePromptFile(
+func renderLaunchPromptFile(
 	ctx context.Context,
 	state ManagerState,
-	nodeID wruntime.NodeID,
+	intent ChildLaunchIntent,
 	opts ContinueOptions,
 ) (string, error) {
 	def, err := Definition()
 	if err != nil {
 		return "", err
 	}
-	node, ok := def.Nodes[nodeID]
+	node, ok := def.Nodes[intent.NodeID]
 	if !ok {
-		return "", fmt.Errorf("node %q is not in QRSPI definition", nodeID)
+		return "", fmt.Errorf("node %q is not in QRSPI definition", intent.NodeID)
 	}
 	return WriteStagePromptFile(
 		ctx,
@@ -3774,8 +4041,9 @@ func renderContinuePromptFile(
 		node,
 		PromptFileOptions{
 			StateFile: opts.StateFile,
-			NodeID:    string(nodeID),
+			NodeID:    string(intent.NodeID),
 			Timestamp: time.Now(),
+			Launch:    &intent,
 		},
 	)
 }
@@ -4433,6 +4701,23 @@ func childRunID(stage string, t time.Time) string {
 		clean = "child"
 	}
 	return fmt.Sprintf("%s-%s-%09d", clean, t.Format("20060102150405"), t.Nanosecond())
+}
+
+func nextChildRunID(state ManagerState, stage string, when time.Time) string {
+	base := childRunID(stage, when)
+	used := func(id string) bool {
+		return (state.ActiveChild != nil && state.ActiveChild.ID == id) ||
+			(state.PendingCleanupChild != nil && state.PendingCleanupChild.ID == id)
+	}
+	if !used(base) {
+		return base
+	}
+	for suffix := 2; ; suffix++ {
+		candidate := fmt.Sprintf("%s-%d", base, suffix)
+		if !used(candidate) {
+			return candidate
+		}
+	}
 }
 
 func CaptureManagerPaneID(explicit string) string {

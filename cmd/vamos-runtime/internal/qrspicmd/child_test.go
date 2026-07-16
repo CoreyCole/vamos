@@ -267,6 +267,79 @@ func TestRunChildCleansPendingAfterNewStart(t *testing.T) {
 	}
 }
 
+func TestRunChildDefersPendingCleanupAndPersistsContinuationLineage(t *testing.T) {
+	fixture := newRunChildFixture(t, false)
+	old := &ChildRunRef{ID: "old", Stage: "research", TmuxPaneID: "%old"}
+	state := fixture.loadState(t)
+	state.ActiveChild = old
+	state.PendingCleanupChild = old
+	fixture.saveState(t, state)
+	tmux := &recordingTmux{}
+	opts := fixture.options()
+	opts.Stage = "research"
+	opts.Timeout = 0
+	opts.DeferPendingCleanup = true
+	opts.Launch = &ChildLaunchIntent{
+		Kind:            ChildLaunchResumeHandoff,
+		NodeID:          "research",
+		SkillPath:       ".pi/skills/q-resume/SKILL.md",
+		PrimaryArtifact: "/repo/thoughts/example/handoffs/research.md",
+		SourceChildID:   "old",
+		DeliveryID:      "delivery-1",
+	}
+	if err := RunChild(
+		t.Context(),
+		opts,
+		deps{Clock: fixture.clock, Runner: fixture.runner, Tmux: tmux},
+		&bytes.Buffer{},
+	); err != nil {
+		t.Fatalf("RunChild error = %v", err)
+	}
+	loaded := fixture.loadState(t)
+	if loaded.ActiveChild == nil || loaded.ActiveChild.ID == "old" ||
+		loaded.ActiveChild.LaunchKind != ChildLaunchResumeHandoff ||
+		loaded.ActiveChild.ContinuationOf != "old" ||
+		loaded.ActiveChild.ContinuationDeliveryID != "delivery-1" {
+		t.Fatalf("active child = %#v", loaded.ActiveChild)
+	}
+	if loaded.PendingCleanupChild == nil || loaded.PendingCleanupChild.ID != "old" {
+		t.Fatalf("pending cleanup = %#v, want old child", loaded.PendingCleanupChild)
+	}
+	if len(tmux.kills) != 0 {
+		t.Fatalf("kills = %#v, want deferred cleanup", tmux.kills)
+	}
+}
+
+func TestRunChildPersistenceFailureCleansUntrackedReplacementAndKeepsSource(t *testing.T) {
+	fixture := newRunChildFixture(t, false)
+	old := &ChildRunRef{ID: "old", Stage: "research", TmuxPaneID: "%old"}
+	state := fixture.loadState(t)
+	state.ActiveChild = old
+	state.PendingCleanupChild = old
+	fixture.saveState(t, state)
+	store := &failNextSaveStateStore{FileStateStore: FileStateStore{}, failNext: true}
+	tmux := &recordingTmux{}
+	opts := fixture.options()
+	opts.Timeout = 0
+	err := RunChild(
+		t.Context(),
+		opts,
+		deps{Clock: fixture.clock, StateStore: store, Runner: fixture.runner, Tmux: tmux},
+		&bytes.Buffer{},
+	)
+	if err == nil || !strings.Contains(err.Error(), "persist started child") {
+		t.Fatalf("RunChild error = %v, want persistence failure", err)
+	}
+	loaded := fixture.loadState(t)
+	if loaded.ActiveChild == nil || loaded.ActiveChild.ID != "old" ||
+		loaded.PendingCleanupChild == nil || loaded.PendingCleanupChild.ID != "old" {
+		t.Fatalf("durable source state changed: %+v", loaded)
+	}
+	if len(tmux.kills) != 1 || tmux.kills[0].ID != "%9" {
+		t.Fatalf("kills = %#v, want untracked replacement %%9", tmux.kills)
+	}
+}
+
 func TestRunChildRejectsMissingPromptFile(t *testing.T) {
 	fixture := newRunChildFixture(t, true)
 	opts := fixture.options()
@@ -308,6 +381,19 @@ func TestRunChildStartFailurePreservesPendingOldPane(t *testing.T) {
 	if loaded.ActiveChild == nil || loaded.ActiveChild.TmuxPaneID != "%old" {
 		t.Fatalf("active child changed before start succeeded: %#v", loaded.ActiveChild)
 	}
+}
+
+type failNextSaveStateStore struct {
+	FileStateStore
+	failNext bool
+}
+
+func (s *failNextSaveStateStore) Save(path string, state ManagerState) error {
+	if s.failNext {
+		s.failNext = false
+		return errors.New("injected save failure")
+	}
+	return s.FileStateStore.Save(path, state)
 }
 
 type fakeChildRunner struct {

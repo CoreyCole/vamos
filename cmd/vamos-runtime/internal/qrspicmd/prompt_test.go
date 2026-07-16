@@ -82,6 +82,58 @@ func TestRenderStagePromptIncludesRequiredContext(t *testing.T) {
 	}
 }
 
+func TestRenderStagePromptUsesResumeLaunchOverridesWithoutChangingNode(t *testing.T) {
+	previousRaw, err := json.Marshal(qrspi.Result{
+		Project:  "github.com/CoreyCole/vamos",
+		Stage:    string(qrspi.NodeResearch),
+		Status:   string(wruntime.StatusHandoff),
+		Artifact: "thoughts/example/handoffs/research.md",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	def, err := Definition()
+	if err != nil {
+		t.Fatal(err)
+	}
+	handoff := "/implementation/thoughts/example/handoffs/research.md"
+	prompt, err := RenderStagePrompt(PromptContext{
+		Node:    def.Nodes[qrspi.NodeResearch],
+		PlanDir: "thoughts/example",
+		State:   ManagerState{SourceCwd: "/repo"},
+		LastResult: &wruntime.WorkflowResultSnapshot{
+			SourceNodeID:    qrspi.NodeResearch,
+			Status:          string(wruntime.StatusHandoff),
+			PrimaryArtifact: "thoughts/example/handoffs/research.md",
+			Raw:             previousRaw,
+		},
+		Launch: &ChildLaunchIntent{
+			Kind:            ChildLaunchResumeHandoff,
+			NodeID:          qrspi.NodeResearch,
+			SkillPath:       ".pi/skills/q-resume/SKILL.md",
+			PrimaryArtifact: handoff,
+		},
+	})
+	if err != nil {
+		t.Fatalf("RenderStagePrompt error = %v", err)
+	}
+	for _, want := range []string{
+		"2. .pi/skills/q-resume/SKILL.md",
+		"3. thoughts/example/AGENTS.md",
+		"4. " + handoff,
+		"Current node: research",
+		"Graph-selected skill: .pi/skills/q-resume/SKILL.md",
+		"qrspi_result:",
+	} {
+		if !strings.Contains(prompt, want) {
+			t.Fatalf("prompt missing %q:\n%s", want, prompt)
+		}
+	}
+	if strings.Contains(prompt, "2. .pi/skills/q-research/SKILL.md") {
+		t.Fatalf("prompt retained normal research skill:\n%s", prompt)
+	}
+}
+
 func TestRenderStagePromptDoesNotDumpManagerManifest(t *testing.T) {
 	def, err := Definition()
 	if err != nil {

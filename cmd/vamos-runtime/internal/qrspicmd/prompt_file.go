@@ -125,6 +125,7 @@ func renderPromptForNode(
 	state ManagerState,
 	node wruntime.Node,
 	planDir string,
+	launch *ChildLaunchIntent,
 ) (string, error) {
 	manifest, err := LoadManifest(state.SourceCwd)
 	if err != nil {
@@ -136,6 +137,7 @@ func renderPromptForNode(
 		PlanDir:    planDir,
 		Manifest:   manifest,
 		LastResult: state.Workflow.LastResult,
+		Launch:     launch,
 	})
 }
 
@@ -150,7 +152,7 @@ func WriteStagePromptFile(
 		return "", ctx.Err()
 	default:
 	}
-	prompt, err := renderPromptForNode(state, node, state.CanonicalPlanDir)
+	prompt, err := renderPromptForNode(state, node, state.CanonicalPlanDir, opts.Launch)
 	if err != nil {
 		return "", err
 	}
