@@ -472,6 +472,123 @@ func TestChildCompleteHandoffLaunchesFreshSameStageResumeChild(t *testing.T) {
 	}
 }
 
+func TestChildCompleteExistingHandoffContinuationRecoversWakeAndCleanup(t *testing.T) {
+	state, source, result := handoffArtifactFixture(t)
+	stateFile := filepath.Join(t.TempDir(), "state.json")
+	state.ManagerPaneID = "%parent"
+	state.Workflow = testWorkflowState(t, qrspi.NodeResearch, nil)
+	def, err := Definition()
+	if err != nil {
+		t.Fatal(err)
+	}
+	decision, err := wruntime.DecideTransition(def, state.Workflow, result)
+	if err != nil {
+		t.Fatal(err)
+	}
+	state.Workflow = decision.State
+	source.TmuxPaneID = "%old"
+	source.ValidationStatusPath = filepath.Join(filepath.Dir(stateFile), "source-validation.json")
+	state.PendingCleanupChild = &source
+	state.ActiveChild = &ChildRunRef{
+		ID:                     "replacement",
+		Stage:                  "research",
+		Cwd:                    source.Cwd,
+		TmuxPaneID:             "%new",
+		LifecycleStatus:        "running",
+		Generation:             1,
+		LaunchKind:             ChildLaunchResumeHandoff,
+		ContinuationOf:         source.ID,
+		ContinuationArtifact:   result.PrimaryArtifact,
+		ContinuationDeliveryID: childCompletionDeliveryID(source, &ParsedDecision{Result: result, Decision: decision}, false),
+	}
+	saveManagerState(t, stateFile, state)
+
+	tmux := &recordingTmux{}
+	status, err := RunChildComplete(
+		t.Context(),
+		ChildCompletionOptions{StateFile: stateFile, ChildID: source.ID},
+		deps{Tmux: tmux},
+		&strings.Builder{},
+	)
+	if err != nil {
+		t.Fatalf("RunChildComplete error = %v", err)
+	}
+	if !status.ContinuationStarted || status.Wake.Mode != "deliver" ||
+		status.DeliveryID != state.ActiveChild.ContinuationDeliveryID {
+		t.Fatalf("status = %+v", status)
+	}
+	if len(tmux.pastes) != 1 || len(tmux.keys) != 1 ||
+		len(tmux.kills) != 1 || tmux.kills[0].ID != "%old" {
+		t.Fatalf("pastes=%#v keys=%#v kills=%#v", tmux.pastes, tmux.keys, tmux.kills)
+	}
+	loaded := loadManagerState(t, stateFile)
+	if loaded.PendingCleanupChild != nil ||
+		loaded.Delivery.LastDeliveryID != status.DeliveryID {
+		t.Fatalf("loaded state = %+v", loaded)
+	}
+	var validation ChildCompletionStatus
+	data, err := os.ReadFile(source.ValidationStatusPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := json.Unmarshal(data, &validation); err != nil {
+		t.Fatal(err)
+	}
+	if validation.Wake.Mode != "deliver" || !validation.ContinuationStarted {
+		t.Fatalf("validation status = %+v", validation)
+	}
+}
+
+func TestChildCompleteExistingHandoffContinuationPreservesNewerQueuedWake(t *testing.T) {
+	state, source, result := handoffArtifactFixture(t)
+	stateFile := filepath.Join(t.TempDir(), "state.json")
+	state.Workflow = testWorkflowState(t, qrspi.NodeResearch, nil)
+	def, err := Definition()
+	if err != nil {
+		t.Fatal(err)
+	}
+	decision, err := wruntime.DecideTransition(def, state.Workflow, result)
+	if err != nil {
+		t.Fatal(err)
+	}
+	state.Workflow = decision.State
+	deliveryID := childCompletionDeliveryID(source, &ParsedDecision{Result: result, Decision: decision}, false)
+	state.ActiveChild = &ChildRunRef{
+		ID: "newer", Stage: "design", TmuxPaneID: "%newer", LifecycleStatus: "running", Generation: 1,
+	}
+	state.PendingCleanupChild = &ChildRunRef{
+		ID: "replacement", Stage: "research", Cwd: source.Cwd, TmuxPaneID: "%replacement",
+		LifecycleStatus: "completed", Generation: 1, LaunchKind: ChildLaunchResumeHandoff,
+		ContinuationOf: source.ID, ContinuationArtifact: result.PrimaryArtifact,
+		ContinuationDeliveryID: deliveryID,
+	}
+	state.Delivery.QueuedWake = &QueuedWake{
+		DeliveryID: "newer-wake", ChildID: "newer", ChildGeneration: 1, Payload: "newer payload",
+	}
+	saveManagerState(t, stateFile, state)
+
+	tmux := &recordingTmux{}
+	status, err := RunChildComplete(
+		t.Context(),
+		ChildCompletionOptions{StateFile: stateFile, ChildID: source.ID},
+		deps{Tmux: tmux},
+		&strings.Builder{},
+	)
+	if err != nil {
+		t.Fatalf("RunChildComplete error = %v", err)
+	}
+	if status.Wake.Mode != "suppress" || status.Wake.Reason != "existing_handoff_continuation" ||
+		len(tmux.pastes) != 0 || len(tmux.kills) != 1 {
+		t.Fatalf("status=%+v pastes=%#v kills=%#v", status, tmux.pastes, tmux.kills)
+	}
+	loaded := loadManagerState(t, stateFile)
+	if loaded.Delivery.QueuedWake == nil ||
+		loaded.Delivery.QueuedWake.DeliveryID != "newer-wake" ||
+		loaded.PendingCleanupChild != nil {
+		t.Fatalf("loaded state = %+v", loaded)
+	}
+}
+
 func TestChildCompleteHandoffLaunchFailureKeepsSourceAndEmitsCard(t *testing.T) {
 	dir := t.TempDir()
 	repo := filepath.Join(dir, "repo")

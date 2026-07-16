@@ -1596,7 +1596,18 @@ func RunChildComplete(
 	requestedChildID := strings.TrimSpace(opts.ChildID)
 	if requestedChildID != "" {
 		if continuation, ok := existingHandoffContinuationForSource(state, requestedChildID); ok {
-			status := handoffContinuationStatus(state, requestedChildID, *continuation)
+			_, status, recoverErr := recoverExistingHandoffContinuation(
+				ctx,
+				opts.StateFile,
+				state,
+				requestedChildID,
+				*continuation,
+				store,
+				d,
+			)
+			if recoverErr != nil {
+				return nil, recoverErr
+			}
 			if err := writeChildCompletionOutput(out, opts.Output, status); err != nil {
 				return nil, err
 			}
@@ -2028,10 +2039,6 @@ func handoffContinuationStatus(
 			Cwd:       continuation.Cwd,
 			WorkingOn: nextChildWorkingOn(wruntime.NodeID(continuation.Stage)),
 		},
-		Wake: WakeDeliveryInstruction{
-			Mode:   "suppress",
-			Reason: "existing_handoff_continuation",
-		},
 		Reason:     "handoff_auto_resumed",
 		RetryLimit: invalidResultRetryLimit(state),
 	}
@@ -2043,6 +2050,64 @@ func handoffContinuationStatus(
 		}
 	}
 	return status
+}
+
+func recoverExistingHandoffContinuation(
+	ctx context.Context,
+	stateFile string,
+	state ManagerState,
+	sourceChildID string,
+	continuation ChildRunRef,
+	store StateStore,
+	d deps,
+) (ManagerState, ChildCompletionStatus, error) {
+	status := handoffContinuationStatus(state, sourceChildID, continuation)
+	queued := state.Delivery.QueuedWake
+	switch {
+	case state.Delivery.LastDeliveryID == status.DeliveryID:
+		status.Wake = WakeDeliveryInstruction{Mode: "suppress", Reason: "duplicate_delivery"}
+	case queued != nil && queued.DeliveryID == status.DeliveryID:
+		status.Wake = WakeDeliveryInstruction{
+			Mode:    "queue",
+			Payload: queued.Payload,
+			Reason:  "existing_queued_wake",
+		}
+	case state.ActiveChild != nil && state.ActiveChild.ID == continuation.ID &&
+		state.ActiveChild.LifecycleStatus == "running":
+		var err error
+		state, status.Wake, err = queueOrDeliverWake(ctx, stateFile, state, status, d)
+		if err != nil {
+			return state, ChildCompletionStatus{}, err
+		}
+	default:
+		status.Wake = WakeDeliveryInstruction{
+			Mode:   "suppress",
+			Reason: "existing_handoff_continuation",
+		}
+	}
+	if state.PendingCleanupChild != nil && state.PendingCleanupChild.ID == sourceChildID {
+		if err := writeValidationStatus(state.PendingCleanupChild.ValidationStatusPath, status); err != nil {
+			return state, ChildCompletionStatus{}, err
+		}
+	}
+	if err := store.Save(stateFile, state); err != nil {
+		return state, ChildCompletionStatus{}, err
+	}
+	if state.PendingCleanupChild != nil {
+		cleaned, cleanupErr := cleanupPendingChildAfterNotification(ctx, state, d.Tmux)
+		if cleanupErr != nil {
+			cleaned.LastActionCard = buildPendingChildCleanupFailureCard(
+				stateFile,
+				cleaned.PendingCleanupChild,
+				cleanupErr,
+			)
+		}
+		state = cleaned
+		if err := store.Save(stateFile, state); err != nil {
+			return state, ChildCompletionStatus{}, err
+		}
+	}
+	return state, status, nil
 }
 
 func childCompletionResultFromSnapshot(
