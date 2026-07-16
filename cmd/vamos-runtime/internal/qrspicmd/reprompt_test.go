@@ -11,11 +11,16 @@ import (
 )
 
 type recordingTmux struct {
-	pastes       []recordedPaste
-	keys         []recordedKeys
-	kills        []TmuxPane
-	layouts      []recordedLayout
-	missingPanes map[string]bool
+	pastes        []recordedPaste
+	keys          []recordedKeys
+	kills         []TmuxPane
+	layouts       []recordedLayout
+	missingPanes  map[string]bool
+	pasteErr      error
+	sendErr       error
+	killErr       error
+	layoutErr     error
+	paneExistsErr error
 }
 
 type recordedPaste struct {
@@ -49,16 +54,23 @@ func (r *recordingTmux) SendKeys(
 		r.keys,
 		recordedKeys{pane: pane, keys: append([]string(nil), keys...)},
 	)
-	return nil
+	return r.sendErr
 }
 
 func (r *recordingTmux) PasteText(ctx context.Context, pane TmuxPane, text string) error {
 	r.pastes = append(r.pastes, recordedPaste{pane: pane, text: text})
-	return nil
+	return r.pasteErr
 }
 
 func (r *recordingTmux) KillPane(ctx context.Context, pane TmuxPane) error {
 	r.kills = append(r.kills, pane)
+	if r.killErr != nil {
+		return r.killErr
+	}
+	if r.missingPanes == nil {
+		r.missingPanes = map[string]bool{}
+	}
+	r.missingPanes[pane.ID] = true
 	return nil
 }
 
@@ -68,10 +80,13 @@ func (r *recordingTmux) SelectLayout(
 	layout string,
 ) error {
 	r.layouts = append(r.layouts, recordedLayout{pane: pane, layout: layout})
-	return nil
+	return r.layoutErr
 }
 
 func (r *recordingTmux) PaneExists(ctx context.Context, pane TmuxPane) (bool, error) {
+	if r.paneExistsErr != nil {
+		return false, r.paneExistsErr
+	}
 	if r.missingPanes != nil && r.missingPanes[pane.ID] {
 		return false, nil
 	}

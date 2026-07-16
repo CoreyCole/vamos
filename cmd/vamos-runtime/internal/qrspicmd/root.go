@@ -1695,7 +1695,13 @@ func RunChildComplete(
 						)
 					}
 				} else {
-					state.ActiveChild.LifecycleStatus = "completed"
+					if parsed.Result.Status == wruntime.StatusHandoff {
+						status.ManagerNeeded = true
+						status.Reason = "handoff_waiting_for_manager_policy"
+						state.ActiveChild.LifecycleStatus = "awaiting_manager"
+					} else {
+						state.ActiveChild.LifecycleStatus = "completed"
+					}
 					state.ActiveChild.LastDeliveryID = status.DeliveryID
 					state, status.Wake, err = queueOrDeliverWake(
 						ctx,
@@ -1852,7 +1858,17 @@ func completeHandoffContinuation(
 	state.ActiveChild.LastDeliveryID = intent.DeliveryID
 	state = markPendingCleanup(state)
 	if err := store.Save(opts.StateFile, state); err != nil {
-		return state, ChildCompletionStatus{}, err
+		return recordHandoffContinuationFailure(
+			ctx,
+			opts.StateFile,
+			state,
+			source,
+			parsed,
+			intent,
+			fmt.Errorf("persist handoff continuation claim: %w", err),
+			store,
+			d,
+		)
 	}
 
 	launched, err := startChildFromIntent(
@@ -1868,14 +1884,34 @@ func completeHandoffContinuation(
 		io.Discard,
 	)
 	if err != nil {
-		return state, ChildCompletionStatus{}, err
+		return recordHandoffContinuationFailure(
+			ctx,
+			opts.StateFile,
+			state,
+			source,
+			parsed,
+			intent,
+			err,
+			store,
+			d,
+		)
 	}
 	if continuation, ok := existingHandoffContinuation(
 		launched,
 		source.ID,
 		intent.DeliveryID,
 	); !ok || continuation.ID == source.ID {
-		return launched, ChildCompletionStatus{}, errors.New("handoff replacement was not persisted with source lineage")
+		return recordHandoffContinuationFailure(
+			ctx,
+			opts.StateFile,
+			launched,
+			source,
+			parsed,
+			intent,
+			errors.New("handoff replacement was not persisted with source lineage"),
+			store,
+			d,
+		)
 	}
 	if err := writeValidationStatus(source.ValidationStatusPath, status); err != nil {
 		return launched, ChildCompletionStatus{}, err
@@ -1890,7 +1926,64 @@ func completeHandoffContinuation(
 	if err != nil {
 		return launched, ChildCompletionStatus{}, err
 	}
-	return launched, status, nil
+	if err := store.Save(opts.StateFile, launched); err != nil {
+		return launched, ChildCompletionStatus{}, err
+	}
+	cleaned, cleanupErr := cleanupPendingChildAfterNotification(ctx, launched, d.Tmux)
+	if cleanupErr != nil {
+		cleaned.LastActionCard = buildPendingChildCleanupFailureCard(
+			opts.StateFile,
+			cleaned.PendingCleanupChild,
+			cleanupErr,
+		)
+	}
+	if err := store.Save(opts.StateFile, cleaned); err != nil {
+		return cleaned, ChildCompletionStatus{}, err
+	}
+	return cleaned, status, nil
+}
+
+func recordHandoffContinuationFailure(
+	ctx context.Context,
+	stateFile string,
+	state ManagerState,
+	source ChildRunRef,
+	parsed ParsedDecision,
+	intent ChildLaunchIntent,
+	launchErr error,
+	store StateStore,
+	d deps,
+) (ManagerState, ChildCompletionStatus, error) {
+	if durable, err := store.Load(stateFile); err == nil {
+		state = durable
+	}
+	status := ChildCompletionStatus{
+		Validated:      true,
+		ManagerNeeded:  true,
+		ChildID:        source.ID,
+		DeliveryID:     intent.DeliveryID + ":continuation_failed",
+		Result:         childCompletionResult(parsed.Result),
+		Normalizations: parsed.Normalizations,
+		Reason:         "handoff_continuation_failed",
+		Attempt:        source.ValidationRetryCount,
+		RetryLimit:     invalidResultRetryLimit(state),
+	}
+	status.ActionCard = buildHandoffContinuationFailureCard(
+		stateFile,
+		source,
+		parsed.Result,
+		launchErr,
+	)
+	state.LastActionCard = status.ActionCard
+	if state.ActiveChild != nil && state.ActiveChild.ID == source.ID {
+		state.ActiveChild.LifecycleStatus = "awaiting_manager"
+		state.ActiveChild.LastDeliveryID = status.DeliveryID
+	}
+	state, status.Wake, _ = queueOrDeliverWake(ctx, stateFile, state, status, d)
+	if err := store.Save(stateFile, state); err != nil {
+		return state, ChildCompletionStatus{}, err
+	}
+	return state, status, nil
 }
 
 func nextChildInfoFromIntent(intent ChildLaunchIntent) NextChildInfo {
@@ -2286,6 +2379,52 @@ func buildInvalidHandoffArtifactCard(
 	}
 }
 
+func buildHandoffContinuationFailureCard(
+	stateFile string,
+	source ChildRunRef,
+	result wruntime.WorkflowResult,
+	launchErr error,
+) *ManagerActionCard {
+	return &ManagerActionCard{
+		Kind:     ActionHandoffContinuationFailed,
+		Severity: "error",
+		Summary:  "validated handoff continuation did not produce a durable replacement child",
+		Evidence: []string{
+			fmt.Sprintf("source child: %s", source.ID),
+			fmt.Sprintf("stage: %s", result.SourceNodeID),
+			fmt.Sprintf("artifact: %s", result.PrimaryArtifact),
+			launchErr.Error(),
+		},
+		RecommendedAction: "inspect launch evidence, then retry the same durable handoff",
+		SafeCommand:       continueCommand(stateFile),
+		ContinueCommand:   continueCommand(stateFile),
+		RequiresHuman:     false,
+	}
+}
+
+func buildPendingChildCleanupFailureCard(
+	stateFile string,
+	pending *ChildRunRef,
+	cleanupErr error,
+) *ManagerActionCard {
+	evidence := []string{cleanupErr.Error()}
+	if pending != nil {
+		evidence = append(evidence,
+			fmt.Sprintf("pending child: %s", pending.ID),
+			fmt.Sprintf("pending pane: %s", pending.TmuxPaneID),
+		)
+	}
+	return &ManagerActionCard{
+		Kind:              ActionPendingChildCleanupFailed,
+		Severity:          "warning",
+		Summary:           "replacement child is active but old-pane cleanup is incomplete",
+		Evidence:          evidence,
+		RecommendedAction: "inspect state; the next manager operation may retry idempotent cleanup",
+		SafeCommand:       fmt.Sprintf("vamos qrspi inspect --state-file %s", stateFile),
+		RequiresHuman:     false,
+	}
+}
+
 func terminalEvidenceForActiveChildWithRefresh(
 	state ManagerState,
 ) (AssistantTerminalEvidence, bool, error) {
@@ -2456,22 +2595,22 @@ func queueOrDeliverWake(
 		}, nil
 	}
 	payload := childCompletionWakePayload(stateFile, state, status)
+	queue := func(reason string) (ManagerState, WakeDeliveryInstruction, error) {
+		state = queueManagerWake(
+			state,
+			status,
+			payload,
+			QueuedWakePasteAndSubmit,
+			"",
+		)
+		return state, WakeDeliveryInstruction{Mode: "queue", Payload: payload, Reason: reason}, nil
+	}
 	if strings.EqualFold(state.Delivery.Status, "compacting") {
-		state = queueManagerWake(state, status, payload)
-		return state, WakeDeliveryInstruction{
-			Mode:    "queue",
-			Payload: payload,
-			Reason:  "manager_compacting",
-		}, nil
+		return queue("manager_compacting")
 	}
 	paneID := managerDeliveryPane(state)
 	if paneID == "" {
-		state = queueManagerWake(state, status, payload)
-		return state, WakeDeliveryInstruction{
-			Mode:    "queue",
-			Payload: payload,
-			Reason:  "manager_pane_missing",
-		}, nil
+		return queue("manager_pane_missing")
 	}
 	if live := managerPaneLiveness(ctx, paneID, d); live.Checked && !live.Exists {
 		evidence := managerPaneEvidence(
@@ -2488,7 +2627,6 @@ func queueOrDeliverWake(
 			evidence,
 			fmt.Sprintf("selected manager pane unavailable: %s", paneID),
 		)
-		state = queueManagerWake(state, status, payload)
 		state.LastActionCard = buildManagerPaneActionCard(
 			state,
 			ManagerPaneAdoptionOptions{
@@ -2498,14 +2636,39 @@ func queueOrDeliverWake(
 			evidence,
 			ActionManagerPaneUnavailable,
 		)
+		return queue("manager_pane_unavailable")
+	}
+	tmux := tmuxClient(d)
+	pane := TmuxPane{ID: paneID}
+	if err := tmux.PasteText(ctx, pane, payload); err != nil {
+		state = queueManagerWake(
+			state,
+			status,
+			payload,
+			QueuedWakePasteAndSubmit,
+			"",
+		)
+		state = recordManagerDeliveryFailure(state, status, paneID, "paste", err)
 		return state, WakeDeliveryInstruction{
 			Mode:    "queue",
 			Payload: payload,
-			Reason:  "manager_pane_unavailable",
+			Reason:  "manager_delivery_failed",
 		}, nil
 	}
-	if err := pasteWake(ctx, d, paneID, payload); err != nil {
-		return state, WakeDeliveryInstruction{}, err
+	if err := tmux.SendKeys(ctx, pane, []string{"Enter"}); err != nil {
+		state = queueManagerWake(
+			state,
+			status,
+			payload,
+			QueuedWakeSubmitOnly,
+			paneID,
+		)
+		state = recordManagerDeliveryFailure(state, status, paneID, "submit", err)
+		return state, WakeDeliveryInstruction{
+			Mode:    "queue",
+			Payload: payload,
+			Reason:  "manager_delivery_failed",
+		}, nil
 	}
 	state.Delivery.LastDeliveryID = status.DeliveryID
 	return state, WakeDeliveryInstruction{Mode: "deliver", Payload: payload}, nil
@@ -2515,13 +2678,49 @@ func queueManagerWake(
 	state ManagerState,
 	status ChildCompletionStatus,
 	payload string,
+	delivery QueuedWakeDelivery,
+	pastedPaneID string,
 ) ManagerState {
+	childID := status.ChildID
+	generation := activeChildGeneration(state)
+	if status.ContinuationStarted && state.ActiveChild != nil &&
+		state.ActiveChild.ContinuationDeliveryID == status.DeliveryID {
+		childID = state.ActiveChild.ID
+		generation = activeChildGeneration(state)
+	}
 	state.Delivery.QueuedWake = &QueuedWake{
 		DeliveryID:      status.DeliveryID,
-		ChildID:         status.ChildID,
-		ChildGeneration: activeChildGeneration(state),
+		ChildID:         childID,
+		ChildGeneration: generation,
 		Payload:         payload,
+		Delivery:        delivery,
+		PastedPaneID:    pastedPaneID,
 		QueuedAt:        time.Now().Format(time.RFC3339),
+	}
+	return state
+}
+
+func recordManagerDeliveryFailure(
+	state ManagerState,
+	status ChildCompletionStatus,
+	paneID, phase string,
+	deliveryErr error,
+) ManagerState {
+	if status.ActionCard != nil {
+		return state
+	}
+	state.LastActionCard = &ManagerActionCard{
+		Kind:     ActionManagerDeliveryFailed,
+		Severity: "warning",
+		Summary:  "manager wake delivery is queued after a tmux write failure",
+		Evidence: []string{
+			fmt.Sprintf("delivery: %s", status.DeliveryID),
+			fmt.Sprintf("pane: %s", paneID),
+			fmt.Sprintf("phase: %s", phase),
+			deliveryErr.Error(),
+		},
+		RecommendedAction: "run manager-ready from the intended manager pane",
+		RequiresHuman:     false,
 	}
 	return state
 }
@@ -2574,33 +2773,42 @@ func childCompletionWakePayload(
 	managerNeeded := status.ManagerNeeded || status.RetryExhausted ||
 		childCompletionManagerNeeded(status.Result.Status)
 	policy := activePolicySummary(state)
-	return fmt.Sprintf(
-		"```yaml\nq_manager_child_wake:\n  validated: %t\n  manager_needed: %t\n  retry_exhausted: %t\n  stage: %q\n  status: %q\n  outcome: %q\n  artifact: %q\n  child_id: %q\n  state_file: %q\n  reason: %q\n%s  policy:\n    advance_mode: %q\n    auto_mode: %t\n    enable_plan_reviews: %t\n    invalid_result_retry_limit: %d\n    note: %q\n  summary:\n    plan_goal: %q\n    stage_completed: %q\n    key_decisions: %q\n  next_child:\n    stage: %q\n    skill: %q\n    cwd: %q\n    working_on: %q\n  next:\n    - action: run_command\n      param: %q\n```",
-		status.Validated,
-		managerNeeded,
-		status.RetryExhausted,
-		status.Result.Stage,
-		status.Result.Status,
-		status.Result.Outcome,
-		status.Result.Artifact,
-		status.ChildID,
-		stateFile,
-		status.Reason,
-		childCompletionWakeTerminalEvidencePayload(status.TerminalEvidence),
-		policy.AdvanceMode,
-		policy.AutoMode,
-		policy.EnablePlanReviews,
-		policy.InvalidResultRetryLimit,
-		"manager policy is authoritative; child-emitted policy is ignored for transitions",
-		status.Result.PlanGoal,
-		status.Result.StageCompleted,
-		status.Result.KeyDecisions,
-		status.NextChild.Stage,
-		status.NextChild.Skill,
-		status.NextChild.Cwd,
-		status.NextChild.WorkingOn,
-		continueCommand(stateFile),
-	)
+	var payload strings.Builder
+	fmt.Fprintf(&payload, "```yaml\nq_manager_child_wake:\n")
+	fmt.Fprintf(&payload, "  validated: %t\n", status.Validated)
+	fmt.Fprintf(&payload, "  manager_needed: %t\n", managerNeeded)
+	fmt.Fprintf(&payload, "  continuation_started: %t\n", status.ContinuationStarted)
+	fmt.Fprintf(&payload, "  retry_exhausted: %t\n", status.RetryExhausted)
+	fmt.Fprintf(&payload, "  stage: %q\n", status.Result.Stage)
+	fmt.Fprintf(&payload, "  status: %q\n", status.Result.Status)
+	fmt.Fprintf(&payload, "  outcome: %q\n", status.Result.Outcome)
+	fmt.Fprintf(&payload, "  artifact: %q\n", status.Result.Artifact)
+	fmt.Fprintf(&payload, "  child_id: %q\n", status.ChildID)
+	fmt.Fprintf(&payload, "  state_file: %q\n", stateFile)
+	fmt.Fprintf(&payload, "  reason: %q\n", status.Reason)
+	payload.WriteString(childCompletionWakeTerminalEvidencePayload(status.TerminalEvidence))
+	fmt.Fprintf(&payload, "  policy:\n")
+	fmt.Fprintf(&payload, "    advance_mode: %q\n", policy.AdvanceMode)
+	fmt.Fprintf(&payload, "    auto_mode: %t\n", policy.AutoMode)
+	fmt.Fprintf(&payload, "    enable_plan_reviews: %t\n", policy.EnablePlanReviews)
+	fmt.Fprintf(&payload, "    invalid_result_retry_limit: %d\n", policy.InvalidResultRetryLimit)
+	fmt.Fprintf(&payload, "    note: %q\n", "manager policy is authoritative; child-emitted policy is ignored for transitions")
+	fmt.Fprintf(&payload, "  summary:\n")
+	fmt.Fprintf(&payload, "    plan_goal: %q\n", status.Result.PlanGoal)
+	fmt.Fprintf(&payload, "    stage_completed: %q\n", status.Result.StageCompleted)
+	fmt.Fprintf(&payload, "    key_decisions: %q\n", status.Result.KeyDecisions)
+	fmt.Fprintf(&payload, "  next_child:\n")
+	fmt.Fprintf(&payload, "    stage: %q\n", status.NextChild.Stage)
+	fmt.Fprintf(&payload, "    skill: %q\n", status.NextChild.Skill)
+	fmt.Fprintf(&payload, "    cwd: %q\n", status.NextChild.Cwd)
+	fmt.Fprintf(&payload, "    working_on: %q\n", status.NextChild.WorkingOn)
+	if !status.ContinuationStarted {
+		fmt.Fprintf(&payload, "  next:\n")
+		fmt.Fprintf(&payload, "    - action: run_command\n")
+		fmt.Fprintf(&payload, "      param: %q\n", continueCommand(stateFile))
+	}
+	payload.WriteString("```")
+	return payload.String()
 }
 
 func childCompletionWakeTerminalEvidencePayload(e *AssistantTerminalEvidence) string {
@@ -2964,6 +3172,17 @@ func RunManagerReady(
 	if err != nil {
 		return err
 	}
+	if state.Delivery.QueuedWake == nil && state.PendingCleanupChild != nil {
+		var cleanupErr error
+		state, cleanupErr = cleanupPendingChildAfterNotification(ctx, state, d.Tmux)
+		if cleanupErr != nil {
+			state.LastActionCard = buildPendingChildCleanupFailureCard(
+				opts.StateFile,
+				state.PendingCleanupChild,
+				cleanupErr,
+			)
+		}
+	}
 	if err := store.Save(opts.StateFile, state); err != nil {
 		return err
 	}
@@ -2998,7 +3217,10 @@ func flushQueuedWake(
 		state.Delivery.QueuedWake = nil
 		return state, false, nil
 	}
-	if state.ActiveChild != nil {
+	matchingContinuation := state.ActiveChild != nil &&
+		state.ActiveChild.LaunchKind == ChildLaunchResumeHandoff &&
+		state.ActiveChild.ContinuationDeliveryID == queued.DeliveryID
+	if state.ActiveChild != nil && !matchingContinuation {
 		if queued.ChildGeneration != activeChildGeneration(state) ||
 			state.ActiveChild.LifecycleStatus == "running" ||
 			state.ActiveChild.LifecycleStatus == "manual_reprompt" {
@@ -3020,14 +3242,57 @@ func flushQueuedWake(
 	if paneID == "" {
 		return state, false, errors.New("manager pane is required to flush queued wake")
 	}
-	if err := pasteWake(ctx, d, paneID, queued.Payload); err != nil {
-		return state, false, err
+	tmux := tmuxClient(d)
+	delivery := queued.Delivery
+	if delivery == "" {
+		delivery = QueuedWakePasteAndSubmit
 	}
-	now := time.Now().Format(time.RFC3339)
-	queued.DeliveredAt = now
+	if delivery == QueuedWakeSubmitOnly && queued.PastedPaneID == paneID {
+		if err := tmux.SendKeys(ctx, TmuxPane{ID: paneID}, []string{"Enter"}); err != nil {
+			state = recordQueuedWakeDeliveryFailure(state, queued, paneID, "submit", err)
+			return state, false, nil
+		}
+	} else {
+		if err := tmux.PasteText(ctx, TmuxPane{ID: paneID}, queued.Payload); err != nil {
+			queued.Delivery = QueuedWakePasteAndSubmit
+			queued.PastedPaneID = ""
+			state = recordQueuedWakeDeliveryFailure(state, queued, paneID, "paste", err)
+			return state, false, nil
+		}
+		queued.Delivery = QueuedWakeSubmitOnly
+		queued.PastedPaneID = paneID
+		if err := tmux.SendKeys(ctx, TmuxPane{ID: paneID}, []string{"Enter"}); err != nil {
+			state = recordQueuedWakeDeliveryFailure(state, queued, paneID, "submit", err)
+			return state, false, nil
+		}
+	}
+	queued.DeliveredAt = time.Now().Format(time.RFC3339)
 	state.Delivery.LastDeliveryID = queued.DeliveryID
 	state.Delivery.QueuedWake = nil
 	return state, true, nil
+}
+
+func recordQueuedWakeDeliveryFailure(
+	state ManagerState,
+	queued *QueuedWake,
+	paneID, phase string,
+	deliveryErr error,
+) ManagerState {
+	state.Delivery.QueuedWake = queued
+	state.LastActionCard = &ManagerActionCard{
+		Kind:     ActionManagerDeliveryFailed,
+		Severity: "warning",
+		Summary:  "queued manager wake delivery remains retryable",
+		Evidence: []string{
+			fmt.Sprintf("delivery: %s", queued.DeliveryID),
+			fmt.Sprintf("pane: %s", paneID),
+			fmt.Sprintf("phase: %s", phase),
+			deliveryErr.Error(),
+		},
+		RecommendedAction: "retry manager-ready from the intended manager pane",
+		RequiresHuman:     false,
+	}
+	return state
 }
 
 func supersedeQueuedWakeForActiveChild(
@@ -3686,6 +3951,26 @@ func RunContinue(ctx context.Context, opts ContinueOptions, d deps, out io.Write
 			)
 		}
 		if err != nil {
+			if launchIntent != nil && state.ActiveChild != nil {
+				durable := nextState
+				if loaded, loadErr := store.Load(opts.StateFile); loadErr == nil {
+					durable = loaded
+				}
+				card := buildHandoffContinuationFailureCard(
+					opts.StateFile,
+					*state.ActiveChild,
+					parsed.Result,
+					err,
+				)
+				if durable.ActiveChild != nil && durable.ActiveChild.ID == state.ActiveChild.ID {
+					durable.ActiveChild.LifecycleStatus = "awaiting_manager"
+				}
+				durable.LastActionCard = card
+				if saveErr := store.Save(opts.StateFile, durable); saveErr != nil {
+					return saveErr
+				}
+				return writeManagerActionCard(out, *card, opts.Output)
+			}
 			return err
 		}
 		launched, _, err = maybeStartManagerCompaction(
@@ -4739,6 +5024,14 @@ func cleanupPendingChildAfterNextStart(
 	state ManagerState,
 	tmux TmuxClient,
 ) (ManagerState, error) {
+	return cleanupPendingChildAfterNotification(ctx, state, tmux)
+}
+
+func cleanupPendingChildAfterNotification(
+	ctx context.Context,
+	state ManagerState,
+	tmux TmuxClient,
+) (ManagerState, error) {
 	ref := state.PendingCleanupChild
 	if ref == nil {
 		return state, nil
@@ -4750,7 +5043,16 @@ func cleanupPendingChildAfterNextStart(
 	if tmux == nil {
 		tmux = ShellTmuxClient{}
 	}
-	if err := tmux.KillPane(ctx, TmuxPane{ID: ref.TmuxPaneID}); err != nil {
+	pane := TmuxPane{ID: ref.TmuxPaneID}
+	exists, err := tmux.PaneExists(ctx, pane)
+	if err != nil {
+		return state, err
+	}
+	if !exists {
+		state.PendingCleanupChild = nil
+		return state, nil
+	}
+	if err := tmux.KillPane(ctx, pane); err != nil {
 		return state, err
 	}
 	if state.ActiveChild != nil && strings.TrimSpace(state.ActiveChild.TmuxPaneID) != "" {

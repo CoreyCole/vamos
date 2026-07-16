@@ -2,6 +2,7 @@ package qrspicmd
 
 import (
 	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -434,11 +435,15 @@ func TestChildCompleteHandoffLaunchesFreshSameStageResumeChild(t *testing.T) {
 		loaded.ActiveChild.LaunchKind != ChildLaunchResumeHandoff ||
 		loaded.ActiveChild.ContinuationOf != "source-child" ||
 		loaded.ActiveChild.ContinuationDeliveryID != status.DeliveryID ||
-		loaded.PendingCleanupChild == nil || loaded.PendingCleanupChild.ID != "source-child" {
+		loaded.PendingCleanupChild != nil {
 		t.Fatalf("loaded state = %+v", loaded)
 	}
-	if len(tmux.kills) != 0 {
-		t.Fatalf("old pane killed before deferred notification cleanup: %#v", tmux.kills)
+	if len(tmux.kills) != 1 || tmux.kills[0].ID != "%old" {
+		t.Fatalf("old pane cleanup = %#v, want one post-notification kill", tmux.kills)
+	}
+	if !strings.Contains(status.Wake.Payload, "continuation_started: true") ||
+		strings.Contains(status.Wake.Payload, "action: run_command") {
+		t.Fatalf("informational wake = %q", status.Wake.Payload)
 	}
 	var disk ChildCompletionStatus
 	data, err := os.ReadFile(validationPath)
@@ -464,6 +469,58 @@ func TestChildCompleteHandoffLaunchesFreshSameStageResumeChild(t *testing.T) {
 	if !duplicate.ContinuationStarted || duplicate.DeliveryID != status.DeliveryID ||
 		duplicate.Wake.Mode != "suppress" || len(runner.started) != 1 {
 		t.Fatalf("duplicate status = %+v; starts = %d", duplicate, len(runner.started))
+	}
+}
+
+func TestChildCompleteHandoffLaunchFailureKeepsSourceAndEmitsCard(t *testing.T) {
+	dir := t.TempDir()
+	repo := filepath.Join(dir, "repo")
+	plan := filepath.Join(repo, "thoughts", "example")
+	writeHandoffFile(t, filepath.Join(plan, "handoffs", "research.md"), "research", "in_progress")
+	stateFile := filepath.Join(dir, "state.json")
+	sessionDir := filepath.Join(dir, "sessions")
+	sessionPath := writePiSession(
+		t,
+		sessionDir,
+		"session.jsonl",
+		"session-1",
+		repo,
+		assistantLine(testResultYAML(
+			"research",
+			"handoff",
+			"",
+			"thoughts/example/handoffs/research.md",
+			"",
+		)),
+	)
+	saveManagerState(t, stateFile, ManagerState{
+		RepoID: repo, CanonicalPlanDir: plan, SourceCwd: repo, ManagerPaneID: "%parent",
+		Workflow: testWorkflowState(t, qrspi.NodeResearch, nil),
+		ActiveChild: &ChildRunRef{
+			ID: "source", Stage: "research", Cwd: repo, TmuxPaneID: "%old",
+			SessionID: "session-1", SessionDir: sessionDir, SessionPath: sessionPath,
+			ValidationStatusPath: filepath.Join(dir, "validation.json"), Generation: 1,
+		},
+	})
+	runner := &fakeChildRunner{startErr: errors.New("split failed")}
+	status, err := RunChildComplete(
+		t.Context(),
+		ChildCompletionOptions{StateFile: stateFile, ChildID: "source"},
+		deps{Runner: runner, Tmux: &recordingTmux{}},
+		&strings.Builder{},
+	)
+	if err != nil {
+		t.Fatalf("RunChildComplete error = %v", err)
+	}
+	if !status.Validated || !status.ManagerNeeded || status.ContinuationStarted ||
+		status.ActionCard == nil || status.ActionCard.Kind != ActionHandoffContinuationFailed {
+		t.Fatalf("status = %+v", status)
+	}
+	loaded := loadManagerState(t, stateFile)
+	if loaded.ActiveChild == nil || loaded.ActiveChild.ID != "source" ||
+		loaded.ActiveChild.LifecycleStatus != "awaiting_manager" ||
+		loaded.PendingCleanupChild == nil || loaded.PendingCleanupChild.ID != "source" {
+		t.Fatalf("loaded = %+v", loaded)
 	}
 }
 

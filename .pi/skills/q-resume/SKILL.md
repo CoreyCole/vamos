@@ -147,14 +147,25 @@ The handoff will be at:
 
 Read `.pi/skills/qrspi-planning/SKILL.md` (pipeline overview), then load artifacts based on the stage you're resuming:
 
-| Stage | Load these artifacts |
+| Exact graph node | Read focused skill, then load these artifacts |
 |-------|---------------------|
-| question | `[plan_dir]/AGENTS.md`, existing `questions/*.md`, relevant `context/question/*.md`, `research/*.md`, `design.md`, optional `design-product.md`, `outline.md`, `prds/*` as relevant |
-| research | relevant `questions/*.md`, relevant `context/research/*.md` |
-| design | `[plan_dir]/AGENTS.md`, `questions/*.md`, `research/*.md`, `adrs/*.md`, `prds/*`, relevant `context/research/*.md`, `context/design/*.md` |
-| outline | `[plan_dir]/AGENTS.md`, `questions/*.md`, `design.md`, optional `design-product.md`, `research/*.md`, `prds/*`, relevant `context/research/*.md`, `context/design/*.md`, `context/design-product/*.md`, `context/outline/*.md` |
-| plan | `[plan_dir]/AGENTS.md`, `questions/*.md`, `design.md`, optional `design-product.md`, `outline.md`, `research/*.md`, `prds/*`, relevant `context/research/*.md`, `context/design/*.md`, `context/design-product/*.md`, `context/outline/*.md`, `context/plan/*.md` |
-| implement | `.pi/skills/q-implement/SKILL.md`, `[plan_dir]/AGENTS.md`, `questions/*.md`, `design.md`, optional `design-product.md`, `outline.md`, `plan.md`, `research/*.md`, `prds/*`, relevant `context/design-product/*.md`, `context/plan/*.md`, latest relevant `context/implement/*.md` |
+| `question` | `q-question`; `[plan_dir]/AGENTS.md`, existing `questions/*.md`, relevant `context/question/*.md`, `prds/*` |
+| `research` | `q-research`; relevant `questions/*.md`, `context/research/*.md` |
+| `design` | `q-design`; `AGENTS.md`, `questions/*.md`, `research/*.md`, `adrs/*.md`, `prds/*`, relevant `context/{research,design}/*.md` |
+| `outline` | `q-outline`; `AGENTS.md`, `design.md`, optional `design-product.md`, `research/*.md`, `prds/*`, relevant `context/{design,design-product,outline}/*.md` |
+| `review-outline` | `q-review`; `AGENTS.md`, `design.md`, optional `design-product.md`, `outline.md`, the active outline review directory and relevant review context |
+| `research-for-review-outline` | `q-research-for-review`; active outline-review `review.md`, `questions/*.md`, and relevant review `context/research/*.md` |
+| `address-review-research-outline` | `q-address-review-research`; parent `design.md`, optional `design-product.md`, `outline.md`, active review `review.md`, questions, and follow-up research |
+| `plan` | `q-plan`; `AGENTS.md`, `design.md`, optional `design-product.md`, `outline.md`, `research/*.md`, `prds/*`, relevant `context/{outline,plan}/*.md` |
+| `review-plan` | `q-review`; `AGENTS.md`, `design.md`, optional `design-product.md`, `outline.md`, `plan.md`, the active plan review directory and relevant review context |
+| `research-for-review-plan` | `q-research-for-review`; active plan-review `review.md`, `questions/*.md`, and relevant review `context/research/*.md` |
+| `address-review-research-plan` | `q-address-review-research`; parent `design.md`, optional `design-product.md`, `outline.md`, `plan.md`, active review `review.md`, questions, and follow-up research |
+| `workspace` | `q-workspace`; reviewed `plan.md`, latest plan review, workspace metadata, and plan `AGENTS.md` |
+| `implement` | `q-implement`; `AGENTS.md`, `design.md`, optional `design-product.md`, `outline.md`, `plan.md`, relevant research/PRDs and latest `context/implement/*.md` |
+| `review-implementation` | `q-review`; `AGENTS.md`, design/outline/plan, final implementation handoff, active implementation review directory, and implementation workspace metadata |
+| `verify` | `q-verify`; implementation handoff, canonical implementation `review.md`, project verification guide, and implementation workspace metadata |
+
+Do not collapse exact review/helper IDs to generic `review`, and never emit synthetic stage `resume`. Implement, implementation-review, and verify resumes stay in the original implementation workspace.
 
 ### 3. Continue working
 

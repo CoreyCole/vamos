@@ -28,28 +28,30 @@ Child QRSPI work runs in a visible tmux pane, usually a right split. Humans must
 
 q-manager child sessions load a local Pi extension plus CLI validation loop. A normal parent wake is a validated manager-needed event, not raw `agent_end`. The extension invokes Go `qrspi child-complete`; Go reads the child session JSONL, validates/normalizes the result, generates `validation-status.json`, and delivers/queues the wake. The extension may still write child `status.json` and touch `done` as diagnostics, but those files are not authoritative manager triggers.
 
-Wake YAML includes validation state and resolved child result context:
+Wake YAML includes validation state and resolved child result context. Normal results include a continue action. A successful handoff continuation is informational instead:
 
 ```yaml
 q_manager_child_wake:
   validated: true
-  manager_needed: true
+  manager_needed: false
+  continuation_started: true
   retry_exhausted: false
-  stage: "<node>"
-  status: "<status>"
-  outcome: "<outcome>"
-  artifact: "thoughts/..."
+  stage: "research"
+  status: "handoff"
+  artifact: "thoughts/.../handoffs/research-handoff.md"
   state_file: "<state-file>"
-  reason: "validated graph result"
-  next:
-    steps:
-      - action: "run_command"
-        param: "vamos qrspi continue --state-file <state-file>"
+  reason: "handoff_auto_resumed"
+  next_child:
+    stage: "research"
+    skill: ".pi/skills/q-resume/SKILL.md"
+    cwd: "<source-or-implementation-cwd>"
 ```
+
+There is no continue action when `continuation_started=true`; the replacement child is already durable. Graph decision and manager policy authorize this path, never child `next.steps`.
 
 Intermediate invalid/missing `qrspi_result` turns, parser retries, and Codex/SSE header noise are suppressed from manager chat while deterministic repair remains possible. Retry exhaustion emits one manager-needed wake with `validated=false`, `retry_exhausted=true`, attempt/limit context, child refs, and deterministic-recovery-first guidance. Do not hand-author `validation-status.json`; it is generated runtime state for child-side logging and manager wake gating.
 
-The manager normally runs `/q-manager continue`, which samples live parent Pi context usage, then delegates to CLI `continue`. The CLI validates the active child session JSONL, reprompts the same child when retry remains, persists the canonical graph decision for valid results, starts the graph-selected next child when safe, and cleans the old pane only after the next child exists. Slight positive wording mistakes are normalized only when deterministic from node/status/workspace context, such as `review-outline` + `status: complete` + `outcome: complete` becoming `ready-for-plan`; ambiguous, negative, human, blocked, or follow-up outcomes still reprompt or stop. The parent Pi `/q-manager start-next|continue` wrapper samples `ctx.getContextUsage()` and passes explicit `--manager-usage-*` flags to the Go CLI; the CLI does not scan parent Pi JSONL for usage. Raw CLI usage flags remain a debug/manual seam. When fresh parent usage is `>=90%`, q-manager writes an operational handoff, saves `Delivery.Status=compacting`, emits `q-manager-parent-compact: started`, and only then the parent wrapper calls native `ctx.compact()`. Child wakes during parent compaction queue until the fresh manager runs `manager-ready` once.
+For non-auto-resumed wakes, the manager normally runs `/q-manager continue`, which samples live parent Pi context usage, then delegates to CLI `continue`. For a graph-authorized handoff in guided/autopilot, `child-complete` instead persists the same-node decision, validates the exact in-plan handoff, starts a fresh q-resume child, saves replacement lineage, writes source validation status, delivers or queues the informational wake, and only then cleans the old pane. Discuss mode validates but does not launch. The CLI otherwise validates the active child session JSONL, reprompts the same child when retry remains, persists canonical graph decisions, starts graph-selected children when safe, and cleans old panes only after replacement durability. Slight positive wording mistakes are normalized only when deterministic from node/status/workspace context, such as `review-outline` + `status: complete` + `outcome: complete` becoming `ready-for-plan`; ambiguous, negative, human, blocked, or follow-up outcomes still reprompt or stop. The parent Pi `/q-manager start-next|continue` wrapper samples `ctx.getContextUsage()` and passes explicit `--manager-usage-*` flags to the Go CLI; the CLI does not scan parent Pi JSONL for usage. Raw CLI usage flags remain a debug/manual seam. When fresh parent usage is `>=90%`, q-manager writes an operational handoff, saves `Delivery.Status=compacting`, emits `q-manager-parent-compact: started`, and only then the parent wrapper calls native `ctx.compact()`. Child wakes during parent compaction queue until the fresh manager runs `manager-ready` once.
 
 Default `continue` output is concise text for manager chat, not the raw validate/decide NDJSON dump:
 
@@ -73,7 +75,7 @@ stop: result blocked
 next: diagnose artifact/session; steer or continue if deterministic before asking human
 ```
 
-Human gates and repairable failures are surfaced as structured manager action cards. Cards include `kind`, evidence, recommended action, safe command, optional continue command, and for human gates a concise review summary to present to the human. `pi_compatibility_failed` means Pi/tmux/state preflight failed before launch state should be trusted; run `vamos qrspi doctor --state-file <state>` or the card's safe command. `child_launch_failed` means active-child diagnostics prove a terminal child process failure before a durable `qrspi_result`; run the card's `repair-state --clear-failed-child --relaunch` safe command only when evidence is deterministic. `child_context_exhausted` means the child ended with context-limit/no-result evidence; preserve refs, inspect latest session, compact/resume the same child only when the evidence is real, or relaunch the same graph node after salvage is impossible. `provider_context_error` is the deterministic child-context variant where the latest Pi JSONL terminal assistant message has `stopReason: "error"` plus a provider context-window `errorMessage`; latest terminal session evidence outranks older `validation-status.json` and older valid `qrspi_result` text in the same session. The action card and wake include session path/id, line/timestamp, evidence ID, provider error, inspect command, latest-session continue command, and optional `recover-summary` command; these are recovery refs only and never a fabricated `qrspi_result`. Human gates should be summarized to the human, then sent back to the same child with `vamos qrspi steer-child --state-file <state> --feedback-file <answer.md>`. Blocked/error states should be diagnosed first; ask the human only when intent, product/safety judgment, workspace replacement, merge policy, or external authority is truly required.
+Human gates and repairable failures are surfaced as structured manager action cards. Handoff-specific kinds include `invalid_handoff_artifact`, `handoff_continuation_failed`, `manager_delivery_failed`, and `pending_child_cleanup_failed`. Cards include `kind`, evidence, recommended action, safe command, optional continue command, and for human gates a concise review summary to present to the human. `pi_compatibility_failed` means Pi/tmux/state preflight failed before launch state should be trusted; run `vamos qrspi doctor --state-file <state>` or the card's safe command. `child_launch_failed` means active-child diagnostics prove a terminal child process failure before a durable `qrspi_result`; run the card's `repair-state --clear-failed-child --relaunch` safe command only when evidence is deterministic. `child_context_exhausted` means the child ended with context-limit/no-result evidence; preserve refs, inspect latest session, compact/resume the same child only when the evidence is real, or relaunch the same graph node after salvage is impossible. `provider_context_error` is the deterministic child-context variant where the latest Pi JSONL terminal assistant message has `stopReason: "error"` plus a provider context-window `errorMessage`; latest terminal session evidence outranks older `validation-status.json` and older valid `qrspi_result` text in the same session. The action card and wake include session path/id, line/timestamp, evidence ID, provider error, inspect command, latest-session continue command, and optional `recover-summary` command; these are recovery refs only and never a fabricated `qrspi_result`. Human gates should be summarized to the human, then sent back to the same child with `vamos qrspi steer-child --state-file <state> --feedback-file <answer.md>`. Blocked/error states should be diagnosed first; ask the human only when intent, product/safety judgment, workspace replacement, merge policy, or external authority is truly required.
 
 Self-heal commands are deterministic control-plane repairs, not durable artifact truth:
 
@@ -109,7 +111,11 @@ Reload from this manifest, `.pi/skills/q-manager/SKILL.md`, `.pi/skills/qrspi-pl
 - Invalid result: reprompt the same child pane/session while retry budget remains; do not create a replacement child and do not wake the manager.
 - Retry exhaustion: wake once with `validated=false`, `manager_needed=true`, `retry_exhausted=true`, failure reason, attempts, child refs, and deterministic-recovery-first guidance.
 - Human gate, blocked, error, or retry exhaustion: keep the child pane and session refs for inspection and recovery.
-- Valid transition with `startNext=true`: mark the old child pending cleanup, launch the next graph-selected child, save the new active child, then kill the old pane.
+- Normal valid transition with `startNext=true`: mark the old child pending cleanup, launch the next graph-selected child, save the new active child, then kill the old pane.
+- Valid agent-node handoff in guided/autopilot: require exact-node `status: in_progress` frontmatter under the mapped plan `handoffs/`; reject file or directory symlink escapes; start a fresh same-node q-resume child before informational wake and old-pane cleanup. Discuss waits.
+- Duplicate source callbacks reuse replacement lineage. Launch failure retains source refs and emits `handoff_continuation_failed` rather than false success.
+- Direct wake delivery is two-phase: paste failure queues paste+submit; Enter failure queues submit-only for that pane. Pane adoption re-pastes once. A matching running replacement does not stale its queued informational wake.
+- Old-pane cleanup is idempotent. Missing pane succeeds; kill/layout partial failure retains pending cleanup so a later manager operation converges without harming the replacement.
 - Recoverable stale manager state/result mismatch: emit a structured action card, normalize state with `repair-state --align-active-child` when evidence is deterministic, append a local validation-recovery log, and continue instead of blocking the manager.
 - Pi compatibility/preflight failure: stop before creating/trusting active-child state, emit `pi_compatibility_failed`, and use `doctor` evidence/safe command before retrying launch.
 - Terminal child launch failure: emit `child_launch_failed` with pane/status/exit/output-tail/full-output evidence; use `repair-state --clear-failed-child --relaunch` or `start-next --force` only when health classification proves terminal failure and no durable `qrspi_result` exists.
@@ -126,7 +132,7 @@ Reload from this manifest, `.pi/skills/q-manager/SKILL.md`, `.pi/skills/qrspi-pl
    Normal parent Pi path samples live usage with `ctx.getContextUsage()` and triggers native parent compaction only after the CLI saves queue-safe `compacting` state. Debug/manual fallback is the raw CLI with explicit usage flags, for example `vamos qrspi start-next --plan-dir <plan> --project-root "$PWD" --manager-pane "$TMUX_PANE" --manager-usage-percent 90`; missing usage skips compaction and q-manager does not guess.
 1. Confirm the child pane is visible and launch refs include `--session-id`, `--session-dir`, and `--extension`; `--session-dir` should point at the plan workspace `.sessions/pi/` directory.
 1. Confirm no parent wake appears for invalid/missing result turns while retry remains, including header-like SSE noise.
-1. When the child reaches a valid graph result or retry exhaustion, confirm the parent pane receives one buffered wake prompt with validation fields and `param: "vamos qrspi continue --state-file <state>"`. In normal parent Pi use, run `/q-manager continue --state-file <state>` so usage is sampled again; raw `vamos qrspi continue --state-file <state>` is the debug/manual equivalent. If the manager was compacting, confirm no immediate paste occurs until `vamos qrspi manager-ready --state-file <state> --manager-pane "$TMUX_PANE"` flushes exactly one current-generation queued wake.
+1. When the child reaches a normal valid graph result or retry exhaustion, confirm the parent pane receives one buffered wake with the continue command. For a valid guided handoff, confirm a fresh same-node q-resume child appears first and the informational wake says `continuation_started: true` with no continue action. If compacting, `manager-ready` must flush the matching replacement wake even while that child is running.
 1. If the original parent pane was replaced or is unavailable, run the raw CLI recovery command from the intended new parent tmux pane: `vamos qrspi continue --state-file <state> --manager-pane "$TMUX_PANE"`. If `continue` or `start-next --state-file` reports `manager_pane_adoption_required`, the stored parent pane is still live and differs from current `$TMUX_PANE`; rerun the safe command printed in the action card only from the intended parent pane.
 1. If child completion queued a wake because the selected manager pane was unavailable, run `vamos qrspi manager-ready --state-file <state> --manager-pane "$TMUX_PANE"`, then follow the flushed wake or run `vamos qrspi continue --state-file <state>` from that parent pane.
 1. Parent Pi `/q-manager` wrapper remains the preferred live path because it samples `ctx.getContextUsage()` for native compaction. Plain `vamos qrspi continue/start-next --manager-pane "$TMUX_PANE"` is the recovery/debug path and safely adopts parent pane ownership when the stored pane is stale or explicit operator intent is supplied.

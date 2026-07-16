@@ -316,6 +316,32 @@ func TestWakeDrivenManagerLoopCleansOldPaneAfterNextLaunch(t *testing.T) {
 	}
 }
 
+func TestPendingCleanupConvergesAfterLayoutFailure(t *testing.T) {
+	state := ManagerState{
+		ActiveChild:         &ChildRunRef{ID: "new", TmuxPaneID: "%new"},
+		PendingCleanupChild: &ChildRunRef{ID: "old", TmuxPaneID: "%old"},
+	}
+	tmux := &recordingTmux{layoutErr: errors.New("layout failed")}
+	first, err := cleanupPendingChildAfterNotification(t.Context(), state, tmux)
+	if err == nil || first.PendingCleanupChild == nil || len(tmux.kills) != 1 {
+		t.Fatalf("first cleanup state=%+v err=%v kills=%#v", first, err, tmux.kills)
+	}
+	tmux.layoutErr = nil
+	second, err := cleanupPendingChildAfterNotification(t.Context(), first, tmux)
+	if err != nil || second.PendingCleanupChild != nil || len(tmux.kills) != 1 {
+		t.Fatalf("retry state=%+v err=%v kills=%#v", second, err, tmux.kills)
+	}
+}
+
+func TestPendingCleanupTreatsMissingPaneAsSuccess(t *testing.T) {
+	state := ManagerState{PendingCleanupChild: &ChildRunRef{ID: "old", TmuxPaneID: "%old"}}
+	tmux := &recordingTmux{missingPanes: map[string]bool{"%old": true}}
+	cleaned, err := cleanupPendingChildAfterNotification(t.Context(), state, tmux)
+	if err != nil || cleaned.PendingCleanupChild != nil || len(tmux.kills) != 0 {
+		t.Fatalf("state=%+v err=%v kills=%#v", cleaned, err, tmux.kills)
+	}
+}
+
 func TestContinueValidResultStartsNextChildAndCleansOldPane(t *testing.T) {
 	fixture := newManagerFlowFixture(t)
 	runner := &fakeChildRunner{panes: []string{"%old", "%new"}}

@@ -1,6 +1,7 @@
 package qrspicmd
 
 import (
+	"errors"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -334,6 +335,119 @@ func TestManagerReadyCurrentPaneAdoptsCompactingLiveDeliveryAndFlushes(t *testin
 	}
 	if len(tmux.pastes) != 1 || tmux.pastes[0].pane.ID != "%new" {
 		t.Fatalf("pastes = %#v", tmux.pastes)
+	}
+}
+
+func TestDeliveryFailureQueuesPhaseAndManagerReadyDoesNotDuplicatePaste(t *testing.T) {
+	stateFile := filepath.Join(t.TempDir(), "state.json")
+	state := ManagerState{
+		ManagerPaneID: "%parent",
+		ActiveChild: &ChildRunRef{
+			ID:                     "replacement",
+			Generation:             1,
+			LifecycleStatus:        "running",
+			LaunchKind:             ChildLaunchResumeHandoff,
+			ContinuationDeliveryID: "wake-1",
+		},
+	}
+	status := ChildCompletionStatus{
+		Validated:           true,
+		ContinuationStarted: true,
+		ChildID:             "source",
+		DeliveryID:          "wake-1",
+		Reason:              "handoff_auto_resumed",
+		Result: ChildCompletionResult{
+			Stage:    "research",
+			Status:   "handoff",
+			Artifact: "thoughts/example/handoffs/research.md",
+		},
+		NextChild: NextChildInfo{Stage: "research", Skill: ".pi/skills/q-resume/SKILL.md"},
+	}
+	tmux := &recordingTmux{sendErr: errors.New("submit failed")}
+	queued, wake, err := queueOrDeliverWake(
+		t.Context(),
+		stateFile,
+		state,
+		status,
+		deps{Tmux: tmux},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if wake.Mode != "queue" || wake.Reason != "manager_delivery_failed" ||
+		queued.Delivery.QueuedWake == nil ||
+		queued.Delivery.QueuedWake.Delivery != QueuedWakeSubmitOnly ||
+		queued.Delivery.QueuedWake.PastedPaneID != "%parent" ||
+		len(tmux.pastes) != 1 || len(tmux.keys) != 1 {
+		t.Fatalf("wake=%+v queued=%+v pastes=%d keys=%d", wake, queued.Delivery.QueuedWake, len(tmux.pastes), len(tmux.keys))
+	}
+	if strings.Contains(queued.Delivery.QueuedWake.Payload, "action: run_command") {
+		t.Fatalf("continuation wake contains continue action: %s", queued.Delivery.QueuedWake.Payload)
+	}
+	saveManagerState(t, stateFile, queued)
+	tmux.sendErr = nil
+	if err := RunManagerReady(
+		t.Context(),
+		ManagerReadyOptions{StateFile: stateFile, ManagerPane: "%parent"},
+		deps{Tmux: tmux},
+		&strings.Builder{},
+	); err != nil {
+		t.Fatal(err)
+	}
+	loaded := loadManagerState(t, stateFile)
+	if loaded.Delivery.QueuedWake != nil || loaded.Delivery.LastDeliveryID != "wake-1" ||
+		len(tmux.pastes) != 1 || len(tmux.keys) != 2 {
+		t.Fatalf("loaded=%+v pastes=%d keys=%d", loaded.Delivery, len(tmux.pastes), len(tmux.keys))
+	}
+}
+
+func TestManagerReadyAdoptsPaneAndRepastesSubmitOnlyWake(t *testing.T) {
+	stateFile := filepath.Join(t.TempDir(), "state.json")
+	saveManagerState(t, stateFile, ManagerState{
+		Delivery: ManagerDeliveryState{QueuedWake: &QueuedWake{
+			DeliveryID: "wake-1", ChildID: "replacement", ChildGeneration: 1,
+			Payload: "wake", Delivery: QueuedWakeSubmitOnly, PastedPaneID: "%old",
+		}},
+		ActiveChild: &ChildRunRef{
+			ID: "replacement", Generation: 1, LifecycleStatus: "running",
+			LaunchKind: ChildLaunchResumeHandoff, ContinuationDeliveryID: "wake-1",
+		},
+	})
+	tmux := &recordingTmux{}
+	if err := RunManagerReady(
+		t.Context(),
+		ManagerReadyOptions{StateFile: stateFile, ManagerPane: "%new"},
+		deps{Tmux: tmux},
+		&strings.Builder{},
+	); err != nil {
+		t.Fatal(err)
+	}
+	if len(tmux.pastes) != 1 || tmux.pastes[0].pane.ID != "%new" ||
+		len(tmux.keys) != 1 || tmux.keys[0].pane.ID != "%new" {
+		t.Fatalf("pastes=%#v keys=%#v", tmux.pastes, tmux.keys)
+	}
+}
+
+func TestDeliveryPasteFailureRetriesPasteAndSubmit(t *testing.T) {
+	stateFile := filepath.Join(t.TempDir(), "state.json")
+	state := ManagerState{ManagerPaneID: "%parent", ActiveChild: &ChildRunRef{ID: "child", Generation: 1, LifecycleStatus: "completed"}}
+	status := ChildCompletionStatus{ChildID: "child", DeliveryID: "wake-1", Result: ChildCompletionResult{Stage: "plan", Status: "complete"}}
+	tmux := &recordingTmux{pasteErr: errors.New("paste failed")}
+	queued, wake, err := queueOrDeliverWake(t.Context(), stateFile, state, status, deps{Tmux: tmux})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if wake.Mode != "queue" || queued.Delivery.QueuedWake == nil ||
+		queued.Delivery.QueuedWake.Delivery != QueuedWakePasteAndSubmit || len(tmux.keys) != 0 {
+		t.Fatalf("wake=%+v queued=%+v keys=%d", wake, queued.Delivery.QueuedWake, len(tmux.keys))
+	}
+	saveManagerState(t, stateFile, queued)
+	tmux.pasteErr = nil
+	if err := RunManagerReady(t.Context(), ManagerReadyOptions{StateFile: stateFile, ManagerPane: "%parent"}, deps{Tmux: tmux}, &strings.Builder{}); err != nil {
+		t.Fatal(err)
+	}
+	if len(tmux.pastes) != 2 || len(tmux.keys) != 1 {
+		t.Fatalf("pastes=%d keys=%d", len(tmux.pastes), len(tmux.keys))
 	}
 }
 

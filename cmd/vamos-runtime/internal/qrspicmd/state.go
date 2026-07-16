@@ -29,13 +29,22 @@ type ManagerDeliveryState struct {
 	LastDeliveryID string      `json:"lastDeliveryId,omitempty"`
 }
 
+type QueuedWakeDelivery string
+
+const (
+	QueuedWakePasteAndSubmit QueuedWakeDelivery = "paste_and_submit"
+	QueuedWakeSubmitOnly     QueuedWakeDelivery = "submit_only"
+)
+
 type QueuedWake struct {
-	DeliveryID      string `json:"deliveryId"`
-	ChildID         string `json:"childId"`
-	ChildGeneration int    `json:"childGeneration"`
-	Payload         string `json:"payload"`
-	QueuedAt        string `json:"queuedAt"`
-	DeliveredAt     string `json:"deliveredAt,omitempty"`
+	DeliveryID      string             `json:"deliveryId"`
+	ChildID         string             `json:"childId"`
+	ChildGeneration int                `json:"childGeneration"`
+	Payload         string             `json:"payload"`
+	Delivery        QueuedWakeDelivery `json:"delivery,omitempty"`
+	PastedPaneID    string             `json:"pastedPaneId,omitempty"`
+	QueuedAt        string             `json:"queuedAt"`
+	DeliveredAt     string             `json:"deliveredAt,omitempty"`
 }
 
 type ChildRunRef struct {

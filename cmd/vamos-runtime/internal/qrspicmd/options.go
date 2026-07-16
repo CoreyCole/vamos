@@ -332,8 +332,10 @@ const (
 	ActionChildContextExhausted       = "child_context_exhausted"
 	ActionManagerPaneAdoptionRequired = "manager_pane_adoption_required"
 	ActionManagerPaneUnavailable      = "manager_pane_unavailable"
+	ActionManagerDeliveryFailed       = "manager_delivery_failed"
 	ActionInvalidHandoffArtifact      = "invalid_handoff_artifact"
 	ActionHandoffContinuationFailed   = "handoff_continuation_failed"
+	ActionPendingChildCleanupFailed   = "pending_child_cleanup_failed"
 )
 
 func ProjectManagerActionCard(

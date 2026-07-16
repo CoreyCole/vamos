@@ -73,20 +73,29 @@ You are creating a handoff document to preserve your working context within a QR
 - **`continue`** — mark the current stage as `complete` and move to the next stage.
 - **manager operational handoff** — not a normal pipeline stage handoff. Use q-manager's handoff flow: write a manager-control markdown handoff first, then emit `qrspi_result.status: handoff` pointing at it.
 
-## Stage order
+## Resumable graph nodes
 
-| # | Stage | Skill | Produces |
-|---|-------|-------|----------|
-| 1 | question | `/q-question` | `questions/*.md` |
-| 2 | research | `/q-research` | `research/*.md` |
-| 3 | design | `/q-design` | `design.md` |
-| 4 | outline | `/q-outline` | `outline.md` |
-| 5 | plan | `/q-plan` | `plan.md` |
-| 6 | implement | `/q-implement` | code changes |
-| 7 | review-implementation | `/q-review` | `reviews/.../review.md` |
-| 8 | verify | `/q-verify` | `verify.md` |
+In-progress handoffs use the exact active graph node ID:
 
-`review` is the post-implementation handoff target, not a core planning stage. Only when `implement` is fully complete should `continue` create a review-ready handoff and point to `/q-review`. Intermediate implementation checkpoints must stay on `/q-resume`. `/q-review` writes the canonical review artifact to `[plan_dir]/reviews/`; clean review routes to `/q-verify` before the final human implementation gate.
+| Node | Resume skill/context owner |
+|---|---|
+| `question` | `/q-question` |
+| `research` | `/q-research` |
+| `design` | `/q-design` |
+| `outline` | `/q-outline` |
+| `review-outline` | `/q-review` |
+| `research-for-review-outline` | `/q-research-for-review` |
+| `address-review-research-outline` | `/q-address-review-research` |
+| `plan` | `/q-plan` |
+| `review-plan` | `/q-review` |
+| `research-for-review-plan` | `/q-research-for-review` |
+| `address-review-research-plan` | `/q-address-review-research` |
+| `workspace` | `/q-workspace` |
+| `implement` | `/q-implement` |
+| `review-implementation` | `/q-review` |
+| `verify` | `/q-verify` |
+
+Human-review and done nodes are not resumable agent checkpoints. `review` is not a graph node ID. Only when `implement` is fully complete should `continue` create a review-ready handoff and point to `/q-review`. Intermediate implementation checkpoints stay on `/q-resume`. `/q-review` writes the canonical review artifact to `[plan_dir]/reviews/`; clean review routes to `/q-verify` before the final human implementation gate.
 
 Manager operational handoffs are a special control-plane case. Prefer the q-manager skill's Manager session handoff flow for them. If `/q-handoff` is used to help create one, write a markdown artifact under `[plan_dir]/handoffs/` that clearly labels local/ephemeral manager refs (`stateFile`, pane IDs, session dirs), then emit a fenced `qrspi_result` with `status: handoff`, no `outcome`, `artifact` pointing to that manager handoff, and `next.steps` that read q-manager, read the handoff, and start `q-manager continue`. Do not put local manager refs as structured fields in `qrspi_result` YAML.
 
@@ -148,9 +157,10 @@ If unknown, ask the user.
 - `continue`: set `status: complete`, compute `next_stage`
   - For `question` through `plan`, point the user to `/q-resume` so the next QRSPI stage can begin immediately. The next session must read `qrspi-planning`, read the next stage skill from the resumed graph state, and start that stage; do not say “ready to proceed.”
   - For `implement`, use this only when all implementation slices are complete; then set `next_stage: review` and point the user directly to `/q-review`, which should start immediately.
-- checkpoint: set handoff document frontmatter `status: in_progress`.
-  - For QRSPI result YAML during non-final implementation checkpoints, use runtime `status: handoff` (not `blocked`, not `complete`, no `outcome`). This is valid for the `implement` node and keeps the workflow resumable without marking it blocked/error.
-  - Use this for any non-final implementation checkpoint so the next step remains `/q-resume`.
+- checkpoint: set handoff document frontmatter `status: in_progress`, `stage` to the exact active resumable node ID above, and `next_stage` to null.
+  - Put the artifact under the canonical plan's `handoffs/` directory.
+  - In QRSPI result YAML use runtime `status: handoff` (not `blocked`, not `complete`) and omit `outcome`.
+  - Route to `/q-resume`. Graph decision and manager policy—not `next.steps`—authorize same-node continuation.
 - manager operational handoff: set handoff document frontmatter `status: in_progress` and `handoff_type: q-manager-operational`; use QRSPI result YAML `status: handoff`, omit `outcome`, point `artifact` at the manager handoff, and route `next.steps` to q-manager continue.
 
 ### 4. Capture key learnings and refresh long-term memory only if essential
@@ -189,7 +199,7 @@ last_updated_by: [git_username]
 git_commit: [current commit hash; for implementation handoffs amended into the current commit, use the pre-handoff branch hash and note the final hash is reported in YAML]
 branch: [current branch]
 repository: [repository name]
-stage: [question|research|design|outline|plan|implement]
+stage: [exact resumable graph node ID]
 ticket: "[ticket reference if any]"
 plan_dir: "thoughts/[git_username]/plans/[timestamp]_[plan-name]"
 status: [in_progress|complete]
