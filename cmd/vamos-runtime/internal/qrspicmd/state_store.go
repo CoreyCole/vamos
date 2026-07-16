@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 )
@@ -85,6 +86,64 @@ func (s FileStateStore) Load(path string) (ManagerState, error) {
 
 func (s FileStateStore) Save(path string, state ManagerState) error {
 	return writeJSONAtomically(path, state)
+}
+
+type fileOperationLock struct {
+	file *os.File
+	once sync.Once
+	err  error
+}
+
+func (l *fileOperationLock) Release() error {
+	l.once.Do(func() {
+		if l.file == nil {
+			return
+		}
+		if err := syscall.Flock(int(l.file.Fd()), syscall.LOCK_UN); err != nil {
+			l.err = err
+		}
+		if err := l.file.Close(); l.err == nil && err != nil {
+			l.err = err
+		}
+	})
+	return l.err
+}
+
+func (s FileStateStore) AcquireOperationLock(
+	ctx context.Context,
+	stateFile string,
+) (StateOperationLock, error) {
+	if strings.TrimSpace(stateFile) == "" {
+		return nil, errors.New("state-file is required")
+	}
+	path := stateFile + ".operation.lock"
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return nil, err
+	}
+	file, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE, 0o644)
+	if err != nil {
+		return nil, err
+	}
+	for {
+		err = syscall.Flock(int(file.Fd()), syscall.LOCK_EX|syscall.LOCK_NB)
+		if err == nil {
+			return &fileOperationLock{file: file}, nil
+		}
+		if !errors.Is(err, syscall.EWOULDBLOCK) && !errors.Is(err, syscall.EAGAIN) {
+			_ = file.Close()
+			return nil, err
+		}
+		timer := time.NewTimer(10 * time.Millisecond)
+		select {
+		case <-ctx.Done():
+			if !timer.Stop() {
+				<-timer.C
+			}
+			_ = file.Close()
+			return nil, ctx.Err()
+		case <-timer.C:
+		}
+	}
 }
 
 func (s FileStateStore) AcquireLock(ctx context.Context, key LockKey, owner string, ttl time.Duration) (Lock, error) {

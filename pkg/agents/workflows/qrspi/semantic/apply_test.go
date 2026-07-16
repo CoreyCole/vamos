@@ -88,7 +88,12 @@ func TestSemanticApplyStatusActions(t *testing.T) {
 		wantNext   wruntime.NodeID
 		wantAction NextActionKind
 	}{
-		{name: "handoff", node: qrspi.NodeImplement, status: "handoff", wantNext: qrspi.NodeImplement, wantAction: NextActionContinuePending},
+		{name: "research handoff", node: qrspi.NodeResearch, status: "handoff", wantNext: qrspi.NodeResearch, wantAction: NextActionContinuePending},
+		{name: "review helper handoff", node: qrspi.NodeReviewOutline, status: "handoff", wantNext: qrspi.NodeReviewOutline, wantAction: NextActionContinuePending},
+		{name: "address review research handoff", node: qrspi.NodeAddressReviewResearchPlan, status: "handoff", wantNext: qrspi.NodeAddressReviewResearchPlan, wantAction: NextActionContinuePending},
+		{name: "workspace handoff", node: qrspi.NodeWorkspace, status: "handoff", wantNext: qrspi.NodeWorkspace, wantAction: NextActionContinuePending},
+		{name: "implement handoff", node: qrspi.NodeImplement, status: "handoff", wantNext: qrspi.NodeImplement, wantAction: NextActionContinuePending},
+		{name: "verify handoff", node: qrspi.NodeVerify, status: "handoff", wantNext: qrspi.NodeVerify, wantAction: NextActionContinuePending},
 		{name: "blocked", node: qrspi.NodeDesign, status: "blocked", wantAction: NextActionBlocked},
 		{name: "error", node: qrspi.NodeDesign, status: "error", wantAction: NextActionError},
 		{name: "needs human", node: qrspi.NodeDesign, status: "needs_human", wantAction: NextActionWaitHuman},

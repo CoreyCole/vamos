@@ -22,6 +22,29 @@ type InitOptions struct {
 	Force             bool
 }
 
+type ChildLaunchKind string
+
+const (
+	ChildLaunchNormal        ChildLaunchKind = "normal"
+	ChildLaunchResumeHandoff ChildLaunchKind = "resume_handoff"
+)
+
+type ChildLaunchIntent struct {
+	Kind            ChildLaunchKind
+	NodeID          wruntime.NodeID
+	SkillPath       string
+	PrimaryArtifact string
+	Cwd             string
+	SourceChildID   string
+	DeliveryID      string
+}
+
+type HandoffArtifact struct {
+	Path   string
+	Stage  wruntime.NodeID
+	Status string
+}
+
 type RunChildOptions struct {
 	PlanDir      string
 	Stage        string
@@ -306,6 +329,8 @@ const (
 	ActionChildContextExhausted       = "child_context_exhausted"
 	ActionManagerPaneAdoptionRequired = "manager_pane_adoption_required"
 	ActionManagerPaneUnavailable      = "manager_pane_unavailable"
+	ActionInvalidHandoffArtifact      = "invalid_handoff_artifact"
+	ActionHandoffContinuationFailed   = "handoff_continuation_failed"
 )
 
 func ProjectManagerActionCard(
@@ -643,10 +668,15 @@ type deps struct {
 	StateRoot     func() (string, error)
 }
 
+type StateOperationLock interface {
+	Release() error
+}
+
 // StateStore is implemented by the external q-manager state store in a later slice.
 type StateStore interface {
 	Load(path string) (ManagerState, error)
 	Save(path string, state ManagerState) error
+	AcquireOperationLock(ctx context.Context, stateFile string) (StateOperationLock, error)
 	AcquireLock(
 		ctx context.Context,
 		key LockKey,

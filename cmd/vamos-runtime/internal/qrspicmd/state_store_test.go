@@ -175,4 +175,89 @@ func TestAcquireLockAllowsOnlyOneConcurrentOwner(t *testing.T) {
 	}
 }
 
+func TestOperationLockSerializesSameStateFile(t *testing.T) {
+	store := FileStateStore{Root: t.TempDir()}
+	stateFile := filepath.Join(t.TempDir(), "state.json")
+	first, err := store.AcquireOperationLock(t.Context(), stateFile)
+	if err != nil {
+		t.Fatalf("first AcquireOperationLock() error = %v", err)
+	}
+	acquired := make(chan StateOperationLock, 1)
+	errs := make(chan error, 1)
+	go func() {
+		lock, lockErr := store.AcquireOperationLock(t.Context(), stateFile)
+		if lockErr != nil {
+			errs <- lockErr
+			return
+		}
+		acquired <- lock
+	}()
+	select {
+	case lock := <-acquired:
+		_ = lock.Release()
+		t.Fatal("second operation lock acquired before first released")
+	case lockErr := <-errs:
+		t.Fatalf("second AcquireOperationLock() error = %v", lockErr)
+	case <-time.After(50 * time.Millisecond):
+	}
+	if err := first.Release(); err != nil {
+		t.Fatalf("first Release() error = %v", err)
+	}
+	select {
+	case lock := <-acquired:
+		if err := lock.Release(); err != nil {
+			t.Fatalf("second Release() error = %v", err)
+		}
+	case lockErr := <-errs:
+		t.Fatalf("second AcquireOperationLock() error = %v", lockErr)
+	case <-time.After(time.Second):
+		t.Fatal("second operation lock did not acquire after release")
+	}
+}
+
+func TestOperationLockHonorsCancellation(t *testing.T) {
+	store := FileStateStore{Root: t.TempDir()}
+	stateFile := filepath.Join(t.TempDir(), "state.json")
+	first, err := store.AcquireOperationLock(t.Context(), stateFile)
+	if err != nil {
+		t.Fatalf("first AcquireOperationLock() error = %v", err)
+	}
+	defer first.Release()
+	ctx, cancel := context.WithTimeout(t.Context(), 30*time.Millisecond)
+	defer cancel()
+	_, err = store.AcquireOperationLock(ctx, stateFile)
+	if !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("AcquireOperationLock() error = %v, want deadline exceeded", err)
+	}
+}
+
+func TestOperationLockAllowsDifferentStateFiles(t *testing.T) {
+	store := FileStateStore{Root: t.TempDir()}
+	dir := t.TempDir()
+	first, err := store.AcquireOperationLock(t.Context(), filepath.Join(dir, "one.json"))
+	if err != nil {
+		t.Fatalf("first AcquireOperationLock() error = %v", err)
+	}
+	defer first.Release()
+	second, err := store.AcquireOperationLock(t.Context(), filepath.Join(dir, "two.json"))
+	if err != nil {
+		t.Fatalf("second AcquireOperationLock() error = %v", err)
+	}
+	defer second.Release()
+}
+
+func TestOperationLockReleaseIsIdempotent(t *testing.T) {
+	store := FileStateStore{Root: t.TempDir()}
+	lock, err := store.AcquireOperationLock(t.Context(), filepath.Join(t.TempDir(), "state.json"))
+	if err != nil {
+		t.Fatalf("AcquireOperationLock() error = %v", err)
+	}
+	if err := lock.Release(); err != nil {
+		t.Fatalf("first Release() error = %v", err)
+	}
+	if err := lock.Release(); err != nil {
+		t.Fatalf("second Release() error = %v", err)
+	}
+}
+
 func fixedClock(t time.Time) func() time.Time { return func() time.Time { return t } }

@@ -9,7 +9,341 @@ import (
 	"time"
 
 	"github.com/CoreyCole/vamos/pkg/agents/workflows/qrspi"
+	wruntime "github.com/CoreyCole/vamos/pkg/agents/workflows/runtime"
 )
+
+func TestValidateHandoffArtifact(t *testing.T) {
+	tests := []struct {
+		name    string
+		mutate  func(t *testing.T, state *ManagerState, source *ChildRunRef, result *wruntime.WorkflowResult)
+		wantErr bool
+	}{
+		{name: "valid research handoff"},
+		{
+			name: "empty artifact",
+			mutate: func(_ *testing.T, _ *ManagerState, _ *ChildRunRef, result *wruntime.WorkflowResult) {
+				result.PrimaryArtifact = ""
+			},
+			wantErr: true,
+		},
+		{
+			name: "missing file",
+			mutate: func(_ *testing.T, _ *ManagerState, _ *ChildRunRef, result *wruntime.WorkflowResult) {
+				result.PrimaryArtifact = "thoughts/example/handoffs/missing.md"
+			},
+			wantErr: true,
+		},
+		{
+			name: "directory",
+			mutate: func(t *testing.T, _ *ManagerState, source *ChildRunRef, result *wruntime.WorkflowResult) {
+				path := filepath.Join(source.Cwd, "thoughts", "example", "handoffs", "directory")
+				if err := os.Mkdir(path, 0o755); err != nil {
+					t.Fatal(err)
+				}
+				result.PrimaryArtifact = "thoughts/example/handoffs/directory"
+			},
+			wantErr: true,
+		},
+		{
+			name: "lexical escape",
+			mutate: func(t *testing.T, _ *ManagerState, source *ChildRunRef, result *wruntime.WorkflowResult) {
+				outside := filepath.Join(filepath.Dir(source.Cwd), "outside.md")
+				writeHandoffFile(t, outside, "research", "in_progress")
+				result.PrimaryArtifact = "../outside.md"
+			},
+			wantErr: true,
+		},
+		{
+			name: "absolute outside path",
+			mutate: func(t *testing.T, _ *ManagerState, source *ChildRunRef, result *wruntime.WorkflowResult) {
+				outside := filepath.Join(filepath.Dir(source.Cwd), "absolute-outside.md")
+				writeHandoffFile(t, outside, "research", "in_progress")
+				result.PrimaryArtifact = outside
+			},
+			wantErr: true,
+		},
+		{
+			name: "artifact symlink escape",
+			mutate: func(t *testing.T, _ *ManagerState, source *ChildRunRef, result *wruntime.WorkflowResult) {
+				outside := filepath.Join(filepath.Dir(source.Cwd), "symlink-outside.md")
+				writeHandoffFile(t, outside, "research", "in_progress")
+				link := filepath.Join(source.Cwd, "thoughts", "example", "handoffs", "link.md")
+				if err := os.Symlink(outside, link); err != nil {
+					t.Fatal(err)
+				}
+				result.PrimaryArtifact = "thoughts/example/handoffs/link.md"
+			},
+			wantErr: true,
+		},
+		{
+			name: "handoffs directory symlink escape",
+			mutate: func(t *testing.T, _ *ManagerState, source *ChildRunRef, result *wruntime.WorkflowResult) {
+				handoffs := filepath.Join(source.Cwd, "thoughts", "example", "handoffs")
+				if err := os.RemoveAll(handoffs); err != nil {
+					t.Fatal(err)
+				}
+				outside := filepath.Join(filepath.Dir(source.Cwd), "external-handoffs")
+				if err := os.MkdirAll(outside, 0o755); err != nil {
+					t.Fatal(err)
+				}
+				writeHandoffFile(t, filepath.Join(outside, "research.md"), "research", "in_progress")
+				if err := os.Symlink(outside, handoffs); err != nil {
+					t.Fatal(err)
+				}
+				result.PrimaryArtifact = "thoughts/example/handoffs/research.md"
+			},
+			wantErr: true,
+		},
+		{
+			name: "implementation copy",
+			mutate: func(t *testing.T, _ *ManagerState, source *ChildRunRef, _ *wruntime.WorkflowResult) {
+				implementation := filepath.Join(filepath.Dir(source.Cwd), "implementation")
+				path := filepath.Join(implementation, "thoughts", "example", "handoffs", "research.md")
+				writeHandoffFile(t, path, "research", "in_progress")
+				source.Cwd = implementation
+			},
+		},
+		{
+			name: "mismatched stage",
+			mutate: func(t *testing.T, _ *ManagerState, source *ChildRunRef, _ *wruntime.WorkflowResult) {
+				path := filepath.Join(source.Cwd, "thoughts", "example", "handoffs", "research.md")
+				writeHandoffFile(t, path, "design", "in_progress")
+			},
+			wantErr: true,
+		},
+		{
+			name: "wrong status",
+			mutate: func(t *testing.T, _ *ManagerState, source *ChildRunRef, _ *wruntime.WorkflowResult) {
+				path := filepath.Join(source.Cwd, "thoughts", "example", "handoffs", "research.md")
+				writeHandoffFile(t, path, "research", "complete")
+			},
+			wantErr: true,
+		},
+		{
+			name: "nonempty outcome",
+			mutate: func(_ *testing.T, _ *ManagerState, _ *ChildRunRef, result *wruntime.WorkflowResult) {
+				result.Outcome = wruntime.OutcomeComplete
+			},
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			state, source, result := handoffArtifactFixture(t)
+			if tt.mutate != nil {
+				tt.mutate(t, &state, &source, &result)
+			}
+			handoff, err := validateHandoffArtifact(state, source, result)
+			if tt.wantErr {
+				if err == nil {
+					t.Fatalf("validateHandoffArtifact() = %+v, want error", handoff)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("validateHandoffArtifact() error = %v", err)
+			}
+			if handoff.Stage != qrspi.NodeResearch || handoff.Status != "in_progress" || !filepath.IsAbs(handoff.Path) {
+				t.Fatalf("handoff = %+v", handoff)
+			}
+		})
+	}
+}
+
+func TestDeriveChildLaunchIntentUsesGraphDecisionAndManagerPolicy(t *testing.T) {
+	state, source, handoffResult := handoffArtifactFixture(t)
+	state.Workflow = testWorkflowState(t, qrspi.NodeResearch, nil)
+	def, err := Definition()
+	if err != nil {
+		t.Fatal(err)
+	}
+	decision, err := wruntime.DecideTransition(def, state.Workflow, handoffResult)
+	if err != nil {
+		t.Fatal(err)
+	}
+	intent, err := deriveChildLaunchIntent(state, source, handoffResult, decision)
+	if err != nil {
+		t.Fatalf("deriveChildLaunchIntent() error = %v", err)
+	}
+	if intent.Kind != ChildLaunchResumeHandoff || intent.NodeID != qrspi.NodeResearch ||
+		intent.SkillPath != ".pi/skills/q-resume/SKILL.md" || intent.Cwd != source.Cwd ||
+		intent.DeliveryID == "" || !filepath.IsAbs(intent.PrimaryArtifact) {
+		t.Fatalf("intent = %+v", intent)
+	}
+
+	forged := decision
+	forged.StartNext = false
+	if _, err := deriveChildLaunchIntent(state, source, handoffResult, forged); err == nil {
+		t.Fatal("forged decision accepted")
+	}
+
+	complete := handoffResult
+	complete.Status = wruntime.StatusComplete
+	complete.Outcome = wruntime.OutcomeComplete
+	complete.DisplayNext = "read .pi/skills/q-resume/SKILL.md"
+	completeDecision, err := wruntime.DecideTransition(def, state.Workflow, complete)
+	if err != nil {
+		t.Fatal(err)
+	}
+	normal, err := deriveChildLaunchIntent(state, source, complete, completeDecision)
+	if err != nil {
+		t.Fatalf("normal deriveChildLaunchIntent() error = %v", err)
+	}
+	if normal.Kind != ChildLaunchNormal || normal.NodeID != qrspi.NodeDesign ||
+		normal.SkillPath != ".pi/skills/q-design/SKILL.md" {
+		t.Fatalf("normal intent = %+v", normal)
+	}
+
+	blocked := handoffResult
+	blocked.Status = wruntime.StatusBlocked
+	blocked.Outcome = ""
+	blocked.DisplayNext = complete.DisplayNext
+	forgedBlocked := decision
+	if _, err := deriveChildLaunchIntent(state, source, blocked, forgedBlocked); err == nil {
+		t.Fatal("blocked result created resume intent")
+	}
+}
+
+func TestDeriveChildLaunchIntentDiscussPolicyDoesNotLaunch(t *testing.T) {
+	state, source, result := handoffArtifactFixture(t)
+	policy, err := json.Marshal(qrspi.Policy{
+		AdvanceMode:             qrspi.AdvanceModeDiscuss,
+		EnablePlanReviews:       true,
+		InvalidResultRetryLimit: 1,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	state.Workflow = testWorkflowState(t, qrspi.NodeResearch, policy)
+	def, err := Definition()
+	if err != nil {
+		t.Fatal(err)
+	}
+	decision, err := wruntime.DecideTransition(def, state.Workflow, result)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if decision.StartNext {
+		t.Fatalf("decision = %+v, want no start", decision)
+	}
+	if _, err := deriveChildLaunchIntent(state, source, result, decision); err == nil {
+		t.Fatal("discuss decision created launch intent")
+	}
+}
+
+func TestExistingHandoffContinuationMatchesSourceAndDelivery(t *testing.T) {
+	state := ManagerState{ActiveChild: &ChildRunRef{
+		ID:                     "replacement",
+		LaunchKind:             ChildLaunchResumeHandoff,
+		ContinuationOf:         "source",
+		ContinuationDeliveryID: "delivery",
+		ContinuationArtifact:   "/tmp/handoff.md",
+	}}
+	got, ok := existingHandoffContinuation(state, "source", "delivery")
+	if !ok || got.ID != "replacement" {
+		t.Fatalf("existingHandoffContinuation() = %+v, %t", got, ok)
+	}
+	if _, ok := existingHandoffContinuation(state, "source", "different"); ok {
+		t.Fatal("mismatched delivery unexpectedly matched")
+	}
+}
+
+func handoffArtifactFixture(t *testing.T) (ManagerState, ChildRunRef, wruntime.WorkflowResult) {
+	t.Helper()
+	root := t.TempDir()
+	repo := filepath.Join(root, "repo")
+	plan := filepath.Join(repo, "thoughts", "example")
+	path := filepath.Join(plan, "handoffs", "research.md")
+	writeHandoffFile(t, path, "research", "in_progress")
+	return ManagerState{
+			RepoID:            repo,
+			CanonicalPlanDir:  plan,
+			SourceCwd:         repo,
+			ImplementationCwd: filepath.Join(root, "implementation"),
+		}, ChildRunRef{
+			ID:         "child-1",
+			Stage:      "research",
+			Cwd:        repo,
+			Generation: 1,
+		}, wruntime.WorkflowResult{
+			WorkflowType:    string(qrspi.AgentChatWorkflowType),
+			SourceNodeID:    qrspi.NodeResearch,
+			Status:          wruntime.StatusHandoff,
+			PrimaryArtifact: "thoughts/example/handoffs/research.md",
+			Summary:         "checkpoint",
+			Evidence:        wruntime.EvidenceRef{RunID: "run-1"},
+		}
+}
+
+func writeHandoffFile(t *testing.T, path, stage, status string) {
+	t.Helper()
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeFile(t, path, "---\nstage: "+stage+"\nstatus: "+status+"\n---\n\n# Handoff\n")
+}
+
+func TestChildCompleteInvalidHandoffArtifactWaitsForManager(t *testing.T) {
+	dir := t.TempDir()
+	repo := filepath.Join(dir, "repo")
+	plan := filepath.Join(repo, "thoughts", "example")
+	if err := os.MkdirAll(filepath.Join(plan, "handoffs"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	stateFile := filepath.Join(dir, "state.json")
+	sessionDir := filepath.Join(dir, "sessions")
+	sessionPath := writePiSession(
+		t,
+		sessionDir,
+		"session.jsonl",
+		"session-1",
+		repo,
+		assistantLine(testResultYAML(
+			"research",
+			"handoff",
+			"",
+			"thoughts/example/handoffs/missing.md",
+			"",
+		)),
+	)
+	state := ManagerState{
+		RepoID:           repo,
+		CanonicalPlanDir: plan,
+		SourceCwd:        repo,
+		ManagerPaneID:    "%parent",
+		Workflow:         testWorkflowState(t, qrspi.NodeResearch, nil),
+		ActiveChild: &ChildRunRef{
+			ID:                   "child-1",
+			Stage:                "research",
+			Cwd:                  repo,
+			SessionID:            "session-1",
+			SessionDir:           sessionDir,
+			SessionPath:          sessionPath,
+			ValidationStatusPath: filepath.Join(dir, "validation-status.json"),
+			Generation:           1,
+		},
+	}
+	saveManagerState(t, stateFile, state)
+	status, err := RunChildComplete(
+		t.Context(),
+		ChildCompletionOptions{StateFile: stateFile, ChildID: "child-1"},
+		deps{Tmux: &recordingTmux{}},
+		&strings.Builder{},
+	)
+	if err != nil {
+		t.Fatalf("RunChildComplete() error = %v", err)
+	}
+	if !status.Validated || !status.ManagerNeeded || status.ActionCard == nil ||
+		status.ActionCard.Kind != ActionInvalidHandoffArtifact {
+		t.Fatalf("status = %+v", status)
+	}
+	loaded := loadManagerState(t, stateFile)
+	if loaded.Workflow.CurrentNodeID != qrspi.NodeResearch ||
+		loaded.ActiveChild == nil || loaded.ActiveChild.LifecycleStatus != "awaiting_manager" ||
+		loaded.LastActionCard == nil || loaded.LastActionCard.Kind != ActionInvalidHandoffArtifact {
+		t.Fatalf("loaded state = %+v", loaded)
+	}
+}
 
 func TestChildCompleteWritesValidatedStatus(t *testing.T) {
 	dir := t.TempDir()

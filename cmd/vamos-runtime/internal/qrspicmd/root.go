@@ -1,6 +1,7 @@
 package qrspicmd
 
 import (
+	"bufio"
 	"context"
 	"encoding/json"
 	"errors"
@@ -8,6 +9,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"time"
 
@@ -16,6 +18,7 @@ import (
 	"github.com/CoreyCole/vamos/pkg/agents/workflows/qrspi"
 	"github.com/CoreyCole/vamos/pkg/agents/workflows/qrspi/semantic"
 	wruntime "github.com/CoreyCole/vamos/pkg/agents/workflows/runtime"
+	"gopkg.in/yaml.v3"
 )
 
 var ErrNotImplemented = errors.New("qrspi command behavior not implemented")
@@ -1568,6 +1571,11 @@ func RunChildComplete(
 		clock = time.Now
 	}
 	store := stateStore(d, "", clock)
+	operationLock, err := store.AcquireOperationLock(ctx, opts.StateFile)
+	if err != nil {
+		return nil, err
+	}
+	defer operationLock.Release()
 	state, err := store.Load(opts.StateFile)
 	if err != nil {
 		return nil, err
@@ -1631,7 +1639,24 @@ func RunChildComplete(
 				status.NextChild = nextChildInfo(state, parsed.Decision.NextNodeID)
 				status.ManagerNeeded = childCompletionManagerNeeded(status.Result.Status)
 				status.Normalizations = parsed.Normalizations
-				state.ActiveChild.LifecycleStatus = "completed"
+				if parsed.Result.Status == wruntime.StatusHandoff && parsed.Decision.StartNext {
+					if _, intentErr := deriveChildLaunchIntent(state, *child, parsed.Result, parsed.Decision); intentErr != nil {
+						status.ManagerNeeded = true
+						status.Reason = intentErr.Error()
+						status.ActionCard = buildInvalidHandoffArtifactCard(
+							opts.StateFile,
+							*child,
+							parsed.Result,
+							intentErr,
+						)
+						state.LastActionCard = status.ActionCard
+						state.ActiveChild.LifecycleStatus = "awaiting_manager"
+					} else {
+						state.ActiveChild.LifecycleStatus = "completed"
+					}
+				} else {
+					state.ActiveChild.LifecycleStatus = "completed"
+				}
 				state.ActiveChild.LastDeliveryID = status.DeliveryID
 				state, status.Wake, err = queueOrDeliverWake(
 					ctx,
@@ -1794,6 +1819,269 @@ func childCompletionDeliveryID(
 		)
 	}
 	return strings.Join(parts, ":")
+}
+
+func resolvePlanArtifact(
+	canonicalRepoRoot, canonicalPlanDir, sourceChildCwd, artifact string,
+) (string, error) {
+	if strings.TrimSpace(canonicalRepoRoot) == "" {
+		return "", errors.New("canonical repo root is required")
+	}
+	if strings.TrimSpace(canonicalPlanDir) == "" {
+		return "", errors.New("canonical plan directory is required")
+	}
+	if strings.TrimSpace(sourceChildCwd) == "" {
+		return "", errors.New("source child cwd is required")
+	}
+	if strings.TrimSpace(artifact) == "" {
+		return "", errors.New("handoff artifact is required")
+	}
+
+	repoRoot, err := filepath.Abs(canonicalRepoRoot)
+	if err != nil {
+		return "", err
+	}
+	planDir, err := filepath.Abs(canonicalPlanDir)
+	if err != nil {
+		return "", err
+	}
+	planRel, err := filepath.Rel(repoRoot, planDir)
+	if err != nil {
+		return "", err
+	}
+	if pathEscapesRoot(planRel) {
+		return "", fmt.Errorf("canonical plan directory %q escapes repo root %q", planDir, repoRoot)
+	}
+
+	mappedPlanDir := filepath.Join(sourceChildCwd, planRel)
+	mappedHandoffsDir := filepath.Join(mappedPlanDir, "handoffs")
+	artifactPath := artifact
+	if !filepath.IsAbs(artifactPath) {
+		artifactPath = filepath.Join(sourceChildCwd, artifactPath)
+	}
+
+	realPlanDir, err := filepath.EvalSymlinks(mappedPlanDir)
+	if err != nil {
+		return "", fmt.Errorf("resolve mapped plan directory: %w", err)
+	}
+	realHandoffsDir, err := filepath.EvalSymlinks(mappedHandoffsDir)
+	if err != nil {
+		return "", fmt.Errorf("resolve handoffs directory: %w", err)
+	}
+	realArtifact, err := filepath.EvalSymlinks(artifactPath)
+	if err != nil {
+		return "", fmt.Errorf("resolve handoff artifact: %w", err)
+	}
+	if err := requirePathWithin(realPlanDir, realHandoffsDir, "handoffs directory"); err != nil {
+		return "", err
+	}
+	if err := requirePathWithin(realHandoffsDir, realArtifact, "handoff artifact"); err != nil {
+		return "", err
+	}
+	info, err := os.Stat(realArtifact)
+	if err != nil {
+		return "", err
+	}
+	if !info.Mode().IsRegular() {
+		return "", fmt.Errorf("handoff artifact %q is not a regular file", realArtifact)
+	}
+	return realArtifact, nil
+}
+
+func pathEscapesRoot(rel string) bool {
+	return filepath.IsAbs(rel) || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator))
+}
+
+func requirePathWithin(root, path, label string) error {
+	rel, err := filepath.Rel(root, path)
+	if err != nil {
+		return err
+	}
+	if pathEscapesRoot(rel) {
+		return fmt.Errorf("%s %q escapes %q", label, path, root)
+	}
+	return nil
+}
+
+func readHandoffArtifact(path string) (HandoffArtifact, error) {
+	file, err := os.Open(path)
+	if err != nil {
+		return HandoffArtifact{}, err
+	}
+	defer file.Close()
+
+	scanner := bufio.NewScanner(file)
+	if !scanner.Scan() || strings.TrimSpace(scanner.Text()) != "---" {
+		return HandoffArtifact{}, errors.New("handoff artifact must start with YAML frontmatter")
+	}
+	var frontmatter strings.Builder
+	closed := false
+	for scanner.Scan() {
+		if strings.TrimSpace(scanner.Text()) == "---" {
+			closed = true
+			break
+		}
+		frontmatter.WriteString(scanner.Text())
+		frontmatter.WriteByte('\n')
+	}
+	if err := scanner.Err(); err != nil {
+		return HandoffArtifact{}, err
+	}
+	if !closed {
+		return HandoffArtifact{}, errors.New("handoff artifact frontmatter is not closed")
+	}
+	var metadata struct {
+		Stage  string `yaml:"stage"`
+		Status string `yaml:"status"`
+	}
+	if err := yaml.Unmarshal([]byte(frontmatter.String()), &metadata); err != nil {
+		return HandoffArtifact{}, fmt.Errorf("parse handoff frontmatter: %w", err)
+	}
+	return HandoffArtifact{
+		Path:   path,
+		Stage:  wruntime.NodeID(strings.TrimSpace(metadata.Stage)),
+		Status: strings.TrimSpace(metadata.Status),
+	}, nil
+}
+
+func validateHandoffArtifact(
+	state ManagerState,
+	source ChildRunRef,
+	result wruntime.WorkflowResult,
+) (HandoffArtifact, error) {
+	if result.Status != wruntime.StatusHandoff {
+		return HandoffArtifact{}, fmt.Errorf("result status %q is not handoff", result.Status)
+	}
+	if result.Outcome != "" {
+		return HandoffArtifact{}, fmt.Errorf("handoff outcome must be empty, got %q", result.Outcome)
+	}
+	path, err := resolvePlanArtifact(
+		state.RepoID,
+		state.CanonicalPlanDir,
+		source.Cwd,
+		result.PrimaryArtifact,
+	)
+	if err != nil {
+		return HandoffArtifact{}, err
+	}
+	handoff, err := readHandoffArtifact(path)
+	if err != nil {
+		return HandoffArtifact{}, err
+	}
+	if handoff.Stage != result.SourceNodeID {
+		return HandoffArtifact{}, fmt.Errorf(
+			"handoff stage %q does not match result source %q",
+			handoff.Stage,
+			result.SourceNodeID,
+		)
+	}
+	if handoff.Status != "in_progress" {
+		return HandoffArtifact{}, fmt.Errorf(
+			"handoff status %q must be in_progress",
+			handoff.Status,
+		)
+	}
+	return handoff, nil
+}
+
+func deriveChildLaunchIntent(
+	state ManagerState,
+	source ChildRunRef,
+	result wruntime.WorkflowResult,
+	decision wruntime.TransitionDecision,
+) (ChildLaunchIntent, error) {
+	def, err := Definition()
+	if err != nil {
+		return ChildLaunchIntent{}, err
+	}
+	authoritative, err := wruntime.DecideTransition(def, state.Workflow, result)
+	if err != nil {
+		return ChildLaunchIntent{}, err
+	}
+	if !reflect.DeepEqual(authoritative, decision) {
+		return ChildLaunchIntent{}, errors.New("launch decision does not match manager workflow policy")
+	}
+	if !decision.StartNext || decision.NextNodeID == "" {
+		return ChildLaunchIntent{}, errors.New("workflow decision does not authorize child launch")
+	}
+	node, ok := def.Nodes[decision.NextNodeID]
+	if !ok {
+		return ChildLaunchIntent{}, fmt.Errorf("node %q is not in QRSPI definition", decision.NextNodeID)
+	}
+	cwd, err := defaultChildCwd(state, decision.NextNodeID, "")
+	if err != nil {
+		return ChildLaunchIntent{}, err
+	}
+	intent := ChildLaunchIntent{
+		Kind:            ChildLaunchNormal,
+		NodeID:          decision.NextNodeID,
+		SkillPath:       node.Prompt.SkillPath,
+		PrimaryArtifact: result.PrimaryArtifact,
+		Cwd:             cwd,
+		SourceChildID:   source.ID,
+	}
+	if result.Status != wruntime.StatusHandoff {
+		return intent, nil
+	}
+	if result.Outcome != "" || decision.NextNodeID != result.SourceNodeID ||
+		wruntime.NodeID(source.Stage) != result.SourceNodeID {
+		return ChildLaunchIntent{}, errors.New("handoff launch must resume the exact source node without outcome")
+	}
+	handoff, err := validateHandoffArtifact(state, source, result)
+	if err != nil {
+		return ChildLaunchIntent{}, err
+	}
+	intent.Kind = ChildLaunchResumeHandoff
+	intent.SkillPath = ".pi/skills/q-resume/SKILL.md"
+	intent.PrimaryArtifact = handoff.Path
+	if strings.TrimSpace(source.Cwd) != "" {
+		intent.Cwd = source.Cwd
+	}
+	intent.DeliveryID = childCompletionDeliveryID(source, &ParsedDecision{
+		Result:   result,
+		Decision: decision,
+	}, false)
+	return intent, nil
+}
+
+func existingHandoffContinuation(
+	state ManagerState,
+	sourceChildID, deliveryID string,
+) (*ChildRunRef, bool) {
+	for _, candidate := range []*ChildRunRef{state.ActiveChild, state.PendingCleanupChild} {
+		if candidate == nil || candidate.LaunchKind != ChildLaunchResumeHandoff {
+			continue
+		}
+		if candidate.ContinuationOf == sourceChildID &&
+			candidate.ContinuationDeliveryID == deliveryID {
+			copy := *candidate
+			return &copy, true
+		}
+	}
+	return nil, false
+}
+
+func buildInvalidHandoffArtifactCard(
+	stateFile string,
+	source ChildRunRef,
+	result wruntime.WorkflowResult,
+	validationErr error,
+) *ManagerActionCard {
+	return &ManagerActionCard{
+		Kind:     ActionInvalidHandoffArtifact,
+		Severity: "warning",
+		Summary:  "validated handoff cannot auto-resume because its artifact is unsafe or inconsistent",
+		Evidence: []string{
+			fmt.Sprintf("source child: %s", source.ID),
+			fmt.Sprintf("stage: %s", result.SourceNodeID),
+			fmt.Sprintf("artifact: %s", result.PrimaryArtifact),
+			validationErr.Error(),
+		},
+		RecommendedAction: "repair the handoff artifact, then retry manager continuation",
+		SafeCommand:       continueCommand(stateFile),
+		ContinueCommand:   continueCommand(stateFile),
+		RequiresHuman:     false,
+	}
 }
 
 func terminalEvidenceForActiveChildWithRefresh(
@@ -2430,6 +2718,11 @@ func RunManagerReady(
 	}
 	out = ensureWriter(out)
 	store := stateStore(d, "", time.Now)
+	operationLock, err := store.AcquireOperationLock(ctx, opts.StateFile)
+	if err != nil {
+		return err
+	}
+	defer operationLock.Release()
 	state, err := store.Load(opts.StateFile)
 	if err != nil {
 		return err
@@ -3003,6 +3296,11 @@ func RunContinue(ctx context.Context, opts ContinueOptions, d deps, out io.Write
 		clock = time.Now
 	}
 	store := stateStore(d, "", clock)
+	operationLock, err := store.AcquireOperationLock(ctx, opts.StateFile)
+	if err != nil {
+		return err
+	}
+	defer operationLock.Release()
 	state, err := store.Load(opts.StateFile)
 	if err != nil {
 		return err
@@ -3117,6 +3415,27 @@ func RunContinue(ctx context.Context, opts ContinueOptions, d deps, out io.Write
 	}
 	result.Validated = &parsed
 	result.PrimaryArtifact = parsed.Result.PrimaryArtifact
+	if parsed.Result.Status == wruntime.StatusHandoff && parsed.Decision.StartNext {
+		if _, intentErr := deriveChildLaunchIntent(
+			state,
+			*state.ActiveChild,
+			parsed.Result,
+			parsed.Decision,
+		); intentErr != nil {
+			card := buildInvalidHandoffArtifactCard(
+				opts.StateFile,
+				*state.ActiveChild,
+				parsed.Result,
+				intentErr,
+			)
+			state.ActiveChild.LifecycleStatus = "awaiting_manager"
+			state.LastActionCard = card
+			if saveErr := store.Save(opts.StateFile, state); saveErr != nil {
+				return saveErr
+			}
+			return writeManagerActionCard(out, *card, opts.Output)
+		}
+	}
 
 	nextState, err := decideValidatedResult(ctx, state, parsed, opts, store)
 	if err != nil {

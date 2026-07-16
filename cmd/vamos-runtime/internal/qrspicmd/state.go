@@ -39,23 +39,27 @@ type QueuedWake struct {
 }
 
 type ChildRunRef struct {
-	ID                   string `json:"id"`
-	Stage                string `json:"stage"`
-	Cwd                  string `json:"cwd"`
-	TmuxPaneID           string `json:"tmuxPaneId,omitempty"`
-	OutputPath           string `json:"outputPath"`
-	SessionID            string `json:"sessionId"`
-	SessionDir           string `json:"sessionDir"`
-	SessionPath          string `json:"sessionPath,omitempty"`
-	DonePath             string `json:"donePath"`
-	StatusPath           string `json:"statusPath"`
-	ResultPath           string `json:"resultPath,omitempty"`
-	ValidationStatusPath string `json:"validationStatusPath,omitempty"`
-	LastDeliveryID       string `json:"lastDeliveryId,omitempty"`
-	LifecycleStatus      string `json:"lifecycleStatus,omitempty"`
-	Generation           int    `json:"generation,omitempty"`
-	ValidationRetryCount int    `json:"validationRetryCount,omitempty"`
-	LastRepromptAttempt  int    `json:"lastRepromptAttempt,omitempty"`
+	ID                     string          `json:"id"`
+	Stage                  string          `json:"stage"`
+	Cwd                    string          `json:"cwd"`
+	TmuxPaneID             string          `json:"tmuxPaneId,omitempty"`
+	OutputPath             string          `json:"outputPath"`
+	SessionID              string          `json:"sessionId"`
+	SessionDir             string          `json:"sessionDir"`
+	SessionPath            string          `json:"sessionPath,omitempty"`
+	DonePath               string          `json:"donePath"`
+	StatusPath             string          `json:"statusPath"`
+	ResultPath             string          `json:"resultPath,omitempty"`
+	ValidationStatusPath   string          `json:"validationStatusPath,omitempty"`
+	LastDeliveryID         string          `json:"lastDeliveryId,omitempty"`
+	LifecycleStatus        string          `json:"lifecycleStatus,omitempty"`
+	Generation             int             `json:"generation,omitempty"`
+	ValidationRetryCount   int             `json:"validationRetryCount,omitempty"`
+	LastRepromptAttempt    int             `json:"lastRepromptAttempt,omitempty"`
+	LaunchKind             ChildLaunchKind `json:"launchKind,omitempty"`
+	ContinuationOf         string          `json:"continuationOf,omitempty"`
+	ContinuationArtifact   string          `json:"continuationArtifact,omitempty"`
+	ContinuationDeliveryID string          `json:"continuationDeliveryId,omitempty"`
 }
 
 type LockKey struct {

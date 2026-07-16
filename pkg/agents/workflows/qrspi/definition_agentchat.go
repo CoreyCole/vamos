@@ -37,23 +37,23 @@ func Definition() (wruntime.Definition, error) {
 		Config(DefaultConfig(), ValidateConfig).
 		Version("v1").Name("QRSPI").Start(NodeQuestion).
 		Agent(NodeQuestion, Skill(".pi/skills/q-question/SKILL.md")).
-		Statuses(wruntime.StatusComplete, wruntime.StatusNeedsHuman, wruntime.StatusBlocked, wruntime.StatusError).
+		Statuses(wruntime.StatusComplete, wruntime.StatusHandoff, wruntime.StatusNeedsHuman, wruntime.StatusBlocked, wruntime.StatusError).
 		Outcomes(wruntime.OutcomeComplete).
 		RequiresPrimaryArtifact().
 		Agent(NodeResearch, Skill(".pi/skills/q-research/SKILL.md")).
-		Statuses(wruntime.StatusComplete, wruntime.StatusBlocked, wruntime.StatusError).
+		Statuses(wruntime.StatusComplete, wruntime.StatusHandoff, wruntime.StatusBlocked, wruntime.StatusError).
 		Outcomes(wruntime.OutcomeComplete).
 		RequiresPrimaryArtifact().
 		Agent(NodeDesign, Skill(".pi/skills/q-design/SKILL.md")).
-		Statuses(wruntime.StatusComplete, wruntime.StatusNeedsHuman, wruntime.StatusBlocked, wruntime.StatusError).
+		Statuses(wruntime.StatusComplete, wruntime.StatusHandoff, wruntime.StatusNeedsHuman, wruntime.StatusBlocked, wruntime.StatusError).
 		Outcomes(wruntime.OutcomeComplete).
 		RequiresPrimaryArtifact().
 		Agent(NodeOutline, Skill(".pi/skills/q-outline/SKILL.md")).
-		Statuses(wruntime.StatusComplete, wruntime.StatusNeedsHuman, wruntime.StatusBlocked, wruntime.StatusError).
+		Statuses(wruntime.StatusComplete, wruntime.StatusHandoff, wruntime.StatusNeedsHuman, wruntime.StatusBlocked, wruntime.StatusError).
 		Outcomes(wruntime.OutcomeComplete).
 		RequiresPrimaryArtifact().
 		Agent(NodeReviewOutline, Skill(".pi/skills/q-review/SKILL.md")).
-		Statuses(wruntime.StatusComplete, wruntime.StatusNeedsHuman, wruntime.StatusBlocked, wruntime.StatusError).
+		Statuses(wruntime.StatusComplete, wruntime.StatusHandoff, wruntime.StatusNeedsHuman, wruntime.StatusBlocked, wruntime.StatusError).
 		Outcomes(wruntime.OutcomeReadyForPlan, wruntime.OutcomeNeedsReviewResearch).
 		RequiresPrimaryArtifact().
 		HumanReview(NodeHumanReviewOutline, "outline approved by human").
@@ -61,31 +61,31 @@ func Definition() (wruntime.Definition, error) {
 		Outcomes(wruntime.OutcomeComplete).
 		AutoApprovable(true).
 		Agent(NodeResearchForReviewOutline, Skill(".pi/skills/q-research-for-review/SKILL.md")).
-		Statuses(wruntime.StatusComplete, wruntime.StatusBlocked, wruntime.StatusError).
+		Statuses(wruntime.StatusComplete, wruntime.StatusHandoff, wruntime.StatusBlocked, wruntime.StatusError).
 		Outcomes(wruntime.OutcomeComplete).
 		RequiresPrimaryArtifact().
 		Agent(NodeAddressReviewResearchOutline, Skill(".pi/skills/q-address-review-research/SKILL.md")).
-		Statuses(wruntime.StatusComplete, wruntime.StatusNeedsHuman, wruntime.StatusBlocked, wruntime.StatusError).
+		Statuses(wruntime.StatusComplete, wruntime.StatusHandoff, wruntime.StatusNeedsHuman, wruntime.StatusBlocked, wruntime.StatusError).
 		Outcomes(wruntime.OutcomeComplete).
 		RequiresPrimaryArtifact().
 		Agent(NodePlan, Skill(".pi/skills/q-plan/SKILL.md")).
-		Statuses(wruntime.StatusComplete, wruntime.StatusBlocked, wruntime.StatusError).
+		Statuses(wruntime.StatusComplete, wruntime.StatusHandoff, wruntime.StatusBlocked, wruntime.StatusError).
 		Outcomes(wruntime.OutcomeComplete).
 		RequiresPrimaryArtifact().
 		Agent(NodeReviewPlan, Skill(".pi/skills/q-review/SKILL.md")).
-		Statuses(wruntime.StatusComplete, wruntime.StatusNeedsHuman, wruntime.StatusBlocked, wruntime.StatusError).
+		Statuses(wruntime.StatusComplete, wruntime.StatusHandoff, wruntime.StatusNeedsHuman, wruntime.StatusBlocked, wruntime.StatusError).
 		Outcomes(wruntime.OutcomeReadyForWorkspace, wruntime.OutcomeReadyForImplement, wruntime.OutcomeReadyForImplementation, wruntime.OutcomeNeedsReviewResearch).
 		RequiresPrimaryArtifact().
 		Agent(NodeResearchForReviewPlan, Skill(".pi/skills/q-research-for-review/SKILL.md")).
-		Statuses(wruntime.StatusComplete, wruntime.StatusBlocked, wruntime.StatusError).
+		Statuses(wruntime.StatusComplete, wruntime.StatusHandoff, wruntime.StatusBlocked, wruntime.StatusError).
 		Outcomes(wruntime.OutcomeComplete).
 		RequiresPrimaryArtifact().
 		Agent(NodeAddressReviewResearchPlan, Skill(".pi/skills/q-address-review-research/SKILL.md")).
-		Statuses(wruntime.StatusComplete, wruntime.StatusNeedsHuman, wruntime.StatusBlocked, wruntime.StatusError).
+		Statuses(wruntime.StatusComplete, wruntime.StatusHandoff, wruntime.StatusNeedsHuman, wruntime.StatusBlocked, wruntime.StatusError).
 		Outcomes(wruntime.OutcomeComplete).
 		RequiresPrimaryArtifact().
 		Agent(NodeWorkspace, Skill(".pi/skills/q-workspace/SKILL.md")).
-		Statuses(wruntime.StatusComplete, wruntime.StatusBlocked, wruntime.StatusError).
+		Statuses(wruntime.StatusComplete, wruntime.StatusHandoff, wruntime.StatusBlocked, wruntime.StatusError).
 		Outcomes(wruntime.OutcomeComplete, wruntime.OutcomeReadyForImplement, wruntime.OutcomeReadyForImplementation).
 		RequiresPrimaryArtifact().
 		Agent(NodeImplement, Skill(".pi/skills/q-implement/SKILL.md")).
@@ -93,11 +93,11 @@ func Definition() (wruntime.Definition, error) {
 		Outcomes(wruntime.OutcomeComplete).
 		RequiresPrimaryArtifact().
 		Agent(NodeReviewImplementation, Skill(".pi/skills/q-review/SKILL.md")).
-		Statuses(wruntime.StatusComplete, wruntime.StatusNeedsHuman, wruntime.StatusBlocked, wruntime.StatusError).
+		Statuses(wruntime.StatusComplete, wruntime.StatusHandoff, wruntime.StatusNeedsHuman, wruntime.StatusBlocked, wruntime.StatusError).
 		Outcomes(wruntime.OutcomeReadyForHumanReview, wruntime.OutcomeNeedsFollowup).
 		RequiresPrimaryArtifact().
 		Agent(NodeVerify, Skill(".pi/skills/q-verify/SKILL.md")).
-		Statuses(wruntime.StatusComplete, wruntime.StatusNeedsHuman, wruntime.StatusBlocked, wruntime.StatusError).
+		Statuses(wruntime.StatusComplete, wruntime.StatusHandoff, wruntime.StatusNeedsHuman, wruntime.StatusBlocked, wruntime.StatusError).
 		Outcomes(wruntime.OutcomeComplete).
 		RequiresPrimaryArtifact().
 		HumanReview(NodeHumanReviewImplementation, "implementation approved by human").

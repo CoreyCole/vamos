@@ -97,33 +97,112 @@ func TestQRSPIOutlineNeedsHumanWaitsWithoutAdvancing(t *testing.T) {
 	}
 }
 
-func TestQRSPIImplementHandoffQueuesResumeWithoutBlocking(t *testing.T) {
+func TestQRSPIAgentHandoffsQueueSameNodeResume(t *testing.T) {
 	def, err := Definition()
 	if err != nil {
 		t.Fatal(err)
 	}
-	state, err := wruntime.InitialState(def, nil)
+	resumable := []wruntime.NodeID{
+		NodeQuestion,
+		NodeResearch,
+		NodeDesign,
+		NodeOutline,
+		NodeReviewOutline,
+		NodeResearchForReviewOutline,
+		NodeAddressReviewResearchOutline,
+		NodePlan,
+		NodeReviewPlan,
+		NodeResearchForReviewPlan,
+		NodeAddressReviewResearchPlan,
+		NodeWorkspace,
+		NodeImplement,
+		NodeReviewImplementation,
+		NodeVerify,
+	}
+	for _, node := range resumable {
+		t.Run(string(node), func(t *testing.T) {
+			state, stateErr := wruntime.InitialState(def, nil)
+			if stateErr != nil {
+				t.Fatal(stateErr)
+			}
+			state.CurrentNodeID = node
+			state.PendingNextNodeID = node
+
+			result := qrspiResult(node, wruntime.StatusHandoff)
+			result.Outcome = ""
+			decision, decisionErr := wruntime.DecideTransition(def, state, result)
+			if decisionErr != nil {
+				t.Fatalf("DecideTransition() error = %v", decisionErr)
+			}
+			if !decision.StartNext || decision.NextNodeID != node ||
+				decision.StopReason != "result handoff" {
+				t.Fatalf("decision = %+v", decision)
+			}
+			if decision.State.Status != wruntime.WorkspaceStatusIdle ||
+				decision.State.PendingNextNodeID != node {
+				t.Fatalf("state = %+v", decision.State)
+			}
+			if got := decision.State.Nodes[node].Status; got != wruntime.NodeStatusPending {
+				t.Fatalf("%s node status = %q, want pending", node, got)
+			}
+		})
+	}
+}
+
+func TestQRSPIHumanAndDoneNodesRejectHandoff(t *testing.T) {
+	def, err := Definition()
 	if err != nil {
 		t.Fatal(err)
 	}
-	state.CurrentNodeID = NodeImplement
+	for _, node := range []wruntime.NodeID{
+		NodeHumanReviewOutline,
+		NodeHumanReviewImplementation,
+		NodeDone,
+	} {
+		t.Run(string(node), func(t *testing.T) {
+			state, stateErr := wruntime.InitialState(def, nil)
+			if stateErr != nil {
+				t.Fatal(stateErr)
+			}
+			state.CurrentNodeID = node
+			state.PendingNextNodeID = node
+			result := qrspiResult(node, wruntime.StatusHandoff)
+			result.Outcome = ""
+			if _, decisionErr := wruntime.DecideTransition(def, state, result); decisionErr == nil {
+				t.Fatal("DecideTransition() error = nil, want unsupported handoff")
+			}
+		})
+	}
+}
 
-	result := qrspiResult(NodeImplement, wruntime.StatusHandoff)
+func TestQRSPIHandoffDiscussPolicyDoesNotAutoStart(t *testing.T) {
+	def, err := Definition()
+	if err != nil {
+		t.Fatal(err)
+	}
+	policy, err := json.Marshal(Policy{
+		AdvanceMode:             AdvanceModeDiscuss,
+		EnablePlanReviews:       true,
+		InvalidResultRetryLimit: 1,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	state, err := wruntime.InitialState(def, policy)
+	if err != nil {
+		t.Fatal(err)
+	}
+	state.CurrentNodeID = NodeResearch
+	state.PendingNextNodeID = NodeResearch
+	result := qrspiResult(NodeResearch, wruntime.StatusHandoff)
 	result.Outcome = ""
 	decision, err := wruntime.DecideTransition(def, state, result)
 	if err != nil {
 		t.Fatalf("DecideTransition() error = %v", err)
 	}
-	if !decision.StartNext || decision.NextNodeID != NodeImplement ||
-		decision.StopReason != "result handoff" {
-		t.Fatalf("decision = %+v", decision)
-	}
-	if decision.State.Status != wruntime.WorkspaceStatusIdle ||
-		decision.State.PendingNextNodeID != NodeImplement {
-		t.Fatalf("state = %+v", decision.State)
-	}
-	if got := decision.State.Nodes[NodeImplement].Status; got != wruntime.NodeStatusPending {
-		t.Fatalf("implement node status = %q, want pending", got)
+	if decision.StartNext || decision.NextNodeID != NodeResearch ||
+		decision.State.PendingNextNodeID != NodeResearch {
+		t.Fatalf("decision = %+v, want pending research without auto-start", decision)
 	}
 }
 
