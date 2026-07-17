@@ -95,14 +95,27 @@ In Graphite repos, including `cn-agents`, the first review-plan slice branch cre
 When the human asks for a new PR on top of an existing unmerged Graphite PR/branch:
 
 1. Treat the named branch as the required implementation parent, not merely research context.
-2. Keep the canonical sync checkout on trunk and clean. Create a fresh copied sibling workspace first; never run `gt get` in the canonical sync checkout.
-3. In the fresh copy, run `gt get --no-interactive <named-parent-branch>` before any edits.
-4. Verify `git branch --show-current`, `git rev-parse HEAD`, `gt branch info`, and `gt parent`/stack metadata prove the workspace is at the named parent branch and current remote PR head.
-5. Record the named parent branch and exact commit in `plan.md`, `AGENTS.md`, and `workspace_metadata.parent_branch`.
-6. The implementation branch created later must be a child of that parent. After `gt create`, verify `gt parent` equals the named parent before submission.
-7. If the human requested a draft PR, preserve that as a delivery requirement through plan, implementation handoff, submit, and read-back verification; do not silently create a ready-for-review PR.
+1. Keep the canonical sync checkout on trunk and clean. Create a fresh copied sibling workspace first; never run `gt get` in the canonical sync checkout.
+1. In the fresh copy, run `gt get --no-interactive <named-parent-branch>` before any edits.
+1. Verify `git branch --show-current`, `git rev-parse HEAD`, `gt branch info`, and `gt parent`/stack metadata prove the workspace is at the named parent branch and current remote PR head.
+1. Record the named parent branch and exact commit in `plan.md`, `AGENTS.md`, and `workspace_metadata.parent_branch`.
+1. The implementation branch created later must be a child of that parent. After `gt create`, verify `gt parent` equals the named parent before submission.
+1. If the human requested a draft PR, preserve that as a delivery requirement through plan, implementation handoff, submit, and read-back verification; do not silently create a ready-for-review PR.
 
 A request such as “`gt get <branch>` in a `/q-workspace`” is explicit base-selection direction. Do not substitute trunk or ask the human to repeat it unless safety checks reveal a conflict or missing branch.
+
+## Shared thoughts and efficient copies
+
+Assume `thoughts/` is a host-owned symlink to durable storage outside the repository. Preserve that symlink when copying a checkout; plan artifacts are shared, not workspace-local copies. Before any plan-directory sync, resolve both paths with `realpath` (or `readlink -f`) and, when they are the same target, **do not rsync**—`just sync-thoughts` is the durable artifact sync.
+
+Create a new checkout only from a clean source and a nonexistent destination. Use a copy-on-write clone, never symlinks (`ln -s`) or hard-link copies (`cp -al`):
+
+| Platform | Command |
+|---|---|
+| macOS/APFS | `cp -cRp "$source" "$destination"` |
+| Linux/GNU coreutils | `cp -a --reflink=auto "$source" "$destination"` |
+
+APFS `-c` and Linux reflinks initially share disk blocks but isolate later writes. Linux falls back to a normal copy when the filesystem lacks reflinks. Both commands preserve the external `thoughts/` symlink; repair a broken relative link to the configured shared thoughts root before implementation. Do not use `rsync` to create the whole checkout.
 
 ## No-work-loss checks
 
@@ -146,7 +159,7 @@ For normal new workspaces, write workspace metadata before copying so the copy s
 1. If workspace exists and is safe: update it to the selected/post-sync base only if doing so does not discard changes or remove the reviewed implementation head from ancestry; otherwise stop. For Graphite continuation or implementation-review follow-up work, repair by running `gt get --no-interactive <reviewed_or_stack_top_branch>` in the same original workspace when needed, not by resetting to trunk and not by creating a second copy.
    - In `cn-agents-*` implementation copies, use `gt sync --no-interactive` to fast-forward trunk metadata; do not use `git pull`, `git merge`, or `git rebase`.
    - Do not rsync changed plan docs into an existing `cn-agents-*` workspace before syncing it to the commit that already contains those docs, or Graphite may correctly refuse the sync due to conflicting unstaged changes.
-1. Use `rsync -a [source]/[plan_dir]/ [workspace]/[plan_dir]/` only after the workspace is at the correct base, or when repairing an existing safe workspace whose base intentionally differs from the source commit.
+1. After the workspace is at the correct base, resolve `[source]/thoughts` and `[workspace]/thoughts`. If they resolve to the same external directory, do not copy `[plan_dir]`; it is already shared. Otherwise, use `rsync -a [source]/[plan_dir]/ [workspace]/[plan_dir]/` only when repairing an existing safe workspace whose base intentionally differs from the source commit.
 1. In the workspace, verify:
 
 ```bash
@@ -164,7 +177,7 @@ If the selected base is an unmerged stack, do not create an implementation branc
 
 ## Update artifacts
 
-The metadata update happens before copying for new workspaces. For repairs to an existing safe workspace, update artifacts, run `just sync-thoughts`, update/sync the workspace safely, then rsync `[plan_dir]/` only after the workspace base is correct.
+The metadata update happens before copying for new workspaces. For repairs to an existing safe workspace, update artifacts, run `just sync-thoughts`, then update/sync the workspace safely. Resolve the source and workspace `thoughts/` links: when they share the configured external target, do not rsync `[plan_dir]/`; otherwise rsync it only after the workspace base is correct.
 
 Record:
 
