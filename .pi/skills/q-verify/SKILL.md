@@ -84,6 +84,12 @@ The project guide is authoritative for project-specific commands, E2E tools, scr
    - allowed fix scope
    - pass/fail criteria
 1. Run required verification commands exactly as the guide specifies.
+1. For table sorting verification, validate the fixture before treating UI evidence as meaningful:
+   - Seed rows with at least two genuinely different values in the sorted field; same-value rows cannot prove direction.
+   - Prefer a project-owned named scenario that naturally spans distinct values (for dates, distinct months/years) over ad hoc mutation.
+   - Verify ascending and descending order as exact reverses, and retain repeated values for tie/stability coverage.
+   - Cover pagination boundaries and missing/null placement with the project’s integration seam when the UI fixture is only one page or contains no missing values; state that split explicitly rather than implying Ranger/browser evidence covered it.
+   - Record the fixture/scenario name and observed value sequence in `verify.md` so reviewers can reproduce the proof.
 1. Inspect outputs, logs, screenshots, visual review artifacts, generated test diffs, and docs findings.
 1. Fix clear problems directly when ALL are true:
    - root cause is proven by evidence

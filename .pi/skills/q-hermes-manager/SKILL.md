@@ -52,13 +52,21 @@ Use the latest validated `qrspi_result` as the source of truth for routing.
 
 - For implementation `status: handoff`, route to `/q-resume` using the handoff artifact; do not pause just because a handoff exists.
 
-Pause only for:
+Pause graph advancement for:
 
 - `needs_human`, `blocked`, or `error`.
 - Invalid/missing `qrspi_result` YAML.
 - Failed background process exit.
 - Invalid artifact or impossible graph transition.
 - Real safety, lost-work, merge, manual-test, or product judgment decision.
+
+A technical `blocked` result does not always require idle waiting. Keep the QRSPI graph paused, preserve the workspace/WIP exactly, and classify the blocker:
+
+- **Needs human judgment:** ask the human; do not reinterpret approved product semantics.
+- **Diagnosable technical capability issue:** launch a bounded diagnostic support process without advancing the QRSPI node. Pass the full blocked YAML, exact handoff, deterministic repro, forbidden workarounds, and no-write/no-branch constraints. Prefer read-only diagnosis first.
+- When the lead engineer invokes `/diagnose` within a Hermes-managed QRSPI run, do not perform a long ad hoc diagnosis in the parent Hermes context and then stop halfway. Delegate the bounded diagnostic loop to a background Pi process immediately; the parent should gather only enough evidence to write a precise child prompt, verify any child-reported side effects, parse the full log, and manage the resulting human gate or resume.
+- If diagnosis finds a behavior-preserving representation or library-supported fix, require a deterministic regression test and update the active design/ADR/outline/plan before resuming the blocked implementation checkpoint.
+- If diagnosis cannot preserve approved semantics, return the concrete incompatibility and smallest human decision required. Never silently weaken null ordering, pagination, missing-value semantics, or delivery constraints just to clear the blocker.
 
 ### Revalidate external stack dependencies
 
@@ -116,11 +124,14 @@ From the selected cwd, start Pi in a Hermes background process with completion n
 pi -p @/tmp/q-hermes-manager-[stage]-prompt.md
 ```
 
-If the user's environment has a known absolute Pi path, prefer it over relying on cron/shell PATH. On swarm machines, use:
+If the user's environment has a known absolute Pi path, prefer it over relying on cron/shell PATH. Remember that Pi's shebang still resolves `node` through `PATH`; an absolute Pi path alone is insufficient in stripped-down Hermes/background shells. On swarm machines, launch with the known Node toolchain explicitly:
 
 ```bash
-/Users/swarm/.npm-global/bin/pi -p @/tmp/q-hermes-manager-[stage]-prompt.md
+PATH=/Users/swarm/.local/share/fnm/node-versions/v24.14.1/installation/bin:/Users/swarm/.npm-global/bin:/Users/swarm/go/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin \
+  /Users/swarm/.npm-global/bin/pi -p @/tmp/q-hermes-manager-[stage]-prompt.md
 ```
+
+Before the first launch in a session, cheaply verify both executables (`test -x .../node`, `node --version`, `test -x .../pi`). If a launch exits with `env: node: No such file or directory`, fix `PATH` and relaunch the same prompt; do not classify the QRSPI stage itself as failed.
 
 Track completion with the returned process ID using process polling/log tools such as `process(action="poll")` and `process(action="log")` when available.
 
@@ -175,9 +186,22 @@ For implementation stages:
 If the user replies while orchestration is in progress with a clarification or correction:
 
 - Treat it as settled alignment for subsequent stages unless it conflicts with safety or plan invariants.
+- First decide whether the correction changes the **currently running stage's acceptance criteria**. If yes, do not merely queue it for a later stage: inspect the active process, and when there is no supported steering channel, stop and relaunch that stage with the correction embedded in the full prompt. Preserve the previous `qrspi_result`, workspace, evidence, and safety constraints. Report that the prior process was intentionally superseded rather than presenting its termination as a stage failure.
+- If the current child can finish valid work that remains correct under the clarification, let it finish and patch the very next child prompt instead; avoid needless restarts.
 - Patch the very next child prompt with the exact correction and label it as lead-engineer guidance.
 - Do not restart completed stages merely to restate the correction; carry it forward into research/design/plan/implementation prompts and artifacts.
 - Example: if the user clarifies an assignment invariant after q-question, pass it into q-research as settled alignment so design and implementation inherit it.
+
+### Human feedback after implementation review or verify
+
+A human may discover or clarify a deeper requirement while inspecting verification evidence, even after implementation review was clean. Treat this as implementation-review follow-up work rather than mutating the completed parent plan in place.
+
+- When the human explicitly asks for a new `/q-question` in a review directory, seed it from the existing canonical `*_implementation-review/review.md` and use that timestamped implementation-review directory as the new QRSPI plan directory.
+- Include the latest full parent `qrspi_result` plus the new human guidance in the child prompt. State which prior constraint the newer guidance supersedes and which surrounding invariants remain unchanged.
+- Preserve `workspace_metadata.implementation_workspace`; later review-plan completion must skip `/q-workspace` and route directly to `/q-implement` in that same workspace.
+- Require follow-up Graphite branches to stack on the exact reviewed head/current draft PR. Do not reset, rebase onto trunk, or create another copied workspace.
+- Keep parent `design.md`, `outline.md`, and `plan.md` immutable. New question/research/design/outline/plan artifacts belong under the implementation-review directory.
+- If verification was awaiting human confirmation, the deeper follow-up supersedes simple verify completion: run the review-directory loop, implement/review/verify the stacked change, then return to the human gate with updated evidence.
 
 ## Step 8: Report concisely
 
