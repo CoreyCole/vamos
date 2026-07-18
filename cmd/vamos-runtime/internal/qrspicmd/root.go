@@ -15,11 +15,11 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
+	"gopkg.in/yaml.v3"
 
 	"github.com/CoreyCole/vamos/pkg/agents/workflows/qrspi"
 	"github.com/CoreyCole/vamos/pkg/agents/workflows/qrspi/semantic"
 	wruntime "github.com/CoreyCole/vamos/pkg/agents/workflows/runtime"
-	"gopkg.in/yaml.v3"
 )
 
 var ErrNotImplemented = errors.New("qrspi command behavior not implemented")
@@ -306,11 +306,15 @@ func newRepairStateCommand(d deps) *cobra.Command {
 		BoolVar(&opts.ClearFailedChild, "clear-failed-child", false, "clear active child only when status/output prove terminal launch failure")
 	cmd.Flags().
 		BoolVar(&opts.Relaunch, "relaunch", false, "after clearing a terminal failed child, relaunch the same graph node")
-	cmd.Flags().StringVar(&opts.SetNode, "set-node", "", "source node for explicit result evidence")
+	cmd.Flags().
+		StringVar(&opts.SetNode, "set-node", "", "source node for explicit result evidence")
 	cmd.Flags().StringVar(&opts.FromResult, "from-result", "", "result evidence file")
-	cmd.Flags().StringVar(&opts.FromSession, "from-session", "", "Pi session evidence file")
-	cmd.Flags().StringVar(&opts.ImplementationCwd, "implementation-cwd", "", "implementation workspace used while validating evidence")
-	cmd.Flags().StringVar(&opts.Reason, "reason", "", "operator reason for explicit state alignment")
+	cmd.Flags().
+		StringVar(&opts.FromSession, "from-session", "", "Pi session evidence file")
+	cmd.Flags().
+		StringVar(&opts.ImplementationCwd, "implementation-cwd", "", "implementation workspace used while validating evidence")
+	cmd.Flags().
+		StringVar(&opts.Reason, "reason", "", "operator reason for explicit state alignment")
 	cmd.Flags().StringVar(&opts.Output, "output", "text", "output format: text or ndjson")
 	return cmd
 }
@@ -596,6 +600,7 @@ func RunInit(ctx context.Context, opts InitOptions, d deps, out io.Writer) error
 		return err
 	}
 	state.ManagerPaneID = CaptureManagerPaneID(opts.ManagerPane)
+	state.LinearIssueID = DetectLinearIssue(state.CanonicalPlanDir)
 	clock := d.Clock
 	if clock == nil {
 		clock = time.Now
@@ -1503,7 +1508,12 @@ func RunChild(ctx context.Context, opts RunChildOptions, d deps, out io.Writer) 
 	if err := store.Save(opts.StateFile, state); err != nil {
 		cleanupErr := tmuxClient(d).KillPane(ctx, run.Pane)
 		if cleanupErr != nil {
-			return fmt.Errorf("persist started child: %w (cleanup untracked pane %s: %v)", err, run.Pane.ID, cleanupErr)
+			return fmt.Errorf(
+				"persist started child: %w (cleanup untracked pane %s: %v)",
+				err,
+				run.Pane.ID,
+				cleanupErr,
+			)
 		}
 		return fmt.Errorf("persist started child: %w", err)
 	}
@@ -1643,7 +1653,10 @@ func RunChildComplete(
 	}
 	requestedChildID := strings.TrimSpace(opts.ChildID)
 	if requestedChildID != "" {
-		if continuation, ok := existingHandoffContinuationForSource(state, requestedChildID); ok {
+		if continuation, ok := existingHandoffContinuationForSource(
+			state,
+			requestedChildID,
+		); ok {
 			_, status, recoverErr := recoverExistingHandoffContinuation(
 				ctx,
 				opts.StateFile,
@@ -1679,7 +1692,11 @@ func RunChildComplete(
 	child := state.ActiveChild
 	sessionPath := strings.TrimSpace(child.SessionPath)
 	if sessionPath == "" {
-		sessionPath, err = ResolveSessionPath(child.SessionDir, child.SessionID, child.Cwd)
+		sessionPath, err = ResolveSessionPath(
+			child.SessionDir,
+			child.SessionID,
+			child.Cwd,
+		)
 		if err != nil {
 			return nil, err
 		}
@@ -1747,7 +1764,11 @@ func RunChildComplete(
 				if err != nil {
 					return nil, err
 				}
-				if err := writeChildCompletionOutput(out, opts.Output, status); err != nil {
+				if err := writeChildCompletionOutput(
+					out,
+					opts.Output,
+					status,
+				); err != nil {
 					return nil, err
 				}
 
@@ -1816,7 +1837,8 @@ func RunChildComplete(
 			state, status.Wake = prepareWake(state, opts.StateFile, status)
 		}
 	case ChildIntentProviderFailure:
-		if evidence.CurrentTerminal != nil && evidence.CurrentTerminal.ContextWindowError {
+		if evidence.CurrentTerminal != nil &&
+			evidence.CurrentTerminal.ContextWindowError {
 			status = childCompletionStatusFromTerminalEvidence(
 				state,
 				*child,
@@ -1837,7 +1859,11 @@ func RunChildComplete(
 				TerminalEvidence: evidence.CurrentTerminal,
 				Evidence:         providerContextEvidenceLines(*evidence.CurrentTerminal),
 			}
-			status.ActionCard = BuildChildContextExhaustedCard(health, state, opts.StateFile)
+			status.ActionCard = BuildChildContextExhaustedCard(
+				health,
+				state,
+				opts.StateFile,
+			)
 		} else {
 			status = childIntentManagerStatus(state, opts.StateFile, *child, intent)
 		}
@@ -1883,31 +1909,36 @@ func persistChildCompletionStatus(
 	out io.Writer,
 	output string,
 ) (*ChildCompletionStatus, error) {
-	persisted, err := store.Mutate(stateFile, &expectedEpoch, func(latest *ManagerState) error {
-		if state.ActiveChild != nil && state.ActiveChild.Generation != expectedEpoch.Generation {
-			*latest = supersedeQueuedWakeForActiveChild(
-				*latest,
-				expectedEpoch.ID,
-				"parser correction started a new evidence epoch",
-			)
-		}
-		latest.ActiveChild = state.ActiveChild
-		if status.ActionCard != nil {
-			latest.LastActionCard = status.ActionCard
-		}
-		if status.DeliveryID != "" {
-			var prepared ManagerState
-			wakeStatus := status
-			wakeStatus.Wake = WakeDeliveryInstruction{}
-			prepared, status.Wake = prepareWake(*latest, stateFile, wakeStatus)
-			latest.Delivery = prepared.Delivery
-			if prepared.LastActionCard != nil {
-				latest.LastActionCard = prepared.LastActionCard
+	persisted, err := store.Mutate(
+		stateFile,
+		&expectedEpoch,
+		func(latest *ManagerState) error {
+			if state.ActiveChild != nil &&
+				state.ActiveChild.Generation != expectedEpoch.Generation {
+				*latest = supersedeQueuedWakeForActiveChild(
+					*latest,
+					expectedEpoch.ID,
+					"parser correction started a new evidence epoch",
+				)
 			}
-		}
+			latest.ActiveChild = state.ActiveChild
+			if status.ActionCard != nil {
+				latest.LastActionCard = status.ActionCard
+			}
+			if status.DeliveryID != "" {
+				var prepared ManagerState
+				wakeStatus := status
+				wakeStatus.Wake = WakeDeliveryInstruction{}
+				prepared, status.Wake = prepareWake(*latest, stateFile, wakeStatus)
+				latest.Delivery = prepared.Delivery
+				if prepared.LastActionCard != nil {
+					latest.LastActionCard = prepared.LastActionCard
+				}
+			}
 
-		return nil
-	})
+			return nil
+		},
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -1979,7 +2010,9 @@ func completeHandoffContinuation(
 	state.Workflow = parsed.Decision.State
 	state = UpdateImplementationCwd(state, parsed.Result)
 	if state.ActiveChild == nil || state.ActiveChild.ID != source.ID {
-		return state, ChildCompletionStatus{}, errors.New("source child changed before handoff continuation claim")
+		return state, ChildCompletionStatus{}, errors.New(
+			"source child changed before handoff continuation claim",
+		)
 	}
 	state.ActiveChild.LifecycleStatus = "continuing"
 	state.ActiveChild.LastDeliveryID = intent.DeliveryID
@@ -2181,7 +2214,10 @@ func recoverExistingHandoffContinuation(
 	queued := state.Delivery.QueuedWake
 	switch {
 	case state.Delivery.LastDeliveryID == status.DeliveryID:
-		status.Wake = WakeDeliveryInstruction{Mode: "suppress", Reason: "duplicate_delivery"}
+		status.Wake = WakeDeliveryInstruction{
+			Mode:   "suppress",
+			Reason: "duplicate_delivery",
+		}
 	case queued != nil && queued.DeliveryID == status.DeliveryID:
 		status.Wake = WakeDeliveryInstruction{
 			Mode:    "queue",
@@ -2202,7 +2238,10 @@ func recoverExistingHandoffContinuation(
 		}
 	}
 	if state.PendingCleanupChild != nil && state.PendingCleanupChild.ID == sourceChildID {
-		if err := writeValidationStatus(state.PendingCleanupChild.ValidationStatusPath, status); err != nil {
+		if err := writeValidationStatus(
+			state.PendingCleanupChild.ValidationStatusPath,
+			status,
+		); err != nil {
 			return state, ChildCompletionStatus{}, err
 		}
 	}
@@ -2326,7 +2365,11 @@ func resolvePlanArtifact(
 		return "", err
 	}
 	if pathEscapesRoot(planRel) {
-		return "", fmt.Errorf("canonical plan directory %q escapes repo root %q", planDir, repoRoot)
+		return "", fmt.Errorf(
+			"canonical plan directory %q escapes repo root %q",
+			planDir,
+			repoRoot,
+		)
 	}
 
 	mappedPlanDir := filepath.Join(sourceChildCwd, planRel)
@@ -2348,10 +2391,18 @@ func resolvePlanArtifact(
 	if err != nil {
 		return "", fmt.Errorf("resolve handoff artifact: %w", err)
 	}
-	if err := requirePathWithin(realPlanDir, realHandoffsDir, "handoffs directory"); err != nil {
+	if err := requirePathWithin(
+		realPlanDir,
+		realHandoffsDir,
+		"handoffs directory",
+	); err != nil {
 		return "", err
 	}
-	if err := requirePathWithin(realHandoffsDir, realArtifact, "handoff artifact"); err != nil {
+	if err := requirePathWithin(
+		realHandoffsDir,
+		realArtifact,
+		"handoff artifact",
+	); err != nil {
 		return "", err
 	}
 	info, err := os.Stat(realArtifact)
@@ -2365,7 +2416,8 @@ func resolvePlanArtifact(
 }
 
 func pathEscapesRoot(rel string) bool {
-	return filepath.IsAbs(rel) || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator))
+	return filepath.IsAbs(rel) || rel == ".." ||
+		strings.HasPrefix(rel, ".."+string(filepath.Separator))
 }
 
 func requirePathWithin(root, path, label string) error {
@@ -2388,7 +2440,9 @@ func readHandoffArtifact(path string) (HandoffArtifact, error) {
 
 	scanner := bufio.NewScanner(file)
 	if !scanner.Scan() || strings.TrimSpace(scanner.Text()) != "---" {
-		return HandoffArtifact{}, errors.New("handoff artifact must start with YAML frontmatter")
+		return HandoffArtifact{}, errors.New(
+			"handoff artifact must start with YAML frontmatter",
+		)
 	}
 	var frontmatter strings.Builder
 	closed := false
@@ -2426,10 +2480,16 @@ func validateHandoffArtifact(
 	result wruntime.WorkflowResult,
 ) (HandoffArtifact, error) {
 	if result.Status != wruntime.StatusHandoff {
-		return HandoffArtifact{}, fmt.Errorf("result status %q is not handoff", result.Status)
+		return HandoffArtifact{}, fmt.Errorf(
+			"result status %q is not handoff",
+			result.Status,
+		)
 	}
 	if result.Outcome != "" {
-		return HandoffArtifact{}, fmt.Errorf("handoff outcome must be empty, got %q", result.Outcome)
+		return HandoffArtifact{}, fmt.Errorf(
+			"handoff outcome must be empty, got %q",
+			result.Outcome,
+		)
 	}
 	path, err := resolvePlanArtifact(
 		state.RepoID,
@@ -2475,14 +2535,21 @@ func deriveChildLaunchIntent(
 		return ChildLaunchIntent{}, err
 	}
 	if !reflect.DeepEqual(authoritative, decision) {
-		return ChildLaunchIntent{}, errors.New("launch decision does not match manager workflow policy")
+		return ChildLaunchIntent{}, errors.New(
+			"launch decision does not match manager workflow policy",
+		)
 	}
 	if !decision.StartNext || decision.NextNodeID == "" {
-		return ChildLaunchIntent{}, errors.New("workflow decision does not authorize child launch")
+		return ChildLaunchIntent{}, errors.New(
+			"workflow decision does not authorize child launch",
+		)
 	}
 	node, ok := def.Nodes[decision.NextNodeID]
 	if !ok {
-		return ChildLaunchIntent{}, fmt.Errorf("node %q is not in QRSPI definition", decision.NextNodeID)
+		return ChildLaunchIntent{}, fmt.Errorf(
+			"node %q is not in QRSPI definition",
+			decision.NextNodeID,
+		)
 	}
 	cwd, err := defaultChildCwd(state, decision.NextNodeID, "")
 	if err != nil {
@@ -2501,7 +2568,9 @@ func deriveChildLaunchIntent(
 	}
 	if result.Outcome != "" || decision.NextNodeID != result.SourceNodeID ||
 		wruntime.NodeID(source.Stage) != result.SourceNodeID {
-		return ChildLaunchIntent{}, errors.New("handoff launch must resume the exact source node without outcome")
+		return ChildLaunchIntent{}, errors.New(
+			"handoff launch must resume the exact source node without outcome",
+		)
 	}
 	handoff, err := validateHandoffArtifact(state, source, result)
 	if err != nil {
@@ -2645,7 +2714,8 @@ func childIntentManagerStatus(
 			card = naturalPivotActionCard(stateFile, intent)
 		}
 	}
-	if intent.Kind == ChildIntentAmbiguousUnsafe && intent.Evidence.ManagerRequestError != "" {
+	if intent.Kind == ChildIntentAmbiguousUnsafe &&
+		intent.Evidence.ManagerRequestError != "" {
 		reason = "refused q_manager_request: " + intent.Evidence.ManagerRequestError
 		card = refusedManagerRequestActionCard(intent, reason)
 	}
@@ -2708,7 +2778,10 @@ func naturalPivotActionCard(stateFile string, intent ChildIntent) *ManagerAction
 	}
 }
 
-func refusedManagerRequestActionCard(intent ChildIntent, reason string) *ManagerActionCard {
+func refusedManagerRequestActionCard(
+	intent ChildIntent,
+	reason string,
+) *ManagerActionCard {
 	return &ManagerActionCard{
 		Kind:              string(ChildIntentAmbiguousUnsafe),
 		Severity:          "warning",
@@ -2886,14 +2959,20 @@ func prepareWake(
 		return state, status.Wake
 	}
 	if strings.TrimSpace(status.DeliveryID) == "" {
-		return state, WakeDeliveryInstruction{Mode: "suppress", Reason: "missing_delivery_id"}
+		return state, WakeDeliveryInstruction{
+			Mode:   "suppress",
+			Reason: "missing_delivery_id",
+		}
 	}
 	if state.Delivery.LastDeliveryID == status.DeliveryID ||
 		(state.Delivery.PendingDelivery != nil &&
 			state.Delivery.PendingDelivery.DeliveryID == status.DeliveryID) ||
 		(state.Delivery.QueuedWake != nil &&
 			state.Delivery.QueuedWake.DeliveryID == status.DeliveryID) {
-		return state, WakeDeliveryInstruction{Mode: "suppress", Reason: "duplicate_delivery"}
+		return state, WakeDeliveryInstruction{
+			Mode:   "suppress",
+			Reason: "duplicate_delivery",
+		}
 	}
 	payload := childCompletionWakePayload(stateFile, state, status)
 	wake := QueuedWake{
@@ -2906,12 +2985,20 @@ func prepareWake(
 	if strings.EqualFold(state.Delivery.Status, "compacting") {
 		state.Delivery.QueuedWake = &wake
 
-		return state, WakeDeliveryInstruction{Mode: "queue", Payload: payload, Reason: "manager_compacting"}
+		return state, WakeDeliveryInstruction{
+			Mode:    "queue",
+			Payload: payload,
+			Reason:  "manager_compacting",
+		}
 	}
 	if managerDeliveryPane(state) == "" {
 		state.Delivery.QueuedWake = &wake
 
-		return state, WakeDeliveryInstruction{Mode: "queue", Payload: payload, Reason: "manager_pane_missing"}
+		return state, WakeDeliveryInstruction{
+			Mode:    "queue",
+			Payload: payload,
+			Reason:  "manager_pane_missing",
+		}
 	}
 	state.Delivery.PendingDelivery = &wake
 
@@ -2935,25 +3022,34 @@ func deliverPreparedWake(
 	}
 	paneID := managerDeliveryPane(state)
 	if live := managerPaneLiveness(ctx, paneID, d); live.Checked && !live.Exists {
-		updated, mutateErr := store.Mutate(stateFile, &epoch, func(latest *ManagerState) error {
-			pending := latest.Delivery.PendingDelivery
-			if pending == nil || pending.DeliveryID != status.DeliveryID {
-				return fmt.Errorf("pending delivery %q changed before queue", status.DeliveryID)
-			}
-			latest.Delivery.QueuedWake = pending
-			latest.Delivery.PendingDelivery = nil
-			latest.LastActionCard = buildManagerPaneActionCard(
-				*latest,
-				ManagerPaneAdoptionOptions{
-					StateFile: stateFile,
-					Command:   ManagerPaneAdoptionManagerReady,
-				},
-				[]string{fmt.Sprintf("selected manager pane unavailable: %s", paneID)},
-				ActionManagerPaneUnavailable,
-			)
+		updated, mutateErr := store.Mutate(
+			stateFile,
+			&epoch,
+			func(latest *ManagerState) error {
+				pending := latest.Delivery.PendingDelivery
+				if pending == nil || pending.DeliveryID != status.DeliveryID {
+					return fmt.Errorf(
+						"pending delivery %q changed before queue",
+						status.DeliveryID,
+					)
+				}
+				latest.Delivery.QueuedWake = pending
+				latest.Delivery.PendingDelivery = nil
+				latest.LastActionCard = buildManagerPaneActionCard(
+					*latest,
+					ManagerPaneAdoptionOptions{
+						StateFile: stateFile,
+						Command:   ManagerPaneAdoptionManagerReady,
+					},
+					[]string{
+						fmt.Sprintf("selected manager pane unavailable: %s", paneID),
+					},
+					ActionManagerPaneUnavailable,
+				)
 
-			return nil
-		})
+				return nil
+			},
+		)
 		if mutateErr != nil {
 			return state, WakeDeliveryInstruction{}, mutateErr
 		}
@@ -2977,8 +3073,11 @@ func deliverPreparedWake(
 				Summary:           "manager wake delivery failed after pending state was persisted",
 				Evidence:          []string{err.Error()},
 				RecommendedAction: "run manager-ready to redeliver the queued wake",
-				SafeCommand:       fmt.Sprintf("vamos qrspi manager-ready --state-file %s --manager-pane \"$TMUX_PANE\"", stateFile),
-				RequiresHuman:     false,
+				SafeCommand: fmt.Sprintf(
+					"vamos qrspi manager-ready --state-file %s --manager-pane \"$TMUX_PANE\"",
+					stateFile,
+				),
+				RequiresHuman: false,
 			}
 
 			return nil
@@ -2989,7 +3088,10 @@ func deliverPreparedWake(
 	updated, err := store.Mutate(stateFile, &epoch, func(latest *ManagerState) error {
 		pending := latest.Delivery.PendingDelivery
 		if pending == nil || pending.DeliveryID != status.DeliveryID {
-			return fmt.Errorf("pending delivery %q changed before finalize", status.DeliveryID)
+			return fmt.Errorf(
+				"pending delivery %q changed before finalize",
+				status.DeliveryID,
+			)
 		}
 		latest.Delivery.LastDeliveryID = pending.DeliveryID
 		latest.Delivery.PendingDelivery = nil
@@ -3000,7 +3102,10 @@ func deliverPreparedWake(
 		return state, WakeDeliveryInstruction{}, err
 	}
 
-	return updated, WakeDeliveryInstruction{Mode: "deliver", Payload: status.Wake.Payload}, nil
+	return updated, WakeDeliveryInstruction{
+		Mode:    "deliver",
+		Payload: status.Wake.Payload,
+	}, nil
 }
 
 func queueOrDeliverWake(
@@ -3034,7 +3139,11 @@ func queueOrDeliverWake(
 			QueuedWakePasteAndSubmit,
 			"",
 		)
-		return state, WakeDeliveryInstruction{Mode: "queue", Payload: payload, Reason: reason}, nil
+		return state, WakeDeliveryInstruction{
+			Mode:    "queue",
+			Payload: payload,
+			Reason:  reason,
+		}, nil
 	}
 	if strings.EqualFold(state.Delivery.Status, "compacting") {
 		return queue("manager_compacting")
@@ -3210,7 +3319,11 @@ func activeChildAssistantHead(state ManagerState) (string, error) {
 	sessionPath := strings.TrimSpace(child.SessionPath)
 	if sessionPath == "" && strings.TrimSpace(child.SessionID) != "" {
 		var err error
-		sessionPath, err = ResolveSessionPath(child.SessionDir, child.SessionID, child.Cwd)
+		sessionPath, err = ResolveSessionPath(
+			child.SessionDir,
+			child.SessionID,
+			child.Cwd,
+		)
 		if err != nil {
 			return "", err
 		}
@@ -3311,14 +3424,25 @@ func childCompletionWakePayload(
 	fmt.Fprintf(&payload, "  artifact: %q\n", status.Result.Artifact)
 	fmt.Fprintf(&payload, "  child_id: %q\n", status.ChildID)
 	fmt.Fprintf(&payload, "  state_file: %q\n", stateFile)
+	writeLinearCommentWake(&payload, state, stateFile)
 	fmt.Fprintf(&payload, "  reason: %q\n", status.Reason)
-	payload.WriteString(childCompletionWakeTerminalEvidencePayload(status.TerminalEvidence))
+	payload.WriteString(
+		childCompletionWakeTerminalEvidencePayload(status.TerminalEvidence),
+	)
 	fmt.Fprintf(&payload, "  policy:\n")
 	fmt.Fprintf(&payload, "    advance_mode: %q\n", policy.AdvanceMode)
 	fmt.Fprintf(&payload, "    auto_mode: %t\n", policy.AutoMode)
 	fmt.Fprintf(&payload, "    enable_plan_reviews: %t\n", policy.EnablePlanReviews)
-	fmt.Fprintf(&payload, "    invalid_result_retry_limit: %d\n", policy.InvalidResultRetryLimit)
-	fmt.Fprintf(&payload, "    note: %q\n", "manager policy is authoritative; child-emitted policy is ignored for transitions")
+	fmt.Fprintf(
+		&payload,
+		"    invalid_result_retry_limit: %d\n",
+		policy.InvalidResultRetryLimit,
+	)
+	fmt.Fprintf(
+		&payload,
+		"    note: %q\n",
+		"manager policy is authoritative; child-emitted policy is ignored for transitions",
+	)
 	fmt.Fprintf(&payload, "  summary:\n")
 	fmt.Fprintf(&payload, "    plan_goal: %q\n", status.Result.PlanGoal)
 	fmt.Fprintf(&payload, "    stage_completed: %q\n", status.Result.StageCompleted)
@@ -3335,6 +3459,42 @@ func childCompletionWakePayload(
 	}
 	payload.WriteString("```")
 	return payload.String()
+}
+
+func writeLinearCommentWake(
+	payload *strings.Builder,
+	state ManagerState,
+	stateFile string,
+) {
+	if strings.TrimSpace(state.LinearIssueID) == "" {
+		return
+	}
+	fmt.Fprintf(payload, "  linear_comment:\n")
+	fmt.Fprintf(payload, "    issue_ref: %q\n", state.LinearIssueID)
+	if strings.TrimSpace(state.LinearRootCommentID) == "" {
+		fmt.Fprintf(payload, "    setup_command: %q\n", continueCommand(stateFile))
+		fmt.Fprintf(
+			payload,
+			"    note: %q\n",
+			"continue creates or reuses the QRSPI root comment and posts this stage reply",
+		)
+		return
+	}
+	fmt.Fprintf(payload, "    parent_comment_uuid: %q\n", state.LinearRootCommentID)
+	fmt.Fprintf(
+		payload,
+		"    reply_command: %q\n",
+		fmt.Sprintf(
+			"linear-cli comments create %s --parent-id %s --body <markdown>",
+			state.LinearIssueID,
+			state.LinearRootCommentID,
+		),
+	)
+	fmt.Fprintf(
+		payload,
+		"    note: %q\n",
+		"use parent_comment_uuid exactly; Linear URL fragments such as #comment-43e8cf86 are not valid --parent-id values",
+	)
 }
 
 func childCompletionWakeTerminalEvidencePayload(e *AssistantTerminalEvidence) string {
@@ -3770,29 +3930,41 @@ func RunManagerReady(
 			}
 		}
 		if deliveryErr != nil {
-			_, _ = store.Mutate(opts.StateFile, expected, func(latest *ManagerState) error {
-				if latest.Delivery.PendingDelivery != nil &&
-					latest.Delivery.PendingDelivery.DeliveryID == pending.DeliveryID {
-					latest.Delivery.QueuedWake = pending
-					latest.Delivery.PendingDelivery = nil
-				}
+			_, _ = store.Mutate(
+				opts.StateFile,
+				expected,
+				func(latest *ManagerState) error {
+					if latest.Delivery.PendingDelivery != nil &&
+						latest.Delivery.PendingDelivery.DeliveryID == pending.DeliveryID {
+						latest.Delivery.QueuedWake = pending
+						latest.Delivery.PendingDelivery = nil
+					}
 
-				return nil
-			})
+					return nil
+				},
+			)
 
 			return deliveryErr
 		}
-		state, err = store.Mutate(opts.StateFile, expected, func(latest *ManagerState) error {
-			if latest.Delivery.PendingDelivery == nil ||
-				latest.Delivery.PendingDelivery.DeliveryID != pending.DeliveryID {
-				return fmt.Errorf("pending delivery %q changed before manager-ready finalize", pending.DeliveryID)
-			}
-			latest.Delivery.PendingDelivery.DeliveredAt = time.Now().Format(time.RFC3339)
-			latest.Delivery.LastDeliveryID = pending.DeliveryID
-			latest.Delivery.PendingDelivery = nil
+		state, err = store.Mutate(
+			opts.StateFile,
+			expected,
+			func(latest *ManagerState) error {
+				if latest.Delivery.PendingDelivery == nil ||
+					latest.Delivery.PendingDelivery.DeliveryID != pending.DeliveryID {
+					return fmt.Errorf(
+						"pending delivery %q changed before manager-ready finalize",
+						pending.DeliveryID,
+					)
+				}
+				latest.Delivery.PendingDelivery.DeliveredAt = time.Now().
+					Format(time.RFC3339)
+				latest.Delivery.LastDeliveryID = pending.DeliveryID
+				latest.Delivery.PendingDelivery = nil
 
-			return nil
-		})
+				return nil
+			},
+		)
 		if err != nil {
 			return err
 		}
@@ -3874,7 +4046,11 @@ func flushQueuedWake(
 		delivery = QueuedWakePasteAndSubmit
 	}
 	if delivery == QueuedWakeSubmitOnly && queued.PastedPaneID == paneID {
-		if err := tmux.SendKeys(ctx, TmuxPane{ID: paneID}, []string{"Enter"}); err != nil {
+		if err := tmux.SendKeys(
+			ctx,
+			TmuxPane{ID: paneID},
+			[]string{"Enter"},
+		); err != nil {
 			state = recordQueuedWakeDeliveryFailure(state, queued, paneID, "submit", err)
 			return state, false, nil
 		}
@@ -3887,7 +4063,11 @@ func flushQueuedWake(
 		}
 		queued.Delivery = QueuedWakeSubmitOnly
 		queued.PastedPaneID = paneID
-		if err := tmux.SendKeys(ctx, TmuxPane{ID: paneID}, []string{"Enter"}); err != nil {
+		if err := tmux.SendKeys(
+			ctx,
+			TmuxPane{ID: paneID},
+			[]string{"Enter"},
+		); err != nil {
 			state = recordQueuedWakeDeliveryFailure(state, queued, paneID, "submit", err)
 			return state, false, nil
 		}
@@ -3968,8 +4148,11 @@ func RunRepairState(
 		strings.TrimSpace(opts.FromSession) != "" ||
 		strings.TrimSpace(opts.ImplementationCwd) != "" ||
 		strings.TrimSpace(opts.Reason) != ""
-	if explicitAlignment && (opts.AlignActiveChild || opts.ClearFailedChild || opts.Relaunch) {
-		return errors.New("explicit state alignment cannot be combined with another repair action")
+	if explicitAlignment &&
+		(opts.AlignActiveChild || opts.ClearFailedChild || opts.Relaunch) {
+		return errors.New(
+			"explicit state alignment cannot be combined with another repair action",
+		)
 	}
 	switch {
 	case explicitAlignment:
@@ -4216,7 +4399,10 @@ func withStateAlignmentLock(stateFile string, fn func() error) error {
 	if err := syscall.Flock(int(file.Fd()), syscall.LOCK_EX); err != nil {
 		return err
 	}
-	defer syscall.Flock(int(file.Fd()), syscall.LOCK_UN) //nolint:errcheck // process exit also releases the advisory lock
+	defer syscall.Flock(
+		int(file.Fd()),
+		syscall.LOCK_UN,
+	) //nolint:errcheck // process exit also releases the advisory lock
 
 	return fn()
 }
@@ -4254,7 +4440,10 @@ func readAlignmentResult(opts RepairStateOptions) (string, string, error) {
 		}
 	}
 
-	return "", "", fmt.Errorf("session %s has no complete active-branch qrspi_result", resolved)
+	return "", "", fmt.Errorf(
+		"session %s has no complete active-branch qrspi_result",
+		resolved,
+	)
 }
 
 func regularEvidencePath(path string) (string, error) {
@@ -4701,11 +4890,20 @@ func RunSteerChild(
 		return nil, err
 	}
 	prompt := buildChildSteerPrompt(state, child, feedback, feedbackPath)
-	state, err = store.Mutate(opts.StateFile, &expected, func(latest *ManagerState) error {
-		advanceChildGeneration(latest, "steered", "child steering started a new evidence epoch", cursor)
+	state, err = store.Mutate(
+		opts.StateFile,
+		&expected,
+		func(latest *ManagerState) error {
+			advanceChildGeneration(
+				latest,
+				"steered",
+				"child steering started a new evidence epoch",
+				cursor,
+			)
 
-		return nil
-	})
+			return nil
+		},
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -4952,7 +5150,11 @@ func RunContinue(ctx context.Context, opts ContinueOptions, d deps, out io.Write
 	})
 	if evidenceErr != nil {
 		if IsRecoverableNoResultChild(health) {
-			if card := BuildChildContextExhaustedCard(health, state, opts.StateFile); card != nil {
+			if card := BuildChildContextExhaustedCard(
+				health,
+				state,
+				opts.StateFile,
+			); card != nil {
 				state.LastActionCard = card
 				_ = store.Save(opts.StateFile, state)
 
@@ -4966,7 +5168,11 @@ func RunContinue(ctx context.Context, opts ContinueOptions, d deps, out io.Write
 	if IsRecoverableNoResultChild(health) &&
 		intent.Kind != ChildIntentGraphValidResult &&
 		intent.Kind != ChildIntentRepairableResult {
-		if card := BuildChildContextExhaustedCard(health, state, opts.StateFile); card != nil {
+		if card := BuildChildContextExhaustedCard(
+			health,
+			state,
+			opts.StateFile,
+		); card != nil {
 			state.LastActionCard = card
 			_ = store.Save(opts.StateFile, state)
 
@@ -5070,6 +5276,15 @@ func RunContinue(ctx context.Context, opts ContinueOptions, d deps, out io.Write
 	if err != nil {
 		return err
 	}
+	linearUpdate := postLinearStageUpdate(ctx, &nextState, parsed, commandRunner(d))
+	if linearUpdate.IssueID != "" {
+		result.LinearIssueID = linearUpdate.IssueID
+		result.LinearRootCommentID = linearUpdate.RootCommentID
+		result.LinearCommentError = linearUpdate.Error
+		if err := store.Save(opts.StateFile, nextState); err != nil {
+			return err
+		}
+	}
 	result.Decided = true
 	result.NextNodeID = parsed.Decision.NextNodeID
 	result.Policy = activePolicySummary(nextState)
@@ -5118,7 +5333,8 @@ func RunContinue(ctx context.Context, opts ContinueOptions, d deps, out io.Write
 					parsed.Result,
 					err,
 				)
-				if durable.ActiveChild != nil && durable.ActiveChild.ID == state.ActiveChild.ID {
+				if durable.ActiveChild != nil &&
+					durable.ActiveChild.ID == state.ActiveChild.ID {
 					durable.ActiveChild.LifecycleStatus = "awaiting_manager"
 				}
 				durable.LastActionCard = card
@@ -5646,7 +5862,8 @@ func buildStateDesyncActionCard(
 		stateFile,
 	)
 	recommended := "align active child, then continue"
-	if state.ActiveChild != nil && strings.TrimSpace(state.ActiveChild.SessionPath) != "" {
+	if state.ActiveChild != nil &&
+		strings.TrimSpace(state.ActiveChild.SessionPath) != "" {
 		cwdFlag := ""
 		if strings.TrimSpace(state.ImplementationCwd) != "" {
 			cwdFlag = fmt.Sprintf(" --implementation-cwd %q", state.ImplementationCwd)
@@ -5841,6 +6058,21 @@ func writeContinueText(out io.Writer, result ContinueResult) error {
 	}
 	if result.PrimaryArtifact != "" {
 		fmt.Fprintf(out, "artifact: %s\n", result.PrimaryArtifact)
+	}
+	if result.LinearIssueID != "" {
+		fmt.Fprintf(out, "linear issue: %s\n", result.LinearIssueID)
+	}
+	if result.LinearRootCommentID != "" {
+		fmt.Fprintf(out, "linear root comment: %s\n", result.LinearRootCommentID)
+		fmt.Fprintf(
+			out,
+			"linear reply: linear-cli comments create %s --parent-id %s --body <markdown>\n",
+			result.LinearIssueID,
+			result.LinearRootCommentID,
+		)
+	}
+	if result.LinearCommentError != nil {
+		fmt.Fprintf(out, "linear comment warning: %v\n", result.LinearCommentError)
 	}
 	if result.Validated != nil {
 		summary := childCompletionResult(result.Validated.Result)

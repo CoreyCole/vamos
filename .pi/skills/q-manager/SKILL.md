@@ -48,16 +48,13 @@ When the user invokes `/q-hermes-manager` or asks Hermes to manage a QRSPI flow,
 
 ## Linear ticket artifact comments
 
-When the active QRSPI plan is operating on a Linear ticket, move the ticket to In Progress and add concise progress comments as stage artifacts are produced.
+When the active QRSPI plan is operating on a Linear ticket, the runtime keeps every progress update in one collapsible comment thread.
 
-1. Detect the Linear issue from durable plan context, preferring `[plan_dir]/context/question/linear/issue.json`, then `ticket.md`, `AGENTS.md`, or prior captured QRSPI artifacts. Do not guess an issue ID when none is recorded.
-1. Detect the preferred Linear comment thread from durable plan context when present, preferring an explicitly recorded project-planning comment/thread ID or URL in `[plan_dir]/context/question/linear/`, `ticket.md`, `AGENTS.md`, or prior captured QRSPI artifacts. If the recorded URL has a fragment like `#comment-c04ee576`, resolve it to the canonical Linear comment ID required by the CLI/API before using it as a parent. Do not guess a parent comment when none is recorded or resolvable.
-1. Before launching the first child stage for that ticket, move the issue to In Progress. Use `linear-cli issues update <ISSUE_ID> --state "In Progress"`; use `linear-cli issues start <ISSUE_ID>` only when assigning the ticket to the current Linear user is also intended.
-1. After `continue` validates a child result, summarize the stage in 1-4 bullets and include markdown links to the produced/updated artifacts from `qrspi_result.artifact` and `qrspi_result.artifacts`.
-1. Use durable links only: provider/web URLs when available, or thoughts-relative artifact paths formatted as markdown links. Do not link machine-local absolute paths, q-manager state files, tmux panes, session JSONL, prompt files, or other ephemeral control refs.
-1. Post with `linear-cli comments create <ISSUE_ID> --body "$(cat /tmp/q-manager-linear-comment.md)"`. If a preferred project-planning/manager thread parent is explicitly recorded and resolvable, include `--parent-id <COMMENT_ID>` so status updates stay in that thread; otherwise create a normal ticket comment.
-1. Keep comments human-readable and non-spammy. One comment per validated stage result is enough; include stage, status/outcome, artifact links, and next stage. Do not paste full `qrspi_result` YAML unless the ticket workflow explicitly requires it.
-1. If Linear CLI/auth fails for state move or comment posting, report the failure and continue QRSPI unless the human made Linear updates a hard requirement.
+1. q-manager discovers the issue from `[plan_dir]/context/question/linear/issue.json` and persists `linearIssueId` in local ManagerState. Do not add required Linear flags to `init` or `start-next`.
+1. On the first validated stage result, runtime finds a prior marker thread or creates one root comment, persists `linearRootCommentId`, then posts the stage update as its reply. Later validated stages always reply to that stored root; never create another top-level progress comment.
+1. `continue` prints `linear issue`, the full UUID `linear root comment`, and an exact `linear-cli comments create ... --parent-id ...` reply command. Use that surfaced command for a manual supplemental update. Never use a short `#comment-...` URL fragment as `--parent-id`; use the full persisted UUID.
+1. Runtime comments are concise and include stage/status, summary, and the primary thoughts-relative artifact. Keep any manual additions human-readable and non-spammy.
+1. If Linear CLI/auth fails, `continue` reports a warning and QRSPI continues unless the human made Linear updates a hard requirement.
 
 Comment shape:
 

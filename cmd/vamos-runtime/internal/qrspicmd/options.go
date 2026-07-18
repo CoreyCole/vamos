@@ -685,20 +685,23 @@ type SetPolicyOptions struct {
 }
 
 type ContinueResult struct {
-	Validated       *ParsedDecision
-	Reprompted      bool
-	Relaunched      bool
-	Decided         bool
-	StartedChild    *ChildRunRef
-	CleanedChild    *ChildRunRef
-	StopReason      string
-	WaitingHuman    bool
-	NextNodeID      wruntime.NodeID
-	PrimaryArtifact string
-	Policy          PolicySummary
-	NextChild       NextChildInfo
-	HumanPrompt     HumanPromptContext
-	ActionCard      *ManagerActionCard
+	Validated           *ParsedDecision
+	Reprompted          bool
+	Relaunched          bool
+	Decided             bool
+	StartedChild        *ChildRunRef
+	CleanedChild        *ChildRunRef
+	StopReason          string
+	WaitingHuman        bool
+	NextNodeID          wruntime.NodeID
+	PrimaryArtifact     string
+	Policy              PolicySummary
+	NextChild           NextChildInfo
+	HumanPrompt         HumanPromptContext
+	ActionCard          *ManagerActionCard
+	LinearIssueID       string
+	LinearRootCommentID string
+	LinearCommentError  error
 }
 
 type HumanPromptContext struct {
@@ -739,7 +742,10 @@ type StateOperationLock interface {
 type StateStore interface {
 	Load(path string) (ManagerState, error)
 	Save(path string, state ManagerState) error
-	AcquireOperationLock(ctx context.Context, stateFile string) (StateOperationLock, error)
+	AcquireOperationLock(
+		ctx context.Context,
+		stateFile string,
+	) (StateOperationLock, error)
 	Mutate(path string, expected *ChildEpoch, fn StateMutation) (ManagerState, error)
 	AcquireLock(
 		ctx context.Context,

@@ -11,6 +11,8 @@ type ManagerState struct {
 	ManagerRunID        string                  `json:"managerRunId"`
 	SourceCwd           string                  `json:"sourceCwd"`
 	ImplementationCwd   string                  `json:"implementationCwd,omitempty"`
+	LinearIssueID       string                  `json:"linearIssueId,omitempty"`
+	LinearRootCommentID string                  `json:"linearRootCommentId,omitempty"`
 	PiModel             string                  `json:"piModel,omitempty"`
 	ManagerPaneID       string                  `json:"managerPaneId,omitempty"`
 	ManagerSessionPath  string                  `json:"managerSessionPath,omitempty"`

@@ -79,19 +79,67 @@ func TestResolveSessionPathDoesNotAcceptSiblingCWD(t *testing.T) {
 
 func TestExtractFinalAssistantTextFromSessionUsesLastAssistantResult(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "session.jsonl")
+	first := testResultYAML(
+		"question",
+		"complete",
+		"complete",
+		"thoughts/example/questions.md",
+		"",
+	)
+	last := testResultYAML(
+		"design",
+		"complete",
+		"complete",
+		"thoughts/example/design.md",
+		"",
+	)
 	writeSessionTestFile(t, path, strings.Join([]string{
 		sessionHeader("s", "/tmp/repo"),
-		assistantLine("first qrspi_result"),
+		assistantLine(first),
 		`{"type":"message","message":{"role":"user","content":"qrspi_result user text"}}`,
-		assistantLine("final qrspi_result"),
+		assistantLine(last),
 	}, "\n")+"\n")
 
 	got, err := ExtractFinalAssistantTextFromSession(path)
 	if err != nil {
 		t.Fatalf("ExtractFinalAssistantTextFromSession error = %v", err)
 	}
-	if got != "final qrspi_result" {
-		t.Fatalf("text = %q", got)
+	if strings.Contains(got, "```") || !strings.Contains(got, `stage: "design"`) {
+		t.Fatalf("text = %q, want extracted final YAML body", got)
+	}
+}
+
+func TestExtractFinalAssistantTextFromSessionExtractsYAMLBeforeTrailingFindings(
+	t *testing.T,
+) {
+	path := filepath.Join(t.TempDir(), "session.jsonl")
+	result := testResultYAML(
+		"design",
+		"complete",
+		"complete",
+		"thoughts/example/design.md",
+		"",
+	)
+	writeSessionTestFile(
+		t,
+		path,
+		sessionHeader(
+			"s",
+			"/tmp/repo",
+		)+"\n"+assistantLine(
+			result+"\nFindings:\n1. First finding\n2. Second finding",
+		)+"\n",
+	)
+
+	got, err := ExtractFinalAssistantTextFromSession(path)
+	if err != nil {
+		t.Fatalf("ExtractFinalAssistantTextFromSession error = %v", err)
+	}
+	if strings.Contains(got, "Findings:") || strings.Contains(got, "```") {
+		t.Fatalf("text = %q, want only fenced YAML body", got)
+	}
+	if !strings.Contains(got, "qrspi_result:") {
+		t.Fatalf("text = %q, missing qrspi_result", got)
 	}
 }
 
@@ -104,15 +152,23 @@ func TestExtractFinalAssistantTextFromSessionIgnoresMalformedToolThinkingAndAbor
 		`not-json`,
 		`{"type":"message","message":{"role":"assistant","stopReason":"aborted","content":[{"type":"text","text":"aborted qrspi_result"}]}}`,
 		`{"type":"message","message":{"role":"assistant","content":[{"type":"thinking","text":"qrspi_result hidden"},{"type":"tool_use","text":"qrspi_result tool"}]}}`,
-		assistantLine("visible qrspi_result"),
+		assistantLine(
+			testResultYAML(
+				"design",
+				"complete",
+				"complete",
+				"thoughts/example/design.md",
+				"",
+			),
+		),
 	}, "\n")+"\n")
 
 	got, err := ExtractFinalAssistantTextFromSession(path)
 	if err != nil {
 		t.Fatalf("ExtractFinalAssistantTextFromSession error = %v", err)
 	}
-	if got != "visible qrspi_result" {
-		t.Fatalf("text = %q", got)
+	if strings.Contains(got, "```") || !strings.Contains(got, `stage: "design"`) {
+		t.Fatalf("text = %q, want extracted YAML body", got)
 	}
 }
 
@@ -246,21 +302,29 @@ func TestExtractSessionEvidenceKeepsLineFallbackForMinimalFixtures(t *testing.T)
 
 func TestTextBlocksFromAssistantMessageAcceptsStringContent(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "session.jsonl")
+	result := testResultYAML(
+		"design",
+		"complete",
+		"complete",
+		"thoughts/example/design.md",
+		"",
+	)
 	writeSessionTestFile(
 		t,
 		path,
-		sessionHeader(
-			"s",
-			"/tmp/repo",
-		)+"\n"+`{"type":"message","message":{"role":"assistant","content":"string qrspi_result"}}`+"\n",
+		sessionHeader("s", "/tmp/repo")+"\n"+
+			fmt.Sprintf(
+				`{"type":"message","message":{"role":"assistant","content":%q}}`,
+				result,
+			)+"\n",
 	)
 
 	got, err := ExtractFinalAssistantTextFromSession(path)
 	if err != nil {
 		t.Fatalf("ExtractFinalAssistantTextFromSession error = %v", err)
 	}
-	if got != "string qrspi_result" {
-		t.Fatalf("text = %q", got)
+	if strings.Contains(got, "```") || !strings.Contains(got, `stage: "design"`) {
+		t.Fatalf("text = %q, want extracted YAML body", got)
 	}
 }
 

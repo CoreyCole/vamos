@@ -212,8 +212,9 @@ func finalQRSPIResultText(
 		if item.StopReason == "error" || item.StopReason == "aborted" {
 			continue
 		}
-		if strings.Contains(item.Text, "qrspi_result") {
-			return item.Text, nil
+		yamlText, err := qrspi.ExtractQRSPIResultYAML(item.Text)
+		if err == nil {
+			return yamlText, nil
 		}
 	}
 
