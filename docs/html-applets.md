@@ -1,6 +1,6 @@
 # HTML Applets
 
-Vamos renders trusted `.html` Thoughts documents as sandboxed applets inside the Thoughts workbench. The applet owns its HTML, CSS, and JavaScript.
+Vamos renders trusted `.html` Thoughts documents as sandboxed applets inside the Thoughts workbench. The applet owns its HTML, CSS, and JavaScript. Unthemed HTML receives a white iframe canvas so browser-default dark text remains readable in either Vamos theme; Vamos does not reinterpret arbitrary authored colors.
 
 Static HTML applets are single files with client-side behavior only. For server-backed Datastar, Streamlit, Go, or Python apps, use [HTTP Applets](http-applets.md). HTTP applets run a managed local server behind the same Workbench shell and support SSE reads and short write requests.
 
@@ -44,7 +44,7 @@ These root-relative assets are embedded-only enhancements and are not available 
 
 Use `/css/out.css` when an embedded applet should share Vamos styles. The parent may use build-hashed CSS internally, but authored Thoughts files should use the stable URL. Put local overrides after the shared stylesheet so later rules win.
 
-Use `/js/vamos-html-applet.js` when an embedded applet should follow the parent light/dark toggle. The helper reads the initial theme from the iframe URL and listens for parent theme changes. Do not hard-code the root element into dark mode for durable applets.
+Use `/js/vamos-html-applet.js` when an embedded applet should follow the parent light/dark toggle. The helper reads the initial theme from the iframe URL, applies the matching `color-scheme` for native controls, and listens for parent theme changes. Pair it with `/css/out.css` and explicit `bg-background text-foreground` classes; an iframe cannot inherit parent document colors. Do not hard-code the root element into dark mode for durable applets.
 
 ## Sandbox boundary
 

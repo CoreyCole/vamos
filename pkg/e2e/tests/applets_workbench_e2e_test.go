@@ -149,16 +149,17 @@ func TestAppletsWorkbench_StreamlitRestartChangesProcessIdentity(t *testing.T) {
 		Run()
 }
 
-func TestAppletsWorkbench_WordleAbsoluteRoutesForwardFromIframe(t *testing.T) {
-	spec.Story(t, "applets workbench forwards wordle absolute datastar routes from iframe").
+func TestWordleAppletSmoke(t *testing.T) {
+	spec.Story(t, "wordle applet smoke").
 		App(vamos.App()).
 		As(vamos.Robot).
 		With(vamos.WorkspaceFixture("thoughts-workbench.basic")).
 		Visit(vamos.Pages.Path("/examples/wordle?context=chat")).
+		Expect(vamos.Thoughts.Ready()).
 		Expect(spec.ExpectStep(expectWorkbenchDatastarImportMapPresent())).
 		Expect(spec.ExpectStep(expectWordleIframeLoaded())).
 		Do(loginToWordleApplet()).
-		Expect(spec.ExpectStep(expectWordleAliasCookiesWorkAfterLogin())).
+		Do(submitWordleGuess("aback")).
 		Expect(spec.ExpectStep(expectAppletConsoleClean())).
 		Run()
 }
@@ -571,7 +572,7 @@ func loginToWordleApplet() spec.Step {
 		if err := input.WaitFor(playwright.LocatorWaitForOptions{Timeout: playwright.Float(60_000)}); err != nil {
 			t.Fatalf("wordle login input missing: %v", err)
 		}
-		if err := input.Fill("e2e"); err != nil {
+		if err := input.Fill(fmt.Sprintf("e2e-%d", time.Now().UnixNano())); err != nil {
 			t.Fatal(err)
 		}
 		if err := frame.GetByRole("button", playwright.FrameLocatorGetByRoleOptions{Name: "Play"}).Click(); err != nil {
@@ -583,32 +584,29 @@ func loginToWordleApplet() spec.Step {
 	})
 }
 
-func expectWordleAliasCookiesWorkAfterLogin() spec.Step {
-	return spec.Custom("wordle alias routes receive login cookie", func(t testing.TB, ctx *duiruntime.Context) {
+func submitWordleGuess(guess string) spec.Step {
+	return spec.Custom("submit wordle guess through applet UI", func(t testing.TB, ctx *duiruntime.Context) {
 		t.Helper()
-		result, err := ctx.Page.FrameLocator(wordleAppletFrameSelector).Locator("body").Evaluate(`async () => {
-			const events = await fetch('/events', {headers: {Accept: 'text/event-stream'}})
-				.then((r) => ({status: r.status}))
-				.catch((e) => ({status: 0, text: String(e)}))
-			const guesses = await fetch('/guesses', {
-				method: 'POST',
-				headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-				body: new URLSearchParams({guess: 'adieu'}),
+		frame := ctx.Page.FrameLocator(wordleAppletFrameSelector)
+		for _, letter := range strings.ToUpper(guess) {
+			key := frame.GetByRole("button", playwright.FrameLocatorGetByRoleOptions{
+				Name:  "Letter " + string(letter),
+				Exact: playwright.Bool(true),
 			})
-				.then(async (r) => ({status: r.status, text: await r.text().catch(() => '')}))
-				.catch((e) => ({status: 0, text: String(e)}))
-			return {events, guesses, cookie: document.cookie}
-		}`, nil)
-		if err != nil {
-			t.Fatal(err)
-		}
-		data := result.(map[string]any)
-		for route, raw := range map[string]any{"events": data["events"], "guesses": data["guesses"]} {
-			entry := raw.(map[string]any)
-			status := browserNumberAsInt(entry["status"])
-			if status == http.StatusNotFound || status == 0 || status >= 500 || status == http.StatusUnauthorized || status == http.StatusForbidden {
-				t.Fatalf("%s status = %d after login; result=%#v", route, status, data)
+			if err := key.Click(); err != nil {
+				t.Fatalf("click wordle letter %q: %v", letter, err)
 			}
+		}
+		if err := frame.GetByRole("button", playwright.FrameLocatorGetByRoleOptions{
+			Name:  "Submit guess",
+			Exact: playwright.Bool(true),
+		}).Click(); err != nil {
+			t.Fatalf("submit wordle guess: %v", err)
+		}
+		if err := frame.GetByText("1/6", playwright.FrameLocatorGetByTextOptions{Exact: playwright.Bool(true)}).WaitFor(
+			playwright.LocatorWaitForOptions{Timeout: playwright.Float(30_000)},
+		); err != nil {
+			t.Fatalf("wordle guess did not reach durable board state: %v", err)
 		}
 	})
 }

@@ -18,7 +18,7 @@ import (
 )
 
 const (
-	rendererDemoAppletFrameSelector = `iframe[data-vamos-html-applet][src^='/thoughts/_render/html/renderer-demo.html?theme=']`
+	rendererDemoAppletFrameSelector = `iframe[data-vamos-html-applet][src^='/thoughts/_render/html/tests/renderer-demo.html?theme=']`
 	styledAppletFrameSelector       = `iframe[data-vamos-html-applet][src^='/thoughts/_render/html/styled-applet.html?theme=']`
 )
 
@@ -69,31 +69,31 @@ func TestThoughtsWorkbench_RendererFormatsShowExpectedWorkbenchStates(t *testing
 		As(vamos.Robot).
 		With(vamos.WorkspaceFixture("thoughts-workbench.basic")).
 		Do(seedRendererThoughtsFiles()).
-		Visit(vamos.Pages.Path("/thoughts/renderer-demo.md?context=chat")).
+		Visit(vamos.Pages.Path("/thoughts/tests/renderer-demo.md?context=chat")).
 		Expect(vamos.Thoughts.Ready()).
 		Expect(spec.TextContains(vamos.Thoughts.CenterPane(), "Renderer Markdown Demo")).
-		Visit(vamos.Pages.Path("/thoughts/renderer-demo.html?context=chat")).
+		Visit(vamos.Pages.Path("/thoughts/tests/renderer-demo.html?context=chat")).
 		Expect(vamos.Thoughts.Ready()).
 		Expect(spec.ExpectStep(spec.TextAbsent("HTML applet:"))).
 		Expect(spec.ExpectStep(spec.Visible(spec.CSS(rendererDemoAppletFrameSelector)))).
 		Expect(iframeSandboxOmitsSameOrigin()).
 		Expect(htmlAppletFillsDocumentSurface(rendererDemoAppletFrameSelector)).
-		Visit(vamos.Pages.Path("/thoughts/renderer-demo.csv?context=chat")).
+		Visit(vamos.Pages.Path("/thoughts/tests/renderer-demo.csv?context=chat")).
 		Expect(vamos.Thoughts.Ready()).
 		Expect(spec.ExpectStep(spec.TextAbsent("CSV table:"))).
 		Expect(spec.TextContains(vamos.Thoughts.CenterPane(), "<script>")).
 		Expect(csvRendererUsesDocumentTableStyles()).
-		Visit(vamos.Pages.Path("/thoughts/renderer-demo.tsv?context=chat")).
+		Visit(vamos.Pages.Path("/thoughts/tests/renderer-demo.tsv?context=chat")).
 		Expect(vamos.Thoughts.Ready()).
 		Expect(spec.TextContains(vamos.Thoughts.CenterPane(), "Ada")).
 		Expect(spec.TextContains(vamos.Thoughts.CenterPane(), "tabbed text")).
 		Expect(csvRendererUsesDocumentTableStyles()).
-		Visit(vamos.Pages.Path("/thoughts/renderer-demo.json?context=chat")).
+		Visit(vamos.Pages.Path("/thoughts/tests/renderer-demo.json?context=chat")).
 		Expect(vamos.Thoughts.Ready()).
 		Expect(spec.ExpectStep(spec.TextAbsent("Unsupported document type"))).
 		Expect(spec.TextContains(vamos.Thoughts.CenterPane(), "source")).
 		Expect(sourceRendererShowsLineNumbers()).
-		Visit(vamos.Pages.Path("/thoughts/renderer-demo.bin?context=chat")).
+		Visit(vamos.Pages.Path("/thoughts/tests/renderer-demo.bin?context=chat")).
 		Expect(vamos.Thoughts.Ready()).
 		Expect(spec.TextContains(vamos.Thoughts.CenterPane(), "Unsupported document type")).
 		Expect(vamos.Console.Clean()).
@@ -108,19 +108,19 @@ func TestThoughtsWorkbench_WorkbenchOverflowWholeDocumentComments(t *testing.T) 
 		As(vamos.Robot).
 		With(vamos.WorkspaceFixture("thoughts-workbench.basic")).
 		Do(seedRendererThoughtsFiles()).
-		Visit(vamos.Pages.Path("/thoughts/renderer-demo.md?context=chat")).
+		Visit(vamos.Pages.Path("/thoughts/tests/renderer-demo.md?context=chat")).
 		Expect(vamos.Thoughts.Ready()).
 		Do(openWorkbenchOverflow()).
 		Expect(spec.ExpectStep(expectWorkbenchOverflowAction("Comment"))).
 		Do(submitWholeDocumentComment(commentText + " markdown")).
 		Expect(spec.ExpectStep(expectCommentsRailShows(commentText + " markdown"))).
-		Visit(vamos.Pages.Path("/thoughts/renderer-demo.json?context=chat")).
+		Visit(vamos.Pages.Path("/thoughts/tests/renderer-demo.json?context=chat")).
 		Expect(vamos.Thoughts.Ready()).
 		Do(openWorkbenchOverflow()).
 		Expect(spec.ExpectStep(expectWorkbenchOverflowAction("Comment"))).
 		Do(submitWholeDocumentComment(commentText + " source")).
 		Expect(spec.ExpectStep(expectCommentsRailShows(commentText + " source"))).
-		Visit(vamos.Pages.Path("/thoughts/renderer-demo.html?context=chat")).
+		Visit(vamos.Pages.Path("/thoughts/tests/renderer-demo.html?context=chat")).
 		Expect(vamos.Thoughts.Ready()).
 		Expect(spec.ExpectStep(spec.Visible(spec.CSS(rendererDemoAppletFrameSelector)))).
 		Do(openWorkbenchOverflow()).
@@ -157,7 +157,7 @@ func TestThoughtsWorkbench_HTMLChildRouteServesAppletContent(t *testing.T) {
 		As(vamos.Robot).
 		With(vamos.WorkspaceFixture("thoughts-workbench.basic")).
 		Do(seedRendererThoughtsFiles()).
-		Visit(vamos.Pages.Path("/thoughts/_render/html/renderer-demo.html")).
+		Visit(vamos.Pages.Path("/thoughts/_render/html/tests/renderer-demo.html")).
 		Expect(spec.ExpectStep(spec.TextAbsent("HTML applet:"))).
 		Expect(spec.ExpectStep(spec.TextAbsent("thoughts-markdown-scroll-region"))).
 		Expect(spec.TextContains(spec.CSS("body"), "Renderer HTML Applet")).
@@ -166,15 +166,16 @@ func TestThoughtsWorkbench_HTMLChildRouteServesAppletContent(t *testing.T) {
 		Run()
 }
 
-func TestThoughtsWorkbench_ClientOnlyHTMLAppletHydratesFromCDN(t *testing.T) {
-	spec.Story(t, "thoughts workbench client-only HTML applet hydrates from CDN").
+func TestStaticHtmlAppletEmbedded(t *testing.T) {
+	spec.Story(t, "static HTML applet embedded").
 		App(vamos.App()).
 		As(vamos.Robot).
 		With(vamos.WorkspaceFixture("thoughts-workbench.basic")).
 		Do(seedRendererThoughtsFiles()).
-		Visit(vamos.Pages.Path("/thoughts/renderer-demo.html?context=chat")).
+		Visit(vamos.Pages.Path("/thoughts/tests/renderer-demo.html?context=chat")).
 		Expect(vamos.Thoughts.Ready()).
 		Expect(iframeSandboxOmitsSameOrigin()).
+		Expect(rendererDemoReady(true)).
 		Expect(rendererDemoFeedback(false, false, true)).
 		Do(clickRendererDemoAnswer("answer-wrong", true)).
 		Expect(rendererDemoFeedback(false, true, true)).
@@ -184,13 +185,14 @@ func TestThoughtsWorkbench_ClientOnlyHTMLAppletHydratesFromCDN(t *testing.T) {
 		Run()
 }
 
-func TestThoughtsWorkbench_ClientOnlyHTMLAppletWorksAsStandaloneFile(t *testing.T) {
-	spec.Story(t, "thoughts workbench client-only HTML applet works as standalone file").
+func TestStaticHtmlAppletStandalone(t *testing.T) {
+	spec.Story(t, "static HTML applet standalone").
 		App(vamos.App()).
 		As(vamos.Robot).
 		With(vamos.WorkspaceFixture("thoughts-workbench.basic")).
 		Do(seedRendererThoughtsFiles()).
 		Do(openRendererDemoStandaloneFile()).
+		Expect(rendererDemoReady(false)).
 		Expect(rendererDemoFeedback(false, false, false)).
 		Do(clickRendererDemoAnswer("answer-wrong", false)).
 		Expect(rendererDemoFeedback(false, true, false)).
@@ -356,6 +358,7 @@ func seedRendererThoughtsFiles() spec.Step {
 </head>
 <body data-signals="{_answer: ''}">
   <h1>Renderer HTML Applet</h1>
+  <p id="runtime-ready" style="display: none" data-show="true">Runtime ready</p>
   <button id="answer-wrong" data-on:click="$_answer = 'wrong'">Wrong answer</button>
   <button id="answer-correct" data-on:click="$_answer = 'correct'">Correct answer</button>
   <p id="feedback-wrong" style="display: none" data-show="$_answer === 'wrong'">Incorrect feedback</p>
@@ -622,6 +625,13 @@ func htmlAppletChildHasInitialTheme() spec.Expectation {
 		if gotDark != wantDark {
 			t.Fatalf("child dark=%v, want %v from %q", gotDark, wantDark, src)
 		}
+		wantScheme := "light"
+		if wantDark {
+			wantScheme = "dark"
+		}
+		if got := htmlAppletChildColorScheme(t, ctx, styledAppletFrameSelector); got != wantScheme {
+			t.Fatalf("child color-scheme=%q, want %q", got, wantScheme)
+		}
 		if err := ctx.Page.FrameLocator(styledAppletFrameSelector).Locator("body[data-parent-blocked='true']").WaitFor(); err != nil {
 			t.Fatalf("child did not record blocked parent DOM access: %v", err)
 		}
@@ -679,6 +689,13 @@ func htmlAppletChildThemeChanged() spec.Expectation {
 		initial := ctx.Memory["styled_applet_initial_dark"] == "true"
 		for i := 0; i < 20; i++ {
 			if got := htmlAppletChildDark(t, ctx, styledAppletFrameSelector); got != initial {
+				wantScheme := "light"
+				if got {
+					wantScheme = "dark"
+				}
+				if scheme := htmlAppletChildColorScheme(t, ctx, styledAppletFrameSelector); scheme != wantScheme {
+					t.Fatalf("child color-scheme=%q after toggle, want %q", scheme, wantScheme)
+				}
 				return
 			}
 			time.Sleep(100 * time.Millisecond)
@@ -709,6 +726,15 @@ func htmlAppletChildDark(t testing.TB, ctx *duiruntime.Context, selector string)
 	return value.(bool)
 }
 
+func htmlAppletChildColorScheme(t testing.TB, ctx *duiruntime.Context, selector string) string {
+	t.Helper()
+	value, err := ctx.Page.FrameLocator(selector).Locator("html").Evaluate("el => el.style.colorScheme", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return fmt.Sprint(value)
+}
+
 func boolString(value bool) string {
 	if value {
 		return "true"
@@ -719,10 +745,10 @@ func boolString(value bool) string {
 func rendererDemoThoughtsRoot(ctx *duiruntime.Context) string {
 	root := strings.TrimSpace(os.Getenv("VAMOS_E2E_THOUGHTS_ROOT"))
 	if root == "" {
-		return filepath.Join(ctx.Config.RepoRoot, "thoughts")
+		root = filepath.Join(ctx.Config.RepoRoot, "thoughts")
 	}
 
-	return root
+	return filepath.Join(root, "tests")
 }
 
 func openRendererDemoStandaloneFile() spec.Step {
@@ -747,6 +773,18 @@ func clickRendererDemoAnswer(id string, embedded bool) spec.Step {
 			t.Fatal(err)
 		}
 	})
+}
+
+func rendererDemoReady(embedded bool) spec.Expectation {
+	return spec.ExpectStep(spec.Custom("renderer demo Datastar runtime ready", func(t testing.TB, ctx *duiruntime.Context) {
+		t.Helper()
+		if err := rendererDemoLocator(ctx, "#runtime-ready", embedded).WaitFor(playwright.LocatorWaitForOptions{
+			State:   playwright.WaitForSelectorStateVisible,
+			Timeout: playwright.Float(30_000),
+		}); err != nil {
+			t.Fatal(err)
+		}
+	}))
 }
 
 func rendererDemoFeedback(correctVisible, wrongVisible, embedded bool) spec.Expectation {

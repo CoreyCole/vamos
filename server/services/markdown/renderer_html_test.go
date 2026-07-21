@@ -200,8 +200,8 @@ func TestHTMLAppletRendererReturnsSandboxedFrame(t *testing.T) {
 	if !strings.Contains(html, `referrerpolicy="same-origin"`) {
 		t.Fatalf("missing referrer policy: %s", html)
 	}
-	if !strings.Contains(html, `class="h-full min-h-0 w-full flex-1 border-0 bg-background"`) {
-		t.Fatalf("iframe no longer fills available width/height: %s", html)
+	if !strings.Contains(html, `class="h-full min-h-0 w-full flex-1 border-0 bg-white"`) {
+		t.Fatalf("iframe must fill the surface with a readable unthemed fallback: %s", html)
 	}
 	if strings.Contains(html, "min-h-[70vh]") || strings.Contains(html, "rounded-lg") {
 		t.Fatalf("HTML renderer keeps inset/card sizing: %s", html)

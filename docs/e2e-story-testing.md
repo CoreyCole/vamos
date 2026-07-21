@@ -62,6 +62,25 @@ just e2e \
   --scenario freeform-chat-started-from-thoughts-root-survives-refresh-and-resume
 ```
 
+### Portable applet smoke stories
+
+Mint and export fresh browser auth as described above immediately before each command, then run these reusable stories against the exact local server under test. Point `VAMOS_E2E_THOUGHTS_ROOT` at that server's thoughts root; checkout-local verification servers normally use `.vamos/state/thoughts`. `--no-restart` keeps the runner on the explicitly supplied external server instead of invoking the configured managed-server command.
+
+```bash
+VAMOS_E2E_THOUGHTS_ROOT="$PWD/.vamos/state/thoughts" \
+  just e2e --base-url http://127.0.0.1:49231 --no-restart \
+  --story static-html-applet-embedded
+
+VAMOS_E2E_THOUGHTS_ROOT="$PWD/.vamos/state/thoughts" \
+  just e2e --base-url http://127.0.0.1:49231 --no-restart \
+  --story static-html-applet-standalone
+
+just e2e --base-url http://127.0.0.1:49231 --no-restart \
+  --story wordle-applet-smoke
+```
+
+The embedded story checks initial hidden feedback, wrong-only feedback, correct-only feedback, opaque sandboxing, and console cleanliness. The standalone story opens the same seeded HTML unchanged through `file://` while retaining the explicit base-URL contract for auth and fixture setup. The Wordle story proves the proxied app renders instead of a stale proxy response, logs in, submits a valid guess through the UI, observes durable board state, and leaves a clean console.
+
 The live QRSPI continuation browser check is intentionally singular and expensive: `agentchat qrspi question completion auto starts design` starts a real Pi/Temporal `question` workflow-node run with legacy `assisted`/autopilot, asserts the runtime starts `research`, lets the real `research` run follow a seeded fast-path fixture, and asserts the runtime starts `design`. Once design is current, the story downgrades the workflow policy to `discuss` so later QRSPI nodes do not auto-start, then verifies no `workspace` node run or sibling implementation checkout was created. The generated Q-to-D plan fixture lives under the served thoughts root (`VAMOS_E2E_THOUGHTS_ROOT` when set, otherwise the checkout `thoughts/`) so plan-workspace validation passes; it is removed at test cleanup unless `VAMOS_E2E_QRSPI_PRESERVE_FIXTURE=1` is set for debugging. Keep card rendering, reload, and sidebar coverage in fixture stories such as `agentchat qrspi continuation`.
 
 ```bash

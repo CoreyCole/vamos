@@ -8,6 +8,7 @@ function applyVamosTheme(theme) {
   const normalized = normalizeVamosTheme(theme);
   if (!normalized) return;
   document.documentElement.classList.toggle("dark", normalized === "dark");
+  document.documentElement.style.colorScheme = normalized;
 }
 
 function themeFromQuery(search) {
