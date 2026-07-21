@@ -1,12 +1,36 @@
 # HTML Applets
 
-Vamos can render trusted `.html` Thoughts documents as sandboxed applets inside the Thoughts workbench. The applet owns its HTML, CSS, and JavaScript; Vamos provides stable shared assets for applets that want to match the app shell.
+Vamos renders trusted `.html` Thoughts documents as sandboxed applets inside the Thoughts workbench. The applet owns its HTML, CSS, and JavaScript.
 
-For process-backed Datastar, Streamlit, Go, or Python apps, use [HTTP Applets](http-applets.md). HTTP applets run a managed local server behind the same Workbench shell instead of serving static HTML bytes.
+Static HTML applets are single files with client-side behavior only. For server-backed Datastar, Streamlit, Go, or Python apps, use [HTTP Applets](http-applets.md). HTTP applets run a managed local server behind the same Workbench shell and support SSE reads and short write requests.
 
-## Default prelude
+## Client-only Datastar
 
-Use this prelude for authored applets that should look native and follow the parent theme:
+Static HTML applets may use Datastar for local UI signals. Load the pinned public bundle explicitly:
+
+```html
+<script
+  type="module"
+  src="https://cdn.jsdelivr.net/gh/starfederation/datastar@v1.0.2/bundles/datastar.js"
+></script>
+```
+
+The same online file should work unchanged through `file://` and in the Vamos iframe. Do not depend on `/js/datastar-pro-v1.js`, parent Workbench signals, or Datastar fetch/SSE actions. The parent and child documents have independent Datastar runtimes and state. Use an HTTP applet for server-backed behavior.
+
+Conditional content should fail closed before Datastar hydrates:
+
+```html
+<body data-signals="{_answer: ''}">
+  <button data-on:click="$_answer = 'correct'">Choose answer</button>
+  <p style="display: none" data-show="$_answer === 'correct'">Correct…</p>
+</body>
+```
+
+Put `style="display: none"` on each conditional element. Do not use a permanent `[data-show] { display: none }` stylesheet rule: Datastar toggles inline display state, so that selector can keep the element hidden after its condition becomes true.
+
+## Optional embedded styling and theme
+
+Applets rendered by Vamos may use stable shared assets to match the app shell:
 
 ```html
 <link rel="stylesheet" href="/css/out.css">
@@ -16,24 +40,14 @@ Use this prelude for authored applets that should look native and follow the par
 </style>
 ```
 
-Use `/css/out.css` in durable authored HTML. The parent app may load build-hashed CSS internally, but Thoughts artifacts should use stable URLs that survive rebuilds.
+These root-relative assets are embedded-only enhancements and are not available when opening the file directly through `file://`. Do not require them for standalone behavior.
 
-Import `/js/vamos-html-applet.js` when the applet should follow the parent light/dark toggle. The helper reads the initial theme from the iframe URL and listens for parent theme changes. Do not hard-code the root element into dark mode for durable applets.
+Use `/css/out.css` when an embedded applet should share Vamos styles. The parent may use build-hashed CSS internally, but authored Thoughts files should use the stable URL. Put local overrides after the shared stylesheet so later rules win.
 
-Local overrides belong after `/css/out.css`, either inline or via same-directory assets. Later rules should win over shared Vamos defaults.
-
-## Optional child-local Datastar
-
-Applet-local Datastar behavior is explicit and separate from the parent workbench:
-
-```html
-<script type="module" src="/js/datastar-pro-v1.js"></script>
-```
-
-Only import Datastar when the child applet needs it. Parent Datastar state and globals do not cross the iframe boundary.
+Use `/js/vamos-html-applet.js` when an embedded applet should follow the parent light/dark toggle. The helper reads the initial theme from the iframe URL and listens for parent theme changes. Do not hard-code the root element into dark mode for durable applets.
 
 ## Sandbox boundary
 
-Applet scripts run inside the iframe. Parent DOM access is intentionally blocked by the sandbox, and applets should communicate only through documented, narrow browser messages such as the theme helper's `dark` / `light` update.
+Applet scripts run in an opaque-origin iframe. Parent DOM access is intentionally blocked; the sandbox does not grant `allow-same-origin`. Applets should communicate only through documented, narrow browser messages such as the theme helper's `dark` / `light` update.
 
-Vamos serves the authored HTML route as raw bytes with applet response headers. It does not inject CSS, scripts, or theme classes into applet documents.
+Vamos serves authored HTML as raw bytes with applet response headers. It does not inject CSS, scripts, runtime state, or theme classes into applet documents.

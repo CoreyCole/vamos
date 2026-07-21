@@ -3,6 +3,7 @@ package tests
 import (
 	"encoding/base64"
 	"fmt"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -160,7 +161,41 @@ func TestThoughtsWorkbench_HTMLChildRouteServesAppletContent(t *testing.T) {
 		Expect(spec.ExpectStep(spec.TextAbsent("HTML applet:"))).
 		Expect(spec.ExpectStep(spec.TextAbsent("thoughts-markdown-scroll-region"))).
 		Expect(spec.TextContains(spec.CSS("body"), "Renderer HTML Applet")).
-		Expect(spec.TextContains(spec.CSS("body"), "Datastar explicit import placeholder")).
+		Expect(spec.TextContains(spec.CSS("body"), "Correct feedback")).
+		Expect(vamos.Console.Clean()).
+		Run()
+}
+
+func TestThoughtsWorkbench_ClientOnlyHTMLAppletHydratesFromCDN(t *testing.T) {
+	spec.Story(t, "thoughts workbench client-only HTML applet hydrates from CDN").
+		App(vamos.App()).
+		As(vamos.Robot).
+		With(vamos.WorkspaceFixture("thoughts-workbench.basic")).
+		Do(seedRendererThoughtsFiles()).
+		Visit(vamos.Pages.Path("/thoughts/renderer-demo.html?context=chat")).
+		Expect(vamos.Thoughts.Ready()).
+		Expect(iframeSandboxOmitsSameOrigin()).
+		Expect(rendererDemoFeedback(false, false, true)).
+		Do(clickRendererDemoAnswer("answer-wrong", true)).
+		Expect(rendererDemoFeedback(false, true, true)).
+		Do(clickRendererDemoAnswer("answer-correct", true)).
+		Expect(rendererDemoFeedback(true, false, true)).
+		Expect(vamos.Console.Clean()).
+		Run()
+}
+
+func TestThoughtsWorkbench_ClientOnlyHTMLAppletWorksAsStandaloneFile(t *testing.T) {
+	spec.Story(t, "thoughts workbench client-only HTML applet works as standalone file").
+		App(vamos.App()).
+		As(vamos.Robot).
+		With(vamos.WorkspaceFixture("thoughts-workbench.basic")).
+		Do(seedRendererThoughtsFiles()).
+		Do(openRendererDemoStandaloneFile()).
+		Expect(rendererDemoFeedback(false, false, false)).
+		Do(clickRendererDemoAnswer("answer-wrong", false)).
+		Expect(rendererDemoFeedback(false, true, false)).
+		Do(clickRendererDemoAnswer("answer-correct", false)).
+		Expect(rendererDemoFeedback(true, false, false)).
 		Expect(vamos.Console.Clean()).
 		Run()
 }
@@ -303,10 +338,7 @@ func TestThoughtsWorkbench_SavedMobileActiveStateDoesNotPinDesktopRefreshDesktop
 func seedRendererThoughtsFiles() spec.Step {
 	return spec.Custom("seed renderer thoughts files", func(t testing.TB, ctx *duiruntime.Context) {
 		t.Helper()
-		root := strings.TrimSpace(os.Getenv("VAMOS_E2E_THOUGHTS_ROOT"))
-		if root == "" {
-			root = filepath.Join(ctx.Config.RepoRoot, "thoughts")
-		}
+		root := rendererDemoThoughtsRoot(ctx)
 		if err := os.MkdirAll(root, 0o755); err != nil {
 			t.Fatal(err)
 		}
@@ -318,16 +350,16 @@ func seedRendererThoughtsFiles() spec.Step {
 			"renderer-demo.html": `<!doctype html>
 <html>
 <head>
+  <meta charset="utf-8">
   <title>Renderer HTML Applet</title>
-  <style>body { background: rgb(1, 2, 3); }</style>
-  <script type="module" src="/js/datastar-pro-v1.js"></script>
+  <script type="module" src="https://cdn.jsdelivr.net/gh/starfederation/datastar@v1.0.2/bundles/datastar.js"></script>
 </head>
-<body>
+<body data-signals="{_answer: ''}">
   <h1>Renderer HTML Applet</h1>
-  <p>Datastar explicit import placeholder</p>
-  <script>
-    try { window.parent.document.body.dataset.htmlAppletEscape = "bad" } catch (e) { document.body.dataset.parentBlocked = "true" }
-  </script>
+  <button id="answer-wrong" data-on:click="$_answer = 'wrong'">Wrong answer</button>
+  <button id="answer-correct" data-on:click="$_answer = 'correct'">Correct answer</button>
+  <p id="feedback-wrong" style="display: none" data-show="$_answer === 'wrong'">Incorrect feedback</p>
+  <p id="feedback-correct" style="display: none" data-show="$_answer === 'correct'">Correct feedback</p>
 </body>
 </html>
 `,
@@ -682,6 +714,65 @@ func boolString(value bool) string {
 		return "true"
 	}
 	return "false"
+}
+
+func rendererDemoThoughtsRoot(ctx *duiruntime.Context) string {
+	root := strings.TrimSpace(os.Getenv("VAMOS_E2E_THOUGHTS_ROOT"))
+	if root == "" {
+		return filepath.Join(ctx.Config.RepoRoot, "thoughts")
+	}
+
+	return root
+}
+
+func openRendererDemoStandaloneFile() spec.Step {
+	return spec.Custom("open renderer demo as standalone file", func(t testing.TB, ctx *duiruntime.Context) {
+		t.Helper()
+		fullPath, err := filepath.Abs(filepath.Join(rendererDemoThoughtsRoot(ctx), "renderer-demo.html"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		fileURL := (&url.URL{Scheme: "file", Path: filepath.ToSlash(fullPath)}).String()
+		if _, err := ctx.Page.Goto(fileURL, playwright.PageGotoOptions{WaitUntil: playwright.WaitUntilStateDomcontentloaded}); err != nil {
+			t.Fatal(err)
+		}
+	})
+}
+
+func clickRendererDemoAnswer(id string, embedded bool) spec.Step {
+	return spec.Custom("choose renderer demo answer", func(t testing.TB, ctx *duiruntime.Context) {
+		t.Helper()
+		button := rendererDemoLocator(ctx, "#"+id, embedded)
+		if err := button.Click(); err != nil {
+			t.Fatal(err)
+		}
+	})
+}
+
+func rendererDemoFeedback(correctVisible, wrongVisible, embedded bool) spec.Expectation {
+	return spec.ExpectStep(spec.Custom("renderer demo feedback matches selected answer", func(t testing.TB, ctx *duiruntime.Context) {
+		t.Helper()
+		for id, want := range map[string]bool{
+			"feedback-correct": correctVisible,
+			"feedback-wrong":   wrongVisible,
+		} {
+			visible, err := rendererDemoLocator(ctx, "#"+id, embedded).IsVisible()
+			if err != nil {
+				t.Fatal(err)
+			}
+			if visible != want {
+				t.Fatalf("%s visibility=%v, want %v", id, visible, want)
+			}
+		}
+	}))
+}
+
+func rendererDemoLocator(ctx *duiruntime.Context, selector string, embedded bool) playwright.Locator {
+	if embedded {
+		return ctx.Page.FrameLocator(rendererDemoAppletFrameSelector).Locator(selector)
+	}
+
+	return ctx.Page.Locator(selector)
 }
 
 func iframeSandboxOmitsSameOrigin() spec.Expectation {
