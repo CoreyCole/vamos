@@ -62,8 +62,13 @@ func TestChildHTMLHeadersSetContainmentHeaders(t *testing.T) {
 		t.Fatal("missing nosniff")
 	}
 	csp := rec.Header().Get("Content-Security-Policy")
-	if !strings.Contains(csp, "frame-ancestors 'self'") {
-		t.Fatalf("bad CSP: %s", csp)
+	for _, want := range []string{
+		"frame-ancestors 'self'",
+		"script-src 'self' 'unsafe-inline' 'unsafe-eval' blob: https://cdn.jsdelivr.net",
+	} {
+		if !strings.Contains(csp, want) {
+			t.Fatalf("CSP missing %q: %s", want, csp)
+		}
 	}
 }
 

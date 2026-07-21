@@ -123,7 +123,7 @@ func childHTMLHeaders(c echo.Context) {
 	h := c.Response().Header()
 	h.Set("Content-Security-Policy", strings.Join([]string{
 		"default-src 'self' data: blob:",
-		"script-src 'self' 'unsafe-inline' 'unsafe-eval' blob:",
+		"script-src 'self' 'unsafe-inline' 'unsafe-eval' blob: https://cdn.jsdelivr.net",
 		"style-src 'self' 'unsafe-inline'",
 		"img-src 'self' data: blob:",
 		"connect-src 'self'",
