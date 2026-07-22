@@ -1,6 +1,7 @@
 package conversationworkflow
 
 import (
+	"errors"
 	"fmt"
 	"time"
 
@@ -40,10 +41,9 @@ func RunTurnWorkflow(
 			"FailConversationRunAfterActivityError",
 			finalizeInput,
 		).Get(ctx, nil); finalizeErr != nil {
-			return conversation.RunResult{}, fmt.Errorf(
-				"run conversation turn: %w; failure finalizer: %v",
-				err,
-				finalizeErr,
+			return conversation.RunResult{}, errors.Join(
+				fmt.Errorf("run conversation turn: %w", err),
+				fmt.Errorf("failure finalizer: %w", finalizeErr),
 			)
 		}
 		return conversation.RunResult{}, fmt.Errorf("run conversation turn: %w", err)

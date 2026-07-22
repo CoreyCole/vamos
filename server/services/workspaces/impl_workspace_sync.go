@@ -74,7 +74,7 @@ func (s *ImplWorkspaceSyncer) Sync(
 			return
 		}
 		if err != nil {
-			err = fmt.Errorf("%w; additionally failed to record workspace sync diagnostic: %v", err, recordErr)
+			err = errors.Join(err, fmt.Errorf("record workspace sync diagnostic: %w", recordErr))
 			return
 		}
 		err = recordErr

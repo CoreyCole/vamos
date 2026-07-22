@@ -1508,11 +1508,9 @@ func RunChild(ctx context.Context, opts RunChildOptions, d deps, out io.Writer) 
 	if err := store.Save(opts.StateFile, state); err != nil {
 		cleanupErr := tmuxClient(d).KillPane(ctx, run.Pane)
 		if cleanupErr != nil {
-			return fmt.Errorf(
-				"persist started child: %w (cleanup untracked pane %s: %v)",
-				err,
-				run.Pane.ID,
-				cleanupErr,
+			return errors.Join(
+				fmt.Errorf("persist started child: %w", err),
+				fmt.Errorf("cleanup untracked pane %s: %w", run.Pane.ID, cleanupErr),
 			)
 		}
 		return fmt.Errorf("persist started child: %w", err)

@@ -593,10 +593,9 @@ func runRemoteSystemDNS(
 			fmt.Fprintln(f)
 			writeRemoteResult(f, fallback)
 			if fallbackErr != nil {
-				return fmt.Errorf(
-					"getent hosts failed: %w; resolvectl query failed: %v",
-					primaryErr,
-					fallbackErr,
+				return errors.Join(
+					fmt.Errorf("getent hosts failed: %w", primaryErr),
+					fmt.Errorf("resolvectl query failed: %w", fallbackErr),
 				)
 			}
 			if remote.ExpectIP != "" &&

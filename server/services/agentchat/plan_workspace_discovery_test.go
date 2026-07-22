@@ -3,6 +3,7 @@ package agentchat
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -1021,7 +1022,7 @@ func writePlanWorkspaceFile(t *testing.T, dir, name string, modTime time.Time) s
 func countWorkspaces(t *testing.T, service *Service) int {
 	t.Helper()
 	count, err := service.queries.TestSupportCountWorkspaces(context.Background())
-	if err != nil && err != sql.ErrNoRows {
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		t.Fatalf("count workspaces: %v", err)
 	}
 	return int(count)

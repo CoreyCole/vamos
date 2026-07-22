@@ -1707,7 +1707,8 @@ func TestHandleInternalRunEventRejectsWrongWorkspace(t *testing.T) {
 	if err == nil {
 		t.Fatal("HandleInternalRunEvent() error = nil, want bad request")
 	}
-	httpErr, ok := err.(*echo.HTTPError)
+	var httpErr *echo.HTTPError
+	ok := errors.As(err, &httpErr)
 	if !ok {
 		t.Fatalf("error type = %T, want *echo.HTTPError", err)
 	}

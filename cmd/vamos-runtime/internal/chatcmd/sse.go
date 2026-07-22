@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -76,7 +77,7 @@ func StreamRunNDJSON(ctx context.Context, client APIClient, keyID, secret string
 			return errTerminalSeen
 		})
 		_ = resp.Body.Close()
-		if err == nil || err == io.ErrUnexpectedEOF {
+		if err == nil || errors.Is(err, io.ErrUnexpectedEOF) {
 			select {
 			case <-ctx.Done():
 				return ctx.Err()
@@ -93,7 +94,7 @@ func StreamRunNDJSON(ctx context.Context, client APIClient, keyID, secret string
 
 var errTerminalSeen = fmt.Errorf("terminal chat run event seen")
 
-func errorsIsTerminalSeen(err error) bool { return err == errTerminalSeen }
+func errorsIsTerminalSeen(err error) bool { return errors.Is(err, errTerminalSeen) }
 
 func isTerminalRunEvent(event chatsession.ChatEvent, runID string) bool {
 	if event.EventType != chatsession.EventRunCompleted && event.EventType != chatsession.EventRunFailed {

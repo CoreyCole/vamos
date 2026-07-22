@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/url"
 	"os"
@@ -1887,7 +1888,7 @@ func TestCreateRunRejectsSecondRunningRunForThread(t *testing.T) {
 	if err == nil {
 		t.Fatal("second createRun() error = nil, want active-run conflict")
 	}
-	if err != ErrThreadRunInProgress {
+	if !errors.Is(err, ErrThreadRunInProgress) {
 		t.Fatalf("second createRun() error = %v, want %v", err, ErrThreadRunInProgress)
 	}
 }

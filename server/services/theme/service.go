@@ -3,12 +3,13 @@ package theme
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"net/http"
 	"slices"
 
-	"github.com/labstack/echo/v4"
 	"github.com/CoreyCole/vamos/pkg/db"
+	"github.com/labstack/echo/v4"
 )
 
 // Default themes
@@ -189,7 +190,7 @@ func (s *Service) GetPreferencesForEmail(ctx context.Context, userEmail string) 
 
 	prefs, err := s.queries.GetUserPreferences(ctx, userEmail)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			// No preferences yet, return defaults
 			return UserPreferences{
 				Theme:       DefaultThemeMode,

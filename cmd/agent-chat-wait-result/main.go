@@ -553,7 +553,7 @@ func finalizeStoppedRun(
 				return waitResult{ExitCode: exitOK, Result: yamlText}
 			}
 		} else if fetchErr != nil {
-			err = fmt.Errorf("%w; final page fetch failed: %v", err, fetchErr)
+			err = errors.Join(err, fmt.Errorf("final page fetch failed: %w", fetchErr))
 		}
 	}
 	return waitResult{

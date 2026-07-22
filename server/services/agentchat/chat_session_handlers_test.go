@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -259,7 +260,8 @@ func TestCLIChatSessionEndpointsRejectMissingBearer(t *testing.T) {
 	c.SetParamValues(session.ID)
 
 	err := handler.GetCLIChatSession(c)
-	httpErr, ok := err.(*echo.HTTPError)
+	var httpErr *echo.HTTPError
+	ok := errors.As(err, &httpErr)
 	if !ok || httpErr.Code != http.StatusUnauthorized {
 		t.Fatalf("GetCLIChatSession error = %v, want 401", err)
 	}

@@ -2,6 +2,7 @@ package workspaces
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"net/http"
@@ -91,7 +92,7 @@ func (r *WorkspaceRuntime) StartBundle(
 	fail := func(phase BundlePhase, cause error) (Workspace, BundleHandles, error) {
 		stopErr := r.stopStarted(ctx, handles)
 		if stopErr != nil {
-			cause = fmt.Errorf("%w; stop partial bundle: %v", cause, stopErr)
+			cause = errors.Join(cause, fmt.Errorf("stop partial bundle: %w", stopErr))
 		}
 		ws.Status = StatusFailed
 		ws.Phase = phase

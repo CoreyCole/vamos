@@ -96,11 +96,9 @@ func TryWorkspaceRestartWithRecovery(
 		return result, first.Err
 	}
 	if force.Err != nil {
-		return result, fmt.Errorf(
-			"workspace graceful restart failed:\n%w\n\nworkspace force restart failed:\n%v\n\n%s",
-			first.Err,
-			force.Err,
-			workspaceRestartRecoveryCommands(),
+		return result, errors.Join(
+			fmt.Errorf("workspace graceful restart failed: %w", first.Err),
+			fmt.Errorf("workspace force restart failed: %w\n\n%s", force.Err, workspaceRestartRecoveryCommands()),
 		)
 	}
 	result.ForceSucceeded = true

@@ -2167,7 +2167,8 @@ func TestHandleCleanupWorkspaceRejectsMergedUnknownProof(t *testing.T) {
 	rec := httptest.NewRecorder()
 
 	err := handler.HandleCleanupWorkspace(e.NewContext(req, rec))
-	httpErr, ok := err.(*echo.HTTPError)
+	var httpErr *echo.HTTPError
+	ok := errors.As(err, &httpErr)
 	if !ok || httpErr.Code != http.StatusConflict {
 		t.Fatalf("HandleCleanupWorkspace() err = %#v, want conflict", err)
 	}
@@ -2198,7 +2199,8 @@ func TestHandleCleanupWorkspaceRejectsUnconfirmedActiveCleanup(t *testing.T) {
 	rec := httptest.NewRecorder()
 
 	err := handler.HandleCleanupWorkspace(e.NewContext(req, rec))
-	httpErr, ok := err.(*echo.HTTPError)
+	var httpErr *echo.HTTPError
+	ok := errors.As(err, &httpErr)
 	if !ok || httpErr.Code != http.StatusBadRequest {
 		t.Fatalf("HandleCleanupWorkspace() err = %#v, want bad request", err)
 	}
@@ -2271,7 +2273,8 @@ func TestHandleCleanupWorkspaceRejectsProtectedReleaseLane(t *testing.T) {
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	rec := httptest.NewRecorder()
 	err = handler.HandleCleanupWorkspace(e.NewContext(req, rec))
-	httpErr, ok := err.(*echo.HTTPError)
+	var httpErr *echo.HTTPError
+	ok := errors.As(err, &httpErr)
 	if !ok || httpErr.Code != http.StatusBadRequest {
 		t.Fatalf("HandleCleanupWorkspace() err = %#v, want bad request", err)
 	}

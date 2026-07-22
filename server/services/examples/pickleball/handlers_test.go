@@ -3,6 +3,7 @@ package pickleball
 import (
 	"bytes"
 	"context"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -108,7 +109,8 @@ func TestHandlersRejectMismatchedSession(t *testing.T) {
 	if err == nil {
 		t.Fatal("HandleSubmitPrompt mismatched session expected error")
 	}
-	httpErr, ok := err.(*echo.HTTPError)
+	var httpErr *echo.HTTPError
+	ok := errors.As(err, &httpErr)
 	if !ok || httpErr.Code != http.StatusForbidden {
 		t.Fatalf("error = %#v", err)
 	}

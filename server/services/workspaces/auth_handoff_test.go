@@ -380,7 +380,8 @@ func TestHandleDevAuthHandoffRejectsUnauthorizedEmail(t *testing.T) {
 	rec := httptest.NewRecorder()
 	c := e.NewContext(req, rec)
 	err = handler.HandleDevAuthHandoff(c)
-	if httpErr, ok := err.(*echo.HTTPError); !ok ||
+	var httpErr *echo.HTTPError
+	if ok := errors.As(err, &httpErr); !ok ||
 		httpErr.Code != http.StatusUnauthorized {
 		t.Fatalf("HandleDevAuthHandoff() error = %#v", err)
 	}
@@ -417,7 +418,8 @@ func TestHandleDevAuthHandoffLogsUnknownEmailForInvalidToken(t *testing.T) {
 	rec := httptest.NewRecorder()
 	c := e.NewContext(req, rec)
 	err := handler.HandleDevAuthHandoff(c)
-	if httpErr, ok := err.(*echo.HTTPError); !ok ||
+	var httpErr *echo.HTTPError
+	if ok := errors.As(err, &httpErr); !ok ||
 		httpErr.Code != http.StatusUnauthorized {
 		t.Fatalf("HandleDevAuthHandoff() error = %#v", err)
 	}

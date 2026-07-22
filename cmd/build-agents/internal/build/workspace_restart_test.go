@@ -3,6 +3,7 @@ package build
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -251,6 +252,12 @@ func TestTryWorkspaceRestartWithRecoveryForceFails(t *testing.T) {
 	}
 	if !result.Handled || !result.ForceAttempted || result.ForceSucceeded {
 		t.Fatalf("result = %+v", result)
+	}
+	if !errors.Is(err, result.GracefulError) {
+		t.Fatalf("error does not preserve graceful cause: %v", err)
+	}
+	if !errors.Is(err, result.ForceError) {
+		t.Fatalf("error does not preserve force cause: %v", err)
 	}
 	for _, want := range []string{
 		"workspace graceful restart failed",

@@ -1878,7 +1878,8 @@ func TestWorkspaceRouteRendersWithoutSelectedThread(t *testing.T) {
 	if err == nil {
 		t.Fatal("HandleWorkspacePage() error = nil, want gone")
 	}
-	httpErr, ok := err.(*echo.HTTPError)
+	var httpErr *echo.HTTPError
+	ok := errors.As(err, &httpErr)
 	if !ok || httpErr.Code != http.StatusGone {
 		t.Fatalf("HandleWorkspacePage() error = %v, want 410 Gone", err)
 	}
@@ -1900,7 +1901,8 @@ func TestWorkspaceRouteWithoutThreadKeepsSidebarVisibleWithPersistedSelection(t 
 	if err == nil {
 		t.Fatal("HandleWorkspacePage() error = nil, want gone")
 	}
-	httpErr, ok := err.(*echo.HTTPError)
+	var httpErr *echo.HTTPError
+	ok := errors.As(err, &httpErr)
 	if !ok || httpErr.Code != http.StatusGone {
 		t.Fatalf("HandleWorkspacePage() error = %v, want 410 Gone", err)
 	}
@@ -1922,7 +1924,8 @@ func TestWorkspaceResourceKeepsShellSignalsAndTextareaGuards(t *testing.T) {
 	if err == nil {
 		t.Fatal("HandleWorkspacePage() error = nil, want gone")
 	}
-	httpErr, ok := err.(*echo.HTTPError)
+	var httpErr *echo.HTTPError
+	ok := errors.As(err, &httpErr)
 	if !ok || httpErr.Code != http.StatusGone {
 		t.Fatalf("HandleWorkspacePage() error = %v, want 410 Gone", err)
 	}
@@ -2084,7 +2087,8 @@ func TestWorkspaceRouteRendersSelectedThreadWithWorkspaceForkAction(t *testing.T
 	if err == nil {
 		t.Fatal("HandleWorkspacePage() error = nil, want gone")
 	}
-	httpErr, ok := err.(*echo.HTTPError)
+	var httpErr *echo.HTTPError
+	ok := errors.As(err, &httpErr)
 	if !ok || httpErr.Code != http.StatusGone {
 		t.Fatalf("HandleWorkspacePage() error = %v, want 410 Gone", err)
 	}
@@ -2130,7 +2134,8 @@ func TestWorkspaceSidebarRendersCollapsibleGroups(t *testing.T) {
 	if err == nil {
 		t.Fatal("HandleWorkspacePage() error = nil, want gone")
 	}
-	httpErr, ok := err.(*echo.HTTPError)
+	var httpErr *echo.HTTPError
+	ok := errors.As(err, &httpErr)
 	if !ok || httpErr.Code != http.StatusGone {
 		t.Fatalf("HandleWorkspacePage() error = %v, want 410 Gone", err)
 	}
@@ -2152,7 +2157,8 @@ func TestWorkspaceThreadHrefRoutePersistsSelectedThread(t *testing.T) {
 	if err == nil {
 		t.Fatal("HandleWorkspacePage() error = nil, want gone")
 	}
-	httpErr, ok := err.(*echo.HTTPError)
+	var httpErr *echo.HTTPError
+	ok := errors.As(err, &httpErr)
 	if !ok || httpErr.Code != http.StatusGone {
 		t.Fatalf("HandleWorkspacePage() error = %v, want 410 Gone", err)
 	}
@@ -3162,7 +3168,8 @@ func TestWorkspacePageAllowsCoworkerAccess(t *testing.T) {
 	if err == nil {
 		t.Fatal("HandleWorkspacePage() error = nil, want gone")
 	}
-	httpErr, ok := err.(*echo.HTTPError)
+	var httpErr *echo.HTTPError
+	ok := errors.As(err, &httpErr)
 	if !ok || httpErr.Code != http.StatusGone {
 		t.Fatalf("HandleWorkspacePage() error = %v, want 410 Gone", err)
 	}
@@ -3681,7 +3688,8 @@ func TestResumeThreadRequiresThreadIDAndPrompt(t *testing.T) {
 				t.Fatal("ResumeThread() error = nil, want HTTP error")
 			}
 
-			httpErr, ok := err.(*echo.HTTPError)
+			var httpErr *echo.HTTPError
+			ok := errors.As(err, &httpErr)
 			if !ok {
 				t.Fatalf("ResumeThread() error type = %T, want *echo.HTTPError", err)
 			}
@@ -3738,7 +3746,8 @@ func TestForkThreadRequiresSourceThreadIDSourceEntryIDAndPrompt(t *testing.T) {
 				t.Fatal("ForkThread() error = nil, want HTTP error")
 			}
 
-			httpErr, ok := err.(*echo.HTTPError)
+			var httpErr *echo.HTTPError
+			ok := errors.As(err, &httpErr)
 			if !ok {
 				t.Fatalf("ForkThread() error type = %T, want *echo.HTTPError", err)
 			}
@@ -4590,7 +4599,8 @@ func TestOpenPiSessionAllowsAuthenticatedViewerToOpenPlanOwnedByAnotherPathUser(
 	if err == nil {
 		t.Fatal("HandleWorkspacePage() error = nil, want gone")
 	}
-	httpErr, ok := err.(*echo.HTTPError)
+	var httpErr *echo.HTTPError
+	ok := errors.As(err, &httpErr)
 	if !ok || httpErr.Code != http.StatusGone {
 		t.Fatalf("HandleWorkspacePage() error = %v, want 410 Gone", err)
 	}
@@ -4637,7 +4647,8 @@ func TestOpenPiSessionRedirectTargetLoadsImportedThreadContext(t *testing.T) {
 	if err == nil {
 		t.Fatal("HandleWorkspacePage() error = nil, want gone")
 	}
-	httpErr, ok := err.(*echo.HTTPError)
+	var httpErr *echo.HTTPError
+	ok := errors.As(err, &httpErr)
 	if !ok || httpErr.Code != http.StatusGone {
 		t.Fatalf("HandleWorkspacePage() error = %v, want 410 Gone", err)
 	}
