@@ -167,7 +167,9 @@ func (m *ManagerImpl) Start(ctx context.Context, cfg RuntimeConfig) (ProcessStat
 	}
 	m.mu.Unlock()
 	if previous != nil && previous != candidate {
-		stopProcess(previous)
+		if err := stopProcess(previous); err != nil {
+			return candidate.state, fmt.Errorf("stop replaced process: %w", err)
+		}
 	}
 	return candidate.state, nil
 }

@@ -14,7 +14,7 @@ func (s *Service) SubmitCommand(ctx context.Context, input SubmitCommandInput) (
 	if err != nil {
 		return CommandOutcome{}, err
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 	q := s.q.WithTx(tx)
 
 	command, err := q.CreateChatCommand(ctx, db.CreateChatCommandParams{
@@ -98,7 +98,7 @@ func (s *Service) transitionCommand(ctx context.Context, id string, status Comma
 	if err != nil {
 		return CommandOutcome{}, err
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 	q := s.q.WithTx(tx)
 	command, err := q.UpdateChatCommandStatus(ctx, db.UpdateChatCommandStatusParams{
 		ID:          strings.TrimSpace(id),

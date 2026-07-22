@@ -103,7 +103,7 @@ func TestReserveChatSessionSeqConcurrentWriters(t *testing.T) {
 				errCh <- fmt.Errorf("begin tx %d: %w", i, err)
 				return
 			}
-			defer tx.Rollback()
+			defer func() { _ = tx.Rollback() }()
 			txq := q.WithTx(tx)
 			if err := txq.EnsureChatSessionSequence(ctx, "session-1"); err != nil {
 				errCh <- fmt.Errorf("ensure seq %d: %w", i, err)

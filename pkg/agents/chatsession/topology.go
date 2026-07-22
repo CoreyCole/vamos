@@ -84,7 +84,7 @@ func (s *Service) PromoteSession(
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 	q := s.q.WithTx(tx)
 	session, err := q.GetChatSession(ctx, strings.TrimSpace(sessionID))
 	if err != nil {

@@ -812,7 +812,7 @@ func (s *Service) EnsureThreadWorkspace(
 	if err != nil {
 		return db.Workspace{}, db.AgentThread{}, err
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 	q := s.queries.WithTx(tx)
 
 	workspace, err := q.FindWorkspaceByRootDocPathForUser(
@@ -1146,7 +1146,7 @@ func (s *Service) StartWorkspaceThread(
 	if err != nil {
 		return nil, nil, nil, err
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 	q := s.queries.WithTx(tx)
 
 	thread, err := q.CreateAgentThread(ctx, db.CreateAgentThreadParams{
@@ -1277,7 +1277,7 @@ func (s *Service) ResumeWorkspaceThread(
 	if err != nil {
 		return nil, nil, nil, err
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 	q := s.queries.WithTx(tx)
 
 	thread, err := s.sharedWorkspaceThread(ctx, workspace.ID, threadID)
@@ -1381,7 +1381,7 @@ func (s *Service) ForkWorkspaceThread(
 	if err != nil {
 		return nil, nil, nil, err
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 	q := s.queries.WithTx(tx)
 
 	sourceThread, err := s.sharedWorkspaceThread(ctx, workspace.ID, sourceThreadID)
@@ -1645,7 +1645,7 @@ func (s *Service) StartThread(
 	if err != nil {
 		return nil, nil, err
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	q := s.queries.WithTx(tx)
 	thread, err := q.CreateAgentThread(ctx, db.CreateAgentThreadParams{
@@ -1730,7 +1730,7 @@ func (s *Service) ResumeThread(
 	if err != nil {
 		return nil, nil, err
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	q := s.queries.WithTx(tx)
 	thread, err := q.GetAgentThreadForUser(ctx, db.GetAgentThreadForUserParams{
@@ -1839,7 +1839,7 @@ func (s *Service) ForkThread(
 	if err != nil {
 		return nil, nil, err
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	q := s.queries.WithTx(tx)
 	sourceThread, err := q.GetAgentThreadForUser(ctx, db.GetAgentThreadForUserParams{
@@ -2550,7 +2550,7 @@ func (s *Service) ApplyCheckpoint(ctx context.Context, cp conversation.Checkpoin
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	q := s.queries.WithTx(tx)
 	run, err := q.GetAgentRun(ctx, cp.RunID)

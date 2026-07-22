@@ -42,22 +42,40 @@ func (s *Service) HandleStream(c echo.Context) error {
 	defer servicesTicker.Stop()
 
 	// Fire all immediately on connection
-	s.sendSystemMetrics(sse)
-	s.sendServices(sse)
-	s.sendProcesses(sse)
-	s.sendCrashes(sse)
-	s.sendBootList(sse)
+	if err := s.sendSystemMetrics(sse); err != nil {
+		return err
+	}
+	if err := s.sendServices(sse); err != nil {
+		return err
+	}
+	if err := s.sendProcesses(sse); err != nil {
+		return err
+	}
+	if err := s.sendCrashes(sse); err != nil {
+		return err
+	}
+	if err := s.sendBootList(sse); err != nil {
+		return err
+	}
 
 	for {
 		select {
 		case <-c.Request().Context().Done():
 			return nil
 		case <-systemTicker.C:
-			s.sendSystemMetrics(sse)
+			if err := s.sendSystemMetrics(sse); err != nil {
+				return err
+			}
 		case <-servicesTicker.C:
-			s.sendServices(sse)
-			s.sendProcesses(sse)
-			s.sendCrashes(sse)
+			if err := s.sendServices(sse); err != nil {
+				return err
+			}
+			if err := s.sendProcesses(sse); err != nil {
+				return err
+			}
+			if err := s.sendCrashes(sse); err != nil {
+				return err
+			}
 		}
 	}
 }
@@ -106,15 +124,15 @@ func (s *Service) HandleHealthJSON(c echo.Context) error {
 }
 
 // sendSystemMetrics pushes scalar system metrics via MarshalAndPatchSignals.
-func (s *Service) sendSystemMetrics(sse *datastar.ServerSentEventGenerator) {
+func (s *Service) sendSystemMetrics(sse *datastar.ServerSentEventGenerator) error {
 	signals := collectSystemSignals()
-	sse.MarshalAndPatchSignals(signals)
+	return sse.MarshalAndPatchSignals(signals)
 }
 
 // sendServices pushes the services table fragment via PatchElementTempl.
-func (s *Service) sendServices(sse *datastar.ServerSentEventGenerator) {
+func (s *Service) sendServices(sse *datastar.ServerSentEventGenerator) error {
 	services := collectServices()
-	sse.PatchElementTempl(
+	return sse.PatchElementTempl(
 		ServicesTable(services),
 		datastar.WithSelectorID("services-table"),
 		datastar.WithModeInner(),
@@ -122,9 +140,9 @@ func (s *Service) sendServices(sse *datastar.ServerSentEventGenerator) {
 }
 
 // sendProcesses pushes the process table fragment via PatchElementTempl.
-func (s *Service) sendProcesses(sse *datastar.ServerSentEventGenerator) {
+func (s *Service) sendProcesses(sse *datastar.ServerSentEventGenerator) error {
 	procs := collectTopProcesses(10)
-	sse.PatchElementTempl(
+	return sse.PatchElementTempl(
 		ProcessesTable(procs),
 		datastar.WithSelectorID("processes-table"),
 		datastar.WithModeInner(),
@@ -132,9 +150,9 @@ func (s *Service) sendProcesses(sse *datastar.ServerSentEventGenerator) {
 }
 
 // sendCrashes pushes the crash reports fragment via PatchElementTempl.
-func (s *Service) sendCrashes(sse *datastar.ServerSentEventGenerator) {
+func (s *Service) sendCrashes(sse *datastar.ServerSentEventGenerator) error {
 	crashes := collectCrashes()
-	sse.PatchElementTempl(
+	return sse.PatchElementTempl(
 		CrashesCard(crashes),
 		datastar.WithSelectorID("crashes-section"),
 		datastar.WithModeInner(),
@@ -142,12 +160,12 @@ func (s *Service) sendCrashes(sse *datastar.ServerSentEventGenerator) {
 }
 
 // sendBootList pushes the metrics history boot list via PatchElementTempl.
-func (s *Service) sendBootList(sse *datastar.ServerSentEventGenerator) {
+func (s *Service) sendBootList(sse *datastar.ServerSentEventGenerator) error {
 	boots, err := s.queries.GetDistinctBootIDs(context.Background())
 	if err != nil {
-		return
+		return err
 	}
-	sse.PatchElementTempl(
+	return sse.PatchElementTempl(
 		HistoryBootList(toBootSessions(boots), s.bootID),
 		datastar.WithSelectorID("history-content"),
 		datastar.WithModeInner(),

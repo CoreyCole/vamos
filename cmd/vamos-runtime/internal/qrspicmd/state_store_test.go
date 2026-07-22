@@ -222,7 +222,7 @@ func TestOperationLockHonorsCancellation(t *testing.T) {
 	if err != nil {
 		t.Fatalf("first AcquireOperationLock() error = %v", err)
 	}
-	defer first.Release()
+	defer func() { _ = first.Release() }()
 	ctx, cancel := context.WithTimeout(t.Context(), 30*time.Millisecond)
 	defer cancel()
 	_, err = store.AcquireOperationLock(ctx, stateFile)
@@ -238,12 +238,12 @@ func TestOperationLockAllowsDifferentStateFiles(t *testing.T) {
 	if err != nil {
 		t.Fatalf("first AcquireOperationLock() error = %v", err)
 	}
-	defer first.Release()
+	defer func() { _ = first.Release() }()
 	second, err := store.AcquireOperationLock(t.Context(), filepath.Join(dir, "two.json"))
 	if err != nil {
 		t.Fatalf("second AcquireOperationLock() error = %v", err)
 	}
-	defer second.Release()
+	defer func() { _ = second.Release() }()
 }
 
 func TestOperationLockReleaseIsIdempotent(t *testing.T) {

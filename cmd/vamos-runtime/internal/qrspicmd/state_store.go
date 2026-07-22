@@ -170,7 +170,7 @@ func (s FileStateStore) Mutate(
 	if err := syscall.Flock(int(file.Fd()), syscall.LOCK_EX); err != nil {
 		return ManagerState{}, err
 	}
-	defer syscall.Flock(int(file.Fd()), syscall.LOCK_UN) //nolint:errcheck // releasing a process-local lock cannot recover usefully
+	defer func() { _ = syscall.Flock(int(file.Fd()), syscall.LOCK_UN) }() //nolint:errcheck // releasing a process-local lock cannot recover usefully
 
 	state, err := s.Load(path)
 	if err != nil {
@@ -220,7 +220,7 @@ func (s FileStateStore) AcquireLock(ctx context.Context, key LockKey, owner stri
 	if err := syscall.Flock(int(file.Fd()), syscall.LOCK_EX); err != nil {
 		return Lock{}, err
 	}
-	defer syscall.Flock(int(file.Fd()), syscall.LOCK_UN)
+	defer func() { _ = syscall.Flock(int(file.Fd()), syscall.LOCK_UN) }()
 
 	now := s.now()
 	data, err := io.ReadAll(file)

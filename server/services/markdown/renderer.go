@@ -26,11 +26,11 @@ const (
 )
 
 type Renderer struct {
-	highlightStyle       *chroma.Style
-	htmlFormatter        *html.Formatter
-	sourceHTMLFormatter  *html.Formatter
-	mdhtmlRenderer       *mdhtml.Renderer
-	projects             server.ProjectsConfig
+	highlightStyle      *chroma.Style
+	htmlFormatter       *html.Formatter
+	sourceHTMLFormatter *html.Formatter
+	mdhtmlRenderer      *mdhtml.Renderer
+	projects            server.ProjectsConfig
 }
 
 func NewRenderer(highlightStyleString string) (*Renderer, error) {
@@ -336,7 +336,7 @@ func mdhtmlRenderer(
 					if hasCheckbox {
 						_, _ = w.Write([]byte("</span>"))
 					}
-					w.Write([]byte("</li>"))
+					_, _ = w.Write([]byte("</li>"))
 				}
 				return ast.GoToNext, true
 			}
@@ -351,13 +351,13 @@ func mdhtmlRenderer(
 					} else if strings.HasPrefix(content, "[x] ") || strings.HasPrefix(content, "[X] ") {
 						content = content[4:]
 					}
-					w.Write([]byte(content))
+					_, _ = w.Write([]byte(content))
 					return ast.GoToNext, true
 				}
 
 				// Auto-link bare thoughts/ paths (skip if inside inline code)
 				if strings.Contains(content, "thoughts/") && !isInsideCode(text) {
-					w.Write([]byte(autoLinkThoughtsPaths(content)))
+					_, _ = w.Write([]byte(autoLinkThoughtsPaths(content)))
 					return ast.GoToNext, true
 				}
 			}
@@ -373,37 +373,37 @@ func mdhtmlRenderer(
 			// so .markdown-viewer and .chat-message-content can style differently
 			if _, ok := node.(*ast.Table); ok {
 				if entering {
-					w.Write(
+					_, _ = w.Write(
 						[]byte(
 							`<div class="table-wrapper"><table>`,
 						),
 					)
 				} else {
-					w.Write([]byte("</table></div>"))
+					_, _ = w.Write([]byte("</table></div>"))
 				}
 				return ast.GoToNext, true
 			}
 			if _, ok := node.(*ast.TableHeader); ok {
 				if entering {
-					w.Write([]byte(`<thead>`))
+					_, _ = w.Write([]byte(`<thead>`))
 				} else {
-					w.Write([]byte("</thead>"))
+					_, _ = w.Write([]byte("</thead>"))
 				}
 				return ast.GoToNext, true
 			}
 			if _, ok := node.(*ast.TableBody); ok {
 				if entering {
-					w.Write([]byte("<tbody>"))
+					_, _ = w.Write([]byte("<tbody>"))
 				} else {
-					w.Write([]byte("</tbody>"))
+					_, _ = w.Write([]byte("</tbody>"))
 				}
 				return ast.GoToNext, true
 			}
 			if _, ok := node.(*ast.TableRow); ok {
 				if entering {
-					w.Write([]byte(`<tr>`))
+					_, _ = w.Write([]byte(`<tr>`))
 				} else {
-					w.Write([]byte("</tr>"))
+					_, _ = w.Write([]byte("</tr>"))
 				}
 				return ast.GoToNext, true
 			}

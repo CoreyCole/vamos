@@ -151,7 +151,7 @@ func readServiceProperties(name string) map[string]string {
 		}
 	}
 	r.Close()
-	proc.Wait()
+	_, _ = proc.Wait()
 
 	return props
 }
@@ -230,7 +230,7 @@ func collectTopProcesses(n int) []ProcessInfo {
 		})
 	}
 	r.Close()
-	proc.Wait()
+	_, _ = proc.Wait()
 
 	return procs
 }

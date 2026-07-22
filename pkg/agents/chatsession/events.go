@@ -17,7 +17,7 @@ func (s *Service) AppendEvent(
 	if err != nil {
 		return ChatEvent{}, err
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	event, err := appendEventTx(ctx, s.q.WithTx(tx), input)
 	if err != nil {

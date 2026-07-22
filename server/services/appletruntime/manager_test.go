@@ -168,7 +168,11 @@ func main() {
 		}(i)
 	}
 	wg.Wait()
-	defer manager.Stop(context.Background(), "pickleball")
+	t.Cleanup(func() {
+		if err := manager.Stop(context.Background(), "pickleball"); err != nil {
+			t.Errorf("stop pickleball applet: %v", err)
+		}
+	})
 	for i, err := range errs {
 		if err != nil {
 			t.Fatalf("EnsureStarted[%d]() error = %v", i, err)
@@ -232,7 +236,11 @@ func main() {
 	if err := <-done; err != nil {
 		t.Fatalf("EnsureStarted() error = %v", err)
 	}
-	defer manager.Stop(context.Background(), "pickleball")
+	t.Cleanup(func() {
+		if err := manager.Stop(context.Background(), "pickleball"); err != nil {
+			t.Errorf("stop pickleball applet: %v", err)
+		}
+	})
 }
 
 func TestStopDuringStartingPreventsLateProcessLaunch(t *testing.T) {
@@ -363,7 +371,11 @@ func main() {
 	if err != nil {
 		t.Fatalf("second EnsureStarted() error = %v", err)
 	}
-	defer manager.Stop(context.Background(), "pickleball")
+	t.Cleanup(func() {
+		if err := manager.Stop(context.Background(), "pickleball"); err != nil {
+			t.Errorf("stop pickleball applet: %v", err)
+		}
+	})
 	if second.Port != first.Port || second.PID != first.PID || second.Status != ProcessStatusHealthy {
 		t.Fatalf("EnsureStarted() did not reuse healthy process: first=%+v second=%+v", first, second)
 	}
@@ -447,7 +459,11 @@ func main() {
 	if err != nil {
 		t.Fatalf("Start() error = %v", err)
 	}
-	defer manager.Stop(context.Background(), "pickleball")
+	t.Cleanup(func() {
+		if err := manager.Stop(context.Background(), "pickleball"); err != nil {
+			t.Errorf("stop pickleball applet: %v", err)
+		}
+	})
 	stopped, err := manager.SweepInactive(context.Background(), state.LastSeenAt.Add(24*time.Hour))
 	if err != nil {
 		t.Fatalf("SweepInactive() error = %v", err)
@@ -484,7 +500,11 @@ func main() {
 	if err != nil {
 		t.Fatalf("first Start() error = %v", err)
 	}
-	defer manager.Stop(context.Background(), "pickleball")
+	t.Cleanup(func() {
+		if err := manager.Stop(context.Background(), "pickleball"); err != nil {
+			t.Errorf("stop pickleball applet: %v", err)
+		}
+	})
 
 	badSource := filepath.Join(filesRoot, "apps", "bad")
 	if err := os.MkdirAll(badSource, 0o755); err != nil {

@@ -1644,7 +1644,7 @@ func RunChildComplete(
 	if err != nil {
 		return nil, err
 	}
-	defer operationLock.Release()
+	defer func() { _ = operationLock.Release() }()
 	state, err := store.Load(opts.StateFile)
 	if err != nil {
 		return nil, err
@@ -3816,7 +3816,7 @@ func RunManagerReady(
 	if err != nil {
 		return err
 	}
-	defer operationLock.Release()
+	defer func() { _ = operationLock.Release() }()
 	state, err := store.Load(opts.StateFile)
 	if err != nil {
 		return err
@@ -4397,10 +4397,9 @@ func withStateAlignmentLock(stateFile string, fn func() error) error {
 	if err := syscall.Flock(int(file.Fd()), syscall.LOCK_EX); err != nil {
 		return err
 	}
-	defer syscall.Flock(
-		int(file.Fd()),
-		syscall.LOCK_UN,
-	) //nolint:errcheck // process exit also releases the advisory lock
+	defer func() {
+		_ = syscall.Flock(int(file.Fd()), syscall.LOCK_UN)
+	}() // process exit also releases the advisory lock
 
 	return fn()
 }
@@ -5066,7 +5065,7 @@ func RunContinue(ctx context.Context, opts ContinueOptions, d deps, out io.Write
 	if err != nil {
 		return err
 	}
-	defer operationLock.Release()
+	defer func() { _ = operationLock.Release() }()
 	state, err := store.Load(opts.StateFile)
 	if err != nil {
 		return err

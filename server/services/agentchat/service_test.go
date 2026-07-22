@@ -1942,7 +1942,7 @@ func TestCreateForkThreadSharesLineageAndStoresForkOrigin(t *testing.T) {
 	if err != nil {
 		t.Fatalf("BeginTx() error = %v", err)
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	q := service.queries.WithTx(tx)
 	sourceEntry, err := q.GetAgentEntry(

@@ -30,7 +30,7 @@ func (s *Service) ForkSession(
 	if err != nil {
 		return db.ChatSession{}, err
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 	child, err := ForkSessionWithQueries(ctx, s.q.WithTx(tx), input)
 	if err != nil {
 		return db.ChatSession{}, err
