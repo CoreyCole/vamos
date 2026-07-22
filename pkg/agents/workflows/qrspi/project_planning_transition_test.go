@@ -27,7 +27,7 @@ func TestQRSPIProjectPlanningTransitions(t *testing.T) {
 		NodeMilestoneCreateTickets,
 	)
 	state = assertStartsNext(t, def, state, NodeMilestoneCreateTickets, NodeDone)
-	state = assertTerminal(t, def, state, NodeDone)
+	assertTerminal(t, def, state, NodeDone)
 }
 
 func TestQRSPIProjectPlanningWorkflowRenderers(t *testing.T) {

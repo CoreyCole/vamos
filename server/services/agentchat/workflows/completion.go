@@ -127,10 +127,9 @@ func (s *Service) prepareQRSPIApplyDecision(
 	if wruntime.WorkflowID(state.Type) != qrspi.AgentChatWorkflowType {
 		return decision, nil
 	}
-	planningCwd := ""
 	var err error
 	if result.SourceNodeID == qrspi.NodeWorkspace {
-		planningCwd, err = s.Store.WorkspacePlanningCwd(ctx, workspaceID)
+		planningCwd, err := s.Store.WorkspacePlanningCwd(ctx, workspaceID)
 		if err != nil {
 			return decision, err
 		}

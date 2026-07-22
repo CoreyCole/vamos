@@ -146,7 +146,7 @@ func slashCommandInputHandler(workspaceID, threadID, endpointBase string) string
 	if endpointBase == "" {
 		endpointBase = "/agent-chat"
 	}
-	commandURL := ""
+	var commandURL string
 	switch {
 	case threadID != "":
 		commandURL = endpointBase + "/thread/" + url.PathEscape(threadID) + "/slash-commands"

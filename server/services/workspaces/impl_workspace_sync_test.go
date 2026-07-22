@@ -104,12 +104,12 @@ func TestImplWorkspaceActivityTimestampsIgnoreMaintenanceChurn(t *testing.T) {
 	}
 	assertOldUpdatedAt := func(label string) {
 		t.Helper()
-		row, err := queries.GetImplWorkspace(ctx, db.GetImplWorkspaceParams{ProjectID: "vamos", WorkspaceSlug: "activity"})
+		storedRow, err := queries.GetImplWorkspace(ctx, db.GetImplWorkspaceParams{ProjectID: "vamos", WorkspaceSlug: "activity"})
 		if err != nil {
 			t.Fatalf("GetImplWorkspace after %s: %v", label, err)
 		}
-		if !row.UpdatedAt.Equal(oldUpdatedAt) {
-			t.Fatalf("%s updated_at = %s, want preserved %s", label, row.UpdatedAt, oldUpdatedAt)
+		if !storedRow.UpdatedAt.Equal(oldUpdatedAt) {
+			t.Fatalf("%s updated_at = %s, want preserved %s", label, storedRow.UpdatedAt, oldUpdatedAt)
 		}
 	}
 

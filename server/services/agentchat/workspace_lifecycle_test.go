@@ -446,7 +446,6 @@ func TestCoworkerCanStartResumeAndForkWorkspaceThread(t *testing.T) {
 		t.Fatalf("ResumeWorkspaceThread(coworker) error = %v", err)
 	}
 	entry := conversation.SnapshotEntry{
-		LineageID:   thread.LineageID,
 		EntryID:     "assistant-fork-source",
 		EntryType:   "message",
 		OriginOrder: 1,
@@ -501,7 +500,6 @@ func TestViewingSideForkDoesNotUpdateWorkspaceCurrentSession(t *testing.T) {
 	}
 	parentSessionID := storedWorkspace.CurrentSessionID.String
 	entry := conversation.SnapshotEntry{
-		LineageID:   thread.LineageID,
 		EntryID:     "assistant-fork-source",
 		EntryType:   "message",
 		OriginOrder: 1,

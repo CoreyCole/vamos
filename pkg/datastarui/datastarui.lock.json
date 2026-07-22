@@ -1,17 +1,17 @@
 {
   "source": ".",
-  "commit": "ba37dd4ab0ec210f59f3ca2373d8068af546657e",
+  "commit": "de30d8f1cf2cc1865b086bc41cbff77edf4c1147",
   "modulePath": "github.com/CoreyCole/vamos",
   "components": {
     "avatar": {
-      "version": "ba37dd4ab0ec210f59f3ca2373d8068af546657e",
+      "version": "de30d8f1cf2cc1865b086bc41cbff77edf4c1147",
       "files": [
         "components/avatar/args.go",
         "components/avatar/avatar.templ"
       ]
     },
     "breadcrumb": {
-      "version": "ba37dd4ab0ec210f59f3ca2373d8068af546657e",
+      "version": "de30d8f1cf2cc1865b086bc41cbff77edf4c1147",
       "files": [
         "components/breadcrumb/args.go",
         "components/breadcrumb/breadcrumb.templ",
@@ -20,7 +20,7 @@
       ]
     },
     "button": {
-      "version": "ba37dd4ab0ec210f59f3ca2373d8068af546657e",
+      "version": "de30d8f1cf2cc1865b086bc41cbff77edf4c1147",
       "files": [
         "components/button/args.go",
         "components/button/button.templ",
@@ -28,7 +28,7 @@
       ]
     },
     "card": {
-      "version": "ba37dd4ab0ec210f59f3ca2373d8068af546657e",
+      "version": "de30d8f1cf2cc1865b086bc41cbff77edf4c1147",
       "files": [
         "components/card/args.go",
         "components/card/card.templ",
@@ -36,7 +36,7 @@
       ]
     },
     "checkbox": {
-      "version": "ba37dd4ab0ec210f59f3ca2373d8068af546657e",
+      "version": "de30d8f1cf2cc1865b086bc41cbff77edf4c1147",
       "files": [
         "components/checkbox/args.go",
         "components/checkbox/checkbox.templ",
@@ -44,7 +44,7 @@
       ]
     },
     "dialog": {
-      "version": "ba37dd4ab0ec210f59f3ca2373d8068af546657e",
+      "version": "de30d8f1cf2cc1865b086bc41cbff77edf4c1147",
       "files": [
         "components/dialog/args.go",
         "components/dialog/dialog.templ",
@@ -53,7 +53,7 @@
       ]
     },
     "dropdown": {
-      "version": "ba37dd4ab0ec210f59f3ca2373d8068af546657e",
+      "version": "de30d8f1cf2cc1865b086bc41cbff77edf4c1147",
       "files": [
         "components/dropdown/args.go",
         "components/dropdown/dropdown.templ",
@@ -62,7 +62,7 @@
       ]
     },
     "form": {
-      "version": "ba37dd4ab0ec210f59f3ca2373d8068af546657e",
+      "version": "de30d8f1cf2cc1865b086bc41cbff77edf4c1147",
       "files": [
         "components/form/args.go",
         "components/form/form.templ",
@@ -70,7 +70,7 @@
       ]
     },
     "input": {
-      "version": "ba37dd4ab0ec210f59f3ca2373d8068af546657e",
+      "version": "de30d8f1cf2cc1865b086bc41cbff77edf4c1147",
       "files": [
         "components/input/args.go",
         "components/input/input.templ",
@@ -78,7 +78,7 @@
       ]
     },
     "label": {
-      "version": "ba37dd4ab0ec210f59f3ca2373d8068af546657e",
+      "version": "de30d8f1cf2cc1865b086bc41cbff77edf4c1147",
       "files": [
         "components/label/args.go",
         "components/label/label.templ",
@@ -86,7 +86,7 @@
       ]
     },
     "select": {
-      "version": "ba37dd4ab0ec210f59f3ca2373d8068af546657e",
+      "version": "de30d8f1cf2cc1865b086bc41cbff77edf4c1147",
       "files": [
         "components/select/args.go",
         "components/select/expressions.go",
@@ -95,7 +95,7 @@
       ]
     },
     "sheet": {
-      "version": "ba37dd4ab0ec210f59f3ca2373d8068af546657e",
+      "version": "de30d8f1cf2cc1865b086bc41cbff77edf4c1147",
       "files": [
         "components/sheet/args.go",
         "components/sheet/expressions.go",
@@ -104,7 +104,7 @@
       ]
     },
     "tabs": {
-      "version": "ba37dd4ab0ec210f59f3ca2373d8068af546657e",
+      "version": "de30d8f1cf2cc1865b086bc41cbff77edf4c1147",
       "files": [
         "components/tabs/args.go",
         "components/tabs/expressions.go",
@@ -113,14 +113,14 @@
       ]
     },
     "tailwind": {
-      "version": "ba37dd4ab0ec210f59f3ca2373d8068af546657e",
+      "version": "de30d8f1cf2cc1865b086bc41cbff77edf4c1147",
       "files": [
         "tailwind/README.md",
         "tailwind/utilities.css"
       ]
     },
     "textarea": {
-      "version": "ba37dd4ab0ec210f59f3ca2373d8068af546657e",
+      "version": "de30d8f1cf2cc1865b086bc41cbff77edf4c1147",
       "files": [
         "components/textarea/args.go",
         "components/textarea/textarea.templ",
@@ -128,7 +128,7 @@
       ]
     },
     "tooltip": {
-      "version": "ba37dd4ab0ec210f59f3ca2373d8068af546657e",
+      "version": "de30d8f1cf2cc1865b086bc41cbff77edf4c1147",
       "files": [
         "components/tooltip/args.go",
         "components/tooltip/expressions.go",
@@ -137,7 +137,7 @@
       ]
     },
     "utils": {
-      "version": "ba37dd4ab0ec210f59f3ca2373d8068af546657e",
+      "version": "de30d8f1cf2cc1865b086bc41cbff77edf4c1147",
       "files": [
         "utils/anchor.go",
         "utils/connect_errors.go",
@@ -249,7 +249,7 @@
     },
     "components/form/form.templ": {
       "sourcePath": "components/form/form.templ",
-      "hash": "155d93a5e8c5f339e1bcfc742a755eb0ff96ea4f8f01e06ca60359c7aa1093e4"
+      "hash": "50717e775ed58f69ce2435cd9933d12fbc05e09deb0b815b70b0852aa20c2930"
     },
     "components/form/variants.go": {
       "sourcePath": "components/form/variants.go",
@@ -309,7 +309,7 @@
     },
     "components/sheet/variants.go": {
       "sourcePath": "components/sheet/variants.go",
-      "hash": "667e582662a6abb11fda49009ac8e0b8fade5a1f18a682ab3678eed41018468b"
+      "hash": "5ff9cc2487fa668135ef31b7267a2dca1e7fd8752bfc0d5844eccdcd0d9f3e88"
     },
     "components/tabs/args.go": {
       "sourcePath": "components/tabs/args.go",

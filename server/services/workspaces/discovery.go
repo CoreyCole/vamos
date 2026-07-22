@@ -460,7 +460,7 @@ func workspaceStartupWarnings(packagePath string) []string {
 	assetPath := filepath.Join(packagePath, "static", "js", "datastar-pro-v1.js")
 	if _, err := os.Stat(assetPath); err == nil {
 		return nil
-	} else if err != nil && !os.IsNotExist(err) {
+	} else if !os.IsNotExist(err) {
 		return []string{fmt.Sprintf(
 			"Datastar Pro asset could not be read at %s; browser falls back to public Datastar CDN.",
 			assetPath,

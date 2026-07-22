@@ -104,7 +104,7 @@ func (r *DBChatWorkspaceCandidateResolver) ResolveChatWorkspaceCandidates(
 				candidate.WorkspaceID = workspace.ID
 			}
 			candidates = append(candidates, candidate)
-		} else if err != nil && !os.IsNotExist(err) {
+		} else if !os.IsNotExist(err) {
 			return nil, err
 		}
 	}

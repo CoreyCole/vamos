@@ -25,12 +25,12 @@ func TestFileLockExcludesConcurrentAcquire(t *testing.T) {
 	acquired := make(chan ReleaseFunc, 1)
 	errs := make(chan error, 1)
 	go func() {
-		release, err := lock.Acquire(context.Background())
+		concurrentRelease, err := lock.Acquire(context.Background())
 		if err != nil {
 			errs <- err
 			return
 		}
-		acquired <- release
+		acquired <- concurrentRelease
 	}()
 
 	select {

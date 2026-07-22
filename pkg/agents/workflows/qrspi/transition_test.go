@@ -67,7 +67,7 @@ func TestQRSPITransitions(t *testing.T) {
 	)
 	state = advanceHumanGate(state)
 	state = assertStartsNext(t, def, state, NodeHumanReviewImplementation, NodeDone)
-	state = assertTerminal(t, def, state, NodeDone)
+	assertTerminal(t, def, state, NodeDone)
 }
 
 func TestQRSPIOutlineNeedsHumanWaitsWithoutAdvancing(t *testing.T) {
@@ -227,7 +227,7 @@ func TestQRSPIPlanReviewsDisabledUsesConfigEdges(t *testing.T) {
 	state = assertStartsNext(t, def, state, NodeDesign, NodeOutline)
 	state = assertStartsNext(t, def, state, NodeOutline, NodePlan)
 	state = assertStartsNext(t, def, state, NodePlan, NodeWorkspace)
-	state = assertStartsNext(t, def, state, NodeWorkspace, NodeImplement)
+	assertStartsNext(t, def, state, NodeWorkspace, NodeImplement)
 }
 
 func TestQRSPIOutcomeTransitionTable(t *testing.T) {

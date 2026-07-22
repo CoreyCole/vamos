@@ -1942,7 +1942,7 @@ func persistChildCompletionStatus(
 	if err != nil {
 		return nil, err
 	}
-	persisted, status.Wake, err = deliverPreparedWake(
+	_, status.Wake, err = deliverPreparedWake(
 		ctx,
 		store,
 		stateFile,

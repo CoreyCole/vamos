@@ -1075,9 +1075,8 @@ func (s *Service) buildWorkspaceDocPane(
 		selectedRel = defaultDocPath(parentFiles)
 	}
 
-	selectedAbs := ""
 	if selectedRel != "" {
-		selectedAbs = filepath.Join(parentRoot, filepath.FromSlash(selectedRel))
+		selectedAbs := filepath.Join(parentRoot, filepath.FromSlash(selectedRel))
 		if focusedRoot := focusedRootDocPath(
 			parentRoot,
 			selectedAbs,
