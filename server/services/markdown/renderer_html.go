@@ -78,13 +78,6 @@ func (s *Service) ServeHTMLApplet(c echo.Context) error {
 	return c.Blob(http.StatusOK, "text/html; charset=utf-8", content)
 }
 
-func assetURLForHTMLApplet(docPath, assetPath string) string {
-	relDoc := NormalizeWorkspaceDocPath(docPath)
-	relAsset := strings.TrimPrefix(path.Clean("/"+assetPath), "/")
-	values := url.Values{"doc": []string{relDoc}}
-	return thoughtsAssetPrefix + relAsset + "?" + values.Encode()
-}
-
 func resolveHTMLAppletAsset(basePath, docPath, assetPath string) (string, error) {
 	docRel := NormalizeWorkspaceDocPath(docPath)
 	if docRel == "" {

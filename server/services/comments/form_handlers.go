@@ -2,7 +2,6 @@ package comments
 
 import (
 	"net/http"
-	"net/url"
 	"strconv"
 	"strings"
 
@@ -408,18 +407,6 @@ func (s *Service) renderCommentSuccess(
 	return sse.MarshalAndPatchSignals(map[string]any{
 		"section_" + sectionID + "_form_open": false,
 	})
-}
-
-// extractFilePathFromReferer extracts thoughts path from referer URL
-func extractFilePathFromReferer(referer string) string {
-	if referer == "" {
-		return ""
-	}
-	parsed, err := url.Parse(referer)
-	if err != nil {
-		return ""
-	}
-	return strings.TrimPrefix(parsed.Path, "/")
 }
 
 func (s *Service) recoverReplyFormValues(c echo.Context, commentID, filePath string) (string, string) {

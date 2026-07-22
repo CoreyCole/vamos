@@ -301,15 +301,7 @@ func (r *WorkspaceErrorRecorder) Record(ctx context.Context, req WorkspaceErrorR
 	if req.DedupeKey == "" {
 		return WorkspaceErrorEvent{}, fmt.Errorf("workspace error event dedupe key is empty")
 	}
-	event, err := r.Store.UpsertWorkspaceErrorEvent(ctx, UpsertWorkspaceErrorEventParams{
-		WorkspaceSlug: req.WorkspaceSlug,
-		Source:        req.Source,
-		Severity:      req.Severity,
-		Message:       req.Message,
-		Detail:        req.Detail,
-		DedupeKey:     req.DedupeKey,
-		PayloadJSON:   req.PayloadJSON,
-	})
+	event, err := r.Store.UpsertWorkspaceErrorEvent(ctx, UpsertWorkspaceErrorEventParams(req))
 	if err == nil && r.Notifier != nil {
 		r.Notifier.Notify(req.WorkspaceSlug)
 	}

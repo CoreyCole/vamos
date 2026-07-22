@@ -106,9 +106,7 @@ func (r *DBWorkspaceResolver) resolveDocPath(documentPath string) (string, error
 	if path == "" {
 		return "", fmt.Errorf("document path is required")
 	}
-	if strings.HasPrefix(path, "thoughts/") {
-		path = strings.TrimPrefix(path, "thoughts/")
-	}
+	path = strings.TrimPrefix(path, "thoughts/")
 	if filepath.IsAbs(path) {
 		return resolveExistingOrCleanPath(path)
 	}

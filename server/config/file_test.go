@@ -394,13 +394,3 @@ func (r serverRepoForTest) serverRepo() server.RepoConfig {
 		Checkouts:        checkouts,
 	}
 }
-
-type serverRepoForTestMap map[string]serverRepoForTest
-
-func (m serverRepoForTestMap) asServerRepos() map[string]server.RepoConfig {
-	repos := make(map[string]server.RepoConfig, len(m))
-	for name, repo := range m {
-		repos[name] = repo.serverRepo()
-	}
-	return repos
-}

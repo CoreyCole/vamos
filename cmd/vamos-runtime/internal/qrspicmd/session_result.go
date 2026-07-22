@@ -193,16 +193,6 @@ func latestSessionEvidenceAfter(
 	return postCursor[len(postCursor)-1], postCursor, nil
 }
 
-func hasCompleteQRSPIResult(evidence []SessionMessageEvidence) bool {
-	for _, item := range evidence {
-		if _, err := qrspi.ExtractQRSPIResultYAML(item.Text); err == nil {
-			return true
-		}
-	}
-
-	return false
-}
-
 func finalQRSPIResultText(
 	path string,
 	evidence []SessionMessageEvidence,

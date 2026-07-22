@@ -40,12 +40,7 @@ func BuildThreadViews(items []ThreadSource) []CommentThreadView {
 	for _, item := range items {
 		replies := make([]CommentReplyView, 0, len(item.Replies))
 		for _, reply := range item.Replies {
-			replies = append(replies, CommentReplyView{
-				AuthorEmail: reply.AuthorEmail,
-				ActorLabel:  reply.ActorLabel,
-				CreatedAt:   reply.CreatedAt,
-				Body:        reply.Body,
-			})
+			replies = append(replies, CommentReplyView(reply))
 		}
 		views = append(views, CommentThreadView{
 			ID:           item.ID,

@@ -294,19 +294,3 @@ func finalAssistantResponse(proj chatsession.ChatProjection, runID string) strin
 	}
 	return ""
 }
-
-func httpClientWithCookies(cookies []*http.Cookie) *http.Client {
-	return &http.Client{Transport: cookieTransport{base: http.DefaultTransport, cookies: cookies}}
-}
-
-type cookieTransport struct {
-	base    http.RoundTripper
-	cookies []*http.Cookie
-}
-
-func (t cookieTransport) RoundTrip(req *http.Request) (*http.Response, error) {
-	for _, cookie := range t.cookies {
-		req.AddCookie(cookie)
-	}
-	return t.base.RoundTrip(req)
-}

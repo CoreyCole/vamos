@@ -19,9 +19,7 @@ func MachineCredentialFromBearer(r *http.Request) (keyID, secret string, err err
 		return "", "", errors.New("machine bearer token required")
 	}
 	token := strings.TrimSpace(strings.TrimPrefix(raw, "Bearer "))
-	if strings.HasPrefix(token, "vamos_machine_") {
-		token = strings.TrimPrefix(token, "vamos_machine_")
-	}
+	token = strings.TrimPrefix(token, "vamos_machine_")
 	keyID, secret, ok := strings.Cut(token, ".")
 	if !ok || strings.TrimSpace(keyID) == "" || strings.TrimSpace(secret) == "" {
 		return "", "", errors.New("invalid machine bearer token")

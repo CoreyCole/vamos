@@ -624,17 +624,6 @@ func thoughtsNormalRegions(contextVisible bool) []workbench.RegionNormalState {
 	}
 }
 
-func thoughtsContextKind(mode string) workbench.RegionKind {
-	switch mode {
-	case thoughtsContextModeChat:
-		return workbench.RegionChat
-	case thoughtsContextModeComments:
-		return workbench.RegionComments
-	default:
-		return workbench.RegionEmpty
-	}
-}
-
 func BuildDocumentPanelArgs(
 	pageArgs *PageArgs,
 	workspaceTree ...*workbench.WorkspaceDocTreeHeaderModel,

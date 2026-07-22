@@ -351,9 +351,7 @@ func normalizePlanDirKey(planDir string) string {
 	if idx := strings.Index(planDir, "/thoughts/"); idx >= 0 {
 		planDir = planDir[idx+len("/thoughts/"):]
 	}
-	if strings.HasPrefix(planDir, "thoughts/") {
-		planDir = strings.TrimPrefix(planDir, "thoughts/")
-	}
+	planDir = strings.TrimPrefix(planDir, "thoughts/")
 	return strings.Trim(planDir, "/")
 }
 

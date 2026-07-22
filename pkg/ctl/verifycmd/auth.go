@@ -45,10 +45,6 @@ type mintBrowserTokenResponse struct {
 	ExpiresAt time.Time `json:"expires_at"`
 }
 
-type e2eTokenMinter interface {
-	MintE2EToken(ctx context.Context, cfg WorkspaceVerifyConfig) (string, error)
-}
-
 type managerE2ETokenMinter struct {
 	HTTPClient *http.Client
 }

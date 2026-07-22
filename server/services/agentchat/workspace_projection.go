@@ -573,14 +573,6 @@ func workspaceThreadHrefForWorkspace(_ db.Workspace, threadID string) string {
 	return threadHref(threadID)
 }
 
-func workspaceThreadHref(workspaceID, threadID string) string {
-	threadID = strings.TrimSpace(threadID)
-	if strings.TrimSpace(workspaceID) == "" || threadID == "" {
-		return ""
-	}
-	return BuildThoughtsChatDocURL(EmbeddedChatURLState{ThreadID: threadID})
-}
-
 type WorkspaceSessionSummary struct {
 	Header          PiSessionHeader
 	FirstPromptText string

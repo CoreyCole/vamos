@@ -382,13 +382,6 @@ func hasUnresolvedThreads(threads []CommentThreadView) bool {
 	return false
 }
 
-func commentSidebarSignals(initiallyExpanded bool) string {
-	if initiallyExpanded {
-		return "{" + CommentSidebarSignal + ": true}"
-	}
-	return "{" + CommentSidebarSignal + ": false}"
-}
-
 func commentSidebarClass(initiallyExpanded bool) string {
 	base := "shrink-0 min-h-screen transition-[width] duration-150"
 	if initiallyExpanded {

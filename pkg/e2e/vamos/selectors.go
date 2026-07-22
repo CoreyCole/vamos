@@ -11,10 +11,6 @@ type expectation struct{ step spec.Step }
 
 func (e expectation) CheckStep() spec.Step { return e.step }
 
-type stepFixture struct{ step spec.Step }
-
-func (f stepFixture) SetupStep() spec.Step { return f.step }
-
 var Thoughts thoughtsFeature
 var AgentChat agentChatFeature
 var Console consoleExpectations

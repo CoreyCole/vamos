@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"net/url"
 	"os"
 	"strings"
 	"time"
@@ -15,8 +14,6 @@ import (
 
 	"github.com/CoreyCole/vamos/cmd/vamos-runtime/internal/authcmd"
 )
-
-const purposeHermesChat = "hermes_chat"
 
 type Options struct {
 	ManagerURL string
@@ -209,40 +206,4 @@ func loadProfile(store authcmd.CredentialStore, profileName string) (authcmd.Pro
 		store = authcmd.FileCredentialStore{Path: path}
 	}
 	return store.Load(profileName)
-}
-
-func resolveBaseURL(explicit, managerURL, slug string) (string, error) {
-	if base := strings.TrimRight(strings.TrimSpace(explicit), "/"); base != "" {
-		return base, nil
-	}
-	u, err := url.Parse(strings.TrimSpace(managerURL))
-	if err != nil || u.Scheme == "" || u.Host == "" {
-		return "", fmt.Errorf("base URL required when manager URL is not absolute")
-	}
-	host := u.Hostname()
-	port := u.Port()
-	parts := strings.Split(host, ".")
-	if len(parts) > 1 {
-		parts[0] = strings.TrimSpace(slug)
-		host = strings.Join(parts, ".")
-	} else {
-		host = strings.TrimSpace(slug) + "." + host
-	}
-	if port != "" {
-		host += ":" + port
-	}
-	return (&url.URL{Scheme: u.Scheme, Host: host}).String(), nil
-}
-
-func agentBrowserLoginURL(baseURL, token, redirect string) (string, error) {
-	u, err := url.Parse(strings.TrimRight(baseURL, "/") + "/internal/agent-auth/browser-login")
-	if err != nil {
-		return "", err
-	}
-	q := u.Query()
-	q.Set("purpose", purposeHermesChat)
-	q.Set("token", token)
-	q.Set("redirect", redirect)
-	u.RawQuery = q.Encode()
-	return u.String(), nil
 }

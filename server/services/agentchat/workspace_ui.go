@@ -272,13 +272,6 @@ func agentChatThreadSheetSignals() string {
 	return strings.TrimSuffix(strings.TrimPrefix(signals.DataSignals, "{"), "}")
 }
 
-func agentChatSidebarInitialClass(hasSelectedThread bool) string {
-	if agentworkspace.SidebarVisibleByDefault(hasSelectedThread) {
-		return "opacity-100 translate-x-0"
-	}
-	return "opacity-0 -translate-x-4 pointer-events-none"
-}
-
 func agentChatDesktopGridInitialClass(hasSelectedThread bool) string {
 	if agentworkspace.SidebarVisibleByDefault(hasSelectedThread) {
 		return "grid-cols-[minmax(0,1fr)_20rem]"
@@ -286,19 +279,11 @@ func agentChatDesktopGridInitialClass(hasSelectedThread bool) string {
 	return "grid-cols-[minmax(0,1fr)_minmax(0,1fr)]"
 }
 
-func agentChatGridInitialClass(hasSelectedThread bool) string {
-	return agentChatDesktopGridInitialClass(hasSelectedThread)
-}
-
 func workspaceSidebarVisibilitySignal(hasSelectedThread bool) string {
 	if agentworkspace.SidebarVisibleByDefault(hasSelectedThread) {
 		return "true"
 	}
 	return "false"
-}
-
-func workspaceSidebarInitialOpenGroup(state WorkspaceSidebarState) string {
-	return strings.TrimSpace(state.ActiveGroupKey)
 }
 
 func planSidebarInitialOpenGroup(state PlanSidebarState) string {

@@ -735,20 +735,6 @@ func docPaneTitle(state DocPaneState) string {
 	return base + " / " + docTitle
 }
 
-func transcriptPaneHasDetails(state TranscriptPaneState) bool {
-	for _, msg := range state.Stable {
-		if msg.Variant == "detail" {
-			return true
-		}
-	}
-	for _, msg := range state.Live.Items {
-		if msg.Variant == "detail" {
-			return true
-		}
-	}
-	return false
-}
-
 type transcriptDetailState struct {
 	Expanded bool `json:"expanded"`
 }

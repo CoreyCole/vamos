@@ -932,10 +932,6 @@ func (h *Handler) ensureWorkspaceRunningForSwitch(ctx context.Context, ws Worksp
 	}
 }
 
-func switchRedirectPath(raw string) (string, error) {
-	return switchRedirectPathForTarget(raw, "", "")
-}
-
 func switchRedirectPathForTarget(raw, currentSlug, targetSlug string) (string, error) {
 	redirectPath, err := ValidateLocalRedirectPath(raw)
 	if err != nil {
@@ -1516,13 +1512,6 @@ func (h *Handler) renderedImplWorkspaceViews(views []ImplWorkspaceView, filter W
 func (h *Handler) workspaceGroups(views []ImplWorkspaceView, filter WorkspacesFilter) WorkspaceGroups {
 	filtered := applyWorkspacesFilter(views, filter, h.protectedReleaseSlugs())
 	return groupFilterImplWorkspaceViews(filtered, filter, h.protectedReleaseSlugs())
-}
-
-func (h *Handler) releaseLaneWorkspaces() []ReleaseLaneWorkspace {
-	if h.releaseProjector == nil || h.releaseProjector.Registry == nil {
-		return nil
-	}
-	return ReleaseLaneWorkspaces(h.releaseProjector.Registry)
 }
 
 func (h *Handler) protectedReleaseSlugList() []string {

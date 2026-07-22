@@ -138,10 +138,6 @@ func isIdempotentCleanupNoop(action WorkspaceCleanupAction, view ImplWorkspaceVi
 	return strings.Contains(strings.ToLower(action.DisabledReason), "already cleaned")
 }
 
-func findImplWorkspaceView(views []ImplWorkspaceView, slug string) (ImplWorkspaceView, bool) {
-	return findImplWorkspaceViewForProject(views, "", slug)
-}
-
 func findImplWorkspaceViewForProject(views []ImplWorkspaceView, projectID, slug string) (ImplWorkspaceView, bool) {
 	projectID = strings.TrimSpace(projectID)
 	for _, view := range views {

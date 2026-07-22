@@ -21,8 +21,6 @@ type RemoteCommandResult struct {
 	Output  string
 }
 
-type remoteCommandRunner func(ctx context.Context, template, host string, command []string) (RemoteCommandResult, error)
-
 func RunRemoteCommand(
 	ctx context.Context,
 	template, host string,

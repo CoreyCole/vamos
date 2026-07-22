@@ -578,22 +578,6 @@ func autoLinkThoughtsPaths(content string) string {
 	})
 }
 
-// assumes lists can be wrapped and we will still find parent lists, for example
-// ````
-// <div><ul><li>list item</li></ul></div>
-// ````
-func calculateListDepth(node ast.Node) int {
-	depth := 0
-	parent := node.GetParent()
-	for parent != nil {
-		if _, ok := parent.(*ast.List); ok {
-			depth++
-		}
-		parent = parent.GetParent()
-	}
-	return depth
-}
-
 // RenderToSections parses markdown and returns sections with metadata
 func (m Renderer) RenderToSections(md []byte) []Section {
 	md = renderableMarkdown(md)

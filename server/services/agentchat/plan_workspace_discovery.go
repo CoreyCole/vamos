@@ -189,18 +189,6 @@ func DiscoverImplWorkspaceBinding(
 	return binding
 }
 
-func discoverBoundOrSyncedImplWorkspace(
-	planDir string,
-	cfg workspaces.ImplWorkspaceDiscoveryConfig,
-	discoveredAt time.Time,
-) (path, url string, at time.Time, ok bool) {
-	path, url, _, _, ok = discoverBoundOrSyncedImplWorkspaceForProject(planDir, "", cfg)
-	if !ok {
-		return "", "", time.Time{}, false
-	}
-	return path, url, discoveredAt, true
-}
-
 func discoverBoundOrSyncedImplWorkspaceForProject(
 	planDir string,
 	projectID string,
@@ -650,13 +638,6 @@ func jsonMarshalString(value any) (string, error) {
 		return "", err
 	}
 	return string(data), nil
-}
-
-func boolInt(value bool) int64 {
-	if value {
-		return 1
-	}
-	return 0
 }
 
 func implWorkspaceDiscoveryConfigIsZero(

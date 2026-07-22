@@ -80,7 +80,7 @@ func (s temporalWorkflowStarter) StartPickleballSelfModify(ctx context.Context, 
 		ID:                    workflowID,
 		TaskQueue:             temporalmgr.GoTaskQueue,
 		WorkflowIDReusePolicy: enums.WORKFLOW_ID_REUSE_POLICY_ALLOW_DUPLICATE_FAILED_ONLY,
-	}, SelfModifyWorkflow, SelfModifyWorkflowInput{SessionID: req.SessionID, Prompt: req.Prompt, UserEmail: req.UserEmail})
+	}, SelfModifyWorkflow, SelfModifyWorkflowInput(req))
 	if err != nil {
 		var alreadyStarted *serviceerror.WorkflowExecutionAlreadyStarted
 		if errors.As(err, &alreadyStarted) {

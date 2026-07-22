@@ -1020,29 +1020,6 @@ func writeStartNextText(out io.Writer, result StartNextResult) error {
 	return nil
 }
 
-func startNextRef(result StartNextResult) map[string]any {
-	ref := map[string]any{"stateFile": result.StateFile}
-	if result.CurrentNode != "" {
-		ref["currentNode"] = result.CurrentNode
-	}
-	if result.PromptFile != "" {
-		ref["promptFile"] = result.PromptFile
-	}
-	if result.ActiveChild != nil {
-		ref["activeChild"] = childRef(result.ActiveChild)
-	}
-	if result.StopReason != "" {
-		ref["stopReason"] = result.StopReason
-	}
-	if result.NextCommand != "" {
-		ref["nextCommand"] = result.NextCommand
-	}
-	if result.FeedbackCommand != "" {
-		ref["feedbackCommand"] = result.FeedbackCommand
-	}
-	return ref
-}
-
 func continueCommand(stateFile string) string {
 	return fmt.Sprintf("vamos qrspi continue --state-file %s", stateFile)
 }
@@ -3387,20 +3364,6 @@ func pasteWake(ctx context.Context, d deps, paneID, payload string) error {
 	return tmux.SendKeys(ctx, pane, []string{"Enter"})
 }
 
-func childCompletionWake(
-	stateFile string,
-	state ManagerState,
-	status ChildCompletionStatus,
-) WakeDeliveryInstruction {
-	if status.DeliveryID != "" && state.Delivery.LastDeliveryID == status.DeliveryID {
-		return WakeDeliveryInstruction{Mode: "suppress", Reason: "duplicate_delivery"}
-	}
-	return WakeDeliveryInstruction{
-		Mode:    "deliver",
-		Payload: childCompletionWakePayload(stateFile, state, status),
-	}
-}
-
 func childCompletionWakePayload(
 	stateFile string,
 	state ManagerState,
@@ -3997,106 +3960,6 @@ func RunManagerReady(
 		_, err = fmt.Fprintln(out, "manager ready: no queued wake")
 	}
 	return err
-}
-
-func flushQueuedWake(
-	ctx context.Context,
-	state ManagerState,
-	pane string,
-	d deps,
-) (ManagerState, bool, error) {
-	queued := state.Delivery.QueuedWake
-	if queued == nil {
-		return state, false, nil
-	}
-	if queued.DeliveryID == "" || queued.DeliveryID == state.Delivery.LastDeliveryID {
-		state.Delivery.QueuedWake = nil
-		return state, false, nil
-	}
-	matchingContinuation := state.ActiveChild != nil &&
-		state.ActiveChild.LaunchKind == ChildLaunchResumeHandoff &&
-		state.ActiveChild.ContinuationDeliveryID == queued.DeliveryID
-	if state.ActiveChild != nil && !matchingContinuation {
-		if queued.ChildGeneration != activeChildGeneration(state) ||
-			state.ActiveChild.LifecycleStatus == "running" ||
-			state.ActiveChild.LifecycleStatus == "manual_reprompt" {
-			state.LastActionCard = &ManagerActionCard{
-				Kind:              ActionSupersededQueuedWake,
-				Severity:          "info",
-				Summary:           "queued child wake superseded by active child generation",
-				RecommendedAction: "wait for newer child completion",
-				RequiresHuman:     false,
-			}
-			state.Delivery.QueuedWake = nil
-			return state, false, nil
-		}
-	}
-	paneID := strings.TrimSpace(pane)
-	if paneID == "" {
-		paneID = managerDeliveryPane(state)
-	}
-	if paneID == "" {
-		return state, false, errors.New("manager pane is required to flush queued wake")
-	}
-	tmux := tmuxClient(d)
-	delivery := queued.Delivery
-	if delivery == "" {
-		delivery = QueuedWakePasteAndSubmit
-	}
-	if delivery == QueuedWakeSubmitOnly && queued.PastedPaneID == paneID {
-		if err := tmux.SendKeys(
-			ctx,
-			TmuxPane{ID: paneID},
-			[]string{"Enter"},
-		); err != nil {
-			state = recordQueuedWakeDeliveryFailure(state, queued, paneID, "submit", err)
-			return state, false, nil
-		}
-	} else {
-		if err := tmux.PasteText(ctx, TmuxPane{ID: paneID}, queued.Payload); err != nil {
-			queued.Delivery = QueuedWakePasteAndSubmit
-			queued.PastedPaneID = ""
-			state = recordQueuedWakeDeliveryFailure(state, queued, paneID, "paste", err)
-			return state, false, nil
-		}
-		queued.Delivery = QueuedWakeSubmitOnly
-		queued.PastedPaneID = paneID
-		if err := tmux.SendKeys(
-			ctx,
-			TmuxPane{ID: paneID},
-			[]string{"Enter"},
-		); err != nil {
-			state = recordQueuedWakeDeliveryFailure(state, queued, paneID, "submit", err)
-			return state, false, nil
-		}
-	}
-	queued.DeliveredAt = time.Now().Format(time.RFC3339)
-	state.Delivery.LastDeliveryID = queued.DeliveryID
-	state.Delivery.QueuedWake = nil
-	return state, true, nil
-}
-
-func recordQueuedWakeDeliveryFailure(
-	state ManagerState,
-	queued *QueuedWake,
-	paneID, phase string,
-	deliveryErr error,
-) ManagerState {
-	state.Delivery.QueuedWake = queued
-	state.LastActionCard = &ManagerActionCard{
-		Kind:     ActionManagerDeliveryFailed,
-		Severity: "warning",
-		Summary:  "queued manager wake delivery remains retryable",
-		Evidence: []string{
-			fmt.Sprintf("delivery: %s", queued.DeliveryID),
-			fmt.Sprintf("pane: %s", paneID),
-			fmt.Sprintf("phase: %s", phase),
-			deliveryErr.Error(),
-		},
-		RecommendedAction: "retry manager-ready from the intended manager pane",
-		RequiresHuman:     false,
-	}
-	return state
 }
 
 func supersedeQueuedWakeForActiveChild(

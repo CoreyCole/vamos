@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/csv"
 	"fmt"
-	"html"
 	"os"
 	"path"
 	"path/filepath"
@@ -163,5 +162,3 @@ func joinURLPath(prefix, rel string) string {
 	}
 	return cleanPrefix + "/" + path.Clean("/" + CleanRelPath(rel))[1:]
 }
-
-func escapeHTMLText(text string) string { return html.EscapeString(text) }

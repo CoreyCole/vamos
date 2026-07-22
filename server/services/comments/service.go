@@ -224,10 +224,8 @@ func markdownSectionTitles(data []byte) map[string]string {
 	titles := map[string]string{}
 	lines := strings.Split(string(data), "\n")
 	inFence := false
-	inFrontmatter := false
-	if len(lines) > 0 && strings.TrimSpace(lines[0]) == "---" {
-		inFrontmatter = true
-	}
+	inFrontmatter := len(lines) > 0 && strings.TrimSpace(lines[0]) == "---"
+
 	sectionID := 0
 	contentBeforeHeading := false
 	for i, line := range lines {

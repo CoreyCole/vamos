@@ -6,6 +6,9 @@ import (
 	"sort"
 	"strings"
 	"time"
+
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
 )
 
 type QRSPIMetadata struct {
@@ -164,13 +167,6 @@ func splitPlanSlug(base, slug string) (string, string, string) {
 		return base[:10], strings.ReplaceAll(base[11:19], "-", ":"), prettyDocLabel(slug)
 	}
 	return "", "", prettyDocLabel(slug)
-}
-
-func directoryTitle(args *DirectoryArgs) string {
-	if args == nil || strings.TrimSpace(args.Path) == "" {
-		return "Documentation Root"
-	}
-	return GetDisplayPath(args.Path)
 }
 
 func canonicalRepositoryLabel(repo string) string {
@@ -368,5 +364,5 @@ func prettyDocLabel(name string) string {
 	if name == "" {
 		return "Document"
 	}
-	return strings.Title(name)
+	return cases.Title(language.Und).String(name)
 }

@@ -55,7 +55,6 @@ type doctorFindings struct {
 	staleMetadata  bool
 	deadProcess    bool
 	managerProblem bool
-	publicProblem  bool
 	notes          []string
 }
 

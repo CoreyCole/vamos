@@ -102,7 +102,7 @@ func (s *Service) registerExampleStartupAliases(e *echo.Echo) error {
 	}
 	for _, manifestPath := range manifests {
 		id := filepath.Base(filepath.Dir(manifestPath))
-		ctx, err := s.resolver.ResolveExampleApplet(nil, id)
+		ctx, err := s.resolver.ResolveExampleApplet(context.Background(), id)
 		if err != nil || len(ctx.Manifest.RootAliases) == 0 {
 			continue
 		}
@@ -126,7 +126,7 @@ func (s *Service) registerThoughtsStartupAliases(e *echo.Echo) error {
 		if err != nil {
 			return nil
 		}
-		ctx, err := s.resolver.ResolveThoughtsApplet(nil, "thoughts/"+filepath.ToSlash(rel))
+		ctx, err := s.resolver.ResolveThoughtsApplet(context.Background(), "thoughts/"+filepath.ToSlash(rel))
 		if err != nil || len(ctx.Manifest.RootAliases) == 0 {
 			return nil
 		}

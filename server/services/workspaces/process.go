@@ -5,67 +5,12 @@ import (
 	"fmt"
 	"net"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
-	"sync"
 	"syscall"
 	"time"
 )
-
-type childProcess struct {
-	cmd  *exec.Cmd
-	done chan error
-
-	once   sync.Once
-	exited chan struct{}
-	err    error
-}
-
-func newChildProcess(cmd *exec.Cmd) *childProcess {
-	return &childProcess{cmd: cmd, done: make(chan error, 1), exited: make(chan struct{})}
-}
-
-func (cp *childProcess) pid() int {
-	if cp == nil || cp.cmd == nil || cp.cmd.Process == nil {
-		return 0
-	}
-	return cp.cmd.Process.Pid
-}
-
-func (cp *childProcess) finish(err error) {
-	if cp == nil {
-		return
-	}
-	cp.once.Do(func() {
-		cp.err = err
-		if cp.done != nil {
-			cp.done <- err
-		}
-		close(cp.exited)
-	})
-}
-
-func (cp *childProcess) wait(ctx context.Context) error {
-	if cp == nil {
-		return nil
-	}
-	if cp.exited == nil {
-		select {
-		case err := <-cp.done:
-			return err
-		case <-ctx.Done():
-			return ctx.Err()
-		}
-	}
-	select {
-	case <-cp.exited:
-		return cp.err
-	case <-ctx.Done():
-		return ctx.Err()
-	}
-}
 
 func findFreePort() (int, error) {
 	l, err := net.Listen("tcp", "127.0.0.1:0")
@@ -146,59 +91,6 @@ func appendEnv(env []string, key, value string) []string {
 		}
 	}
 	return append(out, prefix+value)
-}
-
-func startChild(
-	ctx context.Context,
-	ws Workspace,
-	port int,
-	rt RuntimeConfig,
-) (*childProcess, error) {
-	select {
-	case <-ctx.Done():
-		return nil, ctx.Err()
-	default:
-	}
-	if err := os.MkdirAll(ws.StateDir, 0o755); err != nil {
-		return nil, err
-	}
-	if err := os.MkdirAll(filepath.Dir(ws.LogPath), 0o755); err != nil {
-		return nil, err
-	}
-	logFile, err := os.OpenFile(ws.LogPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
-	if err != nil {
-		return nil, err
-	}
-
-	cmd := exec.Command(filepath.Join(ws.PackagePath, "agents-server"))
-	cmd.Dir = ws.PackagePath
-	cmd.Env = ChildEnv(rt.BaseEnv, ws, map[BundleComponent]int{ComponentWeb: port}, rt)
-	cmd.Stdout = logFile
-	cmd.Stderr = logFile
-	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
-	if err := cmd.Start(); err != nil {
-		_ = logFile.Close()
-		return nil, fmt.Errorf("start %s: %w", ws.Slug, err)
-	}
-
-	cp := newChildProcess(cmd)
-	go func() {
-		cp.finish(cmd.Wait())
-		_ = logFile.Close()
-	}()
-	return cp, nil
-}
-
-func stopChild(ctx context.Context, cp *childProcess) error {
-	if cp == nil || cp.cmd == nil || cp.cmd.Process == nil {
-		return nil
-	}
-	_ = syscall.Kill(-cp.cmd.Process.Pid, syscall.SIGTERM)
-	if err := cp.wait(ctx); err != nil {
-		_ = syscall.Kill(-cp.cmd.Process.Pid, syscall.SIGKILL)
-		return err
-	}
-	return nil
 }
 
 func processAlive(pid int) bool {

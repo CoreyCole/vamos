@@ -174,7 +174,7 @@ func WriteRecoverySummaryPrompt(req RecoverySummaryRequest, promptPath string) e
 		b.WriteString("- Session ID: " + req.Evidence.SessionID + "\n")
 	}
 	if req.Evidence.Line > 0 {
-		b.WriteString(fmt.Sprintf("- Evidence line: %d\n", req.Evidence.Line))
+		fmt.Fprintf(&b, "- Evidence line: %d\n", req.Evidence.Line)
 	}
 	if req.Evidence.StopReason != "" {
 		b.WriteString("- Stop reason: " + req.Evidence.StopReason + "\n")

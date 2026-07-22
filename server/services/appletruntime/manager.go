@@ -508,10 +508,3 @@ func (m *ManagerImpl) logPath(appID string) string {
 	}, appID)
 	return filepath.Join(m.logDir, safe+".log")
 }
-
-func pathWithinRoot(root, candidate string) bool {
-	root = filepath.Clean(root)
-	candidate = filepath.Clean(candidate)
-	rel, err := filepath.Rel(root, candidate)
-	return err == nil && rel != ".." && !strings.HasPrefix(rel, "../")
-}

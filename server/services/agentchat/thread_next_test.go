@@ -2,7 +2,6 @@ package agentchat
 
 import (
 	"context"
-	"encoding/json"
 	"strings"
 	"testing"
 
@@ -137,13 +136,4 @@ func TestBuildThreadMetadataViewListsTargets(t *testing.T) {
 	if got := strings.Trim(strings.Join([]string{string(kinds[0]), string(kinds[1]), string(kinds[2])}, ","), ","); got != "primary,related,freeform" {
 		t.Fatalf("target kinds = %s", got)
 	}
-}
-
-func mustJSONText(t *testing.T, value string) string {
-	t.Helper()
-	encoded, err := json.Marshal(value)
-	if err != nil {
-		t.Fatalf("Marshal JSON text: %v", err)
-	}
-	return string(encoded)
 }

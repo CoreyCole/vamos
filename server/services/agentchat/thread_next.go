@@ -229,12 +229,3 @@ func qrspiImplementationWorkspaceFromText(resultText string) string {
 	}
 	return ""
 }
-
-func nextQRSPIThreadContext(sourceThreadID, workspaceID, cwd, resultYAML string) string {
-	return strings.TrimSpace(fmt.Sprintf(`Continuing QRSPI from previous thread %s.
-Primary workspace: %s
-Pi cwd: %s
-
-Prior result YAML:
-%s`, sourceThreadID, workspaceID, cwd, resultYAML))
-}

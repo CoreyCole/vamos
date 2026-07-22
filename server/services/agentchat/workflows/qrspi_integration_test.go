@@ -1156,28 +1156,6 @@ func assertWaitingHuman(
 	}
 }
 
-func assertBypassedAndWaiting(
-	t *testing.T,
-	store *fakeStore,
-	bypassed, humanReview, reviewContext wruntime.NodeID,
-) {
-	t.Helper()
-	if store.state.Nodes[bypassed].Status != wruntime.NodeStatusBypassed {
-		t.Fatalf(
-			"node %s state = %#v, want bypassed",
-			bypassed,
-			store.state.Nodes[bypassed],
-		)
-	}
-	assertWaitingHuman(
-		t,
-		store,
-		humanReview,
-		reviewContext,
-		store.state.LastResult.PrimaryArtifact,
-	)
-}
-
 func moveQRSPIIntegrationState(t *testing.T, store *fakeStore, node wruntime.NodeID) {
 	t.Helper()
 	store.state.CurrentNodeID = node
@@ -1254,11 +1232,11 @@ func qRSPIIntegrationResultYAMLWithWorkspaceAndArtifacts(
 ) string {
 	var b strings.Builder
 	b.WriteString("```yaml\nqrspi_result:\n")
-	b.WriteString(fmt.Sprintf("  stage: %q\n", string(node)))
-	b.WriteString(fmt.Sprintf("  status: %q\n", status))
-	b.WriteString(fmt.Sprintf("  outcome: %q\n", string(outcome)))
+	fmt.Fprintf(&b, "  stage: %q\n", string(node))
+	fmt.Fprintf(&b, "  status: %q\n", status)
+	fmt.Fprintf(&b, "  outcome: %q\n", string(outcome))
 	if strings.TrimSpace(workspace) != "" {
-		b.WriteString(fmt.Sprintf("  workspace: %q\n", workspace))
+		fmt.Fprintf(&b, "  workspace: %q\n", workspace)
 	}
 	b.WriteString("  policy:\n")
 	b.WriteString("    auto_mode: false\n")
@@ -1266,20 +1244,20 @@ func qRSPIIntegrationResultYAMLWithWorkspaceAndArtifacts(
 	b.WriteString("    invalid_result_retry_limit: 1\n")
 	b.WriteString("  summary:\n")
 	b.WriteString("    plan_goal: \"Build Agent Chat-native generic workflow runtime; QRSPI first.\"\n")
-	b.WriteString(fmt.Sprintf("    stage_completed: %q\n", fmt.Sprintf("Completed %s for runtime parity.", node)))
+	fmt.Fprintf(&b, "    stage_completed: %q\n", fmt.Sprintf("Completed %s for runtime parity.", node))
 	b.WriteString("    key_decisions: \"Continue along the registered QRSPI graph.\"\n")
-	b.WriteString(fmt.Sprintf("  artifact: %q\n", artifact))
+	fmt.Fprintf(&b, "  artifact: %q\n", artifact)
 	if len(artifacts) > 0 {
 		b.WriteString("  artifacts:\n")
 		for _, artifact := range artifacts {
-			b.WriteString(fmt.Sprintf("    - role: %q\n", artifact.Role))
-			b.WriteString(fmt.Sprintf("      path: %q\n", artifact.Path))
+			fmt.Fprintf(&b, "    - role: %q\n", artifact.Role)
+			fmt.Fprintf(&b, "      path: %q\n", artifact.Path)
 		}
 	}
 	b.WriteString("  next:\n")
 	b.WriteString("    steps:\n")
 	b.WriteString("      - action: \"start_stage\"\n")
-	b.WriteString(fmt.Sprintf("        param: %q\n", next))
+	fmt.Fprintf(&b, "        param: %q\n", next)
 	b.WriteString("```")
 	return b.String()
 }

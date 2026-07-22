@@ -659,28 +659,6 @@ func normalizeListenAddress(raw string) (string, error) {
 	return raw, nil
 }
 
-func publicBaseURL(cfg Config, req *http.Request) string {
-	if base := strings.TrimRight(strings.TrimSpace(cfg.PublicBaseURL), "/"); base != "" {
-		return base
-	}
-	if req == nil {
-		return "http://localhost:4200"
-	}
-	scheme := req.Header.Get("X-Forwarded-Proto")
-	if scheme == "" {
-		scheme = "http"
-	}
-	host := req.Host
-	if forwarded := req.Header.Get(
-		"X-Forwarded-Host",
-	); strings.TrimSpace(
-		forwarded,
-	) != "" {
-		host = forwarded
-	}
-	return scheme + "://" + host
-}
-
 func agentChatCallbackBaseURL(cfg Config) string {
 	if base := strings.TrimSpace(cfg.InternalCallbackBaseURL); base != "" {
 		return strings.TrimRight(base, "/")
@@ -1332,7 +1310,6 @@ func main() {
 	if goWorker != nil {
 		goWorker.RegisterWorkflow(agentchat.SyncCoordinatorWorkflow)
 		goWorker.RegisterWorkflow(agentchat.SyncWorkspacesWorkflow)
-		goWorker.RegisterWorkflow(agentchat.PlanWorkspaceDiscoveryWorkflow)
 		goWorker.RegisterActivity(agentChatService.FailConversationRunAfterActivityError)
 		goWorker.RegisterActivity(&agentchat.SyncCoordinatorActivities{
 			Coordinator: workspaceSyncCoordinator,

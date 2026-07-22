@@ -298,9 +298,7 @@ func readNetscapeCookieJar(path string) (string, error) {
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
 		line := strings.TrimSpace(scanner.Text())
-		if strings.HasPrefix(line, "#HttpOnly_") {
-			line = strings.TrimPrefix(line, "#HttpOnly_")
-		}
+		line = strings.TrimPrefix(line, "#HttpOnly_")
 		if line == "" || strings.HasPrefix(line, "#") {
 			continue
 		}

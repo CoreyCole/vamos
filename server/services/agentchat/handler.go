@@ -2967,14 +2967,6 @@ func (h *Handler) writeNoRedirectSuccess(c echo.Context) error {
 	return sse.ExecuteScript(resetAndFocusComposerScript)
 }
 
-func (h *Handler) patchWorkspacePage(
-	c echo.Context,
-	sse *datastar.ServerSentEventGenerator,
-	scope StreamPatchScope,
-) error {
-	return h.patchWorkspace(c, sse, WorkspacePatchScope(scope))
-}
-
 func (h *Handler) patchWorkspaceResource(
 	c echo.Context,
 	sse *datastar.ServerSentEventGenerator,

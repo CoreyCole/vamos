@@ -5,6 +5,8 @@ import (
 	"strings"
 
 	"github.com/a-h/templ"
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
 
 	"github.com/CoreyCole/vamos/server/services/commentui"
 )
@@ -75,9 +77,5 @@ func DocumentTitle(path string, frontmatter *Frontmatter) string {
 	if base == "" || base == "." {
 		return "Document"
 	}
-	return strings.Title(base)
-}
-
-func commentsContextHref(documentPath string) string {
-	return "/" + strings.TrimPrefix(documentPath, "/") + "?context=comments"
+	return cases.Title(language.Und).String(base)
 }

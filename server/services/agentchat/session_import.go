@@ -3,13 +3,10 @@ package agentchat
 import (
 	"bufio"
 	"context"
-	"crypto/sha256"
 	"database/sql"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 	"sort"
@@ -828,48 +825,6 @@ func (s *Service) ImportPiSession(
 	}, nil
 }
 
-func (s *Service) importSessionEntries(
-	ctx context.Context,
-	q *db.Queries,
-	session db.AgentSession,
-	thread db.AgentThread,
-	doc PiSessionDocument,
-) (string, error) {
-	if len(doc.Entries) == 0 {
-		return "", nil
-	}
-	for idx, entry := range doc.Entries {
-		timestamp, err := parsePiTimestamp(entry.Timestamp)
-		if err != nil {
-			return "", fmt.Errorf("entry %q timestamp: %w", entry.ID, err)
-		}
-		payload := string(entry.Raw)
-		if payload == "" {
-			payloadBytes, err := json.Marshal(entry)
-			if err != nil {
-				return "", err
-			}
-			payload = string(payloadBytes)
-		}
-		err = q.CreateAgentEntry(ctx, db.CreateAgentEntryParams{
-			LineageID:        thread.LineageID,
-			EntryID:          entry.ID,
-			ParentEntryID:    nullString(entry.ParentID),
-			EntryType:        normalizePiEntryType(entry.Type),
-			OriginOrder:      int64(idx),
-			PayloadJson:      payload,
-			OriginThreadID:   thread.ID,
-			OriginRunID:      sql.NullString{},
-			OriginSessionID:  nullString(session.ID),
-			SessionTimestamp: timestamp,
-		})
-		if err != nil && !isUniqueConstraintError(err) {
-			return "", err
-		}
-	}
-	return doc.Entries[len(doc.Entries)-1].ID, nil
-}
-
 func (s *Service) importSessionEntryBatch(
 	ctx context.Context,
 	q *db.Queries,
@@ -950,35 +905,6 @@ func (s *Service) resolveImportThreadFromScan(
 		"",
 		false,
 	)
-}
-
-func (s *Service) resolveImportThread(
-	ctx context.Context,
-	q *db.Queries,
-	session db.AgentSession,
-	workspace db.Workspace,
-	doc PiSessionDocument,
-) (db.AgentThread, bool, error) {
-	if session.ProjectedThreadID.Valid && strings.TrimSpace(session.ProjectedThreadID.String) != "" {
-		thread, err := q.GetAgentThread(ctx, session.ProjectedThreadID.String)
-		if err != nil {
-			return db.AgentThread{}, false, err
-		}
-		if !session.ImportedHeadEntryID.Valid || !thread.HeadEntryID.Valid ||
-			thread.HeadEntryID.String == session.ImportedHeadEntryID.String {
-			return thread, false, nil
-		}
-		return s.createImportedThread(
-			ctx,
-			q,
-			workspace,
-			doc,
-			thread.LineageID,
-			thread.ID,
-			true,
-		)
-	}
-	return s.createImportedThread(ctx, q, workspace, doc, uuid.NewString(), "", false)
 }
 
 func (s *Service) validatePiSessionPath(path string) (string, error) {
@@ -1279,28 +1205,6 @@ func (s *Service) createImportedThreadFromScan(
 	return thread, diverged, err
 }
 
-func (s *Service) createImportedThread(
-	ctx context.Context,
-	q *db.Queries,
-	workspace db.Workspace,
-	doc PiSessionDocument,
-	lineageID, parentThreadID string,
-	diverged bool,
-) (db.AgentThread, bool, error) {
-	title := importThreadTitle(doc)
-	thread, err := q.CreateAgentThread(ctx, db.CreateAgentThreadParams{
-		ID:                uuid.NewString(),
-		UserEmail:         workspace.UserEmail,
-		Title:             title,
-		Cwd:               workspace.RootDocPath,
-		LineageID:         lineageID,
-		HeadEntryID:       sql.NullString{},
-		ParentThreadID:    nullString(parentThreadID),
-		ForkedFromEntryID: sql.NullString{},
-	})
-	return thread, diverged, err
-}
-
 func statusForInference(inference WorkspaceInferenceResult) string {
 	switch inference.Status {
 	case "none":
@@ -1317,14 +1221,6 @@ func maybeWorkspaceID(workspace db.Workspace, ok bool) string {
 		return ""
 	}
 	return workspace.ID
-}
-
-func importMetadataJSON(inference WorkspaceInferenceResult) string {
-	payload, err := json.Marshal(inference)
-	if err != nil {
-		return ""
-	}
-	return string(payload)
 }
 
 func importMetadataJSONWithStats(
@@ -1375,22 +1271,6 @@ func normalizePiEntryType(entryType string) string {
 	default:
 		return entryType
 	}
-}
-
-func importThreadTitle(doc PiSessionDocument) string {
-	for _, entry := range doc.Entries {
-		if strings.TrimSpace(entry.Message.Role) == "user" {
-			if text := strings.TrimSpace(
-				extractContentText(entry.Message.Content),
-			); text != "" {
-				return truncateTitle(text)
-			}
-		}
-	}
-	if doc.Header.ID != "" {
-		return "Terminal session " + doc.Header.ID
-	}
-	return "Terminal session"
 }
 
 func workspaceTypeForPlanDir(root string) WorkspaceWorkflowType {
@@ -1532,16 +1412,6 @@ func planDirForTouchedPath(rawPath, thoughtsRoot, cwd string) (string, bool) {
 		return "", false
 	}
 	return filepath.Join(root, parts[0], parts[1], parts[2]), true
-}
-
-func sessionImportEventKey(parts ...string) string {
-	hash := sha256.Sum256([]byte(strings.Join(parts, ":")))
-	return hex.EncodeToString(hash[:])
-}
-
-func copyLimited(r io.Reader, limit int64) ([]byte, error) {
-	limited := io.LimitReader(r, limit)
-	return io.ReadAll(limited)
 }
 
 func (s *Service) AdoptImportedQRSPIState(

@@ -226,9 +226,10 @@ func SemanticEventForLiveEnvelope(
 	switch env.EventType {
 	case "message_start", "message_update", "message_end":
 		eventType := chatsession.EventMessageCheckpointed
-		if env.EventType == "message_start" {
+		switch env.EventType {
+		case "message_start":
 			eventType = chatsession.EventMessageStarted
-		} else if env.EventType == "message_end" {
+		case "message_end":
 			eventType = chatsession.EventMessageCompleted
 		}
 		payload, ok := liveMessageSessionPayload(env)
@@ -243,9 +244,10 @@ func SemanticEventForLiveEnvelope(
 		}, true
 	case "tool_execution_start", "tool_execution_update", "tool_execution_end":
 		eventType := chatsession.EventToolUpdated
-		if env.EventType == "tool_execution_start" {
+		switch env.EventType {
+		case "tool_execution_start":
 			eventType = chatsession.EventToolStarted
-		} else if env.EventType == "tool_execution_end" {
+		case "tool_execution_end":
 			eventType = chatsession.EventToolCompleted
 		}
 		payload, failed, ok := liveToolSessionPayload(env)

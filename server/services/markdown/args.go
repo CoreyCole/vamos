@@ -6,6 +6,8 @@ import (
 	"time"
 
 	"github.com/a-h/templ"
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
 
 	"github.com/CoreyCole/vamos/server/layouts"
 	"github.com/CoreyCole/vamos/server/layouts/workbench"
@@ -258,7 +260,7 @@ func getTitle(filePath string) string {
 		// Convert snake_case or kebab-case to Title Case
 		title = strings.ReplaceAll(title, "-", " ")
 		title = strings.ReplaceAll(title, "_", " ")
-		return strings.Title(title) + " - Documentation"
+		return cases.Title(language.Und).String(title) + " - Documentation"
 	}
 	return "Documentation"
 }

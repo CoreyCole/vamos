@@ -55,18 +55,6 @@ func assertNoLegacyExistingThreadChatRoutes(t *testing.T, body, workspaceID stri
 	}
 }
 
-func assertThreadOnlyChatRoute(t *testing.T, body, threadID string) {
-	t.Helper()
-	for _, needle := range []string{
-		"/thoughts/chat/thread/" + threadID,
-		"/agent-chat/thread/" + threadID,
-	} {
-		if !strings.Contains(body, needle) {
-			t.Fatalf("thread-only chat route %q not found in body", needle)
-		}
-	}
-}
-
 func assertNoChatWorkspaceWithThread(t *testing.T, rawURL string) {
 	t.Helper()
 	if strings.Contains(rawURL, "thread=") && strings.Contains(rawURL, "chat_workspace=") {
@@ -2053,24 +2041,6 @@ func TestAgentChatMobileSidebarDrawer(t *testing.T) {
 	}
 }
 
-func assertMobileDrawerMarkup(t *testing.T, body string) {
-	t.Helper()
-
-	for _, want := range []string{
-		`aria-controls="agent_chat_thread_sheet"`,
-		`$agent_chat_thread_sheet.open = true`,
-		`role="dialog"`,
-		`aria-modal="true"`,
-		`data-on:keydown__window`,
-		`evt.key === &#39;Escape&#39;`,
-		`$agent_chat_thread_sheet.open = false`,
-	} {
-		if !strings.Contains(body, want) {
-			t.Fatalf("mobile drawer markup missing %q: %s", want, body)
-		}
-	}
-}
-
 func TestWorkspaceRouteRendersSelectedThreadWithWorkspaceForkAction(t *testing.T) {
 	service := newTestAgentChatService(t)
 	handler := NewHandler(service, nil)
@@ -2508,49 +2478,6 @@ func TestWorkspaceNotifierSlowSubscriberDoesNotBlock(t *testing.T) {
 		}
 	case <-time.After(time.Second):
 		t.Fatal("fast subscriber did not receive signal")
-	}
-}
-
-func assertWorkspaceSidebarExpandedForEmptySelection(t *testing.T, body string) {
-	t.Helper()
-	for _, want := range []string{
-		`id="workbench-root"`,
-		`id="agent-chat-workspace-topology-region"`,
-		`id="agent-chat-workspace-topology-sidebar"`,
-		`data-workbench-kind="workspace-topology"`,
-		`id="agent-chat-doc-region"`,
-		`id="agent-chat-doc-pane"`,
-		`data-workbench-kind="doc"`,
-		`id="agent-chat-chat-region"`,
-		`id="agent-chat-chat-pane"`,
-		`data-workbench-kind="chat"`,
-		`agentChatNavigation&#34;:{&#34;ratio&#34;:0.22,&#34;visible&#34;:true}`,
-	} {
-		if !strings.Contains(body, want) {
-			t.Fatalf(
-				"empty workspace missing workbench marker %q: %s",
-				want,
-				body,
-			)
-		}
-	}
-}
-
-func assertWorkspaceSidebarMinimizedForSelectedThread(t *testing.T, body string) {
-	t.Helper()
-	assertWorkspaceSidebarExpandedForEmptySelection(t, body)
-	for _, retired := range []string{
-		`id="agent-chat-plan-sidebar-region"`,
-		`id="agent-chat-context-region"`,
-		`id="agent-chat-workspace-right-rail"`,
-	} {
-		if strings.Contains(body, retired) {
-			t.Fatalf(
-				"selected workspace rendered retired shell marker %q: %s",
-				retired,
-				body,
-			)
-		}
 	}
 }
 
@@ -4616,19 +4543,6 @@ func TestOpenPiSessionRequiresAuthentication(t *testing.T) {
 
 	_, err := postOpenPiSession(t, handler, "", form)
 	assertHTTPErrorCode(t, err, http.StatusUnauthorized)
-}
-
-func storedWorkspaceForTest(
-	t *testing.T,
-	service *Service,
-	workspaceID string,
-) db.Workspace {
-	t.Helper()
-	workspaceRecord, err := service.queries.GetWorkspace(t.Context(), workspaceID)
-	if err != nil {
-		t.Fatalf("GetWorkspace() error = %v", err)
-	}
-	return workspaceRecord
 }
 
 func TestOpenPiSessionRedirectTargetLoadsImportedThreadContext(t *testing.T) {

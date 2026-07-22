@@ -1,6 +1,7 @@
 package qrspicmd
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -126,7 +127,7 @@ func parseValidateDecide(
 		semCtx.PlanDir = ""
 		semCtx.ImplementationCwd = ""
 	}
-	applied, err := semantic.Apply(nil, semantic.ApplyInput{
+	applied, err := semantic.Apply(context.Background(), semantic.ApplyInput{
 		Definition:   def,
 		RawOutput:    output,
 		ParseContext: ctx,
