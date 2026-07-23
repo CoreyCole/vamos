@@ -1,15 +1,17 @@
 ---
 name: hermes-vamos-chat-delegation
-description: Hermes background delegation to Vamos Agent Chat via vamos chat start and steer. Use when Hermes needs Vamos/QRSPI to do durable coding, research, planning, recovery, or follow-up work while keeping Hermes context lean. Covers NDJSON refs, web URL sharing, steering, and tenant/project/runtime edit boundaries.
+description: Hermes-only automation for Vamos web Agent Chat via `vamos chat start` and `steer`. Use only when testing/operating the Vamos web UI or delegating from Hermes through its authenticated manager API; it requires a manager-issued machine credential. Do not use for a local Pi/QRSPI tmux manager—use `q-manager` instead.
 ---
 
 # Hermes Vamos Chat Delegation
 
-Delegate durable work from Hermes to Vamos Agent Chat without bloating Hermes context.
+Delegate work from **Hermes** to the authenticated Vamos **web Agent Chat** API without bloating Hermes context.
+
+> **Not for local Pi delegation.** `vamos chat start` is a web-manager API client and requires a manager-issued machine credential. When operating Pi locally in tmux, use `.pi/skills/q-manager/SKILL.md`; it launches local Pi child panes and does not require this credential.
 
 ## Step 1: Start work
 
-Run from a Hermes background task:
+Run only from a Hermes background task when the target is Vamos web Agent Chat:
 
 ```bash
 vamos chat start --project <project_id> "<prompt>"

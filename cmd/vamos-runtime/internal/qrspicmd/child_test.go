@@ -87,12 +87,28 @@ func TestResolveChildExtensionPathWritesEmbeddedAsset(t *testing.T) {
 		t.Fatalf("read extension asset: %v", err)
 	}
 	text := string(data)
-	for _, want := range []string{"export default function qManagerChildExtension", `pi.on("input"`, `pi.on("agent_end"`, `pi.on("agent_settled"`, "event.source", "event.streamingBehavior", "runChildComplete", "qrspi", "child-complete", "--state-file", "--child-id", "--boundary", "--interaction", "Q_MANAGER_STATUS_PATH", "Q_MANAGER_DONE_PATH", "Q_MANAGER_PARENT_PANE", "Q_MANAGER_VALIDATED_STATUS_PATH", "Q_MANAGER_WAKE_MODE", "validated-only", "shouldWakeManager", "wakeDeliveryMode", "pi.sendUserMessage"} {
+	for _, want := range []string{"export default function qManagerChildExtension", `pi.on("input"`, `pi.on("agent_end"`, `pi.on("agent_settled"`, "initialManagedInputPending", "event.source", "event.streamingBehavior", "runChildComplete", "qrspi", "child-complete", "--state-file", "--child-id", "--boundary", "--interaction", "Q_MANAGER_STATUS_PATH", "Q_MANAGER_DONE_PATH", "Q_MANAGER_PARENT_PANE", "Q_MANAGER_VALIDATED_STATUS_PATH", "Q_MANAGER_WAKE_MODE", "validated-only", "shouldWakeManager", "wakeDeliveryMode", "pi.sendUserMessage"} {
 		if !strings.Contains(text, want) {
 			t.Fatalf("extension asset missing %q: %s", want, text)
 		}
 	}
+	inputStart := strings.Index(text, `pi.on("input"`)
 	agentEndStart := strings.Index(text, `pi.on("agent_end"`)
+	if inputStart < 0 || agentEndStart <= inputStart {
+		t.Fatalf("extension input handler missing or out of order: %s", text)
+	}
+	inputHandler := text[inputStart:agentEndStart]
+	managedInput := strings.Index(inputHandler, "if (initialManagedInputPending)")
+	extensionInput := strings.Index(inputHandler, `if (event.source === "extension")`)
+	manualInput := strings.Index(inputHandler, `interaction = event.streamingBehavior`)
+	if managedInput < 0 || extensionInput <= managedInput ||
+		manualInput <= extensionInput {
+		t.Fatalf(
+			"managed initial input must remain stage work before chat classification: %s",
+			inputHandler,
+		)
+	}
+	agentEndStart = strings.Index(text, `pi.on("agent_end"`)
 	agentSettledStart := strings.Index(text, `pi.on("agent_settled"`)
 	if agentEndStart < 0 || agentSettledStart <= agentEndStart {
 		t.Fatalf("extension handlers missing or out of order: %s", text)
@@ -343,7 +359,9 @@ func TestRunChildDefersPendingCleanupAndPersistsContinuationLineage(t *testing.T
 	}
 }
 
-func TestRunChildPersistenceFailureCleansUntrackedReplacementAndKeepsSource(t *testing.T) {
+func TestRunChildPersistenceFailureCleansUntrackedReplacementAndKeepsSource(
+	t *testing.T,
+) {
 	fixture := newRunChildFixture(t, false)
 	old := &ChildRunRef{ID: "old", Stage: "research", TmuxPaneID: "%old"}
 	state := fixture.loadState(t)

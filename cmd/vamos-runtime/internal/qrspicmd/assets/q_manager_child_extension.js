@@ -104,8 +104,14 @@ export default function qManagerChildExtension(pi) {
 
   let interaction = "stage_work";
   let lowLevelRunEnded = false;
+  let initialManagedInputPending = true;
 
   pi.on("input", (event) => {
+    if (initialManagedInputPending) {
+      initialManagedInputPending = false;
+      interaction = "stage_work";
+      return { action: "continue" };
+    }
     if (event.source === "extension") {
       interaction = "stage_work";
       return { action: "continue" };
