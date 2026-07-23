@@ -53,7 +53,7 @@ qrspi_result:
         param: "[concrete next-stage]"
 ```
 
-`status` is lifecycle. `outcome` selects the graph branch. After `/q-workspace`, omit top-level ``workspace`` and record both ``plan_workspace`` and ``implementation_workspace`` inside ``workspace_metadata``. ``next.steps`` is an ordered instruction block for the next agent: read QRSPI guidance, read q-verify, read design, read design-product if it exists, read outline, read plan, read the review artifact, read relevant repository verification docs/guidance for integration and E2E test context, then start verification immediately unless blocked. Runtime transitions are graph-authoritative and may validate/rewrite the steps. Complete results must include ``outcome``. Review stages must use explicit node IDs (`review-outline`, `review-plan`, or `review-implementation`), never `review`.
+`status` is lifecycle. `outcome` selects the graph branch. After `/q-workspace`, omit top-level `workspace` and record both `plan_workspace` and `implementation_workspace` inside `workspace_metadata`. `next.steps` is an ordered instruction block for the next agent: read QRSPI guidance, read q-verify, read design, read design-product if it exists, read outline, read plan, read the review artifact, read relevant repository verification docs/guidance for integration and E2E test context, then start verification immediately unless blocked. Runtime transitions are graph-authoritative and may validate/rewrite the steps. Complete results must include `outcome`. Review stages must use explicit node IDs (`review-outline`, `review-plan`, or `review-implementation`), never `review`.
 
 > **Review rubric:** `~/.pi/agent/skills/review-rubric/SKILL.md`
 
@@ -125,36 +125,23 @@ Later stages write `design.md`, optional `design-product.md`, `outline.md`, and 
    - code files changed by implementation, using handoff sections, `git status`, `git diff`, `git show`, or the known branch range
    - each changed concrete file with the read tool (or the nearest existing neighboring file for newly created paths) so path-scoped `AGENTS.md` context is loaded before judging or applying review fixes
    - verification evidence from the handoff
-   - relevant project guidance surfaced by the focused project-guidance lane, including root/package `AGENTS.md`, `.agents/rules/`, `.cursor/rules/`, local skills, and docs referenced by the plan or changed files
+   - relevant project guidance surfaced by the focused project-guidance lane, including root/package `AGENTS.md`, `.agents/rules/`, `.agents/skills/`, and docs referenced by the plan or changed files
    - doc health findings surfaced by the focused docs-health lane, including docs that should be corrected, simplified, or made more concise
 1. Read `design.md`, optional `design-product.md`, `outline.md`, `questions/*.md`, `context/brainstorms/*.md`, `research/*.md`, PRDs/tickets, and planning context as needed to clarify intent and alignment. The primary review target is code plus verification evidence.
 
 ## Focused Review Lanes
 
-For anything broader than a tiny localized change, use the existing lane selector and focused lane prompts from `q-review/agents/`.
+Call `subagent({ action: "list" })` and confirm `scout` and `reviewer` are executable and non-disabled. Lane Markdown files are embedded prompts, not registered agents.
 
-```bash
-uv run .pi/skills/q-review/bin/select-lanes.py \
-  --mode implementation \
-  --plan-dir [plan_dir] \
-  --reviewed-artifact [implement-handoff] \
-  --review-dir [review_dir] \
-  --pretty
+First run one fresh-context `scout` using `q-review/agents/q-review-lane-selector.md`. Give it the plan, implementation handoff, actual changed files/hunks or exact stack ranges, verification evidence, and applicable project guidance. Save its report to:
+
+```text
+[review_dir]/context/lane-selection.md
 ```
 
-For committed stacks, include the exact range when known:
+Read that report before launching lanes. Implementation selection must include `q-review-correctness`, `q-review-simplicity`, and `q-review-project-guidance`. There is no fixed lane maximum: launch every materially relevant specialist that owns a distinct question, and reject overlapping lanes unless the selector explains their non-overlapping responsibilities. Reject unknown lane IDs or selection based only on keywords/file extensions. If selection is malformed, rerun once; if still malformed, run only the three mandatory lanes and record the fallback.
 
-```bash
-uv run .pi/skills/q-review/bin/select-lanes.py \
-  --mode implementation \
-  --plan-dir [plan_dir] \
-  --reviewed-artifact [implement-handoff] \
-  --review-dir [review_dir] \
-  --diff-range [base]..HEAD \
-  --pretty
-```
-
-Use the selector's `subagent_tool_args` directly with the `subagent` tool. It disables the builtin reviewer defaults for `reads` and `progress` so focused lanes do not create root `plan.md` / `progress.md` files. Focused lane reports are advisory; verify each candidate finding yourself before including it.
+For each selected lane, embed its `q-review/agents/q-review-*.md` prompt in a fresh-context `reviewer` task and save the report to `[review_dir]/context/lanes/[lane-id].md`. Run independent lanes in parallel. Reports are advisory: read and verify every candidate before including it. Do not claim a selector or lane ran unless its persisted report exists.
 
 ## Process
 
@@ -163,11 +150,12 @@ Use the selector's `subagent_tool_args` directly with the `subagent` tool. It di
 1. Build understanding from the handoff, changed files, verification evidence, and relevant plan requirements.
 1. Enumerate changed file paths from git and handoff evidence; read each changed file or nearest neighboring file so all applicable `AGENTS.md` guidance for those paths is loaded before review.
 1. Summarize the implemented behavior at a high level and check alignment with PRDs, ticket text, question docs, `context/brainstorms/`, research findings, design/outline/plan, and approved plan-memory constraints.
-1. Review actual code for correctness, regressions, security, invariants, tests, operations, maintainability, doc health, and compliance with relevant project guidance (`AGENTS.md`, `.agents/rules/`, `.cursor/rules/`, local skills, and docs). Explicitly verify the implementation follows the repo guidance loaded for the changed paths. Preserve conflicting relevant guidance as `IMPORTANT: needs human attention`; do not silently choose between conflicting instructions.
-1. Run focused lanes when useful; read every lane report; verify candidate findings yourself.
+1. Review actual code for correctness, regressions, security, invariants, tests, operations, maintainability, doc health, and compliance with relevant project guidance (`AGENTS.md`, `.agents/rules/`, `.agents/skills/`, and docs). Explicitly verify the implementation follows the repo guidance loaded for the changed paths. Preserve conflicting relevant guidance as `IMPORTANT: needs human attention`; do not silently choose between conflicting instructions.
+1. Run the selector's focused lanes with `subagent`; read every report under `[review_dir]/context/lanes/`; verify candidate findings yourself.
    - Treat a lane output as failed if it is empty, only contains raw tool-call markup/JSON such as `<tool_call>` or `{"cmd": ...}`, lacks the required lane report sections, or contains no evidence for its findings.
    - Rerun each failed lane once with the same task plus an explicit reminder to actually use tools and return only the markdown lane report.
    - If the rerun still fails, record the lane as unavailable in `review.md` and continue with your own targeted verification instead of trusting it.
+1. For every lane finding, record a disposition: `fix`, `ignore`, or `needs_followup_qrspi`, with a concise rationale tied to code evidence and declared requirements. Never silently omit a lane finding.
 1. Classify findings into `straightforward_fix` and `needs_followup_qrspi`. Treat conflicting relevant project guidance as `needs_followup_qrspi` unless it can be resolved by a clearly more-specific local instruction; label it `IMPORTANT: needs human attention` in `review.md` and seed neutral follow-up questions that ask which source is authoritative.
 1. Write the initial `review.md` before applying code fixes or creating follow-up docs.
 1. Apply all `straightforward_fix` findings directly when safe:
@@ -187,7 +175,7 @@ Use the selector's `subagent_tool_args` directly with the `subagent` tool. It di
 
 ## Review Artifact Template
 
-```markdown
+````markdown
 ---
 date: [ISO datetime with timezone]
 reviewer: [git_username]
@@ -229,8 +217,17 @@ verdict: [correct|needs_attention]
 - Example: [Concrete runtime or maintenance scenario showing why it matters.]
 - Resolution: [Applied fix and verification, or follow-up QRSPI questions.]
 
+## Simplifications Applied
+- Removed/collapsed/narrowed: [changes or `None.`]
+- Complexity retained: [item and requirement/risk that requires it, or `None.`]
+
 ## Focused Review Lanes
-- [Lane summaries, including project-guidance lane results, or `Not used; review was small/localized.`]
+- [Lane report path and concise result for every invoked lane.]
+
+## Lane Finding Decisions
+| Lane finding | Decision | Rationale |
+|---|---|---|
+| [report ref] | fix / ignore / needs_followup_qrspi | [evidence-based reason] |
 
 ## Conflicting Guidance
 - IMPORTANT: needs human attention — [conflict summary with exact source refs and decision needed, or `None.`]
@@ -312,9 +309,9 @@ qrspi_result:
         param: "thoughts/..."
       - action: "start_stage"
         param: "[concrete next-stage]"
-```
+````
 
-If deeper follow-up QRSPI work is needed, keep the primary artifact as `review.md`, include a follow-up plan or questions artifact, and route back to QRSPI question/research in the review-dir context. ``implementation_workspace`` must remain the same original implementation workspace and ``plan_workspace`` must identify the review-dir plan workspace; downstream follow-up planning must not create a separate workspace:
+If deeper follow-up QRSPI work is needed, keep the primary artifact as `review.md`, include a follow-up plan or questions artifact, and route back to QRSPI question/research in the review-dir context. `implementation_workspace` must remain the same original implementation workspace and `plan_workspace` must identify the review-dir plan workspace; downstream follow-up planning must not create a separate workspace:
 
 ```yaml
 qrspi_result:
@@ -344,7 +341,7 @@ qrspi_result:
         param: "[concrete next-stage]"
 ```
 
-If straightforward fixes were attempted but verification still fails, use ``status`blocked`status`` or ``status`error`status`` with the review artifact and verification failure in ``summary``.
+If straightforward fixes were attempted but verification still fails, use `` status`blocked`status `` or `` status`error`status `` with the review artifact and verification failure in `summary`.
 
 ## Rules
 

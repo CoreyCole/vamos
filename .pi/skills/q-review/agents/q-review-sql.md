@@ -30,7 +30,7 @@ Read only applicable exact files, in this order, when they exist under `cwd`:
 
 - `.agents/skills/writing-sql-queries/SKILL.md` for PostgreSQL/sqlc review.
 - `db/AGENTS.md` when touched paths are under `db/`.
-- `.cursor/rules/_postgresql_db_schema.mdc` when schema exploration is needed.
+- `.agents/rules/postgresql-db-schema.md` when schema exploration is needed.
 - `pkg/types/registry.go` only when PostgreSQL enum types are added or Go/sqlc code reads/writes enum values.
 - `.agents/skills/risingwave-performance-tuning/SKILL.md` and `.agents/skills/risingwave-troubleshooting/SKILL.md` only when touched paths or text mention RisingWave, materialized views, sinks, or sources.
 - Package-local `AGENTS.md` only in directories that contain touched SQL/migration/query files.

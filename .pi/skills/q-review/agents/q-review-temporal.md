@@ -21,8 +21,8 @@ Before judging Temporal changes, look for and read project-local guidance when i
 - `.agents/skills/temporal-workflows/SKILL.md`
 - `.agents/skills/temporal-workflows/references/*.md` matching the touched risk
 - `.agents/skills/bulk-temporal-ingestion/SKILL.md` for bulk upload / batch ingestion workflows
-- `.claude/skills/*temporal*/**/*.md`
-- `AGENTS.md`, `CLAUDE.md`, or package-local instruction files near touched Temporal code
+- `.agents/skills/*temporal*/**/*.md`
+- `AGENTS.md` or package-local instruction files near touched Temporal code
 
 If local guidance conflicts with this prompt, local project guidance wins.
 

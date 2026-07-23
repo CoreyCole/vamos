@@ -21,7 +21,6 @@ Relevant docs can include:
 - QRSPI planning docs: `design.md`, `design-product.md`, `outline.md`, `plan.md`, ADRs, handoffs, `done.md`, review docs
 - repo/root or package-local `AGENTS.md`
 - `.agents/rules/**/*.md`, `.agents/rules/**/*.mdc`
-- `.cursor/rules/**/*.md`, `.cursor/rules/**/*.mdc`
 - README, contributing, architecture, runbook, API, migration, testing, or package docs near touched files
 - docs explicitly referenced by the plan, handoff, changed files, code comments, tests, or review evidence
 

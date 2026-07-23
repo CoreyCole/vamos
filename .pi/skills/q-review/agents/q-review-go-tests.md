@@ -21,10 +21,10 @@ Before judging Go tests, look for and read project-local guidance when it exists
 - `.agents/skills/go/testing-integration.md`
 - `.agents/skills/go/testing-mocks.md`
 - `.agents/skills/go/testing-unit.md`
-- `.cursor/rules/_integration_test_style.mdc`
+- `.agents/rules/integration-test-style.md`
 - `.agents/rules/*test*.md` or `.agents/rules/*go*.md`
-- `.claude/skills/go/*.md`
-- `AGENTS.md`, `CLAUDE.md`, or package-local instruction files near touched tests
+- `.agents/skills/go/*.md`
+- `AGENTS.md` or package-local instruction files near touched tests
 
 If local guidance conflicts with this prompt, local project guidance wins. If no local guidance exists, use the fallback checklist below.
 

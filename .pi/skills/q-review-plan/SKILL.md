@@ -129,28 +129,23 @@ The review directory is a lightweight research workspace for planning-review fol
    - relevant `questions/*.md`, `context/brainstorms/*.md`, `research/*.md`, `prds/*`, and `context/{design,design-product,outline,plan}/*`
    - code/files explicitly referenced by the planning docs, plus any files needed to verify claims
    - every concrete repo file the outline or plan says the implementation will change when practical; when a planned path does not exist yet, read the nearest existing file in that directory/package. This is required to load path-scoped `AGENTS.md` context before judging whether the plan follows repo guidance.
-   - relevant project guidance surfaced by the focused project-guidance lane, including root/package `AGENTS.md`, `.agents/rules/`, `.cursor/rules/`, local skills, and docs referenced by the plan or touched files
+   - relevant project guidance surfaced by the focused project-guidance lane, including root/package `AGENTS.md`, `.agents/rules/`, `.agents/skills/`, and docs referenced by the plan or touched files
    - doc health findings surfaced by the focused docs-health lane, including docs that should be corrected, simplified, or made more concise
 1. If no planning artifact exists, stop and ask for a valid plan directory or artifact path.
 
 ## Focused Review Lanes
 
-For tiny local planning changes, review directly. For broader plans, use the existing lane selector and focused lane prompts from `q-review/agents/`.
+Call `subagent({ action: "list" })` and confirm `scout` and `reviewer` are executable and non-disabled. Lane Markdown files are embedded prompts, not registered agents.
 
-Run the selector with planning mode:
+First run one fresh-context `scout` using `q-review/agents/q-review-lane-selector.md`. Give it the plan artifacts, declared requirement sources, named implementation paths, and applicable project guidance. Save its report to:
 
-```bash
-uv run .pi/skills/q-review/bin/select-lanes.py \
-  --mode outline \
-  --plan-dir [plan_dir] \
-  --reviewed-artifact [outline.md-or-plan.md] \
-  --review-dir [review_dir] \
-  --pretty
+```text
+[review_dir]/context/lane-selection.md
 ```
 
-Use the selector's `subagent_tool_args` directly with the `subagent` tool. It disables the builtin reviewer defaults for `reads` and `progress` so focused lanes do not create root `plan.md` / `progress.md` files. Planning reviews route from `design.md`, `design-product.md`, `outline.md`, and `plan.md` only. Do not route lanes from `questions/`, `research/`, or `context/` paths.
+Read that report before launching lanes. Planning selection must include `q-review-intent-fit`, `q-review-simplicity`, and `q-review-project-guidance`. There is no fixed lane maximum: launch every materially relevant specialist that owns a distinct question, and reject overlapping lanes unless the selector explains their non-overlapping responsibilities. Reject unknown lane IDs or selection based only on keywords/file extensions. If selection is malformed, rerun once; if still malformed, run only the three mandatory lanes and record the fallback.
 
-Focused lane reports are advisory. Verify every candidate finding yourself before including it in `review.md` or changing docs.
+For each selected lane, embed its `q-review/agents/q-review-*.md` prompt in a fresh-context `reviewer` task and save the report to `[review_dir]/context/lanes/[lane-id].md`. Run independent lanes in parallel. Lane reports are advisory: read and verify every candidate before changing docs. Do not claim a selector or lane ran unless its persisted report exists.
 
 ## Process
 
@@ -164,6 +159,7 @@ Focused lane reports are advisory. Verify every candidate finding yourself befor
    - Summarize the current planned design/approach at a high level.
    - Check alignment with PRDs, ticket text, question docs, `context/brainstorms/`, research findings, and approved plan-memory constraints.
    - Verify major named references and assumptions in the codebase.
+1. Build a compact traceability map from every declared PRD, ADR, approved design, and repository-mandated requirement to a plan slice, existing behavior with evidence, or explicit human-approved exclusion. Require complete declared coverage, not speculative work beyond those sources.
 1. Review planning docs for:
    - fidelity to approved questions/research/design and optional product design
    - hidden scope drift or missing requirements, especially product Critical Findings when present
@@ -173,15 +169,17 @@ Focused lane reports are advisory. Verify every candidate finding yourself befor
    - explicit human agreement points for cleanup at `review-outline`: if the outline makes legacy behavior unnecessary, flag the deletion in `review.md` and edit `outline.md` so the next `/q-plan` treats deletion as intended scope, not optional cleanup
    - test checkpoints that prove removed legacy paths are gone and the canonical replacement covers their behavior
    - plan steps that are too vague for a coding agent
+   - simplification opportunities: eliminate, collapse, or narrow unnecessary slices, abstractions, files, states, migrations, compatibility paths, observability, and tests while preserving traced requirements and verification
+   - unsupported machinery that serves no declared requirement, repository invariant, or concrete failure mode
    - docs that should be corrected, simplified, or made more concise
-   - local codebase rules and project guidance under `AGENTS.md`, `.agents/rules/`, `.cursor/rules/`, local skills, and relevant docs when the plan touches areas covered by repo-specific advice; verify the outline/plan explicitly follows that guidance
+   - local codebase rules and project guidance under `AGENTS.md`, `.agents/rules/`, `.agents/skills/`, and relevant docs when the plan touches areas covered by repo-specific advice; verify the outline/plan explicitly follows that guidance
    - conflicting relevant guidance; preserve each conflict as `IMPORTANT: needs human attention` until a human chooses which source to follow
-1. Run focused lanes when useful, then read every focused-lane output artifact before synthesis.
+1. Run the selector's focused lanes with `subagent`, then read every report under `[review_dir]/context/lanes/` before synthesis.
    - Treat a lane output as failed if it is empty, only contains raw tool-call markup/JSON such as `<tool_call>` or `{"cmd": ...}`, lacks the required lane report sections, or contains no evidence for its findings.
    - Rerun each failed lane once with the same task plus an explicit reminder to actually use tools and return only the markdown lane report.
    - If the rerun still fails, record the lane as unavailable in `review.md` and continue with your own targeted verification instead of trusting it.
    - local codebase rules under `.agents/rules/`, especially Go utility-package rules (`pkg/pointers.To`, `pkg/collections.Set`, nullable `Ptr()`, `pkg/checked`) when the plan writes Go files
-1. Run focused lanes when useful, then synthesize and verify candidate findings.
+1. Synthesize and verify candidate findings. For every lane finding, record a disposition: `fix`, `ignore`, or `needs_research`/`needs_human`, with a concise rationale tied to evidence and declared requirements. Never silently omit a lane finding.
 1. Classify findings into `obvious_doc_fix`, `needs_codebase_research`, or `needs_human_judgment`. Treat conflicting relevant project guidance as `needs_human_judgment` and label it `IMPORTANT: needs human attention` in `review.md` and the user-facing question. At `review-outline`, prefer surfacing planned legacy deletion decisions now: if deletion follows clearly from approved design/research, edit `outline.md` directly; if human agreement is needed to delete old behavior, record the exact deletion question as `needs_human_judgment`. Product-design review is standalone and human-invoked only; never flag a missing `design-product.md` or suggest running that helper.
 1. Apply all `obvious_doc_fix` edits directly to `design.md`, `design-product.md`, `outline.md`, and/or `plan.md`.
 1. For each `needs_codebase_research` finding, create `[review_dir]/questions/`, `[review_dir]/research/`, and `[review_dir]/context/research/`, then write neutral research questions under `[review_dir]/questions/`. Questions must link to `[review_dir]/review.md`, the affected parent docs, and exact file refs.
@@ -238,8 +236,21 @@ verdict: [correct|needs_attention]
 - Example: [Concrete scenario showing why it matters.]
 - Resolution: [Edited docs, research questions doc, or human decision needed.]
 
+## Requirements Traceability
+| Requirement / decision | Source | Plan coverage or existing behavior | Verification | Status |
+|---|---|---|---|---|
+
+## Simplifications Applied
+- Removed/collapsed/narrowed: [changes or `None.`]
+- Complexity retained: [item and requirement/risk that requires it, or `None.`]
+
 ## Focused Review Lanes
-- [Lane summaries, including project-guidance lane results, or `Not used; review was small/localized.`]
+- [Lane report path and concise result for every invoked lane.]
+
+## Lane Finding Decisions
+| Lane finding | Decision | Rationale |
+|---|---|---|
+| [report ref] | fix / ignore / needs_research / needs_human | [evidence-based reason] |
 
 ## Conflicting Guidance
 - IMPORTANT: needs human attention — [conflict summary with exact source refs and decision needed, or `None.`]

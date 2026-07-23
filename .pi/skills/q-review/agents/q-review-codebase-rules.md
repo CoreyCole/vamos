@@ -1,6 +1,6 @@
 ---
 name: q-review-codebase-rules
-description: QRSPI focused reviewer that deterministically applies matched local codebase rule files from .agents/rules, .pi/rules, and .cursor/rules to planning or implementation review targets
+description: QRSPI focused reviewer that deterministically applies matched local codebase rule files from canonical .agents/rules to planning or implementation review targets
 model: gpt-5.5
 thinking: medium
 tools: read, bash

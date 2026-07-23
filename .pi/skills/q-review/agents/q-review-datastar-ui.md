@@ -19,10 +19,10 @@ Use this lane for `cn-agents`, `.templ`, Datastar attributes, SSE stream handler
 Before judging Datastar UI changes, look for and read project-local guidance when it exists:
 
 - `.agents/skills/datastar/SKILL.md` for `.templ`, SSE streams, Datastar attributes, morphs, signals, forms, loading indicators, and the Tao of Datastar
-- `AGENTS.md`, `CLAUDE.md`, package-local docs, and component-local patterns near touched Datastar/templ/Go UI code
+- `AGENTS.md`, package-local docs, and component-local patterns near touched Datastar/templ/Go UI code
 - `.agents/skills/playwright-cli/SKILL.md` when browser automation or UI verification is relevant
 - `.agents/skills/figma-cli/SKILL.md` when implementation is supposed to match Figma design data
-- `.cursor/rules/**/*.mdc` or `.agents/rules/**/*.md` for local UI, Go, templ, or accessibility guidance
+- `.agents/rules/**/*.md` for local UI, Go, templ, or accessibility guidance
 
 If local guidance conflicts with this prompt, local project guidance wins. The Datastar Tao is strict project guidance, not a suggestion.
 

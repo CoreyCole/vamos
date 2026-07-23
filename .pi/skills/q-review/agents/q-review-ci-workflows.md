@@ -16,10 +16,10 @@ You are a focused domain review subagent for `/q-review`. Your lane is **CI/CD w
 
 Before judging CI changes, look for and read project-local guidance when it exists:
 
-- `.cursor/rules/ci-workflow-changes.mdc`
-- `.github/CLAUDE.md`
+- `.agents/rules/ci-workflow-changes.md`
+- applicable `.agents/rules/` and `.github/AGENTS.md` when present
 - CI docs, workflow README files, and scripts sourced by touched workflows
-- `AGENTS.md`, `CLAUDE.md`, or package-local instruction files near touched scripts
+- `AGENTS.md` or package-local instruction files near touched scripts
 
 If local guidance conflicts with this prompt, local project guidance wins.
 

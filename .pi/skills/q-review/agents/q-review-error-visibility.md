@@ -16,7 +16,7 @@ You are a focused domain review subagent for `/q-review`. Your lane is **error v
 
 Before judging error-handling changes, look for and read project-local guidance when it exists:
 
-- `.cursor/rules/error-visibility-patterns.mdc`
+- `.agents/rules/error-visibility-patterns.md`
 - `docs/error-visibility-patterns.md`
 - `.agents/skills/temporal-workflows/SKILL.md` for workflow/activity retry and failure behavior
 - `.agents/skills/bulk-temporal-ingestion/SKILL.md` for ingestion reports and row-level failures

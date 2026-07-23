@@ -18,7 +18,7 @@ Before judging table changes, look for and read project-local guidance when it e
 
 - `.agents/skills/building-tables/SKILL.md`
 - `.agents/skills/writing-sql-queries/SKILL.md` for SQL-backed table queries
-- `.cursor/rules/_postgresql_db_schema.mdc` for DB/schema exploration rules
+- `.agents/rules/postgresql-db-schema.md` for DB/schema exploration rules
 - `.agents/skills/temporal-workflows/SKILL.md` when exports use Temporal workflows
 - `.agents/skills/cn-ranger/SKILL.md` when table UX/browser verification is relevant
 - Local docs and adjacent table implementations in the same navigation section

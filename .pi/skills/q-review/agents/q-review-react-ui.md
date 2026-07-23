@@ -21,12 +21,12 @@ Before judging React UI changes, look for and read project-local guidance when i
 - `frontend/apps/AGENTS.md` for Chestnut React app, form, table, testing, and browser-auth conventions
 - `frontend/apps/nationwide/AGENTS.md` when Nationwide UI or browser auth is touched
 - `frontend/apps/web/tests/AGENTS.md` when Playwright tests or browser automation are touched
-- `frontend/packages/bonsai-ui/AGENTS.md` and nearby `CLAUDE.md` when shared Bonsai components are touched
+- `frontend/packages/bonsai-ui/AGENTS.md` and nearby `AGENTS.md` when shared Bonsai components are touched
 - `.agents/skills/cn-ranger/SKILL.md` and relevant `start.md`/`verify.md`/`feedback.md` for UI feature review and browser verification expectations
 - `.agents/skills/figma-cli/SKILL.md` when implementation is supposed to match Figma design data
 - `.agents/skills/playwright-cli/SKILL.md` when browser automation or UI verification is relevant
-- `.cursor/rules/error-visibility-patterns.mdc` for activity/issues or integrations UI error display
-- `AGENTS.md`, `CLAUDE.md`, package-local docs, and component-local patterns near touched React code
+- `.agents/rules/error-visibility-patterns.md` for activity/issues or integrations UI error display
+- `AGENTS.md`, package-local docs, and component-local patterns near touched React code
 
 If local guidance conflicts with this prompt, local project guidance wins.
 

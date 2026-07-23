@@ -22,11 +22,10 @@ Review only this lane unless you find a critical issue that another lane might m
 
 Look for relevant guidance in the current repo and ancestors up to the git root:
 
-- `AGENTS.md`, `CLAUDE.md`, `.cursorrules`, `.clinerules`, `COPILOT.md`
+- root and path-scoped `AGENTS.md`
 - `.agents/skills/**/SKILL.md`, `.agents/skills/**/*.md`
 - `.agents/rules/**/*.md`, `.agents/rules/**/*.mdc`
-- `.cursor/rules/**/*.mdc`, `.cursor/rules/**/*.md`
-- `.claude/skills/**/SKILL.md`, `.claude/skills/**/*.md`
+- `.agents/skills/**/SKILL.md`, `.agents/skills/**/*.md`
 - package-local instruction files near touched code
 - docs referenced by the plan, outline, handoff, or changed files
 

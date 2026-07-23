@@ -21,9 +21,9 @@ Before judging Go changes, look for and read project-local guidance when it exis
 - `.agents/skills/go/*.md`
 - `.agents/skills/*go*/SKILL.md`
 - `.agents/rules/go-style.md`
-- `.cursor/rules/_integration_test_style.mdc` for integration tests
-- `.claude/skills/go/*.md`
-- `AGENTS.md`, `CLAUDE.md`, or package-local instruction files near touched Go code
+- `.agents/rules/integration-test-style.md` for integration tests
+- `.agents/skills/go/*.md`
+- `AGENTS.md` or package-local instruction files near touched Go code
 
 If local guidance conflicts with this prompt, local project guidance wins. If no guidance exists, use the fallback checklist below.
 

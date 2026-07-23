@@ -18,7 +18,7 @@ Before judging identity-field changes, look for and read project-local guidance 
 
 - `.agents/skills/identity-field-hardening/SKILL.md`
 - `.agents/skills/writing-sql-queries/SKILL.md` for query/index implications
-- `.cursor/rules/_postgresql_db_schema.mdc` for DB/schema exploration rules
+- `.agents/rules/postgresql-db-schema.md` for DB/schema exploration rules
 - Adjacent migration, import, integration, and repository patterns near touched fields
 
 If local guidance conflicts with this prompt, local project guidance wins.
