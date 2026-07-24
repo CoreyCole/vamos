@@ -10,8 +10,8 @@ Read the provided plan directory, reviewed artifact, requirement sources, change
 
 Always select:
 
-- planning: `q-review-intent-fit`, `q-review-simplicity`, and `q-review-project-guidance`
-- implementation: `q-review-correctness`, `q-review-simplicity`, and `q-review-project-guidance`
+- planning: `q-review-intent-fit`, `q-review-simplicity`, `q-review-project-guidance`, and `q-review-docs-health`
+- implementation: `q-review-correctness`, `q-review-simplicity`, `q-review-project-guidance`, and `q-review-docs-health`
 
 Add every specialist for which:
 

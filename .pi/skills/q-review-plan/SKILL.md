@@ -137,9 +137,9 @@ The review directory is a lightweight research workspace for planning-review fol
 
 Follow the router's **Plan-Owned Lane Report Contract**. Discovery must confirm the explicit project roles `qrspi-review-scout` and `qrspi-reviewer`; generic/package `scout` and `reviewer` are never fallbacks.
 
-Create `[review_dir]/context/lanes/`, resolve `selectionReportPath` to the absolute `[review_dir]/context/lane-selection.md`, then run fresh `qrspi-review-scout` with `cwd: repoRoot`, `output: selectionReportPath`, and `outputMode: "file-only"`. Give it the plan artifacts, declared requirement sources, named implementation paths, applicable project guidance, and embedded `q-review/agents/q-review-lane-selector.md`. Validate that the result is absolute, inside `review_dir`, nonempty, and shaped as `# Review Lane Selection` before reading it; retry once at the same path, then stop setup-blocked if unavailable.
+Create `[review_dir]/context/lanes/`, resolve `selectionReportPath` to the absolute `[review_dir]/context/lane-selection.md`, then run fresh `qrspi-review-scout` with `cwd: repoRoot`, `output: selectionReportPath`, and `outputMode: "file-only"`. Give it the plan artifacts, declared requirement sources, named implementation paths, applicable project guidance, and embedded `q-review/agents/q-review-lane-selector.md`. Validate that the result is absolute, resolves inside `review_dir`, is nonempty, and has the `# Review Lane Selection` heading plus required sections before reading it. Retry once at the same path; stop setup-blocked when it remains missing or structurally invalid.
 
-Planning selection must include `q-review-intent-fit`, `q-review-simplicity`, and `q-review-project-guidance`. There is no fixed lane maximum: launch every materially relevant specialist that owns a distinct question, and reject overlapping lanes unless the selector explains their non-overlapping responsibilities. Reject unknown lane IDs or selection based only on keywords/file extensions. If selection is malformed, rerun once; if still malformed, run only the three mandatory lanes and record the fallback.
+Planning selection must include `q-review-intent-fit`, `q-review-simplicity`, `q-review-project-guidance`, and `q-review-docs-health`. There is no fixed lane maximum: launch every materially relevant specialist that owns a distinct question, and reject overlapping lanes unless the selector explains their non-overlapping responsibilities. Reject unknown lane IDs or selection based only on keywords/file extensions. A persisted structurally valid selection that remains semantically invalid after one retry falls back to those four mandatory lanes; record the fallback.
 
 For each selected lane, resolve a unique absolute `reportPath` under `[review_dir]/context/lanes/[lane-id].md`, embed its `q-review/agents/q-review-*.md` prompt in a fresh `qrspi-reviewer` task, and pass `cwd: repoRoot`, `output: reportPath`, and `outputMode: "file-only"`. Run independent lanes in parallel only after validating all paths are unique and contained in `review_dir`. Validate every report is a substantive regular Markdown file with its lane's required shape and evidence before changing docs; retry once at the same path, then record the lane unavailable and verify its scope directly. Do not claim a selector or lane ran without its persisted plan-owned report.
 
@@ -306,32 +306,7 @@ qrspi_result:
         param: "thoughts/..."
       - action: "start_stage"
         param: "[concrete next-stage]"
-```yaml
-qrspi_result:
-  stage: "[canonical node id]"
-  status: "complete"
-  outcome: "complete"
-  policy:
-    advance_mode: "guided"
-    auto_mode: false
-    enable_plan_reviews: true
-    invalid_result_retry_limit: 1
-  summary:
-    plan_goal: "[overall goal]"
-    stage_completed: "[specific work completed]"
-    key_decisions: "[decisions, risks, follow-up, or why next step is safe]"
-  artifact: "thoughts/..."
-  artifacts:
-    - role: "related"
-      path: "thoughts/..."
-  next:
-    steps:
-      - action: "read_skill"
-        param: ".pi/skills/qrspi-planning/SKILL.md"
-      - action: "read_artifact"
-        param: "thoughts/..."
-      - action: "start_stage"
-        param: "[concrete next-stage]"
+```
 ````
 
 Outcome mapping:
