@@ -1,15 +1,12 @@
 package qrspicmd
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 
-	"github.com/CoreyCole/vamos/pkg/agents/workflows/qrspi"
 	wruntime "github.com/CoreyCole/vamos/pkg/agents/workflows/runtime"
-	"gopkg.in/yaml.v3"
 )
 
 type PromptContext struct {
@@ -61,24 +58,31 @@ func RenderStagePrompt(ctx PromptContext) (string, error) {
 	} else {
 		b.WriteString("4. Latest primary artifact: none yet\n")
 	}
-	b.WriteString("\nStart stage immediately unless the loaded stage skill names a human/safety gate.\n")
+	b.WriteString(
+		"\nStart stage immediately unless the loaded stage skill names a human/safety gate.\n",
+	)
 	b.WriteString("Do not answer ready-to-proceed.\n")
-	b.WriteString("Emit the required fenced YAML qrspi_result on completion.\n\n")
+	b.WriteString(
+		"When work reaches a terminal state, run `vamos qrspi result init --state-file \"$Q_MANAGER_STATE_FILE\" --state <state> [--outcome <outcome>] [--artifact thoughts/...]`, edit that generated record's summary and contained artifact references, then stop. Do not emit qrspi_result YAML from memory.\n\n",
+	)
 	fmt.Fprintf(&b, "Plan dir: %s\n", planDir)
 	fmt.Fprintf(&b, "Current node: %s\n", ctx.Node.ID)
 	fmt.Fprintf(&b, "Graph-selected skill: %s\n", skillPath)
-	previousYAML := previousQRSPIResultYAML(ctx.LastResult)
-	if previousYAML != "" {
-		b.WriteString("\nPrevious QRSPI result (canonical child handoff context; use for workspace routing and next artifacts):\n```yaml\n")
-		b.WriteString(previousYAML)
-		b.WriteString("\n```\n")
+	if ref := ctx.State.LastResultRecord; ref != nil && strings.TrimSpace(ref.ID) != "" {
+		b.WriteString(
+			"\nPrevious result record (canonical manager-derived handoff context):\n",
+		)
+		fmt.Fprintf(&b, "- ID: %s\n", ref.ID)
+		fmt.Fprintf(&b, "- Path: %s\n", ref.Path)
 	} else {
 		b.WriteString("\nWorkspace routing:\n")
 		fmt.Fprintf(&b, "- Source cwd: %s\n", ctx.State.SourceCwd)
 		if strings.TrimSpace(ctx.State.ImplementationCwd) != "" {
 			fmt.Fprintf(&b, "- Implementation cwd: %s\n", ctx.State.ImplementationCwd)
 		} else {
-			b.WriteString("- Implementation cwd: not set yet; before /q-workspace, use source/planning cwd.\n")
+			b.WriteString(
+				"- Implementation cwd: not set yet; before /q-workspace, use source/planning cwd.\n",
+			)
 		}
 	}
 	return b.String(), nil
@@ -89,19 +93,4 @@ func latestPrimaryArtifact(result *wruntime.WorkflowResultSnapshot) string {
 		return ""
 	}
 	return strings.TrimSpace(result.PrimaryArtifact)
-}
-
-func previousQRSPIResultYAML(result *wruntime.WorkflowResultSnapshot) string {
-	if result == nil || len(result.Raw) == 0 {
-		return ""
-	}
-	var parsed qrspi.Result
-	if err := json.Unmarshal(result.Raw, &parsed); err != nil {
-		return ""
-	}
-	data, err := yaml.Marshal(map[string]qrspi.Result{"qrspi_result": parsed})
-	if err != nil {
-		return ""
-	}
-	return strings.TrimSpace(string(data))
 }

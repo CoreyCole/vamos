@@ -16,6 +16,7 @@ type ParsedDecision struct {
 	Decision       wruntime.TransitionDecision `json:"decision"`
 	RawYAML        string                      `json:"rawYaml,omitempty"`
 	Normalizations []ResultNormalization       `json:"normalizations,omitempty"`
+	RecordRef      *ResultRecordRef            `json:"recordRef,omitempty"`
 }
 
 type InitOverrides struct {

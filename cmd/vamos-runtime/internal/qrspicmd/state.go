@@ -20,6 +20,7 @@ type ManagerState struct {
 	Delivery            ManagerDeliveryState    `json:"delivery,omitempty"`
 	LastActionCard      *ManagerActionCard      `json:"lastActionCard,omitempty"`
 	LastStateAlignment  *StateAlignmentEvidence `json:"lastStateAlignment,omitempty"`
+	LastResultRecord    *ResultRecordRef        `json:"lastResultRecord,omitempty"`
 	ActiveChild         *ChildRunRef            `json:"activeChild,omitempty"`
 	PendingCleanupChild *ChildRunRef            `json:"pendingCleanupChild,omitempty"`
 	TransitionEpoch     int                     `json:"transitionEpoch,omitempty"`

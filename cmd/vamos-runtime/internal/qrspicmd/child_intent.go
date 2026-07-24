@@ -1,15 +1,17 @@
 package qrspicmd
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
 
+	"gopkg.in/yaml.v3"
+
 	"github.com/CoreyCole/vamos/pkg/agents/workflows/qrspi"
 	wruntime "github.com/CoreyCole/vamos/pkg/agents/workflows/runtime"
-	"gopkg.in/yaml.v3"
 )
 
 const (
@@ -53,6 +55,8 @@ type ChildEvidence struct {
 	CurrentManagerRequest  *ChildManagerRequest
 	ManagerRequestError    string
 	LatestGraphValidResult *ResultEvidence
+	RecordDecision         *ParsedDecision
+	RecordError            error
 	ContentFingerprint     string
 }
 
@@ -75,10 +79,27 @@ func GatherChildEvidence(
 		return ChildEvidence{}, fmt.Errorf("no active child")
 	}
 	child := state.ActiveChild
+	if strings.TrimSpace(child.ResultPath) != "" {
+		decision, err := ReadValidatedActiveResultRecord(state)
+		evidence := ChildEvidence{
+			Boundary:           opts.Boundary,
+			Interaction:        opts.Interaction,
+			RecordError:        err,
+			ContentFingerprint: child.ResultID,
+		}
+		if err == nil {
+			evidence.RecordDecision = &decision
+		}
+		return evidence, nil
+	}
 	sessionPath := strings.TrimSpace(child.SessionPath)
 	if sessionPath == "" {
 		var err error
-		sessionPath, err = ResolveSessionPath(child.SessionDir, child.SessionID, child.Cwd)
+		sessionPath, err = ResolveSessionPath(
+			child.SessionDir,
+			child.SessionID,
+			child.Cwd,
+		)
 		if err != nil {
 			return ChildEvidence{}, err
 		}
@@ -172,6 +193,31 @@ func extractCompleteQRSPIResult(text string) (string, error) {
 }
 
 func ClassifyChildIntentForState(state ManagerState, evidence ChildEvidence) ChildIntent {
+	if evidence.RecordDecision != nil {
+		return ChildIntent{
+			Kind:     ChildIntentGraphValidResult,
+			Evidence: evidence,
+			Parsed:   evidence.RecordDecision,
+			Reason:   "validated durable result record",
+		}
+	}
+	if evidence.RecordError != nil {
+		var partial ResultRecordPartialError
+		if errors.As(evidence.RecordError, &partial) {
+			return ChildIntent{
+				Kind:      ChildIntentRepairableResult,
+				Evidence:  evidence,
+				Retryable: true,
+				Reason:    partial.Error(),
+			}
+		}
+		return ChildIntent{
+			Kind:          ChildIntentAmbiguousUnsafe,
+			Evidence:      evidence,
+			ManagerNeeded: true,
+			Reason:        evidence.RecordError.Error(),
+		}
+	}
 	if evidence.CurrentTerminal != nil &&
 		evidence.LatestGraphValidResult != nil &&
 		resultHasDurableArtifact(state, evidence.LatestGraphValidResult) {
@@ -241,7 +287,8 @@ func ClassifyChildIntent(evidence ChildEvidence) ChildIntent {
 			Reason:        strings.TrimSpace(evidence.CurrentMessage.Text),
 		}
 	}
-	if evidence.CurrentTerminal == nil && IsConciseManagerQuestion(evidence.CurrentMessage.Text) {
+	if evidence.CurrentTerminal == nil &&
+		IsConciseManagerQuestion(evidence.CurrentMessage.Text) {
 		question := strings.TrimSpace(evidence.CurrentMessage.Text)
 
 		return ChildIntent{
@@ -277,7 +324,9 @@ func ClassifyChildIntent(evidence ChildEvidence) ChildIntent {
 	}
 }
 
-var managerRequestFencePattern = regexp.MustCompile("(?s)```(?:yaml|yml)\\s*\\n(.*?)\\n?```")
+var managerRequestFencePattern = regexp.MustCompile(
+	"(?s)```(?:yaml|yml)\\s*\\n(.*?)\\n?```",
+)
 
 func ParseChildManagerRequest(text string) (*ChildManagerRequest, error) {
 	var candidates []string
@@ -305,11 +354,16 @@ func ParseChildManagerRequest(text string) (*ChildManagerRequest, error) {
 		return nil, fmt.Errorf("parse q_manager_request YAML: %w", err)
 	}
 	envelope.Request.Kind = strings.TrimSpace(envelope.Request.Kind)
-	envelope.Request.RequestedNode = wruntime.NodeID(strings.TrimSpace(string(envelope.Request.RequestedNode)))
+	envelope.Request.RequestedNode = wruntime.NodeID(
+		strings.TrimSpace(string(envelope.Request.RequestedNode)),
+	)
 	envelope.Request.PlanDir = strings.TrimSpace(envelope.Request.PlanDir)
 	envelope.Request.Reason = strings.TrimSpace(envelope.Request.Reason)
-	if envelope.Request.Kind == "" || envelope.Request.RequestedNode == "" || envelope.Request.Reason == "" {
-		return nil, fmt.Errorf("q_manager_request requires kind, requested_node, and reason")
+	if envelope.Request.Kind == "" || envelope.Request.RequestedNode == "" ||
+		envelope.Request.Reason == "" {
+		return nil, fmt.Errorf(
+			"q_manager_request requires kind, requested_node, and reason",
+		)
 	}
 
 	return &envelope.Request, nil
@@ -344,7 +398,8 @@ func IsConciseManagerQuestion(text string) bool {
 	if trimmed == "" || len([]rune(trimmed)) > 500 || !strings.HasSuffix(trimmed, "?") {
 		return false
 	}
-	if strings.Contains(trimmed, "qrspi_result") || strings.Contains(trimmed, "q_manager_request") {
+	if strings.Contains(trimmed, "qrspi_result") ||
+		strings.Contains(trimmed, "q_manager_request") {
 		return false
 	}
 
@@ -374,7 +429,9 @@ func resultHasDurableArtifact(state ManagerState, result *ResultEvidence) bool {
 	if !ok {
 		return false
 	}
-	artifactPath, err := filepath.EvalSymlinks(filepath.Join(filepath.Dir(thoughtsRoot), rel))
+	artifactPath, err := filepath.EvalSymlinks(
+		filepath.Join(filepath.Dir(thoughtsRoot), rel),
+	)
 	if err != nil || !pathWithin(planPath, artifactPath) {
 		return false
 	}
@@ -392,12 +449,16 @@ func thoughtsRootForPlan(planPath string) (string, bool) {
 	clean := filepath.Clean(planPath)
 	volume := filepath.VolumeName(clean)
 	rest := strings.TrimPrefix(clean, volume)
-	parts := strings.Split(strings.Trim(rest, string(filepath.Separator)), string(filepath.Separator))
+	parts := strings.Split(
+		strings.Trim(rest, string(filepath.Separator)),
+		string(filepath.Separator),
+	)
 	for i, part := range parts {
 		if part != "thoughts" {
 			continue
 		}
-		root := filepath.Join(append([]string{volume + string(filepath.Separator)}, parts[:i+1]...)...)
+		root := filepath.Join(
+			append([]string{volume + string(filepath.Separator)}, parts[:i+1]...)...)
 
 		return filepath.Clean(root), true
 	}
@@ -411,7 +472,8 @@ func pathWithin(root, candidate string) bool {
 		return false
 	}
 
-	return rel == "." || (rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator)))
+	return rel == "." ||
+		(rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator)))
 }
 
 func DecidePivot(

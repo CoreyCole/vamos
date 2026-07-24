@@ -189,6 +189,7 @@ func testResultRecord(t *testing.T, plan string) ResultRecord {
 		SourceChildGeneration: 1,
 		Node:                  "design",
 		State:                 "complete",
+		Outcome:               "complete",
 		CreatedAt:             time.Unix(100, 0).UTC(),
 		Session:               SessionReference{ID: "session-1", Path: sessionRef},
 		Summary: qrspi.Summary{

@@ -58,6 +58,7 @@ func newCommand(d deps) *cobra.Command {
 		newValidateLatestCommand(d),
 		newRecoverManualCommand(d),
 		newRecoverSummaryCommand(d),
+		newResultCommand(d),
 		newValidateResultCommand(d),
 		newDecideNextCommand(d),
 		newRepromptChildCommand(d),
@@ -462,6 +463,29 @@ func newRecoverSummaryCommand(d deps) *cobra.Command {
 		BoolVar(&opts.DryRun, "dry-run", false, "write prompt and recovery note target without launching Pi")
 	cmd.Flags().StringVar(&opts.Output, "output", "text", "output format: text or json")
 	return cmd
+}
+
+func newResultCommand(d deps) *cobra.Command {
+	result := &cobra.Command{
+		Use:   "result",
+		Short: "Create and inspect durable QRSPI result records",
+	}
+	opts := ResultInitOptions{}
+	init := &cobra.Command{
+		Use:   "init --state-file <file> --state <state> [--outcome <outcome>] [--artifact thoughts/...]",
+		Short: "Create a graph-validated result record for the active child",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return RunResultInit(cmd.Context(), opts, d, cmd.OutOrStdout())
+		},
+	}
+	init.Flags().StringVar(&opts.StateFile, "state-file", "", "q-manager state file")
+	init.Flags().StringVar(&opts.State, "state", "", "result lifecycle state")
+	init.Flags().
+		StringVar(&opts.Outcome, "outcome", "", "graph outcome for complete results")
+	init.Flags().
+		StringVar(&opts.Artifact, "artifact", "", "primary thoughts-relative artifact")
+	result.AddCommand(init)
+	return result
 }
 
 func newValidateResultCommand(d deps) *cobra.Command {
@@ -2103,6 +2127,10 @@ func completeHandoffContinuation(
 		RetryLimit:          invalidResultRetryLimit(state),
 	}
 	state.Workflow = parsed.Decision.State
+	if parsed.RecordRef != nil {
+		ref := *parsed.RecordRef
+		state.LastResultRecord = &ref
+	}
 	state = UpdateImplementationCwd(state, parsed.Result)
 	if state.ActiveChild == nil || state.ActiveChild.ID != source.ID {
 		return state, ChildCompletionStatus{}, errors.New(
@@ -4748,20 +4776,28 @@ func RunValidateResult(
 	if err != nil {
 		return err
 	}
-	text, parseCtx, err := ReadChildResultText(
-		state,
-		ResultSourceOptions{
-			ResultFile:  opts.ResultFile,
-			SessionFile: opts.SessionFile,
-			SessionID:   opts.SessionID,
-			RunID:       opts.RunID,
-		},
-	)
-	if err != nil {
-		return err
+	var parsed ParsedDecision
+	if state.ActiveChild != nil &&
+		strings.TrimSpace(state.ActiveChild.ResultPath) != "" &&
+		strings.TrimSpace(opts.SessionFile) == "" &&
+		strings.TrimSpace(opts.ResultFile) == "" {
+		parsed, err = ReadValidatedActiveResultRecord(state)
+	} else {
+		text, parseCtx, readErr := ReadChildResultText(
+			state,
+			ResultSourceOptions{
+				ResultFile:  opts.ResultFile,
+				SessionFile: opts.SessionFile,
+				SessionID:   opts.SessionID,
+				RunID:       opts.RunID,
+			},
+		)
+		if readErr != nil {
+			return readErr
+		}
+		parseCtx.ExpectedNodeID = wruntime.NodeID(opts.Stage)
+		parsed, err = ParseNormalizeValidateDecide(text, state, parseCtx)
 	}
-	parseCtx.ExpectedNodeID = wruntime.NodeID(opts.Stage)
-	parsed, err := ParseNormalizeValidateDecide(text, state, parseCtx)
 	if err != nil {
 		return err
 	}
@@ -5393,6 +5429,9 @@ func validateActiveChild(
 	opts ContinueOptions,
 ) (ParsedDecision, error) {
 	_ = ctx
+	if state.ActiveChild != nil && strings.TrimSpace(state.ActiveChild.ResultPath) != "" {
+		return ReadValidatedActiveResultRecord(state)
+	}
 	text, parseCtx, err := ReadChildResultText(state, ResultSourceOptions{})
 	if err != nil {
 		return ParsedDecision{}, err
@@ -5569,6 +5608,10 @@ func decideValidatedResult(
 ) (ManagerState, error) {
 	_ = ctx
 	state.Workflow = parsed.Decision.State
+	if parsed.RecordRef != nil {
+		ref := *parsed.RecordRef
+		state.LastResultRecord = &ref
+	}
 	state = UpdateImplementationCwd(state, parsed.Result)
 	if parsed.Decision.StartNext {
 		state = markPendingCleanup(state)
@@ -6202,19 +6245,34 @@ func RunDecideNext(
 	if err != nil {
 		return err
 	}
-	text, parseCtx, err := ReadChildResultText(
-		state,
-		ResultSourceOptions{ResultFile: opts.ResultFile, SessionFile: opts.SessionFile},
-	)
-	if err != nil {
-		return err
+	var parsed ParsedDecision
+	if state.ActiveChild != nil &&
+		strings.TrimSpace(state.ActiveChild.ResultPath) != "" &&
+		strings.TrimSpace(opts.SessionFile) == "" &&
+		strings.TrimSpace(opts.ResultFile) == "" {
+		parsed, err = ReadValidatedActiveResultRecord(state)
+	} else {
+		text, parseCtx, readErr := ReadChildResultText(
+			state,
+			ResultSourceOptions{
+				ResultFile:  opts.ResultFile,
+				SessionFile: opts.SessionFile,
+			},
+		)
+		if readErr != nil {
+			return readErr
+		}
+		parseCtx.ExpectedNodeID = state.Workflow.CurrentNodeID
+		parsed, err = ParseNormalizeValidateDecide(text, state, parseCtx)
 	}
-	parseCtx.ExpectedNodeID = state.Workflow.CurrentNodeID
-	parsed, err := ParseNormalizeValidateDecide(text, state, parseCtx)
 	if err != nil {
 		return err
 	}
 	state.Workflow = parsed.Decision.State
+	if parsed.RecordRef != nil {
+		ref := *parsed.RecordRef
+		state.LastResultRecord = &ref
+	}
 	state = UpdateImplementationCwd(state, parsed.Result)
 	if parsed.Decision.StartNext {
 		state = markPendingCleanup(state)

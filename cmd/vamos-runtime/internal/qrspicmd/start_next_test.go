@@ -209,9 +209,9 @@ func TestStartNextLatestResultSeedLaunchesGraphSelectedNode(t *testing.T) {
 		t.Fatalf("prompt file path = %q, err = %v", result.PromptFile, err)
 	}
 	prompt := readText(t, result.PromptFile)
-	if !strings.Contains(prompt, "Previous QRSPI result") ||
-		!strings.Contains(prompt, "stage: question") {
-		t.Fatalf("prompt missing previous result:\n%s", prompt)
+	if !strings.Contains(prompt, "result init --state-file") ||
+		strings.Contains(prompt, "Previous QRSPI result") {
+		t.Fatalf("prompt must use result-record guidance:\n%s", prompt)
 	}
 }
 

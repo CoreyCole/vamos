@@ -38,7 +38,13 @@ func TestValidateHandoffArtifact(t *testing.T) {
 		{
 			name: "directory",
 			mutate: func(t *testing.T, _ *ManagerState, source *ChildRunRef, result *wruntime.WorkflowResult) {
-				path := filepath.Join(source.Cwd, "thoughts", "example", "handoffs", "directory")
+				path := filepath.Join(
+					source.Cwd,
+					"thoughts",
+					"example",
+					"handoffs",
+					"directory",
+				)
 				if err := os.Mkdir(path, 0o755); err != nil {
 					t.Fatal(err)
 				}
@@ -69,7 +75,13 @@ func TestValidateHandoffArtifact(t *testing.T) {
 			mutate: func(t *testing.T, _ *ManagerState, source *ChildRunRef, result *wruntime.WorkflowResult) {
 				outside := filepath.Join(filepath.Dir(source.Cwd), "symlink-outside.md")
 				writeHandoffFile(t, outside, "research", "in_progress")
-				link := filepath.Join(source.Cwd, "thoughts", "example", "handoffs", "link.md")
+				link := filepath.Join(
+					source.Cwd,
+					"thoughts",
+					"example",
+					"handoffs",
+					"link.md",
+				)
 				if err := os.Symlink(outside, link); err != nil {
 					t.Fatal(err)
 				}
@@ -88,7 +100,12 @@ func TestValidateHandoffArtifact(t *testing.T) {
 				if err := os.MkdirAll(outside, 0o755); err != nil {
 					t.Fatal(err)
 				}
-				writeHandoffFile(t, filepath.Join(outside, "research.md"), "research", "in_progress")
+				writeHandoffFile(
+					t,
+					filepath.Join(outside, "research.md"),
+					"research",
+					"in_progress",
+				)
 				if err := os.Symlink(outside, handoffs); err != nil {
 					t.Fatal(err)
 				}
@@ -99,8 +116,17 @@ func TestValidateHandoffArtifact(t *testing.T) {
 		{
 			name: "implementation copy",
 			mutate: func(t *testing.T, _ *ManagerState, source *ChildRunRef, _ *wruntime.WorkflowResult) {
-				implementation := filepath.Join(filepath.Dir(source.Cwd), "implementation")
-				path := filepath.Join(implementation, "thoughts", "example", "handoffs", "research.md")
+				implementation := filepath.Join(
+					filepath.Dir(source.Cwd),
+					"implementation",
+				)
+				path := filepath.Join(
+					implementation,
+					"thoughts",
+					"example",
+					"handoffs",
+					"research.md",
+				)
 				writeHandoffFile(t, path, "research", "in_progress")
 				source.Cwd = implementation
 			},
@@ -108,7 +134,13 @@ func TestValidateHandoffArtifact(t *testing.T) {
 		{
 			name: "mismatched stage",
 			mutate: func(t *testing.T, _ *ManagerState, source *ChildRunRef, _ *wruntime.WorkflowResult) {
-				path := filepath.Join(source.Cwd, "thoughts", "example", "handoffs", "research.md")
+				path := filepath.Join(
+					source.Cwd,
+					"thoughts",
+					"example",
+					"handoffs",
+					"research.md",
+				)
 				writeHandoffFile(t, path, "design", "in_progress")
 			},
 			wantErr: true,
@@ -116,7 +148,13 @@ func TestValidateHandoffArtifact(t *testing.T) {
 		{
 			name: "wrong status",
 			mutate: func(t *testing.T, _ *ManagerState, source *ChildRunRef, _ *wruntime.WorkflowResult) {
-				path := filepath.Join(source.Cwd, "thoughts", "example", "handoffs", "research.md")
+				path := filepath.Join(
+					source.Cwd,
+					"thoughts",
+					"example",
+					"handoffs",
+					"research.md",
+				)
 				writeHandoffFile(t, path, "research", "complete")
 			},
 			wantErr: true,
@@ -145,7 +183,8 @@ func TestValidateHandoffArtifact(t *testing.T) {
 			if err != nil {
 				t.Fatalf("validateHandoffArtifact() error = %v", err)
 			}
-			if handoff.Stage != qrspi.NodeResearch || handoff.Status != "in_progress" || !filepath.IsAbs(handoff.Path) {
+			if handoff.Stage != qrspi.NodeResearch || handoff.Status != "in_progress" ||
+				!filepath.IsAbs(handoff.Path) {
 				t.Fatalf("handoff = %+v", handoff)
 			}
 		})
@@ -175,7 +214,12 @@ func TestDeriveChildLaunchIntentUsesGraphDecisionAndManagerPolicy(t *testing.T) 
 
 	forged := decision
 	forged.StartNext = false
-	if _, err := deriveChildLaunchIntent(state, source, handoffResult, forged); err == nil {
+	if _, err := deriveChildLaunchIntent(
+		state,
+		source,
+		handoffResult,
+		forged,
+	); err == nil {
 		t.Fatal("forged decision accepted")
 	}
 
@@ -201,7 +245,12 @@ func TestDeriveChildLaunchIntentUsesGraphDecisionAndManagerPolicy(t *testing.T) 
 	blocked.Outcome = ""
 	blocked.DisplayNext = complete.DisplayNext
 	forgedBlocked := decision
-	if _, err := deriveChildLaunchIntent(state, source, blocked, forgedBlocked); err == nil {
+	if _, err := deriveChildLaunchIntent(
+		state,
+		source,
+		blocked,
+		forgedBlocked,
+	); err == nil {
 		t.Fatal("blocked result created resume intent")
 	}
 }
@@ -250,7 +299,9 @@ func TestExistingHandoffContinuationMatchesSourceAndDelivery(t *testing.T) {
 	}
 }
 
-func handoffArtifactFixture(t *testing.T) (ManagerState, ChildRunRef, wruntime.WorkflowResult) {
+func handoffArtifactFixture(
+	t *testing.T,
+) (ManagerState, ChildRunRef, wruntime.WorkflowResult) {
 	t.Helper()
 	root := t.TempDir()
 	repo := filepath.Join(root, "repo")
@@ -394,7 +445,11 @@ func TestChildCompleteHandoffLaunchesFreshSameStageResumeChild(t *testing.T) {
 	status, err := RunChildComplete(
 		t.Context(),
 		ChildCompletionOptions{StateFile: stateFile, ChildID: "source-child"},
-		deps{Clock: func() time.Time { return time.Unix(200, 456) }, Runner: runner, Tmux: tmux},
+		deps{
+			Clock:  func() time.Time { return time.Unix(200, 456) },
+			Runner: runner,
+			Tmux:   tmux,
+		},
 		&strings.Builder{},
 	)
 	if err != nil {
@@ -422,8 +477,7 @@ func TestChildCompleteHandoffLaunchesFreshSameStageResumeChild(t *testing.T) {
 		"2. .pi/skills/q-resume/SKILL.md",
 		"4. " + realHandoffPath,
 		"Current node: research",
-		"Previous QRSPI result",
-		"qrspi_result:",
+		"result init --state-file",
 	} {
 		if !strings.Contains(string(prompt), want) {
 			t.Fatalf("resume prompt missing %q:\n%s", want, prompt)
@@ -461,7 +515,11 @@ func TestChildCompleteHandoffLaunchesFreshSameStageResumeChild(t *testing.T) {
 	duplicate, err := RunChildComplete(
 		t.Context(),
 		ChildCompletionOptions{StateFile: stateFile, ChildID: "source-child"},
-		deps{Clock: func() time.Time { return time.Unix(201, 456) }, Runner: runner, Tmux: tmux},
+		deps{
+			Clock:  func() time.Time { return time.Unix(201, 456) },
+			Runner: runner,
+			Tmux:   tmux,
+		},
 		&strings.Builder{},
 	)
 	if err != nil {
@@ -488,19 +546,26 @@ func TestChildCompleteExistingHandoffContinuationRecoversWakeAndCleanup(t *testi
 	}
 	state.Workflow = decision.State
 	source.TmuxPaneID = "%old"
-	source.ValidationStatusPath = filepath.Join(filepath.Dir(stateFile), "source-validation.json")
+	source.ValidationStatusPath = filepath.Join(
+		filepath.Dir(stateFile),
+		"source-validation.json",
+	)
 	state.PendingCleanupChild = &source
 	state.ActiveChild = &ChildRunRef{
-		ID:                     "replacement",
-		Stage:                  "research",
-		Cwd:                    source.Cwd,
-		TmuxPaneID:             "%new",
-		LifecycleStatus:        "running",
-		Generation:             1,
-		LaunchKind:             ChildLaunchResumeHandoff,
-		ContinuationOf:         source.ID,
-		ContinuationArtifact:   result.PrimaryArtifact,
-		ContinuationDeliveryID: childCompletionDeliveryID(source, &ParsedDecision{Result: result, Decision: decision}, false),
+		ID:                   "replacement",
+		Stage:                "research",
+		Cwd:                  source.Cwd,
+		TmuxPaneID:           "%new",
+		LifecycleStatus:      "running",
+		Generation:           1,
+		LaunchKind:           ChildLaunchResumeHandoff,
+		ContinuationOf:       source.ID,
+		ContinuationArtifact: result.PrimaryArtifact,
+		ContinuationDeliveryID: childCompletionDeliveryID(
+			source,
+			&ParsedDecision{Result: result, Decision: decision},
+			false,
+		),
 	}
 	saveManagerState(t, stateFile, state)
 
@@ -553,9 +618,17 @@ func TestChildCompleteExistingHandoffContinuationPreservesNewerQueuedWake(t *tes
 		t.Fatal(err)
 	}
 	state.Workflow = decision.State
-	deliveryID := childCompletionDeliveryID(source, &ParsedDecision{Result: result, Decision: decision}, false)
+	deliveryID := childCompletionDeliveryID(
+		source,
+		&ParsedDecision{Result: result, Decision: decision},
+		false,
+	)
 	state.ActiveChild = &ChildRunRef{
-		ID: "newer", Stage: "design", TmuxPaneID: "%newer", LifecycleStatus: "running", Generation: 1,
+		ID:              "newer",
+		Stage:           "design",
+		TmuxPaneID:      "%newer",
+		LifecycleStatus: "running",
+		Generation:      1,
 	}
 	state.PendingCleanupChild = &ChildRunRef{
 		ID: "replacement", Stage: "research", Cwd: source.Cwd, TmuxPaneID: "%replacement",
@@ -564,7 +637,10 @@ func TestChildCompleteExistingHandoffContinuationPreservesNewerQueuedWake(t *tes
 		ContinuationDeliveryID: deliveryID,
 	}
 	state.Delivery.QueuedWake = &QueuedWake{
-		DeliveryID: "newer-wake", ChildID: "newer", ChildGeneration: 1, Payload: "newer payload",
+		DeliveryID:      "newer-wake",
+		ChildID:         "newer",
+		ChildGeneration: 1,
+		Payload:         "newer payload",
 	}
 	saveManagerState(t, stateFile, state)
 
@@ -578,8 +654,10 @@ func TestChildCompleteExistingHandoffContinuationPreservesNewerQueuedWake(t *tes
 	if err != nil {
 		t.Fatalf("RunChildComplete error = %v", err)
 	}
-	if status.Wake.Mode != "suppress" || status.Wake.Reason != "existing_handoff_continuation" ||
-		len(tmux.pastes) != 0 || len(tmux.kills) != 1 {
+	if status.Wake.Mode != "suppress" ||
+		status.Wake.Reason != "existing_handoff_continuation" ||
+		len(tmux.pastes) != 0 ||
+		len(tmux.kills) != 1 {
 		t.Fatalf("status=%+v pastes=%#v kills=%#v", status, tmux.pastes, tmux.kills)
 	}
 	loaded := loadManagerState(t, stateFile)
@@ -594,7 +672,12 @@ func TestChildCompleteHandoffLaunchFailureKeepsSourceAndEmitsCard(t *testing.T) 
 	dir := t.TempDir()
 	repo := filepath.Join(dir, "repo")
 	plan := filepath.Join(repo, "thoughts", "example")
-	writeHandoffFile(t, filepath.Join(plan, "handoffs", "research.md"), "research", "in_progress")
+	writeHandoffFile(
+		t,
+		filepath.Join(plan, "handoffs", "research.md"),
+		"research",
+		"in_progress",
+	)
 	stateFile := filepath.Join(dir, "state.json")
 	sessionDir := filepath.Join(dir, "sessions")
 	sessionPath := writePiSession(
@@ -1477,7 +1560,11 @@ func TestChildCompleteRejectsUnknownBoundaryAndInteractionBeforeMutation(t *test
 				t.Fatal(readErr)
 			}
 			if string(after) != string(before) {
-				t.Fatalf("state changed before validation\nbefore=%s\nafter=%s", before, after)
+				t.Fatalf(
+					"state changed before validation\nbefore=%s\nafter=%s",
+					before,
+					after,
+				)
 			}
 		})
 	}
@@ -1536,7 +1623,11 @@ func TestChildCompleteInvalidResultSuppressesThenExhausts(t *testing.T) {
 	}
 	if len(tmux.pastes) != 0 || status.RetryPrompt == "" ||
 		status.TerminalBoundary {
-		t.Fatalf("retry status=%+v pastes=%#v, want deferred Pi correction", status, tmux.pastes)
+		t.Fatalf(
+			"retry status=%+v pastes=%#v, want deferred Pi correction",
+			status,
+			tmux.pastes,
+		)
 	}
 	file, err := os.OpenFile(sessionPath, os.O_APPEND|os.O_WRONLY, 0o644)
 	if err != nil {
@@ -1576,11 +1667,27 @@ func TestChildCompleteManagerIntentsDoNotConsumeRepairBudget(t *testing.T) {
 		line string
 		want ChildIntentKind
 	}{
-		{name: "question", line: assistantLine("Which artifact should I inspect?"), want: ChildIntentManagerQuestion},
-		{name: "pivot", line: assistantLine("Need follow-up research for this bug."), want: ChildIntentPivotRequest},
-		{name: "provider", line: providerContextErrorLine("provider unavailable"), want: ChildIntentProviderFailure},
+		{
+			name: "question",
+			line: assistantLine("Which artifact should I inspect?"),
+			want: ChildIntentManagerQuestion,
+		},
+		{
+			name: "pivot",
+			line: assistantLine("Need follow-up research for this bug."),
+			want: ChildIntentPivotRequest,
+		},
+		{
+			name: "provider",
+			line: providerContextErrorLine("provider unavailable"),
+			want: ChildIntentProviderFailure,
+		},
 		{name: "no result", line: assistantLine(""), want: ChildIntentNoResultIncomplete},
-		{name: "ambiguous", line: assistantLine("I changed several things."), want: ChildIntentAmbiguousUnsafe},
+		{
+			name: "ambiguous",
+			line: assistantLine("I changed several things."),
+			want: ChildIntentAmbiguousUnsafe,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -1646,7 +1753,9 @@ func TestChildCompleteStructuredPivotCreatesDeduplicatedInspectCard(t *testing.T
 		"session.jsonl",
 		"session-1",
 		dir,
-		assistantLine("```yaml\nq_manager_request:\n  kind: pivot\n  requested_node: question\n  plan_dir: thoughts/user/plans/current/reviews/followup\n  reason: verification found a bug\n```"),
+		assistantLine(
+			"```yaml\nq_manager_request:\n  kind: pivot\n  requested_node: question\n  plan_dir: thoughts/user/plans/current/reviews/followup\n  reason: verification found a bug\n```",
+		),
 	)
 	state := ManagerState{
 		CanonicalPlanDir: planDir,
@@ -1705,7 +1814,9 @@ func TestChildCompleteInvalidStructuredPivotProducesRefusalCard(t *testing.T) {
 		"session.jsonl",
 		"session-1",
 		dir,
-		assistantLine("```yaml\nq_manager_request:\n  kind: pivot\n  requested_node: question\n  plan_dir: /tmp/other-plan\n  reason: verification found a bug\n```"),
+		assistantLine(
+			"```yaml\nq_manager_request:\n  kind: pivot\n  requested_node: question\n  plan_dir: /tmp/other-plan\n  reason: verification found a bug\n```",
+		),
 	)
 	saveManagerState(t, stateFile, ManagerState{
 		CanonicalPlanDir: planDir,
@@ -1731,7 +1842,10 @@ func TestChildCompleteInvalidStructuredPivotProducesRefusalCard(t *testing.T) {
 		status.RetryPrompt != "" {
 		t.Fatalf("status = %+v", status)
 	}
-	if got := loadManagerState(t, stateFile).Workflow.CurrentNodeID; got != qrspi.NodeVerify {
+	if got := loadManagerState(
+		t,
+		stateFile,
+	).Workflow.CurrentNodeID; got != qrspi.NodeVerify {
 		t.Fatalf("current node = %s", got)
 	}
 }
@@ -1755,9 +1869,18 @@ func TestChildCompleteCannotOverwriteNewSteerGeneration(t *testing.T) {
 		CanonicalPlanDir: "thoughts/example",
 		Workflow:         testWorkflowState(t, qrspi.NodeReviewOutline, nil),
 		ActiveChild: &ChildRunRef{
-			ID: "child-1", Stage: "review-outline", Cwd: dir, TmuxPaneID: "%9",
-			SessionID: "session-1", SessionDir: sessionDir, SessionPath: sessionPath,
-			ValidationStatusPath: filepath.Join(dir, "validation-status.json"), Generation: 1,
+			ID:          "child-1",
+			Stage:       "review-outline",
+			Cwd:         dir,
+			TmuxPaneID:  "%9",
+			SessionID:   "session-1",
+			SessionDir:  sessionDir,
+			SessionPath: sessionPath,
+			ValidationStatusPath: filepath.Join(
+				dir,
+				"validation-status.json",
+			),
+			Generation: 1,
 		},
 	}); err != nil {
 		t.Fatal(err)
@@ -1788,15 +1911,18 @@ func TestChildCompleteCannotOverwriteNewSteerGeneration(t *testing.T) {
 		t.Fatalf("RunSteerChild() error = %v", err)
 	}
 	close(store.release)
-	if err := <-completeErr; err == nil || !strings.Contains(err.Error(), "active child epoch changed") {
+	if err := <-completeErr; err == nil ||
+		!strings.Contains(err.Error(), "active child epoch changed") {
 		t.Fatalf("RunChildComplete() error = %v, want stale epoch refusal", err)
 	}
 	state, err := baseStore.Load(stateFile)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if state.ActiveChild.Generation != 2 || state.ActiveChild.LifecycleStatus != "steered" ||
-		state.Delivery.QueuedWake != nil || state.Delivery.PendingDelivery != nil {
+	if state.ActiveChild.Generation != 2 ||
+		state.ActiveChild.LifecycleStatus != "steered" ||
+		state.Delivery.QueuedWake != nil ||
+		state.Delivery.PendingDelivery != nil {
 		t.Fatalf("state = %+v", state)
 	}
 }
