@@ -299,7 +299,7 @@ func Root(args RootArgs) templ.Component {
 				return templ_7745c5c3_Err
 			}
 		} else {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 14, "<script type=\"module\">\n\t\t\t\t\tconsole.warn(\n\t\t\t\t\t\t\"Datastar Pro asset unavailable; falling back to public Datastar bundle\",\n\t\t\t\t\t);\n\t\t\t\t\tconst datastar = await import(\"@vamos/datastar\");\n\t\t\t\t\tconst polyfills = await import(\"/js/vamos-datastar-polyfills.js\");\n\t\t\t\t\tpolyfills.install(datastar);\n\t\t\t\t</script>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 14, "<script type=\"module\">\n\t\t\t\t\tconst datastar = await import(\"@vamos/datastar\");\n\t\t\t\t\tconst polyfills = await import(\"/js/vamos-datastar-polyfills.js\");\n\t\t\t\t\tpolyfills.install(datastar);\n\t\t\t\t</script>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}

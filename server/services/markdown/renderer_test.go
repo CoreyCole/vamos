@@ -118,6 +118,27 @@ func TestRenderStateMapsShortWriteAndHookTerminates(t *testing.T) {
 	}
 }
 
+func TestStateWriterRecordsFormatterWriteFailures(t *testing.T) {
+	sentinel := errors.New("formatter write failed")
+	state := &renderState{}
+	writer := stateWriter{state: state, writer: failingWriter{err: sentinel}}
+	if _, err := writer.Write([]byte("x")); !errors.Is(err, sentinel) {
+		t.Fatalf("Write() error = %v, want sentinel", err)
+	}
+	if !errors.Is(state.Err(), sentinel) {
+		t.Fatalf("state error = %v, want sentinel", state.Err())
+	}
+
+	state = &renderState{}
+	writer = stateWriter{state: state, writer: shortWriter{}}
+	if _, err := writer.Write([]byte("x")); !errors.Is(err, io.ErrShortWrite) {
+		t.Fatalf("Write() error = %v, want io.ErrShortWrite", err)
+	}
+	if !errors.Is(state.Err(), io.ErrShortWrite) {
+		t.Fatalf("state error = %v, want io.ErrShortWrite", state.Err())
+	}
+}
+
 func TestResolveGitHubRepoFromConfiguredProjects(t *testing.T) {
 	projects := server.ProjectsConfig{Repos: map[string]server.RepoConfig{
 		"monorepo": {

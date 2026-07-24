@@ -143,7 +143,12 @@ func collectServices() ([]ServiceInfo, error) {
 			info.Since = formatTimestamp(since)
 		}
 		if memStr, ok := props["MemoryCurrent"]; ok {
-			if memBytes, err := strconv.ParseUint(memStr, 10, 64); err == nil && memBytes < 1<<62 {
+			if memBytes, err := strconv.ParseUint(
+				memStr,
+				10,
+				64,
+			); err == nil &&
+				memBytes < 1<<62 {
 				info.Memory = humanize.Bytes(memBytes)
 			}
 		}
@@ -224,7 +229,10 @@ func collectTopProcesses(n int) ([]ProcessInfo, error) {
 			wrapCommandError("ps", output.wait()),
 		)
 	}
-	for scanner.Scan() && len(procs) < n {
+	for scanner.Scan() {
+		if len(procs) >= n {
+			continue
+		}
 		fields := strings.Fields(scanner.Text())
 		if len(fields) < 11 {
 			continue
@@ -236,7 +244,16 @@ func collectTopProcesses(n int) ([]ProcessInfo, error) {
 		if len(command) > 60 {
 			command = command[:57] + "..."
 		}
-		procs = append(procs, ProcessInfo{PID: pid, User: fields[0], MemMB: rssKB / 1024, CPUPct: cpuPct, Command: command})
+		procs = append(
+			procs,
+			ProcessInfo{
+				PID:     pid,
+				User:    fields[0],
+				MemMB:   rssKB / 1024,
+				CPUPct:  cpuPct,
+				Command: command,
+			},
+		)
 	}
 	return procs, errors.Join(
 		wrapCommandError("read ps output", scanner.Err()),

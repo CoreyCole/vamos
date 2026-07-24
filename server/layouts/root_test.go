@@ -19,7 +19,6 @@ func TestRootLoadsDatastarPolyfillsWhenProUnavailable(t *testing.T) {
 
 	body := renderLayoutComponent(t, Root(RootArgs{}))
 	for _, want := range []string{
-		"Datastar Pro asset unavailable; falling back to public Datastar bundle",
 		"https://cdn.jsdelivr.net/gh/starfederation/datastar@v1.0.1/bundles/datastar.js",
 		"/js/vamos-datastar-polyfills.js",
 		"polyfills.install(datastar)",
@@ -28,11 +27,17 @@ func TestRootLoadsDatastarPolyfillsWhenProUnavailable(t *testing.T) {
 			t.Fatalf("Root() missing %q in:\n%s", want, body)
 		}
 	}
-	if !strings.Contains(body, `"@vamos/datastar":"https://cdn.jsdelivr.net/gh/starfederation/datastar@v1.0.1/bundles/datastar.js"`) {
+	if !strings.Contains(
+		body,
+		`"@vamos/datastar":"https://cdn.jsdelivr.net/gh/starfederation/datastar@v1.0.1/bundles/datastar.js"`,
+	) {
 		t.Fatalf("Root() missing fallback Datastar import map:\n%s", body)
 	}
 	if strings.Contains(body, `"@vamos/datastar":"/js/datastar-pro-v1.js"`) {
 		t.Fatalf("Root() mapped Pro asset when fallback expected:\n%s", body)
+	}
+	if strings.Contains(body, "Datastar Pro asset unavailable") {
+		t.Fatalf("Root() logged normal fallback operation:\n%s", body)
 	}
 }
 
@@ -57,7 +62,11 @@ func TestRootLoadsDatastarProDirectlyWhenAvailable(t *testing.T) {
 		`polyfills.install(datastar)`,
 	} {
 		if strings.Contains(body, forbidden) {
-			t.Fatalf("Root() rendered fallback polyfill %q when Pro expected:\n%s", forbidden, body)
+			t.Fatalf(
+				"Root() rendered fallback polyfill %q when Pro expected:\n%s",
+				forbidden,
+				body,
+			)
 		}
 	}
 }
@@ -90,10 +99,15 @@ func TestWorkbenchResizeImportsSelectedDatastarModuleSpecifier(t *testing.T) {
 	}
 	js := string(contents)
 	if !strings.Contains(js, `import("@vamos/datastar")`) {
-		t.Fatalf("workbench resize must import the root import-map Datastar specifier, got:\n%s", js)
+		t.Fatalf(
+			"workbench resize must import the root import-map Datastar specifier, got:\n%s",
+			js,
+		)
 	}
 	if strings.Contains(js, "cdn.jsdelivr.net/gh/starfederation/datastar") {
-		t.Fatalf("workbench resize must not hard-code public Datastar separately from root import map")
+		t.Fatalf(
+			"workbench resize must not hard-code public Datastar separately from root import map",
+		)
 	}
 }
 
@@ -152,7 +166,11 @@ func TestHeaderVisibleNavIsMinimal(t *testing.T) {
 func TestBuildBreadcrumbsFromPathLinksParentsAndCurrentWithoutThoughtsRoot(t *testing.T) {
 	t.Parallel()
 
-	crumbs := buildBreadcrumbsFromPath("owner/plans/demo/outline.md", PageTypeMarkdown, BreadcrumbLinkState{})
+	crumbs := buildBreadcrumbsFromPath(
+		"owner/plans/demo/outline.md",
+		PageTypeMarkdown,
+		BreadcrumbLinkState{},
+	)
 	want := []struct {
 		label string
 		href  string
@@ -167,7 +185,13 @@ func TestBuildBreadcrumbsFromPathLinksParentsAndCurrentWithoutThoughtsRoot(t *te
 	}
 	for i, wantCrumb := range want {
 		if crumbs[i].Label != wantCrumb.label || crumbs[i].Href != wantCrumb.href {
-			t.Fatalf("crumb[%d] = %#v, want label %q href %q", i, crumbs[i], wantCrumb.label, wantCrumb.href)
+			t.Fatalf(
+				"crumb[%d] = %#v, want label %q href %q",
+				i,
+				crumbs[i],
+				wantCrumb.label,
+				wantCrumb.href,
+			)
 		}
 	}
 }
@@ -175,18 +199,25 @@ func TestBuildBreadcrumbsFromPathLinksParentsAndCurrentWithoutThoughtsRoot(t *te
 func TestBuildBreadcrumbsFromPathPreservesChatQuery(t *testing.T) {
 	t.Parallel()
 
-	crumbs := buildBreadcrumbsFromPath("owner/plans/demo/outline.md", PageTypeMarkdown, BreadcrumbLinkState{
-		Active:      true,
-		WorkspaceID: "ws 1",
-		ThreadID:    "th/1",
-		RunID:       "run+1",
-	})
+	crumbs := buildBreadcrumbsFromPath(
+		"owner/plans/demo/outline.md",
+		PageTypeMarkdown,
+		BreadcrumbLinkState{
+			Active:      true,
+			WorkspaceID: "ws 1",
+			ThreadID:    "th/1",
+			RunID:       "run+1",
+		},
+	)
 	if len(crumbs) < 2 {
 		t.Fatalf("crumbs len = %d, want at least 2", len(crumbs))
 	}
 	for _, crumb := range crumbs[:len(crumbs)-1] {
 		if crumb.Label == "Thoughts" {
-			t.Fatalf("breadcrumbs should not duplicate top-level Thoughts nav: %#v", crumbs)
+			t.Fatalf(
+				"breadcrumbs should not duplicate top-level Thoughts nav: %#v",
+				crumbs,
+			)
 		}
 		for _, want := range []string{"context=chat", "thread=th%2F1", "run=run%2B1"} {
 			if !strings.Contains(crumb.Href, want) {
@@ -216,8 +247,12 @@ func TestHeaderBreadcrumbsAlignAfterThoughtsWithoutDuplicateRoot(t *testing.T) {
 		t.Fatalf("breadcrumb should render after Thoughts nav link: %s", body)
 	}
 	breadcrumbSegment := body[breadcrumbIndex:]
-	if strings.Contains(breadcrumbSegment, ">Thoughts</a>") || strings.Contains(breadcrumbSegment, ">Thoughts</span>") {
-		t.Fatalf("breadcrumb should not duplicate top-level Thoughts nav: %s", breadcrumbSegment)
+	if strings.Contains(breadcrumbSegment, ">Thoughts</a>") ||
+		strings.Contains(breadcrumbSegment, ">Thoughts</span>") {
+		t.Fatalf(
+			"breadcrumb should not duplicate top-level Thoughts nav: %s",
+			breadcrumbSegment,
+		)
 	}
 	for _, notWant := range []string{"justify-end", "data-init=\"el.scrollLeft = el.scrollWidth\"", "min-w-full"} {
 		if strings.Contains(breadcrumbSegment, notWant) {

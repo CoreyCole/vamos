@@ -302,9 +302,6 @@ templ Root(args RootArgs) {
 				</script>
 			} else {
 				<script type="module">
-					console.warn(
-						"Datastar Pro asset unavailable; falling back to public Datastar bundle",
-					);
 					const datastar = await import("@vamos/datastar");
 					const polyfills = await import("/js/vamos-datastar-polyfills.js");
 					polyfills.install(datastar);

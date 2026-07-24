@@ -36,7 +36,9 @@ func TestThoughtsWorkbench_RootOpensDocumentWorkbenchWithChat(t *testing.T) {
 		Run()
 }
 
-func TestThoughtsWorkbench_DocumentSidebarNavigationUsesNormalDocumentLinks(t *testing.T) {
+func TestThoughtsWorkbench_DocumentSidebarNavigationUsesNormalDocumentLinks(
+	t *testing.T,
+) {
 	spec.Story(t, "thoughts workbench document sidebar navigation uses normal document links").
 		App(vamos.App()).
 		As(vamos.Robot).
@@ -293,47 +295,81 @@ func TestThoughtsWorkbench_WorkspacesPageSearchHistoryAndProjectFilters(t *testi
 		Run()
 }
 
-func TestThoughtsWorkbench_WorkbenchRegionsRemainUsableAcrossViewportClassesMobile(t *testing.T) {
+func TestThoughtsWorkbench_WorkbenchRegionsRemainUsableAcrossViewportClassesMobile(
+	t *testing.T,
+) {
 	runWorkbenchRegionsRemainUsable(t, duiruntime.ViewportMobile, "/")
 }
 
-func TestThoughtsWorkbench_WorkbenchRegionsRemainUsableAcrossViewportClassesMobileThoughts(t *testing.T) {
+func TestThoughtsWorkbench_WorkbenchRegionsRemainUsableAcrossViewportClassesMobileThoughts(
+	t *testing.T,
+) {
 	runWorkbenchRegionsRemainUsable(t, duiruntime.ViewportMobile, "/thoughts")
 }
 
-func TestThoughtsWorkbench_WorkbenchRegionsRemainUsableAcrossViewportClassesMobileThoughtsExampleMdContextChat(t *testing.T) {
-	runWorkbenchRegionsRemainUsable(t, duiruntime.ViewportMobile, "/thoughts/example.md?context=chat")
+func TestThoughtsWorkbench_WorkbenchRegionsRemainUsableAcrossViewportClassesMobileThoughtsExampleMdContextChat(
+	t *testing.T,
+) {
+	runWorkbenchRegionsRemainUsable(
+		t,
+		duiruntime.ViewportMobile,
+		"/thoughts/example.md?context=chat",
+	)
 }
 
-func TestThoughtsWorkbench_WorkbenchRegionsRemainUsableAcrossViewportClassesDesktopHalf(t *testing.T) {
+func TestThoughtsWorkbench_WorkbenchRegionsRemainUsableAcrossViewportClassesDesktopHalf(
+	t *testing.T,
+) {
 	runWorkbenchRegionsRemainUsable(t, duiruntime.ViewportDesktopHalf, "/")
 }
 
-func TestThoughtsWorkbench_WorkbenchRegionsRemainUsableAcrossViewportClassesDesktopHalfThoughts(t *testing.T) {
+func TestThoughtsWorkbench_WorkbenchRegionsRemainUsableAcrossViewportClassesDesktopHalfThoughts(
+	t *testing.T,
+) {
 	runWorkbenchRegionsRemainUsable(t, duiruntime.ViewportDesktopHalf, "/thoughts")
 }
 
-func TestThoughtsWorkbench_WorkbenchRegionsRemainUsableAcrossViewportClassesDesktopHalfThoughtsExampleMdContextChat(t *testing.T) {
-	runWorkbenchRegionsRemainUsable(t, duiruntime.ViewportDesktopHalf, "/thoughts/example.md?context=chat")
+func TestThoughtsWorkbench_WorkbenchRegionsRemainUsableAcrossViewportClassesDesktopHalfThoughtsExampleMdContextChat(
+	t *testing.T,
+) {
+	runWorkbenchRegionsRemainUsable(
+		t,
+		duiruntime.ViewportDesktopHalf,
+		"/thoughts/example.md?context=chat",
+	)
 }
 
-func TestThoughtsWorkbench_WorkbenchRegionsRemainUsableAcrossViewportClassesDesktopFull(t *testing.T) {
+func TestThoughtsWorkbench_WorkbenchRegionsRemainUsableAcrossViewportClassesDesktopFull(
+	t *testing.T,
+) {
 	runWorkbenchRegionsRemainUsable(t, duiruntime.ViewportDesktopFull, "/")
 }
 
-func TestThoughtsWorkbench_WorkbenchRegionsRemainUsableAcrossViewportClassesDesktopFullThoughts(t *testing.T) {
+func TestThoughtsWorkbench_WorkbenchRegionsRemainUsableAcrossViewportClassesDesktopFullThoughts(
+	t *testing.T,
+) {
 	runWorkbenchRegionsRemainUsable(t, duiruntime.ViewportDesktopFull, "/thoughts")
 }
 
-func TestThoughtsWorkbench_WorkbenchRegionsRemainUsableAcrossViewportClassesDesktopFullThoughtsExampleMdContextChat(t *testing.T) {
-	runWorkbenchRegionsRemainUsable(t, duiruntime.ViewportDesktopFull, "/thoughts/example.md?context=chat")
+func TestThoughtsWorkbench_WorkbenchRegionsRemainUsableAcrossViewportClassesDesktopFullThoughtsExampleMdContextChat(
+	t *testing.T,
+) {
+	runWorkbenchRegionsRemainUsable(
+		t,
+		duiruntime.ViewportDesktopFull,
+		"/thoughts/example.md?context=chat",
+	)
 }
 
-func TestThoughtsWorkbench_SavedMobileActiveStateDoesNotPinDesktopRefreshMobileThoughtsExampleMdContextChat(t *testing.T) {
+func TestThoughtsWorkbench_SavedMobileActiveStateDoesNotPinDesktopRefreshMobileThoughtsExampleMdContextChat(
+	t *testing.T,
+) {
 	runSavedMobileActiveStateDoesNotPinDesktopRefresh(t, duiruntime.ViewportMobile)
 }
 
-func TestThoughtsWorkbench_SavedMobileActiveStateDoesNotPinDesktopRefreshDesktopFullThoughtsExampleMdContextChat(t *testing.T) {
+func TestThoughtsWorkbench_SavedMobileActiveStateDoesNotPinDesktopRefreshDesktopFullThoughtsExampleMdContextChat(
+	t *testing.T,
+) {
 	runSavedMobileActiveStateDoesNotPinDesktopRefresh(t, duiruntime.ViewportDesktopFull)
 }
 
@@ -366,31 +402,44 @@ func seedRendererThoughtsFiles() spec.Step {
 </body>
 </html>
 `,
-		}
-		for name, content := range files {
-			if err := os.WriteFile(filepath.Join(root, name), []byte(content), 0o644); err != nil {
+			}
+			for name, content := range files {
+				if err := os.WriteFile(
+					filepath.Join(root, name),
+					[]byte(content),
+					0o644,
+				); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if err := os.WriteFile(
+				filepath.Join(root, "renderer-demo.bin"),
+				[]byte{'V', 'A', 0, 'M', 'O', 'S'},
+				0o644,
+			); err != nil {
 				t.Fatal(err)
 			}
-		}
-		if err := os.WriteFile(filepath.Join(root, "renderer-demo.bin"), []byte{'V', 'A', 0, 'M', 'O', 'S'}, 0o644); err != nil {
-			t.Fatal(err)
-		}
-	})
+		},
+	)
 }
 
 func seedThoughtsAppletManifest() spec.Step {
-	return spec.Custom("seed thoughts applet manifest", func(t testing.TB, ctx *duiruntime.Context) {
-		t.Helper()
-		root := strings.TrimSpace(os.Getenv("VAMOS_E2E_THOUGHTS_ROOT"))
-		if root == "" {
-			root = filepath.Join(ctx.Config.RepoRoot, "thoughts")
-		}
-		appletDir := filepath.Join(root, "e2e-wordle")
-		if err := os.MkdirAll(appletDir, 0o755); err != nil {
-			t.Fatal(err)
-		}
-		sourceDir := filepath.ToSlash(filepath.Join(ctx.Config.RepoRoot, "examples", "wordle"))
-		content := fmt.Sprintf(`---
+	return spec.Custom(
+		"seed thoughts applet manifest",
+		func(t testing.TB, ctx *duiruntime.Context) {
+			t.Helper()
+			root := strings.TrimSpace(os.Getenv("VAMOS_E2E_THOUGHTS_ROOT"))
+			if root == "" {
+				root = filepath.Join(ctx.Config.RepoRoot, "thoughts")
+			}
+			appletDir := filepath.Join(root, "e2e-wordle")
+			if err := os.MkdirAll(appletDir, 0o755); err != nil {
+				t.Fatal(err)
+			}
+			sourceDir := filepath.ToSlash(
+				filepath.Join(ctx.Config.RepoRoot, "examples", "wordle"),
+			)
+			content := fmt.Sprintf(`---
 vamos_artifact: applet
 applet:
   id: e2e-thoughts-wordle
@@ -402,23 +451,30 @@ applet:
 ---
 # E2E Thoughts Wordle
 `, sourceDir)
-		if err := os.WriteFile(filepath.Join(appletDir, "AGENTS.md"), []byte(content), 0o644); err != nil {
-			t.Fatal(err)
-		}
-	})
+			if err := os.WriteFile(
+				filepath.Join(appletDir, "AGENTS.md"),
+				[]byte(content),
+				0o644,
+			); err != nil {
+				t.Fatal(err)
+			}
+		},
+	)
 }
 
 func seedStyledHTMLAppletFile() spec.Step {
-	return spec.Custom("seed styled HTML applet file", func(t testing.TB, ctx *duiruntime.Context) {
-		t.Helper()
-		root := strings.TrimSpace(os.Getenv("VAMOS_E2E_THOUGHTS_ROOT"))
-		if root == "" {
-			root = filepath.Join(ctx.Config.RepoRoot, "thoughts")
-		}
-		if err := os.MkdirAll(root, 0o755); err != nil {
-			t.Fatal(err)
-		}
-		content := `<!doctype html>
+	return spec.Custom(
+		"seed styled HTML applet file",
+		func(t testing.TB, ctx *duiruntime.Context) {
+			t.Helper()
+			root := strings.TrimSpace(os.Getenv("VAMOS_E2E_THOUGHTS_ROOT"))
+			if root == "" {
+				root = filepath.Join(ctx.Config.RepoRoot, "thoughts")
+			}
+			if err := os.MkdirAll(root, 0o755); err != nil {
+				t.Fatal(err)
+			}
+			content := `<!doctype html>
 <html>
 <head>
   <title>Styled HTML Applet</title>
@@ -441,145 +497,222 @@ func seedStyledHTMLAppletFile() spec.Step {
 </body>
 </html>
 `
-		if err := os.WriteFile(filepath.Join(root, "styled-applet.html"), []byte(content), 0o644); err != nil {
-			t.Fatal(err)
-		}
-	})
+			if err := os.WriteFile(
+				filepath.Join(root, "styled-applet.html"),
+				[]byte(content),
+				0o644,
+			); err != nil {
+				t.Fatal(err)
+			}
+		},
+	)
 }
 
 func expectWorkbenchOverflowAction(label string) spec.Step {
-	return spec.Custom("workbench overflow has "+label+" action", func(t testing.TB, ctx *duiruntime.Context) {
-		t.Helper()
-		menu := ctx.Page.Locator("[data-testid='workbench-overflow-actions']").First()
-		if err := menu.GetByRole(*playwright.AriaRoleButton, playwright.LocatorGetByRoleOptions{Name: label}).First().WaitFor(playwright.LocatorWaitForOptions{Timeout: playwright.Float(30_000)}); err != nil {
-			t.Fatalf("workbench overflow action %q missing: %v", label, err)
-		}
-	})
+	return spec.Custom(
+		"workbench overflow has "+label+" action",
+		func(t testing.TB, ctx *duiruntime.Context) {
+			t.Helper()
+			menu := ctx.Page.Locator("[data-testid='workbench-overflow-actions']").First()
+			if err := menu.GetByRole(*playwright.AriaRoleButton, playwright.LocatorGetByRoleOptions{Name: label}).
+				First().
+				WaitFor(playwright.LocatorWaitForOptions{Timeout: playwright.Float(30_000)}); err != nil {
+				t.Fatalf("workbench overflow action %q missing: %v", label, err)
+			}
+		},
+	)
 }
 
 func expectNoWorkbenchOverflowAction(label string) spec.Step {
-	return spec.Custom("workbench overflow omits "+label+" action", func(t testing.TB, ctx *duiruntime.Context) {
-		t.Helper()
-		menu := ctx.Page.Locator("[data-testid='workbench-overflow-actions']").First()
-		if count, err := menu.GetByRole(*playwright.AriaRoleButton, playwright.LocatorGetByRoleOptions{Name: label}).Count(); err != nil {
-			t.Fatal(err)
-		} else if count > 0 {
-			t.Fatalf("workbench overflow action %q present, want absent", label)
-		}
-	})
+	return spec.Custom(
+		"workbench overflow omits "+label+" action",
+		func(t testing.TB, ctx *duiruntime.Context) {
+			t.Helper()
+			menu := ctx.Page.Locator("[data-testid='workbench-overflow-actions']").First()
+			if count, err := menu.GetByRole(*playwright.AriaRoleButton, playwright.LocatorGetByRoleOptions{Name: label}).
+				Count(); err != nil {
+				t.Fatal(err)
+			} else if count > 0 {
+				t.Fatalf("workbench overflow action %q present, want absent", label)
+			}
+		},
+	)
 }
 
 func submitWholeDocumentComment(text string) spec.Step {
-	return spec.Custom("submit whole-document comment", func(t testing.TB, ctx *duiruntime.Context) {
-		t.Helper()
-		menu := ctx.Page.Locator("[data-testid='workbench-overflow-actions']").First()
-		button := menu.GetByRole(*playwright.AriaRoleButton, playwright.LocatorGetByRoleOptions{Name: "Comment"}).First()
-		if err := button.Click(); err != nil {
-			t.Fatal(err)
-		}
-		form := ctx.Page.Locator("form:has(textarea[name='comment_text'])").First()
-		textarea := form.Locator("textarea[name='comment_text']").First()
-		if err := textarea.WaitFor(playwright.LocatorWaitForOptions{Timeout: playwright.Float(30_000)}); err != nil {
-			t.Fatalf("comment textarea missing: %v", err)
-		}
-		if err := textarea.Fill(text); err != nil {
-			t.Fatal(err)
-		}
-		if err := form.GetByRole(*playwright.AriaRoleButton, playwright.LocatorGetByRoleOptions{Name: "Comment"}).First().Click(); err != nil {
-			t.Fatal(err)
-		}
-	})
+	return spec.Custom(
+		"submit whole-document comment",
+		func(t testing.TB, ctx *duiruntime.Context) {
+			t.Helper()
+			menu := ctx.Page.Locator("[data-testid='workbench-overflow-actions']").First()
+			button := menu.GetByRole(*playwright.AriaRoleButton, playwright.LocatorGetByRoleOptions{Name: "Comment"}).
+				First()
+			if err := button.Click(); err != nil {
+				t.Fatal(err)
+			}
+			form := ctx.Page.Locator("form:has(textarea[name='comment_text'])").First()
+			textarea := form.Locator("textarea[name='comment_text']").First()
+			if err := textarea.WaitFor(
+				playwright.LocatorWaitForOptions{Timeout: playwright.Float(30_000)},
+			); err != nil {
+				t.Fatalf("comment textarea missing: %v", err)
+			}
+			if err := textarea.Fill(text); err != nil {
+				t.Fatal(err)
+			}
+			if err := form.GetByRole(*playwright.AriaRoleButton, playwright.LocatorGetByRoleOptions{Name: "Comment"}).
+				First().
+				Click(); err != nil {
+				t.Fatal(err)
+			}
+		},
+	)
 }
 
 func expectCommentsRailShows(text string) spec.Step {
-	return spec.Custom("comments rail shows submitted comment", func(t testing.TB, ctx *duiruntime.Context) {
-		t.Helper()
-		panel := ctx.Page.Locator("#doc-right-comments-panel #comments-context-panel").First()
-		if err := panel.WaitFor(playwright.LocatorWaitForOptions{Timeout: playwright.Float(30_000)}); err != nil {
-			t.Fatalf("comments panel missing: %v", err)
-		}
-		comment := panel.GetByText(text, playwright.LocatorGetByTextOptions{Exact: playwright.Bool(true)}).First()
-		if err := comment.WaitFor(playwright.LocatorWaitForOptions{State: playwright.WaitForSelectorStateVisible, Timeout: playwright.Float(30_000)}); err != nil {
-			t.Fatalf("comments rail missing submitted comment %q: %v", text, err)
-		}
-	})
+	return spec.Custom(
+		"comments rail shows submitted comment",
+		func(t testing.TB, ctx *duiruntime.Context) {
+			t.Helper()
+			panel := ctx.Page.Locator("#doc-right-comments-panel #comments-context-panel").
+				First()
+			if err := panel.WaitFor(
+				playwright.LocatorWaitForOptions{Timeout: playwright.Float(30_000)},
+			); err != nil {
+				t.Fatalf("comments panel missing: %v", err)
+			}
+			comment := panel.GetByText(text, playwright.LocatorGetByTextOptions{Exact: playwright.Bool(true)}).
+				First()
+			if err := comment.WaitFor(
+				playwright.LocatorWaitForOptions{
+					State:   playwright.WaitForSelectorStateVisible,
+					Timeout: playwright.Float(30_000),
+				},
+			); err != nil {
+				t.Fatalf("comments rail missing submitted comment %q: %v", text, err)
+			}
+		},
+	)
 }
 
 func sourceRendererShowsLineNumbers() spec.Expectation {
-	return spec.ExpectStep(spec.Custom("source renderer shows line numbers", func(t testing.TB, ctx *duiruntime.Context) {
-		t.Helper()
-		lineNumber := ctx.Page.Locator(".source-document-content [data-source-line-number='1']").First()
-		if err := lineNumber.WaitFor(); err != nil {
-			t.Fatalf("source line number missing: %v", err)
-		}
-	}))
+	return spec.ExpectStep(
+		spec.Custom(
+			"source renderer shows Sourcegraph-style line numbers",
+			func(t testing.TB, ctx *duiruntime.Context) {
+				t.Helper()
+				lineNumber := ctx.Page.Locator(".source-document-content .ln#L1").First()
+				if err := lineNumber.WaitFor(); err != nil {
+					t.Fatalf("source line number missing: %v", err)
+				}
+			},
+		),
+	)
 }
 
 func csvRendererUsesDocumentTableStyles() spec.Expectation {
-	return spec.ExpectStep(spec.Custom("CSV table uses shared document table styles", func(t testing.TB, ctx *duiruntime.Context) {
-		t.Helper()
-		csvWrapper := ctx.Page.Locator(".document-table-content .table-wrapper").First()
-		if err := csvWrapper.WaitFor(); err != nil {
-			t.Fatalf("CSV table wrapper missing: %v", err)
-		}
-		borderRadius, err := csvWrapper.Evaluate("el => getComputedStyle(el).borderRadius", nil)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if got := borderRadius.(string); got == "" || got == "0px" {
-			t.Fatalf("CSV wrapper missing shared rounded style, borderRadius=%q", got)
-		}
-		borderWidth, err := csvWrapper.Evaluate("el => getComputedStyle(el).borderTopWidth", nil)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if got := borderWidth.(string); got == "" || got == "0px" {
-			t.Fatalf("CSV wrapper missing shared border style, borderTopWidth=%q", got)
-		}
-		headBackground, err := ctx.Page.Locator(".document-table-content thead").First().Evaluate("el => getComputedStyle(el).backgroundColor", nil)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if got := headBackground.(string); got == "" || got == "rgba(0, 0, 0, 0)" {
-			t.Fatalf("CSV header missing shared background style, background=%q", got)
-		}
-	}))
+	return spec.ExpectStep(
+		spec.Custom(
+			"CSV table uses shared document table styles",
+			func(t testing.TB, ctx *duiruntime.Context) {
+				t.Helper()
+				csvWrapper := ctx.Page.Locator(".document-table-content .table-wrapper").
+					First()
+				if err := csvWrapper.WaitFor(); err != nil {
+					t.Fatalf("CSV table wrapper missing: %v", err)
+				}
+				borderRadius, err := csvWrapper.Evaluate(
+					"el => getComputedStyle(el).borderRadius",
+					nil,
+				)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if got := borderRadius.(string); got == "" || got == "0px" {
+					t.Fatalf(
+						"CSV wrapper missing shared rounded style, borderRadius=%q",
+						got,
+					)
+				}
+				borderWidth, err := csvWrapper.Evaluate(
+					"el => getComputedStyle(el).borderTopWidth",
+					nil,
+				)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if got := borderWidth.(string); got == "" || got == "0px" {
+					t.Fatalf(
+						"CSV wrapper missing shared border style, borderTopWidth=%q",
+						got,
+					)
+				}
+				headBackground, err := ctx.Page.Locator(".document-table-content thead").
+					First().
+					Evaluate("el => getComputedStyle(el).backgroundColor", nil)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if got := headBackground.(string); got == "" ||
+					got == "rgba(0, 0, 0, 0)" {
+					t.Fatalf(
+						"CSV header missing shared background style, background=%q",
+						got,
+					)
+				}
+			},
+		),
+	)
 }
 
 func htmlAppletFillsDocumentSurface(selector string) spec.Expectation {
-	return spec.ExpectStep(spec.Custom("HTML applet fills document surface", func(t testing.TB, ctx *duiruntime.Context) {
-		t.Helper()
-		iframe := ctx.Page.Locator(selector).First()
-		if err := iframe.WaitFor(); err != nil {
-			t.Fatal(err)
-		}
-		classes, err := iframe.GetAttribute("class")
-		if err != nil {
-			t.Fatal(err)
-		}
-		if strings.Contains(classes, "max-w-6xl") || strings.Contains(classes, "mx-auto") {
-			t.Fatalf("iframe has capped layout classes: %q", classes)
-		}
-		metrics, err := iframe.Evaluate(`el => {
+	return spec.ExpectStep(
+		spec.Custom(
+			"HTML applet fills document surface",
+			func(t testing.TB, ctx *duiruntime.Context) {
+				t.Helper()
+				iframe := ctx.Page.Locator(selector).First()
+				if err := iframe.WaitFor(); err != nil {
+					t.Fatal(err)
+				}
+				classes, err := iframe.GetAttribute("class")
+				if err != nil {
+					t.Fatal(err)
+				}
+				if strings.Contains(classes, "max-w-6xl") ||
+					strings.Contains(classes, "mx-auto") {
+					t.Fatalf("iframe has capped layout classes: %q", classes)
+				}
+				metrics, err := iframe.Evaluate(`el => {
 			const iframe = el.getBoundingClientRect();
 			const scroll = document.querySelector('#thoughts-markdown-scroll-region').getBoundingClientRect();
 			return { iframeWidth: iframe.width, iframeHeight: iframe.height, scrollWidth: scroll.width, scrollHeight: scroll.height };
 		}`, nil)
-		if err != nil {
-			t.Fatal(err)
-		}
-		m := metrics.(map[string]any)
-		iframeWidth := numberAsFloat64(t, m["iframeWidth"])
-		scrollWidth := numberAsFloat64(t, m["scrollWidth"])
-		iframeHeight := numberAsFloat64(t, m["iframeHeight"])
-		scrollHeight := numberAsFloat64(t, m["scrollHeight"])
-		if iframeWidth < scrollWidth*0.70 {
-			t.Fatalf("iframe too narrow: iframe=%f scroll=%f", iframeWidth, scrollWidth)
-		}
-		if iframeHeight < scrollHeight*0.50 {
-			t.Fatalf("iframe too short: iframe=%f scroll=%f", iframeHeight, scrollHeight)
-		}
-	}))
+				if err != nil {
+					t.Fatal(err)
+				}
+				m := metrics.(map[string]any)
+				iframeWidth := numberAsFloat64(t, m["iframeWidth"])
+				scrollWidth := numberAsFloat64(t, m["scrollWidth"])
+				iframeHeight := numberAsFloat64(t, m["iframeHeight"])
+				scrollHeight := numberAsFloat64(t, m["scrollHeight"])
+				if iframeWidth < scrollWidth*0.70 {
+					t.Fatalf(
+						"iframe too narrow: iframe=%f scroll=%f",
+						iframeWidth,
+						scrollWidth,
+					)
+				}
+				if iframeHeight < scrollHeight*0.50 {
+					t.Fatalf(
+						"iframe too short: iframe=%f scroll=%f",
+						iframeHeight,
+						scrollHeight,
+					)
+				}
+			},
+		),
+	)
 }
 
 func numberAsFloat64(t testing.TB, value any) float64 {
@@ -602,106 +735,163 @@ func numberAsFloat64(t testing.TB, value any) float64 {
 }
 
 func htmlAppletFrameHasThemeQuery() spec.Expectation {
-	return spec.ExpectStep(spec.Custom("HTML applet frame has theme query", func(t testing.TB, ctx *duiruntime.Context) {
-		t.Helper()
-		src := htmlAppletFrameSrc(t, ctx, styledAppletFrameSelector)
-		if !strings.Contains(src, "theme=dark") && !strings.Contains(src, "theme=light") {
-			t.Fatalf("iframe src missing theme query: %q", src)
-		}
-	}))
+	return spec.ExpectStep(
+		spec.Custom(
+			"HTML applet frame has theme query",
+			func(t testing.TB, ctx *duiruntime.Context) {
+				t.Helper()
+				src := htmlAppletFrameSrc(t, ctx, styledAppletFrameSelector)
+				if !strings.Contains(src, "theme=dark") &&
+					!strings.Contains(src, "theme=light") {
+					t.Fatalf("iframe src missing theme query: %q", src)
+				}
+			},
+		),
+	)
 }
 
 func htmlAppletChildHasInitialTheme() spec.Expectation {
-	return spec.ExpectStep(spec.Custom("HTML applet child applies initial theme", func(t testing.TB, ctx *duiruntime.Context) {
-		t.Helper()
-		src := htmlAppletFrameSrc(t, ctx, styledAppletFrameSelector)
-		wantDark := strings.Contains(src, "theme=dark")
-		if wantDark {
-			if err := ctx.Page.FrameLocator(styledAppletFrameSelector).Locator("html.dark").WaitFor(); err != nil {
-				t.Fatalf("child did not apply initial dark theme from %q: %v", src, err)
-			}
-		}
-		gotDark := htmlAppletChildDark(t, ctx, styledAppletFrameSelector)
-		if gotDark != wantDark {
-			t.Fatalf("child dark=%v, want %v from %q", gotDark, wantDark, src)
-		}
-		wantScheme := "light"
-		if wantDark {
-			wantScheme = "dark"
-		}
-		if got := htmlAppletChildColorScheme(t, ctx, styledAppletFrameSelector); got != wantScheme {
-			t.Fatalf("child color-scheme=%q, want %q", got, wantScheme)
-		}
-		if err := ctx.Page.FrameLocator(styledAppletFrameSelector).Locator("body[data-parent-blocked='true']").WaitFor(); err != nil {
-			t.Fatalf("child did not record blocked parent DOM access: %v", err)
-		}
-	}))
+	return spec.ExpectStep(
+		spec.Custom(
+			"HTML applet child applies initial theme",
+			func(t testing.TB, ctx *duiruntime.Context) {
+				t.Helper()
+				src := htmlAppletFrameSrc(t, ctx, styledAppletFrameSelector)
+				wantDark := strings.Contains(src, "theme=dark")
+				if wantDark {
+					if err := ctx.Page.FrameLocator(styledAppletFrameSelector).
+						Locator("html.dark").
+						WaitFor(); err != nil {
+						t.Fatalf(
+							"child did not apply initial dark theme from %q: %v",
+							src,
+							err,
+						)
+					}
+				}
+				gotDark := htmlAppletChildDark(t, ctx, styledAppletFrameSelector)
+				if gotDark != wantDark {
+					t.Fatalf("child dark=%v, want %v from %q", gotDark, wantDark, src)
+				}
+				wantScheme := "light"
+				if wantDark {
+					wantScheme = "dark"
+				}
+				if got := htmlAppletChildColorScheme(t, ctx, styledAppletFrameSelector); got != wantScheme {
+					t.Fatalf("child color-scheme=%q, want %q", got, wantScheme)
+				}
+				if err := ctx.Page.FrameLocator(styledAppletFrameSelector).
+					Locator("body[data-parent-blocked='true']").
+					WaitFor(); err != nil {
+					t.Fatalf("child did not record blocked parent DOM access: %v", err)
+				}
+			},
+		),
+	)
 }
 
 func htmlAppletUsesSharedStyles() spec.Expectation {
-	return spec.ExpectStep(spec.Custom("HTML applet uses shared Vamos styles", func(t testing.TB, ctx *duiruntime.Context) {
-		t.Helper()
-		background, err := ctx.Page.FrameLocator(styledAppletFrameSelector).Locator("main").Evaluate("el => getComputedStyle(el).backgroundColor", nil)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if got := background.(string); got == "" || got == "rgba(0, 0, 0, 0)" {
-			t.Fatalf("shared bg-background style did not resolve, background=%q", got)
-		}
-	}))
+	return spec.ExpectStep(
+		spec.Custom(
+			"HTML applet uses shared Vamos styles",
+			func(t testing.TB, ctx *duiruntime.Context) {
+				t.Helper()
+				background, err := ctx.Page.FrameLocator(styledAppletFrameSelector).
+					Locator("main").
+					Evaluate("el => getComputedStyle(el).backgroundColor", nil)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if got := background.(string); got == "" || got == "rgba(0, 0, 0, 0)" {
+					t.Fatalf(
+						"shared bg-background style did not resolve, background=%q",
+						got,
+					)
+				}
+			},
+		),
+	)
 }
 
 func htmlAppletLocalOverrideWins() spec.Expectation {
-	return spec.ExpectStep(spec.Custom("HTML applet local override wins", func(t testing.TB, ctx *duiruntime.Context) {
-		t.Helper()
-		color, err := ctx.Page.FrameLocator(styledAppletFrameSelector).Locator("#override-check").Evaluate("el => getComputedStyle(el).color", nil)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if got := color.(string); got != "rgb(12, 34, 56)" {
-			t.Fatalf("override color=%q, want rgb(12, 34, 56)", got)
-		}
-	}))
+	return spec.ExpectStep(
+		spec.Custom(
+			"HTML applet local override wins",
+			func(t testing.TB, ctx *duiruntime.Context) {
+				t.Helper()
+				color, err := ctx.Page.FrameLocator(styledAppletFrameSelector).
+					Locator("#override-check").
+					Evaluate("el => getComputedStyle(el).color", nil)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if got := color.(string); got != "rgb(12, 34, 56)" {
+					t.Fatalf("override color=%q, want rgb(12, 34, 56)", got)
+				}
+			},
+		),
+	)
 }
 
 func toggleThemeFromAvatar() spec.Step {
-	return spec.Custom("toggle parent theme", func(t testing.TB, ctx *duiruntime.Context) {
-		t.Helper()
-		initial := htmlAppletChildDark(t, ctx, styledAppletFrameSelector)
-		ctx.Memory["styled_applet_initial_dark"] = boolString(initial)
-		trigger := ctx.Page.Locator("header [data-slot='dropdown-menu-trigger'][data-on\\:click*='user_profile']").First()
-		if err := trigger.Click(); err != nil {
-			t.Fatal(err)
-		}
-		content := ctx.Page.Locator("[data-slot='dropdown-menu-content'][data-show='$user_profile.open']").First()
-		if err := content.WaitFor(playwright.LocatorWaitForOptions{State: playwright.WaitForSelectorStateVisible}); err != nil {
-			t.Fatalf("avatar menu did not become visible: %v", err)
-		}
-		if err := content.GetByText("Toggle theme").First().Click(); err != nil {
-			t.Fatal(err)
-		}
-	})
+	return spec.Custom(
+		"toggle parent theme",
+		func(t testing.TB, ctx *duiruntime.Context) {
+			t.Helper()
+			initial := htmlAppletChildDark(t, ctx, styledAppletFrameSelector)
+			ctx.Memory["styled_applet_initial_dark"] = boolString(initial)
+			trigger := ctx.Page.Locator("header [data-slot='dropdown-menu-trigger'][data-on\\:click*='user_profile']").
+				First()
+			if err := trigger.Click(); err != nil {
+				t.Fatal(err)
+			}
+			content := ctx.Page.Locator("[data-slot='dropdown-menu-content'][data-show='$user_profile.open']").
+				First()
+			if err := content.WaitFor(
+				playwright.LocatorWaitForOptions{
+					State: playwright.WaitForSelectorStateVisible,
+				},
+			); err != nil {
+				t.Fatalf("avatar menu did not become visible: %v", err)
+			}
+			if err := content.GetByText("Toggle theme").First().Click(); err != nil {
+				t.Fatal(err)
+			}
+		},
+	)
 }
 
 func htmlAppletChildThemeChanged() spec.Expectation {
-	return spec.ExpectStep(spec.Custom("HTML applet child follows parent theme toggle", func(t testing.TB, ctx *duiruntime.Context) {
-		t.Helper()
-		initial := ctx.Memory["styled_applet_initial_dark"] == "true"
-		for i := 0; i < 20; i++ {
-			if got := htmlAppletChildDark(t, ctx, styledAppletFrameSelector); got != initial {
-				wantScheme := "light"
-				if got {
-					wantScheme = "dark"
+	return spec.ExpectStep(
+		spec.Custom(
+			"HTML applet child follows parent theme toggle",
+			func(t testing.TB, ctx *duiruntime.Context) {
+				t.Helper()
+				initial := ctx.Memory["styled_applet_initial_dark"] == "true"
+				for i := 0; i < 20; i++ {
+					if got := htmlAppletChildDark(
+						t,
+						ctx,
+						styledAppletFrameSelector,
+					); got != initial {
+						wantScheme := "light"
+						if got {
+							wantScheme = "dark"
+						}
+						if scheme := htmlAppletChildColorScheme(t, ctx, styledAppletFrameSelector); scheme != wantScheme {
+							t.Fatalf("child color-scheme=%q after toggle, want %q", scheme, wantScheme)
+						}
+						return
+					}
+					time.Sleep(100 * time.Millisecond)
 				}
-				if scheme := htmlAppletChildColorScheme(t, ctx, styledAppletFrameSelector); scheme != wantScheme {
-					t.Fatalf("child color-scheme=%q after toggle, want %q", scheme, wantScheme)
-				}
-				return
-			}
-			time.Sleep(100 * time.Millisecond)
-		}
-		t.Fatalf("child dark class did not change from %v after parent toggle", initial)
-	}))
+				t.Fatalf(
+					"child dark class did not change from %v after parent toggle",
+					initial,
+				)
+			},
+		),
+	)
 }
 
 func htmlAppletFrameSrc(t testing.TB, ctx *duiruntime.Context, selector string) string {
@@ -719,7 +909,9 @@ func htmlAppletFrameSrc(t testing.TB, ctx *duiruntime.Context, selector string) 
 
 func htmlAppletChildDark(t testing.TB, ctx *duiruntime.Context, selector string) bool {
 	t.Helper()
-	value, err := ctx.Page.FrameLocator(selector).Locator("html").Evaluate("el => el.classList.contains('dark')", nil)
+	value, err := ctx.Page.FrameLocator(selector).
+		Locator("html").
+		Evaluate("el => el.classList.contains('dark')", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -818,26 +1010,35 @@ func iframeSandboxOmitsSameOrigin() spec.Expectation {
 }
 
 func iframeSandboxOmitsSameOriginFor(selector string) spec.Expectation {
-	return spec.ExpectStep(spec.Custom("iframe sandbox omits allow-same-origin", func(t testing.TB, ctx *duiruntime.Context) {
-		t.Helper()
-		iframe := ctx.Page.Locator(selector).First()
-		if err := iframe.WaitFor(); err != nil {
-			t.Fatal(err)
-		}
-		sandbox, err := iframe.GetAttribute("sandbox")
-		if err != nil {
-			t.Fatal(err)
-		}
-		if !strings.Contains(sandbox, "allow-scripts") {
-			t.Fatalf("sandbox=%q missing allow-scripts", sandbox)
-		}
-		if strings.Contains(sandbox, "allow-same-origin") {
-			t.Fatalf("sandbox=%q permits same-origin", sandbox)
-		}
-	}))
+	return spec.ExpectStep(
+		spec.Custom(
+			"iframe sandbox omits allow-same-origin",
+			func(t testing.TB, ctx *duiruntime.Context) {
+				t.Helper()
+				iframe := ctx.Page.Locator(selector).First()
+				if err := iframe.WaitFor(); err != nil {
+					t.Fatal(err)
+				}
+				sandbox, err := iframe.GetAttribute("sandbox")
+				if err != nil {
+					t.Fatal(err)
+				}
+				if !strings.Contains(sandbox, "allow-scripts") {
+					t.Fatalf("sandbox=%q missing allow-scripts", sandbox)
+				}
+				if strings.Contains(sandbox, "allow-same-origin") {
+					t.Fatalf("sandbox=%q permits same-origin", sandbox)
+				}
+			},
+		),
+	)
 }
 
-func runWorkbenchRegionsRemainUsable(t *testing.T, viewport duiruntime.ViewportClass, p string) {
+func runWorkbenchRegionsRemainUsable(
+	t *testing.T,
+	viewport duiruntime.ViewportClass,
+	p string,
+) {
 	t.Helper()
 	spec.Story(t, "thoughts workbench regions remain usable across viewport classes").
 		App(vamos.App()).
@@ -854,7 +1055,10 @@ func runWorkbenchRegionsRemainUsable(t *testing.T, viewport duiruntime.ViewportC
 		Run()
 }
 
-func runSavedMobileActiveStateDoesNotPinDesktopRefresh(t *testing.T, viewport duiruntime.ViewportClass) {
+func runSavedMobileActiveStateDoesNotPinDesktopRefresh(
+	t *testing.T,
+	viewport duiruntime.ViewportClass,
+) {
 	t.Helper()
 	spec.Story(t, "thoughts workbench saved mobile active state does not pin desktop refresh").
 		App(vamos.App()).

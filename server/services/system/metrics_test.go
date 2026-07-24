@@ -32,6 +32,21 @@ func (r *errorReader) Read(p []byte) (int, error) {
 
 func (r *errorReader) Close() error { return nil }
 
+type eofReader struct {
+	*strings.Reader
+	eof bool
+}
+
+func (r *eofReader) Read(p []byte) (int, error) {
+	n, err := r.Reader.Read(p)
+	if err == io.EOF {
+		r.eof = true
+	}
+	return n, err
+}
+
+func (r *eofReader) Close() error { return nil }
+
 func stubCommands(t *testing.T, start func(string, []string) (commandOutput, error)) {
 	t.Helper()
 	oldFind, oldStart := findExecutable, startSystemCommand
@@ -113,6 +128,30 @@ func TestCollectTopProcessesRetainsRowsOnExitError(t *testing.T) {
 
 	procs, err := collectTopProcesses(10)
 	if !errors.Is(err, exitErr) || len(procs) != 1 || procs[0].PID != 42 {
+		t.Fatalf("procs=%+v err=%v", procs, err)
+	}
+}
+
+func TestCollectTopProcessesDrainsOutputBeforeWait(t *testing.T) {
+	reader := &eofReader{Reader: strings.NewReader(strings.Join([]string{
+		"USER PID %CPU %MEM VSZ RSS TTY STAT START TIME COMMAND",
+		"root 42 1.5 0 0 2048 ? S 00:00 0:00 first",
+		"root 43 1.5 0 0 2048 ? S 00:00 0:00 second",
+	}, "\n"))}
+	stubCommands(t, func(string, []string) (commandOutput, error) {
+		return commandOutput{
+			reader: reader,
+			wait: func() error {
+				if !reader.eof {
+					return errors.New("stdout closed before command completed")
+				}
+				return nil
+			},
+		}, nil
+	})
+
+	procs, err := collectTopProcesses(1)
+	if err != nil || len(procs) != 1 || procs[0].PID != 42 {
 		t.Fatalf("procs=%+v err=%v", procs, err)
 	}
 }

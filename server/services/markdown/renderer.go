@@ -254,6 +254,23 @@ func (s *renderState) printf(w io.Writer, format string, args ...any) ast.WalkSt
 	return s.writeString(w, fmt.Sprintf(format, args...))
 }
 
+type stateWriter struct {
+	state  *renderState
+	writer io.Writer
+}
+
+func (w stateWriter) Write(p []byte) (int, error) {
+	n, err := w.writer.Write(p)
+	w.state.recordWrite(n, len(p), err)
+	if err != nil {
+		return n, err
+	}
+	if n != len(p) {
+		return n, io.ErrShortWrite
+	}
+	return n, nil
+}
+
 func mdhtmlRenderer(
 	highlightStyle *chroma.Style,
 	htmlFormatter *html.Formatter,
@@ -275,7 +292,12 @@ func mdhtmlRenderer(
 				if write(w, `<div class="markdown-code-block">`) == ast.Terminate {
 					return ast.Terminate, true
 				}
-				if err := renderCode(w, code, highlightStyle, htmlFormatter); err != nil {
+				if err := renderCode(
+					stateWriter{state: state, writer: w},
+					code,
+					highlightStyle,
+					htmlFormatter,
+				); err != nil {
 					return state.record(err), true
 				}
 				return write(w, "</div>"), true
