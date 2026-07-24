@@ -12,6 +12,7 @@ import (
 
 type recordingTmux struct {
 	splits        []TmuxSplitRequest
+	respawns      []recordedRespawn
 	pastes        []recordedPaste
 	keys          []recordedKeys
 	kills         []TmuxPane
@@ -22,6 +23,12 @@ type recordingTmux struct {
 	killErr       error
 	layoutErr     error
 	paneExistsErr error
+	respawnErr    error
+}
+
+type recordedRespawn struct {
+	pane TmuxPane
+	req  TmuxSplitRequest
 }
 
 type recordedPaste struct {
@@ -45,6 +52,15 @@ func (r *recordingTmux) SplitPane(
 ) (TmuxPane, error) {
 	r.splits = append(r.splits, req)
 	return TmuxPane{ID: "%new"}, nil
+}
+
+func (r *recordingTmux) RespawnPane(
+	ctx context.Context,
+	pane TmuxPane,
+	req TmuxSplitRequest,
+) error {
+	r.respawns = append(r.respawns, recordedRespawn{pane: pane, req: req})
+	return r.respawnErr
 }
 
 func (r *recordingTmux) SendKeys(
@@ -404,7 +420,8 @@ func TestContinueManagerQuestionDoesNotRepromptChild(t *testing.T) {
 	); err != nil {
 		t.Fatalf("RunContinue() error = %v", err)
 	}
-	if len(tmux.pastes) != 0 || !strings.Contains(out.String(), "action: manager_question") {
+	if len(tmux.pastes) != 0 ||
+		!strings.Contains(out.String(), "action: manager_question") {
 		t.Fatalf("output=%q pastes=%#v", out.String(), tmux.pastes)
 	}
 	loaded := loadManagerState(t, stateFile)

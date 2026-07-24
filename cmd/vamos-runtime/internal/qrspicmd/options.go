@@ -58,6 +58,7 @@ type RunChildOptions struct {
 	Timeout             time.Duration
 	Launch              *ChildLaunchIntent
 	DeferPendingCleanup bool
+	ReuseActivePane     bool
 }
 
 type StartNextOptions struct {
@@ -135,9 +136,14 @@ type ChildInteractionMode string
 type ChildIntentKind string
 
 const (
-	ChildInteractionStageWork           ChildInteractionMode = "stage_work"
-	ChildInteractionInteractiveChat     ChildInteractionMode = "interactive_child_chat"
-	ChildInteractionManualSameChildChat ChildInteractionMode = "manual_same_child_chat"
+	ChildInteractionManaged ChildInteractionMode = "managed"
+	ChildInteractionChat    ChildInteractionMode = "chat"
+
+	// Legacy values remain accepted by normalizeChildInteraction when reading
+	// older extension/state data. New state always persists managed or chat.
+	ChildInteractionStageWork           = ChildInteractionManaged
+	ChildInteractionInteractiveChat     = ChildInteractionChat
+	ChildInteractionManualSameChildChat = ChildInteractionChat
 )
 
 type ChildCompletionOptions struct {
@@ -786,4 +792,5 @@ type TmuxClient interface {
 	KillPane(ctx context.Context, pane TmuxPane) error
 	SelectLayout(ctx context.Context, pane TmuxPane, layout string) error
 	PaneExists(ctx context.Context, pane TmuxPane) (bool, error)
+	RespawnPane(ctx context.Context, pane TmuxPane, req TmuxSplitRequest) error
 }

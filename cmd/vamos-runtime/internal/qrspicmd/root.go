@@ -1599,9 +1599,28 @@ func RunChild(ctx context.Context, opts RunChildOptions, d deps, out io.Writer) 
 		return err
 	}
 	runner := childRunner(d)
-	run, err := runner.Start(ctx, req)
-	if err != nil {
-		return err
+	var run ChildRun
+	reusedPane := false
+	if opts.ReuseActivePane && state.ActiveChild != nil &&
+		strings.TrimSpace(state.ActiveChild.TmuxPaneID) != "" {
+		pane := TmuxPane{ID: state.ActiveChild.TmuxPaneID}
+		exists, existsErr := tmuxClient(d).PaneExists(ctx, pane)
+		if existsErr == nil && exists {
+			if respawner, ok := runner.(interface {
+				Respawn(context.Context, TmuxPane, ChildRunRequest) (ChildRun, error)
+			}); ok {
+				run, err = respawner.Respawn(ctx, pane, req)
+				if err == nil {
+					reusedPane = true
+				}
+			}
+		}
+	}
+	if !reusedPane {
+		run, err = runner.Start(ctx, req)
+		if err != nil {
+			return err
+		}
 	}
 	replacement := &ChildRunRef{
 		ID:                   childID,
@@ -1627,6 +1646,13 @@ func RunChild(ctx context.Context, opts RunChildOptions, d deps, out io.Writer) 
 	}
 	state.ActiveChild = replacement
 	if err := store.Save(opts.StateFile, state); err != nil {
+		if reusedPane {
+			return fmt.Errorf(
+				"persist respawned child: %w (pane %s was reused; run recover-manager to rebind it)",
+				err,
+				run.Pane.ID,
+			)
+		}
 		cleanupErr := tmuxClient(d).KillPane(ctx, run.Pane)
 		if cleanupErr != nil {
 			return errors.Join(
@@ -1723,14 +1749,11 @@ func normalizeChildBoundary(value ChildBoundaryKind) (ChildBoundaryKind, error) 
 }
 
 func normalizeChildInteraction(value ChildInteractionMode) (ChildInteractionMode, error) {
-	if value == "" {
-		return ChildInteractionStageWork, nil
-	}
 	switch value {
-	case ChildInteractionStageWork,
-		ChildInteractionInteractiveChat,
-		ChildInteractionManualSameChildChat:
-		return value, nil
+	case "", ChildInteractionManaged, "stage_work":
+		return ChildInteractionManaged, nil
+	case ChildInteractionChat, "interactive_child_chat", "manual_same_child_chat":
+		return ChildInteractionChat, nil
 	default:
 		return "", fmt.Errorf("unknown child interaction mode %q", value)
 	}
@@ -5702,6 +5725,7 @@ func startChildFromIntent(
 		Timeout:             opts.Timeout,
 		Launch:              &intent,
 		DeferPendingCleanup: deferPendingCleanup,
+		ReuseActivePane:     intent.Kind == ChildLaunchResumeHandoff,
 	}, d, runOut); err != nil {
 		return state, err
 	}
@@ -6518,7 +6542,8 @@ func cleanupPendingChildAfterNotification(
 	if ref == nil {
 		return state, nil
 	}
-	if strings.TrimSpace(ref.TmuxPaneID) == "" {
+	if strings.TrimSpace(ref.TmuxPaneID) == "" ||
+		(state.ActiveChild != nil && ref.TmuxPaneID == state.ActiveChild.TmuxPaneID) {
 		state.PendingCleanupChild = nil
 		return state, nil
 	}

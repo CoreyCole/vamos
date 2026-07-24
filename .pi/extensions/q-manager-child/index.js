@@ -62,6 +62,25 @@ async function runChildComplete({ boundary, interaction }) {
   });
 }
 
+export const managedResumeControl = "/q-managed-resume";
+
+export function classifyChildInput(event, initialManagedInputPending) {
+  if (initialManagedInputPending || event?.source === "extension") {
+    return { interaction: "managed", managedResume: false };
+  }
+  const text = String(
+    event?.text ?? event?.message ?? event?.content ?? "",
+  ).trim();
+  if (text === managedResumeControl) {
+    return { interaction: "managed", managedResume: true };
+  }
+  return { interaction: "chat", managedResume: false };
+}
+
+export function managedResumeInstruction() {
+  return "Managed completion resumed. Finish the work, run `vamos qrspi result init` with the graph-valid state/outcome, complete the generated result record, then stop.";
+}
+
 function shouldWakeManager(validation) {
   if (!validation) return false;
   return (
@@ -102,23 +121,17 @@ export default function qManagerChildExtension(pi) {
   if (globalThis[key]) return;
   globalThis[key] = true;
 
-  let interaction = "stage_work";
+  let interaction = "managed";
   let lowLevelRunEnded = false;
   let initialManagedInputPending = true;
 
   pi.on("input", (event) => {
-    if (initialManagedInputPending) {
-      initialManagedInputPending = false;
-      interaction = "stage_work";
-      return { action: "continue" };
+    const next = classifyChildInput(event, initialManagedInputPending);
+    initialManagedInputPending = false;
+    interaction = next.interaction;
+    if (next.managedResume && typeof pi.sendUserMessage === "function") {
+      pi.sendUserMessage(managedResumeInstruction());
     }
-    if (event.source === "extension") {
-      interaction = "stage_work";
-      return { action: "continue" };
-    }
-    interaction = event.streamingBehavior
-      ? "interactive_child_chat"
-      : "manual_same_child_chat";
     return { action: "continue" };
   });
 
@@ -146,7 +159,7 @@ export default function qManagerChildExtension(pi) {
       await touch(process.env.Q_MANAGER_DONE_PATH);
     }
 
-    interaction = "stage_work";
+    // Chat remains chat until the explicit managed-resume control arrives.
     lowLevelRunEnded = false;
   });
 }

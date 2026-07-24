@@ -77,6 +77,36 @@ func TestTmuxChildRunnerTargetsManagerPane(t *testing.T) {
 	}
 }
 
+func TestTmuxChildRunnerRespawnsExistingPane(t *testing.T) {
+	tmux := &recordingTmux{}
+	run, err := (TmuxChildRunner{Tmux: tmux}).Respawn(
+		t.Context(),
+		TmuxPane{ID: "%child"},
+		ChildRunRequest{
+			ID:          "child-2",
+			Cwd:         "/repo",
+			PromptFile:  "/tmp/prompt",
+			SessionID:   "session-2",
+			SessionDir:  "/tmp/sessions",
+			SessionName: "q-manager research",
+			OutputPath:  "/tmp/output",
+			DonePath:    "/tmp/done",
+			StatusPath:  "/tmp/status",
+		},
+	)
+	if err != nil {
+		t.Fatalf("Respawn error = %v", err)
+	}
+	if run.Pane.ID != "%child" || len(tmux.respawns) != 1 || len(tmux.splits) != 0 {
+		t.Fatalf(
+			"run = %#v, respawns = %#v, splits = %#v",
+			run,
+			tmux.respawns,
+			tmux.splits,
+		)
+	}
+}
+
 func TestResolveChildExtensionPathCopiesProjectOwnedExtension(t *testing.T) {
 	cwd, err := os.Getwd()
 	if err != nil {
@@ -92,7 +122,7 @@ func TestResolveChildExtensionPathCopiesProjectOwnedExtension(t *testing.T) {
 		t.Fatalf("read extension asset: %v", err)
 	}
 	text := string(data)
-	for _, want := range []string{"export default function qManagerChildExtension", `pi.on("input"`, `pi.on("agent_end"`, `pi.on("agent_settled"`, "initialManagedInputPending", "event.source", "event.streamingBehavior", "runChildComplete", "qrspi", "child-complete", "--state-file", "--child-id", "--boundary", "--interaction", "Q_MANAGER_STATUS_PATH", "Q_MANAGER_DONE_PATH", "Q_MANAGER_PARENT_PANE", "Q_MANAGER_VALIDATED_STATUS_PATH", "Q_MANAGER_WAKE_MODE", "validated-only", "shouldWakeManager", "wakeDeliveryMode", "pi.sendUserMessage"} {
+	for _, want := range []string{"export default function qManagerChildExtension", `pi.on("input"`, `pi.on("agent_end"`, `pi.on("agent_settled"`, "initialManagedInputPending", "classifyChildInput", "managedResumeControl", "/q-managed-resume", "runChildComplete", "qrspi", "child-complete", "--state-file", "--child-id", "--boundary", "--interaction", "Q_MANAGER_STATUS_PATH", "Q_MANAGER_DONE_PATH", "Q_MANAGER_PARENT_PANE", "Q_MANAGER_VALIDATED_STATUS_PATH", "Q_MANAGER_WAKE_MODE", "validated-only", "shouldWakeManager", "wakeDeliveryMode", "pi.sendUserMessage"} {
 		if !strings.Contains(text, want) {
 			t.Fatalf("extension asset missing %q: %s", want, text)
 		}
@@ -103,13 +133,13 @@ func TestResolveChildExtensionPathCopiesProjectOwnedExtension(t *testing.T) {
 		t.Fatalf("extension input handler missing or out of order: %s", text)
 	}
 	inputHandler := text[inputStart:agentEndStart]
-	managedInput := strings.Index(inputHandler, "if (initialManagedInputPending)")
-	extensionInput := strings.Index(inputHandler, `if (event.source === "extension")`)
-	manualInput := strings.Index(inputHandler, `interaction = event.streamingBehavior`)
-	if managedInput < 0 || extensionInput <= managedInput ||
-		manualInput <= extensionInput {
+	if !strings.Contains(
+		inputHandler,
+		"classifyChildInput(event, initialManagedInputPending)",
+	) ||
+		!strings.Contains(inputHandler, "interaction = next.interaction") {
 		t.Fatalf(
-			"managed initial input must remain stage work before chat classification: %s",
+			"input handler must classify explicit managed/chat mode: %s",
 			inputHandler,
 		)
 	}
@@ -365,6 +395,41 @@ func TestRunChildDefersPendingCleanupAndPersistsContinuationLineage(t *testing.T
 	}
 }
 
+func TestRunChildRespawnsActivePaneWithoutCleaningIt(t *testing.T) {
+	fixture := newRunChildFixture(t, false)
+	fixture.runner.respawn = true
+	state := fixture.loadState(t)
+	old := &ChildRunRef{ID: "old", Stage: "research", TmuxPaneID: "%old"}
+	state.ActiveChild = old
+	state.PendingCleanupChild = old
+	fixture.saveState(t, state)
+	tmux := &recordingTmux{}
+	opts := fixture.options()
+	opts.Timeout = 0
+	opts.ReuseActivePane = true
+	if err := RunChild(
+		t.Context(),
+		opts,
+		deps{Clock: fixture.clock, Runner: fixture.runner, Tmux: tmux},
+		&bytes.Buffer{},
+	); err != nil {
+		t.Fatalf("RunChild error = %v", err)
+	}
+	loaded := fixture.loadState(t)
+	if len(fixture.runner.respawned) != 1 || len(fixture.runner.started) != 0 ||
+		loaded.ActiveChild == nil || loaded.ActiveChild.TmuxPaneID != "%old" ||
+		loaded.PendingCleanupChild != nil || len(tmux.kills) != 0 {
+		t.Fatalf(
+			"respawned=%#v started=%#v active=%#v pending=%#v kills=%#v",
+			fixture.runner.respawned,
+			fixture.runner.started,
+			loaded.ActiveChild,
+			loaded.PendingCleanupChild,
+			tmux.kills,
+		)
+	}
+}
+
 func TestRunChildPersistenceFailureCleansUntrackedReplacementAndKeepsSource(
 	t *testing.T,
 ) {
@@ -458,6 +523,8 @@ type fakeChildRunner struct {
 	startErr    error
 	panes       []string
 	started     []ChildRunRequest
+	respawned   []ChildRunRequest
+	respawn     bool
 }
 
 func (f *fakeChildRunner) Start(
@@ -475,6 +542,29 @@ func (f *fakeChildRunner) Start(
 	return ChildRun{
 		ID:         req.ID,
 		Pane:       TmuxPane{ID: paneID},
+		OutputPath: req.OutputPath,
+		SessionID:  req.SessionID,
+		SessionDir: req.SessionDir,
+		DonePath:   req.DonePath,
+		StatusPath: req.StatusPath,
+	}, nil
+}
+
+func (f *fakeChildRunner) Respawn(
+	ctx context.Context,
+	pane TmuxPane,
+	req ChildRunRequest,
+) (ChildRun, error) {
+	if !f.respawn {
+		return ChildRun{}, errors.New("respawn unsupported")
+	}
+	if f.startErr != nil {
+		return ChildRun{}, f.startErr
+	}
+	f.respawned = append(f.respawned, req)
+	return ChildRun{
+		ID:         req.ID,
+		Pane:       pane,
 		OutputPath: req.OutputPath,
 		SessionID:  req.SessionID,
 		SessionDir: req.SessionDir,

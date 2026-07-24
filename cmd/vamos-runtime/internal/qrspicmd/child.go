@@ -200,6 +200,31 @@ func (r TmuxChildRunner) Start(
 	}, nil
 }
 
+func (r TmuxChildRunner) Respawn(
+	ctx context.Context,
+	pane TmuxPane,
+	req ChildRunRequest,
+) (ChildRun, error) {
+	if r.Tmux == nil {
+		return ChildRun{}, errors.New("tmux client is required")
+	}
+	if err := r.Tmux.RespawnPane(ctx, pane, TmuxSplitRequest{
+		Cwd:     req.Cwd,
+		Command: BuildChildCommand(req),
+	}); err != nil {
+		return ChildRun{}, err
+	}
+	return ChildRun{
+		ID:         req.ID,
+		Pane:       pane,
+		OutputPath: req.OutputPath,
+		SessionID:  req.SessionID,
+		SessionDir: req.SessionDir,
+		DonePath:   req.DonePath,
+		StatusPath: req.StatusPath,
+	}, nil
+}
+
 func (r TmuxChildRunner) Wait(ctx context.Context, run ChildRun) (ChildRunResult, error) {
 	select {
 	case <-ctx.Done():

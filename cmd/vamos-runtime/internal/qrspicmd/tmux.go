@@ -10,12 +10,28 @@ import (
 
 type ShellTmuxClient struct{}
 
-func (ShellTmuxClient) SplitPane(ctx context.Context, req TmuxSplitRequest) (TmuxPane, error) {
-	out, err := exec.CommandContext(ctx, "tmux", splitPaneArgs(req, os.Getenv("TMUX_PANE"))...).Output()
+func (ShellTmuxClient) SplitPane(
+	ctx context.Context,
+	req TmuxSplitRequest,
+) (TmuxPane, error) {
+	out, err := exec.CommandContext(ctx, "tmux", splitPaneArgs(req, os.Getenv("TMUX_PANE"))...).
+		Output()
 	if err != nil {
 		return TmuxPane{}, err
 	}
 	return TmuxPane{ID: strings.TrimSpace(string(out))}, nil
+}
+
+func respawnPaneArgs(pane TmuxPane, req TmuxSplitRequest) []string {
+	return []string{
+		"respawn-pane",
+		"-k",
+		"-t",
+		pane.ID,
+		"-c",
+		req.Cwd,
+		strings.Join(shellquote(req.Command), " "),
+	}
 }
 
 func splitPaneArgs(req TmuxSplitRequest, fallbackTargetPane string) []string {
@@ -35,6 +51,17 @@ func splitPaneArgs(req TmuxSplitRequest, fallbackTargetPane string) []string {
 	return append(args, "-c", req.Cwd, strings.Join(shellquote(req.Command), " "))
 }
 
+func (ShellTmuxClient) RespawnPane(
+	ctx context.Context,
+	pane TmuxPane,
+	req TmuxSplitRequest,
+) error {
+	if strings.TrimSpace(pane.ID) == "" {
+		return errors.New("tmux pane ID is required")
+	}
+	return exec.CommandContext(ctx, "tmux", respawnPaneArgs(pane, req)...).Run()
+}
+
 func (ShellTmuxClient) SendKeys(ctx context.Context, pane TmuxPane, keys []string) error {
 	args := append([]string{"send-keys", "-t", pane.ID}, keys...)
 	return exec.CommandContext(ctx, "tmux", args...).Run()
@@ -44,10 +71,12 @@ func (ShellTmuxClient) PasteText(ctx context.Context, pane TmuxPane, text string
 	if strings.TrimSpace(pane.ID) == "" {
 		return errors.New("tmux pane ID is required")
 	}
-	if err := exec.CommandContext(ctx, "tmux", setBufferArgs("q-manager-wake", text)...).Run(); err != nil {
+	if err := exec.CommandContext(ctx, "tmux", setBufferArgs("q-manager-wake", text)...).
+		Run(); err != nil {
 		return err
 	}
-	return exec.CommandContext(ctx, "tmux", pasteBufferArgs("q-manager-wake", pane.ID)...).Run()
+	return exec.CommandContext(ctx, "tmux", pasteBufferArgs("q-manager-wake", pane.ID)...).
+		Run()
 }
 
 func (ShellTmuxClient) KillPane(ctx context.Context, pane TmuxPane) error {
@@ -57,7 +86,11 @@ func (ShellTmuxClient) KillPane(ctx context.Context, pane TmuxPane) error {
 	return exec.CommandContext(ctx, "tmux", killPaneArgs(pane.ID)...).Run()
 }
 
-func (ShellTmuxClient) SelectLayout(ctx context.Context, pane TmuxPane, layout string) error {
+func (ShellTmuxClient) SelectLayout(
+	ctx context.Context,
+	pane TmuxPane,
+	layout string,
+) error {
 	if strings.TrimSpace(pane.ID) == "" {
 		return errors.New("tmux pane ID is required")
 	}
@@ -71,7 +104,8 @@ func (ShellTmuxClient) PaneExists(ctx context.Context, pane TmuxPane) (bool, err
 	if strings.TrimSpace(pane.ID) == "" {
 		return false, nil
 	}
-	if err := exec.CommandContext(ctx, "tmux", "display-message", "-p", "-t", pane.ID, "#{pane_id}").Run(); err != nil {
+	if err := exec.CommandContext(ctx, "tmux", "display-message", "-p", "-t", pane.ID, "#{pane_id}").
+		Run(); err != nil {
 		return false, nil
 	}
 	return true, nil

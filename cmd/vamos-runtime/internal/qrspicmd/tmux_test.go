@@ -1,12 +1,39 @@
 package qrspicmd
 
 import (
+	"reflect"
 	"strings"
 	"testing"
 )
 
+func TestRespawnPaneArgsUsesExistingPaneAndQuotedCommand(t *testing.T) {
+	args := respawnPaneArgs(TmuxPane{ID: "%child"}, TmuxSplitRequest{
+		Cwd:     "/tmp/work space",
+		Command: []string{"echo", "hello world"},
+	})
+	want := []string{
+		"respawn-pane",
+		"-k",
+		"-t",
+		"%child",
+		"-c",
+		"/tmp/work space",
+		"'echo' 'hello world'",
+	}
+	if !reflect.DeepEqual(args, want) {
+		t.Fatalf("respawnPaneArgs() = %#v, want %#v", args, want)
+	}
+}
+
 func TestSplitPaneArgsTargetsCurrentPaneWhenAvailable(t *testing.T) {
-	args := splitPaneArgs(TmuxSplitRequest{Cwd: "/repo", Direction: "right", Command: []string{"echo", "hi"}}, "%18")
+	args := splitPaneArgs(
+		TmuxSplitRequest{
+			Cwd:       "/repo",
+			Direction: "right",
+			Command:   []string{"echo", "hi"},
+		},
+		"%18",
+	)
 	joined := strings.Join(args, " ")
 	for _, want := range []string{"split-window", "-t %18", "-h", "-c /repo", "'echo' 'hi'"} {
 		if !strings.Contains(joined, want) {
@@ -32,7 +59,10 @@ func TestSplitPaneArgsPrefersExplicitTargetOverCurrentPane(t *testing.T) {
 }
 
 func TestSplitPaneArgsOmitsTargetOutsideTmuxPane(t *testing.T) {
-	args := splitPaneArgs(TmuxSplitRequest{Cwd: "/repo", Direction: "down", Command: []string{"echo"}}, "")
+	args := splitPaneArgs(
+		TmuxSplitRequest{Cwd: "/repo", Direction: "down", Command: []string{"echo"}},
+		"",
+	)
 	joined := strings.Join(args, " ")
 	if strings.Contains(joined, " -t ") {
 		t.Fatalf("split args unexpectedly include target: %v", args)
