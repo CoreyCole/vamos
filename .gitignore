@@ -24,3 +24,4 @@ scripts/workspace-db-verify/workspace-db-verify-*
 .pi/npm/
 .pi/auth.json
 .pi/run-history.jsonl
+.pi-subagents/
