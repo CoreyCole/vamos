@@ -22,7 +22,7 @@ There is no fixed lane maximum. File extensions and keyword mentions alone are n
 
 ## Artifact
 
-Write exactly one auditable Markdown report to the output path supplied by the parent:
+Return exactly one complete, auditable Markdown report as your final response. The parent supplies an absolute output path only as the report identity; do not write any repository or plan file. The parent runtime persists your final response at that exact path:
 
 ```markdown
 # Review Lane Selection
@@ -57,4 +57,4 @@ Reviewed artifact: `path`
 - None. | uncertainty
 ```
 
-Use only known lane IDs. Do not edit planning or implementation files. Do not turn candidate risks into findings; focused lanes and the main reviewer establish findings.
+Use only known lane IDs. Do not edit planning or implementation files. Do not turn candidate risks into findings; focused lanes and the main reviewer establish findings. Return the complete Markdown report atomically in one final response; do not emit progress, tool markup, or a partial report.

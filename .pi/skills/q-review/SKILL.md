@@ -119,6 +119,18 @@ After resolving implementation review, read and follow:
 .pi/skills/q-review-implementation/SKILL.md
 ```
 
+## Plan-Owned Lane Report Contract
+
+The focused review owns the review directory and persists all canonical lane artifacts beneath it; `.pi-subagents/`, `singleRunOutputBaseDir`, and package defaults are not artifact destinations.
+
+1. Before delegation, call `subagent({ action: "list", agentScope: "project" })`. Confirm `qrspi-review-scout` and `qrspi-reviewer` are executable and non-disabled. If either is unavailable, stop setup-blocked; never fall back to generic/package `scout` or `reviewer`.
+1. Create `[review_dir]/context/lanes/`. Resolve `selectionReportPath` as the absolute `[review_dir]/context/lane-selection.md`, then invoke `qrspi-review-scout` with `context: "fresh"`, `cwd: repoRoot`, `output: selectionReportPath`, and `outputMode: "file-only"`.
+1. Validate the selection report before using it: its path must be absolute, resolve inside the current `review_dir`, be a nonempty regular file, and contain `# Review Lane Selection` plus the required selection sections. Retry the same role and path once; then stop setup-blocked if it remains unusable. A persisted report that is usable but semantically invalid (unknown IDs, missing mandatory lanes, unsupported overlap, or absent evidence) is retried once; if still semantically invalid, record the fallback and run only the mode's mandatory lanes.
+1. For every selected lane, resolve one unique absolute `reportPath` under `[review_dir]/context/lanes/[lane-id].md`. Invoke `qrspi-reviewer` with the embedded lane prompt, `context: "fresh"`, `cwd: repoRoot`, `output: reportPath`, and `outputMode: "file-only"`. Parallel calls are allowed only after uniqueness and containment are established.
+1. Before reading or synthesizing a lane report, validate that its absolute path resolves inside this review directory, is a nonempty regular Markdown file, has the lane's required report shape, and contains evidence. Retry a malformed/missing report once at the same path. On a second failure, record an unavailable lane and perform the main reviewer's targeted verification; never claim the lane ran.
+
+The child roles are read-only. They return complete Markdown in their final response; the parent-provided absolute `output` argument is the authoritative persistence target.
+
 ## Rules
 
 - Do not run both review modes in one invocation.
@@ -130,9 +142,9 @@ After resolving implementation review, read and follow:
 - Implementation review reviews code, applies only straightforward code fixes directly, and creates a review-directory QRSPI plan for deeper follow-up work.
 - The focused review must summarize the current design/implementation and its alignment with PRDs, tickets, brainstormed requirements, approved QRSPI constraints, and relevant project guidance in `review.md`.
 - The focused review must load repository guidance for the actual paths under review before judging or editing: enumerate the planning/implementation file paths it intends to change or has changed, read those files (or the nearest concrete files in each touched directory) so path-scoped `AGENTS.md` context is loaded, and explicitly check the outline/plan/implementation against that guidance.
-- Before delegating, call `subagent({ action: "list" })` and use only executable, non-disabled agents returned by discovery. Lane Markdown files are embedded prompts, not independently registered agents. If `scout` or `reviewer` is unavailable, record the lane system as unavailable and stop for setup rather than pretending lanes ran.
-- Lane selection is semantic, not regex-based: first delegate `q-review-lane-selector.md` to a fresh `scout`, persist `[review_dir]/context/lane-selection.md`, and have the main reviewer validate its evidence, known lane IDs, mandatory lanes, and lane budget before launching reviewers.
-- The focused review must delegate the selected lanes through the `subagent` tool. Each child writes one report under `[review_dir]/context/lanes/`; the main reviewer reads all reports, verifies their evidence, and synthesizes them. Never claim a lane ran without a persisted report.
+- Lane Markdown files are embedded prompts, not independently registered agents. Follow the plan-owned lane report contract; never fall back to generic/package roles.
+- Lane selection is semantic, not regex-based: delegate `q-review-lane-selector.md` to fresh `qrspi-review-scout`, validate its persisted selection report, then validate evidence, known IDs, mandatory lanes, and lane budget before launching reviewers.
+- Delegate selected lanes through `qrspi-reviewer`, using one validated plan-owned report path each. The main reviewer reads and verifies every persisted report before synthesis.
 - Planning review always includes intent-fit, simplicity, and project-guidance lanes. Implementation review always includes correctness, simplicity, and project-guidance lanes. The project-guidance reviewer owns discovery and enforcement of applicable root/path-scoped `AGENTS.md`, `.agents/rules/`, `.agents/skills/`, and nearby package docs.
 - There is no fixed lane maximum. Add every materially relevant specialist with a distinct review question. The selector must assign exclusive ownership and remove overlapping lanes rather than suppressing independent high-risk reviews.
 - The simplicity lane seeks eliminations, collapses, and narrower solutions while preserving complete coverage of declared PRD, ADR, design, and repository requirements.

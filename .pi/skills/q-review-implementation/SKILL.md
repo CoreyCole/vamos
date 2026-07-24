@@ -131,17 +131,13 @@ Later stages write `design.md`, optional `design-product.md`, `outline.md`, and 
 
 ## Focused Review Lanes
 
-Call `subagent({ action: "list" })` and confirm `scout` and `reviewer` are executable and non-disabled. Lane Markdown files are embedded prompts, not registered agents.
+Follow the router's **Plan-Owned Lane Report Contract**. Discovery must confirm the explicit project roles `qrspi-review-scout` and `qrspi-reviewer`; generic/package `scout` and `reviewer` are never fallbacks.
 
-First run one fresh-context `scout` using `q-review/agents/q-review-lane-selector.md`. Give it the plan, implementation handoff, actual changed files/hunks or exact stack ranges, verification evidence, and applicable project guidance. Save its report to:
+Create `[review_dir]/context/lanes/`, resolve `selectionReportPath` to the absolute `[review_dir]/context/lane-selection.md`, then run fresh `qrspi-review-scout` with `cwd: repoRoot`, `output: selectionReportPath`, and `outputMode: "file-only"`. Give it the plan, implementation handoff, actual changed files/hunks or exact stack ranges, verification evidence, applicable project guidance, and embedded `q-review/agents/q-review-lane-selector.md`. Validate that the result is absolute, inside `review_dir`, nonempty, and shaped as `# Review Lane Selection` before reading it; retry once at the same path, then stop setup-blocked if unavailable.
 
-```text
-[review_dir]/context/lane-selection.md
-```
+Implementation selection must include `q-review-correctness`, `q-review-simplicity`, and `q-review-project-guidance`. There is no fixed lane maximum: launch every materially relevant specialist that owns a distinct question, and reject overlapping lanes unless the selector explains their non-overlapping responsibilities. Reject unknown lane IDs or selection based only on keywords/file extensions. If selection is malformed, rerun once; if still malformed, run only the three mandatory lanes and record the fallback.
 
-Read that report before launching lanes. Implementation selection must include `q-review-correctness`, `q-review-simplicity`, and `q-review-project-guidance`. There is no fixed lane maximum: launch every materially relevant specialist that owns a distinct question, and reject overlapping lanes unless the selector explains their non-overlapping responsibilities. Reject unknown lane IDs or selection based only on keywords/file extensions. If selection is malformed, rerun once; if still malformed, run only the three mandatory lanes and record the fallback.
-
-For each selected lane, embed its `q-review/agents/q-review-*.md` prompt in a fresh-context `reviewer` task and save the report to `[review_dir]/context/lanes/[lane-id].md`. Run independent lanes in parallel. Reports are advisory: read and verify every candidate before including it. Do not claim a selector or lane ran unless its persisted report exists.
+For each selected lane, resolve a unique absolute `reportPath` under `[review_dir]/context/lanes/[lane-id].md`, embed its `q-review/agents/q-review-*.md` prompt in a fresh `qrspi-reviewer` task, and pass `cwd: repoRoot`, `output: reportPath`, and `outputMode: "file-only"`. Run independent lanes in parallel only after validating all paths are unique and contained in `review_dir`. Validate every report is a substantive regular Markdown file with its lane's required shape and evidence before including it; retry once at the same path, then record the lane unavailable and verify its scope directly. Do not claim a selector or lane ran without its persisted plan-owned report.
 
 ## Process
 
