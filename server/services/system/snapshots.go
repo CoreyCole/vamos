@@ -95,7 +95,7 @@ func (s *Service) captureSnapshot() {
 		return
 	}
 
-	procs := collectTopProcesses(10)
+	procs, _ := collectTopProcesses(10)
 	for _, p := range procs {
 		if err := s.queries.InsertSnapshotProcess(ctx, db.InsertSnapshotProcessParams{
 			SnapshotID: snapshot.ID,

@@ -118,7 +118,7 @@ func (s *Service) HandleHealthJSON(c echo.Context) error {
 		health.LoadAvg = [3]float64{loadAvg.Load1, loadAvg.Load5, loadAvg.Load15}
 	}
 
-	health.Services = collectServices()
+	health.Services, _ = collectServices()
 
 	return c.JSON(http.StatusOK, health)
 }
@@ -131,7 +131,7 @@ func (s *Service) sendSystemMetrics(sse *datastar.ServerSentEventGenerator) erro
 
 // sendServices pushes the services table fragment via PatchElementTempl.
 func (s *Service) sendServices(sse *datastar.ServerSentEventGenerator) error {
-	services := collectServices()
+	services, _ := collectServices()
 	return sse.PatchElementTempl(
 		ServicesTable(services),
 		datastar.WithSelectorID("services-table"),
@@ -141,7 +141,7 @@ func (s *Service) sendServices(sse *datastar.ServerSentEventGenerator) error {
 
 // sendProcesses pushes the process table fragment via PatchElementTempl.
 func (s *Service) sendProcesses(sse *datastar.ServerSentEventGenerator) error {
-	procs := collectTopProcesses(10)
+	procs, _ := collectTopProcesses(10)
 	return sse.PatchElementTempl(
 		ProcessesTable(procs),
 		datastar.WithSelectorID("processes-table"),

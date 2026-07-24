@@ -2,7 +2,9 @@ package system
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -75,14 +77,62 @@ var monitoredServices = []string{
 	"cn-temporal",
 }
 
+// commandOutput is a package-local seam around a command's stdout and exit result.
+type commandOutput struct {
+	reader io.ReadCloser
+	wait   func() error
+}
+
+var startSystemCommand = func(path string, args []string) (commandOutput, error) {
+	devNull, err := os.Open("/dev/null")
+	if err != nil {
+		return commandOutput{}, fmt.Errorf("open /dev/null: %w", err)
+	}
+
+	reader, writer, err := os.Pipe()
+	if err != nil {
+		devNull.Close()
+		return commandOutput{}, fmt.Errorf("create stdout pipe: %w", err)
+	}
+
+	proc, err := os.StartProcess(path, args, &os.ProcAttr{
+		Files: []*os.File{devNull, writer, devNull},
+	})
+	if err != nil {
+		reader.Close()
+		writer.Close()
+		devNull.Close()
+		return commandOutput{}, fmt.Errorf("start process: %w", err)
+	}
+	if err := writer.Close(); err != nil {
+		reader.Close()
+		devNull.Close()
+		return commandOutput{}, fmt.Errorf("close stdout writer: %w", err)
+	}
+
+	return commandOutput{
+		reader: reader,
+		wait: func() error {
+			defer devNull.Close()
+			if _, err := proc.Wait(); err != nil {
+				return fmt.Errorf("wait for process: %w", err)
+			}
+			return nil
+		},
+	}, nil
+}
+
 // collectServices queries systemd for service statuses.
-func collectServices() []ServiceInfo {
+func collectServices() ([]ServiceInfo, error) {
 	services := make([]ServiceInfo, 0, len(monitoredServices))
+	var errs []error
 	for _, name := range monitoredServices {
 		info := ServiceInfo{Name: name, Active: "unknown", Sub: "unknown"}
 
-		// Read properties from systemctl
-		props := readServiceProperties(name)
+		props, err := readServiceProperties(name)
+		if err != nil {
+			errs = append(errs, fmt.Errorf("collect service %q: %w", name, err))
+		}
 		if active, ok := props["ActiveState"]; ok {
 			info.Active = active
 		}
@@ -93,71 +143,53 @@ func collectServices() []ServiceInfo {
 			info.Since = formatTimestamp(since)
 		}
 		if memStr, ok := props["MemoryCurrent"]; ok {
-			if memBytes, err := strconv.ParseUint(
-				memStr,
-				10,
-				64,
-			); err == nil &&
-				memBytes < 1<<62 {
+			if memBytes, err := strconv.ParseUint(memStr, 10, 64); err == nil && memBytes < 1<<62 {
 				info.Memory = humanize.Bytes(memBytes)
 			}
 		}
-
 		services = append(services, info)
 	}
-	return services
+	return services, errors.Join(errs...)
 }
 
 // readServiceProperties reads systemctl --user show properties.
-func readServiceProperties(name string) map[string]string {
+func readServiceProperties(name string) (map[string]string, error) {
 	props := make(map[string]string)
-
-	// Use /proc/self to find systemctl path, fallback to common locations
-	cmd := findExecutable("systemctl")
-	if cmd == "" {
-		return props
+	path := findExecutable("systemctl")
+	if path == "" {
+		return props, fmt.Errorf("find systemctl executable")
 	}
 
-	f, err := os.Open("/dev/null")
-	if err != nil {
-		return props
-	}
-	defer f.Close()
-
-	// Build the command manually using os/exec
-	r, w, err := os.Pipe()
-	if err != nil {
-		return props
-	}
-
-	proc, err := os.StartProcess(cmd, []string{
+	output, err := startSystemCommand(path, []string{
 		"systemctl", "--user", "show", name,
 		"--property=ActiveState,SubState,StateChangeTimestamp,MemoryCurrent",
-	}, &os.ProcAttr{
-		Files: []*os.File{f, w, f},
 	})
 	if err != nil {
-		r.Close()
-		w.Close()
-		return props
+		return props, fmt.Errorf("run systemctl show %q: %w", name, err)
 	}
-	w.Close()
 
-	scanner := bufio.NewScanner(r)
+	scanner := bufio.NewScanner(output.reader)
 	for scanner.Scan() {
-		line := scanner.Text()
-		if k, v, ok := strings.Cut(line, "="); ok {
+		if k, v, ok := strings.Cut(scanner.Text(), "="); ok {
 			props[k] = v
 		}
 	}
-	r.Close()
-	_, _ = proc.Wait()
+	return props, errors.Join(
+		wrapCommandError("read systemctl output", scanner.Err()),
+		wrapCommandError("close systemctl output", output.reader.Close()),
+		wrapCommandError("systemctl show", output.wait()),
+	)
+}
 
-	return props
+func wrapCommandError(operation string, err error) error {
+	if err == nil {
+		return nil
+	}
+	return fmt.Errorf("%s: %w", operation, err)
 }
 
 // findExecutable looks for an executable in common paths.
-func findExecutable(name string) string {
+var findExecutable = func(name string) string {
 	paths := []string{
 		"/usr/bin/" + name,
 		"/bin/" + name,
@@ -172,67 +204,45 @@ func findExecutable(name string) string {
 }
 
 // collectTopProcesses returns the top N processes by memory usage.
-func collectTopProcesses(n int) []ProcessInfo {
-	cmd := findExecutable("ps")
-	if cmd == "" {
-		return nil
+func collectTopProcesses(n int) ([]ProcessInfo, error) {
+	path := findExecutable("ps")
+	if path == "" {
+		return nil, fmt.Errorf("find ps executable")
 	}
 
-	f, err := os.Open("/dev/null")
+	output, err := startSystemCommand(path, []string{"ps", "aux", "--sort=-rss"})
 	if err != nil {
-		return nil
+		return nil, fmt.Errorf("run ps: %w", err)
 	}
-	defer f.Close()
-
-	r, w, err := os.Pipe()
-	if err != nil {
-		return nil
-	}
-
-	proc, err := os.StartProcess(cmd, []string{
-		"ps", "aux", "--sort=-rss",
-	}, &os.ProcAttr{
-		Files: []*os.File{f, w, f},
-	})
-	if err != nil {
-		r.Close()
-		w.Close()
-		return nil
-	}
-	w.Close()
 
 	var procs []ProcessInfo
-	scanner := bufio.NewScanner(r)
-	scanner.Scan() // skip header
-
+	scanner := bufio.NewScanner(output.reader)
+	if !scanner.Scan() {
+		return procs, errors.Join(
+			wrapCommandError("read ps header", scanner.Err()),
+			wrapCommandError("close ps output", output.reader.Close()),
+			wrapCommandError("ps", output.wait()),
+		)
+	}
 	for scanner.Scan() && len(procs) < n {
 		fields := strings.Fields(scanner.Text())
 		if len(fields) < 11 {
 			continue
 		}
-
 		pid, _ := strconv.Atoi(fields[1])
 		cpuPct, _ := strconv.ParseFloat(fields[2], 64)
 		rssKB, _ := strconv.ParseFloat(fields[5], 64)
 		command := strings.Join(fields[10:], " ")
-
-		// Truncate long commands
 		if len(command) > 60 {
 			command = command[:57] + "..."
 		}
-
-		procs = append(procs, ProcessInfo{
-			PID:     pid,
-			User:    fields[0],
-			MemMB:   rssKB / 1024,
-			CPUPct:  cpuPct,
-			Command: command,
-		})
+		procs = append(procs, ProcessInfo{PID: pid, User: fields[0], MemMB: rssKB / 1024, CPUPct: cpuPct, Command: command})
 	}
-	r.Close()
-	_, _ = proc.Wait()
-
-	return procs
+	return procs, errors.Join(
+		wrapCommandError("read ps output", scanner.Err()),
+		wrapCommandError("close ps output", output.reader.Close()),
+		wrapCommandError("ps", output.wait()),
+	)
 }
 
 // collectCrashes scans /var/crash for crash report files.
