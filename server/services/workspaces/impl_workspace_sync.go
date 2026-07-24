@@ -74,7 +74,10 @@ func (s *ImplWorkspaceSyncer) Sync(
 			return
 		}
 		if err != nil {
-			err = errors.Join(err, fmt.Errorf("record workspace sync diagnostic: %w", recordErr))
+			err = errors.Join(
+				err,
+				fmt.Errorf("record workspace sync diagnostic: %w", recordErr),
+			)
 			return
 		}
 		err = recordErr
@@ -117,7 +120,10 @@ func (s *ImplWorkspaceSyncer) Sync(
 		seen.Add(seenKey)
 
 		gitState := InspectImplWorkspaceGit(ctx, ws.CheckoutPath, input.TrunkBranch)
-		before, beforeErr := s.Queries.GetImplWorkspace(ctx, db.GetImplWorkspaceParams{ProjectID: key.ProjectID, WorkspaceSlug: key.Slug})
+		before, beforeErr := s.Queries.GetImplWorkspace(
+			ctx,
+			db.GetImplWorkspaceParams{ProjectID: key.ProjectID, WorkspaceSlug: key.Slug},
+		)
 		if beforeErr != nil && !errors.Is(beforeErr, sql.ErrNoRows) {
 			return ImplWorkspaceSyncResult{}, beforeErr
 		}
@@ -133,18 +139,29 @@ func (s *ImplWorkspaceSyncer) Sync(
 			return ImplWorkspaceSyncResult{}, err
 		}
 		params := implWorkspaceUpsertParams(projectID, ws, gitState, binding)
-		if _, err := s.Queries.ReassignImplWorkspaceCheckoutPathIdentity(ctx, db.ReassignImplWorkspaceCheckoutPathIdentityParams{
-			ProjectID:     params.ProjectID,
-			WorkspaceSlug: params.WorkspaceSlug,
-			CheckoutPath:  params.CheckoutPath,
-		}); err != nil {
-			return ImplWorkspaceSyncResult{}, err
+		if errors.Is(beforeErr, sql.ErrNoRows) {
+			if _, err := s.Queries.ReassignImplWorkspaceCheckoutPathIdentity(
+				ctx,
+				db.ReassignImplWorkspaceCheckoutPathIdentityParams{
+					ProjectID:     params.ProjectID,
+					WorkspaceSlug: params.WorkspaceSlug,
+					CheckoutPath:  params.CheckoutPath,
+				},
+			); err != nil {
+				return ImplWorkspaceSyncResult{}, err
+			}
 		}
 		row, err := s.Queries.UpsertDiscoveredImplWorkspace(ctx, params)
 		if err != nil {
 			return ImplWorkspaceSyncResult{}, err
 		}
-		if err := upsertPlanBindingForImplWorkspace(ctx, s.Queries, projectID, ws, binding); err != nil {
+		if err := upsertPlanBindingForImplWorkspace(
+			ctx,
+			s.Queries,
+			projectID,
+			ws,
+			binding,
+		); err != nil {
 			return ImplWorkspaceSyncResult{}, err
 		}
 		result.Upserted++
@@ -167,7 +184,13 @@ func (s *ImplWorkspaceSyncer) Sync(
 		case ImplWorkspaceEnvActionCreated, ImplWorkspaceEnvActionRepaired:
 			result.RepairedEnv++
 			result.Changed = true
-			if err := s.Queries.RecordImplWorkspaceEnvRepair(ctx, db.RecordImplWorkspaceEnvRepairParams{ProjectID: key.ProjectID, WorkspaceSlug: key.Slug}); err != nil {
+			if err := s.Queries.RecordImplWorkspaceEnvRepair(
+				ctx,
+				db.RecordImplWorkspaceEnvRepairParams{
+					ProjectID:     key.ProjectID,
+					WorkspaceSlug: key.Slug,
+				},
+			); err != nil {
 				return ImplWorkspaceSyncResult{}, err
 			}
 		}
@@ -215,7 +238,13 @@ func (s *ImplWorkspaceSyncer) now() time.Time {
 	return time.Now()
 }
 
-func (s *ImplWorkspaceSyncer) recordSyncDiagnostic(ctx context.Context, input ImplWorkspaceSyncInput, started time.Time, result ImplWorkspaceSyncResult, syncErr error) error {
+func (s *ImplWorkspaceSyncer) recordSyncDiagnostic(
+	ctx context.Context,
+	input ImplWorkspaceSyncInput,
+	started time.Time,
+	result ImplWorkspaceSyncResult,
+	syncErr error,
+) error {
 	finished := s.now()
 	status := "ok"
 	errorText := ""
@@ -232,22 +261,25 @@ func (s *ImplWorkspaceSyncer) recordSyncDiagnostic(ctx context.Context, input Im
 		return err
 	}
 	projectID := firstNonEmpty(input.Discovery.ProjectID, input.ProjectID)
-	return s.Queries.UpsertWorkspaceSyncDiagnostic(ctx, db.UpsertWorkspaceSyncDiagnosticParams{
-		ProjectID:    projectID,
-		SyncKind:     "impl_workspaces",
-		StartedAt:    started,
-		FinishedAt:   sql.NullTime{Time: finished, Valid: true},
-		Status:       status,
-		Error:        errorText,
-		Scanned:      int64(result.Scanned),
-		Discovered:   int64(result.Discovered),
-		Upserted:     int64(result.Upserted),
-		RepairedEnv:  int64(result.RepairedEnv),
-		Merged:       int64(result.Merged),
-		CleanedUp:    int64(result.CleanedUp),
-		Changed:      result.Changed,
-		WarningsJson: string(warningsJSON),
-	})
+	return s.Queries.UpsertWorkspaceSyncDiagnostic(
+		ctx,
+		db.UpsertWorkspaceSyncDiagnosticParams{
+			ProjectID:    projectID,
+			SyncKind:     "impl_workspaces",
+			StartedAt:    started,
+			FinishedAt:   sql.NullTime{Time: finished, Valid: true},
+			Status:       status,
+			Error:        errorText,
+			Scanned:      int64(result.Scanned),
+			Discovered:   int64(result.Discovered),
+			Upserted:     int64(result.Upserted),
+			RepairedEnv:  int64(result.RepairedEnv),
+			Merged:       int64(result.Merged),
+			CleanedUp:    int64(result.CleanedUp),
+			Changed:      result.Changed,
+			WarningsJson: string(warningsJSON),
+		},
+	)
 }
 
 func ReconcileWorkspaceEnv(
@@ -375,7 +407,12 @@ func planDirRelCandidates(planDir string) []string {
 
 func stripPlanArtifactFilename(planDir string) string {
 	switch filepath.Base(planDir) {
-	case "plan.md", "outline.md", "design.md", "design-product.md", "verify.md", "review.md":
+	case "plan.md",
+		"outline.md",
+		"design.md",
+		"design-product.md",
+		"verify.md",
+		"review.md":
 		return filepath.Dir(planDir)
 	default:
 		return planDir
@@ -403,17 +440,20 @@ func upsertPlanBindingForImplWorkspace(
 	if bindingProjectID == "" {
 		return nil
 	}
-	_, err := q.UpsertPlanWorkspaceImplBinding(ctx, db.UpsertPlanWorkspaceImplBindingParams{
-		PlanDirRel:        planDir,
-		ProjectID:         bindingProjectID,
-		WorkspaceSlug:     nullableString(ws.Slug),
-		CheckoutPath:      nullableString(ws.CheckoutPath),
-		Url:               nullableString(ws.URL),
-		Status:            string(ImplWorkspaceStatusActive),
-		BindingSource:     "binding_file",
-		ImplProjectID:     nullableString(projectID),
-		ImplWorkspaceSlug: nullableString(ws.Slug),
-	})
+	_, err := q.UpsertPlanWorkspaceImplBinding(
+		ctx,
+		db.UpsertPlanWorkspaceImplBindingParams{
+			PlanDirRel:        planDir,
+			ProjectID:         bindingProjectID,
+			WorkspaceSlug:     nullableString(ws.Slug),
+			CheckoutPath:      nullableString(ws.CheckoutPath),
+			Url:               nullableString(ws.URL),
+			Status:            string(ImplWorkspaceStatusActive),
+			BindingSource:     "binding_file",
+			ImplProjectID:     nullableString(projectID),
+			ImplWorkspaceSlug: nullableString(ws.Slug),
+		},
+	)
 	return err
 }
 
@@ -430,10 +470,13 @@ func implWorkspaceUpsertParams(
 	if proof.Kind == "" {
 		proof.Kind = MergeProofUnknown
 	}
-	protected := IsProtectedCheckoutRole(ws.CheckoutRole) || ws.IsMain || ws.Slug == mainWorkspaceSlug
+	protected := IsProtectedCheckoutRole(ws.CheckoutRole) || ws.IsMain ||
+		ws.Slug == mainWorkspaceSlug
 	if gitState.Merged && !protected {
 		status = string(ImplWorkspaceStatusMerged)
-		mergeEvidence = nullableString(activeCheckoutMergeEvidence(gitState.Commit, proof))
+		mergeEvidence = nullableString(
+			activeCheckoutMergeEvidence(gitState.Commit, proof),
+		)
 	}
 	params := db.UpsertDiscoveredImplWorkspaceParams{
 		ProjectID:                strings.TrimSpace(projectID),
@@ -530,12 +573,16 @@ func missingCheckoutMergeEvidence(row db.ImplWorkspace, proof MergeProof) string
 	return "missing checkout commit " + commit + " is ancestor of " + ref
 }
 
-func applyCachedMergeProof(state ImplWorkspaceGitState, before db.ImplWorkspace) ImplWorkspaceGitState {
+func applyCachedMergeProof(
+	state ImplWorkspaceGitState,
+	before db.ImplWorkspace,
+) ImplWorkspaceGitState {
 	if state.MergeProof.Strong() || !sameStoredHead(before, state.Commit) {
 		return state
 	}
 	kind := MergeProofKind(strings.TrimSpace(before.CleanupProofKind))
-	if kind != MergeProofAncestor && kind != MergeProofPatchEquivalent && kind != MergeProofCached {
+	if kind != MergeProofAncestor && kind != MergeProofPatchEquivalent &&
+		kind != MergeProofCached {
 		return state
 	}
 	state.Merged = true
@@ -551,7 +598,8 @@ func applyCachedMergeProof(state ImplWorkspaceGitState, before db.ImplWorkspace)
 }
 
 func sameStoredHead(row db.ImplWorkspace, head string) bool {
-	return strings.TrimSpace(nullStringValue(row.CommitHash)) != "" && strings.TrimSpace(nullStringValue(row.CommitHash)) == strings.TrimSpace(head)
+	return strings.TrimSpace(nullStringValue(row.CommitHash)) != "" &&
+		strings.TrimSpace(nullStringValue(row.CommitHash)) == strings.TrimSpace(head)
 }
 
 func nullableString(value string) sql.NullString {
@@ -574,7 +622,10 @@ func (s *ImplWorkspaceSyncer) reconcileMissing(
 	activeSlugs collections.Set[string],
 ) (cleaned, merged int, changed bool, warnings []WorkspaceDiagnostic, err error) {
 	projectID := firstNonEmpty(input.Discovery.ProjectID, input.ProjectID)
-	repaired, err := s.Queries.RepairProtectedImplWorkspaceTerminalStatuses(ctx, projectID)
+	repaired, err := s.Queries.RepairProtectedImplWorkspaceTerminalStatuses(
+		ctx,
+		projectID,
+	)
 	if err != nil {
 		return 0, 0, false, nil, err
 	}
@@ -586,7 +637,9 @@ func (s *ImplWorkspaceSyncer) reconcileMissing(
 	}
 	configured := configuredCheckoutSlugs(input.Discovery)
 	for _, row := range rows {
-		rowKey := implWorkspaceSeenKey(ImplWorkspaceKeyFor(row.ProjectID, row.WorkspaceSlug))
+		rowKey := implWorkspaceSeenKey(
+			ImplWorkspaceKeyFor(row.ProjectID, row.WorkspaceSlug),
+		)
 		if row.Status != string(ImplWorkspaceStatusActive) ||
 			activeSlugs.Has(rowKey) ||
 			configured.Has(row.WorkspaceSlug) ||
@@ -604,9 +657,11 @@ func (s *ImplWorkspaceSyncer) reconcileMissing(
 			n, err := s.Queries.MarkImplWorkspaceMerged(
 				ctx,
 				db.MarkImplWorkspaceMergedParams{
-					ProjectID:                row.ProjectID,
-					WorkspaceSlug:            row.WorkspaceSlug,
-					MergeEvidence:            nullableString(missingCheckoutMergeEvidence(row, proof)),
+					ProjectID:     row.ProjectID,
+					WorkspaceSlug: row.WorkspaceSlug,
+					MergeEvidence: nullableString(
+						missingCheckoutMergeEvidence(row, proof),
+					),
 					CleanupProofKind:         string(proof.Kind),
 					CleanupProofSourceRef:    nullableString(proof.SourceRef),
 					CleanupProofTargetCommit: nullableString(proof.TargetCommit),
@@ -619,23 +674,30 @@ func (s *ImplWorkspaceSyncer) reconcileMissing(
 			changed = changed || n > 0
 			continue
 		}
-		n, err := s.Queries.MarkImplWorkspaceMergeUnknown(ctx, db.MarkImplWorkspaceMergeUnknownParams{
-			ProjectID:             row.ProjectID,
-			WorkspaceSlug:         row.WorkspaceSlug,
-			CleanupProofSourceRef: nullableString(proof.SourceRef),
-			CleanupRiskReason:     nullableString(proof.RiskReason),
-			MergeEvidence:         nullableString(proof.RiskReason),
-		})
+		n, err := s.Queries.MarkImplWorkspaceMergeUnknown(
+			ctx,
+			db.MarkImplWorkspaceMergeUnknownParams{
+				ProjectID:             row.ProjectID,
+				WorkspaceSlug:         row.WorkspaceSlug,
+				CleanupProofSourceRef: nullableString(proof.SourceRef),
+				CleanupRiskReason:     nullableString(proof.RiskReason),
+				MergeEvidence:         nullableString(proof.RiskReason),
+			},
+		)
 		if err != nil {
 			return cleaned, merged, changed, warnings, err
 		}
 		if n > 0 {
 			warnings = append(warnings, WorkspaceDiagnostic{
-				Source:        WorkspaceDiagnosticSourceSync,
-				Severity:      WorkspaceDiagnosticWarning,
-				Code:          "merge_proof_unknown",
-				Message:       "Scheduled sync could not prove this missing checkout is merged.",
-				Detail:        firstNonEmpty(proof.RiskReason, proof.Detail, "merge proof unavailable"),
+				Source:   WorkspaceDiagnosticSourceSync,
+				Severity: WorkspaceDiagnosticWarning,
+				Code:     "merge_proof_unknown",
+				Message:  "Scheduled sync could not prove this missing checkout is merged.",
+				Detail: firstNonEmpty(
+					proof.RiskReason,
+					proof.Detail,
+					"merge proof unavailable",
+				),
 				ProjectID:     row.ProjectID,
 				WorkspaceSlug: row.WorkspaceSlug,
 				CheckoutPath:  row.CheckoutPath,
@@ -681,7 +743,8 @@ func rowInDiscoveryScope(row db.ImplWorkspace, cfg ImplWorkspaceDiscoveryConfig)
 	}
 	cleanParent := cleanPathKey(parent)
 	cleanCheckout := cleanPathKey(checkout)
-	if cleanParent == "" || cleanCheckout == "" || strings.TrimPrefix(cleanCheckout, cleanParent) == cleanCheckout {
+	if cleanParent == "" || cleanCheckout == "" ||
+		strings.TrimPrefix(cleanCheckout, cleanParent) == cleanCheckout {
 		return false
 	}
 	rel, err := filepath.Rel(parent, checkout)
@@ -716,7 +779,10 @@ func implWorkspaceRowChanged(before, after db.ImplWorkspace) bool {
 		!nullStringsEqual(before.MergeEvidence, after.MergeEvidence) ||
 		before.CleanupProofKind != after.CleanupProofKind ||
 		!nullStringsEqual(before.CleanupProofSourceRef, after.CleanupProofSourceRef) ||
-		!nullStringsEqual(before.CleanupProofTargetCommit, after.CleanupProofTargetCommit) ||
+		!nullStringsEqual(
+			before.CleanupProofTargetCommit,
+			after.CleanupProofTargetCommit,
+		) ||
 		!nullStringsEqual(before.CleanupRiskReason, after.CleanupRiskReason) ||
 		!nullStringsEqual(before.GitDetail, after.GitDetail) ||
 		before.ActivityHash != after.ActivityHash ||

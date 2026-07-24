@@ -183,14 +183,7 @@ RETURNING * ;
 UPDATE impl_workspaces
 SET project_id = sqlc.arg ('project_id'),
 workspace_slug = sqlc.arg ('workspace_slug')
-WHERE impl_workspaces.checkout_path = sqlc.arg ('checkout_path')
-AND NOT (project_id = sqlc.arg ('project_id') AND workspace_slug = sqlc.arg ('workspace_slug'))
-AND NOT EXISTS (
-SELECT 1
-FROM impl_workspaces target
-WHERE target.project_id = sqlc.arg ('project_id')
-AND target.workspace_slug = sqlc.arg ('workspace_slug')
-) ;
+WHERE impl_workspaces.checkout_path = sqlc.arg ('checkout_path') ;
 
 -- name: MarkImplWorkspaceCleanedUp :execrows
 UPDATE impl_workspaces

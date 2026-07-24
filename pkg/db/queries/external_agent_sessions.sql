@@ -17,7 +17,7 @@ VALUES (
     sqlc.narg('model'),
     sqlc.narg('title')
 )
-RETURNING * ;
+RETURNING *;
 
 -- name: LinkExternalAgentSession :one
 INSERT INTO chat_session_external_links (
@@ -27,9 +27,9 @@ external_agent_session_id,
 link_mode
 )
 VALUES (
-sqlc.arg ('id'),
-sqlc.arg ('chat_session_id'),
-sqlc.arg ('external_agent_session_id'),
-sqlc.arg ('link_mode')
+sqlc.arg('id'),
+sqlc.arg('chat_session_id'),
+sqlc.arg('external_agent_session_id'),
+sqlc.arg('link_mode')
 )
-RETURNING * ;
+RETURNING *;

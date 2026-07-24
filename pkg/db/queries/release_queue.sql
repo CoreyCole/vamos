@@ -33,25 +33,25 @@ VALUES (
     sqlc.arg('error_message'),
     sqlc.arg('payload_json')
 )
-RETURNING * ;
+RETURNING *;
 
 -- name: GetReleaseQueueItem :one
 SELECT *
 FROM release_queue_items
-WHERE id = sqlc.arg ('id') ;
+WHERE id = sqlc.arg('id');
 
 -- name: ListActiveReleaseQueueItems :many
 SELECT *
 FROM release_queue_items
 WHERE status IN ('pending', 'running')
-ORDER BY created_at ASC, id ASC ;
+ORDER BY created_at ASC, id ASC;
 
 -- name: ListRecentReleaseQueueItems :many
 SELECT *
 FROM release_queue_items
 WHERE status IN ('succeeded', 'failed', 'canceled')
 ORDER BY finished_at DESC, created_at DESC, id DESC
-LIMIT sqlc.arg ('limit') ;
+LIMIT sqlc.arg('limit');
 
 -- name: ClaimNextPendingReleaseQueueItem :one
 UPDATE release_queue_items
@@ -65,25 +65,25 @@ WHERE status = 'pending'
 ORDER BY created_at ASC, id ASC
 LIMIT 1
 )
-RETURNING * ;
+RETURNING *;
 
 -- name: MarkReleaseQueueItemRunning :one
 UPDATE release_queue_items
 SET status = 'running',
-current_node_id = sqlc.arg ('current_node_id'),
+current_node_id = sqlc.arg('current_node_id'),
 started_at = COALESCE (started_at, CURRENT_TIMESTAMP),
 updated_at = CURRENT_TIMESTAMP
-WHERE id = sqlc.arg ('id')
-RETURNING * ;
+WHERE id = sqlc.arg('id')
+RETURNING *;
 
 -- name: MarkReleaseQueueItemTerminal :one
 UPDATE release_queue_items
-SET status = sqlc.arg ('status'),
-error_message = sqlc.arg ('error_message'),
+SET status = sqlc.arg('status'),
+error_message = sqlc.arg('error_message'),
 finished_at = COALESCE (finished_at, CURRENT_TIMESTAMP),
 updated_at = CURRENT_TIMESTAMP
-WHERE id = sqlc.arg ('id')
-RETURNING * ;
+WHERE id = sqlc.arg('id')
+RETURNING *;
 
 -- name: AppendReleaseQueueEvent :one
 INSERT INTO release_queue_events (
@@ -94,17 +94,17 @@ message,
 payload_json
 )
 VALUES (
-sqlc.arg ('item_id'),
-sqlc.arg ('level'),
-sqlc.arg ('node_id'),
-sqlc.arg ('message'),
-sqlc.arg ('payload_json')
+sqlc.arg('item_id'),
+sqlc.arg('level'),
+sqlc.arg('node_id'),
+sqlc.arg('message'),
+sqlc.arg('payload_json')
 )
-RETURNING * ;
+RETURNING *;
 
 -- name: ListReleaseQueueEvents :many
 SELECT *
 FROM release_queue_events
-WHERE item_id = sqlc.arg ('item_id')
+WHERE item_id = sqlc.arg('item_id')
 ORDER BY created_at ASC, id ASC
-LIMIT sqlc.arg ('limit') ;
+LIMIT sqlc.arg('limit');

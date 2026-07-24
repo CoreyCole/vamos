@@ -19,22 +19,22 @@ VALUES (
     sqlc.arg('body_markdown'),
     sqlc.arg('status')
 )
-RETURNING * ;
+RETURNING *;
 
 -- name: ResolveChatAnnotation :exec
 UPDATE chat_annotations
 SET status = 'resolved', updated_at = CURRENT_TIMESTAMP
-WHERE id = sqlc.arg ('id') ;
+WHERE id = sqlc.arg('id');
 
 -- name: ListChatAnnotationsBySession :many
 SELECT *
 FROM chat_annotations
-WHERE session_id = sqlc.arg ('session_id')
-ORDER BY created_at ASC ;
+WHERE session_id = sqlc.arg('session_id')
+ORDER BY created_at ASC;
 
 -- name: ListOpenChatAnnotationsByIDs :many
 SELECT *
 FROM chat_annotations
 WHERE id IN (sqlc.slice ('ids'))
 AND status = 'open'
-ORDER BY created_at ASC ;
+ORDER BY created_at ASC;

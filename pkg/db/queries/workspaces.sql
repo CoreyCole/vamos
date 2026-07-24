@@ -23,81 +23,81 @@ VALUES (
     sqlc.narg('selected_thread_id'),
     sqlc.narg('selected_doc_path')
 )
-RETURNING * ;
+RETURNING *;
 
 -- name: GetWorkspaceForUser :one
 SELECT *
 FROM workspaces
-WHERE id = sqlc.arg ('id')
-AND user_email = sqlc.arg ('user_email')
-AND archived_at IS NULL ;
+WHERE id = sqlc.arg('id')
+AND user_email = sqlc.arg('user_email')
+AND archived_at IS NULL;
 
 -- name: GetWorkspace :one
 SELECT *
 FROM workspaces
-WHERE id = sqlc.arg ('id')
-AND archived_at IS NULL ;
+WHERE id = sqlc.arg('id')
+AND archived_at IS NULL;
 
 -- name: ListWorkspaces :many
 SELECT *
 FROM workspaces
 WHERE archived_at IS NULL
 ORDER BY updated_at DESC
-LIMIT sqlc.arg ('limit') ;
+LIMIT sqlc.arg('limit');
 
 -- name: ListWorkspacesForUser :many
 SELECT *
 FROM workspaces
-WHERE user_email = sqlc.arg ('user_email')
+WHERE user_email = sqlc.arg('user_email')
 AND archived_at IS NULL
 ORDER BY updated_at DESC
-LIMIT sqlc.arg ('limit') ;
+LIMIT sqlc.arg('limit');
 
 -- name: FindWorkspaceByRootDocPathForUser :one
 SELECT *
 FROM workspaces
-WHERE user_email = sqlc.arg ('user_email')
-AND root_doc_path = sqlc.arg ('root_doc_path')
+WHERE user_email = sqlc.arg('user_email')
+AND root_doc_path = sqlc.arg('root_doc_path')
 AND archived_at IS NULL
 ORDER BY updated_at DESC
-LIMIT 1 ;
+LIMIT 1;
 
 -- name: FindWorkspaceByRootDocPath :one
 SELECT *
 FROM workspaces
-WHERE root_doc_path = sqlc.arg ('root_doc_path')
+WHERE root_doc_path = sqlc.arg('root_doc_path')
 AND archived_at IS NULL
 ORDER BY updated_at DESC
-LIMIT 1 ;
+LIMIT 1;
 
 -- name: UpdateWorkspaceRootDocPathForTest :exec
 UPDATE workspaces
-SET root_doc_path = sqlc.arg ('root_doc_path'),
+SET root_doc_path = sqlc.arg('root_doc_path'),
 updated_at = CURRENT_TIMESTAMP
-WHERE id = sqlc.arg ('id') ;
+WHERE id = sqlc.arg('id');
 
 -- name: UpdateWorkspaceSelectedThread :exec
 UPDATE workspaces
-SET selected_thread_id = sqlc.narg ('selected_thread_id'),
+SET selected_thread_id = sqlc.narg('selected_thread_id'),
 updated_at = CURRENT_TIMESTAMP
-WHERE id = sqlc.arg ('id') ;
+WHERE id = sqlc.arg('id');
 
 -- name: UpdateWorkspaceSelectedDoc :exec
 UPDATE workspaces
-SET selected_doc_path = sqlc.narg ('selected_doc_path'),
+SET selected_doc_path = sqlc.narg('selected_doc_path'),
 updated_at = CURRENT_TIMESTAMP
-WHERE id = sqlc.arg ('id') ;
+WHERE id = sqlc.arg('id');
 
 -- name: UpdateWorkspaceWorkflowState :exec
 UPDATE workspaces
-SET workflow_type = sqlc.arg ('workflow_type'),
-workflow_state_json = sqlc.narg ('workflow_state_json'),
+SET workflow_type = sqlc.arg('workflow_type'),
+workflow_state_json = sqlc.narg('workflow_state_json'),
 updated_at = CURRENT_TIMESTAMP
-WHERE id = sqlc.arg ('id') ;
+WHERE id = sqlc.arg('id');
 
 -- name: UpdateWorkspaceCurrentSession :exec
 UPDATE workspaces
-SET current_session_id = sqlc.narg ('current_session_id'),
-current_branch_id = sqlc.narg ('current_branch_id'),
+SET current_session_id = sqlc.narg('current_session_id'),
+current_branch_id = sqlc.narg('current_branch_id'),
 updated_at = CURRENT_TIMESTAMP
-WHERE id = sqlc.arg ('id') ;
+WHERE id = sqlc.arg('id');

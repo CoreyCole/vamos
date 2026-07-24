@@ -37,4 +37,4 @@ workspace_id = excluded.workspace_id,
 thread_id = excluded.thread_id,
 run_id = excluded.run_id,
 updated_at = CURRENT_TIMESTAMP
-RETURNING * ;
+RETURNING *;

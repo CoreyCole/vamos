@@ -25,33 +25,33 @@ VALUES (
     sqlc.narg('payload_json'),
     sqlc.narg('event_key')
 )
-RETURNING * ;
+RETURNING *;
 
 -- name: GetWorkspaceEventByKey :one
 SELECT *
 FROM workspace_events
-WHERE workspace_id = sqlc.arg ('workspace_id')
-AND event_key = sqlc.arg ('event_key') ;
+WHERE workspace_id = sqlc.arg('workspace_id')
+AND event_key = sqlc.arg('event_key');
 
 -- name: ListWorkspaceEventsAfter :many
 SELECT *
 FROM workspace_events
-WHERE workspace_id = sqlc.arg ('workspace_id')
-AND id > sqlc.arg ('after_id')
+WHERE workspace_id = sqlc.arg('workspace_id')
+AND id > sqlc.arg('after_id')
 ORDER BY id ASC
-LIMIT sqlc.arg ('limit') ;
+LIMIT sqlc.arg('limit');
 
 -- name: ListWorkspaceEvents :many
 SELECT *
 FROM workspace_events
-WHERE workspace_id = sqlc.arg ('workspace_id')
+WHERE workspace_id = sqlc.arg('workspace_id')
 ORDER BY id ASC
-LIMIT sqlc.arg ('limit') ;
+LIMIT sqlc.arg('limit');
 
 -- name: ListRecentWorkspaceLogEvents :many
 SELECT *
 FROM workspace_events
-WHERE workspace_id = sqlc.arg ('workspace_id')
+WHERE workspace_id = sqlc.arg('workspace_id')
 AND event_type IN (
 'artifact_created',
 'artifact_updated',
@@ -64,4 +64,4 @@ AND event_type IN (
 'run_failed'
 )
 ORDER BY id DESC
-LIMIT sqlc.arg ('limit') ;
+LIMIT sqlc.arg('limit');

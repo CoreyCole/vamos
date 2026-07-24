@@ -169,7 +169,8 @@ func DiscoverImplWorkspaceBinding(
 		DiscoveredAt:  discoveredAt,
 	}
 	expected := expectedImplementationCheckoutPath(planDir, cfg)
-	if isValidImplCheckout(expected, cfg) && discoveryConfigMatchesProject(cfg, projectID) {
+	if isValidImplCheckout(expected, cfg) &&
+		discoveryConfigMatchesProject(cfg, projectID) {
 		binding.WorkspaceSlug = slug
 		binding.CheckoutPath = filepath.Clean(expected)
 		binding.URL = workspaces.WorkspaceURL(slug, cfg.Domain)
@@ -177,7 +178,11 @@ func DiscoverImplWorkspaceBinding(
 		binding.BindingSource = "expected_path"
 		return binding
 	}
-	path, url, checkoutSlug, source, ok := discoverBoundOrSyncedImplWorkspaceForProject(planDir, projectID, cfg)
+	path, url, checkoutSlug, source, ok := discoverBoundOrSyncedImplWorkspaceForProject(
+		planDir,
+		projectID,
+		cfg,
+	)
 	if !ok {
 		return binding
 	}
@@ -227,21 +232,36 @@ func discoverBoundOrSyncedImplWorkspaceForProject(
 		binding, err := workspaces.ReadPlanWorkspaceBinding(
 			workspaces.PlanWorkspaceBindingPath(checkoutPath),
 		)
-		if err == nil && workspaces.PlanWorkspaceBindingMatchesProject(binding, planDir, projectID) {
-			return filepath.Clean(checkoutPath), workspaces.WorkspaceURL(checkoutSlug, cfg.Domain), checkoutSlug, "binding_file", true
+		if err == nil &&
+			workspaces.PlanWorkspaceBindingMatchesProject(binding, planDir, projectID) {
+			return filepath.Clean(
+					checkoutPath,
+				), workspaces.WorkspaceURL(
+					checkoutSlug,
+					cfg.Domain,
+				), checkoutSlug, "binding_file", true
 		}
-		if syncedFallback == "" && discoveryConfigMatchesProject(cfg, projectID) && syncedPlanDirExists(checkoutPath, planDir) {
+		if syncedFallback == "" && discoveryConfigMatchesProject(cfg, projectID) &&
+			syncedPlanDirExists(checkoutPath, planDir) {
 			syncedFallback = checkoutPath
 			syncedFallbackSlug = checkoutSlug
 		}
 	}
 	if syncedFallback != "" {
-		return filepath.Clean(syncedFallback), workspaces.WorkspaceURL(syncedFallbackSlug, cfg.Domain), syncedFallbackSlug, "synced_plan_dir", true
+		return filepath.Clean(
+				syncedFallback,
+			), workspaces.WorkspaceURL(
+				syncedFallbackSlug,
+				cfg.Domain,
+			), syncedFallbackSlug, "synced_plan_dir", true
 	}
 	return "", "", "", "", false
 }
 
-func discoveryConfigMatchesProject(cfg workspaces.ImplWorkspaceDiscoveryConfig, projectID string) bool {
+func discoveryConfigMatchesProject(
+	cfg workspaces.ImplWorkspaceDiscoveryConfig,
+	projectID string,
+) bool {
 	configuredProject := strings.TrimSpace(cfg.ProjectID)
 	projectID = strings.TrimSpace(projectID)
 	return configuredProject == "" || projectID == "" || configuredProject == projectID
@@ -333,13 +353,26 @@ func discoverPlanWorkspaceImplBindings(
 		projectIDs = append(projectIDs, primaryProject)
 	}
 	for _, related := range relatedProjects {
-		if related = strings.TrimSpace(related); related != "" && related != primaryProject {
+		if related = strings.TrimSpace(
+			related,
+		); related != "" &&
+			related != primaryProject {
 			projectIDs = append(projectIDs, related)
 		}
 	}
 	bindings := make([]DiscoveredPlanWorkspaceImplBinding, 0, len(projectIDs))
 	for _, projectID := range projectIDs {
-		bindings = append(bindings, DiscoverImplWorkspaceBinding(planDir, planDirRel, projectID, slug, cfg, discoveredAt))
+		bindings = append(
+			bindings,
+			DiscoverImplWorkspaceBinding(
+				planDir,
+				planDirRel,
+				projectID,
+				slug,
+				cfg,
+				discoveredAt,
+			),
+		)
 	}
 	return bindings
 }
@@ -408,8 +441,19 @@ func (s PlanWorkspaceScanner) Scan(
 			}
 			discoveredAt := s.now()
 			primaryProject := firstNonEmpty(frontmatter.Project, s.ProjectID)
-			relatedProjects := planworkspace.NormalizeRelatedProjects(primaryProject, frontmatter.RelatedProjects)
-			implBindings := discoverPlanWorkspaceImplBindings(path, rel, primaryProject, relatedProjects, slug, s.ImplWorkspaces, discoveredAt)
+			relatedProjects := planworkspace.NormalizeRelatedProjects(
+				primaryProject,
+				frontmatter.RelatedProjects,
+			)
+			implBindings := discoverPlanWorkspaceImplBindings(
+				path,
+				rel,
+				primaryProject,
+				relatedProjects,
+				slug,
+				s.ImplWorkspaces,
+				discoveredAt,
+			)
 			item := DiscoveredPlanWorkspace{
 				ProjectID:               primaryProject,
 				RelatedProjects:         relatedProjects,
@@ -485,12 +529,21 @@ func (s *PlanWorkspaceSyncer) Sync(
 				Valid: true,
 			}
 		}
-		rolesBefore, rolesBeforeErr := s.Queries.ListPlanWorkspaceProjects(ctx, item.PlanDirRel)
+		rolesBefore, rolesBeforeErr := s.Queries.ListPlanWorkspaceProjects(
+			ctx,
+			item.PlanDirRel,
+		)
 		row, err := s.Queries.UpsertDiscoveredPlanWorkspace(ctx, params)
 		if err != nil {
 			return PlanWorkspaceDiscoveryResult{}, err
 		}
-		rolesChanged, err := syncPlanWorkspaceProjects(ctx, s.Queries, item, rolesBefore, rolesBeforeErr)
+		rolesChanged, err := syncPlanWorkspaceProjects(
+			ctx,
+			s.Queries,
+			item,
+			rolesBefore,
+			rolesBeforeErr,
+		)
 		if err != nil {
 			return PlanWorkspaceDiscoveryResult{}, err
 		}
@@ -509,7 +562,10 @@ func (s *PlanWorkspaceSyncer) Sync(
 		if item.ArtifactUpdatedAt.After(result.MaxArtifactUpdatedAt) {
 			result.MaxArtifactUpdatedAt = item.ArtifactUpdatedAt
 		}
-		indexedSessions, sessionIndexChanged, err := s.syncPlanAgentSessions(ctx, item.PlanDir)
+		indexedSessions, sessionIndexChanged, err := s.syncPlanAgentSessions(
+			ctx,
+			item.PlanDir,
+		)
 		if err != nil {
 			return PlanWorkspaceDiscoveryResult{}, err
 		}
@@ -528,7 +584,8 @@ func (s *PlanWorkspaceSyncer) Sync(
 			result.Restored++
 			result.Changed = true
 		}
-		if before.ProjectID != row.ProjectID || before.PlanDir != row.PlanDir || before.Label != row.Label ||
+		if before.ProjectID != row.ProjectID || before.PlanDir != row.PlanDir ||
+			before.Label != row.Label ||
 			before.QrspiLifecycle != row.QrspiLifecycle ||
 			before.QrspiClosedReason != row.QrspiClosedReason ||
 			!nullTimesEqual(
@@ -563,7 +620,10 @@ func (s *PlanWorkspaceSyncer) syncPlanAgentSessions(
 	ctx context.Context,
 	planDir string,
 ) (int, bool, error) {
-	items, err := DiscoverPlanAgentSessionsUnderThoughts(strings.TrimSpace(s.Scanner.ThoughtsRoot), planDir)
+	items, err := DiscoverPlanAgentSessionsUnderThoughts(
+		strings.TrimSpace(s.Scanner.ThoughtsRoot),
+		planDir,
+	)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
 			return 0, false, nil
@@ -572,38 +632,48 @@ func (s *PlanWorkspaceSyncer) syncPlanAgentSessions(
 	}
 	changed := false
 	for _, item := range items {
-		before, beforeErr := s.Queries.GetAgentSessionByPath(ctx, nullableString(item.Path))
+		before, beforeErr := s.Queries.GetAgentSessionByPath(
+			ctx,
+			nullableString(item.Path),
+		)
 		metadata, _ := jsonMarshalString(item)
-		row, err := s.Queries.UpsertAgentSessionIndex(ctx, db.UpsertAgentSessionIndexParams{
-			ID:                     uuid.NewString(),
-			IdentityKind:           "plan_owned",
-			ArtifactPath:           nullableString(item.Path),
-			PlanDir:                nullableString(item.PlanDir),
-			ParentPlanDir:          nullableString(item.ParentPlanDir),
-			SourceReviewDir:        nullableString(item.SourceReviewDir),
-			Agent:                  item.Agent,
-			ExternalSessionID:      nullableString(item.SessionID),
-			ParentSessionID:        nullableString(item.ContinuedFromSessionID),
-			Cwd:                    nullableString(item.CWD),
-			WorkflowID:             nullableString(item.WorkflowID),
-			WorkflowNodeID:         nullableString(item.NodeID),
-			ContinuedFromSessionID: nullableString(item.ContinuedFromSessionID),
-			ForkedFromSessionID:    nullableString(item.ForkedFromSessionID),
-			FileSize:               item.Size,
-			FileMtime:              sql.NullTime{Time: item.MTime, Valid: !item.MTime.IsZero()},
-			FileHash:               nullableString(item.Hash),
-			LastIndexedOffset:      item.LastOffset,
-			ProjectionState:        "needs_hydration",
-			ProjectedThreadID:      sql.NullString{},
-			IndexedByUserEmail:     sql.NullString{},
-			AttachedWorkspaceID:    sql.NullString{},
-			LastError:              sql.NullString{},
-			MetadataJson:           nullableString(metadata),
-		})
+		row, err := s.Queries.UpsertAgentSessionIndex(
+			ctx,
+			db.UpsertAgentSessionIndexParams{
+				ID:                     uuid.NewString(),
+				IdentityKind:           "plan_owned",
+				ArtifactPath:           nullableString(item.Path),
+				PlanDir:                nullableString(item.PlanDir),
+				ParentPlanDir:          nullableString(item.ParentPlanDir),
+				SourceReviewDir:        nullableString(item.SourceReviewDir),
+				Agent:                  item.Agent,
+				ExternalSessionID:      nullableString(item.SessionID),
+				ParentSessionID:        nullableString(item.ContinuedFromSessionID),
+				Cwd:                    nullableString(item.CWD),
+				WorkflowID:             nullableString(item.WorkflowID),
+				WorkflowNodeID:         nullableString(item.NodeID),
+				ContinuedFromSessionID: nullableString(item.ContinuedFromSessionID),
+				ForkedFromSessionID:    nullableString(item.ForkedFromSessionID),
+				FileSize:               item.Size,
+				FileMtime: sql.NullTime{
+					Time:  item.MTime,
+					Valid: !item.MTime.IsZero(),
+				},
+				FileHash:            nullableString(item.Hash),
+				LastIndexedOffset:   item.LastOffset,
+				ProjectionState:     "needs_hydration",
+				ProjectedThreadID:   sql.NullString{},
+				IndexedByUserEmail:  sql.NullString{},
+				AttachedWorkspaceID: sql.NullString{},
+				LastError:           sql.NullString{},
+				MetadataJson:        nullableString(metadata),
+			},
+		)
 		if err != nil {
 			return 0, false, err
 		}
-		if errors.Is(beforeErr, sql.ErrNoRows) || beforeErr == nil && agentSessionIndexChanged(before, row) {
+		if errors.Is(beforeErr, sql.ErrNoRows) ||
+			beforeErr == nil && agentSessionIndexChanged(before, row) {
 			changed = true
 		}
 		if beforeErr != nil && !errors.Is(beforeErr, sql.ErrNoRows) {
@@ -782,21 +852,25 @@ func syncPlanWorkspaceImplBindings(
 		if strings.TrimSpace(binding.ProjectID) == "" {
 			continue
 		}
-		row, err := q.UpsertPlanWorkspaceImplBinding(ctx, db.UpsertPlanWorkspaceImplBindingParams{
-			PlanDirRel:        item.PlanDirRel,
-			ProjectID:         binding.ProjectID,
-			WorkspaceSlug:     nullableString(binding.WorkspaceSlug),
-			CheckoutPath:      nullableString(binding.CheckoutPath),
-			Url:               nullableString(binding.URL),
-			Status:            binding.Status,
-			BindingSource:     binding.BindingSource,
-			ImplProjectID:     nullableString(binding.ImplProjectID),
-			ImplWorkspaceSlug: nullableString(binding.ImplWorkspaceSlug),
-		})
+		row, err := q.UpsertPlanWorkspaceImplBinding(
+			ctx,
+			db.UpsertPlanWorkspaceImplBindingParams{
+				PlanDirRel:        item.PlanDirRel,
+				ProjectID:         binding.ProjectID,
+				WorkspaceSlug:     nullableString(binding.WorkspaceSlug),
+				CheckoutPath:      nullableString(binding.CheckoutPath),
+				Url:               nullableString(binding.URL),
+				Status:            binding.Status,
+				BindingSource:     binding.BindingSource,
+				ImplProjectID:     nullableString(binding.ImplProjectID),
+				ImplWorkspaceSlug: nullableString(binding.ImplWorkspaceSlug),
+			},
+		)
 		if err != nil {
 			return false, err
 		}
-		if before, ok := beforeByProject[row.ProjectID]; !ok || planWorkspaceImplBindingChanged(before, row) {
+		if before, ok := beforeByProject[row.ProjectID]; !ok ||
+			planWorkspaceImplBindingChanged(before, row) {
 			changed = true
 		}
 	}
@@ -830,18 +904,21 @@ func syncPlanWorkspaceProjects(
 	primary := strings.TrimSpace(item.ProjectID)
 	if primary != "" {
 		projectIDs = append(projectIDs, primary)
-		if _, err := q.ArchivePlanWorkspacePrimaryProjectsExcept(ctx, db.ArchivePlanWorkspacePrimaryProjectsExceptParams{
-			PlanDirRel: item.PlanDirRel,
-			ProjectID:  primary,
-		}); err != nil {
+		if _, err := q.ArchivePlanWorkspacePrimaryProjects(
+			ctx,
+			item.PlanDirRel,
+		); err != nil {
 			return false, err
 		}
-		if _, err := q.UpsertPlanWorkspaceProject(ctx, db.UpsertPlanWorkspaceProjectParams{
-			PlanDirRel:     item.PlanDirRel,
-			ProjectID:      primary,
-			Role:           "primary",
-			DeclaredSource: item.DeclaredSource,
-		}); err != nil {
+		if _, err := q.UpsertPlanWorkspaceProject(
+			ctx,
+			db.UpsertPlanWorkspaceProjectParams{
+				PlanDirRel:     item.PlanDirRel,
+				ProjectID:      primary,
+				Role:           "primary",
+				DeclaredSource: item.DeclaredSource,
+			},
+		); err != nil {
 			return false, err
 		}
 	}
@@ -851,20 +928,26 @@ func syncPlanWorkspaceProjects(
 			continue
 		}
 		projectIDs = append(projectIDs, related)
-		if _, err := q.UpsertPlanWorkspaceProject(ctx, db.UpsertPlanWorkspaceProjectParams{
-			PlanDirRel:     item.PlanDirRel,
-			ProjectID:      related,
-			Role:           "related",
-			DeclaredSource: item.DeclaredSource,
-		}); err != nil {
+		if _, err := q.UpsertPlanWorkspaceProject(
+			ctx,
+			db.UpsertPlanWorkspaceProjectParams{
+				PlanDirRel:     item.PlanDirRel,
+				ProjectID:      related,
+				Role:           "related",
+				DeclaredSource: item.DeclaredSource,
+			},
+		); err != nil {
 			return false, err
 		}
 	}
 	if len(projectIDs) > 0 {
-		if _, err := q.ArchiveMissingPlanWorkspaceProjects(ctx, db.ArchiveMissingPlanWorkspaceProjectsParams{
-			PlanDirRel: item.PlanDirRel,
-			ProjectIds: projectIDs,
-		}); err != nil {
+		if _, err := q.ArchiveMissingPlanWorkspaceProjects(
+			ctx,
+			db.ArchiveMissingPlanWorkspaceProjectsParams{
+				PlanDirRel: item.PlanDirRel,
+				ProjectIds: projectIDs,
+			},
+		); err != nil {
 			return false, err
 		}
 	}
@@ -899,7 +982,9 @@ func planWorkspaceLabel(planDir string) string {
 	return label
 }
 
-func readPlanWorkspaceFrontmatter(planDir string) (planworkspace.PlanWorkspaceFrontmatter, error) {
+func readPlanWorkspaceFrontmatter(
+	planDir string,
+) (planworkspace.PlanWorkspaceFrontmatter, error) {
 	for _, name := range []string{"plan.md", "outline.md", "design.md", "AGENTS.md"} {
 		candidate := filepath.Join(planDir, name)
 		data, err := os.ReadFile(candidate)
@@ -918,7 +1003,9 @@ func readPlanWorkspaceFrontmatter(planDir string) (planworkspace.PlanWorkspaceFr
 			return fm, nil
 		}
 	}
-	return planworkspace.PlanWorkspaceFrontmatter{QRSPIStage: planworkspace.QRSPIStageQuestion}, nil
+	return planworkspace.PlanWorkspaceFrontmatter{
+		QRSPIStage: planworkspace.QRSPIStageQuestion,
+	}, nil
 }
 
 func planWorkspaceFrontmatterHasSignal(fm planworkspace.PlanWorkspaceFrontmatter) bool {

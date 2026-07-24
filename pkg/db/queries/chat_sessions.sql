@@ -23,23 +23,23 @@ VALUES (
     sqlc.arg('workflow_attempt'),
     sqlc.arg('topology_kind')
 )
-RETURNING * ;
+RETURNING *;
 
 -- name: GetChatSession :one
 SELECT *
 FROM chat_sessions
-WHERE id = sqlc.arg ('id')
-AND archived_at IS NULL ;
+WHERE id = sqlc.arg('id')
+AND archived_at IS NULL;
 
 -- name: ListChatSessionsByWorkspace :many
 SELECT *
 FROM chat_sessions
-WHERE workspace_id = sqlc.arg ('workspace_id')
+WHERE workspace_id = sqlc.arg('workspace_id')
 AND archived_at IS NULL
-ORDER BY updated_at DESC ;
+ORDER BY updated_at DESC;
 
 -- name: UpdateChatSessionProjectionSeq :exec
 UPDATE chat_sessions
-SET current_projection_seq = sqlc.arg ('current_projection_seq'),
+SET current_projection_seq = sqlc.arg('current_projection_seq'),
 updated_at = CURRENT_TIMESTAMP
-WHERE id = sqlc.arg ('id') ;
+WHERE id = sqlc.arg('id');

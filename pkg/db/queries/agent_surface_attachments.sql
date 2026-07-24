@@ -21,10 +21,10 @@ VALUES (
     sqlc.narg('owner_lease_expires_at'),
     sqlc.narg('last_heartbeat_at')
 )
-RETURNING * ;
+RETURNING *;
 
 -- name: ListAgentSurfaceAttachmentsBySession :many
 SELECT *
 FROM agent_surface_attachments
-WHERE chat_session_id = sqlc.arg ('chat_session_id')
-ORDER BY connected_at ASC ;
+WHERE chat_session_id = sqlc.arg('chat_session_id')
+ORDER BY connected_at ASC;

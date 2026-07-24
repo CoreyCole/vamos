@@ -38,14 +38,14 @@ artifact = excluded.artifact,
 result_json = excluded.result_json,
 event_time = excluded.event_time,
 updated_at = CURRENT_TIMESTAMP
-RETURNING * ;
+RETURNING *;
 
 -- name: ListPendingQRSPIProjections :many
 SELECT *
 FROM qrspi_session_projections
 WHERE projection_state = 'pending'
 ORDER BY event_time ASC
-LIMIT sqlc.arg ('limit') ;
+LIMIT sqlc.arg('limit');
 
 -- name: MarkQRSPIProjectionApplied :exec
 UPDATE qrspi_session_projections
@@ -53,21 +53,21 @@ SET projection_state = 'applied',
 applied_at = CURRENT_TIMESTAMP,
 last_error = NULL,
 updated_at = CURRENT_TIMESTAMP
-WHERE id = sqlc.arg ('id')
-AND projection_state = 'pending' ;
+WHERE id = sqlc.arg('id')
+AND projection_state = 'pending';
 
 -- name: MarkQRSPIProjectionFailed :exec
 UPDATE qrspi_session_projections
 SET projection_state = 'failed',
-last_error = sqlc.narg ('last_error'),
+last_error = sqlc.narg('last_error'),
 updated_at = CURRENT_TIMESTAMP
-WHERE id = sqlc.arg ('id')
-AND projection_state = 'pending' ;
+WHERE id = sqlc.arg('id')
+AND projection_state = 'pending';
 
 -- name: MarkQRSPIProjectionSkipped :exec
 UPDATE qrspi_session_projections
 SET projection_state = 'skipped',
-last_error = sqlc.narg ('last_error'),
+last_error = sqlc.narg('last_error'),
 updated_at = CURRENT_TIMESTAMP
-WHERE id = sqlc.arg ('id')
-AND projection_state = 'pending' ;
+WHERE id = sqlc.arg('id')
+AND projection_state = 'pending';

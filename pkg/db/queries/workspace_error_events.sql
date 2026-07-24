@@ -23,17 +23,17 @@ detail = excluded.detail,
 payload_json = excluded.payload_json,
 occurrence_count = workspace_error_events.occurrence_count + 1,
 last_seen_at = CURRENT_TIMESTAMP
-RETURNING * ;
+RETURNING *;
 
 -- name: ListRecentWorkspaceErrorEvents :many
 SELECT *
 FROM workspace_error_events
 ORDER BY last_seen_at DESC, id DESC
-LIMIT sqlc.arg ('limit') ;
+LIMIT sqlc.arg('limit');
 
 -- name: ListRecentWorkspaceErrorEventsForWorkspace :many
 SELECT *
 FROM workspace_error_events
-WHERE workspace_slug = sqlc.arg ('workspace_slug')
+WHERE workspace_slug = sqlc.arg('workspace_slug')
 ORDER BY last_seen_at DESC, id DESC
-LIMIT sqlc.arg ('limit') ;
+LIMIT sqlc.arg('limit');

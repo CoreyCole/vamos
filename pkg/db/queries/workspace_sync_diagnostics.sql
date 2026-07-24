@@ -46,17 +46,17 @@ merged = excluded.merged,
 cleaned_up = excluded.cleaned_up,
 changed = excluded.changed,
 warnings_json = excluded.warnings_json,
-updated_at = CURRENT_TIMESTAMP ;
+updated_at = CURRENT_TIMESTAMP;
 
 -- name: GetWorkspaceSyncDiagnostic :one
 SELECT *
 FROM workspace_sync_diagnostics
-WHERE project_id = sqlc.arg ('project_id')
-AND sync_kind = sqlc.arg ('sync_kind') ;
+WHERE project_id = sqlc.arg('project_id')
+AND sync_kind = sqlc.arg('sync_kind');
 
 -- name: ListWorkspaceSyncDiagnostics :many
 SELECT *
 FROM workspace_sync_diagnostics
-WHERE CAST (sqlc.arg ('project_id') AS TEXT) = ''
-OR project_id = CAST (sqlc.arg ('project_id') AS TEXT)
-ORDER BY updated_at DESC, project_id, sync_kind ;
+WHERE CAST (sqlc.arg('project_id') AS TEXT) = ''
+OR project_id = CAST (sqlc.arg('project_id') AS TEXT)
+ORDER BY updated_at DESC, project_id, sync_kind;

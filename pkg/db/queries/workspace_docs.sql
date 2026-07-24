@@ -65,12 +65,12 @@ size_bytes = excluded.size_bytes,
 mtime_unix = excluded.mtime_unix,
 content_hash = excluded.content_hash,
 deleted_at = NULL,
-updated_at = CURRENT_TIMESTAMP ;
+updated_at = CURRENT_TIMESTAMP;
 
 -- name: MarkWorkspaceDocDeleted :exec
 UPDATE workspace_docs
 SET deleted_at = CURRENT_TIMESTAMP,
 updated_at = CURRENT_TIMESTAMP
-WHERE workspace_id = sqlc.arg ('workspace_id')
-AND doc_path = sqlc.arg ('doc_path')
-AND deleted_at IS NULL ;
+WHERE workspace_id = sqlc.arg('workspace_id')
+AND doc_path = sqlc.arg('doc_path')
+AND deleted_at IS NULL;

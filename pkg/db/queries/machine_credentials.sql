@@ -21,7 +21,7 @@ allowed_purposes_json,
 expires_at,
 revoked_at,
 created_at,
-last_used_at ;
+last_used_at;
 
 -- name: GetMachineCredential :one
 SELECT id,
@@ -36,17 +36,17 @@ revoked_at,
 created_at,
 last_used_at
 FROM machine_credentials
-WHERE id = ? ;
+WHERE id = ?;
 
 -- name: UpdateMachineCredentialLastUsed :exec
 UPDATE machine_credentials
 SET last_used_at = ?
-WHERE id = ? ;
+WHERE id = ?;
 
 -- name: RevokeMachineCredential :execrows
 UPDATE machine_credentials
 SET revoked_at = ?
-WHERE id = ? AND revoked_at IS NULL ;
+WHERE id = ? AND revoked_at IS NULL;
 
 -- name: ListMachineCredentials :many
 SELECT id,
@@ -61,4 +61,4 @@ revoked_at,
 created_at,
 last_used_at
 FROM machine_credentials
-ORDER BY created_at DESC ;
+ORDER BY created_at DESC;

@@ -321,7 +321,7 @@ func Root(args RootArgs) templ.Component {
 		var templ_7745c5c3_Var7 string
 		templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf(`{"theme": "%s", "_datastarInspectorEnabled": false}`, theme))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/layouts/root.templ`, Line: 319, Col: 170}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/layouts/root.templ`, Line: 316, Col: 170}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var7))
 		if templ_7745c5c3_Err != nil {
@@ -450,7 +450,7 @@ func Header(args RootArgs) templ.Component {
 									var templ_7745c5c3_Var13 string
 									templ_7745c5c3_Var13, templ_7745c5c3_Err = templ.JoinStringErrs(crumb.Label)
 									if templ_7745c5c3_Err != nil {
-										return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/layouts/root.templ`, Line: 354, Col: 26}
+										return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/layouts/root.templ`, Line: 351, Col: 26}
 									}
 									_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var13))
 									if templ_7745c5c3_Err != nil {
@@ -478,7 +478,7 @@ func Header(args RootArgs) templ.Component {
 									var templ_7745c5c3_Var15 string
 									templ_7745c5c3_Var15, templ_7745c5c3_Err = templ.JoinStringErrs(crumb.Label)
 									if templ_7745c5c3_Err != nil {
-										return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/layouts/root.templ`, Line: 358, Col: 26}
+										return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/layouts/root.templ`, Line: 355, Col: 26}
 									}
 									_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var15))
 									if templ_7745c5c3_Err != nil {
@@ -612,7 +612,7 @@ func HeaderAvatarMenu(args RootArgs, githubURL string, workspaceItems []Workspac
 					var templ_7745c5c3_Var20 string
 					templ_7745c5c3_Var20, templ_7745c5c3_Err = templ.JoinStringErrs(avatarhelpers.GetInitials(avatarhelpers.GetEmailBasename(args.UserEmail)))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/layouts/root.templ`, Line: 389, Col: 115}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/layouts/root.templ`, Line: 386, Col: 115}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var20))
 					if templ_7745c5c3_Err != nil {
@@ -665,7 +665,7 @@ func HeaderAvatarMenu(args RootArgs, githubURL string, workspaceItems []Workspac
 					var templ_7745c5c3_Var23 string
 					templ_7745c5c3_Var23, templ_7745c5c3_Err = templ.JoinStringErrs(args.UserEmail)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/layouts/root.templ`, Line: 394, Col: 20}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/layouts/root.templ`, Line: 391, Col: 20}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var23))
 					if templ_7745c5c3_Err != nil {
@@ -729,7 +729,7 @@ func HeaderAvatarMenu(args RootArgs, githubURL string, workspaceItems []Workspac
 							var templ_7745c5c3_Var26 templ.SafeURL
 							templ_7745c5c3_Var26, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(ws.URL))
 							if templ_7745c5c3_Err != nil {
-								return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/layouts/root.templ`, Line: 405, Col: 35}
+								return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/layouts/root.templ`, Line: 402, Col: 35}
 							}
 							_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var26))
 							if templ_7745c5c3_Err != nil {
@@ -755,7 +755,7 @@ func HeaderAvatarMenu(args RootArgs, githubURL string, workspaceItems []Workspac
 							var templ_7745c5c3_Var28 string
 							templ_7745c5c3_Var28, templ_7745c5c3_Err = templ.JoinStringErrs(ws.Label)
 							if templ_7745c5c3_Err != nil {
-								return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/layouts/root.templ`, Line: 411, Col: 23}
+								return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/layouts/root.templ`, Line: 408, Col: 23}
 							}
 							_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var28))
 							if templ_7745c5c3_Err != nil {
@@ -792,7 +792,7 @@ func HeaderAvatarMenu(args RootArgs, githubURL string, workspaceItems []Workspac
 					var templ_7745c5c3_Var29 templ.SafeURL
 					templ_7745c5c3_Var29, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(workspaceManager + "/workspaces"))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/layouts/root.templ`, Line: 419, Col: 61}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/layouts/root.templ`, Line: 416, Col: 61}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var29))
 					if templ_7745c5c3_Err != nil {
@@ -980,7 +980,7 @@ func HeaderAvatarNavLink(dropdownID string, href string, label string, active bo
 		var templ_7745c5c3_Var33 templ.SafeURL
 		templ_7745c5c3_Var33, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(href))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/layouts/root.templ`, Line: 462, Col: 28}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/layouts/root.templ`, Line: 459, Col: 28}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var33))
 		if templ_7745c5c3_Err != nil {
@@ -993,7 +993,7 @@ func HeaderAvatarNavLink(dropdownID string, href string, label string, active bo
 		var templ_7745c5c3_Var34 string
 		templ_7745c5c3_Var34, templ_7745c5c3_Err = templ.JoinStringErrs("$" + dropdownID + ".open = false")
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/layouts/root.templ`, Line: 463, Col: 52}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/layouts/root.templ`, Line: 460, Col: 52}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var34))
 		if templ_7745c5c3_Err != nil {
@@ -1019,7 +1019,7 @@ func HeaderAvatarNavLink(dropdownID string, href string, label string, active bo
 		var templ_7745c5c3_Var36 string
 		templ_7745c5c3_Var36, templ_7745c5c3_Err = templ.JoinStringErrs(label)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/layouts/root.templ`, Line: 470, Col: 9}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/layouts/root.templ`, Line: 467, Col: 9}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var36))
 		if templ_7745c5c3_Err != nil {
@@ -1061,7 +1061,7 @@ func HeaderAvatarPersistedThemeAction(dropdownID string) templ.Component {
 		var templ_7745c5c3_Var38 string
 		templ_7745c5c3_Var38, templ_7745c5c3_Err = templ.JoinStringErrs("$theme = $theme === 'dark' ? 'light' : 'dark'; document.documentElement.classList.toggle('dark', $theme === 'dark'); localStorage.setItem('theme', $theme); broadcastVamosHTMLAppletTheme($theme); @post('/api/theme'); $" + dropdownID + ".open = false")
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/layouts/root.templ`, Line: 476, Col: 268}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/layouts/root.templ`, Line: 473, Col: 268}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var38))
 		if templ_7745c5c3_Err != nil {
@@ -1103,7 +1103,7 @@ func HeaderAvatarDatastarInspectorAction(dropdownID string) templ.Component {
 		var templ_7745c5c3_Var40 string
 		templ_7745c5c3_Var40, templ_7745c5c3_Err = templ.JoinStringErrs("$_datastarInspectorEnabled = !$_datastarInspectorEnabled; $" + dropdownID + ".open = false")
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/layouts/root.templ`, Line: 488, Col: 110}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/layouts/root.templ`, Line: 485, Col: 110}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var40))
 		if templ_7745c5c3_Err != nil {
@@ -1145,7 +1145,7 @@ func HeaderAvatarCopyAction(dropdownID string, clipboardContent string) templ.Co
 		var templ_7745c5c3_Var42 string
 		templ_7745c5c3_Var42, templ_7745c5c3_Err = templ.JoinStringErrs(clipboardContent)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/layouts/root.templ`, Line: 499, Col: 59}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/layouts/root.templ`, Line: 496, Col: 59}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var42))
 		if templ_7745c5c3_Err != nil {
@@ -1158,7 +1158,7 @@ func HeaderAvatarCopyAction(dropdownID string, clipboardContent string) templ.Co
 		var templ_7745c5c3_Var43 string
 		templ_7745c5c3_Var43, templ_7745c5c3_Err = templ.JoinStringErrs("navigator.clipboard.writeText(document.getElementById('clipboard-content-avatar').content.textContent); $" + dropdownID + ".open = false")
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/layouts/root.templ`, Line: 501, Col: 156}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/layouts/root.templ`, Line: 498, Col: 156}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var43))
 		if templ_7745c5c3_Err != nil {
@@ -1200,7 +1200,7 @@ func HeaderAvatarGitHubLink(dropdownID string, githubURL string) templ.Component
 		var templ_7745c5c3_Var45 templ.SafeURL
 		templ_7745c5c3_Var45, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(githubURL))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/layouts/root.templ`, Line: 513, Col: 33}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/layouts/root.templ`, Line: 510, Col: 33}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var45))
 		if templ_7745c5c3_Err != nil {
@@ -1213,7 +1213,7 @@ func HeaderAvatarGitHubLink(dropdownID string, githubURL string) templ.Component
 		var templ_7745c5c3_Var46 string
 		templ_7745c5c3_Var46, templ_7745c5c3_Err = templ.JoinStringErrs("$" + dropdownID + ".open = false")
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/layouts/root.templ`, Line: 516, Col: 52}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/layouts/root.templ`, Line: 513, Col: 52}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var46))
 		if templ_7745c5c3_Err != nil {
@@ -1255,7 +1255,7 @@ func HeaderBrand(args RootArgs) templ.Component {
 		var templ_7745c5c3_Var48 string
 		templ_7745c5c3_Var48, templ_7745c5c3_Err = templ.JoinStringErrs(AppName())
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/layouts/root.templ`, Line: 528, Col: 57}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/layouts/root.templ`, Line: 525, Col: 57}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var48))
 		if templ_7745c5c3_Err != nil {
@@ -1358,7 +1358,7 @@ func HeaderProductNavItem(args RootArgs, item headerNavItem) templ.Component {
 		var templ_7745c5c3_Var53 templ.SafeURL
 		templ_7745c5c3_Var53, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(item.Href))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/layouts/root.templ`, Line: 548, Col: 33}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/layouts/root.templ`, Line: 545, Col: 33}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var53))
 		if templ_7745c5c3_Err != nil {
@@ -1371,7 +1371,7 @@ func HeaderProductNavItem(args RootArgs, item headerNavItem) templ.Component {
 		var templ_7745c5c3_Var54 string
 		templ_7745c5c3_Var54, templ_7745c5c3_Err = templ.JoinStringErrs(item.Label)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/layouts/root.templ`, Line: 550, Col: 14}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/layouts/root.templ`, Line: 547, Col: 14}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var54))
 		if templ_7745c5c3_Err != nil {
