@@ -3,8 +3,8 @@ package system
 import (
 	"fmt"
 
-	"github.com/dustin/go-humanize"
 	"github.com/CoreyCole/vamos/pkg/db"
+	"github.com/dustin/go-humanize"
 )
 
 templ metricCard(label string, signalExpr string) {
@@ -71,9 +71,13 @@ templ ServicesTable(services []ServiceInfo) {
 	}
 }
 
-templ ProcessesTable(procs []ProcessInfo) {
+templ ProcessesTable(procs []ProcessInfo, unavailable bool) {
 	if len(procs) == 0 {
-		<p class="text-sm text-muted-foreground">Loading processes...</p>
+		if unavailable {
+			<p class="text-sm text-muted-foreground" role="status">Processes unavailable; retrying...</p>
+		} else {
+			<p class="text-sm text-muted-foreground">Loading processes...</p>
+		}
 	} else {
 		<div class="overflow-x-auto">
 			<table class="w-full text-sm">

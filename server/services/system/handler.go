@@ -2,6 +2,7 @@ package system
 
 import (
 	"context"
+	"log"
 	"net/http"
 	"strconv"
 	"time"
@@ -98,7 +99,11 @@ func (s *Service) HandleHealthJSON(c echo.Context) error {
 			UsedBytes:  vm.SwapTotal - vm.SwapFree,
 		}
 		if vm.SwapTotal > 0 {
-			health.Swap.UsedPercent = float64(vm.SwapTotal-vm.SwapFree) / float64(vm.SwapTotal) * 100
+			health.Swap.UsedPercent = float64(
+				vm.SwapTotal-vm.SwapFree,
+			) / float64(
+				vm.SwapTotal,
+			) * 100
 		}
 	}
 
@@ -118,7 +123,12 @@ func (s *Service) HandleHealthJSON(c echo.Context) error {
 		health.LoadAvg = [3]float64{loadAvg.Load1, loadAvg.Load5, loadAvg.Load15}
 	}
 
-	health.Services, _ = collectServices()
+	services, err := collectServices()
+	health.Services = services
+	if err != nil {
+		health.Status = "degraded"
+		log.Printf("[system/health] service collection degraded: %v", err)
+	}
 
 	return c.JSON(http.StatusOK, health)
 }
@@ -131,7 +141,10 @@ func (s *Service) sendSystemMetrics(sse *datastar.ServerSentEventGenerator) erro
 
 // sendServices pushes the services table fragment via PatchElementTempl.
 func (s *Service) sendServices(sse *datastar.ServerSentEventGenerator) error {
-	services, _ := collectServices()
+	services, err := collectServices()
+	if err != nil {
+		log.Printf("[system/dashboard] service collection degraded: %v", err)
+	}
 	return sse.PatchElementTempl(
 		ServicesTable(services),
 		datastar.WithSelectorID("services-table"),
@@ -141,9 +154,12 @@ func (s *Service) sendServices(sse *datastar.ServerSentEventGenerator) error {
 
 // sendProcesses pushes the process table fragment via PatchElementTempl.
 func (s *Service) sendProcesses(sse *datastar.ServerSentEventGenerator) error {
-	procs, _ := collectTopProcesses(10)
+	procs, err := collectTopProcesses(10)
+	if err != nil {
+		log.Printf("[system/dashboard] process collection degraded: %v", err)
+	}
 	return sse.PatchElementTempl(
-		ProcessesTable(procs),
+		ProcessesTable(procs, err != nil),
 		datastar.WithSelectorID("processes-table"),
 		datastar.WithModeInner(),
 	)

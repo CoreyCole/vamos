@@ -95,7 +95,10 @@ func (s *Service) captureSnapshot() {
 		return
 	}
 
-	procs, _ := collectTopProcesses(10)
+	procs, err := collectTopProcesses(10)
+	if err != nil {
+		log.Printf("[system/snapshots] process collection degraded: %v", err)
+	}
 	for _, p := range procs {
 		if err := s.queries.InsertSnapshotProcess(ctx, db.InsertSnapshotProcessParams{
 			SnapshotID: snapshot.ID,
@@ -105,7 +108,11 @@ func (s *Service) captureSnapshot() {
 			CpuPercent: p.CPUPct,
 			Command:    p.Command,
 		}); err != nil {
-			log.Printf("[system/snapshots] failed to insert process for snapshot %d: %v", snapshot.ID, err)
+			log.Printf(
+				"[system/snapshots] failed to insert process for snapshot %d: %v",
+				snapshot.ID,
+				err,
+			)
 		}
 	}
 }
@@ -129,16 +136,25 @@ func (s *Service) cleanupOnStartup() {
 
 		// Delete processes first (no cascade), then snapshots
 		if err := s.queries.DeleteSnapshotProcessesByBootIDs(ctx, keepIDs); err != nil {
-			log.Printf("[system/snapshots] cleanup: failed to delete old processes: %v", err)
+			log.Printf(
+				"[system/snapshots] cleanup: failed to delete old processes: %v",
+				err,
+			)
 			return
 		}
 		if err := s.queries.DeleteSnapshotsByExcludedBootIDs(ctx, keepIDs); err != nil {
-			log.Printf("[system/snapshots] cleanup: failed to delete old snapshots: %v", err)
+			log.Printf(
+				"[system/snapshots] cleanup: failed to delete old snapshots: %v",
+				err,
+			)
 			return
 		}
 
 		deleted := len(boots) - maxBootsToKeep
-		log.Printf("[system/snapshots] cleanup: removed data from %d old boot(s)", deleted)
+		log.Printf(
+			"[system/snapshots] cleanup: removed data from %d old boot(s)",
+			deleted,
+		)
 	}
 
 	// Hard cap safety net

@@ -47,7 +47,7 @@ templ Dashboard(args DashboardArgs) {
 				<div class="mb-6">
 					<h2 class="text-lg font-semibold text-foreground mb-4">Processes (by memory)</h2>
 					<div id="processes-table">
-						@ProcessesTable(nil)
+						@ProcessesTable(nil, false)
 					</div>
 				</div>
 				<!-- Crash Reports — PatchElementTempl fragment -->
