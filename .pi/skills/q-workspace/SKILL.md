@@ -104,6 +104,10 @@ When the human asks for a new PR on top of an existing unmerged Graphite PR/bran
 
 A request such as “`gt get <branch>` in a `/q-workspace`” is explicit base-selection direction. Do not substitute trunk or ask the human to repeat it unless safety checks reveal a conflict or missing branch.
 
+## Implementation-workspace claim
+
+Before inspecting, copying, resetting, or launching a normal parent-plan implementation workspace, acquire the q-manager `implementation-workspace` claim for the canonical plan/workspace identity. Persist its owner run, workspace path, epoch, and recovery evidence through implementation/review. If another current or ambiguous owner holds it, do not copy or reset: return that manager's inspect/attach guidance. Recover only with `vamos qrspi recover-manager --plan-dir <plan> --claim <claim-id> --takeover-if-stale` after liveness evidence proves the claim expired; never delete state or claim files. Review-dir and same-workspace plans reuse their recorded workspace and do not create a competing claim/copy.
+
 ## Shared thoughts and efficient copies
 
 Assume `thoughts/` is a host-owned symlink to durable storage outside the repository. Preserve that symlink when copying a checkout; plan artifacts are shared, not workspace-local copies. Before any plan-directory sync, resolve both paths with `realpath` (or `readlink -f`) and, when they are the same target, **do not rsync**—`just sync-thoughts` is the durable artifact sync.

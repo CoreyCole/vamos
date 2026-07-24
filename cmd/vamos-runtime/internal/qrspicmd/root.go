@@ -42,6 +42,7 @@ func newCommand(d deps) *cobra.Command {
 	}
 	cmd.AddCommand(
 		newInitCommand(d),
+		newRecoverManagerCommand(d),
 		newStartNextCommand(d),
 		newSteerChildCommand(d),
 		newSetPolicyCommand(d),
@@ -103,6 +104,25 @@ func newInitCommand(d deps) *cobra.Command {
 		StringVar(&opts.PiModel, "model", "", "Pi model pattern or ID for child sessions (passed to pi --model)")
 	cmd.Flags().
 		BoolVar(&opts.Force, "force", false, "replace existing expired/inactive state")
+	return cmd
+}
+
+func newRecoverManagerCommand(d deps) *cobra.Command {
+	opts := RecoverManagerOptions{Output: "text"}
+	cmd := &cobra.Command{
+		Use:   "recover-manager --plan-dir <path> --claim <claim-id> --takeover-if-stale",
+		Short: "Recover an expired q-manager operation claim without deleting state",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return RunRecoverManager(cmd.Context(), opts, d, cmd.OutOrStdout())
+		},
+	}
+	cmd.Flags().StringVar(&opts.PlanDir, "plan-dir", "", "QRSPI plan directory")
+	cmd.Flags().
+		StringVar(&opts.ProjectRoot, "project-root", "", "project repository root")
+	cmd.Flags().StringVar(&opts.Claim, "claim", "", "expired claim ID")
+	cmd.Flags().
+		BoolVar(&opts.TakeoverStale, "takeover-if-stale", false, "reclaim only a provably expired claim")
+	cmd.Flags().StringVar(&opts.Output, "output", "text", "output format: text or ndjson")
 	return cmd
 }
 
@@ -613,10 +633,6 @@ func RunInit(ctx context.Context, opts InitOptions, d deps, out io.Writer) error
 	}
 	store := stateStore(d, root, clock)
 	key := LockKey{RepoID: state.RepoID, CanonicalPlanDir: state.CanonicalPlanDir}
-	lock, err := store.AcquireLock(ctx, key, state.ManagerRunID, lockTTL)
-	if err != nil {
-		return err
-	}
 	stateFile := StatePath(root, key, state.ManagerRunID)
 	if err := store.Save(stateFile, state); err != nil {
 		return err
@@ -625,11 +641,99 @@ func RunInit(ctx context.Context, opts InitOptions, d deps, out io.Writer) error
 		Type: "initialized",
 		Ref: map[string]any{
 			"stateFile":    stateFile,
-			"lockFile":     lock.Path,
 			"managerRunId": state.ManagerRunID,
 			"currentNode":  state.Workflow.CurrentNodeID,
 		},
 	})
+}
+
+func RunRecoverManager(
+	ctx context.Context,
+	opts RecoverManagerOptions,
+	d deps,
+	out io.Writer,
+) error {
+	if strings.TrimSpace(opts.PlanDir) == "" {
+		return errors.New("plan-dir is required")
+	}
+	if strings.TrimSpace(opts.Claim) == "" {
+		return errors.New("claim is required")
+	}
+	if !opts.TakeoverStale {
+		return errors.New("recover-manager requires --takeover-if-stale")
+	}
+	projectRoot := strings.TrimSpace(opts.ProjectRoot)
+	if projectRoot == "" {
+		var err error
+		projectRoot, err = os.Getwd()
+		if err != nil {
+			return err
+		}
+	}
+	canonicalPlanDir, err := CanonicalPlanDir(projectRoot, opts.PlanDir)
+	if err != nil {
+		return err
+	}
+	repoID, err := RepoID(projectRoot)
+	if err != nil {
+		return err
+	}
+	root, err := stateRoot(d)
+	if err != nil {
+		return err
+	}
+	clock := d.Clock
+	if clock == nil {
+		clock = time.Now
+	}
+	key := LockKey{RepoID: repoID, CanonicalPlanDir: canonicalPlanDir}
+	claim, err := FindClaim(root, key, opts.Claim)
+	if err != nil {
+		return err
+	}
+	store := stateStore(d, root, clock)
+	if holderState, loadErr := store.Load(
+		StatePath(root, key, claim.HolderRunID),
+	); loadErr == nil {
+		if holderState.ActiveChild != nil && holderState.ActiveChild.TmuxPaneID != "" {
+			live, paneErr := tmuxClient(
+				d,
+			).PaneExists(ctx, TmuxPane{ID: holderState.ActiveChild.TmuxPaneID})
+			if paneErr != nil || live {
+				return fmt.Errorf(
+					"claim holder %s may still own live child pane %s",
+					claim.HolderRunID,
+					holderState.ActiveChild.TmuxPaneID,
+				)
+			}
+		}
+		return fmt.Errorf(
+			"claim holder %s has a registered manager state; ownership is ambiguous",
+			claim.HolderRunID,
+		)
+	}
+	replacement, err := store.RecoverClaim(
+		ctx,
+		key,
+		claim.Operation,
+		claim.ID,
+		managerRunID(clock()),
+	)
+	if err != nil {
+		return err
+	}
+	return WriteNDJSON(
+		ensureWriter(out),
+		Event{Type: "manager_claim_recovered", Ref: map[string]any{
+			"claimId":     replacement.ID,
+			"operation":   replacement.Operation,
+			"holderRunId": replacement.HolderRunID,
+			"nextCommand": fmt.Sprintf(
+				"vamos qrspi start-next --plan-dir %s",
+				canonicalPlanDir,
+			),
+		}},
+	)
 }
 
 func RunStartNext(
@@ -683,6 +787,15 @@ func RunStartNext(
 		return nil, err
 	}
 	store := stateStore(d, "", clock)
+	operationLock, err := store.AcquireOperationLock(ctx, stateFile)
+	if err != nil {
+		return nil, err
+	}
+	defer operationLock.Release()
+	state, err = store.Load(stateFile)
+	if err != nil {
+		return nil, err
+	}
 	result := StartNextResult{StateFile: stateFile}
 	if strings.TrimSpace(opts.StateFile) != "" {
 		var stopped bool
@@ -1422,7 +1535,7 @@ func RunChild(ctx context.Context, opts RunChildOptions, d deps, out io.Writer) 
 	}
 	childID := nextChildRunID(state, opts.Stage, clock())
 	runRoot := filepath.Dir(opts.StateFile)
-	extensionPath, err := ResolveChildExtensionPath(runRoot)
+	extensionPath, err := ResolveChildExtensionPath(runRoot, state.SourceCwd)
 	if err != nil {
 		return err
 	}

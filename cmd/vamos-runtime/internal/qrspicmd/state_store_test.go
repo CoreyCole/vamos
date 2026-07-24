@@ -63,7 +63,10 @@ func TestCanonicalPlanDirStableAcrossCwd(t *testing.T) {
 func TestStatePathAndLockPathAreOutsideRepoVamos(t *testing.T) {
 	root := filepath.Join(t.TempDir(), "state-root")
 	repo := filepath.Join(t.TempDir(), "repo")
-	key := LockKey{RepoID: repo, CanonicalPlanDir: filepath.Join(repo, "thoughts", "plan")}
+	key := LockKey{
+		RepoID:           repo,
+		CanonicalPlanDir: filepath.Join(repo, "thoughts", "plan"),
+	}
 	statePath := StatePath(root, key, "run-1")
 	lockPath := LockPath(root, key)
 	if !strings.HasPrefix(statePath, root+string(os.PathSeparator)) {
@@ -72,7 +75,8 @@ func TestStatePathAndLockPathAreOutsideRepoVamos(t *testing.T) {
 	if !strings.HasPrefix(lockPath, root+string(os.PathSeparator)) {
 		t.Fatalf("lock path %q is not under state root %q", lockPath, root)
 	}
-	if strings.Contains(statePath, filepath.Join(repo, ".vamos")) || strings.Contains(lockPath, filepath.Join(repo, ".vamos")) {
+	if strings.Contains(statePath, filepath.Join(repo, ".vamos")) ||
+		strings.Contains(lockPath, filepath.Join(repo, ".vamos")) {
 		t.Fatalf("paths must not live under repo .vamos: %q %q", statePath, lockPath)
 	}
 }
@@ -81,7 +85,12 @@ func TestFileStateStoreSaveLoadRoundTrip(t *testing.T) {
 	root := t.TempDir()
 	store := FileStateStore{Root: root}
 	path := filepath.Join(root, "state.json")
-	state := ManagerState{SchemaVersion: schemaVersion, RepoID: "repo", CanonicalPlanDir: "plan", ManagerRunID: "run"}
+	state := ManagerState{
+		SchemaVersion:    schemaVersion,
+		RepoID:           "repo",
+		CanonicalPlanDir: "plan",
+		ManagerRunID:     "run",
+	}
 	if err := store.Save(path, state); err != nil {
 		t.Fatalf("Save() error = %v", err)
 	}
@@ -89,7 +98,8 @@ func TestFileStateStoreSaveLoadRoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Load() error = %v", err)
 	}
-	if got.SchemaVersion != state.SchemaVersion || got.RepoID != state.RepoID || got.ManagerRunID != state.ManagerRunID {
+	if got.SchemaVersion != state.SchemaVersion || got.RepoID != state.RepoID ||
+		got.ManagerRunID != state.ManagerRunID {
 		t.Fatalf("loaded state = %+v, want %+v", got, state)
 	}
 }
@@ -98,10 +108,20 @@ func TestAcquireLockAllowsSameOwner(t *testing.T) {
 	clock := fixedClock(time.Unix(100, 0))
 	store := FileStateStore{Root: t.TempDir(), Clock: clock}
 	key := LockKey{RepoID: "repo", CanonicalPlanDir: "plan"}
-	if _, err := store.AcquireLock(context.Background(), key, "owner", time.Hour); err != nil {
+	if _, err := store.AcquireLock(
+		context.Background(),
+		key,
+		"owner",
+		time.Hour,
+	); err != nil {
 		t.Fatalf("first AcquireLock() error = %v", err)
 	}
-	if _, err := store.AcquireLock(context.Background(), key, "owner", time.Hour); err != nil {
+	if _, err := store.AcquireLock(
+		context.Background(),
+		key,
+		"owner",
+		time.Hour,
+	); err != nil {
 		t.Fatalf("same-owner AcquireLock() error = %v", err)
 	}
 }
@@ -109,7 +129,12 @@ func TestAcquireLockAllowsSameOwner(t *testing.T) {
 func TestAcquireLockRejectsDifferentActiveOwner(t *testing.T) {
 	store := FileStateStore{Root: t.TempDir(), Clock: fixedClock(time.Unix(100, 0))}
 	key := LockKey{RepoID: "repo", CanonicalPlanDir: "plan"}
-	if _, err := store.AcquireLock(context.Background(), key, "owner-a", time.Hour); err != nil {
+	if _, err := store.AcquireLock(
+		context.Background(),
+		key,
+		"owner-a",
+		time.Hour,
+	); err != nil {
 		t.Fatalf("first AcquireLock() error = %v", err)
 	}
 	_, err := store.AcquireLock(context.Background(), key, "owner-b", time.Hour)
@@ -126,7 +151,12 @@ func TestAcquireLockReplacesExpiredLock(t *testing.T) {
 	now := time.Unix(100, 0)
 	store := FileStateStore{Root: t.TempDir(), Clock: fixedClock(now)}
 	key := LockKey{RepoID: "repo", CanonicalPlanDir: "plan"}
-	if _, err := store.AcquireLock(context.Background(), key, "owner-a", time.Second); err != nil {
+	if _, err := store.AcquireLock(
+		context.Background(),
+		key,
+		"owner-a",
+		time.Second,
+	); err != nil {
 		t.Fatalf("first AcquireLock() error = %v", err)
 	}
 	store.Clock = fixedClock(now.Add(2 * time.Second))
@@ -171,7 +201,11 @@ func TestAcquireLockAllowsOnlyOneConcurrentOwner(t *testing.T) {
 	close(start)
 	wg.Wait()
 	if len(successes) != 1 || conflicts != 3 {
-		t.Fatalf("successes=%v conflicts=%d, want one success and three conflicts", successes, conflicts)
+		t.Fatalf(
+			"successes=%v conflicts=%d, want one success and three conflicts",
+			successes,
+			conflicts,
+		)
 	}
 }
 
@@ -248,7 +282,10 @@ func TestOperationLockAllowsDifferentStateFiles(t *testing.T) {
 
 func TestOperationLockReleaseIsIdempotent(t *testing.T) {
 	store := FileStateStore{Root: t.TempDir()}
-	lock, err := store.AcquireOperationLock(t.Context(), filepath.Join(t.TempDir(), "state.json"))
+	lock, err := store.AcquireOperationLock(
+		t.Context(),
+		filepath.Join(t.TempDir(), "state.json"),
+	)
 	if err != nil {
 		t.Fatalf("AcquireOperationLock() error = %v", err)
 	}
@@ -263,7 +300,10 @@ func TestOperationLockReleaseIsIdempotent(t *testing.T) {
 func TestFileStateStoreMutateSerializesUpdates(t *testing.T) {
 	store := FileStateStore{Root: t.TempDir()}
 	path := filepath.Join(store.Root, "state.json")
-	if err := store.Save(path, ManagerState{ActiveChild: &ChildRunRef{ID: "child-1", Generation: 1}}); err != nil {
+	if err := store.Save(
+		path,
+		ManagerState{ActiveChild: &ChildRunRef{ID: "child-1", Generation: 1}},
+	); err != nil {
 		t.Fatal(err)
 	}
 
@@ -274,13 +314,17 @@ func TestFileStateStoreMutateSerializesUpdates(t *testing.T) {
 		go func() {
 			defer wg.Done()
 			<-start
-			_, err := store.Mutate(path, &ChildEpoch{ID: "child-1", Generation: 1}, func(state *ManagerState) error {
-				current := state.SchemaVersion
-				time.Sleep(time.Millisecond)
-				state.SchemaVersion = current + 1
+			_, err := store.Mutate(
+				path,
+				&ChildEpoch{ID: "child-1", Generation: 1},
+				func(state *ManagerState) error {
+					current := state.SchemaVersion
+					time.Sleep(time.Millisecond)
+					state.SchemaVersion = current + 1
 
-				return nil
-			})
+					return nil
+				},
+			)
 			if err != nil {
 				t.Errorf("Mutate() error = %v", err)
 			}
@@ -301,15 +345,22 @@ func TestFileStateStoreMutateSerializesUpdates(t *testing.T) {
 func TestFileStateStoreMutateRejectsStaleEpoch(t *testing.T) {
 	store := FileStateStore{Root: t.TempDir()}
 	path := filepath.Join(store.Root, "state.json")
-	if err := store.Save(path, ManagerState{ActiveChild: &ChildRunRef{ID: "child-1", Generation: 2}}); err != nil {
+	if err := store.Save(
+		path,
+		ManagerState{ActiveChild: &ChildRunRef{ID: "child-1", Generation: 2}},
+	); err != nil {
 		t.Fatal(err)
 	}
 
-	_, err := store.Mutate(path, &ChildEpoch{ID: "child-1", Generation: 1}, func(state *ManagerState) error {
-		state.SchemaVersion = 99
+	_, err := store.Mutate(
+		path,
+		&ChildEpoch{ID: "child-1", Generation: 1},
+		func(state *ManagerState) error {
+			state.SchemaVersion = 99
 
-		return nil
-	})
+			return nil
+		},
+	)
 	if err == nil || !strings.Contains(err.Error(), "active child epoch changed") {
 		t.Fatalf("Mutate() error = %v, want stale epoch refusal", err)
 	}
@@ -343,6 +394,81 @@ func TestFileStateStoreMutateDoesNotSaveFailedMutation(t *testing.T) {
 	}
 	if state.SchemaVersion != 1 {
 		t.Fatalf("SchemaVersion = %d, failed mutation was saved", state.SchemaVersion)
+	}
+}
+
+func TestAcquireClaimSerializesOnlyTheSameOperation(t *testing.T) {
+	now := time.Unix(100, 0)
+	store := FileStateStore{Root: t.TempDir(), Clock: fixedClock(now)}
+	key := LockKey{RepoID: "repo", CanonicalPlanDir: "plan"}
+	first, err := store.AcquireClaim(t.Context(), ClaimRequest{
+		Key:         key,
+		Operation:   ClaimGraphTransition,
+		HolderRunID: "manager-a",
+		TTL:         time.Hour,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = store.AcquireClaim(t.Context(), ClaimRequest{
+		Key:         key,
+		Operation:   ClaimGraphTransition,
+		HolderRunID: "manager-b",
+		TTL:         time.Hour,
+	})
+	var conflict ClaimConflictError
+	if !errors.As(err, &conflict) || conflict.Existing.ID != first.ID {
+		t.Fatalf(
+			"AcquireClaim() error = %v, want graph-transition conflict for %s",
+			err,
+			first.ID,
+		)
+	}
+	if _, err := store.AcquireClaim(t.Context(), ClaimRequest{
+		Key: key, Operation: ClaimManagerAttach, HolderRunID: "manager-b", TTL: time.Hour,
+	}); err != nil {
+		t.Fatalf("unrelated operation should not contend: %v", err)
+	}
+}
+
+func TestRecoverClaimOnlyReplacesExpiredClaimAndAudits(t *testing.T) {
+	now := time.Unix(100, 0)
+	store := FileStateStore{Root: t.TempDir(), Clock: fixedClock(now)}
+	key := LockKey{RepoID: "repo", CanonicalPlanDir: "plan"}
+	claim, err := store.AcquireClaim(t.Context(), ClaimRequest{
+		Key:         key,
+		Operation:   ClaimActiveChildMutate,
+		HolderRunID: "manager-a",
+		TTL:         time.Second,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.RecoverClaim(
+		t.Context(),
+		key,
+		claim.Operation,
+		claim.ID,
+		"manager-b",
+	); err == nil {
+		t.Fatal("RecoverClaim() succeeded for live claim")
+	}
+	store.Clock = fixedClock(now.Add(2 * time.Second))
+	recovered, err := store.RecoverClaim(
+		t.Context(),
+		key,
+		claim.Operation,
+		claim.ID,
+		"manager-b",
+	)
+	if err != nil {
+		t.Fatalf("RecoverClaim() error = %v", err)
+	}
+	if recovered.HolderRunID != "manager-b" || recovered.ID == claim.ID {
+		t.Fatalf("recovered claim = %+v, original = %+v", recovered, claim)
+	}
+	if _, err := os.Stat(ClaimAuditPath(store.Root, key)); err != nil {
+		t.Fatalf("recovery audit missing: %v", err)
 	}
 }
 

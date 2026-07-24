@@ -77,8 +77,13 @@ func TestTmuxChildRunnerTargetsManagerPane(t *testing.T) {
 	}
 }
 
-func TestResolveChildExtensionPathWritesEmbeddedAsset(t *testing.T) {
-	path, err := ResolveChildExtensionPath(t.TempDir())
+func TestResolveChildExtensionPathCopiesProjectOwnedExtension(t *testing.T) {
+	cwd, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	projectRoot := filepath.Clean(filepath.Join(cwd, "../../../.."))
+	path, err := ResolveChildExtensionPath(t.TempDir(), projectRoot)
 	if err != nil {
 		t.Fatalf("ResolveChildExtensionPath error = %v", err)
 	}

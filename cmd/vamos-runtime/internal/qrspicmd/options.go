@@ -725,6 +725,15 @@ type RenderPromptOptions struct {
 	PlanDir   string
 }
 
+type RecoverManagerOptions struct {
+	PlanDir       string
+	ProjectRoot   string
+	Claim         string
+	Operation     ClaimOperation
+	TakeoverStale bool
+	Output        string
+}
+
 type deps struct {
 	StateStore    StateStore
 	Runner        ChildRunner
@@ -738,7 +747,7 @@ type StateOperationLock interface {
 	Release() error
 }
 
-// StateStore is implemented by the external q-manager state store in a later slice.
+// StateStore persists per-run manager state and narrow plan-operation claims.
 type StateStore interface {
 	Load(path string) (ManagerState, error)
 	Save(path string, state ManagerState) error
@@ -753,6 +762,14 @@ type StateStore interface {
 		owner string,
 		ttl time.Duration,
 	) (Lock, error)
+	AcquireClaim(ctx context.Context, req ClaimRequest) (ManagerClaim, error)
+	ReleaseClaim(ctx context.Context, claim ManagerClaim) error
+	RecoverClaim(
+		ctx context.Context,
+		key LockKey,
+		operation ClaimOperation,
+		claimID, newHolder string,
+	) (ManagerClaim, error)
 }
 
 // ChildRunner starts visible child QRSPI sessions and observes their done marker/session refs.

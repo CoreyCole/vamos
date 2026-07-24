@@ -12,6 +12,12 @@ Use the canonical QRSPI graph and `qrspi_result.policy` to decide advancement. q
 
 `pkg/agents/workflows/qrspi.Definition`, QRSPI parser/converter, artifact validation, and `runtime.DecideTransition` are authoritative. q-manager must not hand-roll transitions from YAML text or duplicate policy rules.
 
+## Concurrent manager coordination
+
+Manager registration is per run, so planning and review managers for one canonical plan may coexist before workspace preparation. Narrow claims serialize only record consumption, manager attachment, active-child mutation, graph transition, and implementation-workspace ownership; guarded saves must compare the expected run, child generation, record, and transition epoch. `vamos qrspi recover-manager --plan-dir <plan> --claim <claim-id> --takeover-if-stale` is the sole stale-claim recovery path: it refuses a current owner, reclaims only an expired claim, records a local audit entry, and prints a safe next command. Never delete control-plane files. The implementation-workspace claim is exclusive and a losing manager must inspect/attach rather than make a second copy.
+
+The project-local `.pi/extensions/q-manager-child` owns child Pi lifecycle behavior. It carries the retained MIT attribution for patterns adapted from the pinned read-only interactive-subagents context; global `npm:pi-subagents` is not loaded. Vamos remains the authority for QRSPI results, graph, plan/workspace policy, managed/chat semantics, claims, and audit.
+
 ## Human escalation preferences
 
 Escalate irreversible workflow changes, project philosophy changes, unsafe workspace replacement, hidden child execution, ambiguous merge policy, or any request to edit Pi metadata/session schema.

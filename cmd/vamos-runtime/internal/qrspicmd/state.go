@@ -22,6 +22,7 @@ type ManagerState struct {
 	LastStateAlignment  *StateAlignmentEvidence `json:"lastStateAlignment,omitempty"`
 	ActiveChild         *ChildRunRef            `json:"activeChild,omitempty"`
 	PendingCleanupChild *ChildRunRef            `json:"pendingCleanupChild,omitempty"`
+	TransitionEpoch     int                     `json:"transitionEpoch,omitempty"`
 	Workflow            wruntime.State          `json:"workflow"`
 }
 

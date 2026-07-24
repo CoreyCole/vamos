@@ -37,6 +37,14 @@ When the user invokes `/q-hermes-manager` or asks Hermes to manage a QRSPI flow,
 1. Read the latest QRSPI result artifact or user-provided result YAML. A pasted result is sufficient startup input; do not require an action verb.
 1. After resolving startup intent, use parent Pi `/q-manager start-next|continue` for normal operator-driven launch/resume so live usage is sampled and native parent compaction can run safely. Use raw `vamos qrspi start-next|continue` only for tool-driven debug/manual fallback. Use default concise text output for normal manager commands; reserve `--output ndjson` for debug/recovery when structured output is specifically needed. Use `init`, `render-prompt`, `run-child`, `validate-result`, `decide-next`, and `reprompt-child` only for debug/recovery.
 
+## Manager coordination
+
+- Manager runs register independently for a canonical plan before `/q-workspace`; a legacy plan-wide initialization lock is migration evidence, never a reason to reject planning or review work.
+- Acquire a short claim only for `record-consume`, `manager-attach`, `active-child-mutate`, `graph-transition`, or `implementation-workspace`. Reload and compare the manager run, child generation, record, and transition epoch before the guarded save.
+- `vamos qrspi recover-manager --plan-dir <plan> --claim <claim-id> --takeover-if-stale` is the only stale-claim recovery path. It preserves a current owner, reclaims only an expired claim, writes local recovery audit evidence, and returns an exact follow-up command. Never delete manager state or claim files.
+- The `implementation-workspace` claim is the exclusive code-edit boundary; a losing `/q-workspace` manager must inspect or attach rather than copy/reset another checkout.
+- The project-local `.pi/extensions/q-manager-child` owns Pi child lifecycle integration. Do not load global `npm:pi-subagents` alongside it; its MIT attribution notice is kept with the extension. Vamos remains the authority for graph, plan/workspace, claim, and audit decisions.
+
 ## General guiding principles
 
 - Capture generalized manager learnings in this q-manager skill. Capture project-specific manager policy, escalation preferences, or domain workflow rules in the target project’s `docs/q-manager.md` instead.

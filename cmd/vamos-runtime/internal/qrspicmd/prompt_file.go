@@ -72,9 +72,6 @@ func resolveOrInitStartState(
 	}
 	store := stateStore(d, root, clock)
 	key := LockKey{RepoID: state.RepoID, CanonicalPlanDir: state.CanonicalPlanDir}
-	if _, err := store.AcquireLock(ctx, key, state.ManagerRunID, lockTTL); err != nil {
-		return ManagerState{}, "", err
-	}
 	stateFile := StatePath(root, key, state.ManagerRunID)
 	if err := store.Save(stateFile, state); err != nil {
 		return ManagerState{}, "", err

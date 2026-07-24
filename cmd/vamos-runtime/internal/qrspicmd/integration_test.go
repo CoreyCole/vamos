@@ -297,7 +297,7 @@ func TestRunInitRejectsUnknownStage(t *testing.T) {
 	}
 }
 
-func TestManagerLockConflictStops(t *testing.T) {
+func TestManagerRunsRegisterIndependentlyDespiteLegacyLock(t *testing.T) {
 	fixture := newManagerFlowFixture(t)
 	key := LockKey{
 		RepoID:           fixture.projectRoot,
@@ -307,26 +307,36 @@ func TestManagerLockConflictStops(t *testing.T) {
 	if _, err := store.AcquireLock(
 		t.Context(),
 		key,
-		"other-manager",
+		"legacy-manager",
 		time.Hour,
 	); err != nil {
 		t.Fatal(err)
 	}
 
-	var out bytes.Buffer
-	err := RunInit(
-		t.Context(),
-		InitOptions{PlanDir: fixture.planDir, ProjectRoot: fixture.projectRoot},
-		deps{StateRoot: fixture.stateRootFunc, Clock: fixture.clock},
-		&out,
-	)
-	var conflict LockConflictError
-	if !errors.As(err, &conflict) {
-		t.Fatalf("expected LockConflictError, got %v (out %q)", err, out.String())
+	var first, second bytes.Buffer
+	clockCalls := 0
+	clock := func() time.Time {
+		clockCalls++
+		return fixture.clock().Add(time.Duration(clockCalls) * time.Second)
+	}
+	for _, out := range []*bytes.Buffer{&first, &second} {
+		if err := RunInit(
+			t.Context(),
+			InitOptions{PlanDir: fixture.planDir, ProjectRoot: fixture.projectRoot},
+			deps{StateRoot: fixture.stateRootFunc, Clock: clock},
+			out,
+		); err != nil {
+			t.Fatalf("RunInit() error = %v", err)
+		}
+	}
+	firstState := eventRefString(t, first.String(), "stateFile")
+	secondState := eventRefString(t, second.String(), "stateFile")
+	if firstState == secondState {
+		t.Fatalf("manager state files must be independent: %q", firstState)
 	}
 	lock := readLock(t, LockPath(fixture.stateRoot, key))
-	if lock.Owner != "other-manager" {
-		t.Fatalf("lock owner = %q, want other-manager", lock.Owner)
+	if lock.Owner != "legacy-manager" {
+		t.Fatalf("legacy lock owner = %q, want legacy-manager", lock.Owner)
 	}
 }
 
@@ -675,7 +685,9 @@ func TestPendingCleanupConvergesAfterLayoutFailure(t *testing.T) {
 }
 
 func TestPendingCleanupTreatsMissingPaneAsSuccess(t *testing.T) {
-	state := ManagerState{PendingCleanupChild: &ChildRunRef{ID: "old", TmuxPaneID: "%old"}}
+	state := ManagerState{
+		PendingCleanupChild: &ChildRunRef{ID: "old", TmuxPaneID: "%old"},
+	}
 	tmux := &recordingTmux{missingPanes: map[string]bool{"%old": true}}
 	cleaned, err := cleanupPendingChildAfterNotification(t.Context(), state, tmux)
 	if err != nil || cleaned.PendingCleanupChild != nil || len(tmux.kills) != 0 {
@@ -1009,7 +1021,22 @@ func TestContinueCommandInvalidResultRepromptsSameChild(t *testing.T) {
 	}
 	state := loadManagerState(t, stateFile)
 	writeFile(t, state.ActiveChild.DonePath, "")
-	writeSessionTestFile(t, filepath.Join(state.ActiveChild.SessionDir, "session.jsonl"), sessionHeader(state.ActiveChild.SessionID, fixture.projectRoot)+"\n"+assistantLine(testResultYAML("question", "complete", "not-valid", "thoughts/example/questions/q.md", ""))+"\n")
+	writeSessionTestFile(
+		t,
+		filepath.Join(state.ActiveChild.SessionDir, "session.jsonl"),
+		sessionHeader(
+			state.ActiveChild.SessionID,
+			fixture.projectRoot,
+		)+"\n"+assistantLine(
+			testResultYAML(
+				"question",
+				"complete",
+				"not-valid",
+				"thoughts/example/questions/q.md",
+				"",
+			),
+		)+"\n",
+	)
 
 	tmux := &recordingTmux{}
 	continueOut, err := executeManagerCommand(
@@ -1061,7 +1088,22 @@ func TestContinueInvalidResultRetryExhaustionEmitsManagerNotice(t *testing.T) {
 		Workflow:         testWorkflowState(t, qrspi.NodePlan, nil),
 	}
 	saveManagerState(t, stateFile, state)
-	writeSessionTestFile(t, sessionPath, sessionHeader(active.SessionID, fixture.projectRoot)+"\n"+assistantLine(testResultYAML("plan", "complete", "not-valid", "thoughts/example/plan.md", ""))+"\n")
+	writeSessionTestFile(
+		t,
+		sessionPath,
+		sessionHeader(
+			active.SessionID,
+			fixture.projectRoot,
+		)+"\n"+assistantLine(
+			testResultYAML(
+				"plan",
+				"complete",
+				"not-valid",
+				"thoughts/example/plan.md",
+				"",
+			),
+		)+"\n",
+	)
 
 	continueOut, err := executeManagerCommand(
 		deps{Clock: fixture.clock},
