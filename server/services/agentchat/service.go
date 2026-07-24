@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"log"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -63,6 +64,14 @@ type StartWorkflowInput struct {
 var ErrThreadRunInProgress = errors.New("thread already has an active run")
 
 const transcriptRoleUser = "user"
+
+var renderMarkdown = func(renderer *markdown.Renderer, content []byte) (string, error) {
+	return renderer.MarkdownBytesToHTML(content)
+}
+
+var renderMarkdownSections = func(renderer *markdown.Renderer, content []byte) ([]markdown.Section, error) {
+	return renderer.RenderToSections(content)
+}
 
 type Service struct {
 	db                                  *sql.DB
@@ -4429,12 +4438,20 @@ func (s *Service) renderDoc(root, relPath string) (DocRenderView, error) {
 		return DocRenderView{}, fmt.Errorf("read doc: %w", err)
 	}
 
+	htmlContent, err := renderMarkdown(s.renderer, content)
+	if err != nil {
+		return DocRenderView{}, fmt.Errorf("render doc markdown: %w", err)
+	}
+	sections, err := renderMarkdownSections(s.renderer, content)
+	if err != nil {
+		return DocRenderView{}, fmt.Errorf("render doc sections: %w", err)
+	}
 	return DocRenderView{
 		RootPath:     root,
 		RelativePath: filepath.ToSlash(clean),
 		DisplayName:  filepath.Base(clean),
-		HTML:         s.renderer.MarkdownBytesToHTML(content),
-		Sections:     s.renderer.RenderToSections(content),
+		HTML:         htmlContent,
+		Sections:     sections,
 		Exists:       true,
 	}, nil
 }
@@ -5275,7 +5292,12 @@ func (s *Service) newBubbleTranscriptMessage(
 ) TranscriptMessage {
 	htmlContent := ""
 	if role == "assistant" {
-		htmlContent = s.renderer.MarkdownBytesToHTML([]byte(text))
+		var err error
+		htmlContent, err = renderMarkdown(s.renderer, []byte(text))
+		if err != nil {
+			log.Printf("agentchat transcript markdown render failed: %v", err)
+			htmlContent = ""
+		}
 	}
 	return TranscriptMessage{
 		DOMID:        domID,
@@ -5294,7 +5316,12 @@ func (s *Service) newDetailTranscriptMessage(
 ) TranscriptMessage {
 	htmlContent := ""
 	if strings.TrimSpace(body) != "" {
-		htmlContent = s.renderer.MarkdownBytesToHTML([]byte(body))
+		var err error
+		htmlContent, err = renderMarkdown(s.renderer, []byte(body))
+		if err != nil {
+			log.Printf("agentchat detail markdown render failed: %v", err)
+			htmlContent = ""
+		}
 	}
 	return TranscriptMessage{
 		DOMID:       domID,

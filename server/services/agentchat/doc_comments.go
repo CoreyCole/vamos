@@ -58,7 +58,10 @@ func (s *Service) BuildWorkspaceDocCommentProjection(
 		}
 		return nil, fmt.Errorf("read doc for comments: %w", err)
 	}
-	sections := s.renderer.RenderToSections(content)
+	sections, err := renderMarkdownSections(s.renderer, content)
+	if err != nil {
+		return nil, fmt.Errorf("render doc comment sections: %w", err)
+	}
 	return AnchorWorkspaceDocComments(content, sections, views), nil
 }
 

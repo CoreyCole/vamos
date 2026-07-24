@@ -22,6 +22,7 @@ import (
 	"github.com/CoreyCole/vamos/pkg/agents/workflows/qrspi"
 	wruntime "github.com/CoreyCole/vamos/pkg/agents/workflows/runtime"
 	"github.com/CoreyCole/vamos/pkg/db"
+	"github.com/CoreyCole/vamos/server/services/markdown"
 	"github.com/CoreyCole/vamos/server/services/workspaces"
 )
 
@@ -1407,6 +1408,24 @@ func TestNewDetailTranscriptMessageCollapsesOnlyAfterLineLimit(t *testing.T) {
 	)
 	if !long.Collapsible {
 		t.Fatalf("long.Collapsible = false, want true")
+	}
+}
+
+func TestTranscriptMessagesKeepRawContentWhenMarkdownRenderFails(t *testing.T) {
+	originalRenderMarkdown := renderMarkdown
+	renderMarkdown = func(_ *markdown.Renderer, _ []byte) (string, error) {
+		return "partial HTML", errors.New("render failed")
+	}
+	t.Cleanup(func() { renderMarkdown = originalRenderMarkdown })
+
+	service := newTestAgentChatService(t)
+	bubble := service.newBubbleTranscriptMessage("bubble", "entry", "assistant", "raw", false)
+	if bubble.Content != "raw" || bubble.HTMLContent != "" {
+		t.Fatalf("bubble = %#v, want raw content without HTML", bubble)
+	}
+	detail := service.newDetailTranscriptMessage("detail", "entry", "title", "raw", false, false)
+	if detail.Content != "raw" || detail.HTMLContent != "" {
+		t.Fatalf("detail = %#v, want raw content without HTML", detail)
 	}
 }
 
