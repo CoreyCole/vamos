@@ -94,7 +94,7 @@ QRSPI update: `q-plan` complete
 - Never paste multiline manager prompts into an interactive child pane as raw tmux keystrokes. Newlines can submit as separate child prompts. For initial stage prompts, use `start-next`; it writes a prompt file and launches the child. For follow-up steering, use `steer-child` with a feedback file. Do not silently fall back to direct tmux as the normal path.
 - Do not poll or sleep on child `done` as the normal control loop. `done`/`status.json` are recovery diagnostics; the primary manager trigger is the child wake pasted into the parent pane.
 - Do not put manager `stateFile`, run IDs, pane IDs, session dirs, or other disposable q-manager control refs in durable `qrspi_result` YAML. Report them in manager prose/diagnostics only. Durable YAML should keep plan/workspace/artifact identity, not machine-local manager state.
-- When testing the runtime CLI from a Vamos checkout, use `go run ./cmd/vamos-runtime ...` in place of installed `vamos ...`.
+- Always invoke the QRSPI CLI as `vamos ...` from `PATH`. The stable launcher resolves and runs the latest runtime in `~/dotfiles/context/vamos`; do not substitute `go run ./cmd/vamos-runtime` from an arbitrary checkout.
 - Child prompts should be stage-work prompts, not manager runbooks. The primary child context should be the previous stage's fenced `qrspi_result` YAML plus minimal routing metadata needed to read planning docs and start the selected stage. The CLI should pass that YAML directly to the child prompt from manager state/session JSONL; do not paste the YAML into the parent manager chat.
 - Manager-specific instructions from `docs/q-manager.md` are for the parent manager/CLI. Do not embed the full manager manifest in every child prompt. If the CLI needs manifest-derived child context, render a small normalized child-safe summary, not raw docs.
 - q-manager may accept extra operator context for a child, but that context should be explicit and additive. A valid previous `qrspi_result` should normally be sufficient for the child to read the plan docs and proceed.
@@ -158,15 +158,15 @@ vamos qrspi decide-next --state-file "$STATE" --plan-dir <plan-dir>
 
 Manual/debug overrides: `--session-file <jsonl>` validates a specific child session JSONL. `--result-file <path>` is deprecated fallback for plaintext result files only when no active child session refs are available. Prefer latest-session recovery commands over state-file edits when a human chatted in the same child pane or used child `/new`.
 
-### Runtime CLI testing with `go run`
+### Runtime CLI invocation
 
-When the user asks to test the runtime CLI before the installed `vamos` binary includes a command, prefix commands with `go run ./cmd/vamos-runtime`. Keep the same wake-driven shape:
+Use the `vamos` command on `PATH` for all QRSPI commands. It is the stable launcher and resolves the latest runtime from `~/dotfiles/context/vamos`; do not run a checkout-local runtime directly.
 
 ```bash
-go run ./cmd/vamos-runtime qrspi start-next --plan-dir "$PLAN" --project-root "$PWD" --manager-pane "$TMUX_PANE" --node <node> --implementation-cwd "$PWD"
+vamos qrspi start-next --plan-dir "$PLAN" --project-root "$PWD" --manager-pane "$TMUX_PANE" --node <node> --implementation-cwd "$PWD"
 ```
 
-After `start-next`, do not poll. Wait for the validated pasted wake, then run `go run ./cmd/vamos-runtime qrspi continue --state-file "$STATE"`.
+After `start-next`, do not poll. Wait for the validated pasted wake, then run `vamos qrspi continue --state-file "$STATE"`.
 
 ## Child wake contract
 
@@ -183,6 +183,20 @@ The wake may include `state_file` because that is ephemeral manager control cont
 If validation fails and policy retry budget remains, `continue`/CLI retry support should run `reprompt-child` with the validation error file. It pastes/injects the canonical QRSPI parser correction prompt into the same active child pane/session as one atomic prompt; do not create a new child ID/session and do not manually paste extra multiline correction prose. If the only problem is deterministic positive wording, the CLI should normalize before retrying. If retry budget is exhausted, emit one manager-needed retry-exhausted notice with deterministic-recovery-first guidance; inspect/steer/recover before asking the human.
 
 ## Cleanup and recovery
+
+### Fresh-state escape hatch
+
+When `continue`/`repair-state` cannot recover an obsolete or internally inconsistent local state, recover from durable truth instead of debugging the JSON. First confirm the latest fenced `qrspi_result`, its primary artifact, and the canonical graph identify one safe next node. Then delete only that plan's local manager-state directory (the parent of the state file) and start a new state at that node:
+
+```bash
+STATE=/absolute/path/to/q-manager-state.json
+rm -rf "$(dirname "$STATE")"
+vamos qrspi start-next --plan-dir "$PLAN" --project-root "$PROJECT_ROOT" \
+  --manager-pane "$TMUX_PANE" --node <graph-safe-next-node> \
+  --implementation-cwd "$IMPLEMENTATION_CWD"
+```
+
+Use this only after recovery commands fail or state evidence is contradictory. Do not pass `--latest-result-file` when creating this escape-hatch state: some runtime versions validate that result against the requested *next* node rather than its completed source node. The selected child must read the durable artifacts for context. Never delete plan artifacts or another plan's state directory.
 
 Supported manual interaction modes: normal managed child, `steer-child`, same-child chat, child `/new`, manual completion, retry exhaustion recovery, and stale wake supersession. Use recovery commands before state-file edits.
 
@@ -219,7 +233,7 @@ Do not rely on chat history. The markdown handoff must contain enough local reco
 - Manager `stateFile` absolute path, explicitly labeled local/ephemeral.
 - Active child refs from state when a child is running: stage, pane ID, session ID, session dir/path, status path, done path, output/transcript path.
 - Whether the manager is waiting for child wake, should run `qrspi continue`, needs a lower-level recovery command, or is stopped at a human gate.
-- Exact next command, using `go run ./cmd/vamos-runtime ...` when testing from checkout.
+- Exact next command using the `vamos` launcher from `PATH`.
 
 Manager handoff may include `stateFile` because it is an operational recovery note for the same local machine. Do not put `stateFile`, pane IDs, session dirs, or run IDs in durable `qrspi_result` YAML. In the markdown handoff, label those fields as local/ephemeral and keep durable plan identity (`thoughts/...` paths, artifact paths, latest result) separate from local recovery refs. Auto-compaction handoffs are manager operational handoffs: resume from the handoff, then run `manager-ready` so any queued validated child wake flushes to the current parent pane.
 
@@ -232,7 +246,7 @@ Fresh manager resume shape:
 ```bash
 # read q-manager skill, docs/q-manager.md, plan AGENTS.md, manager handoff first
 STATE=<stateFile-from-manager-handoff>
-go run ./cmd/vamos-runtime qrspi continue --state-file "$STATE"
+vamos qrspi continue --state-file "$STATE"
 ```
 
 If the handoff says “waiting for child wake,” do not continue/validate until wake arrives unless manually inspecting recovery state. If no active child exists, resume by rendering and running the graph-selected/current node from the saved state.
