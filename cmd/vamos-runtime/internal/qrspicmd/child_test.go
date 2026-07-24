@@ -180,7 +180,8 @@ func TestRunChildStartsRightSplitAndSavesActiveChild(t *testing.T) {
 		req.SessionDir != filepath.Join(
 			fixture.cwd,
 			"thoughts/example",
-			".sessions",
+			".vamos",
+			"sessions",
 			"pi",
 		) ||
 		req.ExtensionPath == "" {

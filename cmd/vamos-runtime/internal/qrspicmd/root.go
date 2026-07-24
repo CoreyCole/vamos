@@ -1266,12 +1266,12 @@ func ChildWorkspaceSessionDir(state ManagerState, opts RunChildOptions) string {
 	planDir := strings.TrimSpace(state.CanonicalPlanDir)
 	if planDir == "" {
 		planDir = strings.TrimSpace(opts.PlanDir)
+		if planDir != "" && !filepath.IsAbs(planDir) {
+			planDir = filepath.Join(opts.Cwd, planDir)
+		}
 	}
 	if planDir != "" {
-		return filepath.Join(planDir, ".sessions", "pi")
-	}
-	if cwd := strings.TrimSpace(opts.Cwd); cwd != "" {
-		return filepath.Join(cwd, ".sessions", "pi")
+		return PlanSessionDir(planDir)
 	}
 	return SessionDir(filepath.Dir(opts.StateFile), childRunID(opts.Stage, time.Now()))
 }
@@ -1544,6 +1544,13 @@ func RunChild(ctx context.Context, opts RunChildOptions, d deps, out io.Writer) 
 		managerRunID = state.ManagerRunID
 	}
 	sessionDir := ChildWorkspaceSessionDir(state, opts)
+	if strings.TrimSpace(state.CanonicalPlanDir) != "" {
+		migration, err := MigratePlanSessions(state.CanonicalPlanDir)
+		if err != nil {
+			return err
+		}
+		sessionDir = migration.SessionDir
+	}
 	req := ChildRunRequest{
 		ID:                   childID,
 		Stage:                opts.Stage,

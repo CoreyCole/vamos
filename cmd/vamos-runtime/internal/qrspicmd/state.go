@@ -63,6 +63,7 @@ type ChildRunRef struct {
 	SessionPath             string          `json:"sessionPath,omitempty"`
 	DonePath                string          `json:"donePath"`
 	StatusPath              string          `json:"statusPath"`
+	ResultID                string          `json:"resultId,omitempty"`
 	ResultPath              string          `json:"resultPath,omitempty"`
 	ValidationStatusPath    string          `json:"validationStatusPath,omitempty"`
 	LastDeliveryID          string          `json:"lastDeliveryId,omitempty"`
