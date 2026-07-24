@@ -59,6 +59,8 @@ func newCommand(d deps) *cobra.Command {
 		newRecoverManualCommand(d),
 		newRecoverSummaryCommand(d),
 		newResultCommand(d),
+		newVamosCommand(d),
+		newManageCommand(d),
 		newValidateResultCommand(d),
 		newDecideNextCommand(d),
 		newRepromptChildCommand(d),
@@ -486,6 +488,49 @@ func newResultCommand(d deps) *cobra.Command {
 		StringVar(&opts.Artifact, "artifact", "", "primary thoughts-relative artifact")
 	result.AddCommand(init)
 	return result
+}
+
+func newVamosCommand(d deps) *cobra.Command {
+	opts := ResultHandoffOptions{}
+	cmd := &cobra.Command{
+		Use:   "vamos <result-id> --plan-dir <path> [--print|--inject]",
+		Short: "Render a durable result record for a manager-free Pi handoff",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			opts.ResultID = args[0]
+			return RunResultHandoff(opts, cmd.OutOrStdout())
+		},
+	}
+	cmd.Flags().StringVar(&opts.PlanDir, "plan-dir", "", "QRSPI plan directory")
+	cmd.Flags().BoolVar(&opts.Print, "print", false, "print result context")
+	cmd.Flags().
+		BoolVar(&opts.Inject, "inject", false, "emit result context for current-session injection")
+	return cmd
+}
+
+func newManageCommand(d deps) *cobra.Command {
+	manage := &cobra.Command{
+		Use:   "manage",
+		Short: "Manage explicit q-manager attachments",
+	}
+	opts := AttachManagedSessionOptions{}
+	attach := &cobra.Command{
+		Use:   "attach --plan-dir <path> --manager-run <id> --result <id> --session <proof>",
+		Short: "Attach an eligible durable result to its exact manager child",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return RunAttachManagedSession(cmd.Context(), opts, d, cmd.OutOrStdout())
+		},
+	}
+	attach.Flags().StringVar(&opts.PlanDir, "plan-dir", "", "QRSPI plan directory")
+	attach.Flags().
+		StringVar(&opts.ProjectRoot, "project-root", "", "project repository root")
+	attach.Flags().
+		StringVar(&opts.ManagerRunID, "manager-run", "", "eligible manager run ID")
+	attach.Flags().StringVar(&opts.ResultID, "result", "", "durable result ID")
+	attach.Flags().
+		StringVar(&opts.SessionProof, "session", "", "current Pi session proof")
+	manage.AddCommand(attach)
+	return manage
 }
 
 func newValidateResultCommand(d deps) *cobra.Command {
