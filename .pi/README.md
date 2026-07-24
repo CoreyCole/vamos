@@ -20,4 +20,6 @@ Chestnut development, `.agents` is a symlink to a shared agent configuration
 checkout; `.pi` is intentionally project-local to Vamos.
 
 Do not commit Pi runtime state here. Keep sessions, package installs, auth, and
-other generated files ignored.
+other generated files ignored. QRSPI review artifacts are plan-owned files under
+`thoughts/.../reviews/.../context/`; `.pi-subagents/` is disposable pi-subagents
+telemetry/debug output, never a canonical QRSPI artifact path.
