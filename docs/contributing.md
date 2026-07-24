@@ -1,5 +1,20 @@
 # Contributing
 
+## Git pre-commit checks
+
+Install the tracked hook once per checkout:
+
+```bash
+git config core.hooksPath .githooks
+```
+
+The hook reads staged paths. SQL query/schema changes require `sqlc v1.31.1`, templ changes require `templ v0.3.1001`, and relevant generated or Go changes compile `./cmd/server`. Install those exact generator versions before committing generated output:
+
+```bash
+go install github.com/sqlc-dev/sqlc/cmd/sqlc@v1.31.1
+go install github.com/a-h/templ/cmd/templ@v0.3.1001
+```
+
 ## Build loop
 
 Use the repository build wrapper for generated assets and compile checks without restarting a configured running host:
