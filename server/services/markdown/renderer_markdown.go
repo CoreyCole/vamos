@@ -22,14 +22,21 @@ func NewMarkdownDocumentRenderer(
 	renderer *Renderer,
 	projects server.ProjectsConfig,
 ) MarkdownDocumentRenderer {
-	return MarkdownDocumentRenderer{service: service, renderer: renderer, projects: projects}
+	return MarkdownDocumentRenderer{
+		service:  service,
+		renderer: renderer,
+		projects: projects,
+	}
 }
 
 func (r MarkdownDocumentRenderer) Match(req DocumentRequest) bool {
 	return req.Extension == ".md" || req.Extension == ".markdown"
 }
 
-func (r MarkdownDocumentRenderer) Render(_ context.Context, req DocumentRequest) (RenderedDocument, error) {
+func (r MarkdownDocumentRenderer) Render(
+	_ context.Context,
+	req DocumentRequest,
+) (RenderedDocument, error) {
 	content, err := os.ReadFile(req.FullPath)
 	if err != nil {
 		return RenderedDocument{}, fmt.Errorf("error reading file: %w", err)
@@ -42,16 +49,28 @@ func (r MarkdownDocumentRenderer) Render(_ context.Context, req DocumentRequest)
 	parser := parser.NewWithExtensions(parser.CommonExtensions | parser.AutoHeadingIDs)
 	parsed := parser.Parse(markdownContent)
 	toc := r.service.extractTableOfContents(parsed)
-	sections := r.renderer.RenderToSections(markdownContent)
-	htmlContent := r.renderer.MarkdownBytesToHTML(markdownContent)
+	sections, err := r.renderer.RenderToSections(markdownContent)
+	if err != nil {
+		return RenderedDocument{}, fmt.Errorf("render markdown sections: %w", err)
+	}
+	htmlContent, err := r.renderer.MarkdownBytesToHTML(markdownContent)
+	if err != nil {
+		return RenderedDocument{}, fmt.Errorf("render markdown HTML: %w", err)
+	}
 	if frontmatter != nil {
 		gh := r.renderer.ResolveGitHubRepo(githubRepoKeyForFrontmatter(frontmatter))
 		if gh != nil {
 			htmlContent = LinkCodePathsToGitHub(htmlContent, gh)
 			for i := range sections {
-				sections[i].HeadingHTML = LinkCodePathsToGitHub(sections[i].HeadingHTML, gh)
+				sections[i].HeadingHTML = LinkCodePathsToGitHub(
+					sections[i].HeadingHTML,
+					gh,
+				)
 				sections[i].BodyHTML = LinkCodePathsToGitHub(sections[i].BodyHTML, gh)
-				sections[i].HTMLContent = LinkCodePathsToGitHub(sections[i].HTMLContent, gh)
+				sections[i].HTMLContent = LinkCodePathsToGitHub(
+					sections[i].HTMLContent,
+					gh,
+				)
 			}
 		}
 	}

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	stdhtml "html"
 	"io"
 	"path/filepath"
 	"regexp"
@@ -29,7 +30,6 @@ type Renderer struct {
 	highlightStyle      *chroma.Style
 	htmlFormatter       *html.Formatter
 	sourceHTMLFormatter *html.Formatter
-	mdhtmlRenderer      *mdhtml.Renderer
 	projects            server.ProjectsConfig
 }
 
@@ -68,25 +68,31 @@ func NewRendererWithProjects(
 	if sourceHTMLFormatter == nil {
 		return nil, errors.New("couldn't create source html formatter")
 	}
-	mdhtmlRenderer := mdhtmlRenderer(highlightStyle, htmlFormatter)
 	return &Renderer{
 		highlightStyle:      highlightStyle,
 		htmlFormatter:       htmlFormatter,
 		sourceHTMLFormatter: sourceHTMLFormatter,
-		mdhtmlRenderer:      mdhtmlRenderer,
 		projects:            projects,
 	}, nil
 }
 
-func (m Renderer) MarkdownBytesToHTML(md []byte) string {
+func (m Renderer) MarkdownBytesToHTML(md []byte) (string, error) {
 	md = renderableMarkdown(md)
 
 	// Use parser with NoEmptyLineBeforeBlock so lists work without a preceding blank line
 	p := parser.NewWithExtensions(
 		parser.CommonExtensions | parser.AutoHeadingIDs | parser.NoEmptyLineBeforeBlock,
 	)
-	htmlBytes := markdown.ToHTML(md, p, m.mdhtmlRenderer)
-	return string(htmlBytes)
+	state := &renderState{}
+	htmlBytes := markdown.ToHTML(
+		md,
+		p,
+		mdhtmlRenderer(m.highlightStyle, m.htmlFormatter, state),
+	)
+	if err := state.Err(); err != nil {
+		return "", err
+	}
+	return string(htmlBytes), nil
 }
 
 func (m Renderer) HighlightSource(source, lang string) (string, error) {
@@ -95,7 +101,14 @@ func (m Renderer) HighlightSource(source, lang string) (string, error) {
 	if formatter == nil {
 		formatter = m.htmlFormatter
 	}
-	if err := htmlHighlight(&buf, source, lang, "", m.highlightStyle, formatter); err != nil {
+	if err := htmlHighlight(
+		&buf,
+		source,
+		lang,
+		"",
+		m.highlightStyle,
+		formatter,
+	); err != nil {
 		return "", err
 	}
 	return buf.String(), nil
@@ -201,37 +214,89 @@ func renderCode(
 	)
 }
 
+type renderState struct {
+	err error
+}
+
+func (s *renderState) Err() error { return s.err }
+
+func (s *renderState) record(err error) ast.WalkStatus {
+	if s.err != nil {
+		return ast.Terminate
+	}
+	if err != nil {
+		s.err = err
+		return ast.Terminate
+	}
+	return ast.GoToNext
+}
+
+func (s *renderState) recordWrite(n, want int, err error) ast.WalkStatus {
+	if err != nil {
+		return s.record(err)
+	}
+	if n != want {
+		return s.record(io.ErrShortWrite)
+	}
+	return s.record(nil)
+}
+
+func (s *renderState) write(w io.Writer, p []byte) ast.WalkStatus {
+	n, err := w.Write(p)
+	return s.recordWrite(n, len(p), err)
+}
+
+func (s *renderState) writeString(w io.Writer, value string) ast.WalkStatus {
+	return s.write(w, []byte(value))
+}
+
+func (s *renderState) printf(w io.Writer, format string, args ...any) ast.WalkStatus {
+	return s.writeString(w, fmt.Sprintf(format, args...))
+}
+
 func mdhtmlRenderer(
 	highlightStyle *chroma.Style,
 	htmlFormatter *html.Formatter,
+	state *renderState,
 ) *mdhtml.Renderer {
-	opts := mdhtml.RendererOptions{
+	write := func(w io.Writer, value string) ast.WalkStatus { return state.writeString(w, value) }
+	printf := func(w io.Writer, format string, args ...any) ast.WalkStatus {
+		return state.printf(w, format, args...)
+	}
+	return mdhtml.NewRenderer(mdhtml.RendererOptions{
 		Flags:           mdhtml.CommonFlags,
 		HeadingIDPrefix: "",
 		HeadingIDSuffix: "",
 		RenderNodeHook: func(w io.Writer, node ast.Node, entering bool) (ast.WalkStatus, bool) {
+			if state.Err() != nil {
+				return ast.Terminate, true
+			}
 			if code, ok := node.(*ast.CodeBlock); ok {
-				_, _ = w.Write([]byte(`<div class="markdown-code-block">`))
-				err := renderCode(w, code, highlightStyle, htmlFormatter)
-				if err != nil {
-					fmt.Println("error rendering code")
-					return ast.Terminate, false
+				if write(w, `<div class="markdown-code-block">`) == ast.Terminate {
+					return ast.Terminate, true
 				}
-				_, _ = w.Write([]byte("</div>"))
-				return ast.GoToNext, true
+				if err := renderCode(w, code, highlightStyle, htmlFormatter); err != nil {
+					return state.record(err), true
+				}
+				return write(w, "</div>"), true
 			}
 			if code, ok := node.(*ast.Code); ok {
-				content := string(code.Literal)
-				if path, ok := normalizeThoughtsPath(content); ok {
-					fmt.Fprintf(
+				if path, ok := normalizeThoughtsPath(string(code.Literal)); ok {
+					if printf(
 						w,
 						`<a class="%s" href="%s"><code>`,
 						thoughtsLinkClass,
 						path,
-					)
-					mdhtml.EscapeHTML(w, code.Literal)
-					_, _ = w.Write([]byte("</code></a>"))
-					return ast.GoToNext, true
+					) == ast.Terminate {
+						return ast.Terminate, true
+					}
+					if write(
+						w,
+						stdhtml.EscapeString(string(code.Literal)),
+					) == ast.Terminate {
+						return ast.Terminate, true
+					}
+					return write(w, "</code></a>"), true
 				}
 				return ast.GoToNext, false
 			}
@@ -240,222 +305,170 @@ func mdhtmlRenderer(
 					dest := string(link.Destination)
 					isInternal := strings.HasPrefix(dest, "/thoughts") ||
 						strings.HasPrefix(dest, "thoughts/")
-
-					_, _ = w.Write([]byte(
+					if write(
+						w,
 						`<a class="font-medium text-primary hover:text-primary/80 transition-colors underline decoration-primary/30 hover:decoration-primary/80"`,
-					))
-
+					) == ast.Terminate {
+						return ast.Terminate, true
+					}
 					if isInternal {
 						if !strings.HasPrefix(dest, "/") {
 							dest = "/" + dest
 						}
-						fmt.Fprintf(w, ` href="%s"`, dest)
-					} else if len(dest) > 0 {
-						fmt.Fprintf(
-							w,
-							` href="%s" target="_blank" rel="noopener noreferrer"`,
-							dest,
-						)
+						if printf(w, ` href="%s"`, dest) == ast.Terminate {
+							return ast.Terminate, true
+						}
+					} else if len(dest) > 0 && printf(w, ` href="%s" target="_blank" rel="noopener noreferrer"`, dest) == ast.Terminate {
+						return ast.Terminate, true
 					}
-
-					if len(link.Title) > 0 {
-						fmt.Fprintf(w, ` title="%s"`, string(link.Title))
+					if len(link.Title) > 0 &&
+						printf(w, ` title="%s"`, string(link.Title)) == ast.Terminate {
+						return ast.Terminate, true
 					}
-					_, _ = w.Write([]byte(">"))
-				} else {
-					_, _ = w.Write([]byte("</a>"))
+					return write(w, ">"), true
 				}
-				return ast.GoToNext, true
+				return write(w, "</a>"), true
 			}
 			if heading, ok := node.(*ast.Heading); ok && entering {
-				headingClass := fmt.Sprintf(
-					"myh myh-%d",
-					min(heading.Level, 6), // max supported level is 6
-				)
-
 				attr := heading.Attribute
 				if attr == nil {
 					attr = &ast.Attribute{}
 				}
 				attr.Classes = append(
 					attr.Classes,
-					[]byte(headingClass),
+					[]byte(fmt.Sprintf("myh myh-%d", min(heading.Level, 6))),
 				)
 				heading.Attribute = attr
 			}
 			if list, ok := node.(*ast.List); ok {
-				listTag := "ul"
-				listClass := "list-disc"
+				tag, class := "ul", "list-disc"
 				if list.ListFlags&ast.ListTypeOrdered != 0 {
-					listTag = "ol"
-					listClass = "list-decimal"
+					tag, class = "ol", "list-decimal"
 				}
 				if entering {
-					// Start of the list - use pl-6 for padding so markers display
-					fmt.Fprintf(
+					return printf(
 						w,
 						`<%s class="%s pl-6 my-4 space-y-2">`,
-						listTag,
-						listClass,
-					)
-				} else {
-					// End of the list
-					fmt.Fprintf(w, "</%s>", listTag)
+						tag,
+						class,
+					), true
 				}
-				return ast.GoToNext, true
+				return printf(w, "</%s>", tag), true
 			}
-			if listItem, ok := node.(*ast.ListItem); ok {
+			if item, ok := node.(*ast.ListItem); ok {
 				if entering {
-					isChecked, hasCheckbox := detectCheckbox(listItem)
-					if hasCheckbox {
-						_, _ = w.Write(
-							[]byte(
-								`<li class="leading-relaxed flex items-start gap-2 list-none -ml-6">`,
-							),
-						)
-						if isChecked {
-							_, _ = w.Write(
-								[]byte(
-									`<input type="checkbox" checked disabled class="mt-1.5 h-4 w-4 shrink-0 rounded border border-primary bg-primary text-primary-foreground accent-primary" />`,
-								),
-							)
-						} else {
-							_, _ = w.Write(
-								[]byte(
-									`<input type="checkbox" disabled class="mt-1.5 h-4 w-4 shrink-0 rounded border border-input bg-background accent-primary" />`,
-								),
-							)
+					checked, checkbox := detectCheckbox(item)
+					if !checkbox {
+						return write(w, `<li class="leading-relaxed">`), true
+					}
+					if write(
+						w,
+						`<li class="leading-relaxed flex items-start gap-2 list-none -ml-6">`,
+					) == ast.Terminate {
+						return ast.Terminate, true
+					}
+					if checked {
+						if write(
+							w,
+							`<input type="checkbox" checked disabled class="mt-1.5 h-4 w-4 shrink-0 rounded border border-primary bg-primary text-primary-foreground accent-primary" />`,
+						) == ast.Terminate {
+							return ast.Terminate, true
 						}
-						_, _ = w.Write([]byte(`<span>`))
-					} else {
-						_, _ = w.Write([]byte(`<li class="leading-relaxed">`))
+					} else if write(w, `<input type="checkbox" disabled class="mt-1.5 h-4 w-4 shrink-0 rounded border border-input bg-background accent-primary" />`) == ast.Terminate {
+						return ast.Terminate, true
 					}
-				} else {
-					// Check if we need to close the span for checkbox items
-					_, hasCheckbox := detectCheckbox(listItem)
-					if hasCheckbox {
-						_, _ = w.Write([]byte("</span>"))
-					}
-					_, _ = w.Write([]byte("</li>"))
+					return write(w, `<span>`), true
 				}
-				return ast.GoToNext, true
+				if _, checkbox := detectCheckbox(
+					item,
+				); checkbox &&
+					write(w, "</span>") == ast.Terminate {
+					return ast.Terminate, true
+				}
+				return write(w, "</li>"), true
 			}
-			// Handle Text nodes to strip checkbox pattern from display
 			if text, ok := node.(*ast.Text); ok && entering {
 				content := string(text.Literal)
-				// Check if this text is inside a checkbox list item and needs stripping
 				if isInsideCheckboxListItem(text) {
-					// Strip the checkbox pattern from the beginning
-					if strings.HasPrefix(content, "[ ] ") {
-						content = content[4:]
-					} else if strings.HasPrefix(content, "[x] ") || strings.HasPrefix(content, "[X] ") {
-						content = content[4:]
-					}
-					_, _ = w.Write([]byte(content))
-					return ast.GoToNext, true
+					content = strings.TrimPrefix(
+						strings.TrimPrefix(strings.TrimPrefix(content, "[ ] "), "[x] "),
+						"[X] ",
+					)
+					return write(w, content), true
 				}
-
-				// Auto-link bare thoughts/ paths (skip if inside inline code)
 				if strings.Contains(content, "thoughts/") && !isInsideCode(text) {
-					_, _ = w.Write([]byte(autoLinkThoughtsPaths(content)))
-					return ast.GoToNext, true
+					return write(w, autoLinkThoughtsPaths(content)), true
 				}
 			}
-			if p, ok := node.(*ast.Paragraph); ok {
-				attr := p.Attribute
+			if paragraph, ok := node.(*ast.Paragraph); ok {
+				attr := paragraph.Attribute
 				if attr == nil {
 					attr = &ast.Attribute{}
 				}
 				attr.Classes = append(attr.Classes, []byte("text-lg"))
-				p.Attribute = attr
+				paragraph.Attribute = attr
 			}
-			// Custom table rendering - structure only, colors handled by CSS
-			// so .markdown-viewer and .chat-message-content can style differently
 			if _, ok := node.(*ast.Table); ok {
 				if entering {
-					_, _ = w.Write(
-						[]byte(
-							`<div class="table-wrapper"><table>`,
-						),
-					)
-				} else {
-					_, _ = w.Write([]byte("</table></div>"))
+					return write(w, `<div class="table-wrapper"><table>`), true
 				}
-				return ast.GoToNext, true
+				return write(w, "</table></div>"), true
 			}
 			if _, ok := node.(*ast.TableHeader); ok {
 				if entering {
-					_, _ = w.Write([]byte(`<thead>`))
-				} else {
-					_, _ = w.Write([]byte("</thead>"))
+					return write(w, `<thead>`), true
 				}
-				return ast.GoToNext, true
+				return write(w, "</thead>"), true
 			}
 			if _, ok := node.(*ast.TableBody); ok {
 				if entering {
-					_, _ = w.Write([]byte("<tbody>"))
-				} else {
-					_, _ = w.Write([]byte("</tbody>"))
+					return write(w, "<tbody>"), true
 				}
-				return ast.GoToNext, true
+				return write(w, "</tbody>"), true
 			}
 			if _, ok := node.(*ast.TableRow); ok {
 				if entering {
-					_, _ = w.Write([]byte(`<tr>`))
-				} else {
-					_, _ = w.Write([]byte("</tr>"))
+					return write(w, `<tr>`), true
 				}
-				return ast.GoToNext, true
+				return write(w, "</tr>"), true
 			}
 			if cell, ok := node.(*ast.TableCell); ok {
+				tag, align := "td", ""
+				if cell.IsHeader {
+					tag = "th"
+				}
+				switch cell.Align {
+				case ast.TableAlignmentLeft:
+					align = " text-left"
+				case ast.TableAlignmentRight:
+					align = " text-right"
+				case ast.TableAlignmentCenter:
+					align = " text-center"
+				}
+				if cell.IsHeader && align == "" {
+					align = " text-left"
+				}
 				if entering {
-					tag := "td"
 					if cell.IsHeader {
-						tag = "th"
-					}
-					align := ""
-					switch cell.Align {
-					case ast.TableAlignmentLeft:
-						align = " text-left"
-					case ast.TableAlignmentRight:
-						align = " text-right"
-					case ast.TableAlignmentCenter:
-						align = " text-center"
-					}
-					if cell.IsHeader {
-						// Default to left alignment for headers unless explicitly set
-						if align == "" {
-							align = " text-left"
-						}
-						fmt.Fprintf(
+						return printf(
 							w,
 							`<%s class="px-4 py-3 text-sm font-semibold text-foreground%s">`,
 							tag,
 							align,
-						)
-					} else {
-						fmt.Fprintf(
-							w,
-							`<%s class="px-4 py-3 text-sm text-foreground%s">`,
-							tag,
-							align,
-						)
+						), true
 					}
-				} else {
-					tag := "td"
-					if cell.IsHeader {
-						tag = "th"
-					}
-					fmt.Fprintf(w, "</%s>", tag)
+					return printf(
+						w,
+						`<%s class="px-4 py-3 text-sm text-foreground%s">`,
+						tag,
+						align,
+					), true
 				}
-				return ast.GoToNext, true
+				return printf(w, "</%s>", tag), true
 			}
-
-			// return false to tell html.Renderer to use default render
 			return ast.GoToNext, false
 		},
-	}
-	return mdhtml.NewRenderer(opts)
+	})
 }
 
 // detectCheckbox checks if a list item contains a task list checkbox pattern
@@ -579,7 +592,7 @@ func autoLinkThoughtsPaths(content string) string {
 }
 
 // RenderToSections parses markdown and returns sections with metadata
-func (m Renderer) RenderToSections(md []byte) []Section {
+func (m Renderer) RenderToSections(md []byte) ([]Section, error) {
 	md = renderableMarkdown(md)
 
 	// Parse markdown to AST - NoEmptyLineBeforeBlock allows lists without preceding blank
@@ -589,6 +602,8 @@ func (m Renderer) RenderToSections(md []byte) []Section {
 	)
 	doc := p.Parse(md)
 
+	state := &renderState{}
+	renderer := mdhtmlRenderer(m.highlightStyle, m.htmlFormatter, state)
 	sections := []Section{}
 	sectionID := 0
 	currentSectionNodes := []ast.Node{}
@@ -601,12 +616,17 @@ func (m Renderer) RenderToSections(md []byte) []Section {
 		if heading, ok := node.(*ast.Heading); ok {
 			// Save previous section if it has content
 			if len(currentSectionNodes) > 0 {
-				section := m.renderSection(
+				section, err := m.renderSection(
+					renderer,
+					state,
 					sectionID,
 					currentSectionNodes,
 					lineStart,
 					currentSectionTitle,
 				)
+				if err != nil {
+					return nil, err
+				}
 				sections = append(sections, section)
 				sectionID++
 			}
@@ -623,25 +643,32 @@ func (m Renderer) RenderToSections(md []byte) []Section {
 
 	// Add final section
 	if len(currentSectionNodes) > 0 {
-		section := m.renderSection(
+		section, err := m.renderSection(
+			renderer,
+			state,
 			sectionID,
 			currentSectionNodes,
 			lineStart,
 			currentSectionTitle,
 		)
+		if err != nil {
+			return nil, err
+		}
 		sections = append(sections, section)
 	}
 
-	return sections
+	return sections, nil
 }
 
 // renderSection renders a group of AST nodes into a section
 func (m Renderer) renderSection(
+	renderer *mdhtml.Renderer,
+	state *renderState,
 	id int,
 	nodes []ast.Node,
 	lineStart int,
 	title string,
-) Section {
+) (Section, error) {
 	sectionID := fmt.Sprintf("section-%d", id)
 
 	// Render heading and body separately
@@ -653,18 +680,21 @@ func (m Renderer) renderSection(
 		// First node is the heading (if section has a title)
 		if i == 0 && title != "" {
 			ast.WalkFunc(node, func(n ast.Node, entering bool) ast.WalkStatus {
-				return m.mdhtmlRenderer.RenderNode(&headingBuf, n, entering)
+				return renderer.RenderNode(&headingBuf, n, entering)
 			})
 			ast.WalkFunc(node, func(n ast.Node, entering bool) ast.WalkStatus {
-				return m.mdhtmlRenderer.RenderNode(&fullBuf, n, entering)
+				return renderer.RenderNode(&fullBuf, n, entering)
 			})
 		} else {
 			ast.WalkFunc(node, func(n ast.Node, entering bool) ast.WalkStatus {
-				return m.mdhtmlRenderer.RenderNode(&bodyBuf, n, entering)
+				return renderer.RenderNode(&bodyBuf, n, entering)
 			})
 			ast.WalkFunc(node, func(n ast.Node, entering bool) ast.WalkStatus {
-				return m.mdhtmlRenderer.RenderNode(&fullBuf, n, entering)
+				return renderer.RenderNode(&fullBuf, n, entering)
 			})
+		}
+		if err := state.Err(); err != nil {
+			return Section{}, err
 		}
 	}
 
@@ -688,7 +718,7 @@ func (m Renderer) renderSection(
 		LineStart:   lineStart,
 		LineEnd:     lineEnd,
 		Title:       title,
-	}
+	}, nil
 }
 
 // extractHeadingText extracts plain text from a heading node
@@ -726,7 +756,10 @@ func (m Renderer) ResolveGitHubRepo(repo string) *GitHubRepo {
 	return ResolveGitHubRepoFromProjects(m.projects, repo)
 }
 
-func ResolveGitHubRepoFromProjectID(projects server.ProjectsConfig, projectID string) *GitHubRepo {
+func ResolveGitHubRepoFromProjectID(
+	projects server.ProjectsConfig,
+	projectID string,
+) *GitHubRepo {
 	return ResolveGitHubRepoFromProjects(projects, projectID)
 }
 

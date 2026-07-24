@@ -1,12 +1,24 @@
 package markdown
 
 import (
+	"errors"
+	"io"
 	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/gomarkdown/markdown/ast"
+
 	"github.com/CoreyCole/vamos/server"
 )
+
+type failingWriter struct{ err error }
+
+func (w failingWriter) Write([]byte) (int, error) { return 0, w.err }
+
+type shortWriter struct{}
+
+func (shortWriter) Write(p []byte) (int, error) { return len(p) - 1, nil }
 
 func TestMarkdownBytesToHTML_LinksInlineThoughtsPath(t *testing.T) {
 	r, err := NewRenderer("github-dark")
@@ -17,7 +29,10 @@ func TestMarkdownBytesToHTML_LinksInlineThoughtsPath(t *testing.T) {
 	md := []byte(
 		"That matches (`thoughts/CoreyCole/plans/2026-04-14_15-28-42_eq-automated-holds/prds/2026-04-14_15-28-42_holds-v2-prd.md`).",
 	)
-	html := r.MarkdownBytesToHTML(md)
+	html, err := r.MarkdownBytesToHTML(md)
+	if err != nil {
+		t.Fatalf("MarkdownBytesToHTML() error = %v", err)
+	}
 
 	want := `<a class="` + thoughtsLinkClass + `" href="/thoughts/CoreyCole/plans/2026-04-14_15-28-42_eq-automated-holds/prds/2026-04-14_15-28-42_holds-v2-prd.md"><code>thoughts/CoreyCole/plans/2026-04-14_15-28-42_eq-automated-holds/prds/2026-04-14_15-28-42_holds-v2-prd.md</code></a>`
 	if !strings.Contains(html, want) {
@@ -32,7 +47,10 @@ func TestMarkdownBytesToHTML_RendersFrontmatterAsYAMLCodeBlock(t *testing.T) {
 	}
 
 	md := []byte("---\ndate: 2026-04-19\ntopic: Renderer Test\n---\n\n# Heading")
-	html := r.MarkdownBytesToHTML(md)
+	html, err := r.MarkdownBytesToHTML(md)
+	if err != nil {
+		t.Fatalf("MarkdownBytesToHTML() error = %v", err)
+	}
 
 	if strings.Contains(html, "<hr") {
 		t.Fatalf(
@@ -51,6 +69,52 @@ func TestMarkdownBytesToHTML_RendersFrontmatterAsYAMLCodeBlock(t *testing.T) {
 			"expected body markdown to still render after frontmatter; html = %s",
 			html,
 		)
+	}
+}
+
+func TestRenderStatePreservesFirstWriteErrorAndTerminates(t *testing.T) {
+	sentinel := errors.New("write failed")
+	state := &renderState{}
+	if got := state.write(
+		failingWriter{err: sentinel},
+		[]byte("x"),
+	); got != ast.Terminate {
+		t.Fatalf("write status = %v, want Terminate", got)
+	}
+	if !errors.Is(state.Err(), sentinel) {
+		t.Fatalf("state error = %v, want sentinel", state.Err())
+	}
+	state.write(failingWriter{err: errors.New("later")}, []byte("x"))
+	if !errors.Is(state.Err(), sentinel) {
+		t.Fatalf("state error replaced: %v", state.Err())
+	}
+}
+
+func TestRenderStateMapsShortWriteAndHookTerminates(t *testing.T) {
+	state := &renderState{}
+	if got := state.write(shortWriter{}, []byte("x")); got != ast.Terminate {
+		t.Fatalf("short write status = %v, want Terminate", got)
+	}
+	if !errors.Is(state.Err(), io.ErrShortWrite) {
+		t.Fatalf("state error = %v, want io.ErrShortWrite", state.Err())
+	}
+
+	r, err := NewRenderer(DefaultCodeStyle)
+	if err != nil {
+		t.Fatalf("NewRenderer() error = %v", err)
+	}
+	state = &renderState{}
+	renderer := mdhtmlRenderer(r.highlightStyle, r.htmlFormatter, state)
+	status := renderer.RenderNode(
+		failingWriter{err: errors.New("hook failed")},
+		&ast.CodeBlock{Leaf: ast.Leaf{Literal: []byte("x")}},
+		true,
+	)
+	if status != ast.Terminate {
+		t.Fatalf("RenderNode status = %v, want Terminate", status)
+	}
+	if state.Err() == nil {
+		t.Fatal("hook failure was not retained")
 	}
 }
 
