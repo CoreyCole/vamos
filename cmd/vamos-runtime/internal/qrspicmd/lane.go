@@ -6,8 +6,10 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -82,6 +84,178 @@ type LaneRunner interface {
 type LaneCoordinator struct {
 	Runner      LaneRunner
 	MaxParallel int
+}
+
+// DetachedLaneRunner is deliberately separate from the interactive child runner.
+// It owns only one local process and its diagnostic record; it has no manager or
+// graph/result/wake dependencies.
+type DetachedLaneRunner struct {
+	ProcessRunner LaneProcessRunner
+	mu            sync.Mutex
+	processes     map[int]LaneProcess
+}
+
+func BuildLaneCommand(spec LaneSpec) []string {
+	contract := "You are a non-interactive, read-only QRSPI review lane. Do not start agents, use QRSPI commands, create results, notify supervisors, or modify files except the assigned report. Write a substantive Markdown report only to: " + spec.ReportPath
+	script := `set -o pipefail
+: > "$OUTPUT_PATH"
+{ pi --print --no-extensions --session-id "$SESSION_ID" --session-dir "$SESSION_DIR" --name "$SESSION_NAME" "$(cat "$PROMPT_FILE")\n\n$LANE_CONTRACT"; } > "$OUTPUT_PATH" 2>&1`
+	return []string{
+		"env",
+		"PROMPT_FILE=" + spec.PromptFile,
+		"OUTPUT_PATH=" + LaneOutputPath(spec),
+		"SESSION_ID=" + spec.SessionID,
+		"SESSION_DIR=" + spec.SessionDir,
+		"SESSION_NAME=" + string(spec.Role),
+		"LANE_CONTRACT=" + contract,
+		"bash", "-lc", script,
+	}
+}
+
+func (r *DetachedLaneRunner) Start(
+	ctx context.Context,
+	spec LaneSpec,
+) (LaneRecord, error) {
+	if err := ValidateLaneSpec(spec); err != nil {
+		return LaneRecord{}, err
+	}
+	if r.ProcessRunner == nil {
+		r.ProcessRunner = ExecLaneProcessRunner{}
+	}
+	if err := os.MkdirAll(LaneAttemptDir(spec), 0o755); err != nil {
+		return LaneRecord{}, err
+	}
+	record := LaneRecord{
+		SchemaVersion: laneSchemaVersion,
+		Spec:          spec,
+		State:         LaneQueued,
+		StatusPath:    LaneStatusPath(spec),
+		EventsPath:    LaneEventsPath(spec),
+		OutputPath:    LaneOutputPath(spec),
+	}
+	if err := WriteLaneRecord(LaneRecordPath(spec), record); err != nil {
+		return LaneRecord{}, err
+	}
+	process, err := r.ProcessRunner.Start(ctx, BuildLaneCommand(spec), spec.Cwd)
+	if err != nil {
+		record.State, record.FinishedAt, record.ErrorTail = LaneFailed, time.Now().
+			UTC(),
+			boundedLaneDiagnostic(
+				err.Error(),
+			)
+		return record, WriteLaneRecord(LaneRecordPath(spec), record)
+	}
+	record.State, record.PID, record.StartedAt = LaneRunning, process.PID(), time.Now().
+		UTC()
+	if err := WriteLaneRecord(LaneRecordPath(spec), record); err != nil {
+		return LaneRecord{}, err
+	}
+	r.mu.Lock()
+	if r.processes == nil {
+		r.processes = make(map[int]LaneProcess)
+	}
+	r.processes[record.PID] = process
+	r.mu.Unlock()
+	return record, nil
+}
+
+func (r *DetachedLaneRunner) Wait(
+	ctx context.Context,
+	record LaneRecord,
+) (LaneRecord, error) {
+	if record.State != LaneRunning {
+		return record, fmt.Errorf("lane %q is not running", record.Spec.ID)
+	}
+	r.mu.Lock()
+	process := r.processes[record.PID]
+	r.mu.Unlock()
+	if process == nil {
+		return record, fmt.Errorf("lane process %d is unavailable", record.PID)
+	}
+	waitCtx, cancel := context.WithTimeout(ctx, record.Spec.Timeout)
+	defer cancel()
+	exit, err := r.ProcessRunner.Wait(waitCtx, process)
+	if waitCtx.Err() != nil {
+		_ = r.ProcessRunner.Cancel(context.Background(), process)
+		err = waitCtx.Err()
+	}
+	record.FinishedAt, record.ErrorTail = time.Now().
+		UTC(),
+		boundedLaneDiagnostic(
+			exit.ErrorTail,
+		)
+	if err != nil {
+		record.State = LaneFailed
+		if record.ErrorTail == "" {
+			record.ErrorTail = boundedLaneDiagnostic(err.Error())
+		}
+	} else if exit.ExitCode == 0 {
+		record.State = LaneSuccess
+	} else {
+		record.State = LaneFailed
+	}
+	writeErr := WriteLaneRecord(LaneRecordPath(record.Spec), record)
+	r.mu.Lock()
+	delete(r.processes, record.PID)
+	r.mu.Unlock()
+	if writeErr != nil {
+		return record, writeErr
+	}
+	return record, err
+}
+
+type execLaneProcess struct{ cmd *exec.Cmd }
+
+func (p execLaneProcess) PID() int { return p.cmd.Process.Pid }
+
+type ExecLaneProcessRunner struct{}
+
+func (ExecLaneProcessRunner) Start(
+	ctx context.Context,
+	command []string,
+	cwd string,
+) (LaneProcess, error) {
+	if len(command) == 0 {
+		return nil, errors.New("lane command is required")
+	}
+	cmd := exec.CommandContext(ctx, command[0], command[1:]...)
+	cmd.Dir = cwd
+	if err := cmd.Start(); err != nil {
+		return nil, err
+	}
+	return execLaneProcess{cmd}, nil
+}
+
+func (ExecLaneProcessRunner) Wait(
+	ctx context.Context,
+	process LaneProcess,
+) (LaneExit, error) {
+	p, ok := process.(execLaneProcess)
+	if !ok {
+		return LaneExit{}, errors.New("unsupported lane process")
+	}
+	done := make(chan error, 1)
+	go func() { done <- p.cmd.Wait() }()
+	select {
+	case err := <-done:
+		if err == nil {
+			return LaneExit{}, nil
+		}
+		if exit, ok := err.(*exec.ExitError); ok {
+			return LaneExit{ExitCode: exit.ExitCode()}, nil
+		}
+		return LaneExit{}, err
+	case <-ctx.Done():
+		return LaneExit{}, ctx.Err()
+	}
+}
+
+func (ExecLaneProcessRunner) Cancel(_ context.Context, process LaneProcess) error {
+	p, ok := process.(execLaneProcess)
+	if !ok {
+		return errors.New("unsupported lane process")
+	}
+	return p.cmd.Process.Kill()
 }
 
 func LaneAttemptDir(spec LaneSpec) string {

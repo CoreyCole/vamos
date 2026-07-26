@@ -1,6 +1,8 @@
 package qrspicmd
 
 import (
+	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -121,6 +123,85 @@ func TestLaneRecord(t *testing.T) {
 	}
 	if _, err := ReadLaneRecord(path); err == nil {
 		t.Fatal("expected malformed record error")
+	}
+}
+
+type fakeLaneProcess struct{ pid int }
+
+func (p fakeLaneProcess) PID() int { return p.pid }
+
+type fakeLaneProcessRunner struct {
+	command   []string
+	exit      LaneExit
+	waitErr   error
+	cancelled bool
+}
+
+func (r *fakeLaneProcessRunner) Start(
+	_ context.Context,
+	command []string,
+	_ string,
+) (LaneProcess, error) {
+	r.command = command
+	return fakeLaneProcess{pid: 42}, nil
+}
+
+func (r *fakeLaneProcessRunner) Wait(_ context.Context, _ LaneProcess) (LaneExit, error) {
+	return r.exit, r.waitErr
+}
+
+func (r *fakeLaneProcessRunner) Cancel(_ context.Context, _ LaneProcess) error {
+	r.cancelled = true
+	return nil
+}
+
+func TestBuildLaneCommandIsNonInteractive(t *testing.T) {
+	command := strings.Join(BuildLaneCommand(testLaneSpec(t)), " ")
+	for _, want := range []string{"pi --print --no-extensions", "--session-id", "--session-dir", "--name", "non-interactive", "read-only"} {
+		if !strings.Contains(command, want) {
+			t.Fatalf("command missing %q: %s", want, command)
+		}
+	}
+	for _, forbidden := range []string{"tmux", "Q_MANAGER_", "child-complete", "--extension", "wake", "result-record"} {
+		if strings.Contains(command, forbidden) {
+			t.Fatalf("command exposes %q: %s", forbidden, command)
+		}
+	}
+}
+
+func TestDetachedLaneRunnerPersistsTerminalState(t *testing.T) {
+	spec := testLaneSpec(t)
+	fake := &fakeLaneProcessRunner{exit: LaneExit{ExitCode: 0}}
+	runner := &DetachedLaneRunner{ProcessRunner: fake}
+	record, err := runner.Start(context.Background(), spec)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if record.State != LaneRunning || record.PID != 42 {
+		t.Fatalf("start record = %#v", record)
+	}
+	record, err = runner.Wait(context.Background(), record)
+	if err != nil || record.State != LaneSuccess {
+		t.Fatalf("wait = %#v, %v", record, err)
+	}
+	persisted, err := ReadLaneRecord(LaneRecordPath(spec))
+	if err != nil || persisted.State != LaneSuccess {
+		t.Fatalf("persisted = %#v, %v", persisted, err)
+	}
+}
+
+func TestDetachedLaneRunnerFailureIsTerminal(t *testing.T) {
+	spec := testLaneSpec(t)
+	fake := &fakeLaneProcessRunner{waitErr: errors.New("stopped")}
+	runner := &DetachedLaneRunner{ProcessRunner: fake}
+	record, err := runner.Start(context.Background(), spec)
+	if err != nil {
+		t.Fatal(err)
+	}
+	record, err = runner.Wait(context.Background(), record)
+	if err == nil || record.State != LaneFailed ||
+		!strings.Contains(record.ErrorTail, "stopped") {
+		t.Fatalf("wait = %#v, %v", record, err)
 	}
 }
 

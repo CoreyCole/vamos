@@ -741,12 +741,13 @@ type RecoverManagerOptions struct {
 }
 
 type deps struct {
-	StateStore    StateStore
-	Runner        ChildRunner
-	Tmux          TmuxClient
-	CommandRunner CommandRunner
-	Clock         func() time.Time
-	StateRoot     func() (string, error)
+	StateStore        StateStore
+	Runner            ChildRunner
+	LaneProcessRunner LaneProcessRunner
+	Tmux              TmuxClient
+	CommandRunner     CommandRunner
+	Clock             func() time.Time
+	StateRoot         func() (string, error)
 }
 
 type StateOperationLock interface {
