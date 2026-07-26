@@ -437,6 +437,88 @@ func unsafeLaneID(value string) bool {
 		strings.Contains(value, "..")
 }
 
+// Run starts a validated set of parent-owned lanes with a bounded worker pool.
+// A lane receives exactly one retry, only when its process or report fails.
+func (c LaneCoordinator) Run(
+	ctx context.Context,
+	specs []LaneSpec,
+) ([]LaneRecord, error) {
+	if c.Runner == nil {
+		return nil, errors.New("lane runner is required")
+	}
+	if err := ValidateLaneSpecs(specs); err != nil {
+		return nil, err
+	}
+	if c.MaxParallel < 1 {
+		return nil, errors.New("maximum lane parallelism must be positive")
+	}
+	if len(specs) == 0 {
+		return nil, nil
+	}
+	type job struct {
+		index int
+		spec  LaneSpec
+	}
+	type completion struct {
+		index  int
+		spec   LaneSpec
+		record LaneRecord
+		err    error
+	}
+	jobs := make(chan job)
+	completed := make(chan completion, c.MaxParallel)
+	workers := c.MaxParallel
+	if workers > len(specs) {
+		workers = len(specs)
+	}
+	var wg sync.WaitGroup
+	for range workers {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for job := range jobs {
+				record, err := c.Runner.Start(ctx, job.spec)
+				if err == nil {
+					record, err = c.Runner.Wait(ctx, record)
+				}
+				if err == nil && record.State == LaneSuccess {
+					err = ValidateLaneReport(job.spec)
+				}
+				completed <- completion{job.index, job.spec, record, err}
+			}
+		}()
+	}
+	defer func() { close(jobs); wg.Wait() }()
+
+	records := make([]LaneRecord, len(specs))
+	next, active, finished := 0, 0, 0
+	for finished < len(specs) {
+		for active < workers && next < len(specs) {
+			jobs <- job{next, specs[next]}
+			next++
+			active++
+		}
+		result := <-completed
+		active--
+		if result.err != nil || result.record.State != LaneSuccess {
+			if result.spec.Attempt == 1 {
+				retry := result.spec
+				retry.Attempt = 2
+				jobs <- job{result.index, retry}
+				active++
+				continue
+			}
+			if result.err == nil {
+				result.err = fmt.Errorf("lane %q failed", result.spec.ID)
+			}
+			return records, result.err
+		}
+		records[result.index] = result.record
+		finished++
+	}
+	return records, nil
+}
+
 func terminalLaneState(
 	state LaneState,
 ) bool {

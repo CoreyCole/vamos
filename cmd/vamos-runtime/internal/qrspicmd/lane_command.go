@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"os"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -12,6 +13,8 @@ import (
 
 type LaneRunOptions struct {
 	LaneSpec
+	SpecsFile   string
+	MaxParallel int
 }
 
 func newLaneRunCommand(d deps) *cobra.Command {
@@ -47,11 +50,44 @@ func newLaneRunCommand(d deps) *cobra.Command {
 	f.StringVar(&opts.SessionDir, "session-dir", "", "absolute Pi session directory")
 	f.IntVar(&opts.Attempt, "attempt", 1, "lane attempt (1 or 2)")
 	f.DurationVar(&opts.Timeout, "timeout", time.Hour, "maximum lane runtime")
+	f.StringVar(
+		&opts.SpecsFile,
+		"specs-file",
+		"",
+		"absolute JSON array of parent-selected lane specs",
+	)
+	f.IntVar(
+		&opts.MaxParallel,
+		"max-parallel",
+		1,
+		"maximum concurrent lanes for --specs-file",
+	)
 	return cmd
 }
 
 func RunLane(ctx context.Context, opts LaneRunOptions, d deps, out io.Writer) error {
 	runner := &DetachedLaneRunner{ProcessRunner: d.LaneProcessRunner}
+	if opts.SpecsFile != "" {
+		data, err := os.ReadFile(opts.SpecsFile)
+		if err != nil {
+			return err
+		}
+		var specs []LaneSpec
+		if err := json.Unmarshal(data, &specs); err != nil {
+			return fmt.Errorf("decode lane specs: %w", err)
+		}
+		records, err := (LaneCoordinator{Runner: runner, MaxParallel: opts.MaxParallel}).Run(
+			ctx,
+			specs,
+		)
+		if encodeErr := json.NewEncoder(out).Encode(struct {
+			Records []LaneRecord `json:"records"`
+			Reports []string     `json:"reports"`
+		}{records, laneReports(records)}); encodeErr != nil {
+			return encodeErr
+		}
+		return err
+	}
 	record, err := runner.Start(ctx, opts.LaneSpec)
 	if err != nil {
 		return err
@@ -66,5 +102,18 @@ func RunLane(ctx context.Context, opts LaneRunOptions, d deps, out io.Writer) er
 	if record.State != LaneSuccess {
 		return fmt.Errorf("lane %q exited unsuccessfully", record.Spec.ID)
 	}
+	if err := ValidateLaneReport(record.Spec); err != nil {
+		return err
+	}
 	return nil
+}
+
+func laneReports(records []LaneRecord) []string {
+	reports := make([]string, 0, len(records))
+	for _, record := range records {
+		if record.State == LaneSuccess {
+			reports = append(reports, record.Spec.ReportPath)
+		}
+	}
+	return reports
 }

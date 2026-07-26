@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 )
@@ -202,6 +203,76 @@ func TestDetachedLaneRunnerFailureIsTerminal(t *testing.T) {
 	if err == nil || record.State != LaneFailed ||
 		!strings.Contains(record.ErrorTail, "stopped") {
 		t.Fatalf("wait = %#v, %v", record, err)
+	}
+}
+
+type fakeLaneRunner struct {
+	mu       sync.Mutex
+	starts   []LaneSpec
+	attempts map[string]int
+}
+
+func (r *fakeLaneRunner) Start(_ context.Context, spec LaneSpec) (LaneRecord, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.starts = append(r.starts, spec)
+	if r.attempts == nil {
+		r.attempts = map[string]int{}
+	}
+	r.attempts[spec.ID]++
+	return LaneRecord{Spec: spec, State: LaneRunning}, nil
+}
+
+func (r *fakeLaneRunner) Wait(_ context.Context, record LaneRecord) (LaneRecord, error) {
+	if record.Spec.ID == "retry" && record.Spec.Attempt == 1 {
+		record.State = LaneFailed
+		return record, errors.New("first attempt failed")
+	}
+	if err := os.WriteFile(
+		record.Spec.ReportPath,
+		[]byte("# report"),
+		0o644,
+	); err != nil {
+		return record, err
+	}
+	record.State = LaneSuccess
+	return record, nil
+}
+
+func TestLaneCoordinatorRetriesOnlyFailedLane(t *testing.T) {
+	first := testLaneSpec(t)
+	first.ID, first.SessionID = "retry", "session-retry"
+	second := testLaneSpec(t)
+	second.ID, second.SessionID = "good", "session-good"
+	runner := &fakeLaneRunner{}
+	records, err := (LaneCoordinator{Runner: runner, MaxParallel: 2}).Run(
+		context.Background(),
+		[]LaneSpec{first, second},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(records) != 2 || records[0].Spec.Attempt != 2 || records[1].Spec.Attempt != 1 {
+		t.Fatalf("records = %#v", records)
+	}
+	if runner.attempts["retry"] != 2 || runner.attempts["good"] != 1 {
+		t.Fatalf("attempts = %#v", runner.attempts)
+	}
+}
+
+func TestLaneCoordinatorValidatesBeforeStart(t *testing.T) {
+	good := testLaneSpec(t)
+	bad := good
+	bad.ID = "../bad"
+	runner := &fakeLaneRunner{}
+	if _, err := (LaneCoordinator{Runner: runner, MaxParallel: 1}).Run(
+		context.Background(),
+		[]LaneSpec{good, bad},
+	); err == nil {
+		t.Fatal("expected validation error")
+	}
+	if len(runner.starts) != 0 {
+		t.Fatalf("started invalid set: %#v", runner.starts)
 	}
 }
 
