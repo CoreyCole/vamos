@@ -17,6 +17,27 @@ type LaneRunOptions struct {
 	MaxParallel int
 }
 
+type LaneStatusOptions struct {
+	PlanDir string
+	Record  string
+	Output  string
+}
+
+type laneStatusView struct {
+	State      LaneState `json:"state"`
+	Attempt    int       `json:"attempt"`
+	ReportPath string    `json:"reportPath"`
+	SessionID  string    `json:"sessionId"`
+	SessionDir string    `json:"sessionDir"`
+	StatusPath string    `json:"statusPath"`
+	EventsPath string    `json:"eventsPath"`
+	OutputPath string    `json:"outputPath"`
+	PID        int       `json:"pid,omitempty"`
+	StartedAt  time.Time `json:"startedAt,omitempty"`
+	FinishedAt time.Time `json:"finishedAt,omitempty"`
+	ErrorTail  string    `json:"errorTail,omitempty"`
+}
+
 func newLaneRunCommand(d deps) *cobra.Command {
 	opts := LaneRunOptions{LaneSpec: LaneSpec{Attempt: 1, Timeout: time.Hour}}
 	cmd := &cobra.Command{
@@ -63,6 +84,66 @@ func newLaneRunCommand(d deps) *cobra.Command {
 		"maximum concurrent lanes for --specs-file",
 	)
 	return cmd
+}
+
+func newLaneStatusCommand(_ deps) *cobra.Command {
+	opts := LaneStatusOptions{Output: "json"}
+	cmd := &cobra.Command{
+		Use:   "lane-status --plan-dir <path> --record <path>",
+		Short: "Inspect read-only QRSPI lane diagnostics",
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			return RunLaneStatus(opts, cmd.OutOrStdout())
+		},
+	}
+	cmd.Flags().StringVar(&opts.PlanDir, "plan-dir", "", "absolute plan directory")
+	cmd.Flags().StringVar(&opts.Record, "record", "", "absolute lane record path")
+	cmd.Flags().StringVar(&opts.Output, "output", "json", "output format: json or text")
+	return cmd
+}
+
+func RunLaneStatus(opts LaneStatusOptions, out io.Writer) error {
+	if opts.Output == "" {
+		opts.Output = "json"
+	}
+	if opts.PlanDir == "" {
+		return fmt.Errorf("plan-dir is required")
+	}
+	if opts.Record == "" {
+		return fmt.Errorf("record is required")
+	}
+	record, err := InspectLaneRecord(opts.PlanDir, opts.Record)
+	if err != nil {
+		return err
+	}
+	view := laneStatusView{
+		State:      record.State,
+		Attempt:    record.Spec.Attempt,
+		ReportPath: record.Spec.ReportPath,
+		SessionID:  record.Spec.SessionID,
+		SessionDir: record.Spec.SessionDir,
+		StatusPath: record.StatusPath,
+		EventsPath: record.EventsPath,
+		OutputPath: record.OutputPath,
+		PID:        record.PID,
+		StartedAt:  record.StartedAt,
+		FinishedAt: record.FinishedAt,
+		ErrorTail:  boundedLaneDiagnostic(record.ErrorTail),
+	}
+	if opts.Output == "text" {
+		_, err = fmt.Fprintf(
+			out,
+			"state: %s\nattempt: %d\nreport: %s\nsession: %s\n",
+			view.State,
+			view.Attempt,
+			view.ReportPath,
+			view.SessionID,
+		)
+		return err
+	}
+	if opts.Output != "json" {
+		return fmt.Errorf("unsupported output format %q", opts.Output)
+	}
+	return json.NewEncoder(out).Encode(view)
 }
 
 func RunLane(ctx context.Context, opts LaneRunOptions, d deps, out io.Writer) error {

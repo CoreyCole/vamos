@@ -48,6 +48,7 @@ func newCommand(d deps) *cobra.Command {
 		newSetPolicyCommand(d),
 		newRunChildCommand(d),
 		newLaneRunCommand(d),
+		newLaneStatusCommand(d),
 		newChildCompleteCommand(d),
 		newManagerReadyCommand(d),
 		newDoctorCommand(d),

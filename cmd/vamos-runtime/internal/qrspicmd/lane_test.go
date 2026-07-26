@@ -1,6 +1,7 @@
 package qrspicmd
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"os"
@@ -273,6 +274,59 @@ func TestLaneCoordinatorValidatesBeforeStart(t *testing.T) {
 	}
 	if len(runner.starts) != 0 {
 		t.Fatalf("started invalid set: %#v", runner.starts)
+	}
+}
+
+func TestInspectLaneRecordRejectsUnsafePaths(t *testing.T) {
+	spec := testLaneSpec(t)
+	path := LaneRecordPath(spec)
+	if err := WriteLaneRecord(
+		path,
+		LaneRecord{Spec: spec, State: LaneSuccess},
+	); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := InspectLaneRecord(spec.PlanDir, path); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := InspectLaneRecord(
+		spec.PlanDir,
+		filepath.Join(t.TempDir(), "record.json"),
+	); err == nil {
+		t.Fatal("expected outside path rejection")
+	}
+	if _, err := InspectLaneRecord(spec.PlanDir, filepath.Dir(path)); err == nil {
+		t.Fatal("expected directory rejection")
+	}
+	link := filepath.Join(filepath.Dir(path), "linked.json")
+	if err := os.Symlink(path, link); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := InspectLaneRecord(spec.PlanDir, link); err == nil {
+		t.Fatal("expected symlink rejection")
+	}
+}
+
+func TestLaneStatusIsReadOnly(t *testing.T) {
+	spec := testLaneSpec(t)
+	path := LaneRecordPath(spec)
+	if err := WriteLaneRecord(
+		path,
+		LaneRecord{Spec: spec, State: LaneFailed, ErrorTail: "failure"},
+	); err != nil {
+		t.Fatal(err)
+	}
+	out := &bytes.Buffer{}
+	if err := RunLaneStatus(
+		LaneStatusOptions{PlanDir: spec.PlanDir, Record: path},
+		out,
+	); err != nil {
+		t.Fatal(err)
+	}
+	for _, forbidden := range []string{"retry", "terminate", "attach", "wake", "result", "graph", "workspace"} {
+		if strings.Contains(strings.ToLower(out.String()), forbidden) {
+			t.Fatalf("status output exposes %q: %s", forbidden, out.String())
+		}
 	}
 }
 

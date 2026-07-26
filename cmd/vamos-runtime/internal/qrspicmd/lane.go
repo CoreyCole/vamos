@@ -406,6 +406,44 @@ func WriteLaneRecord(path string, record LaneRecord) error {
 	return writeJSONAtomically(path, record)
 }
 
+// InspectLaneRecord reads a diagnostic record only after proving it is a regular
+// file within this plan's lane metadata tree. It has no transition authority.
+func InspectLaneRecord(planDir, path string) (LaneRecord, error) {
+	if !filepath.IsAbs(planDir) || !filepath.IsAbs(path) {
+		return LaneRecord{}, errors.New("plan directory and record path must be absolute")
+	}
+	lanesRoot := filepath.Join(planDir, ".vamos", "qrspi", "lanes")
+	if err := requireContained(lanesRoot, path); err != nil {
+		return LaneRecord{}, fmt.Errorf("lane record path: %w", err)
+	}
+	info, err := os.Lstat(path)
+	if err != nil {
+		return LaneRecord{}, err
+	}
+	if !info.Mode().IsRegular() {
+		return LaneRecord{}, errors.New("lane record must be a regular file")
+	}
+	record, err := ReadLaneRecord(path)
+	if err != nil {
+		return LaneRecord{}, err
+	}
+	if expected := LaneRecordPath(
+		record.Spec,
+	); filepath.Clean(
+		path,
+	) != filepath.Clean(
+		expected,
+	) {
+		return LaneRecord{}, errors.New(
+			"lane record path does not match its specification",
+		)
+	}
+	if err := requireContained(planDir, LaneRecordPath(record.Spec)); err != nil {
+		return LaneRecord{}, fmt.Errorf("lane record: %w", err)
+	}
+	return record, nil
+}
+
 func ReadLaneRecord(path string) (LaneRecord, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
