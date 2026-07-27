@@ -5,6 +5,10 @@ description: Prepare or repair the QRSPI implementation workspace after `/q-revi
 
 # QRSPI Workspace Prep
 
+## Managed q-manager completion
+
+When `Q_MANAGER_STATE_FILE` is set, the q-manager record contract in `.pi/skills/qrspi-planning/SKILL.md` overrides every fenced `qrspi_result` response/template in this file. Publish terminal stage results with `vamos qrspi result init`, complete its generated record, then stop; ask in-stage human questions as concise plain text. Do not emit result YAML in managed tmux children.
+
 Every `/q-workspace` session starts by reading `.pi/skills/qrspi-planning/SKILL.md`, then this skill, then immediately creating or repairing the implementation workspace. Do not answer “ready to proceed.” Stop only for a safety check, missing input, dirty/lost-work risk, `needs_human`, `blocked`, or `error`.
 
 Create/repair the implementation workspace after final planning review. This is the gate between `/q-review [plan.md]` and `/q-implement [plan.md]` only when an implementation workspace does not already exist. For implementation-review follow-up plans under `reviews/*_implementation-review/`, nested review plans already inside a prepared implementation workspace, or explicit human instruction to implement in the current workspace, do **not** create a separate workspace; use the existing implementation workspace and route directly to `/q-implement`.

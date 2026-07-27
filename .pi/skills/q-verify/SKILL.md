@@ -7,6 +7,10 @@ description: Generic QRSPI post-implementation verification stage. Use after imp
 
 > Pipeline overview: `.pi/skills/qrspi-planning/SKILL.md`
 
+## Managed q-manager completion
+
+When `Q_MANAGER_STATE_FILE` is set, the q-manager record contract in `qrspi-planning` overrides every fenced `qrspi_result` response/template below. Publish terminal stage results with `vamos qrspi result init`, complete its generated record, then stop; ask in-stage human questions as concise plain text. Do not emit result YAML in managed tmux children.
+
 `q-verify` is a generic agent stage after implementation review and before final human implementation approval. It validates reviewed code in the real project environment using a project-owned verification contract.
 
 ## Runtime YAML contract

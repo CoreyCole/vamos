@@ -3,6 +3,10 @@ name: q-resume
 description: Resume work within a QRSPI planning pipeline from a handoff document
 ---
 
+## Managed q-manager completion
+
+When `Q_MANAGER_STATE_FILE` is set, the q-manager record contract in `.pi/skills/qrspi-planning/SKILL.md` overrides every fenced `qrspi_result` response/template in this file. Publish terminal stage results with `vamos qrspi result init`, complete its generated record, then stop; ask in-stage human questions as concise plain text. Do not emit result YAML in managed tmux children.
+
 ## QRSPI mode contract
 
 QRSPI has a canonical advancement mode plus separate review/retry policy:

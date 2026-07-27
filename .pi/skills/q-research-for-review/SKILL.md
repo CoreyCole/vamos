@@ -7,6 +7,10 @@ description: Research QRSPI planning-review follow-up questions. Use when q-revi
 
 > **Pipeline overview:** `.pi/skills/qrspi-planning/SKILL.md`
 
+## Managed q-manager completion
+
+When `Q_MANAGER_STATE_FILE` is set, the q-manager record contract in `qrspi-planning` overrides every fenced `qrspi_result` response/template below. Publish terminal stage results with `vamos qrspi result init`, complete its generated record, then stop; ask in-stage human questions as concise plain text. Do not emit result YAML in managed tmux children.
+
 ## Runtime YAML contract
 
 Every response that completes a QRSPI workflow node must include a fenced `yaml` block with top-level `qrspi_result`, followed by a mandatory concise human summary. Do not use prose-only `Artifact` / `Summary` / `Next` completion responses.
@@ -53,7 +57,7 @@ qrspi_result:
         param: "[concrete next-stage]"
 ```
 
-`status` is lifecycle. `outcome` selects the graph branch. ``next.steps`` is an ordered instruction block containing only `step` children: read `qrspi-planning`, read the next stage skill, read the artifact(s) needed by that stage, then start the next stage immediately unless blocked by an explicit human/safety gate. Runtime transitions are graph-authoritative. Complete results must include ``outcome``. Review stages must use explicit node IDs (`review-outline`, `review-plan`, or `review-implementation`), never `review`.
+`status` is lifecycle. `outcome` selects the graph branch. `next.steps` is an ordered instruction block containing only `step` children: read `qrspi-planning`, read the next stage skill, read the artifact(s) needed by that stage, then start the next stage immediately unless blocked by an explicit human/safety gate. Runtime transitions are graph-authoritative. Complete results must include `outcome`. Review stages must use explicit node IDs (`review-outline`, `review-plan`, or `review-implementation`), never `review`.
 
 > **Base research skill:** `.pi/skills/q-research/SKILL.md`
 > **Planning review skill:** `.pi/skills/q-review-plan/SKILL.md`
@@ -109,7 +113,7 @@ Write the research artifact under the planning review directory:
 
 Use the normal `q-research` template, plus this required section before `Open Questions`:
 
-```markdown
+````markdown
 ## Review Finding Resolution Map
 
 | Review finding | Original classification | Research result | Next action |
@@ -179,7 +183,7 @@ qrspi_result:
         param: "thoughts/..."
       - action: "start_stage"
         param: "[concrete next-stage]"
-```
+````
 
 ## Rules
 

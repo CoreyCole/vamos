@@ -7,6 +7,10 @@ description: Create a handoff document to carry context forward within a QRSPI p
 
 > **Pipeline overview:** `.pi/skills/qrspi-planning/SKILL.md`
 
+## Managed q-manager completion
+
+When `Q_MANAGER_STATE_FILE` is set, the q-manager record contract in `qrspi-planning` overrides every fenced `qrspi_result` response/template below. Publish terminal stage results with `vamos qrspi result init`, complete its generated record, then stop; ask in-stage human questions as concise plain text. Do not emit result YAML in managed tmux children.
+
 ## Runtime YAML contract
 
 Every response that completes, checkpoints, blocks, or hands off a QRSPI workflow node must include a fenced `yaml` block with top-level `qrspi_result`, followed by exactly one concise natural-language summary line or 1-3 short bullets. Do not use prose-only `Artifact` / `Summary` / `Next` completion responses.

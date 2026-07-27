@@ -74,8 +74,8 @@ func artifactByRole(result wruntime.WorkflowResult, roles ...string) string {
 func inferImplementationReviewPlanDir(artifactPath string) (string, error) {
 	artifactPath = cleanArtifactPath(artifactPath)
 	parts := strings.Split(artifactPath, "/")
-	for i, part := range parts {
-		if strings.HasSuffix(part, "_implementation-review") {
+	for i := len(parts) - 1; i >= 0; i-- {
+		if strings.HasSuffix(parts[i], "_implementation-review") {
 			return strings.Join(parts[:i+1], "/"), nil
 		}
 	}

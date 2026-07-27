@@ -3,61 +3,37 @@ name: qrspi-planning
 description: Ticket-level QRSPI pipeline — Question, Research, Design, Outline, Plan, Workspace, Implement, Review, Verify. Use for concrete tickets; use qrspi-project-planning for projects or milestones.
 ---
 
-## Runtime YAML contract
+## Result publication contract
 
-Every response that completes a QRSPI workflow node must include a fenced `yaml` block with top-level `qrspi_result`, followed by a mandatory concise human summary. Do not use prose-only `Artifact` / `Summary` / `Next` completion responses.
+Choose one control plane. Never mix them.
 
-The user should not have to ask for this YAML. Return it automatically whenever QRSPI stage work completes, hands off, blocks, or errors. When a user says “the correct response”, “now the response”, “what’s the response?”, “give me the result”, or asks for the QRSPI response/result after QRSPI stage work, they mean the YAML contract below plus the required post-YAML concise summary. Return the fenced `yaml` `qrspi_result` block first, not a prose recap in place of YAML. A handoff markdown file is only an artifact referenced from the YAML result; creating a handoff does not replace the required YAML response.
+### q-manager record mode
 
-Required shape:
+When `Q_MANAGER_STATE_FILE` is set, this is a managed tmux child. This contract overrides every fenced `qrspi_result` template or YAML-response instruction in this skill and every stage skill.
 
-```yaml
-qrspi_result:
-  project: "github.com/CoreyCole/vamos"
-  related_projects: []
-  stage: "[canonical node id]"
-  status: "complete"
-  outcome: "complete"
-  workspace: "[absolute active QRSPI plan/ticket directory before q-workspace; omit after implementation workspace exists]"
-  workspace_metadata:
-    plan_workspace: "[absolute active QRSPI plan/ticket directory]"
-    implementation_workspace: "[absolute implementation workspace when known]"
-    trunk_branch: "main"
-    stack_bottom_branch: ""
-    parent_branch: ""
-    current_branch: ""
-  policy:
-    advance_mode: "guided"
-    auto_mode: false
-    enable_plan_reviews: true
-    invalid_result_retry_limit: 1
-  summary:
-    plan_goal: "[overall goal]"
-    stage_completed: "[specific work completed]"
-    key_decisions: "[decisions, risks, follow-up, or why next step is safe]"
-  artifact: "thoughts/..."
-  artifacts:
-    - role: "related"
-      path: "thoughts/..."
-  next:
-    steps:
-      - action: "read_skill"
-        param: ".pi/skills/qrspi-planning/SKILL.md"
-      - action: "read_skill"
-        param: ".pi/skills/[concrete next-stage]/SKILL.md"
-      - action: "read_artifact"
-        param: "thoughts/..."
-      - action: "start_stage"
-        param: "[concrete next-stage]"
-```
+1. Complete stage work and write the normal durable Markdown artifact.
+1. For a graph transition (`complete`, `handoff`, `needs_human`, `blocked`, or `error`), run:
+   ```bash
+   vamos qrspi result init --state-file "$Q_MANAGER_STATE_FILE" \
+     --state <state> [--outcome <graph-outcome>] \
+     --artifact thoughts/...
+   ```
+1. Read the printed record path. Edit only its concise `summary` and plan-contained `artifacts` references; graph-owned identity, node, state, outcome, child binding, and session binding remain unchanged.
+1. Stop. Do **not** print or paste a fenced `qrspi_result` YAML block, previous result YAML, `Artifact`/`Summary`/`Next` envelope, or manager command. A short plain-language completion sentence is allowed.
 
-Summary: [Ultra-concise human update. Sacrifice perfect grammar for concision.]
+For an in-stage human decision with no completed graph result, ask one concise plain-language question and wait. Do not create a result record and do not emit YAML. The child extension must wake the manager once with the child refs and `steer-child` action; it keeps the same child available for feedback.
+
+For every graph-safe agent-to-agent result, the CLI launches and durably records the successor before notifying the manager. The manager does not relay it with `continue`. Any stop the CLI cannot automatically handle—human question/gate, blocked/error, invalid record retry exhaustion, provider/context failure, ambiguous evidence, or launch/cleanup failure—must wake the manager once with a concrete safe action. Never silently wait for manager input on a normal graph-safe edge.
+
+### Hermes/background and unmanaged mode
+
+Only when `Q_MANAGER_STATE_FILE` is absent, use the fenced `qrspi_result` YAML contract below. It carries result data between background sessions; it is not q-manager completion authority.
 
 `status` is lifecycle. `outcome` selects the graph branch. `project` is the singular primary project owner and mirrors frontmatter `project`. `related_projects` mirrors frontmatter `related_projects`; related projects are plan participation metadata only and do not imply multiple execution cwd values. Before `/q-workspace`, include top-level `workspace` immediately after project participation metadata and set it to the absolute active QRSPI plan/ticket directory where the next planning stage should run. Once `/q-workspace` creates or repairs an implementation workspace, omit top-level `workspace` and instead record both paths inside `workspace_metadata` as `plan_workspace` and `implementation_workspace`. `workspace_metadata` records workspace identity plus branch context for humans and runtime handoff/debugging: `plan_workspace` is the plan/ticket directory, `implementation_workspace` is the fresh implementation workspace after `/q-workspace`, `trunk_branch` is usually `main`, `stack_bottom_branch` is the lowest Graphite branch above trunk, `parent_branch` is the branch immediately below the chunk of work just completed, and `current_branch` is the branch created/updated for the chunk. Use empty elements when a value is unknowable. `next.steps` is an explicit ordered instruction block for the next agent: read `qrspi-planning`, read the next stage skill, read the appropriate artifact, then start the next stage immediately unless a named human/safety gate blocks. Runtime transitions remain graph-authoritative and may validate/rewrite the steps. Complete results must include `outcome`. Review stages must use explicit node IDs (`review-outline`, `review-plan`, or `review-implementation`), never `review`.
 
 ## QRSPI execution modes
 
-- **q-manager record mode:** managed tmux children use plan `.vamos/qrspi` result records. Finish work, run `vamos qrspi result init`, edit only summary and plan-contained references, then stop. Do not emit a fenced result YAML or copy raw previous YAML. `vamos qrspi vamos <result-id>` is manager-free context only; explicit `manage attach` is the only validated binding path. Bare `vamos` is chat; `/q-managed-resume` is the exact managed control.
+- **q-manager record mode:** use the Result publication contract above. `vamos qrspi vamos <result-id>` is manager-free context only; explicit `manage attach` is the only validated binding path. Bare `vamos` is chat; `/q-managed-resume` is the exact managed control.
 - **Hermes/background mode:** retains the fenced `qrspi_result` YAML contract below, including verbatim prior-result prompt routing. Do not mix the two control planes.
 
 ## QRSPI mode contract
@@ -70,11 +46,11 @@ QRSPI has a canonical advancement mode plus separate review/retry policy. Use th
 - When delegating QRSPI stages to Pi/background agents, every next-stage prompt must include the full fenced `qrspi_result` YAML from the immediately previous stage, verbatim. Do not summarize or cherry-pick the fields; downstream agents need the exact `workspace_metadata`, `policy`, `artifact`, `artifacts`, and `next.steps` context.
 - If the user has asked for delegated/autonomous advancement, start graph-safe next stages in fresh Pi/background agents without asking for approval; pause only for explicit human-context blockers, safety/lost-work risks, invalid artifacts, or stage rules that require manual confirmation. See `references/delegated-pi-background-orchestration.md` for a prompt skeleton and implementation-loop pattern.
 - Legacy YAML/runtime compatibility: until the runtime persists `advanceMode`, map `auto_mode=false` to `guided` and `auto_mode=true` to `autopilot`. `discuss` requires a distinct runtime policy value; do not pretend it is `auto_mode=false`.
-- All advance modes still stop on `needs_human`, `blocked`, `error`, invalid artifact, disallowed transition, run failure, YAML retry exhaustion, or an explicit safety gate.
+- All advance modes still stop on `needs_human`, `blocked`, `error`, invalid artifact, disallowed transition, run failure, result-validation retry exhaustion, or an explicit safety gate.
 - `enable_plan_reviews=true`: run planning `/q-review` after outline and plan. Do not run `/q-review` immediately after design; design advances directly to `/q-outline`.
 - `enable_plan_reviews=false`: skip planning `/q-review`; final implementation `/q-review` always runs.
 - Research never has its own human stop. Humans evaluate research-derived direction in design/outline review, but research must loop to another `/q-research` pass when new code-answerable factual questions materially inform design.
-- Emit the QRSPI YAML result as a fenced `yaml` block block with top-level `qrspi_result` for every completed QRSPI stage result so it is syntax highlighted, then add only the mandatory concise human summary after it.
+- In Hermes/background or unmanaged mode, emit the QRSPI YAML result as a fenced `yaml` block with top-level `qrspi_result`, then add the mandatory concise human summary. In q-manager record mode, publish the CLI record instead.
 
 ## Immediate continuation contract
 
@@ -90,9 +66,9 @@ One normal post-result pause exists after planning begins: before `/q-outline` w
 
 Other human alignment happens inside the active stage before it emits a complete result, or via explicit `needs_human`; a completed result should route onward immediately. `/q-plan` does not ask for another human approval; it reads relevant code files and writes `plan.md` immediately from the reviewed outline.
 
-For all other complete results, including `review-plan` and `workspace`, `summary.key_decisions` must explicitly say that the next stage should start immediately and name it, e.g. `Next stage should start immediately: /q-workspace ...`. The `next.steps` block must spell out ordered steps for the next agent: read `qrspi-planning`, read the named stage skill, read each required artifact in its own step, read `design-product.md` when it exists and design context is needed, then start the next stage immediately. Do not use ambiguous “or” alternatives inside emitted YAML; choose the concrete next stage for the current outcome. The post-YAML human summary must not say “ready to proceed”; say `Next: start ... now.` when the next graph node should run immediately.
+In Hermes/background or unmanaged mode, all other complete results, including `review-plan` and `workspace`, must say in `summary.key_decisions` that the next stage should start immediately and name it, e.g. `Next stage should start immediately: /q-workspace ...`. The YAML `next.steps` block must spell out ordered steps for the next agent. In q-manager record mode, put that routing rationale in the generated record summary; the graph remains authoritative.
 
-## QRSPI YAML summary contract
+## Hermes/background YAML summary contract
 
 The `summary` element is used by humans to understand workflow state before asking follow-up questions or advancing. It must be structured, specific, self-contained, not a generic completion label. Use these child elements inside `summary`:
 
@@ -104,7 +80,7 @@ Keep each child element short: 1-2 concise lines max.
 
 For review stages, always include both: (1) what the entire implementation/plan now does as a whole, and (2) what this review session checked and changed. Do not write vague summaries like `review complete`, `implementation review result`, `done`, or `summary of findings` without the concrete details a human would need to ask informed questions.
 
-## Post-YAML human summary contract
+## Hermes/background post-YAML human summary contract
 
 After every fenced `qrspi_result` block, add exactly one mandatory concise human summary line or short bullet list.
 
@@ -150,7 +126,7 @@ When more than one artifact is relevant, keep `artifact` as the primary next-com
 
 Do not duplicate artifact lists or machine-control details in prose outside the YAML result result result result. For normal QRSPI stage completion, the response must be the fenced `yaml` `qrspi_result` block followed by a mandatory concise human summary; make both summaries specific enough for humans.
 
-Every primary QRSPI stage and review/helper that completes a workflow transition must include a visible fenced `yaml` QRSPI result block. Always include `outcome` for complete results. Before `/q-workspace`, include `workspace` immediately after `outcome`; after an implementation workspace exists, omit top-level `workspace` and include both workspace paths inside `workspace_metadata`:
+Every primary QRSPI stage and review/helper in Hermes/background or unmanaged mode that completes a workflow transition must include a visible fenced `yaml` QRSPI result block. Always include `outcome` for complete results. Before `/q-workspace`, include `workspace` immediately after `outcome`; after an implementation workspace exists, omit top-level `workspace` and include both workspace paths inside `workspace_metadata`:
 
 ```yaml
 qrspi_result:

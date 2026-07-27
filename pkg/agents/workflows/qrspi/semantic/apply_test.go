@@ -79,6 +79,18 @@ func TestSemanticApplyReviewPlanPositiveRouting(t *testing.T) {
 	}
 }
 
+func TestInferImplementationReviewPlanDirUsesInnermostReview(t *testing.T) {
+	artifact := "thoughts/example/plans/parent/reviews/2026-01-01_parent_implementation-review/reviews/2026-01-02_followup_implementation-review/questions/followup.md"
+	got, err := inferImplementationReviewPlanDir(artifact)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := "thoughts/example/plans/parent/reviews/2026-01-01_parent_implementation-review/reviews/2026-01-02_followup_implementation-review"
+	if got != want {
+		t.Fatalf("follow-up plan directory = %q, want %q", got, want)
+	}
+}
+
 func TestSemanticApplyStatusActions(t *testing.T) {
 	tests := []struct {
 		name       string
