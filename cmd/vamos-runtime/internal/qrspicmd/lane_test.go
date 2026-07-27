@@ -128,15 +128,36 @@ func TestLaneRecord(t *testing.T) {
 	}
 }
 
-type fakeLaneProcess struct{ pid int }
+type fakeLaneProcess struct {
+	pid    int
+	runner *fakeLaneProcessRunner
+}
 
-func (p fakeLaneProcess) PID() int { return p.pid }
+func (p *fakeLaneProcess) PID() int { return p.pid }
+
+func (p *fakeLaneProcess) Terminate(_ context.Context, _ time.Duration) error {
+	p.runner.terminated = true
+	p.runner.order = append(p.runner.order, "terminate")
+	return p.runner.terminateErr
+}
+
+func (p *fakeLaneProcess) Wait(ctx context.Context) (LaneExit, error) {
+	p.runner.waitCalls++
+	if p.runner.wait != nil {
+		return p.runner.wait(ctx, p.runner.waitCalls)
+	}
+	return p.runner.exit, p.runner.waitErr
+}
 
 type fakeLaneProcessRunner struct {
-	command   []string
-	exit      LaneExit
-	waitErr   error
-	cancelled bool
+	command      []string
+	exit         LaneExit
+	waitErr      error
+	terminateErr error
+	terminated   bool
+	waitCalls    int
+	order        []string
+	wait         func(context.Context, int) (LaneExit, error)
 }
 
 func (r *fakeLaneProcessRunner) Start(
@@ -145,21 +166,12 @@ func (r *fakeLaneProcessRunner) Start(
 	_ string,
 ) (LaneProcess, error) {
 	r.command = command
-	return fakeLaneProcess{pid: 42}, nil
-}
-
-func (r *fakeLaneProcessRunner) Wait(_ context.Context, _ LaneProcess) (LaneExit, error) {
-	return r.exit, r.waitErr
-}
-
-func (r *fakeLaneProcessRunner) Cancel(_ context.Context, _ LaneProcess) error {
-	r.cancelled = true
-	return nil
+	return &fakeLaneProcess{pid: 42, runner: r}, nil
 }
 
 func TestBuildLaneCommandIsNonInteractive(t *testing.T) {
 	command := strings.Join(BuildLaneCommand(testLaneSpec(t)), " ")
-	for _, want := range []string{"pi --print --no-extensions", "--session-id", "--session-dir", "--name", "non-interactive", "read-only"} {
+	for _, want := range []string{"pi --print --no-extensions", "--session-id", "--session-dir", "--name", `-- "$(cat "$PROMPT_FILE")`, "non-interactive", "read-only"} {
 		if !strings.Contains(command, want) {
 			t.Fatalf("command missing %q: %s", want, command)
 		}
@@ -173,6 +185,9 @@ func TestBuildLaneCommandIsNonInteractive(t *testing.T) {
 
 func TestDetachedLaneRunnerPersistsTerminalState(t *testing.T) {
 	spec := testLaneSpec(t)
+	if err := os.WriteFile(spec.ReportPath, []byte("# report"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	fake := &fakeLaneProcessRunner{exit: LaneExit{ExitCode: 0}}
 	runner := &DetachedLaneRunner{ProcessRunner: fake}
 	record, err := runner.Start(context.Background(), spec)
@@ -203,6 +218,56 @@ func TestDetachedLaneRunnerFailureIsTerminal(t *testing.T) {
 	record, err = runner.Wait(context.Background(), record)
 	if err == nil || record.State != LaneFailed ||
 		!strings.Contains(record.ErrorTail, "stopped") {
+		t.Fatalf("wait = %#v, %v", record, err)
+	}
+}
+
+func TestDetachedLaneRunnerTerminatesBeforeReapAndFailureRecord(t *testing.T) {
+	spec := testLaneSpec(t)
+	spec.Timeout = time.Millisecond
+	fake := &fakeLaneProcessRunner{}
+	fake.wait = func(ctx context.Context, call int) (LaneExit, error) {
+		switch call {
+		case 1:
+			<-ctx.Done()
+			fake.order = append(fake.order, "timeout")
+			return LaneExit{}, ctx.Err()
+		case 2:
+			fake.order = append(fake.order, "reap")
+			return LaneExit{ExitCode: 143}, nil
+		default:
+			t.Fatalf("unexpected wait call %d", call)
+			return LaneExit{}, nil
+		}
+	}
+	runner := &DetachedLaneRunner{ProcessRunner: fake}
+	record, err := runner.Start(context.Background(), spec)
+	if err != nil {
+		t.Fatal(err)
+	}
+	record, err = runner.Wait(context.Background(), record)
+	if err == nil || record.State != LaneFailed {
+		t.Fatalf("wait = %#v, %v", record, err)
+	}
+	if got, want := strings.Join(fake.order, ","), "timeout,terminate,reap"; got != want {
+		t.Fatalf("lifecycle order = %q, want %q", got, want)
+	}
+	persisted, readErr := ReadLaneRecord(LaneRecordPath(spec))
+	if readErr != nil || persisted.State != LaneFailed {
+		t.Fatalf("persisted = %#v, %v", persisted, readErr)
+	}
+}
+
+func TestDetachedLaneRunnerRejectsSuccessfulExitWithoutReport(t *testing.T) {
+	spec := testLaneSpec(t)
+	runner := &DetachedLaneRunner{ProcessRunner: &fakeLaneProcessRunner{exit: LaneExit{}}}
+	record, err := runner.Start(context.Background(), spec)
+	if err != nil {
+		t.Fatal(err)
+	}
+	record, err = runner.Wait(context.Background(), record)
+	if err == nil || record.State != LaneFailed ||
+		!strings.Contains(record.ErrorTail, "no such file") {
 		t.Fatalf("wait = %#v, %v", record, err)
 	}
 }
