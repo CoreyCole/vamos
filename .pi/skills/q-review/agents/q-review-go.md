@@ -45,6 +45,10 @@ If local guidance conflicts with this prompt, local project guidance wins. If no
 
 When changed files include Go tests or the outline plans Go unit/integration tests, make sure `q-review-go-tests` is selected too. Use this lane to understand whether tests expose important Go behavior or contracts; leave assertion style, build tags, helpers, and go-cmp diff review to `q-review-go-tests`.
 
+## Evidence Discipline
+
+Prioritize the simplest realistic review. Report only concrete findings supported by the declared requirements and current artifacts/code. Do not manufacture speculative edge cases, hypothetical failure machinery, or generic checklist concerns. If no material evidence supports a finding, return `pass`.
+
 ## Scope
 
 Review only this lane unless you find a critical issue that another lane might miss.

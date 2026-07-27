@@ -28,6 +28,10 @@ Before judging Go tests, look for and read project-local guidance when it exists
 
 If local guidance conflicts with this prompt, local project guidance wins. If no local guidance exists, use the fallback checklist below.
 
+## Evidence Discipline
+
+Prioritize the simplest realistic review. Report only concrete findings supported by the declared requirements and current artifacts/code. Do not manufacture speculative edge cases, hypothetical failure machinery, or generic checklist concerns. If no material evidence supports a finding, return `pass`.
+
 ## Scope
 
 Review only Go test files and test helpers unless you must inspect production code to understand the expected behavior.

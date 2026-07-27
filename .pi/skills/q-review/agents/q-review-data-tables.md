@@ -36,6 +36,10 @@ If local guidance conflicts with this prompt, local project guidance wins.
 - Text placeholders, single/multi-select choices, empty/loading/error states, and saved views match data-source constraints.
 - Large datasets avoid client-side filtering/sorting and have plausible index/query support.
 
+## Evidence Discipline
+
+Prioritize the simplest realistic review. Report only concrete findings supported by the declared requirements and current artifacts/code. Do not manufacture speculative edge cases, hypothetical failure machinery, or generic checklist concerns. If no material evidence supports a finding, return `pass`.
+
 ## Scope
 
 Review only this lane unless you find a critical issue that another lane might miss.

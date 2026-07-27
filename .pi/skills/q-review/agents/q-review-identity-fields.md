@@ -42,6 +42,10 @@ Use this lane when a change touches or mentions:
 - Tests cover padded input, case differences where relevant, duplicate prevention, and old/new lookup behavior.
 - Mixed identifier searches are semantically justified or split into dedicated queries.
 
+## Evidence Discipline
+
+Prioritize the simplest realistic review. Report only concrete findings supported by the declared requirements and current artifacts/code. Do not manufacture speculative edge cases, hypothetical failure machinery, or generic checklist concerns. If no material evidence supports a finding, return `pass`.
+
 ## Scope
 
 Review only this lane unless you find a critical issue that another lane might miss.

@@ -76,6 +76,10 @@ Use when reviewing materialized views, streaming queries, sinks/sources, or Risi
 - `EXPLAIN CREATE` / plan review should check for red flags before deployment when practical.
 - Sink/source coupling, backpressure, barrier latency, and operational observability matter for production streaming SQL.
 
+## Evidence Discipline
+
+Prioritize the simplest realistic review. Report only concrete findings supported by the declared requirements and current artifacts/code. Do not manufacture speculative edge cases, hypothetical failure machinery, or generic checklist concerns. If no material evidence supports a finding, return `pass`.
+
 ## Scope
 
 Review only this lane unless you find a critical issue that another lane might miss.

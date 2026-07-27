@@ -43,6 +43,10 @@ If local guidance conflicts with this prompt, local project guidance wins. The D
 - Accessibility is not regressed: semantic elements, labels, keyboard behavior, focus preservation across morphs, and useful ARIA only where needed.
 - Browser verification evidence is requested or inspected when Datastar behavior cannot be proven from code alone.
 
+## Evidence Discipline
+
+Prioritize the simplest realistic review. Report only concrete findings supported by the declared requirements and current artifacts/code. Do not manufacture speculative edge cases, hypothetical failure machinery, or generic checklist concerns. If no material evidence supports a finding, return `pass`.
+
 ## Scope
 
 Review only this lane unless you find a critical issue that another lane might miss.

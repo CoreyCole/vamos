@@ -44,6 +44,10 @@ If local guidance conflicts with this prompt, local project guidance wins.
 - Frontend tests are appropriate: avoid brittle component-library behavior tests by default; prefer pure function tests or backend/API/workflow tests when they prove the real behavior better.
 - Browser verification evidence is requested or inspected when UI behavior cannot be proven from code alone.
 
+## Evidence Discipline
+
+Prioritize the simplest realistic review. Report only concrete findings supported by the declared requirements and current artifacts/code. Do not manufacture speculative edge cases, hypothetical failure machinery, or generic checklist concerns. If no material evidence supports a finding, return `pass`.
+
 ## Scope
 
 Review only this lane unless you find a critical issue that another lane might miss.
