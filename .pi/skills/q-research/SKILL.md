@@ -123,77 +123,26 @@ Reply `go` to start this research. Any edits, objections, or discussion will mov
 
    - Summarize the key desired outcome, design principles, terminology, constraints, non-goals, and tradeoffs surfaced during `q-question` or question-preview approval.
    - Preserve human-confirmed context as framing only; do not invent new decisions here and do not treat framing as evidence of current behavior.
-   - Decompose the work into a small set of research areas or sub-questions before you delegate.
+   - Decompose the work into a small set of research areas or sub-questions.
 
-1. **Read any directly mentioned files fully before spawning sub-agents.**
+1. **Research directly in the main session by default.**
 
-   - If the user prompt or question doc explicitly names files, docs, JSON, tickets, prior research docs, or `thoughts/` artifacts, read them in full yourself first.
-   - Do not rely on partial excerpts for directly referenced artifacts.
+   - Read any directly named files fully, then use bounded `rg`/`find` and targeted reads to trace each question to source and tests.
+   - Keep an evidence ledger while reading: each final claim needs a current-code `path:line` reference.
+   - Prioritize live code as truth; use `thoughts/` only when the question asks for historical context.
 
-1. **Phase 1 — location pass. Spawn one or more parallel `pi-codebase-locator` sub-agents across the research areas**:
+1. **Delegate only for a real bottleneck.**
 
-   - Ask `pi-codebase-locator` for concrete paths, likely entry points, the smallest useful next-read set, related tests/config/docs, and any directory clusters relevant to the question.
-   - Include the QRSPI subagent robustness contract below in every locator task.
-   - When a question explicitly asks about prior decisions, existing research, historical context, or documents in `thoughts/`, ask `pi-codebase-locator` to search `thoughts/` too and correct any `thoughts/searchable/` paths back to editable paths.
-   - Pass each locator artifact path via the subagent tool's `output` parameter. Do not include an instruction like `Write your findings to ...` in the child task text.
+   - Do not use subagents for ordinary discovery, a small file cluster, or questions the main session can trace with bounded searches.
+   - Delegate one narrowly bounded, independent question only when it would otherwise require broad cross-tree archaeology or a long-running external investigation.
+   - Prefer one child over a locator→analyzer pipeline. Give it the exact directories/files to inspect and require concise `path:line` findings.
+   - Read and verify the child report yourself. If it fails or is incomplete, continue direct research; do not retry mechanically or block the stage.
 
-1. **Phase 2 — analysis pass. Run `pi-codebase-analyzer` on the most promising files or flows surfaced by the locator results**:
+1. **Synthesize and verify in the main context.**
 
-   - Ask `pi-codebase-analyzer` to trace entry points, data flow, important types, transformations, configuration, patterns, and error handling with exact file:line references.
-   - Include the QRSPI subagent robustness contract below in every analyzer task.
-   - Keep analyzer tasks narrow and factual.
-   - Pass each analyzer artifact path via the subagent tool's `output` parameter. Do not include an instruction like `Write your findings to ...` in the child task text.
-
-1. **Wait for all sub-agent results before continuing**.
-
-   - Do not synthesize early.
-   - Prioritize live codebase findings as the primary source of truth.
-   - Treat `thoughts/` findings as supplementary historical context.
-   - After each subagent pass, read every output artifact and verify it is a real report. If an artifact is empty, only contains raw tool-call markup/JSON such as `<tool_call>` or `{"cmd": ...}`, has no concrete paths for a locator task, or has no file:line/code references for an analyzer task, treat that subagent result as failed. Rerun that specific task once with the robustness contract emphasized before synthesizing.
-
-## QRSPI Subagent Robustness Contract
-
-Include this contract verbatim in locator and analyzer tasks:
-
-```text
-You are running inside pi. Use only the tools available to your agent: `read`, `grep`, `find`, and `ls`. Do not output tool-call YAML, JSON tool invocations, or proposed commands as your answer. Actually run bounded searches/reads and then return findings.
-
-Run from the provided cwd/repo_root. Keep broad searches bounded to cwd/repo_root or explicitly named directories. Never search outside cwd/repo_root or $TMPDIR. Use Pi's `grep` tool for content searches, `find` for path discovery, `ls` for nearby directory maps, and `read` for directly relevant files. If context is insufficient after bounded reads, report the gap instead of continuing broad discovery.
-
-Return a markdown report, not a transcript. Include concrete paths and exact file:line references wherever possible.
-
-Required report shape:
-# [Locator|Analyzer] Report: [topic]
-
-## Findings
-- [fact] — `path:line`
-
-## Relevant Files
-- `path` — why it matters
-
-## Smallest Next-Read Set
-- `path`
-
-## Tests / Docs / Config
-- `path` or `None found.`
-
-## Searches / Verification
-- [commands or reads actually performed]
-
-## Gaps
-- [not found / not determined, or `None.`]
-```
-
-1. **Synthesize and verify in main context**.
-
-   - Read the key source files surfaced by `pi-codebase-locator` and explained by `pi-codebase-analyzer` yourself.
-   - Verify important claims against source files directly before writing them down.
-   - Connect findings across components, not just within single files.
-
-1. **If a question still lacks enough evidence, run a second focused locator or analyzer pass** with a narrower task.
-
-   - Write any follow-up context artifacts to `[plan_dir]/context/research/`.
-   - Wait for the follow-up results, then re-read the surfaced files/documents yourself.
+   - Re-read the source supporting important claims before writing them down.
+   - Connect findings across components, not just within one file.
+   - If evidence remains insufficient, do one more bounded direct search/read pass before reporting the gap.
 
 1. **Answer each question** with:
 
@@ -325,13 +274,12 @@ Always include the complete `thoughts/.../research/YYYY-MM-DD_HH-MM-SS_topic-nam
 - An implementation-review follow-up plan under `[parent_plan_dir]/reviews/*_implementation-review/` is a normal QRSPI plan for research purposes. Write research artifacts under that review directory's `research/` and `context/research/`, not under the parent plan.
 - Planning-review research questions under `[parent_plan_dir]/reviews/*_[outline|plan]-review/questions/` must use `/skill:q-research-for-review`, not normal `/q-research`, because they need review category context and route to `/skill:q-address-review-research`.
 - Do **NOT** read the ticket, `design.md`, `design-product.md`, `outline.md`, `plan.md`, `handoffs/`, `prds/`, or other forward-looking documents that reveal what is being built. The only plan artifacts you should intentionally read are `[plan_dir]/AGENTS.md`, the relevant `questions/*.md` files, plus relevant prior `context/research/` artifacts when continuing a pass. Everything else must come from code surfaced during research and `thoughts/` documents only when the question explicitly asks for historical context, prior decisions, or existing documentation.
-- Always read directly mentioned files fully before spawning sub-tasks.
-- Always wait for all sub-agents to complete before synthesizing findings.
+- Always read directly mentioned files fully before bounded discovery.
 - Prioritize live codebase findings as the source of truth; use `thoughts/` as supplementary historical context.
 - Every claim must have a file:line reference.
 - If a question can't be answered from code, say so clearly.
 - Keep answers factual and concise.
-- Within QRSPI, prefer `pi-codebase-locator` for discovery and `pi-codebase-analyzer` for detailed implementation tracing. Keep both narrowly scoped and factual.
+- Keep ordinary codebase discovery and tracing in the main session. Use a single generic child only for an independent, demonstrably broad bottleneck.
 - Multiple research docs are expected; each invocation produces one file.
 - Completion responses must be the fenced YAML `qrspi_result` block required by the runtime contract, followed by the mandatory concise human summary.
 - Post-YAML summary for research stage: only key findings and question answers; one per line when multiple. Caveman clear. No detailed evidence; evidence lives in artifact/YAML.
