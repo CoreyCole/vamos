@@ -107,7 +107,7 @@ func BuildLaneCommand(spec LaneSpec) []string {
 	return []string{
 		"env",
 		"PROMPT_FILE=" + spec.PromptFile,
-		"OUTPUT_PATH=" + LaneOutputPath(spec),
+		"OUTPUT_PATH=" + LaneDiagnosticOutputPath(spec),
 		"SESSION_ID=" + spec.SessionID,
 		"SESSION_DIR=" + spec.SessionDir,
 		"SESSION_NAME=" + string(spec.Role),
@@ -129,13 +129,19 @@ func (r *DetachedLaneRunner) Start(
 	if err := os.MkdirAll(LaneAttemptDir(spec), 0o755); err != nil {
 		return LaneRecord{}, err
 	}
+	if err := os.MkdirAll(
+		filepath.Dir(LaneDiagnosticOutputPath(spec)),
+		0o755,
+	); err != nil {
+		return LaneRecord{}, err
+	}
 	record := LaneRecord{
 		SchemaVersion: laneSchemaVersion,
 		Spec:          spec,
 		State:         LaneQueued,
 		StatusPath:    LaneStatusPath(spec),
 		EventsPath:    LaneEventsPath(spec),
-		OutputPath:    LaneOutputPath(spec),
+		OutputPath:    LaneDiagnosticOutputPath(spec),
 	}
 	if err := WriteLaneRecord(LaneRecordPath(spec), record); err != nil {
 		return LaneRecord{}, err
@@ -313,10 +319,59 @@ func LaneEventsPath(
 	return filepath.Join(LaneAttemptDir(spec), "events.jsonl")
 }
 
-func LaneOutputPath(
-	spec LaneSpec,
-) string {
-	return filepath.Join(LaneAttemptDir(spec), "output.txt")
+// LaneDiagnosticOutputPath stores complete lane stdout/stderr separately from
+// lane records and canonical review reports.
+func LaneDiagnosticOutputPath(spec LaneSpec) string {
+	return filepath.Join(
+		spec.PlanDir,
+		".vamos",
+		"sessions",
+		"pi",
+		"subagents",
+		spec.CoordinatorID,
+		spec.ID,
+		fmt.Sprintf("attempt-%d", spec.Attempt),
+		"output.txt",
+	)
+}
+
+func LaneFailureLogPath(planDir, coordinatorID string) string {
+	return filepath.Join(
+		planDir,
+		".vamos",
+		"qrspi",
+		"lanes",
+		coordinatorID,
+		"failures.jsonl",
+	)
+}
+
+type LaneFailureEvent struct {
+	LaneID     string    `json:"laneId"`
+	Attempt    int       `json:"attempt"`
+	FailedAt   time.Time `json:"failedAt"`
+	RecordPath string    `json:"recordPath"`
+	OutputPath string    `json:"outputPath"`
+	ErrorTail  string    `json:"errorTail"`
+}
+
+func AppendLaneFailure(path string, event LaneFailureEvent) error {
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return err
+	}
+	data, err := json.Marshal(event)
+	if err != nil {
+		return err
+	}
+	file, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
+	if err != nil {
+		return err
+	}
+	if _, err := file.Write(append(data, '\n')); err != nil {
+		_ = file.Close()
+		return err
+	}
+	return file.Close()
 }
 
 func ValidateLaneSpec(spec LaneSpec) error {
@@ -340,8 +395,8 @@ func ValidateLaneSpec(spec LaneSpec) error {
 	if spec.Role != LaneRoleReviewScout && spec.Role != LaneRoleReviewer {
 		return fmt.Errorf("unknown lane role %q", spec.Role)
 	}
-	if spec.Attempt < 1 || spec.Attempt > 2 {
-		return errors.New("lane attempt must be 1 or 2")
+	if spec.Attempt != 1 {
+		return errors.New("lane attempt must be 1")
 	}
 	if spec.Timeout <= 0 {
 		return errors.New("lane timeout must be positive")
@@ -356,6 +411,9 @@ func ValidateLaneSpec(spec LaneSpec) error {
 	}
 	if err := requireContained(spec.PlanDir, LaneAttemptDir(spec)); err != nil {
 		return fmt.Errorf("lane metadata: %w", err)
+	}
+	if err := requireContained(spec.PlanDir, LaneDiagnosticOutputPath(spec)); err != nil {
+		return fmt.Errorf("lane diagnostics: %w", err)
 	}
 	return nil
 }
@@ -418,13 +476,11 @@ func WriteLaneRecord(path string, record LaneRecord) error {
 	if err := requireContained(record.Spec.PlanDir, path); err != nil {
 		return fmt.Errorf("record path: %w", err)
 	}
-	if current, err := ReadLaneRecord(
-		path,
-	); err == nil && terminalLaneState(current.State) &&
-		!terminalLaneState(record.State) {
-		return nil
-	} else if err != nil &&
-		!errors.Is(err, os.ErrNotExist) {
+	if current, err := ReadLaneRecord(path); err == nil {
+		if terminalLaneState(current.State) {
+			return nil
+		}
+	} else if !errors.Is(err, os.ErrNotExist) {
 		return err
 	}
 	record.ErrorTail = boundedLaneDiagnostic(record.ErrorTail)
@@ -501,7 +557,7 @@ func unsafeLaneID(value string) bool {
 }
 
 // Run starts a validated set of parent-owned lanes with a bounded worker pool.
-// A lane receives exactly one retry, only when its process or report fails.
+// Lane failures are durable unavailable evidence; independent peers continue.
 func (c LaneCoordinator) Run(
 	ctx context.Context,
 	specs []LaneSpec,
@@ -545,7 +601,11 @@ func (c LaneCoordinator) Run(
 					record, err = c.Runner.Wait(ctx, record)
 				}
 				if err == nil && record.State == LaneSuccess {
-					err = ValidateLaneReport(job.spec)
+					if err = ValidateLaneReport(job.spec); err != nil {
+						record.State = LaneFailed
+						record.FinishedAt = time.Now().UTC()
+						record.ErrorTail = laneErrorTail(LaneExit{}, err)
+					}
 				}
 				completed <- completion{job.index, job.spec, record, err}
 			}
@@ -564,17 +624,35 @@ func (c LaneCoordinator) Run(
 		result := <-completed
 		active--
 		if result.err != nil || result.record.State != LaneSuccess {
-			if result.spec.Attempt == 1 {
-				retry := result.spec
-				retry.Attempt = 2
-				jobs <- job{result.index, retry}
-				active++
-				continue
+			if result.record.Spec.ID == "" {
+				return records, fmt.Errorf(
+					"lane %q failed before recording: %w",
+					result.spec.ID,
+					result.err,
+				)
 			}
-			if result.err == nil {
-				result.err = fmt.Errorf("lane %q failed", result.spec.ID)
+			if result.record.State != LaneFailed {
+				result.record.State = LaneFailed
 			}
-			return records, result.err
+			if result.record.FinishedAt.IsZero() {
+				result.record.FinishedAt = time.Now().UTC()
+			}
+			if result.record.ErrorTail == "" {
+				result.record.ErrorTail = laneErrorTail(LaneExit{}, result.err)
+			}
+			if err := AppendLaneFailure(
+				LaneFailureLogPath(result.spec.PlanDir, result.spec.CoordinatorID),
+				LaneFailureEvent{
+					LaneID:     result.spec.ID,
+					Attempt:    result.spec.Attempt,
+					FailedAt:   result.record.FinishedAt,
+					RecordPath: LaneRecordPath(result.spec),
+					OutputPath: LaneDiagnosticOutputPath(result.spec),
+					ErrorTail:  boundedLaneDiagnostic(result.record.ErrorTail),
+				},
+			); err != nil {
+				return records, fmt.Errorf("append lane failure: %w", err)
+			}
 		}
 		records[result.index] = result.record
 		finished++

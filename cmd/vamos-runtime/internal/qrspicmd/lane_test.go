@@ -3,6 +3,7 @@ package qrspicmd
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"os"
 	"path/filepath"
@@ -49,7 +50,7 @@ func TestLaneSpec(t *testing.T) {
 	for name, mutate := range map[string]func(*LaneSpec){
 		"unsafe ID":      func(s *LaneSpec) { s.ID = "../escape" },
 		"unknown role":   func(s *LaneSpec) { s.Role = "writer" },
-		"bad attempt":    func(s *LaneSpec) { s.Attempt = 3 },
+		"bad attempt":    func(s *LaneSpec) { s.Attempt = 2 },
 		"outside report": func(s *LaneSpec) { s.ReportPath = filepath.Join(t.TempDir(), "report.md") },
 		"zero timeout":   func(s *LaneSpec) { s.Timeout = 0 },
 	} {
@@ -107,18 +108,41 @@ func TestLaneRecord(t *testing.T) {
 	); err != nil {
 		t.Fatal(err)
 	}
+	for _, state := range []LaneState{LaneQueued, LaneRunning, LaneSuccess, LaneFailed} {
+		if err := WriteLaneRecord(
+			path,
+			LaneRecord{Spec: spec, State: state},
+		); err != nil {
+			t.Fatal(err)
+		}
+		got, err = ReadLaneRecord(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got.State != LaneSuccess {
+			t.Fatalf("terminal success replaced with %s", got.State)
+		}
+	}
+	failed := testLaneSpec(t)
+	failedPath := LaneRecordPath(failed)
 	if err := WriteLaneRecord(
-		path,
-		LaneRecord{Spec: spec, State: LaneRunning},
+		failedPath,
+		LaneRecord{Spec: failed, State: LaneFailed},
 	); err != nil {
 		t.Fatal(err)
 	}
-	got, err = ReadLaneRecord(path)
+	if err := WriteLaneRecord(
+		failedPath,
+		LaneRecord{Spec: failed, State: LaneSuccess},
+	); err != nil {
+		t.Fatal(err)
+	}
+	got, err = ReadLaneRecord(failedPath)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got.State != LaneSuccess {
-		t.Fatalf("terminal record replaced with %s", got.State)
+	if got.State != LaneFailed {
+		t.Fatalf("terminal failure replaced with %s", got.State)
 	}
 	if err := os.WriteFile(path, []byte("not json"), 0o644); err != nil {
 		t.Fatal(err)
@@ -181,6 +205,38 @@ func TestBuildLaneCommandIsNonInteractive(t *testing.T) {
 			t.Fatalf("command exposes %q: %s", forbidden, command)
 		}
 	}
+}
+
+type selectiveLaneProcess struct {
+	failed bool
+}
+
+func (p *selectiveLaneProcess) PID() int { return 42 }
+
+func (p *selectiveLaneProcess) Terminate(
+	context.Context,
+	time.Duration,
+) error {
+	return nil
+}
+
+func (p *selectiveLaneProcess) Wait(context.Context) (LaneExit, error) {
+	if p.failed {
+		return LaneExit{ExitCode: 1}, errors.New("lane failed")
+	}
+	return LaneExit{}, nil
+}
+
+type selectiveLaneProcessRunner struct{}
+
+func (selectiveLaneProcessRunner) Start(
+	_ context.Context,
+	command []string,
+	_ string,
+) (LaneProcess, error) {
+	return &selectiveLaneProcess{
+		failed: strings.Contains(strings.Join(command, "\x00"), "/failed/"),
+	}, nil
 }
 
 func TestDetachedLaneRunnerPersistsTerminalState(t *testing.T) {
@@ -290,9 +346,10 @@ func (r *fakeLaneRunner) Start(_ context.Context, spec LaneSpec) (LaneRecord, er
 }
 
 func (r *fakeLaneRunner) Wait(_ context.Context, record LaneRecord) (LaneRecord, error) {
-	if record.Spec.ID == "retry" && record.Spec.Attempt == 1 {
+	if record.Spec.ID == "failed" {
 		record.State = LaneFailed
-		return record, errors.New("first attempt failed")
+		record.ErrorTail = "lane failed"
+		return record, errors.New("lane failed")
 	}
 	if err := os.WriteFile(
 		record.Spec.ReportPath,
@@ -305,24 +362,84 @@ func (r *fakeLaneRunner) Wait(_ context.Context, record LaneRecord) (LaneRecord,
 	return record, nil
 }
 
-func TestLaneCoordinatorRetriesOnlyFailedLane(t *testing.T) {
-	first := testLaneSpec(t)
-	first.ID, first.SessionID = "retry", "session-retry"
-	second := testLaneSpec(t)
-	second.ID, second.SessionID = "good", "session-good"
+func TestLaneCoordinatorContinuesAfterLaneFailure(t *testing.T) {
+	failed := testLaneSpec(t)
+	failed.ID, failed.SessionID = "failed", "session-failed"
+	active := failed
+	active.ID, active.SessionID = "active", "session-active"
+	active.ReportPath = filepath.Join(active.ReviewDir, "active.md")
+	queued := failed
+	queued.ID, queued.SessionID = "queued", "session-queued"
+	queued.ReportPath = filepath.Join(queued.ReviewDir, "queued.md")
 	runner := &fakeLaneRunner{}
 	records, err := (LaneCoordinator{Runner: runner, MaxParallel: 2}).Run(
 		context.Background(),
-		[]LaneSpec{first, second},
+		[]LaneSpec{failed, active, queued},
 	)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(records) != 2 || records[0].Spec.Attempt != 2 || records[1].Spec.Attempt != 1 {
+	if len(records) != 3 || records[0].State != LaneFailed ||
+		records[1].State != LaneSuccess || records[2].State != LaneSuccess {
 		t.Fatalf("records = %#v", records)
 	}
-	if runner.attempts["retry"] != 2 || runner.attempts["good"] != 1 {
-		t.Fatalf("attempts = %#v", runner.attempts)
+	for _, id := range []string{"failed", "active", "queued"} {
+		if runner.attempts[id] != 1 {
+			t.Fatalf("attempts = %#v", runner.attempts)
+		}
+	}
+	data, err := os.ReadFile(LaneFailureLogPath(failed.PlanDir, failed.CoordinatorID))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var event LaneFailureEvent
+	if err := json.Unmarshal(bytes.TrimSpace(data), &event); err != nil {
+		t.Fatal(err)
+	}
+	if event.LaneID != failed.ID || event.Attempt != failed.Attempt ||
+		event.RecordPath != LaneRecordPath(failed) ||
+		event.OutputPath != LaneDiagnosticOutputPath(failed) {
+		t.Fatalf("failure event = %#v", event)
+	}
+}
+
+func TestRunLaneReturnsDegradedBatchResult(t *testing.T) {
+	failed := testLaneSpec(t)
+	failed.ID, failed.SessionID = "failed", "session-failed"
+	good := failed
+	good.ID, good.SessionID = "good", "session-good"
+	good.ReportPath = filepath.Join(good.ReviewDir, "good.md")
+	if err := os.WriteFile(good.ReportPath, []byte("# report"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	specsPath := filepath.Join(t.TempDir(), "specs.json")
+	data, err := json.Marshal([]LaneSpec{failed, good})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(specsPath, data, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	out := &bytes.Buffer{}
+	if err := RunLane(context.Background(), LaneRunOptions{
+		SpecsFile:   specsPath,
+		MaxParallel: 2,
+	}, deps{LaneProcessRunner: selectiveLaneProcessRunner{}}, out); err != nil {
+		t.Fatal(err)
+	}
+	var result LaneRunResult
+	if err := json.Unmarshal(out.Bytes(), &result); err != nil {
+		t.Fatal(err)
+	}
+	if len(result.Records) != 2 || result.Records[0].State != LaneFailed ||
+		result.Records[1].State != LaneSuccess {
+		t.Fatalf("records = %#v", result.Records)
+	}
+	if got, want := result.Reports, []string{
+		good.ReportPath,
+	}; len(got) != 1 ||
+		got[0] != want[0] {
+		t.Fatalf("reports = %#v, want %#v", got, want)
 	}
 }
 
@@ -369,6 +486,46 @@ func TestInspectLaneRecordRejectsUnsafePaths(t *testing.T) {
 	}
 	if _, err := InspectLaneRecord(spec.PlanDir, link); err == nil {
 		t.Fatal("expected symlink rejection")
+	}
+}
+
+func TestLaneDiagnosticsStaySeparateFromReports(t *testing.T) {
+	spec := testLaneSpec(t)
+	diagnostic := LaneDiagnosticOutputPath(spec)
+	if err := requireContained(spec.PlanDir, diagnostic); err != nil {
+		t.Fatalf("diagnostic path = %q: %v", diagnostic, err)
+	}
+	if err := requireContained(filepath.Dir(diagnostic), spec.ReportPath); err == nil {
+		t.Fatalf(
+			"report path %q is inside diagnostic tree %q",
+			spec.ReportPath,
+			diagnostic,
+		)
+	}
+	if err := os.MkdirAll(filepath.Dir(diagnostic), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(diagnostic, []byte("full lane output"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	path := LaneRecordPath(spec)
+	if err := WriteLaneRecord(path, LaneRecord{
+		Spec:       spec,
+		State:      LaneFailed,
+		OutputPath: diagnostic,
+		ErrorTail:  "bounded summary",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	out := &bytes.Buffer{}
+	if err := RunLaneStatus(
+		LaneStatusOptions{PlanDir: spec.PlanDir, Record: path},
+		out,
+	); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(out.String(), "full lane output") {
+		t.Fatalf("status read full diagnostic output: %s", out.String())
 	}
 }
 

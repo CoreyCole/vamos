@@ -23,6 +23,11 @@ type LaneStatusOptions struct {
 	Output  string
 }
 
+type LaneRunResult struct {
+	Records []LaneRecord `json:"records"`
+	Reports []string     `json:"reports"`
+}
+
 type laneStatusView struct {
 	State      LaneState `json:"state"`
 	Attempt    int       `json:"attempt"`
@@ -69,7 +74,7 @@ func newLaneRunCommand(d deps) *cobra.Command {
 	)
 	f.StringVar(&opts.SessionID, "session-id", "", "parent-selected Pi session ID")
 	f.StringVar(&opts.SessionDir, "session-dir", "", "absolute Pi session directory")
-	f.IntVar(&opts.Attempt, "attempt", 1, "lane attempt (1 or 2)")
+	f.IntVar(&opts.Attempt, "attempt", 1, "lane attempt number (must be 1)")
 	f.DurationVar(&opts.Timeout, "timeout", time.Hour, "maximum lane runtime")
 	f.StringVar(
 		&opts.SpecsFile,
@@ -161,10 +166,10 @@ func RunLane(ctx context.Context, opts LaneRunOptions, d deps, out io.Writer) er
 			ctx,
 			specs,
 		)
-		if encodeErr := json.NewEncoder(out).Encode(struct {
-			Records []LaneRecord `json:"records"`
-			Reports []string     `json:"reports"`
-		}{records, laneReports(records)}); encodeErr != nil {
+		if encodeErr := json.NewEncoder(out).Encode(LaneRunResult{
+			Records: records,
+			Reports: laneReports(records),
+		}); encodeErr != nil {
 			return encodeErr
 		}
 		return err
