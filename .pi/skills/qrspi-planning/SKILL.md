@@ -26,7 +26,7 @@ vamos hermes pi done \
 vamos hermes pi done --plan <absolute-plan-dir> --session "$PI_SESSION_ID" ...
 ```
 
-Without host-local Hermes setup, `done` records disk truth and prints the manual continuation command; use `vamos hermes pi result --plan <absolute-plan-dir> --session "$PI_SESSION_ID"` to read its non-binding recommendation. Do not put gateway URLs, credentials, process IDs, locks, run state, or absolute host paths in durable artifacts. `next` is a non-binding recommendation: Hermes or the lead engineer may choose a different safe task.
+Without host-local Hermes setup, or when Vamos returns `404` for a managerless session, `done` records disk truth and ends with `vamos hermes pi continue <short-id>`. Run that command directly to launch the recommended successor. Do not put gateway URLs, credentials, process IDs, locks, run state, or absolute host paths in durable artifacts. `next` is a non-binding recommendation: Hermes or the lead engineer may choose a different safe task.
 
 A successor starts with `vamos hermes pi start --plan <absolute-plan-dir> --previous-session <id> "<task>"`. Hermes reads `vamos hermes pi result` rather than copying prior worker output into prompts.
 
