@@ -3,6 +3,7 @@ package agentchat
 import (
 	"crypto/subtle"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"os"
 	"strings"
@@ -129,6 +130,9 @@ func (h *Handler) HandleHermesPiCompletion(c echo.Context) error {
 		session,
 		result,
 	); err != nil {
+		if errors.Is(err, ErrHermesManagerNotFound) {
+			return echo.NewHTTPError(http.StatusNotFound, err.Error())
+		}
 		return echo.NewHTTPError(http.StatusBadGateway, err.Error())
 	}
 	return c.NoContent(http.StatusAccepted)

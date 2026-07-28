@@ -14,9 +14,10 @@ import (
 )
 
 type recordingHermesGateway struct {
-	prompt  HermesPrompt
-	session string
-	result  []byte
+	prompt        HermesPrompt
+	session       string
+	result        []byte
+	completionErr error
 }
 
 func (g *recordingHermesGateway) DeliverPrompt(
@@ -33,7 +34,7 @@ func (g *recordingHermesGateway) DeliverPiCompletion(
 	result []byte,
 ) error {
 	g.session, g.result = session, append([]byte(nil), result...)
-	return nil
+	return g.completionErr
 }
 
 func TestHandleHermesPromptOnlyDeliversForThreadOwner(t *testing.T) {
@@ -138,6 +139,40 @@ func TestHandleHermesEventAppendsContainedTranscriptInArrivalOrder(t *testing.T)
 	}
 	if len(events) != 2 || events[0].Content != "first" || events[1].Content != "second" {
 		t.Fatalf("events = %#v, want arrival order", events)
+	}
+}
+
+func TestHandleHermesPiCompletionReturnsNotFoundWithoutManager(t *testing.T) {
+	thoughts := t.TempDir()
+	plan := filepath.Join(thoughts, "agent", "plans", "plan-a")
+	path := filepath.Join(plan, ".vamos", "sessions", "pi", "session-1_result.yaml")
+	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte("summary: current\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	e := echo.New()
+	h := NewHandler(
+		&Service{
+			thoughtsRoot: thoughts,
+			hermesGateway: &recordingHermesGateway{
+				completionErr: ErrHermesManagerNotFound,
+			},
+		},
+		nil,
+		HandlerOptions{HermesCallbackToken: "secret"},
+	)
+	body, _ := json.Marshal(map[string]string{"plan_dir": plan})
+	req := httptest.NewRequest(http.MethodPost, "/", bytes.NewReader(body))
+	req.Header.Set("Authorization", "Bearer secret")
+	c := e.NewContext(req, httptest.NewRecorder())
+	c.SetParamNames("session_id")
+	c.SetParamValues("session-1")
+
+	err := h.HandleHermesPiCompletion(c)
+	if httpErr, ok := err.(*echo.HTTPError); !ok || httpErr.Code != http.StatusNotFound {
+		t.Fatalf("HandleHermesPiCompletion() error = %#v, want not found", err)
 	}
 }
 

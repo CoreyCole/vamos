@@ -3,6 +3,9 @@ package hermescmd
 import (
 	"bytes"
 	"context"
+	"errors"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
@@ -108,6 +111,23 @@ func TestDoneWritesResultThenNotifiesVamosFromHostConfig(t *testing.T) {
 	}
 }
 
+func TestNotifyPiCompletionReportsMissingHermesManager(t *testing.T) {
+	server := httptest.NewServer(
+		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusNotFound)
+		}),
+	)
+	defer server.Close()
+	if err := notifyPiCompletion(
+		t.Context(),
+		hostConfig{VamosURL: server.URL, CallbackToken: "secret"},
+		"/plans/example",
+		"session-1",
+	); !errors.Is(err, errHermesManagerNotFound) {
+		t.Fatalf("notifyPiCompletion() error = %v, want manager not found", err)
+	}
+}
+
 func TestDoneUsesPiSessionID(t *testing.T) {
 	ctx := testPlan(t)
 	t.Setenv("PI_SESSION_ID", "pi-session")
@@ -132,6 +152,37 @@ func TestDoneUsesPiSessionID(t *testing.T) {
 	}
 	if _, err := ReadPiResult(ctx.PlanDir, "pi-session"); err != nil {
 		t.Fatalf("Pi session result = %v", err)
+	}
+}
+
+func TestDoneWithoutHermesManagerPrintsManualContinuation(t *testing.T) {
+	ctx := testPlan(t)
+	configPath := filepath.Join(t.TempDir(), "hermes.yaml")
+	if err := os.WriteFile(
+		configPath,
+		[]byte("vamos_url: https://vamos.example\ncallback_token: secret\n"),
+		0o600,
+	); err != nil {
+		t.Fatal(err)
+	}
+	cmd := newDoneCommand(func(context.Context, hostConfig, string, string) error {
+		return errHermesManagerNotFound
+	})
+	var output bytes.Buffer
+	cmd.SetOut(&output)
+	cmd.SetArgs([]string{
+		"--plan", ctx.PlanDir, "--session", "session-1", "--config", configPath,
+		"--outcome", "complete", "--next", "implement", "--summary", "1. done",
+	})
+	if err := cmd.Execute(); err != nil {
+		t.Fatal(err)
+	}
+	if got := output.String(); !strings.Contains(
+		got,
+		"no Hermes manager owns this session",
+	) ||
+		!strings.Contains(got, "recommended: pi @.pi/skills/q-implement/SKILL.md") {
+		t.Fatalf("managerless completion output = %q", got)
 	}
 }
 

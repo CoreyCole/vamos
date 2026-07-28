@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"os"
@@ -22,6 +23,8 @@ type HermesCallbackEvent struct {
 	PlanDir string `json:"plan_dir"`
 	HermesTranscriptEvent
 }
+
+var ErrHermesManagerNotFound = errors.New("Hermes manager session not found")
 
 type HermesGatewayClient interface {
 	DeliverPrompt(context.Context, HermesPrompt) error
@@ -74,6 +77,9 @@ func (c httpHermesGatewayClient) post(
 		return err
 	}
 	defer resp.Body.Close()
+	if resp.StatusCode == http.StatusNotFound {
+		return ErrHermesManagerNotFound
+	}
 	if resp.StatusCode/100 != 2 {
 		return fmt.Errorf("Hermes gateway delivery: %s", resp.Status)
 	}
