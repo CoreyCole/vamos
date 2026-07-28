@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io/fs"
 	"log"
+	"net/http"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -104,6 +105,7 @@ type Service struct {
 	workspaceRestartToken               string
 	piCommandDiscovery                  PiCommandDiscovery
 	chatSessions                        *chatsession.Service
+	hermesGateway                       HermesGatewayClient
 }
 
 type liveThreadState struct {
@@ -121,6 +123,8 @@ type ServiceOptions struct {
 	ImplWorkspaceDiscovery  workspaces.ImplWorkspaceDiscoveryConfig
 	WorkspaceManagerURL     string
 	WorkspaceRestartToken   string
+	HermesGatewayURL        string
+	HermesGatewayToken      string
 }
 
 func NewService(
@@ -210,6 +214,13 @@ func NewServiceWithOptions(
 		workspaceManagerURL:     strings.TrimSpace(opts.WorkspaceManagerURL),
 		workspaceRestartToken:   strings.TrimSpace(opts.WorkspaceRestartToken),
 		chatSessions:            chatsession.NewService(database, queries),
+	}
+	if gatewayURL := strings.TrimSpace(opts.HermesGatewayURL); gatewayURL != "" {
+		svc.hermesGateway = httpHermesGatewayClient{
+			url:    gatewayURL,
+			token:  strings.TrimSpace(opts.HermesGatewayToken),
+			client: &http.Client{},
+		}
 	}
 	return initializeWorkflowRuntime(svc, notifier, queries)
 }
@@ -665,14 +676,19 @@ func (s *Service) workflowThread(
 		threadID = strings.TrimSpace(workspaceRecord.SelectedThreadID.String)
 	}
 	if threadID != "" {
-		thread, err := q.GetAgentThreadForWorkspaceUser(ctx, db.GetAgentThreadForWorkspaceUserParams{
-			ThreadID:    threadID,
-			WorkspaceID: workspaceRecord.ID,
-			UserEmail:   workspaceRecord.UserEmail,
-		})
+		thread, err := q.GetAgentThreadForWorkspaceUser(
+			ctx,
+			db.GetAgentThreadForWorkspaceUserParams{
+				ThreadID:    threadID,
+				WorkspaceID: workspaceRecord.ID,
+				UserEmail:   workspaceRecord.UserEmail,
+			},
+		)
 		if err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
-				return db.AgentThread{}, errors.New("thread is not attached to workflow workspace")
+				return db.AgentThread{}, errors.New(
+					"thread is not attached to workflow workspace",
+				)
 			}
 			return db.AgentThread{}, err
 		}
@@ -782,9 +798,18 @@ func (s *Service) ReconcileUnattachedAgentChatThreads(
 		return err
 	}
 	for _, thread := range threads {
-		if _, err := s.queries.GetPrimaryWorkspaceForThread(ctx, db.GetPrimaryWorkspaceForThreadParams{ThreadID: thread.ID, UserEmail: userEmail}); err == nil {
+		if _, err := s.queries.GetPrimaryWorkspaceForThread(
+			ctx,
+			db.GetPrimaryWorkspaceForThreadParams{
+				ThreadID:  thread.ID,
+				UserEmail: userEmail,
+			},
+		); err == nil {
 			continue
-		} else if !errors.Is(err, sql.ErrNoRows) {
+		} else if !errors.Is(
+			err,
+			sql.ErrNoRows,
+		) {
 			return err
 		}
 		// Historical unattached threads can point at arbitrary cwd values from
@@ -806,9 +831,15 @@ func (s *Service) EnsureThreadWorkspace(
 	if err != nil {
 		return db.Workspace{}, db.AgentThread{}, err
 	}
-	if workspace, err := s.queries.GetPrimaryWorkspaceForThread(ctx, db.GetPrimaryWorkspaceForThreadParams{ThreadID: thread.ID, UserEmail: userEmail}); err == nil {
+	if workspace, err := s.queries.GetPrimaryWorkspaceForThread(
+		ctx,
+		db.GetPrimaryWorkspaceForThreadParams{ThreadID: thread.ID, UserEmail: userEmail},
+	); err == nil {
 		return workspace, thread, nil
-	} else if !errors.Is(err, sql.ErrNoRows) {
+	} else if !errors.Is(
+		err,
+		sql.ErrNoRows,
+	) {
 		return db.Workspace{}, db.AgentThread{}, err
 	}
 
@@ -915,10 +946,22 @@ func (s *Service) attachThreadRunsAndSessionsToWorkspace(
 		return nil
 	}
 	q := s.queries.WithTx(tx)
-	if err := q.BackfillAgentSessionsWorkspaceForThread(ctx, db.BackfillAgentSessionsWorkspaceForThreadParams{AttachedWorkspaceID: nullString(workspaceID), ProjectedThreadID: nullString(threadID)}); err != nil {
+	if err := q.BackfillAgentSessionsWorkspaceForThread(
+		ctx,
+		db.BackfillAgentSessionsWorkspaceForThreadParams{
+			AttachedWorkspaceID: nullString(workspaceID),
+			ProjectedThreadID:   nullString(threadID),
+		},
+	); err != nil {
 		return err
 	}
-	return q.BackfillAgentRunsWorkspaceForThread(ctx, db.BackfillAgentRunsWorkspaceForThreadParams{WorkspaceID: nullString(workspaceID), ThreadID: threadID})
+	return q.BackfillAgentRunsWorkspaceForThread(
+		ctx,
+		db.BackfillAgentRunsWorkspaceForThreadParams{
+			WorkspaceID: nullString(workspaceID),
+			ThreadID:    threadID,
+		},
+	)
 }
 
 func ValidateWorkspaceRootDocPath(
@@ -1812,7 +1855,10 @@ func (s *Service) UpdateThreadCwd(
 		return &thread, nil
 	}
 
-	if err := s.queries.UpdateAgentThreadCwd(ctx, db.UpdateAgentThreadCwdParams{ID: thread.ID, Cwd: resolvedCwd}); err != nil {
+	if err := s.queries.UpdateAgentThreadCwd(
+		ctx,
+		db.UpdateAgentThreadCwdParams{ID: thread.ID, Cwd: resolvedCwd},
+	); err != nil {
 		return nil, err
 	}
 
@@ -1897,10 +1943,13 @@ func (s *Service) createRun(
 	restoreHeadEntryID sql.NullString,
 ) (db.AgentRun, error) {
 	workspaceID := sql.NullString{}
-	workspace, err := q.GetPrimaryWorkspaceForThread(ctx, db.GetPrimaryWorkspaceForThreadParams{
-		ThreadID:  thread.ID,
-		UserEmail: thread.UserEmail,
-	})
+	workspace, err := q.GetPrimaryWorkspaceForThread(
+		ctx,
+		db.GetPrimaryWorkspaceForThreadParams{
+			ThreadID:  thread.ID,
+			UserEmail: thread.UserEmail,
+		},
+	)
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return db.AgentRun{}, err
 	}
@@ -2252,7 +2301,11 @@ func (s *Service) startRun(
 		s.notifyThreadScope(ctx, thread.ID, PatchRunHeader)
 		return &run, nil
 	}
-	if err := s.recordTemporalWorkerSurface(ctx, run, prepared.ChatSessionID); err != nil {
+	if err := s.recordTemporalWorkerSurface(
+		ctx,
+		run,
+		prepared.ChatSessionID,
+	); err != nil {
 		s.notifyThreadScope(ctx, thread.ID, PatchRunHeader)
 		return &run, nil
 	}
@@ -2346,7 +2399,11 @@ func (s *Service) notifyThreadScopes(
 	if err != nil {
 		return
 	}
-	workspace, ok, err := s.ResolvePrimaryWorkspaceForThread(ctx, thread.UserEmail, thread.ID)
+	workspace, ok, err := s.ResolvePrimaryWorkspaceForThread(
+		ctx,
+		thread.UserEmail,
+		thread.ID,
+	)
 	if err != nil || !ok {
 		return
 	}
@@ -2713,11 +2770,14 @@ func (s *Service) FinalizeRun(ctx context.Context, result conversation.RunResult
 	adoption := ThreadWorkspaceAdoptionResult{}
 	if !run.WorkflowNodeID.Valid {
 		var adoptionErr error
-		adoption, adoptionErr = s.AdoptThreadWorkspacesForRun(ctx, ThreadWorkspaceAdoptionInput{
-			ThreadID: run.ThreadID,
-			RunID:    run.ID,
-			Source:   "run_complete",
-		})
+		adoption, adoptionErr = s.AdoptThreadWorkspacesForRun(
+			ctx,
+			ThreadWorkspaceAdoptionInput{
+				ThreadID: run.ThreadID,
+				RunID:    run.ID,
+				Source:   "run_complete",
+			},
+		)
 		if adoptionErr != nil {
 			return adoptionErr
 		}
@@ -3106,7 +3166,11 @@ func (s *Service) BuildThreadPageArgs(
 	args.CurrentThread = &thread
 	args.PrimaryWorkspace = workspaceContext.Primary
 	args.RelatedWorkspaces = workspaceContext.Related
-	args.ThreadMetadata = s.BuildThreadMetadataView(ctx, workspaceContext, firstNonEmpty(input.Cwd, thread.Cwd))
+	args.ThreadMetadata = s.BuildThreadMetadataView(
+		ctx,
+		workspaceContext,
+		firstNonEmpty(input.Cwd, thread.Cwd),
+	)
 	if activePlan, ok := s.canonicalPlanDirFromSource(thread.Cwd); ok {
 		args.PlanSidebar, err = s.BuildPlanSidebarState(ctx, PlanSidebarInput{
 			UserEmail:      userEmail,
@@ -3153,8 +3217,19 @@ func (s *Service) BuildThreadPageArgs(
 
 	primary := *workspaceContext.Primary
 	args.CurrentThread = &thread
-	args.Cwd = firstNonEmpty(args.ThreadMetadata.PiCwd, primary.Cwd.String, primary.RootDocPath, thread.Cwd)
-	args.DocPane, err = s.buildWorkspaceDocPane(ctx, primary, activeRunID, input.DocPath, false)
+	args.Cwd = firstNonEmpty(
+		args.ThreadMetadata.PiCwd,
+		primary.Cwd.String,
+		primary.RootDocPath,
+		thread.Cwd,
+	)
+	args.DocPane, err = s.buildWorkspaceDocPane(
+		ctx,
+		primary,
+		activeRunID,
+		input.DocPath,
+		false,
+	)
 	if err != nil {
 		return nil, err
 	}

@@ -85,7 +85,9 @@ func resolveStaticRoot() string {
 func configureLayoutStaticAssets(staticRoot string) {
 	_, datastarProErr := os.Stat(filepath.Join(staticRoot, "js", "datastar-pro-v1.js"))
 	layouts.SetDatastarProAvailable(datastarProErr == nil)
-	_, datastarInspectorErr := os.Stat(filepath.Join(staticRoot, "js", "datastar-inspector.js"))
+	_, datastarInspectorErr := os.Stat(
+		filepath.Join(staticRoot, "js", "datastar-inspector.js"),
+	)
 	layouts.SetDatastarInspectorAvailable(datastarInspectorErr == nil)
 }
 
@@ -135,7 +137,9 @@ func workspaceReleaseHandlerOptions(
 		Git:      workspaces.ShellGitInspector{},
 	}
 	if releaseStarter != nil {
-		return []workspaces.HandlerOption{workspaces.WithReleaseQueue(projector, releaseStore, releaseStarter)}
+		return []workspaces.HandlerOption{
+			workspaces.WithReleaseQueue(projector, releaseStore, releaseStarter),
+		}
 	}
 	return []workspaces.HandlerOption{workspaces.WithReleaseProjector(projector)}
 }
@@ -220,9 +224,9 @@ type Config struct {
 	WorkspaceDomain         string `envconfig:"CN_AGENTS_WORKSPACE_DOMAIN"           default:""`
 	WorkspaceParentDir      string `envconfig:"CN_AGENTS_WORKSPACE_PARENT_DIR"       default:""`
 	WorkspaceStateDir       string `envconfig:"CN_AGENTS_WORKSPACE_STATE_DIR"        default:"~/.local/state/cn-agents/workspaces"`
-	WorkspaceSlug           string `envconfig:"CN_AGENTS_WORKSPACE_SLUG"                default:"main"`
-	WorkspaceManagerURL     string `envconfig:"CN_AGENTS_WORKSPACE_MANAGER_URL"         default:""`
-	WorkspaceRestartToken   string `envconfig:"CN_AGENTS_WORKSPACE_RESTART_TOKEN"       default:""`
+	WorkspaceSlug           string `envconfig:"CN_AGENTS_WORKSPACE_SLUG"             default:"main"`
+	WorkspaceManagerURL     string `envconfig:"CN_AGENTS_WORKSPACE_MANAGER_URL"      default:""`
+	WorkspaceRestartToken   string `envconfig:"CN_AGENTS_WORKSPACE_RESTART_TOKEN"    default:""`
 	DevAuthSigningKey       string `envconfig:"CN_AGENTS_DEV_AUTH_SIGNING_KEY"       default:""`
 	DevAuthVerifyKey        string `envconfig:"CN_AGENTS_DEV_AUTH_VERIFY_KEY"        default:""`
 	MarkdownBasePath        string `envconfig:"MARKDOWN_BASE_PATH"                   default:""`
@@ -248,6 +252,9 @@ type Config struct {
 	AgentChatDetailCollapseLineLimit int    `envconfig:"AGENT_CHAT_DETAIL_COLLAPSE_LINE_LIMIT" default:"10"`
 	InternalAgentChatToken           string `envconfig:"CN_AGENTS_INTERNAL_TOKEN"              default:""`
 	InternalAgentChatAllowLoopback   bool   `envconfig:"AGENT_CHAT_INTERNAL_ALLOW_LOOPBACK"    default:"false"`
+	HermesGatewayURL                 string `envconfig:"VAMOS_HERMES_GATEWAY_URL"              default:""`
+	HermesGatewayToken               string `envconfig:"VAMOS_HERMES_GATEWAY_TOKEN"            default:""`
+	HermesCallbackToken              string `envconfig:"VAMOS_HERMES_CALLBACK_TOKEN"           default:""`
 }
 
 func loadHostConfigForLegacyStartup() (server.HostConfig, bool) {
@@ -362,19 +369,26 @@ func mergeProjectCheckoutsIntoDiscovery(
 			if strings.TrimSpace(checkout.RootPath) == "" {
 				continue
 			}
-			if configuredCheckoutPathExists(discovery.ConfiguredCheckouts, checkout.RootPath) {
+			if configuredCheckoutPathExists(
+				discovery.ConfiguredCheckouts,
+				checkout.RootPath,
+			) {
 				continue
 			}
 			slug := checkoutName
-			if existing, exists := discovery.ConfiguredCheckouts[slug]; exists && strings.TrimSpace(existing.ProjectID) != "" && strings.TrimSpace(existing.ProjectID) != projectID {
+			if existing, exists := discovery.ConfiguredCheckouts[slug]; exists &&
+				strings.TrimSpace(existing.ProjectID) != "" &&
+				strings.TrimSpace(existing.ProjectID) != projectID {
 				slug = workspaces.ProjectScopedCheckoutSlug(projectID, checkoutName)
 			}
 			discovery.ConfiguredCheckouts[slug] = workspaces.ConfiguredCheckout{
 				RootPath:    checkout.RootPath,
 				DisplayName: firstNonEmpty(checkout.Purpose, checkoutName),
-				IsMain:      checkout.Role == server.CheckoutRoleMain || checkoutName == projects.DefaultCheckout || checkoutName == repo.DefaultCheckout,
-				Role:        workspaces.CheckoutRole(checkout.Role),
-				ProjectID:   projectID,
+				IsMain: checkout.Role == server.CheckoutRoleMain ||
+					checkoutName == projects.DefaultCheckout ||
+					checkoutName == repo.DefaultCheckout,
+				Role:      workspaces.CheckoutRole(checkout.Role),
+				ProjectID: projectID,
 			}
 		}
 	}
@@ -422,24 +436,36 @@ func applyVamosEnvOverrides(cfg Config) Config {
 	}{
 		{"VAMOS_LISTEN_ADDRESS", func(v string) { cfg.ListenAddress = v }},
 		{"VAMOS_PUBLIC_BASE_URL", func(v string) { cfg.PublicBaseURL = v }},
-		{"VAMOS_INTERNAL_CALLBACK_BASE_URL", func(v string) { cfg.InternalCallbackBaseURL = v }},
+		{
+			"VAMOS_INTERNAL_CALLBACK_BASE_URL",
+			func(v string) { cfg.InternalCallbackBaseURL = v },
+		},
 		{"VAMOS_WORKSPACE_MODE", func(v string) { cfg.WorkspaceMode = v }},
 		{"VAMOS_WORKSPACE_DOMAIN", func(v string) { cfg.WorkspaceDomain = v }},
 		{"VAMOS_WORKSPACE_PARENT_DIR", func(v string) { cfg.WorkspaceParentDir = v }},
 		{"VAMOS_WORKSPACE_STATE_DIR", func(v string) { cfg.WorkspaceStateDir = v }},
 		{"VAMOS_WORKSPACE_SLUG", func(v string) { cfg.WorkspaceSlug = v }},
 		{"VAMOS_WORKSPACE_MANAGER_URL", func(v string) { cfg.WorkspaceManagerURL = v }},
-		{"VAMOS_WORKSPACE_RESTART_TOKEN", func(v string) { cfg.WorkspaceRestartToken = v }},
+		{
+			"VAMOS_WORKSPACE_RESTART_TOKEN",
+			func(v string) { cfg.WorkspaceRestartToken = v },
+		},
 		{"VAMOS_DEV_AUTH_SIGNING_KEY", func(v string) { cfg.DevAuthSigningKey = v }},
 		{"VAMOS_DEV_AUTH_VERIFY_KEY", func(v string) { cfg.DevAuthVerifyKey = v }},
 		{"VAMOS_THOUGHTS_ROOT", func(v string) { cfg.MarkdownBasePath = v }},
 		{"VAMOS_THOUGHTS_REPO", func(v string) { cfg.RepoPath = v }},
 		{"VAMOS_DATABASE_PATH", func(v string) { cfg.DatabasePath = v }},
 		{"VAMOS_CONFIG", func(v string) { cfg.ConfigPath = v }},
-		{"VAMOS_PLAYWRIGHT_AUTH_ENABLED", func(v string) { cfg.PlaywrightAuthEnabled = parseBoolEnv(v, cfg.PlaywrightAuthEnabled) }},
+		{
+			"VAMOS_PLAYWRIGHT_AUTH_ENABLED",
+			func(v string) { cfg.PlaywrightAuthEnabled = parseBoolEnv(v, cfg.PlaywrightAuthEnabled) },
+		},
 		{"VAMOS_PLAYWRIGHT_AUTH_EMAIL", func(v string) { cfg.PlaywrightAuthEmail = v }},
 		{"VAMOS_PLAYWRIGHT_AUTH_TOKEN", func(v string) { cfg.PlaywrightAuthToken = v }},
 		{"VAMOS_INTERNAL_TOKEN", func(v string) { cfg.InternalAgentChatToken = v }},
+		{"VAMOS_HERMES_GATEWAY_URL", func(v string) { cfg.HermesGatewayURL = v }},
+		{"VAMOS_HERMES_GATEWAY_TOKEN", func(v string) { cfg.HermesGatewayToken = v }},
+		{"VAMOS_HERMES_CALLBACK_TOKEN", func(v string) { cfg.HermesCallbackToken = v }},
 		{"VAMOS_DEFAULT_CWD", func(v string) { cfg.AgentChatDefaultDir = v }},
 	}
 	for _, override := range overrides {
@@ -462,7 +488,10 @@ func childWorkspacesReadOnlyEnabled(cfg Config) bool {
 	return cfg.WorkspaceMode == "child"
 }
 
-func workspaceHandlerManager(workspaceManager *workspaces.ManagerService, cfg Config) workspaces.Manager {
+func workspaceHandlerManager(
+	workspaceManager *workspaces.ManagerService,
+	cfg Config,
+) workspaces.Manager {
 	if workspaceManager != nil {
 		return workspaceManager
 	}
@@ -905,7 +934,9 @@ func main() {
 		if err != nil {
 			log.Fatal(err)
 		}
-		agentBrowserSigningKey, err = workspaces.ParseHandoffSigningKey(cfg.DevAuthSigningKey)
+		agentBrowserSigningKey, err = workspaces.ParseHandoffSigningKey(
+			cfg.DevAuthSigningKey,
+		)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -921,7 +952,9 @@ func main() {
 		if err != nil {
 			log.Fatal(err)
 		}
-		agentBrowserVerifyKey, err = workspaces.ParseHandoffVerifyKey(cfg.DevAuthVerifyKey)
+		agentBrowserVerifyKey, err = workspaces.ParseHandoffVerifyKey(
+			cfg.DevAuthVerifyKey,
+		)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -1119,11 +1152,17 @@ func main() {
 	if _, hasStage := workspaceDiscovery.ConfiguredCheckouts["stage"]; hasStage {
 		if _, hasMain := workspaceDiscovery.ConfiguredCheckouts["main"]; hasMain {
 			var err error
-			releaseWorkflowRegistry, releaseRegistry, err = workspaces.BuildDefaultReleaseRegistry("stage", "main")
+			releaseWorkflowRegistry, releaseRegistry, err = workspaces.BuildDefaultReleaseRegistry(
+				"stage",
+				"main",
+			)
 			if err != nil {
 				log.Fatal("Failed to build release registry:", err)
 			}
-			if err := workspaces.VerifyReleaseDefinitions(releaseRegistry, workspaceDiscovery.ConfiguredCheckouts); err != nil {
+			if err := workspaces.VerifyReleaseDefinitions(
+				releaseRegistry,
+				workspaceDiscovery.ConfiguredCheckouts,
+			); err != nil {
 				log.Fatal("Invalid release definition:", err)
 			}
 		}
@@ -1220,6 +1259,8 @@ func main() {
 			ThoughtsRoot:            basePath,
 			DetailCollapseLineLimit: cfg.AgentChatDetailCollapseLineLimit,
 			CallbackBaseURL:         agentChatCallbackBaseURL(cfg),
+			HermesGatewayURL:        cfg.HermesGatewayURL,
+			HermesGatewayToken:      cfg.HermesGatewayToken,
 		},
 	)
 	if err != nil {
@@ -1266,6 +1307,7 @@ func main() {
 			MachineCredentials:    agentBrowserMachineCredentials,
 			ProjectsConfig:        hostCfg.Projects,
 			PublicBaseURL:         cfg.PublicBaseURL,
+			HermesCallbackToken:   cfg.HermesCallbackToken,
 		},
 	).WithLayoutPreferenceService(layoutPrefsService)
 	workspaceSyncGuard := agentchat.NewWorkspaceSyncGuard()
@@ -1296,17 +1338,26 @@ func main() {
 		nil,
 		nil,
 	)
-	workspaceSyncCoordinator := agentchat.NewSyncCoordinator(agentchat.SyncCoordinatorOptions{
-		WorkspaceSync: workspaceSyncer,
-		TerminalIndex: agentChatService,
-		QRSPIApply:    agentChatService,
-		OnWorkspaceComplete: func(ctx context.Context, result agentchat.SyncWorkspacesResult, err error) {
-			if result.Skipped {
-				log.Printf("workspace_sync_skipped mode=schedule reason=%q", result.SkipReason)
-			}
-			workspaceSyncCompleteForSchedule(ctx, workspaceSyncRefreshResultFromAgentChat(result), err)
+	workspaceSyncCoordinator := agentchat.NewSyncCoordinator(
+		agentchat.SyncCoordinatorOptions{
+			WorkspaceSync: workspaceSyncer,
+			TerminalIndex: agentChatService,
+			QRSPIApply:    agentChatService,
+			OnWorkspaceComplete: func(ctx context.Context, result agentchat.SyncWorkspacesResult, err error) {
+				if result.Skipped {
+					log.Printf(
+						"workspace_sync_skipped mode=schedule reason=%q",
+						result.SkipReason,
+					)
+				}
+				workspaceSyncCompleteForSchedule(
+					ctx,
+					workspaceSyncRefreshResultFromAgentChat(result),
+					err,
+				)
+			},
 		},
-	})
+	)
 	if goWorker != nil {
 		goWorker.RegisterWorkflow(agentchat.SyncCoordinatorWorkflow)
 		goWorker.RegisterWorkflow(agentchat.SyncWorkspacesWorkflow)
@@ -1356,9 +1407,13 @@ func main() {
 	}
 	var pickleballWorkflowStarter pickleball.WorkflowStarter
 	if temporalManager != nil {
-		pickleballWorkflowStarter = pickleball.NewTemporalWorkflowStarter(temporalManager.Client())
+		pickleballWorkflowStarter = pickleball.NewTemporalWorkflowStarter(
+			temporalManager.Client(),
+		)
 	}
-	pickleballExampleRoot := resolvePickleballExampleRoot(workspaceDiscovery.MainCheckoutPath)
+	pickleballExampleRoot := resolvePickleballExampleRoot(
+		workspaceDiscovery.MainCheckoutPath,
+	)
 	pickleballService, err := pickleball.NewService(pickleball.Options{
 		ThoughtsRoot:    cfg.MarkdownBasePath,
 		SeedBundleDir:   filepath.Join(pickleballExampleRoot, "seed-bundle"),
@@ -1366,23 +1421,39 @@ func main() {
 		WorkflowStarter: pickleballWorkflowStarter,
 		AIGenerator:     pickleball.PromptPatchGenerator{},
 		AppletEditor: pickleball.AgentChatEditor{
-			Starter:       agentChatService,
-			ProjectID:     firstNonEmpty(hostCfg.Projects.DefaultRepo, "github.com/CoreyCole/vamos"),
+			Starter: agentChatService,
+			ProjectID: firstNonEmpty(
+				hostCfg.Projects.DefaultRepo,
+				"github.com/CoreyCole/vamos",
+			),
 			PublicBaseURL: cfg.PublicBaseURL,
 		},
-		AppletRuntime: appletruntime.NewManager(filepath.Join(cfg.MarkdownBasePath, ".vamos", "applets", "logs")),
+		AppletRuntime: appletruntime.NewManager(
+			filepath.Join(cfg.MarkdownBasePath, ".vamos", "applets", "logs"),
+		),
 	})
 	if err != nil {
 		log.Fatal("Failed to initialize pickleball example service:", err)
 	}
-	sharedAppletRuntime := appletruntime.NewManager(filepath.Join(cfg.MarkdownBasePath, ".vamos", "applets", "logs"))
-	go appletruntime.StartAppletSweeper(runtimeCtx, sharedAppletRuntime, appletruntime.SweepOptions{
-		Interval: time.Minute,
-		Logger:   log.Default(),
-	})
-	examplesRoot := filepath.Dir(resolveExampleRoot(workspaceDiscovery.MainCheckoutPath, "todo"))
+	sharedAppletRuntime := appletruntime.NewManager(
+		filepath.Join(cfg.MarkdownBasePath, ".vamos", "applets", "logs"),
+	)
+	go appletruntime.StartAppletSweeper(
+		runtimeCtx,
+		sharedAppletRuntime,
+		appletruntime.SweepOptions{
+			Interval: time.Minute,
+			Logger:   log.Default(),
+		},
+	)
+	examplesRoot := filepath.Dir(
+		resolveExampleRoot(workspaceDiscovery.MainCheckoutPath, "todo"),
+	)
 	sharedAppletService := applets.NewHTTPService(applets.ServiceOptions{
-		Resolver: applets.Resolver{ThoughtsRoot: cfg.MarkdownBasePath, ExamplesRoot: examplesRoot},
+		Resolver: applets.Resolver{
+			ThoughtsRoot: cfg.MarkdownBasePath,
+			ExamplesRoot: examplesRoot,
+		},
 		Manager:  sharedAppletRuntime,
 		Comments: commentService,
 	})
@@ -1396,7 +1467,9 @@ func main() {
 	}
 	if goWorker != nil {
 		goWorker.RegisterWorkflow(pickleball.SelfModifyWorkflow)
-		goWorker.RegisterActivity(&pickleball.SelfModifyActivities{Service: pickleballService})
+		goWorker.RegisterActivity(
+			&pickleball.SelfModifyActivities{Service: pickleballService},
+		)
 		go func() {
 			if err := goWorker.Run(runtimeCtx); err != nil {
 				log.Printf("Go worker error: %v", err)
@@ -1417,7 +1490,8 @@ func main() {
 	e.Static("/static", staticRoot)
 	e.Static("/css", filepath.Join(staticRoot, "css"))
 	e.GET("/js/datastar-pro-v1.js", func(c echo.Context) error {
-		if cfg.WorkspaceMode == "child" && strings.EqualFold(c.Request().Header.Get("Origin"), "null") {
+		if cfg.WorkspaceMode == "child" &&
+			strings.EqualFold(c.Request().Header.Get("Origin"), "null") {
 			c.Response().Header().Del("Access-Control-Allow-Origin")
 		}
 		return c.File(filepath.Join(staticRoot, "js", "datastar-pro-v1.js"))
@@ -1476,7 +1550,11 @@ func main() {
 		}
 		webhookService := webhook.NewServiceWithRoutes(
 			cfg.WebhookSecret,
-			webhook.RepoRoute{RepoPath: cfg.RepoPath, RebuildScript: cfg.RebuildScript, SyncThoughts: true},
+			webhook.RepoRoute{
+				RepoPath:      cfg.RepoPath,
+				RebuildScript: cfg.RebuildScript,
+				SyncThoughts:  true,
+			},
 			webhookRoutes,
 			webhookForwards,
 		)
@@ -1500,7 +1578,8 @@ func main() {
 		WorkspaceDomain: cfg.WorkspaceDomain,
 	})
 	auth.RegisterAgentBrowserAuthRoutes(e, authService, auth.AgentBrowserAuthConfig{
-		Enabled:            cfg.WorkspaceMode != "standalone" && len(agentBrowserVerifyKey) == ed25519.PublicKeySize,
+		Enabled: cfg.WorkspaceMode != "standalone" &&
+			len(agentBrowserVerifyKey) == ed25519.PublicKeySize,
 		WorkspaceSlug:      cfg.WorkspaceSlug,
 		SigningKey:         agentBrowserSigningKey,
 		VerifyKey:          agentBrowserVerifyKey,
@@ -1525,7 +1604,10 @@ func main() {
 	if cfg.WorkspaceMode != "standalone" || workspaceManager != nil {
 		handlerOptions := []workspaces.HandlerOption{
 			workspaces.WithDevAuth(authService, handoffSigner),
-			workspaces.WithRestartAPI(cfg.WorkspaceRestartToken, workspaceDiscovery.MainCheckoutPath),
+			workspaces.WithRestartAPI(
+				cfg.WorkspaceRestartToken,
+				workspaceDiscovery.MainCheckoutPath,
+			),
 			workspaces.WithLifecycleNotifier(workspaceNotifier),
 			workspaces.WithPlanWorkspaces(dbService.Queries),
 			workspaces.WithImplWorkspaces(dbService.Queries),
@@ -1533,29 +1615,78 @@ func main() {
 			workspaces.WithWorkspaceWorkflowSummaryResolver(agentChatService),
 			workspaces.WithWorkspaceProvisionStarter(provisionStarter),
 			workspaces.WithWorkspaceCleanupStarter(cleanupStarter),
-			workspaces.WithWorkspaceErrorStore(workspaces.NewSQLWorkspaceErrorEventStore(dbService.Queries)),
-			workspaces.WithWorkspaceErrorScanner(&workspaces.WorkspaceErrorScanner{Tailer: workspaces.NewFileLogTailer()}),
+			workspaces.WithWorkspaceErrorStore(
+				workspaces.NewSQLWorkspaceErrorEventStore(dbService.Queries),
+			),
+			workspaces.WithWorkspaceErrorScanner(
+				&workspaces.WorkspaceErrorScanner{Tailer: workspaces.NewFileLogTailer()},
+			),
 		}
 		handlerOptions = append(handlerOptions, workspaceReleaseHandlerOptions(
 			releaseRegistry,
 			releaseStore,
 			releaseStarter,
 		)...)
-		handlerOptions = append(handlerOptions,
+		handlerOptions = append(
+			handlerOptions,
 			workspaces.WithWorkspaceSyncCompletion(workspaceSyncCompleteForManualRefresh),
-			workspaces.WithWorkspaceSyncRefresh(func(ctx context.Context) (workspaces.WorkspaceSyncRefreshResult, error) {
-				input := agentChatService.WorkspaceSyncInput()
-				if temporalManager == nil {
-					result, err := workspaceSyncer.Sync(ctx, input)
-					mapped := workspaceSyncRefreshResultFromAgentChat(result)
-					if err != nil {
-						return mapped, err
+			workspaces.WithWorkspaceSyncRefresh(
+				func(ctx context.Context) (workspaces.WorkspaceSyncRefreshResult, error) {
+					input := agentChatService.WorkspaceSyncInput()
+					if temporalManager == nil {
+						result, err := workspaceSyncer.Sync(ctx, input)
+						mapped := workspaceSyncRefreshResultFromAgentChat(result)
+						if err != nil {
+							return mapped, err
+						}
+						if result.Skipped {
+							log.Printf(
+								"workspace_sync_skipped mode=direct reason=%q",
+								result.SkipReason,
+							)
+						}
+						log.Printf(
+							"workspace_sync_refresh_complete mode=direct plan_upserted=%d plan_archived=%d impl_upserted=%d impl_repaired_env=%d impl_cleaned_up=%d impl_merged=%d changed=%t",
+							mapped.PlanUpserted,
+							mapped.PlanArchived,
+							mapped.ImplUpserted,
+							mapped.ImplRepairedEnv,
+							mapped.ImplCleanedUp,
+							mapped.ImplMerged,
+							mapped.Changed,
+						)
+						return mapped, nil
 					}
+					run, err := temporalManager.Client().ExecuteWorkflow(
+						ctx,
+						temporalclient.StartWorkflowOptions{
+							ID: agentchat.SyncWorkspacesWorkflowID(
+								input.ProjectInstanceKey,
+							) + ":manual:" + strconv.FormatInt(
+								time.Now().UnixNano(),
+								10,
+							),
+							TaskQueue: temporalmgr.GoTaskQueue,
+						},
+						agentchat.SyncWorkspacesWorkflow,
+						input,
+					)
+					if err != nil {
+						return workspaces.WorkspaceSyncRefreshResult{}, err
+					}
+					var result agentchat.SyncWorkspacesResult
+					if err := run.Get(ctx, &result); err != nil {
+						return workspaceSyncRefreshResultFromAgentChat(result), err
+					}
+					mapped := workspaceSyncRefreshResultFromAgentChat(result)
 					if result.Skipped {
-						log.Printf("workspace_sync_skipped mode=direct reason=%q", result.SkipReason)
+						log.Printf(
+							"workspace_sync_skipped mode=temporal reason=%q",
+							result.SkipReason,
+						)
 					}
 					log.Printf(
-						"workspace_sync_refresh_complete mode=direct plan_upserted=%d plan_archived=%d impl_upserted=%d impl_repaired_env=%d impl_cleaned_up=%d impl_merged=%d changed=%t",
+						"workspace_sync_refresh_complete mode=temporal plan_upserted=%d plan_archived=%d impl_upserted=%d impl_repaired_env=%d impl_cleaned_up=%d impl_merged=%d changed=%t",
 						mapped.PlanUpserted,
 						mapped.PlanArchived,
 						mapped.ImplUpserted,
@@ -1565,44 +1696,8 @@ func main() {
 						mapped.Changed,
 					)
 					return mapped, nil
-				}
-				run, err := temporalManager.Client().ExecuteWorkflow(
-					ctx,
-					temporalclient.StartWorkflowOptions{
-						ID: agentchat.SyncWorkspacesWorkflowID(
-							input.ProjectInstanceKey,
-						) + ":manual:" + strconv.FormatInt(
-							time.Now().UnixNano(),
-							10,
-						),
-						TaskQueue: temporalmgr.GoTaskQueue,
-					},
-					agentchat.SyncWorkspacesWorkflow,
-					input,
-				)
-				if err != nil {
-					return workspaces.WorkspaceSyncRefreshResult{}, err
-				}
-				var result agentchat.SyncWorkspacesResult
-				if err := run.Get(ctx, &result); err != nil {
-					return workspaceSyncRefreshResultFromAgentChat(result), err
-				}
-				mapped := workspaceSyncRefreshResultFromAgentChat(result)
-				if result.Skipped {
-					log.Printf("workspace_sync_skipped mode=temporal reason=%q", result.SkipReason)
-				}
-				log.Printf(
-					"workspace_sync_refresh_complete mode=temporal plan_upserted=%d plan_archived=%d impl_upserted=%d impl_repaired_env=%d impl_cleaned_up=%d impl_merged=%d changed=%t",
-					mapped.PlanUpserted,
-					mapped.PlanArchived,
-					mapped.ImplUpserted,
-					mapped.ImplRepairedEnv,
-					mapped.ImplCleanedUp,
-					mapped.ImplMerged,
-					mapped.Changed,
-				)
-				return mapped, nil
-			}),
+				},
+			),
 		)
 		handlerManager := workspaceHandlerManager(workspaceManager, cfg)
 		workspaceHandler = workspaces.NewHandler(

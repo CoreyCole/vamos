@@ -56,6 +56,7 @@ type Handler struct {
 	machineCredentials    serverauth.MachineCredentialStore
 	projectsConfig        servercfg.ProjectsConfig
 	publicBaseURL         string
+	hermesCallbackToken   string
 }
 
 type HandlerOptions struct {
@@ -64,6 +65,7 @@ type HandlerOptions struct {
 	MachineCredentials    serverauth.MachineCredentialStore
 	ProjectsConfig        servercfg.ProjectsConfig
 	PublicBaseURL         string
+	HermesCallbackToken   string
 }
 
 type planSidebarSubscription struct {
@@ -88,7 +90,11 @@ func NewHandler(
 		internalAllowLoopback: options.InternalAllowLoopback,
 		machineCredentials:    options.MachineCredentials,
 		projectsConfig:        options.ProjectsConfig,
-		publicBaseURL:         strings.TrimRight(strings.TrimSpace(options.PublicBaseURL), "/"),
+		publicBaseURL: strings.TrimRight(
+			strings.TrimSpace(options.PublicBaseURL),
+			"/",
+		),
+		hermesCallbackToken: strings.TrimSpace(options.HermesCallbackToken),
 	}
 }
 
@@ -127,6 +133,7 @@ func (h *Handler) RegisterMachineAPIRoutes(g *echo.Group) {
 	g.POST("/steer", h.PostCLIChatSteer)
 	g.GET("/chat-sessions/:session_id", h.GetCLIChatSession)
 	g.GET("/chat-sessions/:session_id/events", h.StreamCLIChatSessionEvents)
+	h.RegisterHermesRoutes(g)
 }
 
 // RegisterRuntimeRoutes keeps temporary chat/session endpoints available while the
@@ -277,7 +284,9 @@ func (h *Handler) OpenPlanWorkspace(c echo.Context) error {
 	if !ok {
 		return echo.NewHTTPError(http.StatusBadRequest, "invalid plan workspace")
 	}
-	workflowType := WorkspaceWorkflowType(strings.TrimSpace(c.QueryParam("workflow_type")))
+	workflowType := WorkspaceWorkflowType(
+		strings.TrimSpace(c.QueryParam("workflow_type")),
+	)
 	if !isQRSPIWorkflowType(workflowType) {
 		workspaceRecord, err := h.service.GetOrCreateWorkspaceForRootDocPath(
 			c.Request().Context(),
@@ -413,7 +422,10 @@ func isRecoverableThreadWorkspaceMismatch(err error) bool {
 
 func (h *Handler) logRecoverableThreadWorkspaceMismatch(c echo.Context, err error) {
 	if c == nil || c.Request() == nil {
-		log.Printf("workspace_error source=agentchat severity=warn message=%q", err.Error())
+		log.Printf(
+			"workspace_error source=agentchat severity=warn message=%q",
+			err.Error(),
+		)
 		return
 	}
 	log.Printf(
@@ -429,7 +441,10 @@ func (h *Handler) buildFreeformWorkbenchState(
 	args ChatPageArgs,
 ) (workbench.WorkbenchState, error) {
 	var saved *workbench.WorkbenchConfig
-	viewportClass := workbench.ResolveViewportClass(c.Request().Header, c.Request().UserAgent())
+	viewportClass := workbench.ResolveViewportClass(
+		c.Request().Header,
+		c.Request().UserAgent(),
+	)
 	if h.layoutPrefs != nil {
 		cfg := h.layoutPrefs.GetOrDefault(
 			c.Request().Context(),
@@ -441,7 +456,12 @@ func (h *Handler) buildFreeformWorkbenchState(
 		)
 		saved = &cfg
 	}
-	return buildFreeformWorkbenchState(args, saved, c.Request().URL.RequestURI(), viewportClass)
+	return buildFreeformWorkbenchState(
+		args,
+		saved,
+		c.Request().URL.RequestURI(),
+		viewportClass,
+	)
 }
 
 func (h *Handler) HandleWorkspacePage(c echo.Context) error {
@@ -459,7 +479,10 @@ func (h *Handler) buildWorkspaceWorkbenchState(
 	args WorkspacePageArgs,
 ) (workbench.WorkbenchState, error) {
 	var saved *workbench.WorkbenchConfig
-	viewportClass := workbench.ResolveViewportClass(c.Request().Header, c.Request().UserAgent())
+	viewportClass := workbench.ResolveViewportClass(
+		c.Request().Header,
+		c.Request().UserAgent(),
+	)
 	if h.layoutPrefs != nil {
 		cfg := h.layoutPrefs.GetOrDefault(
 			c.Request().Context(),
@@ -471,7 +494,12 @@ func (h *Handler) buildWorkspaceWorkbenchState(
 		)
 		saved = &cfg
 	}
-	return buildWorkspaceWorkbenchState(args, saved, c.Request().URL.RequestURI(), viewportClass)
+	return buildWorkspaceWorkbenchState(
+		args,
+		saved,
+		c.Request().URL.RequestURI(),
+		viewportClass,
+	)
 }
 
 func (h *Handler) StreamSessions(c echo.Context) error {
@@ -588,9 +616,12 @@ func (h *Handler) patchPlanSidebar(
 	state, err := h.service.BuildPlanSidebarState(
 		c.Request().Context(),
 		PlanSidebarInput{
-			UserEmail:      userEmail,
-			ProjectID:      strings.TrimSpace(c.QueryParam("project")),
-			ActiveThreadID: firstNonEmpty(c.QueryParam("thread"), c.QueryParam("current_thread")),
+			UserEmail: userEmail,
+			ProjectID: strings.TrimSpace(c.QueryParam("project")),
+			ActiveThreadID: firstNonEmpty(
+				c.QueryParam("thread"),
+				c.QueryParam("current_thread"),
+			),
 		},
 	)
 	if err != nil {
@@ -781,7 +812,11 @@ func (h *Handler) StreamEmbeddedFreeform(c echo.Context) error {
 				continue
 			}
 			if signal.Scope == PatchLiveTranscript {
-				if err := h.patchEmbeddedFreeformLiveTranscript(c, sse, userEmail); err != nil {
+				if err := h.patchEmbeddedFreeformLiveTranscript(
+					c,
+					sse,
+					userEmail,
+				); err != nil {
 					return err
 				}
 			} else if err := h.patchEmbeddedFreeformChatPanel(c, sse, userEmail); err != nil {
@@ -1043,7 +1078,10 @@ func (h *Handler) ResumeEmbeddedFreeformThread(c echo.Context) error {
 	return h.resumeEmbeddedFreeformThreadByID(c, userEmail, threadID)
 }
 
-func (h *Handler) resumeEmbeddedFreeformThreadByID(c echo.Context, userEmail, threadID string) error {
+func (h *Handler) resumeEmbeddedFreeformThreadByID(
+	c echo.Context,
+	userEmail, threadID string,
+) error {
 	prompt := strings.TrimSpace(c.FormValue("prompt"))
 	if prompt == "" {
 		return echo.NewHTTPError(http.StatusBadRequest, "prompt is required")
@@ -1168,7 +1206,10 @@ func (h *Handler) ResumeThreadByPath(c echo.Context) error {
 	return h.resumeFreeformThreadByID(c, userEmail, threadID)
 }
 
-func (h *Handler) resumeFreeformThreadByID(c echo.Context, userEmail, threadID string) error {
+func (h *Handler) resumeFreeformThreadByID(
+	c echo.Context,
+	userEmail, threadID string,
+) error {
 	prompt := strings.TrimSpace(c.FormValue("prompt"))
 	if prompt == "" {
 		return echo.NewHTTPError(http.StatusBadRequest, "prompt is required")
@@ -1236,7 +1277,10 @@ func (h *Handler) ForkThreadByPath(c echo.Context) error {
 	return h.forkFreeformThreadByID(c, userEmail, sourceThreadID)
 }
 
-func (h *Handler) forkFreeformThreadByID(c echo.Context, userEmail, sourceThreadID string) error {
+func (h *Handler) forkFreeformThreadByID(
+	c echo.Context,
+	userEmail, sourceThreadID string,
+) error {
 	sourceEntryID := strings.TrimSpace(c.FormValue("source_entry_id"))
 	if sourceEntryID == "" {
 		return echo.NewHTTPError(http.StatusBadRequest, "source_entry_id is required")
@@ -1528,8 +1572,12 @@ func (h *Handler) SendEmbeddedWorkspacePrompt(c echo.Context) error {
 	return h.resetAndFocusEmbeddedComposer(sse)
 }
 
-func embeddedChatSelectionScopeForWorkspace(workspace db.Workspace) EmbeddedChatSelectionScope {
-	if WorkspaceWorkflowType(strings.TrimSpace(workspace.WorkflowType)) == WorkspaceWorkflowFreeform {
+func embeddedChatSelectionScopeForWorkspace(
+	workspace db.Workspace,
+) EmbeddedChatSelectionScope {
+	if WorkspaceWorkflowType(
+		strings.TrimSpace(workspace.WorkflowType),
+	) == WorkspaceWorkflowFreeform {
 		return EmbeddedChatSelectionScopeFreeform
 	}
 	return EmbeddedChatSelectionScopeWorkspace
@@ -1623,10 +1671,18 @@ func (h *Handler) AttachCurrentDocToEmbeddedChat(c echo.Context) error {
 	); err != nil {
 		return echo.NewHTTPError(http.StatusNotFound, err.Error())
 	}
-	return h.attachCurrentDocToEmbeddedChat(c, userEmail, workspaceID, strings.TrimSpace(c.FormValue("thread_id")))
+	return h.attachCurrentDocToEmbeddedChat(
+		c,
+		userEmail,
+		workspaceID,
+		strings.TrimSpace(c.FormValue("thread_id")),
+	)
 }
 
-func (h *Handler) attachCurrentDocToEmbeddedChat(c echo.Context, userEmail, workspaceID, threadID string) error {
+func (h *Handler) attachCurrentDocToEmbeddedChat(
+	c echo.Context,
+	userEmail, workspaceID, threadID string,
+) error {
 	docPath := markdown.CanonicalThoughtsDocPathLoose(c.FormValue("doc_path"))
 	if docPath == "" {
 		return echo.NewHTTPError(http.StatusBadRequest, "doc_path is required")
@@ -1680,7 +1736,11 @@ func (h *Handler) AdvanceThreadWorkflow(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusUnauthorized, "not authenticated")
 	}
 	threadID := strings.TrimSpace(c.Param("thread_id"))
-	workspace, ok, err := h.service.ResolvePrimaryWorkspaceForThread(c.Request().Context(), userEmail, threadID)
+	workspace, ok, err := h.service.ResolvePrimaryWorkspaceForThread(
+		c.Request().Context(),
+		userEmail,
+		threadID,
+	)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 	}
@@ -1729,7 +1789,11 @@ func (h *Handler) UpdateThreadWorkflowPolicy(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusUnauthorized, "not authenticated")
 	}
 	threadID := strings.TrimSpace(c.Param("thread_id"))
-	workspace, ok, err := h.service.ResolvePrimaryWorkspaceForThread(c.Request().Context(), userEmail, threadID)
+	workspace, ok, err := h.service.ResolvePrimaryWorkspaceForThread(
+		c.Request().Context(),
+		userEmail,
+		threadID,
+	)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 	}
@@ -1745,9 +1809,11 @@ func (h *Handler) UpdateThreadWorkflowPolicy(c echo.Context) error {
 	if _, err := h.service.UpdateWorkspaceWorkflowPolicy(
 		c.Request().Context(),
 		UpdateWorkspaceWorkflowPolicyInput{
-			WorkspaceID:             workspace.ID,
-			UserEmail:               userEmail,
-			AdvanceMode:             qrspi.AdvanceMode(strings.TrimSpace(c.FormValue("advanceMode"))),
+			WorkspaceID: workspace.ID,
+			UserEmail:   userEmail,
+			AdvanceMode: qrspi.AdvanceMode(
+				strings.TrimSpace(c.FormValue("advanceMode")),
+			),
 			AutoMode:                c.FormValue("autoMode") == "on",
 			EnablePlanReviews:       c.FormValue("enablePlanReviews") == "on",
 			InvalidResultRetryLimit: retryLimit,
@@ -1764,19 +1830,29 @@ func (h *Handler) CreateThreadFromTarget(c echo.Context) error {
 	if !ok || userEmail == "" {
 		return echo.NewHTTPError(http.StatusUnauthorized, "not authenticated")
 	}
-	kind := NewThreadTargetKind(strings.TrimSpace(firstNonEmpty(c.FormValue("target_kind"), c.QueryParam("target_kind"))))
+	kind := NewThreadTargetKind(
+		strings.TrimSpace(
+			firstNonEmpty(c.FormValue("target_kind"), c.QueryParam("target_kind")),
+		),
+	)
 	if kind == "" {
 		kind = NewThreadTargetPrimary
 	}
-	if kind != NewThreadTargetPrimary && kind != NewThreadTargetRelated && kind != NewThreadTargetFreeform {
+	if kind != NewThreadTargetPrimary && kind != NewThreadTargetRelated &&
+		kind != NewThreadTargetFreeform {
 		return echo.NewHTTPError(http.StatusBadRequest, "invalid target kind")
 	}
-	thread, err := h.service.CreateThreadFromWorkspace(c.Request().Context(), CreateThreadFromWorkspaceInput{
-		UserEmail:         userEmail,
-		SourceThreadID:    c.Param("thread_id"),
-		TargetWorkspaceID: strings.TrimSpace(firstNonEmpty(c.FormValue("workspace_id"), c.QueryParam("workspace_id"))),
-		TargetKind:        kind,
-	})
+	thread, err := h.service.CreateThreadFromWorkspace(
+		c.Request().Context(),
+		CreateThreadFromWorkspaceInput{
+			UserEmail:      userEmail,
+			SourceThreadID: c.Param("thread_id"),
+			TargetWorkspaceID: strings.TrimSpace(
+				firstNonEmpty(c.FormValue("workspace_id"), c.QueryParam("workspace_id")),
+			),
+			TargetKind: kind,
+		},
+	)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 	}
@@ -1784,12 +1860,17 @@ func (h *Handler) CreateThreadFromTarget(c echo.Context) error {
 	return sse.Redirect(h.threadRedirectURL(c.Request().Context(), userEmail, thread.ID))
 }
 
-func (h *Handler) threadRedirectURL(ctx context.Context, userEmail, threadID string) string {
+func (h *Handler) threadRedirectURL(
+	ctx context.Context,
+	userEmail, threadID string,
+) string {
 	workspaceContext, err := h.service.GetThreadWorkspaceContext(ctx, userEmail, threadID)
 	if err == nil {
 		return threadThoughtsURL(workspaceContext)
 	}
-	return BuildThoughtsChatDocURL(EmbeddedChatURLState{Context: ThoughtsChatContext, ThreadID: threadID})
+	return BuildThoughtsChatDocURL(
+		EmbeddedChatURLState{Context: ThoughtsChatContext, ThreadID: threadID},
+	)
 }
 
 func (h *Handler) UpdateWorkspaceWorkflowPolicy(c echo.Context) error {
@@ -1806,9 +1887,11 @@ func (h *Handler) UpdateWorkspaceWorkflowPolicy(c echo.Context) error {
 	if _, err := h.service.UpdateWorkspaceWorkflowPolicy(
 		c.Request().Context(),
 		UpdateWorkspaceWorkflowPolicyInput{
-			WorkspaceID:             c.Param("workspace_id"),
-			UserEmail:               userEmail,
-			AdvanceMode:             qrspi.AdvanceMode(strings.TrimSpace(c.FormValue("advanceMode"))),
+			WorkspaceID: c.Param("workspace_id"),
+			UserEmail:   userEmail,
+			AdvanceMode: qrspi.AdvanceMode(
+				strings.TrimSpace(c.FormValue("advanceMode")),
+			),
 			AutoMode:                c.FormValue("autoMode") == "on",
 			EnablePlanReviews:       c.FormValue("enablePlanReviews") == "on",
 			InvalidResultRetryLimit: retryLimit,
@@ -1835,11 +1918,18 @@ func (h *Handler) ListThreadSlashCommands(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 	}
 	if !ok {
-		workspaceContext, ctxErr := h.service.GetThreadWorkspaceContext(c.Request().Context(), userEmail, threadID)
+		workspaceContext, ctxErr := h.service.GetThreadWorkspaceContext(
+			c.Request().Context(),
+			userEmail,
+			threadID,
+		)
 		if ctxErr != nil {
 			return echo.NewHTTPError(http.StatusNotFound, ctxErr.Error())
 		}
-		return h.listSlashCommandsForCwd(c, firstNonEmpty(c.QueryParam("cwd"), workspaceContext.Thread.Cwd))
+		return h.listSlashCommandsForCwd(
+			c,
+			firstNonEmpty(c.QueryParam("cwd"), workspaceContext.Thread.Cwd),
+		)
 	}
 	cwd := strings.TrimSpace(c.QueryParam("cwd"))
 	if cwd == "" {
@@ -1930,7 +2020,10 @@ func (h *Handler) ResumeWorkspaceThread(c echo.Context) error {
 	return h.resumeWorkspaceThreadByID(c, userEmail, workspaceID, threadID)
 }
 
-func (h *Handler) resumeWorkspaceThreadByID(c echo.Context, userEmail, workspaceID, threadID string) error {
+func (h *Handler) resumeWorkspaceThreadByID(
+	c echo.Context,
+	userEmail, workspaceID, threadID string,
+) error {
 	if _, err := h.service.queries.GetAgentThreadForWorkspaceUser(
 		c.Request().Context(),
 		db.GetAgentThreadForWorkspaceUserParams{
@@ -2002,7 +2095,10 @@ func (h *Handler) ResumeEmbeddedWorkspaceThread(c echo.Context) error {
 	return h.resumeEmbeddedWorkspaceThread(c, userEmail, workspaceID, threadID)
 }
 
-func (h *Handler) resumeEmbeddedWorkspaceThread(c echo.Context, userEmail, workspaceID, threadID string) error {
+func (h *Handler) resumeEmbeddedWorkspaceThread(
+	c echo.Context,
+	userEmail, workspaceID, threadID string,
+) error {
 	if _, err := h.service.queries.GetAgentThreadForWorkspaceUser(
 		c.Request().Context(),
 		db.GetAgentThreadForWorkspaceUserParams{
@@ -2054,7 +2150,12 @@ func (h *Handler) resumeEmbeddedWorkspaceThread(c echo.Context, userEmail, works
 		WorkspaceID: workspaceID,
 		ThreadID:    threadID,
 		RunID:       runID,
-		Scope:       embeddedChatSelectionScopeForWorkspaceRow(workspaceID, h.service, c.Request().Context(), userEmail),
+		Scope: embeddedChatSelectionScopeForWorkspaceRow(
+			workspaceID,
+			h.service,
+			c.Request().Context(),
+			userEmail,
+		),
 	}
 	if err := h.service.PersistEmbeddedChatSelection(
 		c.Request().Context(),
@@ -2096,7 +2197,10 @@ func (h *Handler) ForkWorkspaceThread(c echo.Context) error {
 	return h.forkWorkspaceThreadByID(c, userEmail, workspaceID, sourceThreadID)
 }
 
-func (h *Handler) forkWorkspaceThreadByID(c echo.Context, userEmail, workspaceID, sourceThreadID string) error {
+func (h *Handler) forkWorkspaceThreadByID(
+	c echo.Context,
+	userEmail, workspaceID, sourceThreadID string,
+) error {
 	if _, err := h.service.queries.GetAgentThreadForWorkspaceUser(
 		c.Request().Context(),
 		db.GetAgentThreadForWorkspaceUserParams{
@@ -3073,7 +3177,13 @@ func (h *Handler) patchEmbeddedFreeformLiveTranscript(
 	if err != nil {
 		return err
 	}
-	return sse.PatchElementTempl(LiveTranscriptRegion(args.ThreadID, args.Transcript, freeformForkAction(args.ThreadID)))
+	return sse.PatchElementTempl(
+		LiveTranscriptRegion(
+			args.ThreadID,
+			args.Transcript,
+			freeformForkAction(args.ThreadID),
+		),
+	)
 }
 
 func (h *Handler) patchEmbeddedChatLiveTranscript(
@@ -3190,7 +3300,11 @@ func (h *Handler) patchThreadPage(
 	sse *datastar.ServerSentEventGenerator,
 	scope StreamPatchScope,
 ) error {
-	threadID := firstNonEmpty(c.QueryParam("thread"), c.Param("thread_id"), c.FormValue("thread_id"))
+	threadID := firstNonEmpty(
+		c.QueryParam("thread"),
+		c.Param("thread_id"),
+		c.FormValue("thread_id"),
+	)
 	return h.patchThread(c, sse, threadID, scope)
 }
 
