@@ -22,7 +22,6 @@ import (
 	datastar "github.com/starfederation/datastar-go/datastar"
 
 	conversation "github.com/CoreyCole/vamos/pkg/agents/conversation"
-	"github.com/CoreyCole/vamos/pkg/agents/workflows/qrspi"
 	workspace "github.com/CoreyCole/vamos/pkg/agents/workspace"
 	"github.com/CoreyCole/vamos/pkg/db"
 	servercfg "github.com/CoreyCole/vamos/server"
@@ -158,12 +157,7 @@ func (h *Handler) RegisterRuntimeRoutes(g *echo.Group) {
 	g.GET("/plan-workspace", h.OpenPlanWorkspace)
 	g.GET("/document/open", h.OpenDocumentChat)
 	g.POST("/document/open", h.OpenDocumentChat)
-	g.POST("/thread/:thread_id/workflow/advance", h.AdvanceThreadWorkflow)
-	g.POST("/thread/:thread_id/workflow/policy", h.UpdateThreadWorkflowPolicy)
-	g.POST("/thread/:thread_id/new", h.CreateThreadFromTarget)
 	g.POST("/:workspace_id/send", h.SendWorkspacePrompt)
-	g.POST("/:workspace_id/workflow/advance", h.AdvanceWorkspaceWorkflow)
-	g.POST("/:workspace_id/workflow/policy", h.UpdateWorkspaceWorkflowPolicy)
 	g.GET("/:workspace_id/slash-commands", h.ListWorkspaceSlashCommands)
 	g.POST("/:workspace_id/plan-workspace-action", h.PlanWorkspaceAction)
 	g.POST("/:workspace_id/docs/select", h.SelectWorkspaceDoc)
@@ -280,60 +274,15 @@ func (h *Handler) OpenPlanWorkspace(c echo.Context) error {
 	if !ok || userEmail == "" {
 		return c.Redirect(http.StatusFound, "/login")
 	}
-
-	planDir, ok := h.service.canonicalPlanDirFromSource(c.QueryParam("plan_dir"))
-	if !ok {
-		return echo.NewHTTPError(http.StatusBadRequest, "invalid plan workspace")
+	planDir := strings.TrimSpace(c.QueryParam("plan_dir"))
+	if planDir == "" {
+		return echo.NewHTTPError(http.StatusBadRequest, "plan_dir is required")
 	}
-	workflowType := WorkspaceWorkflowType(
-		strings.TrimSpace(c.QueryParam("workflow_type")),
-	)
-	if !isQRSPIWorkflowType(workflowType) {
-		workspaceRecord, err := h.service.GetOrCreateWorkspaceForRootDocPath(
-			c.Request().Context(),
-			markdown.ChatWorkspaceOpenInput{
-				UserEmail:    userEmail,
-				RootDocPath:  planDir,
-				Title:        planWorkspaceLabel(planDir),
-				WorkflowType: string(WorkspaceWorkflowFreeform),
-				Source:       string(WorkspaceSourceWeb),
-			},
-		)
-		if err != nil {
-			return echo.NewHTTPError(http.StatusBadRequest, err.Error())
-		}
-		return h.redirectToThoughtsDoc(c, workspaceRecord.RootDocPath)
-	}
-
-	preset, err := parseWorkflowPolicyPreset(c.QueryParam("policy_preset"))
+	workspace, err := h.service.GetOrCreateWorkspaceForRootDocPath(c.Request().Context(), markdown.ChatWorkspaceOpenInput{UserEmail: userEmail, RootDocPath: planDir, Title: planWorkspaceLabel(planDir), WorkflowType: string(WorkspaceWorkflowFreeform), Source: string(WorkspaceSourceWeb)})
 	if err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 	}
-	policyJSON, err := marshalWorkflowPolicy(PolicyForPreset(preset))
-	if err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
-	}
-	startNodeID := qrspi.NodeQuestion
-	if workflowType == WorkspaceWorkflowQRSPI && preset == WorkflowPolicyPresetFast {
-		startNodeID = qrspi.NodeOutline
-	}
-	runID, err := h.service.StartWorkflow(c.Request().Context(), StartWorkflowInput{
-		UserEmail:      userEmail,
-		Title:          planWorkspaceLabel(planDir),
-		RootDocPath:    planDir,
-		Cwd:            h.service.defaultCwd,
-		WorkflowType:   workflowType,
-		Policy:         policyJSON,
-		StartNodeID:    startNodeID,
-		PromptOverride: e2eQRSPIStartPromptOverride(c),
-	})
-	if err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
-	}
-	if _, err := h.service.WorkspaceIDForRun(c.Request().Context(), runID); err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
-	}
-	return h.redirectToThoughtsDoc(c, planDir)
+	return h.redirectToThoughtsDoc(c, workspace.RootDocPath)
 }
 
 func (h *Handler) OpenDocumentChat(c echo.Context) error {
@@ -1731,136 +1680,6 @@ func (h *Handler) attachCurrentDocToEmbeddedChat(
 	)
 }
 
-func (h *Handler) AdvanceThreadWorkflow(c echo.Context) error {
-	userEmail, ok := c.Get("user_email").(string)
-	if !ok || userEmail == "" {
-		return echo.NewHTTPError(http.StatusUnauthorized, "not authenticated")
-	}
-	threadID := strings.TrimSpace(c.Param("thread_id"))
-	workspace, ok, err := h.service.ResolvePrimaryWorkspaceForThread(
-		c.Request().Context(),
-		userEmail,
-		threadID,
-	)
-	if err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
-	}
-	if !ok {
-		return echo.NewHTTPError(http.StatusNotFound, "primary workspace not found")
-	}
-	if _, err := h.service.AdvanceWorkflowHumanGate(
-		c.Request().Context(),
-		workspace.ID,
-		userEmail,
-	); err != nil {
-		status := http.StatusBadRequest
-		if errors.Is(err, sql.ErrNoRows) {
-			status = http.StatusNotFound
-		}
-		return echo.NewHTTPError(status, err.Error())
-	}
-	sse := datastar.NewSSE(c.Response().Writer, c.Request())
-	return h.patchThread(c, sse, threadID, PatchThreadPage)
-}
-
-func (h *Handler) AdvanceWorkspaceWorkflow(c echo.Context) error {
-	userEmail, ok := c.Get("user_email").(string)
-	if !ok || userEmail == "" {
-		return echo.NewHTTPError(http.StatusUnauthorized, "not authenticated")
-	}
-	workspaceID := strings.TrimSpace(c.Param("workspace_id"))
-	if _, err := h.service.AdvanceWorkflowHumanGate(
-		c.Request().Context(),
-		workspaceID,
-		userEmail,
-	); err != nil {
-		status := http.StatusBadRequest
-		if errors.Is(err, sql.ErrNoRows) {
-			status = http.StatusNotFound
-		}
-		return echo.NewHTTPError(status, err.Error())
-	}
-	sse := datastar.NewSSE(c.Response().Writer, c.Request())
-	return h.patchWorkspaceResource(c, sse)
-}
-
-func (h *Handler) UpdateThreadWorkflowPolicy(c echo.Context) error {
-	userEmail, ok := c.Get("user_email").(string)
-	if !ok || userEmail == "" {
-		return echo.NewHTTPError(http.StatusUnauthorized, "not authenticated")
-	}
-	threadID := strings.TrimSpace(c.Param("thread_id"))
-	workspace, ok, err := h.service.ResolvePrimaryWorkspaceForThread(
-		c.Request().Context(),
-		userEmail,
-		threadID,
-	)
-	if err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
-	}
-	if !ok {
-		return echo.NewHTTPError(http.StatusNotFound, "primary workspace not found")
-	}
-	retryLimit, err := strconv.Atoi(
-		strings.TrimSpace(c.FormValue("invalidResultRetryLimit")),
-	)
-	if err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, "invalid retry limit")
-	}
-	if _, err := h.service.UpdateWorkspaceWorkflowPolicy(
-		c.Request().Context(),
-		UpdateWorkspaceWorkflowPolicyInput{
-			WorkspaceID: workspace.ID,
-			UserEmail:   userEmail,
-			AdvanceMode: qrspi.AdvanceMode(
-				strings.TrimSpace(c.FormValue("advanceMode")),
-			),
-			AutoMode:                c.FormValue("autoMode") == "on",
-			EnablePlanReviews:       c.FormValue("enablePlanReviews") == "on",
-			InvalidResultRetryLimit: retryLimit,
-		},
-	); err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
-	}
-	sse := datastar.NewSSE(c.Response().Writer, c.Request())
-	return h.patchThread(c, sse, threadID, PatchThreadPage)
-}
-
-func (h *Handler) CreateThreadFromTarget(c echo.Context) error {
-	userEmail, ok := c.Get("user_email").(string)
-	if !ok || userEmail == "" {
-		return echo.NewHTTPError(http.StatusUnauthorized, "not authenticated")
-	}
-	kind := NewThreadTargetKind(
-		strings.TrimSpace(
-			firstNonEmpty(c.FormValue("target_kind"), c.QueryParam("target_kind")),
-		),
-	)
-	if kind == "" {
-		kind = NewThreadTargetPrimary
-	}
-	if kind != NewThreadTargetPrimary && kind != NewThreadTargetRelated &&
-		kind != NewThreadTargetFreeform {
-		return echo.NewHTTPError(http.StatusBadRequest, "invalid target kind")
-	}
-	thread, err := h.service.CreateThreadFromWorkspace(
-		c.Request().Context(),
-		CreateThreadFromWorkspaceInput{
-			UserEmail:      userEmail,
-			SourceThreadID: c.Param("thread_id"),
-			TargetWorkspaceID: strings.TrimSpace(
-				firstNonEmpty(c.FormValue("workspace_id"), c.QueryParam("workspace_id")),
-			),
-			TargetKind: kind,
-		},
-	)
-	if err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
-	}
-	sse := datastar.NewSSE(c.Response().Writer, c.Request())
-	return sse.Redirect(h.threadRedirectURL(c.Request().Context(), userEmail, thread.ID))
-}
-
 func (h *Handler) threadRedirectURL(
 	ctx context.Context,
 	userEmail, threadID string,
@@ -1872,36 +1691,6 @@ func (h *Handler) threadRedirectURL(
 	return BuildThoughtsChatDocURL(
 		EmbeddedChatURLState{Context: ThoughtsChatContext, ThreadID: threadID},
 	)
-}
-
-func (h *Handler) UpdateWorkspaceWorkflowPolicy(c echo.Context) error {
-	userEmail, ok := c.Get("user_email").(string)
-	if !ok || userEmail == "" {
-		return echo.NewHTTPError(http.StatusUnauthorized, "not authenticated")
-	}
-	retryLimit, err := strconv.Atoi(
-		strings.TrimSpace(c.FormValue("invalidResultRetryLimit")),
-	)
-	if err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, "invalid retry limit")
-	}
-	if _, err := h.service.UpdateWorkspaceWorkflowPolicy(
-		c.Request().Context(),
-		UpdateWorkspaceWorkflowPolicyInput{
-			WorkspaceID: c.Param("workspace_id"),
-			UserEmail:   userEmail,
-			AdvanceMode: qrspi.AdvanceMode(
-				strings.TrimSpace(c.FormValue("advanceMode")),
-			),
-			AutoMode:                c.FormValue("autoMode") == "on",
-			EnablePlanReviews:       c.FormValue("enablePlanReviews") == "on",
-			InvalidResultRetryLimit: retryLimit,
-		},
-	); err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
-	}
-	sse := datastar.NewSSE(c.Response().Writer, c.Request())
-	return h.patchWorkspace(c, sse, PatchWorkflowPanel)
 }
 
 func (h *Handler) ListThreadSlashCommands(c echo.Context) error {
@@ -3209,24 +2998,6 @@ func (h *Handler) patchEmbeddedChatLiveTranscript(
 	return sse.PatchElementTempl(LiveTranscriptRegion(threadID, state, ""))
 }
 
-func (h *Handler) patchWorkspaceWorkflowPanel(
-	c echo.Context,
-	sse *datastar.ServerSentEventGenerator,
-) error {
-	userEmail, ok := c.Get("user_email").(string)
-	if !ok || userEmail == "" {
-		return nil
-	}
-	args, err := h.service.BuildWorkspacePageArgs(
-		c.Request().Context(),
-		h.workspacePatchInput(c, userEmail),
-	)
-	if err != nil {
-		return err
-	}
-	return sse.PatchElementTempl(WorkspaceWorkflowPanel(args.Projection.Workflow))
-}
-
 func (h *Handler) patchWorkspace(
 	c echo.Context,
 	sse *datastar.ServerSentEventGenerator,
@@ -3235,8 +3006,6 @@ func (h *Handler) patchWorkspace(
 	switch scope {
 	case PatchLiveTranscript:
 		return h.patchWorkspaceLiveTranscript(c, sse)
-	case PatchWorkflowPanel:
-		return h.patchWorkspaceWorkflowPanel(c, sse)
 	default:
 		return h.patchWorkspaceResource(c, sse)
 	}

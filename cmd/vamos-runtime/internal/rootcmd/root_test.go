@@ -10,7 +10,7 @@ import (
 
 func TestRootCommandContainsExpectedSubcommands(t *testing.T) {
 	cmd := NewCommand()
-	for _, name := range []string{"auth", "chat", "ctl", "e2e", "qrspi"} {
+	for _, name := range []string{"auth", "chat", "ctl", "e2e"} {
 		found := false
 		for _, child := range cmd.Commands() {
 			if child.Name() == name {

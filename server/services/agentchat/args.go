@@ -1,7 +1,6 @@
 package agentchat
 
 import (
-	"encoding/json"
 	"strings"
 	"time"
 
@@ -113,7 +112,6 @@ type TranscriptMessage struct {
 	IsError               bool
 	Collapsible           bool
 	HideBodyWhenCollapsed bool
-	WorkflowCard          *QRSPIWorkflowCard
 	ChatSessionID         string
 	ChatNodeID            string
 	ChatEventSeq          int64
@@ -576,28 +574,6 @@ type WorkspaceCwdProjection struct {
 	BlockReason string
 }
 
-type WorkspaceWorkflowState struct {
-	WorkspaceID       string
-	ThreadID          string
-	Type              WorkspaceWorkflowType
-	CurrentStep       string
-	Status            string
-	ReviewGate        string
-	Mermaid           string
-	Metadata          json.RawMessage
-	LastResultSummary string
-	PrimaryArtifact   string
-	PrimaryDoc        string
-	NextDisplay       string
-	WaitingHuman      bool
-	HumanGateReason   string
-	BypassedNodes     []string
-	Policy            WorkspaceWorkflowPolicyProjection
-	ActiveCwd         WorkspaceCwdProjection
-	RuntimeNextStep   string
-	LastResultCard    *QRSPIWorkflowCard
-}
-
 type WorkspaceSessionState struct {
 	PlanDir            string
 	PlanLabel          string
@@ -656,7 +632,6 @@ type WorkspaceProjection struct {
 	Artifacts            WorkspaceDocPaneState
 	Comments             WorkspaceCommentSummary
 	Minimap              WorkspaceMinimapState
-	Workflow             WorkspaceWorkflowState
 	Sessions             WorkspaceSessionState
 	Log                  WorkspaceLogState
 	CurrentChatSessionID string
@@ -707,7 +682,6 @@ type ChatPageArgs struct {
 	PrimaryWorkspace   *db.Workspace
 	RelatedWorkspaces  []db.Workspace
 	ThreadMetadata     ThreadMetadataView
-	Workflow           WorkspaceWorkflowState
 	Transcript         TranscriptPaneState
 	DocPane            DocPaneState
 	ArtifactPane       DocPaneState

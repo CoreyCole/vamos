@@ -82,10 +82,9 @@ func (s *Service) BuildWorkspaceSidebarProjection(
 		Workspaces: make([]WorkspaceTree, 0, len(workspaces)),
 	}
 	for _, workspace := range workspaces {
-		workflow, _ := s.BuildWorkspaceWorkflowState(ctx, workspace)
 		badge := DeriveWorkspaceLifecycle(
 			workspace,
-			workflowRuntimeState(workspace),
+			wruntime.State{},
 			PRState{},
 		)
 		if badge.Href == "" {
@@ -96,9 +95,6 @@ func (s *Service) BuildWorkspaceSidebarProjection(
 			Title:       workspace.Title,
 			Lifecycle:   badge,
 			Expanded:    workspace.ID == strings.TrimSpace(input.ActiveWorkspaceID),
-		}
-		if workflow.CurrentStep != "" && badge.Label == "" {
-			tree.Lifecycle.Label = workflow.CurrentStep
 		}
 		if tree.Expanded && workspace.CurrentSessionID.Valid {
 			chatProjection, err := s.chatSessions.Snapshot(

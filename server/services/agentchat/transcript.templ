@@ -36,9 +36,7 @@ templ LiveTranscriptRegion(threadID string, state TranscriptPaneState, forkActio
 }
 
 templ TranscriptMessageWithFork(threadID string, msg TranscriptMessage, forkAction string) {
-	if msg.WorkflowCard != nil {
-		@QRSPIWorkflowCardView(*msg.WorkflowCard)
-	} else if msg.Variant == "detail" {
+	if msg.Variant == "detail" {
 		@TranscriptDetailCard(msg)
 	} else {
 		<div class={ "relative min-w-0 overflow-x-hidden border-b border-border first:border-t", templ.KV("bg-muted/60", msg.Role == "user") }>

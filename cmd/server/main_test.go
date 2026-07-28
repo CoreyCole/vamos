@@ -69,8 +69,8 @@ func TestConfigureLayoutStaticAssetsFallsBackWhenLocalDatastarProMissing(t *test
 		t.Fatalf("Render(Root) error = %v", err)
 	}
 	html := body.String()
-	if !strings.Contains(html, "falling back to public Datastar bundle") {
-		t.Fatalf("Root() did not render public Datastar fallback when local asset missing:\n%s", html)
+	if !strings.Contains(html, `"@vamos/datastar":"https://cdn.jsdelivr.net/gh/starfederation/datastar@v1.0.1/bundles/datastar.js"`) {
+		t.Fatalf("Root() did not map the public Datastar bundle when local asset missing:\n%s", html)
 	}
 	if strings.Contains(html, `/js/datastar-inspector.js`) {
 		t.Fatalf("Root() enabled inspector when asset missing:\n%s", html)

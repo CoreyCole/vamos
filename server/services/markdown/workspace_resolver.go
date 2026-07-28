@@ -152,5 +152,12 @@ func cleanPathForRootCheck(path string) string {
 	if resolved, err := filepath.EvalSymlinks(path); err == nil {
 		return filepath.Clean(resolved)
 	}
+	// The leaf may not exist yet (for example, a requested extension-less
+	// Markdown path). Canonicalize the existing parent so macOS /var ↔ /private
+	// aliases cannot make an in-root request appear to escape its base.
+	parent := filepath.Dir(path)
+	if resolved, err := filepath.EvalSymlinks(parent); err == nil {
+		return filepath.Join(filepath.Clean(resolved), filepath.Base(path))
+	}
 	return path
 }

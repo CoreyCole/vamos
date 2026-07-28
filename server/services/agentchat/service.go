@@ -24,11 +24,8 @@ import (
 	conversation "github.com/CoreyCole/vamos/pkg/agents/conversation"
 	temporalmgr "github.com/CoreyCole/vamos/pkg/agents/temporal"
 	conversationworkflow "github.com/CoreyCole/vamos/pkg/agents/workflows/conversation"
-	"github.com/CoreyCole/vamos/pkg/agents/workflows/qrspi"
-	wruntime "github.com/CoreyCole/vamos/pkg/agents/workflows/runtime"
 	agentworkspace "github.com/CoreyCole/vamos/pkg/agents/workspace"
 	"github.com/CoreyCole/vamos/pkg/db"
-	agentchatworkflows "github.com/CoreyCole/vamos/server/services/agentchat/workflows"
 	"github.com/CoreyCole/vamos/server/services/markdown"
 	"github.com/CoreyCole/vamos/server/services/workspaces"
 )
@@ -44,22 +41,6 @@ type TemporalStarter interface {
 		workflowID string,
 		workflowFunc, input any,
 	) (string, error)
-}
-
-type workflowCompletionService interface {
-	OnRunComplete(ctx context.Context, result conversation.RunResult) error
-	AdvanceHumanGate(ctx context.Context, workspaceID, userEmail string) (string, error)
-}
-
-type StartWorkflowInput struct {
-	UserEmail      string
-	Title          string
-	RootDocPath    string
-	Cwd            string
-	WorkflowType   WorkspaceWorkflowType
-	Policy         json.RawMessage
-	StartNodeID    wruntime.NodeID
-	PromptOverride string
 }
 
 var ErrThreadRunInProgress = errors.New("thread already has an active run")
@@ -97,8 +78,6 @@ type Service struct {
 	liveFlush                           *agentworkspace.LiveFlushLoop
 	appendWorkspaceEventForTest         func(context.Context, *db.Queries, AppendWorkspaceEventInput) (db.WorkspaceEvent, error)
 	terminalMetadataBeforeCommitForTest func() error
-	qrspiProjectionBeforeApplyForTest   func() error
-	workflowService                     workflowCompletionService
 	devWorkspaceManager                 devWorkspaceManager
 	implWorkspaceDiscovery              workspaces.ImplWorkspaceDiscoveryConfig
 	workspaceManagerURL                 string
@@ -248,39 +227,12 @@ func legacyThoughtsRoot(projectRoot, defaultCwd string) string {
 	return filepath.Join(root, "thoughts")
 }
 
-func initializeWorkflowRuntime(
-	svc *Service,
-	notifier *Notifier,
-	queries *db.Queries,
-) (*Service, error) {
-	registry := wruntime.NewRegistry()
-	def, err := qrspi.Definition()
-	if err != nil {
-		return nil, err
-	}
-	if err := registry.Register(def); err != nil {
-		return nil, err
-	}
-	projectPlanningDef, err := qrspi.ProjectPlanningDefinition()
-	if err != nil {
-		return nil, err
-	}
-	if err := registry.Register(projectPlanningDef); err != nil {
-		return nil, err
-	}
-	svc.workflowService = &agentchatworkflows.Service{
-		Definitions: registry,
-		Store:       agentchatworkflows.NewDBStore(queries),
-		Runner:      svc,
-	}
-	svc.liveFlush = agentworkspace.NewLiveFlushLoop(
-		agentworkspace.LiveFlushPolicy{},
-		func(workspaceID string) {
-			if notifier != nil {
-				notifier.NotifyLiveTranscript(workspaceID)
-			}
-		},
-	)
+func initializeWorkflowRuntime(svc *Service, notifier *Notifier, queries *db.Queries) (*Service, error) {
+	svc.liveFlush = agentworkspace.NewLiveFlushLoop(agentworkspace.LiveFlushPolicy{}, func(workspaceID string) {
+		if notifier != nil {
+			notifier.NotifyLiveTranscript(workspaceID)
+		}
+	})
 	return svc, nil
 }
 
@@ -460,331 +412,6 @@ func (s *Service) GetWorkspaceForUserOrTrustedImport(
 		return trustedWorkspace, nil
 	}
 	return db.Workspace{}, err
-}
-
-func (s *Service) StartWorkflow(
-	ctx context.Context,
-	input StartWorkflowInput,
-) (string, error) {
-	adapter, ok := s.workflowService.(*agentchatworkflows.Service)
-	if !ok || adapter.Definitions == nil {
-		return "", errors.New("workflow service is not configured")
-	}
-	workflowType := input.WorkflowType
-	if workflowType == "" {
-		workflowType = WorkspaceWorkflowQRSPI
-	}
-	def, ok := adapter.Definitions.Get(wruntime.WorkflowID(string(workflowType)))
-	if !ok {
-		return "", fmt.Errorf("workflow definition %q is not registered", workflowType)
-	}
-	state, err := wruntime.InitialState(def, input.Policy)
-	if err != nil {
-		return "", err
-	}
-	startNodeID := input.StartNodeID
-	if startNodeID == "" {
-		startNodeID = def.Start
-	}
-	node, ok := def.Nodes[startNodeID]
-	if !ok {
-		return "", fmt.Errorf("workflow node %q is not registered", startNodeID)
-	}
-	state.CurrentNodeID = startNodeID
-	state.PendingNextNodeID = startNodeID
-	stateJSON, err := json.Marshal(state)
-	if err != nil {
-		return "", err
-	}
-	prompt, err := agentchatworkflows.RenderNodePrompt(ctx, def, node, state)
-	if err != nil {
-		return "", err
-	}
-	if override := strings.TrimSpace(input.PromptOverride); override != "" {
-		prompt = override
-	}
-	workspaceRecord, err := s.CreateWorkspace(ctx, WorkspaceCreateInput{
-		UserEmail:     input.UserEmail,
-		Title:         input.Title,
-		RootDocPath:   input.RootDocPath,
-		Cwd:           input.Cwd,
-		WorkflowType:  workflowType,
-		WorkflowState: stateJSON,
-		Source:        WorkspaceSourceWeb,
-	})
-	if err != nil {
-		return "", err
-	}
-	return s.StartNodeRun(ctx, agentchatworkflows.StartNodeRunInput{
-		WorkspaceID: workspaceRecord.ID,
-		NodeID:      startNodeID,
-		Prompt:      prompt,
-		Attempt:     1,
-	})
-}
-
-func (s *Service) WorkspaceIDForRun(ctx context.Context, runID string) (string, error) {
-	run, err := s.queries.GetAgentRun(ctx, strings.TrimSpace(runID))
-	if err != nil {
-		return "", err
-	}
-	if !run.WorkspaceID.Valid || strings.TrimSpace(run.WorkspaceID.String) == "" {
-		return "", errors.New("run has no workspace")
-	}
-	return run.WorkspaceID.String, nil
-}
-
-func (s *Service) StartNodeRun(
-	ctx context.Context,
-	input agentchatworkflows.StartNodeRunInput,
-) (string, error) {
-	if s.temporal == nil {
-		return "", errors.New("temporal not configured")
-	}
-	workspaceID := strings.TrimSpace(input.WorkspaceID)
-	if workspaceID == "" {
-		return "", errors.New("workspace id is required")
-	}
-	prompt := strings.TrimSpace(input.Prompt)
-	if prompt == "" {
-		return "", errors.New("prompt is required")
-	}
-	workspaceRecord, err := s.queries.GetWorkspace(ctx, workspaceID)
-	if err != nil {
-		return "", err
-	}
-	nodeID := input.NodeID
-	if strings.TrimSpace(string(nodeID)) == "" {
-		return "", errors.New("workflow node id is required")
-	}
-	attempt := input.Attempt
-	if attempt <= 0 {
-		attempt = 1
-	}
-
-	tx, err := s.db.BeginTx(ctx, nil)
-	if err != nil {
-		return "", err
-	}
-	defer func() { _ = tx.Rollback() }()
-	q := s.queries.WithTx(tx)
-
-	thread, err := s.workflowThread(
-		ctx,
-		q,
-		workspaceRecord,
-		strings.TrimSpace(input.ThreadID),
-		prompt,
-		strings.TrimSpace(input.Cwd),
-	)
-	if err != nil {
-		return "", err
-	}
-	session, err := s.createWebAgentSession(ctx, q, workspaceRecord, thread)
-	if err != nil {
-		return "", err
-	}
-	run, err := s.createWorkflowRunRecord(
-		ctx,
-		q,
-		workspaceRecord,
-		session,
-		thread,
-		prompt,
-		nodeID,
-		attempt,
-	)
-	if err != nil {
-		return "", err
-	}
-	chatSession, err := ensureWorkspaceChatSessionTx(
-		ctx,
-		q,
-		workspaceRecord,
-		workspaceRecord.UserEmail,
-		run.WorkflowID,
-		run.WorkflowNodeID.String,
-		int(run.WorkflowAttempt),
-	)
-	if err != nil {
-		return "", err
-	}
-	if err := appendPromptAndRunStartedSessionEventsTx(
-		ctx,
-		q,
-		chatSession,
-		workspaceRecord.UserEmail,
-		thread,
-		run,
-		prompt,
-	); err != nil {
-		return "", err
-	}
-	if err := s.updateWorkflowRunState(
-		ctx,
-		q,
-		workspaceRecord,
-		nodeID,
-		attempt,
-	); err != nil {
-		return "", err
-	}
-	if err := q.UpdateWorkspaceSelectedThread(ctx, db.UpdateWorkspaceSelectedThreadParams{
-		ID:               workspaceRecord.ID,
-		SelectedThreadID: nullString(thread.ID),
-	}); err != nil {
-		return "", err
-	}
-	event, err := s.AppendWorkspaceEvent(ctx, q, AppendWorkspaceEventInput{
-		WorkspaceID: workspaceRecord.ID,
-		EventType:   "workflow_node_started",
-		ActorType:   "system",
-		ThreadID:    thread.ID,
-		SessionID:   session.ID,
-		RunID:       run.ID,
-		EventKey:    "workflow_node_started:" + run.ID,
-	})
-	if err != nil {
-		return "", err
-	}
-	if err := tx.Commit(); err != nil {
-		return "", err
-	}
-
-	s.NotifyWorkspaceForEvent(event)
-	if err := s.seedPendingUserPrompt(thread, run); err != nil {
-		return "", err
-	}
-	startedRun, err := s.startRun(ctx, thread, run)
-	if err != nil {
-		return "", err
-	}
-	if startedRun != nil {
-		return startedRun.ID, nil
-	}
-	return run.ID, nil
-}
-
-func (s *Service) workflowThread(
-	ctx context.Context,
-	q *db.Queries,
-	workspaceRecord db.Workspace,
-	threadID string,
-	prompt string,
-	effectiveCwd string,
-) (db.AgentThread, error) {
-	if threadID == "" && workspaceRecord.SelectedThreadID.Valid {
-		threadID = strings.TrimSpace(workspaceRecord.SelectedThreadID.String)
-	}
-	if threadID != "" {
-		thread, err := q.GetAgentThreadForWorkspaceUser(
-			ctx,
-			db.GetAgentThreadForWorkspaceUserParams{
-				ThreadID:    threadID,
-				WorkspaceID: workspaceRecord.ID,
-				UserEmail:   workspaceRecord.UserEmail,
-			},
-		)
-		if err != nil {
-			if errors.Is(err, sql.ErrNoRows) {
-				return db.AgentThread{}, errors.New(
-					"thread is not attached to workflow workspace",
-				)
-			}
-			return db.AgentThread{}, err
-		}
-		if effectiveCwd == "" || strings.TrimSpace(thread.Cwd) == effectiveCwd {
-			return thread, nil
-		}
-	}
-	cwd := effectiveCwd
-	if cwd == "" {
-		cwd = s.workspaceThreadCwd(workspaceRecord)
-	}
-	thread, err := q.CreateAgentThread(ctx, db.CreateAgentThreadParams{
-		ID:                uuid.NewString(),
-		UserEmail:         workspaceRecord.UserEmail,
-		Title:             truncateTitle(prompt),
-		Cwd:               cwd,
-		LineageID:         uuid.NewString(),
-		HeadEntryID:       sql.NullString{},
-		ParentThreadID:    sql.NullString{},
-		ForkedFromEntryID: sql.NullString{},
-	})
-	if err != nil {
-		return db.AgentThread{}, err
-	}
-	if err := q.AttachThreadToWorkspace(ctx, db.AttachThreadToWorkspaceParams{
-		ID:          thread.ID,
-		WorkspaceID: nullString(workspaceRecord.ID),
-	}); err != nil {
-		return db.AgentThread{}, err
-	}
-	return thread, nil
-}
-
-func (s *Service) updateWorkflowRunState(
-	ctx context.Context,
-	q *db.Queries,
-	workspaceRecord db.Workspace,
-	nodeID wruntime.NodeID,
-	attempt int,
-) error {
-	var state wruntime.State
-	if err := json.Unmarshal(
-		[]byte(workspaceRecord.WorkflowStateJson.String),
-		&state,
-	); err != nil {
-		return err
-	}
-	if state.Attempts == nil {
-		state.Attempts = map[wruntime.NodeID]int{}
-	}
-	if state.Nodes == nil {
-		state.Nodes = map[wruntime.NodeID]wruntime.NodeState{}
-	}
-	state.CurrentNodeID = nodeID
-	state.Status = wruntime.WorkspaceStatusRunning
-	state.PendingNextNodeID = ""
-	state.Attempts[nodeID] = attempt
-	nodeState := state.Nodes[nodeID]
-	nodeState.Status = wruntime.NodeStatusRunning
-	nodeState.Attempts = attempt
-	state.Nodes[nodeID] = nodeState
-	encoded, err := json.Marshal(state)
-	if err != nil {
-		return err
-	}
-	return q.UpdateWorkspaceWorkflowState(ctx, db.UpdateWorkspaceWorkflowStateParams{
-		ID:                workspaceRecord.ID,
-		WorkflowType:      state.Type,
-		WorkflowStateJson: nullString(string(encoded)),
-	})
-}
-
-func (s *Service) AdvanceWorkflowHumanGate(
-	ctx context.Context,
-	workspaceID string,
-	userEmail string,
-) (string, error) {
-	workspaceID = strings.TrimSpace(workspaceID)
-	if workspaceID == "" {
-		return "", errors.New("workspace id is required")
-	}
-	if _, err := s.GetWorkspaceForUser(ctx, userEmail, workspaceID); err != nil {
-		return "", err
-	}
-	if s.workflowService == nil {
-		return "", errors.New("workflow service is not configured")
-	}
-	runID, err := s.workflowService.AdvanceHumanGate(ctx, workspaceID, userEmail)
-	if err != nil {
-		return "", err
-	}
-	if s.notifier != nil {
-		s.notifier.NotifyWorkspaceResource(workspaceID)
-	}
-	return runID, nil
 }
 
 func (s *Service) ReconcileUnattachedAgentChatThreads(
@@ -2036,38 +1663,6 @@ func (s *Service) createRunRecord(
 	return run, nil
 }
 
-func (s *Service) createWorkflowRunRecord(
-	ctx context.Context,
-	q *db.Queries,
-	workspaceRecord db.Workspace,
-	session db.AgentSession,
-	thread db.AgentThread,
-	prompt string,
-	nodeID wruntime.NodeID,
-	attempt int,
-) (db.AgentRun, error) {
-	runID := uuid.NewString()
-	return q.CreateAgentRun(ctx, db.CreateAgentRunParams{
-		ID:                   runID,
-		WorkspaceID:          nullString(workspaceRecord.ID),
-		ThreadID:             thread.ID,
-		SessionID:            nullString(session.ID),
-		Trigger:              string(conversation.RunTriggerSend),
-		Status:               "running",
-		PromptText:           prompt,
-		RestoreHeadEntryID:   thread.HeadEntryID,
-		ResultHeadEntryID:    sql.NullString{},
-		WorkflowID:           "agent-chat-workflow-" + runID,
-		TemporalRunID:        sql.NullString{},
-		WorkflowNodeID:       nullString(string(nodeID)),
-		WorkflowAttempt:      int64(attempt),
-		WorkflowResultStatus: sql.NullString{},
-		WorkflowResultJson:   sql.NullString{},
-		RootDocPath:          workspaceRecord.RootDocPath,
-		ErrorMessage:         sql.NullString{},
-	})
-}
-
 func (s *Service) createForkThreadRecord(
 	ctx context.Context,
 	q *db.Queries,
@@ -2768,27 +2363,6 @@ func (s *Service) FinalizeRun(ctx context.Context, result conversation.RunResult
 		s.NotifyWorkspaceForEvent(*event)
 	}
 	s.notifyThreadScope(ctx, run.ThreadID, PatchRunHeader)
-	adoption := ThreadWorkspaceAdoptionResult{}
-	if !run.WorkflowNodeID.Valid {
-		var adoptionErr error
-		adoption, adoptionErr = s.AdoptThreadWorkspacesForRun(
-			ctx,
-			ThreadWorkspaceAdoptionInput{
-				ThreadID: run.ThreadID,
-				RunID:    run.ID,
-				Source:   "run_complete",
-			},
-		)
-		if adoptionErr != nil {
-			return adoptionErr
-		}
-		if adoption.Adopted {
-			s.notifyThreadScope(ctx, run.ThreadID, PatchThreadPage)
-		}
-	}
-	if s.workflowService != nil && !adoption.AppliedWorkflowResult {
-		return s.workflowService.OnRunComplete(ctx, result)
-	}
 	return nil
 }
 
@@ -3245,15 +2819,6 @@ func (s *Service) BuildThreadPageArgs(
 		return nil, err
 	}
 	args.PlanSidebar.TargetID = "agent-chat-thread-sidebar"
-	args.Workflow, _ = s.BuildWorkspaceWorkflowState(ctx, primary)
-	args.Workflow.ThreadID = thread.ID
-	if args.Workflow.LastResultCard != nil {
-		args.Workflow.LastResultCard.ThreadID = thread.ID
-	}
-	args.Transcript.Stable = attachQRSPIWorkflowCardToLatestAssistantMessage(
-		args.Transcript.Stable,
-		args.Workflow.LastResultCard,
-	)
 	return args, nil
 }
 

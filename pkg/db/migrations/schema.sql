@@ -541,33 +541,6 @@ created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
 updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 ) ;
 
-CREATE TABLE IF NOT EXISTS qrspi_session_projections (
-id TEXT PRIMARY KEY,
-source_event_id TEXT NOT NULL UNIQUE,
-session_id TEXT,
-session_artifact_path TEXT,
-plan_dir TEXT NOT NULL,
-workflow_node_id TEXT,
-stage TEXT,
-status TEXT,
-outcome TEXT,
-artifact TEXT,
-result_json TEXT NOT NULL,
-projection_state TEXT NOT NULL DEFAULT 'pending'
-CHECK (projection_state IN ('pending', 'applied', 'failed', 'skipped')),
-applied_at DATETIME,
-last_error TEXT,
-event_time DATETIME NOT NULL,
-created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
-) ;
-
-CREATE INDEX IF NOT EXISTS idx_qrspi_session_projections_plan_node
-ON qrspi_session_projections (plan_dir, workflow_node_id, event_time DESC) ;
-
-CREATE INDEX IF NOT EXISTS idx_qrspi_session_projections_state_time
-ON qrspi_session_projections (projection_state, event_time ASC) ;
-
 CREATE TABLE IF NOT EXISTS agent_entries (
 lineage_id TEXT NOT NULL,
 entry_id TEXT NOT NULL,

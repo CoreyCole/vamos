@@ -182,7 +182,11 @@ func TestOpenChatWorkspaceValidatesCandidateRoot(t *testing.T) {
 	if got.WorkspaceID != "ws_1" || got.URL != "/thoughts/?chat_workspace=ws_1" {
 		t.Fatalf("OpenChatWorkspace(valid candidate) = %+v, want ws_1 thoughts URL", got)
 	}
-	if opener.input.RootDocPath != planRoot ||
+	wantPlanRoot, err := resolveExistingOrCleanPath(planRoot)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if opener.input.RootDocPath != wantPlanRoot ||
 		opener.input.UserEmail != "user@example.com" {
 		t.Fatalf("opener input = %+v, want selected absolute root/user", opener.input)
 	}

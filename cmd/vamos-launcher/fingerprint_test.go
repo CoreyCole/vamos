@@ -38,10 +38,10 @@ func TestComputeRuntimeFingerprintChangesForRuntimeInputs(t *testing.T) {
 	root = fakeRuntimeFingerprintRoot(t)
 	source = RuntimeSource{Root: root, SourceKey: sourceRootKey(root), SourceFrom: "test"}
 	base = mustFingerprint(t, source)
-	asset := filepath.Join(root, "cmd", "vamos-runtime", "internal", "qrspicmd", "assets", "q_manager_child_extension.js")
+	asset := filepath.Join(root, "cmd", "vamos-runtime", "internal", "hermescmd", "assets", "platform_adapter.js")
 	writeFile(t, asset, "console.log('changed')\n")
 	if mustFingerprint(t, source).Value == base.Value {
-		t.Fatalf("embedded q-manager JS edit did not change fingerprint")
+		t.Fatalf("embedded Hermes JS edit did not change fingerprint")
 	}
 }
 
@@ -134,7 +134,7 @@ func fakeRuntimeFingerprintRoot(t *testing.T) string {
 	writeFile(t, filepath.Join(root, "go.sum"), "")
 	writeFile(t, filepath.Join(root, "cmd", "vamos-runtime", "main.go"), "package main\nfunc main() {}\n")
 	writeFile(t, filepath.Join(root, "pkg", "example", "example.go"), "package example\nconst Value = 1\n")
-	writeFile(t, filepath.Join(root, "cmd", "vamos-runtime", "internal", "qrspicmd", "assets", "q_manager_child_extension.js"), "console.log('base')\n")
+	writeFile(t, filepath.Join(root, "cmd", "vamos-runtime", "internal", "hermescmd", "assets", "platform_adapter.js"), "console.log('base')\n")
 	resolved, err := filepath.EvalSymlinks(root)
 	if err != nil {
 		t.Fatal(err)

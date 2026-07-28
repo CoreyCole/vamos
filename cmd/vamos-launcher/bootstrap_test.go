@@ -178,15 +178,15 @@ func TestLauncherInstalledOutsideRepoUsesConfiguredRuntimeRoot(t *testing.T) {
 		t.Fatalf("launcher configure: %v\n%s", err, out)
 	}
 
-	run := exec.Command(binPath, "qrspi", "--help")
+	run := exec.Command(binPath, "hermes", "--help")
 	run.Env = env
 	run.Dir = t.TempDir()
 	out, err := run.CombinedOutput()
 	if err != nil {
-		t.Fatalf("launcher qrspi --help outside repo: %v\n%s", err, out)
+		t.Fatalf("launcher hermes --help outside repo: %v\n%s", err, out)
 	}
-	if !strings.Contains(string(out), "qrspi") {
-		t.Fatalf("qrspi help output missing command name: %s", out)
+	if !strings.Contains(string(out), "hermes") {
+		t.Fatalf("hermes help output missing command name: %s", out)
 	}
 }
 

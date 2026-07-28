@@ -340,19 +340,6 @@ func (s *Service) importAdoptablePiSession(
 	if imported.ThreadID == "" || imported.ImportedHeadEntry == "" {
 		return fileResult, nil
 	}
-	adopted, err := s.AdoptImportedQRSPIState(
-		ctx,
-		workspace.ID,
-		imported.ThreadID,
-		imported.ImportedHeadEntry,
-	)
-	if err != nil {
-		return fileResult, fmt.Errorf("adopt imported qrspi state: %w", err)
-	}
-	if adopted {
-		fileResult.AdoptedQRSPIWorkspaces = 1
-		fileResult.Changed = true
-	}
 	return fileResult, nil
 }
 

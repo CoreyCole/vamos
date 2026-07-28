@@ -1328,35 +1328,13 @@ func main() {
 	if workspaceManager != nil {
 		workspaceSyncRegistry = workspaceManager
 	}
-	workspaceSyncCompleteForSchedule := workspaces.NewWorkspaceSyncCompletion(
-		workspaceSyncRegistry,
-		workspaceNotifier,
-		nil,
-	)
 	workspaceSyncCompleteForManualRefresh := workspaces.NewWorkspaceSyncCompletion(
 		workspaceSyncRegistry,
 		nil,
 		nil,
 	)
 	workspaceSyncCoordinator := agentchat.NewSyncCoordinator(
-		agentchat.SyncCoordinatorOptions{
-			WorkspaceSync: workspaceSyncer,
-			TerminalIndex: agentChatService,
-			QRSPIApply:    agentChatService,
-			OnWorkspaceComplete: func(ctx context.Context, result agentchat.SyncWorkspacesResult, err error) {
-				if result.Skipped {
-					log.Printf(
-						"workspace_sync_skipped mode=schedule reason=%q",
-						result.SkipReason,
-					)
-				}
-				workspaceSyncCompleteForSchedule(
-					ctx,
-					workspaceSyncRefreshResultFromAgentChat(result),
-					err,
-				)
-			},
-		},
+		agentchat.SyncCoordinatorOptions{WorkspaceSync: workspaceSyncer},
 	)
 	if goWorker != nil {
 		goWorker.RegisterWorkflow(agentchat.SyncCoordinatorWorkflow)
@@ -1612,7 +1590,6 @@ func main() {
 			workspaces.WithPlanWorkspaces(dbService.Queries),
 			workspaces.WithImplWorkspaces(dbService.Queries),
 			workspaces.WithWorkspaceSyncDiagnostics(dbService.Queries),
-			workspaces.WithWorkspaceWorkflowSummaryResolver(agentChatService),
 			workspaces.WithWorkspaceProvisionStarter(provisionStarter),
 			workspaces.WithWorkspaceCleanupStarter(cleanupStarter),
 			workspaces.WithWorkspaceErrorStore(

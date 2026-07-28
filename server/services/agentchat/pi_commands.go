@@ -2,13 +2,11 @@ package agentchat
 
 import (
 	"context"
-	"encoding/json"
 	"os"
 	"path/filepath"
 	"sort"
 	"strings"
 
-	wruntime "github.com/CoreyCole/vamos/pkg/agents/workflows/runtime"
 	"github.com/CoreyCole/vamos/pkg/db"
 )
 
@@ -41,19 +39,6 @@ type PiCommandDiscovery interface {
 }
 
 func (s *Service) WorkspaceSlashCommandCwd(workspace db.Workspace) string {
-	if isQRSPIWorkflowType(WorkspaceWorkflowType(workspace.WorkflowType)) &&
-		workspace.WorkflowStateJson.Valid && strings.TrimSpace(workspace.WorkflowStateJson.String) != "" {
-		var state wruntime.State
-		if err := json.Unmarshal(
-			[]byte(workspace.WorkflowStateJson.String),
-			&state,
-		); err == nil {
-			projected := ProjectWorkspaceCwd(state, workspace)
-			if !projected.Blocked && strings.TrimSpace(projected.Path) != "" {
-				return projected.Path
-			}
-		}
-	}
 	return s.workspaceThreadCwd(workspace)
 }
 

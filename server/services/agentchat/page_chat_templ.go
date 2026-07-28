@@ -393,7 +393,7 @@ func WorkspaceChatPrimaryRegion(args WorkspacePageArgs) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = WorkspaceComposer(args.WorkspaceID, getThreadID(args.Projection.SelectedThread), args.Projection.SelectedThread != nil, args.Projection.Workflow.ActiveCwd.Path, args.PendingAttachments).Render(ctx, templ_7745c5c3_Buffer)
+		templ_7745c5c3_Err = WorkspaceComposer(args.WorkspaceID, getThreadID(args.Projection.SelectedThread), args.Projection.SelectedThread != nil, "", args.PendingAttachments).Render(ctx, templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
