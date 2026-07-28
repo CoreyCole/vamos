@@ -144,6 +144,7 @@ func (h *Handler) RegisterRuntimeRoutes(g *echo.Group) {
 	g.GET("/thread/:thread_id/slash-commands", h.ListThreadSlashCommands)
 	g.POST("/thread/:thread_id/resume", h.ResumeThreadByPath)
 	g.POST("/thread/:thread_id/fork", h.ForkThreadByPath)
+	g.POST("/hermes/threads/:thread_id/prompts", h.HandleHermesPrompt)
 	g.GET("/sessions/stream", h.StreamSessions)
 	g.POST("/pi-sessions/open", h.OpenPiSession)
 	g.GET("/chat-sessions/:session_id", h.GetChatSessionSnapshot)

@@ -80,6 +80,33 @@ func (c httpHermesGatewayClient) post(
 	return nil
 }
 
+func (s *Service) DeliverOwnedHermesPrompt(
+	ctx context.Context,
+	userEmail string,
+	prompt HermesPrompt,
+) error {
+	owner, err := s.hermesOwner(ctx, prompt.ThreadID)
+	if err != nil {
+		return err
+	}
+	if !strings.EqualFold(strings.TrimSpace(owner), strings.TrimSpace(userEmail)) {
+		return fmt.Errorf("only the thread owner may deliver Hermes prompts")
+	}
+	prompt.OwnerEmail = owner
+	return s.DeliverHermesPrompt(ctx, prompt)
+}
+
+func (s *Service) hermesOwner(ctx context.Context, threadID string) (string, error) {
+	if s.hermesThreadOwner != nil {
+		return s.hermesThreadOwner(ctx, threadID)
+	}
+	thread, err := s.queries.GetAgentThread(ctx, threadID)
+	if err != nil {
+		return "", err
+	}
+	return thread.UserEmail, nil
+}
+
 func (s *Service) DeliverHermesPrompt(ctx context.Context, prompt HermesPrompt) error {
 	if s.hermesGateway == nil {
 		return fmt.Errorf("Hermes gateway is not configured")
@@ -90,6 +117,55 @@ func (s *Service) DeliverHermesPrompt(ctx context.Context, prompt HermesPrompt) 
 		return fmt.Errorf("thread, owner, and prompt are required")
 	}
 	return s.hermesGateway.DeliverPrompt(ctx, prompt)
+}
+
+// RenderHermesTranscript maps durable Hermes events into the existing safe
+// chat presentation model. Final events use the shared Markdown renderer; tool
+// events remain concise cards and never expose gateway tool arguments.
+func (s *Service) RenderHermesTranscript(
+	planDir, threadID string,
+) ([]ChatMessageArgs, error) {
+	planDir, err := s.hermesPlanDir(planDir)
+	if err != nil {
+		return nil, err
+	}
+	events, err := readHermesTranscript(planDir, threadID)
+	if err != nil {
+		return nil, err
+	}
+	messages := make([]ChatMessageArgs, 0, len(events))
+	for _, event := range events {
+		message := ChatMessageArgs{
+			ID:      event.ID,
+			Role:    "assistant",
+			Content: event.Content,
+		}
+		switch event.Type {
+		case "user":
+			message.Role = "user"
+		case "final":
+			if s.renderer == nil {
+				return nil, fmt.Errorf("Hermes Markdown renderer is not configured")
+			}
+			html, err := renderMarkdown(s.renderer, []byte(event.Content))
+			if err != nil {
+				return nil, err
+			}
+			message.HTMLContent = html
+		case "tool":
+			if event.Tool == nil {
+				continue
+			}
+			message.Content = "Tool: " + event.Tool.Name
+			if event.Tool.Status != "" {
+				message.Content += " — " + event.Tool.Status
+			}
+		case "lifecycle", "pi_run":
+			message.Role = "system"
+		}
+		messages = append(messages, message)
+	}
+	return messages, nil
 }
 
 func (s *Service) AppendHermesTranscript(

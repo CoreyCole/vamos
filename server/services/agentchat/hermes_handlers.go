@@ -20,8 +20,39 @@ type hermesEventRequest struct {
 }
 
 func (h *Handler) RegisterHermesRoutes(g *echo.Group) {
+	g.POST("/hermes/threads/:thread_id/prompts", h.HandleHermesPrompt)
 	g.POST("/hermes/threads/:thread_id/events", h.HandleHermesEvent)
 	g.POST("/hermes/pi/:session_id/complete", h.HandleHermesPiCompletion)
+}
+
+func (h *Handler) HandleHermesPrompt(c echo.Context) error {
+	userEmail, ok := c.Get("user_email").(string)
+	if !ok || strings.TrimSpace(userEmail) == "" {
+		return echo.NewHTTPError(http.StatusUnauthorized, "not authenticated")
+	}
+	prompt := strings.TrimSpace(c.FormValue("prompt"))
+	if prompt == "" {
+		return echo.NewHTTPError(http.StatusBadRequest, "prompt is required")
+	}
+	contextPaths := strings.FieldsFunc(c.FormValue("context_paths"), func(r rune) bool {
+		return r == ',' || r == '\n'
+	})
+	err := h.service.DeliverOwnedHermesPrompt(
+		c.Request().Context(),
+		userEmail,
+		HermesPrompt{
+			ThreadID: c.Param(
+				"thread_id",
+			),
+			PlanDir:      strings.TrimSpace(c.FormValue("plan_dir")),
+			ContextPaths: contextPaths,
+			Prompt:       prompt,
+		},
+	)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusForbidden, err.Error())
+	}
+	return c.NoContent(http.StatusAccepted)
 }
 
 func (h *Handler) authorizeHermes(c echo.Context) error {

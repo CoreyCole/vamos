@@ -14,14 +14,16 @@ import (
 )
 
 type recordingHermesGateway struct {
+	prompt  HermesPrompt
 	session string
 	result  []byte
 }
 
 func (g *recordingHermesGateway) DeliverPrompt(
-	context.Context,
-	HermesPrompt,
+	_ context.Context,
+	prompt HermesPrompt,
 ) error {
+	g.prompt = prompt
 	return nil
 }
 
@@ -32,6 +34,48 @@ func (g *recordingHermesGateway) DeliverPiCompletion(
 ) error {
 	g.session, g.result = session, append([]byte(nil), result...)
 	return nil
+}
+
+func TestHandleHermesPromptOnlyDeliversForThreadOwner(t *testing.T) {
+	gateway := &recordingHermesGateway{}
+	service := &Service{
+		hermesGateway: gateway,
+		hermesThreadOwner: func(context.Context, string) (string, error) {
+			return "owner@example.com", nil
+		},
+	}
+	e := echo.New()
+	h := NewHandler(service, nil)
+	for _, user := range []string{"observer@example.com", "owner@example.com"} {
+		req := httptest.NewRequest(
+			http.MethodPost,
+			"/",
+			bytes.NewBufferString(
+				"prompt=hello&plan_dir=%2Fplans%2Fa&context_paths=a.md%2Cb.md",
+			),
+		)
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		rec := httptest.NewRecorder()
+		c := e.NewContext(req, rec)
+		c.Set("user_email", user)
+		c.SetParamNames("thread_id")
+		c.SetParamValues("thread-1")
+		err := h.HandleHermesPrompt(c)
+		if user == "observer@example.com" {
+			if httpErr, ok := err.(*echo.HTTPError); !ok ||
+				httpErr.Code != http.StatusForbidden {
+				t.Fatalf("observer result = %#v", err)
+			}
+			continue
+		}
+		if err != nil || rec.Code != http.StatusAccepted {
+			t.Fatalf("owner result err=%v status=%d", err, rec.Code)
+		}
+	}
+	if gateway.prompt.OwnerEmail != "owner@example.com" ||
+		len(gateway.prompt.ContextPaths) != 2 {
+		t.Fatalf("gateway prompt = %#v", gateway.prompt)
+	}
 }
 
 func TestHandleHermesEventRequiresCallbackCredential(t *testing.T) {

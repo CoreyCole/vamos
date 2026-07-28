@@ -7,6 +7,30 @@ import (
 	"testing"
 )
 
+func TestRenderHermesTranscriptRendersFinalMarkdownAndSafeToolCard(t *testing.T) {
+	service := newTestAgentChatService(t)
+	thoughts := t.TempDir()
+	service.thoughtsRoot = thoughts
+	plan := filepath.Join(thoughts, "agent", "plans", "plan-a")
+	for _, event := range []HermesTranscriptEvent{
+		{ID: "final", Type: "final", ThreadID: "thread-1", Content: "**safe**"},
+		{ID: "tool", Type: "tool", ThreadID: "thread-1", Tool: &HermesToolCard{Name: "shell", Status: "done"}},
+	} {
+		if err := AppendHermesTranscript(plan, event); err != nil {
+			t.Fatal(err)
+		}
+	}
+	messages, err := service.RenderHermesTranscript(plan, "thread-1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(messages) != 2 ||
+		!strings.Contains(messages[0].HTMLContent, "<strong>safe</strong>") ||
+		messages[1].Content != "Tool: shell — done" {
+		t.Fatalf("messages = %#v", messages)
+	}
+}
+
 func TestHermesCallbacksRejectPlanOutsideThoughtsRoot(t *testing.T) {
 	thoughts := t.TempDir()
 	outside := t.TempDir()
