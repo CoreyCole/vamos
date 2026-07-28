@@ -104,6 +104,9 @@ Before copying from a baseline checkout, verify it is clean, on the configured b
 ## Common commands
 
 ```bash
+# Regenerate templ and sqlc output, then lint and run all unit tests.
+just check
+
 just build --no-restart
 
 go test ./server/config ./server/services/workspaces ./server/services/agentchat ./cmd/build-agents/internal/build

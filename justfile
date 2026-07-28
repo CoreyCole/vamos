@@ -1,6 +1,13 @@
 build *args:
   @go run ./cmd/build-agents {{args}}
 
+# Regenerate derived Go code, lint, and run the unit test suite.
+check:
+  @templ generate
+  @sqlc generate
+  @golangci-lint run
+  @go test ./...
+
 e2e *args:
   @VAMOS_ROOT="$PWD"; ../datastarui/scripts/datastarui.sh e2e run --config "$VAMOS_ROOT/datastarui-e2e.yml" {{args}}
 
