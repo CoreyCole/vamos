@@ -37,6 +37,26 @@ func TestAppendHermesTranscriptIsIdempotentAndRedactsToolArguments(t *testing.T)
 	}
 }
 
+func TestAppendHermesTranscriptRejectsSessionDirectorySymlinkOutsidePlan(t *testing.T) {
+	plan := t.TempDir()
+	outside := t.TempDir()
+	hermesDir := filepath.Join(plan, ".vamos", "sessions", "hermes")
+	if err := os.MkdirAll(filepath.Dir(hermesDir), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(outside, hermesDir); err != nil {
+		t.Fatal(err)
+	}
+	if err := AppendHermesTranscript(plan, HermesTranscriptEvent{
+		ID: "event-1", Type: "final", ThreadID: "thread-1", Content: "nope",
+	}); err == nil || !strings.Contains(err.Error(), "escapes plan directory") {
+		t.Fatalf("AppendHermesTranscript() error = %v, want containment rejection", err)
+	}
+	if _, err := os.Stat(filepath.Join(outside, "thread-1.jsonl")); !os.IsNotExist(err) {
+		t.Fatalf("outside transcript = %v, want no file", err)
+	}
+}
+
 func TestHermesTranscriptPathRejectsTraversal(t *testing.T) {
 	if _, err := HermesTranscriptPath(t.TempDir(), "../secret"); err == nil {
 		t.Fatal("expected traversal rejection")

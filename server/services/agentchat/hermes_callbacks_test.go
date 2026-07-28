@@ -73,6 +73,30 @@ func TestHermesPiResultReadsOnlyContainedPlan(t *testing.T) {
 	if _, err := service.HermesPiResult(plan, "../secret"); err == nil {
 		t.Fatal("HermesPiResult() accepted traversal session ID")
 	}
+	outside := t.TempDir()
+	if err := os.RemoveAll(filepath.Join(plan, ".vamos", "sessions", "pi")); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(
+		filepath.Join(outside, "session-1_result.yaml"),
+		[]byte("secret\n"),
+		0o600,
+	); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(
+		outside,
+		filepath.Join(plan, ".vamos", "sessions", "pi"),
+	); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := service.HermesPiResult(
+		plan,
+		"session-1",
+	); err == nil ||
+		!strings.Contains(err.Error(), "escapes plan directory") {
+		t.Fatalf("HermesPiResult() error = %v, want symlink containment rejection", err)
+	}
 	if _, err := service.HermesPiResult(t.TempDir(), "session-1"); err == nil {
 		t.Fatal("HermesPiResult() accepted plan outside thoughts root")
 	}

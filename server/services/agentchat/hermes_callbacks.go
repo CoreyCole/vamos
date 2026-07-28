@@ -191,9 +191,15 @@ func (s *Service) HermesPiResult(planDir, session string) ([]byte, error) {
 	if filepath.Base(session) != session || strings.TrimSpace(session) == "" {
 		return nil, fmt.Errorf("safe Pi session ID is required")
 	}
-	return os.ReadFile(
+	path, err := containedResolvedPath(
+		planDir,
 		filepath.Join(planDir, ".vamos", "sessions", "pi", session+"_result.yaml"),
+		"",
 	)
+	if err != nil {
+		return nil, err
+	}
+	return os.ReadFile(path)
 }
 
 func (s *Service) hermesPlanDir(planDir string) (string, error) {
@@ -221,5 +227,5 @@ func (s *Service) hermesPlanDir(planDir string) (string, error) {
 	if !pathWithinRoot(resolvedPlanDir, resolvedRoot) {
 		return "", fmt.Errorf("plan directory escapes thoughts root")
 	}
-	return planDir, nil
+	return resolvedPlanDir, nil
 }

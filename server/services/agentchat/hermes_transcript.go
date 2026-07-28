@@ -42,7 +42,7 @@ func AppendHermesTranscript(planDir string, event HermesTranscriptEvent) error {
 	if event.ID == "" || event.ThreadID == "" || !validHermesEventType(event.Type) {
 		return errors.New("invalid Hermes transcript event")
 	}
-	path, err := HermesTranscriptPath(planDir, event.ThreadID)
+	path, err := hermesTranscriptWritePath(planDir, event.ThreadID)
 	if err != nil {
 		return err
 	}
@@ -58,9 +58,6 @@ func AppendHermesTranscript(planDir string, event HermesTranscriptEvent) error {
 	}
 	hermesTranscriptMu.Lock()
 	defer hermesTranscriptMu.Unlock()
-	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
-		return err
-	}
 	if existing, err := os.ReadFile(path); err == nil {
 		s := bufio.NewScanner(strings.NewReader(string(existing)))
 		for s.Scan() {
@@ -88,6 +85,89 @@ func AppendHermesTranscript(planDir string, event HermesTranscriptEvent) error {
 	return err
 }
 
+// hermesTranscriptWritePath creates each canonical transcript directory only
+// after checking the preceding component. This avoids MkdirAll following a
+// plan-owned symlink before containment has been established.
+func hermesTranscriptWritePath(planDir, threadID string) (string, error) {
+	path, err := HermesTranscriptPath(planDir, threadID)
+	if err != nil {
+		return "", err
+	}
+	dir, err := ensureContainedDirectory(planDir, ".vamos", "sessions", "hermes")
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(dir, filepath.Base(path)), nil
+}
+
+func ensureContainedDirectory(planDir string, parts ...string) (string, error) {
+	current, err := filepath.EvalSymlinks(planDir)
+	if err != nil {
+		return "", fmt.Errorf("resolve plan directory: %w", err)
+	}
+	for _, part := range parts {
+		next := filepath.Join(current, part)
+		info, err := os.Lstat(next)
+		if errors.Is(err, os.ErrNotExist) {
+			if err := os.Mkdir(next, 0o700); err != nil {
+				return "", err
+			}
+			current = next
+			continue
+		}
+		if err != nil {
+			return "", err
+		}
+		if !info.IsDir() && info.Mode()&os.ModeSymlink == 0 {
+			return "", fmt.Errorf(
+				"Hermes transcript path component %q is not a directory",
+				part,
+			)
+		}
+		resolved, err := filepath.EvalSymlinks(next)
+		if err != nil {
+			return "", err
+		}
+		if !pathWithinRoot(resolved, current) {
+			return "", errors.New("Hermes transcript path escapes plan directory")
+		}
+		current = resolved
+	}
+	return current, nil
+}
+
+func hermesTranscriptReadPath(planDir, threadID string) (string, error) {
+	path, err := HermesTranscriptPath(planDir, threadID)
+	if err != nil {
+		return "", err
+	}
+	return containedResolvedPath(planDir, path, "")
+}
+
+// containedResolvedPath rejects any existing symlink chain that escapes planDir.
+// name is appended after resolving target when writing a new file; an empty name
+// resolves and validates the complete existing read path.
+func containedResolvedPath(planDir, target, name string) (string, error) {
+	resolvedPlan, err := filepath.EvalSymlinks(planDir)
+	if err != nil {
+		return "", fmt.Errorf("resolve plan directory: %w", err)
+	}
+	resolvedTarget, err := filepath.EvalSymlinks(target)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) && name == "" {
+			return target, nil
+		}
+		return "", err
+	}
+	if !pathWithinRoot(resolvedTarget, resolvedPlan) {
+		return "", errors.New("Hermes transcript path escapes plan directory")
+	}
+	if name != "" {
+		return filepath.Join(resolvedTarget, name), nil
+	}
+	return resolvedTarget, nil
+}
+
 func validHermesEventType(kind string) bool {
 	switch kind {
 	case "user", "lifecycle", "tool", "final", "pi_run":
@@ -97,7 +177,7 @@ func validHermesEventType(kind string) bool {
 }
 
 func readHermesTranscript(planDir, threadID string) ([]HermesTranscriptEvent, error) {
-	path, err := HermesTranscriptPath(planDir, threadID)
+	path, err := hermesTranscriptReadPath(planDir, threadID)
 	if err != nil {
 		return nil, err
 	}
