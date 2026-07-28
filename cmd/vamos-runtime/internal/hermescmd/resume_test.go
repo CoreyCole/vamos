@@ -48,7 +48,7 @@ func TestContinueLaunchesMappedPreviousSession(t *testing.T) {
 	if !strings.Contains(
 		strings.Join(gotArgs, " "),
 		"--session-dir "+ctx.PlanDir+"/.vamos/sessions/pi",
-	) || len(gotArgs) < 8 {
+	) || len(gotArgs) < 10 {
 		t.Fatalf("continue args = %#v", gotArgs)
 	}
 	root, err := piResourceRoot()
@@ -56,9 +56,11 @@ func TestContinueLaunchesMappedPreviousSession(t *testing.T) {
 		t.Fatal(err)
 	}
 	wantContext := []string{
+		"@" + filepath.Join(ctx.PlanDir, "AGENTS.md"),
+		"@" + filepath.Join(ctx.PlanDir, "design.md"),
+		"@" + filepath.Join(ctx.PlanDir, "outline.md"),
 		"@" + filepath.Join(root, ".pi", "skills", "qrspi-planning", "SKILL.md"),
 		"@" + filepath.Join(root, ".pi", "skills", "q-verify", "SKILL.md"),
-		"@" + filepath.Join(ctx.PlanDir, "AGENTS.md"),
 		"@" + artifact,
 	}
 	for i, want := range wantContext {

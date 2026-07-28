@@ -29,6 +29,15 @@ func testPlan(t *testing.T) PlanContext {
 	); err != nil {
 		t.Fatal(err)
 	}
+	for _, name := range []string{"design.md", "outline.md"} {
+		if err := os.WriteFile(
+			filepath.Join(dir, name),
+			[]byte("# "+name+"\n"),
+			0o600,
+		); err != nil {
+			t.Fatal(err)
+		}
+	}
 	ctx, err := LoadPlanContext(dir)
 	if err != nil {
 		t.Fatal(err)

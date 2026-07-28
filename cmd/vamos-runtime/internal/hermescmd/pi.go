@@ -101,7 +101,11 @@ func newStartCommand(run commandRunner) *cobra.Command {
 }
 
 func piContextArgs(ctx PlanContext, prior *PiResult) ([]string, error) {
-	paths := []string{}
+	paths := []string{
+		filepath.Join(ctx.PlanDir, "AGENTS.md"),
+		filepath.Join(ctx.PlanDir, "design.md"),
+		filepath.Join(ctx.PlanDir, "outline.md"),
+	}
 	if prior != nil {
 		root, err := piResourceRoot()
 		if err != nil {
@@ -112,7 +116,6 @@ func piContextArgs(ctx PlanContext, prior *PiResult) ([]string, error) {
 			filepath.Join(root, ".pi", "skills", "q-"+string(prior.Next), "SKILL.md"),
 		)
 	}
-	paths = append(paths, filepath.Join(ctx.PlanDir, "AGENTS.md"))
 	if prior != nil && prior.Artifact != "" {
 		artifact := prior.Artifact
 		if !filepath.IsAbs(artifact) {
