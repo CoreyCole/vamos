@@ -1,6 +1,7 @@
 package agentchat
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -44,6 +45,54 @@ func TestHermesCallbacksRejectPlanOutsideThoughtsRoot(t *testing.T) {
 	})
 	if err == nil || !strings.Contains(err.Error(), "escapes thoughts root") {
 		t.Fatalf("AppendHermesTranscript() error = %v, want containment rejection", err)
+	}
+}
+
+func TestHermesThreadForPiRunResolvesUniqueDurableTranscript(t *testing.T) {
+	thoughts := t.TempDir()
+	plan := filepath.Join(thoughts, "agent", "plans", "plan-a")
+	for _, event := range []HermesTranscriptEvent{
+		{ID: "run-a", Type: "pi_run", ThreadID: "thread-a", PiSessionID: "pi-a"},
+		{ID: "run-b", Type: "pi_run", ThreadID: "thread-b", PiSessionID: "pi-b"},
+		{ID: "run-a", Type: "pi_run", ThreadID: "thread-a", PiSessionID: "pi-a"},
+	} {
+		if err := AppendHermesTranscript(plan, event); err != nil {
+			t.Fatal(err)
+		}
+	}
+	service := &Service{thoughtsRoot: thoughts}
+	thread, err := service.HermesThreadForPiRun(plan, "pi-b")
+	if err != nil || thread != "thread-b" {
+		t.Fatalf("HermesThreadForPiRun() = %q, %v", thread, err)
+	}
+	if _, err := service.HermesThreadForPiRun(
+		plan,
+		"missing",
+	); !errors.Is(
+		err,
+		ErrHermesPiRunNotFound,
+	) {
+		t.Fatalf("missing run error = %v", err)
+	}
+	if err := AppendHermesTranscript(
+		plan,
+		HermesTranscriptEvent{
+			ID:          "run-c",
+			Type:        "pi_run",
+			ThreadID:    "thread-c",
+			PiSessionID: "pi-b",
+		},
+	); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := service.HermesThreadForPiRun(
+		plan,
+		"pi-b",
+	); !errors.Is(
+		err,
+		ErrHermesPiRunAmbiguous,
+	) {
+		t.Fatalf("ambiguous run error = %v", err)
 	}
 }
 

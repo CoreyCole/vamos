@@ -15,6 +15,7 @@ import (
 
 type recordingHermesGateway struct {
 	prompt        HermesPrompt
+	threadID      string
 	session       string
 	result        []byte
 	completionErr error
@@ -30,10 +31,10 @@ func (g *recordingHermesGateway) DeliverPrompt(
 
 func (g *recordingHermesGateway) DeliverPiCompletion(
 	_ context.Context,
-	session string,
+	threadID, session string,
 	result []byte,
 ) error {
-	g.session, g.result = session, append([]byte(nil), result...)
+	g.threadID, g.session, g.result = threadID, session, append([]byte(nil), result...)
 	return g.completionErr
 }
 
@@ -142,6 +143,32 @@ func TestHandleHermesEventAppendsContainedTranscriptInArrivalOrder(t *testing.T)
 	}
 }
 
+func TestHandleHermesEventRequiresPiSessionForPiRun(t *testing.T) {
+	thoughts := t.TempDir()
+	plan := filepath.Join(thoughts, "agent", "plans", "plan-a")
+	if err := os.MkdirAll(plan, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	e := echo.New()
+	h := NewHandler(
+		&Service{thoughtsRoot: thoughts},
+		nil,
+		HandlerOptions{HermesCallbackToken: "secret"},
+	)
+	body := bytes.NewBufferString(
+		`{"plan_dir":"` + plan + `","id":"run-1","type":"pi_run"}`,
+	)
+	req := httptest.NewRequest(http.MethodPost, "/", body)
+	req.Header.Set("Authorization", "Bearer secret")
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	c.SetParamNames("thread_id")
+	c.SetParamValues("thread-1")
+	if err := h.HandleHermesEvent(c); err == nil {
+		t.Fatal("HandleHermesEvent accepted pi_run without pi_session_id")
+	}
+}
+
 func TestHandleHermesPiCompletionReturnsNotFoundWithoutManager(t *testing.T) {
 	thoughts := t.TempDir()
 	plan := filepath.Join(thoughts, "agent", "plans", "plan-a")
@@ -150,6 +177,17 @@ func TestHandleHermesPiCompletionReturnsNotFoundWithoutManager(t *testing.T) {
 		t.Fatal(err)
 	}
 	if err := os.WriteFile(path, []byte("summary: current\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := AppendHermesTranscript(
+		plan,
+		HermesTranscriptEvent{
+			ID:          "run-1",
+			Type:        "pi_run",
+			ThreadID:    "thread-1",
+			PiSessionID: "session-1",
+		},
+	); err != nil {
 		t.Fatal(err)
 	}
 	e := echo.New()
@@ -186,6 +224,17 @@ func TestHandleHermesPiCompletionRereadsContainedResult(t *testing.T) {
 	if err := os.WriteFile(path, []byte("summary: current\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
+	if err := AppendHermesTranscript(
+		plan,
+		HermesTranscriptEvent{
+			ID:          "run-1",
+			Type:        "pi_run",
+			ThreadID:    "thread-1",
+			PiSessionID: "session-1",
+		},
+	); err != nil {
+		t.Fatal(err)
+	}
 	gateway := &recordingHermesGateway{}
 	e := echo.New()
 	h := NewHandler(
@@ -207,9 +256,11 @@ func TestHandleHermesPiCompletionRereadsContainedResult(t *testing.T) {
 		rec.Code != http.StatusAccepted {
 		t.Fatalf("HandleHermesPiCompletion() err=%v status=%d", err, rec.Code)
 	}
-	if gateway.session != "session-1" || string(gateway.result) != "summary: current\n" {
+	if gateway.threadID != "thread-1" || gateway.session != "session-1" ||
+		string(gateway.result) != "summary: current\n" {
 		t.Fatalf(
-			"gateway completion = session %q result %q",
+			"gateway completion = thread %q session %q result %q",
+			gateway.threadID,
 			gateway.session,
 			gateway.result,
 		)

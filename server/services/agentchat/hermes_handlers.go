@@ -89,7 +89,8 @@ func (h *Handler) HandleHermesEvent(c echo.Context) error {
 		Tool:        req.Tool,
 		PiSessionID: req.PiSessionID,
 	}
-	if !validHermesEventType(event.Type) || event.ID == "" {
+	if !validHermesEventType(event.Type) || event.ID == "" ||
+		(event.Type == "pi_run" && strings.TrimSpace(event.PiSessionID) == "") {
 		return echo.NewHTTPError(http.StatusBadRequest, "unsupported Hermes event")
 	}
 	if err := h.service.AppendHermesTranscript(
@@ -119,6 +120,14 @@ func (h *Handler) HandleHermesPiCompletion(c echo.Context) error {
 		}
 		return echo.NewHTTPError(http.StatusBadRequest, "invalid Pi completion")
 	}
+	threadID, err := h.service.HermesThreadForPiRun(req.PlanDir, session)
+	if err != nil {
+		if errors.Is(err, ErrHermesPiRunNotFound) ||
+			errors.Is(err, ErrHermesPiRunAmbiguous) {
+			return echo.NewHTTPError(http.StatusNotFound, err.Error())
+		}
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid Pi completion")
+	}
 	if h.service.hermesGateway == nil {
 		return echo.NewHTTPError(
 			http.StatusServiceUnavailable,
@@ -127,6 +136,7 @@ func (h *Handler) HandleHermesPiCompletion(c echo.Context) error {
 	}
 	if err := h.service.hermesGateway.DeliverPiCompletion(
 		c.Request().Context(),
+		threadID,
 		session,
 		result,
 	); err != nil {

@@ -24,11 +24,15 @@ type HermesCallbackEvent struct {
 	HermesTranscriptEvent
 }
 
-var ErrHermesManagerNotFound = errors.New("Hermes manager session not found")
+var (
+	ErrHermesManagerNotFound = errors.New("Hermes manager session not found")
+	ErrHermesPiRunNotFound   = errors.New("Hermes Pi run not found")
+	ErrHermesPiRunAmbiguous  = errors.New("Hermes Pi run is ambiguous")
+)
 
 type HermesGatewayClient interface {
 	DeliverPrompt(context.Context, HermesPrompt) error
-	DeliverPiCompletion(context.Context, string, []byte) error
+	DeliverPiCompletion(context.Context, string, string, []byte) error
 }
 type httpHermesGatewayClient struct {
 	url, token string
@@ -44,10 +48,14 @@ func (c httpHermesGatewayClient) DeliverPrompt(
 
 func (c httpHermesGatewayClient) DeliverPiCompletion(
 	ctx context.Context,
-	session string,
+	threadID, session string,
 	result []byte,
 ) error {
-	return c.post(ctx, "/vamos/pi/"+session+"/complete", json.RawMessage(result))
+	return c.post(
+		ctx,
+		"/vamos/threads/"+threadID+"/pi/"+session+"/complete",
+		json.RawMessage(result),
+	)
 }
 
 func (c httpHermesGatewayClient) post(
@@ -189,6 +197,46 @@ func (s *Service) AppendHermesTranscript(
 // HermesPiResult reads the current result only after confirming that the plan
 // directory is a real descendant of the configured thoughts root. Gateway
 // callback payloads are untrusted and must never select arbitrary host files.
+// HermesThreadForPiRun resolves durable child ownership from the plan transcript.
+// Hermes process and manager state are deliberately not involved.
+func (s *Service) HermesThreadForPiRun(planDir, session string) (string, error) {
+	planDir, err := s.hermesPlanDir(planDir)
+	if err != nil {
+		return "", err
+	}
+	if filepath.Base(session) != session || strings.TrimSpace(session) == "" {
+		return "", fmt.Errorf("safe Pi session ID is required")
+	}
+	thoughtsRoot, err := filepath.EvalSymlinks(s.thoughtsRoot)
+	if err != nil {
+		return "", fmt.Errorf("resolve thoughts root: %w", err)
+	}
+	threads, err := ScanHermesThreads(thoughtsRoot, planDir)
+	if err != nil {
+		return "", err
+	}
+	matched := ""
+	for _, thread := range threads {
+		events, err := readHermesTranscript(planDir, thread.ID)
+		if err != nil {
+			return "", err
+		}
+		for _, event := range events {
+			if event.Type != "pi_run" || event.PiSessionID != session {
+				continue
+			}
+			if matched != "" && matched != thread.ID {
+				return "", ErrHermesPiRunAmbiguous
+			}
+			matched = thread.ID
+		}
+	}
+	if matched == "" {
+		return "", ErrHermesPiRunNotFound
+	}
+	return matched, nil
+}
+
 func (s *Service) HermesPiResult(planDir, session string) ([]byte, error) {
 	planDir, err := s.hermesPlanDir(planDir)
 	if err != nil {
