@@ -48,7 +48,7 @@ func TestContinueLaunchesMappedPreviousSession(t *testing.T) {
 	if !strings.Contains(
 		strings.Join(gotArgs, " "),
 		"--session-dir "+ctx.PlanDir+"/.vamos/sessions/pi",
-	) || len(gotArgs) < 12 {
+	) || len(gotArgs) < 13 {
 		t.Fatalf("continue args = %#v", gotArgs)
 	}
 	root, err := piResourceRoot()
@@ -59,6 +59,7 @@ func TestContinueLaunchesMappedPreviousSession(t *testing.T) {
 		"@" + filepath.Join(ctx.PlanDir, "AGENTS.md"),
 		"@" + filepath.Join(ctx.PlanDir, "design.md"),
 		"@" + filepath.Join(ctx.PlanDir, "outline.md"),
+		"@" + filepath.Join(ctx.PlanDir, "plan.md"),
 		"@" + filepath.Join(root, ".pi", "skills", "qrspi-planning", "SKILL.md"),
 		"@" + filepath.Join(root, ".pi", "skills", "q-resume", "SKILL.md"),
 		"@" + filepath.Join(root, ".pi", "skills", "q-handoff", "SKILL.md"),

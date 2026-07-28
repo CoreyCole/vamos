@@ -105,6 +105,7 @@ func piContextArgs(ctx PlanContext, prior *PiResult) ([]string, error) {
 		filepath.Join(ctx.PlanDir, "AGENTS.md"),
 		filepath.Join(ctx.PlanDir, "design.md"),
 		filepath.Join(ctx.PlanDir, "outline.md"),
+		filepath.Join(ctx.PlanDir, "plan.md"),
 	}
 	if prior != nil {
 		root, err := piResourceRoot()

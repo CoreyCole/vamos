@@ -29,7 +29,7 @@ func testPlan(t *testing.T) PlanContext {
 	); err != nil {
 		t.Fatal(err)
 	}
-	for _, name := range []string{"design.md", "outline.md"} {
+	for _, name := range []string{"design.md", "outline.md", "plan.md"} {
 		if err := os.WriteFile(
 			filepath.Join(dir, name),
 			[]byte("# "+name+"\n"),
