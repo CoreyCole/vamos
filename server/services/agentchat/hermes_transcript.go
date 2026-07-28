@@ -101,6 +101,12 @@ func hermesTranscriptWritePath(planDir, threadID string) (string, error) {
 }
 
 func ensureContainedDirectory(planDir string, parts ...string) (string, error) {
+	// AppendHermesTranscript historically creates the plan-local transcript
+	// hierarchy on first use. Preserve that behavior before resolving the plan;
+	// Service callers have already verified plan containment against thoughts.
+	if err := os.MkdirAll(planDir, 0o700); err != nil {
+		return "", err
+	}
 	current, err := filepath.EvalSymlinks(planDir)
 	if err != nil {
 		return "", fmt.Errorf("resolve plan directory: %w", err)
