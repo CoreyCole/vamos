@@ -188,11 +188,16 @@ func TestDoneWithoutHermesManagerPrintsManualContinuation(t *testing.T) {
 	if err := cmd.Execute(); err != nil {
 		t.Fatal(err)
 	}
-	if got := output.String(); !strings.Contains(
-		got,
+	got := output.String()
+	for _, want := range []string{
 		"no Hermes manager owns this session",
-	) || !strings.Contains(got, "vamos hermes pi continue ") {
-		t.Fatalf("managerless completion output = %q", got)
+		"Human action required to start the recommended next session.",
+		"Do not run this command from the active Pi worker.",
+		"vamos hermes pi continue ",
+	} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("managerless completion output = %q, want %q", got, want)
+		}
 	}
 }
 
@@ -215,7 +220,13 @@ func TestDoneWithoutHostConfigRecordsLocalResult(t *testing.T) {
 	if _, err := ReadPiResult(ctx.PlanDir, "session-1"); err != nil {
 		t.Fatalf("manual Pi result = %v", err)
 	}
-	if got := output.String(); !strings.Contains(got, "vamos hermes pi continue ") {
+	got := output.String()
+	if !strings.Contains(
+		got,
+		"Human action required to start the recommended next session.",
+	) ||
+		!strings.Contains(got, "Do not run this command from the active Pi worker.") ||
+		!strings.Contains(got, "vamos hermes pi continue ") {
 		t.Fatalf("manual completion output = %q", got)
 	}
 }

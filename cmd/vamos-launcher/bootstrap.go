@@ -6,11 +6,17 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"syscall"
 )
 
 func maybeReexecManaged(ctx context.Context) error {
-	if handled, err := maybeHandleLauncherCommand(ctx, os.Args[1:], os.Stdout); handled || err != nil {
+	if handled, err := maybeHandleLauncherCommand(
+		ctx,
+		os.Args[1:],
+		os.Stdout,
+	); handled ||
+		err != nil {
 		return err
 	}
 
@@ -30,7 +36,25 @@ func maybeReexecManaged(ctx context.Context) error {
 	if err := ensureManagedRuntime(ctx, source, target); err != nil {
 		return err
 	}
-	return execRuntime(target.BinaryPath, os.Args[1:], os.Environ())
+	return execRuntime(
+		target.BinaryPath,
+		os.Args[1:],
+		runtimeEnvironment(os.Environ(), source.Root),
+	)
+}
+
+func runtimeEnvironment(env []string, sourceRoot string) []string {
+	const packageRootPrefix = "VAMOS_PACKAGE_ROOT="
+
+	result := make([]string, 0, len(env)+1)
+	for _, value := range env {
+		if strings.HasPrefix(value, packageRootPrefix) {
+			continue
+		}
+		result = append(result, value)
+	}
+
+	return append(result, packageRootPrefix+sourceRoot)
 }
 
 var buildRuntimeFunc = buildRuntime
@@ -39,16 +63,28 @@ func buildRuntime(ctx context.Context, sourceRoot, outputPath string) error {
 	if err := os.MkdirAll(filepath.Dir(outputPath), 0o755); err != nil {
 		return fmt.Errorf("create managed runtime output dir for %q: %w", outputPath, err)
 	}
-	cmd := exec.CommandContext(ctx, "go", "build", "-o", outputPath, "./cmd/vamos-runtime")
+	cmd := exec.CommandContext(
+		ctx,
+		"go",
+		"build",
+		"-o",
+		outputPath,
+		"./cmd/vamos-runtime",
+	)
 	cmd.Dir = sourceRoot
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("build managed runtime from %q with go build -o %q ./cmd/vamos-runtime: %w", sourceRoot, outputPath, err)
+		return fmt.Errorf(
+			"build managed runtime from %q with go build -o %q ./cmd/vamos-runtime: %w",
+			sourceRoot,
+			outputPath,
+			err,
+		)
 	}
 	return nil
 }
 
-func execRuntime(binaryPath string, args []string, env []string) error {
+func execRuntime(binaryPath string, args, env []string) error {
 	return syscall.Exec(binaryPath, append([]string{binaryPath}, args...), env)
 }

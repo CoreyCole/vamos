@@ -263,7 +263,15 @@ func printManualContinuation(cmd *cobra.Command, ctx PlanContext, result PiResul
 		cmd.OutOrStdout(),
 		"Pi result recorded locally; no Hermes manager owns this session.",
 	)
-	fmt.Fprintln(cmd.OutOrStdout(), "Run this manually:")
+	fmt.Fprintln(
+		cmd.OutOrStdout(),
+		"Human action required to start the recommended next session.",
+	)
+	fmt.Fprintln(
+		cmd.OutOrStdout(),
+		"Do not run this command from the active Pi worker.",
+	)
+	fmt.Fprintln(cmd.OutOrStdout(), "After the worker exits, run from a terminal:")
 	fmt.Fprintln(cmd.OutOrStdout(), "vamos hermes pi continue", id)
 	return nil
 }
