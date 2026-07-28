@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
@@ -43,11 +44,25 @@ func defaultConfigPath() (string, error) {
 }
 
 func newSetupCommand() *cobra.Command {
-	var gatewayURL, vamosURL, callbackToken, configPath string
+	var gatewayURL, vamosURL, callbackToken, configPath, hermesBin, pluginSource string
+	var installPlugin, restartGateway bool
 	cmd := &cobra.Command{
 		Use:   "setup --gateway-url <url>",
 		Short: "Verify a Hermes gateway and save host-local settings",
 		RunE: func(cmd *cobra.Command, _ []string) error {
+			if installPlugin {
+				if strings.TrimSpace(pluginSource) == "" {
+					return fmt.Errorf("plugin-source is required with --install-plugin")
+				}
+				if err := installHermesPlugin(
+					cmd,
+					hermesBin,
+					pluginSource,
+					restartGateway,
+				); err != nil {
+					return err
+				}
+			}
 			if !strings.HasPrefix(gatewayURL, "http://") &&
 				!strings.HasPrefix(gatewayURL, "https://") {
 				return fmt.Errorf("gateway-url must be an http(s) URL")
@@ -107,6 +122,59 @@ func newSetupCommand() *cobra.Command {
 	cmd.Flags().
 		StringVar(&callbackToken, "callback-token", "", "machine callback credential shared with Vamos")
 	cmd.Flags().StringVar(&configPath, "config", "", "host-local config path")
+	cmd.Flags().
+		BoolVar(&installPlugin, "install-plugin", false, "explicitly install and enable the Vamos Hermes plugin")
+	cmd.Flags().StringVar(&hermesBin, "hermes-bin", "hermes", "Hermes executable")
+	cmd.Flags().
+		StringVar(&pluginSource, "plugin-source", "", "standalone plugin source, for example file:///repo#plugins/hermes-platform")
+	cmd.Flags().
+		BoolVar(&restartGateway, "restart-gateway", false, "restart Hermes gateway after explicit plugin installation")
 	_ = cmd.MarkFlagRequired("gateway-url")
 	return cmd
+}
+
+func installHermesPlugin(
+	cmd *cobra.Command,
+	hermesBin, source string,
+	restart bool,
+) error {
+	if strings.TrimSpace(hermesBin) == "" {
+		return fmt.Errorf("hermes-bin is required")
+	}
+	install := exec.CommandContext(
+		cmd.Context(),
+		hermesBin,
+		"plugins",
+		"install",
+		"--enable",
+		source,
+	)
+	install.Stdout, install.Stderr = cmd.OutOrStdout(), cmd.ErrOrStderr()
+	if err := install.Run(); err != nil {
+		return fmt.Errorf("install Hermes plugin: %w", err)
+	}
+	verify := exec.CommandContext(
+		cmd.Context(),
+		hermesBin,
+		"plugins",
+		"list",
+		"--enabled",
+	)
+	verify.Stdout, verify.Stderr = cmd.OutOrStdout(), cmd.ErrOrStderr()
+	if err := verify.Run(); err != nil {
+		return fmt.Errorf("verify enabled Hermes plugin: %w", err)
+	}
+	if !restart {
+		fmt.Fprintln(
+			cmd.OutOrStdout(),
+			"Plugin installed. Restart Hermes gateway explicitly when ready.",
+		)
+		return nil
+	}
+	restartCmd := exec.CommandContext(cmd.Context(), hermesBin, "gateway", "restart")
+	restartCmd.Stdout, restartCmd.Stderr = cmd.OutOrStdout(), cmd.ErrOrStderr()
+	if err := restartCmd.Run(); err != nil {
+		return fmt.Errorf("restart Hermes gateway: %w", err)
+	}
+	return nil
 }

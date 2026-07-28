@@ -1,0 +1,6 @@
+name: vamos-platform
+label: Vamos
+kind: platform
+version: 0.1.0
+description: Authenticated Vamos shared-thread platform adapter for Hermes.
+author: Vamos
