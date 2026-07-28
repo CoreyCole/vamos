@@ -388,7 +388,7 @@ func RightRail(args RightRailArgs) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 25, "<div class=\"grid min-w-0 flex-1 grid-cols-2 gap-1 rounded-md bg-muted/40 p-1\" role=\"tablist\" aria-label=\"Doc right rail tabs\"><button type=\"button\" class=\"rounded px-2 py-1 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground\" data-on:click=\"$rightRailActiveTab = 'chat'\" data-class=\"{'bg-background text-foreground shadow-sm': $rightRailActiveTab === 'chat'}\">Chat</button> <button type=\"button\" class=\"rounded px-2 py-1 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground\" data-on:click=\"$rightRailActiveTab = 'comments'\" data-class=\"{'bg-background text-foreground shadow-sm': $rightRailActiveTab === 'comments'}\">Comments</button></div></div></div><div class=\"min-h-0 flex-1 overflow-hidden\"><div id=\"doc-right-chat-panel\" class=\"h-full min-h-0\" data-show=\"$rightRailActiveTab === 'chat'\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 25, "<div class=\"grid min-w-0 flex-1 grid-cols-3 gap-1 rounded-md bg-muted/40 p-1\" role=\"tablist\" aria-label=\"Doc right rail tabs\"><button type=\"button\" class=\"rounded px-2 py-1 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground\" data-on:click=\"$rightRailActiveTab = 'chat'\" data-class=\"{'bg-background text-foreground shadow-sm': $rightRailActiveTab === 'chat'}\">Chat</button> <button type=\"button\" class=\"rounded px-2 py-1 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground\" data-on:click=\"$rightRailActiveTab = 'threads'\" data-class=\"{'bg-background text-foreground shadow-sm': $rightRailActiveTab === 'threads'}\">Threads</button> <button type=\"button\" class=\"rounded px-2 py-1 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground\" data-on:click=\"$rightRailActiveTab = 'comments'\" data-class=\"{'bg-background text-foreground shadow-sm': $rightRailActiveTab === 'comments'}\">Comments</button></div></div></div><div class=\"min-h-0 flex-1 overflow-hidden\"><div id=\"doc-right-chat-panel\" class=\"h-full min-h-0\" data-show=\"$rightRailActiveTab === 'chat'\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -403,7 +403,22 @@ func RightRail(args RightRailArgs) templ.Component {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 27, "</div><div id=\"doc-right-comments-panel\" class=\"h-full min-h-0\" data-show=\"$rightRailActiveTab === 'comments'\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 27, "</div><div id=\"doc-right-threads-panel\" class=\"h-full min-h-0\" data-show=\"$rightRailActiveTab === 'threads'\">")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		if args.Threads != nil {
+			templ_7745c5c3_Err = args.Threads.Render(ctx, templ_7745c5c3_Buffer)
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+		} else {
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 28, "<div class=\"flex h-full items-center justify-center p-4 text-sm text-muted-foreground\">No threads found.</div>")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 29, "</div><div id=\"doc-right-comments-panel\" class=\"h-full min-h-0\" data-show=\"$rightRailActiveTab === 'comments'\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -413,12 +428,12 @@ func RightRail(args RightRailArgs) templ.Component {
 				return templ_7745c5c3_Err
 			}
 		} else {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 28, "<div class=\"flex h-full items-center justify-center p-4 text-sm text-muted-foreground\">No comments selected.</div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 30, "<div class=\"flex h-full items-center justify-center p-4 text-sm text-muted-foreground\">No comments selected.</div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 29, "</div></div></aside>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 31, "</div></div></aside>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

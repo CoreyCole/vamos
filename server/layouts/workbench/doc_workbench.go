@@ -19,6 +19,7 @@ type RightRailTab string
 const (
 	RightRailTabChat     RightRailTab = "chat"
 	RightRailTabComments RightRailTab = "comments"
+	RightRailTabThreads  RightRailTab = "threads"
 )
 
 type DocWorkbenchDefaults struct {
@@ -68,6 +69,7 @@ type RightRailArgs struct {
 	ActiveTab RightRailTab
 	Chat      templ.Component
 	Comments  templ.Component
+	Threads   templ.Component
 }
 
 func BuildDocWorkbenchState(input WorkbenchDocContext) (WorkbenchState, error) {
@@ -127,7 +129,7 @@ func BuildDocWorkbenchState(input WorkbenchDocContext) (WorkbenchState, error) {
 			MinRem:    18,
 			Visible:   true,
 			TargetID:  "doc-workbench-right-region",
-			Title:     "Chat / Comments",
+			Title:     "Chat / Comments / Threads",
 			Component: RightRail(rightRail),
 		},
 	}
@@ -185,6 +187,9 @@ func forceDocWorkbenchRegionVisible(state *WorkbenchState, id string) {
 func rightRailKind(tab RightRailTab) RegionKind {
 	if tab == RightRailTabChat {
 		return RegionChat
+	}
+	if tab == RightRailTabThreads {
+		return RegionArtifact
 	}
 	return RegionComments
 }
