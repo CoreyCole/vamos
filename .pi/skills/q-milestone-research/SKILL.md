@@ -1,115 +1,17 @@
 ---
 name: q-milestone-research
-description: Research a milestone-plan directory for nested QRSPI project planning. Use when answering milestone-level research questions, mapping current code state to requirements, or running /q-milestone-research. Produces factual current-state, source-doc, gap, dependency, and ticket-shaping research.
+description: Research a milestone planning directory.
 ---
 
-# Milestone Research — What Is True Now?
+# q-milestone-research
 
-Use this as the Research stage for milestone-level QRSPI. It mirrors `/q-research`, but the output supports milestone design, architecture-spec inputs, gap mapping, and proposed ticket boundaries.
+Write factual current-state, dependency, and ticket-shaping findings; recommend milestone design when evidence is sufficient.
 
-## Step 1: Load baseline workflow
+## Hermes completion
 
-Read:
+After durable work and verification, record the conclusion with `vamos hermes pi done --session "$VAMOS_PI_SESSION_ID" --outcome <outcome> --next <action> [--artifact thoughts/...] --summary $'1. ...\n2. ...\n3. ...'`. Use only the outcome and action vocabularies in `qrspi-planning`. Hermes owns process lifecycle and continuation; do not use tmux, a manager state file, retry policy, or hand-authored machine-routing output. Keep gateway settings and credentials host-local.
 
-1. `.pi/skills/qrspi-project-planning/SKILL.md`
-1. `.pi/skills/q-research/SKILL.md`
-1. `.pi/skills/q-milestone-question/references/milestone-planning-common.md`
-1. milestone-plan `AGENTS.md`
-1. provided question doc
-1. project/milestone artifacts explicitly referenced by those files
 
-Research may inspect code freely to build an accurate current-state map. Stay factual. Use `file:line` references for current behavior and source docs.
+## Durable boundaries
 
-## Step 2: Keep research at milestone granularity
-
-Allowed:
-
-- detailed high-level current code/system state for future planners
-- current support for product outcome hypotheses
-- current capabilities
-- missing concepts
-- relevant services, tables, APIs, UI surfaces, jobs, tests
-- requirement/source-doc facts
-- gap map evidence
-- likely ticket boundaries
-- dependency and taxonomy signals
-
-Avoid:
-
-- low-level implementation instructions for future tickets
-- exact code-edit slices
-- speculative schema/API designs not required for milestone design
-- replacing ticket-level QRSPI
-
-## Step 3: Produce milestone research
-
-Write `research/YYYY-MM-DD_HH-MM-SS_[slug].md`.
-
-Required sections:
-
-1. Brainstorm / alignment summary.
-1. Product outcome hypotheses under evaluation.
-1. Evidence boundary.
-1. Current code/system state at detailed high-level summary granularity.
-1. Requirement/source-doc state.
-1. Current support for product outcomes: outcome → supported / partial / missing / evidence.
-1. Gap map: requirement → supported / partial / missing.
-1. User-story implications, including engineer-as-user stories only when outcome/architecture-enabling.
-1. Architecture-spec inputs.
-1. Proposed ticket-shaping implications.
-1. Cross-milestone dependencies.
-1. Taxonomy change signals.
-1. Deferred to ticket-level QRSPI.
-1. Open factual questions.
-
-Use concise tables where possible. Cite canonical docs; do not copy full requirements.
-
-## Step 4: Loop when facts are missing
-
-If research reveals new code-answerable factual questions that materially affect milestone design, write a follow-up question/research note and run another research pass before design.
-
-## Response
-
-Use fenced YAML `qrspi_result` blocks for all stage results. Required fields: `project`, `related_projects`, `stage`, `status`, `outcome` for complete results, `workspace`, `workspace_metadata`, `policy`, `summary`, `artifact`, `artifacts`, and structured `next.steps`.
-
-Completed stage example:
-
-```yaml
-qrspi_result:
-  project: "github.com/CoreyCole/vamos"
-  related_projects: []
-  stage: "milestone-research"
-  status: "complete"
-  outcome: "complete"
-  workspace: "/absolute/path/to/thoughts/.../milestone-plan"
-  workspace_metadata:
-    plan_workspace: "/absolute/path/to/thoughts/.../milestone-plan"
-    implementation_workspace: ""
-    trunk_branch: "main"
-    stack_bottom_branch: ""
-    parent_branch: ""
-    current_branch: ""
-  policy:
-    advance_mode: "guided"
-    auto_mode: false
-    enable_plan_reviews: false
-    invalid_result_retry_limit: 1
-  summary:
-    plan_goal: "Plan milestone tickets from requirements."
-    stage_completed: "Milestone research complete."
-    key_decisions: "Next stage should start immediately: /q-milestone-design."
-  artifact: "thoughts/.../research doc path"
-  artifacts:
-    - role: "primary"
-      path: "thoughts/.../research doc path"
-  next:
-    steps:
-      - action: "read_skill"
-        param: ".pi/skills/qrspi-project-planning/SKILL.md"
-      - action: "read_skill"
-        param: ".pi/skills/q-milestone-design/SKILL.md"
-      - action: "read_artifact"
-        param: "thoughts/.../research doc path"
-      - action: "start_stage"
-        param: "q-milestone-design"
-```
+Use `thoughts/...`-relative artifact references. The filesystem and plan-owned `.vamos/sessions/{pi,hermes}` artifacts are durable truth; database indexes are rebuildable. Do not expose credentials, gateway URLs, process IDs, or manager diagnostics in plan artifacts.

@@ -9,11 +9,9 @@ This directory is for Vamos-specific Pi resources:
 Project-local skills:
 
 - `hermes-vamos-chat-delegation` — Hermes background delegation contract for `vamos chat start` / `steer`
-- `q-hermes-manager` — Hermes-managed QRSPI orchestration with background Pi processes instead of tmux q-manager panes
+- `q-hermes-manager` — Hermes-managed isolated Pi workers using `vamos hermes pi start|result|done`
 
-Project-local extensions:
-
-- `q-manager-parent` — conversational `/q-manager` startup from pasted/current QRSPI context plus optional direct `start-next|continue` operations; direct operations sample live Pi context usage and trigger native parent compaction after delivery is queue-safe.
+There are no project-local extensions. Hermes owns worker lifecycle; Pi skills write durable artifacts and record concise CLI completions.
 
 Put broadly useful, cross-repository skills in `.agents/` instead. In local
 Chestnut development, `.agents` is a symlink to a shared agent configuration
