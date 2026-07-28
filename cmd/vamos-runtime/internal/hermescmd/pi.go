@@ -187,7 +187,8 @@ func printManualContinuation(cmd *cobra.Command, ctx PlanContext, result PiResul
 		"Pi result recorded locally; no Hermes manager owns this session.",
 	)
 	if next := RecommendedCommand(ctx, result); next != "" {
-		fmt.Fprintln(cmd.OutOrStdout(), "recommended:", next)
+		fmt.Fprintln(cmd.OutOrStdout(), "Run this manually:")
+		fmt.Fprintln(cmd.OutOrStdout(), next)
 	}
 }
 
