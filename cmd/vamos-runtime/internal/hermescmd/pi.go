@@ -7,8 +7,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net/http"
 	"os"
 	"os/exec"
+	"strings"
 
 	"github.com/spf13/cobra"
 )
@@ -19,11 +21,18 @@ type StartPiInput struct {
 	Task            string
 }
 
-type commandRunner func(context.Context, string, []string, []string, io.Writer, io.Writer) error
+type (
+	commandRunner        func(context.Context, string, []string, []string, io.Writer, io.Writer) error
+	piCompletionNotifier func(context.Context, hostConfig, string, string) error
+)
 
 func newPiCommand(run commandRunner) *cobra.Command {
 	cmd := &cobra.Command{Use: "pi", Short: "Launch and record isolated Pi workers"}
-	cmd.AddCommand(newStartCommand(run), newDoneCommand(), newResultCommand())
+	cmd.AddCommand(
+		newStartCommand(run),
+		newDoneCommand(notifyPiCompletion),
+		newResultCommand(),
+	)
 	return cmd
 }
 
@@ -101,8 +110,8 @@ func RenderPiPrompt(plan PlanContext, task, previous string) string {
 	)
 }
 
-func newDoneCommand() *cobra.Command {
-	var plan, session, outcomeValue, nextValue, artifact, summary string
+func newDoneCommand(notify piCompletionNotifier) *cobra.Command {
+	var plan, session, outcomeValue, nextValue, artifact, summary, configPath string
 	cmd := &cobra.Command{
 		Use: "done [--plan <dir>] [--session <id>] --outcome <outcome> --next <action> --summary <numbered-summary>",
 		RunE: func(cmd *cobra.Command, _ []string) error {
@@ -138,6 +147,19 @@ func newDoneCommand() *cobra.Command {
 				return err
 			}
 			fmt.Fprintln(cmd.OutOrStdout(), path)
+			if configPath == "" {
+				configPath, err = defaultConfigPath()
+				if err != nil {
+					return err
+				}
+			}
+			config, err := readHostConfig(configPath)
+			if err != nil {
+				return fmt.Errorf("read Hermes host configuration: %w", err)
+			}
+			if err := notify(cmd.Context(), config, ctx.PlanDir, session); err != nil {
+				return fmt.Errorf("notify Vamos of Pi completion: %w", err)
+			}
 			return nil
 		},
 	}
@@ -146,6 +168,7 @@ func newDoneCommand() *cobra.Command {
 	cmd.Flags().StringVar(&outcomeValue, "outcome", "", "completion outcome")
 	cmd.Flags().StringVar(&nextValue, "next", "", "non-binding next action")
 	cmd.Flags().StringVar(&artifact, "artifact", "", "optional artifact path")
+	cmd.Flags().StringVar(&configPath, "config", "", "host-local Hermes config path")
 	cmd.Flags().StringVar(&summary, "summary", "", "concise numbered summary")
 	for _, name := range []string{"outcome", "next", "summary"} {
 		_ = cmd.MarkFlagRequired(name)
@@ -183,6 +206,43 @@ func newResultCommand() *cobra.Command {
 	_ = cmd.MarkFlagRequired("plan")
 	_ = cmd.MarkFlagRequired("session")
 	return cmd
+}
+
+func notifyPiCompletion(
+	ctx context.Context,
+	config hostConfig,
+	planDir, session string,
+) error {
+	if strings.TrimSpace(config.VamosURL) == "" ||
+		strings.TrimSpace(config.CallbackToken) == "" {
+		return fmt.Errorf(
+			"Vamos callback URL and credential are required; rerun hermes setup",
+		)
+	}
+	payload := strings.NewReader(fmt.Sprintf(`{"plan_dir":%q}`, planDir))
+	req, err := http.NewRequestWithContext(
+		ctx,
+		http.MethodPost,
+		strings.TrimRight(
+			config.VamosURL,
+			"/",
+		)+"/agent-chat/api/hermes/pi/"+session+"/complete",
+		payload,
+	)
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Authorization", "Bearer "+config.CallbackToken)
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode/100 != 2 {
+		return fmt.Errorf("Vamos callback: %s", resp.Status)
+	}
+	return nil
 }
 
 func defaultRunner(

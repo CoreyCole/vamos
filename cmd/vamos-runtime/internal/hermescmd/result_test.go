@@ -1,6 +1,7 @@
 package hermescmd
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"testing"
@@ -63,6 +64,45 @@ func TestWritePiResultOverwritesCurrentConclusion(t *testing.T) {
 	}
 	if info, err := os.Stat(path); err != nil || info.Mode().Perm() != 0o600 {
 		t.Fatalf("mode=%v err=%v", info.Mode(), err)
+	}
+}
+
+func TestDoneWritesResultThenNotifiesVamosFromHostConfig(t *testing.T) {
+	ctx := testPlan(t)
+	configPath := filepath.Join(t.TempDir(), "hermes.yaml")
+	if err := os.WriteFile(
+		configPath,
+		[]byte("vamos_url: https://vamos.example\ncallback_token: callback-secret\n"),
+		0o600,
+	); err != nil {
+		t.Fatal(err)
+	}
+	var gotConfig hostConfig
+	var gotPlan, gotSession string
+	cmd := newDoneCommand(
+		func(_ context.Context, config hostConfig, plan, session string) error {
+			gotConfig, gotPlan, gotSession = config, plan, session
+			return nil
+		},
+	)
+	cmd.SetArgs([]string{
+		"--plan", ctx.PlanDir, "--session", "session-1", "--config", configPath,
+		"--outcome", "complete", "--next", "none", "--summary", "1. done",
+	})
+	if err := cmd.Execute(); err != nil {
+		t.Fatal(err)
+	}
+	if gotConfig.CallbackToken != "callback-secret" || gotPlan != ctx.PlanDir ||
+		gotSession != "session-1" {
+		t.Fatalf(
+			"notification = config=%+v plan=%q session=%q",
+			gotConfig,
+			gotPlan,
+			gotSession,
+		)
+	}
+	if _, err := ReadPiResult(ctx.PlanDir, "session-1"); err != nil {
+		t.Fatalf("Pi result was not written before notification: %v", err)
 	}
 }
 
