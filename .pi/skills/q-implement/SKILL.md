@@ -5,7 +5,7 @@ description: Execute exactly one unchecked implementation item.
 
 # q-implement
 
-Work only in the prepared implementation workspace. Read affected code, implement and self-verify one item, update plan checkboxes, commit according to repository policy, and write a durable handoff. Until every implementation slice is checked, finish with `--outcome handoff --next implement` so the next child continues implementation. Only the final implementation child uses `--outcome complete --next review`.
+Work only in the prepared implementation workspace. Read affected code, implement and self-verify one item, update plan checkboxes, commit according to repository policy, and write a durable handoff using the `q-handoff` pattern so the next child can apply `q-resume`. Until every implementation slice is checked, finish with `--outcome handoff --next implement` so the next child continues implementation. Only the final implementation child uses `--outcome complete --next review`.
 
 ## Hermes completion
 

@@ -22,7 +22,7 @@ func TestContinueLaunchesMappedPreviousSession(t *testing.T) {
 		ctx,
 		PiResult{
 			Session:  "previous",
-			Outcome:  OutcomeComplete,
+			Outcome:  OutcomeHandoff,
 			Next:     NextVerify,
 			Artifact: "thoughts/me/plans/example/reviews/previous.md",
 			Summary:  "1. done",
@@ -48,7 +48,7 @@ func TestContinueLaunchesMappedPreviousSession(t *testing.T) {
 	if !strings.Contains(
 		strings.Join(gotArgs, " "),
 		"--session-dir "+ctx.PlanDir+"/.vamos/sessions/pi",
-	) || len(gotArgs) < 10 {
+	) || len(gotArgs) < 12 {
 		t.Fatalf("continue args = %#v", gotArgs)
 	}
 	root, err := piResourceRoot()
@@ -60,6 +60,8 @@ func TestContinueLaunchesMappedPreviousSession(t *testing.T) {
 		"@" + filepath.Join(ctx.PlanDir, "design.md"),
 		"@" + filepath.Join(ctx.PlanDir, "outline.md"),
 		"@" + filepath.Join(root, ".pi", "skills", "qrspi-planning", "SKILL.md"),
+		"@" + filepath.Join(root, ".pi", "skills", "q-resume", "SKILL.md"),
+		"@" + filepath.Join(root, ".pi", "skills", "q-handoff", "SKILL.md"),
 		"@" + filepath.Join(root, ".pi", "skills", "q-verify", "SKILL.md"),
 		"@" + artifact,
 	}

@@ -111,8 +111,18 @@ func piContextArgs(ctx PlanContext, prior *PiResult) ([]string, error) {
 		if err != nil {
 			return nil, err
 		}
-		paths = append(paths,
+		paths = append(
+			paths,
 			filepath.Join(root, ".pi", "skills", "qrspi-planning", "SKILL.md"),
+		)
+		if prior.Outcome == OutcomeHandoff {
+			paths = append(paths,
+				filepath.Join(root, ".pi", "skills", "q-resume", "SKILL.md"),
+				filepath.Join(root, ".pi", "skills", "q-handoff", "SKILL.md"),
+			)
+		}
+		paths = append(
+			paths,
 			filepath.Join(root, ".pi", "skills", "q-"+string(prior.Next), "SKILL.md"),
 		)
 	}
