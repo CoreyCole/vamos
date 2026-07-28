@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -55,13 +56,18 @@ func newStartCommand(run commandRunner) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			prompt := RenderPiPrompt(ctx, input.Task, input.PreviousSession)
+			var prior *PiResult
 			if input.PreviousSession != "" {
-				prior, err := ReadPiResult(ctx.PlanDir, input.PreviousSession)
+				result, err := ReadPiResult(ctx.PlanDir, input.PreviousSession)
 				if err != nil {
 					return fmt.Errorf("read previous result: %w", err)
 				}
-				prompt += "\nPrevious completion:\n" + prior.Summary + "\nArtifact: " + prior.Artifact + "\n"
+				prior = &result
+			}
+			prompt := RenderPiPrompt(ctx, input.Task, input.PreviousSession)
+			contextArgs, err := piContextArgs(ctx, prior)
+			if err != nil {
+				return err
 			}
 			dir := ctx.PlanDir + "/.vamos/sessions/pi"
 			if err := os.MkdirAll(dir, 0o700); err != nil {
@@ -73,16 +79,14 @@ func newStartCommand(run commandRunner) *cobra.Command {
 			}
 			env := append(os.Environ(), "VAMOS_PLAN_DIR="+ctx.PlanDir)
 			fmt.Fprintln(cmd.OutOrStdout(), "pi session:", session)
+			piArgs := append(
+				[]string{"--session-id", session, "--session-dir", dir},
+				contextArgs...)
+			piArgs = append(piArgs, "@"+promptPath)
 			return run(
 				cmd.Context(),
 				"pi",
-				[]string{
-					"--session-id",
-					session,
-					"--session-dir",
-					dir,
-					"@" + promptPath,
-				},
+				piArgs,
 				env,
 				cmd.OutOrStdout(),
 				cmd.ErrOrStderr(),
@@ -94,6 +98,62 @@ func newStartCommand(run commandRunner) *cobra.Command {
 		StringVar(&input.PreviousSession, "previous-session", "", "prior Pi session ID")
 	_ = cmd.MarkFlagRequired("plan")
 	return cmd
+}
+
+func piContextArgs(ctx PlanContext, prior *PiResult) ([]string, error) {
+	paths := []string{}
+	if prior != nil {
+		root, err := piResourceRoot()
+		if err != nil {
+			return nil, err
+		}
+		paths = append(paths,
+			filepath.Join(root, ".pi", "skills", "qrspi-planning", "SKILL.md"),
+			filepath.Join(root, ".pi", "skills", "q-"+string(prior.Next), "SKILL.md"),
+		)
+	}
+	paths = append(paths, filepath.Join(ctx.PlanDir, "AGENTS.md"))
+	if prior != nil && prior.Artifact != "" {
+		artifact := prior.Artifact
+		if !filepath.IsAbs(artifact) {
+			for root := ctx.PlanDir; root != filepath.Dir(root); root = filepath.Dir(root) {
+				if filepath.Base(root) == "thoughts" {
+					artifact = filepath.Join(
+						root,
+						strings.TrimPrefix(artifact, "thoughts/"),
+					)
+					break
+				}
+			}
+		}
+		paths = append(paths, artifact)
+	}
+	args := make([]string, 0, len(paths))
+	for _, path := range paths {
+		if _, err := os.Stat(path); err != nil {
+			return nil, fmt.Errorf("load Pi context %q: %w", path, err)
+		}
+		args = append(args, "@"+path)
+	}
+	return args, nil
+}
+
+func piResourceRoot() (string, error) {
+	if root := os.Getenv("VAMOS_PACKAGE_ROOT"); root != "" {
+		return root, nil
+	}
+	root, err := os.Getwd()
+	if err != nil {
+		return "", err
+	}
+	for dir := root; dir != filepath.Dir(dir); dir = filepath.Dir(dir) {
+		if _, err := os.Stat(
+			filepath.Join(dir, ".pi", "skills", "qrspi-planning", "SKILL.md"),
+		); err == nil {
+			return dir, nil
+		}
+	}
+	return "", fmt.Errorf("find Vamos Pi skills from %q", root)
 }
 
 func writePromptFile(dir, session, prompt string) (string, error) {

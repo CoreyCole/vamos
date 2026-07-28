@@ -3,19 +3,29 @@ package hermescmd
 import (
 	"context"
 	"io"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
 
 func TestContinueLaunchesMappedPreviousSession(t *testing.T) {
 	ctx := testPlan(t)
+	artifact := filepath.Join(ctx.PlanDir, "reviews", "previous.md")
+	if err := os.MkdirAll(filepath.Dir(artifact), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(artifact, []byte("# Previous\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
 	if _, err := WritePiResult(
 		ctx,
 		PiResult{
-			Session: "previous",
-			Outcome: OutcomeComplete,
-			Next:    NextVerify,
-			Summary: "1. done",
+			Session:  "previous",
+			Outcome:  OutcomeComplete,
+			Next:     NextVerify,
+			Artifact: "thoughts/me/plans/example/reviews/previous.md",
+			Summary:  "1. done",
 		},
 	); err != nil {
 		t.Fatal(err)
@@ -38,8 +48,22 @@ func TestContinueLaunchesMappedPreviousSession(t *testing.T) {
 	if !strings.Contains(
 		strings.Join(gotArgs, " "),
 		"--session-dir "+ctx.PlanDir+"/.vamos/sessions/pi",
-	) ||
-		!strings.Contains(strings.Join(gotArgs, " "), "@") {
+	) || len(gotArgs) < 8 {
 		t.Fatalf("continue args = %#v", gotArgs)
+	}
+	root, err := piResourceRoot()
+	if err != nil {
+		t.Fatal(err)
+	}
+	wantContext := []string{
+		"@" + filepath.Join(root, ".pi", "skills", "qrspi-planning", "SKILL.md"),
+		"@" + filepath.Join(root, ".pi", "skills", "q-verify", "SKILL.md"),
+		"@" + filepath.Join(ctx.PlanDir, "AGENTS.md"),
+		"@" + artifact,
+	}
+	for i, want := range wantContext {
+		if gotArgs[4+i] != want {
+			t.Fatalf("context arg %d = %q, want %q", i, gotArgs[4+i], want)
+		}
 	}
 }

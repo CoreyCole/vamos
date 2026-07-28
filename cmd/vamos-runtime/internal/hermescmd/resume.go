@@ -173,7 +173,10 @@ func newContinueCommand(run commandRunner) *cobra.Command {
 				"Continue the "+string(result.Next)+" stage using the previous result.",
 				entry.Session,
 			)
-			prompt += "\nPrevious completion:\n" + result.Summary + "\nArtifact: " + result.Artifact + "\n"
+			contextArgs, err := piContextArgs(plan, &result)
+			if err != nil {
+				return err
+			}
 			dir := filepath.Join(plan.PlanDir, ".vamos", "sessions", "pi")
 			if err := os.MkdirAll(dir, 0o700); err != nil {
 				return err
@@ -183,10 +186,14 @@ func newContinueCommand(run commandRunner) *cobra.Command {
 				return err
 			}
 			fmt.Fprintln(cmd.OutOrStdout(), "pi session:", session)
+			piArgs := append(
+				[]string{"--session-id", session, "--session-dir", dir},
+				contextArgs...)
+			piArgs = append(piArgs, "@"+promptPath)
 			return run(
 				cmd.Context(),
 				"pi",
-				[]string{"--session-id", session, "--session-dir", dir, "@" + promptPath},
+				piArgs,
 				append(os.Environ(), "VAMOS_PLAN_DIR="+plan.PlanDir),
 				cmd.OutOrStdout(),
 				cmd.ErrOrStderr(),
