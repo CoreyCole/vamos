@@ -730,7 +730,7 @@ func TestPlanWorkspaceSyncerIndexesPlanOwnedAgentSessions(t *testing.T) {
 	thoughtsRoot := t.TempDir()
 	planDir := filepath.Join(thoughtsRoot, "agent", "plans", "2026-06-02_plan")
 	writePlanWorkspaceFile(t, planDir, "plan.md", time.Now())
-	sessionPath := filepath.Join(planDir, ".sessions", "pi", "session.jsonl")
+	sessionPath := filepath.Join(planDir, ".vamos", "sessions", "pi", "session.jsonl")
 	writeSessionHeader(t, sessionPath, `{"type":"session","id":"plan-session","cwd":"/repo","workflow_id":"wf","workflow_node_id":"outline"}`)
 
 	result, err := (&PlanWorkspaceSyncer{
@@ -743,11 +743,11 @@ func TestPlanWorkspaceSyncerIndexesPlanOwnedAgentSessions(t *testing.T) {
 	if result.AgentSessionsIndexed != 1 || !result.Changed {
 		t.Fatalf("result = %+v, want one indexed session and changed", result)
 	}
-	row, err := service.queries.GetAgentSessionByPath(context.Background(), nullableString("agent/plans/2026-06-02_plan/.sessions/pi/session.jsonl"))
+	row, err := service.queries.GetAgentSessionByPath(context.Background(), nullableString("agent/plans/2026-06-02_plan/.vamos/sessions/pi/session.jsonl"))
 	if err != nil {
 		t.Fatalf("GetAgentSessionByPath(relative): %v", err)
 	}
-	if row.Agent != "pi" || !row.PlanDir.Valid || row.PlanDir.String != "agent/plans/2026-06-02_plan" || !row.WorkflowID.Valid || row.WorkflowID.String != "wf" || !row.WorkflowNodeID.Valid || row.WorkflowNodeID.String != "outline" || row.ProjectionState != "needs_hydration" || !row.ArtifactPath.Valid || row.ArtifactPath.String != "agent/plans/2026-06-02_plan/.sessions/pi/session.jsonl" {
+	if row.Agent != "pi" || !row.PlanDir.Valid || row.PlanDir.String != "agent/plans/2026-06-02_plan" || !row.WorkflowID.Valid || row.WorkflowID.String != "wf" || !row.WorkflowNodeID.Valid || row.WorkflowNodeID.String != "outline" || row.ProjectionState != "needs_hydration" || !row.ArtifactPath.Valid || row.ArtifactPath.String != "agent/plans/2026-06-02_plan/.vamos/sessions/pi/session.jsonl" {
 		t.Fatalf("indexed session = %#v", row)
 	}
 
@@ -769,7 +769,7 @@ func TestPlanWorkspaceSyncerPreservesHydratedProjectionOnUnchangedFile(t *testin
 	thoughtsRoot := t.TempDir()
 	planDir := filepath.Join(thoughtsRoot, "agent", "plans", "2026-06-02_plan")
 	writePlanWorkspaceFile(t, planDir, "plan.md", time.Now())
-	sessionPath := filepath.Join(planDir, ".sessions", "pi", "session.jsonl")
+	sessionPath := filepath.Join(planDir, ".vamos", "sessions", "pi", "session.jsonl")
 	writeSessionHeader(t, sessionPath, `{"type":"session","id":"plan-session","cwd":"/repo"}`)
 
 	syncer := &PlanWorkspaceSyncer{
@@ -779,7 +779,7 @@ func TestPlanWorkspaceSyncerPreservesHydratedProjectionOnUnchangedFile(t *testin
 	if _, err := syncer.Sync(context.Background(), PlanWorkspaceDiscoveryInput{}); err != nil {
 		t.Fatalf("first Sync: %v", err)
 	}
-	row, err := service.queries.GetAgentSessionByPath(context.Background(), nullableString("agent/plans/2026-06-02_plan/.sessions/pi/session.jsonl"))
+	row, err := service.queries.GetAgentSessionByPath(context.Background(), nullableString("agent/plans/2026-06-02_plan/.vamos/sessions/pi/session.jsonl"))
 	if err != nil {
 		t.Fatalf("GetAgentSessionByPath: %v", err)
 	}
@@ -803,7 +803,7 @@ func TestPlanWorkspaceSyncerPreservesHydratedProjectionOnUnchangedFile(t *testin
 	if result.Changed {
 		t.Fatalf("second result = %#v, want unchanged", result)
 	}
-	row, err = service.queries.GetAgentSessionByPath(context.Background(), nullableString("agent/plans/2026-06-02_plan/.sessions/pi/session.jsonl"))
+	row, err = service.queries.GetAgentSessionByPath(context.Background(), nullableString("agent/plans/2026-06-02_plan/.vamos/sessions/pi/session.jsonl"))
 	if err != nil {
 		t.Fatalf("GetAgentSessionByPath: %v", err)
 	}
@@ -817,7 +817,7 @@ func TestPlanWorkspaceSyncerMarksChangedFileNeedsHydration(t *testing.T) {
 	thoughtsRoot := t.TempDir()
 	planDir := filepath.Join(thoughtsRoot, "agent", "plans", "2026-06-02_plan")
 	writePlanWorkspaceFile(t, planDir, "plan.md", time.Now())
-	sessionPath := filepath.Join(planDir, ".sessions", "pi", "session.jsonl")
+	sessionPath := filepath.Join(planDir, ".vamos", "sessions", "pi", "session.jsonl")
 	writeSessionHeader(t, sessionPath, `{"type":"session","id":"plan-session","cwd":"/repo"}`)
 
 	syncer := &PlanWorkspaceSyncer{
@@ -827,7 +827,7 @@ func TestPlanWorkspaceSyncerMarksChangedFileNeedsHydration(t *testing.T) {
 	if _, err := syncer.Sync(context.Background(), PlanWorkspaceDiscoveryInput{}); err != nil {
 		t.Fatalf("first Sync: %v", err)
 	}
-	row, err := service.queries.GetAgentSessionByPath(context.Background(), nullableString("agent/plans/2026-06-02_plan/.sessions/pi/session.jsonl"))
+	row, err := service.queries.GetAgentSessionByPath(context.Background(), nullableString("agent/plans/2026-06-02_plan/.vamos/sessions/pi/session.jsonl"))
 	if err != nil {
 		t.Fatalf("GetAgentSessionByPath: %v", err)
 	}
@@ -852,7 +852,7 @@ func TestPlanWorkspaceSyncerMarksChangedFileNeedsHydration(t *testing.T) {
 	if !result.Changed {
 		t.Fatalf("changed result = %#v, want changed", result)
 	}
-	row, err = service.queries.GetAgentSessionByPath(context.Background(), nullableString("agent/plans/2026-06-02_plan/.sessions/pi/session.jsonl"))
+	row, err = service.queries.GetAgentSessionByPath(context.Background(), nullableString("agent/plans/2026-06-02_plan/.vamos/sessions/pi/session.jsonl"))
 	if err != nil {
 		t.Fatalf("GetAgentSessionByPath: %v", err)
 	}

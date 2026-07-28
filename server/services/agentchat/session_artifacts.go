@@ -55,6 +55,14 @@ type SessionArtifactIndex struct {
 	Hash                   string
 	LastOffset             int64
 	NeedsHydration         bool
+	ResultPath             string
+}
+
+type HermesThreadArtifact struct {
+	ID        string
+	PlanDir   string
+	Path      string
+	UpdatedAt time.Time
 }
 
 type AgentSessionMetadata struct {
@@ -66,7 +74,7 @@ type AgentSessionMetadata struct {
 	ForkedFromSessionID    string `json:"forked_from_session_id,omitempty"`
 }
 
-func PlanAgentSessionDir(planDir string, agent string) (string, error) {
+func PlanAgentSessionDir(planDir, agent string) (string, error) {
 	planDir = strings.TrimSpace(planDir)
 	agent = strings.TrimSpace(agent)
 	if agent == "" {
@@ -78,10 +86,10 @@ func PlanAgentSessionDir(planDir string, agent string) (string, error) {
 	if agent == "." || agent == ".." || strings.ContainsAny(agent, `/\\`) {
 		return "", fmt.Errorf("invalid agent %q", agent)
 	}
-	return filepath.Join(planDir, ".sessions", agent), nil
+	return filepath.Join(planDir, ".vamos", "sessions", agent), nil
 }
 
-func ConfigureWorkspaceAgentSessionDir(workspaceDir string, planDir string, agent string) error {
+func ConfigureWorkspaceAgentSessionDir(workspaceDir, planDir, agent string) error {
 	workspaceDir = strings.TrimSpace(workspaceDir)
 	if workspaceDir == "" {
 		return errors.New("workspace dir is required")
@@ -97,7 +105,11 @@ func ConfigureWorkspaceAgentSessionDir(workspaceDir string, planDir string, agen
 	if err := os.MkdirAll(settingsDir, 0o755); err != nil {
 		return err
 	}
-	payload, err := json.MarshalIndent(map[string]string{"sessionDir": sessionDir}, "", "  ")
+	payload, err := json.MarshalIndent(
+		map[string]string{"sessionDir": sessionDir},
+		"",
+		"  ",
+	)
 	if err != nil {
 		return err
 	}
@@ -111,10 +123,15 @@ func DiscoverPlanAgentSessions(planDir string) ([]SessionArtifactIndex, error) {
 		return nil, errors.New("plan dir is required")
 	}
 	planDir = filepath.Clean(planDir)
-	return DiscoverPlanAgentSessionsUnderThoughts(filepath.Dir(filepath.Dir(filepath.Dir(planDir))), planDir)
+	return DiscoverPlanAgentSessionsUnderThoughts(
+		filepath.Dir(filepath.Dir(filepath.Dir(planDir))),
+		planDir,
+	)
 }
 
-func DiscoverPlanAgentSessionsUnderThoughts(thoughtsRoot, planDir string) ([]SessionArtifactIndex, error) {
+func DiscoverPlanAgentSessionsUnderThoughts(
+	thoughtsRoot, planDir string,
+) ([]SessionArtifactIndex, error) {
 	logicalRoot := filepath.Clean(strings.TrimSpace(thoughtsRoot))
 	logicalPlanDir := filepath.Clean(strings.TrimSpace(planDir))
 	if logicalRoot == "" || logicalRoot == "." {
@@ -138,35 +155,80 @@ func DiscoverPlanAgentSessionsUnderThoughts(thoughtsRoot, planDir string) ([]Ses
 		return nil, err
 	}
 	if !pathWithinRoot(resolvedPlanDir, resolvedRoot) {
-		return nil, fmt.Errorf("plan dir %q escapes thoughts root %q", logicalPlanDir, logicalRoot)
+		return nil, fmt.Errorf(
+			"plan dir %q escapes thoughts root %q",
+			logicalPlanDir,
+			logicalRoot,
+		)
 	}
 
 	var items []SessionArtifactIndex
-	err = filepath.WalkDir(logicalPlanDir, func(logicalPath string, entry fs.DirEntry, walkErr error) error {
-		if walkErr != nil {
-			return walkErr
-		}
-		if entry.IsDir() {
+	err = filepath.WalkDir(
+		logicalPlanDir,
+		func(logicalPath string, entry fs.DirEntry, walkErr error) error {
+			if walkErr != nil {
+				return walkErr
+			}
+			if entry.IsDir() {
+				return nil
+			}
+			if filepath.Ext(logicalPath) != jsonlExtension ||
+				!pathInPlanSessionDir(logicalPlanDir, logicalPath) {
+				return nil
+			}
+			resolvedPath, err := filepath.EvalSymlinks(logicalPath)
+			if err != nil {
+				return err
+			}
+			if !pathWithinRoot(resolvedPath, resolvedRoot) {
+				return fmt.Errorf(
+					"session path %q escapes thoughts root %q",
+					resolvedPath,
+					resolvedRoot,
+				)
+			}
+			item, err := buildSessionArtifactIndex(
+				logicalRoot,
+				resolvedRoot,
+				logicalPath,
+				resolvedPath,
+			)
+			if err != nil {
+				return err
+			}
+			items = append(items, item)
 			return nil
-		}
-		if filepath.Ext(logicalPath) != jsonlExtension || !pathInPlanSessionDir(logicalPlanDir, logicalPath) {
-			return nil
-		}
-		resolvedPath, err := filepath.EvalSymlinks(logicalPath)
-		if err != nil {
-			return err
-		}
-		if !pathWithinRoot(resolvedPath, resolvedRoot) {
-			return fmt.Errorf("session path %q escapes thoughts root %q", resolvedPath, resolvedRoot)
-		}
-		item, err := buildSessionArtifactIndex(logicalRoot, resolvedRoot, logicalPath, resolvedPath)
-		if err != nil {
-			return err
-		}
-		items = append(items, item)
-		return nil
-	})
+		},
+	)
 	return items, err
+}
+
+// ScanPlanSessions discovers canonical Pi and Hermes transcript JSONL files.
+// planDir may be any plan directory under thoughtsRoot.
+func ScanPlanSessions(thoughtsRoot, planDir string) ([]SessionArtifactIndex, error) {
+	return DiscoverPlanAgentSessionsUnderThoughts(thoughtsRoot, planDir)
+}
+
+// ScanHermesThreads is a disk fallback for thread discovery before the database
+// projection has observed a newly appended transcript.
+func ScanHermesThreads(thoughtsRoot, root string) ([]HermesThreadArtifact, error) {
+	items, err := DiscoverPlanAgentSessionsUnderThoughts(thoughtsRoot, root)
+	if err != nil {
+		return nil, err
+	}
+	threads := make([]HermesThreadArtifact, 0)
+	for _, item := range items {
+		if item.Agent != "hermes" {
+			continue
+		}
+		threads = append(threads, HermesThreadArtifact{
+			ID:        item.SessionID,
+			PlanDir:   item.PlanDir,
+			Path:      item.Path,
+			UpdatedAt: item.MTime,
+		})
+	}
+	return threads, nil
 }
 
 func pathInPlanSessionDir(root, path string) bool {
@@ -176,26 +238,35 @@ func pathInPlanSessionDir(root, path string) bool {
 	}
 	parts := strings.Split(rel, string(filepath.Separator))
 	for i, part := range parts {
-		if part == ".sessions" && i+2 < len(parts) {
+		if part == ".vamos" && i+3 < len(parts) && parts[i+1] == "sessions" {
 			return true
 		}
 	}
 	return false
 }
 
-func buildSessionArtifactIndex(logicalRoot, resolvedRoot, logicalPath, resolvedPath string) (SessionArtifactIndex, error) {
+func buildSessionArtifactIndex(
+	logicalRoot, resolvedRoot, logicalPath, resolvedPath string,
+) (SessionArtifactIndex, error) {
 	if !pathWithinRoot(resolvedPath, resolvedRoot) {
-		return SessionArtifactIndex{}, fmt.Errorf("session path %q escapes thoughts root %q", resolvedPath, resolvedRoot)
+		return SessionArtifactIndex{}, fmt.Errorf(
+			"session path %q escapes thoughts root %q",
+			resolvedPath,
+			resolvedRoot,
+		)
 	}
 	info, err := os.Stat(resolvedPath)
 	if err != nil {
 		return SessionArtifactIndex{}, err
 	}
-	metadata, err := ShallowParseAgentSession(resolvedPath)
+	agent, ownerPlanDir, parentPlanDir, sourceReviewDir, err := sessionArtifactOwnership(
+		logicalRoot,
+		logicalPath,
+	)
 	if err != nil {
 		return SessionArtifactIndex{}, err
 	}
-	agent, ownerPlanDir, parentPlanDir, sourceReviewDir, err := sessionArtifactOwnership(logicalRoot, logicalPath)
+	metadata, err := shallowParseSessionArtifact(resolvedPath, agent)
 	if err != nil {
 		return SessionArtifactIndex{}, err
 	}
@@ -206,6 +277,26 @@ func buildSessionArtifactIndex(logicalRoot, resolvedRoot, logicalPath, resolvedP
 	sessionPath, err := thoughtsRelativeArtifactPath(logicalRoot, logicalPath)
 	if err != nil {
 		return SessionArtifactIndex{}, err
+	}
+	resultPath := ""
+	if agent == "pi" {
+		candidate := strings.TrimSuffix(logicalPath, jsonlExtension) + "_result.yaml"
+		if _, err := os.Stat(candidate); err == nil {
+			resolvedResult, err := filepath.EvalSymlinks(candidate)
+			if err != nil {
+				return SessionArtifactIndex{}, err
+			}
+			if !pathWithinRoot(resolvedResult, resolvedRoot) {
+				return SessionArtifactIndex{}, fmt.Errorf(
+					"Pi result path %q escapes thoughts root",
+					resolvedResult,
+				)
+			}
+			resultPath, err = thoughtsRelativeArtifactPath(logicalRoot, candidate)
+			if err != nil {
+				return SessionArtifactIndex{}, err
+			}
+		}
 	}
 	return SessionArtifactIndex{
 		PlanDir:                ownerPlanDir,
@@ -224,21 +315,30 @@ func buildSessionArtifactIndex(logicalRoot, resolvedRoot, logicalPath, resolvedP
 		MTime:                  info.ModTime(),
 		Hash:                   hash,
 		LastOffset:             info.Size(),
-		NeedsHydration:         true,
+		NeedsHydration:         agent != "hermes",
+		ResultPath:             resultPath,
 	}, nil
 }
 
-func sessionArtifactOwnership(logicalRoot, logicalPath string) (agent, ownerPlanDir, parentPlanDir, sourceReviewDir string, err error) {
+func sessionArtifactOwnership(
+	logicalRoot, logicalPath string,
+) (agent, ownerPlanDir, parentPlanDir, sourceReviewDir string, err error) {
 	rel, err := filepath.Rel(filepath.Clean(logicalRoot), filepath.Clean(logicalPath))
-	if err != nil || rel == "." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) || rel == ".." {
-		return "", "", "", "", fmt.Errorf("session path %q is outside thoughts root %q", logicalPath, logicalRoot)
+	if err != nil || rel == "." ||
+		strings.HasPrefix(rel, ".."+string(filepath.Separator)) ||
+		rel == ".." {
+		return "", "", "", "", fmt.Errorf(
+			"session path %q is outside thoughts root %q",
+			logicalPath,
+			logicalRoot,
+		)
 	}
 	parts := strings.Split(filepath.ToSlash(rel), "/")
 	for i, part := range parts {
-		if part != ".sessions" || i+2 >= len(parts) {
+		if part != ".vamos" || i+3 >= len(parts) || parts[i+1] != "sessions" {
 			continue
 		}
-		agent = parts[i+1]
+		agent = parts[i+2]
 		ownerPlanDir = path.Join(parts[:i]...)
 		if i >= 5 && parts[i-2] == "reviews" {
 			parentPlanDir = path.Join(parts[:i-2]...)
@@ -246,13 +346,22 @@ func sessionArtifactOwnership(logicalRoot, logicalPath string) (agent, ownerPlan
 		}
 		return agent, ownerPlanDir, parentPlanDir, sourceReviewDir, nil
 	}
-	return "", "", "", "", fmt.Errorf("session path %q is not under .sessions/<agent>", logicalPath)
+	return "", "", "", "", fmt.Errorf(
+		"session path %q is not under .vamos/sessions/<agent>",
+		logicalPath,
+	)
 }
 
 func thoughtsRelativeArtifactPath(logicalRoot, logicalPath string) (string, error) {
 	rel, err := filepath.Rel(filepath.Clean(logicalRoot), filepath.Clean(logicalPath))
-	if err != nil || rel == "." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) || rel == ".." {
-		return "", fmt.Errorf("path %q is outside thoughts root %q", logicalPath, logicalRoot)
+	if err != nil || rel == "." ||
+		strings.HasPrefix(rel, ".."+string(filepath.Separator)) ||
+		rel == ".." {
+		return "", fmt.Errorf(
+			"path %q is outside thoughts root %q",
+			logicalPath,
+			logicalRoot,
+		)
 	}
 	return filepath.ToSlash(rel), nil
 }
@@ -272,10 +381,19 @@ func (s *Service) resolveSessionPathIdentity(input string) (SessionPathIdentity,
 		if err != nil {
 			return SessionPathIdentity{}, err
 		}
-		if !pathWithinRoot(resolved, thoughtsRoot) || !pathInPlanSessionDir(thoughtsRoot, resolved) {
-			return SessionPathIdentity{}, fmt.Errorf("session path %q escapes thoughts plan sessions", input)
+		if !pathWithinRoot(resolved, thoughtsRoot) ||
+			!pathInPlanSessionDir(thoughtsRoot, resolved) {
+			return SessionPathIdentity{}, fmt.Errorf(
+				"session path %q escapes thoughts plan sessions",
+				input,
+			)
 		}
-		return SessionPathIdentity{Kind: AgentSessionIdentityKindPlanOwned, IdentityPath: rel, ResolvedPath: resolved, PlanOwned: true}, nil
+		return SessionPathIdentity{
+			Kind:         AgentSessionIdentityKindPlanOwned,
+			IdentityPath: rel,
+			ResolvedPath: resolved,
+			PlanOwned:    true,
+		}, nil
 	}
 	if !filepath.IsAbs(input) && planOwnedSessionRelPath(filepath.ToSlash(input)) {
 		identityPath := strings.Trim(strings.TrimSpace(filepath.ToSlash(input)), "/")
@@ -288,40 +406,69 @@ func (s *Service) resolveSessionPathIdentity(input string) (SessionPathIdentity,
 		if err != nil {
 			return SessionPathIdentity{}, err
 		}
-		if !pathWithinRoot(resolved, thoughtsRoot) || !pathInPlanSessionDir(thoughtsRoot, resolved) {
-			return SessionPathIdentity{}, fmt.Errorf("session path %q escapes thoughts plan sessions", input)
+		if !pathWithinRoot(resolved, thoughtsRoot) ||
+			!pathInPlanSessionDir(thoughtsRoot, resolved) {
+			return SessionPathIdentity{}, fmt.Errorf(
+				"session path %q escapes thoughts plan sessions",
+				input,
+			)
 		}
-		return SessionPathIdentity{Kind: AgentSessionIdentityKindPlanOwned, IdentityPath: identityPath, ResolvedPath: resolved, PlanOwned: true}, nil
+		return SessionPathIdentity{
+			Kind:         AgentSessionIdentityKindPlanOwned,
+			IdentityPath: identityPath,
+			ResolvedPath: resolved,
+			PlanOwned:    true,
+		}, nil
 	}
 	resolved, err := s.validatePiSessionPath(input)
 	if err != nil {
 		return SessionPathIdentity{}, err
 	}
-	return SessionPathIdentity{Kind: AgentSessionIdentityKindGlobalPi, IdentityPath: resolved, ResolvedPath: resolved}, nil
+	return SessionPathIdentity{
+		Kind:         AgentSessionIdentityKindGlobalPi,
+		IdentityPath: resolved,
+		ResolvedPath: resolved,
+	}, nil
 }
 
 func planOwnedSessionRelPath(rel string) bool {
-	parts := strings.Split(strings.Trim(strings.TrimSpace(filepath.ToSlash(rel)), "/"), "/")
+	parts := strings.Split(
+		strings.Trim(strings.TrimSpace(filepath.ToSlash(rel)), "/"),
+		"/",
+	)
 	for i, part := range parts {
-		if part == ".sessions" && i+2 < len(parts) && strings.HasSuffix(parts[len(parts)-1], jsonlExtension) {
+		if part == ".vamos" && i+3 < len(parts) && parts[i+1] == "sessions" &&
+			strings.HasSuffix(parts[len(parts)-1], jsonlExtension) {
 			return true
 		}
 	}
 	return false
 }
 
-func (s *Service) HydrateSessionArtifact(ctx context.Context, path string) (chatsession.ChatProjection, error) {
+func (s *Service) HydrateSessionArtifact(
+	ctx context.Context,
+	path string,
+) (chatsession.ChatProjection, error) {
 	identity, err := s.resolveSessionPathIdentity(path)
 	if err != nil {
 		return chatsession.ChatProjection{}, err
 	}
-	artifact, err := s.queries.GetAgentSessionByPath(ctx, nullableString(identity.IdentityPath))
+	artifact, err := s.queries.GetAgentSessionByPath(
+		ctx,
+		nullableString(identity.IdentityPath),
+	)
 	if err != nil {
 		return chatsession.ChatProjection{}, err
 	}
+	if artifact.Agent == "hermes" {
+		return chatsession.ChatProjection{
+			SessionID: strings.TrimSpace(artifact.ExternalSessionID.String),
+		}, nil
+	}
 	if artifact.ProjectionState == "needs_hydration" {
 		userEmail := strings.TrimSpace(artifact.IndexedByUserEmail.String)
-		if userEmail == "" && artifact.IdentityKind == string(AgentSessionIdentityKindPlanOwned) {
+		if userEmail == "" &&
+			artifact.IdentityKind == string(AgentSessionIdentityKindPlanOwned) {
 			userEmail = "plan-owned-session"
 		}
 		if _, err := s.ImportPiSession(ctx, SessionImportInput{
@@ -331,25 +478,37 @@ func (s *Service) HydrateSessionArtifact(ctx context.Context, path string) (chat
 		}); err != nil {
 			return chatsession.ChatProjection{}, err
 		}
-		if err := s.queries.MarkAgentSessionHydratedByPath(ctx, nullableString(identity.IdentityPath)); err != nil {
+		if err := s.queries.MarkAgentSessionHydratedByPath(
+			ctx,
+			nullableString(identity.IdentityPath),
+		); err != nil {
 			return chatsession.ChatProjection{}, err
 		}
-		artifact, err = s.queries.GetAgentSessionByPath(ctx, nullableString(identity.IdentityPath))
+		artifact, err = s.queries.GetAgentSessionByPath(
+			ctx,
+			nullableString(identity.IdentityPath),
+		)
 		if err != nil {
 			return chatsession.ChatProjection{}, err
 		}
 	}
-	if artifact.ProjectedThreadID.Valid && strings.TrimSpace(artifact.ProjectedThreadID.String) != "" {
+	if artifact.ProjectedThreadID.Valid &&
+		strings.TrimSpace(artifact.ProjectedThreadID.String) != "" {
 		threadID := strings.TrimSpace(artifact.ProjectedThreadID.String)
 		if artifact.IdentityKind == string(AgentSessionIdentityKindPlanOwned) {
 			return s.sharedChatProjectionFromAgentThread(ctx, threadID)
 		}
 		return s.chatProjectionFromAgentThread(ctx, threadID)
 	}
-	return chatsession.ChatProjection{SessionID: strings.TrimSpace(artifact.ExternalSessionID.String)}, nil
+	return chatsession.ChatProjection{
+		SessionID: strings.TrimSpace(artifact.ExternalSessionID.String),
+	}, nil
 }
 
-func (s *Service) sharedChatProjectionFromAgentThread(ctx context.Context, threadID string) (chatsession.ChatProjection, error) {
+func (s *Service) sharedChatProjectionFromAgentThread(
+	ctx context.Context,
+	threadID string,
+) (chatsession.ChatProjection, error) {
 	thread, err := s.queries.GetSharedAgentThread(ctx, threadID)
 	if err != nil {
 		return chatsession.ChatProjection{}, err
@@ -357,7 +516,10 @@ func (s *Service) sharedChatProjectionFromAgentThread(ctx context.Context, threa
 	return s.chatProjectionFromThreadRow(ctx, thread)
 }
 
-func (s *Service) chatProjectionFromAgentThread(ctx context.Context, threadID string) (chatsession.ChatProjection, error) {
+func (s *Service) chatProjectionFromAgentThread(
+	ctx context.Context,
+	threadID string,
+) (chatsession.ChatProjection, error) {
 	thread, err := s.queries.GetAgentThread(ctx, threadID)
 	if err != nil {
 		return chatsession.ChatProjection{}, err
@@ -365,7 +527,10 @@ func (s *Service) chatProjectionFromAgentThread(ctx context.Context, threadID st
 	return s.chatProjectionFromThreadRow(ctx, thread)
 }
 
-func (s *Service) chatProjectionFromThreadRow(ctx context.Context, thread db.AgentThread) (chatsession.ChatProjection, error) {
+func (s *Service) chatProjectionFromThreadRow(
+	ctx context.Context,
+	thread db.AgentThread,
+) (chatsession.ChatProjection, error) {
 	if !thread.HeadEntryID.Valid || strings.TrimSpace(thread.HeadEntryID.String) == "" {
 		return chatsession.ChatProjection{SessionID: thread.ID}, nil
 	}
@@ -388,7 +553,9 @@ func (s *Service) chatProjectionFromThreadRow(ctx context.Context, thread db.Age
 	return projection, nil
 }
 
-func projectedMessageFromAgentEntry(entry db.ListAgentEntryPathRow) (chatsession.ProjectedMessage, bool) {
+func projectedMessageFromAgentEntry(
+	entry db.ListAgentEntryPathRow,
+) (chatsession.ProjectedMessage, bool) {
 	var payload struct {
 		Type    string `json:"type"`
 		Message struct {
@@ -412,6 +579,39 @@ func projectedMessageFromAgentEntry(entry db.ListAgentEntryPathRow) (chatsession
 		Role:    role,
 		Content: content,
 	}, true
+}
+
+func shallowParseSessionArtifact(path, agent string) (AgentSessionMetadata, error) {
+	if agent == "hermes" {
+		return shallowParseHermesTranscript(path)
+	}
+	return ShallowParseAgentSession(path)
+}
+
+func shallowParseHermesTranscript(path string) (AgentSessionMetadata, error) {
+	file, err := os.Open(path)
+	if err != nil {
+		return AgentSessionMetadata{}, err
+	}
+	defer file.Close()
+	metadata := AgentSessionMetadata{
+		SessionID: strings.TrimSuffix(filepath.Base(path), jsonlExtension),
+	}
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		var event HermesTranscriptEvent
+		if err := json.Unmarshal(scanner.Bytes(), &event); err != nil {
+			return AgentSessionMetadata{}, err
+		}
+		if event.ThreadID != "" {
+			metadata.SessionID = strings.TrimSpace(event.ThreadID)
+			break
+		}
+	}
+	if err := scanner.Err(); err != nil {
+		return AgentSessionMetadata{}, err
+	}
+	return metadata, nil
 }
 
 func ShallowParseAgentSession(path string) (AgentSessionMetadata, error) {
@@ -439,11 +639,29 @@ func ShallowParseAgentSession(path string) (AgentSessionMetadata, error) {
 	var raw map[string]any
 	if err := json.Unmarshal(scanner.Bytes(), &raw); err == nil {
 		metadata.WorkflowID = firstString(raw, "workflow_id", "workflowID", "workflowId")
-		metadata.NodeID = firstString(raw, "workflow_node_id", "workflowNodeID", "workflowNodeId", "node_id", "nodeID", "nodeId")
-		if value := firstString(raw, "continued_from_session_id", "continuedFromSessionID", "continuedFromSessionId"); value != "" {
+		metadata.NodeID = firstString(
+			raw,
+			"workflow_node_id",
+			"workflowNodeID",
+			"workflowNodeId",
+			"node_id",
+			"nodeID",
+			"nodeId",
+		)
+		if value := firstString(
+			raw,
+			"continued_from_session_id",
+			"continuedFromSessionID",
+			"continuedFromSessionId",
+		); value != "" {
 			metadata.ContinuedFromSessionID = value
 		}
-		metadata.ForkedFromSessionID = firstString(raw, "forked_from_session_id", "forkedFromSessionID", "forkedFromSessionId")
+		metadata.ForkedFromSessionID = firstString(
+			raw,
+			"forked_from_session_id",
+			"forkedFromSessionID",
+			"forkedFromSessionId",
+		)
 	}
 	return metadata, nil
 }
