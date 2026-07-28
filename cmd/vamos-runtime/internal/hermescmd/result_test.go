@@ -181,7 +181,10 @@ func TestDoneWithoutHermesManagerPrintsManualContinuation(t *testing.T) {
 		got,
 		"no Hermes manager owns this session",
 	) ||
-		!strings.HasSuffix(got, "pi @.pi/skills/q-implement/SKILL.md\n") {
+		!strings.HasSuffix(
+			got,
+			"--previous-session \"session-1\" \"Continue the implement stage using the previous result.\"\n",
+		) {
 		t.Fatalf("managerless completion output = %q", got)
 	}
 }
@@ -207,7 +210,7 @@ func TestDoneWithoutHostConfigRecordsLocalResult(t *testing.T) {
 	}
 	if got := output.String(); !strings.HasSuffix(
 		got,
-		"pi @.pi/skills/q-implement/SKILL.md\n",
+		"--previous-session \"session-1\" \"Continue the implement stage using the previous result.\"\n",
 	) {
 		t.Fatalf("manual completion output = %q", got)
 	}

@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"gopkg.in/yaml.v3"
 )
@@ -127,9 +126,10 @@ func RecommendedCommand(ctx PlanContext, result PiResult) string {
 	if result.Next == NextNone {
 		return ""
 	}
-	skill := "q-" + string(result.Next)
-	if strings.HasPrefix(string(result.Next), "milestone-") {
-		skill = "q-" + string(result.Next)
-	}
-	return fmt.Sprintf("pi @.pi/skills/%s/SKILL.md", skill)
+	return fmt.Sprintf(
+		"vamos hermes pi start --plan %q --previous-session %q %q",
+		ctx.PlanDir,
+		result.Session,
+		"Continue the "+string(result.Next)+" stage using the previous result.",
+	)
 }
