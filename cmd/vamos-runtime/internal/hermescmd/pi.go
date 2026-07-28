@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -67,11 +68,7 @@ func newStartCommand(run commandRunner) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			env := append(
-				os.Environ(),
-				"VAMOS_PI_SESSION_ID="+session,
-				"VAMOS_PLAN_DIR="+ctx.PlanDir,
-			)
+			env := append(os.Environ(), "VAMOS_PLAN_DIR="+ctx.PlanDir)
 			fmt.Fprintln(cmd.OutOrStdout(), "pi session:", session)
 			return run(
 				cmd.Context(),
@@ -103,7 +100,7 @@ func writePromptFile(dir, session, prompt string) (string, error) {
 
 func RenderPiPrompt(plan PlanContext, task, previous string) string {
 	return fmt.Sprintf(
-		"You are an isolated Pi worker.\nPlan: %s\nGoal: %s\nTask: %s\nFinish by creating durable artifacts, then call `vamos hermes pi done` with VAMOS_PI_SESSION_ID.\n",
+		"You are an isolated Pi worker.\nPlan: %s\nGoal: %s\nTask: %s\nFinish by creating durable artifacts, then call `vamos hermes pi done` with PI_SESSION_ID.\n",
 		plan.PlanRel,
 		plan.PlanGoal,
 		task,
@@ -119,7 +116,7 @@ func newDoneCommand(notify piCompletionNotifier) *cobra.Command {
 				plan = os.Getenv("VAMOS_PLAN_DIR")
 			}
 			if session == "" {
-				session = os.Getenv("VAMOS_PI_SESSION_ID")
+				session = os.Getenv("PI_SESSION_ID")
 			}
 			ctx, err := LoadPlanContext(plan)
 			if err != nil {
@@ -133,16 +130,14 @@ func newDoneCommand(notify piCompletionNotifier) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			path, err := WritePiResult(
-				ctx,
-				PiResult{
-					Session:  session,
-					Outcome:  outcome,
-					Next:     next,
-					Artifact: artifact,
-					Summary:  summary,
-				},
-			)
+			result := PiResult{
+				Session:  session,
+				Outcome:  outcome,
+				Next:     next,
+				Artifact: artifact,
+				Summary:  summary,
+			}
+			path, err := WritePiResult(ctx, result)
 			if err != nil {
 				return err
 			}
@@ -154,6 +149,13 @@ func newDoneCommand(notify piCompletionNotifier) *cobra.Command {
 				}
 			}
 			config, err := readHostConfig(configPath)
+			if errors.Is(err, os.ErrNotExist) {
+				fmt.Fprintln(cmd.OutOrStdout(), "Pi result recorded locally.")
+				if next := RecommendedCommand(ctx, result); next != "" {
+					fmt.Fprintln(cmd.OutOrStdout(), "recommended:", next)
+				}
+				return nil
+			}
 			if err != nil {
 				return fmt.Errorf("read Hermes host configuration: %w", err)
 			}

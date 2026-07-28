@@ -1,9 +1,11 @@
 package hermescmd
 
 import (
+	"bytes"
 	"context"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -103,6 +105,60 @@ func TestDoneWritesResultThenNotifiesVamosFromHostConfig(t *testing.T) {
 	}
 	if _, err := ReadPiResult(ctx.PlanDir, "session-1"); err != nil {
 		t.Fatalf("Pi result was not written before notification: %v", err)
+	}
+}
+
+func TestDoneUsesPiSessionID(t *testing.T) {
+	ctx := testPlan(t)
+	t.Setenv("PI_SESSION_ID", "pi-session")
+	cmd := newDoneCommand(func(context.Context, hostConfig, string, string) error {
+		t.Fatal("manual completion must not notify")
+		return nil
+	})
+	cmd.SetArgs([]string{
+		"--plan",
+		ctx.PlanDir,
+		"--config",
+		filepath.Join(t.TempDir(), "missing-hermes.yaml"),
+		"--outcome",
+		"complete",
+		"--next",
+		"none",
+		"--summary",
+		"1. done",
+	})
+	if err := cmd.Execute(); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := ReadPiResult(ctx.PlanDir, "pi-session"); err != nil {
+		t.Fatalf("Pi session result = %v", err)
+	}
+}
+
+func TestDoneWithoutHostConfigRecordsLocalResult(t *testing.T) {
+	ctx := testPlan(t)
+	configPath := filepath.Join(t.TempDir(), "missing-hermes.yaml")
+	cmd := newDoneCommand(func(context.Context, hostConfig, string, string) error {
+		t.Fatal("manual completion must not notify")
+		return nil
+	})
+	var output bytes.Buffer
+	cmd.SetOut(&output)
+	cmd.SetArgs([]string{
+		"--plan", ctx.PlanDir, "--session", "session-1", "--config", configPath,
+		"--outcome", "complete", "--next", "implement", "--summary", "1. done",
+	})
+	if err := cmd.Execute(); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := ReadPiResult(ctx.PlanDir, "session-1"); err != nil {
+		t.Fatalf("manual Pi result = %v", err)
+	}
+	if got := output.String(); !strings.Contains(
+		got,
+		"recommended: pi @.pi/skills/q-implement/SKILL.md",
+	) {
+		t.Fatalf("manual completion output = %q", got)
 	}
 }
 

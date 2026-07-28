@@ -13,14 +13,20 @@ Every worker starts by reading this skill, its active stage skill, the plan `AGE
 
 ```bash
 vamos hermes pi done \
-  --session "$VAMOS_PI_SESSION_ID" \
+  --session "$PI_SESSION_ID" \
   --outcome <complete|handoff|needs_human|blocked|error> \
   --next <question|research|design|outline|plan|workspace|implement|review|verify|milestone-question|milestone-research|milestone-design|milestone-create-tickets|none> \
   [--artifact thoughts/.../artifact.md] \
   --summary $'1. Durable work completed.\n2. Verification or decision.\n3. Recommended Hermes follow-up.'
 ```
 
-`VAMOS_PI_SESSION_ID` and `VAMOS_PLAN_DIR` are transient worker context. Do not put gateway URLs, credentials, process IDs, locks, run state, or absolute host paths in durable artifacts. `next` is a non-binding recommendation: Hermes or the lead engineer may choose a different safe task.
+`PI_SESSION_ID` is Pi's session identity and `VAMOS_PLAN_DIR` is the Hermes worker's transient plan context. A manual Pi worker uses the same completion contract with its explicit plan path:
+
+```bash
+vamos hermes pi done --plan <absolute-plan-dir> --session "$PI_SESSION_ID" ...
+```
+
+Without host-local Hermes setup, `done` records disk truth and prints the manual continuation command; use `vamos hermes pi result --plan <absolute-plan-dir> --session "$PI_SESSION_ID"` to read its non-binding recommendation. Do not put gateway URLs, credentials, process IDs, locks, run state, or absolute host paths in durable artifacts. `next` is a non-binding recommendation: Hermes or the lead engineer may choose a different safe task.
 
 A successor starts with `vamos hermes pi start --plan <absolute-plan-dir> --previous-session <id> "<task>"`. Hermes reads `vamos hermes pi result` rather than copying prior worker output into prompts.
 
