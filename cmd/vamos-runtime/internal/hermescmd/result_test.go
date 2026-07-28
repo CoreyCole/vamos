@@ -14,7 +14,9 @@ import (
 
 func testPlan(t *testing.T) PlanContext {
 	t.Helper()
-	dir := filepath.Join(t.TempDir(), "thoughts", "me", "plans", "example")
+	root := t.TempDir()
+	t.Setenv("VAMOS_HERMES_RESUME_INDEX", filepath.Join(root, "manual-resume.json"))
+	dir := filepath.Join(root, "thoughts", "me", "plans", "example")
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		t.Fatal(err)
 	}
@@ -180,11 +182,7 @@ func TestDoneWithoutHermesManagerPrintsManualContinuation(t *testing.T) {
 	if got := output.String(); !strings.Contains(
 		got,
 		"no Hermes manager owns this session",
-	) ||
-		!strings.HasSuffix(
-			got,
-			"--previous-session \"session-1\" \"Continue the implement stage using the previous result.\"\n",
-		) {
+	) || !strings.Contains(got, "vamos hermes pi continue ") {
 		t.Fatalf("managerless completion output = %q", got)
 	}
 }
@@ -208,10 +206,7 @@ func TestDoneWithoutHostConfigRecordsLocalResult(t *testing.T) {
 	if _, err := ReadPiResult(ctx.PlanDir, "session-1"); err != nil {
 		t.Fatalf("manual Pi result = %v", err)
 	}
-	if got := output.String(); !strings.HasSuffix(
-		got,
-		"--previous-session \"session-1\" \"Continue the implement stage using the previous result.\"\n",
-	) {
+	if got := output.String(); !strings.Contains(got, "vamos hermes pi continue ") {
 		t.Fatalf("manual completion output = %q", got)
 	}
 }

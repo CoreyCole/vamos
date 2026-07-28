@@ -33,6 +33,7 @@ func newPiCommand(run commandRunner) *cobra.Command {
 	cmd := &cobra.Command{Use: "pi", Short: "Launch and record isolated Pi workers"}
 	cmd.AddCommand(
 		newStartCommand(run),
+		newContinueCommand(run),
 		newDoneCommand(notifyPiCompletion),
 		newResultCommand(),
 	)
@@ -152,16 +153,14 @@ func newDoneCommand(notify piCompletionNotifier) *cobra.Command {
 			}
 			config, err := readHostConfig(configPath)
 			if errors.Is(err, os.ErrNotExist) {
-				printManualContinuation(cmd, ctx, result)
-				return nil
+				return printManualContinuation(cmd, ctx, result)
 			}
 			if err != nil {
 				return fmt.Errorf("read Hermes host configuration: %w", err)
 			}
 			if err := notify(cmd.Context(), config, ctx.PlanDir, session); err != nil {
 				if errors.Is(err, errHermesManagerNotFound) {
-					printManualContinuation(cmd, ctx, result)
-					return nil
+					return printManualContinuation(cmd, ctx, result)
 				}
 				return fmt.Errorf("notify Vamos of Pi completion: %w", err)
 			}
@@ -181,15 +180,18 @@ func newDoneCommand(notify piCompletionNotifier) *cobra.Command {
 	return cmd
 }
 
-func printManualContinuation(cmd *cobra.Command, ctx PlanContext, result PiResult) {
+func printManualContinuation(cmd *cobra.Command, ctx PlanContext, result PiResult) error {
+	id, err := recordManualResume(ctx, result)
+	if err != nil {
+		return fmt.Errorf("record manual continuation: %w", err)
+	}
 	fmt.Fprintln(
 		cmd.OutOrStdout(),
 		"Pi result recorded locally; no Hermes manager owns this session.",
 	)
-	if next := RecommendedCommand(ctx, result); next != "" {
-		fmt.Fprintln(cmd.OutOrStdout(), "Run this manually:")
-		fmt.Fprintln(cmd.OutOrStdout(), next)
-	}
+	fmt.Fprintln(cmd.OutOrStdout(), "Run this manually:")
+	fmt.Fprintln(cmd.OutOrStdout(), "vamos hermes pi continue", id)
+	return nil
 }
 
 func newResultCommand() *cobra.Command {
