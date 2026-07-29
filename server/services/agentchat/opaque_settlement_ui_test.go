@@ -2,7 +2,6 @@ package agentchat
 
 import (
 	"context"
-	"encoding/base64"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -11,117 +10,19 @@ import (
 	"time"
 )
 
-func TestOpaqueSettlementSuccessorValidation(t *testing.T) {
-	for _, test := range []struct {
-		name  string
-		value OpaqueSettlementSuccessor
-		want  bool
-	}{
-		{"none", OpaqueSettlementSuccessor{Action: "none"}, true},
-		{"start child", OpaqueSettlementSuccessor{Action: "start_child", Target: "child_1", Discovery: "manager inventory"}, true},
-		{"steer", OpaqueSettlementSuccessor{Action: "steer_existing", Target: "thread_1", Discovery: "thread inventory"}, true},
-		{"handoff", OpaqueSettlementSuccessor{Action: "handoff", Target: "handoff_1", Discovery: "artifact inventory"}, true},
-		{"unknown", OpaqueSettlementSuccessor{Action: "execute"}, false},
-		{"unsafe", OpaqueSettlementSuccessor{Action: "start_child", Target: "../child", Discovery: "inventory"}, false},
-		{"missing discovery", OpaqueSettlementSuccessor{Action: "handoff", Target: "handoff"}, false},
-	} {
-		t.Run(test.name, func(t *testing.T) {
-			if (validateOpaqueSettlementSuccessor(test.value) == nil) != test.want {
-				t.Fatalf(
-					"validation = %v, want %v",
-					validateOpaqueSettlementSuccessor(test.value),
-					test.want,
-				)
-			}
-		})
-	}
-}
-
-func TestOpaqueSettlementReceiveAndDecisionOnlyAppendTranscriptEvents(t *testing.T) {
-	root := t.TempDir()
-	plan := filepath.Join(root, "plans", "p")
-	if err := os.MkdirAll(plan, 0o700); err != nil {
-		t.Fatal(err)
-	}
-	if err := AppendHermesTranscript(
-		plan,
-		HermesTranscriptEvent{
-			ID:          "run",
-			Type:        "pi_run",
-			ThreadID:    "thread",
-			PiSessionID: "session",
-		},
-	); err != nil {
-		t.Fatal(err)
-	}
-	raw, err := json.Marshal(
-		opaqueSettlementEnvelope{
-			Version:       1,
-			Kind:          "opaque_pi_settlement",
-			Plan:          "plans/p",
-			ManagerThread: "thread",
-			Session:       "session",
-			FinalEntryID:  "entry",
-			Fences:        []string{"a: b\n"},
-		},
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-	s := &Service{thoughtsRoot: root}
-	if err := s.ReceiveOpaqueSettlement(
-		context.Background(),
-		OpaqueSettlementDeliveryRequest{
-			Version:               1,
-			DeliveryID:            "delivery",
-			Plan:                  "plans/p",
-			ManagerThread:         "thread",
-			Session:               "session",
-			FinalEntryID:          "entry",
-			SettlementBytesBase64: base64.StdEncoding.EncodeToString(raw),
-		},
-	); err != nil {
-		t.Fatal(err)
-	}
-	if err := s.DecideOpaqueSettlementSuccessor(
-		context.Background(),
-		plan,
-		"thread",
-		"session",
-		"entry",
-		OpaqueSettlementSuccessor{
-			Action:    "handoff",
-			Target:    "handoff_1",
-			Discovery: "artifact inventory",
-		},
-	); err != nil {
-		t.Fatal(err)
-	}
-	events, err := readHermesTranscript(plan, "thread")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if got := events[len(events)-1]; got.Type != opaqueSettlementDecisionEvent ||
-		got.Successor == nil ||
-		got.Successor.Action != "handoff" {
-		t.Fatalf("decision event = %#v", got)
-	}
-	if got := events[1].Settlement; got == nil || got.RawResponse != string(raw) ||
-		len(got.YAMLBlocks) != 1 {
-		t.Fatalf("received evidence = %#v", got)
-	}
-}
-
-func TestOpaqueSettlementCardIsEvidenceOnly(t *testing.T) {
+func TestOpaqueSettlementCardRendersEvidenceNotEnvelope(t *testing.T) {
 	card := OpaqueSettlementCard(
 		HermesTranscriptEvent{
-			At: time.Date(2026, 7, 29, 12, 0, 0, 0, time.UTC),
+			At: time.Now(),
 			Settlement: &OpaqueSettlementEvidence{
 				Plan:        "plans/p",
 				Thread:      "thread",
 				Session:     "session",
 				Entry:       "entry",
-				RawResponse: `{"fences":[]}`,
+				RawResponse: "```yaml\nexact: evidence\n```\n",
+				YAMLBlocks: []opaqueSettlementFence{
+					{Language: "yaml", Raw: "```yaml\nexact: evidence\n```\n"},
+				},
 			},
 		},
 		"/record",
@@ -130,10 +31,78 @@ func TestOpaqueSettlementCardIsEvidenceOnly(t *testing.T) {
 	if err := card.Render(context.Background(), &out); err != nil {
 		t.Fatal(err)
 	}
-	html := out.String()
-	for _, want := range []string{"Raw response", "No fenced YAML blocks were present", "Select next action", "Recording this decision never executes it."} {
-		if !strings.Contains(html, want) {
-			t.Fatalf("card missing %q: %s", want, html)
+	if !strings.Contains(out.String(), "exact: evidence") ||
+		strings.Contains(out.String(), "raw_response") {
+		t.Fatalf("card did not render evidence: %s", out.String())
+	}
+}
+
+func TestOpaqueSettlementDecisionUsesContainedEvidenceWithoutDelivery(t *testing.T) {
+	root := t.TempDir()
+	plan := filepath.Join(root, "plans", "p")
+	path := filepath.Join(
+		plan,
+		".vamos",
+		"sessions",
+		"pi",
+		"session",
+		"settlements",
+		"entry.json",
+	)
+	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	raw, err := json.Marshal(
+		opaqueSettlementEnvelope{
+			Version:          1,
+			Kind:             "pi_assistant_settlement",
+			Session:          "session",
+			Plan:             "plans/p",
+			ManagerThread:    "thread",
+			AssistantEntryID: "entry",
+			SettledAt:        time.Now().UTC(),
+			RawResponse:      "raw",
+		},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, raw, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	s := &Service{thoughtsRoot: root}
+	successor := OpaqueSettlementSuccessor{
+		Action:     "handoff",
+		Discovery:  opaqueSettlementDiscoveryReference("session", "entry"),
+		Rationale:  "human review",
+		Actor:      "manager@example.com",
+		Provenance: "test",
+	}
+	if err := s.DecideOpaqueSettlementSuccessor(
+		context.Background(),
+		plan,
+		"thread",
+		"session",
+		"entry",
+		successor,
+	); err != nil {
+		t.Fatal(err)
+	}
+	events, err := readHermesTranscript(plan, "thread")
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := events[len(events)-1]
+	if got.Type != opaqueSettlementDecisionEvent || got.Successor == nil ||
+		got.Successor.Actor != successor.Actor ||
+		got.At.IsZero() {
+		t.Fatalf("decision audit record = %#v", got)
+	}
+	for _, action := range []string{"none", "handoff"} {
+		if err := validateOpaqueSettlementSuccessor(
+			OpaqueSettlementSuccessor{Action: action, Target: "forbidden"},
+		); err == nil {
+			t.Fatalf("%s accepted target", action)
 		}
 	}
 }

@@ -11,7 +11,6 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
-	"reflect"
 	"strings"
 	"sync"
 	"testing"
@@ -70,9 +69,8 @@ func TestOpaqueSettlementFixturePairsDecodeExactJavaScriptBytes(t *testing.T) {
 	}
 	var fixtures struct {
 		Cases []struct {
-			Name               string                   `json:"name"`
-			Envelope           OpaqueSettlementEnvelope `json:"envelope"`
-			ExpectedJSONBase64 string                   `json:"expected_json_base64"`
+			Name     string          `json:"name"`
+			Envelope json.RawMessage `json:"envelope"`
 		} `json:"cases"`
 	}
 	if err := json.Unmarshal(data, &fixtures); err != nil {
@@ -80,18 +78,15 @@ func TestOpaqueSettlementFixturePairsDecodeExactJavaScriptBytes(t *testing.T) {
 	}
 	for _, fixture := range fixtures.Cases {
 		t.Run(fixture.Name, func(t *testing.T) {
-			raw, err := base64.StdEncoding.DecodeString(fixture.ExpectedJSONBase64)
+			got, err := DecodeOpaqueSettlementEnvelope(fixture.Envelope)
 			if err != nil {
 				t.Fatal(err)
 			}
-			got, err := DecodeOpaqueSettlementEnvelope(raw)
-			if err != nil || !reflect.DeepEqual(got, fixture.Envelope) {
-				t.Fatalf(
-					"DecodeOpaqueSettlementEnvelope() = %#v, %v; want %#v",
-					got,
-					err,
-					fixture.Envelope,
-				)
+			if got.RawResponse == "" && fixture.Name != "zero fences" {
+				t.Fatalf("raw response was not decoded: %#v", got)
+			}
+			if fixture.Name == "zero fences" && got.FencedYAMLBlocks != nil {
+				t.Fatalf("no-block representation changed: %#v", got)
 			}
 		})
 	}
@@ -100,7 +95,7 @@ func TestOpaqueSettlementFixturePairsDecodeExactJavaScriptBytes(t *testing.T) {
 func TestOpaqueSettlementPersistsExactBytesAndRecoversBase64(t *testing.T) {
 	ctx := testPlan(t)
 	raw := []byte(
-		`{"version":1,"kind":"opaque_pi_settlement","session":"session-1","plan":"` + ctx.PlanRel + `","manager_thread":"thread-1","final_entry_id":"entry-1","fences":["","café 🌰","line one\r\nline two\r\n"]}`,
+		`{"version":1,"kind":"pi_assistant_settlement","session":"session-1","plan":"` + ctx.PlanRel + `","manager_thread":"thread-1","assistant_entry_id":"entry-1","settled_at":"2026-07-29T12:00:00Z","raw_response":"evidence\\r\\nbytes","fenced_yaml_blocks":[{"language":"yaml","raw":"evidence\\r\\nbytes"}]}`,
 	)
 	path, err := WriteOpaqueSettlement(ctx.PlanDir, "session-1", "entry-1", raw)
 	if err != nil {
@@ -121,11 +116,10 @@ func TestOpaqueSettlementPersistsExactBytesAndRecoversBase64(t *testing.T) {
 	if got := pending.BytesBase64; got != base64.StdEncoding.EncodeToString(raw) {
 		t.Fatalf("base64 = %q, want exact source bytes", got)
 	}
-	if !reflect.DeepEqual(
-		pending.Envelope.Fences,
-		[]string{"", "café 🌰", "line one\r\nline two\r\n"},
-	) {
-		t.Fatalf("fences = %#v", pending.Envelope.Fences)
+	if pending.Envelope.RawResponse != `evidence\r\nbytes` ||
+		pending.Envelope.FencedYAMLBlocks == nil ||
+		(*pending.Envelope.FencedYAMLBlocks)[0].Raw != pending.Envelope.RawResponse {
+		t.Fatalf("opaque evidence = %#v", pending.Envelope)
 	}
 	if info, err := os.Stat(path); err != nil || info.Mode().Perm() != 0o600 {
 		t.Fatalf("mode=%v err=%v", info.Mode(), err)

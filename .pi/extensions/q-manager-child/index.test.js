@@ -147,10 +147,11 @@ test("settlement serializes opaque text fences with JavaScript exact bytes", asy
           text: "prefix```yaml nope\n```YAML\na: café 🌰\r\n```\r\n",
         },
       ],
+      "2026-07-29T19:00:00.000Z",
     );
     assert.equal(
       bytes.toString(),
-      '{"version":1,"kind":"opaque_pi_settlement","session":"session-1","plan":"CoreyCole/plans/example","manager_thread":"thread-1","final_entry_id":"assistant-1","fences":["a: café 🌰\\r\\n"]}',
+      '{"version":1,"kind":"pi_assistant_settlement","session":"session-1","plan":"CoreyCole/plans/example","manager_thread":"thread-1","assistant_entry_id":"assistant-1","settled_at":"2026-07-29T19:00:00.000Z","raw_response":"prefix```yaml nope\\n```YAML\\na: café 🌰\\r\\n```\\r\\n","fenced_yaml_blocks":[{"language":"YAML","raw":"```YAML\\na: café 🌰\\r\\n```\\r\\n"}]}',
     );
   }));
 
@@ -195,7 +196,10 @@ test("later steering skips tool-only leaves, settles the final text leaf once, a
         "utf8",
       ),
     );
-    assert.deepEqual(settlement.fences, ["final: true\n"]);
+    assert.equal(settlement.raw_response, "```yaml\nfinal: true\n```");
+    assert.deepEqual(settlement.fenced_yaml_blocks, [
+      { language: "yaml", raw: "```yaml\nfinal: true\n```" },
+    ]);
   }));
 
 test("agent_settled persists base64 before safe publication and consumes after it", async () =>
@@ -212,7 +216,7 @@ test("agent_settled persists base64 before safe publication and consumes after i
     const pending = branch.find((entry) => entry.customType === PENDING);
     assert.ok(pending);
     assert.equal(branch.at(-1).customType, CONSUMED);
-    const bytes = Buffer.from(pending.data.bytes_base64, "base64");
+    const bytes = Buffer.from(pending.data.envelope_utf8_base64, "base64");
     assert.equal(
       await readFile(
         join(plan, ".vamos/sessions/pi/session-1/settlements/assistant-1.json"),
@@ -220,7 +224,7 @@ test("agent_settled persists base64 before safe publication and consumes after i
       ),
       bytes.toString(),
     );
-    assert.match(bytes.toString(), /"fences":\["value: on\\n"\]/);
+    assert.match(bytes.toString(), /"raw_response":"```yml\\nvalue: on\\n```"/);
   }));
 
 test("restart recovers after link publication but before consume from exact pending bytes", async () =>
@@ -248,10 +252,12 @@ test("restart recovers after link publication but before consume from exact pend
       type: "custom",
       customType: PENDING,
       data: {
+        version: 1,
         bridge_id: "bridge-1",
+        manager_thread: "thread-1",
         session: "session-1",
-        final_entry_id: "assistant-1",
-        bytes_base64: bytes.toString("base64"),
+        assistant_entry_id: "assistant-1",
+        envelope_utf8_base64: bytes.toString("base64"),
       },
     });
     await publish(plan, "session-1", "assistant-1", bytes);

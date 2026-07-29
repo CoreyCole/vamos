@@ -53,9 +53,12 @@ func (h *Handler) HandleOpaqueSettlementSuccessor(c echo.Context) error {
 		c.Param("session"),
 		c.Param("entry"),
 		OpaqueSettlementSuccessor{
-			Action:    c.FormValue("action"),
-			Target:    c.FormValue("target"),
-			Discovery: c.FormValue("discovery"),
+			Action:     c.FormValue("action"),
+			Target:     c.FormValue("target"),
+			Discovery:  c.FormValue("discovery"),
+			Rationale:  c.FormValue("rationale"),
+			Actor:      userEmail,
+			Provenance: "manager-authorized-ui",
 		},
 	); err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, err.Error())

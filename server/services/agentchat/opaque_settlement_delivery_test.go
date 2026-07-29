@@ -10,6 +10,7 @@ import (
 	"reflect"
 	"sync"
 	"testing"
+	"time"
 )
 
 type recordingOpaqueReceiver struct {
@@ -101,13 +102,14 @@ func writeOpaqueFixture(
 	}
 	body, err := json.Marshal(
 		opaqueSettlementEnvelope{
-			Version:       1,
-			Kind:          "opaque_pi_settlement",
-			Session:       session,
-			Plan:          "project/plans/plan",
-			ManagerThread: thread,
-			FinalEntryID:  entry,
-			Fences:        []string{},
+			Version:          1,
+			Kind:             "pi_assistant_settlement",
+			Session:          session,
+			Plan:             "project/plans/plan",
+			ManagerThread:    thread,
+			AssistantEntryID: entry,
+			SettledAt:        time.Date(2026, 7, 29, 0, 0, 0, 0, time.UTC),
+			RawResponse:      "evidence",
 		},
 	)
 	if err != nil {

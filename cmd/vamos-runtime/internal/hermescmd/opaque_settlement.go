@@ -10,20 +10,23 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"time"
 )
 
-const opaqueSettlementKind = "opaque_pi_settlement"
+const opaqueSettlementKind = "pi_assistant_settlement"
 
 // OpaqueSettlementEnvelope is the versioned, structural envelope written by
-// Pi. Fences are evidence only: Hermes does not parse their contents.
+// Pi. Its response and fences are evidence only: Hermes never parses them.
 type OpaqueSettlementEnvelope struct {
-	Version       int      `json:"version"`
-	Kind          string   `json:"kind"`
-	Session       string   `json:"session"`
-	Plan          string   `json:"plan"`
-	ManagerThread string   `json:"manager_thread"`
-	FinalEntryID  string   `json:"final_entry_id"`
-	Fences        []string `json:"fences"`
+	Version          int                      `json:"version"`
+	Kind             string                   `json:"kind"`
+	Session          string                   `json:"session"`
+	Plan             string                   `json:"plan"`
+	ManagerThread    string                   `json:"manager_thread"`
+	AssistantEntryID string                   `json:"assistant_entry_id"`
+	SettledAt        time.Time                `json:"settled_at"`
+	RawResponse      string                   `json:"raw_response"`
+	FencedYAMLBlocks *[]OpaqueSettlementFence `json:"fenced_yaml_blocks,omitempty"`
 }
 
 // OpaqueSettlementPending retains the exact published bytes for recovery.
@@ -38,6 +41,15 @@ type OpaqueSettlementPending struct {
 // interpreting the opaque fence contents.
 func DecodeOpaqueSettlementEnvelope(data []byte) (OpaqueSettlementEnvelope, error) {
 	var envelope OpaqueSettlementEnvelope
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal(data, &fields); err != nil {
+		return OpaqueSettlementEnvelope{}, fmt.Errorf("decode opaque settlement: %w", err)
+	}
+	if raw, ok := fields["raw_response"]; !ok || len(raw) == 0 || raw[0] != '"' {
+		return OpaqueSettlementEnvelope{}, errors.New(
+			"opaque settlement raw_response is required",
+		)
+	}
 	decoder := json.NewDecoder(bytes.NewReader(data))
 	decoder.DisallowUnknownFields()
 	if err := decoder.Decode(&envelope); err != nil {
@@ -67,7 +79,7 @@ func DecodeOpaqueSettlementEnvelope(data []byte) (OpaqueSettlementEnvelope, erro
 		)
 	}
 	for label, value := range map[string]string{
-		"session": envelope.Session, "manager thread": envelope.ManagerThread, "final entry": envelope.FinalEntryID,
+		"session": envelope.Session, "manager thread": envelope.ManagerThread, "assistant entry": envelope.AssistantEntryID,
 	} {
 		if err := ValidateSafeComponent(value); err != nil {
 			return OpaqueSettlementEnvelope{}, fmt.Errorf(
@@ -80,10 +92,19 @@ func DecodeOpaqueSettlementEnvelope(data []byte) (OpaqueSettlementEnvelope, erro
 	if err := validateThoughtsRelativePlan(envelope.Plan); err != nil {
 		return OpaqueSettlementEnvelope{}, err
 	}
-	if envelope.Fences == nil {
+	if envelope.SettledAt.IsZero() {
 		return OpaqueSettlementEnvelope{}, errors.New(
-			"opaque settlement fences is required",
+			"opaque settlement settled_at is required",
 		)
+	}
+	if envelope.FencedYAMLBlocks != nil {
+		for _, block := range *envelope.FencedYAMLBlocks {
+			if block.Language == "" {
+				return OpaqueSettlementEnvelope{}, errors.New(
+					"opaque settlement fence language is required",
+				)
+			}
+		}
 	}
 	return envelope, nil
 }
@@ -103,7 +124,7 @@ func WriteOpaqueSettlement(
 	if err != nil {
 		return "", err
 	}
-	if envelope.Session != sessionID || envelope.FinalEntryID != finalEntryID ||
+	if envelope.Session != sessionID || envelope.AssistantEntryID != finalEntryID ||
 		envelope.Plan != thoughtsRelative(planDir) {
 		return "", errors.New(
 			"opaque settlement payload does not match its immutable path identity",
@@ -129,7 +150,7 @@ func ReadOpaqueSettlement(
 	if err != nil {
 		return OpaqueSettlementPending{}, err
 	}
-	if envelope.Session != sessionID || envelope.FinalEntryID != finalEntryID ||
+	if envelope.Session != sessionID || envelope.AssistantEntryID != finalEntryID ||
 		envelope.Plan != thoughtsRelative(planDir) {
 		return OpaqueSettlementPending{}, errors.New(
 			"opaque settlement payload does not match its immutable path identity",

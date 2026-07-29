@@ -5,6 +5,8 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 	"time"
 )
@@ -17,18 +19,21 @@ const (
 // OpaqueSettlementEvidence is presentation-only evidence. Neither its raw
 // response nor its lexical YAML blocks carry an outcome or an instruction.
 type OpaqueSettlementEvidence struct {
-	Plan        string   `json:"plan"`
-	Thread      string   `json:"thread"`
-	Session     string   `json:"session"`
-	Entry       string   `json:"entry"`
-	RawResponse string   `json:"raw_response"`
-	YAMLBlocks  []string `json:"yaml_blocks"`
+	Plan        string                  `json:"plan"`
+	Thread      string                  `json:"thread"`
+	Session     string                  `json:"session"`
+	Entry       string                  `json:"entry"`
+	RawResponse string                  `json:"raw_response"`
+	YAMLBlocks  []opaqueSettlementFence `json:"yaml_blocks"`
 }
 
 type OpaqueSettlementSuccessor struct {
-	Action    string `json:"action"`
-	Target    string `json:"target,omitempty"`
-	Discovery string `json:"discovery,omitempty"`
+	Action     string `json:"action"`
+	Target     string `json:"target,omitempty"`
+	Discovery  string `json:"discovery"`
+	Rationale  string `json:"rationale"`
+	Actor      string `json:"actor"`
+	Provenance string `json:"provenance"`
 }
 
 func (s *Service) ReceiveOpaqueSettlement(
@@ -50,7 +55,7 @@ func (s *Service) ReceiveOpaqueSettlement(
 	if err != nil || envelope.Plan != request.Plan ||
 		envelope.ManagerThread != request.ManagerThread ||
 		envelope.Session != request.Session ||
-		envelope.FinalEntryID != request.FinalEntryID {
+		envelope.AssistantEntryID != request.FinalEntryID {
 		return errors.New("opaque settlement delivery does not match its response")
 	}
 	planDir, err := s.hermesPlanDirFromRelative(request.Plan)
@@ -74,8 +79,8 @@ func (s *Service) ReceiveOpaqueSettlement(
 			Thread:      request.ManagerThread,
 			Session:     request.Session,
 			Entry:       request.FinalEntryID,
-			RawResponse: string(raw),
-			YAMLBlocks:  envelope.Fences,
+			RawResponse: envelope.RawResponse,
+			YAMLBlocks:  opaqueSettlementBlocks(envelope),
 		},
 	})
 }
@@ -94,24 +99,41 @@ func (s *Service) DecideOpaqueSettlementSuccessor(
 		!safeOpaqueComponent(entry) {
 		return errors.New("safe settlement identity is required")
 	}
+	if strings.TrimSpace(successor.Actor) == "" ||
+		strings.TrimSpace(successor.Provenance) == "" ||
+		strings.TrimSpace(successor.Rationale) == "" {
+		return errors.New("decision actor, provenance, and rationale are required")
+	}
 	if err := validateOpaqueSettlementSuccessor(successor); err != nil {
 		return err
 	}
-	events, err := readHermesTranscript(planDir, threadID)
+	path := filepath.Join(
+		planDir,
+		".vamos",
+		"sessions",
+		"pi",
+		session,
+		"settlements",
+		entry+".json",
+	)
+	if err := validateOpaqueSettlementPath(planDir, path); err != nil {
+		return err
+	}
+	bytes, err := os.ReadFile(path)
 	if err != nil {
 		return err
 	}
-	found := false
-	for _, event := range events {
-		if event.Type == opaqueSettlementReceivedEvent && event.Settlement != nil &&
-			event.Settlement.Session == session &&
-			event.Settlement.Entry == entry {
-			found = true
-			break
-		}
+	envelope, err := decodeOpaqueSettlement(bytes)
+	if err != nil || envelope.ManagerThread != threadID || envelope.Session != session ||
+		envelope.AssistantEntryID != entry {
+		return errors.New("contained settlement does not match decision identity")
 	}
-	if !found {
-		return errors.New("opaque settlement was not delivered to this thread")
+	wantDiscovery := opaqueSettlementDiscoveryReference(session, entry)
+	if strings.TrimSpace(successor.Discovery) != wantDiscovery {
+		return errors.New("invalid settlement discovery reference")
+	}
+	if err := validateOpaqueSettlementTarget(planDir, successor); err != nil {
+		return err
 	}
 	return AppendHermesTranscript(
 		planDir,
@@ -136,23 +158,61 @@ func (s *Service) DecideOpaqueSettlementSuccessor(
 	)
 }
 
+func opaqueSettlementDiscoveryReference(session, entry string) string {
+	return "pi/" + session + "/settlements/" + entry + ".json"
+}
+
 func validateOpaqueSettlementSuccessor(value OpaqueSettlementSuccessor) error {
-	value.Action = strings.TrimSpace(value.Action)
-	value.Target = strings.TrimSpace(value.Target)
-	value.Discovery = strings.TrimSpace(value.Discovery)
-	switch value.Action {
-	case "none":
-		if value.Target != "" || value.Discovery != "" {
-			return errors.New("none has no successor target")
+	switch strings.TrimSpace(value.Action) {
+	case "none", "handoff":
+		if strings.TrimSpace(value.Target) != "" {
+			return errors.New("action forbids a successor target")
 		}
-	case "start_child", "steer_existing", "handoff":
-		if !safeOpaqueComponent(value.Target) || value.Discovery == "" {
-			return errors.New("successor action requires a safe target and discovery")
+	case "start_child", "steer_existing":
+		if !safeOpaqueComponent(strings.TrimSpace(value.Target)) {
+			return errors.New("successor action requires a safe target")
 		}
 	default:
 		return errors.New("unsupported successor action")
 	}
 	return nil
+}
+
+func validateOpaqueSettlementTarget(
+	planDir string,
+	value OpaqueSettlementSuccessor,
+) error {
+	target := strings.TrimSpace(value.Target)
+	switch strings.TrimSpace(value.Action) {
+	case "start_child":
+		path := filepath.Join(
+			planDir,
+			".vamos",
+			"sessions",
+			"hermes",
+			"launches",
+			target+".json",
+		)
+		if _, err := containedResolvedPath(planDir, path, ""); err != nil {
+			return err
+		}
+		if info, err := os.Stat(path); err != nil || !info.Mode().IsRegular() {
+			return errors.New("contained launch target is required")
+		}
+	case "steer_existing":
+		events, err := readHermesTranscript(planDir, target)
+		if err != nil || len(events) == 0 {
+			return errors.New("contained steer target is required")
+		}
+	}
+	return nil
+}
+
+func opaqueSettlementBlocks(envelope opaqueSettlementEnvelope) []opaqueSettlementFence {
+	if envelope.FencedYAMLBlocks == nil {
+		return nil
+	}
+	return append([]opaqueSettlementFence(nil), (*envelope.FencedYAMLBlocks)...)
 }
 
 func (s *Service) hermesPlanDirFromRelative(plan string) (string, error) {

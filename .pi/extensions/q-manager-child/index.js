@@ -63,24 +63,31 @@ function planRelative(plan) {
   return value;
 }
 
-function fenceBody(raw) {
-  const first = raw.indexOf("\n");
-  const last = raw.lastIndexOf("\n", raw.length - 2);
-  return first < 0 || last < first ? "" : raw.slice(first + 1, last + 1);
-}
-
 /** JavaScript owns these exact persisted JSON bytes. */
-export function serializeSettlement(identity, assistantEntryID, content) {
+export function serializeSettlement(
+  identity,
+  assistantEntryID,
+  content,
+  settledAt,
+) {
   const evidence = captureOpaqueSettlementEvidence(content);
   const envelope = {
     version: 1,
-    kind: "opaque_pi_settlement",
+    kind: "pi_assistant_settlement",
     session: identity.session,
     plan: planRelative(identity.plan),
     manager_thread: identity.thread,
-    final_entry_id: assistantEntryID,
-    fences: evidence.fencedYamlBlocks.map((block) => fenceBody(block.raw)),
+    assistant_entry_id: assistantEntryID,
+    settled_at: settledAt ?? new Date().toISOString(),
+    raw_response: evidence.rawResponse,
   };
+  if (evidence.fencedYamlBlocks.length)
+    envelope.fenced_yaml_blocks = evidence.fencedYamlBlocks.map(
+      ({ language, raw }) => ({
+        language,
+        raw,
+      }),
+    );
   return Buffer.from(JSON.stringify(envelope));
 }
 
@@ -216,24 +223,46 @@ export default function qManagerChildExtension(pi) {
         assistant.message.content ?? [],
       );
       pi.appendEntry(PENDING, {
+        version: 1,
         bridge_id: bridge.id,
+        manager_thread: identity.thread,
         session: identity.session,
-        final_entry_id: assistant.id,
-        bytes_base64: bytes.toString("base64"),
+        assistant_entry_id: assistant.id,
+        envelope_utf8_base64: bytes.toString("base64"),
       });
       pending = pendingFor(ctx, bridge.id);
     }
     const record = data(pending);
+    const bytes = Buffer.from(record.envelope_utf8_base64, "base64");
+    let envelope;
+    try {
+      envelope = JSON.parse(bytes.toString("utf8"));
+    } catch {
+      throw new Error("invalid opaque settlement pending bytes");
+    }
+    if (
+      record.version !== 1 ||
+      record.manager_thread !== identity.thread ||
+      record.session !== identity.session ||
+      !safeComponent(record.assistant_entry_id, "assistant entry") ||
+      envelope.version !== 1 ||
+      envelope.kind !== "pi_assistant_settlement" ||
+      envelope.manager_thread !== record.manager_thread ||
+      envelope.session !== record.session ||
+      envelope.assistant_entry_id !== record.assistant_entry_id ||
+      typeof envelope.raw_response !== "string"
+    )
+      throw new Error("invalid opaque settlement pending identity");
     await publish(
       identity.plan,
       record.session,
-      record.final_entry_id,
-      Buffer.from(record.bytes_base64, "base64"),
+      record.assistant_entry_id,
+      bytes,
     );
     pi.appendEntry(CONSUMED, {
       bridge_id: bridge.id,
       pending_id: pending.id,
-      final_entry_id: record.final_entry_id,
+      assistant_entry_id: record.assistant_entry_id,
     });
   });
 

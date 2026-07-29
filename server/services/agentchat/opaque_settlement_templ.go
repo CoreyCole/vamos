@@ -128,9 +128,9 @@ func OpaqueSettlementCard(event HermesTranscriptEvent, successorAction string) t
 						return templ_7745c5c3_Err
 					}
 					var templ_7745c5c3_Var8 string
-					templ_7745c5c3_Var8, templ_7745c5c3_Err = templ.JoinStringErrs(block)
+					templ_7745c5c3_Var8, templ_7745c5c3_Err = templ.JoinStringErrs(block.Raw)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/opaque_settlement.templ`, Line: 15, Col: 117}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/opaque_settlement.templ`, Line: 15, Col: 121}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var8))
 					if templ_7745c5c3_Err != nil {
@@ -173,12 +173,25 @@ func OpaqueSettlementCard(event HermesTranscriptEvent, successorAction string) t
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 15, "\"><select name=\"action\" class=\"rounded border border-input bg-background p-1 text-xs\"><option value=\"none\">None</option><option value=\"start_child\">Start child</option><option value=\"steer_existing\">Steer existing</option><option value=\"handoff\">Handoff</option></select><input name=\"target\" class=\"rounded border border-input bg-background p-1 text-xs\" placeholder=\"Target identity\"><input name=\"discovery\" class=\"rounded border border-input bg-background p-1 text-xs\" placeholder=\"Validated discovery\"><button type=\"submit\" class=\"rounded bg-secondary px-2 py-1 text-xs\">Record decision</button><p class=\"text-xs text-muted-foreground\">Recording this decision never executes it.</p></form>")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 15, "\"><select name=\"action\" class=\"rounded border border-input bg-background p-1 text-xs\"><option value=\"none\">None</option><option value=\"start_child\">Start child</option><option value=\"steer_existing\">Steer existing</option><option value=\"handoff\">Handoff</option></select><input name=\"target\" class=\"rounded border border-input bg-background p-1 text-xs\" placeholder=\"Target identity\"><input name=\"rationale\" class=\"rounded border border-input bg-background p-1 text-xs\" placeholder=\"Decision rationale\"><input type=\"hidden\" name=\"discovery\" value=\"")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				var templ_7745c5c3_Var11 string
+				templ_7745c5c3_Var11, templ_7745c5c3_Err = templ.JoinStringErrs(opaqueSettlementDiscoveryReference(event.Settlement.Session, event.Settlement.Entry))
+				if templ_7745c5c3_Err != nil {
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/opaque_settlement.templ`, Line: 20, Col: 819}
+				}
+				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var11))
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 16, "\"><button type=\"submit\" class=\"rounded bg-secondary px-2 py-1 text-xs\">Record decision</button><p class=\"text-xs text-muted-foreground\">Recording this decision never executes it.</p></form>")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 16, "</section>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 17, "</section>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}

@@ -12,12 +12,12 @@ templ OpaqueSettlementCard(event HermesTranscriptEvent, successorAction string) 
 				<div class="space-y-2">
 					<p class="text-xs font-medium">Opaque YAML blocks</p>
 					for _, block := range event.Settlement.YAMLBlocks {
-						<pre class="overflow-x-auto whitespace-pre-wrap rounded border border-border bg-background p-2 text-xs">{ block }</pre>
+						<pre class="overflow-x-auto whitespace-pre-wrap rounded border border-border bg-background p-2 text-xs">{ block.Raw }</pre>
 					}
 				</div>
 			}
 			if successorAction != "" {
-				<form class="space-y-2" data-on:submit={ successorAction }><p class="text-xs font-medium">Select next action</p><input type="hidden" name="plan_dir" value={ event.Settlement.Plan }/><select name="action" class="rounded border border-input bg-background p-1 text-xs"><option value="none">None</option><option value="start_child">Start child</option><option value="steer_existing">Steer existing</option><option value="handoff">Handoff</option></select><input name="target" class="rounded border border-input bg-background p-1 text-xs" placeholder="Target identity"/><input name="discovery" class="rounded border border-input bg-background p-1 text-xs" placeholder="Validated discovery"/><button type="submit" class="rounded bg-secondary px-2 py-1 text-xs">Record decision</button><p class="text-xs text-muted-foreground">Recording this decision never executes it.</p></form>
+				<form class="space-y-2" data-on:submit={ successorAction }><p class="text-xs font-medium">Select next action</p><input type="hidden" name="plan_dir" value={ event.Settlement.Plan }/><select name="action" class="rounded border border-input bg-background p-1 text-xs"><option value="none">None</option><option value="start_child">Start child</option><option value="steer_existing">Steer existing</option><option value="handoff">Handoff</option></select><input name="target" class="rounded border border-input bg-background p-1 text-xs" placeholder="Target identity"/><input name="rationale" class="rounded border border-input bg-background p-1 text-xs" placeholder="Decision rationale"/><input type="hidden" name="discovery" value={ opaqueSettlementDiscoveryReference(event.Settlement.Session, event.Settlement.Entry) }/><button type="submit" class="rounded bg-secondary px-2 py-1 text-xs">Record decision</button><p class="text-xs text-muted-foreground">Recording this decision never executes it.</p></form>
 			}
 		</section>
 	}

@@ -4,46 +4,50 @@
       "name": "zero fences",
       "envelope": {
         "version": 1,
-        "kind": "opaque_pi_settlement",
+        "kind": "pi_assistant_settlement",
         "session": "session-zero",
         "plan": "CoreyCole/plans/example",
         "manager_thread": "thread-zero",
-        "final_entry_id": "entry-zero",
-        "fences": []
-      },
-      "expected_json_base64": "eyJ2ZXJzaW9uIjoxLCJraW5kIjoib3BhcXVlX3BpX3NldHRsZW1lbnQiLCJzZXNzaW9uIjoic2Vzc2lvbi16ZXJvIiwicGxhbiI6IkNvcmV5Q29sZS9wbGFucy9leGFtcGxlIiwibWFuYWdlcl90aHJlYWQiOiJ0aHJlYWQtemVybyIsImZpbmFsX2VudHJ5X2lkIjoiZW50cnktemVybyIsImZlbmNlcyI6W119"
+        "assistant_entry_id": "entry-zero",
+        "settled_at": "2026-07-29T19:00:00.000Z",
+        "raw_response": "plain\nresponse"
+      }
     },
     {
       "name": "one multiline fence",
       "envelope": {
         "version": 1,
-        "kind": "opaque_pi_settlement",
+        "kind": "pi_assistant_settlement",
         "session": "session-one",
         "plan": "CoreyCole/plans/example",
         "manager_thread": "thread-one",
-        "final_entry_id": "entry-one",
-        "fences": [
-          "first line\nsecond line\n"
+        "assistant_entry_id": "entry-one",
+        "settled_at": "2026-07-29T19:00:01.000Z",
+        "raw_response": "```yaml\nfirst line\nsecond line\n```\n",
+        "fenced_yaml_blocks": [
+          {
+            "language": "yaml",
+            "raw": "```yaml\nfirst line\nsecond line\n```\n"
+          }
         ]
-      },
-      "expected_json_base64": "eyJ2ZXJzaW9uIjoxLCJraW5kIjoib3BhcXVlX3BpX3NldHRsZW1lbnQiLCJzZXNzaW9uIjoic2Vzc2lvbi1vbmUiLCJwbGFuIjoiQ29yZXlDb2xlL3BsYW5zL2V4YW1wbGUiLCJtYW5hZ2VyX3RocmVhZCI6InRocmVhZC1vbmUiLCJmaW5hbF9lbnRyeV9pZCI6ImVudHJ5LW9uZSIsImZlbmNlcyI6WyJmaXJzdCBsaW5lXG5zZWNvbmQgbGluZVxuIl19"
+      }
     },
     {
       "name": "many empty unicode and crlf fences",
       "envelope": {
         "version": 1,
-        "kind": "opaque_pi_settlement",
+        "kind": "pi_assistant_settlement",
         "session": "session-many",
         "plan": "CoreyCole/plans/example",
         "manager_thread": "thread-many",
-        "final_entry_id": "entry-many",
-        "fences": [
-          "",
-          "café 🌰",
-          "alpha\r\nbeta\r\n"
+        "assistant_entry_id": "entry-many",
+        "settled_at": "2026-07-29T19:00:02.000Z",
+        "raw_response": "```YML\r\n```\r\n```yaml\ncafé 🌰\n```\n",
+        "fenced_yaml_blocks": [
+          { "language": "YML", "raw": "```YML\r\n```\r\n" },
+          { "language": "yaml", "raw": "```yaml\ncafé 🌰\n```\n" }
         ]
-      },
-      "expected_json_base64": "eyJ2ZXJzaW9uIjoxLCJraW5kIjoib3BhcXVlX3BpX3NldHRsZW1lbnQiLCJzZXNzaW9uIjoic2Vzc2lvbi1tYW55IiwicGxhbiI6IkNvcmV5Q29sZS9wbGFucy9leGFtcGxlIiwibWFuYWdlcl90aHJlYWQiOiJ0aHJlYWQtbWFueSIsImZpbmFsX2VudHJ5X2lkIjoiZW50cnktbWFueSIsImZlbmNlcyI6WyIiLCJjYWbDqSDwn4ywIiwiYWxwaGFcclxuYmV0YVxyXG4iXX0="
+      }
     }
   ]
 }

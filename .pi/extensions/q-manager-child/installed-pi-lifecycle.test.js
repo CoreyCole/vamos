@@ -166,18 +166,17 @@ test("installed managed Pi persists a text-only, no-YAML settlement without a pr
           (entry) =>
             entry.type === "custom" &&
             entry.customType === "q-manager-child/settlement-consumed",
-        ).data.final_entry_id + ".json",
+        ).data.assistant_entry_id + ".json",
       ),
       "utf8",
     ),
   );
-  assert.deepEqual(settlement, {
-    version: 1,
-    kind: "opaque_pi_settlement",
-    session: "installed-session",
-    plan: "CoreyCole/plans/installed-pi",
-    manager_thread: "installed-thread",
-    final_entry_id: settlement.final_entry_id,
-    fences: [],
-  });
+  assert.equal(settlement.version, 1);
+  assert.equal(settlement.kind, "pi_assistant_settlement");
+  assert.equal(settlement.session, "installed-session");
+  assert.equal(settlement.plan, "CoreyCole/plans/installed-pi");
+  assert.equal(settlement.manager_thread, "installed-thread");
+  assert.equal(typeof settlement.assistant_entry_id, "string");
+  assert.equal(settlement.raw_response, "outcome: complete");
+  assert.equal(settlement.fenced_yaml_blocks, undefined);
 });

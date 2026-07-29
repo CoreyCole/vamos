@@ -39,14 +39,21 @@ type OpaqueSettlementDeliveryRequest struct {
 	SettlementBytesBase64 string `json:"settlement_bytes_base64"`
 }
 
+type opaqueSettlementFence struct {
+	Language string `json:"language"`
+	Raw      string `json:"raw"`
+}
+
 type opaqueSettlementEnvelope struct {
-	Version       int      `json:"version"`
-	Kind          string   `json:"kind"`
-	Session       string   `json:"session"`
-	Plan          string   `json:"plan"`
-	ManagerThread string   `json:"manager_thread"`
-	FinalEntryID  string   `json:"final_entry_id"`
-	Fences        []string `json:"fences"`
+	Version          int                      `json:"version"`
+	Kind             string                   `json:"kind"`
+	Session          string                   `json:"session"`
+	Plan             string                   `json:"plan"`
+	ManagerThread    string                   `json:"manager_thread"`
+	AssistantEntryID string                   `json:"assistant_entry_id"`
+	SettledAt        time.Time                `json:"settled_at"`
+	RawResponse      string                   `json:"raw_response"`
+	FencedYAMLBlocks *[]opaqueSettlementFence `json:"fenced_yaml_blocks,omitempty"`
 }
 
 // OpaqueSettlementReceiver is deliberately a one-way delivery boundary. It
@@ -273,7 +280,7 @@ func (a *OpaqueSettlementDeliveryActivities) deliverOne(
 	}
 	parts := strings.Split(filepath.ToSlash(rel), "/")
 	if len(parts) != 3 || parts[1] != "settlements" ||
-		strings.TrimSuffix(parts[2], ".json") != envelope.FinalEntryID ||
+		strings.TrimSuffix(parts[2], ".json") != envelope.AssistantEntryID ||
 		parts[0] != envelope.Session {
 		return errors.New("opaque settlement path identity mismatch")
 	}
@@ -290,7 +297,7 @@ func (a *OpaqueSettlementDeliveryActivities) deliverOne(
 	projection, err := opaqueSettlementProjectionPath(
 		planDir,
 		envelope.Session,
-		envelope.FinalEntryID,
+		envelope.AssistantEntryID,
 	)
 	if err != nil {
 		return err
@@ -310,12 +317,12 @@ func (a *OpaqueSettlementDeliveryActivities) deliverOne(
 		DeliveryID: opaqueSettlementDeliveryID(
 			envelope.Plan,
 			envelope.Session,
-			envelope.FinalEntryID,
+			envelope.AssistantEntryID,
 		),
 		Plan:                  envelope.Plan,
 		ManagerThread:         envelope.ManagerThread,
 		Session:               envelope.Session,
-		FinalEntryID:          envelope.FinalEntryID,
+		FinalEntryID:          envelope.AssistantEntryID,
 		SettlementBytesBase64: base64.StdEncoding.EncodeToString(data),
 	}
 	if err := appendOpaqueSettlementAttempt(planDir, request, "started"); err != nil {
@@ -359,6 +366,13 @@ func VerifyHermesPiRunBinding(planDir, hintedThread, session string) error {
 
 func decodeOpaqueSettlement(data []byte) (opaqueSettlementEnvelope, error) {
 	var e opaqueSettlementEnvelope
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal(data, &fields); err != nil {
+		return e, err
+	}
+	if raw, ok := fields["raw_response"]; !ok || len(raw) == 0 || raw[0] != '"' {
+		return e, errors.New("opaque settlement raw_response is required")
+	}
 	d := json.NewDecoder(bytes.NewReader(data))
 	d.DisallowUnknownFields()
 	if err := d.Decode(&e); err != nil {
@@ -367,11 +381,17 @@ func decodeOpaqueSettlement(data []byte) (opaqueSettlementEnvelope, error) {
 	if err := d.Decode(&struct{}{}); !errors.Is(err, io.EOF) {
 		return e, errors.New("opaque settlement has trailing data")
 	}
-	if e.Version != 1 || e.Kind != "opaque_pi_settlement" || e.Fences == nil ||
-		!safeOpaqueComponent(e.Session) ||
-		!safeOpaqueComponent(e.ManagerThread) ||
-		!safeOpaqueComponent(e.FinalEntryID) {
+	if e.Version != 1 || e.Kind != "pi_assistant_settlement" || e.SettledAt.IsZero() ||
+		!safeOpaqueComponent(e.Session) || !safeOpaqueComponent(e.ManagerThread) ||
+		!safeOpaqueComponent(e.AssistantEntryID) || strings.TrimSpace(e.Plan) == "" {
 		return e, errors.New("invalid opaque settlement")
+	}
+	if e.FencedYAMLBlocks != nil {
+		for _, block := range *e.FencedYAMLBlocks {
+			if block.Language == "" {
+				return e, errors.New("invalid opaque settlement fence")
+			}
+		}
 	}
 	return e, nil
 }
