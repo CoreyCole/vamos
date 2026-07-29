@@ -1,6 +1,7 @@
 package hermescmd
 
 import (
+	"bytes"
 	"context"
 	"crypto/rand"
 	"encoding/hex"
@@ -9,6 +10,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -21,6 +23,8 @@ type StartPiInput struct {
 	Plan            string
 	PreviousSession string
 	Task            string
+	ThreadID        string
+	ConfigPath      string
 }
 
 type (
@@ -56,15 +60,25 @@ func newStartCommand(run commandRunner) *cobra.Command {
 			if err != nil {
 				return err
 			}
+			if err := ValidateSafeComponent(session); err != nil {
+				return fmt.Errorf("validate generated Pi session: %w", err)
+			}
 			var prior *PiResult
 			if input.PreviousSession != "" {
+				if err := ValidateSafeComponent(input.PreviousSession); err != nil {
+					return fmt.Errorf("validate previous Pi session: %w", err)
+				}
 				result, err := ReadPiResult(ctx.PlanDir, input.PreviousSession)
 				if err != nil {
 					return fmt.Errorf("read previous result: %w", err)
 				}
 				prior = &result
 			}
-			prompt := RenderPiPrompt(ctx, input.Task, input.PreviousSession)
+			threadID, managed, err := resolveManagedHermesThread(input.ThreadID)
+			if err != nil {
+				return err
+			}
+			prompt := RenderPiPrompt(ctx, input.Task, input.PreviousSession, managed)
 			contextArgs, err := piContextArgs(ctx, prior)
 			if err != nil {
 				return err
@@ -77,7 +91,14 @@ func newStartCommand(run commandRunner) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			env := append(os.Environ(), "VAMOS_PLAN_DIR="+ctx.PlanDir)
+			if managed {
+				if err := registerManagedPiRun(
+					cmd.Context(), input.ConfigPath, ctx.PlanDir, threadID, session,
+				); err != nil {
+					return err
+				}
+			}
+			env := managedPiEnvironment(os.Environ(), ctx.PlanDir, session, threadID)
 			fmt.Fprintln(cmd.OutOrStdout(), "pi session:", session)
 			piArgs := append(
 				[]string{"--session-id", session, "--session-dir", dir},
@@ -96,8 +117,121 @@ func newStartCommand(run commandRunner) *cobra.Command {
 	cmd.Flags().StringVar(&input.Plan, "plan", "", "absolute plan directory")
 	cmd.Flags().
 		StringVar(&input.PreviousSession, "previous-session", "", "prior Pi session ID")
+	cmd.Flags().StringVar(&input.ThreadID, "thread-id", "", "owning Hermes thread ID")
+	cmd.Flags().
+		StringVar(&input.ConfigPath, "config", "", "host-local Hermes config path")
 	_ = cmd.MarkFlagRequired("plan")
 	return cmd
+}
+
+func resolveManagedHermesThread(
+	requested string,
+) (threadID string, managed bool, err error) {
+	threadID = strings.TrimSpace(requested)
+	if threadID == "" {
+		threadID = strings.TrimSpace(os.Getenv("VAMOS_HERMES_THREAD_ID"))
+	}
+	if threadID == "" {
+		return "", false, nil
+	}
+	if err := ValidateSafeComponent(threadID); err != nil {
+		return "", false, fmt.Errorf("validate Hermes thread ID: %w", err)
+	}
+	return threadID, true, nil
+}
+
+func managedPiEnvironment(base []string, planDir, session, threadID string) []string {
+	authoritative := map[string]string{
+		"VAMOS_PLAN_DIR": planDir,
+		"PI_SESSION_ID":  session,
+	}
+	if threadID != "" {
+		authoritative["VAMOS_HERMES_THREAD_ID"] = threadID
+	}
+	env := make([]string, 0, len(base)+len(authoritative))
+	for _, entry := range base {
+		key, _, found := strings.Cut(entry, "=")
+		if found {
+			if _, replace := authoritative[key]; replace {
+				continue
+			}
+		}
+		env = append(env, entry)
+	}
+	for _, key := range []string{"VAMOS_PLAN_DIR", "PI_SESSION_ID", "VAMOS_HERMES_THREAD_ID"} {
+		if value, ok := authoritative[key]; ok {
+			env = append(env, key+"="+value)
+		}
+	}
+	return env
+}
+
+func registerManagedPiRun(
+	ctx context.Context,
+	configPath, planDir, threadID, session string,
+) error {
+	if threadID == "" {
+		return nil
+	}
+	if err := ValidateSafeComponent(threadID); err != nil {
+		return fmt.Errorf("validate Hermes thread ID: %w", err)
+	}
+	if err := ValidateSafeComponent(session); err != nil {
+		return fmt.Errorf("validate Pi session ID: %w", err)
+	}
+	if configPath == "" {
+		var err error
+		configPath, err = defaultConfigPath()
+		if err != nil {
+			return err
+		}
+	}
+	config, err := readHostConfig(configPath)
+	if err != nil {
+		return fmt.Errorf("read Hermes host configuration: %w", err)
+	}
+	if strings.TrimSpace(config.VamosURL) == "" ||
+		strings.TrimSpace(config.CallbackToken) == "" {
+		return errors.New(
+			"Vamos callback URL and credential are required; rerun hermes setup",
+		)
+	}
+	payload, err := json.Marshal(struct {
+		PlanDir     string `json:"plan_dir"`
+		ID          string `json:"id"`
+		Type        string `json:"type"`
+		PiSessionID string `json:"pi_session_id"`
+	}{
+		PlanDir:     planDir,
+		ID:          "pi-run-" + session,
+		Type:        "pi_run",
+		PiSessionID: session,
+	})
+	if err != nil {
+		return err
+	}
+	req, err := http.NewRequestWithContext(
+		ctx,
+		http.MethodPost,
+		strings.TrimRight(config.VamosURL, "/")+
+			"/agent-chat/api/hermes/threads/"+url.PathEscape(threadID)+"/events",
+		bytes.NewReader(payload),
+	)
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Authorization", "Bearer "+config.CallbackToken)
+	req.Header.Set("Content-Type", "application/json")
+	response, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer response.Body.Close()
+	if response.StatusCode/100 != 2 {
+		return fmt.Errorf("register managed Pi run: %s", response.Status)
+	}
+
+	return nil
 }
 
 func piContextArgs(ctx PlanContext, prior *PiResult) ([]string, error) {
@@ -175,12 +309,17 @@ func writePromptFile(dir, session, prompt string) (string, error) {
 	return path, os.WriteFile(path, []byte(prompt), 0o600)
 }
 
-func RenderPiPrompt(plan PlanContext, task, previous string) string {
+func RenderPiPrompt(plan PlanContext, task, previous string, managed bool) string {
+	completion := "Finish by creating durable artifacts, then call `vamos hermes pi done` with PI_SESSION_ID."
+	if managed {
+		completion = "Finish by creating durable artifacts and explain the result normally. You may include one compact YAML lifecycle intent (for example `outcome: handoff`) in your final response, but do not invoke completion commands."
+	}
 	return fmt.Sprintf(
-		"You are an isolated Pi worker.\nPlan: %s\nGoal: %s\nTask: %s\nFinish by creating durable artifacts, then call `vamos hermes pi done` with PI_SESSION_ID.\n",
+		"You are an isolated Pi worker.\nPlan: %s\nGoal: %s\nTask: %s\n%s\n",
 		plan.PlanRel,
 		plan.PlanGoal,
 		task,
+		completion,
 	)
 }
 

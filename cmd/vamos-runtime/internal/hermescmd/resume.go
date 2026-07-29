@@ -141,6 +141,7 @@ func newDoctorCommand() *cobra.Command {
 }
 
 func newContinueCommand(run commandRunner) *cobra.Command {
+	var threadID, configPath string
 	cmd := &cobra.Command{
 		Use: "continue <short-id>", Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -160,6 +161,9 @@ func newContinueCommand(run commandRunner) *cobra.Command {
 			if err != nil {
 				return err
 			}
+			if err := ValidateSafeComponent(entry.Session); err != nil {
+				return fmt.Errorf("validate previous Pi session: %w", err)
+			}
 			result, err := ReadPiResult(plan.PlanDir, entry.Session)
 			if err != nil {
 				return err
@@ -168,10 +172,18 @@ func newContinueCommand(run commandRunner) *cobra.Command {
 			if err != nil {
 				return err
 			}
+			if err := ValidateSafeComponent(session); err != nil {
+				return fmt.Errorf("validate generated Pi session: %w", err)
+			}
+			threadID, managed, err := resolveManagedHermesThread(threadID)
+			if err != nil {
+				return err
+			}
 			prompt := RenderPiPrompt(
 				plan,
 				"Continue the "+string(result.Next)+" stage using the previous result.",
 				entry.Session,
+				managed,
 			)
 			contextArgs, err := piContextArgs(plan, &result)
 			if err != nil {
@@ -185,6 +197,13 @@ func newContinueCommand(run commandRunner) *cobra.Command {
 			if err != nil {
 				return err
 			}
+			if managed {
+				if err := registerManagedPiRun(
+					cmd.Context(), configPath, plan.PlanDir, threadID, session,
+				); err != nil {
+					return err
+				}
+			}
 			fmt.Fprintln(cmd.OutOrStdout(), "pi session:", session)
 			piArgs := append(
 				[]string{"--session-id", session, "--session-dir", dir},
@@ -194,12 +213,14 @@ func newContinueCommand(run commandRunner) *cobra.Command {
 				cmd.Context(),
 				"pi",
 				piArgs,
-				append(os.Environ(), "VAMOS_PLAN_DIR="+plan.PlanDir),
+				managedPiEnvironment(os.Environ(), plan.PlanDir, session, threadID),
 				cmd.OutOrStdout(),
 				cmd.ErrOrStderr(),
 			)
 		},
 	}
+	cmd.Flags().StringVar(&threadID, "thread-id", "", "owning Hermes thread ID")
+	cmd.Flags().StringVar(&configPath, "config", "", "host-local Hermes config path")
 	return cmd
 }
 

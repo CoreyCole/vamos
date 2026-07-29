@@ -60,6 +60,24 @@ func thoughtsRelative(path string) string {
 	return filepath.ToSlash(clean)
 }
 
+// ValidateSafeComponent accepts opaque IDs used as one filesystem path component.
+// Components may contain ASCII letters, digits, hyphens, and underscores only.
+func ValidateSafeComponent(value string) error {
+	if value == "" || value == "." || value == ".." {
+		return fmt.Errorf("unsafe empty or dot path component %q", value)
+	}
+	for _, character := range value {
+		if (character >= 'a' && character <= 'z') ||
+			(character >= 'A' && character <= 'Z') ||
+			(character >= '0' && character <= '9') ||
+			character == '-' || character == '_' {
+			continue
+		}
+		return fmt.Errorf("unsafe path component %q", value)
+	}
+	return nil
+}
+
 func ResultPath(planDir, sessionID string) string {
 	return filepath.Join(planDir, ".vamos", "sessions", "pi", sessionID+"_result.yaml")
 }
