@@ -1,5 +1,11 @@
 import { relative, resolve } from "node:path";
 
+export {
+  captureOpaqueSettlementEvidence,
+  captureOpaqueYamlFences,
+  projectPersistedAssistantText,
+} from "./opaque-settlement-capture.js";
+
 function safeComponent(value, label) {
   if (!/^[A-Za-z0-9_-]+$/.test(value ?? ""))
     throw new Error(`unsafe ${label} path component`);
