@@ -1350,6 +1350,16 @@ func main() {
 			Syncer: agentChatService.PlanWorkspaceDiscoverySyncer(),
 			Guard:  workspaceSyncGuard,
 		})
+		agentchat.RegisterOpaqueSettlementDelivery(
+			goWorker,
+			&agentchat.OpaqueSettlementDeliveryActivities{
+				ThoughtsRoot: basePath,
+				PlanSource:   agentchat.PlanWorkspaceScanner{ThoughtsRoot: basePath},
+				Receiver: agentchat.HTTPOpaqueSettlementReceiver{
+					URL: cfg.HermesGatewayURL, Token: cfg.HermesGatewayToken,
+				},
+			},
+		)
 	}
 	if temporalManager != nil {
 		input := agentChatService.WorkspaceSyncInput()
@@ -1366,6 +1376,14 @@ func main() {
 			log.Printf(
 				"Agent Chat workspace sync schedule ensured for %s",
 				input.ProjectInstanceKey,
+			)
+		}
+		if err := agentchat.EnsureOpaqueSettlementDeliverySchedule(
+			runtimeCtx, temporalManager.Client(), basePath,
+		); err != nil {
+			log.Printf(
+				"Warning: failed to ensure opaque settlement delivery schedule: %v",
+				err,
 			)
 		}
 		if err := agentchat.DeleteDeprecatedPlanWorkspaceDiscoverySchedule(
