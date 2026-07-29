@@ -3,6 +3,7 @@ package hermescmd
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"io"
@@ -10,6 +11,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"sync"
 	"testing"
@@ -47,6 +49,124 @@ func testPlan(t *testing.T) PlanContext {
 		t.Fatal(err)
 	}
 	return ctx
+}
+
+func TestOpaqueSettlementFixturePairsDecodeExactJavaScriptBytes(t *testing.T) {
+	data, err := os.ReadFile(
+		filepath.Join(
+			"..",
+			"..",
+			"..",
+			"..",
+			".pi",
+			"extensions",
+			"q-manager-child",
+			"fixtures",
+			"opaque-settlement-fixtures.json",
+		),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var fixtures struct {
+		Cases []struct {
+			Name               string                   `json:"name"`
+			Envelope           OpaqueSettlementEnvelope `json:"envelope"`
+			ExpectedJSONBase64 string                   `json:"expected_json_base64"`
+		} `json:"cases"`
+	}
+	if err := json.Unmarshal(data, &fixtures); err != nil {
+		t.Fatal(err)
+	}
+	for _, fixture := range fixtures.Cases {
+		t.Run(fixture.Name, func(t *testing.T) {
+			raw, err := base64.StdEncoding.DecodeString(fixture.ExpectedJSONBase64)
+			if err != nil {
+				t.Fatal(err)
+			}
+			got, err := DecodeOpaqueSettlementEnvelope(raw)
+			if err != nil || !reflect.DeepEqual(got, fixture.Envelope) {
+				t.Fatalf(
+					"DecodeOpaqueSettlementEnvelope() = %#v, %v; want %#v",
+					got,
+					err,
+					fixture.Envelope,
+				)
+			}
+		})
+	}
+}
+
+func TestOpaqueSettlementPersistsExactBytesAndRecoversBase64(t *testing.T) {
+	ctx := testPlan(t)
+	raw := []byte(
+		`{"version":1,"kind":"opaque_pi_settlement","session":"session-1","plan":"` + ctx.PlanRel + `","manager_thread":"thread-1","final_entry_id":"entry-1","fences":["","café 🌰","line one\r\nline two\r\n"]}`,
+	)
+	path, err := WriteOpaqueSettlement(ctx.PlanDir, "session-1", "entry-1", raw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want, err := SettlementPath(
+		ctx.PlanDir,
+		"session-1",
+		"entry-1",
+	); err != nil ||
+		path != want {
+		t.Fatalf("path = %q, %v; want %q", path, err, want)
+	}
+	pending, err := ReadOpaqueSettlement(ctx.PlanDir, "session-1", "entry-1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := pending.BytesBase64; got != base64.StdEncoding.EncodeToString(raw) {
+		t.Fatalf("base64 = %q, want exact source bytes", got)
+	}
+	if !reflect.DeepEqual(
+		pending.Envelope.Fences,
+		[]string{"", "café 🌰", "line one\r\nline two\r\n"},
+	) {
+		t.Fatalf("fences = %#v", pending.Envelope.Fences)
+	}
+	if info, err := os.Stat(path); err != nil || info.Mode().Perm() != 0o600 {
+		t.Fatalf("mode=%v err=%v", info.Mode(), err)
+	}
+	if _, err := WriteOpaqueSettlement(
+		ctx.PlanDir,
+		"session-1",
+		"entry-1",
+		raw,
+	); err != nil {
+		t.Fatalf("equal-byte retry: %v", err)
+	}
+	if _, err := WriteOpaqueSettlement(
+		ctx.PlanDir,
+		"session-1",
+		"entry-1",
+		append(raw, '\n'),
+	); err == nil ||
+		!strings.Contains(err.Error(), "immutable opaque settlement identity conflict") {
+		t.Fatalf("different-byte retry = %v", err)
+	}
+}
+
+func TestOpaqueSettlementRejectsMalformedOrUnsafePayloads(t *testing.T) {
+	ctx := testPlan(t)
+	for _, raw := range [][]byte{
+		[]byte(`{"version":2,"kind":"opaque_pi_settlement","session":"session","plan":"` + ctx.PlanRel + `","manager_thread":"thread","final_entry_id":"entry","fences":[]}`),
+		[]byte(`{"version":1,"kind":"opaque_pi_settlement","session":"../session","plan":"` + ctx.PlanRel + `","manager_thread":"thread","final_entry_id":"entry","fences":[]}`),
+		[]byte(`{"version":1,"kind":"opaque_pi_settlement","session":"session","plan":"/absolute","manager_thread":"thread","final_entry_id":"entry","fences":[]}`),
+		[]byte(`{"version":1,"kind":"opaque_pi_settlement","session":"session","plan":"` + ctx.PlanRel + `","manager_thread":"thread","final_entry_id":"entry","fences":null}`),
+	} {
+		if _, err := DecodeOpaqueSettlementEnvelope(raw); err == nil {
+			t.Fatalf("accepted invalid envelope %s", raw)
+		}
+	}
+	if _, err := SettlementPath(ctx.PlanDir, "../session", "entry"); err == nil {
+		t.Fatal("accepted traversal settlement path")
+	}
+	if _, err := ReadOpaqueSettlement(ctx.PlanDir, "session", "../entry"); err == nil {
+		t.Fatal("accepted traversal settlement read")
+	}
 }
 
 func TestWritePiResultOverwritesCurrentConclusion(t *testing.T) {

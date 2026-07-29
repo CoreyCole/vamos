@@ -187,6 +187,33 @@ func CheckpointPath(planDir, sessionID, finalEntryID string) (string, error) {
 	return path, nil
 }
 
+// SettlementPath is the only durable location for a v1 opaque settlement.
+func SettlementPath(planDir, sessionID, finalEntryID string) (string, error) {
+	if err := ValidateSafeComponent(sessionID); err != nil {
+		return "", fmt.Errorf("settlement session: %w", err)
+	}
+	if err := ValidateSafeComponent(finalEntryID); err != nil {
+		return "", fmt.Errorf("settlement final entry: %w", err)
+	}
+	planDir, err := filepath.Abs(planDir)
+	if err != nil {
+		return "", err
+	}
+	path := filepath.Join(
+		planDir,
+		".vamos",
+		"sessions",
+		"pi",
+		sessionID,
+		"settlements",
+		finalEntryID+".json",
+	)
+	if !pathWithinPlan(path, planDir) {
+		return "", fmt.Errorf("settlement path escapes plan directory")
+	}
+	return path, nil
+}
+
 func DeliveryAttemptPath(
 	planDir, sessionID, finalEntryID string,
 	attempt uint64,
