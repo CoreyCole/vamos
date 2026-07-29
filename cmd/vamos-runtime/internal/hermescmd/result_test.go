@@ -116,6 +116,74 @@ func TestPiCheckpointExtensionCanonicalFixture(t *testing.T) {
 	}
 }
 
+func TestPiArtifactSchemaDispatchKeepsLegacyAndOpaquePathsDistinct(t *testing.T) {
+	ctx := testPlan(t)
+	tests := []struct {
+		name string
+		path string
+		want PiArtifactSchema
+	}{
+		{
+			name: "legacy manual result",
+			path: ResultPath(ctx.PlanDir, "session-1"),
+			want: PiArtifactSchema{Kind: PiArtifactLegacyResult, Version: 1},
+		},
+		{
+			name: "legacy managed checkpoint",
+			path: filepath.Join(
+				ctx.PlanDir,
+				".vamos",
+				"sessions",
+				"pi",
+				"session-1",
+				"checkpoints",
+				"entry-1.yaml",
+			),
+			want: PiArtifactSchema{Kind: PiArtifactLegacyCheckpoint, Version: 2},
+		},
+		{
+			name: "opaque settlement reserved path",
+			path: filepath.Join(
+				ctx.PlanDir,
+				".vamos",
+				"sessions",
+				"pi",
+				"session-1",
+				"settlements",
+				"entry-1.json",
+			),
+			want: PiArtifactSchema{Kind: PiArtifactOpaqueSettlement, Version: 1},
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			got, err := PiArtifactSchemaForPath(ctx.PlanDir, test.path)
+			if err != nil || got != test.want {
+				t.Fatalf(
+					"PiArtifactSchemaForPath() = %#v, %v; want %#v",
+					got,
+					err,
+					test.want,
+				)
+			}
+		})
+	}
+	if _, err := PiArtifactSchemaForPath(
+		ctx.PlanDir,
+		filepath.Join(
+			ctx.PlanDir,
+			".vamos",
+			"sessions",
+			"pi",
+			"session-1",
+			"checkpoints",
+			"entry-1.json",
+		),
+	); err == nil {
+		t.Fatal("accepted a checkpoint path as an opaque settlement")
+	}
+}
+
 func TestPiCheckpointIsImmutableAndCanonical(t *testing.T) {
 	ctx := testPlan(t)
 	checkpoint := PiCheckpoint{

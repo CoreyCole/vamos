@@ -16,6 +16,75 @@ type PlanContext struct {
 	ImplementationWorkspace string
 }
 
+type PiArtifactKind string
+
+const (
+	PiArtifactLegacyResult     PiArtifactKind = "legacy_pi_result"
+	PiArtifactLegacyCheckpoint PiArtifactKind = "legacy_managed_checkpoint"
+	PiArtifactOpaqueSettlement PiArtifactKind = "opaque_settlement"
+)
+
+type PiArtifactSchema struct {
+	Kind    PiArtifactKind
+	Version int
+}
+
+func PiArtifactSchemaForPath(planDir, artifactPath string) (PiArtifactSchema, error) {
+	planDir, err := filepath.Abs(planDir)
+	if err != nil {
+		return PiArtifactSchema{}, err
+	}
+	artifactPath, err = filepath.Abs(artifactPath)
+	if err != nil {
+		return PiArtifactSchema{}, err
+	}
+	if !pathWithinPlan(artifactPath, planDir) {
+		return PiArtifactSchema{}, fmt.Errorf("Pi artifact path escapes plan directory")
+	}
+	rel, err := filepath.Rel(
+		filepath.Join(planDir, ".vamos", "sessions", "pi"),
+		artifactPath,
+	)
+	if err != nil {
+		return PiArtifactSchema{}, err
+	}
+	parts := strings.Split(filepath.ToSlash(rel), "/")
+	if len(parts) == 1 && strings.HasSuffix(parts[0], "_result.yaml") {
+		session := strings.TrimSuffix(parts[0], "_result.yaml")
+		if err := ValidateSafeComponent(session); err == nil {
+			return PiArtifactSchema{Kind: PiArtifactLegacyResult, Version: 1}, nil
+		}
+	}
+	if len(parts) == 3 && parts[1] == "checkpoints" &&
+		strings.HasSuffix(parts[2], ".yaml") {
+		if err := ValidateSafeComponent(parts[0]); err != nil {
+			return PiArtifactSchema{}, err
+		}
+		if err := ValidateSafeComponent(
+			strings.TrimSuffix(parts[2], ".yaml"),
+		); err != nil {
+			return PiArtifactSchema{}, err
+		}
+		return PiArtifactSchema{Kind: PiArtifactLegacyCheckpoint, Version: 2}, nil
+	}
+	if len(parts) == 3 && parts[1] == "settlements" &&
+		strings.HasSuffix(parts[2], ".json") {
+		if err := ValidateSafeComponent(parts[0]); err != nil {
+			return PiArtifactSchema{}, err
+		}
+		if err := ValidateSafeComponent(
+			strings.TrimSuffix(parts[2], ".json"),
+		); err != nil {
+			return PiArtifactSchema{}, err
+		}
+		return PiArtifactSchema{Kind: PiArtifactOpaqueSettlement, Version: 1}, nil
+	}
+	return PiArtifactSchema{}, fmt.Errorf(
+		"unrecognized Pi artifact path %q",
+		artifactPath,
+	)
+}
+
 type planFrontmatter struct {
 	PlanGoal                string `yaml:"plan_goal"`
 	ImplementationWorkspace string `yaml:"implementation_workspace"`

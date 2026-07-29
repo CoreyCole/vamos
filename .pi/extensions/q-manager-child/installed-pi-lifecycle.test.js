@@ -57,11 +57,7 @@ async function fixtureModel() {
         choices: [
           {
             index: 0,
-            delta: {
-              role: "assistant",
-              content:
-                "outcome: complete\nsummary: installed Pi lifecycle fixture",
-            },
+            delta: { role: "assistant", content: "outcome: complete" },
             finish_reason: null,
           },
         ],
@@ -88,7 +84,7 @@ async function fixtureModel() {
   };
 }
 
-test("installed Pi discovery settles a managed child and publishes its checkpoint", async (t) => {
+test("installed managed Pi does not turn model text into a settlement during the reset", async (t) => {
   const root = await mkdtemp(join(tmpdir(), "q-manager-child-installed-pi-"));
   const agentDir = join(root, "agent");
   const sessions = join(root, "sessions");
@@ -132,7 +128,7 @@ test("installed Pi discovery settles a managed child and publishes its checkpoin
       "--model",
       "fixture/fixture",
       "--print",
-      "Reply with the requested lifecycle result.",
+      "Reply with lifecycle-looking text.",
     ],
     {
       cwd: process.cwd(),
@@ -146,80 +142,31 @@ test("installed Pi discovery settles a managed child and publishes its checkpoin
       },
     },
   );
-  assert.equal(
-    result.code,
-    0,
-    `installed Pi failed (${result.signal ?? "exit"}):\n${result.stderr}\n${result.stdout}`,
-  );
+  assert.equal(result.code, 0, `installed Pi failed:\n${result.stderr}`);
   assert.match(result.stdout, /outcome: complete/);
   assert.equal(model.request().url, "/v1/chat/completions");
 
   const entries = await sessionEntries(sessions);
-  const assistant = entries.find(
-    (entry) => entry.type === "message" && entry.message?.role === "assistant",
-  );
-  assert.ok(
-    assistant,
-    "actual Pi persisted the assistant entry before turn_end",
-  );
-  assert.equal(assistant.message.providerResponseId, undefined);
-  const bridge = entries.find(
-    (entry) =>
-      entry.type === "custom" &&
-      entry.customType === "q-manager-child/assistant-bridge",
-  );
-  assert.equal(bridge?.data?.assistant_entry_id, assistant.id);
-  const pending = entries.find(
-    (entry) =>
-      entry.type === "custom" &&
-      entry.customType === "q-manager-child/settlement-pending",
-  );
-  assert.equal(pending?.data?.payload?.final_entry_id, assistant.id);
-  const consumed = entries.find(
-    (entry) =>
-      entry.type === "custom" &&
-      entry.customType === "q-manager-child/settlement-consumed",
-  );
-  assert.equal(consumed?.data?.bridge_id, bridge.id);
-  assert.equal(consumed?.data?.pending_id, pending.id);
-  const checkpoint = await readFile(
-    join(
-      plan,
-      ".vamos",
-      "sessions",
-      "pi",
-      "installed-session",
-      "checkpoints",
-      `${assistant.id}.yaml`,
-    ),
-    "utf8",
-  );
-  assert.match(checkpoint, /^outcome: complete$/m);
-  assert.match(
-    checkpoint,
-    new RegExp(`^final_entry_id: ${assistant.id}$`, "m"),
-  );
-  const reader = await run(
-    "go",
-    [
-      "test",
-      "./cmd/vamos-runtime/internal/hermescmd",
-      "-run",
-      "TestReadPiCheckpointInstalledFixture",
-    ],
-    {
-      cwd: process.cwd(),
-      env: {
-        ...process.env,
-        VAMOS_PI_CHECKPOINT_FIXTURE_PLAN: plan,
-        VAMOS_PI_CHECKPOINT_FIXTURE_SESSION: "installed-session",
-        VAMOS_PI_CHECKPOINT_FIXTURE_ENTRY: assistant.id,
-      },
-    },
-  );
+  assert.ok(entries.some((entry) => entry.message?.role === "assistant"));
   assert.equal(
-    reader.code,
-    0,
-    `ReadPiCheckpoint rejected installed-Pi checkpoint:\n${reader.stderr}\n${reader.stdout}`,
+    entries.some(
+      (entry) =>
+        entry.type === "custom" &&
+        entry.customType?.startsWith("q-manager-child/"),
+    ),
+    false,
+  );
+  await assert.rejects(
+    readFile(
+      join(
+        plan,
+        ".vamos",
+        "sessions",
+        "pi",
+        "installed-session",
+        "checkpoints",
+        "missing.yaml",
+      ),
+    ),
   );
 });

@@ -47,8 +47,8 @@ type CheckpointIdentity struct {
 	FinalEntryID  string `yaml:"final_entry_id" json:"final_entry_id"`
 }
 
-// PiCheckpoint is the immutable v2 completion fact. Delivery state belongs in
-// CheckpointDeliveryAttempt or a rebuildable projection, never in this value.
+// PiCheckpoint is the legacy immutable v2 managed completion fact. It remains
+// readable for recovery and is not an opaque settlement.
 type PiCheckpoint struct {
 	Version            int `yaml:"version"                   json:"version"`
 	CheckpointIdentity `yaml:",inline" json:",inline"`
