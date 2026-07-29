@@ -149,22 +149,35 @@ func managedPiEnvironment(base []string, planDir, session, threadID string) []st
 	if threadID != "" {
 		authoritative["VAMOS_HERMES_THREAD_ID"] = threadID
 	}
+	keys := []string{
+		"VAMOS_PLAN_DIR",
+		"VAMOS_THOUGHTS_ROOT",
+		"PI_SESSION_ID",
+		"VAMOS_HERMES_THREAD_ID",
+	}
 	env := make([]string, 0, len(base)+len(authoritative))
 	for _, entry := range base {
 		key, _, found := strings.Cut(entry, "=")
-		if found {
-			if _, replace := authoritative[key]; replace {
-				continue
-			}
+		if found && containsString(keys, key) {
+			continue
 		}
 		env = append(env, entry)
 	}
-	for _, key := range []string{"VAMOS_PLAN_DIR", "VAMOS_THOUGHTS_ROOT", "PI_SESSION_ID", "VAMOS_HERMES_THREAD_ID"} {
+	for _, key := range keys {
 		if value, ok := authoritative[key]; ok {
 			env = append(env, key+"="+value)
 		}
 	}
 	return env
+}
+
+func containsString(values []string, want string) bool {
+	for _, value := range values {
+		if value == want {
+			return true
+		}
+	}
+	return false
 }
 
 func registerManagedPiRun(
@@ -313,7 +326,7 @@ func writePromptFile(dir, session, prompt string) (string, error) {
 func RenderPiPrompt(plan PlanContext, task, previous string, managed bool) string {
 	completion := "Finish by creating durable artifacts, then call `vamos hermes pi done` with PI_SESSION_ID."
 	if managed {
-		completion = "Finish by creating durable artifacts and explain the result normally. You may include one compact YAML lifecycle intent (for example `outcome: handoff`) in your final response, but do not invoke completion commands."
+		completion = "Settlement is system-recorded. Finish by creating durable artifacts and explain the result normally. Do not invoke completion commands. A fenced YAML or YML block is optional opaque evidence only; it has no required schema, outcome, or successor."
 	}
 	return fmt.Sprintf(
 		"You are an isolated Pi worker.\nPlan: %s\nGoal: %s\nTask: %s\n%s\n",

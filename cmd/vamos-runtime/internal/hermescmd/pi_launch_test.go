@@ -28,8 +28,10 @@ func TestManagedPiEnvironmentReplacesInheritedValues(t *testing.T) {
 	env := managedPiEnvironment([]string{
 		"KEEP=value",
 		"VAMOS_PLAN_DIR=stale-one",
+		"VAMOS_THOUGHTS_ROOT=stale-one",
 		"PI_SESSION_ID=stale",
 		"VAMOS_PLAN_DIR=stale-two",
+		"VAMOS_THOUGHTS_ROOT=stale-two",
 		"VAMOS_HERMES_THREAD_ID=stale",
 	}, "/tmp/thoughts/CoreyCole/plans/example", "session-1", "thread-1")
 	for _, want := range []string{
@@ -49,6 +51,31 @@ func TestManagedPiEnvironmentReplacesInheritedValues(t *testing.T) {
 	}
 	if !containsEnv(env, "KEEP=value") {
 		t.Fatalf("environment dropped unrelated value: %#v", env)
+	}
+}
+
+func TestManagedPiEnvironmentDropsInheritedThreadWithoutManagedOwner(t *testing.T) {
+	env := managedPiEnvironment([]string{
+		"VAMOS_HERMES_THREAD_ID=stale",
+		"KEEP=value",
+	}, "/tmp/thoughts/CoreyCole/plans/example", "session-1", "")
+	if containsEnv(env, "VAMOS_HERMES_THREAD_ID=stale") {
+		t.Fatalf("environment retained inherited Hermes thread: %#v", env)
+	}
+	for _, want := range []string{
+		"VAMOS_PLAN_DIR=/tmp/thoughts/CoreyCole/plans/example",
+		"VAMOS_THOUGHTS_ROOT=/tmp/thoughts",
+		"PI_SESSION_ID=session-1",
+		"KEEP=value",
+	} {
+		if countEnv(env, want) != 1 {
+			t.Errorf(
+				"environment has %d copies of %q: %#v",
+				countEnv(env, want),
+				want,
+				env,
+			)
+		}
 	}
 }
 
@@ -126,9 +153,23 @@ func TestRenderPiPromptKeepsManualAndManagedCompletionBoundaries(t *testing.T) {
 		strings.Contains(manual, "do not invoke completion commands") {
 		t.Fatalf("manual prompt boundary = %q", manual)
 	}
-	if !strings.Contains(managed, "do not invoke completion commands") ||
-		strings.Contains(managed, "vamos hermes pi done") {
-		t.Fatalf("managed prompt completion boundary = %q", managed)
+	for _, want := range []string{
+		"Settlement is system-recorded.",
+		"Do not invoke completion commands.",
+		"fenced YAML or YML block is optional opaque evidence only",
+		"no required schema, outcome, or successor.",
+	} {
+		if !strings.Contains(managed, want) {
+			t.Errorf("managed prompt missing %q: %q", want, managed)
+		}
+	}
+	for _, unwanted := range []string{
+		"vamos hermes pi done",
+		"lifecycle intent",
+	} {
+		if strings.Contains(managed, unwanted) {
+			t.Errorf("managed prompt retained %q: %q", unwanted, managed)
+		}
 	}
 }
 
