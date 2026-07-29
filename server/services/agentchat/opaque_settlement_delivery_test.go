@@ -157,6 +157,12 @@ func TestOpaqueSettlementDeliveryRetriesExactBytesAndProjectsDedup(t *testing.T)
 	); err == nil {
 		t.Fatal("first lost response unexpectedly succeeded")
 	}
+	plan := filepath.Join(root, "project", "plans", "plan")
+	if err := requireOpaqueSettlementDiscovery(
+		plan, "project/plans/plan", "thread", "session", "entry",
+	); err != nil {
+		t.Fatalf("gateway failure did not retain discovery admission: %v", err)
+	}
 	if err := a.DeliverOpaqueSettlements(
 		context.Background(),
 		OpaqueSettlementDeliveryInput{},

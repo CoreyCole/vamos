@@ -294,6 +294,42 @@ func (a *OpaqueSettlementDeliveryActivities) deliverOne(
 	); err != nil {
 		return err
 	}
+	discovery, err := opaqueSettlementDiscoveryProjectionPath(
+		planDir,
+		envelope.Session,
+		envelope.AssistantEntryID,
+	)
+	if err != nil {
+		return err
+	}
+	unlockDiscovery, err := lockOpaqueSettlementProjection(discovery)
+	if err != nil {
+		return err
+	}
+	if err := writeOpaqueSettlementDiscovery(
+		discovery,
+		envelope.Plan,
+		envelope.ManagerThread,
+		envelope.Session,
+		envelope.AssistantEntryID,
+	); err != nil {
+		unlockDiscovery()
+		return err
+	}
+	unlockDiscovery()
+	request := OpaqueSettlementDeliveryRequest{
+		Version: opaqueSettlementDeliveryVersion,
+		DeliveryID: opaqueSettlementDeliveryID(
+			envelope.Plan,
+			envelope.Session,
+			envelope.AssistantEntryID,
+		),
+		Plan:                  envelope.Plan,
+		ManagerThread:         envelope.ManagerThread,
+		Session:               envelope.Session,
+		FinalEntryID:          envelope.AssistantEntryID,
+		SettlementBytesBase64: base64.StdEncoding.EncodeToString(data),
+	}
 	projection, err := opaqueSettlementProjectionPath(
 		planDir,
 		envelope.Session,
@@ -311,19 +347,6 @@ func (a *OpaqueSettlementDeliveryActivities) deliverOne(
 		return nil
 	} else if !errors.Is(err, os.ErrNotExist) {
 		return err
-	}
-	request := OpaqueSettlementDeliveryRequest{
-		Version: opaqueSettlementDeliveryVersion,
-		DeliveryID: opaqueSettlementDeliveryID(
-			envelope.Plan,
-			envelope.Session,
-			envelope.AssistantEntryID,
-		),
-		Plan:                  envelope.Plan,
-		ManagerThread:         envelope.ManagerThread,
-		Session:               envelope.Session,
-		FinalEntryID:          envelope.AssistantEntryID,
-		SettlementBytesBase64: base64.StdEncoding.EncodeToString(data),
 	}
 	if err := appendOpaqueSettlementAttempt(planDir, request, "started"); err != nil {
 		return err
@@ -431,6 +454,23 @@ func thoughtsRelativeTo(root, path string) string {
 	return filepath.ToSlash(rel)
 }
 
+func opaqueSettlementDiscoveryProjectionPath(
+	plan, session, entry string,
+) (string, error) {
+	if !safeOpaqueComponent(session) || !safeOpaqueComponent(entry) {
+		return "", errors.New("unsafe opaque settlement projection identity")
+	}
+	return filepath.Join(
+		plan,
+		".vamos",
+		"sessions",
+		"pi",
+		session,
+		"discovery-projections",
+		entry+".json",
+	), nil
+}
+
 func opaqueSettlementProjectionPath(plan, session, entry string) (string, error) {
 	if !safeOpaqueComponent(session) || !safeOpaqueComponent(entry) {
 		return "", errors.New("unsafe opaque settlement projection identity")
@@ -502,20 +542,78 @@ func appendOpaqueSettlementAttempt(
 	return err
 }
 
+type opaqueSettlementDiscoveryProjection struct {
+	Version       int    `json:"version"`
+	DiscoveryID   string `json:"discovery_id"`
+	Plan          string `json:"plan"`
+	ManagerThread string `json:"manager_thread"`
+	Session       string `json:"session"`
+	FinalEntryID  string `json:"final_entry_id"`
+}
+
+func writeOpaqueSettlementDiscovery(path, plan, thread, session, entry string) error {
+	value := opaqueSettlementDiscoveryProjection{
+		Version:       1,
+		DiscoveryID:   opaqueSettlementDeliveryID(plan, session, entry),
+		Plan:          plan,
+		ManagerThread: thread,
+		Session:       session,
+		FinalEntryID:  entry,
+	}
+	return writeOpaqueSettlementJSON(path, value, ".discovery-projection-*")
+}
+
+func requireOpaqueSettlementDiscovery(
+	planDir, plan, thread, session, entry string,
+) error {
+	path, err := opaqueSettlementDiscoveryProjectionPath(planDir, session, entry)
+	if err != nil {
+		return err
+	}
+	path, err = containedResolvedPath(planDir, path, "")
+	if err != nil {
+		return errors.New("contained settlement discovery is required")
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return errors.New("contained settlement discovery is required")
+	}
+	var discovery opaqueSettlementDiscoveryProjection
+	decoder := json.NewDecoder(bytes.NewReader(data))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&discovery); err != nil {
+		return errors.New("invalid settlement discovery projection")
+	}
+	if err := decoder.Decode(&struct{}{}); !errors.Is(err, io.EOF) {
+		return errors.New("invalid settlement discovery projection")
+	}
+	if discovery.Version != 1 ||
+		discovery.DiscoveryID != opaqueSettlementDeliveryID(plan, session, entry) ||
+		discovery.Plan != plan || discovery.ManagerThread != thread ||
+		discovery.Session != session || discovery.FinalEntryID != entry {
+		return errors.New("settlement discovery does not match decision identity")
+	}
+	return nil
+}
+
 func writeOpaqueSettlementProjection(
 	path string,
 	request OpaqueSettlementDeliveryRequest,
 ) error {
+	return writeOpaqueSettlementJSON(path, request, ".delivery-projection-*")
+}
+
+func writeOpaqueSettlementJSON(path string, value any, temporaryPattern string) error {
 	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
 		return err
 	}
-	data, err := json.Marshal(request)
+	data, err := json.Marshal(value)
 	if err != nil {
 		return err
 	}
 	// The projection is created only while its advisory lock is held. Rename
 	// prevents readers from observing a partially written server-owned fact.
-	tmp, err := os.CreateTemp(filepath.Dir(path), ".delivery-projection-*")
+	tmp, err := os.CreateTemp(filepath.Dir(path), temporaryPattern)
 	if err != nil {
 		return err
 	}

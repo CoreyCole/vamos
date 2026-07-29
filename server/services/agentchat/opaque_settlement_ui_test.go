@@ -193,7 +193,7 @@ func TestOpaqueSettlementTargetsRequireBoundSchema(t *testing.T) {
 	}
 }
 
-func TestOpaqueSettlementDecisionUsesContainedEvidenceWithoutDelivery(t *testing.T) {
+func TestOpaqueSettlementDecisionRequiresDiscoveryAdmission(t *testing.T) {
 	root := t.TempDir()
 	plan := filepath.Join(root, "plans", "p")
 	path := filepath.Join(
@@ -238,6 +238,30 @@ func TestOpaqueSettlementDecisionUsesContainedEvidenceWithoutDelivery(t *testing
 		Rationale:  "human review",
 		Actor:      "manager@example.com",
 		Provenance: "test",
+	}
+	if err := s.DecideOpaqueSettlementSuccessor(
+		context.Background(),
+		plan,
+		"thread",
+		"session",
+		"entry",
+		successor,
+	); err == nil {
+		t.Fatal("accepted path-addressable settlement without discovery admission")
+	}
+	activity := &OpaqueSettlementDeliveryActivities{
+		ThoughtsRoot: root,
+		PlanSource: opaquePlanSourceFunc(
+			func(context.Context) ([]DiscoveredPlanWorkspace, error) {
+				return []DiscoveredPlanWorkspace{{PlanDir: plan}}, nil
+			},
+		),
+		Receiver: &recordingOpaqueReceiver{fail: 1},
+	}
+	if err := activity.DeliverOpaqueSettlements(
+		context.Background(), OpaqueSettlementDeliveryInput{},
+	); err == nil {
+		t.Fatal("lost delivery unexpectedly succeeded")
 	}
 	if err := s.DecideOpaqueSettlementSuccessor(
 		context.Background(),

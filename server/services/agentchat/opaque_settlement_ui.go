@@ -144,6 +144,15 @@ func (s *Service) DecideOpaqueSettlementSuccessor(
 	if err := VerifyHermesPiRunBinding(planDir, threadID, session); err != nil {
 		return err
 	}
+	if err := requireOpaqueSettlementDiscovery(
+		planDir,
+		planIdentity,
+		threadID,
+		session,
+		entry,
+	); err != nil {
+		return err
+	}
 	wantDiscovery := opaqueSettlementDiscoveryReference(session, entry)
 	if strings.TrimSpace(successor.Discovery) != wantDiscovery {
 		return errors.New("invalid settlement discovery reference")
