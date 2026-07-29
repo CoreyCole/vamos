@@ -86,6 +86,7 @@ type Service struct {
 	chatSessions                        *chatsession.Service
 	hermesGateway                       HermesGatewayClient
 	hermesThreadOwner                   func(context.Context, string) (string, error) // test seam
+	opaqueSettlementAdmissions          OpaqueSettlementAdmissionStore
 }
 
 type liveThreadState struct {

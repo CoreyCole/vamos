@@ -1352,13 +1352,13 @@ func main() {
 		})
 		agentchat.RegisterOpaqueSettlementDelivery(
 			goWorker,
-			&agentchat.OpaqueSettlementDeliveryActivities{
-				ThoughtsRoot: basePath,
-				PlanSource:   agentchat.PlanWorkspaceScanner{ThoughtsRoot: basePath},
-				Receiver: agentchat.HTTPOpaqueSettlementReceiver{
+			agentchat.NewOpaqueSettlementDeliveryActivities(
+				basePath,
+				dbService.DB(),
+				agentchat.HTTPOpaqueSettlementReceiver{
 					URL: cfg.HermesGatewayURL, Token: cfg.HermesGatewayToken,
 				},
-			},
+			),
 		)
 	}
 	if temporalManager != nil {

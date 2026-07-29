@@ -41,7 +41,8 @@ func TestOpaqueSettlementCardRendersEvidenceNotEnvelope(t *testing.T) {
 func TestReceiveOpaqueSettlementDerivesDeliveryIDForDedup(t *testing.T) {
 	root := t.TempDir()
 	plan, raw := writeOpaqueFixture(t, root, "thread", "session", "entry", 1)
-	s := &Service{thoughtsRoot: root}
+	admissions := newOpaqueAdmissionStore()
+	s := &Service{thoughtsRoot: root, opaqueSettlementAdmissions: admissions}
 	request := OpaqueSettlementDeliveryRequest{
 		Version: opaqueSettlementDeliveryVersion,
 		DeliveryID: opaqueSettlementDeliveryID(
@@ -54,6 +55,9 @@ func TestReceiveOpaqueSettlementDerivesDeliveryIDForDedup(t *testing.T) {
 		Session:               "session",
 		FinalEntryID:          "entry",
 		SettlementBytesBase64: base64.StdEncoding.EncodeToString(raw),
+	}
+	if err := admissions.Admit(context.Background(), request, raw); err != nil {
+		t.Fatal(err)
 	}
 	if err := s.ReceiveOpaqueSettlement(context.Background(), request); err != nil {
 		t.Fatal(err)
@@ -77,6 +81,45 @@ func TestReceiveOpaqueSettlementDerivesDeliveryIDForDedup(t *testing.T) {
 	request.DeliveryID = "caller-chosen-id"
 	if err := s.ReceiveOpaqueSettlement(context.Background(), request); err == nil {
 		t.Fatal("accepted caller-chosen alternate delivery ID")
+	}
+}
+
+func TestReceiveOpaqueSettlementRejectsDifferentValidBytesForIdentity(t *testing.T) {
+	root := t.TempDir()
+	_, raw := writeOpaqueFixture(t, root, "thread", "session", "entry", 1)
+	admissions := newOpaqueAdmissionStore()
+	s := &Service{thoughtsRoot: root, opaqueSettlementAdmissions: admissions}
+	request := OpaqueSettlementDeliveryRequest{
+		Version: opaqueSettlementDeliveryVersion,
+		DeliveryID: opaqueSettlementDeliveryID(
+			"project/plans/plan",
+			"session",
+			"entry",
+		),
+		Plan:                  "project/plans/plan",
+		ManagerThread:         "thread",
+		Session:               "session",
+		FinalEntryID:          "entry",
+		SettlementBytesBase64: base64.StdEncoding.EncodeToString(raw),
+	}
+	if err := admissions.Admit(context.Background(), request, raw); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.ReceiveOpaqueSettlement(context.Background(), request); err != nil {
+		t.Fatal(err)
+	}
+	var envelope opaqueSettlementEnvelope
+	if err := json.Unmarshal(raw, &envelope); err != nil {
+		t.Fatal(err)
+	}
+	envelope.RawResponse = "different but valid evidence"
+	conflict, err := json.Marshal(envelope)
+	if err != nil {
+		t.Fatal(err)
+	}
+	request.SettlementBytesBase64 = base64.StdEncoding.EncodeToString(conflict)
+	if err := s.ReceiveOpaqueSettlement(context.Background(), request); err == nil {
+		t.Fatal("accepted different valid envelope bytes for immutable identity")
 	}
 }
 
@@ -231,7 +274,27 @@ func TestOpaqueSettlementDecisionRequiresDiscoveryAdmission(t *testing.T) {
 	}); err != nil {
 		t.Fatal(err)
 	}
-	s := &Service{thoughtsRoot: root}
+	admissions := newOpaqueAdmissionStore()
+	s := &Service{thoughtsRoot: root, opaqueSettlementAdmissions: admissions}
+	forgedAdmission := filepath.Join(
+		plan,
+		".vamos",
+		"sessions",
+		"pi",
+		"session",
+		"discovery-projections",
+		"entry.json",
+	)
+	if err := os.MkdirAll(filepath.Dir(forgedAdmission), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(
+		forgedAdmission,
+		[]byte(`{"forged":true}`),
+		0o600,
+	); err != nil {
+		t.Fatal(err)
+	}
 	successor := OpaqueSettlementSuccessor{
 		Action:     "handoff",
 		Discovery:  opaqueSettlementDiscoveryReference("session", "entry"),
@@ -251,6 +314,7 @@ func TestOpaqueSettlementDecisionRequiresDiscoveryAdmission(t *testing.T) {
 	}
 	activity := &OpaqueSettlementDeliveryActivities{
 		ThoughtsRoot: root,
+		Admissions:   admissions,
 		PlanSource: opaquePlanSourceFunc(
 			func(context.Context) ([]DiscoveredPlanWorkspace, error) {
 				return []DiscoveredPlanWorkspace{{PlanDir: plan}}, nil

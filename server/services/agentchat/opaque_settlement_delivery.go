@@ -68,9 +68,10 @@ type opaqueSettlementPlanSource interface {
 
 type OpaqueSettlementDeliveryActivities struct {
 	ThoughtsRoot string
-	// PlanSource is the configured plan-workspace projection/scanner. Discovery
-	// must never infer plans by traversing arbitrary thoughts directories.
+	// PlanSource is the bounded server-owned plan projection. Discovery must
+	// never infer plans by traversing arbitrary thoughts directories.
 	PlanSource opaqueSettlementPlanSource
+	Admissions OpaqueSettlementAdmissionStore
 	Receiver   OpaqueSettlementReceiver
 }
 
@@ -138,7 +139,7 @@ func (a *OpaqueSettlementDeliveryActivities) planDirectories(
 ) ([]string, error) {
 	source := a.PlanSource
 	if source == nil {
-		source = PlanWorkspaceScanner{ThoughtsRoot: root}
+		return nil, errors.New("opaque settlement plan projection is required")
 	}
 	plans, err := source.Scan(ctx)
 	if err != nil {
@@ -294,29 +295,6 @@ func (a *OpaqueSettlementDeliveryActivities) deliverOne(
 	); err != nil {
 		return err
 	}
-	discovery, err := opaqueSettlementDiscoveryProjectionPath(
-		planDir,
-		envelope.Session,
-		envelope.AssistantEntryID,
-	)
-	if err != nil {
-		return err
-	}
-	unlockDiscovery, err := lockOpaqueSettlementProjection(discovery)
-	if err != nil {
-		return err
-	}
-	if err := writeOpaqueSettlementDiscovery(
-		discovery,
-		envelope.Plan,
-		envelope.ManagerThread,
-		envelope.Session,
-		envelope.AssistantEntryID,
-	); err != nil {
-		unlockDiscovery()
-		return err
-	}
-	unlockDiscovery()
 	request := OpaqueSettlementDeliveryRequest{
 		Version: opaqueSettlementDeliveryVersion,
 		DeliveryID: opaqueSettlementDeliveryID(
@@ -329,6 +307,12 @@ func (a *OpaqueSettlementDeliveryActivities) deliverOne(
 		Session:               envelope.Session,
 		FinalEntryID:          envelope.AssistantEntryID,
 		SettlementBytesBase64: base64.StdEncoding.EncodeToString(data),
+	}
+	if a.Admissions == nil {
+		return errors.New("opaque settlement admission store is required")
+	}
+	if err := a.Admissions.Admit(ctx, request, data); err != nil {
+		return err
 	}
 	projection, err := opaqueSettlementProjectionPath(
 		planDir,
@@ -454,23 +438,6 @@ func thoughtsRelativeTo(root, path string) string {
 	return filepath.ToSlash(rel)
 }
 
-func opaqueSettlementDiscoveryProjectionPath(
-	plan, session, entry string,
-) (string, error) {
-	if !safeOpaqueComponent(session) || !safeOpaqueComponent(entry) {
-		return "", errors.New("unsafe opaque settlement projection identity")
-	}
-	return filepath.Join(
-		plan,
-		".vamos",
-		"sessions",
-		"pi",
-		session,
-		"discovery-projections",
-		entry+".json",
-	), nil
-}
-
 func opaqueSettlementProjectionPath(plan, session, entry string) (string, error) {
 	if !safeOpaqueComponent(session) || !safeOpaqueComponent(entry) {
 		return "", errors.New("unsafe opaque settlement projection identity")
@@ -540,60 +507,6 @@ func appendOpaqueSettlementAttempt(
 	defer f.Close()
 	_, err = f.Write(append(data, '\n'))
 	return err
-}
-
-type opaqueSettlementDiscoveryProjection struct {
-	Version       int    `json:"version"`
-	DiscoveryID   string `json:"discovery_id"`
-	Plan          string `json:"plan"`
-	ManagerThread string `json:"manager_thread"`
-	Session       string `json:"session"`
-	FinalEntryID  string `json:"final_entry_id"`
-}
-
-func writeOpaqueSettlementDiscovery(path, plan, thread, session, entry string) error {
-	value := opaqueSettlementDiscoveryProjection{
-		Version:       1,
-		DiscoveryID:   opaqueSettlementDeliveryID(plan, session, entry),
-		Plan:          plan,
-		ManagerThread: thread,
-		Session:       session,
-		FinalEntryID:  entry,
-	}
-	return writeOpaqueSettlementJSON(path, value, ".discovery-projection-*")
-}
-
-func requireOpaqueSettlementDiscovery(
-	planDir, plan, thread, session, entry string,
-) error {
-	path, err := opaqueSettlementDiscoveryProjectionPath(planDir, session, entry)
-	if err != nil {
-		return err
-	}
-	path, err = containedResolvedPath(planDir, path, "")
-	if err != nil {
-		return errors.New("contained settlement discovery is required")
-	}
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return errors.New("contained settlement discovery is required")
-	}
-	var discovery opaqueSettlementDiscoveryProjection
-	decoder := json.NewDecoder(bytes.NewReader(data))
-	decoder.DisallowUnknownFields()
-	if err := decoder.Decode(&discovery); err != nil {
-		return errors.New("invalid settlement discovery projection")
-	}
-	if err := decoder.Decode(&struct{}{}); !errors.Is(err, io.EOF) {
-		return errors.New("invalid settlement discovery projection")
-	}
-	if discovery.Version != 1 ||
-		discovery.DiscoveryID != opaqueSettlementDeliveryID(plan, session, entry) ||
-		discovery.Plan != plan || discovery.ManagerThread != thread ||
-		discovery.Session != session || discovery.FinalEntryID != entry {
-		return errors.New("settlement discovery does not match decision identity")
-	}
-	return nil
 }
 
 func writeOpaqueSettlementProjection(

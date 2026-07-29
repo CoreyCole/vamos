@@ -1,6 +1,7 @@
 package agentchat
 
 import (
+	"bytes"
 	"context"
 	"encoding/base64"
 	"encoding/json"
@@ -21,6 +22,48 @@ type recordingOpaqueReceiver struct {
 
 type recordingOpaqueWorker struct{ workflows, activities []any }
 
+type opaqueAdmissionStore struct {
+	admissions map[string][]byte
+}
+
+func (s *opaqueAdmissionStore) Admit(
+	_ context.Context,
+	request OpaqueSettlementDeliveryRequest,
+	raw []byte,
+) error {
+	if s.admissions == nil {
+		s.admissions = map[string][]byte{}
+	}
+	if existing, ok := s.admissions[request.DeliveryID]; ok &&
+		!bytes.Equal(existing, raw) {
+		return errors.New("immutable opaque settlement identity conflict")
+	}
+	s.admissions[request.DeliveryID] = append([]byte(nil), raw...)
+	return nil
+}
+
+func (s *opaqueAdmissionStore) Require(
+	_ context.Context,
+	request OpaqueSettlementDeliveryRequest,
+	raw []byte,
+) error {
+	if existing, ok := s.admissions[request.DeliveryID]; ok &&
+		bytes.Equal(existing, raw) {
+		return nil
+	}
+	return errors.New("server-owned settlement discovery admission is required")
+}
+
+func newOpaqueAdmissionStore() *opaqueAdmissionStore { return &opaqueAdmissionStore{} }
+
+func opaqueFixturePlanSource(root string) opaqueSettlementPlanSource {
+	return opaquePlanSourceFunc(func(context.Context) ([]DiscoveredPlanWorkspace, error) {
+		return []DiscoveredPlanWorkspace{
+			{PlanDir: filepath.Join(root, "project", "plans", "plan")},
+		}, nil
+	})
+}
+
 type opaquePlanSourceFunc func(context.Context) ([]DiscoveredPlanWorkspace, error)
 
 func (f opaquePlanSourceFunc) Scan(
@@ -39,6 +82,23 @@ func (w *recordingOpaqueWorker) RegisterActivity(
 	v any,
 ) {
 	w.activities = append(w.activities, v)
+}
+
+func TestNewOpaqueSettlementDeliveryActivitiesUsesServerOwnedProjections(t *testing.T) {
+	activities := NewOpaqueSettlementDeliveryActivities(
+		"thoughts",
+		nil,
+		&recordingOpaqueReceiver{},
+	)
+	if _, ok := activities.PlanSource.(SQLBoundedOpaqueSettlementPlanSource); !ok {
+		t.Fatalf(
+			"production plan source = %T, want bounded SQL projection",
+			activities.PlanSource,
+		)
+	}
+	if _, ok := activities.Admissions.(SQLOpaqueSettlementAdmissionStore); !ok {
+		t.Fatalf("production admissions = %T, want SQL store", activities.Admissions)
+	}
 }
 
 func TestRegisterOpaqueSettlementDelivery(t *testing.T) {
@@ -150,18 +210,27 @@ func TestOpaqueSettlementDeliveryRetriesExactBytesAndProjectsDedup(t *testing.T)
 	root := t.TempDir()
 	_, raw := writeOpaqueFixture(t, root, "thread", "session", "entry", 1)
 	receiver := &recordingOpaqueReceiver{fail: 1}
-	a := &OpaqueSettlementDeliveryActivities{ThoughtsRoot: root, Receiver: receiver}
+	admissions := newOpaqueAdmissionStore()
+	a := &OpaqueSettlementDeliveryActivities{
+		ThoughtsRoot: root,
+		PlanSource:   opaqueFixturePlanSource(root),
+		Admissions:   admissions,
+		Receiver:     receiver,
+	}
 	if err := a.DeliverOpaqueSettlements(
 		context.Background(),
 		OpaqueSettlementDeliveryInput{},
 	); err == nil {
 		t.Fatal("first lost response unexpectedly succeeded")
 	}
-	plan := filepath.Join(root, "project", "plans", "plan")
-	if err := requireOpaqueSettlementDiscovery(
-		plan, "project/plans/plan", "thread", "session", "entry",
-	); err != nil {
-		t.Fatalf("gateway failure did not retain discovery admission: %v", err)
+	if err := admissions.Require(context.Background(), OpaqueSettlementDeliveryRequest{
+		DeliveryID:    "opaque-settlement:project/plans/plan:session:entry",
+		Plan:          "project/plans/plan",
+		ManagerThread: "thread",
+		Session:       "session",
+		FinalEntryID:  "entry",
+	}, raw); err != nil {
+		t.Fatalf("gateway failure did not retain server-owned admission: %v", err)
 	}
 	if err := a.DeliverOpaqueSettlements(
 		context.Background(),
@@ -194,7 +263,12 @@ func TestOpaqueSettlementDeliveryProjectionSerializesConcurrentDiscovery(t *test
 	root := t.TempDir()
 	writeOpaqueFixture(t, root, "thread", "session", "entry", 1)
 	receiver := &recordingOpaqueReceiver{}
-	a := &OpaqueSettlementDeliveryActivities{ThoughtsRoot: root, Receiver: receiver}
+	a := &OpaqueSettlementDeliveryActivities{
+		ThoughtsRoot: root,
+		PlanSource:   opaqueFixturePlanSource(root),
+		Admissions:   newOpaqueAdmissionStore(),
+		Receiver:     receiver,
+	}
 	var wg sync.WaitGroup
 	for range 2 {
 		wg.Add(1)
@@ -225,7 +299,7 @@ func TestOpaqueSettlementDeliveryRejectsForgedAndDuplicateBindings(t *testing.T)
 			root := t.TempDir()
 			writeOpaqueFixture(t, root, "thread", "session", "entry", runs)
 			receiver := &recordingOpaqueReceiver{}
-			err := (&OpaqueSettlementDeliveryActivities{ThoughtsRoot: root, Receiver: receiver}).DeliverOpaqueSettlements(
+			err := (&OpaqueSettlementDeliveryActivities{ThoughtsRoot: root, PlanSource: opaqueFixturePlanSource(root), Admissions: newOpaqueAdmissionStore(), Receiver: receiver}).DeliverOpaqueSettlements(
 				context.Background(),
 				OpaqueSettlementDeliveryInput{},
 			)
@@ -264,7 +338,7 @@ func TestOpaqueSettlementDeliveryRejectsForgedPathIdentity(t *testing.T) {
 		t.Fatal(err)
 	}
 	receiver := &recordingOpaqueReceiver{}
-	if err := (&OpaqueSettlementDeliveryActivities{ThoughtsRoot: root, Receiver: receiver}).DeliverOpaqueSettlements(
+	if err := (&OpaqueSettlementDeliveryActivities{ThoughtsRoot: root, PlanSource: opaqueFixturePlanSource(root), Admissions: newOpaqueAdmissionStore(), Receiver: receiver}).DeliverOpaqueSettlements(
 		context.Background(),
 		OpaqueSettlementDeliveryInput{},
 	); err == nil {

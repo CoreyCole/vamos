@@ -167,5 +167,5 @@ func (s *Service) threadHasWorkspaceAssociation(
 			WorkspaceID: workspaceID,
 		},
 	)
-	return associated != 0, err
+	return associated, err
 }

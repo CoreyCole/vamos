@@ -225,6 +225,18 @@ artifact_updated_at DESC,
 plan_dir_rel)
 WHERE archived_at IS NULL ;
 
+-- Server-owned discovery facts. Pi-managed plan artifacts must never authorize
+-- a settlement decision or delivery replay.
+CREATE TABLE IF NOT EXISTS opaque_settlement_admissions (
+delivery_id TEXT PRIMARY KEY,
+plan TEXT NOT NULL,
+manager_thread TEXT NOT NULL,
+session TEXT NOT NULL,
+final_entry_id TEXT NOT NULL,
+settlement_bytes BLOB NOT NULL,
+admitted_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+) ;
+
 CREATE TABLE IF NOT EXISTS plan_workspace_projects (
 plan_dir_rel TEXT NOT NULL REFERENCES plan_workspaces (plan_dir_rel),
 project_id TEXT NOT NULL DEFAULT '',

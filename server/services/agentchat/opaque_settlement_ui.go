@@ -66,6 +66,9 @@ func (s *Service) ReceiveOpaqueSettlement(
 	) {
 		return errors.New("opaque settlement delivery ID does not match its identity")
 	}
+	if err := s.requireOpaqueSettlementAdmission(ctx, request, raw); err != nil {
+		return err
+	}
 	planDir, err := s.hermesPlanDirFromRelative(request.Plan)
 	if err != nil {
 		return err
@@ -144,13 +147,15 @@ func (s *Service) DecideOpaqueSettlementSuccessor(
 	if err := VerifyHermesPiRunBinding(planDir, threadID, session); err != nil {
 		return err
 	}
-	if err := requireOpaqueSettlementDiscovery(
-		planDir,
-		planIdentity,
-		threadID,
-		session,
-		entry,
-	); err != nil {
+	request := OpaqueSettlementDeliveryRequest{
+		Version:       opaqueSettlementDeliveryVersion,
+		DeliveryID:    opaqueSettlementDeliveryID(planIdentity, session, entry),
+		Plan:          planIdentity,
+		ManagerThread: threadID,
+		Session:       session,
+		FinalEntryID:  entry,
+	}
+	if err := s.requireOpaqueSettlementAdmission(ctx, request, bytes); err != nil {
 		return err
 	}
 	wantDiscovery := opaqueSettlementDiscoveryReference(session, entry)
