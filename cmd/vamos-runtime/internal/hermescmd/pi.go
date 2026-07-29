@@ -142,8 +142,9 @@ func resolveManagedHermesThread(
 
 func managedPiEnvironment(base []string, planDir, session, threadID string) []string {
 	authoritative := map[string]string{
-		"VAMOS_PLAN_DIR": planDir,
-		"PI_SESSION_ID":  session,
+		"VAMOS_PLAN_DIR":      planDir,
+		"VAMOS_THOUGHTS_ROOT": thoughtsRoot(planDir),
+		"PI_SESSION_ID":       session,
 	}
 	if threadID != "" {
 		authoritative["VAMOS_HERMES_THREAD_ID"] = threadID
@@ -158,7 +159,7 @@ func managedPiEnvironment(base []string, planDir, session, threadID string) []st
 		}
 		env = append(env, entry)
 	}
-	for _, key := range []string{"VAMOS_PLAN_DIR", "PI_SESSION_ID", "VAMOS_HERMES_THREAD_ID"} {
+	for _, key := range []string{"VAMOS_PLAN_DIR", "VAMOS_THOUGHTS_ROOT", "PI_SESSION_ID", "VAMOS_HERMES_THREAD_ID"} {
 		if value, ok := authoritative[key]; ok {
 			env = append(env, key+"="+value)
 		}

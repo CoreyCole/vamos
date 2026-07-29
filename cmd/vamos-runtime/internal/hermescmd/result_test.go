@@ -87,6 +87,35 @@ func TestWritePiResultOverwritesCurrentConclusion(t *testing.T) {
 	}
 }
 
+func TestPiCheckpointExtensionCanonicalFixture(t *testing.T) {
+	checkpoint := PiCheckpoint{
+		Version: 2,
+		CheckpointIdentity: CheckpointIdentity{
+			Session:       "session-1",
+			Plan:          "CoreyCole/plans/example",
+			ManagerThread: "thread-1",
+			FinalEntryID:  "entry-1",
+		},
+		Outcome:   OutcomeComplete,
+		Next:      NextNone,
+		CreatedAt: time.Date(2026, 7, 29, 12, 0, 0, 0, time.UTC),
+		RawYAML:   "state: complete\nvalue: on\n",
+		IntentMetadata: map[string]any{
+			"alpha":   "on",
+			"nested":  map[string]any{"note": "a\nb"},
+			"retries": 2,
+		},
+	}
+	got, err := CanonicalPiCheckpoint(checkpoint)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := "version: 2\nsession: session-1\nplan: CoreyCole/plans/example\nmanager_thread: thread-1\nfinal_entry_id: entry-1\noutcome: complete\nnext: none\ncreated_at: 2026-07-29T12:00:00Z\nraw_yaml: |\n    state: complete\n    value: on\nintent_metadata:\n    alpha: \"on\"\n    nested:\n        note: |-\n            a\n            b\n    retries: 2\n"
+	if diff := string(got); diff != want {
+		t.Fatalf("canonical bytes = %q, want %q", diff, want)
+	}
+}
+
 func TestPiCheckpointIsImmutableAndCanonical(t *testing.T) {
 	ctx := testPlan(t)
 	checkpoint := PiCheckpoint{
@@ -127,6 +156,24 @@ func TestPiCheckpointIsImmutableAndCanonical(t *testing.T) {
 	}
 	if info, err := os.Stat(path); err != nil || info.Mode().Perm() != 0o600 {
 		t.Fatalf("mode=%v err=%v", info.Mode(), err)
+	}
+}
+
+func TestReadPiCheckpointInstalledFixture(t *testing.T) {
+	plan := os.Getenv("VAMOS_PI_CHECKPOINT_FIXTURE_PLAN")
+	if plan == "" {
+		t.Skip("installed Pi fixture did not provide a checkpoint")
+	}
+	checkpoint, err := ReadPiCheckpoint(
+		plan,
+		os.Getenv("VAMOS_PI_CHECKPOINT_FIXTURE_SESSION"),
+		os.Getenv("VAMOS_PI_CHECKPOINT_FIXTURE_ENTRY"),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if checkpoint.Next != NextNone || checkpoint.Outcome != OutcomeComplete {
+		t.Fatalf("checkpoint = %+v", checkpoint)
 	}
 }
 

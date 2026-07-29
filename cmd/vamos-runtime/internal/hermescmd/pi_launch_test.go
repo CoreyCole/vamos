@@ -31,9 +31,10 @@ func TestManagedPiEnvironmentReplacesInheritedValues(t *testing.T) {
 		"PI_SESSION_ID=stale",
 		"VAMOS_PLAN_DIR=stale-two",
 		"VAMOS_HERMES_THREAD_ID=stale",
-	}, "/plan", "session-1", "thread-1")
+	}, "/tmp/thoughts/CoreyCole/plans/example", "session-1", "thread-1")
 	for _, want := range []string{
-		"VAMOS_PLAN_DIR=/plan",
+		"VAMOS_PLAN_DIR=/tmp/thoughts/CoreyCole/plans/example",
+		"VAMOS_THOUGHTS_ROOT=/tmp/thoughts",
 		"PI_SESSION_ID=session-1",
 		"VAMOS_HERMES_THREAD_ID=thread-1",
 	} {

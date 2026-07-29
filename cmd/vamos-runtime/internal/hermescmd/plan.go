@@ -49,15 +49,25 @@ func LoadPlanContext(planDir string) (PlanContext, error) {
 }
 
 func thoughtsRelative(path string) string {
+	root := thoughtsRoot(path)
+	if root == "" {
+		return filepath.ToSlash(filepath.Clean(path))
+	}
+	rel, err := filepath.Rel(root, path)
+	if err != nil {
+		return filepath.ToSlash(filepath.Clean(path))
+	}
+	return filepath.ToSlash(rel)
+}
+
+func thoughtsRoot(path string) string {
 	clean := filepath.Clean(path)
 	for dir := clean; dir != filepath.Dir(dir); dir = filepath.Dir(dir) {
 		if filepath.Base(dir) == "thoughts" {
-			return filepath.ToSlash(
-				strings.TrimPrefix(clean, dir+string(filepath.Separator)),
-			)
+			return dir
 		}
 	}
-	return filepath.ToSlash(clean)
+	return ""
 }
 
 // ValidateSafeComponent accepts opaque IDs used as one filesystem path component.
