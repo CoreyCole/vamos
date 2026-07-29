@@ -16,6 +16,8 @@ import (
 	"strings"
 	"time"
 
+	"gopkg.in/yaml.v3"
+
 	"github.com/CoreyCole/vamos/pkg/agents/chatsession"
 	"github.com/CoreyCole/vamos/pkg/db"
 )
@@ -56,6 +58,33 @@ type SessionArtifactIndex struct {
 	LastOffset             int64
 	NeedsHydration         bool
 	ResultPath             string
+	Checkpoints            []CheckpointArtifact
+}
+
+type CheckpointArtifact struct {
+	FinalEntryID string
+	Path         string
+}
+
+type CheckpointDeliveryIdentity struct {
+	ThreadID     string
+	SessionID    string
+	FinalEntryID string
+}
+
+// CheckpointDeliveryProjection is rebuildable server state keyed by immutable
+// checkpoint identity. It never changes the checkpoint artifact.
+type CheckpointDeliveryProjection struct {
+	Identity    CheckpointDeliveryIdentity
+	Delivered   bool
+	LastAttempt uint64
+}
+
+type CheckpointDeliveryProjectionStore interface {
+	GetCheckpointDelivery(
+		CheckpointDeliveryIdentity,
+	) (CheckpointDeliveryProjection, bool, error)
+	PutCheckpointDelivery(CheckpointDeliveryProjection) error
 }
 
 type HermesThreadArtifact struct {
@@ -279,6 +308,7 @@ func buildSessionArtifactIndex(
 		return SessionArtifactIndex{}, err
 	}
 	resultPath := ""
+	var checkpoints []CheckpointArtifact
 	if agent == "pi" {
 		candidate := strings.TrimSuffix(logicalPath, jsonlExtension) + "_result.yaml"
 		if _, err := os.Stat(candidate); err == nil {
@@ -296,6 +326,12 @@ func buildSessionArtifactIndex(
 			if err != nil {
 				return SessionArtifactIndex{}, err
 			}
+		}
+		checkpoints, err = discoverCheckpointArtifacts(
+			logicalRoot, resolvedRoot, logicalPath, metadata.SessionID,
+		)
+		if err != nil {
+			return SessionArtifactIndex{}, err
 		}
 	}
 	return SessionArtifactIndex{
@@ -317,7 +353,85 @@ func buildSessionArtifactIndex(
 		LastOffset:             info.Size(),
 		NeedsHydration:         agent != "hermes",
 		ResultPath:             resultPath,
+		Checkpoints:            checkpoints,
 	}, nil
+}
+
+func discoverCheckpointArtifacts(
+	logicalRoot, resolvedRoot, logicalSessionPath, sessionID string,
+) ([]CheckpointArtifact, error) {
+	if err := validateCheckpointComponent(sessionID); err != nil {
+		return nil, fmt.Errorf("checkpoint session: %w", err)
+	}
+	directory := filepath.Join(
+		filepath.Dir(logicalSessionPath), sessionID, "checkpoints",
+	)
+	entries, err := os.ReadDir(directory)
+	if errors.Is(err, fs.ErrNotExist) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	artifacts := make([]CheckpointArtifact, 0, len(entries))
+	for _, entry := range entries {
+		if entry.IsDir() || filepath.Ext(entry.Name()) != ".yaml" {
+			continue
+		}
+		finalEntryID := strings.TrimSuffix(entry.Name(), ".yaml")
+		if err := validateCheckpointComponent(finalEntryID); err != nil {
+			return nil, fmt.Errorf("checkpoint final entry: %w", err)
+		}
+		logicalPath := filepath.Join(directory, entry.Name())
+		data, err := os.ReadFile(logicalPath)
+		if err != nil {
+			return nil, err
+		}
+		var header struct {
+			Version int `yaml:"version"`
+		}
+		if err := yaml.Unmarshal(data, &header); err != nil {
+			return nil, fmt.Errorf("parse checkpoint %q: %w", logicalPath, err)
+		}
+		if header.Version != 2 {
+			return nil, fmt.Errorf("checkpoint %q is not schema v2", logicalPath)
+		}
+		resolvedPath, err := filepath.EvalSymlinks(logicalPath)
+		if err != nil {
+			return nil, err
+		}
+		if !pathWithinRoot(resolvedPath, resolvedRoot) {
+			return nil, fmt.Errorf(
+				"checkpoint path %q escapes thoughts root",
+				resolvedPath,
+			)
+		}
+		rel, err := thoughtsRelativeArtifactPath(logicalRoot, logicalPath)
+		if err != nil {
+			return nil, err
+		}
+		artifacts = append(
+			artifacts,
+			CheckpointArtifact{FinalEntryID: finalEntryID, Path: rel},
+		)
+	}
+	return artifacts, nil
+}
+
+func validateCheckpointComponent(value string) error {
+	if value == "" || value == "." || value == ".." {
+		return fmt.Errorf("unsafe path component %q", value)
+	}
+	for _, character := range value {
+		if (character >= 'a' && character <= 'z') ||
+			(character >= 'A' && character <= 'Z') ||
+			(character >= '0' && character <= '9') ||
+			character == '-' || character == '_' {
+			continue
+		}
+		return fmt.Errorf("unsafe path component %q", value)
+	}
+	return nil
 }
 
 func sessionArtifactOwnership(

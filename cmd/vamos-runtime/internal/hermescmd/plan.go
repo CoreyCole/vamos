@@ -81,3 +81,49 @@ func ValidateSafeComponent(value string) error {
 func ResultPath(planDir, sessionID string) string {
 	return filepath.Join(planDir, ".vamos", "sessions", "pi", sessionID+"_result.yaml")
 }
+
+func CheckpointPath(planDir, sessionID, finalEntryID string) (string, error) {
+	if err := ValidateSafeComponent(sessionID); err != nil {
+		return "", fmt.Errorf("checkpoint session: %w", err)
+	}
+	if err := ValidateSafeComponent(finalEntryID); err != nil {
+		return "", fmt.Errorf("checkpoint final entry: %w", err)
+	}
+	planDir, err := filepath.Abs(planDir)
+	if err != nil {
+		return "", err
+	}
+	path := filepath.Join(
+		planDir,
+		".vamos",
+		"sessions",
+		"pi",
+		sessionID,
+		"checkpoints",
+		finalEntryID+".yaml",
+	)
+	if !pathWithinPlan(path, planDir) {
+		return "", fmt.Errorf("checkpoint path escapes plan directory")
+	}
+	return path, nil
+}
+
+func DeliveryAttemptPath(
+	planDir, sessionID, finalEntryID string,
+	attempt uint64,
+) (string, error) {
+	checkpoint, err := CheckpointPath(planDir, sessionID, finalEntryID)
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(
+		filepath.Dir(filepath.Dir(checkpoint)), "delivery-attempts",
+		fmt.Sprintf("%s-%d.yaml", finalEntryID, attempt),
+	), nil
+}
+
+func pathWithinPlan(path, planDir string) bool {
+	rel, err := filepath.Rel(planDir, path)
+	return err == nil && rel != ".." &&
+		!strings.HasPrefix(rel, ".."+string(filepath.Separator))
+}
