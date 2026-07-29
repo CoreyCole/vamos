@@ -52,7 +52,6 @@ async function fixtureModel() {
     res.writeHead(200, { "content-type": "text/event-stream" });
     res.write(
       `data: ${JSON.stringify({
-        id: "fixture-response-without-provider-id",
         object: "chat.completion.chunk",
         choices: [
           {
@@ -65,7 +64,6 @@ async function fixtureModel() {
     );
     res.write(
       `data: ${JSON.stringify({
-        id: "fixture-response-without-provider-id",
         object: "chat.completion.chunk",
         choices: [{ index: 0, delta: {}, finish_reason: "stop" }],
       })}\n\n`,
@@ -84,7 +82,7 @@ async function fixtureModel() {
   };
 }
 
-test("installed managed Pi does not turn model text into a settlement during the reset", async (t) => {
+test("installed managed Pi persists a text-only, no-YAML settlement without a provider response ID", async (t) => {
   const root = await mkdtemp(join(tmpdir(), "q-manager-child-installed-pi-"));
   const agentDir = join(root, "agent");
   const sessions = join(root, "sessions");
@@ -148,25 +146,38 @@ test("installed managed Pi does not turn model text into a settlement during the
 
   const entries = await sessionEntries(sessions);
   assert.ok(entries.some((entry) => entry.message?.role === "assistant"));
-  assert.equal(
+  assert.ok(
     entries.some(
       (entry) =>
         entry.type === "custom" &&
-        entry.customType?.startsWith("q-manager-child/"),
+        entry.customType === "q-manager-child/settlement-pending",
     ),
-    false,
   );
-  await assert.rejects(
-    readFile(
+  const settlement = JSON.parse(
+    await readFile(
       join(
         plan,
         ".vamos",
         "sessions",
         "pi",
         "installed-session",
-        "checkpoints",
-        "missing.yaml",
+        "settlements",
+        entries.find(
+          (entry) =>
+            entry.type === "custom" &&
+            entry.customType === "q-manager-child/settlement-consumed",
+        ).data.final_entry_id + ".json",
       ),
+      "utf8",
     ),
   );
+  assert.deepEqual(settlement, {
+    version: 1,
+    kind: "opaque_pi_settlement",
+    session: "installed-session",
+    plan: "CoreyCole/plans/installed-pi",
+    manager_thread: "installed-thread",
+    final_entry_id: settlement.final_entry_id,
+    fences: [],
+  });
 });
