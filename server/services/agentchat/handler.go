@@ -133,6 +133,7 @@ func (h *Handler) RegisterMachineAPIRoutes(g *echo.Group) {
 	g.GET("/chat-sessions/:session_id", h.GetCLIChatSession)
 	g.GET("/chat-sessions/:session_id/events", h.StreamCLIChatSessionEvents)
 	h.RegisterHermesRoutes(g)
+	g.POST("/opaque-settlements", h.HandleOpaqueSettlementDelivery)
 }
 
 // RegisterRuntimeRoutes keeps temporary chat/session endpoints available while the
@@ -144,6 +145,10 @@ func (h *Handler) RegisterRuntimeRoutes(g *echo.Group) {
 	g.POST("/thread/:thread_id/resume", h.ResumeThreadByPath)
 	g.POST("/thread/:thread_id/fork", h.ForkThreadByPath)
 	g.POST("/hermes/threads/:thread_id/prompts", h.HandleHermesPrompt)
+	g.POST(
+		"/hermes/threads/:thread_id/settlements/:session/:entry/successor",
+		h.HandleOpaqueSettlementSuccessor,
+	)
 	g.GET("/sessions/stream", h.StreamSessions)
 	g.POST("/pi-sessions/open", h.OpenPiSession)
 	g.GET("/chat-sessions/:session_id", h.GetChatSessionSnapshot)
@@ -278,7 +283,16 @@ func (h *Handler) OpenPlanWorkspace(c echo.Context) error {
 	if planDir == "" {
 		return echo.NewHTTPError(http.StatusBadRequest, "plan_dir is required")
 	}
-	workspace, err := h.service.GetOrCreateWorkspaceForRootDocPath(c.Request().Context(), markdown.ChatWorkspaceOpenInput{UserEmail: userEmail, RootDocPath: planDir, Title: planWorkspaceLabel(planDir), WorkflowType: string(WorkspaceWorkflowFreeform), Source: string(WorkspaceSourceWeb)})
+	workspace, err := h.service.GetOrCreateWorkspaceForRootDocPath(
+		c.Request().Context(),
+		markdown.ChatWorkspaceOpenInput{
+			UserEmail:    userEmail,
+			RootDocPath:  planDir,
+			Title:        planWorkspaceLabel(planDir),
+			WorkflowType: string(WorkspaceWorkflowFreeform),
+			Source:       string(WorkspaceSourceWeb),
+		},
+	)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 	}

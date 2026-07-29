@@ -1,0 +1,24 @@
+package agentchat
+
+templ OpaqueSettlementCard(event HermesTranscriptEvent, successorAction string) {
+	if event.Settlement != nil {
+		<section class="space-y-3 border-b border-border bg-muted/30 p-4 text-sm">
+			<div><p class="font-medium">Opaque Pi settlement</p><p class="text-xs text-muted-foreground">Evidence only, not a legacy parsed result; it does not report an outcome, recommendation, or next action.</p></div>
+			<dl class="grid grid-cols-2 gap-x-4 gap-y-1 text-xs"><dt>Time</dt><dd>{ event.At.UTC().Format("2006-01-02 15:04:05 UTC") }</dd><dt>Session</dt><dd><code>{ event.Settlement.Session }</code></dd><dt>Entry</dt><dd><code>{ event.Settlement.Entry }</code></dd><dt>Plan</dt><dd><code>{ event.Settlement.Plan }</code></dd><dt>Thread</dt><dd><code>{ event.Settlement.Thread }</code></dd></dl>
+			<details><summary class="cursor-pointer text-xs font-medium">Raw response</summary><pre class="mt-1 overflow-x-auto whitespace-pre-wrap rounded border border-border bg-background p-2 text-xs">{ event.Settlement.RawResponse }</pre></details>
+			if len(event.Settlement.YAMLBlocks) == 0 {
+				<p class="text-xs text-muted-foreground">No fenced YAML blocks were present (lexical indication only).</p>
+			} else {
+				<div class="space-y-2">
+					<p class="text-xs font-medium">Opaque YAML blocks</p>
+					for _, block := range event.Settlement.YAMLBlocks {
+						<pre class="overflow-x-auto whitespace-pre-wrap rounded border border-border bg-background p-2 text-xs">{ block }</pre>
+					}
+				</div>
+			}
+			if successorAction != "" {
+				<form class="space-y-2" data-on:submit={ successorAction }><p class="text-xs font-medium">Select next action</p><input type="hidden" name="plan_dir" value={ event.Settlement.Plan }/><select name="action" class="rounded border border-input bg-background p-1 text-xs"><option value="none">None</option><option value="start_child">Start child</option><option value="steer_existing">Steer existing</option><option value="handoff">Handoff</option></select><input name="target" class="rounded border border-input bg-background p-1 text-xs" placeholder="Target identity"/><input name="discovery" class="rounded border border-input bg-background p-1 text-xs" placeholder="Validated discovery"/><button type="submit" class="rounded bg-secondary px-2 py-1 text-xs">Record decision</button><p class="text-xs text-muted-foreground">Recording this decision never executes it.</p></form>
+			}
+		</section>
+	}
+}

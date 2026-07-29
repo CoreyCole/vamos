@@ -14,13 +14,15 @@ import (
 
 // HermesTranscriptEvent is the durable, secret-free record received from Hermes.
 type HermesTranscriptEvent struct {
-	ID          string          `json:"id"`
-	At          time.Time       `json:"at"`
-	Type        string          `json:"type"`
-	ThreadID    string          `json:"thread_id"`
-	Content     string          `json:"content,omitempty"`
-	Tool        *HermesToolCard `json:"tool,omitempty"`
-	PiSessionID string          `json:"pi_session_id,omitempty"`
+	ID          string                     `json:"id"`
+	At          time.Time                  `json:"at"`
+	Type        string                     `json:"type"`
+	ThreadID    string                     `json:"thread_id"`
+	Content     string                     `json:"content,omitempty"`
+	Tool        *HermesToolCard            `json:"tool,omitempty"`
+	PiSessionID string                     `json:"pi_session_id,omitempty"`
+	Settlement  *OpaqueSettlementEvidence  `json:"settlement,omitempty"`
+	Successor   *OpaqueSettlementSuccessor `json:"successor,omitempty"`
 }
 
 type HermesToolCard struct {
@@ -176,7 +178,13 @@ func containedResolvedPath(planDir, target, name string) (string, error) {
 
 func validHermesEventType(kind string) bool {
 	switch kind {
-	case "user", "lifecycle", "tool", "final", "pi_run":
+	case "user",
+		"lifecycle",
+		"tool",
+		"final",
+		"pi_run",
+		opaqueSettlementReceivedEvent,
+		opaqueSettlementDecisionEvent:
 		return true
 	}
 	return false
