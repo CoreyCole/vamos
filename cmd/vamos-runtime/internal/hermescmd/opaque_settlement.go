@@ -97,6 +97,27 @@ func DecodeOpaqueSettlementEnvelope(data []byte) (OpaqueSettlementEnvelope, erro
 			"opaque settlement settled_at is required",
 		)
 	}
+	if raw, ok := fields["fenced_yaml_blocks"]; ok {
+		if bytes.Equal(raw, []byte("null")) {
+			return OpaqueSettlementEnvelope{}, errors.New(
+				"opaque settlement fences cannot be null",
+			)
+		}
+		var blocks []map[string]json.RawMessage
+		if err := json.Unmarshal(raw, &blocks); err != nil {
+			return OpaqueSettlementEnvelope{}, errors.New(
+				"opaque settlement fences are invalid",
+			)
+		}
+		for _, block := range blocks {
+			raw, ok := block["raw"]
+			if !ok || len(raw) == 0 || raw[0] != '"' {
+				return OpaqueSettlementEnvelope{}, errors.New(
+					"opaque settlement fence raw is required",
+				)
+			}
+		}
+	}
 	if envelope.FencedYAMLBlocks != nil {
 		for _, block := range *envelope.FencedYAMLBlocks {
 			if block.Language == "" {

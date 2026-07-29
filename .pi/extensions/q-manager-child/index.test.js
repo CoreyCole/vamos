@@ -155,7 +155,7 @@ test("settlement serializes opaque text fences with JavaScript exact bytes", asy
     );
   }));
 
-test("later steering skips tool-only leaves, settles the final text leaf once, and adds no capabilities", async () =>
+test("later steering settles a text projection even when the assistant entry also calls tools", async () =>
   managed(async (plan) => {
     const toolLeaf = {
       role: "assistant",
@@ -163,7 +163,10 @@ test("later steering skips tool-only leaves, settles the final text leaf once, a
     };
     const finalLeaf = {
       role: "assistant",
-      content: [{ type: "text", text: "```yaml\nfinal: true\n```" }],
+      content: [
+        { type: "toolCall", name: "still-not-evidence" },
+        { type: "text", text: "```yaml\nfinal: true\n```" },
+      ],
     };
     const state = harness([
       { id: "assistant-tool", type: "message", message: toolLeaf },

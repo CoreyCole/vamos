@@ -1,10 +1,13 @@
 package agentchat
 
 import (
+	"bytes"
 	"context"
 	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -57,6 +60,11 @@ func (s *Service) ReceiveOpaqueSettlement(
 		envelope.Session != request.Session ||
 		envelope.AssistantEntryID != request.FinalEntryID {
 		return errors.New("opaque settlement delivery does not match its response")
+	}
+	if request.DeliveryID != opaqueSettlementDeliveryID(
+		envelope.Plan, envelope.Session, envelope.AssistantEntryID,
+	) {
+		return errors.New("opaque settlement delivery ID does not match its identity")
 	}
 	planDir, err := s.hermesPlanDirFromRelative(request.Plan)
 	if err != nil {
@@ -123,16 +131,29 @@ func (s *Service) DecideOpaqueSettlementSuccessor(
 	if err != nil {
 		return err
 	}
+	planIdentity, err := opaqueSettlementPlanIdentity(s.thoughtsRoot, planDir)
+	if err != nil {
+		return err
+	}
 	envelope, err := decodeOpaqueSettlement(bytes)
-	if err != nil || envelope.ManagerThread != threadID || envelope.Session != session ||
+	if err != nil || envelope.Plan != planIdentity ||
+		envelope.ManagerThread != threadID || envelope.Session != session ||
 		envelope.AssistantEntryID != entry {
 		return errors.New("contained settlement does not match decision identity")
+	}
+	if err := VerifyHermesPiRunBinding(planDir, threadID, session); err != nil {
+		return err
 	}
 	wantDiscovery := opaqueSettlementDiscoveryReference(session, entry)
 	if strings.TrimSpace(successor.Discovery) != wantDiscovery {
 		return errors.New("invalid settlement discovery reference")
 	}
-	if err := validateOpaqueSettlementTarget(planDir, successor); err != nil {
+	if err := validateOpaqueSettlementTarget(
+		planDir,
+		threadID,
+		planIdentity,
+		successor,
+	); err != nil {
 		return err
 	}
 	return AppendHermesTranscript(
@@ -158,6 +179,18 @@ func (s *Service) DecideOpaqueSettlementSuccessor(
 	)
 }
 
+func opaqueSettlementPlanIdentity(root, planDir string) (string, error) {
+	resolvedRoot, err := filepath.EvalSymlinks(root)
+	if err != nil {
+		return "", err
+	}
+	resolvedPlan, err := filepath.EvalSymlinks(planDir)
+	if err != nil {
+		return "", err
+	}
+	return thoughtsRelativeTo(resolvedRoot, resolvedPlan), nil
+}
+
 func opaqueSettlementDiscoveryReference(session, entry string) string {
 	return "pi/" + session + "/settlements/" + entry + ".json"
 }
@@ -178,8 +211,16 @@ func validateOpaqueSettlementSuccessor(value OpaqueSettlementSuccessor) error {
 	return nil
 }
 
+type opaqueSettlementLaunchArtifact struct {
+	Version       int    `json:"version"`
+	Kind          string `json:"kind"`
+	LaunchID      string `json:"launch_id"`
+	Plan          string `json:"plan"`
+	ManagerThread string `json:"manager_thread"`
+}
+
 func validateOpaqueSettlementTarget(
-	planDir string,
+	planDir, threadID, plan string,
 	value OpaqueSettlementSuccessor,
 ) error {
 	target := strings.TrimSpace(value.Target)
@@ -193,16 +234,44 @@ func validateOpaqueSettlementTarget(
 			"launches",
 			target+".json",
 		)
-		if _, err := containedResolvedPath(planDir, path, ""); err != nil {
+		resolved, err := containedResolvedPath(planDir, path, "")
+		if err != nil {
 			return err
 		}
-		if info, err := os.Stat(path); err != nil || !info.Mode().IsRegular() {
+		info, err := os.Stat(resolved)
+		if err != nil || !info.Mode().IsRegular() {
 			return errors.New("contained launch target is required")
 		}
+		data, err := os.ReadFile(resolved)
+		if err != nil {
+			return err
+		}
+		var artifact opaqueSettlementLaunchArtifact
+		decoder := json.NewDecoder(bytes.NewReader(data))
+		decoder.DisallowUnknownFields()
+		if err := decoder.Decode(&artifact); err != nil {
+			return errors.New("invalid contained launch target")
+		}
+		if err := decoder.Decode(&struct{}{}); !errors.Is(err, io.EOF) {
+			return errors.New("invalid contained launch target")
+		}
+		if artifact.Version != 1 || artifact.Kind != "pi_child_launch" ||
+			artifact.LaunchID != target ||
+			artifact.Plan != plan ||
+			artifact.ManagerThread != threadID {
+			return errors.New("contained launch target does not match decision")
+		}
 	case "steer_existing":
-		events, err := readHermesTranscript(planDir, target)
-		if err != nil || len(events) == 0 {
+		path := filepath.Join(planDir, ".vamos", "sessions", "pi", target)
+		resolved, err := containedResolvedPath(planDir, path, "")
+		if err != nil {
+			return err
+		}
+		if info, err := os.Stat(resolved); err != nil || !info.IsDir() {
 			return errors.New("contained steer target is required")
+		}
+		if err := VerifyHermesPiRunBinding(planDir, threadID, target); err != nil {
+			return err
 		}
 	}
 	return nil

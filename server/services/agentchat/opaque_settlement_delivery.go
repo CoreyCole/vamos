@@ -386,6 +386,21 @@ func decodeOpaqueSettlement(data []byte) (opaqueSettlementEnvelope, error) {
 		!safeOpaqueComponent(e.AssistantEntryID) || strings.TrimSpace(e.Plan) == "" {
 		return e, errors.New("invalid opaque settlement")
 	}
+	if raw, ok := fields["fenced_yaml_blocks"]; ok {
+		if bytes.Equal(raw, []byte("null")) {
+			return e, errors.New("invalid opaque settlement fences")
+		}
+		var blocks []map[string]json.RawMessage
+		if err := json.Unmarshal(raw, &blocks); err != nil {
+			return e, errors.New("invalid opaque settlement fences")
+		}
+		for _, block := range blocks {
+			raw, ok := block["raw"]
+			if !ok || len(raw) == 0 || raw[0] != '"' {
+				return e, errors.New("invalid opaque settlement fence")
+			}
+		}
+	}
 	if e.FencedYAMLBlocks != nil {
 		for _, block := range *e.FencedYAMLBlocks {
 			if block.Language == "" {

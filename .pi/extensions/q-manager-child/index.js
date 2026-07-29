@@ -2,7 +2,10 @@ import { randomUUID } from "node:crypto";
 import { link, mkdir, open, readFile, rm } from "node:fs/promises";
 import { dirname, join, relative, resolve } from "node:path";
 
-import { captureOpaqueSettlementEvidence } from "./opaque-settlement-capture.js";
+import {
+  captureOpaqueSettlementEvidence,
+  projectPersistedAssistantText,
+} from "./opaque-settlement-capture.js";
 
 export {
   captureOpaqueSettlementEvidence,
@@ -190,7 +193,7 @@ export default function qManagerChildExtension(pi) {
       });
       return;
     }
-    if (event.message.content?.some((part) => part?.type === "toolCall"))
+    if (projectPersistedAssistantText(event.message.content ?? []) === "")
       return;
     pi.appendEntry(BRIDGE, {
       assistant_entry_id: matches[0].id,

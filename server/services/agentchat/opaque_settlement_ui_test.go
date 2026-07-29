@@ -2,6 +2,7 @@ package agentchat
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -37,6 +38,161 @@ func TestOpaqueSettlementCardRendersEvidenceNotEnvelope(t *testing.T) {
 	}
 }
 
+func TestReceiveOpaqueSettlementDerivesDeliveryIDForDedup(t *testing.T) {
+	root := t.TempDir()
+	plan, raw := writeOpaqueFixture(t, root, "thread", "session", "entry", 1)
+	s := &Service{thoughtsRoot: root}
+	request := OpaqueSettlementDeliveryRequest{
+		Version: opaqueSettlementDeliveryVersion,
+		DeliveryID: opaqueSettlementDeliveryID(
+			"project/plans/plan",
+			"session",
+			"entry",
+		),
+		Plan:                  "project/plans/plan",
+		ManagerThread:         "thread",
+		Session:               "session",
+		FinalEntryID:          "entry",
+		SettlementBytesBase64: base64.StdEncoding.EncodeToString(raw),
+	}
+	if err := s.ReceiveOpaqueSettlement(context.Background(), request); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.ReceiveOpaqueSettlement(context.Background(), request); err != nil {
+		t.Fatal(err)
+	}
+	events, err := readHermesTranscript(plan, "thread")
+	if err != nil {
+		t.Fatal(err)
+	}
+	received := 0
+	for _, event := range events {
+		if event.Type == opaqueSettlementReceivedEvent {
+			received++
+		}
+	}
+	if received != 1 {
+		t.Fatalf("received events = %d, want 1", received)
+	}
+	request.DeliveryID = "caller-chosen-id"
+	if err := s.ReceiveOpaqueSettlement(context.Background(), request); err == nil {
+		t.Fatal("accepted caller-chosen alternate delivery ID")
+	}
+}
+
+func TestOpaqueSettlementDecisionRejectsUnboundSettlement(t *testing.T) {
+	for _, runs := range []int{0, 2} {
+		t.Run("binding", func(t *testing.T) {
+			root := t.TempDir()
+			plan, _ := writeOpaqueFixture(t, root, "thread", "session", "entry", runs)
+			err := (&Service{thoughtsRoot: root}).DecideOpaqueSettlementSuccessor(
+				context.Background(),
+				plan,
+				"thread",
+				"session",
+				"entry",
+				OpaqueSettlementSuccessor{
+					Action:     "handoff",
+					Discovery:  opaqueSettlementDiscoveryReference("session", "entry"),
+					Rationale:  "human review",
+					Actor:      "manager@example.com",
+					Provenance: "test",
+				},
+			)
+			if err == nil {
+				t.Fatal("accepted settlement without exact pi_run binding")
+			}
+		})
+	}
+}
+
+func TestOpaqueSettlementTargetsRequireBoundSchema(t *testing.T) {
+	root := t.TempDir()
+	plan, _ := writeOpaqueFixture(t, root, "thread", "session", "entry", 1)
+	launchPath := filepath.Join(
+		plan,
+		".vamos",
+		"sessions",
+		"hermes",
+		"launches",
+		"launch.json",
+	)
+	if err := os.MkdirAll(filepath.Dir(launchPath), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	writeLaunch := func(value any) {
+		data, err := json.Marshal(value)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(launchPath, data, 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	valid := opaqueSettlementLaunchArtifact{
+		Version:       1,
+		Kind:          "pi_child_launch",
+		LaunchID:      "launch",
+		Plan:          "project/plans/plan",
+		ManagerThread: "thread",
+	}
+	writeLaunch(valid)
+	start := OpaqueSettlementSuccessor{Action: "start_child", Target: "launch"}
+	if err := validateOpaqueSettlementTarget(
+		plan,
+		"thread",
+		"project/plans/plan",
+		start,
+	); err != nil {
+		t.Fatal(err)
+	}
+	for _, value := range []any{"not json", opaqueSettlementLaunchArtifact{Version: 1, Kind: "pi_child_launch", LaunchID: "other", Plan: "project/plans/plan", ManagerThread: "thread"}, opaqueSettlementLaunchArtifact{Version: 1, Kind: "pi_child_launch", LaunchID: "launch", Plan: "other", ManagerThread: "thread"}, opaqueSettlementLaunchArtifact{Version: 1, Kind: "pi_child_launch", LaunchID: "launch", Plan: "project/plans/plan", ManagerThread: "other-thread"}} {
+		if text, ok := value.(string); ok {
+			if err := os.WriteFile(launchPath, []byte(text), 0o600); err != nil {
+				t.Fatal(err)
+			}
+		} else {
+			writeLaunch(value)
+		}
+		if err := validateOpaqueSettlementTarget(
+			plan,
+			"thread",
+			"project/plans/plan",
+			start,
+		); err == nil {
+			t.Fatal("accepted malformed or mismatched launch artifact")
+		}
+	}
+	steer := OpaqueSettlementSuccessor{Action: "steer_existing", Target: "session"}
+	if err := validateOpaqueSettlementTarget(
+		plan,
+		"thread",
+		"project/plans/plan",
+		steer,
+	); err != nil {
+		t.Fatal(err)
+	}
+	if err := AppendHermesTranscript(
+		plan,
+		HermesTranscriptEvent{
+			ID:          "duplicate",
+			Type:        "pi_run",
+			ThreadID:    "thread",
+			PiSessionID: "session",
+		},
+	); err != nil {
+		t.Fatal(err)
+	}
+	if err := validateOpaqueSettlementTarget(
+		plan,
+		"thread",
+		"project/plans/plan",
+		steer,
+	); err == nil {
+		t.Fatal("accepted ambiguously bound steer target")
+	}
+}
+
 func TestOpaqueSettlementDecisionUsesContainedEvidenceWithoutDelivery(t *testing.T) {
 	root := t.TempDir()
 	plan := filepath.Join(root, "plans", "p")
@@ -68,6 +224,11 @@ func TestOpaqueSettlementDecisionUsesContainedEvidenceWithoutDelivery(t *testing
 		t.Fatal(err)
 	}
 	if err := os.WriteFile(path, raw, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := AppendHermesTranscript(plan, HermesTranscriptEvent{
+		ID: "pi-run", Type: "pi_run", ThreadID: "thread", PiSessionID: "session",
+	}); err != nil {
 		t.Fatal(err)
 	}
 	s := &Service{thoughtsRoot: root}

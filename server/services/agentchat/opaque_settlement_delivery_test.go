@@ -133,6 +133,19 @@ func writeOpaqueFixture(
 	return plan, body
 }
 
+func TestDecodeOpaqueSettlementRejectsNullOrInvalidFenceEvidence(t *testing.T) {
+	for _, fences := range []string{
+		`null`, `[{"language":"yaml"}]`, `[{"language":"yaml","raw":null}]`, `[{"language":"yaml","raw":1}]`,
+	} {
+		raw := []byte(
+			`{"version":1,"kind":"pi_assistant_settlement","session":"session","plan":"project/plans/plan","manager_thread":"thread","assistant_entry_id":"entry","settled_at":"2026-07-29T00:00:00Z","raw_response":"evidence","fenced_yaml_blocks":` + fences + `}`,
+		)
+		if _, err := decodeOpaqueSettlement(raw); err == nil {
+			t.Fatalf("accepted invalid fence evidence %s", fences)
+		}
+	}
+}
+
 func TestOpaqueSettlementDeliveryRetriesExactBytesAndProjectsDedup(t *testing.T) {
 	root := t.TempDir()
 	_, raw := writeOpaqueFixture(t, root, "thread", "session", "entry", 1)
