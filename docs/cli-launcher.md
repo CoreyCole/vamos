@@ -8,12 +8,12 @@ Build the launcher, not `cmd/vamos-runtime`, into your PATH:
 
 ```bash
 go build -o ~/.local/bin/vamos ./cmd/vamos-launcher
-vamos launcher configure --runtime-source-root /absolute/path/to/vamos-baseline
+vamos launcher configure --runtime-source-root /absolute/path/to/vamos
 vamos launcher doctor
-(cd /tmp && vamos qrspi --help)
+(cd /tmp && vamos hermes pi start --help)
 ```
 
-For dogfood-style installs, point `--runtime-source-root` at your clean baseline checkout. For feature checkout development and tests, set `VAMOS_PACKAGE_ROOT=/absolute/path/to/checkout` to override persisted launcher state temporarily.
+For dogfood installs, point `--runtime-source-root` at the editable working checkout and promote tested commits to a clean baseline afterward. Stable installations may point directly at a clean baseline. For isolated feature checkout development and tests, set `VAMOS_PACKAGE_ROOT=/absolute/path/to/checkout` to override persisted launcher state temporarily.
 
 ## State and cache overrides
 
