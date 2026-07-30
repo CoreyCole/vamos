@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"gopkg.in/yaml.v3"
 )
@@ -95,20 +96,28 @@ func LoadPlanContext(planDir string) (PlanContext, error) {
 	if err != nil {
 		return PlanContext{}, err
 	}
+	if info, err := os.Stat(absolute); err == nil && !info.IsDir() {
+		return PlanContext{}, fmt.Errorf("plan path is not a directory")
+	} else if err != nil && !os.IsNotExist(err) {
+		return PlanContext{}, fmt.Errorf("stat plan directory: %w", err)
+	}
+
+	var front planFrontmatter
 	data, err := os.ReadFile(filepath.Join(absolute, "AGENTS.md"))
-	if err != nil {
+	if err == nil {
+		parts := strings.SplitN(string(data), "---", 3)
+		if len(parts) < 3 || strings.TrimSpace(parts[0]) != "" {
+			return PlanContext{}, fmt.Errorf(
+				"plan AGENTS.md must begin with YAML frontmatter",
+			)
+		}
+		if err := yaml.Unmarshal([]byte(parts[1]), &front); err != nil {
+			return PlanContext{}, fmt.Errorf("parse plan frontmatter: %w", err)
+		}
+	} else if !os.IsNotExist(err) {
 		return PlanContext{}, fmt.Errorf("read plan AGENTS.md: %w", err)
 	}
-	parts := strings.SplitN(string(data), "---", 3)
-	if len(parts) < 3 || strings.TrimSpace(parts[0]) != "" {
-		return PlanContext{}, fmt.Errorf(
-			"plan AGENTS.md must begin with YAML frontmatter",
-		)
-	}
-	var front planFrontmatter
-	if err := yaml.Unmarshal([]byte(parts[1]), &front); err != nil {
-		return PlanContext{}, fmt.Errorf("parse plan frontmatter: %w", err)
-	}
+
 	return PlanContext{
 		PlanDir:                 absolute,
 		PlanRel:                 thoughtsRelative(absolute),
@@ -188,12 +197,15 @@ func CheckpointPath(planDir, sessionID, finalEntryID string) (string, error) {
 }
 
 // SettlementPath is the only durable location for a v1 opaque settlement.
-func SettlementPath(planDir, sessionID, finalEntryID string) (string, error) {
+func SettlementPath(planDir, sessionID string, settledAt time.Time, finalEntryID string) (string, error) {
 	if err := ValidateSafeComponent(sessionID); err != nil {
 		return "", fmt.Errorf("settlement session: %w", err)
 	}
 	if err := ValidateSafeComponent(finalEntryID); err != nil {
 		return "", fmt.Errorf("settlement final entry: %w", err)
+	}
+	if settledAt.IsZero() {
+		return "", fmt.Errorf("settlement timestamp is required")
 	}
 	planDir, err := filepath.Abs(planDir)
 	if err != nil {
@@ -206,12 +218,17 @@ func SettlementPath(planDir, sessionID, finalEntryID string) (string, error) {
 		"pi",
 		sessionID,
 		"settlements",
-		finalEntryID+".json",
+		settlementFilename(settledAt, finalEntryID),
 	)
 	if !pathWithinPlan(path, planDir) {
 		return "", fmt.Errorf("settlement path escapes plan directory")
 	}
+
 	return path, nil
+}
+
+func settlementFilename(settledAt time.Time, finalEntryID string) string {
+	return settledAt.UTC().Format("20060102T150405000000000Z") + "_" + finalEntryID + ".json"
 }
 
 func DeliveryAttemptPath(

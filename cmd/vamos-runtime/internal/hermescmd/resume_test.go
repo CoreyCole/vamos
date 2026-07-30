@@ -104,6 +104,11 @@ func TestContinueRegistersManagedPiRunBeforeLaunchingWorker(t *testing.T) {
 	var gotPlan, gotSession string
 	server := httptest.NewServer(
 		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.Method == http.MethodGet {
+				w.WriteHeader(http.StatusOK)
+
+				return
+			}
 			if r.URL.Path != "/agent-chat/api/hermes/threads/thread-1/events" {
 				t.Fatalf("request path = %q", r.URL.Path)
 			}
@@ -129,7 +134,7 @@ func TestContinueRegistersManagedPiRunBeforeLaunchingWorker(t *testing.T) {
 	configPath := filepath.Join(t.TempDir(), "hermes.yaml")
 	if err := os.WriteFile(
 		configPath,
-		[]byte("vamos_url: "+server.URL+"\ncallback_token: callback-secret\n"),
+		[]byte("gateway_url: "+server.URL+"\nvamos_url: "+server.URL+"\ncallback_token: callback-secret\n"),
 		0o600,
 	); err != nil {
 		t.Fatal(err)

@@ -7,6 +7,10 @@ description: Ticket-level QRSPI planning using Hermes-managed isolated Pi worker
 
 Hermes owns worker lifecycle and decides what happens next. Pi performs one bounded stage in an isolated context. The filesystem under `thoughts/...` is durable truth; Hermes operational state, process handles, gateway settings, and credentials are not artifacts.
 
+## Bootstrap
+
+The first child of any stage owns plan bootstrap. It creates the plan directory under `thoughts/.../plans/`, copies the manager-provided `AGENTS.md` template into that directory, and then writes the first durable artifact for its active stage. Hermes may supply a not-yet-existing absolute plan path to `vamos hermes pi start`; the launcher must not require `AGENTS.md`, `design.md`, `outline.md`, or `plan.md` before this bootstrap child runs.
+
 ## Worker contract
 
 Every worker starts by reading this skill, its active stage skill, the plan `AGENTS.md`, and only the stage artifacts named there. It creates or updates the durable stage artifact, then ends with a normal final response naming the artifact and the smallest decision for Hermes or the lead. In a managed opaque-settlement run, do not invoke `vamos hermes pi done`, select a successor, or hand-write a machine-routing document.

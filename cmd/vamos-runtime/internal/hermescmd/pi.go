@@ -204,12 +204,29 @@ func registerManagedPiRun(
 	if err != nil {
 		return fmt.Errorf("read Hermes host configuration: %w", err)
 	}
-	if strings.TrimSpace(config.VamosURL) == "" ||
+	if strings.TrimSpace(config.GatewayURL) == "" ||
+		strings.TrimSpace(config.VamosURL) == "" ||
 		strings.TrimSpace(config.CallbackToken) == "" {
 		return errors.New(
-			"Vamos callback URL and credential are required; rerun hermes setup",
+			"Hermes gateway URL and Vamos callback URL and credential are required; rerun hermes setup",
 		)
 	}
+	gatewayRequest, err := http.NewRequestWithContext(
+		ctx, http.MethodGet, config.GatewayURL, nil,
+	)
+	if err != nil {
+		return fmt.Errorf("build Hermes gateway readiness request: %w", err)
+	}
+	gatewayResponse, err := http.DefaultClient.Do(gatewayRequest)
+	if err != nil {
+		return fmt.Errorf("verify Hermes gateway readiness: %w", err)
+	}
+	gatewayResponse.Body.Close()
+	if gatewayResponse.StatusCode >= http.StatusBadRequest {
+		return fmt.Errorf("verify Hermes gateway readiness: %s", gatewayResponse.Status)
+	}
+	// Registering the owned session proves authenticated Vamos callback ingress
+	// is reachable before the child process starts.
 	payload, err := json.Marshal(struct {
 		PlanDir     string `json:"plan_dir"`
 		ID          string `json:"id"`
@@ -249,21 +266,21 @@ func registerManagedPiRun(
 }
 
 func piContextArgs(ctx PlanContext, prior *PiResult) ([]string, error) {
-	paths := []string{
-		filepath.Join(ctx.PlanDir, "AGENTS.md"),
-		filepath.Join(ctx.PlanDir, "design.md"),
-		filepath.Join(ctx.PlanDir, "outline.md"),
-		filepath.Join(ctx.PlanDir, "plan.md"),
+	root, err := piResourceRoot()
+	if err != nil {
+		return nil, err
 	}
-	if prior != nil {
-		root, err := piResourceRoot()
-		if err != nil {
-			return nil, err
+	paths := make([]string, 0, 5)
+	for _, name := range []string{"AGENTS.md", "design.md", "outline.md", "plan.md"} {
+		path := filepath.Join(ctx.PlanDir, name)
+		if _, err := os.Stat(path); err == nil {
+			paths = append(paths, path)
+		} else if !os.IsNotExist(err) {
+			return nil, fmt.Errorf("load Pi context %q: %w", path, err)
 		}
-		paths = append(
-			paths,
-			filepath.Join(root, ".pi", "skills", "qrspi-planning", "SKILL.md"),
-		)
+	}
+	paths = append(paths, filepath.Join(root, ".pi", "skills", "qrspi-planning", "SKILL.md"))
+	if prior != nil {
 		if prior.Outcome == OutcomeHandoff {
 			paths = append(paths,
 				filepath.Join(root, ".pi", "skills", "q-resume", "SKILL.md"),

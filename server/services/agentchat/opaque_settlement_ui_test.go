@@ -239,6 +239,7 @@ func TestOpaqueSettlementTargetsRequireBoundSchema(t *testing.T) {
 func TestOpaqueSettlementDecisionRequiresDiscoveryAdmission(t *testing.T) {
 	root := t.TempDir()
 	plan := filepath.Join(root, "plans", "p")
+	settledAt := time.Now().UTC()
 	path := filepath.Join(
 		plan,
 		".vamos",
@@ -246,7 +247,7 @@ func TestOpaqueSettlementDecisionRequiresDiscoveryAdmission(t *testing.T) {
 		"pi",
 		"session",
 		"settlements",
-		"entry.json",
+		opaqueSettlementFilename(settledAt, "entry"),
 	)
 	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
 		t.Fatal(err)
@@ -259,7 +260,7 @@ func TestOpaqueSettlementDecisionRequiresDiscoveryAdmission(t *testing.T) {
 			Plan:             "plans/p",
 			ManagerThread:    "thread",
 			AssistantEntryID: "entry",
-			SettledAt:        time.Now().UTC(),
+			SettledAt:        settledAt,
 			RawResponse:      "raw",
 		},
 	)

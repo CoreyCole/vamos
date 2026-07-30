@@ -118,15 +118,10 @@ func (s *Service) DecideOpaqueSettlementSuccessor(
 	if err := validateOpaqueSettlementSuccessor(successor); err != nil {
 		return err
 	}
-	path := filepath.Join(
-		planDir,
-		".vamos",
-		"sessions",
-		"pi",
-		session,
-		"settlements",
-		entry+".json",
-	)
+	path, err := opaqueSettlementPath(planDir, session, entry)
+	if err != nil {
+		return err
+	}
 	if err := validateOpaqueSettlementPath(planDir, path); err != nil {
 		return err
 	}
@@ -191,6 +186,29 @@ func (s *Service) DecideOpaqueSettlementSuccessor(
 			Successor: &successor,
 		},
 	)
+}
+
+func opaqueSettlementPath(planDir, session, entry string) (string, error) {
+	if !safeOpaqueComponent(session) || !safeOpaqueComponent(entry) {
+		return "", errors.New("safe settlement identity is required")
+	}
+	matches, err := filepath.Glob(filepath.Join(
+		planDir,
+		".vamos",
+		"sessions",
+		"pi",
+		session,
+		"settlements",
+		"*_"+entry+".json",
+	))
+	if err != nil {
+		return "", err
+	}
+	if len(matches) != 1 {
+		return "", errors.New("expected exactly one timestamped opaque settlement")
+	}
+
+	return matches[0], nil
 }
 
 func opaqueSettlementPlanIdentity(root, planDir string) (string, error) {

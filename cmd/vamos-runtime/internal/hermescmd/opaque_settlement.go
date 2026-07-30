@@ -10,6 +10,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 )
 
@@ -137,11 +138,11 @@ func WriteOpaqueSettlement(
 	planDir, sessionID, finalEntryID string,
 	data []byte,
 ) (string, error) {
-	path, err := SettlementPath(planDir, sessionID, finalEntryID)
+	envelope, err := DecodeOpaqueSettlementEnvelope(data)
 	if err != nil {
 		return "", err
 	}
-	envelope, err := DecodeOpaqueSettlementEnvelope(data)
+	path, err := SettlementPath(planDir, sessionID, envelope.SettledAt, finalEntryID)
 	if err != nil {
 		return "", err
 	}
@@ -159,28 +160,39 @@ func WriteOpaqueSettlement(
 func ReadOpaqueSettlement(
 	planDir, sessionID, finalEntryID string,
 ) (OpaqueSettlementPending, error) {
-	path, err := SettlementPath(planDir, sessionID, finalEntryID)
+	if err := ValidateSafeComponent(sessionID); err != nil {
+		return OpaqueSettlementPending{}, err
+	}
+	if err := ValidateSafeComponent(finalEntryID); err != nil {
+		return OpaqueSettlementPending{}, err
+	}
+	directory := filepath.Join(planDir, ".vamos", "sessions", "pi", sessionID, "settlements")
+	entries, err := os.ReadDir(directory)
 	if err != nil {
 		return OpaqueSettlementPending{}, err
 	}
-	data, err := readContainedOpaqueSettlement(planDir, path)
-	if err != nil {
-		return OpaqueSettlementPending{}, err
+	for _, entry := range entries {
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), "_"+finalEntryID+".json") {
+			continue
+		}
+		path := filepath.Join(directory, entry.Name())
+		data, err := readContainedOpaqueSettlement(planDir, path)
+		if err != nil {
+			return OpaqueSettlementPending{}, err
+		}
+		envelope, err := DecodeOpaqueSettlementEnvelope(data)
+		if err != nil {
+			return OpaqueSettlementPending{}, err
+		}
+		if envelope.Session == sessionID && envelope.AssistantEntryID == finalEntryID && envelope.Plan == thoughtsRelative(planDir) {
+			return OpaqueSettlementPending{
+				Envelope:    envelope,
+				BytesBase64: base64.StdEncoding.EncodeToString(data),
+			}, nil
+		}
 	}
-	envelope, err := DecodeOpaqueSettlementEnvelope(data)
-	if err != nil {
-		return OpaqueSettlementPending{}, err
-	}
-	if envelope.Session != sessionID || envelope.AssistantEntryID != finalEntryID ||
-		envelope.Plan != thoughtsRelative(planDir) {
-		return OpaqueSettlementPending{}, errors.New(
-			"opaque settlement payload does not match its immutable path identity",
-		)
-	}
-	return OpaqueSettlementPending{
-		Envelope:    envelope,
-		BytesBase64: base64.StdEncoding.EncodeToString(data),
-	}, nil
+
+	return OpaqueSettlementPending{}, fs.ErrNotExist
 }
 
 func readContainedOpaqueSettlement(planDir, path string) ([]byte, error) {

@@ -182,7 +182,7 @@ func writeOpaqueFixture(
 		"pi",
 		session,
 		"settlements",
-		entry+".json",
+		opaqueSettlementFilename(time.Date(2026, 7, 29, 0, 0, 0, 0, time.UTC), entry),
 	)
 	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
 		t.Fatal(err)
@@ -332,7 +332,7 @@ func TestOpaqueSettlementDeliveryRejectsForgedPathIdentity(t *testing.T) {
 		"pi",
 		"session",
 		"settlements",
-		"entry.json",
+		opaqueSettlementFilename(time.Date(2026, 7, 29, 0, 0, 0, 0, time.UTC), "entry"),
 	)
 	if err := os.WriteFile(path, forged, 0o600); err != nil {
 		t.Fatal(err)
@@ -426,7 +426,7 @@ func TestOpaqueSettlementPathRejectsSymlinkEscape(t *testing.T) {
 		"pi",
 		"session",
 		"settlements",
-		"entry.json",
+		opaqueSettlementFilename(time.Date(2026, 7, 29, 0, 0, 0, 0, time.UTC), "entry"),
 	)
 	if err := os.Remove(path); err != nil {
 		t.Fatal(err)

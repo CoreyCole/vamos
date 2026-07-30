@@ -281,7 +281,7 @@ func (a *OpaqueSettlementDeliveryActivities) deliverOne(
 	}
 	parts := strings.Split(filepath.ToSlash(rel), "/")
 	if len(parts) != 3 || parts[1] != "settlements" ||
-		strings.TrimSuffix(parts[2], ".json") != envelope.AssistantEntryID ||
+		parts[2] != opaqueSettlementFilename(envelope.SettledAt, envelope.AssistantEntryID) ||
 		parts[0] != envelope.Session {
 		return errors.New("opaque settlement path identity mismatch")
 	}
@@ -428,6 +428,10 @@ func safeOpaqueComponent(v string) bool {
 		}
 	}
 	return true
+}
+
+func opaqueSettlementFilename(settledAt time.Time, entry string) string {
+	return settledAt.UTC().Format("20060102T150405000000000Z") + "_" + entry + ".json"
 }
 
 func thoughtsRelativeTo(root, path string) string {

@@ -103,10 +103,21 @@ async function syncDirectory(directory) {
   }
 }
 
+export function settlementFilename(settledAt, entry) {
+  const date = new Date(settledAt);
+  if (Number.isNaN(date.getTime())) throw new Error("settlement timestamp is required");
+  return `${date
+    .toISOString()
+    .replace(/[-:]/g, "")
+    .replace(".", "")
+    .replace("Z", "000000Z")}_${entry}.json`;
+}
+
 /** Immutable, no-replace publication; equal bytes are a successful retry. */
 export async function publish(plan, session, entry, bytes) {
   safeComponent(session, "session");
   safeComponent(entry, "final entry");
+  const envelope = JSON.parse(bytes.toString("utf8"));
   const target = join(
     plan,
     ".vamos",
@@ -114,7 +125,7 @@ export async function publish(plan, session, entry, bytes) {
     "pi",
     session,
     "settlements",
-    `${entry}.json`,
+    settlementFilename(envelope.settled_at, entry),
   );
   const directory = dirname(target);
   await mkdir(directory, { recursive: true, mode: 0o700 });

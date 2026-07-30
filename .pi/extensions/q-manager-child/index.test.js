@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtemp, readFile, stat } from "node:fs/promises";
+import { mkdtemp, readFile, readdir, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -64,6 +64,15 @@ async function managed(fn) {
   } finally {
     restoreEnvironment(old);
   }
+}
+
+async function settlementPath(plan, entry) {
+  const directory = join(plan, ".vamos/sessions/pi/session-1/settlements");
+  const matches = (await readdir(directory)).filter((name) =>
+    name.endsWith(`_${entry}.json`),
+  );
+  assert.equal(matches.length, 1);
+  return join(directory, matches[0]);
 }
 
 async function bridge(handlers, ctx, message) {
@@ -192,10 +201,7 @@ test("later steering settles a text projection even when the assistant entry als
     );
     const settlement = JSON.parse(
       await readFile(
-        join(
-          plan,
-          ".vamos/sessions/pi/session-1/settlements/assistant-final.json",
-        ),
+        await settlementPath(plan, "assistant-final"),
         "utf8",
       ),
     );
@@ -222,7 +228,7 @@ test("agent_settled persists base64 before safe publication and consumes after i
     const bytes = Buffer.from(pending.data.envelope_utf8_base64, "base64");
     assert.equal(
       await readFile(
-        join(plan, ".vamos/sessions/pi/session-1/settlements/assistant-1.json"),
+        await settlementPath(plan, "assistant-1"),
         "utf8",
       ),
       bytes.toString(),
@@ -276,24 +282,31 @@ test("restart recovers after link publication but before consume from exact pend
     );
     assert.equal(
       await readFile(
-        join(plan, ".vamos/sessions/pi/session-1/settlements/assistant-1.json"),
+        await settlementPath(plan, "assistant-1"),
         "utf8",
       ),
       bytes.toString(),
     );
   }));
 
-test("safe publisher is no-replace and equal-byte idempotent", async () => {
-  const plan = await mkdtemp(join(tmpdir(), "q-manager-child-publish-"));
-  const bytes = Buffer.from("{}", "utf8");
-  const path = await publish(plan, "session-1", "entry-1", bytes);
-  assert.equal((await stat(path)).isFile(), true);
-  assert.equal(await publish(plan, "session-1", "entry-1", bytes), path);
-  await assert.rejects(
-    () => publish(plan, "session-1", "entry-1", Buffer.from("{ }")),
-    /immutable opaque settlement identity conflict/,
-  );
-});
+test("safe publisher is no-replace and equal-byte idempotent", async () =>
+  managed(async (plan) => {
+    const bytes = serializeSettlement(
+      { session: "session-1", plan, thread: "thread-1" },
+      "entry-1",
+      [{ type: "text", text: "evidence" }],
+      "2026-07-30T06:52:03.988Z",
+    );
+    const path = await publish(plan, "session-1", "entry-1", bytes);
+    assert.equal((await stat(path)).isFile(), true);
+    assert.equal(await publish(plan, "session-1", "entry-1", bytes), path);
+    const conflict = JSON.parse(bytes.toString("utf8"));
+    conflict.raw_response = "different evidence";
+    await assert.rejects(
+      () => publish(plan, "session-1", "entry-1", Buffer.from(JSON.stringify(conflict))),
+      /immutable opaque settlement identity conflict/,
+    );
+  }));
 
 test("all compaction is cancelled as nonsemantic telemetry and summary cancellation remains narrow", async () =>
   managed(async () => {

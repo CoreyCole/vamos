@@ -105,7 +105,12 @@ func TestStartRejectsUnsafeManagedThreadWithoutLaunching(t *testing.T) {
 func TestStartDoesNotLaunchWhenRegistrationFails(t *testing.T) {
 	ctx := testPlan(t)
 	server := httptest.NewServer(
-		http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		http.HandlerFunc(func(w http.ResponseWriter, request *http.Request) {
+			if request.Method == http.MethodGet {
+				w.WriteHeader(http.StatusOK)
+
+				return
+			}
 			w.WriteHeader(http.StatusInternalServerError)
 		}),
 	)
@@ -113,7 +118,7 @@ func TestStartDoesNotLaunchWhenRegistrationFails(t *testing.T) {
 	configPath := filepath.Join(t.TempDir(), "hermes.yaml")
 	if err := os.WriteFile(
 		configPath,
-		[]byte("vamos_url: "+server.URL+"\ncallback_token: token\n"),
+		[]byte("gateway_url: "+server.URL+"\nvamos_url: "+server.URL+"\ncallback_token: token\n"),
 		0o600,
 	); err != nil {
 		t.Fatal(err)
@@ -142,6 +147,28 @@ func TestStartDoesNotLaunchWhenRegistrationFails(t *testing.T) {
 	}
 	if launched {
 		t.Fatal("runner launched after failed registration")
+	}
+}
+
+func TestStartAcceptsPlanDirectoryWithoutContextFiles(t *testing.T) {
+	planDir := t.TempDir()
+	var gotArgs []string
+	cmd := newStartCommand(
+		func(_ context.Context, _ string, args []string, _ []string, _ io.Writer, _ io.Writer) error {
+			gotArgs = append([]string(nil), args...)
+
+			return nil
+		},
+	)
+	cmd.SetArgs([]string{"--plan", planDir, "bootstrap task"})
+	if err := cmd.Execute(); err != nil {
+		t.Fatal(err)
+	}
+	for _, arg := range gotArgs {
+		if strings.Contains(arg, "AGENTS.md") || strings.Contains(arg, "design.md") ||
+			strings.Contains(arg, "outline.md") || strings.Contains(arg, "plan.md") {
+			t.Fatalf("bootstrap launch loaded missing optional context: %#v", gotArgs)
+		}
 	}
 }
 

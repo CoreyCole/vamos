@@ -104,10 +104,14 @@ func TestOpaqueSettlementPersistsExactBytesAndRecoversBase64(t *testing.T) {
 	if want, err := SettlementPath(
 		ctx.PlanDir,
 		"session-1",
+		time.Date(2026, 7, 29, 12, 0, 0, 0, time.UTC),
 		"entry-1",
 	); err != nil ||
 		path != want {
 		t.Fatalf("path = %q, %v; want %q", path, err, want)
+	}
+	if base := filepath.Base(path); !strings.HasPrefix(base, "20260729T120000000000000Z_") {
+		t.Fatalf("settlement name = %q, want timestamp prefix", base)
 	}
 	pending, err := ReadOpaqueSettlement(ctx.PlanDir, "session-1", "entry-1")
 	if err != nil {
@@ -169,7 +173,12 @@ func TestOpaqueSettlementRejectsMalformedOrUnsafePayloads(t *testing.T) {
 			t.Fatalf("accepted invalid envelope %s", raw)
 		}
 	}
-	if _, err := SettlementPath(ctx.PlanDir, "../session", "entry"); err == nil {
+	if _, err := SettlementPath(
+		ctx.PlanDir,
+		"../session",
+		time.Now(),
+		"entry",
+	); err == nil {
 		t.Fatal("accepted traversal settlement path")
 	}
 	if _, err := ReadOpaqueSettlement(ctx.PlanDir, "session", "../entry"); err == nil {
@@ -554,6 +563,11 @@ func TestStartRegistersManagedPiRunBeforeLaunchingWorker(t *testing.T) {
 	var gotPlan, gotSession string
 	server := httptest.NewServer(
 		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.Method == http.MethodGet {
+				w.WriteHeader(http.StatusOK)
+
+				return
+			}
 			if r.URL.Path != "/agent-chat/api/hermes/threads/thread-1/events" {
 				t.Fatalf("request path = %q", r.URL.Path)
 			}
@@ -580,7 +594,7 @@ func TestStartRegistersManagedPiRunBeforeLaunchingWorker(t *testing.T) {
 	configPath := filepath.Join(t.TempDir(), "hermes.yaml")
 	if err := os.WriteFile(
 		configPath,
-		[]byte("vamos_url: "+server.URL+"\ncallback_token: callback-secret\n"),
+		[]byte("gateway_url: "+server.URL+"\nvamos_url: "+server.URL+"\ncallback_token: callback-secret\n"),
 		0o600,
 	); err != nil {
 		t.Fatal(err)
