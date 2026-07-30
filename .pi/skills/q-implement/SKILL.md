@@ -5,11 +5,11 @@ description: Execute exactly one unchecked implementation item.
 
 # q-implement
 
-Work only in the prepared implementation workspace. Read affected code, implement and self-verify one item, update plan checkboxes, commit according to repository policy, and write a durable handoff using the `q-handoff` pattern so the next child can apply `q-resume`. Until every implementation slice is checked, finish with `--outcome handoff --next implement` so the next child continues implementation. Only the final implementation child uses `--outcome complete --next review`.
+Work only in the prepared implementation workspace. Read affected code, implement and self-verify one item, update plan checkboxes, commit according to repository policy, and write a durable handoff using the `q-handoff` pattern. Hermes decides whether another child resumes the work or a later stage begins.
 
 ## Hermes completion
 
-After durable work and verification, record the conclusion with `vamos hermes pi done --session "$PI_SESSION_ID" --outcome <outcome> --next <action> [--artifact thoughts/...] --summary $'1. ...\n2. ...\n3. ...'`. For a non-final slice, use `--outcome handoff --next implement`; do not route a slice to review or verify. Use only the outcome and action vocabularies in `qrspi-planning`. Hermes owns process lifecycle and continuation; do not use tmux, a manager state file, retry policy, or hand-authored machine-routing output. Keep gateway settings and credentials host-local.
+After durable work and verification, end with a normal final response that names the durable artifact and the smallest decision for Hermes or the lead. In a managed opaque-settlement run, do not call `vamos hermes pi done`, emit semantic `outcome`/`next` YAML, or launch a successor; `pi done` is an explicit operator recovery command only.
 
 ## Durable boundaries
 

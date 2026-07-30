@@ -9,26 +9,11 @@ Hermes owns worker lifecycle and decides what happens next. Pi performs one boun
 
 ## Worker contract
 
-Every worker starts by reading this skill, its active stage skill, the plan `AGENTS.md`, and only the stage artifacts named there. It creates or updates the durable stage artifact, then records its conclusion through the CLI; never hand-write a machine-routing document.
+Every worker starts by reading this skill, its active stage skill, the plan `AGENTS.md`, and only the stage artifacts named there. It creates or updates the durable stage artifact, then ends with a normal final response naming the artifact and the smallest decision for Hermes or the lead. In a managed opaque-settlement run, do not invoke `vamos hermes pi done`, emit semantic result YAML, select a successor, or hand-write a machine-routing document.
 
-```bash
-vamos hermes pi done \
-  --session "$PI_SESSION_ID" \
-  --outcome <complete|handoff|needs_human|blocked|error> \
-  --next <question|research|design|outline|plan|workspace|implement|review|verify|milestone-question|milestone-research|milestone-design|milestone-create-tickets|none> \
-  [--artifact thoughts/.../artifact.md] \
-  --summary $'1. Durable work completed.\n2. Verification or decision.\n3. Recommended Hermes follow-up.'
-```
+`PI_SESSION_ID` is Pi's injected session identity and `VAMOS_PLAN_DIR` is transient plan context. The stop-bound extension captures the actual final assistant response and qualifying YAML/YML fences as immutable opaque evidence. Hermes alone owns lifecycle, process steering, and any successor decision. `pi done` remains an explicit human/operator recovery path for manual sessions, not a normal managed-worker action.
 
-`PI_SESSION_ID` is Pi's session identity and `VAMOS_PLAN_DIR` is the Hermes worker's transient plan context. A manual Pi worker uses the same completion contract with its explicit plan path:
-
-```bash
-vamos hermes pi done --plan <absolute-plan-dir> --session "$PI_SESSION_ID" ...
-```
-
-Without host-local Hermes setup, or when Vamos returns `404` for a managerless session, `done` records disk truth and prints `vamos hermes pi continue <short-id>` for the human operator. Do not run that command from the active Pi worker. Stop after recording the result; after the worker exits, the human may run the command from a terminal to launch the recommended successor. Do not put gateway URLs, credentials, process IDs, locks, run state, or absolute host paths in durable artifacts. `next` is a non-binding recommendation: Hermes or the lead engineer may choose a different safe task.
-
-A successor starts with `vamos hermes pi start --plan <absolute-plan-dir> --previous-session <id> "<task>"`. Hermes reads `vamos hermes pi result` rather than copying prior worker output into prompts.
+Do not put gateway URLs, credentials, process IDs, locks, run state, or absolute host paths in durable artifacts.
 
 ## Pipeline
 

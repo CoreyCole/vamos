@@ -5,11 +5,11 @@ description: Decompose a task into factual research questions.
 
 # q-question
 
-Interview the lead engineer about outcomes, scope, principles, and tradeoffs. Write questions and preserve the human alignment gate before recommending `research`.
+Interview the lead engineer about outcomes, scope, principles, and tradeoffs. In a managed Pi run, ask concise questions in your ordinary response, then wait for Hermes to submit the manager's answer into the same live session. Do not invent alignment or treat waiting for that answer as a failure. Write the questions artifact and preserve the human alignment gate before Hermes decides whether to start research.
 
-## Hermes completion
+## Managed completion
 
-After durable work and verification, record the conclusion with `vamos hermes pi done --session "$PI_SESSION_ID" --outcome <outcome> --next <action> [--artifact thoughts/...] --summary $'1. ...\n2. ...\n3. ...'`. Use only the outcome and action vocabularies in `qrspi-planning`. Hermes owns process lifecycle and continuation; do not use tmux, a manager state file, retry policy, or hand-authored machine-routing output. Keep gateway settings and credentials host-local.
+After durable work and verification, end with a normal final response that names the durable artifact and the smallest human decision Hermes should inspect. Do not call `vamos hermes pi done`, write semantic `outcome`/`next` YAML, or launch a successor in a normal managed run: the stop-bound extension captures the actual final response as opaque settlement evidence. `pi done` is an explicit operator recovery command only.
 
 
 ## Durable boundaries
