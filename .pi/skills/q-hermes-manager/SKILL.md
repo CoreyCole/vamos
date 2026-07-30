@@ -9,9 +9,9 @@ Hermes owns conversation state, background task handles, process-write steering,
 
 1. Run `vamos hermes setup --gateway-url <url>` once as an administrator; gateway configuration and credentials remain host-local.
 1. Start a worker with `vamos hermes pi start --plan <absolute-plan-dir> --thread-id <originating-hermes-thread> [--previous-session <id>] "<bounded task>"` inside a Hermes background task **with a PTY**. To adopt a manual continuation, add `--thread-id <originating-hermes-thread>` only when the new Pi session is registered before launch; otherwise report it as a local-result fallback.
-1. The worker is intentionally interactive: do **not** add `pi -p` or treat its initial prompt wait as a stalled job. Steer it through Hermes process-write/submit with scoped follow-up instructions. Its initial bounded task must require a durable artifact and a normal final response, not model-issued `pi done`.
+1. The worker is intentionally interactive: do **not** add `pi -p` or treat its initial prompt wait as a stalled job. Steer it through Hermes process-write/submit with scoped follow-up instructions. Its initial bounded task must require a durable artifact and a normal final response, not model-issued `pi done`. When a child intentionally stops to ask a manager question, its final response should contain the opaque YAML manager-message block defined by `qrspi-planning`.
 1. Hermes may steer that live Pi process with its native process-write API. Do not kill an interactive worker merely because it is awaiting or processing a steerable turn; stop it only when superseding it or at the human's direction.
-1. Treat process exit as liveness only. Read `vamos hermes pi result --plan <plan> --session <id> --format json` for semantic completion.
+1. Treat process exit as liveness only. For each `agent_settled` delivery, inspect the immutable settlement envelope and raw final response. A fenced YAML manager-message block is human-readable opaque evidence, not an automatic routing command; a no-YAML stop is still a manager notification and must not receive a synthetic outcome.
 
 ### macOS persistent Vamos/Hermes host configuration
 
@@ -27,7 +27,7 @@ Keep the integration attached to the persistent host service, not a temporary ve
 
 ### Stop-bound delivery verification
 
-Normal managed completion is extension-owned at the actual persisted final-assistant boundary. It writes immutable opaque settlement evidence before delivery; a model-issued `pi done` is only manual recovery and never authorizes manager advancement.
+Normal managed completion is extension-owned at each actual persisted final-assistant boundary. It writes immutable opaque settlement evidence before delivery; a model-issued `pi done` is only manual recovery and never authorizes manager advancement. Deliver every settled response to the owning manager whether or not it contains a YAML fence.
 
 Before claiming end-to-end Hermes↔child delivery, verify all of these without printing credentials:
 

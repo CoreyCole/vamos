@@ -9,9 +9,18 @@ Hermes owns worker lifecycle and decides what happens next. Pi performs one boun
 
 ## Worker contract
 
-Every worker starts by reading this skill, its active stage skill, the plan `AGENTS.md`, and only the stage artifacts named there. It creates or updates the durable stage artifact, then ends with a normal final response naming the artifact and the smallest decision for Hermes or the lead. In a managed opaque-settlement run, do not invoke `vamos hermes pi done`, emit semantic result YAML, select a successor, or hand-write a machine-routing document.
+Every worker starts by reading this skill, its active stage skill, the plan `AGENTS.md`, and only the stage artifacts named there. It creates or updates the durable stage artifact, then ends with a normal final response naming the artifact and the smallest decision for Hermes or the lead. In a managed opaque-settlement run, do not invoke `vamos hermes pi done`, select a successor, or hand-write a machine-routing document.
 
-`PI_SESSION_ID` is Pi's injected session identity and `VAMOS_PLAN_DIR` is transient plan context. The stop-bound extension captures the actual final assistant response and qualifying YAML/YML fences as immutable opaque evidence. Hermes alone owns lifecycle, process steering, and any successor decision. `pi done` remains an explicit human/operator recovery path for manual sessions, not a normal managed-worker action.
+When stopping to ask the manager a question or request a decision, include one fenced `yaml` or `yml` block in that final response. This is human-readable opaque communication, not a machine-routing protocol: Hermes preserves it exactly and does not parse it, infer a lifecycle outcome, or launch a successor from it.
+
+```yaml
+manager_message:
+  kind: question
+  questions:
+    - State the smallest decision needed from the manager.
+```
+
+`PI_SESSION_ID` is Pi's injected session identity and `VAMOS_PLAN_DIR` is transient plan context. At every actual `agent_settled` boundary, the extension captures the final assistant response and any qualifying YAML/YML fence as immutable opaque evidence. A stop with no YAML is still delivered to the manager as the raw response; missing YAML must not become a fabricated outcome. Hermes alone owns lifecycle, process steering, and any successor decision. `pi done` remains an explicit human/operator recovery path for manual sessions, not a normal managed-worker action.
 
 Do not put gateway URLs, credentials, process IDs, locks, run state, or absolute host paths in durable artifacts.
 
@@ -31,7 +40,7 @@ Preserve human gates, workspace/lost-work safety checks, implementation handoffs
 
 ## Completion wording
 
-Use concise numbered summaries. `handoff` means another isolated worker should continue the same bounded activity from the artifact. `needs_human`, `blocked`, and `error` stop autonomous continuation and state the smallest required decision or reproducible blocker. A completed planning or implementation artifact must name what Hermes should inspect next.
+Use concise prose that names the durable artifact and the smallest manager decision. For an intentional manager question, add the opaque YAML block above. Do not emit `outcome`, `next`, lifecycle aliases, or machine-readable successor instructions.
 
 ## Artifact rules
 
