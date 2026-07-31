@@ -48,6 +48,7 @@ class VamosAdapter(BasePlatformAdapter):
             return False
         app = web.Application()
         app.router.add_post("/vamos/prompts", self._prompt)
+        app.router.add_post("/vamos/manager-wake", self._manager_wake)
         app.router.add_post("/vamos/threads/{thread_id}/pi/{session_id}/complete", self._completion)
         app.router.add_get("/health", self._health)
         self._runner = web.AppRunner(app)
@@ -101,6 +102,38 @@ class VamosAdapter(BasePlatformAdapter):
             ),
             raw_message=body,
             message_id=uuid.uuid4().hex,
+        )
+        await self.handle_message(event)
+        return web.json_response({"status": "accepted"}, status=202)
+
+    @staticmethod
+    def _manager_wake_body(body: dict[str, Any]) -> dict[str, Any]:
+        if type(body.get("version")) is not int or body["version"] != 1:
+            raise web.HTTPBadRequest(text="version must be integer 1")
+        for field in ("manager_thread_id", "pi_session_id", "message_id"):
+            value = body.get(field)
+            if not isinstance(value, str) or not value:
+                raise web.HTTPBadRequest(text=f"{field} must be a non-empty string")
+        if not isinstance(body.get("message"), str):
+            raise web.HTTPBadRequest(text="message must be a string")
+        return body
+
+    async def _manager_wake(self, request: web.Request) -> web.Response:
+        body = self._manager_wake_body(await self._body(request))
+        thread_id = body["manager_thread_id"]
+        event = MessageEvent(
+            text=body["message"],
+            message_type=MessageType.TEXT,
+            source=SessionSource(
+                platform=Platform("vamos"), chat_id=thread_id, chat_name="Vamos",
+                chat_type="thread", thread_id=thread_id, user_id="vamos", user_name="Vamos",
+            ),
+            raw_message={
+                "pi_session_id": body["pi_session_id"],
+                "message_id": body["message_id"],
+            },
+            message_id=body["message_id"],
+            internal=True,
         )
         await self.handle_message(event)
         return web.json_response({"status": "accepted"}, status=202)

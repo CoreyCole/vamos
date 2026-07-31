@@ -7,7 +7,7 @@ hermes plugins install --enable file:///absolute/path/to/vamos#plugins/hermes-pl
 hermes plugins list --enabled
 ```
 
-Configure the Hermes gateway's `platforms.vamos` entry with a shared credential and the Vamos server URL. The adapter binds to `127.0.0.1` by default. For a remote Vamos server, use an explicit TLS-terminating reverse proxy and configure a non-loopback bind only after that route and network policy are in place.
+Configure the Hermes gateway's `platforms.vamos` entry with an ingress credential and the Vamos server URL. The adapter binds to `127.0.0.1` by default. For a remote Vamos server, use an explicit TLS-terminating reverse proxy and configure a non-loopback bind only after that route and network policy are in place.
 
 ```yaml
 platforms:
@@ -16,9 +16,9 @@ platforms:
     extra:
       host: 127.0.0.1
       port: 8765
-      token: "shared ingress credential"
-      callback_token: "Vamos callback credential"
+      token: "manager-wake ingress credential"
+      callback_token: "Vamos callback-only credential"
       vamos_url: "https://vamos.example"
 ```
 
-Restart the gateway after configuration. Credentials are host configuration and must not appear in plan artifacts or Pi environments.
+Restart the gateway after configuration. `extra.token` is the ingress credential for `/vamos/manager-wake`; `extra.callback_token` is callback-only. For managed children, only the manager-wake ingress credential may be injected transiently with the manager-wake URL, manager thread ID, and Pi session ID. Neither credential may be persisted or logged, and the callback token is never injected into Pi.
