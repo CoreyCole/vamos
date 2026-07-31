@@ -42,11 +42,13 @@ Configure the host without echoing secret values:
 
 ```bash
 vamos hermes setup \
-  --gateway-url <hermes-adapter-url> \
+  --gateway-url <hermes-adapter-base-url> \
   --vamos-url <vamos-url> \
   --ingress-token <manager-wake-ingress-credential> \
   --callback-token <vamos-callback-credential>
 ```
+
+`--gateway-url` is the Hermes adapter base URL, without an endpoint suffix. Setup and every managed-start preflight verify `GET <base>/health`; manager-wake delivery uses `<base>/vamos/manager-wake`. A trailing slash is normalized before the base URL is saved or injected.
 
 The ingress credential authenticates direct `/vamos/manager-wake` delivery. The callback credential is separate, callback-only, and is never injected into Pi. A managed launch transiently supplies `VAMOS_MANAGER_WAKE_MANAGER_THREAD_ID`, `VAMOS_MANAGER_WAKE_PI_SESSION_ID`, `VAMOS_MANAGER_WAKE_GATEWAY_URL`, and `VAMOS_MANAGER_WAKE_INGRESS_TOKEN`; unmanaged launches supply none of them. URLs and credentials must not enter prompts, Pi custom entries, settlement evidence, attempt records, diagnostics, or logs.
 

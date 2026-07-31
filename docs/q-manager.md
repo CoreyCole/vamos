@@ -51,7 +51,7 @@ At each persisted final-assistant `agent_settled` boundary, the extension writes
 
 The `message_id` and filename are stable for the assistant entry. Empty final text is valid. Every bounded live retry reloads `raw_response` from that same published record; it does not reconstruct the message from later hook state.
 
-The extension posts `version`, `manager_thread_id`, `pi_session_id`, `message_id`, and the preserved message to the authenticated Hermes platform `/vamos/manager-wake` ingress. The adapter awaits the owning manager's `handle_message` call before returning.
+`gateway_url` and `VAMOS_MANAGER_WAKE_GATEWAY_URL` contain the normalized Hermes adapter base URL, not an endpoint URL. Setup and managed-start preflight verify `GET <base>/health`; the extension posts `version`, `manager_thread_id`, `pi_session_id`, `message_id`, and the preserved message to `<base>/vamos/manager-wake`. The adapter awaits the owning manager's `handle_message` call before returning.
 
 Delivery is best-effort at-least-once. Duplicate manager messages are possible. A 2xx means only that the adapter returned after `handle_message`; it is not a durable manager receipt. There is no outbox, automatic post-exit redrive, or exactly-once guarantee.
 

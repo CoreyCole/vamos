@@ -40,7 +40,7 @@ func TestManagedPiEnvironmentReplacesInheritedValues(t *testing.T) {
 		managerWakeIngressToken + "=stale-one",
 		managerWakeIngressToken + "=stale-two",
 	}, "/tmp/thoughts/CoreyCole/plans/example", "session-1", "thread-1", hostConfig{
-		GatewayURL:    " https://gateway.example ",
+		GatewayURL:    " https://gateway.example/ ",
 		IngressToken:  "ingress-secret",
 		CallbackToken: "callback-secret",
 	})
@@ -132,6 +132,9 @@ func TestStartDoesNotLaunchWhenRegistrationFails(t *testing.T) {
 	server := httptest.NewServer(
 		http.HandlerFunc(func(w http.ResponseWriter, request *http.Request) {
 			if request.Method == http.MethodGet {
+				if request.URL.Path != "/health" {
+					t.Errorf("preflight path = %q, want /health", request.URL.Path)
+				}
 				w.WriteHeader(http.StatusOK)
 
 				return
@@ -144,7 +147,7 @@ func TestStartDoesNotLaunchWhenRegistrationFails(t *testing.T) {
 	if err := os.WriteFile(
 		configPath,
 		[]byte(
-			"gateway_url: "+server.URL+"\nvamos_url: "+server.URL+"\ningress_token: ingress-token\ncallback_token: token\n",
+			"gateway_url: "+server.URL+"/\nvamos_url: "+server.URL+"\ningress_token: ingress-token\ncallback_token: token\n",
 		),
 		0o600,
 	); err != nil {
@@ -174,6 +177,53 @@ func TestStartDoesNotLaunchWhenRegistrationFails(t *testing.T) {
 	}
 	if launched {
 		t.Fatal("runner launched after failed registration")
+	}
+}
+
+func TestStartRejectsUnhealthyAdapterBeforeLaunching(t *testing.T) {
+	ctx := testPlan(t)
+	requestPath := ""
+	server := httptest.NewServer(
+		http.HandlerFunc(func(w http.ResponseWriter, request *http.Request) {
+			requestPath = request.URL.Path
+			w.WriteHeader(http.StatusServiceUnavailable)
+		}),
+	)
+	defer server.Close()
+	configPath := filepath.Join(t.TempDir(), "hermes.yaml")
+	if err := os.WriteFile(
+		configPath,
+		[]byte(
+			"gateway_url: "+server.URL+"/\nvamos_url: "+server.URL+"\ningress_token: ingress-token\ncallback_token: token\n",
+		),
+		0o600,
+	); err != nil {
+		t.Fatal(err)
+	}
+	launched := false
+	cmd := newStartCommand(
+		func(context.Context, string, []string, []string, io.Writer, io.Writer) error {
+			launched = true
+			return nil
+		},
+	)
+	cmd.SetArgs(
+		[]string{
+			"--plan", ctx.PlanDir,
+			"--thread-id", "thread-1",
+			"--config", configPath,
+			"task",
+		},
+	)
+	if err := cmd.Execute(); err == nil ||
+		!strings.Contains(err.Error(), "GET /health: 503 Service Unavailable") {
+		t.Fatalf("error = %v, want rejected health status", err)
+	}
+	if requestPath != "/health" {
+		t.Fatalf("preflight path = %q, want /health", requestPath)
+	}
+	if launched {
+		t.Fatal("runner launched after failed adapter health check")
 	}
 }
 

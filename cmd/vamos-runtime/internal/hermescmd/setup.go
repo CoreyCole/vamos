@@ -32,6 +32,14 @@ func readHostConfig(path string) (hostConfig, error) {
 	return config, nil
 }
 
+func normalizeGatewayBaseURL(value string) string {
+	return strings.TrimRight(strings.TrimSpace(value), "/")
+}
+
+func gatewayHealthURL(baseURL string) string {
+	return normalizeGatewayBaseURL(baseURL) + "/health"
+}
+
 func defaultConfigPath() (string, error) {
 	base := os.Getenv("VAMOS_HERMES_CONFIG")
 	if base != "" {
@@ -48,8 +56,8 @@ func newSetupCommand() *cobra.Command {
 	var gatewayURL, vamosURL, ingressToken, callbackToken, configPath, hermesBin, pluginSource string
 	var installPlugin, restartGateway bool
 	cmd := &cobra.Command{
-		Use:   "setup --gateway-url <url>",
-		Short: "Verify a Hermes gateway and save host-local settings",
+		Use:   "setup --gateway-url <adapter-base-url>",
+		Short: "Verify a Hermes adapter health endpoint and save host-local settings",
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			if installPlugin {
 				if strings.TrimSpace(pluginSource) == "" {
@@ -64,18 +72,24 @@ func newSetupCommand() *cobra.Command {
 					return err
 				}
 			}
+			gatewayURL = normalizeGatewayBaseURL(gatewayURL)
 			if !strings.HasPrefix(gatewayURL, "http://") &&
 				!strings.HasPrefix(gatewayURL, "https://") {
-				return fmt.Errorf("gateway-url must be an http(s) URL")
+				return fmt.Errorf(
+					"gateway-url must be the http(s) Hermes adapter base URL",
+				)
 			}
 			client := &http.Client{Timeout: 5 * time.Second}
-			response, err := client.Get(gatewayURL)
+			response, err := client.Get(gatewayHealthURL(gatewayURL))
 			if err != nil {
-				return fmt.Errorf("verify Hermes gateway: %w", err)
+				return fmt.Errorf("verify Hermes adapter GET /health: %w", err)
 			}
 			response.Body.Close()
 			if response.StatusCode >= 400 {
-				return fmt.Errorf("verify Hermes gateway: %s", response.Status)
+				return fmt.Errorf(
+					"verify Hermes adapter GET /health: %s",
+					response.Status,
+				)
 			}
 			if strings.TrimSpace(vamosURL) == "" ||
 				strings.TrimSpace(ingressToken) == "" ||
@@ -119,7 +133,12 @@ func newSetupCommand() *cobra.Command {
 			return nil
 		},
 	}
-	cmd.Flags().StringVar(&gatewayURL, "gateway-url", "", "running Hermes gateway URL")
+	cmd.Flags().StringVar(
+		&gatewayURL,
+		"gateway-url",
+		"",
+		"Hermes adapter base URL (/health and /vamos/manager-wake are appended)",
+	)
 	cmd.Flags().
 		StringVar(&vamosURL, "vamos-url", "", "Vamos server base URL for Pi completion callbacks")
 	cmd.Flags().

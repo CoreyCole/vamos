@@ -181,7 +181,7 @@ func managedPiEnvironment(
 	if threadID != "" {
 		authoritative[managerWakeManagerThreadID] = threadID
 		authoritative[managerWakePiSessionID] = session
-		authoritative[managerWakeGatewayURL] = strings.TrimSpace(config.GatewayURL)
+		authoritative[managerWakeGatewayURL] = normalizeGatewayBaseURL(config.GatewayURL)
 		authoritative[managerWakeIngressToken] = config.IngressToken
 	}
 	env := make([]string, 0, len(base)+len(authoritative))
@@ -229,7 +229,7 @@ func readManagedHostConfig(configPath string) (hostConfig, error) {
 			"Hermes gateway URL, Hermes ingress credential, Vamos callback URL, and Vamos callback credential are required; rerun hermes setup",
 		)
 	}
-	config.GatewayURL = strings.TrimSpace(config.GatewayURL)
+	config.GatewayURL = normalizeGatewayBaseURL(config.GatewayURL)
 	return config, nil
 }
 
@@ -248,18 +248,18 @@ func registerManagedPiRun(
 		return fmt.Errorf("validate Pi session ID: %w", err)
 	}
 	gatewayRequest, err := http.NewRequestWithContext(
-		ctx, http.MethodGet, config.GatewayURL, nil,
+		ctx, http.MethodGet, gatewayHealthURL(config.GatewayURL), nil,
 	)
 	if err != nil {
-		return fmt.Errorf("build Hermes gateway readiness request: %w", err)
+		return fmt.Errorf("build Hermes adapter health request: %w", err)
 	}
 	gatewayResponse, err := http.DefaultClient.Do(gatewayRequest)
 	if err != nil {
-		return fmt.Errorf("verify Hermes gateway readiness: %w", err)
+		return fmt.Errorf("verify Hermes adapter GET /health: %w", err)
 	}
 	gatewayResponse.Body.Close()
 	if gatewayResponse.StatusCode >= http.StatusBadRequest {
-		return fmt.Errorf("verify Hermes gateway readiness: %s", gatewayResponse.Status)
+		return fmt.Errorf("verify Hermes adapter GET /health: %s", gatewayResponse.Status)
 	}
 	// Registering the owned session proves authenticated Vamos callback ingress
 	// is reachable before the child process starts.
