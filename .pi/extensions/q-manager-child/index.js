@@ -1,27 +1,39 @@
-import { randomUUID } from "node:crypto";
-import { link, mkdir, open, readFile, rm } from "node:fs/promises";
-import { dirname, join, relative, resolve } from "node:path";
+import { createHash, randomUUID } from "node:crypto";
+import { link, mkdir, open, readFile, rm, writeFile } from "node:fs/promises";
+import { dirname, join } from "node:path";
+import { YAMLMap, Scalar, parseDocument } from "yaml";
 
 import {
-  captureOpaqueSettlementEvidence,
-  projectPersistedAssistantText,
-} from "./opaque-settlement-capture.js";
-
-export {
+  buildSettlementEvidence,
   captureOpaqueSettlementEvidence,
   captureOpaqueYamlFences,
   projectPersistedAssistantText,
 } from "./opaque-settlement-capture.js";
 
-export const BRIDGE = "q-manager-child/assistant-bridge";
-export const PENDING = "q-manager-child/settlement-pending";
-export const CONSUMED = "q-manager-child/settlement-consumed";
+export {
+  buildSettlementEvidence,
+  captureOpaqueSettlementEvidence,
+  captureOpaqueYamlFences,
+  projectPersistedAssistantText,
+};
 export const DIAGNOSTIC = "q-manager-child/diagnostic";
+export const ATTEMPT = "q-manager-child/manager-wake-attempt";
 
-const custom = (entry, kind) =>
-  entry?.type === "custom" && entry.customType === kind;
-const data = (entry) => entry?.data ?? entry?.content ?? {};
-const entries = (ctx) => ctx.sessionManager.getBranch();
+const wakeNames = [
+  "VAMOS_MANAGER_WAKE_MANAGER_THREAD_ID",
+  "VAMOS_MANAGER_WAKE_PI_SESSION_ID",
+  "VAMOS_MANAGER_WAKE_GATEWAY_URL",
+  "VAMOS_MANAGER_WAKE_INGRESS_TOKEN",
+];
+const defaultDependencies = {
+  fetch: (...args) => fetch(...args),
+  sleep: () => Promise.resolve(),
+  retries: 3,
+};
+let dependencies = defaultDependencies;
+export function setDeliveryDependenciesForTest(overrides) {
+  dependencies = { ...defaultDependencies, ...overrides };
+}
 
 function safeComponent(value, label) {
   if (!/^[A-Za-z0-9_-]+$/.test(value ?? ""))
@@ -29,69 +41,39 @@ function safeComponent(value, label) {
   return value;
 }
 
-function managedIdentity() {
-  const session = process.env.PI_SESSION_ID;
+export function managedIdentity() {
+  const [managerThreadID, piSessionID, gatewayURL, ingressToken] =
+    wakeNames.map((name) => process.env[name]);
   const plan = process.env.VAMOS_PLAN_DIR;
-  const thread = process.env.VAMOS_HERMES_THREAD_ID;
-  if (!session || !plan || !thread) return undefined;
-  return {
-    session: safeComponent(session, "session"),
-    plan,
-    thread: safeComponent(thread, "manager thread"),
-  };
-}
-
-function planRelative(plan) {
-  const root = process.env.VAMOS_THOUGHTS_ROOT;
-  if (!root)
-    throw new Error(
-      "VAMOS_THOUGHTS_ROOT is required for settlement containment",
-    );
-  for (const path of [root, plan]) {
-    if (
-      !path ||
-      path.split(/[\\/]/).some((part) => part === "." || part === "..")
-    )
-      throw new Error(
-        "settlement plan must be a contained thoughts-relative path",
-      );
-  }
-  const value = relative(resolve(root), resolve(plan)).replaceAll("\\", "/");
   if (
-    !value ||
-    value.startsWith("/") ||
-    value.split("/").some((part) => !part || part === "." || part === "..")
+    ![managerThreadID, piSessionID, gatewayURL, ingressToken, plan].every(
+      Boolean,
+    )
   )
-    throw new Error("settlement plan must be thoughts-relative");
-  return value;
+    return undefined;
+  return {
+    managerThreadID,
+    piSessionID: safeComponent(piSessionID, "Pi session"),
+    gatewayURL: gatewayURL.replace(/\/$/, ""),
+    ingressToken,
+    plan,
+  };
 }
 
-/** JavaScript owns these exact persisted JSON bytes. */
-export function serializeSettlement(
-  identity,
-  assistantEntryID,
-  content,
-  settledAt,
-) {
-  const evidence = captureOpaqueSettlementEvidence(content);
-  const envelope = {
-    version: 1,
-    kind: "pi_assistant_settlement",
-    session: identity.session,
-    plan: planRelative(identity.plan),
-    manager_thread: identity.thread,
-    assistant_entry_id: assistantEntryID,
-    settled_at: settledAt ?? new Date().toISOString(),
-    raw_response: evidence.rawResponse,
-  };
-  if (evidence.fencedYamlBlocks.length)
-    envelope.fenced_yaml_blocks = evidence.fencedYamlBlocks.map(
-      ({ language, raw }) => ({
-        language,
-        raw,
-      }),
-    );
-  return Buffer.from(JSON.stringify(envelope));
+export function messageID(piSessionID, assistantEntryID) {
+  return `pi-settlement-v1-${createHash("sha256").update(`${piSessionID}\0${assistantEntryID}`, "utf8").digest("base64url")}`;
+}
+
+function evidencePath(identity, id) {
+  return join(
+    identity.plan,
+    ".vamos",
+    "sessions",
+    "pi",
+    identity.piSessionID,
+    "settlements",
+    `${id}.yaml`,
+  );
 }
 
 async function syncDirectory(directory) {
@@ -103,30 +85,8 @@ async function syncDirectory(directory) {
   }
 }
 
-export function settlementFilename(settledAt, entry) {
-  const date = new Date(settledAt);
-  if (Number.isNaN(date.getTime())) throw new Error("settlement timestamp is required");
-  return `${date
-    .toISOString()
-    .replace(/[-:]/g, "")
-    .replace(".", "")
-    .replace("Z", "000000Z")}_${entry}.json`;
-}
-
-/** Immutable, no-replace publication; equal bytes are a successful retry. */
-export async function publish(plan, session, entry, bytes) {
-  safeComponent(session, "session");
-  safeComponent(entry, "final entry");
-  const envelope = JSON.parse(bytes.toString("utf8"));
-  const target = join(
-    plan,
-    ".vamos",
-    "sessions",
-    "pi",
-    session,
-    "settlements",
-    settlementFilename(envelope.settled_at, entry),
-  );
+/** No-replace publication: equal bytes reuse; different bytes never deliver. */
+export async function publish(target, bytes) {
   const directory = dirname(target);
   await mkdir(directory, { recursive: true, mode: 0o700 });
   const temporary = join(directory, `.settlement-${randomUUID()}`);
@@ -139,147 +99,161 @@ export async function publish(plan, session, entry, bytes) {
   }
   try {
     await link(temporary, target);
-    try {
-      await syncDirectory(directory);
-    } catch (error) {
-      await rm(target, { force: true });
-      await syncDirectory(directory);
-      throw error;
-    }
+    await syncDirectory(directory);
   } catch (error) {
     if (error.code !== "EEXIST") throw error;
     const existing = await readFile(target);
     if (Buffer.compare(existing, bytes))
-      throw new Error("immutable opaque settlement identity conflict");
+      throw new Error("immutable manager-wake settlement conflict");
   } finally {
     await rm(temporary, { force: true });
   }
   return target;
 }
 
-function bridgeFor(ctx) {
-  const branch = entries(ctx);
-  return [...branch]
-    .reverse()
-    .find(
-      (entry) =>
-        custom(entry, BRIDGE) &&
-        !branch.some(
-          (used) => custom(used, CONSUMED) && data(used).bridge_id === entry.id,
-        ),
-    );
+function scalar(map, key) {
+  const pair = map.items.find(
+    (item) => item.key instanceof Scalar && item.key.value === key,
+  );
+  return pair?.value instanceof Scalar ? pair.value.value : undefined;
 }
 
-function pendingFor(ctx, bridgeID) {
-  const branch = entries(ctx);
-  return [...branch]
+/** Reads the published record; delivery never observes a later assistant message. */
+export async function deliveryBody(target) {
+  const document = parseDocument(await readFile(target, "utf8"), {
+    uniqueKeys: true,
+    merge: false,
+    prettyErrors: false,
+  });
+  if (
+    document.errors.length ||
+    document.warnings.length ||
+    !(document.contents instanceof YAMLMap)
+  )
+    throw new Error("invalid published manager-wake evidence");
+  const fields = Object.fromEntries(
+    [
+      "version",
+      "manager_thread_id",
+      "pi_session_id",
+      "message_id",
+      "raw_response",
+    ].map((key) => [key, scalar(document.contents, key)]),
+  );
+  if (
+    fields.version !== 1 ||
+    ![fields.manager_thread_id, fields.pi_session_id, fields.message_id].every(
+      (value) => typeof value === "string",
+    ) ||
+    typeof fields.raw_response !== "string"
+  )
+    throw new Error("invalid published manager-wake identity");
+  return {
+    version: 1,
+    manager_thread_id: fields.manager_thread_id,
+    pi_session_id: fields.pi_session_id,
+    message_id: fields.message_id,
+    message: fields.raw_response,
+  };
+}
+
+async function recordAttempt(target, outcome) {
+  // This is local diagnostics only, never an acknowledgement protocol.
+  await writeFile(`${target}.attempt.json`, JSON.stringify(outcome), {
+    mode: 0o600,
+  });
+}
+
+export async function deliverPublished(identity, target, { appendEntry } = {}) {
+  const body = await deliveryBody(target);
+  let lastError;
+  for (let attempt = 1; attempt <= dependencies.retries; attempt++) {
+    try {
+      const response = await dependencies.fetch(
+        `${identity.gatewayURL}/vamos/manager-wake`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${identity.ingressToken}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(body),
+        },
+      );
+      if (!response.ok) throw new Error(`manager-wake HTTP ${response.status}`);
+      await recordAttempt(target, { status: "success", attempt });
+      appendEntry?.(ATTEMPT, {
+        message_id: body.message_id,
+        status: "success",
+        attempt,
+      });
+      return body;
+    } catch (error) {
+      lastError = error;
+      if (attempt < dependencies.retries) await dependencies.sleep(attempt);
+    }
+  }
+  await recordAttempt(target, {
+    status: "failed",
+    attempts: dependencies.retries,
+  });
+  appendEntry?.(ATTEMPT, {
+    message_id: body.message_id,
+    status: "failed",
+    attempts: dependencies.retries,
+  });
+  throw lastError;
+}
+
+function terminalAssistant(ctx) {
+  return [...ctx.sessionManager.getBranch()]
     .reverse()
     .find(
       (entry) =>
-        custom(entry, PENDING) &&
-        data(entry).bridge_id === bridgeID &&
-        !branch.some(
-          (used) =>
-            custom(used, CONSUMED) && data(used).pending_id === entry.id,
-        ),
+        entry?.type === "message" && entry.message?.role === "assistant",
     );
 }
 
 export default function qManagerChildExtension(pi) {
   const identity = managedIdentity();
   if (!identity) return;
-  planRelative(identity.plan);
-
-  pi.on("turn_end", async (event, ctx) => {
-    const matches = entries(ctx).filter(
-      (entry) =>
-        entry.type === "message" &&
-        entry.message === event.message &&
-        entry.message?.role === "assistant",
-    );
-    if (matches.length !== 1) {
-      pi.appendEntry(DIAGNOSTIC, {
-        code: "assistant_bridge_unavailable",
-        turn: event.turnIndex,
-      });
-      return;
-    }
-    if (projectPersistedAssistantText(event.message.content ?? []) === "")
-      return;
-    pi.appendEntry(BRIDGE, {
-      assistant_entry_id: matches[0].id,
-      turn: event.turnIndex,
-    });
-  });
-
   pi.on("agent_settled", async (_event, ctx) => {
-    const bridge = bridgeFor(ctx);
-    if (!bridge) return;
-    const assistant = ctx.sessionManager.getEntry?.(
-      data(bridge).assistant_entry_id,
+    const assistant = terminalAssistant(ctx);
+    if (!assistant || typeof assistant.id !== "string" || !assistant.id) {
+      pi.appendEntry(DIAGNOSTIC, { code: "assistant_settlement_unavailable" });
+      return;
+    }
+    const id = messageID(identity.piSessionID, assistant.id);
+    const target = evidencePath(identity, id);
+    const rawResponse = projectPersistedAssistantText(
+      assistant.message.content ?? [],
     );
-    if (
-      !assistant ||
-      assistant.type !== "message" ||
-      assistant.message?.role !== "assistant"
-    ) {
+    const bytes = buildSettlementEvidence(
+      {
+        managerThreadID: identity.managerThreadID,
+        piSessionID: identity.piSessionID,
+        messageID: id,
+      },
+      rawResponse,
+    );
+    try {
+      await publish(target, bytes);
+    } catch (error) {
       pi.appendEntry(DIAGNOSTIC, {
-        code: "assistant_bridge_invalid",
-        bridge_id: bridge.id,
+        code: "assistant_settlement_conflict",
+        message_id: id,
       });
       return;
     }
-    let pending = pendingFor(ctx, bridge.id);
-    if (!pending) {
-      const bytes = serializeSettlement(
-        identity,
-        assistant.id,
-        assistant.message.content ?? [],
-      );
-      pi.appendEntry(PENDING, {
-        version: 1,
-        bridge_id: bridge.id,
-        manager_thread: identity.thread,
-        session: identity.session,
-        assistant_entry_id: assistant.id,
-        envelope_utf8_base64: bytes.toString("base64"),
-      });
-      pending = pendingFor(ctx, bridge.id);
-    }
-    const record = data(pending);
-    const bytes = Buffer.from(record.envelope_utf8_base64, "base64");
-    let envelope;
     try {
-      envelope = JSON.parse(bytes.toString("utf8"));
+      await deliverPublished(identity, target, pi);
     } catch {
-      throw new Error("invalid opaque settlement pending bytes");
+      pi.appendEntry(DIAGNOSTIC, {
+        code: "manager_wake_delivery_failed",
+        message_id: id,
+      });
     }
-    if (
-      record.version !== 1 ||
-      record.manager_thread !== identity.thread ||
-      record.session !== identity.session ||
-      !safeComponent(record.assistant_entry_id, "assistant entry") ||
-      envelope.version !== 1 ||
-      envelope.kind !== "pi_assistant_settlement" ||
-      envelope.manager_thread !== record.manager_thread ||
-      envelope.session !== record.session ||
-      envelope.assistant_entry_id !== record.assistant_entry_id ||
-      typeof envelope.raw_response !== "string"
-    )
-      throw new Error("invalid opaque settlement pending identity");
-    await publish(
-      identity.plan,
-      record.session,
-      record.assistant_entry_id,
-      bytes,
-    );
-    pi.appendEntry(CONSUMED, {
-      bridge_id: bridge.id,
-      pending_id: pending.id,
-      assistant_entry_id: record.assistant_entry_id,
-    });
   });
-
   pi.on("session_before_compact", (event) => {
     pi.appendEntry(DIAGNOSTIC, {
       code: "context_compaction_cancelled",
@@ -292,4 +266,4 @@ export default function qManagerChildExtension(pi) {
   );
 }
 
-export { managedIdentity, planRelative, safeComponent };
+export { evidencePath, safeComponent };

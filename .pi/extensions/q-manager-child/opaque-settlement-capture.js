@@ -1,7 +1,14 @@
-/**
- * Projects the persisted Pi assistant message without rendering or normalizing it.
- * Pi assistant content also contains thinking and tool-call parts; neither is evidence.
- */
+import {
+  Alias,
+  Document,
+  Pair,
+  Scalar,
+  YAMLMap,
+  YAMLSeq,
+  parseDocument,
+} from "yaml";
+
+/** Projects only persisted text, without rendering or normalization. */
 export function projectPersistedAssistantText(content) {
   return content
     .filter((part) => part?.type === "text" && typeof part.text === "string")
@@ -14,74 +21,173 @@ function lineEnd(raw, start) {
   return newline < 0 ? raw.length : newline + 1;
 }
 
-function openerAt(raw, start, end) {
-  let cursor = start;
-  while (raw[cursor] === "`") cursor++;
-  const runLength = cursor - start;
-  if (runLength < 3) return undefined;
-  while (raw[cursor] === " " || raw[cursor] === "\t") cursor++;
-  const languageStart = cursor;
-  while (/[A-Za-z]/.test(raw[cursor] ?? "")) cursor++;
-  const language = raw.slice(languageStart, cursor);
-  if (!/^(yaml|yml)$/i.test(language)) return undefined;
-  while (raw[cursor] === " " || raw[cursor] === "\t" || raw[cursor] === "\r")
-    cursor++;
-  if (cursor !== end && raw[cursor] !== "\n") return undefined;
-  return { runLength, language };
-}
-
-function closerAt(raw, start, end, runLength) {
-  let cursor = start;
-  while (raw[cursor] === "`") cursor++;
-  if (cursor - start !== runLength) return false;
-  while (raw[cursor] === " " || raw[cursor] === "\t" || raw[cursor] === "\r")
-    cursor++;
-  return cursor === end || raw[cursor] === "\n";
-}
-
-/**
- * Lexically copies qualifying YAML/YML fences. This deliberately does not
- * decode YAML or assign meaning to its contents.
- */
-export function captureOpaqueYamlFences(rawResponse) {
+/** Returns bodies from exactly lexically-qualified yaml/yml fences. */
+export function captureOpaqueYamlFences(raw) {
   const blocks = [];
-  let lineStart = 0;
-  while (lineStart < rawResponse.length) {
-    const openerEnd = lineEnd(rawResponse, lineStart);
-    const opener = openerAt(rawResponse, lineStart, openerEnd);
+  let start = 0;
+  while (start < raw.length) {
+    const end = lineEnd(raw, start);
+    const opener = raw
+      .slice(start, end)
+      .match(/^(?<ticks>`{3,})(?<lang>yaml|yml)[ \t\r]*(?:\n|$)/i);
     if (!opener) {
-      lineStart = openerEnd;
+      start = end;
       continue;
     }
-
-    let closerStart = openerEnd;
-    let matched = false;
-    while (closerStart < rawResponse.length) {
-      const closerEnd = lineEnd(rawResponse, closerStart);
-      if (closerAt(rawResponse, closerStart, closerEnd, opener.runLength)) {
-        blocks.push({
-          language: opener.language,
-          raw: rawResponse.slice(lineStart, closerEnd),
-        });
-        lineStart = closerEnd;
-        matched = true;
+    let cursor = end;
+    while (cursor < raw.length) {
+      const closeEnd = lineEnd(raw, cursor);
+      if (
+        new RegExp(`^${opener.groups.ticks}[ \\t\\r]*(?:\\n|$)`).test(
+          raw.slice(cursor, closeEnd),
+        )
+      ) {
+        blocks.push(raw.slice(end, cursor));
+        start = closeEnd;
+        cursor = -1;
         break;
       }
-      closerStart = closerEnd;
+      cursor = closeEnd;
     }
-    if (!matched) lineStart = openerEnd;
+    if (cursor !== -1) start = end;
   }
   return blocks;
 }
 
+function scalarString(node) {
+  return node instanceof Scalar && typeof node.value === "string"
+    ? node.value
+    : undefined;
+}
+
+function rejected(node, seen = new Set()) {
+  if (!node || seen.has(node)) return false;
+  seen.add(node);
+  if (node instanceof Alias) return true;
+  if (node instanceof YAMLMap) {
+    const keys = new Set();
+    for (const pair of node.items) {
+      if (!(pair instanceof Pair)) return true;
+      const key = scalarString(pair.key);
+      if (
+        key === undefined ||
+        key === "<<" ||
+        keys.has(key) ||
+        RESERVED.has(key)
+      )
+        return true;
+      keys.add(key);
+      if (rejected(pair.key, seen) || rejected(pair.value, seen)) return true;
+    }
+  } else if (node instanceof YAMLSeq) {
+    for (const item of node.items) if (rejected(item, seen)) return true;
+  }
+  return false;
+}
+
+function codePointCompare(left, right) {
+  const a = Array.from(left);
+  const b = Array.from(right);
+  for (let index = 0; index < Math.min(a.length, b.length); index++) {
+    const difference = a[index].codePointAt(0) - b[index].codePointAt(0);
+    if (difference) return difference;
+  }
+  return a.length - b.length;
+}
+
+function cloneAndSort(node) {
+  if (node instanceof YAMLMap) {
+    const map = new YAMLMap();
+    map.items = [...node.items]
+      .sort((a, b) =>
+        codePointCompare(scalarString(a.key), scalarString(b.key)),
+      )
+      .map(
+        (pair) => new Pair(cloneAndSort(pair.key), cloneAndSort(pair.value)),
+      );
+    return map;
+  }
+  if (node instanceof YAMLSeq) {
+    const seq = new YAMLSeq();
+    seq.items = node.items.map(cloneAndSort);
+    return seq;
+  }
+  if (node instanceof Scalar) return new Scalar(node.value);
+  throw new Error("unexpected accepted YAML node");
+}
+
+const RESERVED = new Set([
+  "version",
+  "manager_thread_id",
+  "pi_session_id",
+  "message_id",
+  "raw_response",
+]);
+
+function literal(value) {
+  const scalar = new Scalar(value);
+  scalar.type = "BLOCK_LITERAL";
+  // yaml's default is strip for no LF and clip for one LF. Keep is explicit.
+  scalar.chompKeep = /\n\n$/.test(value);
+  return scalar;
+}
+
 /**
- * The extension's future envelope serializer consumes this neutral evidence
- * object directly. It intentionally has no completion or routing semantics.
+ * Builds immutable evidence. A child mapping is copied only when it is one
+ * unambiguous YAML document; otherwise the record is deliberately system-only.
  */
-export function captureOpaqueSettlementEvidence(content) {
+export function buildSettlementEvidence(identity, rawResponse) {
+  const fences = captureOpaqueYamlFences(rawResponse);
+  let child;
+  if (fences.length === 1) {
+    const body = fences[0];
+    const hasDocumentSyntax = /^(?:%|---[ \t]*$|\.\.\.[ \t]*$)/m.test(body);
+    const document = hasDocumentSyntax
+      ? undefined
+      : parseDocument(body, {
+          uniqueKeys: true,
+          merge: false,
+          prettyErrors: false,
+        });
+    if (
+      document &&
+      document.errors.length === 0 &&
+      document.warnings.length === 0 &&
+      document.contents instanceof YAMLMap &&
+      !rejected(document.contents)
+    )
+      child = cloneAndSort(document.contents);
+  }
+
+  const document = new Document();
+  const map = child ?? new YAMLMap();
+  map.items.push(
+    new Pair(new Scalar("version"), new Scalar(1)),
+    new Pair(
+      new Scalar("manager_thread_id"),
+      new Scalar(identity.managerThreadID),
+    ),
+    new Pair(new Scalar("pi_session_id"), new Scalar(identity.piSessionID)),
+    new Pair(new Scalar("message_id"), new Scalar(identity.messageID)),
+    new Pair(new Scalar("raw_response"), literal(rawResponse)),
+  );
+  document.contents = map;
+  return Buffer.from(
+    document.toString({
+      indent: 2,
+      lineWidth: 0,
+      defaultStringType: "QUOTE_DOUBLE",
+      defaultKeyType: "PLAIN",
+    }),
+  );
+}
+
+export function captureOpaqueSettlementEvidence(content, identity) {
   const rawResponse = projectPersistedAssistantText(content);
   return {
     rawResponse,
-    fencedYamlBlocks: captureOpaqueYamlFences(rawResponse),
+    bytes: identity
+      ? buildSettlementEvidence(identity, rawResponse)
+      : undefined,
   };
 }

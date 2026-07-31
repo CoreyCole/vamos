@@ -1,85 +1,59 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-
+import { parseDocument } from "yaml";
 import {
-  captureOpaqueSettlementEvidence,
-  captureOpaqueYamlFences,
+  buildSettlementEvidence,
   projectPersistedAssistantText,
 } from "./opaque-settlement-capture.js";
 
-test("projects only persisted text parts in their stored order", () => {
-  const content = [
-    { type: "text", text: "first" },
-    { type: "thinking", thinking: "excluded" },
-    { type: "toolCall", name: "excluded" },
-    { type: "text", text: " second" },
-    { type: "text", text: "" },
-  ];
-  assert.equal(projectPersistedAssistantText(content), "first second");
-  assert.deepEqual(captureOpaqueSettlementEvidence(content), {
-    rawResponse: "first second",
-    fencedYamlBlocks: [],
-  });
-});
-
-const cases = [
-  ["no fence and unfenced YAML", "outcome: handoff\nnext: implement\n", []],
-  [
-    "one empty fence",
-    "```yaml\n```\n",
-    [{ language: "yaml", raw: "```yaml\n```\n" }],
-  ],
-  [
-    "multiple mixed case fences",
-    "```YAML\na: 1\n```\ntext\n```yMl\nb: 2\n```",
-    [
-      { language: "YAML", raw: "```YAML\na: 1\n```\n" },
-      { language: "yMl", raw: "```yMl\nb: 2\n```" },
-    ],
-  ],
-  [
-    "crlf and delimiter whitespace",
-    "```yml \t\r\na: café 🌰\r\n``` \t\r\n",
-    [{ language: "yml", raw: "```yml \t\r\na: café 🌰\r\n``` \t\r\n" }],
-  ],
-  [
-    "exact run only",
-    "````yaml\na\n```\n````\n",
-    [{ language: "yaml", raw: "````yaml\na\n```\n````\n" }],
-  ],
-  [
-    "longer and shorter runs do not close",
-    "```yaml\na\n````\nb\n``\nc\n```\n",
-    [{ language: "yaml", raw: "```yaml\na\n````\nb\n``\nc\n```\n" }],
-  ],
-  ["attributes rejected", "```yaml title=x\na\n```\n```yml {x}\nb\n```\n", []],
-  [
-    "non yaml and inline backticks excluded",
-    "```json\na\n```\ninline ```yaml nope\n",
-    [],
-  ],
-  ["unclosed fence", "```yaml\na: 1\n", []],
-  [
-    "malformed contradictory unknown yaml remains opaque",
-    "```yaml\na: [\noutcome: complete\noutcome: handoff\nunknown: ☃\n```\n",
-    [
-      {
-        language: "yaml",
-        raw: "```yaml\na: [\noutcome: complete\noutcome: handoff\nunknown: ☃\n```\n",
-      },
-    ],
-  ],
-  [
-    "trailing no newline and ascii whitespace only",
-    "```yaml\t\na\n```\t ",
-    [{ language: "yaml", raw: "```yaml\t\na\n```\t " }],
-  ],
-];
-
-for (const [name, raw, want] of cases) {
-  test(`captures lexical fence: ${name}`, () => {
-    const got = captureOpaqueYamlFences(raw);
-    assert.deepEqual(got, want);
-    for (let i = 0; i < got.length; i++) assert.ok(raw.includes(got[i].raw));
-  });
+const identity = {
+  managerThreadID: "thread-1",
+  piSessionID: "session-1",
+  messageID: "pi-settlement-v1-test",
+};
+function built(raw) {
+  return buildSettlementEvidence(identity, raw).toString();
 }
+function raw(bytes) {
+  return parseDocument(bytes).get("raw_response");
+}
+
+test("projects only persisted text", () =>
+  assert.equal(
+    projectPersistedAssistantText([
+      { type: "text", text: "a" },
+      { type: "toolCall" },
+      { type: "text", text: "b" },
+    ]),
+    "ab",
+  ));
+test("valid child mapping is sorted and system fields follow it", () => {
+  const first = built("```yaml\nz: 1\na:\n  y: 2\n  b: 3\n```");
+  assert.equal(first, built("```yaml\nz: 1\na:\n  y: 2\n  b: 3\n```"));
+  assert.match(first, /^a:\n  b: 3\n  y: 2\nz: 1\nversion:/);
+});
+test("invalid or ambiguous candidate falls back to system-only mapping", () => {
+  for (const candidate of [
+    "plain",
+    "```yaml\na: 1\n```\n```yml\nb: 2\n```",
+    "```yaml\na: [\n```",
+    "```yaml\n---\na: 1\n```",
+    "```yaml\na: 1\n...\n```",
+    "```yaml\na: 1\na: 2\n```",
+    "```yaml\na: &x 1\nb: *x\n```",
+    "```yaml\n<<: {a: 1}\n```",
+    "```yaml\n[bad]: key\n```",
+    "```yaml\nraw_response: bad\n```",
+  ]) {
+    const bytes = built(candidate);
+    assert.ok(!bytes.includes("\na: ") && !bytes.includes("\nb: "));
+    assert.equal(raw(bytes), candidate);
+  }
+});
+test("literal raw response preserves terminal newlines, CRLF, and Unicode", () => {
+  for (const value of ["none", "one\n", "many\n\n", "café 🌰\r\nnext\r\n"])
+    assert.equal(raw(built(value)), value);
+  assert.match(built("none"), /raw_response: \|-\n/);
+  assert.match(built("one\n"), /raw_response: \|\n/);
+  assert.match(built("many\n\n"), /raw_response: \|\+\n/);
+});

@@ -1,182 +1,81 @@
 import assert from "node:assert/strict";
-import { createServer } from "node:http";
-import { mkdir, mkdtemp, readFile, readdir, writeFile } from "node:fs/promises";
+import { mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { spawn } from "node:child_process";
 import test from "node:test";
+import extension, {
+  deliveryBody,
+  evidencePath,
+  messageID,
+  setDeliveryDependenciesForTest,
+} from "./index.js";
 
-const pi = process.env.PI_BIN ?? "pi";
-
-function run(command, args, options) {
-  return new Promise((resolve, reject) => {
-    const child = spawn(command, args, options);
-    let stdout = "";
-    let stderr = "";
-    const timeout = setTimeout(() => child.kill("SIGTERM"), 20_000);
-    child.stdin.end();
-    child.stdout.on("data", (chunk) => (stdout += chunk));
-    child.stderr.on("data", (chunk) => (stderr += chunk));
-    child.on("error", reject);
-    child.on("close", (code, signal) => {
-      clearTimeout(timeout);
-      resolve({ code, signal, stdout, stderr });
-    });
+test("lifecycle uses the last persisted assistant entry, not turn identity", async (t) => {
+  const root = await mkdtemp(join(tmpdir(), "installed-wake-"));
+  const keys = [
+    "VAMOS_MANAGER_WAKE_MANAGER_THREAD_ID",
+    "VAMOS_MANAGER_WAKE_PI_SESSION_ID",
+    "VAMOS_MANAGER_WAKE_GATEWAY_URL",
+    "VAMOS_MANAGER_WAKE_INGRESS_TOKEN",
+    "VAMOS_PLAN_DIR",
+  ];
+  const old = Object.fromEntries(keys.map((k) => [k, process.env[k]]));
+  Object.assign(process.env, {
+    VAMOS_MANAGER_WAKE_MANAGER_THREAD_ID: "thread",
+    VAMOS_MANAGER_WAKE_PI_SESSION_ID: "installed-session",
+    VAMOS_MANAGER_WAKE_GATEWAY_URL: "http://fake",
+    VAMOS_MANAGER_WAKE_INGRESS_TOKEN: "token",
+    VAMOS_PLAN_DIR: join(root, "plan"),
   });
-}
-
-async function sessionEntries(directory) {
-  const files = await readdir(directory, { recursive: true });
-  const session = files.find((file) => file.endsWith(".jsonl"));
-  assert.ok(session, "installed Pi persisted a session JSONL file");
-  return (await readFile(join(directory, session), "utf8"))
-    .trim()
-    .split("\n")
-    .map((line) => JSON.parse(line));
-}
-
-async function fixtureModel() {
-  let request;
-  const server = createServer(async (req, res) => {
-    request = {
-      method: req.method,
-      url: req.url,
-      body: await new Promise((resolve, reject) => {
-        let body = "";
-        req.setEncoding("utf8");
-        req.on("data", (chunk) => (body += chunk));
-        req.on("end", () => resolve(JSON.parse(body)));
-        req.on("error", reject);
-      }),
-    };
-    res.writeHead(200, { "content-type": "text/event-stream" });
-    res.write(
-      `data: ${JSON.stringify({
-        object: "chat.completion.chunk",
-        choices: [
-          {
-            index: 0,
-            delta: { role: "assistant", content: "outcome: complete" },
-            finish_reason: null,
-          },
-        ],
-      })}\n\n`,
-    );
-    res.write(
-      `data: ${JSON.stringify({
-        object: "chat.completion.chunk",
-        choices: [{ index: 0, delta: {}, finish_reason: "stop" }],
-      })}\n\n`,
-    );
-    res.end("data: [DONE]\n\n");
+  t.after(() => {
+    for (const [k, v] of Object.entries(old))
+      v === undefined ? delete process.env[k] : (process.env[k] = v);
+    setDeliveryDependenciesForTest({});
   });
-  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
-  const { port } = server.address();
-  return {
-    baseURL: `http://127.0.0.1:${port}/v1`,
-    request: () => request,
-    close: () =>
-      new Promise((resolve, reject) =>
-        server.close((error) => (error ? reject(error) : resolve())),
-      ),
-  };
-}
-
-test("installed managed Pi persists a text-only, no-YAML settlement without a provider response ID", async (t) => {
-  const root = await mkdtemp(join(tmpdir(), "q-manager-child-installed-pi-"));
-  const agentDir = join(root, "agent");
-  const sessions = join(root, "sessions");
-  const thoughts = join(root, "thoughts");
-  const plan = join(thoughts, "CoreyCole", "plans", "installed-pi");
-  const model = await fixtureModel();
-  t.after(model.close);
-  await mkdir(agentDir, { recursive: true });
-  await writeFile(
-    join(agentDir, "models.json"),
-    JSON.stringify({
-      providers: {
-        fixture: {
-          baseUrl: model.baseURL,
-          api: "openai-completions",
-          apiKey: "fixture-key",
-          compat: {
-            supportsDeveloperRole: false,
-            supportsReasoningEffort: false,
-            supportsUsageInStreaming: false,
-            maxTokensField: "max_tokens",
-          },
-          models: [{ id: "fixture", contextWindow: 4096, maxTokens: 256 }],
-        },
-      },
-    }),
-  );
-
-  const result = await run(
-    pi,
-    [
-      "--approve",
-      "--offline",
-      "--no-context-files",
-      "--no-skills",
-      "--no-prompt-templates",
-      "--no-themes",
-      "--no-builtin-tools",
-      "--session-dir",
-      sessions,
-      "--model",
-      "fixture/fixture",
-      "--print",
-      "Reply with lifecycle-looking text.",
-    ],
+  const branch = [
     {
-      cwd: process.cwd(),
-      env: {
-        ...process.env,
-        PI_CODING_AGENT_DIR: agentDir,
-        PI_SESSION_ID: "installed-session",
-        VAMOS_THOUGHTS_ROOT: thoughts,
-        VAMOS_PLAN_DIR: plan,
-        VAMOS_HERMES_THREAD_ID: "installed-thread",
+      id: "first",
+      type: "message",
+      message: {
+        role: "assistant",
+        content: [{ type: "text", text: "first" }],
       },
     },
-  );
-  assert.equal(result.code, 0, `installed Pi failed:\n${result.stderr}`);
-  assert.match(result.stdout, /outcome: complete/);
-  assert.equal(model.request().url, "/v1/chat/completions");
-
-  const entries = await sessionEntries(sessions);
-  assert.ok(entries.some((entry) => entry.message?.role === "assistant"));
-  assert.ok(
-    entries.some(
-      (entry) =>
-        entry.type === "custom" &&
-        entry.customType === "q-manager-child/settlement-pending",
-    ),
-  );
-  const settlement = JSON.parse(
-    await readFile(
-      join(
-        plan,
-        ".vamos",
-        "sessions",
-        "pi",
-        "installed-session",
-        "settlements",
-        entries.find(
-          (entry) =>
-            entry.type === "custom" &&
-            entry.customType === "q-manager-child/settlement-consumed",
-        ).data.assistant_entry_id + ".json",
+    {
+      id: "last",
+      type: "message",
+      message: {
+        role: "assistant",
+        content: [{ type: "text", text: "text-only final" }],
+      },
+    },
+  ];
+  let handler, body;
+  const pi = {
+    on: (name, fn) => {
+      if (name === "agent_settled") handler = fn;
+    },
+    appendEntry: () => {},
+  };
+  setDeliveryDependenciesForTest({
+    retries: 1,
+    fetch: async (_url, request) => {
+      body = JSON.parse(request.body);
+      return { ok: true, status: 200 };
+    },
+  });
+  extension(pi);
+  await handler({}, { sessionManager: { getBranch: () => branch } });
+  const id = messageID("installed-session", "last");
+  assert.equal(body.message_id, id);
+  assert.equal(body.message, "text-only final");
+  assert.deepEqual(
+    await deliveryBody(
+      evidencePath(
+        { plan: process.env.VAMOS_PLAN_DIR, piSessionID: "installed-session" },
+        id,
       ),
-      "utf8",
     ),
+    body,
   );
-  assert.equal(settlement.version, 1);
-  assert.equal(settlement.kind, "pi_assistant_settlement");
-  assert.equal(settlement.session, "installed-session");
-  assert.equal(settlement.plan, "CoreyCole/plans/installed-pi");
-  assert.equal(settlement.manager_thread, "installed-thread");
-  assert.equal(typeof settlement.assistant_entry_id, "string");
-  assert.equal(settlement.raw_response, "outcome: complete");
-  assert.equal(settlement.fenced_yaml_blocks, undefined);
 });

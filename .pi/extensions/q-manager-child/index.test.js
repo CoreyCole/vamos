@@ -1,342 +1,218 @@
 import assert from "node:assert/strict";
-import { mkdtemp, readFile, readdir, stat } from "node:fs/promises";
+import { mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
-
 import extension, {
-  BRIDGE,
-  CONSUMED,
+  ATTEMPT,
   DIAGNOSTIC,
-  PENDING,
+  deliveryBody,
+  evidencePath,
+  messageID,
   publish,
-  serializeSettlement,
+  setDeliveryDependenciesForTest,
 } from "./index.js";
 
-function harness(branch = []) {
-  const handlers = new Map();
-  let sequence = branch.length;
-  const pi = {
-    on: (name, handler) => handlers.set(name, handler),
-    appendEntry(customType, data) {
-      branch.push({
-        id: `custom-${++sequence}`,
-        type: "custom",
-        customType,
-        data,
-      });
-    },
-  };
-  const ctx = {
-    sessionManager: {
-      getBranch: () => branch,
-      getEntry: (id) => branch.find((entry) => entry.id === id),
-    },
-  };
-  extension(pi);
-  return { handlers, ctx, branch };
+function saveEnv() {
+  return Object.fromEntries(
+    [
+      "VAMOS_MANAGER_WAKE_MANAGER_THREAD_ID",
+      "VAMOS_MANAGER_WAKE_PI_SESSION_ID",
+      "VAMOS_MANAGER_WAKE_GATEWAY_URL",
+      "VAMOS_MANAGER_WAKE_INGRESS_TOKEN",
+      "VAMOS_PLAN_DIR",
+    ].map((k) => [k, process.env[k]]),
+  );
 }
-
-function restoreEnvironment(old) {
-  for (const [key, value] of Object.entries(old)) {
-    if (value === undefined) delete process.env[key];
-    else process.env[key] = value;
-  }
+function restore(values) {
+  for (const [k, v] of Object.entries(values))
+    v === undefined ? delete process.env[k] : (process.env[k] = v);
 }
-
-async function managed(fn) {
-  const keys = [
-    "PI_SESSION_ID",
-    "VAMOS_PLAN_DIR",
-    "VAMOS_HERMES_THREAD_ID",
-    "VAMOS_THOUGHTS_ROOT",
-  ];
-  const old = Object.fromEntries(keys.map((key) => [key, process.env[key]]));
-  const root = await mkdtemp(join(tmpdir(), "q-manager-child-thoughts-"));
+async function managed(run) {
+  const old = saveEnv(),
+    root = await mkdtemp(join(tmpdir(), "wake-"));
   Object.assign(process.env, {
-    PI_SESSION_ID: "session-1",
-    VAMOS_PLAN_DIR: join(root, "CoreyCole", "plans", "example"),
-    VAMOS_HERMES_THREAD_ID: "thread-1",
-    VAMOS_THOUGHTS_ROOT: root,
+    VAMOS_MANAGER_WAKE_MANAGER_THREAD_ID: "thread-1",
+    VAMOS_MANAGER_WAKE_PI_SESSION_ID: "session-1",
+    VAMOS_MANAGER_WAKE_GATEWAY_URL: "http://gateway.test/",
+    VAMOS_MANAGER_WAKE_INGRESS_TOKEN: "secret",
+    VAMOS_PLAN_DIR: join(root, "plan"),
   });
   try {
-    await fn(process.env.VAMOS_PLAN_DIR);
+    await run();
   } finally {
-    restoreEnvironment(old);
+    restore(old);
+    setDeliveryDependenciesForTest({});
   }
 }
-
-async function settlementPath(plan, entry) {
-  const directory = join(plan, ".vamos/sessions/pi/session-1/settlements");
-  const matches = (await readdir(directory)).filter((name) =>
-    name.endsWith(`_${entry}.json`),
-  );
-  assert.equal(matches.length, 1);
-  return join(directory, matches[0]);
+function harness(branch) {
+  const handlers = new Map(),
+    entries = [...branch],
+    custom = [];
+  const pi = {
+    on: (n, h) => handlers.set(n, h),
+    appendEntry: (type, data) => custom.push({ type, data }),
+  };
+  extension(pi);
+  return {
+    handlers,
+    ctx: { sessionManager: { getBranch: () => entries } },
+    custom,
+  };
 }
 
-async function bridge(handlers, ctx, message) {
-  await handlers.get("turn_end")({ turnIndex: 1, message }, ctx);
-}
-
-test("ordinary Pi loads remain inert without managed identity", () => {
-  const saved = Object.fromEntries(
-    ["PI_SESSION_ID", "VAMOS_PLAN_DIR", "VAMOS_HERMES_THREAD_ID"].map((key) => [
-      key,
-      process.env[key],
-    ]),
-  );
-  delete process.env.PI_SESSION_ID;
-  delete process.env.VAMOS_PLAN_DIR;
-  delete process.env.VAMOS_HERMES_THREAD_ID;
+test("deterministic ID uses only session and terminal entry", () =>
+  assert.equal(
+    messageID("s", "e"),
+    "pi-settlement-v1-j7Qq1yfM1Wj5G4eYsMMFxzM5B0cSTdvoCtkCSfyVd1Y",
+  ));
+test("unmanaged extension is inert", () => {
+  const old = saveEnv();
+  for (const k of Object.keys(old)) delete process.env[k];
   try {
-    assert.equal(harness().handlers.size, 0);
+    assert.equal(harness([]).handlers.size, 0);
   } finally {
-    restoreEnvironment(saved);
+    restore(old);
   }
 });
-
-test("managed boundary rejects unsafe identities before hooks register", async () =>
+test("agent settlement publishes then posts terminal persisted assistant response", async () =>
   managed(async () => {
-    const unsafe = [
-      ["PI_SESSION_ID", "../session", /unsafe session path component/],
-      [
-        "VAMOS_HERMES_THREAD_ID",
-        "thread/child",
-        /unsafe manager thread path component/,
-      ],
-      [
-        "VAMOS_PLAN_DIR",
-        "/tmp/escape",
-        /settlement plan must be thoughts-relative/,
-      ],
-    ];
-    for (const [key, value, error] of unsafe) {
-      const saved = process.env[key];
-      process.env[key] = value;
-      try {
-        assert.throws(() => harness(), error);
-      } finally {
-        if (saved === undefined) delete process.env[key];
-        else process.env[key] = saved;
-      }
-    }
-  }));
-
-test("turn_end bridges the exact persisted assistant object", async () =>
-  managed(async () => {
-    const persisted = {
-      role: "assistant",
-      content: [{ type: "text", text: "```yaml\na: 1\n```\n" }],
-    };
-    const { handlers, ctx, branch } = harness([
-      { id: "assistant-1", type: "message", message: persisted },
-    ]);
-    await bridge(handlers, ctx, { ...persisted });
-    assert.equal(branch.at(-1).customType, DIAGNOSTIC);
-    await bridge(handlers, ctx, persisted);
-    assert.deepEqual(branch.at(-1).data, {
-      assistant_entry_id: "assistant-1",
-      turn: 1,
-    });
-  }));
-
-test("settlement serializes opaque text fences with JavaScript exact bytes", async () =>
-  managed(async () => {
-    const bytes = serializeSettlement(
-      {
-        session: "session-1",
-        plan: process.env.VAMOS_PLAN_DIR,
-        thread: "thread-1",
+    const calls = [];
+    setDeliveryDependenciesForTest({
+      retries: 1,
+      fetch: async (url, options) => {
+        calls.push({ url, options });
+        return { ok: true, status: 200 };
       },
-      "assistant-1",
-      [
+    });
+    const state = harness([
+      {
+        id: "early",
+        type: "message",
+        message: {
+          role: "assistant",
+          content: [{ type: "text", text: "old" }],
+        },
+      },
+      {
+        id: "final",
+        type: "message",
+        message: {
+          role: "assistant",
+          content: [{ type: "text", text: "```yaml\na: 1\n```" }],
+        },
+      },
+    ]);
+    await state.handlers.get("agent_settled")({}, state.ctx);
+    const id = messageID("session-1", "final"),
+      path = evidencePath(
+        { plan: process.env.VAMOS_PLAN_DIR, piSessionID: "session-1" },
+        id,
+      );
+    assert.equal((await deliveryBody(path)).message, "```yaml\na: 1\n```");
+    assert.equal(calls.length, 1);
+    assert.deepEqual(
+      JSON.parse(calls[0].options.body),
+      await deliveryBody(path),
+    );
+    assert.ok(state.custom.some((x) => x.type === ATTEMPT));
+  }));
+test("empty text is a settlement and duplicate/restarted hooks reuse path and body", async () =>
+  managed(async () => {
+    const bodies = [];
+    setDeliveryDependenciesForTest({
+      retries: 1,
+      fetch: async (_u, o) => {
+        bodies.push(o.body);
+        return { ok: true, status: 200 };
+      },
+    });
+    const branch = [
+      {
+        id: "final",
+        type: "message",
+        message: { role: "assistant", content: [] },
+      },
+    ];
+    for (let i = 0; i < 2; i++) {
+      const s = harness(branch);
+      await s.handlers.get("agent_settled")({}, s.ctx);
+    }
+    assert.equal(bodies.length, 2);
+    assert.equal(bodies[0], bodies[1]);
+    assert.equal(JSON.parse(bodies[0]).message, "");
+  }));
+test("existing byte-different target is a recovery conflict and never posts", async () =>
+  managed(async () => {
+    const branch = [
         {
-          type: "text",
-          text: "prefix```yaml nope\n```YAML\na: café 🌰\r\n```\r\n",
+          id: "final",
+          type: "message",
+          message: {
+            role: "assistant",
+            content: [{ type: "text", text: "new" }],
+          },
         },
       ],
-      "2026-07-29T19:00:00.000Z",
-    );
-    assert.equal(
-      bytes.toString(),
-      '{"version":1,"kind":"pi_assistant_settlement","session":"session-1","plan":"CoreyCole/plans/example","manager_thread":"thread-1","assistant_entry_id":"assistant-1","settled_at":"2026-07-29T19:00:00.000Z","raw_response":"prefix```yaml nope\\n```YAML\\na: café 🌰\\r\\n```\\r\\n","fenced_yaml_blocks":[{"language":"YAML","raw":"```YAML\\na: café 🌰\\r\\n```\\r\\n"}]}',
-    );
-  }));
-
-test("later steering settles a text projection even when the assistant entry also calls tools", async () =>
-  managed(async (plan) => {
-    const toolLeaf = {
-      role: "assistant",
-      content: [{ type: "toolCall", name: "not-settlement-evidence" }],
-    };
-    const finalLeaf = {
-      role: "assistant",
-      content: [
-        { type: "toolCall", name: "still-not-evidence" },
-        { type: "text", text: "```yaml\nfinal: true\n```" },
-      ],
-    };
-    const state = harness([
-      { id: "assistant-tool", type: "message", message: toolLeaf },
-      { id: "assistant-final", type: "message", message: finalLeaf },
-    ]);
-    assert.deepEqual([...state.handlers.keys()].sort(), [
-      "agent_settled",
-      "session_before_compact",
-      "session_before_tree",
-      "turn_end",
-    ]);
-    await bridge(state.handlers, state.ctx, toolLeaf);
-    assert.equal(
-      state.branch.filter((entry) => entry.customType === BRIDGE).length,
-      0,
-    );
-    await bridge(state.handlers, state.ctx, finalLeaf);
-    await state.handlers.get("agent_settled")({}, state.ctx);
-    await state.handlers.get("agent_settled")({}, state.ctx);
-    assert.equal(
-      state.branch.filter((entry) => entry.customType === CONSUMED).length,
-      1,
-    );
-    const settlement = JSON.parse(
-      await readFile(
-        await settlementPath(plan, "assistant-final"),
-        "utf8",
+      id = messageID("session-1", "final"),
+      path = evidencePath(
+        { plan: process.env.VAMOS_PLAN_DIR, piSessionID: "session-1" },
+        id,
+      );
+    await publish(
+      path,
+      Buffer.from(
+        "version: 1\nmanager_thread_id: thread-1\npi_session_id: session-1\nmessage_id: " +
+          id +
+          "\nraw_response: |-\n  old\n",
       ),
     );
-    assert.equal(settlement.raw_response, "```yaml\nfinal: true\n```");
-    assert.deepEqual(settlement.fenced_yaml_blocks, [
-      { language: "yaml", raw: "```yaml\nfinal: true\n```" },
-    ]);
-  }));
-
-test("agent_settled persists base64 before safe publication and consumes after it", async () =>
-  managed(async (plan) => {
-    const message = {
-      role: "assistant",
-      content: [{ type: "text", text: "```yml\nvalue: on\n```" }],
-    };
-    const { handlers, ctx, branch } = harness([
-      { id: "assistant-1", type: "message", message },
-    ]);
-    await bridge(handlers, ctx, message);
-    await handlers.get("agent_settled")({}, ctx);
-    const pending = branch.find((entry) => entry.customType === PENDING);
-    assert.ok(pending);
-    assert.equal(branch.at(-1).customType, CONSUMED);
-    const bytes = Buffer.from(pending.data.envelope_utf8_base64, "base64");
-    assert.equal(
-      await readFile(
-        await settlementPath(plan, "assistant-1"),
-        "utf8",
-      ),
-      bytes.toString(),
-    );
-    assert.match(bytes.toString(), /"raw_response":"```yml\\nvalue: on\\n```"/);
-  }));
-
-test("restart recovers after link publication but before consume from exact pending bytes", async () =>
-  managed(async (plan) => {
-    const message = {
-      role: "assistant",
-      content: [{ type: "text", text: "```yaml\nx: 1\n```\n" }],
-    };
-    const initial = [
-      { id: "assistant-1", type: "message", message },
-      {
-        id: "bridge-1",
-        type: "custom",
-        customType: BRIDGE,
-        data: { assistant_entry_id: "assistant-1", turn: 1 },
-      },
-    ];
-    const bytes = serializeSettlement(
-      { session: "session-1", plan, thread: "thread-1" },
-      "assistant-1",
-      message.content,
-    );
-    initial.push({
-      id: "pending-1",
-      type: "custom",
-      customType: PENDING,
-      data: {
-        version: 1,
-        bridge_id: "bridge-1",
-        manager_thread: "thread-1",
-        session: "session-1",
-        assistant_entry_id: "assistant-1",
-        envelope_utf8_base64: bytes.toString("base64"),
+    let posts = 0;
+    setDeliveryDependenciesForTest({
+      fetch: async () => {
+        posts++;
+        return { ok: true };
       },
     });
-    await publish(plan, "session-1", "assistant-1", bytes);
-    const restarted = harness(initial);
-    await restarted.handlers.get("agent_settled")({}, restarted.ctx);
-    assert.equal(
-      restarted.branch.filter((entry) => entry.customType === PENDING).length,
-      1,
-    );
-    assert.equal(
-      restarted.branch.filter((entry) => entry.customType === CONSUMED).length,
-      1,
-    );
-    assert.equal(
-      await readFile(
-        await settlementPath(plan, "assistant-1"),
-        "utf8",
-      ),
-      bytes.toString(),
-    );
+    const s = harness(branch);
+    await s.handlers.get("agent_settled")({}, s.ctx);
+    assert.equal(posts, 0);
+    assert.equal(s.custom.at(-1).data.code, "assistant_settlement_conflict");
   }));
-
-test("safe publisher is no-replace and equal-byte idempotent", async () =>
-  managed(async (plan) => {
-    const bytes = serializeSettlement(
-      { session: "session-1", plan, thread: "thread-1" },
-      "entry-1",
-      [{ type: "text", text: "evidence" }],
-      "2026-07-30T06:52:03.988Z",
-    );
-    const path = await publish(plan, "session-1", "entry-1", bytes);
-    assert.equal((await stat(path)).isFile(), true);
-    assert.equal(await publish(plan, "session-1", "entry-1", bytes), path);
-    const conflict = JSON.parse(bytes.toString("utf8"));
-    conflict.raw_response = "different evidence";
-    await assert.rejects(
-      () => publish(plan, "session-1", "entry-1", Buffer.from(JSON.stringify(conflict))),
-      /immutable opaque settlement identity conflict/,
-    );
-  }));
-
-test("all compaction is cancelled as nonsemantic telemetry and summary cancellation remains narrow", async () =>
+test("failed delivery retries fixed published bytes without leaking secrets", async () =>
   managed(async () => {
-    const { handlers, ctx, branch } = harness();
-    for (const reason of ["manual", "threshold", "overflow"]) {
-      assert.deepEqual(
-        await handlers.get("session_before_compact")({ reason }, ctx),
-        { cancel: true },
-      );
-    }
-    assert.deepEqual(
-      branch.map((entry) => entry.data),
-      [
-        { code: "context_compaction_cancelled", source: "manual" },
-        { code: "context_compaction_cancelled", source: "threshold" },
-        { code: "context_compaction_cancelled", source: "overflow" },
-      ],
+    const calls = [];
+    setDeliveryDependenciesForTest({
+      retries: 2,
+      sleep: async () => {},
+      fetch: async (_u, o) => {
+        calls.push(o.body);
+        throw new Error("lost ack");
+      },
+    });
+    const s = harness([
+      {
+        id: "final",
+        type: "message",
+        message: {
+          role: "assistant",
+          content: [{ type: "text", text: "safe" }],
+        },
+      },
+    ]);
+    await s.handlers.get("agent_settled")({}, s.ctx);
+    assert.equal(calls.length, 2);
+    assert.equal(calls[0], calls[1]);
+    const diagnostic = JSON.stringify(s.custom);
+    assert.ok(
+      !diagnostic.includes("secret") && !diagnostic.includes("gateway"),
     );
-    assert.deepEqual(
-      await handlers.get("session_before_tree")(
-        { preparation: { userWantsSummary: true } },
-        ctx,
-      ),
-      { cancel: true },
-    );
-    assert.equal(
-      await handlers.get("session_before_tree")(
-        { preparation: { userWantsSummary: false } },
-        ctx,
-      ),
-      undefined,
-    );
+  }));
+test("missing stable assistant identity reports recovery diagnostic", async () =>
+  managed(async () => {
+    const s = harness([]);
+    await s.handlers.get("agent_settled")({}, s.ctx);
+    assert.deepEqual(s.custom, [
+      { type: DIAGNOSTIC, data: { code: "assistant_settlement_unavailable" } },
+    ]);
   }));

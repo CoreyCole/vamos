@@ -1,53 +1,16 @@
 {
   "cases": [
+    { "name": "valid mapping", "raw_response": "```yaml\nz: 1\na: two\n```" },
+    { "name": "missing fence", "raw_response": "outcome: complete\n" },
     {
-      "name": "zero fences",
-      "envelope": {
-        "version": 1,
-        "kind": "pi_assistant_settlement",
-        "session": "session-zero",
-        "plan": "CoreyCole/plans/example",
-        "manager_thread": "thread-zero",
-        "assistant_entry_id": "entry-zero",
-        "settled_at": "2026-07-29T19:00:00.000Z",
-        "raw_response": "plain\nresponse"
-      }
+      "name": "multiple fences",
+      "raw_response": "```yaml\na: 1\n```\n```yml\nb: 2\n```"
     },
+    { "name": "malformed", "raw_response": "```yaml\na: [\n```" },
     {
-      "name": "one multiline fence",
-      "envelope": {
-        "version": 1,
-        "kind": "pi_assistant_settlement",
-        "session": "session-one",
-        "plan": "CoreyCole/plans/example",
-        "manager_thread": "thread-one",
-        "assistant_entry_id": "entry-one",
-        "settled_at": "2026-07-29T19:00:01.000Z",
-        "raw_response": "```yaml\nfirst line\nsecond line\n```\n",
-        "fenced_yaml_blocks": [
-          {
-            "language": "yaml",
-            "raw": "```yaml\nfirst line\nsecond line\n```\n"
-          }
-        ]
-      }
+      "name": "reserved key",
+      "raw_response": "```yaml\nraw_response: bad\n```"
     },
-    {
-      "name": "many empty unicode and crlf fences",
-      "envelope": {
-        "version": 1,
-        "kind": "pi_assistant_settlement",
-        "session": "session-many",
-        "plan": "CoreyCole/plans/example",
-        "manager_thread": "thread-many",
-        "assistant_entry_id": "entry-many",
-        "settled_at": "2026-07-29T19:00:02.000Z",
-        "raw_response": "```YML\r\n```\r\n```yaml\ncafé 🌰\n```\n",
-        "fenced_yaml_blocks": [
-          { "language": "YML", "raw": "```YML\r\n```\r\n" },
-          { "language": "yaml", "raw": "```yaml\ncafé 🌰\n```\n" }
-        ]
-      }
-    }
+    { "name": "CRLF unicode", "raw_response": "café 🌰\r\n" }
   ]
 }
