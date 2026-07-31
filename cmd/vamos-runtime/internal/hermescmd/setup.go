@@ -16,6 +16,7 @@ import (
 type hostConfig struct {
 	GatewayURL    string `yaml:"gateway_url"`
 	VamosURL      string `yaml:"vamos_url"`
+	IngressToken  string `yaml:"ingress_token"`
 	CallbackToken string `yaml:"callback_token"`
 }
 
@@ -44,7 +45,7 @@ func defaultConfigPath() (string, error) {
 }
 
 func newSetupCommand() *cobra.Command {
-	var gatewayURL, vamosURL, callbackToken, configPath, hermesBin, pluginSource string
+	var gatewayURL, vamosURL, ingressToken, callbackToken, configPath, hermesBin, pluginSource string
 	var installPlugin, restartGateway bool
 	cmd := &cobra.Command{
 		Use:   "setup --gateway-url <url>",
@@ -77,9 +78,10 @@ func newSetupCommand() *cobra.Command {
 				return fmt.Errorf("verify Hermes gateway: %s", response.Status)
 			}
 			if strings.TrimSpace(vamosURL) == "" ||
+				strings.TrimSpace(ingressToken) == "" ||
 				strings.TrimSpace(callbackToken) == "" {
 				return fmt.Errorf(
-					"vamos-url and callback-token are required for the Pi completion callback",
+					"vamos-url, ingress-token, and callback-token are required",
 				)
 			}
 			if !strings.HasPrefix(vamosURL, "http://") &&
@@ -98,6 +100,7 @@ func newSetupCommand() *cobra.Command {
 			data, err := yaml.Marshal(hostConfig{
 				GatewayURL:    gatewayURL,
 				VamosURL:      strings.TrimRight(vamosURL, "/"),
+				IngressToken:  ingressToken,
 				CallbackToken: callbackToken,
 			})
 			if err != nil {
@@ -120,6 +123,8 @@ func newSetupCommand() *cobra.Command {
 	cmd.Flags().
 		StringVar(&vamosURL, "vamos-url", "", "Vamos server base URL for Pi completion callbacks")
 	cmd.Flags().
+		StringVar(&ingressToken, "ingress-token", "", "machine ingress credential for manager wake delivery")
+	cmd.Flags().
 		StringVar(&callbackToken, "callback-token", "", "machine callback credential shared with Vamos")
 	cmd.Flags().StringVar(&configPath, "config", "", "host-local config path")
 	cmd.Flags().
@@ -130,6 +135,7 @@ func newSetupCommand() *cobra.Command {
 	cmd.Flags().
 		BoolVar(&restartGateway, "restart-gateway", false, "restart Hermes gateway after explicit plugin installation")
 	_ = cmd.MarkFlagRequired("gateway-url")
+	_ = cmd.MarkFlagRequired("ingress-token")
 	return cmd
 }
 

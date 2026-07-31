@@ -33,12 +33,25 @@ func TestManagedPiEnvironmentReplacesInheritedValues(t *testing.T) {
 		"VAMOS_PLAN_DIR=stale-two",
 		"VAMOS_THOUGHTS_ROOT=stale-two",
 		"VAMOS_HERMES_THREAD_ID=stale",
-	}, "/tmp/thoughts/CoreyCole/plans/example", "session-1", "thread-1")
+		managerWakeManagerThreadID + "=stale-one",
+		managerWakeManagerThreadID + "=stale-two",
+		managerWakePiSessionID + "=stale",
+		managerWakeGatewayURL + "=https://stale.example",
+		managerWakeIngressToken + "=stale-one",
+		managerWakeIngressToken + "=stale-two",
+	}, "/tmp/thoughts/CoreyCole/plans/example", "session-1", "thread-1", hostConfig{
+		GatewayURL:    " https://gateway.example ",
+		IngressToken:  "ingress-secret",
+		CallbackToken: "callback-secret",
+	})
 	for _, want := range []string{
 		"VAMOS_PLAN_DIR=/tmp/thoughts/CoreyCole/plans/example",
 		"VAMOS_THOUGHTS_ROOT=/tmp/thoughts",
 		"PI_SESSION_ID=session-1",
-		"VAMOS_HERMES_THREAD_ID=thread-1",
+		managerWakeManagerThreadID + "=thread-1",
+		managerWakePiSessionID + "=session-1",
+		managerWakeGatewayURL + "=https://gateway.example",
+		managerWakeIngressToken + "=ingress-secret",
 	} {
 		if countEnv(env, want) != 1 {
 			t.Errorf(
@@ -54,13 +67,25 @@ func TestManagedPiEnvironmentReplacesInheritedValues(t *testing.T) {
 	}
 }
 
-func TestManagedPiEnvironmentDropsInheritedThreadWithoutManagedOwner(t *testing.T) {
+func TestManagedPiEnvironmentOmitsManagerWakeValuesWithoutManagedOwner(t *testing.T) {
 	env := managedPiEnvironment([]string{
 		"VAMOS_HERMES_THREAD_ID=stale",
+		managerWakeManagerThreadID + "=stale",
+		managerWakePiSessionID + "=stale",
+		managerWakeGatewayURL + "=https://stale.example",
+		managerWakeIngressToken + "=stale",
 		"KEEP=value",
-	}, "/tmp/thoughts/CoreyCole/plans/example", "session-1", "")
-	if containsEnv(env, "VAMOS_HERMES_THREAD_ID=stale") {
-		t.Fatalf("environment retained inherited Hermes thread: %#v", env)
+	}, "/tmp/thoughts/CoreyCole/plans/example", "session-1", "", hostConfig{})
+	for _, name := range []string{
+		"VAMOS_HERMES_THREAD_ID",
+		managerWakeManagerThreadID,
+		managerWakePiSessionID,
+		managerWakeGatewayURL,
+		managerWakeIngressToken,
+	} {
+		if hasEnvKey(env, name) {
+			t.Fatalf("environment retained %q: %#v", name, env)
+		}
 	}
 	for _, want := range []string{
 		"VAMOS_PLAN_DIR=/tmp/thoughts/CoreyCole/plans/example",
@@ -118,7 +143,9 @@ func TestStartDoesNotLaunchWhenRegistrationFails(t *testing.T) {
 	configPath := filepath.Join(t.TempDir(), "hermes.yaml")
 	if err := os.WriteFile(
 		configPath,
-		[]byte("gateway_url: "+server.URL+"\nvamos_url: "+server.URL+"\ncallback_token: token\n"),
+		[]byte(
+			"gateway_url: "+server.URL+"\nvamos_url: "+server.URL+"\ningress_token: ingress-token\ncallback_token: token\n",
+		),
 		0o600,
 	); err != nil {
 		t.Fatal(err)
@@ -154,7 +181,7 @@ func TestStartAcceptsPlanDirectoryWithoutContextFiles(t *testing.T) {
 	planDir := t.TempDir()
 	var gotArgs []string
 	cmd := newStartCommand(
-		func(_ context.Context, _ string, args []string, _ []string, _ io.Writer, _ io.Writer) error {
+		func(_ context.Context, _ string, args, _ []string, _, _ io.Writer) error {
 			gotArgs = append([]string(nil), args...)
 
 			return nil
@@ -198,6 +225,91 @@ func TestRenderPiPromptKeepsManualAndManagedCompletionBoundaries(t *testing.T) {
 			t.Errorf("managed prompt retained %q: %q", unwanted, managed)
 		}
 	}
+}
+
+func TestManagedPiEnvironmentUsesIngressTokenInsteadOfCallbackToken(t *testing.T) {
+	for _, test := range []struct {
+		name          string
+		ingressToken  string
+		callbackToken string
+	}{
+		{name: "different credentials", ingressToken: "ingress", callbackToken: "callback"},
+		{name: "callback resembles ingress", ingressToken: "ingress-2", callbackToken: "ingress"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			env := managedPiEnvironment(
+				nil,
+				"/tmp/thoughts/plan",
+				"session",
+				"thread",
+				hostConfig{
+					GatewayURL:    "https://gateway.example",
+					IngressToken:  test.ingressToken,
+					CallbackToken: test.callbackToken,
+				},
+			)
+			if !containsEnv(env, managerWakeIngressToken+"="+test.ingressToken) {
+				t.Fatalf("manager wake ingress token was not injected")
+			}
+			if containsEnv(env, managerWakeIngressToken+"="+test.callbackToken) &&
+				test.ingressToken != test.callbackToken {
+				t.Fatal("callback token populated manager wake ingress token")
+			}
+		})
+	}
+}
+
+func TestStartRefusesIncompleteManagedConfigBeforeRunner(t *testing.T) {
+	ctx := testPlan(t)
+	for _, test := range []struct {
+		name   string
+		config string
+	}{
+		{name: "missing ingress token", config: "gateway_url: https://gateway.example\nvamos_url: https://vamos.example\ncallback_token: callback\n"},
+		{name: "missing callback token", config: "gateway_url: https://gateway.example\nvamos_url: https://vamos.example\ningress_token: ingress\n"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			configPath := filepath.Join(t.TempDir(), "hermes.yaml")
+			if err := os.WriteFile(configPath, []byte(test.config), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			launched := false
+			cmd := newStartCommand(
+				func(context.Context, string, []string, []string, io.Writer, io.Writer) error {
+					launched = true
+					return nil
+				},
+			)
+			cmd.SetArgs(
+				[]string{
+					"--plan",
+					ctx.PlanDir,
+					"--thread-id",
+					"thread-1",
+					"--config",
+					configPath,
+					"task",
+				},
+			)
+			if err := cmd.Execute(); err == nil ||
+				!strings.Contains(err.Error(), "credential") {
+				t.Fatalf("error = %v, want incomplete managed configuration", err)
+			}
+			if launched {
+				t.Fatal("runner launched with incomplete managed configuration")
+			}
+		})
+	}
+}
+
+func hasEnvKey(env []string, want string) bool {
+	for _, entry := range env {
+		key, _, found := strings.Cut(entry, "=")
+		if found && key == want {
+			return true
+		}
+	}
+	return false
 }
 
 func countEnv(env []string, want string) int {

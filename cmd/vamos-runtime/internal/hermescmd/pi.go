@@ -34,6 +34,13 @@ type (
 
 var errHermesManagerNotFound = errors.New("Hermes manager session not found")
 
+const (
+	managerWakeManagerThreadID = "VAMOS_MANAGER_WAKE_MANAGER_THREAD_ID"
+	managerWakePiSessionID     = "VAMOS_MANAGER_WAKE_PI_SESSION_ID"
+	managerWakeGatewayURL      = "VAMOS_MANAGER_WAKE_GATEWAY_URL"
+	managerWakeIngressToken    = "VAMOS_MANAGER_WAKE_INGRESS_TOKEN"
+)
+
 func newPiCommand(run commandRunner) *cobra.Command {
 	cmd := &cobra.Command{Use: "pi", Short: "Launch and record isolated Pi workers"}
 	cmd.AddCommand(
@@ -91,14 +98,25 @@ func newStartCommand(run commandRunner) *cobra.Command {
 			if err != nil {
 				return err
 			}
+			var config hostConfig
 			if managed {
+				config, err = readManagedHostConfig(input.ConfigPath)
+				if err != nil {
+					return err
+				}
 				if err := registerManagedPiRun(
-					cmd.Context(), input.ConfigPath, ctx.PlanDir, threadID, session,
+					cmd.Context(), config, ctx.PlanDir, threadID, session,
 				); err != nil {
 					return err
 				}
 			}
-			env := managedPiEnvironment(os.Environ(), ctx.PlanDir, session, threadID)
+			env := managedPiEnvironment(
+				os.Environ(),
+				ctx.PlanDir,
+				session,
+				threadID,
+				config,
+			)
 			fmt.Fprintln(cmd.OutOrStdout(), "pi session:", session)
 			piArgs := append(
 				[]string{"--session-id", session, "--session-dir", dir},
@@ -140,20 +158,31 @@ func resolveManagedHermesThread(
 	return threadID, true, nil
 }
 
-func managedPiEnvironment(base []string, planDir, session, threadID string) []string {
+func managedPiEnvironment(
+	base []string,
+	planDir, session, threadID string,
+	config hostConfig,
+) []string {
 	authoritative := map[string]string{
 		"VAMOS_PLAN_DIR":      planDir,
 		"VAMOS_THOUGHTS_ROOT": thoughtsRoot(planDir),
 		"PI_SESSION_ID":       session,
-	}
-	if threadID != "" {
-		authoritative["VAMOS_HERMES_THREAD_ID"] = threadID
 	}
 	keys := []string{
 		"VAMOS_PLAN_DIR",
 		"VAMOS_THOUGHTS_ROOT",
 		"PI_SESSION_ID",
 		"VAMOS_HERMES_THREAD_ID",
+		managerWakeManagerThreadID,
+		managerWakePiSessionID,
+		managerWakeGatewayURL,
+		managerWakeIngressToken,
+	}
+	if threadID != "" {
+		authoritative[managerWakeManagerThreadID] = threadID
+		authoritative[managerWakePiSessionID] = session
+		authoritative[managerWakeGatewayURL] = strings.TrimSpace(config.GatewayURL)
+		authoritative[managerWakeIngressToken] = config.IngressToken
 	}
 	env := make([]string, 0, len(base)+len(authoritative))
 	for _, entry := range base {
@@ -180,9 +209,34 @@ func containsString(values []string, want string) bool {
 	return false
 }
 
+func readManagedHostConfig(configPath string) (hostConfig, error) {
+	if configPath == "" {
+		var err error
+		configPath, err = defaultConfigPath()
+		if err != nil {
+			return hostConfig{}, err
+		}
+	}
+	config, err := readHostConfig(configPath)
+	if err != nil {
+		return hostConfig{}, fmt.Errorf("read Hermes host configuration: %w", err)
+	}
+	if strings.TrimSpace(config.GatewayURL) == "" ||
+		strings.TrimSpace(config.VamosURL) == "" ||
+		strings.TrimSpace(config.IngressToken) == "" ||
+		strings.TrimSpace(config.CallbackToken) == "" {
+		return hostConfig{}, errors.New(
+			"Hermes gateway URL, Hermes ingress credential, Vamos callback URL, and Vamos callback credential are required; rerun hermes setup",
+		)
+	}
+	config.GatewayURL = strings.TrimSpace(config.GatewayURL)
+	return config, nil
+}
+
 func registerManagedPiRun(
 	ctx context.Context,
-	configPath, planDir, threadID, session string,
+	config hostConfig,
+	planDir, threadID, session string,
 ) error {
 	if threadID == "" {
 		return nil
@@ -192,24 +246,6 @@ func registerManagedPiRun(
 	}
 	if err := ValidateSafeComponent(session); err != nil {
 		return fmt.Errorf("validate Pi session ID: %w", err)
-	}
-	if configPath == "" {
-		var err error
-		configPath, err = defaultConfigPath()
-		if err != nil {
-			return err
-		}
-	}
-	config, err := readHostConfig(configPath)
-	if err != nil {
-		return fmt.Errorf("read Hermes host configuration: %w", err)
-	}
-	if strings.TrimSpace(config.GatewayURL) == "" ||
-		strings.TrimSpace(config.VamosURL) == "" ||
-		strings.TrimSpace(config.CallbackToken) == "" {
-		return errors.New(
-			"Hermes gateway URL and Vamos callback URL and credential are required; rerun hermes setup",
-		)
 	}
 	gatewayRequest, err := http.NewRequestWithContext(
 		ctx, http.MethodGet, config.GatewayURL, nil,
@@ -279,7 +315,10 @@ func piContextArgs(ctx PlanContext, prior *PiResult) ([]string, error) {
 			return nil, fmt.Errorf("load Pi context %q: %w", path, err)
 		}
 	}
-	paths = append(paths, filepath.Join(root, ".pi", "skills", "qrspi-planning", "SKILL.md"))
+	paths = append(
+		paths,
+		filepath.Join(root, ".pi", "skills", "qrspi-planning", "SKILL.md"),
+	)
 	if prior != nil {
 		if prior.Outcome == OutcomeHandoff {
 			paths = append(paths,

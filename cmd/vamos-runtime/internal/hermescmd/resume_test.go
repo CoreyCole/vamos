@@ -134,7 +134,9 @@ func TestContinueRegistersManagedPiRunBeforeLaunchingWorker(t *testing.T) {
 	configPath := filepath.Join(t.TempDir(), "hermes.yaml")
 	if err := os.WriteFile(
 		configPath,
-		[]byte("gateway_url: "+server.URL+"\nvamos_url: "+server.URL+"\ncallback_token: callback-secret\n"),
+		[]byte(
+			"gateway_url: "+server.URL+"\nvamos_url: "+server.URL+"\ningress_token: ingress-secret\ncallback_token: callback-secret\n",
+		),
 		0o600,
 	); err != nil {
 		t.Fatal(err)

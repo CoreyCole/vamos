@@ -110,7 +110,12 @@ func TestOpaqueSettlementPersistsExactBytesAndRecoversBase64(t *testing.T) {
 		path != want {
 		t.Fatalf("path = %q, %v; want %q", path, err, want)
 	}
-	if base := filepath.Base(path); !strings.HasPrefix(base, "20260729T120000000000000Z_") {
+	if base := filepath.Base(
+		path,
+	); !strings.HasPrefix(
+		base,
+		"20260729T120000000000000Z_",
+	) {
 		t.Fatalf("settlement name = %q, want timestamp prefix", base)
 	}
 	pending, err := ReadOpaqueSettlement(ctx.PlanDir, "session-1", "entry-1")
@@ -594,14 +599,18 @@ func TestStartRegistersManagedPiRunBeforeLaunchingWorker(t *testing.T) {
 	configPath := filepath.Join(t.TempDir(), "hermes.yaml")
 	if err := os.WriteFile(
 		configPath,
-		[]byte("gateway_url: "+server.URL+"\nvamos_url: "+server.URL+"\ncallback_token: callback-secret\n"),
+		[]byte(
+			"gateway_url: "+server.URL+"\nvamos_url: "+server.URL+"\ningress_token: ingress-secret\ncallback_token: callback-secret\n",
+		),
 		0o600,
 	); err != nil {
 		t.Fatal(err)
 	}
 	var workerSession string
+	var workerEnv []string
 	cmd := newStartCommand(
-		func(_ context.Context, _ string, args, _ []string, _, _ io.Writer) error {
+		func(_ context.Context, _ string, args, env []string, _, _ io.Writer) error {
+			workerEnv = env
 			for index, arg := range args {
 				if arg == "--session-id" && index+1 < len(args) {
 					workerSession = args[index+1]
@@ -629,6 +638,19 @@ func TestStartRegistersManagedPiRunBeforeLaunchingWorker(t *testing.T) {
 			gotSession,
 			workerSession,
 		)
+	}
+	for _, want := range []string{
+		managerWakeManagerThreadID + "=thread-1",
+		managerWakePiSessionID + "=" + workerSession,
+		managerWakeGatewayURL + "=" + server.URL,
+		managerWakeIngressToken + "=ingress-secret",
+	} {
+		if !containsEnv(workerEnv, want) {
+			t.Fatalf("managed worker environment missing %q", want)
+		}
+	}
+	if containsEnv(workerEnv, "VAMOS_HERMES_THREAD_ID=thread-1") {
+		t.Fatal("managed worker received retired Hermes thread environment")
 	}
 }
 

@@ -197,9 +197,14 @@ func newContinueCommand(run commandRunner) *cobra.Command {
 			if err != nil {
 				return err
 			}
+			var config hostConfig
 			if managed {
+				config, err = readManagedHostConfig(configPath)
+				if err != nil {
+					return err
+				}
 				if err := registerManagedPiRun(
-					cmd.Context(), configPath, plan.PlanDir, threadID, session,
+					cmd.Context(), config, plan.PlanDir, threadID, session,
 				); err != nil {
 					return err
 				}
@@ -213,7 +218,13 @@ func newContinueCommand(run commandRunner) *cobra.Command {
 				cmd.Context(),
 				"pi",
 				piArgs,
-				managedPiEnvironment(os.Environ(), plan.PlanDir, session, threadID),
+				managedPiEnvironment(
+					os.Environ(),
+					plan.PlanDir,
+					session,
+					threadID,
+					config,
+				),
 				cmd.OutOrStdout(),
 				cmd.ErrOrStderr(),
 			)
