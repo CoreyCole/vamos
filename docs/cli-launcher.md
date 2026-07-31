@@ -35,3 +35,19 @@ The state file is JSON:
 The launcher computes a runtime source fingerprint from `cmd/vamos-runtime`, shared runtime packages, module files, generated-code inputs, and embedded runtime assets. Excluded paths include `.vamos/`, `.build-agents/`, `node_modules/`, `dist/`, `thoughts/`, docs, static assets, and test files.
 
 When the fingerprint changes, the launcher builds a new managed runtime under a per-target lock and atomically installs it. When unchanged, it reuses the existing cached runtime.
+
+## Hermes manager-wake setup
+
+Configure the host without echoing secret values:
+
+```bash
+vamos hermes setup \
+  --gateway-url <hermes-adapter-url> \
+  --vamos-url <vamos-url> \
+  --ingress-token <manager-wake-ingress-credential> \
+  --callback-token <vamos-callback-credential>
+```
+
+The ingress credential authenticates direct `/vamos/manager-wake` delivery. The callback credential is separate, callback-only, and is never injected into Pi. A managed launch transiently supplies `VAMOS_MANAGER_WAKE_MANAGER_THREAD_ID`, `VAMOS_MANAGER_WAKE_PI_SESSION_ID`, `VAMOS_MANAGER_WAKE_GATEWAY_URL`, and `VAMOS_MANAGER_WAKE_INGRESS_TOKEN`; unmanaged launches supply none of them. URLs and credentials must not enter prompts, Pi custom entries, settlement evidence, attempt records, diagnostics, or logs.
+
+After deploying the removal of opaque-settlement discovery, an operator runs `vamos-runtime hermes cleanup-opaque-settlement-schedules` once. It uses `TEMPORAL_ADDRESS` and optional `TEMPORAL_NAMESPACE`, deletes only schedules with the literal `opaque-settlement-discovery:` prefix, then freshly verifies zero remain. This is an explicit, safely repeatable operator action, never a startup cleanup hook. Do not record credentials, URLs, or settlement contents in the runbook result.

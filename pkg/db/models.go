@@ -351,16 +351,6 @@ type MachineCredential struct {
 	LastUsedAt             sql.NullTime `json:"last_used_at"`
 }
 
-type OpaqueSettlementAdmission struct {
-	DeliveryID      string    `json:"delivery_id"`
-	Plan            string    `json:"plan"`
-	ManagerThread   string    `json:"manager_thread"`
-	Session         string    `json:"session"`
-	FinalEntryID    string    `json:"final_entry_id"`
-	SettlementBytes []byte    `json:"settlement_bytes"`
-	AdmittedAt      time.Time `json:"admitted_at"`
-}
-
 type PiMetadataCursor struct {
 	SourcePath     string         `json:"source_path"`
 	SourceIdentity sql.NullString `json:"source_identity"`

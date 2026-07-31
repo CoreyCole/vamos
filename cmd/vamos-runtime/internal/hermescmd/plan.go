@@ -5,7 +5,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"time"
 
 	"gopkg.in/yaml.v3"
 )
@@ -22,7 +21,6 @@ type PiArtifactKind string
 const (
 	PiArtifactLegacyResult     PiArtifactKind = "legacy_pi_result"
 	PiArtifactLegacyCheckpoint PiArtifactKind = "legacy_managed_checkpoint"
-	PiArtifactOpaqueSettlement PiArtifactKind = "opaque_settlement"
 )
 
 type PiArtifactSchema struct {
@@ -67,18 +65,6 @@ func PiArtifactSchemaForPath(planDir, artifactPath string) (PiArtifactSchema, er
 			return PiArtifactSchema{}, err
 		}
 		return PiArtifactSchema{Kind: PiArtifactLegacyCheckpoint, Version: 2}, nil
-	}
-	if len(parts) == 3 && parts[1] == "settlements" &&
-		strings.HasSuffix(parts[2], ".json") {
-		if err := ValidateSafeComponent(parts[0]); err != nil {
-			return PiArtifactSchema{}, err
-		}
-		if err := ValidateSafeComponent(
-			strings.TrimSuffix(parts[2], ".json"),
-		); err != nil {
-			return PiArtifactSchema{}, err
-		}
-		return PiArtifactSchema{Kind: PiArtifactOpaqueSettlement, Version: 1}, nil
 	}
 	return PiArtifactSchema{}, fmt.Errorf(
 		"unrecognized Pi artifact path %q",
@@ -194,55 +180,6 @@ func CheckpointPath(planDir, sessionID, finalEntryID string) (string, error) {
 		return "", fmt.Errorf("checkpoint path escapes plan directory")
 	}
 	return path, nil
-}
-
-// SettlementPath is the only durable location for a v1 opaque settlement.
-func SettlementPath(planDir, sessionID string, settledAt time.Time, finalEntryID string) (string, error) {
-	if err := ValidateSafeComponent(sessionID); err != nil {
-		return "", fmt.Errorf("settlement session: %w", err)
-	}
-	if err := ValidateSafeComponent(finalEntryID); err != nil {
-		return "", fmt.Errorf("settlement final entry: %w", err)
-	}
-	if settledAt.IsZero() {
-		return "", fmt.Errorf("settlement timestamp is required")
-	}
-	planDir, err := filepath.Abs(planDir)
-	if err != nil {
-		return "", err
-	}
-	path := filepath.Join(
-		planDir,
-		".vamos",
-		"sessions",
-		"pi",
-		sessionID,
-		"settlements",
-		settlementFilename(settledAt, finalEntryID),
-	)
-	if !pathWithinPlan(path, planDir) {
-		return "", fmt.Errorf("settlement path escapes plan directory")
-	}
-
-	return path, nil
-}
-
-func settlementFilename(settledAt time.Time, finalEntryID string) string {
-	return settledAt.UTC().Format("20060102T150405000000000Z") + "_" + finalEntryID + ".json"
-}
-
-func DeliveryAttemptPath(
-	planDir, sessionID, finalEntryID string,
-	attempt uint64,
-) (string, error) {
-	checkpoint, err := CheckpointPath(planDir, sessionID, finalEntryID)
-	if err != nil {
-		return "", err
-	}
-	return filepath.Join(
-		filepath.Dir(filepath.Dir(checkpoint)), "delivery-attempts",
-		fmt.Sprintf("%s-%d.yaml", finalEntryID, attempt),
-	), nil
 }
 
 func pathWithinPlan(path, planDir string) bool {

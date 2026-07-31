@@ -3,7 +3,6 @@ package hermescmd
 import (
 	"bytes"
 	"context"
-	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"io"
@@ -48,147 +47,6 @@ func testPlan(t *testing.T) PlanContext {
 		t.Fatal(err)
 	}
 	return ctx
-}
-
-func TestOpaqueSettlementFixturePairsDecodeExactJavaScriptBytes(t *testing.T) {
-	data, err := os.ReadFile(
-		filepath.Join(
-			"..",
-			"..",
-			"..",
-			"..",
-			".pi",
-			"extensions",
-			"q-manager-child",
-			"fixtures",
-			"opaque-settlement-fixtures.json",
-		),
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-	var fixtures struct {
-		Cases []struct {
-			Name     string          `json:"name"`
-			Envelope json.RawMessage `json:"envelope"`
-		} `json:"cases"`
-	}
-	if err := json.Unmarshal(data, &fixtures); err != nil {
-		t.Fatal(err)
-	}
-	for _, fixture := range fixtures.Cases {
-		t.Run(fixture.Name, func(t *testing.T) {
-			got, err := DecodeOpaqueSettlementEnvelope(fixture.Envelope)
-			if err != nil {
-				t.Fatal(err)
-			}
-			if got.RawResponse == "" && fixture.Name != "zero fences" {
-				t.Fatalf("raw response was not decoded: %#v", got)
-			}
-			if fixture.Name == "zero fences" && got.FencedYAMLBlocks != nil {
-				t.Fatalf("no-block representation changed: %#v", got)
-			}
-		})
-	}
-}
-
-func TestOpaqueSettlementPersistsExactBytesAndRecoversBase64(t *testing.T) {
-	ctx := testPlan(t)
-	raw := []byte(
-		`{"version":1,"kind":"pi_assistant_settlement","session":"session-1","plan":"` + ctx.PlanRel + `","manager_thread":"thread-1","assistant_entry_id":"entry-1","settled_at":"2026-07-29T12:00:00Z","raw_response":"evidence\\r\\nbytes","fenced_yaml_blocks":[{"language":"yaml","raw":"evidence\\r\\nbytes"}]}`,
-	)
-	path, err := WriteOpaqueSettlement(ctx.PlanDir, "session-1", "entry-1", raw)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if want, err := SettlementPath(
-		ctx.PlanDir,
-		"session-1",
-		time.Date(2026, 7, 29, 12, 0, 0, 0, time.UTC),
-		"entry-1",
-	); err != nil ||
-		path != want {
-		t.Fatalf("path = %q, %v; want %q", path, err, want)
-	}
-	if base := filepath.Base(
-		path,
-	); !strings.HasPrefix(
-		base,
-		"20260729T120000000000000Z_",
-	) {
-		t.Fatalf("settlement name = %q, want timestamp prefix", base)
-	}
-	pending, err := ReadOpaqueSettlement(ctx.PlanDir, "session-1", "entry-1")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if got := pending.BytesBase64; got != base64.StdEncoding.EncodeToString(raw) {
-		t.Fatalf("base64 = %q, want exact source bytes", got)
-	}
-	if pending.Envelope.RawResponse != `evidence\r\nbytes` ||
-		pending.Envelope.FencedYAMLBlocks == nil ||
-		(*pending.Envelope.FencedYAMLBlocks)[0].Raw != pending.Envelope.RawResponse {
-		t.Fatalf("opaque evidence = %#v", pending.Envelope)
-	}
-	if info, err := os.Stat(path); err != nil || info.Mode().Perm() != 0o600 {
-		t.Fatalf("mode=%v err=%v", info.Mode(), err)
-	}
-	if _, err := WriteOpaqueSettlement(
-		ctx.PlanDir,
-		"session-1",
-		"entry-1",
-		raw,
-	); err != nil {
-		t.Fatalf("equal-byte retry: %v", err)
-	}
-	if _, err := WriteOpaqueSettlement(
-		ctx.PlanDir,
-		"session-1",
-		"entry-1",
-		append(raw, '\n'),
-	); err == nil ||
-		!strings.Contains(err.Error(), "immutable opaque settlement identity conflict") {
-		t.Fatalf("different-byte retry = %v", err)
-	}
-}
-
-func TestOpaqueSettlementRejectsNullOrInvalidFenceEvidence(t *testing.T) {
-	ctx := testPlan(t)
-	for _, fences := range []string{
-		`null`, `[{"language":"yaml"}]`, `[{"language":"yaml","raw":null}]`, `[{"language":"yaml","raw":1}]`,
-	} {
-		raw := []byte(
-			`{"version":1,"kind":"pi_assistant_settlement","session":"session","plan":"` + ctx.PlanRel + `","manager_thread":"thread","assistant_entry_id":"entry","settled_at":"2026-07-29T12:00:00Z","raw_response":"evidence","fenced_yaml_blocks":` + fences + `}`,
-		)
-		if _, err := DecodeOpaqueSettlementEnvelope(raw); err == nil {
-			t.Fatalf("accepted invalid fence evidence %s", fences)
-		}
-	}
-}
-
-func TestOpaqueSettlementRejectsMalformedOrUnsafePayloads(t *testing.T) {
-	ctx := testPlan(t)
-	for _, raw := range [][]byte{
-		[]byte(`{"version":2,"kind":"opaque_pi_settlement","session":"session","plan":"` + ctx.PlanRel + `","manager_thread":"thread","final_entry_id":"entry","fences":[]}`),
-		[]byte(`{"version":1,"kind":"opaque_pi_settlement","session":"../session","plan":"` + ctx.PlanRel + `","manager_thread":"thread","final_entry_id":"entry","fences":[]}`),
-		[]byte(`{"version":1,"kind":"opaque_pi_settlement","session":"session","plan":"/absolute","manager_thread":"thread","final_entry_id":"entry","fences":[]}`),
-		[]byte(`{"version":1,"kind":"opaque_pi_settlement","session":"session","plan":"` + ctx.PlanRel + `","manager_thread":"thread","final_entry_id":"entry","fences":null}`),
-	} {
-		if _, err := DecodeOpaqueSettlementEnvelope(raw); err == nil {
-			t.Fatalf("accepted invalid envelope %s", raw)
-		}
-	}
-	if _, err := SettlementPath(
-		ctx.PlanDir,
-		"../session",
-		time.Now(),
-		"entry",
-	); err == nil {
-		t.Fatal("accepted traversal settlement path")
-	}
-	if _, err := ReadOpaqueSettlement(ctx.PlanDir, "session", "../entry"); err == nil {
-		t.Fatal("accepted traversal settlement read")
-	}
 }
 
 func TestWritePiResultOverwritesCurrentConclusion(t *testing.T) {
@@ -258,7 +116,7 @@ func TestPiCheckpointExtensionCanonicalFixture(t *testing.T) {
 	}
 }
 
-func TestPiArtifactSchemaDispatchKeepsLegacyAndOpaquePathsDistinct(t *testing.T) {
+func TestPiArtifactSchemaDispatchKeepsLegacyPathsDistinct(t *testing.T) {
 	ctx := testPlan(t)
 	tests := []struct {
 		name string
@@ -282,19 +140,6 @@ func TestPiArtifactSchemaDispatchKeepsLegacyAndOpaquePathsDistinct(t *testing.T)
 				"entry-1.yaml",
 			),
 			want: PiArtifactSchema{Kind: PiArtifactLegacyCheckpoint, Version: 2},
-		},
-		{
-			name: "opaque settlement reserved path",
-			path: filepath.Join(
-				ctx.PlanDir,
-				".vamos",
-				"sessions",
-				"pi",
-				"session-1",
-				"settlements",
-				"entry-1.json",
-			),
-			want: PiArtifactSchema{Kind: PiArtifactOpaqueSettlement, Version: 1},
 		},
 	}
 	for _, test := range tests {
@@ -322,7 +167,7 @@ func TestPiArtifactSchemaDispatchKeepsLegacyAndOpaquePathsDistinct(t *testing.T)
 			"entry-1.json",
 		),
 	); err == nil {
-		t.Fatal("accepted a checkpoint path as an opaque settlement")
+		t.Fatal("accepted a checkpoint with the wrong extension")
 	}
 }
 

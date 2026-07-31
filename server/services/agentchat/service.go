@@ -86,7 +86,6 @@ type Service struct {
 	chatSessions                        *chatsession.Service
 	hermesGateway                       HermesGatewayClient
 	hermesThreadOwner                   func(context.Context, string) (string, error) // test seam
-	opaqueSettlementAdmissions          OpaqueSettlementAdmissionStore
 }
 
 type liveThreadState struct {
@@ -228,12 +227,19 @@ func legacyThoughtsRoot(projectRoot, defaultCwd string) string {
 	return filepath.Join(root, "thoughts")
 }
 
-func initializeWorkflowRuntime(svc *Service, notifier *Notifier, queries *db.Queries) (*Service, error) {
-	svc.liveFlush = agentworkspace.NewLiveFlushLoop(agentworkspace.LiveFlushPolicy{}, func(workspaceID string) {
-		if notifier != nil {
-			notifier.NotifyLiveTranscript(workspaceID)
-		}
-	})
+func initializeWorkflowRuntime(
+	svc *Service,
+	notifier *Notifier,
+	queries *db.Queries,
+) (*Service, error) {
+	svc.liveFlush = agentworkspace.NewLiveFlushLoop(
+		agentworkspace.LiveFlushPolicy{},
+		func(workspaceID string) {
+			if notifier != nil {
+				notifier.NotifyLiveTranscript(workspaceID)
+			}
+		},
+	)
 	return svc, nil
 }
 
