@@ -1,0 +1,295 @@
+{
+  "address_vectors": [
+    {
+      "base32_token": "zp6vbvnbr44qzjxnaqfaqjstrtmpawovtm3bwqewtc66rwogmola",
+      "basename": "v1-zp6vbvnbr44qzjxnaqfaqjstrtmpawovtm3bwqewtc66rwogmola.sock",
+      "session_id": "20260731_153837_5d85bf",
+      "sha256_hex": "cbfd50d5a18f390ca6ed040a0826538cd8f059d59b361b409698bde8d9c66396"
+    },
+    {
+      "base32_token": "vkmbnyzh3wancwx3n25bgjcii4rnra5vngirin4jdatg4v5in2ba",
+      "basename": "v1-vkmbnyzh3wancwx3n25bgjcii4rnra5vngirin4jdatg4v5in2ba.sock",
+      "session_id": "gateway/session Ω",
+      "sha256_hex": "aa9816e327dd80d15afb6eba1324484722d883b5699114378918266e57a86e82"
+    }
+  ],
+  "canonical": {
+    "capability_request": {
+      "frame_hex": "000000217b226f70223a226361706162696c6974696573222c2276657273696f6e223a317d",
+      "object": {
+        "op": "capabilities",
+        "version": 1
+      },
+      "payload": "{\"op\":\"capabilities\",\"version\":1}",
+      "payload_bytes": 33
+    },
+    "capability_success": {
+      "frame_hex": "000000827b226361706162696c6974696573223a5b2265786163742d73657373696f6e2d6e6578742d7475726e2d7631225d2c22636f6465223a226361706162696c6974696573222c226d61785f6672616d655f6279746573223a3236323134342c2270726f746f636f6c5f76657273696f6e73223a5b315d2c2276657273696f6e223a317d",
+      "object": {
+        "capabilities": [
+          "exact-session-next-turn-v1"
+        ],
+        "code": "capabilities",
+        "max_frame_bytes": 262144,
+        "protocol_versions": [
+          1
+        ],
+        "version": 1
+      },
+      "payload": "{\"capabilities\":[\"exact-session-next-turn-v1\"],\"code\":\"capabilities\",\"max_frame_bytes\":262144,\"protocol_versions\":[1],\"version\":1}",
+      "payload_bytes": 130
+    },
+    "enqueue_accepted": {
+      "frame_hex": "000000247b22636f6465223a2261636365707465645f69646c65222c2276657273696f6e223a317d",
+      "object": {
+        "code": "accepted_idle",
+        "version": 1
+      },
+      "payload": "{\"code\":\"accepted_idle\",\"version\":1}",
+      "payload_bytes": 36
+    },
+    "enqueue_request": {
+      "frame_hex": "000000987b226865726d65735f73657373696f6e5f6964223a2232303236303733315f3135333833375f356438356266222c226d657373616765223a22646f6e65222c226d6573736167655f6964223a2270692d736574746c656d656e742d76312d74657374222c226f70223a22656e7175657565222c2270695f73657373696f6e5f6964223a2270692d313233222c2276657273696f6e223a317d",
+      "object": {
+        "hermes_session_id": "20260731_153837_5d85bf",
+        "message": "done",
+        "message_id": "pi-settlement-v1-test",
+        "op": "enqueue",
+        "pi_session_id": "pi-123",
+        "version": 1
+      },
+      "payload": "{\"hermes_session_id\":\"20260731_153837_5d85bf\",\"message\":\"done\",\"message_id\":\"pi-settlement-v1-test\",\"op\":\"enqueue\",\"pi_session_id\":\"pi-123\",\"version\":1}",
+      "payload_bytes": 152
+    },
+    "retryable_rejection": {
+      "frame_hex": "0000005d7b22636f6465223a2271756575655f66756c6c222c2264657461696c223a2273657373696f6e20696e7075742071756575652069732066756c6c222c2272657472795f61667465725f6d73223a3235302c2276657273696f6e223a317d",
+      "object": {
+        "code": "queue_full",
+        "detail": "session input queue is full",
+        "retry_after_ms": 250,
+        "version": 1
+      },
+      "payload": "{\"code\":\"queue_full\",\"detail\":\"session input queue is full\",\"retry_after_ms\":250,\"version\":1}",
+      "payload_bytes": 93
+    },
+    "terminal_rejection": {
+      "frame_hex": "000000577b22636f6465223a227374616c655f73657373696f6e222c2264657461696c223a2273657373696f6e2067656e65726174696f6e206973206e6f206c6f6e6765722063757272656e74222c2276657273696f6e223a317d",
+      "object": {
+        "code": "stale_session",
+        "detail": "session generation is no longer current",
+        "version": 1
+      },
+      "payload": "{\"code\":\"stale_session\",\"detail\":\"session generation is no longer current\",\"version\":1}",
+      "payload_bytes": 87
+    }
+  },
+  "closed_schemas": {
+    "requests": {
+      "capabilities": {
+        "optional": [],
+        "required": [
+          "op",
+          "version"
+        ]
+      },
+      "enqueue": {
+        "optional": [],
+        "required": [
+          "hermes_session_id",
+          "message",
+          "message_id",
+          "op",
+          "pi_session_id",
+          "version"
+        ]
+      }
+    },
+    "responses": {
+      "accepted": {
+        "optional": [],
+        "required": [
+          "code",
+          "version"
+        ]
+      },
+      "capabilities": {
+        "optional": [],
+        "required": [
+          "capabilities",
+          "code",
+          "max_frame_bytes",
+          "protocol_versions",
+          "version"
+        ]
+      },
+      "retryable": {
+        "optional": [
+          "detail",
+          "retry_after_ms"
+        ],
+        "required": [
+          "code",
+          "version"
+        ]
+      },
+      "terminal": {
+        "optional": [
+          "detail"
+        ],
+        "required": [
+          "code",
+          "version"
+        ]
+      }
+    }
+  },
+  "code_classes": {
+    "accepted": [
+      "accepted_idle",
+      "accepted_queued"
+    ],
+    "capability": [
+      "capabilities"
+    ],
+    "retryable": [
+      "queue_full",
+      "temporarily_unavailable"
+    ],
+    "terminal": [
+      "ambiguous_session",
+      "malformed",
+      "origin_unavailable",
+      "session_expired",
+      "session_suspended",
+      "stale_session",
+      "surface_unsupported",
+      "target_closing",
+      "unauthorized",
+      "unknown_session",
+      "unsupported_version"
+    ]
+  },
+  "fixture_revision": 1,
+  "http_status_by_code": {
+    "accepted_idle": 202,
+    "accepted_queued": 202,
+    "ambiguous_session": 409,
+    "capabilities": 200,
+    "malformed": 400,
+    "origin_unavailable": 422,
+    "queue_full": 429,
+    "session_expired": 410,
+    "session_suspended": 409,
+    "stale_session": 410,
+    "surface_unsupported": 422,
+    "target_closing": 409,
+    "temporarily_unavailable": 503,
+    "unauthorized": 401,
+    "unknown_session": 404,
+    "unsupported_version": 426
+  },
+  "path_selection_vectors": [
+    {
+      "euid": 501,
+      "full_path_utf8_bytes": 100,
+      "hermes_home": "/Users/a/.hermes",
+      "name": "short_home",
+      "selected_directory": "/Users/a/.hermes/run/session-ingress-v1"
+    },
+    {
+      "euid": 501,
+      "full_path_utf8_bytes": 101,
+      "hermes_home": "/Users/å/.hermes",
+      "name": "non_ascii_home",
+      "selected_directory": "/Users/å/.hermes/run/session-ingress-v1"
+    },
+    {
+      "euid": 501,
+      "full_path_utf8_bytes": 103,
+      "hermes_home": "/tmp/xxxxxxxxxxxxxx",
+      "name": "threshold_103",
+      "selected_directory": "/tmp/xxxxxxxxxxxxxx/run/session-ingress-v1"
+    },
+    {
+      "euid": 501,
+      "hermes_home": "/tmp/xxxxxxxxxxxxxxx",
+      "name": "threshold_104",
+      "preferred_full_path_utf8_bytes": 104,
+      "selected_directory": "/tmp/hsi-501"
+    },
+    {
+      "euid": 501,
+      "hermes_home": "/Users/a/xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+      "name": "long_home",
+      "preferred_full_path_utf8_bytes": 213,
+      "selected_directory": "/tmp/hsi-501"
+    }
+  ],
+  "protocol": {
+    "capabilities": [
+      "exact-session-next-turn-v1"
+    ],
+    "frame_byte_order": "big-endian",
+    "frame_prefix_bytes": 4,
+    "max_frame_bytes": 262144,
+    "max_socket_path_bytes": 103,
+    "version": 1
+  },
+  "retry_classes": {
+    "bounded": [
+      "queue_full",
+      "temporarily_unavailable"
+    ],
+    "never": [
+      "accepted_idle",
+      "accepted_queued",
+      "ambiguous_session",
+      "malformed",
+      "origin_unavailable",
+      "session_expired",
+      "session_suspended",
+      "stale_session",
+      "surface_unsupported",
+      "target_closing",
+      "unauthorized",
+      "unknown_session",
+      "unsupported_version"
+    ]
+  },
+  "schema_bounds": {
+    "capability_ascii_bytes": {
+      "max": 64,
+      "min": 1,
+      "pattern": "^[a-z0-9][a-z0-9-]{0,63}$"
+    },
+    "detail_utf8_bytes": {
+      "forbidden": "NUL, C0, and C1 controls",
+      "max": 256,
+      "min": 1
+    },
+    "hermes_session_id_utf8_bytes": {
+      "forbidden": "NUL, C0, and C1 controls",
+      "max": 1024,
+      "min": 1
+    },
+    "message_id_ascii_bytes": {
+      "max": 128,
+      "min": 1,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"
+    },
+    "message_utf8_bytes": {
+      "forbidden": "NUL",
+      "max": 131072,
+      "min": 1
+    },
+    "pi_session_id_ascii_bytes": {
+      "max": 128,
+      "min": 1,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+    },
+    "retry_after_ms": {
+      "max": 60000,
+      "min": 1
+    }
+  }
+}
