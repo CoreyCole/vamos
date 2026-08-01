@@ -1,93 +1,101 @@
 import assert from "node:assert/strict";
-import { mkdtemp, readFile, writeFile } from "node:fs/promises";
+import { closeSync, openSync } from "node:fs";
+import { mkdtemp, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
+import { parseDocument } from "yaml";
+
 import extension, {
-  ATTEMPT,
   DIAGNOSTIC,
-  deliveryBody,
+  deriveLaunchNonce,
   evidencePath,
   messageID,
-  publish,
-  setDeliveryDependenciesForTest,
 } from "./index.js";
 
-function saveEnv() {
-  return Object.fromEntries(
-    [
-      "VAMOS_MANAGER_WAKE_MANAGER_THREAD_ID",
-      "VAMOS_MANAGER_WAKE_PI_SESSION_ID",
-      "VAMOS_MANAGER_WAKE_GATEWAY_URL",
-      "VAMOS_MANAGER_WAKE_INGRESS_TOKEN",
-      "VAMOS_PLAN_DIR",
-    ].map((k) => [k, process.env[k]]),
-  );
-}
+const managedKeys = [
+  "HERMES_SESSION_ID",
+  "PI_SESSION_ID",
+  "VAMOS_PLAN_DIR",
+  "VAMOS_HERMES_HANDOFF_FD",
+  "VAMOS_MANAGER_WAKE_GATEWAY_URL",
+  "VAMOS_MANAGER_WAKE_INGRESS_TOKEN",
+];
+
 function restore(values) {
-  for (const [k, v] of Object.entries(values))
-    v === undefined ? delete process.env[k] : (process.env[k] = v);
+  for (const [key, value] of Object.entries(values))
+    value === undefined ? delete process.env[key] : (process.env[key] = value);
 }
+
 async function managed(run) {
-  const old = saveEnv(),
-    root = await mkdtemp(join(tmpdir(), "wake-"));
+  const old = Object.fromEntries(
+    managedKeys.map((key) => [key, process.env[key]]),
+  );
+  const root = await mkdtemp(join(tmpdir(), "opaque-handoff-"));
+  const handoffPath = join(root, "handoff.bin");
+  const fd = openSync(handoffPath, "w+");
   Object.assign(process.env, {
-    VAMOS_MANAGER_WAKE_MANAGER_THREAD_ID: "thread-1",
-    VAMOS_MANAGER_WAKE_PI_SESSION_ID: "session-1",
-    VAMOS_MANAGER_WAKE_GATEWAY_URL: "http://gateway.test/",
-    VAMOS_MANAGER_WAKE_INGRESS_TOKEN: "secret",
+    HERMES_SESSION_ID: "opaque-hermes-session",
+    PI_SESSION_ID: "pi-session-test-v1",
     VAMOS_PLAN_DIR: join(root, "plan"),
+    VAMOS_HERMES_HANDOFF_FD: String(fd),
+    VAMOS_MANAGER_WAKE_GATEWAY_URL: "https://must-not-be-used.invalid",
+    VAMOS_MANAGER_WAKE_INGRESS_TOKEN: "must-not-be-used",
   });
   try {
-    await run();
+    await run({ handoffPath });
   } finally {
+    closeSync(fd);
     restore(old);
-    setDeliveryDependenciesForTest({});
   }
 }
+
 function harness(branch) {
-  const handlers = new Map(),
-    entries = [...branch],
-    custom = [];
+  const handlers = new Map();
+  const custom = [];
   const pi = {
-    on: (n, h) => handlers.set(n, h),
+    on: (name, handler) => handlers.set(name, handler),
     appendEntry: (type, data) => custom.push({ type, data }),
   };
   extension(pi);
   return {
     handlers,
-    ctx: { sessionManager: { getBranch: () => entries } },
     custom,
+    ctx: { sessionManager: { getBranch: () => branch } },
   };
 }
 
-test("deterministic ID uses only session and terminal entry", () =>
+function decodeFrame(bytes) {
+  const size = bytes.readUInt32BE(0);
+  assert.equal(size, bytes.length - 4);
+  return JSON.parse(bytes.subarray(4).toString("utf8"));
+}
+
+test("cross-language launch nonce vector is frozen", () => {
   assert.equal(
-    messageID("s", "e"),
-    "pi-settlement-v1-j7Qq1yfM1Wj5G4eYsMMFxzM5B0cSTdvoCtkCSfyVd1Y",
-  ));
+    deriveLaunchNonce("pi-session-test-v1"),
+    "ec19312204686d442e83eacc3ae23898ebae285fa94566561940517083ea7a35",
+  );
+});
+
 test("unmanaged extension is inert", () => {
-  const old = saveEnv();
-  for (const k of Object.keys(old)) delete process.env[k];
+  const old = Object.fromEntries(
+    managedKeys.map((key) => [key, process.env[key]]),
+  );
+  for (const key of managedKeys) delete process.env[key];
   try {
     assert.equal(harness([]).handlers.size, 0);
   } finally {
     restore(old);
   }
 });
-test("agent settlement publishes then posts terminal persisted assistant response", async () =>
-  managed(async () => {
-    const calls = [];
-    setDeliveryDependenciesForTest({
-      retries: 1,
-      fetch: async (url, options) => {
-        calls.push({ url, options });
-        return { ok: true, status: 200 };
-      },
-    });
+
+test("active lifecycle publishes opaque evidence before ID-only handoff", async () =>
+  managed(async ({ handoffPath }) => {
+    const rawResponse = "```yaml\noutcome: handoff\nnext: successor\n```";
     const state = harness([
       {
-        id: "early",
+        id: "older",
         type: "message",
         message: {
           role: "assistant",
@@ -95,124 +103,38 @@ test("agent settlement publishes then posts terminal persisted assistant respons
         },
       },
       {
-        id: "final",
+        id: "terminal",
         type: "message",
         message: {
           role: "assistant",
-          content: [{ type: "text", text: "```yaml\na: 1\n```" }],
+          content: [{ type: "text", text: rawResponse }],
         },
       },
     ]);
     await state.handlers.get("agent_settled")({}, state.ctx);
-    const id = messageID("session-1", "final"),
-      path = evidencePath(
-        { plan: process.env.VAMOS_PLAN_DIR, piSessionID: "session-1" },
-        id,
-      );
-    assert.equal((await deliveryBody(path)).message, "```yaml\na: 1\n```");
-    assert.equal(calls.length, 1);
-    assert.deepEqual(
-      JSON.parse(calls[0].options.body),
-      await deliveryBody(path),
+    const id = messageID("pi-session-test-v1", "terminal");
+    const target = evidencePath(
+      { plan: process.env.VAMOS_PLAN_DIR, piSessionID: "pi-session-test-v1" },
+      id,
     );
-    assert.ok(state.custom.some((x) => x.type === ATTEMPT));
-  }));
-test("empty text is a settlement and duplicate/restarted hooks reuse path and body", async () =>
-  managed(async () => {
-    const bodies = [];
-    setDeliveryDependenciesForTest({
-      retries: 1,
-      fetch: async (_u, o) => {
-        bodies.push(o.body);
-        return { ok: true, status: 200 };
-      },
+    const document = parseDocument(await readFile(target, "utf8"));
+    assert.equal(document.get("hermes_session_id"), "opaque-hermes-session");
+    assert.equal(document.get("manager_thread_id"), undefined);
+    assert.equal(document.get("raw_response"), rawResponse);
+    assert.deepEqual(decodeFrame(await readFile(handoffPath)), {
+      version: 1,
+      launch_nonce: deriveLaunchNonce("pi-session-test-v1"),
+      pi_session_id: "pi-session-test-v1",
+      message_id: id,
     });
-    const branch = [
-      {
-        id: "final",
-        type: "message",
-        message: { role: "assistant", content: [] },
-      },
-    ];
-    for (let i = 0; i < 2; i++) {
-      const s = harness(branch);
-      await s.handlers.get("agent_settled")({}, s.ctx);
-    }
-    assert.equal(bodies.length, 2);
-    assert.equal(bodies[0], bodies[1]);
-    assert.equal(JSON.parse(bodies[0]).message, "");
+    assert.equal(state.custom.length, 0);
   }));
-test("existing byte-different target is a recovery conflict and never posts", async () =>
+
+test("missing stable assistant identity records a bounded diagnostic", async () =>
   managed(async () => {
-    const branch = [
-        {
-          id: "final",
-          type: "message",
-          message: {
-            role: "assistant",
-            content: [{ type: "text", text: "new" }],
-          },
-        },
-      ],
-      id = messageID("session-1", "final"),
-      path = evidencePath(
-        { plan: process.env.VAMOS_PLAN_DIR, piSessionID: "session-1" },
-        id,
-      );
-    await publish(
-      path,
-      Buffer.from(
-        "version: 1\nmanager_thread_id: thread-1\npi_session_id: session-1\nmessage_id: " +
-          id +
-          "\nraw_response: |-\n  old\n",
-      ),
-    );
-    let posts = 0;
-    setDeliveryDependenciesForTest({
-      fetch: async () => {
-        posts++;
-        return { ok: true };
-      },
-    });
-    const s = harness(branch);
-    await s.handlers.get("agent_settled")({}, s.ctx);
-    assert.equal(posts, 0);
-    assert.equal(s.custom.at(-1).data.code, "assistant_settlement_conflict");
-  }));
-test("failed delivery retries fixed published bytes without leaking secrets", async () =>
-  managed(async () => {
-    const calls = [];
-    setDeliveryDependenciesForTest({
-      retries: 2,
-      sleep: async () => {},
-      fetch: async (_u, o) => {
-        calls.push(o.body);
-        throw new Error("lost ack");
-      },
-    });
-    const s = harness([
-      {
-        id: "final",
-        type: "message",
-        message: {
-          role: "assistant",
-          content: [{ type: "text", text: "safe" }],
-        },
-      },
-    ]);
-    await s.handlers.get("agent_settled")({}, s.ctx);
-    assert.equal(calls.length, 2);
-    assert.equal(calls[0], calls[1]);
-    const diagnostic = JSON.stringify(s.custom);
-    assert.ok(
-      !diagnostic.includes("secret") && !diagnostic.includes("gateway"),
-    );
-  }));
-test("missing stable assistant identity reports recovery diagnostic", async () =>
-  managed(async () => {
-    const s = harness([]);
-    await s.handlers.get("agent_settled")({}, s.ctx);
-    assert.deepEqual(s.custom, [
+    const state = harness([]);
+    await state.handlers.get("agent_settled")({}, state.ctx);
+    assert.deepEqual(state.custom, [
       { type: DIAGNOSTIC, data: { code: "assistant_settlement_unavailable" } },
     ]);
   }));

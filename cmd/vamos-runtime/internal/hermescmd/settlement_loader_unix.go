@@ -12,6 +12,12 @@ import (
 	"golang.org/x/sys/unix"
 )
 
+func currentOwnerUID() int { return os.Geteuid() }
+
+func requestGracefulTermination(process ManagedCommand) error {
+	return process.Signal(syscall.SIGTERM)
+}
+
 func LoadSettlementEvidence(
 	sessionDirectory *os.File,
 	expected SettlementLoadExpectation,

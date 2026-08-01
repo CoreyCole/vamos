@@ -15,8 +15,11 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/spf13/cobra"
+
+	"github.com/CoreyCole/vamos/pkg/hermes/sessioningress"
 )
 
 type StartPiInput struct {
@@ -32,6 +35,11 @@ type (
 	piCompletionNotifier func(context.Context, hostConfig, string, string) error
 )
 
+type managedCommandDependencies struct {
+	processFactory  StartWaitProcessFactory
+	notifierFactory NotifierFactory
+}
+
 var errHermesManagerNotFound = errors.New("Hermes manager session not found")
 
 const (
@@ -41,18 +49,32 @@ const (
 	managerWakeIngressToken    = "VAMOS_MANAGER_WAKE_INGRESS_TOKEN"
 )
 
-func newPiCommand(run commandRunner) *cobra.Command {
+func newPiCommand(
+	run commandRunner,
+	injected ...managedCommandDependencies,
+) *cobra.Command {
+	dependencies := productionManagedCommandDependencies()
+	if len(injected) > 0 {
+		dependencies = injected[0]
+	}
 	cmd := &cobra.Command{Use: "pi", Short: "Launch and record isolated Pi workers"}
 	cmd.AddCommand(
-		newStartCommand(run),
-		newContinueCommand(run),
+		newStartCommand(run, dependencies),
+		newContinueCommand(run, dependencies),
 		newDoneCommand(notifyPiCompletion),
 		newResultCommand(),
 	)
 	return cmd
 }
 
-func newStartCommand(run commandRunner) *cobra.Command {
+func newStartCommand(
+	run commandRunner,
+	injected ...managedCommandDependencies,
+) *cobra.Command {
+	dependencies := productionManagedCommandDependencies()
+	if len(injected) > 0 {
+		dependencies = injected[0]
+	}
 	var input StartPiInput
 	cmd := &cobra.Command{
 		Use:  "start --plan <absolute-plan-dir> [--previous-session <id>] <task>",
@@ -81,9 +103,14 @@ func newStartCommand(run commandRunner) *cobra.Command {
 				}
 				prior = &result
 			}
-			threadID, managed, err := resolveManagedHermesThread(input.ThreadID)
-			if err != nil {
-				return err
+			hermesSessionID := strings.TrimSpace(os.Getenv("HERMES_SESSION_ID"))
+			managed := hermesSessionID != ""
+			if managed {
+				if _, err := sessioningress.ValidateSessionID(
+					hermesSessionID,
+				); err != nil {
+					return fmt.Errorf("validate inherited Hermes session ID: %w", err)
+				}
 			}
 			prompt := RenderPiPrompt(ctx, input.Task, input.PreviousSession, managed)
 			contextArgs, err := piContextArgs(ctx, prior)
@@ -98,38 +125,26 @@ func newStartCommand(run commandRunner) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			var config hostConfig
-			if managed {
-				config, err = readManagedHostConfig(input.ConfigPath)
-				if err != nil {
-					return err
-				}
-				if err := registerManagedPiRun(
-					cmd.Context(), config, ctx.PlanDir, threadID, session,
-				); err != nil {
-					return err
-				}
-			}
-			env := managedPiEnvironment(
-				os.Environ(),
-				ctx.PlanDir,
-				session,
-				threadID,
-				config,
-			)
 			fmt.Fprintln(cmd.OutOrStdout(), "pi session:", session)
 			piArgs := append(
 				[]string{"--session-id", session, "--session-dir", dir},
 				contextArgs...)
 			piArgs = append(piArgs, "@"+promptPath)
-			return run(
-				cmd.Context(),
-				"pi",
-				piArgs,
-				env,
-				cmd.OutOrStdout(),
-				cmd.ErrOrStderr(),
-			)
+			if managed {
+				return launchManagedPi(
+					cmd,
+					dependencies,
+					input.ConfigPath,
+					ctx.PlanDir,
+					session,
+					hermesSessionID,
+					piArgs,
+				)
+			}
+
+			return run(cmd.Context(), "pi", piArgs, managedPiEnvironment(
+				os.Environ(), ctx.PlanDir, session, "", hostConfig{},
+			), cmd.OutOrStdout(), cmd.ErrOrStderr())
 		},
 	}
 	cmd.Flags().StringVar(&input.Plan, "plan", "", "absolute plan directory")
@@ -140,6 +155,89 @@ func newStartCommand(run commandRunner) *cobra.Command {
 		StringVar(&input.ConfigPath, "config", "", "host-local Hermes config path")
 	_ = cmd.MarkFlagRequired("plan")
 	return cmd
+}
+
+func productionManagedCommandDependencies() managedCommandDependencies {
+	return managedCommandDependencies{
+		processFactory:  defaultStartWaitProcessFactory,
+		notifierFactory: defaultNotifierFactory,
+	}
+}
+
+func launchManagedPi(
+	cmd *cobra.Command,
+	dependencies managedCommandDependencies,
+	configPath, planDir, piSessionID, hermesSessionID string,
+	piArgs []string,
+) error {
+	config, err := readParentClientConfig(configPath)
+	if err != nil {
+		return err
+	}
+	notifier, err := dependencies.notifierFactory(hermesSessionID, config)
+	if err != nil {
+		return fmt.Errorf("construct settlement notifier: %w", err)
+	}
+	result := runManagedProcess(cmd.Context(), managedProcessInput{
+		PlanDir: planDir, PiSessionID: piSessionID, HermesSessionID: hermesSessionID,
+		Name: "pi", Args: piArgs, Environment: os.Environ(), Stdin: os.Stdin,
+		Stdout: cmd.OutOrStdout(), Stderr: cmd.ErrOrStderr(), Notifier: notifier,
+		ProcessFactory: dependencies.processFactory, DrainTimeout: managedDrainTimeout,
+		TerminateGrace: managedTerminateGrace, NotifyTimeout: config.TotalTimeout,
+		OwnerUID: currentOwnerUID(),
+	})
+
+	return result.Err()
+}
+
+func readParentClientConfig(configPath string) (ParentClientConfig, error) {
+	home := strings.TrimSpace(os.Getenv("HERMES_HOME"))
+	if home == "" {
+		userHome, err := os.UserHomeDir()
+		if err != nil {
+			return ParentClientConfig{}, err
+		}
+		home = filepath.Join(userHome, ".hermes")
+	}
+	config := ParentClientConfig{
+		HermesHome:      home,
+		ConnectTimeout:  time.Second,
+		WriteTimeout:    time.Second,
+		ReadTimeout:     parentReadTimeout,
+		ExchangeTimeout: parentExchangeTimeout,
+		TotalTimeout:    parentTotalTimeout,
+		MaxAttempts:     parentMaximumAttempts,
+		BackoffCap:      time.Second,
+	}
+	explicit := configPath != ""
+	if !explicit {
+		var err error
+		configPath, err = defaultConfigPath()
+		if err != nil {
+			return ParentClientConfig{}, err
+		}
+	}
+	host, err := readHostConfig(configPath)
+	if errors.Is(err, os.ErrNotExist) && !explicit {
+		return config, nil
+	}
+	if err != nil {
+		return ParentClientConfig{}, fmt.Errorf(
+			"read Hermes parent configuration: %w",
+			err,
+		)
+	}
+	gateway := normalizeGatewayBaseURL(host.GatewayURL)
+	credential := strings.TrimSpace(host.IngressToken)
+	if (gateway == "") != (credential == "") {
+		return ParentClientConfig{}, errors.New(
+			"gateway base and ingress credential must be configured together",
+		)
+	}
+	config.GatewayBaseURL = gateway
+	config.GatewayCredential = credential
+
+	return config, nil
 }
 
 func resolveManagedHermesThread(

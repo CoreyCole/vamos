@@ -22,7 +22,7 @@ const (
 	handoffFieldCount      = 4
 )
 
-var launchNoncePattern = regexp.MustCompile(`^[A-Za-z0-9_-]{32,128}$`)
+var launchNoncePattern = regexp.MustCompile(`^[a-f0-9]{64}$`)
 
 //nolint:tagliatelle // The child handoff wire schema uses protocol-defined snake_case fields.
 type HandoffFrame struct {
@@ -158,6 +158,23 @@ func rejectDuplicateHandoffFields(payload []byte) error {
 		if err := decoder.Decode(&raw); err != nil {
 			return errors.New("malformed handoff frame")
 		}
+	}
+
+	return nil
+}
+
+func ValidateExpectedHandoffFrame(
+	frame HandoffFrame,
+	expectedNonce, expectedPiSessionID string,
+) error {
+	if err := validateHandoffFrame(frame); err != nil {
+		return err
+	}
+	if frame.LaunchNonce != expectedNonce {
+		return errors.New("handoff launch nonce mismatch")
+	}
+	if frame.PiSessionID != expectedPiSessionID {
+		return errors.New("handoff Pi session ID mismatch")
 	}
 
 	return nil

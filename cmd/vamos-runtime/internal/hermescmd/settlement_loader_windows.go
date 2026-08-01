@@ -7,6 +7,12 @@ import (
 	"os"
 )
 
+func currentOwnerUID() int { return -1 }
+
+func requestGracefulTermination(process ManagedCommand) error {
+	return process.Kill()
+}
+
 func LoadSettlementEvidence(
 	_ *os.File,
 	_ SettlementLoadExpectation,

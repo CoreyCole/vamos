@@ -8,8 +8,11 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 
 	"github.com/spf13/cobra"
+
+	"github.com/CoreyCole/vamos/pkg/hermes/sessioningress"
 )
 
 type manualResumeEntry struct {
@@ -140,7 +143,14 @@ func newDoctorCommand() *cobra.Command {
 	}
 }
 
-func newContinueCommand(run commandRunner) *cobra.Command {
+func newContinueCommand(
+	run commandRunner,
+	injected ...managedCommandDependencies,
+) *cobra.Command {
+	dependencies := productionManagedCommandDependencies()
+	if len(injected) > 0 {
+		dependencies = injected[0]
+	}
 	var threadID, configPath string
 	cmd := &cobra.Command{
 		Use: "continue <short-id>", Args: cobra.ExactArgs(1),
@@ -175,9 +185,14 @@ func newContinueCommand(run commandRunner) *cobra.Command {
 			if err := ValidateSafeComponent(session); err != nil {
 				return fmt.Errorf("validate generated Pi session: %w", err)
 			}
-			threadID, managed, err := resolveManagedHermesThread(threadID)
-			if err != nil {
-				return err
+			hermesSessionID := strings.TrimSpace(os.Getenv("HERMES_SESSION_ID"))
+			managed := hermesSessionID != ""
+			if managed {
+				if _, err := sessioningress.ValidateSessionID(
+					hermesSessionID,
+				); err != nil {
+					return fmt.Errorf("validate inherited Hermes session ID: %w", err)
+				}
 			}
 			prompt := RenderPiPrompt(
 				plan,
@@ -197,37 +212,26 @@ func newContinueCommand(run commandRunner) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			var config hostConfig
-			if managed {
-				config, err = readManagedHostConfig(configPath)
-				if err != nil {
-					return err
-				}
-				if err := registerManagedPiRun(
-					cmd.Context(), config, plan.PlanDir, threadID, session,
-				); err != nil {
-					return err
-				}
-			}
 			fmt.Fprintln(cmd.OutOrStdout(), "pi session:", session)
 			piArgs := append(
 				[]string{"--session-id", session, "--session-dir", dir},
 				contextArgs...)
 			piArgs = append(piArgs, "@"+promptPath)
-			return run(
-				cmd.Context(),
-				"pi",
-				piArgs,
-				managedPiEnvironment(
-					os.Environ(),
+			if managed {
+				return launchManagedPi(
+					cmd,
+					dependencies,
+					configPath,
 					plan.PlanDir,
 					session,
-					threadID,
-					config,
-				),
-				cmd.OutOrStdout(),
-				cmd.ErrOrStderr(),
-			)
+					hermesSessionID,
+					piArgs,
+				)
+			}
+
+			return run(cmd.Context(), "pi", piArgs, managedPiEnvironment(
+				os.Environ(), plan.PlanDir, session, "", hostConfig{},
+			), cmd.OutOrStdout(), cmd.ErrOrStderr())
 		},
 	}
 	cmd.Flags().StringVar(&threadID, "thread-id", "", "owning Hermes thread ID")

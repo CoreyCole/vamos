@@ -11,7 +11,7 @@ import (
 func validHandoffFrame() HandoffFrame {
 	return HandoffFrame{
 		Version:     1,
-		LaunchNonce: strings.Repeat("a", 32),
+		LaunchNonce: strings.Repeat("a", 64),
 		PiSessionID: "pi-123",
 		MessageID:   "pi-settlement-v1-test",
 	}
@@ -59,13 +59,13 @@ func TestHandoffRejectsMalformedPartialOversizedAndUnknownData(t *testing.T) {
 	duplicate := framedJSON(
 		`{"version":1,"version":1,"launch_nonce":"` + strings.Repeat(
 			"a",
-			32,
+			64,
 		) + `","pi_session_id":"p","message_id":"m"}`,
 	)
 	unknown := framedJSON(
 		`{"version":1,"launch_nonce":"` + strings.Repeat(
 			"a",
-			32,
+			64,
 		) + `","pi_session_id":"p","message_id":"m","endpoint":"hidden"}`,
 	)
 	for name, payload := range map[string][]byte{

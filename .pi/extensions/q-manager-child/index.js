@@ -1,62 +1,58 @@
 import { createHash, randomUUID } from "node:crypto";
-import { link, mkdir, open, readFile, rm, writeFile } from "node:fs/promises";
-import { dirname, join } from "node:path";
-import { YAMLMap, Scalar, parseDocument } from "yaml";
+import { writeSync } from "node:fs";
+import { link, mkdir, open, readFile, rm } from "node:fs/promises";
+import { dirname, isAbsolute, join } from "node:path";
 
 import {
-  buildSettlementEvidence,
-  captureOpaqueSettlementEvidence,
-  captureOpaqueYamlFences,
+  buildSettlementEvidenceV1,
   projectPersistedAssistantText,
 } from "./opaque-settlement-capture.js";
 
-export {
-  buildSettlementEvidence,
-  captureOpaqueSettlementEvidence,
-  captureOpaqueYamlFences,
-  projectPersistedAssistantText,
-};
 export const DIAGNOSTIC = "q-manager-child/diagnostic";
-export const ATTEMPT = "q-manager-child/manager-wake-attempt";
 
-const wakeNames = [
-  "VAMOS_MANAGER_WAKE_MANAGER_THREAD_ID",
-  "VAMOS_MANAGER_WAKE_PI_SESSION_ID",
-  "VAMOS_MANAGER_WAKE_GATEWAY_URL",
-  "VAMOS_MANAGER_WAKE_INGRESS_TOKEN",
+const managedNames = [
+  "HERMES_SESSION_ID",
+  "PI_SESSION_ID",
+  "VAMOS_PLAN_DIR",
+  "VAMOS_HERMES_HANDOFF_FD",
 ];
-const defaultDependencies = {
-  fetch: (...args) => fetch(...args),
-  sleep: () => Promise.resolve(),
-  retries: 3,
-};
-let dependencies = defaultDependencies;
-export function setDeliveryDependenciesForTest(overrides) {
-  dependencies = { ...defaultDependencies, ...overrides };
-}
-
 function safeComponent(value, label) {
-  if (!/^[A-Za-z0-9_-]+$/.test(value ?? ""))
+  if (!/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/.test(value ?? ""))
     throw new Error(`unsafe ${label} path component`);
   return value;
 }
 
+export function deriveLaunchNonce(piSessionID) {
+  return createHash("sha256")
+    .update("vamos-hermes-launch-nonce-v1", "ascii")
+    .update(Buffer.from([0]))
+    .update(piSessionID, "utf8")
+    .digest("hex");
+}
+
 export function managedIdentity() {
-  const [managerThreadID, piSessionID, gatewayURL, ingressToken] =
-    wakeNames.map((name) => process.env[name]);
-  const plan = process.env.VAMOS_PLAN_DIR;
-  if (
-    ![managerThreadID, piSessionID, gatewayURL, ingressToken, plan].every(
-      Boolean,
-    )
-  )
+  const [hermesSessionID, piSessionID, plan, rawFD] = managedNames.map(
+    (name) => process.env[name],
+  );
+  if (![hermesSessionID, piSessionID, plan, rawFD].every(Boolean))
     return undefined;
+  if (
+    new TextEncoder().encode(hermesSessionID).length > 1024 ||
+    Array.from(hermesSessionID).some((character) => {
+      const code = character.codePointAt(0);
+      return code <= 0x1f || (code >= 0x7f && code <= 0x9f);
+    })
+  )
+    throw new Error("invalid Hermes session ID");
+  if (!isAbsolute(plan)) throw new Error("invalid plan directory");
+  const handoffFD = Number(rawFD);
+  if (!Number.isSafeInteger(handoffFD) || handoffFD < 3)
+    throw new Error("invalid handoff descriptor");
   return {
-    managerThreadID,
+    hermesSessionID,
     piSessionID: safeComponent(piSessionID, "Pi session"),
-    gatewayURL: gatewayURL.replace(/\/$/, ""),
-    ingressToken,
     plan,
+    handoffFD,
   };
 }
 
@@ -111,98 +107,26 @@ export async function publish(target, bytes) {
   return target;
 }
 
-function scalar(map, key) {
-  const pair = map.items.find(
-    (item) => item.key instanceof Scalar && item.key.value === key,
+export function writeHandoffFrame(identity, id) {
+  const payload = Buffer.from(
+    JSON.stringify({
+      version: 1,
+      launch_nonce: deriveLaunchNonce(identity.piSessionID),
+      pi_session_id: identity.piSessionID,
+      message_id: id,
+    }),
+    "utf8",
   );
-  return pair?.value instanceof Scalar ? pair.value.value : undefined;
-}
-
-/** Reads the published record; delivery never observes a later assistant message. */
-export async function deliveryBody(target) {
-  const document = parseDocument(await readFile(target, "utf8"), {
-    uniqueKeys: true,
-    merge: false,
-    prettyErrors: false,
-  });
-  if (
-    document.errors.length ||
-    document.warnings.length ||
-    !(document.contents instanceof YAMLMap)
-  )
-    throw new Error("invalid published manager-wake evidence");
-  const fields = Object.fromEntries(
-    [
-      "version",
-      "manager_thread_id",
-      "pi_session_id",
-      "message_id",
-      "raw_response",
-    ].map((key) => [key, scalar(document.contents, key)]),
-  );
-  if (
-    fields.version !== 1 ||
-    ![fields.manager_thread_id, fields.pi_session_id, fields.message_id].every(
-      (value) => typeof value === "string",
-    ) ||
-    typeof fields.raw_response !== "string"
-  )
-    throw new Error("invalid published manager-wake identity");
-  return {
-    version: 1,
-    manager_thread_id: fields.manager_thread_id,
-    pi_session_id: fields.pi_session_id,
-    message_id: fields.message_id,
-    message: fields.raw_response,
-  };
-}
-
-async function recordAttempt(target, outcome) {
-  // This is local diagnostics only, never an acknowledgement protocol.
-  await writeFile(`${target}.attempt.json`, JSON.stringify(outcome), {
-    mode: 0o600,
-  });
-}
-
-export async function deliverPublished(identity, target, { appendEntry } = {}) {
-  const body = await deliveryBody(target);
-  let lastError;
-  for (let attempt = 1; attempt <= dependencies.retries; attempt++) {
-    try {
-      const response = await dependencies.fetch(
-        `${identity.gatewayURL}/vamos/manager-wake`,
-        {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${identity.ingressToken}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(body),
-        },
-      );
-      if (!response.ok) throw new Error(`manager-wake HTTP ${response.status}`);
-      await recordAttempt(target, { status: "success", attempt });
-      appendEntry?.(ATTEMPT, {
-        message_id: body.message_id,
-        status: "success",
-        attempt,
-      });
-      return body;
-    } catch (error) {
-      lastError = error;
-      if (attempt < dependencies.retries) await dependencies.sleep(attempt);
-    }
+  if (payload.length < 1 || payload.length > 4096)
+    throw new Error("handoff frame exceeds size limit");
+  const frame = Buffer.allocUnsafe(4 + payload.length);
+  frame.writeUInt32BE(payload.length, 0);
+  payload.copy(frame, 4);
+  for (let offset = 0; offset < frame.length; ) {
+    const written = writeSync(identity.handoffFD, frame, offset);
+    if (written < 1) throw new Error("short handoff frame write");
+    offset += written;
   }
-  await recordAttempt(target, {
-    status: "failed",
-    attempts: dependencies.retries,
-  });
-  appendEntry?.(ATTEMPT, {
-    message_id: body.message_id,
-    status: "failed",
-    attempts: dependencies.retries,
-  });
-  throw lastError;
 }
 
 function terminalAssistant(ctx) {
@@ -228,9 +152,9 @@ export default function qManagerChildExtension(pi) {
     const rawResponse = projectPersistedAssistantText(
       assistant.message.content ?? [],
     );
-    const bytes = buildSettlementEvidence(
+    const bytes = buildSettlementEvidenceV1(
       {
-        managerThreadID: identity.managerThreadID,
+        hermesSessionID: identity.hermesSessionID,
         piSessionID: identity.piSessionID,
         messageID: id,
       },
@@ -246,10 +170,10 @@ export default function qManagerChildExtension(pi) {
       return;
     }
     try {
-      await deliverPublished(identity, target, pi);
+      writeHandoffFrame(identity, id);
     } catch {
       pi.appendEntry(DIAGNOSTIC, {
-        code: "manager_wake_delivery_failed",
+        code: "settlement_handoff_failed",
         message_id: id,
       });
     }

@@ -94,9 +94,13 @@ test("v1 rejects invalid identities and reserves both routing field names", () =
   assert.equal(document.get("manager_thread_id"), undefined);
 });
 
-test("active legacy caller does not import or invoke the additive v1 builder", async () => {
+test("active caller uses opaque v1 evidence and ID-only handoff", async () => {
   const source = await readFile(new URL("./index.js", import.meta.url), "utf8");
-  assert.doesNotMatch(source, /buildSettlementEvidenceV1/);
-  assert.match(source, /buildSettlementEvidence\(/);
-  assert.match(source, /manager_thread_id/);
+  const active = source.slice(source.indexOf("export default function"));
+  assert.match(active, /buildSettlementEvidenceV1/);
+  assert.match(active, /writeHandoffFrame/);
+  assert.doesNotMatch(
+    active,
+    /buildSettlementEvidence\(|manager_thread_id|deliverPublished/,
+  );
 });
