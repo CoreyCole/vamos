@@ -104,7 +104,7 @@ func newStartCommand(
 				}
 				prior = &result
 			}
-			hermesSessionID := strings.TrimSpace(os.Getenv("HERMES_SESSION_ID"))
+			hermesSessionID := os.Getenv("HERMES_SESSION_ID")
 			managed := hermesSessionID != ""
 			if managed {
 				if _, err := sessioningress.ValidateSessionID(

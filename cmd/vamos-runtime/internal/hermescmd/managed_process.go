@@ -102,6 +102,9 @@ func (result ManagedProcessResult) Err() error {
 	if result.ChildError != nil {
 		return result.ChildError
 	}
+	if len(result.Notifications) == 0 {
+		return errors.New("managed Pi exited without a settlement notification")
+	}
 	for _, event := range result.Notifications {
 		if event.Err != nil {
 			return event.Err
@@ -238,22 +241,13 @@ func runManagedProcess(
 			waitChannel = nil
 			result.ChildError = waitErr
 			if readChannel != nil {
-				timer := time.NewTimer(input.DrainTimeout)
-				select {
-				case readResult = <-readChannel:
-					readChannel = nil
-					if !timer.Stop() {
-						<-timer.C
-					}
-				case <-timer.C:
-					cancelNetwork()
-					_ = reader.Close()
-					readResult = <-readChannel
-					readChannel = nil
-					if readResult.err == nil {
-						readResult.err = errors.New("handoff drain deadline exceeded")
-					}
-				}
+				readResult = drainManagedReader(
+					cancelNetwork,
+					reader,
+					readChannel,
+					input.DrainTimeout,
+				)
+				readChannel = nil
 			}
 		case readResult = <-readChannel:
 			readChannel = nil
@@ -280,12 +274,47 @@ func runManagedProcess(
 				result.Secondary = append(result.Secondary, secondary...)
 				waitChannel = nil
 			}
+			if readChannel != nil {
+				readResult = drainManagedReader(
+					cancelNetwork,
+					reader,
+					readChannel,
+					input.DrainTimeout,
+				)
+				readChannel = nil
+			}
 		}
 	}
 	result.Notifications = readResult.events
 	result.ProtocolError = readResult.err
 
 	return result
+}
+
+func drainManagedReader(
+	cancelNetwork context.CancelFunc,
+	reader io.Closer,
+	read <-chan managedReadResult,
+	timeout time.Duration,
+) managedReadResult {
+	timer := time.NewTimer(timeout)
+	select {
+	case result := <-read:
+		if !timer.Stop() {
+			<-timer.C
+		}
+
+		return result
+	case <-timer.C:
+		cancelNetwork()
+		_ = reader.Close()
+		result := <-read
+		if result.err == nil {
+			result.err = errors.New("handoff drain deadline exceeded")
+		}
+
+		return result
+	}
 }
 
 func terminateAndReap(

@@ -10,6 +10,9 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
+	"sync/atomic"
+	"syscall"
 	"testing"
 	"time"
 )
@@ -129,6 +132,108 @@ func TestRunManagedProcessSubprocessBurstAndReap(t *testing.T) {
 		if event.EventIndex != index {
 			t.Fatalf("event %d index = %d", index, event.EventIndex)
 		}
+	}
+}
+
+func TestRunManagedProcessRejectsCleanExitWithoutSettlement(t *testing.T) {
+	t.Parallel()
+	result := runManagedProcess(t.Context(), managedProcessInput{
+		PlanDir:         t.TempDir(),
+		PiSessionID:     "pi-empty-subprocess",
+		HermesSessionID: "hermes-empty-subprocess",
+		Name:            os.Args[0],
+		Args:            []string{"-test.run=TestManagedProcessSubprocessHelper"},
+		Environment: append(
+			os.Environ(),
+			"VAMOS_SUBPROCESS_HELPER=1",
+			"VAMOS_SUBPROCESS_COUNT=0",
+		),
+		Stdout: io.Discard, Stderr: io.Discard, Notifier: &recordingNotifier{},
+		ProcessFactory: defaultStartWaitProcessFactory, DrainTimeout: time.Second,
+		TerminateGrace: time.Second, NotifyTimeout: time.Second, OwnerUID: os.Geteuid(),
+	})
+	if err := result.Err(); err == nil ||
+		!strings.Contains(err.Error(), "without a settlement") {
+		t.Fatalf("error = %v, want missing settlement failure", err)
+	}
+}
+
+func TestRunManagedProcessCancellationClosesRetainedDescendantHandoffAndReaps(t *testing.T) {
+	t.Parallel()
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	waitStarted := make(chan struct{})
+	terminated := make(chan struct{})
+	var terminateOnce sync.Once
+	var reaped atomic.Bool
+	var descendantWriter *os.File
+	factoryReady := make(chan error, 1)
+	factory := func(_ context.Context, spec ProcessSpec) ManagedCommand {
+		//nolint:gosec // The process fixture supplies a live pipe descriptor bounded by the OS descriptor range.
+		fd, err := syscall.Dup(int(spec.ExtraFiles[0].Fd()))
+		if err != nil {
+			factoryReady <- err
+
+			return &fakeManagedCommand{start: func() error { return err }}
+		}
+		//nolint:gosec // syscall.Dup returned this nonnegative OS descriptor.
+		descendantWriter = os.NewFile(uintptr(fd), "descendant-handoff-writer")
+		factoryReady <- nil
+
+		return &fakeManagedCommand{
+			wait: func() error {
+				close(waitStarted)
+				<-terminated
+				reaped.Store(true)
+
+				return nil
+			},
+			signal: func(os.Signal) error {
+				terminateOnce.Do(func() { close(terminated) })
+
+				return nil
+			},
+			kill: func() error {
+				terminateOnce.Do(func() { close(terminated) })
+
+				return nil
+			},
+		}
+	}
+	resultDone := make(chan ManagedProcessResult, 1)
+	planDir := t.TempDir()
+	go func() {
+		resultDone <- runManagedProcess(ctx, managedProcessInput{
+			PlanDir: planDir, PiSessionID: "pi-canceled",
+			HermesSessionID: "hermes-canceled", Name: "fake",
+			Environment: os.Environ(), Notifier: &recordingNotifier{}, ProcessFactory: factory,
+			DrainTimeout: 40 * time.Millisecond, TerminateGrace: 40 * time.Millisecond,
+			NotifyTimeout: time.Second, OwnerUID: os.Geteuid(),
+		})
+	}()
+	if err := <-factoryReady; err != nil {
+		<-resultDone
+		t.Fatal(err)
+	}
+	<-waitStarted
+	cancel()
+	var result ManagedProcessResult
+	select {
+	case result = <-resultDone:
+	case <-time.After(time.Second):
+		t.Fatal("managed process did not return after cancellation")
+	}
+	if !reaped.Load() {
+		t.Fatal("managed child was not reaped")
+	}
+	if result.ProtocolError == nil {
+		t.Fatalf("result = %+v, want bounded handoff drain failure", result)
+	}
+	if _, err := descendantWriter.WriteString("still open"); err == nil {
+		t.Fatal("handoff reader remained open after cancellation")
+	}
+	if err := descendantWriter.Close(); err != nil {
+		t.Fatal(err)
 	}
 }
 

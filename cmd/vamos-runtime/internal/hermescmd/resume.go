@@ -8,7 +8,6 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
-	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -185,7 +184,7 @@ func newContinueCommand(
 			if err := ValidateSafeComponent(session); err != nil {
 				return fmt.Errorf("validate generated Pi session: %w", err)
 			}
-			hermesSessionID := strings.TrimSpace(os.Getenv("HERMES_SESSION_ID"))
+			hermesSessionID := os.Getenv("HERMES_SESSION_ID")
 			managed := hermesSessionID != ""
 			if managed {
 				if _, err := sessioningress.ValidateSessionID(

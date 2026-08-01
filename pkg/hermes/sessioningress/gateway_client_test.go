@@ -168,6 +168,125 @@ func TestGatewayRetriesCanonicalBytesWithStableMessageID(t *testing.T) {
 	}
 }
 
+func TestGatewayRetriesMalformedFiveHundredBeforeEnqueue(t *testing.T) {
+	t.Parallel()
+
+	var capabilityCalls, enqueueCalls int
+	server := httptest.NewServer(http.HandlerFunc(
+		func(writer http.ResponseWriter, request *http.Request) {
+			switch request.URL.Path {
+			case capabilitiesPath:
+				capabilityCalls++
+				if capabilityCalls == 1 {
+					writer.Header().Set("Content-Type", "text/html")
+					writer.WriteHeader(http.StatusInternalServerError)
+					_, _ = writer.Write([]byte("<html>temporary failure</html>"))
+
+					return
+				}
+				writer.Header().Set("Content-Type", "application/json")
+				writeProtocolResponse(t, writer, CapabilityResponse{
+					Capabilities:     []string{ExactSessionCapability},
+					Code:             "capabilities",
+					MaxFrameBytes:    MaxFrameBytes,
+					ProtocolVersions: []int{ProtocolVersion},
+					Version:          ProtocolVersion,
+				})
+			case enqueuePath:
+				enqueueCalls++
+				writer.Header().Set("Content-Type", "application/json")
+				writeProtocolResponse(t, writer, AcceptedResponse{
+					Code: "accepted_idle", Version: ProtocolVersion,
+				})
+			}
+		},
+	))
+	defer server.Close()
+	config := testClientConfig(t)
+	config.GatewayBaseURL = server.URL
+	config.GatewayCredential = testGatewayCredential
+	config.Sleep = func(context.Context, time.Duration) error { return nil }
+	notifier, err := NewNotifier(config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	result := notifier.Notify(t.Context(), testEnqueueRequest())
+	if !result.Admission || result.Attempts != 2 || result.Uncertain ||
+		capabilityCalls != 2 || enqueueCalls != 1 {
+		t.Fatalf(
+			"result = %#v, capability calls = %d, enqueue calls = %d",
+			result,
+			capabilityCalls,
+			enqueueCalls,
+		)
+	}
+}
+
+func TestGatewayRetriesMalformedFiveHundredAfterPossibleEnqueueAdmission(t *testing.T) {
+	t.Parallel()
+
+	request := testEnqueueRequest()
+	want, err := EncodeCanonical(request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var bodies [][]byte
+	server := httptest.NewServer(http.HandlerFunc(
+		func(writer http.ResponseWriter, httpRequest *http.Request) {
+			if httpRequest.URL.Path == capabilitiesPath {
+				writer.Header().Set("Content-Type", "application/json")
+				writeProtocolResponse(t, writer, CapabilityResponse{
+					Capabilities:     []string{ExactSessionCapability},
+					Code:             "capabilities",
+					MaxFrameBytes:    MaxFrameBytes,
+					ProtocolVersions: []int{ProtocolVersion},
+					Version:          ProtocolVersion,
+				})
+
+				return
+			}
+			body, readErr := io.ReadAll(httpRequest.Body)
+			if readErr != nil {
+				t.Errorf("read enqueue: %v", readErr)
+			}
+			bodies = append(bodies, body)
+			writer.Header().Set("Content-Type", "text/html")
+			writer.WriteHeader(http.StatusBadGateway)
+			_, _ = writer.Write([]byte("<html>response lost after enqueue</html>"))
+		},
+	))
+	defer server.Close()
+	config := testClientConfig(t)
+	config.GatewayBaseURL = server.URL
+	config.GatewayCredential = testGatewayCredential
+	config.Sleep = func(context.Context, time.Duration) error { return nil }
+	notifier, err := NewNotifier(config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	result := notifier.Notify(t.Context(), request)
+	if !result.Retryable || result.Admission || !result.Uncertain ||
+		result.Attempts != config.MaxAttempts {
+		t.Fatalf("result = %#v", result)
+	}
+	if len(bodies) != config.MaxAttempts {
+		t.Fatalf("enqueue attempts = %d, want %d", len(bodies), config.MaxAttempts)
+	}
+	for index, body := range bodies {
+		if !bytes.Equal(body, want) {
+			t.Fatalf("attempt %d changed canonical request bytes", index+1)
+		}
+		parsed, parseErr := ParseRequest(body)
+		if parseErr != nil {
+			t.Fatal(parseErr)
+		}
+		enqueue, ok := parsed.(EnqueueRequest)
+		if !ok || enqueue.MessageID != request.MessageID {
+			t.Fatalf("attempt %d request = %#v", index+1, parsed)
+		}
+	}
+}
+
 func TestGatewayCapabilityMismatchAndMalformedResponseAreTerminal(t *testing.T) {
 	t.Parallel()
 

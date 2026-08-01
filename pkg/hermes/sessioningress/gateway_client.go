@@ -185,6 +185,16 @@ func (n *notifier) gatewayExchange(
 		return nil, &result
 	}
 	defer httpResponse.Body.Close()
+	if httpResponse.StatusCode >= http.StatusInternalServerError &&
+		httpResponse.StatusCode <= 599 {
+		result := retryableTransport(
+			TransportGateway,
+			"gateway returned a temporary server failure",
+			admissionPossible,
+		)
+
+		return nil, &result
+	}
 	if httpResponse.ContentLength > MaxFrameBytes {
 		result := malformedPeer(TransportGateway)
 		result.Uncertain = admissionPossible

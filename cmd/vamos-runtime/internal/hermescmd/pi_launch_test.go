@@ -65,7 +65,8 @@ func TestRenderPiPromptKeepsManualAndManagedCompletionBoundaries(t *testing.T) {
 
 func TestManagedStartUsesInheritedOpaqueSessionAndParentOnlyNotifierConfig(t *testing.T) {
 	ctx := testPlan(t)
-	t.Setenv("HERMES_SESSION_ID", "opaque-runtime-session")
+	const hermesSessionID = " opaque-runtime-session "
+	t.Setenv("HERMES_SESSION_ID", hermesSessionID)
 	configPath := filepath.Join(t.TempDir(), "hermes.yaml")
 	if err := os.WriteFile(
 		configPath,
@@ -82,10 +83,12 @@ func TestManagedStartUsesInheritedOpaqueSessionAndParentOnlyNotifierConfig(t *te
 		processFactory: func(_ context.Context, spec ProcessSpec) ManagedCommand {
 			gotSpec = spec
 
-			return &fakeManagedCommand{}
+			return &fakeManagedCommand{start: func() error {
+				return writeManagedSettlement(spec)
+			}}
 		},
 		notifierFactory: func(sessionID string, config ParentClientConfig) (sessioningress.Notifier, error) {
-			if sessionID != "opaque-runtime-session" {
+			if sessionID != hermesSessionID {
 				t.Fatalf("session = %q", sessionID)
 			}
 			gotConfig = config
@@ -108,7 +111,7 @@ func TestManagedStartUsesInheritedOpaqueSessionAndParentOnlyNotifierConfig(t *te
 			t.Fatalf("child environment contains %q", forbidden)
 		}
 	}
-	for _, required := range []string{"HERMES_SESSION_ID=opaque-runtime-session", "VAMOS_HERMES_HANDOFF_FD=3", "PI_SESSION_ID="} {
+	for _, required := range []string{"HERMES_SESSION_ID=" + hermesSessionID, "VAMOS_HERMES_HANDOFF_FD=3", "PI_SESSION_ID="} {
 		if !strings.Contains(joined, required) {
 			t.Fatalf("child environment missing %q: %s", required, joined)
 		}

@@ -7,7 +7,61 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/CoreyCole/vamos/pkg/hermes/sessioningress"
 )
+
+func TestManagedContinuePreservesInheritedOpaqueSession(t *testing.T) {
+	ctx := testPlan(t)
+	artifact := filepath.Join(ctx.PlanDir, "reviews", "previous.md")
+	if err := os.MkdirAll(filepath.Dir(artifact), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(artifact, []byte("# Previous\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := WritePiResult(ctx, PiResult{
+		Session: "previous", Outcome: OutcomeHandoff, Next: NextVerify,
+		Artifact: "thoughts/me/plans/example/reviews/previous.md", Summary: "done",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	id, err := recordManualResume(ctx, PiResult{Session: "previous"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	const hermesSessionID = " opaque-continue-session "
+	t.Setenv("HERMES_SESSION_ID", hermesSessionID)
+	configPath := filepath.Join(t.TempDir(), "hermes.yaml")
+	if err := os.WriteFile(configPath, nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	var gotSpec ProcessSpec
+	dependencies := managedCommandDependencies{
+		processFactory: func(_ context.Context, spec ProcessSpec) ManagedCommand {
+			gotSpec = spec
+
+			return &fakeManagedCommand{start: func() error {
+				return writeManagedSettlement(spec)
+			}}
+		},
+		notifierFactory: func(sessionID string, _ ParentClientConfig) (sessioningress.Notifier, error) {
+			if sessionID != hermesSessionID {
+				t.Fatalf("session = %q, want %q", sessionID, hermesSessionID)
+			}
+
+			return &recordingNotifier{}, nil
+		},
+	}
+	cmd := newContinueCommand(nil, dependencies)
+	cmd.SetArgs([]string{"--config", configPath, id})
+	if err := cmd.Execute(); err != nil {
+		t.Fatal(err)
+	}
+	if !containsEnv(gotSpec.Env, "HERMES_SESSION_ID="+hermesSessionID) {
+		t.Fatalf("child environment did not preserve session: %#v", gotSpec.Env)
+	}
+}
 
 func TestContinueLaunchesMappedPreviousSession(t *testing.T) {
 	ctx := testPlan(t)
