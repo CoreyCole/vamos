@@ -158,11 +158,11 @@ func ParseRequest(payload []byte) (Request, error) {
 			return nil, protocolError("message violates its grammar")
 		}
 		messageID, err := requiredString(fields, "message_id")
-		if err != nil || !messageIDPattern.MatchString(messageID) {
+		if err != nil || ValidateMessageID(messageID) != nil {
 			return nil, protocolError("message_id violates its grammar")
 		}
 		piID, err := requiredString(fields, "pi_session_id")
-		if err != nil || !piSessionIDPattern.MatchString(piID) {
+		if err != nil || ValidatePiSessionID(piID) != nil {
 			return nil, protocolError("pi_session_id violates its grammar")
 		}
 		return EnqueueRequest{
@@ -271,6 +271,22 @@ func ParseResponse(payload []byte) (Response, error) {
 		response.RetryAfterMS = &retryAfter
 	}
 	return response, nil
+}
+
+func ValidatePiSessionID(value string) error {
+	if !piSessionIDPattern.MatchString(value) {
+		return protocolError("pi_session_id violates its grammar")
+	}
+
+	return nil
+}
+
+func ValidateMessageID(value string) error {
+	if !messageIDPattern.MatchString(value) {
+		return protocolError("message_id violates its grammar")
+	}
+
+	return nil
 }
 
 func EncodeCanonical(value any) ([]byte, error) {

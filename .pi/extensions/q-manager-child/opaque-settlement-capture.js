@@ -60,7 +60,7 @@ function scalarString(node) {
     : undefined;
 }
 
-function rejected(node, seen = new Set()) {
+function rejected(node, reserved = RESERVED, seen = new Set()) {
   if (!node || seen.has(node)) return false;
   seen.add(node);
   if (node instanceof Alias) return true;
@@ -73,14 +73,19 @@ function rejected(node, seen = new Set()) {
         key === undefined ||
         key === "<<" ||
         keys.has(key) ||
-        RESERVED.has(key)
+        reserved.has(key)
       )
         return true;
       keys.add(key);
-      if (rejected(pair.key, seen) || rejected(pair.value, seen)) return true;
+      if (
+        rejected(pair.key, reserved, seen) ||
+        rejected(pair.value, reserved, seen)
+      )
+        return true;
     }
   } else if (node instanceof YAMLSeq) {
-    for (const item of node.items) if (rejected(item, seen)) return true;
+    for (const item of node.items)
+      if (rejected(item, reserved, seen)) return true;
   }
   return false;
 }
@@ -123,6 +128,7 @@ const RESERVED = new Set([
   "message_id",
   "raw_response",
 ]);
+const RESERVED_V1 = new Set([...RESERVED, "hermes_session_id"]);
 
 function literal(value) {
   const scalar = new Scalar(value);
@@ -166,6 +172,75 @@ export function buildSettlementEvidence(identity, rawResponse) {
     new Pair(
       new Scalar("manager_thread_id"),
       new Scalar(identity.managerThreadID),
+    ),
+    new Pair(new Scalar("pi_session_id"), new Scalar(identity.piSessionID)),
+    new Pair(new Scalar("message_id"), new Scalar(identity.messageID)),
+    new Pair(new Scalar("raw_response"), literal(rawResponse)),
+  );
+  document.contents = map;
+  return Buffer.from(
+    document.toString({
+      indent: 2,
+      lineWidth: 0,
+      defaultStringType: "QUOTE_DOUBLE",
+      defaultKeyType: "PLAIN",
+    }),
+  );
+}
+
+export function buildSettlementEvidenceV1(identity, rawResponse) {
+  const hermesSessionID = identity?.hermesSessionID;
+  const piSessionID = identity?.piSessionID;
+  const messageID = identity?.messageID;
+  const hermesBytes =
+    typeof hermesSessionID === "string"
+      ? new TextEncoder().encode(hermesSessionID).length
+      : 0;
+  const hermesHasControl =
+    typeof hermesSessionID !== "string" ||
+    Array.from(hermesSessionID).some((character) => {
+      const code = character.codePointAt(0);
+      return code <= 0x1f || (code >= 0x7f && code <= 0x9f);
+    });
+  if (
+    hermesBytes < 1 ||
+    hermesBytes > 1024 ||
+    hermesHasControl ||
+    !/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/.test(piSessionID ?? "") ||
+    !/^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/.test(messageID ?? "") ||
+    typeof rawResponse !== "string"
+  )
+    throw new Error("invalid opaque settlement v1 input");
+
+  const fences = captureOpaqueYamlFences(rawResponse);
+  let child;
+  if (fences.length === 1) {
+    const body = fences[0];
+    const hasDocumentSyntax = /^(?:%|---[ \t]*$|\.\.\.[ \t]*$)/m.test(body);
+    const document = hasDocumentSyntax
+      ? undefined
+      : parseDocument(body, {
+          uniqueKeys: true,
+          merge: false,
+          prettyErrors: false,
+        });
+    if (
+      document &&
+      document.errors.length === 0 &&
+      document.warnings.length === 0 &&
+      document.contents instanceof YAMLMap &&
+      !rejected(document.contents, RESERVED_V1)
+    )
+      child = cloneAndSort(document.contents);
+  }
+
+  const document = new Document();
+  const map = child ?? new YAMLMap();
+  map.items.push(
+    new Pair(new Scalar("version"), new Scalar(1)),
+    new Pair(
+      new Scalar("hermes_session_id"),
+      new Scalar(identity.hermesSessionID),
     ),
     new Pair(new Scalar("pi_session_id"), new Scalar(identity.piSessionID)),
     new Pair(new Scalar("message_id"), new Scalar(identity.messageID)),
