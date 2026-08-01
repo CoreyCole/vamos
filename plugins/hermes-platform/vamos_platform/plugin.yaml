@@ -1,6 +1,9 @@
 name: vamos-platform
 label: Vamos
 kind: platform
-version: 0.1.0
+version: 0.2.0
 description: Authenticated Vamos shared-thread platform adapter for Hermes.
 author: Vamos
+minimum_hermes_commit: db66ff265697d87c64ddaaf96569b733c79c2bba
+protocol_versions: [1]
+capabilities: [exact-session-next-turn-v1]

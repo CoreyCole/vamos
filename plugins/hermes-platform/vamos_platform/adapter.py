@@ -21,6 +21,8 @@ from gateway.config import Platform, PlatformConfig
 from gateway.platforms.base import BasePlatformAdapter, MessageEvent, MessageType, SendResult
 from gateway.session import SessionSource
 
+from . import session_ingress_v1
+
 logger = logging.getLogger(__name__)
 
 _LOOPBACK_HOST = "127.0.0.1"
@@ -29,6 +31,8 @@ _DEFAULT_PORT = 8765
 
 class VamosAdapter(BasePlatformAdapter):
     """Receives Vamos thread events and sends Hermes output back to Vamos."""
+
+    gateway_runner = None
 
     def __init__(self, config: PlatformConfig):
         super().__init__(config, Platform("vamos"))
@@ -49,6 +53,12 @@ class VamosAdapter(BasePlatformAdapter):
         app = web.Application()
         app.router.add_post("/vamos/prompts", self._prompt)
         app.router.add_post("/vamos/manager-wake", self._manager_wake)
+        app.router.add_post(
+            "/vamos/session-ingress/v1/capabilities", self._session_ingress_capabilities,
+        )
+        app.router.add_post(
+            "/vamos/session-ingress/v1/enqueue", self._session_ingress_enqueue,
+        )
         app.router.add_post("/vamos/threads/{thread_id}/pi/{session_id}/complete", self._completion)
         app.router.add_get("/health", self._health)
         self._runner = web.AppRunner(app)
@@ -82,6 +92,67 @@ class VamosAdapter(BasePlatformAdapter):
         if not isinstance(body, dict):
             raise web.HTTPBadRequest(text="object payload required")
         return body
+
+    def _v1_response(self, value) -> web.Response:
+        payload = session_ingress_v1.canonical_json(value)
+        code = value["code"] if isinstance(value, dict) else value.code
+        return web.Response(
+            body=payload,
+            status=session_ingress_v1.http_status(code),
+            content_type="application/json",
+        )
+
+    async def _v1_request(self, request: web.Request, expected_op: str):
+        if not self._authorized(request):
+            return None, self._v1_response(session_ingress_v1.rejection("unauthorized"))
+        if request.content_type != "application/json":
+            return None, self._v1_response(session_ingress_v1.rejection("malformed"))
+        identity_headers = {
+            "hermes-session-id", "pi-session-id", "message-id",
+            "x-hermes-session-id", "x-pi-session-id", "x-message-id",
+        }
+        if request.query or request.cookies or any(
+            key.lower() in identity_headers for key in request.headers
+        ):
+            return None, self._v1_response(session_ingress_v1.rejection("malformed"))
+        if request.content_length is not None and request.content_length > session_ingress_v1.MAX_BODY_BYTES:
+            return None, self._v1_response(session_ingress_v1.rejection("malformed"))
+        body = bytearray()
+        async for chunk in request.content.iter_chunked(64 * 1024):
+            body.extend(chunk)
+            if len(body) > session_ingress_v1.MAX_BODY_BYTES:
+                return None, self._v1_response(session_ingress_v1.rejection("malformed"))
+        try:
+            return session_ingress_v1.parse_request(bytes(body), expected_op), None
+        except session_ingress_v1.ProtocolError as exc:
+            return None, self._v1_response(session_ingress_v1.rejection(exc.code))
+
+    async def _session_ingress_capabilities(self, request: web.Request) -> web.Response:
+        _, error = await self._v1_request(request, "capabilities")
+        if error is not None:
+            return error
+        if not session_ingress_v1.runner_supports_v1(self.gateway_runner):
+            return self._v1_response(session_ingress_v1.rejection("surface_unsupported"))
+        return self._v1_response(session_ingress_v1.capability_response())
+
+    async def _session_ingress_enqueue(self, request: web.Request) -> web.Response:
+        parsed, error = await self._v1_request(request, "enqueue")
+        if error is not None:
+            return error
+        runner = self.gateway_runner
+        if not session_ingress_v1.runner_supports_v1(runner):
+            return self._v1_response(session_ingress_v1.rejection("surface_unsupported"))
+        result = await runner.enqueue_internal_session_turn(
+            parsed.hermes_session_id,
+            parsed.pi_session_id,
+            parsed.message_id,
+            session_ingress_v1.manager_turn(parsed),
+        )
+        try:
+            response = session_ingress_v1.result_response(result.code)
+        except session_ingress_v1.ProtocolError:
+            response = session_ingress_v1.rejection("temporarily_unavailable")
+        return self._v1_response(response)
 
     async def _prompt(self, request: web.Request) -> web.Response:
         body = await self._body(request)

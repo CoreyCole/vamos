@@ -101,6 +101,12 @@ async def test_manager_wake_constructs_and_awaits_the_expected_event(adapter_cli
     adapter, client, events = adapter_client
     completed = False
 
+    class ForbiddenRunner:
+        async def enqueue_internal_session_turn(self, *_args):
+            raise AssertionError("legacy route must not call the v1 runner")
+
+    adapter.gateway_runner = ForbiddenRunner()
+
     async def handle_message(event):
         nonlocal completed
         events.append(event)
@@ -164,4 +170,6 @@ async def test_connect_registers_manager_wake_route(monkeypatch):
     assert await adapter.connect()
     routes = [route.resource.canonical for route in adapter._runner.app.router.routes()]
     assert "/vamos/manager-wake" in routes
+    assert "/vamos/session-ingress/v1/capabilities" in routes
+    assert "/vamos/session-ingress/v1/enqueue" in routes
     await adapter.disconnect()
