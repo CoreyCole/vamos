@@ -1,6 +1,7 @@
 package hermescmd
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"os"
@@ -11,6 +12,8 @@ import (
 
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
+
+	"github.com/CoreyCole/vamos/pkg/hermes/sessioningress"
 )
 
 type hostConfig struct {
@@ -57,7 +60,7 @@ func newSetupCommand() *cobra.Command {
 	var installPlugin, restartGateway bool
 	cmd := &cobra.Command{
 		Use:   "setup --gateway-url <adapter-base-url>",
-		Short: "Verify a Hermes adapter health endpoint and save host-local settings",
+		Short: "Verify Hermes health and exact-session capability, then save settings",
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			if installPlugin {
 				if strings.TrimSpace(pluginSource) == "" {
@@ -79,6 +82,17 @@ func newSetupCommand() *cobra.Command {
 					"gateway-url must be the http(s) Hermes adapter base URL",
 				)
 			}
+			if strings.TrimSpace(vamosURL) == "" ||
+				strings.TrimSpace(ingressToken) == "" ||
+				strings.TrimSpace(callbackToken) == "" {
+				return errors.New(
+					"vamos-url, ingress-token, and callback-token are required",
+				)
+			}
+			if !strings.HasPrefix(vamosURL, "http://") &&
+				!strings.HasPrefix(vamosURL, "https://") {
+				return errors.New("vamos-url must be an http(s) URL")
+			}
 			client := &http.Client{Timeout: 5 * time.Second}
 			response, err := client.Get(gatewayHealthURL(gatewayURL))
 			if err != nil {
@@ -91,16 +105,21 @@ func newSetupCommand() *cobra.Command {
 					response.Status,
 				)
 			}
-			if strings.TrimSpace(vamosURL) == "" ||
-				strings.TrimSpace(ingressToken) == "" ||
-				strings.TrimSpace(callbackToken) == "" {
-				return fmt.Errorf(
-					"vamos-url, ingress-token, and callback-token are required",
-				)
+			parentConfig, err := defaultParentClientConfig()
+			if err != nil {
+				return err
 			}
-			if !strings.HasPrefix(vamosURL, "http://") &&
-				!strings.HasPrefix(vamosURL, "https://") {
-				return fmt.Errorf("vamos-url must be an http(s) URL")
+			parentConfig.GatewayBaseURL = gatewayURL
+			parentConfig.GatewayCredential = strings.TrimSpace(ingressToken)
+			capability := sessioningress.PreflightGateway(
+				cmd.Context(),
+				sessionIngressClientConfig(parentConfig),
+			)
+			if capability.Code != "capabilities" {
+				return fmt.Errorf(
+					"Hermes adapter is healthy but exact-session capability preflight failed: %s",
+					capability.Code,
+				)
 			}
 			if configPath == "" {
 				configPath, err = defaultConfigPath()
@@ -128,7 +147,7 @@ func newSetupCommand() *cobra.Command {
 			}
 			fmt.Fprintln(
 				cmd.OutOrStdout(),
-				"Gateway verified. Configure Hermes with the saved callback credential and callback URL; set VAMOS_HERMES_CALLBACK_TOKEN to the same credential on Vamos.",
+				"Gateway health and authenticated exact-session capability verified. This does not prove admission or manager processing.",
 			)
 			return nil
 		},
@@ -137,7 +156,7 @@ func newSetupCommand() *cobra.Command {
 		&gatewayURL,
 		"gateway-url",
 		"",
-		"Hermes adapter base URL (/health and /vamos/manager-wake are appended)",
+		"Hermes adapter base URL (/health and protocol-v1 capability paths are appended)",
 	)
 	cmd.Flags().
 		StringVar(&vamosURL, "vamos-url", "", "Vamos server base URL for Pi completion callbacks")

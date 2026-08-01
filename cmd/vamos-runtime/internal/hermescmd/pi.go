@@ -61,6 +61,7 @@ func newPiCommand(
 	cmd.AddCommand(
 		newStartCommand(run, dependencies),
 		newContinueCommand(run, dependencies),
+		newNotifyCommand(dependencies.notifierFactory),
 		newDoneCommand(notifyPiCompletion),
 		newResultCommand(),
 	)
@@ -191,27 +192,12 @@ func launchManagedPi(
 }
 
 func readParentClientConfig(configPath string) (ParentClientConfig, error) {
-	home := strings.TrimSpace(os.Getenv("HERMES_HOME"))
-	if home == "" {
-		userHome, err := os.UserHomeDir()
-		if err != nil {
-			return ParentClientConfig{}, err
-		}
-		home = filepath.Join(userHome, ".hermes")
-	}
-	config := ParentClientConfig{
-		HermesHome:      home,
-		ConnectTimeout:  time.Second,
-		WriteTimeout:    time.Second,
-		ReadTimeout:     parentReadTimeout,
-		ExchangeTimeout: parentExchangeTimeout,
-		TotalTimeout:    parentTotalTimeout,
-		MaxAttempts:     parentMaximumAttempts,
-		BackoffCap:      time.Second,
+	config, err := defaultParentClientConfig()
+	if err != nil {
+		return ParentClientConfig{}, err
 	}
 	explicit := configPath != ""
 	if !explicit {
-		var err error
 		configPath, err = defaultConfigPath()
 		if err != nil {
 			return ParentClientConfig{}, err
@@ -238,6 +224,24 @@ func readParentClientConfig(configPath string) (ParentClientConfig, error) {
 	config.GatewayCredential = credential
 
 	return config, nil
+}
+
+func defaultParentClientConfig() (ParentClientConfig, error) {
+	home := strings.TrimSpace(os.Getenv("HERMES_HOME"))
+	if home == "" {
+		userHome, err := os.UserHomeDir()
+		if err != nil {
+			return ParentClientConfig{}, err
+		}
+		home = filepath.Join(userHome, ".hermes")
+	}
+
+	return ParentClientConfig{
+		HermesHome: home, ConnectTimeout: time.Second, WriteTimeout: time.Second,
+		ReadTimeout: parentReadTimeout, ExchangeTimeout: parentExchangeTimeout,
+		TotalTimeout: parentTotalTimeout, MaxAttempts: parentMaximumAttempts,
+		BackoffCap: time.Second,
+	}, nil
 }
 
 func resolveManagedHermesThread(

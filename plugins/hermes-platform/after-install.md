@@ -25,6 +25,16 @@ platforms:
 
 Restart the gateway after configuration. The dedicated ingress token authenticates both `POST /vamos/session-ingress/v1/capabilities` and `POST /vamos/session-ingress/v1/enqueue`; the callback token is callback-only. Capability success advertises only protocol `1` and `exact-session-next-turn-v1`. Enqueue success (`202`) means the turn was admitted to the exact current Hermes session generation; it does not mean the manager processed or answered it.
 
-The existing `/vamos/manager-wake` endpoint remains an isolated compatibility route for old launchers. It retains its previous synthetic-thread request and behavior and never translates to the v1 routes or exact-session runner.
+`vamos hermes setup` checks `/health` and then makes a separate authenticated request to the capability route. A healthy adapter without exact protocol-v1 capability fails closed. Capability is not admission, and enqueue admission is not proof that the manager model ran or that a response reached the original child.
 
-Delivery is at-least-once, so duplicates are possible. The adapter wraps immutable settlement text as non-authoritative manager input. It does not parse child YAML, register callbacks, schedule retries, select or launch a successor, or invoke `pi done`.
+For an uncertain or rejected notification, an operator may retry only one explicitly selected immutable record:
+
+```bash
+vamos hermes pi notify --plan <absolute-plan-dir> --pi-session <id> --message-id <id>
+```
+
+The command uses the same capability and notifier path as managed launch, preserves the exact settlement response as opaque content, and reports at-least-once uncertainty without claiming manager completion. It does not discover or scan settlements.
+
+The existing `/vamos/manager-wake` endpoint remains an isolated compatibility route for old launchers. It retains its previous synthetic `manager_thread_id` request and behavior and never translates to the v1 routes or exact-session runner.
+
+Delivery is at-least-once, so duplicates are possible. The adapter wraps immutable settlement text as non-authoritative manager input. It does not parse child YAML, register a callback, create a schedule, select or launch a successor, or invoke `pi done`. Promotion requires the separate source-tree TUI round-trip proof; health, capability, publication, and admission are insufficient.

@@ -17,6 +17,62 @@ const (
 	enqueuePath      = "/vamos/session-ingress/v1/enqueue"
 )
 
+func PreflightGateway(
+	ctx context.Context,
+	config ClientConfig,
+) NotifyResult {
+	created, err := NewNotifier(config)
+	if err != nil {
+		return NotifyResult{
+			Code: "malformed", Detail: "invalid gateway preflight configuration",
+			Transport: TransportNone,
+		}
+	}
+	n, ok := created.(*notifier)
+	if !ok {
+		return NotifyResult{
+			Code: "malformed", Detail: "invalid gateway preflight notifier",
+			Transport: TransportNone,
+		}
+	}
+	if n.gatewayURL == nil {
+		return NotifyResult{
+			Code: "surface_unsupported", Detail: "gateway is not configured",
+			Transport: TransportNone,
+		}
+	}
+	payload, err := EncodeCanonical(
+		CapabilityRequest{Op: "capabilities", Version: ProtocolVersion},
+	)
+	if err != nil {
+		result := malformedPeer(TransportGateway)
+
+		return result.NotifyResult
+	}
+	response, outcome := n.gatewayExchange(
+		ctx,
+		capabilitiesPath,
+		payload,
+		false,
+		EnqueueRequest{},
+	)
+	if outcome != nil {
+		return outcome.NotifyResult
+	}
+	capabilities, ok := response.(CapabilityResponse)
+	if !ok || !hasExactSessionCapability(capabilities) {
+		return NotifyResult{
+			Code: "surface_unsupported", Detail: "gateway lacks exact-session capability",
+			Transport: TransportGateway,
+		}
+	}
+
+	return NotifyResult{
+		Code: "capabilities", Detail: "exact-session capability available",
+		Transport: TransportGateway, Attempts: 1,
+	}
+}
+
 func newBoundedHTTPClient(config ClientConfig) *http.Client {
 	baseTransport, ok := http.DefaultTransport.(*http.Transport)
 	if !ok {

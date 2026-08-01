@@ -36,20 +36,32 @@ The launcher computes a runtime source fingerprint from `cmd/vamos-runtime`, sha
 
 When the fingerprint changes, the launcher builds a new managed runtime under a per-target lock and atomically installs it. When unchanged, it reuses the existing cached runtime.
 
-## Hermes manager-wake setup
+## Hermes exact-session setup and recovery
 
-Configure the host without echoing secret values:
+Configure the adapter without echoing secret values:
 
 ```bash
 vamos hermes setup \
   --gateway-url <hermes-adapter-base-url> \
   --vamos-url <vamos-url> \
-  --ingress-token <manager-wake-ingress-credential> \
-  --callback-token <vamos-callback-credential>
+  --ingress-token <exact-session-ingress-credential> \
+  --callback-token <legacy-callback-credential>
 ```
 
-`--gateway-url` is the Hermes adapter base URL, without an endpoint suffix. Setup and every managed-start preflight verify `GET <base>/health`; manager-wake delivery uses `<base>/vamos/manager-wake`. A trailing slash is normalized before the base URL is saved or injected.
+`--gateway-url` is a base URL, not an endpoint URL. Setup first verifies `/health`, then separately performs an authenticated protocol-v1 capability request and requires protocol `1` plus `exact-session-next-turn-v1`. Health alone is not readiness. Capability proves compatibility only; it does not prove enqueue admission or manager processing.
 
-The ingress credential authenticates direct `/vamos/manager-wake` delivery. The callback credential is separate, callback-only, and is never injected into Pi. A managed launch transiently supplies `VAMOS_MANAGER_WAKE_MANAGER_THREAD_ID`, `VAMOS_MANAGER_WAKE_PI_SESSION_ID`, `VAMOS_MANAGER_WAKE_GATEWAY_URL`, and `VAMOS_MANAGER_WAKE_INGRESS_TOKEN`; unmanaged launches supply none of them. URLs and credentials must not enter prompts, Pi custom entries, settlement evidence, attempt records, diagnostics, or logs.
+New managed launches inherit the runtime-issued opaque `HERMES_SESSION_ID`. The Go parent owns exact-session notification and keeps endpoints and credentials out of child arguments, environment, evidence, and output. `--vamos-url` and `--callback-token` remain setup compatibility fields for old callback-based host behavior; the new parent notifier does not expose them to the child.
 
-After deploying the removal of opaque-settlement discovery, an operator runs `vamos-runtime hermes cleanup-opaque-settlement-schedules` once. It uses `TEMPORAL_ADDRESS` and optional `TEMPORAL_NAMESPACE`, deletes only schedules with the literal `opaque-settlement-discovery:` prefix, then freshly verifies zero remain. This is an explicit, safely repeatable operator action, never a startup cleanup hook. Do not record credentials, URLs, or settlement contents in the runbook result.
+Retry exactly one published settlement with no discovery:
+
+```bash
+vamos hermes pi notify \
+  --plan <absolute-plan-dir> \
+  --pi-session <pi-session-id> \
+  --message-id <message-id> \
+  [--format text|json]
+```
+
+The result distinguishes immutable publication, admission, retryability, and timeout-after-write uncertainty. Admission is not manager execution, and manager execution is not reverse delivery to the still-live child. Recovery does not scan for latest or all settlements, follow a successor, create a schedule or callback, or invoke `pi done`.
+
+The legacy `/vamos/manager-wake` and `manager_thread_id` route remains isolated compatibility behavior only. Do not use its response as exact-session proof. Promotion still requires the separately approved source-tree Hermes TUI round-trip proof; CLI health, capability, publication, and admission are insufficient.

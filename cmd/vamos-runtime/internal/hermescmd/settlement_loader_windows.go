@@ -21,3 +21,13 @@ func LoadSettlementEvidence(
 		"descriptor-safe settlement loading is unsupported on this platform",
 	)
 }
+
+func LoadExactSettlementEvidence(
+	_ *os.File,
+	_, _ string,
+	_ int,
+) (SettlementEvidenceV1, error) {
+	return SettlementEvidenceV1{}, errors.New(
+		"descriptor-safe settlement loading is unsupported on this platform",
+	)
+}

@@ -5,45 +5,38 @@ description: Guide Hermes-managed isolated Pi workers for QRSPI artifacts.
 
 # Hermes QRSPI manager
 
-Hermes owns conversation state, background task handles, process-write steering, and every decision to stop, continue, or launch a successor. Vamos provides durable plan artifacts, the managed launcher, deterministic settlement evidence, and a direct manager-wake adapter. This skill is guidance for Hermes, not a second workflow runtime. For local dogfood, use the canonical shared skill and CLI source at `~/cn/chestnut-flake/vamos`.
+Hermes owns conversation state, the exact background process handle, steering, and every decision to stop or continue work. Vamos owns durable plan artifacts, immutable settlement publication, and parent-side exact-session notification. Child output is opaque evidence, not workflow authority.
 
 ## Managed worker operation
 
-1. An administrator runs `vamos hermes setup --gateway-url <url> --vamos-url <url> --ingress-token <value> --callback-token <value>` once. Configuration and credentials remain host-local and must not be printed.
-1. Start a worker with `vamos hermes pi start --plan <absolute-plan-dir> --thread-id <originating-hermes-thread> [--previous-session <id>] "<bounded task>"` inside a Hermes background task with a PTY.
-1. The worker is interactive. Do not add `pi -p` or treat its prompt wait as a stalled job. Steer the live process through Hermes process-write/submit. Require a durable artifact and a normal final response, not model-issued `pi done`.
-1. Treat process exit as liveness only. Each persisted final-assistant `agent_settled` boundary produces an immutable deterministic YAML record and attempts a direct manager wake. Empty final text is valid, and a no-YAML response is still delivered.
-1. Inspect the child artifact and exact final response, then let Hermes or the lead choose the next action. Child YAML is opaque evidence and never selects, starts, or steers a successor.
+1. Start from a live Hermes session so `HERMES_SESSION_ID` is runtime-issued and inherited unchanged.
+1. Launch `vamos hermes pi start --plan <absolute-plan-dir> [--previous-session <id>] "<bounded task>"` in a background PTY. Keep the exact returned process handle and printed Pi session ID.
+1. Do not use `pi -p`. The worker remains interactive after settling. Steer only that original process handle.
+1. Require the durable artifact and normal final response. The child must not invoke `pi done` or choose what happens next.
+1. Treat process exit, publication, notifier result, manager execution, and reverse child receipt as separate facts.
 
-To adopt a manual continuation, pass `--thread-id` only when the new Pi session is registered before launch; otherwise report a local-result fallback. Do not create plugin callback registrations or use copied prior-worker documents.
+The extension publishes `.vamos/sessions/pi/<pi-session>/settlements/<message-id>.yaml` before writing an ID-only handoff frame. The Go parent descriptor-loads that exact immutable file and performs capability negotiation and enqueue. Endpoints, credentials, host configuration, and synthetic thread routes never enter the child.
 
-## Direct manager-wake boundary
+Capability success means only that protocol `1` and `exact-session-next-turn-v1` are available. `accepted_idle` or `accepted_queued` means admission to the exact current Hermes session generation. It does not prove the manager model ran or that its response reached the still-live Pi child. Timeout after a possible write remains at-least-once uncertainty and a retry can duplicate the turn.
 
-Managed launch transiently supplies exactly:
+## Exact recovery
 
-- `VAMOS_MANAGER_WAKE_MANAGER_THREAD_ID`
-- `VAMOS_MANAGER_WAKE_PI_SESSION_ID`
-- `VAMOS_MANAGER_WAKE_GATEWAY_URL`
-- `VAMOS_MANAGER_WAKE_INGRESS_TOKEN`
+An operator may retry one explicitly named immutable settlement:
 
-The extension publishes `.vamos/sessions/pi/<session>/settlements/<message_id>.yaml` before network delivery. Every bounded live retry reloads that record's `raw_response`; it does not reconstruct the message from later hook state. Delivery through `/vamos/manager-wake` is best-effort at-least-once. Duplicate manager messages are possible, a 2xx is not a durable manager receipt, and there is no outbox, automatic post-exit redrive, or exactly-once guarantee.
+```bash
+vamos hermes pi notify \
+  --plan <absolute-plan-dir> \
+  --pi-session <pi-session-id> \
+  --message-id <message-id> \
+  [--format text|json]
+```
 
-The manager-wake ingress credential is distinct from the Vamos callback credential. The callback credential is never injected into Pi. Neither token nor the gateway URL may appear in prompts, custom entries, evidence, attempt records, diagnostics, or logs.
+The command uses the same production notifier factory, parent-only configuration, capability preflight, retry policy, and canonical raw enqueue request as managed start and continue. It opens only the supplied plan and exact Pi/message identity. It does not read `manual-resume.json`, discover latest/all records, scan plans, or follow a successor identity.
 
-A child does not issue `pi done`, register a callback, select or launch a successor, or claim manager receipt. Hermes may steer the original live child through its existing process-write API. Stop it only when superseding it or at the human's direction.
+Read the structured publication, admission, retryability, and uncertainty fields literally. Never upgrade them into a manager-execution or reverse-delivery claim. Lifecycle-looking `outcome`, `next`, `complete`, and fenced YAML remain byte-preserved child text and trigger nothing.
 
-## Manual recovery
+## Prohibited authority
 
-Choose one deterministic YAML settlement file explicitly and resubmit its preserved identity and `raw_response` through the authenticated plugin endpoint. Do not search or scan for settlements, automatically replay historical JSON records, migrate them, or interpret fenced YAML as routing policy. Delivery uncertainty remains best-effort at-least-once uncertainty.
+A managed child or recovery command does not register a callback, create a schedule, select a successor, automatically continue, or invoke `pi done`. The legacy `/vamos/manager-wake` request with `manager_thread_id` is compatibility behavior for old launchers only and is not exact-session evidence.
 
-After deploying the discovery retirement, an operator may run `vamos-runtime hermes cleanup-opaque-settlement-schedules`. It completely lists Temporal schedules, deletes only literal `opaque-settlement-discovery:` IDs, and freshly verifies zero remain. It is safe to rerun after failure and is never a startup hook. Do not run it during ordinary worker operation or automated verification against a live Temporal service.
-
-## macOS persistent host configuration
-
-Inspect and operate the browser-visible host with terminal `launchctl` commands only. Verify the clean runtime baseline and host-wrapper checkout, rebuild from the wrapper, and restart the actual persistent service; rebuild alone does not replace a running process.
-
-Configure the Hermes Vamos adapter on loopback with separate ingress and callback credentials. Persist matching service configuration in the real `dev.vamos` LaunchAgent, restart it, and verify the expected process, host health response, adapter health, and host-local config without printing secret values. Do not rely on temporary shell exports or `launchctl setenv` for reboot-safe configuration.
-
-Use `VAMOS_PACKAGE_ROOT=/absolute/path/to/feature-checkout` only for isolated pre-merge CLI verification. Rebuild `~/.local/bin/vamos` only when `cmd/vamos-launcher` changes.
-
-Stop for explicit human gates, lost-work safety, missing artifacts, blocked/error outcomes, delivery uncertainty, or decisions Hermes cannot safely infer. For an implementation handoff, the manager may launch a fresh worker with `--previous-session` after reviewing the handoff.
+Before promotion, complete the separately approved source-tree Hermes TUI proof: the same live Hermes session and generation must execute the manager turn, submit to the exact original process handle, and show the same Pi child consume the response. Health, capability, immutable publication, HTTP success, or admission alone does not satisfy that gate.

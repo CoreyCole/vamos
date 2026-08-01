@@ -25,6 +25,20 @@ func LoadSettlementEvidence(
 	return loadSettlementEvidence(sessionDirectory, expected, nil)
 }
 
+func LoadExactSettlementEvidence(
+	sessionDirectory *os.File,
+	piSessionID, messageID string,
+	ownerUID int,
+) (SettlementEvidenceV1, error) {
+	return loadSettlementEvidence(sessionDirectory, SettlementLoadExpectation{
+		Frame: HandoffFrame{
+			Version: HandoffProtocolVersion, LaunchNonce: deriveLaunchNonce(piSessionID),
+			PiSessionID: piSessionID, MessageID: messageID,
+		},
+		OwnerUID: ownerUID, allowEvidenceHermesIdentity: true,
+	}, nil)
+}
+
 func loadSettlementEvidence(
 	sessionDirectory *os.File,
 	expected SettlementLoadExpectation,

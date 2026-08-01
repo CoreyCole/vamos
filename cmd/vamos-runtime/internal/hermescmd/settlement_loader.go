@@ -16,9 +16,10 @@ const (
 )
 
 type SettlementLoadExpectation struct {
-	HermesSessionID string
-	Frame           HandoffFrame
-	OwnerUID        int
+	HermesSessionID             string
+	Frame                       HandoffFrame
+	OwnerUID                    int
+	allowEvidenceHermesIdentity bool
 }
 
 type SettlementEvidenceV1 struct {
@@ -31,7 +32,13 @@ type SettlementEvidenceV1 struct {
 }
 
 func validateSettlementExpectation(expected SettlementLoadExpectation) error {
-	if _, err := sessioningress.ValidateSessionID(expected.HermesSessionID); err != nil {
+	if expected.allowEvidenceHermesIdentity {
+		if expected.HermesSessionID != "" {
+			return errors.New("recovery Hermes session identity must come from evidence")
+		}
+	} else if _, err := sessioningress.ValidateSessionID(
+		expected.HermesSessionID,
+	); err != nil {
 		return errors.New("invalid expected Hermes session ID")
 	}
 
@@ -102,7 +109,8 @@ func parseSettlementEvidence(
 	if err := sessioningress.ValidateMessageID(evidence.MessageID); err != nil {
 		return SettlementEvidenceV1{}, errors.New("invalid settlement message ID")
 	}
-	if evidence.HermesSessionID != expected.HermesSessionID ||
+	if (!expected.allowEvidenceHermesIdentity &&
+		evidence.HermesSessionID != expected.HermesSessionID) ||
 		evidence.PiSessionID != expected.Frame.PiSessionID ||
 		evidence.MessageID != expected.Frame.MessageID {
 		return SettlementEvidenceV1{}, errors.New("settlement evidence identity mismatch")

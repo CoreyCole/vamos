@@ -366,14 +366,10 @@ func readAndNotifySettlements(
 		}
 		if err == nil {
 			notifyCtx, cancel := context.WithTimeout(ctx, input.NotifyTimeout)
-			event.Result = input.Notifier.Notify(notifyCtx, sessioningress.EnqueueRequest{
-				HermesSessionID: evidence.HermesSessionID,
-				Message:         evidence.RawResponse,
-				MessageID:       evidence.MessageID,
-				Op:              "enqueue",
-				PiSessionID:     evidence.PiSessionID,
-				Version:         sessioningress.ProtocolVersion,
-			})
+			event.Result = input.Notifier.Notify(
+				notifyCtx,
+				enqueueRequestFromEvidence(evidence),
+			)
 			cancel()
 		}
 		result.events = append(result.events, event)
@@ -392,6 +388,19 @@ func readAndNotifySettlements(
 	return result
 }
 
+func enqueueRequestFromEvidence(
+	evidence SettlementEvidenceV1,
+) sessioningress.EnqueueRequest {
+	return sessioningress.EnqueueRequest{
+		HermesSessionID: evidence.HermesSessionID,
+		Message:         evidence.RawResponse,
+		MessageID:       evidence.MessageID,
+		Op:              "enqueue",
+		PiSessionID:     evidence.PiSessionID,
+		Version:         sessioningress.ProtocolVersion,
+	}
+}
+
 func defaultNotifierFactory(
 	validatedHermesSessionID string,
 	config ParentClientConfig,
@@ -400,18 +409,18 @@ func defaultNotifierFactory(
 		return nil, fmt.Errorf("validate Hermes session ID: %w", err)
 	}
 
-	return sessioningress.NewNotifier(sessioningress.ClientConfig{
-		HermesHome:        config.HermesHome,
-		ConnectTimeout:    config.ConnectTimeout,
-		WriteTimeout:      config.WriteTimeout,
-		ReadTimeout:       config.ReadTimeout,
-		ExchangeTimeout:   config.ExchangeTimeout,
-		TotalTimeout:      config.TotalTimeout,
-		MaxAttempts:       config.MaxAttempts,
-		BackoffCap:        config.BackoffCap,
+	return sessioningress.NewNotifier(sessionIngressClientConfig(config))
+}
+
+func sessionIngressClientConfig(config ParentClientConfig) sessioningress.ClientConfig {
+	return sessioningress.ClientConfig{
+		HermesHome: config.HermesHome, ConnectTimeout: config.ConnectTimeout,
+		WriteTimeout: config.WriteTimeout, ReadTimeout: config.ReadTimeout,
+		ExchangeTimeout: config.ExchangeTimeout, TotalTimeout: config.TotalTimeout,
+		MaxAttempts: config.MaxAttempts, BackoffCap: config.BackoffCap,
 		GatewayBaseURL:    config.GatewayBaseURL,
 		GatewayCredential: config.GatewayCredential,
-	})
+	}
 }
 
 type execManagedCommand struct{ command *exec.Cmd }
