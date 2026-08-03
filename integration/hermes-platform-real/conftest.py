@@ -8,9 +8,9 @@ import tempfile
 import pytest
 
 
-_H3_SHA = "db66ff265697d87c64ddaaf96569b733c79c2bba"
+_H4_SHA = "5504217c3bb542794cfe71a4951279ce99b3dd92"
 _checkout_text = os.environ.get("HERMES_EXACT_SESSION_CHECKOUT", "")
-_expected_sha = os.environ.get("HERMES_EXACT_SESSION_H3_SHA", "")
+_expected_sha = os.environ.get("HERMES_EXACT_SESSION_H4_SHA", "")
 _home = tempfile.mkdtemp(prefix="vamos-hermes-real-")
 os.environ["HERMES_HOME"] = _home
 
@@ -27,10 +27,10 @@ def pytest_configure(config):
     checkout = Path(_checkout_text)
     if not checkout.is_dir() or not ((checkout / ".git").is_dir() or (checkout / ".git").is_file()):
         raise pytest.UsageError("HERMES_EXACT_SESSION_CHECKOUT is not a git checkout")
-    if _expected_sha != _H3_SHA:
-        raise pytest.UsageError("HERMES_EXACT_SESSION_H3_SHA does not equal the recorded H3 SHA")
-    if _git(checkout, "rev-parse", "HEAD") != _H3_SHA:
-        raise pytest.UsageError("Hermes checkout HEAD does not equal the recorded H3 SHA")
+    if _expected_sha != _H4_SHA:
+        raise pytest.UsageError("HERMES_EXACT_SESSION_H4_SHA does not equal the recorded H4 SHA")
+    if _git(checkout, "rev-parse", "HEAD") != _H4_SHA:
+        raise pytest.UsageError("Hermes checkout HEAD does not equal the recorded H4 SHA")
     dirty = _git(
         checkout,
         "status", "--porcelain", "--",

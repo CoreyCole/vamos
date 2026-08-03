@@ -16,6 +16,14 @@ class BasePlatformAdapter:
     def __init__(self, config, platform):
         self.config = config
         self.platform = platform
+        self._active_sessions = {}
+        self._session_tasks = {}
+        self._admitted_handler = None
+
+    async def handle_admitted_next_turn(self, event):
+        if self._admitted_handler is not None:
+            return await self._admitted_handler(event)
+        return None
 
     def _mark_connected(self):
         pass

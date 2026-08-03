@@ -237,12 +237,12 @@ async def test_missing_or_old_core_fails_closed(v1_client, runner):
 
 
 def test_protocol_fixture_contract_and_manifest_resource():
-    assert protocol.MINIMUM_HERMES_COMMIT == "db66ff265697d87c64ddaaf96569b733c79c2bba"
+    assert protocol.MINIMUM_HERMES_COMMIT == "5504217c3bb542794cfe71a4951279ce99b3dd92"
     assert protocol.canonical_json(protocol.capability_response()) == (
         FIXTURE["canonical"]["capability_success"]["payload"].encode()
     )
     resource = importlib.resources.files("vamos_platform").joinpath("plugin.yaml")
     manifest = resource.read_text(encoding="utf-8")
-    assert "minimum_hermes_commit: db66ff265697d87c64ddaaf96569b733c79c2bba" in manifest
+    assert "minimum_hermes_commit: 5504217c3bb542794cfe71a4951279ce99b3dd92" in manifest
     assert "protocol_versions: [1]" in manifest
     assert "capabilities: [exact-session-next-turn-v1]" in manifest

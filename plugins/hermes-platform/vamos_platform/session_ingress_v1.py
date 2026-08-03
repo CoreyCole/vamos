@@ -11,7 +11,7 @@ PROTOCOL_VERSION = 1
 MAX_BODY_BYTES = 262_144
 MAX_MESSAGE_BYTES = 131_072
 EXACT_SESSION_CAPABILITY = "exact-session-next-turn-v1"
-MINIMUM_HERMES_COMMIT = "db66ff265697d87c64ddaaf96569b733c79c2bba"
+MINIMUM_HERMES_COMMIT = "5504217c3bb542794cfe71a4951279ce99b3dd92"
 
 ACCEPTED_CODES = frozenset({"accepted_idle", "accepted_queued"})
 RETRYABLE_CODES = frozenset({"queue_full", "temporarily_unavailable"})

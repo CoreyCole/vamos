@@ -10,9 +10,11 @@ set an explicit reverse-proxy/TLS endpoint before exposing it remotely.
 """
 
 import asyncio
+import hashlib
 import hmac
 import json
 import logging
+import re
 import uuid
 from typing import Any, Optional
 
@@ -22,11 +24,20 @@ from gateway.platforms.base import BasePlatformAdapter, MessageEvent, MessageTyp
 from gateway.session import SessionSource
 
 from . import session_ingress_v1
+from .conversation_identity import (
+    ConversationIdentity,
+    conversation_reference,
+    validate_component,
+    verified_identity,
+)
 
 logger = logging.getLogger(__name__)
 
 _LOOPBACK_HOST = "127.0.0.1"
 _DEFAULT_PORT = 8765
+_PRESENTATION_TIMEOUT_SECONDS = 3.0
+_PRESENTATION_SHUTDOWN_SECONDS = 1.0
+_SETTLEMENT_MESSAGE_ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,127}\Z")
 
 
 class VamosAdapter(BasePlatformAdapter):
@@ -44,7 +55,8 @@ class VamosAdapter(BasePlatformAdapter):
         self._callback_token = str(extra.get("callback_token") or self._token)
         self._runner: Optional[web.AppRunner] = None
         self._client = None
-        self._thread_plans: dict[str, str] = {}
+        self._conversation_associations: dict[str, ConversationIdentity] = {}
+        self._presentation_tasks: set[asyncio.Task] = set()
 
     async def connect(self, *, is_reconnect: bool = False) -> bool:
         if not self._token or not self._vamos_url:
@@ -73,6 +85,19 @@ class VamosAdapter(BasePlatformAdapter):
         if self._runner:
             await self._runner.cleanup()
             self._runner = None
+        tasks = tuple(self._presentation_tasks)
+        for task in tasks:
+            task.cancel()
+        if tasks:
+            _, pending = await asyncio.wait(
+                tasks, timeout=_PRESENTATION_SHUTDOWN_SECONDS,
+            )
+            if pending:
+                logger.warning("[vamos] presentation tasks exceeded shutdown deadline")
+        self._presentation_tasks.clear()
+        if self._client is not None:
+            await self._client.close()
+            self._client = None
         self._mark_disconnected()
 
     async def _health(self, request: web.Request) -> web.Response:
@@ -154,25 +179,48 @@ class VamosAdapter(BasePlatformAdapter):
             response = session_ingress_v1.rejection("temporarily_unavailable")
         return self._v1_response(response)
 
+    def _bind_conversation(
+        self, reference: str, identity: ConversationIdentity,
+    ) -> ConversationIdentity:
+        existing = self._conversation_associations.get(reference)
+        if existing is not None and existing != identity:
+            raise ValueError("conversation reference is already bound to another tuple")
+        self._conversation_associations[reference] = identity
+        return identity
+
+    def _identity_for_reference(self, reference: str) -> ConversationIdentity:
+        identity = self._conversation_associations.get(reference)
+        if identity is None:
+            raise ValueError("conversation reference has no active tuple association")
+        if conversation_reference(identity.plan_dir, identity.thread_id) != reference:
+            raise ValueError("conversation association conflicts with its reference")
+        return identity
+
     async def _prompt(self, request: web.Request) -> web.Response:
         body = await self._body(request)
-        thread_id = str(body.get("thread_id") or "").strip()
-        owner = str(body.get("owner_email") or "").strip()
-        prompt = str(body.get("prompt") or "").strip()
-        if not thread_id or not owner or not prompt:
-            raise web.HTTPBadRequest(text="thread_id, owner_email, and prompt are required")
-        plan_dir = str(body.get("plan_dir") or "").strip()
-        if plan_dir:
-            self._thread_plans[thread_id] = plan_dir
+        try:
+            command_id = validate_component(body.get("command_id"), "command_id")
+            reference = body.get("conversation_reference")
+            identity = verified_identity(body.get("plan_dir"), body.get("thread_id"), reference)
+        except ValueError as exc:
+            raise web.HTTPBadRequest(text=str(exc)) from exc
+        owner = body.get("owner_email")
+        prompt = body.get("prompt")
+        if not isinstance(owner, str) or not owner.strip() or not isinstance(prompt, str) or not prompt.strip():
+            raise web.HTTPBadRequest(text="owner_email and prompt are required")
+        try:
+            self._bind_conversation(reference, identity)
+        except ValueError as exc:
+            raise web.HTTPConflict(text=str(exc)) from exc
         event = MessageEvent(
             text=prompt,
             message_type=MessageType.TEXT,
             source=SessionSource(
-                platform=Platform("vamos"), chat_id=thread_id, chat_name="Vamos",
-                chat_type="thread", thread_id=thread_id, user_id=owner, user_name=owner,
+                platform=Platform("vamos"), chat_id=reference, chat_name="Vamos",
+                chat_type="thread", thread_id=reference, user_id=owner, user_name=owner,
             ),
             raw_message=body,
-            message_id=uuid.uuid4().hex,
+            message_id=command_id,
         )
         await self.handle_message(event)
         return web.json_response({"status": "accepted"}, status=202)
@@ -227,26 +275,101 @@ class VamosAdapter(BasePlatformAdapter):
         await self.handle_message(event)
         return web.json_response({"status": "accepted"}, status=202)
 
-    async def send(self, chat_id: str, content: str, reply_to: Optional[str] = None,
-                   metadata: Optional[dict[str, Any]] = None) -> SendResult:
-        """Deliver final Markdown through Vamos's authenticated callback."""
+    async def _post_callback(
+        self, identity: ConversationIdentity, event: dict[str, Any],
+    ) -> None:
         import aiohttp
         if self._client is None:
             self._client = aiohttp.ClientSession()
-        event = {
-            "id": uuid.uuid4().hex,
-            "type": "final",
-            "content": content,
-            "plan_dir": self._thread_plans.get(chat_id, ""),
-        }
-        url = f"{self._vamos_url}/agent-chat/api/hermes/threads/{chat_id}/events"
+        url = (
+            f"{self._vamos_url}/agent-chat/api/hermes/threads/"
+            f"{identity.thread_id}/events"
+        )
+        payload = {**event, "plan_dir": identity.plan_dir}
+        async with self._client.post(
+            url,
+            json=payload,
+            headers={"Authorization": f"Bearer {self._callback_token}"},
+        ) as response:
+            if response.status // 100 != 2:
+                raise RuntimeError(f"Vamos callback: {response.status}")
+
+    async def send(self, chat_id: str, content: str, reply_to: Optional[str] = None,
+                   metadata: Optional[dict[str, Any]] = None) -> SendResult:
+        """Deliver final Markdown through Vamos's authenticated callback."""
         try:
-            async with self._client.post(url, json=event, headers={"Authorization": f"Bearer {self._callback_token}"}) as response:
-                if response.status // 100 != 2:
-                    return SendResult(success=False, error=f"Vamos callback: {response.status}")
+            identity = self._identity_for_reference(chat_id)
+        except ValueError as exc:
+            return SendResult(success=False, error=str(exc))
+        event = {"id": uuid.uuid4().hex, "type": "final", "content": content}
+        try:
+            await self._post_callback(identity, event)
         except Exception as exc:
             return SendResult(success=False, error=str(exc))
         return SendResult(success=True, message_id=event["id"])
+
+    def _capture_delivery_presentation(
+        self, event: MessageEvent,
+    ) -> tuple[ConversationIdentity, str, str, str] | None:
+        source = event.source
+        reference = getattr(source, "chat_id", None)
+        if (
+            getattr(source, "platform", None) != Platform("vamos")
+            or not isinstance(reference, str)
+            or getattr(source, "thread_id", None) != reference
+        ):
+            return None
+        try:
+            identity = self._identity_for_reference(reference)
+        except ValueError as exc:
+            logger.warning("[vamos] settlement presentation suppressed: %s", exc)
+            return None
+        metadata = getattr(event, "metadata", None)
+        settlement_id = metadata.get("settlement_message_id") if isinstance(metadata, dict) else None
+        if not isinstance(settlement_id, str) or not _SETTLEMENT_MESSAGE_ID.fullmatch(settlement_id):
+            logger.warning("[vamos] settlement presentation suppressed: invalid settlement ID")
+            return None
+        if not isinstance(event.text, str):
+            logger.warning("[vamos] settlement presentation suppressed: invalid wrapped turn")
+            return None
+        return identity, reference, settlement_id, event.text
+
+    async def _present_settlement_delivery(
+        self,
+        identity: ConversationIdentity,
+        reference: str,
+        settlement_id: str,
+        content: str,
+    ) -> None:
+        if conversation_reference(identity.plan_dir, identity.thread_id) != reference:
+            raise ValueError("captured conversation association conflicts with its reference")
+        event_id = hashlib.sha256(
+            b"vamos-hermes-settlement-delivering-v1\x00" + settlement_id.encode("ascii")
+        ).hexdigest()
+        async with asyncio.timeout(_PRESENTATION_TIMEOUT_SECONDS):
+            await self._post_callback(identity, {
+                "id": event_id,
+                "type": "settlement_delivering",
+                "content": content,
+            })
+
+    def _presentation_done(self, task: asyncio.Task) -> None:
+        self._presentation_tasks.discard(task)
+        if task.cancelled():
+            logger.warning("[vamos] settlement presentation cancelled")
+            return
+        exception = task.exception()
+        if exception is not None:
+            logger.warning("[vamos] settlement presentation failed: %s", exception)
+
+    async def handle_admitted_next_turn(self, event: MessageEvent) -> None:
+        normal_delivery = asyncio.create_task(super().handle_admitted_next_turn(event))
+        presentation = self._capture_delivery_presentation(event)
+        if presentation is not None:
+            task = asyncio.create_task(self._present_settlement_delivery(*presentation))
+            self._presentation_tasks.add(task)
+            task.add_done_callback(self._presentation_done)
+        return await normal_delivery
 
     async def get_chat_info(self, chat_id: str) -> dict[str, Any]:
         return {"name": "Vamos", "type": "thread"}
