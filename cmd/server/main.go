@@ -1272,7 +1272,8 @@ func main() {
 			basePath,
 			agentChatService,
 		),
-	).WithEmbeddedChatRenderer(agentChatService)
+	).WithEmbeddedChatRenderer(agentChatService).
+		WithHermesThreadsRenderer(agentChatService)
 	agentChatService.SetImplWorkspaceDiscoveryConfig(
 		workspaces.ImplWorkspaceDiscoveryConfig{
 			ProjectID:           workspaceDiscovery.ProjectID,

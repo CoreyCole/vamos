@@ -57,11 +57,13 @@ type DocumentWorkspaceContext struct {
 	Ambiguous    bool
 }
 
-type EmbeddedChatLinkState struct {
-	Active      bool
-	WorkspaceID string
-	ThreadID    string
-	RunID       string
+type ThoughtsWorkbenchLinkState struct {
+	Context          string
+	ChatWorkspaceID  string
+	ChatThreadID     string
+	ChatRunID        string
+	HermesThreadID   string
+	SelectedPlanPath string
 }
 
 type PageArgs struct {
@@ -75,7 +77,7 @@ type PageArgs struct {
 	CurrentSyntaxTheme   string                        // Current syntax theme name
 	PageSessionID        string                        // Unique page session ID for this tab
 	FileTree             []FileTreeNode                // Sidebar file tree
-	ChatLinkState        EmbeddedChatLinkState
+	WorkbenchLinkState   ThoughtsWorkbenchLinkState
 	CommentUI            commentui.CommentableMarkdownArgs
 	WorkspaceContext     DocumentWorkspaceContext
 	QRSPIMetadata        QRSPIMetadata
@@ -133,6 +135,28 @@ type EmbeddedChatURLReplacement struct {
 	URL string
 }
 
+type HermesThreadsRenderRequest struct {
+	UserEmail        string
+	DocPath          string
+	SelectedPlanPath string
+	PlanHint         string
+	NoPlan           bool
+	IsDirectory      bool
+	CurrentURL       string
+	LinkState        ThoughtsWorkbenchLinkState
+}
+
+type HermesThreadsURLReplacement struct {
+	URL string
+}
+
+type HermesThreadsRenderer interface {
+	RenderHermesThreadsPanel(
+		ctx context.Context,
+		request HermesThreadsRenderRequest,
+	) (templ.Component, HermesThreadsURLReplacement, error)
+}
+
 type EmbeddedChatRenderer interface {
 	RenderEmbeddedChatPanel(
 		ctx context.Context,
@@ -172,7 +196,7 @@ type DirectoryArgs struct {
 	CurrentTheme       string         // "dark" or "light" - from user preferences
 	CurrentSyntaxTheme string         // Current syntax theme name
 	FileTree           []FileTreeNode // Sidebar file tree
-	ChatLinkState      EmbeddedChatLinkState
+	WorkbenchLinkState ThoughtsWorkbenchLinkState
 }
 
 // DirectoryItem represents a file or directory
@@ -207,10 +231,13 @@ func (args *PageArgs) BuildRootArgs() layouts.RootArgs {
 		CurrentSyntaxTheme: args.CurrentSyntaxTheme,
 		ClipboardContent:   args.ViewerArgs.RawMarkdown,
 		BreadcrumbChatLinkState: layouts.BreadcrumbLinkState{
-			Active:      args.ChatLinkState.Active,
-			WorkspaceID: args.ChatLinkState.WorkspaceID,
-			ThreadID:    args.ChatLinkState.ThreadID,
-			RunID:       args.ChatLinkState.RunID,
+			Active:           args.WorkbenchLinkState.Context == thoughtsContextModeChat,
+			Context:          args.WorkbenchLinkState.Context,
+			WorkspaceID:      args.WorkbenchLinkState.ChatWorkspaceID,
+			ThreadID:         args.WorkbenchLinkState.ChatThreadID,
+			RunID:            args.WorkbenchLinkState.ChatRunID,
+			HermesThreadID:   args.WorkbenchLinkState.HermesThreadID,
+			SelectedPlanPath: args.WorkbenchLinkState.SelectedPlanPath,
 		},
 	}
 }
@@ -231,10 +258,13 @@ func (args *DirectoryArgs) BuildRootArgs() layouts.RootArgs {
 		CurrentTheme:       args.CurrentTheme,
 		CurrentSyntaxTheme: args.CurrentSyntaxTheme,
 		BreadcrumbChatLinkState: layouts.BreadcrumbLinkState{
-			Active:      args.ChatLinkState.Active,
-			WorkspaceID: args.ChatLinkState.WorkspaceID,
-			ThreadID:    args.ChatLinkState.ThreadID,
-			RunID:       args.ChatLinkState.RunID,
+			Active:           args.WorkbenchLinkState.Context == thoughtsContextModeChat,
+			Context:          args.WorkbenchLinkState.Context,
+			WorkspaceID:      args.WorkbenchLinkState.ChatWorkspaceID,
+			ThreadID:         args.WorkbenchLinkState.ChatThreadID,
+			RunID:            args.WorkbenchLinkState.ChatRunID,
+			HermesThreadID:   args.WorkbenchLinkState.HermesThreadID,
+			SelectedPlanPath: args.WorkbenchLinkState.SelectedPlanPath,
 		},
 	}
 }

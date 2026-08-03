@@ -3,12 +3,17 @@ package agentchat
 import (
 	"context"
 	"errors"
+	"net/url"
 	"os"
 	"sort"
 	"strings"
 	"time"
 
+	"github.com/a-h/templ"
 	"github.com/google/uuid"
+
+	"github.com/CoreyCole/vamos/pkg/safecomponent"
+	"github.com/CoreyCole/vamos/server/services/markdown"
 )
 
 type HermesThread struct {
@@ -157,10 +162,96 @@ func GroupHermesThreads(threads []HermesThread) []HermesThreadGroup {
 }
 
 type HermesThreadsPanelArgs struct {
-	UserEmail    string
-	CurrentFile  string
-	PlanDir      string
-	Threads      []HermesThread
-	SelectedID   string
-	SearchAction string
+	UserEmail     string
+	CurrentFile   string
+	PlanDir       string
+	Threads       []HermesThread
+	ThreadHrefs   map[string]string
+	SelectedID    string
+	SelectedTitle string
+	Messages      []ChatMessageArgs
+	CanPrompt     bool
+	NoPlan        bool
+}
+
+func (s *Service) RenderHermesThreadsPanel(
+	ctx context.Context,
+	request markdown.HermesThreadsRenderRequest,
+) (templ.Component, markdown.HermesThreadsURLReplacement, error) {
+	args := HermesThreadsPanelArgs{
+		UserEmail: request.UserEmail, CurrentFile: request.DocPath,
+		NoPlan: request.NoPlan, ThreadHrefs: map[string]string{},
+	}
+	if request.NoPlan {
+		return HermesThreadsPanel(args), hermesSelectionReplacement(request), nil
+	}
+	identity, _, err := ResolveHermesPlanIdentity(
+		s.thoughtsRoot,
+		request.SelectedPlanPath,
+		request.PlanHint,
+	)
+	if err != nil {
+		return nil, markdown.HermesThreadsURLReplacement{}, err
+	}
+	args.PlanDir = string(identity)
+	threads, err := s.ListHermesThreads(ctx, ThreadQuery{PlanDir: string(identity)})
+	if err != nil {
+		return nil, markdown.HermesThreadsURLReplacement{}, err
+	}
+	args.Threads = threads
+	for _, thread := range threads {
+		state := request.LinkState
+		state.SelectedPlanPath = string(identity)
+		state = state.WithHermesThread(thread.ID)
+		args.ThreadHrefs[thread.ID] = markdown.ThoughtsHrefWithWorkbenchState(
+			request.DocPath,
+			request.IsDirectory,
+			state,
+		)
+	}
+	selectedID := strings.TrimSpace(request.LinkState.HermesThreadID)
+	if selectedID == "" {
+		return HermesThreadsPanel(args), markdown.HermesThreadsURLReplacement{}, nil
+	}
+	if err := safecomponent.ValidateBounded(selectedID); err != nil {
+		return HermesThreadsPanel(args), hermesSelectionReplacement(request), nil
+	}
+	for _, thread := range threads {
+		if thread.ID != selectedID {
+			continue
+		}
+		messages, err := s.RenderHermesTranscript(string(identity), thread.ID)
+		if err != nil {
+			return nil, markdown.HermesThreadsURLReplacement{}, err
+		}
+		args.SelectedID = thread.ID
+		args.SelectedTitle = thread.Title
+		args.Messages = messages
+		args.CanPrompt = s.CanPromptThread(request.UserEmail, thread)
+		return HermesThreadsPanel(args), markdown.HermesThreadsURLReplacement{}, nil
+	}
+	return HermesThreadsPanel(args), hermesSelectionReplacement(request), nil
+}
+
+func hermesSelectionReplacement(
+	request markdown.HermesThreadsRenderRequest,
+) markdown.HermesThreadsURLReplacement {
+	if strings.TrimSpace(request.LinkState.HermesThreadID) == "" {
+		return markdown.HermesThreadsURLReplacement{}
+	}
+	state := request.LinkState.WithoutHermesThread()
+	current := strings.TrimSpace(request.CurrentURL)
+	if current == "" {
+		current = markdown.ThoughtsHrefWithWorkbenchState(
+			request.DocPath,
+			request.IsDirectory,
+			state,
+		)
+	} else if parsed, err := url.Parse(current); err == nil {
+		query := parsed.Query()
+		query.Del("hermes_thread")
+		parsed.RawQuery = query.Encode()
+		current = parsed.String()
+	}
+	return markdown.HermesThreadsURLReplacement{URL: current}
 }

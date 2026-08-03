@@ -14,10 +14,13 @@ import (
 )
 
 type BreadcrumbLinkState struct {
-	Active      bool
-	WorkspaceID string
-	ThreadID    string
-	RunID       string
+	Active           bool
+	Context          string
+	WorkspaceID      string
+	ThreadID         string
+	RunID            string
+	HermesThreadID   string
+	SelectedPlanPath string
 }
 
 type RootArgs struct {
@@ -599,27 +602,38 @@ func thoughtsBreadcrumbHref(
 	return breadcrumbPreserveChat("/thoughts/"+joined, chat)
 }
 
-func breadcrumbPreserveChat(href string, chat BreadcrumbLinkState) string {
-	if !chat.Active {
+func breadcrumbPreserveChat(href string, state BreadcrumbLinkState) string {
+	contextMode := strings.TrimSpace(state.Context)
+	if contextMode == "" && state.Active {
+		contextMode = "chat"
+	}
+	if contextMode == "" && strings.TrimSpace(state.WorkspaceID) == "" &&
+		strings.TrimSpace(state.ThreadID) == "" && strings.TrimSpace(state.RunID) == "" &&
+		strings.TrimSpace(state.HermesThreadID) == "" {
 		return href
 	}
-	values := []string{"context=chat"}
-	threadID := strings.TrimSpace(chat.ThreadID)
-	if threadID == "" {
-		if workspaceID := strings.TrimSpace(chat.WorkspaceID); workspaceID != "" {
-			values = append(values, "chat_workspace="+url.QueryEscape(workspaceID))
+	parsed, err := url.Parse(href)
+	if err != nil {
+		return href
+	}
+	query := parsed.Query()
+	if contextMode != "" {
+		query.Set("context", contextMode)
+	}
+	for key, value := range map[string]string{
+		"chat_workspace": state.WorkspaceID,
+		"thread":         state.ThreadID,
+		"run":            state.RunID,
+	} {
+		if value = strings.TrimSpace(value); value != "" {
+			query.Set(key, value)
 		}
-	} else {
-		values = append(values, "thread="+url.QueryEscape(threadID))
 	}
-	if strings.TrimSpace(chat.RunID) != "" {
-		values = append(values, "run="+url.QueryEscape(strings.TrimSpace(chat.RunID)))
+	if threadID := strings.TrimSpace(state.HermesThreadID); threadID != "" {
+		query.Set("hermes_thread", threadID)
 	}
-	sep := "?"
-	if strings.Contains(href, "?") {
-		sep = "&"
-	}
-	return href + sep + strings.Join(values, "&")
+	parsed.RawQuery = query.Encode()
+	return parsed.String()
 }
 
 func formatBreadcrumbLabelForPathPart(parts []string, index int) string {

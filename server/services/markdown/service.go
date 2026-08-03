@@ -69,6 +69,7 @@ type Service struct {
 	chatWorkspaceResolver ChatWorkspaceCandidateResolver
 	layoutPrefs           *layoutprefs.Service
 	embeddedChatRenderer  EmbeddedChatRenderer
+	hermesThreadsRenderer HermesThreadsRenderer
 }
 
 func NewService(
@@ -126,6 +127,11 @@ func (s *Service) WithLayoutPreferenceService(service *layoutprefs.Service) *Ser
 
 func (s *Service) WithEmbeddedChatRenderer(renderer EmbeddedChatRenderer) *Service {
 	s.embeddedChatRenderer = renderer
+	return s
+}
+
+func (s *Service) WithHermesThreadsRenderer(renderer HermesThreadsRenderer) *Service {
+	s.hermesThreadsRenderer = renderer
 	return s
 }
 

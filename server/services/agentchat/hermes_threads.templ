@@ -1,39 +1,56 @@
 package agentchat
 
 templ HermesThreadsPanel(args HermesThreadsPanelArgs) {
-	<div id="hermes-threads-panel" class="flex h-full min-h-0 flex-col bg-background" data-signals={ "{threadSearch: '', threadPlan: '" + args.PlanDir + "', threadPlanManual: false, threadFreeform: false, threadContext: ['" + args.CurrentFile + "'], newThreadOpen: false}" }>
-		<div class="shrink-0 space-y-2 border-b border-border p-3">
-			<div class="flex items-center justify-between gap-2">
-				<p class="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Shared threads</p>
-				<button type="button" class="rounded-md bg-primary px-2 py-1 text-xs font-medium text-primary-foreground" data-on:click="$newThreadOpen = true">New Thread</button>
-			</div>
-			<input name="query" class="w-full rounded-md border border-input bg-background px-2 py-1.5 text-sm" placeholder="Search all thread names" data-bind="threadSearch"/>
+	<div id="hermes-threads-panel" class="flex h-full min-h-0 flex-col bg-background">
+		<div class="shrink-0 border-b border-border px-3 py-2">
+			<p class="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Shared Hermes threads</p>
+			if args.PlanDir != "" {
+				<p class="truncate text-xs text-muted-foreground">{ args.PlanDir }</p>
+			}
 		</div>
-		<div class="min-h-0 flex-1 overflow-y-auto p-3">
-			for _, group := range GroupHermesThreads(args.Threads) {
-				<section class="mb-4">
-					<p class="mb-1 truncate text-xs font-medium text-muted-foreground">{ group.PlanDir }</p>
-					for _, thread := range group.Threads {
-						<button type="button" class="mb-1 flex w-full flex-col rounded-md border border-border px-2 py-2 text-left hover:bg-muted" data-on:click="$rightRailActiveTab = 'chat'">
-							<span class="truncate text-sm font-medium text-foreground">{ thread.Title }</span>
-							<span class="truncate text-xs text-muted-foreground">{ thread.OwnerEmail }</span>
-						</button>
+		if args.NoPlan {
+			<div class="flex min-h-0 flex-1 items-center justify-center p-4 text-sm text-muted-foreground">
+				Open a document or directory inside a plan to view its Hermes threads.
+			</div>
+		} else {
+			<div class="grid min-h-0 flex-1 grid-rows-[auto_1fr]">
+				<div class="max-h-48 overflow-y-auto border-b border-border p-2">
+					if len(args.Threads) == 0 {
+						<p class="p-2 text-sm text-muted-foreground">No shared threads found for this plan.</p>
 					}
-				</section>
-			}
-			if len(args.Threads) == 0 {
-				<p class="text-sm text-muted-foreground">No shared threads found for this plan.</p>
-			}
-		</div>
-		<div data-show="$newThreadOpen" class="absolute inset-0 z-10 flex items-end bg-black/30 p-3">
-			<div class="w-full space-y-3 rounded-lg border border-border bg-popover p-3 shadow-lg">
-				<div class="flex items-center justify-between"><p class="font-medium">New Thread</p><button type="button" data-on:click="$newThreadOpen = false">Close</button></div>
-				<div class="flex flex-wrap gap-1"><template data-for="path in $threadContext"><span class="rounded-full border border-border px-2 py-0.5 text-xs"><span data-text="$path"></span><button type="button" class="ml-1" data-on:click="$threadContext = $threadContext.filter(value => value !== $path); if (!$threadPlanManual && $threadContext.length === 0) $threadPlan = ''">×</button></span></template></div>
-				<input class="w-full rounded-md border border-input bg-background px-2 py-1.5 text-sm" placeholder="Add context file" data-on:keydown="if (evt.key === 'Enter' && el.value.trim()) { evt.preventDefault(); $threadContext = [...$threadContext, el.value.trim()]; el.value = '' }"/>
-				<label class="block text-xs text-muted-foreground">Plan<input class="mt-1 w-full rounded-md border border-input bg-background px-2 py-1.5 text-sm" data-bind="threadPlan" data-on:input="$threadPlanManual = true" placeholder="Infer from context, or leave blank"/></label>
-				<label class="flex items-center gap-2 text-sm"><input type="checkbox" data-bind="threadFreeform"/> Freeform thread</label>
-				<p class="text-xs text-muted-foreground">Removing all plan context makes this an explicit freeform thread. A manual plan choice stays unchanged.</p>
+					for _, thread := range args.Threads {
+						<a
+							href={ templ.SafeURL(args.ThreadHrefs[thread.ID]) }
+							class={ "mb-1 flex w-full flex-col rounded-md border px-2 py-2 text-left transition-colors hover:bg-muted", templ.KV("border-primary bg-muted", thread.ID == args.SelectedID), templ.KV("border-border", thread.ID != args.SelectedID) }
+						>
+							<span class="truncate text-sm font-medium text-foreground">{ thread.Title }</span>
+							<span class="truncate text-xs text-muted-foreground">Created by { thread.CreatorEmail }</span>
+						</a>
+					}
+				</div>
+				<div id="hermes-thread-transcript" class="min-h-0 overflow-y-auto p-3">
+					if args.SelectedID == "" {
+						<p class="text-sm text-muted-foreground">Select a thread to inspect its transcript.</p>
+					} else {
+						<div class="mb-3 border-b border-border pb-2">
+							<p class="text-sm font-medium text-foreground">{ args.SelectedTitle }</p>
+							if args.CanPrompt {
+								<p class="text-xs text-muted-foreground">You have prompt authority. Prompt controls are not available in this read-only view.</p>
+							} else {
+								<p class="text-xs text-muted-foreground">Shared read-only transcript.</p>
+							}
+						</div>
+						if len(args.Messages) == 0 {
+							<p class="text-sm text-muted-foreground">This thread has no transcript turns yet.</p>
+						}
+						<div class="space-y-3">
+							for _, message := range args.Messages {
+								@ChatMessage(message)
+							}
+						</div>
+					}
+				</div>
 			</div>
-		</div>
+		}
 	</div>
 }

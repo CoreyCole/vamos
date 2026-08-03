@@ -66,10 +66,13 @@ type CenterDocPaneArgs struct {
 }
 
 type RightRailArgs struct {
-	ActiveTab RightRailTab
-	Chat      templ.Component
-	Comments  templ.Component
-	Threads   templ.Component
+	ActiveTab    RightRailTab
+	Chat         templ.Component
+	Comments     templ.Component
+	Threads      templ.Component
+	ChatHref     string
+	CommentsHref string
+	ThreadsHref  string
 }
 
 func BuildDocWorkbenchState(input WorkbenchDocContext) (WorkbenchState, error) {

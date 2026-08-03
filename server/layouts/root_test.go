@@ -219,17 +219,34 @@ func TestBuildBreadcrumbsFromPathPreservesChatQuery(t *testing.T) {
 				crumbs,
 			)
 		}
-		for _, want := range []string{"context=chat", "thread=th%2F1", "run=run%2B1"} {
+		for _, want := range []string{"context=chat", "chat_workspace=ws+1", "thread=th%2F1", "run=run%2B1"} {
 			if !strings.Contains(crumb.Href, want) {
 				t.Fatalf("crumb href missing %q: %#v", want, crumb)
 			}
 		}
-		if strings.Contains(crumb.Href, "chat_workspace=") {
-			t.Fatalf("crumb href preserved chat_workspace with thread: %#v", crumb)
-		}
 	}
 	if got := crumbs[len(crumbs)-1].Href; got != "" {
 		t.Fatalf("current crumb href = %q, want empty", got)
+	}
+}
+
+func TestBuildBreadcrumbsFromPathPreservesThreadsAndInactiveChatSelections(t *testing.T) {
+	t.Parallel()
+
+	crumbs := buildBreadcrumbsFromPath(
+		"owner/plans/demo/outline.md",
+		PageTypeMarkdown,
+		BreadcrumbLinkState{
+			Context: "threads", WorkspaceID: "ws_1", ThreadID: "chat_1", RunID: "run_1",
+			HermesThreadID: "hermes_1", SelectedPlanPath: "owner/plans/demo",
+		},
+	)
+	for _, crumb := range crumbs[:len(crumbs)-1] {
+		for _, want := range []string{"context=threads", "chat_workspace=ws_1", "thread=chat_1", "run=run_1", "hermes_thread=hermes_1"} {
+			if !strings.Contains(crumb.Href, want) {
+				t.Fatalf("crumb href missing %q: %#v", want, crumb)
+			}
+		}
 	}
 }
 

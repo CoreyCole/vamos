@@ -83,9 +83,21 @@ templ RightRail(args RightRailArgs) {
 			<div class="flex items-center gap-2">
 				@DocWorkbenchReturnButton()
 				<div class="grid min-w-0 flex-1 grid-cols-3 gap-1 rounded-md bg-muted/40 p-1" role="tablist" aria-label="Doc right rail tabs">
-					<button type="button" class="rounded px-2 py-1 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground" data-on:click="$rightRailActiveTab = 'chat'" data-class="{'bg-background text-foreground shadow-sm': $rightRailActiveTab === 'chat'}">Chat</button>
-					<button type="button" class="rounded px-2 py-1 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground" data-on:click="$rightRailActiveTab = 'threads'" data-class="{'bg-background text-foreground shadow-sm': $rightRailActiveTab === 'threads'}">Threads</button>
-					<button type="button" class="rounded px-2 py-1 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground" data-on:click="$rightRailActiveTab = 'comments'" data-class="{'bg-background text-foreground shadow-sm': $rightRailActiveTab === 'comments'}">Comments</button>
+					if args.ChatHref != "" {
+						<a href={ templ.SafeURL(args.ChatHref) } class="rounded px-2 py-1 text-center text-xs font-medium text-muted-foreground transition-colors hover:text-foreground" data-class="{'bg-background text-foreground shadow-sm': $rightRailActiveTab === 'chat'}">Chat</a>
+					} else {
+						<button type="button" class="rounded px-2 py-1 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground" data-on:click="$rightRailActiveTab = 'chat'" data-class="{'bg-background text-foreground shadow-sm': $rightRailActiveTab === 'chat'}">Chat</button>
+					}
+					if args.ThreadsHref != "" {
+						<a href={ templ.SafeURL(args.ThreadsHref) } class="rounded px-2 py-1 text-center text-xs font-medium text-muted-foreground transition-colors hover:text-foreground" data-class="{'bg-background text-foreground shadow-sm': $rightRailActiveTab === 'threads'}">Threads</a>
+					} else {
+						<button type="button" class="rounded px-2 py-1 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground" data-on:click="$rightRailActiveTab = 'threads'" data-class="{'bg-background text-foreground shadow-sm': $rightRailActiveTab === 'threads'}">Threads</button>
+					}
+					if args.CommentsHref != "" {
+						<a href={ templ.SafeURL(args.CommentsHref) } class="rounded px-2 py-1 text-center text-xs font-medium text-muted-foreground transition-colors hover:text-foreground" data-class="{'bg-background text-foreground shadow-sm': $rightRailActiveTab === 'comments'}">Comments</a>
+					} else {
+						<button type="button" class="rounded px-2 py-1 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground" data-on:click="$rightRailActiveTab = 'comments'" data-class="{'bg-background text-foreground shadow-sm': $rightRailActiveTab === 'comments'}">Comments</button>
+					}
 				</div>
 			</div>
 		</div>

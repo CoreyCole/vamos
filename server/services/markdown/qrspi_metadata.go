@@ -90,6 +90,18 @@ func (s *Service) buildQRSPIMetadata(pageArgs *PageArgs) QRSPIMetadata {
 	docs := discoverQRSPIDocs(planDir, planFS, current, fm)
 	meta.Nav = buildQRSPINav(docs, meta.Stage)
 	meta.RelatedDocs = buildQRSPIRelatedGroups(docs)
+	for index := range meta.Nav {
+		if meta.Nav[index].Href != "" {
+			meta.Nav[index].Href = pageArgs.WorkbenchLinkState.Preserve(meta.Nav[index].Href)
+		}
+	}
+	for groupIndex := range meta.RelatedDocs {
+		for docIndex := range meta.RelatedDocs[groupIndex].Docs {
+			meta.RelatedDocs[groupIndex].Docs[docIndex].Href = pageArgs.WorkbenchLinkState.Preserve(
+				meta.RelatedDocs[groupIndex].Docs[docIndex].Href,
+			)
+		}
+	}
 	return meta
 }
 
@@ -131,6 +143,17 @@ func discoverQRSPIDocs(planDir, planFS, current string, fm *Frontmatter) qrspiDo
 	docs.Outline = existingDoc(planFS, planDir, "outline.md", current)
 	docs.Plan = existingDoc(planFS, planDir, "plan.md", current)
 	return docs
+}
+
+func selectedPlanPathFromThoughtsPath(rawPath string) string {
+	clean := normalizeThoughtsRelativePath(rawPath)
+	parts := strings.Split(clean, "/")
+	for index := 0; index+1 < len(parts); index++ {
+		if parts[index] == "plans" && strings.TrimSpace(parts[index+1]) != "" {
+			return strings.Join(parts[:index+2], "/")
+		}
+	}
+	return ""
 }
 
 func canonicalPlanDir(frontmatterPlanDir, docPath string) string {

@@ -69,7 +69,7 @@ func TestDirectoryPrimaryPanelPreservesNoThreadChatWorkspaceQuery(t *testing.T) 
 	t.Parallel()
 
 	args := &DirectoryArgs{
-		ChatLinkState: EmbeddedChatLinkState{Active: true, WorkspaceID: "ws 1", RunID: "run+1"},
+		WorkbenchLinkState: ThoughtsWorkbenchLinkState{Context: "chat", ChatWorkspaceID: "ws 1", ChatRunID: "run+1"},
 		Items: []DirectoryItem{
 			{Name: "docs", Path: "owner/docs", IsDir: true},
 			{Name: "plan.md", Path: "owner/plan.md"},
@@ -87,11 +87,11 @@ func TestDirectoryPrimaryPanelPreservesNoThreadChatWorkspaceQuery(t *testing.T) 
 	}
 }
 
-func TestDirectoryPrimaryPanelOmitsChatWorkspaceForActiveThreadQuery(t *testing.T) {
+func TestDirectoryPrimaryPanelPreservesChatWorkspaceWithActiveThreadQuery(t *testing.T) {
 	t.Parallel()
 
 	args := &DirectoryArgs{
-		ChatLinkState: EmbeddedChatLinkState{Active: true, WorkspaceID: "ws 1", ThreadID: "th/1", RunID: "run+1"},
+		WorkbenchLinkState: ThoughtsWorkbenchLinkState{Context: "chat", ChatWorkspaceID: "ws 1", ChatThreadID: "th/1", ChatRunID: "run+1"},
 		Items: []DirectoryItem{
 			{Name: "docs", Path: "owner/docs", IsDir: true},
 			{Name: "plan.md", Path: "owner/plan.md"},
@@ -107,7 +107,7 @@ func TestDirectoryPrimaryPanelOmitsChatWorkspaceForActiveThreadQuery(t *testing.
 			t.Fatalf("missing preserved chat query %q in %s", want, html)
 		}
 	}
-	if strings.Contains(html, "chat_workspace=ws+1") {
-		t.Fatalf("thread-active directory links preserved chat_workspace: %s", html)
+	if !strings.Contains(html, "chat_workspace=ws+1") {
+		t.Fatalf("thread-active directory links dropped chat_workspace: %s", html)
 	}
 }

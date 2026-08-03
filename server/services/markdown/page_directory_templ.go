@@ -135,9 +135,9 @@ func DirectoryPrimaryPanel(args *DirectoryArgs) templ.Component {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var5 templ.SafeURL
-			templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(DirectoryItemHref(item, args.ChatLinkState)))
+			templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(DirectoryItemHref(item, args.WorkbenchLinkState)))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/markdown/page_directory.templ`, Line: 44, Col: 72}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/markdown/page_directory.templ`, Line: 44, Col: 77}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var5))
 			if templ_7745c5c3_Err != nil {
@@ -203,8 +203,8 @@ func DirectoryPrimaryPanel(args *DirectoryArgs) templ.Component {
 	})
 }
 
-func DirectoryItemHref(item DirectoryItem, chat EmbeddedChatLinkState) string {
-	return ThoughtsHrefWithChat(item.Path, item.IsDir, chat)
+func DirectoryItemHref(item DirectoryItem, state ThoughtsWorkbenchLinkState) string {
+	return ThoughtsHrefWithWorkbenchState(item.Path, item.IsDir, state)
 }
 
 func EmptyDirectoryContextPanel() templ.Component {

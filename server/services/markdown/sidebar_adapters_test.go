@@ -124,11 +124,11 @@ func TestBuildThoughtsDirectorySidebarArgsUsesDirectoryAnchors(t *testing.T) {
 func TestBuildThoughtsSidebarArgsPreservesActiveChatQuery(t *testing.T) {
 	args := &PageArgs{
 		FilePath: "owner/plan-a/design.md",
-		ChatLinkState: EmbeddedChatLinkState{
-			Active:      true,
-			WorkspaceID: "ws_1",
-			ThreadID:    "th_1",
-			RunID:       "run_1",
+		WorkbenchLinkState: ThoughtsWorkbenchLinkState{
+			Context:         "chat",
+			ChatWorkspaceID: "ws_1",
+			ChatThreadID:    "th_1",
+			ChatRunID:       "run_1",
 		},
 		FileTree: []FileTreeNode{{
 			Name: "outline.md",
@@ -153,19 +153,19 @@ func TestBuildThoughtsSidebarArgsPreservesActiveChatQuery(t *testing.T) {
 			t.Fatalf("query[%s]=%q want %q in %q", key, got, want, node.Href)
 		}
 	}
-	if got := query.Get("chat_workspace"); got != "" {
-		t.Fatalf("query[chat_workspace]=%q want empty in %q", got, node.Href)
+	if got := query.Get("chat_workspace"); got == "" {
+		t.Fatalf("query[chat_workspace]=%q want preserved in %q", got, node.Href)
 	}
 }
 
 func TestBuildThoughtsDirectorySidebarArgsPreservesActiveChatQuery(t *testing.T) {
 	args := &DirectoryArgs{
 		Path: "owner/plan-a",
-		ChatLinkState: EmbeddedChatLinkState{
-			Active:      true,
-			WorkspaceID: "ws_1",
-			ThreadID:    "th_1",
-			RunID:       "run_1",
+		WorkbenchLinkState: ThoughtsWorkbenchLinkState{
+			Context:         "chat",
+			ChatWorkspaceID: "ws_1",
+			ChatThreadID:    "th_1",
+			ChatRunID:       "run_1",
 		},
 		FileTree: []FileTreeNode{{
 			Name:  "docs",
@@ -191,8 +191,8 @@ func TestBuildThoughtsDirectorySidebarArgsPreservesActiveChatQuery(t *testing.T)
 			t.Fatalf("query[%s]=%q want %q in %q", key, got, want, node.Href)
 		}
 	}
-	if got := query.Get("chat_workspace"); got != "" {
-		t.Fatalf("query[chat_workspace]=%q want empty in %q", got, node.Href)
+	if got := query.Get("chat_workspace"); got == "" {
+		t.Fatalf("query[chat_workspace]=%q want preserved in %q", got, node.Href)
 	}
 }
 
@@ -279,11 +279,11 @@ func TestBuildWorkspaceDocTreeArgsPreservesChatState(t *testing.T) {
 				Title:       "design.md",
 			},
 		},
-		EmbeddedChatLinkState{
-			Active:      true,
-			WorkspaceID: "ws 1",
-			ThreadID:    "th/1",
-			RunID:       "run+1",
+		ThoughtsWorkbenchLinkState{
+			Context:         "chat",
+			ChatWorkspaceID: "ws 1",
+			ChatThreadID:    "th/1",
+			ChatRunID:       "run+1",
 		},
 	)
 	if args == nil || len(args.Nodes) != 1 || len(args.Nodes[0].Children) != 1 {
@@ -307,7 +307,7 @@ func TestBuildWorkspaceDocTreeArgsPreservesChatState(t *testing.T) {
 			t.Fatalf("query[%s]=%q want %q in %q", key, got, want, node.Href)
 		}
 	}
-	if got := query.Get("chat_workspace"); got != "" {
-		t.Fatalf("query[chat_workspace]=%q want empty in %q", got, node.Href)
+	if got := query.Get("chat_workspace"); got == "" {
+		t.Fatalf("query[chat_workspace]=%q want preserved in %q", got, node.Href)
 	}
 }

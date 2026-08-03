@@ -24,11 +24,14 @@ func BuildThoughtsSidebarArgs(
 		ID:         "thoughts-shared-sidebar",
 		DefaultTab: workbench.SidebarTabFiles,
 		Tabs:       workbench.DefaultSidebarTabs(),
-		Workspaces: BuildThoughtsWorkspacesPanelModel(
-			workspaces,
-			args.WorkspaceContext.WorkspaceID,
+		Workspaces: preserveWorkspaceRootHrefs(
+			BuildThoughtsWorkspacesPanelModel(
+				workspaces,
+				args.WorkspaceContext.WorkspaceID,
+			),
+			args.WorkbenchLinkState,
 		),
-		Files: BuildFilesPanelModel(args.FilePath, document, args.FileTree, args.ChatLinkState),
+		Files: BuildFilesPanelModel(args.FilePath, document, args.FileTree, args.WorkbenchLinkState),
 	}
 }
 
@@ -41,14 +44,27 @@ func BuildThoughtsDirectorySidebarArgs(
 		ID:         "thoughts-shared-sidebar",
 		DefaultTab: workbench.SidebarTabFiles,
 		Tabs:       workbench.DefaultSidebarTabs(),
-		Workspaces: BuildThoughtsWorkspacesPanelModel(workspaces, ""),
+		Workspaces: preserveWorkspaceRootHrefs(
+			BuildThoughtsWorkspacesPanelModel(workspaces, ""),
+			args.WorkbenchLinkState,
+		),
 		Files: BuildFilesPanelModel(
 			args.Path,
 			workbench.DocumentPanelModel{CurrentPath: args.Path},
 			args.FileTree,
-			args.ChatLinkState,
+			args.WorkbenchLinkState,
 		),
 	}
+}
+
+func preserveWorkspaceRootHrefs(
+	panel workbench.WorkspacesPanelModel,
+	state ThoughtsWorkbenchLinkState,
+) workbench.WorkspacesPanelModel {
+	for index := range panel.Roots {
+		panel.Roots[index].Href = state.Preserve(panel.Roots[index].Href)
+	}
+	return panel
 }
 
 func firstWorkspaceList(workspaceLists [][]db.Workspace) []db.Workspace {
@@ -156,29 +172,29 @@ func BuildFilesPanelModel(
 	currentPath string,
 	document workbench.DocumentPanelModel,
 	nodes []FileTreeNode,
-	chat EmbeddedChatLinkState,
+	state ThoughtsWorkbenchLinkState,
 ) workbench.FilesPanelModel {
 	return workbench.NewFilesPanelModel(
 		currentPath,
 		document,
-		buildFileTreeItems(nodes, chat),
+		buildFileTreeItems(nodes, state),
 	)
 }
 
 func buildFileTreeItems(
 	nodes []FileTreeNode,
-	chat EmbeddedChatLinkState,
+	state ThoughtsWorkbenchLinkState,
 ) []workbench.FileTreeItem {
 	out := make([]workbench.FileTreeItem, 0, len(nodes))
 	for _, node := range nodes {
 		item := workbench.FileTreeItem{
 			Name:       node.Name,
 			Path:       node.Path,
-			Href:       ThoughtsHrefWithChat(node.Path, node.IsDir, chat),
+			Href:       ThoughtsHrefWithWorkbenchState(node.Path, node.IsDir, state),
 			IsDir:      node.IsDir,
 			IsExpanded: node.IsExpanded,
 			IsActive:   node.IsActive,
-			Children:   buildFileTreeItems(node.Children, chat),
+			Children:   buildFileTreeItems(node.Children, state),
 		}
 		out = append(out, item)
 	}
@@ -190,21 +206,21 @@ func BuildWorkspaceDocTreeArgs(
 	currentPath string,
 	entryMode workbench.DocEntryMode,
 	rows []db.WorkspaceDoc,
-	chatStates ...EmbeddedChatLinkState,
+	linkStates ...ThoughtsWorkbenchLinkState,
 ) *workbench.WorkspaceDocTreeArgs {
 	workspaceID = strings.TrimSpace(workspaceID)
 	if workspaceID == "" {
 		return nil
 	}
-	chat := EmbeddedChatLinkState{}
-	if len(chatStates) > 0 {
-		chat = chatStates[0]
+	state := ThoughtsWorkbenchLinkState{}
+	if len(linkStates) > 0 {
+		state = linkStates[0]
 	}
 	args := &workbench.WorkspaceDocTreeArgs{
 		WorkspaceID:  workspaceID,
 		CurrentPath:  currentPath,
 		EntryMode:    entryMode,
-		Nodes:        buildWorkspaceDocTreeNodes(rows, currentPath, entryMode, chat),
+		Nodes:        buildWorkspaceDocTreeNodes(rows, currentPath, entryMode, state),
 		EmptyMessage: "Workspace docs will appear after the workspace sync runs.",
 	}
 	if len(rows) > 0 {
@@ -217,7 +233,7 @@ func buildWorkspaceDocTreeNodes(
 	rows []db.WorkspaceDoc,
 	current string,
 	entryMode workbench.DocEntryMode,
-	chat EmbeddedChatLinkState,
+	state ThoughtsWorkbenchLinkState,
 ) []workbench.WorkspaceDocNode {
 	current = strings.Trim(strings.TrimSpace(path.Clean("/"+current)), "/")
 	type nodeRef struct {
@@ -241,7 +257,7 @@ func buildWorkspaceDocTreeNodes(
 		docPath := strings.Trim(strings.TrimSpace(row.DocPath), "/")
 		href := ""
 		if kind == workbench.WorkspaceDocKindFile {
-			href = chat.Preserve(workbench.WorkspaceDocNodeHref(entryMode, docPath))
+			href = state.Preserve(workbench.WorkspaceDocNodeHref(entryMode, docPath))
 		}
 		refs[rel] = &nodeRef{node: &workbench.WorkspaceDocNode{
 			Path:     docPath,

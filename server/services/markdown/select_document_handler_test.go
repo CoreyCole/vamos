@@ -2,13 +2,17 @@ package markdown
 
 import (
 	"database/sql"
+	stdhtml "html"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
+
+	xhtml "golang.org/x/net/html"
 
 	pkgdb "github.com/CoreyCole/vamos/pkg/db"
 	commentsvc "github.com/CoreyCole/vamos/server/services/comments"
@@ -123,22 +127,180 @@ func TestThoughtsDocURLWithChatStatePreservesChatQuery(t *testing.T) {
 	}
 }
 
-func TestHandleSelectCommentPatchesTargetDocumentAndPreservesChatState(t *testing.T) {
-	service, database := newDocumentSelectionService(t)
+func createDocumentSelectionComment(t *testing.T, database *dbsvc.Service, id string) {
+	t.Helper()
 	_, err := database.Queries.CreateDocumentComment(t.Context(), pkgdb.CreateDocumentCommentParams{
-		ID:           "comment-1",
-		DocPath:      "thoughts/owner/plan-a/design.md",
-		UserEmail:    "user@example.com",
-		CommentText:  "Needs review",
-		SelectedText: "Design",
-		SectionHint: sql.NullString{
-			String: "design",
-			Valid:  true,
-		},
+		ID:            id,
+		WorkspaceRoot: "owner/plan-a",
+		DocPath:       "thoughts/owner/plan-a/design.md",
+		UserEmail:     "user@example.com",
+		CommentText:   "Needs review",
+		SelectedText:  "Design",
+		SectionHint:   sql.NullString{String: "design", Valid: true},
 	})
 	if err != nil {
 		t.Fatalf("CreateDocumentComment() error = %v", err)
 	}
+}
+
+func selectCommentFormValues(t *testing.T, rendered string) url.Values {
+	t.Helper()
+	doc, err := xhtml.Parse(strings.NewReader(rendered))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var selected *xhtml.Node
+	var walk func(*xhtml.Node)
+	walk = func(node *xhtml.Node) {
+		if selected != nil {
+			return
+		}
+		if node.Type == xhtml.ElementNode && node.Data == "form" && formHasOpenCommentButton(node) {
+			selected = node
+			return
+		}
+		for child := node.FirstChild; child != nil; child = child.NextSibling {
+			walk(child)
+		}
+	}
+	walk(doc)
+	if selected == nil {
+		t.Fatalf("select-comment form not found in %s", rendered)
+	}
+	values := url.Values{}
+	var inputs func(*xhtml.Node)
+	inputs = func(node *xhtml.Node) {
+		if node.Type == xhtml.ElementNode && node.Data == "input" {
+			name, value := "", ""
+			for _, attr := range node.Attr {
+				switch attr.Key {
+				case "name":
+					name = attr.Val
+				case "value":
+					value = attr.Val
+				}
+			}
+			if name != "" {
+				values.Set(name, value)
+			}
+		}
+		for child := node.FirstChild; child != nil; child = child.NextSibling {
+			inputs(child)
+		}
+	}
+	inputs(selected)
+	return values
+}
+
+func formHasOpenCommentButton(form *xhtml.Node) bool {
+	var found bool
+	var walk func(*xhtml.Node)
+	walk = func(node *xhtml.Node) {
+		if node.Type == xhtml.ElementNode && node.Data == "button" {
+			for _, attr := range node.Attr {
+				if attr.Key == "aria-label" && attr.Val == "Open comment in document" {
+					found = true
+					return
+				}
+			}
+		}
+		for child := node.FirstChild; child != nil && !found; child = child.NextSibling {
+			walk(child)
+		}
+	}
+	walk(form)
+	return found
+}
+
+func assertThreadsSelectionURLPatch(t *testing.T, body string) {
+	t.Helper()
+	marker := `data-replace-url="`
+	start := strings.LastIndex(body, marker)
+	if start < 0 {
+		t.Fatalf("URL patch missing from %s", body)
+	}
+	value := body[start+len(marker):]
+	end := strings.Index(value, `"`)
+	if end < 0 {
+		t.Fatalf("URL patch value unterminated in %s", body)
+	}
+	quoted := stdhtml.UnescapeString(value[:end])
+	patched, err := strconv.Unquote(quoted)
+	if err != nil {
+		t.Fatalf("unquote URL patch %q: %v", quoted, err)
+	}
+	parsed, err := url.Parse(patched)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for key, want := range map[string]string{
+		"context": "threads", "chat_workspace": "ws_1", "thread": "chat_1",
+		"run": "run_1", "hermes_thread": "hermes_1",
+	} {
+		if parsed.Query().Get(key) != want {
+			t.Fatalf("patched URL %q query[%s] = %q, want %q", patched, key, parsed.Query().Get(key), want)
+		}
+	}
+}
+
+func TestRenderedThoughtsCommentCardSubmitsCombinedWorkbenchState(t *testing.T) {
+	service, database := newDocumentSelectionService(t)
+	createDocumentSelectionComment(t, database, "comment-card")
+	comments, err := service.commentService.GetCommentsForScopeInternal(t.Context(), "thoughts/owner/plan-a/design.md")
+	if err != nil {
+		t.Fatal(err)
+	}
+	page := &PageArgs{
+		FilePath: "owner/plan-a/design.md",
+		WorkbenchLinkState: ThoughtsWorkbenchLinkState{
+			Context: "threads", ChatWorkspaceID: "ws_1", ChatThreadID: "chat_1", ChatRunID: "run_1",
+			HermesThreadID: "hermes_1", SelectedPlanPath: "owner/plan-a",
+		},
+	}
+	component := CommentsRightRailPanel(service.buildCommentUI(page, "user@example.com", thoughtsCommentThreads(comments.Comments)))
+	var rendered strings.Builder
+	if err := component.Render(t.Context(), &rendered); err != nil {
+		t.Fatal(err)
+	}
+	form := selectCommentFormValues(t, rendered.String())
+	for key, want := range map[string]string{"context": "threads", "chat_workspace": "ws_1", "thread": "chat_1", "run": "run_1", "hermes_thread": "hermes_1"} {
+		if form.Get(key) != want {
+			t.Fatalf("rendered form[%s] = %q, want %q", key, form.Get(key), want)
+		}
+	}
+	context, recorder := newPostFormContext(t, "/thoughts/actions/select-comment", form)
+	if err := service.HandleSelectComment(context); err != nil {
+		t.Fatal(err)
+	}
+	assertThreadsSelectionURLPatch(t, recorder.Body.String())
+}
+
+func TestInPlaceCommentsPanelSubmitsCombinedWorkbenchState(t *testing.T) {
+	service, database := newDocumentSelectionService(t)
+	createDocumentSelectionComment(t, database, "comment-panel")
+	openContext, openRecorder := newPostFormContext(t, "/thoughts/actions/open-comments", url.Values{
+		"doc_path": {"thoughts/owner/plan-a/design.md"}, "context": {"threads"},
+		"chat_workspace": {"ws_1"}, "thread": {"chat_1"}, "run": {"run_1"}, "hermes_thread": {"hermes_1"},
+	})
+	if err := service.HandleOpenCommentsInPlace(openContext); err != nil {
+		t.Fatal(err)
+	}
+	form := selectCommentFormValues(t, openRecorder.Body.String())
+	for key, want := range map[string]string{"context": "threads", "chat_workspace": "ws_1", "thread": "chat_1", "run": "run_1", "hermes_thread": "hermes_1"} {
+		if form.Get(key) != want {
+			t.Fatalf("in-place form[%s] = %q, want %q", key, form.Get(key), want)
+		}
+	}
+	selectContext, selectRecorder := newPostFormContext(t, "/thoughts/actions/select-comment", form)
+	if err := service.HandleSelectComment(selectContext); err != nil {
+		t.Fatal(err)
+	}
+	assertThreadsSelectionURLPatch(t, selectRecorder.Body.String())
+}
+
+func TestHandleSelectCommentPatchesTargetDocumentAndPreservesChatState(t *testing.T) {
+	service, database := newDocumentSelectionService(t)
+	createDocumentSelectionComment(t, database, "comment-1")
 	c, rec := newPostFormContext(t, "/thoughts/actions/select-comment", url.Values{
 		"comment_id":     {"comment-1"},
 		"chat_workspace": {"ws_1"},
@@ -155,7 +317,7 @@ func TestHandleSelectCommentPatchesTargetDocumentAndPreservesChatState(t *testin
 		"thoughts-document-panel",
 		"thoughts-shared-sidebar",
 		"thoughts-url-sync",
-		`data-replace-url="&#34;/thoughts/owner/plan-a/design.md?context=chat&amp;run=run_1&amp;thread=th_1#design&#34;"`,
+		`data-replace-url="&#34;/thoughts/owner/plan-a/design.md?chat_workspace=ws_1&amp;context=chat&amp;run=run_1&amp;thread=th_1#design&#34;"`,
 		"workbench-section-nav",
 		`detail: { hash: 'design', updateURL: false }`,
 		"comment-thread-comment-1",

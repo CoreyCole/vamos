@@ -3,6 +3,7 @@ package markdown
 import (
 	stdhtml "html"
 	"net/http"
+	"net/url"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -21,6 +22,7 @@ import (
 const (
 	thoughtsContextModeComments = "comments"
 	thoughtsContextModeChat     = "chat"
+	thoughtsContextModeThreads  = "threads"
 
 	thoughtsWorkspacesLimit = 200
 
@@ -65,12 +67,10 @@ func (s *Service) ServeMarkdown(c echo.Context) error {
 		dirArgs.CurrentTheme = currentThemeMode
 		dirArgs.CurrentSyntaxTheme = currentTheme
 		dirArgs.FileTree = s.GetFileTree(requestPath)
-		dirArgs.ChatLinkState = EmbeddedChatLinkStateFromRequest(c, EmbeddedChatLinkState{
-			Active:      thoughtsContextMode(c) == thoughtsContextModeChat,
-			WorkspaceID: strings.TrimSpace(c.QueryParam("chat_workspace")),
-			ThreadID:    strings.TrimSpace(c.QueryParam("thread")),
-			RunID:       strings.TrimSpace(c.QueryParam("run")),
-		})
+		dirArgs.WorkbenchLinkState = ThoughtsWorkbenchLinkStateFromRequest(
+			c,
+			selectedPlanPathFromThoughtsPath(dirArgs.Path),
+		)
 
 		workbenchState, err := s.buildThoughtsDirectoryWorkbenchState(c, dirArgs)
 		if err != nil {
@@ -98,12 +98,10 @@ func (s *Service) ServeMarkdown(c echo.Context) error {
 				dirArgs.CurrentTheme = currentThemeMode
 				dirArgs.CurrentSyntaxTheme = currentTheme
 				dirArgs.FileTree = s.GetFileTree(requestPath)
-				dirArgs.ChatLinkState = EmbeddedChatLinkStateFromRequest(c, EmbeddedChatLinkState{
-					Active:      thoughtsContextMode(c) == thoughtsContextModeChat,
-					WorkspaceID: strings.TrimSpace(c.QueryParam("chat_workspace")),
-					ThreadID:    strings.TrimSpace(c.QueryParam("thread")),
-					RunID:       strings.TrimSpace(c.QueryParam("run")),
-				})
+				dirArgs.WorkbenchLinkState = ThoughtsWorkbenchLinkStateFromRequest(
+					c,
+					selectedPlanPathFromThoughtsPath(dirArgs.Path),
+				)
 				workbenchState, stateErr := s.buildThoughtsDirectoryWorkbenchState(
 					c,
 					dirArgs,
@@ -124,12 +122,10 @@ func (s *Service) ServeMarkdown(c echo.Context) error {
 	pageArgs.CurrentTheme = currentThemeMode
 	pageArgs.CurrentSyntaxTheme = currentTheme
 	pageArgs.FileTree = s.GetFileTree(pageArgs.FilePath)
-	pageArgs.ChatLinkState = EmbeddedChatLinkStateFromRequest(c, EmbeddedChatLinkState{
-		Active:      thoughtsContextMode(c) == thoughtsContextModeChat,
-		WorkspaceID: strings.TrimSpace(c.QueryParam("chat_workspace")),
-		ThreadID:    strings.TrimSpace(c.QueryParam("thread")),
-		RunID:       strings.TrimSpace(c.QueryParam("run")),
-	})
+	pageArgs.WorkbenchLinkState = ThoughtsWorkbenchLinkStateFromRequest(
+		c,
+		selectedPlanPathFromThoughtsPath(pageArgs.FilePath),
+	)
 	pageArgs.QRSPIMetadata = s.buildQRSPIMetadata(pageArgs)
 	// Generate unique page session ID for this tab
 	pageArgs.PageSessionID = uuid.Must(uuid.NewV4()).String()
@@ -226,7 +222,7 @@ func (s *Service) ServeMarkdown(c echo.Context) error {
 func thoughtsViewFromQuery(c echo.Context) (workbench.WorkbenchView, string) {
 	mode := thoughtsContextMode(c)
 	switch mode {
-	case thoughtsContextModeComments, thoughtsContextModeChat:
+	case thoughtsContextModeComments, thoughtsContextModeChat, thoughtsContextModeThreads:
 		return workbench.WorkbenchViewSplit, mode
 	default:
 		return workbench.WorkbenchViewFocus, ""
@@ -247,13 +243,15 @@ func (s *Service) buildCommentUI(
 	userEmail string,
 	threads []commentui.CommentThreadView,
 ) commentui.CommentableMarkdownArgs {
+	hiddenFields := pageArgs.WorkbenchLinkState.HiddenFields()
+	hiddenFields["doc_path"] = pageArgs.FilePath
 	selection := commentui.SelectionSignalArgs{}
 	if commentModeHasSelection(pageArgs.ViewerArgs.CommentMode) {
 		selection = commentui.SelectionSignalArgs{
 			Prefix:          "comment_selection",
 			ExcludeSelector: "#comment-sidebar, [data-comment-target=true], [id^=comment-target-], [id^=section-comments-]",
 			ShowRoute:       "/forms/comments/show",
-			HiddenFields:    map[string]string{"doc_path": pageArgs.FilePath},
+			HiddenFields:    hiddenFields,
 			ContainerID:     "thoughts-markdown-scroll-region",
 		}
 	}
@@ -279,7 +277,7 @@ func (s *Service) buildCommentUI(
 				return "/forms/resolve"
 			},
 		},
-		HiddenFields:     map[string]string{"doc_path": pageArgs.FilePath},
+		HiddenFields:     hiddenFields,
 		SelectionSignals: selection,
 	}
 }
@@ -338,8 +336,11 @@ func (s *Service) buildThoughtsWorkbenchState(
 	viewportClass := viewportClassForRequest(c)
 	saved := s.savedThoughtsWorkbenchConfig(c, pageArgs.UserEmail, view, viewportClass)
 	rightTab := workbench.RightRailTabComments
-	if contextMode == thoughtsContextModeChat {
+	switch contextMode {
+	case thoughtsContextModeChat:
 		rightTab = workbench.RightRailTabChat
+	case thoughtsContextModeThreads:
+		rightTab = workbench.RightRailTabThreads
 	}
 	headerWorkspaceTree, hasHeaderWorkspaceTree, err := s.buildHeaderWorkspaceDocTree(
 		c,
@@ -349,12 +350,24 @@ func (s *Service) buildThoughtsWorkbenchState(
 		return workbench.WorkbenchState{}, err
 	}
 	chatComponent, chatURLReplacement, err := s.buildEmbeddedChatComponent(c, pageArgs)
-	if chatURLReplacement.URL != "" && chatComponent != nil {
-		chatComponent = EmbeddedChatInitialContent(chatURLReplacement.URL, chatComponent)
-	}
 	if err != nil {
 		return workbench.WorkbenchState{}, err
 	}
+	hermesComponent, hermesURLReplacement, err := s.buildHermesThreadsComponent(
+		c,
+		pageArgs.UserEmail,
+		pageArgs.FilePath,
+		pageArgs.QRSPIMetadata.PlanDir,
+		false,
+		pageArgs.WorkbenchLinkState,
+	)
+	if err != nil {
+		return workbench.WorkbenchState{}, err
+	}
+	chatComponent, hermesComponent = applyThoughtsRendererURLReplacement(
+		c.Request().URL.RequestURI(), chatComponent, chatURLReplacement.URL,
+		hermesComponent, hermesURLReplacement.URL,
+	)
 	return workbench.BuildDocWorkbenchState(workbench.WorkbenchDocContext{
 		EntryMode:     workbench.DocEntryModeThoughts,
 		UserEmail:     pageArgs.UserEmail,
@@ -384,6 +397,15 @@ func (s *Service) buildThoughtsWorkbenchState(
 		},
 		RightRail: workbench.RightRailArgs{
 			ActiveTab: rightTab,
+			ChatHref: pageArgs.WorkbenchLinkState.WithContext(thoughtsContextModeChat).Preserve(
+				ThoughtsDocURL(pageArgs.FilePath, ""),
+			),
+			CommentsHref: pageArgs.WorkbenchLinkState.WithContext(thoughtsContextModeComments).Preserve(
+				ThoughtsDocURL(pageArgs.FilePath, ""),
+			),
+			ThreadsHref: pageArgs.WorkbenchLinkState.WithContext(thoughtsContextModeThreads).Preserve(
+				ThoughtsDocURL(pageArgs.FilePath, ""),
+			),
 			Chat: ThoughtsContextPanel(ThoughtsContextArgs{
 				Mode:      thoughtsContextModeChat,
 				PageArgs:  pageArgs,
@@ -395,8 +417,69 @@ func (s *Service) buildThoughtsWorkbenchState(
 				PageArgs:  pageArgs,
 				CommentUI: pageArgs.CommentUI,
 			}),
+			Threads: hermesComponent,
 		},
 	})
+}
+
+func applyThoughtsRendererURLReplacement(
+	currentURL string,
+	chatComponent templ.Component,
+	chatReplacement string,
+	hermesComponent templ.Component,
+	hermesReplacement string,
+) (templ.Component, templ.Component) {
+	replacement := composeThoughtsRendererURLReplacement(
+		currentURL,
+		chatReplacement,
+		hermesReplacement,
+	)
+	if replacement == "" {
+		return chatComponent, hermesComponent
+	}
+	if chatComponent != nil {
+		return EmbeddedChatInitialContent(replacement, chatComponent), hermesComponent
+	}
+	if hermesComponent != nil {
+		return chatComponent, EmbeddedChatInitialContent(replacement, hermesComponent)
+	}
+	return chatComponent, hermesComponent
+}
+
+func composeThoughtsRendererURLReplacement(
+	currentURL, chatReplacement, hermesReplacement string,
+) string {
+	chatReplacement = strings.TrimSpace(chatReplacement)
+	hermesReplacement = strings.TrimSpace(hermesReplacement)
+	if chatReplacement == "" && hermesReplacement == "" {
+		return ""
+	}
+	current, err := url.Parse(strings.TrimSpace(currentURL))
+	if err != nil {
+		return ""
+	}
+	composed := current
+	if chatReplacement != "" {
+		parsed, err := url.Parse(chatReplacement)
+		if err != nil {
+			return ""
+		}
+		originalHermes := current.Query().Get("hermes_thread")
+		composed = parsed
+		query := composed.Query()
+		setQueryValue(query, "hermes_thread", originalHermes)
+		composed.RawQuery = query.Encode()
+	}
+	if hermesReplacement != "" {
+		parsed, err := url.Parse(hermesReplacement)
+		if err != nil {
+			return ""
+		}
+		query := composed.Query()
+		setQueryValue(query, "hermes_thread", parsed.Query().Get("hermes_thread"))
+		composed.RawQuery = query.Encode()
+	}
+	return composed.String()
 }
 
 func (s *Service) buildEmbeddedChatComponent(
@@ -424,6 +507,27 @@ func (s *Service) buildEmbeddedChatComponentForRequest(
 	return s.embeddedChatRenderer.RenderEmbeddedChatPanel(
 		c.Request().Context(),
 		request,
+	)
+}
+
+func (s *Service) buildHermesThreadsComponent(
+	c echo.Context,
+	userEmail, docPath, planHint string,
+	isDirectory bool,
+	state ThoughtsWorkbenchLinkState,
+) (templ.Component, HermesThreadsURLReplacement, error) {
+	if s.hermesThreadsRenderer == nil {
+		return nil, HermesThreadsURLReplacement{}, nil
+	}
+	selectedPlanPath := selectedPlanPathFromThoughtsPath(docPath)
+	return s.hermesThreadsRenderer.RenderHermesThreadsPanel(
+		c.Request().Context(),
+		HermesThreadsRenderRequest{
+			UserEmail: userEmail, DocPath: docPath,
+			SelectedPlanPath: selectedPlanPath, PlanHint: planHint,
+			NoPlan: selectedPlanPath == "", IsDirectory: isDirectory,
+			CurrentURL: c.Request().URL.RequestURI(), LinkState: state,
+		},
 	)
 }
 
@@ -475,14 +579,14 @@ func (s *Service) headerWorkspaceDocTreeNodes(
 		if err != nil {
 			return nil, err
 		}
-		return decorateWorkspaceDocNodeHrefs(nodes, pageArgs.ChatLinkState), nil
+		return decorateWorkspaceDocNodeHrefs(nodes, pageArgs.WorkbenchLinkState), nil
 	}
 	return s.workspaceDocTreeNodesFromIndex(c, pageArgs)
 }
 
 func decorateWorkspaceDocNodeHrefs(
 	nodes []workbench.WorkspaceDocNode,
-	chat EmbeddedChatLinkState,
+	state ThoughtsWorkbenchLinkState,
 ) []workbench.WorkspaceDocNode {
 	for i := range nodes {
 		if nodes[i].Kind == workbench.WorkspaceDocKindFile {
@@ -492,9 +596,9 @@ func decorateWorkspaceDocNodeHrefs(
 					nodes[i].Path,
 				)
 			}
-			nodes[i].Href = chat.Preserve(nodes[i].Href)
+			nodes[i].Href = state.Preserve(nodes[i].Href)
 		}
-		nodes[i].Children = decorateWorkspaceDocNodeHrefs(nodes[i].Children, chat)
+		nodes[i].Children = decorateWorkspaceDocNodeHrefs(nodes[i].Children, state)
 	}
 	return nodes
 }
@@ -523,7 +627,7 @@ func (s *Service) workspaceDocTreeNodesFromIndex(
 		pageArgs.FilePath,
 		workbench.DocEntryModeThoughts,
 		rows,
-		pageArgs.ChatLinkState,
+		pageArgs.WorkbenchLinkState,
 	)
 	if tree == nil {
 		return nil, nil
@@ -569,12 +673,27 @@ func (s *Service) buildThoughtsDirectoryWorkbenchState(
 	if err != nil {
 		return workbench.WorkbenchState{}, err
 	}
-	if chatURLReplacement.URL != "" && chatComponent != nil {
-		chatComponent = EmbeddedChatInitialContent(chatURLReplacement.URL, chatComponent)
+	hermesComponent, hermesURLReplacement, err := s.buildHermesThreadsComponent(
+		c,
+		args.UserEmail,
+		args.Path,
+		"",
+		true,
+		args.WorkbenchLinkState,
+	)
+	if err != nil {
+		return workbench.WorkbenchState{}, err
 	}
+	chatComponent, hermesComponent = applyThoughtsRendererURLReplacement(
+		c.Request().URL.RequestURI(), chatComponent, chatURLReplacement.URL,
+		hermesComponent, hermesURLReplacement.URL,
+	)
 	rightTab := workbench.RightRailTabComments
-	if contextMode == thoughtsContextModeChat {
+	switch contextMode {
+	case thoughtsContextModeChat:
 		rightTab = workbench.RightRailTabChat
+	case thoughtsContextModeThreads:
+		rightTab = workbench.RightRailTabThreads
 	}
 	selectedPath := args.Path
 	if strings.TrimSpace(selectedPath) == "" {
@@ -600,17 +719,27 @@ func (s *Service) buildThoughtsDirectoryWorkbenchState(
 		},
 		RightRail: workbench.RightRailArgs{
 			ActiveTab: rightTab,
+			ChatHref: args.WorkbenchLinkState.WithContext(thoughtsContextModeChat).Preserve(
+				ThoughtsDirURL(args.Path),
+			),
+			CommentsHref: args.WorkbenchLinkState.WithContext(thoughtsContextModeComments).Preserve(
+				ThoughtsDirURL(args.Path),
+			),
+			ThreadsHref: args.WorkbenchLinkState.WithContext(thoughtsContextModeThreads).Preserve(
+				ThoughtsDirURL(args.Path),
+			),
 			Chat: ThoughtsContextPanel(ThoughtsContextArgs{
 				Mode:      thoughtsContextModeChat,
 				Component: chatComponent,
 			}),
 			Comments: EmptyDirectoryContextPanel(),
+			Threads:  hermesComponent,
 		},
 	})
 	if err != nil {
 		return workbench.WorkbenchState{}, err
 	}
-	if contextMode == thoughtsContextModeChat && (viewportClass != workbench.ViewportMobile || saved == nil) {
+	if contextMode != "" && (viewportClass != workbench.ViewportMobile || saved == nil) {
 		state.Config.Mobile.ActiveRegionID = "doc-workbench-right"
 	}
 	return state, nil
@@ -683,12 +812,10 @@ func (s *Service) selectDocumentAndPatch(
 	userEmail, _ := c.Get("user_email").(string)
 	pageArgs.UserEmail = userEmail
 	pageArgs.FileTree = s.GetFileTree(pageArgs.FilePath)
-	pageArgs.ChatLinkState = EmbeddedChatLinkStateFromRequest(c, EmbeddedChatLinkState{
-		Active:      thoughtsContextMode(c) == thoughtsContextModeChat,
-		WorkspaceID: firstNonEmptyString(c.FormValue("chat_workspace"), c.QueryParam("chat_workspace")),
-		ThreadID:    firstNonEmptyString(c.FormValue("thread"), c.FormValue("thread_id"), c.QueryParam("thread")),
-		RunID:       firstNonEmptyString(c.FormValue("run"), c.FormValue("run_id"), c.QueryParam("run")),
-	})
+	pageArgs.WorkbenchLinkState = thoughtsWorkbenchLinkStateFromSubmission(
+		c,
+		selectedPlanPathFromThoughtsPath(pageArgs.FilePath),
+	)
 	workspaceCtx := DocumentWorkspaceContext{}
 	if s.workspaceResolver != nil && userEmail != "" {
 		resolved, err := s.workspaceResolver.ResolveWorkspaceForDocument(
@@ -764,26 +891,7 @@ func (s *Service) selectDocumentAndPatch(
 	}
 	url := ThoughtsDocURL(pageArgs.FilePath, selection.Hash)
 	if selection.PreserveChat {
-		url = ThoughtsDocURLWithChatState(
-			pageArgs.FilePath,
-			selection.Hash,
-			DocumentEmbeddedChatSelection{
-				WorkspaceID: firstNonEmptyString(
-					c.FormValue("chat_workspace"),
-					c.QueryParam("chat_workspace"),
-				),
-				ThreadID: firstNonEmptyString(
-					c.FormValue("thread"),
-					c.FormValue("thread_id"),
-					c.QueryParam("thread"),
-				),
-				RunID: firstNonEmptyString(
-					c.FormValue("run"),
-					c.FormValue("run_id"),
-					c.QueryParam("run"),
-				),
-			},
-		)
+		url = pageArgs.WorkbenchLinkState.Preserve(url)
 	}
 	if err := patchThoughtsURL(sse, url); err != nil {
 		return err
@@ -800,6 +908,33 @@ func patchThoughtsURL(sse *datastar.ServerSentEventGenerator, url string) error 
 			stdhtml.EscapeString(strconv.Quote(url))+`"></div>`,
 		datastar.WithSelectorID(thoughtsURLSyncSelectorID),
 	)
+}
+
+func thoughtsWorkbenchLinkStateFromSubmission(
+	c echo.Context,
+	selectedPlanPath string,
+) ThoughtsWorkbenchLinkState {
+	state := ThoughtsWorkbenchLinkState{
+		Context: firstNonEmptyString(c.FormValue("context"), thoughtsContextMode(c)),
+		ChatWorkspaceID: firstNonEmptyString(
+			c.FormValue("chat_workspace"), c.QueryParam("chat_workspace"),
+		),
+		ChatThreadID: firstNonEmptyString(
+			c.FormValue("thread"), c.FormValue("thread_id"), c.QueryParam("thread"),
+		),
+		ChatRunID: firstNonEmptyString(
+			c.FormValue("run"), c.FormValue("run_id"), c.QueryParam("run"),
+		),
+		HermesThreadID: firstNonEmptyString(
+			c.FormValue("hermes_thread"), c.QueryParam("hermes_thread"),
+		),
+		SelectedPlanPath: normalizeThoughtsRelativePath(selectedPlanPath),
+	}
+	if state.Context == "" &&
+		(state.ChatWorkspaceID != "" || state.ChatThreadID != "" || state.ChatRunID != "") {
+		state.Context = thoughtsContextModeChat
+	}
+	return state
 }
 
 func firstNonEmptyString(values ...string) string {
@@ -850,6 +985,13 @@ func (s *Service) HandleOpenCommentsInPlace(c echo.Context) error {
 	if err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
 	}
+	linkState := thoughtsWorkbenchLinkStateFromSubmission(
+		c,
+		selectedPlanPathFromThoughtsPath(docPath),
+	)
+	hiddenFields := linkState.HiddenFields()
+	hiddenFields["doc_path"] = docPath
+	hiddenFields["context_panel"] = "1"
 	panelArgs := commentui.CommentableMarkdownArgs{
 		Surface:  commentui.CommentSurfaceThoughts,
 		IDPrefix: commentui.SafeCommentTargetSlug("thoughts", docPath),
@@ -868,7 +1010,7 @@ func (s *Service) HandleOpenCommentsInPlace(c echo.Context) error {
 				return "/forms/resolve"
 			},
 		},
-		HiddenFields: map[string]string{"doc_path": docPath, "context_panel": "1"},
+		HiddenFields: hiddenFields,
 		UserEmail:    userEmail,
 	}
 	sse := datastar.NewSSE(c.Response().Writer, c.Request())

@@ -388,7 +388,83 @@ func RightRail(args RightRailArgs) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 25, "<div class=\"grid min-w-0 flex-1 grid-cols-3 gap-1 rounded-md bg-muted/40 p-1\" role=\"tablist\" aria-label=\"Doc right rail tabs\"><button type=\"button\" class=\"rounded px-2 py-1 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground\" data-on:click=\"$rightRailActiveTab = 'chat'\" data-class=\"{'bg-background text-foreground shadow-sm': $rightRailActiveTab === 'chat'}\">Chat</button> <button type=\"button\" class=\"rounded px-2 py-1 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground\" data-on:click=\"$rightRailActiveTab = 'threads'\" data-class=\"{'bg-background text-foreground shadow-sm': $rightRailActiveTab === 'threads'}\">Threads</button> <button type=\"button\" class=\"rounded px-2 py-1 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground\" data-on:click=\"$rightRailActiveTab = 'comments'\" data-class=\"{'bg-background text-foreground shadow-sm': $rightRailActiveTab === 'comments'}\">Comments</button></div></div></div><div class=\"min-h-0 flex-1 overflow-hidden\"><div id=\"doc-right-chat-panel\" class=\"h-full min-h-0\" data-show=\"$rightRailActiveTab === 'chat'\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 25, "<div class=\"grid min-w-0 flex-1 grid-cols-3 gap-1 rounded-md bg-muted/40 p-1\" role=\"tablist\" aria-label=\"Doc right rail tabs\">")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		if args.ChatHref != "" {
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 26, "<a href=\"")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			var templ_7745c5c3_Var16 templ.SafeURL
+			templ_7745c5c3_Var16, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(args.ChatHref))
+			if templ_7745c5c3_Err != nil {
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/layouts/workbench/doc_workbench.templ`, Line: 87, Col: 44}
+			}
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var16))
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 27, "\" class=\"rounded px-2 py-1 text-center text-xs font-medium text-muted-foreground transition-colors hover:text-foreground\" data-class=\"{'bg-background text-foreground shadow-sm': $rightRailActiveTab === 'chat'}\">Chat</a> ")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+		} else {
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 28, "<button type=\"button\" class=\"rounded px-2 py-1 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground\" data-on:click=\"$rightRailActiveTab = 'chat'\" data-class=\"{'bg-background text-foreground shadow-sm': $rightRailActiveTab === 'chat'}\">Chat</button> ")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+		}
+		if args.ThreadsHref != "" {
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 29, "<a href=\"")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			var templ_7745c5c3_Var17 templ.SafeURL
+			templ_7745c5c3_Var17, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(args.ThreadsHref))
+			if templ_7745c5c3_Err != nil {
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/layouts/workbench/doc_workbench.templ`, Line: 92, Col: 47}
+			}
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var17))
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 30, "\" class=\"rounded px-2 py-1 text-center text-xs font-medium text-muted-foreground transition-colors hover:text-foreground\" data-class=\"{'bg-background text-foreground shadow-sm': $rightRailActiveTab === 'threads'}\">Threads</a> ")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+		} else {
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 31, "<button type=\"button\" class=\"rounded px-2 py-1 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground\" data-on:click=\"$rightRailActiveTab = 'threads'\" data-class=\"{'bg-background text-foreground shadow-sm': $rightRailActiveTab === 'threads'}\">Threads</button> ")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+		}
+		if args.CommentsHref != "" {
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 32, "<a href=\"")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			var templ_7745c5c3_Var18 templ.SafeURL
+			templ_7745c5c3_Var18, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(args.CommentsHref))
+			if templ_7745c5c3_Err != nil {
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/layouts/workbench/doc_workbench.templ`, Line: 97, Col: 48}
+			}
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var18))
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 33, "\" class=\"rounded px-2 py-1 text-center text-xs font-medium text-muted-foreground transition-colors hover:text-foreground\" data-class=\"{'bg-background text-foreground shadow-sm': $rightRailActiveTab === 'comments'}\">Comments</a>")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+		} else {
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 34, "<button type=\"button\" class=\"rounded px-2 py-1 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground\" data-on:click=\"$rightRailActiveTab = 'comments'\" data-class=\"{'bg-background text-foreground shadow-sm': $rightRailActiveTab === 'comments'}\">Comments</button>")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 35, "</div></div></div><div class=\"min-h-0 flex-1 overflow-hidden\"><div id=\"doc-right-chat-panel\" class=\"h-full min-h-0\" data-show=\"$rightRailActiveTab === 'chat'\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -398,12 +474,12 @@ func RightRail(args RightRailArgs) templ.Component {
 				return templ_7745c5c3_Err
 			}
 		} else {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 26, "<div class=\"flex h-full items-center justify-center p-4 text-sm text-muted-foreground\">No chat selected.</div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 36, "<div class=\"flex h-full items-center justify-center p-4 text-sm text-muted-foreground\">No chat selected.</div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 27, "</div><div id=\"doc-right-threads-panel\" class=\"h-full min-h-0\" data-show=\"$rightRailActiveTab === 'threads'\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 37, "</div><div id=\"doc-right-threads-panel\" class=\"h-full min-h-0\" data-show=\"$rightRailActiveTab === 'threads'\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -413,12 +489,12 @@ func RightRail(args RightRailArgs) templ.Component {
 				return templ_7745c5c3_Err
 			}
 		} else {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 28, "<div class=\"flex h-full items-center justify-center p-4 text-sm text-muted-foreground\">No threads found.</div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 38, "<div class=\"flex h-full items-center justify-center p-4 text-sm text-muted-foreground\">No threads found.</div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 29, "</div><div id=\"doc-right-comments-panel\" class=\"h-full min-h-0\" data-show=\"$rightRailActiveTab === 'comments'\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 39, "</div><div id=\"doc-right-comments-panel\" class=\"h-full min-h-0\" data-show=\"$rightRailActiveTab === 'comments'\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -428,12 +504,12 @@ func RightRail(args RightRailArgs) templ.Component {
 				return templ_7745c5c3_Err
 			}
 		} else {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 30, "<div class=\"flex h-full items-center justify-center p-4 text-sm text-muted-foreground\">No comments selected.</div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 40, "<div class=\"flex h-full items-center justify-center p-4 text-sm text-muted-foreground\">No comments selected.</div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 31, "</div></div></aside>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 41, "</div></div></aside>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

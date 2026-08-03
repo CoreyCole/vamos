@@ -260,6 +260,40 @@ func TestBuildDocWorkbenchStateIgnoresWrongViewportSavedConfig(t *testing.T) {
 	}
 }
 
+func TestDocWorkbenchThreadsRailUsesStablePanelAndNormalLinks(t *testing.T) {
+	state, err := BuildDocWorkbenchState(WorkbenchDocContext{
+		EntryMode:    DocEntryModeThoughts,
+		SelectedPath: "plans/demo/design.md",
+		View:         WorkbenchViewSplit,
+		Center:       CenterDocPaneArgs{Document: templ.Raw("<p>doc</p>")},
+		RightRail: RightRailArgs{
+			ActiveTab: RightRailTabThreads,
+			Chat:      templ.Raw("<p>chat</p>"), Comments: templ.Raw("<p>comments</p>"),
+			Threads:      templ.Raw(`<p id="thread-content">threads</p>`),
+			ChatHref:     "/thoughts/plans/demo/design.md?context=chat",
+			CommentsHref: "/thoughts/plans/demo/design.md?context=comments",
+			ThreadsHref:  "/thoughts/plans/demo/design.md?context=threads",
+		},
+		InitialRailOpen: true,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if state.ContextMode != "threads" || state.Regions[2].Kind != RegionArtifact {
+		t.Fatalf("threads state = %#v", state)
+	}
+	var buffer bytes.Buffer
+	if err := Workbench(state).Render(context.Background(), &buffer); err != nil {
+		t.Fatal(err)
+	}
+	html := buffer.String()
+	for _, want := range []string{`id="doc-right-threads-panel"`, `id="thread-content"`, `href="/thoughts/plans/demo/design.md?context=threads"`} {
+		if !strings.Contains(html, want) {
+			t.Fatalf("render missing %q: %s", want, html)
+		}
+	}
+}
+
 func TestDocWorkbenchRenderContainsSharedChrome(t *testing.T) {
 	state, err := BuildDocWorkbenchState(WorkbenchDocContext{
 		EntryMode:    DocEntryModeThoughts,

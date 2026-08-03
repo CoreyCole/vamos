@@ -150,6 +150,9 @@ func (s *Service) RenderHermesTranscript(
 	}
 	messages := make([]ChatMessageArgs, 0, len(events))
 	for _, event := range events {
+		if event.Type == "thread_metadata" {
+			continue
+		}
 		message := ChatMessageArgs{
 			ID:      event.ID,
 			Role:    "assistant",

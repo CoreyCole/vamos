@@ -22,71 +22,84 @@ type DocumentEmbeddedChatSelection struct {
 	RunID       string
 }
 
-func (state EmbeddedChatLinkState) Selection() DocumentEmbeddedChatSelection {
-	return DocumentEmbeddedChatSelection{
-		WorkspaceID: strings.TrimSpace(state.WorkspaceID),
-		ThreadID:    strings.TrimSpace(state.ThreadID),
-		RunID:       strings.TrimSpace(state.RunID),
+func ThoughtsWorkbenchLinkStateFromRequest(
+	c echo.Context,
+	selectedPlanPath string,
+) ThoughtsWorkbenchLinkState {
+	return ThoughtsWorkbenchLinkState{
+		Context:          thoughtsContextMode(c),
+		ChatWorkspaceID:  strings.TrimSpace(c.QueryParam("chat_workspace")),
+		ChatThreadID:     strings.TrimSpace(c.QueryParam("thread")),
+		ChatRunID:        strings.TrimSpace(c.QueryParam("run")),
+		HermesThreadID:   strings.TrimSpace(c.QueryParam("hermes_thread")),
+		SelectedPlanPath: normalizeThoughtsRelativePath(selectedPlanPath),
 	}
 }
 
-func (state EmbeddedChatLinkState) Preserve(href string) string {
-	if !state.Active {
+func (state ThoughtsWorkbenchLinkState) WithContext(contextMode string) ThoughtsWorkbenchLinkState {
+	state.Context = strings.TrimSpace(contextMode)
+	return state
+}
+
+func (state ThoughtsWorkbenchLinkState) WithHermesThread(threadID string) ThoughtsWorkbenchLinkState {
+	state.Context = thoughtsContextModeThreads
+	state.HermesThreadID = strings.TrimSpace(threadID)
+	return state
+}
+
+func (state ThoughtsWorkbenchLinkState) WithoutHermesThread() ThoughtsWorkbenchLinkState {
+	state.HermesThreadID = ""
+	return state
+}
+
+func (state ThoughtsWorkbenchLinkState) HiddenFields() map[string]string {
+	fields := map[string]string{}
+	for key, value := range map[string]string{
+		"context": state.Context, "chat_workspace": state.ChatWorkspaceID,
+		"thread": state.ChatThreadID, "run": state.ChatRunID,
+		"hermes_thread": state.HermesThreadID,
+	} {
+		if value = strings.TrimSpace(value); value != "" {
+			fields[key] = value
+		}
+	}
+	return fields
+}
+
+func (state ThoughtsWorkbenchLinkState) Preserve(href string) string {
+	u, err := url.Parse(href)
+	if err != nil {
 		return href
 	}
-	selection := state.Selection()
-	if selection.WorkspaceID != "" || selection.ThreadID != "" || selection.RunID != "" {
-		return PreserveEmbeddedChatQuery(href, selection)
-	}
-	return preserveChatContextQuery(href)
-}
-
-func preserveChatContextQuery(base string) string {
-	u, err := url.Parse(base)
-	if err != nil {
-		return base
-	}
 	q := u.Query()
-	q.Set("context", "chat")
+	if contextMode := strings.TrimSpace(state.Context); contextMode != "" {
+		q.Set("context", contextMode)
+	}
+	setQueryValue(q, "chat_workspace", state.ChatWorkspaceID)
+	setQueryValue(q, "thread", state.ChatThreadID)
+	setQueryValue(q, "run", state.ChatRunID)
+	setQueryValue(q, "hermes_thread", state.HermesThreadID)
 	u.RawQuery = q.Encode()
 	return u.String()
 }
 
-func EmbeddedChatLinkStateFromRequest(
-	c echo.Context,
-	fallback EmbeddedChatLinkState,
-) EmbeddedChatLinkState {
-	state := fallback
-	if strings.TrimSpace(c.QueryParam("context")) == thoughtsContextModeChat {
-		state.Active = true
+func setQueryValue(query url.Values, key, value string) {
+	if value = strings.TrimSpace(value); value != "" {
+		query.Set(key, value)
+	} else {
+		query.Del(key)
 	}
-	if v := strings.TrimSpace(c.QueryParam("chat_workspace")); v != "" {
-		state.WorkspaceID = v
-		state.Active = true
-	}
-	if v := strings.TrimSpace(c.QueryParam("thread")); v != "" {
-		state.ThreadID = v
-		state.Active = true
-	}
-	if v := strings.TrimSpace(c.QueryParam("run")); v != "" {
-		state.RunID = v
-		state.Active = true
-	}
-	return state
 }
 
-func ThoughtsHrefWithChat(rawPath string, isDir bool, chat EmbeddedChatLinkState) string {
-	if isDir {
-		return chat.Preserve(ThoughtsDirURL(rawPath))
-	}
-	return chat.Preserve(ThoughtsDocURL(rawPath, ""))
-}
-
-func ThoughtsDirURLWithChatState(
-	dirPath string,
-	selection DocumentEmbeddedChatSelection,
+func ThoughtsHrefWithWorkbenchState(
+	rawPath string,
+	isDir bool,
+	state ThoughtsWorkbenchLinkState,
 ) string {
-	return PreserveEmbeddedChatQuery(ThoughtsDirURL(dirPath), selection)
+	if isDir {
+		return state.Preserve(ThoughtsDirURL(rawPath))
+	}
+	return state.Preserve(ThoughtsDocURL(rawPath, ""))
 }
 
 func CanonicalThoughtsDocPath(raw string) (string, error) {
@@ -175,31 +188,16 @@ func PreserveEmbeddedChatQuery(
 	base string,
 	selection DocumentEmbeddedChatSelection,
 ) string {
-	if strings.TrimSpace(selection.WorkspaceID) == "" &&
-		strings.TrimSpace(selection.ThreadID) == "" &&
-		strings.TrimSpace(selection.RunID) == "" {
-		return base
+	state := ThoughtsWorkbenchLinkState{
+		Context:         thoughtsContextModeChat,
+		ChatWorkspaceID: selection.WorkspaceID,
+		ChatThreadID:    selection.ThreadID,
+		ChatRunID:       selection.RunID,
 	}
-	u, err := url.Parse(base)
-	if err != nil {
-		return base
+	if strings.TrimSpace(selection.ThreadID) != "" {
+		state.ChatWorkspaceID = ""
 	}
-	q := u.Query()
-	q.Set("context", "chat")
-	threadID := strings.TrimSpace(selection.ThreadID)
-	if threadID == "" {
-		if workspaceID := strings.TrimSpace(selection.WorkspaceID); workspaceID != "" {
-			q.Set("chat_workspace", workspaceID)
-		}
-	} else {
-		q.Del("chat_workspace")
-		q.Set("thread", threadID)
-	}
-	if runID := strings.TrimSpace(selection.RunID); runID != "" {
-		q.Set("run", runID)
-	}
-	u.RawQuery = q.Encode()
-	return u.String()
+	return state.Preserve(base)
 }
 
 func ThoughtsDocURLWithChatState(

@@ -29,85 +29,181 @@ func HermesThreadsPanel(args HermesThreadsPanelArgs) templ.Component {
 			templ_7745c5c3_Var1 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<div id=\"hermes-threads-panel\" class=\"flex h-full min-h-0 flex-col bg-background\" data-signals=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<div id=\"hermes-threads-panel\" class=\"flex h-full min-h-0 flex-col bg-background\"><div class=\"shrink-0 border-b border-border px-3 py-2\"><p class=\"text-xs font-semibold uppercase tracking-wide text-muted-foreground\">Shared Hermes threads</p>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var2 string
-		templ_7745c5c3_Var2, templ_7745c5c3_Err = templ.JoinStringErrs("{threadSearch: '', threadPlan: '" + args.PlanDir + "', threadPlanManual: false, threadFreeform: false, threadContext: ['" + args.CurrentFile + "'], newThreadOpen: false}")
-		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/hermes_threads.templ`, Line: 4, Col: 269}
+		if args.PlanDir != "" {
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "<p class=\"truncate text-xs text-muted-foreground\">")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			var templ_7745c5c3_Var2 string
+			templ_7745c5c3_Var2, templ_7745c5c3_Err = templ.JoinStringErrs(args.PlanDir)
+			if templ_7745c5c3_Err != nil {
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/hermes_threads.templ`, Line: 8, Col: 68}
+			}
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var2))
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "</p>")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
 		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var2))
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "</div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "\"><div class=\"shrink-0 space-y-2 border-b border-border p-3\"><div class=\"flex items-center justify-between gap-2\"><p class=\"text-xs font-semibold uppercase tracking-wide text-muted-foreground\">Shared threads</p><button type=\"button\" class=\"rounded-md bg-primary px-2 py-1 text-xs font-medium text-primary-foreground\" data-on:click=\"$newThreadOpen = true\">New Thread</button></div><input name=\"query\" class=\"w-full rounded-md border border-input bg-background px-2 py-1.5 text-sm\" placeholder=\"Search all thread names\" data-bind=\"threadSearch\"></div><div class=\"min-h-0 flex-1 overflow-y-auto p-3\">")
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		for _, group := range GroupHermesThreads(args.Threads) {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "<section class=\"mb-4\"><p class=\"mb-1 truncate text-xs font-medium text-muted-foreground\">")
+		if args.NoPlan {
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, "<div class=\"flex min-h-0 flex-1 items-center justify-center p-4 text-sm text-muted-foreground\">Open a document or directory inside a plan to view its Hermes threads.</div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			var templ_7745c5c3_Var3 string
-			templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.JoinStringErrs(group.PlanDir)
-			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/hermes_threads.templ`, Line: 15, Col: 87}
-			}
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var3))
+		} else {
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, "<div class=\"grid min-h-0 flex-1 grid-rows-[auto_1fr]\"><div class=\"max-h-48 overflow-y-auto border-b border-border p-2\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "</p>")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			for _, thread := range group.Threads {
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, "<button type=\"button\" class=\"mb-1 flex w-full flex-col rounded-md border border-border px-2 py-2 text-left hover:bg-muted\" data-on:click=\"$rightRailActiveTab = 'chat'\"><span class=\"truncate text-sm font-medium text-foreground\">")
+			if len(args.Threads) == 0 {
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, "<p class=\"p-2 text-sm text-muted-foreground\">No shared threads found for this plan.</p>")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				var templ_7745c5c3_Var4 string
-				templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.JoinStringErrs(thread.Title)
+			}
+			for _, thread := range args.Threads {
+				var templ_7745c5c3_Var3 = []any{"mb-1 flex w-full flex-col rounded-md border px-2 py-2 text-left transition-colors hover:bg-muted", templ.KV("border-primary bg-muted", thread.ID == args.SelectedID), templ.KV("border-border", thread.ID != args.SelectedID)}
+				templ_7745c5c3_Err = templ.RenderCSSItems(ctx, templ_7745c5c3_Buffer, templ_7745c5c3_Var3...)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/hermes_threads.templ`, Line: 18, Col: 80}
+					return templ_7745c5c3_Err
+				}
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 8, "<a href=\"")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				var templ_7745c5c3_Var4 templ.SafeURL
+				templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(args.ThreadHrefs[thread.ID]))
+				if templ_7745c5c3_Err != nil {
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/hermes_threads.templ`, Line: 23, Col: 56}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var4))
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, "</span> <span class=\"truncate text-xs text-muted-foreground\">")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 9, "\" class=\"")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 				var templ_7745c5c3_Var5 string
-				templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.JoinStringErrs(thread.OwnerEmail)
+				templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.JoinStringErrs(templ.CSSClasses(templ_7745c5c3_Var3).String())
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/hermes_threads.templ`, Line: 19, Col: 79}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/hermes_threads.templ`, Line: 1, Col: 0}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var5))
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, "</span></button>")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 10, "\"><span class=\"truncate text-sm font-medium text-foreground\">")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				var templ_7745c5c3_Var6 string
+				templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.JoinStringErrs(thread.Title)
+				if templ_7745c5c3_Err != nil {
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/hermes_threads.templ`, Line: 26, Col: 80}
+				}
+				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var6))
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 11, "</span> <span class=\"truncate text-xs text-muted-foreground\">Created by ")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				var templ_7745c5c3_Var7 string
+				templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.JoinStringErrs(thread.CreatorEmail)
+				if templ_7745c5c3_Err != nil {
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/hermes_threads.templ`, Line: 27, Col: 92}
+				}
+				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var7))
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 12, "</span></a>")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 8, "</section>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 13, "</div><div id=\"hermes-thread-transcript\" class=\"min-h-0 overflow-y-auto p-3\">")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			if args.SelectedID == "" {
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 14, "<p class=\"text-sm text-muted-foreground\">Select a thread to inspect its transcript.</p>")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+			} else {
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 15, "<div class=\"mb-3 border-b border-border pb-2\"><p class=\"text-sm font-medium text-foreground\">")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				var templ_7745c5c3_Var8 string
+				templ_7745c5c3_Var8, templ_7745c5c3_Err = templ.JoinStringErrs(args.SelectedTitle)
+				if templ_7745c5c3_Err != nil {
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/hermes_threads.templ`, Line: 36, Col: 74}
+				}
+				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var8))
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 16, "</p>")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				if args.CanPrompt {
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 17, "<p class=\"text-xs text-muted-foreground\">You have prompt authority. Prompt controls are not available in this read-only view.</p>")
+					if templ_7745c5c3_Err != nil {
+						return templ_7745c5c3_Err
+					}
+				} else {
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 18, "<p class=\"text-xs text-muted-foreground\">Shared read-only transcript.</p>")
+					if templ_7745c5c3_Err != nil {
+						return templ_7745c5c3_Err
+					}
+				}
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 19, "</div>")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				if len(args.Messages) == 0 {
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 20, "<p class=\"text-sm text-muted-foreground\">This thread has no transcript turns yet.</p>")
+					if templ_7745c5c3_Err != nil {
+						return templ_7745c5c3_Err
+					}
+				}
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 21, " <div class=\"space-y-3\">")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				for _, message := range args.Messages {
+					templ_7745c5c3_Err = ChatMessage(message).Render(ctx, templ_7745c5c3_Buffer)
+					if templ_7745c5c3_Err != nil {
+						return templ_7745c5c3_Err
+					}
+				}
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 22, "</div>")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 23, "</div></div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		}
-		if len(args.Threads) == 0 {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 9, "<p class=\"text-sm text-muted-foreground\">No shared threads found for this plan.</p>")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 10, "</div><div data-show=\"$newThreadOpen\" class=\"absolute inset-0 z-10 flex items-end bg-black/30 p-3\"><div class=\"w-full space-y-3 rounded-lg border border-border bg-popover p-3 shadow-lg\"><div class=\"flex items-center justify-between\"><p class=\"font-medium\">New Thread</p><button type=\"button\" data-on:click=\"$newThreadOpen = false\">Close</button></div><div class=\"flex flex-wrap gap-1\"><template data-for=\"path in $threadContext\"><span class=\"rounded-full border border-border px-2 py-0.5 text-xs\"><span data-text=\"$path\"></span><button type=\"button\" class=\"ml-1\" data-on:click=\"$threadContext = $threadContext.filter(value => value !== $path); if (!$threadPlanManual && $threadContext.length === 0) $threadPlan = ''\">×</button></span></template></div><input class=\"w-full rounded-md border border-input bg-background px-2 py-1.5 text-sm\" placeholder=\"Add context file\" data-on:keydown=\"if (evt.key === 'Enter' && el.value.trim()) { evt.preventDefault(); $threadContext = [...$threadContext, el.value.trim()]; el.value = '' }\"> <label class=\"block text-xs text-muted-foreground\">Plan<input class=\"mt-1 w-full rounded-md border border-input bg-background px-2 py-1.5 text-sm\" data-bind=\"threadPlan\" data-on:input=\"$threadPlanManual = true\" placeholder=\"Infer from context, or leave blank\"></label> <label class=\"flex items-center gap-2 text-sm\"><input type=\"checkbox\" data-bind=\"threadFreeform\"> Freeform thread</label><p class=\"text-xs text-muted-foreground\">Removing all plan context makes this an explicit freeform thread. A manual plan choice stays unchanged.</p></div></div></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 24, "</div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
