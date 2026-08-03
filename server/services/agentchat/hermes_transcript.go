@@ -35,7 +35,10 @@ type HermesTranscriptEvent struct {
 	Tool            *HermesToolCard        `json:"tool,omitempty"`
 	PiSessionID     string                 `json:"pi_session_id,omitempty"`
 	CommandID       string                 `json:"command_id,omitempty"`
+	CommandDigest   string                 `json:"command_digest,omitempty"`
+	ContextPaths    []string               `json:"context_paths,omitempty"`
 	DeliveryStatus  string                 `json:"delivery_status,omitempty"`
+	DeliveryReason  string                 `json:"delivery_reason,omitempty"`
 }
 
 type HermesToolCard struct {
@@ -267,6 +270,13 @@ func appendHermesTranscript(
 		return err
 	}
 	defer lock.Close()
+	return appendHermesTranscriptUnlocked(path, event)
+}
+
+func appendHermesTranscriptUnlocked(path string, event HermesTranscriptEvent) error {
+	if err := validateHermesEventShape(event); err != nil {
+		return err
+	}
 	existing, err := readHermesTranscriptFile(path, event.PlanDir, event.ThreadID)
 	if err != nil && !errors.Is(err, os.ErrNotExist) {
 		return err

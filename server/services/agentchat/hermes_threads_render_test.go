@@ -76,12 +76,12 @@ func TestRenderHermesThreadsPanelListsSelectedTranscriptAndReadOnlyAuthority(t *
 	if strings.Index(html, "Thread newer") > strings.Index(html, "Thread older") {
 		t.Fatalf("threads are not in updated order: %s", html)
 	}
-	for _, want := range []string{"older transcript", "Shared read-only transcript.", "chat_workspace=ws", "thread=chat", "run=run"} {
+	for _, want := range []string{"older transcript", "Shared read-only transcript.", "chat_workspace=ws", "thread=chat", "run=run", "hermes-thread-create-form"} {
 		if !strings.Contains(html, want) {
 			t.Fatalf("render missing %q: %s", want, html)
 		}
 	}
-	for _, unwanted := range []string{"newer transcript", "<form", "<textarea", "New Thread", "threadFreeform"} {
+	for _, unwanted := range []string{"newer transcript", "hermes-prompt-form", "threadPlanManual", "threadFreeform"} {
 		if strings.Contains(html, unwanted) {
 			t.Fatalf("render contains %q: %s", unwanted, html)
 		}
@@ -112,8 +112,19 @@ func TestRenderHermesThreadsPanelShowsAuthorityWithoutComposer(t *testing.T) {
 		t.Fatal(err)
 	}
 	html := buffer.String()
-	if !strings.Contains(html, "You have prompt authority") || strings.Contains(html, "<form") {
-		t.Fatalf("authority read-only render = %s", html)
+	for _, want := range []string{
+		"You have prompt authority", "hermes-thread-create-form", "hermes-prompt-form",
+		`name="plan_dir"`, `name="command_id"`, `name="conversation_reference"`,
+		`name="context_paths"`, `name="prompt"`, `method="post"`,
+	} {
+		if !strings.Contains(html, want) {
+			t.Fatalf("authority render missing %q: %s", want, html)
+		}
+	}
+	for _, unwanted := range []string{"threadPlanManual", "threadFreeform", `name="HERMES_SESSION_ID"`} {
+		if strings.Contains(html, unwanted) {
+			t.Fatalf("authority render contains %q: %s", unwanted, html)
+		}
 	}
 }
 
@@ -189,5 +200,12 @@ func TestRenderHermesThreadsPanelNoPlanDoesNotDiscoverRoot(t *testing.T) {
 	})
 	if err != nil || component == nil || strings.Contains(replacement.URL, "hermes_thread") {
 		t.Fatalf("component/replacement/error = %v/%q/%v", component, replacement.URL, err)
+	}
+	var buffer bytes.Buffer
+	if err := component.Render(context.Background(), &buffer); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(buffer.String(), "<form") {
+		t.Fatalf("no-plan panel rendered controls: %s", buffer.String())
 	}
 }

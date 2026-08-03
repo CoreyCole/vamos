@@ -162,16 +162,19 @@ func GroupHermesThreads(threads []HermesThread) []HermesThreadGroup {
 }
 
 type HermesThreadsPanelArgs struct {
-	UserEmail     string
-	CurrentFile   string
-	PlanDir       string
-	Threads       []HermesThread
-	ThreadHrefs   map[string]string
-	SelectedID    string
-	SelectedTitle string
-	Messages      []ChatMessageArgs
-	CanPrompt     bool
-	NoPlan        bool
+	UserEmail             string
+	CurrentFile           string
+	PlanDir               string
+	Threads               []HermesThread
+	ThreadHrefs           map[string]string
+	SelectedID            string
+	SelectedTitle         string
+	Messages              []ChatMessageArgs
+	CanPrompt             bool
+	NoPlan                bool
+	ReturnURL             string
+	CommandID             string
+	ConversationReference string
 }
 
 func (s *Service) RenderHermesThreadsPanel(
@@ -181,6 +184,12 @@ func (s *Service) RenderHermesThreadsPanel(
 	args := HermesThreadsPanelArgs{
 		UserEmail: request.UserEmail, CurrentFile: request.DocPath,
 		NoPlan: request.NoPlan, ThreadHrefs: map[string]string{},
+		ReturnURL: request.CurrentURL,
+	}
+	if args.ReturnURL == "" {
+		args.ReturnURL = markdown.ThoughtsHrefWithWorkbenchState(
+			request.DocPath, request.IsDirectory, request.LinkState,
+		)
 	}
 	if request.NoPlan {
 		return HermesThreadsPanel(args), hermesSelectionReplacement(request), nil
@@ -228,6 +237,13 @@ func (s *Service) RenderHermesThreadsPanel(
 		args.SelectedTitle = thread.Title
 		args.Messages = messages
 		args.CanPrompt = s.CanPromptThread(request.UserEmail, thread)
+		if args.CanPrompt {
+			args.CommandID = strings.ReplaceAll(uuid.NewString(), "-", "")
+			args.ConversationReference, err = HermesConversationReference(identity, thread.ID)
+			if err != nil {
+				return nil, markdown.HermesThreadsURLReplacement{}, err
+			}
+		}
 		return HermesThreadsPanel(args), markdown.HermesThreadsURLReplacement{}, nil
 	}
 	return HermesThreadsPanel(args), hermesSelectionReplacement(request), nil

@@ -13,7 +13,16 @@ templ HermesThreadsPanel(args HermesThreadsPanelArgs) {
 				Open a document or directory inside a plan to view its Hermes threads.
 			</div>
 		} else {
-			<div class="grid min-h-0 flex-1 grid-rows-[auto_1fr]">
+			<div class="grid min-h-0 flex-1 grid-rows-[auto_auto_1fr]">
+				<form id="hermes-thread-create-form" method="post" action="/agent-chat/hermes/threads" class="border-b border-border p-3">
+					<input id="hermes-create-plan-dir" type="hidden" name="plan_dir" value={ args.PlanDir }/>
+					<input id="hermes-create-return-to" type="hidden" name="return_to" value={ args.ReturnURL }/>
+					<label for="hermes-create-title" class="sr-only">Thread title</label>
+					<div class="flex gap-2">
+						<input id="hermes-create-title" name="title" type="text" placeholder="New shared thread" class="min-w-0 flex-1 rounded-md border border-input bg-background px-2 py-1.5 text-sm"/>
+						<button type="submit" class="rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground">Create</button>
+					</div>
+				</form>
 				<div class="max-h-48 overflow-y-auto border-b border-border p-2">
 					if len(args.Threads) == 0 {
 						<p class="p-2 text-sm text-muted-foreground">No shared threads found for this plan.</p>
@@ -35,7 +44,7 @@ templ HermesThreadsPanel(args HermesThreadsPanelArgs) {
 						<div class="mb-3 border-b border-border pb-2">
 							<p class="text-sm font-medium text-foreground">{ args.SelectedTitle }</p>
 							if args.CanPrompt {
-								<p class="text-xs text-muted-foreground">You have prompt authority. Prompt controls are not available in this read-only view.</p>
+								<p class="text-xs text-muted-foreground">You have prompt authority.</p>
 							} else {
 								<p class="text-xs text-muted-foreground">Shared read-only transcript.</p>
 							}
@@ -48,6 +57,20 @@ templ HermesThreadsPanel(args HermesThreadsPanelArgs) {
 								@ChatMessage(message)
 							}
 						</div>
+						if args.CanPrompt {
+							<form id="hermes-prompt-form" method="post" action={ templ.SafeURL("/agent-chat/hermes/threads/" + args.SelectedID + "/prompts") } class="mt-4 space-y-2 border-t border-border pt-3">
+								<input id="hermes-prompt-plan-dir" type="hidden" name="plan_dir" value={ args.PlanDir }/>
+								<input id="hermes-prompt-thread-id" type="hidden" name="thread_id" value={ args.SelectedID }/>
+								<input id="hermes-prompt-command-id" type="hidden" name="command_id" value={ args.CommandID }/>
+								<input id="hermes-prompt-conversation-reference" type="hidden" name="conversation_reference" value={ args.ConversationReference }/>
+								<input id="hermes-prompt-return-to" type="hidden" name="return_to" value={ args.ReturnURL }/>
+								<label for="hermes-prompt-context-paths" class="text-xs font-medium text-muted-foreground">Context paths (optional, one per line)</label>
+								<textarea id="hermes-prompt-context-paths" name="context_paths" rows="2" class="w-full rounded-md border border-input bg-background px-2 py-1.5 text-sm" placeholder="thoughts/owner/plans/alpha/design.md"></textarea>
+								<label for="hermes-prompt-input" class="sr-only">Prompt</label>
+								<textarea id="hermes-prompt-input" name="prompt" required rows="4" class="w-full rounded-md border border-input bg-background px-2 py-1.5 text-sm" placeholder="Send a prompt to this persistent Hermes thread"></textarea>
+								<button type="submit" class="rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground">Send prompt</button>
+							</form>
+						}
 					}
 				</div>
 			</div>

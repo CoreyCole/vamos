@@ -1,10 +1,12 @@
 package agentchat
 
 import (
+	"context"
 	"crypto/subtle"
 	"encoding/json"
 	"errors"
 	"net/http"
+	"net/url"
 	"os"
 	"strings"
 
@@ -21,9 +23,28 @@ type hermesEventRequest struct {
 }
 
 func (h *Handler) RegisterHermesRoutes(g *echo.Group) {
+	g.POST("/hermes/threads", h.HandleCreateHermesThread)
 	g.POST("/hermes/threads/:thread_id/prompts", h.HandleHermesPrompt)
+}
+
+func (h *Handler) RegisterHermesMachineRoutes(g *echo.Group) {
 	g.POST("/hermes/threads/:thread_id/events", h.HandleHermesEvent)
 	g.POST("/hermes/pi/:session_id/complete", h.HandleHermesPiCompletion)
+}
+
+func (h *Handler) HandleCreateHermesThread(c echo.Context) error {
+	userEmail, ok := c.Get("user_email").(string)
+	if !ok || strings.TrimSpace(userEmail) == "" {
+		return echo.NewHTTPError(http.StatusUnauthorized, "not authenticated")
+	}
+	identity := HermesPlanIdentity(strings.TrimSpace(c.FormValue("plan_dir")))
+	thread, err := h.service.CreateHermesThread(c.Request().Context(), CreateHermesThreadInput{
+		PlanDir: identity, CreatorEmail: userEmail, Title: c.FormValue("title"),
+	})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
+	}
+	return c.Redirect(http.StatusSeeOther, hermesFormReturnURL(c.FormValue("return_to"), thread.ID))
 }
 
 func (h *Handler) HandleHermesPrompt(c echo.Context) error {
@@ -31,29 +52,75 @@ func (h *Handler) HandleHermesPrompt(c echo.Context) error {
 	if !ok || strings.TrimSpace(userEmail) == "" {
 		return echo.NewHTTPError(http.StatusUnauthorized, "not authenticated")
 	}
-	prompt := strings.TrimSpace(c.FormValue("prompt"))
-	if prompt == "" {
+	if err := c.Request().ParseForm(); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid prompt form")
+	}
+	prompt := c.Request().PostFormValue("prompt")
+	if strings.TrimSpace(prompt) == "" {
 		return echo.NewHTTPError(http.StatusBadRequest, "prompt is required")
 	}
-	contextPaths := strings.FieldsFunc(c.FormValue("context_paths"), func(r rune) bool {
-		return r == ',' || r == '\n'
-	})
-	err := h.service.DeliverOwnedHermesPrompt(
+	contextPaths := make([]string, 0)
+	for _, value := range c.Request().PostForm["context_paths"] {
+		contextPaths = append(contextPaths, strings.FieldsFunc(value, func(r rune) bool {
+			return r == ',' || r == '\n'
+		})...)
+	}
+	result, err := h.service.SubmitOwnedHermesPrompt(
 		c.Request().Context(),
 		userEmail,
 		HermesPrompt{
-			ThreadID: c.Param(
-				"thread_id",
-			),
-			PlanDir:      strings.TrimSpace(c.FormValue("plan_dir")),
-			ContextPaths: contextPaths,
-			Prompt:       prompt,
+			CommandID:             strings.TrimSpace(c.Request().PostFormValue("command_id")),
+			ThreadID:              strings.TrimSpace(c.Param("thread_id")),
+			PlanDir:               strings.TrimSpace(c.Request().PostFormValue("plan_dir")),
+			ConversationReference: strings.TrimSpace(c.Request().PostFormValue("conversation_reference")),
+			ContextPaths:          contextPaths,
+			Prompt:                prompt,
 		},
 	)
 	if err != nil {
-		return echo.NewHTTPError(http.StatusForbidden, err.Error())
+		status := http.StatusBadRequest
+		switch {
+		case errors.Is(err, ErrHermesPromptUnauthorized):
+			status = http.StatusForbidden
+		case errors.Is(err, ErrHermesPromptConflict):
+			status = http.StatusConflict
+		case errors.Is(err, context.Canceled), errors.Is(err, context.DeadlineExceeded):
+			status = http.StatusGatewayTimeout
+		}
+		return echo.NewHTTPError(status, err.Error())
 	}
-	return c.NoContent(http.StatusAccepted)
+	if result.InProgress {
+		return echo.NewHTTPError(http.StatusLocked, ErrHermesPromptInProgress.Error())
+	}
+	switch result.Status {
+	case HermesPromptAccepted:
+		return c.Redirect(http.StatusSeeOther, hermesFormReturnURL(c.Request().PostFormValue("return_to"), c.Param("thread_id")))
+	case HermesPromptRejected:
+		return echo.NewHTTPError(http.StatusUnprocessableEntity, "Hermes rejected the prompt command")
+	case HermesPromptFailed:
+		if result.Reason == HermesPromptGatewayUnavailable {
+			return echo.NewHTTPError(http.StatusServiceUnavailable, "Hermes prompt delivery is unavailable")
+		}
+		return echo.NewHTTPError(http.StatusFailedDependency, "Hermes prompt delivery failed")
+	case HermesPromptUncertain:
+		return echo.NewHTTPError(http.StatusGatewayTimeout, "Hermes prompt delivery is uncertain and will not be retried")
+	default:
+		return echo.NewHTTPError(http.StatusServiceUnavailable, "Hermes prompt delivery is unavailable")
+	}
+}
+
+func hermesFormReturnURL(raw, selected string) string {
+	parsed, err := url.Parse(strings.TrimSpace(raw))
+	if err != nil || parsed.IsAbs() || !strings.HasPrefix(parsed.Path, "/thoughts/") {
+		parsed = &url.URL{Path: "/thoughts/"}
+	}
+	query := parsed.Query()
+	query.Set("context", "threads")
+	if strings.TrimSpace(selected) != "" {
+		query.Set("hermes_thread", selected)
+	}
+	parsed.RawQuery = query.Encode()
+	return parsed.String()
 }
 
 func (h *Handler) authorizeHermes(c echo.Context) error {

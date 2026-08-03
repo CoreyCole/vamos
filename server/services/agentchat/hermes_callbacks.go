@@ -3,6 +3,8 @@ package agentchat
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -10,28 +12,65 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
+
+	"github.com/CoreyCole/vamos/pkg/safecomponent"
 )
 
 type HermesPrompt struct {
-	ThreadID     string   `json:"thread_id"`
-	OwnerEmail   string   `json:"owner_email"`
-	PlanDir      string   `json:"plan_dir,omitempty"`
-	ContextPaths []string `json:"context_paths,omitempty"`
-	Prompt       string   `json:"prompt"`
+	CommandID             string   `json:"command_id"`
+	ThreadID              string   `json:"thread_id"`
+	OwnerEmail            string   `json:"owner_email"`
+	PlanDir               string   `json:"plan_dir"`
+	ConversationReference string   `json:"conversation_reference"`
+	ContextPaths          []string `json:"context_paths,omitempty"`
+	Prompt                string   `json:"prompt"`
 }
+
+type HermesPromptDeliveryStatus string
+
+const (
+	HermesPromptAccepted  HermesPromptDeliveryStatus = "accepted"
+	HermesPromptRejected  HermesPromptDeliveryStatus = "rejected"
+	HermesPromptFailed    HermesPromptDeliveryStatus = "failed"
+	HermesPromptUncertain HermesPromptDeliveryStatus = "uncertain"
+)
+
+type HermesPromptDeliveryReason string
+
+const HermesPromptGatewayUnavailable HermesPromptDeliveryReason = "gateway_unavailable"
+
+type HermesPromptDeliveryObservation struct {
+	Status HermesPromptDeliveryStatus
+	Reason HermesPromptDeliveryReason
+	Detail string
+}
+
+type HermesPromptResult struct {
+	CommandID  string
+	Status     HermesPromptDeliveryStatus
+	Reason     HermesPromptDeliveryReason
+	Detail     string
+	InProgress bool
+}
+
+var hermesPromptAfterGatewayHook func()
+
 type HermesCallbackEvent struct {
 	PlanDir string `json:"plan_dir"`
 	HermesTranscriptEvent
 }
 
 var (
-	ErrHermesManagerNotFound = errors.New("Hermes manager session not found")
-	ErrHermesPiRunNotFound   = errors.New("Hermes Pi run not found")
-	ErrHermesPiRunAmbiguous  = errors.New("Hermes Pi run is ambiguous")
+	ErrHermesManagerNotFound    = errors.New("Hermes manager session not found")
+	ErrHermesPiRunNotFound      = errors.New("Hermes Pi run not found")
+	ErrHermesPiRunAmbiguous     = errors.New("Hermes Pi run is ambiguous")
+	ErrHermesPromptUnauthorized = errors.New("Hermes prompt authority is required")
+	ErrHermesPromptConflict     = errors.New("Hermes prompt command conflicts with its durable request")
 )
 
 type HermesGatewayClient interface {
-	DeliverPrompt(context.Context, HermesPrompt) error
+	DeliverPrompt(context.Context, HermesPrompt) HermesPromptDeliveryObservation
 	DeliverPiCompletion(context.Context, string, string, []byte) error
 }
 type httpHermesGatewayClient struct {
@@ -42,8 +81,37 @@ type httpHermesGatewayClient struct {
 func (c httpHermesGatewayClient) DeliverPrompt(
 	ctx context.Context,
 	p HermesPrompt,
-) error {
-	return c.post(ctx, "/vamos/prompts", p)
+) HermesPromptDeliveryObservation {
+	body, err := json.Marshal(p)
+	if err != nil {
+		return HermesPromptDeliveryObservation{Status: HermesPromptFailed, Detail: err.Error()}
+	}
+	req, err := http.NewRequestWithContext(
+		ctx,
+		http.MethodPost,
+		strings.TrimRight(c.url, "/")+"/vamos/prompts",
+		bytes.NewReader(body),
+	)
+	if err != nil {
+		return HermesPromptDeliveryObservation{Status: HermesPromptFailed, Detail: err.Error()}
+	}
+	req.Header.Set("Content-Type", "application/json")
+	if c.token != "" {
+		req.Header.Set("Authorization", "Bearer "+c.token)
+	}
+	resp, err := c.client.Do(req)
+	if err != nil {
+		return HermesPromptDeliveryObservation{Status: HermesPromptUncertain, Detail: err.Error()}
+	}
+	defer resp.Body.Close()
+	switch {
+	case resp.StatusCode == http.StatusAccepted:
+		return HermesPromptDeliveryObservation{Status: HermesPromptAccepted}
+	case resp.StatusCode >= 400 && resp.StatusCode < 500:
+		return HermesPromptDeliveryObservation{Status: HermesPromptRejected, Detail: resp.Status}
+	default:
+		return HermesPromptDeliveryObservation{Status: HermesPromptUncertain, Detail: resp.Status}
+	}
 }
 
 func (c httpHermesGatewayClient) DeliverPiCompletion(
@@ -94,19 +162,19 @@ func (c httpHermesGatewayClient) post(
 	return nil
 }
 
-func (s *Service) DeliverOwnedHermesPrompt(
+func (s *Service) SubmitOwnedHermesPrompt(
 	ctx context.Context,
 	userEmail string,
 	prompt HermesPrompt,
-) error {
+) (HermesPromptResult, error) {
 	identity := HermesPlanIdentity(prompt.PlanDir)
 	planDir, err := s.hermesPlanDir(prompt.PlanDir)
 	if err != nil {
-		return err
+		return HermesPromptResult{}, err
 	}
 	events, err := readHermesTranscriptContext(ctx, planDir, identity, prompt.ThreadID)
 	if err != nil {
-		return err
+		return HermesPromptResult{}, err
 	}
 	metadata := events[0]
 	thread := HermesThread{
@@ -114,22 +182,270 @@ func (s *Service) DeliverOwnedHermesPrompt(
 		PromptAuthority: *metadata.PromptAuthority, PlanDir: prompt.PlanDir,
 	}
 	if !s.CanPromptThread(userEmail, thread) {
-		return fmt.Errorf("prompt authority is required")
+		return HermesPromptResult{}, ErrHermesPromptUnauthorized
 	}
 	prompt.OwnerEmail = metadata.PromptAuthority.PrincipalValue
-	return s.DeliverHermesPrompt(ctx, prompt)
+	prompt, digest, err := s.validateHermesPromptCommand(prompt)
+	if err != nil {
+		return HermesPromptResult{}, err
+	}
+	commandLock, err := tryAcquireHermesCommandLock(ctx, planDir, prompt.ThreadID, prompt.CommandID)
+	if err != nil {
+		if errors.Is(err, ErrHermesPromptInProgress) {
+			if conflictErr := compareHermesPromptRequest(
+				ctx, planDir, identity, prompt.ThreadID, prompt.CommandID, digest,
+			); conflictErr != nil {
+				return HermesPromptResult{}, conflictErr
+			}
+			return HermesPromptResult{CommandID: prompt.CommandID, InProgress: true}, nil
+		}
+		return HermesPromptResult{}, err
+	}
+	defer commandLock.Close()
+
+	result, send, err := reserveHermesPromptCommand(ctx, planDir, identity, prompt, digest)
+	if err != nil || !send {
+		return result, err
+	}
+
+	var observation HermesPromptDeliveryObservation
+	if s.hermesGateway == nil {
+		observation = HermesPromptDeliveryObservation{
+			Status: HermesPromptFailed,
+			Reason: HermesPromptGatewayUnavailable,
+			Detail: "Hermes gateway is not configured",
+		}
+	} else {
+		deliveryCtx, cancel := context.WithTimeout(ctx, 15*time.Second)
+		observation = s.hermesGateway.DeliverPrompt(deliveryCtx, prompt)
+		cancel()
+		if !validHermesPromptDeliveryStatus(observation.Status) {
+			observation = HermesPromptDeliveryObservation{
+				Status: HermesPromptUncertain,
+				Detail: "Hermes gateway returned an invalid delivery observation",
+			}
+		}
+	}
+	if hermesPromptAfterGatewayHook != nil {
+		hermesPromptAfterGatewayHook()
+	}
+	persistCtx, persistCancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
+	defer persistCancel()
+	return finishHermesPromptCommand(persistCtx, planDir, identity, prompt, digest, observation)
 }
 
-func (s *Service) DeliverHermesPrompt(ctx context.Context, prompt HermesPrompt) error {
-	if s.hermesGateway == nil {
-		return fmt.Errorf("Hermes gateway is not configured")
+func (s *Service) validateHermesPromptCommand(
+	prompt HermesPrompt,
+) (HermesPrompt, string, error) {
+	if err := ValidateHermesPlanIdentity(HermesPlanIdentity(prompt.PlanDir)); err != nil {
+		return HermesPrompt{}, "", err
 	}
-	if strings.TrimSpace(prompt.ThreadID) == "" ||
-		strings.TrimSpace(prompt.OwnerEmail) == "" ||
-		strings.TrimSpace(prompt.Prompt) == "" {
-		return fmt.Errorf("thread, owner, and prompt are required")
+	if err := safecomponent.ValidateBounded(prompt.ThreadID); err != nil {
+		return HermesPrompt{}, "", err
 	}
-	return s.hermesGateway.DeliverPrompt(ctx, prompt)
+	if err := safecomponent.ValidateBounded(prompt.CommandID); err != nil {
+		return HermesPrompt{}, "", err
+	}
+	if strings.TrimSpace(prompt.Prompt) == "" {
+		return HermesPrompt{}, "", errors.New("prompt is required")
+	}
+	reference, err := HermesConversationReference(HermesPlanIdentity(prompt.PlanDir), prompt.ThreadID)
+	if err != nil {
+		return HermesPrompt{}, "", err
+	}
+	if prompt.ConversationReference != "" && prompt.ConversationReference != reference {
+		return HermesPrompt{}, "", errors.New("Hermes conversation reference mismatch")
+	}
+	prompt.ConversationReference = reference
+	canonicalPaths := make([]string, 0, len(prompt.ContextPaths))
+	for _, raw := range prompt.ContextPaths {
+		attached, err := s.ValidateAttachedThoughtsPath(raw)
+		if err != nil {
+			return HermesPrompt{}, "", err
+		}
+		canonicalPaths = append(canonicalPaths, attached.Path)
+	}
+	prompt.ContextPaths = canonicalPaths
+	binding, err := json.Marshal(struct {
+		Prompt       string   `json:"prompt"`
+		ContextPaths []string `json:"context_paths"`
+	}{Prompt: prompt.Prompt, ContextPaths: prompt.ContextPaths})
+	if err != nil {
+		return HermesPrompt{}, "", err
+	}
+	digestBytes := sha256.Sum256(append([]byte("vamos-hermes-prompt-command-v1\x00"), binding...))
+	return prompt, hex.EncodeToString(digestBytes[:]), nil
+}
+
+func compareHermesPromptRequest(
+	ctx context.Context,
+	planDir string,
+	identity HermesPlanIdentity,
+	threadID, commandID, digest string,
+) error {
+	events, err := readHermesTranscriptContext(ctx, planDir, identity, threadID)
+	if err != nil {
+		return err
+	}
+	for _, event := range events {
+		if event.CommandID == commandID && event.Type == "prompt_requested" && event.CommandDigest != digest {
+			return ErrHermesPromptConflict
+		}
+	}
+	return nil
+}
+
+func reserveHermesPromptCommand(
+	ctx context.Context,
+	planDir string,
+	identity HermesPlanIdentity,
+	prompt HermesPrompt,
+	digest string,
+) (HermesPromptResult, bool, error) {
+	lock, err := acquireHermesTranscriptLock(ctx, planDir, prompt.ThreadID, false)
+	if err != nil {
+		return HermesPromptResult{}, false, err
+	}
+	defer lock.Close()
+	path, err := hermesTranscriptReadPath(planDir, prompt.ThreadID)
+	if err != nil {
+		return HermesPromptResult{}, false, err
+	}
+	parsed, err := readHermesTranscriptFile(path, identity, prompt.ThreadID)
+	if err != nil {
+		return HermesPromptResult{}, false, err
+	}
+	requested, started := false, false
+	for _, event := range parsed.events {
+		if event.CommandID != prompt.CommandID {
+			continue
+		}
+		if event.CommandDigest != digest {
+			return HermesPromptResult{}, false, ErrHermesPromptConflict
+		}
+		switch event.Type {
+		case "prompt_requested":
+			requested = true
+		case "prompt_delivery_started":
+			started = true
+		case "prompt_delivery":
+			status := HermesPromptDeliveryStatus(event.DeliveryStatus)
+			if !validHermesPromptDeliveryStatus(status) {
+				return HermesPromptResult{}, false, errors.New("invalid durable Hermes prompt delivery status")
+			}
+			return HermesPromptResult{
+				CommandID: prompt.CommandID,
+				Status:    status,
+				Reason:    HermesPromptDeliveryReason(event.DeliveryReason),
+				Detail:    event.Content,
+			}, false, nil
+		}
+	}
+	if !requested {
+		if err := appendHermesTranscriptUnlocked(path, HermesTranscriptEvent{
+			ID: hermesPromptEventID("request", prompt.CommandID), Type: "prompt_requested",
+			ThreadID: prompt.ThreadID, PlanDir: identity, CommandID: prompt.CommandID,
+			CommandDigest: digest, ContextPaths: prompt.ContextPaths, Content: prompt.Prompt,
+		}); err != nil {
+			return HermesPromptResult{}, false, err
+		}
+	}
+	if started {
+		observation := HermesPromptDeliveryObservation{
+			Status: HermesPromptUncertain,
+			Detail: "delivery started without a durable terminal observation",
+		}
+		result, err := appendHermesPromptTerminal(path, identity, prompt, digest, observation)
+		return result, false, err
+	}
+	if err := appendHermesTranscriptUnlocked(path, HermesTranscriptEvent{
+		ID: hermesPromptEventID("started", prompt.CommandID), Type: "prompt_delivery_started",
+		ThreadID: prompt.ThreadID, PlanDir: identity, CommandID: prompt.CommandID,
+		CommandDigest: digest,
+	}); err != nil {
+		return HermesPromptResult{}, false, err
+	}
+	return HermesPromptResult{CommandID: prompt.CommandID}, true, nil
+}
+
+func finishHermesPromptCommand(
+	ctx context.Context,
+	planDir string,
+	identity HermesPlanIdentity,
+	prompt HermesPrompt,
+	digest string,
+	observation HermesPromptDeliveryObservation,
+) (HermesPromptResult, error) {
+	lock, err := acquireHermesTranscriptLock(ctx, planDir, prompt.ThreadID, false)
+	if err != nil {
+		return HermesPromptResult{}, err
+	}
+	defer lock.Close()
+	path, err := hermesTranscriptReadPath(planDir, prompt.ThreadID)
+	if err != nil {
+		return HermesPromptResult{}, err
+	}
+	parsed, err := readHermesTranscriptFile(path, identity, prompt.ThreadID)
+	if err != nil {
+		return HermesPromptResult{}, err
+	}
+	for _, event := range parsed.events {
+		if event.CommandID != prompt.CommandID {
+			continue
+		}
+		if event.CommandDigest != digest {
+			return HermesPromptResult{}, ErrHermesPromptConflict
+		}
+		if event.Type == "prompt_delivery" {
+			if event.DeliveryStatus != string(observation.Status) ||
+				event.DeliveryReason != string(observation.Reason) {
+				return HermesPromptResult{}, ErrHermesPromptConflict
+			}
+			return HermesPromptResult{
+				CommandID: prompt.CommandID, Status: observation.Status,
+				Reason: HermesPromptDeliveryReason(event.DeliveryReason), Detail: event.Content,
+			}, nil
+		}
+	}
+	return appendHermesPromptTerminal(path, identity, prompt, digest, observation)
+}
+
+func appendHermesPromptTerminal(
+	path string,
+	identity HermesPlanIdentity,
+	prompt HermesPrompt,
+	digest string,
+	observation HermesPromptDeliveryObservation,
+) (HermesPromptResult, error) {
+	if !validHermesPromptDeliveryStatus(observation.Status) {
+		return HermesPromptResult{}, errors.New("invalid Hermes prompt delivery status")
+	}
+	err := appendHermesTranscriptUnlocked(path, HermesTranscriptEvent{
+		ID: hermesPromptEventID("terminal", prompt.CommandID), Type: "prompt_delivery",
+		ThreadID: prompt.ThreadID, PlanDir: identity, CommandID: prompt.CommandID,
+		CommandDigest: digest, DeliveryStatus: string(observation.Status),
+		DeliveryReason: string(observation.Reason), Content: strings.TrimSpace(observation.Detail),
+	})
+	return HermesPromptResult{
+		CommandID: prompt.CommandID,
+		Status:    observation.Status,
+		Reason:    observation.Reason,
+		Detail:    strings.TrimSpace(observation.Detail),
+	}, err
+}
+
+func validHermesPromptDeliveryStatus(status HermesPromptDeliveryStatus) bool {
+	switch status {
+	case HermesPromptAccepted, HermesPromptRejected, HermesPromptFailed, HermesPromptUncertain:
+		return true
+	default:
+		return false
+	}
+}
+
+func hermesPromptEventID(kind, commandID string) string {
+	digest := sha256.Sum256([]byte("vamos-hermes-prompt-event-v1\x00" + kind + "\x00" + commandID))
+	return "prompt_" + hex.EncodeToString(digest[:])
 }
 
 // RenderHermesTranscript maps durable Hermes events into the existing safe
@@ -159,7 +475,7 @@ func (s *Service) RenderHermesTranscript(
 			Content: event.Content,
 		}
 		switch event.Type {
-		case "user":
+		case "user", "prompt_requested":
 			message.Role = "user"
 		case "final":
 			if s.renderer == nil {
@@ -178,8 +494,11 @@ func (s *Service) RenderHermesTranscript(
 			if event.Tool.Status != "" {
 				message.Content += " — " + event.Tool.Status
 			}
-		case "lifecycle", "pi_run":
+		case "lifecycle", "pi_run", "prompt_delivery_started", "prompt_delivery":
 			message.Role = "system"
+			if event.Type == "prompt_delivery" {
+				message.Content = "Prompt delivery: " + event.DeliveryStatus
+			}
 		}
 		messages = append(messages, message)
 	}

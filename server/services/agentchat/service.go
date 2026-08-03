@@ -16,6 +16,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
@@ -196,9 +197,14 @@ func NewServiceWithOptions(
 	}
 	if gatewayURL := strings.TrimSpace(opts.HermesGatewayURL); gatewayURL != "" {
 		svc.hermesGateway = httpHermesGatewayClient{
-			url:    gatewayURL,
-			token:  strings.TrimSpace(opts.HermesGatewayToken),
-			client: &http.Client{},
+			url:   gatewayURL,
+			token: strings.TrimSpace(opts.HermesGatewayToken),
+			client: &http.Client{
+				Timeout: 15 * time.Second,
+				CheckRedirect: func(_ *http.Request, _ []*http.Request) error {
+					return http.ErrUseLastResponse
+				},
+			},
 		}
 	}
 	return initializeWorkflowRuntime(svc, notifier, queries)
