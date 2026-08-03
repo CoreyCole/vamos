@@ -9,9 +9,16 @@ import (
 	"net/url"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/labstack/echo/v4"
+	datastar "github.com/starfederation/datastar-go/datastar"
+
+	"github.com/CoreyCole/vamos/pkg/safecomponent"
 )
+
+var hermesTranscriptRefreshInterval = 750 * time.Millisecond
+var hermesTranscriptStreamReadHook func()
 
 type hermesEventRequest struct {
 	PlanDir     string          `json:"plan_dir"`
@@ -25,11 +32,74 @@ type hermesEventRequest struct {
 func (h *Handler) RegisterHermesRoutes(g *echo.Group) {
 	g.POST("/hermes/threads", h.HandleCreateHermesThread)
 	g.POST("/hermes/threads/:thread_id/prompts", h.HandleHermesPrompt)
+	g.GET("/hermes/threads/:thread_id/transcript", h.HandleHermesTranscriptStream)
 }
 
 func (h *Handler) RegisterHermesMachineRoutes(g *echo.Group) {
 	g.POST("/hermes/threads/:thread_id/events", h.HandleHermesEvent)
 	g.POST("/hermes/pi/:session_id/complete", h.HandleHermesPiCompletion)
+}
+
+func (h *Handler) HandleHermesTranscriptStream(c echo.Context) error {
+	userEmail, ok := c.Get("user_email").(string)
+	if !ok || strings.TrimSpace(userEmail) == "" {
+		return echo.NewHTTPError(http.StatusUnauthorized, "not authenticated")
+	}
+	planIdentity := strings.TrimSpace(c.QueryParam("plan_dir"))
+	threadID := strings.TrimSpace(c.Param("thread_id"))
+	if err := ValidateHermesPlanIdentity(HermesPlanIdentity(planIdentity)); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid Hermes plan identity")
+	}
+	if err := safecomponent.ValidateBounded(threadID); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid Hermes thread identity")
+	}
+	ctx := c.Request().Context()
+	view, err := h.service.renderHermesTranscriptView(ctx, planIdentity, threadID)
+	if err != nil {
+		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+			return nil
+		}
+		if os.IsNotExist(err) {
+			return echo.NewHTTPError(http.StatusNotFound, "Hermes thread not found")
+		}
+		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
+	}
+
+	sse := datastar.NewSSE(c.Response().Writer, c.Request())
+	if err := sse.PatchElementTempl(HermesTranscriptRegion(view)); err != nil {
+		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+			return nil
+		}
+		return err
+	}
+	if hook := hermesTranscriptStreamReadHook; hook != nil {
+		hook()
+	}
+	ticker := time.NewTicker(hermesTranscriptRefreshInterval)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return nil
+		case <-ticker.C:
+			view, err = h.service.renderHermesTranscriptView(ctx, planIdentity, threadID)
+			if err != nil {
+				if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+					return nil
+				}
+				return err
+			}
+			if err := sse.PatchElementTempl(HermesTranscriptRegion(view)); err != nil {
+				if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+					return nil
+				}
+				return err
+			}
+			if hook := hermesTranscriptStreamReadHook; hook != nil {
+				hook()
+			}
+		}
+	}
 }
 
 func (h *Handler) HandleCreateHermesThread(c echo.Context) error {

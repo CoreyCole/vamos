@@ -170,11 +170,13 @@ type HermesThreadsPanelArgs struct {
 	SelectedID            string
 	SelectedTitle         string
 	Messages              []ChatMessageArgs
+	DeliveryStatus        string
 	CanPrompt             bool
 	NoPlan                bool
 	ReturnURL             string
 	CommandID             string
 	ConversationReference string
+	StreamURL             string
 }
 
 func (s *Service) RenderHermesThreadsPanel(
@@ -229,13 +231,16 @@ func (s *Service) RenderHermesThreadsPanel(
 		if thread.ID != selectedID {
 			continue
 		}
-		messages, err := s.RenderHermesTranscript(string(identity), thread.ID)
+		view, err := s.renderHermesTranscriptView(ctx, string(identity), thread.ID)
 		if err != nil {
 			return nil, markdown.HermesThreadsURLReplacement{}, err
 		}
 		args.SelectedID = thread.ID
 		args.SelectedTitle = thread.Title
-		args.Messages = messages
+		args.Messages = view.Messages
+		args.DeliveryStatus = view.Status
+		args.StreamURL = "/agent-chat/hermes/threads/" + url.PathEscape(thread.ID) +
+			"/transcript?plan_dir=" + url.QueryEscape(string(identity))
 		args.CanPrompt = s.CanPromptThread(request.UserEmail, thread)
 		if args.CanPrompt {
 			args.CommandID = strings.ReplaceAll(uuid.NewString(), "-", "")

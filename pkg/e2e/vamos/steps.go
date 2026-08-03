@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/http"
 	"net/url"
 	"os"
 	"os/exec"
@@ -50,6 +51,230 @@ func FollowFirstBreadcrumbLink() spec.Step {
 	return customStep("follow first breadcrumb link", func(t testing.TB, ctx *duiruntime.Context) {
 		followFirstLink(t, ctx, "nav[aria-label='Breadcrumb'] a[href], [data-slot='breadcrumb'] a[href], header a[href*='/thoughts/']")
 	})
+}
+
+func FollowHermesFixturePlanDocumentLink() spec.Step {
+	return customStep("follow Hermes fixture plan document link", func(t testing.TB, ctx *duiruntime.Context) {
+		state := fixtureState(t, ctx, fixtures.HermesSharedThreadsFixture)
+		plan := fixtureString(t, state, "primary_plan")
+		selector := "#doc-workbench-sidebar-region a[href*='/thoughts/" + plan + "/AGENTS.md']"
+		followFirstLink(t, ctx, selector)
+	})
+}
+
+func OpenHermesSharedThreadFixture(planKey string) spec.Step {
+	return customStep("open Hermes shared thread "+planKey, func(t testing.TB, ctx *duiruntime.Context) {
+		state := fixtureState(t, ctx, fixtures.HermesSharedThreadsFixture)
+		plan := fixtureString(t, state, planKey)
+		threadID := fixtureString(t, state, "thread_id")
+		values := url.Values{
+			"context":        {"threads"},
+			"chat_workspace": {"ws_1"},
+			"thread":         {"th_1"},
+			"run":            {"inactive_fixture_run"},
+			"hermes_thread":  {threadID},
+		}
+		visit(t, ctx, "/thoughts/"+plan+"/plan.md?"+values.Encode())
+		if err := resolveLocator(t, ctx, HermesThreads.Panel()).First().WaitFor(); err != nil {
+			t.Fatal(err)
+		}
+	})
+}
+
+func AppendHermesFixtureLiveRefreshEvent() spec.Step {
+	return customStep("append Hermes fixture event after the transcript is open", func(t testing.TB, ctx *duiruntime.Context) {
+		state := fixtureState(t, ctx, fixtures.HermesSharedThreadsFixture)
+		marker := fixtureString(t, state, "live_marker")
+		transcript := resolveLocator(t, ctx, HermesThreads.Transcript()).First()
+		if count, err := transcript.GetByText(marker, playwright.LocatorGetByTextOptions{Exact: playwright.Bool(false)}).Count(); err != nil {
+			t.Fatal(err)
+		} else if count != 0 {
+			t.Fatalf("live refresh marker %q was present before the durable append", marker)
+		}
+		pageURL := ctx.Page.URL()
+		plan := fixtureString(t, state, "primary_plan")
+		threadID := fixtureString(t, state, "thread_id")
+		planDir := filepath.Join(thoughtsRoot(ctx), filepath.FromSlash(plan))
+		if err := agentchat.AppendHermesTranscript(planDir, agentchat.HermesTranscriptEvent{
+			ID: fixtureString(t, state, "live_event_id"), At: time.Now().UTC(), Type: "settlement_delivering",
+			ThreadID: threadID, PlanDir: agentchat.HermesPlanIdentity(plan), Content: marker,
+		}); err != nil {
+			t.Fatal(err)
+		}
+		if ctx.Page.URL() != pageURL {
+			t.Fatalf("durable append navigated from %s to %s", pageURL, ctx.Page.URL())
+		}
+	})
+}
+
+func ExpectHermesFixtureLiveRefresh() expectation {
+	return expectation{customStep("Hermes live stream morphs the post-load durable event", func(t testing.TB, ctx *duiruntime.Context) {
+		state := fixtureState(t, ctx, fixtures.HermesSharedThreadsFixture)
+		transcript := resolveLocator(t, ctx, HermesThreads.Transcript()).First()
+		marker := fixtureString(t, state, "live_marker")
+		if err := transcript.GetByText(marker, playwright.LocatorGetByTextOptions{Exact: playwright.Bool(true)}).First().WaitFor(
+			playwright.LocatorWaitForOptions{Timeout: playwright.Float(transcriptTextTimeoutMS)},
+		); err != nil {
+			t.Fatalf("post-load Hermes event did not arrive through the live transcript region: %v", err)
+		}
+		liveEvent := transcript.Locator("#msg-" + fixtureString(t, state, "live_event_id"))
+		if count, err := liveEvent.Count(); err != nil {
+			t.Fatal(err)
+		} else if count != 1 {
+			t.Fatalf("live event rendered %d times, want exactly once", count)
+		}
+	})}
+}
+
+func ExpectHermesSharedThreadFixture(prefix string, promptAuthority bool) expectation {
+	return expectation{customStep("Hermes shared thread shows isolated "+prefix+" evidence", func(t testing.TB, ctx *duiruntime.Context) {
+		state := fixtureState(t, ctx, fixtures.HermesSharedThreadsFixture)
+		transcript := resolveLocator(t, ctx, HermesThreads.Transcript()).First()
+		for _, want := range []string{
+			"FIXTURE_" + prefix + "_PROMPT",
+			"FIXTURE_OPAQUE_" + prefix,
+			"FIXTURE_" + prefix + "_FINAL_PRESENTATION",
+		} {
+			if err := transcript.GetByText(want, playwright.LocatorGetByTextOptions{Exact: playwright.Bool(false)}).First().WaitFor(); err != nil {
+				t.Fatalf("Hermes transcript missing %q: %v", want, err)
+			}
+		}
+		eventIDs := []string{"prompt_" + prefix, "delivery_" + prefix, "pi_run_" + prefix, "settlement_" + prefix, "final_" + prefix}
+		for _, eventID := range eventIDs {
+			if err := transcript.Locator("#msg-" + eventID).WaitFor(); err != nil {
+				t.Fatalf("Hermes transcript missing rendered event %q: %v", eventID, err)
+			}
+		}
+		planKey := "primary_plan"
+		commandKey := "primary_command_id"
+		if prefix != "alpha" {
+			planKey = "negative_plan"
+			commandKey = "negative_command_id"
+		}
+		transcriptPath := filepath.Join(thoughtsRoot(ctx), filepath.FromSlash(fixtureString(t, state, planKey)), ".vamos", "sessions", "hermes", fixtureString(t, state, "thread_id")+".jsonl")
+		raw, err := os.ReadFile(transcriptPath)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, want := range append(eventIDs, fixtureString(t, state, commandKey)) {
+			if !strings.Contains(string(raw), `"`+want+`"`) {
+				t.Fatalf("durable transcript %s missing command/event ID %q", transcriptPath, want)
+			}
+		}
+		other := "alpha"
+		if prefix == "alpha" {
+			other = "beta"
+		}
+		if count, err := transcript.GetByText("FIXTURE_"+other, playwright.LocatorGetByTextOptions{Exact: playwright.Bool(false)}).Count(); err != nil {
+			t.Fatal(err)
+		} else if count != 0 {
+			t.Fatalf("Hermes transcript crossed into %s fixture", other)
+		}
+		status, err := resolveLocator(t, ctx, HermesThreads.Status()).First().InnerText()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if status != "Prompt accepted by Hermes; execution is not confirmed." {
+			t.Fatalf("Hermes delivery status = %q", status)
+		}
+		composerCount, err := resolveLocator(t, ctx, HermesThreads.Composer()).Count()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if (composerCount > 0) != promptAuthority {
+			t.Fatalf("Hermes composer present=%v, want authority=%v", composerCount > 0, promptAuthority)
+		}
+	})}
+}
+
+func ReloadHermesSharedThread() spec.Step {
+	return customStep("reload Hermes shared thread", func(t testing.TB, ctx *duiruntime.Context) {
+		if _, err := ctx.Page.Reload(playwright.PageReloadOptions{WaitUntil: playwright.WaitUntilStateDomcontentloaded}); err != nil {
+			t.Fatal(err)
+		}
+		if err := resolveLocator(t, ctx, HermesThreads.Panel()).First().WaitFor(); err != nil {
+			t.Fatal(err)
+		}
+	})
+}
+
+func ExpectHermesSharedThreadURLState() expectation {
+	return expectation{customStep("Hermes shared thread URL preserves both selections", func(t testing.TB, ctx *duiruntime.Context) {
+		parsed, err := url.Parse(ctx.Page.URL())
+		if err != nil {
+			t.Fatal(err)
+		}
+		for key, want := range map[string]string{
+			"context": "threads", "chat_workspace": "ws_1", "thread": "th_1",
+			"run": "inactive_fixture_run", "hermes_thread": "equal_thread_id",
+		} {
+			if got := parsed.Query().Get(key); got != want {
+				t.Fatalf("URL %s=%q, want %q: %s", key, got, want, parsed.String())
+			}
+		}
+	})}
+}
+
+func AttemptReadOnlyHermesPrompt() spec.Step {
+	return customStep("read-only Hermes viewer cannot append", func(t testing.TB, ctx *duiruntime.Context) {
+		state := fixtureState(t, ctx, fixtures.HermesSharedThreadsFixture)
+		plan := fixtureString(t, state, "negative_plan")
+		threadID := fixtureString(t, state, "thread_id")
+		transcriptPath := filepath.Join(thoughtsRoot(ctx), filepath.FromSlash(plan), ".vamos", "sessions", "hermes", threadID+".jsonl")
+		before, err := os.ReadFile(transcriptPath)
+		if err != nil {
+			t.Fatal(err)
+		}
+		values := url.Values{
+			"plan_dir": {plan}, "command_id": {"unauthorized_browser_command"},
+			"prompt": {"must not append"},
+		}
+		result, err := ctx.Page.Evaluate(`async ({url, body}) => {
+			const response = await fetch(url, {
+				method: "POST",
+				headers: {"Content-Type": "application/x-www-form-urlencoded"},
+				body,
+			});
+			return response.status;
+		}`, map[string]any{
+			"url":  strings.TrimRight(ctx.Config.BaseURL, "/") + "/agent-chat/hermes/threads/" + url.PathEscape(threadID) + "/prompts",
+			"body": values.Encode(),
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if status, ok := result.(float64); !ok || int(status) != http.StatusForbidden {
+			t.Fatalf("read-only prompt status = %#v", result)
+		}
+		after, err := os.ReadFile(transcriptPath)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if sha256.Sum256(before) != sha256.Sum256(after) {
+			t.Fatal("read-only prompt changed the durable transcript")
+		}
+	})
+}
+
+func ExpectHermesFixtureDiskIsolation() expectation {
+	return expectation{customStep("Hermes browser fixture remains isolated on disk", func(t testing.TB, ctx *duiruntime.Context) {
+		state := fixtureState(t, ctx, fixtures.HermesSharedThreadsFixture)
+		plans := []string{fixtureString(t, state, "primary_plan"), fixtureString(t, state, "negative_plan")}
+		wantIDs := []string{fixtureString(t, state, "primary_event_id"), fixtureString(t, state, "negative_event_id")}
+		for index, plan := range plans {
+			path := filepath.Join(thoughtsRoot(ctx), filepath.FromSlash(plan), ".vamos", "sessions", "hermes", fixtureString(t, state, "thread_id")+".jsonl")
+			raw, err := os.ReadFile(path)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !strings.Contains(string(raw), `"id":"`+wantIDs[index]+`"`) {
+				t.Fatalf("transcript %s missing event %s", plan, wantIDs[index])
+			}
+			if strings.Contains(string(raw), `"id":"`+wantIDs[1-index]+`"`) {
+				t.Fatalf("transcript %s contains cross-plan event %s", plan, wantIDs[1-index])
+			}
+		}
+	})}
 }
 
 func OpenPlanWorkspace(planDir string) spec.Step {

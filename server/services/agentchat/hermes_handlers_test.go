@@ -24,6 +24,7 @@ func TestHermesRouteRegistrationSeparatesBrowserSessionAndMachineCallbacks(t *te
 	for _, want := range []string{
 		"POST /agent-chat/hermes/threads",
 		"POST /agent-chat/hermes/threads/:thread_id/prompts",
+		"GET /agent-chat/hermes/threads/:thread_id/transcript",
 		"POST /agent-chat/api/hermes/threads/:thread_id/events",
 		"POST /agent-chat/api/hermes/pi/:session_id/complete",
 	} {

@@ -1,5 +1,19 @@
 package agentchat
 
+templ HermesTranscriptRegion(view HermesTranscriptView) {
+	<div id="hermes-thread-transcript-region">
+		<p id="hermes-thread-delivery-status" class="mb-3 text-xs text-muted-foreground" aria-live="polite">{ view.Status }</p>
+		<div id="hermes-thread-messages" class="space-y-3">
+			if len(view.Messages) == 0 {
+				<p class="text-sm text-muted-foreground">This thread has no transcript turns yet.</p>
+			}
+			for _, message := range view.Messages {
+				@ChatMessage(message)
+			}
+		</div>
+	</div>
+}
+
 templ HermesThreadsPanel(args HermesThreadsPanelArgs) {
 	<div id="hermes-threads-panel" class="flex h-full min-h-0 flex-col bg-background">
 		<div class="shrink-0 border-b border-border px-3 py-2">
@@ -44,19 +58,13 @@ templ HermesThreadsPanel(args HermesThreadsPanelArgs) {
 						<div class="mb-3 border-b border-border pb-2">
 							<p class="text-sm font-medium text-foreground">{ args.SelectedTitle }</p>
 							if args.CanPrompt {
-								<p class="text-xs text-muted-foreground">You have prompt authority.</p>
+								<p id="hermes-thread-authority-status" class="text-xs text-muted-foreground">You have prompt authority.</p>
 							} else {
-								<p class="text-xs text-muted-foreground">Shared read-only transcript.</p>
+								<p id="hermes-thread-authority-status" class="text-xs text-muted-foreground">Shared read-only transcript.</p>
 							}
 						</div>
-						if len(args.Messages) == 0 {
-							<p class="text-sm text-muted-foreground">This thread has no transcript turns yet.</p>
-						}
-						<div class="space-y-3">
-							for _, message := range args.Messages {
-								@ChatMessage(message)
-							}
-						</div>
+						<div id="hermes-thread-transcript-stream" class="hidden" data-init={ "@get('" + args.StreamURL + "')" }></div>
+						@HermesTranscriptRegion(HermesTranscriptView{Messages: args.Messages, Status: args.DeliveryStatus})
 						if args.CanPrompt {
 							<form id="hermes-prompt-form" method="post" action={ templ.SafeURL("/agent-chat/hermes/threads/" + args.SelectedID + "/prompts") } class="mt-4 space-y-2 border-t border-border pt-3">
 								<input id="hermes-prompt-plan-dir" type="hidden" name="plan_dir" value={ args.PlanDir }/>

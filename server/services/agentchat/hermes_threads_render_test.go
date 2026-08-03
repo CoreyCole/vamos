@@ -191,6 +191,37 @@ func TestRenderHermesThreadsPanelRejectsDifferentContainedPlanHint(t *testing.T)
 	}
 }
 
+func TestRenderHermesTranscriptShowsOpaqueSettlementAndTruthfulPromptOutcome(t *testing.T) {
+	root := t.TempDir()
+	identity := HermesPlanIdentity("owner/plans/alpha")
+	planDir := filepath.Join(root, filepath.FromSlash(string(identity)))
+	if err := os.MkdirAll(planDir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := AppendHermesTranscript(planDir, hermesMetadataFixture(identity, "thread_1")); err != nil {
+		t.Fatal(err)
+	}
+	wrapped := "A managed Pi child settled.\nSettlement bytes remain opaque."
+	for _, event := range []HermesTranscriptEvent{
+		{ID: "delivery", Type: "prompt_delivery", ThreadID: "thread_1", PlanDir: identity, DeliveryStatus: string(HermesPromptUncertain)},
+		{ID: "settlement", Type: "settlement_delivering", ThreadID: "thread_1", PlanDir: identity, Content: wrapped},
+	} {
+		if err := AppendHermesTranscript(planDir, event); err != nil {
+			t.Fatal(err)
+		}
+	}
+	view, err := (&Service{thoughtsRoot: root}).renderHermesTranscriptView(t.Context(), string(identity), "thread_1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if view.Status != "Prompt delivery is uncertain and will not be retried automatically." {
+		t.Fatalf("status = %q", view.Status)
+	}
+	if len(view.Messages) != 2 || view.Messages[1].Role != "user" || view.Messages[1].Content != wrapped {
+		t.Fatalf("messages = %#v", view.Messages)
+	}
+}
+
 func TestRenderHermesThreadsPanelNoPlanDoesNotDiscoverRoot(t *testing.T) {
 	service := &Service{thoughtsRoot: filepath.Join(t.TempDir(), "missing")}
 	component, replacement, err := service.RenderHermesThreadsPanel(t.Context(), markdown.HermesThreadsRenderRequest{

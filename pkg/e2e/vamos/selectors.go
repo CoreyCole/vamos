@@ -13,6 +13,7 @@ func (e expectation) CheckStep() spec.Step { return e.step }
 
 var Thoughts thoughtsFeature
 var AgentChat agentChatFeature
+var HermesThreads hermesThreadsFeature
 var Console consoleExpectations
 
 type thoughtsFeature struct{}
@@ -63,6 +64,24 @@ func reachableRegion(label string, locator spec.Locator) spec.Step {
 	return customStep(label, func(t testing.TB, ctx *duiruntime.Context) {
 		ensureRegionReachable(t, ctx, locator)
 	})
+}
+
+type hermesThreadsFeature struct{}
+
+func (hermesThreadsFeature) Panel() spec.Locator {
+	return spec.CSS("#hermes-threads-panel")
+}
+func (hermesThreadsFeature) Transcript() spec.Locator {
+	return spec.CSS("#hermes-thread-transcript-region")
+}
+func (hermesThreadsFeature) Status() spec.Locator {
+	return spec.CSS("#hermes-thread-delivery-status")
+}
+func (hermesThreadsFeature) Composer() spec.Locator {
+	return spec.CSS("#hermes-prompt-form")
+}
+func (hermesThreadsFeature) AuthorityStatus() spec.Locator {
+	return spec.CSS("#hermes-thread-authority-status")
 }
 
 type agentChatFeature struct{}

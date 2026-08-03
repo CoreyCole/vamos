@@ -448,23 +448,34 @@ func hermesPromptEventID(kind, commandID string) string {
 	return "prompt_" + hex.EncodeToString(digest[:])
 }
 
-// RenderHermesTranscript maps durable Hermes events into the existing safe
-// chat presentation model. Final events use the shared Markdown renderer; tool
-// events remain concise cards and never expose gateway tool arguments.
+type HermesTranscriptView struct {
+	Messages []ChatMessageArgs
+	Status   string
+}
+
 func (s *Service) RenderHermesTranscript(
 	planDirIdentity, threadID string,
 ) ([]ChatMessageArgs, error) {
+	view, err := s.renderHermesTranscriptView(
+		context.Background(), planDirIdentity, threadID,
+	)
+	return view.Messages, err
+}
+
+func (s *Service) renderHermesTranscriptView(
+	ctx context.Context, planDirIdentity, threadID string,
+) (HermesTranscriptView, error) {
 	planDir, err := s.hermesPlanDir(planDirIdentity)
 	if err != nil {
-		return nil, err
+		return HermesTranscriptView{}, err
 	}
 	events, err := readHermesTranscriptContext(
-		context.Background(), planDir, HermesPlanIdentity(planDirIdentity), threadID,
+		ctx, planDir, HermesPlanIdentity(planDirIdentity), threadID,
 	)
 	if err != nil {
-		return nil, err
+		return HermesTranscriptView{}, err
 	}
-	messages := make([]ChatMessageArgs, 0, len(events))
+	view := HermesTranscriptView{Messages: make([]ChatMessageArgs, 0, len(events))}
 	for _, event := range events {
 		if event.Type == "thread_metadata" {
 			continue
@@ -475,15 +486,15 @@ func (s *Service) RenderHermesTranscript(
 			Content: event.Content,
 		}
 		switch event.Type {
-		case "user", "prompt_requested":
+		case "user", "prompt_requested", "settlement_delivering":
 			message.Role = "user"
 		case "final":
 			if s.renderer == nil {
-				return nil, fmt.Errorf("Hermes Markdown renderer is not configured")
+				return HermesTranscriptView{}, fmt.Errorf("Hermes Markdown renderer is not configured")
 			}
 			html, err := renderMarkdown(s.renderer, []byte(event.Content))
 			if err != nil {
-				return nil, err
+				return HermesTranscriptView{}, err
 			}
 			message.HTMLContent = html
 		case "tool":
@@ -494,15 +505,35 @@ func (s *Service) RenderHermesTranscript(
 			if event.Tool.Status != "" {
 				message.Content += " — " + event.Tool.Status
 			}
-		case "lifecycle", "pi_run", "prompt_delivery_started", "prompt_delivery":
+		case "lifecycle", "pi_run":
 			message.Role = "system"
-			if event.Type == "prompt_delivery" {
-				message.Content = "Prompt delivery: " + event.DeliveryStatus
-			}
+		case "prompt_delivery_started":
+			message.Role = "system"
+			message.Content = "Prompt delivery started; no terminal outcome is recorded yet."
+			view.Status = message.Content
+		case "prompt_delivery":
+			message.Role = "system"
+			message.Content = hermesPromptDeliveryText(event.DeliveryStatus)
+			view.Status = message.Content
 		}
-		messages = append(messages, message)
+		view.Messages = append(view.Messages, message)
 	}
-	return messages, nil
+	return view, nil
+}
+
+func hermesPromptDeliveryText(status string) string {
+	switch HermesPromptDeliveryStatus(status) {
+	case HermesPromptAccepted:
+		return "Prompt accepted by Hermes; execution is not confirmed."
+	case HermesPromptRejected:
+		return "Prompt rejected by Hermes."
+	case HermesPromptFailed:
+		return "Prompt delivery failed."
+	case HermesPromptUncertain:
+		return "Prompt delivery is uncertain and will not be retried automatically."
+	default:
+		return "Prompt delivery status is unavailable."
+	}
 }
 
 func (s *Service) AppendHermesTranscript(

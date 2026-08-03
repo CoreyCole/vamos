@@ -49,6 +49,7 @@ func DefaultRegistry() Registry {
 		"workspaces.cleaned":                 BuildEmptyFixture,
 		"workspaces.release-lanes":           BuildEmptyFixture,
 		DurableFreeformFixture:               BuildFreeformDurableChat,
+		HermesSharedThreadsFixture:           BuildHermesSharedThreads,
 	}
 }
 
