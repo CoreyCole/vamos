@@ -40,6 +40,8 @@ func (q *Queries) AttachThreadToWorkspace(ctx context.Context, arg AttachThreadT
 }
 
 const demoteThreadPrimaryWorkspaces = `-- name: DemoteThreadPrimaryWorkspaces :exec
+;
+
 UPDATE agent_thread_workspaces
 SET
 is_primary = 0,
@@ -272,6 +274,8 @@ func (q *Queries) ThreadHasWorkspaceAssociation(ctx context.Context, arg ThreadH
 }
 
 const upsertThreadWorkspaceAssociation = `-- name: UpsertThreadWorkspaceAssociation :exec
+;
+
 INSERT INTO agent_thread_workspaces (
 thread_id, workspace_id, is_primary, role, adopted_from, adopted_at
 ) VALUES (

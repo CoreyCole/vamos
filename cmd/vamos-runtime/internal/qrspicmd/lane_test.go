@@ -424,7 +424,7 @@ func TestRunLaneReturnsDegradedBatchResult(t *testing.T) {
 	if err := RunLane(context.Background(), LaneRunOptions{
 		SpecsFile:   specsPath,
 		MaxParallel: 2,
-	}, deps{LaneProcessRunner: selectiveLaneProcessRunner{}}, out); err != nil {
+	}, laneDependencies{LaneProcessRunner: selectiveLaneProcessRunner{}}, out); err != nil {
 		t.Fatal(err)
 	}
 	var result LaneRunResult

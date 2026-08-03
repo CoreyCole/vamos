@@ -80,6 +80,34 @@ type LaneProcessRunner interface {
 	Start(ctx context.Context, command []string, cwd string) (LaneProcess, error)
 }
 
+type laneDependencies struct {
+	LaneProcessRunner LaneProcessRunner
+}
+
+func writeJSONAtomically(path string, v any) error {
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return err
+	}
+	temporary, err := os.CreateTemp(filepath.Dir(path), ".tmp-*")
+	if err != nil {
+		return err
+	}
+	temporaryPath := temporary.Name()
+	defer os.Remove(temporaryPath)
+	encoder := json.NewEncoder(temporary)
+	encoder.SetIndent("", "  ")
+	if err := encoder.Encode(v); err != nil {
+		_ = temporary.Close()
+
+		return err
+	}
+	if err := temporary.Close(); err != nil {
+		return err
+	}
+
+	return os.Rename(temporaryPath, path)
+}
+
 type LaneRunner interface {
 	Start(ctx context.Context, spec LaneSpec) (LaneRecord, error)
 	Wait(ctx context.Context, record LaneRecord) (LaneRecord, error)

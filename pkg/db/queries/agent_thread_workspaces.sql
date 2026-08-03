@@ -68,21 +68,21 @@ VALUES (
 ON CONFLICT (thread_id, workspace_id) DO UPDATE SET
 is_primary = 1,
 role = 'primary',
-adopted_at = CURRENT_TIMESTAMP;
+adopted_at = CURRENT_TIMESTAMP ;
 
 -- name: DemoteThreadPrimaryWorkspaces :exec
 UPDATE agent_thread_workspaces
 SET
 is_primary = 0,
 role = 'related'
-WHERE thread_id = sqlc.arg('thread_id');
+WHERE thread_id = sqlc.arg ('thread_id') ;
 
 -- name: UpsertThreadWorkspaceAssociation :exec
 INSERT INTO agent_thread_workspaces (
 thread_id, workspace_id, is_primary, role, adopted_from, adopted_at
 ) VALUES (
-sqlc.arg('thread_id'), sqlc.arg('workspace_id'), sqlc.arg('is_primary'),
-sqlc.arg('role'), sqlc.arg('adopted_from'), CURRENT_TIMESTAMP
+sqlc.arg ('thread_id'), sqlc.arg ('workspace_id'), sqlc.arg ('is_primary'),
+sqlc.arg ('role'), sqlc.arg ('adopted_from'), CURRENT_TIMESTAMP
 )
 ON CONFLICT (thread_id, workspace_id) DO UPDATE SET
 is_primary = excluded.is_primary,
@@ -90,4 +90,4 @@ role = excluded.role,
 adopted_from = COALESCE (NULLIF (excluded.adopted_from,
 ''),
 agent_thread_workspaces.adopted_from),
-adopted_at = CURRENT_TIMESTAMP;
+adopted_at = CURRENT_TIMESTAMP ;

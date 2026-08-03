@@ -43,7 +43,7 @@ type laneStatusView struct {
 	ErrorTail  string    `json:"errorTail,omitempty"`
 }
 
-func newLaneRunCommand(d deps) *cobra.Command {
+func newLaneRunCommand(d laneDependencies) *cobra.Command {
 	opts := LaneRunOptions{LaneSpec: LaneSpec{Attempt: 1, Timeout: time.Hour}}
 	cmd := &cobra.Command{
 		Use:   "lane-run --plan-dir <path> --coordinator-id <id> --role <role> --prompt-file <file> --report-path <file>",
@@ -91,7 +91,7 @@ func newLaneRunCommand(d deps) *cobra.Command {
 	return cmd
 }
 
-func newLaneStatusCommand(_ deps) *cobra.Command {
+func newLaneStatusCommand(_ laneDependencies) *cobra.Command {
 	opts := LaneStatusOptions{Output: "json"}
 	cmd := &cobra.Command{
 		Use:   "lane-status --plan-dir <path> --record <path>",
@@ -151,7 +151,12 @@ func RunLaneStatus(opts LaneStatusOptions, out io.Writer) error {
 	return json.NewEncoder(out).Encode(view)
 }
 
-func RunLane(ctx context.Context, opts LaneRunOptions, d deps, out io.Writer) error {
+func RunLane(
+	ctx context.Context,
+	opts LaneRunOptions,
+	d laneDependencies,
+	out io.Writer,
+) error {
 	runner := &DetachedLaneRunner{ProcessRunner: d.LaneProcessRunner}
 	if opts.SpecsFile != "" {
 		data, err := os.ReadFile(opts.SpecsFile)
