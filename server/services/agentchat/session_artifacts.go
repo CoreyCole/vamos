@@ -59,6 +59,7 @@ type SessionArtifactIndex struct {
 	NeedsHydration         bool
 	ResultPath             string
 	Checkpoints            []CheckpointArtifact
+	HermesMetadata         *HermesTranscriptEvent
 }
 
 type CheckpointArtifact struct {
@@ -88,10 +89,15 @@ type CheckpointDeliveryProjectionStore interface {
 }
 
 type HermesThreadArtifact struct {
-	ID        string
-	PlanDir   string
-	Path      string
-	UpdatedAt time.Time
+	ID              string
+	PlanDir         string
+	PlanIdentity    HermesPlanIdentity
+	Path            string
+	CreatorEmail    string
+	PromptAuthority HermesPromptAuthority
+	Title           string
+	CreatedAt       time.Time
+	UpdatedAt       time.Time
 }
 
 type AgentSessionMetadata struct {
@@ -241,19 +247,66 @@ func ScanPlanSessions(thoughtsRoot, planDir string) ([]SessionArtifactIndex, err
 // ScanHermesThreads is a disk fallback for thread discovery before the database
 // projection has observed a newly appended transcript.
 func ScanHermesThreads(thoughtsRoot, root string) ([]HermesThreadArtifact, error) {
-	items, err := DiscoverPlanAgentSessionsUnderThoughts(thoughtsRoot, root)
+	if strings.TrimSpace(thoughtsRoot) == "" {
+		return nil, errors.New("thoughts root is required")
+	}
+	if strings.TrimSpace(root) == "" {
+		return nil, errors.New("plan dir is required")
+	}
+	logicalRoot, err := filepath.Abs(filepath.Clean(strings.TrimSpace(thoughtsRoot)))
 	if err != nil {
 		return nil, err
 	}
-	threads := make([]HermesThreadArtifact, 0)
-	for _, item := range items {
-		if item.Agent != "hermes" {
+	logicalPlan, err := filepath.Abs(filepath.Clean(strings.TrimSpace(root)))
+	if err != nil {
+		return nil, err
+	}
+	resolvedRoot, err := filepath.EvalSymlinks(logicalRoot)
+	if err != nil {
+		return nil, err
+	}
+	resolvedPlan, err := filepath.EvalSymlinks(logicalPlan)
+	if err != nil {
+		return nil, err
+	}
+	if !pathWithinRoot(resolvedPlan, resolvedRoot) {
+		return nil, fmt.Errorf("plan dir %q escapes thoughts root %q", logicalPlan, logicalRoot)
+	}
+	hermesDir := filepath.Join(logicalPlan, ".vamos", "sessions", "hermes")
+	entries, err := os.ReadDir(hermesDir)
+	if errors.Is(err, os.ErrNotExist) {
+		return []HermesThreadArtifact{}, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	threads := make([]HermesThreadArtifact, 0, len(entries))
+	for _, entry := range entries {
+		if entry.IsDir() || filepath.Ext(entry.Name()) != jsonlExtension {
 			continue
 		}
+		logicalPath := filepath.Join(hermesDir, entry.Name())
+		resolvedPath, err := filepath.EvalSymlinks(logicalPath)
+		if err != nil {
+			return nil, err
+		}
+		if !pathWithinRoot(resolvedPath, resolvedRoot) {
+			return nil, fmt.Errorf("session path %q escapes thoughts root %q", resolvedPath, resolvedRoot)
+		}
+		item, err := buildSessionArtifactIndex(logicalRoot, resolvedRoot, logicalPath, resolvedPath)
+		if err != nil {
+			return nil, err
+		}
+		if item.Agent != "hermes" || item.HermesMetadata == nil ||
+			item.HermesMetadata.PromptAuthority == nil {
+			return nil, fmt.Errorf("Hermes artifact %q lacks metadata", item.Path)
+		}
 		threads = append(threads, HermesThreadArtifact{
-			ID:        item.SessionID,
-			PlanDir:   item.PlanDir,
-			Path:      item.Path,
+			ID: item.SessionID, PlanDir: item.PlanDir,
+			PlanIdentity: item.HermesMetadata.PlanDir, Path: item.Path,
+			CreatorEmail:    item.HermesMetadata.CreatorEmail,
+			PromptAuthority: *item.HermesMetadata.PromptAuthority,
+			Title:           item.HermesMetadata.Title, CreatedAt: item.HermesMetadata.At,
 			UpdatedAt: item.MTime,
 		})
 	}
@@ -295,11 +348,31 @@ func buildSessionArtifactIndex(
 	if err != nil {
 		return SessionArtifactIndex{}, err
 	}
-	metadata, err := shallowParseSessionArtifact(resolvedPath, agent)
+	metadata, hermesMetadata, err := shallowParseSessionArtifact(
+		resolvedPath, agent, filepath.Join(logicalRoot, filepath.FromSlash(ownerPlanDir)),
+		HermesPlanIdentity(ownerPlanDir),
+	)
 	if err != nil {
 		return SessionArtifactIndex{}, err
 	}
-	hash, err := fileSHA256(resolvedPath)
+	var hash string
+	if agent == "hermes" {
+		threadID := strings.TrimSuffix(filepath.Base(logicalPath), jsonlExtension)
+		lock, lockErr := acquireHermesTranscriptLock(
+			context.Background(), filepath.Join(logicalRoot, filepath.FromSlash(ownerPlanDir)),
+			threadID, true,
+		)
+		if lockErr != nil {
+			return SessionArtifactIndex{}, lockErr
+		}
+		hash, err = fileSHA256(resolvedPath)
+		closeErr := lock.Close()
+		if err == nil {
+			err = closeErr
+		}
+	} else {
+		hash, err = fileSHA256(resolvedPath)
+	}
 	if err != nil {
 		return SessionArtifactIndex{}, err
 	}
@@ -354,6 +427,7 @@ func buildSessionArtifactIndex(
 		NeedsHydration:         agent != "hermes",
 		ResultPath:             resultPath,
 		Checkpoints:            checkpoints,
+		HermesMetadata:         hermesMetadata,
 	}, nil
 }
 
@@ -695,37 +769,28 @@ func projectedMessageFromAgentEntry(
 	}, true
 }
 
-func shallowParseSessionArtifact(path, agent string) (AgentSessionMetadata, error) {
+func shallowParseSessionArtifact(
+	path, agent, planDir string, planIdentity HermesPlanIdentity,
+) (AgentSessionMetadata, *HermesTranscriptEvent, error) {
 	if agent == "hermes" {
-		return shallowParseHermesTranscript(path)
+		return shallowParseHermesTranscript(path, planDir, planIdentity)
 	}
-	return ShallowParseAgentSession(path)
+	metadata, err := ShallowParseAgentSession(path)
+	return metadata, nil, err
 }
 
-func shallowParseHermesTranscript(path string) (AgentSessionMetadata, error) {
-	file, err := os.Open(path)
+func shallowParseHermesTranscript(
+	path, planDir string, planIdentity HermesPlanIdentity,
+) (AgentSessionMetadata, *HermesTranscriptEvent, error) {
+	threadID := strings.TrimSuffix(filepath.Base(path), jsonlExtension)
+	events, err := readHermesTranscriptContext(
+		context.Background(), planDir, planIdentity, threadID,
+	)
 	if err != nil {
-		return AgentSessionMetadata{}, err
+		return AgentSessionMetadata{}, nil, err
 	}
-	defer file.Close()
-	metadata := AgentSessionMetadata{
-		SessionID: strings.TrimSuffix(filepath.Base(path), jsonlExtension),
-	}
-	scanner := bufio.NewScanner(file)
-	for scanner.Scan() {
-		var event HermesTranscriptEvent
-		if err := json.Unmarshal(scanner.Bytes(), &event); err != nil {
-			return AgentSessionMetadata{}, err
-		}
-		if event.ThreadID != "" {
-			metadata.SessionID = strings.TrimSpace(event.ThreadID)
-			break
-		}
-	}
-	if err := scanner.Err(); err != nil {
-		return AgentSessionMetadata{}, err
-	}
-	return metadata, nil
+	metadata := events[0]
+	return AgentSessionMetadata{SessionID: metadata.ThreadID}, &metadata, nil
 }
 
 func ShallowParseAgentSession(path string) (AgentSessionMetadata, error) {

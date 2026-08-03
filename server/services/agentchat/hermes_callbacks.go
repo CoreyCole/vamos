@@ -99,26 +99,25 @@ func (s *Service) DeliverOwnedHermesPrompt(
 	userEmail string,
 	prompt HermesPrompt,
 ) error {
-	owner, err := s.hermesOwner(ctx, prompt.ThreadID)
+	identity := HermesPlanIdentity(prompt.PlanDir)
+	planDir, err := s.hermesPlanDir(prompt.PlanDir)
 	if err != nil {
 		return err
 	}
-	if !strings.EqualFold(strings.TrimSpace(owner), strings.TrimSpace(userEmail)) {
-		return fmt.Errorf("only the thread owner may deliver Hermes prompts")
-	}
-	prompt.OwnerEmail = owner
-	return s.DeliverHermesPrompt(ctx, prompt)
-}
-
-func (s *Service) hermesOwner(ctx context.Context, threadID string) (string, error) {
-	if s.hermesThreadOwner != nil {
-		return s.hermesThreadOwner(ctx, threadID)
-	}
-	thread, err := s.queries.GetAgentThread(ctx, threadID)
+	events, err := readHermesTranscriptContext(ctx, planDir, identity, prompt.ThreadID)
 	if err != nil {
-		return "", err
+		return err
 	}
-	return thread.UserEmail, nil
+	metadata := events[0]
+	thread := HermesThread{
+		ID: prompt.ThreadID, CreatorEmail: metadata.CreatorEmail,
+		PromptAuthority: *metadata.PromptAuthority, PlanDir: prompt.PlanDir,
+	}
+	if !s.CanPromptThread(userEmail, thread) {
+		return fmt.Errorf("prompt authority is required")
+	}
+	prompt.OwnerEmail = metadata.PromptAuthority.PrincipalValue
+	return s.DeliverHermesPrompt(ctx, prompt)
 }
 
 func (s *Service) DeliverHermesPrompt(ctx context.Context, prompt HermesPrompt) error {
@@ -137,13 +136,15 @@ func (s *Service) DeliverHermesPrompt(ctx context.Context, prompt HermesPrompt) 
 // chat presentation model. Final events use the shared Markdown renderer; tool
 // events remain concise cards and never expose gateway tool arguments.
 func (s *Service) RenderHermesTranscript(
-	planDir, threadID string,
+	planDirIdentity, threadID string,
 ) ([]ChatMessageArgs, error) {
-	planDir, err := s.hermesPlanDir(planDir)
+	planDir, err := s.hermesPlanDir(planDirIdentity)
 	if err != nil {
 		return nil, err
 	}
-	events, err := readHermesTranscript(planDir, threadID)
+	events, err := readHermesTranscriptContext(
+		context.Background(), planDir, HermesPlanIdentity(planDirIdentity), threadID,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -187,11 +188,13 @@ func (s *Service) AppendHermesTranscript(
 	event HermesCallbackEvent,
 ) error {
 	_ = ctx
+	identity := HermesPlanIdentity(event.PlanDir)
 	planDir, err := s.hermesPlanDir(event.PlanDir)
 	if err != nil {
 		return err
 	}
-	return AppendHermesTranscript(planDir, event.HermesTranscriptEvent)
+	event.HermesTranscriptEvent.PlanDir = identity
+	return appendHermesTranscript(ctx, planDir, event.HermesTranscriptEvent)
 }
 
 // HermesPiResult reads the current result only after confirming that the plan
@@ -199,8 +202,9 @@ func (s *Service) AppendHermesTranscript(
 // callback payloads are untrusted and must never select arbitrary host files.
 // HermesThreadForPiRun resolves durable child ownership from the plan transcript.
 // Hermes process and manager state are deliberately not involved.
-func (s *Service) HermesThreadForPiRun(planDir, session string) (string, error) {
-	planDir, err := s.hermesPlanDir(planDir)
+func (s *Service) HermesThreadForPiRun(planDirIdentity, session string) (string, error) {
+	identity := HermesPlanIdentity(planDirIdentity)
+	planDir, err := s.hermesPlanDir(planDirIdentity)
 	if err != nil {
 		return "", err
 	}
@@ -217,7 +221,9 @@ func (s *Service) HermesThreadForPiRun(planDir, session string) (string, error) 
 	}
 	matched := ""
 	for _, thread := range threads {
-		events, err := readHermesTranscript(planDir, thread.ID)
+		events, err := readHermesTranscriptContext(
+			context.Background(), planDir, identity, thread.ID,
+		)
 		if err != nil {
 			return "", err
 		}
@@ -257,29 +263,29 @@ func (s *Service) HermesPiResult(planDir, session string) ([]byte, error) {
 }
 
 func (s *Service) hermesPlanDir(planDir string) (string, error) {
-	root := strings.TrimSpace(s.thoughtsRoot)
-	planDir = strings.TrimSpace(planDir)
-	if root == "" || planDir == "" {
-		return "", fmt.Errorf("thoughts root and plan directory are required")
-	}
-	root, err := filepath.Abs(root)
-	if err != nil {
+	identity := HermesPlanIdentity(strings.TrimSpace(planDir))
+	if err := ValidateHermesPlanIdentity(identity); err != nil {
 		return "", err
 	}
-	planDir, err = filepath.Abs(planDir)
-	if err != nil {
-		return "", err
-	}
-	resolvedRoot, err := filepath.EvalSymlinks(root)
+	root, err := resolveExistingDirectory(s.thoughtsRoot)
 	if err != nil {
 		return "", fmt.Errorf("resolve thoughts root: %w", err)
 	}
-	resolvedPlanDir, err := filepath.EvalSymlinks(planDir)
+	resolvedPlan, err := resolveExistingDirectory(
+		filepath.Join(root, filepath.FromSlash(string(identity))),
+	)
 	if err != nil {
 		return "", fmt.Errorf("resolve plan directory: %w", err)
 	}
-	if !pathWithinRoot(resolvedPlanDir, resolvedRoot) {
-		return "", fmt.Errorf("plan directory escapes thoughts root")
+	if !pathWithinRoot(resolvedPlan, root) || resolvedPlan == root {
+		return "", errors.New("plan directory escapes thoughts root")
 	}
-	return resolvedPlanDir, nil
+	derived, _, err := ResolveHermesPlanIdentity(root, resolvedPlan, "")
+	if err != nil {
+		return "", err
+	}
+	if derived != identity {
+		return "", errors.New("plan identity does not match resolved plan")
+	}
+	return resolvedPlan, nil
 }

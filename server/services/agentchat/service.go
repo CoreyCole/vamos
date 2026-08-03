@@ -85,7 +85,6 @@ type Service struct {
 	piCommandDiscovery                  PiCommandDiscovery
 	chatSessions                        *chatsession.Service
 	hermesGateway                       HermesGatewayClient
-	hermesThreadOwner                   func(context.Context, string) (string, error) // test seam
 }
 
 type liveThreadState struct {
