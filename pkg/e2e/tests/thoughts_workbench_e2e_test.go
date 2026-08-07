@@ -178,6 +178,7 @@ func TestStaticHtmlAppletEmbedded(t *testing.T) {
 		Expect(vamos.Thoughts.Ready()).
 		Expect(iframeSandboxOmitsSameOrigin()).
 		Expect(rendererDemoReady(true)).
+		Do(openRendererDemoLinkInNewTab()).
 		Expect(rendererDemoFeedback(false, false, true)).
 		Do(clickRendererDemoAnswer("answer-wrong", true)).
 		Expect(rendererDemoFeedback(false, true, true)).
@@ -395,6 +396,7 @@ func seedRendererThoughtsFiles() spec.Step {
 <body data-signals="{_answer: ''}">
   <h1>Renderer HTML Applet</h1>
   <p id="runtime-ready" style="display: none" data-show="true">Runtime ready</p>
+  <a id="open-markdown" href="/thoughts/tests/renderer-demo.md" target="_blank" rel="noopener noreferrer">Open Markdown source</a>
   <button id="answer-wrong" data-on:click="$_answer = 'wrong'">Wrong answer</button>
   <button id="answer-correct" data-on:click="$_answer = 'correct'">Correct answer</button>
   <p id="feedback-wrong" style="display: none" data-show="$_answer === 'wrong'">Incorrect feedback</p>
@@ -979,6 +981,30 @@ func rendererDemoReady(embedded bool) spec.Expectation {
 	}))
 }
 
+func openRendererDemoLinkInNewTab() spec.Step {
+	return spec.Custom(
+		"open renderer demo link in a new tab",
+		func(tb testing.TB, ctx *duiruntime.Context) {
+			tb.Helper()
+			link := rendererDemoLocator(ctx, "#open-markdown", true)
+			popup, err := ctx.Page.ExpectPopup(func() error { return link.Click() })
+			if err != nil {
+				tb.Fatalf("open Markdown popup: %v", err)
+			}
+			defer popup.Close()
+			if err := popup.WaitForLoadState(playwright.PageWaitForLoadStateOptions{
+				State:   playwright.LoadStateDomcontentloaded,
+				Timeout: playwright.Float(30_000),
+			}); err != nil {
+				tb.Fatalf("load Markdown popup: %v", err)
+			}
+			if !strings.Contains(popup.URL(), "/thoughts/tests/renderer-demo.md") {
+				tb.Fatalf("popup URL = %q", popup.URL())
+			}
+		},
+	)
+}
+
 func rendererDemoFeedback(correctVisible, wrongVisible, embedded bool) spec.Expectation {
 	return spec.ExpectStep(spec.Custom("renderer demo feedback matches selected answer", func(t testing.TB, ctx *duiruntime.Context) {
 		t.Helper()
@@ -1023,8 +1049,14 @@ func iframeSandboxOmitsSameOriginFor(selector string) spec.Expectation {
 				if err != nil {
 					t.Fatal(err)
 				}
-				if !strings.Contains(sandbox, "allow-scripts") {
-					t.Fatalf("sandbox=%q missing allow-scripts", sandbox)
+				for _, permission := range []string{
+					"allow-scripts",
+					"allow-popups",
+					"allow-popups-to-escape-sandbox",
+				} {
+					if !strings.Contains(sandbox, permission) {
+						t.Fatalf("sandbox=%q missing %s", sandbox, permission)
+					}
 				}
 				if strings.Contains(sandbox, "allow-same-origin") {
 					t.Fatalf("sandbox=%q permits same-origin", sandbox)

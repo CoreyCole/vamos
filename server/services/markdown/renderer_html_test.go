@@ -185,8 +185,11 @@ func TestHTMLAppletRendererReturnsSandboxedFrame(t *testing.T) {
 	if !strings.Contains(html, `src="/thoughts/_render/html/demo.html?theme=light"`) {
 		t.Fatalf("missing iframe src: %s", html)
 	}
-	if !strings.Contains(html, `sandbox="allow-scripts allow-forms allow-downloads"`) {
+	if !strings.Contains(html, `sandbox="allow-scripts allow-forms allow-downloads`) {
 		t.Fatalf("missing sandbox: %s", html)
+	}
+	if !strings.Contains(html, `allow-popups allow-popups-to-escape-sandbox`) {
+		t.Fatalf("sandbox does not permit new tabs: %s", html)
 	}
 	if strings.Contains(html, "allow-same-origin") {
 		t.Fatalf("sandbox permits same-origin: %s", html)
