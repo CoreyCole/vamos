@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestGetChangedFiles_IncludesRebasedLocalCodeChanges(t *testing.T) {
@@ -63,6 +64,86 @@ func TestGetChangedFiles_IncludesRebasedLocalCodeChanges(t *testing.T) {
 
 	assertContains(t, changed, "pkg/agents/workflows/runtime/worker.go")
 	assertContains(t, changed, "thoughts/status.md")
+}
+
+func TestRecoverStaleIndexLockRemovesOldUnownedLock(t *testing.T) {
+	repo := t.TempDir()
+	runGit(t, "", "init", "-b", "main", repo)
+	lockPath := filepath.Join(repo, ".git", "index.lock")
+	if err := os.WriteFile(lockPath, nil, 0o600); err != nil {
+		t.Fatalf("write lock: %v", err)
+	}
+	old := time.Now().Add(-staleIndexLockAge - time.Minute)
+	if err := os.Chtimes(lockPath, old, old); err != nil {
+		t.Fatalf("age lock: %v", err)
+	}
+
+	recovered, err := recoverStaleIndexLock(repo)
+	if err != nil {
+		t.Fatalf("recoverStaleIndexLock: %v", err)
+	}
+	if !recovered {
+		t.Fatal("recoverStaleIndexLock() recovered = false, want true")
+	}
+	if _, err := os.Stat(lockPath); !os.IsNotExist(err) {
+		t.Fatalf("lock still exists after recovery: %v", err)
+	}
+}
+
+func TestPullRecoversVerifiedStaleIndexLock(t *testing.T) {
+	base := t.TempDir()
+	seed := filepath.Join(base, "seed")
+	remote := filepath.Join(base, "remote.git")
+	worktree := filepath.Join(base, "worktree")
+	updater := filepath.Join(base, "updater")
+
+	runGit(t, "", "init", "-b", "main", seed)
+	mustWriteFile(t, filepath.Join(seed, "README.md"), "base\n")
+	runGit(t, seed, "add", "README.md")
+	commitGit(t, seed, "base")
+	runGit(t, "", "clone", "--bare", seed, remote)
+	runGit(t, "", "clone", remote, worktree)
+	runGit(t, "", "clone", remote, updater)
+	mustWriteFile(t, filepath.Join(updater, "README.md"), "remote update\n")
+	runGit(t, updater, "add", "README.md")
+	commitGit(t, updater, "remote update")
+	runGit(t, updater, "push", "origin", "main")
+
+	lockPath := filepath.Join(worktree, ".git", "index.lock")
+	if err := os.WriteFile(lockPath, nil, 0o600); err != nil {
+		t.Fatalf("write lock: %v", err)
+	}
+	old := time.Now().Add(-staleIndexLockAge - time.Minute)
+	if err := os.Chtimes(lockPath, old, old); err != nil {
+		t.Fatalf("age lock: %v", err)
+	}
+
+	if _, err := Pull(context.Background(), worktree); err != nil {
+		t.Fatalf("Pull: %v", err)
+	}
+	if _, err := os.Stat(lockPath); !os.IsNotExist(err) {
+		t.Fatalf("stale lock still exists after Pull: %v", err)
+	}
+}
+
+func TestRecoverStaleIndexLockLeavesRecentLock(t *testing.T) {
+	repo := t.TempDir()
+	runGit(t, "", "init", "-b", "main", repo)
+	lockPath := filepath.Join(repo, ".git", "index.lock")
+	if err := os.WriteFile(lockPath, nil, 0o600); err != nil {
+		t.Fatalf("write lock: %v", err)
+	}
+
+	recovered, err := recoverStaleIndexLock(repo)
+	if err != nil {
+		t.Fatalf("recoverStaleIndexLock: %v", err)
+	}
+	if recovered {
+		t.Fatal("recoverStaleIndexLock() recovered = true, want false")
+	}
+	if _, err := os.Stat(lockPath); err != nil {
+		t.Fatalf("lock should remain: %v", err)
+	}
 }
 
 func runGit(t *testing.T, dir string, args ...string) string {

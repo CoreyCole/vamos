@@ -72,6 +72,29 @@ func TestHandlerReturnsSuccessEnvelopeForBestEffortForwardFailure(t *testing.T) 
 	}
 }
 
+func TestHandlerReturnsServerErrorForLocalSyncFailure(t *testing.T) {
+	t.Parallel()
+
+	body := []byte(`{"ref":"refs/heads/main","repository":{"full_name":"CoreyCole/vamos"}}`)
+	signature := SignGitHubWebhook(body, "secret")
+	svc := NewServiceWithRoutes("secret", RepoRoute{}, []RepoRoute{{
+		GitHubRepo: "CoreyCole/vamos",
+		RepoPath:   t.TempDir(),
+	}}, nil)
+	e := echo.New()
+	req := httptest.NewRequest(http.MethodPost, "/api/webhook/github", bytes.NewReader(body))
+	req.Header.Set("X-GitHub-Event", "push")
+	req.Header.Set("X-Hub-Signature-256", signature)
+	rec := httptest.NewRecorder()
+
+	if err := NewHandler(svc).HandleGitHubWebhook(e.NewContext(req, rec)); err != nil {
+		t.Fatalf("HandleGitHubWebhook() error = %v", err)
+	}
+	if rec.Code != http.StatusInternalServerError || !bytes.Contains(rec.Body.Bytes(), []byte(`"status":"error"`)) {
+		t.Fatalf("response = code %d body %s, want 500 error envelope", rec.Code, rec.Body.String())
+	}
+}
+
 func TestHandlerReturnsErrorEnvelopeForRequiredForwardFailure(t *testing.T) {
 	t.Parallel()
 
@@ -97,7 +120,7 @@ func TestHandlerReturnsErrorEnvelopeForRequiredForwardFailure(t *testing.T) {
 	if err := NewHandler(svc).HandleGitHubWebhook(e.NewContext(req, rec)); err != nil {
 		t.Fatalf("HandleGitHubWebhook() error = %v", err)
 	}
-	if rec.Code != http.StatusOK || !bytes.Contains(rec.Body.Bytes(), []byte(`"status":"error"`)) {
-		t.Fatalf("response = code %d body %s, want error envelope", rec.Code, rec.Body.String())
+	if rec.Code != http.StatusInternalServerError || !bytes.Contains(rec.Body.Bytes(), []byte(`"status":"error"`)) {
+		t.Fatalf("response = code %d body %s, want 500 error envelope", rec.Code, rec.Body.String())
 	}
 }

@@ -57,12 +57,13 @@ func (h *Handler) HandleGitHubWebhook(c echo.Context) error {
 		EventType: eventType,
 		Headers:   c.Request().Header.Clone(),
 	}); err != nil {
-		// Log the error but return 200 OK to GitHub
-		// (GitHub will retry on non-2xx which we don't want)
+		// A local synchronization failure means the deployment did not happen.
+		// Return a non-2xx response so GitHub records a failed delivery and retries
+		// instead of treating a stale checkout as successfully deployed.
 		h.service.logEvent("webhook_processing_error", map[string]any{
 			"error": err.Error(),
 		})
-		return c.JSON(http.StatusOK, map[string]string{
+		return c.JSON(http.StatusInternalServerError, map[string]string{
 			"status": "error",
 			"error":  err.Error(),
 		})
