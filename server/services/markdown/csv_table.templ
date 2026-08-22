@@ -14,7 +14,9 @@ templ CSVTableDocument(docPath string, table CSVTable, label string) {
 					<thead>
 						<tr>
 							for _, header := range table.Headers {
-								<th class="px-4 py-3 text-left text-sm font-semibold text-foreground">{ header }</th>
+								<th class="px-4 py-3 text-left text-sm font-semibold text-foreground">
+									@csvTableCellContent(header)
+								</th>
 							}
 						</tr>
 					</thead>
@@ -23,7 +25,9 @@ templ CSVTableDocument(docPath string, table CSVTable, label string) {
 							<tr>
 								for i := 0; i < len(table.Headers); i++ {
 									if i < len(row) {
-										<td class="px-4 py-3 text-sm text-foreground">{ row[i] }</td>
+										<td class="px-4 py-3 text-sm text-foreground">
+											@csvTableCellContent(row[i])
+										</td>
 									} else {
 										<td class="px-4 py-3 text-sm text-muted-foreground"></td>
 									}
@@ -35,4 +39,12 @@ templ CSVTableDocument(docPath string, table CSVTable, label string) {
 			</div>
 		}
 	</section>
+}
+
+templ csvTableCellContent(cell CSVCell) {
+	if cell.html == "" {
+		{ cell.Text }
+	} else {
+		@templ.Raw(cell.html)
+	}
 }

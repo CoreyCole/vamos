@@ -6,6 +6,7 @@ import (
 	"fmt"
 	stdhtml "html"
 	"io"
+	"net/url"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -93,6 +94,33 @@ func (m Renderer) MarkdownBytesToHTML(md []byte) (string, error) {
 		return "", err
 	}
 	return string(htmlBytes), nil
+}
+
+func (m Renderer) markdownBytesToInlineHTML(md []byte) (string, error) {
+	p := parser.NewWithExtensions(parser.CommonExtensions)
+	paragraph := &ast.Paragraph{}
+	p.Inline(paragraph, md)
+
+	state := &renderState{}
+	renderer := mdhtmlRendererWithOptions(
+		m.highlightStyle,
+		m.htmlFormatter,
+		state,
+		markdownHTMLOptions{
+			Inline:                   true,
+			EscapeHTML:               true,
+			SafeLinks:                true,
+			DisableThoughtsAutoLinks: true,
+		},
+	)
+	var rendered bytes.Buffer
+	ast.WalkFunc(paragraph, func(node ast.Node, entering bool) ast.WalkStatus {
+		return renderer.RenderNode(&rendered, node, entering)
+	})
+	if err := state.Err(); err != nil {
+		return "", err
+	}
+	return rendered.String(), nil
 }
 
 func (m Renderer) HighlightSource(source, lang string) (string, error) {
@@ -271,10 +299,31 @@ func (w stateWriter) Write(p []byte) (int, error) {
 	return n, nil
 }
 
+type markdownHTMLOptions struct {
+	Inline                   bool
+	EscapeHTML               bool
+	SafeLinks                bool
+	DisableThoughtsAutoLinks bool
+}
+
 func mdhtmlRenderer(
 	highlightStyle *chroma.Style,
 	htmlFormatter *html.Formatter,
 	state *renderState,
+) *mdhtml.Renderer {
+	return mdhtmlRendererWithOptions(
+		highlightStyle,
+		htmlFormatter,
+		state,
+		markdownHTMLOptions{},
+	)
+}
+
+func mdhtmlRendererWithOptions(
+	highlightStyle *chroma.Style,
+	htmlFormatter *html.Formatter,
+	state *renderState,
+	options markdownHTMLOptions,
 ) *mdhtml.Renderer {
 	write := func(w io.Writer, value string) ast.WalkStatus { return state.writeString(w, value) }
 	printf := func(w io.Writer, format string, args ...any) ast.WalkStatus {
@@ -287,6 +336,19 @@ func mdhtmlRenderer(
 		RenderNodeHook: func(w io.Writer, node ast.Node, entering bool) (ast.WalkStatus, bool) {
 			if state.Err() != nil {
 				return ast.Terminate, true
+			}
+			if options.Inline {
+				if _, ok := node.(*ast.Paragraph); ok {
+					return ast.GoToNext, true
+				}
+			}
+			if options.EscapeHTML && entering {
+				switch htmlNode := node.(type) {
+				case *ast.HTMLSpan:
+					return write(w, stdhtml.EscapeString(string(htmlNode.Literal))), true
+				case *ast.HTMLBlock:
+					return write(w, stdhtml.EscapeString(string(htmlNode.Literal))), true
+				}
 			}
 			if code, ok := node.(*ast.CodeBlock); ok {
 				if write(w, `<div class="markdown-code-block">`) == ast.Terminate {
@@ -323,8 +385,11 @@ func mdhtmlRenderer(
 				return ast.GoToNext, false
 			}
 			if link, ok := node.(*ast.Link); ok {
+				dest := string(link.Destination)
+				if options.SafeLinks && !isSafeMarkdownLinkDestination(dest) {
+					return ast.GoToNext, true
+				}
 				if entering {
-					dest := string(link.Destination)
 					isInternal := strings.HasPrefix(dest, "/thoughts") ||
 						strings.HasPrefix(dest, "thoughts/")
 					if write(
@@ -337,14 +402,22 @@ func mdhtmlRenderer(
 						if !strings.HasPrefix(dest, "/") {
 							dest = "/" + dest
 						}
-						if printf(w, ` href="%s"`, dest) == ast.Terminate {
+						if printf(
+							w,
+							` href="%s"`,
+							stdhtml.EscapeString(dest),
+						) == ast.Terminate {
 							return ast.Terminate, true
 						}
-					} else if len(dest) > 0 && printf(w, ` href="%s" target="_blank" rel="noopener noreferrer"`, dest) == ast.Terminate {
+					} else if len(dest) > 0 && printf(w, ` href="%s" target="_blank" rel="noopener noreferrer"`, stdhtml.EscapeString(dest)) == ast.Terminate {
 						return ast.Terminate, true
 					}
 					if len(link.Title) > 0 &&
-						printf(w, ` title="%s"`, string(link.Title)) == ast.Terminate {
+						printf(
+							w,
+							` title="%s"`,
+							stdhtml.EscapeString(string(link.Title)),
+						) == ast.Terminate {
 						return ast.Terminate, true
 					}
 					return write(w, ">"), true
@@ -418,7 +491,8 @@ func mdhtmlRenderer(
 					)
 					return write(w, content), true
 				}
-				if strings.Contains(content, "thoughts/") && !isInsideCode(text) {
+				if !options.DisableThoughtsAutoLinks &&
+					strings.Contains(content, "thoughts/") && !isInsideCode(text) {
 					return write(w, autoLinkThoughtsPaths(content)), true
 				}
 			}
@@ -491,6 +565,22 @@ func mdhtmlRenderer(
 			return ast.GoToNext, false
 		},
 	})
+}
+
+func isSafeMarkdownLinkDestination(destination string) bool {
+	if destination == "" || strings.ContainsAny(destination, "\x00\r\n") {
+		return false
+	}
+	parsed, err := url.Parse(destination)
+	if err != nil {
+		return false
+	}
+	switch strings.ToLower(parsed.Scheme) {
+	case "", "http", "https", "mailto", "ftp":
+		return true
+	default:
+		return false
+	}
 }
 
 // detectCheckbox checks if a list item contains a task list checkbox pattern

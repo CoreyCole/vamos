@@ -48,13 +48,82 @@ func TestCSVRendererEscapesCells(t *testing.T) {
 	}
 }
 
+func TestCSVRendererRendersMarkdownLinksInCells(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	mustWriteFile(
+		t,
+		filepath.Join(root, "links.csv"),
+		[]byte(
+			"name,resource\nPlan,[Open plan](thoughts/example/plan.md)\nDocs,[Read docs](https://example.com/docs)",
+		),
+	)
+	service, err := NewService(root, nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	page, err := service.RenderThoughtsDocument(t.Context(), "links.csv")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var buf bytes.Buffer
+	if err := page.ViewerArgs.BodyComponent.Render(t.Context(), &buf); err != nil {
+		t.Fatal(err)
+	}
+	html := buf.String()
+	for _, want := range []string{
+		`href="/thoughts/example/plan.md"`,
+		`>Open plan</a>`,
+		`href="https://example.com/docs" target="_blank" rel="noopener noreferrer"`,
+		`>Read docs</a>`,
+	} {
+		if !strings.Contains(html, want) {
+			t.Fatalf("missing %q: %s", want, html)
+		}
+	}
+	if strings.Contains(html, "[Open plan]") || strings.Contains(html, "[Read docs]") {
+		t.Fatalf("CSV renderer left markdown link syntax visible: %s", html)
+	}
+}
+
+func TestCSVRendererDoesNotActivateUnsafeMarkdownLinks(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	mustWriteFile(
+		t,
+		filepath.Join(root, "links.csv"),
+		[]byte("name,resource\nBad,[click](javascript:alert(1))"),
+	)
+	service, err := NewService(root, nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	page, err := service.RenderThoughtsDocument(t.Context(), "links.csv")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var buf bytes.Buffer
+	if err := page.ViewerArgs.BodyComponent.Render(t.Context(), &buf); err != nil {
+		t.Fatal(err)
+	}
+	html := buf.String()
+	if strings.Contains(html, `href="javascript:`) || strings.Contains(html, `<a `) {
+		t.Fatalf("CSV renderer activated unsafe markdown link: %s", html)
+	}
+	if !strings.Contains(html, "click") {
+		t.Fatalf("CSV renderer dropped unsafe link label: %s", html)
+	}
+}
+
 func TestCSVTableDocumentShowsTruncationWithoutDocumentChrome(t *testing.T) {
 	t.Parallel()
 
 	var buf bytes.Buffer
 	table := CSVTable{
-		Headers:   []string{"name"},
-		Rows:      [][]string{{"a"}},
+		Headers:   []CSVCell{{Text: "name"}},
+		Rows:      [][]CSVCell{{{Text: "a"}}},
 		Truncated: true,
 	}
 	if err := CSVTableDocument("thoughts/data.csv", table, "CSV").Render(t.Context(), &buf); err != nil {
@@ -79,7 +148,7 @@ func TestParseCSVTableTruncatesRows(t *testing.T) {
 	if !table.Truncated {
 		t.Fatal("table.Truncated=false")
 	}
-	if len(table.Rows) != 1 || table.Rows[0][0] != "1" {
+	if len(table.Rows) != 1 || table.Rows[0][0].Text != "1" {
 		t.Fatalf("rows=%#v", table.Rows)
 	}
 }
@@ -123,7 +192,7 @@ func TestParseDelimitedTableUsesTabDelimiter(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(table.Headers) != 2 || table.Headers[0] != "a" || table.Rows[0][1] != "2" {
+	if len(table.Headers) != 2 || table.Headers[0].Text != "a" || table.Rows[0][1].Text != "2" {
 		t.Fatalf("table=%#v", table)
 	}
 }
