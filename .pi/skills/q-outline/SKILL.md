@@ -5,7 +5,7 @@ description: Turn approved design into an implementation outline.
 
 # q-outline
 
-Before writing, summarize slices, invariants, and exclusions and obtain approval unless Hermes has explicit authority to proceed. Then write `outline.md` and recommend planning review.
+Before writing, identify the plan directory. If the user has not named an existing plan directory, create a new timestamped plan directory under `thoughts/<owner>/plans/` and use it for the outline. Summarize slices, invariants, and exclusions and obtain approval unless Hermes has explicit authority to proceed. Then write `<plan-dir>/outline.md` and recommend planning review.
 
 ## Hermes completion
 
