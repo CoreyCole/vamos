@@ -128,6 +128,7 @@ func (h *Handler) notFoundAgentChatPage(c echo.Context) error {
 // RegisterMachineAPIRoutes registers endpoints that authenticate with machine
 // bearer credentials instead of browser session middleware.
 func (h *Handler) RegisterMachineAPIRoutes(g *echo.Group) {
+	g.GET("/comments", h.GetCLIQuoteComments)
 	g.POST("/runs", h.PostCLIChatRun)
 	g.POST("/steer", h.PostCLIChatSteer)
 	g.GET("/chat-sessions/:session_id", h.GetCLIChatSession)

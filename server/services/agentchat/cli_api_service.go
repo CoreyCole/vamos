@@ -335,6 +335,93 @@ func (s *Service) startWorkspaceThreadWithCWD(
 	return &thread, startedRun, &session, nil
 }
 
+const (
+	defaultQuoteCommentsLimit = 50
+	maxQuoteCommentsLimit     = 200
+)
+
+func (s *Service) ListOpenQuoteCommentsForArtifact(
+	ctx context.Context,
+	artifactPath string,
+	limit int,
+) (QuoteCommentsResponse, error) {
+	artifact, err := s.validateQuoteCommentArtifact(artifactPath)
+	if err != nil {
+		return QuoteCommentsResponse{}, err
+	}
+	if limit <= 0 {
+		limit = defaultQuoteCommentsLimit
+	}
+	if limit > maxQuoteCommentsLimit {
+		limit = maxQuoteCommentsLimit
+	}
+	rows, err := s.queries.ListOpenQuoteCommentsForDocument(ctx, artifact)
+	if err != nil {
+		return QuoteCommentsResponse{}, err
+	}
+	comments := make([]QuoteCommentDTO, 0, len(rows))
+	for _, row := range rows {
+		if strings.TrimSpace(row.SelectedText) == "" {
+			continue
+		}
+		comments = append(comments, QuoteCommentDTO{
+			ID:           row.ID,
+			ArtifactPath: row.DocPath,
+			Quote:        row.SelectedText,
+			Body:         row.CommentText,
+			AuthorEmail:  row.UserEmail,
+			CreatedAt:    row.CreatedAt,
+		})
+		if len(comments) == limit {
+			break
+		}
+	}
+	return QuoteCommentsResponse{Comments: comments}, nil
+}
+
+var ErrInvalidQuoteCommentArtifact = errors.New("invalid quote comment artifact")
+
+func (s *Service) validateQuoteCommentArtifact(artifactPath string) (string, error) {
+	clean := strings.TrimSpace(artifactPath)
+	if clean == "" || filepath.IsAbs(clean) || strings.Contains(clean, "\x00") {
+		return "", ErrInvalidQuoteCommentArtifact
+	}
+	rel, ok := strings.CutPrefix(filepath.ToSlash(clean), "thoughts/")
+	if !ok || strings.TrimSpace(rel) == "" {
+		return "", ErrInvalidQuoteCommentArtifact
+	}
+	rel = filepath.ToSlash(filepath.Clean(filepath.FromSlash(rel)))
+	if rel == "." || rel == ".." || strings.HasPrefix(rel, "../") {
+		return "", ErrInvalidQuoteCommentArtifact
+	}
+	root, err := filepath.Abs(s.thoughtsRoot)
+	if err != nil {
+		return "", fmt.Errorf("resolve thoughts root: %w", err)
+	}
+	root, err = filepath.EvalSymlinks(root)
+	if err != nil {
+		return "", fmt.Errorf("resolve thoughts root: %w", err)
+	}
+	resolved, err := filepath.EvalSymlinks(filepath.Join(root, filepath.FromSlash(rel)))
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return "", ErrInvalidQuoteCommentArtifact
+		}
+		return "", fmt.Errorf("resolve comment artifact: %w", err)
+	}
+	if !pathWithinRoot(resolved, root) {
+		return "", ErrInvalidQuoteCommentArtifact
+	}
+	info, err := os.Stat(resolved)
+	if err != nil {
+		return "", fmt.Errorf("stat comment artifact: %w", err)
+	}
+	if !info.Mode().IsRegular() {
+		return "", ErrInvalidQuoteCommentArtifact
+	}
+	return "thoughts/" + rel, nil
+}
+
 func absoluteChatURL(publicBaseURL, threadID, runID string) string {
 	rel := threadThoughtsChatURL(threadID, runID)
 	base := strings.TrimRight(strings.TrimSpace(publicBaseURL), "/")

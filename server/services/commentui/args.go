@@ -7,6 +7,8 @@ import (
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/a-h/templ"
 )
 
 type CommentSurface string
@@ -200,6 +202,12 @@ type SelectionSignalArgs struct {
 	ContainerID     string
 }
 
+type FrameCommentBridgeArgs struct {
+	Content     templ.Component
+	Comments    CommentableMarkdownArgs
+	HeadingHint string
+}
+
 func CommentAnchorClass(signalKey string) string {
 	return "commentui-anchor relative"
 }
@@ -229,12 +237,12 @@ func patchOnlyTargetClass(target CommentTargetView) string {
 	return ""
 }
 
-func SelectionStyleExpr(prefix string) string {
+func FormAnchorStyleExpr(prefix string) string {
 	if prefix == "" {
 		return "{}"
 	}
 	p := "$" + prefix
-	return "{'--commentui-selection-top': (" + p + ".top || 0) + 'px', '--commentui-selection-left': (" + p + ".left || 0) + 'px'}"
+	return "{'--commentui-form-top': (" + p + ".formTop || 0) + 'px', '--commentui-form-left': (" + p + ".formLeft || 0) + 'px'}"
 }
 
 func TargetChromeOrVisible(chrome CommentTargetChrome) CommentTargetChrome {
@@ -279,6 +287,23 @@ func SafeCommentTargetSlug(parts ...string) string {
 
 func SafeSelectionSignalPrefix(parts ...string) string {
 	return "comment_selection_" + safeSignalIdentifier(SafeCommentTargetSlug(parts...))
+}
+
+func FrameCommentBridgeID(docPath string) string {
+	return "comment-frame-" + SafeCommentTargetSlug(docPath)
+}
+
+func FrameSelectionSignalArgs(args CommentableMarkdownArgs) SelectionSignalArgs {
+	prefix := SafeSelectionSignalPrefix("frame", args.DocPath)
+	return SelectionSignalArgs{
+		Prefix:    prefix,
+		ShowRoute: args.Routes.Show,
+		HiddenFields: MergeHidden(args.HiddenFields, map[string]string{
+			"doc_path":                 args.DocPath,
+			"comment_target_chrome":    string(CommentTargetChromePatchOnly),
+			"comment_selection_prefix": prefix,
+		}),
+	}
 }
 
 func TargetID(prefix, sectionID string) string {

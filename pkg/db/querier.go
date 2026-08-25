@@ -127,6 +127,7 @@ type Querier interface {
 	ListImplWorkspaces(ctx context.Context, projectID string) ([]ImplWorkspace, error)
 	ListMachineCredentials(ctx context.Context) ([]MachineCredential, error)
 	ListOpenChatAnnotationsByIDs(ctx context.Context, ids []string) ([]ChatAnnotation, error)
+	ListOpenQuoteCommentsForDocument(ctx context.Context, docPath string) ([]DocumentComment, error)
 	ListPlanOwnedSessionArtifactsByPlanDir(ctx context.Context, planDir sql.NullString) ([]AgentSession, error)
 	ListPlanOwnedSessionArtifactsByPlanDirPrefix(ctx context.Context, arg ListPlanOwnedSessionArtifactsByPlanDirPrefixParams) ([]AgentSession, error)
 	ListPlanWorkspaceImplBindings(ctx context.Context, planDirRel string) ([]PlanWorkspaceImplBinding, error)

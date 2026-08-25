@@ -1,6 +1,7 @@
 package markdown
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"net/http"
@@ -11,11 +12,13 @@ import (
 	"strings"
 
 	"github.com/labstack/echo/v4"
+	xhtml "golang.org/x/net/html"
 )
 
 const (
 	htmlAppletRenderPrefix = "/thoughts/_render/html/"
 	thoughtsAssetPrefix    = "/thoughts/_assets/"
+	htmlAppletBridgeScript = `<script src="/js/frame-comment-bridge.js?v=4" data-commentui-mode="child"></script>`
 )
 
 type HTMLAppletRenderer struct{}
@@ -24,13 +27,19 @@ func (r HTMLAppletRenderer) Match(req DocumentRequest) bool {
 	return req.Extension == ".html" || req.Extension == ".htm"
 }
 
-func (r HTMLAppletRenderer) Render(_ context.Context, req DocumentRequest) (RenderedDocument, error) {
+func (r HTMLAppletRenderer) Render(
+	_ context.Context,
+	req DocumentRequest,
+) (RenderedDocument, error) {
 	docPath := "thoughts/" + req.CleanPath
 	return RenderedDocument{
-		Path:        docPath,
-		Title:       DocumentTitle(docPath, nil),
-		Kind:        DocumentKindHTMLApplet,
-		Component:   HTMLAppletFrame(docPath, iframeSrcForHTMLApplet(docPath, req.CurrentTheme)),
+		Path:  docPath,
+		Title: DocumentTitle(docPath, nil),
+		Kind:  DocumentKindHTMLApplet,
+		Component: HTMLAppletFrame(
+			docPath,
+			iframeSrcForHTMLApplet(docPath, req.CurrentTheme),
+		),
 		CommentMode: CommentModeDocumentOnly,
 	}, nil
 }
@@ -46,7 +55,7 @@ func normalizeHTMLAppletTheme(theme string) string {
 	}
 }
 
-func iframeSrcForHTMLApplet(docPath string, theme string) string {
+func iframeSrcForHTMLApplet(docPath, theme string) string {
 	rel := NormalizeWorkspaceDocPath(docPath)
 	src := htmlAppletRenderPrefix + escapeHTMLAppletPath(path.Clean("/" + rel)[1:])
 	values := url.Values{"theme": []string{normalizeHTMLAppletTheme(theme)}}
@@ -75,7 +84,39 @@ func (s *Service) ServeHTMLApplet(c echo.Context) error {
 		return fmt.Errorf("read HTML applet: %w", err)
 	}
 	childHTMLHeaders(c)
-	return c.Blob(http.StatusOK, "text/html; charset=utf-8", content)
+	return c.Blob(
+		http.StatusOK,
+		"text/html; charset=utf-8",
+		injectHTMLAppletBridge(content),
+	)
+}
+
+func injectHTMLAppletBridge(content []byte) []byte {
+	tokenizer := xhtml.NewTokenizer(bytes.NewReader(content))
+	offset := 0
+	insertAt := -1
+	for {
+		tokenType := tokenizer.Next()
+		raw := tokenizer.Raw()
+		if tokenType == xhtml.ErrorToken {
+			break
+		}
+		if tokenType == xhtml.EndTagToken {
+			name, _ := tokenizer.TagName()
+			if bytes.EqualFold(name, []byte("body")) {
+				insertAt = offset
+			}
+		}
+		offset += len(raw)
+	}
+	if insertAt < 0 {
+		insertAt = len(content)
+	}
+	injected := make([]byte, 0, len(content)+len(htmlAppletBridgeScript))
+	injected = append(injected, content[:insertAt]...)
+	injected = append(injected, htmlAppletBridgeScript...)
+	injected = append(injected, content[insertAt:]...)
+	return injected
 }
 
 func resolveHTMLAppletAsset(basePath, docPath, assetPath string) (string, error) {

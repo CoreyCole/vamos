@@ -140,13 +140,24 @@ func TestDocumentSurfaceRendersSourceEdgeToEdge(t *testing.T) {
 	}
 }
 
-func TestCommentComponentForDocumentOnlyWrapsExistingComponentWithPatchTarget(t *testing.T) {
-	component := commentComponentForMode(CommentModeDocumentOnly, commentui.CommentableMarkdownArgs{
-		Surface:      commentui.CommentSurfaceThoughts,
-		IDPrefix:     "doc",
-		DocPath:      "thoughts/example.html",
-		HiddenFields: map[string]string{"doc_path": "thoughts/example.html"},
-	}, templ.Raw(`<iframe data-vamos-html-applet></iframe>`))
+func TestCommentComponentForDocumentOnlyWrapsExistingComponentWithPatchTarget(
+	t *testing.T,
+) {
+	component := commentComponentForMode(
+		CommentModeDocumentOnly,
+		commentui.CommentableMarkdownArgs{
+			Surface:      commentui.CommentSurfaceThoughts,
+			IDPrefix:     "doc",
+			DocPath:      "thoughts/example.html",
+			HiddenFields: map[string]string{"doc_path": "thoughts/example.html"},
+			Routes: commentui.CommentRoutes{
+				Show:   "/forms/comments/show",
+				Create: "/forms/comments",
+				Cancel: "/forms/comments/cancel",
+			},
+		},
+		templ.Raw(`<iframe data-vamos-html-applet></iframe>`),
+	)
 	if component == nil {
 		t.Fatal("component nil")
 	}
@@ -159,10 +170,12 @@ func TestCommentComponentForDocumentOnlyWrapsExistingComponentWithPatchTarget(t 
 	for _, want := range []string{
 		`data-vamos-html-applet`,
 		`data-commentui-container="true"`,
+		`data-commentui-frame-bridge="` + commentui.FrameCommentBridgeID("thoughts/example.html") + `"`,
 		`id="` + commentui.TargetID("doc", "document") + `"`,
 		`commentui-selection-target-right`,
 		`name="comment_target_chrome" value="patch-only"`,
 		`name="doc_path" value="thoughts/example.html"`,
+		`data-commentui-selection-field="text"`,
 	} {
 		if !strings.Contains(html, want) {
 			t.Fatalf("document-only component missing %q: %s", want, html)

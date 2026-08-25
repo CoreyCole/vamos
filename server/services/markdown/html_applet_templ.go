@@ -8,6 +8,8 @@ package markdown
 import "github.com/a-h/templ"
 import templruntime "github.com/a-h/templ/runtime"
 
+import "github.com/CoreyCole/vamos/server/services/commentui"
+
 func HTMLAppletFrame(docPath string, src string) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
@@ -29,33 +31,46 @@ func HTMLAppletFrame(docPath string, src string) templ.Component {
 			templ_7745c5c3_Var1 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<section class=\"flex h-full min-h-0 w-full flex-1 flex-col\"><iframe data-vamos-html-applet title=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<section class=\"flex h-full min-h-0 w-full flex-1 flex-col\"><iframe data-vamos-html-applet data-commentui-frame data-commentui-bridge-id=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var2 string
-		templ_7745c5c3_Var2, templ_7745c5c3_Err = templ.JoinStringErrs("HTML applet " + docPath)
+		templ_7745c5c3_Var2, templ_7745c5c3_Err = templ.JoinStringErrs(commentui.FrameCommentBridgeID(docPath))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/markdown/html_applet.templ`, Line: 7, Col: 35}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/markdown/html_applet.templ`, Line: 10, Col: 69}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var2))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "\" src=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "\" data-commentui-transport=\"opaque-postmessage\" title=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var3 string
-		templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.JoinStringErrs(templ.SafeURL(src))
+		templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.JoinStringErrs("HTML applet " + docPath)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/markdown/html_applet.templ`, Line: 8, Col: 27}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/markdown/html_applet.templ`, Line: 12, Col: 35}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var3))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "\" sandbox=\"allow-scripts allow-forms allow-downloads allow-popups allow-popups-to-escape-sandbox\" class=\"h-full min-h-0 w-full flex-1 border-0 bg-white\" referrerpolicy=\"same-origin\"></iframe></section>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "\" src=\"")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var4 string
+		templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.JoinStringErrs(templ.SafeURL(src))
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/markdown/html_applet.templ`, Line: 13, Col: 27}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var4))
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "\" sandbox=\"allow-scripts allow-forms allow-downloads allow-popups allow-popups-to-escape-sandbox\" class=\"h-full min-h-0 w-full flex-1 border-0 bg-white\" referrerpolicy=\"same-origin\"></iframe></section>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

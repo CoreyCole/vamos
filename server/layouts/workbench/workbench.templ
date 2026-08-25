@@ -13,6 +13,7 @@ templ Workbench(state WorkbenchState) {
 	>
 		<script type="module" src="/js/workbench-resize.js?v=6"></script>
 		<script type="module" src="/js/workbench-doc-scroll.js?v=3"></script>
+		<script defer src="/js/frame-comment-bridge.js?v=4" data-commentui-mode="parent"></script>
 		<div class="flex min-h-0 w-full flex-col gap-2 overflow-hidden">
 			@MobileRegionTabs(state)
 			<div id="workbench-regions" class="flex min-h-0 w-full flex-1 gap-2 overflow-hidden">

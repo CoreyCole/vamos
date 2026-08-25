@@ -2,6 +2,7 @@ package chatcmd
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -14,6 +15,8 @@ import (
 
 	"github.com/CoreyCole/vamos/cmd/vamos-runtime/internal/authcmd"
 )
+
+const defaultCommentsPullLimit = 50
 
 type Options struct {
 	ManagerURL string
@@ -45,6 +48,14 @@ type SteerOptions struct {
 	Timeout    time.Duration
 }
 
+type CommentsPullOptions struct {
+	ManagerURL   string
+	ArtifactPath string
+	Limit        int
+	Profile      string
+	Cwd          string
+}
+
 type deps struct {
 	Store        authcmd.CredentialStore
 	APIClientNew func(managerURL string) APIClient
@@ -64,18 +75,18 @@ func NewCommand() *cobra.Command { return newCommand(deps{}) }
 func newCommand(d deps) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "chat",
-		Short: "Start or steer Agent Chat runs",
+		Short: "Start runs, steer threads, or read comments",
 		Args: func(cmd *cobra.Command, args []string) error {
 			if len(args) > 0 {
-				return errors.New("use an explicit subcommand: start or steer")
+				return errors.New("use an explicit subcommand: start, steer, or comments")
 			}
 			return nil
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return errors.New("use an explicit subcommand: start or steer")
+			return errors.New("use an explicit subcommand: start, steer, or comments")
 		},
 	}
-	cmd.AddCommand(newStartCommand(d), newSteerCommand(d))
+	cmd.AddCommand(newStartCommand(d), newSteerCommand(d), newCommentsCommand(d))
 	return cmd
 }
 
@@ -113,6 +124,77 @@ func newSteerCommand(d deps) *cobra.Command {
 	cmd.Flags().DurationVar(&opts.Timeout, "timeout", 10*time.Minute, "maximum time to wait for chat completion")
 	cmd.Flags().StringVar(&opts.Profile, "profile", "default", "credential profile name")
 	return cmd
+}
+
+func newCommentsCommand(d deps) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "comments",
+		Short: "Read Agent Chat document comments",
+		Args:  cobra.NoArgs,
+	}
+	cmd.AddCommand(newCommentsPullCommand(d))
+	return cmd
+}
+
+func newCommentsPullCommand(d deps) *cobra.Command {
+	opts := CommentsPullOptions{Limit: defaultCommentsPullLimit, Profile: "default"}
+	cmd := &cobra.Command{
+		Use:   "pull --artifact <thoughts/path>",
+		Short: "Emit open quote comments as NDJSON",
+		Args:  cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			return RunCommentsPull(cmd.Context(), opts, d, cmd.OutOrStdout())
+		},
+	}
+	cmd.Flags().StringVar(&opts.ManagerURL, "manager-url", "", "workspace manager URL")
+	cmd.Flags().
+		StringVar(&opts.ArtifactPath, "artifact", "", "exact thoughts artifact path")
+	cmd.Flags().IntVar(&opts.Limit, "limit", defaultCommentsPullLimit, "maximum comments to return")
+	cmd.Flags().StringVar(&opts.Profile, "profile", "default", "credential profile name")
+	return cmd
+}
+
+func RunCommentsPull(
+	ctx context.Context,
+	opts CommentsPullOptions,
+	d deps,
+	out io.Writer,
+) error {
+	if strings.TrimSpace(opts.ArtifactPath) == "" {
+		return errors.New("artifact is required")
+	}
+	if opts.Limit <= 0 {
+		return errors.New("limit must be a positive integer")
+	}
+	if out == nil {
+		out = os.Stdout
+	}
+	profile, secret, err := loadProfile(d.Store, opts.Profile)
+	if err != nil {
+		return err
+	}
+	managerURL, err := authcmd.ResolveManagerURL(opts.ManagerURL, opts.Cwd, profile)
+	if err != nil {
+		return err
+	}
+	response, err := newAPIClient(d, managerURL).Comments(
+		ctx,
+		profile.KeyID,
+		secret,
+		opts.ArtifactPath,
+		opts.Limit,
+	)
+	if err != nil {
+		return err
+	}
+	encoder := json.NewEncoder(out)
+	encoder.SetEscapeHTML(false)
+	for _, comment := range response.Comments {
+		if err := encoder.Encode(comment); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func RunStart(ctx context.Context, opts StartOptions, d deps, out io.Writer) error {

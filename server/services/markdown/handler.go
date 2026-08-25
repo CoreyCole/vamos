@@ -286,7 +286,11 @@ func commentModeHasSelection(mode CommentMode) bool {
 	return mode == "" || mode == CommentModeSections || mode == CommentModeSelectionOnly
 }
 
-func commentComponentForMode(mode CommentMode, args commentui.CommentableMarkdownArgs, existing templ.Component) templ.Component {
+func commentComponentForMode(
+	mode CommentMode,
+	args commentui.CommentableMarkdownArgs,
+	existing templ.Component,
+) templ.Component {
 	switch mode {
 	case "", CommentModeSections:
 		return commentui.CommentableMarkdown(args)
@@ -295,6 +299,14 @@ func commentComponentForMode(mode CommentMode, args commentui.CommentableMarkdow
 	case CommentModeDocumentOnly:
 		if existing == nil {
 			return commentui.CommentableMarkdown(args)
+		}
+		ext := strings.ToLower(filepath.Ext(args.DocPath))
+		if ext == ".html" || ext == ".htm" {
+			return commentui.FrameCommentBridge(commentui.FrameCommentBridgeArgs{
+				Content:     existing,
+				Comments:    args,
+				HeadingHint: "Document",
+			})
 		}
 		return DocumentOnlyCommentSurface(existing, args)
 	default:

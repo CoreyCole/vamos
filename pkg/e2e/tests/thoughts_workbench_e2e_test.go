@@ -3,6 +3,7 @@ package tests
 import (
 	"encoding/base64"
 	"fmt"
+	"math"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -129,6 +130,75 @@ func TestThoughtsWorkbench_WorkbenchOverflowWholeDocumentComments(t *testing.T) 
 		Expect(spec.ExpectStep(expectWorkbenchOverflowAction("Comment"))).
 		Do(submitWholeDocumentComment(commentText + " html")).
 		Expect(spec.ExpectStep(expectCommentsRailShows(commentText + " html"))).
+		Expect(vamos.Console.Clean()).
+		Run()
+}
+
+func TestThoughtsWorkbench_StaticHTMLQuoteComment(t *testing.T) {
+	commentText := fmt.Sprintf("e2e static HTML quote comment %d", time.Now().UnixNano())
+
+	spec.Story(t, "thoughts workbench creates quote comment from opaque static HTML").
+		App(vamos.App()).
+		As(vamos.Robot).
+		With(vamos.WorkspaceFixture("thoughts-workbench.basic")).
+		Do(seedRendererThoughtsFiles()).
+		Do(rememberRendererDemoHTML()).
+		Visit(vamos.Pages.Path("/thoughts/tests/renderer-demo.html?context=chat")).
+		Expect(vamos.Thoughts.Ready()).
+		Do(expectOpaqueBridgeRejectsInvalidMessages(rendererDemoAppletFrameSelector)).
+		Do(selectIframeText(rendererDemoAppletFrameSelector, "h1")).
+		Expect(spec.ExpectStep(expectSelectedQuote("Renderer HTML Applet"))).
+		Expect(spec.ExpectStep(expectQuoteTriggerBelowIframeText(rendererDemoAppletFrameSelector, "h1"))).
+		Do(submitSelectedQuoteComment(commentText)).
+		Expect(spec.ExpectStep(expectCommentsRailShows("Renderer HTML Applet"))).
+		Expect(spec.ExpectStep(expectCommentsRailShows(commentText))).
+		Expect(spec.ExpectStep(expectRendererDemoHTMLUnchanged())).
+		Expect(vamos.Console.Clean()).
+		Run()
+}
+
+func TestThoughtsWorkbench_StaticHTMLQuoteCommentMobileTouchSelection(t *testing.T) {
+	spec.Story(t, "thoughts workbench shows quote action for mobile HTML selection").
+		App(vamos.App()).
+		Viewport(duiruntime.ViewportMobile).
+		As(vamos.Robot).
+		With(vamos.WorkspaceFixture("thoughts-workbench.basic")).
+		Do(seedRendererThoughtsFiles()).
+		Visit(vamos.Pages.Path("/thoughts/tests/renderer-demo.html?context=comments")).
+		Expect(vamos.Thoughts.Ready()).
+		Do(selectIframeTextWithEvent(rendererDemoAppletFrameSelector, "h1", "touchend")).
+		Expect(spec.ExpectStep(expectSelectedQuote("Renderer HTML Applet"))).
+		Expect(vamos.Console.Clean()).
+		Run()
+}
+
+func TestThoughtsWorkbench_DatastarAppletQuoteCommentRebindsAfterReplacement(
+	t *testing.T,
+) {
+	commentText := fmt.Sprintf(
+		"e2e Datastar applet quote comment %d",
+		time.Now().UnixNano(),
+	)
+	identity := "thoughts/e2e-wordle/AGENTS.md"
+	token := base64.RawURLEncoding.EncodeToString([]byte(identity))
+	frameSelector := `iframe[src^='/thoughts/_render/app/` + token + `/app/']`
+
+	spec.Story(t, "thoughts workbench creates quote comment from same-origin Datastar applet").
+		App(vamos.App()).
+		As(vamos.Robot).
+		With(vamos.WorkspaceFixture("thoughts-workbench.basic")).
+		Do(seedThoughtsAppletManifest()).
+		Visit(vamos.Pages.Path("/thoughts/_render/app/" + token + "?context=chat")).
+		Expect(vamos.Thoughts.Ready()).
+		Do(selectIframeText(frameSelector, "h1")).
+		Expect(spec.ExpectStep(expectSelectedQuote("Daily Wordle"))).
+		Expect(spec.ExpectStep(expectQuoteTriggerBelowIframeText(frameSelector, "h1"))).
+		Do(submitSelectedQuoteComment(commentText)).
+		Expect(spec.ExpectStep(expectCommentsRailShows("Daily Wordle"))).
+		Expect(spec.ExpectStep(expectCommentsRailShows(commentText))).
+		Do(replaceCommentableIframe(frameSelector)).
+		Do(selectIframeTextWithEvent(frameSelector, "header p", "selectionchange")).
+		Expect(spec.ExpectStep(expectSelectedQuote("Datastar daily game"))).
 		Expect(vamos.Console.Clean()).
 		Run()
 }
@@ -375,18 +445,20 @@ func TestThoughtsWorkbench_SavedMobileActiveStateDoesNotPinDesktopRefreshDesktop
 }
 
 func seedRendererThoughtsFiles() spec.Step {
-	return spec.Custom("seed renderer thoughts files", func(t testing.TB, ctx *duiruntime.Context) {
-		t.Helper()
-		root := rendererDemoThoughtsRoot(ctx)
-		if err := os.MkdirAll(root, 0o755); err != nil {
-			t.Fatal(err)
-		}
-		files := map[string]string{
-			"renderer-demo.md":   "# Renderer Markdown Demo\n\nMarkdown parity content.\n\n| name | value |\n| --- | --- |\n| alpha | beta |\n",
-			"renderer-demo.csv":  "name,value\n<script>,escaped text\n",
-			"renderer-demo.tsv":  "name\tvalue\nAda\ttabbed text\nGrace\thopper\n",
-			"renderer-demo.json": `{"source": true, "escaped": "<script>"}`,
-			"renderer-demo.html": `<!doctype html>
+	return spec.Custom(
+		"seed renderer thoughts files",
+		func(t testing.TB, ctx *duiruntime.Context) {
+			t.Helper()
+			root := rendererDemoThoughtsRoot(ctx)
+			if err := os.MkdirAll(root, 0o755); err != nil {
+				t.Fatal(err)
+			}
+			files := map[string]string{
+				"renderer-demo.md":   "# Renderer Markdown Demo\n\nMarkdown parity content.\n\n| name | value |\n| --- | --- |\n| alpha | beta |\n",
+				"renderer-demo.csv":  "name,value\n<script>,escaped text\n",
+				"renderer-demo.tsv":  "name\tvalue\nAda\ttabbed text\nGrace\thopper\n",
+				"renderer-demo.json": `{"source": true, "escaped": "<script>"}`,
+				"renderer-demo.html": `<!doctype html>
 <html>
 <head>
   <meta charset="utf-8">
@@ -597,6 +669,261 @@ func expectCommentsRailShows(text string) spec.Step {
 	)
 }
 
+func rememberRendererDemoHTML() spec.Step {
+	return spec.Custom(
+		"remember static HTML artifact",
+		func(t testing.TB, ctx *duiruntime.Context) {
+			t.Helper()
+			content, err := os.ReadFile(
+				filepath.Join(rendererDemoThoughtsRoot(ctx), "renderer-demo.html"),
+			)
+			if err != nil {
+				t.Fatal(err)
+			}
+			ctx.Memory["renderer_demo_html_before_comment"] = string(content)
+		},
+	)
+}
+
+func expectRendererDemoHTMLUnchanged() spec.Step {
+	return spec.Custom(
+		"static HTML artifact remains unchanged",
+		func(t testing.TB, ctx *duiruntime.Context) {
+			t.Helper()
+			content, err := os.ReadFile(
+				filepath.Join(rendererDemoThoughtsRoot(ctx), "renderer-demo.html"),
+			)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got, want := string(
+				content,
+			), ctx.Memory["renderer_demo_html_before_comment"]; got != want {
+				t.Fatalf("static HTML artifact changed after comment")
+			}
+		},
+	)
+}
+
+func selectIframeText(frameSelector, textSelector string) spec.Step {
+	return selectIframeTextWithEvent(frameSelector, textSelector, "mouseup")
+}
+
+func selectIframeTextWithEvent(frameSelector, textSelector, eventName string) spec.Step {
+	return spec.Custom("select iframe text", func(t testing.TB, ctx *duiruntime.Context) {
+		t.Helper()
+		target := ctx.Page.FrameLocator(frameSelector).Locator(textSelector).First()
+		if err := target.WaitFor(
+			playwright.LocatorWaitForOptions{Timeout: playwright.Float(60_000)},
+		); err != nil {
+			t.Fatalf("iframe selection target missing: %v", err)
+		}
+		if _, err := target.Evaluate(`(el, eventName) => {
+			const range = document.createRange()
+			range.selectNodeContents(el)
+			const selection = window.getSelection()
+			selection.removeAllRanges()
+			selection.addRange(range)
+			el.dispatchEvent(new Event(eventName, {bubbles: true}))
+		}`, eventName); err != nil {
+			t.Fatal(err)
+		}
+	})
+}
+
+func expectSelectedQuote(quote string) spec.Step {
+	return spec.Custom(
+		"parent shows selected iframe quote",
+		func(t testing.TB, ctx *duiruntime.Context) {
+			t.Helper()
+			trigger := ctx.Page.Locator("form.commentui-selection-trigger").First()
+			if err := trigger.WaitFor(playwright.LocatorWaitForOptions{
+				State:   playwright.WaitForSelectorStateVisible,
+				Timeout: playwright.Float(30_000),
+			}); err != nil {
+				t.Fatalf("selection comment trigger missing: %v", err)
+			}
+			value, err := trigger.Locator("input[name='selected_text']").InputValue()
+			if err != nil {
+				t.Fatal(err)
+			}
+			if value != quote {
+				t.Fatalf("selected quote = %q, want %q", value, quote)
+			}
+		},
+	)
+}
+
+func expectQuoteTriggerBelowIframeText(frameSelector, textSelector string) spec.Step {
+	return spec.Custom(
+		"quote trigger appears below selected text",
+		func(t testing.TB, ctx *duiruntime.Context) {
+			t.Helper()
+			selected, err := ctx.Page.FrameLocator(frameSelector).
+				Locator(textSelector).
+				First().
+				BoundingBox()
+			if err != nil {
+				t.Fatal(err)
+			}
+			trigger, err := ctx.Page.Locator("form.commentui-selection-trigger").
+				First().
+				BoundingBox()
+			if err != nil {
+				t.Fatal(err)
+			}
+			if selected == nil || trigger == nil {
+				t.Fatal("selected text or quote trigger has no bounding box")
+			}
+			if trigger.Y < selected.Y+selected.Height+6 {
+				t.Fatalf(
+					"quote trigger top %.1f overlaps selected text ending at %.1f",
+					trigger.Y,
+					selected.Y+selected.Height,
+				)
+			}
+		},
+	)
+}
+
+func submitSelectedQuoteComment(text string) spec.Step {
+	return spec.Custom(
+		"submit selected quote comment",
+		func(t testing.TB, ctx *duiruntime.Context) {
+			t.Helper()
+			trigger := ctx.Page.Locator("form.commentui-selection-trigger").First()
+			triggerBox, err := trigger.BoundingBox()
+			if err != nil {
+				t.Fatal(err)
+			}
+			if triggerBox == nil {
+				t.Fatal("quote trigger has no bounding box")
+			}
+			if err := trigger.GetByRole(*playwright.AriaRoleButton, playwright.LocatorGetByRoleOptions{Name: "Comment on selection"}).
+				Click(); err != nil {
+				t.Fatal(err)
+			}
+			form := ctx.Page.Locator("form:has(textarea[name='comment_text'])").First()
+			textarea := form.Locator("textarea[name='comment_text']").First()
+			if err := textarea.WaitFor(
+				playwright.LocatorWaitForOptions{Timeout: playwright.Float(30_000)},
+			); err != nil {
+				t.Fatalf("comment textarea missing: %v", err)
+			}
+			popover := ctx.Page.Locator(".commentui-selection-target-right .commentui-popover").
+				First()
+			before, err := popover.BoundingBox()
+			if err != nil {
+				t.Fatal(err)
+			}
+			if before == nil {
+				t.Fatal("open comment form has no bounding box")
+			}
+			if math.Abs(before.Y-triggerBox.Y) > 2 {
+				t.Fatalf(
+					"comment form opened at y=%.1f, want trigger y=%.1f",
+					before.Y,
+					triggerBox.Y,
+				)
+			}
+			if err := trigger.WaitFor(playwright.LocatorWaitForOptions{
+				State:   playwright.WaitForSelectorStateHidden,
+				Timeout: playwright.Float(30_000),
+			}); err != nil {
+				t.Fatalf("quote trigger remained visible after deselection: %v", err)
+			}
+			after, err := popover.BoundingBox()
+			if err != nil {
+				t.Fatal(err)
+			}
+			if after == nil {
+				t.Fatal("comment form disappeared after deselection")
+			}
+			if math.Abs(after.Y-triggerBox.Y) > 2 {
+				t.Fatalf(
+					"comment form moved from trigger y=%.1f to y=%.1f after automatic deselection",
+					triggerBox.Y,
+					after.Y,
+				)
+			}
+			if err := textarea.Fill(text); err != nil {
+				t.Fatal(err)
+			}
+			if err := form.GetByRole(*playwright.AriaRoleButton, playwright.LocatorGetByRoleOptions{Name: "Comment"}).
+				Click(); err != nil {
+				t.Fatal(err)
+			}
+		},
+	)
+}
+
+func expectOpaqueBridgeRejectsInvalidMessages(frameSelector string) spec.Step {
+	return spec.Custom(
+		"opaque bridge rejects invalid messages",
+		func(t testing.TB, ctx *duiruntime.Context) {
+			t.Helper()
+			_, err := ctx.Page.Evaluate(`selector => {
+			const frame = document.querySelector(selector)
+			const container = frame?.closest('[data-commentui-frame-bridge]')
+			const input = container?.querySelector('[data-commentui-selection-field="text"]')
+			if (!frame || !container || !input) throw new Error('comment bridge fixture missing')
+			const bridgeID = frame.dataset.commentuiBridgeId
+			const rect = {top: 1, left: 2, width: 3, height: 4}
+			const base = {type: 'vamos:frame-quote-selection', version: 1, bridge_id: bridgeID, quote: 'must not apply', rect}
+			const invalid = [
+				{source: window, data: base},
+				{source: frame.contentWindow, data: {...base, bridge_id: 'wrong-bridge'}},
+				{source: frame.contentWindow, data: {...base, version: 2}},
+				{source: frame.contentWindow, data: {...base, quote: 'x'.repeat(8193)}},
+				{source: frame.contentWindow, data: {...base, quote: '   '}},
+				{source: frame.contentWindow, data: {...base, rect: {...rect, top: Number.NaN}}},
+			]
+			for (const testCase of invalid) {
+				input.value = ''
+				window.dispatchEvent(new MessageEvent('message', {
+					data: testCase.data,
+					origin: 'null',
+					source: testCase.source,
+				}))
+				if (input.value !== '') throw new Error('invalid frame message changed selection')
+			}
+		}`, frameSelector)
+			if err != nil {
+				t.Fatal(err)
+			}
+		},
+	)
+}
+
+func replaceCommentableIframe(frameSelector string) spec.Step {
+	return spec.Custom(
+		"replace commentable iframe",
+		func(t testing.TB, ctx *duiruntime.Context) {
+			t.Helper()
+			_, err := ctx.Page.Evaluate(`selector => new Promise((resolve, reject) => {
+			const frame = document.querySelector(selector)
+			if (!frame) return reject(new Error('commentable iframe missing'))
+			const replacement = frame.cloneNode(true)
+			const timeout = setTimeout(() => reject(new Error('replacement iframe did not load')), 60000)
+			replacement.addEventListener('load', () => {
+				clearTimeout(timeout)
+				resolve()
+			}, {once: true})
+			frame.replaceWith(replacement)
+		})`, frameSelector)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := ctx.Page.FrameLocator(frameSelector).
+				Locator("header p").
+				First().
+				WaitFor(playwright.LocatorWaitForOptions{Timeout: playwright.Float(60_000)}); err != nil {
+				t.Fatalf("replacement iframe content missing: %v", err)
+			}
+		},
+	)
+}
+
 func sourceRendererShowsLineNumbers() spec.Expectation {
 	return spec.ExpectStep(
 		spec.Custom(
@@ -779,7 +1106,11 @@ func htmlAppletChildHasInitialTheme() spec.Expectation {
 				if wantDark {
 					wantScheme = "dark"
 				}
-				if got := htmlAppletChildColorScheme(t, ctx, styledAppletFrameSelector); got != wantScheme {
+				if got := htmlAppletChildColorScheme(
+					t,
+					ctx,
+					styledAppletFrameSelector,
+				); got != wantScheme {
 					t.Fatalf("child color-scheme=%q, want %q", got, wantScheme)
 				}
 				if err := ctx.Page.FrameLocator(styledAppletFrameSelector).
@@ -880,8 +1211,16 @@ func htmlAppletChildThemeChanged() spec.Expectation {
 						if got {
 							wantScheme = "dark"
 						}
-						if scheme := htmlAppletChildColorScheme(t, ctx, styledAppletFrameSelector); scheme != wantScheme {
-							t.Fatalf("child color-scheme=%q after toggle, want %q", scheme, wantScheme)
+						if scheme := htmlAppletChildColorScheme(
+							t,
+							ctx,
+							styledAppletFrameSelector,
+						); scheme != wantScheme {
+							t.Fatalf(
+								"child color-scheme=%q after toggle, want %q",
+								scheme,
+								wantScheme,
+							)
 						}
 						return
 					}
@@ -920,9 +1259,15 @@ func htmlAppletChildDark(t testing.TB, ctx *duiruntime.Context, selector string)
 	return value.(bool)
 }
 
-func htmlAppletChildColorScheme(t testing.TB, ctx *duiruntime.Context, selector string) string {
+func htmlAppletChildColorScheme(
+	t testing.TB,
+	ctx *duiruntime.Context,
+	selector string,
+) string {
 	t.Helper()
-	value, err := ctx.Page.FrameLocator(selector).Locator("html").Evaluate("el => el.style.colorScheme", nil)
+	value, err := ctx.Page.FrameLocator(selector).
+		Locator("html").
+		Evaluate("el => el.style.colorScheme", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -946,39 +1291,61 @@ func rendererDemoThoughtsRoot(ctx *duiruntime.Context) string {
 }
 
 func openRendererDemoStandaloneFile() spec.Step {
-	return spec.Custom("open renderer demo as standalone file", func(t testing.TB, ctx *duiruntime.Context) {
-		t.Helper()
-		fullPath, err := filepath.Abs(filepath.Join(rendererDemoThoughtsRoot(ctx), "renderer-demo.html"))
-		if err != nil {
-			t.Fatal(err)
-		}
-		fileURL := (&url.URL{Scheme: "file", Path: filepath.ToSlash(fullPath)}).String()
-		if _, err := ctx.Page.Goto(fileURL, playwright.PageGotoOptions{WaitUntil: playwright.WaitUntilStateDomcontentloaded}); err != nil {
-			t.Fatal(err)
-		}
-	})
+	return spec.Custom(
+		"open renderer demo as standalone file",
+		func(t testing.TB, ctx *duiruntime.Context) {
+			t.Helper()
+			fullPath, err := filepath.Abs(
+				filepath.Join(rendererDemoThoughtsRoot(ctx), "renderer-demo.html"),
+			)
+			if err != nil {
+				t.Fatal(err)
+			}
+			fileURL := (&url.URL{Scheme: "file", Path: filepath.ToSlash(fullPath)}).String()
+			if _, err := ctx.Page.Goto(
+				fileURL,
+				playwright.PageGotoOptions{
+					WaitUntil: playwright.WaitUntilStateDomcontentloaded,
+				},
+			); err != nil {
+				t.Fatal(err)
+			}
+		},
+	)
 }
 
 func clickRendererDemoAnswer(id string, embedded bool) spec.Step {
-	return spec.Custom("choose renderer demo answer", func(t testing.TB, ctx *duiruntime.Context) {
-		t.Helper()
-		button := rendererDemoLocator(ctx, "#"+id, embedded)
-		if err := button.Click(); err != nil {
-			t.Fatal(err)
-		}
-	})
+	return spec.Custom(
+		"choose renderer demo answer",
+		func(t testing.TB, ctx *duiruntime.Context) {
+			t.Helper()
+			button := rendererDemoLocator(ctx, "#"+id, embedded)
+			if err := button.Click(); err != nil {
+				t.Fatal(err)
+			}
+		},
+	)
 }
 
 func rendererDemoReady(embedded bool) spec.Expectation {
-	return spec.ExpectStep(spec.Custom("renderer demo Datastar runtime ready", func(t testing.TB, ctx *duiruntime.Context) {
-		t.Helper()
-		if err := rendererDemoLocator(ctx, "#runtime-ready", embedded).WaitFor(playwright.LocatorWaitForOptions{
-			State:   playwright.WaitForSelectorStateVisible,
-			Timeout: playwright.Float(30_000),
-		}); err != nil {
-			t.Fatal(err)
-		}
-	}))
+	return spec.ExpectStep(
+		spec.Custom(
+			"renderer demo Datastar runtime ready",
+			func(t testing.TB, ctx *duiruntime.Context) {
+				t.Helper()
+				if err := rendererDemoLocator(
+					ctx,
+					"#runtime-ready",
+					embedded,
+				).WaitFor(playwright.LocatorWaitForOptions{
+					State:   playwright.WaitForSelectorStateVisible,
+					Timeout: playwright.Float(30_000),
+				}); err != nil {
+					t.Fatal(err)
+				}
+			},
+		),
+	)
 }
 
 func openRendererDemoLinkInNewTab() spec.Step {
@@ -1006,24 +1373,33 @@ func openRendererDemoLinkInNewTab() spec.Step {
 }
 
 func rendererDemoFeedback(correctVisible, wrongVisible, embedded bool) spec.Expectation {
-	return spec.ExpectStep(spec.Custom("renderer demo feedback matches selected answer", func(t testing.TB, ctx *duiruntime.Context) {
-		t.Helper()
-		for id, want := range map[string]bool{
-			"feedback-correct": correctVisible,
-			"feedback-wrong":   wrongVisible,
-		} {
-			visible, err := rendererDemoLocator(ctx, "#"+id, embedded).IsVisible()
-			if err != nil {
-				t.Fatal(err)
-			}
-			if visible != want {
-				t.Fatalf("%s visibility=%v, want %v", id, visible, want)
-			}
-		}
-	}))
+	return spec.ExpectStep(
+		spec.Custom(
+			"renderer demo feedback matches selected answer",
+			func(t testing.TB, ctx *duiruntime.Context) {
+				t.Helper()
+				for id, want := range map[string]bool{
+					"feedback-correct": correctVisible,
+					"feedback-wrong":   wrongVisible,
+				} {
+					visible, err := rendererDemoLocator(ctx, "#"+id, embedded).IsVisible()
+					if err != nil {
+						t.Fatal(err)
+					}
+					if visible != want {
+						t.Fatalf("%s visibility=%v, want %v", id, visible, want)
+					}
+				}
+			},
+		),
+	)
 }
 
-func rendererDemoLocator(ctx *duiruntime.Context, selector string, embedded bool) playwright.Locator {
+func rendererDemoLocator(
+	ctx *duiruntime.Context,
+	selector string,
+	embedded bool,
+) playwright.Locator {
 	if embedded {
 		return ctx.Page.FrameLocator(rendererDemoAppletFrameSelector).Locator(selector)
 	}

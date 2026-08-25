@@ -17,6 +17,23 @@ func TestHTTPAPIClientWireContract(t *testing.T) {
 		}
 
 		switch r.URL.Path {
+		case "/agent-chat/api/comments":
+			if r.Method != http.MethodGet {
+				t.Fatalf("comments method = %s", r.Method)
+			}
+			if got := r.URL.Query().
+				Get("artifact_path"); got != "thoughts/plans/demo report.html" {
+				t.Fatalf("comments artifact_path = %q", got)
+			}
+			if got := r.URL.Query().Get("limit"); got != "25" {
+				t.Fatalf("comments limit = %q", got)
+			}
+			_, _ = w.Write(
+				[]byte(
+					`{"comments":[{"id":"comment-1","artifact_path":"thoughts/plans/demo report.html","quote":"selected text","body":"clarify","author_email":"reviewer@example.com","created_at":"2026-08-22T12:00:00Z"}]}`,
+				),
+			)
+
 		case "/agent-chat/api/runs":
 			if r.Method != http.MethodPost {
 				t.Fatalf("start method = %s", r.Method)
@@ -72,6 +89,21 @@ func TestHTTPAPIClientWireContract(t *testing.T) {
 
 	client := HTTPAPIClient{HTTPClient: server.Client(), ManagerURL: server.URL}
 	ctx := context.Background()
+
+	comments, err := client.Comments(
+		ctx,
+		"key-1",
+		"secret-1",
+		"thoughts/plans/demo report.html",
+		25,
+	)
+	if err != nil {
+		t.Fatalf("Comments() error = %v", err)
+	}
+	if len(comments.Comments) != 1 || comments.Comments[0].ID != "comment-1" ||
+		comments.Comments[0].Quote != "selected text" {
+		t.Fatalf("comments = %+v", comments)
+	}
 
 	started, err := client.Start(ctx, "key-1", "secret-1", ChatStartRequest{ProjectID: "github.com/coreycole/vamos", Prompt: "hello"})
 	if err != nil {

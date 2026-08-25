@@ -51,6 +51,14 @@ func preventSubmitPostExpr(route string) string {
 	return "@post('" + route + "', {contentType: 'form'})"
 }
 
+func selectionTriggerSubmitExpr(args SelectionSignalArgs) string {
+	if args.Prefix == "" || args.ShowRoute == "" {
+		return ""
+	}
+	p := "$" + args.Prefix
+	return p + ".formTop = " + p + ".bottom || 0; " + p + ".formLeft = " + p + ".left || 0; " + preventSubmitPostExpr(args.ShowRoute)
+}
+
 func replyRoute(routes CommentRoutes, commentID string) string {
 	if routes.Reply == nil {
 		return ""
@@ -77,7 +85,7 @@ func selectionKeydownExpr(args SelectionSignalArgs) string {
 		return ""
 	}
 	p := "$" + args.Prefix
-	return "if (event.key === 'Escape') { window.getSelection().removeAllRanges(); " + p + ".text = ''; " + p + ".sectionId = ''; " + p + ".headingHint = ''; " + p + ".top = 0; " + p + ".left = 0 }"
+	return "if (event.key === 'Escape') { window.getSelection().removeAllRanges(); " + p + ".text = ''; " + p + ".sectionId = ''; " + p + ".headingHint = '' }"
 }
 
 func selectionMouseupExpr(args SelectionSignalArgs) string {
@@ -90,8 +98,8 @@ func selectionMouseupExpr(args SelectionSignalArgs) string {
 	}
 	containerLookup := "element.closest('[data-commentui-container=true]')"
 	p := "$" + args.Prefix
-	clear := p + ".text = ''; " + p + ".sectionId = ''; " + p + ".headingHint = ''; " + p + ".top = 0; " + p + ".left = 0;"
-	return "const selection = window.getSelection(); const text = selection.toString().trim(); const eventTarget = evt && evt.target ? evt.target : null; const eventElement = eventTarget && eventTarget.nodeType === 3 ? eventTarget.parentElement : eventTarget; if (eventElement && eventElement.closest('" + exclude + "')) { return; } if (text && selection.rangeCount > 0) { const range = selection.getRangeAt(0); const container = range.commonAncestorContainer; const element = container.nodeType === 3 ? container.parentElement : container; const inCommentArea = element.closest('" + exclude + "'); if (inCommentArea) { return; } else { const rect = range.getBoundingClientRect(); const section = element.closest('[data-section-id]'); const sectionId = section ? section.dataset.sectionId : ''; const headingHint = section ? (section.dataset.headingHint || '') : ''; const containerEl = " + containerLookup + "; const containerRect = containerEl ? containerEl.getBoundingClientRect() : {top: 0, left: 0}; " + p + ".text = text; " + p + ".sectionId = sectionId; " + p + ".headingHint = headingHint; " + p + ".top = rect.top - containerRect.top + (containerEl ? containerEl.scrollTop : window.scrollY); " + p + ".left = rect.left - containerRect.left + (containerEl ? containerEl.scrollLeft : 0); } } else { " + clear + " }"
+	clear := p + ".text = ''; " + p + ".sectionId = ''; " + p + ".headingHint = '';"
+	return "const selection = window.getSelection(); const text = selection.toString().trim(); const eventTarget = evt && evt.target ? evt.target : null; const eventElement = eventTarget && eventTarget.nodeType === 3 ? eventTarget.parentElement : eventTarget; if (eventElement && eventElement.closest('" + exclude + "')) { return; } if (text && selection.rangeCount > 0) { const range = selection.getRangeAt(0); const container = range.commonAncestorContainer; const element = container.nodeType === 3 ? container.parentElement : container; const inCommentArea = element.closest('" + exclude + "'); if (inCommentArea) { return; } else { const rect = range.getBoundingClientRect(); const section = element.closest('[data-section-id]'); const sectionId = section ? section.dataset.sectionId : ''; const headingHint = section ? (section.dataset.headingHint || '') : ''; const containerEl = " + containerLookup + "; const containerRect = containerEl ? containerEl.getBoundingClientRect() : {top: 0, left: 0}; const scrollTop = containerEl ? containerEl.scrollTop : window.scrollY; " + p + ".top = rect.top - containerRect.top + scrollTop; " + p + ".bottom = rect.bottom - containerRect.top + scrollTop; " + p + ".left = rect.left - containerRect.left + (containerEl ? containerEl.scrollLeft : 0); " + p + ".sectionId = sectionId; " + p + ".headingHint = headingHint; " + p + ".text = text; } } else { " + clear + " }"
 }
 
 func clickOutsideCollapseExpr(args CommentTargetView) string {
@@ -224,7 +232,7 @@ templ CommentableSelectionHTML(args CommentableMarkdownArgs) {
 
 templ CommentTarget(args CommentTargetView) {
 	if TargetChromeOrVisible(args.Chrome) == CommentTargetChromePatchOnly {
-		<div id={ args.ID } class={ CommentAnchorClass(args.SignalKey) + " commentui-selection-target-right h-0 w-0 overflow-visible" } data-style={ SelectionStyleExpr(args.SelectionSignalPrefix) } data-comment-target="true" aria-hidden="true">
+		<div id={ args.ID } class={ CommentAnchorClass(args.SignalKey) + " commentui-selection-target-right h-0 w-0 overflow-visible" } data-style={ FormAnchorStyleExpr(args.SelectionSignalPrefix) } data-comment-target="true" aria-hidden="true">
 			@HiddenFields(args.HiddenFields)
 		</div>
 	} else {
@@ -238,7 +246,7 @@ templ CommentTarget(args CommentTargetView) {
 }
 
 templ CommentTargetWithForm(args CommentTargetView, view CommentFormView) {
-	<div id={ args.ID } class={ CommentAnchorClass(args.SignalKey) + " commentui-target flex items-center gap-1 z-[100] " + patchOnlyTargetClass(args) } data-style={ SelectionStyleExpr(args.SelectionSignalPrefix) } data-comment-target="true" data-on:click__window={ clickOutsideCancelExpr(args) }>
+	<div id={ args.ID } class={ CommentAnchorClass(args.SignalKey) + " commentui-target flex items-center gap-1 z-[100] " + patchOnlyTargetClass(args) } data-style={ FormAnchorStyleExpr(args.SelectionSignalPrefix) } data-comment-target="true" data-on:click__window={ clickOutsideCancelExpr(args) }>
 		<div class={ CommentPopoverClass(CommentPopoverPlacementForTarget(args)) + " ring-1 ring-primary/30" }>
 			@CommentForm(view)
 			if args.Surface == CommentSurfaceArtifact {
@@ -557,14 +565,44 @@ templ ActionForms(view CommentThreadView, target CommentTargetView) {
 templ SelectedTextTrigger(args SelectionSignalArgs) {
 	if args.Prefix != "" && args.ShowRoute != "" {
 		{{ showExpression := "$" + args.Prefix + ".text && $" + args.Prefix + ".sectionId != ''" }}
-		<form id={ args.Prefix + "-inline-comment-trigger" } class={ SelectionTriggerClass() + " hidden" } data-show={ showExpression } data-class={ "{'hidden': !(" + showExpression + ")}" } data-style={ "{'--commentui-selection-top': ($" + args.Prefix + ".top || 0) + 'px', '--commentui-selection-left': ($" + args.Prefix + ".left || 0) + 'px'}" } data-on:submit__prevent={ preventSubmitPostExpr(args.ShowRoute) }>
+		<form id={ args.Prefix + "-inline-comment-trigger" } class={ SelectionTriggerClass() + " hidden" } data-show={ showExpression } data-class={ "{'hidden': !(" + showExpression + ")}" } data-style={ "{'--commentui-selection-bottom': ($" + args.Prefix + ".bottom || 0) + 'px', '--commentui-selection-left': ($" + args.Prefix + ".left || 0) + 'px'}" } data-on:submit__prevent={ selectionTriggerSubmitExpr(args) }>
 			@HiddenFields(args.HiddenFields)
-			<input type="hidden" name="section_hint" data-bind={ args.Prefix + ".sectionId" }/>
-			<input type="hidden" name="heading_hint" data-bind={ args.Prefix + ".headingHint" }/>
-			<input type="hidden" name="selected_text" data-bind={ args.Prefix + ".text" }/>
+			<input type="hidden" name="section_hint" data-commentui-selection-field="section-id" data-bind={ args.Prefix + ".sectionId" }/>
+			<input type="hidden" name="heading_hint" data-commentui-selection-field="heading-hint" data-bind={ args.Prefix + ".headingHint" }/>
+			<input type="hidden" name="selected_text" data-commentui-selection-field="text" data-bind={ args.Prefix + ".text" }/>
+			<input type="hidden" data-commentui-selection-field="top" data-bind={ args.Prefix + ".top" }/>
+			<input type="hidden" data-commentui-selection-field="bottom" data-bind={ args.Prefix + ".bottom" }/>
+			<input type="hidden" data-commentui-selection-field="left" data-bind={ args.Prefix + ".left" }/>
+			<input type="hidden" data-bind={ args.Prefix + ".formTop" }/>
+			<input type="hidden" data-bind={ args.Prefix + ".formLeft" }/>
 			<button type="submit" class="rounded-md bg-primary p-2 text-primary-foreground shadow-lg transition-colors hover:bg-primary/90" aria-label="Comment on selection">
 				<svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z"></path></svg>
 			</button>
 		</form>
 	}
+}
+
+templ FrameCommentBridge(args FrameCommentBridgeArgs) {
+	{{
+		selection := FrameSelectionSignalArgs(args.Comments)
+		documentArgs := args.Comments
+		documentArgs.HiddenFields = selection.HiddenFields
+		documentTarget := DocumentTargetView(documentArgs, args.HeadingHint, CommentTargetChromePatchOnly)
+		documentTarget.SelectionSignalPrefix = selection.Prefix
+		bridgeID := FrameCommentBridgeID(args.Comments.DocPath)
+	}}
+	<div
+		class="relative h-full min-h-0 min-w-0"
+		data-signals="{}"
+		data-commentui-container="true"
+		data-commentui-frame-bridge={ bridgeID }
+		data-commentui-heading-hint={ documentTarget.HeadingHint }
+		data-on:keydown__window={ selectionKeydownExpr(selection) }
+	>
+		if args.Content != nil {
+			@args.Content
+		}
+		@CommentTarget(documentTarget)
+		@SelectedTextTrigger(selection)
+	</div>
 }

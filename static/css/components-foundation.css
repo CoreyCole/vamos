@@ -81,7 +81,7 @@
 
   .commentui-selection-target-right {
     position: absolute;
-    top: var(--commentui-selection-top, 0px);
+    top: calc(var(--commentui-form-top, 0px) + 0.5rem);
     right: 0.75rem;
     z-index: 100;
   }
@@ -111,7 +111,7 @@
   .commentui-selection-trigger {
     position: absolute;
     left: var(--commentui-selection-left, 0px);
-    top: var(--commentui-selection-top, 0px);
+    top: calc(var(--commentui-selection-bottom, 0px) + 0.5rem);
     z-index: 50;
   }
 

@@ -21,11 +21,27 @@ func (fakeStore) Load(string) (authcmd.Profile, string, error) {
 }
 
 type fakeAPI struct {
-	startReq      ChatStartRequest
-	steerReq      ChatSteerRequest
-	steerResponse ChatAPIResponse
-	eventAfters   []int64
-	streams       []string
+	startReq         ChatStartRequest
+	steerReq         ChatSteerRequest
+	steerResponse    ChatAPIResponse
+	commentsResponse QuoteCommentsResponse
+	commentsArtifact string
+	commentsLimit    int
+	eventAfters      []int64
+	streams          []string
+}
+
+func (f *fakeAPI) Comments(
+	_ context.Context,
+	keyID, secret, artifactPath string,
+	limit int,
+) (QuoteCommentsResponse, error) {
+	if keyID != "machine-1" || secret != "secret-1" {
+		return QuoteCommentsResponse{}, context.Canceled
+	}
+	f.commentsArtifact = artifactPath
+	f.commentsLimit = limit
+	return f.commentsResponse, nil
 }
 
 func (f *fakeAPI) Start(_ context.Context, keyID, secret string, req ChatStartRequest) (ChatAPIResponse, error) {
@@ -71,7 +87,7 @@ func TestCommandExposesExplicitStartAndSteer(t *testing.T) {
 		t.Fatalf("help: %v", err)
 	}
 	text := help.String()
-	for _, want := range []string{"start", "steer"} {
+	for _, want := range []string{"start", "steer", "comments"} {
 		if !strings.Contains(text, want) {
 			t.Fatalf("help missing %q:\n%s", want, text)
 		}
@@ -81,6 +97,96 @@ func TestCommandExposesExplicitStartAndSteer(t *testing.T) {
 	cmd.SetArgs([]string{"hello"})
 	if err := cmd.Execute(); err == nil || !strings.Contains(err.Error(), "explicit subcommand") {
 		t.Fatalf("top-level prompt err = %v", err)
+	}
+}
+
+func TestRunCommentsPullPrintsOneNDJSONObjectPerComment(t *testing.T) {
+	api := &fakeAPI{commentsResponse: QuoteCommentsResponse{Comments: []QuoteComment{
+		{
+			ID:           "comment-1",
+			ArtifactPath: "thoughts/demo.html",
+			Quote:        "first quote",
+			Body:         "first body",
+		},
+		{
+			ID:           "comment-2",
+			ArtifactPath: "thoughts/demo.html",
+			Quote:        "second quote",
+			Body:         "second body",
+		},
+	}}}
+	var out bytes.Buffer
+	err := RunCommentsPull(
+		context.Background(),
+		CommentsPullOptions{
+			ManagerURL:   "https://main.workspaces.test",
+			ArtifactPath: "thoughts/demo.html",
+			Limit:        25,
+			Profile:      "default",
+		},
+		deps{Store: fakeStore{}, APIClientNew: func(string) APIClient { return api }},
+		&out,
+	)
+	if err != nil {
+		t.Fatalf("RunCommentsPull() error = %v", err)
+	}
+	if api.commentsArtifact != "thoughts/demo.html" || api.commentsLimit != 25 {
+		t.Fatalf(
+			"comments request = artifact %q limit %d",
+			api.commentsArtifact,
+			api.commentsLimit,
+		)
+	}
+	lines := strings.Split(strings.TrimSpace(out.String()), "\n")
+	if len(lines) != 2 {
+		t.Fatalf("lines = %d: %q", len(lines), out.String())
+	}
+	for i, line := range lines {
+		var comment QuoteComment
+		if err := json.Unmarshal([]byte(line), &comment); err != nil {
+			t.Fatalf("line %d is not JSON: %v", i, err)
+		}
+		if comment.ID != api.commentsResponse.Comments[i].ID {
+			t.Fatalf("line %d comment = %+v", i, comment)
+		}
+	}
+}
+
+func TestRunCommentsPullEmptyQueueExitsZeroWithoutOutput(t *testing.T) {
+	api := &fakeAPI{commentsResponse: QuoteCommentsResponse{Comments: []QuoteComment{}}}
+	var out bytes.Buffer
+	err := RunCommentsPull(
+		context.Background(),
+		CommentsPullOptions{ArtifactPath: "thoughts/demo.html", Limit: 50},
+		deps{Store: fakeStore{}, APIClientNew: func(string) APIClient { return api }},
+		&out,
+	)
+	if err != nil {
+		t.Fatalf("RunCommentsPull() error = %v", err)
+	}
+	if out.Len() != 0 {
+		t.Fatalf("empty queue output = %q", out.String())
+	}
+}
+
+func TestRunCommentsPullRequiresArtifactAndPositiveLimit(t *testing.T) {
+	if err := RunCommentsPull(
+		context.Background(),
+		CommentsPullOptions{Limit: 50},
+		deps{},
+		io.Discard,
+	); err == nil ||
+		!strings.Contains(err.Error(), "artifact") {
+		t.Fatalf("blank artifact error = %v", err)
+	}
+	if err := RunCommentsPull(
+		context.Background(),
+		CommentsPullOptions{ArtifactPath: "thoughts/demo.html"},
+		deps{},
+		io.Discard,
+	); err == nil ||
+		!strings.Contains(err.Error(), "limit") {
+		t.Fatalf("invalid limit error = %v", err)
 	}
 }
 

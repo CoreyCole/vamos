@@ -46,6 +46,15 @@ AND deleted_at IS NULL
 AND (CAST (sqlc.arg('include_resolved') AS INTEGER) = 1 OR resolved = 0)
 ORDER BY resolved ASC, created_at DESC;
 
+-- name: ListOpenQuoteCommentsForDocument :many
+SELECT *
+FROM document_comments
+WHERE doc_path = sqlc.arg('doc_path')
+AND deleted_at IS NULL
+AND resolved = 0
+AND length(trim(selected_text, ' ' || char(9) || char(10) || char(11) || char(12) || char(13))) > 0
+ORDER BY created_at ASC, id ASC;
+
 -- name: ListWorkspaceDocumentComments :many
 SELECT *
 FROM document_comments

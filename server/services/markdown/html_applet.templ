@@ -1,9 +1,14 @@
 package markdown
 
+import "github.com/CoreyCole/vamos/server/services/commentui"
+
 templ HTMLAppletFrame(docPath string, src string) {
 	<section class="flex h-full min-h-0 w-full flex-1 flex-col">
 		<iframe
 			data-vamos-html-applet
+			data-commentui-frame
+			data-commentui-bridge-id={ commentui.FrameCommentBridgeID(docPath) }
+			data-commentui-transport="opaque-postmessage"
 			title={ "HTML applet " + docPath }
 			src={ templ.SafeURL(src) }
 			sandbox="allow-scripts allow-forms allow-downloads allow-popups allow-popups-to-escape-sandbox"

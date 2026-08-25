@@ -1,6 +1,9 @@
 package agentchat
 
-import "encoding/json"
+import (
+	"encoding/json"
+	"time"
+)
 
 type ChatStartRequest struct {
 	ProjectID string `json:"project_id"`
@@ -28,6 +31,19 @@ type ChatSteerDisposition struct {
 	LatestThreadID   string
 	LatestWebURL     string
 	Reason           string
+}
+
+type QuoteCommentDTO struct {
+	ID           string    `json:"id"`
+	ArtifactPath string    `json:"artifact_path"`
+	Quote        string    `json:"quote"`
+	Body         string    `json:"body"`
+	AuthorEmail  string    `json:"author_email"`
+	CreatedAt    time.Time `json:"created_at"`
+}
+
+type QuoteCommentsResponse struct {
+	Comments []QuoteCommentDTO `json:"comments"`
 }
 
 type ChatAPIResponse struct {

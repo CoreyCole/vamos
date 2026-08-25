@@ -50,4 +50,6 @@ Use `/js/vamos-html-applet.js` when an embedded applet should follow the parent 
 
 Applet scripts run in an opaque-origin iframe. Parent DOM access is intentionally blocked; the sandbox does not grant `allow-same-origin`. Applets should communicate only through documented, narrow browser messages such as the theme helper's `dark` / `light` update.
 
-Vamos serves authored HTML as raw bytes with applet response headers. It does not inject CSS, scripts, runtime state, or theme classes into applet documents.
+Vamos adds one external comment-bridge script to the rendered response. Vamos does not change the saved HTML file or add CSS, runtime state, or theme classes.
+
+A stricter artifact `<meta http-equiv="Content-Security-Policy">` can block this script. In this case, selection comments are not available.

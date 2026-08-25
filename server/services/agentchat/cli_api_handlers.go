@@ -4,12 +4,44 @@ import (
 	"database/sql"
 	"errors"
 	"net/http"
+	"strconv"
+	"strings"
 
 	"github.com/labstack/echo/v4"
 
 	servercfg "github.com/CoreyCole/vamos/server"
 	serverauth "github.com/CoreyCole/vamos/server/services/auth"
 )
+
+func (h *Handler) GetCLIQuoteComments(c echo.Context) error {
+	if _, err := h.authenticateCLIActor(c); err != nil {
+		return err
+	}
+	limit := defaultQuoteCommentsLimit
+	if raw := strings.TrimSpace(c.QueryParam("limit")); raw != "" {
+		parsed, err := strconv.Atoi(raw)
+		if err != nil || parsed <= 0 {
+			return echo.NewHTTPError(
+				http.StatusBadRequest,
+				"limit must be a positive integer",
+			)
+		}
+		limit = parsed
+	}
+	response, err := h.service.ListOpenQuoteCommentsForArtifact(
+		c.Request().Context(),
+		c.QueryParam("artifact_path"),
+		limit,
+	)
+	if err != nil {
+		if errors.Is(err, ErrInvalidQuoteCommentArtifact) {
+			return echo.NewHTTPError(http.StatusBadRequest, "invalid artifact_path")
+		}
+		c.Logger().Errorf("Failed to list quote comments: %v", err)
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to list quote comments")
+	}
+	return c.JSON(http.StatusOK, response)
+}
 
 func (h *Handler) PostCLIChatRun(c echo.Context) error {
 	actor, err := h.authenticateCLIActor(c)

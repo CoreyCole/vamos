@@ -8,6 +8,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/a-h/templ"
 )
 
 func TestSafeHelpersDoNotExposeRawPaths(t *testing.T) {
@@ -40,7 +42,11 @@ func TestHiddenFieldsUseStablePerFieldIDs(t *testing.T) {
 	for _, name := range []string{"comment_id", "context_panel", "doc_path", "heading_hint", "section_hint"} {
 		if !strings.Contains(html, `id="comment-hidden-`) ||
 			!strings.Contains(html, `name="`+name+`" value="`+fields[name]+`"`) {
-			t.Fatalf("hidden field %q not rendered with stable id/name/value in %s", name, html)
+			t.Fatalf(
+				"hidden field %q not rendered with stable id/name/value in %s",
+				name,
+				html,
+			)
 		}
 	}
 }
@@ -223,6 +229,50 @@ func TestCommentableSelectionHTMLRendersSelectionOnlyChrome(t *testing.T) {
 	}
 }
 
+func TestFrameCommentBridgeRendersParentOwnedSelectionUI(t *testing.T) {
+	t.Parallel()
+
+	args := CommentableMarkdownArgs{
+		Surface:      CommentSurfaceThoughts,
+		IDPrefix:     SafeCommentTargetSlug("thoughts", "thoughts/example.html"),
+		DocPath:      "thoughts/example.html",
+		Routes:       CommentRoutes{Show: "/show", Create: "/create", Cancel: "/cancel"},
+		HiddenFields: map[string]string{"doc_path": "thoughts/example.html"},
+	}
+	var buf bytes.Buffer
+	if err := FrameCommentBridge(FrameCommentBridgeArgs{
+		Content:     templ.Raw(`<iframe data-commentui-frame></iframe>`),
+		Comments:    args,
+		HeadingHint: "Example",
+	}).Render(t.Context(), &buf); err != nil {
+		t.Fatalf("Render() error = %v", err)
+	}
+	html := buf.String()
+	prefix := FrameSelectionSignalArgs(args).Prefix
+	for _, want := range []string{
+		`data-commentui-frame-bridge="` + FrameCommentBridgeID(args.DocPath) + `"`,
+		`data-commentui-heading-hint="Example"`,
+		`id="` + TargetID(args.IDPrefix, "document") + `"`,
+		`id="` + prefix + `-inline-comment-trigger"`,
+		`name="doc_path" value="thoughts/example.html"`,
+		`name="section_hint" data-commentui-selection-field="section-id"`,
+		`name="heading_hint" data-commentui-selection-field="heading-hint"`,
+		`name="selected_text" data-commentui-selection-field="text"`,
+		`data-commentui-selection-field="top"`,
+		`data-commentui-selection-field="bottom"`,
+		`data-commentui-selection-field="left"`,
+		`data-bind="` + prefix + `.formTop"`,
+		`data-bind="` + prefix + `.formLeft"`,
+		`--commentui-form-top`,
+		`name="comment_target_chrome" value="patch-only"`,
+		`name="comment_selection_prefix" value="` + prefix + `"`,
+	} {
+		if !strings.Contains(html, want) {
+			t.Fatalf("frame comment bridge missing %q in %s", want, html)
+		}
+	}
+}
+
 func TestCommentableMarkdownDoesNotRenderFrontmatterSummaryCard(t *testing.T) {
 	t.Parallel()
 
@@ -294,7 +344,9 @@ func TestCommentableMarkdownDoesNotRenderRightSidebar(t *testing.T) {
 	}
 }
 
-func TestCommentableMarkdownMountsSingleDocumentPatchTargetForSectionedDocs(t *testing.T) {
+func TestCommentableMarkdownMountsSingleDocumentPatchTargetForSectionedDocs(
+	t *testing.T,
+) {
 	t.Parallel()
 
 	args := CommentableMarkdownArgs{
@@ -316,7 +368,11 @@ func TestCommentableMarkdownMountsSingleDocumentPatchTargetForSectionedDocs(t *t
 	html := buf.String()
 	documentID := `id="` + TargetID("doc", "document") + `"`
 	if strings.Count(html, documentID) != 1 {
-		t.Fatalf("document target count=%d, want 1 in %s", strings.Count(html, documentID), html)
+		t.Fatalf(
+			"document target count=%d, want 1 in %s",
+			strings.Count(html, documentID),
+			html,
+		)
 	}
 	for _, want := range []string{
 		`commentui-selection-target-right`,
@@ -358,10 +414,17 @@ func TestCommentableMarkdownKeepsSingleVisibleDocumentTargetWithThreads(t *testi
 	html := buf.String()
 	documentID := `id="` + TargetID("doc", "document") + `"`
 	if strings.Count(html, documentID) != 1 {
-		t.Fatalf("document target count=%d, want 1 in %s", strings.Count(html, documentID), html)
+		t.Fatalf(
+			"document target count=%d, want 1 in %s",
+			strings.Count(html, documentID),
+			html,
+		)
 	}
 	if strings.Contains(html, `commentui-selection-target-right`) {
-		t.Fatalf("visible document target should not render patch-only duplicate: %s", html)
+		t.Fatalf(
+			"visible document target should not render patch-only duplicate: %s",
+			html,
+		)
 	}
 	if !strings.Contains(html, `aria-label="1 comments"`) {
 		t.Fatalf("visible document target missing thread toggle: %s", html)
@@ -696,8 +759,9 @@ func TestCommentPopoverAndSelectionPlacementClasses(t *testing.T) {
 		`commentui-anchor relative`,
 		`commentui-popover-target`,
 		`commentui-selection-trigger`,
-		`--commentui-selection-top`,
+		`--commentui-selection-bottom`,
 		`--commentui-selection-left`,
+		`.formTop = $comment_selection.bottom`,
 		`name="selected_text"`,
 		`name="section_hint"`,
 		`name="heading_hint"`,

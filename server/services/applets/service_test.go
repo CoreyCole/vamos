@@ -12,12 +12,13 @@ import (
 	"testing"
 	"time"
 
+	"github.com/labstack/echo/v4"
+
 	"github.com/CoreyCole/vamos/pkg/db"
 	"github.com/CoreyCole/vamos/server/layouts/workbench"
 	"github.com/CoreyCole/vamos/server/services/appletruntime"
 	"github.com/CoreyCole/vamos/server/services/comments"
 	"github.com/CoreyCole/vamos/server/services/commentui"
-	"github.com/labstack/echo/v4"
 )
 
 func TestBuildWorkbenchStateUsesOnlyFilesAppAndChatRegions(t *testing.T) {
@@ -32,7 +33,9 @@ func TestBuildWorkbenchStateUsesOnlyFilesAppAndChatRegions(t *testing.T) {
 	}
 
 	files := state.Regions[0]
-	if files.ID != "pickleball-files-app" || files.Slot != workbench.WorkbenchSlotPrimary || files.Title != "Files" {
+	if files.ID != "pickleball-files-app" ||
+		files.Slot != workbench.WorkbenchSlotPrimary ||
+		files.Title != "Files" {
 		t.Fatalf("files region = %#v", files)
 	}
 	if files.TargetID != "pickleball-files-app-region" {
@@ -40,7 +43,8 @@ func TestBuildWorkbenchStateUsesOnlyFilesAppAndChatRegions(t *testing.T) {
 	}
 
 	chat := state.Regions[1]
-	if chat.ID != "pickleball-chat" || chat.Slot != workbench.WorkbenchSlotContext || chat.Title != "Chat" {
+	if chat.ID != "pickleball-chat" || chat.Slot != workbench.WorkbenchSlotContext ||
+		chat.Title != "Chat" {
 		t.Fatalf("chat region = %#v", chat)
 	}
 	if chat.TargetID != "pickleball-chat-region" {
@@ -48,14 +52,18 @@ func TestBuildWorkbenchStateUsesOnlyFilesAppAndChatRegions(t *testing.T) {
 	}
 
 	for _, region := range state.Regions {
-		if region.Slot == workbench.WorkbenchSlotNavigation || region.Kind == workbench.RegionWorkspaceTopology {
+		if region.Slot == workbench.WorkbenchSlotNavigation ||
+			region.Kind == workbench.RegionWorkspaceTopology {
 			t.Fatalf("technical/navigation region leaked: %#v", region)
 		}
 	}
 }
 
 func TestBuildWorkbenchStateDefaultsMobileToFilesApp(t *testing.T) {
-	state := BuildWorkbenchState(t.Context(), WorkbenchState{Config: AppletConfig{ID: "pickleball"}})
+	state := BuildWorkbenchState(
+		t.Context(),
+		WorkbenchState{Config: AppletConfig{ID: "pickleball"}},
+	)
 
 	if got := state.Config.Mobile.ActiveRegionID; got != "pickleball-files-app" {
 		t.Fatalf("mobile active region = %q, want files/app", got)
@@ -64,7 +72,9 @@ func TestBuildWorkbenchStateDefaultsMobileToFilesApp(t *testing.T) {
 
 func TestEmptyRegionRendersFriendlyPlaceholder(t *testing.T) {
 	var body bytes.Buffer
-	if err := EmptyRegion("Files will appear here.").Render(t.Context(), &body); err != nil {
+	if err := EmptyRegion(
+		"Files will appear here.",
+	).Render(t.Context(), &body); err != nil {
 		t.Fatalf("render empty region: %v", err)
 	}
 	if !strings.Contains(body.String(), "Files will appear here.") {
@@ -94,26 +104,42 @@ func TestBuildAppletWorkbenchStateUsesDocumentWorkbenchRegions(t *testing.T) {
 	if len(state.Regions) != 3 {
 		t.Fatalf("regions = %d, want document workbench shell", len(state.Regions))
 	}
-	if state.Regions[0].Slot != workbench.WorkbenchSlotNavigation || state.Regions[1].Slot != workbench.WorkbenchSlotPrimary || state.Regions[2].Slot != workbench.WorkbenchSlotContext {
+	if state.Regions[0].Slot != workbench.WorkbenchSlotNavigation ||
+		state.Regions[1].Slot != workbench.WorkbenchSlotPrimary ||
+		state.Regions[2].Slot != workbench.WorkbenchSlotContext {
 		t.Fatalf("regions = %#v", state.Regions)
 	}
 }
 
 func TestAppletFrameRendersIframeWhenHealthy(t *testing.T) {
 	var body bytes.Buffer
-	err := AppletFrame(appletTestContext(), appletruntime.AppletProcessState{Status: appletruntime.ProcessStatusHealthy}).Render(t.Context(), &body)
+	err := AppletFrame(
+		appletTestContext(),
+		appletruntime.AppletProcessState{Status: appletruntime.ProcessStatusHealthy},
+	).Render(t.Context(), &body)
 	if err != nil {
 		t.Fatalf("AppletFrame.Render() error = %v", err)
 	}
 	html := body.String()
-	for _, want := range []string{"<iframe", `src="/thoughts/_render/app/wordle/app/"`, `sandbox="allow-same-origin allow-forms allow-downloads allow-scripts"`} {
+	for _, want := range []string{
+		"<iframe",
+		`src="/thoughts/_render/app/wordle/app/"`,
+		`sandbox="allow-same-origin allow-forms allow-downloads allow-scripts"`,
+		`data-commentui-frame`,
+		`data-commentui-bridge-id="` + commentui.FrameCommentBridgeID("thoughts/apps/wordle.md") + `"`,
+		`data-commentui-transport="same-origin-dom"`,
+	} {
 		if !strings.Contains(html, want) {
 			t.Fatalf("AppletFrame html missing %q: %s", want, html)
 		}
 	}
 	for _, forbidden := range []string{"datastar applet", "Open in new tab", "/forms/applets/wordle/restart", "/forms/applets/wordle/stop"} {
 		if strings.Contains(html, forbidden) {
-			t.Fatalf("AppletFrame still renders local control/chrome %q: %s", forbidden, html)
+			t.Fatalf(
+				"AppletFrame still renders local control/chrome %q: %s",
+				forbidden,
+				html,
+			)
 		}
 	}
 }
@@ -123,7 +149,10 @@ func TestAppletWorkbenchActionsUseRuntimeKeyForFormActions(t *testing.T) {
 	applet.Manifest.ID = "demo"
 	applet.RuntimeKey = EncodeAppletIdentity(applet.IdentityPath)
 	var body bytes.Buffer
-	if err := BuildAppletWorkbenchActions(applet, appletruntime.AppletProcessState{Status: appletruntime.ProcessStatusHealthy}).Render(t.Context(), &body); err != nil {
+	if err := BuildAppletWorkbenchActions(
+		applet,
+		appletruntime.AppletProcessState{Status: appletruntime.ProcessStatusHealthy},
+	).Render(t.Context(), &body); err != nil {
 		t.Fatalf("BuildAppletWorkbenchActions.Render() error = %v", err)
 	}
 	html := body.String()
@@ -141,7 +170,10 @@ func TestAppletWorkbenchActionsIncludeProxiedNewTabLink(t *testing.T) {
 	applet := appletTestContext()
 	applet.IFrameSrc = "/examples/wordle/app/"
 	var body bytes.Buffer
-	if err := BuildAppletWorkbenchActions(applet, appletruntime.AppletProcessState{Status: appletruntime.ProcessStatusStarting}).Render(t.Context(), &body); err != nil {
+	if err := BuildAppletWorkbenchActions(
+		applet,
+		appletruntime.AppletProcessState{Status: appletruntime.ProcessStatusStarting},
+	).Render(t.Context(), &body); err != nil {
 		t.Fatalf("BuildAppletWorkbenchActions.Render() error = %v", err)
 	}
 	html := body.String()
@@ -157,7 +189,13 @@ func TestAppletWorkbenchActionsIncludeProxiedNewTabLink(t *testing.T) {
 
 func TestAppletFrameRendersStartingPanelWithStatusStream(t *testing.T) {
 	var body bytes.Buffer
-	err := AppletFrame(appletTestContext(), appletruntime.AppletProcessState{Status: appletruntime.ProcessStatusStarting, LogPath: "/tmp/app.log"}).Render(t.Context(), &body)
+	err := AppletFrame(
+		appletTestContext(),
+		appletruntime.AppletProcessState{
+			Status:  appletruntime.ProcessStatusStarting,
+			LogPath: "/tmp/app.log",
+		},
+	).Render(t.Context(), &body)
 	if err != nil {
 		t.Fatalf("AppletFrame.Render() error = %v", err)
 	}
@@ -169,7 +207,11 @@ func TestAppletFrameRendersStartingPanelWithStatusStream(t *testing.T) {
 	}
 	for _, forbidden := range []string{"Open in new tab", "/forms/applets/wordle/restart", "/forms/applets/wordle/stop"} {
 		if strings.Contains(html, forbidden) {
-			t.Fatalf("starting panel still renders local controls %q: %s", forbidden, html)
+			t.Fatalf(
+				"starting panel still renders local controls %q: %s",
+				forbidden,
+				html,
+			)
 		}
 	}
 }
@@ -180,7 +222,11 @@ func TestThoughtsAppletPageRendersWorkbenchOverflowActions(t *testing.T) {
 	token := EncodeAppletIdentity(identity)
 	service := NewHTTPService(ServiceOptions{
 		Resolver: Resolver{ThoughtsRoot: thoughtsRoot},
-		Manager:  &recordingManager{state: appletruntime.AppletProcessState{Status: appletruntime.ProcessStatusHealthy}},
+		Manager: &recordingManager{
+			state: appletruntime.AppletProcessState{
+				Status: appletruntime.ProcessStatusHealthy,
+			},
+		},
 		Comments: fakeAppletCommentReader{},
 	})
 
@@ -210,13 +256,30 @@ func TestThoughtsAppletPageIncludesDocumentCommentPatchTarget(t *testing.T) {
 	token := EncodeAppletIdentity(identity)
 	service := NewHTTPService(ServiceOptions{
 		Resolver: Resolver{ThoughtsRoot: thoughtsRoot},
-		Manager:  &recordingManager{state: appletruntime.AppletProcessState{Status: appletruntime.ProcessStatusHealthy}},
+		Manager: &recordingManager{
+			state: appletruntime.AppletProcessState{
+				Status: appletruntime.ProcessStatusHealthy,
+			},
+		},
 		Comments: fakeAppletCommentReader{},
 	})
 
 	html := renderThoughtsAppletPage(t, service, token)
-	handlerCompatibleTargetID := commentui.TargetID(commentui.SafeCommentTargetSlug("thoughts", identity), "document")
-	for _, want := range []string{`data-comment-target="true"`, `commentui-selection-target-right`, `id="` + handlerCompatibleTargetID + `"`, `name="doc_path" value="` + identity + `"`} {
+	handlerCompatibleTargetID := commentui.TargetID(
+		commentui.SafeCommentTargetSlug("thoughts", identity),
+		"document",
+	)
+	for _, want := range []string{
+		`data-comment-target="true"`,
+		`commentui-selection-target-right`,
+		`id="` + handlerCompatibleTargetID + `"`,
+		`name="doc_path" value="` + identity + `"`,
+		`data-commentui-frame-bridge="` + commentui.FrameCommentBridgeID(identity) + `"`,
+		`data-commentui-transport="same-origin-dom"`,
+		`data-commentui-selection-field="text"`,
+		`/js/frame-comment-bridge.js?v=4`,
+		`data-commentui-mode="parent"`,
+	} {
 		if !strings.Contains(html, want) {
 			t.Fatalf("thoughts applet page missing patch target %q:\n%s", want, html)
 		}
@@ -228,7 +291,11 @@ func TestExampleAppletOmitsUnsupportedCommentAction(t *testing.T) {
 	writeExampleAppletManifestWithAliases(t, examplesRoot, "wordle", nil)
 	service := NewHTTPService(ServiceOptions{
 		Resolver: Resolver{ExamplesRoot: examplesRoot},
-		Manager:  &recordingManager{state: appletruntime.AppletProcessState{Status: appletruntime.ProcessStatusHealthy}},
+		Manager: &recordingManager{
+			state: appletruntime.AppletProcessState{
+				Status: appletruntime.ProcessStatusHealthy,
+			},
+		},
 		Comments: fakeAppletCommentReader{},
 	})
 
@@ -249,7 +316,11 @@ func TestExampleAppletOmitsUnsupportedCommentAction(t *testing.T) {
 	}
 	for _, forbidden := range []string{`>Comment</span>`, `name="doc_path" value="examples/wordle/AGENTS.md"`, `data-on:submit__prevent="@post(&#39;/forms/comments/show&#39;`} {
 		if strings.Contains(html, forbidden) {
-			t.Fatalf("example applet page rendered unsupported comment affordance %q:\n%s", forbidden, html)
+			t.Fatalf(
+				"example applet page rendered unsupported comment affordance %q:\n%s",
+				forbidden,
+				html,
+			)
 		}
 	}
 }
@@ -260,18 +331,26 @@ func TestThoughtsAppletCommentsPanelUsesRealCommentUI(t *testing.T) {
 	token := EncodeAppletIdentity(identity)
 	service := NewHTTPService(ServiceOptions{
 		Resolver: Resolver{ThoughtsRoot: thoughtsRoot},
-		Manager:  &recordingManager{state: appletruntime.AppletProcessState{Status: appletruntime.ProcessStatusHealthy}},
-		Comments: fakeAppletCommentReader{response: &comments.GetCommentsResponse{Comments: []comments.CommentWithReplies{{
-			Comment: db.WorkspaceDocComment{
-				ID:          "comment-1",
-				DocPath:     identity,
-				UserEmail:   "agent@example.com",
-				CommentText: "applet note",
-				SectionHint: sql.NullString{String: "document", Valid: true},
-				HeadingHint: sql.NullString{String: "Demo", Valid: true},
-				CreatedAt:   time.Date(2026, 7, 4, 12, 0, 0, 0, time.UTC),
+		Manager: &recordingManager{
+			state: appletruntime.AppletProcessState{
+				Status: appletruntime.ProcessStatusHealthy,
 			},
-		}}}},
+		},
+		Comments: fakeAppletCommentReader{
+			response: &comments.GetCommentsResponse{
+				Comments: []comments.CommentWithReplies{{
+					Comment: db.WorkspaceDocComment{
+						ID:          "comment-1",
+						DocPath:     identity,
+						UserEmail:   "agent@example.com",
+						CommentText: "applet note",
+						SectionHint: sql.NullString{String: "document", Valid: true},
+						HeadingHint: sql.NullString{String: "Demo", Valid: true},
+						CreatedAt:   time.Date(2026, 7, 4, 12, 0, 0, 0, time.UTC),
+					},
+				}},
+			},
+		},
 	})
 
 	html := renderThoughtsAppletPage(t, service, token)
@@ -286,7 +365,15 @@ func TestThoughtsAppletCommentsPanelUsesRealCommentUI(t *testing.T) {
 }
 
 func TestHandleAppletStatusExecutesReloadWhenHealthy(t *testing.T) {
-	service := statusTestService(t, &sequenceManager{states: []appletruntime.AppletProcessState{{Status: appletruntime.ProcessStatusStarting}, {Status: appletruntime.ProcessStatusHealthy}}})
+	service := statusTestService(
+		t,
+		&sequenceManager{
+			states: []appletruntime.AppletProcessState{
+				{Status: appletruntime.ProcessStatusStarting},
+				{Status: appletruntime.ProcessStatusHealthy},
+			},
+		},
+	)
 	rec := callStatus(t, service)
 	if body := rec.Body.String(); !strings.Contains(body, "window.location.reload") {
 		t.Fatalf("status stream body = %s", body)
@@ -356,7 +443,10 @@ type fakeAppletCommentReader struct {
 	err      error
 }
 
-func (f fakeAppletCommentReader) GetCommentsForFileInternal(context.Context, string) (*comments.GetCommentsResponse, error) {
+func (f fakeAppletCommentReader) GetCommentsForFileInternal(
+	context.Context,
+	string,
+) (*comments.GetCommentsResponse, error) {
 	if f.err != nil {
 		return nil, f.err
 	}
@@ -370,7 +460,9 @@ func statusTestService(t *testing.T, manager appletruntime.Manager) *Service {
 	t.Helper()
 	examplesRoot := t.TempDir()
 	writeAppletManifest(t, examplesRoot, "wordle")
-	return NewHTTPService(ServiceOptions{Resolver: Resolver{ExamplesRoot: examplesRoot}, Manager: manager})
+	return NewHTTPService(
+		ServiceOptions{Resolver: Resolver{ExamplesRoot: examplesRoot}, Manager: manager},
+	)
 }
 
 func callStatus(t *testing.T, service *Service) *httptest.ResponseRecorder {
@@ -393,7 +485,9 @@ type asyncRecordingManager struct {
 	stopCalled   chan string
 }
 
-func newAsyncRecordingManager(states []appletruntime.AppletProcessState) *asyncRecordingManager {
+func newAsyncRecordingManager(
+	states []appletruntime.AppletProcessState,
+) *asyncRecordingManager {
 	return &asyncRecordingManager{
 		sequenceManager: sequenceManager{states: states},
 		ensureCalled:    make(chan appletruntime.RuntimeConfig, 1),
@@ -401,12 +495,19 @@ func newAsyncRecordingManager(states []appletruntime.AppletProcessState) *asyncR
 	}
 }
 
-func (m *asyncRecordingManager) EnsureStarted(_ context.Context, cfg appletruntime.RuntimeConfig) (appletruntime.AppletProcessState, error) {
+func (m *asyncRecordingManager) EnsureStarted(
+	_ context.Context,
+	cfg appletruntime.RuntimeConfig,
+) (appletruntime.AppletProcessState, error) {
 	select {
 	case m.ensureCalled <- cfg:
 	default:
 	}
-	return appletruntime.AppletProcessState{AppID: cfg.AppID, Status: appletruntime.ProcessStatusHealthy, Healthy: true}, nil
+	return appletruntime.AppletProcessState{
+		AppID:   cfg.AppID,
+		Status:  appletruntime.ProcessStatusHealthy,
+		Healthy: true,
+	}, nil
 }
 
 func (m *asyncRecordingManager) Stop(_ context.Context, appID string) error {
@@ -419,7 +520,11 @@ func (m *asyncRecordingManager) Stop(_ context.Context, appID string) error {
 
 func appletTestContext() AppletContext {
 	return AppletContext{
-		Manifest:     AppletManifest{ID: "wordle", Kind: AppletKindDatastar, Title: "Wordle"},
+		Manifest: AppletManifest{
+			ID:    "wordle",
+			Kind:  AppletKindDatastar,
+			Title: "Wordle",
+		},
 		IdentityPath: "thoughts/apps/wordle.md",
 		RuntimeKey:   "wordle",
 		RouteHref:    "/thoughts/_render/app/wordle",
@@ -435,7 +540,11 @@ func writeAppletManifest(t *testing.T, root, id string) {
 		t.Fatal(err)
 	}
 	body := "---\nvamos_artifact: applet\napplet:\n  id: " + id + "\n  kind: datastar\n  title: Wordle\n  app_dir: .\n  start_command: [just, build]\n---\n"
-	if err := os.WriteFile(filepath.Join(dir, "AGENTS.md"), []byte(body), 0o644); err != nil {
+	if err := os.WriteFile(
+		filepath.Join(dir, "AGENTS.md"),
+		[]byte(body),
+		0o644,
+	); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -445,16 +554,33 @@ type sequenceManager struct {
 	calls  int
 }
 
-func (m *sequenceManager) EnsureStarted(context.Context, appletruntime.RuntimeConfig) (appletruntime.AppletProcessState, error) {
-	return appletruntime.AppletProcessState{Status: appletruntime.ProcessStatusHealthy}, nil
+func (m *sequenceManager) EnsureStarted(
+	context.Context,
+	appletruntime.RuntimeConfig,
+) (appletruntime.AppletProcessState, error) {
+	return appletruntime.AppletProcessState{
+		Status: appletruntime.ProcessStatusHealthy,
+	}, nil
 }
-func (m *sequenceManager) Start(context.Context, appletruntime.RuntimeConfig) (appletruntime.ProcessState, error) {
-	return appletruntime.AppletProcessState{Status: appletruntime.ProcessStatusHealthy}, nil
+
+func (m *sequenceManager) Start(
+	context.Context,
+	appletruntime.RuntimeConfig,
+) (appletruntime.ProcessState, error) {
+	return appletruntime.AppletProcessState{
+		Status: appletruntime.ProcessStatusHealthy,
+	}, nil
 }
 func (m *sequenceManager) Stop(context.Context, string) error { return nil }
-func (m *sequenceManager) Health(context.Context, string) (appletruntime.AppletProcessState, error) {
+
+func (m *sequenceManager) Health(
+	context.Context,
+	string,
+) (appletruntime.AppletProcessState, error) {
 	if len(m.states) == 0 {
-		return appletruntime.AppletProcessState{Status: appletruntime.ProcessStatusStopped}, nil
+		return appletruntime.AppletProcessState{
+			Status: appletruntime.ProcessStatusStopped,
+		}, nil
 	}
 	idx := m.calls
 	if idx >= len(m.states) {
@@ -467,16 +593,29 @@ func (m *sequenceManager) Health(context.Context, string) (appletruntime.AppletP
 }
 func (m *sequenceManager) ProxyTarget(string) (string, bool) { return "", false }
 func (m *sequenceManager) Touch(string, int)                 {}
-func (m *sequenceManager) SweepInactive(context.Context, time.Time) ([]appletruntime.AppletProcessState, error) {
+
+func (m *sequenceManager) SweepInactive(
+	context.Context,
+	time.Time,
+) ([]appletruntime.AppletProcessState, error) {
 	return nil, nil
 }
 
 func TestRenderAppletPageIncludesRootImportMapBeforeWorkbenchModules(t *testing.T) {
 	examplesRoot := t.TempDir()
-	writeExampleAppletManifestWithAliases(t, examplesRoot, "wordle", []RouteAlias{{Pattern: "/events", Methods: []string{http.MethodGet}}})
+	writeExampleAppletManifestWithAliases(
+		t,
+		examplesRoot,
+		"wordle",
+		[]RouteAlias{{Pattern: "/events", Methods: []string{http.MethodGet}}},
+	)
 	service := NewHTTPService(ServiceOptions{
 		Resolver: Resolver{ExamplesRoot: examplesRoot},
-		Manager:  &recordingManager{state: appletruntime.AppletProcessState{Status: appletruntime.ProcessStatusStopped}},
+		Manager: &recordingManager{
+			state: appletruntime.AppletProcessState{
+				Status: appletruntime.ProcessStatusStopped,
+			},
+		},
 	})
 
 	e := echo.New()
@@ -499,7 +638,11 @@ func TestRenderAppletPageIncludesRootImportMapBeforeWorkbenchModules(t *testing.
 		t.Fatalf("page missing Workbench resize module:\n%s", html)
 	}
 	if importMapIndex > workbenchScriptIndex {
-		t.Fatalf("import map appears after Workbench module: importMap=%d resize=%d", importMapIndex, workbenchScriptIndex)
+		t.Fatalf(
+			"import map appears after Workbench module: importMap=%d resize=%d",
+			importMapIndex,
+			workbenchScriptIndex,
+		)
 	}
 	if !strings.Contains(html, "<head") || !strings.Contains(html, "</head>") {
 		t.Fatalf("page did not render Root head:\n%s", html)
@@ -512,7 +655,11 @@ func TestHandleThoughtsAppletPageUsesDurableIdentity(t *testing.T) {
 	token := EncodeAppletIdentity(identity)
 	service := NewHTTPService(ServiceOptions{
 		Resolver: Resolver{ThoughtsRoot: thoughtsRoot},
-		Manager:  &recordingManager{state: appletruntime.AppletProcessState{Status: appletruntime.ProcessStatusHealthy}},
+		Manager: &recordingManager{
+			state: appletruntime.AppletProcessState{
+				Status: appletruntime.ProcessStatusHealthy,
+			},
+		},
 	})
 
 	e := echo.New()
@@ -539,10 +686,12 @@ func TestHandleExampleAppletProxyFansOutCookiesToRootAliases(t *testing.T) {
 		{Pattern: "/events", Methods: []string{http.MethodGet}},
 		{Pattern: "/guesses", Methods: []string{http.MethodPost}},
 	})
-	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Add("Set-Cookie", "wordle_user=e2e; Path=/; HttpOnly")
-		_, _ = w.Write([]byte("ok"))
-	}))
+	backend := httptest.NewServer(
+		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Add("Set-Cookie", "wordle_user=e2e; Path=/; HttpOnly")
+			_, _ = w.Write([]byte("ok"))
+		}),
+	)
 	defer backend.Close()
 	service := NewHTTPService(ServiceOptions{
 		Resolver: Resolver{ExamplesRoot: examplesRoot},
@@ -574,15 +723,23 @@ func TestHandleThoughtsAppletProxyUsesRuntimeKey(t *testing.T) {
 	thoughtsRoot := t.TempDir()
 	identity := writeThoughtsAppletManifest(t, thoughtsRoot, "plans/demo", "demo")
 	token := EncodeAppletIdentity(identity)
-	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		_, _ = w.Write([]byte(r.URL.Path))
-	}))
+	backend := httptest.NewServer(
+		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			_, _ = w.Write([]byte(r.URL.Path))
+		}),
+	)
 	defer backend.Close()
 	manager := &recordingManager{target: backend.URL}
-	service := NewHTTPService(ServiceOptions{Resolver: Resolver{ThoughtsRoot: thoughtsRoot}, Manager: manager})
+	service := NewHTTPService(
+		ServiceOptions{Resolver: Resolver{ThoughtsRoot: thoughtsRoot}, Manager: manager},
+	)
 
 	e := echo.New()
-	req := httptest.NewRequest(http.MethodGet, "/thoughts/_render/app/"+token+"/app/events", nil)
+	req := httptest.NewRequest(
+		http.MethodGet,
+		"/thoughts/_render/app/"+token+"/app/events",
+		nil,
+	)
 	rec := httptest.NewRecorder()
 	c := e.NewContext(req, rec)
 	c.SetParamNames("token", "*")
@@ -595,7 +752,11 @@ func TestHandleThoughtsAppletProxyUsesRuntimeKey(t *testing.T) {
 		t.Fatalf("proxied path = %q, want /events", got)
 	}
 	if manager.ensureConfig.AppID != token {
-		t.Fatalf("EnsureStarted AppID = %q, want token %q", manager.ensureConfig.AppID, token)
+		t.Fatalf(
+			"EnsureStarted AppID = %q, want token %q",
+			manager.ensureConfig.AppID,
+			token,
+		)
 	}
 	if manager.proxyTargetAppID != token {
 		t.Fatalf("ProxyTarget AppID = %q, want token %q", manager.proxyTargetAppID, token)
@@ -606,25 +767,37 @@ func TestRegisteredThoughtsRoutesUseDurableIdentityBeforeCatchAll(t *testing.T) 
 	thoughtsRoot := t.TempDir()
 	identity := writeThoughtsAppletManifest(t, thoughtsRoot, "plans/demo", "demo")
 	token := EncodeAppletIdentity(identity)
-	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		_, _ = w.Write([]byte(r.URL.Path))
-	}))
+	backend := httptest.NewServer(
+		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			_, _ = w.Write([]byte(r.URL.Path))
+		}),
+	)
 	defer backend.Close()
 	manager := &recordingManager{
 		target: backend.URL,
-		state:  appletruntime.AppletProcessState{Status: appletruntime.ProcessStatusHealthy},
+		state: appletruntime.AppletProcessState{
+			Status: appletruntime.ProcessStatusHealthy,
+		},
 	}
-	service := NewHTTPService(ServiceOptions{Resolver: Resolver{ThoughtsRoot: thoughtsRoot}, Manager: manager})
+	service := NewHTTPService(
+		ServiceOptions{Resolver: Resolver{ThoughtsRoot: thoughtsRoot}, Manager: manager},
+	)
 
 	e := echo.New()
 	thoughtsGroup := e.Group("/thoughts")
 	service.RegisterThoughtsRoutes(thoughtsGroup)
-	thoughtsGroup.GET("/*", func(c echo.Context) error { return c.String(http.StatusTeapot, "markdown catch-all") })
+	thoughtsGroup.GET(
+		"/*",
+		func(c echo.Context) error { return c.String(http.StatusTeapot, "markdown catch-all") },
+	)
 	formsGroup := e.Group("/forms")
 	service.RegisterFormRoutes(formsGroup)
 
 	rec := httptest.NewRecorder()
-	e.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/thoughts/_render/app/"+token, nil))
+	e.ServeHTTP(
+		rec,
+		httptest.NewRequest(http.MethodGet, "/thoughts/_render/app/"+token, nil),
+	)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("page status = %d body=%q", rec.Code, rec.Body.String())
 	}
@@ -635,16 +808,31 @@ func TestRegisteredThoughtsRoutesUseDurableIdentityBeforeCatchAll(t *testing.T) 
 	}
 
 	rec = httptest.NewRecorder()
-	e.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/thoughts/_render/app/"+token+"/app/events", nil))
+	e.ServeHTTP(
+		rec,
+		httptest.NewRequest(
+			http.MethodGet,
+			"/thoughts/_render/app/"+token+"/app/events",
+			nil,
+		),
+	)
 	if rec.Code != http.StatusOK || strings.TrimSpace(rec.Body.String()) != "/events" {
 		t.Fatalf("proxy response status=%d body=%q", rec.Code, rec.Body.String())
 	}
 	if manager.ensureConfig.AppID != token || manager.proxyTargetAppID != token {
-		t.Fatalf("proxy used ensure=%q target=%q, want token %q", manager.ensureConfig.AppID, manager.proxyTargetAppID, token)
+		t.Fatalf(
+			"proxy used ensure=%q target=%q, want token %q",
+			manager.ensureConfig.AppID,
+			manager.proxyTargetAppID,
+			token,
+		)
 	}
 
 	rec = httptest.NewRecorder()
-	e.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/forms/applets/"+token+"/stop", nil))
+	e.ServeHTTP(
+		rec,
+		httptest.NewRequest(http.MethodPost, "/forms/applets/"+token+"/stop", nil),
+	)
 	if rec.Code != http.StatusSeeOther {
 		t.Fatalf("stop status = %d body=%q", rec.Code, rec.Body.String())
 	}
@@ -655,36 +843,81 @@ func TestRegisteredThoughtsRoutesUseDurableIdentityBeforeCatchAll(t *testing.T) 
 
 func TestRegisterStartupAliasesRejectsReservedStaticConflict(t *testing.T) {
 	thoughtsRoot := t.TempDir()
-	writeThoughtsAppletManifestWithAliases(t, thoughtsRoot, "plans/demo", "demo", []RouteAlias{{Pattern: "/static/demo"}})
-	service := NewHTTPService(ServiceOptions{Resolver: Resolver{ThoughtsRoot: thoughtsRoot}})
+	writeThoughtsAppletManifestWithAliases(
+		t,
+		thoughtsRoot,
+		"plans/demo",
+		"demo",
+		[]RouteAlias{{Pattern: "/static/demo"}},
+	)
+	service := NewHTTPService(
+		ServiceOptions{Resolver: Resolver{ThoughtsRoot: thoughtsRoot}},
+	)
 
-	if err := service.RegisterStartupAliases(echo.New()); err == nil || !strings.Contains(err.Error(), "reserved Vamos prefix") {
-		t.Fatalf("RegisterStartupAliases() error = %v, want reserved prefix conflict", err)
+	if err := service.RegisterStartupAliases(
+		echo.New(),
+	); err == nil ||
+		!strings.Contains(err.Error(), "reserved Vamos prefix") {
+		t.Fatalf(
+			"RegisterStartupAliases() error = %v, want reserved prefix conflict",
+			err,
+		)
 	}
 }
 
 func TestRegisterStartupAliasesRejectsDuplicateExampleAndThoughtsAlias(t *testing.T) {
 	examplesRoot := t.TempDir()
-	writeExampleAppletManifestWithAliases(t, examplesRoot, "wordle", []RouteAlias{{Pattern: "/events"}})
+	writeExampleAppletManifestWithAliases(
+		t,
+		examplesRoot,
+		"wordle",
+		[]RouteAlias{{Pattern: "/events"}},
+	)
 	thoughtsRoot := t.TempDir()
-	writeThoughtsAppletManifestWithAliases(t, thoughtsRoot, "plans/demo", "demo", []RouteAlias{{Pattern: "/events"}})
-	service := NewHTTPService(ServiceOptions{Resolver: Resolver{ExamplesRoot: examplesRoot, ThoughtsRoot: thoughtsRoot}})
+	writeThoughtsAppletManifestWithAliases(
+		t,
+		thoughtsRoot,
+		"plans/demo",
+		"demo",
+		[]RouteAlias{{Pattern: "/events"}},
+	)
+	service := NewHTTPService(
+		ServiceOptions{
+			Resolver: Resolver{ExamplesRoot: examplesRoot, ThoughtsRoot: thoughtsRoot},
+		},
+	)
 
-	if err := service.RegisterStartupAliases(echo.New()); err == nil || !strings.Contains(err.Error(), "already registered") {
-		t.Fatalf("RegisterStartupAliases() error = %v, want duplicate alias conflict", err)
+	if err := service.RegisterStartupAliases(
+		echo.New(),
+	); err == nil ||
+		!strings.Contains(err.Error(), "already registered") {
+		t.Fatalf(
+			"RegisterStartupAliases() error = %v, want duplicate alias conflict",
+			err,
+		)
 	}
 }
 
 func TestRegisterStartupAliasesMountsThoughtsAliasRoute(t *testing.T) {
 	thoughtsRoot := t.TempDir()
-	identity := writeThoughtsAppletManifestWithAliases(t, thoughtsRoot, "plans/demo", "demo", []RouteAlias{{Pattern: "/events", Methods: []string{http.MethodGet}}})
+	identity := writeThoughtsAppletManifestWithAliases(
+		t,
+		thoughtsRoot,
+		"plans/demo",
+		"demo",
+		[]RouteAlias{{Pattern: "/events", Methods: []string{http.MethodGet}}},
+	)
 	token := EncodeAppletIdentity(identity)
-	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		_, _ = w.Write([]byte(r.URL.Path))
-	}))
+	backend := httptest.NewServer(
+		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			_, _ = w.Write([]byte(r.URL.Path))
+		}),
+	)
 	defer backend.Close()
 	manager := &recordingManager{target: backend.URL}
-	service := NewHTTPService(ServiceOptions{Resolver: Resolver{ThoughtsRoot: thoughtsRoot}, Manager: manager})
+	service := NewHTTPService(
+		ServiceOptions{Resolver: Resolver{ThoughtsRoot: thoughtsRoot}, Manager: manager},
+	)
 	e := echo.New()
 
 	if err := service.RegisterStartupAliases(e); err != nil {
@@ -701,7 +934,11 @@ func TestRegisterStartupAliasesMountsThoughtsAliasRoute(t *testing.T) {
 		t.Fatalf("alias proxy body = %q, want /events", got)
 	}
 	if manager.ensureConfig.AppID != token {
-		t.Fatalf("alias EnsureStarted AppID = %q, want token %q", manager.ensureConfig.AppID, token)
+		t.Fatalf(
+			"alias EnsureStarted AppID = %q, want token %q",
+			manager.ensureConfig.AppID,
+			token,
+		)
 	}
 
 	rec = httptest.NewRecorder()
@@ -713,13 +950,22 @@ func TestRegisterStartupAliasesMountsThoughtsAliasRoute(t *testing.T) {
 
 func TestRegisterStartupAliasesMountsExampleAliasRoute(t *testing.T) {
 	examplesRoot := t.TempDir()
-	writeExampleAppletManifestWithAliases(t, examplesRoot, "wordle", []RouteAlias{{Pattern: "/guesses", Methods: []string{http.MethodPost}}})
-	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		_, _ = w.Write([]byte(r.URL.Path))
-	}))
+	writeExampleAppletManifestWithAliases(
+		t,
+		examplesRoot,
+		"wordle",
+		[]RouteAlias{{Pattern: "/guesses", Methods: []string{http.MethodPost}}},
+	)
+	backend := httptest.NewServer(
+		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			_, _ = w.Write([]byte(r.URL.Path))
+		}),
+	)
 	defer backend.Close()
 	manager := &recordingManager{target: backend.URL}
-	service := NewHTTPService(ServiceOptions{Resolver: Resolver{ExamplesRoot: examplesRoot}, Manager: manager})
+	service := NewHTTPService(
+		ServiceOptions{Resolver: Resolver{ExamplesRoot: examplesRoot}, Manager: manager},
+	)
 	e := echo.New()
 
 	if err := service.RegisterStartupAliases(e); err != nil {
@@ -731,22 +977,36 @@ func TestRegisterStartupAliasesMountsExampleAliasRoute(t *testing.T) {
 		t.Fatalf("alias status = %d body=%q", rec.Code, rec.Body.String())
 	}
 	if manager.ensureConfig.AppID != "wordle" {
-		t.Fatalf("example alias EnsureStarted AppID = %q, want wordle", manager.ensureConfig.AppID)
+		t.Fatalf(
+			"example alias EnsureStarted AppID = %q, want wordle",
+			manager.ensureConfig.AppID,
+		)
 	}
 }
 
 func TestHandleAliasRestartsUnhealthyAppletBeforeProxy(t *testing.T) {
 	examplesRoot := t.TempDir()
-	writeExampleAppletManifestWithAliases(t, examplesRoot, "wordle", []RouteAlias{{Pattern: "/events", Methods: []string{http.MethodGet}}})
-	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		_, _ = w.Write([]byte(r.URL.Path))
-	}))
+	writeExampleAppletManifestWithAliases(
+		t,
+		examplesRoot,
+		"wordle",
+		[]RouteAlias{{Pattern: "/events", Methods: []string{http.MethodGet}}},
+	)
+	backend := httptest.NewServer(
+		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			_, _ = w.Write([]byte(r.URL.Path))
+		}),
+	)
 	defer backend.Close()
 	manager := &recordingManager{
 		target: backend.URL,
-		state:  appletruntime.AppletProcessState{Status: appletruntime.ProcessStatusUnhealthy},
+		state: appletruntime.AppletProcessState{
+			Status: appletruntime.ProcessStatusUnhealthy,
+		},
 	}
-	service := NewHTTPService(ServiceOptions{Resolver: Resolver{ExamplesRoot: examplesRoot}, Manager: manager})
+	service := NewHTTPService(
+		ServiceOptions{Resolver: Resolver{ExamplesRoot: examplesRoot}, Manager: manager},
+	)
 	e := echo.New()
 
 	if err := service.RegisterStartupAliases(e); err != nil {
@@ -769,8 +1029,14 @@ func TestHandleThoughtsAppletFormsUseRuntimeKey(t *testing.T) {
 	thoughtsRoot := t.TempDir()
 	identity := writeThoughtsAppletManifest(t, thoughtsRoot, "plans/demo", "demo")
 	token := EncodeAppletIdentity(identity)
-	manager := &recordingManager{state: appletruntime.AppletProcessState{Status: appletruntime.ProcessStatusHealthy}}
-	service := NewHTTPService(ServiceOptions{Resolver: Resolver{ThoughtsRoot: thoughtsRoot}, Manager: manager})
+	manager := &recordingManager{
+		state: appletruntime.AppletProcessState{
+			Status: appletruntime.ProcessStatusHealthy,
+		},
+	}
+	service := NewHTTPService(
+		ServiceOptions{Resolver: Resolver{ThoughtsRoot: thoughtsRoot}, Manager: manager},
+	)
 
 	e := echo.New()
 	req := httptest.NewRequest(http.MethodPost, "/forms/applets/"+token+"/stop", nil)
@@ -794,7 +1060,11 @@ func TestHandleThoughtsAppletFormsUseRuntimeKey(t *testing.T) {
 		t.Fatalf("HandleAppletRestart() error = %v", err)
 	}
 	if manager.ensureConfig.AppID != token {
-		t.Fatalf("restart EnsureStarted AppID = %q, want token %q", manager.ensureConfig.AppID, token)
+		t.Fatalf(
+			"restart EnsureStarted AppID = %q, want token %q",
+			manager.ensureConfig.AppID,
+			token,
+		)
 	}
 }
 
@@ -802,26 +1072,45 @@ func writeThoughtsAppletManifest(t *testing.T, root, relDir, id string) string {
 	return writeThoughtsAppletManifestWithAliases(t, root, relDir, id, nil)
 }
 
-func writeThoughtsAppletManifestWithAliases(t *testing.T, root, relDir, id string, aliases []RouteAlias) string {
+func writeThoughtsAppletManifestWithAliases(
+	t *testing.T,
+	root, relDir, id string,
+	aliases []RouteAlias,
+) string {
 	t.Helper()
 	dir := filepath.Join(root, filepath.FromSlash(relDir))
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		t.Fatal(err)
 	}
 	body := manifestBody(id, "Demo", aliases)
-	if err := os.WriteFile(filepath.Join(dir, "AGENTS.md"), []byte(body), 0o644); err != nil {
+	if err := os.WriteFile(
+		filepath.Join(dir, "AGENTS.md"),
+		[]byte(body),
+		0o644,
+	); err != nil {
 		t.Fatal(err)
 	}
-	return "thoughts/" + strings.Trim(strings.TrimPrefix(filepath.ToSlash(relDir), "thoughts/"), "/") + "/AGENTS.md"
+	return "thoughts/" + strings.Trim(
+		strings.TrimPrefix(filepath.ToSlash(relDir), "thoughts/"),
+		"/",
+	) + "/AGENTS.md"
 }
 
-func writeExampleAppletManifestWithAliases(t *testing.T, root, id string, aliases []RouteAlias) {
+func writeExampleAppletManifestWithAliases(
+	t *testing.T,
+	root, id string,
+	aliases []RouteAlias,
+) {
 	t.Helper()
 	dir := filepath.Join(root, id)
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(dir, "AGENTS.md"), []byte(manifestBody(id, "Wordle", aliases)), 0o644); err != nil {
+	if err := os.WriteFile(
+		filepath.Join(dir, "AGENTS.md"),
+		[]byte(manifestBody(id, "Wordle", aliases)),
+		0o644,
+	); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -877,7 +1166,10 @@ type recordingManager struct {
 	proxyTargetAppID string
 }
 
-func (m *recordingManager) EnsureStarted(_ context.Context, cfg appletruntime.RuntimeConfig) (appletruntime.AppletProcessState, error) {
+func (m *recordingManager) EnsureStarted(
+	_ context.Context,
+	cfg appletruntime.RuntimeConfig,
+) (appletruntime.AppletProcessState, error) {
 	m.ensureConfig = cfg
 	state := m.state
 	if state.Status == "" {
@@ -886,14 +1178,23 @@ func (m *recordingManager) EnsureStarted(_ context.Context, cfg appletruntime.Ru
 	state.AppID = cfg.AppID
 	return state, nil
 }
-func (m *recordingManager) Start(ctx context.Context, cfg appletruntime.RuntimeConfig) (appletruntime.ProcessState, error) {
+
+func (m *recordingManager) Start(
+	ctx context.Context,
+	cfg appletruntime.RuntimeConfig,
+) (appletruntime.ProcessState, error) {
 	return m.EnsureStarted(ctx, cfg)
 }
+
 func (m *recordingManager) Stop(_ context.Context, appID string) error {
 	m.stoppedAppID = appID
 	return nil
 }
-func (m *recordingManager) Health(_ context.Context, appID string) (appletruntime.AppletProcessState, error) {
+
+func (m *recordingManager) Health(
+	_ context.Context,
+	appID string,
+) (appletruntime.AppletProcessState, error) {
 	state := m.state
 	if state.Status == "" {
 		state.Status = appletruntime.ProcessStatusStopped
@@ -901,6 +1202,7 @@ func (m *recordingManager) Health(_ context.Context, appID string) (appletruntim
 	state.AppID = appID
 	return state, nil
 }
+
 func (m *recordingManager) ProxyTarget(appID string) (string, bool) {
 	m.proxyTargetAppID = appID
 	if m.target == "" {
@@ -909,6 +1211,10 @@ func (m *recordingManager) ProxyTarget(appID string) (string, bool) {
 	return m.target, true
 }
 func (m *recordingManager) Touch(string, int) {}
-func (m *recordingManager) SweepInactive(context.Context, time.Time) ([]appletruntime.AppletProcessState, error) {
+
+func (m *recordingManager) SweepInactive(
+	context.Context,
+	time.Time,
+) ([]appletruntime.AppletProcessState, error) {
 	return nil, nil
 }

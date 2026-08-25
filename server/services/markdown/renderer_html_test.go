@@ -4,11 +4,14 @@ import (
 	"bytes"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/labstack/echo/v4"
+
+	"github.com/CoreyCole/vamos/server/services/commentui"
 )
 
 func TestResolveHTMLAppletAssetStaysUnderDocumentDirectory(t *testing.T) {
@@ -72,7 +75,7 @@ func TestChildHTMLHeadersSetContainmentHeaders(t *testing.T) {
 	}
 }
 
-func TestServeHTMLAppletStreamsRawHTML(t *testing.T) {
+func TestServeHTMLAppletInjectsCommentBridgeWithoutChangingArtifact(t *testing.T) {
 	root := t.TempDir()
 	mustWriteFile(t, filepath.Join(root, "demo.html"), []byte("<h1>Demo</h1>"))
 
@@ -93,10 +96,18 @@ func TestServeHTMLAppletStreamsRawHTML(t *testing.T) {
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status=%d body=%s", rec.Code, rec.Body.String())
 	}
-	if got := rec.Body.String(); got != "<h1>Demo</h1>" {
+	if got := rec.Body.String(); got != "<h1>Demo</h1>"+htmlAppletBridgeScript {
 		t.Fatalf("body=%q", got)
 	}
-	if strings.Contains(rec.Body.String(), "doc-workbench") || strings.Contains(rec.Body.String(), "thoughts-markdown-scroll-region") {
+	saved, err := os.ReadFile(filepath.Join(root, "demo.html"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := string(saved); got != "<h1>Demo</h1>" {
+		t.Fatalf("saved artifact=%q", got)
+	}
+	if strings.Contains(rec.Body.String(), "doc-workbench") ||
+		strings.Contains(rec.Body.String(), "thoughts-markdown-scroll-region") {
 		t.Fatalf("child route returned workbench: %s", rec.Body.String())
 	}
 	if ct := rec.Header().Get("Content-Type"); !strings.Contains(ct, "text/html") {
@@ -128,7 +139,7 @@ func TestIframeSrcForHTMLAppletAddsNormalizedTheme(t *testing.T) {
 	}
 }
 
-func TestServeHTMLAppletIgnoresThemeQueryAndStreamsRawHTML(t *testing.T) {
+func TestServeHTMLAppletIgnoresThemeQueryAndInjectsCommentBridge(t *testing.T) {
 	root := t.TempDir()
 	mustWriteFile(t, filepath.Join(root, "demo.html"), []byte("<h1>Demo</h1>"))
 
@@ -137,7 +148,11 @@ func TestServeHTMLAppletIgnoresThemeQueryAndStreamsRawHTML(t *testing.T) {
 		t.Fatal(err)
 	}
 	e := echo.New()
-	req := httptest.NewRequest(http.MethodGet, "/thoughts/_render/html/demo.html?theme=light", nil)
+	req := httptest.NewRequest(
+		http.MethodGet,
+		"/thoughts/_render/html/demo.html?theme=light",
+		nil,
+	)
 	rec := httptest.NewRecorder()
 	c := e.NewContext(req, rec)
 	c.SetParamNames("*")
@@ -146,8 +161,32 @@ func TestServeHTMLAppletIgnoresThemeQueryAndStreamsRawHTML(t *testing.T) {
 	if err := svc.ServeHTMLApplet(c); err != nil {
 		t.Fatal(err)
 	}
-	if got := rec.Body.String(); got != "<h1>Demo</h1>" {
+	if got := rec.Body.String(); got != "<h1>Demo</h1>"+htmlAppletBridgeScript {
 		t.Fatalf("body=%q", got)
+	}
+}
+
+func TestInjectHTMLAppletBridgeFindsRealClosingBody(t *testing.T) {
+	original := []byte(
+		`<html><body><!-- </body> --><script>const marker = "</body>";</script><p>Demo</p></body></html>`,
+	)
+	got := injectHTMLAppletBridge(original)
+	want := []byte(
+		`<html><body><!-- </body> --><script>const marker = "</body>";</script><p>Demo</p>` + htmlAppletBridgeScript + `</body></html>`,
+	)
+	if !bytes.Equal(got, want) {
+		t.Fatalf("injected HTML=%q want %q", got, want)
+	}
+	if restored := bytes.Replace(
+		got,
+		[]byte(htmlAppletBridgeScript),
+		nil,
+		1,
+	); !bytes.Equal(
+		restored,
+		original,
+	) {
+		t.Fatalf("original bytes changed: got %q want %q", restored, original)
 	}
 }
 
@@ -182,6 +221,15 @@ func TestHTMLAppletRendererReturnsSandboxedFrame(t *testing.T) {
 	if !strings.Contains(html, `data-vamos-html-applet`) {
 		t.Fatalf("missing applet marker: %s", html)
 	}
+	for _, want := range []string{
+		`data-commentui-frame`,
+		`data-commentui-bridge-id="` + commentui.FrameCommentBridgeID("thoughts/demo.html") + `"`,
+		`data-commentui-transport="opaque-postmessage"`,
+	} {
+		if !strings.Contains(html, want) {
+			t.Fatalf("missing frame comment marker %q: %s", want, html)
+		}
+	}
 	if !strings.Contains(html, `src="/thoughts/_render/html/demo.html?theme=light"`) {
 		t.Fatalf("missing iframe src: %s", html)
 	}
@@ -204,7 +252,10 @@ func TestHTMLAppletRendererReturnsSandboxedFrame(t *testing.T) {
 		t.Fatalf("missing referrer policy: %s", html)
 	}
 	if !strings.Contains(html, `class="h-full min-h-0 w-full flex-1 border-0 bg-white"`) {
-		t.Fatalf("iframe must fill the surface with a readable unthemed fallback: %s", html)
+		t.Fatalf(
+			"iframe must fill the surface with a readable unthemed fallback: %s",
+			html,
+		)
 	}
 	if strings.Contains(html, "min-h-[70vh]") || strings.Contains(html, "rounded-lg") {
 		t.Fatalf("HTML renderer keeps inset/card sizing: %s", html)

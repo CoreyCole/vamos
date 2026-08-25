@@ -6,12 +6,15 @@ import (
 )
 
 templ AppletWorkbenchDocument(applet AppletContext, process appletruntime.AppletProcessState, comments commentui.CommentableMarkdownArgs) {
-	<div class="relative h-full min-h-0">
+	if comments.DocPath != "" {
+		@commentui.FrameCommentBridge(commentui.FrameCommentBridgeArgs{
+			Content:     AppletFrame(applet, process),
+			Comments:    comments,
+			HeadingHint: applet.Manifest.Title,
+		})
+	} else {
 		@AppletFrame(applet, process)
-		if comments.DocPath != "" {
-			@commentui.DocumentPatchTarget(comments, applet.Manifest.Title)
-		}
-	</div>
+	}
 }
 
 templ AppletFrame(applet AppletContext, process appletruntime.AppletProcessState) {
@@ -20,6 +23,7 @@ templ AppletFrame(applet AppletContext, process appletruntime.AppletProcessState
 			<iframe
 				class="min-h-0 flex-1 border-0 bg-background"
 				src={ applet.IFrameSrc }
+				{ appletCommentFrameAttrs(applet)... }
 				title={ applet.Manifest.Title }
 				sandbox="allow-same-origin allow-forms allow-downloads allow-scripts"
 				referrerpolicy="same-origin"
@@ -28,6 +32,17 @@ templ AppletFrame(applet AppletContext, process appletruntime.AppletProcessState
 			@AppletStartingPanel(applet, process)
 		}
 	</div>
+}
+
+func appletCommentFrameAttrs(applet AppletContext) templ.Attributes {
+	if !supportsAppletComments(applet) {
+		return templ.Attributes{}
+	}
+	return templ.Attributes{
+		"data-commentui-frame":     true,
+		"data-commentui-bridge-id": commentui.FrameCommentBridgeID(applet.IdentityPath),
+		"data-commentui-transport": "same-origin-dom",
+	}
 }
 
 templ AppletStartingPanel(applet AppletContext, process appletruntime.AppletProcessState) {

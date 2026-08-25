@@ -12,6 +12,11 @@ import (
 )
 
 type APIClient interface {
+	Comments(
+		ctx context.Context,
+		keyID, secret, artifactPath string,
+		limit int,
+	) (QuoteCommentsResponse, error)
 	Start(ctx context.Context, keyID, secret string, req ChatStartRequest) (ChatAPIResponse, error)
 	Steer(ctx context.Context, keyID, secret string, req ChatSteerRequest) (ChatAPIResponse, error)
 	Snapshot(ctx context.Context, keyID, secret, sessionID string) (snapshotResponse, error)
@@ -21,6 +26,19 @@ type APIClient interface {
 type HTTPAPIClient struct {
 	HTTPClient *http.Client
 	ManagerURL string
+}
+
+type QuoteComment struct {
+	ID           string `json:"id"`
+	ArtifactPath string `json:"artifact_path"`
+	Quote        string `json:"quote"`
+	Body         string `json:"body"`
+	AuthorEmail  string `json:"author_email"`
+	CreatedAt    string `json:"created_at"`
+}
+
+type QuoteCommentsResponse struct {
+	Comments []QuoteComment `json:"comments"`
 }
 
 type ChatStartRequest struct {
@@ -41,6 +59,27 @@ type ChatAPIResponse struct {
 	LatestThreadID   string     `json:"latest_thread_id,omitempty"`
 	LatestWebURL     string     `json:"latest_web_url,omitempty"`
 	InfluencesLatest bool       `json:"influences_latest,omitempty"`
+}
+
+func (c HTTPAPIClient) Comments(
+	ctx context.Context,
+	keyID, secret, artifactPath string,
+	limit int,
+) (QuoteCommentsResponse, error) {
+	query := url.Values{}
+	query.Set("artifact_path", artifactPath)
+	query.Set("limit", fmt.Sprint(limit))
+	var out QuoteCommentsResponse
+	err := c.doJSON(
+		ctx,
+		http.MethodGet,
+		"/agent-chat/api/comments?"+query.Encode(),
+		keyID,
+		secret,
+		nil,
+		&out,
+	)
+	return out, err
 }
 
 func (c HTTPAPIClient) Start(ctx context.Context, keyID, secret string, req ChatStartRequest) (ChatAPIResponse, error) {

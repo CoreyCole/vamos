@@ -299,6 +299,60 @@ func (q *Queries) ListDocumentComments(ctx context.Context, arg ListDocumentComm
 	return items, nil
 }
 
+const listOpenQuoteCommentsForDocument = `-- name: ListOpenQuoteCommentsForDocument :many
+SELECT id, workspace_root, workspace_id, doc_path, user_email, comment_text, selected_text, section_hint, heading_hint, start_line, start_column, end_line, end_column, resolved, resolved_by, resolved_actor_type, resolved_at, created_at, updated_at, deleted_at
+FROM document_comments
+WHERE doc_path = ?1
+AND deleted_at IS NULL
+AND resolved = 0
+AND length(trim(selected_text, ' ' || char(9) || char(10) || char(11) || char(12) || char(13))) > 0
+ORDER BY created_at ASC, id ASC
+`
+
+func (q *Queries) ListOpenQuoteCommentsForDocument(ctx context.Context, docPath string) ([]DocumentComment, error) {
+	rows, err := q.db.QueryContext(ctx, listOpenQuoteCommentsForDocument, docPath)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []DocumentComment
+	for rows.Next() {
+		var i DocumentComment
+		if err := rows.Scan(
+			&i.ID,
+			&i.WorkspaceRoot,
+			&i.WorkspaceID,
+			&i.DocPath,
+			&i.UserEmail,
+			&i.CommentText,
+			&i.SelectedText,
+			&i.SectionHint,
+			&i.HeadingHint,
+			&i.StartLine,
+			&i.StartColumn,
+			&i.EndLine,
+			&i.EndColumn,
+			&i.Resolved,
+			&i.ResolvedBy,
+			&i.ResolvedActorType,
+			&i.ResolvedAt,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.DeletedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listWorkspaceDocumentComments = `-- name: ListWorkspaceDocumentComments :many
 SELECT id, workspace_root, workspace_id, doc_path, user_email, comment_text, selected_text, section_hint, heading_hint, start_line, start_column, end_line, end_column, resolved, resolved_by, resolved_actor_type, resolved_at, created_at, updated_at, deleted_at
 FROM document_comments
