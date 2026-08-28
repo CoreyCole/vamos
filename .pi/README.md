@@ -4,7 +4,6 @@ This directory is for Vamos-specific Pi resources:
 
 - `skills/` — skills that only make sense for Vamos runtime development
 - `prompts/` — Vamos-specific prompt templates
-- `extensions/` — Vamos-specific Pi extensions
 
 Project-local skills:
 
