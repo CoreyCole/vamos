@@ -7,7 +7,7 @@ import (
 // SheetVariants returns the CSS classes for the main Sheet container component
 func SheetVariants(args SheetArgs) string {
 	// Sheet-specific styling based on side
-	var baseClasses string
+	baseClasses := ""
 
 	switch args.Side {
 	case "top":
