@@ -13,10 +13,16 @@ import (
 )
 
 type AppletCommentReader interface {
-	GetCommentsForFileInternal(ctx context.Context, filePath string) (*comments.GetCommentsResponse, error)
+	GetCommentsForFileInternal(
+		ctx context.Context,
+		filePath string,
+	) (*comments.GetCommentsResponse, error)
 }
 
-func BuildAppletWorkbenchActions(applet AppletContext, process appletruntime.AppletProcessState) templ.Component {
+func BuildAppletWorkbenchActions(
+	applet AppletContext,
+	process appletruntime.AppletProcessState,
+) templ.Component {
 	actions := make([]workbench.OverflowAction, 0, 4)
 	if action, ok := AppletCommentAction(applet); ok {
 		actions = append(actions, action)
@@ -34,7 +40,12 @@ func BuildAppletWorkbenchActions(applet AppletContext, process appletruntime.App
 	})
 }
 
-func AppletCommentUI(ctx context.Context, applet AppletContext, userEmail string, reader AppletCommentReader) (commentui.CommentableMarkdownArgs, bool, error) {
+func AppletCommentUI(
+	ctx context.Context,
+	applet AppletContext,
+	userEmail string,
+	reader AppletCommentReader,
+) (commentui.CommentableMarkdownArgs, bool, error) {
 	if !supportsAppletComments(applet) {
 		return commentui.CommentableMarkdownArgs{}, false, nil
 	}
@@ -66,7 +77,10 @@ func AppletCommentUI(ctx context.Context, applet AppletContext, userEmail string
 				return "/forms/resolve"
 			},
 		},
-		HiddenFields: map[string]string{"doc_path": applet.IdentityPath},
+		HiddenFields: map[string]string{
+			"doc_path":     applet.IdentityPath,
+			"workbench_v2": "1",
+		},
 	}, true, nil
 }
 
@@ -91,11 +105,15 @@ func AppletCommentAction(applet AppletContext) (workbench.OverflowAction, bool) 
 			"heading_hint":          heading,
 			"comment_target_chrome": string(commentui.CommentTargetChromePatchOnly),
 			"selected_text":         "",
+			"workbench_v2":          "1",
 		},
 	}, true
 }
 
-func AppletLifecycleActions(applet AppletContext, process appletruntime.AppletProcessState) []workbench.OverflowAction {
+func AppletLifecycleActions(
+	applet AppletContext,
+	process appletruntime.AppletProcessState,
+) []workbench.OverflowAction {
 	startLabel := "Restart"
 	if process.Status == "" || process.Status == appletruntime.ProcessStatusStopped {
 		startLabel = "Start"
@@ -110,7 +128,8 @@ func AppletLifecycleActions(applet AppletContext, process appletruntime.AppletPr
 			"identity_path": applet.IdentityPath,
 		},
 	}}
-	if process.Status == appletruntime.ProcessStatusHealthy || process.Status == appletruntime.ProcessStatusUnhealthy {
+	if process.Status == appletruntime.ProcessStatusHealthy ||
+		process.Status == appletruntime.ProcessStatusUnhealthy {
 		actions = append(actions, workbench.OverflowAction{
 			Label:      "Stop",
 			Kind:       workbench.OverflowActionForm,
@@ -136,7 +155,9 @@ func supportsAppletComments(applet AppletContext) bool {
 	return strings.HasPrefix(strings.TrimSpace(applet.IdentityPath), "thoughts/")
 }
 
-func appletCommentThreads(items []comments.CommentWithReplies) []commentui.CommentThreadView {
+func appletCommentThreads(
+	items []comments.CommentWithReplies,
+) []commentui.CommentThreadView {
 	sources := make([]commentui.ThreadSource, 0, len(items))
 	for _, item := range items {
 		sectionID := item.Comment.SectionHint.String
@@ -166,8 +187,9 @@ func appletCommentThreads(items []comments.CommentWithReplies) []commentui.Comme
 			Resolved:     item.Comment.Resolved,
 			Replies:      replies,
 			HiddenFields: map[string]string{
-				"comment_id": item.Comment.ID,
-				"doc_path":   item.Comment.DocPath,
+				"comment_id":   item.Comment.ID,
+				"doc_path":     item.Comment.DocPath,
+				"workbench_v2": "1",
 			},
 		})
 	}

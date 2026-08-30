@@ -24,6 +24,7 @@ type commentFormData struct {
 	EndColumn       int
 	TargetChrome    commentui.CommentTargetChrome
 	SelectionPrefix string
+	WorkbenchV2     bool
 }
 
 func parseCommentForm(c echo.Context) commentFormData {
@@ -32,23 +33,27 @@ func parseCommentForm(c echo.Context) commentFormData {
 		documentPath = c.FormValue("file_path")
 	}
 	return commentFormData{
-		FilePath:        documentPath,
-		CommentText:     c.FormValue("comment_text"),
-		SelectedText:    c.FormValue("selected_text"),
-		SectionID:       normalizeSectionID(c.FormValue("section_hint")),
-		HeadingHint:     c.FormValue("heading_hint"),
-		StartLine:       parseFormInt(c, "start_line"),
-		StartColumn:     parseFormInt(c, "start_column"),
-		EndLine:         parseFormInt(c, "end_line"),
-		EndColumn:       parseFormInt(c, "end_column"),
-		TargetChrome:    commentui.CommentTargetChrome(c.FormValue("comment_target_chrome")),
+		FilePath:     documentPath,
+		CommentText:  c.FormValue("comment_text"),
+		SelectedText: c.FormValue("selected_text"),
+		SectionID:    normalizeSectionID(c.FormValue("section_hint")),
+		HeadingHint:  c.FormValue("heading_hint"),
+		StartLine:    parseFormInt(c, "start_line"),
+		StartColumn:  parseFormInt(c, "start_column"),
+		EndLine:      parseFormInt(c, "end_line"),
+		EndColumn:    parseFormInt(c, "end_column"),
+		TargetChrome: commentui.CommentTargetChrome(
+			c.FormValue("comment_target_chrome"),
+		),
 		SelectionPrefix: c.FormValue("comment_selection_prefix"),
+		WorkbenchV2:     c.FormValue("workbench_v2") == "1",
 	}
 }
 
 type thoughtsCommentTargetOptions struct {
 	Chrome          commentui.CommentTargetChrome
 	SelectionPrefix string
+	WorkbenchV2     bool
 }
 
 func parseFormInt(c echo.Context, name string) int {
@@ -70,10 +75,11 @@ func normalizeSectionID(sectionID string) string {
 
 func thoughtsCommentRoutes() commentui.CommentRoutes {
 	return commentui.CommentRoutes{
-		Show:   "/forms/comments/show",
-		Create: "/forms/comments",
-		Cancel: "/forms/comments/cancel",
-		Expand: "/forms/comments/expand",
+		Show:          "/forms/comments/show",
+		Create:        "/forms/comments",
+		Cancel:        "/forms/comments/cancel",
+		Expand:        "/forms/comments/expand",
+		SelectComment: "/thoughts/actions/select-comment",
 		Reply: func(string) string {
 			return "/forms/replies"
 		},
@@ -83,7 +89,9 @@ func thoughtsCommentRoutes() commentui.CommentRoutes {
 	}
 }
 
-func (s *Service) thoughtsCommentThreads(items []CommentWithReplies) []commentui.CommentThreadView {
+func (s *Service) thoughtsCommentThreads(
+	items []CommentWithReplies,
+) []commentui.CommentThreadView {
 	sources := make([]commentui.ThreadSource, 0, len(items))
 	for _, item := range items {
 		sectionID := normalizeSectionID(item.Comment.SectionHint.String)
@@ -154,6 +162,9 @@ func (s *Service) thoughtsCommentTarget(
 		if opts.SelectionPrefix != "" {
 			hiddenFields["comment_selection_prefix"] = opts.SelectionPrefix
 		}
+		if opts.WorkbenchV2 {
+			hiddenFields["workbench_v2"] = "1"
+		}
 	}
 	target := commentui.BuildTargetView(commentui.TargetInput{
 		Surface:      commentui.CommentSurfaceThoughts,
@@ -198,7 +209,19 @@ func patchThoughtsCommentTargetWithForm(
 	)
 }
 
-func patchOpenCommentsSignal(sse *datastar.ServerSentEventGenerator) error {
+func patchOpenCommentsSignal(
+	sse *datastar.ServerSentEventGenerator,
+	workbenchV2 bool,
+) error {
+	if workbenchV2 {
+		return sse.MarshalAndPatchSignals(map[string]any{
+			"workbench": map[string]any{
+				"regions": map[string]any{
+					"workbenchV2Comments": map[string]any{"visible": true},
+				},
+			},
+		})
+	}
 	return sse.MarshalAndPatchSignals(map[string]any{
 		"rightRailActiveTab": "comments",
 		"workbench": map[string]any{
@@ -214,6 +237,7 @@ func (s *Service) patchThoughtsCommentsPanel(
 	sse *datastar.ServerSentEventGenerator,
 	filePath, userEmail, activeSectionID, activeSectionLabel string,
 	items []CommentWithReplies,
+	workbenchV2 bool,
 ) error {
 	args := commentui.CommentableMarkdownArgs{
 		Surface:      commentui.CommentSurfaceThoughts,
@@ -223,6 +247,9 @@ func (s *Service) patchThoughtsCommentsPanel(
 		Routes:       thoughtsCommentRoutes(),
 		HiddenFields: map[string]string{"doc_path": filePath, "context_panel": "1"},
 		UserEmail:    userEmail,
+	}
+	if workbenchV2 {
+		args.HiddenFields["workbench_v2"] = "1"
 	}
 	panelArgs := commentui.BuildCommentsPanelArgs(args, activeSectionID)
 	if label := strings.TrimSpace(activeSectionLabel); label != "" {
@@ -252,7 +279,11 @@ func (s *Service) HandleCancelCommentForm(c echo.Context) error {
 		data.HeadingHint,
 		userEmail,
 		sectionComments,
-		thoughtsCommentTargetOptions{Chrome: data.TargetChrome, SelectionPrefix: data.SelectionPrefix},
+		thoughtsCommentTargetOptions{
+			Chrome:          data.TargetChrome,
+			SelectionPrefix: data.SelectionPrefix,
+			WorkbenchV2:     data.WorkbenchV2,
+		},
 	)
 
 	sse := datastar.NewSSE(c.Response().Writer, c.Request())
@@ -266,7 +297,11 @@ func (s *Service) HandleCancelCommentForm(c echo.Context) error {
 		data.SectionID,
 		data.HeadingHint,
 		response.Comments,
+		data.WorkbenchV2,
 	); err != nil {
+		return err
+	}
+	if err := patchOpenCommentsSignal(sse, data.WorkbenchV2); err != nil {
 		return err
 	}
 	return sse.MarshalAndPatchSignals(map[string]any{
@@ -308,7 +343,14 @@ func (s *Service) HandleCommentForm(c echo.Context) error {
 	}
 
 	// Success - patch sidebar, remove form, and reset signals via SSE
-	return s.renderCommentSuccess(c, comment, userEmail, data.TargetChrome, data.SelectionPrefix)
+	return s.renderCommentSuccess(
+		c,
+		comment,
+		userEmail,
+		data.TargetChrome,
+		data.SelectionPrefix,
+		data.WorkbenchV2,
+	)
 }
 
 // renderFormError re-renders the form with an error message via SSE
@@ -331,7 +373,11 @@ func (s *Service) renderFormError(
 		data.HeadingHint,
 		userEmail,
 		sectionComments,
-		thoughtsCommentTargetOptions{Chrome: data.TargetChrome, SelectionPrefix: data.SelectionPrefix},
+		thoughtsCommentTargetOptions{
+			Chrome:          data.TargetChrome,
+			SelectionPrefix: data.SelectionPrefix,
+			WorkbenchV2:     data.WorkbenchV2,
+		},
 	)
 	if err := patchThoughtsCommentTargetWithForm(sse, target, data, errMsg); err != nil {
 		return err
@@ -343,10 +389,11 @@ func (s *Service) renderFormError(
 		data.SectionID,
 		data.HeadingHint,
 		response.Comments,
+		data.WorkbenchV2,
 	); err != nil {
 		return err
 	}
-	return patchOpenCommentsSignal(sse)
+	return patchOpenCommentsSignal(sse, data.WorkbenchV2)
 }
 
 // renderCommentSuccess patches the specific section's comment target and resets state via
@@ -357,6 +404,7 @@ func (s *Service) renderCommentSuccess(
 	userEmail string,
 	targetChrome commentui.CommentTargetChrome,
 	selectionPrefix string,
+	workbenchV2 bool,
 ) error {
 	sse := datastar.NewSSE(c.Response().Writer, c.Request())
 
@@ -385,7 +433,11 @@ func (s *Service) renderCommentSuccess(
 		"",
 		userEmail,
 		sectionComments,
-		thoughtsCommentTargetOptions{Chrome: targetChrome, SelectionPrefix: selectionPrefix},
+		thoughtsCommentTargetOptions{
+			Chrome:          targetChrome,
+			SelectionPrefix: selectionPrefix,
+			WorkbenchV2:     workbenchV2,
+		},
 	)
 	if err := patchThoughtsCommentTarget(sse, target); err != nil {
 		return err
@@ -397,10 +449,11 @@ func (s *Service) renderCommentSuccess(
 		sectionID,
 		comment.HeadingHint.String,
 		response.Comments,
+		workbenchV2,
 	); err != nil {
 		return err
 	}
-	if err := patchOpenCommentsSignal(sse); err != nil {
+	if err := patchOpenCommentsSignal(sse, workbenchV2); err != nil {
 		return err
 	}
 
@@ -409,8 +462,14 @@ func (s *Service) renderCommentSuccess(
 	})
 }
 
-func (s *Service) recoverReplyFormValues(c echo.Context, commentID, filePath string) (string, string) {
-	if _, err := s.queries.GetDocumentComment(c.Request().Context(), commentID); err == nil {
+func (s *Service) recoverReplyFormValues(
+	c echo.Context,
+	commentID, filePath string,
+) (string, string) {
+	if _, err := s.queries.GetDocumentComment(
+		c.Request().Context(),
+		commentID,
+	); err == nil {
 		if _, pathErr := canonicalThoughtsPath(filePath); pathErr == nil {
 			return commentID, filePath
 		}
@@ -429,18 +488,23 @@ func (s *Service) recoverReplyFormValues(c echo.Context, commentID, filePath str
 				}
 			}
 			if recoveredCommentID == "" {
-				if _, err := s.queries.GetDocumentComment(c.Request().Context(), value); err == nil {
+				if _, err := s.queries.GetDocumentComment(
+					c.Request().Context(),
+					value,
+				); err == nil {
 					recoveredCommentID = value
 				}
 			}
 		}
 	}
 	if recoveredCommentID != "" && recoveredCommentID != commentID {
-		c.Logger().Warnf("Recovered reply comment_id from morphed hidden fields: %q -> %q", commentID, recoveredCommentID)
+		c.Logger().
+			Warnf("Recovered reply comment_id from morphed hidden fields: %q -> %q", commentID, recoveredCommentID)
 		commentID = recoveredCommentID
 	}
 	if recoveredFilePath != "" && recoveredFilePath != filePath {
-		c.Logger().Warnf("Recovered reply doc_path from morphed hidden fields: %q -> %q", filePath, recoveredFilePath)
+		c.Logger().
+			Warnf("Recovered reply doc_path from morphed hidden fields: %q -> %q", filePath, recoveredFilePath)
 		filePath = recoveredFilePath
 	}
 	return commentID, filePath
@@ -499,13 +563,16 @@ func (s *Service) HandleReplyForm(c echo.Context) error {
 	}
 
 	// Patch the section target via SSE
-	return s.renderReplySectionTarget(c, filePath, userEmail, parentComment)
+	return s.renderReplySectionTarget(
+		c, filePath, userEmail, parentComment, c.FormValue("workbench_v2") == "1",
+	)
 }
 
 func (s *Service) renderReplySectionTarget(
 	c echo.Context,
 	filePath, userEmail string,
 	parentComment db.WorkspaceDocComment,
+	workbenchV2 bool,
 ) error {
 	sse := datastar.NewSSE(c.Response().Writer, c.Request())
 
@@ -523,7 +590,14 @@ func (s *Service) renderReplySectionTarget(
 	// Filter to just this section's comments
 	sectionComments := filterCommentsBySection(response.Comments, sectionID)
 
-	target := s.thoughtsCommentTarget(filePath, sectionID, "", userEmail, sectionComments)
+	target := s.thoughtsCommentTarget(
+		filePath,
+		sectionID,
+		"",
+		userEmail,
+		sectionComments,
+		thoughtsCommentTargetOptions{WorkbenchV2: workbenchV2},
+	)
 	if err := patchThoughtsCommentTarget(sse, target); err != nil {
 		return err
 	}
@@ -534,6 +608,7 @@ func (s *Service) renderReplySectionTarget(
 		sectionID,
 		parentComment.HeadingHint.String,
 		response.Comments,
+		workbenchV2,
 	); err != nil {
 		return err
 	}
@@ -542,7 +617,7 @@ func (s *Service) renderReplySectionTarget(
 	}); err != nil {
 		return err
 	}
-	return patchOpenCommentsSignal(sse)
+	return patchOpenCommentsSignal(sse, workbenchV2)
 }
 
 // HandleResolveComment handles marking a comment as resolved
@@ -599,8 +674,16 @@ func (s *Service) HandleResolveComment(c echo.Context) error {
 
 	// Use SSE to patch the specific section target
 	sse := datastar.NewSSE(c.Response().Writer, c.Request())
+	workbenchV2 := c.FormValue("workbench_v2") == "1"
 
-	target := s.thoughtsCommentTarget(filePath, sectionID, "", userEmail, sectionComments)
+	target := s.thoughtsCommentTarget(
+		filePath,
+		sectionID,
+		"",
+		userEmail,
+		sectionComments,
+		thoughtsCommentTargetOptions{WorkbenchV2: workbenchV2},
+	)
 	if err := patchThoughtsCommentTarget(sse, target); err != nil {
 		return err
 	}
@@ -611,10 +694,11 @@ func (s *Service) HandleResolveComment(c echo.Context) error {
 		sectionID,
 		comment.HeadingHint.String,
 		response.Comments,
+		workbenchV2,
 	); err != nil {
 		return err
 	}
-	return patchOpenCommentsSignal(sse)
+	return patchOpenCommentsSignal(sse, workbenchV2)
 }
 
 // HandleExpandSectionComments handles expanding section comments on mobile
@@ -642,10 +726,14 @@ func (s *Service) HandleExpandSectionComments(c echo.Context) error {
 		sectionID,
 		headingHint,
 		response.Comments,
+		c.FormValue("workbench_v2") == "1",
 	); err != nil {
 		return err
 	}
-	if err := patchOpenCommentsSignal(sse); err != nil {
+	if err := patchOpenCommentsSignal(
+		sse,
+		c.FormValue("workbench_v2") == "1",
+	); err != nil {
 		return err
 	}
 
@@ -684,7 +772,11 @@ func (s *Service) HandleShowCommentForm(c echo.Context) error {
 		data.HeadingHint,
 		userEmail,
 		sectionComments,
-		thoughtsCommentTargetOptions{Chrome: data.TargetChrome, SelectionPrefix: data.SelectionPrefix},
+		thoughtsCommentTargetOptions{
+			Chrome:          data.TargetChrome,
+			SelectionPrefix: data.SelectionPrefix,
+			WorkbenchV2:     data.WorkbenchV2,
+		},
 	)
 	if err := patchThoughtsCommentTargetWithForm(sse, target, data, ""); err != nil {
 		c.Logger().Errorf("Failed to patch shared comment target: %v", err)
@@ -697,10 +789,11 @@ func (s *Service) HandleShowCommentForm(c echo.Context) error {
 		data.SectionID,
 		data.HeadingHint,
 		response.Comments,
+		data.WorkbenchV2,
 	); err != nil {
 		return err
 	}
-	if err := patchOpenCommentsSignal(sse); err != nil {
+	if err := patchOpenCommentsSignal(sse, data.WorkbenchV2); err != nil {
 		return err
 	}
 

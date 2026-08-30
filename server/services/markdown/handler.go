@@ -178,7 +178,12 @@ func (s *Service) ServeMarkdown(c echo.Context) error {
 	}
 	pageArgs.WorkspaceContext = workspaceCtx
 	pageArgs.CommentUI = s.buildCommentUI(pageArgs, userEmail, threads)
-	pageArgs.ViewerArgs.BodyComponent = commentComponentForMode(pageArgs.ViewerArgs.CommentMode, pageArgs.CommentUI, pageArgs.ViewerArgs.BodyComponent)
+	pageArgs.CommentUI.HiddenFields["workbench_v2"] = "1"
+	pageArgs.ViewerArgs.BodyComponent = commentComponentForMode(
+		pageArgs.ViewerArgs.CommentMode,
+		pageArgs.CommentUI,
+		pageArgs.ViewerArgs.BodyComponent,
+	)
 
 	// Always create SectionsWithComments if sections exist (even if comments failed to
 	// load)
@@ -409,15 +414,18 @@ func (s *Service) buildThoughtsWorkbenchState(
 		},
 		RightRail: workbench.RightRailArgs{
 			ActiveTab: rightTab,
-			ChatHref: pageArgs.WorkbenchLinkState.WithContext(thoughtsContextModeChat).Preserve(
-				ThoughtsDocURL(pageArgs.FilePath, ""),
-			),
-			CommentsHref: pageArgs.WorkbenchLinkState.WithContext(thoughtsContextModeComments).Preserve(
-				ThoughtsDocURL(pageArgs.FilePath, ""),
-			),
-			ThreadsHref: pageArgs.WorkbenchLinkState.WithContext(thoughtsContextModeThreads).Preserve(
-				ThoughtsDocURL(pageArgs.FilePath, ""),
-			),
+			ChatHref: pageArgs.WorkbenchLinkState.WithContext(thoughtsContextModeChat).
+				Preserve(
+					ThoughtsDocURL(pageArgs.FilePath, ""),
+				),
+			CommentsHref: pageArgs.WorkbenchLinkState.WithContext(thoughtsContextModeComments).
+				Preserve(
+					ThoughtsDocURL(pageArgs.FilePath, ""),
+				),
+			ThreadsHref: pageArgs.WorkbenchLinkState.WithContext(thoughtsContextModeThreads).
+				Preserve(
+					ThoughtsDocURL(pageArgs.FilePath, ""),
+				),
 			Chat: ThoughtsContextPanel(ThoughtsContextArgs{
 				Mode:      thoughtsContextModeChat,
 				PageArgs:  pageArgs,
@@ -731,15 +739,18 @@ func (s *Service) buildThoughtsDirectoryWorkbenchState(
 		},
 		RightRail: workbench.RightRailArgs{
 			ActiveTab: rightTab,
-			ChatHref: args.WorkbenchLinkState.WithContext(thoughtsContextModeChat).Preserve(
-				ThoughtsDirURL(args.Path),
-			),
-			CommentsHref: args.WorkbenchLinkState.WithContext(thoughtsContextModeComments).Preserve(
-				ThoughtsDirURL(args.Path),
-			),
-			ThreadsHref: args.WorkbenchLinkState.WithContext(thoughtsContextModeThreads).Preserve(
-				ThoughtsDirURL(args.Path),
-			),
+			ChatHref: args.WorkbenchLinkState.WithContext(thoughtsContextModeChat).
+				Preserve(
+					ThoughtsDirURL(args.Path),
+				),
+			CommentsHref: args.WorkbenchLinkState.WithContext(thoughtsContextModeComments).
+				Preserve(
+					ThoughtsDirURL(args.Path),
+				),
+			ThreadsHref: args.WorkbenchLinkState.WithContext(thoughtsContextModeThreads).
+				Preserve(
+					ThoughtsDirURL(args.Path),
+				),
 			Chat: ThoughtsContextPanel(ThoughtsContextArgs{
 				Mode:      thoughtsContextModeChat,
 				Component: chatComponent,
@@ -792,6 +803,29 @@ func (s *Service) HandleSelectComment(c echo.Context) error {
 	comment, err := s.commentService.GetDocumentComment(c.Request().Context(), commentID)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusNotFound, "comment not found")
+	}
+	if c.FormValue("workbench_v2") == "1" {
+		sectionID := comment.SectionHint.String
+		if !comment.SectionHint.Valid || sectionID == "" {
+			sectionID = "document"
+		}
+		targetID := commentui.TargetID(
+			commentui.SafeCommentTargetSlug("thoughts", comment.DocPath),
+			sectionID,
+		)
+		sse := datastar.NewSSE(c.Response().Writer, c.Request())
+		if err := sse.MarshalAndPatchSignals(map[string]any{
+			"workbench": map[string]any{"regions": map[string]any{
+				"workbenchV2Comments": map[string]any{"visible": true},
+			}},
+		}); err != nil {
+			return err
+		}
+		return sse.ExecuteScript(
+			"document.getElementById(" + strconv.Quote(
+				targetID,
+			) + ")?.scrollIntoView({block: 'center'});",
+		)
 	}
 	return s.selectDocumentAndPatch(c, DocumentSelection{
 		DocPath:      comment.DocPath,
@@ -869,7 +903,11 @@ func (s *Service) selectDocumentAndPatch(
 		threads = thoughtsCommentThreads(commentsResp.Comments)
 	}
 	pageArgs.CommentUI = s.buildCommentUI(pageArgs, userEmail, threads)
-	pageArgs.ViewerArgs.BodyComponent = commentComponentForMode(pageArgs.ViewerArgs.CommentMode, pageArgs.CommentUI, pageArgs.ViewerArgs.BodyComponent)
+	pageArgs.ViewerArgs.BodyComponent = commentComponentForMode(
+		pageArgs.ViewerArgs.CommentMode,
+		pageArgs.CommentUI,
+		pageArgs.ViewerArgs.BodyComponent,
+	)
 	sse := datastar.NewSSE(c.Response().Writer, c.Request())
 	workbenchState, err := s.buildThoughtsWorkbenchState(c, pageArgs)
 	if err != nil {

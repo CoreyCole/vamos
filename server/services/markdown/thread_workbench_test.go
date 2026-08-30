@@ -130,7 +130,8 @@ func TestServeThreadDisplaysExplicitCrossPlanArtifactsWithoutChangingThread(
 			svc.WithWorkbenchThreadRenderer(renderer)
 			rec := httptest.NewRecorder()
 			c := echo.New().NewContext(
-				httptest.NewRequest("GET", "/threads/thread-alpha?artifact="+tc.doc, nil), rec,
+				httptest.NewRequest("GET", "/threads/thread-alpha?artifact="+tc.doc, nil),
+				rec,
 			)
 			c.SetParamNames("threadID")
 			c.SetParamValues("thread-alpha")
@@ -152,11 +153,28 @@ func TestServeThreadDisplaysExplicitCrossPlanArtifactsWithoutChangingThread(
 					rec.Body.String(),
 				)
 			}
-			if strings.Contains(rec.Body.String(), "Alpha") {
+			html := rec.Body.String()
+			if strings.Contains(html, "Alpha") {
 				t.Fatalf(
 					"default plan artifact replaced cross-plan artifact: %s",
-					rec.Body.String(),
+					html,
 				)
+			}
+			if tc.name == "file" {
+				for _, want := range []string{
+					`comment-target-`,
+					`name="workbench_v2" value="1"`,
+					`name="doc_path" value="thoughts/other/plans/beta/review.md"`,
+				} {
+					if !strings.Contains(html, want) {
+						t.Fatalf("missing wrapped comment UI %q in %s", want, html)
+					}
+				}
+				for _, unwanted := range []string{"rightRailActiveTab", "docWorkbenchRight", "doc-right-comments-panel"} {
+					if strings.Contains(html, unwanted) {
+						t.Fatalf("render retained legacy chrome %q in %s", unwanted, html)
+					}
+				}
 			}
 		})
 	}

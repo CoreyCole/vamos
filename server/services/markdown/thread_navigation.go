@@ -6,6 +6,8 @@ import (
 
 	"github.com/a-h/templ"
 	"github.com/labstack/echo/v4"
+
+	"github.com/CoreyCole/vamos/server/services/commentui"
 )
 
 type ThreadArtifactEntry struct {
@@ -39,11 +41,17 @@ func (s *Service) threadArtifactBrowser(
 	); err != nil {
 		return ThreadArtifactBrowserArgs{}, errors.New("thread artifact is unavailable")
 	}
-	docPath, err := CanonicalThoughtsDocPath(docPath)
-	if err != nil {
-		return ThreadArtifactBrowserArgs{}, err
+	if docPath != "" {
+		var err error
+		docPath, err = CanonicalThoughtsDocPath(docPath)
+		if err != nil {
+			return ThreadArtifactBrowserArgs{}, err
+		}
 	}
 	dir := path.Dir(docPath)
+	if docPath == "" {
+		dir = ""
+	}
 	listing, err := s.GetDirectoryListing(dir)
 	if err != nil {
 		return ThreadArtifactBrowserArgs{}, err
@@ -68,24 +76,57 @@ func (s *Service) threadArtifactPane(
 	c echo.Context,
 	threadID, rawDoc string,
 ) (templ.Component, error) {
-	doc, err := s.ResolveThreadArtifact(c.Request().Context(), threadID, rawDoc)
+	artifact, _, err := s.threadArtifactAndComments(c, threadID, rawDoc)
+	return artifact, err
+}
+
+func (s *Service) threadArtifactAndComments(
+	c echo.Context,
+	threadID, rawDoc string,
+) (templ.Component, templ.Component, error) {
+	hasArtifact := c.Request().URL.Query().Has("artifact")
+	doc, explicit, err := s.resolveThreadArtifact(
+		c.Request().Context(), threadID, rawDoc, hasArtifact,
+	)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	browser, err := s.threadArtifactBrowser(c, threadID, doc)
 	if err != nil {
-		return WorkbenchUnavailable("The thread artifact is unavailable."), nil
+		return WorkbenchUnavailable(
+				"The thread artifact is unavailable.",
+			), WorkbenchUnavailable(
+				"Comments are unavailable for this artifact.",
+			), nil
 	}
-	if directory, err := s.GetDirectoryListing(doc); err == nil {
-		return ThreadArtifactPane(browser, DirectoryPrimaryPanel(directory)), nil
+	content, page, directory := s.artifactContent(c, doc, explicit || !hasArtifact)
+	if directory {
+		return ThreadArtifactPane(browser, content),
+			WorkbenchUnavailable("Comments are unavailable for directories."), nil
 	}
-	page, err := s.RenderThoughtsDocument(c.Request().Context(), doc)
-	if err != nil {
-		return ThreadArtifactPane(
-			browser,
-			WorkbenchUnavailable("The thread artifact is unavailable."),
+	if page == nil {
+		return ThreadArtifactPane(browser, content),
+			WorkbenchUnavailable("Comments are unavailable for this artifact."), nil
+	}
+	userEmail, _ := c.Get("user_email").(string)
+	threads := []commentui.CommentThreadView{}
+	if response, err := s.commentService.GetCommentsForScopeInternal(
+		c.Request().Context(),
+		doc,
+	); err == nil {
+		page.Comments = response
+		threads = thoughtsCommentThreads(response.Comments)
+	}
+	page.CommentUI = s.buildCommentUI(page, userEmail, threads)
+	page.CommentUI.HiddenFields["workbench_v2"] = "1"
+	page.ViewerArgs.BodyComponent = commentComponentForMode(
+		page.ViewerArgs.CommentMode,
+		page.CommentUI,
+		page.ViewerArgs.BodyComponent,
+	)
+	content = DocumentPanel(BuildDocumentPanelArgs(page))
+	return ThreadArtifactPane(browser, content),
+		commentui.CommentsContextPanel(
+			commentui.BuildCommentsPanelArgs(page.CommentUI, ""),
 		), nil
-	}
-	page.UserEmail, _ = c.Get("user_email").(string)
-	return ThreadArtifactPane(browser, DocumentPanel(BuildDocumentPanelArgs(page))), nil
 }

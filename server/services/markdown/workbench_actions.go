@@ -34,6 +34,7 @@ func DocumentCommentAction(pageArgs *PageArgs) workbench.OverflowAction {
 		"heading_hint":          heading,
 		"comment_target_chrome": string(commentui.CommentTargetChromePatchOnly),
 		"selected_text":         "",
+		"workbench_v2":          "1",
 	}
 	if pageArgs != nil {
 		fields["doc_path"] = pageArgs.FilePath

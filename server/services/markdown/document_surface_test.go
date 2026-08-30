@@ -16,6 +16,7 @@ func TestBuildThoughtsDocumentCarriesDocumentModel(t *testing.T) {
 		PageSessionID:   "page-1",
 		TableOfContents: []TocItem{{ID: "overview", Text: "Overview", Level: 1}},
 		ViewerArgs: ViewerArgs{
+			CommentMode: CommentModeSections,
 			Frontmatter: &Frontmatter{Topic: "Shared Workbench"},
 			RawMarkdown: "# Overview",
 			Sections:    []Section{{ID: "section-1", Title: "Overview"}},
@@ -41,14 +42,27 @@ func TestBuildThoughtsDocumentCarriesDocumentModel(t *testing.T) {
 	if doc.Kind != DocumentKindMarkdown {
 		t.Fatalf("doc.Kind=%q", doc.Kind)
 	}
-	if doc.Component == nil {
-		t.Fatal("doc.Component nil")
+	if doc.Component == nil || doc.WorkbenchActions == nil {
+		t.Fatal("document surface is missing its component or V2 actions")
 	}
 	if len(doc.Actions) != 0 {
 		t.Fatalf("Thoughts document actions = %#v, want none", doc.Actions)
 	}
 	if doc.CommentUI.DocPath != args.FilePath || doc.PageSessionID != "page-1" {
 		t.Fatalf("document did not carry comment UI/session: %+v", doc)
+	}
+	var rendered bytes.Buffer
+	if err := DocumentSurface(doc, nil).Render(t.Context(), &rendered); err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{
+		`data-testid="workbench-overflow-actions"`,
+		`name="doc_path" value="thoughts/example/design.md"`,
+		`name="workbench_v2" value="1"`,
+	} {
+		if !strings.Contains(rendered.String(), want) {
+			t.Fatalf("V2 document surface missing %q: %s", want, rendered.String())
+		}
 	}
 }
 
@@ -91,6 +105,7 @@ func TestBuildDocumentWorkbenchActionsRendersWholeDocumentComment(t *testing.T) 
 		`name="section_hint" value="document"`,
 		`name="heading_hint" value="Design Doc"`,
 		`name="comment_target_chrome" value="patch-only"`,
+		`name="workbench_v2" value="1"`,
 	} {
 		if !strings.Contains(html, want) {
 			t.Fatalf("document workbench actions missing %q: %s", want, html)
@@ -111,10 +126,14 @@ func TestDocumentSurfaceRendersHTMLAppletEdgeToEdge(t *testing.T) {
 		t.Fatal(err)
 	}
 	html := buf.String()
-	if !strings.Contains(html, `id="thoughts-markdown-scroll-region" class="min-h-0 flex-1 overflow-hidden"`) {
+	if !strings.Contains(
+		html,
+		`id="thoughts-markdown-scroll-region" class="min-h-0 flex-1 overflow-hidden"`,
+	) {
 		t.Fatalf("HTML document surface is not edge-to-edge: %s", html)
 	}
-	if strings.Contains(html, `p-4 md:p-10`) || strings.Contains(html, `overflow-y-auto`) {
+	if strings.Contains(html, `p-4 md:p-10`) ||
+		strings.Contains(html, `overflow-y-auto`) {
 		t.Fatalf("HTML document surface kept padded scroll wrapper: %s", html)
 	}
 }
@@ -132,7 +151,10 @@ func TestDocumentSurfaceRendersSourceEdgeToEdge(t *testing.T) {
 		t.Fatal(err)
 	}
 	html := buf.String()
-	if !strings.Contains(html, `id="thoughts-markdown-scroll-region" class="min-h-0 flex-1 overflow-auto bg-muted/20"`) {
+	if !strings.Contains(
+		html,
+		`id="thoughts-markdown-scroll-region" class="min-h-0 flex-1 overflow-auto bg-muted/20"`,
+	) {
 		t.Fatalf("Source document surface is not edge-to-edge and scrollable: %s", html)
 	}
 	if strings.Contains(html, `p-4 md:p-10`) {
@@ -228,7 +250,11 @@ func TestDocumentSurfaceRendersSourceSelectionOnlyWithoutCommentTarget(t *testin
 		`aria-label="Section actions"`,
 	} {
 		if strings.Contains(html, unwanted) {
-			t.Fatalf("Source document selection-only chrome should not include %q: %s", unwanted, html)
+			t.Fatalf(
+				"Source document selection-only chrome should not include %q: %s",
+				unwanted,
+				html,
+			)
 		}
 	}
 }

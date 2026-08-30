@@ -186,6 +186,66 @@ func TestThoughtsCommentShowFormPatchesMountedTargets(t *testing.T) {
 	}
 }
 
+func TestWorkbenchV2CommentShowPatchesOnlyCommentsPaneSignal(t *testing.T) {
+	t.Parallel()
+	svc := newTestCommentsService(t)
+	form := url.Values{
+		"doc_path":      {"thoughts/plan.md"},
+		"section_hint":  {"section-1"},
+		"heading_hint":  {"Plan"},
+		"selected_text": {"Selected paragraph"},
+		"workbench_v2":  {"1"},
+	}
+	c, rec := newCommentFormRequest(t, "/forms/comments/show", form)
+
+	if err := svc.HandleShowCommentForm(c); err != nil {
+		t.Fatalf("HandleShowCommentForm() error = %v", err)
+	}
+	body := rec.Body.String()
+	for _, want := range []string{
+		`comment-target-`,
+		commentui.CommentsContextPanelID,
+		`workbenchV2Comments`,
+		`visible`,
+	} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("response missing %q: %s", want, body)
+		}
+	}
+	for _, unwanted := range []string{"rightRailActiveTab", "docWorkbenchRight", "workbench-root", "workbench-v2-chat-body"} {
+		if strings.Contains(body, unwanted) {
+			t.Fatalf("response contains %q: %s", unwanted, body)
+		}
+	}
+}
+
+func TestWorkbenchV2CommentCreatePatchesOnlyCommentsPaneSignal(t *testing.T) {
+	t.Parallel()
+	svc := newTestCommentsService(t)
+	form := url.Values{
+		"doc_path":     {"thoughts/plan.md"},
+		"section_hint": {"section-1"},
+		"heading_hint": {"Plan"},
+		"comment_text": {"Please clarify"},
+		"workbench_v2": {"1"},
+	}
+	c, rec := newCommentFormRequest(t, "/forms/comments", form)
+	if err := svc.HandleCommentForm(c); err != nil {
+		t.Fatalf("HandleCommentForm() error = %v", err)
+	}
+	body := rec.Body.String()
+	for _, want := range []string{"Please clarify", "comment-target-", commentui.CommentsContextPanelID, "workbenchV2Comments", "/thoughts/actions/select-comment"} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("response missing %q: %s", want, body)
+		}
+	}
+	for _, unwanted := range []string{"rightRailActiveTab", "docWorkbenchRight", "doc-right-comments-panel", "workbench-root"} {
+		if strings.Contains(body, unwanted) {
+			t.Fatalf("response contains %q: %s", unwanted, body)
+		}
+	}
+}
+
 func TestThoughtsCommentCreatePatchesInlineTarget(t *testing.T) {
 	t.Parallel()
 	svc := newTestCommentsService(t)
@@ -222,7 +282,9 @@ func TestThoughtsCommentExpandOpensRightRail(t *testing.T) {
 	markdownBase := t.TempDir()
 	if err := os.WriteFile(
 		filepath.Join(markdownBase, "plan.md"),
-		[]byte("# Overview\n\nIntro text.\n\n## Implementation Notes\n\nBody.\n\n## Risks\n\nRisk body."),
+		[]byte(
+			"# Overview\n\nIntro text.\n\n## Implementation Notes\n\nBody.\n\n## Risks\n\nRisk body.",
+		),
 		0o644,
 	); err != nil {
 		t.Fatalf("write markdown fixture: %v", err)
@@ -380,5 +442,55 @@ func TestThoughtsCommentResolvePatchesInlineTarget(t *testing.T) {
 		if !strings.Contains(body, want) {
 			t.Fatalf("response missing %q: %s", want, body)
 		}
+	}
+}
+
+func assertWorkbenchV2CommentResponse(t *testing.T, body string, preservesTarget bool) {
+	t.Helper()
+	for _, want := range []string{commentui.CommentsContextPanelID, "workbenchV2Comments", "visible", "/thoughts/actions/select-comment"} {
+		if !strings.Contains(body, want) { t.Fatalf("response missing %q: %s", want, body) }
+	}
+	if preservesTarget && !strings.Contains(body, `name="workbench_v2" value="1"`) {
+		t.Fatalf("regenerated target lost workbench_v2 marker: %s", body)
+	}
+	for _, unwanted := range []string{"rightRailActiveTab", "docWorkbenchRight", "doc-right-comments-panel", "workbench-root", "workbench-v2-chat-body"} {
+		if strings.Contains(body, unwanted) { t.Fatalf("response contains legacy or broad target %q: %s", unwanted, body) }
+	}
+}
+
+func TestWorkbenchV2CommentCancelPreservesV2Target(t *testing.T) {
+	svc := newTestCommentsService(t)
+	if _, err := svc.createCommentInternal(t.Context(), "user@example.com", CreateCommentRequest{FilePath: "thoughts/plan.md", CommentText: "Question", SectionID: "document"}); err != nil { t.Fatal(err) }
+	form := url.Values{"doc_path":{"thoughts/plan.md"}, "section_hint":{"document"}, "workbench_v2":{"1"}}
+	c, rec := newCommentFormRequest(t, "/forms/comments/cancel", form)
+	if err := svc.HandleCancelCommentForm(c); err != nil { t.Fatal(err) }
+	assertWorkbenchV2CommentResponse(t, rec.Body.String(), true)
+}
+
+func TestWorkbenchV2CommentExpandUsesV2Signal(t *testing.T) {
+	svc := newTestCommentsService(t)
+	if _, err := svc.createCommentInternal(t.Context(), "user@example.com", CreateCommentRequest{FilePath: "thoughts/plan.md", CommentText: "Question", SectionID: "document"}); err != nil { t.Fatal(err) }
+	form := url.Values{"doc_path":{"thoughts/plan.md"}, "section_hint":{"document"}, "workbench_v2":{"1"}}
+	c, rec := newCommentFormRequest(t, "/forms/comments/expand", form)
+	if err := svc.HandleExpandSectionComments(c); err != nil { t.Fatal(err) }
+	assertWorkbenchV2CommentResponse(t, rec.Body.String(), false)
+}
+
+func TestWorkbenchV2CommentReplyAndResolvePreserveV2Target(t *testing.T) {
+	svc := newTestCommentsService(t)
+	comment, err := svc.createCommentInternal(t.Context(), "user@example.com", CreateCommentRequest{FilePath:"thoughts/plan.md", CommentText:"Question", SectionID:"document"})
+	if err != nil { t.Fatal(err) }
+	if _, err := svc.createCommentInternal(t.Context(), "user@example.com", CreateCommentRequest{FilePath:"thoughts/plan.md", CommentText:"Second", SectionID:"document"}); err != nil { t.Fatal(err) }
+	for _, tc := range []struct{name, path string; form url.Values}{
+		{"reply", "/forms/replies", url.Values{"doc_path":{"thoughts/plan.md"}, "comment_id":{comment.ID}, "reply_text":{"Reply"}, "workbench_v2":{"1"}}},
+		{"resolve", "/forms/resolve", url.Values{"doc_path":{"thoughts/plan.md"}, "comment_id":{comment.ID}, "workbench_v2":{"1"}}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			c, rec := newCommentFormRequest(t, tc.path, tc.form)
+			var err error
+			if tc.name == "reply" { err = svc.HandleReplyForm(c) } else { err = svc.HandleResolveComment(c) }
+			if err != nil { t.Fatal(err) }
+			assertWorkbenchV2CommentResponse(t, rec.Body.String(), true)
+		})
 	}
 }

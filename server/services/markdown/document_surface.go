@@ -15,20 +15,21 @@ import (
 // Agent Chat artifact viewers. Route packages own how they populate actions and
 // comment routes; the surface owns only document chrome and markdown rendering.
 type WorkbenchDocument struct {
-	Path          string
-	Title         string
-	Kind          DocumentKind
-	RawMarkdown   string
-	Frontmatter   *Frontmatter
-	Sections      []Section
-	TOC           []TocItem
-	CurrentPath   string
-	PageSessionID string
-	Component     templ.Component
-	CommentMode   CommentMode
-	CommentUI     commentui.CommentableMarkdownArgs
-	Actions       []DocumentAction
-	QRSPIMetadata QRSPIMetadata
+	Path             string
+	Title            string
+	Kind             DocumentKind
+	RawMarkdown      string
+	Frontmatter      *Frontmatter
+	Sections         []Section
+	TOC              []TocItem
+	CurrentPath      string
+	PageSessionID    string
+	Component        templ.Component
+	CommentMode      CommentMode
+	CommentUI        commentui.CommentableMarkdownArgs
+	Actions          []DocumentAction
+	WorkbenchActions templ.Component
+	QRSPIMetadata    QRSPIMetadata
 }
 
 func BuildThoughtsDocument(pageArgs *PageArgs) WorkbenchDocument {
@@ -49,20 +50,24 @@ func BuildThoughtsDocument(pageArgs *PageArgs) WorkbenchDocument {
 		}
 	}
 	return WorkbenchDocument{
-		Path:          pageArgs.FilePath,
-		Title:         DocumentTitle(pageArgs.FilePath, pageArgs.ViewerArgs.Frontmatter),
-		Kind:          kind,
-		RawMarkdown:   pageArgs.ViewerArgs.RawMarkdown,
-		Frontmatter:   pageArgs.ViewerArgs.Frontmatter,
-		Sections:      pageArgs.ViewerArgs.Sections,
-		TOC:           pageArgs.TableOfContents,
-		CurrentPath:   pageArgs.FilePath,
-		PageSessionID: pageArgs.PageSessionID,
-		Component:     component,
-		CommentMode:   pageArgs.ViewerArgs.CommentMode,
-		CommentUI:     pageArgs.CommentUI,
-		Actions:       nil,
-		QRSPIMetadata: pageArgs.QRSPIMetadata,
+		Path: pageArgs.FilePath,
+		Title: DocumentTitle(
+			pageArgs.FilePath,
+			pageArgs.ViewerArgs.Frontmatter,
+		),
+		Kind:             kind,
+		RawMarkdown:      pageArgs.ViewerArgs.RawMarkdown,
+		Frontmatter:      pageArgs.ViewerArgs.Frontmatter,
+		Sections:         pageArgs.ViewerArgs.Sections,
+		TOC:              pageArgs.TableOfContents,
+		CurrentPath:      pageArgs.FilePath,
+		PageSessionID:    pageArgs.PageSessionID,
+		Component:        component,
+		CommentMode:      pageArgs.ViewerArgs.CommentMode,
+		CommentUI:        pageArgs.CommentUI,
+		Actions:          nil,
+		WorkbenchActions: BuildDocumentWorkbenchActions(pageArgs),
+		QRSPIMetadata:    pageArgs.QRSPIMetadata,
 	}
 }
 

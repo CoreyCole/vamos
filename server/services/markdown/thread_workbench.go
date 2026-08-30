@@ -194,7 +194,11 @@ func (s *Service) ServeThread(c echo.Context) error {
 	if err != nil {
 		return err
 	}
-	artifact, err := s.threadArtifactPane(c, threadID, c.QueryParam("artifact"))
+	artifact, comments, err := s.threadArtifactAndComments(
+		c,
+		threadID,
+		c.QueryParam("artifact"),
+	)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 	}
@@ -206,7 +210,7 @@ func (s *Service) ServeThread(c echo.Context) error {
 		Threads:       threads,
 		Chat:          chat,
 		Artifact:      artifact,
-		Comments:      WorkbenchUnavailable("Comments are unavailable for this view."),
+		Comments:      comments,
 		ThreadsOpen:   true,
 		ChatOpen:      true,
 		ArtifactOpen:  true,

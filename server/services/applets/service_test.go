@@ -232,20 +232,33 @@ func TestThoughtsAppletPageRendersWorkbenchOverflowActions(t *testing.T) {
 
 	html := renderThoughtsAppletPage(t, service, token)
 	for _, want := range []string{
-		`data-testid="workbench-overflow-actions"`,
-		`>Comment</span>`,
-		`>Restart</span>`,
-		`>Stop</span>`,
-		`>Open in new tab</span>`,
-		`data-on:submit__prevent="el.closest(&#39;details&#39;)?.removeAttribute(&#39;open&#39;); @post(&#39;/forms/comments/show&#39;, {contentType: &#39;form&#39;})"`,
+		`data-workbench-page="threads"`,
+		`id="workbench-v2-artifact-body"`,
+		`id="workbench-v2-comments-body"`,
 		`name="doc_path" value="` + identity + `"`,
+		`name="workbench_v2" value="1"`,
 		`name="section_hint" value="document"`,
 		`name="comment_target_chrome" value="patch-only"`,
-		`method="post" action="/forms/applets/` + token + `/restart"`,
-		`method="post" action="/forms/applets/` + token + `/stop"`,
 	} {
 		if !strings.Contains(html, want) {
 			t.Fatalf("thoughts applet page missing %q:\n%s", want, html)
+		}
+	}
+	if strings.Count(html, `id="workbench-root"`) != 1 {
+		t.Fatalf("Thoughts applet rendered an unexpected workbench root count: %s", html)
+	}
+	for _, id := range []string{"workbench-v2-threads-body", "workbench-v2-chat-body", "workbench-v2-artifact-body", "workbench-v2-comments-body"} {
+		if strings.Count(html, `id="`+id+`"`) != 1 {
+			t.Fatalf(
+				"Thoughts applet rendered %q an unexpected number of times: %s",
+				id,
+				html,
+			)
+		}
+	}
+	for _, unwanted := range []string{"doc-workbench-", "doc-right-", "rightRailActiveTab"} {
+		if strings.Contains(html, unwanted) {
+			t.Fatalf("Thoughts applet retained legacy chrome %q: %s", unwanted, html)
 		}
 	}
 }
@@ -377,6 +390,43 @@ func TestHandleAppletStatusExecutesReloadWhenHealthy(t *testing.T) {
 	rec := callStatus(t, service)
 	if body := rec.Body.String(); !strings.Contains(body, "window.location.reload") {
 		t.Fatalf("status stream body = %s", body)
+	}
+}
+
+func TestThoughtsAppletHealthyStatusMorphsOnlyFrame(t *testing.T) {
+	thoughtsRoot := t.TempDir()
+	identity := writeThoughtsAppletManifest(t, thoughtsRoot, "plans/demo", "demo")
+	token := EncodeAppletIdentity(identity)
+	service := NewHTTPService(ServiceOptions{
+		Resolver: Resolver{ThoughtsRoot: thoughtsRoot},
+		Manager: &sequenceManager{states: []appletruntime.AppletProcessState{
+			{Status: appletruntime.ProcessStatusStarting},
+			{Status: appletruntime.ProcessStatusHealthy},
+		}},
+	})
+	e := echo.New()
+	req := httptest.NewRequest(
+		http.MethodGet,
+		"/thoughts/_render/app/"+token+"/status",
+		nil,
+	)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	c.SetParamNames("token")
+	c.SetParamValues(token)
+	if err := service.HandleAppletStatus(c); err != nil {
+		t.Fatal(err)
+	}
+	body := rec.Body.String()
+	for _, want := range []string{"selector #applet-frame-demo", `id="applet-frame-demo"`} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("status stream missing %q: %s", want, body)
+		}
+	}
+	for _, unwanted := range []string{"window.location.reload", "workbench-root", "doc-right-", "rightRailActiveTab"} {
+		if strings.Contains(body, unwanted) {
+			t.Fatalf("status stream contains %q: %s", unwanted, body)
+		}
 	}
 }
 
@@ -673,7 +723,7 @@ func TestHandleThoughtsAppletPageUsesDurableIdentity(t *testing.T) {
 		t.Fatalf("HandleAppletPage() error = %v", err)
 	}
 	html := rec.Body.String()
-	for _, want := range []string{identity, "/thoughts/_render/app/" + token + "/app/", "doc-workbench-sidebar", `"@vamos/datastar"`, "/js/workbench-resize.js"} {
+	for _, want := range []string{identity, "/thoughts/_render/app/" + token + "/app/", `data-workbench-page="threads"`, `id="workbench-v2-artifact-body"`, `id="workbench-v2-comments-body"`, `"@vamos/datastar"`, "/js/workbench-resize.js"} {
 		if !strings.Contains(html, want) {
 			t.Fatalf("page HTML missing %q:\n%s", want, html)
 		}
