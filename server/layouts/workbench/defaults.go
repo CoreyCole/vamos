@@ -25,7 +25,12 @@ func DefaultWorkbenchConfig(
 	if len(viewportClass) > 0 {
 		resolvedViewportClass = normalizeViewportClass(viewportClass[0])
 	}
-	cfg := WorkbenchConfig{Version: 1, Page: page, View: view, ViewportClass: resolvedViewportClass}
+	cfg := WorkbenchConfig{
+		Version:       1,
+		Page:          page,
+		View:          view,
+		ViewportClass: resolvedViewportClass,
+	}
 	switch page {
 	case WorkbenchPageAgentChat:
 		cfg.Regions = []RegionSpec{
@@ -77,6 +82,38 @@ func DefaultWorkbenchConfig(
 			},
 		}
 		cfg.Mobile.ActiveRegionID = "thoughts-document"
+	case WorkbenchPageThreads:
+		cfg.Regions = []RegionSpec{
+			{
+				ID:      "workbench-v2-threads",
+				Slot:    WorkbenchSlotNavigation,
+				Kind:    RegionPlanSidebar,
+				Ratio:   defaultSideRatio,
+				Visible: true,
+			},
+			{
+				ID:      "workbench-v2-chat",
+				Slot:    WorkbenchSlotContext,
+				Kind:    RegionChat,
+				Ratio:   defaultPrimaryRatio,
+				Visible: true,
+			},
+			{
+				ID:      "workbench-v2-artifact",
+				Slot:    WorkbenchSlotPrimary,
+				Kind:    RegionArtifact,
+				Ratio:   defaultPrimaryRatio,
+				Visible: true,
+			},
+			{
+				ID:      "workbench-v2-comments",
+				Slot:    WorkbenchSlotContext,
+				Kind:    RegionComments,
+				Ratio:   defaultSideRatio,
+				Visible: false,
+			},
+		}
+		cfg.Mobile.ActiveRegionID = "workbench-v2-artifact"
 	default:
 		return DefaultWorkbenchConfig(WorkbenchPageAgentChat, view, contextMode)
 	}
@@ -100,7 +137,8 @@ func MergeWorkbenchConfig(
 		saved.View != defaults.View {
 		return out
 	}
-	if saved.ViewportClass != "" && normalizeViewportClass(saved.ViewportClass) != viewportClass {
+	if saved.ViewportClass != "" &&
+		normalizeViewportClass(saved.ViewportClass) != viewportClass {
 		return out
 	}
 	byID := map[string]RegionSpec{}
@@ -110,12 +148,13 @@ func MergeWorkbenchConfig(
 	for i, region := range out.Regions {
 		if savedRegion, ok := byID[region.ID]; ok {
 			out.Regions[i].Ratio = clamp(savedRegion.Ratio, minSavedRatio, maxSavedRatio)
-			if viewportClass.IsDesktop() {
+			if viewportClass.IsDesktop() && defaults.Page != WorkbenchPageThreads {
 				out.Regions[i].Visible = savedRegion.Visible
 			}
 		}
 	}
-	if viewportClass == ViewportMobile && hasRegionID(out.Regions, saved.Mobile.ActiveRegionID) {
+	if defaults.Page != WorkbenchPageThreads && viewportClass == ViewportMobile &&
+		hasRegionID(out.Regions, saved.Mobile.ActiveRegionID) {
 		out.Mobile.ActiveRegionID = saved.Mobile.ActiveRegionID
 	}
 	migrateLegacyAgentChatSplitRatios(&out)
@@ -134,7 +173,7 @@ func StripDurableInteractionState(
 	viewportClass = normalizeViewportClass(viewportClass)
 	stripped := cloneWorkbenchConfig(config)
 	stripped.ViewportClass = viewportClass
-	if viewportClass == ViewportMobile {
+	if config.Page == WorkbenchPageThreads || viewportClass == ViewportMobile {
 		defaultByID := regionSpecMap(defaults)
 		for i, region := range stripped.Regions {
 			if defaultRegion, ok := defaultByID[region.ID]; ok {
@@ -144,7 +183,9 @@ func StripDurableInteractionState(
 			}
 		}
 	}
-	if !hasRegionID(stripped.Regions, stripped.Mobile.ActiveRegionID) {
+	if config.Page == WorkbenchPageThreads {
+		stripped.Mobile.ActiveRegionID = defaults.Mobile.ActiveRegionID
+	} else if !hasRegionID(stripped.Regions, stripped.Mobile.ActiveRegionID) {
 		if hasRegionID(stripped.Regions, defaults.Mobile.ActiveRegionID) {
 			stripped.Mobile.ActiveRegionID = defaults.Mobile.ActiveRegionID
 		} else {
@@ -360,6 +401,9 @@ func applyConfigToRegions(
 		}
 		if region.TargetID == "" {
 			region.TargetID = region.ID
+		}
+		if region.BodyID == "" {
+			region.BodyID = region.TargetID + "-body"
 		}
 		if region.MinRem <= 0 {
 			region.MinRem = defaultMinRem

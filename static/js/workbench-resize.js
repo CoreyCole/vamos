@@ -201,26 +201,32 @@ function activeRegionSignal(root) {
   return root.dataset.workbenchMobileActive || "";
 }
 
+function isWorkbenchV2(root) {
+  return root.dataset.workbenchPage === "threads";
+}
+
 function visibleRegionSpecs(root) {
+  const ratioOnly = isWorkbenchV2(root);
   return allRegions(root).map((region) => ({
     id: region.dataset.workbenchRegion,
     slot: region.dataset.workbenchSlot,
     kind: region.dataset.workbenchKind,
     ratio: Number(region.dataset.workbenchRatio || 0),
-    visible: isVisible(region),
+    visible: ratioOnly ? undefined : isVisible(region),
   }));
 }
 
 function currentConfig(root) {
   const viewportClass = currentViewportClass(root);
-  return {
+  const base = {
     version: 1,
     page: root.dataset.workbenchPage,
     view: root.dataset.workbenchView,
     viewportClass,
     regions: visibleRegionSpecs(root),
-    mobile: { activeRegionID: activeRegionID(root) },
   };
+  if (isWorkbenchV2(root)) return { ...base, mobile: {} };
+  return { ...base, mobile: { activeRegionID: activeRegionID(root) } };
 }
 
 function saveConfig(root) {

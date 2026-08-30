@@ -15,6 +15,7 @@ type WorkbenchPage string
 const (
 	WorkbenchPageAgentChat WorkbenchPage = "agent-chat"
 	WorkbenchPageThoughts  WorkbenchPage = "thoughts"
+	WorkbenchPageThreads   WorkbenchPage = "threads"
 )
 
 type WorkbenchView string
@@ -68,6 +69,7 @@ type WorkbenchRegion struct {
 	MinRem    float64
 	Visible   bool
 	TargetID  string
+	BodyID    string
 	Title     string
 	Component templ.Component
 }
@@ -201,7 +203,7 @@ func normalizeViewportClass(value ViewportClass) ViewportClass {
 
 func validPage(page WorkbenchPage) bool {
 	switch page {
-	case WorkbenchPageAgentChat, WorkbenchPageThoughts:
+	case WorkbenchPageAgentChat, WorkbenchPageThoughts, WorkbenchPageThreads:
 		return true
 	default:
 		return false

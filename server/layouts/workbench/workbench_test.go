@@ -1217,6 +1217,97 @@ func TestSharedSidebarFilesPanelUsesRouteOwnedFormActions(t *testing.T) {
 	}
 }
 
+func TestWorkbenchV2StateHasFourIndependentMorphableBodies(t *testing.T) {
+	t.Parallel()
+
+	state, err := BuildWorkbenchV2State(WorkbenchV2Args{
+		ThreadsOpen: true, ChatOpen: true, ArtifactOpen: true,
+	})
+	if err != nil {
+		t.Fatalf("BuildWorkbenchV2State() error = %v", err)
+	}
+	if len(state.Regions) != 4 {
+		t.Fatalf("regions = %#v, want four", state.Regions)
+	}
+	for index, want := range []string{
+		WorkbenchV2ThreadsRegionID, WorkbenchV2ChatRegionID,
+		WorkbenchV2ArtifactRegionID, WorkbenchV2CommentsRegionID,
+	} {
+		if state.Regions[index].ID != want ||
+			state.Regions[index].BodyID == state.Regions[index].ID {
+			t.Fatalf("region %d = %#v", index, state.Regions[index])
+		}
+	}
+	if state.Regions[3].Visible {
+		t.Fatal("comments should start closed")
+	}
+	var body bytes.Buffer
+	if err := Workbench(state).Render(t.Context(), &body); err != nil {
+		t.Fatalf("Workbench.Render() error = %v", err)
+	}
+	html := body.String()
+	for _, want := range []string{
+		`id="workbench-v2-threads-body"`, `id="workbench-v2-chat-body"`,
+		`id="workbench-v2-artifact-body"`, `id="workbench-v2-comments-body"`,
+	} {
+		if !strings.Contains(html, want) {
+			t.Fatalf("Workbench html = %s, want %q", html, want)
+		}
+	}
+	if strings.Contains(html, `data-ignore-morph`) {
+		t.Fatalf("Workbench html has ignored v2 region: %s", html)
+	}
+}
+
+func TestWorkbenchV2LiveBodiesAreUniqueAndMorphable(t *testing.T) {
+	state, err := BuildWorkbenchV2State(
+		WorkbenchV2Args{
+			Threads:      templ.Raw("threads"),
+			Chat:         templ.Raw("chat"),
+			Artifact:     templ.Raw("artifact"),
+			Comments:     templ.Raw("comments"),
+			ThreadsOpen:  true,
+			ChatOpen:     true,
+			ArtifactOpen: true,
+			CommentsOpen: true,
+		},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var body bytes.Buffer
+	if err := Workbench(state).Render(t.Context(), &body); err != nil {
+		t.Fatal(err)
+	}
+	html := body.String()
+	for _, id := range []string{"workbench-v2-threads-body", "workbench-v2-chat-body", "workbench-v2-artifact-body", "workbench-v2-comments-body"} {
+		if strings.Count(html, `id="`+id+`"`) != 1 {
+			t.Fatalf("%s count = %d", id, strings.Count(html, `id="`+id+`"`))
+		}
+	}
+	if strings.Contains(html, `data-ignore-morph`) {
+		t.Fatalf("v2 region body has ignored ancestor: %s", html)
+	}
+}
+
+func TestWorkbenchV2PreferencesKeepOnlyRatios(t *testing.T) {
+	t.Parallel()
+
+	defaults := DefaultWorkbenchConfig(WorkbenchPageThreads, WorkbenchViewSplit, "")
+	saved := cloneWorkbenchConfig(defaults)
+	saved.Regions[0].Ratio = 0.31
+	saved.Regions[0].Visible = false
+	saved.Mobile.ActiveRegionID = WorkbenchV2CommentsRegionID
+	merged := MergeWorkbenchConfig(defaults, &saved)
+	if got := regionSpecByID(merged, WorkbenchV2ThreadsRegionID).Ratio; got != 0.31 {
+		t.Fatalf("ratio = %v, want 0.31", got)
+	}
+	if !regionSpecByID(merged, WorkbenchV2ThreadsRegionID).Visible ||
+		merged.Mobile.ActiveRegionID != WorkbenchV2ArtifactRegionID {
+		t.Fatalf("v2 interaction state was restored: %#v", merged)
+	}
+}
+
 func TestSignalsReflectInitialVisibility(t *testing.T) {
 	t.Parallel()
 
