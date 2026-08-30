@@ -19,7 +19,7 @@ templ FreeformChatComposer(args ChatPageArgs) {
 
 templ AgentChatComposer(args AgentChatComposerArgs) {
 	{{ args = normalizeComposerArgs(args) }}
-	<form id="agent-chat-composer-form" data-on:submit={ composerSubmitAction(args.Action) } data-signals="{slashOpen: false, slashPrefix: ''}">
+	<form id="agent-chat-composer-form" data-on:submit__prevent={ composerSubmitAction(args.Action) } data-signals={ composerSignals(args.InitialDraft) }>
 		<input id="agent-chat-composer-prompt-value" type="hidden" name="prompt"/>
 		if args.IncludeCwd {
 			<input type="hidden" name="cwd" value={ args.Cwd }/>
@@ -58,7 +58,7 @@ templ AgentChatComposer(args AgentChatComposerArgs) {
 			<div id="agent-chat-slash-popover" class="absolute bottom-full left-0 z-30 mb-2 hidden max-h-64 w-full overflow-y-auto rounded-lg border border-border bg-popover p-2 shadow-lg" data-show="$slashOpen"></div>
 			<div class="flex items-start gap-2 rounded-2xl border border-input bg-background px-3 py-2">
 				@ComposerMetadataButton(args)
-				<textarea id="agent-chat-composer-input" class="min-h-[2.75rem] max-h-40 flex-1 resize-none bg-transparent px-0 py-1 text-sm text-foreground outline-none placeholder:text-muted-foreground" placeholder={ args.Placeholder } data-ignore-morph data-on:input={ slashCommandInputHandler(args.WorkspaceID, args.ThreadID, args.SlashEndpointBase) } data-on:keydown="if (evt.key === 'Enter' && !evt.shiftKey) { evt.preventDefault(); el.form.requestSubmit() }"></textarea>
+				<textarea id="agent-chat-composer-input" class="min-h-[2.75rem] max-h-40 flex-1 resize-none bg-transparent px-0 py-1 text-sm text-foreground outline-none placeholder:text-muted-foreground" placeholder={ args.Placeholder } data-bind="chatDraft" data-ignore-morph data-on:input__debounce.500ms={ args.DraftSaveAction } data-on:input={ slashCommandInputHandler(args.WorkspaceID, args.ThreadID, args.SlashEndpointBase) } data-on:keydown="if (evt.key === 'Enter' && !evt.shiftKey) { evt.preventDefault(); el.form.requestSubmit() }"></textarea>
 				<button type="submit" class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground transition-colors hover:bg-primary/90" aria-label="Send message" title="Send message">
 					<svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 11.5L21 3l-8.5 18-2.5-7.5L3 11.5z"></path>
@@ -195,8 +195,12 @@ func normalizeComposerArgs(args AgentChatComposerArgs) AgentChatComposerArgs {
 	return args
 }
 
+func composerSignals(initialDraft string) string {
+	return "{chatDraft: " + strconv.Quote(initialDraft) + ", slashOpen: false, slashPrefix: ''}"
+}
+
 func composerSubmitAction(action string) string {
-	return "const input = document.getElementById('agent-chat-composer-input'); const prompt = document.getElementById('agent-chat-composer-prompt-value'); if (input && prompt) { prompt.value = input.value; input.dataset.clearedPrompt = input.value; input.value = ''; input.dispatchEvent(new Event('input', { bubbles: true })); input.focus({ preventScroll: true }); } " + action
+	return "const input = document.getElementById('agent-chat-composer-input'); const prompt = document.getElementById('agent-chat-composer-prompt-value'); if (input && prompt) { prompt.value = input.value; } " + action
 }
 
 func threadNewTargetAction(threadID string, target ThreadNewTargetView) string {

@@ -20,6 +20,7 @@ type Querier interface {
 	BackfillAgentRunsWorkspaceForThread(ctx context.Context, arg BackfillAgentRunsWorkspaceForThreadParams) error
 	BackfillAgentSessionsWorkspaceForThread(ctx context.Context, arg BackfillAgentSessionsWorkspaceForThreadParams) error
 	ClaimNextPendingReleaseQueueItem(ctx context.Context) (ReleaseQueueItem, error)
+	ClearAgentThreadDraft(ctx context.Context, arg ClearAgentThreadDraftParams) error
 	ClearInvalidImplWorkspacePlanRefs(ctx context.Context) (int64, error)
 	CompleteAgentRun(ctx context.Context, arg CompleteAgentRunParams) error
 	CountUnresolvedWorkspaceComments(ctx context.Context, workspaceRoot string) (int64, error)
@@ -62,6 +63,7 @@ type Querier interface {
 	GetAgentSession(ctx context.Context, id string) (AgentSession, error)
 	GetAgentSessionByPath(ctx context.Context, artifactPath sql.NullString) (AgentSession, error)
 	GetAgentThread(ctx context.Context, id string) (AgentThread, error)
+	GetAgentThreadDraft(ctx context.Context, arg GetAgentThreadDraftParams) (string, error)
 	GetAgentThreadForUser(ctx context.Context, arg GetAgentThreadForUserParams) (AgentThread, error)
 	GetAgentThreadForWorkspaceUser(ctx context.Context, arg GetAgentThreadForWorkspaceUserParams) (AgentThread, error)
 	GetChatCommandByIdempotencyKey(ctx context.Context, arg GetChatCommandByIdempotencyKeyParams) (ChatSessionCommand, error)
@@ -213,6 +215,7 @@ type Querier interface {
 	UpdateWorkspaceSelectedThread(ctx context.Context, arg UpdateWorkspaceSelectedThreadParams) error
 	UpdateWorkspaceWorkflowState(ctx context.Context, arg UpdateWorkspaceWorkflowStateParams) error
 	UpsertAgentSessionIndex(ctx context.Context, arg UpsertAgentSessionIndexParams) (AgentSession, error)
+	UpsertAgentThreadDraft(ctx context.Context, arg UpsertAgentThreadDraftParams) error
 	UpsertChatSessionProjection(ctx context.Context, arg UpsertChatSessionProjectionParams) (ChatSessionProjection, error)
 	UpsertDiscoveredImplWorkspace(ctx context.Context, arg UpsertDiscoveredImplWorkspaceParams) (ImplWorkspace, error)
 	UpsertDiscoveredPlanWorkspace(ctx context.Context, arg UpsertDiscoveredPlanWorkspaceParams) (PlanWorkspace, error)

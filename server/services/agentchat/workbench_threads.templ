@@ -27,7 +27,7 @@ templ SharedThreadChat(args EmbeddedFreeformPanelArgs) {
 			@MessagesPane(args.ThreadID, args.Transcript, args.HasThread, freeformForkAction(args.ThreadID))
 		</div>
 		<div class="shrink-0 border-t border-border bg-background p-3">
-			@AgentChatComposer(AgentChatComposerArgs{Action: args.ComposerAction, ThreadID: args.ThreadID, RunID: args.RunID, Cwd: args.Cwd, ModeLabel: embeddedFreeformModeLabel(args.ThreadMetadata), Placeholder: workspacePromptPlaceholder(args.HasThread), HasThread: args.HasThread, IncludeCwd: !args.HasThread, ThreadMetadata: args.ThreadMetadata})
+			@AgentChatComposer(AgentChatComposerArgs{Action: args.ComposerAction, ThreadID: args.ThreadID, RunID: args.RunID, Cwd: args.Cwd, ModeLabel: embeddedFreeformModeLabel(args.ThreadMetadata), Placeholder: workspacePromptPlaceholder(args.HasThread), HasThread: args.HasThread, IncludeCwd: !args.HasThread, ThreadMetadata: args.ThreadMetadata, InitialDraft: args.InitialDraft, DraftSaveAction: args.DraftSaveAction})
 		</div>
 	</div>
 }

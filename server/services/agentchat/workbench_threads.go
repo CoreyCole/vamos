@@ -94,6 +94,10 @@ func (s *Service) RenderSharedThreadChat(
 	if err != nil {
 		return nil, err
 	}
+	draft, err := s.GetThreadDraft(ctx, userEmail, thread.ID)
+	if err != nil {
+		return nil, err
+	}
 	live, cursor := s.buildLiveTranscript(thread.ID)
 	args := EmbeddedFreeformPanelArgs{
 		ThreadID:  thread.ID,
@@ -109,9 +113,20 @@ func (s *Service) RenderSharedThreadChat(
 			thread.ID,
 			"resume",
 		) + "', {contentType: 'form'})",
-		StreamURL: thoughtsThreadChatAction(thread.ID, "stream") + "?since=0",
+		StreamURL:    thoughtsThreadChatAction(thread.ID, "stream") + "?since=0",
+		InitialDraft: draft,
+		DraftSaveAction: "@post('/agent-chat/thread/" + url.PathEscape(
+			thread.ID,
+		) + "/draft', {filterSignals: {include: /^chatDraft$/}})",
 	}
-	_ = userEmail
+	args.ComposerAction = "@post('" + thoughtsThreadChatAction(
+		thread.ID,
+		"resume",
+	) + "?workbench_v2=1', {contentType: 'form'})"
+	args.StreamURL = thoughtsThreadChatAction(
+		thread.ID,
+		"stream",
+	) + "?since=0&workbench_v2=1"
 	return SharedThreadChat(args), nil
 }
 

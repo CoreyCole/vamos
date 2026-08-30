@@ -115,6 +115,14 @@ type AgentThread struct {
 	ArchivedAt        sql.NullTime   `json:"archived_at"`
 }
 
+type AgentThreadDraft struct {
+	UserEmail      string    `json:"user_email"`
+	ThreadID       string    `json:"thread_id"`
+	Content        string    `json:"content"`
+	OperationOrder int64     `json:"operation_order"`
+	UpdatedAt      time.Time `json:"updated_at"`
+}
+
 type AgentThreadWorkspace struct {
 	ThreadID    string    `json:"thread_id"`
 	WorkspaceID string    `json:"workspace_id"`

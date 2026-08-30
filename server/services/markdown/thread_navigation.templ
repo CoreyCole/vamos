@@ -1,0 +1,27 @@
+package markdown
+
+templ ThreadArtifactPane(browser ThreadArtifactBrowserArgs, document templ.Component) {
+	<div class="flex h-full min-h-0 flex-col bg-background">
+		<div class="flex shrink-0 items-center gap-2 border-b border-border p-2 text-xs">
+			if browser.Parent != "" {
+				<a href={ templ.URL(browser.Parent) } class="rounded px-2 py-1 hover:bg-muted">../</a>
+			}
+			<span class="min-w-0 flex-1 truncate text-muted-foreground">{ "thoughts/" + browser.DocPath }</span>
+			<button type="button" class="rounded border border-border px-2 py-1 hover:bg-muted" data-on:click={ "navigator.clipboard?.writeText('thoughts/" + browser.DocPath + "'); const input = document.getElementById('agent-chat-composer-input'); if (input) { input.value += (input.value ? '\\n' : '') + 'thoughts/" + browser.DocPath + "'; input.dispatchEvent(new Event('input', {bubbles: true})); }" }>Copy path</button>
+		</div>
+		<div class="shrink-0 border-b border-border p-2">
+			for _, entry := range browser.Entries {
+				<a href={ templ.URL(entry.Href) } class="block truncate rounded px-2 py-1 text-xs hover:bg-muted">
+					if entry.IsDir {
+						{ entry.Name + "/" }
+					} else {
+						{ entry.Name }
+					}
+				</a>
+			}
+		</div>
+		<div class="min-h-0 flex-1 overflow-auto">
+			@document
+		</div>
+	</div>
+}

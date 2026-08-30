@@ -447,6 +447,15 @@ CREATE INDEX IF NOT EXISTS idx_agent_threads_project_user_updated
 ON agent_threads (project_id, user_email, updated_at DESC)
 WHERE archived_at IS NULL ;
 
+CREATE TABLE IF NOT EXISTS agent_thread_drafts (
+user_email TEXT NOT NULL,
+thread_id TEXT NOT NULL REFERENCES agent_threads (id) ON DELETE CASCADE,
+content TEXT NOT NULL DEFAULT '',
+operation_order INTEGER NOT NULL DEFAULT 0,
+updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+PRIMARY KEY (user_email, thread_id)
+) ;
+
 CREATE TABLE IF NOT EXISTS agent_thread_workspaces (
 thread_id TEXT NOT NULL REFERENCES agent_threads (id) ON DELETE CASCADE,
 workspace_id TEXT NOT NULL REFERENCES workspaces (id) ON DELETE CASCADE,

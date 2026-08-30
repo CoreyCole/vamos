@@ -39,8 +39,19 @@ func (s *Service) ResolveThreadArtifact(
 	ctx context.Context,
 	threadID, rawDoc string,
 ) (string, error) {
-	artifact, _, err := s.resolveThreadArtifact(ctx, threadID, rawDoc, false)
-	return artifact, err
+	artifact, _, err := s.resolveThreadArtifact(
+		ctx, threadID, rawDoc, strings.TrimSpace(rawDoc) != "",
+	)
+	if err != nil {
+		return "", err
+	}
+	if _, err := s.GetDirectoryListing(artifact); err == nil {
+		return artifact, nil
+	}
+	if _, err := s.RenderThoughtsDocument(ctx, artifact); err != nil {
+		return "", err
+	}
+	return artifact, nil
 }
 
 func (s *Service) resolveThreadArtifact(
@@ -183,7 +194,7 @@ func (s *Service) ServeThread(c echo.Context) error {
 	if err != nil {
 		return err
 	}
-	artifact, err := s.threadArtifactComponent(c, threadID, c.QueryParam("doc"))
+	artifact, err := s.threadArtifactPane(c, threadID, c.QueryParam("artifact"))
 	if err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 	}

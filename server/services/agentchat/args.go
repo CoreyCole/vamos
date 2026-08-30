@@ -339,6 +339,8 @@ type AgentChatComposerArgs struct {
 	CurrentDocAttached   bool
 	SelectedAnnotations  []SelectedChatAnnotation
 	ThreadMetadata       ThreadMetadataView
+	InitialDraft         string
+	DraftSaveAction      string
 }
 
 type ChatMessageArgs struct {

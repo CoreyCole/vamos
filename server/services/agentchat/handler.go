@@ -144,6 +144,7 @@ func (h *Handler) RegisterRuntimeRoutes(g *echo.Group) {
 	g.GET("/thread/:thread_id/slash-commands", h.ListThreadSlashCommands)
 	g.POST("/thread/:thread_id/resume", h.ResumeThreadByPath)
 	g.POST("/thread/:thread_id/fork", h.ForkThreadByPath)
+	g.POST("/thread/:thread_id/draft", h.SaveThreadDraft)
 	h.RegisterHermesRoutes(g)
 	g.GET("/sessions/stream", h.StreamSessions)
 	g.POST("/pi-sessions/open", h.OpenPiSession)
@@ -821,7 +822,11 @@ func (h *Handler) StreamEmbeddedThread(c echo.Context) error {
 		Reason:    "embedded-thread-stream",
 	})
 
+	workbenchV2 := c.QueryParam("workbench_v2") == "1"
 	patchPanel := func() error {
+		if workbenchV2 {
+			return h.patchWorkbenchV2SharedThreadChat(c, sse, userEmail, threadID)
+		}
 		if hasPrimary {
 			input := h.embeddedPatchInput(c, userEmail)
 			input.WorkspaceID = workspaceRecord.ID
@@ -831,6 +836,9 @@ func (h *Handler) StreamEmbeddedThread(c echo.Context) error {
 		return h.patchEmbeddedFreeformChatPanel(c, sse, userEmail)
 	}
 	patchTranscript := func() error {
+		if workbenchV2 {
+			return h.patchWorkbenchV2SharedThreadChat(c, sse, userEmail, threadID)
+		}
 		if hasPrimary {
 			input := h.embeddedPatchInput(c, userEmail)
 			input.WorkspaceID = workspaceRecord.ID
@@ -1066,6 +1074,13 @@ func (h *Handler) resumeEmbeddedFreeformThreadByID(
 		}
 		return echo.NewHTTPError(status, err.Error())
 	}
+	if err := h.service.ClearThreadDraft(
+		c.Request().Context(),
+		userEmail,
+		threadID,
+	); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
+	}
 	runID := ""
 	if run != nil {
 		runID = run.ID
@@ -1084,6 +1099,10 @@ func (h *Handler) resumeEmbeddedFreeformThreadByID(
 			return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 		}
 	}
+	sse := datastar.NewSSE(c.Response().Writer, c.Request())
+	if c.QueryParam("workbench_v2") == "1" {
+		return h.resetAndFocusEmbeddedComposer(sse)
+	}
 	args, err := h.service.BuildEmbeddedFreeformPanelArgs(
 		c.Request().Context(),
 		userEmail,
@@ -1093,11 +1112,13 @@ func (h *Handler) resumeEmbeddedFreeformThreadByID(
 	if err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 	}
-	sse := datastar.NewSSE(c.Response().Writer, c.Request())
-	return sse.PatchElementTempl(
+	if err := sse.PatchElementTempl(
 		EmbeddedFreeformRightRailPanel(args),
 		datastar.WithSelectorID("doc-right-chat-panel"),
-	)
+	); err != nil {
+		return err
+	}
+	return sse.MarshalAndPatchSignals(map[string]any{"chatDraft": ""})
 }
 
 func (h *Handler) SendPrompt(c echo.Context) error {
@@ -1592,6 +1613,7 @@ func (h *Handler) resetAndFocusEmbeddedComposer(
 ) error {
 	if err := sse.MarshalAndPatchSignals(map[string]any{
 		"agentChatLastWriteOK": true,
+		"chatDraft":            "",
 	}); err != nil {
 		return err
 	}
@@ -1865,6 +1887,36 @@ func (h *Handler) resumeWorkspaceThreadByID(
 	return h.writeNoRedirectSuccess(c)
 }
 
+type threadDraftSignals struct {
+	ChatDraft string `json:"chatDraft"`
+}
+
+func (h *Handler) SaveThreadDraft(c echo.Context) error {
+	operationOrder := nextDraftOperationOrder()
+	userEmail, ok := c.Get("user_email").(string)
+	if !ok || strings.TrimSpace(userEmail) == "" {
+		return echo.NewHTTPError(http.StatusUnauthorized, "not authenticated")
+	}
+	var signals threadDraftSignals
+	if err := datastar.ReadSignals(c.Request(), &signals); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
+	}
+	if err := h.service.SaveThreadDraft(
+		c.Request().Context(),
+		userEmail,
+		c.Param("thread_id"),
+		signals.ChatDraft,
+		operationOrder,
+	); err != nil {
+		status := http.StatusBadRequest
+		if errors.Is(err, sql.ErrNoRows) {
+			status = http.StatusNotFound
+		}
+		return echo.NewHTTPError(status, err.Error())
+	}
+	return c.NoContent(http.StatusNoContent)
+}
+
 func (h *Handler) ResumeEmbeddedThread(c echo.Context) error {
 	userEmail, ok := c.Get("user_email").(string)
 	if !ok || userEmail == "" {
@@ -1938,6 +1990,13 @@ func (h *Handler) resumeEmbeddedWorkspaceThread(
 		}
 		return echo.NewHTTPError(status, err.Error())
 	}
+	if err := h.service.ClearThreadDraft(
+		c.Request().Context(),
+		userEmail,
+		threadID,
+	); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
+	}
 	runID := ""
 	if run != nil {
 		runID = run.ID
@@ -1966,6 +2025,9 @@ func (h *Handler) resumeEmbeddedWorkspaceThread(
 	}
 
 	sse := datastar.NewSSE(c.Response().Writer, c.Request())
+	if c.QueryParam("workbench_v2") == "1" {
+		return h.resetAndFocusEmbeddedComposer(sse)
+	}
 	input := EmbeddedChatPatchInput{
 		UserEmail:   userEmail,
 		DocPath:     docPath,
@@ -2960,6 +3022,27 @@ func (h *Handler) patchEmbeddedFreeformChatPanel(
 	return sse.PatchElementTempl(
 		EmbeddedFreeformRightRailPanel(args),
 		datastar.WithSelectorID("doc-right-chat-panel"),
+	)
+}
+
+func (h *Handler) patchWorkbenchV2SharedThreadChat(
+	c echo.Context,
+	sse *datastar.ServerSentEventGenerator,
+	userEmail, threadID string,
+) error {
+	args, err := h.service.BuildEmbeddedFreeformPanelArgs(
+		c.Request().Context(),
+		userEmail,
+		threadID,
+		strings.TrimSpace(c.QueryParam("run")),
+	)
+	if err != nil {
+		return err
+	}
+	return sse.PatchElementTempl(
+		SharedThreadChat(args),
+		datastar.WithSelectorID("workbench-v2-chat-body"),
+		datastar.WithModeInner(),
 	)
 }
 
