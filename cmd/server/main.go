@@ -773,16 +773,9 @@ func registerAgentChatEntryRoutes(
 	handler *agentchat.Handler,
 	markdownService *markdown.Service,
 ) {
-	// Root opens the unified Thoughts workbench with Chat selected. Keep
-	// /agent-chat page routes retired while runtime endpoints remain available.
+	// Threads is the workbench entry resource.
 	e.GET("/", func(c echo.Context) error {
-		if markdownService == nil {
-			return c.NoContent(http.StatusNoContent)
-		}
-		c.Set("thoughts_context_mode", "chat")
-		c.SetParamNames("*")
-		c.SetParamValues("")
-		return markdownService.ServeMarkdown(c)
+		return c.Redirect(http.StatusSeeOther, "/threads")
 	}, authMiddleware)
 
 	agentChatAPIGroup := e.Group("/agent-chat/api")
@@ -1273,7 +1266,8 @@ func main() {
 			agentChatService,
 		),
 	).WithEmbeddedChatRenderer(agentChatService).
-		WithHermesThreadsRenderer(agentChatService)
+		WithHermesThreadsRenderer(agentChatService).
+		WithWorkbenchThreadRenderer(agentChatService)
 	agentChatService.SetImplWorkspaceDiscoveryConfig(
 		workspaces.ImplWorkspaceDiscoveryConfig{
 			ProjectID:           workspaceDiscovery.ProjectID,
@@ -1723,6 +1717,11 @@ func main() {
 	if err := examplesService.RegisterRoutes(e, authMiddleware); err != nil {
 		log.Fatal("Failed to register example applet routes:", err)
 	}
+
+	threadsGroup := e.Group("/threads")
+	threadsGroup.Use(authMiddleware)
+	threadsGroup.GET("", markdownService.ServeThreads)
+	threadsGroup.GET("/:threadID", markdownService.ServeThread)
 
 	// Protected form routes - require authentication
 	formsGroup := e.Group("/forms")

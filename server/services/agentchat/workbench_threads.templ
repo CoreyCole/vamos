@@ -1,0 +1,33 @@
+package agentchat
+
+templ WorkbenchThreadList(groups []WorkbenchThreadGroup, selectedID, artifact string) {
+	<div class="flex h-full min-h-0 flex-col bg-background" data-signals="{threadSearch: ''}">
+		<div class="border-b border-border p-3">
+			<input type="search" placeholder="Search threads" class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm" data-bind="threadSearch"/>
+		</div>
+		<nav class="min-h-0 flex-1 overflow-y-auto p-2" aria-label="Threads">
+			for _, group := range groups {
+				<section class="mb-3">
+					<p class="px-2 pb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{ group.Label }</p>
+					for _, thread := range group.Threads {
+						<a href={ templ.URL(threadWorkbenchHref(thread.ID, artifact)) } data-show={ "!$threadSearch || " + threadSearchMatch(thread.Title) } class={ "block rounded-md px-2 py-2 text-sm hover:bg-muted", templ.KV("bg-muted font-medium text-foreground", thread.ID == selectedID), templ.KV("text-muted-foreground", thread.ID != selectedID) }>{ thread.Title }</a>
+					}
+				</section>
+			}
+		</nav>
+	</div>
+}
+
+templ SharedThreadChat(args EmbeddedFreeformPanelArgs) {
+	<div class="flex h-full min-h-0 flex-col bg-background">
+		if args.StreamURL != "" {
+			<div class="hidden" data-init={ "@get('" + args.StreamURL + "')" }></div>
+		}
+		<div class="min-h-0 flex-1 overflow-y-auto">
+			@MessagesPane(args.ThreadID, args.Transcript, args.HasThread, freeformForkAction(args.ThreadID))
+		</div>
+		<div class="shrink-0 border-t border-border bg-background p-3">
+			@AgentChatComposer(AgentChatComposerArgs{Action: args.ComposerAction, ThreadID: args.ThreadID, RunID: args.RunID, Cwd: args.Cwd, ModeLabel: embeddedFreeformModeLabel(args.ThreadMetadata), Placeholder: workspacePromptPlaceholder(args.HasThread), HasThread: args.HasThread, IncludeCwd: !args.HasThread, ThreadMetadata: args.ThreadMetadata})
+		</div>
+	</div>
+}

@@ -1,6 +1,8 @@
 package markdown
 
 import (
+	"strconv"
+
 	"github.com/CoreyCole/vamos/server/layouts"
 	"github.com/CoreyCole/vamos/server/layouts/workbench"
 )
@@ -32,14 +34,29 @@ templ DirectoryWorkbenchPage(args DirectoryWorkbenchArgs) {
 	}
 }
 
+func directorySearchMatch(name string) string {
+	return "String(" + strconv.Quote(name) + ").toLowerCase().includes(String($dirSearch || '').toLowerCase())"
+}
+
 templ DirectoryPrimaryPanel(args *DirectoryArgs) {
-	<div id="thoughts-directory-primary" class="flex h-full min-h-0 flex-col overflow-hidden bg-background">
-		<div id="thoughts-url-sync" class="hidden" aria-hidden="true"></div>
-		<div id="thoughts-directory-title-sync" class="hidden" aria-hidden="true"></div>
+	<div id="thoughts-directory-primary" class="flex h-full min-h-0 flex-col overflow-hidden bg-background" data-signals="{dirSearch: ''}">
+		<div class="flex shrink-0 items-center gap-2 border-b border-border p-3 text-sm">
+			<a href="/thoughts/" class="text-primary hover:underline">thoughts</a>
+			for _, crumb := range args.Breadcrumbs {
+				<span class="text-muted-foreground">/</span>
+				<a href={ templ.URL(ThoughtsDirURL(crumb.Path)) } class="text-primary hover:underline">{ crumb.Name }</a>
+			}
+			if args.Path != "" {
+				<a href={ templ.URL(ThoughtsDirURL(args.Parent)) } class="ml-auto rounded border border-border px-2 py-1 text-xs hover:bg-muted">../</a>
+			}
+		</div>
+		<div class="shrink-0 border-b border-border p-3 md:p-4">
+			<input type="search" data-bind="dirSearch" placeholder="Search this directory" class="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"/>
+		</div>
 		<div id="thoughts-directory-scroll-region" class="min-h-0 flex-1 overflow-y-auto p-3 md:p-4">
 			<ul class="space-y-1">
 				for _, item := range args.Items {
-					<li>
+					<li data-show={ directorySearchMatch(item.Name) }>
 						<a
 							href={ templ.SafeURL(DirectoryItemHref(item, args.WorkbenchLinkState)) }
 							class="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-primary transition-colors hover:bg-accent"
@@ -71,8 +88,11 @@ templ DirectoryPrimaryPanel(args *DirectoryArgs) {
 	</div>
 }
 
-func DirectoryItemHref(item DirectoryItem, state ThoughtsWorkbenchLinkState) string {
-	return ThoughtsHrefWithWorkbenchState(item.Path, item.IsDir, state)
+func DirectoryItemHref(item DirectoryItem, _ ThoughtsWorkbenchLinkState) string {
+	if item.IsDir {
+		return ThoughtsDirURL(item.Path)
+	}
+	return ThoughtsDocURL(item.Path, "")
 }
 
 templ EmptyDirectoryContextPanel() {

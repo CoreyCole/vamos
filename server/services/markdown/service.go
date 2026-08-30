@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/a-h/templ"
 	"github.com/gomarkdown/markdown/ast"
 	"github.com/labstack/echo/v4"
 	"gopkg.in/yaml.v3"
@@ -44,6 +45,18 @@ type WorkspaceDocTreeResolver interface {
 	ListWorkspaceDocs(ctx context.Context, workspaceID string) ([]db.WorkspaceDoc, error)
 }
 
+type WorkbenchThreadRenderer interface {
+	RenderWorkbenchThreadList(
+		ctx context.Context,
+		selectedID, artifact string,
+	) (templ.Component, error)
+	ResolveSharedThreadPlanDir(ctx context.Context, threadID string) (string, error)
+	RenderSharedThreadChat(
+		ctx context.Context,
+		threadID, userEmail string,
+	) (templ.Component, error)
+}
+
 type ChatWorkspaceCandidateResolver interface {
 	ResolveChatWorkspaceCandidates(
 		ctx context.Context,
@@ -60,16 +73,17 @@ type ServiceOptions struct {
 }
 
 type Service struct {
-	renderer              *Renderer
-	documentRenderers     *DocumentRendererRegistry
-	basePath              string
-	commentService        *comments.Service
-	themeService          ThemeProvider
-	workspaceResolver     DocumentWorkspaceResolver
-	chatWorkspaceResolver ChatWorkspaceCandidateResolver
-	layoutPrefs           *layoutprefs.Service
-	embeddedChatRenderer  EmbeddedChatRenderer
-	hermesThreadsRenderer HermesThreadsRenderer
+	renderer                 *Renderer
+	documentRenderers        *DocumentRendererRegistry
+	basePath                 string
+	commentService           *comments.Service
+	themeService             ThemeProvider
+	workspaceResolver        DocumentWorkspaceResolver
+	chatWorkspaceResolver    ChatWorkspaceCandidateResolver
+	layoutPrefs              *layoutprefs.Service
+	embeddedChatRenderer     EmbeddedChatRenderer
+	hermesThreadsRenderer    HermesThreadsRenderer
+	workbenchThreadsRenderer WorkbenchThreadRenderer
 }
 
 func NewService(
@@ -135,6 +149,11 @@ func (s *Service) WithHermesThreadsRenderer(renderer HermesThreadsRenderer) *Ser
 	return s
 }
 
+func (s *Service) WithWorkbenchThreadRenderer(renderer WorkbenchThreadRenderer) *Service {
+	s.workbenchThreadsRenderer = renderer
+	return s
+}
+
 // parseFrontmatter extracts YAML frontmatter from markdown content
 // Returns the frontmatter struct, the remaining content, and any error
 func parseFrontmatter(content []byte) (*Frontmatter, []byte, error) {
@@ -191,24 +210,27 @@ func parseFrontmatter(content []byte) (*Frontmatter, []byte, error) {
 
 	// Convert to final Frontmatter with parsed dates
 	fm := &Frontmatter{
-		Researcher:      rawFm.Researcher,
-		GitCommit:       strings.TrimSpace(rawFm.GitCommit),
-		Branch:          strings.TrimSpace(rawFm.Branch),
-		Project:         strings.TrimSpace(rawFm.Project),
-		RelatedProjects: planworkspace.NormalizeRelatedProjects(rawFm.Project, rawFm.RelatedProjects),
-		Repository:      strings.TrimSpace(rawFm.Repository),
-		Topic:           rawFm.Topic,
-		Tags:            rawFm.Tags,
-		Status:          rawFm.Status,
-		LastUpdatedBy:   rawFm.LastUpdatedBy,
-		Stage:           rawFm.Stage,
-		Ticket:          rawFm.Ticket,
-		PlanDir:         rawFm.PlanDir,
-		Verdict:         rawFm.Verdict,
-		RelatedADRs:     rawFm.RelatedADRs,
-		BrainstormDocs:  rawFm.BrainstormDocs,
-		Date:            parseDate(rawFm.Date),
-		LastUpdated:     parseDate(rawFm.LastUpdated),
+		Researcher: rawFm.Researcher,
+		GitCommit:  strings.TrimSpace(rawFm.GitCommit),
+		Branch:     strings.TrimSpace(rawFm.Branch),
+		Project:    strings.TrimSpace(rawFm.Project),
+		RelatedProjects: planworkspace.NormalizeRelatedProjects(
+			rawFm.Project,
+			rawFm.RelatedProjects,
+		),
+		Repository:     strings.TrimSpace(rawFm.Repository),
+		Topic:          rawFm.Topic,
+		Tags:           rawFm.Tags,
+		Status:         rawFm.Status,
+		LastUpdatedBy:  rawFm.LastUpdatedBy,
+		Stage:          rawFm.Stage,
+		Ticket:         rawFm.Ticket,
+		PlanDir:        rawFm.PlanDir,
+		Verdict:        rawFm.Verdict,
+		RelatedADRs:    rawFm.RelatedADRs,
+		BrainstormDocs: rawFm.BrainstormDocs,
+		Date:           parseDate(rawFm.Date),
+		LastUpdated:    parseDate(rawFm.LastUpdated),
 	}
 
 	// Return frontmatter and the content after the closing ---
@@ -286,10 +308,15 @@ func extractDateFromFilename(filename string) time.Time {
 // GetDirectoryListing returns entries for a directory sorted by date in filename (newest
 // first)
 func (s *Service) GetDirectoryListing(dirPath string) (*DirectoryArgs, error) {
-	fullDirPath := filepath.Join(s.basePath, dirPath)
-
-	// Security check: ensure the path doesn't escape the base directory
-	if !strings.HasPrefix(filepath.Clean(fullDirPath), filepath.Clean(s.basePath)) {
+	canonical, err := CanonicalThoughtsDirPath(dirPath)
+	if err != nil {
+		return nil, err
+	}
+	_, fullDirPath, err := s.resolveThoughtsRelAndAbs(canonical)
+	if err != nil {
+		return nil, err
+	}
+	if !pathWithinRoot(fullDirPath, s.basePath) {
 		return nil, errors.New("access denied: path escapes base directory")
 	}
 
@@ -354,9 +381,29 @@ func (s *Service) GetDirectoryListing(dirPath string) (*DirectoryArgs, error) {
 		items[i] = item.item
 	}
 
+	breadcrumbs := make([]DirectoryBreadcrumb, 0)
+	for current := canonical; current != ""; {
+		breadcrumbs = append([]DirectoryBreadcrumb{{
+			Name: path.Base(current),
+			Path: current,
+		}}, breadcrumbs...)
+		current = path.Dir(current)
+		if current == "." {
+			current = ""
+		}
+	}
+	parent := ""
+	if canonical != "" {
+		parent = path.Dir(canonical)
+		if parent == "." {
+			parent = ""
+		}
+	}
 	return &DirectoryArgs{
-		Path:  dirPath,
-		Items: items,
+		Path:        canonical,
+		Parent:      parent,
+		Breadcrumbs: breadcrumbs,
+		Items:       items,
 	}, nil
 }
 
@@ -458,11 +505,14 @@ func (s *Service) BuildWorkspaceDocTreeFromRoot(
 		for _, file := range files {
 			rel := pathJoinSlash(relDir, file.Name())
 			nodes = append(nodes, workbench.WorkspaceDocNode{
-				Path:     rel,
-				RelPath:  strings.TrimPrefix(strings.TrimPrefix(rel, rootRel), "/"),
-				Label:    file.Name(),
-				Kind:     workbench.WorkspaceDocKindFile,
-				Href:     workbench.WorkspaceDocNodeHref(workbench.DocEntryModeThoughts, rel),
+				Path:    rel,
+				RelPath: strings.TrimPrefix(strings.TrimPrefix(rel, rootRel), "/"),
+				Label:   file.Name(),
+				Kind:    workbench.WorkspaceDocKindFile,
+				Href: workbench.WorkspaceDocNodeHref(
+					workbench.DocEntryModeThoughts,
+					rel,
+				),
 				IsActive: currentRel == rel,
 			})
 		}

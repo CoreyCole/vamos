@@ -95,6 +95,41 @@ func (q *Queries) GetPrimaryWorkspaceForThread(ctx context.Context, arg GetPrima
 	return i, err
 }
 
+const getSharedPrimaryWorkspaceForThread = `-- name: GetSharedPrimaryWorkspaceForThread :one
+SELECT w.id, w.user_email, w.title, w.root_doc_path, w.cwd, w.workflow_type, w.workflow_state_json, w.source, w.selected_thread_id, w.selected_doc_path, w.current_session_id, w.current_branch_id, w.created_at, w.updated_at, w.archived_at
+FROM agent_thread_workspaces atw
+JOIN workspaces w ON w.id = atw.workspace_id
+JOIN agent_threads t ON t.id = atw.thread_id
+WHERE
+    atw.thread_id = ?1
+    AND atw.is_primary = 1
+    AND t.archived_at IS NULL
+    AND w.archived_at IS NULL
+`
+
+func (q *Queries) GetSharedPrimaryWorkspaceForThread(ctx context.Context, threadID string) (Workspace, error) {
+	row := q.db.QueryRowContext(ctx, getSharedPrimaryWorkspaceForThread, threadID)
+	var i Workspace
+	err := row.Scan(
+		&i.ID,
+		&i.UserEmail,
+		&i.Title,
+		&i.RootDocPath,
+		&i.Cwd,
+		&i.WorkflowType,
+		&i.WorkflowStateJson,
+		&i.Source,
+		&i.SelectedThreadID,
+		&i.SelectedDocPath,
+		&i.CurrentSessionID,
+		&i.CurrentBranchID,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.ArchivedAt,
+	)
+	return i, err
+}
+
 const listThreadWorkspaceAssociations = `-- name: ListThreadWorkspaceAssociations :many
 SELECT
     atw.thread_id, atw.workspace_id, atw.is_primary, atw.role, atw.adopted_from, atw.adopted_at, atw.created_at, w.id AS workspace_id, w.user_email, w.title, w.root_doc_path, w.cwd,

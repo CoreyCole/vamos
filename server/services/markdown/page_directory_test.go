@@ -5,6 +5,7 @@ package markdown
 
 import (
 	"bytes"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -41,6 +42,37 @@ func TestGetDirectoryListingIncludesRenderableFormats(t *testing.T) {
 	}
 }
 
+func TestGetDirectoryListingRejectsEscapesAndBuildsNavigation(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(root, "owner", "docs"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	mustWriteFile(t, filepath.Join(root, "owner", "docs", "plan.md"), []byte("# Plan"))
+	outside := t.TempDir()
+	mustWriteFile(t, filepath.Join(outside, "secret.md"), []byte("# Secret"))
+	if err := os.Symlink(outside, filepath.Join(root, "escape")); err != nil {
+		t.Fatal(err)
+	}
+	service, err := NewService(root, nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	listing, err := service.GetDirectoryListing("owner/docs")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if listing.Parent != "owner" || len(listing.Breadcrumbs) != 2 {
+		t.Fatalf("unexpected navigation: %#v", listing)
+	}
+	for _, escaped := range []string{"../", "escape"} {
+		if _, err := service.GetDirectoryListing(escaped); err == nil {
+			t.Fatalf("GetDirectoryListing(%q) succeeded", escaped)
+		}
+	}
+}
+
 func TestDirectoryPrimaryPanelRendersAnchors(t *testing.T) {
 	t.Parallel()
 
@@ -65,11 +97,15 @@ func TestDirectoryPrimaryPanelRendersAnchors(t *testing.T) {
 	}
 }
 
-func TestDirectoryPrimaryPanelPreservesNoThreadChatWorkspaceQuery(t *testing.T) {
+func TestDirectoryPrimaryPanelOmitsLegacyChatWorkspaceQuery(t *testing.T) {
 	t.Parallel()
 
 	args := &DirectoryArgs{
-		WorkbenchLinkState: ThoughtsWorkbenchLinkState{Context: "chat", ChatWorkspaceID: "ws 1", ChatRunID: "run+1"},
+		WorkbenchLinkState: ThoughtsWorkbenchLinkState{
+			Context:         "chat",
+			ChatWorkspaceID: "ws 1",
+			ChatRunID:       "run+1",
+		},
 		Items: []DirectoryItem{
 			{Name: "docs", Path: "owner/docs", IsDir: true},
 			{Name: "plan.md", Path: "owner/plan.md"},
@@ -80,34 +116,33 @@ func TestDirectoryPrimaryPanelPreservesNoThreadChatWorkspaceQuery(t *testing.T) 
 		t.Fatal(err)
 	}
 	html := buf.String()
-	for _, want := range []string{"context=chat", "chat_workspace=ws+1", "run=run%2B1"} {
-		if !strings.Contains(html, want) {
-			t.Fatalf("missing preserved chat query %q in %s", want, html)
+	for _, notWant := range []string{"context=chat", "chat_workspace=ws+1", "run=run%2B1"} {
+		if strings.Contains(html, notWant) {
+			t.Fatalf("legacy query leaked into directory link %q in %s", notWant, html)
 		}
 	}
 }
 
-func TestDirectoryPrimaryPanelPreservesChatWorkspaceWithActiveThreadQuery(t *testing.T) {
+func TestDirectoryPrimaryPanelUsesLocalSearchAndBreadcrumbs(t *testing.T) {
 	t.Parallel()
 
 	args := &DirectoryArgs{
-		WorkbenchLinkState: ThoughtsWorkbenchLinkState{Context: "chat", ChatWorkspaceID: "ws 1", ChatThreadID: "th/1", ChatRunID: "run+1"},
-		Items: []DirectoryItem{
-			{Name: "docs", Path: "owner/docs", IsDir: true},
-			{Name: "plan.md", Path: "owner/plan.md"},
+		Path:   "owner/docs",
+		Parent: "owner",
+		Breadcrumbs: []DirectoryBreadcrumb{
+			{Name: "owner", Path: "owner"},
+			{Name: "docs", Path: "owner/docs"},
 		},
+		Items: []DirectoryItem{{Name: "Plan", Path: "owner/docs/plan.md"}},
 	}
 	var buf bytes.Buffer
 	if err := DirectoryPrimaryPanel(args).Render(t.Context(), &buf); err != nil {
 		t.Fatal(err)
 	}
 	html := buf.String()
-	for _, want := range []string{"context=chat", "thread=th%2F1", "run=run%2B1"} {
+	for _, want := range []string{`data-signals="{dirSearch: ''}"`, `data-bind="dirSearch"`, `data-show="String(&#34;Plan&#34;).toLowerCase().includes(String($dirSearch || &#39;&#39;).toLowerCase())"`, `href="/thoughts/owner"`, `href="/thoughts/owner/docs"`} {
 		if !strings.Contains(html, want) {
-			t.Fatalf("missing preserved chat query %q in %s", want, html)
+			t.Fatalf("missing %q in %s", want, html)
 		}
-	}
-	if !strings.Contains(html, "chat_workspace=ws+1") {
-		t.Fatalf("thread-active directory links dropped chat_workspace: %s", html)
 	}
 }

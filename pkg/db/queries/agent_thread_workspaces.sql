@@ -20,6 +20,17 @@ WHERE
     AND w.archived_at IS NULL
 ORDER BY atw.is_primary DESC, atw.adopted_at ASC, atw.created_at ASC;
 
+-- name: GetSharedPrimaryWorkspaceForThread :one
+SELECT w.*
+FROM agent_thread_workspaces atw
+JOIN workspaces w ON w.id = atw.workspace_id
+JOIN agent_threads t ON t.id = atw.thread_id
+WHERE
+    atw.thread_id = sqlc.arg('thread_id')
+    AND atw.is_primary = 1
+    AND t.archived_at IS NULL
+    AND w.archived_at IS NULL;
+
 -- name: GetPrimaryWorkspaceForThread :one
 SELECT w.*
 FROM agent_thread_workspaces atw

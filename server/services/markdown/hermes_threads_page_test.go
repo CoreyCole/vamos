@@ -11,7 +11,6 @@ import (
 	"github.com/a-h/templ"
 	"github.com/labstack/echo/v4"
 
-	"github.com/CoreyCole/vamos/pkg/db"
 	"github.com/CoreyCole/vamos/server/layouts/workbench"
 )
 
@@ -214,13 +213,6 @@ func TestThoughtsWorkbenchNavigationBuildersPreserveIndependentSelections(t *tes
 		FilePath: "owner/plans/alpha/design.md", WorkbenchLinkState: state,
 		FileTree: []FileTreeNode{{Name: "outline.md", Path: "owner/plans/alpha/outline.md"}},
 	}
-	sidebarHref := BuildThoughtsSidebarArgs(page).Files.Nodes[0].Href
-	tree := BuildWorkspaceDocTreeArgs("ws", page.FilePath, workbench.DocEntryModeThoughts, []db.WorkspaceDoc{{
-		WorkspaceID: "ws", DocPath: "owner/plans/alpha/outline.md", RelPath: ".", Kind: string(workbench.WorkspaceDocKindFile),
-	}}, state)
-	if tree == nil || len(tree.Nodes) != 1 {
-		t.Fatalf("workspace tree = %#v", tree)
-	}
 	directoryHref := DirectoryItemHref(DirectoryItem{Name: "review", Path: "owner/plans/alpha/review", IsDir: true}, state)
 	service := &Service{}
 	context := newThoughtsThreadsContext(state.Preserve("/thoughts/owner/plans/alpha/design.md"))
@@ -228,18 +220,8 @@ func TestThoughtsWorkbenchNavigationBuildersPreserveIndependentSelections(t *tes
 	if err != nil {
 		t.Fatal(err)
 	}
-	hrefs := []string{sidebarHref, tree.Nodes[0].Href, directoryHref}
-	for _, href := range hrefs {
-		parsed, err := url.Parse(href)
-		if err != nil {
-			t.Fatal(err)
-		}
-		query := parsed.Query()
-		for key, want := range map[string]string{"chat_workspace": "ws_1", "thread": "chat_1", "run": "run_1", "hermes_thread": "hermes_1"} {
-			if query.Get(key) != want {
-				t.Fatalf("%q query[%s] = %q, want %q", href, key, query.Get(key), want)
-			}
-		}
+	if directoryHref != "/thoughts/owner/plans/alpha/review" {
+		t.Fatalf("directory href = %q", directoryHref)
 	}
 	var rendered strings.Builder
 	if err := workbench.Workbench(workbenchState).Render(t.Context(), &rendered); err != nil {

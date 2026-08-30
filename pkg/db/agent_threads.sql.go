@@ -92,6 +92,8 @@ func (q *Queries) CreateAgentThread(ctx context.Context, arg CreateAgentThreadPa
 }
 
 const getAgentThread = `-- name: GetAgentThread :one
+;
+
 SELECT
 id,
 user_email,
@@ -131,6 +133,8 @@ func (q *Queries) GetAgentThread(ctx context.Context, id string) (AgentThread, e
 }
 
 const getAgentThreadForUser = `-- name: GetAgentThreadForUser :one
+;
+
 SELECT
 id,
 user_email,
@@ -176,6 +180,8 @@ func (q *Queries) GetAgentThreadForUser(ctx context.Context, arg GetAgentThreadF
 }
 
 const getAgentThreadForWorkspaceUser = `-- name: GetAgentThreadForWorkspaceUser :one
+;
+
 SELECT
 t.id,
 t.user_email,
@@ -229,6 +235,8 @@ func (q *Queries) GetAgentThreadForWorkspaceUser(ctx context.Context, arg GetAge
 }
 
 const getSharedAgentThread = `-- name: GetSharedAgentThread :one
+;
+
 SELECT
 id,
 user_email,
@@ -268,6 +276,8 @@ func (q *Queries) GetSharedAgentThread(ctx context.Context, id string) (AgentThr
 }
 
 const listAgentThreads = `-- name: ListAgentThreads :many
+;
+
 SELECT
 id,
 user_email,
@@ -330,6 +340,8 @@ func (q *Queries) ListAgentThreads(ctx context.Context, arg ListAgentThreadsPara
 }
 
 const listAgentThreadsByWorkspace = `-- name: ListAgentThreadsByWorkspace :many
+;
+
 SELECT
 t.id,
 t.user_email,
@@ -388,6 +400,8 @@ func (q *Queries) ListAgentThreadsByWorkspace(ctx context.Context, workspaceID s
 }
 
 const listAgentThreadsForUserWithWorkspace = `-- name: ListAgentThreadsForUserWithWorkspace :many
+;
+
 SELECT
 t.id,
 t.user_email,
@@ -471,6 +485,8 @@ func (q *Queries) ListAgentThreadsForUserWithWorkspace(ctx context.Context, user
 }
 
 const listSharedAgentThreadsByPlanDir = `-- name: ListSharedAgentThreadsByPlanDir :many
+;
+
 SELECT DISTINCT
 t.id,
 t.user_email,
@@ -528,7 +544,91 @@ func (q *Queries) ListSharedAgentThreadsByPlanDir(ctx context.Context, planDir s
 	return items, nil
 }
 
+const listSharedAgentThreadsWithWorkspace = `-- name: ListSharedAgentThreadsWithWorkspace :many
+;
+
+SELECT
+t.id,
+t.user_email,
+t.title,
+t.cwd,
+t.lineage_id,
+t.project_id,
+t.head_entry_id,
+t.parent_thread_id,
+t.forked_from_entry_id,
+t.created_at,
+t.updated_at,
+t.archived_at,
+atw.workspace_id AS primary_workspace_id,
+w.root_doc_path AS workspace_root_doc_path
+FROM agent_threads t
+LEFT JOIN agent_thread_workspaces atw
+ON atw.thread_id = t.id AND atw.is_primary = 1
+LEFT JOIN workspaces w
+ON w.id = atw.workspace_id AND w.archived_at IS NULL
+WHERE t.archived_at IS NULL
+ORDER BY t.updated_at DESC
+`
+
+type ListSharedAgentThreadsWithWorkspaceRow struct {
+	ID                   string         `json:"id"`
+	UserEmail            string         `json:"user_email"`
+	Title                string         `json:"title"`
+	Cwd                  string         `json:"cwd"`
+	LineageID            string         `json:"lineage_id"`
+	ProjectID            string         `json:"project_id"`
+	HeadEntryID          sql.NullString `json:"head_entry_id"`
+	ParentThreadID       sql.NullString `json:"parent_thread_id"`
+	ForkedFromEntryID    sql.NullString `json:"forked_from_entry_id"`
+	CreatedAt            time.Time      `json:"created_at"`
+	UpdatedAt            time.Time      `json:"updated_at"`
+	ArchivedAt           sql.NullTime   `json:"archived_at"`
+	PrimaryWorkspaceID   sql.NullString `json:"primary_workspace_id"`
+	WorkspaceRootDocPath sql.NullString `json:"workspace_root_doc_path"`
+}
+
+func (q *Queries) ListSharedAgentThreadsWithWorkspace(ctx context.Context) ([]ListSharedAgentThreadsWithWorkspaceRow, error) {
+	rows, err := q.db.QueryContext(ctx, listSharedAgentThreadsWithWorkspace)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListSharedAgentThreadsWithWorkspaceRow
+	for rows.Next() {
+		var i ListSharedAgentThreadsWithWorkspaceRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.UserEmail,
+			&i.Title,
+			&i.Cwd,
+			&i.LineageID,
+			&i.ProjectID,
+			&i.HeadEntryID,
+			&i.ParentThreadID,
+			&i.ForkedFromEntryID,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.ArchivedAt,
+			&i.PrimaryWorkspaceID,
+			&i.WorkspaceRootDocPath,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const updateAgentThreadCwd = `-- name: UpdateAgentThreadCwd :exec
+;
+
 UPDATE agent_threads
 SET cwd = ?1,
 updated_at = CURRENT_TIMESTAMP
@@ -546,6 +646,8 @@ func (q *Queries) UpdateAgentThreadCwd(ctx context.Context, arg UpdateAgentThrea
 }
 
 const updateAgentThreadHead = `-- name: UpdateAgentThreadHead :exec
+;
+
 UPDATE agent_threads
 SET head_entry_id = ?1,
 updated_at = CURRENT_TIMESTAMP
@@ -563,6 +665,8 @@ func (q *Queries) UpdateAgentThreadHead(ctx context.Context, arg UpdateAgentThre
 }
 
 const updateAgentThreadProject = `-- name: UpdateAgentThreadProject :exec
+;
+
 UPDATE agent_threads
 SET project_id = ?1,
 updated_at = CURRENT_TIMESTAMP
@@ -580,6 +684,8 @@ func (q *Queries) UpdateAgentThreadProject(ctx context.Context, arg UpdateAgentT
 }
 
 const updateAgentThreadTitle = `-- name: UpdateAgentThreadTitle :exec
+;
+
 UPDATE agent_threads
 SET title = ?1,
 updated_at = CURRENT_TIMESTAMP

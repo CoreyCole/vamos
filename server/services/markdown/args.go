@@ -191,6 +191,8 @@ type SectionWithComments struct {
 // DirectoryArgs for directory listing
 type DirectoryArgs struct {
 	Path               string
+	Parent             string
+	Breadcrumbs        []DirectoryBreadcrumb
 	Items              []DirectoryItem
 	UserEmail          string         // User email from auth context
 	CurrentTheme       string         // "dark" or "light" - from user preferences
@@ -204,6 +206,11 @@ type DirectoryItem struct {
 	Name  string
 	Path  string
 	IsDir bool
+}
+
+type DirectoryBreadcrumb struct {
+	Name string
+	Path string
 }
 
 // FileTreeNode represents a node in the file/folder tree sidebar

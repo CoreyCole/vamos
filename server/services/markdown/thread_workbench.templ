@@ -1,0 +1,16 @@
+package markdown
+
+import (
+	"github.com/CoreyCole/vamos/server/layouts"
+	"github.com/CoreyCole/vamos/server/layouts/workbench"
+)
+
+templ ThreadWorkbenchPage(userEmail string, state workbench.WorkbenchState) {
+	@layouts.Root(layouts.RootArgs{Title: "Threads", ShowHeader: true, UserEmail: userEmail}) {
+		@workbench.Workbench(state)
+	}
+}
+
+templ WorkbenchUnavailable(message string) {
+	<div class="flex h-full min-h-0 items-center justify-center p-4 text-sm text-muted-foreground">{ message }</div>
+}
