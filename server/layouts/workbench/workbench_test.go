@@ -510,6 +510,7 @@ func TestWorkbenchLoadsDocScrollScript(t *testing.T) {
 	html := body.String()
 	for _, want := range []string{
 		`/js/workbench-resize.js`,
+		`/js/workbench-history.js`,
 		`/js/workbench-doc-scroll.js`,
 		`/js/frame-comment-bridge.js?v=4`,
 		`data-commentui-mode="parent"`,
@@ -643,6 +644,29 @@ func TestWorkbenchResizeJSShowsHandlesForVisibleAdjacentRegions(t *testing.T) {
 	} {
 		if strings.Contains(js, unwanted) {
 			t.Fatalf("workbench-resize.js should not contain %q in %s", unwanted, js)
+		}
+	}
+}
+
+func TestWorkbenchHistoryJSRevalidatesRestoredThreadDrafts(t *testing.T) {
+	t.Parallel()
+
+	contents, err := os.ReadFile("../../../static/js/workbench-history.js")
+	if err != nil {
+		t.Fatalf("ReadFile(workbench-history.js) error = %v", err)
+	}
+	js := string(contents)
+	for _, want := range []string{
+		`window.addEventListener("pageshow"`,
+		`event.persisted`,
+		`navigation?.type === "back_forward"`,
+		`#workbench-v2-chat-body #agent-chat-composer-form`,
+		`window.location.reload()`,
+		`window.addEventListener("popstate"`,
+		`document.getElementById("thread-artifact-pane")`,
+	} {
+		if !strings.Contains(js, want) {
+			t.Fatalf("workbench-history.js missing %q in %s", want, js)
 		}
 	}
 }

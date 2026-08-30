@@ -483,7 +483,11 @@ func expectStreamlitRestartChangesIdentity() spec.Step {
 }
 
 func readStreamlitProcessIdentity(ctx *duiruntime.Context) (streamlitProcessIdentity, error) {
-	raw, err := ctx.Page.FrameLocator(streamlitAppletFrameSelector).Locator("body").Evaluate(`(body) => {
+	return readStreamlitProcessIdentityForFrame(ctx, streamlitAppletFrameSelector)
+}
+
+func readStreamlitProcessIdentityForFrame(ctx *duiruntime.Context, frameSelector string) (streamlitProcessIdentity, error) {
+	raw, err := ctx.Page.FrameLocator(frameSelector).Locator("body").Evaluate(`(body) => {
 		const text = body.innerText || ''
 		const pick = (re) => {
 			const match = text.match(re)

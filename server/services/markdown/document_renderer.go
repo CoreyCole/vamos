@@ -21,6 +21,12 @@ const (
 	DocumentKindUnsupported DocumentKind = "unsupported"
 )
 
+var (
+	errInvalidThoughtsDocumentPath = errors.New("invalid thoughts document path")
+	errThoughtsDocumentNotFound    = errors.New("thoughts document not found")
+	errThoughtsDocumentIsDirectory = errors.New("thoughts document is a directory")
+)
+
 type CommentMode string
 
 const (
@@ -65,7 +71,10 @@ type DocumentRendererRegistry struct {
 	fallback  DocumentRenderer
 }
 
-func NewDocumentRendererRegistry(fallback DocumentRenderer, renderers ...DocumentRenderer) *DocumentRendererRegistry {
+func NewDocumentRendererRegistry(
+	fallback DocumentRenderer,
+	renderers ...DocumentRenderer,
+) *DocumentRendererRegistry {
 	return &DocumentRendererRegistry{renderers: renderers, fallback: fallback}
 }
 
@@ -87,7 +96,10 @@ type UnsupportedRenderer struct{}
 
 func (r UnsupportedRenderer) Match(DocumentRequest) bool { return false }
 
-func (r UnsupportedRenderer) Render(_ context.Context, req DocumentRequest) (RenderedDocument, error) {
+func (r UnsupportedRenderer) Render(
+	_ context.Context,
+	req DocumentRequest,
+) (RenderedDocument, error) {
 	docPath := "thoughts/" + req.CleanPath
 	return RenderedDocument{
 		Path:        docPath,
@@ -98,11 +110,18 @@ func (r UnsupportedRenderer) Render(_ context.Context, req DocumentRequest) (Ren
 	}, nil
 }
 
-func (s *Service) RenderThoughtsDocument(ctx context.Context, requestPath string) (*PageArgs, error) {
+func (s *Service) RenderThoughtsDocument(
+	ctx context.Context,
+	requestPath string,
+) (*PageArgs, error) {
 	return s.RenderThoughtsDocumentWithOptions(ctx, requestPath, DocumentRenderOptions{})
 }
 
-func (s *Service) RenderThoughtsDocumentWithOptions(ctx context.Context, requestPath string, opts DocumentRenderOptions) (*PageArgs, error) {
+func (s *Service) RenderThoughtsDocumentWithOptions(
+	ctx context.Context,
+	requestPath string,
+	opts DocumentRenderOptions,
+) (*PageArgs, error) {
 	req, err := s.resolveThoughtsDocumentRequest(requestPath)
 	if err != nil {
 		return nil, err
@@ -115,14 +134,20 @@ func (s *Service) RenderThoughtsDocumentWithOptions(ctx context.Context, request
 	return pageArgsFromRenderedDocument(doc), nil
 }
 
-func (s *Service) resolveThoughtsDocumentRequest(requestPath string) (DocumentRequest, error) {
+func (s *Service) resolveThoughtsDocumentRequest(
+	requestPath string,
+) (DocumentRequest, error) {
 	cleanPath, err := CanonicalThoughtsDocPath(requestPath)
 	if err != nil {
-		return DocumentRequest{}, err
+		return DocumentRequest{}, fmt.Errorf(
+			"%w: %w",
+			errInvalidThoughtsDocumentPath,
+			err,
+		)
 	}
 	fullPath := filepath.Join(s.basePath, filepath.FromSlash(cleanPath))
 	if !pathWithinRoot(filepath.Clean(fullPath), filepath.Clean(s.basePath)) {
-		return DocumentRequest{}, errors.New("access denied: path escapes base directory")
+		return DocumentRequest{}, errInvalidThoughtsDocumentPath
 	}
 	info, err := os.Stat(fullPath)
 	if err != nil {
@@ -132,11 +157,19 @@ func (s *Service) resolveThoughtsDocumentRequest(requestPath string) (DocumentRe
 			cleanPath += ".md"
 			info = mdInfo
 		} else {
-			return DocumentRequest{}, fmt.Errorf("file not found: %s", requestPath)
+			return DocumentRequest{}, fmt.Errorf(
+				"%w: %s",
+				errThoughtsDocumentNotFound,
+				requestPath,
+			)
 		}
 	}
 	if info.IsDir() {
-		return DocumentRequest{}, fmt.Errorf("path is a directory: %s", requestPath)
+		return DocumentRequest{}, fmt.Errorf(
+			"%w: %s",
+			errThoughtsDocumentIsDirectory,
+			requestPath,
+		)
 	}
 	return DocumentRequest{
 		RequestPath: requestPath,

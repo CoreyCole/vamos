@@ -82,7 +82,7 @@ updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 
 CREATE TABLE IF NOT EXISTS layout_preferences (
 user_email TEXT NOT NULL,
-page TEXT NOT NULL CHECK (page IN ('agent-chat', 'thoughts')),
+page TEXT NOT NULL CHECK (page IN ('agent-chat', 'thoughts', 'threads')),
 view TEXT NOT NULL CHECK (view IN ('focus', 'split')),
 viewport_class TEXT NOT NULL DEFAULT 'desktop-full'
 CHECK (viewport_class IN ('mobile', 'desktop-half', 'desktop-full')),

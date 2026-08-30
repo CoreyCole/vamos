@@ -3,6 +3,7 @@ package markdown
 import (
 	"errors"
 	"io"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -11,6 +12,60 @@ import (
 
 	"github.com/CoreyCole/vamos/server"
 )
+
+func TestResolveThoughtsDocumentRequestClassifiesSafeClientErrors(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	service := &Service{basePath: root}
+
+	if _, err := service.resolveThoughtsDocumentRequest(
+		"missing.md",
+	); !errors.Is(
+		err,
+		errThoughtsDocumentNotFound,
+	) {
+		t.Fatalf("missing document error = %v", err)
+	}
+	if err := os.Mkdir(filepath.Join(root, "directory"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := service.resolveThoughtsDocumentRequest(
+		"directory",
+	); !errors.Is(
+		err,
+		errThoughtsDocumentIsDirectory,
+	) {
+		t.Fatalf("directory error = %v", err)
+	}
+	if _, err := service.resolveThoughtsDocumentRequest(
+		"../outside.md",
+	); !errors.Is(
+		err,
+		errInvalidThoughtsDocumentPath,
+	) {
+		t.Fatalf("traversal error = %v", err)
+	}
+	outside := t.TempDir()
+	if err := os.WriteFile(
+		filepath.Join(outside, "secret.md"),
+		[]byte("secret"),
+		0o600,
+	); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(outside, filepath.Join(root, "escape")); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := service.resolveThoughtsDocumentRequest(
+		"escape/secret.md",
+	); !errors.Is(
+		err,
+		errInvalidThoughtsDocumentPath,
+	) {
+		t.Fatalf("symlink escape error = %v", err)
+	}
+}
 
 type failingWriter struct{ err error }
 

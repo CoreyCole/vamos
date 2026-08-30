@@ -325,11 +325,10 @@ func TestHeaderAvatarContainsSecondaryActions(t *testing.T) {
 		PageType:           PageTypeSystem,
 		UserEmail:          "user@example.com",
 		CurrentPath:        "thoughts/example.md",
-		ClipboardContent:   "encoded-doc",
 		CurrentSyntaxTheme: "github-dark",
 	}))
 	for _, want := range []string{
-		"System", "Storybook", "Syntax:", "syntax_theme_select", "/api/syntax-theme", "Toggle theme", "Copy document", "View on GitHub",
+		"System", "Storybook", "Syntax:", "syntax_theme_select", "/api/syntax-theme", "Toggle theme", "View on GitHub",
 		`href="/system"`, `href="/storybook"`,
 	} {
 		if !strings.Contains(body, want) {
@@ -340,8 +339,9 @@ func TestHeaderAvatarContainsSecondaryActions(t *testing.T) {
 		strings.Contains(body, `href="/pipe`+`lines"`) {
 		t.Fatalf("avatar menu still contains pipelines nav: %s", body)
 	}
-	if strings.Contains(body, `title="Copy document to clipboard"`) {
-		t.Fatalf("desktop copy control still rendered outside avatar: %s", body)
+	if strings.Contains(body, "Copy document") ||
+		strings.Contains(body, "clipboard-content-avatar") {
+		t.Fatalf("avatar menu still renders document copy action: %s", body)
 	}
 	if strings.Contains(body, `<span class="sr-only">Toggle theme</span>`) {
 		t.Fatalf("old icon-only ThemeToggle still rendered outside avatar: %s", body)

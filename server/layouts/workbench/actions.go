@@ -10,8 +10,9 @@ type OverflowActionKind string
 type OverflowActionSubmitMode string
 
 const (
-	OverflowActionLink OverflowActionKind = "link"
-	OverflowActionForm OverflowActionKind = "form"
+	OverflowActionButton OverflowActionKind = "button"
+	OverflowActionLink   OverflowActionKind = "link"
+	OverflowActionForm   OverflowActionKind = "form"
 
 	OverflowActionSubmitNative   OverflowActionSubmitMode = "native"
 	OverflowActionSubmitDatastar OverflowActionSubmitMode = "datastar"
@@ -27,6 +28,7 @@ type OverflowAction struct {
 	SubmitMode   OverflowActionSubmitMode
 	Target       string
 	Rel          string
+	ClientAction string
 	HiddenFields map[string]string
 	Disabled     bool
 }
@@ -58,7 +60,9 @@ func overflowDatastarSubmit(action OverflowAction) string {
 	if formAction == "" {
 		return ""
 	}
-	return "el.closest('details')?.removeAttribute('open'); @post('" + escapeDatastarString(formAction) + "', {contentType: 'form'})"
+	return "el.closest('details')?.removeAttribute('open'); @post('" + escapeDatastarString(
+		formAction,
+	) + "', {contentType: 'form'})"
 }
 
 func overflowHiddenFieldNames(fields map[string]string) []string {

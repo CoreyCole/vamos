@@ -1,0 +1,8 @@
+package markdown
+
+templ documentWorkbenchActions(clipboardContent string, actions templ.Component) {
+	if clipboardContent != "" {
+		<template id={ documentCopySourceID }>{ clipboardContent }</template>
+	}
+	@actions
+}

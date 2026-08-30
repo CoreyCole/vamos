@@ -9,9 +9,9 @@ import (
 	"strings"
 	"testing"
 
-	querydb "github.com/CoreyCole/vamos/pkg/db"
-
 	_ "modernc.org/sqlite"
+
+	querydb "github.com/CoreyCole/vamos/pkg/db"
 )
 
 func TestReadSchemaSQLUsesModuleLocalSchema(t *testing.T) {
@@ -115,29 +115,48 @@ func TestNewServiceAgentThreadQueriesDoNotRequireWorkspaceIDColumn(t *testing.T)
 		t.Fatalf("CreateAgentThread() ID = %q, want %q", thread.ID, threadID)
 	}
 
-	if err := svc.Queries.AttachThreadToWorkspace(ctx, querydb.AttachThreadToWorkspaceParams{
-		ID:          threadID,
-		WorkspaceID: sql.NullString{String: workspaceID, Valid: true},
-	}); err != nil {
+	if err := svc.Queries.AttachThreadToWorkspace(
+		ctx,
+		querydb.AttachThreadToWorkspaceParams{
+			ID:          threadID,
+			WorkspaceID: sql.NullString{String: workspaceID, Valid: true},
+		},
+	); err != nil {
 		t.Fatalf("AttachThreadToWorkspace() error = %v", err)
 	}
 
 	if _, err := svc.Queries.GetAgentThread(ctx, threadID); err != nil {
 		t.Fatalf("GetAgentThread() error = %v", err)
 	}
-	if _, err := svc.Queries.GetAgentThreadForUser(ctx, querydb.GetAgentThreadForUserParams{ID: threadID, UserEmail: userEmail}); err != nil {
+	if _, err := svc.Queries.GetAgentThreadForUser(
+		ctx,
+		querydb.GetAgentThreadForUserParams{ID: threadID, UserEmail: userEmail},
+	); err != nil {
 		t.Fatalf("GetAgentThreadForUser() error = %v", err)
 	}
-	if _, err := svc.Queries.ListAgentThreads(ctx, querydb.ListAgentThreadsParams{UserEmail: userEmail, Limit: 10}); err != nil {
+	if _, err := svc.Queries.ListAgentThreads(
+		ctx,
+		querydb.ListAgentThreadsParams{UserEmail: userEmail, Limit: 10},
+	); err != nil {
 		t.Fatalf("ListAgentThreads() error = %v", err)
 	}
-	if _, err := svc.Queries.GetAgentThreadForWorkspaceUser(ctx, querydb.GetAgentThreadForWorkspaceUserParams{WorkspaceID: workspaceID, ThreadID: threadID, UserEmail: userEmail}); err != nil {
+	if _, err := svc.Queries.GetAgentThreadForWorkspaceUser(
+		ctx,
+		querydb.GetAgentThreadForWorkspaceUserParams{
+			WorkspaceID: workspaceID,
+			ThreadID:    threadID,
+			UserEmail:   userEmail,
+		},
+	); err != nil {
 		t.Fatalf("GetAgentThreadForWorkspaceUser() error = %v", err)
 	}
 	if _, err := svc.Queries.ListAgentThreadsByWorkspace(ctx, workspaceID); err != nil {
 		t.Fatalf("ListAgentThreadsByWorkspace() error = %v", err)
 	}
-	if _, err := svc.Queries.ListAgentThreadsForUserWithWorkspace(ctx, userEmail); err != nil {
+	if _, err := svc.Queries.ListAgentThreadsForUserWithWorkspace(
+		ctx,
+		userEmail,
+	); err != nil {
 		t.Fatalf("ListAgentThreadsForUserWithWorkspace() error = %v", err)
 	}
 	if _, err := svc.Queries.ListThreadsByPrimaryWorkspace(ctx, workspaceID); err != nil {
@@ -431,6 +450,49 @@ VALUES ('agent@example.com', 'thoughts', 'split', '{"version":1,"page":"thoughts
 	}
 	if row.ViewportClass != "desktop-full" {
 		t.Fatalf("viewport_class = %q, want desktop-full", row.ViewportClass)
+	}
+}
+
+func TestLayoutPreferencesMigrationAddsThreadsPage(t *testing.T) {
+	t.Parallel()
+
+	database := openMigratorTestDB(t)
+	_, err := database.ExecContext(t.Context(), `
+CREATE TABLE layout_preferences (
+    user_email TEXT NOT NULL,
+    page TEXT NOT NULL CHECK (page IN ('agent-chat', 'thoughts')),
+    view TEXT NOT NULL CHECK (view IN ('focus', 'split')),
+    viewport_class TEXT NOT NULL CHECK (viewport_class IN ('mobile', 'desktop-half', 'desktop-full')),
+    config_json TEXT NOT NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (user_email, page, view, viewport_class)
+);
+INSERT INTO layout_preferences (user_email, page, view, viewport_class, config_json)
+VALUES ('agent@example.com', 'thoughts', 'split', 'desktop-half', '{}');`)
+	if err != nil {
+		t.Fatalf("seed layout_preferences: %v", err)
+	}
+
+	if err := prepareSchemaCompatibilityMigrations(t.Context(), database); err != nil {
+		t.Fatalf("prepareSchemaCompatibilityMigrations() error = %v", err)
+	}
+	if _, err := database.ExecContext(t.Context(), `
+INSERT INTO layout_preferences (user_email, page, view, viewport_class, config_json)
+VALUES ('agent@example.com', 'threads', 'split', 'desktop-full', '{}')`); err != nil {
+		t.Fatalf("insert threads layout preference: %v", err)
+	}
+	row, err := querydb.New(database).GetLayoutPreference(
+		t.Context(),
+		querydb.GetLayoutPreferenceParams{
+			UserEmail:     "agent@example.com",
+			Page:          "thoughts",
+			View:          "split",
+			ViewportClass: "desktop-half",
+		},
+	)
+	if err != nil || row.ViewportClass != "desktop-half" {
+		t.Fatalf("preserved preference = %+v, %v", row, err)
 	}
 }
 
@@ -794,12 +856,17 @@ ORDER BY workspace_slug`)
 	for _, slug := range []string{"stage", "durable-stage"} {
 		row := got[slug]
 		if row.status != "active" || row.mergedAt.Valid || row.cleanedUpAt.Valid || row.mergeEvidence.Valid ||
-			row.proofKind != "unknown" || row.sourceRef.Valid || row.targetCommit.Valid || row.proofAt.Valid || row.riskReason.Valid {
+			row.proofKind != "unknown" || row.sourceRef.Valid || row.targetCommit.Valid ||
+			row.proofAt.Valid ||
+			row.riskReason.Valid {
 			t.Fatalf("%s = %+v, want active with cleared terminal metadata", slug, row)
 		}
 	}
 	if got["feature"].status != "merged" {
-		t.Fatalf("feature status = %q, want unprotected terminal row unchanged", got["feature"].status)
+		t.Fatalf(
+			"feature status = %q, want unprotected terminal row unchanged",
+			got["feature"].status,
+		)
 	}
 	assertMigratedWorkspaceDBInvariants(t, database)
 }
@@ -829,10 +896,16 @@ VALUES ('vamos', 'stage', '/repo/vamos', 'Stage', 'active'),
 
 	err = runRuntimeMigrations(t.Context(), database)
 	if err == nil {
-		t.Fatal("runRuntimeMigrations() error = nil, want duplicate checkout path failure")
+		t.Fatal(
+			"runRuntimeMigrations() error = nil, want duplicate checkout path failure",
+		)
 	}
-	if !strings.Contains(err.Error(), "idx_impl_workspaces_checkout_path") && !strings.Contains(err.Error(), "UNIQUE") {
-		t.Fatalf("runRuntimeMigrations() error = %v, want checkout path uniqueness failure", err)
+	if !strings.Contains(err.Error(), "idx_impl_workspaces_checkout_path") &&
+		!strings.Contains(err.Error(), "UNIQUE") {
+		t.Fatalf(
+			"runRuntimeMigrations() error = %v, want checkout path uniqueness failure",
+			err,
+		)
 	}
 }
 
@@ -869,7 +942,9 @@ CREATE INDEX idx_agent_threads_workspace_updated
 		}
 	}
 	if indexExists(t, database, "idx_agent_threads_workspace_updated") {
-		t.Fatal("idx_agent_threads_workspace_updated still exists after runtime migrations")
+		t.Fatal(
+			"idx_agent_threads_workspace_updated still exists after runtime migrations",
+		)
 	}
 	for _, indexName := range []string{
 		"idx_agent_sessions_artifact_path",

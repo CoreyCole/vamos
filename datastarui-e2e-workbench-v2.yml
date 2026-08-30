@@ -1,0 +1,9 @@
+app: vamos
+base_url: http://localhost:4200
+run_package: ./pkg/e2e/workbenchv2tests
+artifacts_dir: .e2e-runs
+server:
+  command: just build
+  skip_when_base_url_set: false
+viewports:
+  - desktop-full

@@ -10,12 +10,12 @@ import (
 	"strings"
 	"testing"
 
+	duiruntime "github.com/coreycole/datastarui/e2e/runtime"
+	"github.com/coreycole/datastarui/e2e/spec"
 	"github.com/playwright-community/playwright-go"
 
 	"github.com/CoreyCole/vamos/pkg/auth/agentbrowser"
 	"github.com/CoreyCole/vamos/pkg/ctl/verifycmd"
-	duiruntime "github.com/coreycole/datastarui/e2e/runtime"
-	"github.com/coreycole/datastarui/e2e/spec"
 )
 
 type User struct{ Email string }
@@ -30,12 +30,20 @@ func (robotActor) AuthStep() spec.Step {
 
 func AuthenticatedAs(user any) spec.Step {
 	email := userEmail(user)
-	return spec.Custom("authenticated as "+email, func(t testing.TB, ctx *duiruntime.Context) {
-		t.Helper()
-		if err := Authenticate(context.Background(), ctx.Page, ctx.Config, email); err != nil {
-			t.Fatal(err)
-		}
-	})
+	return spec.Custom(
+		"authenticated as "+email,
+		func(t testing.TB, ctx *duiruntime.Context) {
+			t.Helper()
+			if err := Authenticate(
+				context.Background(),
+				ctx.Page,
+				ctx.Config,
+				email,
+			); err != nil {
+				t.Fatal(err)
+			}
+		},
+	)
 }
 
 func userEmail(user any) string {
@@ -58,10 +66,32 @@ func firstNonEmpty(values ...string) string {
 	return ""
 }
 
-func authTokenForConfig(ctx context.Context, cfg duiruntime.Config) (string, error) {
-	staticToken := strings.TrimSpace(firstNonEmpty(os.Getenv("VAMOS_E2E_AUTH_TOKEN"), os.Getenv("VAMOS_PLAYWRIGHT_AUTH_TOKEN")))
+func authTokenForConfig(
+	ctx context.Context,
+	cfg duiruntime.Config,
+	email string,
+) (string, error) {
+	staticToken := strings.TrimSpace(
+		firstNonEmpty(
+			os.Getenv("VAMOS_E2E_AUTH_TOKEN"),
+			os.Getenv("VAMOS_PLAYWRIGHT_AUTH_TOKEN"),
+		),
+	)
+	if strings.TrimSpace(os.Getenv("VAMOS_E2E_MACHINE_PROFILE")) != "" {
+		token, err := verifycmd.MintFreshE2EAuthToken(
+			ctx,
+			workspaceVerifyConfigForAuth(cfg, email),
+		)
+		if err != nil {
+			return "", errors.New("fresh playwright auth token mint failed")
+		}
+		return token, nil
+	}
 	if shouldMintFreshBrowserToken(cfg) {
-		if token, err := verifycmd.MintFreshE2EAuthToken(ctx, workspaceVerifyConfigForAuth(cfg)); err == nil {
+		if token, err := verifycmd.MintFreshE2EAuthToken(
+			ctx,
+			workspaceVerifyConfigForAuth(cfg, email),
+		); err == nil {
 			return token, nil
 		} else if staticToken == "" {
 			return "", fmt.Errorf("fresh playwright auth token mint failed: %w", err)
@@ -70,23 +100,38 @@ func authTokenForConfig(ctx context.Context, cfg duiruntime.Config) (string, err
 	if staticToken != "" {
 		return staticToken, nil
 	}
-	return "", errors.New("VAMOS_E2E_AUTH_TOKEN missing; run eval \"$(vamos auth playwright-env --slug <slug>)\"")
+	return "", errors.New(
+		"VAMOS_E2E_AUTH_TOKEN missing; run eval \"$(vamos auth playwright-env --slug <slug>)\"",
+	)
 }
 
 func shouldMintFreshBrowserToken(cfg duiruntime.Config) bool {
-	if strings.EqualFold(strings.TrimSpace(os.Getenv("VAMOS_E2E_AUTH_TOKEN_REFRESH")), "0") {
+	if strings.EqualFold(
+		strings.TrimSpace(os.Getenv("VAMOS_E2E_AUTH_TOKEN_REFRESH")),
+		"0",
+	) {
 		return false
 	}
 	base, err := url.Parse(strings.TrimSpace(cfg.BaseURL))
 	return err == nil && strings.EqualFold(base.Scheme, "https")
 }
 
-func workspaceVerifyConfigForAuth(cfg duiruntime.Config) verifycmd.WorkspaceVerifyConfig {
+func workspaceVerifyConfigForAuth(
+	cfg duiruntime.Config,
+	email string,
+) verifycmd.WorkspaceVerifyConfig {
 	return verifycmd.WorkspaceVerifyConfig{
-		BaseURL:    strings.TrimRight(strings.TrimSpace(cfg.BaseURL), "/"),
-		ManagerURL: strings.TrimSpace(os.Getenv("VAMOS_WORKSPACE_MANAGER_URL")),
-		Slug:       firstNonEmpty(os.Getenv("VAMOS_E2E_WORKSPACE_SLUG"), os.Getenv("VAMOS_WORKSPACE_SLUG"), slugFromBaseURL(cfg.BaseURL), workspaceEnvValue("VAMOS_WORKSPACE_SLUG")),
+		BaseURL:        strings.TrimRight(strings.TrimSpace(cfg.BaseURL), "/"),
+		ManagerURL:     strings.TrimSpace(os.Getenv("VAMOS_WORKSPACE_MANAGER_URL")),
+		MachineProfile: strings.TrimSpace(os.Getenv("VAMOS_E2E_MACHINE_PROFILE")),
+		Slug: firstNonEmpty(
+			os.Getenv("VAMOS_E2E_WORKSPACE_SLUG"),
+			os.Getenv("VAMOS_WORKSPACE_SLUG"),
+			slugFromBaseURL(cfg.BaseURL),
+			workspaceEnvValue("VAMOS_WORKSPACE_SLUG"),
+		),
 		BrowserEmail: firstNonEmpty(
+			email,
 			os.Getenv("VAMOS_E2E_AUTH_EMAIL"),
 			os.Getenv("VAMOS_PLAYWRIGHT_AUTH_EMAIL"),
 			"playwright@localhost",
@@ -134,19 +179,42 @@ func envFileValue(path, key string) string {
 	for _, line := range strings.Split(string(data), "\n") {
 		line = strings.TrimSpace(line)
 		if strings.HasPrefix(line, prefix) {
-			return strings.Trim(strings.TrimSpace(strings.TrimPrefix(line, prefix)), "'\"")
+			return strings.Trim(
+				strings.TrimSpace(strings.TrimPrefix(line, prefix)),
+				"'\"",
+			)
 		}
 	}
 	return ""
 }
 
 func BuildAuthURL(cfg duiruntime.Config, redirect string) (string, error) {
-	if redirect == "" {
-		redirect = "/"
-	}
-	token, err := authTokenForConfig(context.Background(), cfg)
+	return buildAuthURLForEmail(
+		context.Background(),
+		cfg,
+		redirect,
+		"playwright@localhost",
+	)
+}
+
+func buildAuthURLForEmail(
+	ctx context.Context,
+	cfg duiruntime.Config,
+	redirect, email string,
+) (string, error) {
+	token, err := authTokenForConfig(ctx, cfg, email)
 	if err != nil {
 		return "", err
+	}
+	return buildAuthURLWithToken(cfg, redirect, token)
+}
+
+func buildAuthURLWithToken(
+	cfg duiruntime.Config,
+	redirect, token string,
+) (string, error) {
+	if redirect == "" {
+		redirect = "/"
 	}
 	authURL, err := url.Parse(
 		strings.TrimRight(cfg.BaseURL, "/") + "/internal/agent-auth/browser-login",
@@ -162,14 +230,55 @@ func BuildAuthURL(cfg duiruntime.Config, redirect string) (string, error) {
 	return authURL.String(), nil
 }
 
+func AuthenticateSecondary(
+	ctx context.Context,
+	page playwright.Page,
+	cfg duiruntime.Config,
+) error {
+	token := strings.TrimSpace(os.Getenv("VAMOS_E2E_AUTH_TOKEN_SECONDARY"))
+	if strings.TrimSpace(os.Getenv("VAMOS_E2E_MACHINE_PROFILE")) != "" {
+		var err error
+		token, err = authTokenForConfig(ctx, cfg, "playwright-secondary@localhost")
+		if err != nil {
+			return err
+		}
+	}
+	if token == "" {
+		return errors.New("VAMOS_E2E_AUTH_TOKEN_SECONDARY missing")
+	}
+	authURL, err := buildAuthURLWithToken(cfg, "/", token)
+	if err != nil {
+		return err
+	}
+	response, err := page.Goto(
+		authURL,
+		playwright.PageGotoOptions{WaitUntil: playwright.WaitUntilStateDomcontentloaded},
+	)
+	if err != nil {
+		return err
+	}
+	if response == nil || response.Status() < 200 || response.Status() >= 400 {
+		return errors.New("secondary playwright auth failed")
+	}
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	default:
+	}
+	if strings.Contains(page.URL(), "/login") ||
+		strings.Contains(page.URL(), "/internal/agent-auth/browser-login") {
+		return errors.New("secondary playwright auth did not establish a session")
+	}
+	return nil
+}
+
 func Authenticate(
 	ctx context.Context,
 	page playwright.Page,
 	cfg duiruntime.Config,
 	email string,
 ) error {
-	_ = email
-	authURL, err := BuildAuthURL(cfg, "/")
+	authURL, err := buildAuthURLForEmail(ctx, cfg, "/", email)
 	if err != nil {
 		return err
 	}
@@ -181,15 +290,20 @@ func Authenticate(
 		return err
 	}
 	if response == nil {
-		return fmt.Errorf("playwright auth failed; no response from %s", authURL)
+		return errors.New("playwright auth failed; no response")
 	}
 	status := response.Status()
 	if status < 200 || status >= 400 {
 		hint := ""
-		if strings.HasPrefix(strings.TrimSpace(cfg.BaseURL), "https://") && strings.TrimSpace(os.Getenv("VAMOS_E2E_AUTH_TOKEN")) == "" {
+		if strings.HasPrefix(strings.TrimSpace(cfg.BaseURL), "https://") &&
+			strings.TrimSpace(os.Getenv("VAMOS_E2E_AUTH_TOKEN")) == "" {
 			hint = "; set VAMOS_E2E_AUTH_TOKEN for public workspace URLs"
 		}
-		return fmt.Errorf("playwright auth failed; %s returned HTTP %d%s", authURL, status, hint)
+		return fmt.Errorf(
+			"playwright auth failed; browser login returned HTTP %d%s",
+			status,
+			hint,
+		)
 	}
 	select {
 	case <-ctx.Done():

@@ -15,6 +15,11 @@ func TestOverflowActionsRendersLinksAndFormModes(t *testing.T) {
 			Label: "Document",
 			Actions: []OverflowAction{
 				{
+					Label:        "Copy document",
+					Kind:         OverflowActionButton,
+					ClientAction: "navigator.clipboard.writeText('demo')",
+				},
+				{
 					Label:      "Comment",
 					Kind:       OverflowActionForm,
 					FormAction: "/forms/comments/show",
@@ -51,6 +56,7 @@ func TestOverflowActionsRendersLinksAndFormModes(t *testing.T) {
 
 	for _, want := range []string{
 		`data-testid="workbench-overflow-actions"`,
+		`data-on:click="navigator.clipboard.writeText(&#39;demo&#39;)"`,
 		`data-on:submit__prevent="el.closest(&#39;details&#39;)?.removeAttribute(&#39;open&#39;); @post(&#39;/forms/comments/show&#39;, {contentType: &#39;form&#39;})"`,
 		`method="post" action="/forms/applets/demo/restart"`,
 		`target="_blank" rel="noopener"`,

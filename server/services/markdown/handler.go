@@ -1,6 +1,8 @@
 package markdown
 
 import (
+	"context"
+	"errors"
 	stdhtml "html"
 	"net/http"
 	"net/url"
@@ -42,6 +44,21 @@ const (
 // ServeMarkdown handles HTTP requests for markdown files and directories
 func (s *Service) ServeMarkdown(c echo.Context) error {
 	requestPath := c.Param("*")
+	if thoughtsRequestHasLegacyQuery(c) {
+		if thoughtsContextMode(c) == thoughtsContextModeChat ||
+			thoughtsContextMode(c) == thoughtsContextModeThreads {
+			if href := s.threadHrefForDoc(
+				c.Request().Context(),
+				requestPath,
+			); href != "" {
+				return c.Redirect(http.StatusSeeOther, href)
+			}
+		}
+		if strings.HasSuffix(requestPath, "/") || requestPath == "" {
+			return c.Redirect(http.StatusSeeOther, ThoughtsDirURL(requestPath))
+		}
+		return c.Redirect(http.StatusSeeOther, ThoughtsDocURL(requestPath, ""))
+	}
 
 	// Extract user email from context (set by auth middleware)
 	userEmail := ""
@@ -89,9 +106,8 @@ func (s *Service) ServeMarkdown(c echo.Context) error {
 		DocumentRenderOptions{CurrentTheme: currentThemeMode},
 	)
 	if err != nil {
-		// Try directory listing if file not found or if path is a directory
-		if strings.Contains(err.Error(), "not found") ||
-			strings.Contains(err.Error(), "is a directory") {
+		if errors.Is(err, errThoughtsDocumentNotFound) ||
+			errors.Is(err, errThoughtsDocumentIsDirectory) {
 			dirArgs, dirErr := s.GetDirectoryListing(requestPath)
 			if dirErr == nil {
 				dirArgs.UserEmail = userEmail
@@ -107,7 +123,10 @@ func (s *Service) ServeMarkdown(c echo.Context) error {
 					dirArgs,
 				)
 				if stateErr != nil {
-					return c.String(http.StatusInternalServerError, stateErr.Error())
+					return c.String(
+						http.StatusInternalServerError,
+						"failed to render Thoughts directory",
+					)
 				}
 				return DirectoryWorkbenchPage(DirectoryWorkbenchArgs{
 					Directory: dirArgs,
@@ -115,8 +134,19 @@ func (s *Service) ServeMarkdown(c echo.Context) error {
 				}).Render(c.Request().Context(), c.Response().Writer)
 			}
 		}
-
-		return c.String(http.StatusInternalServerError, err.Error())
+		switch {
+		case errors.Is(err, errInvalidThoughtsDocumentPath):
+			return c.String(http.StatusBadRequest, "invalid Thoughts path")
+		case errors.Is(err, errThoughtsDocumentNotFound),
+			errors.Is(err, errThoughtsDocumentIsDirectory):
+			return c.String(http.StatusNotFound, "Thoughts document not found")
+		default:
+			c.Logger().Errorf("Failed to render Thoughts document: %v", err)
+			return c.String(
+				http.StatusInternalServerError,
+				"failed to render Thoughts document",
+			)
+		}
 	}
 	pageArgs.UserEmail = userEmail
 	pageArgs.CurrentTheme = currentThemeMode
@@ -213,6 +243,10 @@ func (s *Service) ServeMarkdown(c echo.Context) error {
 		pageArgs.SectionsWithComments = sectionsWithComments
 	}
 
+	if href := s.thoughtsThreadRedirect(c, pageArgs.FilePath); href != "" {
+		return c.Redirect(http.StatusSeeOther, href)
+	}
+
 	workbenchState, err := s.buildThoughtsWorkbenchState(c, pageArgs)
 	if err != nil {
 		return c.String(http.StatusInternalServerError, err.Error())
@@ -224,6 +258,33 @@ func (s *Service) ServeMarkdown(c echo.Context) error {
 	}).Render(c.Request().Context(), c.Response().Writer)
 }
 
+func (s *Service) thoughtsThreadRedirect(c echo.Context, docPath string) string {
+	mode := thoughtsContextMode(c)
+	if mode != thoughtsContextModeChat && mode != thoughtsContextModeThreads {
+		return ""
+	}
+	return s.threadHrefForDoc(c.Request().Context(), docPath)
+}
+
+func (s *Service) threadHrefForDoc(ctx context.Context, docPath string) string {
+	canonical, err := CanonicalThoughtsDocPath(docPath)
+	if err != nil {
+		canonical, err = CanonicalThoughtsDirPath(docPath)
+		if err != nil {
+			return ""
+		}
+	}
+	artifact := url.QueryEscape("thoughts/" + canonical)
+	if s.workbenchThreadsRenderer == nil {
+		return "/threads?artifact=" + artifact
+	}
+	threadID, err := s.workbenchThreadsRenderer.FindSharedThreadForDoc(ctx, docPath)
+	if err != nil || strings.TrimSpace(threadID) == "" {
+		return "/threads?artifact=" + artifact
+	}
+	return "/threads/" + url.PathEscape(threadID) + "?artifact=" + artifact
+}
+
 func thoughtsViewFromQuery(c echo.Context) (workbench.WorkbenchView, string) {
 	mode := thoughtsContextMode(c)
 	switch mode {
@@ -232,6 +293,15 @@ func thoughtsViewFromQuery(c echo.Context) (workbench.WorkbenchView, string) {
 	default:
 		return workbench.WorkbenchViewFocus, ""
 	}
+}
+
+func thoughtsRequestHasLegacyQuery(c echo.Context) bool {
+	for _, key := range []string{"context", "chat_workspace", "thread", "run", "hermes_thread"} {
+		if strings.TrimSpace(c.QueryParam(key)) != "" {
+			return true
+		}
+	}
+	return false
 }
 
 func thoughtsContextMode(c echo.Context) string {
@@ -345,20 +415,10 @@ func (s *Service) savedThoughtsWorkbenchConfig(
 	return cfg
 }
 
-func (s *Service) buildThoughtsWorkbenchState(
+func (s *Service) buildThoughtsV2WorkbenchState(
 	c echo.Context,
 	pageArgs *PageArgs,
 ) (workbench.WorkbenchState, error) {
-	view, contextMode := thoughtsViewFromQuery(c)
-	viewportClass := viewportClassForRequest(c)
-	saved := s.savedThoughtsWorkbenchConfig(c, pageArgs.UserEmail, view, viewportClass)
-	rightTab := workbench.RightRailTabComments
-	switch contextMode {
-	case thoughtsContextModeChat:
-		rightTab = workbench.RightRailTabChat
-	case thoughtsContextModeThreads:
-		rightTab = workbench.RightRailTabThreads
-	}
 	headerWorkspaceTree, hasHeaderWorkspaceTree, err := s.buildHeaderWorkspaceDocTree(
 		c,
 		pageArgs,
@@ -366,80 +426,56 @@ func (s *Service) buildThoughtsWorkbenchState(
 	if err != nil {
 		return workbench.WorkbenchState{}, err
 	}
-	chatComponent, chatURLReplacement, err := s.buildEmbeddedChatComponent(c, pageArgs)
+	viewport := viewportClassForRequest(c)
+	canonical, err := CanonicalThoughtsDocPath(pageArgs.FilePath)
 	if err != nil {
 		return workbench.WorkbenchState{}, err
 	}
-	hermesComponent, hermesURLReplacement, err := s.buildHermesThreadsComponent(
-		c,
-		pageArgs.UserEmail,
+	chatHref := "/threads?artifact=" + url.QueryEscape("thoughts/"+canonical)
+	if matched := s.threadHrefForDoc(
+		c.Request().Context(),
 		pageArgs.FilePath,
-		pageArgs.QRSPIMetadata.PlanDir,
-		false,
-		pageArgs.WorkbenchLinkState,
-	)
-	if err != nil {
-		return workbench.WorkbenchState{}, err
+	); matched != "" {
+		chatHref = matched
 	}
-	chatComponent, hermesComponent = applyThoughtsRendererURLReplacement(
-		c.Request().URL.RequestURI(), chatComponent, chatURLReplacement.URL,
-		hermesComponent, hermesURLReplacement.URL,
-	)
-	return workbench.BuildDocWorkbenchState(workbench.WorkbenchDocContext{
-		EntryMode:     workbench.DocEntryModeThoughts,
-		UserEmail:     pageArgs.UserEmail,
-		SelectedPath:  pageArgs.FilePath,
-		RouteHref:     c.Request().URL.RequestURI(),
-		View:          view,
-		ViewportClass: viewportClass,
-		SavedConfig:   saved,
-		Sidebar: BuildThoughtsSidebarArgs(
-			pageArgs,
-			s.listWorkbenchWorkspaces(c),
-		),
-		InitialSidebarOpen: false,
-		InitialRailOpen:    contextMode != "",
-		Center: workbench.CenterDocPaneArgs{
-			Title:   DocumentTitle(pageArgs.FilePath, pageArgs.ViewerArgs.Frontmatter),
-			Actions: BuildDocumentWorkbenchActions(pageArgs),
-			Document: DocumentPanel(
-				BuildDocumentPanelArgs(
-					pageArgs,
-					optionalHeaderWorkspaceTree(
-						headerWorkspaceTree,
-						hasHeaderWorkspaceTree,
-					),
+	artifact := ThoughtsV2ArtifactPane(
+		chatHref,
+		DocumentPanel(
+			BuildDocumentPanelArgs(
+				pageArgs,
+				optionalHeaderWorkspaceTree(
+					headerWorkspaceTree,
+					hasHeaderWorkspaceTree,
 				),
 			),
-		},
-		RightRail: workbench.RightRailArgs{
-			ActiveTab: rightTab,
-			ChatHref: pageArgs.WorkbenchLinkState.WithContext(thoughtsContextModeChat).
-				Preserve(
-					ThoughtsDocURL(pageArgs.FilePath, ""),
-				),
-			CommentsHref: pageArgs.WorkbenchLinkState.WithContext(thoughtsContextModeComments).
-				Preserve(
-					ThoughtsDocURL(pageArgs.FilePath, ""),
-				),
-			ThreadsHref: pageArgs.WorkbenchLinkState.WithContext(thoughtsContextModeThreads).
-				Preserve(
-					ThoughtsDocURL(pageArgs.FilePath, ""),
-				),
-			Chat: ThoughtsContextPanel(ThoughtsContextArgs{
-				Mode:      thoughtsContextModeChat,
-				PageArgs:  pageArgs,
-				CommentUI: pageArgs.CommentUI,
-				Component: chatComponent,
-			}),
-			Comments: ThoughtsContextPanel(ThoughtsContextArgs{
-				Mode:      thoughtsContextModeComments,
-				PageArgs:  pageArgs,
-				CommentUI: pageArgs.CommentUI,
-			}),
-			Threads: hermesComponent,
-		},
+		),
+	)
+	comments := commentui.CommentsContextPanel(
+		commentui.BuildCommentsPanelArgs(pageArgs.CommentUI, ""),
+	)
+	return workbench.BuildWorkbenchV2State(workbench.WorkbenchV2Args{
+		UserEmail:     pageArgs.UserEmail,
+		ViewportClass: viewport,
+		SavedConfig:   s.savedThreadsWorkbenchConfig(c, pageArgs.UserEmail, viewport),
+		Artifact:      artifact,
+		Comments:      comments,
+		ThreadsOpen:   false,
+		ChatOpen:      false,
+		ArtifactOpen:  true,
+		CommentsOpen:  false,
 	})
+}
+
+func (s *Service) buildThoughtsWorkbenchState(
+	c echo.Context,
+	pageArgs *PageArgs,
+) (workbench.WorkbenchState, error) {
+	if s.workbenchThreadsRenderer == nil {
+		return workbench.WorkbenchState{}, errors.New(
+			"workbench v2 thread renderer is not configured",
+		)
+	}
+	return s.buildThoughtsV2WorkbenchState(c, pageArgs)
 }
 
 func applyThoughtsRendererURLReplacement(
@@ -677,95 +713,21 @@ func (s *Service) buildThoughtsDirectoryWorkbenchState(
 	c echo.Context,
 	args *DirectoryArgs,
 ) (workbench.WorkbenchState, error) {
-	view, contextMode := thoughtsViewFromQuery(c)
-	viewportClass := viewportClassForRequest(c)
-	saved := s.savedThoughtsWorkbenchConfig(c, args.UserEmail, view, viewportClass)
-	chatComponent, chatURLReplacement, err := s.buildEmbeddedChatComponentForRequest(
-		c,
-		EmbeddedChatRenderRequest{
-			UserEmail:   args.UserEmail,
-			Context:     thoughtsContextMode(c),
-			WorkspaceID: strings.TrimSpace(c.QueryParam("chat_workspace")),
-			ThreadID:    strings.TrimSpace(c.QueryParam("thread")),
-			RunID:       strings.TrimSpace(c.QueryParam("run")),
-		},
-	)
-	if err != nil {
-		return workbench.WorkbenchState{}, err
+	if s.workbenchThreadsRenderer == nil {
+		return workbench.WorkbenchState{}, errors.New(
+			"workbench v2 thread renderer is not configured",
+		)
 	}
-	hermesComponent, hermesURLReplacement, err := s.buildHermesThreadsComponent(
-		c,
-		args.UserEmail,
-		args.Path,
-		"",
-		true,
-		args.WorkbenchLinkState,
-	)
-	if err != nil {
-		return workbench.WorkbenchState{}, err
-	}
-	chatComponent, hermesComponent = applyThoughtsRendererURLReplacement(
-		c.Request().URL.RequestURI(), chatComponent, chatURLReplacement.URL,
-		hermesComponent, hermesURLReplacement.URL,
-	)
-	rightTab := workbench.RightRailTabComments
-	switch contextMode {
-	case thoughtsContextModeChat:
-		rightTab = workbench.RightRailTabChat
-	case thoughtsContextModeThreads:
-		rightTab = workbench.RightRailTabThreads
-	}
-	selectedPath := args.Path
-	if strings.TrimSpace(selectedPath) == "" {
-		selectedPath = "/"
-	}
-	state, err := workbench.BuildDocWorkbenchState(workbench.WorkbenchDocContext{
-		EntryMode:     workbench.DocEntryModeThoughts,
+	viewport := viewportClassForRequest(c)
+	chatHref := s.threadHrefForDoc(c.Request().Context(), args.Path)
+	return workbench.BuildWorkbenchV2State(workbench.WorkbenchV2Args{
 		UserEmail:     args.UserEmail,
-		SelectedPath:  selectedPath,
-		RouteHref:     c.Request().URL.RequestURI(),
-		View:          view,
-		ViewportClass: viewportClass,
-		SavedConfig:   saved,
-		Sidebar: BuildThoughtsDirectorySidebarArgs(
-			args,
-			s.listWorkbenchWorkspaces(c),
-		),
-		InitialSidebarOpen: false,
-		InitialRailOpen:    contextMode != "",
-		Center: workbench.CenterDocPaneArgs{
-			Title:    DirectoryTitle(args.Path),
-			Document: DirectoryPrimaryPanel(args),
-		},
-		RightRail: workbench.RightRailArgs{
-			ActiveTab: rightTab,
-			ChatHref: args.WorkbenchLinkState.WithContext(thoughtsContextModeChat).
-				Preserve(
-					ThoughtsDirURL(args.Path),
-				),
-			CommentsHref: args.WorkbenchLinkState.WithContext(thoughtsContextModeComments).
-				Preserve(
-					ThoughtsDirURL(args.Path),
-				),
-			ThreadsHref: args.WorkbenchLinkState.WithContext(thoughtsContextModeThreads).
-				Preserve(
-					ThoughtsDirURL(args.Path),
-				),
-			Chat: ThoughtsContextPanel(ThoughtsContextArgs{
-				Mode:      thoughtsContextModeChat,
-				Component: chatComponent,
-			}),
-			Comments: EmptyDirectoryContextPanel(),
-			Threads:  hermesComponent,
-		},
+		ViewportClass: viewport,
+		SavedConfig:   s.savedThreadsWorkbenchConfig(c, args.UserEmail, viewport),
+		Artifact:      ThoughtsV2ArtifactPane(chatHref, DirectoryPrimaryPanel(args)),
+		Comments:      EmptyDirectoryContextPanel(),
+		ArtifactOpen:  true,
 	})
-	if err != nil {
-		return workbench.WorkbenchState{}, err
-	}
-	if contextMode != "" && (viewportClass != workbench.ViewportMobile || saved == nil) {
-		state.Config.Mobile.ActiveRegionID = "doc-workbench-right"
-	}
-	return state, nil
 }
 
 func thoughtsNormalRegions(contextVisible bool) []workbench.RegionNormalState {
@@ -814,11 +776,15 @@ func (s *Service) HandleSelectComment(c echo.Context) error {
 			sectionID,
 		)
 		sse := datastar.NewSSE(c.Response().Writer, c.Request())
-		if err := sse.MarshalAndPatchSignals(map[string]any{
-			"workbench": map[string]any{"regions": map[string]any{
-				"workbenchV2Comments": map[string]any{"visible": true},
-			}},
-		}); err != nil {
+		if err := sse.MarshalAndPatchSignals(
+			map[string]any{
+				"workbench": map[string]any{
+					"regions": map[string]any{
+						"workbenchV2Comments": map[string]any{"visible": true},
+					},
+				},
+			},
+		); err != nil {
 			return err
 		}
 		return sse.ExecuteScript(
@@ -1119,6 +1085,11 @@ func (s *Service) OpenChatForDocument(c echo.Context) error {
 	)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
+	}
+	if href := s.threadHrefForDoc(c.Request().Context(), documentPath); href != "" {
+		return sse.ExecuteScript(
+			"window.location.assign(" + strconv.Quote(href) + ")",
+		)
 	}
 	if err := sse.MarshalAndPatchSignals(
 		map[string]any{

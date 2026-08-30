@@ -273,6 +273,44 @@ func TestFrameCommentBridgeRendersParentOwnedSelectionUI(t *testing.T) {
 	}
 }
 
+func TestFrameCommentBridgeRendersContextControlForDocumentComments(t *testing.T) {
+	t.Parallel()
+
+	args := CommentableMarkdownArgs{
+		Surface:  CommentSurfaceThoughts,
+		IDPrefix: SafeCommentTargetSlug("thoughts", "thoughts/example.html"),
+		DocPath:  "thoughts/example.html",
+		Comments: []CommentThreadView{{
+			ID:        "comment-1",
+			Body:      "selected frame comment",
+			SectionID: "document",
+		}},
+		Routes: CommentRoutes{Expand: "/expand"},
+	}
+	var buf bytes.Buffer
+	if err := FrameCommentBridge(FrameCommentBridgeArgs{
+		Content:  templ.Raw(`<iframe data-commentui-frame></iframe>`),
+		Comments: args,
+	}).Render(t.Context(), &buf); err != nil {
+		t.Fatalf("Render() error = %v", err)
+	}
+	html := buf.String()
+	if !strings.Contains(html, `aria-label="Open 1 comments in context pane"`) {
+		t.Fatalf("frame comment bridge lacks context control: %s", html)
+	}
+	targetStart := strings.Index(html, `id="`+TargetID(args.IDPrefix, "document")+`"`)
+	if targetStart < 0 {
+		t.Fatalf("frame comment bridge lacks document target: %s", html)
+	}
+	targetEnd := strings.Index(html[targetStart:], ">")
+	if targetEnd < 0 || strings.Contains(
+		html[targetStart:targetStart+targetEnd],
+		`aria-hidden="true"`,
+	) {
+		t.Fatalf("interactive patch target is hidden from accessibility tree: %s", html)
+	}
+}
+
 func TestCommentableMarkdownDoesNotRenderFrontmatterSummaryCard(t *testing.T) {
 	t.Parallel()
 

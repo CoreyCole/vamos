@@ -316,7 +316,8 @@ func TestSharedThreadDraftHydrationIsUserAndThreadScoped(t *testing.T) {
 		}
 		html := renderDraftComponent(t, component)
 		if !strings.Contains(html, want.draft) ||
-			!strings.Contains(html, "workbench_v2=1") {
+			strings.Count(html, "workbench_v2=1") < 2 ||
+			!strings.Contains(html, "/agent-chat/thread/"+want.thread+"/draft") {
 			t.Fatalf(
 				"%s/%s did not render V2 draft and request markers: %s",
 				want.user,
@@ -336,6 +337,50 @@ func (t draftTestTemporal) StartWorkflow(
 	any,
 ) (string, error) {
 	return "workflow_1", t.err
+}
+
+func TestResumeEmbeddedSharedWorkspaceThreadDoesNotRequireWorkspaceOwner(t *testing.T) {
+	service, queries := newThreadDraftService(t)
+	createDraftThread(t, queries, "thread_1")
+	if _, err := queries.CreateWorkspace(t.Context(), db.CreateWorkspaceParams{
+		ID:           "workspace_1",
+		UserEmail:    "owner@example.com",
+		Title:        "Shared workspace",
+		RootDocPath:  "thoughts/plan",
+		WorkflowType: "agent-chat",
+		Source:       "web",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := queries.UpsertThreadWorkspaceAssociation(
+		t.Context(),
+		db.UpsertThreadWorkspaceAssociationParams{
+			ThreadID:    "thread_1",
+			WorkspaceID: "workspace_1",
+			IsPrimary:   1,
+			Role:        "primary",
+			AdoptedFrom: "test",
+		},
+	); err != nil {
+		t.Fatal(err)
+	}
+	handler := NewHandler(service, nil)
+	req := httptest.NewRequest(
+		http.MethodPost,
+		"/thoughts/chat/thread/thread_1/resume?workbench_v2=1",
+		http.NoBody,
+	)
+	rec := httptest.NewRecorder()
+	ctx := echo.New().NewContext(req, rec)
+	ctx.SetParamNames("thread_id")
+	ctx.SetParamValues("thread_1")
+	ctx.Set("user_email", "reader@example.com")
+	err := handler.ResumeEmbeddedThread(ctx)
+	var httpErr *echo.HTTPError
+	if !errors.As(err, &httpErr) || httpErr.Code != http.StatusBadRequest ||
+		httpErr.Message != "prompt is required" {
+		t.Fatalf("shared resume error = %#v", err)
+	}
 }
 
 func TestResumeEmbeddedThreadAcceptedClearsDraft(t *testing.T) {

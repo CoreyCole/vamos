@@ -825,7 +825,7 @@ func (h *Handler) StreamEmbeddedThread(c echo.Context) error {
 	workbenchV2 := c.QueryParam("workbench_v2") == "1"
 	patchPanel := func() error {
 		if workbenchV2 {
-			return h.patchWorkbenchV2SharedThreadChat(c, sse, userEmail, threadID)
+			return h.patchEmbeddedFreeformLiveTranscript(c, sse, userEmail)
 		}
 		if hasPrimary {
 			input := h.embeddedPatchInput(c, userEmail)
@@ -837,7 +837,7 @@ func (h *Handler) StreamEmbeddedThread(c echo.Context) error {
 	}
 	patchTranscript := func() error {
 		if workbenchV2 {
-			return h.patchWorkbenchV2SharedThreadChat(c, sse, userEmail, threadID)
+			return h.patchEmbeddedFreeformLiveTranscript(c, sse, userEmail)
 		}
 		if hasPrimary {
 			input := h.embeddedPatchInput(c, userEmail)
@@ -1846,16 +1846,14 @@ func (h *Handler) resumeWorkspaceThreadByID(
 	c echo.Context,
 	userEmail, workspaceID, threadID string,
 ) error {
-	if _, err := h.service.queries.GetAgentThreadForWorkspaceUser(
+	if _, err := h.service.sharedWorkspaceThread(
 		c.Request().Context(),
-		db.GetAgentThreadForWorkspaceUserParams{
-			ThreadID:    threadID,
-			WorkspaceID: workspaceID,
-			UserEmail:   userEmail,
-		},
+		workspaceID,
+		threadID,
 	); err != nil {
 		status := http.StatusBadRequest
-		if errors.Is(err, sql.ErrNoRows) {
+		if errors.Is(err, sql.ErrNoRows) ||
+			errors.Is(err, ErrThreadWorkspaceMismatch) {
 			status = http.StatusNotFound
 		}
 		return echo.NewHTTPError(status, err.Error())
@@ -1951,16 +1949,14 @@ func (h *Handler) resumeEmbeddedWorkspaceThread(
 	c echo.Context,
 	userEmail, workspaceID, threadID string,
 ) error {
-	if _, err := h.service.queries.GetAgentThreadForWorkspaceUser(
+	if _, err := h.service.sharedWorkspaceThread(
 		c.Request().Context(),
-		db.GetAgentThreadForWorkspaceUserParams{
-			ThreadID:    threadID,
-			WorkspaceID: workspaceID,
-			UserEmail:   userEmail,
-		},
+		workspaceID,
+		threadID,
 	); err != nil {
 		status := http.StatusBadRequest
-		if errors.Is(err, sql.ErrNoRows) {
+		if errors.Is(err, sql.ErrNoRows) ||
+			errors.Is(err, ErrThreadWorkspaceMismatch) {
 			status = http.StatusNotFound
 		}
 		return echo.NewHTTPError(status, err.Error())
@@ -3022,27 +3018,6 @@ func (h *Handler) patchEmbeddedFreeformChatPanel(
 	return sse.PatchElementTempl(
 		EmbeddedFreeformRightRailPanel(args),
 		datastar.WithSelectorID("doc-right-chat-panel"),
-	)
-}
-
-func (h *Handler) patchWorkbenchV2SharedThreadChat(
-	c echo.Context,
-	sse *datastar.ServerSentEventGenerator,
-	userEmail, threadID string,
-) error {
-	args, err := h.service.BuildEmbeddedFreeformPanelArgs(
-		c.Request().Context(),
-		userEmail,
-		threadID,
-		strings.TrimSpace(c.QueryParam("run")),
-	)
-	if err != nil {
-		return err
-	}
-	return sse.PatchElementTempl(
-		SharedThreadChat(args),
-		datastar.WithSelectorID("workbench-v2-chat-body"),
-		datastar.WithModeInner(),
 	)
 }
 

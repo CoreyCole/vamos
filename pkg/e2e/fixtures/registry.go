@@ -46,6 +46,7 @@ func DefaultRegistry() Registry {
 	return registry{
 		"thoughts-workbench.basic":           BuildThoughtsWorkbenchBasic,
 		"thoughts-workbench.qrspi-lifecycle": BuildThoughtsWorkbenchQRSPILifecycle,
+		WorkbenchV2Fixture:                   BuildWorkbenchV2,
 		"workspaces.cleaned":                 BuildEmptyFixture,
 		"workspaces.release-lanes":           BuildEmptyFixture,
 		DurableFreeformFixture:               BuildFreeformDurableChat,

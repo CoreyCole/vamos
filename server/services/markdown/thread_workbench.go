@@ -101,8 +101,8 @@ func (s *Service) artifactContent(
 	if !explicit {
 		return WorkbenchUnavailable("Select a thread to view an artifact."), nil, false
 	}
-	if directory, err := s.GetDirectoryListing(artifact); err == nil {
-		return DirectoryPrimaryPanel(directory), nil, true
+	if _, err := s.GetDirectoryListing(artifact); err == nil {
+		return WorkbenchUnavailable("Select a file from the artifact browser."), nil, true
 	}
 	page, err := s.RenderThoughtsDocument(c.Request().Context(), artifact)
 	if err != nil {
@@ -118,7 +118,14 @@ func (s *Service) indexArtifactComponent(
 	explicit bool,
 ) templ.Component {
 	content, _, _ := s.artifactContent(c, artifact, explicit)
-	return content
+	if !explicit {
+		return content
+	}
+	browser, err := s.threadArtifactBrowser(c, "", artifact)
+	if err != nil {
+		return WorkbenchUnavailable("The artifact is unavailable.")
+	}
+	return ThreadArtifactPane(browser, content)
 }
 
 func (s *Service) ServeThreads(c echo.Context) error {
@@ -223,20 +230,4 @@ func (s *Service) ServeThread(c echo.Context) error {
 		userEmail,
 		state,
 	).Render(c.Request().Context(), c.Response().Writer)
-}
-
-func (s *Service) threadArtifactComponent(
-	c echo.Context,
-	threadID, rawDoc string,
-) (templ.Component, error) {
-	doc, err := s.ResolveThreadArtifact(c.Request().Context(), threadID, rawDoc)
-	if err != nil {
-		return nil, err
-	}
-	page, err := s.RenderThoughtsDocument(c.Request().Context(), doc)
-	if err != nil {
-		return WorkbenchUnavailable("The thread artifact is unavailable."), nil
-	}
-	page.UserEmail, _ = c.Get("user_email").(string)
-	return DocumentPanel(BuildDocumentPanelArgs(page)), nil
 }

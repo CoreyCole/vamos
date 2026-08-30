@@ -236,7 +236,6 @@ func (args *PageArgs) BuildRootArgs() layouts.RootArgs {
 		UserEmail:          args.UserEmail,
 		CurrentTheme:       args.CurrentTheme,
 		CurrentSyntaxTheme: args.CurrentSyntaxTheme,
-		ClipboardContent:   args.ViewerArgs.RawMarkdown,
 		BreadcrumbChatLinkState: layouts.BreadcrumbLinkState{
 			Active:           args.WorkbenchLinkState.Context == thoughtsContextModeChat,
 			Context:          args.WorkbenchLinkState.Context,

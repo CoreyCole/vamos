@@ -27,21 +27,20 @@ func ThoughtsWorkbenchLinkStateFromRequest(
 	selectedPlanPath string,
 ) ThoughtsWorkbenchLinkState {
 	return ThoughtsWorkbenchLinkState{
-		Context:          thoughtsContextMode(c),
-		ChatWorkspaceID:  strings.TrimSpace(c.QueryParam("chat_workspace")),
-		ChatThreadID:     strings.TrimSpace(c.QueryParam("thread")),
-		ChatRunID:        strings.TrimSpace(c.QueryParam("run")),
-		HermesThreadID:   strings.TrimSpace(c.QueryParam("hermes_thread")),
 		SelectedPlanPath: normalizeThoughtsRelativePath(selectedPlanPath),
 	}
 }
 
-func (state ThoughtsWorkbenchLinkState) WithContext(contextMode string) ThoughtsWorkbenchLinkState {
+func (state ThoughtsWorkbenchLinkState) WithContext(
+	contextMode string,
+) ThoughtsWorkbenchLinkState {
 	state.Context = strings.TrimSpace(contextMode)
 	return state
 }
 
-func (state ThoughtsWorkbenchLinkState) WithHermesThread(threadID string) ThoughtsWorkbenchLinkState {
+func (state ThoughtsWorkbenchLinkState) WithHermesThread(
+	threadID string,
+) ThoughtsWorkbenchLinkState {
 	state.Context = thoughtsContextModeThreads
 	state.HermesThreadID = strings.TrimSpace(threadID)
 	return state

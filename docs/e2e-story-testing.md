@@ -45,6 +45,13 @@ List authored Go Story tests:
 
 ```bash
 go test ./pkg/e2e/tests -list Test
+go test ./pkg/e2e/workbenchv2tests -list Test
+```
+
+Run only the Workbench v2 suite:
+
+```bash
+../datastarui/scripts/datastarui.sh e2e run --config datastarui-e2e-workbench-v2.yml
 ```
 
 Run authored Go Story browser tests from a registered non-main workspace. If the host serves a thoughts root outside the workspace checkout, set `VAMOS_E2E_THOUGHTS_ROOT` so fixtures create served documents in the same tree the browser reads.

@@ -243,11 +243,6 @@ templ MobileSectionCommentSheet() {
 	}
 }
 
-// discussionsAvatarMenuExtra builds the discussions action for the avatar menu.
-templ discussionsAvatarMenuExtra(pageComments *comments.GetCommentsResponse, userEmail string) {
-	@comments.DiscussionsMenuEntry(pageComments, userEmail)
-}
-
 templ OpenChatControl(documentPath string) {
 	<div class="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-md border border-border bg-muted/20 p-3 text-sm text-muted-foreground">
 		<div>
@@ -339,11 +334,7 @@ templ MarkdownPage(args *PageArgs) {
 }
 
 templ MarkdownWorkbenchPage(args MarkdownWorkbenchArgs) {
-	{{
-		rootArgs := args.PageArgs.BuildRootArgs()
-		rootArgs.AvatarMenuExtra = discussionsAvatarMenuExtra(args.PageArgs.Comments, args.PageArgs.UserEmail)
-	}}
-	@layouts.Root(rootArgs) {
+	@layouts.Root(args.PageArgs.BuildRootArgs()) {
 		@workbench.Workbench(args.Workbench)
 	}
 }

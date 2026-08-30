@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/a-h/templ"
+
 	"github.com/CoreyCole/vamos/server/layouts/workbench"
 	"github.com/CoreyCole/vamos/server/services/commentui"
 )
@@ -71,7 +72,6 @@ func TestMarkdownPageUsesSharedCommentUI(t *testing.T) {
 		`name="selected_text"`,
 		`id="document-surface"`,
 		`thoughts-open-chat-result`,
-		`Discussions`,
 		`id="workbench-root"`,
 		`id="thoughts-section-map-region"`,
 		`id="thoughts-document-region"`,
@@ -81,6 +81,7 @@ func TestMarkdownPageUsesSharedCommentUI(t *testing.T) {
 		}
 	}
 	for _, removed := range []string{
+		`Discussions`,
 		`id="comment-sidebar"`,
 		`commentSidebarExpanded`,
 		`$commentSidebarExpanded`,
@@ -398,10 +399,10 @@ func minimalCommentUIArgs() commentui.CommentableMarkdownArgs {
 
 func TestActiveThoughtsCommentSurfacesCarryWorkbenchV2Marker(t *testing.T) {
 	for _, tc := range []struct {
-		name string
-		mode CommentMode
+		name     string
+		mode     CommentMode
 		existing templ.Component
-		wants []string
+		wants    []string
 	}{
 		{"markdown", CommentModeSections, nil, []string{`comment-target-`, `name="workbench_v2" value="1"`}},
 		{"source", CommentModeSelectionOnly, templ.Raw(`<pre>source</pre>`), []string{`comment-target-`, `name="workbench_v2" value="1"`}},
@@ -409,29 +410,81 @@ func TestActiveThoughtsCommentSurfacesCarryWorkbenchV2Marker(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			args := commentui.CommentableMarkdownArgs{
-				Surface: commentui.CommentSurfaceThoughts, IDPrefix: "thoughts-test", DocPath: "thoughts/test.html",
-				Sections: []commentui.CommentSectionView{{ID: "document", BodyHTML: "<p>body</p>"}},
-				Routes: commentui.CommentRoutes{Show: "/forms/comments/show", Create: "/forms/comments", Cancel: "/forms/comments/cancel", Expand: "/forms/comments/expand"},
-				HiddenFields: map[string]string{"doc_path": "thoughts/test", "workbench_v2": "1"},
-				SelectionSignals: commentui.SelectionSignalArgs{Prefix: "selection", ShowRoute: "/forms/comments/show", HiddenFields: map[string]string{"doc_path": "thoughts/test", "workbench_v2": "1"}},
+				Surface:  commentui.CommentSurfaceThoughts,
+				IDPrefix: "thoughts-test",
+				DocPath:  "thoughts/test.html",
+				Sections: []commentui.CommentSectionView{
+					{ID: "document", BodyHTML: "<p>body</p>"},
+				},
+				Routes: commentui.CommentRoutes{
+					Show:   "/forms/comments/show",
+					Create: "/forms/comments",
+					Cancel: "/forms/comments/cancel",
+					Expand: "/forms/comments/expand",
+				},
+				HiddenFields: map[string]string{
+					"doc_path":     "thoughts/test",
+					"workbench_v2": "1",
+				},
+				SelectionSignals: commentui.SelectionSignalArgs{
+					Prefix:    "selection",
+					ShowRoute: "/forms/comments/show",
+					HiddenFields: map[string]string{
+						"doc_path":     "thoughts/test",
+						"workbench_v2": "1",
+					},
+				},
 			}
 			var buf bytes.Buffer
-			if err := commentComponentForMode(tc.mode, args, tc.existing).Render(t.Context(), &buf); err != nil { t.Fatal(err) }
+			if err := commentComponentForMode(
+				tc.mode,
+				args,
+				tc.existing,
+			).Render(t.Context(), &buf); err != nil {
+				t.Fatal(err)
+			}
 			html := buf.String()
-			for _, want := range tc.wants { if !strings.Contains(html, want) { t.Fatalf("missing %q in %s", want, html) } }
+			for _, want := range tc.wants {
+				if !strings.Contains(html, want) {
+					t.Fatalf("missing %q in %s", want, html)
+				}
+			}
 		})
 	}
 }
 
 func TestActiveThoughtsSelectCommentFormCarriesWorkbenchV2Marker(t *testing.T) {
 	args := commentui.CommentableMarkdownArgs{
-		Surface: commentui.CommentSurfaceThoughts, IDPrefix: "thoughts-test", DocPath: "thoughts/test.md",
-		Comments: []commentui.CommentThreadView{{ID: "comment-1", SectionID: "document", HiddenFields: map[string]string{"comment_id": "comment-1", "doc_path": "thoughts/test.md"}}},
-		Routes: commentui.CommentRoutes{SelectComment: "/thoughts/actions/select-comment"},
-		HiddenFields: map[string]string{"doc_path": "thoughts/test.md", "workbench_v2": "1"},
+		Surface:  commentui.CommentSurfaceThoughts,
+		IDPrefix: "thoughts-test",
+		DocPath:  "thoughts/test.md",
+		Comments: []commentui.CommentThreadView{
+			{
+				ID:        "comment-1",
+				SectionID: "document",
+				HiddenFields: map[string]string{
+					"comment_id": "comment-1",
+					"doc_path":   "thoughts/test.md",
+				},
+			},
+		},
+		Routes: commentui.CommentRoutes{
+			SelectComment: "/thoughts/actions/select-comment",
+		},
+		HiddenFields: map[string]string{
+			"doc_path":     "thoughts/test.md",
+			"workbench_v2": "1",
+		},
 	}
 	var buf bytes.Buffer
-	if err := commentui.CommentsContextPanel(commentui.BuildCommentsPanelArgs(args, "")).Render(t.Context(), &buf); err != nil { t.Fatal(err) }
+	if err := commentui.CommentsContextPanel(commentui.BuildCommentsPanelArgs(args, "")).
+		Render(t.Context(), &buf); err != nil {
+		t.Fatal(err)
+	}
 	html := buf.String()
-	for _, want := range []string{`@post(&#39;/thoughts/actions/select-comment&#39;`, `name="workbench_v2" value="1"`} { if !strings.Contains(html, want) { t.Fatalf("select-comment form missing %q: %s", want, html) } }
+	for _, want := range []string{`@post(&#39;/thoughts/actions/select-comment&#39;`, `name="workbench_v2" value="1"`} {
+		if !strings.Contains(html, want) {
+			t.Fatalf("select-comment form missing %q: %s", want, html)
+		}
+	}
 }

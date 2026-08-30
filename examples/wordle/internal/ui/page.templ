@@ -11,7 +11,7 @@ templ Page() {
 			<link rel="stylesheet" href="static/app.css"/>
 		</head>
 		<body class="min-h-screen bg-slate-950 text-slate-100">
-			<main class="mx-auto flex min-h-screen max-w-3xl flex-col gap-8 px-5 py-10" data-init="@get('/events')">
+			<main class="mx-auto flex min-h-screen max-w-3xl flex-col gap-8 px-5 py-10" data-init="@get('events')">
 				<header class="space-y-3 text-center">
 					<p class="text-sm font-semibold uppercase tracking-[0.3em] text-emerald-300">Datastar daily game</p>
 					<h1 class="text-4xl font-black tracking-tight text-white sm:text-6xl">Daily Wordle</h1>
@@ -105,7 +105,7 @@ templ Tile(tile TileView) {
 }
 
 templ GuessForm(data GameView) {
-	<form id="guess-form" class="flex justify-center" autocomplete="off" data-on:submit__prevent="if ($guess.length === 5) { @post('/guesses', {contentType: 'form'}) }">
+	<form id="guess-form" class="flex justify-center" autocomplete="off" data-on:submit__prevent="if ($guess.length === 5) { @post('guesses', {contentType: 'form'}) }">
 		<input type="hidden" name="guess" data-bind="guess"/>
 		<button class="rounded-2xl bg-emerald-300 px-5 py-3 font-bold text-slate-950 transition hover:bg-emerald-200 disabled:cursor-not-allowed disabled:opacity-50" type="submit" data-attr:disabled="$guess.length !== 5">Enter</button>
 	</form>

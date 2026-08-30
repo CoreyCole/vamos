@@ -14,3 +14,18 @@ templ ThreadWorkbenchPage(userEmail string, state workbench.WorkbenchState) {
 templ WorkbenchUnavailable(message string) {
 	<div class="flex h-full min-h-0 items-center justify-center p-4 text-sm text-muted-foreground">{ message }</div>
 }
+
+templ ThoughtsV2ArtifactPane(chatHref string, document templ.Component) {
+	<div class="flex h-full min-h-0 flex-col bg-background">
+		<div class="flex shrink-0 items-center gap-2 border-b border-border p-2 text-xs">
+			if chatHref != "" {
+				<a href={ templ.URL(chatHref) } class="rounded border border-border px-2 py-1 hover:bg-muted">Chat</a>
+			} else {
+				<span class="text-muted-foreground">No thread for this plan</span>
+			}
+		</div>
+		<div class="min-h-0 flex-1 overflow-auto">
+			@document
+		</div>
+	</div>
+}

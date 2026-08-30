@@ -1721,6 +1721,24 @@ func main() {
 	threadsGroup := e.Group("/threads")
 	threadsGroup.Use(authMiddleware)
 	threadsGroup.GET("", markdownService.ServeThreads)
+	threadsGroup.GET("/artifact", markdownService.HandleThreadArtifact)
+	threadsGroup.GET(
+		"/artifact-browser",
+		markdownService.HandleThreadArtifactBrowser,
+	)
+	threadsGroup.GET(
+		"/artifact-directory",
+		markdownService.HandleThreadArtifactDirectory,
+	)
+	threadsGroup.GET("/:threadID/artifact", markdownService.HandleThreadArtifact)
+	threadsGroup.GET(
+		"/:threadID/artifact-browser",
+		markdownService.HandleThreadArtifactBrowser,
+	)
+	threadsGroup.GET(
+		"/:threadID/artifact-directory",
+		markdownService.HandleThreadArtifactDirectory,
+	)
 	threadsGroup.GET("/:threadID", markdownService.ServeThread)
 
 	// Protected form routes - require authentication

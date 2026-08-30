@@ -1,27 +1,132 @@
 package markdown
 
 templ ThreadArtifactPane(browser ThreadArtifactBrowserArgs, document templ.Component) {
-	<div class="flex h-full min-h-0 flex-col bg-background">
+	<div
+		id="thread-artifact-pane"
+		class="flex h-full min-h-0 flex-col bg-background"
+		data-signals="{_threadArtifactLoading: false}"
+		data-attr:aria-busy="$_threadArtifactLoading ? 'true' : 'false'"
+	>
 		<div class="flex shrink-0 items-center gap-2 border-b border-border p-2 text-xs">
-			if browser.Parent != "" {
-				<a href={ templ.URL(browser.Parent) } class="rounded px-2 py-1 hover:bg-muted">../</a>
-			}
 			<span class="min-w-0 flex-1 truncate text-muted-foreground">{ "thoughts/" + browser.DocPath }</span>
-			<button type="button" class="rounded border border-border px-2 py-1 hover:bg-muted" data-on:click={ "navigator.clipboard?.writeText('thoughts/" + browser.DocPath + "'); const input = document.getElementById('agent-chat-composer-input'); if (input) { input.value += (input.value ? '\\n' : '') + 'thoughts/" + browser.DocPath + "'; input.dispatchEvent(new Event('input', {bubbles: true})); }" }>Copy path</button>
-		</div>
-		<div class="shrink-0 border-b border-border p-2">
-			for _, entry := range browser.Entries {
-				<a href={ templ.URL(entry.Href) } class="block truncate rounded px-2 py-1 text-xs hover:bg-muted">
-					if entry.IsDir {
-						{ entry.Name + "/" }
-					} else {
-						{ entry.Name }
-					}
-				</a>
+			if browser.DocPath != "" {
+				<a href={ templ.URL(ThoughtsDocURL(browser.DocPath, "")) } class="rounded border border-border px-2 py-1 hover:bg-muted">Thoughts</a>
+				<button
+					type="button"
+					class="rounded border border-border px-2 py-1 hover:bg-muted"
+					data-artifact-path={ "thoughts/" + browser.DocPath }
+					data-on:click="navigator.clipboard?.writeText(el.dataset.artifactPath); const input = document.getElementById('agent-chat-composer-input'); if (input) { input.value += (input.value ? '\n' : '') + el.dataset.artifactPath; input.dispatchEvent(new Event('input', {bubbles: true})); }"
+				>Copy path</button>
 			}
 		</div>
-		<div class="min-h-0 flex-1 overflow-auto">
+		@ThreadArtifactBrowser(browser)
+		<div id="thread-artifact-document" class="min-h-0 flex-1 overflow-auto" aria-live="polite">
 			@document
 		</div>
 	</div>
+}
+
+templ ThreadArtifactBrowser(browser ThreadArtifactBrowserArgs) {
+	<nav
+		id="thread-artifact-browser"
+		data-thread-artifact-browser
+		data-thread-artifact-cwd={ threadArtifactDirectoryIdentity(browser.DirectoryPath) }
+		class="min-h-0 max-h-64 shrink-0 overflow-y-auto border-b border-border p-2"
+		aria-label="Artifact browser"
+	>
+		<div class="mb-1 flex min-h-8 items-center gap-1 px-1 text-xs text-muted-foreground">
+			if browser.ParentEndpoint != "" {
+				<a
+					href={ templ.URL(browser.ParentHref) }
+					data-thread-artifact-up
+					data-artifact-endpoint={ browser.ParentEndpoint }
+					data-indicator="_threadArtifactLoading"
+					data-on:click={ threadArtifactBrowserClickAction() }
+					class="inline-flex h-7 shrink-0 items-center gap-1 rounded px-2 transition-colors hover:bg-muted hover:text-foreground"
+					aria-label="Open parent folder"
+					title="Open parent folder"
+				>
+					<span aria-hidden="true">←</span>
+					<span>Up</span>
+				</a>
+			}
+			<span class="min-w-0 flex-1 truncate">{ threadArtifactDirectoryIdentity(browser.DirectoryPath) }</span>
+		</div>
+		<ul class="space-y-0.5">
+			for _, entry := range browser.Entries {
+				@ThreadArtifactBrowserEntry(entry)
+			}
+		</ul>
+	</nav>
+}
+
+templ ThreadArtifactBrowserEntry(entry ThreadArtifactEntry) {
+	if entry.IsDir {
+		@ThreadArtifactDirectory(entry)
+	} else {
+		<li>
+			<a
+				href={ templ.URL(entry.Href) }
+				data-thread-artifact-file
+				data-artifact-endpoint={ entry.Endpoint }
+				data-indicator="_threadArtifactLoading"
+				data-on:click={ threadArtifactFileClickAction() }
+				if entry.IsActive {
+					aria-current="page"
+				}
+				class={
+					"block truncate rounded px-2 py-1 text-xs transition-colors",
+					templ.KV("bg-accent font-medium text-accent-foreground", entry.IsActive),
+					templ.KV("text-muted-foreground hover:bg-muted hover:text-foreground", !entry.IsActive),
+				}
+			>
+				{ entry.Name }
+			</a>
+		</li>
+	}
+}
+
+templ ThreadArtifactDirectory(entry ThreadArtifactEntry) {
+	<li id={ entry.TargetID } class="relative">
+		<details
+			class="group"
+			if entry.IsExpanded {
+				open
+			}
+			data-loaded={ threadArtifactLoaded(entry.IsLoaded) }
+			data-artifact-endpoint={ entry.Endpoint }
+			data-on:toggle={ threadArtifactDirectoryToggleAction() }
+		>
+			<summary
+				data-thread-artifact-toggle
+				class="flex min-h-8 cursor-pointer select-none items-center gap-1.5 rounded py-1 pl-2 pr-9 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+				aria-controls={ threadArtifactChildrenID(entry) }
+			>
+				<span class="group-open:hidden" aria-hidden="true">▸</span>
+				<span class="hidden group-open:inline" aria-hidden="true">▾</span>
+				<span class="truncate">{ entry.Name }/</span>
+			</summary>
+			<ul id={ threadArtifactChildrenID(entry) } class="ml-3 space-y-0.5 border-l border-border pl-1">
+				for _, child := range entry.Children {
+					@ThreadArtifactBrowserEntry(child)
+				}
+			</ul>
+		</details>
+		if entry.BrowseEndpoint != "" {
+			<a
+				href={ templ.URL(entry.BrowseHref) }
+				data-thread-artifact-enter
+				data-artifact-endpoint={ entry.BrowseEndpoint }
+				data-indicator="_threadArtifactLoading"
+				data-on:click={ threadArtifactBrowserClickAction() }
+				class="absolute right-1 top-0.5 inline-flex h-7 w-7 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+				aria-label={ "Open " + entry.Name + " folder" }
+				title={ "Open " + entry.Name + " folder" }
+			>
+				<svg class="h-3.5 w-3.5" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+				</svg>
+			</a>
+		}
+	</li>
 }

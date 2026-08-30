@@ -37,6 +37,40 @@ func TestOpenChatForDocumentPatchesEmptyStateWhenNoCandidates(t *testing.T) {
 	}
 }
 
+func TestOpenChatForDocumentNavigatesToThreadWhenMapped(t *testing.T) {
+	t.Parallel()
+
+	resolver := &fakeChatWorkspaceCandidateResolver{
+		candidates: []ChatWorkspaceCandidate{{
+			RootPath: "thoughts/user/plans/plan-a",
+			Label:    "plan-a · user/plans",
+		}},
+		openResult: OpenChatWorkspaceResult{
+			WorkspaceID: "ws_1",
+			URL:         "/thoughts/?chat_workspace=ws_1",
+		},
+	}
+	c, rec := newOpenChatRequest(t, "/thoughts/actions/open-chat", url.Values{
+		"doc_path": {"thoughts/user/plans/plan-a/doc.md"},
+	})
+
+	err := (&Service{
+		chatWorkspaceResolver:    resolver,
+		workbenchThreadsRenderer: stubWorkbenchThreads{threadID: "th_1"},
+	}).OpenChatForDocument(c)
+	if err != nil {
+		t.Fatalf("OpenChatForDocument() error = %v", err)
+	}
+	body := rec.Body.String()
+	if !strings.Contains(body, "/threads/th_1") ||
+		!strings.Contains(body, "window.location.assign") {
+		t.Fatalf("response body = %s, want thread navigation", body)
+	}
+	if strings.Contains(body, "rightRailActiveTab") {
+		t.Fatalf("response body still patches v1 rail: %s", body)
+	}
+}
+
 func TestOpenChatForDocumentOpensSingleCandidateInPlace(t *testing.T) {
 	t.Parallel()
 
@@ -63,22 +97,14 @@ func TestOpenChatForDocumentOpensSingleCandidateInPlace(t *testing.T) {
 		t.Fatalf("openRoot = %q, want single candidate root", resolver.openRoot)
 	}
 	body := rec.Body.String()
-	for _, want := range []string{
-		"rightRailActiveTab",
-		"chat",
-		"agent-chat-composer-attachments",
-		"thoughts/user/plans/plan-a/doc.md",
-		"doc.md",
-		"agent-chat-composer-input",
-	} {
-		if !strings.Contains(body, want) {
-			t.Fatalf("response body missing %q: %s", want, body)
-		}
+	if !strings.Contains(
+		body,
+		"/threads?artifact=thoughts%2Fuser%2Fplans%2Fplan-a%2Fdoc.md",
+	) {
+		t.Fatalf("response body missing thread index artifact route: %s", body)
 	}
-	for _, notWant := range []string{"thoughts-shared-sidebar", "doc-workbench-center-pane"} {
-		if strings.Contains(body, notWant) {
-			t.Fatalf("response body contains %q: %s", notWant, body)
-		}
+	if strings.Contains(body, "rightRailActiveTab") {
+		t.Fatalf("response body still patches v1 rail: %s", body)
 	}
 }
 
@@ -176,6 +202,48 @@ func (f *fakeChatWorkspaceCandidateResolver) OpenChatWorkspace(
 	_ = userEmail
 	f.openRoot = rootPath
 	return f.openResult, nil
+}
+
+type stubWorkbenchThreads struct {
+	threadID string
+}
+
+func (s stubWorkbenchThreads) RenderWorkbenchThreadList(
+	ctx context.Context,
+	selectedID, artifact string,
+) (templ.Component, error) {
+	_ = ctx
+	_ = selectedID
+	_ = artifact
+	return templ.NopComponent, nil
+}
+
+func (s stubWorkbenchThreads) ResolveSharedThreadPlanDir(
+	ctx context.Context,
+	threadID string,
+) (string, error) {
+	_ = ctx
+	_ = threadID
+	return "thoughts/user/plans/plan-a", nil
+}
+
+func (s stubWorkbenchThreads) FindSharedThreadForDoc(
+	ctx context.Context,
+	docPath string,
+) (string, error) {
+	_ = ctx
+	_ = docPath
+	return s.threadID, nil
+}
+
+func (s stubWorkbenchThreads) RenderSharedThreadChat(
+	ctx context.Context,
+	threadID, userEmail string,
+) (templ.Component, error) {
+	_ = ctx
+	_ = threadID
+	_ = userEmail
+	return templ.NopComponent, nil
 }
 
 func TestThoughtsContextPanelRendersEmbeddedChatComponent(t *testing.T) {

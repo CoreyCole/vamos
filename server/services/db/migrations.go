@@ -78,7 +78,10 @@ func prepareSchemaCompatibilityMigrations(ctx context.Context, database *sql.DB)
 	if err := ensurePlanWorkspacesColumnsIfTableExists(ctx, database); err != nil {
 		return err
 	}
-	if err := ensureImplWorkspaceCleanupProofColumnsIfTableExists(ctx, database); err != nil {
+	if err := ensureImplWorkspaceCleanupProofColumnsIfTableExists(
+		ctx,
+		database,
+	); err != nil {
 		return err
 	}
 	if err := ensurePlanWorkspaceRelationshipTables(ctx, database); err != nil {
@@ -157,7 +160,10 @@ func runRuntimeMigrations(ctx context.Context, database *sql.DB) error {
 	if err := ensurePlanWorkspacesColumnsIfTableExists(ctx, database); err != nil {
 		return err
 	}
-	if err := ensureImplWorkspaceCleanupProofColumnsIfTableExists(ctx, database); err != nil {
+	if err := ensureImplWorkspaceCleanupProofColumnsIfTableExists(
+		ctx,
+		database,
+	); err != nil {
 		return err
 	}
 	if err := ensurePlanWorkspaceRelationshipTables(ctx, database); err != nil {
@@ -349,7 +355,13 @@ func ensureImplWorkspaceCleanupProofColumnsIfTableExists(
 		{name: "activity_hash", definition: "TEXT NOT NULL DEFAULT ''"},
 		{name: "activity_checked_at", definition: "DATETIME"},
 	} {
-		if err := ensureColumn(ctx, database, "impl_workspaces", column.name, column.definition); err != nil {
+		if err := ensureColumn(
+			ctx,
+			database,
+			"impl_workspaces",
+			column.name,
+			column.definition,
+		); err != nil {
 			return err
 		}
 	}
@@ -371,7 +383,10 @@ func ensureImplWorkspaceCleanupProofColumnsIfTableExists(
 	return nil
 }
 
-func repairProtectedImplWorkspaceTerminalStatuses(ctx context.Context, database execer) (int64, error) {
+func repairProtectedImplWorkspaceTerminalStatuses(
+	ctx context.Context,
+	database execer,
+) (int64, error) {
 	result, err := database.ExecContext(ctx, `
 UPDATE impl_workspaces
 SET
@@ -482,7 +497,10 @@ func ensureImplWorkspaceCompositePrimaryKey(ctx context.Context, database *sql.D
 	return tx.Commit()
 }
 
-func implWorkspacesHasCompositePrimaryKey(ctx context.Context, database *sql.DB) (bool, error) {
+func implWorkspacesHasCompositePrimaryKey(
+	ctx context.Context,
+	database *sql.DB,
+) (bool, error) {
 	rows, err := database.QueryContext(ctx, "PRAGMA table_info(impl_workspaces)")
 	if err != nil {
 		return false, err
@@ -505,7 +523,8 @@ func implWorkspacesHasCompositePrimaryKey(ctx context.Context, database *sql.DB)
 	if err := rows.Err(); err != nil {
 		return false, err
 	}
-	return len(pk) == 2 && strings.EqualFold(pk[1], "project_id") && strings.EqualFold(pk[2], "workspace_slug"), nil
+	return len(pk) == 2 && strings.EqualFold(pk[1], "project_id") &&
+		strings.EqualFold(pk[2], "workspace_slug"), nil
 }
 
 func ensureWorkspaceEventsDocColumnsIfTableExists(
@@ -537,9 +556,28 @@ func ensureLayoutPreferencesViewportClass(ctx context.Context, database *sql.DB)
 	if err != nil || !exists {
 		return err
 	}
-	hasViewportClass, err := tableColumnExists(ctx, database, "layout_preferences", "viewport_class")
-	if err != nil || hasViewportClass {
+	hasViewportClass, err := tableColumnExists(
+		ctx,
+		database,
+		"layout_preferences",
+		"viewport_class",
+	)
+	if err != nil {
 		return err
+	}
+	var tableDefinition string
+	if err := database.QueryRowContext(
+		ctx,
+		`SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'layout_preferences'`,
+	).Scan(&tableDefinition); err != nil {
+		return err
+	}
+	if hasViewportClass && strings.Contains(tableDefinition, "'threads'") {
+		return nil
+	}
+	viewportValue := "'desktop-full'"
+	if hasViewportClass {
+		viewportValue = "viewport_class"
 	}
 
 	tx, err := database.BeginTx(ctx, nil)
@@ -551,7 +589,7 @@ func ensureLayoutPreferencesViewportClass(ctx context.Context, database *sql.DB)
 	statements := []string{
 		`CREATE TABLE layout_preferences_new (
 			user_email TEXT NOT NULL,
-			page TEXT NOT NULL CHECK (page IN ('agent-chat', 'thoughts')),
+			page TEXT NOT NULL CHECK (page IN ('agent-chat', 'thoughts', 'threads')),
 			view TEXT NOT NULL CHECK (view IN ('focus', 'split')),
 			viewport_class TEXT NOT NULL DEFAULT 'desktop-full' CHECK (viewport_class IN ('mobile', 'desktop-half', 'desktop-full')),
 			config_json TEXT NOT NULL,
@@ -559,8 +597,11 @@ func ensureLayoutPreferencesViewportClass(ctx context.Context, database *sql.DB)
 			updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
 			PRIMARY KEY (user_email, page, view, viewport_class)
 		)`,
-		`INSERT INTO layout_preferences_new (user_email, page, view, viewport_class, config_json, created_at, updated_at)
-		 SELECT user_email, page, view, 'desktop-full', config_json, created_at, updated_at FROM layout_preferences`,
+		fmt.Sprintf(
+			`INSERT INTO layout_preferences_new (user_email, page, view, viewport_class, config_json, created_at, updated_at)
+			 SELECT user_email, page, view, %s, config_json, created_at, updated_at FROM layout_preferences`,
+			viewportValue,
+		),
 		`DROP TABLE layout_preferences`,
 		`ALTER TABLE layout_preferences_new RENAME TO layout_preferences`,
 		`CREATE INDEX IF NOT EXISTS idx_layout_preferences_user ON layout_preferences (user_email, page, view, viewport_class)`,
@@ -651,14 +692,23 @@ func ensurePlanWorkspacesColumns(
 		{name: "qrspi_lifecycle_updated_at", definition: "DATETIME"},
 		{name: "qrspi_closed_reason", definition: "TEXT NOT NULL DEFAULT ''"},
 	} {
-		if err := ensureColumn(ctx, database, "plan_workspaces", column.name, column.definition); err != nil {
+		if err := ensureColumn(
+			ctx,
+			database,
+			"plan_workspaces",
+			column.name,
+			column.definition,
+		); err != nil {
 			return err
 		}
 	}
 	for _, indexName := range []string{
 		"idx_plan_workspaces_active_slug",
 	} {
-		if _, err := database.ExecContext(ctx, "DROP INDEX IF EXISTS "+indexName); err != nil {
+		if _, err := database.ExecContext(
+			ctx,
+			"DROP INDEX IF EXISTS "+indexName,
+		); err != nil {
 			return err
 		}
 	}
@@ -671,7 +721,12 @@ func ensurePlanWorkspacesColumns(
 		"impl_workspace_merged_at",
 		"impl_workspace_missing_at",
 	} {
-		if err := dropColumnIfExists(ctx, database, "plan_workspaces", column); err != nil {
+		if err := dropColumnIfExists(
+			ctx,
+			database,
+			"plan_workspaces",
+			column,
+		); err != nil {
 			return err
 		}
 	}
@@ -741,7 +796,13 @@ REFERENCES impl_workspaces (project_id, workspace_slug)
 		{tableName: "plan_workspace_impl_bindings", name: "last_discovered_at", definition: "DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP"},
 		{tableName: "plan_workspace_impl_bindings", name: "archived_at", definition: "DATETIME"},
 	} {
-		if err := ensureColumn(ctx, database, column.tableName, column.name, column.definition); err != nil {
+		if err := ensureColumn(
+			ctx,
+			database,
+			column.tableName,
+			column.name,
+			column.definition,
+		); err != nil {
 			return err
 		}
 	}
@@ -785,25 +846,46 @@ func ensureAgentThreadWorkspaces(ctx context.Context, database *sql.DB) error {
 			return err
 		}
 	}
-	hasWorkspaceID, err := tableColumnExists(ctx, database, "agent_threads", "workspace_id")
+	hasWorkspaceID, err := tableColumnExists(
+		ctx,
+		database,
+		"agent_threads",
+		"workspace_id",
+	)
 	if err != nil || !hasWorkspaceID {
 		return err
 	}
-	if _, err := database.ExecContext(ctx, `DROP INDEX IF EXISTS idx_agent_threads_workspace_updated`); err != nil {
+	if _, err := database.ExecContext(
+		ctx,
+		`DROP INDEX IF EXISTS idx_agent_threads_workspace_updated`,
+	); err != nil {
 		return err
 	}
 	return dropColumnIfExists(ctx, database, "agent_threads", "workspace_id")
 }
 
-func ensureAgentThreadProjectColumnsIfTableExists(ctx context.Context, database *sql.DB) error {
+func ensureAgentThreadProjectColumnsIfTableExists(
+	ctx context.Context,
+	database *sql.DB,
+) error {
 	exists, err := tableExists(ctx, database, "agent_threads")
 	if err != nil || !exists {
 		return err
 	}
-	if err := ensureColumn(ctx, database, "agent_threads", "project_id", "TEXT NOT NULL DEFAULT ''"); err != nil {
+	if err := ensureColumn(
+		ctx,
+		database,
+		"agent_threads",
+		"project_id",
+		"TEXT NOT NULL DEFAULT ''",
+	); err != nil {
 		return err
 	}
-	return ensureIndex(ctx, database, "CREATE INDEX IF NOT EXISTS idx_agent_threads_project_user_updated ON agent_threads (project_id, user_email, updated_at DESC) WHERE archived_at IS NULL")
+	return ensureIndex(
+		ctx,
+		database,
+		"CREATE INDEX IF NOT EXISTS idx_agent_threads_project_user_updated ON agent_threads (project_id, user_email, updated_at DESC) WHERE archived_at IS NULL",
+	)
 }
 
 func ensureAgentRunsWorkflowColumns(ctx context.Context, database *sql.DB) error {
@@ -1029,15 +1111,30 @@ func ensureAgentSessionsProjectionSchema(ctx context.Context, database *sql.DB) 
 	if err != nil || !exists {
 		return err
 	}
-	hasIdentityKind, err := tableColumnExists(ctx, database, "agent_sessions", "identity_kind")
+	hasIdentityKind, err := tableColumnExists(
+		ctx,
+		database,
+		"agent_sessions",
+		"identity_kind",
+	)
 	if err != nil {
 		return err
 	}
-	hasArtifactPath, err := tableColumnExists(ctx, database, "agent_sessions", "artifact_path")
+	hasArtifactPath, err := tableColumnExists(
+		ctx,
+		database,
+		"agent_sessions",
+		"artifact_path",
+	)
 	if err != nil {
 		return err
 	}
-	hasProjectionState, err := tableColumnExists(ctx, database, "agent_sessions", "projection_state")
+	hasProjectionState, err := tableColumnExists(
+		ctx,
+		database,
+		"agent_sessions",
+		"projection_state",
+	)
 	if err != nil {
 		return err
 	}
@@ -1121,7 +1218,10 @@ func ensureAgentSessionsProjectionSchema(ctx context.Context, database *sql.DB) 
 	return ensureAgentSessionProjectionIndexes(ctx, database)
 }
 
-func ensureLegacyAgentSessionColumnsForProjection(ctx context.Context, database *sql.DB) error {
+func ensureLegacyAgentSessionColumnsForProjection(
+	ctx context.Context,
+	database *sql.DB,
+) error {
 	columns := []struct {
 		name       string
 		definition string
@@ -1142,7 +1242,13 @@ func ensureLegacyAgentSessionColumnsForProjection(ctx context.Context, database 
 		{"updated_at", "DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP"},
 	}
 	for _, column := range columns {
-		if err := ensureColumn(ctx, database, "agent_sessions", column.name, column.definition); err != nil {
+		if err := ensureColumn(
+			ctx,
+			database,
+			"agent_sessions",
+			column.name,
+			column.definition,
+		); err != nil {
 			return err
 		}
 	}

@@ -88,6 +88,7 @@ func TestBuildDocumentWorkbenchActionsRendersWholeDocumentComment(t *testing.T) 
 		ViewerArgs: ViewerArgs{
 			CommentMode: CommentModeSections,
 			Frontmatter: &Frontmatter{Topic: "Design Doc"},
+			RawMarkdown: "# Design Doc\n",
 		},
 	}
 
@@ -99,6 +100,9 @@ func TestBuildDocumentWorkbenchActionsRendersWholeDocumentComment(t *testing.T) 
 	for _, want := range []string{
 		`data-testid="workbench-overflow-actions"`,
 		`Document actions`,
+		`id="document-copy-source"`,
+		`Copy document`,
+		`navigator.clipboard.writeText`,
 		`Comment`,
 		`data-on:submit__prevent="el.closest(&#39;details&#39;)?.removeAttribute(&#39;open&#39;); @post(&#39;/forms/comments/show&#39;, {contentType: &#39;form&#39;})"`,
 		`name="doc_path" value="thoughts/example/design.md"`,

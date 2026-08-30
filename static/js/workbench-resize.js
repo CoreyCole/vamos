@@ -350,6 +350,24 @@ function init() {
   }
 }
 
+let windowResizeFrame;
+function reflowWorkbenchesAfterWindowResize() {
+  if (windowResizeFrame) cancelAnimationFrame(windowResizeFrame);
+  windowResizeFrame = requestAnimationFrame(() => {
+    windowResizeFrame = undefined;
+    for (const root of document.querySelectorAll("#workbench-root")) {
+      for (const region of allRegions(root)) {
+        delete region.dataset.workbenchWidthPx;
+      }
+      applyRegionRatios(root);
+    }
+  });
+}
+
+window.addEventListener("resize", reflowWorkbenchesAfterWindowResize, {
+  passive: true,
+});
+
 init();
 document.addEventListener("datastar-patch-elements", init);
 new MutationObserver(init).observe(document.documentElement, {

@@ -232,9 +232,16 @@ templ CommentableSelectionHTML(args CommentableMarkdownArgs) {
 
 templ CommentTarget(args CommentTargetView) {
 	if TargetChromeOrVisible(args.Chrome) == CommentTargetChromePatchOnly {
-		<div id={ args.ID } class={ CommentAnchorClass(args.SignalKey) + " commentui-selection-target-right h-0 w-0 overflow-visible" } data-style={ FormAnchorStyleExpr(args.SelectionSignalPrefix) } data-comment-target="true" aria-hidden="true">
-			@HiddenFields(args.HiddenFields)
-		</div>
+		if len(args.Threads) > 0 {
+			<div id={ args.ID } class={ CommentAnchorClass(args.SignalKey) + " commentui-selection-target-right h-0 w-0 overflow-visible" } data-style={ FormAnchorStyleExpr(args.SelectionSignalPrefix) } data-comment-target="true">
+				@HiddenFields(args.HiddenFields)
+				@CommentToggle(args)
+			</div>
+		} else {
+			<div id={ args.ID } class={ CommentAnchorClass(args.SignalKey) + " commentui-selection-target-right h-0 w-0 overflow-visible" } data-style={ FormAnchorStyleExpr(args.SelectionSignalPrefix) } data-comment-target="true" aria-hidden="true">
+				@HiddenFields(args.HiddenFields)
+			</div>
+		}
 	} else {
 		<div id={ args.ID } class="commentui-target flex items-center gap-1" data-comment-target="true">
 			if len(args.Threads) > 0 {

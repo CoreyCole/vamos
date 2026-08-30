@@ -21,6 +21,31 @@ import (
 	"github.com/CoreyCole/vamos/server/services/workspaces"
 )
 
+func TestThreadsRouteRegistrationIncludesScopedArtifactReads(t *testing.T) {
+	body, err := os.ReadFile("main.go")
+	if err != nil {
+		t.Fatal(err)
+	}
+	source := string(body)
+	for _, want := range []string{
+		`threadsGroup.GET("", markdownService.ServeThreads)`,
+		`threadsGroup.GET("/artifact", markdownService.HandleThreadArtifact)`,
+		`markdownService.HandleThreadArtifactBrowser`,
+		`markdownService.HandleThreadArtifactDirectory`,
+		`threadsGroup.GET("/:threadID/artifact", markdownService.HandleThreadArtifact)`,
+		`threadsGroup.GET("/:threadID", markdownService.ServeThread)`,
+	} {
+		if !strings.Contains(source, want) {
+			t.Fatalf("missing route registration %q", want)
+		}
+	}
+	for _, forbidden := range []string{`/:threadID/select`, `threadsGroup.POST("/:threadID/artifact"`} {
+		if strings.Contains(source, forbidden) {
+			t.Fatalf("obsolete route registration %q", forbidden)
+		}
+	}
+}
+
 func TestConfigureLayoutStaticAssetsUsesLocalDatastarProWhenPresent(t *testing.T) {
 	staticRoot := t.TempDir()
 	if err := os.MkdirAll(filepath.Join(staticRoot, "js"), 0o755); err != nil {

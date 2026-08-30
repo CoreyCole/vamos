@@ -51,6 +51,7 @@ type WorkbenchThreadRenderer interface {
 		selectedID, artifact string,
 	) (templ.Component, error)
 	ResolveSharedThreadPlanDir(ctx context.Context, threadID string) (string, error)
+	FindSharedThreadForDoc(ctx context.Context, docPath string) (string, error)
 	RenderSharedThreadChat(
 		ctx context.Context,
 		threadID, userEmail string,

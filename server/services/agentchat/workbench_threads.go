@@ -56,6 +56,17 @@ func threadSearchMatch(title string) string {
 	) + ").toLowerCase().includes($threadSearch.toLowerCase())"
 }
 
+func threadGroupSearchMatch(threads []WorkbenchThread) string {
+	matches := make([]string, 0, len(threads))
+	for _, thread := range threads {
+		matches = append(matches, threadSearchMatch(thread.Title))
+	}
+	if len(matches) == 0 {
+		return "false"
+	}
+	return "(" + strings.Join(matches, " || ") + ")"
+}
+
 func (s *Service) RenderWorkbenchThreadList(
 	ctx context.Context,
 	selectedID, artifact string,
@@ -84,6 +95,31 @@ func thoughtsPlanKey(raw string) string {
 		path = path[i:]
 	}
 	return filepath.ToSlash(planDirectoryRoot(path))
+}
+
+func (s *Service) FindSharedThreadForDoc(
+	ctx context.Context,
+	docPath string,
+) (string, error) {
+	want := thoughtsPlanKey(docPath)
+	if want == "" {
+		return "", nil
+	}
+	groups, err := s.ListWorkbenchThreads(ctx)
+	if err != nil {
+		return "", err
+	}
+	for _, group := range groups {
+		plan := thoughtsPlanKey(group.PlanDir)
+		if plan == "" || plan != want {
+			continue
+		}
+		if len(group.Threads) == 0 {
+			return "", nil
+		}
+		return group.Threads[0].ID, nil
+	}
+	return "", nil
 }
 
 func (s *Service) RenderSharedThreadChat(
