@@ -69,6 +69,12 @@ auth:
 web:
   listen_address: :4200
 deploy:
+  webhook_repos:
+    - github_repo: CoreyCole/vamos
+      repo_path: ~/cn/chestnut-flake/vamos
+      sync_thoughts: false
+      fast_forward_branch: " main "
+      skip_rebuild: true
   webhook_forwards:
     - url: http://127.0.0.1:4301/api/webhook/github
       github_repos:
@@ -130,6 +136,13 @@ projects:
 		!gotCheckout.MustBeLatest {
 		t.Fatalf("baseline checkout = %+v, want webhook/clean/latest", gotCheckout)
 	}
+	if len(cfg.Deploy.WebhookRepos) != 1 {
+		t.Fatalf("WebhookRepos = %#v, want one repository", cfg.Deploy.WebhookRepos)
+	}
+	webhookRepo := cfg.Deploy.WebhookRepos[0]
+	if webhookRepo.FastForwardBranch != "main" || !webhookRepo.SkipRebuild {
+		t.Fatalf("WebhookRepo = %+v, want guarded no-rebuild sync", webhookRepo)
+	}
 	if len(cfg.Deploy.WebhookForwards) != 1 {
 		t.Fatalf("WebhookForwards = %#v, want one forward", cfg.Deploy.WebhookForwards)
 	}
@@ -141,9 +154,32 @@ projects:
 	if forward.BestEffort == nil || *forward.BestEffort {
 		t.Fatalf("BestEffort = %v, want false pointer", forward.BestEffort)
 	}
-	if len(forward.GitHubRepos) != 2 || forward.GitHubRepos[0] != "premiumlabs/cn-agents" ||
+	if len(forward.GitHubRepos) != 2 ||
+		forward.GitHubRepos[0] != "premiumlabs/cn-agents" ||
 		forward.Events[0] != "push" {
 		t.Fatalf("WebhookForward filters = %+v, want repo filters and push", forward)
+	}
+}
+
+func TestValidateHostConfigRejectsThoughtsSyncOnFastForwardRoute(t *testing.T) {
+	t.Parallel()
+
+	cfg := serverlessHostConfig(t.TempDir())
+	syncThoughts := true
+	cfg.Deploy.WebhookRepos = []server.WebhookRepoConfig{{
+		GitHubRepo:        "CoreyCole/vamos",
+		RepoPath:          t.TempDir(),
+		SyncThoughts:      &syncThoughts,
+		FastForwardBranch: "main",
+	}}
+
+	_, err := ValidateHostConfig(cfg)
+	if err == nil ||
+		!strings.Contains(
+			err.Error(),
+			"cannot combine fast_forward_branch with sync_thoughts",
+		) {
+		t.Fatalf("ValidateHostConfig() error = %v, want incompatible sync error", err)
 	}
 }
 
@@ -188,7 +224,9 @@ func TestValidateHostConfigRejectsUnsupportedWebhookForwardEvent(t *testing.T) {
 
 func TestValidateHostConfigRejectsInvalidWebhookForwardURL(t *testing.T) {
 	cfg := serverlessHostConfig(t.TempDir())
-	cfg.Deploy.WebhookForwards = []server.WebhookForwardConfig{{URL: "localhost:4301/hook"}}
+	cfg.Deploy.WebhookForwards = []server.WebhookForwardConfig{
+		{URL: "localhost:4301/hook"},
+	}
 
 	_, err := ValidateHostConfig(cfg)
 	if err == nil {
@@ -302,7 +340,12 @@ func TestRejectLegacyConfig(t *testing.T) {
 		key := strings.SplitN(env, "=", 2)[0]
 		if !strings.Contains(err.Error(), "Vamos") ||
 			!strings.Contains(err.Error(), key) {
-			t.Fatalf("RejectLegacyConfig(%q) error = %v, want Vamos %s message", env, err, key)
+			t.Fatalf(
+				"RejectLegacyConfig(%q) error = %v, want Vamos %s message",
+				env,
+				err,
+				key,
+			)
 		}
 	}
 }

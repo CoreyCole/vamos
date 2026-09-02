@@ -66,6 +66,114 @@ func TestGetChangedFiles_IncludesRebasedLocalCodeChanges(t *testing.T) {
 	assertContains(t, changed, "thoughts/status.md")
 }
 
+func TestFastForwardBranchUpdatesCheckoutBehindOrigin(t *testing.T) {
+	t.Parallel()
+
+	base := t.TempDir()
+	seed := filepath.Join(base, "seed")
+	remote := filepath.Join(base, "remote.git")
+	worktree := filepath.Join(base, "worktree")
+	updater := filepath.Join(base, "updater")
+
+	runGit(t, "", "init", "-b", "main", seed)
+	mustWriteFile(t, filepath.Join(seed, "README.md"), "base\n")
+	runGit(t, seed, "add", "README.md")
+	commitGit(t, seed, "base")
+	runGit(t, "", "clone", "--bare", seed, remote)
+	runGit(t, "", "clone", remote, worktree)
+	runGit(t, "", "clone", remote, updater)
+
+	mustWriteFile(t, filepath.Join(updater, "README.md"), "remote update\n")
+	runGit(t, updater, "add", "README.md")
+	commitGit(t, updater, "remote update")
+	runGit(t, updater, "push", "origin", "main")
+	want := strings.TrimSpace(runGit(t, updater, "rev-parse", "HEAD"))
+
+	if _, err := FastForwardBranch(t.Context(), worktree, "main"); err != nil {
+		t.Fatalf("FastForwardBranch: %v", err)
+	}
+	got := strings.TrimSpace(runGit(t, worktree, "rev-parse", "HEAD"))
+	if got != want {
+		t.Fatalf("HEAD = %s, want %s", got, want)
+	}
+	if _, err := FastForwardBranch(t.Context(), worktree, "main"); err != nil {
+		t.Fatalf("second FastForwardBranch: %v", err)
+	}
+	if second := strings.TrimSpace(
+		runGit(t, worktree, "rev-parse", "HEAD"),
+	); second != got {
+		t.Fatalf("second sync changed HEAD from %s to %s", got, second)
+	}
+}
+
+func TestFastForwardBranchRejectsLocalCommits(t *testing.T) {
+	t.Parallel()
+
+	base := t.TempDir()
+	seed := filepath.Join(base, "seed")
+	remote := filepath.Join(base, "remote.git")
+	worktree := filepath.Join(base, "worktree")
+
+	runGit(t, "", "init", "-b", "main", seed)
+	mustWriteFile(t, filepath.Join(seed, "README.md"), "base\n")
+	runGit(t, seed, "add", "README.md")
+	commitGit(t, seed, "base")
+	runGit(t, "", "clone", "--bare", seed, remote)
+	runGit(t, "", "clone", remote, worktree)
+
+	mustWriteFile(t, filepath.Join(worktree, "local.md"), "local\n")
+	runGit(t, worktree, "add", "local.md")
+	commitGit(t, worktree, "local commit")
+	before := strings.TrimSpace(runGit(t, worktree, "rev-parse", "HEAD"))
+
+	_, err := FastForwardBranch(t.Context(), worktree, "main")
+	if err == nil || !strings.Contains(err.Error(), "ahead of or diverged") {
+		t.Fatalf("FastForwardBranch error = %v, want local-history refusal", err)
+	}
+	got := strings.TrimSpace(runGit(t, worktree, "rev-parse", "HEAD"))
+	if got != before {
+		t.Fatalf("HEAD changed from %s to %s", before, got)
+	}
+}
+
+func TestFastForwardBranchRejectsDirtyCheckout(t *testing.T) {
+	t.Parallel()
+
+	base := t.TempDir()
+	seed := filepath.Join(base, "seed")
+	remote := filepath.Join(base, "remote.git")
+	worktree := filepath.Join(base, "worktree")
+
+	runGit(t, "", "init", "-b", "main", seed)
+	mustWriteFile(t, filepath.Join(seed, "README.md"), "base\n")
+	runGit(t, seed, "add", "README.md")
+	commitGit(t, seed, "base")
+	runGit(t, "", "clone", "--bare", seed, remote)
+	runGit(t, "", "clone", remote, worktree)
+	mustWriteFile(t, filepath.Join(worktree, "README.md"), "dirty\n")
+
+	_, err := FastForwardBranch(t.Context(), worktree, "main")
+	if err == nil || !strings.Contains(err.Error(), "uncommitted changes") {
+		t.Fatalf("FastForwardBranch error = %v, want dirty-checkout refusal", err)
+	}
+}
+
+func TestFastForwardBranchRejectsWrongBranch(t *testing.T) {
+	t.Parallel()
+
+	repo := t.TempDir()
+	runGit(t, "", "init", "-b", "main", repo)
+	mustWriteFile(t, filepath.Join(repo, "README.md"), "base\n")
+	runGit(t, repo, "add", "README.md")
+	commitGit(t, repo, "base")
+	runGit(t, repo, "checkout", "-b", "feature")
+
+	_, err := FastForwardBranch(t.Context(), repo, "main")
+	if err == nil || !strings.Contains(err.Error(), `required "main"`) {
+		t.Fatalf("FastForwardBranch error = %v, want branch refusal", err)
+	}
+}
+
 func TestRecoverStaleIndexLockRemovesOldUnownedLock(t *testing.T) {
 	repo := t.TempDir()
 	runGit(t, "", "init", "-b", "main", repo)

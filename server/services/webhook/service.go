@@ -30,10 +30,12 @@ type Service struct {
 }
 
 type RepoRoute struct {
-	GitHubRepo    string
-	RepoPath      string
-	RebuildScript string
-	SyncThoughts  bool
+	GitHubRepo        string
+	RepoPath          string
+	RebuildScript     string
+	SyncThoughts      bool
+	FastForwardBranch string
+	SkipRebuild       bool
 }
 
 // NewService creates a new webhook service.
@@ -94,7 +96,11 @@ type RequestMeta struct {
 }
 
 // HandlePush processes a GitHub push webhook event.
-func (s *Service) HandlePush(ctx context.Context, payload []byte, meta RequestMeta) error {
+func (s *Service) HandlePush(
+	ctx context.Context,
+	payload []byte,
+	meta RequestMeta,
+) error {
 	meta.EventType = strings.ToLower(strings.TrimSpace(meta.EventType))
 	if meta.EventType == "" {
 		meta.EventType = "push"
@@ -102,7 +108,11 @@ func (s *Service) HandlePush(ctx context.Context, payload []byte, meta RequestMe
 	return s.HandleVerifiedEvent(ctx, payload, meta)
 }
 
-func (s *Service) HandleVerifiedEvent(ctx context.Context, payload []byte, meta RequestMeta) error {
+func (s *Service) HandleVerifiedEvent(
+	ctx context.Context,
+	payload []byte,
+	meta RequestMeta,
+) error {
 	if meta.EventType != "push" {
 		s.logEvent("webhook_event_ignored", map[string]any{"event_type": meta.EventType})
 		return nil
@@ -141,7 +151,21 @@ func parsePushEvent(payload []byte) (PushEvent, error) {
 	return event, nil
 }
 
-func (s *Service) handlePushRoute(ctx context.Context, event PushEvent, route RepoRoute) error {
+func (s *Service) handlePushRoute(
+	ctx context.Context,
+	event PushEvent,
+	route RepoRoute,
+) error {
+	if route.FastForwardBranch != "" &&
+		event.Ref != "refs/heads/"+route.FastForwardBranch {
+		s.logEvent("webhook_ref_ignored", map[string]any{
+			"ref":             event.Ref,
+			"repository":      event.Repository.FullName,
+			"required_branch": route.FastForwardBranch,
+		})
+		return nil
+	}
+
 	s.logEvent("webhook_received", map[string]any{
 		"ref":        event.Ref,
 		"before":     event.Before,
@@ -193,17 +217,22 @@ func (s *Service) handlePushRoute(ctx context.Context, event PushEvent, route Re
 		)
 	}
 
-	output, err := git.Pull(ctx, route.RepoPath)
+	var output string
+	if route.FastForwardBranch == "" {
+		output, err = git.Pull(ctx, route.RepoPath)
+	} else {
+		output, err = git.FastForwardBranch(ctx, route.RepoPath, route.FastForwardBranch)
+	}
 	if err != nil {
 		s.logEvent("git_error", map[string]any{
-			"operation": "pull",
+			"operation": "sync",
 			"error":     err.Error(),
 			"output":    output,
 		})
 		return fmt.Errorf("git pull failed: %w", err)
 	}
 
-	s.logEvent("git_pull_success", map[string]any{
+	s.logEvent("git_sync_success", map[string]any{
 		"output": output,
 	})
 
@@ -223,7 +252,12 @@ func (s *Service) handlePushRoute(ctx context.Context, event PushEvent, route Re
 		return nil
 	}
 
-	changedFiles, err := git.GetChangedFiles(ctx, route.RepoPath, beforeCommit, afterCommit)
+	changedFiles, err := git.GetChangedFiles(
+		ctx,
+		route.RepoPath,
+		beforeCommit,
+		afterCommit,
+	)
 	if err != nil {
 		s.logEvent("git_error", map[string]any{
 			"operation": "get_changed_files",
@@ -238,9 +272,9 @@ func (s *Service) handlePushRoute(ctx context.Context, event PushEvent, route Re
 		"files":         changedFiles,
 	})
 
-	needsRebuild := s.hasCodeChanges(changedFiles)
+	hasCodeChanges := s.hasCodeChanges(changedFiles)
 
-	if needsRebuild {
+	if s.needsRebuild(route, changedFiles) {
 		s.logEvent("rebuild_triggered", map[string]any{
 			"script": route.RebuildScript,
 		})
@@ -255,9 +289,11 @@ func (s *Service) handlePushRoute(ctx context.Context, event PushEvent, route Re
 			s.logEvent("rebuild_success", nil)
 		}()
 	} else {
-		s.logEvent("rebuild_skipped", map[string]any{
-			"reason": "only thoughts files changed",
-		})
+		reason := "only thoughts files changed"
+		if hasCodeChanges {
+			reason = "disabled for repository route"
+		}
+		s.logEvent("rebuild_skipped", map[string]any{"reason": reason})
 	}
 
 	return nil
@@ -275,7 +311,11 @@ func (s *Service) routeForLocalSync(fullName string) (RepoRoute, bool) {
 	return route, ok
 }
 
-func (s *Service) forwardWebhook(ctx context.Context, meta RequestMeta, payload []byte) error {
+func (s *Service) forwardWebhook(
+	ctx context.Context,
+	meta RequestMeta,
+	payload []byte,
+) error {
 	var requiredErrs []string
 	for _, route := range s.forwards {
 		if !route.Matches(meta.Repository, meta.EventType) {
@@ -301,7 +341,10 @@ func (s *Service) forwardWebhook(ctx context.Context, meta RequestMeta, payload 
 			logData["error"] = result.Error
 			s.logEvent("webhook_forward_error", logData)
 			if !route.BestEffort {
-				requiredErrs = append(requiredErrs, fmt.Sprintf("%s: %s", route.URL, result.Error))
+				requiredErrs = append(
+					requiredErrs,
+					fmt.Sprintf("%s: %s", route.URL, result.Error),
+				)
 			}
 			continue
 		}
@@ -371,6 +414,10 @@ func (s *Service) getDirtyFiles(ctx context.Context, route RepoRoute) ([]string,
 		}
 	}
 	return files, nil
+}
+
+func (s *Service) needsRebuild(route RepoRoute, files []string) bool {
+	return !route.SkipRebuild && s.hasCodeChanges(files)
 }
 
 // hasCodeChanges returns true if any non-thoughts files were changed

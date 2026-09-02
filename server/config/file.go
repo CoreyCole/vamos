@@ -231,7 +231,10 @@ func ValidateHostConfig(cfg server.HostConfig) (server.HostConfig, error) {
 		if err != nil {
 			return cfg, err
 		}
-		if err := validateCheckoutRole("workspaces.configured_checkouts."+slug+".role", checkout.Role); err != nil {
+		if err := validateCheckoutRole(
+			"workspaces.configured_checkouts."+slug+".role",
+			checkout.Role,
+		); err != nil {
 			return cfg, err
 		}
 		cfg.Workspaces.ConfiguredCheckouts[slug] = checkout
@@ -247,6 +250,17 @@ func ValidateHostConfig(cfg server.HostConfig) (server.HostConfig, error) {
 	}
 	if cfg.Deploy.TSWorkerServiceName == "" {
 		cfg.Deploy.TSWorkerServiceName = "vamos-ts-worker"
+	}
+	for i, repo := range cfg.Deploy.WebhookRepos {
+		repo.FastForwardBranch = strings.TrimSpace(repo.FastForwardBranch)
+		if repo.FastForwardBranch != "" && repo.SyncThoughts != nil &&
+			*repo.SyncThoughts {
+			return cfg, fmt.Errorf(
+				"deploy.webhook_repos.%d cannot combine fast_forward_branch with sync_thoughts",
+				i,
+			)
+		}
+		cfg.Deploy.WebhookRepos[i] = repo
 	}
 	for i, forward := range cfg.Deploy.WebhookForwards {
 		normalized, err := normalizeWebhookForwardConfig(i, forward)
@@ -273,7 +287,10 @@ func ValidateHostConfig(cfg server.HostConfig) (server.HostConfig, error) {
 			if err != nil {
 				return cfg, err
 			}
-			if err := validateCheckoutRole("projects.repos."+repoName+".checkouts."+checkoutName+".role", checkout.Role); err != nil {
+			if err := validateCheckoutRole(
+				"projects.repos."+repoName+".checkouts."+checkoutName+".role",
+				checkout.Role,
+			); err != nil {
 				return cfg, err
 			}
 			repo.Checkouts[checkoutName] = checkout
@@ -299,7 +316,11 @@ func normalizeWebhookForwardConfig(
 	switch parsed.Scheme {
 	case "http", "https":
 	default:
-		return in, fmt.Errorf("%s.url must use http or https; got %q", path, parsed.Scheme)
+		return in, fmt.Errorf(
+			"%s.url must use http or https; got %q",
+			path,
+			parsed.Scheme,
+		)
 	}
 
 	if len(in.Events) == 0 {
@@ -308,7 +329,12 @@ func normalizeWebhookForwardConfig(
 	for i, event := range in.Events {
 		event = strings.ToLower(strings.TrimSpace(event))
 		if event != githubPushEvent {
-			return in, fmt.Errorf("%s.events.%d only supports push; got %q", path, i, in.Events[i])
+			return in, fmt.Errorf(
+				"%s.events.%d only supports push; got %q",
+				path,
+				i,
+				in.Events[i],
+			)
 		}
 		in.Events[i] = event
 	}
@@ -356,14 +382,22 @@ func expandFileConfigPaths(cfg FileConfig) (FileConfig, error) {
 		if strings.TrimSpace(repo.RepoPath) != "" {
 			expanded, err := ExpandPath(repo.RepoPath)
 			if err != nil {
-				return FileConfig{}, fmt.Errorf("deploy.webhook_repos.%d.repo_path: %w", i, err)
+				return FileConfig{}, fmt.Errorf(
+					"deploy.webhook_repos.%d.repo_path: %w",
+					i,
+					err,
+				)
 			}
 			repo.RepoPath = expanded
 		}
 		if strings.TrimSpace(repo.RebuildScript) != "" {
 			expanded, err := ExpandPath(repo.RebuildScript)
 			if err != nil {
-				return FileConfig{}, fmt.Errorf("deploy.webhook_repos.%d.rebuild_script: %w", i, err)
+				return FileConfig{}, fmt.Errorf(
+					"deploy.webhook_repos.%d.rebuild_script: %w",
+					i,
+					err,
+				)
 			}
 			repo.RebuildScript = expanded
 		}

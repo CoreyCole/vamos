@@ -29,6 +29,7 @@ Keep these variables for the workflow. In the current dogfood setup, `cn-agents`
 ## Rules
 
 - Commit only task-owned changes. Stop on unrelated or ambiguous changes.
+- If the thoughts repo has only `thoughts/` changes, run `just sync-thoughts`. This is valid merge cleanup because it formats, commits, rebases, and pushes those artifacts. Make sure that the checkout is clean before continuing.
 - All local checkouts must finish on `main` and up to date with `origin/main`.
 - Treat `../vamos-main` and `$main_thoughts_repo` as clean baselines. Do not edit them directly.
 - Preserve feature commits in Vamos and DatastarUI. Fast-forward only; do not squash, cherry-pick, or create merge commits.

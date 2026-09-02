@@ -60,15 +60,23 @@ Workspace domains, checkout parent directories, lane names, and module markers a
 
 ## `deploy`
 
-Deployment config points to host-owned service names and restart/rebuild hooks. Host executors own private commands. Reusable Vamos must not hardcode service names, domains, or organization-specific deploy policy.
+Deployment config points to host-owned service names and rebuild hooks. Host executors own private commands. Vamos does not contain organization-specific deploy policy.
 
-`deploy.webhook_forwards` lets a public Vamos host fan out verified GitHub push webhooks to private hosts over localhost, VPN, or tailnet URLs. Forwarding is push-only: `events` defaults to `[push]`, and config validation rejects other event names. Leave `secret` empty when the downstream host shares the same `webhook_secret` and should receive the original `X-Hub-Signature-256`; set `secret` only when the downstream host verifies with a different secret.
+A repository route can keep a staging checkout current without changing local work. Set `fast_forward_branch` to require that branch. The route fetches the branch and updates it only when the local commit is its ancestor. A local or divergent commit stops the update. Set `skip_rebuild` to update the source without a build or service restart. A fast-forward route cannot use `sync_thoughts`.
+
+`deploy.webhook_forwards` sends verified GitHub push webhooks from a public Vamos host to private hosts. The destination can use localhost, a VPN, or a tailnet URL. Forwarding supports push events only. Leave `secret` empty when both hosts use the same `webhook_secret`. The forward then preserves the original `X-Hub-Signature-256` header.
 
 ```yaml
 deploy:
   web_service_name: vamos
   ts_worker_service_name: vamos-ts-worker
   # webhook_secret: ${render in private config or env}
+  webhook_repos:
+    - github_repo: owner/repo
+      repo_path: /srv/repo-stage
+      sync_thoughts: false
+      fast_forward_branch: main
+      skip_rebuild: true
   webhook_forwards:
     - url: http://127.0.0.1:4301/api/webhook/github
       github_repos:

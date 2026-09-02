@@ -61,17 +61,55 @@ func TestHandlePush_RefusesDirtyWorktreeWithoutStashing(t *testing.T) {
 	}
 }
 
+func TestHandlePushIgnoresNonConfiguredBranchForFastForwardRoute(t *testing.T) {
+	t.Parallel()
+
+	svc := NewServiceWithRoutes("", RepoRoute{}, []RepoRoute{{
+		GitHubRepo:        "CoreyCole/vamos",
+		RepoPath:          filepath.Join(t.TempDir(), "missing-checkout"),
+		FastForwardBranch: "main",
+	}}, nil)
+	payload := []byte(
+		`{"ref":"refs/heads/feature","repository":{"full_name":"CoreyCole/vamos"}}`,
+	)
+
+	if err := svc.HandlePush(
+		t.Context(),
+		payload,
+		RequestMeta{EventType: "push"},
+	); err != nil {
+		t.Fatalf("HandlePush() error = %v, want ignored branch", err)
+	}
+}
+
+func TestNeedsRebuildHonorsRepositoryRoutePolicy(t *testing.T) {
+	t.Parallel()
+
+	svc := &Service{}
+	files := []string{"server/main.go"}
+	if svc.needsRebuild(RepoRoute{SkipRebuild: true}, files) {
+		t.Fatal("needsRebuild() = true for a no-rebuild route")
+	}
+	if !svc.needsRebuild(RepoRoute{}, files) {
+		t.Fatal("needsRebuild() = false for a default route with code changes")
+	}
+}
+
 func TestHandlePushForwardsUnknownLocalRepoWhenConfigured(t *testing.T) {
 	t.Parallel()
 
 	var gotBody []byte
-	downstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		gotBody, _ = io.ReadAll(r.Body)
-		w.WriteHeader(http.StatusOK)
-	}))
+	downstream := httptest.NewServer(
+		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			gotBody, _ = io.ReadAll(r.Body)
+			w.WriteHeader(http.StatusOK)
+		}),
+	)
 	defer downstream.Close()
 
-	payload := []byte(`{"ref":"refs/heads/main","repository":{"full_name":"CoreyCole/vamos"}}`)
+	payload := []byte(
+		`{"ref":"refs/heads/main","repository":{"full_name":"CoreyCole/vamos"}}`,
+	)
 	svc := NewServiceWithRoutes("secret", RepoRoute{}, nil, []ForwardRoute{{
 		URL:         downstream.URL,
 		GitHubRepos: map[string]bool{"coreycole/vamos": true},
@@ -79,7 +117,11 @@ func TestHandlePushForwardsUnknownLocalRepoWhenConfigured(t *testing.T) {
 		BestEffort:  true,
 	}})
 
-	err := svc.HandlePush(t.Context(), payload, RequestMeta{EventType: "push", Repository: "CoreyCole/vamos"})
+	err := svc.HandlePush(
+		t.Context(),
+		payload,
+		RequestMeta{EventType: "push", Repository: "CoreyCole/vamos"},
+	)
 	if err != nil {
 		t.Fatalf("HandlePush() error = %v", err)
 	}
@@ -91,12 +133,16 @@ func TestHandlePushForwardsUnknownLocalRepoWhenConfigured(t *testing.T) {
 func TestHandlePushBestEffortForwardFailureDoesNotFail(t *testing.T) {
 	t.Parallel()
 
-	downstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusBadGateway)
-	}))
+	downstream := httptest.NewServer(
+		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusBadGateway)
+		}),
+	)
 	defer downstream.Close()
 
-	payload := []byte(`{"ref":"refs/heads/main","repository":{"full_name":"CoreyCole/vamos"}}`)
+	payload := []byte(
+		`{"ref":"refs/heads/main","repository":{"full_name":"CoreyCole/vamos"}}`,
+	)
 	svc := NewServiceWithRoutes("secret", RepoRoute{}, nil, []ForwardRoute{{
 		URL:         downstream.URL,
 		GitHubRepos: map[string]bool{"coreycole/vamos": true},
@@ -104,7 +150,11 @@ func TestHandlePushBestEffortForwardFailureDoesNotFail(t *testing.T) {
 		BestEffort:  true,
 	}})
 
-	if err := svc.HandlePush(t.Context(), payload, RequestMeta{EventType: "push"}); err != nil {
+	if err := svc.HandlePush(
+		t.Context(),
+		payload,
+		RequestMeta{EventType: "push"},
+	); err != nil {
 		t.Fatalf("HandlePush() error = %v, want nil for best-effort forward failure", err)
 	}
 }
@@ -112,12 +162,16 @@ func TestHandlePushBestEffortForwardFailureDoesNotFail(t *testing.T) {
 func TestHandlePushRequiredForwardFailureFails(t *testing.T) {
 	t.Parallel()
 
-	downstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusBadGateway)
-	}))
+	downstream := httptest.NewServer(
+		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusBadGateway)
+		}),
+	)
 	defer downstream.Close()
 
-	payload := []byte(`{"ref":"refs/heads/main","repository":{"full_name":"CoreyCole/vamos"}}`)
+	payload := []byte(
+		`{"ref":"refs/heads/main","repository":{"full_name":"CoreyCole/vamos"}}`,
+	)
 	svc := NewServiceWithRoutes("secret", RepoRoute{}, nil, []ForwardRoute{{
 		URL:         downstream.URL,
 		GitHubRepos: map[string]bool{"coreycole/vamos": true},

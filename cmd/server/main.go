@@ -1482,10 +1482,12 @@ func main() {
 				syncThoughts = *repo.SyncThoughts
 			}
 			webhookRoutes = append(webhookRoutes, webhook.RepoRoute{
-				GitHubRepo:    repo.GitHubRepo,
-				RepoPath:      repo.RepoPath,
-				RebuildScript: repo.RebuildScript,
-				SyncThoughts:  syncThoughts,
+				GitHubRepo:        repo.GitHubRepo,
+				RepoPath:          repo.RepoPath,
+				RebuildScript:     repo.RebuildScript,
+				SyncThoughts:      syncThoughts,
+				FastForwardBranch: repo.FastForwardBranch,
+				SkipRebuild:       repo.SkipRebuild,
 			})
 		}
 		webhookForwards := make([]webhook.ForwardRoute, 0, len(cfg.WebhookForwards))

@@ -167,10 +167,12 @@ type DeployConfig struct {
 }
 
 type WebhookRepoConfig struct {
-	GitHubRepo    string `yaml:"github_repo"`
-	RepoPath      string `yaml:"repo_path"`
-	RebuildScript string `yaml:"rebuild_script"`
-	SyncThoughts  *bool  `yaml:"sync_thoughts"`
+	GitHubRepo        string `yaml:"github_repo"`
+	RepoPath          string `yaml:"repo_path"`
+	RebuildScript     string `yaml:"rebuild_script"`
+	SyncThoughts      *bool  `yaml:"sync_thoughts"`
+	FastForwardBranch string `yaml:"fast_forward_branch"`
+	SkipRebuild       bool   `yaml:"skip_rebuild"`
 }
 
 type WebhookForwardConfig struct {
