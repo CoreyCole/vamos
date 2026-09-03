@@ -372,9 +372,35 @@ func TestSwitchRedirectPathForTargetPreservesThoughtsDirectLinkQuery(t *testing.
 	}
 }
 
-func TestSwitchRedirectPathForTargetPreservesArtifactQuery(t *testing.T) {
+func TestSwitchRedirectPathForTargetPreservesThreadArtifactQuery(t *testing.T) {
+	raw := "/threads/wb2_beta?artifact=thoughts/owner/plans/beta/cross-plan-directory/entry.md&artifact_dir=thoughts/owner/plans/beta"
+	got, err := switchRedirectPathForTarget(raw, "main", "feature")
+	if err != nil {
+		t.Fatalf("switchRedirectPathForTarget() error = %v", err)
+	}
+	want := "/threads/wb2_beta?artifact=thoughts%2Fowner%2Fplans%2Fbeta%2Fcross-plan-directory%2Fentry.md&artifact_dir=thoughts%2Fowner%2Fplans%2Fbeta"
+	if got != want && got != raw {
+		t.Fatalf("redirect = %q, want artifact query to survive", got)
+	}
+	u, err := url.Parse(got)
+	if err != nil {
+		t.Fatalf("parse redirect: %v", err)
+	}
+	if u.Path != "/threads/wb2_beta" {
+		t.Fatalf("path = %q, want /threads/wb2_beta", u.Path)
+	}
+	query := u.Query()
+	if query.Get("artifact") != "thoughts/owner/plans/beta/cross-plan-directory/entry.md" {
+		t.Fatalf("artifact = %q", query.Get("artifact"))
+	}
+	if query.Get("artifact_dir") != "thoughts/owner/plans/beta" {
+		t.Fatalf("artifact_dir = %q", query.Get("artifact_dir"))
+	}
+}
+
+func TestSwitchRedirectPathForTargetStripsUnrelatedThreadQuery(t *testing.T) {
 	got, err := switchRedirectPathForTarget(
-		"/threads/wb2_beta?artifact=thoughts/v2-wordle/AGENTS.md&artifact_dir=thoughts/v2-wordle&thread=stale&run=old",
+		"/threads/wb2_beta?artifact=thoughts/owner/plans/beta/cross-plan-directory/entry.md&artifact_dir=thoughts/owner/plans/beta&thread=stale&run=old",
 		"main",
 		"feature",
 	)
@@ -385,49 +411,15 @@ func TestSwitchRedirectPathForTargetPreservesArtifactQuery(t *testing.T) {
 	if err != nil {
 		t.Fatalf("parse redirect: %v", err)
 	}
-	if u.Path != "/threads/wb2_beta" {
-		t.Fatalf("path = %q, want /threads/wb2_beta", u.Path)
-	}
 	query := u.Query()
-	if query.Get("artifact") != "thoughts/v2-wordle/AGENTS.md" {
+	if query.Get("artifact") != "thoughts/owner/plans/beta/cross-plan-directory/entry.md" {
 		t.Fatalf("artifact = %q", query.Get("artifact"))
 	}
-	if query.Get("artifact_dir") != "thoughts/v2-wordle" {
+	if query.Get("artifact_dir") != "thoughts/owner/plans/beta" {
 		t.Fatalf("artifact_dir = %q", query.Get("artifact_dir"))
 	}
 	if query.Get("thread") != "" || query.Get("run") != "" {
 		t.Fatalf("unrelated params survived: %q", got)
-	}
-	if len(query) != 2 {
-		t.Fatalf("query = %q, want only artifact keys", got)
-	}
-}
-
-func TestSwitchRedirectPathForTargetPreservesThreadArtifactQuery(t *testing.T) {
-	got, err := switchRedirectPathForTarget(
-		"/threads/wb2_beta?artifact=thoughts/plan.md&artifact_dir=thoughts/owner/plans",
-		"main",
-		"feature",
-	)
-	if err != nil {
-		t.Fatalf("switchRedirectPathForTarget() error = %v", err)
-	}
-	u, err := url.Parse(got)
-	if err != nil {
-		t.Fatalf("parse redirect: %v", err)
-	}
-	if u.Path != "/threads/wb2_beta" {
-		t.Fatalf("path = %q, want /threads/wb2_beta", u.Path)
-	}
-	query := u.Query()
-	if query.Get("artifact") != "thoughts/plan.md" {
-		t.Fatalf("artifact = %q", query.Get("artifact"))
-	}
-	if query.Get("artifact_dir") != "thoughts/owner/plans" {
-		t.Fatalf("artifact_dir = %q", query.Get("artifact_dir"))
-	}
-	if len(query) != 2 {
-		t.Fatalf("query = %q, want only artifact keys", got)
 	}
 }
 

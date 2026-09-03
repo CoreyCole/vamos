@@ -979,7 +979,7 @@ func isPreservedSwitchRedirectQueryParam(key string) bool {
 
 func isSwitchAuthQueryParam(key string) bool {
 	switch strings.ToLower(strings.TrimSpace(key)) {
-	case "artifact", "artifact_dir", "auth", "auth_token", "code", "redirect", "session", "session_id", "state", "token":
+	case "auth", "auth_token", "code", "redirect", "session", "session_id", "state", "token":
 		return true
 	default:
 		return false

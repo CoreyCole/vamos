@@ -503,3 +503,17 @@
 #workbench-v2-comments {
   view-transition-name: workbench-v2-comments;
 }
+
+/* Chat/threads/comments stay still; the artifact region is the one that transitions. */
+::view-transition-old(workbench-v2-threads),
+::view-transition-new(workbench-v2-threads),
+::view-transition-group(workbench-v2-threads),
+::view-transition-old(workbench-v2-chat),
+::view-transition-new(workbench-v2-chat),
+::view-transition-group(workbench-v2-chat),
+::view-transition-old(workbench-v2-comments),
+::view-transition-new(workbench-v2-comments),
+::view-transition-group(workbench-v2-comments) {
+  animation: none;
+}
+

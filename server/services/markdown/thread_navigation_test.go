@@ -21,12 +21,6 @@ func TestThreadArtifactRoutesKeepThreadContext(t *testing.T) {
 	); got != "/threads/thread_1?artifact=thoughts%2Fowner%2Fplans%2Falpha%2Fdesign.md" {
 		t.Fatalf("href = %q", got)
 	}
-	if got := ThreadArtifactEndpoint(
-		"thread_1",
-		"thoughts/owner/plans/alpha/design.md",
-	); got != "/threads/thread_1/artifact?artifact=thoughts%2Fowner%2Fplans%2Falpha%2Fdesign.md" {
-		t.Fatalf("endpoint = %q", got)
-	}
 	if got := ThreadArtifactDirectoryEndpoint(
 		"thread_1",
 		"thoughts/owner/plans/alpha/docs",
@@ -66,10 +60,10 @@ func TestThreadArtifactRoutesRoundTripCanonicalIdentity(t *testing.T) {
 		"owner/query?fragment#.md",
 		"owner/unicode-🌰.md",
 	} {
-		endpoint := ThreadArtifactEndpoint("thread_1", artifact)
-		parsed, err := url.Parse(endpoint)
+		href := ThreadArtifactHref("thread_1", artifact)
+		parsed, err := url.Parse(href)
 		if err != nil {
-			t.Fatalf("Parse(%q) error = %v", endpoint, err)
+			t.Fatalf("Parse(%q) error = %v", href, err)
 		}
 		if got, want := parsed.Query().
 			Get("artifact"),
@@ -87,9 +81,6 @@ func TestThreadArtifactRoutesRejectInvalidPaths(t *testing.T) {
 		"../../etc/passwd",
 	); got != "/threads/thread_1" {
 		t.Fatalf("href = %q", got)
-	}
-	if got := ThreadArtifactEndpoint("thread_1", "../../etc/passwd"); got != "" {
-		t.Fatalf("endpoint = %q", got)
 	}
 	if got := ThreadArtifactDirectoryEndpoint("thread_1", "../../etc"); got != "" {
 		t.Fatalf("directory endpoint = %q", got)
@@ -153,7 +144,7 @@ func TestThreadArtifactPaneScopesStaticHandlersToBrowserRows(t *testing.T) {
 		`data-thread-artifact-file`,
 		`data-thread-artifact-up`,
 		`data-thread-artifact-cwd="thoughts/owner"`,
-		`data-artifact-endpoint="/threads/thread_1/artifact?artifact=thoughts%2Fquote%27%5Cline%0A%3Cscript%3E.md"`,
+		`href="/threads/thread_1?artifact=thoughts%2Fsafe.md"`,
 		`data-on:click="if (!$_threadArtifactLoading`,
 		`href="/thoughts/fullscreen.md"`,
 	} {
@@ -161,10 +152,13 @@ func TestThreadArtifactPaneScopesStaticHandlersToBrowserRows(t *testing.T) {
 			t.Fatalf("artifact pane missing %q: %s", want, html)
 		}
 	}
-	if strings.Contains(html, "@get('/threads/thread_1/artifact?artifact=") ||
+	if strings.Contains(html, "threadArtifactFileClickAction") ||
+		strings.Contains(html, `data-thread-artifact-file" data-artifact-endpoint`) ||
+		strings.Contains(html, `data-thread-artifact-file" data-on:click`) ||
+		strings.Contains(html, "/threads/thread_1/artifact?") ||
 		strings.Contains(html, `href="/thoughts/fullscreen.md" data-on:click`) {
 		t.Fatalf(
-			"artifact identity was interpolated or document link intercepted: %s",
+			"file row was intercepted or document link intercepted: %s",
 			html,
 		)
 	}

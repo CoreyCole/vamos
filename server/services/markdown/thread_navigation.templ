@@ -68,9 +68,6 @@ templ ThreadArtifactBrowserEntry(entry ThreadArtifactEntry) {
 			<a
 				href={ templ.URL(entry.Href) }
 				data-thread-artifact-file
-				data-artifact-endpoint={ entry.Endpoint }
-				data-indicator="_threadArtifactLoading"
-				data-on:click={ threadArtifactFileClickAction() }
 				if entry.IsActive {
 					aria-current="page"
 				}

@@ -77,22 +77,6 @@ func ThreadArtifactHrefAtDirectory(threadID, docPath, directoryPath string) stri
 	return threadArtifactPageBase(threadID) + "?" + query
 }
 
-func ThreadArtifactEndpoint(threadID, docPath string) string {
-	query, ok := threadArtifactQuery(docPath, "", false)
-	if !ok {
-		return ""
-	}
-	return threadArtifactActionBase(threadID, "artifact") + "?" + query
-}
-
-func ThreadArtifactEndpointAtDirectory(threadID, docPath, directoryPath string) string {
-	query, ok := threadArtifactQuery(docPath, directoryPath, true)
-	if !ok {
-		return ""
-	}
-	return threadArtifactActionBase(threadID, "artifact") + "?" + query
-}
-
 func ThreadArtifactBrowserEndpoint(threadID, docPath, directoryPath string) string {
 	query, ok := threadArtifactQuery(docPath, directoryPath, true)
 	if !ok {
@@ -164,10 +148,6 @@ func threadArtifactLoaded(loaded bool) string {
 		return "true"
 	}
 	return "false"
-}
-
-func threadArtifactFileClickAction() string {
-	return "if (!$_threadArtifactLoading && evt.button === 0 && !evt.metaKey && !evt.ctrlKey && !evt.shiftKey && !evt.altKey) { evt.preventDefault(); @get(el.dataset.artifactEndpoint) }"
 }
 
 func threadArtifactBrowserClickAction() string {
@@ -318,14 +298,9 @@ func (s *Service) buildThreadArtifactEntries(
 			return nil, err
 		}
 		entries = append(entries, ThreadArtifactEntry{
-			Name: item.Name,
-			Path: docPath,
-			Href: ThreadArtifactHrefAtDirectory(threadID, docPath, browserDirectory),
-			Endpoint: ThreadArtifactEndpointAtDirectory(
-				threadID,
-				docPath,
-				browserDirectory,
-			),
+			Name:     item.Name,
+			Path:     docPath,
+			Href:     ThreadArtifactHrefAtDirectory(threadID, docPath, browserDirectory),
 			IsActive: activePath == docPath,
 		})
 	}
@@ -436,88 +411,6 @@ func (s *Service) threadArtifactAndComments(
 		commentui.CommentsContextPanel(
 			commentui.BuildCommentsPanelArgs(page.CommentUI, ""),
 		), nil
-}
-
-func (s *Service) HandleThreadArtifact(c echo.Context) error {
-	threadID := strings.TrimSpace(c.Param("threadID"))
-	rawArtifact := c.QueryParam("artifact")
-	if strings.TrimSpace(rawArtifact) == "" {
-		return echo.NewHTTPError(http.StatusBadRequest, "artifact is required")
-	}
-
-	var artifact, comments templ.Component
-	if threadID == "" {
-		artifactPath, explicit, err := optionalThreadArtifact(rawArtifact)
-		if err != nil || !explicit {
-			return echo.NewHTTPError(http.StatusBadRequest, "invalid artifact")
-		}
-		if _, err := s.RenderThoughtsDocument(
-			c.Request().Context(),
-			artifactPath,
-		); err != nil {
-			return echo.NewHTTPError(http.StatusBadRequest, "artifact must be a file")
-		}
-		artifact = s.indexArtifactComponent(c, artifactPath, true)
-		comments = WorkbenchUnavailable("Select a thread to view comments.")
-	} else {
-		if err := s.validateThreadArtifactBrowserThread(c, threadID); err != nil {
-			return err
-		}
-		artifactPath, _, err := optionalThreadArtifact(rawArtifact)
-		if err != nil {
-			return echo.NewHTTPError(http.StatusBadRequest, "invalid artifact")
-		}
-		if _, err := s.RenderThoughtsDocument(
-			c.Request().Context(),
-			artifactPath,
-		); err != nil {
-			return echo.NewHTTPError(http.StatusBadRequest, "artifact must be a file")
-		}
-		artifact, comments, err = s.threadArtifactAndComments(
-			c,
-			threadID,
-			rawArtifact,
-		)
-		if err != nil {
-			return echo.NewHTTPError(http.StatusBadRequest, err.Error())
-		}
-	}
-
-	artifactPath, _, err := optionalThreadArtifact(rawArtifact)
-	if err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, "invalid artifact")
-	}
-	browserDirectory, err := threadArtifactBrowserDirectory(c, artifactPath)
-	if err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, "invalid artifact directory")
-	}
-	pageURL := ThreadArtifactHrefAtDirectory(
-		threadID,
-		artifactPath,
-		browserDirectory,
-	)
-	encodedURL, err := json.Marshal(pageURL)
-	if err != nil {
-		return err
-	}
-	sse := datastar.NewSSE(c.Response().Writer, c.Request())
-	if err := sse.PatchElementTempl(
-		artifact,
-		datastar.WithSelectorID("workbench-v2-artifact-body"),
-		datastar.WithModeInner(),
-	); err != nil {
-		return err
-	}
-	if err := sse.PatchElementTempl(
-		comments,
-		datastar.WithSelectorID("workbench-v2-comments-body"),
-		datastar.WithModeInner(),
-	); err != nil {
-		return err
-	}
-	return sse.ExecuteScript(
-		"window.history.pushState({}, '', " + string(encodedURL) + ")",
-	)
 }
 
 func (s *Service) HandleThreadArtifactBrowser(c echo.Context) error {

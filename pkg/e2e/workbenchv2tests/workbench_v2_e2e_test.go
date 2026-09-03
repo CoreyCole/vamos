@@ -76,7 +76,7 @@ func TestWorkbenchV2_ThreadsKeepThreadAndArtifactIdentityIndependent(t *testing.
 			"thoughts/owner/plans/beta/cross-plan-directory/entry.md",
 			"Cross-plan directory entry",
 		)).
-		Expect(spec.ExpectStep(expectWorkbenchRootUnchanged())).
+		Do(rememberWorkbenchRoot()).
 		Do(assertThreadIdentity("wb2_alpha")).
 		Do(assertThreadArtifactCWD("thoughts/owner/plans/beta")).
 		Do(assertThreadArtifactListingContains("design")).
@@ -1084,20 +1084,30 @@ func navigateThreadArtifactBrowser(name, selector, wantCWD string) spec.Step {
 
 func selectThreadArtifactFile(href, identity, text string) spec.Step {
 	return spec.Custom(
-		"thread artifact file patches in place",
+		"thread artifact file is a real thread GET",
 		func(t testing.TB, ctx *duiruntime.Context) {
 			link := ctx.Page.Locator(
 				"[data-thread-artifact-browser] a[data-thread-artifact-file][href='" + href + "']",
 			).First()
-			response, err := ctx.Page.ExpectResponse(
-				"**/threads/wb2_alpha/artifact?*",
+			action, err := link.GetAttribute("data-on:click")
+			if err != nil || action != "" {
+				t.Fatalf("file row was intercepted: %q %v", action, err)
+			}
+			endpoint, err := link.GetAttribute("data-artifact-endpoint")
+			if err != nil || endpoint != "" {
+				t.Fatalf("file row still has patch endpoint: %q %v", endpoint, err)
+			}
+			_, err = ctx.Page.ExpectNavigation(
 				func() error { return link.Click() },
+				playwright.PageExpectNavigationOptions{
+					WaitUntil: playwright.WaitUntilStateDomcontentloaded,
+				},
 			)
 			if err != nil {
-				t.Fatalf("artifact response not observed: %v", err)
+				t.Fatalf("artifact GET navigation not observed: %v", err)
 			}
-			if response.Status() != 200 {
-				t.Fatalf("artifact response status = %d", response.Status())
+			if strings.Contains(ctx.Page.URL(), "/artifact?") {
+				t.Fatalf("file row still used patch endpoint: %s", ctx.Page.URL())
 			}
 			if err := ctx.Page.Locator("#thread-artifact-document").
 				GetByText(text).
@@ -1106,7 +1116,7 @@ func selectThreadArtifactFile(href, identity, text string) spec.Step {
 					State:   playwright.WaitForSelectorStateVisible,
 					Timeout: playwright.Float(30_000),
 				}); err != nil {
-				t.Fatalf("patched artifact missing %q: %v", text, err)
+				t.Fatalf("artifact document missing %q: %v", text, err)
 			}
 			if !strings.Contains(ctx.Page.URL(), href) {
 				t.Fatalf("artifact URL = %s, want %s", ctx.Page.URL(), href)

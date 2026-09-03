@@ -222,9 +222,7 @@ func TestServeThreadDisplaysExplicitCrossPlanArtifactsWithoutChangingThread(
 	}
 }
 
-func TestHandleThreadArtifactPatchesArtifactCommentsAndPreservesBrowserDirectory(
-	t *testing.T,
-) {
+func TestServeThreadFileRowsAreRealThreadGetsWithoutIntercept(t *testing.T) {
 	t.Parallel()
 
 	root := t.TempDir()
@@ -254,7 +252,7 @@ func TestHandleThreadArtifactPatchesArtifactCommentsAndPreservesBrowserDirectory
 	c := echo.New().NewContext(
 		httptest.NewRequest(
 			http.MethodGet,
-			"/threads/thread-alpha/artifact?artifact=thoughts/other/plans/beta/docs/review.md&artifact_dir=thoughts/other/plans/beta",
+			"/threads/thread-alpha?artifact=thoughts/other/plans/beta/docs/review.md&artifact_dir=thoughts/other/plans/beta",
 			http.NoBody,
 		),
 		rec,
@@ -262,30 +260,34 @@ func TestHandleThreadArtifactPatchesArtifactCommentsAndPreservesBrowserDirectory
 	c.SetParamNames("threadID")
 	c.SetParamValues("thread-alpha")
 	c.Set("user_email", "owner@example.com")
-	if err := svc.HandleThreadArtifact(c); err != nil {
+	if err := svc.ServeThread(c); err != nil {
 		t.Fatal(err)
 	}
 	body := rec.Body.String()
+	fileHref := `/threads/thread-alpha?artifact=thoughts%2Fother%2Fplans%2Fbeta%2Fdesign.md&amp;artifact_dir=thoughts%2Fother%2Fplans%2Fbeta`
 	for _, want := range []string{
-		"selector #workbench-v2-artifact-body",
-		"selector #workbench-v2-comments-body",
+		"original thread chat",
 		"Beta review",
 		`href="/thoughts/owner/plans/alpha/design.md"`,
 		`data-thread-artifact-cwd="thoughts/other/plans/beta"`,
-		`href="/threads/thread-alpha?artifact=thoughts%2Fother%2Fplans%2Fbeta%2Fdesign.md&amp;artifact_dir=thoughts%2Fother%2Fplans%2Fbeta"`,
-		"window.history.pushState",
-		`/threads/thread-alpha?artifact=thoughts%2Fother%2Fplans%2Fbeta%2Fdocs%2Freview.md\u0026artifact_dir=thoughts%2Fother%2Fplans%2Fbeta`,
+		`data-thread-artifact-file`,
+		fileHref,
+		`id="thread-chat"`,
 	} {
 		if !strings.Contains(body, want) {
-			t.Fatalf("artifact SSE missing %q: %s", want, body)
+			t.Fatalf("ServeThread missing %q: %s", want, body)
 		}
 	}
-	if strings.Contains(body, "selector #workbench-root") ||
+	if strings.Contains(body, "threadArtifactFileClickAction") ||
+		strings.Contains(body, "/threads/thread-alpha/artifact?") ||
+		strings.Contains(body, "window.history.pushState") ||
+		strings.Contains(body, "selector #workbench-v2-artifact-body") ||
+		strings.Contains(body, "selector #workbench-root") ||
 		strings.Contains(
 			body,
 			`href="/thoughts/owner/plans/alpha/design.md" data-on:click`,
 		) {
-		t.Fatalf("artifact SSE replaced root or intercepted document link: %s", body)
+		t.Fatalf("ServeThread used file-select patch or intercepted Thoughts: %s", body)
 	}
 }
 
@@ -443,7 +445,6 @@ func TestHandleThreadArtifactRejectsUnknownThreadAndDirectorySelection(t *testin
 		&threadWorkbenchTestRenderer{threadPlanErr: sql.ErrNoRows},
 	)
 	for _, target := range []string{
-		"/threads/missing/artifact?artifact=thoughts/owner/plans/alpha/docs",
 		"/threads/missing/artifact-browser?artifact=thoughts/owner/plans/alpha/design.md&artifact_dir=thoughts/owner/plans/alpha/docs",
 		"/threads/missing/artifact-directory?directory=thoughts/owner/plans/alpha/docs",
 	} {
@@ -454,7 +455,7 @@ func TestHandleThreadArtifactRejectsUnknownThreadAndDirectorySelection(t *testin
 		)
 		c.SetParamNames("threadID")
 		c.SetParamValues("missing")
-		err := svc.HandleThreadArtifact(c)
+		var err error
 		if strings.Contains(target, "artifact-browser") {
 			err = svc.HandleThreadArtifactBrowser(c)
 		}
@@ -465,34 +466,6 @@ func TestHandleThreadArtifactRejectsUnknownThreadAndDirectorySelection(t *testin
 		if !errors.As(err, &httpErr) || httpErr.Code != http.StatusNotFound {
 			t.Fatalf("%s error = %#v", target, err)
 		}
-	}
-}
-
-func TestHandleThreadArtifactPropagatesThreadResolverFailures(t *testing.T) {
-	t.Parallel()
-
-	root := t.TempDir()
-	svc, err := NewService(root, nil, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	sentinel := errors.New("thread store unavailable")
-	svc.WithWorkbenchThreadRenderer(
-		&threadWorkbenchTestRenderer{threadPlanErr: sentinel},
-	)
-	rec := httptest.NewRecorder()
-	c := echo.New().NewContext(
-		httptest.NewRequest(
-			http.MethodGet,
-			"/threads/thread-alpha/artifact?artifact=thoughts/doc.md",
-			http.NoBody,
-		),
-		rec,
-	)
-	c.SetParamNames("threadID")
-	c.SetParamValues("thread-alpha")
-	if err := svc.HandleThreadArtifact(c); !errors.Is(err, sentinel) {
-		t.Fatalf("HandleThreadArtifact() error = %v", err)
 	}
 }
 

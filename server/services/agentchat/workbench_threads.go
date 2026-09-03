@@ -134,13 +134,17 @@ func (s *Service) RenderSharedThreadChat(
 	if err != nil {
 		return nil, err
 	}
+	stable, err := s.buildStableTranscript(ctx, thread)
+	if err != nil {
+		return nil, err
+	}
 	live, cursor := s.buildLiveTranscript(thread.ID)
 	args := EmbeddedFreeformPanelArgs{
 		ThreadID:  thread.ID,
 		HasThread: true,
 		Cwd:       thread.Cwd,
 		Transcript: TranscriptPaneState{
-			Stable: []TranscriptMessage{},
+			Stable: stable,
 			Live:   live,
 			Cursor: cursor,
 			Policy: s.defaultTranscriptRenderPolicy(),

@@ -29,10 +29,8 @@ func TestThreadsRouteRegistrationIncludesScopedArtifactReads(t *testing.T) {
 	source := string(body)
 	for _, want := range []string{
 		`threadsGroup.GET("", markdownService.ServeThreads)`,
-		`threadsGroup.GET("/artifact", markdownService.HandleThreadArtifact)`,
 		`markdownService.HandleThreadArtifactBrowser`,
 		`markdownService.HandleThreadArtifactDirectory`,
-		`threadsGroup.GET("/:threadID/artifact", markdownService.HandleThreadArtifact)`,
 		`threadsGroup.GET("/:threadID", markdownService.ServeThread)`,
 	} {
 		if !strings.Contains(source, want) {

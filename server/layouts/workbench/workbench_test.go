@@ -648,7 +648,7 @@ func TestWorkbenchResizeJSShowsHandlesForVisibleAdjacentRegions(t *testing.T) {
 	}
 }
 
-func TestWorkbenchHistoryJSRevalidatesRestoredThreadDrafts(t *testing.T) {
+func TestWorkbenchHistoryJSReloadsSameDocumentArtifactPopstate(t *testing.T) {
 	t.Parallel()
 
 	contents, err := os.ReadFile("../../../static/js/workbench-history.js")
@@ -657,31 +657,56 @@ func TestWorkbenchHistoryJSRevalidatesRestoredThreadDrafts(t *testing.T) {
 	}
 	js := string(contents)
 	for _, want := range []string{
-		`window.addEventListener("pageshow"`,
-		`event.persisted`,
-		`#workbench-v2-chat-body #agent-chat-composer-form`,
 		`window.addEventListener("popstate"`,
 		`document.getElementById("thread-artifact-pane")`,
+		`window.location.reload()`,
+		`navigation.type === "back_forward"`,
 	} {
 		if !strings.Contains(js, want) {
 			t.Fatalf("workbench-history.js missing %q in %s", want, js)
 		}
 	}
 	for _, unwanted := range []string{
-		`navigation?.type === "back_forward"`,
+		`window.addEventListener("pageshow"`,
 		`startViewTransition`,
+		`function revalidateRestoredThread`,
 	} {
 		if strings.Contains(js, unwanted) {
 			t.Fatalf("workbench-history.js should not contain %q in %s", unwanted, js)
 		}
 	}
-	pageshowStart := strings.Index(js, "function revalidateRestoredThread")
-	pageshowEnd := strings.Index(js, "function reloadThreadArtifactHistory")
-	if pageshowStart < 0 || pageshowEnd <= pageshowStart {
-		t.Fatal("workbench-history.js missing pageshow/popstate handlers")
+}
+
+func TestWorkbenchV2CSSKeepsStableRegionTransitionNames(t *testing.T) {
+	t.Parallel()
+
+	contents, err := os.ReadFile("../../../static/css/index.css")
+	if err != nil {
+		t.Fatalf("ReadFile(index.css) error = %v", err)
 	}
-	if strings.Contains(js[pageshowStart:pageshowEnd], "window.location.reload") {
-		t.Fatalf("pageshow must not window.location.reload() on back_forward: %s", js[pageshowStart:pageshowEnd])
+	css := string(contents)
+	for _, want := range []string{
+		"#workbench-v2-threads {",
+		"view-transition-name: workbench-v2-threads;",
+		"#workbench-v2-chat {",
+		"view-transition-name: workbench-v2-chat;",
+		"#workbench-v2-artifact {",
+		"view-transition-name: workbench-v2-artifact;",
+		"#workbench-v2-comments {",
+		"view-transition-name: workbench-v2-comments;",
+		"::view-transition-old(workbench-v2-chat)",
+		"animation: none;",
+	} {
+		if !strings.Contains(css, want) {
+			t.Fatalf("index.css missing %q", want)
+		}
+	}
+	idx := strings.Index(css, "#doc-workbench-viewer-region")
+	if idx >= 0 {
+		window := css[idx : idx+180]
+		if strings.Contains(window, "view-transition-name") {
+			t.Fatalf("legacy viewer region has view-transition-name: %s", window)
+		}
 	}
 }
 
