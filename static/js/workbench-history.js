@@ -1,11 +1,11 @@
 function revalidateRestoredThread(event) {
-  // Only revalidate drafts restored from bfcache. Native Back/Forward to a
-  // full document must stay a traverse so the browser can run View Transitions.
+  // Native Back/Forward (including bfcache via event.persisted) must stay a
+  // traverse so the browser can restore without a white flash.
   if (
     event.persisted &&
     document.querySelector("#workbench-v2-chat-body #agent-chat-composer-form")
   ) {
-    window.location.reload();
+    return;
   }
 }
 

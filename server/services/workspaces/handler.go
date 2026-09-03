@@ -943,8 +943,7 @@ func switchRedirectPathForTarget(raw, currentSlug, targetSlug string) (string, e
 	if strings.TrimSpace(currentSlug) == "" || strings.TrimSpace(targetSlug) == "" || strings.TrimSpace(currentSlug) == strings.TrimSpace(targetSlug) {
 		return redirectPath, nil
 	}
-	if strings.HasPrefix(redirectPath, "/thoughts/") ||
-		strings.HasPrefix(redirectPath, "/threads/") {
+	if strings.HasPrefix(redirectPath, "/thoughts/") {
 		return redirectPath, nil
 	}
 	return stripNonAuthSwitchRedirectQuery(redirectPath), nil
@@ -980,7 +979,7 @@ func isPreservedSwitchRedirectQueryParam(key string) bool {
 
 func isSwitchAuthQueryParam(key string) bool {
 	switch strings.ToLower(strings.TrimSpace(key)) {
-	case "auth", "auth_token", "code", "redirect", "session", "session_id", "state", "token":
+	case "artifact", "artifact_dir", "auth", "auth_token", "code", "redirect", "session", "session_id", "state", "token":
 		return true
 	default:
 		return false

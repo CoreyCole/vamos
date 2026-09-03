@@ -372,6 +372,37 @@ func TestSwitchRedirectPathForTargetPreservesThoughtsDirectLinkQuery(t *testing.
 	}
 }
 
+func TestSwitchRedirectPathForTargetPreservesArtifactQuery(t *testing.T) {
+	got, err := switchRedirectPathForTarget(
+		"/threads/wb2_beta?artifact=thoughts/v2-wordle/AGENTS.md&artifact_dir=thoughts/v2-wordle&thread=stale&run=old",
+		"main",
+		"feature",
+	)
+	if err != nil {
+		t.Fatalf("switchRedirectPathForTarget() error = %v", err)
+	}
+	u, err := url.Parse(got)
+	if err != nil {
+		t.Fatalf("parse redirect: %v", err)
+	}
+	if u.Path != "/threads/wb2_beta" {
+		t.Fatalf("path = %q, want /threads/wb2_beta", u.Path)
+	}
+	query := u.Query()
+	if query.Get("artifact") != "thoughts/v2-wordle/AGENTS.md" {
+		t.Fatalf("artifact = %q", query.Get("artifact"))
+	}
+	if query.Get("artifact_dir") != "thoughts/v2-wordle" {
+		t.Fatalf("artifact_dir = %q", query.Get("artifact_dir"))
+	}
+	if query.Get("thread") != "" || query.Get("run") != "" {
+		t.Fatalf("unrelated params survived: %q", got)
+	}
+	if len(query) != 2 {
+		t.Fatalf("query = %q, want only artifact keys", got)
+	}
+}
+
 func TestSwitchRedirectPathForTargetPreservesThreadArtifactQuery(t *testing.T) {
 	got, err := switchRedirectPathForTarget(
 		"/threads/wb2_beta?artifact=thoughts/plan.md&artifact_dir=thoughts/owner/plans",
@@ -381,9 +412,22 @@ func TestSwitchRedirectPathForTargetPreservesThreadArtifactQuery(t *testing.T) {
 	if err != nil {
 		t.Fatalf("switchRedirectPathForTarget() error = %v", err)
 	}
-	want := "/threads/wb2_beta?artifact=thoughts/plan.md&artifact_dir=thoughts/owner/plans"
-	if got != want {
-		t.Fatalf("redirect = %q, want %q", got, want)
+	u, err := url.Parse(got)
+	if err != nil {
+		t.Fatalf("parse redirect: %v", err)
+	}
+	if u.Path != "/threads/wb2_beta" {
+		t.Fatalf("path = %q, want /threads/wb2_beta", u.Path)
+	}
+	query := u.Query()
+	if query.Get("artifact") != "thoughts/plan.md" {
+		t.Fatalf("artifact = %q", query.Get("artifact"))
+	}
+	if query.Get("artifact_dir") != "thoughts/owner/plans" {
+		t.Fatalf("artifact_dir = %q", query.Get("artifact_dir"))
+	}
+	if len(query) != 2 {
+		t.Fatalf("query = %q, want only artifact keys", got)
 	}
 }
 

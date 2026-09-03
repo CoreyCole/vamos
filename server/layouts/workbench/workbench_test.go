@@ -660,7 +660,6 @@ func TestWorkbenchHistoryJSRevalidatesRestoredThreadDrafts(t *testing.T) {
 		`window.addEventListener("pageshow"`,
 		`event.persisted`,
 		`#workbench-v2-chat-body #agent-chat-composer-form`,
-		`window.location.reload()`,
 		`window.addEventListener("popstate"`,
 		`document.getElementById("thread-artifact-pane")`,
 	} {
@@ -675,6 +674,14 @@ func TestWorkbenchHistoryJSRevalidatesRestoredThreadDrafts(t *testing.T) {
 		if strings.Contains(js, unwanted) {
 			t.Fatalf("workbench-history.js should not contain %q in %s", unwanted, js)
 		}
+	}
+	pageshowStart := strings.Index(js, "function revalidateRestoredThread")
+	pageshowEnd := strings.Index(js, "function reloadThreadArtifactHistory")
+	if pageshowStart < 0 || pageshowEnd <= pageshowStart {
+		t.Fatal("workbench-history.js missing pageshow/popstate handlers")
+	}
+	if strings.Contains(js[pageshowStart:pageshowEnd], "window.location.reload") {
+		t.Fatalf("pageshow must not window.location.reload() on back_forward: %s", js[pageshowStart:pageshowEnd])
 	}
 }
 
