@@ -943,7 +943,8 @@ func switchRedirectPathForTarget(raw, currentSlug, targetSlug string) (string, e
 	if strings.TrimSpace(currentSlug) == "" || strings.TrimSpace(targetSlug) == "" || strings.TrimSpace(currentSlug) == strings.TrimSpace(targetSlug) {
 		return redirectPath, nil
 	}
-	if strings.HasPrefix(redirectPath, "/thoughts/") {
+	if strings.HasPrefix(redirectPath, "/thoughts/") ||
+		strings.HasPrefix(redirectPath, "/threads/") {
 		return redirectPath, nil
 	}
 	return stripNonAuthSwitchRedirectQuery(redirectPath), nil
@@ -957,7 +958,7 @@ func stripNonAuthSwitchRedirectQuery(redirectPath string) string {
 	query := u.Query()
 	filtered := url.Values{}
 	for key, values := range query {
-		if !isSwitchAuthQueryParam(key) {
+		if !isPreservedSwitchRedirectQueryParam(key) {
 			continue
 		}
 		for _, value := range values {
@@ -966,6 +967,15 @@ func stripNonAuthSwitchRedirectQuery(redirectPath string) string {
 	}
 	u.RawQuery = filtered.Encode()
 	return u.RequestURI()
+}
+
+func isPreservedSwitchRedirectQueryParam(key string) bool {
+	switch strings.ToLower(strings.TrimSpace(key)) {
+	case "artifact", "artifact_dir":
+		return true
+	default:
+		return isSwitchAuthQueryParam(key)
+	}
 }
 
 func isSwitchAuthQueryParam(key string) bool {

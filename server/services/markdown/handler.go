@@ -17,6 +17,7 @@ import (
 
 	"github.com/CoreyCole/vamos/pkg/db"
 	"github.com/CoreyCole/vamos/server/layouts/workbench"
+	"github.com/CoreyCole/vamos/server/services/applets"
 	"github.com/CoreyCole/vamos/server/services/comments"
 	"github.com/CoreyCole/vamos/server/services/commentui"
 )
@@ -97,6 +98,10 @@ func (s *Service) ServeMarkdown(c echo.Context) error {
 			Directory: dirArgs,
 			Workbench: workbenchState,
 		}).Render(c.Request().Context(), c.Response().Writer)
+	}
+
+	if href := s.thoughtsAppletPageHref(c.Request().Context(), requestPath); href != "" {
+		return c.Redirect(http.StatusSeeOther, href)
 	}
 
 	// Render document file
@@ -293,6 +298,20 @@ func thoughtsViewFromQuery(c echo.Context) (workbench.WorkbenchView, string) {
 	default:
 		return workbench.WorkbenchViewFocus, ""
 	}
+}
+
+func (s *Service) thoughtsAppletPageHref(ctx context.Context, requestPath string) string {
+	if s == nil || strings.TrimSpace(s.basePath) == "" || strings.TrimSpace(requestPath) == "" {
+		return ""
+	}
+	applet, err := applets.Resolver{ThoughtsRoot: s.basePath}.ResolveThoughtsApplet(
+		ctx,
+		requestPath,
+	)
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(applet.RouteHref)
 }
 
 func thoughtsRequestHasLegacyQuery(c echo.Context) bool {

@@ -8,6 +8,11 @@
 @source "../../server";
 @source "../../pkg/datastarui";
 
+/* Cross-document View Transitions: let the browser drive Back/Forward. */
+@view-transition {
+  navigation: auto;
+}
+
 @layer base {
   /* Global scroll behavior to account for sticky header */
   html {
@@ -482,4 +487,19 @@
     letter-spacing: 0.05em;
     color: hsl(var(--muted-foreground));
   }
+}
+
+
+/* Stable workbench v2 regions for cross-document View Transitions. */
+#workbench-v2-threads {
+  view-transition-name: workbench-v2-threads;
+}
+#workbench-v2-chat {
+  view-transition-name: workbench-v2-chat;
+}
+#workbench-v2-artifact {
+  view-transition-name: workbench-v2-artifact;
+}
+#workbench-v2-comments {
+  view-transition-name: workbench-v2-comments;
 }

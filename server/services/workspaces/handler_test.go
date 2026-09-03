@@ -372,6 +372,21 @@ func TestSwitchRedirectPathForTargetPreservesThoughtsDirectLinkQuery(t *testing.
 	}
 }
 
+func TestSwitchRedirectPathForTargetPreservesThreadArtifactQuery(t *testing.T) {
+	got, err := switchRedirectPathForTarget(
+		"/threads/wb2_beta?artifact=thoughts/plan.md&artifact_dir=thoughts/owner/plans",
+		"main",
+		"feature",
+	)
+	if err != nil {
+		t.Fatalf("switchRedirectPathForTarget() error = %v", err)
+	}
+	want := "/threads/wb2_beta?artifact=thoughts/plan.md&artifact_dir=thoughts/owner/plans"
+	if got != want {
+		t.Fatalf("redirect = %q, want %q", got, want)
+	}
+}
+
 func TestHandleSwitchWorkspaceRedirectsManagerWorkspacePageToChildRoot(t *testing.T) {
 	manager := &fakeLifecycleManager{
 		workspaces: []Workspace{{

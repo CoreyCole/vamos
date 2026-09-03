@@ -659,7 +659,6 @@ func TestWorkbenchHistoryJSRevalidatesRestoredThreadDrafts(t *testing.T) {
 	for _, want := range []string{
 		`window.addEventListener("pageshow"`,
 		`event.persisted`,
-		`navigation?.type === "back_forward"`,
 		`#workbench-v2-chat-body #agent-chat-composer-form`,
 		`window.location.reload()`,
 		`window.addEventListener("popstate"`,
@@ -667,6 +666,14 @@ func TestWorkbenchHistoryJSRevalidatesRestoredThreadDrafts(t *testing.T) {
 	} {
 		if !strings.Contains(js, want) {
 			t.Fatalf("workbench-history.js missing %q in %s", want, js)
+		}
+	}
+	for _, unwanted := range []string{
+		`navigation?.type === "back_forward"`,
+		`startViewTransition`,
+	} {
+		if strings.Contains(js, unwanted) {
+			t.Fatalf("workbench-history.js should not contain %q in %s", unwanted, js)
 		}
 	}
 }
