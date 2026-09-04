@@ -37,6 +37,7 @@ func BuildWorkbenchV2(ctx context.Context, db DBTX, input Input) (State, error) 
 		"workbench-v2/nested/data.csv":                   "name,value\nAda,1\n",
 		"workbench-v2/static.html":                       "<h1>Opaque fixture</h1><p>Comments cross the bridge.</p>",
 		"owner/plans/alpha/design.md":                    "# Alpha design\n",
+		"owner/plans/alpha/notes.md":                     "# Alpha notes\n\nSibling artifact for chat-jank Story.\n",
 		"owner/plans/beta/design.md":                     "# Beta design\n",
 		"owner/plans/beta/cross-plan-artifact.md":        "# Cross-plan artifact\n\nCross-plan selected text.\n\n[Open root artifact](/thoughts/workbench-v2/root.md)\n",
 		"owner/plans/beta/cross-plan-directory/entry.md": "# Cross-plan directory entry\n",
@@ -74,6 +75,9 @@ func BuildWorkbenchV2(ctx context.Context, db DBTX, input Input) (State, error) 
 		"alpha_design": "thoughts/owner/plans/alpha/design.md",
 		"cross_file":   "thoughts/owner/plans/beta/cross-plan-artifact.md",
 		"cross_dir":    "thoughts/owner/plans/beta/cross-plan-directory",
+		"alpha_notes":  "thoughts/owner/plans/alpha/notes.md",
+		"jank_early":   "WB2_CHAT_JANK_USER_01",
+		"jank_late":    "WB2_CHAT_JANK_ASSIST_12",
 	}
 	return state, nil
 }
@@ -81,8 +85,8 @@ func BuildWorkbenchV2(ctx context.Context, db DBTX, input Input) (State, error) 
 func cleanupWorkbenchV2State(ctx context.Context, db DBTX) error {
 	statements := []string{
 		`DELETE FROM layout_preferences WHERE user_email IN ('playwright@localhost', 'playwright-secondary@localhost') AND page = 'threads'`,
-		`DELETE FROM document_comment_replies WHERE comment_id IN (SELECT id FROM document_comments WHERE doc_path IN ('thoughts/workbench-v2/root.md', 'thoughts/workbench-v2/nested/needle.md', 'thoughts/workbench-v2/nested/source.go', 'thoughts/workbench-v2/nested/data.csv', 'thoughts/workbench-v2/static.html', 'thoughts/owner/plans/alpha/design.md', 'thoughts/owner/plans/beta/design.md', 'thoughts/owner/plans/beta/cross-plan-artifact.md', 'thoughts/owner/plans/beta/cross-plan-directory/entry.md', 'thoughts/v2-wordle/AGENTS.md', 'thoughts/v2-streamlit/AGENTS.md'))`,
-		`DELETE FROM document_comments WHERE doc_path IN ('thoughts/workbench-v2/root.md', 'thoughts/workbench-v2/nested/needle.md', 'thoughts/workbench-v2/nested/source.go', 'thoughts/workbench-v2/nested/data.csv', 'thoughts/workbench-v2/static.html', 'thoughts/owner/plans/alpha/design.md', 'thoughts/owner/plans/beta/design.md', 'thoughts/owner/plans/beta/cross-plan-artifact.md', 'thoughts/owner/plans/beta/cross-plan-directory/entry.md', 'thoughts/v2-wordle/AGENTS.md', 'thoughts/v2-streamlit/AGENTS.md')`,
+		`DELETE FROM document_comment_replies WHERE comment_id IN (SELECT id FROM document_comments WHERE doc_path IN ('thoughts/workbench-v2/root.md', 'thoughts/workbench-v2/nested/needle.md', 'thoughts/workbench-v2/nested/source.go', 'thoughts/workbench-v2/nested/data.csv', 'thoughts/workbench-v2/static.html', 'thoughts/owner/plans/alpha/design.md', 'thoughts/owner/plans/alpha/notes.md', 'thoughts/owner/plans/beta/design.md', 'thoughts/owner/plans/beta/cross-plan-artifact.md', 'thoughts/owner/plans/beta/cross-plan-directory/entry.md', 'thoughts/v2-wordle/AGENTS.md', 'thoughts/v2-streamlit/AGENTS.md'))`,
+		`DELETE FROM document_comments WHERE doc_path IN ('thoughts/workbench-v2/root.md', 'thoughts/workbench-v2/nested/needle.md', 'thoughts/workbench-v2/nested/source.go', 'thoughts/workbench-v2/nested/data.csv', 'thoughts/workbench-v2/static.html', 'thoughts/owner/plans/alpha/design.md', 'thoughts/owner/plans/alpha/notes.md', 'thoughts/owner/plans/beta/design.md', 'thoughts/owner/plans/beta/cross-plan-artifact.md', 'thoughts/owner/plans/beta/cross-plan-directory/entry.md', 'thoughts/v2-wordle/AGENTS.md', 'thoughts/v2-streamlit/AGENTS.md')`,
 		`DELETE FROM workspace_events WHERE thread_id IN ('wb2_alpha', 'wb2_beta', 'wb2_rejected') OR run_id IN (SELECT id FROM agent_runs WHERE thread_id IN ('wb2_alpha', 'wb2_beta', 'wb2_rejected'))`,
 		`DELETE FROM agent_surface_attachments WHERE run_id IN (SELECT id FROM agent_runs WHERE thread_id IN ('wb2_alpha', 'wb2_beta', 'wb2_rejected'))`,
 		`DELETE FROM chat_session_events WHERE run_id IN (SELECT id FROM agent_runs WHERE thread_id IN ('wb2_alpha', 'wb2_beta', 'wb2_rejected'))`,
@@ -182,6 +186,78 @@ INSERT INTO agent_runs (id, workspace_id, thread_id, trigger, status, prompt_tex
 VALUES ('wb2_rejected_active_run', 'ws_1', 'wb2_rejected', 'resume', 'running', 'fixture active run', 'wb2-rejected-fixture', ?)
 ON CONFLICT(id) DO UPDATE SET status = 'running', thread_id = excluded.thread_id`, thoughtsRoot); err != nil && !strings.Contains(err.Error(), "no such table") {
 		return fmt.Errorf("seed rejected workbench v2 run: %w", err)
+	}
+	if err := seedWorkbenchV2LongTranscript(ctx, db); err != nil && !strings.Contains(err.Error(), "no such table") {
+		return err
+	}
+	return nil
+}
+
+func seedWorkbenchV2LongTranscript(ctx context.Context, db DBTX) error {
+	const threadID = "wb2_alpha"
+	const pairs = 12
+	var parent any
+	parent = nil
+	headID := ""
+	order := 0
+	for turn := 1; turn <= pairs; turn++ {
+		userID := fmt.Sprintf("wb2_alpha_jank_user_%02d", turn)
+		assistantID := fmt.Sprintf("wb2_alpha_jank_assist_%02d", turn)
+		userContent := fmt.Sprintf(
+			"WB2_CHAT_JANK_USER_%02d\nfixture user turn %d\npad-a\npad-b\npad-c\npad-d\npad-e",
+			turn,
+			turn,
+		)
+		assistantContent := fmt.Sprintf(
+			"WB2_CHAT_JANK_ASSIST_%02d\nfixture assistant turn %d\npad-a\npad-b\npad-c\npad-d\npad-e\npad-f\npad-g",
+			turn,
+			turn,
+		)
+		order++
+		userPayload := fmt.Sprintf(
+			`{"type":"message","id":"%s","message":{"role":"user","content":%q}}`,
+			userID,
+			userContent,
+		)
+		if _, err := db.ExecContext(ctx, `
+INSERT INTO agent_entries (lineage_id, entry_id, parent_entry_id, entry_type, origin_order, payload_json, origin_thread_id, session_timestamp)
+VALUES (?, ?, ?, 'message', ?, ?, ?, CURRENT_TIMESTAMP)
+ON CONFLICT(lineage_id, entry_id) DO UPDATE SET
+parent_entry_id = excluded.parent_entry_id,
+origin_order = excluded.origin_order,
+payload_json = excluded.payload_json,
+origin_thread_id = excluded.origin_thread_id`,
+			threadID, userID, parent, order, userPayload, threadID,
+		); err != nil {
+			return fmt.Errorf("seed workbench v2 jank user entry %d: %w", turn, err)
+		}
+		order++
+		assistantPayload := fmt.Sprintf(
+			`{"type":"message","id":"%s","parentId":"%s","message":{"role":"assistant","content":%q}}`,
+			assistantID,
+			userID,
+			assistantContent,
+		)
+		if _, err := db.ExecContext(ctx, `
+INSERT INTO agent_entries (lineage_id, entry_id, parent_entry_id, entry_type, origin_order, payload_json, origin_thread_id, session_timestamp)
+VALUES (?, ?, ?, 'message', ?, ?, ?, CURRENT_TIMESTAMP)
+ON CONFLICT(lineage_id, entry_id) DO UPDATE SET
+parent_entry_id = excluded.parent_entry_id,
+origin_order = excluded.origin_order,
+payload_json = excluded.payload_json,
+origin_thread_id = excluded.origin_thread_id`,
+			threadID, assistantID, userID, order, assistantPayload, threadID,
+		); err != nil {
+			return fmt.Errorf("seed workbench v2 jank assistant entry %d: %w", turn, err)
+		}
+		parent = assistantID
+		headID = assistantID
+	}
+	if _, err := db.ExecContext(ctx, `
+UPDATE agent_threads SET head_entry_id = ?, lineage_id = ? WHERE id = ?`,
+		headID, threadID, threadID,
+	); err != nil {
+		return fmt.Errorf("set workbench v2 jank head entry: %w", err)
 	}
 	return nil
 }
