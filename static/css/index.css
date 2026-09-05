@@ -571,3 +571,13 @@ html[data-workbench-doc-switching="true"] #thread-artifact-document::after {
     transform: translateX(100%);
   }
 }
+
+/* workbench nested overscroll contain (mobile PTR) */
+#agent-chat-scroll-region,
+#thread-artifact-document,
+#thread-artifact-browser,
+#workbench-regions .overflow-y-auto,
+#workbench-regions .overflow-auto,
+#thoughts-markdown-scroll-region {
+  overscroll-behavior-y: contain;
+}
