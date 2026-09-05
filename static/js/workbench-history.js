@@ -1,4 +1,5 @@
 const CHAT_SCROLL_KEY = "workbench-v2:chat-scroll";
+const CHAT_SCROLL_PENDING_KEY = "workbench-v2:chat-scroll-pending";
 const COMPOSER_FOCUS_KEY = "workbench-v2:composer-focused";
 const DOC_SWITCH_ATTR = "data-workbench-doc-switching";
 
@@ -25,7 +26,11 @@ function isThreadRoute() {
 }
 
 function chatScrollEl() {
-  return document.querySelector("#workbench-v2-chat-body");
+  // Real transcript scroller (workbench-v2-chat-body is overflow-hidden).
+  return (
+    document.getElementById("agent-chat-scroll-region") ||
+    document.querySelector("#workbench-v2-chat-body #agent-chat-scroll-region")
+  );
 }
 
 function composerEl() {
@@ -49,7 +54,7 @@ function clearDocSwitchPending() {
   document.documentElement.removeAttribute(DOC_SWITCH_ATTR);
 }
 
-function persistChatContinuity() {
+function persistChatContinuity({ pending = false } = {}) {
   if (!isThreadRoute()) return;
   const chat = chatScrollEl();
   if (chat) {
@@ -61,6 +66,9 @@ function persistChatContinuity() {
           top: chat.scrollTop,
         }),
       );
+      if (pending) {
+        sessionStorage.setItem(CHAT_SCROLL_PENDING_KEY, "1");
+      }
     } catch (_) {}
   }
   const active = document.activeElement;
@@ -74,25 +82,54 @@ function persistChatContinuity() {
   } catch (_) {}
 }
 
-function restoreChatScroll() {
-  if (!isThreadRoute()) return;
+function consumeScrollPending() {
+  try {
+    const pending = sessionStorage.getItem(CHAT_SCROLL_PENDING_KEY) === "1";
+    sessionStorage.removeItem(CHAT_SCROLL_PENDING_KEY);
+    return pending;
+  } catch (_) {
+    return false;
+  }
+}
+
+function scrollChatToLatest() {
   const chat = chatScrollEl();
   if (!chat) return;
+  chat.scrollTop = chat.scrollHeight;
+  chat.dataset.follow = "true";
+}
+
+function restoreChatScroll() {
+  if (!isThreadRoute()) return false;
+  const chat = chatScrollEl();
+  if (!chat) return false;
+  const pending = consumeScrollPending();
+  if (!pending) {
+    // First open / normal navigation: land on latest, ignore stale scroll.
+    try {
+      sessionStorage.removeItem(CHAT_SCROLL_KEY);
+    } catch (_) {}
+    return false;
+  }
   let saved;
   try {
     saved = JSON.parse(sessionStorage.getItem(CHAT_SCROLL_KEY) || "null");
+    sessionStorage.removeItem(CHAT_SCROLL_KEY);
   } catch (_) {
-    return;
+    return false;
   }
-  if (!saved || typeof saved.top !== "number") return;
+  if (!saved || typeof saved.top !== "number") return false;
   // Same thread family: pathname may keep the same /threads/:id across artifacts.
   if (
     typeof saved.path === "string" &&
     saved.path.split("?")[0] !== window.location.pathname
   ) {
-    return;
+    return false;
   }
   chat.scrollTop = saved.top;
+  chat.dataset.follow = "false";
+  chat.dataset.scrollRestored = "true";
+  return true;
 }
 
 function restoreComposerFocus() {
@@ -130,23 +167,62 @@ function onArtifactFileClick(event) {
   const link = event.target?.closest?.("a[data-thread-artifact-file]");
   if (!link || !link.href) return;
   // Keep real GET anchors; only add continuity + light loading affordance.
-  persistChatContinuity();
+  persistChatContinuity({ pending: true });
   try {
     sessionStorage.setItem(COMPOSER_FOCUS_KEY, "1");
   } catch (_) {}
   markDocSwitchPending();
 }
 
+function onMobileTabClick(event) {
+  const btn = event.target?.closest?.(
+    '[role="tablist"][aria-label="Workbench regions"] button[role="tab"]',
+  );
+  if (!btn) return;
+  const controls = btn.getAttribute("aria-controls") || "";
+  if (controls !== "workbench-v2-chat") return;
+  // After Datastar applies max-md:!flex, scroll to latest.
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      scrollChatToLatest();
+      requestAnimationFrame(scrollChatToLatest);
+    });
+  });
+}
+
+function bindMobileActiveObserver() {
+  const root = document.getElementById("workbench-root");
+  if (!root || root.dataset.chatScrollMobileBound === "true") return;
+  root.dataset.chatScrollMobileBound = "true";
+  const observer = new MutationObserver(() => {
+    if (root.dataset.workbenchMobileActive !== "workbenchV2Chat") return;
+    requestAnimationFrame(() => {
+      scrollChatToLatest();
+    });
+  });
+  observer.observe(root, {
+    attributes: true,
+    attributeFilter: ["data-workbench-mobile-active"],
+  });
+}
+
 function initNavPolish() {
   clearDocSwitchPending();
-  restoreChatScroll();
-  // Defer focus until after layout/VT paint so we don't fight the browser.
+  const restored = restoreChatScroll();
+  bindMobileActiveObserver();
+  // Defer focus/scroll until after layout/VT paint so we don't fight the browser.
   requestAnimationFrame(() => {
-    requestAnimationFrame(restoreComposerFocus);
+    requestAnimationFrame(() => {
+      restoreComposerFocus();
+      if (!restored) {
+        scrollChatToLatest();
+      }
+    });
   });
 }
 
 window.addEventListener("popstate", reloadThreadArtifactHistory);
 window.addEventListener("pagehide", persistChatContinuity);
 document.addEventListener("click", onArtifactFileClick, true);
+document.addEventListener("click", onMobileTabClick);
 initNavPolish();

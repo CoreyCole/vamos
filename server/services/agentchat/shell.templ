@@ -31,7 +31,7 @@ templ AgentChatMobilePaneToggle() {
 }
 
 templ AgentChatChatPane(header templ.Component, messages templ.Component, composer templ.Component) {
-	<script type="module" src="/js/agent-chat-scroll.js?v=1"></script>
+	<script type="module" src="/js/agent-chat-scroll.js?v=2"></script>
 	<main id="agent-chat-chat-pane" class="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-lg border border-border bg-card" data-class="{'hidden md:flex': $mobilePane !== 'chat'}" role="tabpanel" aria-labelledby="agent-chat-mobile-chat-tab">
 		@header
 		<div class="relative min-h-0 flex-1">

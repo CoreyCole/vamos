@@ -30,9 +30,13 @@ export function scrollAgentChatToBottom(
   if (!region) return;
   bindFollow(region);
   if (hasMessageHash() && !force) return;
+  // Sibling-doc continuity restored a mid-scroll position — don't clobber it
+  // unless a caller explicitly forces (mobile tab reveal).
+  if (!force && region.dataset.scrollRestored === "true") return;
   if (force || region.dataset.follow === "true" || isNearBottom(region)) {
     region.scrollTop = region.scrollHeight;
     region.dataset.follow = "true";
+    delete region.dataset.scrollRestored;
   }
 }
 
@@ -49,8 +53,59 @@ export function initAgentChatInitialScroll(root = document) {
   }
 }
 
+function regionIsVisible(region) {
+  if (!region) return false;
+  if (region.clientHeight <= 0) return false;
+  const style = window.getComputedStyle(region);
+  if (style.display === "none" || style.visibility === "hidden") return false;
+  // Ancestor may be max-md:!hidden while chat tab is inactive.
+  let node = region;
+  while (node && node !== document.documentElement) {
+    const cs = window.getComputedStyle(node);
+    if (cs.display === "none") return false;
+    node = node.parentElement;
+  }
+  return true;
+}
+
+function bindVisibilityScroll(region) {
+  if (!region || region.dataset.visibilityScrollBound === "true") return;
+  region.dataset.visibilityScrollBound = "true";
+  let wasVisible = regionIsVisible(region);
+  const maybeScroll = () => {
+    const visible = regionIsVisible(region);
+    if (visible && !wasVisible) {
+      // Chat mobile tab just became visible — land on latest.
+      scrollAgentChatToBottom(region.parentElement || document, {
+        force: true,
+      });
+    }
+    wasVisible = visible;
+  };
+  if (typeof IntersectionObserver === "function") {
+    const io = new IntersectionObserver(
+      () => {
+        maybeScroll();
+      },
+      { threshold: 0.01 },
+    );
+    io.observe(region);
+  }
+  const mo = new MutationObserver(() => maybeScroll());
+  const root = document.getElementById("workbench-root") || document.body;
+  mo.observe(root, {
+    attributes: true,
+    subtree: true,
+    attributeFilter: ["class", "data-workbench-mobile-active", "style"],
+  });
+}
+
 function init(event) {
   initAgentChatInitialScroll(event?.target || document);
+  const regions = document.querySelectorAll("#agent-chat-scroll-region");
+  for (const region of regions) {
+    bindVisibilityScroll(region);
+  }
 }
 
 init();

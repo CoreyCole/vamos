@@ -30,7 +30,7 @@ type WorkbenchV2Args struct {
 }
 
 func BuildWorkbenchV2State(args WorkbenchV2Args) (WorkbenchState, error) {
-	return BuildWorkbenchState(BuildWorkbenchStateInput{
+	state, err := BuildWorkbenchState(BuildWorkbenchStateInput{
 		UserEmail:     args.UserEmail,
 		Page:          WorkbenchPageThreads,
 		View:          WorkbenchViewSplit,
@@ -75,6 +75,14 @@ func BuildWorkbenchV2State(args WorkbenchV2Args) (WorkbenchState, error) {
 			),
 		},
 	})
+	if err != nil {
+		return state, err
+	}
+	// Mobile thread deep links are chat-first. ?artifact= still loads the Docs
+	// pane content, but does not steal the visible mobile tab on first open.
+	state.Config.Mobile.ActiveRegionID = WorkbenchV2ChatRegionID
+	return state, nil
+
 }
 
 func v2Region(

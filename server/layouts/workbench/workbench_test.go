@@ -668,6 +668,9 @@ func TestWorkbenchHistoryJSReloadsSameDocumentArtifactPopstate(t *testing.T) {
 		`data-workbench-doc-switching`,
 		`agent-chat-composer-input`,
 		`workbench-v2:chat-scroll`,
+		`workbench-v2:chat-scroll-pending`,
+		`agent-chat-scroll-region`,
+		`persistChatContinuity({ pending: true })`,
 	} {
 		if !strings.Contains(js, want) {
 			t.Fatalf("workbench-history.js missing %q in %s", want, js)
@@ -1375,7 +1378,7 @@ func TestWorkbenchV2PreferencesKeepOnlyRatios(t *testing.T) {
 		t.Fatalf("ratio = %v, want 0.31", got)
 	}
 	if !regionSpecByID(merged, WorkbenchV2ThreadsRegionID).Visible ||
-		merged.Mobile.ActiveRegionID != WorkbenchV2ArtifactRegionID {
+		merged.Mobile.ActiveRegionID != WorkbenchV2ChatRegionID {
 		t.Fatalf("v2 interaction state was restored: %#v", merged)
 	}
 }
@@ -1415,6 +1418,7 @@ func TestSignalsReflectInitialVisibility(t *testing.T) {
 		t.Fatalf("signals = %s, want visible agentChatPrimary", signals)
 	}
 	if got := RegionInitialClass(
+		state,
 		state.Regions[1],
 	); !strings.Contains(got, "flex") ||
 		strings.Contains(got, "hidden") {
@@ -1440,6 +1444,49 @@ func regionSpecByID(config WorkbenchConfig, id string) RegionSpec {
 	return RegionSpec{}
 }
 
+
+func TestWorkbenchV2MobileDefaultsToChat(t *testing.T) {
+	t.Parallel()
+
+	state, err := BuildWorkbenchV2State(WorkbenchV2Args{
+		ViewportClass: ViewportMobile,
+		ThreadsOpen:   true,
+		ChatOpen:      true,
+		ArtifactOpen:  true,
+	})
+	if err != nil {
+		t.Fatalf("BuildWorkbenchV2State() error = %v", err)
+	}
+	if state.Config.Mobile.ActiveRegionID != WorkbenchV2ChatRegionID {
+		t.Fatalf(
+			"mobile active = %q, want chat-first %q",
+			state.Config.Mobile.ActiveRegionID,
+			WorkbenchV2ChatRegionID,
+		)
+	}
+	chat := state.Regions[1]
+	artifact := state.Regions[2]
+	if got := RegionInitialClass(state, chat); !strings.Contains(got, "flex") ||
+		strings.Contains(got, "hidden") {
+		t.Fatalf("mobile chat initial class = %q, want visible flex", got)
+	}
+	if got := RegionInitialClass(state, artifact); !strings.Contains(got, "hidden") {
+		t.Fatalf("mobile artifact initial class = %q, want hidden until Docs tab", got)
+	}
+}
+
+func TestDefaultThreadsConfigMobileActiveIsChat(t *testing.T) {
+	t.Parallel()
+
+	cfg := DefaultWorkbenchConfig(WorkbenchPageThreads, WorkbenchViewSplit, "")
+	if cfg.Mobile.ActiveRegionID != WorkbenchV2ChatRegionID {
+		t.Fatalf(
+			"threads default mobile active = %q, want %q",
+			cfg.Mobile.ActiveRegionID,
+			WorkbenchV2ChatRegionID,
+		)
+	}
+}
 
 func TestWorkbenchV2RegionsEnforceComposerFriendlyMinRem(t *testing.T) {
 	t.Parallel()
@@ -1473,7 +1520,7 @@ func TestWorkbenchV2RegionsEnforceComposerFriendlyMinRem(t *testing.T) {
 		`data-workbench-region="workbench-v2-chat"`,
 		`data-workbench-min-rem="18"`,
 		`/js/workbench-resize.js?v=8`,
-		`/js/workbench-history.js?v=6`,
+		`/js/workbench-history.js?v=7`,
 	} {
 		if !strings.Contains(html, fragment) {
 			t.Fatalf("workbench html missing %q", fragment)

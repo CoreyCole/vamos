@@ -113,7 +113,7 @@ func DefaultWorkbenchConfig(
 				Visible: false,
 			},
 		}
-		cfg.Mobile.ActiveRegionID = "workbench-v2-artifact"
+		cfg.Mobile.ActiveRegionID = "workbench-v2-chat"
 	default:
 		return DefaultWorkbenchConfig(WorkbenchPageAgentChat, view, contextMode)
 	}

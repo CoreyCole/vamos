@@ -100,9 +100,18 @@ func firstRegionSignalForSlot(state WorkbenchState, slot WorkbenchSlot) string {
 	return ""
 }
 
-func RegionInitialClass(region WorkbenchRegion) string {
+func RegionInitialClass(state WorkbenchState, region WorkbenchRegion) string {
 	if !region.Visible {
 		return "hidden"
+	}
+	// On mobile viewport SSR, show the active region immediately so deep links
+	// into /threads/:id land on Chat before Datastar hydrates data-class.
+	if state.ViewportClass == ViewportMobile {
+		active := SignalKeyForID(state.Config.Mobile.ActiveRegionID)
+		if SignalKey(region) == active {
+			return "flex min-w-0 flex-1 flex-col"
+		}
+		return "hidden min-w-0 flex-col md:flex"
 	}
 	switch region.Slot {
 	case WorkbenchSlotPrimary:
