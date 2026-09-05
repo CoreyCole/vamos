@@ -204,7 +204,7 @@ templ CommentableMarkdown(args CommentableMarkdownArgs) {
 				<div class="markdown-viewer prose prose-invert max-w-none min-h-full">
 					@templ.Raw(args.HTML)
 				</div>
-				@CommentTarget(DocumentTargetView(args, "Document", CommentTargetChromeVisible))
+				@DocumentPatchTarget(args, "Document")
 			}
 			@SelectedTextTrigger(args.SelectionSignals)
 		</div>
@@ -247,7 +247,11 @@ templ CommentTarget(args CommentTargetView) {
 			if len(args.Threads) > 0 {
 				@CommentToggle(args)
 			}
-			@SectionMenu(args)
+			if isDocumentLevelCommentTarget(args) {
+				@HiddenFields(args.HiddenFields)
+			} else {
+				@SectionMenu(args)
+			}
 		</div>
 	}
 }
@@ -262,7 +266,7 @@ templ CommentTargetWithForm(args CommentTargetView, view CommentFormView) {
 				}
 			}
 		</div>
-		if TargetChromeOrVisible(args.Chrome) != CommentTargetChromePatchOnly {
+		if TargetChromeOrVisible(args.Chrome) != CommentTargetChromePatchOnly && !isDocumentLevelCommentTarget(args) {
 			@SectionMenu(args)
 		}
 	</div>

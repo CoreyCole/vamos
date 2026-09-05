@@ -797,7 +797,7 @@ func TestWorkbenchV2CSSKeepsStableRegionTransitionNames(t *testing.T) {
 		"#workbench-v2-chat {",
 		"view-transition-name: workbench-v2-chat;",
 		"#workbench-v2-artifact {",
-		"view-transition-name: workbench-v2-artifact;",
+		"view-transition-name: none;",
 		"#workbench-v2-comments {",
 		"view-transition-name: workbench-v2-comments;",
 		"#thread-artifact-browser {",
@@ -812,6 +812,8 @@ func TestWorkbenchV2CSSKeepsStableRegionTransitionNames(t *testing.T) {
 		"data-workbench-doc-switching",
 		`html[data-workbench-doc-switching="true"] #thread-artifact-document {`,
 		"workbench-doc-switch-sweep",
+		"z-index: 20;",
+		"#agent-chat-messages,",
 	} {
 		if !strings.Contains(css, want) {
 			t.Fatalf("index.css missing %q", want)

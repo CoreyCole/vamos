@@ -252,6 +252,15 @@ func TargetChromeOrVisible(chrome CommentTargetChrome) CommentTargetChrome {
 	return chrome
 }
 
+func isDocumentLevelCommentTarget(args CommentTargetView) bool {
+	section := strings.TrimSpace(args.SectionID)
+	if section == "" {
+		section = strings.TrimSpace(args.HeadingHint)
+	}
+	return strings.EqualFold(section, "document")
+}
+
+
 func SelectionOnlySignalArgs(args CommentableMarkdownArgs) SelectionSignalArgs {
 	selection := args.SelectionSignals
 	hidden := MergeHidden(args.HiddenFields, selection.HiddenFields)

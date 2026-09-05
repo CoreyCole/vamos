@@ -498,7 +498,8 @@
   view-transition-name: workbench-v2-chat;
 }
 #workbench-v2-artifact {
-  view-transition-name: workbench-v2-artifact;
+  /* Sibling/doc switches use sub-region names only; parent must not crossfade. */
+  view-transition-name: none;
 }
 #workbench-v2-comments {
   view-transition-name: workbench-v2-comments;
@@ -506,9 +507,13 @@
 
 /* Artifact sub-regions: browser + path stay put; document may transition. */
 #thread-artifact-path-header {
+  position: relative;
+  z-index: 20;
   view-transition-name: thread-artifact-path-header;
 }
 #thread-artifact-browser {
+  position: relative;
+  z-index: 0;
   view-transition-name: thread-artifact-browser;
 }
 #thread-artifact-document {
@@ -574,6 +579,7 @@ html[data-workbench-doc-switching="true"] #thread-artifact-document::after {
 
 /* workbench nested overscroll contain (mobile PTR) */
 #agent-chat-scroll-region,
+#agent-chat-messages,
 #thread-artifact-document,
 #thread-artifact-browser,
 #workbench-regions .overflow-y-auto,

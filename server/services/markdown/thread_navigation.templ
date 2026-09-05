@@ -77,7 +77,7 @@ templ ThreadArtifactBrowserEntry(entry ThreadArtifactEntry) {
 	if entry.IsDir {
 		@ThreadArtifactDirectory(entry)
 	} else {
-		<li>
+		<li class="relative z-0">
 			<a
 				href={ templ.URL(entry.Href) }
 				data-thread-artifact-file
@@ -85,7 +85,7 @@ templ ThreadArtifactBrowserEntry(entry ThreadArtifactEntry) {
 					aria-current="page"
 				}
 				class={
-					"block truncate rounded-r px-2 py-1 text-xs transition-colors border-l-2",
+					"relative z-0 block min-w-0 truncate rounded-r px-2 py-1 text-xs transition-colors border-l-2",
 					templ.KV("border-primary bg-muted font-medium text-foreground", entry.IsActive),
 					templ.KV("border-transparent text-muted-foreground hover:bg-muted/60 hover:text-foreground", !entry.IsActive),
 				}
@@ -97,7 +97,7 @@ templ ThreadArtifactBrowserEntry(entry ThreadArtifactEntry) {
 }
 
 templ ThreadArtifactDirectory(entry ThreadArtifactEntry) {
-	<li id={ entry.TargetID } class="relative">
+	<li id={ entry.TargetID } class="relative z-0">
 		<details
 			class="group"
 			if entry.IsExpanded {
@@ -129,7 +129,7 @@ templ ThreadArtifactDirectory(entry ThreadArtifactEntry) {
 				data-artifact-endpoint={ entry.BrowseEndpoint }
 				data-indicator="_threadArtifactLoading"
 				data-on:click={ threadArtifactBrowserClickAction() }
-				class="absolute right-1 top-0.5 inline-flex h-7 w-7 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+				class="absolute right-1 top-0.5 z-10 inline-flex h-7 w-7 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
 				aria-label={ "Open " + entry.Name + " folder" }
 				title={ "Open " + entry.Name + " folder" }
 			>
