@@ -2,15 +2,18 @@ package agentchat
 
 import "strconv"
 
-templ MessagesPane(threadID string, state TranscriptPaneState, hasThread bool, forkAction string) {
-	<div id="agent-chat-messages" class="min-h-full min-w-0 overflow-x-hidden pb-28">
+templ MessagesPane(threadID string, state TranscriptPaneState, hasThread bool, forkAction string, inFlowComposer bool) {
+	<div id="agent-chat-messages" class={
+		"min-w-0 overflow-x-hidden",
+		templ.KV("min-h-full pb-28", !inFlowComposer),
+	}>
 		@StableTranscriptRegion(threadID, state.Stable, forkAction)
 		if hasThread {
 			@LiveTranscriptRegion(threadID, state, forkAction)
 		} else {
 			<div id="agent-chat-live-transcript" class="min-w-0 overflow-x-hidden"></div>
 		}
-		<div id="chat-latest" tabindex="-1" autofocus class="h-px w-full shrink-0"></div>
+		<div id="chat-latest" tabindex="-1" autofocus class="h-0 w-full shrink-0 outline-none"></div>
 	</div>
 }
 
@@ -40,7 +43,7 @@ templ TranscriptMessageWithFork(threadID string, msg TranscriptMessage, forkActi
 	if msg.Variant == "detail" {
 		@TranscriptDetailCard(msg)
 	} else {
-		<div class={ "relative min-w-0 overflow-x-hidden border-b border-border first:border-t", templ.KV("bg-muted/60", msg.Role == "user") }>
+		<div class={ "relative min-w-0 overflow-x-hidden border-b border-border first:border-t last:border-b-0", templ.KV("bg-muted/60", msg.Role == "user") }>
 			@TranscriptForkControl(threadID, msg, forkAction)
 			@ChatMessage(ChatMessageArgs{ID: msg.DOMID, Role: msg.Role, Content: msg.Content, HTMLContent: msg.HTMLContent, Attachments: msg.Attachments})
 		</div>
@@ -48,7 +51,7 @@ templ TranscriptMessageWithFork(threadID string, msg TranscriptMessage, forkActi
 }
 
 templ TranscriptDetailCard(msg TranscriptMessage) {
-	<div class={ "min-w-0 overflow-x-hidden border-b first:border-t", templ.KV("border-destructive/40 bg-destructive/5", msg.IsError), templ.KV("border-border", !msg.IsError) }>
+	<div class={ "min-w-0 overflow-x-hidden border-b first:border-t last:border-b-0", templ.KV("border-destructive/40 bg-destructive/5", msg.IsError), templ.KV("border-border", !msg.IsError) }>
 		<div
 			id={ "msg-" + msg.DOMID }
 			data-signals={ transcriptDetailSignals(msg) }

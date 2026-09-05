@@ -16,7 +16,7 @@ templ EmbeddedChatRightRailContent(args EmbeddedChatPanelArgs) {
 		} else {
 			<div id="thoughts-embedded-chat-stream" class="hidden" data-init={ "@get('" + args.StreamURL + "')" }></div>
 			<div id="agent-chat-scroll-region" class="flex min-h-0 flex-1 flex-col overflow-y-auto overflow-x-hidden">
-				@MessagesPane(args.ThreadID, args.Transcript, args.HasThread, "")
+				@MessagesPane(args.ThreadID, args.Transcript, args.HasThread, "", false)
 			</div>
 			<div class="shrink-0 border-t border-border bg-background p-3">
 				@EmbeddedWorkspaceComposer(args)
@@ -31,7 +31,7 @@ templ EmbeddedFreeformRightRailContent(args EmbeddedFreeformPanelArgs) {
 			<div id="thoughts-freeform-chat-stream" class="hidden" data-init={ "@get('" + args.StreamURL + "')" }></div>
 		}
 		<div id="agent-chat-scroll-region" class="flex min-h-0 flex-1 flex-col overflow-y-auto overflow-x-hidden">
-			@MessagesPane(args.ThreadID, args.Transcript, args.HasThread, freeformForkAction(args.ThreadID))
+			@MessagesPane(args.ThreadID, args.Transcript, args.HasThread, freeformForkAction(args.ThreadID), false)
 		</div>
 		<div class="shrink-0 border-t border-border bg-background p-3">
 			<div id="agent-chat-workspace-composer">

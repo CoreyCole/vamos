@@ -200,7 +200,7 @@ func FreeformChatPrimaryRegion(args ChatPageArgs) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = MessagesPane(getThreadID(args.CurrentThread), args.Transcript, args.CurrentThread != nil, freeformForkAction(getThreadID(args.CurrentThread))).Render(ctx, templ_7745c5c3_Buffer)
+		templ_7745c5c3_Err = MessagesPane(getThreadID(args.CurrentThread), args.Transcript, args.CurrentThread != nil, freeformForkAction(getThreadID(args.CurrentThread)), false).Render(ctx, templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -385,7 +385,7 @@ func WorkspaceChatPrimaryRegion(args WorkspacePageArgs) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = MessagesPane(getThreadID(args.Projection.SelectedThread), args.Projection.Transcript, args.Projection.SelectedThread != nil, workspaceForkAction(args.WorkspaceID, getThreadID(args.Projection.SelectedThread))).Render(ctx, templ_7745c5c3_Buffer)
+		templ_7745c5c3_Err = MessagesPane(getThreadID(args.Projection.SelectedThread), args.Projection.Transcript, args.Projection.SelectedThread != nil, workspaceForkAction(args.WorkspaceID, getThreadID(args.Projection.SelectedThread)), false).Render(ctx, templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

@@ -3198,6 +3198,7 @@ func (h *Handler) patchThread(
 				args.Transcript,
 				args.CurrentThread != nil,
 				freeformForkAction(threadID),
+				false,
 			),
 		)
 	}
