@@ -40,6 +40,7 @@ type ThreadArtifactBrowserArgs struct {
 	ParentHref     string
 	ParentEndpoint string
 	Entries        []ThreadArtifactEntry
+	HeaderActions  templ.Component
 }
 
 func threadArtifactQuery(
@@ -379,12 +380,14 @@ func (s *Service) threadArtifactAndComments(
 	}
 	content, page, directory := s.artifactContent(c, doc, explicit || !hasArtifact)
 	if directory {
+		browser.HeaderActions = BuildThreadArtifactHeaderActions(nil, browser.DocPath)
 		return ThreadArtifactPane(
 			browser,
 			WorkbenchUnavailable("Select a file from the artifact browser."),
 		), WorkbenchUnavailable("Comments are unavailable for directories."), nil
 	}
 	if page == nil {
+		browser.HeaderActions = BuildThreadArtifactHeaderActions(nil, browser.DocPath)
 		return ThreadArtifactPane(browser, content),
 			WorkbenchUnavailable("Comments are unavailable for this artifact."), nil
 	}
@@ -406,7 +409,10 @@ func (s *Service) threadArtifactAndComments(
 		page.CommentUI,
 		page.ViewerArgs.BodyComponent,
 	)
-	content = DocumentPanel(BuildDocumentPanelArgs(page))
+	panelArgs := BuildDocumentPanelArgs(page)
+	browser.HeaderActions = BuildThreadArtifactHeaderActions(page, browser.DocPath)
+	panelArgs.Document.WorkbenchActions = nil
+	content = DocumentPanel(panelArgs)
 	return ThreadArtifactPane(browser, content),
 		commentui.CommentsContextPanel(
 			commentui.BuildCommentsPanelArgs(page.CommentUI, ""),

@@ -25,14 +25,13 @@ func BuildDocumentWorkbenchActions(pageArgs *PageArgs) templ.Component {
 	if len(actions) == 0 {
 		return nil
 	}
-	overflow := workbench.OverflowActions(workbench.OverflowActionsArgs{
+	return workbench.OverflowActions(workbench.OverflowActionsArgs{
 		Label: "Document actions",
 		Groups: []workbench.OverflowActionGroup{{
 			Label:   "Document",
 			Actions: actions,
 		}},
 	})
-	return documentWorkbenchActions(pageArgs.ViewerArgs.RawMarkdown, overflow)
 }
 
 func DocumentCopyAction() workbench.OverflowAction {
@@ -71,5 +70,56 @@ func DocumentCommentAction(pageArgs *PageArgs) workbench.OverflowAction {
 		FormMethod:   "post",
 		SubmitMode:   workbench.OverflowActionSubmitDatastar,
 		HiddenFields: fields,
+	}
+}
+
+func BuildThreadArtifactHeaderActions(pageArgs *PageArgs, docPath string) templ.Component {
+	docPath = strings.TrimSpace(docPath)
+	groups := make([]workbench.OverflowActionGroup, 0, 2)
+	pathActions := make([]workbench.OverflowAction, 0, 2)
+	if docPath != "" {
+		pathActions = append(pathActions, workbench.OverflowAction{
+			Label: "Thoughts",
+			Kind:  workbench.OverflowActionLink,
+			Href:  ThoughtsDocURL(docPath, ""),
+		})
+		pathActions = append(pathActions, DocumentCopyPathAction(docPath))
+	}
+	if len(pathActions) > 0 {
+		groups = append(groups, workbench.OverflowActionGroup{Actions: pathActions})
+	}
+	docActions := make([]workbench.OverflowAction, 0, 2)
+	if pageArgs != nil {
+		if pageArgs.ViewerArgs.RawMarkdown != "" {
+			docActions = append(docActions, DocumentCopyAction())
+		}
+		if pageArgs.ViewerArgs.CommentMode != CommentModeNone {
+			docActions = append(docActions, DocumentCommentAction(pageArgs))
+		}
+	}
+	if len(docActions) > 0 {
+		groups = append(groups, workbench.OverflowActionGroup{
+			Label:   "Document",
+			Actions: docActions,
+		})
+	}
+	if len(groups) == 0 {
+		return nil
+	}
+	return workbench.OverflowActions(workbench.OverflowActionsArgs{
+		Label:  "Artifact actions",
+		Groups: groups,
+	})
+}
+
+func DocumentCopyPathAction(docPath string) workbench.OverflowAction {
+	path := "thoughts/" + strings.TrimSpace(docPath)
+	escaped := strings.ReplaceAll(path, `\`, `\\`)
+	escaped = strings.ReplaceAll(escaped, `'`, `\'`)
+	return workbench.OverflowAction{
+		Label:       "Copy path",
+		Description: "Copy path and attach in chat",
+		Kind:        workbench.OverflowActionButton,
+		ClientAction: "const p='" + escaped + "'; navigator.clipboard?.writeText(p); const input = document.getElementById('agent-chat-composer-input'); if (input) { input.value += (input.value ? '\n' : '') + p; input.dispatchEvent(new Event('input', {bubbles: true})); } el.closest('details')?.removeAttribute('open')",
 	}
 }

@@ -57,6 +57,7 @@ func TestBuildThoughtsDocumentCarriesDocumentModel(t *testing.T) {
 	}
 	for _, want := range []string{
 		`data-testid="workbench-overflow-actions"`,
+		`id="document-copy-source"`,
 		`name="doc_path" value="thoughts/example/design.md"`,
 		`name="workbench_v2" value="1"`,
 	} {
@@ -100,7 +101,6 @@ func TestBuildDocumentWorkbenchActionsRendersWholeDocumentComment(t *testing.T) 
 	for _, want := range []string{
 		`data-testid="workbench-overflow-actions"`,
 		`Document actions`,
-		`id="document-copy-source"`,
 		`Copy document`,
 		`navigator.clipboard.writeText`,
 		`Comment`,

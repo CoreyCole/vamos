@@ -12,6 +12,9 @@ templ DocumentSurface(doc WorkbenchDocument, workspaceTree *workbench.WorkspaceD
 	<div id="document-surface" class="flex h-full min-h-0 flex-col overflow-hidden bg-background" data-signals={ encodePageSignals(doc.PageSessionID) }>
 		<div id="thoughts-url-sync" class="hidden" aria-hidden="true"></div>
 		<div id="thoughts-open-chat-result" class="hidden" aria-hidden="true"></div>
+		if doc.RawMarkdown != "" {
+			<template id={ documentCopySourceID }>{ doc.RawMarkdown }</template>
+		}
 		if doc.WorkbenchActions != nil {
 			<div class="flex shrink-0 justify-end border-b border-border px-3 py-2">
 				@doc.WorkbenchActions

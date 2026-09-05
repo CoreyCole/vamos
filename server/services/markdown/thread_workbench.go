@@ -117,13 +117,19 @@ func (s *Service) indexArtifactComponent(
 	artifact string,
 	explicit bool,
 ) templ.Component {
-	content, _, _ := s.artifactContent(c, artifact, explicit)
+	content, page, _ := s.artifactContent(c, artifact, explicit)
 	if !explicit {
 		return content
 	}
 	browser, err := s.threadArtifactBrowser(c, "", artifact)
 	if err != nil {
 		return WorkbenchUnavailable("The artifact is unavailable.")
+	}
+	browser.HeaderActions = BuildThreadArtifactHeaderActions(page, browser.DocPath)
+	if page != nil {
+		panelArgs := BuildDocumentPanelArgs(page)
+		panelArgs.Document.WorkbenchActions = nil
+		content = DocumentPanel(panelArgs)
 	}
 	return ThreadArtifactPane(browser, content)
 }
