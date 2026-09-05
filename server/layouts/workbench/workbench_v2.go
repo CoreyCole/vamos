@@ -7,6 +7,12 @@ const (
 	WorkbenchV2ChatRegionID     = "workbench-v2-chat"
 	WorkbenchV2ArtifactRegionID = "workbench-v2-artifact"
 	WorkbenchV2CommentsRegionID = "workbench-v2-comments"
+
+	// Keep chat wide enough that the composer prompt stays usable after grip drags.
+	workbenchV2ThreadsMinRem  = 12
+	workbenchV2ChatMinRem     = 18
+	workbenchV2ArtifactMinRem = 20
+	workbenchV2CommentsMinRem = 12
 )
 
 type WorkbenchV2Args struct {
@@ -36,6 +42,7 @@ func BuildWorkbenchV2State(args WorkbenchV2Args) (WorkbenchState, error) {
 				WorkbenchSlotNavigation,
 				RegionPlanSidebar,
 				defaultSideRatio,
+				workbenchV2ThreadsMinRem,
 				args.ThreadsOpen,
 				args.Threads,
 			),
@@ -44,6 +51,7 @@ func BuildWorkbenchV2State(args WorkbenchV2Args) (WorkbenchState, error) {
 				WorkbenchSlotContext,
 				RegionChat,
 				defaultPrimaryRatio,
+				workbenchV2ChatMinRem,
 				args.ChatOpen,
 				args.Chat,
 			),
@@ -52,6 +60,7 @@ func BuildWorkbenchV2State(args WorkbenchV2Args) (WorkbenchState, error) {
 				WorkbenchSlotPrimary,
 				RegionArtifact,
 				defaultPrimaryRatio,
+				workbenchV2ArtifactMinRem,
 				args.ArtifactOpen,
 				args.Artifact,
 			),
@@ -60,6 +69,7 @@ func BuildWorkbenchV2State(args WorkbenchV2Args) (WorkbenchState, error) {
 				WorkbenchSlotContext,
 				RegionComments,
 				defaultSideRatio,
+				workbenchV2CommentsMinRem,
 				args.CommentsOpen,
 				args.Comments,
 			),
@@ -72,12 +82,13 @@ func v2Region(
 	slot WorkbenchSlot,
 	kind RegionKind,
 	ratio float64,
+	minRem float64,
 	visible bool,
 	component templ.Component,
 ) WorkbenchRegion {
 	return WorkbenchRegion{
 		ID: id, TargetID: id, BodyID: id + "-body", Slot: slot, Kind: kind,
-		Ratio: ratio, Visible: visible, Component: component,
+		Ratio: ratio, MinRem: minRem, Visible: visible, Component: component,
 	}
 }
 

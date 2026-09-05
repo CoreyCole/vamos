@@ -124,3 +124,137 @@ func assertWorkbenchViewTransitionNames() spec.Step {
 		},
 	)
 }
+
+func TestWorkbenchV2ChatPaneRespectsMinWidthDuringResize(t *testing.T) {
+	spec.Story(t, "workbench v2 chat pane keeps composer-friendly min width").
+		App(vamos.App()).
+		Viewport(duiruntime.ViewportDesktopFull).
+		As(vamos.Robot).
+		With(vamos.WorkspaceFixture(fixtures.WorkbenchV2Fixture)).
+		Visit(vamos.Pages.Path("/threads/wb2_alpha")).
+		Expect(vamos.WorkbenchV2.Ready()).
+		Do(assertChatMinRemAndDragFloor()).
+		Expect(vamos.Console.Clean()).
+		Run()
+}
+
+func assertChatMinRemAndDragFloor() spec.Step {
+	return spec.Custom(
+		"chat min-rem is enforced while dragging toward zero",
+		func(t testing.TB, ctx *duiruntime.Context) {
+			minRem, err := ctx.Page.Locator(`#workbench-v2-chat`).GetAttribute("data-workbench-min-rem")
+			if err != nil || minRem != "18" {
+				t.Fatalf("chat min-rem = %q, want 18 (%v)", minRem, err)
+			}
+			handle := ctx.Page.Locator(
+				`[data-workbench-resize-handle][data-workbench-before="workbenchV2Chat"] > div:first-child,` +
+					`[data-workbench-resize-handle][data-workbench-after="workbenchV2Chat"] > div:first-child`,
+			).First()
+			box, err := handle.BoundingBox()
+			if err != nil || box == nil {
+				// Fall back to any visible handle between chat and artifact.
+				handle = ctx.Page.Locator("[data-workbench-resize-handle] > div:first-child:visible").Nth(1)
+				box, err = handle.BoundingBox()
+			}
+			if err != nil || box == nil {
+				t.Fatalf("chat/artifact resize handle missing: %v", err)
+			}
+			beforeWidth, err := ctx.Page.Evaluate(
+				`() => document.getElementById('workbench-v2-chat')?.getBoundingClientRect().width || 0`,
+				nil,
+			)
+			if err != nil {
+				t.Fatal(err)
+			}
+			// Drag aggressively to try to collapse chat.
+			if err := ctx.Page.Mouse().Move(box.X+box.Width/2, box.Y+box.Height/2); err != nil {
+				t.Fatal(err)
+			}
+			if err := ctx.Page.Mouse().Down(); err != nil {
+				t.Fatal(err)
+			}
+			if err := ctx.Page.Mouse().Move(box.X+box.Width/2-400, box.Y+box.Height/2); err != nil {
+				t.Fatal(err)
+			}
+			if err := ctx.Page.Mouse().Move(box.X+box.Width/2+400, box.Y+box.Height/2); err != nil {
+				t.Fatal(err)
+			}
+			if err := ctx.Page.Mouse().Up(); err != nil {
+				t.Fatal(err)
+			}
+			after, err := ctx.Page.Evaluate(
+				`() => {
+					const chat = document.getElementById('workbench-v2-chat');
+					const min = Number(chat?.dataset.workbenchMinRem || 12) * 16;
+					const width = chat?.getBoundingClientRect().width || 0;
+					return { width, min, before: 0 };
+				}`,
+				nil,
+			)
+			if err != nil {
+				t.Fatal(err)
+			}
+			state, ok := after.(map[string]any)
+			if !ok {
+				t.Fatalf("width probe type %T", after)
+			}
+			width, _ := state["width"].(float64)
+			min, _ := state["min"].(float64)
+			if width+1 < min {
+				t.Fatalf("chat width %.1f below min %.1f (before=%v)", width, min, beforeWidth)
+			}
+		},
+	)
+}
+
+func TestWorkbenchV2SiblingFileNavRestoresComposerFocus(t *testing.T) {
+	const notesPath = "thoughts/owner/plans/alpha/notes.md"
+	siblingHref := "/threads/wb2_alpha?artifact=" + url.QueryEscape(notesPath) +
+		"&artifact_dir=" + url.QueryEscape("thoughts/owner/plans/alpha")
+
+	spec.Story(t, "workbench v2 sibling file nav restores composer focus").
+		App(vamos.App()).
+		Viewport(duiruntime.ViewportDesktopFull).
+		As(vamos.Robot).
+		With(vamos.WorkspaceFixture(fixtures.WorkbenchV2Fixture)).
+		Visit(vamos.Pages.Path("/threads/wb2_alpha")).
+		Expect(vamos.WorkbenchV2.Ready()).
+		Do(selectThreadArtifactFile(
+			siblingHref,
+			notesPath,
+			"Alpha notes",
+		)).
+		Expect(vamos.WorkbenchV2.Ready()).
+		Do(assertComposerFocusedAfterSiblingNav()).
+		Expect(vamos.Console.Clean()).
+		Run()
+}
+
+func assertComposerFocusedAfterSiblingNav() spec.Step {
+	return spec.Custom(
+		"composer receives focus after sibling artifact GET",
+		func(t testing.TB, ctx *duiruntime.Context) {
+			focused, err := ctx.Page.Evaluate(
+				`() => document.activeElement && document.activeElement.id === 'agent-chat-composer-input'`,
+				nil,
+			)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if focused != true {
+				active, _ := ctx.Page.Evaluate(`() => document.activeElement && (document.activeElement.id || document.activeElement.tagName)`, nil)
+				t.Fatalf("activeElement = %#v, want agent-chat-composer-input", active)
+			}
+			switching, err := ctx.Page.Evaluate(
+				`() => document.documentElement.getAttribute('data-workbench-doc-switching')`,
+				nil,
+			)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if switching != nil && switching != "" {
+				t.Fatalf("doc-switching attr still set: %#v", switching)
+			}
+		},
+	)
+}

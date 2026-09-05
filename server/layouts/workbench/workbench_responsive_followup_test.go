@@ -46,7 +46,7 @@ func TestWorkbenchV2ThreadsHasIndependentHideAndReopenControls(t *testing.T) {
 		`data-workbench-threads-reopen`,
 		`aria-label="Show threads sidebar"`,
 		`$workbench.regions.workbenchV2Threads.visible = true`,
-		`/js/workbench-resize.js?v=7`,
+		`/js/workbench-resize.js?v=8`,
 	} {
 		if !strings.Contains(html, want) {
 			t.Fatalf("workbench threads reopen control missing %q", want)

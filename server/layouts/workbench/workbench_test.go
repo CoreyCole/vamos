@@ -618,6 +618,9 @@ func TestWorkbenchResizeJSShowsHandlesForVisibleAdjacentRegions(t *testing.T) {
 		"if (!navigation || content.length === 0) return null",
 		"const datastarModule = import(\"@vamos/datastar\");",
 		"collapseRegion(root, navigationGroup.navigation)",
+		"clampRegionWidth(",
+		"regionMinWidth(before)",
+		"regionMinWidth(after)",
 		"regionSlot(region) !== \"primary\"",
 		"attributeFilter: [\"class\", \"style\", \"data-workbench-focused\"]",
 		"function currentViewportClass(root)",
@@ -661,6 +664,10 @@ func TestWorkbenchHistoryJSReloadsSameDocumentArtifactPopstate(t *testing.T) {
 		`document.getElementById("thread-artifact-pane")`,
 		`window.location.reload()`,
 		`navigation.type === "back_forward"`,
+		`a[data-thread-artifact-file]`,
+		`data-workbench-doc-switching`,
+		`agent-chat-composer-input`,
+		`workbench-v2:chat-scroll`,
 	} {
 		if !strings.Contains(js, want) {
 			t.Fatalf("workbench-history.js missing %q in %s", want, js)
@@ -696,6 +703,8 @@ func TestWorkbenchV2CSSKeepsStableRegionTransitionNames(t *testing.T) {
 		"view-transition-name: workbench-v2-comments;",
 		"::view-transition-old(workbench-v2-chat)",
 		"animation: none;",
+		"data-workbench-doc-switching",
+		"workbench-doc-switch-sweep",
 	} {
 		if !strings.Contains(css, want) {
 			t.Fatalf("index.css missing %q", want)
@@ -1429,4 +1438,45 @@ func regionSpecByID(config WorkbenchConfig, id string) RegionSpec {
 		}
 	}
 	return RegionSpec{}
+}
+
+
+func TestWorkbenchV2RegionsEnforceComposerFriendlyMinRem(t *testing.T) {
+	t.Parallel()
+
+	state, err := BuildWorkbenchV2State(WorkbenchV2Args{
+		ThreadsOpen:  true,
+		ChatOpen:     true,
+		ArtifactOpen: true,
+	})
+	if err != nil {
+		t.Fatalf("BuildWorkbenchV2State() error = %v", err)
+	}
+	want := map[string]float64{
+		WorkbenchV2ThreadsRegionID:  12,
+		WorkbenchV2ChatRegionID:     18,
+		WorkbenchV2ArtifactRegionID: 20,
+		WorkbenchV2CommentsRegionID: 12,
+	}
+	for _, region := range state.Regions {
+		got := region.MinRem
+		if got != want[region.ID] {
+			t.Fatalf("region %s MinRem = %v, want %v", region.ID, got, want[region.ID])
+		}
+	}
+	var body bytes.Buffer
+	if err := Workbench(state).Render(t.Context(), &body); err != nil {
+		t.Fatal(err)
+	}
+	html := body.String()
+	for _, fragment := range []string{
+		`data-workbench-region="workbench-v2-chat"`,
+		`data-workbench-min-rem="18"`,
+		`/js/workbench-resize.js?v=8`,
+		`/js/workbench-history.js?v=6`,
+	} {
+		if !strings.Contains(html, fragment) {
+			t.Fatalf("workbench html missing %q", fragment)
+		}
+	}
 }

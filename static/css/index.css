@@ -517,3 +517,39 @@
   animation: none;
 }
 
+
+/* Light sibling-doc switch affordance (full GET remount; keep non-janky). */
+html[data-workbench-doc-switching="true"] #workbench-v2-artifact {
+  opacity: 0.72;
+  transition: opacity 120ms ease;
+}
+
+html[data-workbench-doc-switching="true"] #thread-artifact-pane::after {
+  content: "";
+  position: absolute;
+  inset: 0 auto auto 0;
+  width: 100%;
+  height: 2px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    hsl(var(--primary) / 0.7),
+    transparent
+  );
+  animation: workbench-doc-switch-sweep 900ms linear infinite;
+  pointer-events: none;
+  z-index: 5;
+}
+
+#thread-artifact-pane {
+  position: relative;
+}
+
+@keyframes workbench-doc-switch-sweep {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(100%);
+  }
+}

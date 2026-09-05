@@ -66,6 +66,12 @@ function regionMinWidth(region) {
   return Number(region.dataset.workbenchMinRem || 12) * 16;
 }
 
+function clampRegionWidth(region, pixels, availableWidth, reservedMin = 0) {
+  const min = regionMinWidth(region);
+  const max = Math.max(min, availableWidth - Math.max(0, reservedMin));
+  return clamp(pixels, min, max);
+}
+
 function regionSlot(region) {
   return region.dataset.workbenchSlot || "";
 }
@@ -155,22 +161,49 @@ function applyRegionRatios(root) {
     return;
   }
 
+  const primaryMin = regionMinWidth(primary);
+  const fixedRegions = regions.filter((region) => region !== primary);
+  let reservedForOthers = primaryMin;
   let fixedWidth = 0;
-  for (const region of regions) {
-    if (region === primary) continue;
+  const widths = new Map();
+  for (const region of fixedRegions) {
+    const othersMin = fixedRegions
+      .filter((other) => other !== region)
+      .reduce((sum, other) => sum + regionMinWidth(other), 0);
     const storedWidth = Number(region.dataset.workbenchWidthPx || 0);
     const ratioWidth =
       Number(region.dataset.workbenchRatio || 0) * availableWidth;
-    const width = clamp(
+    const width = clampRegionWidth(
+      region,
       storedWidth > 0 ? storedWidth : ratioWidth,
-      0,
       availableWidth,
+      reservedForOthers + othersMin,
     );
-    region.dataset.workbenchWidthPx = width.toFixed(2);
+    widths.set(region, width);
     fixedWidth += width;
+  }
+  if (fixedWidth > availableWidth - primaryMin) {
+    let overflow = fixedWidth - (availableWidth - primaryMin);
+    for (const region of [...fixedRegions].reverse()) {
+      if (overflow <= 0) break;
+      const min = regionMinWidth(region);
+      const current = widths.get(region);
+      const reducible = Math.max(0, current - min);
+      const cut = Math.min(reducible, overflow);
+      widths.set(region, current - cut);
+      overflow -= cut;
+      fixedWidth -= cut;
+    }
+  }
+  for (const region of fixedRegions) {
+    const width = widths.get(region);
+    region.dataset.workbenchWidthPx = width.toFixed(2);
     setRegionWidth(region, width);
   }
-  setRegionWidth(primary, Math.max(0, availableWidth - fixedWidth));
+  setRegionWidth(
+    primary,
+    Math.max(primaryMin, availableWidth - fixedWidth),
+  );
 }
 
 function updateHandles(root) {
@@ -292,7 +325,12 @@ function startResize(event) {
     const afterIsPrimary = regionSlot(after) === "primary";
 
     if (beforeIsPrimary && !afterIsPrimary) {
-      const nextAfter = clamp(afterStart - dx, 0, availableWidth);
+      const nextAfter = clampRegionWidth(
+        after,
+        afterStart - dx,
+        availableWidth,
+        regionMinWidth(before),
+      );
       after.dataset.workbenchRatio = (nextAfter / availableWidth).toFixed(4);
       after.dataset.workbenchWidthPx = nextAfter.toFixed(2);
       applyRegionRatios(root);
@@ -300,15 +338,22 @@ function startResize(event) {
     }
 
     if (!beforeIsPrimary && afterIsPrimary) {
-      const nextBefore = clamp(beforeStart + dx, 0, availableWidth);
+      const nextBefore = clampRegionWidth(
+        before,
+        beforeStart + dx,
+        availableWidth,
+        regionMinWidth(after),
+      );
       before.dataset.workbenchRatio = (nextBefore / availableWidth).toFixed(4);
       before.dataset.workbenchWidthPx = nextBefore.toFixed(2);
       applyRegionRatios(root);
       return;
     }
 
+    const beforeMin = regionMinWidth(before);
+    const afterMin = regionMinWidth(after);
     const rawBefore = beforeStart + dx;
-    const nextBefore = clamp(rawBefore, 0, pairWidth);
+    const nextBefore = clamp(rawBefore, beforeMin, Math.max(beforeMin, pairWidth - afterMin));
     const nextAfter = pairWidth - nextBefore;
     before.dataset.workbenchRatio = (nextBefore / availableWidth).toFixed(4);
     after.dataset.workbenchRatio = (nextAfter / availableWidth).toFixed(4);
