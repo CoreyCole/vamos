@@ -2,6 +2,7 @@ package commentui
 
 import (
 	"fmt"
+	"strings"
 	"net/url"
 	"sort"
 	"time"
@@ -171,30 +172,36 @@ templ CommentableMarkdown(args CommentableMarkdownArgs) {
 				for _, section := range args.Sections {
 					{{
 						sectionID := sectionOrDocument(section.ID)
+						hasHeading := strings.TrimSpace(section.HeadingHTML) != ""
+						chrome := CommentTargetChromeVisible
+						if !hasHeading {
+							// Preamble / body-only: no floating Section actions; Artifact actions owns doc chrome.
+							chrome = CommentTargetChromePatchOnly
+						}
 						target := CommentTargetView{
-							ID:           TargetID(args.IDPrefix, sectionID),
-							SignalKey:    SignalKey(args.IDPrefix, sectionID),
-							Surface:      args.Surface,
-							DocPath:      args.DocPath,
-							SectionID:    sectionID,
-							HeadingHint:  section.Title,
-							UserEmail:    args.UserEmail,
-							Threads:      CommentsForSection(args.Comments, sectionID, section.Title),
-							Routes:       args.Routes,
-							HiddenFields: MergeHidden(args.HiddenFields, map[string]string{"section_hint": sectionID, "heading_hint": section.Title}),
+							ID:              TargetID(args.IDPrefix, sectionID),
+							SignalKey:       SignalKey(args.IDPrefix, sectionID),
+							Surface:         args.Surface,
+							DocPath:         args.DocPath,
+							SectionID:       sectionID,
+							HeadingHint:     section.Title,
+							UserEmail:       args.UserEmail,
+							Threads:         CommentsForSection(args.Comments, sectionID, section.Title),
+							Routes:          args.Routes,
+							HiddenFields:    MergeHidden(args.HiddenFields, map[string]string{"section_hint": sectionID, "heading_hint": section.Title}),
+							Chrome:          chrome,
+							OmitSectionMenu: !hasHeading,
 						}
 					}}
 					<section data-section-id={ sectionID } data-heading-hint={ section.Title } class="relative">
 						<div class="markdown-viewer prose prose-invert max-w-none">
-							if section.HeadingHTML != "" {
+							if hasHeading {
 								<div class="flex items-center justify-between gap-3">
 									@templ.Raw(section.HeadingHTML)
 									@CommentTarget(target)
 								</div>
 							} else {
-								<div class="mb-2 flex justify-end">
-									@CommentTarget(target)
-								</div>
+								@CommentTarget(target)
 							}
 							@templ.Raw(section.BodyHTML)
 						</div>
@@ -247,7 +254,7 @@ templ CommentTarget(args CommentTargetView) {
 			if len(args.Threads) > 0 {
 				@CommentToggle(args)
 			}
-			if isDocumentLevelCommentTarget(args) {
+			if omitSectionMenu(args) {
 				@HiddenFields(args.HiddenFields)
 			} else {
 				@SectionMenu(args)
@@ -266,7 +273,7 @@ templ CommentTargetWithForm(args CommentTargetView, view CommentFormView) {
 				}
 			}
 		</div>
-		if TargetChromeOrVisible(args.Chrome) != CommentTargetChromePatchOnly && !isDocumentLevelCommentTarget(args) {
+		if TargetChromeOrVisible(args.Chrome) != CommentTargetChromePatchOnly && !omitSectionMenu(args) {
 			@SectionMenu(args)
 		}
 	</div>

@@ -153,6 +153,8 @@ func TestThreadArtifactPaneScopesStaticHandlersToBrowserRows(t *testing.T) {
 		`id="thread-artifact-path-header"`,
 		`aria-label="Toggle files"`,
 		`title="Toggle files"`,
+		`sessionStorage.setItem('workbench-v2:artifact-browser-open'`,
+		`document.currentScript.parentElement`,
 	} {
 		if !strings.Contains(html, want) {
 			t.Fatalf("artifact pane missing %q: %s", want, html)

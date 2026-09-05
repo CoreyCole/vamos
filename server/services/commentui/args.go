@@ -108,6 +108,7 @@ type CommentTargetView struct {
 	Routes                CommentRoutes
 	HiddenFields          map[string]string
 	Chrome                CommentTargetChrome
+	OmitSectionMenu       bool
 	SelectionSignalPrefix string
 }
 
@@ -258,6 +259,16 @@ func isDocumentLevelCommentTarget(args CommentTargetView) bool {
 		section = strings.TrimSpace(args.HeadingHint)
 	}
 	return strings.EqualFold(section, "document")
+}
+
+// omitSectionMenu suppresses the floating Section actions control. Document-level
+// targets and preamble/body-only sections (no heading HTML) use Artifact actions
+// / selection instead; real headed sections keep SectionMenu.
+func omitSectionMenu(args CommentTargetView) bool {
+	if isDocumentLevelCommentTarget(args) {
+		return true
+	}
+	return args.OmitSectionMenu
 }
 
 

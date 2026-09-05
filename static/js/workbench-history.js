@@ -168,38 +168,52 @@ function persistArtifactBrowserOpenFromToggle(event) {
   });
 }
 
-async function restoreArtifactBrowserOpen() {
-  if (!isThreadRoute()) return;
-  let stored = null;
+function readArtifactBrowserOpenPref() {
+  if (!isThreadRoute()) return null;
   try {
-    stored = sessionStorage.getItem(BROWSER_OPEN_KEY);
+    const stored = sessionStorage.getItem(BROWSER_OPEN_KEY);
+    if (stored === "0" || stored === "1") return stored === "1";
   } catch (_) {}
-  if (stored !== "0" && stored !== "1") return;
-  const open = stored === "1";
+  return null;
+}
+
+function seedArtifactBrowserOpenBeforePaint() {
+  const open = readArtifactBrowserOpenPref();
+  if (open === null) return;
+  const pane = document.getElementById("thread-artifact-pane");
+  if (!pane) return;
+  try {
+    pane.setAttribute(
+      "data-signals",
+      `{_threadArtifactLoading: false, _artifactBrowserOpen: ${open}}`,
+    );
+    pane.setAttribute("data-artifact-browser-pref", open ? "1" : "0");
+  } catch (_) {}
+  const browser = document.getElementById("thread-artifact-browser");
+  const btn = document.querySelector(
+    'button[aria-controls="thread-artifact-browser"]',
+  );
+  if (browser) {
+    if (open) browser.style.removeProperty("display");
+    else browser.style.display = "none";
+  }
+  if (btn) {
+    btn.setAttribute("aria-expanded", open ? "true" : "false");
+    btn.setAttribute("aria-pressed", open ? "true" : "false");
+  }
+}
+
+async function restoreArtifactBrowserOpen() {
+  const open = readArtifactBrowserOpenPref();
+  if (open === null) return;
+  seedArtifactBrowserOpenBeforePaint();
   const pane = document.getElementById("thread-artifact-pane");
   if (!pane) return;
   try {
     const { mergePatch } = await import("@vamos/datastar");
     mergePatch({ _artifactBrowserOpen: open });
   } catch (_) {
-    try {
-      pane.setAttribute(
-        "data-signals",
-        `{_threadArtifactLoading: false, _artifactBrowserOpen: ${open}}`,
-      );
-      const browser = document.getElementById("thread-artifact-browser");
-      const btn = document.querySelector(
-        'button[aria-controls="thread-artifact-browser"]',
-      );
-      if (browser) {
-        if (open) browser.style.removeProperty("display");
-        else browser.style.display = "none";
-      }
-      if (btn) {
-        btn.setAttribute("aria-expanded", open ? "true" : "false");
-        btn.setAttribute("aria-pressed", open ? "true" : "false");
-      }
-    } catch (_) {}
+    seedArtifactBrowserOpenBeforePaint();
   }
 }
 
@@ -241,6 +255,7 @@ function onPageShow(event) {
 
 function initNavPolish() {
   // pagereveal / pageshow(persisted) own DOC_SWITCH_ATTR lifecycle — do not clear here.
+  seedArtifactBrowserOpenBeforePaint();
   restoreArtifactBrowserOpen();
   requestAnimationFrame(() => {
     requestAnimationFrame(() => {
@@ -258,4 +273,5 @@ document.addEventListener("click", onArtifactFileClick, true);
 document.addEventListener("click", persistArtifactBrowserOpenFromToggle, true);
 document.addEventListener("pointerdown", onArtifactPrefetchIntent, true);
 document.addEventListener("focusin", onArtifactPrefetchIntent, true);
+seedArtifactBrowserOpenBeforePaint();
 initNavPolish();

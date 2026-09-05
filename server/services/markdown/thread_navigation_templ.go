@@ -29,14 +29,14 @@ func ThreadArtifactPane(browser ThreadArtifactBrowserArgs, document templ.Compon
 			templ_7745c5c3_Var1 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<div id=\"thread-artifact-pane\" class=\"flex h-full min-h-0 flex-col bg-background\" data-signals=\"{_threadArtifactLoading: false, _artifactBrowserOpen: true}\" data-attr:aria-busy=\"$_threadArtifactLoading ? 'true' : 'false'\"><div id=\"thread-artifact-path-header\" class=\"flex shrink-0 items-center gap-2 border-b border-border p-2 text-xs\"><button type=\"button\" class=\"inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground\" data-on:click=\"$_artifactBrowserOpen = !$_artifactBrowserOpen\" data-attr:aria-expanded=\"$_artifactBrowserOpen ? 'true' : 'false'\" data-attr:aria-pressed=\"$_artifactBrowserOpen ? 'true' : 'false'\" data-class=\"{ 'bg-muted text-foreground': $_artifactBrowserOpen }\" aria-controls=\"thread-artifact-browser\" aria-label=\"Toggle files\" title=\"Toggle files\"><svg data-show=\"!$_artifactBrowserOpen\" class=\"h-3.5 w-3.5\" aria-hidden=\"true\" fill=\"none\" stroke=\"currentColor\" viewBox=\"0 0 24 24\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2\" d=\"M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V7z\"></path></svg> <svg data-show=\"$_artifactBrowserOpen\" class=\"h-3.5 w-3.5\" aria-hidden=\"true\" fill=\"none\" stroke=\"currentColor\" viewBox=\"0 0 24 24\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2\" d=\"M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v2M3 7v10a2 2 0 002 2h14a2 2 0 002-2V11M3 11h18\"></path></svg></button> <span class=\"min-w-0 flex-1 truncate text-muted-foreground\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<div id=\"thread-artifact-pane\" class=\"flex h-full min-h-0 flex-col bg-background\" data-signals=\"{_threadArtifactLoading: false, _artifactBrowserOpen: true}\" data-attr:aria-busy=\"$_threadArtifactLoading ? 'true' : 'false'\"><script>\n\t\t\t(function (pane) {\n\t\t\t\ttry {\n\t\t\t\t\tvar stored = sessionStorage.getItem(\"workbench-v2:artifact-browser-open\");\n\t\t\t\t\tif (stored !== \"0\" && stored !== \"1\") return;\n\t\t\t\t\tvar open = stored === \"1\";\n\t\t\t\t\tpane.setAttribute(\n\t\t\t\t\t\t\"data-signals\",\n\t\t\t\t\t\t\"{_threadArtifactLoading: false, _artifactBrowserOpen: \" + open + \"}\",\n\t\t\t\t\t);\n\t\t\t\t\tpane.setAttribute(\"data-artifact-browser-pref\", stored);\n\t\t\t\t} catch (e) {}\n\t\t\t})(document.currentScript.parentElement);\n\t\t</script><div id=\"thread-artifact-path-header\" class=\"flex shrink-0 items-center gap-2 border-b border-border p-2 text-xs\"><button type=\"button\" class=\"inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground\" data-on:click=\"$_artifactBrowserOpen = !$_artifactBrowserOpen; try { sessionStorage.setItem('workbench-v2:artifact-browser-open', $_artifactBrowserOpen ? '1' : '0') } catch (e) {}\" data-attr:aria-expanded=\"$_artifactBrowserOpen ? 'true' : 'false'\" data-attr:aria-pressed=\"$_artifactBrowserOpen ? 'true' : 'false'\" data-class=\"{ 'bg-muted text-foreground': $_artifactBrowserOpen }\" aria-controls=\"thread-artifact-browser\" aria-label=\"Toggle files\" title=\"Toggle files\"><svg data-show=\"!$_artifactBrowserOpen\" class=\"h-3.5 w-3.5\" aria-hidden=\"true\" fill=\"none\" stroke=\"currentColor\" viewBox=\"0 0 24 24\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2\" d=\"M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V7z\"></path></svg> <svg data-show=\"$_artifactBrowserOpen\" class=\"h-3.5 w-3.5\" aria-hidden=\"true\" fill=\"none\" stroke=\"currentColor\" viewBox=\"0 0 24 24\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2\" d=\"M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v2M3 7v10a2 2 0 002 2h14a2 2 0 002-2V11M3 11h18\"></path></svg></button> <span class=\"min-w-0 flex-1 truncate text-muted-foreground\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var2 string
 		templ_7745c5c3_Var2, templ_7745c5c3_Err = templ.JoinStringErrs("thoughts/" + browser.DocPath)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/markdown/thread_navigation.templ`, Line: 29, Col: 94}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/markdown/thread_navigation.templ`, Line: 43, Col: 94}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var2))
 		if templ_7745c5c3_Err != nil {
@@ -104,7 +104,7 @@ func ThreadArtifactBrowser(browser ThreadArtifactBrowserArgs) templ.Component {
 		var templ_7745c5c3_Var4 string
 		templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.ResolveAttributeValue(threadArtifactDirectoryIdentity(browser.DirectoryPath))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/markdown/thread_navigation.templ`, Line: 45, Col: 83}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/markdown/thread_navigation.templ`, Line: 59, Col: 83}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var4)
 		if templ_7745c5c3_Err != nil {
@@ -122,7 +122,7 @@ func ThreadArtifactBrowser(browser ThreadArtifactBrowserArgs) templ.Component {
 			var templ_7745c5c3_Var5 templ.SafeURL
 			templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.JoinURLErrs(templ.URL(browser.ParentHref))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/markdown/thread_navigation.templ`, Line: 53, Col: 41}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/markdown/thread_navigation.templ`, Line: 67, Col: 41}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var5))
 			if templ_7745c5c3_Err != nil {
@@ -135,7 +135,7 @@ func ThreadArtifactBrowser(browser ThreadArtifactBrowserArgs) templ.Component {
 			var templ_7745c5c3_Var6 string
 			templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.ResolveAttributeValue(browser.ParentEndpoint)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/markdown/thread_navigation.templ`, Line: 55, Col: 52}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/markdown/thread_navigation.templ`, Line: 69, Col: 52}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var6)
 			if templ_7745c5c3_Err != nil {
@@ -148,7 +148,7 @@ func ThreadArtifactBrowser(browser ThreadArtifactBrowserArgs) templ.Component {
 			var templ_7745c5c3_Var7 string
 			templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.ResolveAttributeValue(threadArtifactBrowserClickAction())
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/markdown/thread_navigation.templ`, Line: 57, Col: 55}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/markdown/thread_navigation.templ`, Line: 71, Col: 55}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var7)
 			if templ_7745c5c3_Err != nil {
@@ -166,7 +166,7 @@ func ThreadArtifactBrowser(browser ThreadArtifactBrowserArgs) templ.Component {
 		var templ_7745c5c3_Var8 string
 		templ_7745c5c3_Var8, templ_7745c5c3_Err = templ.JoinStringErrs(threadArtifactDirectoryIdentity(browser.DirectoryPath))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/markdown/thread_navigation.templ`, Line: 66, Col: 97}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/markdown/thread_navigation.templ`, Line: 80, Col: 97}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var8))
 		if templ_7745c5c3_Err != nil {
@@ -236,7 +236,7 @@ func ThreadArtifactBrowserEntry(entry ThreadArtifactEntry) templ.Component {
 			var templ_7745c5c3_Var11 templ.SafeURL
 			templ_7745c5c3_Var11, templ_7745c5c3_Err = templ.JoinURLErrs(templ.URL(entry.Href))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/markdown/thread_navigation.templ`, Line: 82, Col: 32}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/markdown/thread_navigation.templ`, Line: 96, Col: 32}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var11))
 			if templ_7745c5c3_Err != nil {
@@ -272,7 +272,7 @@ func ThreadArtifactBrowserEntry(entry ThreadArtifactEntry) templ.Component {
 			var templ_7745c5c3_Var13 string
 			templ_7745c5c3_Var13, templ_7745c5c3_Err = templ.JoinStringErrs(entry.Name)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/markdown/thread_navigation.templ`, Line: 93, Col: 16}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/markdown/thread_navigation.templ`, Line: 107, Col: 16}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var13))
 			if templ_7745c5c3_Err != nil {
@@ -315,7 +315,7 @@ func ThreadArtifactDirectory(entry ThreadArtifactEntry) templ.Component {
 		var templ_7745c5c3_Var15 string
 		templ_7745c5c3_Var15, templ_7745c5c3_Err = templ.ResolveAttributeValue(entry.TargetID)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/markdown/thread_navigation.templ`, Line: 100, Col: 24}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/markdown/thread_navigation.templ`, Line: 114, Col: 24}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var15)
 		if templ_7745c5c3_Err != nil {
@@ -338,7 +338,7 @@ func ThreadArtifactDirectory(entry ThreadArtifactEntry) templ.Component {
 		var templ_7745c5c3_Var16 string
 		templ_7745c5c3_Var16, templ_7745c5c3_Err = templ.ResolveAttributeValue(threadArtifactLoaded(entry.IsLoaded))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/markdown/thread_navigation.templ`, Line: 106, Col: 53}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/markdown/thread_navigation.templ`, Line: 120, Col: 53}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var16)
 		if templ_7745c5c3_Err != nil {
@@ -351,7 +351,7 @@ func ThreadArtifactDirectory(entry ThreadArtifactEntry) templ.Component {
 		var templ_7745c5c3_Var17 string
 		templ_7745c5c3_Var17, templ_7745c5c3_Err = templ.ResolveAttributeValue(entry.Endpoint)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/markdown/thread_navigation.templ`, Line: 107, Col: 42}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/markdown/thread_navigation.templ`, Line: 121, Col: 42}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var17)
 		if templ_7745c5c3_Err != nil {
@@ -364,7 +364,7 @@ func ThreadArtifactDirectory(entry ThreadArtifactEntry) templ.Component {
 		var templ_7745c5c3_Var18 string
 		templ_7745c5c3_Var18, templ_7745c5c3_Err = templ.ResolveAttributeValue(threadArtifactDirectoryToggleAction())
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/markdown/thread_navigation.templ`, Line: 108, Col: 57}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/markdown/thread_navigation.templ`, Line: 122, Col: 57}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var18)
 		if templ_7745c5c3_Err != nil {
@@ -377,7 +377,7 @@ func ThreadArtifactDirectory(entry ThreadArtifactEntry) templ.Component {
 		var templ_7745c5c3_Var19 string
 		templ_7745c5c3_Var19, templ_7745c5c3_Err = templ.ResolveAttributeValue(threadArtifactChildrenID(entry))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/markdown/thread_navigation.templ`, Line: 113, Col: 51}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/markdown/thread_navigation.templ`, Line: 127, Col: 51}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var19)
 		if templ_7745c5c3_Err != nil {
@@ -390,7 +390,7 @@ func ThreadArtifactDirectory(entry ThreadArtifactEntry) templ.Component {
 		var templ_7745c5c3_Var20 string
 		templ_7745c5c3_Var20, templ_7745c5c3_Err = templ.JoinStringErrs(entry.Name)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/markdown/thread_navigation.templ`, Line: 117, Col: 39}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/markdown/thread_navigation.templ`, Line: 131, Col: 39}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var20))
 		if templ_7745c5c3_Err != nil {
@@ -403,7 +403,7 @@ func ThreadArtifactDirectory(entry ThreadArtifactEntry) templ.Component {
 		var templ_7745c5c3_Var21 string
 		templ_7745c5c3_Var21, templ_7745c5c3_Err = templ.ResolveAttributeValue(threadArtifactChildrenID(entry))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/markdown/thread_navigation.templ`, Line: 119, Col: 43}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/markdown/thread_navigation.templ`, Line: 133, Col: 43}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var21)
 		if templ_7745c5c3_Err != nil {
@@ -431,7 +431,7 @@ func ThreadArtifactDirectory(entry ThreadArtifactEntry) templ.Component {
 			var templ_7745c5c3_Var22 templ.SafeURL
 			templ_7745c5c3_Var22, templ_7745c5c3_Err = templ.JoinURLErrs(templ.URL(entry.BrowseHref))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/markdown/thread_navigation.templ`, Line: 127, Col: 38}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/markdown/thread_navigation.templ`, Line: 141, Col: 38}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var22))
 			if templ_7745c5c3_Err != nil {
@@ -444,7 +444,7 @@ func ThreadArtifactDirectory(entry ThreadArtifactEntry) templ.Component {
 			var templ_7745c5c3_Var23 string
 			templ_7745c5c3_Var23, templ_7745c5c3_Err = templ.ResolveAttributeValue(entry.BrowseEndpoint)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/markdown/thread_navigation.templ`, Line: 129, Col: 49}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/markdown/thread_navigation.templ`, Line: 143, Col: 49}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var23)
 			if templ_7745c5c3_Err != nil {
@@ -457,7 +457,7 @@ func ThreadArtifactDirectory(entry ThreadArtifactEntry) templ.Component {
 			var templ_7745c5c3_Var24 string
 			templ_7745c5c3_Var24, templ_7745c5c3_Err = templ.ResolveAttributeValue(threadArtifactBrowserClickAction())
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/markdown/thread_navigation.templ`, Line: 131, Col: 54}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/markdown/thread_navigation.templ`, Line: 145, Col: 54}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var24)
 			if templ_7745c5c3_Err != nil {
@@ -470,7 +470,7 @@ func ThreadArtifactDirectory(entry ThreadArtifactEntry) templ.Component {
 			var templ_7745c5c3_Var25 string
 			templ_7745c5c3_Var25, templ_7745c5c3_Err = templ.ResolveAttributeValue("Open " + entry.Name + " folder")
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/markdown/thread_navigation.templ`, Line: 133, Col: 49}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/markdown/thread_navigation.templ`, Line: 147, Col: 49}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var25)
 			if templ_7745c5c3_Err != nil {
@@ -483,7 +483,7 @@ func ThreadArtifactDirectory(entry ThreadArtifactEntry) templ.Component {
 			var templ_7745c5c3_Var26 string
 			templ_7745c5c3_Var26, templ_7745c5c3_Err = templ.ResolveAttributeValue("Open " + entry.Name + " folder")
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/markdown/thread_navigation.templ`, Line: 134, Col: 44}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/markdown/thread_navigation.templ`, Line: 148, Col: 44}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var26)
 			if templ_7745c5c3_Err != nil {

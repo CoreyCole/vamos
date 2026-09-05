@@ -675,6 +675,7 @@ func TestWorkbenchHistoryJSReloadsSameDocumentArtifactPopstate(t *testing.T) {
 		`agent-chat-composer-input`,
 		`workbench-v2:composer-focused`,
 		`workbench-v2:artifact-browser-open`,
+		`seedArtifactBrowserOpenBeforePaint`,
 		`rel="prefetch"`,
 	} {
 		if !strings.Contains(js, want) {
@@ -1664,7 +1665,7 @@ func TestWorkbenchV2RegionsEnforceComposerFriendlyMinRem(t *testing.T) {
 		`data-workbench-region="workbench-v2-chat"`,
 		`data-workbench-min-rem="18"`,
 		`/js/workbench-resize.js?v=8`,
-		`/js/workbench-history.js?v=10`,
+		`/js/workbench-history.js?v=11`,
 	} {
 		if !strings.Contains(html, fragment) {
 			t.Fatalf("workbench html missing %q", fragment)

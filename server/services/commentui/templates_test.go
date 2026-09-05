@@ -392,9 +392,10 @@ func TestCommentableMarkdownMountsSingleDocumentPatchTargetForSectionedDocs(
 		IDPrefix: "doc",
 		DocPath:  "thoughts/example.md",
 		Sections: []CommentSectionView{{
-			ID:       "section-1",
-			Title:    "Section 1",
-			BodyHTML: `<p>Body</p>`,
+			ID:          "section-1",
+			Title:       "Section 1",
+			HeadingHTML: `<h1>Section 1</h1>`,
+			BodyHTML:    `<p>Body</p>`,
 		}},
 		Routes:       CommentRoutes{Show: "/show", Create: "/create", Cancel: "/cancel"},
 		HiddenFields: map[string]string{"doc_path": "thoughts/example.md"},
@@ -432,9 +433,10 @@ func TestCommentableMarkdownKeepsSingleVisibleDocumentTargetWithThreads(t *testi
 		IDPrefix: "doc",
 		DocPath:  "thoughts/example.md",
 		Sections: []CommentSectionView{{
-			ID:       "section-1",
-			Title:    "Section 1",
-			BodyHTML: `<p>Body</p>`,
+			ID:          "section-1",
+			Title:       "Section 1",
+			HeadingHTML: `<h1>Section 1</h1>`,
+			BodyHTML:    `<p>Body</p>`,
 		}},
 		Comments: []CommentThreadView{{
 			ID:          "document-comment",
@@ -491,11 +493,20 @@ func TestCommentableMarkdownMountsEmptyTargetsForPreambleSections(t *testing.T) 
 	if !strings.Contains(html, `markdown-code-block`) {
 		t.Fatalf("render missing preamble body: %s", html)
 	}
-	for _, want := range []string{`data-comment-target="true"`, `aria-label="Section actions"`, `Add comment`} {
+	for _, want := range []string{`data-comment-target="true"`, `commentui-selection-target-right`} {
 		if !strings.Contains(html, want) {
 			t.Fatalf(
 				"empty preamble section missing mounted comment target marker %q in %s",
 				want,
+				html,
+			)
+		}
+	}
+	for _, unwanted := range []string{`aria-label="Section actions"`, `Add comment`} {
+		if strings.Contains(html, unwanted) {
+			t.Fatalf(
+				"preamble must not render document-level Section actions %q in %s",
+				unwanted,
 				html,
 			)
 		}

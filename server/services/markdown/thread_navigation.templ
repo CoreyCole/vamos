@@ -7,11 +7,25 @@ templ ThreadArtifactPane(browser ThreadArtifactBrowserArgs, document templ.Compo
 		data-signals="{_threadArtifactLoading: false, _artifactBrowserOpen: true}"
 		data-attr:aria-busy="$_threadArtifactLoading ? 'true' : 'false'"
 	>
+		<script>
+			(function (pane) {
+				try {
+					var stored = sessionStorage.getItem("workbench-v2:artifact-browser-open");
+					if (stored !== "0" && stored !== "1") return;
+					var open = stored === "1";
+					pane.setAttribute(
+						"data-signals",
+						"{_threadArtifactLoading: false, _artifactBrowserOpen: " + open + "}",
+					);
+					pane.setAttribute("data-artifact-browser-pref", stored);
+				} catch (e) {}
+			})(document.currentScript.parentElement);
+		</script>
 		<div id="thread-artifact-path-header" class="flex shrink-0 items-center gap-2 border-b border-border p-2 text-xs">
 			<button
 				type="button"
 				class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-				data-on:click="$_artifactBrowserOpen = !$_artifactBrowserOpen"
+				data-on:click="$_artifactBrowserOpen = !$_artifactBrowserOpen; try { sessionStorage.setItem('workbench-v2:artifact-browser-open', $_artifactBrowserOpen ? '1' : '0') } catch (e) {}"
 				data-attr:aria-expanded="$_artifactBrowserOpen ? 'true' : 'false'"
 				data-attr:aria-pressed="$_artifactBrowserOpen ? 'true' : 'false'"
 				data-class="{ 'bg-muted text-foreground': $_artifactBrowserOpen }"
