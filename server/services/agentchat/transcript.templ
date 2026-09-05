@@ -11,6 +11,7 @@ templ MessagesPane(threadID string, state TranscriptPaneState, hasThread bool, f
 			<div id="agent-chat-live-transcript" class="min-w-0 overflow-x-hidden"></div>
 		}
 	</div>
+	<div id="chat-latest" tabindex="-1" autofocus class="h-px w-full shrink-0" aria-hidden="true"></div>
 }
 
 templ StableTranscriptRegion(threadID string, messages []TranscriptMessage, forkAction string) {

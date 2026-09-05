@@ -149,3 +149,12 @@ func NextVisibleSignalKey(state WorkbenchState, index int) string {
 	}
 	return SignalKey(state.Regions[index+1])
 }
+
+func mobileRegionTabClick(region WorkbenchRegion) string {
+	key := SignalKey(region)
+	click := "$workbench.activeRegionID = '" + key + "'; $workbench.regions." + key + ".visible = true; el.closest('#workbench-root').dataset.workbenchMobileActive = '" + key + "'; queueMicrotask(() => el.dispatchEvent(new CustomEvent('workbench-layout-save', {bubbles: true})))"
+	if region.Kind == RegionChat {
+		click += "; document.getElementById('chat-latest')?.focus({preventScroll:false})"
+	}
+	return click
+}

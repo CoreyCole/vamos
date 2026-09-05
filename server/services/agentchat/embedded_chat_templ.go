@@ -89,7 +89,7 @@ func EmbeddedChatRightRailContent(args EmbeddedChatPanelArgs) templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, "\"></div><div id=\"agent-chat-scroll-region\" class=\"flex min-h-0 flex-1 flex-col-reverse overflow-y-auto overflow-x-hidden\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, "\"></div><div id=\"agent-chat-scroll-region\" class=\"flex min-h-0 flex-1 flex-col overflow-y-auto overflow-x-hidden\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -162,7 +162,7 @@ func EmbeddedFreeformRightRailContent(args EmbeddedFreeformPanelArgs) templ.Comp
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 13, "<div id=\"agent-chat-scroll-region\" class=\"flex min-h-0 flex-1 flex-col-reverse overflow-y-auto overflow-x-hidden\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 13, "<div id=\"agent-chat-scroll-region\" class=\"flex min-h-0 flex-1 flex-col overflow-y-auto overflow-x-hidden\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

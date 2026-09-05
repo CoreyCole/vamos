@@ -21,7 +21,7 @@ templ AgentChatMobileToolbar() {
 
 templ AgentChatMobilePaneToggle() {
 	<div class="inline-grid grid-cols-2 rounded-lg border border-border bg-muted/40 p-1 text-xs" role="tablist" aria-label="Agent Chat mobile panes">
-		<button id="agent-chat-mobile-chat-tab" type="button" class="rounded-md px-3 py-1.5 font-medium text-muted-foreground transition-colors hover:bg-background/80 hover:text-foreground" data-on:click="$mobilePane = 'chat'" data-class="{'bg-background text-foreground shadow-sm': $mobilePane === 'chat'}" data-attr:aria-selected="$mobilePane === 'chat' ? 'true' : 'false'" aria-controls="agent-chat-chat-pane" role="tab">
+		<button id="agent-chat-mobile-chat-tab" type="button" class="rounded-md px-3 py-1.5 font-medium text-muted-foreground transition-colors hover:bg-background/80 hover:text-foreground" data-on:click="$mobilePane = 'chat'; document.getElementById('chat-latest')?.focus({preventScroll:false})" data-class="{'bg-background text-foreground shadow-sm': $mobilePane === 'chat'}" data-attr:aria-selected="$mobilePane === 'chat' ? 'true' : 'false'" aria-controls="agent-chat-chat-pane" role="tab">
 			Chat
 		</button>
 		<button id="agent-chat-mobile-rail-tab" type="button" class="rounded-md px-3 py-1.5 font-medium text-muted-foreground transition-colors hover:bg-background/80 hover:text-foreground" data-on:click="$mobilePane = 'rail'" data-class="{'bg-background text-foreground shadow-sm': $mobilePane === 'rail'}" data-attr:aria-selected="$mobilePane === 'rail' ? 'true' : 'false'" aria-controls="agent-chat-rail-pane" role="tab">
@@ -35,7 +35,7 @@ templ AgentChatChatPane(header templ.Component, messages templ.Component, compos
 		@header
 		<div class="relative min-h-0 flex-1">
 			@ChatScrollControls()
-			<div id="agent-chat-scroll-region" class="flex h-full min-w-0 flex-col-reverse overflow-y-auto overflow-x-hidden">
+			<div id="agent-chat-scroll-region" class="flex h-full min-w-0 flex-col overflow-y-auto overflow-x-hidden">
 				@messages
 			</div>
 		</div>
@@ -66,7 +66,7 @@ templ ChatScrollControls() {
 			class="pointer-events-auto inline-flex h-8 w-8 items-center justify-center rounded-md border border-border bg-background/95 text-muted-foreground shadow-sm backdrop-blur transition-colors hover:bg-muted hover:text-foreground"
 			aria-label="Scroll to top"
 			title="Scroll to top"
-			data-on:click="document.getElementById('agent-chat-scroll-region')?.scrollTo({ top: document.getElementById('agent-chat-scroll-region')?.scrollHeight ?? 0, behavior: 'smooth' })"
+			data-on:click="document.getElementById('agent-chat-scroll-region')?.scrollTo({ top: 0, behavior: 'smooth' })"
 		>
 			<svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 				<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7"></path>
@@ -77,7 +77,7 @@ templ ChatScrollControls() {
 			class="pointer-events-auto inline-flex h-8 w-8 items-center justify-center rounded-md border border-border bg-background/95 text-muted-foreground shadow-sm backdrop-blur transition-colors hover:bg-muted hover:text-foreground"
 			aria-label="Scroll to bottom"
 			title="Scroll to bottom"
-			data-on:click="document.getElementById('agent-chat-scroll-region')?.scrollTo({ top: 0, behavior: 'smooth' })"
+			data-on:click="document.getElementById('agent-chat-scroll-region')?.scrollTo({ top: document.getElementById('agent-chat-scroll-region')?.scrollHeight ?? 0, behavior: 'smooth' })"
 		>
 			<svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 				<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>

@@ -196,7 +196,7 @@ func FreeformChatPrimaryRegion(args ChatPageArgs) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 10, "<div id=\"agent-chat-scroll-region\" class=\"flex h-full min-w-0 flex-col-reverse overflow-y-auto overflow-x-hidden\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 10, "<div id=\"agent-chat-scroll-region\" class=\"flex h-full min-w-0 flex-col overflow-y-auto overflow-x-hidden\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -381,7 +381,7 @@ func WorkspaceChatPrimaryRegion(args WorkspacePageArgs) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 17, "<div id=\"agent-chat-scroll-region\" class=\"flex h-full min-w-0 flex-col-reverse overflow-y-auto overflow-x-hidden\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 17, "<div id=\"agent-chat-scroll-region\" class=\"flex h-full min-w-0 flex-col overflow-y-auto overflow-x-hidden\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

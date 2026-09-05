@@ -50,7 +50,7 @@ func MessagesPane(threadID string, state TranscriptPaneState, hasThread bool, fo
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "</div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "</div><div id=\"chat-latest\" tabindex=\"-1\" autofocus class=\"h-px w-full shrink-0\" aria-hidden=\"true\"></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -257,7 +257,7 @@ func TranscriptDetailCard(msg TranscriptMessage) templ.Component {
 		var templ_7745c5c3_Var10 string
 		templ_7745c5c3_Var10, templ_7745c5c3_Err = templ.ResolveAttributeValue("msg-" + msg.DOMID)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/transcript.templ`, Line: 52, Col: 26}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/transcript.templ`, Line: 53, Col: 26}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var10)
 		if templ_7745c5c3_Err != nil {
@@ -270,7 +270,7 @@ func TranscriptDetailCard(msg TranscriptMessage) templ.Component {
 		var templ_7745c5c3_Var11 string
 		templ_7745c5c3_Var11, templ_7745c5c3_Err = templ.ResolveAttributeValue(transcriptDetailSignals(msg))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/transcript.templ`, Line: 53, Col: 46}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/transcript.templ`, Line: 54, Col: 46}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var11)
 		if templ_7745c5c3_Err != nil {
@@ -283,7 +283,7 @@ func TranscriptDetailCard(msg TranscriptMessage) templ.Component {
 		var templ_7745c5c3_Var12 string
 		templ_7745c5c3_Var12, templ_7745c5c3_Err = templ.JoinStringErrs(msg.Title)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/transcript.templ`, Line: 58, Col: 108}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/transcript.templ`, Line: 59, Col: 108}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var12))
 		if templ_7745c5c3_Err != nil {
@@ -301,7 +301,7 @@ func TranscriptDetailCard(msg TranscriptMessage) templ.Component {
 			var templ_7745c5c3_Var13 string
 			templ_7745c5c3_Var13, templ_7745c5c3_Err = templ.JoinStringErrs(msg.HeaderCode)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/transcript.templ`, Line: 60, Col: 112}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/transcript.templ`, Line: 61, Col: 112}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var13))
 			if templ_7745c5c3_Err != nil {
@@ -320,7 +320,7 @@ func TranscriptDetailCard(msg TranscriptMessage) templ.Component {
 			var templ_7745c5c3_Var14 string
 			templ_7745c5c3_Var14, templ_7745c5c3_Err = templ.JoinStringErrs(msg.HeaderSummary)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/transcript.templ`, Line: 63, Col: 94}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/transcript.templ`, Line: 64, Col: 94}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var14))
 			if templ_7745c5c3_Err != nil {
@@ -343,7 +343,7 @@ func TranscriptDetailCard(msg TranscriptMessage) templ.Component {
 			var templ_7745c5c3_Var15 string
 			templ_7745c5c3_Var15, templ_7745c5c3_Err = templ.ResolveAttributeValue(transcriptDetailToggle(msg))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/transcript.templ`, Line: 70, Col: 49}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/transcript.templ`, Line: 71, Col: 49}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var15)
 			if templ_7745c5c3_Err != nil {
@@ -356,7 +356,7 @@ func TranscriptDetailCard(msg TranscriptMessage) templ.Component {
 			var templ_7745c5c3_Var16 string
 			templ_7745c5c3_Var16, templ_7745c5c3_Err = templ.ResolveAttributeValue(transcriptDetailAriaExpanded(msg))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/transcript.templ`, Line: 71, Col: 65}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/transcript.templ`, Line: 72, Col: 65}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var16)
 			if templ_7745c5c3_Err != nil {
@@ -369,7 +369,7 @@ func TranscriptDetailCard(msg TranscriptMessage) templ.Component {
 			var templ_7745c5c3_Var17 string
 			templ_7745c5c3_Var17, templ_7745c5c3_Err = templ.ResolveAttributeValue(transcriptDetailCaretClasses(msg))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/transcript.templ`, Line: 75, Col: 98}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/transcript.templ`, Line: 76, Col: 98}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var17)
 			if templ_7745c5c3_Err != nil {
@@ -393,7 +393,7 @@ func TranscriptDetailCard(msg TranscriptMessage) templ.Component {
 				var templ_7745c5c3_Var18 string
 				templ_7745c5c3_Var18, templ_7745c5c3_Err = templ.ResolveAttributeValue(transcriptDetailExpanded(msg))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/transcript.templ`, Line: 83, Col: 51}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/transcript.templ`, Line: 84, Col: 51}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var18)
 				if templ_7745c5c3_Err != nil {
@@ -406,7 +406,7 @@ func TranscriptDetailCard(msg TranscriptMessage) templ.Component {
 				var templ_7745c5c3_Var19 string
 				templ_7745c5c3_Var19, templ_7745c5c3_Err = templ.ResolveAttributeValue(transcriptDetailCollapsedBodyClasses(msg))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/transcript.templ`, Line: 83, Col: 108}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/transcript.templ`, Line: 84, Col: 108}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var19)
 				if templ_7745c5c3_Err != nil {
@@ -419,7 +419,7 @@ func TranscriptDetailCard(msg TranscriptMessage) templ.Component {
 				var templ_7745c5c3_Var20 string
 				templ_7745c5c3_Var20, templ_7745c5c3_Err = templ.ResolveAttributeValue(transcriptDetailBodyClasses(msg))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/transcript.templ`, Line: 84, Col: 88}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/transcript.templ`, Line: 85, Col: 88}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var20)
 				if templ_7745c5c3_Err != nil {
@@ -471,7 +471,7 @@ func TranscriptDetailCard(msg TranscriptMessage) templ.Component {
 				var templ_7745c5c3_Var23 string
 				templ_7745c5c3_Var23, templ_7745c5c3_Err = templ.ResolveAttributeValue(transcriptDetailBodyClasses(msg))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/transcript.templ`, Line: 93, Col: 88}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/transcript.templ`, Line: 94, Col: 88}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var23)
 				if templ_7745c5c3_Err != nil {
@@ -523,7 +523,7 @@ func TranscriptDetailCard(msg TranscriptMessage) templ.Component {
 					var templ_7745c5c3_Var26 string
 					templ_7745c5c3_Var26, templ_7745c5c3_Err = templ.ResolveAttributeValue(transcriptDetailToggle(msg))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/transcript.templ`, Line: 103, Col: 51}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/transcript.templ`, Line: 104, Col: 51}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var26)
 					if templ_7745c5c3_Err != nil {
@@ -536,7 +536,7 @@ func TranscriptDetailCard(msg TranscriptMessage) templ.Component {
 					var templ_7745c5c3_Var27 string
 					templ_7745c5c3_Var27, templ_7745c5c3_Err = templ.ResolveAttributeValue(transcriptDetailAriaExpanded(msg))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/transcript.templ`, Line: 104, Col: 67}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/transcript.templ`, Line: 105, Col: 67}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var27)
 					if templ_7745c5c3_Err != nil {
@@ -549,7 +549,7 @@ func TranscriptDetailCard(msg TranscriptMessage) templ.Component {
 					var templ_7745c5c3_Var28 string
 					templ_7745c5c3_Var28, templ_7745c5c3_Err = templ.ResolveAttributeValue(transcriptDetailCaretClasses(msg))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/transcript.templ`, Line: 108, Col: 100}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/transcript.templ`, Line: 109, Col: 100}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var28)
 					if templ_7745c5c3_Err != nil {
@@ -574,7 +574,7 @@ func TranscriptDetailCard(msg TranscriptMessage) templ.Component {
 				var templ_7745c5c3_Var29 string
 				templ_7745c5c3_Var29, templ_7745c5c3_Err = templ.ResolveAttributeValue(transcriptDetailExpanded(msg))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/transcript.templ`, Line: 117, Col: 51}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/transcript.templ`, Line: 118, Col: 51}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var29)
 				if templ_7745c5c3_Err != nil {
@@ -587,7 +587,7 @@ func TranscriptDetailCard(msg TranscriptMessage) templ.Component {
 				var templ_7745c5c3_Var30 string
 				templ_7745c5c3_Var30, templ_7745c5c3_Err = templ.ResolveAttributeValue(transcriptDetailCollapsedBodyClasses(msg))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/transcript.templ`, Line: 117, Col: 108}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/transcript.templ`, Line: 118, Col: 108}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var30)
 				if templ_7745c5c3_Err != nil {
@@ -600,7 +600,7 @@ func TranscriptDetailCard(msg TranscriptMessage) templ.Component {
 				var templ_7745c5c3_Var31 string
 				templ_7745c5c3_Var31, templ_7745c5c3_Err = templ.ResolveAttributeValue(transcriptDetailBodyClasses(msg))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/transcript.templ`, Line: 118, Col: 88}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/transcript.templ`, Line: 119, Col: 88}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var31)
 				if templ_7745c5c3_Err != nil {
@@ -613,7 +613,7 @@ func TranscriptDetailCard(msg TranscriptMessage) templ.Component {
 				var templ_7745c5c3_Var32 string
 				templ_7745c5c3_Var32, templ_7745c5c3_Err = templ.JoinStringErrs(msg.Content)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/transcript.templ`, Line: 119, Col: 138}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/transcript.templ`, Line: 120, Col: 138}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var32))
 				if templ_7745c5c3_Err != nil {
@@ -631,7 +631,7 @@ func TranscriptDetailCard(msg TranscriptMessage) templ.Component {
 				var templ_7745c5c3_Var33 string
 				templ_7745c5c3_Var33, templ_7745c5c3_Err = templ.ResolveAttributeValue(transcriptDetailBodyClasses(msg))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/transcript.templ`, Line: 124, Col: 88}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/transcript.templ`, Line: 125, Col: 88}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var33)
 				if templ_7745c5c3_Err != nil {
@@ -644,7 +644,7 @@ func TranscriptDetailCard(msg TranscriptMessage) templ.Component {
 				var templ_7745c5c3_Var34 string
 				templ_7745c5c3_Var34, templ_7745c5c3_Err = templ.JoinStringErrs(msg.Content)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/transcript.templ`, Line: 125, Col: 138}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/transcript.templ`, Line: 126, Col: 138}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var34))
 				if templ_7745c5c3_Err != nil {
@@ -662,7 +662,7 @@ func TranscriptDetailCard(msg TranscriptMessage) templ.Component {
 					var templ_7745c5c3_Var35 string
 					templ_7745c5c3_Var35, templ_7745c5c3_Err = templ.ResolveAttributeValue(transcriptDetailToggle(msg))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/transcript.templ`, Line: 131, Col: 51}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/transcript.templ`, Line: 132, Col: 51}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var35)
 					if templ_7745c5c3_Err != nil {
@@ -675,7 +675,7 @@ func TranscriptDetailCard(msg TranscriptMessage) templ.Component {
 					var templ_7745c5c3_Var36 string
 					templ_7745c5c3_Var36, templ_7745c5c3_Err = templ.ResolveAttributeValue(transcriptDetailAriaExpanded(msg))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/transcript.templ`, Line: 132, Col: 67}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/transcript.templ`, Line: 133, Col: 67}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var36)
 					if templ_7745c5c3_Err != nil {
@@ -688,7 +688,7 @@ func TranscriptDetailCard(msg TranscriptMessage) templ.Component {
 					var templ_7745c5c3_Var37 string
 					templ_7745c5c3_Var37, templ_7745c5c3_Err = templ.ResolveAttributeValue(transcriptDetailCaretClasses(msg))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/transcript.templ`, Line: 136, Col: 100}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/transcript.templ`, Line: 137, Col: 100}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var37)
 					if templ_7745c5c3_Err != nil {
@@ -742,7 +742,7 @@ func TranscriptDetailHeader(msg TranscriptMessage) templ.Component {
 			var templ_7745c5c3_Var39 string
 			templ_7745c5c3_Var39, templ_7745c5c3_Err = templ.JoinStringErrs(msg.DetailHeader)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/transcript.templ`, Line: 151, Col: 86}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/transcript.templ`, Line: 152, Col: 86}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var39))
 			if templ_7745c5c3_Err != nil {
@@ -786,7 +786,7 @@ func ChatMessage(args ChatMessageArgs) templ.Component {
 		var templ_7745c5c3_Var41 string
 		templ_7745c5c3_Var41, templ_7745c5c3_Err = templ.ResolveAttributeValue("msg-" + args.ID)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/transcript.templ`, Line: 158, Col: 27}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/transcript.templ`, Line: 159, Col: 27}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var41)
 		if templ_7745c5c3_Err != nil {
@@ -810,7 +810,7 @@ func ChatMessage(args ChatMessageArgs) templ.Component {
 			var templ_7745c5c3_Var42 string
 			templ_7745c5c3_Var42, templ_7745c5c3_Err = templ.JoinStringErrs(args.Content)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/transcript.templ`, Line: 163, Col: 113}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/transcript.templ`, Line: 164, Col: 113}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var42))
 			if templ_7745c5c3_Err != nil {
@@ -875,7 +875,7 @@ func AttachmentPills(paths []AttachedPath) templ.Component {
 			var templ_7745c5c3_Var44 string
 			templ_7745c5c3_Var44, templ_7745c5c3_Err = templ.JoinStringErrs(path.Basename)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/transcript.templ`, Line: 175, Col: 117}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/transcript.templ`, Line: 176, Col: 117}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var44))
 			if templ_7745c5c3_Err != nil {
@@ -922,7 +922,7 @@ func ChatMessageStreaming(args ChatMessageStreamingArgs) templ.Component {
 		var templ_7745c5c3_Var46 string
 		templ_7745c5c3_Var46, templ_7745c5c3_Err = templ.ResolveAttributeValue("msg-" + args.ID)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/transcript.templ`, Line: 181, Col: 27}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/transcript.templ`, Line: 182, Col: 27}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var46)
 		if templ_7745c5c3_Err != nil {
@@ -935,7 +935,7 @@ func ChatMessageStreaming(args ChatMessageStreamingArgs) templ.Component {
 		var templ_7745c5c3_Var47 string
 		templ_7745c5c3_Var47, templ_7745c5c3_Err = templ.ResolveAttributeValue("msg-content-" + args.ID)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/transcript.templ`, Line: 183, Col: 37}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/transcript.templ`, Line: 184, Col: 37}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var47)
 		if templ_7745c5c3_Err != nil {
@@ -948,7 +948,7 @@ func ChatMessageStreaming(args ChatMessageStreamingArgs) templ.Component {
 		var templ_7745c5c3_Var48 string
 		templ_7745c5c3_Var48, templ_7745c5c3_Err = templ.ResolveAttributeValue("msg-cursor-" + args.ID)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/transcript.templ`, Line: 184, Col: 37}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/transcript.templ`, Line: 185, Col: 37}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var48)
 		if templ_7745c5c3_Err != nil {
@@ -990,7 +990,7 @@ func ChatMessageDelta(args ChatMessageDeltaArgs) templ.Component {
 		var templ_7745c5c3_Var50 string
 		templ_7745c5c3_Var50, templ_7745c5c3_Err = templ.JoinStringErrs(args.Text)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/transcript.templ`, Line: 190, Col: 46}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/transcript.templ`, Line: 191, Col: 46}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var50))
 		if templ_7745c5c3_Err != nil {
@@ -1061,7 +1061,7 @@ func ChatMessageComplete(args ChatMessageCompleteArgs) templ.Component {
 		var templ_7745c5c3_Var53 string
 		templ_7745c5c3_Var53, templ_7745c5c3_Err = templ.ResolveAttributeValue("msg-" + args.ID)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/transcript.templ`, Line: 198, Col: 27}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/transcript.templ`, Line: 199, Col: 27}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var53)
 		if templ_7745c5c3_Err != nil {
@@ -1112,7 +1112,7 @@ func TranscriptForkControl(threadID string, msg TranscriptMessage, forkAction st
 			var templ_7745c5c3_Var55 string
 			templ_7745c5c3_Var55, templ_7745c5c3_Err = templ.ResolveAttributeValue(forkAction)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/transcript.templ`, Line: 222, Col: 65}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/transcript.templ`, Line: 223, Col: 65}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var55)
 			if templ_7745c5c3_Err != nil {
@@ -1125,7 +1125,7 @@ func TranscriptForkControl(threadID string, msg TranscriptMessage, forkAction st
 			var templ_7745c5c3_Var56 string
 			templ_7745c5c3_Var56, templ_7745c5c3_Err = templ.ResolveAttributeValue(threadID)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/transcript.templ`, Line: 223, Col: 67}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/transcript.templ`, Line: 224, Col: 67}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var56)
 			if templ_7745c5c3_Err != nil {
@@ -1138,7 +1138,7 @@ func TranscriptForkControl(threadID string, msg TranscriptMessage, forkAction st
 			var templ_7745c5c3_Var57 string
 			templ_7745c5c3_Var57, templ_7745c5c3_Err = templ.ResolveAttributeValue(msg.EntryID)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/transcript.templ`, Line: 224, Col: 69}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/transcript.templ`, Line: 225, Col: 69}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var57)
 			if templ_7745c5c3_Err != nil {
@@ -1156,7 +1156,7 @@ func TranscriptForkControl(threadID string, msg TranscriptMessage, forkAction st
 				var templ_7745c5c3_Var58 string
 				templ_7745c5c3_Var58, templ_7745c5c3_Err = templ.ResolveAttributeValue("@post('/agent-chat/chat-sessions/" + msg.ChatSessionID + "/annotations', {contentType: 'form'})")
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/transcript.templ`, Line: 232, Col: 153}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/transcript.templ`, Line: 233, Col: 153}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var58)
 				if templ_7745c5c3_Err != nil {
@@ -1169,7 +1169,7 @@ func TranscriptForkControl(threadID string, msg TranscriptMessage, forkAction st
 				var templ_7745c5c3_Var59 string
 				templ_7745c5c3_Var59, templ_7745c5c3_Err = templ.ResolveAttributeValue(msg.ChatSessionID)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/transcript.templ`, Line: 233, Col: 71}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/transcript.templ`, Line: 234, Col: 71}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var59)
 				if templ_7745c5c3_Err != nil {
@@ -1182,7 +1182,7 @@ func TranscriptForkControl(threadID string, msg TranscriptMessage, forkAction st
 				var templ_7745c5c3_Var60 string
 				templ_7745c5c3_Var60, templ_7745c5c3_Err = templ.ResolveAttributeValue(msg.ChatNodeID)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/transcript.templ`, Line: 234, Col: 65}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/transcript.templ`, Line: 235, Col: 65}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var60)
 				if templ_7745c5c3_Err != nil {
@@ -1195,7 +1195,7 @@ func TranscriptForkControl(threadID string, msg TranscriptMessage, forkAction st
 				var templ_7745c5c3_Var61 string
 				templ_7745c5c3_Var61, templ_7745c5c3_Err = templ.ResolveAttributeValue(strconv.FormatInt(msg.ChatEventSeq, 10))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/transcript.templ`, Line: 235, Col: 92}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/transcript.templ`, Line: 236, Col: 92}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var61)
 				if templ_7745c5c3_Err != nil {
@@ -1213,7 +1213,7 @@ func TranscriptForkControl(threadID string, msg TranscriptMessage, forkAction st
 			var templ_7745c5c3_Var62 string
 			templ_7745c5c3_Var62, templ_7745c5c3_Err = templ.ResolveAttributeValue("@clipboard(window.location.href.split('#')[0] + " + strconv.Quote("#msg-"+msg.DOMID) + "); $agentChatToast = 'Link copied'; setTimeout(() => $agentChatToast = '', 2000)")
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/transcript.templ`, Line: 244, Col: 191}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/transcript.templ`, Line: 245, Col: 191}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var62)
 			if templ_7745c5c3_Err != nil {

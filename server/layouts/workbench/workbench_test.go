@@ -689,7 +689,7 @@ func TestWorkbenchHistoryJSReloadsSameDocumentArtifactPopstate(t *testing.T) {
 	}
 }
 
-func TestAgentChatScrollUsesColumnReverseCSS(t *testing.T) {
+func TestAgentChatScrollUsesSSRLatestAnchor(t *testing.T) {
 	t.Parallel()
 
 	contents, err := os.ReadFile("../../../static/js/agent-chat-scroll.js")
@@ -709,6 +709,18 @@ func TestAgentChatScrollUsesColumnReverseCSS(t *testing.T) {
 		}
 	}
 
+	transcript, err := os.ReadFile("../../../server/services/agentchat/transcript.templ")
+	if err != nil {
+		t.Fatalf("ReadFile(transcript.templ) error = %v", err)
+	}
+	transcriptSrc := string(transcript)
+	if !strings.Contains(transcriptSrc, `id="chat-latest"`) {
+		t.Fatalf("transcript.templ missing #chat-latest SSR sentinel")
+	}
+	if !strings.Contains(transcriptSrc, "autofocus") {
+		t.Fatalf("transcript.templ missing autofocus on #chat-latest")
+	}
+
 	for _, rel := range []string{
 		"../../../server/services/agentchat/workbench_threads.templ",
 		"../../../server/services/agentchat/shell.templ",
@@ -723,9 +735,27 @@ func TestAgentChatScrollUsesColumnReverseCSS(t *testing.T) {
 		if !strings.Contains(src, `id="agent-chat-scroll-region"`) {
 			t.Fatalf("%s missing agent-chat-scroll-region", rel)
 		}
-		if !strings.Contains(src, "flex-col-reverse") {
-			t.Fatalf("%s missing flex-col-reverse CSS anchor for latest chat", rel)
+		if strings.Contains(src, "flex-col-reverse") || strings.Contains(src, "column-reverse") {
+			t.Fatalf("%s must not use flex-col-reverse / column-reverse", rel)
 		}
+		if !strings.Contains(src, "flex-col") {
+			t.Fatalf("%s missing normal flex-col on scroll region", rel)
+		}
+	}
+
+	mobile, err := os.ReadFile("../../../server/layouts/workbench/mobile.templ")
+	if err != nil {
+		t.Fatalf("ReadFile(mobile.templ) error = %v", err)
+	}
+	if !strings.Contains(string(mobile), "mobileRegionTabClick") {
+		t.Fatalf("mobile.templ missing mobileRegionTabClick for chat-latest focus")
+	}
+	shellBody, err := os.ReadFile("../../../server/services/agentchat/shell.templ")
+	if err != nil {
+		t.Fatalf("ReadFile(shell.templ) error = %v", err)
+	}
+	if !strings.Contains(string(shellBody), "chat-latest") || !strings.Contains(string(shellBody), "preventScroll:false") {
+		t.Fatalf("shell.templ Chat tab missing chat-latest focus one-liner")
 	}
 }
 

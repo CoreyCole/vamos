@@ -36,7 +36,7 @@ templ FreeformChatPrimaryRegion(args ChatPageArgs) {
 		@FreeformRunHeader(ensureFreeformWorkbenchState(args))
 		<div class="relative min-h-0 flex-1">
 			@ChatScrollControls()
-			<div id="agent-chat-scroll-region" class="flex h-full min-w-0 flex-col-reverse overflow-y-auto overflow-x-hidden">
+			<div id="agent-chat-scroll-region" class="flex h-full min-w-0 flex-col overflow-y-auto overflow-x-hidden">
 				@MessagesPane(getThreadID(args.CurrentThread), args.Transcript, args.CurrentThread != nil, freeformForkAction(getThreadID(args.CurrentThread)))
 			</div>
 		</div>
@@ -69,7 +69,7 @@ templ WorkspaceChatPrimaryRegion(args WorkspacePageArgs) {
 		@WorkspaceHeader(args.Projection, ensureWorkspaceWorkbenchState(args))
 		<div class="relative min-h-0 flex-1">
 			@ChatScrollControls()
-			<div id="agent-chat-scroll-region" class="flex h-full min-w-0 flex-col-reverse overflow-y-auto overflow-x-hidden">
+			<div id="agent-chat-scroll-region" class="flex h-full min-w-0 flex-col overflow-y-auto overflow-x-hidden">
 				@MessagesPane(getThreadID(args.Projection.SelectedThread), args.Projection.Transcript, args.Projection.SelectedThread != nil, workspaceForkAction(args.WorkspaceID, getThreadID(args.Projection.SelectedThread)))
 			</div>
 		</div>
