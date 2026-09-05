@@ -105,7 +105,8 @@ func RegionInitialClass(state WorkbenchState, region WorkbenchRegion) string {
 		return "hidden"
 	}
 	// On mobile viewport SSR, show the active region immediately so deep links
-	// into /threads/:id land on Chat before Datastar hydrates data-class.
+	// into /threads/:id land on the default Docs/artifact pane before Datastar
+	// hydrates data-class. Chat remains available via the Chat tab.
 	if state.ViewportClass == ViewportMobile {
 		active := SignalKeyForID(state.Config.Mobile.ActiveRegionID)
 		if SignalKey(region) == active {

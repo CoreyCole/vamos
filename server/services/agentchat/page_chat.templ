@@ -32,7 +32,7 @@ templ FreeformNavigationRegion(args ChatPageArgs) {
 }
 
 templ FreeformChatPrimaryRegion(args ChatPageArgs) {
-	<script type="module" src="/js/agent-chat-scroll.js?v=2"></script>
+	<script type="module" src="/js/agent-chat-scroll.js?v=3"></script>
 	<main class="relative flex h-full min-h-0 w-full min-w-0 flex-col overflow-hidden rounded-lg border border-border bg-card">
 		@FreeformRunHeader(ensureFreeformWorkbenchState(args))
 		<div class="relative min-h-0 flex-1">
@@ -66,7 +66,7 @@ templ WorkspaceDocPrimaryRegion(args WorkspacePageArgs) {
 }
 
 templ WorkspaceChatPrimaryRegion(args WorkspacePageArgs) {
-	<script type="module" src="/js/agent-chat-scroll.js?v=2"></script>
+	<script type="module" src="/js/agent-chat-scroll.js?v=3"></script>
 	<main id="agent-chat-chat-pane" class="relative flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-lg border border-border bg-card">
 		@WorkspaceHeader(args.Projection, ensureWorkspaceWorkbenchState(args))
 		<div class="relative min-h-0 flex-1">

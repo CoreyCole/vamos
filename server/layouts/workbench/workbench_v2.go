@@ -30,7 +30,7 @@ type WorkbenchV2Args struct {
 }
 
 func BuildWorkbenchV2State(args WorkbenchV2Args) (WorkbenchState, error) {
-	state, err := BuildWorkbenchState(BuildWorkbenchStateInput{
+	return BuildWorkbenchState(BuildWorkbenchStateInput{
 		UserEmail:     args.UserEmail,
 		Page:          WorkbenchPageThreads,
 		View:          WorkbenchViewSplit,
@@ -75,16 +75,6 @@ func BuildWorkbenchV2State(args WorkbenchV2Args) (WorkbenchState, error) {
 			),
 		},
 	})
-	if err != nil {
-		return state, err
-	}
-	// When chat is open (thread selected), mobile deep links are chat-first.
-	// ?artifact= still loads Docs content but does not steal the visible tab.
-	// Index / thoughts shells with chat closed keep the previous default.
-	if args.ChatOpen {
-		state.Config.Mobile.ActiveRegionID = WorkbenchV2ChatRegionID
-	}
-	return state, nil
 }
 
 func v2Region(
