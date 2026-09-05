@@ -1488,6 +1488,27 @@ func TestDefaultThreadsConfigMobileActiveIsChat(t *testing.T) {
 	}
 }
 
+func TestWorkbenchV2MobileKeepsPrimaryWhenChatClosed(t *testing.T) {
+	t.Parallel()
+
+	state, err := BuildWorkbenchV2State(WorkbenchV2Args{
+		ViewportClass: ViewportMobile,
+		ThreadsOpen:   true,
+		ChatOpen:      false,
+		ArtifactOpen:  true,
+	})
+	if err != nil {
+		t.Fatalf("BuildWorkbenchV2State() error = %v", err)
+	}
+	// No selected thread chat: do not force Chat tab (index / thoughts shells).
+	if state.Config.Mobile.ActiveRegionID != WorkbenchV2ArtifactRegionID {
+		t.Fatalf(
+			"mobile active = %q, want primary artifact when chat closed",
+			state.Config.Mobile.ActiveRegionID,
+		)
+	}
+}
+
 func TestWorkbenchV2RegionsEnforceComposerFriendlyMinRem(t *testing.T) {
 	t.Parallel()
 
