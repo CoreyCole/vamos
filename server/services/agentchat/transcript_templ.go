@@ -50,7 +50,7 @@ func MessagesPane(threadID string, state TranscriptPaneState, hasThread bool, fo
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "</div><div id=\"chat-latest\" tabindex=\"-1\" autofocus class=\"h-px w-full shrink-0\" aria-hidden=\"true\"></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "<div id=\"chat-latest\" tabindex=\"-1\" autofocus class=\"h-px w-full shrink-0\"></div></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

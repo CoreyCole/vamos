@@ -720,6 +720,22 @@ func TestAgentChatScrollUsesSSRLatestAnchor(t *testing.T) {
 	if !strings.Contains(transcriptSrc, "autofocus") {
 		t.Fatalf("transcript.templ missing autofocus on #chat-latest")
 	}
+	var sentinelLine string
+	for _, line := range strings.Split(transcriptSrc, "\n") {
+		if strings.Contains(line, `id="chat-latest"`) {
+			sentinelLine = line
+			break
+		}
+	}
+	if sentinelLine == "" {
+		t.Fatalf("transcript.templ missing chat-latest line")
+	}
+	if strings.Contains(sentinelLine, "aria-hidden") {
+		t.Fatalf("#chat-latest must not have aria-hidden (browsers skip focus)")
+	}
+	if !strings.Contains(transcriptSrc, "\t\t<div id=\"chat-latest\" tabindex=\"-1\" autofocus") {
+		t.Fatalf("#chat-latest must be nested inside #agent-chat-messages")
+	}
 
 	for _, rel := range []string{
 		"../../../server/services/agentchat/workbench_threads.templ",
@@ -754,8 +770,16 @@ func TestAgentChatScrollUsesSSRLatestAnchor(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ReadFile(shell.templ) error = %v", err)
 	}
-	if !strings.Contains(string(shellBody), "chat-latest") || !strings.Contains(string(shellBody), "preventScroll:false") {
-		t.Fatalf("shell.templ Chat tab missing chat-latest focus one-liner")
+	if !strings.Contains(string(shellBody), "chat-latest") || !strings.Contains(string(shellBody), "queueMicrotask") {
+		t.Fatalf("shell.templ Chat tab missing queueMicrotask chat-latest focus")
+	}
+	signalsBody, err := os.ReadFile("../../../server/layouts/workbench/signals.go")
+	if err != nil {
+		t.Fatalf("ReadFile(signals.go) error = %v", err)
+	}
+	signalsSrc := string(signalsBody)
+	if !strings.Contains(signalsSrc, "chat-latest") || !strings.Contains(signalsSrc, "queueMicrotask(() => document.getElementById('chat-latest')?.focus())") {
+		t.Fatalf("signals.go mobileRegionTabClick missing queueMicrotask chat-latest focus")
 	}
 }
 

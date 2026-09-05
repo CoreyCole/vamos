@@ -21,7 +21,7 @@ templ AgentChatMobileToolbar() {
 
 templ AgentChatMobilePaneToggle() {
 	<div class="inline-grid grid-cols-2 rounded-lg border border-border bg-muted/40 p-1 text-xs" role="tablist" aria-label="Agent Chat mobile panes">
-		<button id="agent-chat-mobile-chat-tab" type="button" class="rounded-md px-3 py-1.5 font-medium text-muted-foreground transition-colors hover:bg-background/80 hover:text-foreground" data-on:click="$mobilePane = 'chat'; document.getElementById('chat-latest')?.focus({preventScroll:false})" data-class="{'bg-background text-foreground shadow-sm': $mobilePane === 'chat'}" data-attr:aria-selected="$mobilePane === 'chat' ? 'true' : 'false'" aria-controls="agent-chat-chat-pane" role="tab">
+		<button id="agent-chat-mobile-chat-tab" type="button" class="rounded-md px-3 py-1.5 font-medium text-muted-foreground transition-colors hover:bg-background/80 hover:text-foreground" data-on:click="$mobilePane = 'chat'; queueMicrotask(() => document.getElementById('chat-latest')?.focus())" data-class="{'bg-background text-foreground shadow-sm': $mobilePane === 'chat'}" data-attr:aria-selected="$mobilePane === 'chat' ? 'true' : 'false'" aria-controls="agent-chat-chat-pane" role="tab">
 			Chat
 		</button>
 		<button id="agent-chat-mobile-rail-tab" type="button" class="rounded-md px-3 py-1.5 font-medium text-muted-foreground transition-colors hover:bg-background/80 hover:text-foreground" data-on:click="$mobilePane = 'rail'" data-class="{'bg-background text-foreground shadow-sm': $mobilePane === 'rail'}" data-attr:aria-selected="$mobilePane === 'rail' ? 'true' : 'false'" aria-controls="agent-chat-rail-pane" role="tab">
