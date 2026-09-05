@@ -800,9 +800,17 @@ func TestWorkbenchV2CSSKeepsStableRegionTransitionNames(t *testing.T) {
 		"view-transition-name: workbench-v2-artifact;",
 		"#workbench-v2-comments {",
 		"view-transition-name: workbench-v2-comments;",
+		"#thread-artifact-browser {",
+		"view-transition-name: thread-artifact-browser;",
+		"#thread-artifact-document {",
+		"view-transition-name: thread-artifact-document;",
+		"#thread-artifact-path-header {",
+		"view-transition-name: thread-artifact-path-header;",
 		"::view-transition-old(workbench-v2-chat)",
+		"::view-transition-old(thread-artifact-browser)",
 		"animation: none;",
 		"data-workbench-doc-switching",
+		`html[data-workbench-doc-switching="true"] #thread-artifact-document {`,
 		"workbench-doc-switch-sweep",
 	} {
 		if !strings.Contains(css, want) {
@@ -815,6 +823,9 @@ func TestWorkbenchV2CSSKeepsStableRegionTransitionNames(t *testing.T) {
 		if strings.Contains(window, "view-transition-name") {
 			t.Fatalf("legacy viewer region has view-transition-name: %s", window)
 		}
+	}
+	if strings.Contains(css, `html[data-workbench-doc-switching="true"] #workbench-v2-artifact`) {
+		t.Fatalf("doc-switching must not opacity-fade whole #workbench-v2-artifact")
 	}
 }
 

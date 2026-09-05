@@ -504,7 +504,19 @@
   view-transition-name: workbench-v2-comments;
 }
 
-/* Chat/threads/comments stay still; the artifact region is the one that transitions. */
+/* Artifact sub-regions: browser + path stay put; document may transition. */
+#thread-artifact-path-header {
+  view-transition-name: thread-artifact-path-header;
+}
+#thread-artifact-browser {
+  view-transition-name: thread-artifact-browser;
+}
+#thread-artifact-document {
+  position: relative;
+  view-transition-name: thread-artifact-document;
+}
+
+/* Chat/threads/comments (+ artifact browser/path) stay still. */
 ::view-transition-old(workbench-v2-threads),
 ::view-transition-new(workbench-v2-threads),
 ::view-transition-group(workbench-v2-threads),
@@ -513,18 +525,24 @@
 ::view-transition-group(workbench-v2-chat),
 ::view-transition-old(workbench-v2-comments),
 ::view-transition-new(workbench-v2-comments),
-::view-transition-group(workbench-v2-comments) {
+::view-transition-group(workbench-v2-comments),
+::view-transition-old(thread-artifact-browser),
+::view-transition-new(thread-artifact-browser),
+::view-transition-group(thread-artifact-browser),
+::view-transition-old(thread-artifact-path-header),
+::view-transition-new(thread-artifact-path-header),
+::view-transition-group(thread-artifact-path-header) {
   animation: none;
 }
 
 
-/* Light sibling-doc switch affordance (full GET remount; keep non-janky). */
-html[data-workbench-doc-switching="true"] #workbench-v2-artifact {
+/* Light sibling-doc switch affordance: document only (not browser/path). */
+html[data-workbench-doc-switching="true"] #thread-artifact-document {
   opacity: 0.72;
   transition: opacity 120ms ease;
 }
 
-html[data-workbench-doc-switching="true"] #thread-artifact-pane::after {
+html[data-workbench-doc-switching="true"] #thread-artifact-document::after {
   content: "";
   position: absolute;
   inset: 0 auto auto 0;

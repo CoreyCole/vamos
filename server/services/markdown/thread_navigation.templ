@@ -4,11 +4,23 @@ templ ThreadArtifactPane(browser ThreadArtifactBrowserArgs, document templ.Compo
 	<div
 		id="thread-artifact-pane"
 		class="flex h-full min-h-0 flex-col bg-background"
-		data-signals="{_threadArtifactLoading: false}"
+		data-signals="{_threadArtifactLoading: false, _artifactBrowserOpen: true}"
 		data-attr:aria-busy="$_threadArtifactLoading ? 'true' : 'false'"
 	>
-		<div class="flex shrink-0 items-center gap-2 border-b border-border p-2 text-xs">
+		<div id="thread-artifact-path-header" class="flex shrink-0 items-center gap-2 border-b border-border p-2 text-xs">
 			<span class="min-w-0 flex-1 truncate text-muted-foreground">{ "thoughts/" + browser.DocPath }</span>
+			<button
+				type="button"
+				class="inline-flex items-center gap-1 rounded border border-border px-2 py-1 hover:bg-muted"
+				data-on:click="$_artifactBrowserOpen = !$_artifactBrowserOpen"
+				data-attr:aria-expanded="$_artifactBrowserOpen ? 'true' : 'false'"
+				aria-controls="thread-artifact-browser"
+			>
+				<svg class="h-3.5 w-3.5" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V7z"></path>
+				</svg>
+				<span>Files</span>
+			</button>
 			if browser.DocPath != "" {
 				<a href={ templ.URL(ThoughtsDocURL(browser.DocPath, "")) } class="rounded border border-border px-2 py-1 hover:bg-muted">Thoughts</a>
 				<button
@@ -31,6 +43,7 @@ templ ThreadArtifactBrowser(browser ThreadArtifactBrowserArgs) {
 		id="thread-artifact-browser"
 		data-thread-artifact-browser
 		data-thread-artifact-cwd={ threadArtifactDirectoryIdentity(browser.DirectoryPath) }
+		data-show="$_artifactBrowserOpen"
 		class="min-h-0 max-h-64 shrink-0 overflow-y-auto border-b border-border p-2"
 		aria-label="Artifact browser"
 	>

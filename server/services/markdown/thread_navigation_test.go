@@ -147,6 +147,11 @@ func TestThreadArtifactPaneScopesStaticHandlersToBrowserRows(t *testing.T) {
 		`href="/threads/thread_1?artifact=thoughts%2Fsafe.md"`,
 		`data-on:click="if (!$_threadArtifactLoading`,
 		`href="/thoughts/fullscreen.md"`,
+		`_artifactBrowserOpen: true`,
+		`data-show="$_artifactBrowserOpen"`,
+		`aria-controls="thread-artifact-browser"`,
+		`id="thread-artifact-path-header"`,
+		`>Files</span>`,
 	} {
 		if !strings.Contains(html, want) {
 			t.Fatalf("artifact pane missing %q: %s", want, html)
