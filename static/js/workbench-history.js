@@ -1,26 +1,26 @@
 const COMPOSER_FOCUS_KEY = "workbench-v2:composer-focused";
+const DOC_SWITCH_KEY = "workbench-v2:doc-switch";
+const BROWSER_OPEN_KEY = "workbench-v2:artifact-browser-open";
 const DOC_SWITCH_ATTR = "data-workbench-doc-switching";
-
-function reloadThreadArtifactHistory() {
-  const navigation = performance.getEntriesByType("navigation")[0];
-  // Same-document popstate after Enter/Up pushState keeps type "navigate".
-  // Native document Back/Forward is type "back_forward" -- do not blast it.
-  if (navigation && navigation.type === "back_forward") {
-    return;
-  }
-  const threadRoute =
-    window.location.pathname === "/threads" ||
-    window.location.pathname.startsWith("/threads/");
-  if (threadRoute && document.getElementById("thread-artifact-pane")) {
-    window.location.reload();
-  }
-}
+const DOC_SWITCH_TYPE = "workbench-doc-switch";
 
 function isThreadRoute() {
   return (
     window.location.pathname === "/threads" ||
     window.location.pathname.startsWith("/threads/")
   );
+}
+
+function reloadThreadArtifactHistory() {
+  // Enter/Up folder patches pushState({ workbenchArtifactPatch: true }).
+  // Native Back/Forward between real artifact GETs (and bfcache) must NOT reload
+  // — that blanks path/tree/document under stable Workspace tabs.
+  if (!history.state?.workbenchArtifactPatch) {
+    return;
+  }
+  if (isThreadRoute() && document.getElementById("thread-artifact-pane")) {
+    window.location.reload();
+  }
 }
 
 function composerEl() {
@@ -42,6 +42,30 @@ function markDocSwitchPending() {
 
 function clearDocSwitchPending() {
   document.documentElement.removeAttribute(DOC_SWITCH_ATTR);
+}
+
+function setDocSwitchFlag() {
+  try {
+    sessionStorage.setItem(DOC_SWITCH_KEY, "1");
+  } catch (_) {}
+}
+
+function peekDocSwitchFlag() {
+  try {
+    return sessionStorage.getItem(DOC_SWITCH_KEY) === "1";
+  } catch (_) {
+    return false;
+  }
+}
+
+function consumeDocSwitchFlag() {
+  try {
+    const on = sessionStorage.getItem(DOC_SWITCH_KEY) === "1";
+    if (on) sessionStorage.removeItem(DOC_SWITCH_KEY);
+    return on;
+  } catch (_) {
+    return false;
+  }
 }
 
 function persistComposerFocus() {
@@ -93,11 +117,131 @@ function onArtifactFileClick(event) {
   try {
     sessionStorage.setItem(COMPOSER_FOCUS_KEY, "1");
   } catch (_) {}
+  setDocSwitchFlag();
   markDocSwitchPending();
 }
 
-function initNavPolish() {
+function prefetchArtifactHref(href) {
+  if (!href) return;
+  try {
+    const url = new URL(href, window.location.href);
+    if (url.origin !== window.location.origin) return;
+    if (
+      url.pathname === window.location.pathname &&
+      url.search === window.location.search
+    ) {
+      return;
+    }
+    const abs = url.pathname + url.search;
+    if (
+      document.head.querySelector(
+        `link[rel="prefetch"][data-workbench-prefetch="${CSS.escape(abs)}"]`,
+      )
+    ) {
+      return;
+    }
+    const link = document.createElement("link");
+    link.rel = "prefetch";
+    link.href = url.href;
+    link.setAttribute("data-workbench-prefetch", abs);
+    document.head.appendChild(link);
+  } catch (_) {}
+}
+
+function onArtifactPrefetchIntent(event) {
+  const link = event.target?.closest?.("a[data-thread-artifact-file]");
+  if (!link?.href) return;
+  prefetchArtifactHref(link.href);
+}
+
+function persistArtifactBrowserOpenFromToggle(event) {
+  const btn = event.target?.closest?.(
+    'button[aria-controls="thread-artifact-browser"]',
+  );
+  if (!btn) return;
+  // Datastar toggles on click; read expanded after the signal flush.
+  queue(() => {
+    try {
+      const expanded = btn.getAttribute("aria-expanded") === "true";
+      sessionStorage.setItem(BROWSER_OPEN_KEY, expanded ? "1" : "0");
+    } catch (_) {}
+  });
+}
+
+async function restoreArtifactBrowserOpen() {
+  if (!isThreadRoute()) return;
+  let stored = null;
+  try {
+    stored = sessionStorage.getItem(BROWSER_OPEN_KEY);
+  } catch (_) {}
+  if (stored !== "0" && stored !== "1") return;
+  const open = stored === "1";
+  const pane = document.getElementById("thread-artifact-pane");
+  if (!pane) return;
+  try {
+    const { mergePatch } = await import("@vamos/datastar");
+    mergePatch({ _artifactBrowserOpen: open });
+  } catch (_) {
+    try {
+      pane.setAttribute(
+        "data-signals",
+        `{_threadArtifactLoading: false, _artifactBrowserOpen: ${open}}`,
+      );
+      const browser = document.getElementById("thread-artifact-browser");
+      const btn = document.querySelector(
+        'button[aria-controls="thread-artifact-browser"]',
+      );
+      if (browser) {
+        if (open) browser.style.removeProperty("display");
+        else browser.style.display = "none";
+      }
+      if (btn) {
+        btn.setAttribute("aria-expanded", open ? "true" : "false");
+        btn.setAttribute("aria-pressed", open ? "true" : "false");
+      }
+    } catch (_) {}
+  }
+}
+
+function onPageSwap(event) {
+  if (!peekDocSwitchFlag()) return;
+  if (event.viewTransition) {
+    try {
+      event.viewTransition.types.add(DOC_SWITCH_TYPE);
+    } catch (_) {}
+  }
+}
+
+function onPageReveal(event) {
+  const switching = consumeDocSwitchFlag();
+  if (event.viewTransition && switching) {
+    try {
+      event.viewTransition.types.add(DOC_SWITCH_TYPE);
+    } catch (_) {}
+    markDocSwitchPending();
+    const done = () => clearDocSwitchPending();
+    try {
+      event.viewTransition.finished.then(done, done);
+    } catch (_) {
+      done();
+    }
+    return;
+  }
+  // No VT (unsupported, reduced-motion, skipped): do not leave opacity hacks.
   clearDocSwitchPending();
+}
+
+function onPageShow(event) {
+  // bfcache restore: never reload; chrome is already painted.
+  if (event.persisted) {
+    clearDocSwitchPending();
+    return;
+  }
+}
+
+function initNavPolish() {
+  // pagereveal / pageshow(persisted) own DOC_SWITCH_ATTR lifecycle — do not clear here.
+  restoreArtifactBrowserOpen();
   requestAnimationFrame(() => {
     requestAnimationFrame(() => {
       restoreComposerFocus();
@@ -106,6 +250,12 @@ function initNavPolish() {
 }
 
 window.addEventListener("popstate", reloadThreadArtifactHistory);
+window.addEventListener("pageshow", onPageShow);
+window.addEventListener("pageswap", onPageSwap);
+window.addEventListener("pagereveal", onPageReveal);
 window.addEventListener("pagehide", () => persistComposerFocus());
 document.addEventListener("click", onArtifactFileClick, true);
+document.addEventListener("click", persistArtifactBrowserOpenFromToggle, true);
+document.addEventListener("pointerdown", onArtifactPrefetchIntent, true);
+document.addEventListener("focusin", onArtifactPrefetchIntent, true);
 initNavPolish();

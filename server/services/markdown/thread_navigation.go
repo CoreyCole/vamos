@@ -464,7 +464,7 @@ func (s *Service) HandleThreadArtifactBrowser(c echo.Context) error {
 		return err
 	}
 	return sse.ExecuteScript(
-		"window.history.pushState({}, '', " + string(encodedURL) + ")",
+		"window.history.pushState({ workbenchArtifactPatch: true }, '', " + string(encodedURL) + ")",
 	)
 }
 

@@ -661,20 +661,28 @@ func TestWorkbenchHistoryJSReloadsSameDocumentArtifactPopstate(t *testing.T) {
 	js := string(contents)
 	for _, want := range []string{
 		`window.addEventListener("popstate"`,
+		`window.addEventListener("pageshow"`,
+		`window.addEventListener("pageswap"`,
+		`window.addEventListener("pagereveal"`,
 		`document.getElementById("thread-artifact-pane")`,
 		`window.location.reload()`,
-		`navigation.type === "back_forward"`,
+		`history.state?.workbenchArtifactPatch`,
+		`event.persisted`,
+		`workbench-v2:doc-switch`,
+		`workbench-doc-switch`,
 		`a[data-thread-artifact-file]`,
 		`data-workbench-doc-switching`,
 		`agent-chat-composer-input`,
 		`workbench-v2:composer-focused`,
+		`workbench-v2:artifact-browser-open`,
+		`rel="prefetch"`,
 	} {
 		if !strings.Contains(js, want) {
 			t.Fatalf("workbench-history.js missing %q in %s", want, js)
 		}
 	}
 	for _, unwanted := range []string{
-		`window.addEventListener("pageshow"`,
+		`navigation.type === "back_forward"`,
 		`startViewTransition`,
 		`function revalidateRestoredThread`,
 		`scrollChatToLatest`,
@@ -809,8 +817,9 @@ func TestWorkbenchV2CSSKeepsStableRegionTransitionNames(t *testing.T) {
 		"::view-transition-old(workbench-v2-chat)",
 		"::view-transition-old(thread-artifact-browser)",
 		"animation: none;",
-		"data-workbench-doc-switching",
-		`html[data-workbench-doc-switching="true"] #thread-artifact-document {`,
+		"::view-transition-old(thread-artifact-path-header)",
+		"display: none;",
+		"html:active-view-transition-type(workbench-doc-switch)",
 		"workbench-doc-switch-sweep",
 		"z-index: 20;",
 		"#agent-chat-messages,",
@@ -828,6 +837,9 @@ func TestWorkbenchV2CSSKeepsStableRegionTransitionNames(t *testing.T) {
 	}
 	if strings.Contains(css, `html[data-workbench-doc-switching="true"] #workbench-v2-artifact`) {
 		t.Fatalf("doc-switching must not opacity-fade whole #workbench-v2-artifact")
+	}
+	if strings.Contains(css, `html[data-workbench-doc-switching="true"] #thread-artifact-document`) {
+		t.Fatalf("doc-switching must not opacity-fade #thread-artifact-document; use VT type sweep only")
 	}
 }
 
@@ -1652,7 +1664,7 @@ func TestWorkbenchV2RegionsEnforceComposerFriendlyMinRem(t *testing.T) {
 		`data-workbench-region="workbench-v2-chat"`,
 		`data-workbench-min-rem="18"`,
 		`/js/workbench-resize.js?v=8`,
-		`/js/workbench-history.js?v=9`,
+		`/js/workbench-history.js?v=10`,
 	} {
 		if !strings.Contains(html, fragment) {
 			t.Fatalf("workbench html missing %q", fragment)

@@ -325,6 +325,7 @@ func TestHandleThreadArtifactBrowserPatchesOnlyBrowserAndHistory(t *testing.T) {
 		"selector #thread-artifact-browser",
 		`data-thread-artifact-cwd="thoughts/owner/plans/alpha/docs"`,
 		"window.history.pushState",
+		"workbenchArtifactPatch: true",
 		`/threads/thread-alpha?artifact=thoughts%2Fowner%2Fplans%2Falpha%2Fdesign.md\u0026artifact_dir=thoughts%2Fowner%2Fplans%2Falpha%2Fdocs`,
 	} {
 		if !strings.Contains(body, want) {

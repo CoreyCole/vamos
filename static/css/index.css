@@ -540,14 +540,15 @@
   animation: none;
 }
 
-
-/* Light sibling-doc switch affordance: document only (not browser/path). */
-html[data-workbench-doc-switching="true"] #thread-artifact-document {
-  opacity: 0.72;
-  transition: opacity 120ms ease;
+/* Never crossfade/ghost path+browser snapshots during doc switches. */
+::view-transition-old(thread-artifact-browser),
+::view-transition-old(thread-artifact-path-header) {
+  display: none;
 }
 
-html[data-workbench-doc-switching="true"] #thread-artifact-document::after {
+/* Thin sweep only while a typed workbench doc View Transition is active.
+   No opacity fade — that blanks chrome when VT is skipped. */
+html:active-view-transition-type(workbench-doc-switch) #thread-artifact-document::after {
   content: "";
   position: absolute;
   inset: 0 auto auto 0;
