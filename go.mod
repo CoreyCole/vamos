@@ -7,7 +7,7 @@ require (
 	connectrpc.com/connect v1.19.1
 	github.com/Oudwins/tailwind-merge-go v0.2.1
 	github.com/PuerkitoBio/goquery v1.11.0
-	github.com/a-h/templ v0.3.977
+	github.com/a-h/templ v0.3.1020
 	github.com/alecthomas/chroma/v2 v2.20.0
 	github.com/coreycole/datastarui v0.0.0-20260601175616-23fb67476613
 	github.com/dustin/go-humanize v1.0.1
@@ -23,9 +23,11 @@ require (
 	github.com/starfederation/datastar-go v1.1.0
 	go.temporal.io/api v1.62.2
 	go.temporal.io/sdk v1.41.1
+	golang.org/x/crypto v0.48.0
+	golang.org/x/net v0.51.0
 	golang.org/x/oauth2 v0.32.0
 	golang.org/x/sys v0.41.0
-	golang.org/x/text v0.31.0
+	golang.org/x/text v0.34.0
 	google.golang.org/protobuf v1.36.10
 	gopkg.in/yaml.v3 v3.0.1
 	modernc.org/sqlite v1.39.1
@@ -68,10 +70,8 @@ require (
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
 	github.com/valyala/fasttemplate v1.2.2 // indirect
 	github.com/yusufpapurcu/wmi v1.2.4 // indirect
-	golang.org/x/crypto v0.44.0 // indirect
 	golang.org/x/exp v0.0.0-20250620022241-b7579e27df2b // indirect
-	golang.org/x/net v0.47.0 // indirect
-	golang.org/x/sync v0.18.0 // indirect
+	golang.org/x/sync v0.19.0 // indirect
 	golang.org/x/time v0.11.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20250603155806-513f23925822 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20250603155806-513f23925822 // indirect

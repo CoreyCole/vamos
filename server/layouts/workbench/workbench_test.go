@@ -667,14 +667,7 @@ func TestWorkbenchHistoryJSReloadsSameDocumentArtifactPopstate(t *testing.T) {
 		`a[data-thread-artifact-file]`,
 		`data-workbench-doc-switching`,
 		`agent-chat-composer-input`,
-		`workbench-v2:chat-scroll`,
-		`workbench-v2:chat-scroll-pending`,
-		`agent-chat-scroll-region`,
-		`persistChatContinuity({ pending: true })`,
-		`scrollChatToLatest`,
-		`applyChatScrollIntent`,
-		`saved.top <= 0`,
-		`workbenchV2Chat`,
+		`workbench-v2:composer-focused`,
 	} {
 		if !strings.Contains(js, want) {
 			t.Fatalf("workbench-history.js missing %q in %s", want, js)
@@ -684,9 +677,54 @@ func TestWorkbenchHistoryJSReloadsSameDocumentArtifactPopstate(t *testing.T) {
 		`window.addEventListener("pageshow"`,
 		`startViewTransition`,
 		`function revalidateRestoredThread`,
+		`scrollChatToLatest`,
+		`applyChatScrollIntent`,
+		`workbench-v2:chat-scroll`,
+		`ResizeObserver`,
+		`scheduleAgentChatScrollToLatest`,
 	} {
 		if strings.Contains(js, unwanted) {
 			t.Fatalf("workbench-history.js should not contain %q in %s", unwanted, js)
+		}
+	}
+}
+
+func TestAgentChatScrollUsesColumnReverseCSS(t *testing.T) {
+	t.Parallel()
+
+	contents, err := os.ReadFile("../../../static/js/agent-chat-scroll.js")
+	if err != nil {
+		t.Fatalf("ReadFile(agent-chat-scroll.js) error = %v", err)
+	}
+	js := string(contents)
+	for _, unwanted := range []string{
+		`ResizeObserver`,
+		`requestAnimationFrame`,
+		`pendingLatest`,
+		`scrollRestored`,
+		`IntersectionObserver`,
+	} {
+		if strings.Contains(js, unwanted) {
+			t.Fatalf("agent-chat-scroll.js should not contain complex scroll machinery %q", unwanted)
+		}
+	}
+
+	for _, rel := range []string{
+		"../../../server/services/agentchat/workbench_threads.templ",
+		"../../../server/services/agentchat/shell.templ",
+		"../../../server/services/agentchat/page_chat.templ",
+		"../../../server/services/agentchat/embedded_chat.templ",
+	} {
+		body, err := os.ReadFile(rel)
+		if err != nil {
+			t.Fatalf("ReadFile(%s) error = %v", rel, err)
+		}
+		src := string(body)
+		if !strings.Contains(src, `id="agent-chat-scroll-region"`) {
+			t.Fatalf("%s missing agent-chat-scroll-region", rel)
+		}
+		if !strings.Contains(src, "flex-col-reverse") {
+			t.Fatalf("%s missing flex-col-reverse CSS anchor for latest chat", rel)
 		}
 	}
 }
@@ -1547,7 +1585,7 @@ func TestWorkbenchV2RegionsEnforceComposerFriendlyMinRem(t *testing.T) {
 		`data-workbench-region="workbench-v2-chat"`,
 		`data-workbench-min-rem="18"`,
 		`/js/workbench-resize.js?v=8`,
-		`/js/workbench-history.js?v=8`,
+		`/js/workbench-history.js?v=9`,
 	} {
 		if !strings.Contains(html, fragment) {
 			t.Fatalf("workbench html missing %q", fragment)
