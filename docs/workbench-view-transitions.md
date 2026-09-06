@@ -14,7 +14,7 @@ Plain **GET** sibling artifact links + **CSS View Transitions**. Chrome (tabs, t
 4. Parent `#workbench-root` / `#workbench-regions` / `#workbench-v2-artifact` (and pane wrappers) stay `view-transition-name: none` so the whole pane does not crossfade as one unit while children are named. Do **not** name whole regions flex as one unit.
 5. Only `#thread-artifact-document` is the live/changing named region.
 6. Freeze chrome with **explicit per-name** `::view-transition-{group,old,new}(name) { animation: none }`. Don’t rely on `view-transition-class` alone on any engine; keep explicit per-name freeze.
-7. Unchanged chrome (`workbench-v2-chat|threads|comments`, `app-header`, `workbench-mobile-tabs`): **keep `::view-transition-old` painted** and **`display: none` on `::view-transition-new`**. Hiding old then revealing new remounts the chat column (visible flash). Path/browser selection *does* change — hide **old** there so the new selection shows. Document: hide old only (live swap).
+7. Unchanged chrome (`workbench-v2-chat|threads|comments`, `app-header`, `workbench-mobile-tabs`): **`animation: none` on both `::view-transition-old` and `::view-transition-new`** — do **not** `display: none` either side (blanking old or new flashes/remounts the column). Path/browser selection *does* change — hide **old** there so the new selection shows. Document: hide old only (live swap). Do **not** set `view-transition-name: none` on chat.
 8. Root: `animation: none` on group/old/new; **`display: none` only on `::view-transition-old(root)`**. Never blank both old **and** new root — that wipes unmatched chrome and causes under-tabs black on mobile Chromium.
 9. Prefer real `<a href>` sibling GETs. No fetch/morph click intercept for file nav.
 10. Minimal JS only (`static/js/workbench-history.js`): Enter/Up `pushState({ workbenchArtifactPatch })` + popstate reload gate so Back never blanks; after `pagereveal` / `viewTransition.finished` and `pageshow(!persisted)`, `pinChatToBottom` (double rAF + `fonts.ready`) pins whichever of `#agent-chat-messages` / `#agent-chat-scroll-region` actually overflows, `scrollIntoView` on `#chat-latest`, then focuses with `preventScroll`; Files cookie on templ button + SSR; history.js stays tiny.
@@ -26,6 +26,7 @@ Plain **GET** sibling artifact links + **CSS View Transitions**. Chrome (tabs, t
 - Blank all chrome to `view-transition-name: none` and only name the document (browser has nothing shared → black flash).
 - Rely on `view-transition-class` alone for freeze.
 - `display: none` on both `::view-transition-old(root)` and `::view-transition-new(root)`.
+- `display: none` on unchanged-chrome old **or** new (chat/threads/comments/header/tabs) — blanks the column during sibling GET.
 - Reintroduce fetch/morph intercept for sibling docs (rejected as overcomplicated).
 - Opacity-dim whole panes as a “soft” transition.
 - Blame the browser before auditing names: unmatched or missing shared names are our bug.
@@ -46,7 +47,7 @@ Plain **GET** sibling artifact links + **CSS View Transitions**. Chrome (tabs, t
 
 ## Key files
 
-- `static/css/index.css` — `@view-transition { navigation: auto }`, names (incl. desktop `#app-header`), per-name freeze, root old-only hide, unchanged-chrome new-hide / path-browser old-hide
+- `static/css/index.css` — `@view-transition { navigation: auto }`, names (incl. desktop `#app-header`), per-name freeze (`animation: none` both sides for unchanged chrome), root old-only hide, path-browser/doc old-hide
 - `server/layouts/root.templ` — `<meta name="view-transition" content="same-origin">` (cross-document VT opt-in)
 - `static/js/workbench-history.js` — pushState patch flag + popstate reload gate + pagereveal `pinChatToBottom` after VT (no morph)
 - `server/layouts/workbench/mobile.templ` — SSR selected tab + ActiveRegionID deep-link hardening
@@ -56,7 +57,7 @@ Plain **GET** sibling artifact links + **CSS View Transitions**. Chrome (tabs, t
 
 ## History (brief)
 
-We tried morph intercept, then over-cleared names, then class-only freeze + root old+new `display: none` — each caused flashes (including under-tabs black on mobile Chromium). Current shape (`147e21d+`) is the proven one on box Chrome + Brave Android: stable shared names, per-name freeze, old-root-only hide, plain sibling GETs, tiny history gate.
+We tried morph intercept, then over-cleared names, then class-only freeze + root old+new `display: none`, then unchanged-chrome `display: none` on new (chat blank flash on box) — each caused flashes (including under-tabs black on mobile Chromium). Current shape: stable shared names, per-name `animation: none` freeze (unchanged chrome: no display:none on old or new), old-root-only hide, path/browser/doc old-hide, plain sibling GETs, tiny history gate.
 
 ## Debugging checklist
 

@@ -550,7 +550,9 @@
   display: none;
 }
 
-/* Explicit per-name freeze (mobile Chromium–reliable). view-transition-class is Chromium PE. */
+/* Explicit per-name freeze (mobile Chromium–reliable). view-transition-class is Chromium PE.
+   Unchanged chrome (chat/threads/comments/header/mobile-tabs): animation:none on both old and
+   new — do NOT display:none either side (blanking old or new flashes/remounts the column). */
 ::view-transition-old(app-header),
 ::view-transition-new(app-header),
 ::view-transition-group(app-header),
@@ -580,16 +582,6 @@
 ::view-transition-old(.workbench-chrome),
 ::view-transition-new(.workbench-chrome) {
   animation: none;
-}
-
-/* Unchanged chrome: keep OLD painted during VT; hide NEW (avoids remount flash).
-   Chat/threads/comments/header do not change on sibling doc GET. */
-::view-transition-new(workbench-v2-chat),
-::view-transition-new(workbench-v2-threads),
-::view-transition-new(workbench-v2-comments),
-::view-transition-new(app-header),
-::view-transition-new(workbench-mobile-tabs) {
-  display: none;
 }
 
 /* Path/browser selection DOES change — hide OLD so new selection shows immediately. */
