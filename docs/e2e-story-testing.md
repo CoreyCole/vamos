@@ -143,3 +143,7 @@ Only delete generated `e2e-qrspi-q-to-d-*` fixture directories/checkouts after c
 `just e2e` / `datastarui e2e run` writes browser artifacts under `--artifacts-dir` or the config `artifacts_dir`, grouped by run timestamp, feature, scenario, and viewport.
 
 Keep screenshots, HTML snapshots, traces when present, visual review markdown, and the exact command with implementation handoffs or verification artifacts.
+
+## See also
+
+- Workbench V2 under-tabs chrome regression Story: `workbench-v2-mobile-sibling-doc-keeps-chrome-under-tabs` in `pkg/e2e/workbenchv2tests/workbench_v2_doc_vt_e2e_test.go` — best-practices guide in `docs/workbench-view-transitions.md`.

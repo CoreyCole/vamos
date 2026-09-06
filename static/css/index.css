@@ -535,8 +535,8 @@
 }
 
 /* Root: kill crossfade animation. Prefer NOT display:none on both old AND new
-   root — Safari can leave unmatched named chrome inside a blanked root and the
-   under-tabs pane goes fully black. Only hide the old root snapshot. */
+   root — mobile Chromium leaves unmatched named chrome inside a blanked root and
+   the under-tabs pane goes fully black. Only hide the old root snapshot. */
 ::view-transition-group(root),
 ::view-transition-old(root),
 ::view-transition-new(root) {
@@ -546,7 +546,7 @@
   display: none;
 }
 
-/* Explicit per-name freeze (Safari-safe). view-transition-class is Chromium PE. */
+/* Explicit per-name freeze (mobile Chromium–reliable). view-transition-class is Chromium PE. */
 ::view-transition-old(workbench-mobile-tabs),
 ::view-transition-new(workbench-mobile-tabs),
 ::view-transition-group(workbench-mobile-tabs),
