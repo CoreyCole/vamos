@@ -92,18 +92,23 @@ func scrollChatTranscriptToMarker(marker string) spec.Step {
 
 func assertWorkbenchViewTransitionNames() spec.Step {
 	return spec.Custom(
-		"workbench chat and artifact regions keep view-transition names",
+		"workbench chrome keeps VT names; parent artifact stays none",
 		func(t testing.TB, ctx *duiruntime.Context) {
 			value, err := ctx.Page.Evaluate(
 				`() => {
 					const read = (id) => {
 						const el = document.getElementById(id);
 						if (!el) return null;
-						return getComputedStyle(el).viewTransitionName || el.style.viewTransitionName || null;
+						const name = getComputedStyle(el).viewTransitionName || el.style.viewTransitionName || null;
+						return name === 'none' ? 'none' : name;
 					};
 					return {
 						chat: read('workbench-v2-chat'),
 						artifact: read('workbench-v2-artifact'),
+						path: read('thread-artifact-path-header'),
+						browser: read('thread-artifact-browser'),
+						document: read('thread-artifact-document'),
+						tabs: read('workbench-mobile-tabs'),
 					};
 				}`,
 				nil,
@@ -118,8 +123,17 @@ func assertWorkbenchViewTransitionNames() spec.Step {
 			if state["chat"] != "workbench-v2-chat" {
 				t.Fatalf("chat view-transition-name = %#v, want workbench-v2-chat", state["chat"])
 			}
-			if state["artifact"] != "workbench-v2-artifact" {
-				t.Fatalf("artifact view-transition-name = %#v, want workbench-v2-artifact", state["artifact"])
+			if state["artifact"] != "none" && state["artifact"] != nil {
+				t.Fatalf("artifact view-transition-name = %#v, want none", state["artifact"])
+			}
+			if state["path"] != "thread-artifact-path-header" {
+				t.Fatalf("path-header VT = %#v", state["path"])
+			}
+			if state["browser"] != "thread-artifact-browser" {
+				t.Fatalf("browser VT = %#v", state["browser"])
+			}
+			if state["document"] != "thread-artifact-document" {
+				t.Fatalf("document VT = %#v", state["document"])
 			}
 		},
 	)

@@ -808,6 +808,8 @@ func TestWorkbenchV2CSSKeepsStableRegionTransitionNames(t *testing.T) {
 		"#workbench-v2-artifact,",
 		"#thread-artifact-pane {",
 		"view-transition-name: none;",
+		"#workbench-mobile-tabs {",
+		"view-transition-name: workbench-mobile-tabs;",
 		"#workbench-v2-threads {",
 		"view-transition-name: workbench-v2-threads;",
 		"view-transition-class: workbench-chrome;",
@@ -824,6 +826,11 @@ func TestWorkbenchV2CSSKeepsStableRegionTransitionNames(t *testing.T) {
 		"::view-transition-group(root),",
 		"::view-transition-old(root),",
 		"::view-transition-new(root) {",
+		"::view-transition-old(root) {",
+		"::view-transition-old(workbench-v2-chat),",
+		"::view-transition-group(workbench-v2-chat),",
+		"::view-transition-old(thread-artifact-path-header),",
+		"::view-transition-group(thread-artifact-path-header) {",
 		"::view-transition-group(.workbench-chrome),",
 		"::view-transition-old(.workbench-chrome),",
 		"::view-transition-new(.workbench-chrome) {",
@@ -837,6 +844,16 @@ func TestWorkbenchV2CSSKeepsStableRegionTransitionNames(t *testing.T) {
 	} {
 		if !strings.Contains(css, want) {
 			t.Fatalf("index.css missing %q", want)
+		}
+	}
+	// Root must not blank BOTH old and new (Safari unmatched-chrome wipe).
+	rootBlock := css[strings.Index(css, "::view-transition-group(root)"):]
+	rootBlock = rootBlock[:strings.Index(rootBlock, "/* Explicit per-name")]
+	if strings.Count(rootBlock, "display: none") != 0 {
+		// only old(root) may display:none — not the shared group/new block
+		shared := rootBlock[:strings.Index(rootBlock, "::view-transition-old(root) {")]
+		if strings.Contains(shared, "display: none") {
+			t.Fatalf("root group/new must not display:none both snapshots: %s", shared)
 		}
 	}
 	idx := strings.Index(css, "#doc-workbench-viewer-region")
@@ -1027,6 +1044,51 @@ func TestMobileRegionTabsRenderFromWorkbench(t *testing.T) {
 		if !strings.Contains(html, want) {
 			t.Fatalf("Workbench missing %s: %s", want, html)
 		}
+	}
+}
+
+func TestMobileRegionTabsSSRSelectedForActiveRegion(t *testing.T) {
+	t.Parallel()
+
+	state, err := BuildWorkbenchV2State(WorkbenchV2Args{
+		ViewportClass: ViewportMobile,
+		ThreadsOpen:   true,
+		ChatOpen:      true,
+		ArtifactOpen:  true,
+		Threads:       templ.NopComponent,
+		Chat:          templ.NopComponent,
+		Artifact:      templ.NopComponent,
+		Comments:      templ.NopComponent,
+	})
+	if err != nil {
+		t.Fatalf("BuildWorkbenchV2State() error = %v", err)
+	}
+	var body bytes.Buffer
+	if err := MobileRegionTabs(state).Render(t.Context(), &body); err != nil {
+		t.Fatalf("MobileRegionTabs.Render() error = %v", err)
+	}
+	html := body.String()
+	if !strings.Contains(html, `id="workbench-mobile-tabs"`) {
+		t.Fatalf("missing workbench-mobile-tabs id: %s", html)
+	}
+	if !strings.Contains(html, `class="workbench-chrome flex shrink-0`) &&
+		!strings.Contains(html, "workbench-chrome") {
+		t.Fatalf("mobile tablist missing workbench-chrome: %s", html)
+	}
+	// Docs/artifact tab must paint selected in SSR HTML (before Datastar).
+	if !strings.Contains(html, `aria-selected="true"`) {
+		t.Fatalf("no SSR aria-selected=true: %s", html)
+	}
+	if !strings.Contains(html, "bg-muted text-foreground") {
+		t.Fatalf("no SSR selected classes bg-muted text-foreground: %s", html)
+	}
+	if state.Config.Mobile.ActiveRegionID != WorkbenchV2ArtifactRegionID {
+		t.Fatalf("ActiveRegionID = %q, want artifact", state.Config.Mobile.ActiveRegionID)
+	}
+	signals := EncodeWorkbenchSignals(state)
+	if !strings.Contains(signals, `"activeRegionID":"workbenchV2Artifact"`) &&
+		!strings.Contains(signals, `"activeRegionID":"`+SignalKeyForID(WorkbenchV2ArtifactRegionID)+`"`) {
+		t.Fatalf("signals missing artifact activeRegionID: %s", signals)
 	}
 }
 

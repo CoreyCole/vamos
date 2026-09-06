@@ -499,6 +499,10 @@
   view-transition-name: none;
 }
 
+#workbench-mobile-tabs {
+  view-transition-name: workbench-mobile-tabs;
+  view-transition-class: workbench-chrome;
+}
 #workbench-v2-threads {
   view-transition-name: workbench-v2-threads;
   view-transition-class: workbench-chrome;
@@ -530,15 +534,41 @@
   view-transition-name: thread-artifact-document;
 }
 
-/* Default root crossfade blanks the Docs pane — kill it. */
+/* Root: kill crossfade animation. Prefer NOT display:none on both old AND new
+   root — Safari can leave unmatched named chrome inside a blanked root and the
+   under-tabs pane goes fully black. Only hide the old root snapshot. */
 ::view-transition-group(root),
 ::view-transition-old(root),
 ::view-transition-new(root) {
   animation: none;
+}
+::view-transition-old(root) {
   display: none;
 }
 
-/* Frozen shared chrome (Chromium 126+ class selector). */
+/* Explicit per-name freeze (Safari-safe). view-transition-class is Chromium PE. */
+::view-transition-old(workbench-mobile-tabs),
+::view-transition-new(workbench-mobile-tabs),
+::view-transition-group(workbench-mobile-tabs),
+::view-transition-old(workbench-v2-threads),
+::view-transition-new(workbench-v2-threads),
+::view-transition-group(workbench-v2-threads),
+::view-transition-old(workbench-v2-chat),
+::view-transition-new(workbench-v2-chat),
+::view-transition-group(workbench-v2-chat),
+::view-transition-old(workbench-v2-comments),
+::view-transition-new(workbench-v2-comments),
+::view-transition-group(workbench-v2-comments),
+::view-transition-old(thread-artifact-browser),
+::view-transition-new(thread-artifact-browser),
+::view-transition-group(thread-artifact-browser),
+::view-transition-old(thread-artifact-path-header),
+::view-transition-new(thread-artifact-path-header),
+::view-transition-group(thread-artifact-path-header) {
+  animation: none;
+}
+
+/* Frozen shared chrome (Chromium 126+ class selector; progressive enhancement). */
 ::view-transition-group(.workbench-chrome),
 ::view-transition-old(.workbench-chrome),
 ::view-transition-new(.workbench-chrome) {

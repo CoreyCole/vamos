@@ -30,7 +30,7 @@ type WorkbenchV2Args struct {
 }
 
 func BuildWorkbenchV2State(args WorkbenchV2Args) (WorkbenchState, error) {
-	return BuildWorkbenchState(BuildWorkbenchStateInput{
+	state, err := BuildWorkbenchState(BuildWorkbenchStateInput{
 		UserEmail:     args.UserEmail,
 		Page:          WorkbenchPageThreads,
 		View:          WorkbenchViewSplit,
@@ -75,6 +75,16 @@ func BuildWorkbenchV2State(args WorkbenchV2Args) (WorkbenchState, error) {
 			),
 		},
 	})
+	if err != nil {
+		return state, err
+	}
+	// Doc deep-links / mobile Docs pane: ActiveRegionID must be artifact on SSR
+	// so EncodeWorkbenchSignals + tab selected classes paint before Datastar.
+	// Saved layout prefs must not win first paint for ?artifact= sibling GETs.
+	if state.ViewportClass == ViewportMobile || args.ArtifactOpen {
+		state.Config.Mobile.ActiveRegionID = WorkbenchV2ArtifactRegionID
+	}
+	return state, nil
 }
 
 func v2Region(
