@@ -77,13 +77,15 @@ templ ThreadArtifactBrowser(browser ThreadArtifactBrowserArgs) {
 		}
 	>
 		<div class="mb-1 flex min-h-8 items-center gap-1 px-1 text-xs text-muted-foreground">
-			if browser.ParentEndpoint != "" {
+			if browser.ParentHref != "" {
 				<a
 					href={ templ.URL(browser.ParentHref) }
 					data-thread-artifact-up
-					data-artifact-endpoint={ browser.ParentEndpoint }
-					data-indicator="_threadArtifactLoading"
-					data-on:click={ threadArtifactBrowserClickAction() }
+					if browser.ParentEndpoint != "" {
+						data-artifact-endpoint={ browser.ParentEndpoint }
+						data-indicator="_threadArtifactLoading"
+						data-on:click={ threadArtifactBrowserClickAction() }
+					}
 					class="inline-flex h-7 shrink-0 items-center gap-1 rounded px-2 transition-colors hover:bg-muted hover:text-foreground"
 					aria-label="Open parent folder"
 					title="Open parent folder"
@@ -151,13 +153,15 @@ templ ThreadArtifactDirectory(entry ThreadArtifactEntry) {
 				}
 			</ul>
 		</details>
-		if entry.BrowseEndpoint != "" {
+		if entry.BrowseHref != "" {
 			<a
 				href={ templ.URL(entry.BrowseHref) }
 				data-thread-artifact-enter
-				data-artifact-endpoint={ entry.BrowseEndpoint }
-				data-indicator="_threadArtifactLoading"
-				data-on:click={ threadArtifactBrowserClickAction() }
+				if entry.BrowseEndpoint != "" {
+					data-artifact-endpoint={ entry.BrowseEndpoint }
+					data-indicator="_threadArtifactLoading"
+					data-on:click={ threadArtifactBrowserClickAction() }
+				}
 				class="absolute right-1 top-0.5 z-10 inline-flex h-7 w-7 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
 				aria-label={ "Open " + entry.Name + " folder" }
 				title={ "Open " + entry.Name + " folder" }

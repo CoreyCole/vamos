@@ -44,6 +44,8 @@ Plain **GET** sibling artifact links + **CSS View Transitions**. Chrome (tabs, t
 | `#thread-artifact-path-header` | `thread-artifact-path-header` | `workbench-chrome` |
 | `#thread-artifact-browser` | `thread-artifact-browser` | `workbench-chrome` |
 | `#thread-artifact-document` | `thread-artifact-document` | — |
+
+`/thoughts` document and directory workbench panes reuse `ThreadArtifactPane` (same path-header / Files browser / document IDs) so sibling GETs keep identical chrome. Header overflow reuses `BuildThreadArtifactHeaderActions` and adds a **Chat** link on thoughts pages.
 | `#workbench-root` / `#workbench-regions` / `#workbench-v2-artifact` / pane | `none` | — |
 
 ## Key files

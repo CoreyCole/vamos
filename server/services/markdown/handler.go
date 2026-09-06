@@ -457,18 +457,24 @@ func (s *Service) buildThoughtsV2WorkbenchState(
 	); matched != "" {
 		chatHref = matched
 	}
-	artifact := ThoughtsV2ArtifactPane(
-		chatHref,
-		DocumentPanel(
-			BuildDocumentPanelArgs(
-				pageArgs,
-				optionalHeaderWorkspaceTree(
-					headerWorkspaceTree,
-					hasHeaderWorkspaceTree,
-				),
-			),
+	panelArgs := BuildDocumentPanelArgs(
+		pageArgs,
+		optionalHeaderWorkspaceTree(
+			headerWorkspaceTree,
+			hasHeaderWorkspaceTree,
 		),
 	)
+	panelArgs.Document.WorkbenchActions = nil
+	artifact, err := s.thoughtsArtifactPane(
+		c,
+		canonical,
+		pageArgs,
+		DocumentPanel(panelArgs),
+		chatHref,
+	)
+	if err != nil {
+		return workbench.WorkbenchState{}, err
+	}
 	comments := commentui.CommentsContextPanel(
 		commentui.BuildCommentsPanelArgs(pageArgs.CommentUI, ""),
 	)
@@ -739,11 +745,22 @@ func (s *Service) buildThoughtsDirectoryWorkbenchState(
 	}
 	viewport := viewportClassForRequest(c)
 	chatHref := s.threadHrefForDoc(c.Request().Context(), args.Path)
+	dirPath := strings.Trim(strings.TrimSpace(args.Path), "/")
+	artifact, err := s.thoughtsArtifactPane(
+		c,
+		dirPath,
+		nil,
+		DirectoryPrimaryPanel(args),
+		chatHref,
+	)
+	if err != nil {
+		return workbench.WorkbenchState{}, err
+	}
 	return workbench.BuildWorkbenchV2State(workbench.WorkbenchV2Args{
 		UserEmail:     args.UserEmail,
 		ViewportClass: viewport,
 		SavedConfig:   s.savedThreadsWorkbenchConfig(c, args.UserEmail, viewport),
-		Artifact:      ThoughtsV2ArtifactPane(chatHref, DirectoryPrimaryPanel(args)),
+		Artifact:      artifact,
 		Comments:      EmptyDirectoryContextPanel(),
 		ArtifactOpen:  true,
 	})

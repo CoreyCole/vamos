@@ -125,7 +125,7 @@ func (s *Service) indexArtifactComponent(
 	if err != nil {
 		return WorkbenchUnavailable("The artifact is unavailable.")
 	}
-	browser.HeaderActions = BuildThreadArtifactHeaderActions(page, browser.DocPath)
+	browser.HeaderActions = BuildThreadArtifactHeaderActions(page, browser.DocPath, "")
 	if page != nil {
 		panelArgs := BuildDocumentPanelArgs(page)
 		panelArgs.Document.WorkbenchActions = nil

@@ -73,10 +73,11 @@ func DocumentCommentAction(pageArgs *PageArgs) workbench.OverflowAction {
 	}
 }
 
-func BuildThreadArtifactHeaderActions(pageArgs *PageArgs, docPath string) templ.Component {
+func BuildThreadArtifactHeaderActions(pageArgs *PageArgs, docPath string, chatHref string) templ.Component {
 	docPath = strings.TrimSpace(docPath)
+	chatHref = strings.TrimSpace(chatHref)
 	groups := make([]workbench.OverflowActionGroup, 0, 2)
-	pathActions := make([]workbench.OverflowAction, 0, 2)
+	pathActions := make([]workbench.OverflowAction, 0, 3)
 	if docPath != "" {
 		pathActions = append(pathActions, workbench.OverflowAction{
 			Label: "Thoughts",
@@ -84,6 +85,13 @@ func BuildThreadArtifactHeaderActions(pageArgs *PageArgs, docPath string) templ.
 			Href:  ThoughtsDocURL(docPath, ""),
 		})
 		pathActions = append(pathActions, DocumentCopyPathAction(docPath))
+	}
+	if chatHref != "" {
+		pathActions = append(pathActions, workbench.OverflowAction{
+			Label: "Chat",
+			Kind:  workbench.OverflowActionLink,
+			Href:  chatHref,
+		})
 	}
 	if len(pathActions) > 0 {
 		groups = append(groups, workbench.OverflowActionGroup{Actions: pathActions})

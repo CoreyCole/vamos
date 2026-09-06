@@ -235,7 +235,7 @@ func TestThreadArtifactDirectoryRendersDisclosureWithoutNavigation(t *testing.T)
 	html := body.String()
 	for _, want := range []string{
 		`<details class="group" open`,
-		`data-on:toggle="if (el.open &amp;&amp; el.dataset.loaded !== &#39;true&#39;)`,
+		`data-on:toggle="if (el.open &amp;&amp; el.dataset.loaded !== &#39;true&#39; &amp;&amp; el.dataset.artifactEndpoint)`,
 		`aria-controls="` + threadArtifactChildrenID(entry) + `"`,
 		`data-thread-artifact-toggle`,
 		`data-thread-artifact-enter`,

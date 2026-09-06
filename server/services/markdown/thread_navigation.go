@@ -180,7 +180,7 @@ func threadArtifactBrowserClickAction() string {
 }
 
 func threadArtifactDirectoryToggleAction() string {
-	return "if (el.open && el.dataset.loaded !== 'true') { @get(el.dataset.artifactEndpoint) }"
+	return "if (el.open && el.dataset.loaded !== 'true' && el.dataset.artifactEndpoint) { @get(el.dataset.artifactEndpoint) }"
 }
 
 func (s *Service) validateThreadArtifactBrowserThread(
@@ -388,6 +388,101 @@ func (s *Service) loadedThreadArtifactDirectory(
 	}, nil
 }
 
+func remapThreadArtifactBrowserForThoughts(
+	browser ThreadArtifactBrowserArgs,
+) ThreadArtifactBrowserArgs {
+	if browser.DirectoryPath != "" && browser.DocPath != "" {
+		parent := path.Dir(browser.DirectoryPath)
+		if parent == "." {
+			parent = ""
+		}
+		browser.ParentHref = ThoughtsDirURL(parent)
+		browser.ParentEndpoint = ""
+	} else {
+		browser.ParentHref = ""
+		browser.ParentEndpoint = ""
+	}
+	for i := range browser.Entries {
+		browser.Entries[i] = remapThreadArtifactEntryForThoughts(browser.Entries[i])
+	}
+	return browser
+}
+
+func remapThreadArtifactEntryForThoughts(entry ThreadArtifactEntry) ThreadArtifactEntry {
+	if entry.IsDir {
+		entry.BrowseHref = ThoughtsDirURL(entry.Path)
+		entry.BrowseEndpoint = ""
+		// Keep SSR-expanded children; avoid threads Datastar endpoints on /thoughts.
+		entry.Endpoint = ""
+		for i := range entry.Children {
+			entry.Children[i] = remapThreadArtifactEntryForThoughts(entry.Children[i])
+		}
+		return entry
+	}
+	entry.Href = ThoughtsDocURL(entry.Path, "")
+	entry.Endpoint = ""
+	return entry
+}
+
+func (s *Service) thoughtsArtifactPane(
+	c echo.Context,
+	docOrDirPath string,
+	page *PageArgs,
+	document templ.Component,
+	chatHref string,
+) (templ.Component, error) {
+	var (
+		browser ThreadArtifactBrowserArgs
+		err     error
+	)
+	if page == nil {
+		// Directory /thoughts pages: Files lists this directory (not its parent).
+		browser, err = s.thoughtsDirectoryArtifactBrowser(c, docOrDirPath)
+	} else {
+		browser, err = s.threadArtifactBrowser(c, "", docOrDirPath)
+	}
+	if err != nil {
+		return nil, err
+	}
+	browser = remapThreadArtifactBrowserForThoughts(browser)
+	browser.HeaderActions = BuildThreadArtifactHeaderActions(page, browser.DocPath, chatHref)
+	return ThreadArtifactPane(browser, document), nil
+}
+
+func (s *Service) thoughtsDirectoryArtifactBrowser(
+	c echo.Context,
+	dirPath string,
+) (ThreadArtifactBrowserArgs, error) {
+	canonical, err := CanonicalThoughtsDirPath(dirPath)
+	if err != nil {
+		return ThreadArtifactBrowserArgs{}, err
+	}
+	listing, err := s.GetDirectoryListing(canonical)
+	if err != nil {
+		return ThreadArtifactBrowserArgs{}, err
+	}
+	entries, err := s.buildThreadArtifactEntries("", listing, canonical, canonical)
+	if err != nil {
+		return ThreadArtifactBrowserArgs{}, err
+	}
+	args := ThreadArtifactBrowserArgs{
+		DocPath:       canonical,
+		DirectoryPath: canonical,
+		Entries:       entries,
+		BrowserOpen:   ArtifactBrowserOpenFromRequest(c.Request()),
+	}
+	if canonical != "" {
+		parent := path.Dir(canonical)
+		if parent == "." {
+			parent = ""
+		}
+		// ParentHref remapped for thoughts in remapThreadArtifactBrowserForThoughts.
+		args.ParentHref = ThreadArtifactHrefAtDirectory("", canonical, parent)
+		args.ParentEndpoint = ThreadArtifactBrowserEndpoint("", canonical, parent)
+	}
+	return args, nil
+}
+
 func (s *Service) threadArtifactAndComments(
 	c echo.Context,
 	threadID, rawDoc string,
@@ -405,14 +500,14 @@ func (s *Service) threadArtifactAndComments(
 	}
 	content, page, directory := s.artifactContent(c, doc, explicit || !hasArtifact)
 	if directory {
-		browser.HeaderActions = BuildThreadArtifactHeaderActions(nil, browser.DocPath)
+		browser.HeaderActions = BuildThreadArtifactHeaderActions(nil, browser.DocPath, "")
 		return ThreadArtifactPane(
 			browser,
 			WorkbenchUnavailable("Select a file from the artifact browser."),
 		), WorkbenchUnavailable("Comments are unavailable for directories."), nil
 	}
 	if page == nil {
-		browser.HeaderActions = BuildThreadArtifactHeaderActions(nil, browser.DocPath)
+		browser.HeaderActions = BuildThreadArtifactHeaderActions(nil, browser.DocPath, "")
 		return ThreadArtifactPane(browser, content),
 			WorkbenchUnavailable("Comments are unavailable for this artifact."), nil
 	}
@@ -435,7 +530,7 @@ func (s *Service) threadArtifactAndComments(
 		page.ViewerArgs.BodyComponent,
 	)
 	panelArgs := BuildDocumentPanelArgs(page)
-	browser.HeaderActions = BuildThreadArtifactHeaderActions(page, browser.DocPath)
+	browser.HeaderActions = BuildThreadArtifactHeaderActions(page, browser.DocPath, "")
 	panelArgs.Document.WorkbenchActions = nil
 	content = DocumentPanel(panelArgs)
 	return ThreadArtifactPane(browser, content),
