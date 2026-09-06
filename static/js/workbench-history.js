@@ -17,8 +17,28 @@ function reloadThreadArtifactHistory() {
   }
 }
 
+function chatOverflowScroller() {
+  // Prefer the element that actually overflows. Live DOM can put overflow on
+  // #agent-chat-messages (overflow-x-hidden → computed overflow-y:auto) while
+  // #agent-chat-scroll-region has scrollHeight === clientHeight.
+  const candidates = [
+    document.getElementById("agent-chat-messages"),
+    document.getElementById("agent-chat-scroll-region"),
+  ].filter(Boolean);
+  let best = candidates[0] || null;
+  let bestOverflow = -1;
+  for (const el of candidates) {
+    const overflow = el.scrollHeight - el.clientHeight;
+    if (overflow > bestOverflow) {
+      best = el;
+      bestOverflow = overflow;
+    }
+  }
+  return best;
+}
+
 function pinChatToBottom() {
-  const region = document.getElementById("agent-chat-scroll-region");
+  const region = chatOverflowScroller();
   if (region) {
     region.scrollTop = region.scrollHeight;
   }

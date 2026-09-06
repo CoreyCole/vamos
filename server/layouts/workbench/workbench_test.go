@@ -666,6 +666,8 @@ func TestWorkbenchHistoryJSReloadsSameDocumentArtifactPopstate(t *testing.T) {
 		`history.state?.workbenchArtifactPatch`,
 		`pinChatToBottom`,
 		`scheduleChatPinAfterReveal`,
+		`chatOverflowScroller`,
+		`agent-chat-messages`,
 		`agent-chat-scroll-region`,
 		`scrollTop = region.scrollHeight`,
 		`event?.viewTransition?.finished`,
@@ -1761,7 +1763,7 @@ func TestWorkbenchV2RegionsEnforceComposerFriendlyMinRem(t *testing.T) {
 		`data-workbench-region="workbench-v2-chat"`,
 		`data-workbench-min-rem="18"`,
 		`/js/workbench-resize.js?v=8`,
-		`/js/workbench-history.js?v=18`,
+		`/js/workbench-history.js?v=19`,
 	} {
 		if !strings.Contains(html, fragment) {
 			t.Fatalf("workbench html missing %q", fragment)

@@ -282,11 +282,11 @@ func clickSiblingAndAssertNoUnderHeaderBlackout(href, wantText string) spec.Step
 
 func assertChatPinnedAfterSiblingNav() spec.Step {
 	return spec.Custom(
-		"after sibling nav #agent-chat-scroll-region scrollTop is near scrollHeight",
+		"after sibling nav #agent-chat-messages scrollTop is near scrollHeight",
 		func(t testing.TB, ctx *duiruntime.Context) {
 			value, err := ctx.Page.Evaluate(
 				`() => {
-					const region = document.getElementById('agent-chat-scroll-region');
+					const region = document.getElementById('agent-chat-messages');
 					if (!region) return { hasRegion: false };
 					const max = Math.max(0, region.scrollHeight - region.clientHeight);
 					const gap = max - region.scrollTop;
@@ -311,7 +311,7 @@ func assertChatPinnedAfterSiblingNav() spec.Step {
 			}
 			hasRegion, _ := state["hasRegion"].(bool)
 			if !hasRegion {
-				t.Fatalf("missing #agent-chat-scroll-region after sibling: %#v", state)
+				t.Fatalf("missing #agent-chat-messages after sibling: %#v", state)
 			}
 			nearBottom, _ := state["nearBottom"].(bool)
 			if !nearBottom {
