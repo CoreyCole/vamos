@@ -39,24 +39,67 @@ Plain **GET** sibling artifact links + **CSS View Transitions**. Chrome (tabs, t
 | `#app-header` | `app-header` | `workbench-chrome` |
 | `#workbench-mobile-tabs` | `workbench-mobile-tabs` **only `@media (max-width: 767px)`**; `none` on `md+` | `workbench-chrome` (max-md only) |
 | `#workbench-v2-threads` | `workbench-v2-threads` | `workbench-chrome` |
+| `#workbench-v2-threads-reopen` | `workbench-v2-threads-reopen` | `workbench-chrome` (desktop; `max-md:hidden`) |
 | `#workbench-v2-chat` | `workbench-v2-chat` | `workbench-chrome` |
 | `#workbench-v2-comments` | `workbench-v2-comments` | `workbench-chrome` |
 | `#thread-artifact-path-header` | `thread-artifact-path-header` | `workbench-chrome` |
 | `#thread-artifact-browser` | `thread-artifact-browser` | `workbench-chrome` |
 | `#thread-artifact-document` | `thread-artifact-document` | — |
-
-`/thoughts` document and directory workbench panes reuse `ThreadArtifactPane` (same path-header / Files browser / document IDs) so sibling GETs keep identical chrome. Header overflow reuses `BuildThreadArtifactHeaderActions` and adds a **Chat** link on thoughts pages.
 | `#workbench-root` / `#workbench-regions` / `#workbench-v2-artifact` / pane | `none` | — |
+
+`/thoughts` document and directory workbench panes reuse `ThreadArtifactPane` (same path-header / Files browser / document IDs) so sibling GETs keep identical chrome. Header overflow reuses `BuildThreadArtifactHeaderActions` and adds a **Chat** link on thoughts pages. `#workbench-v2-threads-reopen` already has stable name + per-name `animation: none` freeze at tip; desktop VT Story assert for reopen paint still tracks with ticket 2/3.
+
+
+## Ephemeral chrome cookies vs layout prefs (SSR)
+
+Sibling artifact navigation is a **full same-origin GET**. Client Datastar signals die with the document. Anything that must stay open/closed across that GET has to arrive again on first paint from the server.
+
+### Two stores (do not mix)
+
+| Store | Survives sibling GET? | What it holds on Threads |
+| --- | --- | --- |
+| **Layout prefs** (DB via `layoutprefs`, grip drag / `workbench-layout-save`) | ratios yes; **visibility no** | Column **ratios** only |
+| **Host cookies** (`wb2_*`, `path=/; SameSite=Lax`) | yes (browser sends them on the next GET) | Ephemeral chrome open/closed |
+
+**Why prefs drop `Visible` on Threads**
+
+- `MergeWorkbenchConfig` applies saved **ratios** for every page, but only merges saved `Visible` when `defaults.Page != WorkbenchPageThreads` (desktop). Threads never rehydrate open/closed from prefs.
+- `StripDurableInteractionState` (used on layoutprefs Upsert/Get as the “ratioOnly” strip) resets `Visible` (and Threads mobile `ActiveRegionID`) back to page defaults before storage/read — so a closed threads column cannot hide in the DB and surprise the next paint.
+
+Route-owned visibility for Threads therefore comes from **Serve* args**, not from saved prefs:
+
+- `ServeThreads` / `ServeThread` → `ThreadsOpen: workbench.ThreadsOpenFromRequest(r)` → `BuildWorkbenchV2State` → region `.Visible` → `EncodeWorkbenchSignals` / `data-signals` on first paint.
+- Files browser: `ArtifactBrowserOpenFromRequest` → `ThreadArtifactBrowserArgs.BrowserOpen` → SSR `$_artifactBrowserOpen` seed in `thread_navigation.templ`.
+
+| Cookie | Local signal | FromRequest | SSR seed |
+| --- | --- | --- | --- |
+| `wb2_threads_open` | `$workbench.regions.workbenchV2Threads.visible` (region) | `ThreadsOpenFromRequest` | `EncodeWorkbenchSignals` |
+| `wb2_artifact_browser` | `$_artifactBrowserOpen` (underscore / pane-local) | `ArtifactBrowserOpenFromRequest` | `data-signals` on `#thread-artifact-pane` |
+
+Toggle handlers write **both** the live signal and the cookie (see `ThreadsHideClickAction` / `ThreadsShowClickAction`, Files button `data-on:click`). Missing/invalid cookie ⇒ **open** (matches prior always-open first visit).
+
+Underscore signals (`$_…`) are local to the pane morph world; they do **not** automatically ride to the next document. The cookie is what the next GET sends so SSR can re-seed them.
+
+### Add-toggle recipe (SSR checklist)
+
+1. **Classify**: workbench **region** visibility (`$workbench.regions.<SignalKey>.visible`) vs pane-local **`$_…`** signal. Regions go through `BuildWorkbenchV2State` + `EncodeWorkbenchSignals`; locals seed via templ `data-signals`.
+2. **Persist for GET**: host cookie (`wb2_<name>`, `0`/`1`, `path=/; SameSite=Lax; Max-Age=…`) written in the click action alongside the signal flip. Optional `sessionStorage` mirror is fine; cookie is authoritative for SSR.
+3. **Read on Serve**: `*FromRequest(r)` in `ServeThreads` / `ServeThread` (and any sibling artifact Serve that must match) → pass into build/args → first-paint signals. Do **not** rely on client-only flips surviving navigation.
+4. **Never** put chrome open/closed into layout-save / prefs for Threads visibility — prefs stay ratio-only (`Merge` + `StripDurableInteractionState`).
+5. **Tests**: FromRequest defaults + `0`/`1`; cookie write present in click action; cookie drives `EncodeWorkbenchSignals` / SSR attribute (see `threads_open_test.go`, `TestArtifactBrowserOpenFromRequest`).
+6. **VT first paint**: if the toggle reveals/hides named chrome (e.g. `#workbench-v2-threads` vs `#workbench-v2-threads-reopen`), keep stable `view-transition-name` + per-name `animation: none` freeze on **both** old and new so a closed→closed sibling GET does not flash remount. Do not `display: none` unchanged-chrome `::view-transition-new`.
 
 ## Key files
 
-- `static/css/index.css` — `@view-transition { navigation: auto }`, names (incl. desktop `#app-header`), per-name freeze (`animation: none` both sides for unchanged chrome), root old-only hide, path-browser/doc old-hide
-- `server/layouts/root.templ` — `<meta name="view-transition" content="same-origin">` (cross-document VT opt-in)
+- `static/css/index.css` — `@view-transition { navigation: auto }`, names (incl. desktop `#app-header`, `#workbench-v2-threads-reopen`), per-name freeze (`animation: none` both sides for unchanged chrome), root old-only hide, path-browser/doc old-hide
+- `server/layouts/root.templ` — `<meta name="view-transition" content="same-origin">` (cross-document VT opt-in); `#app-header` stable id for desktop VT freeze
 - `static/js/workbench-history.js` — pushState patch flag + popstate reload gate + pagereveal `pinChatToBottom` after VT (no morph)
 - `server/layouts/workbench/mobile.templ` — SSR selected tab + ActiveRegionID deep-link hardening
-- `server/services/markdown/thread_navigation.templ` — sibling `<a href>` GETs / Files cookie
+- `server/layouts/workbench/threads_open.go` — `wb2_threads_open` cookie ↔ `ThreadsOpenFromRequest` / click actions
+- `server/layouts/workbench/defaults.go` — `MergeWorkbenchConfig` (Threads skips saved `Visible`) + `StripDurableInteractionState` (ratioOnly strip)
+- `server/services/markdown/thread_workbench.go` — `ServeThreads` / `ServeThread` pass `ThreadsOpenFromRequest` into `BuildWorkbenchV2State`
+- `server/services/markdown/thread_navigation.templ` — sibling `<a href>` GETs / Files `wb2_artifact_browser` + `$_artifactBrowserOpen` SSR seed
 - `pkg/e2e/workbenchv2tests/workbench_v2_doc_vt_e2e_test.go` — under-tabs (mobile) + under-header (desktop) chrome Stories
-- `server/layouts/root.templ` — `#app-header` stable id for desktop VT freeze
 
 ## History (brief)
 

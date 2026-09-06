@@ -116,7 +116,7 @@ Use plain `just build` only when intentionally restarting a configured running s
 
 ## UI/server rules
 
-- Workbench V2 sibling artifact View Transitions: see `docs/workbench-view-transitions.md` (stable chrome names, per-name freeze, plain GET links).
+- Workbench V2 sibling artifact View Transitions: see `docs/workbench-view-transitions.md` (stable chrome names, per-name freeze, plain GET links; ephemeral chrome cookies vs ratio-only layout prefs).
 - Build MPAs with Datastar CQRS: backend source of truth, SSE streams for reads, short POSTs for writes.
 - Use real HTML forms with `name` attributes and stable IDs for SSE-patched elements.
 - Avoid inline styles; use Tailwind utilities.
