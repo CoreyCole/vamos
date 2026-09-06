@@ -662,26 +662,10 @@ func TestWorkbenchHistoryJSReloadsSameDocumentArtifactPopstate(t *testing.T) {
 	for _, want := range []string{
 		`window.addEventListener("popstate"`,
 		`window.addEventListener("pageshow"`,
-		`window.addEventListener("pageswap"`,
-		`window.addEventListener("pagereveal"`,
 		`document.getElementById("thread-artifact-pane")`,
 		`window.location.reload()`,
 		`history.state?.workbenchArtifactPatch`,
-		`workbenchArtifactDoc`,
-		`DOMParser`,
-		`thread-artifact-document`,
-		`thread-artifact-path-header`,
-		`preventDefault`,
-		`history.pushState({ workbenchArtifactDoc: true }`,
-		`window.location.assign(href)`,
 		`event.persisted`,
-		`workbench-v2:doc-switch`,
-		`workbench-doc-switch`,
-		`a[data-thread-artifact-file]`,
-		`data-workbench-doc-switching`,
-		`agent-chat-composer-input`,
-		`workbench-v2:composer-focused`,
-		`rel="prefetch"`,
 	} {
 		if !strings.Contains(js, want) {
 			t.Fatalf("workbench-history.js missing %q in %s", want, js)
@@ -700,6 +684,17 @@ func TestWorkbenchHistoryJSReloadsSameDocumentArtifactPopstate(t *testing.T) {
 		`restoreArtifactBrowserOpen`,
 		`mergePatch({ _artifactBrowserOpen`,
 		`persistArtifactBrowserOpenFromToggle`,
+		`workbench-v2:doc-switch`,
+		`workbench-doc-switch`,
+		`data-workbench-doc-switching`,
+		`pageswap`,
+		`pagereveal`,
+		`rel="prefetch"`,
+		`workbench-v2:composer-focused`,
+		`agent-chat-composer-input`,
+		`DOMParser`,
+		`workbenchArtifactDoc`,
+		`fetch(`,
 	} {
 		if strings.Contains(js, unwanted) {
 			t.Fatalf("workbench-history.js should not contain %q in %s", unwanted, js)
@@ -815,6 +810,7 @@ func TestWorkbenchV2CSSKeepsStableRegionTransitionNames(t *testing.T) {
 		"view-transition-name: none;",
 		"#workbench-v2-threads {",
 		"view-transition-name: workbench-v2-threads;",
+		"view-transition-class: workbench-chrome;",
 		"#workbench-v2-chat {",
 		"view-transition-name: workbench-v2-chat;",
 		"#workbench-v2-comments {",
@@ -828,16 +824,14 @@ func TestWorkbenchV2CSSKeepsStableRegionTransitionNames(t *testing.T) {
 		"::view-transition-group(root),",
 		"::view-transition-old(root),",
 		"::view-transition-new(root) {",
-		"::view-transition-old(workbench-v2-threads),",
-		"::view-transition-old(workbench-v2-chat),",
-		"::view-transition-old(workbench-v2-comments),",
+		"::view-transition-group(.workbench-chrome),",
+		"::view-transition-old(.workbench-chrome),",
+		"::view-transition-new(.workbench-chrome) {",
 		"::view-transition-old(thread-artifact-browser),",
-		"::view-transition-old(thread-artifact-path-header),",
+		"::view-transition-old(thread-artifact-path-header) {",
 		"::view-transition-old(thread-artifact-document)",
 		"animation: none;",
 		"display: none;",
-		"html:active-view-transition-type(workbench-doc-switch)",
-		"workbench-doc-switch-sweep",
 		"z-index: 20;",
 		"#agent-chat-messages,",
 	} {
@@ -856,10 +850,16 @@ func TestWorkbenchV2CSSKeepsStableRegionTransitionNames(t *testing.T) {
 		t.Fatalf("doc-switching must not opacity-fade whole #workbench-v2-artifact")
 	}
 	if strings.Contains(css, `html[data-workbench-doc-switching="true"] #thread-artifact-document`) {
-		t.Fatalf("doc-switching must not opacity-fade #thread-artifact-document; use VT type sweep only")
+		t.Fatalf("doc-switching must not opacity-fade #thread-artifact-document")
 	}
 	if strings.Contains(css, "view-transition-name: workbench-v2-artifact;") {
 		t.Fatalf("parent #workbench-v2-artifact must stay view-transition-name: none")
+	}
+	if strings.Contains(css, "html:active-view-transition-type(workbench-doc-switch)") {
+		t.Fatalf("typed workbench-doc-switch sweep must stay removed (CSS-only chrome freeze)")
+	}
+	if strings.Contains(css, "workbench-doc-switch-sweep") {
+		t.Fatalf("workbench-doc-switch-sweep must stay removed")
 	}
 }
 
@@ -1684,7 +1684,7 @@ func TestWorkbenchV2RegionsEnforceComposerFriendlyMinRem(t *testing.T) {
 		`data-workbench-region="workbench-v2-chat"`,
 		`data-workbench-min-rem="18"`,
 		`/js/workbench-resize.js?v=8`,
-		`/js/workbench-history.js?v=13`,
+		`/js/workbench-history.js?v=15`,
 	} {
 		if !strings.Contains(html, fragment) {
 			t.Fatalf("workbench html missing %q", fragment)

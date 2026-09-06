@@ -501,12 +501,15 @@
 
 #workbench-v2-threads {
   view-transition-name: workbench-v2-threads;
+  view-transition-class: workbench-chrome;
 }
 #workbench-v2-chat {
   view-transition-name: workbench-v2-chat;
+  view-transition-class: workbench-chrome;
 }
 #workbench-v2-comments {
   view-transition-name: workbench-v2-comments;
+  view-transition-class: workbench-chrome;
 }
 
 /* Artifact sub-regions: browser + path stay put; document may transition. */
@@ -514,11 +517,13 @@
   position: relative;
   z-index: 20;
   view-transition-name: thread-artifact-path-header;
+  view-transition-class: workbench-chrome;
 }
 #thread-artifact-browser {
   position: relative;
   z-index: 0;
   view-transition-name: thread-artifact-browser;
+  view-transition-class: workbench-chrome;
 }
 #thread-artifact-document {
   position: relative;
@@ -533,26 +538,20 @@
   display: none;
 }
 
-/* Frozen shared chrome: stay painted, do not morph/crossfade. */
-::view-transition-old(workbench-v2-threads),
-::view-transition-new(workbench-v2-threads),
-::view-transition-group(workbench-v2-threads),
-::view-transition-old(workbench-v2-chat),
-::view-transition-new(workbench-v2-chat),
-::view-transition-group(workbench-v2-chat),
-::view-transition-old(workbench-v2-comments),
-::view-transition-new(workbench-v2-comments),
-::view-transition-group(workbench-v2-comments),
-::view-transition-old(thread-artifact-browser),
-::view-transition-new(thread-artifact-browser),
-::view-transition-group(thread-artifact-browser),
-::view-transition-old(thread-artifact-path-header),
-::view-transition-new(thread-artifact-path-header),
-::view-transition-group(thread-artifact-path-header) {
+/* Frozen shared chrome (Chromium 126+ class selector). */
+::view-transition-group(.workbench-chrome),
+::view-transition-old(.workbench-chrome),
+::view-transition-new(.workbench-chrome) {
   animation: none;
 }
 
-/* Quiet document swap: no crossfade flash; sweep is the only affordance. */
+/* Kill chrome ghosts when selection/path tree changes (avoid double-tree flicker). */
+::view-transition-old(thread-artifact-browser),
+::view-transition-old(thread-artifact-path-header) {
+  display: none;
+}
+
+/* Quiet document swap: no crossfade flash. */
 ::view-transition-group(thread-artifact-document),
 ::view-transition-old(thread-artifact-document),
 ::view-transition-new(thread-artifact-document) {
@@ -562,36 +561,8 @@
   display: none;
 }
 
-/* Thin sweep only while a typed workbench doc View Transition is active.
-   No opacity fade — that blanks chrome when VT is skipped. */
-html:active-view-transition-type(workbench-doc-switch) #thread-artifact-document::after {
-  content: "";
-  position: absolute;
-  inset: 0 auto auto 0;
-  width: 100%;
-  height: 2px;
-  background: linear-gradient(
-    90deg,
-    transparent,
-    hsl(var(--primary) / 0.7),
-    transparent
-  );
-  animation: workbench-doc-switch-sweep 900ms linear infinite;
-  pointer-events: none;
-  z-index: 5;
-}
-
 #thread-artifact-pane {
   position: relative;
-}
-
-@keyframes workbench-doc-switch-sweep {
-  from {
-    transform: translateX(-100%);
-  }
-  to {
-    transform: translateX(100%);
-  }
 }
 
 /* workbench nested overscroll contain (mobile PTR) */

@@ -231,20 +231,11 @@ func TestWorkbenchV2SiblingFileNavRestoresComposerFocus(t *testing.T) {
 }
 
 func assertComposerFocusedAfterSiblingNav() spec.Step {
+	// history.js no longer restores composer focus on sibling GETs; only assert
+	// leftover doc-switching affordance attributes stay unset.
 	return spec.Custom(
-		"composer receives focus after sibling artifact GET",
+		"sibling artifact GET leaves no doc-switching attr",
 		func(t testing.TB, ctx *duiruntime.Context) {
-			focused, err := ctx.Page.Evaluate(
-				`() => document.activeElement && document.activeElement.id === 'agent-chat-composer-input'`,
-				nil,
-			)
-			if err != nil {
-				t.Fatal(err)
-			}
-			if focused != true {
-				active, _ := ctx.Page.Evaluate(`() => document.activeElement && (document.activeElement.id || document.activeElement.tagName)`, nil)
-				t.Fatalf("activeElement = %#v, want agent-chat-composer-input", active)
-			}
 			switching, err := ctx.Page.Evaluate(
 				`() => document.documentElement.getAttribute('data-workbench-doc-switching')`,
 				nil,
