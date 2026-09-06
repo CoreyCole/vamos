@@ -320,7 +320,6 @@ func assertChatPinnedAfterSiblingNav() spec.Step {
 		},
 	)
 }
-}
 
 
 func assertDocsTabSSRSelected() spec.Step {
