@@ -120,6 +120,34 @@ func hideWorkbenchThreadsSidebar() spec.Step {
 	)
 }
 
+func TestWorkbenchV2DesktopThreadSwitchKeepsChatUnderHeader(t *testing.T) {
+	// Residual: large black gap under chat chrome after thread->thread GET (Alpha),
+	// with threads sidebar open. Distinct from sibling-artifact under-header Story
+	// (same thread; artifact only). Chat column remounts; VT still names+freezes
+	// #workbench-v2-chat as unchanged chrome.
+	spec.Story(t, "workbench v2 desktop thread switch keeps chat under header").
+		App(vamos.App()).
+		Viewport(duiruntime.ViewportDesktopFull).
+		As(vamos.Robot).
+		With(vamos.WorkspaceFixture(fixtures.WorkbenchV2Fixture)).
+		Visit(vamos.Pages.Path("/threads/wb2_beta")).
+		Expect(vamos.WorkbenchV2.Ready()).
+		Do(assertThreadsSidebarOpen()).
+		Do(assertDesktopDocChromeViewTransitionNames()).
+		Do(clickThreadAndAssertNoChatUnderHeaderGap(
+			"#workbench-v2-threads-body a[href='/threads/wb2_alpha']",
+			"WB2_CHAT_JANK_ASSIST_12",
+		)).
+		Expect(vamos.WorkbenchV2.Ready()).
+		Do(assertThreadsSidebarOpen()).
+		Expect(spec.TextContains(vamos.WorkbenchV2.Chat(), "WB2_CHAT_JANK_USER_01")).
+		Expect(spec.TextContains(vamos.WorkbenchV2.Chat(), "WB2_CHAT_JANK_ASSIST_12")).
+		Do(assertChatPinnedTight("after thread switch real overflow scroller room <=2px")).
+		Do(assertNoLargeGapUnderAppHeaderInChatColumn("after thread switch settle")).
+		Expect(vamos.Console.Clean()).
+		Run()
+}
+
 func assertDesktopThreadsReopenViewTransitionName() spec.Step {
 	return spec.Custom(
 		"desktop #workbench-v2-threads-reopen has stable view-transition-name",
@@ -971,6 +999,254 @@ func clickSiblingAndAssertNoUnderTabsBlackout(href, wantText string) spec.Step {
 					Timeout: playwright.Float(30_000),
 				}); err != nil {
 				t.Fatalf("document missing %q after sibling: %v", wantText, err)
+			}
+		},
+	)
+}
+
+func assertThreadsSidebarOpen() spec.Step {
+	return spec.Custom(
+		"threads sidebar region is open/visible on desktop",
+		func(t testing.TB, ctx *duiruntime.Context) {
+			region := ctx.Page.Locator("#workbench-v2-threads")
+			if err := region.WaitFor(playwright.LocatorWaitForOptions{
+				State:   playwright.WaitForSelectorStateVisible,
+				Timeout: playwright.Float(10_000),
+			}); err != nil {
+				t.Fatalf("threads sidebar not visible: %v", err)
+			}
+			box, err := region.BoundingBox()
+			if err != nil || box == nil || box.Width < 8 || box.Height < 8 {
+				t.Fatalf("threads sidebar collapsed: %#v err=%v", box, err)
+			}
+		},
+	)
+}
+
+func assertNoLargeGapUnderAppHeaderInChatColumn(label string) spec.Step {
+	return spec.Custom(
+		label,
+		func(t testing.TB, ctx *duiruntime.Context) {
+			value, err := ctx.Page.Evaluate(
+				`() => {
+					const header = document.getElementById('app-header');
+					const chat = document.getElementById('workbench-v2-chat');
+					const body = document.getElementById('workbench-v2-chat-body');
+					const scroll = document.getElementById('agent-chat-scroll-region');
+					if (!header || !chat || !body || !scroll) {
+						return { ok: false, reason: 'missing nodes' };
+					}
+					const hr = header.getBoundingClientRect();
+					const cr = chat.getBoundingClientRect();
+					const br = body.getBoundingClientRect();
+					const sr = scroll.getBoundingClientRect();
+					const headerToChat = cr.top - hr.bottom;
+					const chatToScroll = sr.top - cr.top;
+					const chatToBody = br.top - cr.top;
+					return {
+						ok: true,
+						headerToChat,
+						chatToScroll,
+						chatToBody,
+						chatH: cr.height,
+						scrollH: sr.height,
+						bodyH: br.height,
+					};
+				}`,
+				nil,
+			)
+			if err != nil {
+				t.Fatal(err)
+			}
+			state, ok := value.(map[string]any)
+			if !ok {
+				t.Fatalf("gap probe type %T", value)
+			}
+			if okFlag, _ := state["ok"].(bool); !okFlag {
+				t.Fatalf("gap probe failed: %#v", state)
+			}
+			headerToChat, _ := state["headerToChat"].(float64)
+			chatToScroll, _ := state["chatToScroll"].(float64)
+			if headerToChat > 48 {
+				t.Fatalf("large gap under app-header above chat column: headerToChat=%.1fpx %#v", headerToChat, state)
+			}
+			if chatToScroll > 24 {
+				t.Fatalf("large gap under chat column top before scroll region: chatToScroll=%.1fpx %#v", chatToScroll, state)
+			}
+			chatH, _ := state["chatH"].(float64)
+			if chatH < 80 {
+				t.Fatalf("chat column unexpectedly short: %#v", state)
+			}
+		},
+	)
+}
+
+func clickThreadAndAssertNoChatUnderHeaderGap(linkSelector, wantChatText string) spec.Step {
+	return spec.Custom(
+		"thread->thread GET never blacks out/collapses chat under surviving header",
+		func(t testing.TB, ctx *duiruntime.Context) {
+			link := ctx.Page.Locator(linkSelector).First()
+			if err := link.WaitFor(playwright.LocatorWaitForOptions{
+				State:   playwright.WaitForSelectorStateVisible,
+				Timeout: playwright.Float(15_000),
+			}); err != nil {
+				t.Fatalf("thread link missing: %v", err)
+			}
+
+			_, err := ctx.Page.Evaluate(
+				`() => {
+					sessionStorage.removeItem('wb2ThreadVtSamples');
+					window.__wb2ThreadVtSamples = [];
+					window.__wb2ThreadVtSampling = true;
+					const box = (el) => {
+						if (!el) return null;
+						const r = el.getBoundingClientRect();
+						const cs = getComputedStyle(el);
+						return {
+							h: r.height, w: r.width, top: r.top,
+							opacity: cs.opacity,
+							visibility: cs.visibility,
+							display: cs.display,
+							inDom: document.contains(el),
+						};
+					};
+					const take = (phase) => {
+						const header = document.getElementById('app-header');
+						const chat = document.getElementById('workbench-v2-chat');
+						const scroll = document.getElementById('agent-chat-scroll-region');
+						const hb = box(header);
+						const cb = box(chat);
+						const sb = box(scroll);
+						let headerToChat = null;
+						let chatToScroll = null;
+						if (hb && cb) headerToChat = cb.top - (hb.top + hb.h);
+						if (cb && sb) chatToScroll = sb.top - cb.top;
+						window.__wb2ThreadVtSamples.push({
+							phase,
+							t: performance.now(),
+							header: hb,
+							threads: box(document.getElementById('workbench-v2-threads')),
+							chat: cb,
+							scroll: sb,
+							headerToChat,
+							chatToScroll,
+						});
+					};
+					const sample = () => {
+						if (!window.__wb2ThreadVtSampling) return;
+						take('pre');
+						if (window.__wb2ThreadVtSamples.length < 20) {
+							requestAnimationFrame(sample);
+						}
+					};
+					const persist = () => {
+						try {
+							sessionStorage.setItem('wb2ThreadVtSamples', JSON.stringify(window.__wb2ThreadVtSamples || []));
+						} catch (_) {}
+					};
+					window.addEventListener('pagehide', () => { take('pagehide'); persist(); });
+					window.addEventListener('pageshow', () => {
+						window.__wb2ThreadVtSamples = JSON.parse(sessionStorage.getItem('wb2ThreadVtSamples') || '[]');
+						window.__wb2ThreadVtSampling = true;
+						let n = 0;
+						const post = () => {
+							take('post');
+							persist();
+							if (++n < 12) requestAnimationFrame(post);
+							else window.__wb2ThreadVtSampling = false;
+						};
+						requestAnimationFrame(post);
+					});
+					requestAnimationFrame(sample);
+					return true;
+				}`,
+				nil,
+			)
+			if err != nil {
+				t.Fatalf("start rAF sampler: %v", err)
+			}
+
+			_, err = ctx.Page.ExpectNavigation(
+				func() error { return link.Click() },
+				playwright.PageExpectNavigationOptions{
+					WaitUntil: playwright.WaitUntilStateDomcontentloaded,
+				},
+			)
+			if err != nil {
+				t.Fatalf("thread GET navigation not observed: %v", err)
+			}
+
+			_, _ = ctx.Page.Evaluate(
+				`() => new Promise(r => {
+					let n = 0;
+					const tick = () => { if (++n >= 16) r(true); else requestAnimationFrame(tick); };
+					requestAnimationFrame(tick);
+				})`,
+				nil,
+			)
+
+			samples, err := ctx.Page.Evaluate(
+				`() => {
+					const fromMem = window.__wb2ThreadVtSamples;
+					if (fromMem && fromMem.length) return fromMem;
+					try { return JSON.parse(sessionStorage.getItem('wb2ThreadVtSamples') || '[]'); }
+					catch (_) { return []; }
+				}`,
+				nil,
+			)
+			if err != nil {
+				t.Fatal(err)
+			}
+			list, ok := samples.([]any)
+			if !ok || len(list) < 3 {
+				t.Fatalf("expected >=3 rAF samples, got %#v", samples)
+			}
+
+			for i, raw := range list {
+				s, ok := raw.(map[string]any)
+				if !ok {
+					continue
+				}
+				header, _ := s["header"].(map[string]any)
+				threads, _ := s["threads"].(map[string]any)
+				chat, _ := s["chat"].(map[string]any)
+				headerVisible := boxVisible(header)
+				if !headerVisible {
+					continue
+				}
+				for name, b := range map[string]map[string]any{
+					"threads": threads,
+					"chat":    chat,
+				} {
+					if b == nil || !boxInDOM(b) {
+						t.Fatalf("sample %d: %s missing from DOM while header visible", i, name)
+					}
+					if boxCollapsed(b) || boxHidden(b) {
+						t.Fatalf("sample %d: under-header black — %s collapsed/hidden while header visible: %#v", i, name, b)
+					}
+				}
+				if op, _ := chat["opacity"].(string); op != "" && op != "1" {
+					t.Fatalf("sample %d: chat opacity = %q want 1 (column flash): %#v", i, op, chat)
+				}
+				if vis, _ := chat["visibility"].(string); vis != "" && vis != "visible" {
+					t.Fatalf("sample %d: chat visibility = %q want visible: %#v", i, vis, chat)
+				}
+				if gap, ok := s["headerToChat"].(float64); ok && gap > 64 {
+					t.Fatalf("sample %d: large gap under header above chat: headerToChat=%.1f %#v", i, gap, s)
+				}
+				if gap, ok := s["chatToScroll"].(float64); ok && gap > 32 {
+					t.Fatalf("sample %d: large gap under chat top before scroll region: chatToScroll=%.1f %#v", i, gap, s)
+				}
+			}
+
+			if err := ctx.Page.Locator("#workbench-v2-chat-body").
+				GetByText(wantChatText).
+				First().
+				WaitFor(playwright.LocatorWaitForOptions{
+					State:   playwright.WaitForSelectorStateVisible,
+					Timeout: playwright.Float(30_000),
+				}); err != nil {
+				t.Fatalf("chat missing %q after thread switch: %v", wantChatText, err)
 			}
 		},
 	)
