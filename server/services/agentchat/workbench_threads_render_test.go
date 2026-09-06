@@ -88,6 +88,7 @@ func TestWorkbenchThreadListRendersToggleableProjectFolders(t *testing.T) {
 	action, _ := toggle.Attr("data-on:click")
 	if toggle.Length() != 1 ||
 		!strings.Contains(action, "workbenchV2Threads.visible = false") ||
+		!strings.Contains(action, "wb2_threads_open=0") ||
 		toggle.NextAllFiltered("input#workbench-thread-search").Length() != 1 {
 		t.Fatalf("threads toggle is not placed before search: %q", action)
 	}

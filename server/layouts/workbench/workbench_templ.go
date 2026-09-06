@@ -175,9 +175,9 @@ func WorkbenchV2ThreadsReopen(state WorkbenchState) templ.Component {
 					return templ_7745c5c3_Err
 				}
 				var templ_7745c5c3_Var9 string
-				templ_7745c5c3_Var9, templ_7745c5c3_Err = templ.ResolveAttributeValue("$workbench.regions." + SignalKey(region) + ".visible = true")
+				templ_7745c5c3_Var9, templ_7745c5c3_Err = templ.ResolveAttributeValue(ThreadsShowClickAction(SignalKey(region)))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/layouts/workbench/workbench.templ`, Line: 45, Col: 82}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/layouts/workbench/workbench.templ`, Line: 45, Col: 62}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var9)
 				if templ_7745c5c3_Err != nil {

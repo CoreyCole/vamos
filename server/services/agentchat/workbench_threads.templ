@@ -1,5 +1,7 @@
 package agentchat
 
+import "github.com/CoreyCole/vamos/server/layouts/workbench"
+
 templ WorkbenchThreadList(groups []WorkbenchThreadGroup, selectedID, artifact string) {
 	<div class="flex h-full min-h-0 flex-col bg-background" data-signals="{threadSearch: ''}">
 		<div class="flex items-center gap-2 border-b border-border p-3">
@@ -7,7 +9,7 @@ templ WorkbenchThreadList(groups []WorkbenchThreadGroup, selectedID, artifact st
 				type="button"
 				data-workbench-threads-toggle
 				class="hidden h-9 w-9 shrink-0 items-center justify-center rounded-md border border-border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:inline-flex"
-				data-on:click="$workbench.regions.workbenchV2Threads.visible = false"
+				data-on:click={ workbench.ThreadsHideClickAction() }
 				data-attr:aria-expanded="$workbench.regions.workbenchV2Threads.visible ? 'true' : 'false'"
 				aria-controls="workbench-v2-threads"
 				aria-label="Hide threads sidebar"
