@@ -22,6 +22,8 @@ function onPageShow(event) {
   if (event.persisted) {
     return;
   }
+  // Desktop: chat region stays mounted; autofocus can race VT/layout. Mirror mobile tab focus.
+  queueMicrotask(() => document.getElementById('chat-latest')?.focus());
 }
 
 window.addEventListener("popstate", reloadThreadArtifactHistory);

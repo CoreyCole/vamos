@@ -376,7 +376,7 @@ func Header(args RootArgs) templ.Component {
 			templ_7745c5c3_Var8 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 21, "<header class=\"sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60\"><div class=\"w-full\"><div class=\"h-14 flex flex-row items-center justify-between gap-3 px-4 md:px-10\"><!-- Left side: Logo/Branding, visible product navigation, and Breadcrumbs -->")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 21, "<header id=\"app-header\" class=\"sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60\"><div class=\"w-full\"><div class=\"h-14 flex flex-row items-center justify-between gap-3 px-4 md:px-10\"><!-- Left side: Logo/Branding, visible product navigation, and Breadcrumbs -->")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

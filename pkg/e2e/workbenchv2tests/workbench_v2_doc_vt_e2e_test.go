@@ -40,6 +40,281 @@ func TestWorkbenchV2MobileSiblingDocKeepsChromeUnderTabs(t *testing.T) {
 		Run()
 }
 
+
+func TestWorkbenchV2DesktopSiblingDocKeepsChromeUnderHeader(t *testing.T) {
+	const (
+		designPath = "thoughts/owner/plans/alpha/design.md"
+		notesPath  = "thoughts/owner/plans/alpha/notes.md"
+	)
+	designHref := "/threads/wb2_alpha?artifact=" + url.QueryEscape(designPath) +
+		"&artifact_dir=" + url.QueryEscape("thoughts/owner/plans/alpha")
+	notesHref := "/threads/wb2_alpha?artifact=" + url.QueryEscape(notesPath) +
+		"&artifact_dir=" + url.QueryEscape("thoughts/owner/plans/alpha")
+
+	spec.Story(t, "workbench v2 desktop sibling doc keeps chrome under header").
+		App(vamos.App()).
+		Viewport(duiruntime.ViewportDesktopFull).
+		As(vamos.Robot).
+		With(vamos.WorkspaceFixture(fixtures.WorkbenchV2Fixture)).
+		Visit(vamos.Pages.Path(designHref)).
+		Expect(vamos.WorkbenchV2.Ready()).
+		Do(assertDesktopDocChromeViewTransitionNames()).
+		Do(clickSiblingAndAssertNoUnderHeaderBlackout(notesHref, "Alpha notes")).
+		Expect(vamos.WorkbenchV2.Ready()).
+		Expect(spec.TextContains(vamos.WorkbenchV2.Artifact(), "Alpha notes")).
+		Do(assertChatPinnedAfterSiblingNav()).
+		Expect(vamos.Console.Clean()).
+		Run()
+}
+
+func assertDesktopDocChromeViewTransitionNames() spec.Step {
+	return spec.Custom(
+		"desktop chrome VT names: header/threads/chat/path/browser named; regions/artifact none; document named",
+		func(t testing.TB, ctx *duiruntime.Context) {
+			value, err := ctx.Page.Evaluate(
+				`() => {
+					const read = (id) => {
+						const el = document.getElementById(id);
+						if (!el) return null;
+						const name = getComputedStyle(el).viewTransitionName || el.style.viewTransitionName || null;
+						return (!name || name === 'none') ? 'none' : name;
+					};
+					return {
+						header: read('app-header'),
+						threads: read('workbench-v2-threads'),
+						chat: read('workbench-v2-chat'),
+						regions: read('workbench-regions'),
+						root: read('workbench-root'),
+						artifact: read('workbench-v2-artifact'),
+						path: read('thread-artifact-path-header'),
+						browser: read('thread-artifact-browser'),
+						document: read('thread-artifact-document'),
+					};
+				}`,
+				nil,
+			)
+			if err != nil {
+				t.Fatal(err)
+			}
+			state, ok := value.(map[string]any)
+			if !ok {
+				t.Fatalf("VT probe type %T", value)
+			}
+			checks := map[string]string{
+				"header":   "app-header",
+				"threads":  "workbench-v2-threads",
+				"chat":     "workbench-v2-chat",
+				"path":     "thread-artifact-path-header",
+				"browser":  "thread-artifact-browser",
+				"document": "thread-artifact-document",
+				"artifact": "none",
+				"regions":  "none",
+				"root":     "none",
+			}
+			for key, want := range checks {
+				if state[key] != want {
+					t.Fatalf("%s view-transition-name = %#v, want %s", key, state[key], want)
+				}
+			}
+		},
+	)
+}
+
+func clickSiblingAndAssertNoUnderHeaderBlackout(href, wantText string) spec.Step {
+	return spec.Custom(
+		"sibling GET never blacks out threads/chat/path/browser under surviving header",
+		func(t testing.TB, ctx *duiruntime.Context) {
+			link := ctx.Page.Locator(
+				"[data-thread-artifact-browser] a[data-thread-artifact-file][href='" + href + "']",
+			).First()
+			if err := link.WaitFor(playwright.LocatorWaitForOptions{
+				State:   playwright.WaitForSelectorStateVisible,
+				Timeout: playwright.Float(15_000),
+			}); err != nil {
+				t.Fatalf("sibling link missing: %v", err)
+			}
+
+			_, err := ctx.Page.Evaluate(
+				`() => {
+					sessionStorage.removeItem('wb2DesktopVtSamples');
+					window.__wb2DesktopVtSamples = [];
+					window.__wb2DesktopVtSampling = true;
+					const box = (el) => {
+						if (!el) return null;
+						const r = el.getBoundingClientRect();
+						const cs = getComputedStyle(el);
+						return {
+							h: r.height, w: r.width,
+							opacity: cs.opacity,
+							visibility: cs.visibility,
+							display: cs.display,
+							inDom: document.contains(el),
+						};
+					};
+					const take = (phase) => {
+						window.__wb2DesktopVtSamples.push({
+							phase,
+							t: performance.now(),
+							header: box(document.getElementById('app-header')),
+							threads: box(document.getElementById('workbench-v2-threads')),
+							chat: box(document.getElementById('workbench-v2-chat')),
+							path: box(document.getElementById('thread-artifact-path-header')),
+							browser: box(document.getElementById('thread-artifact-browser')),
+						});
+					};
+					const sample = () => {
+						if (!window.__wb2DesktopVtSampling) return;
+						take('pre');
+						if (window.__wb2DesktopVtSamples.length < 20) {
+							requestAnimationFrame(sample);
+						}
+					};
+					const persist = () => {
+						try {
+							sessionStorage.setItem('wb2DesktopVtSamples', JSON.stringify(window.__wb2DesktopVtSamples || []));
+						} catch (_) {}
+					};
+					window.addEventListener('pagehide', () => { take('pagehide'); persist(); });
+					window.addEventListener('pageshow', () => {
+						window.__wb2DesktopVtSamples = JSON.parse(sessionStorage.getItem('wb2DesktopVtSamples') || '[]');
+						window.__wb2DesktopVtSampling = true;
+						let n = 0;
+						const post = () => {
+							take('post');
+							persist();
+							if (++n < 12) requestAnimationFrame(post);
+							else window.__wb2DesktopVtSampling = false;
+						};
+						requestAnimationFrame(post);
+					});
+					requestAnimationFrame(sample);
+					return true;
+				}`,
+				nil,
+			)
+			if err != nil {
+				t.Fatalf("start rAF sampler: %v", err)
+			}
+
+			_, err = ctx.Page.ExpectNavigation(
+				func() error { return link.Click() },
+				playwright.PageExpectNavigationOptions{
+					WaitUntil: playwright.WaitUntilStateDomcontentloaded,
+				},
+			)
+			if err != nil {
+				t.Fatalf("sibling GET navigation not observed: %v", err)
+			}
+
+			_, _ = ctx.Page.Evaluate(
+				`() => new Promise(r => {
+					let n = 0;
+					const tick = () => { if (++n >= 16) r(true); else requestAnimationFrame(tick); };
+					requestAnimationFrame(tick);
+				})`,
+				nil,
+			)
+
+			samples, err := ctx.Page.Evaluate(
+				`() => {
+					const fromMem = window.__wb2DesktopVtSamples;
+					if (fromMem && fromMem.length) return fromMem;
+					try { return JSON.parse(sessionStorage.getItem('wb2DesktopVtSamples') || '[]'); }
+					catch (_) { return []; }
+				}`,
+				nil,
+			)
+			if err != nil {
+				t.Fatal(err)
+			}
+			list, ok := samples.([]any)
+			if !ok || len(list) < 3 {
+				t.Fatalf("expected >=3 rAF samples, got %#v", samples)
+			}
+
+			for i, raw := range list {
+				s, ok := raw.(map[string]any)
+				if !ok {
+					continue
+				}
+				header, _ := s["header"].(map[string]any)
+				threads, _ := s["threads"].(map[string]any)
+				chat, _ := s["chat"].(map[string]any)
+				path, _ := s["path"].(map[string]any)
+				browser, _ := s["browser"].(map[string]any)
+				headerVisible := boxVisible(header)
+				if headerVisible {
+					for name, b := range map[string]map[string]any{
+						"threads": threads,
+						"chat":    chat,
+						"path":    path,
+						"browser": browser,
+					} {
+						if b == nil || !boxInDOM(b) {
+							t.Fatalf("sample %d: %s missing from DOM while header visible", i, name)
+						}
+						if boxCollapsed(b) || boxHidden(b) {
+							t.Fatalf("sample %d: under-header black — %s collapsed/hidden while header visible: %#v", i, name, b)
+						}
+					}
+				}
+			}
+
+			if err := ctx.Page.Locator("#thread-artifact-document").
+				GetByText(wantText).
+				First().
+				WaitFor(playwright.LocatorWaitForOptions{
+					State:   playwright.WaitForSelectorStateVisible,
+					Timeout: playwright.Float(30_000),
+				}); err != nil {
+				t.Fatalf("document missing %q after sibling: %v", wantText, err)
+			}
+		},
+	)
+}
+
+func assertChatPinnedAfterSiblingNav() spec.Step {
+	return spec.Custom(
+		"after sibling nav chat is near bottom or #chat-latest focused/in view",
+		func(t testing.TB, ctx *duiruntime.Context) {
+			value, err := ctx.Page.Evaluate(
+				`() => {
+					const latest = document.getElementById('chat-latest');
+					const region = document.getElementById('agent-chat-scroll-region')
+						|| document.getElementById('agent-chat-messages');
+					const focused = document.activeElement === latest;
+					let inView = false;
+					if (latest) {
+						const r = latest.getBoundingClientRect();
+						inView = r.bottom > 0 && r.top < (window.innerHeight || 0) && r.height >= 0;
+					}
+					let nearBottom = false;
+					if (region) {
+						const max = Math.max(0, region.scrollHeight - region.clientHeight);
+						nearBottom = max <= 4 || (region.scrollTop >= max - 48);
+					}
+					return { focused, inView, nearBottom, hasLatest: !!latest, hasRegion: !!region };
+				}`,
+				nil,
+			)
+			if err != nil {
+				t.Fatal(err)
+			}
+			state, ok := value.(map[string]any)
+			if !ok {
+				t.Fatalf("chat pin probe type %T", value)
+			}
+			focused, _ := state["focused"].(bool)
+			inView, _ := state["inView"].(bool)
+			nearBottom, _ := state["nearBottom"].(bool)
+			if !(focused || inView || nearBottom) {
+				t.Fatalf("chat not pinned after sibling: %#v", state)
+			}
+		},
+	)
+}
+
+
 func assertDocsTabSSRSelected() spec.Step {
 	return spec.Custom(
 		"Docs tab paints selected in SSR HTML before sibling click",

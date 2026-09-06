@@ -151,7 +151,7 @@ func TestHeaderVisibleNavIsMinimal(t *testing.T) {
 	}
 
 	body := renderLayoutComponent(t, Header(RootArgs{PageType: PageTypeAgentChat}))
-	for _, want := range []string{"Vamos", `href="/"`, "Thoughts", `href="/thoughts/"`} {
+	for _, want := range []string{"Vamos", `id="app-header"`, `href="/"`, "Thoughts", `href="/thoughts/"`} {
 		if !strings.Contains(body, want) {
 			t.Fatalf("Header() missing %q: %s", want, body)
 		}

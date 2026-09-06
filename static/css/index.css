@@ -499,6 +499,10 @@
   view-transition-name: none;
 }
 
+#app-header {
+  view-transition-name: app-header;
+  view-transition-class: workbench-chrome;
+}
 #workbench-mobile-tabs {
   view-transition-name: workbench-mobile-tabs;
   view-transition-class: workbench-chrome;
@@ -547,6 +551,9 @@
 }
 
 /* Explicit per-name freeze (mobile Chromium–reliable). view-transition-class is Chromium PE. */
+::view-transition-old(app-header),
+::view-transition-new(app-header),
+::view-transition-group(app-header),
 ::view-transition-old(workbench-mobile-tabs),
 ::view-transition-new(workbench-mobile-tabs),
 ::view-transition-group(workbench-mobile-tabs),

@@ -666,6 +666,7 @@ func TestWorkbenchHistoryJSReloadsSameDocumentArtifactPopstate(t *testing.T) {
 		`window.location.reload()`,
 		`history.state?.workbenchArtifactPatch`,
 		`event.persisted`,
+		`queueMicrotask(() => document.getElementById('chat-latest')?.focus())`,
 	} {
 		if !strings.Contains(js, want) {
 			t.Fatalf("workbench-history.js missing %q in %s", want, js)
@@ -808,6 +809,8 @@ func TestWorkbenchV2CSSKeepsStableRegionTransitionNames(t *testing.T) {
 		"#workbench-v2-artifact,",
 		"#thread-artifact-pane {",
 		"view-transition-name: none;",
+		"#app-header {",
+		"view-transition-name: app-header;",
 		"#workbench-mobile-tabs {",
 		"view-transition-name: workbench-mobile-tabs;",
 		"#workbench-v2-threads {",
@@ -827,6 +830,8 @@ func TestWorkbenchV2CSSKeepsStableRegionTransitionNames(t *testing.T) {
 		"::view-transition-old(root),",
 		"::view-transition-new(root) {",
 		"::view-transition-old(root) {",
+		"::view-transition-old(app-header),",
+		"::view-transition-group(app-header),",
 		"::view-transition-old(workbench-v2-chat),",
 		"::view-transition-group(workbench-v2-chat),",
 		"::view-transition-old(thread-artifact-path-header),",
@@ -1746,7 +1751,7 @@ func TestWorkbenchV2RegionsEnforceComposerFriendlyMinRem(t *testing.T) {
 		`data-workbench-region="workbench-v2-chat"`,
 		`data-workbench-min-rem="18"`,
 		`/js/workbench-resize.js?v=8`,
-		`/js/workbench-history.js?v=15`,
+		`/js/workbench-history.js?v=16`,
 	} {
 		if !strings.Contains(html, fragment) {
 			t.Fatalf("workbench html missing %q", fragment)
