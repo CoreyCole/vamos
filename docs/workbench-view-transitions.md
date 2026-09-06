@@ -34,18 +34,18 @@ Plain **GET** sibling artifact links + **CSS View Transitions**. Chrome (tabs, t
 
 ## Name map (current)
 
-| selector | name | class |
-| --- | --- | --- |
-| `#app-header` | `app-header` | `workbench-chrome` |
-| `#workbench-mobile-tabs` | `workbench-mobile-tabs` **only `@media (max-width: 767px)`**; `none` on `md+` | `workbench-chrome` (max-md only) |
-| `#workbench-v2-threads` | `workbench-v2-threads` | `workbench-chrome` |
-| `#workbench-v2-threads-reopen` | `workbench-v2-threads-reopen` | `workbench-chrome` (desktop; `max-md:hidden`) |
-| `#workbench-v2-chat` | `workbench-v2-chat` | `workbench-chrome` |
-| `#workbench-v2-comments` | `workbench-v2-comments` | `workbench-chrome` |
-| `#thread-artifact-path-header` | `thread-artifact-path-header` | `workbench-chrome` |
-| `#thread-artifact-browser` | `thread-artifact-browser` | `workbench-chrome` |
-| `#thread-artifact-document` | `thread-artifact-document` | — |
-| `#workbench-root` / `#workbench-regions` / `#workbench-v2-artifact` / pane | `none` | — |
+| selector | name | class | media |
+| --- | --- | --- | --- |
+| `#app-header` | `app-header` | `workbench-chrome` | all |
+| `#workbench-mobile-tabs` | `workbench-mobile-tabs` / `none` | `workbench-chrome` | named `@media (max-width: 767px)` only; `view-transition-name: none` on `md+` |
+| `#workbench-v2-threads` | `workbench-v2-threads` | `workbench-chrome` | all |
+| `#workbench-v2-threads-reopen` | `workbench-v2-threads-reopen` | `workbench-chrome` | desktop (`max-md:hidden`) |
+| `#workbench-v2-chat` | `workbench-v2-chat` | `workbench-chrome` | all |
+| `#workbench-v2-comments` | `workbench-v2-comments` | `workbench-chrome` | all |
+| `#thread-artifact-path-header` | `thread-artifact-path-header` | `workbench-chrome` | all |
+| `#thread-artifact-browser` | `thread-artifact-browser` | `workbench-chrome` | all |
+| `#thread-artifact-document` | `thread-artifact-document` | — | all |
+| `#workbench-root` / `#workbench-regions` / `#workbench-v2-artifact` / pane | `none` | — | all |
 
 `/thoughts` document and directory workbench panes reuse `ThreadArtifactPane` (same path-header / Files browser / document IDs) so sibling GETs keep identical chrome. Header overflow reuses `BuildThreadArtifactHeaderActions` and adds a **Chat** link on thoughts pages. `#workbench-v2-threads-reopen` has stable name + per-name `animation: none` freeze; desktop Story `workbench-v2-desktop-sibling-doc-keeps-threads-reopen-chrome` gates closed-threads reopen paint across sibling GETs.
 
@@ -83,7 +83,7 @@ Underscore signals (`$_…`) are local to the pane morph world; they do **not** 
 ### Add-toggle recipe (SSR checklist)
 
 1. **Classify**: workbench **region** visibility (`$workbench.regions.<SignalKey>.visible`) vs pane-local **`$_…`** signal. Regions go through `BuildWorkbenchV2State` + `EncodeWorkbenchSignals`; locals seed via templ `data-signals`.
-2. **Persist for GET**: host cookie (`wb2_<name>`, `0`/`1`, `path=/; SameSite=Lax; Max-Age=…`) written in the click action alongside the signal flip. Optional `sessionStorage` mirror is fine; cookie is authoritative for SSR.
+2. **Persist for GET**: host cookie (`wb2_<name>`, `0`/`1`, `path=/; SameSite=Lax; Max-Age=…`) written in the click action alongside the signal flip. Optional `sessionStorage` mirror is fine; cookie is authoritative for SSR. **Default: missing/invalid cookie ⇒ open** (`*FromRequest` must not invent “default closed”).
 3. **Read on Serve**: `*FromRequest(r)` in `ServeThreads` / `ServeThread` (and any sibling artifact Serve that must match) → pass into build/args → first-paint signals. Do **not** rely on client-only flips surviving navigation.
 4. **Never** put chrome open/closed into layout-save / prefs for Threads visibility — prefs stay ratio-only (`Merge` + `StripDurableInteractionState`).
 5. **Tests**: FromRequest defaults + `0`/`1`; cookie write present in click action; cookie drives `EncodeWorkbenchSignals` / SSR attribute (see `threads_open_test.go`, `TestArtifactBrowserOpenFromRequest`).
