@@ -14,12 +14,12 @@ Plain **GET** sibling artifact links + **CSS View Transitions**. Chrome (tabs, t
 4. Parent `#workbench-root` / `#workbench-regions` / `#workbench-v2-artifact` (and pane wrappers) stay `view-transition-name: none` so the whole pane does not crossfade as one unit while children are named. Do **not** name whole regions flex as one unit.
 5. Only `#thread-artifact-document` is the live/changing named region.
 6. Freeze chrome with **explicit per-name** `::view-transition-{group,old,new}(name) { animation: none }`. Don’t rely on `view-transition-class` alone on any engine; keep explicit per-name freeze.
-7. Ghost kill **all frozen-chrome old snapshots** (`workbench-v2-chat|threads|comments`, `app-header`, `workbench-mobile-tabs`, `thread-artifact-browser|path-header`) with `display: none`. Per-name freeze is `animation: none` only; without hiding old snapshots, frozen chrome can still flash from old/new mismatch (chat sibling-doc flash).
+7. Unchanged chrome (`workbench-v2-chat|threads|comments`, `app-header`, `workbench-mobile-tabs`): **keep `::view-transition-old` painted** and **`display: none` on `::view-transition-new`**. Hiding old then revealing new remounts the chat column (visible flash). Path/browser selection *does* change — hide **old** there so the new selection shows. Document: hide old only (live swap).
 8. Root: `animation: none` on group/old/new; **`display: none` only on `::view-transition-old(root)`**. Never blank both old **and** new root — that wipes unmatched chrome and causes under-tabs black on mobile Chromium.
 9. Prefer real `<a href>` sibling GETs. No fetch/morph click intercept for file nav.
-10. Minimal JS only (`static/js/workbench-history.js`): Enter/Up `pushState({ workbenchArtifactPatch })` + popstate reload gate so Back never blanks; `#chat-latest` focus on `pagereveal` after `viewTransition.finished` when present (else one-shot microtask; no pageshow double-fire); Files cookie on templ button + SSR; history.js stays tiny.
+10. Minimal JS only (`static/js/workbench-history.js`): Enter/Up `pushState({ workbenchArtifactPatch })` + popstate reload gate so Back never blanks; after `pagereveal` / `viewTransition.finished`, `pinChatToBottom` sets `#agent-chat-scroll-region.scrollTop = scrollHeight` then focuses `#chat-latest` with `preventScroll` (focus alone leaves a gap above the composer); Files cookie on templ button + SSR; history.js stays tiny.
 11. SSR selected mobile tab classes + `ActiveRegionID=workbench-v2-artifact` on `?artifact=` deep-links (hardening against Datastar bind flash).
-12. Regression gates: Playwright Story `workbench-v2-mobile-sibling-doc-keeps-chrome-under-tabs` (mobile under-tabs) and `workbench-v2-desktop-sibling-doc-keeps-chrome-under-header` (desktop under-header: header + threads/chat/path/browser stay painted; chat near bottom / `#chat-latest` focused).
+12. Regression gates: Playwright Story `workbench-v2-mobile-sibling-doc-keeps-chrome-under-tabs` (mobile under-tabs) and `workbench-v2-desktop-sibling-doc-keeps-chrome-under-header` (desktop under-header: header + threads/chat/path/browser stay painted; chat column opacity stays visible across frames; `#agent-chat-scroll-region.scrollTop` near `scrollHeight`).
 
 ## Don’t
 
@@ -46,9 +46,9 @@ Plain **GET** sibling artifact links + **CSS View Transitions**. Chrome (tabs, t
 
 ## Key files
 
-- `static/css/index.css` — `@view-transition { navigation: auto }`, names (incl. desktop `#app-header`), per-name freeze, root old-only hide, ghost kill
+- `static/css/index.css` — `@view-transition { navigation: auto }`, names (incl. desktop `#app-header`), per-name freeze, root old-only hide, unchanged-chrome new-hide / path-browser old-hide
 - `server/layouts/root.templ` — `<meta name="view-transition" content="same-origin">` (cross-document VT opt-in)
-- `static/js/workbench-history.js` — pushState patch flag + popstate reload gate + pagereveal `#chat-latest` focus after VT (no morph)
+- `static/js/workbench-history.js` — pushState patch flag + popstate reload gate + pagereveal `pinChatToBottom` after VT (no morph)
 - `server/layouts/workbench/mobile.templ` — SSR selected tab + ActiveRegionID deep-link hardening
 - `server/services/markdown/thread_navigation.templ` — sibling `<a href>` GETs / Files cookie
 - `pkg/e2e/workbenchv2tests/workbench_v2_doc_vt_e2e_test.go` — under-tabs (mobile) + under-header (desktop) chrome Stories

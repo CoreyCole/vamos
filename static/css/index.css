@@ -582,12 +582,17 @@
   animation: none;
 }
 
-/* Kill frozen-chrome old snapshots (old/new mismatch flash: chat etc.). */
-::view-transition-old(workbench-v2-chat),
-::view-transition-old(workbench-v2-threads),
-::view-transition-old(workbench-v2-comments),
-::view-transition-old(app-header),
-::view-transition-old(workbench-mobile-tabs),
+/* Unchanged chrome: keep OLD painted during VT; hide NEW (avoids remount flash).
+   Chat/threads/comments/header do not change on sibling doc GET. */
+::view-transition-new(workbench-v2-chat),
+::view-transition-new(workbench-v2-threads),
+::view-transition-new(workbench-v2-comments),
+::view-transition-new(app-header),
+::view-transition-new(workbench-mobile-tabs) {
+  display: none;
+}
+
+/* Path/browser selection DOES change — hide OLD so new selection shows immediately. */
 ::view-transition-old(thread-artifact-browser),
 ::view-transition-old(thread-artifact-path-header) {
   display: none;

@@ -17,24 +17,29 @@ function reloadThreadArtifactHistory() {
   }
 }
 
-function focusChatLatest() {
-  document.getElementById("chat-latest")?.focus();
+function pinChatToBottom() {
+  const region = document.getElementById("agent-chat-scroll-region");
+  if (region) {
+    region.scrollTop = region.scrollHeight;
+  }
+  // Focus may still help a11y / some engines; preventScroll so we do not undo pin.
+  document.getElementById("chat-latest")?.focus({ preventScroll: true });
 }
 
-function scheduleChatLatestFocus(event) {
-  // After cross-document VT, wait for finished so focus does not fight the old snapshot.
+function scheduleChatPinAfterReveal(event) {
+  // After cross-document VT, wait for finished so pin does not fight the old snapshot.
   const finished = event?.viewTransition?.finished;
   if (finished) {
-    finished.then(focusChatLatest, focusChatLatest);
+    finished.then(pinChatToBottom, pinChatToBottom);
     return;
   }
-  queueMicrotask(focusChatLatest);
+  queueMicrotask(pinChatToBottom);
 }
 
 window.addEventListener("popstate", reloadThreadArtifactHistory);
 if ("onpagereveal" in window) {
-  window.addEventListener("pagereveal", scheduleChatLatestFocus);
+  window.addEventListener("pagereveal", scheduleChatPinAfterReveal);
 } else {
   // No pagereveal: one-shot microtask only (avoid pairing with another reveal hook).
-  queueMicrotask(focusChatLatest);
+  queueMicrotask(pinChatToBottom);
 }

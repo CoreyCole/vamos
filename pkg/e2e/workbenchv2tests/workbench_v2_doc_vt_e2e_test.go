@@ -257,6 +257,13 @@ func clickSiblingAndAssertNoUnderHeaderBlackout(href, wantText string) spec.Step
 							t.Fatalf("sample %d: under-header black — %s collapsed/hidden while header visible: %#v", i, name, b)
 						}
 					}
+					// Chat must stay fully opaque across sibling VT frames (no remount flash).
+					if op, _ := chat["opacity"].(string); op != "" && op != "1" {
+						t.Fatalf("sample %d: chat opacity = %q want 1 (column flash): %#v", i, op, chat)
+					}
+					if vis, _ := chat["visibility"].(string); vis != "" && vis != "visible" {
+						t.Fatalf("sample %d: chat visibility = %q want visible: %#v", i, vis, chat)
+					}
 				}
 			}
 
@@ -275,25 +282,23 @@ func clickSiblingAndAssertNoUnderHeaderBlackout(href, wantText string) spec.Step
 
 func assertChatPinnedAfterSiblingNav() spec.Step {
 	return spec.Custom(
-		"after sibling nav chat is near bottom or #chat-latest focused/in view",
+		"after sibling nav #agent-chat-scroll-region scrollTop is near scrollHeight",
 		func(t testing.TB, ctx *duiruntime.Context) {
 			value, err := ctx.Page.Evaluate(
 				`() => {
-					const latest = document.getElementById('chat-latest');
-					const region = document.getElementById('agent-chat-scroll-region')
-						|| document.getElementById('agent-chat-messages');
-					const focused = document.activeElement === latest;
-					let inView = false;
-					if (latest) {
-						const r = latest.getBoundingClientRect();
-						inView = r.bottom > 0 && r.top < (window.innerHeight || 0) && r.height >= 0;
-					}
-					let nearBottom = false;
-					if (region) {
-						const max = Math.max(0, region.scrollHeight - region.clientHeight);
-						nearBottom = max <= 4 || (region.scrollTop >= max - 48);
-					}
-					return { focused, inView, nearBottom, hasLatest: !!latest, hasRegion: !!region };
+					const region = document.getElementById('agent-chat-scroll-region');
+					if (!region) return { hasRegion: false };
+					const max = Math.max(0, region.scrollHeight - region.clientHeight);
+					const gap = max - region.scrollTop;
+					return {
+						hasRegion: true,
+						scrollTop: region.scrollTop,
+						scrollHeight: region.scrollHeight,
+						clientHeight: region.clientHeight,
+						max,
+						gap,
+						nearBottom: max <= 4 || gap <= 8,
+					};
 				}`,
 				nil,
 			)
@@ -304,14 +309,17 @@ func assertChatPinnedAfterSiblingNav() spec.Step {
 			if !ok {
 				t.Fatalf("chat pin probe type %T", value)
 			}
-			focused, _ := state["focused"].(bool)
-			inView, _ := state["inView"].(bool)
+			hasRegion, _ := state["hasRegion"].(bool)
+			if !hasRegion {
+				t.Fatalf("missing #agent-chat-scroll-region after sibling: %#v", state)
+			}
 			nearBottom, _ := state["nearBottom"].(bool)
-			if !(focused || inView || nearBottom) {
-				t.Fatalf("chat not pinned after sibling: %#v", state)
+			if !nearBottom {
+				t.Fatalf("chat scroll not pinned after sibling (want scrollTop near scrollHeight): %#v", state)
 			}
 		},
 	)
+}
 }
 
 

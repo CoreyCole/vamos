@@ -664,12 +664,14 @@ func TestWorkbenchHistoryJSReloadsSameDocumentArtifactPopstate(t *testing.T) {
 		`document.getElementById("thread-artifact-pane")`,
 		`window.location.reload()`,
 		`history.state?.workbenchArtifactPatch`,
-		`focusChatLatest`,
-		`scheduleChatLatestFocus`,
+		`pinChatToBottom`,
+		`scheduleChatPinAfterReveal`,
+		`agent-chat-scroll-region`,
+		`scrollTop = region.scrollHeight`,
 		`event?.viewTransition?.finished`,
 		`window.addEventListener("pagereveal"`,
 		`"onpagereveal" in window`,
-		`queueMicrotask(focusChatLatest)`,
+		`queueMicrotask(pinChatToBottom)`,
 	} {
 		if !strings.Contains(js, want) {
 			t.Fatalf("workbench-history.js missing %q in %s", want, js)
@@ -842,11 +844,11 @@ func TestWorkbenchV2CSSKeepsStableRegionTransitionNames(t *testing.T) {
 		"::view-transition-group(.workbench-chrome),",
 		"::view-transition-old(.workbench-chrome),",
 		"::view-transition-new(.workbench-chrome) {",
-		"::view-transition-old(workbench-v2-chat),",
-		"::view-transition-old(workbench-v2-threads),",
-		"::view-transition-old(workbench-v2-comments),",
-		"::view-transition-old(app-header),",
-		"::view-transition-old(workbench-mobile-tabs),",
+		"::view-transition-new(workbench-v2-chat),",
+		"::view-transition-new(workbench-v2-threads),",
+		"::view-transition-new(workbench-v2-comments),",
+		"::view-transition-new(app-header),",
+		"::view-transition-new(workbench-mobile-tabs) {",
 		"::view-transition-old(thread-artifact-browser),",
 		"::view-transition-old(thread-artifact-path-header) {",
 		"::view-transition-old(thread-artifact-document)",
@@ -1759,7 +1761,7 @@ func TestWorkbenchV2RegionsEnforceComposerFriendlyMinRem(t *testing.T) {
 		`data-workbench-region="workbench-v2-chat"`,
 		`data-workbench-min-rem="18"`,
 		`/js/workbench-resize.js?v=8`,
-		`/js/workbench-history.js?v=17`,
+		`/js/workbench-history.js?v=18`,
 	} {
 		if !strings.Contains(html, fragment) {
 			t.Fatalf("workbench html missing %q", fragment)
