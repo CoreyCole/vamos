@@ -528,6 +528,13 @@
   view-transition-name: workbench-v2-chat;
   view-transition-class: workbench-chrome;
 }
+/* Thread->thread GETs: history.js sets data-wb2-vt-nav=thread-switch on both
+   documents so chat is NOT in the VT freeze/name set (SharedThreadChat remounts).
+   Sibling artifact GETs keep the named + animation:none freeze above.
+   Do NOT display:none ::view-transition-new(workbench-v2-chat). */
+html[data-wb2-vt-nav="thread-switch"] #workbench-v2-chat {
+  view-transition-name: none;
+}
 #workbench-v2-comments {
   view-transition-name: workbench-v2-comments;
   view-transition-class: workbench-chrome;

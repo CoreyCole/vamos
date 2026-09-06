@@ -682,6 +682,13 @@ func TestWorkbenchHistoryJSReloadsSameDocumentArtifactPopstate(t *testing.T) {
 		`"onpagereveal" in window`,
 		`queueMicrotask(pinAfterFonts)`,
 		`event?.persisted`,
+		`data-wb2-vt-nav`,
+		`thread-switch`,
+		`isThreadToThreadNavigation`,
+		`setThreadSwitchChatUnname`,
+		`onpageswap`,
+		`pageswap`,
+		`scheduleThreadSwitchChatUnnameOnReveal`,
 	} {
 		if !strings.Contains(js, want) {
 			t.Fatalf("workbench-history.js missing %q in %s", want, js)
@@ -703,7 +710,6 @@ func TestWorkbenchHistoryJSReloadsSameDocumentArtifactPopstate(t *testing.T) {
 		`workbench-v2:doc-switch`,
 		`workbench-doc-switch`,
 		`data-workbench-doc-switching`,
-		`pageswap`,
 		`rel="prefetch"`,
 		`workbench-v2:composer-focused`,
 		`agent-chat-composer-input`,
@@ -840,6 +846,8 @@ func TestWorkbenchV2CSSKeepsStableRegionTransitionNames(t *testing.T) {
 		"::view-transition-group(workbench-v2-threads-reopen),",
 		"#workbench-v2-chat {",
 		"view-transition-name: workbench-v2-chat;",
+		"html[data-wb2-vt-nav=\"thread-switch\"] #workbench-v2-chat {",
+		"view-transition-name: none;",
 		"#workbench-v2-comments {",
 		"view-transition-name: workbench-v2-comments;",
 		"#thread-artifact-path-header {",
@@ -1777,7 +1785,7 @@ func TestWorkbenchV2RegionsEnforceComposerFriendlyMinRem(t *testing.T) {
 		`data-workbench-region="workbench-v2-chat"`,
 		`data-workbench-min-rem="18"`,
 		`/js/workbench-resize.js?v=8`,
-		`/js/workbench-history.js?v=20`,
+		`/js/workbench-history.js?v=21`,
 	} {
 		if !strings.Contains(html, fragment) {
 			t.Fatalf("workbench html missing %q", fragment)

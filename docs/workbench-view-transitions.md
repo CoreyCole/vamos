@@ -14,12 +14,12 @@ Plain **GET** sibling artifact links + **CSS View Transitions**. Chrome (tabs, t
 4. Parent `#workbench-root` / `#workbench-regions` / `#workbench-v2-artifact` (and pane wrappers) stay `view-transition-name: none` so the whole pane does not crossfade as one unit while children are named. Do **not** name whole regions flex as one unit.
 5. Only `#thread-artifact-document` is the live/changing named region.
 6. Freeze chrome with **explicit per-name** `::view-transition-{group,old,new}(name) { animation: none }`. Don’t rely on `view-transition-class` alone on any engine; keep explicit per-name freeze.
-7. Unchanged chrome (`workbench-v2-chat|threads|comments`, `app-header`, `workbench-mobile-tabs`): **`animation: none` on both `::view-transition-old` and `::view-transition-new`** — do **not** `display: none` either side (blanking old or new flashes/remounts the column). Path/browser selection *does* change — hide **old** there so the new selection shows. Document: hide old only (live swap). Do **not** set `view-transition-name: none` on chat.
+7. Unchanged chrome (`workbench-v2-chat|threads|comments`, `app-header`, `workbench-mobile-tabs`): **`animation: none` on both `::view-transition-old` and `::view-transition-new`** — do **not** `display: none` either side (blanking old or new flashes/remounts the column). Path/browser selection *does* change — hide **old** there so the new selection shows. Document: hide old only (live swap). **Chat naming is contextual:** keep `#workbench-v2-chat` named + frozen for **sibling artifact** GETs (same `/threads/:id`, chat DOM unchanged). On **thread→thread** GETs (`SharedThreadChat` remounts), unname chat for that navigation only (`html[data-wb2-vt-nav=thread-switch]` → `view-transition-name: none` via `workbench-history.js` pageswap/pagereveal + click fallback). Never `display: none` on `::view-transition-new(workbench-v2-chat)`.
 8. Root: `animation: none` on group/old/new; **`display: none` only on `::view-transition-old(root)`**. Never blank both old **and** new root — that wipes unmatched chrome and causes under-tabs black on mobile Chromium.
 9. Prefer real `<a href>` sibling GETs. No fetch/morph click intercept for file nav.
 10. Minimal JS only (`static/js/workbench-history.js`): Enter/Up `pushState({ workbenchArtifactPatch })` + popstate reload gate so Back never blanks; after `pagereveal` / `viewTransition.finished` and `pageshow(!persisted)`, `pinChatToBottom` (double rAF + `fonts.ready`) pins whichever of `#agent-chat-messages` / `#agent-chat-scroll-region` actually overflows, `scrollIntoView` on `#chat-latest`, then focuses with `preventScroll`; Files cookie on templ button + SSR; history.js stays tiny.
 11. SSR selected mobile tab classes + `ActiveRegionID=workbench-v2-artifact` on `?artifact=` deep-links (hardening against Datastar bind flash).
-12. Regression gates: Playwright Story `workbench-v2-mobile-sibling-doc-keeps-chrome-under-tabs` (mobile under-tabs), `workbench-v2-desktop-sibling-doc-keeps-chrome-under-header` (desktop under-header: header + threads/chat/path/browser stay painted; chat column opacity stays visible across frames; `#agent-chat-messages.scrollTop` near `scrollHeight`), and `workbench-v2-desktop-sibling-doc-keeps-threads-reopen-chrome` (closed threads: `#workbench-v2-threads-reopen` stays named + painted across sibling GET; `wb2_threads_open=0`). Thread→thread (chat remount) residual gate: `workbench-v2-desktop-thread-switch-keeps-chat-under-header` (beta→Alpha with threads open: chat/threads stay painted under header across VT frames; no large header→chat / chat→scroll gap; pin tight).
+12. Regression gates: Playwright Story `workbench-v2-mobile-sibling-doc-keeps-chrome-under-tabs` (mobile under-tabs), `workbench-v2-desktop-sibling-doc-keeps-chrome-under-header` (desktop under-header: header + threads/chat/path/browser stay painted; chat column opacity stays visible across frames; `#agent-chat-messages.scrollTop` near `scrollHeight`), and `workbench-v2-desktop-sibling-doc-keeps-threads-reopen-chrome` (closed threads: `#workbench-v2-threads-reopen` stays named + painted across sibling GET; `wb2_threads_open=0`). Thread→thread (chat remount) residual gate: `workbench-v2-desktop-thread-switch-keeps-chat-under-header` (beta→Alpha with threads open: chat unnamed for that VT; chat/threads stay painted under header across VT frames; no large header→chat / chat→scroll gap — ~16px gutter is OK; pin tight).
 
 ## Don’t
 
@@ -40,7 +40,7 @@ Plain **GET** sibling artifact links + **CSS View Transitions**. Chrome (tabs, t
 | `#workbench-mobile-tabs` | `workbench-mobile-tabs` / `none` | `workbench-chrome` | named `@media (max-width: 767px)` only; `view-transition-name: none` on `md+` |
 | `#workbench-v2-threads` | `workbench-v2-threads` | `workbench-chrome` | all |
 | `#workbench-v2-threads-reopen` | `workbench-v2-threads-reopen` | `workbench-chrome` | desktop (`max-md:hidden`) |
-| `#workbench-v2-chat` | `workbench-v2-chat` | `workbench-chrome` | all |
+| `#workbench-v2-chat` | `workbench-v2-chat` / `none` on thread→thread | `workbench-chrome` | named by default (sibling artifact freeze); `view-transition-name: none` while `html[data-wb2-vt-nav=thread-switch]` (thread→thread only) |
 | `#workbench-v2-comments` | `workbench-v2-comments` | `workbench-chrome` | all |
 | `#thread-artifact-path-header` | `thread-artifact-path-header` | `workbench-chrome` | all |
 | `#thread-artifact-browser` | `thread-artifact-browser` | `workbench-chrome` | all |
@@ -91,9 +91,9 @@ Underscore signals (`$_…`) are local to the pane morph world; they do **not** 
 
 ## Key files
 
-- `static/css/index.css` — `@view-transition { navigation: auto }`, names (incl. desktop `#app-header`, `#workbench-v2-threads-reopen`), per-name freeze (`animation: none` both sides for unchanged chrome), root old-only hide, path-browser/doc old-hide
+- `static/css/index.css` — `@view-transition { navigation: auto }`, names (incl. desktop `#app-header`, `#workbench-v2-threads-reopen`), per-name freeze (`animation: none` both sides for unchanged chrome), `html[data-wb2-vt-nav=thread-switch] #workbench-v2-chat { view-transition-name: none }`, root old-only hide, path-browser/doc old-hide
 - `server/layouts/root.templ` — `<meta name="view-transition" content="same-origin">` (cross-document VT opt-in); `#app-header` stable id for desktop VT freeze
-- `static/js/workbench-history.js` — pushState patch flag + popstate reload gate + pagereveal `pinChatToBottom` after VT (no morph)
+- `static/js/workbench-history.js` — pushState patch flag + popstate reload gate + pagereveal `pinChatToBottom` after VT (no morph); thread→thread chat unname (`data-wb2-vt-nav=thread-switch` via pageswap/pagereveal + sidebar click fallback; cleared after `viewTransition.finished`)
 - `server/layouts/workbench/mobile.templ` — SSR selected tab + ActiveRegionID deep-link hardening
 - `server/layouts/workbench/threads_open.go` — `wb2_threads_open` cookie ↔ `ThreadsOpenFromRequest` / click actions
 - `server/layouts/workbench/defaults.go` — `MergeWorkbenchConfig` (Threads skips saved `Visible`) + `StripDurableInteractionState` (ratioOnly strip)
@@ -103,7 +103,7 @@ Underscore signals (`$_…`) are local to the pane morph world; they do **not** 
 
 ## History (brief)
 
-We tried morph intercept, then over-cleared names, then class-only freeze + root old+new `display: none`, then unchanged-chrome `display: none` on new (chat blank flash on box) — each caused flashes (including under-tabs black on mobile Chromium). Later: globally named `#workbench-mobile-tabs` (`md:hidden`) still painted a VT snapshot during desktop sibling GETs (in-frame flash). Current shape: stable shared names for **visible** chrome only, mobile-tabs named under max-md / `none` on md+, per-name `animation: none` freeze (unchanged chrome: no display:none on old or new), old-root-only hide, path/browser/doc old-hide, plain sibling GETs, tiny history gate.
+We tried morph intercept, then over-cleared names, then class-only freeze + root old+new `display: none`, then unchanged-chrome `display: none` on new (chat blank flash on box) — each caused flashes (including under-tabs black on mobile Chromium). Later: globally named `#workbench-mobile-tabs` (`md:hidden`) still painted a VT snapshot during desktop sibling GETs (in-frame flash). Current shape: stable shared names for **visible** chrome only, mobile-tabs named under max-md / `none` on md+, per-name `animation: none` freeze (unchanged chrome: no display:none on old or new), chat named for sibling artifact / **unnamed for thread→thread** (`data-wb2-vt-nav`), old-root-only hide, path/browser/doc old-hide, plain sibling GETs, tiny history gate.
 
 ## Debugging checklist
 
