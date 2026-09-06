@@ -503,9 +503,18 @@
   view-transition-name: app-header;
   view-transition-class: workbench-chrome;
 }
-#workbench-mobile-tabs {
-  view-transition-name: workbench-mobile-tabs;
-  view-transition-class: workbench-chrome;
+/* Mobile-only chrome: name under max-md only. md:hidden elements still
+   generate VT snapshots on desktop if named — flashes in the transition frame. */
+@media (max-width: 767px) {
+  #workbench-mobile-tabs {
+    view-transition-name: workbench-mobile-tabs;
+    view-transition-class: workbench-chrome;
+  }
+}
+@media (min-width: 768px) {
+  #workbench-mobile-tabs {
+    view-transition-name: none;
+  }
 }
 #workbench-v2-threads {
   view-transition-name: workbench-v2-threads;

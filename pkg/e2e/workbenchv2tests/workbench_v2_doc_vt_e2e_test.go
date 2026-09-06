@@ -69,7 +69,7 @@ func TestWorkbenchV2DesktopSiblingDocKeepsChromeUnderHeader(t *testing.T) {
 
 func assertDesktopDocChromeViewTransitionNames() spec.Step {
 	return spec.Custom(
-		"desktop chrome VT names: header/threads/chat/path/browser named; regions/artifact none; document named",
+		"desktop chrome VT names: header/threads/chat/path/browser named; mobile-tabs/regions/artifact none; document named",
 		func(t testing.TB, ctx *duiruntime.Context) {
 			value, err := ctx.Page.Evaluate(
 				`() => {
@@ -81,6 +81,7 @@ func assertDesktopDocChromeViewTransitionNames() spec.Step {
 					};
 					return {
 						header: read('app-header'),
+						tabs: read('workbench-mobile-tabs'),
 						threads: read('workbench-v2-threads'),
 						chat: read('workbench-v2-chat'),
 						regions: read('workbench-regions'),
@@ -102,6 +103,7 @@ func assertDesktopDocChromeViewTransitionNames() spec.Step {
 			}
 			checks := map[string]string{
 				"header":   "app-header",
+				"tabs":     "none",
 				"threads":  "workbench-v2-threads",
 				"chat":     "workbench-v2-chat",
 				"path":     "thread-artifact-path-header",

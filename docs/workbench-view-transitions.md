@@ -10,7 +10,7 @@ Plain **GET** sibling artifact links + **CSS View Transitions**. Chrome (tabs, t
 
 1. Opt in to cross-document VT in head: `<meta name="view-transition" content="same-origin">` (`server/layouts/root.templ`) — easy to forget when copying the pattern.
 2. Opt in in CSS: `@view-transition { navigation: auto }` (`static/css/index.css`) — pairs with the meta; also easy to miss when copying.
-3. Give **stable unique `view-transition-name`s** on both old and new pages for chrome that should persist: **desktop app header** (`#app-header`), mobile tabs, threads, chat, comments, path-header, browser. Same name = shared element across the GET. Mobile freezes under-tabs chrome; desktop freezes the top header plus the three columns.
+3. Give **stable unique `view-transition-name`s** on both old and new pages for chrome that should persist: **desktop app header** (`#app-header`), threads, chat, comments, path-header, browser. Same name = shared element across the GET. Mobile freezes under-tabs chrome; desktop freezes the top header plus the three columns. **Never name `md:hidden` mobile-only chrome for desktop VT** — `#workbench-mobile-tabs` is named only inside `@media (max-width: 767px)` and gets `view-transition-name: none` at `min-width: 768px` (hidden elements can still snapshot/flash during sibling GET).
 4. Parent `#workbench-root` / `#workbench-regions` / `#workbench-v2-artifact` (and pane wrappers) stay `view-transition-name: none` so the whole pane does not crossfade as one unit while children are named. Do **not** name whole regions flex as one unit.
 5. Only `#thread-artifact-document` is the live/changing named region.
 6. Freeze chrome with **explicit per-name** `::view-transition-{group,old,new}(name) { animation: none }`. Don’t rely on `view-transition-class` alone on any engine; keep explicit per-name freeze.
@@ -24,6 +24,7 @@ Plain **GET** sibling artifact links + **CSS View Transitions**. Chrome (tabs, t
 ## Don’t
 
 - Blank all chrome to `view-transition-name: none` and only name the document (browser has nothing shared → black flash).
+- Name `md:hidden` / mobile-only chrome globally (e.g. `#workbench-mobile-tabs`) — it still participates in desktop sibling VT snapshots and flashes in-frame. Name only under `max-md`; set `view-transition-name: none` on `md+`.
 - Rely on `view-transition-class` alone for freeze.
 - `display: none` on both `::view-transition-old(root)` and `::view-transition-new(root)`.
 - `display: none` on unchanged-chrome old **or** new (chat/threads/comments/header/tabs) — blanks the column during sibling GET.
@@ -36,7 +37,7 @@ Plain **GET** sibling artifact links + **CSS View Transitions**. Chrome (tabs, t
 | selector | name | class |
 | --- | --- | --- |
 | `#app-header` | `app-header` | `workbench-chrome` |
-| `#workbench-mobile-tabs` | `workbench-mobile-tabs` | `workbench-chrome` |
+| `#workbench-mobile-tabs` | `workbench-mobile-tabs` **only `@media (max-width: 767px)`**; `none` on `md+` | `workbench-chrome` (max-md only) |
 | `#workbench-v2-threads` | `workbench-v2-threads` | `workbench-chrome` |
 | `#workbench-v2-chat` | `workbench-v2-chat` | `workbench-chrome` |
 | `#workbench-v2-comments` | `workbench-v2-comments` | `workbench-chrome` |
@@ -57,7 +58,7 @@ Plain **GET** sibling artifact links + **CSS View Transitions**. Chrome (tabs, t
 
 ## History (brief)
 
-We tried morph intercept, then over-cleared names, then class-only freeze + root old+new `display: none`, then unchanged-chrome `display: none` on new (chat blank flash on box) — each caused flashes (including under-tabs black on mobile Chromium). Current shape: stable shared names, per-name `animation: none` freeze (unchanged chrome: no display:none on old or new), old-root-only hide, path/browser/doc old-hide, plain sibling GETs, tiny history gate.
+We tried morph intercept, then over-cleared names, then class-only freeze + root old+new `display: none`, then unchanged-chrome `display: none` on new (chat blank flash on box) — each caused flashes (including under-tabs black on mobile Chromium). Later: globally named `#workbench-mobile-tabs` (`md:hidden`) still painted a VT snapshot during desktop sibling GETs (in-frame flash). Current shape: stable shared names for **visible** chrome only, mobile-tabs named under max-md / `none` on md+, per-name `animation: none` freeze (unchanged chrome: no display:none on old or new), old-root-only hide, path/browser/doc old-hide, plain sibling GETs, tiny history gate.
 
 ## Debugging checklist
 
