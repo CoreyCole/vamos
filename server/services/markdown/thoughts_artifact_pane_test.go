@@ -101,6 +101,11 @@ func TestThoughtsArtifactPaneUsesSharedThreadChrome(t *testing.T) {
 		!strings.Contains(html, `data-testid="workbench-overflow-actions"`) {
 		t.Fatalf("expected shared thread artifact chrome, got thin bar only")
 	}
+
+	// Shared path header must not be paired with DocumentSurface WorkbenchActions bar.
+	if strings.Contains(html, `id="document-header-actions"`) || strings.Contains(html, "Document actions") {
+		t.Fatalf("legacy DocumentSurface WorkbenchActions bar present")
+	}
 }
 
 func TestRemapThreadArtifactBrowserForThoughtsUsesThoughtsHrefs(t *testing.T) {

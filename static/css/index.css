@@ -520,6 +520,10 @@
   view-transition-name: workbench-v2-threads;
   view-transition-class: workbench-chrome;
 }
+#workbench-v2-threads-reopen {
+  view-transition-name: workbench-v2-threads-reopen;
+  view-transition-class: workbench-chrome;
+}
 #workbench-v2-chat {
   view-transition-name: workbench-v2-chat;
   view-transition-class: workbench-chrome;
@@ -571,6 +575,9 @@
 ::view-transition-old(workbench-v2-threads),
 ::view-transition-new(workbench-v2-threads),
 ::view-transition-group(workbench-v2-threads),
+::view-transition-old(workbench-v2-threads-reopen),
+::view-transition-new(workbench-v2-threads-reopen),
+::view-transition-group(workbench-v2-threads-reopen),
 ::view-transition-old(workbench-v2-chat),
 ::view-transition-new(workbench-v2-chat),
 ::view-transition-group(workbench-v2-chat),
