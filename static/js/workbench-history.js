@@ -17,14 +17,24 @@ function reloadThreadArtifactHistory() {
   }
 }
 
-function onPageShow(event) {
-  // bfcache restore: never reload; chrome is already painted.
-  if (event.persisted) {
+function focusChatLatest() {
+  document.getElementById("chat-latest")?.focus();
+}
+
+function scheduleChatLatestFocus(event) {
+  // After cross-document VT, wait for finished so focus does not fight the old snapshot.
+  const finished = event?.viewTransition?.finished;
+  if (finished) {
+    finished.then(focusChatLatest, focusChatLatest);
     return;
   }
-  // Desktop: chat region stays mounted; autofocus can race VT/layout. Mirror mobile tab focus.
-  queueMicrotask(() => document.getElementById('chat-latest')?.focus());
+  queueMicrotask(focusChatLatest);
 }
 
 window.addEventListener("popstate", reloadThreadArtifactHistory);
-window.addEventListener("pageshow", onPageShow);
+if ("onpagereveal" in window) {
+  window.addEventListener("pagereveal", scheduleChatLatestFocus);
+} else {
+  // No pagereveal: one-shot microtask only (avoid pairing with another reveal hook).
+  queueMicrotask(focusChatLatest);
+}

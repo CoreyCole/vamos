@@ -582,7 +582,12 @@
   animation: none;
 }
 
-/* Kill chrome ghosts when selection/path tree changes (avoid double-tree flicker). */
+/* Kill frozen-chrome old snapshots (old/new mismatch flash: chat etc.). */
+::view-transition-old(workbench-v2-chat),
+::view-transition-old(workbench-v2-threads),
+::view-transition-old(workbench-v2-comments),
+::view-transition-old(app-header),
+::view-transition-old(workbench-mobile-tabs),
 ::view-transition-old(thread-artifact-browser),
 ::view-transition-old(thread-artifact-path-header) {
   display: none;
