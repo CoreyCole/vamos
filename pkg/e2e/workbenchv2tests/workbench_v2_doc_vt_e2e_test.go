@@ -1,6 +1,7 @@
 package tests
 
 import (
+	"encoding/json"
 	"net/url"
 	"strings"
 	"testing"
@@ -123,8 +124,8 @@ func hideWorkbenchThreadsSidebar() spec.Step {
 func TestWorkbenchV2DesktopThreadSwitchKeepsChatUnderHeader(t *testing.T) {
 	// Residual: large black gap under chat chrome after thread->thread GET (Alpha),
 	// with threads sidebar open. Distinct from sibling-artifact under-header Story
-	// (same thread; artifact only). Chat column remounts; VT still names+freezes
-	// #workbench-v2-chat as unchanged chrome.
+	// (same thread; artifact only). Chat column remounts — VT unnames chat for
+	// thread→thread (data-wb2-vt-nav=thread-switch); sibling artifact keeps name+freeze.
 	spec.Story(t, "workbench v2 desktop thread switch keeps chat under header").
 		App(vamos.App()).
 		Viewport(duiruntime.ViewportDesktopFull).
@@ -1023,6 +1024,29 @@ func assertThreadsSidebarOpen() spec.Step {
 	)
 }
 
+
+// asFloat coerces Playwright Evaluate JSON numbers (float64 or int) so settle
+// probes do not false-fail when whole-pixel metrics arrive as int (chatH→0).
+func asFloat(v any) (float64, bool) {
+	switch n := v.(type) {
+	case float64:
+		return n, true
+	case float32:
+		return float64(n), true
+	case int:
+		return float64(n), true
+	case int32:
+		return float64(n), true
+	case int64:
+		return float64(n), true
+	case json.Number:
+		f, err := n.Float64()
+		return f, err == nil
+	default:
+		return 0, false
+	}
+}
+
 func assertNoLargeGapUnderAppHeaderInChatColumn(label string) spec.Step {
 	return spec.Custom(
 		label,
@@ -1065,15 +1089,21 @@ func assertNoLargeGapUnderAppHeaderInChatColumn(label string) spec.Step {
 			if okFlag, _ := state["ok"].(bool); !okFlag {
 				t.Fatalf("gap probe failed: %#v", state)
 			}
-			headerToChat, _ := state["headerToChat"].(float64)
-			chatToScroll, _ := state["chatToScroll"].(float64)
+			headerToChat, okH := asFloat(state["headerToChat"])
+			chatToScroll, okS := asFloat(state["chatToScroll"])
+			chatH, okC := asFloat(state["chatH"])
+			if !okH || !okS || !okC {
+				t.Fatalf("gap probe missing numeric metrics: %#v", state)
+			}
+			// ~16px is normal layout gutter under the app-header, not under-header blackout.
 			if headerToChat > 48 {
 				t.Fatalf("large gap under app-header above chat column: headerToChat=%.1fpx %#v", headerToChat, state)
 			}
 			if chatToScroll > 24 {
 				t.Fatalf("large gap under chat column top before scroll region: chatToScroll=%.1fpx %#v", chatToScroll, state)
 			}
-			chatH, _ := state["chatH"].(float64)
+			// Real collapse/blackout mid/settle: chat column stub-height. Whole-pixel
+			// Evaluate ints must not coerce to 0 via failed float64 assert (false fail).
 			if chatH < 80 {
 				t.Fatalf("chat column unexpectedly short: %#v", state)
 			}
@@ -1231,10 +1261,10 @@ func clickThreadAndAssertNoChatUnderHeaderGap(linkSelector, wantChatText string)
 				if vis, _ := chat["visibility"].(string); vis != "" && vis != "visible" {
 					t.Fatalf("sample %d: chat visibility = %q want visible: %#v", i, vis, chat)
 				}
-				if gap, ok := s["headerToChat"].(float64); ok && gap > 64 {
+				if gap, ok := asFloat(s["headerToChat"]); ok && gap > 64 {
 					t.Fatalf("sample %d: large gap under header above chat: headerToChat=%.1f %#v", i, gap, s)
 				}
-				if gap, ok := s["chatToScroll"].(float64); ok && gap > 32 {
+				if gap, ok := asFloat(s["chatToScroll"]); ok && gap > 32 {
 					t.Fatalf("sample %d: large gap under chat top before scroll region: chatToScroll=%.1f %#v", i, gap, s)
 				}
 			}
@@ -1256,8 +1286,8 @@ func boxVisible(b map[string]any) bool {
 	if b == nil {
 		return false
 	}
-	h, _ := b["h"].(float64)
-	w, _ := b["w"].(float64)
+	h, _ := asFloat(b["h"])
+	w, _ := asFloat(b["w"])
 	return h > 1 && w > 1 && !boxHidden(b)
 }
 
@@ -1273,7 +1303,10 @@ func boxCollapsed(b map[string]any) bool {
 	if b == nil {
 		return true
 	}
-	h, _ := b["h"].(float64)
+	h, ok := asFloat(b["h"])
+	if !ok {
+		return true
+	}
 	return h < 1
 }
 
