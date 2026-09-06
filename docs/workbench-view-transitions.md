@@ -34,6 +34,8 @@ Plain **GET** sibling artifact links + **CSS View Transitions**. Chrome (tabs, t
 
 ## Name map (current)
 
+Source of truth: `server/layouts/workbench/vt_chrome_names.go` (`WorkbenchV2ChromeNames`). Hand CSS in `static/css/index.css` stays; Stories + this table assert against it (no CSS codegen).
+
 | selector | name | class | media |
 | --- | --- | --- | --- |
 | `#app-header` | `app-header` | `workbench-chrome` | all |
@@ -45,7 +47,7 @@ Plain **GET** sibling artifact links + **CSS View Transitions**. Chrome (tabs, t
 | `#thread-artifact-path-header` | `thread-artifact-path-header` | `workbench-chrome` | all |
 | `#thread-artifact-browser` | `thread-artifact-browser` | `workbench-chrome` | all |
 | `#thread-artifact-document` | `thread-artifact-document` | — | all |
-| `#workbench-root` / `#workbench-regions` / `#workbench-v2-artifact` / pane | `none` | — | all |
+| `#workbench-root` / `#workbench-regions` / `#workbench-v2-artifact` / `#thread-artifact-pane` | `none` | — | all |
 
 `/thoughts` document and directory workbench panes reuse `ThreadArtifactPane` (same path-header / Files browser / document IDs) so sibling GETs keep identical chrome. Header overflow reuses `BuildThreadArtifactHeaderActions` and adds a **Chat** link on thoughts pages. `#workbench-v2-threads-reopen` has stable name + per-name `animation: none` freeze; desktop Story `workbench-v2-desktop-sibling-doc-keeps-threads-reopen-chrome` gates closed-threads reopen paint across sibling GETs.
 

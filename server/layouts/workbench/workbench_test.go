@@ -825,57 +825,19 @@ func TestWorkbenchV2CSSKeepsStableRegionTransitionNames(t *testing.T) {
 		t.Fatalf("ReadFile(index.css) error = %v", err)
 	}
 	css := string(contents)
+	for _, want := range CSSPresenceSnippets() {
+		if !strings.Contains(css, want) {
+			t.Fatalf("index.css missing name-map snippet %q", want)
+		}
+	}
 	for _, want := range []string{
-		"#workbench-v2-artifact,",
-		"#thread-artifact-pane {",
-		"view-transition-name: none;",
-		"#app-header {",
-		"view-transition-name: app-header;",
-		"@media (max-width: 767px) {",
-		"#workbench-mobile-tabs {",
-		"view-transition-name: workbench-mobile-tabs;",
-		"@media (min-width: 768px) {",
-		"view-transition-name: none;",
-		"#workbench-v2-threads {",
-		"view-transition-name: workbench-v2-threads;",
-		"view-transition-class: workbench-chrome;",
-		"#workbench-v2-threads-reopen {",
-		"view-transition-name: workbench-v2-threads-reopen;",
-		"::view-transition-old(workbench-v2-threads-reopen),",
-		"::view-transition-new(workbench-v2-threads-reopen),",
-		"::view-transition-group(workbench-v2-threads-reopen),",
-		"#workbench-v2-chat {",
-		"view-transition-name: workbench-v2-chat;",
-		"html[data-wb2-vt-nav=\"thread-switch\"] #workbench-v2-chat {",
-		"view-transition-name: none;",
-		"#workbench-v2-comments {",
-		"view-transition-name: workbench-v2-comments;",
-		"#thread-artifact-path-header {",
-		"view-transition-name: thread-artifact-path-header;",
-		"#thread-artifact-browser {",
-		"view-transition-name: thread-artifact-browser;",
-		"#thread-artifact-document {",
-		"view-transition-name: thread-artifact-document;",
 		"::view-transition-group(root),",
 		"::view-transition-old(root),",
 		"::view-transition-new(root) {",
 		"::view-transition-old(root) {",
-		"::view-transition-old(app-header),",
-		"::view-transition-group(app-header),",
-		"::view-transition-old(workbench-v2-chat),",
-		"::view-transition-group(workbench-v2-chat),",
-		"::view-transition-old(thread-artifact-path-header),",
-		"::view-transition-group(thread-artifact-path-header) {",
 		"::view-transition-group(.workbench-chrome),",
 		"::view-transition-old(.workbench-chrome),",
 		"::view-transition-new(.workbench-chrome) {",
-		"::view-transition-new(workbench-v2-chat),",
-		"::view-transition-new(workbench-v2-threads),",
-		"::view-transition-new(workbench-v2-comments),",
-		"::view-transition-new(app-header),",
-		"::view-transition-new(workbench-mobile-tabs) {",
-		"::view-transition-old(thread-artifact-browser),",
-		"::view-transition-old(thread-artifact-path-header) {",
 		"::view-transition-old(thread-artifact-document)",
 		"animation: none;",
 		"display: none;",
@@ -890,7 +852,6 @@ func TestWorkbenchV2CSSKeepsStableRegionTransitionNames(t *testing.T) {
 	rootBlock := css[strings.Index(css, "::view-transition-group(root)"):]
 	rootBlock = rootBlock[:strings.Index(rootBlock, "/* Explicit per-name")]
 	if strings.Count(rootBlock, "display: none") != 0 {
-		// only old(root) may display:none — not the shared group/new block
 		shared := rootBlock[:strings.Index(rootBlock, "::view-transition-old(root) {")]
 		if strings.Contains(shared, "display: none") {
 			t.Fatalf("root group/new must not display:none both snapshots: %s", shared)

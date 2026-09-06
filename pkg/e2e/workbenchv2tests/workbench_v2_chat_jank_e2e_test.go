@@ -11,6 +11,7 @@ import (
 
 	"github.com/CoreyCole/vamos/pkg/e2e/fixtures"
 	"github.com/CoreyCole/vamos/pkg/e2e/vamos"
+	"github.com/CoreyCole/vamos/server/layouts/workbench"
 )
 
 func TestWorkbenchV2SiblingArtifactKeepsSsrChatTranscript(t *testing.T) {
@@ -120,20 +121,15 @@ func assertWorkbenchViewTransitionNames() spec.Step {
 			if !ok {
 				t.Fatalf("view-transition probe type %T", value)
 			}
-			if state["chat"] != "workbench-v2-chat" {
-				t.Fatalf("chat view-transition-name = %#v, want workbench-v2-chat", state["chat"])
-			}
-			if state["artifact"] != "none" && state["artifact"] != nil {
-				t.Fatalf("artifact view-transition-name = %#v, want none", state["artifact"])
-			}
-			if state["path"] != "thread-artifact-path-header" {
-				t.Fatalf("path-header VT = %#v", state["path"])
-			}
-			if state["browser"] != "thread-artifact-browser" {
-				t.Fatalf("browser VT = %#v", state["browser"])
-			}
-			if state["document"] != "thread-artifact-document" {
-				t.Fatalf("document VT = %#v", state["document"])
+			want := workbench.DesktopSiblingDocNameInventory()
+			for _, key := range []string{"chat", "artifact", "path", "browser", "document"} {
+				got := state[key]
+				if got == nil {
+					got = "none"
+				}
+				if got != want[key] {
+					t.Fatalf("%s view-transition-name = %#v, want %s", key, state[key], want[key])
+				}
 			}
 		},
 	)

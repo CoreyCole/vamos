@@ -12,6 +12,7 @@ import (
 
 	"github.com/CoreyCole/vamos/pkg/e2e/fixtures"
 	"github.com/CoreyCole/vamos/pkg/e2e/vamos"
+	"github.com/CoreyCole/vamos/server/layouts/workbench"
 )
 
 func TestWorkbenchV2MobileSiblingDocKeepsChromeUnderTabs(t *testing.T) {
@@ -389,31 +390,53 @@ func assertThreadsStillClosedWithReopen() spec.Step {
 
 func assertDesktopDocChromeViewTransitionNames() spec.Step {
 	return spec.Custom(
-		"desktop chrome VT names: header/threads/threads-reopen/chat/path/browser named; mobile-tabs/regions/artifact none; document named",
+		"desktop chrome VT names from workbench.WorkbenchV2ChromeNames SoT",
 		func(t testing.TB, ctx *duiruntime.Context) {
+			want := workbench.DesktopSiblingDocNameInventory()
+			ids := make([]string, 0, len(want))
+			for key := range want {
+				switch key {
+				case "header":
+					ids = append(ids, "app-header")
+				case "tabs":
+					ids = append(ids, "workbench-mobile-tabs")
+				case "threads":
+					ids = append(ids, "workbench-v2-threads")
+				case "threadsReopen":
+					ids = append(ids, "workbench-v2-threads-reopen")
+				case "chat":
+					ids = append(ids, "workbench-v2-chat")
+				case "comments":
+					ids = append(ids, "workbench-v2-comments")
+				case "path":
+					ids = append(ids, "thread-artifact-path-header")
+				case "browser":
+					ids = append(ids, "thread-artifact-browser")
+				case "document":
+					ids = append(ids, "thread-artifact-document")
+				case "artifact":
+					ids = append(ids, "workbench-v2-artifact")
+				case "regions":
+					ids = append(ids, "workbench-regions")
+				case "root":
+					ids = append(ids, "workbench-root")
+				}
+			}
 			value, err := ctx.Page.Evaluate(
-				`() => {
+				`(ids) => {
 					const read = (id) => {
 						const el = document.getElementById(id);
 						if (!el) return null;
 						const name = getComputedStyle(el).viewTransitionName || el.style.viewTransitionName || null;
 						return (!name || name === 'none') ? 'none' : name;
 					};
-					return {
-						header: read('app-header'),
-						tabs: read('workbench-mobile-tabs'),
-						threads: read('workbench-v2-threads'),
-						threadsReopen: read('workbench-v2-threads-reopen'),
-						chat: read('workbench-v2-chat'),
-						regions: read('workbench-regions'),
-						root: read('workbench-root'),
-						artifact: read('workbench-v2-artifact'),
-						path: read('thread-artifact-path-header'),
-						browser: read('thread-artifact-browser'),
-						document: read('thread-artifact-document'),
-					};
+					const out = {};
+					for (const id of ids) {
+						out[id] = read(id);
+					}
+					return out;
 				}`,
-				nil,
+				ids,
 			)
 			if err != nil {
 				t.Fatal(err)
@@ -422,22 +445,19 @@ func assertDesktopDocChromeViewTransitionNames() spec.Step {
 			if !ok {
 				t.Fatalf("VT probe type %T", value)
 			}
-			checks := map[string]string{
-				"header":        "app-header",
-				"tabs":          "none",
-				"threads":       "workbench-v2-threads",
-				"threadsReopen": "workbench-v2-threads-reopen",
-				"chat":          "workbench-v2-chat",
-				"path":          "thread-artifact-path-header",
-				"browser":       "thread-artifact-browser",
-				"document":      "thread-artifact-document",
-				"artifact":      "none",
-				"regions":       "none",
-				"root":          "none",
+			idFor := map[string]string{
+				"header": "app-header", "tabs": "workbench-mobile-tabs",
+				"threads": "workbench-v2-threads", "threadsReopen": "workbench-v2-threads-reopen",
+				"chat": "workbench-v2-chat", "comments": "workbench-v2-comments",
+				"path": "thread-artifact-path-header", "browser": "thread-artifact-browser",
+				"document": "thread-artifact-document", "artifact": "workbench-v2-artifact",
+				"regions": "workbench-regions", "root": "workbench-root",
 			}
-			for key, want := range checks {
-				if state[key] != want {
-					t.Fatalf("%s view-transition-name = %#v, want %s", key, state[key], want)
+			for key, wantName := range want {
+				id := idFor[key]
+				got := state[id]
+				if got != wantName {
+					t.Fatalf("%s (%s) view-transition-name = %#v, want %s", key, id, got, wantName)
 				}
 			}
 		},
@@ -799,26 +819,53 @@ func assertDocsTabStillSelected() spec.Step {
 
 func assertMobileDocChromeViewTransitionNames() spec.Step {
 	return spec.Custom(
-		"mobile chrome VT names: tabs/path/browser/chat named; artifact none; document named",
+		"mobile chrome VT names from workbench.WorkbenchV2ChromeNames SoT",
 		func(t testing.TB, ctx *duiruntime.Context) {
+			want := workbench.MobileSiblingDocNameInventory()
+			ids := make([]string, 0, len(want))
+			for key := range want {
+				switch key {
+				case "header":
+					ids = append(ids, "app-header")
+				case "tabs":
+					ids = append(ids, "workbench-mobile-tabs")
+				case "threads":
+					ids = append(ids, "workbench-v2-threads")
+				case "threadsReopen":
+					ids = append(ids, "workbench-v2-threads-reopen")
+				case "chat":
+					ids = append(ids, "workbench-v2-chat")
+				case "comments":
+					ids = append(ids, "workbench-v2-comments")
+				case "path":
+					ids = append(ids, "thread-artifact-path-header")
+				case "browser":
+					ids = append(ids, "thread-artifact-browser")
+				case "document":
+					ids = append(ids, "thread-artifact-document")
+				case "artifact":
+					ids = append(ids, "workbench-v2-artifact")
+				case "regions":
+					ids = append(ids, "workbench-regions")
+				case "root":
+					ids = append(ids, "workbench-root")
+				}
+			}
 			value, err := ctx.Page.Evaluate(
-				`() => {
+				`(ids) => {
 					const read = (id) => {
 						const el = document.getElementById(id);
 						if (!el) return null;
 						const name = getComputedStyle(el).viewTransitionName || el.style.viewTransitionName || null;
 						return (!name || name === 'none') ? 'none' : name;
 					};
-					return {
-						tabs: read('workbench-mobile-tabs'),
-						chat: read('workbench-v2-chat'),
-						artifact: read('workbench-v2-artifact'),
-						path: read('thread-artifact-path-header'),
-						browser: read('thread-artifact-browser'),
-						document: read('thread-artifact-document'),
-					};
+					const out = {};
+					for (const id of ids) {
+						out[id] = read(id);
+					}
+					return out;
 				}`,
-				nil,
+				ids,
 			)
 			if err != nil {
 				t.Fatal(err)
@@ -827,17 +874,19 @@ func assertMobileDocChromeViewTransitionNames() spec.Step {
 			if !ok {
 				t.Fatalf("VT probe type %T", value)
 			}
-			checks := map[string]string{
-				"tabs":     "workbench-mobile-tabs",
-				"chat":     "workbench-v2-chat",
-				"path":     "thread-artifact-path-header",
-				"browser":  "thread-artifact-browser",
-				"document": "thread-artifact-document",
-				"artifact": "none",
+			idFor := map[string]string{
+				"header": "app-header", "tabs": "workbench-mobile-tabs",
+				"threads": "workbench-v2-threads", "threadsReopen": "workbench-v2-threads-reopen",
+				"chat": "workbench-v2-chat", "comments": "workbench-v2-comments",
+				"path": "thread-artifact-path-header", "browser": "thread-artifact-browser",
+				"document": "thread-artifact-document", "artifact": "workbench-v2-artifact",
+				"regions": "workbench-regions", "root": "workbench-root",
 			}
-			for key, want := range checks {
-				if state[key] != want {
-					t.Fatalf("%s view-transition-name = %#v, want %s", key, state[key], want)
+			for key, wantName := range want {
+				id := idFor[key]
+				got := state[id]
+				if got != wantName {
+					t.Fatalf("%s (%s) view-transition-name = %#v, want %s", key, id, got, wantName)
 				}
 			}
 		},
@@ -1023,7 +1072,6 @@ func assertThreadsSidebarOpen() spec.Step {
 		},
 	)
 }
-
 
 // asFloat coerces Playwright Evaluate JSON numbers (float64 or int) so settle
 // probes do not false-fail when whole-pixel metrics arrive as int (chatH→0).
