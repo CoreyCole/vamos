@@ -40,7 +40,6 @@ func TestWorkbenchV2MobileSiblingDocKeepsChromeUnderTabs(t *testing.T) {
 		Run()
 }
 
-
 func TestWorkbenchV2DesktopSiblingDocKeepsChromeUnderHeader(t *testing.T) {
 	const (
 		designPath = "thoughts/owner/plans/alpha/design.md"
@@ -62,7 +61,8 @@ func TestWorkbenchV2DesktopSiblingDocKeepsChromeUnderHeader(t *testing.T) {
 		Do(clickSiblingAndAssertNoUnderHeaderBlackout(notesHref, "Alpha notes")).
 		Expect(vamos.WorkbenchV2.Ready()).
 		Expect(spec.TextContains(vamos.WorkbenchV2.Artifact(), "Alpha notes")).
-		Do(assertChatPinnedAfterSiblingNav()).
+		Do(assertChatPinnedTight("after sibling nav real overflow scroller room <=2px")).
+		Do(assertChatPinnedAfterReload()).
 		Expect(vamos.Console.Clean()).
 		Run()
 }
@@ -280,24 +280,41 @@ func clickSiblingAndAssertNoUnderHeaderBlackout(href, wantText string) spec.Step
 	)
 }
 
-func assertChatPinnedAfterSiblingNav() spec.Step {
+func assertChatPinnedTight(label string) spec.Step {
 	return spec.Custom(
-		"after sibling nav #agent-chat-messages scrollTop is near scrollHeight",
+		label,
 		func(t testing.TB, ctx *duiruntime.Context) {
+			// Settle a couple frames so pageshow/rAF/fonts.ready pin can finish.
+			for i := 0; i < 4; i++ {
+				if _, err := ctx.Page.Evaluate(`() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)))`, nil); err != nil {
+					t.Fatalf("rAF settle: %v", err)
+				}
+			}
 			value, err := ctx.Page.Evaluate(
 				`() => {
-					const region = document.getElementById('agent-chat-messages');
-					if (!region) return { hasRegion: false };
-					const max = Math.max(0, region.scrollHeight - region.clientHeight);
-					const gap = max - region.scrollTop;
+					const candidates = [
+						document.getElementById('agent-chat-messages'),
+						document.getElementById('agent-chat-scroll-region'),
+					].filter(Boolean);
+					if (!candidates.length) return { hasRegion: false };
+					let region = candidates[0];
+					let bestOverflow = -1;
+					for (const el of candidates) {
+						const overflow = el.scrollHeight - el.clientHeight;
+						if (overflow > bestOverflow) {
+							region = el;
+							bestOverflow = overflow;
+						}
+					}
+					const room = Math.max(0, region.scrollHeight - region.scrollTop - region.clientHeight);
 					return {
 						hasRegion: true,
+						id: region.id,
 						scrollTop: region.scrollTop,
 						scrollHeight: region.scrollHeight,
 						clientHeight: region.clientHeight,
-						max,
-						gap,
-						nearBottom: max <= 4 || gap <= 8,
+						room,
+						pinned: room <= 2,
 					};
 				}`,
 				nil,
@@ -311,16 +328,86 @@ func assertChatPinnedAfterSiblingNav() spec.Step {
 			}
 			hasRegion, _ := state["hasRegion"].(bool)
 			if !hasRegion {
-				t.Fatalf("missing #agent-chat-messages after sibling: %#v", state)
+				t.Fatalf("missing chat overflow scroller: %#v", state)
 			}
-			nearBottom, _ := state["nearBottom"].(bool)
-			if !nearBottom {
-				t.Fatalf("chat scroll not pinned after sibling (want scrollTop near scrollHeight): %#v", state)
+			pinned, _ := state["pinned"].(bool)
+			if !pinned {
+				t.Fatalf("chat still has scroll room (want scrollHeight-scrollTop-clientHeight <= 2): %#v", state)
 			}
 		},
 	)
 }
 
+func assertChatPinnedAfterReload() spec.Step {
+	return spec.Custom(
+		"after full reload real overflow scroller room <=2px",
+		func(t testing.TB, ctx *duiruntime.Context) {
+			if _, err := ctx.Page.Reload(playwright.PageReloadOptions{
+				WaitUntil: playwright.WaitUntilStateLoad,
+				Timeout:   playwright.Float(30_000),
+			}); err != nil {
+				t.Fatalf("reload: %v", err)
+			}
+			if err := ctx.Page.Locator("#workbench-v2-chat, #agent-chat-messages, #agent-chat-scroll-region").First().
+				WaitFor(playwright.LocatorWaitForOptions{
+					State:   playwright.WaitForSelectorStateVisible,
+					Timeout: playwright.Float(30_000),
+				}); err != nil {
+				t.Fatalf("chat missing after reload: %v", err)
+			}
+			// Inline the same probe (Custom steps are not re-entrant via .Fn).
+			for i := 0; i < 4; i++ {
+				if _, err := ctx.Page.Evaluate(`() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)))`, nil); err != nil {
+					t.Fatalf("rAF settle: %v", err)
+				}
+			}
+			value, err := ctx.Page.Evaluate(
+				`() => {
+					const candidates = [
+						document.getElementById('agent-chat-messages'),
+						document.getElementById('agent-chat-scroll-region'),
+					].filter(Boolean);
+					if (!candidates.length) return { hasRegion: false };
+					let region = candidates[0];
+					let bestOverflow = -1;
+					for (const el of candidates) {
+						const overflow = el.scrollHeight - el.clientHeight;
+						if (overflow > bestOverflow) {
+							region = el;
+							bestOverflow = overflow;
+						}
+					}
+					const room = Math.max(0, region.scrollHeight - region.scrollTop - region.clientHeight);
+					return {
+						hasRegion: true,
+						id: region.id,
+						scrollTop: region.scrollTop,
+						scrollHeight: region.scrollHeight,
+						clientHeight: region.clientHeight,
+						room,
+						pinned: room <= 2,
+					};
+				}`,
+				nil,
+			)
+			if err != nil {
+				t.Fatal(err)
+			}
+			state, ok := value.(map[string]any)
+			if !ok {
+				t.Fatalf("chat pin probe type %T", value)
+			}
+			hasRegion, _ := state["hasRegion"].(bool)
+			if !hasRegion {
+				t.Fatalf("missing chat overflow scroller after reload: %#v", state)
+			}
+			pinned, _ := state["pinned"].(bool)
+			if !pinned {
+				t.Fatalf("chat still has scroll room after reload (want <= 2px): %#v", state)
+			}
+		},
+	)
+}
 
 func assertDocsTabSSRSelected() spec.Step {
 	return spec.Custom(

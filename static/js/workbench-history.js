@@ -18,9 +18,9 @@ function reloadThreadArtifactHistory() {
 }
 
 function chatOverflowScroller() {
-  // Prefer the element that actually overflows. Live DOM can put overflow on
-  // #agent-chat-messages (overflow-x-hidden → computed overflow-y:auto) while
-  // #agent-chat-scroll-region has scrollHeight === clientHeight.
+  // Prefer #agent-chat-messages when it is the real overflow scroller; fall back
+  // to #agent-chat-scroll-region (SharedThreadChat in-flow composer layout).
+  // overflow-x-hidden → computed overflow-y:auto can make either scroll.
   const candidates = [
     document.getElementById("agent-chat-messages"),
     document.getElementById("agent-chat-scroll-region"),
@@ -39,27 +39,60 @@ function chatOverflowScroller() {
 
 function pinChatToBottom() {
   const region = chatOverflowScroller();
+  const latest = document.getElementById("chat-latest");
   if (region) {
+    region.scrollTop = region.scrollHeight;
+    // Prefer anchoring the SSR sentinel inside the scroller (not the window).
+    latest?.scrollIntoView({ block: "end", inline: "nearest" });
     region.scrollTop = region.scrollHeight;
   }
   // Focus may still help a11y / some engines; preventScroll so we do not undo pin.
-  document.getElementById("chat-latest")?.focus({ preventScroll: true });
+  latest?.focus({ preventScroll: true });
+}
+
+function settleChatPin() {
+  pinChatToBottom();
+  // Double rAF: first frame applies scrollTop; second catches post-layout growth
+  // (fonts, images, SSE morph) before the user sees leftover room.
+  requestAnimationFrame(() => {
+    pinChatToBottom();
+    requestAnimationFrame(pinChatToBottom);
+  });
+}
+
+function pinAfterFonts() {
+  settleChatPin();
+  const fonts = document.fonts;
+  if (fonts?.ready) {
+    fonts.ready.then(settleChatPin, settleChatPin);
+  }
 }
 
 function scheduleChatPinAfterReveal(event) {
   // After cross-document VT, wait for finished so pin does not fight the old snapshot.
+  const run = pinAfterFonts;
   const finished = event?.viewTransition?.finished;
   if (finished) {
-    finished.then(pinChatToBottom, pinChatToBottom);
+    finished.then(run, run);
     return;
   }
-  queueMicrotask(pinChatToBottom);
+  queueMicrotask(run);
+}
+
+function scheduleChatPinOnPageshow(event) {
+  // Full refresh / non-bfcache navigations: pagereveal may fire before layout
+  // settles; pageshow(!persisted) re-pins after the document is shown.
+  if (event?.persisted) {
+    return;
+  }
+  pinAfterFonts();
 }
 
 window.addEventListener("popstate", reloadThreadArtifactHistory);
 if ("onpagereveal" in window) {
   window.addEventListener("pagereveal", scheduleChatPinAfterReveal);
 } else {
-  // No pagereveal: one-shot microtask only (avoid pairing with another reveal hook).
-  queueMicrotask(pinChatToBottom);
+  // No pagereveal: one-shot settle only (pageshow still reinforces).
+  queueMicrotask(pinAfterFonts);
 }
+window.addEventListener("pageshow", scheduleChatPinOnPageshow);

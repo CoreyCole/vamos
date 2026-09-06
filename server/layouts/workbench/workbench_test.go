@@ -665,15 +665,23 @@ func TestWorkbenchHistoryJSReloadsSameDocumentArtifactPopstate(t *testing.T) {
 		`window.location.reload()`,
 		`history.state?.workbenchArtifactPatch`,
 		`pinChatToBottom`,
+		`settleChatPin`,
+		`pinAfterFonts`,
 		`scheduleChatPinAfterReveal`,
+		`scheduleChatPinOnPageshow`,
 		`chatOverflowScroller`,
 		`agent-chat-messages`,
 		`agent-chat-scroll-region`,
 		`scrollTop = region.scrollHeight`,
+		`scrollIntoView`,
+		`requestAnimationFrame`,
+		`fonts.ready`,
 		`event?.viewTransition?.finished`,
 		`window.addEventListener("pagereveal"`,
+		`window.addEventListener("pageshow"`,
 		`"onpagereveal" in window`,
-		`queueMicrotask(pinChatToBottom)`,
+		`queueMicrotask(pinAfterFonts)`,
+		`event?.persisted`,
 	} {
 		if !strings.Contains(js, want) {
 			t.Fatalf("workbench-history.js missing %q in %s", want, js)
@@ -696,7 +704,6 @@ func TestWorkbenchHistoryJSReloadsSameDocumentArtifactPopstate(t *testing.T) {
 		`workbench-doc-switch`,
 		`data-workbench-doc-switching`,
 		`pageswap`,
-		`addEventListener("pageshow"`,
 		`rel="prefetch"`,
 		`workbench-v2:composer-focused`,
 		`agent-chat-composer-input`,
@@ -1664,7 +1671,6 @@ func regionSpecByID(config WorkbenchConfig, id string) RegionSpec {
 	return RegionSpec{}
 }
 
-
 func TestWorkbenchV2MobileDefaultsToArtifact(t *testing.T) {
 	t.Parallel()
 
@@ -1763,7 +1769,7 @@ func TestWorkbenchV2RegionsEnforceComposerFriendlyMinRem(t *testing.T) {
 		`data-workbench-region="workbench-v2-chat"`,
 		`data-workbench-min-rem="18"`,
 		`/js/workbench-resize.js?v=8`,
-		`/js/workbench-history.js?v=19`,
+		`/js/workbench-history.js?v=20`,
 	} {
 		if !strings.Contains(html, fragment) {
 			t.Fatalf("workbench html missing %q", fragment)
