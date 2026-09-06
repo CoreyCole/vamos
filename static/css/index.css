@@ -491,26 +491,34 @@
 
 
 /* Stable workbench v2 regions for cross-document View Transitions.
-   Only #thread-artifact-document participates; chrome stays outside VT. */
+   Named chrome stays painted across sibling GETs; only the document swaps. */
 #workbench-root,
 #workbench-regions,
-#workbench-v2-threads,
-#workbench-v2-chat,
-#workbench-v2-comments,
 #workbench-v2-artifact,
-#thread-artifact-pane,
-#thread-artifact-path-header,
-#thread-artifact-browser {
+#thread-artifact-pane {
   view-transition-name: none;
 }
 
+#workbench-v2-threads {
+  view-transition-name: workbench-v2-threads;
+}
+#workbench-v2-chat {
+  view-transition-name: workbench-v2-chat;
+}
+#workbench-v2-comments {
+  view-transition-name: workbench-v2-comments;
+}
+
+/* Artifact sub-regions: browser + path stay put; document may transition. */
 #thread-artifact-path-header {
   position: relative;
   z-index: 20;
+  view-transition-name: thread-artifact-path-header;
 }
 #thread-artifact-browser {
   position: relative;
   z-index: 0;
+  view-transition-name: thread-artifact-browser;
 }
 #thread-artifact-document {
   position: relative;
@@ -523,6 +531,25 @@
 ::view-transition-new(root) {
   animation: none;
   display: none;
+}
+
+/* Frozen shared chrome: stay painted, do not morph/crossfade. */
+::view-transition-old(workbench-v2-threads),
+::view-transition-new(workbench-v2-threads),
+::view-transition-group(workbench-v2-threads),
+::view-transition-old(workbench-v2-chat),
+::view-transition-new(workbench-v2-chat),
+::view-transition-group(workbench-v2-chat),
+::view-transition-old(workbench-v2-comments),
+::view-transition-new(workbench-v2-comments),
+::view-transition-group(workbench-v2-comments),
+::view-transition-old(thread-artifact-browser),
+::view-transition-new(thread-artifact-browser),
+::view-transition-group(thread-artifact-browser),
+::view-transition-old(thread-artifact-path-header),
+::view-transition-new(thread-artifact-path-header),
+::view-transition-group(thread-artifact-path-header) {
+  animation: none;
 }
 
 /* Quiet document swap: no crossfade flash; sweep is the only affordance. */
