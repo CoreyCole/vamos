@@ -667,6 +667,13 @@ func TestWorkbenchHistoryJSReloadsSameDocumentArtifactPopstate(t *testing.T) {
 		`document.getElementById("thread-artifact-pane")`,
 		`window.location.reload()`,
 		`history.state?.workbenchArtifactPatch`,
+		`workbenchArtifactDoc`,
+		`DOMParser`,
+		`thread-artifact-document`,
+		`thread-artifact-path-header`,
+		`preventDefault`,
+		`history.pushState({ workbenchArtifactDoc: true }`,
+		`window.location.assign(href)`,
 		`event.persisted`,
 		`workbench-v2:doc-switch`,
 		`workbench-doc-switch`,
@@ -1674,7 +1681,7 @@ func TestWorkbenchV2RegionsEnforceComposerFriendlyMinRem(t *testing.T) {
 		`data-workbench-region="workbench-v2-chat"`,
 		`data-workbench-min-rem="18"`,
 		`/js/workbench-resize.js?v=8`,
-		`/js/workbench-history.js?v=12`,
+		`/js/workbench-history.js?v=13`,
 	} {
 		if !strings.Contains(html, fragment) {
 			t.Fatalf("workbench html missing %q", fragment)
