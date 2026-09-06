@@ -801,24 +801,20 @@ func TestWorkbenchV2CSSKeepsStableRegionTransitionNames(t *testing.T) {
 	}
 	css := string(contents)
 	for _, want := range []string{
-		"#workbench-v2-threads {",
-		"view-transition-name: workbench-v2-threads;",
-		"#workbench-v2-chat {",
-		"view-transition-name: workbench-v2-chat;",
-		"#workbench-v2-artifact {",
-		"view-transition-name: none;",
-		"#workbench-v2-comments {",
-		"view-transition-name: workbench-v2-comments;",
+		"#workbench-v2-threads,",
+		"#workbench-v2-chat,",
+		"#workbench-v2-comments,",
+		"#workbench-v2-artifact,",
+		"#thread-artifact-path-header,",
 		"#thread-artifact-browser {",
-		"view-transition-name: thread-artifact-browser;",
+		"view-transition-name: none;",
 		"#thread-artifact-document {",
 		"view-transition-name: thread-artifact-document;",
-		"#thread-artifact-path-header {",
-		"view-transition-name: thread-artifact-path-header;",
-		"::view-transition-old(workbench-v2-chat)",
-		"::view-transition-old(thread-artifact-browser)",
+		"::view-transition-group(root),",
+		"::view-transition-old(root),",
+		"::view-transition-new(root) {",
+		"::view-transition-old(thread-artifact-document)",
 		"animation: none;",
-		"::view-transition-old(thread-artifact-path-header)",
 		"display: none;",
 		"html:active-view-transition-type(workbench-doc-switch)",
 		"workbench-doc-switch-sweep",
@@ -841,6 +837,17 @@ func TestWorkbenchV2CSSKeepsStableRegionTransitionNames(t *testing.T) {
 	}
 	if strings.Contains(css, `html[data-workbench-doc-switching="true"] #thread-artifact-document`) {
 		t.Fatalf("doc-switching must not opacity-fade #thread-artifact-document; use VT type sweep only")
+	}
+	for _, banned := range []string{
+		"view-transition-name: workbench-v2-threads;",
+		"view-transition-name: workbench-v2-chat;",
+		"view-transition-name: workbench-v2-comments;",
+		"view-transition-name: thread-artifact-browser;",
+		"view-transition-name: thread-artifact-path-header;",
+	} {
+		if strings.Contains(css, banned) {
+			t.Fatalf("index.css must not assign live VT name %q; only document participates", banned)
+		}
 	}
 }
 
