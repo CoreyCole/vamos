@@ -19,7 +19,7 @@ Plain **GET** sibling artifact links + **CSS View Transitions**. Chrome (tabs, t
 9. Prefer real `<a href>` sibling GETs. No fetch/morph click intercept for file nav.
 10. Minimal JS only (`static/js/workbench-history.js`): Enter/Up `pushState({ workbenchArtifactPatch })` + popstate reload gate so Back never blanks; after `pagereveal` / `viewTransition.finished` and `pageshow(!persisted)`, `pinChatToBottom` (double rAF + `fonts.ready`) pins whichever of `#agent-chat-messages` / `#agent-chat-scroll-region` actually overflows, `scrollIntoView` on `#chat-latest`, then focuses with `preventScroll`; Files cookie on templ button + SSR; history.js stays tiny.
 11. SSR selected mobile tab classes + `ActiveRegionID=workbench-v2-artifact` on `?artifact=` deep-links (hardening against Datastar bind flash).
-12. Regression gates: Playwright Story `workbench-v2-mobile-sibling-doc-keeps-chrome-under-tabs` (mobile under-tabs) and `workbench-v2-desktop-sibling-doc-keeps-chrome-under-header` (desktop under-header: header + threads/chat/path/browser stay painted; chat column opacity stays visible across frames; `#agent-chat-messages.scrollTop` near `scrollHeight`).
+12. Regression gates: Playwright Story `workbench-v2-mobile-sibling-doc-keeps-chrome-under-tabs` (mobile under-tabs), `workbench-v2-desktop-sibling-doc-keeps-chrome-under-header` (desktop under-header: header + threads/chat/path/browser stay painted; chat column opacity stays visible across frames; `#agent-chat-messages.scrollTop` near `scrollHeight`), and `workbench-v2-desktop-sibling-doc-keeps-threads-reopen-chrome` (closed threads: `#workbench-v2-threads-reopen` stays named + painted across sibling GET; `wb2_threads_open=0`).
 
 ## Don’t
 
@@ -47,7 +47,7 @@ Plain **GET** sibling artifact links + **CSS View Transitions**. Chrome (tabs, t
 | `#thread-artifact-document` | `thread-artifact-document` | — |
 | `#workbench-root` / `#workbench-regions` / `#workbench-v2-artifact` / pane | `none` | — |
 
-`/thoughts` document and directory workbench panes reuse `ThreadArtifactPane` (same path-header / Files browser / document IDs) so sibling GETs keep identical chrome. Header overflow reuses `BuildThreadArtifactHeaderActions` and adds a **Chat** link on thoughts pages. `#workbench-v2-threads-reopen` already has stable name + per-name `animation: none` freeze at tip; desktop VT Story assert for reopen paint still tracks with ticket 2/3.
+`/thoughts` document and directory workbench panes reuse `ThreadArtifactPane` (same path-header / Files browser / document IDs) so sibling GETs keep identical chrome. Header overflow reuses `BuildThreadArtifactHeaderActions` and adds a **Chat** link on thoughts pages. `#workbench-v2-threads-reopen` has stable name + per-name `animation: none` freeze; desktop Story `workbench-v2-desktop-sibling-doc-keeps-threads-reopen-chrome` gates closed-threads reopen paint across sibling GETs.
 
 
 ## Ephemeral chrome cookies vs layout prefs (SSR)

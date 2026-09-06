@@ -67,9 +67,300 @@ func TestWorkbenchV2DesktopSiblingDocKeepsChromeUnderHeader(t *testing.T) {
 		Run()
 }
 
+func TestWorkbenchV2DesktopSiblingDocKeepsThreadsReopenChrome(t *testing.T) {
+	const (
+		designPath = "thoughts/owner/plans/alpha/design.md"
+		notesPath  = "thoughts/owner/plans/alpha/notes.md"
+	)
+	designHref := "/threads/wb2_alpha?artifact=" + url.QueryEscape(designPath) +
+		"&artifact_dir=" + url.QueryEscape("thoughts/owner/plans/alpha")
+	notesHref := "/threads/wb2_alpha?artifact=" + url.QueryEscape(notesPath) +
+		"&artifact_dir=" + url.QueryEscape("thoughts/owner/plans/alpha")
+
+	spec.Story(t, "workbench v2 desktop sibling doc keeps threads reopen chrome").
+		App(vamos.App()).
+		Viewport(duiruntime.ViewportDesktopFull).
+		As(vamos.Robot).
+		With(vamos.WorkspaceFixture(fixtures.WorkbenchV2Fixture)).
+		Visit(vamos.Pages.Path(designHref)).
+		Expect(vamos.WorkbenchV2.Ready()).
+		Do(hideWorkbenchThreadsSidebar()).
+		Do(assertDesktopThreadsReopenViewTransitionName()).
+		Do(clickSiblingAndAssertThreadsReopenSurvives(notesHref, "Alpha notes")).
+		Expect(vamos.WorkbenchV2.Ready()).
+		Expect(spec.TextContains(vamos.WorkbenchV2.Artifact(), "Alpha notes")).
+		Do(assertThreadsStillClosedWithReopen()).
+		Expect(vamos.Console.Clean()).
+		Run()
+}
+
+func hideWorkbenchThreadsSidebar() spec.Step {
+	return spec.Custom(
+		"hide threads sidebar so reopen chrome is the live named control",
+		func(t testing.TB, ctx *duiruntime.Context) {
+			region := ctx.Page.Locator("#workbench-v2-threads")
+			if err := region.Locator("button[data-workbench-threads-toggle]").
+				Click(); err != nil {
+				t.Fatal(err)
+			}
+			if err := region.WaitFor(playwright.LocatorWaitForOptions{
+				State:   playwright.WaitForSelectorStateHidden,
+				Timeout: playwright.Float(10_000),
+			}); err != nil {
+				t.Fatalf("threads sidebar did not hide: %v", err)
+			}
+			reopen := ctx.Page.Locator("#workbench-v2-threads-reopen")
+			if err := reopen.WaitFor(playwright.LocatorWaitForOptions{
+				State:   playwright.WaitForSelectorStateVisible,
+				Timeout: playwright.Float(10_000),
+			}); err != nil {
+				t.Fatalf("threads reopen chrome did not appear: %v", err)
+			}
+		},
+	)
+}
+
+func assertDesktopThreadsReopenViewTransitionName() spec.Step {
+	return spec.Custom(
+		"desktop #workbench-v2-threads-reopen has stable view-transition-name",
+		func(t testing.TB, ctx *duiruntime.Context) {
+			value, err := ctx.Page.Evaluate(
+				`() => {
+					const el = document.getElementById('workbench-v2-threads-reopen');
+					if (!el) return null;
+					const name = getComputedStyle(el).viewTransitionName || el.style.viewTransitionName || null;
+					return (!name || name === 'none') ? 'none' : name;
+				}`,
+				nil,
+			)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if value != "workbench-v2-threads-reopen" {
+				t.Fatalf("threads-reopen view-transition-name = %#v, want workbench-v2-threads-reopen", value)
+			}
+		},
+	)
+}
+
+func clickSiblingAndAssertThreadsReopenSurvives(href, wantText string) spec.Step {
+	return spec.Custom(
+		"sibling GET keeps closed-threads reopen chrome painted under surviving header",
+		func(t testing.TB, ctx *duiruntime.Context) {
+			link := ctx.Page.Locator(
+				"[data-thread-artifact-browser] a[data-thread-artifact-file][href='" + href + "']",
+			).First()
+			if err := link.WaitFor(playwright.LocatorWaitForOptions{
+				State:   playwright.WaitForSelectorStateVisible,
+				Timeout: playwright.Float(15_000),
+			}); err != nil {
+				t.Fatalf("sibling link missing: %v", err)
+			}
+
+			_, err := ctx.Page.Evaluate(
+				`() => {
+					sessionStorage.removeItem('wb2DesktopVtReopenSamples');
+					window.__wb2DesktopVtReopenSamples = [];
+					window.__wb2DesktopVtReopenSampling = true;
+					const box = (el) => {
+						if (!el) return null;
+						const r = el.getBoundingClientRect();
+						const cs = getComputedStyle(el);
+						return {
+							h: r.height, w: r.width,
+							opacity: cs.opacity,
+							visibility: cs.visibility,
+							display: cs.display,
+							inDom: document.contains(el),
+						};
+					};
+					const take = (phase) => {
+						window.__wb2DesktopVtReopenSamples.push({
+							phase,
+							t: performance.now(),
+							header: box(document.getElementById('app-header')),
+							reopen: box(document.getElementById('workbench-v2-threads-reopen')),
+							chat: box(document.getElementById('workbench-v2-chat')),
+							path: box(document.getElementById('thread-artifact-path-header')),
+							browser: box(document.getElementById('thread-artifact-browser')),
+						});
+					};
+					const sample = () => {
+						if (!window.__wb2DesktopVtReopenSampling) return;
+						take('pre');
+						if (window.__wb2DesktopVtReopenSamples.length < 20) {
+							requestAnimationFrame(sample);
+						}
+					};
+					const persist = () => {
+						try {
+							sessionStorage.setItem(
+								'wb2DesktopVtReopenSamples',
+								JSON.stringify(window.__wb2DesktopVtReopenSamples || []),
+							);
+						} catch (_) {}
+					};
+					window.addEventListener('pagehide', () => { take('pagehide'); persist(); });
+					window.addEventListener('pageshow', () => {
+						window.__wb2DesktopVtReopenSamples = JSON.parse(
+							sessionStorage.getItem('wb2DesktopVtReopenSamples') || '[]',
+						);
+						window.__wb2DesktopVtReopenSampling = true;
+						let n = 0;
+						const post = () => {
+							take('post');
+							persist();
+							if (++n < 12) requestAnimationFrame(post);
+							else window.__wb2DesktopVtReopenSampling = false;
+						};
+						requestAnimationFrame(post);
+					});
+					requestAnimationFrame(sample);
+					return true;
+				}`,
+				nil,
+			)
+			if err != nil {
+				t.Fatalf("start rAF sampler: %v", err)
+			}
+
+			_, err = ctx.Page.ExpectNavigation(
+				func() error { return link.Click() },
+				playwright.PageExpectNavigationOptions{
+					WaitUntil: playwright.WaitUntilStateDomcontentloaded,
+				},
+			)
+			if err != nil {
+				t.Fatalf("sibling GET navigation not observed: %v", err)
+			}
+
+			_, _ = ctx.Page.Evaluate(
+				`() => new Promise(r => {
+					let n = 0;
+					const tick = () => { if (++n >= 16) r(true); else requestAnimationFrame(tick); };
+					requestAnimationFrame(tick);
+				})`,
+				nil,
+			)
+
+			samples, err := ctx.Page.Evaluate(
+				`() => {
+					const fromMem = window.__wb2DesktopVtReopenSamples;
+					if (fromMem && fromMem.length) return fromMem;
+					try { return JSON.parse(sessionStorage.getItem('wb2DesktopVtReopenSamples') || '[]'); }
+					catch (_) { return []; }
+				}`,
+				nil,
+			)
+			if err != nil {
+				t.Fatal(err)
+			}
+			list, ok := samples.([]any)
+			if !ok || len(list) < 3 {
+				t.Fatalf("expected >=3 rAF samples, got %#v", samples)
+			}
+
+			for i, raw := range list {
+				s, ok := raw.(map[string]any)
+				if !ok {
+					continue
+				}
+				header, _ := s["header"].(map[string]any)
+				reopen, _ := s["reopen"].(map[string]any)
+				chat, _ := s["chat"].(map[string]any)
+				path, _ := s["path"].(map[string]any)
+				browser, _ := s["browser"].(map[string]any)
+				if !boxVisible(header) {
+					continue
+				}
+				for name, b := range map[string]map[string]any{
+					"reopen":  reopen,
+					"chat":    chat,
+					"path":    path,
+					"browser": browser,
+				} {
+					if b == nil || !boxInDOM(b) {
+						t.Fatalf("sample %d: %s missing from DOM while header visible", i, name)
+					}
+					if boxCollapsed(b) || boxHidden(b) {
+						t.Fatalf(
+							"sample %d: under-header black — %s collapsed/hidden while header visible: %#v",
+							i, name, b,
+						)
+					}
+				}
+				if op, _ := reopen["opacity"].(string); op != "" && op != "1" {
+					t.Fatalf("sample %d: threads-reopen opacity = %q want 1: %#v", i, op, reopen)
+				}
+			}
+
+			if err := ctx.Page.Locator("#thread-artifact-document").
+				GetByText(wantText).
+				First().
+				WaitFor(playwright.LocatorWaitForOptions{
+					State:   playwright.WaitForSelectorStateVisible,
+					Timeout: playwright.Float(30_000),
+				}); err != nil {
+				t.Fatalf("document missing %q after sibling: %v", wantText, err)
+			}
+		},
+	)
+}
+
+func assertThreadsStillClosedWithReopen() spec.Step {
+	return spec.Custom(
+		"threads stay closed after sibling GET; reopen chrome + wb2_threads_open=0",
+		func(t testing.TB, ctx *duiruntime.Context) {
+			region := ctx.Page.Locator("#workbench-v2-threads")
+			visible, err := region.IsVisible()
+			if err != nil {
+				t.Fatal(err)
+			}
+			if visible {
+				t.Fatal("threads sidebar reopened across sibling GET")
+			}
+			reopen := ctx.Page.Locator("#workbench-v2-threads-reopen")
+			if err := reopen.WaitFor(playwright.LocatorWaitForOptions{
+				State:   playwright.WaitForSelectorStateVisible,
+				Timeout: playwright.Float(10_000),
+			}); err != nil {
+				t.Fatalf("threads reopen chrome missing after sibling: %v", err)
+			}
+			cookie, err := ctx.Page.Evaluate(
+				`() => {
+					const match = document.cookie.match(/(?:^|; )wb2_threads_open=([^;]*)/);
+					return match ? match[1] : null;
+				}`,
+				nil,
+			)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if cookie != "0" {
+				t.Fatalf("wb2_threads_open = %#v, want 0", cookie)
+			}
+			name, err := ctx.Page.Evaluate(
+				`() => {
+					const el = document.getElementById('workbench-v2-threads-reopen');
+					if (!el) return null;
+					const n = getComputedStyle(el).viewTransitionName || el.style.viewTransitionName || null;
+					return (!n || n === 'none') ? 'none' : n;
+				}`,
+				nil,
+			)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if name != "workbench-v2-threads-reopen" {
+				t.Fatalf("post-nav threads-reopen VT name = %#v", name)
+			}
+		},
+	)
+}
+
 func assertDesktopDocChromeViewTransitionNames() spec.Step {
 	return spec.Custom(
-		"desktop chrome VT names: header/threads/chat/path/browser named; mobile-tabs/regions/artifact none; document named",
+		"desktop chrome VT names: header/threads/threads-reopen/chat/path/browser named; mobile-tabs/regions/artifact none; document named",
 		func(t testing.TB, ctx *duiruntime.Context) {
 			value, err := ctx.Page.Evaluate(
 				`() => {
@@ -83,6 +374,7 @@ func assertDesktopDocChromeViewTransitionNames() spec.Step {
 						header: read('app-header'),
 						tabs: read('workbench-mobile-tabs'),
 						threads: read('workbench-v2-threads'),
+						threadsReopen: read('workbench-v2-threads-reopen'),
 						chat: read('workbench-v2-chat'),
 						regions: read('workbench-regions'),
 						root: read('workbench-root'),
@@ -102,16 +394,17 @@ func assertDesktopDocChromeViewTransitionNames() spec.Step {
 				t.Fatalf("VT probe type %T", value)
 			}
 			checks := map[string]string{
-				"header":   "app-header",
-				"tabs":     "none",
-				"threads":  "workbench-v2-threads",
-				"chat":     "workbench-v2-chat",
-				"path":     "thread-artifact-path-header",
-				"browser":  "thread-artifact-browser",
-				"document": "thread-artifact-document",
-				"artifact": "none",
-				"regions":  "none",
-				"root":     "none",
+				"header":        "app-header",
+				"tabs":          "none",
+				"threads":       "workbench-v2-threads",
+				"threadsReopen": "workbench-v2-threads-reopen",
+				"chat":          "workbench-v2-chat",
+				"path":          "thread-artifact-path-header",
+				"browser":       "thread-artifact-browser",
+				"document":      "thread-artifact-document",
+				"artifact":      "none",
+				"regions":       "none",
+				"root":          "none",
 			}
 			for key, want := range checks {
 				if state[key] != want {
