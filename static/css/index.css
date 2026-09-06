@@ -522,6 +522,7 @@
 ::view-transition-old(root),
 ::view-transition-new(root) {
   animation: none;
+  display: none;
 }
 
 /* Quiet document swap: no crossfade flash; sweep is the only affordance. */

@@ -41,7 +41,31 @@ type ThreadArtifactBrowserArgs struct {
 	ParentEndpoint string
 	Entries        []ThreadArtifactEntry
 	HeaderActions  templ.Component
+	// BrowserOpen is the SSR Files-browser preference (cookie wb2_artifact_browser).
+	// Default open when unset so first visit matches prior always-open behavior.
+	BrowserOpen bool
 }
+
+const artifactBrowserOpenCookie = "wb2_artifact_browser"
+
+// ArtifactBrowserOpenFromRequest reads wb2_artifact_browser; missing/invalid => open.
+func ArtifactBrowserOpenFromRequest(r *http.Request) bool {
+	if r == nil {
+		return true
+	}
+	c, err := r.Cookie(artifactBrowserOpenCookie)
+	if err != nil || (c.Value != "0" && c.Value != "1") {
+		return true
+	}
+	return c.Value == "1"
+}
+func boolString(v bool) string {
+	if v {
+		return "true"
+	}
+	return "false"
+}
+
 
 func threadArtifactQuery(
 	docPath, directoryPath string,
@@ -229,6 +253,7 @@ func (s *Service) threadArtifactBrowser(
 		DocPath:       docPath,
 		DirectoryPath: directoryPath,
 		Entries:       entries,
+		BrowserOpen:   ArtifactBrowserOpenFromRequest(c.Request()),
 	}
 	if directoryPath != "" && docPath != "" {
 		parent := path.Dir(directoryPath)

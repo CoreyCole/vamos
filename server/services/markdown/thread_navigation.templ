@@ -4,40 +4,52 @@ templ ThreadArtifactPane(browser ThreadArtifactBrowserArgs, document templ.Compo
 	<div
 		id="thread-artifact-pane"
 		class="flex h-full min-h-0 flex-col bg-background"
-		data-signals="{_threadArtifactLoading: false, _artifactBrowserOpen: true}"
+		data-signals={ "{_threadArtifactLoading: false, _artifactBrowserOpen: " + boolString(browser.BrowserOpen) + "}" }
 		data-attr:aria-busy="$_threadArtifactLoading ? 'true' : 'false'"
+		data-attr:data-artifact-browser-open="$_artifactBrowserOpen ? '1' : '0'"
+		if browser.BrowserOpen {
+			data-artifact-browser-open="1"
+		} else {
+			data-artifact-browser-open="0"
+		}
 	>
-		<script>
-			(function (pane) {
-				try {
-					var stored = sessionStorage.getItem("workbench-v2:artifact-browser-open");
-					if (stored !== "0" && stored !== "1") return;
-					var open = stored === "1";
-					pane.setAttribute(
-						"data-signals",
-						"{_threadArtifactLoading: false, _artifactBrowserOpen: " + open + "}",
-					);
-					pane.setAttribute("data-artifact-browser-pref", stored);
-				} catch (e) {}
-			})(document.currentScript.parentElement);
-		</script>
 		<div id="thread-artifact-path-header" class="flex shrink-0 items-center gap-2 border-b border-border p-2 text-xs">
 			<button
 				type="button"
-				class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-				data-on:click="$_artifactBrowserOpen = !$_artifactBrowserOpen; try { sessionStorage.setItem('workbench-v2:artifact-browser-open', $_artifactBrowserOpen ? '1' : '0') } catch (e) {}"
+				class={
+					"inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground",
+					templ.KV("bg-muted text-foreground", browser.BrowserOpen),
+				}
+				data-on:click="$_artifactBrowserOpen = !$_artifactBrowserOpen; try { var v = $_artifactBrowserOpen ? '1' : '0'; document.cookie = 'wb2_artifact_browser=' + v + '; path=/; SameSite=Lax; Max-Age=31536000'; sessionStorage.setItem('workbench-v2:artifact-browser-open', v) } catch (e) {}"
 				data-attr:aria-expanded="$_artifactBrowserOpen ? 'true' : 'false'"
 				data-attr:aria-pressed="$_artifactBrowserOpen ? 'true' : 'false'"
 				data-class="{ 'bg-muted text-foreground': $_artifactBrowserOpen }"
+				data-attr:data-artifact-browser-open="$_artifactBrowserOpen ? '1' : '0'"
 				aria-controls="thread-artifact-browser"
 				aria-label="Toggle files"
 				title="Toggle files"
+				if browser.BrowserOpen {
+					aria-expanded="true"
+					aria-pressed="true"
+					data-artifact-browser-open="1"
+				} else {
+					aria-expanded="false"
+					aria-pressed="false"
+					data-artifact-browser-open="0"
+				}
 			>
-				<svg data-show="!$_artifactBrowserOpen" class="h-3.5 w-3.5" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V7z"></path>
-				</svg>
-				<svg data-show="$_artifactBrowserOpen" class="h-3.5 w-3.5" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v2M3 7v10a2 2 0 002 2h14a2 2 0 002-2V11M3 11h18"></path>
+				<svg class="h-3.5 w-3.5" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+					<path
+						stroke-linecap="round"
+						stroke-linejoin="round"
+						stroke-width="2"
+						data-attr:d="$_artifactBrowserOpen ? 'M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v2M3 7v10a2 2 0 002 2h14a2 2 0 002-2V11M3 11h18' : 'M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V7z'"
+						if browser.BrowserOpen {
+							d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v2M3 7v10a2 2 0 002 2h14a2 2 0 002-2V11M3 11h18"
+						} else {
+							d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V7z"
+						}
+					></path>
 				</svg>
 			</button>
 			<span class="min-w-0 flex-1 truncate text-muted-foreground">{ "thoughts/" + browser.DocPath }</span>
@@ -60,6 +72,9 @@ templ ThreadArtifactBrowser(browser ThreadArtifactBrowserArgs) {
 		data-show="$_artifactBrowserOpen"
 		class="min-h-0 max-h-64 shrink-0 overflow-y-auto border-b border-border p-2"
 		aria-label="Artifact browser"
+		if !browser.BrowserOpen {
+			style="display: none;"
+		}
 	>
 		<div class="mb-1 flex min-h-8 items-center gap-1 px-1 text-xs text-muted-foreground">
 			if browser.ParentEndpoint != "" {

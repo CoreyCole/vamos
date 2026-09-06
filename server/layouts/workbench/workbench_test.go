@@ -674,8 +674,6 @@ func TestWorkbenchHistoryJSReloadsSameDocumentArtifactPopstate(t *testing.T) {
 		`data-workbench-doc-switching`,
 		`agent-chat-composer-input`,
 		`workbench-v2:composer-focused`,
-		`workbench-v2:artifact-browser-open`,
-		`seedArtifactBrowserOpenBeforePaint`,
 		`rel="prefetch"`,
 	} {
 		if !strings.Contains(js, want) {
@@ -691,6 +689,10 @@ func TestWorkbenchHistoryJSReloadsSameDocumentArtifactPopstate(t *testing.T) {
 		`workbench-v2:chat-scroll`,
 		`ResizeObserver`,
 		`scheduleAgentChatScrollToLatest`,
+		`seedArtifactBrowserOpenBeforePaint`,
+		`restoreArtifactBrowserOpen`,
+		`mergePatch({ _artifactBrowserOpen`,
+		`persistArtifactBrowserOpenFromToggle`,
 	} {
 		if strings.Contains(js, unwanted) {
 			t.Fatalf("workbench-history.js should not contain %q in %s", unwanted, js)
@@ -1672,7 +1674,7 @@ func TestWorkbenchV2RegionsEnforceComposerFriendlyMinRem(t *testing.T) {
 		`data-workbench-region="workbench-v2-chat"`,
 		`data-workbench-min-rem="18"`,
 		`/js/workbench-resize.js?v=8`,
-		`/js/workbench-history.js?v=11`,
+		`/js/workbench-history.js?v=12`,
 	} {
 		if !strings.Contains(html, fragment) {
 			t.Fatalf("workbench html missing %q", fragment)

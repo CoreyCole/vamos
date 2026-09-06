@@ -133,6 +133,7 @@ func TestThreadArtifactPaneScopesStaticHandlersToBrowserRows(t *testing.T) {
 			ParentHref:     "/threads/thread_1?artifact=thoughts%2Fsafe.md&artifact_dir=thoughts",
 			ParentEndpoint: "/threads/thread_1/artifact-browser?artifact=thoughts%2Fsafe.md&artifact_dir=thoughts",
 			Entries:        []ThreadArtifactEntry{entry},
+			BrowserOpen:    true,
 		},
 		templ.Raw(`<p><a href="/thoughts/fullscreen.md">Fullscreen</a></p>`),
 	).Render(t.Context(), &body); err != nil {
@@ -153,8 +154,11 @@ func TestThreadArtifactPaneScopesStaticHandlersToBrowserRows(t *testing.T) {
 		`id="thread-artifact-path-header"`,
 		`aria-label="Toggle files"`,
 		`title="Toggle files"`,
+		`wb2_artifact_browser=`,
+		`document.cookie`,
 		`sessionStorage.setItem('workbench-v2:artifact-browser-open'`,
-		`document.currentScript.parentElement`,
+		`data-attr:d=`,
+		`data-artifact-browser-open="1"`,
 	} {
 		if !strings.Contains(html, want) {
 			t.Fatalf("artifact pane missing %q: %s", want, html)
@@ -248,5 +252,23 @@ func TestThreadArtifactDirectoryRendersDisclosureWithoutNavigation(t *testing.T)
 			`href=`,
 		) {
 		t.Fatalf("directory summary still navigates: %s", html)
+	}
+}
+
+func TestArtifactBrowserOpenFromRequest(t *testing.T) {
+	t.Parallel()
+
+	req := httptest.NewRequest(http.MethodGet, "/threads/t", http.NoBody)
+	if !ArtifactBrowserOpenFromRequest(req) {
+		t.Fatal("missing cookie should default open")
+	}
+	req.AddCookie(&http.Cookie{Name: "wb2_artifact_browser", Value: "0"})
+	if ArtifactBrowserOpenFromRequest(req) {
+		t.Fatal("cookie 0 should be closed")
+	}
+	req2 := httptest.NewRequest(http.MethodGet, "/threads/t", http.NoBody)
+	req2.AddCookie(&http.Cookie{Name: "wb2_artifact_browser", Value: "1"})
+	if !ArtifactBrowserOpenFromRequest(req2) {
+		t.Fatal("cookie 1 should be open")
 	}
 }
