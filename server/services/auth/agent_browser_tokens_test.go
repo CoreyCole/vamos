@@ -105,6 +105,9 @@ func TestAgentBrowserMintAndLoginSetsSessionCookie(t *testing.T) {
 	if !cookie.Secure {
 		t.Fatalf("expected secure cookie for forwarded https")
 	}
+	if cookie.SameSite != http.SameSiteNoneMode {
+		t.Fatalf("expected SameSite=None for cross-site one-shot opens, got %v", cookie.SameSite)
+	}
 	session, err := service.GetSession(t.Context(), cookie.Value)
 	if err != nil {
 		t.Fatalf("GetSession returned error: %v", err)
