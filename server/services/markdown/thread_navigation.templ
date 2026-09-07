@@ -13,11 +13,11 @@ templ ThreadArtifactPane(browser ThreadArtifactBrowserArgs, document templ.Compo
 			data-artifact-browser-open="0"
 		}
 	>
-		<div id="thread-artifact-path-header" class="flex shrink-0 items-center gap-2 border-b border-border p-2 text-xs">
+		<div id="thread-artifact-path-header" class="flex h-10 min-h-10 max-h-10 shrink-0 items-center gap-2 overflow-hidden border-b border-border px-2.5 text-xs">
 			<button
 				type="button"
 				class={
-					"inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground",
+					"inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground",
 					templ.KV("bg-muted text-foreground", browser.BrowserOpen),
 				}
 				data-on:click="$_artifactBrowserOpen = !$_artifactBrowserOpen; try { var v = $_artifactBrowserOpen ? '1' : '0'; document.cookie = 'wb2_artifact_browser=' + v + '; path=/; SameSite=Lax; Max-Age=31536000'; sessionStorage.setItem('workbench-v2:artifact-browser-open', v) } catch (e) {}"

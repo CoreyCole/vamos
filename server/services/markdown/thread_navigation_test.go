@@ -272,3 +272,23 @@ func TestArtifactBrowserOpenFromRequest(t *testing.T) {
 		t.Fatal("cookie 1 should be open")
 	}
 }
+
+func TestThreadArtifactPathHeaderLockedH10(t *testing.T) {
+	t.Parallel()
+	var body strings.Builder
+	if err := ThreadArtifactPane(ThreadArtifactBrowserArgs{DocPath: "x.md", BrowserOpen: true}, templ.Raw("<p>doc</p>")).Render(t.Context(), &body); err != nil {
+		t.Fatal(err)
+	}
+	out := body.String()
+	idx := strings.Index(out, `id="thread-artifact-path-header"`)
+	if idx < 0 {
+		t.Fatal("missing path header")
+	}
+	end := strings.Index(out[idx:], ">")
+	tag := out[idx : idx+end]
+	for _, want := range []string{"h-10", "min-h-10", "max-h-10"} {
+		if !strings.Contains(tag, want) {
+			t.Fatalf("path header missing %s: %s", want, tag)
+		}
+	}
+}
