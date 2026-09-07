@@ -157,6 +157,9 @@ func (h *Handler) RegisterRuntimeRoutes(g *echo.Group) {
 		h.ResolveChatAnnotation,
 	)
 	g.GET("/plan-workspace", h.OpenPlanWorkspace)
+	g.GET("/plan-workspaces", h.ListPlanWorkspacesAPI)
+	g.POST("/plan-workspaces/archive", h.ArchivePlanWorkspaceAPI)
+	g.POST("/plan-workspaces/unarchive", h.UnarchivePlanWorkspaceAPI)
 	g.GET("/document/open", h.OpenDocumentChat)
 	g.POST("/document/open", h.OpenDocumentChat)
 	g.POST("/:workspace_id/send", h.SendWorkspacePrompt)

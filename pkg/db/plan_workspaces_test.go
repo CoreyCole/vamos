@@ -3,6 +3,7 @@ package db
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"strings"
 	"testing"
 	"time"
@@ -176,7 +177,6 @@ func TestArchiveMissingPlanWorkspaceProjectsArchivesRemovedRoles(t *testing.T) {
 	}
 }
 
-
 func TestUpsertDiscoveredPlanWorkspaceClearsMissingFromDiskArchive(t *testing.T) {
 	ctx := context.Background()
 	dbConn, q := openWorkspaceDocsTestDB(t)
@@ -323,5 +323,120 @@ func TestArchiveAllActivePlanWorkspacesSetsMissingFromDiskReason(t *testing.T) {
 	}
 	if !row.ArchivedAt.Valid || row.ArchiveReason != "missing_from_disk" {
 		t.Fatalf("archive-all state = %#v", row)
+	}
+}
+
+func TestManualArchivePlanWorkspaceStickyAndIdempotent(t *testing.T) {
+	ctx := context.Background()
+	_, q := openWorkspaceDocsTestDB(t)
+	rel := "agent/plans/manual-api"
+	insertPlanWorkspaceForProjectTest(t, ctx, q, rel, "vamos")
+
+	first, err := q.ManualArchivePlanWorkspace(ctx, ManualArchivePlanWorkspaceParams{
+		PlanDirRel:      rel,
+		ArchivedByEmail: "corey@example.com",
+	})
+	if err != nil {
+		t.Fatalf("ManualArchivePlanWorkspace: %v", err)
+	}
+	if !first.ArchivedAt.Valid || first.ArchiveReason != "manual" || first.ArchivedByEmail != "corey@example.com" {
+		t.Fatalf("first archive state = %#v", first)
+	}
+
+	second, err := q.ManualArchivePlanWorkspace(ctx, ManualArchivePlanWorkspaceParams{
+		PlanDirRel:      rel,
+		ArchivedByEmail: "other@example.com",
+	})
+	if err != nil {
+		t.Fatalf("idempotent ManualArchivePlanWorkspace: %v", err)
+	}
+	if !second.ArchivedAt.Valid || !second.ArchivedAt.Time.Equal(first.ArchivedAt.Time) {
+		t.Fatalf("archived_at changed on idempotent archive: first=%v second=%v", first.ArchivedAt, second.ArchivedAt)
+	}
+	if second.ArchiveReason != "manual" || second.ArchivedByEmail != "corey@example.com" {
+		t.Fatalf("idempotent archive should keep original actor: %#v", second)
+	}
+
+	current, err := q.ListCurrentPlanWorkspaces(ctx, "")
+	if err != nil {
+		t.Fatalf("ListCurrentPlanWorkspaces: %v", err)
+	}
+	for _, row := range current {
+		if row.PlanDirRel == rel {
+			t.Fatalf("manually archived plan still in current list: %#v", row)
+		}
+	}
+
+	archived, err := q.ListManualArchivedPlanWorkspaces(ctx, "")
+	if err != nil {
+		t.Fatalf("ListManualArchivedPlanWorkspaces: %v", err)
+	}
+	if len(archived) != 1 || archived[0].PlanDirRel != rel {
+		t.Fatalf("manual archived list = %#v, want %s", archived, rel)
+	}
+}
+
+func TestUnarchiveManualPlanWorkspaceAndRefuseMissingFromDisk(t *testing.T) {
+	ctx := context.Background()
+	_, q := openWorkspaceDocsTestDB(t)
+
+	manualRel := "agent/plans/manual-unarchive"
+	insertPlanWorkspaceForProjectTest(t, ctx, q, manualRel, "vamos")
+	if _, err := q.ManualArchivePlanWorkspace(ctx, ManualArchivePlanWorkspaceParams{
+		PlanDirRel:      manualRel,
+		ArchivedByEmail: "corey@example.com",
+	}); err != nil {
+		t.Fatalf("seed manual archive: %v", err)
+	}
+	cleared, err := q.UnarchiveManualPlanWorkspace(ctx, manualRel)
+	if err != nil {
+		t.Fatalf("UnarchiveManualPlanWorkspace: %v", err)
+	}
+	if cleared.ArchivedAt.Valid || cleared.ArchiveReason != "" || cleared.ArchivedByEmail != "" {
+		t.Fatalf("unarchive did not clear fields: %#v", cleared)
+	}
+
+	missingRel := "agent/plans/missing-unarchive"
+	insertPlanWorkspaceForProjectTest(t, ctx, q, missingRel, "vamos")
+	if _, err := q.ArchiveMissingPlanWorkspaces(ctx, []string{"agent/plans/other"}); err != nil {
+		t.Fatalf("ArchiveMissingPlanWorkspaces: %v", err)
+	}
+	missing, err := q.GetPlanWorkspace(ctx, missingRel)
+	if err != nil {
+		t.Fatalf("GetPlanWorkspace: %v", err)
+	}
+	if missing.ArchiveReason != "missing_from_disk" {
+		t.Fatalf("expected missing_from_disk, got %#v", missing)
+	}
+	if _, err := q.UnarchiveManualPlanWorkspace(ctx, missingRel); !errors.Is(err, sql.ErrNoRows) {
+		t.Fatalf("unarchive missing_from_disk err = %v, want sql.ErrNoRows", err)
+	}
+}
+
+func TestListManualArchivedExcludesMissingFromDisk(t *testing.T) {
+	ctx := context.Background()
+	_, q := openWorkspaceDocsTestDB(t)
+	insertPlanWorkspaceForProjectTest(t, ctx, q, "agent/plans/manual-listed", "vamos")
+	insertPlanWorkspaceForProjectTest(t, ctx, q, "agent/plans/missing-listed", "vamos")
+
+	if _, err := q.ManualArchivePlanWorkspace(ctx, ManualArchivePlanWorkspaceParams{
+		PlanDirRel:      "agent/plans/manual-listed",
+		ArchivedByEmail: "corey@example.com",
+	}); err != nil {
+		t.Fatalf("manual archive: %v", err)
+	}
+	if _, err := q.ArchiveMissingPlanWorkspaces(ctx, []string{"agent/plans/manual-listed"}); err != nil {
+		t.Fatalf("missing archive: %v", err)
+	}
+
+	archived, err := q.ListManualArchivedPlanWorkspaces(ctx, "")
+	if err != nil {
+		t.Fatalf("ListManualArchivedPlanWorkspaces: %v", err)
+	}
+	if len(archived) != 1 || archived[0].PlanDirRel != "agent/plans/manual-listed" {
+		t.Fatalf("archived list = %#v", archived)
+	}
+	if archived[0].ArchiveReason != "manual" {
+		t.Fatalf("archive_reason = %q", archived[0].ArchiveReason)
 	}
 }

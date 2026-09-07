@@ -135,6 +135,7 @@ type Querier interface {
 	ListDocumentComments(ctx context.Context, arg ListDocumentCommentsParams) ([]DocumentComment, error)
 	ListImplWorkspaces(ctx context.Context, projectID string) ([]ImplWorkspace, error)
 	ListMachineCredentials(ctx context.Context) ([]MachineCredential, error)
+	ListManualArchivedPlanWorkspaces(ctx context.Context, projectID string) ([]PlanWorkspace, error)
 	ListOpenChatAnnotationsByIDs(ctx context.Context, ids []string) ([]ChatAnnotation, error)
 	ListOpenQuoteCommentsForDocument(ctx context.Context, docPath string) ([]DocumentComment, error)
 	ListPlanOwnedSessionArtifactsByPlanDir(ctx context.Context, planDir sql.NullString) ([]AgentSession, error)
@@ -164,6 +165,7 @@ type Querier interface {
 	ListWorkspaces(ctx context.Context, limit int64) ([]Workspace, error)
 	ListWorkspacesForUser(ctx context.Context, arg ListWorkspacesForUserParams) ([]Workspace, error)
 	LogAuthAttempt(ctx context.Context, arg LogAuthAttemptParams) (AuthAttempt, error)
+	ManualArchivePlanWorkspace(ctx context.Context, arg ManualArchivePlanWorkspaceParams) (PlanWorkspace, error)
 	MarkAgentSessionHydratedByPath(ctx context.Context, artifactPath sql.NullString) error
 	MarkAllActiveImplWorkspacesCleanedUp(ctx context.Context) (int64, error)
 	MarkImplWorkspaceCleanedUp(ctx context.Context, arg MarkImplWorkspaceCleanedUpParams) (int64, error)
@@ -200,6 +202,7 @@ type Querier interface {
 	TestSupportCountWorkspacesByRootDocPath(ctx context.Context, rootDocPath string) (int64, error)
 	TestSupportGetAgentSessionWorkspaceID(ctx context.Context, id string) (sql.NullString, error)
 	ThreadHasWorkspaceAssociation(ctx context.Context, arg ThreadHasWorkspaceAssociationParams) (bool, error)
+	UnarchiveManualPlanWorkspace(ctx context.Context, planDirRel string) (PlanWorkspace, error)
 	UpdateAgentRunCheckpoint(ctx context.Context, arg UpdateAgentRunCheckpointParams) error
 	UpdateAgentRunStarted(ctx context.Context, arg UpdateAgentRunStartedParams) error
 	UpdateAgentRunWorkflowResult(ctx context.Context, arg UpdateAgentRunWorkflowResultParams) error

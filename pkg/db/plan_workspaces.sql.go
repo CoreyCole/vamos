@@ -222,6 +222,64 @@ func (q *Queries) ListCurrentPlanWorkspaces(ctx context.Context, projectID strin
 	return items, nil
 }
 
+const listManualArchivedPlanWorkspaces = `-- name: ListManualArchivedPlanWorkspaces :many
+SELECT plan_dir_rel, project_id, plan_dir, label, artifact_updated_at, qrspi_lifecycle, qrspi_lifecycle_updated_at, qrspi_closed_reason, discovered_at, last_discovered_at, archived_at, archive_reason, archived_by_email
+FROM plan_workspaces
+WHERE
+    archive_reason = 'manual'
+    AND archived_at IS NOT NULL
+    AND (
+        CAST(?1 AS TEXT) = ''
+        OR project_id = CAST(?1 AS TEXT)
+        OR EXISTS (
+            SELECT 1
+            FROM plan_workspace_projects pwp
+            WHERE
+                pwp.plan_dir_rel = plan_workspaces.plan_dir_rel
+                AND pwp.project_id = CAST(?1 AS TEXT)
+                AND pwp.archived_at IS NULL
+        )
+    )
+ORDER BY archived_at DESC, LOWER(label), plan_dir_rel
+`
+
+func (q *Queries) ListManualArchivedPlanWorkspaces(ctx context.Context, projectID string) ([]PlanWorkspace, error) {
+	rows, err := q.db.QueryContext(ctx, listManualArchivedPlanWorkspaces, projectID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []PlanWorkspace
+	for rows.Next() {
+		var i PlanWorkspace
+		if err := rows.Scan(
+			&i.PlanDirRel,
+			&i.ProjectID,
+			&i.PlanDir,
+			&i.Label,
+			&i.ArtifactUpdatedAt,
+			&i.QrspiLifecycle,
+			&i.QrspiLifecycleUpdatedAt,
+			&i.QrspiClosedReason,
+			&i.DiscoveredAt,
+			&i.LastDiscoveredAt,
+			&i.ArchivedAt,
+			&i.ArchiveReason,
+			&i.ArchivedByEmail,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listPlanWorkspaceImplBindings = `-- name: ListPlanWorkspaceImplBindings :many
 ;
 
@@ -364,6 +422,87 @@ func (q *Queries) ListPlanWorkspaces(ctx context.Context, projectID string) ([]P
 		return nil, err
 	}
 	return items, nil
+}
+
+const manualArchivePlanWorkspace = `-- name: ManualArchivePlanWorkspace :one
+;
+
+UPDATE plan_workspaces
+SET
+    archived_at = CASE
+        WHEN archive_reason = 'manual' AND archived_at IS NOT NULL THEN archived_at
+        ELSE CURRENT_TIMESTAMP
+    END,
+    archive_reason = 'manual',
+    archived_by_email = CASE
+        WHEN archive_reason = 'manual' AND archived_at IS NOT NULL THEN archived_by_email
+        ELSE ?1
+    END
+WHERE plan_dir_rel = ?2
+AND (
+    archived_at IS NULL
+    OR archive_reason = 'manual'
+)
+RETURNING plan_dir_rel, project_id, plan_dir, label, artifact_updated_at, qrspi_lifecycle, qrspi_lifecycle_updated_at, qrspi_closed_reason, discovered_at, last_discovered_at, archived_at, archive_reason, archived_by_email
+`
+
+type ManualArchivePlanWorkspaceParams struct {
+	ArchivedByEmail string `json:"archived_by_email"`
+	PlanDirRel      string `json:"plan_dir_rel"`
+}
+
+func (q *Queries) ManualArchivePlanWorkspace(ctx context.Context, arg ManualArchivePlanWorkspaceParams) (PlanWorkspace, error) {
+	row := q.db.QueryRowContext(ctx, manualArchivePlanWorkspace, arg.ArchivedByEmail, arg.PlanDirRel)
+	var i PlanWorkspace
+	err := row.Scan(
+		&i.PlanDirRel,
+		&i.ProjectID,
+		&i.PlanDir,
+		&i.Label,
+		&i.ArtifactUpdatedAt,
+		&i.QrspiLifecycle,
+		&i.QrspiLifecycleUpdatedAt,
+		&i.QrspiClosedReason,
+		&i.DiscoveredAt,
+		&i.LastDiscoveredAt,
+		&i.ArchivedAt,
+		&i.ArchiveReason,
+		&i.ArchivedByEmail,
+	)
+	return i, err
+}
+
+const unarchiveManualPlanWorkspace = `-- name: UnarchiveManualPlanWorkspace :one
+UPDATE plan_workspaces
+SET
+    archived_at = NULL,
+    archive_reason = '',
+    archived_by_email = ''
+WHERE plan_dir_rel = ?1
+AND archive_reason = 'manual'
+AND archived_at IS NOT NULL
+RETURNING plan_dir_rel, project_id, plan_dir, label, artifact_updated_at, qrspi_lifecycle, qrspi_lifecycle_updated_at, qrspi_closed_reason, discovered_at, last_discovered_at, archived_at, archive_reason, archived_by_email
+`
+
+func (q *Queries) UnarchiveManualPlanWorkspace(ctx context.Context, planDirRel string) (PlanWorkspace, error) {
+	row := q.db.QueryRowContext(ctx, unarchiveManualPlanWorkspace, planDirRel)
+	var i PlanWorkspace
+	err := row.Scan(
+		&i.PlanDirRel,
+		&i.ProjectID,
+		&i.PlanDir,
+		&i.Label,
+		&i.ArtifactUpdatedAt,
+		&i.QrspiLifecycle,
+		&i.QrspiLifecycleUpdatedAt,
+		&i.QrspiClosedReason,
+		&i.DiscoveredAt,
+		&i.LastDiscoveredAt,
+		&i.ArchivedAt,
+		&i.ArchiveReason,
+		&i.ArchivedByEmail,
+	)
+	return i, err
 }
 
 const upsertDiscoveredPlanWorkspace = `-- name: UpsertDiscoveredPlanWorkspace :one
