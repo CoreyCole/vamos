@@ -2,6 +2,7 @@ package workbench
 
 import (
 	"encoding/json"
+	"fmt"
 	"strconv"
 	"strings"
 )
@@ -98,6 +99,25 @@ func firstRegionSignalForSlot(state WorkbenchState, slot WorkbenchSlot) string {
 		return SignalKey(state.Regions[0])
 	}
 	return ""
+}
+
+
+// RegionSSRFlexStyle paints proportional flex before workbench-resize.js runs,
+// so room/thread GETs match SavedConfig ratios on first paint (no default→restore snap).
+func RegionSSRFlexStyle(state WorkbenchState, region WorkbenchRegion) string {
+	if !region.Visible || state.ViewportClass == ViewportMobile {
+		return ""
+	}
+	var total float64
+	for _, r := range state.Regions {
+		if r.Visible {
+			total += r.Ratio
+		}
+	}
+	if total <= 0 || region.Ratio <= 0 {
+		return ""
+	}
+	return fmt.Sprintf("flex: %.4f 1 0%%", region.Ratio/total)
 }
 
 func RegionInitialClass(state WorkbenchState, region WorkbenchRegion) string {
