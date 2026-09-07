@@ -16,9 +16,9 @@ templ Workbench(state WorkbenchState) {
 		<script type="module" src="/js/workbench-doc-scroll.js?v=3"></script>
 		<script defer src="/js/frame-comment-bridge.js?v=4" data-commentui-mode="parent"></script>
 		<div class="flex min-h-0 w-full flex-col gap-2 overflow-hidden">
-			@WorkbenchV2ThreadsReopen(state)
 			@MobileRegionTabs(state)
-			<div id="workbench-regions" class="flex min-h-0 w-full flex-1 gap-2 overflow-hidden">
+			<div id="workbench-regions" class="relative flex min-h-0 w-full flex-1 gap-2 overflow-hidden">
+				@WorkbenchV2ThreadsReopen(state)
 				for index, region := range state.Regions {
 					@Region(state, region)
 					if CanResizeAfter(state, index) {
@@ -33,9 +33,10 @@ templ Workbench(state WorkbenchState) {
 templ WorkbenchV2ThreadsReopen(state WorkbenchState) {
 	for _, region := range state.Regions {
 		if region.ID == WorkbenchV2ThreadsRegionID {
+			// In-shell only: rendered INSIDE #workbench-regions (never above the 3-col grid). Lead HARD stamp.
 			<div
 				id="workbench-v2-threads-reopen"
-				class={ "workbench-chrome shrink-0 max-md:hidden", templ.KV("hidden", region.Visible) }
+				class={ "workbench-chrome pointer-events-auto absolute left-2 top-2 z-30 max-md:hidden", templ.KV("hidden", region.Visible) }
 				data-show={ "!$workbench.regions." + SignalKey(region) + ".visible" }
 			>
 				<button

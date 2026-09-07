@@ -12,6 +12,7 @@ import (
 	"github.com/labstack/echo/v4"
 
 	"github.com/CoreyCole/vamos/server/layouts/workbench"
+	"github.com/CoreyCole/vamos/server/services/agenthome"
 )
 
 func (s *Service) savedThreadsWorkbenchConfig(
@@ -153,11 +154,12 @@ func (s *Service) ServeThreads(c echo.Context) error {
 		return err
 	}
 	viewport := viewportClassForRequest(c)
+	_ = threads // AI-470 converge: left rail is roster, not thread list.
 	state, err := workbench.BuildWorkbenchV2State(workbench.WorkbenchV2Args{
 		UserEmail:     userEmail,
 		ViewportClass: viewport,
 		SavedConfig:   s.savedThreadsWorkbenchConfig(c, userEmail, viewport),
-		Threads:       threads,
+		Threads:       agenthome.RosterRail(agenthome.RosterSelection{Kind: agenthome.KindDM, ID: "bot"}),
 		Chat:          WorkbenchUnavailable("Select a thread to open chat."),
 		Artifact:      s.indexArtifactComponent(c, artifactPath, hasArtifact),
 		Comments:      WorkbenchUnavailable("Select an artifact to view comments."),
@@ -216,11 +218,12 @@ func (s *Service) ServeThread(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 	}
 	viewport := viewportClassForRequest(c)
+	_ = threads // AI-470 converge: left rail is roster, not thread list.
 	state, err := workbench.BuildWorkbenchV2State(workbench.WorkbenchV2Args{
 		UserEmail:     userEmail,
 		ViewportClass: viewport,
 		SavedConfig:   s.savedThreadsWorkbenchConfig(c, userEmail, viewport),
-		Threads:       threads,
+		Threads:       agenthome.RosterRail(rosterSelectionForThread(threadID)),
 		Chat:          chat,
 		Artifact:      artifact,
 		Comments:      comments,

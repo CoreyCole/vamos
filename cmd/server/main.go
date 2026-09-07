@@ -40,6 +40,7 @@ import (
 	"github.com/CoreyCole/vamos/server/layouts"
 	authmw "github.com/CoreyCole/vamos/server/middleware"
 	"github.com/CoreyCole/vamos/server/services/agentchat"
+	"github.com/CoreyCole/vamos/server/services/agenthome"
 	"github.com/CoreyCole/vamos/server/services/appletruntime"
 	"github.com/CoreyCole/vamos/server/services/applets"
 	"github.com/CoreyCole/vamos/server/services/auth"
@@ -1738,6 +1739,14 @@ func main() {
 		markdownService.HandleThreadArtifactDirectory,
 	)
 	threadsGroup.GET("/:threadID", markdownService.ServeThread)
+
+	// AI-470 leftover converge: roster land + room GETs (plain GET, leftover chat/artifacts).
+	agentsGroup := e.Group("/agents")
+	agentsGroup.Use(authMiddleware)
+	agenthome.RegisterAgentsRoutes(agentsGroup, markdown.ServeAgentsLand)
+	roomsGroup := e.Group("/rooms")
+	roomsGroup.Use(authMiddleware)
+	agenthome.RegisterRoomRoutes(roomsGroup, markdownService.ServeAI470Room)
 
 	// Protected form routes - require authentication
 	formsGroup := e.Group("/forms")

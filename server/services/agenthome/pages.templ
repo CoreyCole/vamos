@@ -1,0 +1,532 @@
+package agenthome
+
+import (
+	"github.com/CoreyCole/vamos/server/layouts"
+	"github.com/CoreyCole/vamos/server/layouts/workbench"
+)
+
+// RosterSelection marks the SSR-selected roster row.
+type RosterSelection struct {
+	Kind RoomKind
+	ID   string
+}
+
+templ RosterRail(sel RosterSelection) {
+	<div id="workbench-v2-roster" class="flex h-full min-h-0 flex-col gap-3 overflow-hidden p-2">
+		<div class="flex shrink-0 items-center gap-2 px-1">
+			<button
+				type="button"
+				data-workbench-threads-toggle
+				class="hidden h-9 w-9 shrink-0 items-center justify-center rounded-md border border-border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:inline-flex"
+				data-on:click={ workbench.ThreadsHideClickAction() }
+				data-attr:aria-expanded="$workbench.regions.workbenchV2Threads.visible ? 'true' : 'false'"
+				aria-controls="workbench-v2-threads"
+				aria-label="Hide roster sidebar"
+				title="Hide roster sidebar"
+			>
+				<svg class="h-4 w-4" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
+				</svg>
+			</button>
+			<label class="sr-only" for="workbench-v2-roster-search">Search</label>
+			<div class="flex min-w-0 flex-1 items-center gap-2 rounded-lg border border-border bg-muted/40 px-2.5 py-1.5">
+				<svg class="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M11 18a7 7 0 100-14 7 7 0 000 14z"></path>
+				</svg>
+				<input
+					id="workbench-v2-roster-search"
+					type="search"
+					placeholder="Search"
+					class="min-w-0 flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground focus:outline-none"
+				/>
+			</div>
+		</div>
+		<div class="flex shrink-0 gap-2 px-1">
+			<a
+				href="/rooms/dm/bot"
+				class={ "flex w-20 flex-col items-center gap-1 rounded-xl border px-2 py-2 text-center transition-colors", templ.KV("border-border bg-muted", sel.Kind == KindDM && sel.ID == "bot"), templ.KV("border-transparent hover:bg-muted/50", !(sel.Kind == KindDM && sel.ID == "bot")) }
+			>
+				<span class="flex h-10 w-10 items-center justify-center rounded-2xl bg-fuchsia-500/90 text-sm font-semibold text-white">B</span>
+				<span class="w-full truncate text-[10px] text-muted-foreground">Bot</span>
+			</a>
+			<a
+				href="/rooms/group/vamos-dev"
+				class={ "flex w-20 flex-col items-center gap-1 rounded-xl border px-2 py-2 text-center transition-colors", templ.KV("border-border bg-muted", sel.Kind == KindGroup && sel.ID == "vamos-dev"), templ.KV("border-transparent hover:bg-muted/50", !(sel.Kind == KindGroup && sel.ID == "vamos-dev")) }
+			>
+				<span class="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-500/90 text-sm font-semibold text-white">V</span>
+				<span class="w-full truncate text-[10px] text-muted-foreground">Vamos Lead</span>
+			</a>
+		</div>
+		<div class="min-h-0 flex-1 space-y-4 overflow-y-auto px-1 pb-2">
+			<section id="workbench-v2-roster-agents" class="space-y-1" aria-label="Agents">
+				<h2 class="px-1 text-[11px] font-medium text-muted-foreground">Agents</h2>
+				<ul class="flex flex-col">
+					<li id="roster-row-dm-bot">
+						<a
+							href="/rooms/dm/bot"
+							data-roster-id="dm:bot"
+							class={ "flex items-start gap-2.5 rounded-lg px-1.5 py-2 hover:bg-muted/60", templ.KV("bg-muted", sel.Kind == KindDM && sel.ID == "bot") }
+						>
+							<span class="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-2xl bg-fuchsia-500/90 text-xs font-semibold text-white">B</span>
+							<span class="min-w-0 flex-1">
+								<span class="flex items-baseline justify-between gap-2">
+									<span class="truncate text-sm font-medium text-foreground">Bot</span>
+									<span class="shrink-0 text-[10px] text-muted-foreground">2m</span>
+								</span>
+								<span class="mt-0.5 line-clamp-1 text-xs text-muted-foreground">Ready when you are.</span>
+							</span>
+						</a>
+					</li>
+					<li id="roster-row-dm-research">
+						<a
+							href="/rooms/dm/research"
+							data-roster-id="dm:research"
+							class={ "flex items-start gap-2.5 rounded-lg px-1.5 py-2 hover:bg-muted/60", templ.KV("bg-muted", sel.Kind == KindDM && sel.ID == "research") }
+						>
+							<span class="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-2xl bg-sky-500/80 text-xs font-semibold text-white">R</span>
+							<span class="min-w-0 flex-1">
+								<span class="flex items-baseline justify-between gap-2">
+									<span class="truncate text-sm font-medium text-foreground">Research agent</span>
+									<span class="shrink-0 text-[10px] text-muted-foreground">Thu</span>
+								</span>
+								<span class="mt-0.5 line-clamp-1 text-xs text-muted-foreground">No recent messages</span>
+							</span>
+						</a>
+					</li>
+				</ul>
+			</section>
+			<section id="workbench-v2-roster-groups" class="space-y-1" aria-label="Groups">
+				<h2 class="px-1 text-[11px] font-medium text-muted-foreground">Groups</h2>
+				<ul class="flex flex-col">
+					<li id="roster-row-group-vamos-dev">
+						<a
+							href="/rooms/group/vamos-dev"
+							data-roster-id="group:vamos-dev"
+							class={ "flex items-start gap-2.5 rounded-lg px-1.5 py-2 hover:bg-muted/60", templ.KV("bg-muted", sel.Kind == KindGroup && sel.ID == "vamos-dev") }
+						>
+							<span class="relative mt-0.5 h-8 w-8 shrink-0">
+								<span class="absolute left-0 top-0 h-6 w-6 overflow-hidden rounded-full bg-emerald-500/90 ring-2 ring-background"></span>
+								<span class="absolute bottom-0 right-0 flex h-6 w-6 items-center justify-center rounded-2xl bg-fuchsia-500/90 text-[10px] font-semibold text-white ring-2 ring-background">+</span>
+								<span class="absolute -bottom-0.5 -right-0.5 rounded bg-muted px-0.5 text-[8px] font-medium text-muted-foreground">+2</span>
+							</span>
+							<span class="min-w-0 flex-1">
+								<span class="flex items-baseline justify-between gap-2">
+									<span class="truncate text-sm font-medium text-foreground">Vamos dev</span>
+									<span class="shrink-0 text-[10px] text-muted-foreground">9:26 PM</span>
+								</span>
+								<span class="mt-0.5 line-clamp-1 text-xs text-muted-foreground">UX: feel LGTM on rail tip.</span>
+							</span>
+							if sel.Kind != KindGroup || sel.ID != "vamos-dev" {
+								<span class="mt-2 h-2 w-2 shrink-0 rounded-full bg-sky-500" aria-label="Unread"></span>
+							}
+						</a>
+					</li>
+				</ul>
+			</section>
+			<section id="workbench-v2-roster-plans" class="space-y-1 border-t border-dashed border-border/60 pt-3" aria-label="Plan threads">
+				<h2 class="px-1 text-[11px] font-medium text-muted-foreground">Plan threads</h2>
+				<ul class="flex flex-col">
+					<li id="roster-row-plan-alpha">
+						<a
+							href="/rooms/plan/alpha"
+							data-roster-id="plan:alpha"
+							class={ "flex items-start gap-2.5 rounded-lg px-1.5 py-1.5 hover:bg-muted/40", templ.KV("bg-muted/70", sel.Kind == KindPlan && sel.ID == "alpha") }
+						>
+							<span class="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-border bg-background text-[10px] text-muted-foreground">P</span>
+							<span class="min-w-0 flex-1">
+								<span class="flex items-baseline justify-between gap-2">
+									<span class="truncate text-xs font-medium text-muted-foreground">Alpha</span>
+									<span class="shrink-0 text-[10px] text-muted-foreground" title="Last file mtime in plan dir">Thu 2:18 PM</span>
+								</span>
+							</span>
+						</a>
+					</li>
+				</ul>
+			</section>
+		</div>
+		@RosterContextMenu()
+		@EditProfileSheet()
+		@RosterChromeScript()
+		<style>
+			#workbench-v2-roster a.roster-multi-selected {
+				background-color: rgb(14 165 233 / 0.25);
+				box-shadow: inset 0 0 0 1px rgb(56 189 248 / 0.7);
+			}
+		</style>
+	</div>
+}
+
+templ RoomChatPane(kind RoomKind, id string, title string, body string) {
+	{{ placeholder := roomComposerPlaceholder(kind, id, title) }}
+	<div class="flex h-full min-h-0 flex-col">
+		<header id="workbench-v2-room-header" class="shrink-0 border-b border-border px-4 py-2">
+			<p class="text-sm font-semibold text-foreground">{ title }</p>
+			<p class="text-[11px] text-muted-foreground">{ string(kind) } / { id }</p>
+		</header>
+		<div id="workbench-v2-room-transcript" class="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-4">
+			if kind == KindDM && id == "bot" {
+				@BotDMFixtureTranscript()
+			} else if kind == KindDM && id == "research" {
+				@ResearchDMFixtureTranscript()
+			} else if kind == KindGroup && id == "vamos-dev" {
+				@GroupVamosDevFixtureTranscript()
+			} else if kind == KindPlan && id == "alpha" {
+				@PlanAlphaFixtureTranscript()
+			} else if body != "" {
+				<p class="text-sm text-muted-foreground">{ body }</p>
+			}
+		</div>
+		@RoomSimpleComposer(placeholder)
+	</div>
+}
+
+// InlineCodePill is a muted path/command chip inside Grok-like bubbles.
+templ InlineCodePill(text string) {
+	<span class="mx-0.5 inline rounded-md bg-[#5c2a3a]/70 px-1.5 py-0.5 font-mono text-[12px] text-[#f5c2c7]">{ text }</span>
+}
+
+templ AgentAvatar(initial string, bgClass string) {
+	<span class={ "flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-semibold text-white", bgClass }>{ initial }</span>
+}
+
+templ AgentName(name string, colorClass string) {
+	<p class={ "mb-1 text-xs font-semibold", colorClass }>{ name }</p>
+}
+
+// AgentFixtureMessage — left: colored avatar + name above dark bubble.
+templ AgentFixtureMessage(initial string, name string, avatarBg string, nameColor string, body templ.Component) {
+	<div class="flex items-start gap-2.5" data-role="agent">
+		@AgentAvatar(initial, avatarBg)
+		<div class="min-w-0 max-w-[85%]">
+			@AgentName(name, nameColor)
+			<div class="rounded-2xl bg-[#161b22] px-3.5 py-2.5 text-sm leading-relaxed text-white">
+				@body
+			</div>
+		</div>
+	</div>
+}
+
+// UserFixtureMessage — right-aligned lighter bubble; no avatar/name.
+templ UserFixtureMessage(body templ.Component) {
+	<div class="flex justify-end" data-role="user">
+		<div class="max-w-[85%] rounded-2xl bg-[#30363d] px-3.5 py-2.5 text-sm leading-relaxed text-white">
+			@body
+		</div>
+	</div>
+}
+
+// NestedQuoteBlock — mini avatar+name quote inside a bubble (group stub).
+templ NestedQuoteBlock(initial string, name string, avatarBg string, nameColor string, quote string) {
+	<div class="mb-2 rounded-xl bg-black/40 px-2.5 py-2" data-role="quote">
+		<div class="mb-1 flex items-center gap-1.5">
+			<span class={ "flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[8px] font-semibold text-white", avatarBg }>{ initial }</span>
+			<span class={ "text-[11px] font-semibold", nameColor }>{ name }</span>
+		</div>
+		<p class="text-[12px] leading-snug text-white/80">{ quote }</p>
+	</div>
+}
+
+templ RoomSimpleComposer(placeholder string) {
+	<div id="workbench-v2-room-composer" class="shrink-0 border-t border-border bg-background px-3 py-3">
+		<form class="flex items-center gap-2 rounded-2xl border border-border bg-muted/40 px-3 py-2" action="#" method="post" onsubmit="return false">
+			<label class="sr-only" for="workbench-v2-room-composer-input">{ placeholder }</label>
+			<input
+				id="workbench-v2-room-composer-input"
+				type="text"
+				name="message"
+				placeholder={ placeholder }
+				autocomplete="off"
+				class="min-w-0 flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground focus:outline-none"
+			/>
+			<button
+				type="submit"
+				class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground transition-colors hover:bg-primary/90"
+				aria-label="Send message"
+				title="Send"
+			>
+				<svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 11.5L21 3l-8.5 18-2.5-7.5L3 11.5z"></path>
+				</svg>
+			</button>
+		</form>
+	</div>
+}
+
+templ botDMBody1() {
+	<p>Rail tip LGTM. Next: replace empty Bot Chat stubs with a Grok-like transcript and a single rounded composer well.</p>
+}
+
+templ botDMBody2() {
+	<p>Keep the roster rail and leave @InlineCodePill("#workbench-v2-interagent-chips") as bare centered lines among messages.</p>
+}
+
+templ botDMUser1() {
+	<p>Ship a transcript for dm/bot plus group/vamos-dev — SSR stub is fine.</p>
+}
+
+templ botDMBody3() {
+	<p>On it. Composer placeholder should read @InlineCodePill("Message Bot") with compact send; drop cluttered Vamos chrome.</p>
+}
+
+templ BotDMFixtureTranscript() {
+	@AgentFixtureMessage("B", "Bot", "bg-fuchsia-500/90", "text-fuchsia-300", botDMBody1())
+	@InterAgentMessageChips()
+	@AgentFixtureMessage("B", "Bot", "bg-fuchsia-500/90", "text-fuchsia-300", botDMBody2())
+	@UserFixtureMessage(botDMUser1())
+	@AgentFixtureMessage("B", "Bot", "bg-fuchsia-500/90", "text-fuchsia-300", botDMBody3())
+}
+
+templ groupFEBody() {
+	<p>Feel ask: Grok Bot–like bubbles — left agents with colored avatar+name, right user with no header.</p>
+}
+
+templ groupLeadBody() {
+	@NestedQuoteBlock("I", "Chestnut Infra Engineer", "bg-teal-600", "text-teal-300", "Host slug ai470-agent-home-sketch is up; rebuild after tip.")
+	<p>Greenlit. Prefer HTML in @InlineCodePill("RoomChatPane"); reuse agentchat only if clean.</p>
+}
+
+templ groupUserBody() {
+	<p>Also bump chip vertical gap a touch if cheap — @InlineCodePill("gap-3") → @InlineCodePill("gap-4").</p>
+}
+
+templ groupInfraBody() {
+	<p>After commit rebuild with @InlineCodePill("/tmp/ai470_build2.sh") for this tip host.</p>
+}
+
+templ researchDMBody1() {
+	<p>Pulled the latest notes on Chestnut Eng onboarding. Want the short path or the deep dive?</p>
+}
+
+templ researchDMUser1() {
+	<p>Short path — how do I get read-only access?</p>
+}
+
+templ researchDMBody2() {
+	<p>Use @InlineCodePill("just setup") then ask Infra for @InlineCodePill("chestnut envs") read-only.</p>
+}
+
+templ ResearchDMFixtureTranscript() {
+	@AgentFixtureMessage("R", "Research agent", "bg-sky-500/90", "text-sky-300", researchDMBody1())
+	@UserFixtureMessage(researchDMUser1())
+	@AgentFixtureMessage("R", "Research agent", "bg-sky-500/90", "text-sky-300", researchDMBody2())
+}
+
+templ GroupVamosDevFixtureTranscript() {
+	@AgentFixtureMessage("F", "Chestnut FE Engineer", "bg-amber-700", "text-amber-300", groupFEBody())
+	@AgentFixtureMessage("L", "Chestnut Lead Engineer", "bg-emerald-600", "text-emerald-300", groupLeadBody())
+	@UserFixtureMessage(groupUserBody())
+	@AgentFixtureMessage("I", "Chestnut Infra Engineer", "bg-teal-600", "text-teal-300", groupInfraBody())
+}
+
+templ planAlphaBody1() {
+	<p>Plan Alpha is the sketch lane for agent-home chrome. Artifacts hold @InlineCodePill("design.md") — rail shows title only.</p>
+}
+
+templ planAlphaUser1() {
+	<p>Open the plan and switch artifacts — need jank coverage for room↔artifact.</p>
+}
+
+templ planAlphaBody2() {
+	<p>On it. Preview should update when you pick @InlineCodePill("tasks.md") vs @InlineCodePill("design.md").</p>
+}
+
+templ PlanAlphaFixtureTranscript() {
+	@AgentFixtureMessage("B", "Bot", "bg-fuchsia-500/90", "text-fuchsia-300", planAlphaBody1())
+	@UserFixtureMessage(planAlphaUser1())
+	@AgentFixtureMessage("B", "Bot", "bg-fuchsia-500/90", "text-fuchsia-300", planAlphaBody2())
+}
+
+// InterAgentMessageChips is chrome: agent↔agent traffic surfaces in the open Bot Chat, not the rail.
+// Match UX ref: centered bare lines, overlapping circular avatars, summary + per-peer counts (no card/border).
+templ InterAgentMessageChips() {
+	<div id="workbench-v2-interagent-chips" class="flex flex-col items-center gap-4 py-2">
+		<button
+			type="button"
+			class="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground/80"
+		>
+			<span>Messaged</span>
+			<span class="inline-flex -space-x-1.5" aria-hidden="true">
+				<span class="relative z-10 inline-flex h-4 w-4 items-center justify-center rounded-full bg-amber-800 ring-1 ring-background text-[7px] font-semibold text-amber-100">F</span>
+				<span class="relative z-0 inline-flex h-4 w-4 items-center justify-center rounded-full bg-fuchsia-600 ring-1 ring-background text-[7px] font-semibold text-fuchsia-50">L</span>
+			</span>
+			<span class="text-foreground/80">2 Bots</span>
+		</button>
+		<button
+			type="button"
+			class="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground/80"
+		>
+			<span>3 messages with</span>
+			<span class="inline-flex h-4 w-4 items-center justify-center rounded-full bg-amber-800 text-[7px] font-semibold text-amber-100" aria-hidden="true">F</span>
+			<span class="text-foreground/80">Vamos FE Engineer</span>
+		</button>
+		<button
+			type="button"
+			class="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground/80"
+		>
+			<span>2 messages with</span>
+			<span class="inline-flex h-4 w-4 items-center justify-center rounded-full bg-fuchsia-600 text-[7px] font-semibold text-fuchsia-50" aria-hidden="true">L</span>
+			<span class="text-foreground/80">Vamos Lead Engineer</span>
+		</button>
+	</div>
+}
+
+// RoomArtifactPane — fixture artifacts; list click switches preview (Datastar local signal).
+templ RoomArtifactPane(kind RoomKind, id string) {
+	<div
+		id="workbench-v2-room-artifacts"
+		class="flex h-full min-h-0 flex-col"
+		data-signals={ "{artPreview: '" + artPreviewInitial(kind, id) + "'}" }
+	>
+		<header class="shrink-0 border-b border-border px-4 py-2">
+			<p class="text-sm font-semibold text-foreground">Artifacts</p>
+			<p class="text-[11px] text-muted-foreground">
+				if kind == KindDM && id == "bot" {
+					Bot Chat files
+				} else if kind == KindDM && id == "research" {
+					Research files
+				} else if kind == KindGroup && id == "vamos-dev" {
+					Group files
+				} else if kind == KindPlan {
+					Plan dir files
+				} else {
+					{ string(kind) } / { id }
+				}
+			</p>
+		</header>
+		<div class="min-h-0 flex-1 space-y-3 overflow-y-auto p-4">
+			if kind == KindDM && id == "bot" {
+				<ul class="space-y-1" id="workbench-v2-artifact-list">
+					<li>
+						<button type="button" data-on:click="$artPreview = 'reply-draft.md'" data-class="{ 'bg-muted/40': $artPreview === 'reply-draft.md' }" class="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm hover:bg-muted/50">
+							<span class="text-[10px] text-muted-foreground">MD</span>
+							<span class="truncate font-medium text-foreground">reply-draft.md</span>
+							<span class="ml-auto shrink-0 text-[10px] text-muted-foreground">2m</span>
+						</button>
+					</li>
+					<li>
+						<button type="button" data-on:click="$artPreview = 'chips_stub.go'" data-class="{ 'bg-muted/40': $artPreview === 'chips_stub.go' }" class="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm hover:bg-muted/50">
+							<span class="text-[10px] text-muted-foreground">GO</span>
+							<span class="truncate text-foreground">chips_stub.go</span>
+							<span class="ml-auto shrink-0 text-[10px] text-muted-foreground">1h</span>
+						</button>
+					</li>
+					<li>
+						<button type="button" data-on:click="$artPreview = 'chip-ref.png'" data-class="{ 'bg-muted/40': $artPreview === 'chip-ref.png' }" class="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm hover:bg-muted/50">
+							<span class="text-[10px] text-muted-foreground">PNG</span>
+							<span class="truncate text-foreground">chip-ref.png</span>
+							<span class="ml-auto shrink-0 text-[10px] text-muted-foreground">Thu</span>
+						</button>
+					</li>
+				</ul>
+				<div id="workbench-v2-artifact-preview" class="rounded-xl border border-border bg-muted/20 p-3">
+					<div data-show="$artPreview === 'reply-draft.md'">
+						<p class="mb-2 text-[11px] font-medium text-muted-foreground">reply-draft.md</p>
+						<p class="font-mono text-[12px] leading-relaxed text-foreground/90">Keep chips among messages. Composer: Message Bot. Chip gap-4.</p>
+					</div>
+					<div data-show="$artPreview === 'chips_stub.go'">
+						<p class="mb-2 text-[11px] font-medium text-muted-foreground">chips_stub.go</p>
+						<p class="font-mono text-[12px] leading-relaxed text-foreground/90">InterAgentMessageChips: centered bare lines + overlapping avatars.</p>
+					</div>
+					<div data-show="$artPreview === 'chip-ref.png'">
+						<p class="mb-2 text-[11px] font-medium text-muted-foreground">chip-ref.png</p>
+						<p class="text-sm text-muted-foreground">UX ref shot (placeholder preview).</p>
+					</div>
+				</div>
+			} else if kind == KindDM && id == "research" {
+				<ul class="space-y-1" id="workbench-v2-artifact-list">
+					<li>
+						<button type="button" data-on:click="$artPreview = 'onboarding-short.md'" data-class="{ 'bg-muted/40': $artPreview === 'onboarding-short.md' }" class="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm hover:bg-muted/50">
+							<span class="text-[10px] text-muted-foreground">MD</span>
+							<span class="truncate font-medium text-foreground">onboarding-short.md</span>
+							<span class="ml-auto shrink-0 text-[10px] text-muted-foreground">Thu</span>
+						</button>
+					</li>
+					<li>
+						<button type="button" data-on:click="$artPreview = 'sources.md'" data-class="{ 'bg-muted/40': $artPreview === 'sources.md' }" class="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm hover:bg-muted/50">
+							<span class="text-[10px] text-muted-foreground">MD</span>
+							<span class="truncate text-foreground">sources.md</span>
+							<span class="ml-auto shrink-0 text-[10px] text-muted-foreground">Wed</span>
+						</button>
+					</li>
+				</ul>
+				<div id="workbench-v2-artifact-preview" class="rounded-xl border border-border bg-muted/20 p-3">
+					<div data-show="$artPreview === 'onboarding-short.md'">
+						<p class="mb-2 text-[11px] font-medium text-muted-foreground">onboarding-short.md</p>
+						<p class="font-mono text-[12px] leading-relaxed text-foreground/90">Short path: just setup, then chestnut envs read-only.</p>
+					</div>
+					<div data-show="$artPreview === 'sources.md'">
+						<p class="mb-2 text-[11px] font-medium text-muted-foreground">sources.md</p>
+						<p class="font-mono text-[12px] leading-relaxed text-foreground/90">Chestnut Eng wiki · monorepo/frontend/</p>
+					</div>
+				</div>
+			} else if kind == KindGroup && id == "vamos-dev" {
+				<ul class="space-y-1" id="workbench-v2-artifact-list">
+					<li>
+						<button type="button" data-on:click="$artPreview = 'setup-notes.md'" data-class="{ 'bg-muted/40': $artPreview === 'setup-notes.md' }" class="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm hover:bg-muted/50">
+							<span class="text-[10px] text-muted-foreground">MD</span>
+							<span class="truncate font-medium text-foreground">setup-notes.md</span>
+							<span class="ml-auto shrink-0 text-[10px] text-muted-foreground">5m</span>
+						</button>
+					</li>
+					<li>
+						<button type="button" data-on:click="$artPreview = 'just-setup'" data-class="{ 'bg-muted/40': $artPreview === 'just-setup' }" class="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm hover:bg-muted/50">
+							<span class="text-[10px] text-muted-foreground">SH</span>
+							<span class="truncate text-foreground">just setup</span>
+							<span class="ml-auto shrink-0 text-[10px] text-muted-foreground">Wed</span>
+						</button>
+					</li>
+				</ul>
+				<div id="workbench-v2-artifact-preview" class="rounded-xl border border-border bg-muted/20 p-3">
+					<div data-show="$artPreview === 'setup-notes.md'">
+						<p class="mb-2 text-[11px] font-medium text-muted-foreground">setup-notes.md</p>
+						<p class="font-mono text-[12px] leading-relaxed text-foreground/90">Read-only path: monorepo/frontend/. Run just setup then chestnut envs.</p>
+					</div>
+					<div data-show="$artPreview === 'just-setup'">
+						<p class="mb-2 text-[11px] font-medium text-muted-foreground">just setup</p>
+						<p class="font-mono text-[12px] leading-relaxed text-foreground/90">Recipe: just setup</p>
+					</div>
+				</div>
+			} else if kind == KindPlan {
+				<ul class="space-y-1" id="workbench-v2-artifact-list">
+					<li>
+						<button type="button" data-on:click="$artPreview = 'design.md'" data-class="{ 'bg-muted/40': $artPreview === 'design.md' }" class="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm hover:bg-muted/50">
+							<span class="text-[10px] text-muted-foreground">MD</span>
+							<span class="truncate font-medium text-foreground">design.md</span>
+							<span class="ml-auto shrink-0 text-[10px] text-muted-foreground">Thu 2:18 PM</span>
+						</button>
+					</li>
+					<li>
+						<button type="button" data-on:click="$artPreview = 'tasks.md'" data-class="{ 'bg-muted/40': $artPreview === 'tasks.md' }" class="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm hover:bg-muted/50">
+							<span class="text-[10px] text-muted-foreground">MD</span>
+							<span class="truncate text-foreground">tasks.md</span>
+							<span class="ml-auto shrink-0 text-[10px] text-muted-foreground">Wed</span>
+						</button>
+					</li>
+				</ul>
+				<div id="workbench-v2-artifact-preview" class="rounded-xl border border-border bg-muted/20 p-3">
+					<div data-show="$artPreview === 'design.md'">
+						<p class="mb-2 text-[11px] font-medium text-muted-foreground">design.md</p>
+						<p class="font-mono text-[12px] leading-relaxed text-foreground/90">Alpha plan: title on rail; preview lives here in artifacts, not under the roster row.</p>
+					</div>
+					<div data-show="$artPreview === 'tasks.md'">
+						<p class="mb-2 text-[11px] font-medium text-muted-foreground">tasks.md</p>
+						<p class="font-mono text-[12px] leading-relaxed text-foreground/90">Research clickable · Artifact preview switch · Multi-select menu</p>
+					</div>
+				</div>
+			} else {
+				<p class="text-sm text-muted-foreground">No artifacts for this room yet.</p>
+			}
+		</div>
+	</div>
+}
+
+templ RoomWorkbenchPage(userEmail string, kind RoomKind, id string, state workbench.WorkbenchState) {
+	@layouts.Root(layouts.RootArgs{
+		Title:      string(kind) + " / " + id,
+		ShowHeader: true,
+		UserEmail:  userEmail,
+		PageType:   layouts.PageTypeAgentChat,
+	}) {
+		@workbench.Workbench(state)
+	}
+}
