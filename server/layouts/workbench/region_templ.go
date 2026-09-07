@@ -29,7 +29,7 @@ func Region(state WorkbenchState, region WorkbenchRegion) templ.Component {
 			templ_7745c5c3_Var1 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		var templ_7745c5c3_Var2 = []any{RegionInitialClass(state, region) + " workbench-region overflow-hidden rounded-none border border-border shadow-none max-md:!w-full max-md:!flex-1 " + RegionSurfaceClass(region)}
+		var templ_7745c5c3_Var2 = []any{RegionInitialClass(state, region) + " workbench-region overflow-hidden rounded-none border-0 shadow-none max-md:!w-full max-md:!flex-1 " + RegionSurfaceClass(region)}
 		templ_7745c5c3_Err = templ.RenderCSSItems(ctx, templ_7745c5c3_Buffer, templ_7745c5c3_Var2...)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err

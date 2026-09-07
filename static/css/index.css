@@ -660,3 +660,22 @@ html[data-wb2-vt-nav="thread-switch"] #workbench-v2-chat {
 #thoughts-markdown-scroll-region {
   overscroll-behavior-y: contain;
 }
+
+/* AI-470 flush chrome — Grok Bot edge-to-edge columns (no inset card gutters).
+   Hairlines only between columns; sharp corners; no outer padding. */
+#workbench-root {
+  padding: 0 !important;
+}
+#workbench-regions {
+  gap: 0 !important;
+}
+#workbench-regions > .workbench-region {
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  border-style: none;
+  border-width: 0;
+}
+/* Handles sit between regions (w-0); border-r on every region except the last paints hairlines. */
+#workbench-regions > .workbench-region:not(:last-child) {
+  border-right: 1px solid hsl(var(--border));
+}

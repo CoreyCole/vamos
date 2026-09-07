@@ -1795,8 +1795,36 @@ func TestWorkbenchV2FlushChrome(t *testing.T) {
 	if strings.Contains(out, "rounded-lg border border-border shadow-sm") {
 		t.Fatal("regions still have rounded-lg/shadow-sm")
 	}
-	if !strings.Contains(out, "rounded-none") || !strings.Contains(out, "shadow-none") {
-		t.Fatal("regions should be rounded-none shadow-none")
+	if !strings.Contains(out, "workbench-region overflow-hidden rounded-none border-0 shadow-none") {
+		t.Fatal("regions should be rounded-none border-0 shadow-none (flush shells)")
+	}
+	if strings.Contains(out, "workbench-region overflow-hidden rounded-none border border-border") {
+		t.Fatal("regions still have full card border")
 	}
 }
 
+
+
+func TestWorkbenchV2FlushChromeCSS(t *testing.T) {
+	t.Parallel()
+	b, err := os.ReadFile("../../../static/css/index.css")
+	if err != nil {
+		// path from package dir during go test
+		b, err = os.ReadFile("static/css/index.css")
+	}
+	if err != nil {
+		t.Skip("index.css not found from test cwd")
+	}
+	out := string(b)
+	for _, want := range []string{
+		"AI-470 flush chrome",
+		"#workbench-root",
+		"padding: 0 !important",
+		"#workbench-regions > .workbench-region:not(:last-child)",
+		"border-right: 1px solid",
+	} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("index.css missing flush rule %q", want)
+		}
+	}
+}

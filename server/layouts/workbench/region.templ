@@ -13,7 +13,7 @@ templ Region(state WorkbenchState, region WorkbenchRegion) {
 		data-workbench-kind={ string(region.Kind) }
 		data-class={ RegionDataClass(region) }
 		data-attr:aria-hidden={ RegionAriaHidden(region) }
-		class={ RegionInitialClass(state, region) + " workbench-region overflow-hidden rounded-none border border-border shadow-none max-md:!w-full max-md:!flex-1 " + RegionSurfaceClass(region) }
+		class={ RegionInitialClass(state, region) + " workbench-region overflow-hidden rounded-none border-0 shadow-none max-md:!w-full max-md:!flex-1 " + RegionSurfaceClass(region) }
 		if flexStyle := RegionSSRFlexStyle(state, region); flexStyle != "" {
 			style={ flexStyle }
 		}
