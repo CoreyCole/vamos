@@ -154,17 +154,13 @@ function applyRegionRatios(root) {
   const availableWidth = availableRegionWidth(root);
   if (availableWidth <= 0) return;
 
-  // First paint after SSR flex: seed width px from layout, do not rewrite flex
-  // (avoids default→pixel redistrib flash on room switch).
-  const ssrOnly =
+  // Keep SSR flex (SavedConfig ratios) until the user drags a grip.
+  // Seeding/rewriting pixels on load caused measurable width drift on room switch.
+  if (
+    root.dataset.workbenchPixelLock !== "1" &&
     regions.length > 0 &&
-    regions.every(
-      (region) => !region.dataset.workbenchWidthPx && regionHasSSRFlex(region),
-    );
-  if (ssrOnly) {
-    for (const region of regions) {
-      region.dataset.workbenchWidthPx = regionWidth(region).toFixed(2);
-    }
+    regions.every((region) => regionHasSSRFlex(region))
+  ) {
     return;
   }
 
@@ -184,6 +180,11 @@ function applyRegionRatios(root) {
 
   const primaryMin = regionMinWidth(primary);
   const fixedRegions = regions.filter((region) => region !== primary);
+  const visibleRatioTotal =
+    regions.reduce(
+      (sum, region) => sum + Number(region.dataset.workbenchRatio || 0),
+      0,
+    ) || 1;
   let reservedForOthers = primaryMin;
   let fixedWidth = 0;
   const widths = new Map();
@@ -193,7 +194,8 @@ function applyRegionRatios(root) {
       .reduce((sum, other) => sum + regionMinWidth(other), 0);
     const storedWidth = Number(region.dataset.workbenchWidthPx || 0);
     const ratioWidth =
-      Number(region.dataset.workbenchRatio || 0) * availableWidth;
+      (Number(region.dataset.workbenchRatio || 0) / visibleRatioTotal) *
+      availableWidth;
     const width = clampRegionWidth(
       region,
       storedWidth > 0 ? storedWidth : ratioWidth,
@@ -313,6 +315,16 @@ function startResize(event) {
   const after = regionBySignal(root, handle.dataset.workbenchAfter);
   if (!before || !after || !isVisible(before) || !isVisible(after)) return;
 
+  // First grip drag: convert SSR flex to pixel lock from current painted widths.
+  if (root.dataset.workbenchPixelLock !== "1") {
+    root.dataset.workbenchPixelLock = "1";
+    for (const region of visibleRegions(root)) {
+      const w = regionWidth(region);
+      region.dataset.workbenchWidthPx = w.toFixed(2);
+      setRegionWidth(region, w);
+    }
+  }
+
   event.preventDefault();
   const availableWidth = availableRegionWidth(root);
   if (availableWidth <= 0) return;
@@ -422,6 +434,11 @@ function reflowWorkbenchesAfterWindowResize() {
   windowResizeFrame = requestAnimationFrame(() => {
     windowResizeFrame = undefined;
     for (const root of document.querySelectorAll("#workbench-root")) {
+      if (root.dataset.workbenchPixelLock !== "1") {
+        // SSR flex scales with container — do not snap to pixels on window resize.
+        updateHandles(root);
+        continue;
+      }
       for (const region of allRegions(root)) {
         delete region.dataset.workbenchWidthPx;
       }
