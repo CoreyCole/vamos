@@ -2,6 +2,7 @@ package auth
 
 import (
 	"crypto/ed25519"
+	"html"
 	"net/http"
 	"strings"
 	"time"
@@ -80,11 +81,24 @@ func (s *Service) HandleAgentBrowserLogin(c echo.Context, cfg AgentBrowserAuthCo
 		Value:    session.ID,
 		Path:     "/",
 		HttpOnly: true,
-		Secure:   cookieSecureForRequest(c.Request()),
-		SameSite: http.SameSiteLaxMode,
+		Secure:   true,
+		SameSite: http.SameSiteNoneMode,
 		Expires:  session.ExpiresAt,
 	})
-	return c.Redirect(http.StatusTemporaryRedirect, claims.RedirectPath)
+	// Prefer 200 + meta-refresh over 307: some CDP/automation clients drop
+	// Set-Cookie on Temporary Redirect, then follow / unauthenticated and hit
+	// the Google workspace switch wall.
+	redirect := strings.TrimSpace(claims.RedirectPath)
+	if redirect == "" || redirect == "/" {
+		redirect = "/threads"
+	}
+	safe := html.EscapeString(redirect)
+	page := "<!DOCTYPE html><html><head><meta charset=\"utf-8\">" +
+		"<meta http-equiv=\"refresh\" content=\"0;url=" + safe + "\">" +
+		"<title>Signing in…</title></head><body>" +
+		"<p>Signing in… <a href=\"" + safe + "\">Continue</a></p>" +
+		"</body></html>"
+	return c.HTML(http.StatusOK, page)
 }
 
 func MintBrowserToken(credential MachineCredential, req BrowserTokenRequest, cfg AgentBrowserAuthConfig) (BrowserTokenResponse, error) {

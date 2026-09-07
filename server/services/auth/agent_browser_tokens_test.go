@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"strings"
 	"bytes"
 	"crypto/ed25519"
 	"encoding/json"
@@ -83,11 +84,15 @@ func TestAgentBrowserMintAndLoginSetsSessionCookie(t *testing.T) {
 	loginReq.Header.Set("X-Forwarded-Proto", "https")
 	loginRec := httptest.NewRecorder()
 	e.ServeHTTP(loginRec, loginReq)
-	if loginRec.Code != http.StatusTemporaryRedirect {
-		t.Fatalf("expected login redirect 307, got %d: %s", loginRec.Code, loginRec.Body.String())
+	if loginRec.Code != http.StatusOK {
+		t.Fatalf("expected login 200 meta-refresh, got %d: %s", loginRec.Code, loginRec.Body.String())
 	}
-	if location := loginRec.Header().Get("Location"); location != "/agent-chat?thread=thread-1" {
-		t.Fatalf("expected /agent-chat redirect, got %q", location)
+	loginBody := loginRec.Body.String()
+	if !strings.Contains(loginBody, "/agent-chat?thread=thread-1") {
+		t.Fatalf("expected meta-refresh to /agent-chat?thread=thread-1, body=%q", loginBody)
+	}
+	if loc := loginRec.Header().Get("Location"); loc != "" {
+		t.Fatalf("expected no Location header on 200 meta-refresh, got %q", loc)
 	}
 	cookies := loginRec.Result().Cookies()
 	if len(cookies) != 1 {
@@ -291,7 +296,7 @@ func TestAgentBrowserLoginRejectsWrongSlugPurposeExpiredAndReplay(t *testing.T) 
 		e := echo.New()
 		RegisterAgentBrowserAuthRoutes(e, newPlaywrightAuthTestService(t), AgentBrowserAuthConfig{Enabled: true, WorkspaceSlug: "stage", VerifyKey: publicKey, Replay: replay})
 		token := mintToken(t, agentbrowser.Claims{Purpose: agentbrowser.PurposeHermesChat, Email: "agent@example.test", TargetSlug: "stage", RedirectPath: "/agent-chat", ExpiresAt: time.Now().Add(time.Minute).Unix(), KeyID: "mc_1"})
-		for i, want := range []int{http.StatusTemporaryRedirect, http.StatusForbidden} {
+		for i, want := range []int{http.StatusOK, http.StatusForbidden} {
 			req := httptest.NewRequest(http.MethodGet, "/internal/agent-auth/browser-login?purpose=hermes_chat&token="+url.QueryEscape(token), nil)
 			rec := httptest.NewRecorder()
 			e.ServeHTTP(rec, req)
