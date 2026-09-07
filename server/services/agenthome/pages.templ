@@ -12,12 +12,12 @@ type RosterSelection struct {
 }
 
 templ RosterRail(sel RosterSelection) {
-	<div id="workbench-v2-roster" class="flex h-full min-h-0 flex-col gap-3 overflow-hidden p-2">
-		<div class="flex shrink-0 items-center gap-2 px-1">
+	<div id="workbench-v2-roster" class="flex h-full min-h-0 flex-col overflow-hidden">
+		<header id="workbench-v2-roster-header" class="flex h-10 min-h-10 max-h-10 shrink-0 items-center gap-2 overflow-hidden border-b border-border px-2.5">
 			<button
 				type="button"
 				data-workbench-threads-toggle
-				class="hidden h-9 w-9 shrink-0 items-center justify-center rounded-md border border-border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:inline-flex"
+				class="hidden h-7 w-7 shrink-0 items-center justify-center rounded-md border border-border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:inline-flex"
 				data-on:click={ workbench.ThreadsHideClickAction() }
 				data-attr:aria-expanded="$workbench.regions.workbenchV2Threads.visible ? 'true' : 'false'"
 				aria-controls="workbench-v2-threads"
@@ -29,7 +29,7 @@ templ RosterRail(sel RosterSelection) {
 				</svg>
 			</button>
 			<label class="sr-only" for="workbench-v2-roster-search">Search</label>
-			<div class="flex min-w-0 flex-1 items-center gap-2 rounded-lg border border-border bg-muted/40 px-2.5 py-1.5">
+			<div class="flex h-7 min-w-0 flex-1 items-center gap-2 rounded-md border border-border bg-muted/40 px-2">
 				<svg class="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M11 18a7 7 0 100-14 7 7 0 000 14z"></path>
 				</svg>
@@ -37,10 +37,11 @@ templ RosterRail(sel RosterSelection) {
 					id="workbench-v2-roster-search"
 					type="search"
 					placeholder="Search"
-					class="min-w-0 flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground focus:outline-none"
+					class="min-w-0 flex-1 bg-transparent text-[13px] leading-none text-foreground placeholder:text-muted-foreground focus:outline-none"
 				/>
 			</div>
-		</div>
+		</header>
+		<div class="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden p-2">
 		<div class="flex shrink-0 gap-2 px-1">
 			<a
 				href="/rooms/dm/bot"
@@ -153,6 +154,7 @@ templ RosterRail(sel RosterSelection) {
 				box-shadow: inset 0 0 0 1px rgb(56 189 248 / 0.7);
 			}
 		</style>
+		</div>
 	</div>
 }
 

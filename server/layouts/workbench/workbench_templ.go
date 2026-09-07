@@ -241,7 +241,7 @@ func ChatColumnWithReopen(threadsOpen bool, title string, chat templ.Component) 
 			templ_7745c5c3_Var13 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 15, "<div class=\"flex h-full min-h-0 flex-col bg-background\"><header id=\"workbench-v2-chat-header\" class=\"flex h-10 shrink-0 items-center gap-2 border-b border-border px-2.5\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 15, "<div class=\"flex h-full min-h-0 flex-col bg-background\"><header id=\"workbench-v2-chat-header\" class=\"flex h-10 min-h-10 max-h-10 shrink-0 items-center gap-2 overflow-hidden border-b border-border px-2.5\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -249,19 +249,19 @@ func ChatColumnWithReopen(threadsOpen bool, title string, chat templ.Component) 
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 16, "<div class=\"min-w-0 flex-1\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 16, "<div class=\"flex min-h-0 min-w-0 flex-1 items-center\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		if title != "" {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 17, "<p class=\"truncate text-[13px] font-semibold leading-tight text-foreground\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 17, "<p class=\"truncate text-[13px] font-semibold leading-none text-foreground\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var14 string
 			templ_7745c5c3_Var14, templ_7745c5c3_Err = templ.JoinStringErrs(title)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/layouts/workbench/workbench.templ`, Line: 67, Col: 88}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/layouts/workbench/workbench.templ`, Line: 67, Col: 87}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var14))
 			if templ_7745c5c3_Err != nil {

@@ -40,7 +40,7 @@ func RosterRail(sel RosterSelection) templ.Component {
 			templ_7745c5c3_Var1 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<div id=\"workbench-v2-roster\" class=\"flex h-full min-h-0 flex-col gap-3 overflow-hidden p-2\"><div class=\"flex shrink-0 items-center gap-2 px-1\"><button type=\"button\" data-workbench-threads-toggle class=\"hidden h-9 w-9 shrink-0 items-center justify-center rounded-md border border-border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:inline-flex\" data-on:click=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<div id=\"workbench-v2-roster\" class=\"flex h-full min-h-0 flex-col overflow-hidden\"><header id=\"workbench-v2-roster-header\" class=\"flex h-10 min-h-10 max-h-10 shrink-0 items-center gap-2 overflow-hidden border-b border-border px-2.5\"><button type=\"button\" data-workbench-threads-toggle class=\"hidden h-7 w-7 shrink-0 items-center justify-center rounded-md border border-border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:inline-flex\" data-on:click=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -53,7 +53,7 @@ func RosterRail(sel RosterSelection) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "\" data-attr:aria-expanded=\"$workbench.regions.workbenchV2Threads.visible ? 'true' : 'false'\" aria-controls=\"workbench-v2-threads\" aria-label=\"Hide roster sidebar\" title=\"Hide roster sidebar\"><svg class=\"h-4 w-4\" aria-hidden=\"true\" fill=\"none\" stroke=\"currentColor\" viewBox=\"0 0 24 24\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2\" d=\"M4 6h16M4 12h16M4 18h16\"></path></svg></button> <label class=\"sr-only\" for=\"workbench-v2-roster-search\">Search</label><div class=\"flex min-w-0 flex-1 items-center gap-2 rounded-lg border border-border bg-muted/40 px-2.5 py-1.5\"><svg class=\"h-3.5 w-3.5 shrink-0 text-muted-foreground\" aria-hidden=\"true\" fill=\"none\" stroke=\"currentColor\" viewBox=\"0 0 24 24\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2\" d=\"M21 21l-4.35-4.35M11 18a7 7 0 100-14 7 7 0 000 14z\"></path></svg> <input id=\"workbench-v2-roster-search\" type=\"search\" placeholder=\"Search\" class=\"min-w-0 flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground focus:outline-none\"></div></div><div class=\"flex shrink-0 gap-2 px-1\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "\" data-attr:aria-expanded=\"$workbench.regions.workbenchV2Threads.visible ? 'true' : 'false'\" aria-controls=\"workbench-v2-threads\" aria-label=\"Hide roster sidebar\" title=\"Hide roster sidebar\"><svg class=\"h-4 w-4\" aria-hidden=\"true\" fill=\"none\" stroke=\"currentColor\" viewBox=\"0 0 24 24\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2\" d=\"M4 6h16M4 12h16M4 18h16\"></path></svg></button> <label class=\"sr-only\" for=\"workbench-v2-roster-search\">Search</label><div class=\"flex h-7 min-w-0 flex-1 items-center gap-2 rounded-md border border-border bg-muted/40 px-2\"><svg class=\"h-3.5 w-3.5 shrink-0 text-muted-foreground\" aria-hidden=\"true\" fill=\"none\" stroke=\"currentColor\" viewBox=\"0 0 24 24\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2\" d=\"M21 21l-4.35-4.35M11 18a7 7 0 100-14 7 7 0 000 14z\"></path></svg> <input id=\"workbench-v2-roster-search\" type=\"search\" placeholder=\"Search\" class=\"min-w-0 flex-1 bg-transparent text-[13px] leading-none text-foreground placeholder:text-muted-foreground focus:outline-none\"></div></header><div class=\"flex min-h-0 flex-1 flex-col gap-3 overflow-hidden p-2\"><div class=\"flex shrink-0 gap-2 px-1\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -211,7 +211,7 @@ func RosterRail(sel RosterSelection) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 17, "<style>\n\t\t\t#workbench-v2-roster a.roster-multi-selected {\n\t\t\t\tbackground-color: rgb(14 165 233 / 0.25);\n\t\t\t\tbox-shadow: inset 0 0 0 1px rgb(56 189 248 / 0.7);\n\t\t\t}\n\t\t</style></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 17, "<style>\n\t\t\t#workbench-v2-roster a.roster-multi-selected {\n\t\t\t\tbackground-color: rgb(14 165 233 / 0.25);\n\t\t\t\tbox-shadow: inset 0 0 0 1px rgb(56 189 248 / 0.7);\n\t\t\t}\n\t\t</style></div></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -248,7 +248,7 @@ func RoomChatPane(kind RoomKind, id string, title string, body string) templ.Com
 		var templ_7745c5c3_Var16 string
 		templ_7745c5c3_Var16, templ_7745c5c3_Err = templ.JoinStringErrs(title)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agenthome/pages.templ`, Line: 163, Col: 59}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agenthome/pages.templ`, Line: 165, Col: 59}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var16))
 		if templ_7745c5c3_Err != nil {
@@ -261,7 +261,7 @@ func RoomChatPane(kind RoomKind, id string, title string, body string) templ.Com
 		var templ_7745c5c3_Var17 string
 		templ_7745c5c3_Var17, templ_7745c5c3_Err = templ.JoinStringErrs(string(kind))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agenthome/pages.templ`, Line: 164, Col: 62}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agenthome/pages.templ`, Line: 166, Col: 62}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var17))
 		if templ_7745c5c3_Err != nil {
@@ -274,7 +274,7 @@ func RoomChatPane(kind RoomKind, id string, title string, body string) templ.Com
 		var templ_7745c5c3_Var18 string
 		templ_7745c5c3_Var18, templ_7745c5c3_Err = templ.JoinStringErrs(id)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agenthome/pages.templ`, Line: 164, Col: 71}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agenthome/pages.templ`, Line: 166, Col: 71}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var18))
 		if templ_7745c5c3_Err != nil {
@@ -312,7 +312,7 @@ func RoomChatPane(kind RoomKind, id string, title string, body string) templ.Com
 			var templ_7745c5c3_Var19 string
 			templ_7745c5c3_Var19, templ_7745c5c3_Err = templ.JoinStringErrs(body)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agenthome/pages.templ`, Line: 176, Col: 51}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agenthome/pages.templ`, Line: 178, Col: 51}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var19))
 			if templ_7745c5c3_Err != nil {
@@ -368,7 +368,7 @@ func InlineCodePill(text string) templ.Component {
 		var templ_7745c5c3_Var21 string
 		templ_7745c5c3_Var21, templ_7745c5c3_Err = templ.JoinStringErrs(text)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agenthome/pages.templ`, Line: 185, Col: 113}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agenthome/pages.templ`, Line: 187, Col: 113}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var21))
 		if templ_7745c5c3_Err != nil {
@@ -428,7 +428,7 @@ func AgentAvatar(initial string, bgClass string) templ.Component {
 		var templ_7745c5c3_Var25 string
 		templ_7745c5c3_Var25, templ_7745c5c3_Err = templ.JoinStringErrs(initial)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agenthome/pages.templ`, Line: 189, Col: 133}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agenthome/pages.templ`, Line: 191, Col: 133}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var25))
 		if templ_7745c5c3_Err != nil {
@@ -488,7 +488,7 @@ func AgentName(name string, colorClass string) templ.Component {
 		var templ_7745c5c3_Var29 string
 		templ_7745c5c3_Var29, templ_7745c5c3_Err = templ.JoinStringErrs(name)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agenthome/pages.templ`, Line: 193, Col: 61}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agenthome/pages.templ`, Line: 195, Col: 61}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var29))
 		if templ_7745c5c3_Err != nil {
@@ -645,7 +645,7 @@ func NestedQuoteBlock(initial string, name string, avatarBg string, nameColor st
 		var templ_7745c5c3_Var35 string
 		templ_7745c5c3_Var35, templ_7745c5c3_Err = templ.JoinStringErrs(initial)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agenthome/pages.templ`, Line: 222, Col: 139}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agenthome/pages.templ`, Line: 224, Col: 139}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var35))
 		if templ_7745c5c3_Err != nil {
@@ -680,7 +680,7 @@ func NestedQuoteBlock(initial string, name string, avatarBg string, nameColor st
 		var templ_7745c5c3_Var38 string
 		templ_7745c5c3_Var38, templ_7745c5c3_Err = templ.JoinStringErrs(name)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agenthome/pages.templ`, Line: 223, Col: 64}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agenthome/pages.templ`, Line: 225, Col: 64}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var38))
 		if templ_7745c5c3_Err != nil {
@@ -693,7 +693,7 @@ func NestedQuoteBlock(initial string, name string, avatarBg string, nameColor st
 		var templ_7745c5c3_Var39 string
 		templ_7745c5c3_Var39, templ_7745c5c3_Err = templ.JoinStringErrs(quote)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agenthome/pages.templ`, Line: 225, Col: 59}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agenthome/pages.templ`, Line: 227, Col: 59}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var39))
 		if templ_7745c5c3_Err != nil {
@@ -735,7 +735,7 @@ func RoomSimpleComposer(placeholder string) templ.Component {
 		var templ_7745c5c3_Var41 string
 		templ_7745c5c3_Var41, templ_7745c5c3_Err = templ.JoinStringErrs(placeholder)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agenthome/pages.templ`, Line: 232, Col: 78}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agenthome/pages.templ`, Line: 234, Col: 78}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var41))
 		if templ_7745c5c3_Err != nil {
@@ -748,7 +748,7 @@ func RoomSimpleComposer(placeholder string) templ.Component {
 		var templ_7745c5c3_Var42 string
 		templ_7745c5c3_Var42, templ_7745c5c3_Err = templ.ResolveAttributeValue(placeholder)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agenthome/pages.templ`, Line: 237, Col: 29}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agenthome/pages.templ`, Line: 239, Col: 29}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var42)
 		if templ_7745c5c3_Err != nil {
@@ -1392,7 +1392,7 @@ func RoomArtifactPane(kind RoomKind, id string) templ.Component {
 		var templ_7745c5c3_Var63 string
 		templ_7745c5c3_Var63, templ_7745c5c3_Err = templ.ResolveAttributeValue("{artPreview: '" + artPreviewInitial(kind, id) + "'}")
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agenthome/pages.templ`, Line: 378, Col: 70}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agenthome/pages.templ`, Line: 380, Col: 70}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var63)
 		if templ_7745c5c3_Err != nil {
@@ -1426,7 +1426,7 @@ func RoomArtifactPane(kind RoomKind, id string) templ.Component {
 			var templ_7745c5c3_Var64 string
 			templ_7745c5c3_Var64, templ_7745c5c3_Err = templ.JoinStringErrs(string(kind))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agenthome/pages.templ`, Line: 392, Col: 19}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agenthome/pages.templ`, Line: 394, Col: 19}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var64))
 			if templ_7745c5c3_Err != nil {
@@ -1439,7 +1439,7 @@ func RoomArtifactPane(kind RoomKind, id string) templ.Component {
 			var templ_7745c5c3_Var65 string
 			templ_7745c5c3_Var65, templ_7745c5c3_Err = templ.JoinStringErrs(id)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agenthome/pages.templ`, Line: 392, Col: 28}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agenthome/pages.templ`, Line: 394, Col: 28}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var65))
 			if templ_7745c5c3_Err != nil {
