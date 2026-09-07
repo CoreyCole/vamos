@@ -32,10 +32,13 @@ templ Workbench(state WorkbenchState) {
 // ThreadsReopenControl — icon control for the chat header row when left rail is closed.
 // Hard lock: never a band above the chat column / above the 3-col grid.
 templ ThreadsReopenControl(threadsOpen bool) {
+	// data-show only — no max-md:hidden (hides below md), no SSR hidden/flex class fight.
+	// SSR: inline display:none when threads start open; Datastar data-show owns visibility after hydrate.
 	<div
 		id="workbench-v2-threads-reopen"
-		class={ "workbench-chrome max-md:hidden", templ.KV("hidden", threadsOpen), templ.KV("flex shrink-0 items-center", !threadsOpen) }
-		data-class={ "{'hidden': $workbench.regions.workbenchV2Threads.visible, 'flex': !$workbench.regions.workbenchV2Threads.visible}" }
+		class="workbench-chrome flex shrink-0 items-center"
+		data-show={ "!$workbench.regions.workbenchV2Threads.visible" }
+		style={ threadsOpenSSRHide(threadsOpen) }
 	>
 		<button
 			type="button"
