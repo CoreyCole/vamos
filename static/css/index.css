@@ -252,6 +252,29 @@
     margin-bottom: 0;
   }
 
+  /* AI-470 SharedThreadChat bubbles: match user bubble type; no outer pad. */
+  .chat-bubble-md.chat-message-content > :not(.markdown-code-block):not(.streaming) {
+    padding-left: 0;
+    padding-right: 0;
+  }
+  .chat-bubble-md.chat-message-content
+    > :first-child:not(.markdown-code-block):not(.streaming) {
+    padding-top: 0;
+  }
+  .chat-bubble-md.chat-message-content
+    > :last-child:not(.markdown-code-block):not(.streaming) {
+    padding-bottom: 0;
+  }
+  .chat-bubble-md.markdown-viewer p {
+    margin-bottom: 0.5rem;
+    line-height: 1.375;
+    font-size: 0.8125rem; /* 13px */
+  }
+  .chat-bubble-md.markdown-viewer li {
+    font-size: 0.8125rem;
+    line-height: 1.375;
+  }
+
   .chat-message-content > :not(.markdown-code-block):not(.streaming) {
     padding-left: 1rem;
     padding-right: 1rem;

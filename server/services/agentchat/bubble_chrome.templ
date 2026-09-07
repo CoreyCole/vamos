@@ -33,7 +33,7 @@ templ bubbleBodyInner(args ChatMessageArgs) {
 	if args.Role == "user" {
 		<div class="whitespace-pre-wrap break-words text-[13px] leading-snug text-white">{ args.Content }</div>
 	} else if args.HTMLContent != "" {
-		<div class="markdown-viewer chat-message-content min-w-0 break-words text-[13px] leading-snug text-white [&_pre]:overflow-x-auto [&_pre]:rounded-lg [&_pre]:!bg-black/40 [&_pre]:text-[12px]" data-ignore>
+		<div class="markdown-viewer chat-message-content chat-bubble-md min-w-0 break-words text-[13px] leading-snug text-white [&_p]:!text-[13px] [&_p]:!leading-snug [&_p]:!mb-2 [&_li]:!text-[13px] [&_li]:!leading-snug [&_pre]:overflow-x-auto [&_pre]:rounded-lg [&_pre]:!bg-black/40 [&_pre]:!text-[12px]" data-ignore>
 			@templ.Raw(args.HTMLContent)
 		</div>
 	} else {

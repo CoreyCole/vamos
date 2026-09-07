@@ -293,7 +293,7 @@ func bubbleBodyInner(args ChatMessageArgs) templ.Component {
 				return templ_7745c5c3_Err
 			}
 		} else if args.HTMLContent != "" {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 17, "<div class=\"markdown-viewer chat-message-content min-w-0 break-words text-[13px] leading-snug text-white [&_pre]:overflow-x-auto [&_pre]:rounded-lg [&_pre]:!bg-black/40 [&_pre]:text-[12px]\" data-ignore>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 17, "<div class=\"markdown-viewer chat-message-content chat-bubble-md min-w-0 break-words text-[13px] leading-snug text-white [&_p]:!text-[13px] [&_p]:!leading-snug [&_p]:!mb-2 [&_li]:!text-[13px] [&_li]:!leading-snug [&_pre]:overflow-x-auto [&_pre]:rounded-lg [&_pre]:!bg-black/40 [&_pre]:!text-[12px]\" data-ignore>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}

@@ -139,9 +139,15 @@ func RosterChromeScript() templ.Component {
     if (hide) hide.textContent = n === 1 ? "Hide from sidebar" : ("Hide " + n + " Bots from sidebar");
     if (del) del.textContent = n === 1 ? "Delete" : ("Delete " + n + " Bots");
   }
+  function ensurePortaled(el) {
+    if (el && el.parentElement !== document.body) document.body.appendChild(el);
+  }
   function hideMenu() { menu.style.display = "none"; }
   function openMenu(x, y) {
+    // Portal out of #workbench-v2-threads (view-transition-name + overflow clips fixed).
+    ensurePortaled(menu);
     menu.style.display = "block";
+    menu.style.zIndex = "200";
     const pad = 8;
     const w = menu.offsetWidth || 220;
     const h = menu.offsetHeight || 280;
@@ -149,6 +155,7 @@ func RosterChromeScript() templ.Component {
     menu.style.top = Math.min(y, window.innerHeight - h - pad) + "px";
   }
   function openProfile() {
+    ensurePortaled(sheet);
     const m = meta[focusId] || meta["dm:bot"];
     const avatar = document.getElementById("workbench-v2-edit-profile-avatar");
     const name = document.getElementById("workbench-v2-edit-profile-name");

@@ -972,7 +972,7 @@ func ChatMessageStreaming(args ChatMessageStreamingArgs) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 77, "<div class=\"rounded-2xl bg-[#161b22] px-3 py-1.5 text-[13px] leading-snug text-white\"><div class=\"markdown-viewer chat-message-content min-w-0 break-words text-[13px] leading-snug text-white [&_pre]:overflow-x-auto [&_pre]:rounded-lg [&_pre]:!bg-black/40 [&_pre]:text-[12px]\"><div id=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 77, "<div class=\"rounded-2xl bg-[#161b22] px-3 py-1.5 text-[13px] leading-snug text-white\"><div class=\"markdown-viewer chat-message-content chat-bubble-md min-w-0 break-words text-[13px] leading-snug text-white [&_p]:!text-[13px] [&_p]:!leading-snug [&_p]:!mb-2 [&_li]:!text-[13px] [&_li]:!leading-snug [&_pre]:overflow-x-auto [&_pre]:rounded-lg [&_pre]:!bg-black/40 [&_pre]:!text-[12px]\"><div id=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
