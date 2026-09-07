@@ -34,8 +34,8 @@ templ Workbench(state WorkbenchState) {
 templ ThreadsReopenControl(threadsOpen bool) {
 	<div
 		id="workbench-v2-threads-reopen"
-		class={ "workbench-chrome flex shrink-0 items-center gap-2 border-b border-border px-3 py-2 max-md:hidden", templ.KV("hidden", threadsOpen) }
-		data-show={ "!$workbench.regions.workbenchV2Threads.visible" }
+		class={ "workbench-chrome relative z-20 flex shrink-0 items-center gap-2 border-b border-border bg-background px-3 py-2 max-md:hidden", templ.KV("hidden", threadsOpen) }
+		data-class={ "{'hidden': $workbench.regions.workbenchV2Threads.visible, '!flex': !$workbench.regions.workbenchV2Threads.visible}" }
 	>
 		<button
 			type="button"
@@ -59,7 +59,7 @@ templ ThreadsReopenControl(threadsOpen bool) {
 templ ChatColumnWithReopen(threadsOpen bool, chat templ.Component) {
 	<div class="flex h-full min-h-0 flex-col bg-background">
 		@ThreadsReopenControl(threadsOpen)
-		<div class="min-h-0 flex-1 overflow-hidden">
+		<div class="flex min-h-0 flex-1 flex-col overflow-hidden">
 			@chat
 		</div>
 	</div>

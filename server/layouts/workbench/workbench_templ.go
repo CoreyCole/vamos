@@ -153,7 +153,7 @@ func ThreadsReopenControl(threadsOpen bool) templ.Component {
 			templ_7745c5c3_Var7 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		var templ_7745c5c3_Var8 = []any{"workbench-chrome flex shrink-0 items-center gap-2 border-b border-border px-3 py-2 max-md:hidden", templ.KV("hidden", threadsOpen)}
+		var templ_7745c5c3_Var8 = []any{"workbench-chrome relative z-20 flex shrink-0 items-center gap-2 border-b border-border bg-background px-3 py-2 max-md:hidden", templ.KV("hidden", threadsOpen)}
 		templ_7745c5c3_Err = templ.RenderCSSItems(ctx, templ_7745c5c3_Buffer, templ_7745c5c3_Var8...)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
@@ -171,14 +171,14 @@ func ThreadsReopenControl(threadsOpen bool) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 11, "\" data-show=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 11, "\" data-class=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var10 string
-		templ_7745c5c3_Var10, templ_7745c5c3_Err = templ.ResolveAttributeValue("!$workbench.regions.workbenchV2Threads.visible")
+		templ_7745c5c3_Var10, templ_7745c5c3_Err = templ.ResolveAttributeValue("{'hidden': $workbench.regions.workbenchV2Threads.visible, '!flex': !$workbench.regions.workbenchV2Threads.visible}")
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/layouts/workbench/workbench.templ`, Line: 38, Col: 62}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/layouts/workbench/workbench.templ`, Line: 38, Col: 131}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var10)
 		if templ_7745c5c3_Err != nil {
@@ -236,7 +236,7 @@ func ChatColumnWithReopen(threadsOpen bool, chat templ.Component) templ.Componen
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 15, "<div class=\"min-h-0 flex-1 overflow-hidden\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 15, "<div class=\"flex min-h-0 flex-1 flex-col overflow-hidden\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
