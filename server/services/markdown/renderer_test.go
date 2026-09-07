@@ -127,6 +127,31 @@ func TestMarkdownBytesToHTML_RendersFrontmatterAsYAMLCodeBlock(t *testing.T) {
 	}
 }
 
+
+func TestMarkdownBytesToHTML_FencedCodeSyntaxHighlight(t *testing.T) {
+	r, err := NewRenderer("github-dark")
+	if err != nil {
+		t.Fatalf("NewRenderer() error = %v", err)
+	}
+
+	md := []byte("```go\npackage main\n\nimport \"fmt\"\n\nfunc main() {\n\tfmt.Println(\"hi\")\n}\n```\n")
+	html, err := r.MarkdownBytesToHTML(md)
+	if err != nil {
+		t.Fatalf("MarkdownBytesToHTML() error = %v", err)
+	}
+	if !strings.Contains(html, `class="chroma"`) && !strings.Contains(html, "chroma") {
+		t.Fatalf("expected chroma syntax-highlight classes in fenced go block; html = %s", html)
+	}
+	// Token classes vary by style; require at least one highlighted token span.
+	if !strings.Contains(html, "<span") {
+		t.Fatalf("expected chroma token spans inside fenced code; html = %s", html)
+	}
+	if !strings.Contains(html, "fmt") || !strings.Contains(html, "Println") {
+		t.Fatalf("expected go source text preserved in highlighted html; html = %s", html)
+	}
+}
+
+
 func TestRenderStatePreservesFirstWriteErrorAndTerminates(t *testing.T) {
 	sentinel := errors.New("write failed")
 	state := &renderState{}
