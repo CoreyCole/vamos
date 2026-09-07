@@ -29,18 +29,18 @@ templ Workbench(state WorkbenchState) {
 	</div>
 }
 
-// ThreadsReopenControl — show-control when left rail is closed.
-// Corey/Lead: lives in chat header only (never above the 3-col grid).
+// ThreadsReopenControl — icon control for the chat header row when left rail is closed.
+// Hard lock: never a band above the chat column / above the 3-col grid.
 templ ThreadsReopenControl(threadsOpen bool) {
 	<div
 		id="workbench-v2-threads-reopen"
-		class={ "workbench-chrome relative z-20 flex shrink-0 items-center gap-2 border-b border-border bg-background px-3 py-2 max-md:hidden", templ.KV("hidden", threadsOpen) }
-		data-class={ "{'hidden': $workbench.regions.workbenchV2Threads.visible, '!flex': !$workbench.regions.workbenchV2Threads.visible}" }
+		class={ "workbench-chrome max-md:hidden", templ.KV("hidden", threadsOpen), templ.KV("flex shrink-0 items-center", !threadsOpen) }
+		data-class={ "{'hidden': $workbench.regions.workbenchV2Threads.visible, 'flex': !$workbench.regions.workbenchV2Threads.visible, '!hidden': !$workbench.regions.workbenchV2Threads.visible}" }
 	>
 		<button
 			type="button"
 			data-workbench-threads-reopen
-			class="inline-flex h-8 items-center gap-2 rounded-md border border-border bg-background px-2 text-xs font-medium text-muted-foreground shadow-sm transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+			class="inline-flex h-8 w-8 items-center justify-center rounded-md border border-border bg-background text-muted-foreground shadow-sm transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
 			data-on:click={ ThreadsShowClickAction("workbenchV2Threads") }
 			aria-controls="workbench-v2-threads"
 			aria-label="Show threads sidebar"
@@ -49,16 +49,22 @@ templ ThreadsReopenControl(threadsOpen bool) {
 			<svg class="h-4 w-4" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 				<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
 			</svg>
-			<span>Threads</span>
 		</button>
 	</div>
 }
 
-// ChatColumnWithReopen wraps middle-column chat so reopen sits in the chat header
-// strip when the left rail is closed (strip hidden while left is open).
-templ ChatColumnWithReopen(threadsOpen bool, chat templ.Component) {
+// ChatColumnWithReopen wraps middle-column chat with an in-shell chat header row.
+// Threads reopen lives in that header (same row as title) — never a strip above.
+templ ChatColumnWithReopen(threadsOpen bool, title string, chat templ.Component) {
 	<div class="flex h-full min-h-0 flex-col bg-background">
-		@ThreadsReopenControl(threadsOpen)
+		<header id="workbench-v2-chat-header" class="flex shrink-0 items-center gap-2 border-b border-border px-3 py-2">
+			@ThreadsReopenControl(threadsOpen)
+			<div class="min-w-0 flex-1">
+				if title != "" {
+					<p class="truncate text-sm font-semibold text-foreground">{ title }</p>
+				}
+			</div>
+		</header>
 		<div class="flex min-h-0 flex-1 flex-col overflow-hidden">
 			@chat
 		</div>

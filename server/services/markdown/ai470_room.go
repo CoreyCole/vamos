@@ -53,6 +53,7 @@ func (s *Service) ServeAI470Room(c echo.Context) error {
 	if threadID == "" {
 		chatComp = workbench.ChatColumnWithReopen(
 			threadsOpen,
+			ai470RoomTitle(kind, id),
 			WorkbenchUnavailable("No shared thread mapped for this room yet."),
 		)
 	} else {
@@ -65,7 +66,7 @@ func (s *Service) ServeAI470Room(c echo.Context) error {
 		if err != nil {
 			return err
 		}
-		chatComp = workbench.ChatColumnWithReopen(threadsOpen, chat)
+		chatComp = workbench.ChatColumnWithReopen(threadsOpen, ai470RoomTitle(kind, id), chat)
 		artifactComp, commentsComp, err = s.threadArtifactAndComments(
 			c, threadID, c.QueryParam("artifact"),
 		)
@@ -205,5 +206,23 @@ func (s *Service) renderAI470SharedChat(
 		}
 	}
 	return s.workbenchThreadsRenderer.RenderSharedThreadChat(ctx, threadID, userEmail)
+}
+
+func ai470RoomTitle(kind agenthome.RoomKind, id string) string {
+	switch {
+	case kind == agenthome.KindDM && id == "bot":
+		return "Bot"
+	case kind == agenthome.KindDM && id == "research":
+		return "Research agent"
+	case kind == agenthome.KindGroup && id == "vamos-dev":
+		return "Vamos dev"
+	case kind == agenthome.KindPlan && id == "alpha":
+		return "Alpha"
+	default:
+		if id != "" {
+			return id
+		}
+		return "Chat"
+	}
 }
 
