@@ -8,7 +8,7 @@ import (
 	"github.com/a-h/templ"
 )
 
-func TestChatColumnWithReopen_ClosedUsesDataShowNotHiddenClass(t *testing.T) {
+func TestChatColumnWithReopen_ClosedShowsVisibleSlot(t *testing.T) {
 	var b strings.Builder
 	if err := ChatColumnWithReopen(false, "Bot", templ.Raw("<p>chat</p>")).Render(context.Background(), &b); err != nil {
 		t.Fatal(err)
@@ -17,33 +17,39 @@ func TestChatColumnWithReopen_ClosedUsesDataShowNotHiddenClass(t *testing.T) {
 	if !strings.Contains(out, `id="workbench-v2-threads-reopen"`) {
 		t.Fatalf("missing reopen: %s", out)
 	}
-	if !strings.Contains(out, `data-show="!$workbench.regions.workbenchV2Threads.visible"`) &&
-		!strings.Contains(out, "data-show=\"!$workbench.regions.workbenchV2Threads.visible\"") {
-		// templ may escape differently
-		if !strings.Contains(out, "workbenchV2Threads.visible") || !strings.Contains(out, "data-show") {
-			t.Fatalf("missing data-show binding: %s", out)
-		}
+	if !strings.Contains(out, `id="workbench-v2-chat-header"`) || !strings.Contains(out, "h-10") {
+		t.Fatalf("chat header missing fixed h-10: %s", out)
 	}
 	idx := strings.Index(out, `id="workbench-v2-threads-reopen"`)
-	snippet := out[idx:min(idx+400, len(out))]
-	if strings.Contains(snippet, "max-md:hidden") {
-		t.Fatalf("max-md:hidden must not be on reopen: %s", snippet)
+	end := strings.Index(out[idx:], ">")
+	openTag := out[idx : idx+end]
+	if strings.Contains(openTag, "max-md:hidden") {
+		t.Fatalf("max-md:hidden must not be on reopen: %s", openTag)
 	}
-	// closed SSR: no display:none inline
-	if strings.Contains(snippet, "display: none") || strings.Contains(snippet, "display:none") {
-		t.Fatalf("closed SSR should not inline-hide reopen: %s", snippet)
+	classIdx := strings.Index(openTag, `class="`)
+	if classIdx < 0 {
+		t.Fatalf("no class on reopen: %s", openTag)
+	}
+	classEnd := strings.Index(openTag[classIdx+7:], `"`)
+	classVal := openTag[classIdx+7 : classIdx+7+classEnd]
+	if strings.Contains(classVal, "invisible") {
+		t.Fatalf("closed SSR class should not be invisible: %s", classVal)
 	}
 }
 
-func TestChatColumnWithReopen_OpenSSRHidesInline(t *testing.T) {
+func TestChatColumnWithReopen_OpenKeepsInvisibleSlot(t *testing.T) {
 	var b strings.Builder
 	if err := ChatColumnWithReopen(true, "Bot", templ.Raw("<p>chat</p>")).Render(context.Background(), &b); err != nil {
 		t.Fatal(err)
 	}
 	out := b.String()
 	idx := strings.Index(out, `id="workbench-v2-threads-reopen"`)
-	snippet := out[idx:min(idx+400, len(out))]
-	if !strings.Contains(snippet, "display: none") && !strings.Contains(snippet, "display:none") {
-		t.Fatalf("open SSR should inline-hide reopen: %s", snippet)
+	end := strings.Index(out[idx:], ">")
+	openTag := out[idx : idx+end]
+	classIdx := strings.Index(openTag, `class="`)
+	classEnd := strings.Index(openTag[classIdx+7:], `"`)
+	classVal := openTag[classIdx+7 : classIdx+7+classEnd]
+	if !strings.Contains(classVal, "invisible") {
+		t.Fatalf("open SSR should reserve invisible slot: %s", classVal)
 	}
 }

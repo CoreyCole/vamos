@@ -1,12 +1,9 @@
 package workbench
 
-import "github.com/a-h/templ"
-
-// threadsOpenSSRHide is SSR-only inline hide when the left rail starts open.
-// Datastar data-show takes over after hydrate (no Tailwind hidden class fight).
-func threadsOpenSSRHide(threadsOpen bool) templ.SafeCSS {
+// threadsOpenAriaHidden is "true" when the left rail starts open (reopen slot invisible).
+func threadsOpenAriaHidden(threadsOpen bool) string {
 	if threadsOpen {
-		return templ.SafeCSS("display: none;")
+		return "true"
 	}
-	return templ.SafeCSS("")
+	return "false"
 }
