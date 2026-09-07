@@ -141,11 +141,32 @@ function regionWidth(region) {
   return region.getBoundingClientRect().width;
 }
 
+
+function regionHasSSRFlex(region) {
+  const flex = (region.style && region.style.flex) || "";
+  // SSR RegionSSRFlexStyle: "0.2200 1 0%" — proportional grow before pixel lock.
+  return /^\d/.test(flex.trim()) && flex.includes("1 0%");
+}
+
 function applyRegionRatios(root) {
   updateHandles(root);
   const regions = visibleRegions(root);
   const availableWidth = availableRegionWidth(root);
   if (availableWidth <= 0) return;
+
+  // First paint after SSR flex: seed width px from layout, do not rewrite flex
+  // (avoids default→pixel redistrib flash on room switch).
+  const ssrOnly =
+    regions.length > 0 &&
+    regions.every(
+      (region) => !region.dataset.workbenchWidthPx && regionHasSSRFlex(region),
+    );
+  if (ssrOnly) {
+    for (const region of regions) {
+      region.dataset.workbenchWidthPx = regionWidth(region).toFixed(2);
+    }
+    return;
+  }
 
   const primary = regions.find((region) => regionSlot(region) === "primary");
   if (!primary) {

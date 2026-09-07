@@ -631,6 +631,8 @@ func TestWorkbenchResizeJSShowsHandlesForVisibleAdjacentRegions(t *testing.T) {
 		"body: JSON.stringify({",
 		"viewportClass: currentViewportClass(root)",
 		"workbench-layout-save",
+		"regionHasSSRFlex",
+		"ssrOnly",
 	} {
 		if !strings.Contains(js, want) {
 			t.Fatalf("workbench-resize.js missing %q in %s", want, js)
@@ -1745,7 +1747,7 @@ func TestWorkbenchV2RegionsEnforceComposerFriendlyMinRem(t *testing.T) {
 	for _, fragment := range []string{
 		`data-workbench-region="workbench-v2-chat"`,
 		`data-workbench-min-rem="18"`,
-		`/js/workbench-resize.js?v=8`,
+		`/js/workbench-resize.js?v=9`,
 		`/js/workbench-history.js?v=21`,
 	} {
 		if !strings.Contains(html, fragment) {
@@ -1753,3 +1755,23 @@ func TestWorkbenchV2RegionsEnforceComposerFriendlyMinRem(t *testing.T) {
 		}
 	}
 }
+
+func TestWorkbenchV2RegionsHairlineGap(t *testing.T) {
+	t.Parallel()
+	state, err := BuildWorkbenchV2State(WorkbenchV2Args{ThreadsOpen: true, ChatOpen: true, ArtifactOpen: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var body strings.Builder
+	if err := Workbench(state).Render(t.Context(), &body); err != nil {
+		t.Fatal(err)
+	}
+	out := body.String()
+	if !strings.Contains(out, `id="workbench-regions" class="flex min-h-0 w-full flex-1 gap-0 overflow-hidden"`) {
+		t.Fatal("workbench-regions should use gap-0 hairline columns")
+	}
+	if strings.Contains(out, `id="workbench-regions" class="flex min-h-0 w-full flex-1 gap-2`) {
+		t.Fatal("workbench-regions still has gap-2 gutter")
+	}
+}
+
