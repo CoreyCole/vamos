@@ -140,34 +140,60 @@ func RosterChromeScript() templ.Component {
     if (del) del.textContent = n === 1 ? "Delete" : ("Delete " + n + " Bots");
   }
   function ensurePortaled(el) {
-    if (el && el.parentElement !== document.body) document.body.appendChild(el);
+    if (!el) return el;
+    // Morph can re-SSR a duplicate under the clipped left region; keep one on body.
+    if (el.id) {
+      document.querySelectorAll("#" + CSS.escape(el.id)).forEach((node) => {
+        if (node !== el) node.remove();
+      });
+    }
+    if (el.parentElement !== document.body) document.body.appendChild(el);
+    el.style.position = "fixed";
+    return el;
   }
-  function hideMenu() { menu.style.display = "none"; }
+  function liveMenu() {
+    return ensurePortaled(document.getElementById("workbench-v2-roster-context-menu") || menu);
+  }
+  function liveSheet() {
+    return ensurePortaled(document.getElementById("workbench-v2-edit-profile-sheet") || sheet);
+  }
+  // Escape the VT/overflow containing block before first interaction.
+  ensurePortaled(menu);
+  ensurePortaled(sheet);
+  function hideMenu() {
+    const m = liveMenu();
+    if (m) m.style.display = "none";
+  }
   function openMenu(x, y) {
     // Portal out of #workbench-v2-threads (view-transition-name + overflow clips fixed).
-    ensurePortaled(menu);
-    menu.style.display = "block";
-    menu.style.zIndex = "200";
+    const m = liveMenu();
+    if (!m) return;
+    m.style.display = "block";
+    m.style.zIndex = "1000";
+    m.style.position = "fixed";
     const pad = 8;
-    const w = menu.offsetWidth || 220;
-    const h = menu.offsetHeight || 280;
-    menu.style.left = Math.min(x, window.innerWidth - w - pad) + "px";
-    menu.style.top = Math.min(y, window.innerHeight - h - pad) + "px";
+    const w = m.offsetWidth || 220;
+    const h = m.offsetHeight || 280;
+    m.style.left = Math.min(x, window.innerWidth - w - pad) + "px";
+    m.style.top = Math.min(y, window.innerHeight - h - pad) + "px";
   }
   function openProfile() {
-    ensurePortaled(sheet);
+    const s = liveSheet();
+    if (!s) return;
     const m = meta[focusId] || meta["dm:bot"];
     const avatar = document.getElementById("workbench-v2-edit-profile-avatar");
     const name = document.getElementById("workbench-v2-edit-profile-name");
     if (avatar) { avatar.textContent = m.initial; avatar.className = "flex h-14 w-14 items-center justify-center rounded-2xl text-lg font-semibold text-white " + m.bg; }
     if (name) name.value = m.name;
-    sheet.classList.remove("hidden");
-    sheet.classList.add("flex");
+    s.classList.remove("hidden");
+    s.classList.add("flex");
     hideMenu();
   }
   function closeProfile() {
-    sheet.classList.add("hidden");
-    sheet.classList.remove("flex");
+    const s = liveSheet();
+    if (!s) return;
+    s.classList.add("hidden");
+    s.classList.remove("flex");
   }
 
   root.addEventListener("click", (evt) => {
