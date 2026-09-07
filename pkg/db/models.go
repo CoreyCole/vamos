@@ -107,6 +107,7 @@ type AgentThread struct {
 	Cwd               string         `json:"cwd"`
 	LineageID         string         `json:"lineage_id"`
 	ProjectID         string         `json:"project_id"`
+	PlanDirRel        sql.NullString `json:"plan_dir_rel"`
 	HeadEntryID       sql.NullString `json:"head_entry_id"`
 	ParentThreadID    sql.NullString `json:"parent_thread_id"`
 	ForkedFromEntryID sql.NullString `json:"forked_from_entry_id"`
@@ -383,6 +384,8 @@ type PlanWorkspace struct {
 	DiscoveredAt            time.Time    `json:"discovered_at"`
 	LastDiscoveredAt        time.Time    `json:"last_discovered_at"`
 	ArchivedAt              sql.NullTime `json:"archived_at"`
+	ArchiveReason           string       `json:"archive_reason"`
+	ArchivedByEmail         string       `json:"archived_by_email"`
 }
 
 type PlanWorkspaceImplBinding struct {

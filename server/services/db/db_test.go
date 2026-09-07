@@ -1237,6 +1237,79 @@ VALUES
 	}
 }
 
+
+func TestEnsureAddsPlanWorkspaceArchiveColumnsAndAgentThreadPlanDir(t *testing.T) {
+	t.Parallel()
+
+	database := openMigratorTestDB(t)
+	createOldShapeAgentChatTables(t, database)
+	_, err := database.ExecContext(t.Context(), `
+CREATE TABLE plan_workspaces (
+	plan_dir_rel TEXT PRIMARY KEY,
+	project_id TEXT NOT NULL DEFAULT '',
+	plan_dir TEXT NOT NULL,
+	label TEXT NOT NULL,
+	artifact_updated_at DATETIME NOT NULL,
+	qrspi_lifecycle TEXT NOT NULL DEFAULT 'question',
+	qrspi_closed_reason TEXT NOT NULL DEFAULT '',
+	discovered_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+	last_discovered_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+	archived_at DATETIME
+);`)
+	if err != nil {
+		t.Fatalf("seed old plan_workspaces: %v", err)
+	}
+
+	if err := prepareSchemaCompatibilityMigrations(t.Context(), database); err != nil {
+		t.Fatalf("prepareSchemaCompatibilityMigrations() error = %v", err)
+	}
+	for _, column := range []string{"archive_reason", "archived_by_email"} {
+		if !columnExists(t, database, "plan_workspaces", column) {
+			t.Fatalf("plan_workspaces.%s missing after prepare", column)
+		}
+	}
+	if !columnExists(t, database, "agent_threads", "plan_dir_rel") {
+		t.Fatal("agent_threads.plan_dir_rel missing after prepare")
+	}
+	if !indexExists(t, database, "idx_agent_threads_plan_updated") {
+		t.Fatal("idx_agent_threads_plan_updated missing after prepare")
+	}
+
+	// Fresh DB path through runtime migrations should also ensure the same shape.
+	database2 := openMigratorTestDB(t)
+	createOldShapeAgentChatTables(t, database2)
+	_, err = database2.ExecContext(t.Context(), `
+CREATE TABLE plan_workspaces (
+	plan_dir_rel TEXT PRIMARY KEY,
+	project_id TEXT NOT NULL DEFAULT '',
+	plan_dir TEXT NOT NULL,
+	label TEXT NOT NULL,
+	artifact_updated_at DATETIME NOT NULL,
+	qrspi_lifecycle TEXT NOT NULL DEFAULT 'question',
+	qrspi_closed_reason TEXT NOT NULL DEFAULT '',
+	discovered_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+	last_discovered_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+	archived_at DATETIME
+);`)
+	if err != nil {
+		t.Fatalf("seed old plan_workspaces for runtime: %v", err)
+	}
+	if err := runRuntimeMigrations(t.Context(), database2); err != nil {
+		t.Fatalf("runRuntimeMigrations() error = %v", err)
+	}
+	for _, column := range []string{"archive_reason", "archived_by_email"} {
+		if !columnExists(t, database2, "plan_workspaces", column) {
+			t.Fatalf("plan_workspaces.%s missing after runtime", column)
+		}
+	}
+	if !columnExists(t, database2, "agent_threads", "plan_dir_rel") {
+		t.Fatal("agent_threads.plan_dir_rel missing after runtime")
+	}
+	if !indexExists(t, database2, "idx_agent_threads_plan_updated") {
+		t.Fatal("idx_agent_threads_plan_updated missing after runtime")
+	}
+}
+
 func openMigratorTestDB(t *testing.T) *sql.DB {
 	t.Helper()
 	database, err := sql.Open("sqlite", filepath.Join(t.TempDir(), "old.db"))

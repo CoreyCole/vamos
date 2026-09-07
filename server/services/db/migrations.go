@@ -691,6 +691,8 @@ func ensurePlanWorkspacesColumns(
 		{name: "qrspi_lifecycle", definition: "TEXT NOT NULL DEFAULT 'question' CHECK (qrspi_lifecycle IN ('question', 'research', 'design', 'outline', 'review_outline', 'plan', 'review_plan', 'workspace', 'implement', 'review_implementation', 'verify', 'merged', 'closed'))"},
 		{name: "qrspi_lifecycle_updated_at", definition: "DATETIME"},
 		{name: "qrspi_closed_reason", definition: "TEXT NOT NULL DEFAULT ''"},
+		{name: "archive_reason", definition: "TEXT NOT NULL DEFAULT '' CHECK (archive_reason IN ('', 'manual', 'missing_from_disk', 'lifecycle_closed'))"},
+		{name: "archived_by_email", definition: "TEXT NOT NULL DEFAULT ''"},
 	} {
 		if err := ensureColumn(
 			ctx,
@@ -881,10 +883,26 @@ func ensureAgentThreadProjectColumnsIfTableExists(
 	); err != nil {
 		return err
 	}
-	return ensureIndex(
+	if err := ensureColumn(
+		ctx,
+		database,
+		"agent_threads",
+		"plan_dir_rel",
+		"TEXT REFERENCES plan_workspaces(plan_dir_rel)",
+	); err != nil {
+		return err
+	}
+	if err := ensureIndex(
 		ctx,
 		database,
 		"CREATE INDEX IF NOT EXISTS idx_agent_threads_project_user_updated ON agent_threads (project_id, user_email, updated_at DESC) WHERE archived_at IS NULL",
+	); err != nil {
+		return err
+	}
+	return ensureIndex(
+		ctx,
+		database,
+		"CREATE INDEX IF NOT EXISTS idx_agent_threads_plan_updated ON agent_threads (plan_dir_rel, updated_at DESC) WHERE archived_at IS NULL AND plan_dir_rel IS NOT NULL",
 	)
 }
 

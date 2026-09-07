@@ -175,3 +175,153 @@ func TestArchiveMissingPlanWorkspaceProjectsArchivesRemovedRoles(t *testing.T) {
 		t.Fatalf("restored roles = %#v, want active restored cn-agents", restored)
 	}
 }
+
+
+func TestUpsertDiscoveredPlanWorkspaceClearsMissingFromDiskArchive(t *testing.T) {
+	ctx := context.Background()
+	dbConn, q := openWorkspaceDocsTestDB(t)
+	rel := "agent/plans/rediscover-missing"
+
+	row, err := q.UpsertDiscoveredPlanWorkspace(ctx, UpsertDiscoveredPlanWorkspaceParams{
+		PlanDirRel:        rel,
+		ProjectID:         "vamos",
+		PlanDir:           "thoughts/" + rel,
+		Label:             "rediscover-missing",
+		ArtifactUpdatedAt: time.Now(),
+		QrspiLifecycle:    "plan",
+	})
+	if err != nil {
+		t.Fatalf("initial upsert: %v", err)
+	}
+	if row.ArchiveReason != "" || row.ArchivedAt.Valid {
+		t.Fatalf("fresh row archive state = %#v", row)
+	}
+
+	archived, err := q.ArchiveMissingPlanWorkspaces(ctx, []string{"agent/plans/other"})
+	if err != nil {
+		t.Fatalf("ArchiveMissingPlanWorkspaces: %v", err)
+	}
+	if archived != 1 {
+		t.Fatalf("archived = %d, want 1", archived)
+	}
+	missing, err := q.GetPlanWorkspace(ctx, rel)
+	if err != nil {
+		t.Fatalf("GetPlanWorkspace after missing archive: %v", err)
+	}
+	if !missing.ArchivedAt.Valid || missing.ArchiveReason != "missing_from_disk" {
+		t.Fatalf("missing archive state = %#v", missing)
+	}
+
+	restored, err := q.UpsertDiscoveredPlanWorkspace(ctx, UpsertDiscoveredPlanWorkspaceParams{
+		PlanDirRel:        rel,
+		ProjectID:         "vamos",
+		PlanDir:           "thoughts/" + rel,
+		Label:             "rediscover-missing",
+		ArtifactUpdatedAt: time.Now(),
+		QrspiLifecycle:    "plan",
+	})
+	if err != nil {
+		t.Fatalf("rediscover upsert: %v", err)
+	}
+	if restored.ArchivedAt.Valid {
+		t.Fatalf("rediscover should clear archived_at, got %#v", restored.ArchivedAt)
+	}
+	if restored.ArchiveReason != "" || restored.ArchivedByEmail != "" {
+		t.Fatalf("rediscover should clear archive metadata, got reason=%q email=%q", restored.ArchiveReason, restored.ArchivedByEmail)
+	}
+	_ = dbConn
+}
+
+func TestUpsertDiscoveredPlanWorkspaceKeepsManualArchiveSticky(t *testing.T) {
+	ctx := context.Background()
+	_, q := openWorkspaceDocsTestDB(t)
+	rel := "agent/plans/manual-sticky"
+
+	if _, err := q.UpsertDiscoveredPlanWorkspace(ctx, UpsertDiscoveredPlanWorkspaceParams{
+		PlanDirRel:        rel,
+		ProjectID:         "vamos",
+		PlanDir:           "thoughts/" + rel,
+		Label:             "manual-sticky",
+		ArtifactUpdatedAt: time.Now(),
+		QrspiLifecycle:    "plan",
+	}); err != nil {
+		t.Fatalf("initial upsert: %v", err)
+	}
+
+	manualAt := time.Date(2026, 9, 1, 12, 0, 0, 0, time.UTC)
+	if _, err := q.db.ExecContext(ctx, `
+UPDATE plan_workspaces
+SET archived_at = ?, archive_reason = 'manual', archived_by_email = 'corey@example.com'
+WHERE plan_dir_rel = ?`, manualAt, rel); err != nil {
+		t.Fatalf("seed manual archive: %v", err)
+	}
+
+	before, err := q.GetPlanWorkspace(ctx, rel)
+	if err != nil {
+		t.Fatalf("GetPlanWorkspace before rediscover: %v", err)
+	}
+	if !before.ArchivedAt.Valid || before.ArchiveReason != "manual" || before.ArchivedByEmail != "corey@example.com" {
+		t.Fatalf("manual seed state = %#v", before)
+	}
+
+	after, err := q.UpsertDiscoveredPlanWorkspace(ctx, UpsertDiscoveredPlanWorkspaceParams{
+		PlanDirRel:        rel,
+		ProjectID:         "vamos",
+		PlanDir:           "thoughts/" + rel,
+		Label:             "manual-sticky-updated",
+		ArtifactUpdatedAt: time.Now(),
+		QrspiLifecycle:    "implement",
+	})
+	if err != nil {
+		t.Fatalf("rediscover upsert: %v", err)
+	}
+	if after.Label != "manual-sticky-updated" || after.QrspiLifecycle != "implement" {
+		t.Fatalf("rediscover should still update non-archive fields: %#v", after)
+	}
+	if !after.ArchivedAt.Valid {
+		t.Fatal("manual archive archived_at should stay set")
+	}
+	if !after.ArchivedAt.Time.Equal(before.ArchivedAt.Time) {
+		t.Fatalf("archived_at changed from %v to %v", before.ArchivedAt.Time, after.ArchivedAt.Time)
+	}
+	if after.ArchiveReason != "manual" || after.ArchivedByEmail != "corey@example.com" {
+		t.Fatalf("manual archive metadata cleared: reason=%q email=%q", after.ArchiveReason, after.ArchivedByEmail)
+	}
+
+	// Manual rows already archived should not be touched by missing-disk archive sync.
+	n, err := q.ArchiveMissingPlanWorkspaces(ctx, []string{"agent/plans/other"})
+	if err != nil {
+		t.Fatalf("ArchiveMissingPlanWorkspaces: %v", err)
+	}
+	if n != 0 {
+		t.Fatalf("ArchiveMissingPlanWorkspaces rows = %d, want 0 (manual already archived)", n)
+	}
+	still, err := q.GetPlanWorkspace(ctx, rel)
+	if err != nil {
+		t.Fatalf("GetPlanWorkspace after missing sync: %v", err)
+	}
+	if still.ArchiveReason != "manual" || still.ArchivedByEmail != "corey@example.com" {
+		t.Fatalf("missing sync changed manual archive: %#v", still)
+	}
+}
+
+func TestArchiveAllActivePlanWorkspacesSetsMissingFromDiskReason(t *testing.T) {
+	ctx := context.Background()
+	_, q := openWorkspaceDocsTestDB(t)
+	insertPlanWorkspaceForProjectTest(t, ctx, q, "agent/plans/all-active", "vamos")
+
+	n, err := q.ArchiveAllActivePlanWorkspaces(ctx)
+	if err != nil {
+		t.Fatalf("ArchiveAllActivePlanWorkspaces: %v", err)
+	}
+	if n != 1 {
+		t.Fatalf("archived = %d, want 1", n)
+	}
+	row, err := q.GetPlanWorkspace(ctx, "agent/plans/all-active")
+	if err != nil {
+		t.Fatalf("GetPlanWorkspace: %v", err)
+	}
+	if !row.ArchivedAt.Valid || row.ArchiveReason != "missing_from_disk" {
+		t.Fatalf("archive-all state = %#v", row)
+	}
+}

@@ -51,7 +51,9 @@ INSERT INTO plan_workspaces (
     artifact_updated_at,
     qrspi_lifecycle,
     qrspi_lifecycle_updated_at,
-    qrspi_closed_reason
+    qrspi_closed_reason,
+    archive_reason,
+    archived_by_email
 )
 VALUES (
     sqlc.arg('plan_dir_rel'),
@@ -61,7 +63,9 @@ VALUES (
     sqlc.arg('artifact_updated_at'),
     COALESCE(NULLIF(sqlc.arg('qrspi_lifecycle'), ''), 'question'),
     sqlc.narg('qrspi_lifecycle_updated_at'),
-    sqlc.arg('qrspi_closed_reason')
+    sqlc.arg('qrspi_closed_reason'),
+    '',
+    ''
 )
 ON CONFLICT (plan_dir_rel) DO UPDATE SET
 project_id = excluded.project_id,
@@ -72,18 +76,31 @@ qrspi_lifecycle = excluded.qrspi_lifecycle,
 qrspi_lifecycle_updated_at = excluded.qrspi_lifecycle_updated_at,
 qrspi_closed_reason = excluded.qrspi_closed_reason,
 last_discovered_at = CURRENT_TIMESTAMP,
-archived_at = NULL
+archived_at = CASE
+  WHEN plan_workspaces.archive_reason = 'manual' THEN plan_workspaces.archived_at
+  ELSE NULL
+END,
+archive_reason = CASE
+  WHEN plan_workspaces.archive_reason = 'manual' THEN plan_workspaces.archive_reason
+  ELSE ''
+END,
+archived_by_email = CASE
+  WHEN plan_workspaces.archive_reason = 'manual' THEN plan_workspaces.archived_by_email
+  ELSE ''
+END
 RETURNING * ;
 
 -- name: ArchiveMissingPlanWorkspaces :execrows
 UPDATE plan_workspaces
-SET archived_at = CURRENT_TIMESTAMP
+SET archived_at = CURRENT_TIMESTAMP,
+    archive_reason = 'missing_from_disk'
 WHERE archived_at IS NULL
 AND plan_dir_rel NOT IN (sqlc.slice ('plan_dir_rels')) ;
 
 -- name: ArchiveAllActivePlanWorkspaces :execrows
 UPDATE plan_workspaces
-SET archived_at = CURRENT_TIMESTAMP
+SET archived_at = CURRENT_TIMESTAMP,
+    archive_reason = 'missing_from_disk'
 WHERE archived_at IS NULL ;
 
 -- name: ListPlanWorkspaceProjects :many

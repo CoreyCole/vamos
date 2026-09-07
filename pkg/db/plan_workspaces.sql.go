@@ -16,7 +16,8 @@ const archiveAllActivePlanWorkspaces = `-- name: ArchiveAllActivePlanWorkspaces 
 ;
 
 UPDATE plan_workspaces
-SET archived_at = CURRENT_TIMESTAMP
+SET archived_at = CURRENT_TIMESTAMP,
+    archive_reason = 'missing_from_disk'
 WHERE archived_at IS NULL
 `
 
@@ -66,7 +67,8 @@ const archiveMissingPlanWorkspaces = `-- name: ArchiveMissingPlanWorkspaces :exe
 ;
 
 UPDATE plan_workspaces
-SET archived_at = CURRENT_TIMESTAMP
+SET archived_at = CURRENT_TIMESTAMP,
+    archive_reason = 'missing_from_disk'
 WHERE archived_at IS NULL
 AND plan_dir_rel NOT IN (/*SLICE:plan_dir_rels*/?)
 `
@@ -108,7 +110,7 @@ func (q *Queries) ArchivePlanWorkspacePrimaryProjects(ctx context.Context, planD
 }
 
 const getPlanWorkspace = `-- name: GetPlanWorkspace :one
-SELECT plan_dir_rel, project_id, plan_dir, label, artifact_updated_at, qrspi_lifecycle, qrspi_lifecycle_updated_at, qrspi_closed_reason, discovered_at, last_discovered_at, archived_at
+SELECT plan_dir_rel, project_id, plan_dir, label, artifact_updated_at, qrspi_lifecycle, qrspi_lifecycle_updated_at, qrspi_closed_reason, discovered_at, last_discovered_at, archived_at, archive_reason, archived_by_email
 FROM plan_workspaces
 WHERE plan_dir_rel = ?1
 `
@@ -128,12 +130,14 @@ func (q *Queries) GetPlanWorkspace(ctx context.Context, planDirRel string) (Plan
 		&i.DiscoveredAt,
 		&i.LastDiscoveredAt,
 		&i.ArchivedAt,
+		&i.ArchiveReason,
+		&i.ArchivedByEmail,
 	)
 	return i, err
 }
 
 const listCurrentPlanWorkspaces = `-- name: ListCurrentPlanWorkspaces :many
-SELECT plan_dir_rel, project_id, plan_dir, label, artifact_updated_at, qrspi_lifecycle, qrspi_lifecycle_updated_at, qrspi_closed_reason, discovered_at, last_discovered_at, archived_at
+SELECT plan_dir_rel, project_id, plan_dir, label, artifact_updated_at, qrspi_lifecycle, qrspi_lifecycle_updated_at, qrspi_closed_reason, discovered_at, last_discovered_at, archived_at, archive_reason, archived_by_email
 FROM plan_workspaces
 WHERE
     archived_at IS NULL
@@ -174,6 +178,8 @@ func (q *Queries) ListCurrentPlanWorkspaces(ctx context.Context, projectID strin
 			&i.DiscoveredAt,
 			&i.LastDiscoveredAt,
 			&i.ArchivedAt,
+			&i.ArchiveReason,
+			&i.ArchivedByEmail,
 		); err != nil {
 			return nil, err
 		}
@@ -276,7 +282,7 @@ func (q *Queries) ListPlanWorkspaceProjects(ctx context.Context, planDirRel stri
 }
 
 const listPlanWorkspaces = `-- name: ListPlanWorkspaces :many
-SELECT plan_dir_rel, project_id, plan_dir, label, artifact_updated_at, qrspi_lifecycle, qrspi_lifecycle_updated_at, qrspi_closed_reason, discovered_at, last_discovered_at, archived_at
+SELECT plan_dir_rel, project_id, plan_dir, label, artifact_updated_at, qrspi_lifecycle, qrspi_lifecycle_updated_at, qrspi_closed_reason, discovered_at, last_discovered_at, archived_at, archive_reason, archived_by_email
 FROM plan_workspaces
 WHERE
     archived_at IS NULL
@@ -316,6 +322,8 @@ func (q *Queries) ListPlanWorkspaces(ctx context.Context, projectID string) ([]P
 			&i.DiscoveredAt,
 			&i.LastDiscoveredAt,
 			&i.ArchivedAt,
+			&i.ArchiveReason,
+			&i.ArchivedByEmail,
 		); err != nil {
 			return nil, err
 		}
@@ -339,7 +347,9 @@ INSERT INTO plan_workspaces (
     artifact_updated_at,
     qrspi_lifecycle,
     qrspi_lifecycle_updated_at,
-    qrspi_closed_reason
+    qrspi_closed_reason,
+    archive_reason,
+    archived_by_email
 )
 VALUES (
     ?1,
@@ -349,7 +359,9 @@ VALUES (
     ?5,
     COALESCE(NULLIF(?6, ''), 'question'),
     ?7,
-    ?8
+    ?8,
+    '',
+    ''
 )
 ON CONFLICT (plan_dir_rel) DO UPDATE SET
 project_id = excluded.project_id,
@@ -360,8 +372,19 @@ qrspi_lifecycle = excluded.qrspi_lifecycle,
 qrspi_lifecycle_updated_at = excluded.qrspi_lifecycle_updated_at,
 qrspi_closed_reason = excluded.qrspi_closed_reason,
 last_discovered_at = CURRENT_TIMESTAMP,
-archived_at = NULL
-RETURNING plan_dir_rel, project_id, plan_dir, label, artifact_updated_at, qrspi_lifecycle, qrspi_lifecycle_updated_at, qrspi_closed_reason, discovered_at, last_discovered_at, archived_at
+archived_at = CASE
+  WHEN plan_workspaces.archive_reason = 'manual' THEN plan_workspaces.archived_at
+  ELSE NULL
+END,
+archive_reason = CASE
+  WHEN plan_workspaces.archive_reason = 'manual' THEN plan_workspaces.archive_reason
+  ELSE ''
+END,
+archived_by_email = CASE
+  WHEN plan_workspaces.archive_reason = 'manual' THEN plan_workspaces.archived_by_email
+  ELSE ''
+END
+RETURNING plan_dir_rel, project_id, plan_dir, label, artifact_updated_at, qrspi_lifecycle, qrspi_lifecycle_updated_at, qrspi_closed_reason, discovered_at, last_discovered_at, archived_at, archive_reason, archived_by_email
 `
 
 type UpsertDiscoveredPlanWorkspaceParams struct {
@@ -399,6 +422,8 @@ func (q *Queries) UpsertDiscoveredPlanWorkspace(ctx context.Context, arg UpsertD
 		&i.DiscoveredAt,
 		&i.LastDiscoveredAt,
 		&i.ArchivedAt,
+		&i.ArchiveReason,
+		&i.ArchivedByEmail,
 	)
 	return i, err
 }

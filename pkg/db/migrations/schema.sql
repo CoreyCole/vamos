@@ -203,7 +203,9 @@ qrspi_lifecycle_updated_at DATETIME,
 qrspi_closed_reason TEXT NOT NULL DEFAULT '',
 discovered_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
 last_discovered_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-archived_at DATETIME
+archived_at DATETIME,
+archive_reason TEXT NOT NULL DEFAULT '' CHECK (archive_reason IN ('', 'manual', 'missing_from_disk', 'lifecycle_closed')),
+archived_by_email TEXT NOT NULL DEFAULT ''
 ) ;
 
 CREATE INDEX IF NOT EXISTS idx_plan_workspaces_active_activity
@@ -431,6 +433,7 @@ title TEXT NOT NULL DEFAULT 'New Chat',
 cwd TEXT NOT NULL,
 lineage_id TEXT NOT NULL,
 project_id TEXT NOT NULL DEFAULT '',
+plan_dir_rel TEXT REFERENCES plan_workspaces (plan_dir_rel),
 head_entry_id TEXT,
 parent_thread_id TEXT REFERENCES agent_threads (id),
 forked_from_entry_id TEXT,
@@ -446,6 +449,10 @@ WHERE archived_at IS NULL ;
 CREATE INDEX IF NOT EXISTS idx_agent_threads_project_user_updated
 ON agent_threads (project_id, user_email, updated_at DESC)
 WHERE archived_at IS NULL ;
+
+CREATE INDEX IF NOT EXISTS idx_agent_threads_plan_updated
+ON agent_threads (plan_dir_rel, updated_at DESC)
+WHERE archived_at IS NULL AND plan_dir_rel IS NOT NULL ;
 
 CREATE TABLE IF NOT EXISTS agent_thread_drafts (
 user_email TEXT NOT NULL,
