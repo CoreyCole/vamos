@@ -56,8 +56,8 @@ func (s *Service) ServeAI470Room(c echo.Context) error {
 			WorkbenchUnavailable("No shared thread mapped for this room yet."),
 		)
 	} else {
-		chat, err := s.workbenchThreadsRenderer.RenderSharedThreadChat(
-			c.Request().Context(), threadID, userEmail,
+		chat, err := s.renderAI470SharedChat(
+			c.Request().Context(), kind, id, threadID, userEmail,
 		)
 		if errors.Is(err, sql.ErrNoRows) {
 			return echo.NewHTTPError(http.StatusNotFound, "thread not found")
@@ -176,3 +176,25 @@ func rosterSelectionForThread(threadID string) agenthome.RosterSelection {
 		return agenthome.RosterSelection{}
 	}
 }
+
+type chromaFixtureChatRenderer interface {
+	RenderSharedThreadChatWithChromaFixture(
+		ctx context.Context,
+		threadID, userEmail string,
+	) (templ.Component, error)
+}
+
+func (s *Service) renderAI470SharedChat(
+	ctx context.Context,
+	kind agenthome.RoomKind,
+	roomID, threadID, userEmail string,
+) (templ.Component, error) {
+	// Seed visible fenced ```go bubble on dm/bot for chroma VA (Corey).
+	if kind == agenthome.KindDM && roomID == "bot" {
+		if r, ok := s.workbenchThreadsRenderer.(chromaFixtureChatRenderer); ok {
+			return r.RenderSharedThreadChatWithChromaFixture(ctx, threadID, userEmail)
+		}
+	}
+	return s.workbenchThreadsRenderer.RenderSharedThreadChat(ctx, threadID, userEmail)
+}
+

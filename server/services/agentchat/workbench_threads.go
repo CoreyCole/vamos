@@ -132,48 +132,7 @@ func (s *Service) RenderSharedThreadChat(
 	ctx context.Context,
 	threadID, userEmail string,
 ) (templ.Component, error) {
-	thread, err := s.queries.GetSharedAgentThread(ctx, strings.TrimSpace(threadID))
-	if err != nil {
-		return nil, err
-	}
-	draft, err := s.GetThreadDraft(ctx, userEmail, thread.ID)
-	if err != nil {
-		return nil, err
-	}
-	stable, err := s.buildStableTranscript(ctx, thread)
-	if err != nil {
-		return nil, err
-	}
-	live, cursor := s.buildLiveTranscript(thread.ID)
-	args := EmbeddedFreeformPanelArgs{
-		ThreadID:  thread.ID,
-		HasThread: true,
-		Cwd:       thread.Cwd,
-		Transcript: TranscriptPaneState{
-			Stable: stable,
-			Live:   live,
-			Cursor: cursor,
-			Policy: s.defaultTranscriptRenderPolicy(),
-		},
-		ComposerAction: "@post('" + thoughtsThreadChatAction(
-			thread.ID,
-			"resume",
-		) + "', {contentType: 'form'})",
-		StreamURL:    thoughtsThreadChatAction(thread.ID, "stream") + "?since=0",
-		InitialDraft: draft,
-		DraftSaveAction: "@post('/agent-chat/thread/" + url.PathEscape(
-			thread.ID,
-		) + "/draft', {filterSignals: {include: /^chatDraft$/}})",
-	}
-	args.ComposerAction = "@post('" + thoughtsThreadChatAction(
-		thread.ID,
-		"resume",
-	) + "?workbench_v2=1', {contentType: 'form'})"
-	args.StreamURL = thoughtsThreadChatAction(
-		thread.ID,
-		"stream",
-	) + "?since=0&workbench_v2=1"
-	return SharedThreadChat(args), nil
+	return s.renderSharedThreadChat(ctx, threadID, userEmail, false)
 }
 
 func (s *Service) ListWorkbenchThreads(
