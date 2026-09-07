@@ -40,7 +40,7 @@ templ ThreadsReopenControl(threadsOpen bool) {
 		<button
 			type="button"
 			data-workbench-threads-reopen
-			class="inline-flex h-8 w-8 items-center justify-center rounded-md border border-border bg-background text-muted-foreground shadow-sm transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+			class="inline-flex h-7 w-7 items-center justify-center rounded-md border border-border bg-background text-muted-foreground shadow-sm transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
 			data-on:click={ ThreadsShowClickAction("workbenchV2Threads") }
 			aria-controls="workbench-v2-threads"
 			aria-label="Show threads sidebar"
@@ -57,11 +57,11 @@ templ ThreadsReopenControl(threadsOpen bool) {
 // Threads reopen lives in that header (same row as title) — never a strip above.
 templ ChatColumnWithReopen(threadsOpen bool, title string, chat templ.Component) {
 	<div class="flex h-full min-h-0 flex-col bg-background">
-		<header id="workbench-v2-chat-header" class="flex shrink-0 items-center gap-2 border-b border-border px-3 py-2">
+		<header id="workbench-v2-chat-header" class="flex shrink-0 items-center gap-2 border-b border-border px-2.5 py-1.5">
 			@ThreadsReopenControl(threadsOpen)
 			<div class="min-w-0 flex-1">
 				if title != "" {
-					<p class="truncate text-sm font-semibold text-foreground">{ title }</p>
+					<p class="truncate text-[13px] font-semibold leading-tight text-foreground">{ title }</p>
 				}
 			</div>
 		</header>

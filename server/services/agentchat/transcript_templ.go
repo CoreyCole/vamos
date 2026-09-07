@@ -192,7 +192,7 @@ func TranscriptMessageWithFork(threadID string, msg TranscriptMessage, forkActio
 				return templ_7745c5c3_Err
 			}
 		} else {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 10, "<div class=\"relative min-w-0 overflow-x-hidden px-3 py-2\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 10, "<div class=\"relative min-w-0 overflow-x-hidden px-2.5 py-1\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -819,7 +819,7 @@ func ChatMessage(args ChatMessageArgs) templ.Component {
 			}
 		}
 		if isUser {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 63, "<div class=\"flex justify-end\" data-role=\"user\"><div class=\"max-w-[85%] rounded-2xl bg-[#30363d] px-3.5 py-2.5 text-sm leading-relaxed text-white\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 63, "<div class=\"flex justify-end\" data-role=\"user\"><div class=\"max-w-[85%] rounded-2xl bg-[#30363d] px-3 py-1.5 text-[13px] leading-snug text-white\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -832,7 +832,7 @@ func ChatMessage(args ChatMessageArgs) templ.Component {
 				return templ_7745c5c3_Err
 			}
 		} else {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 65, "<div class=\"flex items-start gap-2.5\" data-role=\"agent\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 65, "<div class=\"flex items-start gap-2\" data-role=\"agent\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -848,7 +848,7 @@ func ChatMessage(args ChatMessageArgs) templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 67, "<div class=\"rounded-2xl bg-[#161b22] px-3.5 py-2.5 text-sm leading-relaxed text-white\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 67, "<div class=\"rounded-2xl bg-[#161b22] px-3 py-1.5 text-[13px] leading-snug text-white\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -956,7 +956,7 @@ func ChatMessageStreaming(args ChatMessageStreamingArgs) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 75, "\" class=\"w-full min-w-0 overflow-x-hidden\" data-role=\"assistant\"><div class=\"flex items-start gap-2.5\" data-role=\"agent\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 75, "\" class=\"w-full min-w-0 overflow-x-hidden\" data-role=\"assistant\"><div class=\"flex items-start gap-2\" data-role=\"agent\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -972,7 +972,7 @@ func ChatMessageStreaming(args ChatMessageStreamingArgs) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 77, "<div class=\"rounded-2xl bg-[#161b22] px-3.5 py-2.5 text-sm leading-relaxed text-white\"><div class=\"markdown-viewer chat-message-content min-w-0 break-words text-sm leading-relaxed text-white [&_pre]:overflow-x-auto [&_pre]:rounded-xl [&_pre]:!bg-black/40\"><div id=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 77, "<div class=\"rounded-2xl bg-[#161b22] px-3 py-1.5 text-[13px] leading-snug text-white\"><div class=\"markdown-viewer chat-message-content min-w-0 break-words text-[13px] leading-snug text-white [&_pre]:overflow-x-auto [&_pre]:rounded-lg [&_pre]:!bg-black/40 [&_pre]:text-[12px]\"><div id=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

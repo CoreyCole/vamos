@@ -292,7 +292,7 @@ func AgentChatComposer(args AgentChatComposerArgs) templ.Component {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 25, "</div><div class=\"relative\"><div id=\"agent-chat-slash-popover\" class=\"absolute bottom-full left-0 z-30 mb-2 hidden max-h-64 w-full overflow-y-auto rounded-lg border border-border bg-popover p-2 shadow-lg\" data-show=\"$slashOpen\"></div><div class=\"flex items-start gap-2 rounded-2xl border border-input bg-background px-3 py-2\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 25, "</div><div class=\"relative\"><div id=\"agent-chat-slash-popover\" class=\"absolute bottom-full left-0 z-30 mb-2 hidden max-h-64 w-full overflow-y-auto rounded-lg border border-border bg-popover p-2 shadow-lg\" data-show=\"$slashOpen\"></div><div class=\"flex items-start gap-2 rounded-xl border border-input bg-background px-2.5 py-1.5\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -300,14 +300,14 @@ func AgentChatComposer(args AgentChatComposerArgs) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 26, "<textarea id=\"agent-chat-composer-input\" class=\"min-h-[2.75rem] max-h-40 flex-1 resize-none bg-transparent px-0 py-1 text-sm text-foreground outline-none placeholder:text-muted-foreground\" placeholder=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 26, "<textarea id=\"agent-chat-composer-input\" class=\"min-h-[2.25rem] max-h-36 flex-1 resize-none bg-transparent px-0 py-0.5 text-[13px] leading-snug text-foreground outline-none placeholder:text-muted-foreground\" placeholder=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var14 string
 		templ_7745c5c3_Var14, templ_7745c5c3_Err = templ.ResolveAttributeValue(args.Placeholder)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/composer.templ`, Line: 61, Col: 223}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/composer.templ`, Line: 61, Col: 242}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var14)
 		if templ_7745c5c3_Err != nil {
@@ -320,7 +320,7 @@ func AgentChatComposer(args AgentChatComposerArgs) templ.Component {
 		var templ_7745c5c3_Var15 string
 		templ_7745c5c3_Var15, templ_7745c5c3_Err = templ.ResolveAttributeValue(args.DraftSaveAction)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/composer.templ`, Line: 61, Col: 318}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/composer.templ`, Line: 61, Col: 337}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var15)
 		if templ_7745c5c3_Err != nil {
@@ -333,13 +333,13 @@ func AgentChatComposer(args AgentChatComposerArgs) templ.Component {
 		var templ_7745c5c3_Var16 string
 		templ_7745c5c3_Var16, templ_7745c5c3_Err = templ.ResolveAttributeValue(slashCommandInputHandler(args.WorkspaceID, args.ThreadID, args.SlashEndpointBase))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/composer.templ`, Line: 61, Col: 418}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/composer.templ`, Line: 61, Col: 437}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var16)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 29, "\" data-on:keydown=\"if (evt.key === 'Enter' && !evt.shiftKey) { evt.preventDefault(); el.form.requestSubmit() }\"></textarea> <button type=\"submit\" class=\"inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground transition-colors hover:bg-primary/90\" aria-label=\"Send message\" title=\"Send message\"><svg class=\"h-4 w-4\" fill=\"none\" stroke=\"currentColor\" viewBox=\"0 0 24 24\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2\" d=\"M3 11.5L21 3l-8.5 18-2.5-7.5L3 11.5z\"></path></svg></button></div></div></form>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 29, "\" data-on:keydown=\"if (evt.key === 'Enter' && !evt.shiftKey) { evt.preventDefault(); el.form.requestSubmit() }\"></textarea> <button type=\"submit\" class=\"inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground transition-colors hover:bg-primary/90\" aria-label=\"Send message\" title=\"Send message\"><svg class=\"h-4 w-4\" fill=\"none\" stroke=\"currentColor\" viewBox=\"0 0 24 24\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2\" d=\"M3 11.5L21 3l-8.5 18-2.5-7.5L3 11.5z\"></path></svg></button></div></div></form>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

@@ -3,20 +3,20 @@ package agentchat
 // iMessage/Grok bubble chrome ported from agenthome fixtures into SharedThreadChat.
 
 templ BubbleAvatar(initial string, bgClass string) {
-	<span class={ "flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-semibold text-white", bgClass }>{ initial }</span>
+	<span class={ "flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[10px] font-semibold text-white", bgClass }>{ initial }</span>
 }
 
 templ BubbleAuthorName(name string, colorClass string) {
-	<p class={ "mb-1 text-xs font-semibold", colorClass }>{ name }</p>
+	<p class={ "mb-0.5 text-[11px] font-semibold leading-none", colorClass }>{ name }</p>
 }
 
 templ NestedQuoteBlock(initial string, name string, avatarBg string, nameColor string, quote string) {
-	<div class="mb-2 rounded-xl bg-black/40 px-2.5 py-2" data-role="quote">
+	<div class="mb-1.5 rounded-lg bg-black/40 px-2 py-1.5" data-role="quote">
 		<div class="mb-1 flex items-center gap-1.5">
 			<span class={ "flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[8px] font-semibold text-white", avatarBg }>{ initial }</span>
 			<span class={ "text-[11px] font-semibold", nameColor }>{ name }</span>
 		</div>
-		<p class="text-[12px] leading-snug text-white/80">{ quote }</p>
+		<p class="text-[11px] leading-snug text-white/80">{ quote }</p>
 	</div>
 }
 
@@ -31,12 +31,12 @@ templ bubbleBodyInner(args ChatMessageArgs) {
 		)
 	}
 	if args.Role == "user" {
-		<div class="whitespace-pre-wrap break-words text-sm leading-relaxed text-white">{ args.Content }</div>
+		<div class="whitespace-pre-wrap break-words text-[13px] leading-snug text-white">{ args.Content }</div>
 	} else if args.HTMLContent != "" {
-		<div class="markdown-viewer chat-message-content min-w-0 break-words text-sm leading-relaxed text-white [&_pre]:overflow-x-auto [&_pre]:rounded-xl [&_pre]:!bg-black/40" data-ignore>
+		<div class="markdown-viewer chat-message-content min-w-0 break-words text-[13px] leading-snug text-white [&_pre]:overflow-x-auto [&_pre]:rounded-lg [&_pre]:!bg-black/40 [&_pre]:text-[12px]" data-ignore>
 			@templ.Raw(args.HTMLContent)
 		</div>
 	} else {
-		<div class="whitespace-pre-wrap break-words text-sm leading-relaxed text-white">{ args.Content }</div>
+		<div class="whitespace-pre-wrap break-words text-[13px] leading-snug text-white">{ args.Content }</div>
 	}
 }

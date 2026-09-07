@@ -30,7 +30,7 @@ func BubbleAvatar(initial string, bgClass string) templ.Component {
 			templ_7745c5c3_Var1 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		var templ_7745c5c3_Var2 = []any{"flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-semibold text-white", bgClass}
+		var templ_7745c5c3_Var2 = []any{"flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[10px] font-semibold text-white", bgClass}
 		templ_7745c5c3_Err = templ.RenderCSSItems(ctx, templ_7745c5c3_Buffer, templ_7745c5c3_Var2...)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
@@ -55,7 +55,7 @@ func BubbleAvatar(initial string, bgClass string) templ.Component {
 		var templ_7745c5c3_Var4 string
 		templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.JoinStringErrs(initial)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/bubble_chrome.templ`, Line: 6, Col: 133}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/bubble_chrome.templ`, Line: 6, Col: 137}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var4))
 		if templ_7745c5c3_Err != nil {
@@ -90,7 +90,7 @@ func BubbleAuthorName(name string, colorClass string) templ.Component {
 			templ_7745c5c3_Var5 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		var templ_7745c5c3_Var6 = []any{"mb-1 text-xs font-semibold", colorClass}
+		var templ_7745c5c3_Var6 = []any{"mb-0.5 text-[11px] font-semibold leading-none", colorClass}
 		templ_7745c5c3_Err = templ.RenderCSSItems(ctx, templ_7745c5c3_Buffer, templ_7745c5c3_Var6...)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
@@ -115,7 +115,7 @@ func BubbleAuthorName(name string, colorClass string) templ.Component {
 		var templ_7745c5c3_Var8 string
 		templ_7745c5c3_Var8, templ_7745c5c3_Err = templ.JoinStringErrs(name)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/bubble_chrome.templ`, Line: 10, Col: 61}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/bubble_chrome.templ`, Line: 10, Col: 80}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var8))
 		if templ_7745c5c3_Err != nil {
@@ -150,7 +150,7 @@ func NestedQuoteBlock(initial string, name string, avatarBg string, nameColor st
 			templ_7745c5c3_Var9 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, "<div class=\"mb-2 rounded-xl bg-black/40 px-2.5 py-2\" data-role=\"quote\"><div class=\"mb-1 flex items-center gap-1.5\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, "<div class=\"mb-1.5 rounded-lg bg-black/40 px-2 py-1.5\" data-role=\"quote\"><div class=\"mb-1 flex items-center gap-1.5\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -220,7 +220,7 @@ func NestedQuoteBlock(initial string, name string, avatarBg string, nameColor st
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 13, "</span></div><p class=\"text-[12px] leading-snug text-white/80\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 13, "</span></div><p class=\"text-[11px] leading-snug text-white/80\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -275,14 +275,14 @@ func bubbleBodyInner(args ChatMessageArgs) templ.Component {
 			}
 		}
 		if args.Role == "user" {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 15, "<div class=\"whitespace-pre-wrap break-words text-sm leading-relaxed text-white\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 15, "<div class=\"whitespace-pre-wrap break-words text-[13px] leading-snug text-white\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var18 string
 			templ_7745c5c3_Var18, templ_7745c5c3_Err = templ.JoinStringErrs(args.Content)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/bubble_chrome.templ`, Line: 34, Col: 96}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/bubble_chrome.templ`, Line: 34, Col: 97}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var18))
 			if templ_7745c5c3_Err != nil {
@@ -293,7 +293,7 @@ func bubbleBodyInner(args ChatMessageArgs) templ.Component {
 				return templ_7745c5c3_Err
 			}
 		} else if args.HTMLContent != "" {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 17, "<div class=\"markdown-viewer chat-message-content min-w-0 break-words text-sm leading-relaxed text-white [&_pre]:overflow-x-auto [&_pre]:rounded-xl [&_pre]:!bg-black/40\" data-ignore>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 17, "<div class=\"markdown-viewer chat-message-content min-w-0 break-words text-[13px] leading-snug text-white [&_pre]:overflow-x-auto [&_pre]:rounded-lg [&_pre]:!bg-black/40 [&_pre]:text-[12px]\" data-ignore>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -306,14 +306,14 @@ func bubbleBodyInner(args ChatMessageArgs) templ.Component {
 				return templ_7745c5c3_Err
 			}
 		} else {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 19, "<div class=\"whitespace-pre-wrap break-words text-sm leading-relaxed text-white\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 19, "<div class=\"whitespace-pre-wrap break-words text-[13px] leading-snug text-white\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var19 string
 			templ_7745c5c3_Var19, templ_7745c5c3_Err = templ.JoinStringErrs(args.Content)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/bubble_chrome.templ`, Line: 40, Col: 96}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/bubble_chrome.templ`, Line: 40, Col: 97}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var19))
 			if templ_7745c5c3_Err != nil {

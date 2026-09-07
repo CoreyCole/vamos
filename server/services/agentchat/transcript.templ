@@ -43,7 +43,7 @@ templ TranscriptMessageWithFork(threadID string, msg TranscriptMessage, forkActi
 	if msg.Variant == "detail" {
 		@TranscriptDetailCard(msg)
 	} else {
-		<div class="relative min-w-0 overflow-x-hidden px-3 py-2">
+		<div class="relative min-w-0 overflow-x-hidden px-2.5 py-1">
 			@TranscriptForkControl(threadID, msg, forkAction)
 			@ChatMessage(chatMessageArgsFromTranscript(msg))
 		</div>
@@ -166,16 +166,16 @@ templ ChatMessage(args ChatMessageArgs) {
 		}
 		if isUser {
 			<div class="flex justify-end" data-role="user">
-				<div class="max-w-[85%] rounded-2xl bg-[#30363d] px-3.5 py-2.5 text-sm leading-relaxed text-white">
+				<div class="max-w-[85%] rounded-2xl bg-[#30363d] px-3 py-1.5 text-[13px] leading-snug text-white">
 					@bubbleBodyInner(args)
 				</div>
 			</div>
 		} else {
-			<div class="flex items-start gap-2.5" data-role="agent">
+			<div class="flex items-start gap-2" data-role="agent">
 				@BubbleAvatar(initial, avatarBg)
 				<div class="min-w-0 max-w-[85%]">
 					@BubbleAuthorName(name, nameColor)
-					<div class="rounded-2xl bg-[#161b22] px-3.5 py-2.5 text-sm leading-relaxed text-white">
+					<div class="rounded-2xl bg-[#161b22] px-3 py-1.5 text-[13px] leading-snug text-white">
 						@bubbleBodyInner(args)
 					</div>
 				</div>
@@ -195,12 +195,12 @@ templ AttachmentPills(paths []AttachedPath) {
 templ ChatMessageStreaming(args ChatMessageStreamingArgs) {
 	{{ initial, name, avatarBg, nameColor := streamingBubbleAuthorChrome(args) }}
 	<div id={ "msg-" + args.ID } class="w-full min-w-0 overflow-x-hidden" data-role="assistant">
-		<div class="flex items-start gap-2.5" data-role="agent">
+		<div class="flex items-start gap-2" data-role="agent">
 			@BubbleAvatar(initial, avatarBg)
 			<div class="min-w-0 max-w-[85%]">
 				@BubbleAuthorName(name, nameColor)
-				<div class="rounded-2xl bg-[#161b22] px-3.5 py-2.5 text-sm leading-relaxed text-white">
-					<div class="markdown-viewer chat-message-content min-w-0 break-words text-sm leading-relaxed text-white [&_pre]:overflow-x-auto [&_pre]:rounded-xl [&_pre]:!bg-black/40">
+				<div class="rounded-2xl bg-[#161b22] px-3 py-1.5 text-[13px] leading-snug text-white">
+					<div class="markdown-viewer chat-message-content min-w-0 break-words text-[13px] leading-snug text-white [&_pre]:overflow-x-auto [&_pre]:rounded-lg [&_pre]:!bg-black/40 [&_pre]:text-[12px]">
 						<div id={ "msg-content-" + args.ID } class="streaming"></div>
 						<span id={ "msg-cursor-" + args.ID } class="ml-0.5 inline-block h-4 w-2 animate-pulse bg-white/50"></span>
 					</div>
