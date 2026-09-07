@@ -369,20 +369,8 @@ function startResize(event) {
 
   const onMove = (moveEvent) => {
     const dx = moveEvent.clientX - startX;
-    const navigationGroup = resizeGroupForHandle(root, before, after);
-    if (navigationGroup) {
-      const navigationStart =
-        navigationGroup.navigation === before ? beforeStart : afterStart;
-      const navigationNext =
-        navigationGroup.navigation === before
-          ? navigationStart + dx
-          : navigationStart - dx;
-      if (navigationNext <= regionMinWidth(navigationGroup.navigation) / 2) {
-        collapseRegion(root, navigationGroup.navigation);
-        return;
-      }
-    }
-
+    // AI-470: never auto-close from gutter drag (steals pointer onto reopen).
+    // Min-width clamp below only — explicit Threads toggle owns visibility/cookie.
     const beforeIsPrimary = regionSlot(before) === "primary";
     const afterIsPrimary = regionSlot(after) === "primary";
 
@@ -425,10 +413,17 @@ function startResize(event) {
     setRegionWidth(after, nextAfter);
   };
 
-  const onUp = () => {
+  const onUp = (upEvent) => {
     handle.removeEventListener("pointermove", onMove);
     handle.removeEventListener("pointerup", onUp);
     handle.removeEventListener("pointercancel", onUp);
+    try {
+      if (handle.hasPointerCapture?.(upEvent.pointerId)) {
+        handle.releasePointerCapture(upEvent.pointerId);
+      }
+    } catch (_) {
+      /* already released */
+    }
     delete handle.dataset.resizing;
     document.documentElement.classList.remove("workbench-resizing");
     document.body.classList.remove("select-none", "cursor-col-resize");

@@ -637,6 +637,7 @@ func TestWorkbenchResizeJSShowsHandlesForVisibleAdjacentRegions(t *testing.T) {
 		"workbenchResizeBound",
 		"lockPixelWidthsFromPaint",
 		"syncRatiosFromPaint",
+		"never auto-close from gutter drag",
 	} {
 		if !strings.Contains(js, want) {
 			t.Fatalf("workbench-resize.js missing %q in %s", want, js)
