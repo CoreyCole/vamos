@@ -101,8 +101,10 @@ func firstRegionSignalForSlot(state WorkbenchState, slot WorkbenchSlot) string {
 }
 
 func RegionInitialClass(state WorkbenchState, region WorkbenchRegion) string {
+	// Match RegionDataClass !important display locks so first paint survives
+	// Datastar hydrate (no one-frame open/closed flip on room/thread GET).
 	if !region.Visible {
-		return "hidden"
+		return "hidden md:!hidden"
 	}
 	// On mobile viewport SSR, show the active region immediately so deep links
 	// into /threads/:id land on the default Docs/artifact pane before Datastar
@@ -112,15 +114,15 @@ func RegionInitialClass(state WorkbenchState, region WorkbenchRegion) string {
 		if SignalKey(region) == active {
 			return "flex min-w-0 flex-1 flex-col"
 		}
-		return "hidden min-w-0 flex-col md:flex"
+		return "hidden min-w-0 flex-col md:!flex"
 	}
 	switch region.Slot {
 	case WorkbenchSlotPrimary:
 		return "flex min-w-0 flex-1 flex-col"
 	case WorkbenchSlotNavigation, WorkbenchSlotContext:
-		return "hidden min-w-0 flex-col md:flex"
+		return "hidden min-w-0 flex-col md:!flex"
 	default:
-		return "hidden min-w-0 flex-col md:flex"
+		return "hidden min-w-0 flex-col md:!flex"
 	}
 }
 

@@ -75,3 +75,37 @@ func TestThreadsOpenCookieDrivesEncodeWorkbenchSignals(t *testing.T) {
 		t.Fatalf("SSR signals must keep threads closed: %s", window)
 	}
 }
+
+func TestRegionInitialClass_ThreadsClosedLocksHidden(t *testing.T) {
+	t.Parallel()
+	req := &http.Request{Header: http.Header{}}
+	req.AddCookie(&http.Cookie{Name: ThreadsOpenCookie, Value: "0"})
+	state, err := BuildWorkbenchV2State(WorkbenchV2Args{
+		ThreadsOpen:  ThreadsOpenFromRequest(req),
+		ChatOpen:     true,
+		ArtifactOpen: true,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	threads := state.Regions[0]
+	if threads.Visible {
+		t.Fatal("threads should be closed from cookie")
+	}
+	got := RegionInitialClass(state, threads)
+	if !strings.Contains(got, "md:!hidden") || !strings.Contains(got, "hidden") {
+		t.Fatalf("closed threads initial class = %q, want hidden md:!hidden lock", got)
+	}
+	// Open state must use md:!flex so data-class hydrate is a no-op visually.
+	stateOpen, err := BuildWorkbenchV2State(WorkbenchV2Args{
+		ThreadsOpen: true, ChatOpen: true, ArtifactOpen: true,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	gotOpen := RegionInitialClass(stateOpen, stateOpen.Regions[0])
+	if !strings.Contains(gotOpen, "md:!flex") {
+		t.Fatalf("open threads initial class = %q, want md:!flex", gotOpen)
+	}
+}
+
