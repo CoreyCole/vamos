@@ -144,8 +144,8 @@ function regionWidth(region) {
 
 function regionHasSSRFlex(region) {
   const flex = (region.style && region.style.flex) || "";
-  // SSR RegionSSRFlexStyle: "0.2200 1 0%" — proportional grow before pixel lock.
-  return /^\d/.test(flex.trim()) && flex.includes("1 0%");
+  // SSR RegionSSRFlexStyle: "0.2200 1 0%" — browsers may normalize 0% → 0px.
+  return /^\d/.test(flex.trim()) && /1\s+0(%|px)/.test(flex);
 }
 
 function applyRegionRatios(root) {
@@ -306,6 +306,26 @@ function saveConfigForEvent(event) {
 
 document.addEventListener("workbench-layout-save", saveConfigForEvent);
 
+function lockPixelWidthsFromPaint(root) {
+  const regions = visibleRegions(root);
+  const availableWidth = availableRegionWidth(root);
+  if (availableWidth <= 0 || regions.length === 0) return;
+  let total = 0;
+  for (const region of regions) {
+    const w = regionWidth(region);
+    total += w;
+    region.dataset.workbenchWidthPx = w.toFixed(2);
+    setRegionWidth(region, w);
+  }
+  // Normalize visible ratios from painted widths so save + applyRegionRatios agree.
+  const denom = total > 0 ? total : 1;
+  for (const region of regions) {
+    const w = Number(region.dataset.workbenchWidthPx || 0);
+    region.dataset.workbenchRatio = (w / denom).toFixed(4);
+  }
+  root.dataset.workbenchPixelLock = "1";
+}
+
 function startResize(event) {
   if (event.button !== 0) return;
   const handle = event.currentTarget;
@@ -317,12 +337,7 @@ function startResize(event) {
 
   // First grip drag: convert SSR flex to pixel lock from current painted widths.
   if (root.dataset.workbenchPixelLock !== "1") {
-    root.dataset.workbenchPixelLock = "1";
-    for (const region of visibleRegions(root)) {
-      const w = regionWidth(region);
-      region.dataset.workbenchWidthPx = w.toFixed(2);
-      setRegionWidth(region, w);
-    }
+    lockPixelWidthsFromPaint(root);
   }
 
   event.preventDefault();
@@ -411,15 +426,25 @@ function startResize(event) {
   handle.addEventListener("pointercancel", onUp);
 }
 
-function initWorkbench(root) {
-  applyRegionRatios(root);
-  if (roots.has(root)) return;
-  roots.add(root);
+function bindResizeHandles(root) {
   for (const handle of root.querySelectorAll(
     "[data-workbench-resize-handle]",
   )) {
+    // Datastar morphs can replace handle nodes while keeping #workbench-root.
+    // Rebind any unbound handle; WeakSet-on-root alone left detached listeners.
+    if (handle.dataset.workbenchResizeBound === "1") continue;
+    handle.dataset.workbenchResizeBound = "1";
     handle.addEventListener("pointerdown", startResize);
   }
+}
+
+function initWorkbench(root) {
+  // Don't fight an in-progress grip drag (MutationObserver style/class churn).
+  if (!document.documentElement.classList.contains("workbench-resizing")) {
+    applyRegionRatios(root);
+  }
+  bindResizeHandles(root);
+  roots.add(root);
 }
 
 function init() {

@@ -55,7 +55,7 @@ func ResizeHandle(before WorkbenchRegion, afterSignalKey string) templ.Component
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "\" class=\"group relative hidden w-0 shrink-0 outline-none md:!block\"><div class=\"absolute inset-y-2 -left-2 z-20 w-4 cursor-col-resize rounded-md focus-visible:ring-2 focus-visible:ring-ring\"></div><div class=\"pointer-events-none absolute left-1/2 top-1/2 z-20 hidden h-10 w-1 -translate-x-1/2 -translate-y-1/2 rounded-full bg-muted-foreground/25 transition-colors group-hover:block group-focus-visible:block group-data-[resizing=true]:block group-data-[resizing=true]:bg-primary/60\"></div></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "\" class=\"group relative z-30 hidden w-0 shrink-0 touch-none outline-none md:!block\"><!-- Hairline gutter (gap-0): wide absolute hit target centered on the seam. --><div class=\"absolute inset-y-0 left-1/2 z-30 w-4 -translate-x-1/2 cursor-col-resize touch-none rounded-md focus-visible:ring-2 focus-visible:ring-ring\"></div><div class=\"pointer-events-none absolute left-1/2 top-1/2 z-30 hidden h-10 w-1 -translate-x-1/2 -translate-y-1/2 rounded-full bg-muted-foreground/25 transition-colors group-hover:block group-focus-visible:block group-data-[resizing=true]:block group-data-[resizing=true]:bg-primary/60\"></div></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

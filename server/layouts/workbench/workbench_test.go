@@ -397,8 +397,8 @@ func TestResizeHandleRendersInvisibleGutterTarget(t *testing.T) {
 	html := body.String()
 	for _, want := range []string{
 		`data-workbench-resize-handle`,
-		`class="group relative hidden w-0 shrink-0 outline-none md:!block"`,
-		`absolute inset-y-2 -left-2 z-20 w-4 cursor-col-resize`,
+		`class="group relative z-30 hidden w-0 shrink-0 touch-none outline-none md:!block"`,
+		`absolute inset-y-0 left-1/2 z-30 w-4 -translate-x-1/2 cursor-col-resize`,
 	} {
 		if !strings.Contains(html, want) {
 			t.Fatalf("resize handle html = %s, want %q", html, want)
@@ -633,7 +633,9 @@ func TestWorkbenchResizeJSShowsHandlesForVisibleAdjacentRegions(t *testing.T) {
 		"workbench-layout-save",
 		"regionHasSSRFlex",
 		"workbenchPixelLock",
-		"workbenchPixelLock",
+		"bindResizeHandles",
+		"workbenchResizeBound",
+		"lockPixelWidthsFromPaint",
 	} {
 		if !strings.Contains(js, want) {
 			t.Fatalf("workbench-resize.js missing %q in %s", want, js)
