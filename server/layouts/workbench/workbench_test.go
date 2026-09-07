@@ -1776,3 +1776,25 @@ func TestWorkbenchV2RegionsHairlineGap(t *testing.T) {
 	}
 }
 
+func TestWorkbenchV2FlushChrome(t *testing.T) {
+	t.Parallel()
+	state, err := BuildWorkbenchV2State(WorkbenchV2Args{ThreadsOpen: true, ChatOpen: true, ArtifactOpen: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var body strings.Builder
+	if err := Workbench(state).Render(t.Context(), &body); err != nil {
+		t.Fatal(err)
+	}
+	out := body.String()
+	if !strings.Contains(out, `class="flex h-full min-h-0 w-full overflow-hidden p-0"`) {
+		t.Fatal("workbench-root should be p-0 flush")
+	}
+	if strings.Contains(out, "rounded-lg border border-border shadow-sm") {
+		t.Fatal("regions still have rounded-lg/shadow-sm")
+	}
+	if !strings.Contains(out, "rounded-none") || !strings.Contains(out, "shadow-none") {
+		t.Fatal("regions should be rounded-none shadow-none")
+	}
+}
+
