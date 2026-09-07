@@ -43,9 +43,9 @@ templ TranscriptMessageWithFork(threadID string, msg TranscriptMessage, forkActi
 	if msg.Variant == "detail" {
 		@TranscriptDetailCard(msg)
 	} else {
-		<div class={ "relative min-w-0 overflow-x-hidden border-b border-border first:border-t last:border-b-0", templ.KV("bg-muted/60", msg.Role == "user") }>
+		<div class="relative min-w-0 overflow-x-hidden px-3 py-2">
 			@TranscriptForkControl(threadID, msg, forkAction)
-			@ChatMessage(ChatMessageArgs{ID: msg.DOMID, Role: msg.Role, Content: msg.Content, HTMLContent: msg.HTMLContent, Attachments: msg.Attachments})
+			@ChatMessage(chatMessageArgsFromTranscript(msg))
 		</div>
 	}
 }
@@ -159,15 +159,26 @@ templ TranscriptDetailHeader(msg TranscriptMessage) {
 
 templ ChatMessage(args ChatMessageArgs) {
 	{{ isUser := args.Role == "user" }}
-	<div id={ "msg-" + args.ID } class="w-full min-w-0 overflow-x-hidden">
+	{{ initial, name, avatarBg, nameColor := bubbleAuthorChrome(args) }}
+	<div id={ "msg-" + args.ID } class="w-full min-w-0 overflow-x-hidden" data-role={ args.Role }>
 		if len(args.Attachments) > 0 {
 			@AttachmentPills(args.Attachments)
 		}
 		if isUser {
-			<div class="agent-chat-content-padding whitespace-pre-wrap break-words text-sm text-foreground">{ args.Content }</div>
+			<div class="flex justify-end" data-role="user">
+				<div class="max-w-[85%] rounded-2xl bg-[#30363d] px-3.5 py-2.5 text-sm leading-relaxed text-white">
+					@bubbleBodyInner(args)
+				</div>
+			</div>
 		} else {
-			<div class="markdown-viewer chat-message-content min-w-0 break-words text-sm" data-ignore>
-				@templ.Raw(args.HTMLContent)
+			<div class="flex items-start gap-2.5" data-role="agent">
+				@BubbleAvatar(initial, avatarBg)
+				<div class="min-w-0 max-w-[85%]">
+					@BubbleAuthorName(name, nameColor)
+					<div class="rounded-2xl bg-[#161b22] px-3.5 py-2.5 text-sm leading-relaxed text-white">
+						@bubbleBodyInner(args)
+					</div>
+				</div>
 			</div>
 		}
 	</div>
@@ -182,10 +193,19 @@ templ AttachmentPills(paths []AttachedPath) {
 }
 
 templ ChatMessageStreaming(args ChatMessageStreamingArgs) {
-	<div id={ "msg-" + args.ID } class="w-full min-w-0 overflow-x-hidden">
-		<div class="agent-chat-content-padding markdown-viewer chat-message-content min-w-0 break-words text-sm">
-			<div id={ "msg-content-" + args.ID } class="streaming"></div>
-			<span id={ "msg-cursor-" + args.ID } class="ml-0.5 inline-block h-4 w-2 animate-pulse bg-foreground/50"></span>
+	{{ initial, name, avatarBg, nameColor := streamingBubbleAuthorChrome(args) }}
+	<div id={ "msg-" + args.ID } class="w-full min-w-0 overflow-x-hidden" data-role="assistant">
+		<div class="flex items-start gap-2.5" data-role="agent">
+			@BubbleAvatar(initial, avatarBg)
+			<div class="min-w-0 max-w-[85%]">
+				@BubbleAuthorName(name, nameColor)
+				<div class="rounded-2xl bg-[#161b22] px-3.5 py-2.5 text-sm leading-relaxed text-white">
+					<div class="markdown-viewer chat-message-content min-w-0 break-words text-sm leading-relaxed text-white [&_pre]:overflow-x-auto [&_pre]:rounded-xl [&_pre]:!bg-black/40">
+						<div id={ "msg-content-" + args.ID } class="streaming"></div>
+						<span id={ "msg-cursor-" + args.ID } class="ml-0.5 inline-block h-4 w-2 animate-pulse bg-white/50"></span>
+					</div>
+				</div>
+			</div>
 		</div>
 	</div>
 }
@@ -199,11 +219,21 @@ templ ChatMessageDeltaHTML(args ChatMessageDeltaHTMLArgs) {
 }
 
 templ ChatMessageComplete(args ChatMessageCompleteArgs) {
-	<div id={ "msg-" + args.ID } class="w-full min-w-0 overflow-x-hidden">
-		<div class="markdown-viewer chat-message-content min-w-0 break-words text-sm" data-ignore>
-			@templ.Raw(args.HTMLContent)
-		</div>
-	</div>
+	@ChatMessage(ChatMessageArgs{
+		ID:            args.ID,
+		Role:          completeBubbleRole(args),
+		Content:       args.Content,
+		HTMLContent:   args.HTMLContent,
+		AuthorInitial: args.AuthorInitial,
+		AuthorName:    args.AuthorName,
+		AvatarBg:      args.AvatarBg,
+		NameColor:     args.NameColor,
+		QuoteInitial:  args.QuoteInitial,
+		QuoteName:     args.QuoteName,
+		QuoteAvatarBg: args.QuoteAvatarBg,
+		QuoteNameColor: args.QuoteNameColor,
+		QuoteText:     args.QuoteText,
+	})
 }
 
 templ TranscriptForkControl(threadID string, msg TranscriptMessage, forkAction string) {

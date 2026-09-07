@@ -132,7 +132,7 @@ func (s *Service) RenderSharedThreadChat(
 	ctx context.Context,
 	threadID, userEmail string,
 ) (templ.Component, error) {
-	return s.renderSharedThreadChat(ctx, threadID, userEmail, false)
+	return s.renderSharedThreadChat(ctx, threadID, userEmail, "")
 }
 
 func (s *Service) ListWorkbenchThreads(

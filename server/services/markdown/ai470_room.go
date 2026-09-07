@@ -182,6 +182,10 @@ type chromaFixtureChatRenderer interface {
 		ctx context.Context,
 		threadID, userEmail string,
 	) (templ.Component, error)
+	RenderSharedThreadChatWithGroupBubbleFixture(
+		ctx context.Context,
+		threadID, userEmail string,
+	) (templ.Component, error)
 }
 
 func (s *Service) renderAI470SharedChat(
@@ -189,10 +193,15 @@ func (s *Service) renderAI470SharedChat(
 	kind agenthome.RoomKind,
 	roomID, threadID, userEmail string,
 ) (templ.Component, error) {
-	// Seed visible fenced ```go bubble on dm/bot for chroma VA (Corey).
-	if kind == agenthome.KindDM && roomID == "bot" {
-		if r, ok := s.workbenchThreadsRenderer.(chromaFixtureChatRenderer); ok {
+	r, ok := s.workbenchThreadsRenderer.(chromaFixtureChatRenderer)
+	if ok {
+		// Seed visible fenced ```go bubble on dm/bot for chroma VA.
+		if kind == agenthome.KindDM && roomID == "bot" {
 			return r.RenderSharedThreadChatWithChromaFixture(ctx, threadID, userEmail)
+		}
+		// Group: multi-author bubbles + NestedQuoteBlock + chroma for Bot-vs-group VA.
+		if kind == agenthome.KindGroup && roomID == "vamos-dev" {
+			return r.RenderSharedThreadChatWithGroupBubbleFixture(ctx, threadID, userEmail)
 		}
 	}
 	return s.workbenchThreadsRenderer.RenderSharedThreadChat(ctx, threadID, userEmail)

@@ -115,6 +115,17 @@ type TranscriptMessage struct {
 	ChatSessionID         string
 	ChatNodeID            string
 	ChatEventSeq          int64
+	// Optional iMessage/Grok bubble author chrome (AI-470 SharedThreadChat).
+	AuthorInitial string
+	AuthorName    string
+	AvatarBg      string
+	NameColor     string
+	// Optional NestedQuoteBlock inside the bubble body.
+	QuoteInitial string
+	QuoteName    string
+	QuoteAvatarBg string
+	QuoteNameColor string
+	QuoteText     string
 }
 
 type SessionThreadSource string
@@ -349,10 +360,24 @@ type ChatMessageArgs struct {
 	Content     string
 	HTMLContent string
 	Attachments []AttachedPath
+	AuthorInitial string
+	AuthorName    string
+	AvatarBg      string
+	NameColor     string
+	QuoteInitial  string
+	QuoteName     string
+	QuoteAvatarBg string
+	QuoteNameColor string
+	QuoteText     string
 }
 
 type ChatMessageStreamingArgs struct {
-	ID string
+	ID           string
+	Role         string
+	AuthorInitial string
+	AuthorName    string
+	AvatarBg      string
+	NameColor     string
 }
 
 type ChatMessageDeltaArgs struct {
@@ -366,9 +391,19 @@ type ChatMessageDeltaHTMLArgs struct {
 }
 
 type ChatMessageCompleteArgs struct {
-	ID          string
-	Content     string
-	HTMLContent string
+	ID           string
+	Role         string
+	Content      string
+	HTMLContent  string
+	AuthorInitial string
+	AuthorName    string
+	AvatarBg      string
+	NameColor     string
+	QuoteInitial  string
+	QuoteName     string
+	QuoteAvatarBg string
+	QuoteNameColor string
+	QuoteText     string
 }
 
 type (

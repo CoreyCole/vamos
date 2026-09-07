@@ -4962,7 +4962,7 @@ func (s *Service) newBubbleTranscriptMessage(
 			htmlContent = ""
 		}
 	}
-	return TranscriptMessage{
+	msg := TranscriptMessage{
 		DOMID:        domID,
 		EntryID:      entryID,
 		Variant:      "bubble",
@@ -4971,6 +4971,10 @@ func (s *Service) newBubbleTranscriptMessage(
 		HTMLContent:  htmlContent,
 		ShowForkForm: showFork,
 	}
+	if role == "assistant" {
+		msg = withDefaultAssistantBubbleChrome(msg)
+	}
+	return msg
 }
 
 func (s *Service) newDetailTranscriptMessage(
