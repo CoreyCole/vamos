@@ -247,7 +247,7 @@ func (s *Service) startWorkspaceThreadWithCWD(
 	defer func() { _ = tx.Rollback() }()
 	q := s.queries.WithTx(tx)
 
-	thread, err := q.CreateAgentThread(ctx, db.CreateAgentThreadParams{
+	thread, err := q.CreateAgentThread(ctx, s.attachPlanDirRel(ctx, db.CreateAgentThreadParams{
 		ID:                uuid.NewString(),
 		UserEmail:         userEmail,
 		Title:             truncateTitle(prompt),
@@ -256,7 +256,7 @@ func (s *Service) startWorkspaceThreadWithCWD(
 		HeadEntryID:       sql.NullString{},
 		ParentThreadID:    sql.NullString{},
 		ForkedFromEntryID: sql.NullString{},
-	})
+	}))
 	if err != nil {
 		return nil, nil, nil, err
 	}

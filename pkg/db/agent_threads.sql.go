@@ -19,6 +19,7 @@ INSERT INTO agent_threads (
     cwd,
     lineage_id,
     project_id,
+    plan_dir_rel,
     head_entry_id,
     parent_thread_id,
     forked_from_entry_id
@@ -32,7 +33,8 @@ VALUES (
     ?6,
     ?7,
     ?8,
-    ?9
+    ?9,
+    ?10
 )
 RETURNING
 id,
@@ -57,6 +59,7 @@ type CreateAgentThreadParams struct {
 	Cwd               string         `json:"cwd"`
 	LineageID         string         `json:"lineage_id"`
 	ProjectID         string         `json:"project_id"`
+	PlanDirRel        sql.NullString `json:"plan_dir_rel"`
 	HeadEntryID       sql.NullString `json:"head_entry_id"`
 	ParentThreadID    sql.NullString `json:"parent_thread_id"`
 	ForkedFromEntryID sql.NullString `json:"forked_from_entry_id"`
@@ -70,6 +73,7 @@ func (q *Queries) CreateAgentThread(ctx context.Context, arg CreateAgentThreadPa
 		arg.Cwd,
 		arg.LineageID,
 		arg.ProjectID,
+		arg.PlanDirRel,
 		arg.HeadEntryID,
 		arg.ParentThreadID,
 		arg.ForkedFromEntryID,
@@ -242,6 +246,52 @@ func (q *Queries) GetAgentThreadForWorkspaceUser(ctx context.Context, arg GetAge
 	return i, err
 }
 
+const getMostRecentAgentThreadByPlanDirRel = `-- name: GetMostRecentAgentThreadByPlanDirRel :one
+;
+
+SELECT
+id,
+user_email,
+title,
+cwd,
+lineage_id,
+project_id,
+plan_dir_rel,
+head_entry_id,
+parent_thread_id,
+forked_from_entry_id,
+created_at,
+updated_at,
+archived_at
+FROM agent_threads
+WHERE plan_dir_rel = ?1
+AND archived_at IS NULL
+ORDER BY updated_at DESC
+LIMIT 1
+`
+
+// Plan-home most-recent chat via idx_agent_threads_plan_updated.
+func (q *Queries) GetMostRecentAgentThreadByPlanDirRel(ctx context.Context, planDirRel sql.NullString) (AgentThread, error) {
+	row := q.db.QueryRowContext(ctx, getMostRecentAgentThreadByPlanDirRel, planDirRel)
+	var i AgentThread
+	err := row.Scan(
+		&i.ID,
+		&i.UserEmail,
+		&i.Title,
+		&i.Cwd,
+		&i.LineageID,
+		&i.ProjectID,
+		&i.PlanDirRel,
+		&i.HeadEntryID,
+		&i.ParentThreadID,
+		&i.ForkedFromEntryID,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.ArchivedAt,
+	)
+	return i, err
+}
+
 const getSharedAgentThread = `-- name: GetSharedAgentThread :one
 ;
 
@@ -351,6 +401,68 @@ func (q *Queries) ListAgentThreads(ctx context.Context, arg ListAgentThreadsPara
 	return items, nil
 }
 
+const listAgentThreadsByPlanDirRel = `-- name: ListAgentThreadsByPlanDirRel :many
+;
+
+
+SELECT
+id,
+user_email,
+title,
+cwd,
+lineage_id,
+project_id,
+plan_dir_rel,
+head_entry_id,
+parent_thread_id,
+forked_from_entry_id,
+created_at,
+updated_at,
+archived_at
+FROM agent_threads
+WHERE plan_dir_rel = ?1
+AND archived_at IS NULL
+ORDER BY updated_at DESC
+`
+
+// Plan-home children: FK only (freeform NULL excluded).
+func (q *Queries) ListAgentThreadsByPlanDirRel(ctx context.Context, planDirRel sql.NullString) ([]AgentThread, error) {
+	rows, err := q.db.QueryContext(ctx, listAgentThreadsByPlanDirRel, planDirRel)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []AgentThread
+	for rows.Next() {
+		var i AgentThread
+		if err := rows.Scan(
+			&i.ID,
+			&i.UserEmail,
+			&i.Title,
+			&i.Cwd,
+			&i.LineageID,
+			&i.ProjectID,
+			&i.PlanDirRel,
+			&i.HeadEntryID,
+			&i.ParentThreadID,
+			&i.ForkedFromEntryID,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.ArchivedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listAgentThreadsByWorkspace = `-- name: ListAgentThreadsByWorkspace :many
 ;
 
@@ -399,6 +511,58 @@ func (q *Queries) ListAgentThreadsByWorkspace(ctx context.Context, workspaceID s
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.ArchivedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listAgentThreadsForPlanDirBackfill = `-- name: ListAgentThreadsForPlanDirBackfill :many
+;
+
+SELECT
+t.id,
+t.cwd,
+t.plan_dir_rel,
+s.plan_dir AS session_plan_dir
+FROM agent_threads t
+LEFT JOIN agent_sessions s
+ON s.projected_thread_id = t.id
+AND s.identity_kind = 'plan_owned'
+AND s.plan_dir IS NOT NULL
+WHERE t.archived_at IS NULL
+AND t.plan_dir_rel IS NULL
+`
+
+type ListAgentThreadsForPlanDirBackfillRow struct {
+	ID             string         `json:"id"`
+	Cwd            string         `json:"cwd"`
+	PlanDirRel     sql.NullString `json:"plan_dir_rel"`
+	SessionPlanDir sql.NullString `json:"session_plan_dir"`
+}
+
+func (q *Queries) ListAgentThreadsForPlanDirBackfill(ctx context.Context) ([]ListAgentThreadsForPlanDirBackfillRow, error) {
+	rows, err := q.db.QueryContext(ctx, listAgentThreadsForPlanDirBackfill)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListAgentThreadsForPlanDirBackfillRow
+	for rows.Next() {
+		var i ListAgentThreadsForPlanDirBackfillRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Cwd,
+			&i.PlanDirRel,
+			&i.SessionPlanDir,
 		); err != nil {
 			return nil, err
 		}
@@ -519,15 +683,29 @@ t.created_at,
 t.updated_at,
 t.archived_at
 FROM agent_threads t
-JOIN agent_sessions s ON s.projected_thread_id = t.id
-WHERE s.identity_kind = 'plan_owned'
-AND s.plan_dir = ?1
-AND t.archived_at IS NULL
+LEFT JOIN agent_sessions s
+ON s.projected_thread_id = t.id
+AND s.identity_kind = 'plan_owned'
+WHERE t.archived_at IS NULL
+AND (
+    t.plan_dir_rel = ?1
+    OR (
+        t.plan_dir_rel IS NULL
+        AND s.plan_dir = ?2
+    )
+)
 ORDER BY t.updated_at DESC
 `
 
-func (q *Queries) ListSharedAgentThreadsByPlanDir(ctx context.Context, planDir sql.NullString) ([]AgentThread, error) {
-	rows, err := q.db.QueryContext(ctx, listSharedAgentThreadsByPlanDir, planDir)
+type ListSharedAgentThreadsByPlanDirParams struct {
+	PlanDirRel sql.NullString `json:"plan_dir_rel"`
+	PlanDir    sql.NullString `json:"plan_dir"`
+}
+
+// Dual-read: prefer agent_threads.plan_dir_rel FK; fallback to plan-owned
+// session plan_dir for not-yet-backfilled (NULL) threads only.
+func (q *Queries) ListSharedAgentThreadsByPlanDir(ctx context.Context, arg ListSharedAgentThreadsByPlanDirParams) ([]AgentThread, error) {
+	rows, err := q.db.QueryContext(ctx, listSharedAgentThreadsByPlanDir, arg.PlanDirRel, arg.PlanDir)
 	if err != nil {
 		return nil, err
 	}
@@ -648,22 +826,44 @@ func (q *Queries) ListSharedAgentThreadsWithWorkspace(ctx context.Context) ([]Li
 	return items, nil
 }
 
+const setAgentThreadPlanDirRel = `-- name: SetAgentThreadPlanDirRel :exec
+;
+
+UPDATE agent_threads
+SET plan_dir_rel = ?1
+WHERE id = ?2
+AND plan_dir_rel IS NULL
+`
+
+type SetAgentThreadPlanDirRelParams struct {
+	PlanDirRel sql.NullString `json:"plan_dir_rel"`
+	ID         string         `json:"id"`
+}
+
+// Backfill helper: do not bump updated_at (preserve most-recent ordering).
+func (q *Queries) SetAgentThreadPlanDirRel(ctx context.Context, arg SetAgentThreadPlanDirRelParams) error {
+	_, err := q.db.ExecContext(ctx, setAgentThreadPlanDirRel, arg.PlanDirRel, arg.ID)
+	return err
+}
+
 const updateAgentThreadCwd = `-- name: UpdateAgentThreadCwd :exec
 ;
 
 UPDATE agent_threads
 SET cwd = ?1,
+plan_dir_rel = COALESCE(?2, plan_dir_rel),
 updated_at = CURRENT_TIMESTAMP
-WHERE id = ?2
+WHERE id = ?3
 `
 
 type UpdateAgentThreadCwdParams struct {
-	Cwd string `json:"cwd"`
-	ID  string `json:"id"`
+	Cwd        string         `json:"cwd"`
+	PlanDirRel sql.NullString `json:"plan_dir_rel"`
+	ID         string         `json:"id"`
 }
 
 func (q *Queries) UpdateAgentThreadCwd(ctx context.Context, arg UpdateAgentThreadCwdParams) error {
-	_, err := q.db.ExecContext(ctx, updateAgentThreadCwd, arg.Cwd, arg.ID)
+	_, err := q.db.ExecContext(ctx, updateAgentThreadCwd, arg.Cwd, arg.PlanDirRel, arg.ID)
 	return err
 }
 

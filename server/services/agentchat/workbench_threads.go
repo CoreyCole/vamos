@@ -32,14 +32,12 @@ func (s *Service) ResolveThreadPlanDir(
 	ctx context.Context,
 	thread db.AgentThread,
 ) string {
-	if planDir, ok := s.canonicalPlanDirFromSource(thread.Cwd); ok {
-		return planDir
-	}
+	workspaceRoot := ""
 	workspace, err := s.queries.GetSharedPrimaryWorkspaceForThread(ctx, thread.ID)
-	if err != nil {
-		return ""
+	if err == nil {
+		workspaceRoot = workspace.RootDocPath
 	}
-	planDir, _ := s.canonicalPlanDirFromSource(workspace.RootDocPath)
+	planDir, _ := s.threadPlanDir(ctx, thread.PlanDirRel, thread.Cwd, workspaceRoot)
 	return planDir
 }
 
@@ -104,6 +102,14 @@ func (s *Service) FindSharedThreadForDoc(
 	want := thoughtsPlanKey(docPath)
 	if want == "" {
 		return "", nil
+	}
+	// Plan-home: prefer FK most-recent when the plan workspace exists.
+	if rel, ok := s.lookupPlanDirRel(ctx, docPath); ok {
+		if thread, found, err := s.MostRecentPlanHomeThread(ctx, rel, ""); err != nil {
+			return "", err
+		} else if found {
+			return thread.ID, nil
+		}
 	}
 	groups, err := s.ListWorkbenchThreads(ctx)
 	if err != nil {
@@ -179,14 +185,18 @@ func (s *Service) ListWorkbenchThreads(
 	}
 	groups := map[string]*WorkbenchThreadGroup{}
 	for _, row := range rows {
-		planDir, ok := s.canonicalPlanDirFromSource(row.Cwd)
-		if !ok {
-			planDir, ok = s.canonicalPlanDirFromSource(row.WorkspaceRootDocPath.String)
-		}
+		// Dual-read: prefer plan_dir_rel FK; fallback to cwd / workspace root.
+		planDir, ok := s.threadPlanDir(
+			ctx,
+			row.PlanDirRel,
+			row.Cwd,
+			row.WorkspaceRootDocPath.String,
+		)
 		key := planDir
 		label := "Ungrouped threads"
 		if !ok {
 			key = ""
+			planDir = ""
 		} else {
 			label = filepath.Base(planDir)
 		}

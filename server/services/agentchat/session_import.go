@@ -1189,7 +1189,7 @@ func (s *Service) createImportedThreadFromScan(
 	} else if scan.Header.ID != "" {
 		title = "Terminal session " + scan.Header.ID
 	}
-	thread, err := q.CreateAgentThread(ctx, db.CreateAgentThreadParams{
+	thread, err := q.CreateAgentThread(ctx, s.attachPlanDirRel(ctx, db.CreateAgentThreadParams{
 		ID:                uuid.NewString(),
 		UserEmail:         workspace.UserEmail,
 		Title:             title,
@@ -1198,7 +1198,7 @@ func (s *Service) createImportedThreadFromScan(
 		HeadEntryID:       sql.NullString{},
 		ParentThreadID:    nullString(parentThreadID),
 		ForkedFromEntryID: sql.NullString{},
-	})
+	}))
 	return thread, diverged, err
 }
 

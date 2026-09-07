@@ -83,8 +83,11 @@ type Querier interface {
 	GetLatestUserChatSelectionByScope(ctx context.Context, arg GetLatestUserChatSelectionByScopeParams) (UserChatSelection, error)
 	GetLayoutPreference(ctx context.Context, arg GetLayoutPreferenceParams) (LayoutPreference, error)
 	GetMachineCredential(ctx context.Context, id string) (MachineCredential, error)
+	// Plan-home most-recent chat via idx_agent_threads_plan_updated.
+	GetMostRecentAgentThreadByPlanDirRel(ctx context.Context, planDirRel sql.NullString) (AgentThread, error)
 	GetPiMetadataCursor(ctx context.Context, sourcePath string) (PiMetadataCursor, error)
 	GetPlanWorkspace(ctx context.Context, planDirRel string) (PlanWorkspace, error)
+	GetPlanWorkspaceByPlanDir(ctx context.Context, planDir string) (PlanWorkspace, error)
 	GetPrimaryWorkspaceForThread(ctx context.Context, arg GetPrimaryWorkspaceForThreadParams) (Workspace, error)
 	GetRecentAuthAttempts(ctx context.Context, arg GetRecentAuthAttemptsParams) ([]AuthAttempt, error)
 	GetReleaseQueueItem(ctx context.Context, id string) (ReleaseQueueItem, error)
@@ -117,7 +120,10 @@ type Querier interface {
 	ListAgentSessionsByWorkspace(ctx context.Context, attachedWorkspaceID sql.NullString) ([]AgentSession, error)
 	ListAgentSurfaceAttachmentsBySession(ctx context.Context, chatSessionID string) ([]AgentSurfaceAttachment, error)
 	ListAgentThreads(ctx context.Context, arg ListAgentThreadsParams) ([]AgentThread, error)
+	// Plan-home children: FK only (freeform NULL excluded).
+	ListAgentThreadsByPlanDirRel(ctx context.Context, planDirRel sql.NullString) ([]AgentThread, error)
 	ListAgentThreadsByWorkspace(ctx context.Context, workspaceID string) ([]AgentThread, error)
+	ListAgentThreadsForPlanDirBackfill(ctx context.Context) ([]ListAgentThreadsForPlanDirBackfillRow, error)
 	ListAgentThreadsForUserWithWorkspace(ctx context.Context, userEmail string) ([]ListAgentThreadsForUserWithWorkspaceRow, error)
 	ListChatAnnotationsBySession(ctx context.Context, sessionID string) ([]ChatAnnotation, error)
 	ListChatSessionEventsAfter(ctx context.Context, arg ListChatSessionEventsAfterParams) ([]ChatSessionEvent, error)
@@ -144,7 +150,9 @@ type Querier interface {
 	ListRecentWorkspaceErrorEventsForWorkspace(ctx context.Context, arg ListRecentWorkspaceErrorEventsForWorkspaceParams) ([]WorkspaceErrorEvent, error)
 	ListRecentWorkspaceLogEvents(ctx context.Context, arg ListRecentWorkspaceLogEventsParams) ([]WorkspaceEvent, error)
 	ListReleaseQueueEvents(ctx context.Context, arg ListReleaseQueueEventsParams) ([]ReleaseQueueEvent, error)
-	ListSharedAgentThreadsByPlanDir(ctx context.Context, planDir sql.NullString) ([]AgentThread, error)
+	// Dual-read: prefer agent_threads.plan_dir_rel FK; fallback to plan-owned
+	// session plan_dir for not-yet-backfilled (NULL) threads only.
+	ListSharedAgentThreadsByPlanDir(ctx context.Context, arg ListSharedAgentThreadsByPlanDirParams) ([]AgentThread, error)
 	ListSharedAgentThreadsWithWorkspace(ctx context.Context) ([]ListSharedAgentThreadsWithWorkspaceRow, error)
 	ListThreadWorkspaceAssociations(ctx context.Context, threadID string) ([]ListThreadWorkspaceAssociationsRow, error)
 	ListThreadsByPrimaryWorkspace(ctx context.Context, workspaceID string) ([]ListThreadsByPrimaryWorkspaceRow, error)
@@ -176,6 +184,8 @@ type Querier interface {
 	ResolveDocumentComment(ctx context.Context, arg ResolveDocumentCommentParams) error
 	ResolveWorkspaceForDocPath(ctx context.Context, arg ResolveWorkspaceForDocPathParams) (ResolveWorkspaceForDocPathRow, error)
 	RevokeMachineCredential(ctx context.Context, arg RevokeMachineCredentialParams) (int64, error)
+	// Backfill helper: do not bump updated_at (preserve most-recent ordering).
+	SetAgentThreadPlanDirRel(ctx context.Context, arg SetAgentThreadPlanDirRelParams) error
 	SoftDeleteDocumentComment(ctx context.Context, id string) error
 	TestSupportCountAgentEntries(ctx context.Context) (int64, error)
 	TestSupportCountAgentSessions(ctx context.Context) (int64, error)

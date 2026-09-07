@@ -841,7 +841,7 @@ func (s *Service) StartWorkspaceThread(
 	defer func() { _ = tx.Rollback() }()
 	q := s.queries.WithTx(tx)
 
-	thread, err := q.CreateAgentThread(ctx, db.CreateAgentThreadParams{
+	thread, err := q.CreateAgentThread(ctx, s.attachPlanDirRel(ctx, db.CreateAgentThreadParams{
 		ID:                uuid.NewString(),
 		UserEmail:         userEmail,
 		Title:             truncateTitle(prompt),
@@ -850,7 +850,7 @@ func (s *Service) StartWorkspaceThread(
 		HeadEntryID:       sql.NullString{},
 		ParentThreadID:    sql.NullString{},
 		ForkedFromEntryID: sql.NullString{},
-	})
+	}))
 	if err != nil {
 		return nil, nil, nil, err
 	}
@@ -1340,7 +1340,7 @@ func (s *Service) StartThread(
 	defer func() { _ = tx.Rollback() }()
 
 	q := s.queries.WithTx(tx)
-	thread, err := q.CreateAgentThread(ctx, db.CreateAgentThreadParams{
+	thread, err := q.CreateAgentThread(ctx, s.attachPlanDirRel(ctx, db.CreateAgentThreadParams{
 		ID:                threadID,
 		UserEmail:         userEmail,
 		Title:             title,
@@ -1349,7 +1349,7 @@ func (s *Service) StartThread(
 		HeadEntryID:       sql.NullString{},
 		ParentThreadID:    sql.NullString{},
 		ForkedFromEntryID: sql.NullString{},
-	})
+	}))
 	if err != nil {
 		return nil, nil, err
 	}
@@ -1495,14 +1495,22 @@ func (s *Service) UpdateThreadCwd(
 		return &thread, nil
 	}
 
+	planDirRel := s.resolvePlanDirRel(ctx, resolvedCwd)
 	if err := s.queries.UpdateAgentThreadCwd(
 		ctx,
-		db.UpdateAgentThreadCwdParams{ID: thread.ID, Cwd: resolvedCwd},
+		db.UpdateAgentThreadCwdParams{
+			ID:         thread.ID,
+			Cwd:        resolvedCwd,
+			PlanDirRel: planDirRel,
+		},
 	); err != nil {
 		return nil, err
 	}
 
 	thread.Cwd = resolvedCwd
+	if planDirRel.Valid {
+		thread.PlanDirRel = planDirRel
+	}
 	s.notifyThreadScope(ctx, thread.ID, PatchThreadPage)
 	return &thread, nil
 }
@@ -1711,16 +1719,18 @@ func (s *Service) createForkThreadRecord(
 	)
 	restoreHead := sql.NullString{String: restoreHeadID, Valid: restoreHeadID != ""}
 
-	thread, err := q.CreateAgentThread(ctx, db.CreateAgentThreadParams{
+	forkParams := db.CreateAgentThreadParams{
 		ID:                uuid.NewString(),
 		UserEmail:         sourceThread.UserEmail,
 		Title:             truncateTitle(prompt),
 		Cwd:               sourceThread.Cwd,
 		LineageID:         sourceThread.LineageID,
+		PlanDirRel:        sourceThread.PlanDirRel,
 		HeadEntryID:       restoreHead,
 		ParentThreadID:    sql.NullString{String: sourceThread.ID, Valid: true},
 		ForkedFromEntryID: sql.NullString{String: sourceEntry.EntryID, Valid: true},
-	})
+	}
+	thread, err := q.CreateAgentThread(ctx, s.attachPlanDirRel(ctx, forkParams))
 	if err != nil {
 		return db.AgentThread{}, sql.NullString{}, err
 	}

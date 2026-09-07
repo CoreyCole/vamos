@@ -42,6 +42,13 @@ SELECT *
 FROM plan_workspaces
 WHERE plan_dir_rel = sqlc.arg('plan_dir_rel');
 
+
+-- name: GetPlanWorkspaceByPlanDir :one
+SELECT *
+FROM plan_workspaces
+WHERE plan_dir = sqlc.arg('plan_dir')
+LIMIT 1 ;
+
 -- name: UpsertDiscoveredPlanWorkspace :one
 INSERT INTO plan_workspaces (
     plan_dir_rel,

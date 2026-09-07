@@ -6,6 +6,7 @@ INSERT INTO agent_threads (
     cwd,
     lineage_id,
     project_id,
+    plan_dir_rel,
     head_entry_id,
     parent_thread_id,
     forked_from_entry_id
@@ -17,6 +18,7 @@ VALUES (
     sqlc.arg('cwd'),
     sqlc.arg('lineage_id'),
     sqlc.arg('project_id'),
+    sqlc.narg('plan_dir_rel'),
     sqlc.narg('head_entry_id'),
     sqlc.narg('parent_thread_id'),
     sqlc.narg('forked_from_entry_id')
@@ -100,6 +102,8 @@ WHERE t.archived_at IS NULL
 ORDER BY t.updated_at DESC ;
 
 -- name: ListSharedAgentThreadsByPlanDir :many
+-- Dual-read: prefer agent_threads.plan_dir_rel FK; fallback to plan-owned
+-- session plan_dir for not-yet-backfilled (NULL) threads only.
 SELECT DISTINCT
 t.id,
 t.user_email,
@@ -115,10 +119,17 @@ t.created_at,
 t.updated_at,
 t.archived_at
 FROM agent_threads t
-JOIN agent_sessions s ON s.projected_thread_id = t.id
-WHERE s.identity_kind = 'plan_owned'
-AND s.plan_dir = sqlc.arg ('plan_dir')
-AND t.archived_at IS NULL
+LEFT JOIN agent_sessions s
+ON s.projected_thread_id = t.id
+AND s.identity_kind = 'plan_owned'
+WHERE t.archived_at IS NULL
+AND (
+    t.plan_dir_rel = sqlc.arg ('plan_dir_rel')
+    OR (
+        t.plan_dir_rel IS NULL
+        AND s.plan_dir = sqlc.arg ('plan_dir')
+    )
+)
 ORDER BY t.updated_at DESC ;
 
 -- name: GetAgentThreadForUser :one
@@ -177,6 +188,7 @@ WHERE id = sqlc.arg ('id') ;
 -- name: UpdateAgentThreadCwd :exec
 UPDATE agent_threads
 SET cwd = sqlc.arg ('cwd'),
+plan_dir_rel = COALESCE(sqlc.narg ('plan_dir_rel'), plan_dir_rel),
 updated_at = CURRENT_TIMESTAMP
 WHERE id = sqlc.arg ('id') ;
 
@@ -262,3 +274,68 @@ WHERE t.id = sqlc.arg ('thread_id')
 AND w.user_email = sqlc.arg ('user_email')
 AND t.archived_at IS NULL
 AND w.archived_at IS NULL ;
+
+
+-- name: ListAgentThreadsByPlanDirRel :many
+-- Plan-home children: FK only (freeform NULL excluded).
+SELECT
+id,
+user_email,
+title,
+cwd,
+lineage_id,
+project_id,
+plan_dir_rel,
+head_entry_id,
+parent_thread_id,
+forked_from_entry_id,
+created_at,
+updated_at,
+archived_at
+FROM agent_threads
+WHERE plan_dir_rel = sqlc.arg ('plan_dir_rel')
+AND archived_at IS NULL
+ORDER BY updated_at DESC ;
+
+-- name: GetMostRecentAgentThreadByPlanDirRel :one
+-- Plan-home most-recent chat via idx_agent_threads_plan_updated.
+SELECT
+id,
+user_email,
+title,
+cwd,
+lineage_id,
+project_id,
+plan_dir_rel,
+head_entry_id,
+parent_thread_id,
+forked_from_entry_id,
+created_at,
+updated_at,
+archived_at
+FROM agent_threads
+WHERE plan_dir_rel = sqlc.arg ('plan_dir_rel')
+AND archived_at IS NULL
+ORDER BY updated_at DESC
+LIMIT 1 ;
+
+-- name: ListAgentThreadsForPlanDirBackfill :many
+SELECT
+t.id,
+t.cwd,
+t.plan_dir_rel,
+s.plan_dir AS session_plan_dir
+FROM agent_threads t
+LEFT JOIN agent_sessions s
+ON s.projected_thread_id = t.id
+AND s.identity_kind = 'plan_owned'
+AND s.plan_dir IS NOT NULL
+WHERE t.archived_at IS NULL
+AND t.plan_dir_rel IS NULL ;
+
+-- name: SetAgentThreadPlanDirRel :exec
+-- Backfill helper: do not bump updated_at (preserve most-recent ordering).
+UPDATE agent_threads
+SET plan_dir_rel = sqlc.arg ('plan_dir_rel')
+WHERE id = sqlc.arg ('id')
+AND plan_dir_rel IS NULL ;

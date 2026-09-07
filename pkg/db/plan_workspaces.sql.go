@@ -136,6 +136,34 @@ func (q *Queries) GetPlanWorkspace(ctx context.Context, planDirRel string) (Plan
 	return i, err
 }
 
+const getPlanWorkspaceByPlanDir = `-- name: GetPlanWorkspaceByPlanDir :one
+SELECT plan_dir_rel, project_id, plan_dir, label, artifact_updated_at, qrspi_lifecycle, qrspi_lifecycle_updated_at, qrspi_closed_reason, discovered_at, last_discovered_at, archived_at, archive_reason, archived_by_email
+FROM plan_workspaces
+WHERE plan_dir = ?1
+LIMIT 1
+`
+
+func (q *Queries) GetPlanWorkspaceByPlanDir(ctx context.Context, planDir string) (PlanWorkspace, error) {
+	row := q.db.QueryRowContext(ctx, getPlanWorkspaceByPlanDir, planDir)
+	var i PlanWorkspace
+	err := row.Scan(
+		&i.PlanDirRel,
+		&i.ProjectID,
+		&i.PlanDir,
+		&i.Label,
+		&i.ArtifactUpdatedAt,
+		&i.QrspiLifecycle,
+		&i.QrspiLifecycleUpdatedAt,
+		&i.QrspiClosedReason,
+		&i.DiscoveredAt,
+		&i.LastDiscoveredAt,
+		&i.ArchivedAt,
+		&i.ArchiveReason,
+		&i.ArchivedByEmail,
+	)
+	return i, err
+}
+
 const listCurrentPlanWorkspaces = `-- name: ListCurrentPlanWorkspaces :many
 SELECT plan_dir_rel, project_id, plan_dir, label, artifact_updated_at, qrspi_lifecycle, qrspi_lifecycle_updated_at, qrspi_closed_reason, discovered_at, last_discovered_at, archived_at, archive_reason, archived_by_email
 FROM plan_workspaces
@@ -339,6 +367,8 @@ func (q *Queries) ListPlanWorkspaces(ctx context.Context, projectID string) ([]P
 }
 
 const upsertDiscoveredPlanWorkspace = `-- name: UpsertDiscoveredPlanWorkspace :one
+;
+
 INSERT INTO plan_workspaces (
     plan_dir_rel,
     project_id,

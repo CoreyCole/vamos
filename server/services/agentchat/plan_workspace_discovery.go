@@ -69,14 +69,15 @@ type DiscoveredPlanWorkspaceImplBinding struct {
 }
 
 type PlanWorkspaceDiscoveryResult struct {
-	Scanned              int
-	Discovered           int
-	Upserted             int
-	Archived             int
-	Restored             int
-	AgentSessionsIndexed int
-	Changed              bool
-	MaxArtifactUpdatedAt time.Time
+	Scanned                    int
+	Discovered                 int
+	Upserted                   int
+	Archived                   int
+	Restored                   int
+	AgentSessionsIndexed       int
+	ThreadPlanDirRelBackfilled int
+	Changed                    bool
+	MaxArtifactUpdatedAt       time.Time
 }
 
 type WorkspaceDocKind string
@@ -610,6 +611,23 @@ func (s *PlanWorkspaceSyncer) Sync(
 	if archived > 0 {
 		result.Changed = true
 	}
+	// Bare Service is intentional: BackfillAgentThreadPlanDirRels / resolvePlanDirRel
+	// only need queries (FK lookups), thoughtsRoot (rel/path bounds), and projectRoot
+	// (relative cwd resolution). Other Service deps are unused for this path.
+	backfillSvc := &Service{
+		queries:      s.Queries,
+		thoughtsRoot: s.Scanner.ThoughtsRoot,
+		projectRoot:  strings.TrimSpace(input.ProjectRoot),
+	}
+	backfill, err := backfillSvc.BackfillAgentThreadPlanDirRels(ctx)
+	if err != nil {
+		return PlanWorkspaceDiscoveryResult{}, err
+	}
+	result.ThreadPlanDirRelBackfilled = backfill.Updated
+	if backfill.Updated > 0 {
+		result.Changed = true
+	}
+
 	if result.Changed && s.Notifier != nil {
 		s.Notifier.NotifyProjectPlanSidebar()
 	}
