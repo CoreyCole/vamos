@@ -176,9 +176,9 @@ func ThreadsReopenControl(threadsOpen bool) templ.Component {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var10 string
-		templ_7745c5c3_Var10, templ_7745c5c3_Err = templ.ResolveAttributeValue("{'hidden': $workbench.regions.workbenchV2Threads.visible, 'flex': !$workbench.regions.workbenchV2Threads.visible, '!hidden': !$workbench.regions.workbenchV2Threads.visible}")
+		templ_7745c5c3_Var10, templ_7745c5c3_Err = templ.ResolveAttributeValue("{'hidden': $workbench.regions.workbenchV2Threads.visible, 'flex': !$workbench.regions.workbenchV2Threads.visible}")
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/layouts/workbench/workbench.templ`, Line: 38, Col: 189}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/layouts/workbench/workbench.templ`, Line: 38, Col: 130}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var10)
 		if templ_7745c5c3_Err != nil {

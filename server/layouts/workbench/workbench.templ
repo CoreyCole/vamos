@@ -35,7 +35,7 @@ templ ThreadsReopenControl(threadsOpen bool) {
 	<div
 		id="workbench-v2-threads-reopen"
 		class={ "workbench-chrome max-md:hidden", templ.KV("hidden", threadsOpen), templ.KV("flex shrink-0 items-center", !threadsOpen) }
-		data-class={ "{'hidden': $workbench.regions.workbenchV2Threads.visible, 'flex': !$workbench.regions.workbenchV2Threads.visible, '!hidden': !$workbench.regions.workbenchV2Threads.visible}" }
+		data-class={ "{'hidden': $workbench.regions.workbenchV2Threads.visible, 'flex': !$workbench.regions.workbenchV2Threads.visible}" }
 	>
 		<button
 			type="button"
