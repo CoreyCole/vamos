@@ -286,6 +286,9 @@ function currentConfig(root) {
 }
 
 function saveConfig(root) {
+  if (root?.dataset?.workbenchPixelLock === "1") {
+    syncRatiosFromPaint(root);
+  }
   fetch("/api/layout-preferences", {
     method: "POST",
     headers: {
@@ -306,23 +309,34 @@ function saveConfigForEvent(event) {
 
 document.addEventListener("workbench-layout-save", saveConfigForEvent);
 
+// Visible columns only: ratios must sum to ~1 so RegionSSRFlexStyle shares
+// match painted widths after sibling GETs (agent/room switch).
+function syncRatiosFromPaint(root) {
+  const regions = visibleRegions(root);
+  if (regions.length === 0) return;
+  let total = 0;
+  const widths = [];
+  for (const region of regions) {
+    const w = regionWidth(region);
+    widths.push(w);
+    total += w;
+  }
+  const denom = total > 0 ? total : 1;
+  regions.forEach((region, i) => {
+    const w = widths[i];
+    region.dataset.workbenchWidthPx = w.toFixed(2);
+    region.dataset.workbenchRatio = (w / denom).toFixed(4);
+  });
+}
+
 function lockPixelWidthsFromPaint(root) {
   const regions = visibleRegions(root);
   const availableWidth = availableRegionWidth(root);
   if (availableWidth <= 0 || regions.length === 0) return;
-  let total = 0;
   for (const region of regions) {
-    const w = regionWidth(region);
-    total += w;
-    region.dataset.workbenchWidthPx = w.toFixed(2);
-    setRegionWidth(region, w);
+    setRegionWidth(region, regionWidth(region));
   }
-  // Normalize visible ratios from painted widths so save + applyRegionRatios agree.
-  const denom = total > 0 ? total : 1;
-  for (const region of regions) {
-    const w = Number(region.dataset.workbenchWidthPx || 0);
-    region.dataset.workbenchRatio = (w / denom).toFixed(4);
-  }
+  syncRatiosFromPaint(root);
   root.dataset.workbenchPixelLock = "1";
 }
 
@@ -418,6 +432,9 @@ function startResize(event) {
     delete handle.dataset.resizing;
     document.documentElement.classList.remove("workbench-resizing");
     document.body.classList.remove("select-none", "cursor-col-resize");
+    // Drag paths only rewrite the gripped pair's ratio attrs — resync all
+    // visible columns from paint so layoutprefs survive the next room GET.
+    syncRatiosFromPaint(root);
     saveConfig(root);
   };
 
