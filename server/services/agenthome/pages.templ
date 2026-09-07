@@ -45,14 +45,14 @@ templ RosterRail(sel RosterSelection) {
 		<div class="flex shrink-0 gap-2 px-1">
 			<a
 				href="/rooms/dm/bot"
-				class={ "flex w-20 flex-col items-center gap-1 rounded-xl border px-2 py-2 text-center transition-colors", templ.KV("border-border bg-muted", sel.Kind == KindDM && sel.ID == "bot"), templ.KV("border-transparent hover:bg-muted/50", !(sel.Kind == KindDM && sel.ID == "bot")) }
+				class={ rosterPinClass(sel.Kind == KindDM && sel.ID == "bot") }
 			>
 				<span class="flex h-10 w-10 items-center justify-center rounded-2xl bg-fuchsia-500/90 text-sm font-semibold text-white">B</span>
 				<span class="w-full truncate text-[10px] text-muted-foreground">Bot</span>
 			</a>
 			<a
 				href="/rooms/group/vamos-dev"
-				class={ "flex w-20 flex-col items-center gap-1 rounded-xl border px-2 py-2 text-center transition-colors", templ.KV("border-border bg-muted", sel.Kind == KindGroup && sel.ID == "vamos-dev"), templ.KV("border-transparent hover:bg-muted/50", !(sel.Kind == KindGroup && sel.ID == "vamos-dev")) }
+				class={ rosterPinClass(sel.Kind == KindGroup && sel.ID == "vamos-dev") }
 			>
 				<span class="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-500/90 text-sm font-semibold text-white">V</span>
 				<span class="w-full truncate text-[10px] text-muted-foreground">Vamos Lead</span>
@@ -66,7 +66,7 @@ templ RosterRail(sel RosterSelection) {
 						<a
 							href="/rooms/dm/bot"
 							data-roster-id="dm:bot"
-							class={ "flex items-start gap-2.5 rounded-lg px-1.5 py-2 hover:bg-muted/60", templ.KV("bg-muted", sel.Kind == KindDM && sel.ID == "bot") }
+							class={ rosterAgentRowClass(sel.Kind == KindDM && sel.ID == "bot") }
 						>
 							<span class="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-2xl bg-fuchsia-500/90 text-xs font-semibold text-white">B</span>
 							<span class="min-w-0 flex-1">
@@ -82,7 +82,7 @@ templ RosterRail(sel RosterSelection) {
 						<a
 							href="/rooms/dm/research"
 							data-roster-id="dm:research"
-							class={ "flex items-start gap-2.5 rounded-lg px-1.5 py-2 hover:bg-muted/60", templ.KV("bg-muted", sel.Kind == KindDM && sel.ID == "research") }
+							class={ rosterAgentRowClass(sel.Kind == KindDM && sel.ID == "research") }
 						>
 							<span class="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-2xl bg-sky-500/80 text-xs font-semibold text-white">R</span>
 							<span class="min-w-0 flex-1">
@@ -103,7 +103,7 @@ templ RosterRail(sel RosterSelection) {
 						<a
 							href="/rooms/group/vamos-dev"
 							data-roster-id="group:vamos-dev"
-							class={ "flex items-start gap-2.5 rounded-lg px-1.5 py-2 hover:bg-muted/60", templ.KV("bg-muted", sel.Kind == KindGroup && sel.ID == "vamos-dev") }
+							class={ rosterAgentRowClass(sel.Kind == KindGroup && sel.ID == "vamos-dev") }
 						>
 							<span class="relative mt-0.5 h-8 w-8 shrink-0">
 								<span class="absolute left-0 top-0 h-6 w-6 overflow-hidden rounded-full bg-emerald-500/90 ring-2 ring-background"></span>
@@ -131,7 +131,7 @@ templ RosterRail(sel RosterSelection) {
 						<a
 							href="/rooms/plan/alpha"
 							data-roster-id="plan:alpha"
-							class={ "flex items-start gap-2.5 rounded-lg px-1.5 py-1.5 hover:bg-muted/40", templ.KV("bg-muted/70", sel.Kind == KindPlan && sel.ID == "alpha") }
+							class={ rosterPlanRowClass(sel.Kind == KindPlan && sel.ID == "alpha") }
 						>
 							<span class="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-border bg-background text-[10px] text-muted-foreground">P</span>
 							<span class="min-w-0 flex-1">
@@ -149,9 +149,30 @@ templ RosterRail(sel RosterSelection) {
 		@EditProfileSheet()
 		@RosterChromeScript()
 		<style>
+			#workbench-v2-roster a.roster-row:hover {
+				background-color: hsl(var(--background) / 0.55);
+			}
+			#workbench-v2-roster a.roster-row-plan:hover {
+				background-color: hsl(var(--background) / 0.45);
+			}
+			#workbench-v2-roster a.roster-row-selected,
+			#workbench-v2-roster a.roster-row-selected:hover {
+				background-color: hsl(var(--background));
+				color: hsl(var(--foreground));
+				box-shadow: inset 3px 0 0 0 hsl(var(--primary)), inset 0 0 0 1px hsl(var(--border) / 0.8);
+			}
+			#workbench-v2-roster a.roster-pin:hover {
+				background-color: hsl(var(--background) / 0.55);
+			}
+			#workbench-v2-roster a.roster-pin-selected,
+			#workbench-v2-roster a.roster-pin-selected:hover {
+				background-color: hsl(var(--background));
+				border-color: hsl(var(--border));
+				box-shadow: 0 1px 2px hsl(var(--foreground) / 0.06);
+			}
 			#workbench-v2-roster a.roster-multi-selected {
-				background-color: rgb(14 165 233 / 0.25);
-				box-shadow: inset 0 0 0 1px rgb(56 189 248 / 0.7);
+				background-color: hsl(var(--accent) / 0.55);
+				box-shadow: inset 3px 0 0 0 hsl(var(--primary)), inset 0 0 0 1px hsl(var(--border));
 			}
 		</style>
 		</div>
