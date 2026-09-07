@@ -53,16 +53,16 @@ func RosterRail(sel RosterSelection) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "\" data-attr:aria-expanded=\"$workbench.regions.workbenchV2Threads.visible ? 'true' : 'false'\" aria-controls=\"workbench-v2-threads\" aria-label=\"Hide roster sidebar\" title=\"Hide roster sidebar\"><svg class=\"h-4 w-4\" aria-hidden=\"true\" fill=\"none\" stroke=\"currentColor\" viewBox=\"0 0 24 24\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2\" d=\"M4 6h16M4 12h16M4 18h16\"></path></svg></button> <label class=\"sr-only\" for=\"workbench-v2-roster-search\">Search</label><div class=\"flex h-7 min-w-0 flex-1 items-center gap-2 rounded-md border border-border bg-muted/40 px-2\"><svg class=\"h-3.5 w-3.5 shrink-0 text-muted-foreground\" aria-hidden=\"true\" fill=\"none\" stroke=\"currentColor\" viewBox=\"0 0 24 24\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2\" d=\"M21 21l-4.35-4.35M11 18a7 7 0 100-14 7 7 0 000 14z\"></path></svg> <input id=\"workbench-v2-roster-search\" type=\"search\" placeholder=\"Search\" class=\"min-w-0 flex-1 bg-transparent text-[13px] leading-none text-foreground placeholder:text-muted-foreground focus:outline-none\"></div></header><div class=\"flex min-h-0 flex-1 flex-col gap-3 overflow-hidden p-2\"><div class=\"flex shrink-0 gap-2 px-1\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "\" data-attr:aria-expanded=\"$workbench.regions.workbenchV2Threads.visible ? 'true' : 'false'\" aria-controls=\"workbench-v2-threads\" aria-label=\"Hide roster sidebar\" title=\"Hide roster sidebar\"><svg class=\"h-4 w-4\" aria-hidden=\"true\" fill=\"none\" stroke=\"currentColor\" viewBox=\"0 0 24 24\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2\" d=\"M4 6h16M4 12h16M4 18h16\"></path></svg></button> <label class=\"sr-only\" for=\"workbench-v2-roster-search\">Search</label><div class=\"flex h-7 min-w-0 flex-1 items-center gap-2 rounded-md border border-border bg-muted/40 px-2\"><svg class=\"h-3.5 w-3.5 shrink-0 text-muted-foreground\" aria-hidden=\"true\" fill=\"none\" stroke=\"currentColor\" viewBox=\"0 0 24 24\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2\" d=\"M21 21l-4.35-4.35M11 18a7 7 0 100-14 7 7 0 000 14z\"></path></svg> <input id=\"workbench-v2-roster-search\" type=\"search\" placeholder=\"Search\" class=\"min-w-0 flex-1 bg-transparent text-[13px] leading-none text-foreground placeholder:text-muted-foreground focus:outline-none\"></div></header><div class=\"flex min-h-0 flex-1 flex-col gap-3 overflow-hidden p-2\"><div id=\"workbench-v2-roster-pins\" class=\"flex shrink-0 gap-2 px-1\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var3 = []any{rosterPinClass(sel.Kind == KindDM && sel.ID == "bot")}
+		var templ_7745c5c3_Var3 = []any{rosterPinClass(sel.Kind == KindDM && sel.ID == "bot"), templ.KV("hidden", !rosterIsPinned(KindDM, "bot"))}
 		templ_7745c5c3_Err = templ.RenderCSSItems(ctx, templ_7745c5c3_Buffer, templ_7745c5c3_Var3...)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "<a href=\"/rooms/dm/bot\" class=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "<a href=\"/rooms/dm/bot\" data-roster-id=\"dm:bot\" class=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -79,12 +79,12 @@ func RosterRail(sel RosterSelection) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var5 = []any{rosterPinClass(sel.Kind == KindGroup && sel.ID == "vamos-dev")}
+		var templ_7745c5c3_Var5 = []any{rosterPinClass(sel.Kind == KindGroup && sel.ID == "vamos-dev"), templ.KV("hidden", !rosterIsPinned(KindGroup, "vamos-dev"))}
 		templ_7745c5c3_Err = templ.RenderCSSItems(ctx, templ_7745c5c3_Buffer, templ_7745c5c3_Var5...)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, "<a href=\"/rooms/group/vamos-dev\" class=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, "<a href=\"/rooms/group/vamos-dev\" data-roster-id=\"group:vamos-dev\" class=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -97,16 +97,16 @@ func RosterRail(sel RosterSelection) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, "\"><span class=\"flex h-10 w-10 items-center justify-center rounded-full bg-emerald-500/90 text-sm font-semibold text-white\">V</span> <span class=\"w-full truncate text-[10px] text-muted-foreground\">Vamos Lead</span></a></div><div class=\"min-h-0 flex-1 space-y-4 overflow-y-auto px-1 pb-2\"><section id=\"workbench-v2-roster-agents\" class=\"space-y-1\" aria-label=\"Agents\"><h2 class=\"px-1 text-[11px] font-medium text-muted-foreground\">Agents</h2><ul class=\"flex flex-col\"><li id=\"roster-row-dm-bot\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, "\"><span class=\"flex h-10 w-10 items-center justify-center rounded-full bg-emerald-500/90 text-sm font-semibold text-white\">V</span> <span class=\"w-full truncate text-[10px] text-muted-foreground\">Vamos Lead</span></a> ")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var7 = []any{rosterAgentRowClass(sel.Kind == KindDM && sel.ID == "bot")}
+		var templ_7745c5c3_Var7 = []any{rosterPinClass(sel.Kind == KindDM && sel.ID == "research"), templ.KV("hidden", !rosterIsPinned(KindDM, "research"))}
 		templ_7745c5c3_Err = templ.RenderCSSItems(ctx, templ_7745c5c3_Buffer, templ_7745c5c3_Var7...)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, "<a href=\"/rooms/dm/bot\" data-roster-id=\"dm:bot\" class=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, "<a href=\"/rooms/dm/research\" data-roster-id=\"dm:research\" class=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -119,16 +119,16 @@ func RosterRail(sel RosterSelection) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 8, "\"><span class=\"mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-2xl bg-fuchsia-500/90 text-xs font-semibold text-white\">B</span> <span class=\"min-w-0 flex-1\"><span class=\"flex items-baseline justify-between gap-2\"><span class=\"truncate text-sm font-medium text-foreground\">Bot</span> <span class=\"shrink-0 text-[10px] text-muted-foreground\">2m</span></span> <span class=\"mt-0.5 line-clamp-1 text-xs text-muted-foreground\">Ready when you are.</span></span></a></li><li id=\"roster-row-dm-research\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 8, "\"><span class=\"flex h-10 w-10 items-center justify-center rounded-2xl bg-sky-500/80 text-sm font-semibold text-white\">R</span> <span class=\"w-full truncate text-[10px] text-muted-foreground\">Research</span></a></div><div class=\"min-h-0 flex-1 space-y-4 overflow-y-auto px-1 pb-2\"><section id=\"workbench-v2-roster-agents\" class=\"space-y-1\" aria-label=\"Agents\"><h2 class=\"px-1 text-[11px] font-medium text-muted-foreground\">Agents</h2><ul class=\"flex flex-col\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var9 = []any{rosterAgentRowClass(sel.Kind == KindDM && sel.ID == "research")}
+		var templ_7745c5c3_Var9 = []any{templ.KV("hidden", rosterIsPinned(KindDM, "bot"))}
 		templ_7745c5c3_Err = templ.RenderCSSItems(ctx, templ_7745c5c3_Buffer, templ_7745c5c3_Var9...)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 9, "<a href=\"/rooms/dm/research\" data-roster-id=\"dm:research\" class=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 9, "<li id=\"roster-row-dm-bot\" class=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -141,16 +141,16 @@ func RosterRail(sel RosterSelection) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 10, "\"><span class=\"mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-2xl bg-sky-500/80 text-xs font-semibold text-white\">R</span> <span class=\"min-w-0 flex-1\"><span class=\"flex items-baseline justify-between gap-2\"><span class=\"truncate text-sm font-medium text-foreground\">Research agent</span> <span class=\"shrink-0 text-[10px] text-muted-foreground\">Thu</span></span> <span class=\"mt-0.5 line-clamp-1 text-xs text-muted-foreground\">No recent messages</span></span></a></li></ul></section><section id=\"workbench-v2-roster-groups\" class=\"space-y-1\" aria-label=\"Groups\"><h2 class=\"px-1 text-[11px] font-medium text-muted-foreground\">Groups</h2><ul class=\"flex flex-col\"><li id=\"roster-row-group-vamos-dev\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 10, "\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var11 = []any{rosterAgentRowClass(sel.Kind == KindGroup && sel.ID == "vamos-dev")}
+		var templ_7745c5c3_Var11 = []any{rosterAgentRowClass(sel.Kind == KindDM && sel.ID == "bot")}
 		templ_7745c5c3_Err = templ.RenderCSSItems(ctx, templ_7745c5c3_Buffer, templ_7745c5c3_Var11...)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 11, "<a href=\"/rooms/group/vamos-dev\" data-roster-id=\"group:vamos-dev\" class=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 11, "<a href=\"/rooms/dm/bot\" data-roster-id=\"dm:bot\" class=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -163,26 +163,16 @@ func RosterRail(sel RosterSelection) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 12, "\"><span class=\"relative mt-0.5 h-8 w-8 shrink-0\"><span class=\"absolute left-0 top-0 h-6 w-6 overflow-hidden rounded-full bg-emerald-500/90 ring-2 ring-background\"></span> <span class=\"absolute bottom-0 right-0 flex h-6 w-6 items-center justify-center rounded-2xl bg-fuchsia-500/90 text-[10px] font-semibold text-white ring-2 ring-background\">+</span> <span class=\"absolute -bottom-0.5 -right-0.5 rounded bg-muted px-0.5 text-[8px] font-medium text-muted-foreground\">+2</span></span> <span class=\"min-w-0 flex-1\"><span class=\"flex items-baseline justify-between gap-2\"><span class=\"truncate text-sm font-medium text-foreground\">Vamos dev</span> <span class=\"shrink-0 text-[10px] text-muted-foreground\">9:26 PM</span></span> <span class=\"mt-0.5 line-clamp-1 text-xs text-muted-foreground\">UX: feel LGTM on rail tip.</span></span> ")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 12, "\"><span class=\"mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-2xl bg-fuchsia-500/90 text-xs font-semibold text-white\">B</span> <span class=\"min-w-0 flex-1\"><span class=\"flex items-baseline justify-between gap-2\"><span class=\"truncate text-sm font-medium text-foreground\">Bot</span> <span class=\"shrink-0 text-[10px] text-muted-foreground\">2m</span></span> <span class=\"mt-0.5 line-clamp-1 text-xs text-muted-foreground\">Ready when you are.</span></span></a></li>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		if sel.Kind != KindGroup || sel.ID != "vamos-dev" {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 13, "<span class=\"mt-2 h-2 w-2 shrink-0 rounded-full bg-sky-500\" aria-label=\"Unread\"></span>")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 14, "</a></li></ul></section><section id=\"workbench-v2-roster-plans\" class=\"space-y-1 border-t border-dashed border-border/60 pt-3\" aria-label=\"Plan threads\"><h2 class=\"px-1 text-[11px] font-medium text-muted-foreground\">Plan threads</h2><ul class=\"flex flex-col\"><li id=\"roster-row-plan-alpha\">")
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		var templ_7745c5c3_Var13 = []any{rosterPlanRowClass(sel.Kind == KindPlan && sel.ID == "alpha")}
+		var templ_7745c5c3_Var13 = []any{templ.KV("hidden", rosterIsPinned(KindDM, "research"))}
 		templ_7745c5c3_Err = templ.RenderCSSItems(ctx, templ_7745c5c3_Buffer, templ_7745c5c3_Var13...)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 15, "<a href=\"/rooms/plan/alpha\" data-roster-id=\"plan:alpha\" class=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 13, "<li id=\"roster-row-dm-research\" class=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -195,7 +185,117 @@ func RosterRail(sel RosterSelection) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 16, "\"><span class=\"mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-border bg-background text-[10px] text-muted-foreground\">P</span> <span class=\"min-w-0 flex-1\"><span class=\"flex items-baseline justify-between gap-2\"><span class=\"truncate text-xs font-medium text-muted-foreground\">Alpha</span> <span class=\"shrink-0 text-[10px] text-muted-foreground\" title=\"Last file mtime in plan dir\">Thu 2:18 PM</span></span></span></a></li></ul></section></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 14, "\">")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var15 = []any{rosterAgentRowClass(sel.Kind == KindDM && sel.ID == "research")}
+		templ_7745c5c3_Err = templ.RenderCSSItems(ctx, templ_7745c5c3_Buffer, templ_7745c5c3_Var15...)
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 15, "<a href=\"/rooms/dm/research\" data-roster-id=\"dm:research\" class=\"")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var16 string
+		templ_7745c5c3_Var16, templ_7745c5c3_Err = templ.ResolveAttributeValue(templ.CSSClasses(templ_7745c5c3_Var15).String())
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agenthome/pages.templ`, Line: 1, Col: 0}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var16)
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 16, "\"><span class=\"mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-2xl bg-sky-500/80 text-xs font-semibold text-white\">R</span> <span class=\"min-w-0 flex-1\"><span class=\"flex items-baseline justify-between gap-2\"><span class=\"truncate text-sm font-medium text-foreground\">Research agent</span> <span class=\"shrink-0 text-[10px] text-muted-foreground\">Thu</span></span> <span class=\"mt-0.5 line-clamp-1 text-xs text-muted-foreground\">No recent messages</span></span></a></li></ul></section>")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var17 = []any{"space-y-1", templ.KV("hidden", rosterIsPinned(KindGroup, "vamos-dev"))}
+		templ_7745c5c3_Err = templ.RenderCSSItems(ctx, templ_7745c5c3_Buffer, templ_7745c5c3_Var17...)
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 17, "<section id=\"workbench-v2-roster-groups\" class=\"")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var18 string
+		templ_7745c5c3_Var18, templ_7745c5c3_Err = templ.ResolveAttributeValue(templ.CSSClasses(templ_7745c5c3_Var17).String())
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agenthome/pages.templ`, Line: 1, Col: 0}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var18)
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 18, "\" aria-label=\"Groups\"><h2 class=\"px-1 text-[11px] font-medium text-muted-foreground\">Groups</h2><ul class=\"flex flex-col\">")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var19 = []any{templ.KV("hidden", rosterIsPinned(KindGroup, "vamos-dev"))}
+		templ_7745c5c3_Err = templ.RenderCSSItems(ctx, templ_7745c5c3_Buffer, templ_7745c5c3_Var19...)
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 19, "<li id=\"roster-row-group-vamos-dev\" class=\"")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var20 string
+		templ_7745c5c3_Var20, templ_7745c5c3_Err = templ.ResolveAttributeValue(templ.CSSClasses(templ_7745c5c3_Var19).String())
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agenthome/pages.templ`, Line: 1, Col: 0}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var20)
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 20, "\">")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var21 = []any{rosterAgentRowClass(sel.Kind == KindGroup && sel.ID == "vamos-dev")}
+		templ_7745c5c3_Err = templ.RenderCSSItems(ctx, templ_7745c5c3_Buffer, templ_7745c5c3_Var21...)
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 21, "<a href=\"/rooms/group/vamos-dev\" data-roster-id=\"group:vamos-dev\" class=\"")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var22 string
+		templ_7745c5c3_Var22, templ_7745c5c3_Err = templ.ResolveAttributeValue(templ.CSSClasses(templ_7745c5c3_Var21).String())
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agenthome/pages.templ`, Line: 1, Col: 0}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var22)
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 22, "\"><span class=\"relative mt-0.5 h-8 w-8 shrink-0\"><span class=\"absolute left-0 top-0 h-6 w-6 overflow-hidden rounded-full bg-emerald-500/90 ring-2 ring-background\"></span> <span class=\"absolute bottom-0 right-0 flex h-6 w-6 items-center justify-center rounded-2xl bg-fuchsia-500/90 text-[10px] font-semibold text-white ring-2 ring-background\">+</span> <span class=\"absolute -bottom-0.5 -right-0.5 rounded bg-muted px-0.5 text-[8px] font-medium text-muted-foreground\">+2</span></span> <span class=\"min-w-0 flex-1\"><span class=\"flex items-baseline justify-between gap-2\"><span class=\"truncate text-sm font-medium text-foreground\">Vamos dev</span> <span class=\"shrink-0 text-[10px] text-muted-foreground\">9:26 PM</span></span> <span class=\"mt-0.5 line-clamp-1 text-xs text-muted-foreground\">UX: feel LGTM on rail tip.</span></span></a></li></ul></section><section id=\"workbench-v2-roster-plans\" class=\"space-y-1 border-t border-dashed border-border/60 pt-3\" aria-label=\"Plan threads\"><h2 class=\"px-1 text-[11px] font-medium text-muted-foreground\">Plan threads</h2><ul class=\"flex flex-col\"><li id=\"roster-row-plan-alpha\">")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var23 = []any{rosterPlanRowClass(sel.Kind == KindPlan && sel.ID == "alpha")}
+		templ_7745c5c3_Err = templ.RenderCSSItems(ctx, templ_7745c5c3_Buffer, templ_7745c5c3_Var23...)
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 23, "<a href=\"/rooms/plan/alpha\" data-roster-id=\"plan:alpha\" class=\"")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var24 string
+		templ_7745c5c3_Var24, templ_7745c5c3_Err = templ.ResolveAttributeValue(templ.CSSClasses(templ_7745c5c3_Var23).String())
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agenthome/pages.templ`, Line: 1, Col: 0}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var24)
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 24, "\"><span class=\"mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-border bg-background text-[10px] text-muted-foreground\">P</span> <span class=\"min-w-0 flex-1\"><span class=\"flex items-baseline justify-between gap-2\"><span class=\"truncate text-xs font-medium text-muted-foreground\">Alpha</span> <span class=\"shrink-0 text-[10px] text-muted-foreground\" title=\"Last file mtime in plan dir\">Thu 2:18 PM</span></span></span></a></li></ul></section></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -211,7 +311,7 @@ func RosterRail(sel RosterSelection) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 17, "<style>\n\t\t\t#workbench-v2-roster a.roster-row:hover {\n\t\t\t\tbackground-color: hsl(var(--background) / 0.55);\n\t\t\t}\n\t\t\t#workbench-v2-roster a.roster-row-plan:hover {\n\t\t\t\tbackground-color: hsl(var(--background) / 0.45);\n\t\t\t}\n\t\t\t#workbench-v2-roster a.roster-row-selected,\n\t\t\t#workbench-v2-roster a.roster-row-selected:hover {\n\t\t\t\t/* Strong Grok-like selected chip on muted rail */\n\t\t\t\tbackground-color: hsl(var(--accent));\n\t\t\t\tcolor: hsl(var(--accent-foreground));\n\t\t\t\tbox-shadow: inset 4px 0 0 0 hsl(var(--primary));\n\t\t\t}\n\t\t\t#workbench-v2-roster a.roster-pin:hover {\n\t\t\t\tbackground-color: hsl(var(--background) / 0.55);\n\t\t\t}\n\t\t\t#workbench-v2-roster a.roster-pin-selected,\n\t\t\t#workbench-v2-roster a.roster-pin-selected:hover {\n\t\t\t\tbackground-color: hsl(var(--accent));\n\t\t\t\tcolor: hsl(var(--accent-foreground));\n\t\t\t\tborder-color: hsl(var(--border));\n\t\t\t\tbox-shadow: inset 0 0 0 1px hsl(var(--primary) / 0.45);\n\t\t\t}\n\t\t\t#workbench-v2-roster a.roster-multi-selected {\n\t\t\t\tbackground-color: hsl(var(--accent) / 0.55);\n\t\t\t\tbox-shadow: inset 3px 0 0 0 hsl(var(--primary)), inset 0 0 0 1px hsl(var(--border));\n\t\t\t}\n\t\t</style></div></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 25, "<style>\n\t\t\t#workbench-v2-roster a.roster-row:hover,\n\t\t\t#workbench-v2-roster a.roster-pin:hover {\n\t\t\t\tbackground-color: #232323;\n\t\t\t}\n\t\t\t#workbench-v2-roster a.roster-row-selected,\n\t\t\t#workbench-v2-roster a.roster-row-selected:hover,\n\t\t\t#workbench-v2-roster a.roster-pin-selected,\n\t\t\t#workbench-v2-roster a.roster-pin-selected:hover {\n\t\t\t\tbackground-color: #313131;\n\t\t\t}\n\t\t\t#workbench-v2-roster a.roster-multi-selected {\n\t\t\t\tbackground-color: #313131;\n\t\t\t}\n\t\t</style></div></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -235,52 +335,52 @@ func RoomChatPane(kind RoomKind, id string, title string, body string) templ.Com
 			}()
 		}
 		ctx = templ.InitializeContext(ctx)
-		templ_7745c5c3_Var15 := templ.GetChildren(ctx)
-		if templ_7745c5c3_Var15 == nil {
-			templ_7745c5c3_Var15 = templ.NopComponent
+		templ_7745c5c3_Var25 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var25 == nil {
+			templ_7745c5c3_Var25 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
 		placeholder := roomComposerPlaceholder(kind, id, title)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 18, "<div class=\"flex h-full min-h-0 flex-col\"><header id=\"workbench-v2-room-header\" class=\"shrink-0 border-b border-border px-4 py-2\"><p class=\"text-sm font-semibold text-foreground\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 26, "<div class=\"flex h-full min-h-0 flex-col\"><header id=\"workbench-v2-room-header\" class=\"shrink-0 border-b border-border px-4 py-2\"><p class=\"text-sm font-semibold text-foreground\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var16 string
-		templ_7745c5c3_Var16, templ_7745c5c3_Err = templ.JoinStringErrs(title)
+		var templ_7745c5c3_Var26 string
+		templ_7745c5c3_Var26, templ_7745c5c3_Err = templ.JoinStringErrs(title)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agenthome/pages.templ`, Line: 188, Col: 59}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agenthome/pages.templ`, Line: 181, Col: 59}
 		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var16))
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 19, "</p><p class=\"text-[11px] text-muted-foreground\">")
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var26))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var17 string
-		templ_7745c5c3_Var17, templ_7745c5c3_Err = templ.JoinStringErrs(string(kind))
-		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agenthome/pages.templ`, Line: 189, Col: 62}
-		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var17))
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 27, "</p><p class=\"text-[11px] text-muted-foreground\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 20, " / ")
+		var templ_7745c5c3_Var27 string
+		templ_7745c5c3_Var27, templ_7745c5c3_Err = templ.JoinStringErrs(string(kind))
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agenthome/pages.templ`, Line: 182, Col: 62}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var27))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var18 string
-		templ_7745c5c3_Var18, templ_7745c5c3_Err = templ.JoinStringErrs(id)
-		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agenthome/pages.templ`, Line: 189, Col: 71}
-		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var18))
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 28, " / ")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 21, "</p></header><div id=\"workbench-v2-room-transcript\" class=\"min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-4\">")
+		var templ_7745c5c3_Var28 string
+		templ_7745c5c3_Var28, templ_7745c5c3_Err = templ.JoinStringErrs(id)
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agenthome/pages.templ`, Line: 182, Col: 71}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var28))
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 29, "</p></header><div id=\"workbench-v2-room-transcript\" class=\"min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-4\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -305,25 +405,25 @@ func RoomChatPane(kind RoomKind, id string, title string, body string) templ.Com
 				return templ_7745c5c3_Err
 			}
 		} else if body != "" {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 22, "<p class=\"text-sm text-muted-foreground\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 30, "<p class=\"text-sm text-muted-foreground\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			var templ_7745c5c3_Var19 string
-			templ_7745c5c3_Var19, templ_7745c5c3_Err = templ.JoinStringErrs(body)
+			var templ_7745c5c3_Var29 string
+			templ_7745c5c3_Var29, templ_7745c5c3_Err = templ.JoinStringErrs(body)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agenthome/pages.templ`, Line: 201, Col: 51}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agenthome/pages.templ`, Line: 194, Col: 51}
 			}
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var19))
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var29))
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 23, "</p>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 31, "</p>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 24, "</div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 32, "</div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -331,7 +431,7 @@ func RoomChatPane(kind RoomKind, id string, title string, body string) templ.Com
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 25, "</div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 33, "</div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -356,25 +456,25 @@ func InlineCodePill(text string) templ.Component {
 			}()
 		}
 		ctx = templ.InitializeContext(ctx)
-		templ_7745c5c3_Var20 := templ.GetChildren(ctx)
-		if templ_7745c5c3_Var20 == nil {
-			templ_7745c5c3_Var20 = templ.NopComponent
+		templ_7745c5c3_Var30 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var30 == nil {
+			templ_7745c5c3_Var30 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 26, "<span class=\"mx-0.5 inline rounded-md bg-[#5c2a3a]/70 px-1.5 py-0.5 font-mono text-[12px] text-[#f5c2c7]\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 34, "<span class=\"mx-0.5 inline rounded-md bg-[#5c2a3a]/70 px-1.5 py-0.5 font-mono text-[12px] text-[#f5c2c7]\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var21 string
-		templ_7745c5c3_Var21, templ_7745c5c3_Err = templ.JoinStringErrs(text)
+		var templ_7745c5c3_Var31 string
+		templ_7745c5c3_Var31, templ_7745c5c3_Err = templ.JoinStringErrs(text)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agenthome/pages.templ`, Line: 210, Col: 113}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agenthome/pages.templ`, Line: 203, Col: 113}
 		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var21))
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var31))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 27, "</span>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 35, "</span>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -398,43 +498,43 @@ func AgentAvatar(initial string, bgClass string) templ.Component {
 			}()
 		}
 		ctx = templ.InitializeContext(ctx)
-		templ_7745c5c3_Var22 := templ.GetChildren(ctx)
-		if templ_7745c5c3_Var22 == nil {
-			templ_7745c5c3_Var22 = templ.NopComponent
+		templ_7745c5c3_Var32 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var32 == nil {
+			templ_7745c5c3_Var32 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		var templ_7745c5c3_Var23 = []any{"flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-semibold text-white", bgClass}
-		templ_7745c5c3_Err = templ.RenderCSSItems(ctx, templ_7745c5c3_Buffer, templ_7745c5c3_Var23...)
+		var templ_7745c5c3_Var33 = []any{"flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-semibold text-white", bgClass}
+		templ_7745c5c3_Err = templ.RenderCSSItems(ctx, templ_7745c5c3_Buffer, templ_7745c5c3_Var33...)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 28, "<span class=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 36, "<span class=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var24 string
-		templ_7745c5c3_Var24, templ_7745c5c3_Err = templ.ResolveAttributeValue(templ.CSSClasses(templ_7745c5c3_Var23).String())
+		var templ_7745c5c3_Var34 string
+		templ_7745c5c3_Var34, templ_7745c5c3_Err = templ.ResolveAttributeValue(templ.CSSClasses(templ_7745c5c3_Var33).String())
 		if templ_7745c5c3_Err != nil {
 			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agenthome/pages.templ`, Line: 1, Col: 0}
 		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var24)
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var34)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 29, "\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 37, "\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var25 string
-		templ_7745c5c3_Var25, templ_7745c5c3_Err = templ.JoinStringErrs(initial)
+		var templ_7745c5c3_Var35 string
+		templ_7745c5c3_Var35, templ_7745c5c3_Err = templ.JoinStringErrs(initial)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agenthome/pages.templ`, Line: 214, Col: 133}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agenthome/pages.templ`, Line: 207, Col: 133}
 		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var25))
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var35))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 30, "</span>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 38, "</span>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -458,43 +558,43 @@ func AgentName(name string, colorClass string) templ.Component {
 			}()
 		}
 		ctx = templ.InitializeContext(ctx)
-		templ_7745c5c3_Var26 := templ.GetChildren(ctx)
-		if templ_7745c5c3_Var26 == nil {
-			templ_7745c5c3_Var26 = templ.NopComponent
+		templ_7745c5c3_Var36 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var36 == nil {
+			templ_7745c5c3_Var36 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		var templ_7745c5c3_Var27 = []any{"mb-1 text-xs font-semibold", colorClass}
-		templ_7745c5c3_Err = templ.RenderCSSItems(ctx, templ_7745c5c3_Buffer, templ_7745c5c3_Var27...)
+		var templ_7745c5c3_Var37 = []any{"mb-1 text-xs font-semibold", colorClass}
+		templ_7745c5c3_Err = templ.RenderCSSItems(ctx, templ_7745c5c3_Buffer, templ_7745c5c3_Var37...)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 31, "<p class=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 39, "<p class=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var28 string
-		templ_7745c5c3_Var28, templ_7745c5c3_Err = templ.ResolveAttributeValue(templ.CSSClasses(templ_7745c5c3_Var27).String())
+		var templ_7745c5c3_Var38 string
+		templ_7745c5c3_Var38, templ_7745c5c3_Err = templ.ResolveAttributeValue(templ.CSSClasses(templ_7745c5c3_Var37).String())
 		if templ_7745c5c3_Err != nil {
 			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agenthome/pages.templ`, Line: 1, Col: 0}
 		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var28)
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var38)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 32, "\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 40, "\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var29 string
-		templ_7745c5c3_Var29, templ_7745c5c3_Err = templ.JoinStringErrs(name)
+		var templ_7745c5c3_Var39 string
+		templ_7745c5c3_Var39, templ_7745c5c3_Err = templ.JoinStringErrs(name)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agenthome/pages.templ`, Line: 218, Col: 61}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agenthome/pages.templ`, Line: 211, Col: 61}
 		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var29))
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var39))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 33, "</p>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 41, "</p>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -519,12 +619,12 @@ func AgentFixtureMessage(initial string, name string, avatarBg string, nameColor
 			}()
 		}
 		ctx = templ.InitializeContext(ctx)
-		templ_7745c5c3_Var30 := templ.GetChildren(ctx)
-		if templ_7745c5c3_Var30 == nil {
-			templ_7745c5c3_Var30 = templ.NopComponent
+		templ_7745c5c3_Var40 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var40 == nil {
+			templ_7745c5c3_Var40 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 34, "<div class=\"flex items-start gap-2.5\" data-role=\"agent\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 42, "<div class=\"flex items-start gap-2.5\" data-role=\"agent\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -532,7 +632,7 @@ func AgentFixtureMessage(initial string, name string, avatarBg string, nameColor
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 35, "<div class=\"min-w-0 max-w-[85%]\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 43, "<div class=\"min-w-0 max-w-[85%]\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -540,7 +640,7 @@ func AgentFixtureMessage(initial string, name string, avatarBg string, nameColor
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 36, "<div class=\"rounded-2xl bg-[#161b22] px-3.5 py-2.5 text-sm leading-relaxed text-white\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 44, "<div class=\"rounded-2xl bg-[#161b22] px-3.5 py-2.5 text-sm leading-relaxed text-white\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -548,7 +648,7 @@ func AgentFixtureMessage(initial string, name string, avatarBg string, nameColor
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 37, "</div></div></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 45, "</div></div></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -573,12 +673,12 @@ func UserFixtureMessage(body templ.Component) templ.Component {
 			}()
 		}
 		ctx = templ.InitializeContext(ctx)
-		templ_7745c5c3_Var31 := templ.GetChildren(ctx)
-		if templ_7745c5c3_Var31 == nil {
-			templ_7745c5c3_Var31 = templ.NopComponent
+		templ_7745c5c3_Var41 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var41 == nil {
+			templ_7745c5c3_Var41 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 38, "<div class=\"flex justify-end\" data-role=\"user\"><div class=\"max-w-[85%] rounded-2xl bg-[#30363d] px-3.5 py-2.5 text-sm leading-relaxed text-white\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 46, "<div class=\"flex justify-end\" data-role=\"user\"><div class=\"max-w-[85%] rounded-2xl bg-[#30363d] px-3.5 py-2.5 text-sm leading-relaxed text-white\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -586,7 +686,7 @@ func UserFixtureMessage(body templ.Component) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 39, "</div></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 47, "</div></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -611,95 +711,95 @@ func NestedQuoteBlock(initial string, name string, avatarBg string, nameColor st
 			}()
 		}
 		ctx = templ.InitializeContext(ctx)
-		templ_7745c5c3_Var32 := templ.GetChildren(ctx)
-		if templ_7745c5c3_Var32 == nil {
-			templ_7745c5c3_Var32 = templ.NopComponent
+		templ_7745c5c3_Var42 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var42 == nil {
+			templ_7745c5c3_Var42 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 40, "<div class=\"mb-2 rounded-xl bg-black/40 px-2.5 py-2\" data-role=\"quote\"><div class=\"mb-1 flex items-center gap-1.5\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 48, "<div class=\"mb-2 rounded-xl bg-black/40 px-2.5 py-2\" data-role=\"quote\"><div class=\"mb-1 flex items-center gap-1.5\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var33 = []any{"flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[8px] font-semibold text-white", avatarBg}
-		templ_7745c5c3_Err = templ.RenderCSSItems(ctx, templ_7745c5c3_Buffer, templ_7745c5c3_Var33...)
+		var templ_7745c5c3_Var43 = []any{"flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[8px] font-semibold text-white", avatarBg}
+		templ_7745c5c3_Err = templ.RenderCSSItems(ctx, templ_7745c5c3_Buffer, templ_7745c5c3_Var43...)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 41, "<span class=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 49, "<span class=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var34 string
-		templ_7745c5c3_Var34, templ_7745c5c3_Err = templ.ResolveAttributeValue(templ.CSSClasses(templ_7745c5c3_Var33).String())
+		var templ_7745c5c3_Var44 string
+		templ_7745c5c3_Var44, templ_7745c5c3_Err = templ.ResolveAttributeValue(templ.CSSClasses(templ_7745c5c3_Var43).String())
 		if templ_7745c5c3_Err != nil {
 			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agenthome/pages.templ`, Line: 1, Col: 0}
 		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var34)
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var44)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 42, "\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 50, "\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var35 string
-		templ_7745c5c3_Var35, templ_7745c5c3_Err = templ.JoinStringErrs(initial)
+		var templ_7745c5c3_Var45 string
+		templ_7745c5c3_Var45, templ_7745c5c3_Err = templ.JoinStringErrs(initial)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agenthome/pages.templ`, Line: 247, Col: 139}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agenthome/pages.templ`, Line: 240, Col: 139}
 		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var35))
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 43, "</span> ")
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var45))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var36 = []any{"text-[11px] font-semibold", nameColor}
-		templ_7745c5c3_Err = templ.RenderCSSItems(ctx, templ_7745c5c3_Buffer, templ_7745c5c3_Var36...)
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 51, "</span> ")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 44, "<span class=\"")
+		var templ_7745c5c3_Var46 = []any{"text-[11px] font-semibold", nameColor}
+		templ_7745c5c3_Err = templ.RenderCSSItems(ctx, templ_7745c5c3_Buffer, templ_7745c5c3_Var46...)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var37 string
-		templ_7745c5c3_Var37, templ_7745c5c3_Err = templ.ResolveAttributeValue(templ.CSSClasses(templ_7745c5c3_Var36).String())
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 52, "<span class=\"")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var47 string
+		templ_7745c5c3_Var47, templ_7745c5c3_Err = templ.ResolveAttributeValue(templ.CSSClasses(templ_7745c5c3_Var46).String())
 		if templ_7745c5c3_Err != nil {
 			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agenthome/pages.templ`, Line: 1, Col: 0}
 		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var37)
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var47)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 45, "\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 53, "\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var38 string
-		templ_7745c5c3_Var38, templ_7745c5c3_Err = templ.JoinStringErrs(name)
+		var templ_7745c5c3_Var48 string
+		templ_7745c5c3_Var48, templ_7745c5c3_Err = templ.JoinStringErrs(name)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agenthome/pages.templ`, Line: 248, Col: 64}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agenthome/pages.templ`, Line: 241, Col: 64}
 		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var38))
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 46, "</span></div><p class=\"text-[12px] leading-snug text-white/80\">")
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var48))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var39 string
-		templ_7745c5c3_Var39, templ_7745c5c3_Err = templ.JoinStringErrs(quote)
-		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agenthome/pages.templ`, Line: 250, Col: 59}
-		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var39))
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 54, "</span></div><p class=\"text-[12px] leading-snug text-white/80\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 47, "</p></div>")
+		var templ_7745c5c3_Var49 string
+		templ_7745c5c3_Var49, templ_7745c5c3_Err = templ.JoinStringErrs(quote)
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agenthome/pages.templ`, Line: 243, Col: 59}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var49))
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 55, "</p></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -723,38 +823,38 @@ func RoomSimpleComposer(placeholder string) templ.Component {
 			}()
 		}
 		ctx = templ.InitializeContext(ctx)
-		templ_7745c5c3_Var40 := templ.GetChildren(ctx)
-		if templ_7745c5c3_Var40 == nil {
-			templ_7745c5c3_Var40 = templ.NopComponent
+		templ_7745c5c3_Var50 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var50 == nil {
+			templ_7745c5c3_Var50 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 48, "<div id=\"workbench-v2-room-composer\" class=\"shrink-0 border-t border-border bg-background px-3 py-3\"><form class=\"flex items-center gap-2 rounded-2xl border border-border bg-muted/40 px-3 py-2\" action=\"#\" method=\"post\" onsubmit=\"return false\"><label class=\"sr-only\" for=\"workbench-v2-room-composer-input\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 56, "<div id=\"workbench-v2-room-composer\" class=\"shrink-0 border-t border-border bg-background px-3 py-3\"><form class=\"flex items-center gap-2 rounded-2xl border border-border bg-muted/40 px-3 py-2\" action=\"#\" method=\"post\" onsubmit=\"return false\"><label class=\"sr-only\" for=\"workbench-v2-room-composer-input\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var41 string
-		templ_7745c5c3_Var41, templ_7745c5c3_Err = templ.JoinStringErrs(placeholder)
+		var templ_7745c5c3_Var51 string
+		templ_7745c5c3_Var51, templ_7745c5c3_Err = templ.JoinStringErrs(placeholder)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agenthome/pages.templ`, Line: 257, Col: 78}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agenthome/pages.templ`, Line: 250, Col: 78}
 		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var41))
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 49, "</label> <input id=\"workbench-v2-room-composer-input\" type=\"text\" name=\"message\" placeholder=\"")
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var51))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var42 string
-		templ_7745c5c3_Var42, templ_7745c5c3_Err = templ.ResolveAttributeValue(placeholder)
-		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agenthome/pages.templ`, Line: 262, Col: 29}
-		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var42)
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 57, "</label> <input id=\"workbench-v2-room-composer-input\" type=\"text\" name=\"message\" placeholder=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 50, "\" autocomplete=\"off\" class=\"min-w-0 flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground focus:outline-none\"> <button type=\"submit\" class=\"inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground transition-colors hover:bg-primary/90\" aria-label=\"Send message\" title=\"Send\"><svg class=\"h-3.5 w-3.5\" fill=\"none\" stroke=\"currentColor\" viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2\" d=\"M3 11.5L21 3l-8.5 18-2.5-7.5L3 11.5z\"></path></svg></button></form></div>")
+		var templ_7745c5c3_Var52 string
+		templ_7745c5c3_Var52, templ_7745c5c3_Err = templ.ResolveAttributeValue(placeholder)
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agenthome/pages.templ`, Line: 255, Col: 29}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var52)
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 58, "\" autocomplete=\"off\" class=\"min-w-0 flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground focus:outline-none\"> <button type=\"submit\" class=\"inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground transition-colors hover:bg-primary/90\" aria-label=\"Send message\" title=\"Send\"><svg class=\"h-3.5 w-3.5\" fill=\"none\" stroke=\"currentColor\" viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2\" d=\"M3 11.5L21 3l-8.5 18-2.5-7.5L3 11.5z\"></path></svg></button></form></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -778,12 +878,12 @@ func botDMBody1() templ.Component {
 			}()
 		}
 		ctx = templ.InitializeContext(ctx)
-		templ_7745c5c3_Var43 := templ.GetChildren(ctx)
-		if templ_7745c5c3_Var43 == nil {
-			templ_7745c5c3_Var43 = templ.NopComponent
+		templ_7745c5c3_Var53 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var53 == nil {
+			templ_7745c5c3_Var53 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 51, "<p>Rail tip LGTM. Next: replace empty Bot Chat stubs with a Grok-like transcript and a single rounded composer well.</p>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 59, "<p>Rail tip LGTM. Next: replace empty Bot Chat stubs with a Grok-like transcript and a single rounded composer well.</p>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -807,12 +907,12 @@ func botDMBody2() templ.Component {
 			}()
 		}
 		ctx = templ.InitializeContext(ctx)
-		templ_7745c5c3_Var44 := templ.GetChildren(ctx)
-		if templ_7745c5c3_Var44 == nil {
-			templ_7745c5c3_Var44 = templ.NopComponent
+		templ_7745c5c3_Var54 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var54 == nil {
+			templ_7745c5c3_Var54 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 52, "<p>Keep the roster rail and leave @InlineCodePill(\"#workbench-v2-interagent-chips\") as bare centered lines among messages.</p>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 60, "<p>Keep the roster rail and leave @InlineCodePill(\"#workbench-v2-interagent-chips\") as bare centered lines among messages.</p>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -836,12 +936,12 @@ func botDMUser1() templ.Component {
 			}()
 		}
 		ctx = templ.InitializeContext(ctx)
-		templ_7745c5c3_Var45 := templ.GetChildren(ctx)
-		if templ_7745c5c3_Var45 == nil {
-			templ_7745c5c3_Var45 = templ.NopComponent
+		templ_7745c5c3_Var55 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var55 == nil {
+			templ_7745c5c3_Var55 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 53, "<p>Ship a transcript for dm/bot plus group/vamos-dev — SSR stub is fine.</p>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 61, "<p>Ship a transcript for dm/bot plus group/vamos-dev — SSR stub is fine.</p>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -865,12 +965,12 @@ func botDMBody3() templ.Component {
 			}()
 		}
 		ctx = templ.InitializeContext(ctx)
-		templ_7745c5c3_Var46 := templ.GetChildren(ctx)
-		if templ_7745c5c3_Var46 == nil {
-			templ_7745c5c3_Var46 = templ.NopComponent
+		templ_7745c5c3_Var56 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var56 == nil {
+			templ_7745c5c3_Var56 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 54, "<p>On it. Composer placeholder should read @InlineCodePill(\"Message Bot\") with compact send; drop cluttered Vamos chrome.</p>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 62, "<p>On it. Composer placeholder should read @InlineCodePill(\"Message Bot\") with compact send; drop cluttered Vamos chrome.</p>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -894,9 +994,9 @@ func BotDMFixtureTranscript() templ.Component {
 			}()
 		}
 		ctx = templ.InitializeContext(ctx)
-		templ_7745c5c3_Var47 := templ.GetChildren(ctx)
-		if templ_7745c5c3_Var47 == nil {
-			templ_7745c5c3_Var47 = templ.NopComponent
+		templ_7745c5c3_Var57 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var57 == nil {
+			templ_7745c5c3_Var57 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
 		templ_7745c5c3_Err = AgentFixtureMessage("B", "Bot", "bg-fuchsia-500/90", "text-fuchsia-300", botDMBody1()).Render(ctx, templ_7745c5c3_Buffer)
@@ -939,12 +1039,12 @@ func groupFEBody() templ.Component {
 			}()
 		}
 		ctx = templ.InitializeContext(ctx)
-		templ_7745c5c3_Var48 := templ.GetChildren(ctx)
-		if templ_7745c5c3_Var48 == nil {
-			templ_7745c5c3_Var48 = templ.NopComponent
+		templ_7745c5c3_Var58 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var58 == nil {
+			templ_7745c5c3_Var58 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 55, "<p>Feel ask: Grok Bot–like bubbles — left agents with colored avatar+name, right user with no header.</p>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 63, "<p>Feel ask: Grok Bot–like bubbles — left agents with colored avatar+name, right user with no header.</p>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -968,16 +1068,16 @@ func groupLeadBody() templ.Component {
 			}()
 		}
 		ctx = templ.InitializeContext(ctx)
-		templ_7745c5c3_Var49 := templ.GetChildren(ctx)
-		if templ_7745c5c3_Var49 == nil {
-			templ_7745c5c3_Var49 = templ.NopComponent
+		templ_7745c5c3_Var59 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var59 == nil {
+			templ_7745c5c3_Var59 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
 		templ_7745c5c3_Err = NestedQuoteBlock("I", "Chestnut Infra Engineer", "bg-teal-600", "text-teal-300", "Host slug ai470-agent-home-sketch is up; rebuild after tip.").Render(ctx, templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 56, "<p>Greenlit. Prefer HTML in @InlineCodePill(\"RoomChatPane\"); reuse agentchat only if clean.</p>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 64, "<p>Greenlit. Prefer HTML in @InlineCodePill(\"RoomChatPane\"); reuse agentchat only if clean.</p>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -1001,12 +1101,12 @@ func groupUserBody() templ.Component {
 			}()
 		}
 		ctx = templ.InitializeContext(ctx)
-		templ_7745c5c3_Var50 := templ.GetChildren(ctx)
-		if templ_7745c5c3_Var50 == nil {
-			templ_7745c5c3_Var50 = templ.NopComponent
+		templ_7745c5c3_Var60 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var60 == nil {
+			templ_7745c5c3_Var60 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 57, "<p>Also bump chip vertical gap a touch if cheap — @InlineCodePill(\"gap-3\") → @InlineCodePill(\"gap-4\").</p>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 65, "<p>Also bump chip vertical gap a touch if cheap — @InlineCodePill(\"gap-3\") → @InlineCodePill(\"gap-4\").</p>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -1030,12 +1130,12 @@ func groupInfraBody() templ.Component {
 			}()
 		}
 		ctx = templ.InitializeContext(ctx)
-		templ_7745c5c3_Var51 := templ.GetChildren(ctx)
-		if templ_7745c5c3_Var51 == nil {
-			templ_7745c5c3_Var51 = templ.NopComponent
+		templ_7745c5c3_Var61 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var61 == nil {
+			templ_7745c5c3_Var61 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 58, "<p>After commit rebuild with @InlineCodePill(\"/tmp/ai470_build2.sh\") for this tip host.</p>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 66, "<p>After commit rebuild with @InlineCodePill(\"/tmp/ai470_build2.sh\") for this tip host.</p>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -1059,12 +1159,12 @@ func researchDMBody1() templ.Component {
 			}()
 		}
 		ctx = templ.InitializeContext(ctx)
-		templ_7745c5c3_Var52 := templ.GetChildren(ctx)
-		if templ_7745c5c3_Var52 == nil {
-			templ_7745c5c3_Var52 = templ.NopComponent
+		templ_7745c5c3_Var62 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var62 == nil {
+			templ_7745c5c3_Var62 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 59, "<p>Pulled the latest notes on Chestnut Eng onboarding. Want the short path or the deep dive?</p>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 67, "<p>Pulled the latest notes on Chestnut Eng onboarding. Want the short path or the deep dive?</p>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -1088,12 +1188,12 @@ func researchDMUser1() templ.Component {
 			}()
 		}
 		ctx = templ.InitializeContext(ctx)
-		templ_7745c5c3_Var53 := templ.GetChildren(ctx)
-		if templ_7745c5c3_Var53 == nil {
-			templ_7745c5c3_Var53 = templ.NopComponent
+		templ_7745c5c3_Var63 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var63 == nil {
+			templ_7745c5c3_Var63 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 60, "<p>Short path — how do I get read-only access?</p>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 68, "<p>Short path — how do I get read-only access?</p>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -1117,12 +1217,12 @@ func researchDMBody2() templ.Component {
 			}()
 		}
 		ctx = templ.InitializeContext(ctx)
-		templ_7745c5c3_Var54 := templ.GetChildren(ctx)
-		if templ_7745c5c3_Var54 == nil {
-			templ_7745c5c3_Var54 = templ.NopComponent
+		templ_7745c5c3_Var64 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var64 == nil {
+			templ_7745c5c3_Var64 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 61, "<p>Use @InlineCodePill(\"just setup\") then ask Infra for @InlineCodePill(\"chestnut envs\") read-only.</p>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 69, "<p>Use @InlineCodePill(\"just setup\") then ask Infra for @InlineCodePill(\"chestnut envs\") read-only.</p>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -1146,9 +1246,9 @@ func ResearchDMFixtureTranscript() templ.Component {
 			}()
 		}
 		ctx = templ.InitializeContext(ctx)
-		templ_7745c5c3_Var55 := templ.GetChildren(ctx)
-		if templ_7745c5c3_Var55 == nil {
-			templ_7745c5c3_Var55 = templ.NopComponent
+		templ_7745c5c3_Var65 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var65 == nil {
+			templ_7745c5c3_Var65 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
 		templ_7745c5c3_Err = AgentFixtureMessage("R", "Research agent", "bg-sky-500/90", "text-sky-300", researchDMBody1()).Render(ctx, templ_7745c5c3_Buffer)
@@ -1183,9 +1283,9 @@ func GroupVamosDevFixtureTranscript() templ.Component {
 			}()
 		}
 		ctx = templ.InitializeContext(ctx)
-		templ_7745c5c3_Var56 := templ.GetChildren(ctx)
-		if templ_7745c5c3_Var56 == nil {
-			templ_7745c5c3_Var56 = templ.NopComponent
+		templ_7745c5c3_Var66 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var66 == nil {
+			templ_7745c5c3_Var66 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
 		templ_7745c5c3_Err = AgentFixtureMessage("F", "Chestnut FE Engineer", "bg-amber-700", "text-amber-300", groupFEBody()).Render(ctx, templ_7745c5c3_Buffer)
@@ -1224,12 +1324,12 @@ func planAlphaBody1() templ.Component {
 			}()
 		}
 		ctx = templ.InitializeContext(ctx)
-		templ_7745c5c3_Var57 := templ.GetChildren(ctx)
-		if templ_7745c5c3_Var57 == nil {
-			templ_7745c5c3_Var57 = templ.NopComponent
+		templ_7745c5c3_Var67 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var67 == nil {
+			templ_7745c5c3_Var67 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 62, "<p>Plan Alpha is the sketch lane for agent-home chrome. Artifacts hold @InlineCodePill(\"design.md\") — rail shows title only.</p>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 70, "<p>Plan Alpha is the sketch lane for agent-home chrome. Artifacts hold @InlineCodePill(\"design.md\") — rail shows title only.</p>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -1253,12 +1353,12 @@ func planAlphaUser1() templ.Component {
 			}()
 		}
 		ctx = templ.InitializeContext(ctx)
-		templ_7745c5c3_Var58 := templ.GetChildren(ctx)
-		if templ_7745c5c3_Var58 == nil {
-			templ_7745c5c3_Var58 = templ.NopComponent
+		templ_7745c5c3_Var68 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var68 == nil {
+			templ_7745c5c3_Var68 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 63, "<p>Open the plan and switch artifacts — need jank coverage for room↔artifact.</p>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 71, "<p>Open the plan and switch artifacts — need jank coverage for room↔artifact.</p>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -1282,12 +1382,12 @@ func planAlphaBody2() templ.Component {
 			}()
 		}
 		ctx = templ.InitializeContext(ctx)
-		templ_7745c5c3_Var59 := templ.GetChildren(ctx)
-		if templ_7745c5c3_Var59 == nil {
-			templ_7745c5c3_Var59 = templ.NopComponent
+		templ_7745c5c3_Var69 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var69 == nil {
+			templ_7745c5c3_Var69 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 64, "<p>On it. Preview should update when you pick @InlineCodePill(\"tasks.md\") vs @InlineCodePill(\"design.md\").</p>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 72, "<p>On it. Preview should update when you pick @InlineCodePill(\"tasks.md\") vs @InlineCodePill(\"design.md\").</p>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -1311,9 +1411,9 @@ func PlanAlphaFixtureTranscript() templ.Component {
 			}()
 		}
 		ctx = templ.InitializeContext(ctx)
-		templ_7745c5c3_Var60 := templ.GetChildren(ctx)
-		if templ_7745c5c3_Var60 == nil {
-			templ_7745c5c3_Var60 = templ.NopComponent
+		templ_7745c5c3_Var70 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var70 == nil {
+			templ_7745c5c3_Var70 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
 		templ_7745c5c3_Err = AgentFixtureMessage("B", "Bot", "bg-fuchsia-500/90", "text-fuchsia-300", planAlphaBody1()).Render(ctx, templ_7745c5c3_Buffer)
@@ -1350,12 +1450,12 @@ func InterAgentMessageChips() templ.Component {
 			}()
 		}
 		ctx = templ.InitializeContext(ctx)
-		templ_7745c5c3_Var61 := templ.GetChildren(ctx)
-		if templ_7745c5c3_Var61 == nil {
-			templ_7745c5c3_Var61 = templ.NopComponent
+		templ_7745c5c3_Var71 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var71 == nil {
+			templ_7745c5c3_Var71 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 65, "<div id=\"workbench-v2-interagent-chips\" class=\"flex flex-col items-center gap-4 py-2\"><button type=\"button\" class=\"inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground/80\"><span>Messaged</span> <span class=\"inline-flex -space-x-1.5\" aria-hidden=\"true\"><span class=\"relative z-10 inline-flex h-4 w-4 items-center justify-center rounded-full bg-amber-800 ring-1 ring-background text-[7px] font-semibold text-amber-100\">F</span> <span class=\"relative z-0 inline-flex h-4 w-4 items-center justify-center rounded-full bg-fuchsia-600 ring-1 ring-background text-[7px] font-semibold text-fuchsia-50\">L</span></span> <span class=\"text-foreground/80\">2 Bots</span></button> <button type=\"button\" class=\"inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground/80\"><span>3 messages with</span> <span class=\"inline-flex h-4 w-4 items-center justify-center rounded-full bg-amber-800 text-[7px] font-semibold text-amber-100\" aria-hidden=\"true\">F</span> <span class=\"text-foreground/80\">Vamos FE Engineer</span></button> <button type=\"button\" class=\"inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground/80\"><span>2 messages with</span> <span class=\"inline-flex h-4 w-4 items-center justify-center rounded-full bg-fuchsia-600 text-[7px] font-semibold text-fuchsia-50\" aria-hidden=\"true\">L</span> <span class=\"text-foreground/80\">Vamos Lead Engineer</span></button></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 73, "<div id=\"workbench-v2-interagent-chips\" class=\"flex flex-col items-center gap-4 py-2\"><button type=\"button\" class=\"inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground/80\"><span>Messaged</span> <span class=\"inline-flex -space-x-1.5\" aria-hidden=\"true\"><span class=\"relative z-10 inline-flex h-4 w-4 items-center justify-center rounded-full bg-amber-800 ring-1 ring-background text-[7px] font-semibold text-amber-100\">F</span> <span class=\"relative z-0 inline-flex h-4 w-4 items-center justify-center rounded-full bg-fuchsia-600 ring-1 ring-background text-[7px] font-semibold text-fuchsia-50\">L</span></span> <span class=\"text-foreground/80\">2 Bots</span></button> <button type=\"button\" class=\"inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground/80\"><span>3 messages with</span> <span class=\"inline-flex h-4 w-4 items-center justify-center rounded-full bg-amber-800 text-[7px] font-semibold text-amber-100\" aria-hidden=\"true\">F</span> <span class=\"text-foreground/80\">Vamos FE Engineer</span></button> <button type=\"button\" class=\"inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground/80\"><span>2 messages with</span> <span class=\"inline-flex h-4 w-4 items-center justify-center rounded-full bg-fuchsia-600 text-[7px] font-semibold text-fuchsia-50\" aria-hidden=\"true\">L</span> <span class=\"text-foreground/80\">Vamos Lead Engineer</span></button></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -1380,103 +1480,103 @@ func RoomArtifactPane(kind RoomKind, id string) templ.Component {
 			}()
 		}
 		ctx = templ.InitializeContext(ctx)
-		templ_7745c5c3_Var62 := templ.GetChildren(ctx)
-		if templ_7745c5c3_Var62 == nil {
-			templ_7745c5c3_Var62 = templ.NopComponent
+		templ_7745c5c3_Var72 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var72 == nil {
+			templ_7745c5c3_Var72 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 66, "<div id=\"workbench-v2-room-artifacts\" class=\"flex h-full min-h-0 flex-col\" data-signals=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 74, "<div id=\"workbench-v2-room-artifacts\" class=\"flex h-full min-h-0 flex-col\" data-signals=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var63 string
-		templ_7745c5c3_Var63, templ_7745c5c3_Err = templ.ResolveAttributeValue("{artPreview: '" + artPreviewInitial(kind, id) + "'}")
+		var templ_7745c5c3_Var73 string
+		templ_7745c5c3_Var73, templ_7745c5c3_Err = templ.ResolveAttributeValue("{artPreview: '" + artPreviewInitial(kind, id) + "'}")
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agenthome/pages.templ`, Line: 403, Col: 70}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agenthome/pages.templ`, Line: 396, Col: 70}
 		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var63)
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 67, "\"><header class=\"shrink-0 border-b border-border px-4 py-2\"><p class=\"text-sm font-semibold text-foreground\">Artifacts</p><p class=\"text-[11px] text-muted-foreground\">")
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var73)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		if kind == KindDM && id == "bot" {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 68, "Bot Chat files")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-		} else if kind == KindDM && id == "research" {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 69, "Research files")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-		} else if kind == KindGroup && id == "vamos-dev" {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 70, "Group files")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-		} else if kind == KindPlan {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 71, "Plan dir files")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-		} else {
-			var templ_7745c5c3_Var64 string
-			templ_7745c5c3_Var64, templ_7745c5c3_Err = templ.JoinStringErrs(string(kind))
-			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agenthome/pages.templ`, Line: 417, Col: 19}
-			}
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var64))
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 72, " / ")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			var templ_7745c5c3_Var65 string
-			templ_7745c5c3_Var65, templ_7745c5c3_Err = templ.JoinStringErrs(id)
-			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agenthome/pages.templ`, Line: 417, Col: 28}
-			}
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var65))
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 73, "</p></header><div class=\"min-h-0 flex-1 space-y-3 overflow-y-auto p-4\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 75, "\"><header class=\"shrink-0 border-b border-border px-4 py-2\"><p class=\"text-sm font-semibold text-foreground\">Artifacts</p><p class=\"text-[11px] text-muted-foreground\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		if kind == KindDM && id == "bot" {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 74, "<ul class=\"space-y-1\" id=\"workbench-v2-artifact-list\"><li><button type=\"button\" data-on:click=\"$artPreview = 'reply-draft.md'\" data-class=\"{ 'bg-muted/40': $artPreview === 'reply-draft.md' }\" class=\"flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm hover:bg-muted/50\"><span class=\"text-[10px] text-muted-foreground\">MD</span> <span class=\"truncate font-medium text-foreground\">reply-draft.md</span> <span class=\"ml-auto shrink-0 text-[10px] text-muted-foreground\">2m</span></button></li><li><button type=\"button\" data-on:click=\"$artPreview = 'chips_stub.go'\" data-class=\"{ 'bg-muted/40': $artPreview === 'chips_stub.go' }\" class=\"flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm hover:bg-muted/50\"><span class=\"text-[10px] text-muted-foreground\">GO</span> <span class=\"truncate text-foreground\">chips_stub.go</span> <span class=\"ml-auto shrink-0 text-[10px] text-muted-foreground\">1h</span></button></li><li><button type=\"button\" data-on:click=\"$artPreview = 'chip-ref.png'\" data-class=\"{ 'bg-muted/40': $artPreview === 'chip-ref.png' }\" class=\"flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm hover:bg-muted/50\"><span class=\"text-[10px] text-muted-foreground\">PNG</span> <span class=\"truncate text-foreground\">chip-ref.png</span> <span class=\"ml-auto shrink-0 text-[10px] text-muted-foreground\">Thu</span></button></li></ul><div id=\"workbench-v2-artifact-preview\" class=\"rounded-xl border border-border bg-muted/20 p-3\"><div data-show=\"$artPreview === 'reply-draft.md'\"><p class=\"mb-2 text-[11px] font-medium text-muted-foreground\">reply-draft.md</p><p class=\"font-mono text-[12px] leading-relaxed text-foreground/90\">Keep chips among messages. Composer: Message Bot. Chip gap-4.</p></div><div data-show=\"$artPreview === 'chips_stub.go'\"><p class=\"mb-2 text-[11px] font-medium text-muted-foreground\">chips_stub.go</p><p class=\"font-mono text-[12px] leading-relaxed text-foreground/90\">InterAgentMessageChips: centered bare lines + overlapping avatars.</p></div><div data-show=\"$artPreview === 'chip-ref.png'\"><p class=\"mb-2 text-[11px] font-medium text-muted-foreground\">chip-ref.png</p><p class=\"text-sm text-muted-foreground\">UX ref shot (placeholder preview).</p></div></div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 76, "Bot Chat files")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		} else if kind == KindDM && id == "research" {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 75, "<ul class=\"space-y-1\" id=\"workbench-v2-artifact-list\"><li><button type=\"button\" data-on:click=\"$artPreview = 'onboarding-short.md'\" data-class=\"{ 'bg-muted/40': $artPreview === 'onboarding-short.md' }\" class=\"flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm hover:bg-muted/50\"><span class=\"text-[10px] text-muted-foreground\">MD</span> <span class=\"truncate font-medium text-foreground\">onboarding-short.md</span> <span class=\"ml-auto shrink-0 text-[10px] text-muted-foreground\">Thu</span></button></li><li><button type=\"button\" data-on:click=\"$artPreview = 'sources.md'\" data-class=\"{ 'bg-muted/40': $artPreview === 'sources.md' }\" class=\"flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm hover:bg-muted/50\"><span class=\"text-[10px] text-muted-foreground\">MD</span> <span class=\"truncate text-foreground\">sources.md</span> <span class=\"ml-auto shrink-0 text-[10px] text-muted-foreground\">Wed</span></button></li></ul><div id=\"workbench-v2-artifact-preview\" class=\"rounded-xl border border-border bg-muted/20 p-3\"><div data-show=\"$artPreview === 'onboarding-short.md'\"><p class=\"mb-2 text-[11px] font-medium text-muted-foreground\">onboarding-short.md</p><p class=\"font-mono text-[12px] leading-relaxed text-foreground/90\">Short path: just setup, then chestnut envs read-only.</p></div><div data-show=\"$artPreview === 'sources.md'\"><p class=\"mb-2 text-[11px] font-medium text-muted-foreground\">sources.md</p><p class=\"font-mono text-[12px] leading-relaxed text-foreground/90\">Chestnut Eng wiki · monorepo/frontend/</p></div></div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 77, "Research files")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		} else if kind == KindGroup && id == "vamos-dev" {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 76, "<ul class=\"space-y-1\" id=\"workbench-v2-artifact-list\"><li><button type=\"button\" data-on:click=\"$artPreview = 'setup-notes.md'\" data-class=\"{ 'bg-muted/40': $artPreview === 'setup-notes.md' }\" class=\"flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm hover:bg-muted/50\"><span class=\"text-[10px] text-muted-foreground\">MD</span> <span class=\"truncate font-medium text-foreground\">setup-notes.md</span> <span class=\"ml-auto shrink-0 text-[10px] text-muted-foreground\">5m</span></button></li><li><button type=\"button\" data-on:click=\"$artPreview = 'just-setup'\" data-class=\"{ 'bg-muted/40': $artPreview === 'just-setup' }\" class=\"flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm hover:bg-muted/50\"><span class=\"text-[10px] text-muted-foreground\">SH</span> <span class=\"truncate text-foreground\">just setup</span> <span class=\"ml-auto shrink-0 text-[10px] text-muted-foreground\">Wed</span></button></li></ul><div id=\"workbench-v2-artifact-preview\" class=\"rounded-xl border border-border bg-muted/20 p-3\"><div data-show=\"$artPreview === 'setup-notes.md'\"><p class=\"mb-2 text-[11px] font-medium text-muted-foreground\">setup-notes.md</p><p class=\"font-mono text-[12px] leading-relaxed text-foreground/90\">Read-only path: monorepo/frontend/. Run just setup then chestnut envs.</p></div><div data-show=\"$artPreview === 'just-setup'\"><p class=\"mb-2 text-[11px] font-medium text-muted-foreground\">just setup</p><p class=\"font-mono text-[12px] leading-relaxed text-foreground/90\">Recipe: just setup</p></div></div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 78, "Group files")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		} else if kind == KindPlan {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 77, "<ul class=\"space-y-1\" id=\"workbench-v2-artifact-list\"><li><button type=\"button\" data-on:click=\"$artPreview = 'design.md'\" data-class=\"{ 'bg-muted/40': $artPreview === 'design.md' }\" class=\"flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm hover:bg-muted/50\"><span class=\"text-[10px] text-muted-foreground\">MD</span> <span class=\"truncate font-medium text-foreground\">design.md</span> <span class=\"ml-auto shrink-0 text-[10px] text-muted-foreground\">Thu 2:18 PM</span></button></li><li><button type=\"button\" data-on:click=\"$artPreview = 'tasks.md'\" data-class=\"{ 'bg-muted/40': $artPreview === 'tasks.md' }\" class=\"flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm hover:bg-muted/50\"><span class=\"text-[10px] text-muted-foreground\">MD</span> <span class=\"truncate text-foreground\">tasks.md</span> <span class=\"ml-auto shrink-0 text-[10px] text-muted-foreground\">Wed</span></button></li></ul><div id=\"workbench-v2-artifact-preview\" class=\"rounded-xl border border-border bg-muted/20 p-3\"><div data-show=\"$artPreview === 'design.md'\"><p class=\"mb-2 text-[11px] font-medium text-muted-foreground\">design.md</p><p class=\"font-mono text-[12px] leading-relaxed text-foreground/90\">Alpha plan: title on rail; preview lives here in artifacts, not under the roster row.</p></div><div data-show=\"$artPreview === 'tasks.md'\"><p class=\"mb-2 text-[11px] font-medium text-muted-foreground\">tasks.md</p><p class=\"font-mono text-[12px] leading-relaxed text-foreground/90\">Research clickable · Artifact preview switch · Multi-select menu</p></div></div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 79, "Plan dir files")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		} else {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 78, "<p class=\"text-sm text-muted-foreground\">No artifacts for this room yet.</p>")
+			var templ_7745c5c3_Var74 string
+			templ_7745c5c3_Var74, templ_7745c5c3_Err = templ.JoinStringErrs(string(kind))
+			if templ_7745c5c3_Err != nil {
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agenthome/pages.templ`, Line: 410, Col: 19}
+			}
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var74))
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 80, " / ")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			var templ_7745c5c3_Var75 string
+			templ_7745c5c3_Var75, templ_7745c5c3_Err = templ.JoinStringErrs(id)
+			if templ_7745c5c3_Err != nil {
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agenthome/pages.templ`, Line: 410, Col: 28}
+			}
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var75))
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 79, "</div></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 81, "</p></header><div class=\"min-h-0 flex-1 space-y-3 overflow-y-auto p-4\">")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		if kind == KindDM && id == "bot" {
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 82, "<ul class=\"space-y-1\" id=\"workbench-v2-artifact-list\"><li><button type=\"button\" data-on:click=\"$artPreview = 'reply-draft.md'\" data-class=\"{ 'bg-muted/40': $artPreview === 'reply-draft.md' }\" class=\"flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm hover:bg-muted/50\"><span class=\"text-[10px] text-muted-foreground\">MD</span> <span class=\"truncate font-medium text-foreground\">reply-draft.md</span> <span class=\"ml-auto shrink-0 text-[10px] text-muted-foreground\">2m</span></button></li><li><button type=\"button\" data-on:click=\"$artPreview = 'chips_stub.go'\" data-class=\"{ 'bg-muted/40': $artPreview === 'chips_stub.go' }\" class=\"flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm hover:bg-muted/50\"><span class=\"text-[10px] text-muted-foreground\">GO</span> <span class=\"truncate text-foreground\">chips_stub.go</span> <span class=\"ml-auto shrink-0 text-[10px] text-muted-foreground\">1h</span></button></li><li><button type=\"button\" data-on:click=\"$artPreview = 'chip-ref.png'\" data-class=\"{ 'bg-muted/40': $artPreview === 'chip-ref.png' }\" class=\"flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm hover:bg-muted/50\"><span class=\"text-[10px] text-muted-foreground\">PNG</span> <span class=\"truncate text-foreground\">chip-ref.png</span> <span class=\"ml-auto shrink-0 text-[10px] text-muted-foreground\">Thu</span></button></li></ul><div id=\"workbench-v2-artifact-preview\" class=\"rounded-xl border border-border bg-muted/20 p-3\"><div data-show=\"$artPreview === 'reply-draft.md'\"><p class=\"mb-2 text-[11px] font-medium text-muted-foreground\">reply-draft.md</p><p class=\"font-mono text-[12px] leading-relaxed text-foreground/90\">Keep chips among messages. Composer: Message Bot. Chip gap-4.</p></div><div data-show=\"$artPreview === 'chips_stub.go'\"><p class=\"mb-2 text-[11px] font-medium text-muted-foreground\">chips_stub.go</p><p class=\"font-mono text-[12px] leading-relaxed text-foreground/90\">InterAgentMessageChips: centered bare lines + overlapping avatars.</p></div><div data-show=\"$artPreview === 'chip-ref.png'\"><p class=\"mb-2 text-[11px] font-medium text-muted-foreground\">chip-ref.png</p><p class=\"text-sm text-muted-foreground\">UX ref shot (placeholder preview).</p></div></div>")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+		} else if kind == KindDM && id == "research" {
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 83, "<ul class=\"space-y-1\" id=\"workbench-v2-artifact-list\"><li><button type=\"button\" data-on:click=\"$artPreview = 'onboarding-short.md'\" data-class=\"{ 'bg-muted/40': $artPreview === 'onboarding-short.md' }\" class=\"flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm hover:bg-muted/50\"><span class=\"text-[10px] text-muted-foreground\">MD</span> <span class=\"truncate font-medium text-foreground\">onboarding-short.md</span> <span class=\"ml-auto shrink-0 text-[10px] text-muted-foreground\">Thu</span></button></li><li><button type=\"button\" data-on:click=\"$artPreview = 'sources.md'\" data-class=\"{ 'bg-muted/40': $artPreview === 'sources.md' }\" class=\"flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm hover:bg-muted/50\"><span class=\"text-[10px] text-muted-foreground\">MD</span> <span class=\"truncate text-foreground\">sources.md</span> <span class=\"ml-auto shrink-0 text-[10px] text-muted-foreground\">Wed</span></button></li></ul><div id=\"workbench-v2-artifact-preview\" class=\"rounded-xl border border-border bg-muted/20 p-3\"><div data-show=\"$artPreview === 'onboarding-short.md'\"><p class=\"mb-2 text-[11px] font-medium text-muted-foreground\">onboarding-short.md</p><p class=\"font-mono text-[12px] leading-relaxed text-foreground/90\">Short path: just setup, then chestnut envs read-only.</p></div><div data-show=\"$artPreview === 'sources.md'\"><p class=\"mb-2 text-[11px] font-medium text-muted-foreground\">sources.md</p><p class=\"font-mono text-[12px] leading-relaxed text-foreground/90\">Chestnut Eng wiki · monorepo/frontend/</p></div></div>")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+		} else if kind == KindGroup && id == "vamos-dev" {
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 84, "<ul class=\"space-y-1\" id=\"workbench-v2-artifact-list\"><li><button type=\"button\" data-on:click=\"$artPreview = 'setup-notes.md'\" data-class=\"{ 'bg-muted/40': $artPreview === 'setup-notes.md' }\" class=\"flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm hover:bg-muted/50\"><span class=\"text-[10px] text-muted-foreground\">MD</span> <span class=\"truncate font-medium text-foreground\">setup-notes.md</span> <span class=\"ml-auto shrink-0 text-[10px] text-muted-foreground\">5m</span></button></li><li><button type=\"button\" data-on:click=\"$artPreview = 'just-setup'\" data-class=\"{ 'bg-muted/40': $artPreview === 'just-setup' }\" class=\"flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm hover:bg-muted/50\"><span class=\"text-[10px] text-muted-foreground\">SH</span> <span class=\"truncate text-foreground\">just setup</span> <span class=\"ml-auto shrink-0 text-[10px] text-muted-foreground\">Wed</span></button></li></ul><div id=\"workbench-v2-artifact-preview\" class=\"rounded-xl border border-border bg-muted/20 p-3\"><div data-show=\"$artPreview === 'setup-notes.md'\"><p class=\"mb-2 text-[11px] font-medium text-muted-foreground\">setup-notes.md</p><p class=\"font-mono text-[12px] leading-relaxed text-foreground/90\">Read-only path: monorepo/frontend/. Run just setup then chestnut envs.</p></div><div data-show=\"$artPreview === 'just-setup'\"><p class=\"mb-2 text-[11px] font-medium text-muted-foreground\">just setup</p><p class=\"font-mono text-[12px] leading-relaxed text-foreground/90\">Recipe: just setup</p></div></div>")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+		} else if kind == KindPlan {
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 85, "<ul class=\"space-y-1\" id=\"workbench-v2-artifact-list\"><li><button type=\"button\" data-on:click=\"$artPreview = 'design.md'\" data-class=\"{ 'bg-muted/40': $artPreview === 'design.md' }\" class=\"flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm hover:bg-muted/50\"><span class=\"text-[10px] text-muted-foreground\">MD</span> <span class=\"truncate font-medium text-foreground\">design.md</span> <span class=\"ml-auto shrink-0 text-[10px] text-muted-foreground\">Thu 2:18 PM</span></button></li><li><button type=\"button\" data-on:click=\"$artPreview = 'tasks.md'\" data-class=\"{ 'bg-muted/40': $artPreview === 'tasks.md' }\" class=\"flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm hover:bg-muted/50\"><span class=\"text-[10px] text-muted-foreground\">MD</span> <span class=\"truncate text-foreground\">tasks.md</span> <span class=\"ml-auto shrink-0 text-[10px] text-muted-foreground\">Wed</span></button></li></ul><div id=\"workbench-v2-artifact-preview\" class=\"rounded-xl border border-border bg-muted/20 p-3\"><div data-show=\"$artPreview === 'design.md'\"><p class=\"mb-2 text-[11px] font-medium text-muted-foreground\">design.md</p><p class=\"font-mono text-[12px] leading-relaxed text-foreground/90\">Alpha plan: title on rail; preview lives here in artifacts, not under the roster row.</p></div><div data-show=\"$artPreview === 'tasks.md'\"><p class=\"mb-2 text-[11px] font-medium text-muted-foreground\">tasks.md</p><p class=\"font-mono text-[12px] leading-relaxed text-foreground/90\">Research clickable · Artifact preview switch · Multi-select menu</p></div></div>")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+		} else {
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 86, "<p class=\"text-sm text-muted-foreground\">No artifacts for this room yet.</p>")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 87, "</div></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -1500,12 +1600,12 @@ func RoomWorkbenchPage(userEmail string, kind RoomKind, id string, state workben
 			}()
 		}
 		ctx = templ.InitializeContext(ctx)
-		templ_7745c5c3_Var66 := templ.GetChildren(ctx)
-		if templ_7745c5c3_Var66 == nil {
-			templ_7745c5c3_Var66 = templ.NopComponent
+		templ_7745c5c3_Var76 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var76 == nil {
+			templ_7745c5c3_Var76 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Var67 := templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
+		templ_7745c5c3_Var77 := templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 			templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 			templ_7745c5c3_Buffer, templ_7745c5c3_IsBuffer := templruntime.GetBuffer(templ_7745c5c3_W)
 			if !templ_7745c5c3_IsBuffer {
@@ -1528,7 +1628,7 @@ func RoomWorkbenchPage(userEmail string, kind RoomKind, id string, state workben
 			ShowHeader: true,
 			UserEmail:  userEmail,
 			PageType:   layouts.PageTypeAgentChat,
-		}).Render(templ.WithChildren(ctx, templ_7745c5c3_Var67), templ_7745c5c3_Buffer)
+		}).Render(templ.WithChildren(ctx, templ_7745c5c3_Var77), templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

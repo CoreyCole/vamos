@@ -101,16 +101,16 @@ func firstRegionSignalForSlot(state WorkbenchState, slot WorkbenchSlot) string {
 	return ""
 }
 
-
 // RegionSSRFlexStyle paints proportional flex before workbench-resize.js runs,
 // so room/thread GETs match SavedConfig ratios on first paint (no default→restore snap).
 
-// RegionSurfaceClass — Grok Bot left rail is a lighter muted panel vs chat/artifact.
+// RegionSurfaceClass paints Grok Bot columns: rail #111111 vs chat #070707.
+// bg-muted (#27272A) is too light; bg-background/bg-card are the same token.
 func RegionSurfaceClass(region WorkbenchRegion) string {
 	if region.Slot == WorkbenchSlotNavigation || region.ID == WorkbenchV2ThreadsRegionID {
-		return "bg-muted"
+		return "bg-[#111111]"
 	}
-	return "bg-card"
+	return "bg-[#070707]"
 }
 
 func RegionSSRFlexStyle(state WorkbenchState, region WorkbenchRegion) string {

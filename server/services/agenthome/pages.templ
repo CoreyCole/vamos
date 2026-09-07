@@ -42,139 +42,132 @@ templ RosterRail(sel RosterSelection) {
 			</div>
 		</header>
 		<div class="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden p-2">
-		<div class="flex shrink-0 gap-2 px-1">
-			<a
-				href="/rooms/dm/bot"
-				class={ rosterPinClass(sel.Kind == KindDM && sel.ID == "bot") }
-			>
-				<span class="flex h-10 w-10 items-center justify-center rounded-2xl bg-fuchsia-500/90 text-sm font-semibold text-white">B</span>
-				<span class="w-full truncate text-[10px] text-muted-foreground">Bot</span>
-			</a>
-			<a
-				href="/rooms/group/vamos-dev"
-				class={ rosterPinClass(sel.Kind == KindGroup && sel.ID == "vamos-dev") }
-			>
-				<span class="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-500/90 text-sm font-semibold text-white">V</span>
-				<span class="w-full truncate text-[10px] text-muted-foreground">Vamos Lead</span>
-			</a>
-		</div>
-		<div class="min-h-0 flex-1 space-y-4 overflow-y-auto px-1 pb-2">
-			<section id="workbench-v2-roster-agents" class="space-y-1" aria-label="Agents">
-				<h2 class="px-1 text-[11px] font-medium text-muted-foreground">Agents</h2>
-				<ul class="flex flex-col">
-					<li id="roster-row-dm-bot">
-						<a
-							href="/rooms/dm/bot"
-							data-roster-id="dm:bot"
-							class={ rosterAgentRowClass(sel.Kind == KindDM && sel.ID == "bot") }
-						>
-							<span class="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-2xl bg-fuchsia-500/90 text-xs font-semibold text-white">B</span>
-							<span class="min-w-0 flex-1">
-								<span class="flex items-baseline justify-between gap-2">
-									<span class="truncate text-sm font-medium text-foreground">Bot</span>
-									<span class="shrink-0 text-[10px] text-muted-foreground">2m</span>
+			<div id="workbench-v2-roster-pins" class="flex shrink-0 gap-2 px-1">
+				<a
+					href="/rooms/dm/bot"
+					data-roster-id="dm:bot"
+					class={ rosterPinClass(sel.Kind == KindDM && sel.ID == "bot"), templ.KV("hidden", !rosterIsPinned(KindDM, "bot")) }
+				>
+					<span class="flex h-10 w-10 items-center justify-center rounded-2xl bg-fuchsia-500/90 text-sm font-semibold text-white">B</span>
+					<span class="w-full truncate text-[10px] text-muted-foreground">Bot</span>
+				</a>
+				<a
+					href="/rooms/group/vamos-dev"
+					data-roster-id="group:vamos-dev"
+					class={ rosterPinClass(sel.Kind == KindGroup && sel.ID == "vamos-dev"), templ.KV("hidden", !rosterIsPinned(KindGroup, "vamos-dev")) }
+				>
+					<span class="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-500/90 text-sm font-semibold text-white">V</span>
+					<span class="w-full truncate text-[10px] text-muted-foreground">Vamos Lead</span>
+				</a>
+				<a
+					href="/rooms/dm/research"
+					data-roster-id="dm:research"
+					class={ rosterPinClass(sel.Kind == KindDM && sel.ID == "research"), templ.KV("hidden", !rosterIsPinned(KindDM, "research")) }
+				>
+					<span class="flex h-10 w-10 items-center justify-center rounded-2xl bg-sky-500/80 text-sm font-semibold text-white">R</span>
+					<span class="w-full truncate text-[10px] text-muted-foreground">Research</span>
+				</a>
+			</div>
+			<div class="min-h-0 flex-1 space-y-4 overflow-y-auto px-1 pb-2">
+				<section id="workbench-v2-roster-agents" class="space-y-1" aria-label="Agents">
+					<h2 class="px-1 text-[11px] font-medium text-muted-foreground">Agents</h2>
+					<ul class="flex flex-col">
+						<li id="roster-row-dm-bot" class={ templ.KV("hidden", rosterIsPinned(KindDM, "bot")) }>
+							<a
+								href="/rooms/dm/bot"
+								data-roster-id="dm:bot"
+								class={ rosterAgentRowClass(sel.Kind == KindDM && sel.ID == "bot") }
+							>
+								<span class="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-2xl bg-fuchsia-500/90 text-xs font-semibold text-white">B</span>
+								<span class="min-w-0 flex-1">
+									<span class="flex items-baseline justify-between gap-2">
+										<span class="truncate text-sm font-medium text-foreground">Bot</span>
+										<span class="shrink-0 text-[10px] text-muted-foreground">2m</span>
+									</span>
+									<span class="mt-0.5 line-clamp-1 text-xs text-muted-foreground">Ready when you are.</span>
 								</span>
-								<span class="mt-0.5 line-clamp-1 text-xs text-muted-foreground">Ready when you are.</span>
-							</span>
-						</a>
-					</li>
-					<li id="roster-row-dm-research">
-						<a
-							href="/rooms/dm/research"
-							data-roster-id="dm:research"
-							class={ rosterAgentRowClass(sel.Kind == KindDM && sel.ID == "research") }
-						>
-							<span class="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-2xl bg-sky-500/80 text-xs font-semibold text-white">R</span>
-							<span class="min-w-0 flex-1">
-								<span class="flex items-baseline justify-between gap-2">
-									<span class="truncate text-sm font-medium text-foreground">Research agent</span>
-									<span class="shrink-0 text-[10px] text-muted-foreground">Thu</span>
+							</a>
+						</li>
+						<li id="roster-row-dm-research" class={ templ.KV("hidden", rosterIsPinned(KindDM, "research")) }>
+							<a
+								href="/rooms/dm/research"
+								data-roster-id="dm:research"
+								class={ rosterAgentRowClass(sel.Kind == KindDM && sel.ID == "research") }
+							>
+								<span class="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-2xl bg-sky-500/80 text-xs font-semibold text-white">R</span>
+								<span class="min-w-0 flex-1">
+									<span class="flex items-baseline justify-between gap-2">
+										<span class="truncate text-sm font-medium text-foreground">Research agent</span>
+										<span class="shrink-0 text-[10px] text-muted-foreground">Thu</span>
+									</span>
+									<span class="mt-0.5 line-clamp-1 text-xs text-muted-foreground">No recent messages</span>
 								</span>
-								<span class="mt-0.5 line-clamp-1 text-xs text-muted-foreground">No recent messages</span>
-							</span>
-						</a>
-					</li>
-				</ul>
-			</section>
-			<section id="workbench-v2-roster-groups" class="space-y-1" aria-label="Groups">
-				<h2 class="px-1 text-[11px] font-medium text-muted-foreground">Groups</h2>
-				<ul class="flex flex-col">
-					<li id="roster-row-group-vamos-dev">
-						<a
-							href="/rooms/group/vamos-dev"
-							data-roster-id="group:vamos-dev"
-							class={ rosterAgentRowClass(sel.Kind == KindGroup && sel.ID == "vamos-dev") }
-						>
-							<span class="relative mt-0.5 h-8 w-8 shrink-0">
-								<span class="absolute left-0 top-0 h-6 w-6 overflow-hidden rounded-full bg-emerald-500/90 ring-2 ring-background"></span>
-								<span class="absolute bottom-0 right-0 flex h-6 w-6 items-center justify-center rounded-2xl bg-fuchsia-500/90 text-[10px] font-semibold text-white ring-2 ring-background">+</span>
-								<span class="absolute -bottom-0.5 -right-0.5 rounded bg-muted px-0.5 text-[8px] font-medium text-muted-foreground">+2</span>
-							</span>
-							<span class="min-w-0 flex-1">
-								<span class="flex items-baseline justify-between gap-2">
-									<span class="truncate text-sm font-medium text-foreground">Vamos dev</span>
-									<span class="shrink-0 text-[10px] text-muted-foreground">9:26 PM</span>
+							</a>
+						</li>
+					</ul>
+				</section>
+				<section id="workbench-v2-roster-groups" class={ "space-y-1", templ.KV("hidden", rosterIsPinned(KindGroup, "vamos-dev")) } aria-label="Groups">
+					<h2 class="px-1 text-[11px] font-medium text-muted-foreground">Groups</h2>
+					<ul class="flex flex-col">
+						<li id="roster-row-group-vamos-dev" class={ templ.KV("hidden", rosterIsPinned(KindGroup, "vamos-dev")) }>
+							<a
+								href="/rooms/group/vamos-dev"
+								data-roster-id="group:vamos-dev"
+								class={ rosterAgentRowClass(sel.Kind == KindGroup && sel.ID == "vamos-dev") }
+							>
+								<span class="relative mt-0.5 h-8 w-8 shrink-0">
+									<span class="absolute left-0 top-0 h-6 w-6 overflow-hidden rounded-full bg-emerald-500/90 ring-2 ring-background"></span>
+									<span class="absolute bottom-0 right-0 flex h-6 w-6 items-center justify-center rounded-2xl bg-fuchsia-500/90 text-[10px] font-semibold text-white ring-2 ring-background">+</span>
+									<span class="absolute -bottom-0.5 -right-0.5 rounded bg-muted px-0.5 text-[8px] font-medium text-muted-foreground">+2</span>
 								</span>
-								<span class="mt-0.5 line-clamp-1 text-xs text-muted-foreground">UX: feel LGTM on rail tip.</span>
-							</span>
-							if sel.Kind != KindGroup || sel.ID != "vamos-dev" {
-								<span class="mt-2 h-2 w-2 shrink-0 rounded-full bg-sky-500" aria-label="Unread"></span>
-							}
-						</a>
-					</li>
-				</ul>
-			</section>
-			<section id="workbench-v2-roster-plans" class="space-y-1 border-t border-dashed border-border/60 pt-3" aria-label="Plan threads">
-				<h2 class="px-1 text-[11px] font-medium text-muted-foreground">Plan threads</h2>
-				<ul class="flex flex-col">
-					<li id="roster-row-plan-alpha">
-						<a
-							href="/rooms/plan/alpha"
-							data-roster-id="plan:alpha"
-							class={ rosterPlanRowClass(sel.Kind == KindPlan && sel.ID == "alpha") }
-						>
-							<span class="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-border bg-background text-[10px] text-muted-foreground">P</span>
-							<span class="min-w-0 flex-1">
-								<span class="flex items-baseline justify-between gap-2">
-									<span class="truncate text-xs font-medium text-muted-foreground">Alpha</span>
-									<span class="shrink-0 text-[10px] text-muted-foreground" title="Last file mtime in plan dir">Thu 2:18 PM</span>
+								<span class="min-w-0 flex-1">
+									<span class="flex items-baseline justify-between gap-2">
+										<span class="truncate text-sm font-medium text-foreground">Vamos dev</span>
+										<span class="shrink-0 text-[10px] text-muted-foreground">9:26 PM</span>
+									</span>
+									<span class="mt-0.5 line-clamp-1 text-xs text-muted-foreground">UX: feel LGTM on rail tip.</span>
 								</span>
-							</span>
-						</a>
-					</li>
-				</ul>
-			</section>
-		</div>
-		@RosterContextMenu()
-		@EditProfileSheet()
-		@RosterChromeScript()
-		<style>
-			#workbench-v2-roster a.roster-row:hover {
-				background-color: hsl(var(--background) / 0.55);
-			}
-			#workbench-v2-roster a.roster-row-plan:hover {
-				background-color: hsl(var(--background) / 0.45);
+							</a>
+						</li>
+					</ul>
+				</section>
+				<section id="workbench-v2-roster-plans" class="space-y-1 border-t border-dashed border-border/60 pt-3" aria-label="Plan threads">
+					<h2 class="px-1 text-[11px] font-medium text-muted-foreground">Plan threads</h2>
+					<ul class="flex flex-col">
+						<li id="roster-row-plan-alpha">
+							<a
+								href="/rooms/plan/alpha"
+								data-roster-id="plan:alpha"
+								class={ rosterPlanRowClass(sel.Kind == KindPlan && sel.ID == "alpha") }
+							>
+								<span class="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-border bg-background text-[10px] text-muted-foreground">P</span>
+								<span class="min-w-0 flex-1">
+									<span class="flex items-baseline justify-between gap-2">
+										<span class="truncate text-xs font-medium text-muted-foreground">Alpha</span>
+										<span class="shrink-0 text-[10px] text-muted-foreground" title="Last file mtime in plan dir">Thu 2:18 PM</span>
+									</span>
+								</span>
+							</a>
+						</li>
+					</ul>
+				</section>
+			</div>
+			@RosterContextMenu()
+			@EditProfileSheet()
+			@RosterChromeScript()
+			<style>
+			#workbench-v2-roster a.roster-row:hover,
+			#workbench-v2-roster a.roster-pin:hover {
+				background-color: #232323;
 			}
 			#workbench-v2-roster a.roster-row-selected,
-			#workbench-v2-roster a.roster-row-selected:hover {
-				/* Strong Grok-like selected chip on muted rail */
-				background-color: hsl(var(--accent));
-				color: hsl(var(--accent-foreground));
-				box-shadow: inset 4px 0 0 0 hsl(var(--primary));
-			}
-			#workbench-v2-roster a.roster-pin:hover {
-				background-color: hsl(var(--background) / 0.55);
-			}
+			#workbench-v2-roster a.roster-row-selected:hover,
 			#workbench-v2-roster a.roster-pin-selected,
 			#workbench-v2-roster a.roster-pin-selected:hover {
-				background-color: hsl(var(--accent));
-				color: hsl(var(--accent-foreground));
-				border-color: hsl(var(--border));
-				box-shadow: inset 0 0 0 1px hsl(var(--primary) / 0.45);
+				background-color: #313131;
 			}
 			#workbench-v2-roster a.roster-multi-selected {
-				background-color: hsl(var(--accent) / 0.55);
-				box-shadow: inset 3px 0 0 0 hsl(var(--primary)), inset 0 0 0 1px hsl(var(--border));
+				background-color: #313131;
 			}
 		</style>
 		</div>

@@ -10,11 +10,17 @@ import (
 // StubPane is a minimal pane body for AI-470 room sketches.
 func StubPane(title, subtitle, href, body string) templ.Component {
 	return templ.ComponentFunc(func(ctx context.Context, w io.Writer) error {
-		_, err := io.WriteString(w, `<div class="flex h-full min-h-0 flex-col gap-2 p-4">`)
+		_, err := io.WriteString(
+			w,
+			`<div class="flex h-full min-h-0 flex-col gap-2 p-4">`,
+		)
 		if err != nil {
 			return err
 		}
-		_, err = io.WriteString(w, `<div class="text-xs font-semibold uppercase tracking-wide text-muted-foreground">`)
+		_, err = io.WriteString(
+			w,
+			`<div class="text-xs font-semibold uppercase tracking-wide text-muted-foreground">`,
+		)
 		if err != nil {
 			return err
 		}
@@ -67,7 +73,7 @@ func StubPane(title, subtitle, href, body string) templ.Component {
 	})
 }
 
-func roomComposerPlaceholder(kind RoomKind, id string, title string) string {
+func roomComposerPlaceholder(kind RoomKind, id, title string) string {
 	if kind == KindDM && id == "bot" {
 		return "Message Bot"
 	}
@@ -116,10 +122,44 @@ func RosterChromeScript() templ.Component {
   let selected = new Set();
   let anchor = null;
   let focusId = "dm:bot";
+  const PIN_KEY = "wb2-roster-pinned";
+  const PIN_DEFAULT = ["dm:bot", "group:vamos-dev"];
+  function loadPinned() {
+    try {
+      const raw = sessionStorage.getItem(PIN_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) return new Set(parsed);
+      }
+    } catch (_) {}
+    return new Set(PIN_DEFAULT);
+  }
+  let pinned = loadPinned();
+  function savePinned() {
+    try { sessionStorage.setItem(PIN_KEY, JSON.stringify([...pinned])); } catch (_) {}
+  }
 
   function rowEl(id) {
     const [kind, rid] = id.split(":");
     return document.getElementById("roster-row-" + kind + "-" + rid);
+  }
+  function pinEl(id) {
+    return root.querySelector('#workbench-v2-roster-pins a[data-roster-id="' + id + '"]');
+  }
+  function paintPins() {
+    for (const id of order) {
+      const pin = pinEl(id);
+      if (pin) pin.classList.toggle("hidden", !pinned.has(id));
+      const li = rowEl(id);
+      if (li) li.classList.toggle("hidden", pinned.has(id));
+    }
+    const groups = document.getElementById("workbench-v2-roster-groups");
+    if (groups) {
+      const visible = [...groups.querySelectorAll(":scope > ul > li")].some((li) => !li.classList.contains("hidden"));
+      groups.classList.toggle("hidden", !visible);
+    }
+    const pinLabel = menu.querySelector('[data-roster-label="pin"]');
+    if (pinLabel) pinLabel.textContent = pinned.has(focusId) ? "Unpin" : "Pin";
   }
   function paint() {
     for (const id of order) {
@@ -238,6 +278,7 @@ func RosterChromeScript() templ.Component {
       anchor = id;
     }
     paint();
+    paintPins();
     openMenu(evt.clientX, evt.clientY);
   });
 
@@ -252,8 +293,17 @@ func RosterChromeScript() templ.Component {
     const btn = evt.target.closest("[data-roster-action]");
     if (!btn) return;
     const action = btn.getAttribute("data-roster-action");
-    if (action === "edit-profile") openProfile();
-    else hideMenu();
+    if (action === "edit-profile") {
+      openProfile();
+      return;
+    }
+    if (action === "pin" && focusId) {
+      if (pinned.has(focusId)) pinned.delete(focusId);
+      else if (pinEl(focusId)) pinned.add(focusId);
+      savePinned();
+      paintPins();
+    }
+    hideMenu();
   });
 
   document.getElementById("workbench-v2-edit-profile-close")?.addEventListener("click", closeProfile);
@@ -270,9 +320,9 @@ func RosterChromeScript() templ.Component {
   });
 
   paint();
+  paintPins();
 })();
 </script>`)
 		return err
 	})
 }
-
