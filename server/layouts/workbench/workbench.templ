@@ -35,7 +35,7 @@ templ WorkbenchV2ThreadsReopen(state WorkbenchState) {
 		if region.ID == WorkbenchV2ThreadsRegionID {
 			<div
 				id="workbench-v2-threads-reopen"
-				class="workbench-chrome shrink-0 max-md:hidden"
+				class={ "workbench-chrome shrink-0 max-md:hidden", templ.KV("hidden", region.Visible) }
 				data-show={ "!$workbench.regions." + SignalKey(region) + ".visible" }
 			>
 				<button
