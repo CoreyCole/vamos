@@ -160,7 +160,10 @@ func (s *Service) ServeThreads(c echo.Context) error {
 		ViewportClass: viewport,
 		SavedConfig:   s.savedThreadsWorkbenchConfig(c, userEmail, viewport),
 		Threads:       agenthome.RosterRail(agenthome.RosterSelection{Kind: agenthome.KindDM, ID: "bot"}),
-		Chat:          WorkbenchUnavailable("Select a thread to open chat."),
+		Chat: workbench.ChatColumnWithReopen(
+			workbench.ThreadsOpenFromRequest(c.Request()),
+			WorkbenchUnavailable("Select a thread to open chat."),
+		),
 		Artifact:      s.indexArtifactComponent(c, artifactPath, hasArtifact),
 		Comments:      WorkbenchUnavailable("Select an artifact to view comments."),
 		ThreadsOpen:   workbench.ThreadsOpenFromRequest(c.Request()),
@@ -224,7 +227,10 @@ func (s *Service) ServeThread(c echo.Context) error {
 		ViewportClass: viewport,
 		SavedConfig:   s.savedThreadsWorkbenchConfig(c, userEmail, viewport),
 		Threads:       agenthome.RosterRail(rosterSelectionForThread(threadID)),
-		Chat:          chat,
+		Chat: workbench.ChatColumnWithReopen(
+			workbench.ThreadsOpenFromRequest(c.Request()),
+			chat,
+		),
 		Artifact:      artifact,
 		Comments:      comments,
 		ThreadsOpen:   workbench.ThreadsOpenFromRequest(c.Request()),

@@ -1,7 +1,8 @@
 function isThreadRoute() {
   return (
     window.location.pathname === "/threads" ||
-    window.location.pathname.startsWith("/threads/")
+    window.location.pathname.startsWith("/threads/") ||
+    window.location.pathname.startsWith("/rooms/")
   );
 }
 
@@ -96,7 +97,11 @@ function threadIdFromURL(urlLike) {
     const u = new URL(urlLike, window.location.origin);
     const parts = u.pathname.split("/");
     if (parts[1] === "threads" && parts[2]) {
-      return decodeURIComponent(parts[2]);
+      return "thread:" + decodeURIComponent(parts[2]);
+    }
+    // AI-470 rooms: treat kind/id as the switch identity for pin + VT unname.
+    if (parts[1] === "rooms" && parts[2] && parts[3]) {
+      return "room:" + parts[2] + "/" + decodeURIComponent(parts[3]);
     }
   } catch (_) {}
   return null;
@@ -175,7 +180,7 @@ document.addEventListener(
       return;
     }
     const anchor = event.target?.closest?.(
-      "#workbench-v2-threads a[href], #workbench-v2-threads-body a[href]",
+      "#workbench-v2-threads a[href], #workbench-v2-threads-body a[href], #workbench-v2-roster a[href]",
     );
     if (!anchor) {
       return;

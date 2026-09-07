@@ -12,13 +12,12 @@ templ Workbench(state WorkbenchState) {
 		class="flex h-full min-h-0 w-full overflow-hidden p-2 md:p-4"
 	>
 		<script type="module" src="/js/workbench-resize.js?v=8"></script>
-		<script type="module" src="/js/workbench-history.js?v=21"></script>
+		<script type="module" src="/js/workbench-history.js?v=22"></script>
 		<script type="module" src="/js/workbench-doc-scroll.js?v=3"></script>
 		<script defer src="/js/frame-comment-bridge.js?v=4" data-commentui-mode="parent"></script>
 		<div class="flex min-h-0 w-full flex-col gap-2 overflow-hidden">
 			@MobileRegionTabs(state)
-			<div id="workbench-regions" class="relative flex min-h-0 w-full flex-1 gap-2 overflow-hidden">
-				@WorkbenchV2ThreadsReopen(state)
+			<div id="workbench-regions" class="flex min-h-0 w-full flex-1 gap-2 overflow-hidden">
 				for index, region := range state.Regions {
 					@Region(state, region)
 					if CanResizeAfter(state, index) {
@@ -30,30 +29,38 @@ templ Workbench(state WorkbenchState) {
 	</div>
 }
 
-templ WorkbenchV2ThreadsReopen(state WorkbenchState) {
-	for _, region := range state.Regions {
-		if region.ID == WorkbenchV2ThreadsRegionID {
-			// In-shell only: rendered INSIDE #workbench-regions (never above the 3-col grid). Lead HARD stamp.
-			<div
-				id="workbench-v2-threads-reopen"
-				class={ "workbench-chrome pointer-events-auto absolute left-2 top-2 z-30 max-md:hidden", templ.KV("hidden", region.Visible) }
-				data-show={ "!$workbench.regions." + SignalKey(region) + ".visible" }
-			>
-				<button
-					type="button"
-					data-workbench-threads-reopen
-					class="inline-flex h-8 items-center gap-2 rounded-md border border-border bg-background px-2 text-xs font-medium text-muted-foreground shadow-sm transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-					data-on:click={ ThreadsShowClickAction(SignalKey(region)) }
-					aria-controls={ region.TargetID }
-					aria-label="Show threads sidebar"
-					title="Show threads sidebar"
-				>
-					<svg class="h-4 w-4" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
-					</svg>
-					<span>Threads</span>
-				</button>
-			</div>
-		}
-	}
+// ThreadsReopenControl — show-control when left rail is closed.
+// Corey/Lead: lives in chat header only (never above the 3-col grid).
+templ ThreadsReopenControl(threadsOpen bool) {
+	<div
+		id="workbench-v2-threads-reopen"
+		class={ "workbench-chrome flex shrink-0 items-center gap-2 border-b border-border px-3 py-2 max-md:hidden", templ.KV("hidden", threadsOpen) }
+		data-show={ "!$workbench.regions.workbenchV2Threads.visible" }
+	>
+		<button
+			type="button"
+			data-workbench-threads-reopen
+			class="inline-flex h-8 items-center gap-2 rounded-md border border-border bg-background px-2 text-xs font-medium text-muted-foreground shadow-sm transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+			data-on:click={ ThreadsShowClickAction("workbenchV2Threads") }
+			aria-controls="workbench-v2-threads"
+			aria-label="Show threads sidebar"
+			title="Show threads sidebar"
+		>
+			<svg class="h-4 w-4" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+				<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
+			</svg>
+			<span>Threads</span>
+		</button>
+	</div>
+}
+
+// ChatColumnWithReopen wraps middle-column chat so reopen sits in the chat header
+// strip when the left rail is closed (strip hidden while left is open).
+templ ChatColumnWithReopen(threadsOpen bool, chat templ.Component) {
+	<div class="flex h-full min-h-0 flex-col bg-background">
+		@ThreadsReopenControl(threadsOpen)
+		<div class="min-h-0 flex-1 overflow-hidden">
+			@chat
+		</div>
+	</div>
 }

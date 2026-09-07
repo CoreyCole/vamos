@@ -19,8 +19,8 @@ func ServeAgentsLand(c echo.Context) error {
 	return c.Redirect(http.StatusSeeOther, "/rooms/dm/bot")
 }
 
-// ServeAI470Room renders leftover V2 workbench with RosterRail left + real
-// chat/ThreadArtifactPane when a shared thread can be resolved.
+// ServeAI470Room renders leftover V2 workbench with RosterRail left + the same
+// SharedThreadChat / ThreadArtifactPane tree as /threads/:id (never sketch RoomChatPane).
 func (s *Service) ServeAI470Room(c echo.Context) error {
 	kind, ok := agenthome.ParseKind(c.Param("kind"))
 	if !ok {
@@ -43,17 +43,20 @@ func (s *Service) ServeAI470Room(c echo.Context) error {
 		return err
 	}
 	viewport := viewportClassForRequest(c)
+	threadsOpen := workbench.ThreadsOpenFromRequest(c.Request())
 
-	// Prefer real SharedThreadChat when a thread resolves. Otherwise keep sketch
-	// RoomChatPane feel for VA until room↔thread mapping lands (Lead: bundle chat feel).
-	chatComp := agenthome.RoomChatPane(kind, id, roomTitle(kind, id), "")
+	var chatComp templ.Component
 	artifactComp := s.indexArtifactComponent(c, "", false)
 	commentsComp := WorkbenchUnavailable("Select an artifact to view comments.")
-	chatOpen := true
+	chatOpen := false
 
-	if threadID != "" {
-		var chat templ.Component
-		chat, err = s.workbenchThreadsRenderer.RenderSharedThreadChat(
+	if threadID == "" {
+		chatComp = workbench.ChatColumnWithReopen(
+			threadsOpen,
+			WorkbenchUnavailable("No shared thread mapped for this room yet."),
+		)
+	} else {
+		chat, err := s.workbenchThreadsRenderer.RenderSharedThreadChat(
 			c.Request().Context(), threadID, userEmail,
 		)
 		if errors.Is(err, sql.ErrNoRows) {
@@ -62,7 +65,7 @@ func (s *Service) ServeAI470Room(c echo.Context) error {
 		if err != nil {
 			return err
 		}
-		chatComp = chat
+		chatComp = workbench.ChatColumnWithReopen(threadsOpen, chat)
 		artifactComp, commentsComp, err = s.threadArtifactAndComments(
 			c, threadID, c.QueryParam("artifact"),
 		)
@@ -80,7 +83,7 @@ func (s *Service) ServeAI470Room(c echo.Context) error {
 		Chat:          chatComp,
 		Artifact:      artifactComp,
 		Comments:      commentsComp,
-		ThreadsOpen:   workbench.ThreadsOpenFromRequest(c.Request()),
+		ThreadsOpen:   threadsOpen,
 		ChatOpen:      chatOpen,
 		ArtifactOpen:  true,
 		CommentsOpen:  false,
@@ -93,21 +96,24 @@ func (s *Service) ServeAI470Room(c echo.Context) error {
 	)
 }
 
+// sharedThreadIDLister is optional on the workbench thread renderer so agent/group
+// rooms can fixture-map onto real shared threads without sketch RoomChatPane.
+type sharedThreadIDLister interface {
+	ListSharedThreadIDs(ctx context.Context) ([]string, error)
+}
+
 func (s *Service) resolveAI470Thread(
 	ctx context.Context,
 	kind agenthome.RoomKind,
 	id string,
 ) (string, error) {
 	id = strings.TrimSpace(id)
+
+	// Plan rooms: prefer design.md identity.
 	docs := []string{
 		"thoughts/owner/plans/" + id + "/design.md",
 		"thoughts/shared/plans/" + id + "/design.md",
 		"thoughts/" + id + "/design.md",
-	}
-	if kind == agenthome.KindPlan {
-		docs = append([]string{
-			"thoughts/owner/plans/" + id + "/design.md",
-		}, docs...)
 	}
 	seen := map[string]bool{}
 	for _, doc := range docs {
@@ -123,7 +129,37 @@ func (s *Service) resolveAI470Thread(
 			return threadID, nil
 		}
 	}
+
+	// Agent/group (and plan fallback): map onto real shared threads by stable index.
+	// Fixtures OK until room↔thread schema lands (Corey P0: same component tree).
+	ids, err := s.listSharedThreadIDs(ctx)
+	if err != nil {
+		return "", err
+	}
+	idx := -1
+	switch {
+	case kind == agenthome.KindDM && id == "bot":
+		idx = 0
+	case kind == agenthome.KindDM && id == "research":
+		idx = 1
+	case kind == agenthome.KindGroup && id == "vamos-dev":
+		idx = 2
+	case kind == agenthome.KindPlan && id == "alpha":
+		idx = 0
+	case kind == agenthome.KindDM || kind == agenthome.KindGroup || kind == agenthome.KindAgentDM:
+		idx = 0
+	}
+	if idx >= 0 && idx < len(ids) {
+		return ids[idx], nil
+	}
 	return "", nil
+}
+
+func (s *Service) listSharedThreadIDs(ctx context.Context) ([]string, error) {
+	if lister, ok := s.workbenchThreadsRenderer.(sharedThreadIDLister); ok {
+		return lister.ListSharedThreadIDs(ctx)
+	}
+	return nil, nil
 }
 
 func rosterSelectionForThread(threadID string) agenthome.RosterSelection {
@@ -138,30 +174,5 @@ func rosterSelectionForThread(threadID string) agenthome.RosterSelection {
 		return agenthome.RosterSelection{Kind: agenthome.KindPlan, ID: "alpha"}
 	default:
 		return agenthome.RosterSelection{}
-	}
-}
-
-func roomTitle(kind agenthome.RoomKind, id string) string {
-	switch kind {
-	case agenthome.KindDM:
-		if id == "bot" {
-			return "Bot"
-		}
-		if id == "research" {
-			return "Research agent"
-		}
-		return id
-	case agenthome.KindGroup:
-		if id == "vamos-dev" {
-			return "Vamos dev"
-		}
-		return id
-	case agenthome.KindPlan:
-		if id == "alpha" {
-			return "Alpha"
-		}
-		return id
-	default:
-		return id
 	}
 }
