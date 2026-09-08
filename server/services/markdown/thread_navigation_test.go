@@ -398,7 +398,6 @@ func TestViewDocumentButtonSitsLeftOfOverflow(t *testing.T) {
 		t.Fatal(err)
 	}
 	header := artifactPathHeader(t, body.String())
-	view := strings.Index(header, `data-testid="view-document"`)
 	comments := strings.Index(header, `data-testid="view-comments"`)
 	up := strings.Index(header, `data-thread-artifact-up`)
 	path := strings.Index(header, `data-testid="artifact-browser-path"`)
@@ -407,23 +406,23 @@ func TestViewDocumentButtonSitsLeftOfOverflow(t *testing.T) {
 	overflow := strings.Index(header, `data-testid="workbench-overflow-actions"`)
 	chat := strings.Index(header, `data-testid="view-chat"`)
 	if chat < 0 || comments < 0 || up < 0 || path < 0 || search < 0 || files < 0 ||
-		view < 0 || overflow < 0 ||
-		!(chat < comments && comments < up && up < path && path < search && search < files && files < view && view < overflow) {
+		overflow < 0 ||
+		!(chat < comments && comments < up && up < path && path < search && search < files && files < overflow) {
 		t.Fatalf(
-			"header order chat=%d comments=%d up=%d path=%d search=%d files=%d view=%d overflow=%d\n%s",
+			"header order chat=%d comments=%d up=%d path=%d search=%d files=%d overflow=%d\n%s",
 			chat,
 			comments,
 			up,
 			path,
 			search,
 			files,
-			view,
 			overflow,
 			header,
 		)
 	}
-	if !strings.Contains(header, `title="View Document"`) {
-		t.Fatalf("missing View Document tooltip: %s", header)
+	if strings.Contains(header, `data-testid="view-document"`) ||
+		strings.Contains(header, `title="View Document"`) {
+		t.Fatalf("View Document should not be a header button: %s", header)
 	}
 }
 

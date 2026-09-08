@@ -28,7 +28,6 @@ func BuildDocumentWorkbenchActions(pageArgs *PageArgs) templ.Component {
 	return workbench.OverflowActions(workbench.OverflowActionsArgs{
 		Label: "Document actions",
 		Groups: []workbench.OverflowActionGroup{{
-			Label:   "Document",
 			Actions: actions,
 		}},
 	})
@@ -73,48 +72,58 @@ func DocumentCommentAction(pageArgs *PageArgs) workbench.OverflowAction {
 	}
 }
 
+func artifactMenuViewDocumentHref(browser ThreadArtifactBrowserArgs) string {
+	if browser.DocumentViewActive {
+		return ""
+	}
+	return strings.TrimSpace(browser.ViewDocumentHref)
+}
+
 func BuildThreadArtifactHeaderActions(
 	pageArgs *PageArgs,
-	docPath, chatHref string,
+	docPath, chatHref, viewDocumentHref string,
 ) templ.Component {
 	docPath = strings.TrimSpace(docPath)
 	chatHref = strings.TrimSpace(chatHref)
-	groups := make([]workbench.OverflowActionGroup, 0, 2)
-	pathActions := make([]workbench.OverflowAction, 0, 3)
+	viewDocumentHref = strings.TrimSpace(viewDocumentHref)
+	actions := make([]workbench.OverflowAction, 0, 5)
 	if docPath != "" {
-		pathActions = append(pathActions, DocumentCopyPathAction(docPath))
+		actions = append(actions, DocumentCopyPathAction(docPath))
 	}
 	if chatHref != "" {
-		pathActions = append(pathActions, workbench.OverflowAction{
+		chat := workbench.OverflowAction{
 			Label: "chat about this plan",
 			Kind:  workbench.OverflowActionLink,
 			Href:  chatHref,
+		}
+		if name := planLeadRoomID(docPath); name != "" {
+			chat.Description = name
+		}
+		actions = append(actions, chat)
+	}
+	if viewDocumentHref != "" {
+		actions = append(actions, workbench.OverflowAction{
+			Label: "View Document",
+			Kind:  workbench.OverflowActionLink,
+			Href:  viewDocumentHref,
 		})
 	}
-	if len(pathActions) > 0 {
-		groups = append(groups, workbench.OverflowActionGroup{Actions: pathActions})
-	}
-	docActions := make([]workbench.OverflowAction, 0, 2)
 	if pageArgs != nil {
 		if pageArgs.ViewerArgs.RawMarkdown != "" {
-			docActions = append(docActions, DocumentCopyAction())
+			actions = append(actions, DocumentCopyAction())
 		}
 		if pageArgs.ViewerArgs.CommentMode != CommentModeNone {
-			docActions = append(docActions, DocumentCommentAction(pageArgs))
+			actions = append(actions, DocumentCommentAction(pageArgs))
 		}
 	}
-	if len(docActions) > 0 {
-		groups = append(groups, workbench.OverflowActionGroup{
-			Label:   "Document",
-			Actions: docActions,
-		})
-	}
-	if len(groups) == 0 {
+	if len(actions) == 0 {
 		return nil
 	}
 	return workbench.OverflowActions(workbench.OverflowActionsArgs{
-		Label:  "Artifact actions",
-		Groups: groups,
+		Label: "Artifact actions",
+		Groups: []workbench.OverflowActionGroup{{
+			Actions: actions,
+		}},
 	})
 }
 

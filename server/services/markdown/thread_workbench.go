@@ -137,6 +137,7 @@ func (s *Service) indexArtifactComponent(
 		page,
 		browser.DocPath,
 		"",
+		artifactMenuViewDocumentHref(browser),
 	)
 	if page != nil {
 		panelArgs := BuildDocumentPanelArgs(page)

@@ -344,9 +344,15 @@ func artifactBrowserSearchClearAction() string {
 	return "$_dirSearchOpen = false; $dirSearch = ''; " + artifactBrowserSearchFetchAction()
 }
 
+func artifactBrowserSearchFirstResultExpr() string {
+	return "document.querySelector('#thread-artifact-browser-results a[href]')"
+}
+
 func artifactBrowserSearchKeydownAction() string {
-	return "evt.key === 'Enter' ? evt.preventDefault() : evt.key === 'Escape' ? (" +
-		"$_dirSearchOpen = false, $dirSearch = '', " +
+	first := artifactBrowserSearchFirstResultExpr()
+	return "evt.key === 'Tab' && !evt.shiftKey ? (evt.preventDefault(), " + first +
+		"?.focus()) : evt.key === 'Enter' ? (evt.preventDefault(), " + first +
+		"?.click()) : evt.key === 'Escape' ? ($_dirSearchOpen = false, $dirSearch = '', " +
 		artifactBrowserSearchFetchAction() +
 		") : null"
 }
@@ -651,6 +657,7 @@ func (s *Service) thoughtsArtifactPane(
 		page,
 		browser.DocPath,
 		chatHref,
+		artifactMenuViewDocumentHref(browser),
 	)
 	return ThreadArtifactPane(browser, document), nil
 }
@@ -711,6 +718,7 @@ func (s *Service) threadArtifactAndComments(
 			nil,
 			browser.DocPath,
 			"",
+			artifactMenuViewDocumentHref(browser),
 		)
 		return ThreadArtifactPane(
 			browser,
@@ -723,6 +731,7 @@ func (s *Service) threadArtifactAndComments(
 			nil,
 			browser.DocPath,
 			"",
+			artifactMenuViewDocumentHref(browser),
 		)
 		return ThreadArtifactPane(browser, content),
 			WorkbenchUnavailable("Comments are unavailable for this artifact."), nil
@@ -751,6 +760,7 @@ func (s *Service) threadArtifactAndComments(
 		page,
 		browser.DocPath,
 		"",
+		artifactMenuViewDocumentHref(browser),
 	)
 	panelArgs.Document.WorkbenchActions = nil
 	content = DocumentPanel(panelArgs)
