@@ -473,21 +473,14 @@ func (s *Service) buildThoughtsV2WorkbenchState(
 	comments := commentui.CommentsContextPanel(
 		commentui.BuildCommentsPanelArgs(pageArgs.CommentUI, ""),
 	)
-	threads, chat, threadsOpen, chatOpen := s.thoughtsPlanLeadChrome(
-		c,
-		pageArgs.FilePath,
-		pageArgs.UserEmail,
-	)
 	return workbench.BuildWorkbenchV2State(workbench.WorkbenchV2Args{
 		UserEmail:     pageArgs.UserEmail,
 		ViewportClass: viewport,
 		SavedConfig:   s.savedThreadsWorkbenchConfig(c, pageArgs.UserEmail, viewport),
-		Threads:       threads,
-		Chat:          chat,
 		Artifact:      artifact,
 		Comments:      comments,
-		ThreadsOpen:   threadsOpen,
-		ChatOpen:      chatOpen,
+		ThreadsOpen:   false,
+		ChatOpen:      false,
 		ArtifactOpen:  true,
 		CommentsOpen:  false,
 	})
@@ -758,21 +751,14 @@ func (s *Service) buildThoughtsDirectoryWorkbenchState(
 	if err != nil {
 		return workbench.WorkbenchState{}, err
 	}
-	threads, chat, threadsOpen, chatOpen := s.thoughtsPlanLeadChrome(
-		c,
-		dirPath,
-		args.UserEmail,
-	)
 	return workbench.BuildWorkbenchV2State(workbench.WorkbenchV2Args{
 		UserEmail:     args.UserEmail,
 		ViewportClass: viewport,
 		SavedConfig:   s.savedThreadsWorkbenchConfig(c, args.UserEmail, viewport),
-		Threads:       threads,
-		Chat:          chat,
 		Artifact:      artifact,
 		Comments:      EmptyDirectoryContextPanel(),
-		ThreadsOpen:   threadsOpen,
-		ChatOpen:      chatOpen,
+		ThreadsOpen:   false,
+		ChatOpen:      false,
 		ArtifactOpen:  true,
 	})
 }

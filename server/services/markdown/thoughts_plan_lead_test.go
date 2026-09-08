@@ -2,7 +2,6 @@ package markdown
 
 import (
 	"bytes"
-	"context"
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
@@ -14,21 +13,7 @@ import (
 	"github.com/CoreyCole/vamos/server/layouts/workbench"
 )
 
-type planLeadThreadRenderer struct {
-	threadWorkbenchTestRenderer
-}
-
-func (r *planLeadThreadRenderer) FindSharedThreadForDoc(
-	_ context.Context,
-	docPath string,
-) (string, error) {
-	if strings.Contains(docPath, "plans/alpha") {
-		return "plan-alpha-thread", nil
-	}
-	return "", nil
-}
-
-func TestThoughtsPlanDocKeepsPlanLeadChat(t *testing.T) {
+func TestThoughtsPlanDocIsFullscreenWithPlanLeadChatLink(t *testing.T) {
 	root := t.TempDir()
 	mustMkdirAll(t, filepath.Join(root, "owner", "plans", "alpha"))
 	mustWriteFile(
@@ -40,8 +25,7 @@ func TestThoughtsPlanDocKeepsPlanLeadChat(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	renderer := &planLeadThreadRenderer{}
-	svc.WithWorkbenchThreadRenderer(renderer)
+	svc.WithWorkbenchThreadRenderer(&threadWorkbenchTestRenderer{})
 
 	e := echo.New()
 	req := httptest.NewRequest(
@@ -67,19 +51,22 @@ func TestThoughtsPlanDocKeepsPlanLeadChat(t *testing.T) {
 	}
 	html := body.String()
 	for _, want := range []string{
-		`id="workbench-v2-chat"`,
-		`id="thread-chat"`,
+		`id="thread-artifact-document"`,
 		`<span>chat about this plan</span>`,
 		`href="/rooms/plan/alpha?artifact=thoughts%2Fowner%2Fplans%2Falpha%2Fdesign.md"`,
-		`id="workbench-v2-roster"`,
-		`href="/rooms/plan/alpha"`,
 	} {
 		if !strings.Contains(html, want) {
 			t.Fatalf("missing %q in:\n%s", want, html)
 		}
 	}
-	if renderer.chatThreadID != "plan-alpha-thread" {
-		t.Fatalf("chat thread = %q", renderer.chatThreadID)
+	for _, unwanted := range []string{
+		`id="workbench-v2-roster"`,
+		`id="thread-chat"`,
+		`id="workbench-v2-chat-header"`,
+	} {
+		if strings.Contains(html, unwanted) {
+			t.Fatalf("thoughts is not fullscreen, found %q", unwanted)
+		}
 	}
 	overflowStart := strings.Index(html, `data-testid="workbench-overflow-actions"`)
 	if overflowStart < 0 {
