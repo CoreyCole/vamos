@@ -361,6 +361,48 @@ func TestHandleThoughtsArtifactSearchThisDirectoryShowsFullPath(t *testing.T) {
 	}
 }
 
+func TestHandleThoughtsArtifactSearchDirHitTogglesInsteadOfChangingCwd(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	mustMkdirAll(t, filepath.Join(root, "owner", "plans", "alpha", "docs"))
+	mustWriteFile(
+		t,
+		filepath.Join(root, "owner", "plans", "alpha", "design.md"),
+		[]byte("# Design"),
+	)
+	svc, err := NewService(root, nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	body := thoughtsArtifactSearchBody(
+		t,
+		svc,
+		"docs",
+		"thoughts/owner/plans/alpha/design.md",
+		"thoughts/owner/plans/alpha",
+	)
+	dirStart := strings.Index(body, `data-testid="artifact-search-this-directory"`)
+	globalStart := strings.Index(body, `data-testid="artifact-search-all-thoughts"`)
+	if dirStart < 0 || globalStart < 0 {
+		t.Fatalf("missing search sections: %s", body)
+	}
+	dirSection := body[dirStart:globalStart]
+	for _, want := range []string{
+		`data-thread-artifact-toggle`,
+		`<details`,
+		`data-on:toggle`,
+	} {
+		if !strings.Contains(dirSection, want) {
+			t.Fatalf("dir hit missing toggle %q: %s", want, dirSection)
+		}
+	}
+	if strings.Contains(dirSection, `data-thread-artifact-file`) {
+		t.Fatalf("dir hit should not be a file link: %s", dirSection)
+	}
+}
+
 func thoughtsArtifactSearchBody(
 	t *testing.T,
 	svc *Service,

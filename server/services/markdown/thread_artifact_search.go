@@ -14,10 +14,13 @@ import (
 )
 
 type ArtifactSearchHit struct {
-	Name  string
-	Path  string
-	Href  string
-	IsDir bool
+	Name           string
+	Path           string
+	Href           string
+	Endpoint       string
+	BrowseEndpoint string
+	TargetID       string
+	IsDir          bool
 }
 
 type ThreadArtifactBrowserResultsArgs struct {
@@ -25,13 +28,6 @@ type ThreadArtifactBrowserResultsArgs struct {
 	Entries   []ThreadArtifactEntry
 	Directory []ArtifactSearchHit
 	Global    []ArtifactSearchHit
-}
-
-func artifactSearchDirSuffix(isDir bool) string {
-	if isDir {
-		return "/"
-	}
-	return ""
 }
 
 func artifactSearchQueryMatch(query, name, itemPath string) bool {
@@ -178,12 +174,7 @@ func (s *Service) searchThoughtsNames(
 			if !artifactSearchQueryMatch(query, name, rel) {
 				return nil
 			}
-			hits = append(hits, ArtifactSearchHit{
-				Name:  name,
-				Path:  rel,
-				Href:  artifactSearchDirHref(selectedDoc, threadID, rel),
-				IsDir: true,
-			})
+			hits = append(hits, artifactSearchDirHit(name, rel, selectedDoc, threadID))
 		} else {
 			if !isThoughtsRenderableFile(name) {
 				return nil
@@ -231,4 +222,36 @@ func artifactSearchDirHref(selectedDoc, threadID, dirPath string) string {
 		return ThreadArtifactHrefAtDirectory(threadID, dirPath, dirPath)
 	}
 	return thoughtsArtifactPageURL(selectedDoc, dirPath)
+}
+
+func artifactSearchDirHit(name, rel, selectedDoc, threadID string) ArtifactSearchHit {
+	hit := ArtifactSearchHit{
+		Name:     name,
+		Path:     rel,
+		Href:     artifactSearchDirHref(selectedDoc, threadID, rel),
+		TargetID: threadArtifactDirectoryID(rel),
+		IsDir:    true,
+	}
+	if strings.TrimSpace(threadID) != "" {
+		hit.Endpoint = ThreadArtifactDirectoryEndpointForBrowser(
+			threadID, rel, selectedDoc, rel,
+		)
+		hit.BrowseEndpoint = ThreadArtifactBrowserEndpoint(threadID, selectedDoc, rel)
+		return hit
+	}
+	hit.Endpoint = thoughtsArtifactDirectoryEndpoint(rel, selectedDoc, rel)
+	hit.BrowseEndpoint = thoughtsArtifactBrowserEndpoint(selectedDoc, rel)
+	return hit
+}
+
+func artifactSearchHitEntry(hit ArtifactSearchHit) ThreadArtifactEntry {
+	return ThreadArtifactEntry{
+		Name:           hit.Name,
+		Path:           hit.Path,
+		Endpoint:       hit.Endpoint,
+		BrowseHref:     hit.Href,
+		BrowseEndpoint: hit.BrowseEndpoint,
+		TargetID:       hit.TargetID,
+		IsDir:          true,
+	}
 }

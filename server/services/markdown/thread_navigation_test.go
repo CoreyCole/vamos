@@ -223,6 +223,7 @@ func TestThreadArtifactBrowserSearchLivesInPathHeader(t *testing.T) {
 		`dataset.artifactSearchEndpoint`,
 		`ArrowDown`,
 		`Tab`,
+		`data-thread-artifact-toggle`,
 	} {
 		if !strings.Contains(header, want) {
 			t.Fatalf("header search missing %q: %s", want, header)

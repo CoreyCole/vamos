@@ -263,18 +263,22 @@ templ artifactSearchSection(title, testID string, hits []ArtifactSearchHit, show
 }
 
 templ artifactSearchHitRow(hit ArtifactSearchHit, showPath bool) {
-	<li class="relative z-0">
-		<a
-			href={ templ.URL(hit.Href) }
-			data-thread-artifact-file
-			class="relative z-0 block min-w-0 rounded-r px-2 py-1 text-xs text-muted-foreground transition-colors border-l-2 border-transparent hover:bg-muted/60 hover:text-foreground focus-visible:bg-muted/60 focus-visible:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-		>
-			<span class="block truncate">{ hit.Name }{ artifactSearchDirSuffix(hit.IsDir) }</span>
-			if showPath {
-				<span class="block truncate text-[10px] text-muted-foreground">{ threadArtifactDirectoryIdentity(hit.Path) }</span>
-			}
-		</a>
-	</li>
+	if hit.IsDir {
+		@ThreadArtifactDirectory(artifactSearchHitEntry(hit))
+	} else {
+		<li class="relative z-0">
+			<a
+				href={ templ.URL(hit.Href) }
+				data-thread-artifact-file
+				class="relative z-0 block min-w-0 rounded-r px-2 py-1 text-xs text-muted-foreground transition-colors border-l-2 border-transparent hover:bg-muted/60 hover:text-foreground focus-visible:bg-muted/60 focus-visible:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+			>
+				<span class="block truncate">{ hit.Name }</span>
+				if showPath {
+					<span class="block truncate text-[10px] text-muted-foreground">{ threadArtifactDirectoryIdentity(hit.Path) }</span>
+				}
+			</a>
+		</li>
+	}
 }
 
 templ ThreadArtifactBrowserEntry(entry ThreadArtifactEntry) {

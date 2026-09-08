@@ -344,12 +344,16 @@ func artifactBrowserSearchClearAction() string {
 	return "$_dirSearchOpen = false; $dirSearch = ''; " + artifactBrowserSearchFetchAction()
 }
 
+func artifactBrowserSearchHitSelector() string {
+	return "#thread-artifact-browser-results [data-thread-artifact-toggle], #thread-artifact-browser-results a[data-thread-artifact-file]"
+}
+
 func artifactBrowserSearchFirstResultExpr() string {
-	return "document.querySelector('#thread-artifact-browser-results a[href]')"
+	return "document.querySelector('" + artifactBrowserSearchHitSelector() + "')"
 }
 
 func artifactBrowserSearchMoveFocusExpr() string {
-	return "(evt.preventDefault(), (function(){ var links = Array.from(document.querySelectorAll('#thread-artifact-browser-results a[href]')); var cur = evt.target.closest ? evt.target.closest('a') : null; var n = links.indexOf(cur) + (evt.key === 'ArrowUp' ? -1 : 1); if (n < 0) { var s = document.getElementById('artifact-browser-search'); if (s) s.focus(); return } if (links[n]) links[n].focus() })())"
+	return "(evt.preventDefault(), (function(){ var links = Array.from(document.querySelectorAll('" + artifactBrowserSearchHitSelector() + "')); var cur = evt.target.closest ? (evt.target.closest('[data-thread-artifact-toggle]') || evt.target.closest('a[data-thread-artifact-file]')) : null; var n = links.indexOf(cur) + (evt.key === 'ArrowUp' ? -1 : 1); if (n < 0) { var s = document.getElementById('artifact-browser-search'); if (s) s.focus(); return } if (links[n]) links[n].focus() })())"
 }
 
 func artifactBrowserSearchResultsKeydownAction() string {
