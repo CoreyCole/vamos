@@ -352,8 +352,10 @@ func artifactBrowserToggleKeydownAction() string {
 func artifactBrowserSearchHotkeyAction() string {
 	return "if ((evt.ctrlKey || evt.metaKey) && (evt.key === 'k' || evt.key === 'K')) { evt.preventDefault(); " +
 		artifactBrowserSearchFocusAction() +
-		" } else if ((evt.ctrlKey || evt.metaKey) && (evt.key === 'l' || evt.key === 'L')) { evt.preventDefault(); $_artifactBrowserOpen = true; try { document.cookie = 'wb2_artifact_browser=1; path=/; SameSite=Lax; Max-Age=31536000'; sessionStorage.setItem('workbench-v2:artifact-browser-open', '1') } catch (e) {}; requestAnimationFrame(function(){ " +
-		artifactBrowserFocusToggleExpr() + " }) }"
+		" } else if ((evt.ctrlKey || evt.metaKey) && (evt.key === 'l' || evt.key === 'L')) { evt.preventDefault(); " +
+		artifactBrowserToggleAction() +
+		"; if ($_artifactBrowserOpen) { requestAnimationFrame(function(){ " +
+		artifactBrowserFocusToggleExpr() + " }) } }"
 }
 
 func artifactBrowserSearchFetchAction() string {
