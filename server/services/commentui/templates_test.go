@@ -178,29 +178,76 @@ func TestCommentableMarkdownRendersStableTargetsAndHiddenFields(t *testing.T) {
 	}
 	menu := strings.Index(html, `aria-label="Section actions"`)
 	heading := strings.Index(html, `<h1>Intro</h1>`)
-	if menu < 0 || heading < 0 || !(menu < heading) {
+	toggle := strings.Index(html, `id="comment-toggle-`)
+	if menu < 0 || heading < 0 || toggle < 0 || !(menu < heading && heading < toggle) {
 		t.Fatalf(
-			"section 3-dot should sit left of title: menu=%d heading=%d\n%s",
+			"header order menu=%d heading=%d who-commented=%d\n%s",
 			menu,
 			heading,
+			toggle,
 			html,
 		)
 	}
 	for _, want := range []string{
 		`pl-7`,
+		`pr-16`,
 		`absolute left-0 top-1/2 z-10 flex h-7 w-7 -translate-x-full -translate-y-1/2 items-center justify-center`,
+		`absolute right-0 top-1/2 z-10 flex -translate-y-1/2 translate-x-full items-center`,
 	} {
 		if !strings.Contains(html, want) {
-			t.Fatalf("section 3-dot missing left-margin gutter %q in %s", want, html)
+			t.Fatalf("section gutters missing %q in %s", want, html)
 		}
 	}
-	if strings.Contains(html, `flex items-center gap-1">`) &&
-		strings.Contains(html, `justify-between`) {
-		t.Fatalf("section 3-dot should not sit inline with the title: %s", html)
+	if strings.Contains(html, `commentui-target flex items-center gap-1`) {
+		t.Fatalf(
+			"who-commented should not sit in the left gutter with the 3-dot: %s",
+			html,
+		)
 	}
 	if strings.Contains(html, `id="plans/raw/path.md`) ||
 		strings.Contains(html, ` style="`) {
 		t.Fatalf("render exposes raw paths in IDs or inline styles: %s", html)
+	}
+}
+
+func TestCommentableMarkdownOmitsWhoCommentedWhenSectionHasNoComments(t *testing.T) {
+	t.Parallel()
+
+	var buf bytes.Buffer
+	args := CommentableMarkdownArgs{
+		Surface: CommentSurfaceThoughts,
+		IDPrefix: SafeCommentTargetSlug(
+			"thoughts",
+			"thoughts/plan.md",
+		),
+		DocPath: "thoughts/plan.md",
+		Sections: []CommentSectionView{{
+			ID:          "section-1",
+			Title:       "Intro",
+			HeadingHTML: "<h1>Intro</h1>",
+			BodyHTML:    "<p>Hello</p>",
+		}},
+		Routes: CommentRoutes{Show: "/show"},
+	}
+	if err := CommentableMarkdown(args).Render(t.Context(), &buf); err != nil {
+		t.Fatalf("Render() error = %v", err)
+	}
+	html := buf.String()
+	if !strings.Contains(html, `aria-label="Section actions"`) {
+		t.Fatalf("missing left 3-dot: %s", html)
+	}
+	for _, unwanted := range []string{
+		`id="comment-toggle-`,
+		`Open 1 comments in context pane`,
+		`translate-x-full items-center`,
+	} {
+		if strings.Contains(html, unwanted) {
+			t.Fatalf(
+				"who-commented should be absent without comments, found %q: %s",
+				unwanted,
+				html,
+			)
+		}
 	}
 }
 

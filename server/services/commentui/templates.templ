@@ -180,11 +180,11 @@ templ DocumentPatchTarget(args CommentableMarkdownArgs, headingHint string) {
 
 templ CommentableMarkdown(args CommentableMarkdownArgs) {
 	<div class="relative min-h-full" data-signals="{}">
-		<div class="relative min-h-full min-w-0 pl-7" data-commentui-container="true" data-on:keydown__window={ selectionKeydownExpr(args.SelectionSignals) } data-on:mouseup__debounce.500ms.leading={ selectionMouseupExpr(args.SelectionSignals) }>
+		<div class="relative min-h-full min-w-0 pl-7 pr-16" data-commentui-container="true" data-on:keydown__window={ selectionKeydownExpr(args.SelectionSignals) } data-on:mouseup__debounce.500ms.leading={ selectionMouseupExpr(args.SelectionSignals) }>
 			if len(args.Sections) > 0 {
 				{{ documentThreads := DocumentComments(args.Comments) }}
 				if len(documentThreads) > 0 {
-					<div class="mb-2 flex justify-end">
+					<div class="relative mb-2 min-h-7">
 						@CommentTarget(DocumentTargetView(args, "Document", CommentTargetChromeVisible))
 					</div>
 				} else {
@@ -218,12 +218,15 @@ templ CommentableMarkdown(args CommentableMarkdownArgs) {
 						<div class="markdown-viewer prose prose-invert max-w-none">
 							if hasHeading {
 								<div class="relative">
-									<div class="absolute left-0 top-1/2 z-10 flex h-7 w-7 -translate-x-full -translate-y-1/2 items-center justify-center">
-										@CommentTarget(target)
-									</div>
+									if !omitSectionMenu(target) {
+										<div class="absolute left-0 top-1/2 z-10 flex h-7 w-7 -translate-x-full -translate-y-1/2 items-center justify-center">
+											@SectionMenu(target)
+										</div>
+									}
 									<div class="min-w-0 [&>h1]:!my-0 [&>h2]:!my-0 [&>h3]:!my-0 [&>h4]:!my-0 [&>h5]:!my-0 [&>h6]:!my-0">
 										@templ.Raw(section.HeadingHTML)
 									</div>
+									@CommentTarget(target)
 								</div>
 							} else {
 								@CommentTarget(target)
@@ -274,17 +277,19 @@ templ CommentTarget(args CommentTargetView) {
 				@HiddenFields(args.HiddenFields)
 			</div>
 		}
-	} else {
-		<div id={ args.ID } class="commentui-target flex items-center gap-1" data-comment-target="true">
-			if len(args.Threads) > 0 {
-				@CommentToggle(args)
-			}
+	} else if len(args.Threads) > 0 {
+		<div id={ args.ID } class="absolute right-0 top-1/2 z-10 flex -translate-y-1/2 translate-x-full items-center" data-comment-target="true">
+			@CommentToggle(args)
 			if omitSectionMenu(args) {
 				@HiddenFields(args.HiddenFields)
-			} else {
-				@SectionMenu(args)
 			}
 		</div>
+	} else if omitSectionMenu(args) {
+		<div id={ args.ID } class="h-0 w-0 overflow-visible" data-comment-target="true" aria-hidden="true">
+			@HiddenFields(args.HiddenFields)
+		</div>
+	} else {
+		<div id={ args.ID } class="h-0 w-0 overflow-visible" data-comment-target="true" aria-hidden="true"></div>
 	}
 }
 
