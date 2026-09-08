@@ -342,8 +342,25 @@ func artifactBrowserSearchFocusAction() string {
 	return "$_dirSearchOpen = true; requestAnimationFrame(function() { var n = document.getElementById('artifact-browser-search'); if (n) n.focus() })"
 }
 
+func artifactBrowserPersistOpenJS(open bool) string {
+	v := "0"
+	if open {
+		v = "1"
+	}
+	return "try { document.cookie = '" + artifactBrowserOpenCookie + "=" + v +
+		"; path=/; SameSite=Lax; Max-Age=31536000'; sessionStorage.setItem(" +
+		"'workbench-v2:artifact-browser-open', '" + v + "') } catch (e) {}"
+}
+
+func artifactBrowserCloseCookieJS() string {
+	return artifactBrowserPersistOpenJS(false)
+}
+
 func artifactBrowserToggleAction() string {
-	return "$_artifactBrowserOpen = !$_artifactBrowserOpen; try { var v = $_artifactBrowserOpen ? '1' : '0'; document.cookie = 'wb2_artifact_browser=' + v + '; path=/; SameSite=Lax; Max-Age=31536000'; sessionStorage.setItem('workbench-v2:artifact-browser-open', v) } catch (e) {}"
+	return "$_artifactBrowserOpen = !$_artifactBrowserOpen; " +
+		"try { var v = $_artifactBrowserOpen ? '1' : '0'; document.cookie = '" +
+		artifactBrowserOpenCookie +
+		"=' + v + '; path=/; SameSite=Lax; Max-Age=31536000'; sessionStorage.setItem('workbench-v2:artifact-browser-open', v) } catch (e) {}"
 }
 
 func artifactBrowserFocusToggleExpr() string {

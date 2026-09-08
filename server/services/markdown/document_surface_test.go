@@ -374,6 +374,8 @@ func TestDocumentSurfaceKeepsQRSPIChromeWithoutWorkspaceDocTree(t *testing.T) {
 		"AI-470",
 		"Design",
 		`aria-label="QRSPI flow"`,
+		`wb2_artifact_browser=0`,
+		"workbench-v2:artifact-browser-open",
 	} {
 		if !strings.Contains(html, want) {
 			t.Fatalf("QRSPI chrome missing %q in %s", want, html)

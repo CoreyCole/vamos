@@ -80,7 +80,7 @@ templ QRSPIArtifactContext(meta QRSPIMetadata) {
 						if item.Disabled {
 							<span class="rounded-md px-2 py-1 text-muted-foreground/60">{ item.Label }</span>
 						} else {
-							<a href={ templ.SafeURL(item.Href) } class={ "rounded-md px-2 py-1 transition-colors hover:bg-muted", templ.KV("bg-muted font-medium text-foreground", item.Current), templ.KV("text-muted-foreground", !item.Current) }>{ item.Label }</a>
+							<a href={ templ.SafeURL(item.Href) } data-on:click={ artifactBrowserCloseCookieJS() } class={ "rounded-md px-2 py-1 transition-colors hover:bg-muted", templ.KV("bg-muted font-medium text-foreground", item.Current), templ.KV("text-muted-foreground", !item.Current) }>{ item.Label }</a>
 						}
 					}
 				</nav>
