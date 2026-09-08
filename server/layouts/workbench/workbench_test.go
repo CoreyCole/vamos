@@ -1668,6 +1668,10 @@ func TestChatToggleClickActionClosesWhenAlreadyOpen(t *testing.T) {
 	if !strings.Contains(js, "if ($workbench.regions.workbenchV2Chat.visible)") {
 		t.Fatalf("chat should close on second click: %s", js)
 	}
+	if !strings.Contains(js, "workbenchApplyRegionVisible") ||
+		!strings.Contains(js, "workbenchReflow") {
+		t.Fatalf("chat toggle must paint visibility before reflow: %s", js)
+	}
 }
 
 func TestWorkbenchV2PreferencesKeepOnlyRatios(t *testing.T) {

@@ -15,6 +15,8 @@ func TestWorkbenchResizeReflowsVisibleColumnsOnThreadsToggle(t *testing.T) {
 	js := string(contents)
 	for _, want := range []string{
 		"function reflowVisibleRegionFlex(root)",
+		"function applyRegionVisible(regionID, visible)",
+		`getAttribute("data-workbench-visible")`,
 		`document.addEventListener("workbench-layout-reflow", reflowWorkbenchFromEvent)`,
 		`grow.toFixed(4) + " 1 0%"`,
 	} {

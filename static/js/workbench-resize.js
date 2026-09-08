@@ -16,8 +16,28 @@ function allRegions(root) {
 }
 
 function isVisible(region) {
+  const flag = region.getAttribute("data-workbench-visible");
+  if (flag === "true") return true;
+  if (flag === "false") return false;
   return window.getComputedStyle(region).display !== "none";
 }
+
+function applyRegionVisible(regionID, visible) {
+  const region = document.querySelector(
+    "[data-workbench-region='" + regionID + "']",
+  );
+  if (!region) return;
+  region.setAttribute("data-workbench-visible", visible ? "true" : "false");
+  region.classList.toggle("hidden", !visible);
+  region.classList.toggle("md:!hidden", !visible);
+  region.classList.toggle("md:!flex", visible);
+}
+
+window.workbenchApplyRegionVisible = applyRegionVisible;
+window.workbenchReflow = function () {
+  const root = document.getElementById("workbench-root");
+  if (root) reflowVisibleRegionFlex(root);
+};
 
 function visibleRegions(root) {
   return allRegions(root).filter(isVisible);
