@@ -330,10 +330,22 @@ func artifactBrowserSearchFocusAction() string {
 	return "$_dirSearchOpen = true; requestAnimationFrame(function() { var n = document.getElementById('artifact-browser-search'); if (n) n.focus() })"
 }
 
+func artifactBrowserToggleAction() string {
+	return "$_artifactBrowserOpen = !$_artifactBrowserOpen; try { var v = $_artifactBrowserOpen ? '1' : '0'; document.cookie = 'wb2_artifact_browser=' + v + '; path=/; SameSite=Lax; Max-Age=31536000'; sessionStorage.setItem('workbench-v2:artifact-browser-open', v) } catch (e) {}"
+}
+
+func artifactBrowserToggleKeydownAction() string {
+	return "$_artifactBrowserOpen && (evt.key === 'ArrowDown' || (evt.key === 'Tab' && !evt.shiftKey)) ? (evt.preventDefault(), " +
+		artifactBrowserSearchFirstResultExpr() + "?.focus()) : null"
+}
+
 func artifactBrowserSearchHotkeyAction() string {
 	return "if ((evt.ctrlKey || evt.metaKey) && (evt.key === 'k' || evt.key === 'K')) { evt.preventDefault(); " +
 		artifactBrowserSearchFocusAction() +
-		" }"
+		" } else if ((evt.ctrlKey || evt.metaKey) && (evt.key === 'l' || evt.key === 'L')) { evt.preventDefault(); " +
+		artifactBrowserToggleAction() +
+		"; if ($_artifactBrowserOpen) { " + artifactBrowserSearchFirstResultExpr() +
+		"?.focus() } }"
 }
 
 func artifactBrowserSearchFetchAction() string {
@@ -353,11 +365,11 @@ func artifactBrowserSearchFirstResultExpr() string {
 }
 
 func artifactBrowserSearchMoveFocusExpr() string {
-	return "(evt.preventDefault(), (function(){ var links = Array.from(document.querySelectorAll('" + artifactBrowserSearchHitSelector() + "')); var cur = evt.target.closest ? (evt.target.closest('[data-thread-artifact-toggle]') || evt.target.closest('a[data-thread-artifact-file]')) : null; var n = links.indexOf(cur) + (evt.key === 'ArrowUp' ? -1 : 1); if (n < 0) { var s = document.getElementById('artifact-browser-search'); if (s) s.focus(); return } if (links[n]) links[n].focus() })())"
+	return "(function(){ var links = Array.from(document.querySelectorAll('" + artifactBrowserSearchHitSelector() + "')); var cur = evt.target.closest ? (evt.target.closest('[data-thread-artifact-toggle]') || evt.target.closest('a[data-thread-artifact-file]')) : null; var d = evt.key === 'ArrowUp' || (evt.key === 'Tab' && evt.shiftKey) ? -1 : 1; var n = links.indexOf(cur) + d; if (n < 0) { evt.preventDefault(); var s = document.getElementById('artifact-browser-search'); if (s && s.offsetParent !== null) { s.focus(); return } if (links[0]) links[0].focus(); return } if (n >= links.length) { if (evt.key !== 'Tab' || evt.shiftKey) { evt.preventDefault() } return } evt.preventDefault(); if (links[n]) links[n].focus() })()"
 }
 
 func artifactBrowserSearchResultsKeydownAction() string {
-	return "evt.key === 'ArrowDown' || evt.key === 'ArrowUp' ? " +
+	return "evt.key === 'ArrowDown' || evt.key === 'ArrowUp' || evt.key === 'Tab' ? " +
 		artifactBrowserSearchMoveFocusExpr() + " : null"
 }
 

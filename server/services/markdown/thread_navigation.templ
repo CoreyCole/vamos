@@ -94,7 +94,7 @@ templ ThreadArtifactPane(browser ThreadArtifactBrowserArgs, document templ.Compo
 				data-attr:aria-pressed="$_dirSearchOpen ? 'true' : 'false'"
 				class="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
 				aria-label="Search files"
-				title="Search files"
+				title="Search files (Ctrl+K)"
 				aria-pressed="false"
 			>
 				<svg class="h-3.5 w-3.5" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -108,7 +108,7 @@ templ ThreadArtifactPane(browser ThreadArtifactBrowserArgs, document templ.Compo
 				data-show="$_dirSearchOpen"
 				class="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
 				aria-label="Clear search"
-				title="Clear search"
+				title="Clear search (Esc)"
 				style="display: none;"
 			>
 				<svg class="h-3.5 w-3.5" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -121,14 +121,15 @@ templ ThreadArtifactPane(browser ThreadArtifactBrowserArgs, document templ.Compo
 					"inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground",
 					templ.KV("bg-muted text-foreground", browser.BrowserOpen),
 				}
-				data-on:click="$_artifactBrowserOpen = !$_artifactBrowserOpen; try { var v = $_artifactBrowserOpen ? '1' : '0'; document.cookie = 'wb2_artifact_browser=' + v + '; path=/; SameSite=Lax; Max-Age=31536000'; sessionStorage.setItem('workbench-v2:artifact-browser-open', v) } catch (e) {}"
+				data-on:click={ artifactBrowserToggleAction() }
+				data-on:keydown={ artifactBrowserToggleKeydownAction() }
 				data-attr:aria-expanded="$_artifactBrowserOpen ? 'true' : 'false'"
 				data-attr:aria-pressed="$_artifactBrowserOpen ? 'true' : 'false'"
 				data-class="{ 'bg-muted text-foreground': $_artifactBrowserOpen }"
 				data-attr:data-artifact-browser-open="$_artifactBrowserOpen ? '1' : '0'"
 				aria-controls="thread-artifact-browser"
 				aria-label="Toggle files"
-				title="Toggle files"
+				title="Toggle files (Ctrl+L)"
 				if browser.BrowserOpen {
 					aria-expanded="true"
 					aria-pressed="true"
@@ -319,6 +320,7 @@ templ ThreadArtifactDirectory(entry ThreadArtifactEntry) {
 				data-thread-artifact-toggle
 				class="flex min-h-8 cursor-pointer select-none items-center gap-1.5 rounded py-1 pl-2 pr-9 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
 				aria-controls={ threadArtifactChildrenID(entry) }
+				title="Expand or collapse (Enter)"
 			>
 				<span class="group-open:hidden" aria-hidden="true">▸</span>
 				<span class="hidden group-open:inline" aria-hidden="true">▾</span>
