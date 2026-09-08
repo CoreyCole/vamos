@@ -233,7 +233,7 @@ templ ThreadArtifactUp(browser ThreadArtifactBrowserArgs) {
 }
 
 templ ThreadArtifactBrowserResults(args ThreadArtifactBrowserResultsArgs) {
-	<div id="thread-artifact-browser-results" class="px-2.5 py-2" data-testid="artifact-browser-results">
+	<div id="thread-artifact-browser-results" class="px-2.5 py-2" data-testid="artifact-browser-results" data-on:keydown={ artifactBrowserSearchResultsKeydownAction() }>
 		if args.Query == "" {
 			<ul class="space-y-0.5">
 				for _, entry := range args.Entries {
@@ -267,7 +267,7 @@ templ artifactSearchHitRow(hit ArtifactSearchHit, showPath bool) {
 		<a
 			href={ templ.URL(hit.Href) }
 			data-thread-artifact-file
-			class="relative z-0 block min-w-0 rounded-r px-2 py-1 text-xs text-muted-foreground transition-colors border-l-2 border-transparent hover:bg-muted/60 hover:text-foreground"
+			class="relative z-0 block min-w-0 rounded-r px-2 py-1 text-xs text-muted-foreground transition-colors border-l-2 border-transparent hover:bg-muted/60 hover:text-foreground focus-visible:bg-muted/60 focus-visible:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
 		>
 			<span class="block truncate">{ hit.Name }{ artifactSearchDirSuffix(hit.IsDir) }</span>
 			if showPath {

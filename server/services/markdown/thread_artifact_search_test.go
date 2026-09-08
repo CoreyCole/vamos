@@ -135,6 +135,7 @@ func TestThreadArtifactBrowserWiresSearchEndpoint(t *testing.T) {
 	for _, want := range []string{
 		`id="thread-artifact-browser-results"`,
 		thoughtsArtifactSearchPath,
+		`ArrowUp`,
 	} {
 		if !strings.Contains(html, want) {
 			t.Fatalf("browser missing %q: %s", want, html)
@@ -352,6 +353,7 @@ func TestHandleThoughtsArtifactSearchThisDirectoryShowsFullPath(t *testing.T) {
 		"thoughts/owner/plans/alpha/design.md",
 		"thoughts/owner/plans/alpha/docs/design.md",
 		`text-[10px]`,
+		`focus-visible:ring-2`,
 	} {
 		if !strings.Contains(dirSection, want) {
 			t.Fatalf("this directory missing path %q: %s", want, dirSection)

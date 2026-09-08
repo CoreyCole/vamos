@@ -348,11 +348,20 @@ func artifactBrowserSearchFirstResultExpr() string {
 	return "document.querySelector('#thread-artifact-browser-results a[href]')"
 }
 
+func artifactBrowserSearchMoveFocusExpr() string {
+	return "(evt.preventDefault(), (function(){ var links = Array.from(document.querySelectorAll('#thread-artifact-browser-results a[href]')); var cur = evt.target.closest ? evt.target.closest('a') : null; var n = links.indexOf(cur) + (evt.key === 'ArrowUp' ? -1 : 1); if (n < 0) { var s = document.getElementById('artifact-browser-search'); if (s) s.focus(); return } if (links[n]) links[n].focus() })())"
+}
+
+func artifactBrowserSearchResultsKeydownAction() string {
+	return "evt.key === 'ArrowDown' || evt.key === 'ArrowUp' ? " +
+		artifactBrowserSearchMoveFocusExpr() + " : null"
+}
+
 func artifactBrowserSearchKeydownAction() string {
 	first := artifactBrowserSearchFirstResultExpr()
-	return "evt.key === 'Tab' && !evt.shiftKey ? (evt.preventDefault(), " + first +
-		"?.focus()) : evt.key === 'Enter' ? (evt.preventDefault(), " + first +
-		"?.click()) : evt.key === 'Escape' ? ($_dirSearchOpen = false, $dirSearch = '', " +
+	return "evt.key === 'ArrowDown' || (evt.key === 'Tab' && !evt.shiftKey) ? (evt.preventDefault(), " +
+		first + "?.focus()) : evt.key === 'Enter' ? (evt.preventDefault(), " +
+		first + "?.click()) : evt.key === 'Escape' ? ($_dirSearchOpen = false, $dirSearch = '', " +
 		artifactBrowserSearchFetchAction() +
 		") : null"
 }
