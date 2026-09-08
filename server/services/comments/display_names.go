@@ -34,7 +34,7 @@ func (s *Service) commentDisplayName(email string) string {
 			return titleCaseEmailLocalPart(local)
 		}
 	}
-	return trimmed
+	return local
 }
 
 func titleCaseEmailLocalPart(local string) string {

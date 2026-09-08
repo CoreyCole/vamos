@@ -1757,6 +1757,7 @@ func main() {
 	formsGroup.POST("/comments/cancel", commentService.HandleCancelCommentForm)
 	formsGroup.POST("/replies", commentService.HandleReplyForm)
 	formsGroup.POST("/resolve", commentService.HandleResolveComment)
+	formsGroup.POST("/reopen", commentService.HandleReopenComment)
 	sharedAppletService.RegisterFormRoutes(formsGroup)
 
 	// Protected routes - require authentication

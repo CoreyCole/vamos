@@ -165,7 +165,7 @@ func (s *Service) GetCommentsForFileInternal(
 		ctx,
 		db.ListDocumentCommentsParams{
 			DocPath:         documentPath,
-			IncludeResolved: int64(0),
+			IncludeResolved: int64(1),
 		},
 	)
 	if err != nil {
@@ -320,7 +320,7 @@ func (s *Service) GetCommentsForScopeInternal(
 		ctx,
 		db.ListWorkspaceDocumentCommentsParams{
 			WorkspaceRoot:   scope.RootDocPath,
-			IncludeResolved: int64(0),
+			IncludeResolved: int64(1),
 		},
 	)
 	if err != nil {

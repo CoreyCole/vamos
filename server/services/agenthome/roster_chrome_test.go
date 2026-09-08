@@ -83,6 +83,9 @@ func TestRosterRail_PinActionAndHrefs(t *testing.T) {
 		!strings.Contains(html, "flex h-7 min-w-0 flex-1") {
 		t.Fatal("search header must match other h-10 chrome with an h-7 well")
 	}
+	if !strings.Contains(html, "Hide roster sidebar (Ctrl+B)") {
+		t.Fatal("roster hide control must show Ctrl+B")
+	}
 	if !strings.Contains(html, "rounded-xl bg-white/[0.05]") {
 		t.Fatal("search must be a full-width rounded well")
 	}

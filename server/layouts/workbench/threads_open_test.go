@@ -50,6 +50,34 @@ func TestThreadsToggleClickActionsWriteCookieNotLayoutSave(t *testing.T) {
 	}
 }
 
+func TestThreadsToggleHotkeyActionUsesCtrlB(t *testing.T) {
+	t.Parallel()
+	got := ThreadsToggleHotkeyAction()
+	for _, want := range []string{
+		"evt.ctrlKey || evt.metaKey",
+		"evt.key === 'b' || evt.key === 'B'",
+		ThreadsOpenCookie + "=",
+		"visible === false",
+		"visible = false",
+	} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("hotkey missing %q: %s", want, got)
+		}
+	}
+	if !strings.Contains(ThreadsHideControlTitle(), "Ctrl+B") ||
+		!strings.Contains(ThreadsShowControlTitle(), "Ctrl+B") {
+		t.Fatal("tooltips must show Ctrl+B")
+	}
+}
+
+func TestThreadsReopenDataClassTreatsMissingVisibleAsHidden(t *testing.T) {
+	t.Parallel()
+	got := ThreadsReopenDataClass()
+	if !strings.Contains(got, "visible !== false") {
+		t.Fatalf("data-class = %q, want missing visible to keep hamburger hidden", got)
+	}
+}
+
 func TestThreadsOpenCookieDrivesEncodeWorkbenchSignals(t *testing.T) {
 	t.Parallel()
 

@@ -76,6 +76,9 @@ func AppletCommentUI(
 			Resolve: func(string) string {
 				return "/forms/resolve"
 			},
+			Reopen: func(string) string {
+				return "/forms/reopen"
+			},
 		},
 		HiddenFields: map[string]string{
 			"doc_path":     applet.IdentityPath,

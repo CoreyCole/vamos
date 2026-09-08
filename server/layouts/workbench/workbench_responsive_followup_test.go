@@ -63,7 +63,7 @@ func TestWorkbenchV2ThreadsHasIndependentHideAndReopenControls(t *testing.T) {
 	html := body.String()
 	for _, want := range []string{
 		`data-workbench-threads-reopen`,
-		`aria-label="Show threads sidebar"`,
+		`aria-label="Show roster sidebar (Ctrl+B)"`,
 		`$workbench.regions.workbenchV2Threads.visible = true`,
 		`wb2_threads_open=1`,
 		`/js/workbench-resize.js?v=10`,

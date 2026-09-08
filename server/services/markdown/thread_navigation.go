@@ -1,11 +1,13 @@
 package markdown
 
 import (
+	"context"
 	"crypto/sha256"
 	"database/sql"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/url"
 	"path"
@@ -16,6 +18,7 @@ import (
 	"github.com/starfederation/datastar-go/datastar"
 
 	"github.com/CoreyCole/vamos/server/layouts/workbench"
+	"github.com/CoreyCole/vamos/server/services/comments"
 	"github.com/CoreyCole/vamos/server/services/commentui"
 )
 
@@ -31,6 +34,8 @@ type ThreadArtifactEntry struct {
 	IsActive       bool
 	IsExpanded     bool
 	IsLoaded       bool
+	ResolvedCount  int
+	TotalCount     int
 	Children       []ThreadArtifactEntry
 }
 
@@ -468,6 +473,7 @@ func (s *Service) threadArtifactBrowser(
 	if err != nil {
 		return ThreadArtifactBrowserArgs{}, err
 	}
+	entries = s.withArtifactCommentCounts(c.Request().Context(), entries)
 	args := ThreadArtifactBrowserArgs{
 		ThreadID:      threadID,
 		DocPath:       docPath,
@@ -554,6 +560,66 @@ func (s *Service) buildThreadArtifactEntries(
 	return entries, nil
 }
 
+func (s *Service) withArtifactCommentCounts(
+	ctx context.Context,
+	entries []ThreadArtifactEntry,
+) []ThreadArtifactEntry {
+	if s.commentService == nil || len(entries) == 0 {
+		return entries
+	}
+	paths := artifactFilePaths(entries)
+	if len(paths) == 0 {
+		return entries
+	}
+	counts, err := s.commentService.CountsByDocPath(ctx, paths)
+	if err != nil || len(counts) == 0 {
+		return entries
+	}
+	return applyArtifactCommentCounts(entries, counts)
+}
+
+func artifactFilePaths(entries []ThreadArtifactEntry) []string {
+	var paths []string
+	var walk func([]ThreadArtifactEntry)
+	walk = func(items []ThreadArtifactEntry) {
+		for _, item := range items {
+			if item.IsDir {
+				walk(item.Children)
+				continue
+			}
+			if p := strings.TrimSpace(item.Path); p != "" {
+				paths = append(paths, p)
+			}
+		}
+	}
+	walk(entries)
+	return paths
+}
+
+func applyArtifactCommentCounts(
+	entries []ThreadArtifactEntry,
+	counts map[string]comments.DocCommentCount,
+) []ThreadArtifactEntry {
+	for i := range entries {
+		if entries[i].IsDir {
+			entries[i].Children = applyArtifactCommentCounts(entries[i].Children, counts)
+			continue
+		}
+		if count, ok := counts[entries[i].Path]; ok {
+			entries[i].ResolvedCount = count.Resolved
+			entries[i].TotalCount = count.Total
+		}
+	}
+	return entries
+}
+
+func artifactCommentCountLabel(entry ThreadArtifactEntry) string {
+	if entry.TotalCount <= 0 {
+		return ""
+	}
+	return fmt.Sprintf("%d/%d", entry.ResolvedCount, entry.TotalCount)
+}
+
 func (s *Service) loadedThreadArtifactDirectory(
 	c echo.Context,
 	threadID, rawDir string,
@@ -586,6 +652,7 @@ func (s *Service) loadedThreadArtifactDirectory(
 	if err != nil {
 		return ThreadArtifactEntry{}, err
 	}
+	children = s.withArtifactCommentCounts(c.Request().Context(), children)
 	name := path.Base(dirPath)
 	if dirPath == "" {
 		name = "thoughts"
@@ -715,6 +782,7 @@ func (s *Service) thoughtsDirectoryArtifactBrowser(
 	if err != nil {
 		return ThreadArtifactBrowserArgs{}, err
 	}
+	entries = s.withArtifactCommentCounts(c.Request().Context(), entries)
 	args := ThreadArtifactBrowserArgs{
 		DocPath:       canonical,
 		DirectoryPath: canonical,

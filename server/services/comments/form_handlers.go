@@ -86,6 +86,9 @@ func thoughtsCommentRoutes() commentui.CommentRoutes {
 		Resolve: func(string) string {
 			return "/forms/resolve"
 		},
+		Reopen: func(string) string {
+			return "/forms/reopen"
+		},
 	}
 }
 
@@ -173,7 +176,7 @@ func (s *Service) thoughtsCommentTarget(
 		SectionID:    sectionID,
 		HeadingHint:  headingHint,
 		UserEmail:    userEmail,
-		Threads:      s.thoughtsCommentThreads(comments),
+		Threads:      s.thoughtsCommentThreads(filterUnresolvedComments(comments)),
 		Routes:       thoughtsCommentRoutes(),
 		HiddenFields: hiddenFields,
 	})
@@ -764,6 +767,87 @@ func (s *Service) HandleResolveComment(c echo.Context) error {
 		return err
 	}
 	return patchOpenCommentsSignal(sse, workbenchV2)
+}
+
+func (s *Service) HandleReopenComment(c echo.Context) error {
+	userEmail, ok := c.Get("user_email").(string)
+	if !ok || userEmail == "" {
+		return echo.NewHTTPError(http.StatusUnauthorized, "user not authenticated")
+	}
+
+	commentID := c.FormValue("comment_id")
+	filePath := c.FormValue("doc_path")
+	if commentID == "" {
+		return echo.NewHTTPError(http.StatusBadRequest, "comment ID is required")
+	}
+	if filePath == "" {
+		return echo.NewHTTPError(http.StatusBadRequest, "file path is required")
+	}
+
+	comment, err := s.queries.GetDocumentComment(c.Request().Context(), commentID)
+	if err != nil {
+		c.Logger().Errorf("Failed to get comment %s: %v", commentID, err)
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to get comment")
+	}
+
+	sectionID := comment.SectionHint.String
+	if !comment.SectionHint.Valid || sectionID == "" {
+		sectionID = "document"
+	}
+
+	if err := s.UnresolveComment(c.Request().Context(), commentID); err != nil {
+		c.Logger().Errorf("Failed to reopen comment %s: %v", commentID, err)
+		return echo.NewHTTPError(
+			http.StatusInternalServerError,
+			"failed to reopen comment",
+		)
+	}
+
+	response, err := s.GetCommentsForFileInternal(c.Request().Context(), filePath)
+	if err != nil {
+		c.Logger().
+			Errorf("Failed to fetch updated comments for file %s: %v", filePath, err)
+		return err
+	}
+
+	sectionComments := filterCommentsBySection(response.Comments, sectionID)
+	sse := datastar.NewSSE(c.Response().Writer, c.Request())
+	workbenchV2 := c.FormValue("workbench_v2") == "1"
+
+	target := s.thoughtsCommentTarget(
+		filePath,
+		sectionID,
+		"",
+		userEmail,
+		sectionComments,
+		thoughtsCommentTargetOptions{WorkbenchV2: workbenchV2},
+	)
+	if err := patchThoughtsCommentTarget(sse, target); err != nil {
+		return err
+	}
+	if err := s.patchThoughtsCommentsPanel(
+		sse,
+		filePath,
+		userEmail,
+		sectionID,
+		comment.HeadingHint.String,
+		response.Comments,
+		workbenchV2,
+	); err != nil {
+		return err
+	}
+	return patchOpenCommentsSignal(sse, workbenchV2)
+}
+
+func filterUnresolvedComments(comments []CommentWithReplies) []CommentWithReplies {
+	out := make([]CommentWithReplies, 0, len(comments))
+	for _, item := range comments {
+		if item.Comment.Resolved {
+			continue
+		}
+		out = append(out, item)
+	}
+	return out
 }
 
 // HandleExpandSectionComments handles expanding section comments on mobile

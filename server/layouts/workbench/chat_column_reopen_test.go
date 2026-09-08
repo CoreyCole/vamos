@@ -29,6 +29,9 @@ func TestChatColumnWithReopen_ClosedShowsVisibleSlot(t *testing.T) {
 		!strings.Contains(out, `aria-label="Share"`) {
 		t.Fatalf("chat header missing avatar or share: %s", out)
 	}
+	if !strings.Contains(out, "Show roster sidebar (Ctrl+B)") {
+		t.Fatalf("reopen tooltip must show Ctrl+B: %s", out)
+	}
 	if strings.Contains(out, "/new") {
 		t.Fatalf("chat header must not offer /new: %s", out)
 	}
@@ -70,6 +73,9 @@ func TestChatColumnWithReopen_OpenHidesHamburgerSlot(t *testing.T) {
 			"open threads should hide hamburger so title is left-aligned: %s",
 			classVal,
 		)
+	}
+	if !strings.Contains(out, "visible !== false") {
+		t.Fatalf("reopen data-class must not flash open before signals hydrate: %s", out)
 	}
 	if strings.Contains(classVal, "invisible") {
 		t.Fatalf("hidden hamburger must not keep layout space: %s", classVal)

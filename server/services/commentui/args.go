@@ -155,6 +155,7 @@ type CommentsPanelArgs struct {
 	HiddenFields       map[string]string
 	UserEmail          string
 	Form               *CommentFormView
+	ThreadsOpen        bool
 }
 
 type CommentThreadOptions struct {
@@ -176,6 +177,7 @@ func BuildCommentsPanelArgs(
 		Routes:       args.Routes,
 		HiddenFields: args.HiddenFields,
 		UserEmail:    args.UserEmail,
+		ThreadsOpen:  true,
 	}
 }
 
@@ -348,6 +350,9 @@ func CommentsForSection(
 	sectionID = sectionOrDocument(sectionID)
 	out := make([]CommentThreadView, 0)
 	for _, thread := range threads {
+		if thread.Resolved {
+			continue
+		}
 		threadSection := sectionOrDocument(thread.SectionID)
 		if threadSection == sectionID ||
 			(headingHint != "" && thread.HeadingHint == headingHint) {

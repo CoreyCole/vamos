@@ -70,7 +70,14 @@ func commentsThreadsShowClick() string {
 }
 
 func commentsThreadsReopenClass() string {
-	return "{'hidden': $workbench.regions.workbenchV2Threads.visible}"
+	return "{'hidden': $workbench.regions.workbenchV2Threads.visible !== false}"
+}
+
+func commentsThreadsReopenAriaHidden(threadsOpen bool) string {
+	if threadsOpen {
+		return "true"
+	}
+	return "false"
 }
 
 func selectionTriggerSubmitExpr(args SelectionSignalArgs) string {
@@ -407,7 +414,7 @@ templ SidebarResolvedThreadChip(thread CommentThreadView, target CommentTargetVi
 	<div class="flex items-center gap-2 rounded-md border border-border/70 bg-muted/30 px-2 py-1.5 text-xs text-muted-foreground">
 		<span class="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-emerald-500/10 text-[10px] font-medium text-emerald-200">✓</span>
 		<span class="min-w-0 flex-1 truncate">{ commentDisplayName(thread) }</span>
-		<span class="text-[11px] text-emerald-200">Resolved</span>
+		<span class="text-[11px] text-emerald-200">Archived</span>
 	</div>
 }
 
@@ -496,8 +503,8 @@ templ CommentForm(view CommentFormView) {
 templ CommentsContextPanel(args CommentsPanelArgs) {
 	<aside id={ CommentsContextPanelID } class="flex h-full min-h-0 flex-col overflow-hidden bg-background">
 		<div class="flex h-10 min-h-10 max-h-10 shrink-0 items-center gap-2 border-b border-border px-2.5">
-			<div id="workbench-v2-comments-threads-reopen" class="workbench-chrome flex h-7 w-7 shrink-0 items-center justify-center" data-class={ commentsThreadsReopenClass() } aria-hidden="true">
-				<button type="button" data-workbench-threads-reopen class="inline-flex h-7 w-7 items-center justify-center rounded-md border border-border bg-background text-muted-foreground shadow-sm transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" data-on:click={ commentsThreadsShowClick() } aria-controls="workbench-v2-threads" aria-label="Show threads sidebar" title="Show threads sidebar">
+			<div id="workbench-v2-comments-threads-reopen" class={ "workbench-chrome flex h-7 w-7 shrink-0 items-center justify-center", templ.KV("hidden", args.ThreadsOpen) } data-class={ commentsThreadsReopenClass() } aria-hidden={ commentsThreadsReopenAriaHidden(args.ThreadsOpen) }>
+				<button type="button" data-workbench-threads-reopen class="inline-flex h-7 w-7 items-center justify-center rounded-md border border-border bg-background text-muted-foreground shadow-sm transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" data-on:click={ commentsThreadsShowClick() } aria-controls="workbench-v2-threads" aria-label="Show roster sidebar (Ctrl+B)" title="Show roster sidebar (Ctrl+B)">
 					<svg class="h-4 w-4" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
 				</button>
 			</div>
@@ -523,14 +530,23 @@ templ CommentsContextPanel(args CommentsPanelArgs) {
 			</div>
 		}
 		<div id={ CommentsContextThreadListID } class="min-h-0 flex-1 space-y-3 overflow-y-auto p-3">
-			if len(args.Threads) == 0 {
+			{{ openThreads := unresolvedThreads(args.Threads) }}
+			{{ archivedThreads := resolvedThreads(args.Threads) }}
+			if len(openThreads) == 0 && len(archivedThreads) == 0 {
 				<p class="rounded-md border border-dashed border-border p-3 text-sm text-muted-foreground">No comments yet.</p>
 			} else {
-				for _, thread := range unresolvedThreads(args.Threads) {
+				for _, thread := range openThreads {
 					@CommentThreadCard(thread, panelThreadTarget(args, thread), CommentThreadOptions{ShowSection: true, ShowSelectedText: true})
 				}
-				for _, thread := range resolvedThreads(args.Threads) {
-					@CommentThreadCard(thread, panelThreadTarget(args, thread), CommentThreadOptions{ShowSection: true, ShowSelectedText: true, Compact: true})
+				if len(archivedThreads) > 0 {
+					<details id="comments-archived" class="rounded-md border border-border/70 bg-muted/20">
+						<summary class="cursor-pointer px-2 py-1.5 text-xs font-medium text-muted-foreground">Archived ({ fmt.Sprintf("%d", len(archivedThreads)) })</summary>
+						<div id="comments-archived-list" class="space-y-3 border-t border-border/70 p-2">
+							for _, thread := range archivedThreads {
+								@CommentThreadCard(thread, panelThreadTarget(args, thread), CommentThreadOptions{ShowSection: true, ShowSelectedText: true, Compact: true})
+							}
+						</div>
+					</details>
 				}
 			}
 		</div>
@@ -572,7 +588,7 @@ templ CommentCard(view CommentThreadView, target CommentTargetView) {
 					</form>
 				}
 				if view.Resolved {
-					<span class="rounded-full bg-emerald-500/10 px-2 py-0.5 text-[11px] text-emerald-200">Resolved</span>
+					<span class="rounded-full bg-emerald-500/10 px-2 py-0.5 text-[11px] text-emerald-200">Archived</span>
 				} else {
 					<span class="rounded-full bg-amber-500/10 px-2 py-0.5 text-[11px] text-amber-200">Open</span>
 				}
@@ -598,7 +614,7 @@ templ ReplyItem(reply CommentReplyView) {
 }
 
 templ ReplyForm(view CommentThreadView, target CommentTargetView) {
-	if replyRoute(target.Routes, view.ID) != "" {
+	if !view.Resolved && replyRoute(target.Routes, view.ID) != "" {
 		{{ replyTextSignal := ReplyTextSignalKey(view.ID) }}
 		<form class="flex items-start gap-2" method="post" data-signals={ "{" + replyTextSignal + ": ''}" } data-on:submit__prevent={ preventSubmitPostExpr(replyRoute(target.Routes, view.ID)) }>
 			@HiddenFields(MergeHidden(target.HiddenFields, view.HiddenFields))
@@ -623,7 +639,7 @@ templ ActionForms(view CommentThreadView, target CommentTargetView) {
 			<form data-on:submit__prevent={ preventSubmitPostExpr(resolveRoute(target.Routes, view.ID)) }>
 				@HiddenFields(MergeHidden(target.HiddenFields, view.HiddenFields))
 				<input type="hidden" name="request_id" value={ "resolve-" + view.ID }/>
-				<button type="submit" class="text-xs text-muted-foreground hover:text-foreground">Resolve</button>
+				<button type="submit" class="text-xs text-muted-foreground hover:text-foreground">Archive</button>
 			</form>
 		}
 	}

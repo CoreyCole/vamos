@@ -9,6 +9,7 @@ templ Workbench(state WorkbenchState) {
 		data-workbench-viewport-class={ string(state.ViewportClass) }
 		data-workbench-mobile-active={ SignalKeyForID(state.Config.Mobile.ActiveRegionID) }
 		data-attr:data-workbench-focused="$workbench.focused ? 'true' : 'false'"
+		data-on:keydown__window={ ThreadsToggleHotkeyAction() }
 		class="flex h-full min-h-0 w-full overflow-hidden p-0"
 	>
 		<script type="module" src="/js/workbench-resize.js?v=16"></script>
@@ -35,7 +36,7 @@ templ ThreadsReopenControl(threadsOpen bool, controlID string) {
 	<div
 		id={ controlID }
 		class={ "workbench-chrome flex h-7 w-7 shrink-0 items-center justify-center", templ.KV("hidden", threadsOpen) }
-		data-class={ "{'hidden': $workbench.regions.workbenchV2Threads.visible}" }
+		data-class={ ThreadsReopenDataClass() }
 		aria-hidden={ threadsOpenAriaHidden(threadsOpen) }
 	>
 		<button
@@ -44,8 +45,8 @@ templ ThreadsReopenControl(threadsOpen bool, controlID string) {
 			class="inline-flex h-7 w-7 items-center justify-center rounded-md border border-border bg-background text-muted-foreground shadow-sm transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
 			data-on:click={ ThreadsShowClickAction("workbenchV2Threads") }
 			aria-controls="workbench-v2-threads"
-			aria-label="Show threads sidebar"
-			title="Show threads sidebar"
+			aria-label={ ThreadsShowControlTitle() }
+			title={ ThreadsShowControlTitle() }
 		>
 			<svg class="h-4 w-4" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 				<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>

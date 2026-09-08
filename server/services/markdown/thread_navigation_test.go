@@ -184,6 +184,34 @@ func TestThreadArtifactPaneScopesStaticHandlersToBrowserRows(t *testing.T) {
 	}
 }
 
+func TestThreadArtifactBrowserEntryShowsResolvedTotalCount(t *testing.T) {
+	t.Parallel()
+
+	var withCount, withoutCount bytes.Buffer
+	if err := ThreadArtifactBrowserEntry(ThreadArtifactEntry{
+		Name:          "design.md",
+		Path:          "thoughts/owner/plans/alpha/design.md",
+		Href:          "/threads/thread_1?artifact=thoughts%2Fowner%2Fplans%2Falpha%2Fdesign.md",
+		ResolvedCount: 0,
+		TotalCount:    3,
+	}).Render(t.Context(), &withCount); err != nil {
+		t.Fatal(err)
+	}
+	if got := withCount.String(); !strings.Contains(got, ">0/3<") {
+		t.Fatalf("missing resolved/total count: %s", got)
+	}
+	if err := ThreadArtifactBrowserEntry(ThreadArtifactEntry{
+		Name: "notes.md",
+		Path: "thoughts/owner/plans/alpha/notes.md",
+		Href: "/threads/thread_1?artifact=thoughts%2Fowner%2Fplans%2Falpha%2Fnotes.md",
+	}).Render(t.Context(), &withoutCount); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(withoutCount.String(), "0/0") {
+		t.Fatalf("zero-count file should omit badge: %s", withoutCount.String())
+	}
+}
+
 func TestThreadArtifactBrowserDirectoryCanonicalizesRootFileParent(t *testing.T) {
 	t.Parallel()
 

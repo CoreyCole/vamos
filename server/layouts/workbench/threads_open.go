@@ -46,3 +46,31 @@ func ThreadsShowClickAction(signalKey string) string {
 	return "$workbench.regions." + signalKey + ".visible = true; " +
 		threadsOpenCookieWriteJS(true) + "; " + threadsLayoutReflowJS()
 }
+
+func ThreadsToggleHotkeyAction() string {
+	return "if ((evt.ctrlKey || evt.metaKey) && !evt.altKey && !evt.shiftKey && (evt.key === 'b' || evt.key === 'B')) { " +
+		"var n = evt.target; if (n && (n.tagName === 'INPUT' || n.tagName === 'TEXTAREA' || n.tagName === 'SELECT' || n.isContentEditable)) { return } " +
+		"evt.preventDefault(); " +
+		"if ($workbench.regions.workbenchV2Threads.visible === false) { " +
+		ThreadsShowClickAction(
+			"workbenchV2Threads",
+		) +
+		" } else { " +
+		ThreadsHideClickAction() +
+		" } }"
+}
+
+func ThreadsHideControlTitle() string {
+	return "Hide roster sidebar (Ctrl+B)"
+}
+
+func ThreadsShowControlTitle() string {
+	return "Show roster sidebar (Ctrl+B)"
+}
+
+// ThreadsReopenDataClass hides the hamburger unless threads are explicitly closed.
+// Missing/undefined visible must stay hidden so Datastar hydrate cannot flash the
+// control open for a frame on thread/room GET (default cookie is threads open).
+func ThreadsReopenDataClass() string {
+	return "{'hidden': $workbench.regions.workbenchV2Threads.visible !== false}"
+}

@@ -684,7 +684,8 @@ func TestCommentSharedPatchTargetsRenderStableIDs(t *testing.T) {
 		`aria-label="Add comment"`,
 		`/forms/comments/show`,
 		`id="workbench-v2-comments-threads-reopen"`,
-		`aria-label="Show threads sidebar"`,
+		`aria-label="Show roster sidebar (Ctrl+B)"`,
+		`visible !== false`,
 	} {
 		if !strings.Contains(panelHTML, want) {
 			t.Fatalf("context panel missing %q: %s", want, panelHTML)
@@ -695,6 +696,12 @@ func TestCommentSharedPatchTargetsRenderStableIDs(t *testing.T) {
 			"comments header should match doc header height, not a two-line label: %s",
 			panelHTML,
 		)
+	}
+	idx := strings.Index(panelHTML, `id="workbench-v2-comments-threads-reopen"`)
+	end := strings.Index(panelHTML[idx:], ">")
+	openTag := panelHTML[idx : idx+end]
+	if !strings.Contains(openTag, "hidden") {
+		t.Fatalf("open threads should SSR-hide comments hamburger: %s", openTag)
 	}
 
 	var mobile bytes.Buffer
@@ -785,6 +792,60 @@ func TestCommentsContextPanelShowsAllSectionsWithSectionTitles(t *testing.T) {
 	}
 	if strings.Contains(html, `>section-13<`) || strings.Contains(html, `>section-14<`) {
 		t.Fatalf("context panel rendered section ids instead of titles: %s", html)
+	}
+}
+
+func TestCommentsContextPanelArchivesResolvedInCollapsedSection(t *testing.T) {
+	t.Parallel()
+
+	args := BuildCommentsPanelArgs(CommentableMarkdownArgs{
+		Surface:  CommentSurfaceThoughts,
+		IDPrefix: SafeCommentTargetSlug("thoughts", "thoughts/plan.md"),
+		DocPath:  "thoughts/plan.md",
+		Routes: CommentRoutes{
+			Resolve: func(string) string { return "/forms/resolve" },
+			Reopen:  func(string) string { return "/forms/reopen" },
+		},
+		HiddenFields: map[string]string{"doc_path": "thoughts/plan.md"},
+		Comments: []CommentThreadView{
+			{
+				ID:          "open-1",
+				AuthorEmail: "a@example.com",
+				Body:        "open body",
+				SectionID:   "section-0",
+				HeadingHint: "Alpha design",
+			},
+			{
+				ID:          "done-1",
+				AuthorEmail: "a@example.com",
+				Body:        "archived body",
+				SectionID:   "section-0",
+				HeadingHint: "Alpha design",
+				Resolved:    true,
+			},
+		},
+	}, "")
+
+	var buf bytes.Buffer
+	if err := CommentsContextPanel(args).Render(t.Context(), &buf); err != nil {
+		t.Fatalf("Render() error = %v", err)
+	}
+	html := buf.String()
+	for _, want := range []string{
+		`open body`,
+		`Archive`,
+		`id="comments-archived"`,
+		`Archived (1)`,
+		`archived body`,
+		`/forms/reopen`,
+		`Reopen`,
+	} {
+		if !strings.Contains(html, want) {
+			t.Fatalf("context panel missing %q: %s", want, html)
+		}
+	}
+	if strings.Contains(html, `>Resolve<`) {
+		t.Fatalf("open comment still uses Resolve: %s", html)
 	}
 }
 

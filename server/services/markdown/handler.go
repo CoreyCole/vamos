@@ -371,6 +371,9 @@ func (s *Service) buildCommentUI(
 			Resolve: func(string) string {
 				return "/forms/resolve"
 			},
+			Reopen: func(string) string {
+				return "/forms/reopen"
+			},
 		},
 		HiddenFields:     hiddenFields,
 		SelectionSignals: selection,
@@ -1061,6 +1064,9 @@ func (s *Service) HandleOpenCommentsInPlace(c echo.Context) error {
 			},
 			Resolve: func(string) string {
 				return "/forms/resolve"
+			},
+			Reopen: func(string) string {
+				return "/forms/reopen"
 			},
 		},
 		HiddenFields: hiddenFields,

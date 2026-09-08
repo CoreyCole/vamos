@@ -295,12 +295,15 @@ templ ThreadArtifactBrowserEntry(entry ThreadArtifactEntry) {
 					aria-current="page"
 				}
 				class={
-					"relative z-0 block min-w-0 truncate rounded-r px-2 py-1 text-xs transition-colors border-l-2 focus:outline-none focus:ring-2 focus:ring-ring",
+					"relative z-0 flex min-w-0 items-center justify-between gap-2 rounded-r px-2 py-1 text-xs transition-colors border-l-2 focus:outline-none focus:ring-2 focus:ring-ring",
 					templ.KV("border-primary bg-muted font-medium text-foreground", entry.IsActive),
 					templ.KV("border-transparent text-muted-foreground hover:bg-muted/60 hover:text-foreground focus:bg-muted/60 focus:text-foreground", !entry.IsActive),
 				}
 			>
-				{ entry.Name }
+				<span class="min-w-0 truncate">{ entry.Name }</span>
+				if label := artifactCommentCountLabel(entry); label != "" {
+					<span class="shrink-0 tabular-nums text-[10px] text-muted-foreground">{ label }</span>
+				}
 			</a>
 		</li>
 	}

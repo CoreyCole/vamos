@@ -214,7 +214,7 @@ func TestWorkbenchV2CommentShowPatchesOnlyCommentsPaneSignal(t *testing.T) {
 			t.Fatalf("response missing %q: %s", want, body)
 		}
 	}
-	for _, unwanted := range []string{"rightRailActiveTab", "docWorkbenchRight", "workbench-root", "workbench-v2-chat-body", "commentui-popover-target"} {
+	for _, unwanted := range []string{"rightRailActiveTab", "docWorkbenchRight", `id="workbench-root"`, "workbench-v2-chat-body", "commentui-popover-target"} {
 		if strings.Contains(body, unwanted) {
 			t.Fatalf("response contains %q: %s", unwanted, body)
 		}
@@ -266,7 +266,7 @@ func TestWorkbenchV2CommentCreatePatchesOnlyCommentsPaneSignal(t *testing.T) {
 			t.Fatalf("response missing %q: %s", want, body)
 		}
 	}
-	for _, unwanted := range []string{"rightRailActiveTab", "docWorkbenchRight", "doc-right-comments-panel", "workbench-root"} {
+	for _, unwanted := range []string{"rightRailActiveTab", "docWorkbenchRight", "doc-right-comments-panel", `id="workbench-root"`} {
 		if strings.Contains(body, unwanted) {
 			t.Fatalf("response contains %q: %s", unwanted, body)
 		}
@@ -368,6 +368,49 @@ func TestThoughtsCommentExpandOpensRightRail(t *testing.T) {
 	}
 }
 
+func TestThoughtsCommentExpandShowsUsernameNotEmail(t *testing.T) {
+	t.Parallel()
+	svc := newTestCommentsService(t)
+	comment, err := svc.createCommentInternal(
+		t.Context(),
+		"ccoreycole@gmail.com",
+		CreateCommentRequest{
+			FilePath:    "thoughts/plan.md",
+			CommentText: "test",
+			SectionID:   "section-1",
+		},
+	)
+	if err != nil {
+		t.Fatalf("createCommentInternal() error = %v", err)
+	}
+	if _, err := svc.createReplyInternal(
+		t.Context(),
+		"ccoreycole@gmail.com",
+		CreateReplyRequest{
+			CommentID: comment.ID,
+			ReplyText: "test",
+		},
+	); err != nil {
+		t.Fatalf("createReplyInternal() error = %v", err)
+	}
+	form := url.Values{}
+	form.Set("doc_path", "thoughts/plan.md")
+	form.Set("section_hint", "section-1")
+	form.Set("heading_hint", "Alpha design")
+	c, rec := newCommentFormRequest(t, "/forms/comments/expand", form)
+
+	if err := svc.HandleExpandSectionComments(c); err != nil {
+		t.Fatalf("HandleExpandSectionComments() error = %v", err)
+	}
+	body := rec.Body.String()
+	if !strings.Contains(body, ">ccoreycole<") {
+		t.Fatalf("response missing username: %s", body)
+	}
+	if strings.Contains(body, "ccoreycole@gmail.com") {
+		t.Fatalf("response leaked author email: %s", body)
+	}
+}
+
 func TestThoughtsCommentReplyPatchesInlineTarget(t *testing.T) {
 	t.Parallel()
 	svc := newTestCommentsService(t)
@@ -465,10 +508,58 @@ func TestThoughtsCommentResolvePatchesInlineTarget(t *testing.T) {
 		`comment-target-`,
 		commentui.CommentsContextPanelID,
 		`rightRailActiveTab`,
+		`id="comments-archived"`,
+		`Archived (1)`,
+		`Reopen`,
+		`Question`,
 	} {
 		if !strings.Contains(body, want) {
 			t.Fatalf("response missing %q: %s", want, body)
 		}
+	}
+	if strings.Contains(body, ">Archive<") {
+		t.Fatalf("archived comment still offers Archive: %s", body)
+	}
+}
+
+func TestThoughtsCommentReopenMovesOutOfArchivedSection(t *testing.T) {
+	t.Parallel()
+	svc := newTestCommentsService(t)
+	comment, err := svc.createCommentInternal(
+		t.Context(),
+		"user@example.com",
+		CreateCommentRequest{
+			FilePath:    "thoughts/plan.md",
+			CommentText: "Question",
+			SectionID:   "section-1",
+		},
+	)
+	if err != nil {
+		t.Fatalf("createCommentInternal() error = %v", err)
+	}
+	if err := svc.ResolveComment(t.Context(), comment.ID); err != nil {
+		t.Fatalf("ResolveComment() error = %v", err)
+	}
+	form := url.Values{}
+	form.Set("doc_path", "thoughts/plan.md")
+	form.Set("comment_id", comment.ID)
+	c, rec := newCommentFormRequest(t, "/forms/reopen", form)
+
+	if err := svc.HandleReopenComment(c); err != nil {
+		t.Fatalf("HandleReopenComment() error = %v", err)
+	}
+	body := rec.Body.String()
+	for _, want := range []string{
+		commentui.CommentsContextPanelID,
+		`Question`,
+		`Archive`,
+	} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("response missing %q: %s", want, body)
+		}
+	}
+	if strings.Contains(body, `id="comments-archived"`) {
+		t.Fatalf("reopened comment stayed archived: %s", body)
 	}
 }
 
@@ -482,7 +573,7 @@ func assertWorkbenchV2CommentResponse(t *testing.T, body string, preservesTarget
 	if preservesTarget && !strings.Contains(body, `name="workbench_v2" value="1"`) {
 		t.Fatalf("regenerated target lost workbench_v2 marker: %s", body)
 	}
-	for _, unwanted := range []string{"rightRailActiveTab", "docWorkbenchRight", "doc-right-comments-panel", "workbench-root", "workbench-v2-chat-body"} {
+	for _, unwanted := range []string{"rightRailActiveTab", "docWorkbenchRight", "doc-right-comments-panel", `id="workbench-root"`, "workbench-v2-chat-body"} {
 		if strings.Contains(body, unwanted) {
 			t.Fatalf("response contains legacy or broad target %q: %s", unwanted, body)
 		}
