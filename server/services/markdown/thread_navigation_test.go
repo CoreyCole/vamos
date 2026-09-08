@@ -395,16 +395,19 @@ func TestViewDocumentButtonSitsLeftOfOverflow(t *testing.T) {
 	}
 	header := artifactPathHeader(t, body.String())
 	view := strings.Index(header, `data-testid="view-document"`)
+	comments := strings.Index(header, `data-testid="view-comments"`)
 	up := strings.Index(header, `data-thread-artifact-up`)
 	path := strings.Index(header, `>thoughts/owner/plans/alpha/design.md</span>`)
 	search := strings.Index(header, `data-testid="artifact-browser-search-toggle"`)
 	files := strings.Index(header, `aria-label="Toggle files"`)
 	overflow := strings.Index(header, `data-testid="workbench-overflow-actions"`)
-	if view < 0 || up < 0 || path < 0 || search < 0 || files < 0 || overflow < 0 ||
-		!(view < up && up < path && path < search && search < files && files < overflow) {
+	if view < 0 || comments < 0 || up < 0 || path < 0 || search < 0 || files < 0 ||
+		overflow < 0 ||
+		!(view < comments && comments < up && up < path && path < search && search < files && files < overflow) {
 		t.Fatalf(
-			"header order view=%d up=%d path=%d search=%d files=%d overflow=%d\n%s",
+			"header order view=%d comments=%d up=%d path=%d search=%d files=%d overflow=%d\n%s",
 			view,
+			comments,
 			up,
 			path,
 			search,

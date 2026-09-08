@@ -15,6 +15,7 @@ import (
 	"github.com/labstack/echo/v4"
 	"github.com/starfederation/datastar-go/datastar"
 
+	"github.com/CoreyCole/vamos/server/layouts/workbench"
 	"github.com/CoreyCole/vamos/server/services/commentui"
 )
 
@@ -43,6 +44,7 @@ type ThreadArtifactBrowserArgs struct {
 	HeaderActions      templ.Component
 	ViewDocumentHref   string
 	DocumentViewActive bool
+	CommentsOpen       bool
 	// BrowserOpen is the SSR Files-browser preference (cookie wb2_artifact_browser).
 	// Default open when unset so first visit matches prior always-open behavior.
 	BrowserOpen bool
@@ -74,6 +76,15 @@ func boolString(v bool) string {
 		return "true"
 	}
 	return "false"
+}
+
+func commentsToggleClickAction(browser ThreadArtifactBrowserArgs) string {
+	chatDefault := browser.ViewDocumentHref != "" && !browser.DocumentViewActive
+	return workbench.CommentsToggleClickAction(chatDefault)
+}
+
+func commentsCloseCookieJS() string {
+	return workbench.CommentsCloseCookieJS()
 }
 
 func setViewDocumentToggle(
@@ -399,6 +410,7 @@ func (s *Service) threadArtifactBrowser(
 		DirectoryPath: directoryPath,
 		Entries:       entries,
 		BrowserOpen:   ArtifactBrowserOpenFromRequest(c.Request()),
+		CommentsOpen:  workbench.CommentsOpenFromRequest(c.Request()),
 	}
 	if directoryPath != "" && docPath != "" {
 		parent := path.Dir(directoryPath)
@@ -643,6 +655,7 @@ func (s *Service) thoughtsDirectoryArtifactBrowser(
 		DirectoryPath: canonical,
 		Entries:       entries,
 		BrowserOpen:   ArtifactBrowserOpenFromRequest(c.Request()),
+		CommentsOpen:  workbench.CommentsOpenFromRequest(c.Request()),
 	}
 	if canonical != "" {
 		parent := path.Dir(canonical)

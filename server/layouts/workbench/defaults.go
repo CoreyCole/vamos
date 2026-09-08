@@ -99,18 +99,18 @@ func DefaultWorkbenchConfig(
 				Visible: true,
 			},
 			{
-				ID:      "workbench-v2-artifact",
-				Slot:    WorkbenchSlotPrimary,
-				Kind:    RegionArtifact,
-				Ratio:   defaultPrimaryRatio,
-				Visible: true,
-			},
-			{
 				ID:      "workbench-v2-comments",
 				Slot:    WorkbenchSlotContext,
 				Kind:    RegionComments,
 				Ratio:   defaultSideRatio,
 				Visible: false,
+			},
+			{
+				ID:      "workbench-v2-artifact",
+				Slot:    WorkbenchSlotPrimary,
+				Kind:    RegionArtifact,
+				Ratio:   defaultPrimaryRatio,
+				Visible: true,
 			},
 		}
 		cfg.Mobile.ActiveRegionID = "workbench-v2-artifact"

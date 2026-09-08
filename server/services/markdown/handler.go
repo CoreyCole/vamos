@@ -473,6 +473,7 @@ func (s *Service) buildThoughtsV2WorkbenchState(
 	comments := commentui.CommentsContextPanel(
 		commentui.BuildCommentsPanelArgs(pageArgs.CommentUI, ""),
 	)
+	_, commentsOpen := chatCommentsOpen(c.Request(), false)
 	return workbench.BuildWorkbenchV2State(workbench.WorkbenchV2Args{
 		UserEmail:     pageArgs.UserEmail,
 		ViewportClass: viewport,
@@ -482,7 +483,7 @@ func (s *Service) buildThoughtsV2WorkbenchState(
 		ThreadsOpen:   false,
 		ChatOpen:      false,
 		ArtifactOpen:  true,
-		CommentsOpen:  false,
+		CommentsOpen:  commentsOpen,
 	})
 }
 
@@ -751,6 +752,7 @@ func (s *Service) buildThoughtsDirectoryWorkbenchState(
 	if err != nil {
 		return workbench.WorkbenchState{}, err
 	}
+	_, commentsOpen := chatCommentsOpen(c.Request(), false)
 	return workbench.BuildWorkbenchV2State(workbench.WorkbenchV2Args{
 		UserEmail:     args.UserEmail,
 		ViewportClass: viewport,
@@ -760,6 +762,7 @@ func (s *Service) buildThoughtsDirectoryWorkbenchState(
 		ThreadsOpen:   false,
 		ChatOpen:      false,
 		ArtifactOpen:  true,
+		CommentsOpen:  commentsOpen,
 	})
 }
 
@@ -814,6 +817,7 @@ func (s *Service) HandleSelectComment(c echo.Context) error {
 				"workbench": map[string]any{
 					"regions": map[string]any{
 						"workbenchV2Comments": map[string]any{"visible": true},
+						"workbenchV2Chat":     map[string]any{"visible": false},
 					},
 				},
 			},

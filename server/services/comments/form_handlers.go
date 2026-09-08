@@ -218,6 +218,7 @@ func patchOpenCommentsSignal(
 			"workbench": map[string]any{
 				"regions": map[string]any{
 					"workbenchV2Comments": map[string]any{"visible": true},
+					"workbenchV2Chat":     map[string]any{"visible": false},
 				},
 			},
 		})

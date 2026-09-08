@@ -15,6 +15,12 @@ import (
 	"github.com/CoreyCole/vamos/server/services/agenthome"
 )
 
+func chatCommentsOpen(r *http.Request, routeChatOpen bool) (chatOpen, commentsOpen bool) {
+	commentsOpen = workbench.CommentsOpenFromRequest(r)
+	chatOpen = routeChatOpen && !commentsOpen
+	return chatOpen, commentsOpen
+}
+
 func (s *Service) savedThreadsWorkbenchConfig(
 	c echo.Context,
 	userEmail string,
@@ -230,6 +236,7 @@ func (s *Service) ServeThread(c echo.Context) error {
 	}
 	viewport := viewportClassForRequest(c)
 	_ = threads // AI-470 converge: left rail is roster, not thread list.
+	chatOpen, commentsOpen := chatCommentsOpen(c.Request(), true)
 	state, err := workbench.BuildWorkbenchV2State(workbench.WorkbenchV2Args{
 		UserEmail:     userEmail,
 		ViewportClass: viewport,
@@ -243,9 +250,9 @@ func (s *Service) ServeThread(c echo.Context) error {
 		Artifact:     artifact,
 		Comments:     comments,
 		ThreadsOpen:  workbench.ThreadsOpenFromRequest(c.Request()),
-		ChatOpen:     true,
+		ChatOpen:     chatOpen,
 		ArtifactOpen: true,
-		CommentsOpen: false,
+		CommentsOpen: commentsOpen,
 	})
 	if err != nil {
 		return err

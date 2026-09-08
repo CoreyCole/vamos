@@ -2,9 +2,9 @@ package commentui
 
 import (
 	"fmt"
-	"strings"
 	"net/url"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/CoreyCole/vamos/pkg/datastarui/components/form"
@@ -196,9 +196,11 @@ templ CommentableMarkdown(args CommentableMarkdownArgs) {
 					<section data-section-id={ sectionID } data-heading-hint={ section.Title } class="relative">
 						<div class="markdown-viewer prose prose-invert max-w-none">
 							if hasHeading {
-								<div class="flex items-center justify-between gap-3">
-									@templ.Raw(section.HeadingHTML)
+								<div class="flex items-center gap-1">
 									@CommentTarget(target)
+									<div class="min-w-0 flex-1">
+										@templ.Raw(section.HeadingHTML)
+									</div>
 								</div>
 							} else {
 								@CommentTarget(target)

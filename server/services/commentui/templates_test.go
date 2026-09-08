@@ -176,6 +176,16 @@ func TestCommentableMarkdownRendersStableTargetsAndHiddenFields(t *testing.T) {
 			t.Fatalf("render missing %q in %s", want, html)
 		}
 	}
+	menu := strings.Index(html, `aria-label="Section actions"`)
+	heading := strings.Index(html, `<h1>Intro</h1>`)
+	if menu < 0 || heading < 0 || !(menu < heading) {
+		t.Fatalf(
+			"section 3-dot should sit left of title: menu=%d heading=%d\n%s",
+			menu,
+			heading,
+			html,
+		)
+	}
 	if strings.Contains(html, `id="plans/raw/path.md`) ||
 		strings.Contains(html, ` style="`) {
 		t.Fatalf("render exposes raw paths in IDs or inline styles: %s", html)

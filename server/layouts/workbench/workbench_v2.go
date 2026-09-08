@@ -30,6 +30,9 @@ type WorkbenchV2Args struct {
 }
 
 func BuildWorkbenchV2State(args WorkbenchV2Args) (WorkbenchState, error) {
+	if args.CommentsOpen {
+		args.ChatOpen = false
+	}
 	state, err := BuildWorkbenchState(BuildWorkbenchStateInput{
 		UserEmail:     args.UserEmail,
 		Page:          WorkbenchPageThreads,
@@ -56,15 +59,6 @@ func BuildWorkbenchV2State(args WorkbenchV2Args) (WorkbenchState, error) {
 				args.Chat,
 			),
 			v2Region(
-				WorkbenchV2ArtifactRegionID,
-				WorkbenchSlotPrimary,
-				RegionArtifact,
-				defaultPrimaryRatio,
-				workbenchV2ArtifactMinRem,
-				args.ArtifactOpen,
-				args.Artifact,
-			),
-			v2Region(
 				WorkbenchV2CommentsRegionID,
 				WorkbenchSlotContext,
 				RegionComments,
@@ -72,6 +66,15 @@ func BuildWorkbenchV2State(args WorkbenchV2Args) (WorkbenchState, error) {
 				workbenchV2CommentsMinRem,
 				args.CommentsOpen,
 				args.Comments,
+			),
+			v2Region(
+				WorkbenchV2ArtifactRegionID,
+				WorkbenchSlotPrimary,
+				RegionArtifact,
+				defaultPrimaryRatio,
+				workbenchV2ArtifactMinRem,
+				args.ArtifactOpen,
+				args.Artifact,
 			),
 		},
 	})

@@ -80,6 +80,7 @@ func (s *Service) ServeAI470Room(c echo.Context) error {
 		chatOpen = true
 	}
 
+	chatOpen, commentsOpen := chatCommentsOpen(c.Request(), chatOpen)
 	state, err := workbench.BuildWorkbenchV2State(workbench.WorkbenchV2Args{
 		UserEmail:     userEmail,
 		ViewportClass: viewport,
@@ -91,7 +92,7 @@ func (s *Service) ServeAI470Room(c echo.Context) error {
 		ThreadsOpen:   threadsOpen,
 		ChatOpen:      chatOpen,
 		ArtifactOpen:  true,
-		CommentsOpen:  false,
+		CommentsOpen:  commentsOpen,
 	})
 	if err != nil {
 		return err

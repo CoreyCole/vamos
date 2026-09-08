@@ -20,6 +20,7 @@ templ ThreadArtifactPane(browser ThreadArtifactBrowserArgs, document templ.Compo
 					<a
 						href={ templ.URL(browser.ViewDocumentHref) }
 						data-testid="view-chat"
+						data-on:click={ commentsCloseCookieJS() }
 						class="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
 						aria-label="View Chat"
 						title="View Chat"
@@ -43,6 +44,29 @@ templ ThreadArtifactPane(browser ThreadArtifactBrowserArgs, document templ.Compo
 					</a>
 				}
 			}
+			<button
+				type="button"
+				data-testid="view-comments"
+				class={
+					"inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground",
+					templ.KV("bg-muted text-foreground", browser.CommentsOpen),
+				}
+				data-on:click={ commentsToggleClickAction(browser) }
+				data-attr:aria-pressed="$workbench.regions.workbenchV2Comments.visible ? 'true' : 'false'"
+				data-class="{ 'bg-muted text-foreground': $workbench.regions.workbenchV2Comments.visible }"
+				aria-controls="workbench-v2-comments"
+				aria-label="Toggle comments"
+				title="Toggle comments"
+				if browser.CommentsOpen {
+					aria-pressed="true"
+				} else {
+					aria-pressed="false"
+				}
+			>
+				<svg class="h-3.5 w-3.5" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z"></path>
+				</svg>
+			</button>
 			@ThreadArtifactUp(browser)
 			<span
 				data-testid="artifact-browser-path"

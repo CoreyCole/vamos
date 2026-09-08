@@ -273,6 +273,7 @@ func (s *Service) RenderAppletPage(c echo.Context, applet AppletContext, process
 			Artifact: AppletWorkbenchDocument(applet, process, commentUI),
 			Comments: commentsPanel,
 			ArtifactOpen: true,
+			CommentsOpen: workbench.CommentsOpenFromRequest(c.Request()),
 		})
 		if err != nil { return err }
 		return layouts.Root(rootArgs).Render(templ.WithChildren(c.Request().Context(), workbench.Workbench(state)), c.Response().Writer)

@@ -3,6 +3,7 @@ package workbench
 import (
 	"bytes"
 	"net/http"
+	"net/http/httptest"
 	"os"
 	"strings"
 	"testing"
@@ -746,7 +747,10 @@ func TestAgentChatScrollUsesSSRLatestAnchor(t *testing.T) {
 		`IntersectionObserver`,
 	} {
 		if strings.Contains(js, unwanted) {
-			t.Fatalf("agent-chat-scroll.js should not contain complex scroll machinery %q", unwanted)
+			t.Fatalf(
+				"agent-chat-scroll.js should not contain complex scroll machinery %q",
+				unwanted,
+			)
 		}
 	}
 
@@ -774,7 +778,10 @@ func TestAgentChatScrollUsesSSRLatestAnchor(t *testing.T) {
 	if strings.Contains(sentinelLine, "aria-hidden") {
 		t.Fatalf("#chat-latest must not have aria-hidden (browsers skip focus)")
 	}
-	if !strings.Contains(transcriptSrc, "\t\t<div id=\"chat-latest\" tabindex=\"-1\" autofocus") {
+	if !strings.Contains(
+		transcriptSrc,
+		"\t\t<div id=\"chat-latest\" tabindex=\"-1\" autofocus",
+	) {
 		t.Fatalf("#chat-latest must be nested inside #agent-chat-messages")
 	}
 
@@ -792,7 +799,8 @@ func TestAgentChatScrollUsesSSRLatestAnchor(t *testing.T) {
 		if !strings.Contains(src, `id="agent-chat-scroll-region"`) {
 			t.Fatalf("%s missing agent-chat-scroll-region", rel)
 		}
-		if strings.Contains(src, "flex-col-reverse") || strings.Contains(src, "column-reverse") {
+		if strings.Contains(src, "flex-col-reverse") ||
+			strings.Contains(src, "column-reverse") {
 			t.Fatalf("%s must not use flex-col-reverse / column-reverse", rel)
 		}
 		if !strings.Contains(src, "flex-col") {
@@ -811,7 +819,8 @@ func TestAgentChatScrollUsesSSRLatestAnchor(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ReadFile(shell.templ) error = %v", err)
 	}
-	if !strings.Contains(string(shellBody), "chat-latest") || !strings.Contains(string(shellBody), "queueMicrotask") {
+	if !strings.Contains(string(shellBody), "chat-latest") ||
+		!strings.Contains(string(shellBody), "queueMicrotask") {
 		t.Fatalf("shell.templ Chat tab missing queueMicrotask chat-latest focus")
 	}
 	signalsBody, err := os.ReadFile("../../../server/layouts/workbench/signals.go")
@@ -819,8 +828,14 @@ func TestAgentChatScrollUsesSSRLatestAnchor(t *testing.T) {
 		t.Fatalf("ReadFile(signals.go) error = %v", err)
 	}
 	signalsSrc := string(signalsBody)
-	if !strings.Contains(signalsSrc, "chat-latest") || !strings.Contains(signalsSrc, "queueMicrotask(() => document.getElementById('chat-latest')?.focus())") {
-		t.Fatalf("signals.go mobileRegionTabClick missing queueMicrotask chat-latest focus")
+	if !strings.Contains(signalsSrc, "chat-latest") ||
+		!strings.Contains(
+			signalsSrc,
+			"queueMicrotask(() => document.getElementById('chat-latest')?.focus())",
+		) {
+		t.Fatalf(
+			"signals.go mobileRegionTabClick missing queueMicrotask chat-latest focus",
+		)
 	}
 }
 
@@ -871,17 +886,25 @@ func TestWorkbenchV2CSSKeepsStableRegionTransitionNames(t *testing.T) {
 			t.Fatalf("legacy viewer region has view-transition-name: %s", window)
 		}
 	}
-	if strings.Contains(css, `html[data-workbench-doc-switching="true"] #workbench-v2-artifact`) {
+	if strings.Contains(
+		css,
+		`html[data-workbench-doc-switching="true"] #workbench-v2-artifact`,
+	) {
 		t.Fatalf("doc-switching must not opacity-fade whole #workbench-v2-artifact")
 	}
-	if strings.Contains(css, `html[data-workbench-doc-switching="true"] #thread-artifact-document`) {
+	if strings.Contains(
+		css,
+		`html[data-workbench-doc-switching="true"] #thread-artifact-document`,
+	) {
 		t.Fatalf("doc-switching must not opacity-fade #thread-artifact-document")
 	}
 	if strings.Contains(css, "view-transition-name: workbench-v2-artifact;") {
 		t.Fatalf("parent #workbench-v2-artifact must stay view-transition-name: none")
 	}
 	if strings.Contains(css, "html:active-view-transition-type(workbench-doc-switch)") {
-		t.Fatalf("typed workbench-doc-switch sweep must stay removed (CSS-only chrome freeze)")
+		t.Fatalf(
+			"typed workbench-doc-switch sweep must stay removed (CSS-only chrome freeze)",
+		)
 	}
 	if strings.Contains(css, "workbench-doc-switch-sweep") {
 		t.Fatalf("workbench-doc-switch-sweep must stay removed")
@@ -1095,7 +1118,10 @@ func TestMobileRegionTabsSSRSelectedForActiveRegion(t *testing.T) {
 	}
 	signals := EncodeWorkbenchSignals(state)
 	if !strings.Contains(signals, `"activeRegionID":"workbenchV2Artifact"`) &&
-		!strings.Contains(signals, `"activeRegionID":"`+SignalKeyForID(WorkbenchV2ArtifactRegionID)+`"`) {
+		!strings.Contains(
+			signals,
+			`"activeRegionID":"`+SignalKeyForID(WorkbenchV2ArtifactRegionID)+`"`,
+		) {
 		t.Fatalf("signals missing artifact activeRegionID: %s", signals)
 	}
 }
@@ -1517,14 +1543,14 @@ func TestWorkbenchV2StateHasFourIndependentMorphableBodies(t *testing.T) {
 	}
 	for index, want := range []string{
 		WorkbenchV2ThreadsRegionID, WorkbenchV2ChatRegionID,
-		WorkbenchV2ArtifactRegionID, WorkbenchV2CommentsRegionID,
+		WorkbenchV2CommentsRegionID, WorkbenchV2ArtifactRegionID,
 	} {
 		if state.Regions[index].ID != want ||
 			state.Regions[index].BodyID == state.Regions[index].ID {
 			t.Fatalf("region %d = %#v", index, state.Regions[index])
 		}
 	}
-	if state.Regions[3].Visible {
+	if state.Regions[2].Visible {
 		t.Fatal("comments should start closed")
 	}
 	var body bytes.Buffer
@@ -1573,6 +1599,44 @@ func TestWorkbenchV2LiveBodiesAreUniqueAndMorphable(t *testing.T) {
 	}
 	if strings.Contains(html, `data-ignore-morph`) {
 		t.Fatalf("v2 region body has ignored ancestor: %s", html)
+	}
+}
+
+func TestWorkbenchV2CommentsSitLeftOfArtifactAndXORChat(t *testing.T) {
+	t.Parallel()
+
+	state, err := BuildWorkbenchV2State(WorkbenchV2Args{
+		ThreadsOpen: true, ChatOpen: true, ArtifactOpen: true, CommentsOpen: true,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(state.Regions) != 4 {
+		t.Fatalf("regions = %#v", state.Regions)
+	}
+	if state.Regions[1].ID != WorkbenchV2ChatRegionID || state.Regions[1].Visible {
+		t.Fatalf("chat should close when comments open: %#v", state.Regions[1])
+	}
+	if state.Regions[2].ID != WorkbenchV2CommentsRegionID || !state.Regions[2].Visible {
+		t.Fatalf("comments should sit left of artifact: %#v", state.Regions[2])
+	}
+	if state.Regions[3].ID != WorkbenchV2ArtifactRegionID || !state.Regions[3].Visible {
+		t.Fatalf("artifact = %#v", state.Regions[3])
+	}
+}
+
+func TestCommentsOpenFromRequestDefaultsClosed(t *testing.T) {
+	t.Parallel()
+	if CommentsOpenFromRequest(nil) {
+		t.Fatal("nil request should close comments")
+	}
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	if CommentsOpenFromRequest(req) {
+		t.Fatal("missing cookie should close comments")
+	}
+	req.AddCookie(&http.Cookie{Name: CommentsOpenCookie, Value: "1"})
+	if !CommentsOpenFromRequest(req) {
+		t.Fatal("cookie 1 should open comments")
 	}
 }
 
@@ -1674,8 +1738,15 @@ func TestWorkbenchV2MobileDefaultsToArtifact(t *testing.T) {
 			WorkbenchV2ArtifactRegionID,
 		)
 	}
-	chat := state.Regions[1]
-	artifact := state.Regions[2]
+	var chat, artifact WorkbenchRegion
+	for _, region := range state.Regions {
+		switch region.ID {
+		case WorkbenchV2ChatRegionID:
+			chat = region
+		case WorkbenchV2ArtifactRegionID:
+			artifact = region
+		}
+	}
 	if got := RegionInitialClass(state, artifact); !strings.Contains(got, "flex") ||
 		strings.Contains(got, "hidden") {
 		t.Fatalf("mobile artifact initial class = %q, want visible flex", got)
@@ -1763,7 +1834,9 @@ func TestWorkbenchV2RegionsEnforceComposerFriendlyMinRem(t *testing.T) {
 
 func TestWorkbenchV2RegionsHairlineGap(t *testing.T) {
 	t.Parallel()
-	state, err := BuildWorkbenchV2State(WorkbenchV2Args{ThreadsOpen: true, ChatOpen: true, ArtifactOpen: true})
+	state, err := BuildWorkbenchV2State(
+		WorkbenchV2Args{ThreadsOpen: true, ChatOpen: true, ArtifactOpen: true},
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1772,17 +1845,25 @@ func TestWorkbenchV2RegionsHairlineGap(t *testing.T) {
 		t.Fatal(err)
 	}
 	out := body.String()
-	if !strings.Contains(out, `id="workbench-regions" class="flex min-h-0 w-full flex-1 gap-0 overflow-hidden"`) {
+	if !strings.Contains(
+		out,
+		`id="workbench-regions" class="flex min-h-0 w-full flex-1 gap-0 overflow-hidden"`,
+	) {
 		t.Fatal("workbench-regions should use gap-0 hairline columns")
 	}
-	if strings.Contains(out, `id="workbench-regions" class="flex min-h-0 w-full flex-1 gap-2`) {
+	if strings.Contains(
+		out,
+		`id="workbench-regions" class="flex min-h-0 w-full flex-1 gap-2`,
+	) {
 		t.Fatal("workbench-regions still has gap-2 gutter")
 	}
 }
 
 func TestWorkbenchV2FlushChrome(t *testing.T) {
 	t.Parallel()
-	state, err := BuildWorkbenchV2State(WorkbenchV2Args{ThreadsOpen: true, ChatOpen: true, ArtifactOpen: true})
+	state, err := BuildWorkbenchV2State(
+		WorkbenchV2Args{ThreadsOpen: true, ChatOpen: true, ArtifactOpen: true},
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1797,15 +1878,19 @@ func TestWorkbenchV2FlushChrome(t *testing.T) {
 	if strings.Contains(out, "rounded-lg border border-border shadow-sm") {
 		t.Fatal("regions still have rounded-lg/shadow-sm")
 	}
-	if !strings.Contains(out, "workbench-region overflow-hidden rounded-none border-0 shadow-none") {
+	if !strings.Contains(
+		out,
+		"workbench-region overflow-hidden rounded-none border-0 shadow-none",
+	) {
 		t.Fatal("regions should be rounded-none border-0 shadow-none (flush shells)")
 	}
-	if strings.Contains(out, "workbench-region overflow-hidden rounded-none border border-border") {
+	if strings.Contains(
+		out,
+		"workbench-region overflow-hidden rounded-none border border-border",
+	) {
 		t.Fatal("regions still have full card border")
 	}
 }
-
-
 
 func TestWorkbenchV2FlushChromeCSS(t *testing.T) {
 	t.Parallel()
