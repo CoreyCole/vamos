@@ -154,6 +154,7 @@ func TestThreadArtifactPaneScopesStaticHandlersToBrowserRows(t *testing.T) {
 		`id="thread-artifact-path-header"`,
 		`aria-label="Toggle files"`,
 		`title="Toggle files (Ctrl+L)"`,
+		`data-testid="artifact-browser-toggle"`,
 		`Ctrl+K`,
 		`wb2_artifact_browser=`,
 		`document.cookie`,

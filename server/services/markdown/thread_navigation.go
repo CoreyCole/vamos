@@ -334,18 +334,26 @@ func artifactBrowserToggleAction() string {
 	return "$_artifactBrowserOpen = !$_artifactBrowserOpen; try { var v = $_artifactBrowserOpen ? '1' : '0'; document.cookie = 'wb2_artifact_browser=' + v + '; path=/; SameSite=Lax; Max-Age=31536000'; sessionStorage.setItem('workbench-v2:artifact-browser-open', v) } catch (e) {}"
 }
 
+func artifactBrowserFocusToggleExpr() string {
+	return "var b = document.querySelector('[data-testid=artifact-browser-toggle]'); if (b) b.focus({focusVisible:true})"
+}
+
+func artifactBrowserFocusHitExpr(target string) string {
+	return target + "?.focus({focusVisible:true})"
+}
+
 func artifactBrowserToggleKeydownAction() string {
 	return "$_artifactBrowserOpen && (evt.key === 'ArrowDown' || (evt.key === 'Tab' && !evt.shiftKey)) ? (evt.preventDefault(), " +
-		artifactBrowserSearchFirstResultExpr() + "?.focus()) : null"
+		artifactBrowserFocusHitExpr(
+			artifactBrowserSearchFirstResultExpr(),
+		) + ") : null"
 }
 
 func artifactBrowserSearchHotkeyAction() string {
 	return "if ((evt.ctrlKey || evt.metaKey) && (evt.key === 'k' || evt.key === 'K')) { evt.preventDefault(); " +
 		artifactBrowserSearchFocusAction() +
-		" } else if ((evt.ctrlKey || evt.metaKey) && (evt.key === 'l' || evt.key === 'L')) { evt.preventDefault(); " +
-		artifactBrowserToggleAction() +
-		"; if ($_artifactBrowserOpen) { " + artifactBrowserSearchFirstResultExpr() +
-		"?.focus() } }"
+		" } else if ((evt.ctrlKey || evt.metaKey) && (evt.key === 'l' || evt.key === 'L')) { evt.preventDefault(); $_artifactBrowserOpen = true; try { document.cookie = 'wb2_artifact_browser=1; path=/; SameSite=Lax; Max-Age=31536000'; sessionStorage.setItem('workbench-v2:artifact-browser-open', '1') } catch (e) {}; requestAnimationFrame(function(){ " +
+		artifactBrowserFocusToggleExpr() + " }) }"
 }
 
 func artifactBrowserSearchFetchAction() string {
@@ -365,7 +373,7 @@ func artifactBrowserSearchFirstResultExpr() string {
 }
 
 func artifactBrowserSearchMoveFocusExpr() string {
-	return "(function(){ var links = Array.from(document.querySelectorAll('" + artifactBrowserSearchHitSelector() + "')); var cur = evt.target.closest ? (evt.target.closest('[data-thread-artifact-toggle]') || evt.target.closest('a[data-thread-artifact-file]')) : null; var d = evt.key === 'ArrowUp' || (evt.key === 'Tab' && evt.shiftKey) ? -1 : 1; var n = links.indexOf(cur) + d; if (n < 0) { evt.preventDefault(); var s = document.getElementById('artifact-browser-search'); if (s && s.offsetParent !== null) { s.focus(); return } if (links[0]) links[0].focus(); return } if (n >= links.length) { if (evt.key !== 'Tab' || evt.shiftKey) { evt.preventDefault() } return } evt.preventDefault(); if (links[n]) links[n].focus() })()"
+	return "(function(){ var links = Array.from(document.querySelectorAll('" + artifactBrowserSearchHitSelector() + "')); var cur = evt.target.closest ? (evt.target.closest('[data-thread-artifact-toggle]') || evt.target.closest('a[data-thread-artifact-file]')) : null; var d = evt.key === 'ArrowUp' || (evt.key === 'Tab' && evt.shiftKey) ? -1 : 1; var n = links.indexOf(cur) + d; if (n < 0) { evt.preventDefault(); var s = document.getElementById('artifact-browser-search'); if (s && s.offsetParent !== null) { s.focus({focusVisible:true}); return } var t = document.querySelector('[data-testid=artifact-browser-toggle]'); if (t) t.focus({focusVisible:true}); return } if (n >= links.length) { if (evt.key !== 'Tab' || evt.shiftKey) { evt.preventDefault() } return } evt.preventDefault(); if (links[n]) links[n].focus({focusVisible:true}) })()"
 }
 
 func artifactBrowserSearchResultsKeydownAction() string {
@@ -376,7 +384,9 @@ func artifactBrowserSearchResultsKeydownAction() string {
 func artifactBrowserSearchKeydownAction() string {
 	first := artifactBrowserSearchFirstResultExpr()
 	return "evt.key === 'ArrowDown' || (evt.key === 'Tab' && !evt.shiftKey) ? (evt.preventDefault(), " +
-		first + "?.focus()) : evt.key === 'Enter' ? (evt.preventDefault(), " +
+		artifactBrowserFocusHitExpr(
+			first,
+		) + ") : evt.key === 'Enter' ? (evt.preventDefault(), " +
 		first + "?.click()) : evt.key === 'Escape' ? ($_dirSearchOpen = false, $dirSearch = '', " +
 		artifactBrowserSearchFetchAction() +
 		") : null"

@@ -353,7 +353,7 @@ func TestHandleThoughtsArtifactSearchThisDirectoryShowsFullPath(t *testing.T) {
 		"thoughts/owner/plans/alpha/design.md",
 		"thoughts/owner/plans/alpha/docs/design.md",
 		`text-[10px]`,
-		`focus-visible:ring-2`,
+		`focus:ring-2`,
 	} {
 		if !strings.Contains(dirSection, want) {
 			t.Fatalf("this directory missing path %q: %s", want, dirSection)
