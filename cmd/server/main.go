@@ -1810,6 +1810,18 @@ func main() {
 		agentChatHandler.ListWorkspaceSlashCommands,
 	)
 	sharedAppletService.RegisterThoughtsRoutes(thoughtsGroup)
+	thoughtsGroup.GET(
+		"/_artifact-browser",
+		markdownService.HandleThoughtsArtifactBrowser,
+	)
+	thoughtsGroup.GET(
+		"/_artifact-directory",
+		markdownService.HandleThoughtsArtifactDirectory,
+	)
+	thoughtsGroup.GET(
+		"/_artifact-search",
+		markdownService.HandleThoughtsArtifactSearch,
+	)
 	thoughtsGroup.GET("/_assets/*", markdownService.ServeThoughtsAsset)
 	thoughtsGroup.GET("/_render/html/*", markdownService.ServeHTMLApplet)
 	thoughtsGroup.GET("/*", markdownService.ServeMarkdown)

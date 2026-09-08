@@ -4,7 +4,8 @@ templ ThreadArtifactPane(browser ThreadArtifactBrowserArgs, document templ.Compo
 	<div
 		id="thread-artifact-pane"
 		class="flex h-full min-h-0 flex-col bg-background"
-		data-signals={ "{_threadArtifactLoading: false, _artifactBrowserOpen: " + boolString(browser.BrowserOpen) + "}" }
+		data-signals={ "{_threadArtifactLoading: false, _artifactBrowserOpen: " + boolString(browser.BrowserOpen) + ", dirSearch: '', _dirSearchOpen: false}" }
+		data-on:keydown__window={ artifactBrowserSearchHotkeyAction() }
 		data-attr:aria-busy="$_threadArtifactLoading ? 'true' : 'false'"
 		data-attr:data-artifact-browser-open="$_artifactBrowserOpen ? '1' : '0'"
 		if browser.BrowserOpen {
@@ -42,7 +43,40 @@ templ ThreadArtifactPane(browser ThreadArtifactBrowserArgs, document templ.Compo
 					</a>
 				}
 			}
-			<span class="min-w-0 flex-1 truncate text-muted-foreground">{ "thoughts/" + browser.DocPath }</span>
+			@ThreadArtifactUp(browser)
+			<span
+				data-testid="artifact-browser-path"
+				data-show="!$_dirSearchOpen"
+				class="min-w-0 flex-1 truncate text-muted-foreground"
+			>{ "thoughts/" + browser.DocPath }</span>
+			<input
+				id="artifact-browser-search"
+				type="search"
+				data-bind="dirSearch"
+				data-testid="artifact-browser-search"
+				data-show="$_dirSearchOpen"
+				data-on:input__debounce.300ms={ artifactBrowserSearchFetchAction() }
+				data-on:keydown={ artifactBrowserSearchKeydownAction() }
+				data-on:blur={ artifactBrowserSearchBlurAction() }
+				placeholder="Search"
+				aria-label="Search files"
+				class="h-7 min-w-0 flex-1 rounded-md border border-transparent bg-transparent px-1.5 text-xs text-foreground outline-none focus:border-ring focus:ring-2 focus:ring-ring"
+				style="display: none;"
+			/>
+			<button
+				type="button"
+				data-testid="artifact-browser-search-toggle"
+				data-on:click={ artifactBrowserSearchFocusAction() }
+				data-attr:aria-pressed="$_dirSearchOpen ? 'true' : 'false'"
+				class="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+				aria-label="Search files"
+				title="Search files"
+				aria-pressed="false"
+			>
+				<svg class="h-3.5 w-3.5" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M17 10a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+				</svg>
+			</button>
 			<button
 				type="button"
 				class={
@@ -97,40 +131,85 @@ templ ThreadArtifactBrowser(browser ThreadArtifactBrowserArgs) {
 		id="thread-artifact-browser"
 		data-thread-artifact-browser
 		data-thread-artifact-cwd={ threadArtifactDirectoryIdentity(browser.DirectoryPath) }
+		data-artifact-search-endpoint={ thoughtsArtifactSearchEndpoint(browser.ThreadID, browser.DocPath, browser.DirectoryPath) }
 		data-show="$_artifactBrowserOpen"
-		class="min-h-0 max-h-64 shrink-0 overflow-y-auto border-b border-border px-2.5 py-2"
+		class="min-h-0 max-h-64 shrink-0 overflow-y-auto border-b border-border"
 		aria-label="Artifact browser"
 		if !browser.BrowserOpen {
 			style="display: none;"
 		}
 	>
-		<div class="mb-1 flex min-h-7 items-center gap-2 text-xs text-muted-foreground">
-			if browser.ParentHref != "" {
-				<a
-					href={ templ.URL(browser.ParentHref) }
-					data-thread-artifact-up
-					if browser.ParentEndpoint != "" {
-						data-artifact-endpoint={ browser.ParentEndpoint }
-						data-indicator="_threadArtifactLoading"
-						data-on:click={ threadArtifactBrowserClickAction() }
-					}
-					class="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-					aria-label="Open parent folder"
-					title="Open parent folder"
-				>
-					<svg class="h-3.5 w-3.5" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
-					</svg>
-				</a>
-			}
-			<span class="min-w-0 flex-1 truncate">{ threadArtifactDirectoryIdentity(browser.DirectoryPath) }</span>
-		</div>
-		<ul class="space-y-0.5">
-			for _, entry := range browser.Entries {
-				@ThreadArtifactBrowserEntry(entry)
-			}
-		</ul>
+		@ThreadArtifactBrowserResults(ThreadArtifactBrowserResultsArgs{Entries: browser.Entries})
 	</nav>
+}
+
+templ ThreadArtifactUp(browser ThreadArtifactBrowserArgs) {
+	<div id="thread-artifact-up-slot" class="contents">
+		if browser.ParentHref != "" {
+			<a
+				id="thread-artifact-up"
+				href={ templ.URL(browser.ParentHref) }
+				data-thread-artifact-up
+				if browser.ParentEndpoint != "" {
+					data-artifact-endpoint={ browser.ParentEndpoint }
+					data-indicator="_threadArtifactLoading"
+					data-on:click={ threadArtifactBrowserClickAction() }
+				}
+				class="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+				aria-label="Open parent folder"
+				title="Open parent folder"
+			>
+				<svg class="h-3.5 w-3.5" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
+				</svg>
+			</a>
+		}
+	</div>
+}
+
+templ ThreadArtifactBrowserResults(args ThreadArtifactBrowserResultsArgs) {
+	<div id="thread-artifact-browser-results" class="px-2.5 py-2" data-testid="artifact-browser-results">
+		if args.Query == "" {
+			<ul class="space-y-0.5">
+				for _, entry := range args.Entries {
+					@ThreadArtifactBrowserEntry(entry)
+				}
+			</ul>
+		} else {
+			@artifactSearchSection("This directory", "artifact-search-this-directory", args.Directory, false)
+			@artifactSearchSection("All thoughts", "artifact-search-all-thoughts", args.Global, true)
+		}
+	</div>
+}
+
+templ artifactSearchSection(title, testID string, hits []ArtifactSearchHit, showPath bool) {
+	<section class="mb-2 last:mb-0" data-testid={ testID }>
+		<h2 class="px-2 pb-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">{ title }</h2>
+		if len(hits) == 0 {
+			<p class="px-2 py-1 text-xs italic text-muted-foreground">No matches</p>
+		} else {
+			<ul class="space-y-0.5">
+				for _, hit := range hits {
+					@artifactSearchHitRow(hit, showPath)
+				}
+			</ul>
+		}
+	</section>
+}
+
+templ artifactSearchHitRow(hit ArtifactSearchHit, showPath bool) {
+	<li class="relative z-0">
+		<a
+			href={ templ.URL(hit.Href) }
+			data-thread-artifact-file
+			class="relative z-0 block min-w-0 rounded-r px-2 py-1 text-xs text-muted-foreground transition-colors border-l-2 border-transparent hover:bg-muted/60 hover:text-foreground"
+		>
+			<span class="block truncate">{ hit.Name }{ artifactSearchDirSuffix(hit.IsDir) }</span>
+			if showPath {
+				<span class="block truncate text-[10px] text-muted-foreground">{ threadArtifactDirectoryIdentity(hit.Path) }</span>
+			}
+		</a>
+	</li>
 }
 
 templ ThreadArtifactBrowserEntry(entry ThreadArtifactEntry) {

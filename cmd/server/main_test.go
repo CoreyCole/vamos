@@ -31,6 +31,12 @@ func TestThreadsRouteRegistrationIncludesScopedArtifactReads(t *testing.T) {
 		`threadsGroup.GET("", markdownService.ServeThreads)`,
 		`markdownService.HandleThreadArtifactBrowser`,
 		`markdownService.HandleThreadArtifactDirectory`,
+		`markdownService.HandleThoughtsArtifactBrowser`,
+		`markdownService.HandleThoughtsArtifactDirectory`,
+		`markdownService.HandleThoughtsArtifactSearch`,
+		`"/_artifact-browser"`,
+		`"/_artifact-directory"`,
+		`"/_artifact-search"`,
 		`threadsGroup.GET("/:threadID", markdownService.ServeThread)`,
 	} {
 		if !strings.Contains(source, want) {
@@ -49,10 +55,18 @@ func TestConfigureLayoutStaticAssetsUsesLocalDatastarProWhenPresent(t *testing.T
 	if err := os.MkdirAll(filepath.Join(staticRoot, "js"), 0o755); err != nil {
 		t.Fatalf("MkdirAll(js) error = %v", err)
 	}
-	if err := os.WriteFile(filepath.Join(staticRoot, "js", "datastar-pro-v1.js"), []byte("export {};"), 0o644); err != nil {
+	if err := os.WriteFile(
+		filepath.Join(staticRoot, "js", "datastar-pro-v1.js"),
+		[]byte("export {};"),
+		0o644,
+	); err != nil {
 		t.Fatalf("WriteFile(datastar-pro-v1.js) error = %v", err)
 	}
-	if err := os.WriteFile(filepath.Join(staticRoot, "js", "datastar-inspector.js"), []byte("export {};"), 0o644); err != nil {
+	if err := os.WriteFile(
+		filepath.Join(staticRoot, "js", "datastar-inspector.js"),
+		[]byte("export {};"),
+		0o644,
+	); err != nil {
 		t.Fatalf("WriteFile(datastar-inspector.js) error = %v", err)
 	}
 	t.Cleanup(func() {
@@ -63,7 +77,8 @@ func TestConfigureLayoutStaticAssetsUsesLocalDatastarProWhenPresent(t *testing.T
 	configureLayoutStaticAssets(staticRoot)
 
 	var body bytes.Buffer
-	if err := layouts.Root(layouts.RootArgs{}).Render(context.Background(), &body); err != nil {
+	if err := layouts.Root(layouts.RootArgs{}).
+		Render(context.Background(), &body); err != nil {
 		t.Fatalf("Render(Root) error = %v", err)
 	}
 	html := body.String()
@@ -71,7 +86,10 @@ func TestConfigureLayoutStaticAssetsUsesLocalDatastarProWhenPresent(t *testing.T
 		t.Fatalf("Root() did not map Datastar Pro asset when present:\n%s", html)
 	}
 	if strings.Contains(html, "falling back to public Datastar bundle") {
-		t.Fatalf("Root() rendered public Datastar fallback despite local asset:\n%s", html)
+		t.Fatalf(
+			"Root() rendered public Datastar fallback despite local asset:\n%s",
+			html,
+		)
 	}
 	if !strings.Contains(html, `/js/datastar-inspector.js`) {
 		t.Fatalf("Root() did not enable inspector when asset present:\n%s", html)
@@ -88,12 +106,19 @@ func TestConfigureLayoutStaticAssetsFallsBackWhenLocalDatastarProMissing(t *test
 	configureLayoutStaticAssets(staticRoot)
 
 	var body bytes.Buffer
-	if err := layouts.Root(layouts.RootArgs{}).Render(context.Background(), &body); err != nil {
+	if err := layouts.Root(layouts.RootArgs{}).
+		Render(context.Background(), &body); err != nil {
 		t.Fatalf("Render(Root) error = %v", err)
 	}
 	html := body.String()
-	if !strings.Contains(html, `"@vamos/datastar":"https://cdn.jsdelivr.net/gh/starfederation/datastar@v1.0.1/bundles/datastar.js"`) {
-		t.Fatalf("Root() did not map the public Datastar bundle when local asset missing:\n%s", html)
+	if !strings.Contains(
+		html,
+		`"@vamos/datastar":"https://cdn.jsdelivr.net/gh/starfederation/datastar@v1.0.1/bundles/datastar.js"`,
+	) {
+		t.Fatalf(
+			"Root() did not map the public Datastar bundle when local asset missing:\n%s",
+			html,
+		)
 	}
 	if strings.Contains(html, `/js/datastar-inspector.js`) {
 		t.Fatalf("Root() enabled inspector when asset missing:\n%s", html)
@@ -132,10 +157,14 @@ func TestMergeProjectCheckoutsPreservesWorkspaceConfiguredPath(t *testing.T) {
 	})
 
 	if _, exists := discovery.ConfiguredCheckouts["local"]; exists {
-		t.Fatalf("local checkout duplicated configured stage path: %#v", discovery.ConfiguredCheckouts)
+		t.Fatalf(
+			"local checkout duplicated configured stage path: %#v",
+			discovery.ConfiguredCheckouts,
+		)
 	}
 	stage := discovery.ConfiguredCheckouts["stage"]
-	if stage.RootPath != "/repo/vamos" || stage.Role != workspaces.CheckoutRoleStage || stage.ProjectID != "vamos" {
+	if stage.RootPath != "/repo/vamos" || stage.Role != workspaces.CheckoutRoleStage ||
+		stage.ProjectID != "vamos" {
 		t.Fatalf("stage checkout = %#v, want preserved configured stage", stage)
 	}
 	main := discovery.ConfiguredCheckouts["vamos-main"]
@@ -394,9 +423,15 @@ func TestChildWorkspacesReadOnlyEnabled(t *testing.T) {
 func TestWorkspaceHandlerManagerUsesFixtureForChildWithoutManager(t *testing.T) {
 	t.Parallel()
 
-	manager := workspaceHandlerManager(nil, Config{WorkspaceMode: "child", WorkspaceSlug: "feature"})
+	manager := workspaceHandlerManager(
+		nil,
+		Config{WorkspaceMode: "child", WorkspaceSlug: "feature"},
+	)
 	if _, ok := manager.(*fixtureLifecycleRegistry); !ok {
-		t.Fatalf("workspaceHandlerManager() = %T, want *fixtureLifecycleRegistry", manager)
+		t.Fatalf(
+			"workspaceHandlerManager() = %T, want *fixtureLifecycleRegistry",
+			manager,
+		)
 	}
 }
 
@@ -417,10 +452,13 @@ func TestNewFixtureLifecycleRegistryDescribesCurrentChild(t *testing.T) {
 		t.Fatalf("len(snapshots) = %d, want 1", len(snapshots))
 	}
 	got := snapshots[0]
-	if got.Workspace.Slug != "feature-slug" || got.Workspace.CheckoutPath != "/repo/feature" || got.Workspace.Host != "feature.workspaces.test" {
+	if got.Workspace.Slug != "feature-slug" ||
+		got.Workspace.CheckoutPath != "/repo/feature" ||
+		got.Workspace.Host != "feature.workspaces.test" {
 		t.Fatalf("snapshot workspace = %+v", got.Workspace)
 	}
-	if got.DesiredState != workspaces.WorkspaceDesiredRunning || got.ObservedState != workspaces.WorkspaceObservedRunning {
+	if got.DesiredState != workspaces.WorkspaceDesiredRunning ||
+		got.ObservedState != workspaces.WorkspaceObservedRunning {
 		t.Fatalf("snapshot state = %s/%s", got.DesiredState, got.ObservedState)
 	}
 }
@@ -429,10 +467,25 @@ func TestFixtureLifecycleRegistryRejectsMutations(t *testing.T) {
 	t.Parallel()
 
 	registry := newFixtureLifecycleRegistry(Config{WorkspaceSlug: "feature"})
-	if _, err := registry.Start(context.Background(), "feature"); !errors.Is(err, errFixtureWorkspacesReadOnly) {
+	if _, err := registry.Start(
+		context.Background(),
+		"feature",
+	); !errors.Is(
+		err,
+		errFixtureWorkspacesReadOnly,
+	) {
 		t.Fatalf("Start() error = %v, want read-only", err)
 	}
-	if _, err := registry.RequestLifecycle(context.Background(), workspaces.WorkspaceLifecycleRequest{Slug: "feature", Kind: workspaces.WorkspaceTransitionRestart}); !errors.Is(err, errFixtureWorkspacesReadOnly) {
+	if _, err := registry.RequestLifecycle(
+		context.Background(),
+		workspaces.WorkspaceLifecycleRequest{
+			Slug: "feature",
+			Kind: workspaces.WorkspaceTransitionRestart,
+		},
+	); !errors.Is(
+		err,
+		errFixtureWorkspacesReadOnly,
+	) {
 		t.Fatalf("RequestLifecycle() error = %v, want read-only", err)
 	}
 }
@@ -587,7 +640,9 @@ func TestExpandRuntimePathsRejectsPreCutoverRelativeDatabasePath(t *testing.T) {
 	}
 }
 
-func TestWorkspaceReleaseHandlerOptionsShowReleaseLanesWithoutTemporalQueue(t *testing.T) {
+func TestWorkspaceReleaseHandlerOptionsShowReleaseLanesWithoutTemporalQueue(
+	t *testing.T,
+) {
 	t.Parallel()
 
 	_, releaseRegistry, err := workspaces.BuildDefaultReleaseRegistry("stage", "main")
@@ -596,8 +651,24 @@ func TestWorkspaceReleaseHandlerOptionsShowReleaseLanesWithoutTemporalQueue(t *t
 	}
 	handler := workspaces.NewHandler(
 		fakeMainTestLifecycleManager{snapshots: []workspaces.WorkspaceLifecycleSnapshot{
-			{Workspace: workspaces.Workspace{Slug: "stage", DisplayName: "Stage", Status: workspaces.StatusRunning, URL: "https://stage.workspaces.test/", Commit: "abcdef1234567890"}},
-			{Workspace: workspaces.Workspace{Slug: "main", DisplayName: "Main", Status: workspaces.StatusStopped, IsMain: true, Commit: "1234567890abcdef"}},
+			{
+				Workspace: workspaces.Workspace{
+					Slug:        "stage",
+					DisplayName: "Stage",
+					Status:      workspaces.StatusRunning,
+					URL:         "https://stage.workspaces.test/",
+					Commit:      "abcdef1234567890",
+				},
+			},
+			{
+				Workspace: workspaces.Workspace{
+					Slug:        "main",
+					DisplayName: "Main",
+					Status:      workspaces.StatusStopped,
+					IsMain:      true,
+					Commit:      "1234567890abcdef",
+				},
+			},
 		}},
 		"https://main.workspaces.test",
 		"main",
@@ -652,26 +723,45 @@ func (f fakeMainTestLifecycleManager) LookupHost(string) (workspaces.Workspace, 
 	return workspaces.Workspace{}, false
 }
 
-func (f fakeMainTestLifecycleManager) Start(context.Context, string) (workspaces.Workspace, error) {
+func (f fakeMainTestLifecycleManager) Start(
+	context.Context,
+	string,
+) (workspaces.Workspace, error) {
 	return workspaces.Workspace{}, nil
 }
 
-func (f fakeMainTestLifecycleManager) Stop(context.Context, string) (workspaces.Workspace, error) {
+func (f fakeMainTestLifecycleManager) Stop(
+	context.Context,
+	string,
+) (workspaces.Workspace, error) {
 	return workspaces.Workspace{}, nil
 }
 
-func (f fakeMainTestLifecycleManager) Restart(context.Context, string) (workspaces.Workspace, error) {
+func (f fakeMainTestLifecycleManager) Restart(
+	context.Context,
+	string,
+) (workspaces.Workspace, error) {
 	return workspaces.Workspace{}, nil
 }
 
-func (f fakeMainTestLifecycleManager) RequestLifecycle(context.Context, workspaces.WorkspaceLifecycleRequest) (workspaces.WorkspaceLifecycleSnapshot, error) {
+func (f fakeMainTestLifecycleManager) RequestLifecycle(
+	context.Context,
+	workspaces.WorkspaceLifecycleRequest,
+) (workspaces.WorkspaceLifecycleSnapshot, error) {
 	return workspaces.WorkspaceLifecycleSnapshot{}, nil
 }
 
-func (f fakeMainTestLifecycleManager) ListLifecycle(context.Context) ([]workspaces.WorkspaceLifecycleSnapshot, error) {
+func (f fakeMainTestLifecycleManager) ListLifecycle(
+	context.Context,
+) ([]workspaces.WorkspaceLifecycleSnapshot, error) {
 	return f.snapshots, nil
 }
 
-func (f fakeMainTestLifecycleManager) CompleteTransition(context.Context, string, string, workspaces.WorkspaceTransitionResult) error {
+func (f fakeMainTestLifecycleManager) CompleteTransition(
+	context.Context,
+	string,
+	string,
+	workspaces.WorkspaceTransitionResult,
+) error {
 	return nil
 }

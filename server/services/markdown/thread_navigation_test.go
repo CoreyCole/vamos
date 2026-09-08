@@ -160,6 +160,8 @@ func TestThreadArtifactPaneScopesStaticHandlersToBrowserRows(t *testing.T) {
 		`data-attr:d=`,
 		`data-artifact-browser-open="1"`,
 		`d="M15 19l-7-7 7-7"`,
+		`data-on:keydown__window`,
+		`evt.ctrlKey`,
 	} {
 		if !strings.Contains(html, want) {
 			t.Fatalf("artifact pane missing %q: %s", want, html)
@@ -190,6 +192,65 @@ func TestThreadArtifactBrowserDirectoryCanonicalizesRootFileParent(t *testing.T)
 	got, err := threadArtifactBrowserDirectory(c, "root.md")
 	if err != nil || got != "" {
 		t.Fatalf("root artifact browser directory = %q, %v", got, err)
+	}
+}
+
+func TestThreadArtifactBrowserSearchLivesInPathHeader(t *testing.T) {
+	t.Parallel()
+
+	var body strings.Builder
+	if err := ThreadArtifactPane(
+		ThreadArtifactBrowserArgs{
+			DocPath:       "owner/note.md",
+			DirectoryPath: "owner",
+			BrowserOpen:   false,
+		},
+		templ.Raw("<p>doc</p>"),
+	).Render(t.Context(), &body); err != nil {
+		t.Fatal(err)
+	}
+	html := body.String()
+	header := artifactPathHeader(t, html)
+	for _, want := range []string{
+		`data-testid="artifact-browser-search"`,
+		`data-testid="artifact-browser-search-toggle"`,
+		`aria-label="Search files"`,
+		`focus:ring-2`,
+		`data-on:input__debounce.300ms`,
+	} {
+		if !strings.Contains(header, want) {
+			t.Fatalf("header search missing %q: %s", want, header)
+		}
+	}
+	search := strings.Index(header, `data-testid="artifact-browser-search-toggle"`)
+	files := strings.Index(header, `aria-label="Toggle files"`)
+	if search < 0 || files < 0 || search > files {
+		t.Fatalf(
+			"search should sit left of files toggle search=%d files=%d\n%s",
+			search,
+			files,
+			header,
+		)
+	}
+	browserStart := strings.Index(html, `id="thread-artifact-browser"`)
+	if browserStart < 0 {
+		t.Fatal("missing files browser")
+	}
+	browser := html[browserStart:]
+	if strings.Contains(browser, `data-testid="artifact-browser-search"`) {
+		t.Fatalf("search should not live inside collapsed files browser: %s", browser)
+	}
+	if strings.Contains(browser, `data-testid="artifact-browser-cwd"`) {
+		t.Fatalf("cwd label should be gone: %s", browser)
+	}
+	toggleAt := strings.Index(header, `data-testid="artifact-browser-search-toggle"`)
+	toggleEnd := strings.Index(header[toggleAt:], "</button>")
+	if toggleAt < 0 || toggleEnd < 0 {
+		t.Fatal("missing search toggle")
+	}
+	toggle := header[toggleAt : toggleAt+toggleEnd]
+	if strings.Contains(toggle, `$_artifactBrowserOpen`) {
+		t.Fatalf("search must not toggle files open: %s", toggle)
 	}
 }
 
@@ -323,6 +384,7 @@ func TestViewDocumentButtonSitsLeftOfOverflow(t *testing.T) {
 			DocPath:            "owner/plans/alpha/design.md",
 			ViewDocumentHref:   "/thoughts/owner/plans/alpha/design.md",
 			DocumentViewActive: false,
+			ParentHref:         "/thoughts/owner/plans",
 			HeaderActions: templ.Raw(
 				`<div data-testid="workbench-overflow-actions"></div>`,
 			),
@@ -333,12 +395,23 @@ func TestViewDocumentButtonSitsLeftOfOverflow(t *testing.T) {
 	}
 	header := artifactPathHeader(t, body.String())
 	view := strings.Index(header, `data-testid="view-document"`)
+	up := strings.Index(header, `data-thread-artifact-up`)
 	path := strings.Index(header, `>thoughts/owner/plans/alpha/design.md</span>`)
+	search := strings.Index(header, `data-testid="artifact-browser-search-toggle"`)
 	files := strings.Index(header, `aria-label="Toggle files"`)
 	overflow := strings.Index(header, `data-testid="workbench-overflow-actions"`)
-	if view < 0 || path < 0 || files < 0 || overflow < 0 ||
-		!(view < path && path < files && files < overflow) {
-		t.Fatalf("header order view=%d path=%d files=%d overflow=%d\n%s", view, path, files, overflow, header)
+	if view < 0 || up < 0 || path < 0 || search < 0 || files < 0 || overflow < 0 ||
+		!(view < up && up < path && path < search && search < files && files < overflow) {
+		t.Fatalf(
+			"header order view=%d up=%d path=%d search=%d files=%d overflow=%d\n%s",
+			view,
+			up,
+			path,
+			search,
+			files,
+			overflow,
+			header,
+		)
 	}
 	if !strings.Contains(header, `title="View Document"`) {
 		t.Fatalf("missing View Document tooltip: %s", header)
@@ -364,11 +437,20 @@ func TestViewChatButtonOnThoughts(t *testing.T) {
 	header := artifactPathHeader(t, body.String())
 	chat := strings.Index(header, `data-testid="view-chat"`)
 	path := strings.Index(header, `>thoughts/owner/plans/alpha/design.md</span>`)
+	search := strings.Index(header, `data-testid="artifact-browser-search-toggle"`)
 	files := strings.Index(header, `aria-label="Toggle files"`)
 	overflow := strings.Index(header, `data-testid="workbench-overflow-actions"`)
-	if chat < 0 || path < 0 || files < 0 || overflow < 0 ||
-		!(chat < path && path < files && files < overflow) {
-		t.Fatalf("header order chat=%d path=%d files=%d overflow=%d\n%s", chat, path, files, overflow, header)
+	if chat < 0 || path < 0 || search < 0 || files < 0 || overflow < 0 ||
+		!(chat < path && path < search && search < files && files < overflow) {
+		t.Fatalf(
+			"header order chat=%d path=%d search=%d files=%d overflow=%d\n%s",
+			chat,
+			path,
+			search,
+			files,
+			overflow,
+			header,
+		)
 	}
 	if !strings.Contains(header, `title="View Chat"`) ||
 		strings.Contains(header, `title="View Document"`) {

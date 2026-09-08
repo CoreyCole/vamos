@@ -50,6 +50,13 @@ type ThreadArtifactBrowserArgs struct {
 
 const artifactBrowserOpenCookie = "wb2_artifact_browser"
 
+const (
+	thoughtsArtifactBrowserPath   = "/thoughts/_artifact-browser"
+	thoughtsArtifactDirectoryPath = "/thoughts/_artifact-directory"
+	thoughtsArtifactSearchPath    = "/thoughts/_artifact-search"
+	artifactSearchGlobalLimit     = 25
+)
+
 // ArtifactBrowserOpenFromRequest reads wb2_artifact_browser; missing/invalid => open.
 func ArtifactBrowserOpenFromRequest(r *http.Request) bool {
 	if r == nil {
@@ -159,6 +166,102 @@ func ThreadArtifactDirectoryEndpointForBrowser(
 	) + "?" + values.Encode()
 }
 
+func ThoughtsDocURLAtDirectory(docPath, directoryPath string) string {
+	href := ThoughtsDocURL(docPath, "")
+	canonicalDir, err := CanonicalThoughtsDirPath(directoryPath)
+	if err != nil {
+		return href
+	}
+	parsed, err := url.Parse(href)
+	if err != nil {
+		return href
+	}
+	q := parsed.Query()
+	q.Set("artifact_dir", threadArtifactDirectoryIdentity(canonicalDir))
+	parsed.RawQuery = q.Encode()
+	return parsed.String()
+}
+
+func thoughtsArtifactSearchEndpoint(threadID, docPath, directoryPath string) string {
+	q := url.Values{}
+	if strings.TrimSpace(threadID) != "" {
+		q.Set("thread", strings.TrimSpace(threadID))
+	}
+	if strings.TrimSpace(docPath) != "" {
+		query, ok := threadArtifactQuery(docPath, directoryPath, true)
+		if !ok {
+			return ""
+		}
+		values, err := url.ParseQuery(query)
+		if err != nil {
+			return ""
+		}
+		if strings.TrimSpace(threadID) != "" {
+			values.Set("thread", strings.TrimSpace(threadID))
+		}
+		return thoughtsArtifactSearchPath + "?" + values.Encode()
+	}
+	canonicalDir, err := CanonicalThoughtsDirPath(directoryPath)
+	if err != nil {
+		return ""
+	}
+	q.Set("artifact_dir", threadArtifactDirectoryIdentity(canonicalDir))
+	return thoughtsArtifactSearchPath + "?" + q.Encode()
+}
+
+func thoughtsArtifactBrowserEndpoint(docPath, directoryPath string) string {
+	if strings.TrimSpace(docPath) != "" {
+		query, ok := threadArtifactQuery(docPath, directoryPath, true)
+		if !ok {
+			return ""
+		}
+		return thoughtsArtifactBrowserPath + "?" + query
+	}
+	canonicalDir, err := CanonicalThoughtsDirPath(directoryPath)
+	if err != nil {
+		return ""
+	}
+	q := url.Values{}
+	q.Set("artifact_dir", threadArtifactDirectoryIdentity(canonicalDir))
+	return thoughtsArtifactBrowserPath + "?" + q.Encode()
+}
+
+func thoughtsArtifactDirectoryEndpoint(
+	dirPath, docPath, browserDirectory string,
+) string {
+	canonicalDir, err := CanonicalThoughtsDirPath(dirPath)
+	if err != nil {
+		return ""
+	}
+	if strings.TrimSpace(docPath) != "" {
+		query, ok := threadArtifactQuery(docPath, browserDirectory, true)
+		if !ok {
+			return ""
+		}
+		values, err := url.ParseQuery(query)
+		if err != nil {
+			return ""
+		}
+		values.Set("directory", threadArtifactDirectoryIdentity(canonicalDir))
+		return thoughtsArtifactDirectoryPath + "?" + values.Encode()
+	}
+	canonicalBrowser, err := CanonicalThoughtsDirPath(browserDirectory)
+	if err != nil {
+		return ""
+	}
+	q := url.Values{}
+	q.Set("artifact_dir", threadArtifactDirectoryIdentity(canonicalBrowser))
+	q.Set("directory", threadArtifactDirectoryIdentity(canonicalDir))
+	return thoughtsArtifactDirectoryPath + "?" + q.Encode()
+}
+
+func thoughtsArtifactPageURL(selectedDoc, directoryPath string) string {
+	if strings.TrimSpace(selectedDoc) != "" {
+		return ThoughtsDocURLAtDirectory(selectedDoc, directoryPath)
+	}
+	return ThoughtsDirURL(directoryPath)
+}
+
 func threadArtifactDirectoryIdentity(directoryPath string) string {
 	if directoryPath == "" {
 		return "thoughts"
@@ -195,6 +298,30 @@ func threadArtifactLoaded(loaded bool) string {
 
 func threadArtifactBrowserClickAction() string {
 	return "if (!$_threadArtifactLoading && evt.button === 0 && !evt.metaKey && !evt.ctrlKey && !evt.shiftKey && !evt.altKey) { evt.preventDefault(); @get(el.dataset.artifactEndpoint) }"
+}
+
+func artifactBrowserSearchFocusAction() string {
+	return "$_dirSearchOpen = true; requestAnimationFrame(function() { var n = document.getElementById('artifact-browser-search'); if (n) n.focus() })"
+}
+
+func artifactBrowserSearchHotkeyAction() string {
+	return "if ((evt.ctrlKey || evt.metaKey) && (evt.key === 'k' || evt.key === 'K')) { evt.preventDefault(); " +
+		artifactBrowserSearchFocusAction() +
+		" }"
+}
+
+func artifactBrowserSearchFetchAction() string {
+	return "var root = document.getElementById('thread-artifact-browser'); if (!root || !root.dataset.artifactSearchEndpoint) { return }; var ep = root.dataset.artifactSearchEndpoint; var sep = ep.indexOf('?') >= 0 ? '&' : '?'; @get(ep + sep + 'q=' + encodeURIComponent(String($dirSearch || '')))"
+}
+
+func artifactBrowserSearchKeydownAction() string {
+	return "if (evt.key !== 'Escape') { return }; $_dirSearchOpen = false; $dirSearch = ''; " +
+		artifactBrowserSearchFetchAction()
+}
+
+func artifactBrowserSearchBlurAction() string {
+	return "if (evt.relatedTarget && evt.relatedTarget.closest && evt.relatedTarget.closest('[data-testid=artifact-browser-search-toggle]')) { return }; if (String($dirSearch || '') !== '') { return }; $_dirSearchOpen = false; " +
+		artifactBrowserSearchFetchAction()
 }
 
 func threadArtifactDirectoryToggleAction() string {
@@ -408,32 +535,53 @@ func (s *Service) loadedThreadArtifactDirectory(
 
 func remapThreadArtifactBrowserForThoughts(
 	browser ThreadArtifactBrowserArgs,
+	selectedDoc string,
 ) ThreadArtifactBrowserArgs {
-	if browser.DirectoryPath != "" && browser.DocPath != "" {
+	if browser.DirectoryPath != "" {
 		parent := path.Dir(browser.DirectoryPath)
 		if parent == "." {
 			parent = ""
 		}
-		browser.ParentHref = ThoughtsDirURL(parent)
-		browser.ParentEndpoint = ""
+		browser.ParentHref = thoughtsArtifactPageURL(selectedDoc, parent)
+		browser.ParentEndpoint = thoughtsArtifactBrowserEndpoint(
+			selectedDoc,
+			parent,
+		)
 	} else {
 		browser.ParentHref = ""
 		browser.ParentEndpoint = ""
 	}
 	for i := range browser.Entries {
-		browser.Entries[i] = remapThreadArtifactEntryForThoughts(browser.Entries[i])
+		browser.Entries[i] = remapThreadArtifactEntryForThoughts(
+			browser.Entries[i],
+			selectedDoc,
+			browser.DirectoryPath,
+		)
 	}
 	return browser
 }
 
-func remapThreadArtifactEntryForThoughts(entry ThreadArtifactEntry) ThreadArtifactEntry {
+func remapThreadArtifactEntryForThoughts(
+	entry ThreadArtifactEntry,
+	selectedDoc, browserDirectory string,
+) ThreadArtifactEntry {
 	if entry.IsDir {
-		entry.BrowseHref = ThoughtsDirURL(entry.Path)
-		entry.BrowseEndpoint = ""
-		// Keep SSR-expanded children; avoid threads Datastar endpoints on /thoughts.
-		entry.Endpoint = ""
+		entry.BrowseHref = thoughtsArtifactPageURL(selectedDoc, entry.Path)
+		entry.BrowseEndpoint = thoughtsArtifactBrowserEndpoint(
+			selectedDoc,
+			entry.Path,
+		)
+		entry.Endpoint = thoughtsArtifactDirectoryEndpoint(
+			entry.Path,
+			selectedDoc,
+			browserDirectory,
+		)
 		for i := range entry.Children {
-			entry.Children[i] = remapThreadArtifactEntryForThoughts(entry.Children[i])
+			entry.Children[i] = remapThreadArtifactEntryForThoughts(
+				entry.Children[i],
+				selectedDoc,
+				browserDirectory,
+			)
 		}
 		return entry
 	}
@@ -453,16 +601,18 @@ func (s *Service) thoughtsArtifactPane(
 		browser ThreadArtifactBrowserArgs
 		err     error
 	)
+	selectedDoc := ""
 	if page == nil {
 		// Directory /thoughts pages: Files lists this directory (not its parent).
 		browser, err = s.thoughtsDirectoryArtifactBrowser(c, docOrDirPath)
 	} else {
+		selectedDoc = docOrDirPath
 		browser, err = s.threadArtifactBrowser(c, "", docOrDirPath)
 	}
 	if err != nil {
 		return nil, err
 	}
-	browser = remapThreadArtifactBrowserForThoughts(browser)
+	browser = remapThreadArtifactBrowserForThoughts(browser, selectedDoc)
 	setViewDocumentToggle(&browser, true, chatHref)
 	browser.HeaderActions = BuildThreadArtifactHeaderActions(
 		page,
@@ -499,7 +649,6 @@ func (s *Service) thoughtsDirectoryArtifactBrowser(
 		if parent == "." {
 			parent = ""
 		}
-		// ParentHref remapped for thoughts in remapThreadArtifactBrowserForThoughts.
 		args.ParentHref = ThreadArtifactHrefAtDirectory("", canonical, parent)
 		args.ParentEndpoint = ThreadArtifactBrowserEndpoint("", canonical, parent)
 	}
@@ -614,17 +763,31 @@ func (s *Service) HandleThreadArtifactBrowser(c echo.Context) error {
 		return err
 	}
 	sse := datastar.NewSSE(c.Response().Writer, c.Request())
-	if err := sse.PatchElementTempl(
-		ThreadArtifactBrowser(browser),
-		datastar.WithSelectorID("thread-artifact-browser"),
-		datastar.WithModeOuter(),
-	); err != nil {
+	if err := patchThreadArtifactBrowserChrome(sse, browser); err != nil {
 		return err
 	}
 	return sse.ExecuteScript(
 		"window.history.pushState({ workbenchArtifactPatch: true }, '', " + string(
 			encodedURL,
 		) + ")",
+	)
+}
+
+func patchThreadArtifactBrowserChrome(
+	sse *datastar.ServerSentEventGenerator,
+	browser ThreadArtifactBrowserArgs,
+) error {
+	if err := sse.PatchElementTempl(
+		ThreadArtifactUp(browser),
+		datastar.WithSelectorID("thread-artifact-up-slot"),
+		datastar.WithModeOuter(),
+	); err != nil {
+		return err
+	}
+	return sse.PatchElementTempl(
+		ThreadArtifactBrowser(browser),
+		datastar.WithSelectorID("thread-artifact-browser"),
+		datastar.WithModeOuter(),
 	)
 }
 
@@ -642,6 +805,99 @@ func (s *Service) HandleThreadArtifactDirectory(c echo.Context) error {
 		}
 		return echo.NewHTTPError(http.StatusBadRequest, "invalid directory")
 	}
+	sse := datastar.NewSSE(c.Response().Writer, c.Request())
+	return sse.PatchElementTempl(ThreadArtifactDirectory(entry))
+}
+
+func (s *Service) thoughtsSelectedDoc(c echo.Context) (string, error) {
+	rawArtifact := strings.TrimSpace(c.QueryParam("artifact"))
+	if rawArtifact == "" {
+		return "", nil
+	}
+	artifactPath, _, err := optionalThreadArtifact(rawArtifact)
+	if err != nil {
+		return "", echo.NewHTTPError(http.StatusBadRequest, "invalid artifact")
+	}
+	if strings.TrimSpace(artifactPath) == "" {
+		return "", nil
+	}
+	if _, err := s.RenderThoughtsDocument(
+		c.Request().Context(),
+		artifactPath,
+	); err != nil {
+		return "", echo.NewHTTPError(http.StatusBadRequest, "artifact must be a file")
+	}
+	return artifactPath, nil
+}
+
+func (s *Service) HandleThoughtsArtifactBrowser(c echo.Context) error {
+	selectedDoc, err := s.thoughtsSelectedDoc(c)
+	if err != nil {
+		return err
+	}
+	var browser ThreadArtifactBrowserArgs
+	if selectedDoc != "" {
+		browser, err = s.threadArtifactBrowser(c, "", selectedDoc)
+	} else {
+		dirPath, dirErr := threadArtifactBrowserDirectory(c, "")
+		if dirErr != nil {
+			return echo.NewHTTPError(http.StatusBadRequest, "invalid artifact directory")
+		}
+		browser, err = s.thoughtsDirectoryArtifactBrowser(c, dirPath)
+	}
+	if err != nil {
+		var httpErr *echo.HTTPError
+		if errors.As(err, &httpErr) {
+			return httpErr
+		}
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid artifact directory")
+	}
+	browser = remapThreadArtifactBrowserForThoughts(browser, selectedDoc)
+	pageURL := thoughtsArtifactPageURL(selectedDoc, browser.DirectoryPath)
+	encodedURL, err := json.Marshal(pageURL)
+	if err != nil {
+		return err
+	}
+	sse := datastar.NewSSE(c.Response().Writer, c.Request())
+	if err := patchThreadArtifactBrowserChrome(sse, browser); err != nil {
+		return err
+	}
+	return sse.ExecuteScript(
+		"window.history.pushState({ workbenchArtifactPatch: true }, '', " + string(
+			encodedURL,
+		) + ")",
+	)
+}
+
+func (s *Service) HandleThoughtsArtifactDirectory(c echo.Context) error {
+	if !c.Request().URL.Query().Has("directory") {
+		return echo.NewHTTPError(http.StatusBadRequest, "directory is required")
+	}
+	selectedDoc, err := s.thoughtsSelectedDoc(c)
+	if err != nil {
+		return err
+	}
+	entry, err := s.loadedThreadArtifactDirectory(
+		c,
+		"",
+		c.QueryParam("directory"),
+	)
+	if err != nil {
+		var httpErr *echo.HTTPError
+		if errors.As(err, &httpErr) {
+			return httpErr
+		}
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid directory")
+	}
+	browserDirectory, err := threadArtifactBrowserDirectory(c, selectedDoc)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid artifact directory")
+	}
+	entry = remapThreadArtifactEntryForThoughts(
+		entry,
+		selectedDoc,
+		browserDirectory,
+	)
 	sse := datastar.NewSSE(c.Response().Writer, c.Request())
 	return sse.PatchElementTempl(ThreadArtifactDirectory(entry))
 }

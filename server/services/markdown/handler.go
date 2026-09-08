@@ -745,7 +745,7 @@ func (s *Service) buildThoughtsDirectoryWorkbenchState(
 		c,
 		dirPath,
 		nil,
-		DirectoryPrimaryPanel(args),
+		WorkbenchUnavailable("Select a file from the artifact browser."),
 		chatHref,
 	)
 	if err != nil {
