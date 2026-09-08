@@ -141,7 +141,6 @@ function regionWidth(region) {
   return region.getBoundingClientRect().width;
 }
 
-
 function regionHasSSRFlex(region) {
   const flex = (region.style && region.style.flex) || "";
   // SSR RegionSSRFlexStyle: "0.2200 1 0%" — browsers may normalize 0% → 0px.
@@ -223,10 +222,7 @@ function applyRegionRatios(root) {
     region.dataset.workbenchWidthPx = width.toFixed(2);
     setRegionWidth(region, width);
   }
-  setRegionWidth(
-    primary,
-    Math.max(primaryMin, availableWidth - fixedWidth),
-  );
+  setRegionWidth(primary, Math.max(primaryMin, availableWidth - fixedWidth));
 }
 
 function updateHandles(root) {
@@ -403,7 +399,11 @@ function startResize(event) {
     const beforeMin = regionMinWidth(before);
     const afterMin = regionMinWidth(after);
     const rawBefore = beforeStart + dx;
-    const nextBefore = clamp(rawBefore, beforeMin, Math.max(beforeMin, pairWidth - afterMin));
+    const nextBefore = clamp(
+      rawBefore,
+      beforeMin,
+      Math.max(beforeMin, pairWidth - afterMin),
+    );
     const nextAfter = pairWidth - nextBefore;
     before.dataset.workbenchRatio = (nextBefore / availableWidth).toFixed(4);
     after.dataset.workbenchRatio = (nextAfter / availableWidth).toFixed(4);
@@ -450,6 +450,40 @@ function bindResizeHandles(root) {
   }
 }
 
+function reflowVisibleRegionFlex(root) {
+  if (!root) return;
+  updateHandles(root);
+  for (const region of allRegions(root)) {
+    if (!isVisible(region)) {
+      region.style.removeProperty("flex");
+      region.style.removeProperty("width");
+      delete region.dataset.workbenchWidthPx;
+    }
+  }
+  if (root.dataset.workbenchPixelLock === "1") {
+    applyRegionRatios(root);
+    return;
+  }
+  const regions = visibleRegions(root);
+  let total = 0;
+  for (const region of regions) {
+    total += Number(region.dataset.workbenchRatio || 0);
+  }
+  if (total <= 0) total = 1;
+  for (const region of regions) {
+    const grow = Number(region.dataset.workbenchRatio || 0) / total;
+    region.style.flex = grow.toFixed(4) + " 1 0%";
+    region.style.removeProperty("width");
+  }
+}
+
+function reflowWorkbenchFromEvent(event) {
+  const root =
+    event.target?.closest?.("#workbench-root") ||
+    document.getElementById("workbench-root");
+  if (root) reflowVisibleRegionFlex(root);
+}
+
 function initWorkbench(root) {
   // Don't fight an in-progress grip drag (MutationObserver style/class churn).
   if (!document.documentElement.classList.contains("workbench-resizing")) {
@@ -489,6 +523,7 @@ window.addEventListener("resize", reflowWorkbenchesAfterWindowResize, {
 });
 
 init();
+document.addEventListener("workbench-layout-reflow", reflowWorkbenchFromEvent);
 document.addEventListener("datastar-patch-elements", init);
 new MutationObserver(init).observe(document.documentElement, {
   childList: true,

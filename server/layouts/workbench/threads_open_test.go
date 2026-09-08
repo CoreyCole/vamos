@@ -43,6 +43,11 @@ func TestThreadsToggleClickActionsWriteCookieNotLayoutSave(t *testing.T) {
 	if !strings.Contains(show, "visible = true") || !strings.Contains(show, "=1;") {
 		t.Fatalf("show action = %q", show)
 	}
+	for _, action := range []string{hide, show} {
+		if !strings.Contains(action, "workbench-layout-reflow") {
+			t.Fatalf("toggle must reflow chat/doc split: %q", action)
+		}
+	}
 }
 
 func TestThreadsOpenCookieDrivesEncodeWorkbenchSignals(t *testing.T) {
@@ -108,4 +113,3 @@ func TestRegionInitialClass_ThreadsClosedLocksHidden(t *testing.T) {
 		t.Fatalf("open threads initial class = %q, want md:!flex", gotOpen)
 	}
 }
-

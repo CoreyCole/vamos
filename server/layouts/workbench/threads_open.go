@@ -31,14 +31,18 @@ func threadsOpenCookieWriteJS(open bool) string {
 		"'workbench-v2:threads-open', '" + v + "') } catch (e) {}"
 }
 
+func threadsLayoutReflowJS() string {
+	return "requestAnimationFrame(() => document.getElementById('workbench-root')?.dispatchEvent(new CustomEvent('workbench-layout-reflow')))"
+}
+
 // ThreadsHideClickAction collapses the threads sidebar and persists via cookie.
 func ThreadsHideClickAction() string {
 	return "$workbench.regions.workbenchV2Threads.visible = false; " +
-		threadsOpenCookieWriteJS(false)
+		threadsOpenCookieWriteJS(false) + "; " + threadsLayoutReflowJS()
 }
 
 // ThreadsShowClickAction reopens the threads sidebar and persists via cookie.
 func ThreadsShowClickAction(signalKey string) string {
 	return "$workbench.regions." + signalKey + ".visible = true; " +
-		threadsOpenCookieWriteJS(true)
+		threadsOpenCookieWriteJS(true) + "; " + threadsLayoutReflowJS()
 }

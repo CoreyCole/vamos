@@ -7,6 +7,23 @@ import (
 	"testing"
 )
 
+func TestWorkbenchResizeReflowsVisibleColumnsOnThreadsToggle(t *testing.T) {
+	contents, err := os.ReadFile("../../../static/js/workbench-resize.js")
+	if err != nil {
+		t.Fatal(err)
+	}
+	js := string(contents)
+	for _, want := range []string{
+		"function reflowVisibleRegionFlex(root)",
+		`document.addEventListener("workbench-layout-reflow", reflowWorkbenchFromEvent)`,
+		`grow.toFixed(4) + " 1 0%"`,
+	} {
+		if !strings.Contains(js, want) {
+			t.Fatalf("threads toggle reflow missing %q", want)
+		}
+	}
+}
+
 func TestWorkbenchResizeReflowsEphemeralPixelWidthsOnWindowResize(t *testing.T) {
 	contents, err := os.ReadFile("../../../static/js/workbench-resize.js")
 	if err != nil {
