@@ -52,6 +52,15 @@ func preventSubmitPostExpr(route string) string {
 	return "@post('" + route + "', {contentType: 'form'})"
 }
 
+func sectionAddCommentSubmitExpr(route string) string {
+	closeMenu := "el.closest('details')?.removeAttribute('open')"
+	post := preventSubmitPostExpr(route)
+	if post == "" {
+		return closeMenu
+	}
+	return closeMenu + "; " + post
+}
+
 func FocusComposerScript() string {
 	return "document.getElementById('" + CommentsComposerTextID + "')?.focus()"
 }
@@ -395,7 +404,7 @@ templ SectionMenu(args CommentTargetView) {
 			<svg class="h-3.5 w-3.5 text-muted-foreground" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="5" r="2"></circle><circle cx="12" cy="12" r="2"></circle><circle cx="12" cy="19" r="2"></circle></svg>
 		</summary>
 		<div class="absolute left-0 z-50 mt-2 min-w-36 rounded-md border border-border bg-popover p-1 text-popover-foreground shadow-md">
-			<form data-on:submit__prevent={ preventSubmitPostExpr(args.Routes.Show) } class="flex w-full items-center">
+			<form data-on:submit__prevent={ sectionAddCommentSubmitExpr(args.Routes.Show) } class="flex w-full items-center">
 				@HiddenFields(args.HiddenFields)
 				<input type="hidden" name="selected_text" value={ args.HeadingHint }/>
 				<button type="submit" class="flex w-full items-center rounded-sm px-2 py-1.5 text-sm hover:bg-accent hover:text-accent-foreground"><span class="whitespace-nowrap">Add comment</span></button>

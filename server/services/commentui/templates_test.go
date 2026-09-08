@@ -171,7 +171,7 @@ func TestCommentableMarkdownRendersStableTargetsAndHiddenFields(t *testing.T) {
 		t.Fatalf("Render() error = %v", err)
 	}
 	html := buf.String()
-	for _, want := range []string{`data-section-id="section-1"`, `data-comment-target="true"`, `name="artifact_rel_path"`, "Add comment", `contentType`, `name="selected_text" value="Intro"`} {
+	for _, want := range []string{`data-section-id="section-1"`, `data-comment-target="true"`, `name="artifact_rel_path"`, "Add comment", `contentType`, `name="selected_text" value="Intro"`, `removeAttribute(&#39;open&#39;)`} {
 		if !strings.Contains(html, want) {
 			t.Fatalf("render missing %q in %s", want, html)
 		}

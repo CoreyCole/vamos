@@ -437,25 +437,10 @@ func (s *Service) renderFormError(
 		},
 	)
 	form := thoughtsCommentForm(target, data, errMsg)
-	if data.WorkbenchV2 {
-		if err := patchThoughtsCommentTarget(sse, target); err != nil {
-			return err
-		}
-		if err := s.patchThoughtsCommentsPanelWithForm(
-			sse,
-			data.FilePath,
-			userEmail,
-			data.SectionID,
-			data.HeadingHint,
-			response.Comments,
-			data.WorkbenchV2,
-			form,
-		); err != nil {
-			return err
-		}
-	} else if err := patchThoughtsCommentTargetWithForm(sse, target, data, errMsg); err != nil {
+	if err := patchThoughtsCommentTarget(sse, target); err != nil {
 		return err
-	} else if err := s.patchThoughtsCommentsPanel(
+	}
+	if err := s.patchThoughtsCommentsPanelWithForm(
 		sse,
 		data.FilePath,
 		userEmail,
@@ -463,6 +448,7 @@ func (s *Service) renderFormError(
 		data.HeadingHint,
 		response.Comments,
 		data.WorkbenchV2,
+		form,
 	); err != nil {
 		return err
 	}
@@ -852,39 +838,21 @@ func (s *Service) HandleShowCommentForm(c echo.Context) error {
 		},
 	)
 	form := thoughtsCommentForm(target, data, "")
-	if data.WorkbenchV2 {
-		if err := patchThoughtsCommentTarget(sse, target); err != nil {
-			c.Logger().Errorf("Failed to patch shared comment target: %v", err)
-			return err
-		}
-		if err := s.patchThoughtsCommentsPanelWithForm(
-			sse,
-			data.FilePath,
-			userEmail,
-			data.SectionID,
-			data.HeadingHint,
-			response.Comments,
-			data.WorkbenchV2,
-			form,
-		); err != nil {
-			return err
-		}
-	} else {
-		if err := patchThoughtsCommentTargetWithForm(sse, target, data, ""); err != nil {
-			c.Logger().Errorf("Failed to patch shared comment target: %v", err)
-			return err
-		}
-		if err := s.patchThoughtsCommentsPanel(
-			sse,
-			data.FilePath,
-			userEmail,
-			data.SectionID,
-			data.HeadingHint,
-			response.Comments,
-			data.WorkbenchV2,
-		); err != nil {
-			return err
-		}
+	if err := patchThoughtsCommentTarget(sse, target); err != nil {
+		c.Logger().Errorf("Failed to patch shared comment target: %v", err)
+		return err
+	}
+	if err := s.patchThoughtsCommentsPanelWithForm(
+		sse,
+		data.FilePath,
+		userEmail,
+		data.SectionID,
+		data.HeadingHint,
+		response.Comments,
+		data.WorkbenchV2,
+		form,
+	); err != nil {
+		return err
 	}
 	if err := patchOpenCommentsSignal(sse, data.WorkbenchV2); err != nil {
 		return err
