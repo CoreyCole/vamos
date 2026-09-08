@@ -87,6 +87,10 @@ func commentsCloseCookieJS() string {
 	return workbench.CommentsCloseCookieJS()
 }
 
+func chatToggleClickAction() string {
+	return workbench.ChatToggleClickAction()
+}
+
 func setViewDocumentToggle(
 	browser *ThreadArtifactBrowserArgs,
 	onThoughts bool,

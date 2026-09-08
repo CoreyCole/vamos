@@ -401,17 +401,19 @@ func TestViewDocumentButtonSitsLeftOfOverflow(t *testing.T) {
 	search := strings.Index(header, `data-testid="artifact-browser-search-toggle"`)
 	files := strings.Index(header, `aria-label="Toggle files"`)
 	overflow := strings.Index(header, `data-testid="workbench-overflow-actions"`)
-	if view < 0 || comments < 0 || up < 0 || path < 0 || search < 0 || files < 0 ||
-		overflow < 0 ||
-		!(view < comments && comments < up && up < path && path < search && search < files && files < overflow) {
+	chat := strings.Index(header, `data-testid="view-chat"`)
+	if chat < 0 || comments < 0 || up < 0 || path < 0 || search < 0 || files < 0 ||
+		view < 0 || overflow < 0 ||
+		!(chat < comments && comments < up && up < path && path < search && search < files && files < view && view < overflow) {
 		t.Fatalf(
-			"header order view=%d comments=%d up=%d path=%d search=%d files=%d overflow=%d\n%s",
-			view,
+			"header order chat=%d comments=%d up=%d path=%d search=%d files=%d view=%d overflow=%d\n%s",
+			chat,
 			comments,
 			up,
 			path,
 			search,
 			files,
+			view,
 			overflow,
 			header,
 		)
@@ -439,12 +441,13 @@ func TestViewChatButtonOnThoughts(t *testing.T) {
 	}
 	header := artifactPathHeader(t, body.String())
 	chat := strings.Index(header, `data-testid="view-chat"`)
+	comments := strings.Index(header, `data-testid="view-comments"`)
 	path := strings.Index(header, `>thoughts/owner/plans/alpha/design.md</span>`)
 	search := strings.Index(header, `data-testid="artifact-browser-search-toggle"`)
 	files := strings.Index(header, `aria-label="Toggle files"`)
 	overflow := strings.Index(header, `data-testid="workbench-overflow-actions"`)
-	if chat < 0 || path < 0 || search < 0 || files < 0 || overflow < 0 ||
-		!(chat < path && path < search && search < files && files < overflow) {
+	if chat < 0 || comments < 0 || path < 0 || search < 0 || files < 0 || overflow < 0 ||
+		!(chat < comments && comments < path && path < search && search < files && files < overflow) {
 		t.Fatalf(
 			"header order chat=%d path=%d search=%d files=%d overflow=%d\n%s",
 			chat,

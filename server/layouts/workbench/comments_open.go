@@ -36,6 +36,16 @@ func CommentsCloseCookieJS() string {
 	return commentsOpenCookieWriteJS(false)
 }
 
+// ChatToggleClickAction opens chat and closes comments.
+func ChatToggleClickAction() string {
+	return "$workbench.regions.workbenchV2Comments.visible = false; $workbench.regions.workbenchV2Chat.visible = true; " +
+		commentsOpenCookieWriteJS(
+			false,
+		) + "; " +
+		shareChatCommentsRatioJS() + "; " +
+		threadsLayoutReflowJS()
+}
+
 func shareChatCommentsRatioJS() string {
 	return `var chat=document.querySelector("[data-workbench-region='workbench-v2-chat']"); var comments=document.querySelector("[data-workbench-region='workbench-v2-comments']"); if (chat && comments) { if ($workbench.regions.workbenchV2Comments.visible) { comments.dataset.workbenchRatio = chat.dataset.workbenchRatio; $workbench.regions.workbenchV2Comments.ratio = $workbench.regions.workbenchV2Chat.ratio } else { chat.dataset.workbenchRatio = comments.dataset.workbenchRatio; $workbench.regions.workbenchV2Chat.ratio = $workbench.regions.workbenchV2Comments.ratio } }`
 }
