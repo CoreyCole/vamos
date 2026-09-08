@@ -74,19 +74,22 @@ templ ThreadArtifactPane(browser ThreadArtifactBrowserArgs, document templ.Compo
 			<span
 				data-testid="artifact-browser-path"
 				data-show="!$_dirSearchOpen"
-				class="min-w-0 flex-1 truncate text-muted-foreground"
+				class="min-w-0 flex-1 overflow-hidden text-muted-foreground"
 			>
 				<span
 					data-testid="artifact-browser-file"
 					data-show="!$_artifactBrowserOpen"
+					dir="rtl"
+					class="block overflow-hidden text-ellipsis whitespace-nowrap text-left"
 					title={ artifactHeaderFileTitle(browser.DocPath) }
 					if browser.BrowserOpen {
 						style="display: none;"
 					}
-				>{ artifactHeaderFileLabel(browser.DocPath) }</span>
+				><span dir="ltr">{ artifactHeaderFileTitle(browser.DocPath) }</span></span>
 				<span
 					data-testid="artifact-browser-cwd"
 					data-show="$_artifactBrowserOpen"
+					class="block truncate"
 					title={ threadArtifactDirectoryIdentity(browser.DirectoryPath) }
 					if !browser.BrowserOpen {
 						style="display: none;"

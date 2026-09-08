@@ -480,9 +480,9 @@ func TestArtifactHeaderShowsFileWhenClosedAndCwdWhenOpen(t *testing.T) {
 	}
 	header := artifactPathHeader(t, closed.String())
 	if !strings.Contains(header, `data-testid="artifact-browser-file"`) ||
-		!strings.Contains(header, `>design</span>`) ||
-		!strings.Contains(header, `title="thoughts/owner/plans/alpha/design.md"`) {
-		t.Fatalf("closed files should show file name: %s", header)
+		!strings.Contains(header, `dir="rtl"`) ||
+		!strings.Contains(header, `>thoughts/owner/plans/alpha/design.md</span>`) {
+		t.Fatalf("closed files should show full path with left ellipsis: %s", header)
 	}
 	if !strings.Contains(header, `data-testid="artifact-browser-cwd"`) ||
 		!strings.Contains(header, `>alpha</span>`) ||

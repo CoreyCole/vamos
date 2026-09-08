@@ -283,14 +283,6 @@ func threadArtifactDirectoryIdentity(directoryPath string) string {
 	return "thoughts/" + directoryPath
 }
 
-func artifactHeaderFileLabel(docPath string) string {
-	base := path.Base(strings.Trim(strings.TrimSpace(docPath), "/"))
-	if base == "" || base == "." {
-		return artifactHeaderCwdLabel("")
-	}
-	return displayDocumentName(base)
-}
-
 func artifactHeaderCwdLabel(directoryPath string) string {
 	base := path.Base(strings.Trim(strings.TrimSpace(directoryPath), "/"))
 	if base == "" || base == "." {
