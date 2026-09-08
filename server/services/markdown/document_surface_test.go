@@ -117,6 +117,29 @@ func TestBuildDocumentWorkbenchActionsRendersWholeDocumentComment(t *testing.T) 
 	}
 }
 
+func TestDocumentSurfaceMarkdownMatchesChatBubblePadding(t *testing.T) {
+	doc := WorkbenchDocument{
+		Path:          "thoughts/example/design.md",
+		Kind:          DocumentKindMarkdown,
+		PageSessionID: "page-1",
+		Component:     templ.Raw(`<article>body</article>`),
+	}
+	var buf bytes.Buffer
+	if err := DocumentSurface(doc, nil).Render(t.Context(), &buf); err != nil {
+		t.Fatal(err)
+	}
+	html := buf.String()
+	if !strings.Contains(
+		html,
+		`id="thoughts-markdown-scroll-region" class="min-h-0 flex-1 overflow-y-auto px-3 py-1.5"`,
+	) {
+		t.Fatalf("markdown scroll padding = %s", html)
+	}
+	if strings.Contains(html, `p-4 md:p-10`) {
+		t.Fatalf("markdown still uses large inset padding: %s", html)
+	}
+}
+
 func TestDocumentSurfaceRendersHTMLAppletEdgeToEdge(t *testing.T) {
 	doc := WorkbenchDocument{
 		Path:          "thoughts/example.html",
