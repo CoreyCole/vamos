@@ -34,35 +34,34 @@ func artifactSearchDirSuffix(isDir bool) string {
 	return ""
 }
 
-func artifactSearchHitFromEntry(entry ThreadArtifactEntry) ArtifactSearchHit {
-	href := entry.Href
-	if entry.IsDir {
-		href = entry.BrowseHref
-	}
-	return ArtifactSearchHit{
-		Name:  entry.Name,
-		Path:  entry.Path,
-		Href:  href,
-		IsDir: entry.IsDir,
-	}
-}
-
 func artifactSearchQueryMatch(query, name, itemPath string) bool {
 	q := strings.ToLower(strings.TrimSpace(query))
 	if q == "" {
 		return true
+	}
+	needles := []string{q}
+	if ext := filepath.Ext(q); ext != "" {
+		if base := strings.TrimSuffix(q, ext); base != "" {
+			needles = append(needles, base)
+		}
 	}
 	for _, candidate := range []string{name, path.Base(filepath.ToSlash(itemPath))} {
 		n := strings.ToLower(strings.TrimSpace(candidate))
 		if n == "" {
 			continue
 		}
-		if strings.Contains(n, q) {
-			return true
+		hay := []string{n}
+		if ext := filepath.Ext(n); ext != "" {
+			if base := strings.TrimSuffix(n, ext); base != "" {
+				hay = append(hay, base)
+			}
 		}
-		ext := strings.ToLower(filepath.Ext(n))
-		if ext != "" && strings.Contains(strings.TrimSuffix(n, ext), q) {
-			return true
+		for _, h := range hay {
+			for _, needle := range needles {
+				if strings.Contains(h, needle) {
+					return true
+				}
+			}
 		}
 	}
 	return false
@@ -101,7 +100,7 @@ func (s *Service) HandleThoughtsArtifactSearch(c echo.Context) error {
 	}
 	if query != "" {
 		results.Directory, results.Global = s.artifactSearchSections(
-			browser.Entries,
+			browser.DirectoryPath,
 			query,
 			selectedDoc,
 			threadID,
@@ -115,39 +114,50 @@ func (s *Service) HandleThoughtsArtifactSearch(c echo.Context) error {
 	)
 }
 
-func (s *Service) artifactSearchSections(
-	cwdEntries []ThreadArtifactEntry,
-	query, selectedDoc, threadID string,
-) (directory, global []ArtifactSearchHit) {
-	skip := make(map[string]struct{}, len(cwdEntries))
-	for _, entry := range cwdEntries {
-		skip[entry.Path] = struct{}{}
-		if artifactSearchQueryMatch(query, entry.Name, entry.Path) {
-			directory = append(directory, artifactSearchHitFromEntry(entry))
-		}
+func artifactSearchRelPrefix(dir string) string {
+	return strings.Trim(filepath.ToSlash(dir), "/")
+}
+
+func artifactSearchUnderDir(rel, dir string) bool {
+	if dir == "" {
+		return true
 	}
-	global = s.searchThoughtsGlobal(query, selectedDoc, threadID, skip)
+	return rel == dir || strings.HasPrefix(rel, dir+"/")
+}
+
+func (s *Service) artifactSearchSections(
+	cwdDir, query, selectedDoc, threadID string,
+) (directory, global []ArtifactSearchHit) {
+	cwdDir = artifactSearchRelPrefix(cwdDir)
+	directory = s.searchThoughtsNames(query, selectedDoc, threadID, cwdDir, "")
+	if cwdDir == "" {
+		return directory, nil
+	}
+	global = s.searchThoughtsNames(query, selectedDoc, threadID, "", cwdDir)
 	return directory, global
 }
 
-func (s *Service) searchThoughtsGlobal(
-	query, selectedDoc, threadID string,
-	skip map[string]struct{},
+func (s *Service) searchThoughtsNames(
+	query, selectedDoc, threadID, startRel, excludeRel string,
 ) []ArtifactSearchHit {
 	if s == nil || strings.TrimSpace(s.basePath) == "" {
 		return nil
 	}
+	start := s.basePath
+	if startRel != "" {
+		start = filepath.Join(s.basePath, filepath.FromSlash(startRel))
+	}
 	hits := make([]ArtifactSearchHit, 0, artifactSearchGlobalLimit)
-	_ = filepath.WalkDir(s.basePath, func(abs string, d fs.DirEntry, err error) error {
+	_ = filepath.WalkDir(start, func(abs string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return nil
 		}
 		name := d.Name()
-		if abs != s.basePath && d.IsDir() &&
+		if abs != start && d.IsDir() &&
 			(strings.HasPrefix(name, ".") || skipWorkspaceDocTreeEntry(name, true)) {
 			return filepath.SkipDir
 		}
-		if abs != s.basePath && strings.HasPrefix(name, ".") {
+		if abs != start && strings.HasPrefix(name, ".") {
 			return nil
 		}
 		rel, relErr := filepath.Rel(s.basePath, abs)
@@ -158,7 +168,10 @@ func (s *Service) searchThoughtsGlobal(
 		if rel == "." || rel == "" {
 			return nil
 		}
-		if _, dup := skip[rel]; dup {
+		if excludeRel != "" && artifactSearchUnderDir(rel, excludeRel) {
+			if d.IsDir() && rel == excludeRel {
+				return filepath.SkipDir
+			}
 			return nil
 		}
 		if d.IsDir() {

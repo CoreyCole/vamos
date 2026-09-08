@@ -152,6 +152,9 @@ func TestArtifactSearchQueryMatchUsesFileNameNotPathSegments(t *testing.T) {
 	if !artifactSearchQueryMatch("unique-target.md", "unique-target", path) {
 		t.Fatal("query unique-target.md should match display name unique-target")
 	}
+	if !artifactSearchQueryMatch("design.md", "design", "owner/plans/alpha/design.md") {
+		t.Fatal("query design.md should match display name design")
+	}
 	if artifactSearchQueryMatch("alpha", "unique-target.md", path) {
 		t.Fatal("parent dir name should not match a file in that path")
 	}
@@ -203,8 +206,11 @@ func TestHandleThoughtsArtifactSearchFindsFileByNameNotPathDirs(t *testing.T) {
 	if dirStart < 0 || globalStart < 0 {
 		t.Fatalf("missing search sections: %s", body)
 	}
-	if strings.Contains(body[dirStart:globalStart], "unique-target.md") {
-		t.Fatalf("nested file leaked into this directory: %s", body[dirStart:globalStart])
+	if !strings.Contains(body[dirStart:globalStart], "unique-target.md") {
+		t.Fatalf(
+			"this directory should include nested unique-target.md: %s",
+			body[dirStart:globalStart],
+		)
 	}
 
 	design := thoughtsArtifactSearchBody(
@@ -239,6 +245,49 @@ func TestHandleThoughtsArtifactSearchFindsFileByNameNotPathDirs(t *testing.T) {
 	}
 	if !strings.Contains(alpha, `>alpha/<`) {
 		t.Fatalf("dir-name search missed the alpha directory: %s", alpha)
+	}
+}
+
+func TestHandleThoughtsArtifactSearchThisDirectoryWalksNestedFiles(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	mustMkdirAll(t, filepath.Join(root, "owner", "plans", "alpha"))
+	mustMkdirAll(t, filepath.Join(root, "owner", "shared"))
+	mustWriteFile(
+		t,
+		filepath.Join(root, "owner", "plans", "alpha", "design.md"),
+		[]byte("# Design"),
+	)
+	mustWriteFile(
+		t,
+		filepath.Join(root, "owner", "shared", "notebook.md"),
+		[]byte("# Notebook"),
+	)
+	svc, err := NewService(root, nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	body := thoughtsArtifactSearchBody(
+		t,
+		svc,
+		"design.md",
+		"thoughts/owner/plans/alpha/design.md",
+		"thoughts/owner/plans",
+	)
+	dirStart := strings.Index(body, `data-testid="artifact-search-this-directory"`)
+	globalStart := strings.Index(body, `data-testid="artifact-search-all-thoughts"`)
+	if dirStart < 0 || globalStart < 0 {
+		t.Fatalf("missing search sections: %s", body)
+	}
+	dirSection := body[dirStart:globalStart]
+	if !strings.Contains(dirSection, `href="/thoughts/owner/plans/alpha/design.md"`) {
+		t.Fatalf("this directory missed nested design.md: %s", dirSection)
+	}
+	if strings.Contains(body[globalStart:], "design.md") &&
+		strings.Contains(body[globalStart:], ">design<") {
+		t.Fatalf("nested design.md leaked into all thoughts: %s", body[globalStart:])
 	}
 }
 
