@@ -337,7 +337,7 @@ func artifactBrowserSearchHotkeyAction() string {
 }
 
 func artifactBrowserSearchFetchAction() string {
-	return "var root = document.getElementById('thread-artifact-browser'); if (!root || !root.dataset.artifactSearchEndpoint) { return }; var ep = root.dataset.artifactSearchEndpoint; var sep = ep.indexOf('?') >= 0 ? '&' : '?'; @get(ep + sep + 'q=' + encodeURIComponent(String($dirSearch || '')))"
+	return "@get(document.getElementById('thread-artifact-browser').dataset.artifactSearchEndpoint + '&q=' + encodeURIComponent($dirSearch || ''))"
 }
 
 func artifactBrowserSearchClearAction() string {
@@ -345,7 +345,10 @@ func artifactBrowserSearchClearAction() string {
 }
 
 func artifactBrowserSearchKeydownAction() string {
-	return "if (evt.key !== 'Escape') { return }; " + artifactBrowserSearchClearAction()
+	return "evt.key === 'Enter' ? evt.preventDefault() : evt.key === 'Escape' ? (" +
+		"$_dirSearchOpen = false, $dirSearch = '', " +
+		artifactBrowserSearchFetchAction() +
+		") : null"
 }
 
 func artifactBrowserSearchBlurAction() string {

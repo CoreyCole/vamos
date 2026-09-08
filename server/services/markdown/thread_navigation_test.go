@@ -219,6 +219,8 @@ func TestThreadArtifactBrowserSearchLivesInPathHeader(t *testing.T) {
 		`aria-label="Clear search"`,
 		`focus:ring-2`,
 		`data-on:input__debounce.300ms`,
+		`@get(document.getElementById(`,
+		`dataset.artifactSearchEndpoint`,
 	} {
 		if !strings.Contains(header, want) {
 			t.Fatalf("header search missing %q: %s", want, header)
