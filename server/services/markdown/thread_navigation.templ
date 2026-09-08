@@ -103,6 +103,20 @@ templ ThreadArtifactPane(browser ThreadArtifactBrowserArgs, document templ.Compo
 			</button>
 			<button
 				type="button"
+				data-testid="artifact-browser-search-clear"
+				data-on:click={ artifactBrowserSearchClearAction() }
+				data-show="$_dirSearchOpen"
+				class="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+				aria-label="Clear search"
+				title="Clear search"
+				style="display: none;"
+			>
+				<svg class="h-3.5 w-3.5" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+				</svg>
+			</button>
+			<button
+				type="button"
 				class={
 					"inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground",
 					templ.KV("bg-muted text-foreground", browser.BrowserOpen),
@@ -241,7 +255,7 @@ templ ThreadArtifactBrowserResults(args ThreadArtifactBrowserResultsArgs) {
 				}
 			</ul>
 		} else {
-			@artifactSearchSection("This directory", "artifact-search-this-directory", args.Directory, false)
+			@artifactSearchSection("This directory", "artifact-search-this-directory", args.Directory, true)
 			@artifactSearchSection("All thoughts", "artifact-search-all-thoughts", args.Global, true)
 		}
 	</div>

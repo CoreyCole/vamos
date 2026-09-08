@@ -149,7 +149,7 @@ func TestThreadArtifactPaneScopesStaticHandlersToBrowserRows(t *testing.T) {
 		`data-on:click="if (!$_threadArtifactLoading`,
 		`href="/thoughts/fullscreen.md"`,
 		`_artifactBrowserOpen: true`,
-		`data-show="` + artifactBrowserVisibleExpr() + `"`,
+		`$_artifactBrowserOpen || $dirSearch`,
 		`aria-controls="thread-artifact-browser"`,
 		`id="thread-artifact-path-header"`,
 		`aria-label="Toggle files"`,
@@ -214,7 +214,9 @@ func TestThreadArtifactBrowserSearchLivesInPathHeader(t *testing.T) {
 	for _, want := range []string{
 		`data-testid="artifact-browser-search"`,
 		`data-testid="artifact-browser-search-toggle"`,
+		`data-testid="artifact-browser-search-clear"`,
 		`aria-label="Search files"`,
+		`aria-label="Clear search"`,
 		`focus:ring-2`,
 		`data-on:input__debounce.300ms`,
 	} {

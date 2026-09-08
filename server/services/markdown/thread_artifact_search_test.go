@@ -315,6 +315,50 @@ func TestHandleThoughtsArtifactSearchThisDirectoryWalksNestedFiles(t *testing.T)
 	}
 }
 
+func TestHandleThoughtsArtifactSearchThisDirectoryShowsFullPath(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	mustMkdirAll(t, filepath.Join(root, "owner", "plans", "alpha", "docs"))
+	mustWriteFile(
+		t,
+		filepath.Join(root, "owner", "plans", "alpha", "design.md"),
+		[]byte("# Design"),
+	)
+	mustWriteFile(
+		t,
+		filepath.Join(root, "owner", "plans", "alpha", "docs", "design.md"),
+		[]byte("# Nested"),
+	)
+	svc, err := NewService(root, nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	body := thoughtsArtifactSearchBody(
+		t,
+		svc,
+		"design.md",
+		"thoughts/owner/plans/alpha/design.md",
+		"thoughts/owner/plans/alpha",
+	)
+	dirStart := strings.Index(body, `data-testid="artifact-search-this-directory"`)
+	globalStart := strings.Index(body, `data-testid="artifact-search-all-thoughts"`)
+	if dirStart < 0 || globalStart < 0 {
+		t.Fatalf("missing search sections: %s", body)
+	}
+	dirSection := body[dirStart:globalStart]
+	for _, want := range []string{
+		"thoughts/owner/plans/alpha/design.md",
+		"thoughts/owner/plans/alpha/docs/design.md",
+		`text-[10px]`,
+	} {
+		if !strings.Contains(dirSection, want) {
+			t.Fatalf("this directory missing path %q: %s", want, dirSection)
+		}
+	}
+}
+
 func thoughtsArtifactSearchBody(
 	t *testing.T,
 	svc *Service,
