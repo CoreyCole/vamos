@@ -13,11 +13,11 @@ type RosterSelection struct {
 
 templ RosterRail(sel RosterSelection) {
 	<div id="workbench-v2-roster" class="flex h-full min-h-0 flex-col overflow-hidden">
-		<header id="workbench-v2-roster-header" class="flex h-10 min-h-10 max-h-10 shrink-0 items-center gap-2 overflow-hidden border-b border-border px-2.5">
+		<div id="workbench-v2-roster-header" class="flex h-10 min-h-10 max-h-10 shrink-0 items-center gap-2 overflow-hidden px-2.5">
 			<button
 				type="button"
 				data-workbench-threads-toggle
-				class="hidden h-7 w-7 shrink-0 items-center justify-center rounded-md border border-border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:inline-flex"
+				class="hidden h-7 w-7 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-white/[0.06] hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:inline-flex"
 				data-on:click={ workbench.ThreadsHideClickAction() }
 				data-attr:aria-expanded="$workbench.regions.workbenchV2Threads.visible ? 'true' : 'false'"
 				aria-controls="workbench-v2-threads"
@@ -29,7 +29,7 @@ templ RosterRail(sel RosterSelection) {
 				</svg>
 			</button>
 			<label class="sr-only" for="workbench-v2-roster-search">Search</label>
-			<div class="flex h-7 min-w-0 flex-1 items-center gap-2 rounded-md border border-border bg-muted/40 px-2">
+			<div class="flex h-7 min-w-0 flex-1 items-center gap-2 rounded-xl bg-white/[0.05] px-2.5">
 				<svg class="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M11 18a7 7 0 100-14 7 7 0 000 14z"></path>
 				</svg>
@@ -40,15 +40,15 @@ templ RosterRail(sel RosterSelection) {
 					class="min-w-0 flex-1 bg-transparent text-[13px] leading-none text-foreground placeholder:text-muted-foreground focus:outline-none"
 				/>
 			</div>
-		</header>
-		<div class="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden p-2">
+		</div>
+		<div class="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden px-2 pb-2">
 			<div id="workbench-v2-roster-pins" class="flex shrink-0 gap-2 px-1">
 				<a
 					href="/rooms/dm/bot"
 					data-roster-id="dm:bot"
 					class={ rosterPinClass(sel.Kind == KindDM && sel.ID == "bot"), templ.KV("hidden", !rosterIsPinned(KindDM, "bot")) }
 				>
-					<span class="flex h-10 w-10 items-center justify-center rounded-2xl bg-fuchsia-500/90 text-sm font-semibold text-white">B</span>
+					<span class="flex h-12 w-12 items-center justify-center rounded-2xl bg-fuchsia-500/90 text-base font-semibold text-white">B</span>
 					<span class="w-full truncate text-[10px] text-muted-foreground">Bot</span>
 				</a>
 				<a
@@ -56,7 +56,7 @@ templ RosterRail(sel RosterSelection) {
 					data-roster-id="group:vamos-dev"
 					class={ rosterPinClass(sel.Kind == KindGroup && sel.ID == "vamos-dev"), templ.KV("hidden", !rosterIsPinned(KindGroup, "vamos-dev")) }
 				>
-					<span class="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-500/90 text-sm font-semibold text-white">V</span>
+					<span class="flex h-12 w-12 items-center justify-center rounded-full bg-emerald-500/90 text-base font-semibold text-white">V</span>
 					<span class="w-full truncate text-[10px] text-muted-foreground">Vamos Lead</span>
 				</a>
 				<a
@@ -64,13 +64,13 @@ templ RosterRail(sel RosterSelection) {
 					data-roster-id="dm:research"
 					class={ rosterPinClass(sel.Kind == KindDM && sel.ID == "research"), templ.KV("hidden", !rosterIsPinned(KindDM, "research")) }
 				>
-					<span class="flex h-10 w-10 items-center justify-center rounded-2xl bg-sky-500/80 text-sm font-semibold text-white">R</span>
+					<span class="flex h-12 w-12 items-center justify-center rounded-2xl bg-sky-500/80 text-base font-semibold text-white">R</span>
 					<span class="w-full truncate text-[10px] text-muted-foreground">Research</span>
 				</a>
 			</div>
-			<div class="min-h-0 flex-1 space-y-4 overflow-y-auto px-1 pb-2">
-				<section id="workbench-v2-roster-agents" class="space-y-1" aria-label="Agents">
-					<h2 class="px-1 text-[11px] font-medium text-muted-foreground">Agents</h2>
+			<div class="min-h-0 flex-1 space-y-3 overflow-y-auto px-1 pb-2">
+				<section id="workbench-v2-roster-agents" class="space-y-0.5" aria-label="Agents">
+					<h2 class="px-1.5 pb-1 text-[10px] font-medium tracking-wide text-muted-foreground/80">Agents</h2>
 					<ul class="flex flex-col">
 						<li id="roster-row-dm-bot" class={ templ.KV("hidden", rosterIsPinned(KindDM, "bot")) }>
 							<a
@@ -98,16 +98,19 @@ templ RosterRail(sel RosterSelection) {
 								<span class="min-w-0 flex-1">
 									<span class="flex items-baseline justify-between gap-2">
 										<span class="truncate text-sm font-medium text-foreground">Research agent</span>
-										<span class="shrink-0 text-[10px] text-muted-foreground">Thu</span>
+										<span class="flex shrink-0 items-center gap-1.5">
+											<span class="text-[10px] text-muted-foreground">Thu</span>
+											<span class="h-1.5 w-1.5 rounded-full bg-sky-400" aria-label="Unread"></span>
+										</span>
 									</span>
-									<span class="mt-0.5 line-clamp-1 text-xs text-muted-foreground">No recent messages</span>
+									<span class="mt-0.5 line-clamp-1 text-xs text-muted-foreground">Short path — how do I get read-only access?</span>
 								</span>
 							</a>
 						</li>
 					</ul>
 				</section>
-				<section id="workbench-v2-roster-groups" class={ "space-y-1", templ.KV("hidden", rosterIsPinned(KindGroup, "vamos-dev")) } aria-label="Groups">
-					<h2 class="px-1 text-[11px] font-medium text-muted-foreground">Groups</h2>
+				<section id="workbench-v2-roster-groups" class={ "space-y-0.5", templ.KV("hidden", rosterIsPinned(KindGroup, "vamos-dev")) } aria-label="Groups">
+					<h2 class="px-1.5 pb-1 text-[10px] font-medium tracking-wide text-muted-foreground/80">Groups</h2>
 					<ul class="flex flex-col">
 						<li id="roster-row-group-vamos-dev" class={ templ.KV("hidden", rosterIsPinned(KindGroup, "vamos-dev")) }>
 							<a
@@ -131,8 +134,8 @@ templ RosterRail(sel RosterSelection) {
 						</li>
 					</ul>
 				</section>
-				<section id="workbench-v2-roster-plans" class="space-y-1 border-t border-dashed border-border/60 pt-3" aria-label="Plan threads">
-					<h2 class="px-1 text-[11px] font-medium text-muted-foreground">Plan threads</h2>
+				<section id="workbench-v2-roster-plans" class="space-y-0.5 pt-1" aria-label="Plan">
+					<h2 class="px-1.5 pb-1 text-[10px] font-medium tracking-wide text-muted-foreground/80">Plan</h2>
 					<ul class="flex flex-col">
 						<li id="roster-row-plan-alpha">
 							<a
@@ -177,9 +180,14 @@ templ RosterRail(sel RosterSelection) {
 templ RoomChatPane(kind RoomKind, id string, title string, body string) {
 	{{ placeholder := roomComposerPlaceholder(kind, id, title) }}
 	<div class="flex h-full min-h-0 flex-col">
-		<header id="workbench-v2-room-header" class="shrink-0 border-b border-border px-4 py-2">
-			<p class="text-sm font-semibold text-foreground">{ title }</p>
-			<p class="text-[11px] text-muted-foreground">{ string(kind) } / { id }</p>
+		<header id="workbench-v2-room-header" class="flex shrink-0 items-center gap-2 border-b border-border px-3 py-2">
+			<span class={ "flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold", workbench.ChatHeaderAvatarClass(title) }>{ workbench.ChatHeaderInitial(title) }</span>
+			<p class="min-w-0 flex-1 truncate text-sm font-semibold text-foreground">{ title }</p>
+			<button type="button" class="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground" aria-label="Share" title="Share">
+				<svg class="h-3.5 w-3.5" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 12v7a1 1 0 001 1h14a1 1 0 001-1v-7M16 6l-4-4-4 4M12 2v13"></path>
+				</svg>
+			</button>
 		</header>
 		<div id="workbench-v2-room-transcript" class="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-4">
 			if kind == KindDM && id == "bot" {
@@ -245,8 +253,13 @@ templ NestedQuoteBlock(initial string, name string, avatarBg string, nameColor s
 }
 
 templ RoomSimpleComposer(placeholder string) {
-	<div id="workbench-v2-room-composer" class="shrink-0 border-t border-border bg-background px-3 py-3">
-		<form class="flex items-center gap-2 rounded-2xl border border-border bg-muted/40 px-3 py-2" action="#" method="post" onsubmit="return false">
+	<div id="workbench-v2-room-composer" class="shrink-0 px-3 py-3">
+		<form class="flex items-center gap-2 rounded-full border border-white/10 bg-[#111111] px-2 py-1.5" action="#" method="post" onsubmit="return false">
+			<button type="button" class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-white/[0.06] hover:text-foreground" aria-label="Add" title="Add">
+				<svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v14M5 12h14"></path>
+				</svg>
+			</button>
 			<label class="sr-only" for="workbench-v2-room-composer-input">{ placeholder }</label>
 			<input
 				id="workbench-v2-room-composer-input"
@@ -257,13 +270,13 @@ templ RoomSimpleComposer(placeholder string) {
 				class="min-w-0 flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground focus:outline-none"
 			/>
 			<button
-				type="submit"
-				class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground transition-colors hover:bg-primary/90"
-				aria-label="Send message"
-				title="Send"
+				type="button"
+				class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-white/[0.06] hover:text-foreground"
+				aria-label="Voice message"
+				title="Voice message"
 			>
-				<svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 11.5L21 3l-8.5 18-2.5-7.5L3 11.5z"></path>
+				<svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3a3 3 0 00-3 3v6a3 3 0 006 0V6a3 3 0 00-3-3zM19 10v2a7 7 0 01-14 0v-2M12 19v3"></path>
 				</svg>
 			</button>
 		</form>

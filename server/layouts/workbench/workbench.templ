@@ -62,11 +62,26 @@ templ ChatColumnWithReopen(threadsOpen bool, title string, chat templ.Component)
 	<div class="flex h-full min-h-0 flex-col bg-background">
 		<header id="workbench-v2-chat-header" class="flex h-10 min-h-10 max-h-10 shrink-0 items-center gap-2 overflow-hidden border-b border-border px-2.5">
 			@ThreadsReopenControl(threadsOpen)
+			if title != "" {
+				<span class={ "flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold", ChatHeaderAvatarClass(title) }>{ ChatHeaderInitial(title) }</span>
+			}
 			<div class="flex min-h-0 min-w-0 flex-1 items-center">
 				if title != "" {
 					<p class="truncate text-[13px] font-semibold leading-none text-foreground">{ title }</p>
 				}
 			</div>
+			if title != "" {
+				<button
+					type="button"
+					class="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+					aria-label="Share"
+					title="Share"
+				>
+					<svg class="h-3.5 w-3.5" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 12v7a1 1 0 001 1h14a1 1 0 001-1v-7M16 6l-4-4-4 4M12 2v13"></path>
+					</svg>
+				</button>
+			}
 		</header>
 		<div class="flex min-h-0 flex-1 flex-col overflow-hidden">
 			@chat

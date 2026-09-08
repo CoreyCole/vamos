@@ -56,8 +56,10 @@ func TestOverflowActionsRendersLinksAndFormModes(t *testing.T) {
 
 	for _, want := range []string{
 		`data-testid="workbench-overflow-actions"`,
+		`data-overflow-trigger`,
+		`data-overflow-menu`,
 		`data-on:click="navigator.clipboard.writeText(&#39;demo&#39;)"`,
-		`data-on:submit__prevent="el.closest(&#39;details&#39;)?.removeAttribute(&#39;open&#39;); @post(&#39;/forms/comments/show&#39;, {contentType: &#39;form&#39;})"`,
+		`data-on:submit__prevent="el.closest(&#39;[data-overflow-menu]&#39;)?.style.setProperty(&#39;display&#39;,&#39;none&#39;); @post(&#39;/forms/comments/show&#39;, {contentType: &#39;form&#39;})"`,
 		`method="post" action="/forms/applets/demo/restart"`,
 		`target="_blank" rel="noopener"`,
 	} {
@@ -67,5 +69,8 @@ func TestOverflowActionsRendersLinksAndFormModes(t *testing.T) {
 	}
 	if strings.Contains(html, `@post(&#39;/forms/applets/demo/restart&#39;`) {
 		t.Fatalf("native lifecycle form rendered as Datastar post: %s", html)
+	}
+	if strings.Contains(html, "<details") || strings.Contains(html, "<summary") {
+		t.Fatalf("overflow actions must be a portaled dropdown, not details: %s", html)
 	}
 }

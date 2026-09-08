@@ -21,7 +21,7 @@ func rosterPlanRowClass(selected bool) string {
 }
 
 func rosterPinClass(selected bool) string {
-	base := "roster-pin flex w-20 flex-col items-center gap-1 rounded-xl px-2 py-2 text-center transition-colors"
+	base := "roster-pin flex flex-col items-center gap-1 rounded-2xl px-1.5 py-1.5 text-center transition-colors"
 	if selected {
 		return base + " roster-pin-selected"
 	}

@@ -1,8 +1,12 @@
 package workbench
 
 import (
+	"context"
+	"io"
 	"sort"
 	"strings"
+
+	"github.com/a-h/templ"
 )
 
 type OverflowActionKind string
@@ -55,12 +59,16 @@ func overflowFormMethod(action OverflowAction) string {
 	return method
 }
 
+func overflowCloseMenuExpr() string {
+	return "el.closest('[data-overflow-menu]')?.style.setProperty('display','none')"
+}
+
 func overflowDatastarSubmit(action OverflowAction) string {
 	formAction := strings.TrimSpace(action.FormAction)
 	if formAction == "" {
 		return ""
 	}
-	return "el.closest('details')?.removeAttribute('open'); @post('" + escapeDatastarString(
+	return overflowCloseMenuExpr() + "; @post('" + escapeDatastarString(
 		formAction,
 	) + "', {contentType: 'form'})"
 }
@@ -77,4 +85,58 @@ func overflowHiddenFieldNames(fields map[string]string) []string {
 func escapeDatastarString(value string) string {
 	value = strings.ReplaceAll(value, `\`, `\\`)
 	return strings.ReplaceAll(value, `'`, `\'`)
+}
+
+func OverflowActionsScript() templ.Component {
+	return templ.ComponentFunc(func(ctx context.Context, w io.Writer) error {
+		_, err := io.WriteString(w, `<script data-overflow-chrome="1">
+(() => {
+  function closeMenu(menu) {
+    if (menu) menu.style.display = "none";
+  }
+  function placeMenu(trigger, menu) {
+    if (!trigger || !menu) return;
+    if (menu.parentElement !== document.body) document.body.appendChild(menu);
+    menu.style.display = "block";
+    menu.style.position = "fixed";
+    menu.style.zIndex = "1000";
+    const r = trigger.getBoundingClientRect();
+    const w = menu.offsetWidth || 192;
+    const pad = 8;
+    menu.style.top = (r.bottom + 4) + "px";
+    menu.style.left = Math.max(pad, Math.min(r.right - w, window.innerWidth - w - pad)) + "px";
+  }
+  function bindRoot(root) {
+    if (!root || root.dataset.overflowBound) return;
+    root.dataset.overflowBound = "1";
+    const trigger = root.querySelector("[data-overflow-trigger]");
+    const menu = root.querySelector("[data-overflow-menu]");
+    if (!trigger || !menu) return;
+    trigger.addEventListener("click", (evt) => {
+      evt.preventDefault();
+      evt.stopPropagation();
+      const open = menu.style.display === "block";
+      document.querySelectorAll("[data-overflow-menu]").forEach((node) => closeMenu(node));
+      if (!open) placeMenu(trigger, menu);
+    });
+    menu.addEventListener("click", (evt) => {
+      if (evt.target.closest("a,button")) closeMenu(menu);
+    });
+  }
+  document.querySelectorAll("[data-overflow-root]").forEach(bindRoot);
+  if (document.documentElement.dataset.overflowChromeBound) return;
+  document.documentElement.dataset.overflowChromeBound = "1";
+  document.addEventListener("click", (evt) => {
+    if (evt.target.closest("[data-overflow-root], [data-overflow-menu]")) return;
+    document.querySelectorAll("[data-overflow-menu]").forEach((node) => closeMenu(node));
+  });
+  document.addEventListener("keydown", (evt) => {
+    if (evt.key === "Escape") {
+      document.querySelectorAll("[data-overflow-menu]").forEach((node) => closeMenu(node));
+    }
+  });
+})();
+</script>`)
+		return err
+	})
 }

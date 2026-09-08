@@ -10,15 +10,27 @@ import (
 
 func TestChatColumnWithReopen_ClosedShowsVisibleSlot(t *testing.T) {
 	var b strings.Builder
-	if err := ChatColumnWithReopen(false, "Bot", templ.Raw("<p>chat</p>")).Render(context.Background(), &b); err != nil {
+	if err := ChatColumnWithReopen(
+		false,
+		"Bot",
+		templ.Raw("<p>chat</p>"),
+	).Render(context.Background(), &b); err != nil {
 		t.Fatal(err)
 	}
 	out := b.String()
 	if !strings.Contains(out, `id="workbench-v2-threads-reopen"`) {
 		t.Fatalf("missing reopen: %s", out)
 	}
-	if !strings.Contains(out, `id="workbench-v2-chat-header"`) || !strings.Contains(out, "h-10") {
+	if !strings.Contains(out, `id="workbench-v2-chat-header"`) ||
+		!strings.Contains(out, "h-10") {
 		t.Fatalf("chat header missing fixed h-10: %s", out)
+	}
+	if !strings.Contains(out, ">B</span>") ||
+		!strings.Contains(out, `aria-label="Share"`) {
+		t.Fatalf("chat header missing avatar or share: %s", out)
+	}
+	if strings.Contains(out, "/new") {
+		t.Fatalf("chat header must not offer /new: %s", out)
 	}
 	idx := strings.Index(out, `id="workbench-v2-threads-reopen"`)
 	end := strings.Index(out[idx:], ">")
@@ -39,7 +51,11 @@ func TestChatColumnWithReopen_ClosedShowsVisibleSlot(t *testing.T) {
 
 func TestChatColumnWithReopen_OpenKeepsInvisibleSlot(t *testing.T) {
 	var b strings.Builder
-	if err := ChatColumnWithReopen(true, "Bot", templ.Raw("<p>chat</p>")).Render(context.Background(), &b); err != nil {
+	if err := ChatColumnWithReopen(
+		true,
+		"Bot",
+		templ.Raw("<p>chat</p>"),
+	).Render(context.Background(), &b); err != nil {
 		t.Fatal(err)
 	}
 	out := b.String()

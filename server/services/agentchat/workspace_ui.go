@@ -149,7 +149,9 @@ func slashCommandInputHandler(workspaceID, threadID, endpointBase string) string
 	var commandURL string
 	switch {
 	case threadID != "":
-		commandURL = endpointBase + "/thread/" + url.PathEscape(threadID) + "/slash-commands"
+		commandURL = endpointBase + "/thread/" + url.PathEscape(
+			threadID,
+		) + "/slash-commands"
 	case workspaceID != "":
 		commandURL = endpointBase + "/" + url.PathEscape(workspaceID) + "/slash-commands"
 	default:
@@ -335,4 +337,14 @@ func workspacePromptPlaceholder(hasThread bool) string {
 		return "Continue this conversation"
 	}
 	return "Ask Pi to do work in this workspace"
+}
+
+func sharedThreadComposerPlaceholder(args EmbeddedFreeformPanelArgs) string {
+	if placeholder := strings.TrimSpace(args.Placeholder); placeholder != "" {
+		return placeholder
+	}
+	if args.HasThread {
+		return "Message Bot"
+	}
+	return workspacePromptPlaceholder(false)
 }

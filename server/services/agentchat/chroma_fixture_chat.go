@@ -8,15 +8,19 @@ import (
 	"github.com/a-h/templ"
 )
 
-const chromaHighlightFixtureDOMID = "ai470-chroma-highlight-fixture"
-const groupQuoteFixtureDOMID = "ai470-group-quote-fixture"
-const groupPeerFixtureDOMID = "ai470-group-peer-fixture"
+const (
+	chromaHighlightFixtureDOMID = "ai470-chroma-highlight-fixture"
+	groupQuoteFixtureDOMID      = "ai470-group-quote-fixture"
+	groupPeerFixtureDOMID       = "ai470-group-peer-fixture"
+)
 
 // chromaHighlightFixtureMarkdown is a visible assistant bubble for UX chroma VA.
 const chromaHighlightFixtureMarkdown = "Syntax-highlight smoke (AI-470):\n\n```go\npackage main\n\nimport \"fmt\"\n\nfunc main() {\n\tfmt.Println(\"chroma\")\n}\n```\n"
 
-const groupPeerFixtureMarkdown = "Feel ask: Grok Bot–like bubbles — left agents with colored avatar+name, right user with no header."
-const groupLeadFixtureMarkdown = "Greenlit. Prefer HTML in `RoomChatPane`; reuse agentchat only if clean."
+const (
+	groupPeerFixtureMarkdown = "Feel ask: Grok Bot–like bubbles — left agents with colored avatar+name, right user with no header."
+	groupLeadFixtureMarkdown = "Greenlit. Prefer HTML in `RoomChatPane`; reuse agentchat only if clean."
+)
 
 // RenderSharedThreadChatWithChromaFixture is SharedThreadChat plus a fenced ```go
 // assistant bubble so converge VA can smoke chroma in-workbench.
@@ -61,9 +65,10 @@ func (s *Service) renderSharedThreadChat(
 	}
 	live, cursor := s.buildLiveTranscript(thread.ID)
 	args := EmbeddedFreeformPanelArgs{
-		ThreadID:  thread.ID,
-		HasThread: true,
-		Cwd:       thread.Cwd,
+		ThreadID:    thread.ID,
+		HasThread:   true,
+		Cwd:         thread.Cwd,
+		Placeholder: leftoverComposerPlaceholder(fixtureMode),
 		Transcript: TranscriptPaneState{
 			Stable: stable,
 			Live:   live,
@@ -84,6 +89,15 @@ func (s *Service) renderSharedThreadChat(
 		) + "/draft', {filterSignals: {include: /^chatDraft$/}})",
 	}
 	return SharedThreadChat(args), nil
+}
+
+func leftoverComposerPlaceholder(fixtureMode string) string {
+	switch fixtureMode {
+	case "group":
+		return "Message Vamos dev"
+	default:
+		return "Message Bot"
+	}
 }
 
 func (s *Service) chromaHighlightFixtureMessage() TranscriptMessage {

@@ -159,10 +159,14 @@ func TestThreadArtifactPaneScopesStaticHandlersToBrowserRows(t *testing.T) {
 		`sessionStorage.setItem('workbench-v2:artifact-browser-open'`,
 		`data-attr:d=`,
 		`data-artifact-browser-open="1"`,
+		`d="M15 19l-7-7 7-7"`,
 	} {
 		if !strings.Contains(html, want) {
 			t.Fatalf("artifact pane missing %q: %s", want, html)
 		}
+	}
+	if strings.Contains(html, ">Up</span>") || strings.Contains(html, ">←</span>") {
+		t.Fatalf("Up control must be an icon aligned with files toggle: %s", html)
 	}
 	if strings.Contains(html, "threadArtifactFileClickAction") ||
 		strings.Contains(html, `data-thread-artifact-file" data-artifact-endpoint`) ||
@@ -276,7 +280,10 @@ func TestArtifactBrowserOpenFromRequest(t *testing.T) {
 func TestThreadArtifactPathHeaderLockedH10(t *testing.T) {
 	t.Parallel()
 	var body strings.Builder
-	if err := ThreadArtifactPane(ThreadArtifactBrowserArgs{DocPath: "x.md", BrowserOpen: true}, templ.Raw("<p>doc</p>")).Render(t.Context(), &body); err != nil {
+	if err := ThreadArtifactPane(
+		ThreadArtifactBrowserArgs{DocPath: "x.md", BrowserOpen: true},
+		templ.Raw("<p>doc</p>"),
+	).Render(t.Context(), &body); err != nil {
 		t.Fatal(err)
 	}
 	out := body.String()

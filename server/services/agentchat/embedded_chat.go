@@ -67,15 +67,16 @@ type EmbeddedChatPatchInput struct {
 }
 
 type EmbeddedFreeformPanelArgs struct {
-	ThreadID       string
-	RunID          string
-	Transcript     TranscriptPaneState
-	HasThread      bool
-	StreamURL      string
-	ComposerAction string
-	Cwd            string
-	ThreadMetadata ThreadMetadataView
-	InitialDraft string
+	ThreadID        string
+	RunID           string
+	Transcript      TranscriptPaneState
+	HasThread       bool
+	StreamURL       string
+	ComposerAction  string
+	Cwd             string
+	Placeholder     string
+	ThreadMetadata  ThreadMetadataView
+	InitialDraft    string
 	DraftSaveAction string
 }
 
@@ -195,7 +196,9 @@ func (s *Service) LastFreeformEmbeddedChatSelection(
 			}
 			return EmbeddedChatSelection{}, err
 		}
-		if WorkspaceWorkflowType(strings.TrimSpace(workspace.WorkflowType)) == WorkspaceWorkflowFreeform {
+		if WorkspaceWorkflowType(
+			strings.TrimSpace(workspace.WorkflowType),
+		) == WorkspaceWorkflowFreeform {
 			selection.Scope = scope
 			return selection, nil
 		}
@@ -208,10 +211,13 @@ func (s *Service) LastFreeformEmbeddedChatSelection(
 		return EmbeddedChatSelection{}, err
 	}
 	for _, thread := range threads {
-		_, err := s.queries.GetPrimaryWorkspaceForThread(ctx, db.GetPrimaryWorkspaceForThreadParams{
-			ThreadID:  thread.ID,
-			UserEmail: thread.UserEmail,
-		})
+		_, err := s.queries.GetPrimaryWorkspaceForThread(
+			ctx,
+			db.GetPrimaryWorkspaceForThreadParams{
+				ThreadID:  thread.ID,
+				UserEmail: thread.UserEmail,
+			},
+		)
 		if errors.Is(err, sql.ErrNoRows) {
 			return EmbeddedChatSelection{
 				ThreadID: thread.ID,
@@ -353,8 +359,14 @@ func (s *Service) ResolveEmbeddedChatSelection(
 	if strings.TrimSpace(state.Context) != ThoughtsChatContext {
 		return EmbeddedChatSelection{}, nil
 	}
-	if workspaceID := strings.TrimSpace(state.WorkspaceContext.WorkspaceID); workspaceID != "" {
-		selection, err := s.LastWorkspaceEmbeddedChatSelection(ctx, userEmail, workspaceID)
+	if workspaceID := strings.TrimSpace(
+		state.WorkspaceContext.WorkspaceID,
+	); workspaceID != "" {
+		selection, err := s.LastWorkspaceEmbeddedChatSelection(
+			ctx,
+			userEmail,
+			workspaceID,
+		)
 		if err != nil {
 			return EmbeddedChatSelection{}, err
 		}
@@ -386,7 +398,8 @@ func (s *Service) RenderEmbeddedChatPanel(
 	if err != nil {
 		return nil, markdown.EmbeddedChatURLReplacement{}, err
 	}
-	if selection.WorkspaceID == "" && (selection.ThreadID != "" || selection.RunID != "") {
+	if selection.WorkspaceID == "" &&
+		(selection.ThreadID != "" || selection.RunID != "") {
 		args, err := s.BuildEmbeddedFreeformPanelArgs(
 			ctx,
 			request.UserEmail,
@@ -396,7 +409,9 @@ func (s *Service) RenderEmbeddedChatPanel(
 		if err != nil {
 			return nil, markdown.EmbeddedChatURLReplacement{}, err
 		}
-		return EmbeddedFreeformRightRailContent(args), markdown.EmbeddedChatURLReplacement{}, nil
+		return EmbeddedFreeformRightRailContent(
+			args,
+		), markdown.EmbeddedChatURLReplacement{}, nil
 	}
 	if selection.WorkspaceID == "" {
 		return EmbeddedFreeformRightRailContent(
@@ -414,7 +429,9 @@ func (s *Service) RenderEmbeddedChatPanel(
 	if err != nil {
 		return nil, markdown.EmbeddedChatURLReplacement{}, err
 	}
-	if WorkspaceWorkflowType(strings.TrimSpace(workspace.WorkflowType)) == WorkspaceWorkflowFreeform {
+	if WorkspaceWorkflowType(
+		strings.TrimSpace(workspace.WorkflowType),
+	) == WorkspaceWorkflowFreeform {
 		args, err := s.BuildEmbeddedFreeformPanelArgs(
 			ctx,
 			request.UserEmail,
@@ -474,7 +491,10 @@ func (s *Service) BuildEmbeddedFreeformPanelArgs(
 	resolvedRunID := getRunID(args.ActiveRun)
 	composerAction := "@post('/thoughts/chat/freeform/send', {contentType: 'form'})"
 	if resolvedThreadID != "" {
-		composerAction = "@post('" + thoughtsThreadChatAction(resolvedThreadID, "resume") + "', {contentType: 'form'})"
+		composerAction = "@post('" + thoughtsThreadChatAction(
+			resolvedThreadID,
+			"resume",
+		) + "', {contentType: 'form'})"
 	}
 	streamURL := ""
 	if resolvedThreadID != "" {
@@ -483,7 +503,10 @@ func (s *Service) BuildEmbeddedFreeformPanelArgs(
 			values.Set("run", resolvedRunID)
 		}
 		values.Set("since", "0")
-		streamURL = thoughtsThreadChatAction(resolvedThreadID, "stream") + "?" + values.Encode()
+		streamURL = thoughtsThreadChatAction(
+			resolvedThreadID,
+			"stream",
+		) + "?" + values.Encode()
 	}
 	return EmbeddedFreeformPanelArgs{
 		ThreadID:       resolvedThreadID,
@@ -562,7 +585,11 @@ func (s *Service) BuildEmbeddedChatPanelArgs(
 		if err != nil {
 			return EmbeddedChatPanelArgs{}, err
 		}
-		threadMetadata = s.BuildThreadMetadataView(ctx, workspaceContext, pageArgs.Projection.Workspace.Cwd.String)
+		threadMetadata = s.BuildThreadMetadataView(
+			ctx,
+			workspaceContext,
+			pageArgs.Projection.Workspace.Cwd.String,
+		)
 	}
 	return EmbeddedChatPanelArgs{
 		DocPath:            input.DocPath,

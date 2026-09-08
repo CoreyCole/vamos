@@ -104,7 +104,7 @@ func TestBuildDocumentWorkbenchActionsRendersWholeDocumentComment(t *testing.T) 
 		`Copy document`,
 		`navigator.clipboard.writeText`,
 		`Comment`,
-		`data-on:submit__prevent="el.closest(&#39;details&#39;)?.removeAttribute(&#39;open&#39;); @post(&#39;/forms/comments/show&#39;, {contentType: &#39;form&#39;})"`,
+		`data-on:submit__prevent="el.closest(&#39;[data-overflow-menu]&#39;)?.style.setProperty(&#39;display&#39;,&#39;none&#39;); @post(&#39;/forms/comments/show&#39;, {contentType: &#39;form&#39;})"`,
 		`name="doc_path" value="thoughts/example/design.md"`,
 		`name="section_hint" value="document"`,
 		`name="heading_hint" value="Design Doc"`,

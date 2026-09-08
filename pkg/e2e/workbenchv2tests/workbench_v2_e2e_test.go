@@ -1400,7 +1400,7 @@ func submitV2WholeDocumentComment(text string) spec.Step {
 		func(t testing.TB, ctx *duiruntime.Context) {
 			menu := ctx.Page.Locator("#workbench-v2-artifact-body [data-testid='workbench-overflow-actions']").
 				First()
-			if err := menu.Locator("summary").Click(); err != nil {
+			if err := menu.Locator("[data-overflow-trigger]").Click(); err != nil {
 				t.Fatal(err)
 			}
 			button := menu.GetByRole(*playwright.AriaRoleButton, playwright.LocatorGetByRoleOptions{Name: "Comment"}).

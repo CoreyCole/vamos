@@ -75,4 +75,21 @@ func TestRosterRail_PinActionAndHrefs(t *testing.T) {
 	if !strings.Contains(html, "#313131") {
 		t.Fatal("pin and row selected fill must be Grok #313131")
 	}
+	if strings.Contains(html, "border-b border-border") {
+		t.Fatal("search well must sit on the rail without a header rule")
+	}
+	if !strings.Contains(html, `id="workbench-v2-roster-header"`) ||
+		!strings.Contains(html, "h-10 min-h-10 max-h-10") ||
+		!strings.Contains(html, "flex h-7 min-w-0 flex-1") {
+		t.Fatal("search header must match other h-10 chrome with an h-7 well")
+	}
+	if !strings.Contains(html, "rounded-xl bg-white/[0.05]") {
+		t.Fatal("search must be a full-width rounded well")
+	}
+	if strings.Contains(html, "border-dashed") || strings.Contains(html, "Plan threads") {
+		t.Fatal("plan band must stay quiet: no dashed rule, label Plan")
+	}
+	if !strings.Contains(html, ">Plan</h2>") {
+		t.Fatal("plan band label must remain Plan")
+	}
 }

@@ -39,7 +39,7 @@ func DocumentCopyAction() workbench.OverflowAction {
 		Label:        "Copy document",
 		Description:  "Copy source to clipboard",
 		Kind:         workbench.OverflowActionButton,
-		ClientAction: "navigator.clipboard.writeText(document.getElementById('" + documentCopySourceID + "').content.textContent); el.closest('details')?.removeAttribute('open')",
+		ClientAction: "navigator.clipboard.writeText(document.getElementById('" + documentCopySourceID + "').content.textContent); el.closest('[data-overflow-menu]')?.style.setProperty('display','none')",
 	}
 }
 
@@ -73,7 +73,10 @@ func DocumentCommentAction(pageArgs *PageArgs) workbench.OverflowAction {
 	}
 }
 
-func BuildThreadArtifactHeaderActions(pageArgs *PageArgs, docPath string, chatHref string) templ.Component {
+func BuildThreadArtifactHeaderActions(
+	pageArgs *PageArgs,
+	docPath, chatHref string,
+) templ.Component {
 	docPath = strings.TrimSpace(docPath)
 	chatHref = strings.TrimSpace(chatHref)
 	groups := make([]workbench.OverflowActionGroup, 0, 2)
@@ -125,9 +128,9 @@ func DocumentCopyPathAction(docPath string) workbench.OverflowAction {
 	escaped := strings.ReplaceAll(path, `\`, `\\`)
 	escaped = strings.ReplaceAll(escaped, `'`, `\'`)
 	return workbench.OverflowAction{
-		Label:       "Copy path",
-		Description: "Copy path and attach in chat",
-		Kind:        workbench.OverflowActionButton,
-		ClientAction: "const p='" + escaped + "'; navigator.clipboard?.writeText(p); const input = document.getElementById('agent-chat-composer-input'); if (input) { input.value += (input.value ? '\n' : '') + p; input.dispatchEvent(new Event('input', {bubbles: true})); } el.closest('details')?.removeAttribute('open')",
+		Label:        "Copy path",
+		Description:  "Copy path and attach in chat",
+		Kind:         workbench.OverflowActionButton,
+		ClientAction: "const p='" + escaped + "'; navigator.clipboard?.writeText(p); const input = document.getElementById('agent-chat-composer-input'); if (input) { input.value += (input.value ? '\n' : '') + p; input.dispatchEvent(new Event('input', {bubbles: true})); } el.closest('[data-overflow-menu]')?.style.setProperty('display','none')",
 	}
 }

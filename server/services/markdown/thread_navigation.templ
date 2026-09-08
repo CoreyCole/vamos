@@ -70,13 +70,13 @@ templ ThreadArtifactBrowser(browser ThreadArtifactBrowserArgs) {
 		data-thread-artifact-browser
 		data-thread-artifact-cwd={ threadArtifactDirectoryIdentity(browser.DirectoryPath) }
 		data-show="$_artifactBrowserOpen"
-		class="min-h-0 max-h-64 shrink-0 overflow-y-auto border-b border-border p-2"
+		class="min-h-0 max-h-64 shrink-0 overflow-y-auto border-b border-border px-2.5 py-2"
 		aria-label="Artifact browser"
 		if !browser.BrowserOpen {
 			style="display: none;"
 		}
 	>
-		<div class="mb-1 flex min-h-8 items-center gap-1 px-1 text-xs text-muted-foreground">
+		<div class="mb-1 flex min-h-7 items-center gap-2 text-xs text-muted-foreground">
 			if browser.ParentHref != "" {
 				<a
 					href={ templ.URL(browser.ParentHref) }
@@ -86,12 +86,13 @@ templ ThreadArtifactBrowser(browser ThreadArtifactBrowserArgs) {
 						data-indicator="_threadArtifactLoading"
 						data-on:click={ threadArtifactBrowserClickAction() }
 					}
-					class="inline-flex h-7 shrink-0 items-center gap-1 rounded px-2 transition-colors hover:bg-muted hover:text-foreground"
+					class="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
 					aria-label="Open parent folder"
 					title="Open parent folder"
 				>
-					<span aria-hidden="true">←</span>
-					<span>Up</span>
+					<svg class="h-3.5 w-3.5" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
+					</svg>
 				</a>
 			}
 			<span class="min-w-0 flex-1 truncate">{ threadArtifactDirectoryIdentity(browser.DirectoryPath) }</span>

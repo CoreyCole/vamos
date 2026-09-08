@@ -292,7 +292,7 @@ func AgentChatComposer(args AgentChatComposerArgs) templ.Component {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 25, "</div><div class=\"relative\"><div id=\"agent-chat-slash-popover\" class=\"absolute bottom-full left-0 z-30 mb-2 hidden max-h-64 w-full overflow-y-auto rounded-lg border border-border bg-popover p-2 shadow-lg\" data-show=\"$slashOpen\"></div><div class=\"flex items-start gap-2 rounded-xl border border-input bg-background px-2.5 py-1.5\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 25, "</div><div class=\"relative\"><div id=\"agent-chat-slash-popover\" class=\"absolute bottom-full left-0 z-30 mb-2 hidden max-h-64 w-full overflow-y-auto rounded-lg border border-border bg-popover p-2 shadow-lg\" data-show=\"$slashOpen\"></div><div class=\"flex items-center gap-1.5 rounded-full border border-white/10 bg-[#111111] px-1.5 py-1.5\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -300,14 +300,14 @@ func AgentChatComposer(args AgentChatComposerArgs) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 26, "<textarea id=\"agent-chat-composer-input\" class=\"min-h-[2.25rem] max-h-36 flex-1 resize-none bg-transparent px-0 py-0.5 text-[13px] leading-snug text-foreground outline-none placeholder:text-muted-foreground\" placeholder=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 26, "<textarea id=\"agent-chat-composer-input\" class=\"min-h-[2rem] max-h-36 flex-1 resize-none bg-transparent px-1 py-1 text-[13px] leading-snug text-foreground outline-none placeholder:text-muted-foreground\" placeholder=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var14 string
 		templ_7745c5c3_Var14, templ_7745c5c3_Err = templ.ResolveAttributeValue(args.Placeholder)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/composer.templ`, Line: 61, Col: 242}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/composer.templ`, Line: 61, Col: 237}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var14)
 		if templ_7745c5c3_Err != nil {
@@ -320,7 +320,7 @@ func AgentChatComposer(args AgentChatComposerArgs) templ.Component {
 		var templ_7745c5c3_Var15 string
 		templ_7745c5c3_Var15, templ_7745c5c3_Err = templ.ResolveAttributeValue(args.DraftSaveAction)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/composer.templ`, Line: 61, Col: 337}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/composer.templ`, Line: 61, Col: 332}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var15)
 		if templ_7745c5c3_Err != nil {
@@ -333,13 +333,13 @@ func AgentChatComposer(args AgentChatComposerArgs) templ.Component {
 		var templ_7745c5c3_Var16 string
 		templ_7745c5c3_Var16, templ_7745c5c3_Err = templ.ResolveAttributeValue(slashCommandInputHandler(args.WorkspaceID, args.ThreadID, args.SlashEndpointBase))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/composer.templ`, Line: 61, Col: 437}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/composer.templ`, Line: 61, Col: 432}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var16)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 29, "\" data-on:keydown=\"if (evt.key === 'Enter' && !evt.shiftKey) { evt.preventDefault(); el.form.requestSubmit() }\"></textarea> <button type=\"submit\" class=\"inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground transition-colors hover:bg-primary/90\" aria-label=\"Send message\" title=\"Send message\"><svg class=\"h-4 w-4\" fill=\"none\" stroke=\"currentColor\" viewBox=\"0 0 24 24\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2\" d=\"M3 11.5L21 3l-8.5 18-2.5-7.5L3 11.5z\"></path></svg></button></div></div></form>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 29, "\" data-on:keydown=\"if (evt.key === 'Enter' && !evt.shiftKey) { evt.preventDefault(); el.form.requestSubmit() }\"></textarea> <button type=\"button\" class=\"inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-white/[0.06] hover:text-foreground\" aria-label=\"Voice message\" title=\"Voice message\"><svg class=\"h-4 w-4\" fill=\"none\" stroke=\"currentColor\" viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2\" d=\"M12 3a3 3 0 00-3 3v6a3 3 0 006 0V6a3 3 0 00-3-3zM19 10v2a7 7 0 01-14 0v-2M12 19v3\"></path></svg></button> <button type=\"submit\" class=\"sr-only\" aria-label=\"Send message\">Send</button></div></div></form>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -397,13 +397,13 @@ func ComposerMetadataButton(args AgentChatComposerArgs) templ.Component {
 					}()
 				}
 				ctx = templ.InitializeContext(ctx)
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 30, "<span aria-hidden=\"true\">i</span>")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 30, "<svg class=\"h-4 w-4\" fill=\"none\" stroke=\"currentColor\" viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2\" d=\"M12 5v14M5 12h14\"></path></svg>")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 				return nil
 			})
-			templ_7745c5c3_Err = dropdown.DropdownMenuTrigger(dropdown.DropdownMenuTriggerArgs{ID: dropdownID, Class: "inline-flex h-8 w-8 items-center justify-center rounded-full border border-border text-xs font-semibold text-muted-foreground transition-colors hover:bg-muted hover:text-foreground", Attributes: templ.Attributes{"aria-label": "Show chat metadata", "title": "Show chat metadata"}}).Render(templ.WithChildren(ctx, templ_7745c5c3_Var19), templ_7745c5c3_Buffer)
+			templ_7745c5c3_Err = dropdown.DropdownMenuTrigger(dropdown.DropdownMenuTriggerArgs{ID: dropdownID, Class: "inline-flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-white/[0.06] hover:text-foreground", Attributes: templ.Attributes{"aria-label": "Add", "title": "Add"}}).Render(templ.WithChildren(ctx, templ_7745c5c3_Var19), templ_7745c5c3_Buffer)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -472,7 +472,7 @@ func ThreadMetadataPopover(args AgentChatComposerArgs) templ.Component {
 		var templ_7745c5c3_Var22 string
 		templ_7745c5c3_Var22, templ_7745c5c3_Err = templ.JoinStringErrs(args.ModeLabel)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/composer.templ`, Line: 91, Col: 57}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/composer.templ`, Line: 94, Col: 57}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var22))
 		if templ_7745c5c3_Err != nil {
@@ -490,7 +490,7 @@ func ThreadMetadataPopover(args AgentChatComposerArgs) templ.Component {
 			var templ_7745c5c3_Var23 string
 			templ_7745c5c3_Var23, templ_7745c5c3_Err = templ.JoinStringErrs(view.ThreadID)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/composer.templ`, Line: 96, Col: 57}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/composer.templ`, Line: 99, Col: 57}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var23))
 			if templ_7745c5c3_Err != nil {
@@ -503,7 +503,7 @@ func ThreadMetadataPopover(args AgentChatComposerArgs) templ.Component {
 			var templ_7745c5c3_Var24 string
 			templ_7745c5c3_Var24, templ_7745c5c3_Err = templ.JoinStringErrs(view.URL)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/composer.templ`, Line: 100, Col: 52}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/composer.templ`, Line: 103, Col: 52}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var24))
 			if templ_7745c5c3_Err != nil {
@@ -522,7 +522,7 @@ func ThreadMetadataPopover(args AgentChatComposerArgs) templ.Component {
 			var templ_7745c5c3_Var25 string
 			templ_7745c5c3_Var25, templ_7745c5c3_Err = templ.JoinStringErrs(view.ProjectID)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/composer.templ`, Line: 106, Col: 58}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/composer.templ`, Line: 109, Col: 58}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var25))
 			if templ_7745c5c3_Err != nil {
@@ -541,7 +541,7 @@ func ThreadMetadataPopover(args AgentChatComposerArgs) templ.Component {
 			var templ_7745c5c3_Var26 string
 			templ_7745c5c3_Var26, templ_7745c5c3_Err = templ.JoinStringErrs(displayThreadPath(view.ThreadCwd))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/composer.templ`, Line: 112, Col: 77}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/composer.templ`, Line: 115, Col: 77}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var26))
 			if templ_7745c5c3_Err != nil {
@@ -560,7 +560,7 @@ func ThreadMetadataPopover(args AgentChatComposerArgs) templ.Component {
 			var templ_7745c5c3_Var27 string
 			templ_7745c5c3_Var27, templ_7745c5c3_Err = templ.JoinStringErrs(displayThreadPath(firstNonEmpty(view.PiCwd, args.Cwd)))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/composer.templ`, Line: 118, Col: 98}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/composer.templ`, Line: 121, Col: 98}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var27))
 			if templ_7745c5c3_Err != nil {
@@ -579,7 +579,7 @@ func ThreadMetadataPopover(args AgentChatComposerArgs) templ.Component {
 			var templ_7745c5c3_Var28 string
 			templ_7745c5c3_Var28, templ_7745c5c3_Err = templ.JoinStringErrs(displayThreadPath(view.ImplementationWorkspace))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/composer.templ`, Line: 124, Col: 91}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/composer.templ`, Line: 127, Col: 91}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var28))
 			if templ_7745c5c3_Err != nil {
@@ -598,7 +598,7 @@ func ThreadMetadataPopover(args AgentChatComposerArgs) templ.Component {
 			var templ_7745c5c3_Var29 string
 			templ_7745c5c3_Var29, templ_7745c5c3_Err = templ.JoinStringErrs(threadWorkspaceSummary(view, *view.Primary))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/composer.templ`, Line: 130, Col: 91}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/composer.templ`, Line: 133, Col: 91}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var29))
 			if templ_7745c5c3_Err != nil {
@@ -611,7 +611,7 @@ func ThreadMetadataPopover(args AgentChatComposerArgs) templ.Component {
 			var templ_7745c5c3_Var30 string
 			templ_7745c5c3_Var30, templ_7745c5c3_Err = templ.JoinStringErrs(displayThreadPath(view.Primary.RootDocPath))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/composer.templ`, Line: 131, Col: 93}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/composer.templ`, Line: 134, Col: 93}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var30))
 			if templ_7745c5c3_Err != nil {
@@ -629,7 +629,7 @@ func ThreadMetadataPopover(args AgentChatComposerArgs) templ.Component {
 			var templ_7745c5c3_Var31 string
 			templ_7745c5c3_Var31, templ_7745c5c3_Err = templ.JoinStringErrs(args.WorkspaceID)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/composer.templ`, Line: 136, Col: 60}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/composer.templ`, Line: 139, Col: 60}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var31))
 			if templ_7745c5c3_Err != nil {
@@ -653,7 +653,7 @@ func ThreadMetadataPopover(args AgentChatComposerArgs) templ.Component {
 				var templ_7745c5c3_Var32 string
 				templ_7745c5c3_Var32, templ_7745c5c3_Err = templ.JoinStringErrs(workspace.Label)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/composer.templ`, Line: 144, Col: 72}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/composer.templ`, Line: 147, Col: 72}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var32))
 				if templ_7745c5c3_Err != nil {
@@ -720,7 +720,7 @@ func ThreadNewTargetControl(view ThreadMetadataView) templ.Component {
 		var templ_7745c5c3_Var34 string
 		templ_7745c5c3_Var34, templ_7745c5c3_Err = templ.ResolveAttributeValue(threadNewTargetFormID(defaultIndex))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/composer.templ`, Line: 161, Col: 66}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/composer.templ`, Line: 164, Col: 66}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var34)
 		if templ_7745c5c3_Err != nil {
@@ -788,7 +788,7 @@ func ThreadNewTargetControl(view ThreadMetadataView) templ.Component {
 					var templ_7745c5c3_Var38 string
 					templ_7745c5c3_Var38, templ_7745c5c3_Err = templ.ResolveAttributeValue(threadNewTargetFormID(i))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/composer.templ`, Line: 170, Col: 58}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/composer.templ`, Line: 173, Col: 58}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var38)
 					if templ_7745c5c3_Err != nil {
@@ -801,7 +801,7 @@ func ThreadNewTargetControl(view ThreadMetadataView) templ.Component {
 					var templ_7745c5c3_Var39 string
 					templ_7745c5c3_Var39, templ_7745c5c3_Err = templ.JoinStringErrs(threadNewTargetLabel(target, target.Selected || i == defaultIndex))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/composer.templ`, Line: 171, Col: 74}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/composer.templ`, Line: 174, Col: 74}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var39))
 					if templ_7745c5c3_Err != nil {
@@ -862,7 +862,7 @@ func ThreadNewTargetForms(view ThreadMetadataView) templ.Component {
 				var templ_7745c5c3_Var41 string
 				templ_7745c5c3_Var41, templ_7745c5c3_Err = templ.ResolveAttributeValue(threadNewTargetFormID(i))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/composer.templ`, Line: 182, Col: 38}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/composer.templ`, Line: 185, Col: 38}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var41)
 				if templ_7745c5c3_Err != nil {
@@ -875,7 +875,7 @@ func ThreadNewTargetForms(view ThreadMetadataView) templ.Component {
 				var templ_7745c5c3_Var42 string
 				templ_7745c5c3_Var42, templ_7745c5c3_Err = templ.ResolveAttributeValue(threadNewTargetAction(view.ThreadID, target))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/composer.templ`, Line: 182, Col: 102}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/composer.templ`, Line: 185, Col: 102}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var42)
 				if templ_7745c5c3_Err != nil {

@@ -42,7 +42,8 @@ func (p *streamlitBrowserProbe) observeWebSocket(ws playwright.WebSocket) {
 }
 
 func (p *streamlitBrowserProbe) observeResponse(response playwright.Response) {
-	if !strings.Contains(response.URL(), "_stcore/") && !strings.Contains(response.URL(), "/examples/streamlit/app/") {
+	if !strings.Contains(response.URL(), "_stcore/") &&
+		!strings.Contains(response.URL(), "/examples/streamlit/app/") {
 		return
 	}
 	if status := response.Status(); status >= http.StatusBadRequest {
@@ -53,7 +54,8 @@ func (p *streamlitBrowserProbe) observeResponse(response playwright.Response) {
 }
 
 func (p *streamlitBrowserProbe) observeRequestFailure(request playwright.Request) {
-	if !strings.Contains(request.URL(), "_stcore/") && request.ResourceType() != "websocket" {
+	if !strings.Contains(request.URL(), "_stcore/") &&
+		request.ResourceType() != "websocket" {
 		return
 	}
 	failure := "request failed"
@@ -66,12 +68,15 @@ func (p *streamlitBrowserProbe) observeRequestFailure(request playwright.Request
 }
 
 func observeStreamlitBrowserTraffic(probe *streamlitBrowserProbe) spec.Step {
-	return spec.Custom("observe Streamlit browser traffic", func(t testing.TB, ctx *duiruntime.Context) {
-		t.Helper()
-		ctx.Page.OnWebSocket(probe.observeWebSocket)
-		ctx.Page.OnResponse(probe.observeResponse)
-		ctx.Page.OnRequestFailed(probe.observeRequestFailure)
-	})
+	return spec.Custom(
+		"observe Streamlit browser traffic",
+		func(t testing.TB, ctx *duiruntime.Context) {
+			t.Helper()
+			ctx.Page.OnWebSocket(probe.observeWebSocket)
+			ctx.Page.OnResponse(probe.observeResponse)
+			ctx.Page.OnRequestFailed(probe.observeRequestFailure)
+		},
+	)
 }
 
 func TestAppletsWorkbench_WordleRendersWorkbenchShell(t *testing.T) {
@@ -165,9 +170,11 @@ func TestWordleAppletSmoke(t *testing.T) {
 }
 
 func expectWorkbenchDatastarImportMapPresent() spec.Step {
-	return spec.Custom("Workbench page has Datastar import map before modules", func(t testing.TB, ctx *duiruntime.Context) {
-		t.Helper()
-		result, err := ctx.Page.Evaluate(`() => {
+	return spec.Custom(
+		"Workbench page has Datastar import map before modules",
+		func(t testing.TB, ctx *duiruntime.Context) {
+			t.Helper()
+			result, err := ctx.Page.Evaluate(`() => {
 			const scripts = [...document.scripts]
 			const maps = [...document.querySelectorAll('script[type="importmap"]')].map((el) => el.textContent || '')
 			const resize = document.querySelector('script[src^="/js/workbench-resize.js"]')
@@ -175,231 +182,332 @@ func expectWorkbenchDatastarImportMapPresent() spec.Step {
 			const mapIndex = scripts.findIndex((el) => el.type === 'importmap' && (el.textContent || '').includes('@vamos/datastar'))
 			return {hasHead: !!document.head, maps, mapIndex, resizeIndex}
 		}`, nil)
-		if err != nil {
-			t.Fatal(err)
-		}
-		data := result.(map[string]any)
-		mapIndex := browserNumberAsInt(data["mapIndex"])
-		if data["hasHead"] != true || mapIndex < 0 {
-			t.Fatalf("Datastar import map missing: %#v", data)
-		}
-		if resizeIndex := browserNumberAsInt(data["resizeIndex"]); resizeIndex >= 0 && mapIndex > resizeIndex {
-			t.Fatalf("Datastar import map after Workbench module: %#v", data)
-		}
-	})
+			if err != nil {
+				t.Fatal(err)
+			}
+			data := result.(map[string]any)
+			mapIndex := browserNumberAsInt(data["mapIndex"])
+			if data["hasHead"] != true || mapIndex < 0 {
+				t.Fatalf("Datastar import map missing: %#v", data)
+			}
+			if resizeIndex := browserNumberAsInt(
+				data["resizeIndex"],
+			); resizeIndex >= 0 &&
+				mapIndex > resizeIndex {
+				t.Fatalf("Datastar import map after Workbench module: %#v", data)
+			}
+		},
+	)
 }
 
 func openWorkbenchOverflow() spec.Step {
-	return spec.Custom("open workbench overflow", func(t testing.TB, ctx *duiruntime.Context) {
-		t.Helper()
-		trigger := ctx.Page.Locator("[data-testid='workbench-overflow-actions'] summary").First()
-		if err := trigger.WaitFor(playwright.LocatorWaitForOptions{Timeout: playwright.Float(30_000)}); err != nil {
-			t.Fatalf("workbench overflow trigger missing: %v", err)
-		}
-		open, err := trigger.Evaluate("el => el.parentElement.open", nil)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if open != true {
-			if err := trigger.Click(); err != nil {
+	return spec.Custom(
+		"open workbench overflow",
+		func(t testing.TB, ctx *duiruntime.Context) {
+			t.Helper()
+			trigger := ctx.Page.Locator("[data-testid='workbench-overflow-actions'] [data-overflow-trigger]").
+				First()
+			if err := trigger.WaitFor(
+				playwright.LocatorWaitForOptions{Timeout: playwright.Float(30_000)},
+			); err != nil {
+				t.Fatalf("workbench overflow trigger missing: %v", err)
+			}
+			open, err := ctx.Page.Locator("[data-overflow-menu]").
+				First().
+				Evaluate("el => el.style.display === 'block'", nil)
+			if err != nil {
 				t.Fatal(err)
 			}
-		}
-	})
+			if open != true {
+				if err := trigger.Click(); err != nil {
+					t.Fatal(err)
+				}
+			}
+		},
+	)
 }
 
 func expectOpenAppletInNewTabLink() spec.Step {
-	return spec.Custom("Open in new tab uses proxied app route", func(t testing.TB, ctx *duiruntime.Context) {
-		t.Helper()
-		link := ctx.Page.GetByRole(*playwright.AriaRoleLink, playwright.PageGetByRoleOptions{Name: "Open in new tab"}).First()
-		if err := link.WaitFor(playwright.LocatorWaitForOptions{Timeout: playwright.Float(30_000)}); err != nil {
-			t.Fatalf("open-new-tab link missing: %v", err)
-		}
-		href, err := link.GetAttribute("href")
-		if err != nil {
-			t.Fatal(err)
-		}
-		if !strings.Contains(href, "/examples/wordle/app/") {
-			t.Fatalf("open-new-tab href = %q, want proxied /examples/wordle/app/", href)
-		}
-		if strings.Contains(href, "localhost") || strings.Contains(href, "127.0.0.1") {
-			t.Fatalf("open-new-tab href exposes raw backend: %q", href)
-		}
-	})
+	return spec.Custom(
+		"Open in new tab uses proxied app route",
+		func(t testing.TB, ctx *duiruntime.Context) {
+			t.Helper()
+			link := ctx.Page.GetByRole(*playwright.AriaRoleLink, playwright.PageGetByRoleOptions{Name: "Open in new tab"}).
+				First()
+			if err := link.WaitFor(
+				playwright.LocatorWaitForOptions{Timeout: playwright.Float(30_000)},
+			); err != nil {
+				t.Fatalf("open-new-tab link missing: %v", err)
+			}
+			href, err := link.GetAttribute("href")
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !strings.Contains(href, "/examples/wordle/app/") {
+				t.Fatalf(
+					"open-new-tab href = %q, want proxied /examples/wordle/app/",
+					href,
+				)
+			}
+			if strings.Contains(href, "localhost") ||
+				strings.Contains(href, "127.0.0.1") {
+				t.Fatalf("open-new-tab href exposes raw backend: %q", href)
+			}
+		},
+	)
 }
 
 func expectAppletSidebarTabs() spec.Step {
-	return spec.Custom("applet sidebar has Files and Workspaces tabs", func(t testing.TB, ctx *duiruntime.Context) {
-		t.Helper()
-		sidebar := ctx.Page.Locator("#doc-workbench-sidebar-region, #thoughts-shared-sidebar, #thoughts-workbench-sidebar").First()
-		if err := sidebar.WaitFor(); err != nil {
-			t.Fatal(err)
-		}
-		for _, label := range []string{"Files", "Workspaces"} {
-			if err := sidebar.GetByText(label, playwright.LocatorGetByTextOptions{Exact: playwright.Bool(true)}).First().WaitFor(); err != nil {
-				t.Fatalf("sidebar missing %s tab: %v", label, err)
+	return spec.Custom(
+		"applet sidebar has Files and Workspaces tabs",
+		func(t testing.TB, ctx *duiruntime.Context) {
+			t.Helper()
+			sidebar := ctx.Page.Locator("#doc-workbench-sidebar-region, #thoughts-shared-sidebar, #thoughts-workbench-sidebar").
+				First()
+			if err := sidebar.WaitFor(); err != nil {
+				t.Fatal(err)
 			}
-		}
-	})
+			for _, label := range []string{"Files", "Workspaces"} {
+				if err := sidebar.GetByText(label, playwright.LocatorGetByTextOptions{Exact: playwright.Bool(true)}).
+					First().
+					WaitFor(); err != nil {
+					t.Fatalf("sidebar missing %s tab: %v", label, err)
+				}
+			}
+		},
+	)
 }
 
 func expectAppletRightRailTabs() spec.Step {
-	return spec.Custom("applet right rail has Chat and Comments tabs", func(t testing.TB, ctx *duiruntime.Context) {
-		t.Helper()
-		rightRail := ctx.Page.Locator("#doc-workbench-right-region, #doc-right-rail, #doc-workbench-right-rail").First()
-		if err := rightRail.WaitFor(); err != nil {
-			t.Fatal(err)
-		}
-		for _, label := range []string{"Chat", "Comments"} {
-			if err := rightRail.GetByText(label, playwright.LocatorGetByTextOptions{Exact: playwright.Bool(true)}).First().WaitFor(); err != nil {
-				t.Fatalf("right rail missing %s tab: %v", label, err)
+	return spec.Custom(
+		"applet right rail has Chat and Comments tabs",
+		func(t testing.TB, ctx *duiruntime.Context) {
+			t.Helper()
+			rightRail := ctx.Page.Locator("#doc-workbench-right-region, #doc-right-rail, #doc-workbench-right-rail").
+				First()
+			if err := rightRail.WaitFor(); err != nil {
+				t.Fatal(err)
 			}
-		}
-	})
+			for _, label := range []string{"Chat", "Comments"} {
+				if err := rightRail.GetByText(label, playwright.LocatorGetByTextOptions{Exact: playwright.Bool(true)}).
+					First().
+					WaitFor(); err != nil {
+					t.Fatalf("right rail missing %s tab: %v", label, err)
+				}
+			}
+		},
+	)
 }
 
 func expectWordleIframeLoaded() spec.Step {
-	return spec.Custom("wordle applet iframe loads", func(t testing.TB, ctx *duiruntime.Context) {
-		t.Helper()
-		frame := ctx.Page.Locator(wordleAppletFrameSelector).First()
-		if err := frame.WaitFor(playwright.LocatorWaitForOptions{Timeout: playwright.Float(60_000)}); err != nil {
-			dumpBody(t, ctx, "wordle iframe missing")
-		}
-		title, err := frame.GetAttribute("title")
-		if err != nil {
-			t.Fatal(err)
-		}
-		if !strings.Contains(title, "Daily Wordle") {
-			t.Fatalf("iframe title = %q, want Daily Wordle", title)
-		}
-		if err := ctx.Page.FrameLocator(wordleAppletFrameSelector).GetByText("Daily Wordle").First().WaitFor(playwright.LocatorWaitForOptions{Timeout: playwright.Float(60_000)}); err != nil {
-			t.Fatalf("wordle iframe content did not load: %v", err)
-		}
-	})
+	return spec.Custom(
+		"wordle applet iframe loads",
+		func(t testing.TB, ctx *duiruntime.Context) {
+			t.Helper()
+			frame := ctx.Page.Locator(wordleAppletFrameSelector).First()
+			if err := frame.WaitFor(
+				playwright.LocatorWaitForOptions{Timeout: playwright.Float(60_000)},
+			); err != nil {
+				dumpBody(t, ctx, "wordle iframe missing")
+			}
+			title, err := frame.GetAttribute("title")
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !strings.Contains(title, "Daily Wordle") {
+				t.Fatalf("iframe title = %q, want Daily Wordle", title)
+			}
+			if err := ctx.Page.FrameLocator(wordleAppletFrameSelector).
+				GetByText("Daily Wordle").
+				First().
+				WaitFor(playwright.LocatorWaitForOptions{Timeout: playwright.Float(60_000)}); err != nil {
+				t.Fatalf("wordle iframe content did not load: %v", err)
+			}
+		},
+	)
 }
 
 func expectAppletLocalChromeRemoved() spec.Step {
-	return spec.Custom("healthy applet body omits local chrome", func(t testing.TB, ctx *duiruntime.Context) {
-		t.Helper()
-		html, err := ctx.Page.Locator("#applet-frame-wordle").Evaluate("el => el.innerHTML", nil)
-		if err != nil {
-			t.Fatal(err)
-		}
-		for _, forbidden := range []string{"datastar applet", "Open in new tab", "/forms/applets/wordle/restart", "/forms/applets/wordle/stop"} {
-			if strings.Contains(fmt.Sprint(html), forbidden) {
-				t.Fatalf("local applet chrome/control still rendered %q", forbidden)
+	return spec.Custom(
+		"healthy applet body omits local chrome",
+		func(t testing.TB, ctx *duiruntime.Context) {
+			t.Helper()
+			html, err := ctx.Page.Locator("#applet-frame-wordle").
+				Evaluate("el => el.innerHTML", nil)
+			if err != nil {
+				t.Fatal(err)
 			}
-		}
-	})
+			for _, forbidden := range []string{"datastar applet", "Open in new tab", "/forms/applets/wordle/restart", "/forms/applets/wordle/stop"} {
+				if strings.Contains(fmt.Sprint(html), forbidden) {
+					t.Fatalf("local applet chrome/control still rendered %q", forbidden)
+				}
+			}
+		},
+	)
 }
 
 func expectStreamlitIframeLoaded() spec.Step {
-	return spec.Custom("streamlit applet iframe loads", func(t testing.TB, ctx *duiruntime.Context) {
-		t.Helper()
-		frame := ctx.Page.Locator(streamlitAppletFrameSelector).First()
-		if err := frame.WaitFor(playwright.LocatorWaitForOptions{Timeout: playwright.Float(90_000)}); err != nil {
-			dumpBody(t, ctx, "streamlit iframe missing")
-		}
-		title, err := frame.GetAttribute("title")
-		if err != nil {
-			t.Fatal(err)
-		}
-		if !strings.Contains(title, "Streamlit") {
-			t.Fatalf("iframe title = %q, want Streamlit", title)
-		}
-		if err := ctx.Page.FrameLocator(streamlitAppletFrameSelector).GetByText("Streamlit applet smoke test").First().WaitFor(playwright.LocatorWaitForOptions{Timeout: playwright.Float(90_000)}); err != nil {
-			t.Fatalf("streamlit iframe content did not load: %v", err)
-		}
-	})
+	return spec.Custom(
+		"streamlit applet iframe loads",
+		func(t testing.TB, ctx *duiruntime.Context) {
+			t.Helper()
+			frame := ctx.Page.Locator(streamlitAppletFrameSelector).First()
+			if err := frame.WaitFor(
+				playwright.LocatorWaitForOptions{Timeout: playwright.Float(90_000)},
+			); err != nil {
+				dumpBody(t, ctx, "streamlit iframe missing")
+			}
+			title, err := frame.GetAttribute("title")
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !strings.Contains(title, "Streamlit") {
+				t.Fatalf("iframe title = %q, want Streamlit", title)
+			}
+			if err := ctx.Page.FrameLocator(streamlitAppletFrameSelector).
+				GetByText("Streamlit applet smoke test").
+				First().
+				WaitFor(playwright.LocatorWaitForOptions{Timeout: playwright.Float(90_000)}); err != nil {
+				t.Fatalf("streamlit iframe content did not load: %v", err)
+			}
+		},
+	)
 }
 
 func expectStreamlitSessionCounterWorks() spec.Step {
-	return spec.Custom("streamlit session counter works", func(t testing.TB, ctx *duiruntime.Context) {
-		t.Helper()
-		app := ctx.Page.FrameLocator(streamlitAppletFrameSelector)
-		if err := app.GetByRole("button", playwright.FrameLocatorGetByRoleOptions{Name: "Increment Streamlit session counter"}).Click(); err != nil {
-			t.Fatal(err)
-		}
-		if err := app.GetByText("Session counter: 1").First().WaitFor(playwright.LocatorWaitForOptions{Timeout: playwright.Float(30_000)}); err != nil {
-			t.Fatalf("streamlit counter did not increment over websocket session: %v", err)
-		}
-	})
+	return spec.Custom(
+		"streamlit session counter works",
+		func(t testing.TB, ctx *duiruntime.Context) {
+			t.Helper()
+			app := ctx.Page.FrameLocator(streamlitAppletFrameSelector)
+			if err := app.GetByRole("button", playwright.FrameLocatorGetByRoleOptions{Name: "Increment Streamlit session counter"}).
+				Click(); err != nil {
+				t.Fatal(err)
+			}
+			if err := app.GetByText("Session counter: 1").
+				First().
+				WaitFor(playwright.LocatorWaitForOptions{Timeout: playwright.Float(30_000)}); err != nil {
+				t.Fatalf(
+					"streamlit counter did not increment over websocket session: %v",
+					err,
+				)
+			}
+		},
+	)
 }
 
 func expectOpenStreamlitInNewTabLink() spec.Step {
-	return spec.Custom("Open in new tab uses Streamlit scoped app route", func(t testing.TB, ctx *duiruntime.Context) {
-		t.Helper()
-		link := ctx.Page.GetByRole(*playwright.AriaRoleLink, playwright.PageGetByRoleOptions{Name: "Open in new tab"}).First()
-		if err := link.WaitFor(playwright.LocatorWaitForOptions{Timeout: playwright.Float(30_000)}); err != nil {
-			t.Fatalf("open-new-tab link missing: %v", err)
-		}
-		href, err := link.GetAttribute("href")
-		if err != nil {
-			t.Fatal(err)
-		}
-		if !strings.Contains(href, "/examples/streamlit/app/") {
-			t.Fatalf("open-new-tab href = %q, want proxied /examples/streamlit/app/", href)
-		}
-		if strings.Contains(href, "localhost") || strings.Contains(href, "127.0.0.1") {
-			t.Fatalf("open-new-tab href exposes raw backend: %q", href)
-		}
-	})
+	return spec.Custom(
+		"Open in new tab uses Streamlit scoped app route",
+		func(t testing.TB, ctx *duiruntime.Context) {
+			t.Helper()
+			link := ctx.Page.GetByRole(*playwright.AriaRoleLink, playwright.PageGetByRoleOptions{Name: "Open in new tab"}).
+				First()
+			if err := link.WaitFor(
+				playwright.LocatorWaitForOptions{Timeout: playwright.Float(30_000)},
+			); err != nil {
+				t.Fatalf("open-new-tab link missing: %v", err)
+			}
+			href, err := link.GetAttribute("href")
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !strings.Contains(href, "/examples/streamlit/app/") {
+				t.Fatalf(
+					"open-new-tab href = %q, want proxied /examples/streamlit/app/",
+					href,
+				)
+			}
+			if strings.Contains(href, "localhost") ||
+				strings.Contains(href, "127.0.0.1") {
+				t.Fatalf("open-new-tab href exposes raw backend: %q", href)
+			}
+		},
+	)
 }
 
 func expectStreamlitOpenNewTabRenders() spec.Step {
-	return spec.Custom("Streamlit scoped new tab renders", func(t testing.TB, ctx *duiruntime.Context) {
-		t.Helper()
-		link := ctx.Page.GetByRole(*playwright.AriaRoleLink, playwright.PageGetByRoleOptions{Name: "Open in new tab"}).First()
-		popup, err := ctx.Page.ExpectPopup(func() error { return link.Click() })
-		if err != nil {
-			t.Fatalf("open Streamlit popup: %v", err)
-		}
-		defer popup.Close()
-		if err := popup.WaitForLoadState(playwright.PageWaitForLoadStateOptions{State: playwright.LoadStateDomcontentloaded, Timeout: playwright.Float(60_000)}); err != nil {
-			t.Fatal(err)
-		}
-		if !strings.Contains(popup.URL(), "/examples/streamlit/app/") {
-			t.Fatalf("popup URL = %q", popup.URL())
-		}
-		if strings.Contains(popup.URL(), "localhost") || strings.Contains(popup.URL(), "127.0.0.1") {
-			t.Fatalf("popup exposes raw backend URL: %q", popup.URL())
-		}
-		if err := popup.GetByText("Streamlit applet smoke test").First().WaitFor(playwright.LocatorWaitForOptions{Timeout: playwright.Float(90_000)}); err != nil {
-			t.Fatalf("streamlit popup content did not load: %v", err)
-		}
-	})
+	return spec.Custom(
+		"Streamlit scoped new tab renders",
+		func(t testing.TB, ctx *duiruntime.Context) {
+			t.Helper()
+			link := ctx.Page.GetByRole(*playwright.AriaRoleLink, playwright.PageGetByRoleOptions{Name: "Open in new tab"}).
+				First()
+			popup, err := ctx.Page.ExpectPopup(func() error { return link.Click() })
+			if err != nil {
+				t.Fatalf("open Streamlit popup: %v", err)
+			}
+			defer popup.Close()
+			if err := popup.WaitForLoadState(
+				playwright.PageWaitForLoadStateOptions{
+					State:   playwright.LoadStateDomcontentloaded,
+					Timeout: playwright.Float(60_000),
+				},
+			); err != nil {
+				t.Fatal(err)
+			}
+			if !strings.Contains(popup.URL(), "/examples/streamlit/app/") {
+				t.Fatalf("popup URL = %q", popup.URL())
+			}
+			if strings.Contains(popup.URL(), "localhost") ||
+				strings.Contains(popup.URL(), "127.0.0.1") {
+				t.Fatalf("popup exposes raw backend URL: %q", popup.URL())
+			}
+			if err := popup.GetByText("Streamlit applet smoke test").
+				First().
+				WaitFor(playwright.LocatorWaitForOptions{Timeout: playwright.Float(90_000)}); err != nil {
+				t.Fatalf("streamlit popup content did not load: %v", err)
+			}
+		},
+	)
 }
 
 func expectStreamlitNoWebSocketFailures(probe *streamlitBrowserProbe) spec.Step {
-	return spec.Custom("Streamlit websocket has no browser failures", func(t testing.TB, ctx *duiruntime.Context) {
-		t.Helper()
-		time.Sleep(500 * time.Millisecond)
-		probe.mu.Lock()
-		urls := append([]string(nil), probe.urls...)
-		errors := append([]string(nil), probe.errors...)
-		responses := append([]string(nil), probe.responses...)
-		probe.mu.Unlock()
-		if len(urls) == 0 {
-			t.Fatalf("no _stcore/stream websocket observed")
-		}
-		if len(errors) > 0 || len(responses) > 0 {
-			t.Fatalf("streamlit websocket/network errors: websocket=%v responses=%v", errors, responses)
-		}
-		problems := ctx.Console.Problems()
-		filtered := problems[:0]
-		for _, problem := range problems {
-			if problem.Type == "warning" && strings.Contains(problem.Text, "allow-scripts and allow-same-origin") {
-				continue
+	return spec.Custom(
+		"Streamlit websocket has no browser failures",
+		func(t testing.TB, ctx *duiruntime.Context) {
+			t.Helper()
+			time.Sleep(500 * time.Millisecond)
+			probe.mu.Lock()
+			urls := append([]string(nil), probe.urls...)
+			errors := append([]string(nil), probe.errors...)
+			responses := append([]string(nil), probe.responses...)
+			probe.mu.Unlock()
+			if len(urls) == 0 {
+				t.Fatalf("no _stcore/stream websocket observed")
 			}
-			text := strings.ToLower(problem.Text)
-			if strings.Contains(text, "_stcore/stream") || strings.Contains(text, "websocket") || strings.Contains(text, "502") {
-				filtered = append(filtered, problem)
+			if len(errors) > 0 || len(responses) > 0 {
+				t.Fatalf(
+					"streamlit websocket/network errors: websocket=%v responses=%v",
+					errors,
+					responses,
+				)
 			}
-		}
-		if len(filtered) > 0 {
-			t.Fatalf("streamlit websocket console problems:\n%s", duiruntime.FormatConsoleProblems(filtered))
-		}
-	})
+			problems := ctx.Console.Problems()
+			filtered := problems[:0]
+			for _, problem := range problems {
+				if problem.Type == "warning" &&
+					strings.Contains(
+						problem.Text,
+						"allow-scripts and allow-same-origin",
+					) {
+					continue
+				}
+				text := strings.ToLower(problem.Text)
+				if strings.Contains(text, "_stcore/stream") ||
+					strings.Contains(text, "websocket") ||
+					strings.Contains(text, "502") {
+					filtered = append(filtered, problem)
+				}
+			}
+			if len(filtered) > 0 {
+				t.Fatalf(
+					"streamlit websocket console problems:\n%s",
+					duiruntime.FormatConsoleProblems(filtered),
+				)
+			}
+		},
+	)
 }
 
 type streamlitProcessIdentity struct {
@@ -410,10 +518,12 @@ type streamlitProcessIdentity struct {
 }
 
 func stopStreamlitAppletIfRunning() spec.Step {
-	return spec.Custom("stop streamlit applet if running", func(t testing.TB, ctx *duiruntime.Context) {
-		t.Helper()
-		visit(t, ctx, "/examples/streamlit")
-		_, _ = ctx.Page.Evaluate(`async () => {
+	return spec.Custom(
+		"stop streamlit applet if running",
+		func(t testing.TB, ctx *duiruntime.Context) {
+			t.Helper()
+			visit(t, ctx, "/examples/streamlit")
+			_, _ = ctx.Page.Evaluate(`async () => {
 			await fetch('/forms/applets/streamlit/stop', {
 				method: 'POST',
 				headers: {'Content-Type': 'application/x-www-form-urlencoded'},
@@ -421,39 +531,48 @@ func stopStreamlitAppletIfRunning() spec.Step {
 				redirect: 'manual'
 			}).catch(() => null)
 		}`, nil)
-	})
+		},
+	)
 }
 
 func expectStreamlitStartingPanelOrIframe() spec.Step {
-	return spec.Custom("streamlit shows starting panel or iframe", func(t testing.TB, ctx *duiruntime.Context) {
-		t.Helper()
-		starting := ctx.Page.Locator("[id^='applet-status-streamlit']").First()
-		iframe := ctx.Page.Locator(streamlitAppletFrameSelector).First()
-		deadline := time.Now().Add(15 * time.Second)
-		for time.Now().Before(deadline) {
-			if count, _ := iframe.Count(); count > 0 {
-				return
+	return spec.Custom(
+		"streamlit shows starting panel or iframe",
+		func(t testing.TB, ctx *duiruntime.Context) {
+			t.Helper()
+			starting := ctx.Page.Locator("[id^='applet-status-streamlit']").First()
+			iframe := ctx.Page.Locator(streamlitAppletFrameSelector).First()
+			deadline := time.Now().Add(15 * time.Second)
+			for time.Now().Before(deadline) {
+				if count, _ := iframe.Count(); count > 0 {
+					return
+				}
+				if count, _ := starting.Count(); count > 0 {
+					return
+				}
+				time.Sleep(100 * time.Millisecond)
 			}
-			if count, _ := starting.Count(); count > 0 {
-				return
-			}
-			time.Sleep(100 * time.Millisecond)
-		}
-		dumpBody(t, ctx, "streamlit starting panel or iframe missing")
-	})
+			dumpBody(t, ctx, "streamlit starting panel or iframe missing")
+		},
+	)
 }
 
 func expectStreamlitRestartChangesIdentity() spec.Step {
-	return spec.Custom("streamlit restart changes process identity", func(t testing.TB, ctx *duiruntime.Context) {
-		t.Helper()
-		before, err := readStreamlitProcessIdentity(ctx)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if before.PID == "" && before.RunID == "" && before.StartedAt == "" {
-			t.Fatalf("empty streamlit identity before restart; body:\n%s", before.Text)
-		}
-		_, err = ctx.Page.Evaluate(`async () => {
+	return spec.Custom(
+		"streamlit restart changes process identity",
+		func(t testing.TB, ctx *duiruntime.Context) {
+			t.Helper()
+			before, err := readStreamlitProcessIdentity(ctx)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if before.PID == "" && before.RunID == "" && before.StartedAt == "" {
+				t.Fatalf(
+					"empty streamlit identity before restart; body:\n%s",
+					before.Text,
+				)
+			}
+			_, err = ctx.Page.Evaluate(`async () => {
 			await fetch('/forms/applets/streamlit/restart', {
 				method: 'POST',
 				headers: {'Content-Type': 'application/x-www-form-urlencoded'},
@@ -461,32 +580,45 @@ func expectStreamlitRestartChangesIdentity() spec.Step {
 				redirect: 'manual'
 			})
 		}`, nil)
-		if err != nil {
-			t.Fatal(err)
-		}
-		visit(t, ctx, "/examples/streamlit?context=chat")
-		if err := ctx.Page.FrameLocator(streamlitAppletFrameSelector).GetByText("Streamlit applet smoke test").First().WaitFor(playwright.LocatorWaitForOptions{Timeout: playwright.Float(90_000)}); err != nil {
-			t.Fatalf("streamlit did not return after restart: %v", err)
-		}
-
-		var after streamlitProcessIdentity
-		deadline := time.Now().Add(45 * time.Second)
-		for time.Now().Before(deadline) {
-			after, err = readStreamlitProcessIdentity(ctx)
-			if err == nil && identityChanged(before, after) {
-				return
+			if err != nil {
+				t.Fatal(err)
 			}
-			time.Sleep(500 * time.Millisecond)
-		}
-		t.Fatalf("streamlit identity did not change after restart\nbefore=%+v\nafter=%+v", before, after)
-	})
+			visit(t, ctx, "/examples/streamlit?context=chat")
+			if err := ctx.Page.FrameLocator(streamlitAppletFrameSelector).
+				GetByText("Streamlit applet smoke test").
+				First().
+				WaitFor(playwright.LocatorWaitForOptions{Timeout: playwright.Float(90_000)}); err != nil {
+				t.Fatalf("streamlit did not return after restart: %v", err)
+			}
+
+			var after streamlitProcessIdentity
+			deadline := time.Now().Add(45 * time.Second)
+			for time.Now().Before(deadline) {
+				after, err = readStreamlitProcessIdentity(ctx)
+				if err == nil && identityChanged(before, after) {
+					return
+				}
+				time.Sleep(500 * time.Millisecond)
+			}
+			t.Fatalf(
+				"streamlit identity did not change after restart\nbefore=%+v\nafter=%+v",
+				before,
+				after,
+			)
+		},
+	)
 }
 
-func readStreamlitProcessIdentity(ctx *duiruntime.Context) (streamlitProcessIdentity, error) {
+func readStreamlitProcessIdentity(
+	ctx *duiruntime.Context,
+) (streamlitProcessIdentity, error) {
 	return readStreamlitProcessIdentityForFrame(ctx, streamlitAppletFrameSelector)
 }
 
-func readStreamlitProcessIdentityForFrame(ctx *duiruntime.Context, frameSelector string) (streamlitProcessIdentity, error) {
+func readStreamlitProcessIdentityForFrame(
+	ctx *duiruntime.Context,
+	frameSelector string,
+) (streamlitProcessIdentity, error) {
 	raw, err := ctx.Page.FrameLocator(frameSelector).Locator("body").Evaluate(`(body) => {
 		const text = body.innerText || ''
 		const pick = (re) => {
@@ -522,23 +654,28 @@ func identityChanged(before, after streamlitProcessIdentity) bool {
 }
 
 func expectAppletIdentityEncoded(identity string) spec.Step {
-	return spec.Custom("applet identity is present in page", func(t testing.TB, ctx *duiruntime.Context) {
-		t.Helper()
-		html, err := ctx.Page.Locator("body").Evaluate("el => el.innerHTML", nil)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if !strings.Contains(fmt.Sprint(html), identity) {
-			t.Fatalf("page does not encode applet identity %q", identity)
-		}
-	})
+	return spec.Custom(
+		"applet identity is present in page",
+		func(t testing.TB, ctx *duiruntime.Context) {
+			t.Helper()
+			html, err := ctx.Page.Locator("body").Evaluate("el => el.innerHTML", nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !strings.Contains(fmt.Sprint(html), identity) {
+				t.Fatalf("page does not encode applet identity %q", identity)
+			}
+		},
+	)
 }
 
 func stopWordleAppletIfRunning() spec.Step {
-	return spec.Custom("stop wordle applet if running", func(t testing.TB, ctx *duiruntime.Context) {
-		t.Helper()
-		visit(t, ctx, "/examples/wordle")
-		_, _ = ctx.Page.Evaluate(`async () => {
+	return spec.Custom(
+		"stop wordle applet if running",
+		func(t testing.TB, ctx *duiruntime.Context) {
+			t.Helper()
+			visit(t, ctx, "/examples/wordle")
+			_, _ = ctx.Page.Evaluate(`async () => {
 			await fetch('/forms/applets/wordle/stop', {
 				method: 'POST',
 				headers: {'Content-Type': 'application/x-www-form-urlencoded'},
@@ -546,91 +683,119 @@ func stopWordleAppletIfRunning() spec.Step {
 				redirect: 'manual'
 			}).catch(() => null)
 		}`, nil)
-	})
+		},
+	)
 }
 
 func expectStartingPanelOrIframe() spec.Step {
-	return spec.Custom("applet shows starting panel or iframe", func(t testing.TB, ctx *duiruntime.Context) {
-		t.Helper()
-		starting := ctx.Page.Locator("[id^='applet-status-wordle']").First()
-		iframe := ctx.Page.Locator(wordleAppletFrameSelector).First()
-		deadline := time.Now().Add(10 * time.Second)
-		for time.Now().Before(deadline) {
-			if count, _ := iframe.Count(); count > 0 {
-				return
+	return spec.Custom(
+		"applet shows starting panel or iframe",
+		func(t testing.TB, ctx *duiruntime.Context) {
+			t.Helper()
+			starting := ctx.Page.Locator("[id^='applet-status-wordle']").First()
+			iframe := ctx.Page.Locator(wordleAppletFrameSelector).First()
+			deadline := time.Now().Add(10 * time.Second)
+			for time.Now().Before(deadline) {
+				if count, _ := iframe.Count(); count > 0 {
+					return
+				}
+				if count, _ := starting.Count(); count > 0 {
+					return
+				}
+				time.Sleep(100 * time.Millisecond)
 			}
-			if count, _ := starting.Count(); count > 0 {
-				return
-			}
-			time.Sleep(100 * time.Millisecond)
-		}
-		dumpBody(t, ctx, "starting panel or iframe missing")
-	})
+			dumpBody(t, ctx, "starting panel or iframe missing")
+		},
+	)
 }
 
 func loginToWordleApplet() spec.Step {
-	return spec.Custom("login to wordle iframe", func(t testing.TB, ctx *duiruntime.Context) {
-		t.Helper()
-		frame := ctx.Page.FrameLocator(wordleAppletFrameSelector)
-		input := frame.Locator("input[name='username']").First()
-		if err := input.WaitFor(playwright.LocatorWaitForOptions{Timeout: playwright.Float(60_000)}); err != nil {
-			t.Fatalf("wordle login input missing: %v", err)
-		}
-		if err := input.Fill(fmt.Sprintf("e2e-%d", time.Now().UnixNano())); err != nil {
-			t.Fatal(err)
-		}
-		if err := frame.GetByRole("button", playwright.FrameLocatorGetByRoleOptions{Name: "Play"}).Click(); err != nil {
-			t.Fatal(err)
-		}
-		if err := frame.Locator("[aria-label='Wordle board']").First().WaitFor(playwright.LocatorWaitForOptions{Timeout: playwright.Float(30_000)}); err != nil {
-			t.Fatalf("wordle board did not render after login: %v", err)
-		}
-	})
+	return spec.Custom(
+		"login to wordle iframe",
+		func(t testing.TB, ctx *duiruntime.Context) {
+			t.Helper()
+			frame := ctx.Page.FrameLocator(wordleAppletFrameSelector)
+			input := frame.Locator("input[name='username']").First()
+			if err := input.WaitFor(
+				playwright.LocatorWaitForOptions{Timeout: playwright.Float(60_000)},
+			); err != nil {
+				t.Fatalf("wordle login input missing: %v", err)
+			}
+			if err := input.Fill(
+				fmt.Sprintf("e2e-%d", time.Now().UnixNano()),
+			); err != nil {
+				t.Fatal(err)
+			}
+			if err := frame.GetByRole("button", playwright.FrameLocatorGetByRoleOptions{Name: "Play"}).
+				Click(); err != nil {
+				t.Fatal(err)
+			}
+			if err := frame.Locator("[aria-label='Wordle board']").
+				First().
+				WaitFor(playwright.LocatorWaitForOptions{Timeout: playwright.Float(30_000)}); err != nil {
+				t.Fatalf("wordle board did not render after login: %v", err)
+			}
+		},
+	)
 }
 
 func submitWordleGuess(guess string) spec.Step {
-	return spec.Custom("submit wordle guess through applet UI", func(t testing.TB, ctx *duiruntime.Context) {
-		t.Helper()
-		frame := ctx.Page.FrameLocator(wordleAppletFrameSelector)
-		for _, letter := range strings.ToUpper(guess) {
-			key := frame.GetByRole("button", playwright.FrameLocatorGetByRoleOptions{
-				Name:  "Letter " + string(letter),
-				Exact: playwright.Bool(true),
-			})
-			if err := key.Click(); err != nil {
-				t.Fatalf("click wordle letter %q: %v", letter, err)
+	return spec.Custom(
+		"submit wordle guess through applet UI",
+		func(t testing.TB, ctx *duiruntime.Context) {
+			t.Helper()
+			frame := ctx.Page.FrameLocator(wordleAppletFrameSelector)
+			for _, letter := range strings.ToUpper(guess) {
+				key := frame.GetByRole("button", playwright.FrameLocatorGetByRoleOptions{
+					Name:  "Letter " + string(letter),
+					Exact: playwright.Bool(true),
+				})
+				if err := key.Click(); err != nil {
+					t.Fatalf("click wordle letter %q: %v", letter, err)
+				}
 			}
-		}
-		if err := frame.GetByRole("button", playwright.FrameLocatorGetByRoleOptions{
-			Name:  "Submit guess",
-			Exact: playwright.Bool(true),
-		}).Click(); err != nil {
-			t.Fatalf("submit wordle guess: %v", err)
-		}
-		if err := frame.GetByText("1/6", playwright.FrameLocatorGetByTextOptions{Exact: playwright.Bool(true)}).WaitFor(
-			playwright.LocatorWaitForOptions{Timeout: playwright.Float(30_000)},
-		); err != nil {
-			t.Fatalf("wordle guess did not reach durable board state: %v", err)
-		}
-	})
+			if err := frame.GetByRole("button", playwright.FrameLocatorGetByRoleOptions{
+				Name:  "Submit guess",
+				Exact: playwright.Bool(true),
+			}).Click(); err != nil {
+				t.Fatalf("submit wordle guess: %v", err)
+			}
+			if err := frame.GetByText("1/6", playwright.FrameLocatorGetByTextOptions{Exact: playwright.Bool(true)}).
+				WaitFor(
+					playwright.LocatorWaitForOptions{Timeout: playwright.Float(30_000)},
+				); err != nil {
+				t.Fatalf("wordle guess did not reach durable board state: %v", err)
+			}
+		},
+	)
 }
 
 func expectAppletConsoleClean() spec.Step {
-	return spec.Custom("applet console clean", func(t testing.TB, ctx *duiruntime.Context) {
-		t.Helper()
-		time.Sleep(250 * time.Millisecond)
-		problems := ctx.Console.Problems()
-		filtered := problems[:0]
-		for _, problem := range problems {
-			if problem.Type == "warning" && strings.Contains(problem.Text, "allow-scripts and allow-same-origin") {
-				continue
+	return spec.Custom(
+		"applet console clean",
+		func(t testing.TB, ctx *duiruntime.Context) {
+			t.Helper()
+			time.Sleep(250 * time.Millisecond)
+			problems := ctx.Console.Problems()
+			filtered := problems[:0]
+			for _, problem := range problems {
+				if problem.Type == "warning" &&
+					strings.Contains(
+						problem.Text,
+						"allow-scripts and allow-same-origin",
+					) {
+					continue
+				}
+				filtered = append(filtered, problem)
 			}
-			filtered = append(filtered, problem)
-		}
-		if len(filtered) > 0 {
-			t.Fatalf("console problems:\n%s", duiruntime.FormatConsoleProblems(filtered))
-		}
-	})
+			if len(filtered) > 0 {
+				t.Fatalf(
+					"console problems:\n%s",
+					duiruntime.FormatConsoleProblems(filtered),
+				)
+			}
+		},
+	)
 }
 
 func browserNumberAsInt(value any) int {
@@ -648,7 +813,10 @@ func browserNumberAsInt(value any) int {
 
 func visit(t testing.TB, ctx *duiruntime.Context, p string) {
 	t.Helper()
-	if _, err := ctx.Page.Goto(strings.TrimRight(ctx.Config.BaseURL, "/")+p, playwright.PageGotoOptions{WaitUntil: playwright.WaitUntilStateDomcontentloaded}); err != nil {
+	if _, err := ctx.Page.Goto(
+		strings.TrimRight(ctx.Config.BaseURL, "/")+p,
+		playwright.PageGotoOptions{WaitUntil: playwright.WaitUntilStateDomcontentloaded},
+	); err != nil {
 		t.Fatal(err)
 	}
 }
