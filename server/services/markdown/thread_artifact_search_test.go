@@ -1,6 +1,7 @@
 package markdown
 
 import (
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
@@ -139,4 +140,127 @@ func TestThreadArtifactBrowserWiresSearchEndpoint(t *testing.T) {
 			t.Fatalf("browser missing %q: %s", want, html)
 		}
 	}
+}
+
+func TestArtifactSearchQueryMatchUsesFileNameNotPathSegments(t *testing.T) {
+	t.Parallel()
+
+	path := "owner/plans/alpha/unique-target.md"
+	if !artifactSearchQueryMatch("unique-target", "unique-target.md", path) {
+		t.Fatal("filename unique-target should match unique-target.md")
+	}
+	if !artifactSearchQueryMatch("unique-target.md", "unique-target", path) {
+		t.Fatal("query unique-target.md should match display name unique-target")
+	}
+	if artifactSearchQueryMatch("alpha", "unique-target.md", path) {
+		t.Fatal("parent dir name should not match a file in that path")
+	}
+	if !artifactSearchQueryMatch("alpha", "alpha", "owner/plans/alpha") {
+		t.Fatal("directory name alpha should match")
+	}
+}
+
+func TestHandleThoughtsArtifactSearchFindsFileByNameNotPathDirs(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	for i := 0; i < 40; i++ {
+		mustMkdirAll(
+			t,
+			filepath.Join(root, "owner", "plans", "alpha", fmt.Sprintf("dir-%02d", i)),
+		)
+	}
+	mustWriteFile(
+		t,
+		filepath.Join(root, "owner", "plans", "alpha", "design.md"),
+		[]byte("# Design"),
+	)
+	mustWriteFile(
+		t,
+		filepath.Join(root, "owner", "plans", "alpha", "dir-39", "unique-target.md"),
+		[]byte("# Target"),
+	)
+	svc, err := NewService(root, nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	body := thoughtsArtifactSearchBody(
+		t,
+		svc,
+		"unique-target",
+		"thoughts/owner/plans/alpha/design.md",
+		"thoughts/owner/plans/alpha",
+	)
+	if !strings.Contains(
+		body,
+		`href="/thoughts/owner/plans/alpha/dir-39/unique-target.md"`,
+	) {
+		t.Fatalf("filename search missed unique-target.md: %s", body)
+	}
+	dirStart := strings.Index(body, `data-testid="artifact-search-this-directory"`)
+	globalStart := strings.Index(body, `data-testid="artifact-search-all-thoughts"`)
+	if dirStart < 0 || globalStart < 0 {
+		t.Fatalf("missing search sections: %s", body)
+	}
+	if strings.Contains(body[dirStart:globalStart], "unique-target.md") {
+		t.Fatalf("nested file leaked into this directory: %s", body[dirStart:globalStart])
+	}
+
+	design := thoughtsArtifactSearchBody(
+		t,
+		svc,
+		"design.md",
+		"thoughts/owner/plans/alpha/design.md",
+		"thoughts/owner/plans/alpha",
+	)
+	dirStart = strings.Index(design, `data-testid="artifact-search-this-directory"`)
+	globalStart = strings.Index(design, `data-testid="artifact-search-all-thoughts"`)
+	if dirStart < 0 || globalStart < 0 {
+		t.Fatalf("missing search sections: %s", design)
+	}
+	dirSection := design[dirStart:globalStart]
+	if !strings.Contains(dirSection, `href="/thoughts/owner/plans/alpha/design.md"`) {
+		t.Fatalf("this directory missed design.md by filename: %s", dirSection)
+	}
+
+	alpha := thoughtsArtifactSearchBody(
+		t,
+		svc,
+		"alpha",
+		"thoughts/owner/plans/alpha/design.md",
+		"thoughts/owner/plans/alpha",
+	)
+	if strings.Contains(alpha, "unique-target.md") {
+		t.Fatalf("dir-name search should not return files under that path: %s", alpha)
+	}
+	if strings.Contains(alpha, `>design<`) {
+		t.Fatalf("dir-name search should not return design.md: %s", alpha)
+	}
+	if !strings.Contains(alpha, `>alpha/<`) {
+		t.Fatalf("dir-name search missed the alpha directory: %s", alpha)
+	}
+}
+
+func thoughtsArtifactSearchBody(
+	t *testing.T,
+	svc *Service,
+	query, artifact, artifactDir string,
+) string {
+	t.Helper()
+	rec := httptest.NewRecorder()
+	c := echo.New().NewContext(
+		httptest.NewRequest(
+			http.MethodGet,
+			"/thoughts/_artifact-search?q="+query+
+				"&artifact="+artifact+
+				"&artifact_dir="+artifactDir,
+			http.NoBody,
+		),
+		rec,
+	)
+	if err := svc.HandleThoughtsArtifactSearch(c); err != nil {
+		t.Fatal(err)
+	}
+	return rec.Body.String()
 }

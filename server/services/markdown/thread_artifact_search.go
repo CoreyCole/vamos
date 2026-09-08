@@ -4,6 +4,7 @@ import (
 	"errors"
 	"io/fs"
 	"net/http"
+	"path"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -51,10 +52,20 @@ func artifactSearchQueryMatch(query, name, itemPath string) bool {
 	if q == "" {
 		return true
 	}
-	if strings.Contains(strings.ToLower(name), q) {
-		return true
+	for _, candidate := range []string{name, path.Base(filepath.ToSlash(itemPath))} {
+		n := strings.ToLower(strings.TrimSpace(candidate))
+		if n == "" {
+			continue
+		}
+		if strings.Contains(n, q) {
+			return true
+		}
+		ext := strings.ToLower(filepath.Ext(n))
+		if ext != "" && strings.Contains(strings.TrimSuffix(n, ext), q) {
+			return true
+		}
 	}
-	return strings.Contains(strings.ToLower(itemPath), q)
+	return false
 }
 
 func (s *Service) HandleThoughtsArtifactSearch(c echo.Context) error {
@@ -164,8 +175,7 @@ func (s *Service) searchThoughtsGlobal(
 			if !isThoughtsRenderableFile(name) {
 				return nil
 			}
-			if !artifactSearchQueryMatch(query, displayDocumentName(name), rel) &&
-				!artifactSearchQueryMatch(query, name, rel) {
+			if !artifactSearchQueryMatch(query, name, rel) {
 				return nil
 			}
 			hits = append(hits, ArtifactSearchHit{
@@ -180,8 +190,10 @@ func (s *Service) searchThoughtsGlobal(
 		return nil
 	})
 	sort.Slice(hits, func(i, j int) bool {
-		if hits[i].IsDir != hits[j].IsDir {
-			return hits[i].IsDir
+		li := strings.ToLower(hits[i].Name)
+		lj := strings.ToLower(hits[j].Name)
+		if li != lj {
+			return li < lj
 		}
 		return hits[i].Path < hits[j].Path
 	})
