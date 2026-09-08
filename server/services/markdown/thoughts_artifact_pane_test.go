@@ -85,7 +85,7 @@ func TestThoughtsArtifactPaneUsesSharedThreadChrome(t *testing.T) {
 		`aria-label="Artifact actions"`,
 		`data-testid="workbench-overflow-actions"`,
 		`href="` + chatHref + `"`,
-		`<span>chat about this plan</span>`,
+		`<span>Chat about this plan</span>`,
 		`data-testid="view-chat"`,
 		`title="View Chat"`,
 		`href="/thoughts/owner/plans/alpha/notes.md"`,

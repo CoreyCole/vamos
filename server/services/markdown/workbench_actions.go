@@ -92,7 +92,7 @@ func BuildThreadArtifactHeaderActions(
 	}
 	if chatHref != "" {
 		chat := workbench.OverflowAction{
-			Label: "chat about this plan",
+			Label: "Chat about this plan",
 			Kind:  workbench.OverflowActionLink,
 			Href:  chatHref,
 		}

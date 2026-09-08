@@ -15,8 +15,8 @@ func TestBuildThreadArtifactHeaderActionsOmitsThoughts(t *testing.T) {
 	if strings.Contains(html, "<span>Thoughts</span>") {
 		t.Fatalf("Thoughts still in 3-dot:\n%s", html)
 	}
-	if !strings.Contains(html, "<span>chat about this plan</span>") {
-		t.Fatalf("missing chat about this plan:\n%s", html)
+	if !strings.Contains(html, "<span>Chat about this plan</span>") {
+		t.Fatalf("missing Chat about this plan:\n%s", html)
 	}
 	if !strings.Contains(html, ">alpha</span>") {
 		t.Fatalf("missing plan name subtitle:\n%s", html)
@@ -44,8 +44,8 @@ func TestBuildThreadArtifactHeaderActionsOmitsChatWithoutHref(t *testing.T) {
 	if strings.Contains(html, "<span>Thoughts</span>") {
 		t.Fatalf("Thoughts still in 3-dot:\n%s", html)
 	}
-	if strings.Contains(html, "chat about this plan") {
-		t.Fatalf("chat about this plan should be hidden on plan chat:\n%s", html)
+	if strings.Contains(html, "Chat about this plan") {
+		t.Fatalf("Chat about this plan should be hidden on plan chat:\n%s", html)
 	}
 }
 
