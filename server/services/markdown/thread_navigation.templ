@@ -89,12 +89,13 @@ templ ThreadArtifactPane(browser ThreadArtifactBrowserArgs, document templ.Compo
 				<span
 					data-testid="artifact-browser-cwd"
 					data-show="$_artifactBrowserOpen"
-					class="block truncate"
+					dir="rtl"
+					class="block overflow-hidden text-ellipsis whitespace-nowrap text-left"
 					title={ threadArtifactDirectoryIdentity(browser.DirectoryPath) }
 					if !browser.BrowserOpen {
 						style="display: none;"
 					}
-				>{ artifactHeaderCwdLabel(browser.DirectoryPath) }</span>
+				><span dir="ltr">{ threadArtifactDirectoryIdentity(browser.DirectoryPath) }</span></span>
 			</span>
 			<input
 				id="artifact-browser-search"
@@ -193,7 +194,7 @@ templ ThreadArtifactBrowser(browser ThreadArtifactBrowserArgs) {
 		data-thread-artifact-browser
 		data-thread-artifact-cwd={ threadArtifactDirectoryIdentity(browser.DirectoryPath) }
 		data-artifact-search-endpoint={ thoughtsArtifactSearchEndpoint(browser.ThreadID, browser.DocPath, browser.DirectoryPath) }
-		data-show="$_artifactBrowserOpen"
+		data-show={ artifactBrowserVisibleExpr() }
 		class="min-h-0 max-h-64 shrink-0 overflow-y-auto border-b border-border"
 		aria-label="Artifact browser"
 		if !browser.BrowserOpen {

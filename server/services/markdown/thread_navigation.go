@@ -283,14 +283,6 @@ func threadArtifactDirectoryIdentity(directoryPath string) string {
 	return "thoughts/" + directoryPath
 }
 
-func artifactHeaderCwdLabel(directoryPath string) string {
-	base := path.Base(strings.Trim(strings.TrimSpace(directoryPath), "/"))
-	if base == "" || base == "." {
-		return "thoughts"
-	}
-	return base
-}
-
 func artifactHeaderFileTitle(docPath string) string {
 	trimmed := strings.Trim(strings.TrimSpace(docPath), "/")
 	if trimmed == "" {
@@ -328,6 +320,10 @@ func threadArtifactLoaded(loaded bool) string {
 
 func threadArtifactBrowserClickAction() string {
 	return "if (!$_threadArtifactLoading && evt.button === 0 && !evt.metaKey && !evt.ctrlKey && !evt.shiftKey && !evt.altKey) { evt.preventDefault(); @get(el.dataset.artifactEndpoint) }"
+}
+
+func artifactBrowserVisibleExpr() string {
+	return "$_artifactBrowserOpen || $dirSearch"
 }
 
 func artifactBrowserSearchFocusAction() string {

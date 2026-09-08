@@ -149,7 +149,7 @@ func TestThreadArtifactPaneScopesStaticHandlersToBrowserRows(t *testing.T) {
 		`data-on:click="if (!$_threadArtifactLoading`,
 		`href="/thoughts/fullscreen.md"`,
 		`_artifactBrowserOpen: true`,
-		`data-show="$_artifactBrowserOpen"`,
+		`data-show="` + artifactBrowserVisibleExpr() + `"`,
 		`aria-controls="thread-artifact-browser"`,
 		`id="thread-artifact-path-header"`,
 		`aria-label="Toggle files"`,
@@ -485,8 +485,7 @@ func TestArtifactHeaderShowsFileWhenClosedAndCwdWhenOpen(t *testing.T) {
 		t.Fatalf("closed files should show full path with left ellipsis: %s", header)
 	}
 	if !strings.Contains(header, `data-testid="artifact-browser-cwd"`) ||
-		!strings.Contains(header, `>alpha</span>`) ||
-		!strings.Contains(header, `title="thoughts/owner/plans/alpha"`) {
+		!strings.Contains(header, `>thoughts/owner/plans/alpha</span>`) {
 		t.Fatalf("closed files should still carry cwd for open state: %s", header)
 	}
 
@@ -503,8 +502,9 @@ func TestArtifactHeaderShowsFileWhenClosedAndCwdWhenOpen(t *testing.T) {
 	}
 	openHeader := artifactPathHeader(t, open.String())
 	if !strings.Contains(openHeader, `data-testid="artifact-browser-cwd"`) ||
-		!strings.Contains(openHeader, `>plans</span>`) {
-		t.Fatalf("open files should show cwd: %s", openHeader)
+		!strings.Contains(openHeader, `dir="rtl"`) ||
+		!strings.Contains(openHeader, `>thoughts/owner/plans</span>`) {
+		t.Fatalf("open files should show full cwd with left ellipsis: %s", openHeader)
 	}
 }
 
