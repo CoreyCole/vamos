@@ -142,6 +142,28 @@ func TestThreadArtifactBrowserWiresSearchEndpoint(t *testing.T) {
 	}
 }
 
+func TestThreadArtifactBrowserShowsResultsWhenSearchHasQuery(t *testing.T) {
+	t.Parallel()
+
+	var body strings.Builder
+	if err := ThreadArtifactBrowser(ThreadArtifactBrowserArgs{
+		DocPath:     "owner/note.md",
+		BrowserOpen: false,
+	}).Render(t.Context(), &body); err != nil {
+		t.Fatal(err)
+	}
+	html := body.String()
+	for _, want := range []string{
+		`data-show="` + artifactBrowserVisibleExpr() + `"`,
+		`id="thread-artifact-browser-results"`,
+		`style="display: none;"`,
+	} {
+		if !strings.Contains(html, want) {
+			t.Fatalf("collapsed browser missing %q: %s", want, html)
+		}
+	}
+}
+
 func TestArtifactSearchQueryMatchUsesFileNameNotPathSegments(t *testing.T) {
 	t.Parallel()
 
