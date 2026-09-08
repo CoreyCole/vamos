@@ -71,32 +71,7 @@ templ ThreadArtifactPane(browser ThreadArtifactBrowserArgs, document templ.Compo
 				</svg>
 			</button>
 			@ThreadArtifactUp(browser)
-			<span
-				data-testid="artifact-browser-path"
-				data-show="!$_dirSearchOpen"
-				class="min-w-0 flex-1 overflow-hidden text-muted-foreground"
-			>
-				<span
-					data-testid="artifact-browser-file"
-					data-show="!$_artifactBrowserOpen"
-					dir="rtl"
-					class="block overflow-hidden text-ellipsis whitespace-nowrap text-left"
-					title={ artifactHeaderFileTitle(browser.DocPath) }
-					if browser.BrowserOpen {
-						style="display: none;"
-					}
-				><span dir="ltr">{ artifactHeaderFileTitle(browser.DocPath) }</span></span>
-				<span
-					data-testid="artifact-browser-cwd"
-					data-show="$_artifactBrowserOpen"
-					dir="rtl"
-					class="block overflow-hidden text-ellipsis whitespace-nowrap text-left"
-					title={ threadArtifactDirectoryIdentity(browser.DirectoryPath) }
-					if !browser.BrowserOpen {
-						style="display: none;"
-					}
-				><span dir="ltr">{ threadArtifactDirectoryIdentity(browser.DirectoryPath) }</span></span>
-			</span>
+			@ThreadArtifactPath(browser)
 			<input
 				id="artifact-browser-search"
 				type="search"
@@ -197,12 +172,39 @@ templ ThreadArtifactBrowser(browser ThreadArtifactBrowserArgs) {
 		data-show={ artifactBrowserVisibleExpr() }
 		class="min-h-0 max-h-64 shrink-0 overflow-y-auto border-b border-border"
 		aria-label="Artifact browser"
-		if !browser.BrowserOpen {
-			style="display: none;"
-		}
 	>
 		@ThreadArtifactBrowserResults(ThreadArtifactBrowserResultsArgs{Entries: browser.Entries})
 	</nav>
+}
+
+templ ThreadArtifactPath(browser ThreadArtifactBrowserArgs) {
+	<span
+		id="thread-artifact-path-slot"
+		data-testid="artifact-browser-path"
+		data-show="!$_dirSearchOpen"
+		class="min-w-0 flex-1 overflow-hidden text-muted-foreground"
+	>
+		<span
+			data-testid="artifact-browser-file"
+			data-show="!$_artifactBrowserOpen"
+			dir="rtl"
+			class="block overflow-hidden text-ellipsis whitespace-nowrap text-left"
+			title={ artifactHeaderFileTitle(browser.DocPath) }
+			if browser.BrowserOpen {
+				style="display: none;"
+			}
+		><span dir="ltr">{ artifactHeaderFileTitle(browser.DocPath) }</span></span>
+		<span
+			data-testid="artifact-browser-cwd"
+			data-show="$_artifactBrowserOpen"
+			dir="rtl"
+			class="block overflow-hidden text-ellipsis whitespace-nowrap text-left"
+			title={ threadArtifactDirectoryIdentity(browser.DirectoryPath) }
+			if !browser.BrowserOpen {
+				style="display: none;"
+			}
+		><span dir="ltr">{ threadArtifactDirectoryIdentity(browser.DirectoryPath) }</span></span>
+	</span>
 }
 
 templ ThreadArtifactUp(browser ThreadArtifactBrowserArgs) {

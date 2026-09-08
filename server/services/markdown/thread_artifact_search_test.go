@@ -154,13 +154,15 @@ func TestThreadArtifactBrowserShowsResultsWhenSearchHasQuery(t *testing.T) {
 	}
 	html := body.String()
 	for _, want := range []string{
-		`data-show="` + artifactBrowserVisibleExpr() + `"`,
+		`$_artifactBrowserOpen || $dirSearch`,
 		`id="thread-artifact-browser-results"`,
-		`style="display: none;"`,
 	} {
 		if !strings.Contains(html, want) {
 			t.Fatalf("collapsed browser missing %q: %s", want, html)
 		}
+	}
+	if strings.Contains(html, `style="display: none;"`) {
+		t.Fatalf("SSR display:none blocks search from showing results: %s", html)
 	}
 }
 

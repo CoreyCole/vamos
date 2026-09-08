@@ -323,7 +323,7 @@ func threadArtifactBrowserClickAction() string {
 }
 
 func artifactBrowserVisibleExpr() string {
-	return "$_artifactBrowserOpen || $dirSearch"
+	return "$_artifactBrowserOpen || $dirSearch !== ''"
 }
 
 func artifactBrowserSearchFocusAction() string {
@@ -808,6 +808,13 @@ func patchThreadArtifactBrowserChrome(
 	if err := sse.PatchElementTempl(
 		ThreadArtifactUp(browser),
 		datastar.WithSelectorID("thread-artifact-up-slot"),
+		datastar.WithModeOuter(),
+	); err != nil {
+		return err
+	}
+	if err := sse.PatchElementTempl(
+		ThreadArtifactPath(browser),
+		datastar.WithSelectorID("thread-artifact-path-slot"),
 		datastar.WithModeOuter(),
 	); err != nil {
 		return err
