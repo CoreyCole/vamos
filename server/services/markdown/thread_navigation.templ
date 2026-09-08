@@ -14,6 +14,35 @@ templ ThreadArtifactPane(browser ThreadArtifactBrowserArgs, document templ.Compo
 		}
 	>
 		<div id="thread-artifact-path-header" class="flex h-10 min-h-10 max-h-10 shrink-0 items-center gap-2 overflow-hidden border-b border-border px-2.5 text-xs">
+			if browser.ViewDocumentHref != "" {
+				if browser.DocumentViewActive {
+					<a
+						href={ templ.URL(browser.ViewDocumentHref) }
+						data-testid="view-chat"
+						class="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+						aria-label="View Chat"
+						title="View Chat"
+					>
+						<svg class="h-3.5 w-3.5" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path>
+						</svg>
+					</a>
+				} else {
+					<a
+						href={ templ.URL(browser.ViewDocumentHref) }
+						data-testid="view-document"
+						class="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+						aria-label="View Document"
+						title="View Document"
+					>
+						<svg class="h-3.5 w-3.5" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 3h8l4 4v14a2 2 0 01-2 2H7a2 2 0 01-2-2V5a2 2 0 012-2z"></path>
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 3v5h5"></path>
+						</svg>
+					</a>
+				}
+			}
+			<span class="min-w-0 flex-1 truncate text-muted-foreground">{ "thoughts/" + browser.DocPath }</span>
 			<button
 				type="button"
 				class={
@@ -52,29 +81,6 @@ templ ThreadArtifactPane(browser ThreadArtifactBrowserArgs, document templ.Compo
 					></path>
 				</svg>
 			</button>
-			<span class="min-w-0 flex-1 truncate text-muted-foreground">{ "thoughts/" + browser.DocPath }</span>
-			if browser.ViewDocumentHref != "" {
-				<a
-					href={ templ.URL(browser.ViewDocumentHref) }
-					data-testid="view-document"
-					class={
-						"inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground",
-						templ.KV("bg-muted text-foreground", browser.DocumentViewActive),
-					}
-					aria-label="View Document"
-					title="View Document"
-					if browser.DocumentViewActive {
-						aria-pressed="true"
-					} else {
-						aria-pressed="false"
-					}
-				>
-					<svg class="h-3.5 w-3.5" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 3h8l4 4v14a2 2 0 01-2 2H7a2 2 0 01-2-2V5a2 2 0 012-2z"></path>
-						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 3v5h5"></path>
-					</svg>
-				</a>
-			}
 			if browser.HeaderActions != nil {
 				@browser.HeaderActions
 			}

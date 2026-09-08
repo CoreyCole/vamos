@@ -331,19 +331,60 @@ func TestViewDocumentButtonSitsLeftOfOverflow(t *testing.T) {
 	).Render(t.Context(), &body); err != nil {
 		t.Fatal(err)
 	}
-	out := body.String()
-	view := strings.Index(out, `data-testid="view-document"`)
-	overflow := strings.Index(out, `data-testid="workbench-overflow-actions"`)
-	if view < 0 || overflow < 0 || view > overflow {
-		t.Fatalf(
-			"view document should be left of 3-dot: view=%d overflow=%d\n%s",
-			view,
-			overflow,
-			out,
-		)
+	header := artifactPathHeader(t, body.String())
+	view := strings.Index(header, `data-testid="view-document"`)
+	path := strings.Index(header, `>thoughts/owner/plans/alpha/design.md</span>`)
+	files := strings.Index(header, `aria-label="Toggle files"`)
+	overflow := strings.Index(header, `data-testid="workbench-overflow-actions"`)
+	if view < 0 || path < 0 || files < 0 || overflow < 0 ||
+		!(view < path && path < files && files < overflow) {
+		t.Fatalf("header order view=%d path=%d files=%d overflow=%d\n%s", view, path, files, overflow, header)
 	}
-	if !strings.Contains(out, `title="View Document"`) ||
-		!strings.Contains(out, `aria-pressed="false"`) {
-		t.Fatalf("missing View Document tooltip/pressed: %s", out)
+	if !strings.Contains(header, `title="View Document"`) {
+		t.Fatalf("missing View Document tooltip: %s", header)
 	}
+}
+
+func TestViewChatButtonOnThoughts(t *testing.T) {
+	t.Parallel()
+	var body strings.Builder
+	if err := ThreadArtifactPane(
+		ThreadArtifactBrowserArgs{
+			DocPath:            "owner/plans/alpha/design.md",
+			ViewDocumentHref:   "/rooms/plan/alpha?artifact=x",
+			DocumentViewActive: true,
+			HeaderActions: templ.Raw(
+				`<div data-testid="workbench-overflow-actions"></div>`,
+			),
+		},
+		templ.Raw("<p>doc</p>"),
+	).Render(t.Context(), &body); err != nil {
+		t.Fatal(err)
+	}
+	header := artifactPathHeader(t, body.String())
+	chat := strings.Index(header, `data-testid="view-chat"`)
+	path := strings.Index(header, `>thoughts/owner/plans/alpha/design.md</span>`)
+	files := strings.Index(header, `aria-label="Toggle files"`)
+	overflow := strings.Index(header, `data-testid="workbench-overflow-actions"`)
+	if chat < 0 || path < 0 || files < 0 || overflow < 0 ||
+		!(chat < path && path < files && files < overflow) {
+		t.Fatalf("header order chat=%d path=%d files=%d overflow=%d\n%s", chat, path, files, overflow, header)
+	}
+	if !strings.Contains(header, `title="View Chat"`) ||
+		strings.Contains(header, `title="View Document"`) {
+		t.Fatalf("thoughts should show View Chat: %s", header)
+	}
+}
+
+func artifactPathHeader(t *testing.T, html string) string {
+	t.Helper()
+	start := strings.Index(html, `id="thread-artifact-path-header"`)
+	if start < 0 {
+		t.Fatal("missing path header")
+	}
+	header := html[start:]
+	if end := strings.Index(header, `id="thread-artifact-browser"`); end > 0 {
+		return header[:end]
+	}
+	return header
 }
