@@ -35,8 +35,16 @@ func CommentsCloseCookieJS() string {
 	return commentsOpenCookieWriteJS(false)
 }
 
+func hideThreadsWhenChatAndCommentsClosedJS() string {
+	return "if (!$workbench.regions.workbenchV2Chat.visible && !$workbench.regions.workbenchV2Comments.visible) { $workbench.regions.workbenchV2Threads.visible = false; " +
+		threadsOpenCookieWriteJS(
+			false,
+		) + " }"
+}
+
 func paintChatCommentsLayoutJS() string {
-	return "if (window.workbenchApplyRegionVisible) { workbenchApplyRegionVisible('workbench-v2-chat', $workbench.regions.workbenchV2Chat.visible); workbenchApplyRegionVisible('workbench-v2-comments', $workbench.regions.workbenchV2Comments.visible) }; " +
+	return hideThreadsWhenChatAndCommentsClosedJS() +
+		"; if (window.workbenchApplyRegionVisible) { workbenchApplyRegionVisible('workbench-v2-chat', $workbench.regions.workbenchV2Chat.visible); workbenchApplyRegionVisible('workbench-v2-comments', $workbench.regions.workbenchV2Comments.visible); workbenchApplyRegionVisible('workbench-v2-threads', $workbench.regions.workbenchV2Threads.visible) }; " +
 		shareChatCommentsRatioJS() +
 		"; if (window.workbenchReflow) { workbenchReflow() }; " +
 		threadsLayoutReflowJS()

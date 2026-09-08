@@ -1660,6 +1660,9 @@ func TestCommentsToggleClickActionClosesWithoutOpeningChat(t *testing.T) {
 	) {
 		t.Fatalf("comments should toggle: %s", js)
 	}
+	if !strings.Contains(js, "workbenchV2Threads.visible = false") {
+		t.Fatalf("closing chat and comments should hide threads: %s", js)
+	}
 }
 
 func TestChatToggleClickActionClosesWhenAlreadyOpen(t *testing.T) {
@@ -1671,6 +1674,9 @@ func TestChatToggleClickActionClosesWhenAlreadyOpen(t *testing.T) {
 	if !strings.Contains(js, "workbenchApplyRegionVisible") ||
 		!strings.Contains(js, "workbenchReflow") {
 		t.Fatalf("chat toggle must paint visibility before reflow: %s", js)
+	}
+	if !strings.Contains(js, "workbenchV2Threads.visible = false") {
+		t.Fatalf("closing chat and comments should hide threads: %s", js)
 	}
 }
 
