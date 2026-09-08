@@ -78,7 +78,7 @@ func commentsThreadsShowClick() string {
 }
 
 func commentsThreadsReopenClass() string {
-	return "{'invisible': $workbench.regions.workbenchV2Threads.visible, 'pointer-events-none': $workbench.regions.workbenchV2Threads.visible}"
+	return "{'hidden': $workbench.regions.workbenchV2Threads.visible}"
 }
 
 func selectionTriggerSubmitExpr(args SelectionSignalArgs) string {
@@ -2168,14 +2168,14 @@ func CommentsContextPanel(args CommentsPanelArgs) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 144, "\" class=\"flex h-full min-h-0 flex-col overflow-hidden bg-background\"><div class=\"flex h-10 min-h-10 max-h-10 shrink-0 items-center gap-2 border-b border-border px-2.5\"><div id=\"workbench-v2-comments-threads-reopen\" class=\"workbench-chrome invisible pointer-events-none flex h-7 w-7 shrink-0 items-center justify-center\" data-class=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 144, "\" class=\"flex h-full min-h-0 flex-col overflow-hidden bg-background\"><div class=\"flex h-10 min-h-10 max-h-10 shrink-0 items-center gap-2 border-b border-border px-2.5\"><div id=\"workbench-v2-comments-threads-reopen\" class=\"workbench-chrome flex h-7 w-7 shrink-0 items-center justify-center\" data-class=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var103 string
 		templ_7745c5c3_Var103, templ_7745c5c3_Err = templ.ResolveAttributeValue(commentsThreadsReopenClass())
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/commentui/templates.templ`, Line: 499, Col: 196}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/commentui/templates.templ`, Line: 499, Col: 166}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var103)
 		if templ_7745c5c3_Err != nil {

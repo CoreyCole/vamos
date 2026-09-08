@@ -44,12 +44,12 @@ func TestChatColumnWithReopen_ClosedShowsVisibleSlot(t *testing.T) {
 	}
 	classEnd := strings.Index(openTag[classIdx+7:], `"`)
 	classVal := openTag[classIdx+7 : classIdx+7+classEnd]
-	if strings.Contains(classVal, "invisible") {
-		t.Fatalf("closed SSR class should not be invisible: %s", classVal)
+	if strings.Contains(classVal, "invisible") || strings.Contains(classVal, "hidden") {
+		t.Fatalf("closed SSR hamburger should take space: %s", classVal)
 	}
 }
 
-func TestChatColumnWithReopen_OpenKeepsInvisibleSlot(t *testing.T) {
+func TestChatColumnWithReopen_OpenHidesHamburgerSlot(t *testing.T) {
 	var b strings.Builder
 	if err := ChatColumnWithReopen(
 		true,
@@ -65,7 +65,13 @@ func TestChatColumnWithReopen_OpenKeepsInvisibleSlot(t *testing.T) {
 	classIdx := strings.Index(openTag, `class="`)
 	classEnd := strings.Index(openTag[classIdx+7:], `"`)
 	classVal := openTag[classIdx+7 : classIdx+7+classEnd]
-	if !strings.Contains(classVal, "invisible") {
-		t.Fatalf("open SSR should reserve invisible slot: %s", classVal)
+	if !strings.Contains(classVal, "hidden") {
+		t.Fatalf(
+			"open threads should hide hamburger so title is left-aligned: %s",
+			classVal,
+		)
+	}
+	if strings.Contains(classVal, "invisible") {
+		t.Fatalf("hidden hamburger must not keep layout space: %s", classVal)
 	}
 }
