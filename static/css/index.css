@@ -120,6 +120,16 @@
     color: hsl(var(--foreground));
   }
 
+  .markdown-viewer > h1:first-child,
+  .markdown-viewer > h2:first-child,
+  .markdown-viewer > h3:first-child,
+  .markdown-viewer > :first-child > h1,
+  .markdown-viewer > :first-child > h2,
+  .markdown-viewer > :first-child > h3,
+  .markdown-viewer > .section-heading-row:first-child {
+    margin-top: 0;
+  }
+
   .markdown-viewer h2 {
     font-size: 1.5rem;
     font-weight: 600;
@@ -253,7 +263,8 @@
   }
 
   /* AI-470 SharedThreadChat bubbles: match user bubble type; no outer pad. */
-  .chat-bubble-md.chat-message-content > :not(.markdown-code-block):not(.streaming) {
+  .chat-bubble-md.chat-message-content
+    > :not(.markdown-code-block):not(.streaming) {
     padding-left: 0;
     padding-right: 0;
   }
@@ -511,7 +522,6 @@
     color: hsl(var(--muted-foreground));
   }
 }
-
 
 /* Stable workbench v2 regions for cross-document View Transitions.
    Named chrome stays painted across sibling GETs; only the document swaps. */
