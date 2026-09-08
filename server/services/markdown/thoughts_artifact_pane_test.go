@@ -286,7 +286,8 @@ func TestThoughtsArtifactPaneUpKeepsSelectedDoc(t *testing.T) {
 	if !strings.Contains(html, `data-thread-artifact-cwd="thoughts/owner/plans"`) {
 		t.Fatalf("cwd did not honor artifact_dir:\n%s", html)
 	}
-	if !strings.Contains(html, `>thoughts/owner/plans/alpha/design.md</span>`) {
+	if !strings.Contains(html, `data-testid="artifact-browser-file"`) ||
+		!strings.Contains(html, `title="thoughts/owner/plans/alpha/design.md"`) {
 		t.Fatalf("path header lost selected doc:\n%s", html)
 	}
 	if !strings.Contains(html, `data-testid="artifact-browser-search"`) {

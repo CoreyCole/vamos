@@ -75,7 +75,24 @@ templ ThreadArtifactPane(browser ThreadArtifactBrowserArgs, document templ.Compo
 				data-testid="artifact-browser-path"
 				data-show="!$_dirSearchOpen"
 				class="min-w-0 flex-1 truncate text-muted-foreground"
-			>{ "thoughts/" + browser.DocPath }</span>
+			>
+				<span
+					data-testid="artifact-browser-file"
+					data-show="!$_artifactBrowserOpen"
+					title={ artifactHeaderFileTitle(browser.DocPath) }
+					if browser.BrowserOpen {
+						style="display: none;"
+					}
+				>{ artifactHeaderFileLabel(browser.DocPath) }</span>
+				<span
+					data-testid="artifact-browser-cwd"
+					data-show="$_artifactBrowserOpen"
+					title={ threadArtifactDirectoryIdentity(browser.DirectoryPath) }
+					if !browser.BrowserOpen {
+						style="display: none;"
+					}
+				>{ artifactHeaderCwdLabel(browser.DirectoryPath) }</span>
+			</span>
 			<input
 				id="artifact-browser-search"
 				type="search"

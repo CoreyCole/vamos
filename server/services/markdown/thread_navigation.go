@@ -283,6 +283,30 @@ func threadArtifactDirectoryIdentity(directoryPath string) string {
 	return "thoughts/" + directoryPath
 }
 
+func artifactHeaderFileLabel(docPath string) string {
+	base := path.Base(strings.Trim(strings.TrimSpace(docPath), "/"))
+	if base == "" || base == "." {
+		return artifactHeaderCwdLabel("")
+	}
+	return displayDocumentName(base)
+}
+
+func artifactHeaderCwdLabel(directoryPath string) string {
+	base := path.Base(strings.Trim(strings.TrimSpace(directoryPath), "/"))
+	if base == "" || base == "." {
+		return "thoughts"
+	}
+	return base
+}
+
+func artifactHeaderFileTitle(docPath string) string {
+	trimmed := strings.Trim(strings.TrimSpace(docPath), "/")
+	if trimmed == "" {
+		return "thoughts"
+	}
+	return "thoughts/" + trimmed
+}
+
 func threadArtifactPageBase(threadID string) string {
 	if strings.TrimSpace(threadID) == "" {
 		return "/threads"

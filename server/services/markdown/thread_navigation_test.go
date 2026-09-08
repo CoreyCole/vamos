@@ -397,7 +397,7 @@ func TestViewDocumentButtonSitsLeftOfOverflow(t *testing.T) {
 	view := strings.Index(header, `data-testid="view-document"`)
 	comments := strings.Index(header, `data-testid="view-comments"`)
 	up := strings.Index(header, `data-thread-artifact-up`)
-	path := strings.Index(header, `>thoughts/owner/plans/alpha/design.md</span>`)
+	path := strings.Index(header, `data-testid="artifact-browser-path"`)
 	search := strings.Index(header, `data-testid="artifact-browser-search-toggle"`)
 	files := strings.Index(header, `aria-label="Toggle files"`)
 	overflow := strings.Index(header, `data-testid="workbench-overflow-actions"`)
@@ -442,7 +442,7 @@ func TestViewChatButtonOnThoughts(t *testing.T) {
 	header := artifactPathHeader(t, body.String())
 	chat := strings.Index(header, `data-testid="view-chat"`)
 	comments := strings.Index(header, `data-testid="view-comments"`)
-	path := strings.Index(header, `>thoughts/owner/plans/alpha/design.md</span>`)
+	path := strings.Index(header, `data-testid="artifact-browser-path"`)
 	search := strings.Index(header, `data-testid="artifact-browser-search-toggle"`)
 	files := strings.Index(header, `aria-label="Toggle files"`)
 	overflow := strings.Index(header, `data-testid="workbench-overflow-actions"`)
@@ -461,6 +461,50 @@ func TestViewChatButtonOnThoughts(t *testing.T) {
 	if !strings.Contains(header, `title="View Chat"`) ||
 		strings.Contains(header, `title="View Document"`) {
 		t.Fatalf("thoughts should show View Chat: %s", header)
+	}
+}
+
+func TestArtifactHeaderShowsFileWhenClosedAndCwdWhenOpen(t *testing.T) {
+	t.Parallel()
+
+	var closed strings.Builder
+	if err := ThreadArtifactPane(
+		ThreadArtifactBrowserArgs{
+			DocPath:       "owner/plans/alpha/design.md",
+			DirectoryPath: "owner/plans/alpha",
+			BrowserOpen:   false,
+		},
+		templ.Raw("<p>doc</p>"),
+	).Render(t.Context(), &closed); err != nil {
+		t.Fatal(err)
+	}
+	header := artifactPathHeader(t, closed.String())
+	if !strings.Contains(header, `data-testid="artifact-browser-file"`) ||
+		!strings.Contains(header, `>design</span>`) ||
+		!strings.Contains(header, `title="thoughts/owner/plans/alpha/design.md"`) {
+		t.Fatalf("closed files should show file name: %s", header)
+	}
+	if !strings.Contains(header, `data-testid="artifact-browser-cwd"`) ||
+		!strings.Contains(header, `>alpha</span>`) ||
+		!strings.Contains(header, `title="thoughts/owner/plans/alpha"`) {
+		t.Fatalf("closed files should still carry cwd for open state: %s", header)
+	}
+
+	var open strings.Builder
+	if err := ThreadArtifactPane(
+		ThreadArtifactBrowserArgs{
+			DocPath:       "owner/plans/alpha/design.md",
+			DirectoryPath: "owner/plans",
+			BrowserOpen:   true,
+		},
+		templ.Raw("<p>doc</p>"),
+	).Render(t.Context(), &open); err != nil {
+		t.Fatal(err)
+	}
+	openHeader := artifactPathHeader(t, open.String())
+	if !strings.Contains(openHeader, `data-testid="artifact-browser-cwd"`) ||
+		!strings.Contains(openHeader, `>plans</span>`) {
+		t.Fatalf("open files should show cwd: %s", openHeader)
 	}
 }
 
