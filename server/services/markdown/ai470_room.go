@@ -38,7 +38,17 @@ func (s *Service) ServeAI470Room(c echo.Context) error {
 	}
 	userEmail, _ := c.Get("user_email").(string)
 	sel := agenthome.RosterSelection{Kind: kind, ID: id}
-	threadID, err := s.resolveAI470Thread(c.Request().Context(), kind, id)
+	artifactPath, hasArtifact, err := optionalThreadArtifact(c.QueryParam("artifact"))
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
+	}
+	planDoc := artifactPath
+	if planDoc != "" && !strings.HasPrefix(planDoc, "thoughts/") {
+		planDoc = "thoughts/" + planDoc
+	}
+	threadID, err := s.resolveAI470Thread(
+		c.Request().Context(), kind, id, planDoc, userEmail,
+	)
 	if err != nil {
 		return err
 	}
@@ -46,7 +56,7 @@ func (s *Service) ServeAI470Room(c echo.Context) error {
 	threadsOpen := workbench.ThreadsOpenFromRequest(c.Request())
 
 	var chatComp templ.Component
-	artifactComp := s.indexArtifactComponent(c, "", false)
+	artifactComp := s.indexArtifactComponent(c, artifactPath, hasArtifact)
 	commentsComp := WorkbenchUnavailable("Select an artifact to view comments.")
 	chatOpen := false
 
@@ -56,6 +66,7 @@ func (s *Service) ServeAI470Room(c echo.Context) error {
 			ai470RoomTitle(kind, id),
 			WorkbenchUnavailable("No shared thread mapped for this room yet."),
 		)
+		chatOpen = kind == agenthome.KindPlan && hasArtifact
 	} else {
 		chat, err := s.renderAI470SharedChat(
 			c.Request().Context(), kind, id, threadID, userEmail,
@@ -111,15 +122,21 @@ type sharedThreadIDLister interface {
 func (s *Service) resolveAI470Thread(
 	ctx context.Context,
 	kind agenthome.RoomKind,
-	id string,
+	id, artifact, userEmail string,
 ) (string, error) {
 	id = strings.TrimSpace(id)
+	artifact = strings.TrimSpace(artifact)
 
-	// Plan rooms: prefer design.md identity.
-	docs := []string{
-		"thoughts/owner/plans/" + id + "/design.md",
-		"thoughts/shared/plans/" + id + "/design.md",
-		"thoughts/" + id + "/design.md",
+	docs := make([]string, 0, 4)
+	if artifact != "" {
+		docs = append(docs, artifact)
+	} else if kind == agenthome.KindPlan && id != "" {
+		docs = append(
+			docs,
+			"thoughts/owner/plans/"+id+"/design.md",
+			"thoughts/shared/plans/"+id+"/design.md",
+			"thoughts/"+id+"/design.md",
+		)
 	}
 	seen := map[string]bool{}
 	for _, doc := range docs {
@@ -135,9 +152,23 @@ func (s *Service) resolveAI470Thread(
 			return threadID, nil
 		}
 	}
+	if kind == agenthome.KindPlan && artifact != "" &&
+		strings.TrimSpace(userEmail) != "" {
+		threadID, err := s.workbenchThreadsRenderer.EnsureSharedThreadForDoc(
+			ctx, artifact, userEmail,
+		)
+		if err != nil {
+			return "", err
+		}
+		if strings.TrimSpace(threadID) != "" {
+			return threadID, nil
+		}
+		return "", nil
+	}
+	if kind == agenthome.KindPlan {
+		return "", nil
+	}
 
-	// Agent/group (and plan fallback): map onto real shared threads by stable index.
-	// Fixtures OK until room↔thread schema lands (Corey P0: same component tree).
 	ids, err := s.listSharedThreadIDs(ctx)
 	if err != nil {
 		return "", err
@@ -150,8 +181,6 @@ func (s *Service) resolveAI470Thread(
 		idx = 1
 	case kind == agenthome.KindGroup && id == "vamos-dev":
 		idx = 2
-	case kind == agenthome.KindPlan && id == "alpha":
-		idx = 0
 	case kind == agenthome.KindDM || kind == agenthome.KindGroup || kind == agenthome.KindAgentDM:
 		idx = 0
 	}

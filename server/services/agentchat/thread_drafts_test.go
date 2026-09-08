@@ -290,6 +290,42 @@ func TestComposerDraftSignalAndSaveContract(t *testing.T) {
 	}
 }
 
+func TestAgentChatComposerStartsAsSingleLine(t *testing.T) {
+	html := renderDraftComponent(t, AgentChatComposer(AgentChatComposerArgs{
+		Action:    "@post('/send')",
+		ThreadID:  "thread_1",
+		HasThread: true,
+	}))
+	for _, want := range []string{
+		`rows="1"`,
+		`min-h-8`,
+		`data-composer-shell`,
+		`data-multiline="0"`,
+		`rounded-full border`,
+		`data-[multiline=1]:rounded-3xl`,
+		`scrollHeight`,
+	} {
+		if !strings.Contains(html, want) {
+			t.Fatalf("composer missing %q: %s", want, html)
+		}
+	}
+	for _, notWant := range []string{
+		`min-h-[2rem]`,
+	} {
+		if strings.Contains(html, notWant) {
+			t.Fatalf("composer still has tall empty state %q: %s", notWant, html)
+		}
+	}
+	js := composerAutosizeJS()
+	if strings.Contains(js, "\n") {
+		t.Fatal("autosize JS injects a newline into the HTML attribute")
+	}
+	if !strings.Contains(js, `indexOf('\n')`) &&
+		!strings.Contains(js, `indexOf("\n")`) {
+		t.Fatalf("autosize JS missing newline check: %s", js)
+	}
+}
+
 func TestSharedThreadDraftHydrationIsUserAndThreadScoped(t *testing.T) {
 	service, queries := newThreadDraftService(t)
 	createDraftThread(t, queries, "thread_1")

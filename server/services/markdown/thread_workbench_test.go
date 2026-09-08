@@ -22,6 +22,10 @@ type threadWorkbenchTestRenderer struct {
 	chatThreadID  string
 	threadPlanDir string
 	threadPlanErr error
+	findID        string
+	lastFindDoc   string
+	ensureID      string
+	lastEnsureDoc string
 }
 
 func (r *threadWorkbenchTestRenderer) RenderWorkbenchThreadList(
@@ -49,10 +53,22 @@ func (r *threadWorkbenchTestRenderer) ResolveSharedThreadPlanDir(
 }
 
 func (r *threadWorkbenchTestRenderer) FindSharedThreadForDoc(
-	context.Context,
-	string,
+	_ context.Context,
+	docPath string,
 ) (string, error) {
-	return "", nil
+	r.lastFindDoc = docPath
+	return r.findID, nil
+}
+
+func (r *threadWorkbenchTestRenderer) EnsureSharedThreadForDoc(
+	_ context.Context,
+	docPath, _ string,
+) (string, error) {
+	r.lastEnsureDoc = docPath
+	if r.ensureID != "" {
+		return r.ensureID, nil
+	}
+	return r.findID, nil
 }
 
 func (r *threadWorkbenchTestRenderer) RenderSharedThreadChat(

@@ -236,6 +236,16 @@ func (s stubWorkbenchThreads) FindSharedThreadForDoc(
 	return s.threadID, nil
 }
 
+func (s stubWorkbenchThreads) EnsureSharedThreadForDoc(
+	ctx context.Context,
+	docPath, userEmail string,
+) (string, error) {
+	_ = ctx
+	_ = docPath
+	_ = userEmail
+	return s.threadID, nil
+}
+
 func (s stubWorkbenchThreads) RenderSharedThreadChat(
 	ctx context.Context,
 	threadID, userEmail string,

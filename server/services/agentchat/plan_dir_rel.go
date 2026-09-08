@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/google/uuid"
+
 	"github.com/CoreyCole/vamos/pkg/db"
 )
 
@@ -18,7 +20,10 @@ type PlanDirRelBackfillResult struct {
 
 // resolvePlanDirRel looks up a plan_workspaces row for cwd / absolute / relative
 // plan identity. Returns NULL when unresolved (freeform).
-func (s *Service) resolvePlanDirRel(ctx context.Context, sources ...string) sql.NullString {
+func (s *Service) resolvePlanDirRel(
+	ctx context.Context,
+	sources ...string,
+) sql.NullString {
 	if s == nil || s.queries == nil {
 		return sql.NullString{}
 	}
@@ -73,8 +78,12 @@ func (s *Service) planDirRelLookupCandidates(raw string) []string {
 		candidates = append(candidates, clean[idx+len("/thoughts/"):])
 	}
 	if s.thoughtsRoot != "" {
-		if rel, err := filepath.Rel(s.thoughtsRoot, filepath.FromSlash(clean)); err == nil &&
-			rel != "." && !strings.HasPrefix(rel, "..") {
+		if rel, err := filepath.Rel(
+			s.thoughtsRoot,
+			filepath.FromSlash(clean),
+		); err == nil &&
+			rel != "." &&
+			!strings.HasPrefix(rel, "..") {
 			candidates = append(candidates, filepath.ToSlash(rel))
 		}
 	}
@@ -94,7 +103,10 @@ func (s *Service) planDirRelLookupCandidates(raw string) []string {
 	return out
 }
 
-func (s *Service) absolutePlanDirFromRel(ctx context.Context, planDirRel string) (string, bool) {
+func (s *Service) absolutePlanDirFromRel(
+	ctx context.Context,
+	planDirRel string,
+) (string, bool) {
 	planDirRel = strings.TrimSpace(planDirRel)
 	if planDirRel == "" {
 		return "", false
@@ -133,6 +145,54 @@ func (s *Service) threadPlanDir(
 		return planDir, true
 	}
 	return s.canonicalPlanDirFromSource(workspaceRoot)
+}
+
+func (s *Service) EnsureSharedThreadForDoc(
+	ctx context.Context,
+	docPath, userEmail string,
+) (string, error) {
+	id, err := s.FindSharedThreadForDoc(ctx, docPath)
+	if err != nil {
+		return "", err
+	}
+	if strings.TrimSpace(id) != "" {
+		return id, nil
+	}
+	userEmail = strings.TrimSpace(userEmail)
+	if userEmail == "" || s == nil || s.queries == nil {
+		return "", nil
+	}
+	planKey := thoughtsPlanKey(docPath)
+	if planKey == "" {
+		return "", nil
+	}
+	cwd := planKey
+	if abs, ok := s.canonicalPlanDirFromSource(planKey); ok {
+		cwd = abs
+	} else if s.thoughtsRoot != "" {
+		rel := strings.TrimPrefix(filepath.ToSlash(planKey), "thoughts/")
+		cwd = filepath.Join(s.thoughtsRoot, filepath.FromSlash(rel))
+	}
+	title := filepath.Base(filepath.ToSlash(planKey))
+	if title == "" || title == "." {
+		title = "Plan chat"
+	}
+	thread, err := s.queries.CreateAgentThread(
+		ctx,
+		s.attachPlanDirRel(ctx, db.CreateAgentThreadParams{
+			ID:         uuid.NewString(),
+			UserEmail:  userEmail,
+			Title:      title,
+			Cwd:        cwd,
+			LineageID:  uuid.NewString(),
+			ProjectID:  "",
+			PlanDirRel: sql.NullString{},
+		}),
+	)
+	if err != nil {
+		return "", err
+	}
+	return thread.ID, nil
 }
 
 // ListPlanHomeThreads returns FK-linked threads for a plan. Freeform (NULL) excluded.
@@ -183,7 +243,10 @@ func (s *Service) MostRecentPlanHomeThread(
 		ctx,
 		db.ListSharedAgentThreadsByPlanDirParams{
 			PlanDirRel: sql.NullString{String: planDirRel, Valid: planDirRel != ""},
-			PlanDir:    sql.NullString{String: absolutePlanDir, Valid: absolutePlanDir != ""},
+			PlanDir: sql.NullString{
+				String: absolutePlanDir,
+				Valid:  absolutePlanDir != "",
+			},
 		},
 	)
 	if err != nil {

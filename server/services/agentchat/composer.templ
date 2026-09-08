@@ -56,16 +56,18 @@ templ AgentChatComposer(args AgentChatComposerArgs) {
 		</div>
 		<div class="relative">
 			<div id="agent-chat-slash-popover" class="absolute bottom-full left-0 z-30 mb-2 hidden max-h-64 w-full overflow-y-auto rounded-lg border border-border bg-popover p-2 shadow-lg" data-show="$slashOpen"></div>
-			<div class="flex items-center gap-1.5 rounded-full border border-white/10 bg-[#111111] px-1.5 py-1.5">
-				@ComposerMetadataButton(args)
-				<textarea id="agent-chat-composer-input" class="min-h-[2rem] max-h-36 flex-1 resize-none bg-transparent px-1 py-1 text-[13px] leading-snug text-foreground outline-none placeholder:text-muted-foreground" placeholder={ args.Placeholder } data-bind="chatDraft" data-ignore-morph data-on:input__debounce.500ms={ args.DraftSaveAction } data-on:input={ slashCommandInputHandler(args.WorkspaceID, args.ThreadID, args.SlashEndpointBase) } data-on:keydown="if (evt.key === 'Enter' && !evt.shiftKey) { evt.preventDefault(); el.form.requestSubmit() }"></textarea>
-				<button type="button" class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-white/[0.06] hover:text-foreground" aria-label="Voice message" title="Voice message">
+			<div data-composer-shell data-multiline="0" class="group grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-1.5 rounded-full border border-white/10 bg-[#111111] px-1.5 py-1.5 data-[multiline=1]:grid-rows-[auto_auto] data-[multiline=1]:items-end data-[multiline=1]:rounded-3xl data-[multiline=1]:px-2 data-[multiline=1]:pb-1.5 data-[multiline=1]:pt-2">
+				<div class="col-start-1 row-start-1 group-data-[multiline=1]:row-start-2">
+					@ComposerMetadataButton(args)
+				</div>
+				<textarea id="agent-chat-composer-input" rows="1" class="col-start-2 row-start-1 min-h-8 min-w-0 w-full resize-none overflow-y-auto bg-transparent px-1 py-0 text-[13px] leading-8 text-foreground outline-none placeholder:text-muted-foreground group-data-[multiline=1]:col-span-full group-data-[multiline=1]:col-start-1 group-data-[multiline=1]:leading-6" placeholder={ args.Placeholder } data-bind="chatDraft" data-ignore-morph data-init={ composerAutosizeJS() } data-on:input__debounce.500ms={ args.DraftSaveAction } data-on:input={ composerInputHandler(args.WorkspaceID, args.ThreadID, args.SlashEndpointBase) } data-on:keydown="if (evt.key === 'Enter' && !evt.shiftKey) { evt.preventDefault(); el.form.requestSubmit() }"></textarea>
+				<button type="button" class="col-start-3 row-start-1 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-white/[0.06] hover:text-foreground group-data-[multiline=1]:row-start-2" aria-label="Voice message" title="Voice message">
 					<svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
 						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3a3 3 0 00-3 3v6a3 3 0 006 0V6a3 3 0 00-3-3zM19 10v2a7 7 0 01-14 0v-2M12 19v3"></path>
 					</svg>
 				</button>
-				<button type="submit" class="sr-only" aria-label="Send message">Send</button>
 			</div>
+			<button type="submit" class="sr-only" aria-label="Send message">Send</button>
 		</div>
 	</form>
 	@ThreadNewTargetForms(args.ThreadMetadata)
@@ -200,6 +202,14 @@ func normalizeComposerArgs(args AgentChatComposerArgs) AgentChatComposerArgs {
 
 func composerSignals(initialDraft string) string {
 	return "{chatDraft: " + strconv.Quote(initialDraft) + ", slashOpen: false, slashPrefix: ''}"
+}
+
+func composerAutosizeJS() string {
+	return `el.style.height='2rem';const s=el.closest('[data-composer-shell]');if(s)s.dataset.multiline=(el.scrollHeight>40||el.value.indexOf('\n')>=0)?'1':'0';const size=()=>{el.style.height='2rem';el.style.height=Math.min(el.scrollHeight,144)+'px'};size();requestAnimationFrame(size)`
+}
+
+func composerInputHandler(workspaceID, threadID, endpointBase string) string {
+	return composerAutosizeJS() + ";" + slashCommandInputHandler(workspaceID, threadID, endpointBase)
 }
 
 func composerSubmitAction(action string) string {

@@ -11,7 +11,9 @@ import (
 	serverdb "github.com/CoreyCole/vamos/server/services/db"
 )
 
-func setupPlanDirRelTest(t *testing.T) (projectRoot, thoughtsRoot, planAbs, planRel string, service *Service, database *serverdb.Service) {
+func setupPlanDirRelTest(
+	t *testing.T,
+) (projectRoot, thoughtsRoot, planAbs, planRel string, service *Service, database *serverdb.Service) {
 	t.Helper()
 	projectRoot = t.TempDir()
 	thoughtsRoot = filepath.Join(projectRoot, "thoughts")
@@ -69,7 +71,12 @@ func TestBackfillAgentThreadPlanDirRelsSetsFKWhenPlanExists(t *testing.T) {
 		t.Fatal(err)
 	}
 	if result.Updated != 1 {
-		t.Fatalf("Updated = %d, want 1 (scanned=%d unresolved=%d)", result.Updated, result.Scanned, result.Unresolved)
+		t.Fatalf(
+			"Updated = %d, want 1 (scanned=%d unresolved=%d)",
+			result.Updated,
+			result.Scanned,
+			result.Unresolved,
+		)
 	}
 	got, err := database.Queries.GetSharedAgentThread(t.Context(), threadID)
 	if err != nil {
@@ -239,5 +246,58 @@ func TestMostRecentPlanHomeThreadUsesUpdatedAt(t *testing.T) {
 	}
 	if got.ID != newerID {
 		t.Fatalf("MostRecentPlanHomeThread = %q, want %q", got.ID, newerID)
+	}
+}
+
+func TestEnsureSharedThreadForDocCreatesThenReuses(t *testing.T) {
+	_, _, planAbs, _, service, _ := setupPlanDirRelTest(t)
+	doc := "thoughts/owner/plans/alpha/design.md"
+	if err := os.WriteFile(
+		filepath.Join(planAbs, "design.md"),
+		[]byte("# Design"),
+		0o644,
+	); err != nil {
+		t.Fatal(err)
+	}
+
+	first, err := service.EnsureSharedThreadForDoc(
+		t.Context(), doc, "owner@example.com",
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if first == "" {
+		t.Fatal("expected created thread id")
+	}
+	second, err := service.EnsureSharedThreadForDoc(
+		t.Context(), doc, "owner@example.com",
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if second != first {
+		t.Fatalf("EnsureSharedThreadForDoc reused %q, want %q", second, first)
+	}
+	got, err := service.FindSharedThreadForDoc(t.Context(), doc)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != first {
+		t.Fatalf("FindSharedThreadForDoc = %q, want %q", got, first)
+	}
+}
+
+func TestEnsureSharedThreadForDocIgnoresNonPlan(t *testing.T) {
+	_, _, _, _, service, _ := setupPlanDirRelTest(t)
+	got, err := service.EnsureSharedThreadForDoc(
+		t.Context(),
+		"thoughts/owner/notes.md",
+		"owner@example.com",
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != "" {
+		t.Fatalf("EnsureSharedThreadForDoc = %q, want empty", got)
 	}
 }
