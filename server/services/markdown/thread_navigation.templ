@@ -235,16 +235,18 @@ templ ThreadArtifactUp(browser ThreadArtifactBrowserArgs) {
 }
 
 templ ThreadArtifactBrowserResults(args ThreadArtifactBrowserResultsArgs) {
-	<div id="thread-artifact-browser-results" class="px-2.5 py-2" data-testid="artifact-browser-results" data-on:keydown={ artifactBrowserSearchResultsKeydownAction() }>
+	<div id="thread-artifact-browser-results" class="px-2.5 py-2" data-testid="artifact-browser-results" data-on:keydown={ artifactBrowserSearchResultsKeydownAction() } data-init={ artifactBrowserFocusActiveHitAction() }>
 		if args.Query == "" {
 			<ul class="space-y-0.5">
 				for _, entry := range args.Entries {
 					@ThreadArtifactBrowserEntry(entry)
 				}
 			</ul>
-		} else {
+		} else if args.ShowAllThoughts {
 			@artifactSearchSection("This directory", "artifact-search-this-directory", args.Directory, true)
 			@artifactSearchSection("All thoughts", "artifact-search-all-thoughts", args.Global, true)
+		} else {
+			@artifactSearchSection("All thoughts", "artifact-search-all-thoughts", args.Directory, true)
 		}
 	</div>
 }
@@ -265,22 +267,33 @@ templ artifactSearchSection(title, testID string, hits []ArtifactSearchHit, show
 }
 
 templ artifactSearchHitRow(hit ArtifactSearchHit, showPath bool) {
-	if hit.IsDir {
-		@ThreadArtifactDirectory(artifactSearchHitEntry(hit))
-	} else {
-		<li class="relative z-0">
-			<a
-				href={ templ.URL(hit.Href) }
-				data-thread-artifact-file
-				class="relative z-0 block min-w-0 rounded-r px-2 py-1 text-xs text-muted-foreground transition-colors border-l-2 border-transparent hover:bg-muted/60 hover:text-foreground focus:bg-muted/60 focus:text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-			>
-				<span class="block truncate">{ hit.Name }</span>
-				if showPath {
-					<span class="block truncate text-[10px] text-muted-foreground">{ threadArtifactDirectoryIdentity(hit.Path) }</span>
+	<li class="relative z-0">
+		<a
+			href={ templ.URL(hit.Href) }
+			data-thread-artifact-hit
+			if hit.IsDir {
+				data-thread-artifact-enter
+				if hit.BrowseEndpoint != "" {
+					data-artifact-endpoint={ hit.BrowseEndpoint }
+					data-indicator="_threadArtifactLoading"
+					data-on:click={ artifactSearchDirOpenAction() }
 				}
-			</a>
-		</li>
-	}
+			} else {
+				data-thread-artifact-file
+			}
+			class="relative z-0 block min-w-0 rounded-r px-2 py-1 text-xs text-muted-foreground transition-colors border-l-2 border-transparent hover:bg-muted/60 hover:text-foreground focus:bg-muted/60 focus:text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+		>
+			<span class="flex min-w-0 items-baseline justify-between gap-2">
+				<span class="min-w-0 truncate">{ artifactSearchHitLabel(hit) }</span>
+				if ts := artifactSearchHitTimestamp(hit.ModTime); ts != "" {
+					<span class="shrink-0 tabular-nums text-[10px] text-muted-foreground">{ ts }</span>
+				}
+			</span>
+			if showPath {
+				<span class="block truncate text-[10px] text-muted-foreground">{ threadArtifactDirectoryIdentity(hit.Path) }</span>
+			}
+		</a>
+	</li>
 }
 
 templ ThreadArtifactBrowserEntry(entry ThreadArtifactEntry) {
@@ -291,6 +304,7 @@ templ ThreadArtifactBrowserEntry(entry ThreadArtifactEntry) {
 			<a
 				href={ templ.URL(entry.Href) }
 				data-thread-artifact-file
+				data-thread-artifact-hit
 				if entry.IsActive {
 					aria-current="page"
 				}
@@ -322,13 +336,22 @@ templ ThreadArtifactDirectory(entry ThreadArtifactEntry) {
 		>
 			<summary
 				data-thread-artifact-toggle
-				class="flex min-h-8 cursor-pointer select-none items-center gap-1.5 rounded py-1 pl-2 pr-9 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus:bg-muted focus:text-foreground focus:outline-none focus:ring-2 focus:ring-ring focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+				data-thread-artifact-hit
+				class="flex min-h-8 cursor-pointer select-none flex-col justify-center gap-0 rounded py-1 pl-2 pr-9 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus:bg-muted focus:text-foreground focus:outline-none focus:ring-2 focus:ring-ring focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
 				aria-controls={ threadArtifactChildrenID(entry) }
 				title="Expand or collapse (Enter)"
 			>
-				<span class="group-open:hidden" aria-hidden="true">▸</span>
-				<span class="hidden group-open:inline" aria-hidden="true">▾</span>
-				<span class="truncate">{ entry.Name }/</span>
+				<span class="flex min-w-0 items-center gap-1.5">
+					<span class="group-open:hidden" aria-hidden="true">▸</span>
+					<span class="hidden group-open:inline" aria-hidden="true">▾</span>
+					<span class="min-w-0 truncate">{ entry.Name }/</span>
+					if ts := artifactSearchHitTimestamp(entry.ModTime); ts != "" {
+						<span class="ml-auto shrink-0 tabular-nums text-[10px] text-muted-foreground">{ ts }</span>
+					}
+				</span>
+				if entry.ShowPath {
+					<span class="block truncate pl-4 text-[10px] text-muted-foreground">{ threadArtifactDirectoryIdentity(entry.Path) }</span>
+				}
 			</summary>
 			<ul id={ threadArtifactChildrenID(entry) } class="ml-3 space-y-0.5 border-l border-border pl-1">
 				for _, child := range entry.Children {
@@ -340,6 +363,7 @@ templ ThreadArtifactDirectory(entry ThreadArtifactEntry) {
 			<a
 				href={ templ.URL(entry.BrowseHref) }
 				data-thread-artifact-enter
+				tabindex="-1"
 				if entry.BrowseEndpoint != "" {
 					data-artifact-endpoint={ entry.BrowseEndpoint }
 					data-indicator="_threadArtifactLoading"

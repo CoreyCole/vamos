@@ -4,9 +4,11 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/labstack/echo/v4"
 )
@@ -136,6 +138,8 @@ func TestThreadArtifactBrowserWiresSearchEndpoint(t *testing.T) {
 		`id="thread-artifact-browser-results"`,
 		thoughtsArtifactSearchPath,
 		`ArrowUp`,
+		`data-thread-artifact-hit`,
+		`aria-current=page`,
 	} {
 		if !strings.Contains(html, want) {
 			t.Fatalf("browser missing %q: %s", want, html)
@@ -361,7 +365,7 @@ func TestHandleThoughtsArtifactSearchThisDirectoryShowsFullPath(t *testing.T) {
 	}
 }
 
-func TestHandleThoughtsArtifactSearchDirHitTogglesInsteadOfChangingCwd(t *testing.T) {
+func TestHandleThoughtsArtifactSearchDirHitChangesCwd(t *testing.T) {
 	t.Parallel()
 
 	root := t.TempDir()
@@ -390,16 +394,187 @@ func TestHandleThoughtsArtifactSearchDirHitTogglesInsteadOfChangingCwd(t *testin
 	}
 	dirSection := body[dirStart:globalStart]
 	for _, want := range []string{
-		`data-thread-artifact-toggle`,
-		`<details`,
-		`data-on:toggle`,
+		`data-thread-artifact-enter`,
+		`data-thread-artifact-hit`,
+		`data-on:click`,
+		`$dirSearch =`,
+		thoughtsArtifactBrowserPath,
+		"thoughts/owner/plans/alpha/docs",
+		">alpha/docs/<",
 	} {
 		if !strings.Contains(dirSection, want) {
-			t.Fatalf("dir hit missing toggle %q: %s", want, dirSection)
+			t.Fatalf("dir hit missing cwd open %q: %s", want, dirSection)
 		}
+	}
+	if strings.Contains(dirSection, `data-thread-artifact-toggle`) ||
+		strings.Contains(dirSection, `<details`) {
+		t.Fatalf("dir hit should change cwd, not toggle: %s", dirSection)
 	}
 	if strings.Contains(dirSection, `data-thread-artifact-file`) {
 		t.Fatalf("dir hit should not be a file link: %s", dirSection)
+	}
+}
+
+func TestHandleThoughtsArtifactSearchRootUsesSingleAllThoughtsSection(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	mustMkdirAll(t, filepath.Join(root, "owner", "plans", "alpha", "design"))
+	mustMkdirAll(t, filepath.Join(root, "owner", "shared", "design"))
+	mustWriteFile(
+		t,
+		filepath.Join(root, "owner", "plans", "alpha", "design.md"),
+		[]byte("# Design"),
+	)
+	mustWriteFile(
+		t,
+		filepath.Join(root, "owner", "shared", "notebook.md"),
+		[]byte("# Notebook"),
+	)
+	svc, err := NewService(root, nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	body := thoughtsArtifactSearchBody(
+		t,
+		svc,
+		"design",
+		"thoughts/owner/plans/alpha/design.md",
+		"thoughts",
+	)
+	if strings.Contains(body, `data-testid="artifact-search-this-directory"`) {
+		t.Fatalf("root search should not split this directory: %s", body)
+	}
+	if strings.Contains(body, "No matches") {
+		t.Fatalf("root search should not show empty All thoughts: %s", body)
+	}
+	globalStart := strings.Index(body, `data-testid="artifact-search-all-thoughts"`)
+	if globalStart < 0 {
+		t.Fatalf("root search missing All thoughts: %s", body)
+	}
+	section := body[globalStart:]
+	for _, want := range []string{
+		`href="/thoughts/owner/plans/alpha/design.md"`,
+		">alpha/design.md<",
+		">alpha/design/<",
+		">shared/design/<",
+		"thoughts/owner/plans/alpha/design.md",
+		"thoughts/owner/plans/alpha/design",
+		"thoughts/owner/shared/design",
+	} {
+		if !strings.Contains(section, want) {
+			t.Fatalf("root All thoughts missing %q: %s", want, section)
+		}
+	}
+}
+
+func TestHandleThoughtsArtifactSearchHitTitleUsesPlanDirAndFilename(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	mustMkdirAll(t, filepath.Join(root, "owner", "plans", "pi-config-cleanup"))
+	mustMkdirAll(t, filepath.Join(root, "owner", "plans", "pkg-state-refactor"))
+	mustWriteFile(
+		t,
+		filepath.Join(root, "owner", "plans", "pi-config-cleanup", "design.md"),
+		[]byte("# One"),
+	)
+	mustWriteFile(
+		t,
+		filepath.Join(root, "owner", "plans", "pkg-state-refactor", "design.md"),
+		[]byte("# Two"),
+	)
+	svc, err := NewService(root, nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	body := thoughtsArtifactSearchBody(
+		t,
+		svc,
+		"design",
+		"thoughts/owner/plans/pi-config-cleanup/design.md",
+		"thoughts",
+	)
+	for _, want := range []string{
+		">pi-config-cleanup/design.md<",
+		">pkg-state-refactor/design.md<",
+		"thoughts/owner/plans/pi-config-cleanup/design.md",
+		"thoughts/owner/plans/pkg-state-refactor/design.md",
+	} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("search title missing %q: %s", want, body)
+		}
+	}
+	if strings.Contains(body, `truncate">design<`) {
+		t.Fatalf("search title should not be naked design: %s", body)
+	}
+}
+
+func TestHandleThoughtsArtifactSearchOrdersHitsByModTime(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	alpha := filepath.Join(root, "owner", "plans", "alpha")
+	mustMkdirAll(t, alpha)
+	olderPath := filepath.Join(alpha, "recency-alpha.md")
+	newerPath := filepath.Join(alpha, "recency-zeta.md")
+	mustWriteFile(t, olderPath, []byte("# Older"))
+	mustWriteFile(t, newerPath, []byte("# Newer"))
+	mustWriteFile(
+		t,
+		filepath.Join(alpha, "design.md"),
+		[]byte("# Design"),
+	)
+	older := time.Date(2026, 1, 1, 10, 0, 0, 0, time.Local)
+	newer := time.Date(2026, 9, 7, 18, 30, 0, 0, time.Local)
+	mustChtimes(t, olderPath, older)
+	mustChtimes(t, newerPath, newer)
+
+	svc, err := NewService(root, nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	body := thoughtsArtifactSearchBody(
+		t,
+		svc,
+		"recency",
+		"thoughts/owner/plans/alpha/design.md",
+		"thoughts/owner/plans/alpha",
+	)
+	dirStart := strings.Index(body, `data-testid="artifact-search-this-directory"`)
+	globalStart := strings.Index(body, `data-testid="artifact-search-all-thoughts"`)
+	if dirStart < 0 || globalStart < 0 {
+		t.Fatalf("missing search sections: %s", body)
+	}
+	dirSection := body[dirStart:globalStart]
+	newerHref := `href="/thoughts/owner/plans/alpha/recency-zeta.md"`
+	olderHref := `href="/thoughts/owner/plans/alpha/recency-alpha.md"`
+	newerAt := strings.Index(dirSection, newerHref)
+	olderAt := strings.Index(dirSection, olderHref)
+	if newerAt < 0 || olderAt < 0 || newerAt > olderAt {
+		t.Fatalf(
+			"expected newer recency-zeta.md before recency-alpha.md: newer=%d older=%d %s",
+			newerAt,
+			olderAt,
+			dirSection,
+		)
+	}
+	for _, want := range []string{
+		artifactSearchHitTimestamp(newer),
+		artifactSearchHitTimestamp(older),
+	} {
+		if !strings.Contains(dirSection, want) {
+			t.Fatalf("search hit missing timestamp %q: %s", want, dirSection)
+		}
+	}
+}
+
+func mustChtimes(t *testing.T, path string, mtime time.Time) {
+	t.Helper()
+	if err := os.Chtimes(path, mtime, mtime); err != nil {
+		t.Fatal(err)
 	}
 }
 

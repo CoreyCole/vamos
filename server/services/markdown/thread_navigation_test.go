@@ -256,7 +256,7 @@ func TestThreadArtifactBrowserSearchLivesInPathHeader(t *testing.T) {
 		`dataset.artifactSearchEndpoint`,
 		`ArrowDown`,
 		`Tab`,
-		`data-thread-artifact-toggle`,
+		`data-thread-artifact-hit`,
 	} {
 		if !strings.Contains(header, want) {
 			t.Fatalf("header search missing %q: %s", want, header)
@@ -343,7 +343,9 @@ func TestThreadArtifactDirectoryRendersDisclosureWithoutNavigation(t *testing.T)
 		`data-on:toggle="if (el.open &amp;&amp; el.dataset.loaded !== &#39;true&#39; &amp;&amp; el.dataset.artifactEndpoint)`,
 		`aria-controls="` + threadArtifactChildrenID(entry) + `"`,
 		`data-thread-artifact-toggle`,
+		`data-thread-artifact-hit`,
 		`data-thread-artifact-enter`,
+		`tabindex="-1"`,
 		`aria-label="Open docs folder"`,
 		`href="/threads/thread_1?artifact=thoughts%2Fowner%2Fdocs%2Fnote.md"`,
 	} {

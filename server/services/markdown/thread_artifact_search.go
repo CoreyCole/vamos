@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/labstack/echo/v4"
 	"github.com/starfederation/datastar-go/datastar"
@@ -21,13 +22,15 @@ type ArtifactSearchHit struct {
 	BrowseEndpoint string
 	TargetID       string
 	IsDir          bool
+	ModTime        time.Time
 }
 
 type ThreadArtifactBrowserResultsArgs struct {
-	Query     string
-	Entries   []ThreadArtifactEntry
-	Directory []ArtifactSearchHit
-	Global    []ArtifactSearchHit
+	Query           string
+	Entries         []ThreadArtifactEntry
+	Directory       []ArtifactSearchHit
+	Global          []ArtifactSearchHit
+	ShowAllThoughts bool
 }
 
 func artifactSearchQueryMatch(query, name, itemPath string) bool {
@@ -91,8 +94,9 @@ func (s *Service) HandleThoughtsArtifactSearch(c echo.Context) error {
 		browser = remapThreadArtifactBrowserForThoughts(browser, selectedDoc)
 	}
 	results := ThreadArtifactBrowserResultsArgs{
-		Query:   query,
-		Entries: browser.Entries,
+		Query:           query,
+		Entries:         browser.Entries,
+		ShowAllThoughts: artifactSearchRelPrefix(browser.DirectoryPath) != "",
 	}
 	if query != "" {
 		results.Directory, results.Global = s.artifactSearchSections(
@@ -174,7 +178,9 @@ func (s *Service) searchThoughtsNames(
 			if !artifactSearchQueryMatch(query, name, rel) {
 				return nil
 			}
-			hits = append(hits, artifactSearchDirHit(name, rel, selectedDoc, threadID))
+			hits = append(hits, artifactSearchDirHit(
+				rel, selectedDoc, threadID, artifactSearchModTime(d),
+			))
 		} else {
 			if !isThoughtsRenderableFile(name) {
 				return nil
@@ -183,9 +189,10 @@ func (s *Service) searchThoughtsNames(
 				return nil
 			}
 			hits = append(hits, ArtifactSearchHit{
-				Name: displayDocumentName(name),
-				Path: rel,
-				Href: artifactSearchFileHref(threadID, rel),
+				Name:    artifactSearchHitTitle(rel),
+				Path:    rel,
+				Href:    artifactSearchFileHref(threadID, rel),
+				ModTime: artifactSearchModTime(d),
 			})
 		}
 		if len(hits) >= artifactSearchGlobalLimit*4 {
@@ -193,7 +200,11 @@ func (s *Service) searchThoughtsNames(
 		}
 		return nil
 	})
-	sort.Slice(hits, func(i, j int) bool {
+	sort.SliceStable(hits, func(i, j int) bool {
+		ti, tj := hits[i].ModTime, hits[j].ModTime
+		if !ti.Equal(tj) {
+			return ti.After(tj)
+		}
 		li := strings.ToLower(hits[i].Name)
 		lj := strings.ToLower(hits[j].Name)
 		if li != lj {
@@ -224,13 +235,67 @@ func artifactSearchDirHref(selectedDoc, threadID, dirPath string) string {
 	return thoughtsArtifactPageURL(selectedDoc, dirPath)
 }
 
-func artifactSearchDirHit(name, rel, selectedDoc, threadID string) ArtifactSearchHit {
+func artifactSearchHitLabel(hit ArtifactSearchHit) string {
+	if hit.IsDir {
+		return hit.Name + "/"
+	}
+	return hit.Name
+}
+
+func artifactSearchHitTitle(rel string) string {
+	rel = filepath.ToSlash(strings.Trim(rel, "/"))
+	base := path.Base(rel)
+	if base == "." || base == "" {
+		return rel
+	}
+	qualifier := artifactSearchHitQualifier(rel)
+	if qualifier == "" || qualifier == base {
+		return base
+	}
+	return qualifier + "/" + base
+}
+
+func artifactSearchHitQualifier(rel string) string {
+	parts := strings.Split(filepath.ToSlash(strings.Trim(rel, "/")), "/")
+	for i := 0; i < len(parts)-1; i++ {
+		if parts[i] == "plans" {
+			return parts[i+1]
+		}
+	}
+	if len(parts) < 2 {
+		return ""
+	}
+	return parts[len(parts)-2]
+}
+
+func artifactSearchHitTimestamp(t time.Time) string {
+	if t.IsZero() {
+		return ""
+	}
+	return t.Format("Jan 2 15:04")
+}
+
+func artifactSearchModTime(d fs.DirEntry) time.Time {
+	if d == nil {
+		return time.Time{}
+	}
+	info, err := d.Info()
+	if err != nil {
+		return time.Time{}
+	}
+	return info.ModTime()
+}
+
+func artifactSearchDirHit(
+	rel, selectedDoc, threadID string, modTime time.Time,
+) ArtifactSearchHit {
 	hit := ArtifactSearchHit{
-		Name:     name,
+		Name:     artifactSearchHitTitle(rel),
 		Path:     rel,
 		Href:     artifactSearchDirHref(selectedDoc, threadID, rel),
 		TargetID: threadArtifactDirectoryID(rel),
 		IsDir:    true,
+		ModTime:  modTime,
 	}
 	if strings.TrimSpace(threadID) != "" {
 		hit.Endpoint = ThreadArtifactDirectoryEndpointForBrowser(
@@ -242,16 +307,4 @@ func artifactSearchDirHit(name, rel, selectedDoc, threadID string) ArtifactSearc
 	hit.Endpoint = thoughtsArtifactDirectoryEndpoint(rel, selectedDoc, rel)
 	hit.BrowseEndpoint = thoughtsArtifactBrowserEndpoint(selectedDoc, rel)
 	return hit
-}
-
-func artifactSearchHitEntry(hit ArtifactSearchHit) ThreadArtifactEntry {
-	return ThreadArtifactEntry{
-		Name:           hit.Name,
-		Path:           hit.Path,
-		Endpoint:       hit.Endpoint,
-		BrowseHref:     hit.Href,
-		BrowseEndpoint: hit.BrowseEndpoint,
-		TargetID:       hit.TargetID,
-		IsDir:          true,
-	}
 }

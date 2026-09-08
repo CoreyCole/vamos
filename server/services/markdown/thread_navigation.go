@@ -12,6 +12,7 @@ import (
 	"net/url"
 	"path"
 	"strings"
+	"time"
 
 	"github.com/a-h/templ"
 	"github.com/labstack/echo/v4"
@@ -36,6 +37,8 @@ type ThreadArtifactEntry struct {
 	IsLoaded       bool
 	ResolvedCount  int
 	TotalCount     int
+	ModTime        time.Time
+	ShowPath       bool
 	Children       []ThreadArtifactEntry
 }
 
@@ -327,6 +330,10 @@ func threadArtifactBrowserClickAction() string {
 	return "if (!$_threadArtifactLoading && evt.button === 0 && !evt.metaKey && !evt.ctrlKey && !evt.shiftKey && !evt.altKey) { evt.preventDefault(); @get(el.dataset.artifactEndpoint) }"
 }
 
+func artifactSearchDirOpenAction() string {
+	return "if (!$_threadArtifactLoading && evt.button === 0 && !evt.metaKey && !evt.ctrlKey && !evt.shiftKey && !evt.altKey) { evt.preventDefault(); $dirSearch = ''; $_dirSearchOpen = false; @get(el.dataset.artifactEndpoint) }"
+}
+
 func artifactBrowserVisibleExpr() string {
 	return "$_artifactBrowserOpen || $dirSearch !== ''"
 }
@@ -372,7 +379,11 @@ func artifactBrowserSearchClearAction() string {
 }
 
 func artifactBrowserSearchHitSelector() string {
-	return "#thread-artifact-browser-results [data-thread-artifact-toggle], #thread-artifact-browser-results a[data-thread-artifact-file]"
+	return "#thread-artifact-browser-results [data-thread-artifact-hit]"
+}
+
+func artifactBrowserFocusActiveHitAction() string {
+	return "requestAnimationFrame(function(){ if (!$_artifactBrowserOpen || String($dirSearch || '') !== '') return; var root = document.getElementById('thread-artifact-browser-results'); if (!root) return; var cur = root.querySelector('[data-thread-artifact-hit][aria-current=page]'); if (cur) cur.focus({focusVisible:true}) })"
 }
 
 func artifactBrowserSearchFirstResultExpr() string {
@@ -380,7 +391,7 @@ func artifactBrowserSearchFirstResultExpr() string {
 }
 
 func artifactBrowserSearchMoveFocusExpr() string {
-	return "(function(){ var links = Array.from(document.querySelectorAll('" + artifactBrowserSearchHitSelector() + "')); var cur = evt.target.closest ? (evt.target.closest('[data-thread-artifact-toggle]') || evt.target.closest('a[data-thread-artifact-file]')) : null; var d = evt.key === 'ArrowUp' || (evt.key === 'Tab' && evt.shiftKey) ? -1 : 1; var n = links.indexOf(cur) + d; if (n < 0) { evt.preventDefault(); var s = document.getElementById('artifact-browser-search'); if (s && s.offsetParent !== null) { s.focus({focusVisible:true}); return } var t = document.querySelector('[data-testid=artifact-browser-toggle]'); if (t) t.focus({focusVisible:true}); return } if (n >= links.length) { if (evt.key !== 'Tab' || evt.shiftKey) { evt.preventDefault() } return } evt.preventDefault(); if (links[n]) links[n].focus({focusVisible:true}) })()"
+	return "(function(){ var links = Array.from(document.querySelectorAll('" + artifactBrowserSearchHitSelector() + "')); var cur = evt.target.closest ? evt.target.closest('[data-thread-artifact-hit]') : null; var d = evt.key === 'ArrowUp' || (evt.key === 'Tab' && evt.shiftKey) ? -1 : 1; var n = links.indexOf(cur) + d; if (n < 0) { evt.preventDefault(); var s = document.getElementById('artifact-browser-search'); if (s && s.offsetParent !== null) { s.focus({focusVisible:true}); return } var t = document.querySelector('[data-testid=artifact-browser-toggle]'); if (t) t.focus({focusVisible:true}); return } if (n >= links.length) { if (evt.key !== 'Tab' || evt.shiftKey) { evt.preventDefault() } return } evt.preventDefault(); if (links[n]) links[n].focus({focusVisible:true}) })()"
 }
 
 func artifactBrowserSearchResultsKeydownAction() string {
