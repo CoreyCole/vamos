@@ -76,20 +76,12 @@ func DocumentCommentAction(pageArgs *PageArgs) workbench.OverflowAction {
 func BuildThreadArtifactHeaderActions(
 	pageArgs *PageArgs,
 	docPath, chatHref string,
-	showThoughts bool,
 ) templ.Component {
 	docPath = strings.TrimSpace(docPath)
 	chatHref = strings.TrimSpace(chatHref)
 	groups := make([]workbench.OverflowActionGroup, 0, 2)
 	pathActions := make([]workbench.OverflowAction, 0, 3)
 	if docPath != "" {
-		if showThoughts {
-			pathActions = append(pathActions, workbench.OverflowAction{
-				Label: "Thoughts",
-				Kind:  workbench.OverflowActionLink,
-				Href:  ThoughtsDocURL(docPath, ""),
-			})
-		}
 		pathActions = append(pathActions, DocumentCopyPathAction(docPath))
 	}
 	if chatHref != "" {

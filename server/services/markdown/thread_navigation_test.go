@@ -299,3 +299,51 @@ func TestThreadArtifactPathHeaderLockedH10(t *testing.T) {
 		}
 	}
 }
+
+func TestSetViewDocumentToggle(t *testing.T) {
+	t.Parallel()
+	browser := ThreadArtifactBrowserArgs{DocPath: "owner/plans/alpha/design.md"}
+	setViewDocumentToggle(&browser, false, "")
+	if browser.ViewDocumentHref != "/thoughts/owner/plans/alpha/design.md" ||
+		browser.DocumentViewActive {
+		t.Fatalf("chat -> thoughts = %#v", browser)
+	}
+	setViewDocumentToggle(&browser, true, "/rooms/plan/alpha?artifact=x")
+	if browser.ViewDocumentHref != "/rooms/plan/alpha?artifact=x" ||
+		!browser.DocumentViewActive {
+		t.Fatalf("thoughts -> chat = %#v", browser)
+	}
+}
+
+func TestViewDocumentButtonSitsLeftOfOverflow(t *testing.T) {
+	t.Parallel()
+	var body strings.Builder
+	if err := ThreadArtifactPane(
+		ThreadArtifactBrowserArgs{
+			DocPath:            "owner/plans/alpha/design.md",
+			ViewDocumentHref:   "/thoughts/owner/plans/alpha/design.md",
+			DocumentViewActive: false,
+			HeaderActions: templ.Raw(
+				`<div data-testid="workbench-overflow-actions"></div>`,
+			),
+		},
+		templ.Raw("<p>doc</p>"),
+	).Render(t.Context(), &body); err != nil {
+		t.Fatal(err)
+	}
+	out := body.String()
+	view := strings.Index(out, `data-testid="view-document"`)
+	overflow := strings.Index(out, `data-testid="workbench-overflow-actions"`)
+	if view < 0 || overflow < 0 || view > overflow {
+		t.Fatalf(
+			"view document should be left of 3-dot: view=%d overflow=%d\n%s",
+			view,
+			overflow,
+			out,
+		)
+	}
+	if !strings.Contains(out, `title="View Document"`) ||
+		!strings.Contains(out, `aria-pressed="false"`) {
+		t.Fatalf("missing View Document tooltip/pressed: %s", out)
+	}
+}

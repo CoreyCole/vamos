@@ -126,11 +126,11 @@ func (s *Service) indexArtifactComponent(
 	if err != nil {
 		return WorkbenchUnavailable("The artifact is unavailable.")
 	}
+	setViewDocumentToggle(&browser, false, "")
 	browser.HeaderActions = BuildThreadArtifactHeaderActions(
 		page,
 		browser.DocPath,
 		"",
-		true,
 	)
 	if page != nil {
 		panelArgs := BuildDocumentPanelArgs(page)

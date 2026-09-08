@@ -53,6 +53,28 @@ templ ThreadArtifactPane(browser ThreadArtifactBrowserArgs, document templ.Compo
 				</svg>
 			</button>
 			<span class="min-w-0 flex-1 truncate text-muted-foreground">{ "thoughts/" + browser.DocPath }</span>
+			if browser.ViewDocumentHref != "" {
+				<a
+					href={ templ.URL(browser.ViewDocumentHref) }
+					data-testid="view-document"
+					class={
+						"inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground",
+						templ.KV("bg-muted text-foreground", browser.DocumentViewActive),
+					}
+					aria-label="View Document"
+					title="View Document"
+					if browser.DocumentViewActive {
+						aria-pressed="true"
+					} else {
+						aria-pressed="false"
+					}
+				>
+					<svg class="h-3.5 w-3.5" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 3h8l4 4v14a2 2 0 01-2 2H7a2 2 0 01-2-2V5a2 2 0 012-2z"></path>
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 3v5h5"></path>
+					</svg>
+				</a>
+			}
 			if browser.HeaderActions != nil {
 				@browser.HeaderActions
 			}

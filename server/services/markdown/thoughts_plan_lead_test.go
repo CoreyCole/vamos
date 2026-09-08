@@ -54,6 +54,9 @@ func TestThoughtsPlanDocIsFullscreenWithPlanLeadChatLink(t *testing.T) {
 		`id="thread-artifact-document"`,
 		`<span>chat about this plan</span>`,
 		`href="/rooms/plan/alpha?artifact=thoughts%2Fowner%2Fplans%2Falpha%2Fdesign.md"`,
+		`data-testid="view-document"`,
+		`title="View Document"`,
+		`aria-pressed="true"`,
 	} {
 		if !strings.Contains(html, want) {
 			t.Fatalf("missing %q in:\n%s", want, html)

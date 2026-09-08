@@ -34,13 +34,15 @@ type ThreadArtifactEntry struct {
 }
 
 type ThreadArtifactBrowserArgs struct {
-	ThreadID       string
-	DocPath        string
-	DirectoryPath  string
-	ParentHref     string
-	ParentEndpoint string
-	Entries        []ThreadArtifactEntry
-	HeaderActions  templ.Component
+	ThreadID           string
+	DocPath            string
+	DirectoryPath      string
+	ParentHref         string
+	ParentEndpoint     string
+	Entries            []ThreadArtifactEntry
+	HeaderActions      templ.Component
+	ViewDocumentHref   string
+	DocumentViewActive bool
 	// BrowserOpen is the SSR Files-browser preference (cookie wb2_artifact_browser).
 	// Default open when unset so first visit matches prior always-open behavior.
 	BrowserOpen bool
@@ -65,6 +67,22 @@ func boolString(v bool) string {
 		return "true"
 	}
 	return "false"
+}
+
+func setViewDocumentToggle(
+	browser *ThreadArtifactBrowserArgs,
+	onThoughts bool,
+	chatHref string,
+) {
+	if browser == nil || strings.TrimSpace(browser.DocPath) == "" {
+		return
+	}
+	browser.DocumentViewActive = onThoughts
+	if onThoughts {
+		browser.ViewDocumentHref = strings.TrimSpace(chatHref)
+		return
+	}
+	browser.ViewDocumentHref = ThoughtsDocURL(browser.DocPath, "")
 }
 
 func threadArtifactQuery(
@@ -445,11 +463,11 @@ func (s *Service) thoughtsArtifactPane(
 		return nil, err
 	}
 	browser = remapThreadArtifactBrowserForThoughts(browser)
+	setViewDocumentToggle(&browser, true, chatHref)
 	browser.HeaderActions = BuildThreadArtifactHeaderActions(
 		page,
 		browser.DocPath,
 		chatHref,
-		false,
 	)
 	return ThreadArtifactPane(browser, document), nil
 }
@@ -505,11 +523,11 @@ func (s *Service) threadArtifactAndComments(
 	}
 	content, page, directory := s.artifactContent(c, doc, explicit || !hasArtifact)
 	if directory {
+		setViewDocumentToggle(&browser, false, "")
 		browser.HeaderActions = BuildThreadArtifactHeaderActions(
 			nil,
 			browser.DocPath,
 			"",
-			true,
 		)
 		return ThreadArtifactPane(
 			browser,
@@ -517,11 +535,11 @@ func (s *Service) threadArtifactAndComments(
 		), WorkbenchUnavailable("Comments are unavailable for directories."), nil
 	}
 	if page == nil {
+		setViewDocumentToggle(&browser, false, "")
 		browser.HeaderActions = BuildThreadArtifactHeaderActions(
 			nil,
 			browser.DocPath,
 			"",
-			true,
 		)
 		return ThreadArtifactPane(browser, content),
 			WorkbenchUnavailable("Comments are unavailable for this artifact."), nil
@@ -545,11 +563,11 @@ func (s *Service) threadArtifactAndComments(
 		page.ViewerArgs.BodyComponent,
 	)
 	panelArgs := BuildDocumentPanelArgs(page)
+	setViewDocumentToggle(&browser, false, "")
 	browser.HeaderActions = BuildThreadArtifactHeaderActions(
 		page,
 		browser.DocPath,
 		"",
-		true,
 	)
 	panelArgs.Document.WorkbenchActions = nil
 	content = DocumentPanel(panelArgs)
