@@ -126,7 +126,12 @@ func (s *Service) indexArtifactComponent(
 	if err != nil {
 		return WorkbenchUnavailable("The artifact is unavailable.")
 	}
-	browser.HeaderActions = BuildThreadArtifactHeaderActions(page, browser.DocPath, "")
+	browser.HeaderActions = BuildThreadArtifactHeaderActions(
+		page,
+		browser.DocPath,
+		"",
+		true,
+	)
 	if page != nil {
 		panelArgs := BuildDocumentPanelArgs(page)
 		panelArgs.Document.WorkbenchActions = nil
@@ -159,18 +164,20 @@ func (s *Service) ServeThreads(c echo.Context) error {
 		UserEmail:     userEmail,
 		ViewportClass: viewport,
 		SavedConfig:   s.savedThreadsWorkbenchConfig(c, userEmail, viewport),
-		Threads:       agenthome.RosterRail(agenthome.RosterSelection{Kind: agenthome.KindDM, ID: "bot"}),
+		Threads: agenthome.RosterRail(
+			agenthome.RosterSelection{Kind: agenthome.KindDM, ID: "bot"},
+		),
 		Chat: workbench.ChatColumnWithReopen(
 			workbench.ThreadsOpenFromRequest(c.Request()),
 			"Chat",
 			WorkbenchUnavailable("Select a thread to open chat."),
 		),
-		Artifact:      s.indexArtifactComponent(c, artifactPath, hasArtifact),
-		Comments:      WorkbenchUnavailable("Select an artifact to view comments."),
-		ThreadsOpen:   workbench.ThreadsOpenFromRequest(c.Request()),
-		ChatOpen:      false,
-		ArtifactOpen:  true,
-		CommentsOpen:  false,
+		Artifact:     s.indexArtifactComponent(c, artifactPath, hasArtifact),
+		Comments:     WorkbenchUnavailable("Select an artifact to view comments."),
+		ThreadsOpen:  workbench.ThreadsOpenFromRequest(c.Request()),
+		ChatOpen:     false,
+		ArtifactOpen: true,
+		CommentsOpen: false,
 	})
 	if err != nil {
 		return err
@@ -233,12 +240,12 @@ func (s *Service) ServeThread(c echo.Context) error {
 			"Chat",
 			chat,
 		),
-		Artifact:      artifact,
-		Comments:      comments,
-		ThreadsOpen:   workbench.ThreadsOpenFromRequest(c.Request()),
-		ChatOpen:      true,
-		ArtifactOpen:  true,
-		CommentsOpen:  false,
+		Artifact:     artifact,
+		Comments:     comments,
+		ThreadsOpen:  workbench.ThreadsOpenFromRequest(c.Request()),
+		ChatOpen:     true,
+		ArtifactOpen: true,
+		CommentsOpen: false,
 	})
 	if err != nil {
 		return err

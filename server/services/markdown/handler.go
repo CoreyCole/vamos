@@ -301,7 +301,8 @@ func thoughtsViewFromQuery(c echo.Context) (workbench.WorkbenchView, string) {
 }
 
 func (s *Service) thoughtsAppletPageHref(ctx context.Context, requestPath string) string {
-	if s == nil || strings.TrimSpace(s.basePath) == "" || strings.TrimSpace(requestPath) == "" {
+	if s == nil || strings.TrimSpace(s.basePath) == "" ||
+		strings.TrimSpace(requestPath) == "" {
 		return ""
 	}
 	applet, err := applets.Resolver{ThoughtsRoot: s.basePath}.ResolveThoughtsApplet(
@@ -450,13 +451,7 @@ func (s *Service) buildThoughtsV2WorkbenchState(
 	if err != nil {
 		return workbench.WorkbenchState{}, err
 	}
-	chatHref := "/threads?artifact=" + url.QueryEscape("thoughts/"+canonical)
-	if matched := s.threadHrefForDoc(
-		c.Request().Context(),
-		pageArgs.FilePath,
-	); matched != "" {
-		chatHref = matched
-	}
+	chatHref := planLeadChatHref(pageArgs.FilePath)
 	panelArgs := BuildDocumentPanelArgs(
 		pageArgs,
 		optionalHeaderWorkspaceTree(
@@ -478,14 +473,21 @@ func (s *Service) buildThoughtsV2WorkbenchState(
 	comments := commentui.CommentsContextPanel(
 		commentui.BuildCommentsPanelArgs(pageArgs.CommentUI, ""),
 	)
+	threads, chat, threadsOpen, chatOpen := s.thoughtsPlanLeadChrome(
+		c,
+		pageArgs.FilePath,
+		pageArgs.UserEmail,
+	)
 	return workbench.BuildWorkbenchV2State(workbench.WorkbenchV2Args{
 		UserEmail:     pageArgs.UserEmail,
 		ViewportClass: viewport,
 		SavedConfig:   s.savedThreadsWorkbenchConfig(c, pageArgs.UserEmail, viewport),
+		Threads:       threads,
+		Chat:          chat,
 		Artifact:      artifact,
 		Comments:      comments,
-		ThreadsOpen:   false,
-		ChatOpen:      false,
+		ThreadsOpen:   threadsOpen,
+		ChatOpen:      chatOpen,
 		ArtifactOpen:  true,
 		CommentsOpen:  false,
 	})
@@ -744,7 +746,7 @@ func (s *Service) buildThoughtsDirectoryWorkbenchState(
 		)
 	}
 	viewport := viewportClassForRequest(c)
-	chatHref := s.threadHrefForDoc(c.Request().Context(), args.Path)
+	chatHref := planLeadChatHref(args.Path)
 	dirPath := strings.Trim(strings.TrimSpace(args.Path), "/")
 	artifact, err := s.thoughtsArtifactPane(
 		c,
@@ -756,12 +758,21 @@ func (s *Service) buildThoughtsDirectoryWorkbenchState(
 	if err != nil {
 		return workbench.WorkbenchState{}, err
 	}
+	threads, chat, threadsOpen, chatOpen := s.thoughtsPlanLeadChrome(
+		c,
+		dirPath,
+		args.UserEmail,
+	)
 	return workbench.BuildWorkbenchV2State(workbench.WorkbenchV2Args{
 		UserEmail:     args.UserEmail,
 		ViewportClass: viewport,
 		SavedConfig:   s.savedThreadsWorkbenchConfig(c, args.UserEmail, viewport),
+		Threads:       threads,
+		Chat:          chat,
 		Artifact:      artifact,
 		Comments:      EmptyDirectoryContextPanel(),
+		ThreadsOpen:   threadsOpen,
+		ChatOpen:      chatOpen,
 		ArtifactOpen:  true,
 	})
 }

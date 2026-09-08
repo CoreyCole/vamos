@@ -66,7 +66,11 @@ func (s *Service) ServeAI470Room(c echo.Context) error {
 		if err != nil {
 			return err
 		}
-		chatComp = workbench.ChatColumnWithReopen(threadsOpen, ai470RoomTitle(kind, id), chat)
+		chatComp = workbench.ChatColumnWithReopen(
+			threadsOpen,
+			ai470RoomTitle(kind, id),
+			chat,
+		)
 		artifactComp, commentsComp, err = s.threadArtifactAndComments(
 			c, threadID, c.QueryParam("artifact"),
 		)
@@ -202,7 +206,11 @@ func (s *Service) renderAI470SharedChat(
 		}
 		// Group: multi-author bubbles + NestedQuoteBlock + chroma for Bot-vs-group VA.
 		if kind == agenthome.KindGroup && roomID == "vamos-dev" {
-			return r.RenderSharedThreadChatWithGroupBubbleFixture(ctx, threadID, userEmail)
+			return r.RenderSharedThreadChatWithGroupBubbleFixture(
+				ctx,
+				threadID,
+				userEmail,
+			)
 		}
 	}
 	return s.workbenchThreadsRenderer.RenderSharedThreadChat(ctx, threadID, userEmail)
@@ -226,3 +234,58 @@ func ai470RoomTitle(kind agenthome.RoomKind, id string) string {
 	}
 }
 
+func (s *Service) thoughtsPlanLeadChrome(
+	c echo.Context,
+	docOrDirPath, userEmail string,
+) (threads, chat templ.Component, threadsOpen, chatOpen bool) {
+	planID := planLeadRoomID(docOrDirPath)
+	if planID == "" {
+		return nil, nil, false, false
+	}
+	threadsOpen = workbench.ThreadsOpenFromRequest(c.Request())
+	threads = agenthome.RosterRail(agenthome.RosterSelection{
+		Kind: agenthome.KindPlan,
+		ID:   planID,
+	})
+	chat = s.planLeadChatColumn(c, planID, userEmail, threadsOpen)
+	return threads, chat, threadsOpen, chat != nil
+}
+
+func (s *Service) planLeadChatColumn(
+	c echo.Context,
+	planID, userEmail string,
+	threadsOpen bool,
+) templ.Component {
+	planID = strings.TrimSpace(planID)
+	if planID == "" {
+		return nil
+	}
+	title := ai470RoomTitle(agenthome.KindPlan, planID)
+	threadID, err := s.resolveAI470Thread(
+		c.Request().Context(),
+		agenthome.KindPlan,
+		planID,
+	)
+	if err != nil || strings.TrimSpace(threadID) == "" {
+		return workbench.ChatColumnWithReopen(
+			threadsOpen,
+			title,
+			WorkbenchUnavailable("No shared thread mapped for this room yet."),
+		)
+	}
+	chat, err := s.renderAI470SharedChat(
+		c.Request().Context(),
+		agenthome.KindPlan,
+		planID,
+		threadID,
+		userEmail,
+	)
+	if err != nil {
+		return workbench.ChatColumnWithReopen(
+			threadsOpen,
+			title,
+			WorkbenchUnavailable("No shared thread mapped for this room yet."),
+		)
+	}
+	return workbench.ChatColumnWithReopen(threadsOpen, title, chat)
+}

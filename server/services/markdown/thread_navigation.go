@@ -59,13 +59,13 @@ func ArtifactBrowserOpenFromRequest(r *http.Request) bool {
 	}
 	return c.Value == "1"
 }
+
 func boolString(v bool) string {
 	if v {
 		return "true"
 	}
 	return "false"
 }
-
 
 func threadArtifactQuery(
 	docPath, directoryPath string,
@@ -445,7 +445,12 @@ func (s *Service) thoughtsArtifactPane(
 		return nil, err
 	}
 	browser = remapThreadArtifactBrowserForThoughts(browser)
-	browser.HeaderActions = BuildThreadArtifactHeaderActions(page, browser.DocPath, chatHref)
+	browser.HeaderActions = BuildThreadArtifactHeaderActions(
+		page,
+		browser.DocPath,
+		chatHref,
+		false,
+	)
 	return ThreadArtifactPane(browser, document), nil
 }
 
@@ -500,14 +505,24 @@ func (s *Service) threadArtifactAndComments(
 	}
 	content, page, directory := s.artifactContent(c, doc, explicit || !hasArtifact)
 	if directory {
-		browser.HeaderActions = BuildThreadArtifactHeaderActions(nil, browser.DocPath, "")
+		browser.HeaderActions = BuildThreadArtifactHeaderActions(
+			nil,
+			browser.DocPath,
+			"",
+			true,
+		)
 		return ThreadArtifactPane(
 			browser,
 			WorkbenchUnavailable("Select a file from the artifact browser."),
 		), WorkbenchUnavailable("Comments are unavailable for directories."), nil
 	}
 	if page == nil {
-		browser.HeaderActions = BuildThreadArtifactHeaderActions(nil, browser.DocPath, "")
+		browser.HeaderActions = BuildThreadArtifactHeaderActions(
+			nil,
+			browser.DocPath,
+			"",
+			true,
+		)
 		return ThreadArtifactPane(browser, content),
 			WorkbenchUnavailable("Comments are unavailable for this artifact."), nil
 	}
@@ -530,7 +545,12 @@ func (s *Service) threadArtifactAndComments(
 		page.ViewerArgs.BodyComponent,
 	)
 	panelArgs := BuildDocumentPanelArgs(page)
-	browser.HeaderActions = BuildThreadArtifactHeaderActions(page, browser.DocPath, "")
+	browser.HeaderActions = BuildThreadArtifactHeaderActions(
+		page,
+		browser.DocPath,
+		"",
+		true,
+	)
 	panelArgs.Document.WorkbenchActions = nil
 	content = DocumentPanel(panelArgs)
 	return ThreadArtifactPane(browser, content),
@@ -584,7 +604,9 @@ func (s *Service) HandleThreadArtifactBrowser(c echo.Context) error {
 		return err
 	}
 	return sse.ExecuteScript(
-		"window.history.pushState({ workbenchArtifactPatch: true }, '', " + string(encodedURL) + ")",
+		"window.history.pushState({ workbenchArtifactPatch: true }, '', " + string(
+			encodedURL,
+		) + ")",
 	)
 }
 

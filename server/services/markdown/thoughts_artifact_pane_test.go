@@ -85,7 +85,7 @@ func TestThoughtsArtifactPaneUsesSharedThreadChrome(t *testing.T) {
 		`aria-label="Artifact actions"`,
 		`data-testid="workbench-overflow-actions"`,
 		`href="` + chatHref + `"`,
-		`<span>Chat</span>`,
+		`<span>chat about this plan</span>`,
 		`href="/thoughts/owner/plans/alpha/notes.md"`,
 		`thoughts/owner/plans/alpha/design.md`,
 	} {
@@ -97,13 +97,25 @@ func TestThoughtsArtifactPaneUsesSharedThreadChrome(t *testing.T) {
 	if strings.Contains(html, "No thread for this plan") {
 		t.Fatalf("thoughts workbench still has thin Chat-only empty state")
 	}
+	overflowStart := strings.Index(html, `data-testid="workbench-overflow-actions"`)
+	if overflowStart < 0 {
+		t.Fatal("missing overflow actions")
+	}
+	overflow := html[overflowStart:]
+	if end := strings.Index(overflow, `id="thread-artifact-browser"`); end > 0 {
+		overflow = overflow[:end]
+	}
+	if strings.Contains(overflow, "<span>Thoughts</span>") {
+		t.Fatalf("Thoughts still in 3-dot on thoughts:\n%s", overflow)
+	}
 	if !strings.Contains(html, `id="thread-artifact-path-header"`) ||
 		!strings.Contains(html, `data-testid="workbench-overflow-actions"`) {
 		t.Fatalf("expected shared thread artifact chrome, got thin bar only")
 	}
 
 	// Shared path header must not be paired with DocumentSurface WorkbenchActions bar.
-	if strings.Contains(html, `id="document-header-actions"`) || strings.Contains(html, "Document actions") {
+	if strings.Contains(html, `id="document-header-actions"`) ||
+		strings.Contains(html, "Document actions") {
 		t.Fatalf("legacy DocumentSurface WorkbenchActions bar present")
 	}
 }
@@ -112,9 +124,9 @@ func TestRemapThreadArtifactBrowserForThoughtsUsesThoughtsHrefs(t *testing.T) {
 	t.Parallel()
 
 	got := remapThreadArtifactBrowserForThoughts(ThreadArtifactBrowserArgs{
-		DocPath:       "owner/plans/alpha/design.md",
-		DirectoryPath: "owner/plans/alpha",
-		ParentHref:    "/threads?artifact=thoughts%2Fowner%2Fplans%2Falpha%2Fdesign.md&artifact_dir=thoughts%2Fowner%2Fplans",
+		DocPath:        "owner/plans/alpha/design.md",
+		DirectoryPath:  "owner/plans/alpha",
+		ParentHref:     "/threads?artifact=thoughts%2Fowner%2Fplans%2Falpha%2Fdesign.md&artifact_dir=thoughts%2Fowner%2Fplans",
 		ParentEndpoint: "/threads/artifact-browser?artifact=thoughts%2Fowner%2Fplans%2Falpha%2Fdesign.md&artifact_dir=thoughts%2Fowner%2Fplans",
 		Entries: []ThreadArtifactEntry{
 			{
