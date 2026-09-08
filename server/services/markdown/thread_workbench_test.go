@@ -324,6 +324,9 @@ func TestHandleThreadArtifactBrowserPatchesOnlyBrowserAndHistory(t *testing.T) {
 	for _, want := range []string{
 		"selector #thread-artifact-browser",
 		"selector #thread-artifact-up-slot",
+		"selector #thread-artifact-path-slot",
+		`data-testid="artifact-browser-cwd"`,
+		`>thoughts/owner/plans/alpha/docs</span>`,
 		`data-thread-artifact-cwd="thoughts/owner/plans/alpha/docs"`,
 		"window.history.pushState",
 		"workbenchArtifactPatch: true",

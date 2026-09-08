@@ -334,6 +334,9 @@ func TestHandleThoughtsArtifactBrowserKeepsSelectedDoc(t *testing.T) {
 	for _, want := range []string{
 		"selector #thread-artifact-browser",
 		"selector #thread-artifact-up-slot",
+		"selector #thread-artifact-path-slot",
+		`data-testid="artifact-browser-cwd"`,
+		`>thoughts/owner/plans</span>`,
 		`data-thread-artifact-cwd="thoughts/owner/plans"`,
 		"window.history.pushState",
 		`/thoughts/owner/plans/alpha/design.md`,
