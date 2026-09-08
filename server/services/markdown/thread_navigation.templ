@@ -90,6 +90,7 @@ templ ThreadArtifactPane(browser ThreadArtifactBrowserArgs, document templ.Compo
 				type="button"
 				data-testid="artifact-browser-search-toggle"
 				data-on:click={ artifactBrowserSearchFocusAction() }
+				data-show="!$_dirSearchOpen"
 				data-attr:aria-pressed="$_dirSearchOpen ? 'true' : 'false'"
 				class="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
 				aria-label="Search files"

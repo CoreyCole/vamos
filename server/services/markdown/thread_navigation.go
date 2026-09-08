@@ -340,14 +340,17 @@ func artifactBrowserSearchFetchAction() string {
 	return "var root = document.getElementById('thread-artifact-browser'); if (!root || !root.dataset.artifactSearchEndpoint) { return }; var ep = root.dataset.artifactSearchEndpoint; var sep = ep.indexOf('?') >= 0 ? '&' : '?'; @get(ep + sep + 'q=' + encodeURIComponent(String($dirSearch || '')))"
 }
 
+func artifactBrowserSearchClearAction() string {
+	return "$_dirSearchOpen = false; $dirSearch = ''; " + artifactBrowserSearchFetchAction()
+}
+
 func artifactBrowserSearchKeydownAction() string {
-	return "if (evt.key !== 'Escape') { return }; $_dirSearchOpen = false; $dirSearch = ''; " +
-		artifactBrowserSearchFetchAction()
+	return "if (evt.key !== 'Escape') { return }; " + artifactBrowserSearchClearAction()
 }
 
 func artifactBrowserSearchBlurAction() string {
-	return "if (evt.relatedTarget && evt.relatedTarget.closest && evt.relatedTarget.closest('[data-testid=artifact-browser-search-toggle]')) { return }; if (String($dirSearch || '') !== '') { return }; $_dirSearchOpen = false; " +
-		artifactBrowserSearchFetchAction()
+	return "if (evt.relatedTarget && evt.relatedTarget.closest && evt.relatedTarget.closest('[data-testid=artifact-browser-search-toggle], [data-testid=artifact-browser-search-clear]')) { return }; if (String($dirSearch || '') !== '') { return }; " +
+		artifactBrowserSearchClearAction()
 }
 
 func threadArtifactDirectoryToggleAction() string {
