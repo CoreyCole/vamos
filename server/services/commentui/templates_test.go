@@ -186,6 +186,18 @@ func TestCommentableMarkdownRendersStableTargetsAndHiddenFields(t *testing.T) {
 			html,
 		)
 	}
+	for _, want := range []string{
+		`pl-8`,
+		`-ml-8 grid grid-cols-[2rem_minmax(0,1fr)] items-center`,
+	} {
+		if !strings.Contains(html, want) {
+			t.Fatalf("section 3-dot missing left-margin gutter %q in %s", want, html)
+		}
+	}
+	if strings.Contains(html, `flex items-center gap-1">`) &&
+		strings.Contains(html, `justify-between`) {
+		t.Fatalf("section 3-dot should not sit inline with the title: %s", html)
+	}
 	if strings.Contains(html, `id="plans/raw/path.md`) ||
 		strings.Contains(html, ` style="`) {
 		t.Fatalf("render exposes raw paths in IDs or inline styles: %s", html)
@@ -617,10 +629,17 @@ func TestCommentSharedPatchTargetsRenderStableIDs(t *testing.T) {
 	for _, want := range []string{
 		`id="` + CommentsContextPanelID + `"`,
 		`id="` + CommentsContextThreadListID + `"`,
+		`h-10 min-h-10 max-h-10`,
 	} {
 		if !strings.Contains(panelHTML, want) {
 			t.Fatalf("context panel missing %q: %s", want, panelHTML)
 		}
+	}
+	if strings.Contains(panelHTML, `uppercase tracking-wide`) {
+		t.Fatalf(
+			"comments header should match doc header height, not a two-line label: %s",
+			panelHTML,
+		)
 	}
 
 	var mobile bytes.Buffer
@@ -630,6 +649,47 @@ func TestCommentSharedPatchTargetsRenderStableIDs(t *testing.T) {
 	mobileHTML := mobile.String()
 	if !strings.Contains(mobileHTML, `id="`+MobileSectionCommentContentID+`"`) {
 		t.Fatalf("mobile target missing shared ID: %s", mobileHTML)
+	}
+}
+
+func TestCommentsContextPanelRendersComposerInsteadOfDialog(t *testing.T) {
+	t.Parallel()
+
+	target := CommentTargetView{
+		ID: "comment-target-doc",
+		Routes: CommentRoutes{
+			Create: "/create",
+			Cancel: "/cancel",
+		},
+		HiddenFields: map[string]string{"doc_path": "thoughts/plan.md"},
+	}
+	args := BuildCommentsPanelArgs(CommentableMarkdownArgs{
+		Surface:  CommentSurfaceThoughts,
+		IDPrefix: SafeCommentTargetSlug("thoughts", "thoughts/plan.md"),
+		DocPath:  "thoughts/plan.md",
+	}, "")
+	form := CommentFormView{
+		ID:           "comment-section-1",
+		Target:       target,
+		SelectedText: "quote",
+	}
+	args.Form = &form
+	var buf bytes.Buffer
+	if err := CommentsContextPanel(args).Render(t.Context(), &buf); err != nil {
+		t.Fatalf("Render() error = %v", err)
+	}
+	html := buf.String()
+	for _, want := range []string{
+		`Add a comment...`,
+		`name="selected_text" value="quote"`,
+		`h-10 min-h-10 max-h-10`,
+	} {
+		if !strings.Contains(html, want) {
+			t.Fatalf("panel composer missing %q: %s", want, html)
+		}
+	}
+	if strings.Contains(html, `commentui-popover-target`) {
+		t.Fatalf("composer should sit in the comments pane, not a dialog: %s", html)
 	}
 }
 

@@ -153,6 +153,7 @@ type CommentsPanelArgs struct {
 	Routes             CommentRoutes
 	HiddenFields       map[string]string
 	UserEmail          string
+	Form               *CommentFormView
 }
 
 type CommentThreadOptions struct {
@@ -270,7 +271,6 @@ func omitSectionMenu(args CommentTargetView) bool {
 	}
 	return args.OmitSectionMenu
 }
-
 
 func SelectionOnlySignalArgs(args CommentableMarkdownArgs) SelectionSignalArgs {
 	selection := args.SelectionSignals

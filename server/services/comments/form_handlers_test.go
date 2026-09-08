@@ -207,12 +207,14 @@ func TestWorkbenchV2CommentShowPatchesOnlyCommentsPaneSignal(t *testing.T) {
 		commentui.CommentsContextPanelID,
 		`workbenchV2Comments`,
 		`visible`,
+		`Add a comment...`,
+		`Selected paragraph`,
 	} {
 		if !strings.Contains(body, want) {
 			t.Fatalf("response missing %q: %s", want, body)
 		}
 	}
-	for _, unwanted := range []string{"rightRailActiveTab", "docWorkbenchRight", "workbench-root", "workbench-v2-chat-body"} {
+	for _, unwanted := range []string{"rightRailActiveTab", "docWorkbenchRight", "workbench-root", "workbench-v2-chat-body", "commentui-popover-target"} {
 		if strings.Contains(body, unwanted) {
 			t.Fatalf("response contains %q: %s", unwanted, body)
 		}

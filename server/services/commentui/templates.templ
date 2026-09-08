@@ -159,7 +159,7 @@ templ DocumentPatchTarget(args CommentableMarkdownArgs, headingHint string) {
 
 templ CommentableMarkdown(args CommentableMarkdownArgs) {
 	<div class="relative min-h-full" data-signals="{}">
-		<div class="min-w-0 relative min-h-full" data-commentui-container="true" data-on:keydown__window={ selectionKeydownExpr(args.SelectionSignals) } data-on:mouseup__debounce.500ms.leading={ selectionMouseupExpr(args.SelectionSignals) }>
+		<div class="relative min-h-full min-w-0 pl-8" data-commentui-container="true" data-on:keydown__window={ selectionKeydownExpr(args.SelectionSignals) } data-on:mouseup__debounce.500ms.leading={ selectionMouseupExpr(args.SelectionSignals) }>
 			if len(args.Sections) > 0 {
 				{{ documentThreads := DocumentComments(args.Comments) }}
 				if len(documentThreads) > 0 {
@@ -196,9 +196,11 @@ templ CommentableMarkdown(args CommentableMarkdownArgs) {
 					<section data-section-id={ sectionID } data-heading-hint={ section.Title } class="relative">
 						<div class="markdown-viewer prose prose-invert max-w-none">
 							if hasHeading {
-								<div class="flex items-center gap-1">
-									@CommentTarget(target)
-									<div class="min-w-0 flex-1">
+								<div class="relative -ml-8 grid grid-cols-[2rem_minmax(0,1fr)] items-center">
+									<div class="flex items-center justify-center">
+										@CommentTarget(target)
+									</div>
+									<div class="min-w-0 [&>h1]:!mt-0 [&>h2]:!mt-0 [&>h3]:!mt-0 [&>h4]:!mt-0 [&>h5]:!mt-0 [&>h6]:!mt-0">
 										@templ.Raw(section.HeadingHTML)
 									</div>
 								</div>
@@ -385,10 +387,10 @@ templ SidebarResolvedThreadChip(thread CommentThreadView, target CommentTargetVi
 
 templ SectionMenu(args CommentTargetView) {
 	<details class="relative">
-		<summary class="inline-flex h-8 w-8 cursor-pointer list-none items-center justify-center rounded-full transition-colors hover:bg-muted" aria-label="Section actions">
-			<svg class="h-4 w-4 text-muted-foreground" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="5" r="2"></circle><circle cx="12" cy="12" r="2"></circle><circle cx="12" cy="19" r="2"></circle></svg>
+		<summary class="inline-flex h-7 w-7 cursor-pointer list-none items-center justify-center rounded-full transition-colors hover:bg-muted [&::-webkit-details-marker]:hidden" aria-label="Section actions">
+			<svg class="h-3.5 w-3.5 text-muted-foreground" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="5" r="2"></circle><circle cx="12" cy="12" r="2"></circle><circle cx="12" cy="19" r="2"></circle></svg>
 		</summary>
-		<div class="absolute right-0 z-50 mt-2 min-w-36 rounded-md border border-border bg-popover p-1 text-popover-foreground shadow-md">
+		<div class="absolute left-0 z-50 mt-2 min-w-36 rounded-md border border-border bg-popover p-1 text-popover-foreground shadow-md">
 			<form data-on:submit__prevent={ preventSubmitPostExpr(args.Routes.Show) } class="flex w-full items-center">
 				@HiddenFields(args.HiddenFields)
 				<input type="hidden" name="selected_text" value=""/>
@@ -467,14 +469,14 @@ templ CommentForm(view CommentFormView) {
 
 templ CommentsContextPanel(args CommentsPanelArgs) {
 	<aside id={ CommentsContextPanelID } class="flex h-full min-h-0 flex-col overflow-hidden bg-background">
-		<div class="shrink-0 border-b border-border px-3 py-2">
-			<p class="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Comments</p>
-			if args.ActiveSectionID != "" {
-				<p class="truncate text-sm text-foreground">{ args.ActiveSectionLabel }</p>
-			} else if args.DocPath != "" {
-				<p class="truncate text-sm text-muted-foreground">{ args.DocPath }</p>
-			}
+		<div class="flex h-10 min-h-10 max-h-10 shrink-0 items-center border-b border-border px-2.5">
+			<p class="truncate text-[13px] font-semibold leading-none text-foreground">Comments</p>
 		</div>
+		if args.Form != nil {
+			<div class="shrink-0 border-b border-border p-3">
+				@CommentForm(*args.Form)
+			</div>
+		}
 		<div id={ CommentsContextThreadListID } class="min-h-0 flex-1 space-y-3 overflow-y-auto p-3">
 			if len(args.Threads) == 0 {
 				<p class="rounded-md border border-dashed border-border p-3 text-sm text-muted-foreground">No comments yet.</p>

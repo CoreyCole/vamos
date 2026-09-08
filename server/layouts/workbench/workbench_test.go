@@ -614,7 +614,8 @@ func TestWorkbenchResizeJSShowsHandlesForVisibleAdjacentRegions(t *testing.T) {
 	js := string(contents)
 	for _, want := range []string{
 		"const show = Boolean(",
-		"before && after && isVisible(before) && isVisible(after)",
+		"before && isVisible(before) && nextVisibleRegionAfter(before)",
+		"function nextVisibleRegionAfter(region)",
 		"const content = visible.filter((region) => region !== navigation)",
 		"if (!navigation || content.length === 0) return null",
 		"const datastarModule = import(\"@vamos/datastar\");",

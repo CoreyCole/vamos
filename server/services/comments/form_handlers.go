@@ -240,6 +240,44 @@ func (s *Service) patchThoughtsCommentsPanel(
 	items []CommentWithReplies,
 	workbenchV2 bool,
 ) error {
+	return s.patchThoughtsCommentsPanelForm(
+		sse,
+		filePath,
+		userEmail,
+		activeSectionID,
+		activeSectionLabel,
+		items,
+		workbenchV2,
+		nil,
+	)
+}
+
+func (s *Service) patchThoughtsCommentsPanelWithForm(
+	sse *datastar.ServerSentEventGenerator,
+	filePath, userEmail, activeSectionID, activeSectionLabel string,
+	items []CommentWithReplies,
+	workbenchV2 bool,
+	form commentui.CommentFormView,
+) error {
+	return s.patchThoughtsCommentsPanelForm(
+		sse,
+		filePath,
+		userEmail,
+		activeSectionID,
+		activeSectionLabel,
+		items,
+		workbenchV2,
+		&form,
+	)
+}
+
+func (s *Service) patchThoughtsCommentsPanelForm(
+	sse *datastar.ServerSentEventGenerator,
+	filePath, userEmail, activeSectionID, activeSectionLabel string,
+	items []CommentWithReplies,
+	workbenchV2 bool,
+	form *commentui.CommentFormView,
+) error {
 	args := commentui.CommentableMarkdownArgs{
 		Surface:      commentui.CommentSurfaceThoughts,
 		IDPrefix:     commentui.SafeCommentTargetSlug("thoughts", filePath),
@@ -256,10 +294,24 @@ func (s *Service) patchThoughtsCommentsPanel(
 	if label := strings.TrimSpace(activeSectionLabel); label != "" {
 		panelArgs.ActiveSectionLabel = label
 	}
+	panelArgs.Form = form
 	return sse.PatchElementTempl(
 		commentui.CommentsContextPanel(panelArgs),
 		datastar.WithSelectorID(commentui.CommentsContextPanelID),
 	)
+}
+
+func thoughtsCommentForm(
+	target commentui.CommentTargetView,
+	data commentFormData,
+	errMsg string,
+) commentui.CommentFormView {
+	return commentui.CommentFormView{
+		ID:           "comment-" + target.SectionID,
+		Target:       target,
+		SelectedText: data.SelectedText,
+		Error:        errMsg,
+	}
 }
 
 // HandleCancelCommentForm handles canceling the comment form
@@ -380,10 +432,26 @@ func (s *Service) renderFormError(
 			WorkbenchV2:     data.WorkbenchV2,
 		},
 	)
-	if err := patchThoughtsCommentTargetWithForm(sse, target, data, errMsg); err != nil {
+	form := thoughtsCommentForm(target, data, errMsg)
+	if data.WorkbenchV2 {
+		if err := patchThoughtsCommentTarget(sse, target); err != nil {
+			return err
+		}
+		if err := s.patchThoughtsCommentsPanelWithForm(
+			sse,
+			data.FilePath,
+			userEmail,
+			data.SectionID,
+			data.HeadingHint,
+			response.Comments,
+			data.WorkbenchV2,
+			form,
+		); err != nil {
+			return err
+		}
+	} else if err := patchThoughtsCommentTargetWithForm(sse, target, data, errMsg); err != nil {
 		return err
-	}
-	if err := s.patchThoughtsCommentsPanel(
+	} else if err := s.patchThoughtsCommentsPanel(
 		sse,
 		data.FilePath,
 		userEmail,
@@ -779,20 +847,40 @@ func (s *Service) HandleShowCommentForm(c echo.Context) error {
 			WorkbenchV2:     data.WorkbenchV2,
 		},
 	)
-	if err := patchThoughtsCommentTargetWithForm(sse, target, data, ""); err != nil {
-		c.Logger().Errorf("Failed to patch shared comment target: %v", err)
-		return err
-	}
-	if err := s.patchThoughtsCommentsPanel(
-		sse,
-		data.FilePath,
-		userEmail,
-		data.SectionID,
-		data.HeadingHint,
-		response.Comments,
-		data.WorkbenchV2,
-	); err != nil {
-		return err
+	form := thoughtsCommentForm(target, data, "")
+	if data.WorkbenchV2 {
+		if err := patchThoughtsCommentTarget(sse, target); err != nil {
+			c.Logger().Errorf("Failed to patch shared comment target: %v", err)
+			return err
+		}
+		if err := s.patchThoughtsCommentsPanelWithForm(
+			sse,
+			data.FilePath,
+			userEmail,
+			data.SectionID,
+			data.HeadingHint,
+			response.Comments,
+			data.WorkbenchV2,
+			form,
+		); err != nil {
+			return err
+		}
+	} else {
+		if err := patchThoughtsCommentTargetWithForm(sse, target, data, ""); err != nil {
+			c.Logger().Errorf("Failed to patch shared comment target: %v", err)
+			return err
+		}
+		if err := s.patchThoughtsCommentsPanel(
+			sse,
+			data.FilePath,
+			userEmail,
+			data.SectionID,
+			data.HeadingHint,
+			response.Comments,
+			data.WorkbenchV2,
+		); err != nil {
+			return err
+		}
 	}
 	if err := patchOpenCommentsSignal(sse, data.WorkbenchV2); err != nil {
 		return err

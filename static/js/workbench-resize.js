@@ -27,6 +27,17 @@ function regionBySignal(root, signal) {
   return root.querySelector(`[data-workbench-signal="${CSS.escape(signal)}"]`);
 }
 
+function nextVisibleRegionAfter(region) {
+  let el = region ? region.nextElementSibling : null;
+  while (el) {
+    if (el.hasAttribute("data-workbench-region") && isVisible(el)) {
+      return el;
+    }
+    el = el.nextElementSibling;
+  }
+  return null;
+}
+
 function regionsContainer(root) {
   return root.querySelector("#workbench-regions") || root;
 }
@@ -230,9 +241,8 @@ function updateHandles(root) {
     "[data-workbench-resize-handle]",
   )) {
     const before = regionBySignal(root, handle.dataset.workbenchBefore);
-    const after = regionBySignal(root, handle.dataset.workbenchAfter);
     const show = Boolean(
-      before && after && isVisible(before) && isVisible(after),
+      before && isVisible(before) && nextVisibleRegionAfter(before),
     );
     handle.classList.toggle("md:!block", show);
     handle.classList.toggle("md:!hidden", !show);
@@ -342,8 +352,8 @@ function startResize(event) {
   const root = handle.closest("#workbench-root");
   if (!root) return;
   const before = regionBySignal(root, handle.dataset.workbenchBefore);
-  const after = regionBySignal(root, handle.dataset.workbenchAfter);
-  if (!before || !after || !isVisible(before) || !isVisible(after)) return;
+  const after = nextVisibleRegionAfter(before);
+  if (!before || !after || !isVisible(before)) return;
 
   // First grip drag: convert SSR flex to pixel lock from current painted widths.
   if (root.dataset.workbenchPixelLock !== "1") {
