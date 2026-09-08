@@ -2,11 +2,10 @@ package workbench
 
 import (
 	"net/http"
-	"strconv"
 )
 
 // CommentsOpenCookie stores comments-pane visibility across sibling GETs.
-// Missing/invalid => closed. Chat XOR comments: opening comments closes chat.
+// Missing/invalid => closed.
 const CommentsOpenCookie = "wb2_comments_open"
 
 // CommentsOpenFromRequest reads wb2_comments_open; missing/invalid => closed.
@@ -36,12 +35,11 @@ func CommentsCloseCookieJS() string {
 	return commentsOpenCookieWriteJS(false)
 }
 
-// ChatToggleClickAction opens chat and closes comments.
 func ChatToggleClickAction() string {
-	return "$workbench.regions.workbenchV2Comments.visible = false; $workbench.regions.workbenchV2Chat.visible = true; " +
+	return "if ($workbench.regions.workbenchV2Chat.visible) { $workbench.regions.workbenchV2Chat.visible = false } else { $workbench.regions.workbenchV2Comments.visible = false; $workbench.regions.workbenchV2Chat.visible = true; " +
 		commentsOpenCookieWriteJS(
 			false,
-		) + "; " +
+		) + " }; " +
 		shareChatCommentsRatioJS() + "; " +
 		threadsLayoutReflowJS()
 }
@@ -50,16 +48,11 @@ func shareChatCommentsRatioJS() string {
 	return `var chat=document.querySelector("[data-workbench-region='workbench-v2-chat']"); var comments=document.querySelector("[data-workbench-region='workbench-v2-comments']"); if (chat && comments) { if ($workbench.regions.workbenchV2Comments.visible) { comments.dataset.workbenchRatio = chat.dataset.workbenchRatio; $workbench.regions.workbenchV2Comments.ratio = $workbench.regions.workbenchV2Chat.ratio } else { chat.dataset.workbenchRatio = comments.dataset.workbenchRatio; $workbench.regions.workbenchV2Chat.ratio = $workbench.regions.workbenchV2Comments.ratio } }`
 }
 
-// CommentsToggleClickAction opens comments and closes chat, or closes comments
-// and restores chat when chatDefaultOpen is true (room pages).
-func CommentsToggleClickAction(chatDefaultOpen bool) string {
+func CommentsToggleClickAction() string {
 	return "$workbench.regions.workbenchV2Comments.visible = !$workbench.regions.workbenchV2Comments.visible; if ($workbench.regions.workbenchV2Comments.visible) { $workbench.regions.workbenchV2Chat.visible = false; " +
 		commentsOpenCookieWriteJS(
 			true,
-		) + " } else { $workbench.regions.workbenchV2Chat.visible = " +
-		strconv.FormatBool(
-			chatDefaultOpen,
-		) + "; " + commentsOpenCookieWriteJS(
+		) + " } else { " + commentsOpenCookieWriteJS(
 		false,
 	) + " }; " +
 		shareChatCommentsRatioJS() + "; " +

@@ -1648,6 +1648,28 @@ func TestCommentsOpenFromRequestDefaultsClosed(t *testing.T) {
 	}
 }
 
+func TestCommentsToggleClickActionClosesWithoutOpeningChat(t *testing.T) {
+	t.Parallel()
+	js := CommentsToggleClickAction()
+	if strings.Contains(js, "workbenchV2Chat.visible = true") {
+		t.Fatalf("closing comments should not open chat: %s", js)
+	}
+	if !strings.Contains(
+		js,
+		"workbenchV2Comments.visible = !$workbench.regions.workbenchV2Comments.visible",
+	) {
+		t.Fatalf("comments should toggle: %s", js)
+	}
+}
+
+func TestChatToggleClickActionClosesWhenAlreadyOpen(t *testing.T) {
+	t.Parallel()
+	js := ChatToggleClickAction()
+	if !strings.Contains(js, "if ($workbench.regions.workbenchV2Chat.visible)") {
+		t.Fatalf("chat should close on second click: %s", js)
+	}
+}
+
 func TestWorkbenchV2PreferencesKeepOnlyRatios(t *testing.T) {
 	t.Parallel()
 

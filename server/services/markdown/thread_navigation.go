@@ -78,9 +78,8 @@ func boolString(v bool) string {
 	return "false"
 }
 
-func commentsToggleClickAction(browser ThreadArtifactBrowserArgs) string {
-	chatDefault := browser.ViewDocumentHref != "" && !browser.DocumentViewActive
-	return workbench.CommentsToggleClickAction(chatDefault)
+func commentsToggleClickAction(_ ThreadArtifactBrowserArgs) string {
+	return workbench.CommentsToggleClickAction()
 }
 
 func commentsCloseCookieJS() string {
