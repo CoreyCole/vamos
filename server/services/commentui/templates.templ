@@ -469,7 +469,7 @@ templ CommentForm(view CommentFormView) {
 				<div class="rounded bg-destructive/10 px-3 py-2 text-sm text-destructive">{ view.Error }</div>
 			}
 			if view.SelectedText != "" {
-				<blockquote class="max-h-20 overflow-y-auto rounded border-l-2 border-muted-foreground/30 bg-muted px-2 py-1.5 text-xs text-muted-foreground"><span class="font-mono">{ view.SelectedText }</span></blockquote>
+				<blockquote class="commentui-thread-quote whitespace-pre-wrap rounded-md border-l-4 border-primary/50 bg-muted px-3 py-2 text-muted-foreground">{ view.SelectedText }</blockquote>
 			}
 			@textarea.Textarea(textarea.TextareaArgs{ID: CommentsComposerTextID, Placeholder: "Add a comment...", Name: "comment_text", Rows: 3, Class: "resize-none", Attributes: map[string]any{"data-ignore-morph": true}})
 			<div class="flex justify-end gap-2">

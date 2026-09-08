@@ -89,7 +89,7 @@ func TestCommentFormSelectedTextIsPreviewOnly(t *testing.T) {
 		t.Fatalf("Render() error = %v", err)
 	}
 	html := buf.String()
-	for _, want := range []string{`name="selected_text" value="quoted"`, "quoted", "contentType", `name="artifact_rel_path"`} {
+	for _, want := range []string{`name="selected_text" value="quoted"`, "quoted", "contentType", `name="artifact_rel_path"`, `commentui-thread-quote`} {
 		if !strings.Contains(html, want) {
 			t.Fatalf("render missing %q in %s", want, html)
 		}
@@ -930,7 +930,7 @@ func TestCommentToggleWithFormUsesPopoverPlacementClass(t *testing.T) {
 			t.Fatalf("render missing %q in %s", want, html)
 		}
 	}
-	for _, forbidden := range []string{`left-full top-0 ml-12`, ` style="`, `New comment`, `>New<`, `border-primary/50`} {
+	for _, forbidden := range []string{`left-full top-0 ml-12`, ` style="`, `New comment`, `>New<`} {
 		if strings.Contains(html, forbidden) {
 			t.Fatalf("render contains forbidden %q in %s", forbidden, html)
 		}

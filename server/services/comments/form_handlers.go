@@ -301,19 +301,25 @@ func (s *Service) patchThoughtsCommentsPanelForm(
 	)
 }
 
+func (data commentFormData) quotedText() string {
+	if q := strings.TrimSpace(data.SelectedText); q != "" {
+		return q
+	}
+	if data.SectionID != "document" {
+		return strings.TrimSpace(data.HeadingHint)
+	}
+	return ""
+}
+
 func thoughtsCommentForm(
 	target commentui.CommentTargetView,
 	data commentFormData,
 	errMsg string,
 ) commentui.CommentFormView {
-	selected := strings.TrimSpace(data.SelectedText)
-	if selected == "" && data.SectionID != "document" {
-		selected = strings.TrimSpace(data.HeadingHint)
-	}
 	return commentui.CommentFormView{
 		ID:           "comment-" + target.SectionID,
 		Target:       target,
-		SelectedText: selected,
+		SelectedText: data.quotedText(),
 		Error:        errMsg,
 	}
 }
@@ -385,7 +391,7 @@ func (s *Service) HandleCommentForm(c echo.Context) error {
 		CreateCommentRequest{
 			FilePath:     data.FilePath,
 			CommentText:  data.CommentText,
-			SelectedText: data.SelectedText,
+			SelectedText: data.quotedText(),
 			StartLine:    data.StartLine,
 			StartColumn:  data.StartColumn,
 			EndLine:      data.EndLine,
