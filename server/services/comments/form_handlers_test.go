@@ -221,6 +221,31 @@ func TestWorkbenchV2CommentShowPatchesOnlyCommentsPaneSignal(t *testing.T) {
 	}
 }
 
+func TestWorkbenchV2SectionTitleCommentQuotesHeading(t *testing.T) {
+	t.Parallel()
+	svc := newTestCommentsService(t)
+	form := url.Values{
+		"doc_path":     {"thoughts/plan.md"},
+		"section_hint": {"section-1"},
+		"heading_hint": {"Alpha notes"},
+		"workbench_v2": {"1"},
+	}
+	c, rec := newCommentFormRequest(t, "/forms/comments/show", form)
+	if err := svc.HandleShowCommentForm(c); err != nil {
+		t.Fatalf("HandleShowCommentForm() error = %v", err)
+	}
+	body := rec.Body.String()
+	for _, want := range []string{
+		`name="selected_text" value="Alpha notes"`,
+		commentui.CommentsComposerTextID,
+		commentui.FocusComposerScript(),
+	} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("section title comment missing %q: %s", want, body)
+		}
+	}
+}
+
 func TestWorkbenchV2CommentCreatePatchesOnlyCommentsPaneSignal(t *testing.T) {
 	t.Parallel()
 	svc := newTestCommentsService(t)

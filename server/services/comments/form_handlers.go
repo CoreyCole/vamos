@@ -306,10 +306,14 @@ func thoughtsCommentForm(
 	data commentFormData,
 	errMsg string,
 ) commentui.CommentFormView {
+	selected := strings.TrimSpace(data.SelectedText)
+	if selected == "" && data.SectionID != "document" {
+		selected = strings.TrimSpace(data.HeadingHint)
+	}
 	return commentui.CommentFormView{
 		ID:           "comment-" + target.SectionID,
 		Target:       target,
-		SelectedText: data.SelectedText,
+		SelectedText: selected,
 		Error:        errMsg,
 	}
 }
@@ -885,9 +889,11 @@ func (s *Service) HandleShowCommentForm(c echo.Context) error {
 	if err := patchOpenCommentsSignal(sse, data.WorkbenchV2); err != nil {
 		return err
 	}
-
-	return sse.MarshalAndPatchSignals(map[string]any{
+	if err := sse.MarshalAndPatchSignals(map[string]any{
 		"section_" + data.SectionID + "_form_open": true,
 		"section_" + data.SectionID + "_expanded":  true,
-	})
+	}); err != nil {
+		return err
+	}
+	return sse.ExecuteScript(commentui.FocusComposerScript())
 }

@@ -115,6 +115,7 @@ type CommentTargetView struct {
 const (
 	CommentsContextPanelID        = "comments-context-panel"
 	CommentsContextThreadListID   = "comments-context-thread-list"
+	CommentsComposerTextID        = "comments-composer-text"
 	MobileSectionCommentContentID = "mobile-section-comment-content"
 	CommentSidebarSignal          = "commentSidebarExpanded"
 )

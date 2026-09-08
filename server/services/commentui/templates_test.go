@@ -171,7 +171,7 @@ func TestCommentableMarkdownRendersStableTargetsAndHiddenFields(t *testing.T) {
 		t.Fatalf("Render() error = %v", err)
 	}
 	html := buf.String()
-	for _, want := range []string{`data-section-id="section-1"`, `data-comment-target="true"`, `name="artifact_rel_path"`, "Add comment", `contentType`} {
+	for _, want := range []string{`data-section-id="section-1"`, `data-comment-target="true"`, `name="artifact_rel_path"`, "Add comment", `contentType`, `name="selected_text" value="Intro"`} {
 		if !strings.Contains(html, want) {
 			t.Fatalf("render missing %q in %s", want, html)
 		}
@@ -187,8 +187,8 @@ func TestCommentableMarkdownRendersStableTargetsAndHiddenFields(t *testing.T) {
 		)
 	}
 	for _, want := range []string{
-		`pl-8`,
-		`-ml-8 grid grid-cols-[2rem_minmax(0,1fr)] items-center`,
+		`pl-7`,
+		`absolute left-0 top-1/2 z-10 flex h-7 w-7 -translate-x-full -translate-y-1/2 items-center justify-center`,
 	} {
 		if !strings.Contains(html, want) {
 			t.Fatalf("section 3-dot missing left-margin gutter %q in %s", want, html)
@@ -618,7 +618,11 @@ func TestCommentSharedPatchTargetsRenderStableIDs(t *testing.T) {
 		Surface:  CommentSurfaceThoughts,
 		IDPrefix: SafeCommentTargetSlug("thoughts", "thoughts/plan.md"),
 		DocPath:  "thoughts/plan.md",
-		Routes:   CommentRoutes{Reply: func(string) string { return "/reply" }},
+		Routes: CommentRoutes{
+			Show:  "/forms/comments/show",
+			Reply: func(string) string { return "/reply" },
+		},
+		HiddenFields: map[string]string{"doc_path": "thoughts/plan.md"},
 	}, "")
 
 	var panel bytes.Buffer
@@ -630,6 +634,8 @@ func TestCommentSharedPatchTargetsRenderStableIDs(t *testing.T) {
 		`id="` + CommentsContextPanelID + `"`,
 		`id="` + CommentsContextThreadListID + `"`,
 		`h-10 min-h-10 max-h-10`,
+		`aria-label="Add comment"`,
+		`/forms/comments/show`,
 	} {
 		if !strings.Contains(panelHTML, want) {
 			t.Fatalf("context panel missing %q: %s", want, panelHTML)

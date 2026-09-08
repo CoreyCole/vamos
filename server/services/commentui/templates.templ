@@ -52,6 +52,10 @@ func preventSubmitPostExpr(route string) string {
 	return "@post('" + route + "', {contentType: 'form'})"
 }
 
+func FocusComposerScript() string {
+	return "document.getElementById('" + CommentsComposerTextID + "')?.focus()"
+}
+
 func selectionTriggerSubmitExpr(args SelectionSignalArgs) string {
 	if args.Prefix == "" || args.ShowRoute == "" {
 		return ""
@@ -159,7 +163,7 @@ templ DocumentPatchTarget(args CommentableMarkdownArgs, headingHint string) {
 
 templ CommentableMarkdown(args CommentableMarkdownArgs) {
 	<div class="relative min-h-full" data-signals="{}">
-		<div class="relative min-h-full min-w-0 pl-8" data-commentui-container="true" data-on:keydown__window={ selectionKeydownExpr(args.SelectionSignals) } data-on:mouseup__debounce.500ms.leading={ selectionMouseupExpr(args.SelectionSignals) }>
+		<div class="relative min-h-full min-w-0 pl-7" data-commentui-container="true" data-on:keydown__window={ selectionKeydownExpr(args.SelectionSignals) } data-on:mouseup__debounce.500ms.leading={ selectionMouseupExpr(args.SelectionSignals) }>
 			if len(args.Sections) > 0 {
 				{{ documentThreads := DocumentComments(args.Comments) }}
 				if len(documentThreads) > 0 {
@@ -196,11 +200,11 @@ templ CommentableMarkdown(args CommentableMarkdownArgs) {
 					<section data-section-id={ sectionID } data-heading-hint={ section.Title } class="relative">
 						<div class="markdown-viewer prose prose-invert max-w-none">
 							if hasHeading {
-								<div class="relative -ml-8 grid grid-cols-[2rem_minmax(0,1fr)] items-center">
-									<div class="flex items-center justify-center">
+								<div class="relative">
+									<div class="absolute left-0 top-1/2 z-10 flex h-7 w-7 -translate-x-full -translate-y-1/2 items-center justify-center">
 										@CommentTarget(target)
 									</div>
-									<div class="min-w-0 [&>h1]:!mt-0 [&>h2]:!mt-0 [&>h3]:!mt-0 [&>h4]:!mt-0 [&>h5]:!mt-0 [&>h6]:!mt-0">
+									<div class="min-w-0 [&>h1]:!my-0 [&>h2]:!my-0 [&>h3]:!my-0 [&>h4]:!my-0 [&>h5]:!my-0 [&>h6]:!my-0">
 										@templ.Raw(section.HeadingHTML)
 									</div>
 								</div>
@@ -393,7 +397,7 @@ templ SectionMenu(args CommentTargetView) {
 		<div class="absolute left-0 z-50 mt-2 min-w-36 rounded-md border border-border bg-popover p-1 text-popover-foreground shadow-md">
 			<form data-on:submit__prevent={ preventSubmitPostExpr(args.Routes.Show) } class="flex w-full items-center">
 				@HiddenFields(args.HiddenFields)
-				<input type="hidden" name="selected_text" value=""/>
+				<input type="hidden" name="selected_text" value={ args.HeadingHint }/>
 				<button type="submit" class="flex w-full items-center rounded-sm px-2 py-1.5 text-sm hover:bg-accent hover:text-accent-foreground"><span class="whitespace-nowrap">Add comment</span></button>
 			</form>
 		</div>
@@ -458,7 +462,7 @@ templ CommentForm(view CommentFormView) {
 			if view.SelectedText != "" {
 				<blockquote class="max-h-20 overflow-y-auto rounded border-l-2 border-muted-foreground/30 bg-muted px-2 py-1.5 text-xs text-muted-foreground"><span class="font-mono">{ view.SelectedText }</span></blockquote>
 			}
-			@textarea.Textarea(textarea.TextareaArgs{Placeholder: "Add a comment...", Name: "comment_text", Rows: 3, Class: "resize-none", Attributes: map[string]any{"data-ignore-morph": true}})
+			@textarea.Textarea(textarea.TextareaArgs{ID: CommentsComposerTextID, Placeholder: "Add a comment...", Name: "comment_text", Rows: 3, Class: "resize-none", Attributes: map[string]any{"data-ignore-morph": true}})
 			<div class="flex justify-end gap-2">
 				<button type="button" class="rounded-md px-3 py-1.5 text-xs text-muted-foreground hover:bg-muted" data-on:click={ "@post('" + view.Target.Routes.Cancel + "', {contentType: 'form'})" }>Cancel</button>
 				<button type="submit" class="rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90">Comment</button>
@@ -469,8 +473,22 @@ templ CommentForm(view CommentFormView) {
 
 templ CommentsContextPanel(args CommentsPanelArgs) {
 	<aside id={ CommentsContextPanelID } class="flex h-full min-h-0 flex-col overflow-hidden bg-background">
-		<div class="flex h-10 min-h-10 max-h-10 shrink-0 items-center border-b border-border px-2.5">
-			<p class="truncate text-[13px] font-semibold leading-none text-foreground">Comments</p>
+		<div class="flex h-10 min-h-10 max-h-10 shrink-0 items-center gap-2 border-b border-border px-2.5">
+			<p class="min-w-0 flex-1 truncate text-[13px] font-semibold leading-none text-foreground">Comments</p>
+			if args.Form != nil {
+				<button type="button" class="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground" data-on:click={ FocusComposerScript() } aria-label="Add comment" title="Add comment">
+					<svg class="h-3.5 w-3.5" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v14M5 12h14"></path></svg>
+				</button>
+			} else if args.Routes.Show != "" {
+				<form data-on:submit__prevent={ preventSubmitPostExpr(args.Routes.Show) } class="shrink-0">
+					@HiddenFields(args.HiddenFields)
+					<input type="hidden" name="selected_text" value=""/>
+					<input type="hidden" name="section_hint" value="document"/>
+					<button type="submit" class="inline-flex h-7 w-7 items-center justify-center rounded-md border border-border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground" aria-label="Add comment" title="Add comment">
+						<svg class="h-3.5 w-3.5" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v14M5 12h14"></path></svg>
+					</button>
+				</form>
+			}
 		</div>
 		if args.Form != nil {
 			<div class="shrink-0 border-b border-border p-3">
