@@ -862,6 +862,7 @@ func TestWorkbenchV2CSSKeepsStableRegionTransitionNames(t *testing.T) {
 		"::view-transition-old(.workbench-chrome),",
 		"::view-transition-new(.workbench-chrome) {",
 		"::view-transition-old(thread-artifact-document)",
+		`#thread-artifact-pane[data-artifact-browser-open="0"] #thread-artifact-browser`,
 		"animation: none;",
 		"display: none;",
 		"z-index: 20;",

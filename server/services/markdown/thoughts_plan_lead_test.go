@@ -65,6 +65,9 @@ func TestThoughtsPlanDocIsFullscreenWithPlanLeadChatLink(t *testing.T) {
 		`id="workbench-v2-roster"`,
 		`id="thread-chat"`,
 		`id="workbench-v2-chat-header"`,
+		`id="workspace-doc-tree-header"`,
+		"Related docs",
+		"workspaceDocTreeNode_",
 	} {
 		if strings.Contains(html, unwanted) {
 			t.Fatalf("thoughts is not fullscreen, found %q", unwanted)

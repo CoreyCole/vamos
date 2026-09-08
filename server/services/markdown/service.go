@@ -19,7 +19,6 @@ import (
 
 	"github.com/CoreyCole/vamos/pkg/db"
 	"github.com/CoreyCole/vamos/server"
-	"github.com/CoreyCole/vamos/server/layouts/workbench"
 	"github.com/CoreyCole/vamos/server/services/comments"
 	"github.com/CoreyCole/vamos/server/services/layoutprefs"
 	"github.com/CoreyCole/vamos/server/services/planworkspace"
@@ -39,10 +38,6 @@ type DocumentWorkspaceResolver interface {
 
 type WorkspaceListResolver interface {
 	ListWorkspaces(ctx context.Context, limit int64) ([]db.Workspace, error)
-}
-
-type WorkspaceDocTreeResolver interface {
-	ListWorkspaceDocs(ctx context.Context, workspaceID string) ([]db.WorkspaceDoc, error)
 }
 
 type WorkbenchThreadRenderer interface {
@@ -89,6 +84,7 @@ type Service struct {
 	embeddedChatRenderer     EmbeddedChatRenderer
 	hermesThreadsRenderer    HermesThreadsRenderer
 	workbenchThreadsRenderer WorkbenchThreadRenderer
+	queries                  db.Querier
 }
 
 func NewService(
@@ -156,6 +152,12 @@ func (s *Service) WithHermesThreadsRenderer(renderer HermesThreadsRenderer) *Ser
 
 func (s *Service) WithWorkbenchThreadRenderer(renderer WorkbenchThreadRenderer) *Service {
 	s.workbenchThreadsRenderer = renderer
+	return s
+}
+
+func (s *Service) WithQueries(queries db.Querier) *Service {
+	s.queries = queries
+
 	return s
 }
 
@@ -454,82 +456,6 @@ func NormalizeWorkspaceDocPath(raw string) string {
 	return strings.Trim(clean, "/")
 }
 
-func (s *Service) BuildWorkspaceDocTreeFromRoot(
-	rootDocPath, currentDocPath string,
-) ([]workbench.WorkspaceDocNode, error) {
-	rootRel, rootAbs, err := s.resolveThoughtsRelAndAbs(rootDocPath)
-	if err != nil {
-		return nil, err
-	}
-	currentRel := normalizeThoughtsRelativePath(currentDocPath)
-
-	var build func(string) ([]workbench.WorkspaceDocNode, error)
-	build = func(relDir string) ([]workbench.WorkspaceDocNode, error) {
-		entries, err := os.ReadDir(filepath.Join(s.basePath, filepath.FromSlash(relDir)))
-		if err != nil {
-			return nil, err
-		}
-
-		var dirs, files []os.DirEntry
-		for _, entry := range entries {
-			name := entry.Name()
-			if skipWorkspaceDocTreeEntry(name, entry.IsDir()) {
-				continue
-			}
-			if entry.IsDir() {
-				dirs = append(dirs, entry)
-			} else if isWorkspaceDocTreeFile(name) {
-				files = append(files, entry)
-			}
-		}
-		sort.Slice(dirs, func(i, j int) bool {
-			return strings.ToLower(dirs[i].Name()) < strings.ToLower(dirs[j].Name())
-		})
-		sort.Slice(files, func(i, j int) bool {
-			return strings.ToLower(files[i].Name()) < strings.ToLower(files[j].Name())
-		})
-
-		nodes := make([]workbench.WorkspaceDocNode, 0, len(dirs)+len(files))
-		for _, dir := range dirs {
-			rel := pathJoinSlash(relDir, dir.Name())
-			children, err := build(rel)
-			if err != nil {
-				return nil, err
-			}
-			active := currentRel == rel || strings.HasPrefix(currentRel, rel+"/")
-			nodes = append(nodes, workbench.WorkspaceDocNode{
-				Path:       rel,
-				RelPath:    strings.TrimPrefix(strings.TrimPrefix(rel, rootRel), "/"),
-				Label:      dir.Name(),
-				Kind:       workbench.WorkspaceDocKindDir,
-				IsActive:   currentRel == rel,
-				IsExpanded: active,
-				Children:   children,
-			})
-		}
-		for _, file := range files {
-			rel := pathJoinSlash(relDir, file.Name())
-			nodes = append(nodes, workbench.WorkspaceDocNode{
-				Path:    rel,
-				RelPath: strings.TrimPrefix(strings.TrimPrefix(rel, rootRel), "/"),
-				Label:   file.Name(),
-				Kind:    workbench.WorkspaceDocKindFile,
-				Href: workbench.WorkspaceDocNodeHref(
-					workbench.DocEntryModeThoughts,
-					rel,
-				),
-				IsActive: currentRel == rel,
-			})
-		}
-		return nodes, nil
-	}
-
-	if stat, err := os.Stat(rootAbs); err != nil || !stat.IsDir() {
-		return nil, fmt.Errorf("workspace doc root is not a directory: %s", rootDocPath)
-	}
-	return build(rootRel)
-}
-
 func (s *Service) resolveThoughtsRelAndAbs(path string) (string, string, error) {
 	rel := normalizeThoughtsRelativePath(path)
 	if filepath.IsAbs(strings.TrimSpace(path)) {
@@ -555,10 +481,6 @@ func normalizeThoughtsRelativePath(path string) string {
 	clean = strings.TrimPrefix(clean, "./")
 	clean = strings.TrimPrefix(clean, "thoughts/")
 	return strings.Trim(clean, "/")
-}
-
-func pathJoinSlash(elem ...string) string {
-	return filepath.ToSlash(filepath.Join(elem...))
 }
 
 func skipWorkspaceDocTreeEntry(name string, isDir bool) bool {
@@ -612,10 +534,6 @@ func displayDocumentName(name string) string {
 	default:
 		return name
 	}
-}
-
-func isWorkspaceDocTreeFile(name string) bool {
-	return isThoughtsRenderableFile(name)
 }
 
 func (s *Service) buildTree(relDir, activePath string) []FileTreeNode {

@@ -52,7 +52,7 @@ func TestBuildThoughtsDocumentCarriesDocumentModel(t *testing.T) {
 		t.Fatalf("document did not carry comment UI/session: %+v", doc)
 	}
 	var rendered bytes.Buffer
-	if err := DocumentSurface(doc, nil).Render(t.Context(), &rendered); err != nil {
+	if err := DocumentSurface(doc).Render(t.Context(), &rendered); err != nil {
 		t.Fatal(err)
 	}
 	for _, want := range []string{
@@ -75,7 +75,7 @@ func TestDocumentSurfaceRendersRendererComponent(t *testing.T) {
 	}
 
 	var buf bytes.Buffer
-	if err := DocumentSurface(doc, nil).Render(t.Context(), &buf); err != nil {
+	if err := DocumentSurface(doc).Render(t.Context(), &buf); err != nil {
 		t.Fatal(err)
 	}
 	if !strings.Contains(buf.String(), `id="csv-doc"`) {
@@ -125,7 +125,7 @@ func TestDocumentSurfaceMarkdownMatchesChatBubblePadding(t *testing.T) {
 		Component:     templ.Raw(`<article>body</article>`),
 	}
 	var buf bytes.Buffer
-	if err := DocumentSurface(doc, nil).Render(t.Context(), &buf); err != nil {
+	if err := DocumentSurface(doc).Render(t.Context(), &buf); err != nil {
 		t.Fatal(err)
 	}
 	html := buf.String()
@@ -149,7 +149,7 @@ func TestDocumentSurfaceRendersHTMLAppletEdgeToEdge(t *testing.T) {
 	}
 
 	var buf bytes.Buffer
-	if err := DocumentSurface(doc, nil).Render(t.Context(), &buf); err != nil {
+	if err := DocumentSurface(doc).Render(t.Context(), &buf); err != nil {
 		t.Fatal(err)
 	}
 	html := buf.String()
@@ -174,7 +174,7 @@ func TestDocumentSurfaceRendersSourceEdgeToEdge(t *testing.T) {
 	}
 
 	var buf bytes.Buffer
-	if err := DocumentSurface(doc, nil).Render(t.Context(), &buf); err != nil {
+	if err := DocumentSurface(doc).Render(t.Context(), &buf); err != nil {
 		t.Fatal(err)
 	}
 	html := buf.String()
@@ -253,7 +253,7 @@ func TestDocumentSurfaceRendersSourceSelectionOnlyWithoutCommentTarget(t *testin
 	}
 
 	var buf bytes.Buffer
-	if err := DocumentSurface(doc, nil).Render(t.Context(), &buf); err != nil {
+	if err := DocumentSurface(doc).Render(t.Context(), &buf); err != nil {
 		t.Fatal(err)
 	}
 	html := buf.String()
@@ -305,7 +305,7 @@ func TestDocumentSurfaceRendersSharedChromeWithoutDuplicateActions(t *testing.T)
 	}
 
 	var buf bytes.Buffer
-	if err := DocumentSurface(doc, nil).Render(t.Context(), &buf); err != nil {
+	if err := DocumentSurface(doc).Render(t.Context(), &buf); err != nil {
 		t.Fatalf("Render() error = %v", err)
 	}
 	html := buf.String()
@@ -344,6 +344,51 @@ func TestDocumentSurfaceRendersSharedChromeWithoutDuplicateActions(t *testing.T)
 				unwanted,
 				html,
 			)
+		}
+	}
+}
+
+func TestDocumentSurfaceKeepsQRSPIChromeWithoutWorkspaceDocTree(t *testing.T) {
+	doc := WorkbenchDocument{
+		Path:          "thoughts/owner/plans/demo/design.md",
+		PageSessionID: "page-1",
+		QRSPIMetadata: QRSPIMetadata{
+			Present:   true,
+			PlanTitle: "Demo plan",
+			Ticket:    "AI-470",
+			Nav: []QRSPINavItem{{
+				Label:   "Design",
+				Href:    "/thoughts/owner/plans/demo/design.md",
+				Current: true,
+			}},
+		},
+	}
+
+	var buf bytes.Buffer
+	if err := DocumentSurface(doc).Render(t.Context(), &buf); err != nil {
+		t.Fatalf("Render() error = %v", err)
+	}
+	html := buf.String()
+	for _, want := range []string{
+		"Demo plan",
+		"AI-470",
+		"Design",
+		`aria-label="QRSPI flow"`,
+	} {
+		if !strings.Contains(html, want) {
+			t.Fatalf("QRSPI chrome missing %q in %s", want, html)
+		}
+	}
+	for _, unwanted := range []string{
+		"Related docs",
+		"Hide docs",
+		`id="workspace-doc-tree-header"`,
+		"workspaceDocTreeNode_",
+		"No workspace document tree available.",
+		"qrspiArtifactExpanded",
+	} {
+		if strings.Contains(html, unwanted) {
+			t.Fatalf("QRSPI chrome kept workspace tree %q in %s", unwanted, html)
 		}
 	}
 }

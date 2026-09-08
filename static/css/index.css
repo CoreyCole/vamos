@@ -586,6 +586,12 @@ html[data-wb2-vt-nav="thread-switch"] #workbench-v2-chat {
   view-transition-name: thread-artifact-browser;
   view-transition-class: workbench-chrome;
 }
+/* Closed Files: hide before Datastar hydrates, and unname so sibling GETs do not
+   snapshot the listing (hidden named chrome still flashes; same lesson as mobile-tabs). */
+#thread-artifact-pane[data-artifact-browser-open="0"] #thread-artifact-browser {
+  display: none;
+  view-transition-name: none;
+}
 #thread-artifact-document {
   position: relative;
   view-transition-name: thread-artifact-document;

@@ -23,31 +23,6 @@ templ WorkspaceDocTree(args WorkspaceDocTreeArgs) {
 	</section>
 }
 
-templ WorkspaceDocTreeHeader(args WorkspaceDocTreeHeaderModel) {
-	{{ targetID := args.TargetID }}
-	if targetID == "" {
-		{{ targetID = "workspace-doc-tree-header" }}
-	}
-	<div id={ targetID } class="min-w-0 flex-1" data-signals={ "{workspaceDocTreeOpen: " + sidebarBool(args.InitialOpen) + "}" }>
-		<button type="button" class="flex items-center gap-2 rounded-md px-2 py-1 text-left text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground" data-on:click="$workspaceDocTreeOpen = !$workspaceDocTreeOpen" data-attr:aria-expanded="$workspaceDocTreeOpen ? 'true' : 'false'">
-			<span data-show="!$workspaceDocTreeOpen">▸</span>
-			<span data-show="$workspaceDocTreeOpen">▾</span>
-			<span class="truncate">{ args.RootLabel }</span>
-		</button>
-		<div data-show="$workspaceDocTreeOpen" class="mt-2 max-h-72 overflow-y-auto rounded-md border border-border bg-card p-2 shadow-sm">
-			if len(args.Nodes) == 0 {
-				<p class="px-2 py-1 text-xs text-muted-foreground">{ args.EmptyLabel }</p>
-			} else {
-				<div class="space-y-0.5">
-					for _, node := range args.Nodes {
-						@WorkspaceDocTreeNode(DocEntryModeThoughts, node)
-					}
-				</div>
-			}
-		</div>
-	</div>
-}
-
 templ WorkspaceDocTreeNode(mode DocEntryMode, node WorkspaceDocNode) {
 	{{ openSignal := WorkspaceDocNodeToggleSignal(node) }}
 	<div class="space-y-0.5" data-signals={ "{" + openSignal + ": " + sidebarBool(node.IsExpanded) + "}" }>

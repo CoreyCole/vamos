@@ -150,6 +150,7 @@ func TestThreadArtifactPaneScopesStaticHandlersToBrowserRows(t *testing.T) {
 		`href="/thoughts/fullscreen.md"`,
 		`_artifactBrowserOpen: true`,
 		`$_artifactBrowserOpen || $dirSearch`,
+		`data-attr:data-artifact-browser-open="($_artifactBrowserOpen || $dirSearch !== '') ? '1' : '0'"`,
 		`aria-controls="thread-artifact-browser"`,
 		`id="thread-artifact-path-header"`,
 		`aria-label="Toggle files"`,
@@ -240,6 +241,9 @@ func TestThreadArtifactBrowserSearchLivesInPathHeader(t *testing.T) {
 		t.Fatal(err)
 	}
 	html := body.String()
+	if !strings.Contains(html, `data-artifact-browser-open="0"`) {
+		t.Fatalf("closed files pane must SSR data-artifact-browser-open=0: %s", html)
+	}
 	header := artifactPathHeader(t, html)
 	for _, want := range []string{
 		`data-testid="artifact-browser-search"`,

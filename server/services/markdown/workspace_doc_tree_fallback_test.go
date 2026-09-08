@@ -5,60 +5,6 @@ import (
 	"testing"
 )
 
-func TestBuildWorkspaceDocTreeFromRootUsesFilesystemFallback(t *testing.T) {
-	t.Parallel()
-
-	root := t.TempDir()
-	planRoot := filepath.Join(root, "creative-mode-agent", "plans", "demo")
-	mustMkdirAll(t, planRoot)
-	mustWriteFile(t, filepath.Join(planRoot, "AGENTS.md"), []byte("# Plan"))
-	mustWriteFile(t, filepath.Join(planRoot, "outline.md"), []byte("# Outline"))
-	mustWriteFile(t, filepath.Join(planRoot, "plan.md"), []byte("# Implementation"))
-	mustWriteFile(t, filepath.Join(planRoot, "notes.txt"), []byte("include"))
-	mustWriteFile(t, filepath.Join(planRoot, "data.csv"), []byte("a,b\n1,2"))
-	mustWriteFile(t, filepath.Join(planRoot, "data.tsv"), []byte("a\tb\n1\t2"))
-	mustWriteFile(t, filepath.Join(planRoot, "demo.html"), []byte("<h1>Demo</h1>"))
-	mustWriteFile(t, filepath.Join(planRoot, "legacy.htm"), []byte("<h1>Legacy</h1>"))
-	mustWriteFile(t, filepath.Join(planRoot, "image.png"), []byte("skip"))
-	mustMkdirAll(t, filepath.Join(planRoot, "context"))
-	mustWriteFile(t, filepath.Join(planRoot, "context", "design.md"), []byte("# Design"))
-
-	service, err := NewService(root, nil, nil)
-	if err != nil {
-		t.Fatalf("NewService error = %v", err)
-	}
-	nodes, err := service.BuildWorkspaceDocTreeFromRoot(
-		"creative-mode-agent/plans/demo",
-		"creative-mode-agent/plans/demo/plan.md",
-	)
-	if err != nil {
-		t.Fatalf("BuildWorkspaceDocTreeFromRoot error = %v", err)
-	}
-
-	labels := make(map[string]bool)
-	var active bool
-	for _, node := range nodes {
-		labels[node.Label] = true
-		if node.IsActive && node.Path == "creative-mode-agent/plans/demo/plan.md" {
-			active = true
-		}
-		for _, child := range node.Children {
-			labels[child.Label] = true
-		}
-	}
-	for _, want := range []string{"AGENTS.md", "outline.md", "plan.md", "notes.txt", "data.csv", "data.tsv", "demo.html", "legacy.htm", "context"} {
-		if !labels[want] {
-			t.Fatalf("missing label %q in nodes %#v", want, nodes)
-		}
-	}
-	if labels["image.png"] {
-		t.Fatalf("binary file should not be included: %#v", nodes)
-	}
-	if !active {
-		t.Fatalf("current plan.md node was not marked active: %#v", nodes)
-	}
-}
-
 func TestInferWorkspaceRootNearestAgents(t *testing.T) {
 	t.Parallel()
 

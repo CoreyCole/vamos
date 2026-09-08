@@ -78,7 +78,7 @@ func CenterDocPane(args CenterDocPaneArgs) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		if args.WorkspaceDocTree != nil && args.HeaderWorkspaceTree == nil {
+		if args.WorkspaceDocTree != nil {
 			templ_7745c5c3_Err = WorkspaceDocTree(*args.WorkspaceDocTree).Render(ctx, templ_7745c5c3_Buffer)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err

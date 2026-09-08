@@ -238,7 +238,7 @@ templ WorkspaceDocContent(state DocPaneState) {
 		@DocScrollControls()
 		<div id="agent-chat-doc-scroll-region" class="h-full min-w-0 overflow-y-auto overflow-x-hidden">
 			if doc, ok := BuildDocDocument(state); ok {
-				@markdown.DocumentSurface(doc, nil)
+				@markdown.DocumentSurface(doc)
 			} else {
 				<div class="p-4">
 					<p class="text-xs text-muted-foreground">Select an doc file to render it here.</p>

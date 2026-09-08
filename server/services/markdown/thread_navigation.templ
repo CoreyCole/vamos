@@ -7,7 +7,7 @@ templ ThreadArtifactPane(browser ThreadArtifactBrowserArgs, document templ.Compo
 		data-signals={ "{_threadArtifactLoading: false, _artifactBrowserOpen: " + boolString(browser.BrowserOpen) + ", dirSearch: '', _dirSearchOpen: false}" }
 		data-on:keydown__window={ artifactBrowserSearchHotkeyAction() }
 		data-attr:aria-busy="$_threadArtifactLoading ? 'true' : 'false'"
-		data-attr:data-artifact-browser-open="$_artifactBrowserOpen ? '1' : '0'"
+		data-attr:data-artifact-browser-open="($_artifactBrowserOpen || $dirSearch !== '') ? '1' : '0'"
 		if browser.BrowserOpen {
 			data-artifact-browser-open="1"
 		} else {

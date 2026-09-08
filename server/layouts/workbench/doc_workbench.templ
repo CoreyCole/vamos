@@ -18,7 +18,7 @@ templ CenterDocPane(args CenterDocPaneArgs) {
 				</div>
 			</div>
 		</div>
-		if args.WorkspaceDocTree != nil && args.HeaderWorkspaceTree == nil {
+		if args.WorkspaceDocTree != nil {
 			@WorkspaceDocTree(*args.WorkspaceDocTree)
 		}
 		<div id="doc-workbench-viewer-region" class="min-h-0 flex-1 overflow-hidden" style={ "view-transition-name: " + ViewTransitionName("doc", "viewer") }>

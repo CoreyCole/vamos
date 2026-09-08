@@ -58,11 +58,10 @@ type WorkbenchDocContext struct {
 }
 
 type CenterDocPaneArgs struct {
-	Title               string
-	Document            templ.Component
-	WorkspaceDocTree    *WorkspaceDocTreeArgs
-	HeaderWorkspaceTree *WorkspaceDocTreeHeaderModel
-	Actions             templ.Component
+	Title            string
+	Document         templ.Component
+	WorkspaceDocTree *WorkspaceDocTreeArgs
+	Actions          templ.Component
 }
 
 type RightRailArgs struct {

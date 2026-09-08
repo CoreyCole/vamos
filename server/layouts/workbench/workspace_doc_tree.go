@@ -22,15 +22,6 @@ type WorkspaceDocTreeArgs struct {
 	EmptyMessage string
 }
 
-type WorkspaceDocTreeHeaderModel struct {
-	RootLabel   string
-	CurrentPath string
-	Nodes       []WorkspaceDocNode
-	EmptyLabel  string
-	InitialOpen bool
-	TargetID    string
-}
-
 type WorkspaceDocNode struct {
 	Path       string
 	RelPath    string

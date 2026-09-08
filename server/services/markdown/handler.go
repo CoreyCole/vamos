@@ -442,26 +442,13 @@ func (s *Service) buildThoughtsV2WorkbenchState(
 	c echo.Context,
 	pageArgs *PageArgs,
 ) (workbench.WorkbenchState, error) {
-	headerWorkspaceTree, hasHeaderWorkspaceTree, err := s.buildHeaderWorkspaceDocTree(
-		c,
-		pageArgs,
-	)
-	if err != nil {
-		return workbench.WorkbenchState{}, err
-	}
 	viewport := viewportClassForRequest(c)
 	canonical, err := CanonicalThoughtsDocPath(pageArgs.FilePath)
 	if err != nil {
 		return workbench.WorkbenchState{}, err
 	}
 	chatHref := planLeadChatHref(pageArgs.FilePath)
-	panelArgs := BuildDocumentPanelArgs(
-		pageArgs,
-		optionalHeaderWorkspaceTree(
-			headerWorkspaceTree,
-			hasHeaderWorkspaceTree,
-		),
-	)
+	panelArgs := BuildDocumentPanelArgs(pageArgs)
 	panelArgs.Document.WorkbenchActions = nil
 	artifact, err := s.thoughtsArtifactPane(
 		c,
@@ -611,128 +598,6 @@ func (s *Service) buildHermesThreadsComponent(
 	)
 }
 
-func (s *Service) buildHeaderWorkspaceDocTree(
-	c echo.Context,
-	pageArgs *PageArgs,
-) (workbench.WorkspaceDocTreeHeaderModel, bool, error) {
-	workspaceCtx := pageArgs.WorkspaceContext
-	if workspaceCtx.RootDocPath == "" {
-		if root, ok := InferWorkspaceRoot(s.basePath, pageArgs.FilePath); ok {
-			workspaceCtx.RootDocPath = root
-		}
-	}
-	if workspaceCtx.WorkspaceID == "" && workspaceCtx.RootDocPath == "" {
-		return workbench.WorkspaceDocTreeHeaderModel{}, false, nil
-	}
-
-	nodes, err := s.headerWorkspaceDocTreeNodes(c, pageArgs)
-	if err != nil {
-		return workbench.WorkspaceDocTreeHeaderModel{}, false, err
-	}
-
-	rootLabel := workspaceDocRootLabel(workspaceCtx.RootDocPath)
-	if rootLabel == "" {
-		rootLabel = "Workspace docs"
-	}
-	return workbench.WorkspaceDocTreeHeaderModel{
-		RootLabel:   rootLabel,
-		CurrentPath: pageArgs.FilePath,
-		Nodes:       nodes,
-		EmptyLabel:  "Workspace docs will appear after the workspace sync runs.",
-		TargetID:    "workspace-doc-tree-header",
-	}, true, nil
-}
-
-func (s *Service) headerWorkspaceDocTreeNodes(
-	c echo.Context,
-	pageArgs *PageArgs,
-) ([]workbench.WorkspaceDocNode, error) {
-	workspaceCtx := pageArgs.WorkspaceContext
-	root := workspaceCtx.RootDocPath
-	if root == "" {
-		if inferred, ok := InferWorkspaceRoot(s.basePath, pageArgs.FilePath); ok {
-			root = inferred
-		}
-	}
-	if root != "" {
-		nodes, err := s.BuildWorkspaceDocTreeFromRoot(root, pageArgs.FilePath)
-		if err != nil {
-			return nil, err
-		}
-		return decorateWorkspaceDocNodeHrefs(nodes, pageArgs.WorkbenchLinkState), nil
-	}
-	return s.workspaceDocTreeNodesFromIndex(c, pageArgs)
-}
-
-func decorateWorkspaceDocNodeHrefs(
-	nodes []workbench.WorkspaceDocNode,
-	state ThoughtsWorkbenchLinkState,
-) []workbench.WorkspaceDocNode {
-	for i := range nodes {
-		if nodes[i].Kind == workbench.WorkspaceDocKindFile {
-			if strings.TrimSpace(nodes[i].Href) == "" {
-				nodes[i].Href = workbench.WorkspaceDocNodeHref(
-					workbench.DocEntryModeThoughts,
-					nodes[i].Path,
-				)
-			}
-			nodes[i].Href = state.Preserve(nodes[i].Href)
-		}
-		nodes[i].Children = decorateWorkspaceDocNodeHrefs(nodes[i].Children, state)
-	}
-	return nodes
-}
-
-func (s *Service) workspaceDocTreeNodesFromIndex(
-	c echo.Context,
-	pageArgs *PageArgs,
-) ([]workbench.WorkspaceDocNode, error) {
-	workspaceCtx := pageArgs.WorkspaceContext
-	resolver, ok := s.workspaceResolver.(WorkspaceDocTreeResolver)
-	if !ok || workspaceCtx.WorkspaceID == "" {
-		return nil, nil
-	}
-	rows, err := resolver.ListWorkspaceDocs(
-		c.Request().Context(),
-		workspaceCtx.WorkspaceID,
-	)
-	if err != nil {
-		return nil, err
-	}
-	if len(rows) == 0 {
-		return nil, nil
-	}
-	tree := BuildWorkspaceDocTreeArgs(
-		workspaceCtx.WorkspaceID,
-		pageArgs.FilePath,
-		workbench.DocEntryModeThoughts,
-		rows,
-		pageArgs.WorkbenchLinkState,
-	)
-	if tree == nil {
-		return nil, nil
-	}
-	return tree.Nodes, nil
-}
-
-func optionalHeaderWorkspaceTree(
-	model workbench.WorkspaceDocTreeHeaderModel,
-	ok bool,
-) *workbench.WorkspaceDocTreeHeaderModel {
-	if !ok {
-		return nil
-	}
-	return &model
-}
-
-func workspaceDocRootLabel(rootDocPath string) string {
-	trimmed := strings.Trim(strings.TrimSpace(rootDocPath), "/")
-	if trimmed == "" {
-		return ""
-	}
-	return filepath.Base(trimmed)
-}
-
 func (s *Service) buildThoughtsDirectoryWorkbenchState(
 	c echo.Context,
 	args *DirectoryArgs,
@@ -777,15 +642,8 @@ func thoughtsNormalRegions(contextVisible bool) []workbench.RegionNormalState {
 	}
 }
 
-func BuildDocumentPanelArgs(
-	pageArgs *PageArgs,
-	workspaceTree ...*workbench.WorkspaceDocTreeHeaderModel,
-) DocumentPanelArgs {
-	args := DocumentPanelArgs{Document: BuildThoughtsDocument(pageArgs)}
-	if len(workspaceTree) > 0 {
-		args.WorkspaceTree = workspaceTree[0]
-	}
-	return args
+func BuildDocumentPanelArgs(pageArgs *PageArgs) DocumentPanelArgs {
+	return DocumentPanelArgs{Document: BuildThoughtsDocument(pageArgs)}
 }
 
 func BuildSectionMapArgs(pageArgs *PageArgs) SectionMapArgs {

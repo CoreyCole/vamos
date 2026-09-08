@@ -20,9 +20,8 @@ import (
 // encodePageSignals encodes the initial page signals to JSON
 func encodePageSignals(pageSessionID string) string {
 	signals := map[string]interface{}{
-		"comment_text":          "",
-		"pageSessionId":         pageSessionID,
-		"qrspiArtifactExpanded": false,
+		"comment_text":  "",
+		"pageSessionId": pageSessionID,
 		"comment_selection": map[string]interface{}{
 			"text":        "",
 			"sectionId":   "",
@@ -341,7 +340,7 @@ templ MarkdownWorkbenchPage(args MarkdownWorkbenchArgs) {
 
 templ DocumentPanel(args DocumentPanelArgs) {
 	<div id="thoughts-document-panel" class="h-full min-h-0 overflow-hidden">
-		@DocumentSurface(args.Document, args.WorkspaceTree)
+		@DocumentSurface(args.Document)
 	</div>
 }
 

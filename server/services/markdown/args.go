@@ -84,8 +84,7 @@ type PageArgs struct {
 }
 
 type DocumentPanelArgs struct {
-	Document      WorkbenchDocument
-	WorkspaceTree *workbench.WorkspaceDocTreeHeaderModel
+	Document WorkbenchDocument
 }
 
 type DocumentAction struct {
