@@ -36,6 +36,10 @@ func CommentsCloseCookieJS() string {
 	return commentsOpenCookieWriteJS(false)
 }
 
+func shareChatCommentsRatioJS() string {
+	return `var chat=document.querySelector("[data-workbench-region='workbench-v2-chat']"); var comments=document.querySelector("[data-workbench-region='workbench-v2-comments']"); if (chat && comments) { if ($workbench.regions.workbenchV2Comments.visible) { comments.dataset.workbenchRatio = chat.dataset.workbenchRatio; $workbench.regions.workbenchV2Comments.ratio = $workbench.regions.workbenchV2Chat.ratio } else { chat.dataset.workbenchRatio = comments.dataset.workbenchRatio; $workbench.regions.workbenchV2Chat.ratio = $workbench.regions.workbenchV2Comments.ratio } }`
+}
+
 // CommentsToggleClickAction opens comments and closes chat, or closes comments
 // and restores chat when chatDefaultOpen is true (room pages).
 func CommentsToggleClickAction(chatDefaultOpen bool) string {
@@ -48,5 +52,6 @@ func CommentsToggleClickAction(chatDefaultOpen bool) string {
 		) + "; " + commentsOpenCookieWriteJS(
 		false,
 	) + " }; " +
+		shareChatCommentsRatioJS() + "; " +
 		threadsLayoutReflowJS()
 }

@@ -12,7 +12,7 @@ const (
 	workbenchV2ThreadsMinRem  = 12
 	workbenchV2ChatMinRem     = 18
 	workbenchV2ArtifactMinRem = 20
-	workbenchV2CommentsMinRem = 12
+	workbenchV2CommentsMinRem = workbenchV2ChatMinRem
 )
 
 type WorkbenchV2Args struct {
@@ -62,7 +62,7 @@ func BuildWorkbenchV2State(args WorkbenchV2Args) (WorkbenchState, error) {
 				WorkbenchV2CommentsRegionID,
 				WorkbenchSlotContext,
 				RegionComments,
-				defaultSideRatio,
+				defaultPrimaryRatio,
 				workbenchV2CommentsMinRem,
 				args.CommentsOpen,
 				args.Comments,

@@ -1624,6 +1624,13 @@ func TestWorkbenchV2CommentsSitLeftOfArtifactAndXORChat(t *testing.T) {
 	if state.Regions[3].ID != WorkbenchV2ArtifactRegionID || !state.Regions[3].Visible {
 		t.Fatalf("artifact = %#v", state.Regions[3])
 	}
+	if state.Regions[1].Ratio != state.Regions[2].Ratio {
+		t.Fatalf(
+			"chat ratio %v comments ratio %v, want shared",
+			state.Regions[1].Ratio,
+			state.Regions[2].Ratio,
+		)
+	}
 }
 
 func TestCommentsOpenFromRequestDefaultsClosed(t *testing.T) {
@@ -1808,7 +1815,7 @@ func TestWorkbenchV2RegionsEnforceComposerFriendlyMinRem(t *testing.T) {
 		WorkbenchV2ThreadsRegionID:  12,
 		WorkbenchV2ChatRegionID:     18,
 		WorkbenchV2ArtifactRegionID: 20,
-		WorkbenchV2CommentsRegionID: 12,
+		WorkbenchV2CommentsRegionID: 18,
 	}
 	for _, region := range state.Regions {
 		got := region.MinRem

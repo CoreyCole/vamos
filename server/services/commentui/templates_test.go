@@ -636,6 +636,8 @@ func TestCommentSharedPatchTargetsRenderStableIDs(t *testing.T) {
 		`h-10 min-h-10 max-h-10`,
 		`aria-label="Add comment"`,
 		`/forms/comments/show`,
+		`id="workbench-v2-comments-threads-reopen"`,
+		`aria-label="Show threads sidebar"`,
 	} {
 		if !strings.Contains(panelHTML, want) {
 			t.Fatalf("context panel missing %q: %s", want, panelHTML)

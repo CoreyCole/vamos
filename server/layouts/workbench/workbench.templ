@@ -31,11 +31,11 @@ templ Workbench(state WorkbenchState) {
 
 // ThreadsReopenControl — icon control for the chat header row when left rail is closed.
 // Hard lock: never a band above the chat column / above the 3-col grid.
-templ ThreadsReopenControl(threadsOpen bool) {
-	// Keep a fixed icon slot so #workbench-v2-chat-header height does not jump.
+templ ThreadsReopenControl(threadsOpen bool, controlID string) {
+	// Keep a fixed icon slot so column header height does not jump.
 	// Invisible (not display:none) when left is open; no max-md:hidden.
 	<div
-		id="workbench-v2-threads-reopen"
+		id={ controlID }
 		class={ "workbench-chrome flex h-7 w-7 shrink-0 items-center justify-center", templ.KV("invisible pointer-events-none", threadsOpen) }
 		data-class={ "{'invisible': $workbench.regions.workbenchV2Threads.visible, 'pointer-events-none': $workbench.regions.workbenchV2Threads.visible}" }
 		aria-hidden={ threadsOpenAriaHidden(threadsOpen) }
@@ -61,7 +61,7 @@ templ ThreadsReopenControl(threadsOpen bool) {
 templ ChatColumnWithReopen(threadsOpen bool, title string, chat templ.Component) {
 	<div class="flex h-full min-h-0 flex-col bg-background">
 		<header id="workbench-v2-chat-header" class="flex h-10 min-h-10 max-h-10 shrink-0 items-center gap-2 overflow-hidden border-b border-border px-2.5">
-			@ThreadsReopenControl(threadsOpen)
+			@ThreadsReopenControl(threadsOpen, "workbench-v2-threads-reopen")
 			if title != "" {
 				<span class={ "flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold", ChatHeaderAvatarClass(title) }>{ ChatHeaderInitial(title) }</span>
 			}

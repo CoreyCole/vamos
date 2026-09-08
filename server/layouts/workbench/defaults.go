@@ -102,7 +102,7 @@ func DefaultWorkbenchConfig(
 				ID:      "workbench-v2-comments",
 				Slot:    WorkbenchSlotContext,
 				Kind:    RegionComments,
-				Ratio:   defaultSideRatio,
+				Ratio:   defaultPrimaryRatio,
 				Visible: false,
 			},
 			{

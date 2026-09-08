@@ -65,6 +65,14 @@ func FocusComposerScript() string {
 	return "document.getElementById('" + CommentsComposerTextID + "')?.focus()"
 }
 
+func commentsThreadsShowClick() string {
+	return "$workbench.regions.workbenchV2Threads.visible = true; try { document.cookie = 'wb2_threads_open=1; path=/; SameSite=Lax; Max-Age=31536000'; sessionStorage.setItem('workbench-v2:threads-open', '1') } catch (e) {}; requestAnimationFrame(() => document.getElementById('workbench-root')?.dispatchEvent(new CustomEvent('workbench-layout-reflow')))"
+}
+
+func commentsThreadsReopenClass() string {
+	return "{'invisible': $workbench.regions.workbenchV2Threads.visible, 'pointer-events-none': $workbench.regions.workbenchV2Threads.visible}"
+}
+
 func selectionTriggerSubmitExpr(args SelectionSignalArgs) string {
 	if args.Prefix == "" || args.ShowRoute == "" {
 		return ""
@@ -483,6 +491,11 @@ templ CommentForm(view CommentFormView) {
 templ CommentsContextPanel(args CommentsPanelArgs) {
 	<aside id={ CommentsContextPanelID } class="flex h-full min-h-0 flex-col overflow-hidden bg-background">
 		<div class="flex h-10 min-h-10 max-h-10 shrink-0 items-center gap-2 border-b border-border px-2.5">
+			<div id="workbench-v2-comments-threads-reopen" class="workbench-chrome invisible pointer-events-none flex h-7 w-7 shrink-0 items-center justify-center" data-class={ commentsThreadsReopenClass() } aria-hidden="true">
+				<button type="button" data-workbench-threads-reopen class="inline-flex h-7 w-7 items-center justify-center rounded-md border border-border bg-background text-muted-foreground shadow-sm transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" data-on:click={ commentsThreadsShowClick() } aria-controls="workbench-v2-threads" aria-label="Show threads sidebar" title="Show threads sidebar">
+					<svg class="h-4 w-4" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
+				</button>
+			</div>
 			<p class="min-w-0 flex-1 truncate text-[13px] font-semibold leading-none text-foreground">Comments</p>
 			if args.Form != nil {
 				<button type="button" class="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground" data-on:click={ FocusComposerScript() } aria-label="Add comment" title="Add comment">
