@@ -7,6 +7,7 @@ import (
 	"unicode"
 
 	"github.com/CoreyCole/vamos/pkg/agents/conversation"
+	"github.com/CoreyCole/vamos/server/services/markdown"
 )
 
 const (
@@ -41,7 +42,22 @@ func transcriptArtifactHref(raw string) string {
 	if strings.HasPrefix(cleaned, "../") || cleaned == ".." || cleaned == "." {
 		return ""
 	}
+	if schemeAt := strings.Index(cleaned, ":"); schemeAt >= 0 && !strings.Contains(cleaned[:schemeAt], "/") {
+		return ""
+	}
 	return cleaned
+}
+
+func transcriptThoughtsBrowserHref(raw string) string {
+	cleaned := transcriptArtifactHref(raw)
+	if cleaned == "" || !strings.HasPrefix(cleaned, "thoughts/") {
+		return ""
+	}
+	href := markdown.ThoughtsDocURL(cleaned, "")
+	if href == "" || href == "/thoughts/" {
+		return ""
+	}
+	return href
 }
 
 func roomCutHandoffHref(timestamp, handoffPath string) string {

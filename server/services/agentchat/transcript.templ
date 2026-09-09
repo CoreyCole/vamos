@@ -54,6 +54,8 @@ templ TranscriptMessageWithFork(threadID string, msg TranscriptMessage, forkActi
 }
 
 templ TranscriptDetailCard(msg TranscriptMessage) {
+	{{ headerHref := transcriptThoughtsBrowserHref(msg.HeaderHref) }}
+	{{ secondaryHref := transcriptThoughtsBrowserHref(msg.SecondaryHref) }}
 	<div class={ "min-w-0 overflow-x-hidden border-b first:border-t last:border-b-0", templ.KV("border-destructive/40 bg-destructive/5", msg.IsError), templ.KV("border-border", !msg.IsError) }>
 		<div
 			id={ "msg-" + msg.DOMID }
@@ -63,13 +65,15 @@ templ TranscriptDetailCard(msg TranscriptMessage) {
 			<div class="flex items-center justify-between gap-3 px-4 pb-1 pt-2">
 				<div class="flex min-w-0 flex-1 items-center gap-2">
 					<p class="shrink-0 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{ msg.Title }</p>
-					if msg.HeaderHref != "" {
-						<a href={ msg.HeaderHref } class="min-w-0 truncate text-[11px] text-primary underline">{ headerLinkLabel(msg) }</a>
-					} else if msg.HeaderCode != "" {
-						<code class="min-w-0 truncate rounded bg-muted px-1.5 py-0.5 text-[11px] text-foreground">{ msg.HeaderCode }</code>
+					if headerHref != "" {
+						<a href={ templ.URL(headerHref) } class="min-w-0 truncate text-[11px] text-primary underline">{ headerLinkLabel(msg) }</a>
+					} else if headerLinkLabel(msg) != "" {
+						<code class="min-w-0 truncate rounded bg-muted px-1.5 py-0.5 text-[11px] text-foreground">{ headerLinkLabel(msg) }</code>
 					}
-					if msg.SecondaryHref != "" {
-						<a href={ msg.SecondaryHref } class="min-w-0 truncate text-[11px] text-muted-foreground underline">{ secondaryLinkLabel(msg) }</a>
+					if secondaryHref != "" {
+						<a href={ templ.URL(secondaryHref) } class="min-w-0 truncate text-[11px] text-muted-foreground underline">{ secondaryLinkLabel(msg) }</a>
+					} else if secondaryLinkLabel(msg) != "" {
+						<code class="min-w-0 truncate rounded bg-muted px-1.5 py-0.5 text-[11px] text-foreground">{ secondaryLinkLabel(msg) }</code>
 					}
 					if msg.HeaderSummary != "" {
 						<p class="min-w-0 flex-1 truncate text-[11px] text-muted-foreground">{ msg.HeaderSummary }</p>

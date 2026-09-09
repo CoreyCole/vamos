@@ -46,6 +46,14 @@ func TestDecodePersistedTranscriptItems_HandoffIsDetailCut(t *testing.T) {
 	if !strings.Contains(out, wantHref) {
 		t.Fatalf("rendered handoff missing href %q; html = %s", wantHref, out)
 	}
+	wantBrowser := `/thoughts/agents/bot/sessions/handoffs/2026-09-09_16-04-47.md`
+	if !strings.Contains(out, `href="`+wantBrowser+`"`) {
+		t.Fatalf("rendered handoff missing rooted href %q; html = %s", wantBrowser, out)
+	}
+	wantHistBrowser := `/thoughts/agents/bot/sessions/history/2026-09-09_16-04-47.jsonl`
+	if !strings.Contains(out, `href="`+wantHistBrowser+`"`) {
+		t.Fatalf("rendered handoff missing history href %q; html = %s", wantHistBrowser, out)
+	}
 }
 
 func TestDecodePersistedTranscriptItems_CompactionIsCutCard(t *testing.T) {
@@ -166,6 +174,23 @@ func TestTranscriptArtifactHrefRejectsAbsolute(t *testing.T) {
 	}
 	if got := transcriptArtifactHref("https://example.invalid/x"); got != "" {
 		t.Fatalf("url leaked: %q", got)
+	}
+	if got := transcriptArtifactHref("javascript:alert(1)"); got != "" {
+		t.Fatalf("javascript href leaked: %q", got)
+	}
+}
+
+func TestTranscriptThoughtsBrowserHrefRootsThoughtsPath(t *testing.T) {
+	t.Parallel()
+	got := transcriptThoughtsBrowserHref(
+		"thoughts/agents/bot/sessions/handoffs/2026-09-09_16-04-47.md",
+	)
+	want := "/thoughts/agents/bot/sessions/handoffs/2026-09-09_16-04-47.md"
+	if got != want {
+		t.Fatalf("transcriptThoughtsBrowserHref() = %q, want %q", got, want)
+	}
+	if got := transcriptThoughtsBrowserHref("handoffs/2026-09-09_16-04-47.md"); got != "" {
+		t.Fatalf("bare handoffs path became URL %q", got)
 	}
 }
 
