@@ -246,15 +246,25 @@ func SharedThreadChat(args EmbeddedFreeformPanelArgs) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 20, "</div><div class=\"shrink-0 px-3 py-3\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 20, "</div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = AgentChatComposer(AgentChatComposerArgs{Action: args.ComposerAction, ThreadID: args.ThreadID, RunID: args.RunID, Cwd: args.Cwd, ModeLabel: embeddedFreeformModeLabel(args.ThreadMetadata), Placeholder: sharedThreadComposerPlaceholder(args), HasThread: args.HasThread, IncludeCwd: !args.HasThread, ThreadMetadata: args.ThreadMetadata, InitialDraft: args.InitialDraft, DraftSaveAction: args.DraftSaveAction}).Render(ctx, templ_7745c5c3_Buffer)
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
+		if !args.ComposerDisabled {
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 21, "<div class=\"shrink-0 px-3 py-3\">")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = AgentChatComposer(AgentChatComposerArgs{Action: args.ComposerAction, ThreadID: args.ThreadID, RunID: args.RunID, Cwd: args.Cwd, ModeLabel: embeddedFreeformModeLabel(args.ThreadMetadata), Placeholder: sharedThreadComposerPlaceholder(args), HasThread: args.HasThread, IncludeCwd: !args.HasThread, ThreadMetadata: args.ThreadMetadata, InitialDraft: args.InitialDraft, DraftSaveAction: args.DraftSaveAction}).Render(ctx, templ_7745c5c3_Buffer)
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 22, "</div>")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 21, "</div></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 23, "</div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

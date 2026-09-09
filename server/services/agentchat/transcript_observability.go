@@ -2,6 +2,7 @@ package agentchat
 
 import (
 	"encoding/json"
+	"fmt"
 	"path"
 	"strings"
 	"unicode"
@@ -14,6 +15,32 @@ const (
 	inboundA2AAvatarBg  = "bg-sky-700"
 	inboundA2ANameColor = "text-sky-300"
 )
+
+func pairwiseA2AHref(a, b string) string {
+	a = strings.TrimSpace(a)
+	b = strings.TrimSpace(b)
+	if a == "" || b == "" {
+		return ""
+	}
+	if a > b {
+		a, b = b, a
+	}
+	return "/rooms/a2a/" + a + "/" + b
+}
+
+func botDMChipID(chip BotDMChip) string {
+	id := strings.TrimSpace(chip.OriginTurnID)
+	if id == "" {
+		id = "unknown"
+	}
+	return "bot-dm-chip-" + id
+}
+
+func botDMChipLabel(chip BotDMChip) string {
+	n := chip.MessageCount
+	m := len(chip.Bots)
+	return fmt.Sprintf("%d messages with %d bots", n, m)
+}
 
 func headerLinkLabel(msg TranscriptMessage) string {
 	if strings.TrimSpace(msg.HeaderCode) != "" {
@@ -42,7 +69,11 @@ func transcriptArtifactHref(raw string) string {
 	if strings.HasPrefix(cleaned, "../") || cleaned == ".." || cleaned == "." {
 		return ""
 	}
-	if schemeAt := strings.Index(cleaned, ":"); schemeAt >= 0 && !strings.Contains(cleaned[:schemeAt], "/") {
+	if schemeAt := strings.Index(
+		cleaned,
+		":",
+	); schemeAt >= 0 &&
+		!strings.Contains(cleaned[:schemeAt], "/") {
 		return ""
 	}
 	return cleaned

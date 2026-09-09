@@ -129,6 +129,24 @@ type TranscriptMessage struct {
 	QuoteAvatarBg  string
 	QuoteNameColor string
 	QuoteText      string
+	BotDMChip      *BotDMChip
+}
+
+// BotDMChip is Grok-style group-room chrome for message_room traffic.
+// N/M may be fixture constants until TODO-6.2 derives live counts.
+type BotDMChip struct {
+	OriginTurnID string
+	SpeakerSlug  string
+	MessageCount int
+	Bots         []BotDMChipPeer
+}
+
+type BotDMChipPeer struct {
+	Name          string
+	Slug          string
+	AuthorInitial string
+	AvatarBg      string
+	Count         int
 }
 
 type SessionThreadSource string

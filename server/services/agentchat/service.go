@@ -4888,6 +4888,9 @@ func (s *Service) compactToolCallPresentation(
 			parts = append(parts, "task: "+task)
 		}
 		return title, "", strings.Join(parts, " · "), true
+	case "message_room":
+		to := extractArgumentString(arguments, "to")
+		return title, to, "", true
 	default:
 		return title, "", "", false
 	}

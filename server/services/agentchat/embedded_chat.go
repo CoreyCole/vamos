@@ -67,17 +67,18 @@ type EmbeddedChatPatchInput struct {
 }
 
 type EmbeddedFreeformPanelArgs struct {
-	ThreadID        string
-	RunID           string
-	Transcript      TranscriptPaneState
-	HasThread       bool
-	StreamURL       string
-	ComposerAction  string
-	Cwd             string
-	Placeholder     string
-	ThreadMetadata  ThreadMetadataView
-	InitialDraft    string
-	DraftSaveAction string
+	ThreadID         string
+	RunID            string
+	Transcript       TranscriptPaneState
+	HasThread        bool
+	StreamURL        string
+	ComposerAction   string
+	Cwd              string
+	Placeholder      string
+	ThreadMetadata   ThreadMetadataView
+	InitialDraft     string
+	DraftSaveAction  string
+	ComposerDisabled bool
 }
 
 func ParseEmbeddedChatURL(c echo.Context) EmbeddedChatURLState {

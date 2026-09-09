@@ -9,6 +9,8 @@ import (
 	"testing"
 
 	"github.com/labstack/echo/v4"
+
+	"github.com/CoreyCole/vamos/server/services/agenthome"
 )
 
 func TestServeAI470RoomUsesArtifactPathForPlanChat(t *testing.T) {
@@ -109,5 +111,22 @@ func TestServeAI470RoomEnsuresPlanThreadWhenMissing(t *testing.T) {
 	}
 	if strings.Contains(body, "Select a thread to view an artifact.") {
 		t.Fatalf("blank artifact pane: %s", body)
+	}
+}
+
+func TestAI470RoomComposerDisabledDoesNotTreatKindAgentDMAsPairwise(t *testing.T) {
+	t.Parallel()
+	if AI470RoomComposerDisabled(agenthome.KindAgentDM, "pair") {
+		t.Fatal("KindAgentDM must not disable composer as pairwise")
+	}
+	for _, kind := range []agenthome.RoomKind{
+		agenthome.KindDM, agenthome.KindGroup, agenthome.KindPlan,
+	} {
+		if AI470RoomComposerDisabled(kind, "bot") {
+			t.Fatalf("kind %s unexpectedly disables composer", kind)
+		}
+	}
+	if !AI470PairwiseComposerDisabled() {
+		t.Fatal("pairwise rooms must disable composer")
 	}
 }

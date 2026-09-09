@@ -246,6 +246,24 @@ func (s *Service) renderAI470SharedChat(
 	return s.workbenchThreadsRenderer.RenderSharedThreadChat(ctx, threadID, userEmail)
 }
 
+// AI470RoomComposerDisabled is the view-only composer gate.
+// Pairwise /rooms/a2a/{a}/{b} (TODO-3.2) has no send form. Do not treat
+// leftover KindAgentDM as pairwise.
+func AI470RoomComposerDisabled(kind agenthome.RoomKind, id string) bool {
+	_ = id
+	switch kind {
+	case agenthome.KindDM, agenthome.KindGroup, agenthome.KindPlan, agenthome.KindAgentDM:
+		return false
+	default:
+		return false
+	}
+}
+
+// AI470PairwiseComposerDisabled is the template flag for two-slug pairwise rooms.
+func AI470PairwiseComposerDisabled() bool {
+	return true
+}
+
 func ai470RoomTitle(kind agenthome.RoomKind, id string) string {
 	switch {
 	case kind == agenthome.KindDM && id == "bot":

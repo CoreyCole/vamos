@@ -62,6 +62,8 @@ func (s *Service) renderSharedThreadChat(
 	case "group":
 		stable = append(stable, s.groupBubbleFixtureMessages()...)
 		stable = append(stable, s.chromaHighlightFixtureMessage())
+	case "pairwise":
+		stable = append(stable, s.chromaHighlightFixtureMessage())
 	}
 	live, cursor := s.buildLiveTranscript(thread.ID)
 	args := EmbeddedFreeformPanelArgs{
@@ -87,8 +89,41 @@ func (s *Service) renderSharedThreadChat(
 		DraftSaveAction: "@post('/agent-chat/thread/" + url.PathEscape(
 			thread.ID,
 		) + "/draft', {filterSignals: {include: /^chatDraft$/}})",
+		ComposerDisabled: fixtureMode == "pairwise",
 	}
 	return SharedThreadChat(args), nil
+}
+
+// RenderSharedThreadChatWithPairwiseFixture is view-only pairwise chrome (no composer).
+func (s *Service) RenderSharedThreadChatWithPairwiseFixture(
+	ctx context.Context,
+	threadID, userEmail string,
+) (templ.Component, error) {
+	return s.renderSharedThreadChat(ctx, threadID, userEmail, "pairwise")
+}
+
+func groupBotDMChipFixture(originTurnID string) *BotDMChip {
+	return &BotDMChip{
+		OriginTurnID: originTurnID,
+		SpeakerSlug:  "lead",
+		MessageCount: 3,
+		Bots: []BotDMChipPeer{
+			{
+				Name:          "Infra Engineer",
+				Slug:          "infra",
+				AuthorInitial: "I",
+				AvatarBg:      "bg-teal-600",
+				Count:         2,
+			},
+			{
+				Name:          "Research",
+				Slug:          "research",
+				AuthorInitial: "R",
+				AvatarBg:      "bg-violet-600",
+				Count:         1,
+			},
+		},
+	}
 }
 
 func leftoverComposerPlaceholder(fixtureMode string) string {
@@ -140,6 +175,7 @@ func (s *Service) groupBubbleFixtureMessages() []TranscriptMessage {
 	lead.QuoteAvatarBg = "bg-teal-600"
 	lead.QuoteNameColor = "text-teal-300"
 	lead.QuoteText = "Host slug ai470-leftover-converge is up; rebuild after tip."
+	lead.BotDMChip = groupBotDMChipFixture(groupQuoteFixtureDOMID)
 
 	user := s.newBubbleTranscriptMessage(
 		"ai470-group-user-fixture",

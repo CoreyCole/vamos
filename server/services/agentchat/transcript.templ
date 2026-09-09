@@ -1,6 +1,9 @@
 package agentchat
 
-import "strconv"
+import (
+	"github.com/CoreyCole/vamos/pkg/datastarui/components/dropdown"
+	"strconv"
+)
 
 templ MessagesPane(threadID string, state TranscriptPaneState, hasThread bool, forkAction string, inFlowComposer bool) {
 	<div
@@ -49,6 +52,9 @@ templ TranscriptMessageWithFork(threadID string, msg TranscriptMessage, forkActi
 		<div class="relative min-w-0 overflow-x-hidden px-2.5 py-1">
 			@TranscriptForkControl(threadID, msg, forkAction)
 			@ChatMessage(chatMessageArgsFromTranscript(msg))
+			if msg.BotDMChip != nil && len(msg.BotDMChip.Bots) > 0 {
+				@BotDMChipPopover(*msg.BotDMChip)
+			}
 		</div>
 	}
 }
@@ -301,4 +307,27 @@ templ TranscriptForkControl(threadID string, msg TranscriptMessage, forkAction s
 			</div>
 		</details>
 	}
+}
+
+templ BotDMChipPopover(chip BotDMChip) {
+	{{ chipID := botDMChipID(chip) }}
+	<div class="mt-1 pl-9" id={ chipID }>
+		@dropdown.DropdownMenu(dropdown.DropdownMenuArgs{ID: chipID, Class: "inline-flex"}) {
+			@dropdown.DropdownMenuTrigger(dropdown.DropdownMenuTriggerArgs{ID: chipID, Class: "inline-flex items-center rounded-full border border-border bg-muted px-2.5 py-0.5 text-[11px] font-medium text-foreground hover:bg-muted/80", Attributes: templ.Attributes{"aria-label": botDMChipLabel(chip)}}) {
+				{ botDMChipLabel(chip) }
+			}
+			@dropdown.DropdownMenuContent(dropdown.DropdownMenuContentArgs{ID: chipID, Side: "bottom", Align: "start", SideOffset: 6, Class: "w-64 p-1"}) {
+				for _, bot := range chip.Bots {
+					@dropdown.DropdownMenuLinkItem(dropdown.DropdownMenuLinkItemArgs{ID: chipID, Href: pairwiseA2AHref(chip.SpeakerSlug, bot.Slug), Class: "flex items-center gap-2"}) {
+						@BubbleAvatar(bot.AuthorInitial, bot.AvatarBg)
+						<div class="min-w-0 flex-1">
+							<p class="truncate text-xs font-medium text-foreground">{ bot.Name }</p>
+							<p class="truncate text-[11px] text-muted-foreground">{ bot.Slug }</p>
+						</div>
+						<span class="text-[11px] tabular-nums text-muted-foreground">{ strconv.Itoa(bot.Count) }</span>
+					}
+				}
+			}
+		}
+	</div>
 }
