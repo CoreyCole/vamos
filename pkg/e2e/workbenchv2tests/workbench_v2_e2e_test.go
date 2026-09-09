@@ -962,10 +962,34 @@ func assertThreadDocumentLinksStayFullscreen() spec.Step {
 	)
 }
 
+func ensureArtifactBrowserOpen(t testing.TB, ctx *duiruntime.Context) {
+	t.Helper()
+	pane := ctx.Page.Locator("#thread-artifact-pane")
+	open, err := pane.GetAttribute("data-artifact-browser-open")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if open == "1" {
+		return
+	}
+	toggle := ctx.Page.Locator(`[data-testid="artifact-browser-toggle"]`).First()
+	if err := toggle.Click(); err != nil {
+		t.Fatal(err)
+	}
+	if err := ctx.Page.Locator(`#thread-artifact-pane[data-artifact-browser-open="1"]`).
+		WaitFor(playwright.LocatorWaitForOptions{
+			State:   playwright.WaitForSelectorStateVisible,
+			Timeout: playwright.Float(5_000),
+		}); err != nil {
+		t.Fatalf("files browser did not open: %v", err)
+	}
+}
+
 func toggleThreadArtifactDirectory(directory, child string) spec.Step {
 	return spec.Custom(
 		"thread artifact directory expands without navigation",
 		func(t testing.TB, ctx *duiruntime.Context) {
+			ensureArtifactBrowserOpen(t, ctx)
 			before := ctx.Page.URL()
 			beforeCWD, err := ctx.Page.Locator("[data-thread-artifact-cwd]").
 				GetAttribute("data-thread-artifact-cwd")
@@ -1032,6 +1056,7 @@ func assertThreadArtifactListingContains(name string) spec.Step {
 	return spec.Custom(
 		"thread artifact browser retains parent listing",
 		func(t testing.TB, ctx *duiruntime.Context) {
+			ensureArtifactBrowserOpen(t, ctx)
 			link := ctx.Page.Locator("[data-thread-artifact-browser] a[data-thread-artifact-file]").
 				Filter(playwright.LocatorFilterOptions{HasText: name}).
 				First()
@@ -1061,6 +1086,7 @@ func upThreadArtifactDirectory(wantCWD string) spec.Step {
 
 func navigateThreadArtifactBrowser(name, selector, wantCWD string) spec.Step {
 	return spec.Custom(name, func(t testing.TB, ctx *duiruntime.Context) {
+		ensureArtifactBrowserOpen(t, ctx)
 		link := ctx.Page.Locator(selector).First()
 		response, err := ctx.Page.ExpectResponse(
 			"**/threads/wb2_alpha/artifact-browser?*",

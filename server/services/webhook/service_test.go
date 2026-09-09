@@ -1,6 +1,7 @@
 package webhook
 
 import (
+	"context"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -58,6 +59,45 @@ func TestHandlePush_RefusesDirtyWorktreeWithoutStashing(t *testing.T) {
 	stashList := runGit(t, worktree, "stash", "list")
 	if strings.TrimSpace(stashList) != "" {
 		t.Fatalf("expected no webhook stash, stash list=%q", stashList)
+	}
+}
+
+func TestHandlePushLocalSyncSurvivesCanceledRequestContext(t *testing.T) {
+	t.Parallel()
+
+	base := t.TempDir()
+	seed := filepath.Join(base, "seed")
+	remote := filepath.Join(base, "remote.git")
+	worktree := filepath.Join(base, "worktree")
+
+	runGit(t, "", "init", "-b", "main", seed)
+	mustWriteFile(t, filepath.Join(seed, "README.md"), "hello\n")
+	runGitWithEnv(t, seed, []string{
+		"GIT_AUTHOR_NAME=Test User",
+		"GIT_AUTHOR_EMAIL=test@example.com",
+		"GIT_COMMITTER_NAME=Test User",
+		"GIT_COMMITTER_EMAIL=test@example.com",
+	}, "add", "README.md")
+	runGitWithEnv(t, seed, []string{
+		"GIT_AUTHOR_NAME=Test User",
+		"GIT_AUTHOR_EMAIL=test@example.com",
+		"GIT_COMMITTER_NAME=Test User",
+		"GIT_COMMITTER_EMAIL=test@example.com",
+	}, "commit", "-m", "initial")
+	runGit(t, "", "clone", "--bare", seed, remote)
+	runGit(t, "", "clone", remote, worktree)
+
+	svc := NewService("", worktree, filepath.Join(t.TempDir(), "noop.sh"))
+	payload := []byte(
+		`{"ref":"refs/heads/main","repository":{"full_name":"premiumlabs/cn-agents"}}`,
+	)
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+	if err := svc.HandlePush(ctx, payload, RequestMeta{EventType: "push"}); err != nil {
+		t.Fatalf(
+			"HandlePush() error = %v, want local sync to ignore canceled request context",
+			err,
+		)
 	}
 }
 

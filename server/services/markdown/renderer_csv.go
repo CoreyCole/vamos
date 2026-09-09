@@ -117,7 +117,30 @@ func parseDelimitedTable(
 	for i, row := range rows {
 		table.Rows[i] = csvCells(row)
 	}
-	return table, nil
+	return widenDelimitedTable(table), nil
+}
+
+func widenDelimitedTable(table CSVTable) CSVTable {
+	width := len(table.Headers)
+	for _, row := range table.Rows {
+		if len(row) > width {
+			width = len(row)
+		}
+	}
+	table.Headers = padCSVRow(table.Headers, width)
+	for i, row := range table.Rows {
+		table.Rows[i] = padCSVRow(row, width)
+	}
+	return table
+}
+
+func padCSVRow(row []CSVCell, width int) []CSVCell {
+	if len(row) >= width {
+		return row[:width]
+	}
+	out := make([]CSVCell, width)
+	copy(out, row)
+	return out
 }
 
 func csvCells(values []string) []CSVCell {

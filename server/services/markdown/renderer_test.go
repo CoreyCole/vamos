@@ -127,20 +127,24 @@ func TestMarkdownBytesToHTML_RendersFrontmatterAsYAMLCodeBlock(t *testing.T) {
 	}
 }
 
-
 func TestMarkdownBytesToHTML_FencedCodeSyntaxHighlight(t *testing.T) {
 	r, err := NewRenderer("github-dark")
 	if err != nil {
 		t.Fatalf("NewRenderer() error = %v", err)
 	}
 
-	md := []byte("```go\npackage main\n\nimport \"fmt\"\n\nfunc main() {\n\tfmt.Println(\"hi\")\n}\n```\n")
+	md := []byte(
+		"```go\npackage main\n\nimport \"fmt\"\n\nfunc main() {\n\tfmt.Println(\"hi\")\n}\n```\n",
+	)
 	html, err := r.MarkdownBytesToHTML(md)
 	if err != nil {
 		t.Fatalf("MarkdownBytesToHTML() error = %v", err)
 	}
 	if !strings.Contains(html, `class="chroma"`) && !strings.Contains(html, "chroma") {
-		t.Fatalf("expected chroma syntax-highlight classes in fenced go block; html = %s", html)
+		t.Fatalf(
+			"expected chroma syntax-highlight classes in fenced go block; html = %s",
+			html,
+		)
 	}
 	// Token classes vary by style; require at least one highlighted token span.
 	if !strings.Contains(html, "<span") {
@@ -150,7 +154,6 @@ func TestMarkdownBytesToHTML_FencedCodeSyntaxHighlight(t *testing.T) {
 		t.Fatalf("expected go source text preserved in highlighted html; html = %s", html)
 	}
 }
-
 
 func TestRenderStatePreservesFirstWriteErrorAndTerminates(t *testing.T) {
 	sentinel := errors.New("write failed")
@@ -267,5 +270,63 @@ func TestNormalizeThoughtsPath(t *testing.T) {
 
 	if _, ok := normalizeThoughtsPath("pkg/ledger/v2/commissions/post.go"); ok {
 		t.Fatal("expected non-thoughts code path not to match")
+	}
+}
+
+func TestMarkdownBytesToHTML_KeepsHeadersWhenDelimiterHasExtraColumns(t *testing.T) {
+	t.Parallel()
+
+	r, err := NewRenderer(DefaultCodeStyle)
+	if err != nil {
+		t.Fatalf("NewRenderer() error = %v", err)
+	}
+	md := []byte(strings.Join([]string{
+		"## Review follow-ups",
+		"",
+		"| Age | Owner | Follow-up | Source review |",
+		"| --- | --- | --- | --- | --- |",
+		"| 57 days | Nick Hilem | [fix(onboarding)](https://linear.app/chestnut/issue/PRO-9835) | [AI-113](https://linear.app/chestnut/issue/AI-113) |",
+	}, "\n"))
+	html, err := r.MarkdownBytesToHTML(md)
+	if err != nil {
+		t.Fatalf("MarkdownBytesToHTML() error = %v", err)
+	}
+	if strings.Contains(html, "| Age | Owner |") {
+		t.Fatalf("header leaked as raw markdown: %s", html)
+	}
+	for _, want := range []string{
+		"<th",
+		"Age",
+		"Owner",
+		"Follow-up",
+		"Source review",
+		"Nick Hilem",
+		"AI-113",
+	} {
+		if !strings.Contains(html, want) {
+			t.Fatalf("missing %q: %s", want, html)
+		}
+	}
+}
+
+func TestMarkdownBytesToHTML_KeepsExtraHeaderCellsWhenDelimiterIsShort(t *testing.T) {
+	t.Parallel()
+
+	r, err := NewRenderer(DefaultCodeStyle)
+	if err != nil {
+		t.Fatalf("NewRenderer() error = %v", err)
+	}
+	md := []byte("| A | B | C |\n| --- | --- |\n| 1 | 2 | 3 |\n")
+	html, err := r.MarkdownBytesToHTML(md)
+	if err != nil {
+		t.Fatalf("MarkdownBytesToHTML() error = %v", err)
+	}
+	if strings.Contains(html, "| A | B | C |") {
+		t.Fatalf("header leaked as raw markdown: %s", html)
+	}
+	for _, want := range []string{"<th", ">A</th>", ">B</th>", ">C</th>", ">1</td>", ">2</td>", ">3</td>"} {
+		if !strings.Contains(html, want) {
+			t.Fatalf("missing %q: %s", want, html)
+		}
 	}
 }

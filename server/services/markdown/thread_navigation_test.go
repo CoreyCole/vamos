@@ -370,8 +370,11 @@ func TestArtifactBrowserOpenFromRequest(t *testing.T) {
 	t.Parallel()
 
 	req := httptest.NewRequest(http.MethodGet, "/threads/t", http.NoBody)
-	if !ArtifactBrowserOpenFromRequest(req) {
-		t.Fatal("missing cookie should default open")
+	if ArtifactBrowserOpenFromRequest(req) {
+		t.Fatal("missing cookie should default closed")
+	}
+	if ArtifactBrowserOpenFromRequest(nil) {
+		t.Fatal("nil request should default closed")
 	}
 	req.AddCookie(&http.Cookie{Name: "wb2_artifact_browser", Value: "0"})
 	if ArtifactBrowserOpenFromRequest(req) {

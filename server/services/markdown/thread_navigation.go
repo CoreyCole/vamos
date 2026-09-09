@@ -54,7 +54,7 @@ type ThreadArtifactBrowserArgs struct {
 	DocumentViewActive bool
 	CommentsOpen       bool
 	// BrowserOpen is the SSR Files-browser preference (cookie wb2_artifact_browser).
-	// Default open when unset so first visit matches prior always-open behavior.
+	// Default closed when unset so first visit does not show the sibling file list.
 	BrowserOpen bool
 }
 
@@ -67,14 +67,14 @@ const (
 	artifactSearchGlobalLimit     = 25
 )
 
-// ArtifactBrowserOpenFromRequest reads wb2_artifact_browser; missing/invalid => open.
+// ArtifactBrowserOpenFromRequest reads wb2_artifact_browser; missing/invalid => closed.
 func ArtifactBrowserOpenFromRequest(r *http.Request) bool {
 	if r == nil {
-		return true
+		return false
 	}
 	c, err := r.Cookie(artifactBrowserOpenCookie)
 	if err != nil || (c.Value != "0" && c.Value != "1") {
-		return true
+		return false
 	}
 	return c.Value == "1"
 }

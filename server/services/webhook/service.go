@@ -128,7 +128,9 @@ func (s *Service) HandleVerifiedEvent(
 
 	var localErr error
 	if route, ok := s.routeForLocalSync(event.Repository.FullName); ok {
-		localErr = s.handlePushRoute(ctx, event, route)
+		// Public hosts forward to stage with a ~15s client timeout. Thoughts sync
+		// and git pull must keep running after that disconnect.
+		localErr = s.handlePushRoute(context.WithoutCancel(ctx), event, route)
 	} else {
 		s.logEvent("webhook_repo_ignored", map[string]any{
 			"ref":        event.Ref,

@@ -21,7 +21,11 @@ func TestCSVRendererEscapesCells(t *testing.T) {
 		t.Fatal(err)
 	}
 	if page.ViewerArgs.DocumentKind != DocumentKindCSVTable {
-		t.Fatalf("DocumentKind=%q, want %q", page.ViewerArgs.DocumentKind, DocumentKindCSVTable)
+		t.Fatalf(
+			"DocumentKind=%q, want %q",
+			page.ViewerArgs.DocumentKind,
+			DocumentKindCSVTable,
+		)
 	}
 	var buf bytes.Buffer
 	if err := page.ViewerArgs.BodyComponent.Render(t.Context(), &buf); err != nil {
@@ -126,14 +130,19 @@ func TestCSVTableDocumentShowsTruncationWithoutDocumentChrome(t *testing.T) {
 		Rows:      [][]CSVCell{{{Text: "a"}}},
 		Truncated: true,
 	}
-	if err := CSVTableDocument("thoughts/data.csv", table, "CSV").Render(t.Context(), &buf); err != nil {
+	if err := CSVTableDocument(
+		"thoughts/data.csv",
+		table,
+		"CSV",
+	).Render(t.Context(), &buf); err != nil {
 		t.Fatal(err)
 	}
 	html := buf.String()
 	if !strings.Contains(html, "truncated") {
 		t.Fatalf("missing truncation status: %s", html)
 	}
-	if strings.Contains(html, "thoughts/data.csv") || strings.Contains(html, "CSV table:") {
+	if strings.Contains(html, "thoughts/data.csv") ||
+		strings.Contains(html, "CSV table:") {
 		t.Fatalf("truncation status reintroduced document chrome: %s", html)
 	}
 }
@@ -157,7 +166,11 @@ func TestDelimitedRendererParsesTSV(t *testing.T) {
 	t.Parallel()
 
 	root := t.TempDir()
-	mustWriteFile(t, filepath.Join(root, "data.tsv"), []byte("name\tvalue\nAda\t1\nGrace\t2"))
+	mustWriteFile(
+		t,
+		filepath.Join(root, "data.tsv"),
+		[]byte("name\tvalue\nAda\t1\nGrace\t2"),
+	)
 	service, err := NewService(root, nil, nil)
 	if err != nil {
 		t.Fatal(err)
@@ -167,7 +180,11 @@ func TestDelimitedRendererParsesTSV(t *testing.T) {
 		t.Fatal(err)
 	}
 	if page.ViewerArgs.DocumentKind != DocumentKindCSVTable {
-		t.Fatalf("DocumentKind=%q, want %q", page.ViewerArgs.DocumentKind, DocumentKindCSVTable)
+		t.Fatalf(
+			"DocumentKind=%q, want %q",
+			page.ViewerArgs.DocumentKind,
+			DocumentKindCSVTable,
+		)
 	}
 	if page.ViewerArgs.RawMarkdown != "name\tvalue\nAda\t1\nGrace\t2" {
 		t.Fatalf("RawMarkdown=%q", page.ViewerArgs.RawMarkdown)
@@ -184,6 +201,59 @@ func TestDelimitedRendererParsesTSV(t *testing.T) {
 	}
 }
 
+func TestParseDelimitedTableWidensToLongestRow(t *testing.T) {
+	t.Parallel()
+
+	table, err := parseCSVTable([]byte("a,b\n1,2,3\n4"), 500)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(table.Headers) != 3 {
+		t.Fatalf("headers=%#v", table.Headers)
+	}
+	if table.Headers[0].Text != "a" || table.Headers[1].Text != "b" ||
+		table.Headers[2].Text != "" {
+		t.Fatalf("headers=%#v", table.Headers)
+	}
+	if len(table.Rows) != 2 || len(table.Rows[0]) != 3 || table.Rows[0][2].Text != "3" {
+		t.Fatalf("rows=%#v", table.Rows)
+	}
+	if len(table.Rows[1]) != 3 || table.Rows[1][0].Text != "4" ||
+		table.Rows[1][1].Text != "" {
+		t.Fatalf("short row=%#v", table.Rows[1])
+	}
+}
+
+func TestDelimitedRendererKeepsExtraTSVColumns(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	mustWriteFile(
+		t,
+		filepath.Join(root, "data.tsv"),
+		[]byte("name\tvalue\nAda\t1\textra\nGrace\t2"),
+	)
+	service, err := NewService(root, nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	page, err := service.RenderThoughtsDocument(t.Context(), "data.tsv")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var buf bytes.Buffer
+	if err := page.ViewerArgs.BodyComponent.Render(t.Context(), &buf); err != nil {
+		t.Fatal(err)
+	}
+	html := buf.String()
+	if !strings.Contains(html, "extra") {
+		t.Fatalf("extra TSV column dropped: %s", html)
+	}
+	if strings.Count(html, "</th>") != 3 {
+		t.Fatalf("expected 3 header cells, html=%s", html)
+	}
+}
+
 func TestParseDelimitedTableUsesTabDelimiter(t *testing.T) {
 	t.Parallel()
 
@@ -192,7 +262,8 @@ func TestParseDelimitedTableUsesTabDelimiter(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(table.Headers) != 2 || table.Headers[0].Text != "a" || table.Rows[0][1].Text != "2" {
+	if len(table.Headers) != 2 || table.Headers[0].Text != "a" ||
+		table.Rows[0][1].Text != "2" {
 		t.Fatalf("table=%#v", table)
 	}
 }
@@ -201,7 +272,11 @@ func TestDelimitedRendererFallsBackToSourceOnMalformedSafeText(t *testing.T) {
 	t.Parallel()
 
 	root := t.TempDir()
-	mustWriteFile(t, filepath.Join(root, "bad.tsv"), []byte("name\tvalue\n\"unterminated"))
+	mustWriteFile(
+		t,
+		filepath.Join(root, "bad.tsv"),
+		[]byte("name\tvalue\n\"unterminated"),
+	)
 	service, err := NewService(root, nil, nil)
 	if err != nil {
 		t.Fatal(err)
@@ -211,7 +286,11 @@ func TestDelimitedRendererFallsBackToSourceOnMalformedSafeText(t *testing.T) {
 		t.Fatal(err)
 	}
 	if page.ViewerArgs.DocumentKind != DocumentKindSource {
-		t.Fatalf("DocumentKind=%q, want %q", page.ViewerArgs.DocumentKind, DocumentKindSource)
+		t.Fatalf(
+			"DocumentKind=%q, want %q",
+			page.ViewerArgs.DocumentKind,
+			DocumentKindSource,
+		)
 	}
 	if !strings.Contains(page.ViewerArgs.RawMarkdown, "unterminated") {
 		t.Fatalf("RawMarkdown=%q", page.ViewerArgs.RawMarkdown)
@@ -222,7 +301,37 @@ func TestDelimitedRendererParseFallbackKeepsUnsafeContentUnsupported(t *testing.
 	t.Parallel()
 
 	root := t.TempDir()
-	mustWriteFile(t, filepath.Join(root, "bad.csv"), []byte{'n', 'a', 'm', 'e', ',', 'v', 'a', 'l', 'u', 'e', '\n', '"', 'u', 'n', 't', 'e', 'r', 'm', 'i', 'n', 'a', 't', 'e', 'd', 0})
+	mustWriteFile(
+		t,
+		filepath.Join(root, "bad.csv"),
+		[]byte{
+			'n',
+			'a',
+			'm',
+			'e',
+			',',
+			'v',
+			'a',
+			'l',
+			'u',
+			'e',
+			'\n',
+			'"',
+			'u',
+			'n',
+			't',
+			'e',
+			'r',
+			'm',
+			'i',
+			'n',
+			'a',
+			't',
+			'e',
+			'd',
+			0,
+		},
+	)
 	service, err := NewService(root, nil, nil)
 	if err != nil {
 		t.Fatal(err)
@@ -232,7 +341,11 @@ func TestDelimitedRendererParseFallbackKeepsUnsafeContentUnsupported(t *testing.
 		t.Fatal(err)
 	}
 	if page.ViewerArgs.DocumentKind != DocumentKindUnsupported {
-		t.Fatalf("DocumentKind=%q, want %q", page.ViewerArgs.DocumentKind, DocumentKindUnsupported)
+		t.Fatalf(
+			"DocumentKind=%q, want %q",
+			page.ViewerArgs.DocumentKind,
+			DocumentKindUnsupported,
+		)
 	}
 	var buf bytes.Buffer
 	if err := page.ViewerArgs.BodyComponent.Render(t.Context(), &buf); err != nil {

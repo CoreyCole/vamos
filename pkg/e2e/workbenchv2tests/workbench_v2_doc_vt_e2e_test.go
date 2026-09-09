@@ -177,6 +177,7 @@ func clickSiblingAndAssertThreadsReopenSurvives(href, wantText string) spec.Step
 	return spec.Custom(
 		"sibling GET keeps closed-threads reopen chrome painted under surviving header",
 		func(t testing.TB, ctx *duiruntime.Context) {
+			ensureArtifactBrowserOpen(t, ctx)
 			link := ctx.Page.Locator(
 				"[data-thread-artifact-browser] a[data-thread-artifact-file][href='" + href + "']",
 			).First()
@@ -468,6 +469,7 @@ func clickSiblingAndAssertNoUnderHeaderBlackout(href, wantText string) spec.Step
 	return spec.Custom(
 		"sibling GET never blacks out threads/chat/path/browser under surviving header",
 		func(t testing.TB, ctx *duiruntime.Context) {
+			ensureArtifactBrowserOpen(t, ctx)
 			link := ctx.Page.Locator(
 				"[data-thread-artifact-browser] a[data-thread-artifact-file][href='" + href + "']",
 			).First()
@@ -897,6 +899,7 @@ func clickSiblingAndAssertNoUnderTabsBlackout(href, wantText string) spec.Step {
 	return spec.Custom(
 		"sibling GET never blacks out path/browser under surviving tabs",
 		func(t testing.TB, ctx *duiruntime.Context) {
+			ensureArtifactBrowserOpen(t, ctx)
 			link := ctx.Page.Locator(
 				"[data-thread-artifact-browser] a[data-thread-artifact-file][href='" + href + "']",
 			).First()
@@ -1318,6 +1321,56 @@ func clickThreadAndAssertNoChatUnderHeaderGap(linkSelector, wantChatText string)
 			}
 
 			if err := ctx.Page.Locator("#workbench-v2-chat-body").
+				GetByText(wantChatText).
+				First().
+				WaitFor(playwright.LocatorWaitForOptions{
+					State:   playwright.WaitForSelectorStateVisible,
+					Timeout: playwright.Float(30_000),
+				}); err != nil {
+				t.Fatalf("chat missing %q after thread switch: %v", wantChatText, err)
+			}
+		},
+	)
+}
+
+func boxVisible(b map[string]any) bool {
+	if b == nil {
+		return false
+	}
+	h, _ := asFloat(b["h"])
+	w, _ := asFloat(b["w"])
+	return h > 1 && w > 1 && !boxHidden(b)
+}
+
+func boxInDOM(b map[string]any) bool {
+	if b == nil {
+		return false
+	}
+	in, _ := b["inDom"].(bool)
+	return in
+}
+
+func boxCollapsed(b map[string]any) bool {
+	if b == nil {
+		return true
+	}
+	h, ok := asFloat(b["h"])
+	if !ok {
+		return true
+	}
+	return h < 1
+}
+
+func boxHidden(b map[string]any) bool {
+	if b == nil {
+		return true
+	}
+	op, _ := b["opacity"].(string)
+	vis, _ := b["visibility"].(string)
+	disp, _ := b["display"].(string)
+	return op == "0" || vis == "hidden" || disp == "none"
+}
+at-body").
 				GetByText(wantChatText).
 				First().
 				WaitFor(playwright.LocatorWaitForOptions{

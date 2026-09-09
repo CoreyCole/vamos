@@ -145,7 +145,7 @@ func (m Renderer) HighlightSource(source, lang string) (string, error) {
 func renderableMarkdown(md []byte) []byte {
 	frontmatter, body, ok := splitYAMLFrontmatter(md)
 	if !ok {
-		return md
+		return normalizeMarkdownTables(md)
 	}
 
 	frontmatter = bytes.Trim(frontmatter, "\r\n")
@@ -165,7 +165,7 @@ func renderableMarkdown(md []byte) []byte {
 		rendered.WriteByte('\n')
 	}
 
-	return rendered.Bytes()
+	return normalizeMarkdownTables(rendered.Bytes())
 }
 
 func splitYAMLFrontmatter(md []byte) ([]byte, []byte, bool) {
