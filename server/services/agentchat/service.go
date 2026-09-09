@@ -841,16 +841,19 @@ func (s *Service) StartWorkspaceThread(
 	defer func() { _ = tx.Rollback() }()
 	q := s.queries.WithTx(tx)
 
-	thread, err := q.CreateAgentThread(ctx, s.attachPlanDirRel(ctx, db.CreateAgentThreadParams{
-		ID:                uuid.NewString(),
-		UserEmail:         userEmail,
-		Title:             truncateTitle(prompt),
-		Cwd:               s.workspaceThreadCwd(workspace),
-		LineageID:         uuid.NewString(),
-		HeadEntryID:       sql.NullString{},
-		ParentThreadID:    sql.NullString{},
-		ForkedFromEntryID: sql.NullString{},
-	}))
+	thread, err := q.CreateAgentThread(
+		ctx,
+		s.attachPlanDirRel(ctx, db.CreateAgentThreadParams{
+			ID:                uuid.NewString(),
+			UserEmail:         userEmail,
+			Title:             truncateTitle(prompt),
+			Cwd:               s.workspaceThreadCwd(workspace),
+			LineageID:         uuid.NewString(),
+			HeadEntryID:       sql.NullString{},
+			ParentThreadID:    sql.NullString{},
+			ForkedFromEntryID: sql.NullString{},
+		}),
+	)
 	if err != nil {
 		return nil, nil, nil, err
 	}
@@ -1340,16 +1343,19 @@ func (s *Service) StartThread(
 	defer func() { _ = tx.Rollback() }()
 
 	q := s.queries.WithTx(tx)
-	thread, err := q.CreateAgentThread(ctx, s.attachPlanDirRel(ctx, db.CreateAgentThreadParams{
-		ID:                threadID,
-		UserEmail:         userEmail,
-		Title:             title,
-		Cwd:               resolvedCwd,
-		LineageID:         lineageID,
-		HeadEntryID:       sql.NullString{},
-		ParentThreadID:    sql.NullString{},
-		ForkedFromEntryID: sql.NullString{},
-	}))
+	thread, err := q.CreateAgentThread(
+		ctx,
+		s.attachPlanDirRel(ctx, db.CreateAgentThreadParams{
+			ID:                threadID,
+			UserEmail:         userEmail,
+			Title:             title,
+			Cwd:               resolvedCwd,
+			LineageID:         lineageID,
+			HeadEntryID:       sql.NullString{},
+			ParentThreadID:    sql.NullString{},
+			ForkedFromEntryID: sql.NullString{},
+		}),
+	)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -4303,13 +4309,23 @@ func (s *Service) decodePersistedTranscriptItems(
 		Provider      string `json:"provider"`
 		ModelID       string `json:"modelId"`
 		ThinkingLevel string `json:"thinkingLevel"`
+		UserEmail     string `json:"userEmail"`
+		FromAgentID   string `json:"fromAgentId"`
+		FromAgentSlug string `json:"fromAgentSlug"`
+		Timestamp     string `json:"timestamp"`
+		HandoffPath   string `json:"handoffPath"`
+		HistoryPath   string `json:"historyPath"`
+		Body          string `json:"body"`
 		Message       struct {
-			Role       string `json:"role"`
-			Content    any    `json:"content"`
-			ToolCallID string `json:"toolCallId"`
-			ToolName   string `json:"toolName"`
-			Details    any    `json:"details"`
-			IsError    bool   `json:"isError"`
+			Role          string `json:"role"`
+			Content       any    `json:"content"`
+			ToolCallID    string `json:"toolCallId"`
+			ToolName      string `json:"toolName"`
+			Details       any    `json:"details"`
+			IsError       bool   `json:"isError"`
+			UserEmail     string `json:"userEmail"`
+			FromAgentID   string `json:"fromAgentId"`
+			FromAgentSlug string `json:"fromAgentSlug"`
 		} `json:"message"`
 		Content any  `json:"content"`
 		Display bool `json:"display"`
@@ -4323,7 +4339,7 @@ func (s *Service) decodePersistedTranscriptItems(
 	case "model_change", "thinking_level_change":
 		return nil, nil
 	case "message":
-		return s.messageTranscriptItems(
+		items := s.messageTranscriptItems(
 			domID,
 			envelope.ID,
 			envelope.Message.Role,
@@ -4334,7 +4350,18 @@ func (s *Service) decodePersistedTranscriptItems(
 			envelope.Message.Details,
 			envelope.Message.IsError,
 			toolCallPresentations,
-		), nil
+		)
+		applySpeakerAttribution(
+			items,
+			firstNonEmpty(envelope.Message.UserEmail, envelope.UserEmail),
+			firstNonEmpty(
+				envelope.Message.FromAgentSlug,
+				envelope.FromAgentSlug,
+				envelope.Message.FromAgentID,
+				envelope.FromAgentID,
+			),
+		)
+		return items, nil
 	case "custom_message":
 		if !envelope.Display {
 			return nil, nil
@@ -4346,6 +4373,20 @@ func (s *Service) decodePersistedTranscriptItems(
 		return []TranscriptMessage{
 			s.newBubbleTranscriptMessage(domID, envelope.ID, "assistant", text, true),
 		}, nil
+	case "handoff", "compaction", "memory_write", "memory_read":
+		body := strings.TrimSpace(envelope.Body)
+		if body == "" {
+			body = strings.TrimSpace(extractContentText(envelope.Content))
+		}
+		return s.cutDetailTranscriptItems(
+			domID,
+			envelope.ID,
+			envelope.Type,
+			body,
+			envelope.Timestamp,
+			envelope.HandoffPath,
+			envelope.HistoryPath,
+		), nil
 	default:
 		return nil, nil
 	}
@@ -4368,19 +4409,22 @@ func (s *Service) liveTurnTranscriptItems(
 		conversation.LiveTurnAssistantMessage,
 		conversation.LiveTurnToolResult:
 		var message struct {
-			Role       string `json:"role"`
-			Content    any    `json:"content"`
-			ToolCallID string `json:"toolCallId"`
-			ToolName   string `json:"toolName"`
-			Details    any    `json:"details"`
-			IsError    bool   `json:"isError"`
+			Role          string `json:"role"`
+			Content       any    `json:"content"`
+			ToolCallID    string `json:"toolCallId"`
+			ToolName      string `json:"toolName"`
+			Details       any    `json:"details"`
+			IsError       bool   `json:"isError"`
+			UserEmail     string `json:"userEmail"`
+			FromAgentID   string `json:"fromAgentId"`
+			FromAgentSlug string `json:"fromAgentSlug"`
 		}
 		if len(item.MessageJSON) > 0 {
 			if err := json.Unmarshal(item.MessageJSON, &message); err != nil {
 				return nil, err
 			}
 		}
-		return s.messageTranscriptItemsWithPolicy(
+		items := s.messageTranscriptItemsWithPolicy(
 			domID,
 			domID,
 			message.Role,
@@ -4393,7 +4437,13 @@ func (s *Service) liveTurnTranscriptItems(
 			policy,
 			toolState,
 			toolCallPresentations,
-		), nil
+		)
+		applySpeakerAttribution(
+			items,
+			message.UserEmail,
+			firstNonEmpty(message.FromAgentSlug, message.FromAgentID),
+		)
+		return items, nil
 	case conversation.LiveTurnToolExecution:
 		return s.toolExecutionTranscriptItems(
 			domID,
@@ -4401,6 +4451,11 @@ func (s *Service) liveTurnTranscriptItems(
 			item,
 			toolCallPresentations,
 		), nil
+	case conversation.LiveTurnHandoff,
+		conversation.LiveTurnCompaction,
+		conversation.LiveTurnMemoryWrite,
+		conversation.LiveTurnMemoryRead:
+		return s.liveCutTranscriptItems(domID, domID, item), nil
 	default:
 		return nil, nil
 	}

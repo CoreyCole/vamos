@@ -9,11 +9,31 @@ func TestLiveTurnReducerPreservesMessageAndToolExecutionOrdering(t *testing.T) {
 	reducer := NewLiveTurnReducer()
 
 	events := []EventEnvelope{
-		{RunID: "run-1", EventType: "message_end", PayloadJSON: `{"message":{"role":"user","content":"hi"}}`},
-		{RunID: "run-1", EventType: "message_update", PayloadJSON: `{"message":{"role":"assistant","content":[{"type":"thinking","thinking":"plan"},{"type":"text","text":"answer"},{"type":"toolCall","id":"call-1","name":"read","arguments":{"path":"main.go"}}]}}`},
-		{RunID: "run-1", EventType: "tool_execution_start", PayloadJSON: `{"toolCallId":"call-1","toolName":"read","args":{"path":"main.go"}}`},
-		{RunID: "run-1", EventType: "tool_execution_end", PayloadJSON: `{"toolCallId":"call-1","toolName":"read","result":{"content":[{"type":"text","text":"file body"}],"details":{}},"isError":false}`},
-		{RunID: "run-1", EventType: "message_end", PayloadJSON: `{"message":{"role":"toolResult","toolCallId":"call-1","toolName":"read","content":[{"type":"text","text":"file body"}],"details":{},"isError":false}}`},
+		{
+			RunID:       "run-1",
+			EventType:   "message_end",
+			PayloadJSON: `{"message":{"role":"user","content":"hi"}}`,
+		},
+		{
+			RunID:       "run-1",
+			EventType:   "message_update",
+			PayloadJSON: `{"message":{"role":"assistant","content":[{"type":"thinking","thinking":"plan"},{"type":"text","text":"answer"},{"type":"toolCall","id":"call-1","name":"read","arguments":{"path":"main.go"}}]}}`,
+		},
+		{
+			RunID:       "run-1",
+			EventType:   "tool_execution_start",
+			PayloadJSON: `{"toolCallId":"call-1","toolName":"read","args":{"path":"main.go"}}`,
+		},
+		{
+			RunID:       "run-1",
+			EventType:   "tool_execution_end",
+			PayloadJSON: `{"toolCallId":"call-1","toolName":"read","result":{"content":[{"type":"text","text":"file body"}],"details":{}},"isError":false}`,
+		},
+		{
+			RunID:       "run-1",
+			EventType:   "message_end",
+			PayloadJSON: `{"message":{"role":"toolResult","toolCallId":"call-1","toolName":"read","content":[{"type":"text","text":"file body"}],"details":{},"isError":false}}`,
+		},
 	}
 
 	for _, env := range events {
@@ -38,17 +58,33 @@ func TestLiveTurnReducerPreservesMessageAndToolExecutionOrdering(t *testing.T) {
 		t.Fatalf("kinds = %v, want %v", gotKinds, wantKinds)
 	}
 	if snapshot.Items[2].Status != ToolExecutionDone {
-		t.Fatalf("tool execution status = %q, want %q", snapshot.Items[2].Status, ToolExecutionDone)
+		t.Fatalf(
+			"tool execution status = %q, want %q",
+			snapshot.Items[2].Status,
+			ToolExecutionDone,
+		)
 	}
 }
 
 func TestLiveTurnReducerResetsWhenRunChanges(t *testing.T) {
 	reducer := NewLiveTurnReducer()
 
-	if _, err := reducer.Apply(EventEnvelope{RunID: "run-1", EventType: "message_end", PayloadJSON: `{"message":{"role":"user","content":"hi"}}`}); err != nil {
+	if _, err := reducer.Apply(
+		EventEnvelope{
+			RunID:       "run-1",
+			EventType:   "message_end",
+			PayloadJSON: `{"message":{"role":"user","content":"hi"}}`,
+		},
+	); err != nil {
 		t.Fatalf("Apply(run-1) error = %v", err)
 	}
-	if _, err := reducer.Apply(EventEnvelope{RunID: "run-2", EventType: "message_update", PayloadJSON: `{"message":{"role":"assistant","content":[{"type":"text","text":"next"}]}}`}); err != nil {
+	if _, err := reducer.Apply(
+		EventEnvelope{
+			RunID:       "run-2",
+			EventType:   "message_update",
+			PayloadJSON: `{"message":{"role":"assistant","content":[{"type":"text","text":"next"}]}}`,
+		},
+	); err != nil {
 		t.Fatalf("Apply(run-2) error = %v", err)
 	}
 
@@ -60,13 +96,23 @@ func TestLiveTurnReducerResetsWhenRunChanges(t *testing.T) {
 		t.Fatalf("len(snapshot.Items) = %d, want 1", len(snapshot.Items))
 	}
 	if snapshot.Items[0].Kind != LiveTurnAssistantMessage {
-		t.Fatalf("snapshot.Items[0].Kind = %q, want %q", snapshot.Items[0].Kind, LiveTurnAssistantMessage)
+		t.Fatalf(
+			"snapshot.Items[0].Kind = %q, want %q",
+			snapshot.Items[0].Kind,
+			LiveTurnAssistantMessage,
+		)
 	}
 }
 
 func TestLiveTurnReducerSnapshotIsDeepCopy(t *testing.T) {
 	reducer := NewLiveTurnReducer()
-	if _, err := reducer.Apply(EventEnvelope{RunID: "run-1", EventType: "message_update", PayloadJSON: `{"message":{"role":"assistant","content":[{"type":"text","text":"hello"}]}}`}); err != nil {
+	if _, err := reducer.Apply(
+		EventEnvelope{
+			RunID:       "run-1",
+			EventType:   "message_update",
+			PayloadJSON: `{"message":{"role":"assistant","content":[{"type":"text","text":"hello"}]}}`,
+		},
+	); err != nil {
 		t.Fatalf("Apply() error = %v", err)
 	}
 
@@ -82,6 +128,42 @@ func TestLiveTurnReducerSnapshotIsDeepCopy(t *testing.T) {
 		t.Fatalf("len(again.Items) = %d, want 1", len(again.Items))
 	}
 	if again.Items[0].MessageJSON[0] == 'x' {
-		t.Fatalf("snapshot mutation leaked into reducer state: %q", again.Items[0].MessageJSON)
+		t.Fatalf(
+			"snapshot mutation leaked into reducer state: %q",
+			again.Items[0].MessageJSON,
+		)
+	}
+}
+
+func TestLiveTurnReducerAppliesHandoffAndMemoryKinds(t *testing.T) {
+	reducer := NewLiveTurnReducer()
+	events := []EventEnvelope{
+		{
+			RunID:       "run-1",
+			EventType:   "handoff",
+			PayloadJSON: `{"timestamp":"2026-09-09_16-04-47"}`,
+		},
+		{RunID: "run-1", EventType: "compaction", PayloadJSON: `{}`},
+		{RunID: "run-1", EventType: "memory_write", PayloadJSON: `{}`},
+		{RunID: "run-1", EventType: "memory_read", PayloadJSON: `{}`},
+	}
+	for _, env := range events {
+		if _, err := reducer.Apply(env); err != nil {
+			t.Fatalf("Apply(%s) error = %v", env.EventType, err)
+		}
+	}
+	snapshot := reducer.Snapshot()
+	got := make([]LiveTurnItemKind, 0, len(snapshot.Items))
+	for _, item := range snapshot.Items {
+		got = append(got, item.Kind)
+	}
+	want := []LiveTurnItemKind{
+		LiveTurnHandoff,
+		LiveTurnCompaction,
+		LiveTurnMemoryWrite,
+		LiveTurnMemoryRead,
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("kinds = %v, want %v", got, want)
 	}
 }

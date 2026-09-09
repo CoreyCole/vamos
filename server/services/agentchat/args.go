@@ -103,7 +103,10 @@ type TranscriptMessage struct {
 	Role                  string
 	Title                 string
 	HeaderCode            string
+	HeaderHref            string
 	HeaderSummary         string
+	SecondaryHref         string
+	SecondaryLinkLabel    string
 	DetailHeader          string
 	Content               string
 	HTMLContent           string
@@ -121,11 +124,11 @@ type TranscriptMessage struct {
 	AvatarBg      string
 	NameColor     string
 	// Optional NestedQuoteBlock inside the bubble body.
-	QuoteInitial string
-	QuoteName    string
-	QuoteAvatarBg string
+	QuoteInitial   string
+	QuoteName      string
+	QuoteAvatarBg  string
 	QuoteNameColor string
-	QuoteText     string
+	QuoteText      string
 }
 
 type SessionThreadSource string
@@ -355,25 +358,25 @@ type AgentChatComposerArgs struct {
 }
 
 type ChatMessageArgs struct {
-	ID          string
-	Role        string
-	Content     string
-	HTMLContent string
-	Attachments []AttachedPath
-	AuthorInitial string
-	AuthorName    string
-	AvatarBg      string
-	NameColor     string
-	QuoteInitial  string
-	QuoteName     string
-	QuoteAvatarBg string
+	ID             string
+	Role           string
+	Content        string
+	HTMLContent    string
+	Attachments    []AttachedPath
+	AuthorInitial  string
+	AuthorName     string
+	AvatarBg       string
+	NameColor      string
+	QuoteInitial   string
+	QuoteName      string
+	QuoteAvatarBg  string
 	QuoteNameColor string
-	QuoteText     string
+	QuoteText      string
 }
 
 type ChatMessageStreamingArgs struct {
-	ID           string
-	Role         string
+	ID            string
+	Role          string
 	AuthorInitial string
 	AuthorName    string
 	AvatarBg      string
@@ -391,19 +394,19 @@ type ChatMessageDeltaHTMLArgs struct {
 }
 
 type ChatMessageCompleteArgs struct {
-	ID           string
-	Role         string
-	Content      string
-	HTMLContent  string
-	AuthorInitial string
-	AuthorName    string
-	AvatarBg      string
-	NameColor     string
-	QuoteInitial  string
-	QuoteName     string
-	QuoteAvatarBg string
+	ID             string
+	Role           string
+	Content        string
+	HTMLContent    string
+	AuthorInitial  string
+	AuthorName     string
+	AvatarBg       string
+	NameColor      string
+	QuoteInitial   string
+	QuoteName      string
+	QuoteAvatarBg  string
 	QuoteNameColor string
-	QuoteText     string
+	QuoteText      string
 }
 
 type (

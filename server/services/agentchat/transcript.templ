@@ -3,10 +3,13 @@ package agentchat
 import "strconv"
 
 templ MessagesPane(threadID string, state TranscriptPaneState, hasThread bool, forkAction string, inFlowComposer bool) {
-	<div id="agent-chat-messages" class={
-		"min-w-0 overflow-x-hidden",
-		templ.KV("min-h-full pb-28", !inFlowComposer),
-	}>
+	<div
+		id="agent-chat-messages"
+		class={
+			"min-w-0 overflow-x-hidden",
+			templ.KV("min-h-full pb-28", !inFlowComposer),
+		}
+	>
 		@StableTranscriptRegion(threadID, state.Stable, forkAction)
 		if hasThread {
 			@LiveTranscriptRegion(threadID, state, forkAction)
@@ -60,8 +63,13 @@ templ TranscriptDetailCard(msg TranscriptMessage) {
 			<div class="flex items-center justify-between gap-3 px-4 pb-1 pt-2">
 				<div class="flex min-w-0 flex-1 items-center gap-2">
 					<p class="shrink-0 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{ msg.Title }</p>
-					if msg.HeaderCode != "" {
+					if msg.HeaderHref != "" {
+						<a href={ msg.HeaderHref } class="min-w-0 truncate text-[11px] text-primary underline">{ headerLinkLabel(msg) }</a>
+					} else if msg.HeaderCode != "" {
 						<code class="min-w-0 truncate rounded bg-muted px-1.5 py-0.5 text-[11px] text-foreground">{ msg.HeaderCode }</code>
+					}
+					if msg.SecondaryHref != "" {
+						<a href={ msg.SecondaryHref } class="min-w-0 truncate text-[11px] text-muted-foreground underline">{ secondaryLinkLabel(msg) }</a>
 					}
 					if msg.HeaderSummary != "" {
 						<p class="min-w-0 flex-1 truncate text-[11px] text-muted-foreground">{ msg.HeaderSummary }</p>
@@ -166,8 +174,15 @@ templ ChatMessage(args ChatMessageArgs) {
 		}
 		if isUser {
 			<div class="flex justify-end" data-role="user">
-				<div class="max-w-[85%] rounded-2xl bg-[#30363d] px-3 py-1.5 text-[13px] leading-snug text-white">
-					@bubbleBodyInner(args)
+				<div class="max-w-[85%]">
+					if args.AuthorName != "" {
+						<div class="mb-0.5 text-right">
+							@BubbleAuthorName(args.AuthorName, "text-muted-foreground")
+						</div>
+					}
+					<div class="rounded-2xl bg-[#30363d] px-3 py-1.5 text-[13px] leading-snug text-white">
+						@bubbleBodyInner(args)
+					</div>
 				</div>
 			</div>
 		} else {
@@ -220,19 +235,19 @@ templ ChatMessageDeltaHTML(args ChatMessageDeltaHTMLArgs) {
 
 templ ChatMessageComplete(args ChatMessageCompleteArgs) {
 	@ChatMessage(ChatMessageArgs{
-		ID:            args.ID,
-		Role:          completeBubbleRole(args),
-		Content:       args.Content,
-		HTMLContent:   args.HTMLContent,
-		AuthorInitial: args.AuthorInitial,
-		AuthorName:    args.AuthorName,
-		AvatarBg:      args.AvatarBg,
-		NameColor:     args.NameColor,
-		QuoteInitial:  args.QuoteInitial,
-		QuoteName:     args.QuoteName,
-		QuoteAvatarBg: args.QuoteAvatarBg,
+		ID:             args.ID,
+		Role:           completeBubbleRole(args),
+		Content:        args.Content,
+		HTMLContent:    args.HTMLContent,
+		AuthorInitial:  args.AuthorInitial,
+		AuthorName:     args.AuthorName,
+		AvatarBg:       args.AvatarBg,
+		NameColor:      args.NameColor,
+		QuoteInitial:   args.QuoteInitial,
+		QuoteName:      args.QuoteName,
+		QuoteAvatarBg:  args.QuoteAvatarBg,
 		QuoteNameColor: args.QuoteNameColor,
-		QuoteText:     args.QuoteText,
+		QuoteText:      args.QuoteText,
 	})
 }
 

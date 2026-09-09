@@ -15,6 +15,10 @@ const (
 	LiveTurnToolCall         LiveTurnItemKind = "tool_call"
 	LiveTurnToolExecution    LiveTurnItemKind = "tool_execution"
 	LiveTurnToolResult       LiveTurnItemKind = "tool_result"
+	LiveTurnHandoff          LiveTurnItemKind = "handoff"
+	LiveTurnCompaction       LiveTurnItemKind = "compaction"
+	LiveTurnMemoryWrite      LiveTurnItemKind = "memory_write"
+	LiveTurnMemoryRead       LiveTurnItemKind = "memory_read"
 )
 
 type ToolExecutionStatus string
@@ -148,6 +152,8 @@ func (r *LiveTurnReducer) Apply(env EventEnvelope) (bool, error) {
 		return r.applyMessageEvent(env)
 	case "tool_execution_start", "tool_execution_update", "tool_execution_end":
 		return r.applyToolExecutionEvent(env)
+	case "handoff", "compaction", "memory_write", "memory_read":
+		return r.applyCutEvent(env)
 	default:
 		return false, nil
 	}
@@ -273,6 +279,16 @@ func (r *LiveTurnReducer) applyToolExecutionEvent(env EventEnvelope) (bool, erro
 	}
 
 	r.upsertToolExecutionItem(toolExecutionKey(item.ToolCallID), item)
+	return true, nil
+}
+
+func (r *LiveTurnReducer) applyCutEvent(env EventEnvelope) (bool, error) {
+	kind := LiveTurnItemKind(strings.TrimSpace(env.EventType))
+	r.appendItem(LiveTurnItem{
+		Kind:        kind,
+		MessageJSON: cloneRawMessage(json.RawMessage(env.PayloadJSON)),
+		IsFinal:     true,
+	})
 	return true, nil
 }
 
