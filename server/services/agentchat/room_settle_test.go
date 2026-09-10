@@ -376,3 +376,171 @@ func TestSettleHotRoomPlanDoesNotWriteSpeakerMemory(t *testing.T) {
 		t.Fatalf("plan settle wrote speaker MEMORY.md: %v", err)
 	}
 }
+
+func TestSettleHotRoomRetryKeepsHistoryAndOneCut(t *testing.T) {
+	t.Parallel()
+	thoughtsRoot := t.TempDir()
+	home := filepath.Join(thoughtsRoot, "agents", "nova")
+	if err := os.MkdirAll(filepath.Join(home, "sessions"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(
+		filepath.Join(home, "notes.md"),
+		[]byte("note"),
+		0o644,
+	); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(
+		filepath.Join(home, "sessions", "current.jsonl"),
+		[]byte("window-keep\n"),
+		0o644,
+	); err != nil {
+		t.Fatal(err)
+	}
+	database, err := serverdb.NewService(filepath.Join(t.TempDir(), "settle-retry.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = database.Close() })
+	threadID := "thread-settle-retry"
+	if _, err := database.Queries.CreateAgentThread(
+		t.Context(),
+		db.CreateAgentThreadParams{
+			ID:        threadID,
+			UserEmail: "owner@example.com",
+			Title:     "Nova",
+			Cwd:       home,
+			LineageID: threadID,
+			ProjectID: "p",
+		},
+	); err != nil {
+		t.Fatal(err)
+	}
+	service := &Service{
+		db:           database.DB(),
+		queries:      database.Queries,
+		thoughtsRoot: thoughtsRoot,
+	}
+	in := SettleHotRoomInput{
+		ThreadID:    threadID,
+		UsageHot:    true,
+		Timestamp:   "2026-09-10_05-03-00",
+		HandoffBody: "cut",
+		Files:       []string{"thoughts/agents/nova/notes.md"},
+		SpeakerSlug: "nova",
+	}
+	first, err := service.SettleHotRoom(t.Context(), in)
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := service.SettleHotRoom(t.Context(), in)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if first.CutEntryID == "" || first.CutEntryID != second.CutEntryID {
+		t.Fatalf("cut ids %q vs %q", first.CutEntryID, second.CutEntryID)
+	}
+	hist, err := os.ReadFile(filepath.Join(
+		home, "sessions", "history", "2026-09-10_05-03-00.jsonl",
+	))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(hist) != "window-keep\n" {
+		t.Fatalf("history clobbered: %q", hist)
+	}
+	thread, err := database.Queries.GetAgentThread(t.Context(), threadID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	path, err := database.Queries.ListAgentEntryPath(
+		t.Context(),
+		db.ListAgentEntryPathParams{
+			LineageID:   threadID,
+			HeadEntryID: thread.HeadEntryID.String,
+		},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cuts := 0
+	for _, row := range path {
+		if row.EntryType == "handoff" {
+			cuts++
+		}
+	}
+	if cuts != 1 {
+		t.Fatalf("handoff cuts = %d", cuts)
+	}
+}
+
+func TestSettleHotRoomPairwiseWritesSpeakerRoleFiles(t *testing.T) {
+	t.Parallel()
+	thoughtsRoot := t.TempDir()
+	pair := filepath.Join(thoughtsRoot, "a2a", "aa__bb")
+	if err := os.MkdirAll(filepath.Join(pair, "sessions"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(
+		filepath.Join(pair, "notes.md"),
+		[]byte("pair"),
+		0o644,
+	); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(
+		filepath.Join(pair, "sessions", "current.jsonl"),
+		[]byte("pair-window\n"),
+		0o644,
+	); err != nil {
+		t.Fatal(err)
+	}
+	database, err := serverdb.NewService(filepath.Join(t.TempDir(), "settle-pair.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = database.Close() })
+	threadID := "thread-pair-settle"
+	if _, err := database.Queries.CreateAgentThread(
+		t.Context(),
+		db.CreateAgentThreadParams{
+			ID:        threadID,
+			UserEmail: "owner@example.com",
+			Title:     "Pair",
+			Cwd:       pair,
+			LineageID: threadID,
+			ProjectID: "p",
+		},
+	); err != nil {
+		t.Fatal(err)
+	}
+	service := &Service{
+		db:           database.DB(),
+		queries:      database.Queries,
+		thoughtsRoot: thoughtsRoot,
+	}
+	_, err = service.SettleHotRoom(t.Context(), SettleHotRoomInput{
+		ThreadID:    threadID,
+		UsageHot:    true,
+		Timestamp:   "2026-09-10_05-04-00",
+		Files:       []string{"thoughts/a2a/aa__bb/notes.md"},
+		SpeakerSlug: "aa",
+		RoleMemoryFiles: map[string]string{
+			"MEMORY.md": "pairwise role note",
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	mem, err := os.ReadFile(filepath.Join(thoughtsRoot, "agents", "aa", "MEMORY.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(mem) != "pairwise role note" {
+		t.Fatalf("MEMORY.md = %q", mem)
+	}
+	if _, err := os.Stat(filepath.Join(pair, "MEMORY.md")); !os.IsNotExist(err) {
+		t.Fatalf("pairwise notebook MEMORY.md: %v", err)
+	}
+}

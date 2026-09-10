@@ -129,10 +129,18 @@ func RotateRoomCurrentJSONL(
 		return out, err
 	}
 
-	if err := os.Rename(currentAbs, historyAbs); err != nil {
+	if _, err := os.Stat(historyAbs); err == nil {
+		// Retry after a completed rotate: keep the archived window.
+	} else if !os.IsNotExist(err) {
+		return out, err
+	} else if err := os.Rename(currentAbs, historyAbs); err != nil {
 		return out, err
 	}
-	if err := os.WriteFile(currentAbs, nil, 0o644); err != nil {
+	if _, err := os.Stat(currentAbs); err == nil {
+		// Current already exists (empty after rotate, or still live).
+	} else if !os.IsNotExist(err) {
+		return out, err
+	} else if err := os.WriteFile(currentAbs, nil, 0o644); err != nil {
 		return out, err
 	}
 

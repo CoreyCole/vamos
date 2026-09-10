@@ -48,7 +48,7 @@ func (s *Service) SettleHotRoom(
 	if err != nil {
 		return SettleHotRoomResult{}, err
 	}
-	if room.Kind == RoomKindBotHome {
+	if room.Kind != RoomKindPlan {
 		if err := writeSpeakerRoleMemories(
 			s.thoughtsRoot,
 			room.SpeakerSlug,
@@ -124,6 +124,16 @@ func (s *Service) insertHandoffCutRow(
 	thread db.AgentThread,
 	rotated RoomRotateResult,
 ) (string, error) {
+	s.callbackWriteMu.Lock()
+	defer s.callbackWriteMu.Unlock()
+
+	latest, err := s.queries.GetAgentThread(ctx, thread.ID)
+	if err == nil {
+		thread = latest
+	}
+	if existing, ok := s.existingHandoffCutID(ctx, thread, rotated.Timestamp); ok {
+		return existing, nil
+	}
 	parentID := ""
 	if thread.HeadEntryID.Valid {
 		parentID = strings.TrimSpace(thread.HeadEntryID.String)
@@ -141,9 +151,6 @@ func (s *Service) insertHandoffCutRow(
 	if err != nil {
 		return "", err
 	}
-
-	s.callbackWriteMu.Lock()
-	defer s.callbackWriteMu.Unlock()
 
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -176,4 +183,36 @@ func (s *Service) insertHandoffCutRow(
 		return "", err
 	}
 	return entryID, nil
+}
+
+func (s *Service) existingHandoffCutID(
+	ctx context.Context,
+	thread db.AgentThread,
+	timestamp string,
+) (string, bool) {
+	if !thread.HeadEntryID.Valid {
+		return "", false
+	}
+	path, err := s.queries.ListAgentEntryPath(ctx, db.ListAgentEntryPathParams{
+		LineageID:   thread.LineageID,
+		HeadEntryID: thread.HeadEntryID.String,
+	})
+	if err != nil {
+		return "", false
+	}
+	for _, row := range path {
+		if row.EntryType != "handoff" {
+			continue
+		}
+		var payload struct {
+			Timestamp string `json:"timestamp"`
+		}
+		if err := json.Unmarshal([]byte(row.PayloadJson), &payload); err != nil {
+			continue
+		}
+		if payload.Timestamp == timestamp {
+			return row.EntryID, true
+		}
+	}
+	return "", false
 }
