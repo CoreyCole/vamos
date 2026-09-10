@@ -15,13 +15,14 @@ import (
 )
 
 type EnqueueThreadMailInput struct {
-	ThreadID       string `json:"thread_id"`
-	OpID           string `json:"op_id"`
-	SpeakerAgentID string `json:"speaker_agent_id"`
-	FromKind       string `json:"from_kind"`
-	FromAgentID    string `json:"from_agent_id"`
-	FromUserEmail  string `json:"from_user_email"`
-	Body           string `json:"body"`
+	ThreadID       string         `json:"thread_id"`
+	OpID           string         `json:"op_id"`
+	SpeakerAgentID string         `json:"speaker_agent_id"`
+	FromKind       string         `json:"from_kind"`
+	FromAgentID    string         `json:"from_agent_id"`
+	FromUserEmail  string         `json:"from_user_email"`
+	Body           string         `json:"body"`
+	Attachments    []AttachedPath `json:"attachments,omitempty"`
 }
 
 type EnqueueThreadMailResult struct {
@@ -100,6 +101,7 @@ func (s *Service) EnqueueThreadMail(
 		FromAgentID:    strings.TrimSpace(in.FromAgentID),
 		FromUserEmail:  strings.TrimSpace(in.FromUserEmail),
 		Body:           body,
+		Attachments:    attachmentPaths(in.Attachments),
 	}
 	if _, err := s.temporal.SignalWithStartWorkflow(
 		ctx,
@@ -109,6 +111,10 @@ func (s *Service) EnqueueThreadMail(
 		conversationworkflow.ThreadInboxWorkflow,
 		conversation.ThreadWorkflowInput{ThreadID: threadID},
 	); err != nil {
+		_ = s.queries.DeleteAgentThreadOp(ctx, db.DeleteAgentThreadOpParams{
+			ThreadID: threadID,
+			OpID:     opID,
+		})
 		return EnqueueThreadMailResult{}, err
 	}
 	return EnqueueThreadMailResult{WorkflowID: workflowID}, nil
@@ -133,7 +139,7 @@ func (s *Service) PrepareThreadTurn(
 	if speakerID == "" {
 		speakerID = speakerAgentIDForMail(thread, mail.FromKind, mail.FromAgentID)
 	}
-	run, err := s.createQueuedRun(ctx, s.queries, thread, mail.Body, speakerID)
+	run, err := s.createQueuedRun(ctx, s.queries, thread, mail, speakerID)
 	if err != nil {
 		return conversation.RunInput{}, err
 	}
@@ -149,11 +155,52 @@ func (s *Service) PrepareThreadTurn(
 	return prepared.Input, nil
 }
 
+func threadTurnRunID(threadID, opID string) string {
+	return uuid.NewSHA1(
+		uuid.NameSpaceOID,
+		[]byte(strings.TrimSpace(threadID)+"\x00"+strings.TrimSpace(opID)),
+	).String()
+}
+
+func attachmentPaths(paths []AttachedPath) []string {
+	out := make([]string, 0, len(paths))
+	for _, p := range paths {
+		path := strings.TrimSpace(p.Path)
+		if path == "" {
+			continue
+		}
+		out = append(out, path)
+	}
+	return out
+}
+
+func attachedPathsFromMail(paths []string) []AttachedPath {
+	out := make([]AttachedPath, 0, len(paths))
+	for _, path := range paths {
+		path = strings.TrimSpace(path)
+		if path == "" {
+			continue
+		}
+		out = append(out, AttachedPath{Path: path, Basename: pathBase(path)})
+	}
+	return out
+}
+
+func pathBase(path string) string {
+	path = strings.ReplaceAll(path, "\\", "/")
+	i := strings.LastIndex(path, "/")
+	if i < 0 {
+		return path
+	}
+	return path[i+1:]
+}
+
 func (s *Service) createQueuedRun(
 	ctx context.Context,
 	q *db.Queries,
 	thread db.AgentThread,
-	prompt, speakerAgentID string,
+	mail conversation.ThreadMail,
+	speakerAgentID string,
 ) (db.AgentRun, error) {
 	workspaceID := sql.NullString{}
 	workspace, err := q.GetPrimaryWorkspaceForThread(
@@ -169,7 +216,7 @@ func (s *Service) createQueuedRun(
 	if err == nil {
 		workspaceID = nullString(workspace.ID)
 	}
-	runID := uuid.NewString()
+	runID := threadTurnRunID(thread.ID, mail.OpID)
 	workflowID := conversation.ThreadWorkflowID(thread.ID)
 	docRoot := thread.Cwd
 	run, err := q.CreateAgentRun(ctx, db.CreateAgentRunParams{
@@ -179,7 +226,7 @@ func (s *Service) createQueuedRun(
 		SessionID:            sql.NullString{},
 		Trigger:              string(conversation.RunTriggerResume),
 		Status:               "running",
-		PromptText:           prompt,
+		PromptText:           mail.Body,
 		RestoreHeadEntryID:   thread.HeadEntryID,
 		ResultHeadEntryID:    sql.NullString{},
 		WorkflowID:           workflowID,
@@ -197,9 +244,25 @@ func (s *Service) createQueuedRun(
 	})
 	if err != nil {
 		if isUniqueConstraintError(err) {
+			existing, getErr := q.GetAgentRun(ctx, runID)
+			if getErr == nil {
+				return existing, nil
+			}
 			return db.AgentRun{}, ErrThreadRunInProgress
 		}
 		return db.AgentRun{}, err
+	}
+	existing, listErr := q.ListAgentRunAttachmentsForRun(ctx, run.ID)
+	if listErr == nil && len(existing) == 0 {
+		if err := s.appendRunAttachments(
+			ctx,
+			q,
+			run.ID,
+			thread.ID,
+			attachedPathsFromMail(mail.Attachments),
+		); err != nil {
+			return db.AgentRun{}, err
+		}
 	}
 	return run, nil
 }

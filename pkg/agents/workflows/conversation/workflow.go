@@ -50,9 +50,7 @@ func ThreadInboxWorkflow(
 		}
 		item := inbox[0]
 		inbox = inbox[1:]
-		if err := drainMailItem(ctx, item); err != nil {
-			return err
-		}
+		_ = drainMailItem(ctx, item)
 	}
 }
 

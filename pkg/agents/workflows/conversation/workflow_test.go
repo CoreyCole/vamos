@@ -115,6 +115,65 @@ func TestThreadInboxWorkflowDrainsTwoMailsThenCompletes(t *testing.T) {
 	}
 }
 
+func TestThreadInboxWorkflowContinuesAfterFailedDrain(t *testing.T) {
+	t.Parallel()
+
+	var suite testsuite.WorkflowTestSuite
+	env := suite.NewTestWorkflowEnvironment()
+	prepareCalls := 0
+	turnCalls := 0
+	env.RegisterActivityWithOptions(
+		func(mail conversation.ThreadMail) (conversation.RunInput, error) {
+			prepareCalls++
+			return conversation.RunInput{
+				RunID:    mail.OpID,
+				ThreadID: mail.ThreadID,
+				Prompt:   mail.Body,
+			}, nil
+		},
+		activity.RegisterOptions{Name: conversation.ActivityPrepareThreadTurn},
+	)
+	env.RegisterActivityWithOptions(
+		func(input conversation.RunInput) (conversation.RunResult, error) {
+			turnCalls++
+			if input.RunID == "op-a" {
+				return conversation.RunResult{}, errors.New("pi failed")
+			}
+			return conversation.RunResult{
+				RunID:    input.RunID,
+				ThreadID: input.ThreadID,
+			}, nil
+		},
+		activity.RegisterOptions{Name: "RunConversationTurn"},
+	)
+	env.RegisterActivityWithOptions(
+		func(conversation.ActivityFailureInput) error { return nil },
+		activity.RegisterOptions{Name: "FailConversationRunAfterActivityError"},
+	)
+	env.RegisterDelayedCallback(func() {
+		env.SignalWorkflow(conversation.ThreadMailSignal, conversation.ThreadMail{
+			ThreadID: "thread-1", OpID: "op-a", Body: "one",
+		})
+		env.SignalWorkflow(conversation.ThreadMailSignal, conversation.ThreadMail{
+			ThreadID: "thread-1", OpID: "op-b", Body: "two",
+		})
+	}, 0)
+
+	env.ExecuteWorkflow(
+		ThreadInboxWorkflow,
+		conversation.ThreadWorkflowInput{ThreadID: "thread-1"},
+	)
+	if !env.IsWorkflowCompleted() {
+		t.Fatal("workflow did not complete")
+	}
+	if env.GetWorkflowError() != nil {
+		t.Fatalf("workflow error: %v", env.GetWorkflowError())
+	}
+	if prepareCalls != 2 || turnCalls != 2 {
+		t.Fatalf("prepare=%d turn=%d, want 2/2", prepareCalls, turnCalls)
+	}
+}
+
 func TestRunTurnWorkflowIncludesFinalizerError(t *testing.T) {
 	t.Parallel()
 

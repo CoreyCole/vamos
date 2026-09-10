@@ -26,13 +26,14 @@ const (
 )
 
 type ThreadMail struct {
-	ThreadID       string `json:"thread_id"`
-	OpID           string `json:"op_id"`
-	SpeakerAgentID string `json:"speaker_agent_id,omitempty"`
-	FromKind       string `json:"from_kind"`
-	FromAgentID    string `json:"from_agent_id,omitempty"`
-	FromUserEmail  string `json:"from_user_email,omitempty"`
-	Body           string `json:"body"`
+	ThreadID       string   `json:"thread_id"`
+	OpID           string   `json:"op_id"`
+	SpeakerAgentID string   `json:"speaker_agent_id,omitempty"`
+	FromKind       string   `json:"from_kind"`
+	FromAgentID    string   `json:"from_agent_id,omitempty"`
+	FromUserEmail  string   `json:"from_user_email,omitempty"`
+	Body           string   `json:"body"`
+	Attachments    []string `json:"attachments,omitempty"`
 }
 
 type ThreadWorkflowInput struct {

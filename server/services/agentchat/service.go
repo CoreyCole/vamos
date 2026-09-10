@@ -1456,11 +1456,11 @@ func (s *Service) ResumeThread(
 		FromKind:      EnqueueFromUser,
 		FromUserEmail: userEmail,
 		Body:          prompt,
+		Attachments:   flattenAttachedPaths(attachments),
 	})
 	if err != nil {
 		return &thread, nil, err
 	}
-	_ = attachments
 	return &thread, nil, nil
 }
 
@@ -1858,7 +1858,11 @@ func (s *Service) buildRunInput(
 		}
 	}
 	chatSessionID := s.chatSessionIDForRun(ctx, run)
-	room, sessionFile, cwd, injectFiles, err := s.prepareRoomSession(thread)
+	room, sessionFile, cwd, injectFiles, err := s.prepareRoomSession(
+		ctx,
+		thread,
+		run.SpeakerAgentID.String,
+	)
 	if err != nil {
 		return preparedRunInput{}, err
 	}
@@ -1900,9 +1904,17 @@ func (s *Service) buildRunInput(
 }
 
 func (s *Service) prepareRoomSession(
+	ctx context.Context,
 	thread db.AgentThread,
+	speakerAgentID string,
 ) (RoomIdentity, string, string, []conversation.InjectFile, error) {
-	room, err := RoomIdentityFromThread(s.thoughtsRoot, thread, "")
+	speakerSlug := ""
+	if id := strings.TrimSpace(speakerAgentID); id != "" {
+		if agent, err := s.queries.GetAgent(ctx, id); err == nil {
+			speakerSlug = strings.TrimSpace(agent.Slug)
+		}
+	}
+	room, err := RoomIdentityFromThread(s.thoughtsRoot, thread, speakerSlug)
 	if err == nil && strings.TrimSpace(s.thoughtsRoot) != "" {
 		sessionFile, err := EnsureRoomCurrentJSONL(s.thoughtsRoot, room)
 		if err != nil {

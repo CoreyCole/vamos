@@ -29,3 +29,8 @@ AND op_id = sqlc.arg ('op_id') ;
 SELECT COUNT (*)
 FROM agent_thread_ops
 WHERE thread_id = sqlc.arg ('thread_id') ;
+
+-- name: DeleteAgentThreadOp :exec
+DELETE FROM agent_thread_ops
+WHERE thread_id = sqlc.arg ('thread_id')
+AND op_id = sqlc.arg ('op_id') ;

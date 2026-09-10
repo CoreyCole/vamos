@@ -25,6 +25,24 @@ func (q *Queries) CountAgentThreadOps(ctx context.Context, threadID string) (int
 	return count, err
 }
 
+const deleteAgentThreadOp = `-- name: DeleteAgentThreadOp :exec
+;
+
+DELETE FROM agent_thread_ops
+WHERE thread_id = ?1
+AND op_id = ?2
+`
+
+type DeleteAgentThreadOpParams struct {
+	ThreadID string `json:"thread_id"`
+	OpID     string `json:"op_id"`
+}
+
+func (q *Queries) DeleteAgentThreadOp(ctx context.Context, arg DeleteAgentThreadOpParams) error {
+	_, err := q.db.ExecContext(ctx, deleteAgentThreadOp, arg.ThreadID, arg.OpID)
+	return err
+}
+
 const getAgentThreadOp = `-- name: GetAgentThreadOp :one
 ;
 

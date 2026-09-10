@@ -49,6 +49,7 @@ type Querier interface {
 	CreateSession(ctx context.Context, arg CreateSessionParams) (Session, error)
 	CreateWorkspace(ctx context.Context, arg CreateWorkspaceParams) (Workspace, error)
 	CreateWorkspaceEvent(ctx context.Context, arg CreateWorkspaceEventParams) (WorkspaceEvent, error)
+	DeleteAgentThreadOp(ctx context.Context, arg DeleteAgentThreadOpParams) error
 	DeleteExpiredSessions(ctx context.Context) error
 	DeleteLayoutPreference(ctx context.Context, arg DeleteLayoutPreferenceParams) error
 	DeleteOldestSnapshotProcesses(ctx context.Context, limit int64) error

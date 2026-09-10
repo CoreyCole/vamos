@@ -1185,17 +1185,6 @@ func (h *Handler) ResumeThreadByPath(c echo.Context) error {
 	if threadID == "" {
 		return echo.NewHTTPError(http.StatusBadRequest, "thread_id is required")
 	}
-	workspace, ok, err := h.service.ResolvePrimaryWorkspaceForThread(
-		c.Request().Context(),
-		userEmail,
-		threadID,
-	)
-	if err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
-	}
-	if ok {
-		return h.resumeWorkspaceThreadByID(c, userEmail, workspace.ID, threadID)
-	}
 	return h.resumeFreeformThreadByID(c, userEmail, threadID)
 }
 
