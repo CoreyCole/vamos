@@ -1749,6 +1749,10 @@ func main() {
 	roomsGroup.Use(authMiddleware)
 	agenthome.RegisterRoomRoutes(roomsGroup, markdownService.ServeAI470Room)
 	agenthome.RegisterBindPlanLeadRoute(roomsGroup, markdownService.HandleBindPlanLead)
+	agenthome.RegisterAgentProfileRoute(
+		roomsGroup,
+		markdownService.HandleUpdateAgentProfile,
+	)
 
 	// Protected form routes - require authentication
 	formsGroup := e.Group("/forms")

@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -190,5 +191,75 @@ func TestHandleCreateAgentRedirectsToBotHome(t *testing.T) {
 	}
 	if loc := rec.Header().Get("Location"); loc != "/rooms/dm/hermes" {
 		t.Fatalf("Location = %q", loc)
+	}
+}
+
+func TestServeAI470RoomProfileViewListsDiskFiles(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	svc, err := NewService(root, nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	svc.WithWorkbenchThreadRenderer(&threadWorkbenchTestRenderer{})
+	if err := seedBotHomeTree(root, "nova", "Nova"); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Remove(filepath.Join(root, "agents", "nova", "USER.md")); err != nil {
+		t.Fatal(err)
+	}
+	rec := httptest.NewRecorder()
+	c := echo.New().NewContext(
+		httptest.NewRequest(http.MethodGet, "/rooms/dm/nova?view=profile", nil),
+		rec,
+	)
+	c.SetParamNames("kind", "id")
+	c.SetParamValues("dm", "nova")
+	if err := svc.ServeAI470Room(c); err != nil {
+		t.Fatal(err)
+	}
+	body := rec.Body.String()
+	for _, want := range []string{"AGENTS.md", "MEMORY.md", `id="agent-profile-files"`} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("missing %q: %s", want, body)
+		}
+	}
+	if strings.Contains(body, "USER.md") {
+		t.Fatalf("invented missing USER.md: %s", body)
+	}
+}
+
+func TestHandleUpdateAgentProfileWritesDiskFile(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	svc, err := NewService(root, nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := seedBotHomeTree(root, "nova", "Nova"); err != nil {
+		t.Fatal(err)
+	}
+	form := url.Values{}
+	form.Set("file", "MEMORY.md")
+	form.Set("body", "# updated memory\n")
+	req := httptest.NewRequest(
+		http.MethodPost,
+		"/rooms/dm/nova/profile",
+		strings.NewReader(form.Encode()),
+	)
+	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationForm)
+	rec := httptest.NewRecorder()
+	c := echo.New().NewContext(req, rec)
+	c.SetParamNames("kind", "id")
+	c.SetParamValues("dm", "nova")
+	if err := svc.HandleUpdateAgentProfile(c); err != nil {
+		t.Fatal(err)
+	}
+	got, err := os.ReadFile(filepath.Join(root, "agents", "nova", "MEMORY.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(got) != "# updated memory\n" {
+		t.Fatalf("disk body = %q", got)
 	}
 }

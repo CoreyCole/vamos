@@ -103,6 +103,11 @@ func (s *Service) ServeAI470Room(c echo.Context) error {
 		chatOpen = true
 	}
 
+	if profileView(c) && kind == agenthome.KindDM {
+		artifactComp = s.agentProfilePane(kind, id, c.QueryParam("file"))
+		_ = mobileActiveRegionForRoom("profile")
+	}
+
 	chatOpen, commentsOpen := chatCommentsOpen(c.Request(), chatOpen)
 	state, err := workbench.BuildWorkbenchV2State(workbench.WorkbenchV2Args{
 		UserEmail:     userEmail,

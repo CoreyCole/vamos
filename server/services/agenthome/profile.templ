@@ -1,0 +1,41 @@
+package agenthome
+
+templ ProfilePane(args ProfilePaneArgs) {
+	<div id="agent-profile-pane" class="flex h-full min-h-0 flex-col gap-3 overflow-auto p-4">
+		<h2 class="text-sm font-semibold text-foreground">Profile</h2>
+		<p class="text-xs text-muted-foreground">Files on disk under thoughts/agents/{ args.Slug }/.</p>
+		if len(args.Files) == 0 {
+			<p id="agent-profile-empty" class="text-sm text-muted-foreground">No profile files on disk.</p>
+		} else {
+			<ul id="agent-profile-files" class="flex flex-col gap-1 text-sm">
+				for _, file := range args.Files {
+					<li>
+						<a
+							class="underline"
+							href={ templ.SafeURL(ProfileGETPath(args.Kind, args.Slug, file.RelPath)) }
+						>{ file.RelPath }</a>
+					</li>
+				}
+			</ul>
+		}
+		if args.Selected != "" {
+			<form
+				id="agent-profile-edit"
+				method="post"
+				action={ templ.SafeURL(ProfilePOSTPath(args.Kind, args.Slug)) }
+				class="flex min-h-0 flex-1 flex-col gap-2"
+			>
+				<input type="hidden" name="file" value={ args.Selected }/>
+				<label class="text-xs text-muted-foreground" for="agent-profile-body">{ args.Selected }</label>
+				<textarea
+					id="agent-profile-body"
+					name="body"
+					class="min-h-48 w-full rounded-md border border-border bg-background p-2 font-mono text-sm"
+				>{ args.Body }</textarea>
+				<button type="submit" class="w-fit rounded-md border border-border px-3 py-1 text-sm">
+					Save
+				</button>
+			</form>
+		}
+	</div>
+}
