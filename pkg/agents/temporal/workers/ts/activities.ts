@@ -5,6 +5,10 @@ import {
 	AuthStorage,
 	ModelRegistry,
 } from '@mariozechner/pi-coding-agent';
+import {
+	agentMemoryTools,
+	agentMemoryToolsEnabled,
+} from './agent_memory.js';
 import type {
 	ConversationRunFailure,
 	ConversationRunInput,
@@ -50,6 +54,9 @@ export async function RunConversationTurn(
 		}),
 	});
 
+	const customTools = agentMemoryToolsEnabled(input.room?.kind)
+		? agentMemoryTools()
+		: undefined;
 	const { session } = await createAgentSession({
 		cwd: input.cwd,
 		sessionManager,
@@ -58,6 +65,7 @@ export async function RunConversationTurn(
 		model: model ?? undefined,
 		thinkingLevel: input.thinking_level as any,
 		resourceLoader,
+		customTools,
 	});
 	session.setAutoCompactionEnabled(false);
 
