@@ -1,9 +1,19 @@
 package markdown
 
 import (
+	"context"
+	"database/sql"
+	"errors"
+	"html"
+	"net/http"
 	"net/url"
 	"path/filepath"
 	"strings"
+
+	"github.com/a-h/templ"
+	"github.com/labstack/echo/v4"
+
+	"github.com/CoreyCole/vamos/pkg/db"
 )
 
 func planLeadRoomID(docPath string) string {
@@ -48,4 +58,213 @@ func planLeadChatHref(docPath string) string {
 		return href
 	}
 	return href + "?artifact=" + url.QueryEscape("thoughts/"+canonical)
+}
+
+func (s *Service) HandleBindPlanLead(c echo.Context) error {
+	if s.queries == nil {
+		return echo.NewHTTPError(
+			http.StatusServiceUnavailable,
+			"database is not configured",
+		)
+	}
+	slug := strings.TrimSpace(c.FormValue("agent_slug"))
+	if slug == "" {
+		return echo.NewHTTPError(http.StatusBadRequest, "agent_slug required")
+	}
+	agent, err := s.queries.GetAgentBySlug(c.Request().Context(), slug)
+	if errors.Is(err, sql.ErrNoRows) {
+		return echo.NewHTTPError(http.StatusNotFound, "agent not found")
+	}
+	if err != nil {
+		return err
+	}
+	artifact := strings.TrimSpace(c.FormValue("artifact"))
+	roomID := strings.TrimSpace(c.Param("id"))
+	planRel, err := s.resolvePlanDirRelForRoom(c.Request().Context(), roomID, artifact)
+	if err != nil {
+		return err
+	}
+	if planRel == "" {
+		return echo.NewHTTPError(http.StatusNotFound, "plan workspace not found")
+	}
+	if err := s.queries.SetPlanWorkspaceLeadAgent(
+		c.Request().Context(),
+		db.SetPlanWorkspaceLeadAgentParams{
+			LeadAgentID: sql.NullString{String: agent.ID, Valid: true},
+			PlanDirRel:  planRel,
+		},
+	); err != nil {
+		return err
+	}
+	userEmail, _ := c.Get("user_email").(string)
+	if s.workbenchThreadsRenderer != nil && artifact != "" && userEmail != "" {
+		threadID, err := s.workbenchThreadsRenderer.EnsureSharedThreadForDoc(
+			c.Request().Context(), artifact, userEmail,
+		)
+		if err != nil {
+			return err
+		}
+		if threadID != "" {
+			row, err := s.queries.GetPlanWorkspace(c.Request().Context(), planRel)
+			if err != nil {
+				return err
+			}
+			if err := s.queries.BindAgentThreadPlan(
+				c.Request().Context(),
+				db.BindAgentThreadPlanParams{
+					AgentID: sql.NullString{String: agent.ID, Valid: true},
+					Cwd:     row.PlanDir,
+					Title:   row.Label,
+					ID:      threadID,
+				},
+			); err != nil {
+				return err
+			}
+		}
+	}
+	target := "/rooms/plan/" + roomID
+	if artifact != "" {
+		target += "?artifact=" + artifact
+	}
+	return c.Redirect(http.StatusSeeOther, target)
+}
+
+func (s *Service) planRoomNeedsLead(
+	ctx context.Context,
+	roomID, artifact string,
+) (bool, error) {
+	if s.queries == nil {
+		return false, nil
+	}
+	planRel, err := s.resolvePlanDirRelForRoom(ctx, roomID, artifact)
+	if err != nil {
+		return false, err
+	}
+	if planRel == "" {
+		return true, nil
+	}
+	row, err := s.queries.GetPlanWorkspace(ctx, planRel)
+	if errors.Is(err, sql.ErrNoRows) {
+		return true, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	return !row.LeadAgentID.Valid || strings.TrimSpace(row.LeadAgentID.String) == "", nil
+}
+
+func (s *Service) resolvePlanDirRelForRoom(
+	ctx context.Context,
+	roomID, artifact string,
+) (string, error) {
+	if s.queries == nil {
+		return "", nil
+	}
+	for _, candidate := range []string{strings.TrimSpace(artifact), strings.TrimSpace(roomID)} {
+		if candidate == "" {
+			continue
+		}
+		if row, err := s.queries.GetPlanWorkspace(ctx, candidate); err == nil {
+			return row.PlanDirRel, nil
+		} else if err != nil && !errors.Is(err, sql.ErrNoRows) {
+			return "", err
+		}
+		if !strings.HasPrefix(candidate, "thoughts/") {
+			if row, err := s.queries.GetPlanWorkspace(
+				ctx,
+				"thoughts/"+candidate,
+			); err == nil {
+				return row.PlanDirRel, nil
+			} else if err != nil &&
+				!errors.Is(err, sql.ErrNoRows) {
+				return "", err
+			}
+		}
+	}
+	if artifact != "" {
+		if rel, err := s.lookupPlanDirRelFromArtifact(ctx, artifact); err != nil {
+			return "", err
+		} else if rel != "" {
+			return rel, nil
+		}
+	}
+	if roomID != "" {
+		rows, err := s.queries.ListCurrentPlanWorkspaces(ctx, "")
+		if err != nil {
+			return "", err
+		}
+		for _, row := range rows {
+			if row.Label == roomID || strings.HasSuffix(row.PlanDirRel, "/"+roomID) {
+				return row.PlanDirRel, nil
+			}
+		}
+	}
+	return "", nil
+}
+
+func (s *Service) lookupPlanDirRelFromArtifact(
+	ctx context.Context,
+	artifact string,
+) (string, error) {
+	artifact = strings.TrimSpace(artifact)
+	if artifact == "" {
+		return "", nil
+	}
+	candidates := []string{artifact}
+	if strings.HasPrefix(artifact, "thoughts/") {
+		candidates = append(candidates, strings.TrimPrefix(artifact, "thoughts/"))
+	}
+	for _, c := range candidates {
+		c = strings.TrimSuffix(c, "/")
+		if i := strings.LastIndex(c, "/"); i > 0 {
+			dir := c[:i]
+			if row, err := s.queries.GetPlanWorkspace(ctx, dir); err == nil {
+				return row.PlanDirRel, nil
+			} else if err != nil && !errors.Is(err, sql.ErrNoRows) {
+				return "", err
+			}
+		}
+	}
+	return "", nil
+}
+
+func (s *Service) planLeadBindComponent(
+	ctx context.Context,
+	roomID, artifact string,
+) templ.Component {
+	var b strings.Builder
+	b.WriteString(`<div id="plan-lead-bind" class="space-y-3 p-4">`)
+	b.WriteString(
+		`<p class="text-sm text-muted-foreground">Pick a roster agent as this plan&apos;s lead. Composer stays disabled until a lead is bound.</p>`,
+	)
+	b.WriteString(`<form id="plan-lead-bind-form" method="post" action="/rooms/plan/`)
+	b.WriteString(html.EscapeString(roomID))
+	b.WriteString(`/lead" class="flex flex-col gap-2">`)
+	if artifact != "" {
+		b.WriteString(`<input type="hidden" name="artifact" value="`)
+		b.WriteString(html.EscapeString(artifact))
+		b.WriteString(`"/>`)
+	}
+	b.WriteString(`<label class="text-sm" for="plan-lead-agent-slug">Lead agent</label>`)
+	b.WriteString(
+		`<select id="plan-lead-agent-slug" name="agent_slug" class="rounded-md border border-border bg-background px-2 py-1 text-sm">`,
+	)
+	if s.queries != nil {
+		agents, err := s.queries.ListAgents(ctx)
+		if err == nil {
+			for _, agent := range agents {
+				b.WriteString(`<option value="`)
+				b.WriteString(html.EscapeString(agent.Slug))
+				b.WriteString(`">`)
+				b.WriteString(html.EscapeString(agent.Name))
+				b.WriteString(`</option>`)
+			}
+		}
+	}
+	b.WriteString(`</select>`)
+	b.WriteString(
+		`<button type="submit" class="rounded-md border border-border px-3 py-1 text-sm">Bind lead</button>`,
+	)
+	b.WriteString(`</form></div>`)
+	return templ.Raw(b.String())
 }

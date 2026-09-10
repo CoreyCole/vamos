@@ -124,6 +124,8 @@ type AgentThread struct {
 	ForkedFromEntryID sql.NullString `json:"forked_from_entry_id"`
 	AgentID           sql.NullString `json:"agent_id"`
 	RoomKind          string         `json:"room_kind"`
+	PairAgentIDA      sql.NullString `json:"pair_agent_id_a"`
+	PairAgentIDB      sql.NullString `json:"pair_agent_id_b"`
 	CreatedAt         time.Time      `json:"created_at"`
 	UpdatedAt         time.Time      `json:"updated_at"`
 	ArchivedAt        sql.NullTime   `json:"archived_at"`
@@ -386,19 +388,20 @@ type PiMetadataCursor struct {
 }
 
 type PlanWorkspace struct {
-	PlanDirRel              string       `json:"plan_dir_rel"`
-	ProjectID               string       `json:"project_id"`
-	PlanDir                 string       `json:"plan_dir"`
-	Label                   string       `json:"label"`
-	ArtifactUpdatedAt       time.Time    `json:"artifact_updated_at"`
-	QrspiLifecycle          string       `json:"qrspi_lifecycle"`
-	QrspiLifecycleUpdatedAt sql.NullTime `json:"qrspi_lifecycle_updated_at"`
-	QrspiClosedReason       string       `json:"qrspi_closed_reason"`
-	DiscoveredAt            time.Time    `json:"discovered_at"`
-	LastDiscoveredAt        time.Time    `json:"last_discovered_at"`
-	ArchivedAt              sql.NullTime `json:"archived_at"`
-	ArchiveReason           string       `json:"archive_reason"`
-	ArchivedByEmail         string       `json:"archived_by_email"`
+	PlanDirRel              string         `json:"plan_dir_rel"`
+	ProjectID               string         `json:"project_id"`
+	PlanDir                 string         `json:"plan_dir"`
+	Label                   string         `json:"label"`
+	ArtifactUpdatedAt       time.Time      `json:"artifact_updated_at"`
+	QrspiLifecycle          string         `json:"qrspi_lifecycle"`
+	QrspiLifecycleUpdatedAt sql.NullTime   `json:"qrspi_lifecycle_updated_at"`
+	QrspiClosedReason       string         `json:"qrspi_closed_reason"`
+	DiscoveredAt            time.Time      `json:"discovered_at"`
+	LastDiscoveredAt        time.Time      `json:"last_discovered_at"`
+	ArchivedAt              sql.NullTime   `json:"archived_at"`
+	ArchiveReason           string         `json:"archive_reason"`
+	ArchivedByEmail         string         `json:"archived_by_email"`
+	LeadAgentID             sql.NullString `json:"lead_agent_id"`
 }
 
 type PlanWorkspaceImplBinding struct {

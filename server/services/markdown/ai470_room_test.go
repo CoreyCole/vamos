@@ -129,4 +129,7 @@ func TestAI470RoomComposerDisabledDoesNotTreatKindAgentDMAsPairwise(t *testing.T
 	if !AI470PairwiseComposerDisabled() {
 		t.Fatal("pairwise rooms must disable composer")
 	}
+	if !AI470RoomComposerDisabled(agenthome.KindA2A, "nova/research") {
+		t.Fatal("KindA2A must disable composer")
+	}
 }

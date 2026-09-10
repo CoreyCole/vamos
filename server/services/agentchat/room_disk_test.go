@@ -261,3 +261,26 @@ func TestSeedBotHomeTree(t *testing.T) {
 		t.Fatalf("AGENTS.md embedded a roster table: %s", body)
 	}
 }
+
+func TestSeedPairwiseTreeHasWorkingContextOnly(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	if err := SeedPairwiseTree(root, "research", "nova"); err != nil {
+		t.Fatal(err)
+	}
+	dir := filepath.Join(root, "a2a", "nova__research")
+	for _, path := range []string{
+		filepath.Join(dir, "sessions", "current.jsonl"),
+		filepath.Join(dir, "sessions", "history"),
+		filepath.Join(dir, "sessions", "handoffs"),
+	} {
+		if _, err := os.Stat(path); err != nil {
+			t.Fatalf("missing %s: %v", path, err)
+		}
+	}
+	for _, notebook := range []string{"AGENTS.md", "MEMORY.md", "USER.md"} {
+		if _, err := os.Stat(filepath.Join(dir, notebook)); err == nil {
+			t.Fatalf("pairwise must not seed %s", notebook)
+		}
+	}
+}

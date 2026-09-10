@@ -326,6 +326,48 @@ func SeedBotHomeTree(thoughtsRoot, slug, name string) error {
 	return nil
 }
 
+// SeedPairwiseTree writes thoughts/a2a/{a}__{b}/sessions only (no standing notebook).
+func SeedPairwiseTree(thoughtsRoot, a, b string) error {
+	left, right, err := CanonicalPairSlugs(a, b)
+	if err != nil {
+		return err
+	}
+	if err := validateSlug(left); err != nil {
+		return err
+	}
+	if err := validateSlug(right); err != nil {
+		return err
+	}
+	id := RoomIdentity{Kind: RoomKindPairwise, PairA: left, PairB: right}
+	root, err := RoomCwdAbs(thoughtsRoot, id)
+	if err != nil {
+		return err
+	}
+	history := filepath.Join(root, sessionsDirName, historyDirName)
+	handoffs := filepath.Join(root, sessionsDirName, handoffsDirName)
+	for _, dir := range []string{history, handoffs} {
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			return err
+		}
+	}
+	rel, err := id.CurrentJSONLRel()
+	if err != nil {
+		return err
+	}
+	current, err := AbsFromThoughtsRel(thoughtsRoot, rel)
+	if err != nil {
+		return err
+	}
+	if _, err := os.Stat(current); os.IsNotExist(err) {
+		if err := os.WriteFile(current, nil, 0o644); err != nil {
+			return err
+		}
+	} else if err != nil {
+		return err
+	}
+	return nil
+}
+
 type AgentRosterRow struct {
 	Slug        string
 	Name        string

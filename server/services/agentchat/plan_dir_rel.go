@@ -177,19 +177,39 @@ func (s *Service) EnsureSharedThreadForDoc(
 	if title == "" || title == "." {
 		title = "Plan chat"
 	}
-	thread, err := s.queries.CreateAgentThread(
-		ctx,
-		s.attachPlanDirRel(ctx, db.CreateAgentThreadParams{
-			ID:         uuid.NewString(),
-			UserEmail:  userEmail,
-			Title:      title,
-			Cwd:        cwd,
-			LineageID:  uuid.NewString(),
-			ProjectID:  "",
-			PlanDirRel: sql.NullString{},
-		}),
-	)
+	params := s.attachPlanDirRel(ctx, db.CreateAgentThreadParams{
+		ID:         uuid.NewString(),
+		UserEmail:  userEmail,
+		Title:      title,
+		Cwd:        cwd,
+		LineageID:  uuid.NewString(),
+		ProjectID:  "",
+		PlanDirRel: sql.NullString{},
+	})
+	thread, err := s.queries.CreateAgentThread(ctx, params)
 	if err != nil {
+		return "", err
+	}
+	lead := sql.NullString{}
+	if params.PlanDirRel.Valid {
+		if row, err := s.queries.GetPlanWorkspace(
+			ctx,
+			params.PlanDirRel.String,
+		); err == nil {
+			lead = row.LeadAgentID
+		} else if !errors.Is(
+			err,
+			sql.ErrNoRows,
+		) {
+			return "", err
+		}
+	}
+	if err := s.queries.BindAgentThreadPlan(ctx, db.BindAgentThreadPlanParams{
+		AgentID: lead,
+		Cwd:     cwd,
+		Title:   title,
+		ID:      thread.ID,
+	}); err != nil {
 		return "", err
 	}
 	return thread.ID, nil

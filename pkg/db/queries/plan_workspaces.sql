@@ -47,7 +47,12 @@ WHERE plan_dir_rel = sqlc.arg('plan_dir_rel');
 SELECT *
 FROM plan_workspaces
 WHERE plan_dir = sqlc.arg('plan_dir')
-LIMIT 1 ;
+LIMIT 1;
+
+-- name: SetPlanWorkspaceLeadAgent :exec
+UPDATE plan_workspaces
+SET lead_agent_id = sqlc.arg('lead_agent_id')
+WHERE plan_dir_rel = sqlc.arg('plan_dir_rel');
 
 -- name: UpsertDiscoveredPlanWorkspace :one
 INSERT INTO plan_workspaces (
@@ -84,30 +89,30 @@ qrspi_lifecycle_updated_at = excluded.qrspi_lifecycle_updated_at,
 qrspi_closed_reason = excluded.qrspi_closed_reason,
 last_discovered_at = CURRENT_TIMESTAMP,
 archived_at = CASE
-  WHEN plan_workspaces.archive_reason = 'manual' THEN plan_workspaces.archived_at
-  ELSE NULL
+WHEN plan_workspaces.archive_reason = 'manual' THEN plan_workspaces.archived_at
+ELSE NULL
 END,
 archive_reason = CASE
-  WHEN plan_workspaces.archive_reason = 'manual' THEN plan_workspaces.archive_reason
-  ELSE ''
+WHEN plan_workspaces.archive_reason = 'manual' THEN plan_workspaces.archive_reason
+ELSE ''
 END,
 archived_by_email = CASE
-  WHEN plan_workspaces.archive_reason = 'manual' THEN plan_workspaces.archived_by_email
-  ELSE ''
+WHEN plan_workspaces.archive_reason = 'manual' THEN plan_workspaces.archived_by_email
+ELSE ''
 END
 RETURNING * ;
 
 -- name: ArchiveMissingPlanWorkspaces :execrows
 UPDATE plan_workspaces
 SET archived_at = CURRENT_TIMESTAMP,
-    archive_reason = 'missing_from_disk'
+archive_reason = 'missing_from_disk'
 WHERE archived_at IS NULL
 AND plan_dir_rel NOT IN (sqlc.slice ('plan_dir_rels')) ;
 
 -- name: ArchiveAllActivePlanWorkspaces :execrows
 UPDATE plan_workspaces
 SET archived_at = CURRENT_TIMESTAMP,
-    archive_reason = 'missing_from_disk'
+archive_reason = 'missing_from_disk'
 WHERE archived_at IS NULL ;
 
 -- name: ListPlanWorkspaceProjects :many
@@ -196,49 +201,49 @@ RETURNING * ;
 -- name: ManualArchivePlanWorkspace :one
 UPDATE plan_workspaces
 SET
-    archived_at = CASE
-        WHEN archive_reason = 'manual' AND archived_at IS NOT NULL THEN archived_at
-        ELSE CURRENT_TIMESTAMP
-    END,
-    archive_reason = 'manual',
-    archived_by_email = CASE
-        WHEN archive_reason = 'manual' AND archived_at IS NOT NULL THEN archived_by_email
-        ELSE sqlc.arg('archived_by_email')
-    END
-WHERE plan_dir_rel = sqlc.arg('plan_dir_rel')
+archived_at = CASE
+WHEN archive_reason = 'manual' AND archived_at IS NOT NULL THEN archived_at
+ELSE CURRENT_TIMESTAMP
+END,
+archive_reason = 'manual',
+archived_by_email = CASE
+WHEN archive_reason = 'manual' AND archived_at IS NOT NULL THEN archived_by_email
+ELSE sqlc.arg ('archived_by_email')
+END
+WHERE plan_dir_rel = sqlc.arg ('plan_dir_rel')
 AND (
-    archived_at IS NULL
-    OR archive_reason = 'manual'
+archived_at IS NULL
+OR archive_reason = 'manual'
 )
-RETURNING *;
+RETURNING * ;
 
 -- name: UnarchiveManualPlanWorkspace :one
 UPDATE plan_workspaces
 SET
-    archived_at = NULL,
-    archive_reason = '',
-    archived_by_email = ''
-WHERE plan_dir_rel = sqlc.arg('plan_dir_rel')
+archived_at = NULL,
+archive_reason = '',
+archived_by_email = ''
+WHERE plan_dir_rel = sqlc.arg ('plan_dir_rel')
 AND archive_reason = 'manual'
 AND archived_at IS NOT NULL
-RETURNING *;
+RETURNING * ;
 
 -- name: ListManualArchivedPlanWorkspaces :many
 SELECT *
 FROM plan_workspaces
 WHERE
-    archive_reason = 'manual'
-    AND archived_at IS NOT NULL
-    AND (
-        CAST(sqlc.arg('project_id') AS TEXT) = ''
-        OR project_id = CAST(sqlc.arg('project_id') AS TEXT)
-        OR EXISTS (
-            SELECT 1
-            FROM plan_workspace_projects pwp
-            WHERE
-                pwp.plan_dir_rel = plan_workspaces.plan_dir_rel
-                AND pwp.project_id = CAST(sqlc.arg('project_id') AS TEXT)
-                AND pwp.archived_at IS NULL
-        )
-    )
-ORDER BY archived_at DESC, LOWER(label), plan_dir_rel;
+archive_reason = 'manual'
+AND archived_at IS NOT NULL
+AND (
+CAST (sqlc.arg ('project_id') AS TEXT) = ''
+OR project_id = CAST (sqlc.arg ('project_id') AS TEXT)
+OR EXISTS (
+SELECT 1
+FROM plan_workspace_projects pwp
+WHERE
+pwp.plan_dir_rel = plan_workspaces.plan_dir_rel
+AND pwp.project_id = CAST (sqlc.arg ('project_id') AS TEXT)
+AND pwp.archived_at IS NULL
+)
+)
+ORDER BY archived_at DESC, LOWER (label), plan_dir_rel ;

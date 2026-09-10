@@ -699,6 +699,7 @@ func ensurePlanWorkspacesColumns(
 		{name: "qrspi_closed_reason", definition: "TEXT NOT NULL DEFAULT ''"},
 		{name: "archive_reason", definition: "TEXT NOT NULL DEFAULT '' CHECK (archive_reason IN ('', 'manual', 'missing_from_disk', 'lifecycle_closed'))"},
 		{name: "archived_by_email", definition: "TEXT NOT NULL DEFAULT ''"},
+		{name: "lead_agent_id", definition: "TEXT REFERENCES agents(id)"},
 	} {
 		if err := ensureColumn(
 			ctx,
@@ -916,10 +917,35 @@ archived_at DATETIME
 	); err != nil {
 		return err
 	}
-	return ensureIndex(
+	if err := ensureColumn(
+		ctx,
+		database,
+		"agent_threads",
+		"pair_agent_id_a",
+		"TEXT REFERENCES agents(id)",
+	); err != nil {
+		return err
+	}
+	if err := ensureColumn(
+		ctx,
+		database,
+		"agent_threads",
+		"pair_agent_id_b",
+		"TEXT REFERENCES agents(id)",
+	); err != nil {
+		return err
+	}
+	if err := ensureIndex(
 		ctx,
 		database,
 		"CREATE UNIQUE INDEX IF NOT EXISTS idx_agent_threads_bot_home_agent ON agent_threads (agent_id) WHERE archived_at IS NULL AND room_kind = 'bot_home' AND agent_id IS NOT NULL",
+	); err != nil {
+		return err
+	}
+	return ensureIndex(
+		ctx,
+		database,
+		"CREATE UNIQUE INDEX IF NOT EXISTS idx_agent_threads_pairwise_agents ON agent_threads (pair_agent_id_a, pair_agent_id_b) WHERE archived_at IS NULL AND room_kind = 'pairwise' AND pair_agent_id_a IS NOT NULL AND pair_agent_id_b IS NOT NULL",
 	)
 }
 

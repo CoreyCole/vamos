@@ -150,6 +150,8 @@ func TestServeAI470RoomUsesBotHomeThreadNotFixtureIndex(t *testing.T) {
 		agenthome.KindDM,
 		"nova",
 		"",
+		"",
+		"",
 		"t@example.com",
 	)
 	if err != nil {

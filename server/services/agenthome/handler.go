@@ -15,12 +15,13 @@ const (
 	KindAgentDM RoomKind = "agent_dm"
 	KindGroup   RoomKind = "group"
 	KindPlan    RoomKind = "plan"
+	KindA2A     RoomKind = "a2a"
 )
 
 // ParseKind validates a room kind path segment.
 func ParseKind(raw string) (RoomKind, bool) {
 	switch RoomKind(strings.TrimSpace(raw)) {
-	case KindDM, KindAgentDM, KindGroup, KindPlan:
+	case KindDM, KindAgentDM, KindGroup, KindPlan, KindA2A:
 		return RoomKind(raw), true
 	default:
 		return "", false
@@ -38,10 +39,16 @@ func RegisterCreateAgentRoute(g *echo.Group, create echo.HandlerFunc) {
 	g.POST("", create)
 }
 
-// RegisterRoomRoutes mounts GET /rooms/:kind/:id.
+// RegisterRoomRoutes mounts GET /rooms/a2a/:a/:b and GET /rooms/:kind/:id.
 // serve is typically markdownService.ServeAI470Room.
 func RegisterRoomRoutes(g *echo.Group, serve echo.HandlerFunc) {
+	g.GET("/a2a/:a/:b", serve)
 	g.GET("/:kind/:id", serve)
+}
+
+// RegisterBindPlanLeadRoute mounts POST /rooms/plan/:id/lead.
+func RegisterBindPlanLeadRoute(g *echo.Group, bind echo.HandlerFunc) {
+	g.POST("/plan/:id/lead", bind)
 }
 
 // RedirectAgentsLand is a tiny helper when markdown is unavailable in tests.

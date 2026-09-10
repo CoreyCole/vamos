@@ -20,6 +20,8 @@ type Querier interface {
 	BackfillAgentRunsWorkspaceForThread(ctx context.Context, arg BackfillAgentRunsWorkspaceForThreadParams) error
 	BackfillAgentSessionsWorkspaceForThread(ctx context.Context, arg BackfillAgentSessionsWorkspaceForThreadParams) error
 	BindAgentThreadBotHome(ctx context.Context, arg BindAgentThreadBotHomeParams) error
+	BindAgentThreadPairwise(ctx context.Context, arg BindAgentThreadPairwiseParams) error
+	BindAgentThreadPlan(ctx context.Context, arg BindAgentThreadPlanParams) error
 	ClaimNextPendingReleaseQueueItem(ctx context.Context) (ReleaseQueueItem, error)
 	ClearAgentThreadDraft(ctx context.Context, arg ClearAgentThreadDraftParams) error
 	ClearInvalidImplWorkspacePlanRefs(ctx context.Context) (int64, error)
@@ -90,6 +92,7 @@ type Querier interface {
 	GetMachineCredential(ctx context.Context, id string) (MachineCredential, error)
 	// Plan-home most-recent chat via idx_agent_threads_plan_updated.
 	GetMostRecentAgentThreadByPlanDirRel(ctx context.Context, planDirRel sql.NullString) (AgentThread, error)
+	GetPairwiseThread(ctx context.Context, arg GetPairwiseThreadParams) (AgentThread, error)
 	GetPiMetadataCursor(ctx context.Context, sourcePath string) (PiMetadataCursor, error)
 	GetPlanWorkspace(ctx context.Context, planDirRel string) (PlanWorkspace, error)
 	GetPlanWorkspaceByPlanDir(ctx context.Context, planDir string) (PlanWorkspace, error)
@@ -194,6 +197,7 @@ type Querier interface {
 	RevokeMachineCredential(ctx context.Context, arg RevokeMachineCredentialParams) (int64, error)
 	// Backfill helper: do not bump updated_at (preserve most-recent ordering).
 	SetAgentThreadPlanDirRel(ctx context.Context, arg SetAgentThreadPlanDirRelParams) error
+	SetPlanWorkspaceLeadAgent(ctx context.Context, arg SetPlanWorkspaceLeadAgentParams) error
 	SoftDeleteDocumentComment(ctx context.Context, id string) error
 	TestSupportCountAgentEntries(ctx context.Context) (int64, error)
 	TestSupportCountAgentSessions(ctx context.Context) (int64, error)

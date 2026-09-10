@@ -250,7 +250,7 @@ func TestMostRecentPlanHomeThreadUsesUpdatedAt(t *testing.T) {
 }
 
 func TestEnsureSharedThreadForDocCreatesThenReuses(t *testing.T) {
-	_, _, planAbs, _, service, _ := setupPlanDirRelTest(t)
+	_, _, planAbs, _, service, database := setupPlanDirRelTest(t)
 	doc := "thoughts/owner/plans/alpha/design.md"
 	if err := os.WriteFile(
 		filepath.Join(planAbs, "design.md"),
@@ -284,6 +284,13 @@ func TestEnsureSharedThreadForDocCreatesThenReuses(t *testing.T) {
 	}
 	if got != first {
 		t.Fatalf("FindSharedThreadForDoc = %q, want %q", got, first)
+	}
+	thread, err := database.Queries.GetAgentThread(t.Context(), first)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if thread.RoomKind != RoomKindPlan {
+		t.Fatalf("room_kind = %q, want plan", thread.RoomKind)
 	}
 }
 

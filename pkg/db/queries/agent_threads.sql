@@ -36,6 +36,8 @@ parent_thread_id,
 forked_from_entry_id,
 agent_id,
 room_kind,
+pair_agent_id_a,
+pair_agent_id_b,
 created_at,
 updated_at,
 archived_at ;
@@ -54,6 +56,8 @@ parent_thread_id,
 forked_from_entry_id,
 agent_id,
 room_kind,
+pair_agent_id_a,
+pair_agent_id_b,
 created_at,
 updated_at,
 archived_at
@@ -75,6 +79,8 @@ parent_thread_id,
 forked_from_entry_id,
 agent_id,
 room_kind,
+pair_agent_id_a,
+pair_agent_id_b,
 created_at,
 updated_at,
 archived_at
@@ -96,6 +102,8 @@ t.parent_thread_id,
 t.forked_from_entry_id,
 t.agent_id,
 t.room_kind,
+t.pair_agent_id_a,
+t.pair_agent_id_b,
 t.created_at,
 t.updated_at,
 t.archived_at,
@@ -125,6 +133,8 @@ t.parent_thread_id,
 t.forked_from_entry_id,
 t.agent_id,
 t.room_kind,
+t.pair_agent_id_a,
+t.pair_agent_id_b,
 t.created_at,
 t.updated_at,
 t.archived_at
@@ -134,11 +144,11 @@ ON s.projected_thread_id = t.id
 AND s.identity_kind = 'plan_owned'
 WHERE t.archived_at IS NULL
 AND (
-    t.plan_dir_rel = sqlc.arg ('plan_dir_rel')
-    OR (
-        t.plan_dir_rel IS NULL
-        AND s.plan_dir = sqlc.arg ('plan_dir')
-    )
+t.plan_dir_rel = sqlc.arg ('plan_dir_rel')
+OR (
+t.plan_dir_rel IS NULL
+AND s.plan_dir = sqlc.arg ('plan_dir')
+)
 )
 ORDER BY t.updated_at DESC ;
 
@@ -156,6 +166,8 @@ parent_thread_id,
 forked_from_entry_id,
 agent_id,
 room_kind,
+pair_agent_id_a,
+pair_agent_id_b,
 created_at,
 updated_at,
 archived_at
@@ -178,6 +190,8 @@ parent_thread_id,
 forked_from_entry_id,
 agent_id,
 room_kind,
+pair_agent_id_a,
+pair_agent_id_b,
 created_at,
 updated_at,
 archived_at
@@ -202,7 +216,7 @@ WHERE id = sqlc.arg ('id') ;
 -- name: UpdateAgentThreadCwd :exec
 UPDATE agent_threads
 SET cwd = sqlc.arg ('cwd'),
-plan_dir_rel = COALESCE(sqlc.narg ('plan_dir_rel'), plan_dir_rel),
+plan_dir_rel = COALESCE (sqlc.narg ('plan_dir_rel'), plan_dir_rel),
 updated_at = CURRENT_TIMESTAMP
 WHERE id = sqlc.arg ('id') ;
 
@@ -226,6 +240,8 @@ t.parent_thread_id,
 t.forked_from_entry_id,
 t.agent_id,
 t.room_kind,
+t.pair_agent_id_a,
+t.pair_agent_id_b,
 t.created_at,
 t.updated_at,
 t.archived_at
@@ -250,6 +266,8 @@ t.parent_thread_id,
 t.forked_from_entry_id,
 t.agent_id,
 t.room_kind,
+t.pair_agent_id_a,
+t.pair_agent_id_b,
 t.created_at,
 t.updated_at,
 t.archived_at,
@@ -280,6 +298,8 @@ t.parent_thread_id,
 t.forked_from_entry_id,
 t.agent_id,
 t.room_kind,
+t.pair_agent_id_a,
+t.pair_agent_id_b,
 t.created_at,
 t.updated_at,
 t.archived_at
@@ -311,6 +331,8 @@ parent_thread_id,
 forked_from_entry_id,
 agent_id,
 room_kind,
+pair_agent_id_a,
+pair_agent_id_b,
 created_at,
 updated_at,
 archived_at
@@ -334,6 +356,8 @@ parent_thread_id,
 forked_from_entry_id,
 agent_id,
 room_kind,
+pair_agent_id_a,
+pair_agent_id_b,
 created_at,
 updated_at,
 archived_at
@@ -378,21 +402,67 @@ parent_thread_id,
 forked_from_entry_id,
 agent_id,
 room_kind,
+pair_agent_id_a,
+pair_agent_id_b,
 created_at,
 updated_at,
 archived_at
 FROM agent_threads
-WHERE agent_id = sqlc.arg('agent_id')
+WHERE agent_id = sqlc.arg ('agent_id')
 AND room_kind = 'bot_home'
 AND archived_at IS NULL
 LIMIT 1 ;
 
 -- name: BindAgentThreadBotHome :exec
 UPDATE agent_threads
-SET agent_id = sqlc.arg('agent_id'),
-    room_kind = 'bot_home',
-    cwd = sqlc.arg('cwd'),
-    title = sqlc.arg('title'),
-    updated_at = CURRENT_TIMESTAMP
-WHERE id = sqlc.arg('id') ;
+SET agent_id = sqlc.arg ('agent_id'),
+room_kind = 'bot_home',
+cwd = sqlc.arg ('cwd'),
+title = sqlc.arg ('title'),
+updated_at = CURRENT_TIMESTAMP
+WHERE id = sqlc.arg ('id') ;
 
+-- name: BindAgentThreadPlan :exec
+UPDATE agent_threads
+SET agent_id = sqlc.narg ('agent_id'),
+room_kind = 'plan',
+cwd = sqlc.arg ('cwd'),
+title = sqlc.arg ('title'),
+updated_at = CURRENT_TIMESTAMP
+WHERE id = sqlc.arg ('id') ;
+
+-- name: BindAgentThreadPairwise :exec
+UPDATE agent_threads
+SET pair_agent_id_a = sqlc.arg ('pair_agent_id_a'),
+pair_agent_id_b = sqlc.arg ('pair_agent_id_b'),
+room_kind = 'pairwise',
+cwd = sqlc.arg ('cwd'),
+title = sqlc.arg ('title'),
+updated_at = CURRENT_TIMESTAMP
+WHERE id = sqlc.arg ('id') ;
+
+-- name: GetPairwiseThread :one
+SELECT
+id,
+user_email,
+title,
+cwd,
+lineage_id,
+project_id,
+plan_dir_rel,
+head_entry_id,
+parent_thread_id,
+forked_from_entry_id,
+agent_id,
+room_kind,
+pair_agent_id_a,
+pair_agent_id_b,
+created_at,
+updated_at,
+archived_at
+FROM agent_threads
+WHERE pair_agent_id_a = sqlc.arg ('pair_agent_id_a')
+AND pair_agent_id_b = sqlc.arg ('pair_agent_id_b')
+AND room_kind = 'pairwise'
+AND archived_at IS NULL
+LIMIT 1 ;

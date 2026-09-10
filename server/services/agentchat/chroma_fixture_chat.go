@@ -89,7 +89,9 @@ func (s *Service) renderSharedThreadChat(
 		DraftSaveAction: "@post('/agent-chat/thread/" + url.PathEscape(
 			thread.ID,
 		) + "/draft', {filterSignals: {include: /^chatDraft$/}})",
-		ComposerDisabled: fixtureMode == "pairwise",
+		ComposerDisabled: fixtureMode == "pairwise" ||
+			thread.RoomKind == RoomKindPairwise ||
+			(thread.RoomKind == RoomKindPlan && !thread.AgentID.Valid),
 	}
 	return SharedThreadChat(args), nil
 }
