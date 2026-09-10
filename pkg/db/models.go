@@ -52,6 +52,7 @@ type AgentRun struct {
 	WorkflowResultJson   sql.NullString `json:"workflow_result_json"`
 	RootDocPath          string         `json:"root_doc_path"`
 	ErrorMessage         sql.NullString `json:"error_message"`
+	SpeakerAgentID       sql.NullString `json:"speaker_agent_id"`
 	CreatedAt            time.Time      `json:"created_at"`
 	CompletedAt          sql.NullTime   `json:"completed_at"`
 }
@@ -137,6 +138,17 @@ type AgentThreadDraft struct {
 	Content        string    `json:"content"`
 	OperationOrder int64     `json:"operation_order"`
 	UpdatedAt      time.Time `json:"updated_at"`
+}
+
+type AgentThreadOp struct {
+	ThreadID       string         `json:"thread_id"`
+	OpID           string         `json:"op_id"`
+	SpeakerAgentID sql.NullString `json:"speaker_agent_id"`
+	FromKind       string         `json:"from_kind"`
+	FromAgentID    sql.NullString `json:"from_agent_id"`
+	FromUserEmail  string         `json:"from_user_email"`
+	Body           string         `json:"body"`
+	CreatedAt      time.Time      `json:"created_at"`
 }
 
 type AgentThreadWorkspace struct {

@@ -26,6 +26,7 @@ type Querier interface {
 	ClearAgentThreadDraft(ctx context.Context, arg ClearAgentThreadDraftParams) error
 	ClearInvalidImplWorkspacePlanRefs(ctx context.Context) (int64, error)
 	CompleteAgentRun(ctx context.Context, arg CompleteAgentRunParams) error
+	CountAgentThreadOps(ctx context.Context, threadID string) (int64, error)
 	CountUnresolvedWorkspaceComments(ctx context.Context, workspaceRoot string) (int64, error)
 	CreateAgent(ctx context.Context, arg CreateAgentParams) (Agent, error)
 	CreateAgentEntry(ctx context.Context, arg CreateAgentEntryParams) error
@@ -72,6 +73,7 @@ type Querier interface {
 	GetAgentThreadDraft(ctx context.Context, arg GetAgentThreadDraftParams) (string, error)
 	GetAgentThreadForUser(ctx context.Context, arg GetAgentThreadForUserParams) (AgentThread, error)
 	GetAgentThreadForWorkspaceUser(ctx context.Context, arg GetAgentThreadForWorkspaceUserParams) (AgentThread, error)
+	GetAgentThreadOp(ctx context.Context, arg GetAgentThreadOpParams) (AgentThreadOp, error)
 	GetBotHomeThreadByAgentID(ctx context.Context, agentID sql.NullString) (AgentThread, error)
 	GetChatCommandByIdempotencyKey(ctx context.Context, arg GetChatCommandByIdempotencyKeyParams) (ChatSessionCommand, error)
 	GetChatMessageCount(ctx context.Context, threadID string) (int64, error)
@@ -113,6 +115,7 @@ type Querier interface {
 	GetWorkspaceEventByKey(ctx context.Context, arg GetWorkspaceEventByKeyParams) (WorkspaceEvent, error)
 	GetWorkspaceForUser(ctx context.Context, arg GetWorkspaceForUserParams) (Workspace, error)
 	GetWorkspaceSyncDiagnostic(ctx context.Context, arg GetWorkspaceSyncDiagnosticParams) (WorkspaceSyncDiagnostic, error)
+	InsertAgentThreadOp(ctx context.Context, arg InsertAgentThreadOpParams) (int64, error)
 	InsertSnapshotProcess(ctx context.Context, arg InsertSnapshotProcessParams) error
 	InsertSystemSnapshot(ctx context.Context, arg InsertSystemSnapshotParams) (SystemSnapshot, error)
 	LinkExternalAgentSession(ctx context.Context, arg LinkExternalAgentSessionParams) (ChatSessionExternalLink, error)

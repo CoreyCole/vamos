@@ -635,6 +635,7 @@ workflow_result_status TEXT,
 workflow_result_json TEXT,
 root_doc_path TEXT NOT NULL,
 error_message TEXT,
+speaker_agent_id TEXT REFERENCES agents (id),
 created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
 completed_at DATETIME
 ) ;
@@ -645,6 +646,18 @@ ON agent_runs (thread_id, created_at DESC) ;
 CREATE UNIQUE INDEX IF NOT EXISTS idx_agent_runs_thread_running
 ON agent_runs (thread_id)
 WHERE status = 'running' ;
+
+CREATE TABLE IF NOT EXISTS agent_thread_ops (
+thread_id TEXT NOT NULL REFERENCES agent_threads (id),
+op_id TEXT NOT NULL,
+speaker_agent_id TEXT REFERENCES agents (id),
+from_kind TEXT NOT NULL CHECK (from_kind IN ('user', 'agent')),
+from_agent_id TEXT REFERENCES agents (id),
+from_user_email TEXT NOT NULL DEFAULT '',
+body TEXT NOT NULL DEFAULT '',
+created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+PRIMARY KEY (thread_id, op_id)
+) ;
 
 CREATE INDEX IF NOT EXISTS idx_agent_runs_workspace_node_created
 ON agent_runs (workspace_id, workflow_node_id, created_at DESC)

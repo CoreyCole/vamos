@@ -1195,6 +1195,7 @@ func main() {
 
 			goWorker = agentworker.New(mgr.Client())
 			goWorker.RegisterWorkflow(conversationworkflow.RunTurnWorkflow)
+			goWorker.RegisterWorkflow(conversationworkflow.ThreadInboxWorkflow)
 			goWorker.RegisterWorkflow(workspaces.StartWorkspaceWorkflow)
 			goWorker.RegisterWorkflow(workspaces.StopWorkspaceWorkflow)
 			goWorker.RegisterWorkflow(workspaces.RestartWorkspaceWorkflow)
@@ -1846,6 +1847,7 @@ func main() {
 	// Internal Agent Chat endpoints (from TS worker — no auth, localhost only)
 	e.POST("/internal/agent-chat/events", agentChatHandler.HandleInternalRunEvent)
 	e.GET("/internal/agent-chat/snapshots", agentChatHandler.HandleInternalRunSnapshot)
+	e.POST("/internal/agent-chat/enqueue", agentChatHandler.HandleInternalEnqueue)
 	e.POST("/internal/agent-chat/probe", agentChatHandler.HandleInternalWorkspaceProbe)
 	e.POST(
 		"/internal/agent-chat/import-session",

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 
+	enumspb "go.temporal.io/api/enums/v1"
 	"go.temporal.io/api/serviceerror"
 	"go.temporal.io/sdk/client"
 )
@@ -70,13 +71,46 @@ func (m *Manager) StartWorkflowIdempotent(
 	return "", err
 }
 
+// SignalWithStartWorkflow signals a running execution or starts a new one
+// with ALLOW_DUPLICATE so a completed thread id can start a later execution.
+func (m *Manager) SignalWithStartWorkflow(
+	ctx context.Context,
+	workflowID, signalName string,
+	signalArg, workflowFunc, input any,
+) (string, error) {
+	opts := client.StartWorkflowOptions{
+		ID:                    workflowID,
+		TaskQueue:             GoTaskQueue,
+		WorkflowIDReusePolicy: enumspb.WORKFLOW_ID_REUSE_POLICY_ALLOW_DUPLICATE,
+	}
+	run, err := m.client.SignalWithStartWorkflow(
+		ctx,
+		workflowID,
+		signalName,
+		signalArg,
+		opts,
+		workflowFunc,
+		input,
+	)
+	if err != nil {
+		return "", fmt.Errorf("signal-with-start workflow %s: %w", workflowID, err)
+	}
+	return run.GetRunID(), nil
+}
+
 // SignalWorkflow sends a signal to an existing workflow execution.
 func (m *Manager) SignalWorkflow(
 	ctx context.Context,
 	workflowID, runID, signalName string,
 	arg any,
 ) error {
-	if err := m.client.SignalWorkflow(ctx, workflowID, runID, signalName, arg); err != nil {
+	if err := m.client.SignalWorkflow(
+		ctx,
+		workflowID,
+		runID,
+		signalName,
+		arg,
+	); err != nil {
 		return fmt.Errorf("signal workflow %s: %w", workflowID, err)
 	}
 	return nil

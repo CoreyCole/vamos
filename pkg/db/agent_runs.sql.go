@@ -11,6 +11,8 @@ import (
 )
 
 const backfillAgentRunsWorkspaceForThread = `-- name: BackfillAgentRunsWorkspaceForThread :exec
+;
+
 UPDATE agent_runs
 SET workspace_id = ?1
 WHERE thread_id = ?2
@@ -28,6 +30,8 @@ func (q *Queries) BackfillAgentRunsWorkspaceForThread(ctx context.Context, arg B
 }
 
 const completeAgentRun = `-- name: CompleteAgentRun :exec
+;
+
 UPDATE agent_runs
 SET status = 'complete',
 result_head_entry_id = ?1,
@@ -64,7 +68,8 @@ INSERT INTO agent_runs (
     workflow_result_status,
     workflow_result_json,
     root_doc_path,
-    error_message
+    error_message,
+    speaker_agent_id
 )
 VALUES (
     ?1,
@@ -83,9 +88,10 @@ VALUES (
     ?14,
     ?15,
     ?16,
-    ?17
+    ?17,
+    ?18
 )
-RETURNING id, workspace_id, thread_id, session_id, "trigger", status, prompt_text, restore_head_entry_id, result_head_entry_id, workflow_id, temporal_run_id, workflow_node_id, workflow_attempt, workflow_result_status, workflow_result_json, root_doc_path, error_message, created_at, completed_at
+RETURNING id, workspace_id, thread_id, session_id, "trigger", status, prompt_text, restore_head_entry_id, result_head_entry_id, workflow_id, temporal_run_id, workflow_node_id, workflow_attempt, workflow_result_status, workflow_result_json, root_doc_path, error_message, speaker_agent_id, created_at, completed_at
 `
 
 type CreateAgentRunParams struct {
@@ -106,6 +112,7 @@ type CreateAgentRunParams struct {
 	WorkflowResultJson   sql.NullString `json:"workflow_result_json"`
 	RootDocPath          string         `json:"root_doc_path"`
 	ErrorMessage         sql.NullString `json:"error_message"`
+	SpeakerAgentID       sql.NullString `json:"speaker_agent_id"`
 }
 
 func (q *Queries) CreateAgentRun(ctx context.Context, arg CreateAgentRunParams) (AgentRun, error) {
@@ -127,6 +134,7 @@ func (q *Queries) CreateAgentRun(ctx context.Context, arg CreateAgentRunParams) 
 		arg.WorkflowResultJson,
 		arg.RootDocPath,
 		arg.ErrorMessage,
+		arg.SpeakerAgentID,
 	)
 	var i AgentRun
 	err := row.Scan(
@@ -147,6 +155,7 @@ func (q *Queries) CreateAgentRun(ctx context.Context, arg CreateAgentRunParams) 
 		&i.WorkflowResultJson,
 		&i.RootDocPath,
 		&i.ErrorMessage,
+		&i.SpeakerAgentID,
 		&i.CreatedAt,
 		&i.CompletedAt,
 	)
@@ -154,6 +163,8 @@ func (q *Queries) CreateAgentRun(ctx context.Context, arg CreateAgentRunParams) 
 }
 
 const failAgentRun = `-- name: FailAgentRun :exec
+;
+
 UPDATE agent_runs
 SET status = 'failed',
 error_message = ?1,
@@ -172,13 +183,15 @@ func (q *Queries) FailAgentRun(ctx context.Context, arg FailAgentRunParams) erro
 }
 
 const failAgentRunIfRunning = `-- name: FailAgentRunIfRunning :one
+;
+
 UPDATE agent_runs
 SET status = 'failed',
 error_message = ?1,
 completed_at = CURRENT_TIMESTAMP
 WHERE id = ?2
 AND status = 'running'
-RETURNING id, workspace_id, thread_id, session_id, "trigger", status, prompt_text, restore_head_entry_id, result_head_entry_id, workflow_id, temporal_run_id, workflow_node_id, workflow_attempt, workflow_result_status, workflow_result_json, root_doc_path, error_message, created_at, completed_at
+RETURNING id, workspace_id, thread_id, session_id, "trigger", status, prompt_text, restore_head_entry_id, result_head_entry_id, workflow_id, temporal_run_id, workflow_node_id, workflow_attempt, workflow_result_status, workflow_result_json, root_doc_path, error_message, speaker_agent_id, created_at, completed_at
 `
 
 type FailAgentRunIfRunningParams struct {
@@ -207,6 +220,7 @@ func (q *Queries) FailAgentRunIfRunning(ctx context.Context, arg FailAgentRunIfR
 		&i.WorkflowResultJson,
 		&i.RootDocPath,
 		&i.ErrorMessage,
+		&i.SpeakerAgentID,
 		&i.CreatedAt,
 		&i.CompletedAt,
 	)
@@ -214,7 +228,9 @@ func (q *Queries) FailAgentRunIfRunning(ctx context.Context, arg FailAgentRunIfR
 }
 
 const getAgentRun = `-- name: GetAgentRun :one
-SELECT id, workspace_id, thread_id, session_id, "trigger", status, prompt_text, restore_head_entry_id, result_head_entry_id, workflow_id, temporal_run_id, workflow_node_id, workflow_attempt, workflow_result_status, workflow_result_json, root_doc_path, error_message, created_at, completed_at
+;
+
+SELECT id, workspace_id, thread_id, session_id, "trigger", status, prompt_text, restore_head_entry_id, result_head_entry_id, workflow_id, temporal_run_id, workflow_node_id, workflow_attempt, workflow_result_status, workflow_result_json, root_doc_path, error_message, speaker_agent_id, created_at, completed_at
 FROM agent_runs
 WHERE id = ?1
 `
@@ -240,6 +256,7 @@ func (q *Queries) GetAgentRun(ctx context.Context, id string) (AgentRun, error) 
 		&i.WorkflowResultJson,
 		&i.RootDocPath,
 		&i.ErrorMessage,
+		&i.SpeakerAgentID,
 		&i.CreatedAt,
 		&i.CompletedAt,
 	)
@@ -247,7 +264,9 @@ func (q *Queries) GetAgentRun(ctx context.Context, id string) (AgentRun, error) 
 }
 
 const getAgentRunForWorkspace = `-- name: GetAgentRunForWorkspace :one
-SELECT id, workspace_id, thread_id, session_id, "trigger", status, prompt_text, restore_head_entry_id, result_head_entry_id, workflow_id, temporal_run_id, workflow_node_id, workflow_attempt, workflow_result_status, workflow_result_json, root_doc_path, error_message, created_at, completed_at
+;
+
+SELECT id, workspace_id, thread_id, session_id, "trigger", status, prompt_text, restore_head_entry_id, result_head_entry_id, workflow_id, temporal_run_id, workflow_node_id, workflow_attempt, workflow_result_status, workflow_result_json, root_doc_path, error_message, speaker_agent_id, created_at, completed_at
 FROM agent_runs
 WHERE id = ?1
 AND workspace_id = ?2
@@ -279,6 +298,7 @@ func (q *Queries) GetAgentRunForWorkspace(ctx context.Context, arg GetAgentRunFo
 		&i.WorkflowResultJson,
 		&i.RootDocPath,
 		&i.ErrorMessage,
+		&i.SpeakerAgentID,
 		&i.CreatedAt,
 		&i.CompletedAt,
 	)
@@ -286,7 +306,9 @@ func (q *Queries) GetAgentRunForWorkspace(ctx context.Context, arg GetAgentRunFo
 }
 
 const getLatestAgentRunByThread = `-- name: GetLatestAgentRunByThread :one
-SELECT id, workspace_id, thread_id, session_id, "trigger", status, prompt_text, restore_head_entry_id, result_head_entry_id, workflow_id, temporal_run_id, workflow_node_id, workflow_attempt, workflow_result_status, workflow_result_json, root_doc_path, error_message, created_at, completed_at
+;
+
+SELECT id, workspace_id, thread_id, session_id, "trigger", status, prompt_text, restore_head_entry_id, result_head_entry_id, workflow_id, temporal_run_id, workflow_node_id, workflow_attempt, workflow_result_status, workflow_result_json, root_doc_path, error_message, speaker_agent_id, created_at, completed_at
 FROM agent_runs
 WHERE thread_id = ?1
 ORDER BY created_at DESC
@@ -314,6 +336,7 @@ func (q *Queries) GetLatestAgentRunByThread(ctx context.Context, threadID string
 		&i.WorkflowResultJson,
 		&i.RootDocPath,
 		&i.ErrorMessage,
+		&i.SpeakerAgentID,
 		&i.CreatedAt,
 		&i.CompletedAt,
 	)
@@ -321,7 +344,9 @@ func (q *Queries) GetLatestAgentRunByThread(ctx context.Context, threadID string
 }
 
 const getLatestAgentRunByWorkspaceNode = `-- name: GetLatestAgentRunByWorkspaceNode :one
-SELECT id, workspace_id, thread_id, session_id, "trigger", status, prompt_text, restore_head_entry_id, result_head_entry_id, workflow_id, temporal_run_id, workflow_node_id, workflow_attempt, workflow_result_status, workflow_result_json, root_doc_path, error_message, created_at, completed_at
+;
+
+SELECT id, workspace_id, thread_id, session_id, "trigger", status, prompt_text, restore_head_entry_id, result_head_entry_id, workflow_id, temporal_run_id, workflow_node_id, workflow_attempt, workflow_result_status, workflow_result_json, root_doc_path, error_message, speaker_agent_id, created_at, completed_at
 FROM agent_runs
 WHERE workspace_id = ?1
 AND workflow_node_id = ?2
@@ -355,6 +380,7 @@ func (q *Queries) GetLatestAgentRunByWorkspaceNode(ctx context.Context, arg GetL
 		&i.WorkflowResultJson,
 		&i.RootDocPath,
 		&i.ErrorMessage,
+		&i.SpeakerAgentID,
 		&i.CreatedAt,
 		&i.CompletedAt,
 	)
@@ -362,7 +388,9 @@ func (q *Queries) GetLatestAgentRunByWorkspaceNode(ctx context.Context, arg GetL
 }
 
 const getLatestAgentRunByWorkspaceThread = `-- name: GetLatestAgentRunByWorkspaceThread :one
-SELECT id, workspace_id, thread_id, session_id, "trigger", status, prompt_text, restore_head_entry_id, result_head_entry_id, workflow_id, temporal_run_id, workflow_node_id, workflow_attempt, workflow_result_status, workflow_result_json, root_doc_path, error_message, created_at, completed_at
+;
+
+SELECT id, workspace_id, thread_id, session_id, "trigger", status, prompt_text, restore_head_entry_id, result_head_entry_id, workflow_id, temporal_run_id, workflow_node_id, workflow_attempt, workflow_result_status, workflow_result_json, root_doc_path, error_message, speaker_agent_id, created_at, completed_at
 FROM agent_runs
 WHERE workspace_id = ?1
 AND thread_id = ?2
@@ -396,6 +424,7 @@ func (q *Queries) GetLatestAgentRunByWorkspaceThread(ctx context.Context, arg Ge
 		&i.WorkflowResultJson,
 		&i.RootDocPath,
 		&i.ErrorMessage,
+		&i.SpeakerAgentID,
 		&i.CreatedAt,
 		&i.CompletedAt,
 	)
@@ -403,7 +432,9 @@ func (q *Queries) GetLatestAgentRunByWorkspaceThread(ctx context.Context, arg Ge
 }
 
 const listAgentRunsByThread = `-- name: ListAgentRunsByThread :many
-SELECT id, workspace_id, thread_id, session_id, "trigger", status, prompt_text, restore_head_entry_id, result_head_entry_id, workflow_id, temporal_run_id, workflow_node_id, workflow_attempt, workflow_result_status, workflow_result_json, root_doc_path, error_message, created_at, completed_at
+;
+
+SELECT id, workspace_id, thread_id, session_id, "trigger", status, prompt_text, restore_head_entry_id, result_head_entry_id, workflow_id, temporal_run_id, workflow_node_id, workflow_attempt, workflow_result_status, workflow_result_json, root_doc_path, error_message, speaker_agent_id, created_at, completed_at
 FROM agent_runs
 WHERE thread_id = ?1
 ORDER BY created_at DESC
@@ -436,6 +467,7 @@ func (q *Queries) ListAgentRunsByThread(ctx context.Context, threadID string) ([
 			&i.WorkflowResultJson,
 			&i.RootDocPath,
 			&i.ErrorMessage,
+			&i.SpeakerAgentID,
 			&i.CreatedAt,
 			&i.CompletedAt,
 		); err != nil {
@@ -453,7 +485,9 @@ func (q *Queries) ListAgentRunsByThread(ctx context.Context, threadID string) ([
 }
 
 const listAgentRunsByWorkspace = `-- name: ListAgentRunsByWorkspace :many
-SELECT id, workspace_id, thread_id, session_id, "trigger", status, prompt_text, restore_head_entry_id, result_head_entry_id, workflow_id, temporal_run_id, workflow_node_id, workflow_attempt, workflow_result_status, workflow_result_json, root_doc_path, error_message, created_at, completed_at
+;
+
+SELECT id, workspace_id, thread_id, session_id, "trigger", status, prompt_text, restore_head_entry_id, result_head_entry_id, workflow_id, temporal_run_id, workflow_node_id, workflow_attempt, workflow_result_status, workflow_result_json, root_doc_path, error_message, speaker_agent_id, created_at, completed_at
 FROM agent_runs
 WHERE workspace_id = ?1
 ORDER BY created_at DESC
@@ -486,6 +520,7 @@ func (q *Queries) ListAgentRunsByWorkspace(ctx context.Context, workspaceID sql.
 			&i.WorkflowResultJson,
 			&i.RootDocPath,
 			&i.ErrorMessage,
+			&i.SpeakerAgentID,
 			&i.CreatedAt,
 			&i.CompletedAt,
 		); err != nil {
@@ -503,7 +538,9 @@ func (q *Queries) ListAgentRunsByWorkspace(ctx context.Context, workspaceID sql.
 }
 
 const listAgentRunsByWorkspaceNode = `-- name: ListAgentRunsByWorkspaceNode :many
-SELECT id, workspace_id, thread_id, session_id, "trigger", status, prompt_text, restore_head_entry_id, result_head_entry_id, workflow_id, temporal_run_id, workflow_node_id, workflow_attempt, workflow_result_status, workflow_result_json, root_doc_path, error_message, created_at, completed_at
+;
+
+SELECT id, workspace_id, thread_id, session_id, "trigger", status, prompt_text, restore_head_entry_id, result_head_entry_id, workflow_id, temporal_run_id, workflow_node_id, workflow_attempt, workflow_result_status, workflow_result_json, root_doc_path, error_message, speaker_agent_id, created_at, completed_at
 FROM agent_runs
 WHERE workspace_id = ?1
 AND workflow_node_id = ?2
@@ -542,6 +579,7 @@ func (q *Queries) ListAgentRunsByWorkspaceNode(ctx context.Context, arg ListAgen
 			&i.WorkflowResultJson,
 			&i.RootDocPath,
 			&i.ErrorMessage,
+			&i.SpeakerAgentID,
 			&i.CreatedAt,
 			&i.CompletedAt,
 		); err != nil {
@@ -559,6 +597,8 @@ func (q *Queries) ListAgentRunsByWorkspaceNode(ctx context.Context, arg ListAgen
 }
 
 const updateAgentRunCheckpoint = `-- name: UpdateAgentRunCheckpoint :exec
+;
+
 UPDATE agent_runs
 SET result_head_entry_id = ?1
 WHERE id = ?2
@@ -575,6 +615,8 @@ func (q *Queries) UpdateAgentRunCheckpoint(ctx context.Context, arg UpdateAgentR
 }
 
 const updateAgentRunStarted = `-- name: UpdateAgentRunStarted :exec
+;
+
 UPDATE agent_runs
 SET status = 'running',
 temporal_run_id = ?1
@@ -592,6 +634,8 @@ func (q *Queries) UpdateAgentRunStarted(ctx context.Context, arg UpdateAgentRunS
 }
 
 const updateAgentRunWorkflowResult = `-- name: UpdateAgentRunWorkflowResult :exec
+;
+
 UPDATE agent_runs
 SET workflow_result_status = ?1,
 workflow_result_json = ?2
@@ -610,6 +654,8 @@ func (q *Queries) UpdateAgentRunWorkflowResult(ctx context.Context, arg UpdateAg
 }
 
 const updateAgentRunWorkspaceForTest = `-- name: UpdateAgentRunWorkspaceForTest :exec
+;
+
 UPDATE agent_runs
 SET workspace_id = ?1
 WHERE id = ?2

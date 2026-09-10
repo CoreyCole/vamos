@@ -2,6 +2,7 @@ package conversation
 
 import (
 	"fmt"
+	"strings"
 	"time"
 )
 
@@ -18,6 +19,29 @@ const (
 	EventRunComplete = "run_complete"
 	EventRunFailed   = "run_failed"
 )
+
+const (
+	ThreadMailSignal          = "thread_mail"
+	ActivityPrepareThreadTurn = "PrepareThreadTurn"
+)
+
+type ThreadMail struct {
+	ThreadID       string `json:"thread_id"`
+	OpID           string `json:"op_id"`
+	SpeakerAgentID string `json:"speaker_agent_id,omitempty"`
+	FromKind       string `json:"from_kind"`
+	FromAgentID    string `json:"from_agent_id,omitempty"`
+	FromUserEmail  string `json:"from_user_email,omitempty"`
+	Body           string `json:"body"`
+}
+
+type ThreadWorkflowInput struct {
+	ThreadID string `json:"thread_id"`
+}
+
+func ThreadWorkflowID(threadID string) string {
+	return fmt.Sprintf("agent-chat-thread-%s", strings.TrimSpace(threadID))
+}
 
 type SnapshotHeader struct {
 	SessionID       string `json:"session_id"`

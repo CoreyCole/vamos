@@ -2661,6 +2661,25 @@ func (h *Handler) HandleInternalWorkspaceProbe(c echo.Context) error {
 	return c.JSON(http.StatusOK, result)
 }
 
+func (h *Handler) HandleInternalEnqueue(c echo.Context) error {
+	if !h.trustedInternalRequest(c) {
+		return echo.NewHTTPError(http.StatusUnauthorized, "invalid internal token")
+	}
+	var payload EnqueueThreadMailInput
+	if err := c.Bind(&payload); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid enqueue payload")
+	}
+	result, err := h.service.EnqueueThreadMail(c.Request().Context(), payload)
+	if err != nil {
+		return echo.NewHTTPError(resumeComposeHTTPStatus(err), err.Error())
+	}
+	return c.JSON(http.StatusOK, map[string]any{
+		"ok":          true,
+		"duplicate":   result.Duplicate,
+		"workflow_id": result.WorkflowID,
+	})
+}
+
 func (h *Handler) HandleInternalRunSnapshot(c echo.Context) error {
 	if !h.trustedInternalRequest(c) {
 		return echo.NewHTTPError(http.StatusUnauthorized, "invalid internal token")

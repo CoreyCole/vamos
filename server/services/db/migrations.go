@@ -108,6 +108,9 @@ func prepareSchemaCompatibilityMigrations(ctx context.Context, database *sql.DB)
 	if err := ensureAgentSessionsProjectionSchema(ctx, database); err != nil {
 		return err
 	}
+	if err := ensureAgentThreadOps(ctx, database); err != nil {
+		return err
+	}
 	return ensureArtifactCommentsDocPathColumn(ctx, database)
 }
 
@@ -134,6 +137,9 @@ func runRuntimeMigrations(ctx context.Context, database *sql.DB) error {
 		return err
 	}
 	if err := ensureAgentsAndThreadRoomColumns(ctx, database); err != nil {
+		return err
+	}
+	if err := ensureAgentThreadOps(ctx, database); err != nil {
 		return err
 	}
 	if err := ensureColumn(
@@ -998,6 +1004,7 @@ func ensureAgentRunsWorkflowColumns(ctx context.Context, database *sql.DB) error
 		{name: "workflow_attempt", definition: "INTEGER NOT NULL DEFAULT 0"},
 		{name: "workflow_result_status", definition: "TEXT"},
 		{name: "workflow_result_json", definition: "TEXT"},
+		{name: "speaker_agent_id", definition: "TEXT REFERENCES agents(id)"},
 	} {
 		if err := ensureColumn(
 			ctx,
@@ -1010,6 +1017,27 @@ func ensureAgentRunsWorkflowColumns(ctx context.Context, database *sql.DB) error
 		}
 	}
 	return nil
+}
+
+func ensureAgentThreadOps(ctx context.Context, database *sql.DB) error {
+	if err := ensureAgentRunsWorkflowColumnsIfTableExists(ctx, database); err != nil {
+		return err
+	}
+	_, err := database.ExecContext(
+		ctx,
+		`CREATE TABLE IF NOT EXISTS agent_thread_ops (
+thread_id TEXT NOT NULL REFERENCES agent_threads (id),
+op_id TEXT NOT NULL,
+speaker_agent_id TEXT REFERENCES agents (id),
+from_kind TEXT NOT NULL CHECK (from_kind IN ('user', 'agent')),
+from_agent_id TEXT REFERENCES agents (id),
+from_user_email TEXT NOT NULL DEFAULT '',
+body TEXT NOT NULL DEFAULT '',
+created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+PRIMARY KEY (thread_id, op_id)
+)`,
+	)
+	return err
 }
 
 func ensureColumn(

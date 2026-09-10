@@ -375,6 +375,17 @@ func (t draftTestTemporal) StartWorkflow(
 	return "workflow_1", t.err
 }
 
+func (t draftTestTemporal) SignalWithStartWorkflow(
+	context.Context,
+	string,
+	string,
+	any,
+	any,
+	any,
+) (string, error) {
+	return "workflow_1", t.err
+}
+
 func TestResumeEmbeddedSharedWorkspaceThreadDoesNotRequireWorkspaceOwner(t *testing.T) {
 	service, queries := newThreadDraftService(t)
 	createDraftThread(t, queries, "thread_1")

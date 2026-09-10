@@ -42,6 +42,11 @@ type TemporalStarter interface {
 		workflowID string,
 		workflowFunc, input any,
 	) (string, error)
+	SignalWithStartWorkflow(
+		ctx context.Context,
+		workflowID, signalName string,
+		signalArg, workflowFunc, input any,
+	) (string, error)
 }
 
 var ErrThreadRunInProgress = errors.New("thread already has an active run")
@@ -1440,44 +1445,23 @@ func (s *Service) ResumeThread(
 	if err := GuardHumanCompose(thread); err != nil {
 		return nil, nil, err
 	}
-	if s.temporal == nil {
-		return nil, nil, fmt.Errorf("temporal not configured")
-	}
-
-	run, err := s.createRun(
-		ctx,
-		q,
-		thread,
-		conversation.RunTriggerResume,
-		prompt,
-		thread.HeadEntryID,
-	)
-	if err != nil {
-		return nil, nil, err
-	}
-	if err := s.appendRunAttachments(
-		ctx,
-		q,
-		run.ID,
-		thread.ID,
-		flattenAttachedPaths(attachments),
-	); err != nil {
-		return nil, nil, err
-	}
 
 	if err := tx.Commit(); err != nil {
 		return nil, nil, err
 	}
 
-	if err := s.seedPendingUserPrompt(thread, run); err != nil {
-		return &thread, nil, err
-	}
-	startedRun, err := s.startRun(ctx, thread, run)
+	_, err = s.EnqueueThreadMail(ctx, EnqueueThreadMailInput{
+		ThreadID:      thread.ID,
+		OpID:          uuid.NewString(),
+		FromKind:      EnqueueFromUser,
+		FromUserEmail: userEmail,
+		Body:          prompt,
+	})
 	if err != nil {
 		return &thread, nil, err
 	}
-
-	return &thread, startedRun, nil
+	_ = attachments
+	return &thread, nil, nil
 }
 
 func (s *Service) UpdateThreadCwd(
@@ -1683,6 +1667,7 @@ func (s *Service) createRunRecord(
 		WorkflowResultJson:   sql.NullString{},
 		RootDocPath:          docRoot,
 		ErrorMessage:         sql.NullString{},
+		SpeakerAgentID:       sql.NullString{},
 	})
 	if err != nil {
 		if isUniqueConstraintError(err) {

@@ -3,6 +3,7 @@ package conversationworkflow
 import (
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	temporalsdk "go.temporal.io/sdk/temporal"
@@ -13,6 +14,69 @@ import (
 )
 
 func RunTurnWorkflow(
+	ctx workflow.Context,
+	input conversation.RunInput,
+) (conversation.RunResult, error) {
+	return runPreparedTurn(ctx, input)
+}
+
+func ThreadInboxWorkflow(
+	ctx workflow.Context,
+	input conversation.ThreadWorkflowInput,
+) error {
+	inbox := make([]conversation.ThreadMail, 0, 4)
+	seen := map[string]struct{}{}
+	ch := workflow.GetSignalChannel(ctx, conversation.ThreadMailSignal)
+
+	for {
+		for {
+			var mail conversation.ThreadMail
+			ok := ch.ReceiveAsync(&mail)
+			if !ok {
+				break
+			}
+			opID := strings.TrimSpace(mail.OpID)
+			if opID == "" {
+				continue
+			}
+			if _, dup := seen[opID]; dup {
+				continue
+			}
+			seen[opID] = struct{}{}
+			inbox = append(inbox, mail)
+		}
+		if len(inbox) == 0 {
+			return nil
+		}
+		item := inbox[0]
+		inbox = inbox[1:]
+		if err := drainMailItem(ctx, item); err != nil {
+			return err
+		}
+	}
+}
+
+func drainMailItem(ctx workflow.Context, mail conversation.ThreadMail) error {
+	goActCtx := workflow.WithActivityOptions(ctx, workflow.ActivityOptions{
+		TaskQueue:           temporalmgr.GoTaskQueue,
+		StartToCloseTimeout: 30 * time.Second,
+		RetryPolicy: &temporalsdk.RetryPolicy{
+			MaximumAttempts: 3,
+		},
+	})
+	var input conversation.RunInput
+	if err := workflow.ExecuteActivity(
+		goActCtx,
+		conversation.ActivityPrepareThreadTurn,
+		mail,
+	).Get(ctx, &input); err != nil {
+		return fmt.Errorf("prepare thread turn: %w", err)
+	}
+	_, err := runPreparedTurn(ctx, input)
+	return err
+}
+
+func runPreparedTurn(
 	ctx workflow.Context,
 	input conversation.RunInput,
 ) (conversation.RunResult, error) {
