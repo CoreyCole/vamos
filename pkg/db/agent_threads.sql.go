@@ -269,8 +269,11 @@ updated_at,
 archived_at
 FROM agent_threads
 WHERE id = ?1
-AND user_email = ?2
 AND archived_at IS NULL
+AND (
+user_email = ?2
+OR room_kind IN ('bot_home', 'plan', 'pairwise')
+)
 `
 
 type GetAgentThreadForUserParams struct {
@@ -332,9 +335,12 @@ AND atw.is_primary = 1
 JOIN workspaces AS w
 ON w.id = atw.workspace_id
 WHERE t.id = ?2
-AND w.user_email = ?3
 AND t.archived_at IS NULL
 AND w.archived_at IS NULL
+AND (
+w.user_email = ?3
+OR t.room_kind IN ('bot_home', 'plan', 'pairwise')
+)
 `
 
 type GetAgentThreadForWorkspaceUserParams struct {
@@ -607,8 +613,11 @@ created_at,
 updated_at,
 archived_at
 FROM agent_threads
-WHERE user_email = ?1
-AND archived_at IS NULL
+WHERE archived_at IS NULL
+AND (
+user_email = ?1
+OR room_kind IN ('bot_home', 'plan', 'pairwise')
+)
 ORDER BY updated_at DESC
 LIMIT ?2
 `
@@ -879,10 +888,12 @@ LEFT JOIN agent_thread_workspaces atw
 ON atw.thread_id = t.id AND atw.is_primary = 1
 LEFT JOIN workspaces w
 ON w.id = atw.workspace_id
-AND w.user_email = t.user_email
 AND w.archived_at IS NULL
-WHERE t.user_email = ?1
-AND t.archived_at IS NULL
+WHERE t.archived_at IS NULL
+AND (
+t.user_email = ?1
+OR t.room_kind IN ('bot_home', 'plan', 'pairwise')
+)
 ORDER BY t.updated_at DESC
 `
 

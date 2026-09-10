@@ -951,9 +951,6 @@ func (s *Service) ResumeWorkspaceThread(
 	workspaceID, userEmail, threadID, prompt string,
 	attachments ...[]AttachedPath,
 ) (*db.AgentThread, *db.AgentRun, *db.AgentSession, error) {
-	if s.temporal == nil {
-		return nil, nil, nil, fmt.Errorf("temporal not configured")
-	}
 	prompt = strings.TrimSpace(prompt)
 	if prompt == "" {
 		return nil, nil, nil, fmt.Errorf("prompt is required")
@@ -978,6 +975,12 @@ func (s *Service) ResumeWorkspaceThread(
 	thread, err := s.sharedWorkspaceThread(ctx, workspace.ID, threadID)
 	if err != nil {
 		return nil, nil, nil, err
+	}
+	if err := GuardHumanCompose(thread); err != nil {
+		return nil, nil, nil, err
+	}
+	if s.temporal == nil {
+		return nil, nil, nil, fmt.Errorf("temporal not configured")
 	}
 	session, err := s.createWebAgentSession(ctx, q, workspace, thread)
 	if err != nil {
@@ -1410,10 +1413,6 @@ func (s *Service) ResumeThread(
 	userEmail, threadID, prompt string,
 	attachments ...[]AttachedPath,
 ) (*db.AgentThread, *db.AgentRun, error) {
-	if s.temporal == nil {
-		return nil, nil, fmt.Errorf("temporal not configured")
-	}
-
 	threadID = strings.TrimSpace(threadID)
 	if threadID == "" {
 		return nil, nil, fmt.Errorf("thread_id is required")
@@ -1437,6 +1436,12 @@ func (s *Service) ResumeThread(
 	})
 	if err != nil {
 		return nil, nil, err
+	}
+	if err := GuardHumanCompose(thread); err != nil {
+		return nil, nil, err
+	}
+	if s.temporal == nil {
+		return nil, nil, fmt.Errorf("temporal not configured")
 	}
 
 	run, err := s.createRun(
@@ -1909,7 +1914,9 @@ func (s *Service) buildRunInput(
 	}, nil
 }
 
-func (s *Service) prepareRoomSession(thread db.AgentThread) (RoomIdentity, string, string, []conversation.InjectFile, error) {
+func (s *Service) prepareRoomSession(
+	thread db.AgentThread,
+) (RoomIdentity, string, string, []conversation.InjectFile, error) {
 	room, err := RoomIdentityFromThread(s.thoughtsRoot, thread, "")
 	if err == nil && strings.TrimSpace(s.thoughtsRoot) != "" {
 		sessionFile, err := EnsureRoomCurrentJSONL(s.thoughtsRoot, room)

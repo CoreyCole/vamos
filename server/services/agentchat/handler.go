@@ -73,6 +73,21 @@ type planSidebarSubscription struct {
 	since int64
 }
 
+func resumeComposeHTTPStatus(err error) int {
+	switch {
+	case errors.Is(err, ErrPairwiseViewOnly),
+		errors.Is(err, ErrBotHomeRejectsA2A),
+		errors.Is(err, ErrPairwiseSpeakerNotInPair):
+		return http.StatusForbidden
+	case errors.Is(err, ErrThreadRunInProgress):
+		return http.StatusConflict
+	case errors.Is(err, sql.ErrNoRows):
+		return http.StatusNotFound
+	default:
+		return http.StatusBadRequest
+	}
+}
+
 func NewHandler(
 	service *Service,
 	themeService *theme.Service,
@@ -1069,13 +1084,7 @@ func (h *Handler) resumeEmbeddedFreeformThreadByID(
 		attachments,
 	)
 	if err != nil {
-		status := http.StatusBadRequest
-		if errors.Is(err, ErrThreadRunInProgress) {
-			status = http.StatusConflict
-		} else if errors.Is(err, sql.ErrNoRows) {
-			status = http.StatusNotFound
-		}
-		return echo.NewHTTPError(status, err.Error())
+		return echo.NewHTTPError(resumeComposeHTTPStatus(err), err.Error())
 	}
 	if err := h.service.ClearThreadDraft(
 		c.Request().Context(),
@@ -1212,14 +1221,7 @@ func (h *Handler) resumeFreeformThreadByID(
 		attachments,
 	)
 	if err != nil {
-		status := http.StatusBadRequest
-		switch {
-		case errors.Is(err, ErrThreadRunInProgress):
-			status = http.StatusConflict
-		case errors.Is(err, sql.ErrNoRows):
-			status = http.StatusNotFound
-		}
-		return echo.NewHTTPError(status, err.Error())
+		return echo.NewHTTPError(resumeComposeHTTPStatus(err), err.Error())
 	}
 
 	return c.NoContent(http.StatusNoContent)
@@ -1877,13 +1879,7 @@ func (h *Handler) resumeWorkspaceThreadByID(
 		prompt,
 		attachments,
 	); err != nil {
-		status := http.StatusBadRequest
-		if errors.Is(err, ErrThreadRunInProgress) {
-			status = http.StatusConflict
-		} else if errors.Is(err, sql.ErrNoRows) {
-			status = http.StatusNotFound
-		}
-		return echo.NewHTTPError(status, err.Error())
+		return echo.NewHTTPError(resumeComposeHTTPStatus(err), err.Error())
 	}
 	return h.writeNoRedirectSuccess(c)
 }
@@ -1981,13 +1977,7 @@ func (h *Handler) resumeEmbeddedWorkspaceThread(
 		attachments,
 	)
 	if err != nil {
-		status := http.StatusBadRequest
-		if errors.Is(err, ErrThreadRunInProgress) {
-			status = http.StatusConflict
-		} else if errors.Is(err, sql.ErrNoRows) {
-			status = http.StatusNotFound
-		}
-		return echo.NewHTTPError(status, err.Error())
+		return echo.NewHTTPError(resumeComposeHTTPStatus(err), err.Error())
 	}
 	if err := h.service.ClearThreadDraft(
 		c.Request().Context(),

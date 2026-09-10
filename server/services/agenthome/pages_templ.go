@@ -145,7 +145,7 @@ func RosterRail(sel RosterSelection) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 10, "\"><span class=\"flex h-12 w-12 items-center justify-center rounded-2xl bg-sky-500/80 text-base font-semibold text-white\">R</span> <span class=\"w-full truncate text-[10px] text-muted-foreground\">Research</span></a></div><div class=\"min-h-0 flex-1 space-y-3 overflow-y-auto px-1 pb-2\"><section id=\"workbench-v2-roster-agents\" class=\"space-y-0.5\" aria-label=\"Agents\"><h2 class=\"px-1.5 pb-1 text-[10px] font-medium tracking-wide text-muted-foreground/80\">Agents</h2><ul class=\"flex flex-col\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 10, "\"><span class=\"flex h-12 w-12 items-center justify-center rounded-2xl bg-sky-500/80 text-base font-semibold text-white\">R</span> <span class=\"w-full truncate text-[10px] text-muted-foreground\">Research</span></a></div><div class=\"min-h-0 flex-1 space-y-3 overflow-y-auto px-1 pb-2\"><section id=\"workbench-v2-roster-agents\" class=\"space-y-0.5\" aria-label=\"Bots\"><h2 class=\"px-1.5 pb-1 text-[10px] font-medium tracking-wide text-muted-foreground/80\">Bots</h2><ul class=\"flex flex-col\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -255,7 +255,7 @@ func RosterRail(sel RosterSelection) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 20, "\" aria-label=\"Groups\"><h2 class=\"px-1.5 pb-1 text-[10px] font-medium tracking-wide text-muted-foreground/80\">Groups</h2><ul class=\"flex flex-col\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 20, "\" aria-label=\"Group chats\"><h2 class=\"px-1.5 pb-1 text-[10px] font-medium tracking-wide text-muted-foreground/80\">Group chats</h2><ul class=\"flex flex-col\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

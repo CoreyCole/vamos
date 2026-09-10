@@ -95,4 +95,13 @@ func TestRosterRail_PinActionAndHrefs(t *testing.T) {
 	if !strings.Contains(html, ">Plan</h2>") {
 		t.Fatal("plan band label must remain Plan")
 	}
+	if strings.Contains(html, "private DM") || strings.Contains(html, "Private DM") {
+		t.Fatal("roster must not call bot homes private DMs")
+	}
+	if !strings.Contains(html, ">Bots</h2>") {
+		t.Fatal("roster agent band must say Bots")
+	}
+	if !strings.Contains(html, ">Group chats</h2>") {
+		t.Fatal("roster group band must say Group chats")
+	}
 }
