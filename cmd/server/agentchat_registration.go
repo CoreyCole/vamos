@@ -18,6 +18,7 @@ func registerAgentChatTemporalWorker(
 	worker.RegisterWorkflow(agentchat.SyncWorkspacesWorkflow)
 	worker.RegisterActivity(service.FailConversationRunAfterActivityError)
 	worker.RegisterActivity(service.PrepareThreadTurn)
+	worker.RegisterActivity(service.InspectThreadUsage)
 	worker.RegisterActivity(service.SettleHotRoom)
 	worker.RegisterActivity(&agentchat.SyncCoordinatorActivities{
 		Coordinator: coordinator,

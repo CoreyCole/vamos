@@ -21,8 +21,10 @@ const (
 )
 
 const (
-	ThreadMailSignal          = "thread_mail"
-	ActivityPrepareThreadTurn = "PrepareThreadTurn"
+	ThreadMailSignal           = "thread_mail"
+	ActivityPrepareThreadTurn  = "PrepareThreadTurn"
+	ActivityInspectThreadUsage = "InspectThreadUsage"
+	ActivitySettleHotRoom      = "SettleHotRoom"
 )
 
 type ThreadMail struct {
@@ -38,6 +40,16 @@ type ThreadMail struct {
 
 type ThreadWorkflowInput struct {
 	ThreadID string `json:"thread_id"`
+}
+
+type ThreadUsage struct {
+	Hot bool `json:"hot"`
+}
+
+type SettleIdleInput struct {
+	ThreadID    string `json:"thread_id"`
+	UsageHot    bool   `json:"usage_hot"`
+	SpeakerSlug string `json:"speaker_slug,omitempty"`
 }
 
 func ThreadWorkflowID(threadID string) string {

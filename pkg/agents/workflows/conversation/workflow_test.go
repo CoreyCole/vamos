@@ -55,6 +55,28 @@ func TestRunTurnWorkflowDoesNotRetryWholePiTurnActivity(t *testing.T) {
 	}
 }
 
+func registerIdleSettleActivities(
+	env *testsuite.TestWorkflowEnvironment,
+	hot bool,
+	onSettle func(conversation.SettleIdleInput),
+) {
+	env.RegisterActivityWithOptions(
+		func(conversation.ThreadWorkflowInput) (conversation.ThreadUsage, error) {
+			return conversation.ThreadUsage{Hot: hot}, nil
+		},
+		activity.RegisterOptions{Name: conversation.ActivityInspectThreadUsage},
+	)
+	env.RegisterActivityWithOptions(
+		func(input conversation.SettleIdleInput) error {
+			if onSettle != nil {
+				onSettle(input)
+			}
+			return nil
+		},
+		activity.RegisterOptions{Name: conversation.ActivitySettleHotRoom},
+	)
+}
+
 func TestThreadInboxWorkflowDrainsTwoMailsThenCompletes(t *testing.T) {
 	t.Parallel()
 
@@ -85,6 +107,7 @@ func TestThreadInboxWorkflowDrainsTwoMailsThenCompletes(t *testing.T) {
 		},
 		activity.RegisterOptions{Name: "RunConversationTurn"},
 	)
+	registerIdleSettleActivities(env, false, nil)
 	env.RegisterDelayedCallback(func() {
 		env.SignalWorkflow(conversation.ThreadMailSignal, conversation.ThreadMail{
 			ThreadID: "thread-1", OpID: "op-a", SpeakerAgentID: "agent-a", Body: "one",
@@ -150,6 +173,7 @@ func TestThreadInboxWorkflowContinuesAfterFailedDrain(t *testing.T) {
 		func(conversation.ActivityFailureInput) error { return nil },
 		activity.RegisterOptions{Name: "FailConversationRunAfterActivityError"},
 	)
+	registerIdleSettleActivities(env, false, nil)
 	env.RegisterDelayedCallback(func() {
 		env.SignalWorkflow(conversation.ThreadMailSignal, conversation.ThreadMail{
 			ThreadID: "thread-1", OpID: "op-a", Body: "one",
@@ -201,5 +225,90 @@ func TestRunTurnWorkflowIncludesFinalizerError(t *testing.T) {
 	if !strings.Contains(err.Error(), "callback delivery failed") ||
 		!strings.Contains(err.Error(), "finalizer unavailable") {
 		t.Fatalf("workflow error = %v, want both activity and finalizer errors", err)
+	}
+}
+
+func TestThreadInboxWorkflowIdleHotCallsSettleRotate(t *testing.T) {
+	t.Parallel()
+
+	var suite testsuite.WorkflowTestSuite
+	env := suite.NewTestWorkflowEnvironment()
+	env.RegisterActivityWithOptions(
+		func(conversation.ThreadMail) (conversation.RunInput, error) {
+			return conversation.RunInput{RunID: "op-a", ThreadID: "thread-1"}, nil
+		},
+		activity.RegisterOptions{Name: conversation.ActivityPrepareThreadTurn},
+	)
+	env.RegisterActivityWithOptions(
+		func(conversation.RunInput) (conversation.RunResult, error) {
+			return conversation.RunResult{RunID: "op-a", ThreadID: "thread-1"}, nil
+		},
+		activity.RegisterOptions{Name: "RunConversationTurn"},
+	)
+	var settled conversation.SettleIdleInput
+	registerIdleSettleActivities(env, true, func(input conversation.SettleIdleInput) {
+		settled = input
+	})
+	env.RegisterDelayedCallback(func() {
+		env.SignalWorkflow(conversation.ThreadMailSignal, conversation.ThreadMail{
+			ThreadID: "thread-1", OpID: "op-a", SpeakerAgentID: "agent-a", Body: "one",
+		})
+	}, 0)
+
+	env.ExecuteWorkflow(
+		ThreadInboxWorkflow,
+		conversation.ThreadWorkflowInput{ThreadID: "thread-1"},
+	)
+	if !env.IsWorkflowCompleted() {
+		t.Fatal("workflow did not complete")
+	}
+	if env.GetWorkflowError() != nil {
+		t.Fatalf("workflow error: %v", env.GetWorkflowError())
+	}
+	if !settled.UsageHot || settled.ThreadID != "thread-1" ||
+		settled.SpeakerSlug != "agent-a" {
+		t.Fatalf("settle = %+v, want hot rotate for thread-1 speaker agent-a", settled)
+	}
+}
+
+func TestThreadInboxWorkflowIdleLowKeepsCurrentJSONL(t *testing.T) {
+	t.Parallel()
+
+	var suite testsuite.WorkflowTestSuite
+	env := suite.NewTestWorkflowEnvironment()
+	env.RegisterActivityWithOptions(
+		func(conversation.ThreadMail) (conversation.RunInput, error) {
+			return conversation.RunInput{RunID: "op-a", ThreadID: "thread-1"}, nil
+		},
+		activity.RegisterOptions{Name: conversation.ActivityPrepareThreadTurn},
+	)
+	env.RegisterActivityWithOptions(
+		func(conversation.RunInput) (conversation.RunResult, error) {
+			return conversation.RunResult{RunID: "op-a", ThreadID: "thread-1"}, nil
+		},
+		activity.RegisterOptions{Name: "RunConversationTurn"},
+	)
+	var settled conversation.SettleIdleInput
+	registerIdleSettleActivities(env, false, func(input conversation.SettleIdleInput) {
+		settled = input
+	})
+	env.RegisterDelayedCallback(func() {
+		env.SignalWorkflow(conversation.ThreadMailSignal, conversation.ThreadMail{
+			ThreadID: "thread-1", OpID: "op-a", SpeakerAgentID: "agent-a", Body: "one",
+		})
+	}, 0)
+
+	env.ExecuteWorkflow(
+		ThreadInboxWorkflow,
+		conversation.ThreadWorkflowInput{ThreadID: "thread-1"},
+	)
+	if !env.IsWorkflowCompleted() {
+		t.Fatal("workflow did not complete")
+	}
+	if env.GetWorkflowError() != nil {
+		t.Fatalf("workflow error: %v", env.GetWorkflowError())
+	}
+	if settled.UsageHot || settled.ThreadID != "thread-1" {
+		t.Fatalf("settle = %+v, want usage_hot=false keep current.jsonl", settled)
 	}
 }

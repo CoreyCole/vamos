@@ -26,6 +26,7 @@ func ThreadInboxWorkflow(
 ) error {
 	inbox := make([]conversation.ThreadMail, 0, 4)
 	seen := map[string]struct{}{}
+	lastSpeaker := ""
 	ch := workflow.GetSignalChannel(ctx, conversation.ThreadMailSignal)
 
 	for {
@@ -46,12 +47,43 @@ func ThreadInboxWorkflow(
 			inbox = append(inbox, mail)
 		}
 		if len(inbox) == 0 {
-			return nil
+			return settleIdleThread(ctx, input.ThreadID, lastSpeaker)
 		}
 		item := inbox[0]
 		inbox = inbox[1:]
 		_ = drainMailItem(ctx, item)
+		lastSpeaker = strings.TrimSpace(item.SpeakerAgentID)
 	}
+}
+
+func settleIdleThread(ctx workflow.Context, threadID, speakerSlug string) error {
+	goActCtx := workflow.WithActivityOptions(ctx, workflow.ActivityOptions{
+		TaskQueue:           temporalmgr.GoTaskQueue,
+		StartToCloseTimeout: 30 * time.Second,
+		RetryPolicy: &temporalsdk.RetryPolicy{
+			MaximumAttempts: 3,
+		},
+	})
+	var usage conversation.ThreadUsage
+	if err := workflow.ExecuteActivity(
+		goActCtx,
+		conversation.ActivityInspectThreadUsage,
+		conversation.ThreadWorkflowInput{ThreadID: threadID},
+	).Get(ctx, &usage); err != nil {
+		return fmt.Errorf("inspect thread usage: %w", err)
+	}
+	if err := workflow.ExecuteActivity(
+		goActCtx,
+		conversation.ActivitySettleHotRoom,
+		conversation.SettleIdleInput{
+			ThreadID:    threadID,
+			UsageHot:    usage.Hot,
+			SpeakerSlug: speakerSlug,
+		},
+	).Get(ctx, nil); err != nil {
+		return fmt.Errorf("settle idle thread: %w", err)
+	}
+	return nil
 }
 
 func drainMailItem(ctx workflow.Context, mail conversation.ThreadMail) error {

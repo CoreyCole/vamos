@@ -12,6 +12,7 @@ import (
 
 	"github.com/google/uuid"
 
+	conversation "github.com/CoreyCole/vamos/pkg/agents/conversation"
 	"github.com/CoreyCole/vamos/pkg/db"
 )
 
@@ -31,6 +32,14 @@ type SettleHotRoomResult struct {
 	HandoffRel string `json:"handoff_rel,omitempty"`
 	HistoryRel string `json:"history_rel,omitempty"`
 	CutEntryID string `json:"cut_entry_id,omitempty"`
+}
+
+func (s *Service) InspectThreadUsage(
+	_ context.Context,
+	_ conversation.ThreadWorkflowInput,
+) (conversation.ThreadUsage, error) {
+	// Pi auto-compaction stays off; idle rotate is workflow-driven and off until usage is wired.
+	return conversation.ThreadUsage{Hot: false}, nil
 }
 
 func (s *Service) SettleHotRoom(
