@@ -1,7 +1,7 @@
 import { Context } from '@temporalio/activity';
 import {
 	createAgentSession,
-	SessionManager,
+	DefaultResourceLoader,
 	AuthStorage,
 	ModelRegistry,
 } from '@mariozechner/pi-coding-agent';
@@ -18,11 +18,10 @@ import {
 	durableCallbackAttemptTimeoutMS,
 	liveCallbackDrainTimeoutMS,
 	liveCallbackTimeoutMS,
-	loadSnapshot,
-	materializeSnapshot,
+	entryIdsInSession,
+	openRoomSession,
 	postEnvelope,
 	postEnvelopeWithRetry,
-	snapshotFetchTimeoutMS,
 } from './conversation.js';
 
 function logLiveCallbackDrop(error: unknown, envelope: EventEnvelope): void {
@@ -34,16 +33,22 @@ export async function RunConversationTurn(
 	input: ConversationRunInput,
 ): Promise<ConversationRunResult> {
 	Context.current().heartbeat();
-	const snapshot = await loadSnapshot(input, {
-		timeoutMS: snapshotFetchTimeoutMS,
-	});
-	Context.current().heartbeat();
-	const sessionManager = await materializeSnapshot(input, snapshot);
+	const sessionManager = await openRoomSession(input);
+	const existingIds = entryIdsInSession(sessionManager);
 	const authStorage = AuthStorage.create(process.env.PI_AUTH_PATH || undefined);
 	const modelRegistry = ModelRegistry.create(authStorage);
 	const provider = process.env.PI_MODEL_PROVIDER || 'openai-codex';
 	const modelId = process.env.PI_MODEL_ID || 'gpt-5.5';
 	const model = modelRegistry.find(provider, modelId);
+	const resourceLoader = new DefaultResourceLoader({
+		cwd: input.cwd,
+		agentsFilesOverride: () => ({
+			agentsFiles: (input.inject_files ?? []).map((file) => ({
+				path: file.path,
+				content: file.content,
+			})),
+		}),
+	});
 
 	const { session } = await createAgentSession({
 		cwd: input.cwd,
@@ -52,6 +57,7 @@ export async function RunConversationTurn(
 		modelRegistry,
 		model: model ?? undefined,
 		thinkingLevel: input.thinking_level as any,
+		resourceLoader,
 	});
 	session.setAutoCompactionEnabled(false);
 
@@ -107,9 +113,9 @@ export async function RunConversationTurn(
 			metadata.turns = Number(metadata.turns) + 1;
 			const checkpoint = buildCheckpoint(
 				input,
-				snapshot,
 				sessionManager,
 				event.turnIndex,
+				existingIds,
 			);
 			enqueueDurableCallback({
 				workspace_id: input.workspace_id,

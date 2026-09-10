@@ -1,10 +1,16 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { mkdtemp, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import {
+	buildCheckpoint,
 	drainBestEffort,
+	entryIdsInSession,
 	fetchWithTimeout,
 	isDurableConversationEvent,
 	loadSnapshot,
+	openRoomSession,
 	postEnvelope,
 	postEnvelopeWithRetry,
 } from './conversation.js';
@@ -289,4 +295,44 @@ test('postEnvelopeWithRetry stops after configured attempts', async () => {
 	} finally {
 		restore();
 	}
+});
+
+
+function sampleRunInput(sessionFile: string): ConversationRunInput {
+	return {
+		workspace_id: 'w1',
+		session_id: 's1',
+		run_id: 'r1',
+		thread_id: 't1',
+		trigger: 'send',
+		prompt: 'hello',
+		cwd: '/tmp/project',
+		artifact_root: '/tmp/project',
+		thinking_level: '',
+		callback_endpoint: 'http://localhost/internal/agent-chat/events',
+		snapshot_ref: { lineage_id: 'lineage-1' },
+		session_file: sessionFile,
+		lineage_id: 'lineage-1',
+		next_origin_order: 12,
+	};
+}
+
+test('openRoomSession opens current.jsonl and does not use tmpdir snapshots', async () => {
+	const dir = await mkdtemp(join(tmpdir(), 'room-jsonl-'));
+	const sessionFile = join(dir, 'sessions', 'current.jsonl');
+	const session = await openRoomSession(sampleRunInput(sessionFile));
+	assert.equal(session.getSessionFile(), sessionFile);
+	assert.equal(entryIdsInSession(session).size, 0);
+});
+
+test('buildCheckpoint uses opened jsonl ids and next_origin_order after rotate', async () => {
+	const dir = await mkdtemp(join(tmpdir(), 'room-jsonl-'));
+	const sessionFile = join(dir, 'current.jsonl');
+	await writeFile(sessionFile, '', 'utf8');
+	const session = await openRoomSession(sampleRunInput(sessionFile));
+	const existing = entryIdsInSession(session);
+	assert.equal(existing.size, 0);
+	const checkpoint = buildCheckpoint(sampleRunInput(sessionFile), session, 0, existing);
+	assert.equal(checkpoint.new_entries.length, 0);
+	assert.equal(session.getSessionFile(), sessionFile);
 });

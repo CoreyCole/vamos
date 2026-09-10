@@ -29,6 +29,19 @@ export interface ConversationSnapshotRef {
 	session_path?: string;
 }
 
+export interface ConversationInjectFile {
+	path: string;
+	content: string;
+}
+
+export interface ConversationRoomContext {
+	kind: string;
+	speaker_slug?: string;
+	pair_a?: string;
+	pair_b?: string;
+	plan_dir_rel?: string;
+}
+
 export interface ConversationRunInput {
 	workspace_id: string;
 	session_id?: string;
@@ -43,6 +56,11 @@ export interface ConversationRunInput {
 	callback_endpoint: string;
 	snapshot_loader_endpoint?: string;
 	snapshot_ref: ConversationSnapshotRef;
+	session_file?: string;
+	lineage_id?: string;
+	next_origin_order?: number;
+	room?: ConversationRoomContext;
+	inject_files?: ConversationInjectFile[];
 }
 
 export interface ConversationCheckpoint {

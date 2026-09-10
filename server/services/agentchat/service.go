@@ -1868,28 +1868,92 @@ func (s *Service) buildRunInput(
 		}
 	}
 	chatSessionID := s.chatSessionIDForRun(ctx, run)
+	room, sessionFile, cwd, injectFiles, err := s.prepareRoomSession(thread)
+	if err != nil {
+		return preparedRunInput{}, err
+	}
+	nextOrigin := s.nextOriginOrder(ctx, thread)
 	return preparedRunInput{
 		Input: conversation.RunInput{
-			WorkspaceID:            workspaceID,
-			SessionID:              sessionID,
-			ChatSessionID:          chatSessionID,
-			RunID:                  run.ID,
-			ThreadID:               thread.ID,
-			Trigger:                conversation.RunTrigger(run.Trigger),
-			Prompt:                 run.PromptText,
-			Context:                inputContext,
-			Cwd:                    thread.Cwd,
-			RootDocPath:            run.RootDocPath,
-			ThinkingLevel:          "high",
-			CallbackEndpoint:       s.callbackURL("/internal/agent-chat/events"),
-			SnapshotLoaderEndpoint: s.callbackURL("/internal/agent-chat/snapshots"),
+			WorkspaceID:      workspaceID,
+			SessionID:        sessionID,
+			ChatSessionID:    chatSessionID,
+			RunID:            run.ID,
+			ThreadID:         thread.ID,
+			Trigger:          conversation.RunTrigger(run.Trigger),
+			Prompt:           run.PromptText,
+			Context:          inputContext,
+			Cwd:              cwd,
+			RootDocPath:      run.RootDocPath,
+			ThinkingLevel:    "high",
+			CallbackEndpoint: s.callbackURL("/internal/agent-chat/events"),
 			SnapshotRef: conversation.SnapshotRef{
 				LineageID:   thread.LineageID,
 				HeadEntryID: restoreHead,
+				SessionPath: sessionFile,
 			},
+			SessionFile:     sessionFile,
+			LineageID:       thread.LineageID,
+			NextOriginOrder: nextOrigin,
+			Room: conversation.RoomContext{
+				Kind:        room.Kind,
+				SpeakerSlug: room.SpeakerSlug,
+				PairA:       room.PairA,
+				PairB:       room.PairB,
+				PlanDirRel:  room.PlanDirRel,
+			},
+			InjectFiles: injectFiles,
 		},
 		ChatSessionID: chatSessionID,
 	}, nil
+}
+
+func (s *Service) prepareRoomSession(thread db.AgentThread) (RoomIdentity, string, string, []conversation.InjectFile, error) {
+	room, err := RoomIdentityFromThread(s.thoughtsRoot, thread, "")
+	if err == nil && strings.TrimSpace(s.thoughtsRoot) != "" {
+		sessionFile, err := EnsureRoomCurrentJSONL(s.thoughtsRoot, room)
+		if err != nil {
+			return RoomIdentity{}, "", "", nil, err
+		}
+		cwd, err := RoomCwdAbs(s.thoughtsRoot, room)
+		if err != nil {
+			return RoomIdentity{}, "", "", nil, err
+		}
+		injectFiles, err := BuildWindowInjectFiles(s.thoughtsRoot, room, nil)
+		if err != nil {
+			return RoomIdentity{}, "", "", nil, err
+		}
+		return room, sessionFile, cwd, injectFiles, nil
+	}
+	cwd := strings.TrimSpace(thread.Cwd)
+	if cwd == "" {
+		return RoomIdentity{}, "", "", nil, fmt.Errorf("thread cwd is required")
+	}
+	sessionFile := filepath.Join(cwd, ".vamos", "sessions", currentJSONLName)
+	if err := os.MkdirAll(filepath.Dir(sessionFile), 0o755); err != nil {
+		return RoomIdentity{}, "", "", nil, err
+	}
+	return RoomIdentity{Kind: RoomKindPlan}, sessionFile, cwd, nil, nil
+}
+
+func (s *Service) nextOriginOrder(ctx context.Context, thread db.AgentThread) int64 {
+	if !thread.HeadEntryID.Valid || strings.TrimSpace(thread.HeadEntryID.String) == "" {
+		return 0
+	}
+	rows, err := s.queries.ListAgentEntryPath(ctx, db.ListAgentEntryPathParams{
+		LineageID:   thread.LineageID,
+		HeadEntryID: thread.HeadEntryID.String,
+	})
+	if err != nil || len(rows) == 0 {
+		return 0
+	}
+	var max int64 = -1
+	for _, row := range rows {
+		if row.OriginOrder > max {
+			max = row.OriginOrder
+		}
+	}
+	return max + 1
 }
 
 func (s *Service) startRun(

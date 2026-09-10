@@ -1,6 +1,5 @@
-import { mkdir, writeFile } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import { dirname, join } from 'node:path';
+import { mkdir } from 'node:fs/promises';
+import { dirname } from 'node:path';
 import { SessionManager } from '@mariozechner/pi-coding-agent';
 import type {
 	ConversationCheckpoint,
@@ -218,52 +217,33 @@ export async function loadSnapshot(
 	return (await response.json()) as ConversationSnapshot;
 }
 
-export async function materializeSnapshot(
+export async function openRoomSession(
 	input: ConversationRunInput,
-	snapshot: ConversationSnapshot,
 ): Promise<SessionManager> {
-	const sessionDir = join(tmpdir(), 'agent-chat-sessions', input.run_id);
-	const sessionFile = join(sessionDir, 'session.jsonl');
+	if (!input.session_file) {
+		throw new Error('ConversationRunInput requires session_file');
+	}
+	await mkdir(dirname(input.session_file), { recursive: true });
+	return SessionManager.open(input.session_file, dirname(input.session_file));
+}
 
-	await mkdir(sessionDir, { recursive: true });
-
-	const header = {
-		type: 'session',
-		version: 3,
-		id: snapshot.header.session_id || input.session_id || input.run_id,
-		timestamp: new Date().toISOString(),
-		cwd: snapshot.header.cwd,
-		...(snapshot.header.parent_session_id
-			? { parentSession: snapshot.header.parent_session_id }
-			: {}),
-	};
-
-	const lines = [
-		JSON.stringify(header),
-		...snapshot.entries.map((entry) => entry.payload_json),
-	];
-	await writeFile(sessionFile, lines.join('\n') + '\n', 'utf8');
-
-	return SessionManager.open(sessionFile, dirname(sessionFile));
+export function entryIdsInSession(sessionManager: SessionManager): Set<string> {
+	return new Set(sessionManager.getEntries().map((entry) => entry.id));
 }
 
 export function buildCheckpoint(
 	input: ConversationRunInput,
-	snapshot: ConversationSnapshot,
 	sessionManager: SessionManager,
 	turnIndex: number,
+	existingIds: Set<string>,
 ): ConversationCheckpoint {
-	const existingIds = new Set(snapshot.entries.map((entry) => entry.entry_id));
-	const nextOriginOrder =
-		snapshot.entries.length === 0
-			? 0
-			: Math.max(...snapshot.entries.map((entry) => entry.origin_order)) + 1;
+	const nextOriginOrder = Number(input.next_origin_order ?? 0);
 
 	const newEntries = sessionManager
 		.getEntries()
 		.filter((entry) => !existingIds.has(entry.id))
 		.map((entry, index) => ({
-			lineage_id: snapshot.lineage_id,
+			lineage_id: input.lineage_id ?? '',
 			entry_id: entry.id,
 			parent_entry_id: entry.parentId ?? undefined,
 			entry_type: entry.type,
@@ -282,7 +262,7 @@ export function buildCheckpoint(
 		head_entry_id: sessionManager.getLeafId() ?? undefined,
 		turn_index: turnIndex,
 		header: {
-			session_id: header?.id ?? snapshot.header.session_id,
+			session_id: header?.id ?? input.session_id ?? input.run_id,
 			parent_session_id: header?.parentSession,
 			cwd: header?.cwd ?? input.cwd,
 		},

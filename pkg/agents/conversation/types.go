@@ -48,21 +48,39 @@ type SnapshotRef struct {
 	SessionPath string `json:"session_path,omitempty"`
 }
 
+type InjectFile struct {
+	Path    string `json:"path"`
+	Content string `json:"content"`
+}
+
+type RoomContext struct {
+	Kind        string `json:"kind"`
+	SpeakerSlug string `json:"speaker_slug,omitempty"`
+	PairA       string `json:"pair_a,omitempty"`
+	PairB       string `json:"pair_b,omitempty"`
+	PlanDirRel  string `json:"plan_dir_rel,omitempty"`
+}
+
 type RunInput struct {
-	WorkspaceID            string      `json:"workspace_id"`
-	SessionID              string      `json:"session_id,omitempty"`
-	ChatSessionID          string      `json:"chat_session_id,omitempty"`
-	RunID                  string      `json:"run_id"`
-	ThreadID               string      `json:"thread_id"`
-	Trigger                RunTrigger  `json:"trigger"`
-	Prompt                 string      `json:"prompt"`
-	Context                string      `json:"context,omitempty"`
-	Cwd                    string      `json:"cwd"`
-	RootDocPath            string      `json:"root_doc_path"`
-	ThinkingLevel          string      `json:"thinking_level"`
-	CallbackEndpoint       string      `json:"callback_endpoint"`
-	SnapshotLoaderEndpoint string      `json:"snapshot_loader_endpoint,omitempty"`
-	SnapshotRef            SnapshotRef `json:"snapshot_ref"`
+	WorkspaceID            string       `json:"workspace_id"`
+	SessionID              string       `json:"session_id,omitempty"`
+	ChatSessionID          string       `json:"chat_session_id,omitempty"`
+	RunID                  string       `json:"run_id"`
+	ThreadID               string       `json:"thread_id"`
+	Trigger                RunTrigger   `json:"trigger"`
+	Prompt                 string       `json:"prompt"`
+	Context                string       `json:"context,omitempty"`
+	Cwd                    string       `json:"cwd"`
+	RootDocPath            string       `json:"root_doc_path"`
+	ThinkingLevel          string       `json:"thinking_level"`
+	CallbackEndpoint       string       `json:"callback_endpoint"`
+	SnapshotLoaderEndpoint string       `json:"snapshot_loader_endpoint,omitempty"`
+	SnapshotRef            SnapshotRef  `json:"snapshot_ref"`
+	SessionFile            string       `json:"session_file,omitempty"`
+	LineageID              string       `json:"lineage_id,omitempty"`
+	NextOriginOrder        int64        `json:"next_origin_order"`
+	Room                   RoomContext  `json:"room"`
+	InjectFiles            []InjectFile `json:"inject_files,omitempty"`
 }
 
 type Checkpoint struct {
