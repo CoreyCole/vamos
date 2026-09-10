@@ -1,4 +1,4 @@
-import { mkdir } from 'node:fs/promises';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
 import { SessionManager } from '@mariozechner/pi-coding-agent';
 import type {
@@ -223,8 +223,53 @@ export async function openRoomSession(
 	if (!input.session_file) {
 		throw new Error('ConversationRunInput requires session_file');
 	}
+	if (!input.cwd) {
+		throw new Error('ConversationRunInput requires cwd');
+	}
 	await mkdir(dirname(input.session_file), { recursive: true });
+	await ensureRoomSessionHeader(input);
 	return SessionManager.open(input.session_file, dirname(input.session_file));
+}
+
+async function ensureRoomSessionHeader(
+	input: ConversationRunInput,
+): Promise<void> {
+	const sessionFile = input.session_file as string;
+	let raw = '';
+	try {
+		raw = await readFile(sessionFile, 'utf8');
+	} catch (error) {
+		const code = (error as NodeJS.ErrnoException).code;
+		if (code !== 'ENOENT') {
+			throw error;
+		}
+	}
+	if (roomSessionHasHeader(raw)) {
+		return;
+	}
+	const header = {
+		type: 'session',
+		version: 3,
+		id: input.session_id || input.run_id,
+		timestamp: new Date().toISOString(),
+		cwd: input.cwd,
+	};
+	await writeFile(sessionFile, JSON.stringify(header) + '\n', 'utf8');
+}
+
+function roomSessionHasHeader(raw: string): boolean {
+	for (const line of raw.split('\n')) {
+		if (!line.trim()) {
+			continue;
+		}
+		try {
+			const entry = JSON.parse(line) as { type?: string; id?: unknown };
+			return entry.type === 'session' && typeof entry.id === 'string';
+		} catch {
+			return false;
+		}
+	}
+	return false;
 }
 
 export function entryIdsInSession(sessionManager: SessionManager): Set<string> {

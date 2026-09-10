@@ -322,7 +322,17 @@ test('openRoomSession opens current.jsonl and does not use tmpdir snapshots', as
 	const sessionFile = join(dir, 'sessions', 'current.jsonl');
 	const session = await openRoomSession(sampleRunInput(sessionFile));
 	assert.equal(session.getSessionFile(), sessionFile);
+	assert.equal(session.getCwd(), '/tmp/project');
 	assert.equal(entryIdsInSession(session).size, 0);
+});
+
+test('openRoomSession seeds session header cwd for empty current.jsonl', async () => {
+	const dir = await mkdtemp(join(tmpdir(), 'room-jsonl-'));
+	const sessionFile = join(dir, 'current.jsonl');
+	await writeFile(sessionFile, '', 'utf8');
+	const session = await openRoomSession(sampleRunInput(sessionFile));
+	assert.equal(session.getCwd(), '/tmp/project');
+	assert.equal(session.getSessionFile(), sessionFile);
 });
 
 test('buildCheckpoint uses opened jsonl ids and next_origin_order after rotate', async () => {
