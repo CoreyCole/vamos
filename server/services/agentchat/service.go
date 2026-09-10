@@ -4299,7 +4299,7 @@ func (s *Service) buildStableTranscript(
 		messages = append(messages, items...)
 	}
 
-	return combinePairedToolMessages(messages), nil
+	return s.attachDerivedBotDMChips(thread, combinePairedToolMessages(messages)), nil
 }
 
 func (s *Service) buildLiveTranscript(threadID string) (LiveTranscriptView, int64) {
@@ -4339,7 +4339,11 @@ func (s *Service) buildLiveTranscript(threadID string) (LiveTranscriptView, int6
 	}
 
 	cursor := s.CurrentCursor(threadID)
-	return LiveTranscriptView{Items: combinePairedToolMessages(items)}, cursor
+	combined := s.attachDerivedBotDMChipsForThreadID(
+		threadID,
+		combinePairedToolMessages(items),
+	)
+	return LiveTranscriptView{Items: combined}, cursor
 }
 
 func combinePairedToolMessages(items []TranscriptMessage) []TranscriptMessage {

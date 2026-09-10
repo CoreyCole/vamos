@@ -133,7 +133,7 @@ type TranscriptMessage struct {
 }
 
 // BotDMChip is Grok-style group-room chrome for message_room traffic.
-// N/M may be fixture constants until TODO-6.2 derives live counts.
+// N/M are derived live from pairwise rooms touched by the origin turn.
 type BotDMChip struct {
 	OriginTurnID string
 	SpeakerSlug  string
