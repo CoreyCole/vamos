@@ -11,6 +11,35 @@ import (
 	"time"
 )
 
+const bindAgentThreadBotHome = `-- name: BindAgentThreadBotHome :exec
+;
+
+UPDATE agent_threads
+SET agent_id = ?1,
+    room_kind = 'bot_home',
+    cwd = ?2,
+    title = ?3,
+    updated_at = CURRENT_TIMESTAMP
+WHERE id = ?4
+`
+
+type BindAgentThreadBotHomeParams struct {
+	AgentID sql.NullString `json:"agent_id"`
+	Cwd     string         `json:"cwd"`
+	Title   string         `json:"title"`
+	ID      string         `json:"id"`
+}
+
+func (q *Queries) BindAgentThreadBotHome(ctx context.Context, arg BindAgentThreadBotHomeParams) error {
+	_, err := q.db.ExecContext(ctx, bindAgentThreadBotHome,
+		arg.AgentID,
+		arg.Cwd,
+		arg.Title,
+		arg.ID,
+	)
+	return err
+}
+
 const createAgentThread = `-- name: CreateAgentThread :one
 INSERT INTO agent_threads (
     id,
@@ -47,6 +76,8 @@ plan_dir_rel,
 head_entry_id,
 parent_thread_id,
 forked_from_entry_id,
+agent_id,
+room_kind,
 created_at,
 updated_at,
 archived_at
@@ -90,6 +121,8 @@ func (q *Queries) CreateAgentThread(ctx context.Context, arg CreateAgentThreadPa
 		&i.HeadEntryID,
 		&i.ParentThreadID,
 		&i.ForkedFromEntryID,
+		&i.AgentID,
+		&i.RoomKind,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.ArchivedAt,
@@ -111,6 +144,8 @@ plan_dir_rel,
 head_entry_id,
 parent_thread_id,
 forked_from_entry_id,
+agent_id,
+room_kind,
 created_at,
 updated_at,
 archived_at
@@ -133,6 +168,8 @@ func (q *Queries) GetAgentThread(ctx context.Context, id string) (AgentThread, e
 		&i.HeadEntryID,
 		&i.ParentThreadID,
 		&i.ForkedFromEntryID,
+		&i.AgentID,
+		&i.RoomKind,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.ArchivedAt,
@@ -154,6 +191,8 @@ plan_dir_rel,
 head_entry_id,
 parent_thread_id,
 forked_from_entry_id,
+agent_id,
+room_kind,
 created_at,
 updated_at,
 archived_at
@@ -182,6 +221,8 @@ func (q *Queries) GetAgentThreadForUser(ctx context.Context, arg GetAgentThreadF
 		&i.HeadEntryID,
 		&i.ParentThreadID,
 		&i.ForkedFromEntryID,
+		&i.AgentID,
+		&i.RoomKind,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.ArchivedAt,
@@ -203,6 +244,8 @@ t.plan_dir_rel,
 t.head_entry_id,
 t.parent_thread_id,
 t.forked_from_entry_id,
+t.agent_id,
+t.room_kind,
 t.created_at,
 t.updated_at,
 t.archived_at
@@ -239,6 +282,57 @@ func (q *Queries) GetAgentThreadForWorkspaceUser(ctx context.Context, arg GetAge
 		&i.HeadEntryID,
 		&i.ParentThreadID,
 		&i.ForkedFromEntryID,
+		&i.AgentID,
+		&i.RoomKind,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.ArchivedAt,
+	)
+	return i, err
+}
+
+const getBotHomeThreadByAgentID = `-- name: GetBotHomeThreadByAgentID :one
+;
+
+SELECT
+id,
+user_email,
+title,
+cwd,
+lineage_id,
+project_id,
+plan_dir_rel,
+head_entry_id,
+parent_thread_id,
+forked_from_entry_id,
+agent_id,
+room_kind,
+created_at,
+updated_at,
+archived_at
+FROM agent_threads
+WHERE agent_id = ?1
+AND room_kind = 'bot_home'
+AND archived_at IS NULL
+LIMIT 1
+`
+
+func (q *Queries) GetBotHomeThreadByAgentID(ctx context.Context, agentID sql.NullString) (AgentThread, error) {
+	row := q.db.QueryRowContext(ctx, getBotHomeThreadByAgentID, agentID)
+	var i AgentThread
+	err := row.Scan(
+		&i.ID,
+		&i.UserEmail,
+		&i.Title,
+		&i.Cwd,
+		&i.LineageID,
+		&i.ProjectID,
+		&i.PlanDirRel,
+		&i.HeadEntryID,
+		&i.ParentThreadID,
+		&i.ForkedFromEntryID,
+		&i.AgentID,
+		&i.RoomKind,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.ArchivedAt,
@@ -260,6 +354,8 @@ plan_dir_rel,
 head_entry_id,
 parent_thread_id,
 forked_from_entry_id,
+agent_id,
+room_kind,
 created_at,
 updated_at,
 archived_at
@@ -285,6 +381,8 @@ func (q *Queries) GetMostRecentAgentThreadByPlanDirRel(ctx context.Context, plan
 		&i.HeadEntryID,
 		&i.ParentThreadID,
 		&i.ForkedFromEntryID,
+		&i.AgentID,
+		&i.RoomKind,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.ArchivedAt,
@@ -306,6 +404,8 @@ plan_dir_rel,
 head_entry_id,
 parent_thread_id,
 forked_from_entry_id,
+agent_id,
+room_kind,
 created_at,
 updated_at,
 archived_at
@@ -328,6 +428,8 @@ func (q *Queries) GetSharedAgentThread(ctx context.Context, id string) (AgentThr
 		&i.HeadEntryID,
 		&i.ParentThreadID,
 		&i.ForkedFromEntryID,
+		&i.AgentID,
+		&i.RoomKind,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.ArchivedAt,
@@ -349,6 +451,8 @@ plan_dir_rel,
 head_entry_id,
 parent_thread_id,
 forked_from_entry_id,
+agent_id,
+room_kind,
 created_at,
 updated_at,
 archived_at
@@ -384,6 +488,8 @@ func (q *Queries) ListAgentThreads(ctx context.Context, arg ListAgentThreadsPara
 			&i.HeadEntryID,
 			&i.ParentThreadID,
 			&i.ForkedFromEntryID,
+			&i.AgentID,
+			&i.RoomKind,
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.ArchivedAt,
@@ -416,6 +522,8 @@ plan_dir_rel,
 head_entry_id,
 parent_thread_id,
 forked_from_entry_id,
+agent_id,
+room_kind,
 created_at,
 updated_at,
 archived_at
@@ -446,6 +554,8 @@ func (q *Queries) ListAgentThreadsByPlanDirRel(ctx context.Context, planDirRel s
 			&i.HeadEntryID,
 			&i.ParentThreadID,
 			&i.ForkedFromEntryID,
+			&i.AgentID,
+			&i.RoomKind,
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.ArchivedAt,
@@ -477,6 +587,8 @@ t.plan_dir_rel,
 t.head_entry_id,
 t.parent_thread_id,
 t.forked_from_entry_id,
+t.agent_id,
+t.room_kind,
 t.created_at,
 t.updated_at,
 t.archived_at
@@ -508,6 +620,8 @@ func (q *Queries) ListAgentThreadsByWorkspace(ctx context.Context, workspaceID s
 			&i.HeadEntryID,
 			&i.ParentThreadID,
 			&i.ForkedFromEntryID,
+			&i.AgentID,
+			&i.RoomKind,
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.ArchivedAt,
@@ -591,6 +705,8 @@ t.plan_dir_rel,
 t.head_entry_id,
 t.parent_thread_id,
 t.forked_from_entry_id,
+t.agent_id,
+t.room_kind,
 t.created_at,
 t.updated_at,
 t.archived_at,
@@ -619,6 +735,8 @@ type ListAgentThreadsForUserWithWorkspaceRow struct {
 	HeadEntryID          sql.NullString `json:"head_entry_id"`
 	ParentThreadID       sql.NullString `json:"parent_thread_id"`
 	ForkedFromEntryID    sql.NullString `json:"forked_from_entry_id"`
+	AgentID              sql.NullString `json:"agent_id"`
+	RoomKind             string         `json:"room_kind"`
 	CreatedAt            time.Time      `json:"created_at"`
 	UpdatedAt            time.Time      `json:"updated_at"`
 	ArchivedAt           sql.NullTime   `json:"archived_at"`
@@ -646,6 +764,8 @@ func (q *Queries) ListAgentThreadsForUserWithWorkspace(ctx context.Context, user
 			&i.HeadEntryID,
 			&i.ParentThreadID,
 			&i.ForkedFromEntryID,
+			&i.AgentID,
+			&i.RoomKind,
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.ArchivedAt,
@@ -679,6 +799,8 @@ t.plan_dir_rel,
 t.head_entry_id,
 t.parent_thread_id,
 t.forked_from_entry_id,
+t.agent_id,
+t.room_kind,
 t.created_at,
 t.updated_at,
 t.archived_at
@@ -724,6 +846,8 @@ func (q *Queries) ListSharedAgentThreadsByPlanDir(ctx context.Context, arg ListS
 			&i.HeadEntryID,
 			&i.ParentThreadID,
 			&i.ForkedFromEntryID,
+			&i.AgentID,
+			&i.RoomKind,
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.ArchivedAt,
@@ -755,6 +879,8 @@ t.plan_dir_rel,
 t.head_entry_id,
 t.parent_thread_id,
 t.forked_from_entry_id,
+t.agent_id,
+t.room_kind,
 t.created_at,
 t.updated_at,
 t.archived_at,
@@ -780,6 +906,8 @@ type ListSharedAgentThreadsWithWorkspaceRow struct {
 	HeadEntryID          sql.NullString `json:"head_entry_id"`
 	ParentThreadID       sql.NullString `json:"parent_thread_id"`
 	ForkedFromEntryID    sql.NullString `json:"forked_from_entry_id"`
+	AgentID              sql.NullString `json:"agent_id"`
+	RoomKind             string         `json:"room_kind"`
 	CreatedAt            time.Time      `json:"created_at"`
 	UpdatedAt            time.Time      `json:"updated_at"`
 	ArchivedAt           sql.NullTime   `json:"archived_at"`
@@ -807,6 +935,8 @@ func (q *Queries) ListSharedAgentThreadsWithWorkspace(ctx context.Context) ([]Li
 			&i.HeadEntryID,
 			&i.ParentThreadID,
 			&i.ForkedFromEntryID,
+			&i.AgentID,
+			&i.RoomKind,
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.ArchivedAt,

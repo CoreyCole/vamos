@@ -102,6 +102,9 @@ func prepareSchemaCompatibilityMigrations(ctx context.Context, database *sql.DB)
 	if err := ensureAgentThreadProjectColumnsIfTableExists(ctx, database); err != nil {
 		return err
 	}
+	if err := ensureAgentsAndThreadRoomColumns(ctx, database); err != nil {
+		return err
+	}
 	if err := ensureAgentSessionsProjectionSchema(ctx, database); err != nil {
 		return err
 	}
@@ -128,6 +131,9 @@ func runRuntimeMigrations(ctx context.Context, database *sql.DB) error {
 		return err
 	}
 	if err := ensureAgentThreadProjectColumnsIfTableExists(ctx, database); err != nil {
+		return err
+	}
+	if err := ensureAgentsAndThreadRoomColumns(ctx, database); err != nil {
 		return err
 	}
 	if err := ensureColumn(
@@ -864,6 +870,57 @@ func ensureAgentThreadWorkspaces(ctx context.Context, database *sql.DB) error {
 		return err
 	}
 	return dropColumnIfExists(ctx, database, "agent_threads", "workspace_id")
+}
+
+func ensureAgentsAndThreadRoomColumns(ctx context.Context, database *sql.DB) error {
+	agentsSQL := `
+CREATE TABLE IF NOT EXISTS agents (
+id TEXT PRIMARY KEY,
+slug TEXT NOT NULL,
+name TEXT NOT NULL,
+label TEXT NOT NULL DEFAULT '',
+description TEXT NOT NULL DEFAULT '',
+created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+archived_at DATETIME
+)`
+	if _, err := database.ExecContext(ctx, agentsSQL); err != nil {
+		return err
+	}
+	if err := ensureIndex(
+		ctx,
+		database,
+		"CREATE UNIQUE INDEX IF NOT EXISTS idx_agents_slug_active ON agents (slug) WHERE archived_at IS NULL",
+	); err != nil {
+		return err
+	}
+	exists, err := tableExists(ctx, database, "agent_threads")
+	if err != nil || !exists {
+		return err
+	}
+	if err := ensureColumn(
+		ctx,
+		database,
+		"agent_threads",
+		"agent_id",
+		"TEXT REFERENCES agents(id)",
+	); err != nil {
+		return err
+	}
+	if err := ensureColumn(
+		ctx,
+		database,
+		"agent_threads",
+		"room_kind",
+		"TEXT NOT NULL DEFAULT ''",
+	); err != nil {
+		return err
+	}
+	return ensureIndex(
+		ctx,
+		database,
+		"CREATE UNIQUE INDEX IF NOT EXISTS idx_agent_threads_bot_home_agent ON agent_threads (agent_id) WHERE archived_at IS NULL AND room_kind = 'bot_home' AND agent_id IS NOT NULL",
+	)
 }
 
 func ensureAgentThreadProjectColumnsIfTableExists(

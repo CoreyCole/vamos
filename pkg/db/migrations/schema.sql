@@ -204,7 +204,10 @@ qrspi_closed_reason TEXT NOT NULL DEFAULT '',
 discovered_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
 last_discovered_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
 archived_at DATETIME,
-archive_reason TEXT NOT NULL DEFAULT '' CHECK (archive_reason IN ('', 'manual', 'missing_from_disk', 'lifecycle_closed')),
+archive_reason TEXT NOT NULL DEFAULT '' CHECK (archive_reason IN ('',
+'manual',
+'missing_from_disk',
+'lifecycle_closed')),
 archived_by_email TEXT NOT NULL DEFAULT ''
 ) ;
 
@@ -426,6 +429,21 @@ ON workspace_error_events (last_seen_at DESC, id DESC) ;
 CREATE INDEX IF NOT EXISTS idx_workspace_error_events_workspace_recent
 ON workspace_error_events (workspace_slug, last_seen_at DESC, id DESC) ;
 
+CREATE TABLE IF NOT EXISTS agents (
+id TEXT PRIMARY KEY,
+slug TEXT NOT NULL,
+name TEXT NOT NULL,
+label TEXT NOT NULL DEFAULT '',
+description TEXT NOT NULL DEFAULT '',
+created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+archived_at DATETIME
+) ;
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_agents_slug_active
+ON agents (slug)
+WHERE archived_at IS NULL ;
+
 CREATE TABLE IF NOT EXISTS agent_threads (
 id TEXT PRIMARY KEY,
 user_email TEXT NOT NULL,
@@ -437,6 +455,11 @@ plan_dir_rel TEXT REFERENCES plan_workspaces (plan_dir_rel),
 head_entry_id TEXT,
 parent_thread_id TEXT REFERENCES agent_threads (id),
 forked_from_entry_id TEXT,
+agent_id TEXT REFERENCES agents (id),
+room_kind TEXT NOT NULL DEFAULT '' CHECK (room_kind IN ('',
+'bot_home',
+'plan',
+'pairwise')),
 created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
 updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
 archived_at DATETIME
@@ -453,6 +476,10 @@ WHERE archived_at IS NULL ;
 CREATE INDEX IF NOT EXISTS idx_agent_threads_plan_updated
 ON agent_threads (plan_dir_rel, updated_at DESC)
 WHERE archived_at IS NULL AND plan_dir_rel IS NOT NULL ;
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_agent_threads_bot_home_agent
+ON agent_threads (agent_id)
+WHERE archived_at IS NULL AND room_kind = 'bot_home' AND agent_id IS NOT NULL ;
 
 CREATE TABLE IF NOT EXISTS agent_thread_drafts (
 user_email TEXT NOT NULL,

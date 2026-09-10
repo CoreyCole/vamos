@@ -9,6 +9,17 @@ import (
 	"time"
 )
 
+type Agent struct {
+	ID          string       `json:"id"`
+	Slug        string       `json:"slug"`
+	Name        string       `json:"name"`
+	Label       string       `json:"label"`
+	Description string       `json:"description"`
+	CreatedAt   time.Time    `json:"created_at"`
+	UpdatedAt   time.Time    `json:"updated_at"`
+	ArchivedAt  sql.NullTime `json:"archived_at"`
+}
+
 type AgentEntry struct {
 	LineageID        string         `json:"lineage_id"`
 	EntryID          string         `json:"entry_id"`
@@ -111,6 +122,8 @@ type AgentThread struct {
 	HeadEntryID       sql.NullString `json:"head_entry_id"`
 	ParentThreadID    sql.NullString `json:"parent_thread_id"`
 	ForkedFromEntryID sql.NullString `json:"forked_from_entry_id"`
+	AgentID           sql.NullString `json:"agent_id"`
+	RoomKind          string         `json:"room_kind"`
 	CreatedAt         time.Time      `json:"created_at"`
 	UpdatedAt         time.Time      `json:"updated_at"`
 	ArchivedAt        sql.NullTime   `json:"archived_at"`

@@ -255,10 +255,73 @@ func thoughtsRelFromAbs(thoughtsRoot, abs string) (string, bool) {
 	return "thoughts/" + rel, true
 }
 
+func ValidateAgentSlug(slug string) error {
+	return validateSlug(slug)
+}
+
 func validateSlug(slug string) error {
 	slug = strings.TrimSpace(slug)
 	if slug == "" || slug == "." || slug == ".." || strings.ContainsAny(slug, `/\\`) {
 		return fmt.Errorf("invalid slug %q", slug)
+	}
+	if slug == "a2a" || strings.HasPrefix(slug, "_") {
+		return fmt.Errorf("reserved slug %q", slug)
+	}
+	return nil
+}
+
+// SeedBotHomeTree writes thoughts/agents/{slug}/ role files and sessions dirs.
+func SeedBotHomeTree(thoughtsRoot, slug, name string) error {
+	if err := validateSlug(slug); err != nil {
+		return err
+	}
+	id := RoomIdentity{Kind: RoomKindBotHome, SpeakerSlug: slug}
+	root, err := RoomCwdAbs(thoughtsRoot, id)
+	if err != nil {
+		return err
+	}
+	skills := filepath.Join(root, "skills")
+	history := filepath.Join(root, sessionsDirName, historyDirName)
+	handoffs := filepath.Join(root, sessionsDirName, handoffsDirName)
+	for _, dir := range []string{skills, history, handoffs} {
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			return err
+		}
+	}
+	display := strings.TrimSpace(name)
+	if display == "" {
+		display = slug
+	}
+	files := map[string]string{
+		"AGENTS.md": "# " + display + "\n\nRole memory lives in MEMORY.md. Do not embed the live roster here.\n",
+		"MEMORY.md": "# Memory\n",
+		"USER.md":   "# User\n",
+	}
+	for fileName, body := range files {
+		path := filepath.Join(root, fileName)
+		if _, err := os.Stat(path); err == nil {
+			continue
+		} else if !os.IsNotExist(err) {
+			return err
+		}
+		if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
+			return err
+		}
+	}
+	rel, err := id.CurrentJSONLRel()
+	if err != nil {
+		return err
+	}
+	current, err := AbsFromThoughtsRel(thoughtsRoot, rel)
+	if err != nil {
+		return err
+	}
+	if _, err := os.Stat(current); os.IsNotExist(err) {
+		if err := os.WriteFile(current, nil, 0o644); err != nil {
+			return err
+		}
+	} else if err != nil {
+		return err
 	}
 	return nil
 }

@@ -214,3 +214,50 @@ func TestBuildWindowInjectSkipsBotHomeHandoffOnPlan(t *testing.T) {
 		}
 	}
 }
+
+func TestValidateAgentSlugRejectsReserved(t *testing.T) {
+	t.Parallel()
+	for _, slug := range []string{"a2a", "_hidden", ""} {
+		if err := ValidateAgentSlug(slug); err == nil {
+			t.Fatalf("slug %q accepted", slug)
+		}
+	}
+	if err := ValidateAgentSlug("nova"); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestSeedBotHomeTree(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	if err := SeedBotHomeTree(root, "nova", "Nova"); err != nil {
+		t.Fatal(err)
+	}
+	wants := []string{
+		filepath.Join(root, "agents", "nova", "AGENTS.md"),
+		filepath.Join(root, "agents", "nova", "MEMORY.md"),
+		filepath.Join(root, "agents", "nova", "USER.md"),
+		filepath.Join(root, "agents", "nova", "skills"),
+		filepath.Join(root, "agents", "nova", "sessions", "current.jsonl"),
+		filepath.Join(root, "agents", "nova", "sessions", "history"),
+		filepath.Join(root, "agents", "nova", "sessions", "handoffs"),
+	}
+	for _, path := range wants {
+		if _, err := os.Stat(path); err != nil {
+			t.Fatalf("missing %s: %v", path, err)
+		}
+	}
+	body, err := os.ReadFile(filepath.Join(root, "agents", "nova", "AGENTS.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(body), "MEMORY.md") {
+		t.Fatalf("AGENTS.md should point at MEMORY.md: %s", body)
+	}
+	if strings.Contains(strings.ToLower(string(body)), "roster") &&
+		strings.Contains(string(body), "embed the live roster") {
+		// expected: tells the reader not to embed roster
+	} else if strings.Contains(string(body), "| slug |") {
+		t.Fatalf("AGENTS.md embedded a roster table: %s", body)
+	}
+}

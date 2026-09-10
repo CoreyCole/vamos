@@ -169,25 +169,43 @@ func (s *Service) resolveAI470Thread(
 		return "", nil
 	}
 
+	if kind == agenthome.KindDM {
+		return s.resolveBotHomeThread(ctx, id, userEmail)
+	}
+
 	ids, err := s.listSharedThreadIDs(ctx)
 	if err != nil {
 		return "", err
 	}
 	idx := -1
 	switch {
-	case kind == agenthome.KindDM && id == "bot":
-		idx = 0
-	case kind == agenthome.KindDM && id == "research":
-		idx = 1
 	case kind == agenthome.KindGroup && id == "vamos-dev":
 		idx = 2
-	case kind == agenthome.KindDM || kind == agenthome.KindGroup || kind == agenthome.KindAgentDM:
+	case kind == agenthome.KindGroup || kind == agenthome.KindAgentDM:
 		idx = 0
 	}
 	if idx >= 0 && idx < len(ids) {
 		return ids[idx], nil
 	}
 	return "", nil
+}
+
+func (s *Service) resolveBotHomeThread(
+	ctx context.Context,
+	slug, userEmail string,
+) (string, error) {
+	slug = strings.TrimSpace(slug)
+	if slug == "" || s.queries == nil {
+		return "", nil
+	}
+	agent, err := s.queries.GetAgentBySlug(ctx, slug)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", nil
+	}
+	if err != nil {
+		return "", err
+	}
+	return s.ensureBotHomeThread(ctx, agent, userEmail)
 }
 
 func (s *Service) listSharedThreadIDs(ctx context.Context) ([]string, error) {

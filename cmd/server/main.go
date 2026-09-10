@@ -1129,7 +1129,7 @@ func main() {
 	if err != nil {
 		log.Fatal("Failed to create markdown service:", err)
 	}
-	markdownService.WithWorkspaceResolver(
+	markdownService.WithQueries(dbService.Queries).WithWorkspaceResolver(
 		markdown.NewDBWorkspaceResolver(dbService.Queries, basePath),
 	).WithLayoutPreferenceService(layoutPrefsService)
 
@@ -1744,6 +1744,7 @@ func main() {
 	agentsGroup := e.Group("/agents")
 	agentsGroup.Use(authMiddleware)
 	agenthome.RegisterAgentsRoutes(agentsGroup, markdown.ServeAgentsLand)
+	agenthome.RegisterCreateAgentRoute(agentsGroup, markdownService.HandleCreateAgent)
 	roomsGroup := e.Group("/rooms")
 	roomsGroup.Use(authMiddleware)
 	agenthome.RegisterRoomRoutes(roomsGroup, markdownService.ServeAI470Room)

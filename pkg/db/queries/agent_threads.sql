@@ -34,6 +34,8 @@ plan_dir_rel,
 head_entry_id,
 parent_thread_id,
 forked_from_entry_id,
+agent_id,
+room_kind,
 created_at,
 updated_at,
 archived_at ;
@@ -50,6 +52,8 @@ plan_dir_rel,
 head_entry_id,
 parent_thread_id,
 forked_from_entry_id,
+agent_id,
+room_kind,
 created_at,
 updated_at,
 archived_at
@@ -69,6 +73,8 @@ plan_dir_rel,
 head_entry_id,
 parent_thread_id,
 forked_from_entry_id,
+agent_id,
+room_kind,
 created_at,
 updated_at,
 archived_at
@@ -88,6 +94,8 @@ t.plan_dir_rel,
 t.head_entry_id,
 t.parent_thread_id,
 t.forked_from_entry_id,
+t.agent_id,
+t.room_kind,
 t.created_at,
 t.updated_at,
 t.archived_at,
@@ -115,6 +123,8 @@ t.plan_dir_rel,
 t.head_entry_id,
 t.parent_thread_id,
 t.forked_from_entry_id,
+t.agent_id,
+t.room_kind,
 t.created_at,
 t.updated_at,
 t.archived_at
@@ -144,6 +154,8 @@ plan_dir_rel,
 head_entry_id,
 parent_thread_id,
 forked_from_entry_id,
+agent_id,
+room_kind,
 created_at,
 updated_at,
 archived_at
@@ -164,6 +176,8 @@ plan_dir_rel,
 head_entry_id,
 parent_thread_id,
 forked_from_entry_id,
+agent_id,
+room_kind,
 created_at,
 updated_at,
 archived_at
@@ -210,6 +224,8 @@ t.plan_dir_rel,
 t.head_entry_id,
 t.parent_thread_id,
 t.forked_from_entry_id,
+t.agent_id,
+t.room_kind,
 t.created_at,
 t.updated_at,
 t.archived_at
@@ -232,6 +248,8 @@ t.plan_dir_rel,
 t.head_entry_id,
 t.parent_thread_id,
 t.forked_from_entry_id,
+t.agent_id,
+t.room_kind,
 t.created_at,
 t.updated_at,
 t.archived_at,
@@ -260,6 +278,8 @@ t.plan_dir_rel,
 t.head_entry_id,
 t.parent_thread_id,
 t.forked_from_entry_id,
+t.agent_id,
+t.room_kind,
 t.created_at,
 t.updated_at,
 t.archived_at
@@ -289,6 +309,8 @@ plan_dir_rel,
 head_entry_id,
 parent_thread_id,
 forked_from_entry_id,
+agent_id,
+room_kind,
 created_at,
 updated_at,
 archived_at
@@ -310,6 +332,8 @@ plan_dir_rel,
 head_entry_id,
 parent_thread_id,
 forked_from_entry_id,
+agent_id,
+room_kind,
 created_at,
 updated_at,
 archived_at
@@ -339,3 +363,36 @@ UPDATE agent_threads
 SET plan_dir_rel = sqlc.arg ('plan_dir_rel')
 WHERE id = sqlc.arg ('id')
 AND plan_dir_rel IS NULL ;
+
+-- name: GetBotHomeThreadByAgentID :one
+SELECT
+id,
+user_email,
+title,
+cwd,
+lineage_id,
+project_id,
+plan_dir_rel,
+head_entry_id,
+parent_thread_id,
+forked_from_entry_id,
+agent_id,
+room_kind,
+created_at,
+updated_at,
+archived_at
+FROM agent_threads
+WHERE agent_id = sqlc.arg('agent_id')
+AND room_kind = 'bot_home'
+AND archived_at IS NULL
+LIMIT 1 ;
+
+-- name: BindAgentThreadBotHome :exec
+UPDATE agent_threads
+SET agent_id = sqlc.arg('agent_id'),
+    room_kind = 'bot_home',
+    cwd = sqlc.arg('cwd'),
+    title = sqlc.arg('title'),
+    updated_at = CURRENT_TIMESTAMP
+WHERE id = sqlc.arg('id') ;
+

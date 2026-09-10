@@ -33,6 +33,11 @@ func RegisterAgentsRoutes(g *echo.Group, serve echo.HandlerFunc) {
 	g.GET("", serve)
 }
 
+// RegisterCreateAgentRoute mounts POST /agents.
+func RegisterCreateAgentRoute(g *echo.Group, create echo.HandlerFunc) {
+	g.POST("", create)
+}
+
 // RegisterRoomRoutes mounts GET /rooms/:kind/:id.
 // serve is typically markdownService.ServeAI470Room.
 func RegisterRoomRoutes(g *echo.Group, serve echo.HandlerFunc) {
