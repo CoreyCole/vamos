@@ -85,15 +85,15 @@ func TestDiscoverPlanAgentSessionsParsesHermesHeaderMetadata(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(items) != 1 || items[0].HermesMetadata == nil ||
-		items[0].HermesMetadata.Title != metadata.Title {
-		t.Fatalf("items = %#v", items)
+	if len(items) != 0 {
+		t.Fatalf("plan session index should skip Hermes JSONL, got %#v", items)
 	}
 	threads, err := ScanHermesThreads(root, plan)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(threads) != 1 || threads[0].PromptAuthority.PrincipalValue != "owner@example.com" {
+	if len(threads) != 1 ||
+		threads[0].PromptAuthority.PrincipalValue != "owner@example.com" {
 		t.Fatalf("threads = %#v", threads)
 	}
 }
@@ -150,11 +150,49 @@ func TestDiscoverPlanAgentSessionsRejectsMalformedHermesArtifact(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(dir, "thread_1.jsonl"), append(data, '\n'), 0o600); err != nil {
+	if err := os.WriteFile(
+		filepath.Join(dir, "thread_1.jsonl"),
+		append(data, '\n'),
+		0o600,
+	); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := DiscoverPlanAgentSessionsUnderThoughts(root, plan); err == nil {
-		t.Fatal("malformed Hermes artifact was indexed")
+	items, err := DiscoverPlanAgentSessionsUnderThoughts(root, plan)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(items) != 0 {
+		t.Fatalf("Hermes JSONL should not be indexed, got %#v", items)
+	}
+}
+
+func TestDiscoverPlanAgentSessionsIndexesUnrecognizedPiJSONL(t *testing.T) {
+	root := t.TempDir()
+	plan := filepath.Join(root, "me", "plans", "example")
+	dir := filepath.Join(plan, ".vamos", "sessions", "pi")
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(dir, "odd.jsonl")
+	if err := os.WriteFile(
+		path,
+		[]byte("not-json\n{\"id\":\"session-odd\"}\n"),
+		0o600,
+	); err != nil {
+		t.Fatal(err)
+	}
+	items, err := DiscoverPlanAgentSessionsUnderThoughts(root, plan)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(items) != 1 {
+		t.Fatalf("items = %#v", items)
+	}
+	if items[0].Path != "me/plans/example/.vamos/sessions/pi/odd.jsonl" {
+		t.Fatalf("path = %q", items[0].Path)
+	}
+	if items[0].Agent != "pi" {
+		t.Fatalf("agent = %q", items[0].Agent)
 	}
 }
 

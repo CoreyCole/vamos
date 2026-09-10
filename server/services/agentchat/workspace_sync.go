@@ -65,8 +65,10 @@ func (s *WorkspaceSyncer) syncUnlocked(
 	input SyncWorkspacesInput,
 ) (SyncWorkspacesResult, error) {
 	var result SyncWorkspacesResult
+	var planErr error
 	if s.PlanSyncer != nil {
-		plan, err := s.PlanSyncer.Sync(ctx, PlanWorkspaceDiscoveryInput{
+		var plan PlanWorkspaceDiscoveryResult
+		plan, planErr = s.PlanSyncer.Sync(ctx, PlanWorkspaceDiscoveryInput{
 			ProjectName:        input.ProjectName,
 			ProjectID:          input.ProjectID,
 			ProjectInstanceKey: input.ProjectInstanceKey,
@@ -74,28 +76,30 @@ func (s *WorkspaceSyncer) syncUnlocked(
 			ThoughtsRoot:       input.ThoughtsRoot,
 			ImplWorkspaces:     input.ImplWorkspaces,
 		})
-		if err != nil {
-			return SyncWorkspacesResult{}, err
-		}
 		result.Plan = plan
 	}
+	var implErr error
 	if s.ImplSyncer != nil {
 		implDiscovery := input.ImplWorkspaces
 		if implDiscovery.ProjectID == "" {
 			implDiscovery.ProjectID = input.ProjectID
 		}
-		impl, err := s.ImplSyncer.Sync(ctx, workspaces.ImplWorkspaceSyncInput{
+		var impl workspaces.ImplWorkspaceSyncResult
+		impl, implErr = s.ImplSyncer.Sync(ctx, workspaces.ImplWorkspaceSyncInput{
 			ProjectID:    input.ProjectID,
 			Discovery:    implDiscovery,
 			ManagerURL:   input.ManagerURL,
 			RestartToken: input.RestartToken,
 			TrunkBranch:  input.TrunkBranch,
 		})
-		if err != nil {
-			return SyncWorkspacesResult{}, err
-		}
 		result.Impl = impl
 	}
 	result.Changed = result.Plan.Changed || result.Impl.Changed
+	if implErr != nil {
+		return result, implErr
+	}
+	if s.ImplSyncer == nil {
+		return result, planErr
+	}
 	return result, nil
 }

@@ -208,7 +208,8 @@ func DiscoverPlanAgentSessionsUnderThoughts(
 				return nil
 			}
 			if filepath.Ext(logicalPath) != jsonlExtension ||
-				!pathInPlanSessionDir(logicalPlanDir, logicalPath) {
+				!pathInPlanSessionDir(logicalPlanDir, logicalPath) ||
+				pathInHermesSessionDir(logicalPlanDir, logicalPath) {
 				return nil
 			}
 			resolvedPath, err := filepath.EvalSymlinks(logicalPath)
@@ -270,7 +271,11 @@ func ScanHermesThreads(thoughtsRoot, root string) ([]HermesThreadArtifact, error
 		return nil, err
 	}
 	if !pathWithinRoot(resolvedPlan, resolvedRoot) {
-		return nil, fmt.Errorf("plan dir %q escapes thoughts root %q", logicalPlan, logicalRoot)
+		return nil, fmt.Errorf(
+			"plan dir %q escapes thoughts root %q",
+			logicalPlan,
+			logicalRoot,
+		)
 	}
 	hermesDir := filepath.Join(logicalPlan, ".vamos", "sessions", "hermes")
 	entries, err := os.ReadDir(hermesDir)
@@ -291,9 +296,18 @@ func ScanHermesThreads(thoughtsRoot, root string) ([]HermesThreadArtifact, error
 			return nil, err
 		}
 		if !pathWithinRoot(resolvedPath, resolvedRoot) {
-			return nil, fmt.Errorf("session path %q escapes thoughts root %q", resolvedPath, resolvedRoot)
+			return nil, fmt.Errorf(
+				"session path %q escapes thoughts root %q",
+				resolvedPath,
+				resolvedRoot,
+			)
 		}
-		item, err := buildSessionArtifactIndex(logicalRoot, resolvedRoot, logicalPath, resolvedPath)
+		item, err := buildSessionArtifactIndex(
+			logicalRoot,
+			resolvedRoot,
+			logicalPath,
+			resolvedPath,
+		)
 		if err != nil {
 			return nil, err
 		}
@@ -327,6 +341,21 @@ func pathInPlanSessionDir(root, path string) bool {
 	return false
 }
 
+func pathInHermesSessionDir(root, path string) bool {
+	rel, err := filepath.Rel(root, path)
+	if err != nil || strings.HasPrefix(rel, "..") {
+		return false
+	}
+	parts := strings.Split(rel, string(filepath.Separator))
+	for i, part := range parts {
+		if part == ".vamos" && i+2 < len(parts) &&
+			parts[i+1] == "sessions" && parts[i+2] == "hermes" {
+			return true
+		}
+	}
+	return false
+}
+
 func buildSessionArtifactIndex(
 	logicalRoot, resolvedRoot, logicalPath, resolvedPath string,
 ) (SessionArtifactIndex, error) {
@@ -353,14 +382,17 @@ func buildSessionArtifactIndex(
 		HermesPlanIdentity(ownerPlanDir),
 	)
 	if err != nil {
-		return SessionArtifactIndex{}, err
+		metadata = AgentSessionMetadata{}
+		hermesMetadata = nil
 	}
 	var hash string
 	if agent == "hermes" {
 		threadID := strings.TrimSuffix(filepath.Base(logicalPath), jsonlExtension)
 		lock, lockErr := acquireHermesTranscriptLock(
-			context.Background(), filepath.Join(logicalRoot, filepath.FromSlash(ownerPlanDir)),
-			threadID, true,
+			context.Background(),
+			filepath.Join(logicalRoot, filepath.FromSlash(ownerPlanDir)),
+			threadID,
+			true,
 		)
 		if lockErr != nil {
 			return SessionArtifactIndex{}, lockErr
@@ -400,11 +432,13 @@ func buildSessionArtifactIndex(
 				return SessionArtifactIndex{}, err
 			}
 		}
-		checkpoints, err = discoverCheckpointArtifacts(
-			logicalRoot, resolvedRoot, logicalPath, metadata.SessionID,
-		)
-		if err != nil {
-			return SessionArtifactIndex{}, err
+		if metadata.SessionID != "" {
+			checkpoints, err = discoverCheckpointArtifacts(
+				logicalRoot, resolvedRoot, logicalPath, metadata.SessionID,
+			)
+			if err != nil {
+				return SessionArtifactIndex{}, err
+			}
 		}
 	}
 	return SessionArtifactIndex{
@@ -801,47 +835,55 @@ func ShallowParseAgentSession(path string) (AgentSessionMetadata, error) {
 	defer file.Close()
 	scanner := bufio.NewScanner(file)
 	if !scanner.Scan() {
-		if err := scanner.Err(); err != nil {
-			return AgentSessionMetadata{}, err
-		}
-		return AgentSessionMetadata{}, errors.New("empty session file")
+		return AgentSessionMetadata{}, scanner.Err()
 	}
+	var metadata AgentSessionMetadata
 	var header PiSessionHeader
-	if err := json.Unmarshal(scanner.Bytes(), &header); err != nil {
-		return AgentSessionMetadata{}, err
-	}
-	metadata := AgentSessionMetadata{
-		SessionID:              strings.TrimSpace(header.ID),
-		CWD:                    strings.TrimSpace(header.Cwd),
-		ContinuedFromSessionID: strings.TrimSpace(header.ParentSession),
+	if err := json.Unmarshal(scanner.Bytes(), &header); err == nil {
+		metadata.SessionID = strings.TrimSpace(header.ID)
+		metadata.CWD = strings.TrimSpace(header.Cwd)
+		metadata.ContinuedFromSessionID = strings.TrimSpace(header.ParentSession)
 	}
 	var raw map[string]any
-	if err := json.Unmarshal(scanner.Bytes(), &raw); err == nil {
-		metadata.WorkflowID = firstString(raw, "workflow_id", "workflowID", "workflowId")
-		metadata.NodeID = firstString(
+	if err := json.Unmarshal(scanner.Bytes(), &raw); err != nil {
+		return metadata, nil
+	}
+	if metadata.SessionID == "" {
+		metadata.SessionID = firstString(
 			raw,
-			"workflow_node_id",
-			"workflowNodeID",
-			"workflowNodeId",
-			"node_id",
-			"nodeID",
-			"nodeId",
-		)
-		if value := firstString(
-			raw,
-			"continued_from_session_id",
-			"continuedFromSessionID",
-			"continuedFromSessionId",
-		); value != "" {
-			metadata.ContinuedFromSessionID = value
-		}
-		metadata.ForkedFromSessionID = firstString(
-			raw,
-			"forked_from_session_id",
-			"forkedFromSessionID",
-			"forkedFromSessionId",
+			"id",
+			"session_id",
+			"sessionID",
+			"sessionId",
 		)
 	}
+	if metadata.CWD == "" {
+		metadata.CWD = firstString(raw, "cwd", "Cwd")
+	}
+	metadata.WorkflowID = firstString(raw, "workflow_id", "workflowID", "workflowId")
+	metadata.NodeID = firstString(
+		raw,
+		"workflow_node_id",
+		"workflowNodeID",
+		"workflowNodeId",
+		"node_id",
+		"nodeID",
+		"nodeId",
+	)
+	if value := firstString(
+		raw,
+		"continued_from_session_id",
+		"continuedFromSessionID",
+		"continuedFromSessionId",
+	); value != "" {
+		metadata.ContinuedFromSessionID = value
+	}
+	metadata.ForkedFromSessionID = firstString(
+		raw,
+		"forked_from_session_id",
+		"forkedFromSessionID",
+		"forkedFromSessionId",
+	)
 	return metadata, nil
 }
 
