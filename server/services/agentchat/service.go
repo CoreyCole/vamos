@@ -1893,6 +1893,7 @@ func (s *Service) buildRunInput(
 			Room: conversation.RoomContext{
 				Kind:        room.Kind,
 				SpeakerSlug: room.SpeakerSlug,
+				FromAgentID: strings.TrimSpace(run.SpeakerAgentID.String),
 				PairA:       room.PairA,
 				PairB:       room.PairB,
 				PlanDirRel:  room.PlanDirRel,

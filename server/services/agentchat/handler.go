@@ -77,6 +77,7 @@ func resumeComposeHTTPStatus(err error) int {
 	switch {
 	case errors.Is(err, ErrPairwiseViewOnly),
 		errors.Is(err, ErrBotHomeRejectsA2A),
+		errors.Is(err, ErrMessageRoomBotHome),
 		errors.Is(err, ErrPairwiseSpeakerNotInPair):
 		return http.StatusForbidden
 	case errors.Is(err, ErrThreadRunInProgress):
@@ -2654,11 +2655,33 @@ func (h *Handler) HandleInternalEnqueue(c echo.Context) error {
 	if !h.trustedInternalRequest(c) {
 		return echo.NewHTTPError(http.StatusUnauthorized, "invalid internal token")
 	}
-	var payload EnqueueThreadMailInput
+	var payload struct {
+		EnqueueThreadMailInput
+		To string `json:"to"`
+	}
 	if err := c.Bind(&payload); err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, "invalid enqueue payload")
 	}
-	result, err := h.service.EnqueueThreadMail(c.Request().Context(), payload)
+	if to := strings.TrimSpace(payload.To); to != "" {
+		resolved, err := h.service.ResolveMessageRoom(
+			c.Request().Context(),
+			MessageRoomResolveInput{
+				To:             to,
+				FromAgentID:    payload.FromAgentID,
+				OriginThreadID: payload.ThreadID,
+			},
+		)
+		if err != nil {
+			return echo.NewHTTPError(resumeComposeHTTPStatus(err), err.Error())
+		}
+		payload.ThreadID = resolved.ThreadID
+		payload.SpeakerAgentID = resolved.SpeakerAgentID
+		payload.FromKind = EnqueueFromAgent
+	}
+	result, err := h.service.EnqueueThreadMail(
+		c.Request().Context(),
+		payload.EnqueueThreadMailInput,
+	)
 	if err != nil {
 		return echo.NewHTTPError(resumeComposeHTTPStatus(err), err.Error())
 	}

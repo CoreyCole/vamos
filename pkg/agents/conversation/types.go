@@ -93,6 +93,7 @@ type InjectFile struct {
 type RoomContext struct {
 	Kind        string `json:"kind"`
 	SpeakerSlug string `json:"speaker_slug,omitempty"`
+	FromAgentID string `json:"from_agent_id,omitempty"`
 	PairA       string `json:"pair_a,omitempty"`
 	PairB       string `json:"pair_b,omitempty"`
 	PlanDirRel  string `json:"plan_dir_rel,omitempty"`
