@@ -3,8 +3,11 @@ package agentchat
 import (
 	"bufio"
 	"context"
+	"database/sql"
 	"encoding/json"
 	"os"
+	"path/filepath"
+	"sort"
 	"strings"
 
 	"github.com/CoreyCole/vamos/pkg/db"
@@ -282,5 +285,99 @@ func (s *Service) pairwiseWindowVisibleCount(speaker, dest string) int {
 	if err != nil {
 		return 0
 	}
-	return countVisibleJSONLMessages(abs)
+	if n := countVisibleJSONLMessages(abs); n > 0 {
+		return n
+	}
+	return countLatestPairwiseHistoryMessages(s.thoughtsRoot, id)
+}
+
+func countLatestPairwiseHistoryMessages(thoughtsRoot string, id RoomIdentity) int {
+	rel, err := id.HistoryRel()
+	if err != nil {
+		return 0
+	}
+	abs, err := AbsFromThoughtsRel(thoughtsRoot, rel)
+	if err != nil {
+		return 0
+	}
+	entries, err := os.ReadDir(abs)
+	if err != nil {
+		return 0
+	}
+	names := make([]string, 0, len(entries))
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+		name := entry.Name()
+		if !strings.HasSuffix(name, ".jsonl") {
+			continue
+		}
+		names = append(names, name)
+	}
+	if len(names) == 0 {
+		return 0
+	}
+	sort.Strings(names)
+	return countVisibleJSONLMessages(filepath.Join(abs, names[len(names)-1]))
+}
+
+func (s *Service) notifyPairwiseOriginTranscripts(
+	ctx context.Context,
+	workspaceID, pairwiseThreadID string,
+) {
+	if s == nil || s.queries == nil {
+		return
+	}
+	pairwiseThreadID = strings.TrimSpace(pairwiseThreadID)
+	if pairwiseThreadID == "" {
+		return
+	}
+	thread, err := s.queries.GetAgentThread(ctx, pairwiseThreadID)
+	if err != nil || strings.TrimSpace(thread.RoomKind) != RoomKindPairwise {
+		return
+	}
+	seen := map[string]struct{}{pairwiseThreadID: {}}
+	notify := func(id string) {
+		id = strings.TrimSpace(id)
+		if id == "" {
+			return
+		}
+		if _, ok := seen[id]; ok {
+			return
+		}
+		seen[id] = struct{}{}
+		if strings.TrimSpace(workspaceID) != "" {
+			s.notifyLiveTranscriptDirty(workspaceID, id)
+		}
+		s.notifyThreadScope(ctx, id, PatchLiveTranscript)
+	}
+	for _, agentID := range []string{
+		strings.TrimSpace(thread.PairAgentIDA.String),
+		strings.TrimSpace(thread.PairAgentIDB.String),
+	} {
+		if agentID == "" {
+			continue
+		}
+		home, err := s.queries.GetBotHomeThreadByAgentID(
+			ctx,
+			sql.NullString{String: agentID, Valid: true},
+		)
+		if err != nil {
+			continue
+		}
+		notify(home.ID)
+	}
+	listed, err := s.queries.ListAgentThreads(ctx, db.ListAgentThreadsParams{
+		UserEmail: "",
+		Limit:     500,
+	})
+	if err != nil {
+		return
+	}
+	for _, row := range listed {
+		if strings.TrimSpace(row.RoomKind) == RoomKindPlan {
+			notify(row.ID)
+		}
+	}
 }

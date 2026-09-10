@@ -2745,6 +2745,11 @@ func (h *Handler) HandleInternalRunEvent(c echo.Context) error {
 				PatchLiveTranscript,
 			)
 		}
+		h.service.notifyPairwiseOriginTranscripts(
+			c.Request().Context(),
+			env.WorkspaceID,
+			env.ThreadID,
+		)
 		return c.NoContent(http.StatusAccepted)
 	case env.EventType == conversation.EventCheckpoint:
 		var cp conversation.Checkpoint

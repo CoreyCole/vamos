@@ -1,9 +1,14 @@
 package agentchat
 
 import (
+	"database/sql"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/CoreyCole/vamos/pkg/db"
+	serverdb "github.com/CoreyCole/vamos/server/services/db"
 	"github.com/CoreyCole/vamos/server/testhelpers"
 )
 
@@ -176,5 +181,145 @@ func TestCompactToolCallPresentationMessageRoomShowsArgs(t *testing.T) {
 	}
 	if !hide {
 		t.Fatal("expected collapsed chrome with visible header args")
+	}
+}
+
+func TestAttachDerivedBotDMChipsReadsJSONLAndSurvivesRotate(t *testing.T) {
+	t.Parallel()
+	thoughtsRoot := t.TempDir()
+	id := RoomIdentity{Kind: RoomKindPairwise, PairA: "lead", PairB: "infra"}
+	currentAbs, err := EnsureRoomCurrentJSONL(thoughtsRoot, id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	body := strings.Join([]string{
+		`{"type":"message","message":{"role":"user","content":"ping"}}`,
+		`{"type":"message","message":{"role":"assistant","content":"pong"}}`,
+		`{"type":"message","message":{"role":"assistant","content":"more"}}`,
+		"",
+	}, "\n")
+	if err := os.WriteFile(currentAbs, []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	home := db.AgentThread{ID: "home-lead", RoomKind: RoomKindBotHome}
+	svc := &Service{thoughtsRoot: thoughtsRoot}
+	items := []TranscriptMessage{
+		{
+			EntryID:    "turn-origin-1",
+			Variant:    "bubble",
+			Role:       "assistant",
+			AuthorName: "lead",
+			Content:    "I'll ping infra",
+		},
+		{
+			EntryID:    "turn-origin-1",
+			Variant:    "detail",
+			Title:      "message_room",
+			HeaderCode: "infra",
+		},
+	}
+	got := svc.attachDerivedBotDMChips(home, items)
+	if got[0].BotDMChip == nil {
+		t.Fatal("chip not attached from JSONL")
+	}
+	if got[0].BotDMChip.MessageCount != 3 {
+		t.Fatalf("N = %d, want 3", got[0].BotDMChip.MessageCount)
+	}
+
+	rotated, err := RotateRoomCurrentJSONL(thoughtsRoot, id, RoomHandoffSpec{
+		Timestamp: "2026-09-10_08-00-00",
+		Body:      "idle",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if rotated.HistoryRel == "" {
+		t.Fatal("expected history file")
+	}
+	after := svc.attachDerivedBotDMChips(home, items)
+	if after[0].BotDMChip == nil {
+		t.Fatal("chip missing after rotate")
+	}
+	if after[0].BotDMChip.MessageCount != 3 {
+		t.Fatalf(
+			"post-rotate N = %d, want 3 (do not recount empty current)",
+			after[0].BotDMChip.MessageCount,
+		)
+	}
+}
+
+func TestPairwiseLiveEventNotifiesOriginHomeThread(t *testing.T) {
+	t.Parallel()
+	database, err := serverdb.NewService(filepath.Join(t.TempDir(), "chip-notify.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = database.Close() })
+	q := database.Queries
+	ctx := t.Context()
+	lead, err := q.CreateAgent(ctx, db.CreateAgentParams{
+		ID: "id-lead", Slug: "lead", Name: "Lead",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	infra, err := q.CreateAgent(ctx, db.CreateAgentParams{
+		ID: "id-infra", Slug: "infra", Name: "Infra",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	home, err := q.CreateAgentThread(ctx, db.CreateAgentThreadParams{
+		ID:        "thread-home-lead",
+		UserEmail: "owner@example.com",
+		Title:     "Lead home",
+		Cwd:       "thoughts/agents/lead",
+		LineageID: "lin-home",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := q.BindAgentThreadBotHome(ctx, db.BindAgentThreadBotHomeParams{
+		AgentID: sql.NullString{String: lead.ID, Valid: true},
+		Cwd:     home.Cwd,
+		Title:   home.Title,
+		ID:      home.ID,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	pair, err := q.CreateAgentThread(ctx, db.CreateAgentThreadParams{
+		ID:        "thread-pair",
+		UserEmail: "owner@example.com",
+		Title:     "a2a",
+		Cwd:       "thoughts/a2a/infra__lead",
+		LineageID: "lin-pair",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := q.BindAgentThreadPairwise(ctx, db.BindAgentThreadPairwiseParams{
+		PairAgentIDA: sql.NullString{String: infra.ID, Valid: true},
+		PairAgentIDB: sql.NullString{String: lead.ID, Valid: true},
+		Cwd:          pair.Cwd,
+		Title:        pair.Title,
+		ID:           pair.ID,
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	notifier := NewNotifier()
+	originCh := notifier.Subscribe(home.ID)
+	defer notifier.Unsubscribe(home.ID, originCh)
+	svc := &Service{queries: q, notifier: notifier}
+	svc.notifyPairwiseOriginTranscripts(ctx, "", pair.ID)
+
+	select {
+	case signal := <-originCh:
+		if signal.Scope != PatchLiveTranscript {
+			t.Fatalf("scope = %q", signal.Scope)
+		}
+	default:
+		t.Fatal("pairwise live event did not dirty origin home thread")
 	}
 }
