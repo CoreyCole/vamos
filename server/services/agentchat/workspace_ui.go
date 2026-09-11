@@ -339,12 +339,20 @@ func workspacePromptPlaceholder(hasThread bool) string {
 	return "Ask Pi to do work in this workspace"
 }
 
+func composerPlaceholderForTitle(title string) string {
+	title = strings.TrimSpace(title)
+	if title == "" {
+		return "Message…"
+	}
+	return "Message " + title
+}
+
 func sharedThreadComposerPlaceholder(args EmbeddedFreeformPanelArgs) string {
 	if placeholder := strings.TrimSpace(args.Placeholder); placeholder != "" {
 		return placeholder
 	}
 	if args.HasThread {
-		return "Message Bot"
+		return "Message…"
 	}
 	return workspacePromptPlaceholder(false)
 }

@@ -67,10 +67,13 @@ func (s *Service) renderSharedThreadChat(
 	}
 	live, cursor := s.buildLiveTranscript(thread.ID)
 	args := EmbeddedFreeformPanelArgs{
-		ThreadID:    thread.ID,
-		HasThread:   true,
-		Cwd:         thread.Cwd,
-		Placeholder: leftoverComposerPlaceholder(fixtureMode),
+		ThreadID:  thread.ID,
+		HasThread: true,
+		Cwd:       thread.Cwd,
+		Placeholder: sharedThreadComposerPlaceholder(EmbeddedFreeformPanelArgs{
+			HasThread:   true,
+			Placeholder: composerPlaceholderForTitle(thread.Title),
+		}),
 		Transcript: TranscriptPaneState{
 			Stable: stable,
 			Live:   live,
@@ -125,15 +128,6 @@ func groupBotDMChipFixture(originTurnID string) *BotDMChip {
 				Count:         1,
 			},
 		},
-	}
-}
-
-func leftoverComposerPlaceholder(fixtureMode string) string {
-	switch fixtureMode {
-	case "group":
-		return "Message Vamos dev"
-	default:
-		return "Message Bot"
 	}
 }
 

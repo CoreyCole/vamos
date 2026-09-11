@@ -11,14 +11,17 @@ func ChatHeaderInitial(title string) string {
 }
 
 func ChatHeaderAvatarClass(title string) string {
-	switch strings.TrimSpace(title) {
-	case "Bot":
-		return "bg-fuchsia-500/90 text-white"
-	case "Research agent":
-		return "bg-sky-500/80 text-white"
-	case "Vamos dev":
-		return "bg-emerald-500/90 text-white"
-	default:
+	title = strings.TrimSpace(title)
+	if title == "" {
 		return "bg-muted text-muted-foreground"
 	}
+	palette := []string{
+		"bg-muted text-muted-foreground",
+		"bg-secondary text-secondary-foreground",
+	}
+	h := 0
+	for _, r := range title {
+		h = (h*31 + int(r)) & 0xffff
+	}
+	return palette[h%len(palette)]
 }

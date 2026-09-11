@@ -34,6 +34,7 @@ func (s *Service) ServeAI470Room(c echo.Context) error {
 	}
 	userEmail, _ := c.Get("user_email").(string)
 	sel := agenthome.RosterSelection{Kind: kind, ID: id}
+	roomTitle := s.ai470RoomTitle(c.Request().Context(), kind, id)
 	artifactPath, hasArtifact, err := optionalThreadArtifact(c.QueryParam("artifact"))
 	if err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
@@ -72,13 +73,13 @@ func (s *Service) ServeAI470Room(c echo.Context) error {
 		}
 		chatComp = workbench.ChatColumnWithReopen(
 			threadsOpen,
-			ai470RoomTitle(kind, id),
+			roomTitle,
 			chatBody,
 		)
 		chatOpen = kind == agenthome.KindPlan && hasArtifact
 	} else {
 		chat, err := s.renderAI470SharedChat(
-			c.Request().Context(), kind, id, threadID, userEmail,
+			c.Request().Context(), threadID, userEmail,
 		)
 		if errors.Is(err, sql.ErrNoRows) {
 			return echo.NewHTTPError(http.StatusNotFound, "thread not found")
@@ -91,7 +92,7 @@ func (s *Service) ServeAI470Room(c echo.Context) error {
 		}
 		chatComp = workbench.ChatColumnWithReopen(
 			threadsOpen,
-			ai470RoomTitle(kind, id),
+			roomTitle,
 			chat,
 		)
 		artifactComp, commentsComp, err = s.threadArtifactAndComments(
@@ -100,6 +101,9 @@ func (s *Service) ServeAI470Room(c echo.Context) error {
 		if err != nil {
 			return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 		}
+		chatOpen = true
+	}
+	if kind == agenthome.KindDM {
 		chatOpen = true
 	}
 
@@ -137,12 +141,6 @@ func (s *Service) ServeAI470Room(c echo.Context) error {
 	)
 }
 
-// sharedThreadIDLister is optional on the workbench thread renderer so agent/group
-// rooms can fixture-map onto real shared threads without sketch RoomChatPane.
-type sharedThreadIDLister interface {
-	ListSharedThreadIDs(ctx context.Context) ([]string, error)
-}
-
 func parseAI470RoomParams(
 	c echo.Context,
 ) (agenthome.RoomKind, string, string, string, error) {
@@ -167,6 +165,11 @@ func parseAI470RoomParams(
 	if kind == agenthome.KindA2A {
 		return "", "", "", "", echo.NewHTTPError(
 			http.StatusNotFound, "pairwise rooms require /rooms/a2a/{a}/{b}",
+		)
+	}
+	if kind == agenthome.KindGroup || kind == agenthome.KindAgentDM {
+		return "", "", "", "", echo.NewHTTPError(
+			http.StatusNotFound, "room kind is not in v1",
 		)
 	}
 	return kind, id, "", "", nil
@@ -228,21 +231,6 @@ func (s *Service) resolveAI470Thread(
 	if kind == agenthome.KindDM {
 		return s.resolveBotHomeThread(ctx, id, userEmail)
 	}
-
-	ids, err := s.listSharedThreadIDs(ctx)
-	if err != nil {
-		return "", err
-	}
-	idx := -1
-	switch {
-	case kind == agenthome.KindGroup && id == "vamos-dev":
-		idx = 2
-	case kind == agenthome.KindGroup || kind == agenthome.KindAgentDM:
-		idx = 0
-	}
-	if idx >= 0 && idx < len(ids) {
-		return ids[idx], nil
-	}
 	return "", nil
 }
 
@@ -256,19 +244,12 @@ func (s *Service) resolveBotHomeThread(
 	}
 	agent, err := s.queries.GetAgentBySlug(ctx, slug)
 	if errors.Is(err, sql.ErrNoRows) {
-		return "", nil
+		return "", echo.NewHTTPError(http.StatusNotFound, "agent not found")
 	}
 	if err != nil {
 		return "", err
 	}
 	return s.ensureBotHomeThread(ctx, agent, userEmail)
-}
-
-func (s *Service) listSharedThreadIDs(ctx context.Context) ([]string, error) {
-	if lister, ok := s.workbenchThreadsRenderer.(sharedThreadIDLister); ok {
-		return lister.ListSharedThreadIDs(ctx)
-	}
-	return nil, nil
 }
 
 func (s *Service) liveRoster(
@@ -307,37 +288,10 @@ func rosterSelectionForThread(threadID string) agenthome.RosterSelection {
 	}
 }
 
-type chromaFixtureChatRenderer interface {
-	RenderSharedThreadChatWithChromaFixture(
-		ctx context.Context,
-		threadID, userEmail string,
-	) (templ.Component, error)
-	RenderSharedThreadChatWithGroupBubbleFixture(
-		ctx context.Context,
-		threadID, userEmail string,
-	) (templ.Component, error)
-}
-
 func (s *Service) renderAI470SharedChat(
 	ctx context.Context,
-	kind agenthome.RoomKind,
-	roomID, threadID, userEmail string,
+	threadID, userEmail string,
 ) (templ.Component, error) {
-	r, ok := s.workbenchThreadsRenderer.(chromaFixtureChatRenderer)
-	if ok {
-		// Seed visible fenced ```go bubble on dm/bot for chroma VA.
-		if kind == agenthome.KindDM && roomID == "bot" {
-			return r.RenderSharedThreadChatWithChromaFixture(ctx, threadID, userEmail)
-		}
-		// Group: multi-author bubbles + NestedQuoteBlock + chroma for Bot-vs-group VA.
-		if kind == agenthome.KindGroup && roomID == "vamos-dev" {
-			return r.RenderSharedThreadChatWithGroupBubbleFixture(
-				ctx,
-				threadID,
-				userEmail,
-			)
-		}
-	}
 	return s.workbenchThreadsRenderer.RenderSharedThreadChat(ctx, threadID, userEmail)
 }
 
@@ -354,20 +308,20 @@ func AI470PairwiseComposerDisabled() bool {
 	return true
 }
 
-func ai470RoomTitle(kind agenthome.RoomKind, id string) string {
-	switch {
-	case kind == agenthome.KindDM && id == "bot":
-		return "Bot"
-	case kind == agenthome.KindDM && id == "research":
-		return "Research agent"
-	case kind == agenthome.KindGroup && id == "vamos-dev":
-		return "Vamos dev"
-	case kind == agenthome.KindPlan && id == "alpha":
-		return "Alpha"
-	default:
-		if id != "" {
-			return id
+func (s *Service) ai470RoomTitle(
+	ctx context.Context,
+	kind agenthome.RoomKind,
+	id string,
+) string {
+	id = strings.TrimSpace(id)
+	if kind == agenthome.KindDM && s != nil && s.queries != nil && id != "" {
+		agent, err := s.queries.GetAgentBySlug(ctx, id)
+		if err == nil {
+			return agenthome.RosterBotTitle(agent.Name, agent.Slug)
 		}
-		return "Chat"
 	}
+	if id != "" {
+		return id
+	}
+	return "Chat"
 }
