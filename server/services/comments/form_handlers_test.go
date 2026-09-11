@@ -205,6 +205,9 @@ func TestWorkbenchV2CommentShowPatchesOnlyCommentsPaneSignal(t *testing.T) {
 	for _, want := range []string{
 		`comment-target-`,
 		commentui.CommentsContextPanelID,
+		commentui.WorkbenchMobileCommentsContentID,
+		`workbench_v2_mobile_comments`,
+		`matchMedia`,
 		`workbenchV2Comments`,
 		`visible`,
 		`Add a comment...`,
@@ -261,7 +264,18 @@ func TestWorkbenchV2CommentCreatePatchesOnlyCommentsPaneSignal(t *testing.T) {
 		t.Fatalf("HandleCommentForm() error = %v", err)
 	}
 	body := rec.Body.String()
-	for _, want := range []string{"Please clarify", "comment-target-", commentui.CommentsContextPanelID, "workbenchV2Comments", "/thoughts/actions/select-comment", `commentui-thread-quote`, "Plan"} {
+	for _, want := range []string{
+		"Please clarify",
+		"comment-target-",
+		commentui.CommentsContextPanelID,
+		commentui.WorkbenchMobileCommentsContentID,
+		"workbench_v2_mobile_comments",
+		"matchMedia",
+		"workbenchV2Comments",
+		"/thoughts/actions/select-comment",
+		`commentui-thread-quote`,
+		"Plan",
+	} {
 		if !strings.Contains(body, want) {
 			t.Fatalf("response missing %q: %s", want, body)
 		}

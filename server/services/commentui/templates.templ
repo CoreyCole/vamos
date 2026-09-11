@@ -62,7 +62,22 @@ func sectionAddCommentSubmitExpr(route string) string {
 }
 
 func FocusComposerScript() string {
-	return "document.getElementById('" + CommentsComposerTextID + "')?.focus()"
+	return "if (window.matchMedia('(max-width: 767px)').matches) { document.getElementById('" +
+		WorkbenchMobileCommentsComposerID +
+		"')?.focus() } else { document.getElementById('" +
+		CommentsComposerTextID +
+		"')?.focus() }"
+}
+
+func WorkbenchV2OpenCommentsExpr() string {
+	return "if (window.matchMedia('(max-width: 767px)').matches) { $workbench_v2_mobile_comments.open = true } else { $workbench.regions.workbenchV2Comments.visible = true; $workbench.regions.workbenchV2Chat.visible = false }"
+}
+
+func commentComposerID(view CommentFormView) string {
+	if id := strings.TrimSpace(view.ComposerID); id != "" {
+		return id
+	}
+	return CommentsComposerTextID
 }
 
 func commentsThreadsShowClick() string {
@@ -491,7 +506,7 @@ templ CommentForm(view CommentFormView) {
 			if view.SelectedText != "" {
 				<blockquote class="commentui-thread-quote whitespace-pre-wrap rounded-md border-l-4 border-primary/50 bg-muted px-3 py-2 text-muted-foreground">{ view.SelectedText }</blockquote>
 			}
-			@textarea.Textarea(textarea.TextareaArgs{ID: CommentsComposerTextID, Placeholder: "Add a comment...", Name: "comment_text", Rows: 3, Class: "resize-none", Attributes: map[string]any{"data-ignore-morph": true}})
+			@textarea.Textarea(textarea.TextareaArgs{ID: commentComposerID(view), Placeholder: "Add a comment...", Name: "comment_text", Rows: 3, Class: "resize-none", Attributes: map[string]any{"data-ignore-morph": true}})
 			<div class="flex justify-end gap-2">
 				<button type="button" class="rounded-md px-3 py-1.5 text-xs text-muted-foreground hover:bg-muted" data-on:click={ "@post('" + view.Target.Routes.Cancel + "', {contentType: 'form'})" }>Cancel</button>
 				<button type="submit" class="rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90">Comment</button>
@@ -569,17 +584,60 @@ templ WorkbenchMobileCommentsTarget() {
 	</div>
 }
 
+templ WorkbenchMobileCommentsPanel(args CommentsPanelArgs) {
+	<div id={ WorkbenchMobileCommentsContentID } class="flex min-h-0 flex-col" data-init={ WorkbenchV2OpenCommentsExpr() }>
+		<p class="shrink-0 border-b border-border px-3 py-2 text-[13px] font-semibold text-foreground">Comments</p>
+		if args.Form != nil {
+			<div class="shrink-0 border-b border-border p-3">
+				@CommentForm(*args.Form)
+			</div>
+		}
+		<div id={ WorkbenchMobileCommentsThreadListID } class="min-h-0 flex-1 space-y-3 overflow-y-auto p-3">
+			{{ openThreads := unresolvedThreads(args.Threads) }}
+			{{ archivedThreads := resolvedThreads(args.Threads) }}
+			if len(openThreads) == 0 && len(archivedThreads) == 0 {
+				<p class="rounded-md border border-dashed border-border p-3 text-sm text-muted-foreground">No comments yet.</p>
+			} else {
+				for _, thread := range openThreads {
+					@CommentThreadCard(thread, panelThreadTarget(args, thread), CommentThreadOptions{ShowSection: true, ShowSelectedText: true, IDPrefix: "workbench-v2-mobile-thread-"})
+				}
+				if len(archivedThreads) > 0 {
+					<details class="rounded-md border border-border/70 bg-muted/20">
+						<summary class="cursor-pointer px-2 py-1.5 text-xs font-medium text-muted-foreground">Archived ({ fmt.Sprintf("%d", len(archivedThreads)) })</summary>
+						<div class="space-y-3 border-t border-border/70 p-2">
+							for _, thread := range archivedThreads {
+								@CommentThreadCard(thread, panelThreadTarget(args, thread), CommentThreadOptions{ShowSection: true, ShowSelectedText: true, Compact: true, IDPrefix: "workbench-v2-mobile-thread-"})
+							}
+						</div>
+					</details>
+				}
+			}
+		</div>
+	</div>
+}
+
 templ CommentThreadCard(view CommentThreadView, target CommentTargetView, opts CommentThreadOptions) {
 	<div class="space-y-1.5">
 		if opts.ShowSection {
 			<p class="truncate px-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">{ CommentSectionLabel(view) }</p>
 		}
-		@CommentCard(view, target)
+		@CommentCardWithOptions(view, target, opts)
 	</div>
 }
 
+func commentThreadElementID(view CommentThreadView, opts CommentThreadOptions) string {
+	if prefix := strings.TrimSpace(opts.IDPrefix); prefix != "" {
+		return prefix + view.ID
+	}
+	return "comment-thread-" + view.ID
+}
+
 templ CommentCard(view CommentThreadView, target CommentTargetView) {
-	<article id={ "comment-thread-" + view.ID } class="space-y-2 rounded-lg border border-border/70 bg-card p-3 text-xs shadow-sm">
+	@CommentCardWithOptions(view, target, CommentThreadOptions{})
+}
+
+templ CommentCardWithOptions(view CommentThreadView, target CommentTargetView, opts CommentThreadOptions) {
+	<article id={ commentThreadElementID(view, opts) } class="space-y-2 rounded-lg border border-border/70 bg-card p-3 text-xs shadow-sm">
 		<div class="flex items-start justify-between gap-3">
 			<div class="min-w-0">
 				<p class="font-medium text-foreground">{ commentDisplayName(view) }</p>

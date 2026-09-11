@@ -113,12 +113,15 @@ type CommentTargetView struct {
 }
 
 const (
-	CommentsContextPanelID           = "comments-context-panel"
-	CommentsContextThreadListID      = "comments-context-thread-list"
-	CommentsComposerTextID           = "comments-composer-text"
-	MobileSectionCommentContentID    = "mobile-section-comment-content"
-	WorkbenchMobileCommentsContentID = "workbench-v2-mobile-comments-content"
-	CommentSidebarSignal             = "commentSidebarExpanded"
+	CommentsContextPanelID              = "comments-context-panel"
+	CommentsContextThreadListID         = "comments-context-thread-list"
+	CommentsComposerTextID              = "comments-composer-text"
+	MobileSectionCommentContentID       = "mobile-section-comment-content"
+	WorkbenchMobileCommentsContentID    = "workbench-v2-mobile-comments-content"
+	WorkbenchMobileCommentsThreadListID = "workbench-v2-mobile-comments-thread-list"
+	WorkbenchMobileCommentsComposerID   = "workbench-v2-mobile-comments-composer"
+	WorkbenchMobileCommentsFormID       = "workbench-v2-mobile-comment-form"
+	CommentSidebarSignal                = "commentSidebarExpanded"
 )
 
 type CommentSidebarView struct {
@@ -140,6 +143,7 @@ type CommentAuthorsView struct {
 
 type CommentFormView struct {
 	ID           string
+	ComposerID   string
 	Target       CommentTargetView
 	SelectedText string
 	Error        string
@@ -163,6 +167,7 @@ type CommentThreadOptions struct {
 	ShowSection      bool
 	ShowSelectedText bool
 	Compact          bool
+	IDPrefix         string
 }
 
 func BuildCommentsPanelArgs(

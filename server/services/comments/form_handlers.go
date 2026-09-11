@@ -217,14 +217,8 @@ func patchOpenCommentsSignal(
 	workbenchV2 bool,
 ) error {
 	if workbenchV2 {
-		return sse.MarshalAndPatchSignals(map[string]any{
-			"workbench": map[string]any{
-				"regions": map[string]any{
-					"workbenchV2Comments": map[string]any{"visible": true},
-					"workbenchV2Chat":     map[string]any{"visible": false},
-				},
-			},
-		})
+		// Viewport split lives on WorkbenchMobileCommentsPanel data-init.
+		return nil
 	}
 	return sse.MarshalAndPatchSignals(map[string]any{
 		"rightRailActiveTab": "comments",
@@ -298,9 +292,41 @@ func (s *Service) patchThoughtsCommentsPanelForm(
 		panelArgs.ActiveSectionLabel = label
 	}
 	panelArgs.Form = form
-	return sse.PatchElementTempl(
+	if err := sse.PatchElementTempl(
 		commentui.CommentsContextPanel(panelArgs),
 		datastar.WithSelectorID(commentui.CommentsContextPanelID),
+	); err != nil {
+		return err
+	}
+	if !workbenchV2 {
+		return nil
+	}
+	mobileArgs := panelArgs
+	mobileArgs.HiddenFields = commentui.MergeHidden(
+		panelArgs.HiddenFields,
+		map[string]string{
+			"request_id":   "workbench-v2-mobile-comments",
+			"workbench_v2": "1",
+		},
+	)
+	if form != nil {
+		mobileForm := *form
+		mobileForm.ID = commentui.WorkbenchMobileCommentsFormID
+		mobileForm.ComposerID = commentui.WorkbenchMobileCommentsComposerID
+		mobileTarget := mobileForm.Target
+		mobileTarget.HiddenFields = commentui.MergeHidden(
+			mobileTarget.HiddenFields,
+			map[string]string{
+				"request_id":   "workbench-v2-mobile-comments",
+				"workbench_v2": "1",
+			},
+		)
+		mobileForm.Target = mobileTarget
+		mobileArgs.Form = &mobileForm
+	}
+	return sse.PatchElementTempl(
+		commentui.WorkbenchMobileCommentsPanel(mobileArgs),
+		datastar.WithSelectorID(commentui.WorkbenchMobileCommentsContentID),
 	)
 }
 

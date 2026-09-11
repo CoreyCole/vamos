@@ -726,6 +726,51 @@ func TestCommentSharedPatchTargetsRenderStableIDs(t *testing.T) {
 	}
 }
 
+func TestWorkbenchMobileCommentsPanelOpensNonModalSheetOnMobile(t *testing.T) {
+	t.Parallel()
+	var buf bytes.Buffer
+	form := CommentFormView{
+		ID:         WorkbenchMobileCommentsFormID,
+		ComposerID: WorkbenchMobileCommentsComposerID,
+		Target: CommentTargetView{
+			Routes: CommentRoutes{
+				Create: "/forms/comments",
+				Cancel: "/forms/comments/cancel",
+			},
+			HiddenFields: map[string]string{
+				"doc_path":     "thoughts/plan.md",
+				"workbench_v2": "1",
+				"request_id":   "workbench-v2-mobile-comments",
+			},
+		},
+		SelectedText: "quoted",
+	}
+	err := WorkbenchMobileCommentsPanel(CommentsPanelArgs{
+		Form:         &form,
+		HiddenFields: form.Target.HiddenFields,
+	}).Render(t.Context(), &buf)
+	if err != nil {
+		t.Fatalf("Render() error = %v", err)
+	}
+	html := buf.String()
+	for _, want := range []string{
+		`id="` + WorkbenchMobileCommentsContentID + `"`,
+		WorkbenchV2OpenCommentsExpr(),
+		`id="` + WorkbenchMobileCommentsComposerID + `"`,
+		`name="workbench_v2" value="1"`,
+		"quoted",
+	} {
+		if !strings.Contains(html, want) {
+			t.Fatalf("mobile comments panel missing %q: %s", want, html)
+		}
+	}
+	for _, unwanted := range []string{MobileSectionCommentContentID, "comments_sheet", `id="` + CommentsContextPanelID + `"`} {
+		if strings.Contains(html, unwanted) {
+			t.Fatalf("mobile comments panel contains %q: %s", unwanted, html)
+		}
+	}
+}
+
 func TestCommentsContextPanelRendersComposerInsteadOfDialog(t *testing.T) {
 	t.Parallel()
 

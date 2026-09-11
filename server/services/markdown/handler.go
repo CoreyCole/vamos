@@ -672,16 +672,55 @@ func (s *Service) HandleSelectComment(c echo.Context) error {
 			commentui.SafeCommentTargetSlug("thoughts", comment.DocPath),
 			sectionID,
 		)
-		sse := datastar.NewSSE(c.Response().Writer, c.Request())
-		if err := sse.MarshalAndPatchSignals(
-			map[string]any{
-				"workbench": map[string]any{
-					"regions": map[string]any{
-						"workbenchV2Comments": map[string]any{"visible": true},
-						"workbenchV2Chat":     map[string]any{"visible": false},
-					},
-				},
+		userEmail, _ := c.Get("user_email").(string)
+		resp, commentsErr := s.commentService.GetCommentsForScopeInternal(
+			c.Request().Context(),
+			comment.DocPath,
+		)
+		threads := []commentui.CommentThreadView{}
+		if commentsErr == nil && resp != nil {
+			threads = thoughtsCommentThreads(resp.Comments)
+		}
+		hiddenFields := map[string]string{
+			"doc_path":      comment.DocPath,
+			"context_panel": "1",
+			"workbench_v2":  "1",
+		}
+		panelArgs := commentui.BuildCommentsPanelArgs(commentui.CommentableMarkdownArgs{
+			Surface:  commentui.CommentSurfaceThoughts,
+			IDPrefix: commentui.SafeCommentTargetSlug("thoughts", comment.DocPath),
+			DocPath:  comment.DocPath,
+			Comments: threads,
+			Routes: commentui.CommentRoutes{
+				Show:          "/forms/comments/show",
+				Create:        "/forms/comments",
+				Cancel:        "/forms/comments/cancel",
+				Expand:        "/forms/comments/expand",
+				SelectComment: "/thoughts/actions/select-comment",
+				Reply:         func(string) string { return "/forms/replies" },
+				Resolve:       func(string) string { return "/forms/resolve" },
+				Reopen:        func(string) string { return "/forms/reopen" },
 			},
+			HiddenFields: hiddenFields,
+			UserEmail:    userEmail,
+		}, sectionID)
+		sse := datastar.NewSSE(c.Response().Writer, c.Request())
+		if err := sse.PatchElementTempl(
+			commentui.CommentsContextPanel(panelArgs),
+			datastar.WithSelectorID(commentui.CommentsContextPanelID),
+		); err != nil {
+			return err
+		}
+		mobileArgs := panelArgs
+		mobileArgs.HiddenFields = commentui.MergeHidden(
+			panelArgs.HiddenFields,
+			map[string]string{
+				"request_id": "workbench-v2-mobile-comments",
+			},
+		)
+		if err := sse.PatchElementTempl(
+			commentui.WorkbenchMobileCommentsPanel(mobileArgs),
+			datastar.WithSelectorID(commentui.WorkbenchMobileCommentsContentID),
 		); err != nil {
 			return err
 		}
