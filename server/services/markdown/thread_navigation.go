@@ -800,8 +800,6 @@ func (s *Service) thoughtsArtifactPane(
 	browser.HeaderActions = BuildThreadArtifactHeaderActions(
 		page,
 		browser.DocPath,
-		chatHref,
-		artifactMenuViewDocumentHref(browser),
 	)
 	return ThreadArtifactPane(browser, document), nil
 }
@@ -862,8 +860,6 @@ func (s *Service) threadArtifactAndComments(
 		browser.HeaderActions = BuildThreadArtifactHeaderActions(
 			nil,
 			browser.DocPath,
-			"",
-			artifactMenuViewDocumentHref(browser),
 		)
 		return ThreadArtifactPane(
 			browser,
@@ -875,8 +871,6 @@ func (s *Service) threadArtifactAndComments(
 		browser.HeaderActions = BuildThreadArtifactHeaderActions(
 			nil,
 			browser.DocPath,
-			"",
-			artifactMenuViewDocumentHref(browser),
 		)
 		return ThreadArtifactPane(browser, content),
 			WorkbenchUnavailable("Comments are unavailable for this artifact."), nil
@@ -904,8 +898,6 @@ func (s *Service) threadArtifactAndComments(
 	browser.HeaderActions = BuildThreadArtifactHeaderActions(
 		page,
 		browser.DocPath,
-		"",
-		artifactMenuViewDocumentHref(browser),
 	)
 	panelArgs.Document.WorkbenchActions = nil
 	content = DocumentPanel(panelArgs)

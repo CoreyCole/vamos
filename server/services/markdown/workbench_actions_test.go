@@ -10,8 +10,7 @@ func TestBuildThreadArtifactHeaderActionsOmitsThoughts(t *testing.T) {
 	t.Parallel()
 
 	chatHref := "/rooms/plan/alpha?artifact=thoughts%2Fowner%2Fplans%2Falpha%2Fdesign.md"
-	viewHref := "/thoughts/owner/plans/alpha/design.md"
-	html := renderHeaderActions(t, "owner/plans/alpha/design.md", chatHref, viewHref)
+	html := renderHeaderActions(t, "owner/plans/alpha/design.md")
 	if strings.Contains(html, "<span>Thoughts</span>") {
 		t.Fatalf("Thoughts still in 3-dot:\n%s", html)
 	}
@@ -27,9 +26,8 @@ func TestBuildThreadArtifactHeaderActionsOmitsThoughts(t *testing.T) {
 	if !strings.Contains(html, `href="`+chatHref+`"`) {
 		t.Fatalf("missing plan-lead href:\n%s", html)
 	}
-	if !strings.Contains(html, "<span>View Document</span>") ||
-		!strings.Contains(html, `href="`+viewHref+`"`) {
-		t.Fatalf("View Document should live in the 3-dot:\n%s", html)
+	if strings.Contains(html, "View Document") {
+		t.Fatalf("View Document must not be in the 3-dot:\n%s", html)
 	}
 	if strings.Contains(html, ">Document</p>") ||
 		strings.Contains(html, "border-t border-border") {
@@ -37,24 +35,24 @@ func TestBuildThreadArtifactHeaderActionsOmitsThoughts(t *testing.T) {
 	}
 }
 
-func TestBuildThreadArtifactHeaderActionsOmitsChatWithoutHref(t *testing.T) {
+func TestBuildThreadArtifactHeaderActionsAlwaysChatsOnPlanDocs(t *testing.T) {
 	t.Parallel()
 
-	html := renderHeaderActions(t, "owner/plans/alpha/design.md", "", "")
-	if strings.Contains(html, "<span>Thoughts</span>") {
-		t.Fatalf("Thoughts still in 3-dot:\n%s", html)
+	html := renderHeaderActions(t, "owner/plans/alpha/design.md")
+	if !strings.Contains(html, "<span>Chat about this plan</span>") {
+		t.Fatalf("Chat about this plan required on threads and thoughts:\n%s", html)
 	}
-	if strings.Contains(html, "Chat about this plan") {
-		t.Fatalf("Chat about this plan should be hidden on plan chat:\n%s", html)
+	if strings.Contains(html, "View Document") {
+		t.Fatalf("View Document must not be in the 3-dot:\n%s", html)
 	}
 }
 
 func renderHeaderActions(
 	t *testing.T,
-	docPath, chatHref, viewDocumentHref string,
+	docPath string,
 ) string {
 	t.Helper()
-	comp := BuildThreadArtifactHeaderActions(nil, docPath, chatHref, viewDocumentHref)
+	comp := BuildThreadArtifactHeaderActions(nil, docPath)
 	if comp == nil {
 		t.Fatal("header actions is nil")
 	}

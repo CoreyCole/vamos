@@ -72,21 +72,13 @@ func DocumentCommentAction(pageArgs *PageArgs) workbench.OverflowAction {
 	}
 }
 
-func artifactMenuViewDocumentHref(browser ThreadArtifactBrowserArgs) string {
-	if browser.DocumentViewActive {
-		return ""
-	}
-	return strings.TrimSpace(browser.ViewDocumentHref)
-}
-
 func BuildThreadArtifactHeaderActions(
 	pageArgs *PageArgs,
-	docPath, chatHref, viewDocumentHref string,
+	docPath string,
 ) templ.Component {
 	docPath = strings.TrimSpace(docPath)
-	chatHref = strings.TrimSpace(chatHref)
-	viewDocumentHref = strings.TrimSpace(viewDocumentHref)
-	actions := make([]workbench.OverflowAction, 0, 5)
+	chatHref := planLeadChatHref(docPath)
+	actions := make([]workbench.OverflowAction, 0, 4)
 	if docPath != "" {
 		actions = append(actions, DocumentCopyPathAction(docPath))
 	}
@@ -100,13 +92,6 @@ func BuildThreadArtifactHeaderActions(
 			chat.Description = name
 		}
 		actions = append(actions, chat)
-	}
-	if viewDocumentHref != "" {
-		actions = append(actions, workbench.OverflowAction{
-			Label: "View Document",
-			Kind:  workbench.OverflowActionLink,
-			Href:  viewDocumentHref,
-		})
 	}
 	if pageArgs != nil {
 		if pageArgs.ViewerArgs.RawMarkdown != "" {
