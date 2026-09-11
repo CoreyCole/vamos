@@ -1,6 +1,7 @@
 package markdown
 
 import (
+	"bytes"
 	"context"
 	"net/http"
 	"net/http/httptest"
@@ -8,9 +9,11 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/labstack/echo/v4"
 
+	"github.com/CoreyCole/vamos/pkg/db"
 	"github.com/CoreyCole/vamos/server/services/agenthome"
 	servicedb "github.com/CoreyCole/vamos/server/services/db"
 )
@@ -280,5 +283,123 @@ func TestAI470RoomTitleUsesLiveAgentName(t *testing.T) {
 		"alpha",
 	); got != "alpha" {
 		t.Fatalf("plan title fixture leftover = %q", got)
+	}
+}
+
+func TestLiveRosterListsPlanDirsFromIndex(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	planA := filepath.Join(root, "owner-a", "plans", "plan-one")
+	planB := filepath.Join(root, "owner-b", "plans", "plan-two")
+	mustMkdirAll(t, planA)
+	mustMkdirAll(t, planB)
+	mustWriteFile(t, filepath.Join(planA, "design.md"), []byte("# One\n"))
+	mustWriteFile(t, filepath.Join(planB, "design.md"), []byte("# Two\n"))
+
+	dbSvc, err := servicedb.NewService(filepath.Join(t.TempDir(), "plans.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = dbSvc.Close() })
+	ctx := context.Background()
+	stampA := time.Date(2026, 9, 11, 13, 2, 0, 0, time.Local)
+	stampB := time.Date(2026, 9, 10, 16, 5, 0, 0, time.Local)
+	if _, err := dbSvc.Queries.UpsertDiscoveredPlanWorkspace(
+		ctx,
+		db.UpsertDiscoveredPlanWorkspaceParams{
+			PlanDirRel:        "owner-a/plans/plan-one",
+			ProjectID:         "vamos",
+			PlanDir:           "thoughts/owner-a/plans/plan-one",
+			Label:             "Plan One",
+			ArtifactUpdatedAt: stampA,
+			QrspiLifecycle:    "implement",
+		},
+	); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := dbSvc.Queries.UpsertDiscoveredPlanWorkspace(
+		ctx,
+		db.UpsertDiscoveredPlanWorkspaceParams{
+			PlanDirRel:        "owner-b/plans/plan-two",
+			ProjectID:         "vamos",
+			PlanDir:           "thoughts/owner-b/plans/plan-two",
+			Label:             "Plan Two",
+			ArtifactUpdatedAt: stampB,
+			QrspiLifecycle:    "design",
+		},
+	); err != nil {
+		t.Fatal(err)
+	}
+
+	svc, err := NewService(root, nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	svc.WithQueries(dbSvc.Queries)
+
+	view := svc.liveRoster(ctx, agenthome.RosterSelection{})
+	var buf bytes.Buffer
+	if err := agenthome.RosterRail(view).Render(ctx, &buf); err != nil {
+		t.Fatal(err)
+	}
+	html := buf.String()
+	for _, want := range []string{
+		"Plan One",
+		"Plan Two",
+		"design.md",
+		"/rooms/plan/plan-one",
+		"/rooms/plan/plan-two",
+		"artifact=",
+	} {
+		if !strings.Contains(html, want) {
+			t.Fatalf("missing %q in %s", want, html)
+		}
+	}
+	if !strings.Contains(
+		html,
+		url.QueryEscape("thoughts/owner-a/plans/plan-one/design.md"),
+	) &&
+		!strings.Contains(html, "thoughts/owner-a/plans/plan-one/design.md") {
+		t.Fatalf("missing plan-one design.md artifact query: %s", html)
+	}
+	if !strings.Contains(
+		html,
+		url.QueryEscape("thoughts/owner-b/plans/plan-two/design.md"),
+	) &&
+		!strings.Contains(html, "thoughts/owner-b/plans/plan-two/design.md") {
+		t.Fatalf("missing plan-two design.md artifact query: %s", html)
+	}
+	if strings.Contains(html, `href="/rooms/plan/alpha"`) ||
+		strings.Contains(html, ">Alpha<") {
+		t.Fatal("Alpha fixture must not appear")
+	}
+	if !strings.Contains(html, rosterPlanTime(stampA)) {
+		t.Fatalf("missing stamp A %q", rosterPlanTime(stampA))
+	}
+}
+
+func TestLiveRosterPlansEmptyIndexHasNoAlpha(t *testing.T) {
+	t.Parallel()
+	svc, err := NewService(t.TempDir(), nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	dbSvc, err := servicedb.NewService(filepath.Join(t.TempDir(), "empty.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = dbSvc.Close() })
+	svc.WithQueries(dbSvc.Queries)
+	view := svc.liveRoster(context.Background(), agenthome.RosterSelection{})
+	if len(view.Plans) != 0 {
+		t.Fatalf("empty index plans = %#v", view.Plans)
+	}
+	var buf bytes.Buffer
+	if err := agenthome.RosterRail(view).Render(context.Background(), &buf); err != nil {
+		t.Fatal(err)
+	}
+	html := buf.String()
+	if strings.Contains(html, "Alpha") || strings.Contains(html, "/rooms/plan/alpha") {
+		t.Fatalf("empty roster leaked Alpha: %s", html)
 	}
 }

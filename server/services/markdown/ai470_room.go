@@ -270,6 +270,7 @@ func (s *Service) liveRoster(
 			Title: agenthome.RosterBotTitle(agent.Name, agent.Slug),
 		})
 	}
+	view.Plans = s.liveRosterPlans(ctx)
 	return view
 }
 

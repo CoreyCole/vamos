@@ -138,3 +138,45 @@ func TestRosterRail_LiveBotsAndChrome(t *testing.T) {
 		t.Fatal("selected live bot must use roster-row-selected")
 	}
 }
+
+func TestRosterRail_LivePlans(t *testing.T) {
+	t.Parallel()
+	var buf bytes.Buffer
+	view := RosterView{
+		Selection: RosterSelection{Kind: KindPlan, ID: "plan-one"},
+		Plans: []RosterPlanRow{
+			{
+				ID:    "plan-one",
+				Title: "Plan One",
+				Href:  "/rooms/plan/plan-one?artifact=thoughts%2Fowner%2Fplans%2Fplan-one%2Fdesign.md",
+				Time:  "Fri 1:02 PM",
+			},
+			{
+				ID:    "plan-two",
+				Title: "Plan Two",
+				Href:  "/rooms/plan/plan-two?artifact=thoughts%2Fowner%2Fplans%2Fplan-two%2Fdesign.md",
+				Time:  "Sat 4:05 PM",
+			},
+		},
+	}
+	if err := RosterRail(view).Render(context.Background(), &buf); err != nil {
+		t.Fatal(err)
+	}
+	html := buf.String()
+	for _, want := range []string{
+		"Plan One",
+		"Plan Two",
+		`id="roster-row-plan-plan-one"`,
+		`href="/rooms/plan/plan-one?artifact=thoughts%2Fowner%2Fplans%2Fplan-one%2Fdesign.md"`,
+		`href="/rooms/plan/plan-two?artifact=thoughts%2Fowner%2Fplans%2Fplan-two%2Fdesign.md"`,
+		"Fri 1:02 PM",
+	} {
+		if !strings.Contains(html, want) {
+			t.Fatalf("missing %q", want)
+		}
+	}
+	if strings.Contains(html, `href="/rooms/plan/alpha"`) ||
+		strings.Contains(html, ">Alpha<") {
+		t.Fatal("Alpha fixture must not appear")
+	}
+}

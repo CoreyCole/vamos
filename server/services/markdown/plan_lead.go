@@ -7,13 +7,16 @@ import (
 	"html"
 	"net/http"
 	"net/url"
+	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/a-h/templ"
 	"github.com/labstack/echo/v4"
 
 	"github.com/CoreyCole/vamos/pkg/db"
+	"github.com/CoreyCole/vamos/server/services/agenthome"
 )
 
 func planLeadRoomID(docPath string) string {
@@ -58,6 +61,88 @@ func planLeadChatHref(docPath string) string {
 		return href
 	}
 	return href + "?artifact=" + url.QueryEscape("thoughts/"+canonical)
+}
+
+func rosterPlanTitle(label, planDirRel string) string {
+	title := strings.TrimSpace(label)
+	if title != "" {
+		return title
+	}
+	return filepath.Base(filepath.ToSlash(strings.TrimSpace(planDirRel)))
+}
+
+func rosterPlanTime(t time.Time) string {
+	if t.IsZero() {
+		return ""
+	}
+	return t.Local().Format("Mon 3:04 PM")
+}
+
+func rosterPlanRowFromDirRel(
+	planDirRel string,
+	updatedAt time.Time,
+	label string,
+) agenthome.RosterPlanRow {
+	rel := filepath.ToSlash(strings.TrimSpace(planDirRel))
+	rel = strings.Trim(rel, "/")
+	rel = strings.TrimPrefix(rel, "thoughts/")
+	design := "thoughts/" + rel + "/design.md"
+	id := planLeadRoomID(design)
+	if id == "" {
+		id = filepath.Base(rel)
+	}
+	return agenthome.RosterPlanRow{
+		ID:    id,
+		Title: rosterPlanTitle(label, rel),
+		Href:  planLeadChatHref(design),
+		Time:  rosterPlanTime(updatedAt),
+	}
+}
+
+func (s *Service) liveRosterPlans(ctx context.Context) []agenthome.RosterPlanRow {
+	if s != nil && s.queries != nil {
+		rows, err := s.queries.ListCurrentPlanWorkspaces(ctx, "")
+		if err == nil && len(rows) > 0 {
+			out := make([]agenthome.RosterPlanRow, 0, len(rows))
+			for _, row := range rows {
+				out = append(out, rosterPlanRowFromDirRel(
+					row.PlanDirRel,
+					row.ArtifactUpdatedAt,
+					row.Label,
+				))
+			}
+			return out
+		}
+	}
+	return s.globRosterPlans()
+}
+
+func (s *Service) globRosterPlans() []agenthome.RosterPlanRow {
+	if s == nil || strings.TrimSpace(s.basePath) == "" {
+		return nil
+	}
+	matches, err := filepath.Glob(
+		filepath.Join(s.basePath, "*", "plans", "*", "design.md"),
+	)
+	if err != nil || len(matches) == 0 {
+		return nil
+	}
+	var out []agenthome.RosterPlanRow
+	for _, abs := range matches {
+		rel, err := filepath.Rel(s.basePath, abs)
+		if err != nil {
+			continue
+		}
+		rel = filepath.ToSlash(rel)
+		dir := strings.TrimSuffix(rel, "/design.md")
+		st, err := os.Stat(abs)
+		var updated time.Time
+		if err == nil {
+			updated = st.ModTime()
+		}
+		out = append(out, rosterPlanRowFromDirRel(dir, updated, ""))
+	}
+	return out
 }
 
 func (s *Service) HandleBindPlanLead(c echo.Context) error {
