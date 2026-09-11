@@ -1104,7 +1104,7 @@ func TestMobileChatCommentsHeaderRendersFromWorkbench(t *testing.T) {
 		`data-testid="mobile-toggle-chat"`,
 		`data-testid="mobile-toggle-comments"`,
 		`aria-controls="workbench-v2-chat"`,
-		`aria-controls="workbench-v2-comments"`,
+		`$workbench_v2_mobile_comments.open = true`,
 		`workbench-chrome`,
 		`$workbench.activeRegionID`,
 		`workbenchV2Threads`,
@@ -1133,6 +1133,7 @@ func TestMobileChatCommentsHeaderRendersFromWorkbench(t *testing.T) {
 		`visible !== false`,
 		`CommentsToggleClickAction`,
 		`workbenchV2Comments.visible =`,
+		`activeRegionID = 'workbenchV2Comments'`,
 	} {
 		if strings.Contains(header, refuse) {
 			t.Fatalf("mobile header unexpectedly contains %s: %s", refuse, header)
@@ -1143,6 +1144,63 @@ func TestMobileChatCommentsHeaderRendersFromWorkbench(t *testing.T) {
 			"desktop ThreadsReopenDataClass missing visible !== false: %s",
 			ThreadsReopenDataClass(),
 		)
+	}
+}
+
+func TestWorkbenchV2MountsMobileCommentsSheet(t *testing.T) {
+	t.Parallel()
+
+	state, err := BuildWorkbenchV2State(WorkbenchV2Args{
+		ViewportClass: ViewportMobile,
+		ThreadsOpen:   true,
+		ChatOpen:      true,
+		ArtifactOpen:  true,
+		Threads:       templ.NopComponent,
+		Chat:          templ.NopComponent,
+		Artifact:      templ.NopComponent,
+		Comments:      templ.NopComponent,
+	})
+	if err != nil {
+		t.Fatalf("BuildWorkbenchV2State() error = %v", err)
+	}
+	var body bytes.Buffer
+	if err := Workbench(state).Render(t.Context(), &body); err != nil {
+		t.Fatalf("Workbench.Render() error = %v", err)
+	}
+	html := body.String()
+	for _, want := range []string{
+		`id="workbench_v2_mobile_comments"`,
+		`id="workbench-v2-mobile-comments-content"`,
+		`max-h-[70vh]`,
+		`overflow-y-auto`,
+	} {
+		if !strings.Contains(html, want) {
+			t.Fatalf("Workbench missing %s: %s", want, html)
+		}
+	}
+	if strings.Contains(html, `aria-modal="true"`) {
+		t.Fatal("mobile comments sheet must not be modal")
+	}
+	if !strings.Contains(
+		html,
+		`data-on:click="$workbench_v2_mobile_comments.open = false"`,
+	) &&
+		!strings.Contains(html, `$workbench_v2_mobile_comments.open = false`) {
+		t.Fatalf("sheet missing explicit close: %s", html)
+	}
+	commentsStart := strings.Index(html, `id="workbench-v2-comments"`)
+	sheetStart := strings.Index(html, `id="workbench_v2_mobile_comments"`)
+	if commentsStart < 0 || sheetStart < 0 {
+		t.Fatal("missing comments column or mobile comments sheet")
+	}
+	commentsEnd := strings.Index(html[commentsStart:], `id="workbench-v2-comments-body"`)
+	if commentsEnd > 0 && sheetStart > commentsStart &&
+		sheetStart < commentsStart+commentsEnd {
+		t.Fatal("mobile comments sheet must not mount inside #workbench-v2-comments")
+	}
+	rootStart := strings.Index(html, `id="workbench-root"`)
+	if sheetStart < rootStart {
+		t.Fatal("mobile comments sheet must be under #workbench-root")
 	}
 }
 

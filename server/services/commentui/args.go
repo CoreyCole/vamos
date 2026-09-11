@@ -113,11 +113,12 @@ type CommentTargetView struct {
 }
 
 const (
-	CommentsContextPanelID        = "comments-context-panel"
-	CommentsContextThreadListID   = "comments-context-thread-list"
-	CommentsComposerTextID        = "comments-composer-text"
-	MobileSectionCommentContentID = "mobile-section-comment-content"
-	CommentSidebarSignal          = "commentSidebarExpanded"
+	CommentsContextPanelID           = "comments-context-panel"
+	CommentsContextThreadListID      = "comments-context-thread-list"
+	CommentsComposerTextID           = "comments-composer-text"
+	MobileSectionCommentContentID    = "mobile-section-comment-content"
+	WorkbenchMobileCommentsContentID = "workbench-v2-mobile-comments-content"
+	CommentSidebarSignal             = "commentSidebarExpanded"
 )
 
 type CommentSidebarView struct {

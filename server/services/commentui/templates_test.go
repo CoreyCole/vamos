@@ -712,6 +712,18 @@ func TestCommentSharedPatchTargetsRenderStableIDs(t *testing.T) {
 	if !strings.Contains(mobileHTML, `id="`+MobileSectionCommentContentID+`"`) {
 		t.Fatalf("mobile target missing shared ID: %s", mobileHTML)
 	}
+
+	var v2 bytes.Buffer
+	if err := WorkbenchMobileCommentsTarget().Render(t.Context(), &v2); err != nil {
+		t.Fatalf("WorkbenchMobileCommentsTarget Render() error = %v", err)
+	}
+	v2HTML := v2.String()
+	if !strings.Contains(v2HTML, `id="`+WorkbenchMobileCommentsContentID+`"`) {
+		t.Fatalf("v2 mobile comments target missing ID: %s", v2HTML)
+	}
+	if strings.Contains(v2HTML, MobileSectionCommentContentID) {
+		t.Fatal("v2 mobile comments target collided with thoughts section sheet ID")
+	}
 }
 
 func TestCommentsContextPanelRendersComposerInsteadOfDialog(t *testing.T) {

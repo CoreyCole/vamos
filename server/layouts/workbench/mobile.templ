@@ -38,9 +38,8 @@ templ MobileChatCommentsHeader(state WorkbenchState) {
 			type="button"
 			data-testid="mobile-toggle-comments"
 			class="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-			data-attr:aria-pressed="$workbench.regions.workbenchV2Comments.visible ? 'true' : 'false'"
-			data-class="{ 'bg-muted text-foreground': $workbench.regions.workbenchV2Comments.visible }"
-			aria-controls="workbench-v2-comments"
+			data-on:click="$workbench_v2_mobile_comments.open = true"
+			aria-controls="workbench_v2_mobile_comments"
 			aria-label="Toggle comments"
 			title="Toggle comments"
 		>

@@ -1,0 +1,22 @@
+package workbench
+
+import (
+	"github.com/CoreyCole/vamos/pkg/datastarui/components/sheet"
+	"github.com/CoreyCole/vamos/server/services/commentui"
+)
+
+templ MobileCommentsSheet() {
+	@sheet.Sheet(sheet.SheetArgs{
+		ID:    "workbench_v2_mobile_comments",
+		Modal: false,
+		Side:  "bottom",
+		Class: "md:hidden",
+	}) {
+		@sheet.SheetContent(sheet.SheetContentArgs{
+			SheetID: "workbench_v2_mobile_comments",
+			Class:   "max-h-[70vh] overflow-y-auto",
+		}) {
+			@commentui.WorkbenchMobileCommentsTarget()
+		}
+	}
+}

@@ -29,6 +29,9 @@ templ Workbench(state WorkbenchState) {
 				}
 			</div>
 		</div>
+		if state.MobileChatCommentsHeader {
+			@MobileCommentsSheet()
+		}
 	</div>
 }
 
