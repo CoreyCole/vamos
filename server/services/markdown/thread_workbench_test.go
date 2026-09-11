@@ -144,8 +144,20 @@ func TestServeThreadsHydratesArtifactAndCarriesIt(t *testing.T) {
 	if r.artifact != "owner/plans/alpha/design.md" {
 		t.Fatalf("artifact = %q", r.artifact)
 	}
-	if !strings.Contains(rec.Body.String(), "Distinctive artifact") {
-		t.Fatalf("missing artifact body: %s", rec.Body.String())
+	body := rec.Body.String()
+	if !strings.Contains(body, "Distinctive artifact") {
+		t.Fatalf("missing artifact body: %s", body)
+	}
+	for _, bad := range []string{
+		"workbench-v2-artifact-list",
+		"$artPreview",
+		"reply-draft.md",
+		"onboarding-short.md",
+		"AgentFixtureMessage",
+	} {
+		if strings.Contains(body, bad) {
+			t.Fatalf("/threads contains sketch %q: %s", bad, body)
+		}
 	}
 }
 
@@ -257,6 +269,17 @@ func TestServeThreadDisplaysExplicitCrossPlanArtifactsWithoutChangingThread(
 				)
 			}
 			html := rec.Body.String()
+			for _, bad := range []string{
+				"workbench-v2-artifact-list",
+				"$artPreview",
+				"reply-draft.md",
+				"onboarding-short.md",
+				"AgentFixtureMessage",
+			} {
+				if strings.Contains(html, bad) {
+					t.Fatalf("/threads/:id contains sketch %q: %s", bad, html)
+				}
+			}
 			if strings.Contains(html, "Alpha") {
 				t.Fatalf(
 					"default plan artifact replaced cross-plan artifact: %s",

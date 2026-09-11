@@ -249,7 +249,10 @@ func (s *Service) ServeThread(c echo.Context) error {
 		ViewportClass: viewport,
 		SavedConfig:   s.savedThreadsWorkbenchConfig(c, userEmail, viewport),
 		Threads: agenthome.RosterRail(
-			s.liveRoster(c.Request().Context(), rosterSelectionForThread(threadID)),
+			s.liveRoster(
+				c.Request().Context(),
+				s.rosterSelectionForLiveThread(c.Request().Context(), threadID),
+			),
 		),
 		Chat: workbench.ChatColumnWithReopen(
 			workbench.ThreadsOpenFromRequest(c.Request()),

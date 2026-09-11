@@ -299,6 +299,11 @@ func TestServeAI470RoomKnownBotHydratesHomeThread(t *testing.T) {
 		"Select a thread to open chat.",
 		"Message Bot",
 		"Message Vamos dev",
+		"workbench-v2-artifact-list",
+		"$artPreview",
+		"reply-draft.md",
+		"onboarding-short.md",
+		"AgentFixtureMessage",
 	} {
 		if strings.Contains(body, bad) {
 			t.Fatalf("body contains %q", bad)

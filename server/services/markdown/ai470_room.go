@@ -10,6 +10,7 @@ import (
 	"github.com/a-h/templ"
 	"github.com/labstack/echo/v4"
 
+	"github.com/CoreyCole/vamos/pkg/db"
 	"github.com/CoreyCole/vamos/server/layouts/workbench"
 	"github.com/CoreyCole/vamos/server/services/agenthome"
 )
@@ -288,18 +289,60 @@ func (s *Service) liveRoster(
 	return view
 }
 
-func rosterSelectionForThread(threadID string) agenthome.RosterSelection {
-	switch strings.TrimSpace(threadID) {
-	case "bot", "dm-bot":
-		return agenthome.RosterSelection{Kind: agenthome.KindDM, ID: "bot"}
-	case "research", "dm-research":
-		return agenthome.RosterSelection{Kind: agenthome.KindDM, ID: "research"}
-	case "vamos-dev", "group-vamos-dev":
-		return agenthome.RosterSelection{Kind: agenthome.KindGroup, ID: "vamos-dev"}
-	case "alpha", "plan-alpha":
-		return agenthome.RosterSelection{Kind: agenthome.KindPlan, ID: "alpha"}
+func (s *Service) rosterSelectionForLiveThread(
+	ctx context.Context,
+	threadID string,
+) agenthome.RosterSelection {
+	threadID = strings.TrimSpace(threadID)
+	if s == nil || s.queries == nil || threadID == "" {
+		return agenthome.RosterSelection{}
+	}
+	thread, err := s.queries.GetSharedAgentThread(ctx, threadID)
+	if err != nil {
+		return agenthome.RosterSelection{}
+	}
+	switch thread.RoomKind {
+	case "bot_home":
+		if !thread.AgentID.Valid {
+			return agenthome.RosterSelection{}
+		}
+		agent, err := s.queries.GetAgent(ctx, thread.AgentID.String)
+		if err != nil {
+			return agenthome.RosterSelection{}
+		}
+		return agenthome.RosterSelection{Kind: agenthome.KindDM, ID: agent.Slug}
+	case "plan":
+		id := planLeadRoomID(thread.PlanDirRel.String)
+		if id == "" {
+			return agenthome.RosterSelection{}
+		}
+		return agenthome.RosterSelection{Kind: agenthome.KindPlan, ID: id}
+	case "pairwise":
+		return s.pairwiseRosterSelection(ctx, thread)
 	default:
 		return agenthome.RosterSelection{}
+	}
+}
+
+func (s *Service) pairwiseRosterSelection(
+	ctx context.Context,
+	thread db.AgentThread,
+) agenthome.RosterSelection {
+	if !thread.PairAgentIDA.Valid || !thread.PairAgentIDB.Valid {
+		return agenthome.RosterSelection{}
+	}
+	a, errA := s.queries.GetAgent(ctx, thread.PairAgentIDA.String)
+	b, errB := s.queries.GetAgent(ctx, thread.PairAgentIDB.String)
+	if errA != nil || errB != nil {
+		return agenthome.RosterSelection{}
+	}
+	left, right := a.Slug, b.Slug
+	if right < left {
+		left, right = right, left
+	}
+	return agenthome.RosterSelection{
+		Kind: agenthome.KindA2A,
+		ID:   left + "/" + right,
 	}
 }
 

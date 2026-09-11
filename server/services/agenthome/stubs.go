@@ -73,33 +73,15 @@ func StubPane(title, subtitle, href, body string) templ.Component {
 	})
 }
 
-func roomComposerPlaceholder(kind RoomKind, id, title string) string {
-	if kind == KindDM && id == "bot" {
-		return "Message Bot"
-	}
-	if kind == KindDM && id == "research" {
-		return "Message Research agent"
-	}
-	if kind == KindPlan && id == "alpha" {
-		return "Message Alpha"
-	}
+func roomComposerPlaceholder(_ RoomKind, _, title string) string {
 	if title != "" {
 		return "Message " + title
 	}
 	return "Message…"
 }
 
-func artPreviewInitial(kind RoomKind, id string) string {
-	switch {
-	case kind == KindDM && id == "research":
-		return "onboarding-short.md"
-	case kind == KindGroup && id == "vamos-dev":
-		return "setup-notes.md"
-	case kind == KindPlan:
-		return "design.md"
-	default:
-		return "reply-draft.md"
-	}
+func artPreviewInitial(RoomKind, string) string {
+	return ""
 }
 
 func RosterChromeScript() templ.Component {
