@@ -19,8 +19,6 @@ templ Workbench(state WorkbenchState) {
 		<div class="flex min-h-0 w-full flex-col gap-2 overflow-hidden">
 			if state.MobileChatCommentsHeader {
 				@MobileChatCommentsHeader(state)
-			} else if !state.SkipMobileRegionTabs {
-				@MobileRegionTabs(state)
 			}
 			<div id="workbench-regions" class="flex min-h-0 w-full flex-1 gap-0 overflow-hidden">
 				for index, region := range state.Regions {

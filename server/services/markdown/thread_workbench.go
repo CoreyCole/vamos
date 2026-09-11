@@ -186,11 +186,10 @@ func (s *Service) ServeThreads(c echo.Context) error {
 		Comments: WorkbenchUnavailable(
 			"Select an artifact to view comments.",
 		),
-		ThreadsOpen:              workbench.ThreadsOpenFromRequest(c.Request()),
-		ChatOpen:                 false,
-		ArtifactOpen:             hasArtifact,
-		CommentsOpen:             false,
-		MobileChatCommentsHeader: true,
+		ThreadsOpen:  workbench.ThreadsOpenFromRequest(c.Request()),
+		ChatOpen:     false,
+		ArtifactOpen: hasArtifact,
+		CommentsOpen: false,
 	})
 	if err != nil {
 		return err

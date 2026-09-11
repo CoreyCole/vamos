@@ -137,9 +137,6 @@ func (s *Service) ServeAI470Room(c echo.Context) error {
 	if viewport.IsDesktop() {
 		artifactOpen = true
 	}
-	// Plan/design.md already has chat/comments in the artifact path header.
-	// Do not add a second mobile row (icons or the old tablist).
-	skipExtraMobileChrome := hasArtifact
 	state, err := workbench.BuildWorkbenchV2State(workbench.WorkbenchV2Args{
 		UserEmail:     userEmail,
 		ViewportClass: viewport,
@@ -147,15 +144,13 @@ func (s *Service) ServeAI470Room(c echo.Context) error {
 		Threads: agenthome.RosterRail(
 			s.liveRoster(c.Request().Context(), sel),
 		),
-		Chat:                     chatComp,
-		Artifact:                 artifactComp,
-		Comments:                 commentsComp,
-		ThreadsOpen:              threadsOpen,
-		ChatOpen:                 chatOpen,
-		ArtifactOpen:             artifactOpen,
-		CommentsOpen:             commentsOpen,
-		MobileChatCommentsHeader: !skipExtraMobileChrome,
-		SkipMobileRegionTabs:     skipExtraMobileChrome,
+		Chat:         chatComp,
+		Artifact:     artifactComp,
+		Comments:     commentsComp,
+		ThreadsOpen:  threadsOpen,
+		ChatOpen:     chatOpen,
+		ArtifactOpen: artifactOpen,
+		CommentsOpen: commentsOpen,
 	})
 	if err != nil {
 		return err

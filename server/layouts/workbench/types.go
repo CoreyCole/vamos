@@ -115,12 +115,9 @@ type WorkbenchState struct {
 	FocusDefault  bool
 	NormalRegions []RegionNormalState
 
-	// MobileChatCommentsHeader replaces MobileRegionTabs on /threads land and /rooms.
-	// Leave false for /threads/:id and thoughts so those keep the region tablist.
+	// MobileChatCommentsHeader is shared v2 mobile chrome above #workbench-regions.
+	// Thoughts leaves this false (CenterDocPane owns sidebar/chat icons).
 	MobileChatCommentsHeader bool
-	// SkipMobileRegionTabs hides the old tablist when the extra mobile chrome
-	// row is also off (plan artifact already has chat/comments in its header).
-	SkipMobileRegionTabs bool
 }
 
 type BuildWorkbenchStateInput struct {

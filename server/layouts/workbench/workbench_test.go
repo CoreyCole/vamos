@@ -1084,15 +1084,14 @@ func TestMobileChatCommentsHeaderRendersFromWorkbench(t *testing.T) {
 	t.Parallel()
 
 	state, err := BuildWorkbenchV2State(WorkbenchV2Args{
-		ViewportClass:            ViewportMobile,
-		ThreadsOpen:              true,
-		ChatOpen:                 true,
-		ArtifactOpen:             true,
-		MobileChatCommentsHeader: true,
-		Threads:                  templ.NopComponent,
-		Chat:                     templ.NopComponent,
-		Artifact:                 templ.NopComponent,
-		Comments:                 templ.NopComponent,
+		ViewportClass: ViewportMobile,
+		ThreadsOpen:   true,
+		ChatOpen:      true,
+		ArtifactOpen:  true,
+		Threads:       templ.NopComponent,
+		Chat:          templ.NopComponent,
+		Artifact:      templ.NopComponent,
+		Comments:      templ.NopComponent,
 	})
 	if err != nil {
 		t.Fatalf("BuildWorkbenchV2State() error = %v", err)
@@ -1129,15 +1128,14 @@ func TestSkipMobileRegionTabsOmitsExtraChromeRow(t *testing.T) {
 	t.Parallel()
 
 	state, err := BuildWorkbenchV2State(WorkbenchV2Args{
-		ViewportClass:        ViewportMobile,
-		ThreadsOpen:          true,
-		ChatOpen:             true,
-		ArtifactOpen:         true,
-		SkipMobileRegionTabs: true,
-		Threads:              templ.NopComponent,
-		Chat:                 templ.NopComponent,
-		Artifact:             templ.NopComponent,
-		Comments:             templ.NopComponent,
+		ViewportClass: ViewportMobile,
+		ThreadsOpen:   true,
+		ChatOpen:      true,
+		ArtifactOpen:  true,
+		Threads:       templ.NopComponent,
+		Chat:          templ.NopComponent,
+		Artifact:      templ.NopComponent,
+		Comments:      templ.NopComponent,
 	})
 	if err != nil {
 		t.Fatalf("BuildWorkbenchV2State() error = %v", err)
