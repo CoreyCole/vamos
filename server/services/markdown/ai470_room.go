@@ -114,10 +114,12 @@ func (s *Service) ServeAI470Room(c echo.Context) error {
 		artifactOpen = true
 	}
 	state, err := workbench.BuildWorkbenchV2State(workbench.WorkbenchV2Args{
-		UserEmail:                userEmail,
-		ViewportClass:            viewport,
-		SavedConfig:              s.savedThreadsWorkbenchConfig(c, userEmail, viewport),
-		Threads:                  agenthome.RosterRail(sel),
+		UserEmail:     userEmail,
+		ViewportClass: viewport,
+		SavedConfig:   s.savedThreadsWorkbenchConfig(c, userEmail, viewport),
+		Threads: agenthome.RosterRail(
+			s.liveRoster(c.Request().Context(), sel),
+		),
 		Chat:                     chatComp,
 		Artifact:                 artifactComp,
 		Comments:                 commentsComp,
@@ -267,6 +269,27 @@ func (s *Service) listSharedThreadIDs(ctx context.Context) ([]string, error) {
 		return lister.ListSharedThreadIDs(ctx)
 	}
 	return nil, nil
+}
+
+func (s *Service) liveRoster(
+	ctx context.Context,
+	sel agenthome.RosterSelection,
+) agenthome.RosterView {
+	view := agenthome.RosterView{Selection: sel}
+	if s == nil || s.queries == nil {
+		return view
+	}
+	agents, err := s.queries.ListAgents(ctx)
+	if err != nil {
+		return view
+	}
+	for _, agent := range agents {
+		view.Bots = append(view.Bots, agenthome.RosterBotRow{
+			Slug:  agent.Slug,
+			Title: agenthome.RosterBotTitle(agent.Name, agent.Slug),
+		})
+	}
+	return view
 }
 
 func rosterSelectionForThread(threadID string) agenthome.RosterSelection {

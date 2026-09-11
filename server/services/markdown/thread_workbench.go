@@ -172,7 +172,10 @@ func (s *Service) ServeThreads(c echo.Context) error {
 		ViewportClass: viewport,
 		SavedConfig:   s.savedThreadsWorkbenchConfig(c, userEmail, viewport),
 		Threads: agenthome.RosterRail(
-			agenthome.RosterSelection{Kind: agenthome.KindDM, ID: "bot"},
+			s.liveRoster(
+				c.Request().Context(),
+				agenthome.RosterSelection{Kind: agenthome.KindDM, ID: "bot"},
+			),
 		),
 		Chat: workbench.ChatColumnWithReopen(
 			workbench.ThreadsOpenFromRequest(c.Request()),
@@ -245,7 +248,9 @@ func (s *Service) ServeThread(c echo.Context) error {
 		UserEmail:     userEmail,
 		ViewportClass: viewport,
 		SavedConfig:   s.savedThreadsWorkbenchConfig(c, userEmail, viewport),
-		Threads:       agenthome.RosterRail(rosterSelectionForThread(threadID)),
+		Threads: agenthome.RosterRail(
+			s.liveRoster(c.Request().Context(), rosterSelectionForThread(threadID)),
+		),
 		Chat: workbench.ChatColumnWithReopen(
 			workbench.ThreadsOpenFromRequest(c.Request()),
 			"Chat",

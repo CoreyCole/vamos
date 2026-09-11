@@ -112,18 +112,28 @@ func RosterChromeScript() templ.Component {
   if (!root || !menu || !sheet || root.dataset.rosterChromeBound) return;
   root.dataset.rosterChromeBound = "1";
 
-  const order = ["dm:bot", "dm:research", "group:vamos-dev", "plan:alpha"];
-  const meta = {
-    "dm:bot": { name: "Bot", initial: "B", bg: "bg-fuchsia-500/90", href: "/rooms/dm/bot" },
-    "dm:research": { name: "Research agent", initial: "R", bg: "bg-sky-500/80", href: "/rooms/dm/research" },
-    "group:vamos-dev": { name: "Vamos dev", initial: "V", bg: "bg-emerald-500/90", href: "/rooms/group/vamos-dev" },
-    "plan:alpha": { name: "Alpha", initial: "P", bg: "bg-muted", href: "/rooms/plan/alpha" }
-  };
+  function rosterIds() {
+    const ids = [];
+    root.querySelectorAll("a[data-roster-id]").forEach((a) => {
+      const id = a.getAttribute("data-roster-id");
+      if (id && !ids.includes(id)) ids.push(id);
+    });
+    return ids;
+  }
+  function rosterMeta(id) {
+    const a = root.querySelector('a[data-roster-id="' + id + '"]');
+    const title = (a && (a.getAttribute("data-roster-title") || a.textContent || id).trim()) || id;
+    return {
+      name: title,
+      initial: title ? title.slice(0, 1).toUpperCase() : "?",
+      bg: "bg-muted",
+      href: a ? a.getAttribute("href") : "#"
+    };
+  }
   let selected = new Set();
   let anchor = null;
-  let focusId = "dm:bot";
+  let focusId = rosterIds()[0] || "";
   const PIN_KEY = "wb2-roster-pinned";
-  const PIN_DEFAULT = ["dm:bot", "group:vamos-dev"];
   function loadPinned() {
     try {
       const raw = sessionStorage.getItem(PIN_KEY);
@@ -132,7 +142,7 @@ func RosterChromeScript() templ.Component {
         if (Array.isArray(parsed)) return new Set(parsed);
       }
     } catch (_) {}
-    return new Set(PIN_DEFAULT);
+    return new Set();
   }
   let pinned = loadPinned();
   function savePinned() {
@@ -147,22 +157,17 @@ func RosterChromeScript() templ.Component {
     return root.querySelector('#workbench-v2-roster-pins a[data-roster-id="' + id + '"]');
   }
   function paintPins() {
-    for (const id of order) {
+    for (const id of rosterIds()) {
       const pin = pinEl(id);
       if (pin) pin.classList.toggle("hidden", !pinned.has(id));
       const li = rowEl(id);
       if (li) li.classList.toggle("hidden", pinned.has(id));
     }
-    const groups = document.getElementById("workbench-v2-roster-groups");
-    if (groups) {
-      const visible = [...groups.querySelectorAll(":scope > ul > li")].some((li) => !li.classList.contains("hidden"));
-      groups.classList.toggle("hidden", !visible);
-    }
     const pinLabel = menu.querySelector('[data-roster-label="pin"]');
     if (pinLabel) pinLabel.textContent = pinned.has(focusId) ? "Unpin" : "Pin";
   }
   function paint() {
-    for (const id of order) {
+    for (const id of rosterIds()) {
       const li = rowEl(id);
       if (!li) continue;
       const a = li.querySelector("a[data-roster-id]");
@@ -220,7 +225,7 @@ func RosterChromeScript() templ.Component {
   function openProfile() {
     const s = liveSheet();
     if (!s) return;
-    const m = meta[focusId] || meta["dm:bot"];
+    const m = rosterMeta(focusId);
     const avatar = document.getElementById("workbench-v2-edit-profile-avatar");
     const name = document.getElementById("workbench-v2-edit-profile-name");
     if (avatar) { avatar.textContent = m.initial; avatar.className = "flex h-14 w-14 items-center justify-center rounded-2xl text-lg font-semibold text-white " + m.bg; }
@@ -251,11 +256,12 @@ func RosterChromeScript() templ.Component {
     }
     if (evt.shiftKey && anchor) {
       evt.preventDefault();
-      const i0 = order.indexOf(anchor);
-      const i1 = order.indexOf(id);
+      const ids = rosterIds();
+      const i0 = ids.indexOf(anchor);
+      const i1 = ids.indexOf(id);
       if (i0 >= 0 && i1 >= 0) {
         const lo = Math.min(i0, i1), hi = Math.max(i0, i1);
-        selected = new Set(order.slice(lo, hi + 1));
+        selected = new Set(ids.slice(lo, hi + 1));
         focusId = id;
         paint();
       }

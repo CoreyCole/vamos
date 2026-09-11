@@ -9,14 +9,11 @@ import (
 
 func TestRosterIsPinned(t *testing.T) {
 	t.Parallel()
-	if !rosterIsPinned(KindDM, "bot") {
-		t.Fatal("Bot pin must hide the Bot agent row")
+	if rosterIsPinned(KindDM, "bot") {
+		t.Fatal("SSR must not fixture-pin dm:bot")
 	}
-	if !rosterIsPinned(KindGroup, "vamos-dev") {
-		t.Fatal("Vamos Lead pin must hide the Vamos dev group row")
-	}
-	if rosterIsPinned(KindDM, "research") {
-		t.Fatal("Research is not pinned")
+	if rosterIsPinned(KindGroup, "vamos-dev") {
+		t.Fatal("SSR must not fixture-pin group:vamos-dev")
 	}
 }
 
@@ -47,30 +44,59 @@ func TestRosterPinClass_SelectedFillNoBorder(t *testing.T) {
 	}
 }
 
-func TestRosterRail_PinActionAndHrefs(t *testing.T) {
+func TestRosterRail_EmptyBots(t *testing.T) {
 	t.Parallel()
 	var buf bytes.Buffer
-	if err := RosterRail(
-		RosterSelection{Kind: KindGroup, ID: "vamos-dev"},
-	).Render(context.Background(), &buf); err != nil {
+	if err := RosterRail(RosterView{}).Render(context.Background(), &buf); err != nil {
 		t.Fatal(err)
 	}
 	html := buf.String()
-	if !strings.Contains(html, `id="roster-row-dm-bot"`) {
-		t.Fatal("Bot list row must exist so Unpin can restore it")
+	if !strings.Contains(html, "No bots yet") {
+		t.Fatal("empty agents must say No bots yet")
 	}
-	if !strings.Contains(html, `id="roster-row-group-vamos-dev"`) {
-		t.Fatal("Vamos dev list row must exist so Unpin can restore it")
+	for _, forbidden := range []string{
+		"Research agent",
+		"Short path — how do I get read-only access?",
+		`href="/rooms/plan/alpha"`,
+		`href="/rooms/group/vamos-dev"`,
+		"Group chats",
+		"Vamos Lead",
+		"Ready when you are.",
+	} {
+		if strings.Contains(html, forbidden) {
+			t.Fatalf("fixture leftover %q in empty roster", forbidden)
+		}
 	}
-	if !strings.Contains(html, `href="/rooms/dm/bot"`) ||
-		!strings.Contains(html, `href="/rooms/group/vamos-dev"`) {
-		t.Fatal("pin tiles must keep room hrefs")
+}
+
+func TestRosterRail_LiveBotsAndChrome(t *testing.T) {
+	t.Parallel()
+	var buf bytes.Buffer
+	view := RosterView{
+		Selection: RosterSelection{Kind: KindDM, ID: "live-bot"},
+		Bots: []RosterBotRow{
+			{Slug: "live-bot", Title: "Live bot"},
+			{Slug: "other", Title: "other"},
+		},
+	}
+	if err := RosterRail(view).Render(context.Background(), &buf); err != nil {
+		t.Fatal(err)
+	}
+	html := buf.String()
+	if !strings.Contains(html, `id="roster-row-dm-live-bot"`) {
+		t.Fatal("live bot list row must exist")
+	}
+	if !strings.Contains(html, `href="/rooms/dm/live-bot"`) {
+		t.Fatal("bot href must be /rooms/dm/{slug}")
+	}
+	if !strings.Contains(html, `data-roster-id="dm:live-bot"`) {
+		t.Fatal("rows must expose data-roster-id for pin JS")
+	}
+	if !strings.Contains(html, "Live bot") {
+		t.Fatal("title must use agent name")
 	}
 	if !strings.Contains(html, `data-roster-action="pin"`) {
 		t.Fatal("context menu must expose pin action")
-	}
-	if !strings.Contains(html, "roster-pin-selected") {
-		t.Fatal("Vamos Lead pin must be selected")
 	}
 	if !strings.Contains(html, "#313131") {
 		t.Fatal("pin and row selected fill must be Grok #313131")
@@ -101,7 +127,14 @@ func TestRosterRail_PinActionAndHrefs(t *testing.T) {
 	if !strings.Contains(html, ">Bots</h2>") {
 		t.Fatal("roster agent band must say Bots")
 	}
-	if !strings.Contains(html, ">Group chats</h2>") {
-		t.Fatal("roster group band must say Group chats")
+	if strings.Contains(html, ">Group chats</h2>") {
+		t.Fatal("ad-hoc Group chats section must be gone")
+	}
+	if strings.Contains(html, `href="/rooms/group/vamos-dev"`) ||
+		strings.Contains(html, `href="/rooms/plan/alpha"`) {
+		t.Fatal("fixture room hrefs must not remain")
+	}
+	if !strings.Contains(html, "roster-row-selected") {
+		t.Fatal("selected live bot must use roster-row-selected")
 	}
 }

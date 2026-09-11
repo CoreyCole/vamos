@@ -1,7 +1,9 @@
 package agenthome
 
 func rosterIsPinned(kind RoomKind, id string) bool {
-	return (kind == KindDM && id == "bot") || (kind == KindGroup && id == "vamos-dev")
+	_ = kind
+	_ = id
+	return false
 }
 
 func rosterAgentRowClass(selected bool) string {
