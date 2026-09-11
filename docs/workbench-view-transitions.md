@@ -40,6 +40,7 @@ Source of truth: `server/layouts/workbench/vt_chrome_names.go` (`WorkbenchV2Chro
 | --- | --- | --- | --- |
 | `#app-header` | `app-header` | `workbench-chrome` | all |
 | `#workbench-mobile-tabs` | `workbench-mobile-tabs` / `none` | `workbench-chrome` | named `@media (max-width: 767px)` only; `view-transition-name: none` on `md+` |
+| `#workbench-mobile-chat-comments` | `workbench-mobile-chat-comments` / `none` | `workbench-chrome` | named `@media (max-width: 767px)` only; `view-transition-name: none` on `md+` |
 | `#workbench-v2-threads` | `workbench-v2-threads` | `workbench-chrome` | all |
 | `#workbench-v2-threads-reopen` | `workbench-v2-threads-reopen` | `workbench-chrome` | desktop (`max-md:hidden`) |
 | `#workbench-v2-chat` | `workbench-v2-chat` / `none` on thread→thread | `workbench-chrome` | named by default (sibling artifact freeze); `view-transition-name: none` while `html[data-wb2-vt-nav=thread-switch]` (thread→thread only) |

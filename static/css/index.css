@@ -543,9 +543,16 @@
     view-transition-name: workbench-mobile-tabs;
     view-transition-class: workbench-chrome;
   }
+  #workbench-mobile-chat-comments {
+    view-transition-name: workbench-mobile-chat-comments;
+    view-transition-class: workbench-chrome;
+  }
 }
 @media (min-width: 768px) {
   #workbench-mobile-tabs {
+    view-transition-name: none;
+  }
+  #workbench-mobile-chat-comments {
     view-transition-name: none;
   }
 }
@@ -618,6 +625,9 @@ html[data-wb2-vt-nav="thread-switch"] #workbench-v2-chat {
 ::view-transition-old(workbench-mobile-tabs),
 ::view-transition-new(workbench-mobile-tabs),
 ::view-transition-group(workbench-mobile-tabs),
+::view-transition-old(workbench-mobile-chat-comments),
+::view-transition-new(workbench-mobile-chat-comments),
+::view-transition-group(workbench-mobile-chat-comments),
 ::view-transition-old(workbench-v2-threads),
 ::view-transition-new(workbench-v2-threads),
 ::view-transition-group(workbench-v2-threads),

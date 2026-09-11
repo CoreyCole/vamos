@@ -40,15 +40,41 @@ func TestWorkbenchV2ChromeNamesStableShape(t *testing.T) {
 		}
 	}
 	desktop := DesktopSiblingDocNameInventory()
-	if desktop["chat"] != "workbench-v2-chat" || desktop["tabs"] != "none" || desktop["artifact"] != "none" {
+	if desktop["chat"] != "workbench-v2-chat" || desktop["tabs"] != "none" ||
+		desktop["artifact"] != "none" {
 		t.Fatalf("desktop inventory = %#v", desktop)
 	}
 	if desktop["threadsReopen"] != "workbench-v2-threads-reopen" {
 		t.Fatalf("desktop missing threadsReopen: %#v", desktop)
 	}
+	if desktop["chatComments"] != "none" {
+		t.Fatalf("desktop chatComments must be none: %#v", desktop)
+	}
 	mobile := MobileSiblingDocNameInventory()
-	if mobile["tabs"] != "workbench-mobile-tabs" || mobile["chat"] != "workbench-v2-chat" {
+	if mobile["tabs"] != "workbench-mobile-tabs" ||
+		mobile["chat"] != "workbench-v2-chat" {
 		t.Fatalf("mobile inventory = %#v", mobile)
+	}
+	var chatComments VTChromeName
+	for _, e := range names {
+		if e.Selector == "#workbench-mobile-chat-comments" {
+			chatComments = e
+			break
+		}
+	}
+	if chatComments.Name != "workbench-mobile-chat-comments" ||
+		chatComments.Media != VTChromeMediaMaxMD ||
+		!chatComments.Freeze {
+		t.Fatalf("mobile chat/comments header chrome: %#v", chatComments)
+	}
+	if chatComments.ExpectedComputedName(
+		false,
+		false,
+	) != "workbench-mobile-chat-comments" {
+		t.Fatal("chatComments must be named under max-md")
+	}
+	if chatComments.ExpectedComputedName(true, false) != "none" {
+		t.Fatal("chatComments must be none on md+")
 	}
 	chat := VTChromeName{}
 	for _, e := range names {
@@ -90,7 +116,10 @@ func TestWorkbenchV2ChromeNamesMatchDocs(t *testing.T) {
 	docs := string(contents)
 	table := DocsNameMapMarkdownTable()
 	if !strings.Contains(docs, table) {
-		t.Fatalf("docs name map must match WorkbenchV2ChromeNames table exactly.\nwant:\n%s", table)
+		t.Fatalf(
+			"docs name map must match WorkbenchV2ChromeNames table exactly.\nwant:\n%s",
+			table,
+		)
 	}
 	if !strings.Contains(docs, "server/layouts/workbench/vt_chrome_names.go") {
 		t.Fatal("docs must point at vt_chrome_names.go as SoT")
