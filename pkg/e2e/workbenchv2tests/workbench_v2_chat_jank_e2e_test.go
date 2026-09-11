@@ -65,9 +65,14 @@ func assertChatNotWaitingForFirstTurn() spec.Step {
 			if strings.Contains(text, "Waiting for the first completed turn") {
 				t.Fatalf("chat pane wiped to empty waiting state: %q", text)
 			}
-			stable, err := ctx.Page.Locator("#workbench-v2-chat-body #agent-chat-stable-transcript").Count()
+			stable, err := ctx.Page.Locator("#workbench-v2-chat-body #agent-chat-stable-transcript").
+				Count()
 			if err != nil || stable == 0 {
-				t.Fatalf("stable transcript missing after navigation: count=%d err=%v", stable, err)
+				t.Fatalf(
+					"stable transcript missing after navigation: count=%d err=%v",
+					stable,
+					err,
+				)
 			}
 		},
 	)
@@ -77,7 +82,9 @@ func scrollChatTranscriptToMarker(marker string) spec.Step {
 	return spec.Custom(
 		"scroll long SSR transcript to mid-history marker",
 		func(t testing.TB, ctx *duiruntime.Context) {
-			target := ctx.Page.Locator("#workbench-v2-chat-body").GetByText(marker).First()
+			target := ctx.Page.Locator("#workbench-v2-chat-body").
+				GetByText(marker).
+				First()
 			if err := target.ScrollIntoViewIfNeeded(); err != nil {
 				t.Fatalf("scroll transcript marker %q into view: %v", marker, err)
 			}
@@ -109,7 +116,7 @@ func assertWorkbenchViewTransitionNames() spec.Step {
 						path: read('thread-artifact-path-header'),
 						browser: read('thread-artifact-browser'),
 						document: read('thread-artifact-document'),
-						tabs: read('workbench-mobile-tabs'),
+						chatComments: read('workbench-mobile-chat-comments'),
 					};
 				}`,
 				nil,
@@ -128,7 +135,12 @@ func assertWorkbenchViewTransitionNames() spec.Step {
 					got = "none"
 				}
 				if got != want[key] {
-					t.Fatalf("%s view-transition-name = %#v, want %s", key, state[key], want[key])
+					t.Fatalf(
+						"%s view-transition-name = %#v, want %s",
+						key,
+						state[key],
+						want[key],
+					)
 				}
 			}
 		},
@@ -152,7 +164,8 @@ func assertChatMinRemAndDragFloor() spec.Step {
 	return spec.Custom(
 		"chat min-rem is enforced while dragging toward zero",
 		func(t testing.TB, ctx *duiruntime.Context) {
-			minRem, err := ctx.Page.Locator(`#workbench-v2-chat`).GetAttribute("data-workbench-min-rem")
+			minRem, err := ctx.Page.Locator(`#workbench-v2-chat`).
+				GetAttribute("data-workbench-min-rem")
 			if err != nil || minRem != "18" {
 				t.Fatalf("chat min-rem = %q, want 18 (%v)", minRem, err)
 			}
@@ -163,7 +176,8 @@ func assertChatMinRemAndDragFloor() spec.Step {
 			box, err := handle.BoundingBox()
 			if err != nil || box == nil {
 				// Fall back to any visible handle between chat and artifact.
-				handle = ctx.Page.Locator("[data-workbench-resize-handle] > div:first-child:visible").Nth(1)
+				handle = ctx.Page.Locator("[data-workbench-resize-handle] > div:first-child:visible").
+					Nth(1)
 				box, err = handle.BoundingBox()
 			}
 			if err != nil || box == nil {
@@ -177,16 +191,19 @@ func assertChatMinRemAndDragFloor() spec.Step {
 				t.Fatal(err)
 			}
 			// Drag aggressively to try to collapse chat.
-			if err := ctx.Page.Mouse().Move(box.X+box.Width/2, box.Y+box.Height/2); err != nil {
+			if err := ctx.Page.Mouse().
+				Move(box.X+box.Width/2, box.Y+box.Height/2); err != nil {
 				t.Fatal(err)
 			}
 			if err := ctx.Page.Mouse().Down(); err != nil {
 				t.Fatal(err)
 			}
-			if err := ctx.Page.Mouse().Move(box.X+box.Width/2-400, box.Y+box.Height/2); err != nil {
+			if err := ctx.Page.Mouse().
+				Move(box.X+box.Width/2-400, box.Y+box.Height/2); err != nil {
 				t.Fatal(err)
 			}
-			if err := ctx.Page.Mouse().Move(box.X+box.Width/2+400, box.Y+box.Height/2); err != nil {
+			if err := ctx.Page.Mouse().
+				Move(box.X+box.Width/2+400, box.Y+box.Height/2); err != nil {
 				t.Fatal(err)
 			}
 			if err := ctx.Page.Mouse().Up(); err != nil {
@@ -211,7 +228,12 @@ func assertChatMinRemAndDragFloor() spec.Step {
 			width, _ := state["width"].(float64)
 			min, _ := state["min"].(float64)
 			if width+1 < min {
-				t.Fatalf("chat width %.1f below min %.1f (before=%v)", width, min, beforeWidth)
+				t.Fatalf(
+					"chat width %.1f below min %.1f (before=%v)",
+					width,
+					min,
+					beforeWidth,
+				)
 			}
 		},
 	)

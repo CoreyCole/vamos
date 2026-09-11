@@ -15,7 +15,7 @@ import (
 	"github.com/CoreyCole/vamos/server/layouts/workbench"
 )
 
-func TestWorkbenchV2MobileSiblingDocKeepsChromeUnderTabs(t *testing.T) {
+func TestWorkbenchV2MobileSiblingDocKeepsChromeUnderIconHeader(t *testing.T) {
 	const (
 		designPath = "thoughts/owner/plans/alpha/design.md"
 		notesPath  = "thoughts/owner/plans/alpha/notes.md"
@@ -25,19 +25,19 @@ func TestWorkbenchV2MobileSiblingDocKeepsChromeUnderTabs(t *testing.T) {
 	notesHref := "/threads/wb2_alpha?artifact=" + url.QueryEscape(notesPath) +
 		"&artifact_dir=" + url.QueryEscape("thoughts/owner/plans/alpha")
 
-	spec.Story(t, "workbench v2 mobile sibling doc keeps chrome under tabs").
+	spec.Story(t, "workbench v2 mobile sibling doc keeps chrome under icon header").
 		App(vamos.App()).
 		Viewport(duiruntime.ViewportMobile).
 		As(vamos.Robot).
 		With(vamos.WorkspaceFixture(fixtures.WorkbenchV2Fixture)).
 		Visit(vamos.Pages.Path(designHref)).
 		Expect(vamos.WorkbenchV2.Ready()).
-		Do(assertDocsTabSSRSelected()).
+		Do(assertMobileChatCommentsSSRFirstPaint()).
 		Do(assertMobileDocChromeViewTransitionNames()).
-		Do(clickSiblingAndAssertNoUnderTabsBlackout(notesHref, "Alpha notes")).
+		Do(clickSiblingAndAssertNoUnderIconHeaderBlackout(notesHref, "Alpha notes")).
 		Expect(vamos.WorkbenchV2.Ready()).
 		Expect(spec.TextContains(vamos.WorkbenchV2.Artifact(), "Alpha notes")).
-		Do(assertDocsTabStillSelected()).
+		Do(assertMobileIconHeaderStillActive()).
 		Expect(vamos.Console.Clean()).
 		Run()
 }
@@ -399,8 +399,8 @@ func assertDesktopDocChromeViewTransitionNames() spec.Step {
 				switch key {
 				case "header":
 					ids = append(ids, "app-header")
-				case "tabs":
-					ids = append(ids, "workbench-mobile-tabs")
+				case "chatComments":
+					ids = append(ids, "workbench-mobile-chat-comments")
 				case "threads":
 					ids = append(ids, "workbench-v2-threads")
 				case "threadsReopen":
@@ -447,7 +447,7 @@ func assertDesktopDocChromeViewTransitionNames() spec.Step {
 				t.Fatalf("VT probe type %T", value)
 			}
 			idFor := map[string]string{
-				"header": "app-header", "tabs": "workbench-mobile-tabs",
+				"header": "app-header", "chatComments": "workbench-mobile-chat-comments",
 				"threads": "workbench-v2-threads", "threadsReopen": "workbench-v2-threads-reopen",
 				"chat": "workbench-v2-chat", "comments": "workbench-v2-comments",
 				"path": "thread-artifact-path-header", "browser": "thread-artifact-browser",
@@ -755,12 +755,10 @@ func assertChatPinnedAfterReload() spec.Step {
 	)
 }
 
-func assertDocsTabSSRSelected() spec.Step {
+func assertMobileChatCommentsSSRFirstPaint() spec.Step {
 	return spec.Custom(
-		"Docs tab paints selected in SSR HTML before sibling click",
+		"mobile chat/comments header paints in SSR; artifact is first-paint; no Docs tablist",
 		func(t testing.TB, ctx *duiruntime.Context) {
-			// Prefer live DOM outerHTML; also re-GET document to confirm SSR attributes
-			// (not only post-Datastar wait state).
 			pageURL := ctx.Page.URL()
 			api := ctx.Page.Context().Request()
 			resp, err := api.Get(pageURL)
@@ -771,30 +769,15 @@ func assertDocsTabSSRSelected() spec.Step {
 			if err != nil {
 				t.Fatalf("read SSR body: %v", err)
 			}
-			if !strings.Contains(body, `id="workbench-mobile-tabs"`) {
-				t.Fatalf("SSR missing workbench-mobile-tabs")
+			if !strings.Contains(body, `id="workbench-mobile-chat-comments"`) {
+				t.Fatalf("SSR missing workbench-mobile-chat-comments")
 			}
-			docsIdx := strings.Index(body, ">Docs</button>")
-			if docsIdx < 0 {
-				// templ may insert whitespace/newlines
-				docsIdx = strings.Index(body, ">Docs<")
+			if strings.Contains(body, `id="workbench-mobile-tabs"`) {
+				t.Fatalf("SSR still has workbench-mobile-tabs")
 			}
-			if docsIdx < 0 {
-				t.Fatalf("SSR missing Docs tab button text")
+			if strings.Contains(body, ">Docs</button>") || strings.Contains(body, `role="tablist"`) {
+				t.Fatalf("SSR still has Docs tab / tablist")
 			}
-			// Look back to the opening <button for Docs.
-			start := strings.LastIndex(body[:docsIdx], "<button")
-			if start < 0 {
-				t.Fatalf("Docs button open tag missing")
-			}
-			btn := body[start:docsIdx]
-			if !strings.Contains(btn, `aria-selected="true"`) {
-				t.Fatalf("Docs tab SSR aria-selected not true: %s", btn)
-			}
-			if !strings.Contains(btn, "bg-muted") || !strings.Contains(btn, "text-foreground") {
-				t.Fatalf("Docs tab SSR missing selected classes: %s", btn)
-			}
-			// data-signals may be HTML-attribute escaped (&quot;) in raw GET body.
 			hasSignal := strings.Contains(body, `"activeRegionID":"workbenchV2Artifact"`) ||
 				strings.Contains(body, `activeRegionID&quot;:&quot;workbenchV2Artifact`) ||
 				strings.Contains(body, `data-workbench-mobile-active="workbenchV2Artifact"`)
@@ -805,15 +788,36 @@ func assertDocsTabSSRSelected() spec.Step {
 	)
 }
 
-func assertDocsTabStillSelected() spec.Step {
+func assertMobileIconHeaderStillActive() spec.Step {
 	return spec.Custom(
-		"Docs tab remains aria-selected after sibling nav",
+		"icon header stays in DOM after sibling nav; artifact remains mobile active region",
 		func(t testing.TB, ctx *duiruntime.Context) {
-			selected, err := ctx.Page.Locator(`#workbench-mobile-tabs button[role="tab"]`).
-				Filter(playwright.LocatorFilterOptions{HasText: "Docs"}).
-				GetAttribute("aria-selected")
-			if err != nil || selected != "true" {
-				t.Fatalf("Docs aria-selected=%q err=%v", selected, err)
+			header := ctx.Page.Locator("#workbench-mobile-chat-comments")
+			if err := header.WaitFor(playwright.LocatorWaitForOptions{
+				State:   playwright.WaitForSelectorStateAttached,
+				Timeout: playwright.Float(10_000),
+			}); err != nil {
+				t.Fatalf("mobile chat/comments header missing after sibling: %v", err)
+			}
+			tabs, err := ctx.Page.Locator("#workbench-mobile-tabs").Count()
+			if err != nil {
+				t.Fatal(err)
+			}
+			if tabs != 0 {
+				t.Fatalf("workbench-mobile-tabs still in DOM after sibling: count=%d", tabs)
+			}
+			active, err := ctx.Page.Evaluate(
+				`() => {
+					const el = document.querySelector('[data-workbench-mobile-active]');
+					return el ? el.getAttribute('data-workbench-mobile-active') : null;
+				}`,
+				nil,
+			)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if active != nil && active != "" && active != "workbenchV2Artifact" {
+				t.Fatalf("mobile active region = %#v, want workbenchV2Artifact", active)
 			}
 		},
 	)
@@ -829,8 +833,8 @@ func assertMobileDocChromeViewTransitionNames() spec.Step {
 				switch key {
 				case "header":
 					ids = append(ids, "app-header")
-				case "tabs":
-					ids = append(ids, "workbench-mobile-tabs")
+				case "chatComments":
+					ids = append(ids, "workbench-mobile-chat-comments")
 				case "threads":
 					ids = append(ids, "workbench-v2-threads")
 				case "threadsReopen":
@@ -877,7 +881,7 @@ func assertMobileDocChromeViewTransitionNames() spec.Step {
 				t.Fatalf("VT probe type %T", value)
 			}
 			idFor := map[string]string{
-				"header": "app-header", "tabs": "workbench-mobile-tabs",
+				"header": "app-header", "chatComments": "workbench-mobile-chat-comments",
 				"threads": "workbench-v2-threads", "threadsReopen": "workbench-v2-threads-reopen",
 				"chat": "workbench-v2-chat", "comments": "workbench-v2-comments",
 				"path": "thread-artifact-path-header", "browser": "thread-artifact-browser",
@@ -895,9 +899,9 @@ func assertMobileDocChromeViewTransitionNames() spec.Step {
 	)
 }
 
-func clickSiblingAndAssertNoUnderTabsBlackout(href, wantText string) spec.Step {
+func clickSiblingAndAssertNoUnderIconHeaderBlackout(href, wantText string) spec.Step {
 	return spec.Custom(
-		"sibling GET never blacks out path/browser under surviving tabs",
+		"sibling GET never blacks out path/browser under surviving icon header",
 		func(t testing.TB, ctx *duiruntime.Context) {
 			ensureArtifactBrowserOpen(t, ctx)
 			link := ctx.Page.Locator(
@@ -930,16 +934,13 @@ func clickSiblingAndAssertNoUnderTabsBlackout(href, wantText string) spec.Step {
 						};
 					};
 					const take = (phase) => {
-						const tabs = document.getElementById('workbench-mobile-tabs');
+						const chatComments = document.getElementById('workbench-mobile-chat-comments');
 						const path = document.getElementById('thread-artifact-path-header');
 						const browser = document.getElementById('thread-artifact-browser');
-						const docs = [...(tabs?.querySelectorAll('button[role="tab"]') || [])]
-							.find(b => (b.textContent || '').trim() === 'Docs');
 						window.__wb2VtSamples.push({
 							phase,
 							t: performance.now(),
-							docsSelected: docs?.getAttribute('aria-selected'),
-							tabs: box(tabs),
+							chatComments: box(chatComments),
 							path: box(path),
 							browser: box(browser),
 						});
@@ -1020,26 +1021,22 @@ func clickSiblingAndAssertNoUnderTabsBlackout(href, wantText string) spec.Step {
 				if !ok {
 					continue
 				}
-				if sel, _ := s["docsSelected"].(string); sel == "false" {
-					t.Fatalf("sample %d: Docs aria-selected went false", i)
-				}
-				tabs, _ := s["tabs"].(map[string]any)
+				chatComments, _ := s["chatComments"].(map[string]any)
 				path, _ := s["path"].(map[string]any)
 				browser, _ := s["browser"].(map[string]any)
-				tabsVisible := boxVisible(tabs)
-				// Fail on under-tabs black: tabs still visible but path/browser height≈0 / hidden.
-				if tabsVisible {
+				headerVisible := boxVisible(chatComments)
+				if headerVisible {
 					if path == nil || !boxInDOM(path) {
-						t.Fatalf("sample %d: path-header missing from DOM while tabs visible", i)
+						t.Fatalf("sample %d: path-header missing from DOM while icon header visible", i)
 					}
 					if browser == nil || !boxInDOM(browser) {
-						t.Fatalf("sample %d: browser missing from DOM while tabs visible", i)
+						t.Fatalf("sample %d: browser missing from DOM while icon header visible", i)
 					}
 					if boxCollapsed(path) || boxHidden(path) {
-						t.Fatalf("sample %d: under-tabs black — path-header collapsed/hidden while tabs visible: %#v", i, path)
+						t.Fatalf("sample %d: under-header black — path-header collapsed/hidden while icon header visible: %#v", i, path)
 					}
 					if boxCollapsed(browser) || boxHidden(browser) {
-						t.Fatalf("sample %d: under-tabs black — browser collapsed/hidden while tabs visible: %#v", i, browser)
+						t.Fatalf("sample %d: under-header black — browser collapsed/hidden while icon header visible: %#v", i, browser)
 					}
 				}
 			}
@@ -1321,56 +1318,6 @@ func clickThreadAndAssertNoChatUnderHeaderGap(linkSelector, wantChatText string)
 			}
 
 			if err := ctx.Page.Locator("#workbench-v2-chat-body").
-				GetByText(wantChatText).
-				First().
-				WaitFor(playwright.LocatorWaitForOptions{
-					State:   playwright.WaitForSelectorStateVisible,
-					Timeout: playwright.Float(30_000),
-				}); err != nil {
-				t.Fatalf("chat missing %q after thread switch: %v", wantChatText, err)
-			}
-		},
-	)
-}
-
-func boxVisible(b map[string]any) bool {
-	if b == nil {
-		return false
-	}
-	h, _ := asFloat(b["h"])
-	w, _ := asFloat(b["w"])
-	return h > 1 && w > 1 && !boxHidden(b)
-}
-
-func boxInDOM(b map[string]any) bool {
-	if b == nil {
-		return false
-	}
-	in, _ := b["inDom"].(bool)
-	return in
-}
-
-func boxCollapsed(b map[string]any) bool {
-	if b == nil {
-		return true
-	}
-	h, ok := asFloat(b["h"])
-	if !ok {
-		return true
-	}
-	return h < 1
-}
-
-func boxHidden(b map[string]any) bool {
-	if b == nil {
-		return true
-	}
-	op, _ := b["opacity"].(string)
-	vis, _ := b["visibility"].(string)
-	disp, _ := b["display"].(string)
-	return op == "0" || vis == "hidden" || disp == "none"
-}
-at-body").
 				GetByText(wantChatText).
 				First().
 				WaitFor(playwright.LocatorWaitForOptions{
