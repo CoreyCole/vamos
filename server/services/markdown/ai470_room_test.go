@@ -304,6 +304,8 @@ func TestServeAI470RoomKnownBotHydratesHomeThread(t *testing.T) {
 		"reply-draft.md",
 		"onboarding-short.md",
 		"AgentFixtureMessage",
+		`id="workbench-mobile-tabs"`,
+		`aria-label="Workbench regions"`,
 	} {
 		if strings.Contains(body, bad) {
 			t.Fatalf("body contains %q", bad)
