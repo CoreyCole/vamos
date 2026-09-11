@@ -28,7 +28,7 @@ func ParseKind(raw string) (RoomKind, bool) {
 	}
 }
 
-// RegisterAgentsRoutes mounts GET /agents — redirects into roster land.
+// RegisterAgentsRoutes mounts GET /agents — redirects onto /threads.
 // serve is typically markdown.ServeAgentsLand.
 func RegisterAgentsRoutes(g *echo.Group, serve echo.HandlerFunc) {
 	g.GET("", serve)
@@ -53,5 +53,5 @@ func RegisterBindPlanLeadRoute(g *echo.Group, bind echo.HandlerFunc) {
 
 // RedirectAgentsLand is a tiny helper when markdown is unavailable in tests.
 func RedirectAgentsLand(c echo.Context) error {
-	return c.Redirect(http.StatusSeeOther, "/rooms/dm/bot")
+	return c.Redirect(http.StatusSeeOther, "/threads")
 }

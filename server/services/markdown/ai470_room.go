@@ -15,9 +15,9 @@ import (
 	"github.com/CoreyCole/vamos/server/services/agenthome"
 )
 
-// ServeAgentsLand redirects /agents into roster land (dm/bot).
+// ServeAgentsLand redirects /agents onto the threads roster.
 func ServeAgentsLand(c echo.Context) error {
-	return c.Redirect(http.StatusSeeOther, "/rooms/dm/bot")
+	return c.Redirect(http.StatusSeeOther, "/threads")
 }
 
 // ServeAI470Room renders leftover V2 workbench with RosterRail left + the same

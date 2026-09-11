@@ -174,7 +174,7 @@ func (s *Service) ServeThreads(c echo.Context) error {
 		Threads: agenthome.RosterRail(
 			s.liveRoster(
 				c.Request().Context(),
-				agenthome.RosterSelection{Kind: agenthome.KindDM, ID: "bot"},
+				agenthome.RosterSelection{},
 			),
 		),
 		Chat: workbench.ChatColumnWithReopen(
@@ -188,7 +188,7 @@ func (s *Service) ServeThreads(c echo.Context) error {
 		),
 		ThreadsOpen:              workbench.ThreadsOpenFromRequest(c.Request()),
 		ChatOpen:                 false,
-		ArtifactOpen:             hasArtifact || viewport.IsDesktop(),
+		ArtifactOpen:             hasArtifact,
 		CommentsOpen:             false,
 		MobileChatCommentsHeader: true,
 	})

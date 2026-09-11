@@ -641,3 +641,18 @@ func TestServeThreadsRendersDirectoryArtifactsAndKeepsAbsentArtifactNeutral(
 		})
 	}
 }
+
+func TestServeAgentsLandRedirectsToThreads(t *testing.T) {
+	e := echo.New()
+	rec := httptest.NewRecorder()
+	c := e.NewContext(httptest.NewRequest(http.MethodGet, "/agents", nil), rec)
+	if err := ServeAgentsLand(c); err != nil {
+		t.Fatal(err)
+	}
+	if rec.Code != http.StatusSeeOther {
+		t.Fatalf("status = %d", rec.Code)
+	}
+	if got := rec.Header().Get("Location"); got != "/threads" {
+		t.Fatalf("Location = %q", got)
+	}
+}
