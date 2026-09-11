@@ -40,6 +40,7 @@ func (s *Service) ServeAI470Room(c echo.Context) error {
 	if err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 	}
+	c.Set(artifactThreadsReopenKey, true)
 	if kind == agenthome.KindPlan && !hasArtifact {
 		planRel, resolveErr := s.resolvePlanDirRelForRoom(
 			c.Request().Context(), id, "",
@@ -47,8 +48,8 @@ func (s *Service) ServeAI470Room(c echo.Context) error {
 		if resolveErr != nil {
 			return resolveErr
 		}
-		if design := thoughtsDesignDocPath(planRel); design != "" {
-			artifactPath, hasArtifact, err = optionalThreadArtifact(design)
+		if doc := s.thoughtsPlanArtifactPath(planRel); doc != "" {
+			artifactPath, hasArtifact, err = optionalThreadArtifact(doc)
 			if err != nil {
 				return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 			}
@@ -136,6 +137,9 @@ func (s *Service) ServeAI470Room(c echo.Context) error {
 	if viewport.IsDesktop() {
 		artifactOpen = true
 	}
+	// Plan/design.md already has chat/comments in the artifact path header.
+	// Do not add a second mobile row (icons or the old tablist).
+	skipExtraMobileChrome := hasArtifact
 	state, err := workbench.BuildWorkbenchV2State(workbench.WorkbenchV2Args{
 		UserEmail:     userEmail,
 		ViewportClass: viewport,
@@ -150,7 +154,8 @@ func (s *Service) ServeAI470Room(c echo.Context) error {
 		ChatOpen:                 chatOpen,
 		ArtifactOpen:             artifactOpen,
 		CommentsOpen:             commentsOpen,
-		MobileChatCommentsHeader: true,
+		MobileChatCommentsHeader: !skipExtraMobileChrome,
+		SkipMobileRegionTabs:     skipExtraMobileChrome,
 	})
 	if err != nil {
 		return err

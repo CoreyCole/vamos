@@ -53,6 +53,8 @@ type ThreadArtifactBrowserArgs struct {
 	ViewDocumentHref   string
 	DocumentViewActive bool
 	CommentsOpen       bool
+	ShowThreadsReopen  bool
+	ThreadsOpen        bool
 	// BrowserOpen is the SSR Files-browser preference (cookie wb2_artifact_browser).
 	// Default closed when unset so first visit does not show the sibling file list.
 	BrowserOpen bool
@@ -468,6 +470,16 @@ func threadArtifactBrowserDirectory(c echo.Context, docPath string) (string, err
 		return "", nil
 	}
 	return CanonicalThoughtsDirPath(path.Dir(docPath))
+}
+
+const artifactThreadsReopenKey = "artifactThreadsReopen"
+
+func artifactThreadsReopenFrom(c echo.Context) bool {
+	if c == nil {
+		return false
+	}
+	v, _ := c.Get(artifactThreadsReopenKey).(bool)
+	return v
 }
 
 func (s *Service) threadArtifactBrowser(

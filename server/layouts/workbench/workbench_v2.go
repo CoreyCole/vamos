@@ -30,6 +30,7 @@ type WorkbenchV2Args struct {
 	// MobileChatCommentsHeader is set only by ServeThreads and ServeAI470Room.
 	// Do not key this off WorkbenchPageThreads; /threads/:id uses that page too.
 	MobileChatCommentsHeader bool
+	SkipMobileRegionTabs     bool
 }
 
 func BuildWorkbenchV2State(args WorkbenchV2Args) (WorkbenchState, error) {
@@ -96,6 +97,7 @@ func BuildWorkbenchV2State(args WorkbenchV2Args) (WorkbenchState, error) {
 		state.Config.Mobile.ActiveRegionID = WorkbenchV2ThreadsRegionID
 	}
 	state.MobileChatCommentsHeader = args.MobileChatCommentsHeader
+	state.SkipMobileRegionTabs = args.SkipMobileRegionTabs
 	return state, nil
 }
 

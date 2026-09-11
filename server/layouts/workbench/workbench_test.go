@@ -1125,6 +1125,41 @@ func TestMobileChatCommentsHeaderRendersFromWorkbench(t *testing.T) {
 	}
 }
 
+func TestSkipMobileRegionTabsOmitsExtraChromeRow(t *testing.T) {
+	t.Parallel()
+
+	state, err := BuildWorkbenchV2State(WorkbenchV2Args{
+		ViewportClass:        ViewportMobile,
+		ThreadsOpen:          true,
+		ChatOpen:             true,
+		ArtifactOpen:         true,
+		SkipMobileRegionTabs: true,
+		Threads:              templ.NopComponent,
+		Chat:                 templ.NopComponent,
+		Artifact:             templ.NopComponent,
+		Comments:             templ.NopComponent,
+	})
+	if err != nil {
+		t.Fatalf("BuildWorkbenchV2State() error = %v", err)
+	}
+	var body bytes.Buffer
+	if err := Workbench(state).Render(t.Context(), &body); err != nil {
+		t.Fatalf("Workbench.Render() error = %v", err)
+	}
+	html := body.String()
+	for _, refuse := range []string{
+		`id="workbench-mobile-tabs"`,
+		`id="workbench-mobile-chat-comments"`,
+		`data-testid="mobile-toggle-chat"`,
+		`data-testid="mobile-toggle-comments"`,
+		`aria-label="Workbench regions"`,
+	} {
+		if strings.Contains(html, refuse) {
+			t.Fatalf("Workbench unexpectedly contains %s: %s", refuse, html)
+		}
+	}
+}
+
 func TestMobileRegionTabsRemainWhenChatCommentsHeaderOff(t *testing.T) {
 	t.Parallel()
 

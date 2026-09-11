@@ -78,17 +78,52 @@ func rosterPlanTime(t time.Time) string {
 	return t.Local().Format("Mon 3:04 PM")
 }
 
-func thoughtsDesignDocPath(planDirRel string) string {
+func thoughtsPlanDocPath(planDirRel, name string) string {
 	rel := filepath.ToSlash(strings.TrimSpace(planDirRel))
 	rel = strings.Trim(rel, "/")
 	rel = strings.TrimPrefix(rel, "thoughts/")
-	if rel == "" {
+	name = strings.TrimSpace(name)
+	if rel == "" || name == "" {
 		return ""
 	}
-	return "thoughts/" + rel + "/design.md"
+	return "thoughts/" + rel + "/" + name
 }
 
-func rosterPlanRowFromDirRel(
+func thoughtsDesignDocPath(planDirRel string) string {
+	return thoughtsPlanDocPath(planDirRel, "design.md")
+}
+
+func thoughtsAgentsDocPath(planDirRel string) string {
+	return thoughtsPlanDocPath(planDirRel, "AGENTS.md")
+}
+
+func (s *Service) planDocExists(thoughtsRel string) bool {
+	if s == nil || strings.TrimSpace(s.basePath) == "" {
+		return false
+	}
+	rel := filepath.ToSlash(strings.TrimSpace(thoughtsRel))
+	rel = strings.Trim(rel, "/")
+	rel = strings.TrimPrefix(rel, "thoughts/")
+	if rel == "" {
+		return false
+	}
+	_, err := os.Stat(filepath.Join(s.basePath, filepath.FromSlash(rel)))
+	return err == nil
+}
+
+func (s *Service) thoughtsPlanArtifactPath(planDirRel string) string {
+	design := thoughtsDesignDocPath(planDirRel)
+	if s.planDocExists(design) {
+		return design
+	}
+	agents := thoughtsAgentsDocPath(planDirRel)
+	if s.planDocExists(agents) {
+		return agents
+	}
+	return design
+}
+
+func (s *Service) rosterPlanRowFromDirRel(
 	planDirRel string,
 	updatedAt time.Time,
 	label string,
@@ -96,15 +131,15 @@ func rosterPlanRowFromDirRel(
 	rel := filepath.ToSlash(strings.TrimSpace(planDirRel))
 	rel = strings.Trim(rel, "/")
 	rel = strings.TrimPrefix(rel, "thoughts/")
-	design := thoughtsDesignDocPath(rel)
-	id := planLeadRoomID(design)
+	doc := s.thoughtsPlanArtifactPath(rel)
+	id := planLeadRoomID(doc)
 	if id == "" {
 		id = filepath.Base(rel)
 	}
 	return agenthome.RosterPlanRow{
 		ID:    id,
 		Title: rosterPlanTitle(label, rel),
-		Href:  planLeadChatHref(design),
+		Href:  planLeadChatHref(doc),
 		Time:  rosterPlanTime(updatedAt),
 	}
 }
@@ -115,7 +150,7 @@ func (s *Service) liveRosterPlans(ctx context.Context) []agenthome.RosterPlanRow
 		if err == nil && len(rows) > 0 {
 			out := make([]agenthome.RosterPlanRow, 0, len(rows))
 			for _, row := range rows {
-				out = append(out, rosterPlanRowFromDirRel(
+				out = append(out, s.rosterPlanRowFromDirRel(
 					row.PlanDirRel,
 					row.ArtifactUpdatedAt,
 					row.Label,
@@ -131,26 +166,35 @@ func (s *Service) globRosterPlans() []agenthome.RosterPlanRow {
 	if s == nil || strings.TrimSpace(s.basePath) == "" {
 		return nil
 	}
-	matches, err := filepath.Glob(
-		filepath.Join(s.basePath, "*", "plans", "*", "design.md"),
-	)
-	if err != nil || len(matches) == 0 {
-		return nil
-	}
-	var out []agenthome.RosterPlanRow
-	for _, abs := range matches {
-		rel, err := filepath.Rel(s.basePath, abs)
+	var order []string
+	byDir := map[string]time.Time{}
+	for _, name := range []string{"design.md", "AGENTS.md"} {
+		matches, err := filepath.Glob(
+			filepath.Join(s.basePath, "*", "plans", "*", name),
+		)
 		if err != nil {
 			continue
 		}
-		rel = filepath.ToSlash(rel)
-		dir := strings.TrimSuffix(rel, "/design.md")
-		st, err := os.Stat(abs)
-		var updated time.Time
-		if err == nil {
-			updated = st.ModTime()
+		for _, abs := range matches {
+			rel, err := filepath.Rel(s.basePath, abs)
+			if err != nil {
+				continue
+			}
+			dir := strings.TrimSuffix(filepath.ToSlash(rel), "/"+name)
+			if _, seen := byDir[dir]; seen {
+				continue
+			}
+			var updated time.Time
+			if st, err := os.Stat(abs); err == nil {
+				updated = st.ModTime()
+			}
+			byDir[dir] = updated
+			order = append(order, dir)
 		}
-		out = append(out, rosterPlanRowFromDirRel(dir, updated, ""))
+	}
+	out := make([]agenthome.RosterPlanRow, 0, len(order))
+	for _, dir := range order {
+		out = append(out, s.rosterPlanRowFromDirRel(dir, byDir[dir], ""))
 	}
 	return out
 }

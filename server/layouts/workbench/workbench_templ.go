@@ -116,7 +116,7 @@ func Workbench(state WorkbenchState) templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-		} else {
+		} else if !state.SkipMobileRegionTabs {
 			templ_7745c5c3_Err = MobileRegionTabs(state).Render(ctx, templ_7745c5c3_Buffer)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err

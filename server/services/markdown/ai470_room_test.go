@@ -172,6 +172,73 @@ func TestServeAI470RoomOpensPlanDesignWithoutArtifactQuery(t *testing.T) {
 	if strings.Contains(body, "Select a thread to view an artifact.") {
 		t.Fatalf("blank artifact pane: %s", body)
 	}
+	for _, refuse := range []string{
+		`id="workbench-mobile-tabs"`,
+		`id="workbench-mobile-chat-comments"`,
+		`data-testid="mobile-toggle-chat"`,
+		`aria-label="Workbench regions"`,
+	} {
+		if strings.Contains(body, refuse) {
+			t.Fatalf("plan artifact extra mobile chrome %q: %s", refuse, body)
+		}
+	}
+	if !strings.Contains(body, `data-testid="view-chat"`) {
+		t.Fatalf("missing artifact-header chat toggle: %s", body)
+	}
+}
+
+func TestServeAI470RoomFallsBackToAgentsMd(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	plan := filepath.Join(root, "owner-a", "plans", "agents-only")
+	mustMkdirAll(t, plan)
+	heading := "Unique live plan agents heading"
+	mustWriteFile(t, filepath.Join(plan, "AGENTS.md"), []byte("# "+heading+"\n"))
+
+	dbSvc, err := servicedb.NewService(filepath.Join(t.TempDir(), "agents-plan.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = dbSvc.Close() })
+	if _, err := dbSvc.Queries.UpsertDiscoveredPlanWorkspace(
+		context.Background(),
+		db.UpsertDiscoveredPlanWorkspaceParams{
+			PlanDirRel:     "owner-a/plans/agents-only",
+			ProjectID:      "vamos",
+			PlanDir:        "thoughts/owner-a/plans/agents-only",
+			Label:          "Agents Only",
+			QrspiLifecycle: "design",
+		},
+	); err != nil {
+		t.Fatal(err)
+	}
+
+	svc, err := NewService(root, nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	svc.WithQueries(dbSvc.Queries)
+	svc.WithWorkbenchThreadRenderer(&threadWorkbenchTestRenderer{})
+
+	rec := httptest.NewRecorder()
+	c := echo.New().NewContext(
+		httptest.NewRequest(http.MethodGet, "/rooms/plan/agents-only", http.NoBody),
+		rec,
+	)
+	c.SetParamNames("kind", "id")
+	c.SetParamValues("plan", "agents-only")
+	c.Set("user_email", "t@example.com")
+	if err := svc.ServeAI470Room(c); err != nil {
+		t.Fatal(err)
+	}
+	body := rec.Body.String()
+	if !strings.Contains(body, heading) {
+		t.Fatalf("missing AGENTS.md heading %q: %s", heading, body)
+	}
+	if strings.Contains(body, "Select a thread to view an artifact.") {
+		t.Fatalf("blank artifact pane: %s", body)
+	}
 }
 
 func TestAI470RoomComposerDisabledDoesNotTreatKindAgentDMAsPairwise(t *testing.T) {

@@ -15,6 +15,9 @@ templ ThreadArtifactPane(browser ThreadArtifactBrowserArgs, document templ.Compo
 		}
 	>
 		<div id="thread-artifact-path-header" class="flex h-10 min-h-10 max-h-10 shrink-0 items-center gap-2 overflow-hidden border-b border-border px-2.5 text-xs">
+			if browser.ShowThreadsReopen {
+				@ThreadArtifactMobileReopen(browser.ThreadsOpen)
+			}
 			if browser.ViewDocumentHref != "" {
 				if browser.DocumentViewActive {
 					<a
