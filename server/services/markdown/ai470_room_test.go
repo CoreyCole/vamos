@@ -174,8 +174,7 @@ func TestServeAI470RoomOpensPlanDesignWithoutArtifactQuery(t *testing.T) {
 	}
 	for _, want := range []string{
 		`id="workbench-mobile-chat-comments"`,
-		`id="workbench-mobile-threads-reopen"`,
-		`data-workbench-threads-reopen`,
+		`data-testid="mobile-toggle-threads"`,
 	} {
 		if !strings.Contains(body, want) {
 			t.Fatalf("plan artifact missing mobile chrome %q: %s", want, body)

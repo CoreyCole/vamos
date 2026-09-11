@@ -5,12 +5,25 @@ templ MobileChatCommentsHeader(state WorkbenchState) {
 		id="workbench-mobile-chat-comments"
 		class="workbench-chrome flex shrink-0 items-center gap-2 md:hidden"
 	>
-		@ThreadsReopenControl(threadsRegionVisible(state), "workbench-mobile-threads-reopen")
+		<button
+			type="button"
+			id="workbench-mobile-toggle-threads"
+			data-testid="mobile-toggle-threads"
+			class="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+			data-on:click={ mobileRegionTabClick(WorkbenchRegion{ID: WorkbenchV2ThreadsRegionID, Kind: RegionPlanSidebar, TargetID: WorkbenchV2ThreadsRegionID}) }
+			aria-controls="workbench-v2-threads"
+			aria-label="View threads"
+			title="View threads"
+		>
+			<svg class="h-3.5 w-3.5" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+				<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
+			</svg>
+		</button>
 		<button
 			type="button"
 			data-testid="mobile-toggle-chat"
 			class="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-			data-on:click={ ChatToggleClickAction() }
+			data-on:click={ mobileRegionTabClick(WorkbenchRegion{ID: WorkbenchV2ChatRegionID, Kind: RegionChat, TargetID: WorkbenchV2ChatRegionID}) }
 			data-attr:aria-pressed="$workbench.regions.workbenchV2Chat.visible ? 'true' : 'false'"
 			data-class="{ 'bg-muted text-foreground': $workbench.regions.workbenchV2Chat.visible }"
 			aria-controls="workbench-v2-chat"
@@ -25,7 +38,6 @@ templ MobileChatCommentsHeader(state WorkbenchState) {
 			type="button"
 			data-testid="mobile-toggle-comments"
 			class="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-			data-on:click={ CommentsToggleClickAction() }
 			data-attr:aria-pressed="$workbench.regions.workbenchV2Comments.visible ? 'true' : 'false'"
 			data-class="{ 'bg-muted text-foreground': $workbench.regions.workbenchV2Comments.visible }"
 			aria-controls="workbench-v2-comments"

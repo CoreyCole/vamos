@@ -1097,15 +1097,18 @@ func TestMobileChatCommentsHeaderRendersFromWorkbench(t *testing.T) {
 		t.Fatalf("Workbench.Render() error = %v", err)
 	}
 	html := body.String()
+	header := mobileChatCommentsHeaderHTML(html)
 	for _, want := range []string{
 		`id="workbench-mobile-chat-comments"`,
-		`id="workbench-mobile-threads-reopen"`,
-		`data-workbench-threads-reopen`,
+		`data-testid="mobile-toggle-threads"`,
 		`data-testid="mobile-toggle-chat"`,
 		`data-testid="mobile-toggle-comments"`,
 		`aria-controls="workbench-v2-chat"`,
 		`aria-controls="workbench-v2-comments"`,
 		`workbench-chrome`,
+		`$workbench.activeRegionID`,
+		`workbenchV2Threads`,
+		`chat-latest`,
 	} {
 		if !strings.Contains(html, want) {
 			t.Fatalf("Workbench missing %s: %s", want, html)
@@ -1119,6 +1122,27 @@ func TestMobileChatCommentsHeaderRendersFromWorkbench(t *testing.T) {
 		if strings.Contains(html, refuse) {
 			t.Fatalf("Workbench unexpectedly contains %s: %s", refuse, html)
 		}
+	}
+	if !strings.Contains(header, `$workbench.activeRegionID`) ||
+		!strings.Contains(header, `workbenchV2Threads`) {
+		t.Fatalf("mobile hamburger missing activeRegionID threads switch: %s", header)
+	}
+	for _, refuse := range []string{
+		`id="workbench-mobile-threads-reopen"`,
+		`data-workbench-threads-reopen`,
+		`visible !== false`,
+		`CommentsToggleClickAction`,
+		`workbenchV2Comments.visible =`,
+	} {
+		if strings.Contains(header, refuse) {
+			t.Fatalf("mobile header unexpectedly contains %s: %s", refuse, header)
+		}
+	}
+	if !strings.Contains(ThreadsReopenDataClass(), "visible !== false") {
+		t.Fatalf(
+			"desktop ThreadsReopenDataClass missing visible !== false: %s",
+			ThreadsReopenDataClass(),
+		)
 	}
 }
 
@@ -1145,7 +1169,7 @@ func TestWorkbenchV2AlwaysMobileHeaderNeverTabs(t *testing.T) {
 	html := body.String()
 	for _, want := range []string{
 		`id="workbench-mobile-chat-comments"`,
-		`id="workbench-mobile-threads-reopen"`,
+		`data-testid="mobile-toggle-threads"`,
 	} {
 		if !strings.Contains(html, want) {
 			t.Fatalf("Workbench missing %s: %s", want, html)
@@ -2038,4 +2062,16 @@ func TestWorkbenchV2FlushChromeCSS(t *testing.T) {
 			t.Fatalf("index.css missing flush rule %q", want)
 		}
 	}
+}
+
+func mobileChatCommentsHeaderHTML(html string) string {
+	start := strings.Index(html, `id="workbench-mobile-chat-comments"`)
+	if start < 0 {
+		return ""
+	}
+	end := strings.Index(html[start:], `id="workbench-regions"`)
+	if end < 0 {
+		return html[start:]
+	}
+	return html[start : start+end]
 }
