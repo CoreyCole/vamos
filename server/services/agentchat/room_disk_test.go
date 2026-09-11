@@ -284,3 +284,15 @@ func TestSeedPairwiseTreeHasWorkingContextOnly(t *testing.T) {
 		}
 	}
 }
+
+func TestLastWorkingContextPreviewEmptyFile(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	if err := SeedBotHomeTree(root, "nova", "Nova"); err != nil {
+		t.Fatal(err)
+	}
+	got := LastWorkingContextPreview(root, "nova")
+	if got.Text != "" {
+		t.Fatalf("empty jsonl preview = %q", got.Text)
+	}
+}

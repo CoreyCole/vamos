@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -455,5 +456,63 @@ func TestLiveRosterPlansEmptyIndexHasNoAlpha(t *testing.T) {
 	html := buf.String()
 	if strings.Contains(html, "Alpha") || strings.Contains(html, "/rooms/plan/alpha") {
 		t.Fatalf("empty roster leaked Alpha: %s", html)
+	}
+}
+
+func TestLiveRosterBotPreviewFromJSONL(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	dbSvc, err := servicedb.NewService(filepath.Join(t.TempDir(), "agents.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = dbSvc.Close() })
+	svc, err := NewService(root, nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	svc.WithQueries(dbSvc.Queries)
+	ctx := context.Background()
+	if _, err := svc.createAgent(ctx, createAgentInput{
+		Slug: "nova", Name: "Nova", UserEmail: "t@example.com",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := svc.createAgent(ctx, createAgentInput{
+		Slug: "other", Name: "Other", UserEmail: "t@example.com",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	sentence := "UNIQUE_PREVIEW_SENTENCE_willow_bamboo_4421"
+	jsonl := filepath.Join(root, "agents", "nova", "sessions", "current.jsonl")
+	body := `{"type":"message","id":"u1","message":{"role":"user","content":"` +
+		sentence + `"}}` + "\n"
+	if err := os.WriteFile(jsonl, []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	view := svc.liveRoster(ctx, agenthome.RosterSelection{})
+	var buf bytes.Buffer
+	if err := agenthome.RosterRail(view).Render(ctx, &buf); err != nil {
+		t.Fatal(err)
+	}
+	html := buf.String()
+	if !strings.Contains(html, sentence) {
+		t.Fatalf("roster missing preview sentence: %s", html)
+	}
+	n := strings.Count(html, sentence)
+	if n != 1 {
+		t.Fatalf("preview count = %d want 1", n)
+	}
+	novaIdx := strings.Index(html, `id="roster-row-dm-nova"`)
+	otherIdx := strings.Index(html, `id="roster-row-dm-other"`)
+	sentIdx := strings.Index(html, sentence)
+	if novaIdx < 0 || otherIdx < 0 || sentIdx < 0 {
+		t.Fatal("missing row ids")
+	}
+	if sentIdx < novaIdx || (otherIdx > novaIdx && sentIdx > otherIdx) {
+		t.Fatal("preview must sit in nova row only")
+	}
+	if strings.Contains(html, "Ready when you are.") {
+		t.Fatal("fixture subtitle leaked")
 	}
 }
