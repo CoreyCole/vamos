@@ -172,11 +172,19 @@ func TestServeAI470RoomOpensPlanDesignWithoutArtifactQuery(t *testing.T) {
 	if strings.Contains(body, "Select a thread to view an artifact.") {
 		t.Fatalf("blank artifact pane: %s", body)
 	}
+	for _, want := range []string{
+		`id="workbench-mobile-chat-comments"`,
+		`id="workbench-mobile-threads-reopen"`,
+		`data-workbench-threads-reopen`,
+	} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("plan artifact missing mobile chrome %q: %s", want, body)
+		}
+	}
 	for _, refuse := range []string{
 		`id="workbench-mobile-tabs"`,
-		`id="workbench-mobile-chat-comments"`,
-		`data-testid="mobile-toggle-chat"`,
 		`aria-label="Workbench regions"`,
+		`role="tablist"`,
 	} {
 		if strings.Contains(body, refuse) {
 			t.Fatalf("plan artifact extra mobile chrome %q: %s", refuse, body)

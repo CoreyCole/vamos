@@ -809,13 +809,6 @@ func TestAgentChatScrollUsesSSRLatestAnchor(t *testing.T) {
 		}
 	}
 
-	mobile, err := os.ReadFile("../../../server/layouts/workbench/mobile.templ")
-	if err != nil {
-		t.Fatalf("ReadFile(mobile.templ) error = %v", err)
-	}
-	if !strings.Contains(string(mobile), "mobileRegionTabClick") {
-		t.Fatalf("mobile.templ missing mobileRegionTabClick for chat-latest focus")
-	}
 	shellBody, err := os.ReadFile("../../../server/services/agentchat/shell.templ")
 	if err != nil {
 		t.Fatalf("ReadFile(shell.templ) error = %v", err)
@@ -1021,7 +1014,7 @@ func TestFocusExitActionRestoresNormalVisibility(t *testing.T) {
 	}
 }
 
-func TestMobileRegionTabsRenderFromWorkbench(t *testing.T) {
+func TestThoughtsWorkbenchRendersWithoutMobileTablist(t *testing.T) {
 	t.Parallel()
 
 	state, err := BuildWorkbenchState(BuildWorkbenchStateInput{
@@ -1064,18 +1057,21 @@ func TestMobileRegionTabsRenderFromWorkbench(t *testing.T) {
 	}
 	html := body.String()
 	for _, want := range []string{
-		`aria-label="Workbench regions"`,
-		`aria-controls="doc-workbench-sidebar-region"`,
-		`aria-controls="doc-workbench-center-region"`,
-		`aria-controls="doc-workbench-right-region"`,
-		`data-attr:aria-selected`,
 		`id="workbench-regions"`,
 		`data-workbench-mobile-active="docWorkbenchCenter"`,
 		`data-workbench-viewport-class="desktop-full"`,
-		`workbench-layout-save`,
 	} {
 		if !strings.Contains(html, want) {
 			t.Fatalf("Workbench missing %s: %s", want, html)
+		}
+	}
+	for _, refuse := range []string{
+		`id="workbench-mobile-tabs"`,
+		`aria-label="Workbench regions"`,
+		`role="tablist"`,
+	} {
+		if strings.Contains(html, refuse) {
+			t.Fatalf("Workbench unexpectedly contains %s: %s", refuse, html)
 		}
 	}
 }
@@ -1103,6 +1099,8 @@ func TestMobileChatCommentsHeaderRendersFromWorkbench(t *testing.T) {
 	html := body.String()
 	for _, want := range []string{
 		`id="workbench-mobile-chat-comments"`,
+		`id="workbench-mobile-threads-reopen"`,
+		`data-workbench-threads-reopen`,
 		`data-testid="mobile-toggle-chat"`,
 		`data-testid="mobile-toggle-comments"`,
 		`aria-controls="workbench-v2-chat"`,
@@ -1124,7 +1122,7 @@ func TestMobileChatCommentsHeaderRendersFromWorkbench(t *testing.T) {
 	}
 }
 
-func TestSkipMobileRegionTabsOmitsExtraChromeRow(t *testing.T) {
+func TestWorkbenchV2AlwaysMobileHeaderNeverTabs(t *testing.T) {
 	t.Parallel()
 
 	state, err := BuildWorkbenchV2State(WorkbenchV2Args{
@@ -1145,123 +1143,22 @@ func TestSkipMobileRegionTabsOmitsExtraChromeRow(t *testing.T) {
 		t.Fatalf("Workbench.Render() error = %v", err)
 	}
 	html := body.String()
+	for _, want := range []string{
+		`id="workbench-mobile-chat-comments"`,
+		`id="workbench-mobile-threads-reopen"`,
+	} {
+		if !strings.Contains(html, want) {
+			t.Fatalf("Workbench missing %s: %s", want, html)
+		}
+	}
 	for _, refuse := range []string{
 		`id="workbench-mobile-tabs"`,
-		`id="workbench-mobile-chat-comments"`,
-		`data-testid="mobile-toggle-chat"`,
-		`data-testid="mobile-toggle-comments"`,
 		`aria-label="Workbench regions"`,
+		`role="tablist"`,
 	} {
 		if strings.Contains(html, refuse) {
 			t.Fatalf("Workbench unexpectedly contains %s: %s", refuse, html)
 		}
-	}
-}
-
-func TestMobileRegionTabsRemainWhenChatCommentsHeaderOff(t *testing.T) {
-	t.Parallel()
-
-	state, err := BuildWorkbenchV2State(WorkbenchV2Args{
-		ViewportClass: ViewportMobile,
-		ThreadsOpen:   true,
-		ChatOpen:      true,
-		ArtifactOpen:  true,
-		Threads:       templ.NopComponent,
-		Chat:          templ.NopComponent,
-		Artifact:      templ.NopComponent,
-		Comments:      templ.NopComponent,
-	})
-	if err != nil {
-		t.Fatalf("BuildWorkbenchV2State() error = %v", err)
-	}
-	var body bytes.Buffer
-	if err := Workbench(state).Render(t.Context(), &body); err != nil {
-		t.Fatalf("Workbench.Render() error = %v", err)
-	}
-	html := body.String()
-	if !strings.Contains(html, `id="workbench-mobile-tabs"`) {
-		t.Fatalf("missing workbench-mobile-tabs: %s", html)
-	}
-	if strings.Contains(html, `id="workbench-mobile-chat-comments"`) {
-		t.Fatalf("unexpected chat/comments header: %s", html)
-	}
-}
-
-func TestMobileRegionTabsSSRSelectedForActiveRegion(t *testing.T) {
-	t.Parallel()
-
-	state, err := BuildWorkbenchV2State(WorkbenchV2Args{
-		ViewportClass: ViewportMobile,
-		ThreadsOpen:   true,
-		ChatOpen:      true,
-		ArtifactOpen:  true,
-		Threads:       templ.NopComponent,
-		Chat:          templ.NopComponent,
-		Artifact:      templ.NopComponent,
-		Comments:      templ.NopComponent,
-	})
-	if err != nil {
-		t.Fatalf("BuildWorkbenchV2State() error = %v", err)
-	}
-	var body bytes.Buffer
-	if err := MobileRegionTabs(state).Render(t.Context(), &body); err != nil {
-		t.Fatalf("MobileRegionTabs.Render() error = %v", err)
-	}
-	html := body.String()
-	if !strings.Contains(html, `id="workbench-mobile-tabs"`) {
-		t.Fatalf("missing workbench-mobile-tabs id: %s", html)
-	}
-	if !strings.Contains(html, `class="workbench-chrome flex shrink-0`) &&
-		!strings.Contains(html, "workbench-chrome") {
-		t.Fatalf("mobile tablist missing workbench-chrome: %s", html)
-	}
-	// Docs/artifact tab must paint selected in SSR HTML (before Datastar).
-	if !strings.Contains(html, `aria-selected="true"`) {
-		t.Fatalf("no SSR aria-selected=true: %s", html)
-	}
-	if !strings.Contains(html, "bg-muted text-foreground") {
-		t.Fatalf("no SSR selected classes bg-muted text-foreground: %s", html)
-	}
-	if state.Config.Mobile.ActiveRegionID != WorkbenchV2ArtifactRegionID {
-		t.Fatalf("ActiveRegionID = %q, want artifact", state.Config.Mobile.ActiveRegionID)
-	}
-	signals := EncodeWorkbenchSignals(state)
-	if !strings.Contains(signals, `"activeRegionID":"workbenchV2Artifact"`) &&
-		!strings.Contains(
-			signals,
-			`"activeRegionID":"`+SignalKeyForID(WorkbenchV2ArtifactRegionID)+`"`,
-		) {
-		t.Fatalf("signals missing artifact activeRegionID: %s", signals)
-	}
-}
-
-func TestMobileRegionTabsRenderUnavailableHiddenNotRemoved(t *testing.T) {
-	t.Parallel()
-
-	state := WorkbenchState{Regions: []WorkbenchRegion{
-		{
-			ID:       "agent-chat-navigation",
-			TargetID: "agent-chat-navigation",
-			Slot:     WorkbenchSlotNavigation,
-			Visible:  false,
-		},
-		{
-			ID:       "agent-chat-primary",
-			TargetID: "agent-chat-primary",
-			Slot:     WorkbenchSlotPrimary,
-			Visible:  true,
-		},
-	}}
-	var body bytes.Buffer
-	if err := MobileRegionTabs(state).Render(t.Context(), &body); err != nil {
-		t.Fatalf("MobileRegionTabs.Render() error = %v", err)
-	}
-	html := body.String()
-	if strings.Count(html, "role=\"tab\"") != 2 {
-		t.Fatalf("mobile tabs html = %s, want hidden nav tab still rendered", html)
-	}
-	if !strings.Contains(html, "$workbench.normalRegions.agentChatNavigation.available") {
-		t.Fatalf("mobile tabs html = %s, want normal availability data-show", html)
 	}
 }
 

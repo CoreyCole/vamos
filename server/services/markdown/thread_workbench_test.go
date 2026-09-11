@@ -196,6 +196,9 @@ func TestServeThreadsMobileIndexUsesRosterNotEmptyArtifact(t *testing.T) {
 	if !strings.Contains(mobileBody, `id="workbench-mobile-chat-comments"`) {
 		t.Fatalf("mobile /threads missing chat/comments header")
 	}
+	if !strings.Contains(mobileBody, `id="workbench-mobile-threads-reopen"`) {
+		t.Fatalf("mobile /threads missing hamburger")
+	}
 
 	deepReq := httptest.NewRequest(
 		"GET",
