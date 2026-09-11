@@ -185,7 +185,7 @@ func (s *Service) ServeThreads(c echo.Context) error {
 		),
 		ThreadsOpen:              workbench.ThreadsOpenFromRequest(c.Request()),
 		ChatOpen:                 false,
-		ArtifactOpen:             true,
+		ArtifactOpen:             hasArtifact || viewport.IsDesktop(),
 		CommentsOpen:             false,
 		MobileChatCommentsHeader: true,
 	})

@@ -1907,6 +1907,85 @@ func TestWorkbenchV2MobileKeepsArtifactEvenWhenChatOpen(t *testing.T) {
 	}
 }
 
+func TestBuildWorkbenchV2StateMobileActiveRegionFromOpenPanes(t *testing.T) {
+	t.Parallel()
+
+	for _, tc := range []struct {
+		name        string
+		chat        bool
+		artifact    bool
+		comments    bool
+		want        string
+		desktopWant string
+	}{
+		{
+			name:        "threads index",
+			want:        WorkbenchV2ThreadsRegionID,
+			desktopWant: WorkbenchV2ThreadsRegionID,
+		},
+		{
+			name:        "bot home chat",
+			chat:        true,
+			want:        WorkbenchV2ChatRegionID,
+			desktopWant: WorkbenchV2ChatRegionID,
+		},
+		{
+			name:        "explicit artifact",
+			chat:        true,
+			artifact:    true,
+			want:        WorkbenchV2ArtifactRegionID,
+			desktopWant: WorkbenchV2ArtifactRegionID,
+		},
+		{
+			name:        "comments cookie over chat",
+			chat:        true,
+			comments:    true,
+			want:        WorkbenchV2CommentsRegionID,
+			desktopWant: WorkbenchV2CommentsRegionID,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			state, err := BuildWorkbenchV2State(WorkbenchV2Args{
+				ViewportClass: ViewportMobile,
+				ThreadsOpen:   true,
+				ChatOpen:      tc.chat,
+				ArtifactOpen:  tc.artifact,
+				CommentsOpen:  tc.comments,
+			})
+			if err != nil {
+				t.Fatalf("mobile BuildWorkbenchV2State() error = %v", err)
+			}
+			if state.Config.Mobile.ActiveRegionID != tc.want {
+				t.Fatalf(
+					"mobile ActiveRegionID = %q, want %q",
+					state.Config.Mobile.ActiveRegionID,
+					tc.want,
+				)
+			}
+			desktop, err := BuildWorkbenchV2State(WorkbenchV2Args{
+				ViewportClass: ViewportDesktopFull,
+				ThreadsOpen:   true,
+				ChatOpen:      tc.chat,
+				ArtifactOpen:  true,
+				CommentsOpen:  tc.comments,
+			})
+			if err != nil {
+				t.Fatalf("desktop BuildWorkbenchV2State() error = %v", err)
+			}
+			var artifactVisible bool
+			for _, region := range desktop.Regions {
+				if region.ID == WorkbenchV2ArtifactRegionID {
+					artifactVisible = region.Visible
+				}
+			}
+			if !artifactVisible {
+				t.Fatal("desktop artifact column must stay visible")
+			}
+		})
+	}
+}
+
 func TestWorkbenchV2RegionsEnforceComposerFriendlyMinRem(t *testing.T) {
 	t.Parallel()
 

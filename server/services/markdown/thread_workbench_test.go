@@ -144,10 +144,55 @@ func TestServeThreadsHydratesArtifactAndCarriesIt(t *testing.T) {
 	if r.artifact != "owner/plans/alpha/design.md" {
 		t.Fatalf("artifact = %q", r.artifact)
 	}
-	for _, want := range []string{"Distinctive artifact", "/threads/thread-1?artifact=thoughts%2Fowner%2Fplans%2Falpha%2Fdesign.md"} {
-		if !strings.Contains(rec.Body.String(), want) {
-			t.Fatalf("missing %q", want)
-		}
+	if !strings.Contains(rec.Body.String(), "Distinctive artifact") {
+		t.Fatalf("missing artifact body: %s", rec.Body.String())
+	}
+}
+
+func TestServeThreadsMobileIndexUsesRosterNotEmptyArtifact(t *testing.T) {
+	root := t.TempDir()
+	svc, err := NewService(root, nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	svc.WithWorkbenchThreadRenderer(&threadWorkbenchTestRenderer{})
+
+	mobileReq := httptest.NewRequest("GET", "/threads", nil)
+	mobileReq.Header.Set("X-Vamos-Viewport-Class", "mobile")
+	mobileRec := httptest.NewRecorder()
+	if err := svc.ServeThreads(echo.New().NewContext(mobileReq, mobileRec)); err != nil {
+		t.Fatal(err)
+	}
+	mobileBody := mobileRec.Body.String()
+	if !strings.Contains(
+		mobileBody,
+		`data-workbench-mobile-active="workbenchV2Threads"`,
+	) {
+		t.Fatalf("mobile /threads active = %s", mobileBody)
+	}
+
+	deepReq := httptest.NewRequest(
+		"GET",
+		"/threads?artifact=thoughts/owner/plans/alpha/design.md",
+		nil,
+	)
+	deepReq.Header.Set("X-Vamos-Viewport-Class", "mobile")
+	mustMkdirAll(t, filepath.Join(root, "owner", "plans", "alpha"))
+	mustWriteFile(
+		t,
+		filepath.Join(root, "owner", "plans", "alpha", "design.md"),
+		[]byte("# Distinctive artifact"),
+	)
+	deepRec := httptest.NewRecorder()
+	if err := svc.ServeThreads(echo.New().NewContext(deepReq, deepRec)); err != nil {
+		t.Fatal(err)
+	}
+	deepBody := deepRec.Body.String()
+	if !strings.Contains(deepBody, `data-workbench-mobile-active="workbenchV2Artifact"`) {
+		t.Fatalf("mobile ?artifact= active = %s", deepBody)
+	}
+	if !strings.Contains(deepBody, "Distinctive artifact") {
+		t.Fatalf("missing deep-link artifact: %s", deepBody)
 	}
 }
 

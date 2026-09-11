@@ -84,11 +84,16 @@ func BuildWorkbenchV2State(args WorkbenchV2Args) (WorkbenchState, error) {
 	if err != nil {
 		return state, err
 	}
-	// Doc deep-links / mobile Docs pane: ActiveRegionID must be artifact on SSR
-	// so EncodeWorkbenchSignals + tab selected classes paint before Datastar.
-	// Saved layout prefs must not win first paint for ?artifact= sibling GETs.
-	if state.ViewportClass == ViewportMobile || args.ArtifactOpen {
+	// First-paint mobile pane follows open columns, not a blanket artifact default.
+	// ?artifact= / plan design.md set ArtifactOpen; comments cookie wins over chat.
+	if args.ArtifactOpen {
 		state.Config.Mobile.ActiveRegionID = WorkbenchV2ArtifactRegionID
+	} else if args.CommentsOpen {
+		state.Config.Mobile.ActiveRegionID = WorkbenchV2CommentsRegionID
+	} else if args.ChatOpen {
+		state.Config.Mobile.ActiveRegionID = WorkbenchV2ChatRegionID
+	} else {
+		state.Config.Mobile.ActiveRegionID = WorkbenchV2ThreadsRegionID
 	}
 	state.MobileChatCommentsHeader = args.MobileChatCommentsHeader
 	return state, nil

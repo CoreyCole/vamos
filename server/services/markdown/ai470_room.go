@@ -109,6 +109,10 @@ func (s *Service) ServeAI470Room(c echo.Context) error {
 	}
 
 	chatOpen, commentsOpen := chatCommentsOpen(c.Request(), chatOpen)
+	artifactOpen := hasArtifact || kind == agenthome.KindPlan
+	if viewport.IsDesktop() {
+		artifactOpen = true
+	}
 	state, err := workbench.BuildWorkbenchV2State(workbench.WorkbenchV2Args{
 		UserEmail:                userEmail,
 		ViewportClass:            viewport,
@@ -119,7 +123,7 @@ func (s *Service) ServeAI470Room(c echo.Context) error {
 		Comments:                 commentsComp,
 		ThreadsOpen:              threadsOpen,
 		ChatOpen:                 chatOpen,
-		ArtifactOpen:             true,
+		ArtifactOpen:             artifactOpen,
 		CommentsOpen:             commentsOpen,
 		MobileChatCommentsHeader: true,
 	})
