@@ -41,15 +41,6 @@ func WorkbenchV2ChromeNames() []VTChromeName {
 			Class: chrome, Freeze: true, ProbeKey: "header", DocsMedia: "all",
 		},
 		{
-			Selector:  "#workbench-mobile-tabs",
-			Name:      "workbench-mobile-tabs",
-			Media:     VTChromeMediaMaxMD,
-			Class:     chrome,
-			Freeze:    true,
-			ProbeKey:  "tabs",
-			DocsMedia: "named `@media (max-width: 767px)` only; `view-transition-name: none` on `md+`",
-		},
-		{
 			Selector:  "#workbench-mobile-chat-comments",
 			Name:      "workbench-mobile-chat-comments",
 			Media:     VTChromeMediaMaxMD,
@@ -172,7 +163,7 @@ func MobileSiblingDocNameInventory() map[string]string {
 	out := make(map[string]string)
 	for _, e := range WorkbenchV2ChromeNames() {
 		switch e.ProbeKey {
-		case "tabs", "path", "browser", "chat", "document", "artifact":
+		case "chatComments", "path", "browser", "chat", "document", "artifact":
 			out[e.ProbeKey] = e.ExpectedComputedName(false, false)
 		}
 	}

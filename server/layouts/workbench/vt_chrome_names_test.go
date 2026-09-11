@@ -40,8 +40,7 @@ func TestWorkbenchV2ChromeNamesStableShape(t *testing.T) {
 		}
 	}
 	desktop := DesktopSiblingDocNameInventory()
-	if desktop["chat"] != "workbench-v2-chat" || desktop["tabs"] != "none" ||
-		desktop["artifact"] != "none" {
+	if desktop["chat"] != "workbench-v2-chat" || desktop["artifact"] != "none" {
 		t.Fatalf("desktop inventory = %#v", desktop)
 	}
 	if desktop["threadsReopen"] != "workbench-v2-threads-reopen" {
@@ -51,7 +50,7 @@ func TestWorkbenchV2ChromeNamesStableShape(t *testing.T) {
 		t.Fatalf("desktop chatComments must be none: %#v", desktop)
 	}
 	mobile := MobileSiblingDocNameInventory()
-	if mobile["tabs"] != "workbench-mobile-tabs" ||
+	if mobile["chatComments"] != "workbench-mobile-chat-comments" ||
 		mobile["chat"] != "workbench-v2-chat" {
 		t.Fatalf("mobile inventory = %#v", mobile)
 	}
