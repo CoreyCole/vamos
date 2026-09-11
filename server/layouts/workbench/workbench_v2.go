@@ -27,6 +27,9 @@ type WorkbenchV2Args struct {
 	ChatOpen      bool
 	ArtifactOpen  bool
 	CommentsOpen  bool
+	// MobileChatCommentsHeader is set only by ServeThreads and ServeAI470Room.
+	// Do not key this off WorkbenchPageThreads; /threads/:id uses that page too.
+	MobileChatCommentsHeader bool
 }
 
 func BuildWorkbenchV2State(args WorkbenchV2Args) (WorkbenchState, error) {
@@ -87,6 +90,7 @@ func BuildWorkbenchV2State(args WorkbenchV2Args) (WorkbenchState, error) {
 	if state.ViewportClass == ViewportMobile || args.ArtifactOpen {
 		state.Config.Mobile.ActiveRegionID = WorkbenchV2ArtifactRegionID
 	}
+	state.MobileChatCommentsHeader = args.MobileChatCommentsHeader
 	return state, nil
 }
 
@@ -103,6 +107,15 @@ func v2Region(
 		ID: id, TargetID: id, BodyID: id + "-body", Slot: slot, Kind: kind,
 		Ratio: ratio, MinRem: minRem, Visible: visible, Component: component,
 	}
+}
+
+func threadsRegionVisible(state WorkbenchState) bool {
+	for _, region := range state.Regions {
+		if region.ID == WorkbenchV2ThreadsRegionID {
+			return region.Visible
+		}
+	}
+	return false
 }
 
 func WorkbenchV2(args WorkbenchV2Args) templ.Component {

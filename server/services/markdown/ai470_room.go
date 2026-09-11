@@ -110,17 +110,18 @@ func (s *Service) ServeAI470Room(c echo.Context) error {
 
 	chatOpen, commentsOpen := chatCommentsOpen(c.Request(), chatOpen)
 	state, err := workbench.BuildWorkbenchV2State(workbench.WorkbenchV2Args{
-		UserEmail:     userEmail,
-		ViewportClass: viewport,
-		SavedConfig:   s.savedThreadsWorkbenchConfig(c, userEmail, viewport),
-		Threads:       agenthome.RosterRail(sel),
-		Chat:          chatComp,
-		Artifact:      artifactComp,
-		Comments:      commentsComp,
-		ThreadsOpen:   threadsOpen,
-		ChatOpen:      chatOpen,
-		ArtifactOpen:  true,
-		CommentsOpen:  commentsOpen,
+		UserEmail:                userEmail,
+		ViewportClass:            viewport,
+		SavedConfig:              s.savedThreadsWorkbenchConfig(c, userEmail, viewport),
+		Threads:                  agenthome.RosterRail(sel),
+		Chat:                     chatComp,
+		Artifact:                 artifactComp,
+		Comments:                 commentsComp,
+		ThreadsOpen:              threadsOpen,
+		ChatOpen:                 chatOpen,
+		ArtifactOpen:             true,
+		CommentsOpen:             commentsOpen,
+		MobileChatCommentsHeader: true,
 	})
 	if err != nil {
 		return err

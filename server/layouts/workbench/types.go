@@ -114,6 +114,10 @@ type WorkbenchState struct {
 
 	FocusDefault  bool
 	NormalRegions []RegionNormalState
+
+	// MobileChatCommentsHeader replaces MobileRegionTabs on /threads land and /rooms.
+	// Leave false for /threads/:id and thoughts so those keep the region tablist.
+	MobileChatCommentsHeader bool
 }
 
 type BuildWorkbenchStateInput struct {

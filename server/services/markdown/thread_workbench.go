@@ -179,12 +179,15 @@ func (s *Service) ServeThreads(c echo.Context) error {
 			"Chat",
 			WorkbenchUnavailable("Select a thread to open chat."),
 		),
-		Artifact:     s.indexArtifactComponent(c, artifactPath, hasArtifact),
-		Comments:     WorkbenchUnavailable("Select an artifact to view comments."),
-		ThreadsOpen:  workbench.ThreadsOpenFromRequest(c.Request()),
-		ChatOpen:     false,
-		ArtifactOpen: true,
-		CommentsOpen: false,
+		Artifact: s.indexArtifactComponent(c, artifactPath, hasArtifact),
+		Comments: WorkbenchUnavailable(
+			"Select an artifact to view comments.",
+		),
+		ThreadsOpen:              workbench.ThreadsOpenFromRequest(c.Request()),
+		ChatOpen:                 false,
+		ArtifactOpen:             true,
+		CommentsOpen:             false,
+		MobileChatCommentsHeader: true,
 	})
 	if err != nil {
 		return err

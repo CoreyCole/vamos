@@ -1080,6 +1080,80 @@ func TestMobileRegionTabsRenderFromWorkbench(t *testing.T) {
 	}
 }
 
+func TestMobileChatCommentsHeaderRendersFromWorkbench(t *testing.T) {
+	t.Parallel()
+
+	state, err := BuildWorkbenchV2State(WorkbenchV2Args{
+		ViewportClass:            ViewportMobile,
+		ThreadsOpen:              true,
+		ChatOpen:                 true,
+		ArtifactOpen:             true,
+		MobileChatCommentsHeader: true,
+		Threads:                  templ.NopComponent,
+		Chat:                     templ.NopComponent,
+		Artifact:                 templ.NopComponent,
+		Comments:                 templ.NopComponent,
+	})
+	if err != nil {
+		t.Fatalf("BuildWorkbenchV2State() error = %v", err)
+	}
+	var body bytes.Buffer
+	if err := Workbench(state).Render(t.Context(), &body); err != nil {
+		t.Fatalf("Workbench.Render() error = %v", err)
+	}
+	html := body.String()
+	for _, want := range []string{
+		`id="workbench-mobile-chat-comments"`,
+		`data-testid="mobile-toggle-chat"`,
+		`data-testid="mobile-toggle-comments"`,
+		`aria-controls="workbench-v2-chat"`,
+		`aria-controls="workbench-v2-comments"`,
+		`workbench-chrome`,
+	} {
+		if !strings.Contains(html, want) {
+			t.Fatalf("Workbench missing %s: %s", want, html)
+		}
+	}
+	for _, refuse := range []string{
+		`id="workbench-mobile-tabs"`,
+		`aria-label="Workbench regions"`,
+		`role="tablist"`,
+	} {
+		if strings.Contains(html, refuse) {
+			t.Fatalf("Workbench unexpectedly contains %s: %s", refuse, html)
+		}
+	}
+}
+
+func TestMobileRegionTabsRemainWhenChatCommentsHeaderOff(t *testing.T) {
+	t.Parallel()
+
+	state, err := BuildWorkbenchV2State(WorkbenchV2Args{
+		ViewportClass: ViewportMobile,
+		ThreadsOpen:   true,
+		ChatOpen:      true,
+		ArtifactOpen:  true,
+		Threads:       templ.NopComponent,
+		Chat:          templ.NopComponent,
+		Artifact:      templ.NopComponent,
+		Comments:      templ.NopComponent,
+	})
+	if err != nil {
+		t.Fatalf("BuildWorkbenchV2State() error = %v", err)
+	}
+	var body bytes.Buffer
+	if err := Workbench(state).Render(t.Context(), &body); err != nil {
+		t.Fatalf("Workbench.Render() error = %v", err)
+	}
+	html := body.String()
+	if !strings.Contains(html, `id="workbench-mobile-tabs"`) {
+		t.Fatalf("missing workbench-mobile-tabs: %s", html)
+	}
+	if strings.Contains(html, `id="workbench-mobile-chat-comments"`) {
+		t.Fatalf("unexpected chat/comments header: %s", html)
+	}
+}
+
 func TestMobileRegionTabsSSRSelectedForActiveRegion(t *testing.T) {
 	t.Parallel()
 
