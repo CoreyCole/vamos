@@ -39,6 +39,20 @@ func (s *Service) ServeAI470Room(c echo.Context) error {
 	if err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 	}
+	if kind == agenthome.KindPlan && !hasArtifact {
+		planRel, resolveErr := s.resolvePlanDirRelForRoom(
+			c.Request().Context(), id, "",
+		)
+		if resolveErr != nil {
+			return resolveErr
+		}
+		if design := thoughtsDesignDocPath(planRel); design != "" {
+			artifactPath, hasArtifact, err = optionalThreadArtifact(design)
+			if err != nil {
+				return echo.NewHTTPError(http.StatusBadRequest, err.Error())
+			}
+		}
+	}
 	planDoc := artifactPath
 	if planDoc != "" && !strings.HasPrefix(planDoc, "thoughts/") {
 		planDoc = "thoughts/" + planDoc
@@ -95,8 +109,12 @@ func (s *Service) ServeAI470Room(c echo.Context) error {
 			roomTitle,
 			chat,
 		)
+		artifactQuery := c.QueryParam("artifact")
+		if strings.TrimSpace(artifactQuery) == "" {
+			artifactQuery = planDoc
+		}
 		artifactComp, commentsComp, err = s.threadArtifactAndComments(
-			c, threadID, c.QueryParam("artifact"),
+			c, threadID, artifactQuery,
 		)
 		if err != nil {
 			return echo.NewHTTPError(http.StatusBadRequest, err.Error())
@@ -189,13 +207,6 @@ func (s *Service) resolveAI470Thread(
 	docs := make([]string, 0, 4)
 	if artifact != "" {
 		docs = append(docs, artifact)
-	} else if kind == agenthome.KindPlan && id != "" {
-		docs = append(
-			docs,
-			"thoughts/owner/plans/"+id+"/design.md",
-			"thoughts/shared/plans/"+id+"/design.md",
-			"thoughts/"+id+"/design.md",
-		)
 	}
 	seen := map[string]bool{}
 	for _, doc := range docs {

@@ -119,6 +119,60 @@ func TestServeAI470RoomEnsuresPlanThreadWhenMissing(t *testing.T) {
 	}
 }
 
+func TestServeAI470RoomOpensPlanDesignWithoutArtifactQuery(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	plan := filepath.Join(root, "owner-a", "plans", "plan-one")
+	mustMkdirAll(t, plan)
+	heading := "Unique live plan design heading 3-2"
+	mustWriteFile(t, filepath.Join(plan, "design.md"), []byte("# "+heading+"\n"))
+
+	dbSvc, err := servicedb.NewService(filepath.Join(t.TempDir(), "plan-room.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = dbSvc.Close() })
+	if _, err := dbSvc.Queries.UpsertDiscoveredPlanWorkspace(
+		context.Background(),
+		db.UpsertDiscoveredPlanWorkspaceParams{
+			PlanDirRel:     "owner-a/plans/plan-one",
+			ProjectID:      "vamos",
+			PlanDir:        "thoughts/owner-a/plans/plan-one",
+			Label:          "Plan One",
+			QrspiLifecycle: "design",
+		},
+	); err != nil {
+		t.Fatal(err)
+	}
+
+	svc, err := NewService(root, nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	svc.WithQueries(dbSvc.Queries)
+	svc.WithWorkbenchThreadRenderer(&threadWorkbenchTestRenderer{})
+
+	rec := httptest.NewRecorder()
+	c := echo.New().NewContext(
+		httptest.NewRequest(http.MethodGet, "/rooms/plan/plan-one", http.NoBody),
+		rec,
+	)
+	c.SetParamNames("kind", "id")
+	c.SetParamValues("plan", "plan-one")
+	c.Set("user_email", "t@example.com")
+	if err := svc.ServeAI470Room(c); err != nil {
+		t.Fatal(err)
+	}
+	body := rec.Body.String()
+	if !strings.Contains(body, heading) {
+		t.Fatalf("missing live design heading %q: %s", heading, body)
+	}
+	if strings.Contains(body, "Select a thread to view an artifact.") {
+		t.Fatalf("blank artifact pane: %s", body)
+	}
+}
+
 func TestAI470RoomComposerDisabledDoesNotTreatKindAgentDMAsPairwise(t *testing.T) {
 	t.Parallel()
 	if AI470RoomComposerDisabled(agenthome.KindAgentDM, "pair") {

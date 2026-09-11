@@ -78,6 +78,16 @@ func rosterPlanTime(t time.Time) string {
 	return t.Local().Format("Mon 3:04 PM")
 }
 
+func thoughtsDesignDocPath(planDirRel string) string {
+	rel := filepath.ToSlash(strings.TrimSpace(planDirRel))
+	rel = strings.Trim(rel, "/")
+	rel = strings.TrimPrefix(rel, "thoughts/")
+	if rel == "" {
+		return ""
+	}
+	return "thoughts/" + rel + "/design.md"
+}
+
 func rosterPlanRowFromDirRel(
 	planDirRel string,
 	updatedAt time.Time,
@@ -86,7 +96,7 @@ func rosterPlanRowFromDirRel(
 	rel := filepath.ToSlash(strings.TrimSpace(planDirRel))
 	rel = strings.Trim(rel, "/")
 	rel = strings.TrimPrefix(rel, "thoughts/")
-	design := "thoughts/" + rel + "/design.md"
+	design := thoughtsDesignDocPath(rel)
 	id := planLeadRoomID(design)
 	if id == "" {
 		id = filepath.Base(rel)
