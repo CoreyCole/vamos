@@ -3,6 +3,7 @@ package agenthome
 import (
 	"strings"
 
+	"github.com/CoreyCole/vamos/pkg/datastarui/components/button"
 	"github.com/CoreyCole/vamos/server/layouts"
 	"github.com/CoreyCole/vamos/server/layouts/workbench"
 )
@@ -89,7 +90,11 @@ func rosterInitial(title string) string {
 }
 
 templ RosterRail(view RosterView) {
-	<div id="workbench-v2-roster" class="flex h-full min-h-0 flex-col overflow-hidden">
+	<div
+		id="workbench-v2-roster"
+		class="flex h-full min-h-0 flex-col overflow-hidden"
+		data-signals="{rosterNewBotOpen: false}"
+	>
 		<div id="workbench-v2-roster-header" class="flex h-10 min-h-10 max-h-10 shrink-0 items-center gap-2 overflow-hidden px-2.5">
 			<button
 				type="button"
@@ -117,6 +122,24 @@ templ RosterRail(view RosterView) {
 					class="min-w-0 flex-1 bg-transparent text-[13px] leading-none text-foreground placeholder:text-muted-foreground focus:outline-none"
 				/>
 			</div>
+			@button.Button(button.ButtonArgs{
+				Variant: "ghost",
+				Size:    "icon",
+				Type:    "button",
+				Class:   "h-7 w-7 shrink-0 text-muted-foreground hover:text-foreground",
+				Attributes: templ.Attributes{
+					"aria-label":              "New bot",
+					"title":                   "New bot",
+					"data-testid":             "roster-new-bot",
+					"data-on:click":           "$rosterNewBotOpen = true",
+					"aria-controls":           "workbench-v2-new-bot-sheet",
+					"data-attr:aria-expanded": "$rosterNewBotOpen ? 'true' : 'false'",
+				},
+			}) {
+				<svg class="h-4 w-4" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v14M5 12h14"></path>
+				</svg>
+			}
 		</div>
 		<div class="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden px-2 pb-2">
 			<div id="workbench-v2-roster-pins" class="flex shrink-0 gap-2 px-1">
@@ -190,6 +213,7 @@ templ RosterRail(view RosterView) {
 			</div>
 			@RosterContextMenu()
 			@EditProfileSheet()
+			@NewBotSheet()
 			@RosterChromeScript()
 		</div>
 	</div>

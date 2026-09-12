@@ -709,3 +709,8 @@ html[data-wb2-vt-nav="thread-switch"] #workbench-v2-chat {
   background-color: #3a3a3a;
   box-shadow: inset 3px 0 0 0 hsl(var(--primary));
 }
+
+/* Roster New-bot control — keep h-10 header band compact. */
+#workbench-v2-roster-header [data-testid="roster-new-bot"] {
+  flex-shrink: 0;
+}

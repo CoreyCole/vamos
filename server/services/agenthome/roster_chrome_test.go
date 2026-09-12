@@ -118,6 +118,13 @@ func TestRosterRail_LiveBotsAndChrome(t *testing.T) {
 	if !strings.Contains(html, "rounded-xl bg-white/[0.05]") {
 		t.Fatal("search must be a full-width rounded well")
 	}
+	if !strings.Contains(html, `data-testid="roster-new-bot"`) {
+		t.Fatal("roster header must expose New bot control")
+	}
+	if !strings.Contains(html, `action="/agents"`) || !strings.Contains(html, `id="workbench-v2-new-bot-sheet"`) {
+		t.Fatal("New bot must POST /agents via create sheet")
+	}
+
 	if strings.Contains(html, "border-dashed") || strings.Contains(html, "Plan threads") {
 		t.Fatal("plan band must stay quiet: no dashed rule, label Plan")
 	}
