@@ -3,6 +3,9 @@ package agenthome
 import (
 	"bytes"
 	"context"
+	"os"
+	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -98,11 +101,8 @@ func TestRosterRail_LiveBotsAndChrome(t *testing.T) {
 	if !strings.Contains(html, `data-roster-action="pin"`) {
 		t.Fatal("context menu must expose pin action")
 	}
-	if !strings.Contains(html, "#3a3a3a") {
-		t.Fatal("pin and row selected fill must be Grok #3a3a3a")
-	}
-	if !strings.Contains(html, "inset 3px 0 0 0 hsl(var(--primary))") {
-		t.Fatal("selected row must keep primary leading edge")
+	if strings.Contains(html, "<style>") {
+		t.Fatal("roster selected/hover must live in shared CSS, not inline <style>")
 	}
 	if strings.Contains(html, "border-b border-border") {
 		t.Fatal("search well must sit on the rail without a header rule")
@@ -191,5 +191,28 @@ func TestRosterRail_LivePlans(t *testing.T) {
 	if strings.Contains(html, `href="/rooms/plan/alpha"`) ||
 		strings.Contains(html, ">Alpha<") {
 		t.Fatal("Alpha fixture must not appear")
+	}
+}
+
+func TestWorkbenchRosterChromeCSS(t *testing.T) {
+	t.Parallel()
+	_, file, _, ok := runtime.Caller(0)
+	if !ok {
+		t.Fatal("runtime.Caller failed")
+	}
+	root := filepath.Clean(filepath.Join(filepath.Dir(file), "../../.."))
+	b, err := os.ReadFile(filepath.Join(root, "static/css/index.css"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	css := string(b)
+	for _, want := range []string{
+		"#workbench-v2-roster a.roster-row-selected",
+		"#3a3a3a",
+		"inset 3px 0 0 0 hsl(var(--primary))",
+	} {
+		if !strings.Contains(css, want) {
+			t.Fatalf("static/css/index.css missing %q", want)
+		}
 	}
 }
