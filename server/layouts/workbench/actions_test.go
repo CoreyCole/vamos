@@ -97,3 +97,39 @@ func TestChatHeaderShareOverflowLabels(t *testing.T) {
 		t.Fatalf("flat menu must not paint section headers: %s", html)
 	}
 }
+
+
+func TestArtifactReloadButtonResetsIframeSrcOnly(t *testing.T) {
+	var body strings.Builder
+	if err := ArtifactReloadButton().Render(t.Context(), &body); err != nil {
+		t.Fatal(err)
+	}
+	html := body.String()
+	for _, want := range []string{
+		`data-testid="artifact-reload"`,
+		`aria-label="Reload"`,
+		`thread-artifact-document`,
+		`applet-frame-`,
+		`.src=`,
+	} {
+		if !strings.Contains(html, want) {
+			t.Fatalf("ArtifactReloadButton missing %q in %s", want, html)
+		}
+	}
+	for _, bad := range []string{"/forms/applets/", "Restart", "pull-to-refresh", "PTR"} {
+		if strings.Contains(html, bad) {
+			t.Fatalf("Reload must not include %q: %s", bad, html)
+		}
+	}
+}
+
+func TestChatHeaderShareOverflowOmitsReload(t *testing.T) {
+	var body strings.Builder
+	if err := ChatHeaderShareOverflow().Render(t.Context(), &body); err != nil {
+		t.Fatal(err)
+	}
+	html := body.String()
+	if strings.Contains(html, `data-testid="artifact-reload"`) || strings.Contains(html, ">Reload<") {
+		t.Fatalf("HARD LOCK A: chat Share overflow must omit Reload: %s", html)
+	}
+}

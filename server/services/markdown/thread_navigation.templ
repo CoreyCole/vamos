@@ -1,5 +1,7 @@
 package markdown
 
+import "github.com/CoreyCole/vamos/server/layouts/workbench"
+
 templ ThreadArtifactPane(browser ThreadArtifactBrowserArgs, document templ.Component) {
 	<div
 		id="thread-artifact-pane"
@@ -14,6 +16,11 @@ templ ThreadArtifactPane(browser ThreadArtifactBrowserArgs, document templ.Compo
 			data-artifact-browser-open="0"
 		}
 	>
+		if browser.ShowReload {
+			<div class="flex h-10 min-h-10 max-h-10 shrink-0 items-center gap-2 overflow-hidden border-b border-border px-2.5 text-xs md:hidden" data-testid="artifact-reload-mobile">
+				@workbench.ArtifactReloadButton()
+			</div>
+		}
 		<div id="thread-artifact-path-header" class="hidden h-10 min-h-10 max-h-10 shrink-0 items-center gap-2 overflow-hidden border-b border-border px-2.5 text-xs md:flex">
 			if browser.ShowThreadsReopen {
 				@ThreadArtifactMobileReopen(browser.ThreadsOpen)
@@ -169,6 +176,9 @@ templ ThreadArtifactPane(browser ThreadArtifactBrowserArgs, document templ.Compo
 				<span aria-hidden="true" class="font-mono text-[11px] leading-none">&gt;&gt;</span>
 				<span class="sr-only">Close details</span>
 			</button>
+			if browser.ShowReload {
+				@workbench.ArtifactReloadButton()
+			}
 			if browser.HeaderActions != nil {
 				@browser.HeaderActions
 			}

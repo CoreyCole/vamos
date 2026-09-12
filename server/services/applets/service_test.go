@@ -723,9 +723,19 @@ func TestHandleThoughtsAppletPageUsesDurableIdentity(t *testing.T) {
 		t.Fatalf("HandleAppletPage() error = %v", err)
 	}
 	html := rec.Body.String()
-	for _, want := range []string{identity, "/thoughts/_render/app/" + token + "/app/", `data-workbench-page="threads"`, `id="workbench-v2-artifact-body"`, `id="workbench-v2-comments-body"`, `"@vamos/datastar"`, "/js/workbench-resize.js"} {
+	for _, want := range []string{identity, "/thoughts/_render/app/" + token + "/app/", `data-workbench-page="threads"`, `id="workbench-v2-artifact-body"`, `id="workbench-v2-comments-body"`, `"@vamos/datastar"`, "/js/workbench-resize.js", `id="thread-artifact-path-header"`, `data-testid="artifact-reload"`, `id="thread-artifact-document"`, `id="applet-frame-`} {
 		if !strings.Contains(html, want) {
 			t.Fatalf("page HTML missing %q:\n%s", want, html)
+		}
+	}
+	// HARD LOCK A: chat-header must not gain Reload.
+	if chatStart := strings.Index(html, `id="workbench-v2-chat-header"`); chatStart >= 0 {
+		chatEnd := strings.Index(html[chatStart:], `</header>`)
+		if chatEnd > 0 {
+			chat := html[chatStart : chatStart+chatEnd]
+			if strings.Contains(chat, `data-testid="artifact-reload"`) || strings.Contains(chat, ">Reload<") {
+				t.Fatalf("HARD LOCK A: Reload must not appear in chat header:\n%s", chat)
+			}
 		}
 	}
 }

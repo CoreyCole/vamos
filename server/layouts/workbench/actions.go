@@ -167,3 +167,9 @@ func OverflowActionsScript() templ.Component {
 		return err
 	})
 }
+
+// ArtifactReloadClickAction reassigns the artifact iframe src (full document reload).
+// Restart (process) is separate — this never posts /forms/applets/*/restart.
+func ArtifactReloadClickAction() string {
+	return `(function(){var host=document.getElementById("thread-artifact-document")||document.getElementById("workbench-v2-artifact-body");if(!host)return;var f=host.querySelector("iframe[data-vamos-html-applet],[id^=\"applet-frame-\"] iframe,iframe");if(!f)return;var s=f.getAttribute("src")||f.src;f.src=s;})()`
+}

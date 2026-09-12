@@ -652,3 +652,29 @@ func TestPathHeaderOmitsOverflowWhenHeaderActionsNil(t *testing.T) {
 		t.Fatalf("path-header must not paint overflow when HeaderActions nil:\n%s", header)
 	}
 }
+
+
+func TestPathHeaderShowsReloadWhenShowReload(t *testing.T) {
+	var body strings.Builder
+	if err := ThreadArtifactPane(
+		ThreadArtifactBrowserArgs{
+			DocPath:       "thoughts/demo.html",
+			DirectoryPath: "thoughts",
+			ShowReload:    true,
+		},
+		templ.Raw(`<iframe data-vamos-html-applet src="/thoughts/_render/html/demo.html"></iframe>`),
+	).Render(t.Context(), &body); err != nil {
+		t.Fatal(err)
+	}
+	html := body.String()
+	header := artifactPathHeader(t, html)
+	if !strings.Contains(header, `data-testid="artifact-reload"`) {
+		t.Fatalf("path-header missing Reload icon:\n%s", header)
+	}
+	if !strings.Contains(html, `data-testid="artifact-reload-mobile"`) {
+		t.Fatalf("soft mobile reload bar missing:\n%s", html)
+	}
+	if strings.Contains(header, "pull-to-refresh") {
+		t.Fatalf("must not invent PTR")
+	}
+}

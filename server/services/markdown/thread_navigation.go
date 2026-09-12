@@ -55,6 +55,8 @@ type ThreadArtifactBrowserArgs struct {
 	CommentsOpen       bool
 	ShowThreadsReopen  bool
 	ThreadsOpen        bool
+	// ShowReload paints the dedicated path-header Reload icon (iframe src reset only).
+	ShowReload bool
 	// BrowserOpen is the SSR Files-browser preference (cookie wb2_artifact_browser).
 	// Default closed when unset so first visit does not show the sibling file list.
 	BrowserOpen bool
@@ -807,6 +809,9 @@ func (s *Service) thoughtsArtifactPane(
 		page,
 		browser.DocPath,
 	)
+	if page != nil && page.ViewerArgs.DocumentKind == DocumentKindHTMLApplet {
+		browser.ShowReload = true
+	}
 	return ThreadArtifactPane(browser, document), nil
 }
 
@@ -863,6 +868,9 @@ func (s *Service) threadArtifactAndComments(
 	content, page, directory := s.artifactContent(c, doc, explicit || !hasArtifact)
 	// Chat pages paint OverflowActions in the chat header only — no path-header kebab.
 	browser.HeaderActions = nil
+	if page != nil && page.ViewerArgs.DocumentKind == DocumentKindHTMLApplet {
+		browser.ShowReload = true
+	}
 	if directory {
 		setViewDocumentToggle(&browser, false, "")
 		return ThreadArtifactPane(

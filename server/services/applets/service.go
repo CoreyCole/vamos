@@ -270,7 +270,7 @@ func (s *Service) RenderAppletPage(c echo.Context, applet AppletContext, process
 			ViewportClass: workbench.ResolveViewportClass(c.Request().Header, c.Request().UserAgent()),
 			Threads: EmptyRegion("Threads will appear here."),
 			Chat: EmptyRegion("Chat will appear here."),
-			Artifact: AppletWorkbenchDocument(applet, process, commentUI),
+			Artifact: ThoughtsAppletArtifactPane(applet, process, commentUI),
 			Comments: commentsPanel,
 			ArtifactOpen: true,
 			CommentsOpen: workbench.CommentsOpenFromRequest(c.Request()),

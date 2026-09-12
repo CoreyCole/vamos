@@ -98,3 +98,21 @@ templ KebabVerticalIcon() {
 		<circle cx="12" cy="19" r="2"></circle>
 	</svg>
 }
+
+// ArtifactReloadButton is the dedicated path/artifact-header Reload icon (not chat ⋯).
+// Soft mobile+desktop: same control; callers place it where the header is visible.
+templ ArtifactReloadButton() {
+	<button
+		type="button"
+		data-testid="artifact-reload"
+		class="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+		data-on:click={ ArtifactReloadClickAction() }
+		aria-label="Reload"
+		title="Reload"
+	>
+		<svg class="h-3.5 w-3.5" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+			<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+		</svg>
+		<span class="sr-only">Reload</span>
+	</button>
+}

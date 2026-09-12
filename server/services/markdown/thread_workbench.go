@@ -135,6 +135,9 @@ func (s *Service) indexArtifactComponent(
 	setViewDocumentToggle(&browser, false, "")
 	// Chat pages paint OverflowActions in the chat header only — no path-header kebab.
 	browser.HeaderActions = nil
+	if page != nil && page.ViewerArgs.DocumentKind == DocumentKindHTMLApplet {
+		browser.ShowReload = true
+	}
 	if page != nil {
 		panelArgs := BuildDocumentPanelArgs(page)
 		panelArgs.Document.WorkbenchActions = nil
