@@ -219,9 +219,27 @@ func TestWorkbenchRosterChromeCSS(t *testing.T) {
 		"#3a3a3a",
 		"rgba(255, 255, 255, 0.28)",
 		"inset 0 0 0 1px",
-			} {
+	} {
 		if !strings.Contains(css, want) {
 			t.Fatalf("static/css/index.css missing %q", want)
+		}
+	}
+}
+
+func TestRosterChromeScriptPortalsNewBotSheet(t *testing.T) {
+	t.Parallel()
+	var buf bytes.Buffer
+	if err := RosterChromeScript().Render(context.Background(), &buf); err != nil {
+		t.Fatal(err)
+	}
+	script := buf.String()
+	for _, want := range []string{
+		`workbench-v2-new-bot-sheet`,
+		`liveNewBot`,
+		`ensurePortaled(newBot)`,
+	} {
+		if !strings.Contains(script, want) {
+			t.Fatalf("roster chrome script missing %q", want)
 		}
 	}
 }

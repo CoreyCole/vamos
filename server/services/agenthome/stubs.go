@@ -91,6 +91,7 @@ func RosterChromeScript() templ.Component {
   const root = document.getElementById("workbench-v2-roster");
   const menu = document.getElementById("workbench-v2-roster-context-menu");
   const sheet = document.getElementById("workbench-v2-edit-profile-sheet");
+  const newBot = document.getElementById("workbench-v2-new-bot-sheet");
   if (!root || !menu || !sheet || root.dataset.rosterChromeBound) return;
   root.dataset.rosterChromeBound = "1";
 
@@ -184,9 +185,17 @@ func RosterChromeScript() templ.Component {
   function liveSheet() {
     return ensurePortaled(document.getElementById("workbench-v2-edit-profile-sheet") || sheet);
   }
+  function liveNewBot() {
+    return ensurePortaled(document.getElementById("workbench-v2-new-bot-sheet") || newBot);
+  }
   // Escape the VT/overflow containing block before first interaction.
   ensurePortaled(menu);
   ensurePortaled(sheet);
+  ensurePortaled(newBot);
+
+  document.querySelectorAll('[data-testid="roster-new-bot"]').forEach((btn) => {
+    btn.addEventListener("click", () => { liveNewBot(); });
+  });
   function hideMenu() {
     const m = liveMenu();
     if (m) m.style.display = "none";
