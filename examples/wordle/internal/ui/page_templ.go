@@ -29,7 +29,7 @@ func Page() templ.Component {
 			templ_7745c5c3_Var1 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"><title>Daily Wordle</title><script type=\"module\" src=\"https://cdn.jsdelivr.net/gh/starfederation/datastar@v1.0.1/bundles/datastar.js\"></script><link rel=\"stylesheet\" href=\"static/app.css\"></head><body class=\"min-h-screen bg-slate-950 text-slate-100\"><main class=\"mx-auto flex min-h-screen max-w-3xl flex-col gap-8 px-5 py-10\" data-init=\"@get('events')\"><header class=\"space-y-3 text-center\"><p class=\"text-sm font-semibold uppercase tracking-[0.3em] text-emerald-300\">Datastar daily game</p><h1 class=\"text-4xl font-black tracking-tight text-white sm:text-6xl\">Daily Wordle</h1><p class=\"text-lg text-slate-300\">Same local-date word for everyone. Username resumes your board on another device.</p></header><section id=\"wordle-panel\" class=\"rounded-3xl border border-white/10 bg-white/10 p-6 shadow-2xl shadow-emerald-950/40 backdrop-blur\">Loading…</section></main></body></html>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"><title>Daily Wordle</title><script type=\"module\" src=\"https://cdn.jsdelivr.net/gh/starfederation/datastar@v1.0.1/bundles/datastar.js\"></script><script src=\"static/shared/vamos-applet-ptr.js\"></script><link rel=\"stylesheet\" href=\"static/app.css\"></head><body class=\"min-h-screen bg-slate-950 text-slate-100\"><main class=\"mx-auto flex min-h-screen max-w-3xl flex-col gap-8 px-5 py-10\" data-init=\"@get('events')\"><header class=\"space-y-3 text-center\"><p class=\"text-sm font-semibold uppercase tracking-[0.3em] text-emerald-300\">Datastar daily game</p><h1 class=\"text-4xl font-black tracking-tight text-white sm:text-6xl\">Daily Wordle</h1><p class=\"text-lg text-slate-300\">Same local-date word for everyone. Username resumes your board on another device.</p></header><section id=\"wordle-panel\" class=\"rounded-3xl border border-white/10 bg-white/10 p-6 shadow-2xl shadow-emerald-950/40 backdrop-blur\">Loading…</section></main></body></html>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -114,7 +114,7 @@ func LoginPanel(message string) templ.Component {
 			var templ_7745c5c3_Var4 string
 			templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.JoinStringErrs(message)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `examples/wordle/internal/ui/page.templ`, Line: 44, Col: 47}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/page.templ`, Line: 45, Col: 47}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var4))
 			if templ_7745c5c3_Err != nil {
@@ -161,7 +161,7 @@ func GamePanel(data PageData) templ.Component {
 		var templ_7745c5c3_Var6 string
 		templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.ResolveAttributeValue(gameSignals(data.Game))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `examples/wordle/internal/ui/page.templ`, Line: 56, Col: 61}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/page.templ`, Line: 57, Col: 61}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var6)
 		if templ_7745c5c3_Err != nil {
@@ -174,7 +174,7 @@ func GamePanel(data PageData) templ.Component {
 		var templ_7745c5c3_Var7 string
 		templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.ResolveAttributeValue(physicalKeyboardHandler(data.Game.CanGuess))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `examples/wordle/internal/ui/page.templ`, Line: 56, Col: 133}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/page.templ`, Line: 57, Col: 133}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var7)
 		if templ_7745c5c3_Err != nil {
@@ -187,7 +187,7 @@ func GamePanel(data PageData) templ.Component {
 		var templ_7745c5c3_Var8 string
 		templ_7745c5c3_Var8, templ_7745c5c3_Err = templ.JoinStringErrs(data.Game.PuzzleDate)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `examples/wordle/internal/ui/page.templ`, Line: 59, Col: 68}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/page.templ`, Line: 60, Col: 68}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var8))
 		if templ_7745c5c3_Err != nil {
@@ -200,7 +200,7 @@ func GamePanel(data PageData) templ.Component {
 		var templ_7745c5c3_Var9 string
 		templ_7745c5c3_Var9, templ_7745c5c3_Err = templ.JoinStringErrs(data.Message)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `examples/wordle/internal/ui/page.templ`, Line: 60, Col: 52}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/page.templ`, Line: 61, Col: 52}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var9))
 		if templ_7745c5c3_Err != nil {
@@ -213,7 +213,7 @@ func GamePanel(data PageData) templ.Component {
 		var templ_7745c5c3_Var10 string
 		templ_7745c5c3_Var10, templ_7745c5c3_Err = templ.JoinStringErrs(data.Auth.Username)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `examples/wordle/internal/ui/page.templ`, Line: 61, Col: 58}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/page.templ`, Line: 62, Col: 58}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var10))
 		if templ_7745c5c3_Err != nil {
@@ -226,7 +226,7 @@ func GamePanel(data PageData) templ.Component {
 		var templ_7745c5c3_Var11 string
 		templ_7745c5c3_Var11, templ_7745c5c3_Err = templ.JoinStringErrs(data.Auth.Timezone)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `examples/wordle/internal/ui/page.templ`, Line: 61, Col: 84}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/page.templ`, Line: 62, Col: 84}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var11))
 		if templ_7745c5c3_Err != nil {
@@ -239,7 +239,7 @@ func GamePanel(data PageData) templ.Component {
 		var templ_7745c5c3_Var12 string
 		templ_7745c5c3_Var12, templ_7745c5c3_Err = templ.JoinStringErrs(guessCount(data.Game.AttemptsUsed, data.Game.AttemptsMax))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `examples/wordle/internal/ui/page.templ`, Line: 64, Col: 152}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/page.templ`, Line: 65, Col: 152}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var12))
 		if templ_7745c5c3_Err != nil {
@@ -266,7 +266,7 @@ func GamePanel(data PageData) templ.Component {
 			var templ_7745c5c3_Var13 string
 			templ_7745c5c3_Var13, templ_7745c5c3_Err = templ.JoinStringErrs(data.Game.Answer)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `examples/wordle/internal/ui/page.templ`, Line: 76, Col: 64}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/page.templ`, Line: 77, Col: 64}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var13))
 			if templ_7745c5c3_Err != nil {
@@ -361,7 +361,7 @@ func BoardRow(row GuessRow) templ.Component {
 		var templ_7745c5c3_Var17 string
 		templ_7745c5c3_Var17, templ_7745c5c3_Err = templ.ResolveAttributeValue(templ.CSSClasses(templ_7745c5c3_Var16).String())
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `examples/wordle/internal/ui/page.templ`, Line: 1, Col: 0}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/page.templ`, Line: 1, Col: 0}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var17)
 		if templ_7745c5c3_Err != nil {
@@ -426,7 +426,7 @@ func Tile(tile TileView) templ.Component {
 		var templ_7745c5c3_Var20 string
 		templ_7745c5c3_Var20, templ_7745c5c3_Err = templ.ResolveAttributeValue(templ.CSSClasses(templ_7745c5c3_Var19).String())
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `examples/wordle/internal/ui/page.templ`, Line: 1, Col: 0}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/page.templ`, Line: 1, Col: 0}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var20)
 		if templ_7745c5c3_Err != nil {
@@ -447,7 +447,7 @@ func Tile(tile TileView) templ.Component {
 		var templ_7745c5c3_Var21 string
 		templ_7745c5c3_Var21, templ_7745c5c3_Err = templ.ResolveAttributeValue(tileAriaLabel(tile))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `examples/wordle/internal/ui/page.templ`, Line: 100, Col: 93}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/page.templ`, Line: 101, Col: 93}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var21)
 		if templ_7745c5c3_Err != nil {
@@ -461,7 +461,7 @@ func Tile(tile TileView) templ.Component {
 			var templ_7745c5c3_Var22 string
 			templ_7745c5c3_Var22, templ_7745c5c3_Err = templ.JoinStringErrs(tile.Letter)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `examples/wordle/internal/ui/page.templ`, Line: 102, Col: 16}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/page.templ`, Line: 103, Col: 16}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var22))
 			if templ_7745c5c3_Err != nil {
@@ -593,7 +593,7 @@ func KeyboardButton(key KeyboardKey) templ.Component {
 			var templ_7745c5c3_Var27 string
 			templ_7745c5c3_Var27, templ_7745c5c3_Err = templ.ResolveAttributeValue(templ.CSSClasses(templ_7745c5c3_Var26).String())
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `examples/wordle/internal/ui/page.templ`, Line: 1, Col: 0}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/page.templ`, Line: 1, Col: 0}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var27)
 			if templ_7745c5c3_Err != nil {
@@ -614,7 +614,7 @@ func KeyboardButton(key KeyboardKey) templ.Component {
 			var templ_7745c5c3_Var28 string
 			templ_7745c5c3_Var28, templ_7745c5c3_Err = templ.ResolveAttributeValue(keyAriaLabel(key))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `examples/wordle/internal/ui/page.templ`, Line: 130, Col: 99}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/page.templ`, Line: 131, Col: 99}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var28)
 			if templ_7745c5c3_Err != nil {
@@ -627,7 +627,7 @@ func KeyboardButton(key KeyboardKey) templ.Component {
 			var templ_7745c5c3_Var29 string
 			templ_7745c5c3_Var29, templ_7745c5c3_Err = templ.JoinStringErrs(key.Label)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `examples/wordle/internal/ui/page.templ`, Line: 130, Col: 113}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/page.templ`, Line: 131, Col: 113}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var29))
 			if templ_7745c5c3_Err != nil {
