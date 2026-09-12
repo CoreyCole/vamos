@@ -136,11 +136,11 @@ func (s *Service) rosterPlanRowFromDirRel(
 	if id == "" {
 		id = filepath.Base(rel)
 	}
+	_ = updatedAt // plan roster rows omit timestamps (title + color swatch only)
 	return agenthome.RosterPlanRow{
 		ID:    id,
 		Title: rosterPlanTitle(label, rel),
 		Href:  planLeadChatHref(doc),
-		Time:  rosterPlanTime(updatedAt),
 	}
 }
 

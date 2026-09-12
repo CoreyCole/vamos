@@ -172,10 +172,20 @@ func TestRosterRail_LivePlans(t *testing.T) {
 		`id="roster-row-plan-plan-one"`,
 		`href="/rooms/plan/plan-one?artifact=thoughts%2Fowner%2Fplans%2Fplan-one%2Fdesign.md"`,
 		`href="/rooms/plan/plan-two?artifact=thoughts%2Fowner%2Fplans%2Fplan-two%2Fdesign.md"`,
-		"Fri 1:02 PM",
+		`data-roster-plan-swatch`,
+		"roster-row-plan",
 	} {
 		if !strings.Contains(html, want) {
 			t.Fatalf("missing %q", want)
+		}
+	}
+	for _, ban := range []string{
+		"Fri 1:02 PM",
+		"Sat 4:05 PM",
+		">P</span>", // letter glyph from rosterInitial
+	} {
+		if strings.Contains(html, ban) {
+			t.Fatalf("plan row must not contain %q", ban)
 		}
 	}
 	if strings.Contains(html, `href="/rooms/plan/alpha"`) ||
