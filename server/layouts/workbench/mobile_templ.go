@@ -29,7 +29,7 @@ func MobileChatCommentsHeader(state WorkbenchState) templ.Component {
 			templ_7745c5c3_Var1 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<div id=\"workbench-mobile-chat-comments\" class=\"workbench-chrome flex shrink-0 items-center gap-2 md:hidden\"><button type=\"button\" id=\"workbench-mobile-toggle-threads\" data-testid=\"mobile-toggle-threads\" class=\"inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground\" data-on:click=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<div id=\"workbench-mobile-chat-comments\" class=\"workbench-chrome flex h-10 min-h-10 max-h-10 shrink-0 items-center gap-2 border-b border-border px-2.5 md:hidden\"><button type=\"button\" id=\"workbench-mobile-toggle-threads\" data-testid=\"mobile-toggle-threads\" class=\"inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground\" data-on:click=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

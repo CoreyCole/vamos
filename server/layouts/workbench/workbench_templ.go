@@ -107,7 +107,7 @@ func Workbench(state WorkbenchState) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, "\" class=\"flex h-full min-h-0 w-full overflow-hidden p-0\"><script type=\"module\" src=\"/js/workbench-resize.js?v=16\"></script><script type=\"module\" src=\"/js/workbench-history.js?v=22\"></script><script type=\"module\" src=\"/js/workbench-doc-scroll.js?v=3\"></script><script defer src=\"/js/frame-comment-bridge.js?v=4\" data-commentui-mode=\"parent\"></script><div class=\"flex min-h-0 w-full flex-col gap-2 overflow-hidden\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, "\" class=\"flex h-full min-h-0 w-full overflow-hidden p-0\"><script type=\"module\" src=\"/js/workbench-resize.js?v=16\"></script><script type=\"module\" src=\"/js/workbench-history.js?v=22\"></script><script type=\"module\" src=\"/js/workbench-doc-scroll.js?v=3\"></script><script defer src=\"/js/frame-comment-bridge.js?v=4\" data-commentui-mode=\"parent\"></script><div class=\"flex min-h-0 w-full flex-col gap-0 overflow-hidden\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -305,7 +305,7 @@ func ChatColumnWithReopen(threadsOpen bool, title string, chat templ.Component) 
 			templ_7745c5c3_Var17 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 20, "<div class=\"flex h-full min-h-0 flex-col bg-background\"><header id=\"workbench-v2-chat-header\" class=\"flex h-10 min-h-10 max-h-10 shrink-0 items-center gap-2 overflow-hidden border-b border-border px-2.5\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 20, "<div class=\"flex h-full min-h-0 flex-col bg-background\"><header id=\"workbench-v2-chat-header\" class=\"hidden h-10 min-h-10 max-h-10 shrink-0 items-center gap-2 overflow-hidden border-b border-border px-2.5 md:flex\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

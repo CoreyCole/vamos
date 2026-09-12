@@ -52,7 +52,7 @@ func ThreadWorkbenchPage(userEmail string, state workbench.WorkbenchState) templ
 			}
 			return nil
 		})
-		templ_7745c5c3_Err = layouts.Root(layouts.RootArgs{Title: "Threads", ShowHeader: true, UserEmail: userEmail}).Render(templ.WithChildren(ctx, templ_7745c5c3_Var2), templ_7745c5c3_Buffer)
+		templ_7745c5c3_Err = layouts.Root(layouts.RootArgs{Title: "Threads", ShowHeader: true, HideHeaderBelowMd: true, UserEmail: userEmail}).Render(templ.WithChildren(ctx, templ_7745c5c3_Var2), templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

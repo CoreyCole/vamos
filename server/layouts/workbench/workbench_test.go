@@ -1106,6 +1106,8 @@ func TestMobileChatCommentsHeaderRendersFromWorkbench(t *testing.T) {
 		`aria-controls="workbench-v2-chat"`,
 		`$workbench_v2_mobile_comments.open = true`,
 		`workbench-chrome`,
+		`h-10 min-h-10 max-h-10`,
+		`border-b border-border`,
 		`$workbench.activeRegionID`,
 		`workbenchV2Threads`,
 		`chat-latest`,

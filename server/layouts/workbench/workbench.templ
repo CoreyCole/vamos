@@ -16,7 +16,7 @@ templ Workbench(state WorkbenchState) {
 		<script type="module" src="/js/workbench-history.js?v=22"></script>
 		<script type="module" src="/js/workbench-doc-scroll.js?v=3"></script>
 		<script defer src="/js/frame-comment-bridge.js?v=4" data-commentui-mode="parent"></script>
-		<div class="flex min-h-0 w-full flex-col gap-2 overflow-hidden">
+		<div class="flex min-h-0 w-full flex-col gap-0 overflow-hidden">
 			if state.MobileChatCommentsHeader {
 				@MobileChatCommentsHeader(state)
 			}
@@ -64,7 +64,7 @@ templ ThreadsReopenControl(threadsOpen bool, controlID string) {
 // Threads reopen lives in that header (same row as title) — never a strip above.
 templ ChatColumnWithReopen(threadsOpen bool, title string, chat templ.Component) {
 	<div class="flex h-full min-h-0 flex-col bg-background">
-		<header id="workbench-v2-chat-header" class="flex h-10 min-h-10 max-h-10 shrink-0 items-center gap-2 overflow-hidden border-b border-border px-2.5">
+		<header id="workbench-v2-chat-header" class="hidden h-10 min-h-10 max-h-10 shrink-0 items-center gap-2 overflow-hidden border-b border-border px-2.5 md:flex">
 			@ThreadsReopenControl(threadsOpen, "workbench-v2-threads-reopen")
 			if title != "" {
 				<span class={ "flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold", ChatHeaderAvatarClass(title) }>{ ChatHeaderInitial(title) }</span>

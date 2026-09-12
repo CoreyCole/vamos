@@ -22,8 +22,10 @@ func TestChatColumnWithReopen_ClosedShowsVisibleSlot(t *testing.T) {
 		t.Fatalf("missing reopen: %s", out)
 	}
 	if !strings.Contains(out, `id="workbench-v2-chat-header"`) ||
-		!strings.Contains(out, "h-10") {
-		t.Fatalf("chat header missing fixed h-10: %s", out)
+		!strings.Contains(out, "h-10") ||
+		!strings.Contains(out, "hidden") ||
+		!strings.Contains(out, "md:flex") {
+		t.Fatalf("chat header missing fixed h-10 desktop-only band: %s", out)
 	}
 	if !strings.Contains(out, ">B</span>") ||
 		!strings.Contains(out, `aria-label="Share"`) {

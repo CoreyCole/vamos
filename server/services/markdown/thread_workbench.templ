@@ -6,7 +6,7 @@ import (
 )
 
 templ ThreadWorkbenchPage(userEmail string, state workbench.WorkbenchState) {
-	@layouts.Root(layouts.RootArgs{Title: "Threads", ShowHeader: true, UserEmail: userEmail}) {
+	@layouts.Root(layouts.RootArgs{Title: "Threads", ShowHeader: true, HideHeaderBelowMd: true, UserEmail: userEmail}) {
 		@workbench.Workbench(state)
 	}
 }
