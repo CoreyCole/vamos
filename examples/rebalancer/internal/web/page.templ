@@ -2,50 +2,458 @@ package web
 
 templ Layout(data PageData) {
 	<!DOCTYPE html>
-	<html lang="en">
+	<html lang="en" class="theme-system">
 		<head>
 			<meta charset="UTF-8"/>
 			<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 			<title>Portfolio Rebalancer</title>
-			<script src="https://cdn.tailwindcss.com"></script>
 			<script type="module" src="https://cdn.jsdelivr.net/gh/starfederation/datastar@v1.0.1/bundles/datastar.js"></script>
+			<script>
+				// Theme system: detect preference, load saved override, listen for parent
+				(function() {
+					const saved = localStorage.getItem('theme');
+					const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+					
+					function setTheme(theme) {
+						const root = document.documentElement;
+						root.classList.remove('theme-light', 'theme-dark', 'theme-system');
+						
+						if (theme === 'system') {
+							root.classList.add('theme-system');
+							root.setAttribute('data-theme', prefersDark ? 'dark' : 'light');
+						} else {
+							root.classList.add('theme-' + theme);
+							root.setAttribute('data-theme', theme);
+						}
+						
+						localStorage.setItem('theme', theme);
+					}
+					
+					// Initialize from saved or system
+					if (saved && ['light', 'dark', 'system'].includes(saved)) {
+						setTheme(saved);
+					} else {
+						setTheme('system');
+					}
+					
+					// Listen for system preference changes
+					window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', e => {
+						if (document.documentElement.classList.contains('theme-system')) {
+							document.documentElement.setAttribute('data-theme', e.matches ? 'dark' : 'light');
+						}
+					});
+					
+					// Listen for parent theme messages (Vamos embed)
+					window.addEventListener('message', e => {
+						if (e.data && (e.data === 'dark' || e.data === 'light')) {
+							setTheme(e.data);
+						}
+					});
+					
+					window.toggleTheme = function() {
+						const current = document.documentElement.getAttribute('data-theme');
+						setTheme(current === 'dark' ? 'light' : 'dark');
+					};
+				})();
+			</script>
+			<style>
+				:root[data-theme="light"] {
+					--bg-primary: #ffffff;
+					--bg-secondary: #f8f9fa;
+					--bg-tertiary: #e9ecef;
+					--text-primary: #000000;
+					--text-secondary: #6c757d;
+					--text-tertiary: #adb5bd;
+					--border-color: #dee2e6;
+					--accent-green: #00a651;
+					--accent-green-bg: #e8f5e9;
+					--accent-red: #d32f2f;
+					--accent-red-bg: #ffebee;
+					--card-shadow: 0 1px 3px rgba(0,0,0,0.1);
+				}
+				
+				:root[data-theme="dark"] {
+					--bg-primary: #000000;
+					--bg-secondary: #1a1a1a;
+					--bg-tertiary: #2d2d2d;
+					--text-primary: #ffffff;
+					--text-secondary: #b0b0b0;
+					--text-tertiary: #6c757d;
+					--border-color: #3a3a3a;
+					--accent-green: #00d662;
+					--accent-green-bg: #0a2e1a;
+					--accent-red: #ff5252;
+					--accent-red-bg: #2e0a0a;
+					--card-shadow: 0 1px 3px rgba(255,255,255,0.05);
+				}
+				
+				* {
+					margin: 0;
+					padding: 0;
+					box-sizing: border-box;
+				}
+				
+				body {
+					font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+					background: var(--bg-primary);
+					color: var(--text-primary);
+					line-height: 1.5;
+					min-height: 100vh;
+				}
+				
+				.container {
+					max-width: 960px;
+					margin: 0 auto;
+					padding: 0;
+				}
+				
+				.header {
+					background: var(--bg-secondary);
+					border-bottom: 1px solid var(--border-color);
+					padding: 16px;
+					display: flex;
+					justify-content: space-between;
+					align-items: center;
+					position: sticky;
+					top: 0;
+					z-index: 100;
+				}
+				
+				.header-title {
+					font-size: 18px;
+					font-weight: 600;
+				}
+				
+				.theme-toggle {
+					background: none;
+					border: none;
+					color: var(--text-primary);
+					font-size: 20px;
+					cursor: pointer;
+					padding: 8px;
+					border-radius: 8px;
+					transition: background 0.2s;
+				}
+				
+				.theme-toggle:hover {
+					background: var(--bg-tertiary);
+				}
+				
+				.card {
+					background: var(--bg-secondary);
+					border: 1px solid var(--border-color);
+					border-radius: 8px;
+					margin: 16px;
+					overflow: hidden;
+				}
+				
+				.card-header {
+					padding: 16px;
+					border-bottom: 1px solid var(--border-color);
+					font-weight: 600;
+					font-size: 16px;
+				}
+				
+				.card-body {
+					padding: 16px;
+				}
+				
+				.position-item {
+					display: flex;
+					justify-content: space-between;
+					align-items: center;
+					padding: 12px 16px;
+					border-bottom: 1px solid var(--border-color);
+					cursor: pointer;
+					transition: background 0.1s;
+				}
+				
+				.position-item:hover {
+					background: var(--bg-tertiary);
+				}
+				
+				.position-item:last-child {
+					border-bottom: none;
+				}
+				
+				.position-left {
+					flex: 1;
+				}
+				
+				.position-symbol {
+					font-weight: 600;
+					font-size: 15px;
+					margin-bottom: 2px;
+				}
+				
+				.position-detail {
+					font-size: 13px;
+					color: var(--text-secondary);
+				}
+				
+				.position-right {
+					text-align: right;
+					display: flex;
+					flex-direction: column;
+					align-items: flex-end;
+					gap: 4px;
+				}
+				
+				.position-value {
+					font-size: 16px;
+					font-weight: 600;
+				}
+				
+				.pill {
+					font-size: 12px;
+					padding: 4px 8px;
+					border-radius: 12px;
+					font-weight: 600;
+					white-space: nowrap;
+				}
+				
+				.pill-green {
+					background: var(--accent-green-bg);
+					color: var(--accent-green);
+				}
+				
+				.pill-red {
+					background: var(--accent-red-bg);
+					color: var(--accent-red);
+				}
+				
+				.btn {
+					background: var(--accent-green);
+					color: white;
+					border: none;
+					padding: 12px 24px;
+					border-radius: 8px;
+					font-weight: 600;
+					font-size: 15px;
+					cursor: pointer;
+					transition: opacity 0.2s;
+					width: 100%;
+				}
+				
+				.btn:hover {
+					opacity: 0.9;
+				}
+				
+				.btn:active {
+					opacity: 0.8;
+				}
+				
+				.input-group {
+					margin-bottom: 12px;
+				}
+				
+				.input-label {
+					display: block;
+					font-size: 13px;
+					color: var(--text-secondary);
+					margin-bottom: 4px;
+					font-weight: 500;
+				}
+				
+				.input {
+					width: 100%;
+					padding: 10px 12px;
+					background: var(--bg-primary);
+					border: 1px solid var(--border-color);
+					border-radius: 6px;
+					color: var(--text-primary);
+					font-size: 15px;
+				}
+				
+				.input:focus {
+					outline: none;
+					border-color: var(--accent-green);
+				}
+				
+				.select {
+					width: 100%;
+					padding: 10px 12px;
+					background: var(--bg-primary);
+					border: 1px solid var(--border-color);
+					border-radius: 6px;
+					color: var(--text-primary);
+					font-size: 14px;
+				}
+				
+				.grid {
+					display: grid;
+					grid-template-columns: repeat(2, 1fr);
+					gap: 12px;
+				}
+				
+				@media (min-width: 640px) {
+					.grid {
+						grid-template-columns: repeat(3, 1fr);
+					}
+				}
+				
+				.summary-item {
+					display: flex;
+					flex-direction: column;
+					gap: 4px;
+				}
+				
+				.summary-label {
+					font-size: 12px;
+					color: var(--text-secondary);
+					text-transform: uppercase;
+					letter-spacing: 0.5px;
+				}
+				
+				.summary-value {
+					font-size: 20px;
+					font-weight: 700;
+				}
+				
+				.summary-target {
+					font-size: 11px;
+					color: var(--text-tertiary);
+				}
+				
+				.alert {
+					padding: 12px 16px;
+					border-radius: 8px;
+					margin: 16px;
+				}
+				
+				.alert-success {
+					background: var(--accent-green-bg);
+					color: var(--accent-green);
+					border: 1px solid var(--accent-green);
+				}
+				
+				.alert-error {
+					background: var(--accent-red-bg);
+					color: var(--accent-red);
+					border: 1px solid var(--accent-red);
+				}
+				
+				.alert-warning {
+					background: #fff3cd;
+					color: #856404;
+					border: 1px solid #ffc107;
+				}
+				
+				:root[data-theme="dark"] .alert-warning {
+					background: #332701;
+					color: #ffc107;
+				}
+				
+				.constraint-list {
+					list-style: none;
+					font-size: 13px;
+					line-height: 1.6;
+				}
+				
+				.constraint-list li:before {
+					content: "• ";
+					color: var(--text-secondary);
+				}
+				
+				.controls-row {
+					display: flex;
+					gap: 12px;
+					align-items: center;
+					padding: 12px 16px;
+					background: var(--bg-tertiary);
+					border-bottom: 1px solid var(--border-color);
+				}
+				
+				.controls-row select {
+					flex: 1;
+					min-width: 0;
+				}
+				
+				.account-badge {
+					display: inline-block;
+					font-size: 11px;
+					padding: 2px 8px;
+					border-radius: 10px;
+					background: var(--bg-tertiary);
+					color: var(--text-secondary);
+					font-weight: 500;
+					margin-left: 6px;
+				}
+				
+				.trade-row {
+					display: flex;
+					justify-content: space-between;
+					padding: 12px 16px;
+					border-bottom: 1px solid var(--border-color);
+					font-size: 14px;
+				}
+				
+				.trade-row:last-child {
+					border-bottom: none;
+				}
+				
+				.trade-info {
+					flex: 1;
+				}
+				
+				.trade-symbol {
+					font-weight: 600;
+					margin-bottom: 2px;
+				}
+				
+				.trade-detail {
+					font-size: 12px;
+					color: var(--text-secondary);
+				}
+			</style>
 		</head>
-		<body class="bg-gray-50 min-h-screen">
-			<div class="container mx-auto px-4 py-8 max-w-7xl">
-				<header class="mb-8">
-					<h1 class="text-3xl font-bold text-gray-900">Household Portfolio Rebalancer</h1>
-					<p class="text-gray-600 mt-2">Multi-account position management and rebalancing</p>
-				</header>
-				<main data-init="@get('/events')">
-					<div id="ingest-status"></div>
-					@MainContent(data)
-				</main>
+		<body>
+			<div class="header">
+				<div class="header-title">Portfolio Rebalancer</div>
+				<button class="theme-toggle" onclick="window.toggleTheme()" title="Toggle theme">
+					<span id="theme-icon">◐</span>
+				</button>
 			</div>
+			<main data-init="@get('/events')">
+				<div id="ingest-status"></div>
+				@MainContent(data)
+			</main>
+			<script>
+				// Update theme icon
+				function updateThemeIcon() {
+					const theme = document.documentElement.getAttribute('data-theme');
+					document.getElementById('theme-icon').textContent = theme === 'dark' ? '☀' : '🌙';
+				}
+				updateThemeIcon();
+				new MutationObserver(updateThemeIcon).observe(
+					document.documentElement,
+					{ attributes: true, attributeFilter: ['data-theme'] }
+				);
+			</script>
 		</body>
 	</html>
 }
 
 templ MainContent(data PageData) {
-	<div id="rebalancer-main" class="space-y-6">
-		<!-- Controls -->
-		<div class="bg-white rounded-lg shadow p-6">
-			<h2 class="text-xl font-semibold mb-4">Controls</h2>
-			<div class="flex gap-4">
+	<div id="rebalancer-main">
+		<!-- Controls Card -->
+		<div class="card">
+			<div class="card-body">
 				<button
-					class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+					class="btn"
 					data-on:click="@post('/ingest', {contentType: 'form'})"
 				>
 					Load Positions
 				</button>
 			</div>
 		</div>
-		<!-- Targets -->
+		<!-- Targets Card -->
 		@Targets(data)
-		<!-- Summary -->
+		<!-- Summary Card -->
 		@Summary(data)
-		<!-- Positions -->
+		<!-- Positions Card -->
 		@Positions(data)
-		<!-- Trades -->
+		<!-- Trades Card -->
 		@Trades(data)
 	</div>
 }
@@ -53,252 +461,239 @@ templ MainContent(data PageData) {
 templ IngestStatus(status, message string) {
 	<div id="ingest-status">
 		if status != "" {
-			<div class={ "mb-6 p-4 rounded-lg", templ.KV("bg-green-50 border border-green-200", status == "success"), templ.KV("bg-red-50 border border-red-200", status == "error") }>
-				<p class={ "text-sm font-medium", templ.KV("text-green-800", status == "success"), templ.KV("text-red-800", status == "error") }>
-					{ message }
-				</p>
+			<div class={ "alert", templ.KV("alert-success", status == "success"), templ.KV("alert-error", status == "error") }>
+				{ message }
 			</div>
 		}
 	</div>
 }
 
 templ Targets(data PageData) {
-	<div id="targets" class="bg-white rounded-lg shadow p-6">
-		<h2 class="text-xl font-semibold mb-4">Target Allocation</h2>
-		<form class="space-y-4">
-			<div class="grid grid-cols-2 md:grid-cols-3 gap-4">
-				<div>
-					<label class="block text-sm font-medium text-gray-700 mb-1">US Equity (%)</label>
-					<input
-						type="number"
-						name="wUs"
-						min="0"
-						max="100"
-						step="1"
-						value={ formatFloat(data.Targets.USEquity) }
-						data-model="wUs"
-						data-on-input.debounce_500ms="@post('/rebalance', {contentType: 'form'})"
-						class="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500"
-					/>
+	<div id="targets" class="card">
+		<div class="card-header">Target Allocation</div>
+		<div class="card-body">
+			<form>
+				<div class="grid">
+					<div class="input-group">
+						<label class="input-label">US Equity (%)</label>
+						<input
+							type="number"
+							name="wUs"
+							min="0"
+							max="100"
+							step="1"
+							value={ formatFloat(data.Targets.USEquity) }
+							data-model="wUs"
+							data-on:input.debounce_500ms="@post('/rebalance', {contentType: 'form'})"
+							class="input"
+						/>
+					</div>
+					<div class="input-group">
+						<label class="input-label">Intl Equity (%)</label>
+						<input
+							type="number"
+							name="wIntl"
+							min="0"
+							max="100"
+							step="1"
+							value={ formatFloat(data.Targets.IntlEquity) }
+							data-model="wIntl"
+							data-on:input.debounce_500ms="@post('/rebalance', {contentType: 'form'})"
+							class="input"
+						/>
+					</div>
+					<div class="input-group">
+						<label class="input-label">Thematic Equity (%)</label>
+						<input
+							type="number"
+							name="wThematic"
+							min="0"
+							max="100"
+							step="1"
+							value={ formatFloat(data.Targets.ThematicEquity) }
+							data-model="wThematic"
+							data-on:input.debounce_500ms="@post('/rebalance', {contentType: 'form'})"
+							class="input"
+						/>
+					</div>
+					<div class="input-group">
+						<label class="input-label">Gold (%)</label>
+						<input
+							type="number"
+							name="wGold"
+							min="0"
+							max="100"
+							step="1"
+							value={ formatFloat(data.Targets.Gold) }
+							data-model="wGold"
+							data-on:input.debounce_500ms="@post('/rebalance', {contentType: 'form'})"
+							class="input"
+						/>
+					</div>
+					<div class="input-group">
+						<label class="input-label">Short Duration (%)</label>
+						<input
+							type="number"
+							name="wShort"
+							min="0"
+							max="100"
+							step="1"
+							value={ formatFloat(data.Targets.ShortDuration) }
+							data-model="wShort"
+							data-on:input.debounce_500ms="@post('/rebalance', {contentType: 'form'})"
+							class="input"
+						/>
+					</div>
+					<div class="input-group">
+						<label class="input-label">Cash (%)</label>
+						<input
+							type="number"
+							name="wCash"
+							min="0"
+							max="100"
+							step="1"
+							value={ formatFloat(data.Targets.Cash) }
+							data-model="wCash"
+							data-on:input.debounce_500ms="@post('/rebalance', {contentType: 'form'})"
+							class="input"
+						/>
+					</div>
 				</div>
-				<div>
-					<label class="block text-sm font-medium text-gray-700 mb-1">Intl Equity (%)</label>
-					<input
-						type="number"
-						name="wIntl"
-						min="0"
-						max="100"
-						step="1"
-						value={ formatFloat(data.Targets.IntlEquity) }
-						data-model="wIntl"
-						data-on-input.debounce_500ms="@post('/rebalance', {contentType: 'form'})"
-						class="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500"
-					/>
-				</div>
-				<div>
-					<label class="block text-sm font-medium text-gray-700 mb-1">Thematic Equity (%)</label>
-					<input
-						type="number"
-						name="wThematic"
-						min="0"
-						max="100"
-						step="1"
-						value={ formatFloat(data.Targets.ThematicEquity) }
-						data-model="wThematic"
-						data-on-input.debounce_500ms="@post('/rebalance', {contentType: 'form'})"
-						class="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500"
-					/>
-				</div>
-				<div>
-					<label class="block text-sm font-medium text-gray-700 mb-1">Gold (%)</label>
-					<input
-						type="number"
-						name="wGold"
-						min="0"
-						max="100"
-						step="1"
-						value={ formatFloat(data.Targets.Gold) }
-						data-model="wGold"
-						data-on-input.debounce_500ms="@post('/rebalance', {contentType: 'form'})"
-						class="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500"
-					/>
-				</div>
-				<div>
-					<label class="block text-sm font-medium text-gray-700 mb-1">Short Duration (%)</label>
-					<input
-						type="number"
-						name="wShort"
-						min="0"
-						max="100"
-						step="1"
-						value={ formatFloat(data.Targets.ShortDuration) }
-						data-model="wShort"
-						data-on-input.debounce_500ms="@post('/rebalance', {contentType: 'form'})"
-						class="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500"
-					/>
-				</div>
-				<div>
-					<label class="block text-sm font-medium text-gray-700 mb-1">Cash (%)</label>
-					<input
-						type="number"
-						name="wCash"
-						min="0"
-						max="100"
-						step="1"
-						value={ formatFloat(data.Targets.Cash) }
-						data-model="wCash"
-						data-on-input.debounce_500ms="@post('/rebalance', {contentType: 'form'})"
-						class="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500"
-					/>
-				</div>
-			</div>
-		</form>
+			</form>
+		</div>
 	</div>
 }
 
 templ Summary(data PageData) {
-	<div id="summary" class="bg-white rounded-lg shadow p-6">
-		<h2 class="text-xl font-semibold mb-4">Portfolio Mix</h2>
-		<div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-			<div>
-				<div class="text-sm text-gray-600">Total Value</div>
-				<div class="text-2xl font-bold">${ formatMoney(data.TotalValue) }</div>
-			</div>
-			if len(data.ClassBreakdown) > 0 {
-				for _, cb := range data.ClassBreakdown {
-					<div>
-						<div class="text-sm text-gray-600">{ cb.Class }</div>
-						<div class="text-lg font-semibold">{ formatFloat(cb.CurrentPct) }%</div>
-						if cb.TargetPct > 0 {
-							<div class="text-xs text-gray-500">Target: { formatFloat(cb.TargetPct) }%</div>
-						}
-					</div>
+	<div id="summary" class="card">
+		<div class="card-header">Portfolio Mix</div>
+		<div class="card-body">
+			<div class="grid">
+				<div class="summary-item">
+					<div class="summary-label">Total Value</div>
+					<div class="summary-value">{ "$" + formatMoney(data.TotalValue) }</div>
+				</div>
+				if len(data.ClassBreakdown) > 0 {
+					for _, cb := range data.ClassBreakdown {
+						<div class="summary-item">
+							<div class="summary-label">{ cb.Class }</div>
+							<div class="summary-value">{ formatFloat(cb.CurrentPct) }%</div>
+							if cb.TargetPct > 0 {
+								<div class="summary-target">Target: { formatFloat(cb.TargetPct) }%</div>
+							}
+						</div>
+					}
 				}
+			</div>
+			if len(data.Blockers) > 0 {
+				<div class="alert alert-warning" style="margin-top: 16px;">
+					<div style="font-weight: 600; margin-bottom: 8px;">Constraints</div>
+					<ul class="constraint-list">
+						for _, b := range data.Blockers {
+							<li>{ b }</li>
+						}
+					</ul>
+				</div>
 			}
 		</div>
-		if len(data.Blockers) > 0 {
-			<div class="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded">
-				<h3 class="font-medium text-yellow-900 mb-2">Constraints</h3>
-				<ul class="list-disc list-inside text-sm text-yellow-800 space-y-1">
-					for _, b := range data.Blockers {
-						<li>{ b }</li>
-					}
-				</ul>
-			</div>
-		}
 	</div>
 }
 
 templ Positions(data PageData) {
-	<div id="positions" class="bg-white rounded-lg shadow p-6">
-		<div class="flex justify-between items-center mb-4">
-			<h2 class="text-xl font-semibold">Positions</h2>
-			<div class="flex gap-2">
-				<select
-					name="listShows"
-					data-model="listShows"
-					data-on-change="@post('/positions', {contentType: 'form'})"
-					class="px-3 py-1 border border-gray-300 rounded text-sm"
-				>
-					<option value="value" selected?={ data.ListShows == "value" }>Market Value</option>
-					<option value="quantity" selected?={ data.ListShows == "quantity" }>Quantity</option>
-					<option value="price" selected?={ data.ListShows == "price" }>Last Price</option>
-				</select>
-				<select
-					name="sortBy"
-					data-model="sortBy"
-					data-on-change="@post('/positions', {contentType: 'form'})"
-					class="px-3 py-1 border border-gray-300 rounded text-sm"
-				>
-					<option value="value" selected?={ data.SortBy == "value" }>Sort by Value</option>
-					<option value="account" selected?={ data.SortBy == "account" }>Sort by Account</option>
-					<option value="class" selected?={ data.SortBy == "class" }>Sort by Class</option>
-					<option value="symbol" selected?={ data.SortBy == "symbol" }>Sort by Symbol</option>
-				</select>
-			</div>
+	<div id="positions" class="card">
+		<div class="card-header">Positions</div>
+		<div class="controls-row">
+			<select
+				name="listShows"
+				data-model="listShows"
+				data-on:change="@post('/positions', {contentType: 'form'})"
+				class="select"
+			>
+				<option value="value" selected?={ data.ListShows == "value" }>Market Value</option>
+				<option value="quantity" selected?={ data.ListShows == "quantity" }>Quantity</option>
+				<option value="price" selected?={ data.ListShows == "price" }>Last Price</option>
+			</select>
+			<select
+				name="sortBy"
+				data-model="sortBy"
+				data-on:change="@post('/positions', {contentType: 'form'})"
+				class="select"
+			>
+				<option value="value" selected?={ data.SortBy == "value" }>Sort by Value</option>
+				<option value="account" selected?={ data.SortBy == "account" }>Sort by Account</option>
+				<option value="class" selected?={ data.SortBy == "class" }>Sort by Class</option>
+				<option value="symbol" selected?={ data.SortBy == "symbol" }>Sort by Symbol</option>
+			</select>
 		</div>
 		if len(data.Positions) == 0 {
-			<p class="text-gray-500 text-center py-8">No positions loaded. Click "Load Positions" to start.</p>
+			<div class="card-body">
+				<div style="text-align: center; color: var(--text-secondary); padding: 32px 16px;">
+					No positions loaded. Click "Load Positions" to start.
+				</div>
+			</div>
 		} else {
-			<div class="overflow-x-auto">
-				<table class="min-w-full divide-y divide-gray-200">
-					<thead class="bg-gray-50">
-						<tr>
-							<th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Account</th>
-							<th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Symbol</th>
-							<th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
-							<th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Class</th>
-							<th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">
+			<div>
+				for _, p := range data.Positions {
+					<div class="position-item">
+						<div class="position-left">
+							<div class="position-symbol">{ p.Symbol }<span class="account-badge">{ p.Account }</span></div>
+							<div class="position-detail">
 								if data.ListShows == "quantity" {
-									Quantity
+									{ formatFloat(p.Quantity) } shares &bull; { p.AssetClass }
 								} else if data.ListShows == "price" {
-									Price
+									{ formatFloat(p.Quantity) } at { "$" + formatMoney(p.Price) }
 								} else {
-									Value
+									{ formatFloat(p.Quantity) } at { "$" + formatMoney(p.Price) } &bull; { p.AssetClass }
 								}
-							</th>
-						</tr>
-					</thead>
-					<tbody class="bg-white divide-y divide-gray-200">
-						for _, p := range data.Positions {
-							<tr>
-								<td class="px-4 py-3 text-sm text-gray-900">{ p.Account }</td>
-								<td class="px-4 py-3 text-sm font-medium text-gray-900">{ p.Symbol }</td>
-								<td class="px-4 py-3 text-sm text-gray-600">{ p.Name }</td>
-								<td class="px-4 py-3 text-sm text-gray-600">{ p.AssetClass }</td>
-								<td class="px-4 py-3 text-sm text-gray-900 text-right">
-									if data.ListShows == "quantity" {
-										{ formatFloat(p.Quantity) }
-									} else if data.ListShows == "price" {
-										${ formatMoney(p.Price) }
-									} else {
-										${ formatMoney(p.MarketValue) }
-									}
-								</td>
-							</tr>
-						}
-					</tbody>
-				</table>
+							</div>
+						</div>
+						<div class="position-right">
+							<div class="position-value">
+								if data.ListShows == "quantity" {
+									{ formatFloat(p.Quantity) }
+								} else if data.ListShows == "price" {
+									{ "$" + formatMoney(p.Price) }
+								} else {
+									{ "$" + formatMoney(p.MarketValue) }
+								}
+							</div>
+						</div>
+					</div>
+				}
 			</div>
 		}
 	</div>
 }
 
 templ Trades(data PageData) {
-	<div id="trades" class="bg-white rounded-lg shadow p-6">
-		<h2 class="text-xl font-semibold mb-4">Proposed Trades</h2>
+	<div id="trades" class="card">
+		<div class="card-header">Proposed Trades</div>
 		if len(data.Trades) == 0 {
-			<p class="text-gray-500 text-center py-8">No trades proposed. Adjust target allocation to generate trades.</p>
+			<div class="card-body">
+				<div style="text-align: center; color: var(--text-secondary); padding: 32px 16px;">
+					No trades proposed. Adjust target allocation to generate trades.
+				</div>
+			</div>
 		} else {
-			<div class="overflow-x-auto">
-				<table class="min-w-full divide-y divide-gray-200">
-					<thead class="bg-gray-50">
-						<tr>
-							<th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Account</th>
-							<th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Side</th>
-							<th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Symbol</th>
-							<th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Shares</th>
-							<th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Dollars</th>
-							<th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Reason</th>
-						</tr>
-					</thead>
-					<tbody class="bg-white divide-y divide-gray-200">
-						for _, t := range data.Trades {
-							<tr>
-								<td class="px-4 py-3 text-sm text-gray-900">{ t.Account }</td>
-								<td class="px-4 py-3 text-sm">
-									<span class={ "px-2 py-1 rounded text-xs font-medium", templ.KV("bg-green-100 text-green-800", t.Side == "BUY"), templ.KV("bg-red-100 text-red-800", t.Side == "SELL") }>
-										{ t.Side }
-									</span>
-								</td>
-								<td class="px-4 py-3 text-sm font-medium text-gray-900">{ t.Symbol }</td>
-								<td class="px-4 py-3 text-sm text-gray-900 text-right">{ formatInt(t.RoundedShares) }</td>
-								<td class="px-4 py-3 text-sm text-gray-900 text-right">${ formatMoney(t.Dollars) }</td>
-								<td class="px-4 py-3 text-sm text-gray-600">{ t.Reason }</td>
-							</tr>
-						}
-					</tbody>
-				</table>
+			<div>
+				for _, t := range data.Trades {
+					<div class="trade-row">
+						<div class="trade-info">
+							<div class="trade-symbol">
+								{ t.Symbol }
+								<span class={ "pill", templ.KV("pill-green", t.Side == "BUY"), templ.KV("pill-red", t.Side == "SELL") }>
+									{ t.Side }
+								</span>
+							</div>
+							<div class="trade-detail">
+								{ t.Account } &bull; { formatInt(t.RoundedShares) } shares &bull; { t.Reason }
+							</div>
+						</div>
+						<div class="position-value">
+							{ "$" + formatMoney(t.Dollars) }
+						</div>
+					</div>
+				}
 			</div>
 		}
 	</div>
