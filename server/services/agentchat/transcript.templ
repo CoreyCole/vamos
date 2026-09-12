@@ -20,6 +20,7 @@ templ MessagesPane(threadID string, state TranscriptPaneState, hasThread bool, f
 			<div id="agent-chat-live-transcript" class="min-w-0 overflow-x-hidden"></div>
 		}
 		<div id="chat-latest" tabindex="-1" autofocus class="h-0 w-full shrink-0 outline-none"></div>
+		@MessageActionsPortalScript()
 	</div>
 }
 
@@ -67,12 +68,18 @@ templ TranscriptMessageWithFork(threadID string, msg TranscriptMessage, forkActi
 	if msg.Variant == "detail" {
 		@TranscriptDetailCard(msg)
 	} else {
-		<div class="relative min-w-0 overflow-x-hidden px-2.5 py-1">
-			@TranscriptForkControl(threadID, msg, forkAction)
-			@ChatMessage(chatMessageArgsFromTranscript(msg))
+		<div
+			class="group relative min-w-0 overflow-x-hidden px-2.5 py-1"
+			data-msg-actions-root={ msg.DOMID }
+		>
+			@ChatMessageWithActions(chatMessageArgsFromTranscript(msg)) {
+				@MessageActionsCluster(threadID, msg, forkAction)
+			}
 			if msg.BotDMChip != nil && len(msg.BotDMChip.Bots) > 0 {
 				@BotDMChipPopover(*msg.BotDMChip)
 			}
+			@MessageActionsMenu(threadID, msg, forkAction)
+			@MessageActionsSheet(threadID, msg, forkAction)
 		</div>
 	}
 }
@@ -194,6 +201,11 @@ templ TranscriptDetailHeader(msg TranscriptMessage) {
 }
 
 templ ChatMessage(args ChatMessageArgs) {
+	@ChatMessageWithActions(args) {
+	}
+}
+
+templ ChatMessageWithActions(args ChatMessageArgs) {
 	{{ isUser := args.Role == "user" }}
 	{{ initial, name, avatarBg, nameColor := bubbleAuthorChrome(args) }}
 	<div id={ "msg-" + args.ID } class={ "agent-chat-msg w-full min-w-0 overflow-x-hidden", templ.KV("agent-chat-msg-user", isUser) } data-role={ args.Role }>
@@ -201,8 +213,9 @@ templ ChatMessage(args ChatMessageArgs) {
 			@AttachmentPills(args.Attachments)
 		}
 		if isUser {
-			<div class="flex justify-end" data-role="user">
-				<div class="max-w-[85%]">
+			<div class="flex items-center justify-end gap-1" data-role="user">
+				{ children... }
+				<div class="min-w-0 max-w-[85%]">
 					if args.AuthorName != "" {
 						<div class="mb-0.5 text-right">
 							@BubbleAuthorName(args.AuthorName, "text-muted-foreground")
@@ -214,13 +227,16 @@ templ ChatMessage(args ChatMessageArgs) {
 				</div>
 			</div>
 		} else {
-			<div class="flex items-start gap-2" data-role="agent">
+			<div class="flex items-start gap-1" data-role="agent">
 				@BubbleAvatar(initial, avatarBg)
 				<div class="min-w-0 max-w-[85%]">
 					@BubbleAuthorName(name, nameColor)
 					<div class="rounded-2xl bg-[#161b22] px-3 py-1.5 text-[13px] leading-snug text-white">
 						@bubbleBodyInner(args)
 					</div>
+				</div>
+				<div class="flex shrink-0 items-center self-center">
+					{ children... }
 				</div>
 			</div>
 		}
@@ -279,53 +295,6 @@ templ ChatMessageComplete(args ChatMessageCompleteArgs) {
 	})
 }
 
-templ TranscriptForkControl(threadID string, msg TranscriptMessage, forkAction string) {
-	if msg.ShowForkForm {
-		<details class="absolute right-2 top-2 z-10 text-xs text-muted-foreground">
-			<summary
-				class="inline-flex h-7 w-7 cursor-pointer list-none items-center justify-center rounded-md text-muted-foreground transition-colors hover:text-foreground [&::-webkit-details-marker]:hidden"
-				title="Message actions"
-				aria-label="Message actions"
-			>
-				<svg class="h-4 w-4" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
-					<circle cx="10" cy="4" r="1.5"></circle>
-					<circle cx="10" cy="10" r="1.5"></circle>
-					<circle cx="10" cy="16" r="1.5"></circle>
-				</svg>
-			</summary>
-			<div class="absolute right-0 top-8 w-80 rounded-md border border-border bg-background/95 p-1 shadow-lg backdrop-blur">
-				<details>
-					<summary class="cursor-pointer list-none rounded px-2 py-1.5 text-xs font-medium text-foreground hover:bg-muted [&::-webkit-details-marker]:hidden">Fork</summary>
-					<form class="space-y-2 p-2 pt-1" data-on:submit={ forkAction }>
-						<input type="hidden" name="source_thread_id" value={ threadID }/>
-						<input type="hidden" name="source_entry_id" value={ msg.EntryID }/>
-						<textarea name="prompt" class="min-h-[84px] w-full rounded-md border border-input bg-background px-2 py-1 text-xs text-foreground" placeholder="Write the alternative continuation" data-ignore-morph></textarea>
-						<button type="submit" class="rounded-md bg-secondary px-2 py-1 text-xs font-medium text-secondary-foreground hover:bg-secondary/90">Create fork</button>
-					</form>
-				</details>
-				if msg.ChatSessionID != "" && msg.ChatNodeID != "" && msg.ChatEventSeq > 0 {
-					<details>
-						<summary class="cursor-pointer list-none rounded px-2 py-1.5 text-xs font-medium text-foreground hover:bg-muted [&::-webkit-details-marker]:hidden">Annotate</summary>
-						<form class="space-y-2 p-2 pt-1" data-on:submit={ "@post('/agent-chat/chat-sessions/" + msg.ChatSessionID + "/annotations', {contentType: 'form'})" }>
-							<input type="hidden" name="session_id" value={ msg.ChatSessionID }/>
-							<input type="hidden" name="node_id" value={ msg.ChatNodeID }/>
-							<input type="hidden" name="event_seq" value={ strconv.FormatInt(msg.ChatEventSeq, 10) }/>
-							<textarea name="body_markdown" class="min-h-[84px] w-full rounded-md border border-input bg-background px-2 py-1 text-xs text-foreground" placeholder="Add annotation for a future reply" data-ignore-morph></textarea>
-							<button type="submit" class="rounded-md bg-secondary px-2 py-1 text-xs font-medium text-secondary-foreground hover:bg-secondary/90">Save annotation</button>
-						</form>
-					</details>
-				}
-				<button
-					type="button"
-					class="w-full rounded px-2 py-1.5 text-left text-xs font-medium text-foreground hover:bg-muted"
-					data-on:click={ "@clipboard(window.location.href.split('#')[0] + " + strconv.Quote("#msg-"+msg.DOMID) + "); $agentChatToast = 'Link copied'; setTimeout(() => $agentChatToast = '', 2000)" }
-				>
-					Share
-				</button>
-			</div>
-		</details>
-	}
-}
 
 templ BotDMChipPopover(chip BotDMChip) {
 	{{ chipID := botDMChipID(chip) }}

@@ -1,0 +1,254 @@
+package agentchat
+
+import (
+	"strconv"
+)
+
+templ MessageActionsCluster(threadID string, msg TranscriptMessage, forkAction string) {
+	{{ actionsID := msgActionsID(msg.DOMID) }}
+	{{ menuID := msgMenuID(msg.DOMID) }}
+	{{ openExpr := msgActionsOpenExpr(msg.DOMID) }}
+	{{ plain := messagePlainText(msg) }}
+	<div
+		id={ actionsID }
+		class="msg-actions-cluster pointer-events-none z-[5] hidden shrink-0 items-center gap-0.5 rounded-md border border-border/60 bg-background/95 p-0.5 opacity-0 shadow-sm backdrop-blur transition-opacity md:flex md:group-hover:pointer-events-auto md:group-hover:opacity-100 md:group-focus-within:pointer-events-auto md:group-focus-within:opacity-100"
+		data-class={ openExpr + " ? 'pointer-events-auto opacity-100' : ''" }
+		data-msg-actions={ msg.DOMID }
+	>
+		<button
+			type="button"
+			class="inline-flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+			title="Coming soon"
+			aria-label="React (coming soon)"
+			disabled
+		>
+			<svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+				<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+			</svg>
+		</button>
+		<button
+			type="button"
+			class="inline-flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+			title="Quote"
+			aria-label="Quote"
+			data-on:click={ messageQuoteClickExpr(msg.DOMID, plain) }
+		>
+			<svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+				<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M3 10h10a4 4 0 014 4v2M3 10l4-4M3 10l4 4M21 14H11a4 4 0 01-4-4V8m14 6l-4 4m4-4l-4-4"></path>
+			</svg>
+		</button>
+		<button
+			type="button"
+			class="inline-flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+			title="More"
+			aria-label="More message actions"
+			aria-haspopup="menu"
+			data-on:click={ msgActionsToggleExpr(msg.DOMID) }
+			data-msg-menu-trigger={ menuID }
+		>
+			<svg class="h-4 w-4" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
+				<circle cx="4" cy="10" r="1.5"></circle>
+				<circle cx="10" cy="10" r="1.5"></circle>
+				<circle cx="16" cy="10" r="1.5"></circle>
+			</svg>
+		</button>
+	</div>
+}
+
+templ MessageActionsMenu(threadID string, msg TranscriptMessage, forkAction string) {
+	{{ menuID := msgMenuID(msg.DOMID) }}
+	{{ signals := msgActionsSignalsManager(msg.DOMID) }}
+	{{ plain := messagePlainText(msg) }}
+	{{ openExpr := msgActionsOpenExpr(msg.DOMID) }}
+	<div
+		id={ menuID }
+		data-signals={ signals.DataSignals }
+		data-show={ openExpr }
+		data-msg-menu={ msg.DOMID }
+		class="z-[1000] min-w-48 rounded-md border border-border bg-popover p-1 text-popover-foreground shadow-md max-md:!hidden"
+		style="display: none; position: fixed; left: 0px; top: 0px;"
+		role="menu"
+		aria-label="Message actions"
+	>
+		<button
+			type="button"
+			role="menuitem"
+			class="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-xs font-medium text-foreground hover:bg-muted"
+			data-on:click={ messageCopyClickExpr(msg.DOMID, plain) }
+		>
+			<svg class="h-3.5 w-3.5 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+				<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
+			</svg>
+			Copy
+		</button>
+		if msg.ShowForkForm {
+			<details class="rounded-sm">
+				<summary class="cursor-pointer list-none rounded-sm px-2 py-1.5 text-xs font-medium text-foreground hover:bg-muted [&::-webkit-details-marker]:hidden">Fork</summary>
+				<form class="space-y-2 p-2 pt-1" data-on:submit={ forkAction }>
+					<input type="hidden" name="source_thread_id" value={ threadID }/>
+					<input type="hidden" name="source_entry_id" value={ msg.EntryID }/>
+					<textarea name="prompt" class="min-h-[84px] w-full rounded-md border border-input bg-background px-2 py-1 text-xs text-foreground" placeholder="Write the alternative continuation" data-ignore-morph></textarea>
+					<button type="submit" class="rounded-md bg-secondary px-2 py-1 text-xs font-medium text-secondary-foreground hover:bg-secondary/90">Create fork</button>
+				</form>
+			</details>
+		}
+		if msg.ChatSessionID != "" && msg.ChatNodeID != "" && msg.ChatEventSeq > 0 {
+			<details class="rounded-sm">
+				<summary class="cursor-pointer list-none rounded-sm px-2 py-1.5 text-xs font-medium text-foreground hover:bg-muted [&::-webkit-details-marker]:hidden">Annotate</summary>
+				<form class="space-y-2 p-2 pt-1" data-on:submit={ "@post('/agent-chat/chat-sessions/" + msg.ChatSessionID + "/annotations', {contentType: 'form'})" }>
+					<input type="hidden" name="session_id" value={ msg.ChatSessionID }/>
+					<input type="hidden" name="node_id" value={ msg.ChatNodeID }/>
+					<input type="hidden" name="event_seq" value={ strconv.FormatInt(msg.ChatEventSeq, 10) }/>
+					<textarea name="body_markdown" class="min-h-[84px] w-full rounded-md border border-input bg-background px-2 py-1 text-xs text-foreground" placeholder="Add annotation for a future reply" data-ignore-morph></textarea>
+					<button type="submit" class="rounded-md bg-secondary px-2 py-1 text-xs font-medium text-secondary-foreground hover:bg-secondary/90">Save annotation</button>
+				</form>
+			</details>
+		}
+	</div>
+}
+
+templ MessageActionsSheet(threadID string, msg TranscriptMessage, forkAction string) {
+	{{ sheetID := msgSheetID(msg.DOMID) }}
+	{{ signals := msgActionsSignalsManager(msg.DOMID) }}
+	{{ plain := messagePlainText(msg) }}
+	{{ openExpr := msgActionsOpenExpr(msg.DOMID) }}
+	<button
+		type="button"
+		class="hidden"
+		tabindex="-1"
+		aria-hidden="true"
+		data-msg-sheet-open={ msg.DOMID }
+		data-on:click={ msgActionsSetOpenExpr(msg.DOMID, true) }
+	></button>
+	<div
+		id={ sheetID }
+		data-signals={ signals.DataSignals }
+		data-show={ openExpr }
+		data-msg-sheet={ msg.DOMID }
+		class="fixed inset-x-0 bottom-0 z-[1000] max-h-[70vh] overflow-y-auto rounded-t-xl border border-border bg-popover p-3 text-popover-foreground shadow-xl md:!hidden"
+		style="display: none;"
+		role="dialog"
+		aria-label="Message actions"
+	>
+		<div class="mx-auto mb-3 h-1 w-10 rounded-full bg-muted-foreground/40" aria-hidden="true"></div>
+		<div class="grid gap-1">
+			<button type="button" class="rounded-md px-3 py-2.5 text-left text-sm text-muted-foreground" title="Coming soon" disabled>React</button>
+			<button type="button" class="rounded-md px-3 py-2.5 text-left text-sm hover:bg-muted" data-on:click={ messageQuoteClickExpr(msg.DOMID, plain) }>Quote</button>
+			<button type="button" class="rounded-md px-3 py-2.5 text-left text-sm hover:bg-muted" data-on:click={ messageCopyClickExpr(msg.DOMID, plain) }>Copy</button>
+			if msg.ShowForkForm {
+				<details class="rounded-md">
+					<summary class="cursor-pointer list-none rounded-md px-3 py-2.5 text-sm hover:bg-muted [&::-webkit-details-marker]:hidden">Fork</summary>
+					<form class="space-y-2 px-3 pb-2" data-on:submit={ forkAction }>
+						<input type="hidden" name="source_thread_id" value={ threadID }/>
+						<input type="hidden" name="source_entry_id" value={ msg.EntryID }/>
+						<textarea name="prompt" class="min-h-[84px] w-full rounded-md border border-input bg-background px-2 py-1 text-xs text-foreground" placeholder="Write the alternative continuation" data-ignore-morph></textarea>
+						<button type="submit" class="rounded-md bg-secondary px-2 py-1 text-xs font-medium text-secondary-foreground hover:bg-secondary/90">Create fork</button>
+					</form>
+				</details>
+			}
+			if msg.ChatSessionID != "" && msg.ChatNodeID != "" && msg.ChatEventSeq > 0 {
+				<details class="rounded-md">
+					<summary class="cursor-pointer list-none rounded-md px-3 py-2.5 text-sm hover:bg-muted [&::-webkit-details-marker]:hidden">Annotate</summary>
+					<form class="space-y-2 px-3 pb-2" data-on:submit={ "@post('/agent-chat/chat-sessions/" + msg.ChatSessionID + "/annotations', {contentType: 'form'})" }>
+						<input type="hidden" name="session_id" value={ msg.ChatSessionID }/>
+						<input type="hidden" name="node_id" value={ msg.ChatNodeID }/>
+						<input type="hidden" name="event_seq" value={ strconv.FormatInt(msg.ChatEventSeq, 10) }/>
+						<textarea name="body_markdown" class="min-h-[84px] w-full rounded-md border border-input bg-background px-2 py-1 text-xs text-foreground" placeholder="Add annotation for a future reply" data-ignore-morph></textarea>
+						<button type="submit" class="rounded-md bg-secondary px-2 py-1 text-xs font-medium text-secondary-foreground hover:bg-secondary/90">Save annotation</button>
+					</form>
+				</details>
+			}
+			<button type="button" class="mt-1 rounded-md px-3 py-2.5 text-left text-sm text-muted-foreground hover:bg-muted" data-on:click={ msgActionsCloseExpr(msg.DOMID) }>Cancel</button>
+		</div>
+	</div>
+}
+
+templ MessageActionsPortalScript() {
+	<script data-msg-actions-portal="1">
+(() => {
+  if (window.__msgActionsPortalBound) return;
+  window.__msgActionsPortalBound = true;
+  function ensurePortaled(el) {
+    if (!el) return el;
+    if (el.id) {
+      document.querySelectorAll("#" + CSS.escape(el.id)).forEach((node) => {
+        if (node !== el) node.remove();
+      });
+    }
+    if (el.parentElement !== document.body) document.body.appendChild(el);
+    return el;
+  }
+  function placeMenu(trigger, menu) {
+    if (!trigger || !menu) return;
+    ensurePortaled(menu);
+    menu.style.position = "fixed";
+    menu.style.zIndex = "1000";
+    const r = trigger.getBoundingClientRect();
+    const w = menu.offsetWidth || 192;
+    const pad = 8;
+    menu.style.top = Math.min(r.bottom + 4, window.innerHeight - (menu.offsetHeight || 120) - pad) + "px";
+    menu.style.left = Math.max(pad, Math.min(r.right - w, window.innerWidth - w - pad)) + "px";
+  }
+  function placeSheet(sheet) {
+    if (!sheet) return;
+    ensurePortaled(sheet);
+    sheet.style.position = "fixed";
+    sheet.style.zIndex = "1000";
+  }
+  document.addEventListener("click", (evt) => {
+    const trigger = evt.target.closest("[data-msg-menu-trigger]");
+    if (!trigger) return;
+    if (!window.matchMedia("(min-width: 768px)").matches) return;
+    const menuID = trigger.getAttribute("data-msg-menu-trigger");
+    const menu = document.getElementById(menuID);
+    if (menu) requestAnimationFrame(() => placeMenu(trigger, menu));
+  });
+  const LONG_MS = 480;
+  const MOVE_PX = 10;
+  document.addEventListener("touchstart", (evt) => {
+    if (window.matchMedia("(min-width: 768px)").matches) return;
+    const root = evt.target.closest("[data-msg-actions-root]");
+    if (!root || evt.target.closest("a,button,textarea,input,summary")) return;
+    const domID = root.getAttribute("data-msg-actions-root");
+    if (!domID) return;
+    const touch = evt.changedTouches[0];
+    if (!touch) return;
+    const startX = touch.clientX;
+    const startY = touch.clientY;
+    let moved = false;
+    let timer = setTimeout(() => {
+      timer = null;
+      if (moved) return;
+      const opener = root.querySelector('[data-msg-sheet-open="' + domID + '"]');
+      if (opener) opener.click();
+      const sheet = document.getElementById("msg-" + domID + "-sheet");
+      if (sheet) placeSheet(sheet);
+    }, LONG_MS);
+    const onMove = (e) => {
+      const t = e.changedTouches[0];
+      if (!t) return;
+      if (Math.abs(t.clientX - startX) > MOVE_PX || Math.abs(t.clientY - startY) > MOVE_PX) {
+        moved = true;
+        clearTimeout(timer);
+        timer = null;
+      }
+    };
+    const onEnd = () => {
+      clearTimeout(timer);
+      timer = null;
+      document.removeEventListener("touchmove", onMove, true);
+      document.removeEventListener("touchend", onEnd, true);
+      document.removeEventListener("touchcancel", onEnd, true);
+    };
+    document.addEventListener("touchmove", onMove, true);
+    document.addEventListener("touchend", onEnd, true);
+    document.addEventListener("touchcancel", onEnd, true);
+  }, { passive: true });
+  const portalAll = () => {
+    document.querySelectorAll("[data-msg-menu],[data-msg-sheet]").forEach((el) => ensurePortaled(el));
+  };
+  portalAll();
+  new MutationObserver(portalAll).observe(document.documentElement, { childList: true, subtree: true });
+})();
+</script>
+}

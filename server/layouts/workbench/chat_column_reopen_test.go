@@ -179,3 +179,24 @@ func TestChatColumnUnifiedOverflowFoldsArtifactActions(t *testing.T) {
 		t.Fatalf("standalone share icon still present: %s", out)
 	}
 }
+
+func TestChatColumnPlanSlugTitleAndDatetime(t *testing.T) {
+	var buf bytes.Buffer
+	title := "2026-09-08_10-10-54_agent-memory-observable-context"
+	if err := ChatColumnWithPlanReopen(true, true, title, templ.Raw("<div></div>"), nil).Render(context.Background(), &buf); err != nil {
+		t.Fatal(err)
+	}
+	out := buf.String()
+	if !strings.Contains(out, "Agent Memory Observable Context") {
+		t.Fatalf("missing human title: %s", out)
+	}
+	if !strings.Contains(out, "Sep 8, 2026 · 10:10") {
+		t.Fatalf("missing datetime: %s", out)
+	}
+	if strings.Contains(out, title) {
+		t.Fatalf("raw plan id must not remain in header: %s", out)
+	}
+	if n := strings.Count(out, `data-testid="workbench-overflow-actions"`); n != 1 {
+		t.Fatalf("HARD LOCK A: want one header kebab, got %d", n)
+	}
+}

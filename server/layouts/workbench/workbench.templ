@@ -111,9 +111,13 @@ templ ChatColumnWithReopenMark(threadsOpen bool, artifactOpen bool, title string
 					<span class={ "flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold", ChatHeaderAvatarClass(title) }>{ ChatHeaderInitial(title) }</span>
 				}
 			}
-			<div class="flex min-h-0 min-w-0 flex-1 items-center">
+			<div class="flex min-h-0 min-w-0 flex-1 items-center gap-2">
 				if title != "" {
-					<p class="truncate text-[13px] font-semibold leading-none text-foreground">{ title }</p>
+					{{ parts := ParseChatHeaderTitle(title) }}
+					<p class="min-w-0 flex-1 truncate text-[13px] font-semibold leading-none text-foreground">{ parts.Display }</p>
+					if parts.Datetime != "" {
+						<span class="shrink-0 text-[11px] tabular-nums leading-none text-muted-foreground">{ parts.Datetime }</span>
+					}
 				}
 			</div>
 			@ArtifactReopenControl(artifactOpen, "workbench-v2-artifact-reopen")
