@@ -52,6 +52,8 @@ Demo applets can include the shared `examples/shared/vamos-applet-ptr.js` bootst
 
 The todo and wordle examples demonstrate the default always-reload pattern.
 
+- **Hosted vs standalone:** when the applet runs in a parent iframe, the default PTR action is `parent.postMessage({ type: 'vamos:ptr' }, '*')` so the workbench can reload the artifact (`iframe.src` reset). Standalone still uses `location.reload()`. If you set `window.VamosApplet.onPullRefresh`, it runs **instead** and skips that postMessage — only do this when intentionally overriding parent get-latest.
+
 ## Applet boundaries
 
 - Read and write user-visible files only inside `VAMOS_APP_FILES_ROOT` or the example's documented files root.
