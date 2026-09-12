@@ -40,10 +40,9 @@
       window.pageYOffset,
       document.documentElement && document.documentElement.scrollTop,
       document.body && document.body.scrollTop,
-    ];
-    const scrollTop = Math.min(
-      ...candidates.map((v) => (typeof v === 'number' && !Number.isNaN(v) ? v : Number.POSITIVE_INFINITY))
-    );
+    ].map((v) => (typeof v === 'number' && !Number.isNaN(v) ? v : 0));
+    // Use max: a non-scrolling <main> can report 0 while window is scrolled.
+    const scrollTop = Math.max(0, ...candidates);
     return scrollTop <= SCROLL_TOLERANCE;
   }
 
