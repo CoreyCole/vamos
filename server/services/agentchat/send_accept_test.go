@@ -295,3 +295,77 @@ func TestResumeEmbeddedFreeformThreadAcceptPatchesBeforeTemporal(t *testing.T) {
 	}
 	close(blocker.release)
 }
+
+func TestLiveTranscriptShowWorkingDerivedFromRunAndLive(t *testing.T) {
+	service, queries := newThreadDraftService(t)
+	createDraftThread(t, queries, "thread_1")
+	service.liveThreads = make(map[string]*liveThreadState)
+
+	state, err := service.BuildLiveTranscriptState(
+		t.Context(),
+		"owner@example.com",
+		"thread_1",
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if state.ShowWorking {
+		t.Fatal("expected ShowWorking false with no in-flight run")
+	}
+
+	run, err := queries.CreateAgentRun(t.Context(), db.CreateAgentRunParams{
+		ID:          "run_pending_1",
+		ThreadID:    "thread_1",
+		Trigger:     "resume",
+		Status:      "running",
+		PromptText:  "seeded user",
+		WorkflowID:  "wf_1",
+		RootDocPath: "thoughts/plan",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := service.seedPendingUserPrompt(
+		db.AgentThread{ID: "thread_1"},
+		run,
+	); err != nil {
+		t.Fatal(err)
+	}
+
+	state, err = service.BuildLiveTranscriptState(
+		t.Context(),
+		"owner@example.com",
+		"thread_1",
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !state.ShowWorking {
+		t.Fatal("expected ShowWorking true with running run and user-only live")
+	}
+	if len(state.Live.Items) == 0 {
+		t.Fatal("expected seeded user live item")
+	}
+
+	// Assistant live item drops working (Architect lock) — call helper directly
+	// so we do not need a markdown renderer for bubble HTML.
+	liveWithAssistant := LiveTranscriptView{
+		Items: append(append([]TranscriptMessage{}, state.Live.Items...), TranscriptMessage{
+			Role:    "assistant",
+			Content: "hello",
+			Variant: "bubble",
+		}),
+	}
+	if service.liveTranscriptShowWorking("thread_1", liveWithAssistant) {
+		t.Fatal("expected ShowWorking false once assistant live item exists")
+	}
+
+	if err := queries.CompleteAgentRun(t.Context(), db.CompleteAgentRunParams{
+		ID: run.ID,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if service.liveTranscriptShowWorking("thread_1", state.Live) {
+		t.Fatal("expected ShowWorking false when latest run is complete")
+	}
+}

@@ -2791,10 +2791,11 @@ func (s *Service) BuildLiveTranscriptState(
 
 	live, cursor := s.buildLiveTranscript(thread.ID)
 	return TranscriptPaneState{
-		Cursor: cursor,
-		Stable: []TranscriptMessage{},
-		Live:   live,
-		Policy: s.defaultTranscriptRenderPolicy(),
+		Cursor:      cursor,
+		Stable:      []TranscriptMessage{},
+		Live:        live,
+		Policy:      s.defaultTranscriptRenderPolicy(),
+		ShowWorking: s.liveTranscriptShowWorking(thread.ID, live),
 	}, nil
 }
 
@@ -2900,6 +2901,7 @@ func (s *Service) BuildThreadPageArgs(
 	}
 	args.Transcript.Live, args.Cursor = s.buildLiveTranscript(thread.ID)
 	args.Transcript.Cursor = args.Cursor
+	args.Transcript.ShowWorking = s.liveTranscriptShowWorking(thread.ID, args.Transcript.Live)
 
 	if strings.TrimSpace(input.RunID) != "" {
 		run, err := s.queries.GetAgentRun(ctx, strings.TrimSpace(input.RunID))
@@ -4381,6 +4383,34 @@ func (s *Service) buildLiveTranscript(threadID string) (LiveTranscriptView, int6
 		combinePairedToolMessages(items),
 	)
 	return LiveTranscriptView{Items: combined}, cursor
+}
+
+// liveTranscriptShowWorking is true while the thread's latest run is pending or
+// running and the live SoT has not received an assistant message yet. Accept
+// still sets ShowWorking explicitly; stream/SSR rebuilds derive it here.
+func (s *Service) liveTranscriptShowWorking(
+	threadID string,
+	live LiveTranscriptView,
+) bool {
+	threadID = strings.TrimSpace(threadID)
+	if threadID == "" || s == nil || s.queries == nil {
+		return false
+	}
+	for _, item := range live.Items {
+		if strings.EqualFold(strings.TrimSpace(item.Role), "assistant") {
+			return false
+		}
+	}
+	run, err := s.queries.GetLatestAgentRunByThread(context.Background(), threadID)
+	if err != nil {
+		return false
+	}
+	switch strings.ToLower(strings.TrimSpace(run.Status)) {
+	case "pending", "running":
+		return true
+	default:
+		return false
+	}
 }
 
 func combinePairedToolMessages(items []TranscriptMessage) []TranscriptMessage {

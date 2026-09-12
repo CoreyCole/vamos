@@ -345,7 +345,7 @@ type TranscriptPaneState struct {
 	Stable      []TranscriptMessage
 	Live        LiveTranscriptView
 	Policy      TranscriptRenderPolicy
-	ShowWorking bool // accept-only; SSR/live SoT morphs leave this false
+	ShowWorking bool // true while latest run pending/running and live has no assistant yet
 }
 
 type SelectedChatAnnotation struct {

@@ -75,10 +75,11 @@ func (s *Service) renderSharedThreadChat(
 			Placeholder: composerPlaceholderForTitle(thread.Title),
 		}),
 		Transcript: TranscriptPaneState{
-			Stable: stable,
-			Live:   live,
-			Cursor: cursor,
-			Policy: s.defaultTranscriptRenderPolicy(),
+			Stable:      stable,
+			Live:        live,
+			Cursor:      cursor,
+			Policy:      s.defaultTranscriptRenderPolicy(),
+			ShowWorking: s.liveTranscriptShowWorking(thread.ID, live),
 		},
 		ComposerAction: "@post('" + thoughtsThreadChatAction(
 			thread.ID,
