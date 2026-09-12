@@ -711,6 +711,63 @@ html[data-wb2-vt-nav="thread-switch"] #workbench-v2-chat {
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.28);
 }
 
+
+/* AI-470 instant plan-chat accept: user bubble enter + working row (DOM presence).
+   Scoped to live transcript / #agent-chat-working so fat morph keeps IDs stable
+   and animations stop when working is morph-removed. No signals / MorphMap. */
+@keyframes agent-chat-user-enter {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 0.35rem, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@keyframes agent-chat-working-pulse {
+  0%,
+  100% {
+    opacity: 0.45;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@keyframes agent-chat-working-dot {
+  0%,
+  100% {
+    opacity: 0.35;
+    transform: scale(0.85);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+#agent-chat-live-transcript .agent-chat-msg-user {
+  animation: agent-chat-user-enter 180ms ease-out both;
+}
+
+#agent-chat-working.agent-chat-working {
+  animation: agent-chat-working-pulse 1.25s ease-in-out infinite;
+}
+
+#agent-chat-working .agent-chat-working-dot {
+  animation: agent-chat-working-dot 1.25s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #agent-chat-live-transcript .agent-chat-msg-user,
+  #agent-chat-working.agent-chat-working,
+  #agent-chat-working .agent-chat-working-dot {
+    animation: none;
+  }
+}
+
 /* Roster New-bot control — keep h-10 header band compact. */
 #workbench-v2-roster-header [data-testid="roster-new-bot"] {
   flex-shrink: 0;

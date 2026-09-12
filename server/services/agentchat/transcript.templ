@@ -58,8 +58,8 @@ templ ChatWorkingRow() {
 		class="agent-chat-working flex items-center gap-2 px-4 py-2 text-sm text-muted-foreground"
 		aria-live="polite"
 	>
-		<span class="inline-block h-2 w-2 animate-pulse rounded-full bg-muted-foreground/70"></span>
-		<span>Working…</span>
+		<span class="agent-chat-working-dot inline-block h-2 w-2 rounded-full bg-muted-foreground/70" aria-hidden="true"></span>
+		<span class="agent-chat-working-label">Working…</span>
 	</div>
 }
 
@@ -196,7 +196,7 @@ templ TranscriptDetailHeader(msg TranscriptMessage) {
 templ ChatMessage(args ChatMessageArgs) {
 	{{ isUser := args.Role == "user" }}
 	{{ initial, name, avatarBg, nameColor := bubbleAuthorChrome(args) }}
-	<div id={ "msg-" + args.ID } class="w-full min-w-0 overflow-x-hidden" data-role={ args.Role }>
+	<div id={ "msg-" + args.ID } class={ "agent-chat-msg w-full min-w-0 overflow-x-hidden", templ.KV("agent-chat-msg-user", isUser) } data-role={ args.Role }>
 		if len(args.Attachments) > 0 {
 			@AttachmentPills(args.Attachments)
 		}
