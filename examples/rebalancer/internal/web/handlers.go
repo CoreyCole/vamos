@@ -54,6 +54,7 @@ func (a *App) Routes() *echo.Echo {
 	e.Use(middleware.Logger())
 	e.Use(middleware.Recover())
 
+	e.Static("/static", "static")
 	e.GET("/healthz", a.handleHealthz)
 	e.GET("/", a.handleIndex)
 	e.GET("/events", a.handleEvents)
