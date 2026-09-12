@@ -184,13 +184,20 @@ func (s *Service) ServeThreads(c echo.Context) error {
 		Comments: WorkbenchUnavailable(
 			"Select an artifact to view comments.",
 		),
-		ThreadsOpen:  workbench.ThreadsOpenFromRequest(c.Request()),
-		ChatOpen:     false,
-		ArtifactOpen: hasArtifact,
+		ThreadsOpen: workbench.ThreadsOpenFromRequest(c.Request()),
+		ChatOpen:    false,
+		// Index land keeps the artifact column open (empty state) so route-defaults
+		// Stories see workbench-v2-artifact visible even without ?artifact=.
+		ArtifactOpen: true,
 		CommentsOpen: false,
 	})
 	if err != nil {
 		return err
+	}
+	// Bare /threads: keep artifact column Visible for route-defaults, but first-paint
+	// mobile pane is the roster (not the empty artifact).
+	if !hasArtifact {
+		state.Config.Mobile.ActiveRegionID = workbench.WorkbenchV2ThreadsRegionID
 	}
 	return ThreadWorkbenchPage(
 		userEmail,

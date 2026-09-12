@@ -391,14 +391,27 @@ func TestArtifactBrowserOpenFromRequest(t *testing.T) {
 
 	req := httptest.NewRequest(http.MethodGet, "/threads/t", http.NoBody)
 	if ArtifactBrowserOpenFromRequest(req) {
-		t.Fatal("missing cookie should default closed")
+		t.Fatal("missing cookie without artifact_dir should default closed")
 	}
 	if ArtifactBrowserOpenFromRequest(nil) {
 		t.Fatal("nil request should default closed")
 	}
-	req.AddCookie(&http.Cookie{Name: "wb2_artifact_browser", Value: "0"})
-	if ArtifactBrowserOpenFromRequest(req) {
-		t.Fatal("cookie 0 should be closed")
+	withDir := httptest.NewRequest(
+		http.MethodGet,
+		"/threads/t?artifact_dir=thoughts%2Fowner%2Fplans",
+		http.NoBody,
+	)
+	if !ArtifactBrowserOpenFromRequest(withDir) {
+		t.Fatal("missing cookie with artifact_dir should default open for sibling VT")
+	}
+	closed := httptest.NewRequest(
+		http.MethodGet,
+		"/threads/t?artifact_dir=thoughts%2Fowner%2Fplans",
+		http.NoBody,
+	)
+	closed.AddCookie(&http.Cookie{Name: "wb2_artifact_browser", Value: "0"})
+	if ArtifactBrowserOpenFromRequest(closed) {
+		t.Fatal("cookie 0 should stay closed even with artifact_dir")
 	}
 	req2 := httptest.NewRequest(http.MethodGet, "/threads/t", http.NoBody)
 	req2.AddCookie(&http.Cookie{Name: "wb2_artifact_browser", Value: "1"})

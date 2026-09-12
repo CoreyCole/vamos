@@ -69,16 +69,22 @@ const (
 	artifactSearchGlobalLimit     = 25
 )
 
-// ArtifactBrowserOpenFromRequest reads wb2_artifact_browser; missing/invalid => closed.
+// ArtifactBrowserOpenFromRequest reads wb2_artifact_browser.
+// Cookie 0/1 wins. Missing/invalid: open when ?artifact_dir= is present so sibling
+// VT can freeze #thread-artifact-browser (CSS unnames it while closed).
 func ArtifactBrowserOpenFromRequest(r *http.Request) bool {
 	if r == nil {
 		return false
 	}
-	c, err := r.Cookie(artifactBrowserOpenCookie)
-	if err != nil || (c.Value != "0" && c.Value != "1") {
-		return false
+	if c, err := r.Cookie(artifactBrowserOpenCookie); err == nil {
+		switch c.Value {
+		case "1":
+			return true
+		case "0":
+			return false
+		}
 	}
-	return c.Value == "1"
+	return strings.TrimSpace(r.URL.Query().Get("artifact_dir")) != ""
 }
 
 func boolString(v bool) string {
