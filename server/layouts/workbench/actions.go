@@ -7,6 +7,8 @@ import (
 	"strings"
 
 	"github.com/a-h/templ"
+
+	"github.com/CoreyCole/vamos/pkg/datastarui/components/toast"
 )
 
 type OverflowActionKind string
@@ -88,9 +90,11 @@ func escapeDatastarString(value string) string {
 }
 
 
-// ChatHeaderShareOverflow is the desktop chat-header ⋯ menu (Share artifact / Share chat).
-// Class A open only via OverflowActionsScript; stubs until share routes exist.
+// ChatHeaderShareOverflow is the desktop chat-header ⋯ fallback (Share artifact / Share chat)
+// when callers pass nil overflow. Prefer markdown.BuildChatHeaderOverflow for full flat menu.
 func ChatHeaderShareOverflow() templ.Component {
+	show := toast.ShowToastExpr("clipboard_success", 2000)
+	closeMenu := "el.closest('[data-overflow-menu]')?.style.setProperty('display','none')"
 	return OverflowActions(OverflowActionsArgs{
 		Label: "Share",
 		Groups: []OverflowActionGroup{{
@@ -98,12 +102,12 @@ func ChatHeaderShareOverflow() templ.Component {
 				{
 					Label:        "Share artifact",
 					Kind:         OverflowActionButton,
-					ClientAction: "el.closest('[data-overflow-menu]')?.style.setProperty('display','none')",
+					ClientAction: "navigator.clipboard.writeText('thoughts/').then(() => { " + show + " }); " + closeMenu,
 				},
 				{
 					Label:        "Share chat",
 					Kind:         OverflowActionButton,
-					ClientAction: "el.closest('[data-overflow-menu]')?.style.setProperty('display','none')",
+					ClientAction: "navigator.clipboard.writeText(location.href.replace(/#.*$/, '')).then(() => { " + show + " }); " + closeMenu,
 				},
 			},
 		}},

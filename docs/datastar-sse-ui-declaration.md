@@ -352,3 +352,9 @@ Lead can LGTM if:
 - Anti-jank VT research with UX is research-first — **no DatastarUI API until Corey greenlights a slice**.
 - DatastarUI Lead will sanity-check primitives vs app only — not rewrite MVC design.
 - Product name-maps / workbench CSS / app sanitizers stay vamos unless a second app forces promotion.
+
+## Toast chrome ownership (AI-470 Share)
+
+Layout owns toaster chrome: mount `toast.ToastContainer` **once** in the root layout with item id `clipboard_success` (Title `Copied to clipboard`, `ToastVariantSuccess`).
+
+Features only trigger toasts after success — e.g. `navigator.clipboard.writeText(...).then(() => { ... toast.ShowToastExpr("clipboard_success", 2000) ... })` or `$clipboard_success.open = true`. Never toast on clipboard failure. Do not invent local toast components; consume `pkg/datastarui/components/toast` only.

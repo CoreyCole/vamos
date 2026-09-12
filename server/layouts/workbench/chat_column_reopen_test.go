@@ -145,17 +145,14 @@ func TestChatColumnUnifiedOverflowFoldsArtifactActions(t *testing.T) {
 	var buf bytes.Buffer
 	overflow := OverflowActions(OverflowActionsArgs{
 		Label: "Share",
-		Groups: []OverflowActionGroup{
-			{Label: "Share", Actions: []OverflowAction{
+		Groups: []OverflowActionGroup{{
+			Actions: []OverflowAction{
 				{Label: "Share artifact", Kind: OverflowActionButton, ClientAction: "1"},
 				{Label: "Share chat", Kind: OverflowActionButton, ClientAction: "1"},
-			}},
-			{Label: "Artifact", Actions: []OverflowAction{
-				{Label: "Copy path", Kind: OverflowActionButton, ClientAction: "1"},
-				{Label: "Copy document", Kind: OverflowActionButton, ClientAction: "1"},
+				{Label: "Copy document contents", Kind: OverflowActionButton, ClientAction: "1"},
 				{Label: "Comment", Kind: OverflowActionButton, ClientAction: "1"},
-			}},
-		},
+			},
+		}},
 	})
 	if err := ChatColumnWithReopen(true, true, "Bot", templ.Raw("<p>chat</p>"), overflow).Render(context.Background(), &buf); err != nil {
 		t.Fatal(err)
@@ -164,10 +161,16 @@ func TestChatColumnUnifiedOverflowFoldsArtifactActions(t *testing.T) {
 	if n := strings.Count(out, `data-testid="workbench-overflow-actions"`); n != 1 {
 		t.Fatalf("want exactly one overflow menu, got %d: %s", n, out)
 	}
-	for _, want := range []string{"Share artifact", "Share chat", "Copy path", "Copy document", "Comment", "Artifact"} {
+	for _, want := range []string{"Share artifact", "Share chat", "Copy document contents", "Comment"} {
 		if !strings.Contains(out, want) {
 			t.Fatalf("missing %q in unified overflow: %s", want, out)
 		}
+	}
+	if strings.Contains(out, ">Share</p>") || strings.Contains(out, ">Artifact</p>") {
+		t.Fatalf("flat menu must not paint section headers: %s", out)
+	}
+	if strings.Contains(out, "Copy path") {
+		t.Fatalf("Copy path must be folded into Share artifact: %s", out)
 	}
 	if strings.Contains(out, "Chat about this plan") {
 		t.Fatalf("plan-room chat link must not appear in this fixture: %s", out)

@@ -101,8 +101,10 @@ func TestBuildDocumentWorkbenchActionsRendersWholeDocumentComment(t *testing.T) 
 	for _, want := range []string{
 		`data-testid="workbench-overflow-actions"`,
 		`Document actions`,
-		`Copy document`,
+		`Share artifact`,
+		`Copy document contents`,
 		`navigator.clipboard.writeText`,
+		`clipboard_success`,
 		`Comment`,
 		`data-on:submit__prevent="el.closest(&#39;[data-overflow-menu]&#39;)?.style.setProperty(&#39;display&#39;,&#39;none&#39;); @post(&#39;/forms/comments/show&#39;, {contentType: &#39;form&#39;})"`,
 		`name="doc_path" value="thoughts/example/design.md"`,

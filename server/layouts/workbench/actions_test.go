@@ -86,9 +86,14 @@ func TestChatHeaderShareOverflowLabels(t *testing.T) {
 		"Share artifact",
 		"Share chat",
 		`aria-label="Share"`,
+		"writeText",
+		"clipboard_success",
 	} {
 		if !strings.Contains(html, want) {
 			t.Fatalf("ChatHeaderShareOverflow missing %q in %s", want, html)
 		}
+	}
+	if strings.Contains(html, ">Share</p>") || strings.Contains(html, ">Artifact</p>") {
+		t.Fatalf("flat menu must not paint section headers: %s", html)
 	}
 }

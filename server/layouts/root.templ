@@ -9,6 +9,7 @@ import (
 	"github.com/CoreyCole/vamos/pkg/datastarui/components/avatar"
 	"github.com/CoreyCole/vamos/pkg/datastarui/components/breadcrumb"
 	"github.com/CoreyCole/vamos/pkg/datastarui/components/dropdown"
+	"github.com/CoreyCole/vamos/pkg/datastarui/components/toast"
 	avatarhelpers "github.com/CoreyCole/vamos/server/components/avatar"
 	"github.com/CoreyCole/vamos/server/components/syntaxthemeselector"
 )
@@ -330,6 +331,16 @@ templ Root(args RootArgs) {
 				<main class="min-h-0 flex-1 overflow-hidden">
 					{ children... }
 				</main>
+				@toast.ToastContainer(toast.ToastContainerArgs{
+					ID:       "app-toast-root",
+					Position: toast.ToastPositionTopRight,
+				}) {
+					@toast.ToastItem(toast.ToastItemArgs{
+						ID:      "clipboard_success",
+						Title:   "Copied to clipboard",
+						Variant: toast.ToastVariantSuccess,
+					})
+				}
 			</div>
 		</body>
 	</html>

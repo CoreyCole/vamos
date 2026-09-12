@@ -33,6 +33,15 @@ func TestBuildThreadArtifactHeaderActionsOmitsThoughts(t *testing.T) {
 		strings.Contains(html, "border-t border-border") {
 		t.Fatalf("kebab should not have a Document section or divider:\n%s", html)
 	}
+	if !strings.Contains(html, "Share artifact") {
+		t.Fatalf("path-header must include Share artifact:\n%s", html)
+	}
+	if strings.Contains(html, "Share chat") {
+		t.Fatalf("doc shell must not include Share chat:\n%s", html)
+	}
+	if strings.Contains(html, "Copy path") {
+		t.Fatalf("Copy path must be folded into Share artifact:\n%s", html)
+	}
 }
 
 func TestBuildThreadArtifactHeaderActionsAlwaysChatsOnPlanDocs(t *testing.T) {
@@ -70,17 +79,27 @@ func TestBuildChatHeaderOverflowShareOnlyWithoutDoc(t *testing.T) {
 		`data-testid="workbench-overflow-actions"`,
 		"Share artifact",
 		"Share chat",
-		"Share",
+		"writeText",
+		"clipboard_success",
 	} {
 		if !strings.Contains(html, want) {
 			t.Fatalf("missing %q:\n%s", want, html)
 		}
 	}
-	if strings.Contains(html, "Copy path") || strings.Contains(html, "Artifact") {
-		t.Fatalf("empty doc must not paint Artifact group:\n%s", html)
+	if strings.Contains(html, "Copy path") {
+		t.Fatalf("Copy path must be folded into Share artifact:\n%s", html)
+	}
+	if strings.Contains(html, ">Share</p>") || strings.Contains(html, ">Artifact</p>") {
+		t.Fatalf("flat menu must not paint Share/Artifact section headers:\n%s", html)
+	}
+	if strings.Contains(html, "border-t border-border") {
+		t.Fatalf("flat menu must not paint section dividers:\n%s", html)
 	}
 	if n := strings.Count(html, `data-testid="workbench-overflow-actions"`); n != 1 {
 		t.Fatalf("want one overflow root, got %d", n)
+	}
+	if strings.Contains(html, "agent-chat-composer-input") {
+		t.Fatalf("Share artifact must not append to composer:\n%s", html)
 	}
 }
 
@@ -97,10 +116,11 @@ func TestBuildChatHeaderOverflowFoldsArtifactSkipsPlanChat(t *testing.T) {
 	for _, want := range []string{
 		"Share artifact",
 		"Share chat",
-		"Copy path",
-		"Copy document",
+		"Copy document contents",
 		"Comment",
-		"Artifact",
+		"writeText",
+		"clipboard_success",
+		"thoughts/owner/plans/alpha/design.md",
 	} {
 		if !strings.Contains(html, want) {
 			t.Fatalf("missing %q:\n%s", want, html)
@@ -108,6 +128,15 @@ func TestBuildChatHeaderOverflowFoldsArtifactSkipsPlanChat(t *testing.T) {
 	}
 	if strings.Contains(html, "Chat about this plan") {
 		t.Fatalf("plan room must skip Chat about this plan:\n%s", html)
+	}
+	if strings.Contains(html, "Copy path") {
+		t.Fatalf("Copy path must be folded into Share artifact:\n%s", html)
+	}
+	if strings.Contains(html, ">Share</p>") || strings.Contains(html, ">Artifact</p>") {
+		t.Fatalf("flat menu must not paint section headers:\n%s", html)
+	}
+	if strings.Contains(html, "border-t border-border") {
+		t.Fatalf("flat menu must not paint section dividers:\n%s", html)
 	}
 }
 
