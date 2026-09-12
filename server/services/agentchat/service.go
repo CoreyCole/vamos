@@ -2269,10 +2269,108 @@ func projectedPartialMessage(
 	}
 }
 
-func (s *Service) resetLiveThread(threadID string) {
+// clearLiveThread drops in-memory live state unconditionally. Use after a
+// checkpoint has already promoted entries into stable SoT.
+func (s *Service) clearLiveThread(threadID string) {
 	s.liveMu.Lock()
 	defer s.liveMu.Unlock()
 	delete(s.liveThreads, threadID)
+}
+
+// resetLiveThread clears live turn state after fail/cancel/finalize, but keeps
+// pending user bubbles when no renderable assistant exists yet. An empty live
+// REPLACE is what wiped the Accept-seeded user in VA (PatchRunHeader also
+// patchLive()s after reset).
+func (s *Service) resetLiveThread(threadID string) {
+	s.liveMu.Lock()
+	defer s.liveMu.Unlock()
+	state := s.liveThreads[threadID]
+	if state == nil {
+		return
+	}
+	if state.Reducer == nil {
+		delete(s.liveThreads, threadID)
+		return
+	}
+	snap := state.Reducer.Snapshot()
+	if liveSnapshotHasRenderableAssistant(snap) {
+		delete(s.liveThreads, threadID)
+		return
+	}
+	pending := liveSnapshotPendingUserItems(snap)
+	if len(pending) == 0 {
+		delete(s.liveThreads, threadID)
+		return
+	}
+	newReducer := conversation.NewLiveTurnReducer()
+	newReducer.Reset(state.RunID)
+	for _, item := range pending {
+		payload := item.MessageJSON
+		if len(payload) == 0 {
+			continue
+		}
+		wrapped, err := json.Marshal(map[string]any{
+			"message": json.RawMessage(payload),
+		})
+		if err != nil {
+			continue
+		}
+		env := conversation.EventEnvelope{
+			RunID:       state.RunID,
+			ThreadID:    threadID,
+			EventType:   "message_start",
+			PayloadJSON: string(wrapped),
+			EventKey:    state.RunID + ":pending_user_keep:" + item.Key,
+		}
+		if _, err := newReducer.Apply(env); err != nil {
+			continue
+		}
+	}
+	if len(newReducer.Snapshot().Items) == 0 {
+		delete(s.liveThreads, threadID)
+		return
+	}
+	s.liveThreads[threadID] = &liveThreadState{
+		RunID:   state.RunID,
+		Reducer: newReducer,
+	}
+}
+
+func liveSnapshotHasRenderableAssistant(snap conversation.LiveTurnState) bool {
+	for _, item := range snap.Items {
+		if item.Kind != conversation.LiveTurnAssistantMessage {
+			continue
+		}
+		if liveTurnItemHasVisibleContent(item) {
+			return true
+		}
+	}
+	return false
+}
+
+func liveSnapshotPendingUserItems(snap conversation.LiveTurnState) []conversation.LiveTurnItem {
+	out := make([]conversation.LiveTurnItem, 0, len(snap.Items))
+	for _, item := range snap.Items {
+		if item.Kind == conversation.LiveTurnUserMessage {
+			out = append(out, item)
+		}
+	}
+	return out
+}
+
+func liveTurnItemHasVisibleContent(item conversation.LiveTurnItem) bool {
+	if len(item.MessageJSON) == 0 {
+		return false
+	}
+	var payload struct {
+		Content any `json:"content"`
+	}
+	if err := json.Unmarshal(item.MessageJSON, &payload); err != nil {
+		// Undecodable assistant payload: treat as non-renderable so we keep the
+		// pending user rather than empty-REPLACE wiping the Accept seed.
+		return false
+	}
+	return strings.TrimSpace(contentString(payload.Content)) != ""
 }
 
 func (s *Service) snapshotLiveThread(threadID string) conversation.LiveTurnState {
@@ -2444,7 +2542,9 @@ func (s *Service) ApplyCheckpoint(ctx context.Context, cp conversation.Checkpoin
 		return err
 	}
 
-	s.resetLiveThread(thread.ID)
+	// Entries are in stable SoT now — hard-clear live so MessagesPane does not
+	// duplicate the pending user. Fail/cancel paths use resetLiveThread instead.
+	s.clearLiveThread(thread.ID)
 	if workspaceID != "" {
 		workspaceRecord, err := s.queries.GetWorkspace(ctx, workspaceID)
 		if err == nil {
@@ -2468,6 +2568,7 @@ func (s *Service) ApplyCheckpoint(ctx context.Context, cp conversation.Checkpoin
 		thread.ID,
 		PatchStableTranscript,
 		PatchDocPane,
+		PatchLiveTranscript,
 	)
 	return nil
 }
@@ -2497,7 +2598,7 @@ func (s *Service) FinalizeRun(ctx context.Context, result conversation.RunResult
 	if event != nil {
 		s.NotifyWorkspaceForEvent(*event)
 	}
-	s.notifyThreadScope(ctx, run.ThreadID, PatchRunHeader)
+	s.notifyThreadScopes(ctx, run.ThreadID, PatchRunHeader, PatchLiveTranscript)
 	return nil
 }
 
@@ -2580,7 +2681,7 @@ func (s *Service) FailRun(ctx context.Context, failure conversation.RunFailure) 
 	if event != nil {
 		s.NotifyWorkspaceForEvent(*event)
 	}
-	s.notifyThreadScope(ctx, run.ThreadID, PatchRunHeader)
+	s.notifyThreadScopes(ctx, run.ThreadID, PatchRunHeader, PatchLiveTranscript)
 	return nil
 }
 
@@ -2686,7 +2787,7 @@ func (s *Service) FailRunIfRunning(
 	if event != nil {
 		s.NotifyWorkspaceForEvent(*event)
 	}
-	s.notifyThreadScope(ctx, run.ThreadID, PatchRunHeader)
+	s.notifyThreadScopes(ctx, run.ThreadID, PatchRunHeader, PatchLiveTranscript)
 	return nil
 }
 
@@ -4343,6 +4444,16 @@ func (s *Service) buildStableTranscript(
 
 func (s *Service) buildLiveTranscript(threadID string) (LiveTranscriptView, int64) {
 	snapshot := s.snapshotLiveThread(threadID)
+	view := s.buildLiveTranscriptFromSnapshot(threadID, snapshot)
+	return view, s.CurrentCursor(threadID)
+}
+
+// buildLiveTranscriptFromSnapshot renders live SoT items. Decode errors skip the
+// bad item instead of returning an empty view (empty REPLACE wiped pending users).
+func (s *Service) buildLiveTranscriptFromSnapshot(
+	threadID string,
+	snapshot conversation.LiveTurnState,
+) LiveTranscriptView {
 	liveAttachments := []AttachedPath{}
 	if strings.TrimSpace(snapshot.RunID) != "" {
 		if paths, err := s.attachedPathsForRun(
@@ -4371,18 +4482,19 @@ func (s *Service) buildLiveTranscript(threadID string) (LiveTranscriptView, int6
 			toolCallPresentations,
 		)
 		if err != nil {
-			return LiveTranscriptView{}, s.CurrentCursor(threadID)
+			// Decode errors must not empty-REPLACE the live region (would drop a
+			// previously seeded pending user). Skip the bad item and continue.
+			continue
 		}
 		attachTranscriptAttachments(decoded, liveAttachments)
 		items = append(items, decoded...)
 	}
 
-	cursor := s.CurrentCursor(threadID)
 	combined := s.attachDerivedBotDMChipsForThreadID(
 		threadID,
 		combinePairedToolMessages(items),
 	)
-	return LiveTranscriptView{Items: combined}, cursor
+	return LiveTranscriptView{Items: combined}
 }
 
 // liveTranscriptShowWorking is true while the thread's latest run is pending or
