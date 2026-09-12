@@ -35,7 +35,15 @@
 
   function isAtTop() {
     const el = getScrollElement();
-    const scrollTop = el.scrollTop || window.pageYOffset || 0;
+    const candidates = [
+      el && el.scrollTop,
+      window.pageYOffset,
+      document.documentElement && document.documentElement.scrollTop,
+      document.body && document.body.scrollTop,
+    ];
+    const scrollTop = Math.min(
+      ...candidates.map((v) => (typeof v === 'number' && !Number.isNaN(v) ? v : Number.POSITIVE_INFINITY))
+    );
     return scrollTop <= SCROLL_TOLERANCE;
   }
 
@@ -105,3 +113,4 @@
     init();
   }
 })();
+
