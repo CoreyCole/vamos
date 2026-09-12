@@ -98,8 +98,11 @@ func TestRosterRail_LiveBotsAndChrome(t *testing.T) {
 	if !strings.Contains(html, `data-roster-action="pin"`) {
 		t.Fatal("context menu must expose pin action")
 	}
-	if !strings.Contains(html, "#313131") {
-		t.Fatal("pin and row selected fill must be Grok #313131")
+	if !strings.Contains(html, "#2a2a2a") {
+		t.Fatal("pin and row selected fill must be Grok #2a2a2a")
+	}
+	if !strings.Contains(html, "inset 3px 0 0 0 hsl(var(--primary))") {
+		t.Fatal("selected row must keep primary leading edge")
 	}
 	if strings.Contains(html, "border-b border-border") {
 		t.Fatal("search well must sit on the rail without a header rule")

@@ -8,8 +8,8 @@ func TestRegionSurfaceClass_RailAndChatAreDistinctGrokHex(t *testing.T) {
 		ID:   WorkbenchV2ThreadsRegionID,
 		Slot: WorkbenchSlotNavigation,
 	}
-	if got := RegionSurfaceClass(threads); got != "bg-[#111111]" {
-		t.Fatalf("threads surface = %q, want bg-[#111111]", got)
+	if got := RegionSurfaceClass(threads); got != "bg-[#0a0a0a]" {
+		t.Fatalf("threads surface = %q, want bg-[#0a0a0a]", got)
 	}
 	chat := WorkbenchRegion{ID: WorkbenchV2ChatRegionID, Slot: WorkbenchSlotContext}
 	if got := RegionSurfaceClass(chat); got != "bg-[#070707]" {
