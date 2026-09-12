@@ -81,6 +81,7 @@ func (s *Service) ServeAI470Room(c echo.Context) error {
 		chatComp = chatColumnForAI470Room(
 			kind,
 			threadsOpen,
+			workbench.ArtifactOpenFromRequest(c.Request()),
 			roomTitle,
 			chatBody,
 		)
@@ -98,6 +99,7 @@ func (s *Service) ServeAI470Room(c echo.Context) error {
 		chatComp = chatColumnForAI470Room(
 			kind,
 			threadsOpen,
+			workbench.ArtifactOpenFromRequest(c.Request()),
 			roomTitle,
 			chat,
 		)
@@ -125,7 +127,8 @@ func (s *Service) ServeAI470Room(c echo.Context) error {
 	chatOpen, commentsOpen := chatCommentsOpen(c.Request(), chatOpen)
 	artifactOpen := hasArtifact || kind == agenthome.KindPlan
 	if viewport.IsDesktop() {
-		artifactOpen = true
+		// Class B cookie↔SSR (Threads-reopen pattern); default open when missing.
+		artifactOpen = workbench.ArtifactOpenFromRequest(c.Request())
 	}
 	state, err := workbench.BuildWorkbenchV2State(workbench.WorkbenchV2Args{
 		UserEmail:     userEmail,
@@ -346,13 +349,14 @@ func (s *Service) renderAI470SharedChat(
 func chatColumnForAI470Room(
 	kind agenthome.RoomKind,
 	threadsOpen bool,
+	artifactOpen bool,
 	title string,
 	body templ.Component,
 ) templ.Component {
 	if kind == agenthome.KindPlan {
-		return workbench.ChatColumnWithPlanReopen(threadsOpen, title, body)
+		return workbench.ChatColumnWithPlanReopen(threadsOpen, artifactOpen, title, body)
 	}
-	return workbench.ChatColumnWithReopen(threadsOpen, title, body)
+	return workbench.ChatColumnWithReopen(threadsOpen, artifactOpen, title, body)
 }
 
 // AI470RoomComposerDisabled is the view-only composer gate.

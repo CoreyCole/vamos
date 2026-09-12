@@ -13,6 +13,7 @@ func TestChatColumnWithReopen_ClosedShowsVisibleSlot(t *testing.T) {
 	var b strings.Builder
 	if err := ChatColumnWithReopen(
 		false,
+		true,
 		"Bot",
 		templ.Raw("<p>chat</p>"),
 	).Render(context.Background(), &b); err != nil {
@@ -59,6 +60,7 @@ func TestChatColumnWithReopen_OpenHidesHamburgerSlot(t *testing.T) {
 	var b strings.Builder
 	if err := ChatColumnWithReopen(
 		true,
+		true,
 		"Bot",
 		templ.Raw("<p>chat</p>"),
 	).Render(context.Background(), &b); err != nil {
@@ -87,7 +89,7 @@ func TestChatColumnWithReopen_OpenHidesHamburgerSlot(t *testing.T) {
 
 func TestChatColumnWithPlanReopenUsesSwatchNotGlyph(t *testing.T) {
 	var buf bytes.Buffer
-	if err := ChatColumnWithPlanReopen(true, "2-alpha", templ.Raw("<div id=\"chat-body\"></div>")).Render(context.Background(), &buf); err != nil {
+	if err := ChatColumnWithPlanReopen(true, true, "2-alpha", templ.Raw("<div id=\"chat-body\"></div>")).Render(context.Background(), &buf); err != nil {
 		t.Fatal(err)
 	}
 	out := buf.String()
@@ -96,5 +98,19 @@ func TestChatColumnWithPlanReopenUsesSwatchNotGlyph(t *testing.T) {
 	}
 	if strings.Contains(out, ">2</span>") {
 		t.Fatal("plan header must not show digit glyph")
+	}
+}
+
+func TestChatColumnArtifactReopenWhenClosed(t *testing.T) {
+	var buf bytes.Buffer
+	if err := ChatColumnWithReopen(true, false, "Bot", templ.Raw("<p>chat</p>")).Render(context.Background(), &buf); err != nil {
+		t.Fatal(err)
+	}
+	out := buf.String()
+	if !strings.Contains(out, `data-testid="artifact-open-details"`) {
+		t.Fatalf("missing Open details: %s", out)
+	}
+	if !strings.Contains(out, `id="workbench-v2-artifact-reopen"`) {
+		t.Fatalf("missing artifact reopen slot: %s", out)
 	}
 }

@@ -1095,3 +1095,11 @@ func (s *Service) HandleThoughtsArtifactDirectory(c echo.Context) error {
 	sse := datastar.NewSSE(c.Response().Writer, c.Request())
 	return sse.PatchElementTempl(ThreadArtifactDirectory(entry))
 }
+
+func artifactHideClickAction() string {
+	return workbench.ArtifactHideClickAction()
+}
+
+func artifactHideControlTitle() string {
+	return workbench.ArtifactHideControlTitle()
+}

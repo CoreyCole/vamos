@@ -177,6 +177,7 @@ func (s *Service) ServeThreads(c echo.Context) error {
 		),
 		Chat: workbench.ChatColumnWithReopen(
 			workbench.ThreadsOpenFromRequest(c.Request()),
+			workbench.ArtifactOpenFromRequest(c.Request()),
 			"Chat",
 			WorkbenchUnavailable("Select a thread to open chat."),
 		),
@@ -186,9 +187,8 @@ func (s *Service) ServeThreads(c echo.Context) error {
 		),
 		ThreadsOpen: workbench.ThreadsOpenFromRequest(c.Request()),
 		ChatOpen:    false,
-		// Index land keeps the artifact column open (empty state) so route-defaults
-		// Stories see workbench-v2-artifact visible even without ?artifact=.
-		ArtifactOpen: true,
+		// Index land: cookie missing => open so route-defaults Stories stay green.
+		ArtifactOpen: workbench.ArtifactOpenFromRequest(c.Request()),
 		CommentsOpen: false,
 	})
 	if err != nil {
@@ -260,6 +260,7 @@ func (s *Service) ServeThread(c echo.Context) error {
 		),
 		Chat: workbench.ChatColumnWithReopen(
 			workbench.ThreadsOpenFromRequest(c.Request()),
+			workbench.ArtifactOpenFromRequest(c.Request()),
 			"Chat",
 			chat,
 		),
@@ -267,7 +268,7 @@ func (s *Service) ServeThread(c echo.Context) error {
 		Comments:     comments,
 		ThreadsOpen:  workbench.ThreadsOpenFromRequest(c.Request()),
 		ChatOpen:     chatOpen,
-		ArtifactOpen: true,
+		ArtifactOpen: workbench.ArtifactOpenFromRequest(c.Request()),
 		CommentsOpen: commentsOpen,
 	})
 	if err != nil {

@@ -157,6 +157,18 @@ templ ThreadArtifactPane(browser ThreadArtifactBrowserArgs, document templ.Compo
 					></path>
 				</svg>
 			</button>
+			<button
+				type="button"
+				data-testid="artifact-close-details"
+				class="inline-flex h-7 shrink-0 items-center gap-1 rounded-md border border-border px-2 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+				data-on:click={ artifactHideClickAction() }
+				aria-controls="workbench-v2-artifact"
+				aria-label={ artifactHideControlTitle() }
+				title={ artifactHideControlTitle() }
+			>
+				<span>Close details</span>
+				<span aria-hidden="true" class="font-mono text-[11px]">&gt;&gt;</span>
+			</button>
 			if browser.HeaderActions != nil {
 				@browser.HeaderActions
 			}

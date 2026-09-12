@@ -60,18 +60,42 @@ templ ThreadsReopenControl(threadsOpen bool, controlID string) {
 	</div>
 }
 
+// ArtifactReopenControl — desktop reopen when artifact pane is closed (Grok-like Open details).
+// Lives in chat header; path-header Close details is md:flex only (no second mobile >>).
+templ ArtifactReopenControl(artifactOpen bool, controlID string) {
+	<div
+		id={ controlID }
+		class={ "workbench-chrome flex h-7 shrink-0 items-center justify-center", templ.KV("hidden", artifactOpen) }
+		data-class={ ArtifactReopenDataClass() }
+		aria-hidden={ artifactOpenAriaHidden(artifactOpen) }
+	>
+		<button
+			type="button"
+			data-testid="artifact-open-details"
+			class="inline-flex h-7 items-center gap-1 rounded-md border border-border bg-background px-2 text-xs text-muted-foreground shadow-sm transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+			data-on:click={ ArtifactShowClickAction() }
+			aria-controls="workbench-v2-artifact"
+			aria-label={ ArtifactShowControlTitle() }
+			title={ ArtifactShowControlTitle() }
+		>
+			<span aria-hidden="true" class="font-mono text-[11px]">&lt;&lt;</span>
+			<span>Open details</span>
+		</button>
+	</div>
+}
+
 // ChatColumnWithReopen wraps middle-column chat with an in-shell chat header row.
 // Threads reopen lives in that header (same row as title) — never a strip above.
-templ ChatColumnWithReopen(threadsOpen bool, title string, chat templ.Component) {
-	@ChatColumnWithReopenMark(threadsOpen, title, false, chat)
+templ ChatColumnWithReopen(threadsOpen bool, artifactOpen bool, title string, chat templ.Component) {
+	@ChatColumnWithReopenMark(threadsOpen, artifactOpen, title, false, chat)
 }
 
 // ChatColumnWithPlanReopen is ChatColumnWithReopen with a color swatch (no letter/number glyph).
-templ ChatColumnWithPlanReopen(threadsOpen bool, title string, chat templ.Component) {
-	@ChatColumnWithReopenMark(threadsOpen, title, true, chat)
+templ ChatColumnWithPlanReopen(threadsOpen bool, artifactOpen bool, title string, chat templ.Component) {
+	@ChatColumnWithReopenMark(threadsOpen, artifactOpen, title, true, chat)
 }
 
-templ ChatColumnWithReopenMark(threadsOpen bool, title string, planSwatch bool, chat templ.Component) {
+templ ChatColumnWithReopenMark(threadsOpen bool, artifactOpen bool, title string, planSwatch bool, chat templ.Component) {
 	<div class="flex h-full min-h-0 flex-col bg-background">
 		<header id="workbench-v2-chat-header" class="hidden h-10 min-h-10 max-h-10 shrink-0 items-center gap-2 overflow-hidden border-b border-border px-2.5 md:flex">
 			@ThreadsReopenControl(threadsOpen, "workbench-v2-threads-reopen")
@@ -91,6 +115,7 @@ templ ChatColumnWithReopenMark(threadsOpen bool, title string, planSwatch bool, 
 					<p class="truncate text-[13px] font-semibold leading-none text-foreground">{ title }</p>
 				}
 			</div>
+			@ArtifactReopenControl(artifactOpen, "workbench-v2-artifact-reopen")
 			if title != "" {
 				<button
 					type="button"
