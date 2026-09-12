@@ -25,3 +25,23 @@ func ChatHeaderAvatarClass(title string) string {
 	}
 	return palette[h%len(palette)]
 }
+
+// ChatHeaderPlanSwatchClass is a stable accent for plan-room header dots (no glyph).
+func ChatHeaderPlanSwatchClass(title string) string {
+	title = strings.TrimSpace(title)
+	palette := []string{
+		"bg-sky-500/90",
+		"bg-violet-500/90",
+		"bg-rose-500/90",
+		"bg-emerald-500/90",
+		"bg-amber-500/90",
+	}
+	if title == "" {
+		return palette[0]
+	}
+	h := 0
+	for _, r := range title {
+		h = (h*31 + int(r)) & 0xffff
+	}
+	return palette[h%len(palette)]
+}

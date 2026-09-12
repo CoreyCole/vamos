@@ -92,9 +92,10 @@ func (s *Service) renderSharedThreadChat(
 		DraftSaveAction: "@post('/agent-chat/thread/" + url.PathEscape(
 			thread.ID,
 		) + "/draft', {filterSignals: {include: /^chatDraft$/}})",
+		// Plan rooms stay sendable without a roster-bound AgentID — plan-lead is
+		// derived from plan_dir_rel (BE contract). Pairwise remains view-only.
 		ComposerDisabled: fixtureMode == "pairwise" ||
-			thread.RoomKind == RoomKindPairwise ||
-			(thread.RoomKind == RoomKindPlan && !thread.AgentID.Valid),
+			thread.RoomKind == RoomKindPairwise,
 	}
 	return SharedThreadChat(args), nil
 }

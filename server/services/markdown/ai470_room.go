@@ -78,7 +78,8 @@ func (s *Service) ServeAI470Room(c echo.Context) error {
 
 	if threadID == "" {
 		chatBody := WorkbenchUnavailable("No shared thread mapped for this room yet.")
-		chatComp = workbench.ChatColumnWithReopen(
+		chatComp = chatColumnForAI470Room(
+			kind,
 			threadsOpen,
 			roomTitle,
 			chatBody,
@@ -94,7 +95,8 @@ func (s *Service) ServeAI470Room(c echo.Context) error {
 		if err != nil {
 			return err
 		}
-		chatComp = workbench.ChatColumnWithReopen(
+		chatComp = chatColumnForAI470Room(
+			kind,
 			threadsOpen,
 			roomTitle,
 			chat,
@@ -339,6 +341,18 @@ func (s *Service) renderAI470SharedChat(
 	threadID, userEmail string,
 ) (templ.Component, error) {
 	return s.workbenchThreadsRenderer.RenderSharedThreadChat(ctx, threadID, userEmail)
+}
+
+func chatColumnForAI470Room(
+	kind agenthome.RoomKind,
+	threadsOpen bool,
+	title string,
+	body templ.Component,
+) templ.Component {
+	if kind == agenthome.KindPlan {
+		return workbench.ChatColumnWithPlanReopen(threadsOpen, title, body)
+	}
+	return workbench.ChatColumnWithReopen(threadsOpen, title, body)
 }
 
 // AI470RoomComposerDisabled is the view-only composer gate.

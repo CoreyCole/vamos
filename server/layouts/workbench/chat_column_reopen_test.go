@@ -1,6 +1,7 @@
 package workbench
 
 import (
+	"bytes"
 	"context"
 	"strings"
 	"testing"
@@ -81,5 +82,19 @@ func TestChatColumnWithReopen_OpenHidesHamburgerSlot(t *testing.T) {
 	}
 	if strings.Contains(classVal, "invisible") {
 		t.Fatalf("hidden hamburger must not keep layout space: %s", classVal)
+	}
+}
+
+func TestChatColumnWithPlanReopenUsesSwatchNotGlyph(t *testing.T) {
+	var buf bytes.Buffer
+	if err := ChatColumnWithPlanReopen(true, "2-alpha", templ.Raw("<div id=\"chat-body\"></div>")).Render(context.Background(), &buf); err != nil {
+		t.Fatal(err)
+	}
+	out := buf.String()
+	if !strings.Contains(out, `data-chat-plan-swatch`) {
+		t.Fatalf("missing plan swatch: %s", out)
+	}
+	if strings.Contains(out, ">2</span>") {
+		t.Fatal("plan header must not show digit glyph")
 	}
 }

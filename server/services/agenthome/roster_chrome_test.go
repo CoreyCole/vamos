@@ -152,13 +152,11 @@ func TestRosterRail_LivePlans(t *testing.T) {
 				ID:    "plan-one",
 				Title: "Plan One",
 				Href:  "/rooms/plan/plan-one?artifact=thoughts%2Fowner%2Fplans%2Fplan-one%2Fdesign.md",
-				Time:  "Fri 1:02 PM",
 			},
 			{
 				ID:    "plan-two",
 				Title: "Plan Two",
 				Href:  "/rooms/plan/plan-two?artifact=thoughts%2Fowner%2Fplans%2Fplan-two%2Fdesign.md",
-				Time:  "Sat 4:05 PM",
 			},
 		},
 	}
