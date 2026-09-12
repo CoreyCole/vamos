@@ -367,6 +367,8 @@ func (s *Service) lookupPlanDirRelFromArtifact(
 	return "", nil
 }
 
+// planLeadBindComponent is retained for HandleBindPlanLead tests only.
+// ServeAI470Room must not render it — plan lead is not a roster persona bind gate.
 func (s *Service) planLeadBindComponent(
 	ctx context.Context,
 	roomID, artifact string,

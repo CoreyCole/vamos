@@ -153,11 +153,11 @@ func TestPlanRoomWithoutLeadDisablesComposerAndBindingPersists(t *testing.T) {
 		t.Fatal(err)
 	}
 	body := rec.Body.String()
-	if !strings.Contains(body, `id="plan-lead-bind-form"`) {
-		t.Fatalf("missing lead bind form: %s", body)
+	if strings.Contains(body, `id="plan-lead-bind-form"`) {
+		t.Fatalf("plan-lead bind UI must not gate plan rooms: %s", body)
 	}
-	if strings.Contains(body, `id="agent-chat-composer-form"`) {
-		t.Fatal("composer enabled without lead")
+	if strings.Contains(body, "Pick a roster agent as this plan") {
+		t.Fatal("pick-a-lead copy still present")
 	}
 
 	form := strings.NewReader("agent_slug=nova&artifact=" + url.QueryEscape(artifact))

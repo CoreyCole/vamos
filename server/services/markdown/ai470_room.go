@@ -65,15 +65,9 @@ func (s *Service) ServeAI470Room(c echo.Context) error {
 	if err != nil {
 		return err
 	}
-	planNeedsLead := false
-	if kind == agenthome.KindPlan {
-		planNeedsLead, err = s.planRoomNeedsLead(
-			c.Request().Context(), id, planDoc,
-		)
-		if err != nil {
-			return err
-		}
-	}
+	// Plan rooms no longer gate chat on binding a roster persona as "lead".
+	// Each plan dir owns its plan-lead identity; composer must work without
+	// a SetPlanWorkspaceLeadAgent bind (Corey UX lock).
 	viewport := viewportClassForRequest(c)
 	threadsOpen := workbench.ThreadsOpenFromRequest(c.Request())
 
@@ -84,9 +78,6 @@ func (s *Service) ServeAI470Room(c echo.Context) error {
 
 	if threadID == "" {
 		chatBody := WorkbenchUnavailable("No shared thread mapped for this room yet.")
-		if planNeedsLead {
-			chatBody = s.planLeadBindComponent(c.Request().Context(), id, planDoc)
-		}
 		chatComp = workbench.ChatColumnWithReopen(
 			threadsOpen,
 			roomTitle,
@@ -102,9 +93,6 @@ func (s *Service) ServeAI470Room(c echo.Context) error {
 		}
 		if err != nil {
 			return err
-		}
-		if planNeedsLead {
-			chat = s.planLeadBindComponent(c.Request().Context(), id, planDoc)
 		}
 		chatComp = workbench.ChatColumnWithReopen(
 			threadsOpen,
