@@ -163,7 +163,8 @@ func MobileSiblingDocNameInventory() map[string]string {
 	out := make(map[string]string)
 	for _, e := range WorkbenchV2ChromeNames() {
 		switch e.ProbeKey {
-		case "chatComments", "path", "browser", "chat", "document", "artifact":
+		// path omitted: #thread-artifact-path-header is hidden md:flex under the icon header.
+		case "chatComments", "browser", "chat", "document", "artifact":
 			out[e.ProbeKey] = e.ExpectedComputedName(false, false)
 		}
 	}

@@ -901,7 +901,7 @@ func assertMobileDocChromeViewTransitionNames() spec.Step {
 
 func clickSiblingAndAssertNoUnderIconHeaderBlackout(href, wantText string) spec.Step {
 	return spec.Custom(
-		"sibling GET never blacks out path/browser under surviving icon header",
+		"sibling GET never blacks out browser under surviving icon header",
 		func(t testing.TB, ctx *duiruntime.Context) {
 			ensureArtifactBrowserOpen(t, ctx)
 			link := ctx.Page.Locator(
@@ -1022,21 +1022,16 @@ func clickSiblingAndAssertNoUnderIconHeaderBlackout(href, wantText string) spec.
 					continue
 				}
 				chatComments, _ := s["chatComments"].(map[string]any)
-				path, _ := s["path"].(map[string]any)
 				browser, _ := s["browser"].(map[string]any)
 				headerVisible := boxVisible(chatComments)
 				if headerVisible {
-					if path == nil || !boxInDOM(path) {
-						t.Fatalf("sample %d: path-header missing from DOM while icon header visible", i)
-					}
+					// Path-header is intentionally hidden on mobile (hidden md:flex);
+					// icon header is the only top chrome — do not require path usable.
 					if browser == nil || !boxInDOM(browser) {
 						t.Fatalf("sample %d: browser missing from DOM while icon header visible", i)
 					}
-					if boxCollapsed(path) || boxHidden(path) {
-						t.Fatalf("sample %d: under-header black — path-header collapsed/hidden while icon header visible: %#v", i, path)
-					}
 					if boxCollapsed(browser) || boxHidden(browser) {
-						t.Fatalf("sample %d: under-header black — browser collapsed/hidden while icon header visible: %#v", i, browser)
+						t.Fatalf("sample %d: under-icon-header black — browser collapsed/hidden while icon header visible: %#v", i, browser)
 					}
 				}
 			}

@@ -606,7 +606,7 @@ func assertV2RouteVisibility(route string) spec.Step {
 
 func assertMobileTabBehavior() spec.Step {
 	return spec.Custom(
-		"mobile tabs select one usable region",
+		"mobile icon header selects one usable region (no Docs tablist)",
 		func(t testing.TB, ctx *duiruntime.Context) {
 			viewport, err := ctx.Page.Locator("#workbench-root").
 				GetAttribute("data-workbench-viewport-class")
@@ -616,18 +616,39 @@ func assertMobileTabBehavior() spec.Step {
 			if viewport != "mobile" {
 				return
 			}
-			if err := ctx.Page.GetByRole(*playwright.AriaRoleTab, playwright.PageGetByRoleOptions{Name: "Docs"}).
-				Click(); err != nil {
+			tabs, err := ctx.Page.Locator("#workbench-mobile-tabs").Count()
+			if err != nil {
+				t.Fatal(err)
+			}
+			if tabs != 0 {
+				t.Fatalf("Docs tablist still present: count=%d", tabs)
+			}
+			header := ctx.Page.Locator("#workbench-mobile-chat-comments")
+			if err := header.WaitFor(playwright.LocatorWaitForOptions{
+				State:   playwright.WaitForSelectorStateVisible,
+				Timeout: playwright.Float(10_000),
+			}); err != nil {
+				t.Fatalf("mobile icon header missing: %v", err)
+			}
+			if err := ctx.Page.GetByTestId("mobile-toggle-chat").Click(); err != nil {
 				t.Fatal(err)
 			}
 			active, err := ctx.Page.Locator("#workbench-root").
 				GetAttribute("data-workbench-mobile-active")
-			if err != nil || active != "workbenchV2Artifact" {
-				t.Fatalf("mobile active region = %q %v", active, err)
+			if err != nil || active != "workbenchV2Chat" {
+				t.Fatalf("after chat icon mobile active = %q %v", active, err)
 			}
 			visible, err := ctx.Page.Locator("[data-workbench-region]:visible").Count()
 			if err != nil || visible != 1 {
 				t.Fatalf("mobile visible region count = %d %v", visible, err)
+			}
+			if err := ctx.Page.GetByTestId("mobile-toggle-threads").Click(); err != nil {
+				t.Fatal(err)
+			}
+			active, err = ctx.Page.Locator("#workbench-root").
+				GetAttribute("data-workbench-mobile-active")
+			if err != nil || active != "workbenchV2Threads" {
+				t.Fatalf("after hamburger mobile active = %q %v", active, err)
 			}
 		},
 	)
