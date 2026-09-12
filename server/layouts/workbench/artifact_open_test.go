@@ -31,6 +31,8 @@ func TestArtifactHideShowActionsWriteCookie(t *testing.T) {
 	for _, want := range []string{
 		"workbenchV2Artifact.visible = false",
 		ArtifactOpenCookie + "=0",
+		"workbenchApplyRegionVisible('workbench-v2-artifact', false)",
+		"workbenchReflow()",
 	} {
 		if !strings.Contains(hide, want) {
 			t.Fatalf("hide missing %q in %s", want, hide)
@@ -39,6 +41,8 @@ func TestArtifactHideShowActionsWriteCookie(t *testing.T) {
 	for _, want := range []string{
 		"workbenchV2Artifact.visible = true",
 		ArtifactOpenCookie + "=1",
+		"workbenchApplyRegionVisible('workbench-v2-artifact', true)",
+		"workbenchReflow()",
 	} {
 		if !strings.Contains(show, want) {
 			t.Fatalf("show missing %q in %s", want, show)

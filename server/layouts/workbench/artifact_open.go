@@ -31,15 +31,23 @@ func artifactOpenCookieWriteJS(open bool) string {
 }
 
 // ArtifactHideClickAction collapses the artifact pane and persists via cookie.
+// Apply DOM visibility immediately (comments-toggle pattern) so chat flex
+// expands without waiting for a hard refresh / Datastar class catch-up.
 func ArtifactHideClickAction() string {
 	return "$workbench.regions.workbenchV2Artifact.visible = false; " +
-		artifactOpenCookieWriteJS(false) + "; " + threadsLayoutReflowJS()
+		artifactOpenCookieWriteJS(false) + "; " +
+		"if (window.workbenchApplyRegionVisible) { workbenchApplyRegionVisible('workbench-v2-artifact', false) }; " +
+		"if (window.workbenchReflow) { workbenchReflow() }; " +
+		threadsLayoutReflowJS()
 }
 
 // ArtifactShowClickAction reopens the artifact pane and persists via cookie.
 func ArtifactShowClickAction() string {
 	return "$workbench.regions.workbenchV2Artifact.visible = true; " +
-		artifactOpenCookieWriteJS(true) + "; " + threadsLayoutReflowJS()
+		artifactOpenCookieWriteJS(true) + "; " +
+		"if (window.workbenchApplyRegionVisible) { workbenchApplyRegionVisible('workbench-v2-artifact', true) }; " +
+		"if (window.workbenchReflow) { workbenchReflow() }; " +
+		threadsLayoutReflowJS()
 }
 
 func ArtifactHideControlTitle() string {
