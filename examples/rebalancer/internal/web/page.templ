@@ -136,6 +136,27 @@ templ Layout(data PageData) {
 					background: rgb(var(--muted));
 				}
 				
+				.header-controls {
+					display: flex;
+					gap: 8px;
+					align-items: center;
+				}
+				
+				.refresh-button {
+					background: none;
+					border: none;
+					color: rgb(var(--foreground));
+					font-size: 20px;
+					cursor: pointer;
+					padding: 8px;
+					border-radius: 8px;
+					transition: background 0.2s;
+				}
+				
+				.refresh-button:hover {
+					background: rgb(var(--muted));
+				}
+				
 				.card {
 					background: rgb(var(--card));
 					border: 1px solid rgb(var(--border));
@@ -495,9 +516,14 @@ templ Layout(data PageData) {
 		<body>
 			<div class="header">
 				<div class="header-title">Portfolio Rebalancer</div>
-				<button class="theme-toggle" onclick="window.toggleTheme()" title="Toggle theme">
-					<span id="theme-icon">◐</span>
-				</button>
+				<div class="header-controls">
+					<button class="refresh-button" onclick="location.reload()" title="Refresh" aria-label="Refresh">
+						<span>↻</span>
+					</button>
+					<button class="theme-toggle" onclick="window.toggleTheme()" title="Toggle theme">
+						<span id="theme-icon">◐</span>
+					</button>
+				</div>
 			</div>
 			<main data-init="@get('/events')">
 				<div id="ingest-status"></div>
