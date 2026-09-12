@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"log"
 	"net/http"
+	"os"
 	"path/filepath"
 	"strconv"
 	"sync"
@@ -16,6 +17,7 @@ import (
 	"github.com/a-h/templ"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
+	"github.com/starfederation/datastar-go/datastar"
 )
 
 type App struct {
@@ -97,12 +99,14 @@ func (a *App) handleEvents(c echo.Context) error {
 func (a *App) handleIngest(c echo.Context) error {
 	ctx := c.Request().Context()
 
-	positionsPath := filepath.Join(a.filesRoot, "..", "data", "acme_positions.csv")
-	instrumentsPath := filepath.Join(a.filesRoot, "..", "data", "asset_map.csv")
+	positionsPath := resolveDataFile(a.filesRoot, "acme_positions.csv")
+	instrumentsPath := resolveDataFile(a.filesRoot, "asset_map.csv")
+
+	sse := datastar.NewSSE(c.Response().Writer, c.Request())
 
 	if err := ingest.ImportToDatabase(ctx, a.queries, positionsPath, instrumentsPath); err != nil {
 		log.Printf("ingest error: %v", err)
-		return c.String(http.StatusInternalServerError, "Import failed")
+		return sse.PatchElementTempl(IngestStatus("error", "Import failed: "+err.Error()))
 	}
 
 	// Initialize default targets
@@ -130,15 +134,14 @@ func (a *App) handleIngest(c echo.Context) error {
 
 	data, err := a.buildPageData(ctx, "value", "value", nil)
 	if err != nil {
+		return sse.PatchElementTempl(IngestStatus("error", "Failed to build page data: "+err.Error()))
+	}
+
+	if err := sse.PatchElementTempl(MainContent(data)); err != nil {
 		return err
 	}
 
-	c.Response().Header().Set("Content-Type", "text/vnd.datastar.fragment+html")
-	if err := render(c, Content(data)); err != nil {
-		return err
-	}
-
-	return nil
+	return sse.PatchElementTempl(IngestStatus("success", "Loaded positions successfully"))
 }
 
 func (a *App) handlePositions(c echo.Context) error {
@@ -496,6 +499,30 @@ func parseFloat(s string, defaultVal float64) float64 {
 
 func render(c echo.Context, component templ.Component) error {
 	return component.Render(c.Request().Context(), c.Response().Writer)
+}
+
+// resolveDataFile tries multiple locations to find a data file
+func resolveDataFile(filesRoot, name string) string {
+	// Try data/<name> relative to cwd (SourceDir)
+	candidate := filepath.Join("data", name)
+	if _, err := os.Stat(candidate); err == nil {
+		return candidate
+	}
+
+	// Try filesRoot/../data/<name>
+	candidate = filepath.Join(filesRoot, "..", "data", name)
+	if _, err := os.Stat(candidate); err == nil {
+		return candidate
+	}
+
+	// Try filesRoot/data/<name>
+	candidate = filepath.Join(filesRoot, "data", name)
+	if _, err := os.Stat(candidate); err == nil {
+		return candidate
+	}
+
+	// Fall back to first path (will fail later with clear error)
+	return filepath.Join("data", name)
 }
 
 type notifier struct {

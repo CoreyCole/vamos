@@ -8,7 +8,7 @@ templ Layout(data PageData) {
 			<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 			<title>Portfolio Rebalancer</title>
 			<script src="https://cdn.tailwindcss.com"></script>
-			<script type="module" src="https://cdn.jsdelivr.net/npm/@sudodevnull/datastar"></script>
+			<script type="module" src="https://cdn.jsdelivr.net/gh/starfederation/datastar@v1.0.1/bundles/datastar.js"></script>
 		</head>
 		<body class="bg-gray-50 min-h-screen">
 			<div class="container mx-auto px-4 py-8 max-w-7xl">
@@ -17,22 +17,23 @@ templ Layout(data PageData) {
 					<p class="text-gray-600 mt-2">Multi-account position management and rebalancing</p>
 				</header>
 				<main data-init="@get('/events')">
-					@Content(data)
+					<div id="ingest-status"></div>
+					@MainContent(data)
 				</main>
 			</div>
 		</body>
 	</html>
 }
 
-templ Content(data PageData) {
-	<div class="space-y-6">
+templ MainContent(data PageData) {
+	<div id="rebalancer-main" class="space-y-6">
 		<!-- Controls -->
 		<div class="bg-white rounded-lg shadow p-6">
 			<h2 class="text-xl font-semibold mb-4">Controls</h2>
 			<div class="flex gap-4">
 				<button
 					class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-					data-on-click="@post('/ingest', {contentType: 'form'})"
+					data-on:click="@post('/ingest', {contentType: 'form'})"
 				>
 					Load Positions
 				</button>
@@ -46,6 +47,18 @@ templ Content(data PageData) {
 		@Positions(data)
 		<!-- Trades -->
 		@Trades(data)
+	</div>
+}
+
+templ IngestStatus(status, message string) {
+	<div id="ingest-status">
+		if status != "" {
+			<div class={ "mb-6 p-4 rounded-lg", templ.KV("bg-green-50 border border-green-200", status == "success"), templ.KV("bg-red-50 border border-red-200", status == "error") }>
+				<p class={ "text-sm font-medium", templ.KV("text-green-800", status == "success"), templ.KV("text-red-800", status == "error") }>
+					{ message }
+				</p>
+			</div>
+		}
 	</div>
 }
 
