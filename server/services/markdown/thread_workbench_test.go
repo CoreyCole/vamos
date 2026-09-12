@@ -673,3 +673,42 @@ func TestServeAgentsLandRedirectsToThreads(t *testing.T) {
 		t.Fatalf("Location = %q", got)
 	}
 }
+
+func TestServeThreadPlanSlugHeaderTitleAndDatetime(t *testing.T) {
+	root := t.TempDir()
+	slug := "2026-09-08_10-10-54_agent-memory-observable-context"
+	mustMkdirAll(t, filepath.Join(root, "owner", "plans", slug))
+	mustWriteFile(
+		t,
+		filepath.Join(root, "owner", "plans", slug, "design.md"),
+		[]byte("# Design"),
+	)
+	svc, err := NewService(root, nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	renderer := &threadWorkbenchTestRenderer{
+		threadPlanDir: "owner/plans/" + slug,
+	}
+	svc.WithWorkbenchThreadRenderer(renderer)
+	rec := httptest.NewRecorder()
+	c := echo.New().NewContext(
+		httptest.NewRequest("GET", "/threads/thread-plan", nil),
+		rec,
+	)
+	c.SetParamNames("threadID")
+	c.SetParamValues("thread-plan")
+	if err := svc.ServeThread(c); err != nil {
+		t.Fatal(err)
+	}
+	body := rec.Body.String()
+	hasTitle := strings.Contains(body, "Agent Memory Observable Context")
+	hasDT := strings.Contains(body, "Sep 8, 2026 · 10:10")
+	// Slug may appear in artifact hrefs; header <p> must show humanized Display only.
+	rawInTitle := strings.Contains(body, `truncate text-[13px] font-semibold leading-none text-foreground">`+slug)
+	kebab := strings.Count(body, `data-testid="workbench-overflow-actions"`)
+	if !hasTitle || !hasDT || rawInTitle || kebab != 1 {
+		t.Fatalf("title=%v datetime=%v rawInTitle=%v kebab=%d", hasTitle, hasDT, rawInTitle, kebab)
+	}
+}
+

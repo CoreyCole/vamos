@@ -143,6 +143,40 @@ func (s *Service) indexArtifactComponent(
 	return ThreadArtifactPane(browser, content), page, browser.DocPath
 }
 
+
+// threadChatHeaderTitle resolves the /threads/:id header room name.
+// Plan-linked threads pass the plan-dir basename (often YYYY-MM-DD_HH-MM-SS_*)
+// so ChatColumnWithPlanReopen + ParseChatHeaderTitle yield Display + Datetime.
+// Non-plan threads fall back to roster/bot title or "Chat".
+func (s *Service) threadChatHeaderTitle(
+	ctx context.Context,
+	threadID string,
+) (title string, planLinked bool) {
+	title = "Chat"
+	if s == nil || s.workbenchThreadsRenderer == nil {
+		return title, false
+	}
+	planDir, err := s.workbenchThreadsRenderer.ResolveSharedThreadPlanDir(ctx, threadID)
+	if err == nil && strings.TrimSpace(planDir) != "" {
+		id := planLeadRoomID(planDir)
+		if id == "" {
+			id = path.Base(strings.Trim(planDir, "/"))
+		}
+		if id != "" && id != "." && id != "/" {
+			return id, true
+		}
+	}
+	sel := s.rosterSelectionForLiveThread(ctx, threadID)
+	if sel.ID != "" && (sel.Kind == agenthome.KindDM ||
+		sel.Kind == agenthome.KindA2A ||
+		sel.Kind == agenthome.KindPlan) {
+		if t := s.ai470RoomTitle(ctx, sel.Kind, sel.ID); strings.TrimSpace(t) != "" {
+			return t, sel.Kind == agenthome.KindPlan
+		}
+	}
+	return title, false
+}
+
 func (s *Service) ServeThreads(c echo.Context) error {
 	if s.workbenchThreadsRenderer == nil {
 		return echo.NewHTTPError(
@@ -250,6 +284,11 @@ func (s *Service) ServeThread(c echo.Context) error {
 	viewport := viewportClassForRequest(c)
 	_ = threads // AI-470 converge: left rail is roster, not thread list.
 	chatOpen, commentsOpen := chatCommentsOpen(c.Request(), true)
+	title, planLinked := s.threadChatHeaderTitle(c.Request().Context(), threadID)
+	chatColumn := workbench.ChatColumnWithReopen
+	if planLinked {
+		chatColumn = workbench.ChatColumnWithPlanReopen
+	}
 	state, err := workbench.BuildWorkbenchV2State(workbench.WorkbenchV2Args{
 		UserEmail:     userEmail,
 		ViewportClass: viewport,
@@ -260,10 +299,10 @@ func (s *Service) ServeThread(c echo.Context) error {
 				s.rosterSelectionForLiveThread(c.Request().Context(), threadID),
 			),
 		),
-		Chat: workbench.ChatColumnWithReopen(
+		Chat: chatColumn(
 			workbench.ThreadsOpenFromRequest(c.Request()),
 			workbench.ArtifactOpenFromRequest(c.Request()),
-			"Chat",
+			title,
 			chat,
 			BuildChatHeaderOverflow(artifactPage, artifactDoc, true),
 		),
