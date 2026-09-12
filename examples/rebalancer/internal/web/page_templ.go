@@ -29,7 +29,7 @@ func Layout(data PageData) templ.Component {
 			templ_7745c5c3_Var1 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<!doctype html><html lang=\"en\"><head><meta charset=\"UTF-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\"><title>Portfolio Rebalancer</title><script type=\"module\" src=\"https://cdn.jsdelivr.net/gh/starfederation/datastar@v1.0.1/bundles/datastar.js\"></script><script>\n\t\t\t\t// Theme system: match DatastarUI/shadcn with class=\"dark\"\n\t\t\t\t(function() {\n\t\t\t\t\tconst root = document.documentElement;\n\t\t\t\t\tconst media = window.matchMedia('(prefers-color-scheme: dark)');\n\t\t\t\t\t\n\t\t\t\t\tfunction applyTheme(theme) {\n\t\t\t\t\t\tif (theme === 'system') {\n\t\t\t\t\t\t\troot.classList.toggle('dark', media.matches);\n\t\t\t\t\t\t} else {\n\t\t\t\t\t\t\troot.classList.toggle('dark', theme === 'dark');\n\t\t\t\t\t\t}\n\t\t\t\t\t}\n\t\t\t\t\t\n\t\t\t\t\tfunction setTheme(theme) {\n\t\t\t\t\t\tlocalStorage.setItem('theme', theme);\n\t\t\t\t\t\tapplyTheme(theme);\n\t\t\t\t\t}\n\t\t\t\t\t\n\t\t\t\t\t// Initialize from localStorage or system\n\t\t\t\t\tconst saved = localStorage.getItem('theme');\n\t\t\t\t\tif (saved && ['light', 'dark', 'system'].includes(saved)) {\n\t\t\t\t\t\tapplyTheme(saved);\n\t\t\t\t\t} else {\n\t\t\t\t\t\tsetTheme('system');\n\t\t\t\t\t}\n\t\t\t\t\t\n\t\t\t\t\t// Listen for system preference changes when theme=system\n\t\t\t\t\tmedia.addEventListener('change', () => {\n\t\t\t\t\t\tconst current = localStorage.getItem('theme');\n\t\t\t\t\t\tif (!current || current === 'system') {\n\t\t\t\t\t\t\tapplyTheme('system');\n\t\t\t\t\t\t}\n\t\t\t\t\t});\n\t\t\t\t\t\n\t\t\t\t\t// Listen for parent theme messages (Vamos embed)\n\t\t\t\t\twindow.addEventListener('message', e => {\n\t\t\t\t\t\tif (e.data === 'dark' || e.data === 'light') {\n\t\t\t\t\t\t\tsetTheme(e.data);\n\t\t\t\t\t\t}\n\t\t\t\t\t});\n\t\t\t\t\t\n\t\t\t\t\twindow.toggleTheme = function() {\n\t\t\t\t\t\tconst current = localStorage.getItem('theme') || 'system';\n\t\t\t\t\t\tconst isDark = root.classList.contains('dark');\n\t\t\t\t\t\tsetTheme(isDark ? 'light' : 'dark');\n\t\t\t\t\t};\n\t\t\t\t})();\n\t\t\t</script><style>\n\t\t\t\t:root {\n\t\t\t\t\t--background: 255 255 255;\n\t\t\t\t\t--foreground: 0 0 0;\n\t\t\t\t\t--card: 255 255 255;\n\t\t\t\t\t--card-foreground: 0 0 0;\n\t\t\t\t\t--muted: 248 249 250;\n\t\t\t\t\t--muted-foreground: 108 117 125;\n\t\t\t\t\t--border: 222 226 230;\n\t\t\t\t\t--accent: 0 166 81;\n\t\t\t\t\t--accent-foreground: 255 255 255;\n\t\t\t\t\t--destructive: 211 47 47;\n\t\t\t\t\t--destructive-foreground: 255 255 255;\n\t\t\t\t}\n\t\t\t\t\n\t\t\t\t.dark {\n\t\t\t\t\t--background: 0 0 0;\n\t\t\t\t\t--foreground: 255 255 255;\n\t\t\t\t\t--card: 26 26 26;\n\t\t\t\t\t--card-foreground: 255 255 255;\n\t\t\t\t\t--muted: 45 45 45;\n\t\t\t\t\t--muted-foreground: 176 176 176;\n\t\t\t\t\t--border: 58 58 58;\n\t\t\t\t\t--accent: 0 214 98;\n\t\t\t\t\t--accent-foreground: 0 0 0;\n\t\t\t\t\t--destructive: 255 82 82;\n\t\t\t\t\t--destructive-foreground: 255 255 255;\n\t\t\t\t}\n\t\t\t\t\n\t\t\t\t* {\n\t\t\t\t\tmargin: 0;\n\t\t\t\t\tpadding: 0;\n\t\t\t\t\tbox-sizing: border-box;\n\t\t\t\t}\n\t\t\t\t\n\t\t\t\tbody {\n\t\t\t\t\tfont-family: -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, \"Helvetica Neue\", Arial, sans-serif;\n\t\t\t\t\tbackground: rgb(var(--background));\n\t\t\t\t\tcolor: rgb(var(--foreground));\n\t\t\t\t\tline-height: 1.5;\n\t\t\t\t}\n\t\t\t\t\n\t\t\t\t.container {\n\t\t\t\t\tmax-width: 960px;\n\t\t\t\t\tmargin: 0 auto;\n\t\t\t\t}\n\t\t\t\t\n\t\t\t\t.header {\n\t\t\t\t\tbackground: rgb(var(--card));\n\t\t\t\t\tborder-bottom: 1px solid rgb(var(--border));\n\t\t\t\t\tpadding: 16px;\n\t\t\t\t\tdisplay: flex;\n\t\t\t\t\tjustify-content: space-between;\n\t\t\t\t\talign-items: center;\n\t\t\t\t\tposition: sticky;\n\t\t\t\t\ttop: 0;\n\t\t\t\t\tz-index: 100;\n\t\t\t\t}\n\t\t\t\t\n\t\t\t\t.header-title {\n\t\t\t\t\tfont-size: 18px;\n\t\t\t\t\tfont-weight: 600;\n\t\t\t\t}\n\t\t\t\t\n\t\t\t\t.theme-toggle {\n\t\t\t\t\tbackground: none;\n\t\t\t\t\tborder: none;\n\t\t\t\t\tcolor: rgb(var(--foreground));\n\t\t\t\t\tfont-size: 20px;\n\t\t\t\t\tcursor: pointer;\n\t\t\t\t\tpadding: 8px;\n\t\t\t\t\tborder-radius: 8px;\n\t\t\t\t\ttransition: background 0.2s;\n\t\t\t\t}\n\t\t\t\t\n\t\t\t\t.theme-toggle:hover {\n\t\t\t\t\tbackground: rgb(var(--muted));\n\t\t\t\t}\n\t\t\t\t\n\t\t\t\t.card {\n\t\t\t\t\tbackground: rgb(var(--card));\n\t\t\t\t\tborder: 1px solid rgb(var(--border));\n\t\t\t\t\tborder-radius: 8px;\n\t\t\t\t\tmargin: 16px;\n\t\t\t\t\toverflow: hidden;\n\t\t\t\t}\n\t\t\t\t\n\t\t\t\t.card-header {\n\t\t\t\t\tpadding: 16px;\n\t\t\t\t\tborder-bottom: 1px solid rgb(var(--border));\n\t\t\t\t\tfont-weight: 600;\n\t\t\t\t\tfont-size: 16px;\n\t\t\t\t\tbackground: rgb(var(--muted));\n\t\t\t\t\tposition: sticky;\n\t\t\t\t\ttop: 57px;\n\t\t\t\t\tz-index: 10;\n\t\t\t\t}\n\t\t\t\t\n\t\t\t\t.card-body {\n\t\t\t\t\tpadding: 16px;\n\t\t\t\t}\n\t\t\t\t\n\t\t\t\t.table-container {\n\t\t\t\t\toverflow-x: auto;\n\t\t\t\t}\n\t\t\t\t\n\t\t\t\t.table {\n\t\t\t\t\twidth: 100%;\n\t\t\t\t\tborder-collapse: collapse;\n\t\t\t\t\tfont-size: 14px;\n\t\t\t\t}\n\t\t\t\t\n\t\t\t\t.table thead {\n\t\t\t\t\tbackground: rgb(var(--muted));\n\t\t\t\t\tposition: sticky;\n\t\t\t\t\ttop: 73px;\n\t\t\t\t\tz-index: 9;\n\t\t\t\t}\n\t\t\t\t\n\t\t\t\t.table th {\n\t\t\t\t\tpadding: 12px 16px;\n\t\t\t\t\ttext-align: left;\n\t\t\t\t\tfont-weight: 600;\n\t\t\t\t\tfont-size: 12px;\n\t\t\t\t\ttext-transform: uppercase;\n\t\t\t\t\tletter-spacing: 0.5px;\n\t\t\t\t\tcolor: rgb(var(--muted-foreground));\n\t\t\t\t\tborder-bottom: 1px solid rgb(var(--border));\n\t\t\t\t}\n\t\t\t\t\n\t\t\t\t.table th.text-right {\n\t\t\t\t\ttext-align: right;\n\t\t\t\t}\n\t\t\t\t\n\t\t\t\t.table td {\n\t\t\t\t\tpadding: 12px 16px;\n\t\t\t\t\tborder-bottom: 1px solid rgb(var(--border));\n\t\t\t\t}\n\t\t\t\t\n\t\t\t\t.table td.text-right {\n\t\t\t\t\ttext-align: right;\n\t\t\t\t}\n\t\t\t\t\n\t\t\t\t.table td.muted {\n\t\t\t\t\tcolor: rgb(var(--muted-foreground));\n\t\t\t\t}\n\t\t\t\t\n\t\t\t\t.table tbody tr:nth-child(even) {\n\t\t\t\t\tbackground: rgb(var(--muted) / 0.3);\n\t\t\t\t}\n\t\t\t\t\n\t\t\t\t.table tbody tr:hover {\n\t\t\t\t\tbackground: rgb(var(--muted) / 0.6);\n\t\t\t\t}\n\t\t\t\t\n\t\t\t\t.symbol {\n\t\t\t\t\tfont-weight: 600;\n\t\t\t\t}\n\t\t\t\t\n\t\t\t\t.account-badge {\n\t\t\t\t\tdisplay: inline-block;\n\t\t\t\t\tfont-size: 11px;\n\t\t\t\t\tpadding: 2px 8px;\n\t\t\t\t\tborder-radius: 10px;\n\t\t\t\t\tbackground: rgb(var(--muted));\n\t\t\t\t\tcolor: rgb(var(--muted-foreground));\n\t\t\t\t\tfont-weight: 500;\n\t\t\t\t\tmargin-left: 6px;\n\t\t\t\t}\n\t\t\t\t\n\t\t\t\t.pill {\n\t\t\t\t\tfont-size: 11px;\n\t\t\t\t\tpadding: 3px 8px;\n\t\t\t\t\tborder-radius: 10px;\n\t\t\t\t\tfont-weight: 600;\n\t\t\t\t\twhite-space: nowrap;\n\t\t\t\t}\n\t\t\t\t\n\t\t\t\t.pill-buy {\n\t\t\t\t\tbackground: rgb(var(--accent) / 0.15);\n\t\t\t\t\tcolor: rgb(var(--accent));\n\t\t\t\t}\n\t\t\t\t\n\t\t\t\t.pill-sell {\n\t\t\t\t\tbackground: rgb(var(--destructive) / 0.15);\n\t\t\t\t\tcolor: rgb(var(--destructive));\n\t\t\t\t}\n\t\t\t\t\n\t\t\t\t.btn {\n\t\t\t\t\tbackground: rgb(var(--accent));\n\t\t\t\t\tcolor: rgb(var(--accent-foreground));\n\t\t\t\t\tborder: none;\n\t\t\t\t\tpadding: 12px 24px;\n\t\t\t\t\tborder-radius: 8px;\n\t\t\t\t\tfont-weight: 600;\n\t\t\t\t\tfont-size: 15px;\n\t\t\t\t\tcursor: pointer;\n\t\t\t\t\ttransition: opacity 0.2s;\n\t\t\t\t\twidth: 100%;\n\t\t\t\t}\n\t\t\t\t\n\t\t\t\t.btn:hover {\n\t\t\t\t\topacity: 0.9;\n\t\t\t\t}\n\t\t\t\t\n\t\t\t\t.btn:active {\n\t\t\t\t\topacity: 0.8;\n\t\t\t\t}\n\t\t\t\t\n\t\t\t\t.input-group {\n\t\t\t\t\tmargin-bottom: 12px;\n\t\t\t\t}\n\t\t\t\t\n\t\t\t\t.input-label {\n\t\t\t\t\tdisplay: block;\n\t\t\t\t\tfont-size: 13px;\n\t\t\t\t\tcolor: rgb(var(--muted-foreground));\n\t\t\t\t\tmargin-bottom: 4px;\n\t\t\t\t\tfont-weight: 500;\n\t\t\t\t}\n\t\t\t\t\n\t\t\t\t.input {\n\t\t\t\t\twidth: 100%;\n\t\t\t\t\tpadding: 10px 12px;\n\t\t\t\t\tbackground: rgb(var(--background));\n\t\t\t\t\tborder: 1px solid rgb(var(--border));\n\t\t\t\t\tborder-radius: 6px;\n\t\t\t\t\tcolor: rgb(var(--foreground));\n\t\t\t\t\tfont-size: 15px;\n\t\t\t\t}\n\t\t\t\t\n\t\t\t\t.input:focus {\n\t\t\t\t\toutline: none;\n\t\t\t\t\tborder-color: rgb(var(--accent));\n\t\t\t\t}\n\t\t\t\t\n\t\t\t\t.select {\n\t\t\t\t\tpadding: 8px 12px;\n\t\t\t\t\tbackground: rgb(var(--background));\n\t\t\t\t\tborder: 1px solid rgb(var(--border));\n\t\t\t\t\tborder-radius: 6px;\n\t\t\t\t\tcolor: rgb(var(--foreground));\n\t\t\t\t\tfont-size: 14px;\n\t\t\t\t\tcursor: pointer;\n\t\t\t\t}\n\t\t\t\t\n\t\t\t\t.grid {\n\t\t\t\t\tdisplay: grid;\n\t\t\t\t\tgrid-template-columns: repeat(2, 1fr);\n\t\t\t\t\tgap: 12px;\n\t\t\t\t}\n\t\t\t\t\n\t\t\t\t@media (min-width: 640px) {\n\t\t\t\t\t.grid {\n\t\t\t\t\t\tgrid-template-columns: repeat(3, 1fr);\n\t\t\t\t\t}\n\t\t\t\t}\n\t\t\t\t\n\t\t\t\t.summary-item {\n\t\t\t\t\tdisplay: flex;\n\t\t\t\t\tflex-direction: column;\n\t\t\t\t\tgap: 4px;\n\t\t\t\t}\n\t\t\t\t\n\t\t\t\t.summary-label {\n\t\t\t\t\tfont-size: 12px;\n\t\t\t\t\tcolor: rgb(var(--muted-foreground));\n\t\t\t\t\ttext-transform: uppercase;\n\t\t\t\t\tletter-spacing: 0.5px;\n\t\t\t\t}\n\t\t\t\t\n\t\t\t\t.summary-value {\n\t\t\t\t\tfont-size: 20px;\n\t\t\t\t\tfont-weight: 700;\n\t\t\t\t}\n\t\t\t\t\n\t\t\t\t.summary-target {\n\t\t\t\t\tfont-size: 11px;\n\t\t\t\t\tcolor: rgb(var(--muted-foreground));\n\t\t\t\t}\n\t\t\t\t\n\t\t\t\t.alert {\n\t\t\t\t\tpadding: 12px 16px;\n\t\t\t\t\tborder-radius: 8px;\n\t\t\t\t\tmargin: 16px;\n\t\t\t\t}\n\t\t\t\t\n\t\t\t\t.alert-success {\n\t\t\t\t\tbackground: rgb(var(--accent) / 0.15);\n\t\t\t\t\tcolor: rgb(var(--accent));\n\t\t\t\t\tborder: 1px solid rgb(var(--accent));\n\t\t\t\t}\n\t\t\t\t\n\t\t\t\t.alert-error {\n\t\t\t\t\tbackground: rgb(var(--destructive) / 0.15);\n\t\t\t\t\tcolor: rgb(var(--destructive));\n\t\t\t\t\tborder: 1px solid rgb(var(--destructive));\n\t\t\t\t}\n\t\t\t\t\n\t\t\t\t.alert-warning {\n\t\t\t\t\tbackground: rgb(255 243 205 / 0.15);\n\t\t\t\t\tcolor: #856404;\n\t\t\t\t\tborder: 1px solid #ffc107;\n\t\t\t\t}\n\t\t\t\t\n\t\t\t\t.dark .alert-warning {\n\t\t\t\t\tbackground: rgb(51 39 1 / 0.3);\n\t\t\t\t\tcolor: #ffc107;\n\t\t\t\t}\n\t\t\t\t\n\t\t\t\t.constraint-list {\n\t\t\t\t\tlist-style: none;\n\t\t\t\t\tfont-size: 13px;\n\t\t\t\t\tline-height: 1.6;\n\t\t\t\t}\n\t\t\t\t\n\t\t\t\t.constraint-list li:before {\n\t\t\t\t\tcontent: \"• \";\n\t\t\t\t\tcolor: rgb(var(--muted-foreground));\n\t\t\t\t}\n\t\t\t\t\n\t\t\t\t.controls-row {\n\t\t\t\t\tdisplay: flex;\n\t\t\t\t\tgap: 12px;\n\t\t\t\t\tpadding: 12px 16px;\n\t\t\t\t\tbackground: rgb(var(--muted));\n\t\t\t\t\tborder-bottom: 1px solid rgb(var(--border));\n\t\t\t\t}\n\t\t\t\t\n\t\t\t\t.controls-row select {\n\t\t\t\t\tflex: 1;\n\t\t\t\t}\n\t\t\t\t\n\t\t\t\t.empty-state {\n\t\t\t\t\ttext-align: center;\n\t\t\t\t\tcolor: rgb(var(--muted-foreground));\n\t\t\t\t\tpadding: 32px 16px;\n\t\t\t\t}\n\t\t\t</style></head><body><div class=\"header\"><div class=\"header-title\">Portfolio Rebalancer</div><button class=\"theme-toggle\" onclick=\"window.toggleTheme()\" title=\"Toggle theme\"><span id=\"theme-icon\">◐</span></button></div><main data-init=\"@get('/events')\"><div id=\"ingest-status\"></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<!doctype html><html lang=\"en\"><head><meta charset=\"UTF-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\"><title>Portfolio Rebalancer</title><script type=\"module\" src=\"https://cdn.jsdelivr.net/gh/starfederation/datastar@v1.0.1/bundles/datastar.js\"></script><script>\n\t\t\t\t// Theme system: match DatastarUI/shadcn with class=\"dark\"\n\t\t\t\t(function() {\n\t\t\t\t\tconst root = document.documentElement;\n\t\t\t\t\tconst media = window.matchMedia('(prefers-color-scheme: dark)');\n\t\t\t\t\t\n\t\t\t\t\tfunction applyTheme(theme) {\n\t\t\t\t\t\tif (theme === 'system') {\n\t\t\t\t\t\t\troot.classList.toggle('dark', media.matches);\n\t\t\t\t\t\t} else {\n\t\t\t\t\t\t\troot.classList.toggle('dark', theme === 'dark');\n\t\t\t\t\t\t}\n\t\t\t\t\t}\n\t\t\t\t\t\n\t\t\t\t\tfunction setTheme(theme) {\n\t\t\t\t\t\tlocalStorage.setItem('theme', theme);\n\t\t\t\t\t\tapplyTheme(theme);\n\t\t\t\t\t}\n\t\t\t\t\t\n\t\t\t\t\t// Initialize from localStorage or system\n\t\t\t\t\tconst saved = localStorage.getItem('theme');\n\t\t\t\t\tif (saved && ['light', 'dark', 'system'].includes(saved)) {\n\t\t\t\t\t\tapplyTheme(saved);\n\t\t\t\t\t} else {\n\t\t\t\t\t\tsetTheme('system');\n\t\t\t\t\t}\n\t\t\t\t\t\n\t\t\t\t\t// Listen for system preference changes when theme=system\n\t\t\t\t\tmedia.addEventListener('change', () => {\n\t\t\t\t\t\tconst current = localStorage.getItem('theme');\n\t\t\t\t\t\tif (!current || current === 'system') {\n\t\t\t\t\t\t\tapplyTheme('system');\n\t\t\t\t\t\t}\n\t\t\t\t\t});\n\t\t\t\t\t\n\t\t\t\t\t// Listen for parent theme messages (Vamos embed)\n\t\t\t\t\twindow.addEventListener('message', e => {\n\t\t\t\t\t\tif (e.data === 'dark' || e.data === 'light') {\n\t\t\t\t\t\t\tsetTheme(e.data);\n\t\t\t\t\t\t}\n\t\t\t\t\t});\n\t\t\t\t\t\n\t\t\t\t\twindow.toggleTheme = function() {\n\t\t\t\t\t\tconst current = localStorage.getItem('theme') || 'system';\n\t\t\t\t\t\tconst isDark = root.classList.contains('dark');\n\t\t\t\t\t\tsetTheme(isDark ? 'light' : 'dark');\n\t\t\t\t\t};\n\t\t\t\t})();\n\t\t\t</script><style>\n\t\t\t\t:root {\n\t\t\t\t\t--background: 255 255 255;\n\t\t\t\t\t--foreground: 0 0 0;\n\t\t\t\t\t--card: 255 255 255;\n\t\t\t\t\t--card-foreground: 0 0 0;\n\t\t\t\t\t--muted: 248 249 250;\n\t\t\t\t\t--muted-foreground: 108 117 125;\n\t\t\t\t\t--border: 222 226 230;\n\t\t\t\t\t--accent: 0 166 81;\n\t\t\t\t\t--accent-foreground: 255 255 255;\n\t\t\t\t\t--destructive: 211 47 47;\n\t\t\t\t\t--destructive-foreground: 255 255 255;\n\t\t\t\t}\n\t\t\t\t\n\t\t\t\t.dark {\n\t\t\t\t\t--background: 0 0 0;\n\t\t\t\t\t--foreground: 255 255 255;\n\t\t\t\t\t--card: 26 26 26;\n\t\t\t\t\t--card-foreground: 255 255 255;\n\t\t\t\t\t--muted: 45 45 45;\n\t\t\t\t\t--muted-foreground: 176 176 176;\n\t\t\t\t\t--border: 58 58 58;\n\t\t\t\t\t--accent: 0 214 98;\n\t\t\t\t\t--accent-foreground: 0 0 0;\n\t\t\t\t\t--destructive: 255 82 82;\n\t\t\t\t\t--destructive-foreground: 255 255 255;\n\t\t\t\t}\n\t\t\t\t\n\t\t\t\t* {\n\t\t\t\t\tmargin: 0;\n\t\t\t\t\tpadding: 0;\n\t\t\t\t\tbox-sizing: border-box;\n\t\t\t\t}\n\t\t\t\t\n\t\t\t\tbody {\n\t\t\t\t\tfont-family: -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, \"Helvetica Neue\", Arial, sans-serif;\n\t\t\t\t\tbackground: rgb(var(--background));\n\t\t\t\t\tcolor: rgb(var(--foreground));\n\t\t\t\t\tline-height: 1.5;\n\t\t\t\t}\n\t\t\t\t\n\t\t\t\t.container {\n\t\t\t\t\tmax-width: 960px;\n\t\t\t\t\tmargin: 0 auto;\n\t\t\t\t}\n\t\t\t\t\n\t\t\t\t.header {\n\t\t\t\t\tbackground: rgb(var(--card));\n\t\t\t\t\tborder-bottom: 1px solid rgb(var(--border));\n\t\t\t\t\tpadding: 16px;\n\t\t\t\t\tdisplay: flex;\n\t\t\t\t\tjustify-content: space-between;\n\t\t\t\t\talign-items: center;\n\t\t\t\t\tposition: sticky;\n\t\t\t\t\ttop: 0;\n\t\t\t\t\tz-index: 100;\n\t\t\t\t}\n\t\t\t\t\n\t\t\t\t.header-title {\n\t\t\t\t\tfont-size: 18px;\n\t\t\t\t\tfont-weight: 600;\n\t\t\t\t}\n\t\t\t\t\n\t\t\t\t.theme-toggle {\n\t\t\t\t\tbackground: none;\n\t\t\t\t\tborder: none;\n\t\t\t\t\tcolor: rgb(var(--foreground));\n\t\t\t\t\tfont-size: 20px;\n\t\t\t\t\tcursor: pointer;\n\t\t\t\t\tpadding: 8px;\n\t\t\t\t\tborder-radius: 8px;\n\t\t\t\t\ttransition: background 0.2s;\n\t\t\t\t}\n\t\t\t\t\n\t\t\t\t.theme-toggle:hover {\n\t\t\t\t\tbackground: rgb(var(--muted));\n\t\t\t\t}\n\t\t\t\t\n\t\t\t\t.card {\n\t\t\t\t\tbackground: rgb(var(--card));\n\t\t\t\t\tborder: 1px solid rgb(var(--border));\n\t\t\t\t\tborder-radius: 8px;\n\t\t\t\t\tmargin: 16px;\n\t\t\t\t\toverflow: hidden;\n\t\t\t\t}\n\t\t\t\t\n\t\t\t\t.card-header {\n\t\t\t\t\tpadding: 16px;\n\t\t\t\t\tborder-bottom: 1px solid rgb(var(--border));\n\t\t\t\t\tfont-weight: 600;\n\t\t\t\t\tfont-size: 16px;\n\t\t\t\t\tbackground: rgb(var(--muted));\n\t\t\t\t\tposition: sticky;\n\t\t\t\t\ttop: 57px;\n\t\t\t\t\tz-index: 10;\n\t\t\t\t}\n\t\t\t\t\n\t\t\t\t.card-body {\n\t\t\t\t\tpadding: 16px;\n\t\t\t\t}\n\t\t\t\t\n\t\t\t\t.search-controls {\n\t\t\t\t\tdisplay: flex;\n\t\t\t\t\tgap: 12px;\n\t\t\t\t\tpadding: 12px 16px;\n\t\t\t\t\tbackground: rgb(var(--muted));\n\t\t\t\t\tborder-bottom: 1px solid rgb(var(--border));\n\t\t\t\t\talign-items: center;\n\t\t\t\t}\n\t\t\t\t\n\t\t\t\t.search-input {\n\t\t\t\t\tflex: 1;\n\t\t\t\t\tpadding: 10px 12px;\n\t\t\t\t\tbackground: rgb(var(--background));\n\t\t\t\t\tborder: 1px solid rgb(var(--border));\n\t\t\t\t\tborder-radius: 6px;\n\t\t\t\t\tcolor: rgb(var(--foreground));\n\t\t\t\t\tfont-size: 14px;\n\t\t\t\t}\n\t\t\t\t\n\t\t\t\t.search-input::placeholder {\n\t\t\t\t\tcolor: rgb(var(--muted-foreground));\n\t\t\t\t}\n\t\t\t\t\n\t\t\t\t.search-input:focus {\n\t\t\t\t\toutline: none;\n\t\t\t\t\tborder-color: rgb(var(--accent));\n\t\t\t\t}\n\t\t\t\t\n\t\t\t\t.sort-select {\n\t\t\t\t\tpadding: 10px 12px;\n\t\t\t\t\tbackground: rgb(var(--background));\n\t\t\t\t\tborder: 1px solid rgb(var(--border));\n\t\t\t\t\tborder-radius: 6px;\n\t\t\t\t\tcolor: rgb(var(--foreground));\n\t\t\t\t\tfont-size: 14px;\n\t\t\t\t\tcursor: pointer;\n\t\t\t\t\tmin-width: 120px;\n\t\t\t\t}\n\t\t\t\t\n\t\t\t\t.list-container {\n\t\t\t\t\tmax-height: 600px;\n\t\t\t\t\toverflow-y: auto;\n\t\t\t\t}\n\t\t\t\t\n\t\t\t\t.list-row {\n\t\t\t\t\tdisplay: flex;\n\t\t\t\t\tjustify-content: space-between;\n\t\t\t\t\talign-items: center;\n\t\t\t\t\tpadding: 12px 16px;\n\t\t\t\t\tborder-bottom: 1px solid rgb(var(--border));\n\t\t\t\t\ttransition: background 0.1s;\n\t\t\t\t}\n\t\t\t\t\n\t\t\t\t.list-row:hover {\n\t\t\t\t\tbackground: rgb(var(--muted) / 0.5);\n\t\t\t\t}\n\t\t\t\t\n\t\t\t\t.list-row:last-child {\n\t\t\t\t\tborder-bottom: none;\n\t\t\t\t}\n\t\t\t\t\n\t\t\t\t.list-left {\n\t\t\t\t\tflex: 1;\n\t\t\t\t\tmin-width: 0;\n\t\t\t\t}\n\t\t\t\t\n\t\t\t\t.list-symbol {\n\t\t\t\t\tfont-weight: 700;\n\t\t\t\t\tfont-size: 16px;\n\t\t\t\t\tmargin-bottom: 2px;\n\t\t\t\t\tcolor: rgb(var(--foreground));\n\t\t\t\t}\n\t\t\t\t\n\t\t\t\t.list-detail {\n\t\t\t\t\tfont-size: 13px;\n\t\t\t\t\tcolor: rgb(var(--muted-foreground));\n\t\t\t\t\tmargin-bottom: 2px;\n\t\t\t\t}\n\t\t\t\t\n\t\t\t\t.list-account {\n\t\t\t\t\tfont-size: 11px;\n\t\t\t\t\tcolor: rgb(var(--muted-foreground));\n\t\t\t\t}\n\t\t\t\t\n\t\t\t\t.list-right {\n\t\t\t\t\ttext-align: right;\n\t\t\t\t\tmargin-left: 16px;\n\t\t\t\t}\n\t\t\t\t\n\t\t\t\t.list-value {\n\t\t\t\t\tfont-size: 16px;\n\t\t\t\t\tfont-weight: 600;\n\t\t\t\t\tcolor: rgb(var(--foreground));\n\t\t\t\t}\n\t\t\t\t\n\t\t\t\t.table-container {\n\t\t\t\t\toverflow-x: auto;\n\t\t\t\t}\n\t\t\t\t\n\t\t\t\t.table {\n\t\t\t\t\twidth: 100%;\n\t\t\t\t\tborder-collapse: collapse;\n\t\t\t\t\tfont-size: 14px;\n\t\t\t\t}\n\t\t\t\t\n\t\t\t\t.table thead {\n\t\t\t\t\tbackground: rgb(var(--muted));\n\t\t\t\t\tposition: sticky;\n\t\t\t\t\ttop: 73px;\n\t\t\t\t\tz-index: 9;\n\t\t\t\t}\n\t\t\t\t\n\t\t\t\t.table th {\n\t\t\t\t\tpadding: 12px 16px;\n\t\t\t\t\ttext-align: left;\n\t\t\t\t\tfont-weight: 600;\n\t\t\t\t\tfont-size: 12px;\n\t\t\t\t\ttext-transform: uppercase;\n\t\t\t\t\tletter-spacing: 0.5px;\n\t\t\t\t\tcolor: rgb(var(--muted-foreground));\n\t\t\t\t\tborder-bottom: 1px solid rgb(var(--border));\n\t\t\t\t}\n\t\t\t\t\n\t\t\t\t.table th.text-right {\n\t\t\t\t\ttext-align: right;\n\t\t\t\t}\n\t\t\t\t\n\t\t\t\t.table td {\n\t\t\t\t\tpadding: 12px 16px;\n\t\t\t\t\tborder-bottom: 1px solid rgb(var(--border));\n\t\t\t\t}\n\t\t\t\t\n\t\t\t\t.table td.text-right {\n\t\t\t\t\ttext-align: right;\n\t\t\t\t}\n\t\t\t\t\n\t\t\t\t.table td.muted {\n\t\t\t\t\tcolor: rgb(var(--muted-foreground));\n\t\t\t\t}\n\t\t\t\t\n\t\t\t\t.table tbody tr:nth-child(even) {\n\t\t\t\t\tbackground: rgb(var(--muted) / 0.3);\n\t\t\t\t}\n\t\t\t\t\n\t\t\t\t.table tbody tr:hover {\n\t\t\t\t\tbackground: rgb(var(--muted) / 0.6);\n\t\t\t\t}\n\t\t\t\t\n\t\t\t\t.symbol {\n\t\t\t\t\tfont-weight: 600;\n\t\t\t\t}\n\t\t\t\t\n\t\t\t\t.account-badge {\n\t\t\t\t\tdisplay: inline-block;\n\t\t\t\t\tfont-size: 11px;\n\t\t\t\t\tpadding: 2px 8px;\n\t\t\t\t\tborder-radius: 10px;\n\t\t\t\t\tbackground: rgb(var(--muted));\n\t\t\t\t\tcolor: rgb(var(--muted-foreground));\n\t\t\t\t\tfont-weight: 500;\n\t\t\t\t\tmargin-left: 6px;\n\t\t\t\t}\n\t\t\t\t\n\t\t\t\t.pill {\n\t\t\t\t\tfont-size: 11px;\n\t\t\t\t\tpadding: 3px 8px;\n\t\t\t\t\tborder-radius: 10px;\n\t\t\t\t\tfont-weight: 600;\n\t\t\t\t\twhite-space: nowrap;\n\t\t\t\t}\n\t\t\t\t\n\t\t\t\t.pill-buy {\n\t\t\t\t\tbackground: rgb(var(--accent) / 0.15);\n\t\t\t\t\tcolor: rgb(var(--accent));\n\t\t\t\t}\n\t\t\t\t\n\t\t\t\t.pill-sell {\n\t\t\t\t\tbackground: rgb(var(--destructive) / 0.15);\n\t\t\t\t\tcolor: rgb(var(--destructive));\n\t\t\t\t}\n\t\t\t\t\n\t\t\t\t.btn {\n\t\t\t\t\tbackground: rgb(var(--accent));\n\t\t\t\t\tcolor: rgb(var(--accent-foreground));\n\t\t\t\t\tborder: none;\n\t\t\t\t\tpadding: 12px 24px;\n\t\t\t\t\tborder-radius: 8px;\n\t\t\t\t\tfont-weight: 600;\n\t\t\t\t\tfont-size: 15px;\n\t\t\t\t\tcursor: pointer;\n\t\t\t\t\ttransition: opacity 0.2s;\n\t\t\t\t\twidth: 100%;\n\t\t\t\t}\n\t\t\t\t\n\t\t\t\t.btn:hover {\n\t\t\t\t\topacity: 0.9;\n\t\t\t\t}\n\t\t\t\t\n\t\t\t\t.btn:active {\n\t\t\t\t\topacity: 0.8;\n\t\t\t\t}\n\t\t\t\t\n\t\t\t\t.input-group {\n\t\t\t\t\tmargin-bottom: 12px;\n\t\t\t\t}\n\t\t\t\t\n\t\t\t\t.input-label {\n\t\t\t\t\tdisplay: block;\n\t\t\t\t\tfont-size: 13px;\n\t\t\t\t\tcolor: rgb(var(--muted-foreground));\n\t\t\t\t\tmargin-bottom: 4px;\n\t\t\t\t\tfont-weight: 500;\n\t\t\t\t}\n\t\t\t\t\n\t\t\t\t.input {\n\t\t\t\t\twidth: 100%;\n\t\t\t\t\tpadding: 10px 12px;\n\t\t\t\t\tbackground: rgb(var(--background));\n\t\t\t\t\tborder: 1px solid rgb(var(--border));\n\t\t\t\t\tborder-radius: 6px;\n\t\t\t\t\tcolor: rgb(var(--foreground));\n\t\t\t\t\tfont-size: 15px;\n\t\t\t\t}\n\t\t\t\t\n\t\t\t\t.input:focus {\n\t\t\t\t\toutline: none;\n\t\t\t\t\tborder-color: rgb(var(--accent));\n\t\t\t\t}\n\t\t\t\t\n\t\t\t\t.select {\n\t\t\t\t\tpadding: 8px 12px;\n\t\t\t\t\tbackground: rgb(var(--background));\n\t\t\t\t\tborder: 1px solid rgb(var(--border));\n\t\t\t\t\tborder-radius: 6px;\n\t\t\t\t\tcolor: rgb(var(--foreground));\n\t\t\t\t\tfont-size: 14px;\n\t\t\t\t\tcursor: pointer;\n\t\t\t\t}\n\t\t\t\t\n\t\t\t\t.grid {\n\t\t\t\t\tdisplay: grid;\n\t\t\t\t\tgrid-template-columns: repeat(2, 1fr);\n\t\t\t\t\tgap: 12px;\n\t\t\t\t}\n\t\t\t\t\n\t\t\t\t@media (min-width: 640px) {\n\t\t\t\t\t.grid {\n\t\t\t\t\t\tgrid-template-columns: repeat(3, 1fr);\n\t\t\t\t\t}\n\t\t\t\t}\n\t\t\t\t\n\t\t\t\t.summary-item {\n\t\t\t\t\tdisplay: flex;\n\t\t\t\t\tflex-direction: column;\n\t\t\t\t\tgap: 4px;\n\t\t\t\t}\n\t\t\t\t\n\t\t\t\t.summary-label {\n\t\t\t\t\tfont-size: 12px;\n\t\t\t\t\tcolor: rgb(var(--muted-foreground));\n\t\t\t\t\ttext-transform: uppercase;\n\t\t\t\t\tletter-spacing: 0.5px;\n\t\t\t\t}\n\t\t\t\t\n\t\t\t\t.summary-value {\n\t\t\t\t\tfont-size: 20px;\n\t\t\t\t\tfont-weight: 700;\n\t\t\t\t}\n\t\t\t\t\n\t\t\t\t.summary-target {\n\t\t\t\t\tfont-size: 11px;\n\t\t\t\t\tcolor: rgb(var(--muted-foreground));\n\t\t\t\t}\n\t\t\t\t\n\t\t\t\t.alert {\n\t\t\t\t\tpadding: 12px 16px;\n\t\t\t\t\tborder-radius: 8px;\n\t\t\t\t\tmargin: 16px;\n\t\t\t\t}\n\t\t\t\t\n\t\t\t\t.alert-success {\n\t\t\t\t\tbackground: rgb(var(--accent) / 0.15);\n\t\t\t\t\tcolor: rgb(var(--accent));\n\t\t\t\t\tborder: 1px solid rgb(var(--accent));\n\t\t\t\t}\n\t\t\t\t\n\t\t\t\t.alert-error {\n\t\t\t\t\tbackground: rgb(var(--destructive) / 0.15);\n\t\t\t\t\tcolor: rgb(var(--destructive));\n\t\t\t\t\tborder: 1px solid rgb(var(--destructive));\n\t\t\t\t}\n\t\t\t\t\n\t\t\t\t.alert-warning {\n\t\t\t\t\tbackground: rgb(255 243 205 / 0.15);\n\t\t\t\t\tcolor: #856404;\n\t\t\t\t\tborder: 1px solid #ffc107;\n\t\t\t\t}\n\t\t\t\t\n\t\t\t\t.dark .alert-warning {\n\t\t\t\t\tbackground: rgb(51 39 1 / 0.3);\n\t\t\t\t\tcolor: #ffc107;\n\t\t\t\t}\n\t\t\t\t\n\t\t\t\t.constraint-list {\n\t\t\t\t\tlist-style: none;\n\t\t\t\t\tfont-size: 13px;\n\t\t\t\t\tline-height: 1.6;\n\t\t\t\t}\n\t\t\t\t\n\t\t\t\t.constraint-list li:before {\n\t\t\t\t\tcontent: \"• \";\n\t\t\t\t\tcolor: rgb(var(--muted-foreground));\n\t\t\t\t}\n\t\t\t\t\n\t\t\t\t.controls-row {\n\t\t\t\t\tdisplay: flex;\n\t\t\t\t\tgap: 12px;\n\t\t\t\t\tpadding: 12px 16px;\n\t\t\t\t\tbackground: rgb(var(--muted));\n\t\t\t\t\tborder-bottom: 1px solid rgb(var(--border));\n\t\t\t\t}\n\t\t\t\t\n\t\t\t\t.controls-row select {\n\t\t\t\t\tflex: 1;\n\t\t\t\t}\n\t\t\t\t\n\t\t\t\t.empty-state {\n\t\t\t\t\ttext-align: center;\n\t\t\t\t\tcolor: rgb(var(--muted-foreground));\n\t\t\t\t\tpadding: 32px 16px;\n\t\t\t\t}\n\t\t\t</style></head><body><div class=\"header\"><div class=\"header-title\">Portfolio Rebalancer</div><button class=\"theme-toggle\" onclick=\"window.toggleTheme()\" title=\"Toggle theme\"><span id=\"theme-icon\">◐</span></button></div><main data-init=\"@get('/events')\"><div id=\"ingest-status\"></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -157,7 +157,7 @@ func IngestStatus(status, message string) templ.Component {
 			var templ_7745c5c3_Var6 string
 			templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.JoinStringErrs(message)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/page.templ`, Line: 455, Col: 13}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/page.templ`, Line: 550, Col: 13}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var6))
 			if templ_7745c5c3_Err != nil {
@@ -204,7 +204,7 @@ func Targets(data PageData) templ.Component {
 		var templ_7745c5c3_Var8 string
 		templ_7745c5c3_Var8, templ_7745c5c3_Err = templ.ResolveAttributeValue(formatFloat(data.Targets.USEquity))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/page.templ`, Line: 475, Col: 49}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/page.templ`, Line: 570, Col: 49}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var8)
 		if templ_7745c5c3_Err != nil {
@@ -217,7 +217,7 @@ func Targets(data PageData) templ.Component {
 		var templ_7745c5c3_Var9 string
 		templ_7745c5c3_Var9, templ_7745c5c3_Err = templ.ResolveAttributeValue(formatFloat(data.Targets.IntlEquity))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/page.templ`, Line: 489, Col: 51}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/page.templ`, Line: 584, Col: 51}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var9)
 		if templ_7745c5c3_Err != nil {
@@ -230,7 +230,7 @@ func Targets(data PageData) templ.Component {
 		var templ_7745c5c3_Var10 string
 		templ_7745c5c3_Var10, templ_7745c5c3_Err = templ.ResolveAttributeValue(formatFloat(data.Targets.ThematicEquity))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/page.templ`, Line: 503, Col: 55}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/page.templ`, Line: 598, Col: 55}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var10)
 		if templ_7745c5c3_Err != nil {
@@ -243,7 +243,7 @@ func Targets(data PageData) templ.Component {
 		var templ_7745c5c3_Var11 string
 		templ_7745c5c3_Var11, templ_7745c5c3_Err = templ.ResolveAttributeValue(formatFloat(data.Targets.Gold))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/page.templ`, Line: 517, Col: 45}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/page.templ`, Line: 612, Col: 45}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var11)
 		if templ_7745c5c3_Err != nil {
@@ -256,7 +256,7 @@ func Targets(data PageData) templ.Component {
 		var templ_7745c5c3_Var12 string
 		templ_7745c5c3_Var12, templ_7745c5c3_Err = templ.ResolveAttributeValue(formatFloat(data.Targets.ShortDuration))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/page.templ`, Line: 531, Col: 54}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/page.templ`, Line: 626, Col: 54}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var12)
 		if templ_7745c5c3_Err != nil {
@@ -269,7 +269,7 @@ func Targets(data PageData) templ.Component {
 		var templ_7745c5c3_Var13 string
 		templ_7745c5c3_Var13, templ_7745c5c3_Err = templ.ResolveAttributeValue(formatFloat(data.Targets.Cash))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/page.templ`, Line: 545, Col: 45}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/page.templ`, Line: 640, Col: 45}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var13)
 		if templ_7745c5c3_Err != nil {
@@ -311,7 +311,7 @@ func Summary(data PageData) templ.Component {
 		var templ_7745c5c3_Var15 string
 		templ_7745c5c3_Var15, templ_7745c5c3_Err = templ.JoinStringErrs("$" + formatMoney(data.TotalValue))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/page.templ`, Line: 564, Col: 68}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/page.templ`, Line: 659, Col: 68}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var15))
 		if templ_7745c5c3_Err != nil {
@@ -330,7 +330,7 @@ func Summary(data PageData) templ.Component {
 				var templ_7745c5c3_Var16 string
 				templ_7745c5c3_Var16, templ_7745c5c3_Err = templ.JoinStringErrs(cb.Class)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/page.templ`, Line: 569, Col: 44}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/page.templ`, Line: 664, Col: 44}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var16))
 				if templ_7745c5c3_Err != nil {
@@ -343,7 +343,7 @@ func Summary(data PageData) templ.Component {
 				var templ_7745c5c3_Var17 string
 				templ_7745c5c3_Var17, templ_7745c5c3_Err = templ.JoinStringErrs(formatFloat(cb.CurrentPct))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/page.templ`, Line: 570, Col: 62}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/page.templ`, Line: 665, Col: 62}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var17))
 				if templ_7745c5c3_Err != nil {
@@ -361,7 +361,7 @@ func Summary(data PageData) templ.Component {
 					var templ_7745c5c3_Var18 string
 					templ_7745c5c3_Var18, templ_7745c5c3_Err = templ.JoinStringErrs(formatFloat(cb.TargetPct))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/page.templ`, Line: 572, Col: 71}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/page.templ`, Line: 667, Col: 71}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var18))
 					if templ_7745c5c3_Err != nil {
@@ -395,7 +395,7 @@ func Summary(data PageData) templ.Component {
 				var templ_7745c5c3_Var19 string
 				templ_7745c5c3_Var19, templ_7745c5c3_Err = templ.JoinStringErrs(b)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/page.templ`, Line: 583, Col: 14}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/page.templ`, Line: 678, Col: 14}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var19))
 				if templ_7745c5c3_Err != nil {
@@ -440,209 +440,114 @@ func Positions(data PageData) templ.Component {
 			templ_7745c5c3_Var20 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 34, "<div id=\"positions\" class=\"card\"><div class=\"card-header\">Positions</div><div class=\"controls-row\"><select name=\"listShows\" data-model=\"listShows\" data-on:change=\"@post('/positions', {contentType: 'form'})\" class=\"select\"><option value=\"value\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 34, "<div id=\"positions\" class=\"card\"><div class=\"card-header\">Positions</div><div class=\"search-controls\"><input type=\"text\" placeholder=\"Search 57 positions\" class=\"search-input\" data-model=\"searchQuery\" data-on:input.debounce_300ms=\"@post('/positions', {contentType: 'form'})\"> <select name=\"sortBy\" data-model=\"sortBy\" data-on:change=\"@post('/positions', {contentType: 'form'})\" class=\"sort-select\"><option value=\"value\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		if data.ListShows == "value" {
+		if data.SortBy == "value" {
 			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 35, " selected")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 36, ">Market Value</option> <option value=\"quantity\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 36, ">Last price</option> <option value=\"symbol\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		if data.ListShows == "quantity" {
+		if data.SortBy == "symbol" {
 			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 37, " selected")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 38, ">Quantity</option> <option value=\"price\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 38, ">Symbol</option> <option value=\"account\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		if data.ListShows == "price" {
+		if data.SortBy == "account" {
 			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 39, " selected")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 40, ">Last Price</option></select> <select name=\"sortBy\" data-model=\"sortBy\" data-on:change=\"@post('/positions', {contentType: 'form'})\" class=\"select\"><option value=\"value\"")
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		if data.SortBy == "value" {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 41, " selected")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 42, ">Sort by Value</option> <option value=\"account\"")
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		if data.SortBy == "account" {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 43, " selected")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 44, ">Sort by Account</option> <option value=\"class\"")
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		if data.SortBy == "class" {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 45, " selected")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 46, ">Sort by Class</option> <option value=\"symbol\"")
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		if data.SortBy == "symbol" {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 47, " selected")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 48, ">Sort by Symbol</option></select></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 40, ">Account</option></select></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		if len(data.Positions) == 0 {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 49, "<div class=\"empty-state\">No positions loaded. Click \"Load Positions\" to start.</div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 41, "<div class=\"empty-state\">No positions loaded. Click \"Load Positions\" to start.</div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		} else {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 50, "<div class=\"table-container\"><table class=\"table\"><thead><tr><th>Account</th><th>Symbol</th><th class=\"muted\">Name</th><th class=\"muted\">Class</th><th class=\"text-right\">")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			if data.ListShows == "quantity" {
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 51, "Quantity")
-				if templ_7745c5c3_Err != nil {
-					return templ_7745c5c3_Err
-				}
-			} else if data.ListShows == "price" {
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 52, "Price")
-				if templ_7745c5c3_Err != nil {
-					return templ_7745c5c3_Err
-				}
-			} else {
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 53, "Value")
-				if templ_7745c5c3_Err != nil {
-					return templ_7745c5c3_Err
-				}
-			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 54, "</th></tr></thead> <tbody>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 42, "<div class=\"list-container\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			for _, p := range data.Positions {
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 55, "<tr><td class=\"muted\">")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 43, "<div class=\"list-row\"><div class=\"list-left\"><div class=\"list-symbol\">")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 				var templ_7745c5c3_Var21 string
-				templ_7745c5c3_Var21, templ_7745c5c3_Err = templ.JoinStringErrs(p.Account)
+				templ_7745c5c3_Var21, templ_7745c5c3_Err = templ.JoinStringErrs(p.Symbol)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/page.templ`, Line: 645, Col: 37}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/page.templ`, Line: 718, Col: 42}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var21))
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 56, "</td><td class=\"symbol\">")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 44, "</div><div class=\"list-detail\">")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 				var templ_7745c5c3_Var22 string
-				templ_7745c5c3_Var22, templ_7745c5c3_Err = templ.JoinStringErrs(p.Symbol)
+				templ_7745c5c3_Var22, templ_7745c5c3_Err = templ.JoinStringErrs(formatFloat(p.Quantity) + " @ $" + formatMoney(p.Price))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/page.templ`, Line: 646, Col: 37}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/page.templ`, Line: 720, Col: 65}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var22))
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 57, "</td><td class=\"muted\">")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 45, "</div><div class=\"list-account\">")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 				var templ_7745c5c3_Var23 string
-				templ_7745c5c3_Var23, templ_7745c5c3_Err = templ.JoinStringErrs(p.Name)
+				templ_7745c5c3_Var23, templ_7745c5c3_Err = templ.JoinStringErrs(p.Account)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/page.templ`, Line: 647, Col: 34}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/page.templ`, Line: 722, Col: 44}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var23))
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 58, "</td><td class=\"muted\">")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 46, "</div></div><div class=\"list-right\"><div class=\"list-value\">")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 				var templ_7745c5c3_Var24 string
-				templ_7745c5c3_Var24, templ_7745c5c3_Err = templ.JoinStringErrs(p.AssetClass)
+				templ_7745c5c3_Var24, templ_7745c5c3_Err = templ.JoinStringErrs("$" + formatMoney(p.MarketValue))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/page.templ`, Line: 648, Col: 40}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/page.templ`, Line: 725, Col: 65}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var24))
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 59, "</td><td class=\"text-right\">")
-				if templ_7745c5c3_Err != nil {
-					return templ_7745c5c3_Err
-				}
-				if data.ListShows == "quantity" {
-					var templ_7745c5c3_Var25 string
-					templ_7745c5c3_Var25, templ_7745c5c3_Err = templ.JoinStringErrs(formatFloat(p.Quantity))
-					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/page.templ`, Line: 651, Col: 35}
-					}
-					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var25))
-					if templ_7745c5c3_Err != nil {
-						return templ_7745c5c3_Err
-					}
-				} else if data.ListShows == "price" {
-					var templ_7745c5c3_Var26 string
-					templ_7745c5c3_Var26, templ_7745c5c3_Err = templ.JoinStringErrs("$" + formatMoney(p.Price))
-					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/page.templ`, Line: 653, Col: 38}
-					}
-					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var26))
-					if templ_7745c5c3_Err != nil {
-						return templ_7745c5c3_Err
-					}
-				} else {
-					var templ_7745c5c3_Var27 string
-					templ_7745c5c3_Var27, templ_7745c5c3_Err = templ.JoinStringErrs("$" + formatMoney(p.MarketValue))
-					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/page.templ`, Line: 655, Col: 44}
-					}
-					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var27))
-					if templ_7745c5c3_Err != nil {
-						return templ_7745c5c3_Err
-					}
-				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 60, "</td></tr>")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 47, "</div></div></div>")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 61, "</tbody></table></div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 48, "</div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 62, "</div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 49, "</div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -666,137 +571,137 @@ func Trades(data PageData) templ.Component {
 			}()
 		}
 		ctx = templ.InitializeContext(ctx)
-		templ_7745c5c3_Var28 := templ.GetChildren(ctx)
-		if templ_7745c5c3_Var28 == nil {
-			templ_7745c5c3_Var28 = templ.NopComponent
+		templ_7745c5c3_Var25 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var25 == nil {
+			templ_7745c5c3_Var25 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 63, "<div id=\"trades\" class=\"card\"><div class=\"card-header\">Proposed Trades</div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 50, "<div id=\"trades\" class=\"card\"><div class=\"card-header\">Proposed Trades</div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		if len(data.Trades) == 0 {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 64, "<div class=\"empty-state\">No trades proposed. Adjust target allocation to generate trades.</div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 51, "<div class=\"empty-state\">No trades proposed. Adjust target allocation to generate trades.</div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		} else {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 65, "<div class=\"table-container\"><table class=\"table\"><thead><tr><th>Account</th><th>Side</th><th>Symbol</th><th class=\"text-right\">Shares</th><th class=\"text-right\">Dollars</th><th class=\"muted\">Reason</th></tr></thead> <tbody>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 52, "<div class=\"table-container\"><table class=\"table\"><thead><tr><th>Account</th><th>Side</th><th>Symbol</th><th class=\"text-right\">Shares</th><th class=\"text-right\">Dollars</th><th class=\"muted\">Reason</th></tr></thead> <tbody>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			for _, t := range data.Trades {
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 66, "<tr><td class=\"muted\">")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 53, "<tr><td class=\"muted\">")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				var templ_7745c5c3_Var26 string
+				templ_7745c5c3_Var26, templ_7745c5c3_Err = templ.JoinStringErrs(t.Account)
+				if templ_7745c5c3_Err != nil {
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/page.templ`, Line: 757, Col: 37}
+				}
+				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var26))
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 54, "</td><td>")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				var templ_7745c5c3_Var27 = []any{"pill", templ.KV("pill-buy", t.Side == "BUY"), templ.KV("pill-sell", t.Side == "SELL")}
+				templ_7745c5c3_Err = templ.RenderCSSItems(ctx, templ_7745c5c3_Buffer, templ_7745c5c3_Var27...)
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 55, "<span class=\"")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				var templ_7745c5c3_Var28 string
+				templ_7745c5c3_Var28, templ_7745c5c3_Err = templ.ResolveAttributeValue(templ.CSSClasses(templ_7745c5c3_Var27).String())
+				if templ_7745c5c3_Err != nil {
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/page.templ`, Line: 1, Col: 0}
+				}
+				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var28)
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 56, "\">")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 				var templ_7745c5c3_Var29 string
-				templ_7745c5c3_Var29, templ_7745c5c3_Err = templ.JoinStringErrs(t.Account)
+				templ_7745c5c3_Var29, templ_7745c5c3_Err = templ.JoinStringErrs(t.Side)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/page.templ`, Line: 690, Col: 37}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/page.templ`, Line: 760, Col: 18}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var29))
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 67, "</td><td>")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 57, "</span></td><td class=\"symbol\">")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				var templ_7745c5c3_Var30 = []any{"pill", templ.KV("pill-buy", t.Side == "BUY"), templ.KV("pill-sell", t.Side == "SELL")}
-				templ_7745c5c3_Err = templ.RenderCSSItems(ctx, templ_7745c5c3_Buffer, templ_7745c5c3_Var30...)
+				var templ_7745c5c3_Var30 string
+				templ_7745c5c3_Var30, templ_7745c5c3_Err = templ.JoinStringErrs(t.Symbol)
+				if templ_7745c5c3_Err != nil {
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/page.templ`, Line: 763, Col: 37}
+				}
+				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var30))
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 68, "<span class=\"")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 58, "</td><td class=\"text-right\">")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 				var templ_7745c5c3_Var31 string
-				templ_7745c5c3_Var31, templ_7745c5c3_Err = templ.ResolveAttributeValue(templ.CSSClasses(templ_7745c5c3_Var30).String())
+				templ_7745c5c3_Var31, templ_7745c5c3_Err = templ.JoinStringErrs(formatInt(t.RoundedShares))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/page.templ`, Line: 1, Col: 0}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/page.templ`, Line: 764, Col: 59}
 				}
-				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var31)
+				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var31))
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 69, "\">")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 59, "</td><td class=\"text-right\">")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 				var templ_7745c5c3_Var32 string
-				templ_7745c5c3_Var32, templ_7745c5c3_Err = templ.JoinStringErrs(t.Side)
+				templ_7745c5c3_Var32, templ_7745c5c3_Err = templ.JoinStringErrs("$" + formatMoney(t.Dollars))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/page.templ`, Line: 693, Col: 18}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/page.templ`, Line: 765, Col: 61}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var32))
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 70, "</span></td><td class=\"symbol\">")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 60, "</td><td class=\"muted\">")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 				var templ_7745c5c3_Var33 string
-				templ_7745c5c3_Var33, templ_7745c5c3_Err = templ.JoinStringErrs(t.Symbol)
+				templ_7745c5c3_Var33, templ_7745c5c3_Err = templ.JoinStringErrs(t.Reason)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/page.templ`, Line: 696, Col: 37}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/page.templ`, Line: 766, Col: 36}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var33))
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 71, "</td><td class=\"text-right\">")
-				if templ_7745c5c3_Err != nil {
-					return templ_7745c5c3_Err
-				}
-				var templ_7745c5c3_Var34 string
-				templ_7745c5c3_Var34, templ_7745c5c3_Err = templ.JoinStringErrs(formatInt(t.RoundedShares))
-				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/page.templ`, Line: 697, Col: 59}
-				}
-				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var34))
-				if templ_7745c5c3_Err != nil {
-					return templ_7745c5c3_Err
-				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 72, "</td><td class=\"text-right\">")
-				if templ_7745c5c3_Err != nil {
-					return templ_7745c5c3_Err
-				}
-				var templ_7745c5c3_Var35 string
-				templ_7745c5c3_Var35, templ_7745c5c3_Err = templ.JoinStringErrs("$" + formatMoney(t.Dollars))
-				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/page.templ`, Line: 698, Col: 61}
-				}
-				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var35))
-				if templ_7745c5c3_Err != nil {
-					return templ_7745c5c3_Err
-				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 73, "</td><td class=\"muted\">")
-				if templ_7745c5c3_Err != nil {
-					return templ_7745c5c3_Err
-				}
-				var templ_7745c5c3_Var36 string
-				templ_7745c5c3_Var36, templ_7745c5c3_Err = templ.JoinStringErrs(t.Reason)
-				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/page.templ`, Line: 699, Col: 36}
-				}
-				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var36))
-				if templ_7745c5c3_Err != nil {
-					return templ_7745c5c3_Err
-				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 74, "</td></tr>")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 61, "</td></tr>")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 75, "</tbody></table></div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 62, "</tbody></table></div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 76, "</div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 63, "</div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

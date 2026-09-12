@@ -159,6 +159,101 @@ templ Layout(data PageData) {
 					padding: 16px;
 				}
 				
+				.search-controls {
+					display: flex;
+					gap: 12px;
+					padding: 12px 16px;
+					background: rgb(var(--muted));
+					border-bottom: 1px solid rgb(var(--border));
+					align-items: center;
+				}
+				
+				.search-input {
+					flex: 1;
+					padding: 10px 12px;
+					background: rgb(var(--background));
+					border: 1px solid rgb(var(--border));
+					border-radius: 6px;
+					color: rgb(var(--foreground));
+					font-size: 14px;
+				}
+				
+				.search-input::placeholder {
+					color: rgb(var(--muted-foreground));
+				}
+				
+				.search-input:focus {
+					outline: none;
+					border-color: rgb(var(--accent));
+				}
+				
+				.sort-select {
+					padding: 10px 12px;
+					background: rgb(var(--background));
+					border: 1px solid rgb(var(--border));
+					border-radius: 6px;
+					color: rgb(var(--foreground));
+					font-size: 14px;
+					cursor: pointer;
+					min-width: 120px;
+				}
+				
+				.list-container {
+					max-height: 600px;
+					overflow-y: auto;
+				}
+				
+				.list-row {
+					display: flex;
+					justify-content: space-between;
+					align-items: center;
+					padding: 12px 16px;
+					border-bottom: 1px solid rgb(var(--border));
+					transition: background 0.1s;
+				}
+				
+				.list-row:hover {
+					background: rgb(var(--muted) / 0.5);
+				}
+				
+				.list-row:last-child {
+					border-bottom: none;
+				}
+				
+				.list-left {
+					flex: 1;
+					min-width: 0;
+				}
+				
+				.list-symbol {
+					font-weight: 700;
+					font-size: 16px;
+					margin-bottom: 2px;
+					color: rgb(var(--foreground));
+				}
+				
+				.list-detail {
+					font-size: 13px;
+					color: rgb(var(--muted-foreground));
+					margin-bottom: 2px;
+				}
+				
+				.list-account {
+					font-size: 11px;
+					color: rgb(var(--muted-foreground));
+				}
+				
+				.list-right {
+					text-align: right;
+					margin-left: 16px;
+				}
+				
+				.list-value {
+					font-size: 16px;
+					font-weight: 600;
+					color: rgb(var(--foreground));
+				}
+				
 				.table-container {
 					overflow-x: auto;
 				}
@@ -592,27 +687,23 @@ templ Summary(data PageData) {
 templ Positions(data PageData) {
 	<div id="positions" class="card">
 		<div class="card-header">Positions</div>
-		<div class="controls-row">
-			<select
-				name="listShows"
-				data-model="listShows"
-				data-on:change="@post('/positions', {contentType: 'form'})"
-				class="select"
-			>
-				<option value="value" selected?={ data.ListShows == "value" }>Market Value</option>
-				<option value="quantity" selected?={ data.ListShows == "quantity" }>Quantity</option>
-				<option value="price" selected?={ data.ListShows == "price" }>Last Price</option>
-			</select>
+		<div class="search-controls">
+			<input
+				type="text"
+				placeholder="Search 57 positions"
+				class="search-input"
+				data-model="searchQuery"
+				data-on:input.debounce_300ms="@post('/positions', {contentType: 'form'})"
+			/>
 			<select
 				name="sortBy"
 				data-model="sortBy"
 				data-on:change="@post('/positions', {contentType: 'form'})"
-				class="select"
+				class="sort-select"
 			>
-				<option value="value" selected?={ data.SortBy == "value" }>Sort by Value</option>
-				<option value="account" selected?={ data.SortBy == "account" }>Sort by Account</option>
-				<option value="class" selected?={ data.SortBy == "class" }>Sort by Class</option>
-				<option value="symbol" selected?={ data.SortBy == "symbol" }>Sort by Symbol</option>
+				<option value="value" selected?={ data.SortBy == "value" }>Last price</option>
+				<option value="symbol" selected?={ data.SortBy == "symbol" }>Symbol</option>
+				<option value="account" selected?={ data.SortBy == "account" }>Account</option>
 			</select>
 		</div>
 		if len(data.Positions) == 0 {
@@ -620,45 +711,21 @@ templ Positions(data PageData) {
 				No positions loaded. Click "Load Positions" to start.
 			</div>
 		} else {
-			<div class="table-container">
-				<table class="table">
-					<thead>
-						<tr>
-							<th>Account</th>
-							<th>Symbol</th>
-							<th class="muted">Name</th>
-							<th class="muted">Class</th>
-							<th class="text-right">
-								if data.ListShows == "quantity" {
-									Quantity
-								} else if data.ListShows == "price" {
-									Price
-								} else {
-									Value
-								}
-							</th>
-						</tr>
-					</thead>
-					<tbody>
-						for _, p := range data.Positions {
-							<tr>
-								<td class="muted">{ p.Account }</td>
-								<td class="symbol">{ p.Symbol }</td>
-								<td class="muted">{ p.Name }</td>
-								<td class="muted">{ p.AssetClass }</td>
-								<td class="text-right">
-									if data.ListShows == "quantity" {
-										{ formatFloat(p.Quantity) }
-									} else if data.ListShows == "price" {
-										{ "$" + formatMoney(p.Price) }
-									} else {
-										{ "$" + formatMoney(p.MarketValue) }
-									}
-								</td>
-							</tr>
-						}
-					</tbody>
-				</table>
+			<div class="list-container">
+				for _, p := range data.Positions {
+					<div class="list-row">
+						<div class="list-left">
+							<div class="list-symbol">{ p.Symbol }</div>
+							<div class="list-detail">
+								{ formatFloat(p.Quantity) + " @ $" + formatMoney(p.Price) }
+							</div>
+							<div class="list-account">{ p.Account }</div>
+						</div>
+						<div class="list-right">
+							<div class="list-value">{ "$" + formatMoney(p.MarketValue) }</div>
+						</div>
+					</div>
+				}
 			</div>
 		}
 	</div>
