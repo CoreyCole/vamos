@@ -341,10 +341,11 @@ type LiveTranscriptView struct {
 }
 
 type TranscriptPaneState struct {
-	Cursor int64
-	Stable []TranscriptMessage
-	Live   LiveTranscriptView
-	Policy TranscriptRenderPolicy
+	Cursor      int64
+	Stable      []TranscriptMessage
+	Live        LiveTranscriptView
+	Policy      TranscriptRenderPolicy
+	ShowWorking bool // accept-only; SSR/live SoT morphs leave this false
 }
 
 type SelectedChatAnnotation struct {

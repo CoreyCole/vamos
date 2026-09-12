@@ -34,7 +34,7 @@ templ StableTranscriptRegion(threadID string, messages []TranscriptMessage, fork
 templ LiveTranscriptRegion(threadID string, state TranscriptPaneState, forkAction string) {
 	<div id="agent-chat-live-transcript" class="min-w-0 overflow-x-hidden">
 		if len(state.Live.Items) == 0 {
-			if len(state.Stable) == 0 && state.Cursor == 0 {
+			if len(state.Stable) == 0 && state.Cursor == 0 && !state.ShowWorking {
 				<p class="p-4 text-sm text-muted-foreground">Waiting for the first completed turn…</p>
 			}
 		} else {
@@ -42,6 +42,24 @@ templ LiveTranscriptRegion(threadID string, state TranscriptPaneState, forkActio
 				@TranscriptMessageWithFork(threadID, msg, forkAction)
 			}
 		}
+		if state.ShowWorking {
+			@ChatWorkingRow()
+		}
+	</div>
+}
+
+// ChatWorkingRow is the in-flight indicator morph target for send accept.
+// Presence of #agent-chat-working is the working state (no signal).
+templ ChatWorkingRow() {
+	<div
+		id="agent-chat-working"
+		data-testid="agent-chat-working"
+		data-agent-chat-working="true"
+		class="agent-chat-working flex items-center gap-2 px-4 py-2 text-sm text-muted-foreground"
+		aria-live="polite"
+	>
+		<span class="inline-block h-2 w-2 animate-pulse rounded-full bg-muted-foreground/70"></span>
+		<span>Working…</span>
 	</div>
 }
 

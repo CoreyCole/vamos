@@ -821,7 +821,7 @@ func defaultPiSessionsDir() string {
 	return filepath.Join(home, ".pi", "agent", "sessions")
 }
 
-func (s *Service) StartWorkspaceThread(
+func (s *Service) startWorkspaceThreadAccepted(
 	ctx context.Context,
 	workspaceID, userEmail, prompt string,
 	attachments ...[]AttachedPath,
@@ -944,14 +944,28 @@ func (s *Service) StartWorkspaceThread(
 	if err := s.seedPendingUserPrompt(thread, run); err != nil {
 		return &thread, nil, &session, err
 	}
-	startedRun, err := s.startRun(ctx, thread, run)
-	if err != nil {
-		return &thread, nil, &session, err
-	}
-	return &thread, startedRun, &session, nil
+	return &thread, &run, &session, nil
 }
 
-func (s *Service) ResumeWorkspaceThread(
+func (s *Service) StartWorkspaceThread(
+	ctx context.Context,
+	workspaceID, userEmail, prompt string,
+	attachments ...[]AttachedPath,
+) (*db.AgentThread, *db.AgentRun, *db.AgentSession, error) {
+	thread, run, session, err := s.startWorkspaceThreadAccepted(
+		ctx, workspaceID, userEmail, prompt, attachments...,
+	)
+	if err != nil {
+		return thread, run, session, err
+	}
+	startedRun, err := s.startRun(ctx, *thread, *run)
+	if err != nil {
+		return thread, nil, session, err
+	}
+	return thread, startedRun, session, nil
+}
+
+func (s *Service) resumeWorkspaceThreadAccepted(
 	ctx context.Context,
 	workspaceID, userEmail, threadID, prompt string,
 	attachments ...[]AttachedPath,
@@ -1048,11 +1062,25 @@ func (s *Service) ResumeWorkspaceThread(
 	if err := s.seedPendingUserPrompt(thread, run); err != nil {
 		return &thread, nil, &session, err
 	}
-	startedRun, err := s.startRun(ctx, thread, run)
+	return &thread, &run, &session, nil
+}
+
+func (s *Service) ResumeWorkspaceThread(
+	ctx context.Context,
+	workspaceID, userEmail, threadID, prompt string,
+	attachments ...[]AttachedPath,
+) (*db.AgentThread, *db.AgentRun, *db.AgentSession, error) {
+	thread, run, session, err := s.resumeWorkspaceThreadAccepted(
+		ctx, workspaceID, userEmail, threadID, prompt, attachments...,
+	)
 	if err != nil {
-		return &thread, nil, &session, err
+		return thread, run, session, err
 	}
-	return &thread, startedRun, &session, nil
+	startedRun, err := s.startRun(ctx, *thread, *run)
+	if err != nil {
+		return thread, nil, session, err
+	}
+	return thread, startedRun, session, nil
 }
 
 func (s *Service) ForkWorkspaceThread(

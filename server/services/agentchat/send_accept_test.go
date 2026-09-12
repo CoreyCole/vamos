@@ -1,0 +1,225 @@
+package agentchat
+
+import (
+	"context"
+	"net/http"
+	"net/http/httptest"
+	"net/url"
+	"strings"
+	"sync"
+	"testing"
+	"time"
+
+	"github.com/labstack/echo/v4"
+
+	"github.com/CoreyCole/vamos/pkg/db"
+)
+
+type blockingTemporal struct {
+	started chan struct{}
+	release chan struct{}
+	calls   int
+	mu      sync.Mutex
+}
+
+func (b *blockingTemporal) StartWorkflow(
+	ctx context.Context,
+	_ string,
+	_ any,
+	_ any,
+) (string, error) {
+	b.mu.Lock()
+	b.calls++
+	b.mu.Unlock()
+	select {
+	case b.started <- struct{}{}:
+	default:
+	}
+	select {
+	case <-b.release:
+		return "workflow_blocked", nil
+	case <-ctx.Done():
+		return "", ctx.Err()
+	case <-time.After(5 * time.Second):
+		return "workflow_blocked_timeout", nil
+	}
+}
+
+func (b *blockingTemporal) SignalWithStartWorkflow(
+	ctx context.Context,
+	_ string,
+	_ string,
+	_ any,
+	_ any,
+	_ any,
+) (string, error) {
+	return b.StartWorkflow(ctx, "", nil, nil)
+}
+
+func setupWorkspaceResumeFixture(t *testing.T) (*Service, *db.Queries, *blockingTemporal) {
+	t.Helper()
+	service, queries := newThreadDraftService(t)
+	createDraftThread(t, queries, "thread_1")
+	if _, err := queries.CreateWorkspace(t.Context(), db.CreateWorkspaceParams{
+		ID:           "workspace_1",
+		UserEmail:    "owner@example.com",
+		Title:        "Plan workspace",
+		RootDocPath:  "thoughts/plan",
+		WorkflowType: "agent-chat",
+		Source:       "web",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := queries.UpsertThreadWorkspaceAssociation(
+		t.Context(),
+		db.UpsertThreadWorkspaceAssociationParams{
+			ThreadID:    "thread_1",
+			WorkspaceID: "workspace_1",
+			IsPrimary:   1,
+			Role:        "primary",
+			AdoptedFrom: "test",
+		},
+	); err != nil {
+		t.Fatal(err)
+	}
+	if err := queries.AttachThreadToWorkspace(t.Context(), db.AttachThreadToWorkspaceParams{
+		ID:          "thread_1",
+		WorkspaceID: nullString("workspace_1"),
+	}); err != nil {
+		t.Fatal(err)
+	}
+	blocker := &blockingTemporal{
+		started: make(chan struct{}, 1),
+		release: make(chan struct{}),
+	}
+	service.temporal = blocker
+	service.liveThreads = make(map[string]*liveThreadState)
+	return service, queries, blocker
+}
+
+func TestResumeWorkspaceThreadAcceptPatchesBeforeTemporal(t *testing.T) {
+	service, _, blocker := setupWorkspaceResumeFixture(t)
+	handler := NewHandler(service, nil)
+	values := url.Values{"prompt": {"hello accept now"}}
+	req := httptest.NewRequest(
+		http.MethodPost,
+		"/agent-chat/workspace_1/thread/thread_1/resume",
+		strings.NewReader(values.Encode()),
+	)
+	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationForm)
+	rec := httptest.NewRecorder()
+	ctx := echo.New().NewContext(req, rec)
+	ctx.SetParamNames("workspace_id", "thread_id")
+	ctx.SetParamValues("workspace_1", "thread_1")
+	ctx.Set("user_email", "owner@example.com")
+
+	done := make(chan error, 1)
+	go func() {
+		done <- handler.ResumeWorkspaceThread(ctx)
+	}()
+
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Fatalf("ResumeWorkspaceThread error = %v", err)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("accept handler blocked on Temporal StartWorkflow")
+	}
+
+	body := rec.Body.String()
+	if !strings.Contains(body, `id="agent-chat-live-transcript"`) {
+		t.Fatalf("missing live transcript morph: %s", body)
+	}
+	if !strings.Contains(body, `id="agent-chat-working"`) ||
+		!strings.Contains(body, `data-testid="agent-chat-working"`) {
+		t.Fatalf("missing working row in live transcript: %s", body)
+	}
+	if !strings.Contains(body, "hello accept now") {
+		t.Fatalf("missing optimistic user prompt in live transcript: %s", body)
+	}
+	if !strings.Contains(body, `"chatDraft":""`) {
+		t.Fatalf("missing chatDraft clear: %s", body)
+	}
+	if !strings.Contains(body, "agent-chat-composer-input") {
+		t.Fatalf("missing composer reset script: %s", body)
+	}
+	if strings.Contains(body, `id="agent-chat-messages"`) {
+		t.Fatalf("must not morph messages chrome: %s", body)
+	}
+	if strings.Contains(body, "agent-chat-turn-working") {
+		t.Fatalf("forbidden working id: %s", body)
+	}
+
+	select {
+	case <-blocker.started:
+	case <-time.After(2 * time.Second):
+		t.Fatal("Temporal StartWorkflow was not started asynchronously")
+	}
+	close(blocker.release)
+}
+
+func TestResumeEmbeddedWorkspaceThreadAcceptPatchesLiveOnly(t *testing.T) {
+	service, _, blocker := setupWorkspaceResumeFixture(t)
+	handler := NewHandler(service, nil)
+	values := url.Values{"prompt": {"embedded accept"}}
+	req := httptest.NewRequest(
+		http.MethodPost,
+		"/thoughts/chat/thread/thread_1/resume?workbench_v2=1",
+		strings.NewReader(values.Encode()),
+	)
+	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationForm)
+	rec := httptest.NewRecorder()
+	ctx := echo.New().NewContext(req, rec)
+	ctx.SetParamNames("thread_id")
+	ctx.SetParamValues("thread_1")
+	ctx.Set("user_email", "owner@example.com")
+
+	done := make(chan error, 1)
+	go func() {
+		done <- handler.ResumeEmbeddedThread(ctx)
+	}()
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Fatalf("ResumeEmbeddedThread error = %v", err)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("embedded accept blocked on Temporal")
+	}
+
+	body := rec.Body.String()
+	if !strings.Contains(body, `id="agent-chat-working"`) ||
+		!strings.Contains(body, "embedded accept") ||
+		!strings.Contains(body, `"chatDraft":""`) {
+		t.Fatalf("embedded accept missing patches: %s", body)
+	}
+	if strings.Contains(body, "doc-right-chat-panel") {
+		t.Fatalf("v2 must not morph right rail chrome: %s", body)
+	}
+	select {
+	case <-blocker.started:
+	case <-time.After(2 * time.Second):
+		t.Fatal("async Temporal not started")
+	}
+	close(blocker.release)
+}
+
+func TestLiveTranscriptRegionSSROmitsWorkingWithoutFlag(t *testing.T) {
+	var buf strings.Builder
+	err := LiveTranscriptRegion(
+		"thread_1",
+		TranscriptPaneState{},
+		"",
+	).Render(t.Context(), &buf)
+	if err != nil {
+		t.Fatal(err)
+	}
+	html := buf.String()
+	if strings.Contains(html, `id="agent-chat-working"`) {
+		t.Fatalf("SSR cold GET must not include working row: %s", html)
+	}
+	if !strings.Contains(html, "Waiting for the first completed turn") {
+		t.Fatalf("SSR empty live missing waiting copy: %s", html)
+	}
+}

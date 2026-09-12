@@ -1461,7 +1461,7 @@ func (h *Handler) SendWorkspacePrompt(c echo.Context) error {
 	if err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 	}
-	thread, run, _, err := h.service.StartWorkspaceThread(
+	turn, err := h.service.AcceptStartWorkspaceThread(
 		c.Request().Context(),
 		workspaceRow.ID,
 		userEmail,
@@ -1471,7 +1471,17 @@ func (h *Handler) SendWorkspacePrompt(c echo.Context) error {
 	if err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 	}
+	thread := turn.Thread
+	run := turn.Run
 	sse := datastar.NewSSE(c.Response().Writer, c.Request())
+	if err := h.patchLiveTranscriptSendAccept(
+		sse,
+		thread.ID,
+		workspaceForkAction(workspaceRow.ID, thread.ID),
+	); err != nil {
+		return err
+	}
+	h.startAcceptedTurnAsync(turn)
 	return sse.Redirect(
 		workspaceThreadURLForRequest(c, workspaceRow.ID, thread.ID, run.ID),
 	)
@@ -1498,7 +1508,7 @@ func (h *Handler) SendEmbeddedWorkspacePrompt(c echo.Context) error {
 	if err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 	}
-	thread, run, _, err := h.service.StartWorkspaceThread(
+	turn, err := h.service.AcceptStartWorkspaceThread(
 		c.Request().Context(),
 		workspaceRow.ID,
 		userEmail,
@@ -1508,6 +1518,8 @@ func (h *Handler) SendEmbeddedWorkspacePrompt(c echo.Context) error {
 	if err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 	}
+	thread := turn.Thread
+	run := turn.Run
 	docPath := markdown.CanonicalThoughtsDocPathLoose(c.FormValue("doc_path"))
 	if docPath == "" {
 		docPath = markdown.CanonicalThoughtsDocPathLoose(c.FormValue("doc"))
@@ -1527,6 +1539,13 @@ func (h *Handler) SendEmbeddedWorkspacePrompt(c echo.Context) error {
 	}
 
 	sse := datastar.NewSSE(c.Response().Writer, c.Request())
+	if err := h.patchLiveTranscriptSendAccept(
+		sse,
+		thread.ID,
+		workspaceForkAction(workspaceRow.ID, thread.ID),
+	); err != nil {
+		return err
+	}
 	input := EmbeddedChatPatchInput{
 		UserEmail:   userEmail,
 		DocPath:     docPath,
@@ -1545,7 +1564,8 @@ func (h *Handler) SendEmbeddedWorkspacePrompt(c echo.Context) error {
 	}); err != nil {
 		return err
 	}
-	return h.resetAndFocusEmbeddedComposer(sse)
+	h.startAcceptedTurnAsync(turn)
+	return nil
 }
 
 func embeddedChatSelectionScopeForWorkspace(
@@ -1861,17 +1881,27 @@ func (h *Handler) resumeWorkspaceThreadByID(
 	if err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 	}
-	if _, _, _, err := h.service.ResumeWorkspaceThread(
+	turn, err := h.service.AcceptResumeWorkspaceThread(
 		c.Request().Context(),
 		workspaceID,
 		userEmail,
 		threadID,
 		prompt,
 		attachments,
-	); err != nil {
+	)
+	if err != nil {
 		return echo.NewHTTPError(resumeComposeHTTPStatus(err), err.Error())
 	}
-	return h.writeNoRedirectSuccess(c)
+	sse := datastar.NewSSE(c.Response().Writer, c.Request())
+	if err := h.patchLiveTranscriptSendAccept(
+		sse,
+		threadID,
+		workspaceForkAction(workspaceID, threadID),
+	); err != nil {
+		return err
+	}
+	h.startAcceptedTurnAsync(turn)
+	return nil
 }
 
 type threadDraftSignals struct {
@@ -1958,7 +1988,7 @@ func (h *Handler) resumeEmbeddedWorkspaceThread(
 	if err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 	}
-	_, run, _, err := h.service.ResumeWorkspaceThread(
+	turn, err := h.service.AcceptResumeWorkspaceThread(
 		c.Request().Context(),
 		workspaceID,
 		userEmail,
@@ -1976,10 +2006,7 @@ func (h *Handler) resumeEmbeddedWorkspaceThread(
 	); err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 	}
-	runID := ""
-	if run != nil {
-		runID = run.ID
-	}
+	runID := turn.Run.ID
 	docPath := markdown.CanonicalThoughtsDocPathLoose(c.FormValue("doc_path"))
 	if docPath == "" {
 		docPath = markdown.CanonicalThoughtsDocPathLoose(c.FormValue("doc"))
@@ -2004,28 +2031,36 @@ func (h *Handler) resumeEmbeddedWorkspaceThread(
 	}
 
 	sse := datastar.NewSSE(c.Response().Writer, c.Request())
-	if c.QueryParam("workbench_v2") == "1" {
-		return h.resetAndFocusEmbeddedComposer(sse)
-	}
-	input := EmbeddedChatPatchInput{
-		UserEmail:   userEmail,
-		DocPath:     docPath,
-		WorkspaceID: workspaceID,
-		ThreadID:    threadID,
-		RunID:       runID,
-	}
-	if err := h.patchEmbeddedChatPanel(c, sse, input); err != nil {
+	// Instant accept: live transcript fat morph + composer reset before Temporal.
+	if err := h.patchLiveTranscriptSendAccept(
+		sse,
+		threadID,
+		workspaceForkAction(workspaceID, threadID),
+	); err != nil {
 		return err
 	}
-	if err := h.replaceEmbeddedChatURL(sse, EmbeddedChatURLState{
-		DocPath:     docPath,
-		WorkspaceID: workspaceID,
-		ThreadID:    threadID,
-		RunID:       runID,
-	}); err != nil {
-		return err
+	if c.QueryParam("workbench_v2") != "1" {
+		input := EmbeddedChatPatchInput{
+			UserEmail:   userEmail,
+			DocPath:     docPath,
+			WorkspaceID: workspaceID,
+			ThreadID:    threadID,
+			RunID:       runID,
+		}
+		if err := h.patchEmbeddedChatPanel(c, sse, input); err != nil {
+			return err
+		}
+		if err := h.replaceEmbeddedChatURL(sse, EmbeddedChatURLState{
+			DocPath:     docPath,
+			WorkspaceID: workspaceID,
+			ThreadID:    threadID,
+			RunID:       runID,
+		}); err != nil {
+			return err
+		}
 	}
-	return h.resetAndFocusEmbeddedComposer(sse)
+	h.startAcceptedTurnAsync(turn)
+	return nil
 }
 
 func (h *Handler) ForkWorkspaceThread(c echo.Context) error {
@@ -2950,9 +2985,10 @@ func workspaceThreadURLForRequest(
 
 func (h *Handler) writeNoRedirectSuccess(c echo.Context) error {
 	sse := datastar.NewSSE(c.Response().Writer, c.Request())
-	if err := sse.MarshalAndPatchSignals(
-		map[string]any{"agentChatLastWriteOK": true},
-	); err != nil {
+	if err := sse.MarshalAndPatchSignals(map[string]any{
+		"agentChatLastWriteOK": true,
+		"chatDraft":            "",
+	}); err != nil {
 		return err
 	}
 	return sse.ExecuteScript(resetAndFocusComposerScript)
