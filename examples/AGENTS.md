@@ -34,6 +34,24 @@ Examples are small, long-running applets that demonstrate Vamos app patterns. Ke
 - If an example uses SQLite, use `sqlc` for typed queries rather than hand-written row scanning spread through handlers.
 - Store generated database files only inside the example's configured files root, never in source directories unless explicitly checked in as a fixture.
 
+## Pull-to-refresh for applets
+
+Demo applets can include the shared `examples/shared/vamos-applet-ptr.js` bootstrap to add mobile pull-to-refresh.
+
+**How it works:**
+- The gesture lives in the iframe (no parent dependency or `allow-same-origin` requirement).
+- Default action: `location.reload()` for honest SSR + Datastar boot + SSE reconnection.
+- Applets can customize by setting `window.VamosApplet.onPullRefresh` before the bootstrap script runs. When defined, that function is called instead of reload.
+- Applies `overscroll-behavior-y: contain` to the main scrollable element.
+- Triggers on pull-down gesture at `scrollTop ≈ 0` when pull distance exceeds 80px.
+
+**Usage:**
+1. Copy `examples/shared/vamos-applet-ptr.js` to your applet's `static/shared/` directory.
+2. Add `<script src="static/shared/vamos-applet-ptr.js"></script>` in the page `<head>` after Datastar.
+3. Optionally define `window.VamosApplet.onPullRefresh = function() { /* custom refresh */ }` before the script loads if you need non-reload behavior.
+
+The todo and wordle examples demonstrate the default always-reload pattern.
+
 ## Applet boundaries
 
 - Read and write user-visible files only inside `VAMOS_APP_FILES_ROOT` or the example's documented files root.

@@ -29,7 +29,7 @@ func Page() templ.Component {
 			templ_7745c5c3_Var1 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"><title>Datastar Starter</title><script type=\"module\" src=\"https://cdn.jsdelivr.net/gh/starfederation/datastar@v1.0.1/bundles/datastar.js\"></script><link rel=\"stylesheet\" href=\"static/app.css\"></head><body class=\"min-h-screen bg-slate-950 text-slate-100\"><main class=\"mx-auto flex min-h-screen max-w-3xl flex-col gap-8 px-5 py-10\" data-init=\"@get('events')\"><header class=\"space-y-3\"><p class=\"text-sm font-semibold uppercase tracking-[0.3em] text-cyan-300\">Vamos applet template</p><h1 class=\"text-4xl font-black tracking-tight text-white sm:text-6xl\">Datastar Starter</h1><p class=\"max-w-2xl text-lg text-slate-300\">Applet using Go, templ, Datastar, Tailwind, sqlc, and SQLite.</p></header><section id=\"app-panel\" class=\"rounded-3xl border border-white/10 bg-white/10 p-6 shadow-2xl shadow-cyan-950/40 backdrop-blur\">Loading…</section></main></body></html>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"><title>Datastar Starter</title><script type=\"module\" src=\"https://cdn.jsdelivr.net/gh/starfederation/datastar@v1.0.1/bundles/datastar.js\"></script><script src=\"static/shared/vamos-applet-ptr.js\"></script><link rel=\"stylesheet\" href=\"static/app.css\"></head><body class=\"min-h-screen bg-slate-950 text-slate-100\"><main class=\"mx-auto flex min-h-screen max-w-3xl flex-col gap-8 px-5 py-10\" data-init=\"@get('events')\"><header class=\"space-y-3\"><p class=\"text-sm font-semibold uppercase tracking-[0.3em] text-cyan-300\">Vamos applet template</p><h1 class=\"text-4xl font-black tracking-tight text-white sm:text-6xl\">Datastar Starter</h1><p class=\"max-w-2xl text-lg text-slate-300\">Applet using Go, templ, Datastar, Tailwind, sqlc, and SQLite.</p></header><section id=\"app-panel\" class=\"rounded-3xl border border-white/10 bg-white/10 p-6 shadow-2xl shadow-cyan-950/40 backdrop-blur\">Loading…</section></main></body></html>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -65,7 +65,7 @@ func AppPanel(data PageData) templ.Component {
 		var templ_7745c5c3_Var3 string
 		templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.JoinStringErrs(data.Message)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `examples/todo/internal/ui/page.templ`, Line: 33, Col: 64}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/page.templ`, Line: 34, Col: 64}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var3))
 		if templ_7745c5c3_Err != nil {
@@ -78,7 +78,7 @@ func AppPanel(data PageData) templ.Component {
 		var templ_7745c5c3_Var4 string
 		templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.JoinStringErrs(len(data.Items))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `examples/todo/internal/ui/page.templ`, Line: 35, Col: 103}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/page.templ`, Line: 36, Col: 103}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var4))
 		if templ_7745c5c3_Err != nil {
@@ -106,7 +106,7 @@ func AppPanel(data PageData) templ.Component {
 				var templ_7745c5c3_Var5 string
 				templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.ResolveAttributeValue(itemIDValue(item.ID))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `examples/todo/internal/ui/page.templ`, Line: 48, Col: 66}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/page.templ`, Line: 49, Col: 66}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var5)
 				if templ_7745c5c3_Err != nil {
@@ -143,7 +143,7 @@ func AppPanel(data PageData) templ.Component {
 				var templ_7745c5c3_Var7 string
 				templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.ResolveAttributeValue(templ.CSSClasses(templ_7745c5c3_Var6).String())
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `examples/todo/internal/ui/page.templ`, Line: 1, Col: 0}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/page.templ`, Line: 1, Col: 0}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var7)
 				if templ_7745c5c3_Err != nil {
@@ -156,7 +156,7 @@ func AppPanel(data PageData) templ.Component {
 				var templ_7745c5c3_Var8 string
 				templ_7745c5c3_Var8, templ_7745c5c3_Err = templ.JoinStringErrs(item.Title)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `examples/todo/internal/ui/page.templ`, Line: 57, Col: 65}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/page.templ`, Line: 58, Col: 65}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var8))
 				if templ_7745c5c3_Err != nil {
@@ -169,7 +169,7 @@ func AppPanel(data PageData) templ.Component {
 				var templ_7745c5c3_Var9 string
 				templ_7745c5c3_Var9, templ_7745c5c3_Err = templ.ResolveAttributeValue(itemIDValue(item.ID))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `examples/todo/internal/ui/page.templ`, Line: 59, Col: 66}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/page.templ`, Line: 60, Col: 66}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var9)
 				if templ_7745c5c3_Err != nil {
