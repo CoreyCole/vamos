@@ -62,3 +62,77 @@ func renderHeaderActions(
 	}
 	return body.String()
 }
+
+func TestBuildChatHeaderOverflowShareOnlyWithoutDoc(t *testing.T) {
+	t.Parallel()
+	html := renderChatHeaderOverflow(t, nil, "", false)
+	for _, want := range []string{
+		`data-testid="workbench-overflow-actions"`,
+		"Share artifact",
+		"Share chat",
+		"Share",
+	} {
+		if !strings.Contains(html, want) {
+			t.Fatalf("missing %q:\n%s", want, html)
+		}
+	}
+	if strings.Contains(html, "Copy path") || strings.Contains(html, "Artifact") {
+		t.Fatalf("empty doc must not paint Artifact group:\n%s", html)
+	}
+	if n := strings.Count(html, `data-testid="workbench-overflow-actions"`); n != 1 {
+		t.Fatalf("want one overflow root, got %d", n)
+	}
+}
+
+func TestBuildChatHeaderOverflowFoldsArtifactSkipsPlanChat(t *testing.T) {
+	t.Parallel()
+	page := &PageArgs{
+		FilePath: "owner/plans/alpha/design.md",
+		ViewerArgs: ViewerArgs{
+			RawMarkdown: "# Design",
+			CommentMode: CommentModeDocumentOnly,
+		},
+	}
+	html := renderChatHeaderOverflow(t, page, page.FilePath, false)
+	for _, want := range []string{
+		"Share artifact",
+		"Share chat",
+		"Copy path",
+		"Copy document",
+		"Comment",
+		"Artifact",
+	} {
+		if !strings.Contains(html, want) {
+			t.Fatalf("missing %q:\n%s", want, html)
+		}
+	}
+	if strings.Contains(html, "Chat about this plan") {
+		t.Fatalf("plan room must skip Chat about this plan:\n%s", html)
+	}
+}
+
+func TestBuildChatHeaderOverflowIncludesPlanChatOutsidePlanRoom(t *testing.T) {
+	t.Parallel()
+	html := renderChatHeaderOverflow(t, nil, "owner/plans/alpha/design.md", true)
+	if !strings.Contains(html, "Chat about this plan") {
+		t.Fatalf("non-plan room should keep Chat about this plan:\n%s", html)
+	}
+}
+
+func renderChatHeaderOverflow(
+	t *testing.T,
+	pageArgs *PageArgs,
+	docPath string,
+	includePlanChat bool,
+) string {
+	t.Helper()
+	comp := BuildChatHeaderOverflow(pageArgs, docPath, includePlanChat)
+	if comp == nil {
+		t.Fatal("chat header overflow is nil")
+	}
+	var body bytes.Buffer
+	if err := comp.Render(t.Context(), &body); err != nil {
+		t.Fatal(err)
+	}
+	return body.String()
+}

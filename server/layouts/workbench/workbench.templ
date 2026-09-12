@@ -86,16 +86,17 @@ templ ArtifactReopenControl(artifactOpen bool, controlID string) {
 
 // ChatColumnWithReopen wraps middle-column chat with an in-shell chat header row.
 // Threads reopen lives in that header (same row as title) — never a strip above.
-templ ChatColumnWithReopen(threadsOpen bool, artifactOpen bool, title string, chat templ.Component) {
-	@ChatColumnWithReopenMark(threadsOpen, artifactOpen, title, false, chat)
+// overflow is the single desktop ⋯ menu (Share + optional Artifact); nil => Share stubs only.
+templ ChatColumnWithReopen(threadsOpen bool, artifactOpen bool, title string, chat templ.Component, overflow templ.Component) {
+	@ChatColumnWithReopenMark(threadsOpen, artifactOpen, title, false, chat, overflow)
 }
 
 // ChatColumnWithPlanReopen is ChatColumnWithReopen with a color swatch (no letter/number glyph).
-templ ChatColumnWithPlanReopen(threadsOpen bool, artifactOpen bool, title string, chat templ.Component) {
-	@ChatColumnWithReopenMark(threadsOpen, artifactOpen, title, true, chat)
+templ ChatColumnWithPlanReopen(threadsOpen bool, artifactOpen bool, title string, chat templ.Component, overflow templ.Component) {
+	@ChatColumnWithReopenMark(threadsOpen, artifactOpen, title, true, chat, overflow)
 }
 
-templ ChatColumnWithReopenMark(threadsOpen bool, artifactOpen bool, title string, planSwatch bool, chat templ.Component) {
+templ ChatColumnWithReopenMark(threadsOpen bool, artifactOpen bool, title string, planSwatch bool, chat templ.Component, overflow templ.Component) {
 	<div class="flex h-full min-h-0 flex-col bg-background">
 		<header id="workbench-v2-chat-header" class="hidden h-10 min-h-10 max-h-10 shrink-0 items-center gap-2 overflow-hidden border-b border-border px-2.5 md:flex">
 			@ThreadsReopenControl(threadsOpen, "workbench-v2-threads-reopen")
@@ -116,7 +117,11 @@ templ ChatColumnWithReopenMark(threadsOpen bool, artifactOpen bool, title string
 				}
 			</div>
 			@ArtifactReopenControl(artifactOpen, "workbench-v2-artifact-reopen")
-			@ChatHeaderShareOverflow()
+			if overflow != nil {
+				@overflow
+			} else {
+				@ChatHeaderShareOverflow()
+			}
 		</header>
 		<div class="flex min-h-0 flex-1 flex-col overflow-hidden">
 			@chat

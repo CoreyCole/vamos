@@ -123,26 +123,24 @@ func (s *Service) indexArtifactComponent(
 	c echo.Context,
 	artifact string,
 	explicit bool,
-) templ.Component {
+) (templ.Component, *PageArgs, string) {
 	content, page, _ := s.artifactContent(c, artifact, explicit)
 	if !explicit {
-		return content
+		return content, nil, ""
 	}
 	browser, err := s.threadArtifactBrowser(c, "", artifact)
 	if err != nil {
-		return WorkbenchUnavailable("The artifact is unavailable.")
+		return WorkbenchUnavailable("The artifact is unavailable."), page, artifact
 	}
 	setViewDocumentToggle(&browser, false, "")
-	browser.HeaderActions = BuildThreadArtifactHeaderActions(
-		page,
-		browser.DocPath,
-	)
+	// Chat pages paint OverflowActions in the chat header only — no path-header kebab.
+	browser.HeaderActions = nil
 	if page != nil {
 		panelArgs := BuildDocumentPanelArgs(page)
 		panelArgs.Document.WorkbenchActions = nil
 		content = DocumentPanel(panelArgs)
 	}
-	return ThreadArtifactPane(browser, content)
+	return ThreadArtifactPane(browser, content), page, browser.DocPath
 }
 
 func (s *Service) ServeThreads(c echo.Context) error {
@@ -165,6 +163,9 @@ func (s *Service) ServeThreads(c echo.Context) error {
 	}
 	viewport := viewportClassForRequest(c)
 	_ = threads // AI-470 converge: left rail is roster, not thread list.
+	artifactComp, artifactPage, artifactDoc := s.indexArtifactComponent(
+		c, artifactPath, hasArtifact,
+	)
 	state, err := workbench.BuildWorkbenchV2State(workbench.WorkbenchV2Args{
 		UserEmail:     userEmail,
 		ViewportClass: viewport,
@@ -180,8 +181,9 @@ func (s *Service) ServeThreads(c echo.Context) error {
 			workbench.ArtifactOpenFromRequest(c.Request()),
 			"Chat",
 			WorkbenchUnavailable("Select a thread to open chat."),
+			BuildChatHeaderOverflow(artifactPage, artifactDoc, true),
 		),
-		Artifact: s.indexArtifactComponent(c, artifactPath, hasArtifact),
+		Artifact: artifactComp,
 		Comments: WorkbenchUnavailable(
 			"Select an artifact to view comments.",
 		),
@@ -237,7 +239,7 @@ func (s *Service) ServeThread(c echo.Context) error {
 	if err != nil {
 		return err
 	}
-	artifact, comments, err := s.threadArtifactAndComments(
+	artifact, comments, artifactPage, artifactDoc, err := s.threadArtifactAndComments(
 		c,
 		threadID,
 		c.QueryParam("artifact"),
@@ -263,6 +265,7 @@ func (s *Service) ServeThread(c echo.Context) error {
 			workbench.ArtifactOpenFromRequest(c.Request()),
 			"Chat",
 			chat,
+			BuildChatHeaderOverflow(artifactPage, artifactDoc, true),
 		),
 		Artifact:     artifact,
 		Comments:     comments,

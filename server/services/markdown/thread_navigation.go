@@ -848,38 +848,32 @@ func (s *Service) thoughtsDirectoryArtifactBrowser(
 func (s *Service) threadArtifactAndComments(
 	c echo.Context,
 	threadID, rawDoc string,
-) (templ.Component, templ.Component, error) {
+) (templ.Component, templ.Component, *PageArgs, string, error) {
 	hasArtifact := c.Request().URL.Query().Has("artifact")
 	doc, explicit, err := s.resolveThreadArtifact(
 		c.Request().Context(), threadID, rawDoc, hasArtifact,
 	)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, "", err
 	}
 	browser, err := s.threadArtifactBrowser(c, threadID, doc)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, "", err
 	}
 	content, page, directory := s.artifactContent(c, doc, explicit || !hasArtifact)
+	// Chat pages paint OverflowActions in the chat header only — no path-header kebab.
+	browser.HeaderActions = nil
 	if directory {
 		setViewDocumentToggle(&browser, false, "")
-		browser.HeaderActions = BuildThreadArtifactHeaderActions(
-			nil,
-			browser.DocPath,
-		)
 		return ThreadArtifactPane(
 			browser,
 			WorkbenchUnavailable("Select a file from the artifact browser."),
-		), WorkbenchUnavailable("Comments are unavailable for directories."), nil
+		), WorkbenchUnavailable("Comments are unavailable for directories."), nil, browser.DocPath, nil
 	}
 	if page == nil {
 		setViewDocumentToggle(&browser, false, "")
-		browser.HeaderActions = BuildThreadArtifactHeaderActions(
-			nil,
-			browser.DocPath,
-		)
 		return ThreadArtifactPane(browser, content),
-			WorkbenchUnavailable("Comments are unavailable for this artifact."), nil
+			WorkbenchUnavailable("Comments are unavailable for this artifact."), nil, browser.DocPath, nil
 	}
 	userEmail, _ := c.Get("user_email").(string)
 	threads := []commentui.CommentThreadView{}
@@ -901,17 +895,14 @@ func (s *Service) threadArtifactAndComments(
 	)
 	panelArgs := BuildDocumentPanelArgs(page)
 	setViewDocumentToggle(&browser, false, "")
-	browser.HeaderActions = BuildThreadArtifactHeaderActions(
-		page,
-		browser.DocPath,
-	)
 	panelArgs.Document.WorkbenchActions = nil
 	content = DocumentPanel(panelArgs)
 	return ThreadArtifactPane(browser, content),
 		commentui.CommentsContextPanel(
 			commentui.BuildCommentsPanelArgs(page.CommentUI, ""),
-		), nil
+		), page, browser.DocPath, nil
 }
+
 
 func (s *Service) HandleThreadArtifactBrowser(c echo.Context) error {
 	threadID := strings.TrimSpace(c.Param("threadID"))

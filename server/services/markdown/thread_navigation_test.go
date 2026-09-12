@@ -632,3 +632,23 @@ func TestViewChatDocumentLinkIsPlainGET(t *testing.T) {
 		t.Fatalf("view-chat missing href: %s", header)
 	}
 }
+
+func TestPathHeaderOmitsOverflowWhenHeaderActionsNil(t *testing.T) {
+	t.Parallel()
+	var body strings.Builder
+	if err := ThreadArtifactPane(
+		ThreadArtifactBrowserArgs{
+			DocPath:          "owner/plans/alpha/design.md",
+			ViewDocumentHref: "/thoughts/owner/plans/alpha/design.md",
+			HeaderActions:    nil,
+		},
+		templ.Raw("<p>doc</p>"),
+	).Render(t.Context(), &body); err != nil {
+		t.Fatal(err)
+	}
+	header := artifactPathHeader(t, body.String())
+	if strings.Contains(header, `data-testid="workbench-overflow-actions"`) ||
+		strings.Contains(header, "data-overflow-root") {
+		t.Fatalf("path-header must not paint overflow when HeaderActions nil:\n%s", header)
+	}
+}

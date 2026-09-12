@@ -72,26 +72,46 @@ func DocumentCommentAction(pageArgs *PageArgs) workbench.OverflowAction {
 	}
 }
 
-func BuildThreadArtifactHeaderActions(
+func shareOverflowActions() []workbench.OverflowAction {
+	closeMenu := "el.closest('[data-overflow-menu]')?.style.setProperty('display','none')"
+	return []workbench.OverflowAction{
+		{
+			Label:        "Share artifact",
+			Kind:         workbench.OverflowActionButton,
+			ClientAction: closeMenu,
+		},
+		{
+			Label:        "Share chat",
+			Kind:         workbench.OverflowActionButton,
+			ClientAction: closeMenu,
+		},
+	}
+}
+
+// threadArtifactOverflowActions builds path-header / chat-header Artifact items.
+// includePlanChat controls "Chat about this plan" (skip when already in that plan room).
+func threadArtifactOverflowActions(
 	pageArgs *PageArgs,
 	docPath string,
-) templ.Component {
+	includePlanChat bool,
+) []workbench.OverflowAction {
 	docPath = strings.TrimSpace(docPath)
-	chatHref := planLeadChatHref(docPath)
 	actions := make([]workbench.OverflowAction, 0, 4)
 	if docPath != "" {
 		actions = append(actions, DocumentCopyPathAction(docPath))
 	}
-	if chatHref != "" {
-		chat := workbench.OverflowAction{
-			Label: "Chat about this plan",
-			Kind:  workbench.OverflowActionLink,
-			Href:  chatHref,
+	if includePlanChat {
+		if chatHref := planLeadChatHref(docPath); chatHref != "" {
+			chat := workbench.OverflowAction{
+				Label: "Chat about this plan",
+				Kind:  workbench.OverflowActionLink,
+				Href:  chatHref,
+			}
+			if name := planLeadRoomID(docPath); name != "" {
+				chat.Description = name
+			}
+			actions = append(actions, chat)
 		}
-		if name := planLeadRoomID(docPath); name != "" {
-			chat.Description = name
-		}
-		actions = append(actions, chat)
 	}
 	if pageArgs != nil {
 		if pageArgs.ViewerArgs.RawMarkdown != "" {
@@ -101,6 +121,14 @@ func BuildThreadArtifactHeaderActions(
 			actions = append(actions, DocumentCommentAction(pageArgs))
 		}
 	}
+	return actions
+}
+
+func BuildThreadArtifactHeaderActions(
+	pageArgs *PageArgs,
+	docPath string,
+) templ.Component {
+	actions := threadArtifactOverflowActions(pageArgs, docPath, true)
 	if len(actions) == 0 {
 		return nil
 	}
@@ -112,6 +140,31 @@ func BuildThreadArtifactHeaderActions(
 	})
 }
 
+// BuildChatHeaderOverflow is the single desktop chat-header ⋯ menu: Share stubs
+// always, plus optional Artifact group (Copy path / document / Comment). Pass
+// includePlanChat=false when already in that plan room so "Chat about this plan"
+// is omitted.
+func BuildChatHeaderOverflow(
+	pageArgs *PageArgs,
+	docPath string,
+	includePlanChat bool,
+) templ.Component {
+	groups := []workbench.OverflowActionGroup{{
+		Label:   "Share",
+		Actions: shareOverflowActions(),
+	}}
+	if artifact := threadArtifactOverflowActions(pageArgs, docPath, includePlanChat); len(artifact) > 0 {
+		groups = append(groups, workbench.OverflowActionGroup{
+			Label:   "Artifact",
+			Actions: artifact,
+		})
+	}
+	return workbench.OverflowActions(workbench.OverflowActionsArgs{
+		Label:  "Share",
+		Groups: groups,
+	})
+}
+
 func DocumentCopyPathAction(docPath string) workbench.OverflowAction {
 	path := "thoughts/" + strings.TrimSpace(docPath)
 	escaped := strings.ReplaceAll(path, `\`, `\\`)
@@ -120,6 +173,6 @@ func DocumentCopyPathAction(docPath string) workbench.OverflowAction {
 		Label:        "Copy path",
 		Description:  "Copy path and attach in chat",
 		Kind:         workbench.OverflowActionButton,
-		ClientAction: "const p='" + escaped + "'; navigator.clipboard?.writeText(p); const input = document.getElementById('agent-chat-composer-input'); if (input) { input.value += (input.value ? '\n' : '') + p; input.dispatchEvent(new Event('input', {bubbles: true})); } el.closest('[data-overflow-menu]')?.style.setProperty('display','none')",
+		ClientAction: "const p='" + escaped + "'; navigator.clipboard?.writeText(p); const input = document.getElementById('agent-chat-composer-input'); if (input) { input.value += (input.value ? '\\n' : '') + p; input.dispatchEvent(new Event('input', {bubbles: true})); } el.closest('[data-overflow-menu]')?.style.setProperty('display','none')",
 	}
 }

@@ -72,9 +72,12 @@ func (s *Service) ServeAI470Room(c echo.Context) error {
 	threadsOpen := workbench.ThreadsOpenFromRequest(c.Request())
 
 	var chatComp templ.Component
-	artifactComp := s.indexArtifactComponent(c, artifactPath, hasArtifact)
+	artifactComp, artifactPage, artifactDoc := s.indexArtifactComponent(
+		c, artifactPath, hasArtifact,
+	)
 	commentsComp := WorkbenchUnavailable("Select an artifact to view comments.")
 	chatOpen := false
+	includePlanChat := kind != agenthome.KindPlan
 
 	if threadID == "" {
 		chatBody := WorkbenchUnavailable("No shared thread mapped for this room yet.")
@@ -84,6 +87,7 @@ func (s *Service) ServeAI470Room(c echo.Context) error {
 			workbench.ArtifactOpenFromRequest(c.Request()),
 			roomTitle,
 			chatBody,
+			BuildChatHeaderOverflow(artifactPage, artifactDoc, includePlanChat),
 		)
 		chatOpen = kind == agenthome.KindPlan && hasArtifact
 	} else {
@@ -96,23 +100,24 @@ func (s *Service) ServeAI470Room(c echo.Context) error {
 		if err != nil {
 			return err
 		}
+		artifactQuery := c.QueryParam("artifact")
+		if strings.TrimSpace(artifactQuery) == "" {
+			artifactQuery = planDoc
+		}
+		artifactComp, commentsComp, artifactPage, artifactDoc, err = s.threadArtifactAndComments(
+			c, threadID, artifactQuery,
+		)
+		if err != nil {
+			return echo.NewHTTPError(http.StatusBadRequest, err.Error())
+		}
 		chatComp = chatColumnForAI470Room(
 			kind,
 			threadsOpen,
 			workbench.ArtifactOpenFromRequest(c.Request()),
 			roomTitle,
 			chat,
+			BuildChatHeaderOverflow(artifactPage, artifactDoc, includePlanChat),
 		)
-		artifactQuery := c.QueryParam("artifact")
-		if strings.TrimSpace(artifactQuery) == "" {
-			artifactQuery = planDoc
-		}
-		artifactComp, commentsComp, err = s.threadArtifactAndComments(
-			c, threadID, artifactQuery,
-		)
-		if err != nil {
-			return echo.NewHTTPError(http.StatusBadRequest, err.Error())
-		}
 		chatOpen = true
 	}
 	if kind == agenthome.KindDM {
@@ -352,11 +357,16 @@ func chatColumnForAI470Room(
 	artifactOpen bool,
 	title string,
 	body templ.Component,
+	overflow templ.Component,
 ) templ.Component {
 	if kind == agenthome.KindPlan {
-		return workbench.ChatColumnWithPlanReopen(threadsOpen, artifactOpen, title, body)
+		return workbench.ChatColumnWithPlanReopen(
+			threadsOpen, artifactOpen, title, body, overflow,
+		)
 	}
-	return workbench.ChatColumnWithReopen(threadsOpen, artifactOpen, title, body)
+	return workbench.ChatColumnWithReopen(
+		threadsOpen, artifactOpen, title, body, overflow,
+	)
 }
 
 // AI470RoomComposerDisabled is the view-only composer gate.

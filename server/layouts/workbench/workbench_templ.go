@@ -411,7 +411,8 @@ func ArtifactReopenControl(artifactOpen bool, controlID string) templ.Component 
 
 // ChatColumnWithReopen wraps middle-column chat with an in-shell chat header row.
 // Threads reopen lives in that header (same row as title) — never a strip above.
-func ChatColumnWithReopen(threadsOpen bool, artifactOpen bool, title string, chat templ.Component) templ.Component {
+// overflow is the single desktop ⋯ menu (Share + optional Artifact); nil => Share stubs only.
+func ChatColumnWithReopen(threadsOpen bool, artifactOpen bool, title string, chat templ.Component, overflow templ.Component) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
@@ -432,7 +433,7 @@ func ChatColumnWithReopen(threadsOpen bool, artifactOpen bool, title string, cha
 			templ_7745c5c3_Var26 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = ChatColumnWithReopenMark(threadsOpen, artifactOpen, title, false, chat).Render(ctx, templ_7745c5c3_Buffer)
+		templ_7745c5c3_Err = ChatColumnWithReopenMark(threadsOpen, artifactOpen, title, false, chat, overflow).Render(ctx, templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -441,7 +442,7 @@ func ChatColumnWithReopen(threadsOpen bool, artifactOpen bool, title string, cha
 }
 
 // ChatColumnWithPlanReopen is ChatColumnWithReopen with a color swatch (no letter/number glyph).
-func ChatColumnWithPlanReopen(threadsOpen bool, artifactOpen bool, title string, chat templ.Component) templ.Component {
+func ChatColumnWithPlanReopen(threadsOpen bool, artifactOpen bool, title string, chat templ.Component, overflow templ.Component) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
@@ -462,7 +463,7 @@ func ChatColumnWithPlanReopen(threadsOpen bool, artifactOpen bool, title string,
 			templ_7745c5c3_Var27 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = ChatColumnWithReopenMark(threadsOpen, artifactOpen, title, true, chat).Render(ctx, templ_7745c5c3_Buffer)
+		templ_7745c5c3_Err = ChatColumnWithReopenMark(threadsOpen, artifactOpen, title, true, chat, overflow).Render(ctx, templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -470,7 +471,7 @@ func ChatColumnWithPlanReopen(threadsOpen bool, artifactOpen bool, title string,
 	})
 }
 
-func ChatColumnWithReopenMark(threadsOpen bool, artifactOpen bool, title string, planSwatch bool, chat templ.Component) templ.Component {
+func ChatColumnWithReopenMark(threadsOpen bool, artifactOpen bool, title string, planSwatch bool, chat templ.Component, overflow templ.Component) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
@@ -549,7 +550,7 @@ func ChatColumnWithReopenMark(threadsOpen bool, artifactOpen bool, title string,
 				var templ_7745c5c3_Var33 string
 				templ_7745c5c3_Var33, templ_7745c5c3_Err = templ.JoinStringErrs(ChatHeaderInitial(title))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/layouts/workbench/workbench.templ`, Line: 110, Col: 168}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/layouts/workbench/workbench.templ`, Line: 111, Col: 168}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var33))
 				if templ_7745c5c3_Err != nil {
@@ -573,7 +574,7 @@ func ChatColumnWithReopenMark(threadsOpen bool, artifactOpen bool, title string,
 			var templ_7745c5c3_Var34 string
 			templ_7745c5c3_Var34, templ_7745c5c3_Err = templ.JoinStringErrs(title)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/layouts/workbench/workbench.templ`, Line: 115, Col: 87}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/layouts/workbench/workbench.templ`, Line: 116, Col: 87}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var34))
 			if templ_7745c5c3_Err != nil {
@@ -592,9 +593,16 @@ func ChatColumnWithReopenMark(threadsOpen bool, artifactOpen bool, title string,
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = ChatHeaderShareOverflow().Render(ctx, templ_7745c5c3_Buffer)
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
+		if overflow != nil {
+			templ_7745c5c3_Err = overflow.Render(ctx, templ_7745c5c3_Buffer)
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+		} else {
+			templ_7745c5c3_Err = ChatHeaderShareOverflow().Render(ctx, templ_7745c5c3_Buffer)
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
 		}
 		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 38, "</header><div class=\"flex min-h-0 flex-1 flex-col overflow-hidden\">")
 		if templ_7745c5c3_Err != nil {
