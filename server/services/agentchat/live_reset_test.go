@@ -142,7 +142,7 @@ func TestResetLiveThreadPreservesPendingUserOnFinalizeWithoutAssistant(t *testin
 	}
 }
 
-func TestResetLiveThreadClearsWhenRenderableAssistantExists(t *testing.T) {
+func TestResetLiveThreadKeepsPendingUserWhenAssistantPresentButUserNotPromoted(t *testing.T) {
 	service, queries := newThreadDraftService(t)
 	createDraftThread(t, queries, "thread_1")
 	service.liveThreads = make(map[string]*liveThreadState)
@@ -181,10 +181,101 @@ func TestResetLiveThreadClearsWhenRenderableAssistantExists(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	// Assistant present in live but user never promoted via clearLive/checkpoint.
 	service.resetLiveThread("thread_1")
 	after, _ := service.buildLiveTranscript("thread_1")
-	if len(after.Items) != 0 {
-		t.Fatalf("expected hard clear when renderable assistant exists, got %#v", after.Items)
+	if len(after.Items) == 0 {
+		t.Fatal("must keep pending user when assistant present but user not promoted")
+	}
+	foundUser := false
+	for _, item := range after.Items {
+		if strings.EqualFold(item.Role, "user") &&
+			strings.Contains(item.Content, "user then assistant") {
+			foundUser = true
+			break
+		}
+	}
+	if !foundUser {
+		t.Fatalf("expected pending user kept after reset with assistant, got %#v", after.Items)
+	}
+
+	state, err := service.BuildLiveTranscriptState(t.Context(), "owner@example.com", "thread_1")
+	if err != nil {
+		// thread may use createDraftThread email — fall back to HTML from after
+		state = TranscriptPaneState{Live: after, ShowWorking: false}
+	}
+	var buf strings.Builder
+	if err := LiveTranscriptRegion("thread_1", state, "").Render(t.Context(), &buf); err != nil {
+		t.Fatal(err)
+	}
+	html := buf.String()
+	if !strings.Contains(html, "user then assistant") {
+		t.Fatalf("PatchLiveTranscript/BuildLive HTML must keep user bubble: %s", html)
+	}
+	if strings.Contains(html, "Waiting for the first completed turn") {
+		t.Fatalf("must not empty-REPLACE live: %s", html)
+	}
+}
+
+func TestFailRunKeepsUserBubbleHTMLWhenAssistantPresentButNotPromoted(t *testing.T) {
+	service, queries := newThreadDraftService(t)
+	createDraftThread(t, queries, "thread_1")
+	service.liveThreads = make(map[string]*liveThreadState)
+
+	run, err := queries.CreateAgentRun(t.Context(), db.CreateAgentRunParams{
+		ID:          "run_fail_asst_keep_user",
+		ThreadID:    "thread_1",
+		Trigger:     "resume",
+		Status:      "running",
+		PromptText:  "keep after fail with asst",
+		WorkflowID:  "wf_fail_asst",
+		RootDocPath: "thoughts/plan",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := service.seedPendingUserPrompt(db.AgentThread{ID: "thread_1"}, run); err != nil {
+		t.Fatal(err)
+	}
+	assistantPayload, err := json.Marshal(map[string]any{
+		"message": map[string]any{
+			"role":    "assistant",
+			"content": "partial asst",
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := service.ApplyLiveEvent(conversation.EventEnvelope{
+		RunID:       run.ID,
+		ThreadID:    "thread_1",
+		EventType:   "message_end",
+		PayloadJSON: string(assistantPayload),
+		EventKey:    run.ID + ":asst",
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := service.FailRun(t.Context(), conversation.RunFailure{
+		RunID:        run.ID,
+		ThreadID:     "thread_1",
+		ErrorMessage: "boom",
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	after, _ := service.buildLiveTranscript("thread_1")
+	var buf strings.Builder
+	if err := LiveTranscriptRegion(
+		"thread_1",
+		TranscriptPaneState{Live: after, ShowWorking: false},
+		"",
+	).Render(t.Context(), &buf); err != nil {
+		t.Fatal(err)
+	}
+	html := buf.String()
+	if !strings.Contains(html, "keep after fail with asst") {
+		t.Fatalf("after Accept seed + Fail with assistant, live HTML must keep user: %s", html)
 	}
 }
 

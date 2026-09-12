@@ -2295,9 +2295,11 @@ func (s *Service) clearLiveThread(threadID string) {
 }
 
 // resetLiveThread clears live turn state after fail/cancel/finalize, but keeps
-// pending user bubbles when no renderable assistant exists yet. An empty live
-// REPLACE is what wiped the Accept-seeded user in VA (PatchRunHeader also
-// patchLive()s after reset).
+// pending user bubbles unless a checkpoint already promoted that user into
+// stable SoT (clearLiveThread). Do NOT wipe live just because a renderable
+// assistant is present — assistant-only clear left Accept seeds empty-REPLACE
+// when the user was never promoted. PatchRunHeader must not patchLive() an
+// empty REPLACE after this keep.
 func (s *Service) resetLiveThread(threadID string) {
 	s.liveMu.Lock()
 	defer s.liveMu.Unlock()
@@ -2310,10 +2312,6 @@ func (s *Service) resetLiveThread(threadID string) {
 		return
 	}
 	snap := state.Reducer.Snapshot()
-	if liveSnapshotHasRenderableAssistant(snap) {
-		delete(s.liveThreads, threadID)
-		return
-	}
 	pending := liveSnapshotPendingUserItems(snap)
 	if len(pending) == 0 {
 		delete(s.liveThreads, threadID)

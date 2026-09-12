@@ -3294,16 +3294,6 @@ func (h *Handler) patchThread(
 			),
 		)
 	}
-	patchLive := func() error {
-		threadID := getThreadID(args.CurrentThread)
-		return sse.PatchElementTempl(
-			LiveTranscriptRegion(
-				threadID,
-				args.Transcript,
-				freeformForkAction(threadID),
-			),
-		)
-	}
 	patchDocs := func() error {
 		return sse.PatchElementTempl(
 			DocPane(args.DocPane, getThreadID(args.CurrentThread)),
@@ -3314,10 +3304,9 @@ func (h *Handler) patchThread(
 	case PatchSidebar:
 		return patchSidebar()
 	case PatchRunHeader:
-		if err := patchRunHeader(); err != nil {
-			return err
-		}
-		return patchLive()
+		// Do not patchLive() here: after reset/clear an empty live REPLACE
+		// wiped Accept-seeded users. Live morphs only via PatchLiveTranscript.
+		return patchRunHeader()
 	case PatchDocPane:
 		return patchDocs()
 	case PatchStableTranscript:
