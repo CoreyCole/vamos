@@ -288,6 +288,10 @@ func TestComposerDraftSignalAndSaveContract(t *testing.T) {
 		strings.Contains(action, "await") {
 		t.Fatalf("submit action mutates or waits: %s", action)
 	}
+	if !strings.Contains(action, "__agentChatPinAfterAccept") ||
+		!strings.Contains(action, "agent-chat-scroll-region") {
+		t.Fatalf("submit action missing pin-when-at-bottom arm: %s", action)
+	}
 }
 
 func TestAgentChatComposerStartsAsSingleLine(t *testing.T) {

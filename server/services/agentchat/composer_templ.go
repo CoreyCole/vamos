@@ -928,7 +928,9 @@ func composerInputHandler(workspaceID, threadID, endpointBase string) string {
 }
 
 func composerSubmitAction(action string) string {
-	return "const input = document.getElementById('agent-chat-composer-input'); const prompt = document.getElementById('agent-chat-composer-prompt-value'); if (input && prompt) { prompt.value = input.value; } " + action
+	// When already pinned (dist~0), arm accept-path pin so fat-morph user+working
+	// does not leave the fold (UX: dist 0->73). Do not yank if scrolled up.
+	return "const input = document.getElementById('agent-chat-composer-input'); const prompt = document.getElementById('agent-chat-composer-prompt-value'); if (input && prompt) { prompt.value = input.value; } const __scr = document.getElementById('agent-chat-scroll-region'); if (__scr) { const __dist = __scr.scrollHeight - __scr.scrollTop - __scr.clientHeight; if (__dist <= 4) { window.__agentChatPinAfterAccept = true; } } " + action
 }
 
 func threadNewTargetAction(threadID string, target ThreadNewTargetView) string {

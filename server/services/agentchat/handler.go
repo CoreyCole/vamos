@@ -44,6 +44,27 @@ if (input) {
   input.dispatchEvent(new Event('input', { bubbles: true }));
   input.focus({ preventScroll: true });
 }
+if (window.__agentChatPinAfterAccept) {
+  window.__agentChatPinAfterAccept = false;
+  const pin = () => {
+    const region = document.getElementById('agent-chat-scroll-region');
+    const latest = document.getElementById('chat-latest');
+    if (region) {
+      const dist = region.scrollHeight - region.scrollTop - region.clientHeight;
+      // Morph may already raise dist (~user+working). Skip only if user scrolled away.
+      if (dist > 160) return;
+      region.scrollTop = region.scrollHeight;
+      latest?.scrollIntoView({ block: 'end', inline: 'nearest' });
+      region.scrollTop = region.scrollHeight;
+    }
+    latest?.focus({ preventScroll: true });
+  };
+  pin();
+  requestAnimationFrame(() => {
+    pin();
+    requestAnimationFrame(pin);
+  });
+}
 `
 
 type Handler struct {
