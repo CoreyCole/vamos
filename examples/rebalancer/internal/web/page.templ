@@ -2,89 +2,88 @@ package web
 
 templ Layout(data PageData) {
 	<!DOCTYPE html>
-	<html lang="en" class="theme-system">
+	<html lang="en">
 		<head>
 			<meta charset="UTF-8"/>
 			<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 			<title>Portfolio Rebalancer</title>
 			<script type="module" src="https://cdn.jsdelivr.net/gh/starfederation/datastar@v1.0.1/bundles/datastar.js"></script>
 			<script>
-				// Theme system: detect preference, load saved override, listen for parent
+				// Theme system: match DatastarUI/shadcn with class="dark"
 				(function() {
-					const saved = localStorage.getItem('theme');
-					const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+					const root = document.documentElement;
+					const media = window.matchMedia('(prefers-color-scheme: dark)');
 					
-					function setTheme(theme) {
-						const root = document.documentElement;
-						root.classList.remove('theme-light', 'theme-dark', 'theme-system');
-						
+					function applyTheme(theme) {
 						if (theme === 'system') {
-							root.classList.add('theme-system');
-							root.setAttribute('data-theme', prefersDark ? 'dark' : 'light');
+							root.classList.toggle('dark', media.matches);
 						} else {
-							root.classList.add('theme-' + theme);
-							root.setAttribute('data-theme', theme);
+							root.classList.toggle('dark', theme === 'dark');
 						}
-						
-						localStorage.setItem('theme', theme);
 					}
 					
-					// Initialize from saved or system
+					function setTheme(theme) {
+						localStorage.setItem('theme', theme);
+						applyTheme(theme);
+					}
+					
+					// Initialize from localStorage or system
+					const saved = localStorage.getItem('theme');
 					if (saved && ['light', 'dark', 'system'].includes(saved)) {
-						setTheme(saved);
+						applyTheme(saved);
 					} else {
 						setTheme('system');
 					}
 					
-					// Listen for system preference changes
-					window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', e => {
-						if (document.documentElement.classList.contains('theme-system')) {
-							document.documentElement.setAttribute('data-theme', e.matches ? 'dark' : 'light');
+					// Listen for system preference changes when theme=system
+					media.addEventListener('change', () => {
+						const current = localStorage.getItem('theme');
+						if (!current || current === 'system') {
+							applyTheme('system');
 						}
 					});
 					
 					// Listen for parent theme messages (Vamos embed)
 					window.addEventListener('message', e => {
-						if (e.data && (e.data === 'dark' || e.data === 'light')) {
+						if (e.data === 'dark' || e.data === 'light') {
 							setTheme(e.data);
 						}
 					});
 					
 					window.toggleTheme = function() {
-						const current = document.documentElement.getAttribute('data-theme');
-						setTheme(current === 'dark' ? 'light' : 'dark');
+						const current = localStorage.getItem('theme') || 'system';
+						const isDark = root.classList.contains('dark');
+						setTheme(isDark ? 'light' : 'dark');
 					};
 				})();
 			</script>
 			<style>
-				:root[data-theme="light"] {
-					--bg-primary: #ffffff;
-					--bg-secondary: #f8f9fa;
-					--bg-tertiary: #e9ecef;
-					--text-primary: #000000;
-					--text-secondary: #6c757d;
-					--text-tertiary: #adb5bd;
-					--border-color: #dee2e6;
-					--accent-green: #00a651;
-					--accent-green-bg: #e8f5e9;
-					--accent-red: #d32f2f;
-					--accent-red-bg: #ffebee;
-					--card-shadow: 0 1px 3px rgba(0,0,0,0.1);
+				:root {
+					--background: 255 255 255;
+					--foreground: 0 0 0;
+					--card: 255 255 255;
+					--card-foreground: 0 0 0;
+					--muted: 248 249 250;
+					--muted-foreground: 108 117 125;
+					--border: 222 226 230;
+					--accent: 0 166 81;
+					--accent-foreground: 255 255 255;
+					--destructive: 211 47 47;
+					--destructive-foreground: 255 255 255;
 				}
 				
-				:root[data-theme="dark"] {
-					--bg-primary: #000000;
-					--bg-secondary: #1a1a1a;
-					--bg-tertiary: #2d2d2d;
-					--text-primary: #ffffff;
-					--text-secondary: #b0b0b0;
-					--text-tertiary: #6c757d;
-					--border-color: #3a3a3a;
-					--accent-green: #00d662;
-					--accent-green-bg: #0a2e1a;
-					--accent-red: #ff5252;
-					--accent-red-bg: #2e0a0a;
-					--card-shadow: 0 1px 3px rgba(255,255,255,0.05);
+				.dark {
+					--background: 0 0 0;
+					--foreground: 255 255 255;
+					--card: 26 26 26;
+					--card-foreground: 255 255 255;
+					--muted: 45 45 45;
+					--muted-foreground: 176 176 176;
+					--border: 58 58 58;
+					--accent: 0 214 98;
+					--accent-foreground: 0 0 0;
+					--destructive: 255 82 82;
+					--destructive-foreground: 255 255 255;
 				}
 				
 				* {
@@ -95,21 +94,19 @@ templ Layout(data PageData) {
 				
 				body {
 					font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-					background: var(--bg-primary);
-					color: var(--text-primary);
+					background: rgb(var(--background));
+					color: rgb(var(--foreground));
 					line-height: 1.5;
-					min-height: 100vh;
 				}
 				
 				.container {
 					max-width: 960px;
 					margin: 0 auto;
-					padding: 0;
 				}
 				
 				.header {
-					background: var(--bg-secondary);
-					border-bottom: 1px solid var(--border-color);
+					background: rgb(var(--card));
+					border-bottom: 1px solid rgb(var(--border));
 					padding: 16px;
 					display: flex;
 					justify-content: space-between;
@@ -127,7 +124,7 @@ templ Layout(data PageData) {
 				.theme-toggle {
 					background: none;
 					border: none;
-					color: var(--text-primary);
+					color: rgb(var(--foreground));
 					font-size: 20px;
 					cursor: pointer;
 					padding: 8px;
@@ -136,12 +133,12 @@ templ Layout(data PageData) {
 				}
 				
 				.theme-toggle:hover {
-					background: var(--bg-tertiary);
+					background: rgb(var(--muted));
 				}
 				
 				.card {
-					background: var(--bg-secondary);
-					border: 1px solid var(--border-color);
+					background: rgb(var(--card));
+					border: 1px solid rgb(var(--border));
 					border-radius: 8px;
 					margin: 16px;
 					overflow: hidden;
@@ -149,82 +146,108 @@ templ Layout(data PageData) {
 				
 				.card-header {
 					padding: 16px;
-					border-bottom: 1px solid var(--border-color);
+					border-bottom: 1px solid rgb(var(--border));
 					font-weight: 600;
 					font-size: 16px;
+					background: rgb(var(--muted));
+					position: sticky;
+					top: 57px;
+					z-index: 10;
 				}
 				
 				.card-body {
 					padding: 16px;
 				}
 				
-				.position-item {
-					display: flex;
-					justify-content: space-between;
-					align-items: center;
+				.table-container {
+					overflow-x: auto;
+				}
+				
+				.table {
+					width: 100%;
+					border-collapse: collapse;
+					font-size: 14px;
+				}
+				
+				.table thead {
+					background: rgb(var(--muted));
+					position: sticky;
+					top: 73px;
+					z-index: 9;
+				}
+				
+				.table th {
 					padding: 12px 16px;
-					border-bottom: 1px solid var(--border-color);
-					cursor: pointer;
-					transition: background 0.1s;
-				}
-				
-				.position-item:hover {
-					background: var(--bg-tertiary);
-				}
-				
-				.position-item:last-child {
-					border-bottom: none;
-				}
-				
-				.position-left {
-					flex: 1;
-				}
-				
-				.position-symbol {
+					text-align: left;
 					font-weight: 600;
-					font-size: 15px;
-					margin-bottom: 2px;
+					font-size: 12px;
+					text-transform: uppercase;
+					letter-spacing: 0.5px;
+					color: rgb(var(--muted-foreground));
+					border-bottom: 1px solid rgb(var(--border));
 				}
 				
-				.position-detail {
-					font-size: 13px;
-					color: var(--text-secondary);
-				}
-				
-				.position-right {
+				.table th.text-right {
 					text-align: right;
-					display: flex;
-					flex-direction: column;
-					align-items: flex-end;
-					gap: 4px;
 				}
 				
-				.position-value {
-					font-size: 16px;
+				.table td {
+					padding: 12px 16px;
+					border-bottom: 1px solid rgb(var(--border));
+				}
+				
+				.table td.text-right {
+					text-align: right;
+				}
+				
+				.table td.muted {
+					color: rgb(var(--muted-foreground));
+				}
+				
+				.table tbody tr:nth-child(even) {
+					background: rgb(var(--muted) / 0.3);
+				}
+				
+				.table tbody tr:hover {
+					background: rgb(var(--muted) / 0.6);
+				}
+				
+				.symbol {
 					font-weight: 600;
+				}
+				
+				.account-badge {
+					display: inline-block;
+					font-size: 11px;
+					padding: 2px 8px;
+					border-radius: 10px;
+					background: rgb(var(--muted));
+					color: rgb(var(--muted-foreground));
+					font-weight: 500;
+					margin-left: 6px;
 				}
 				
 				.pill {
-					font-size: 12px;
-					padding: 4px 8px;
-					border-radius: 12px;
+					font-size: 11px;
+					padding: 3px 8px;
+					border-radius: 10px;
 					font-weight: 600;
 					white-space: nowrap;
 				}
 				
-				.pill-green {
-					background: var(--accent-green-bg);
-					color: var(--accent-green);
+				.pill-buy {
+					background: rgb(var(--accent) / 0.15);
+					color: rgb(var(--accent));
 				}
 				
-				.pill-red {
-					background: var(--accent-red-bg);
-					color: var(--accent-red);
+				.pill-sell {
+					background: rgb(var(--destructive) / 0.15);
+					color: rgb(var(--destructive));
 				}
 				
 				.btn {
-					background: var(--accent-green);
-					color: white;
+					background: rgb(var(--accent));
+					color: rgb(var(--accent-foreground));
 					border: none;
 					padding: 12px 24px;
 					border-radius: 8px;
@@ -250,7 +273,7 @@ templ Layout(data PageData) {
 				.input-label {
 					display: block;
 					font-size: 13px;
-					color: var(--text-secondary);
+					color: rgb(var(--muted-foreground));
 					margin-bottom: 4px;
 					font-weight: 500;
 				}
@@ -258,26 +281,26 @@ templ Layout(data PageData) {
 				.input {
 					width: 100%;
 					padding: 10px 12px;
-					background: var(--bg-primary);
-					border: 1px solid var(--border-color);
+					background: rgb(var(--background));
+					border: 1px solid rgb(var(--border));
 					border-radius: 6px;
-					color: var(--text-primary);
+					color: rgb(var(--foreground));
 					font-size: 15px;
 				}
 				
 				.input:focus {
 					outline: none;
-					border-color: var(--accent-green);
+					border-color: rgb(var(--accent));
 				}
 				
 				.select {
-					width: 100%;
-					padding: 10px 12px;
-					background: var(--bg-primary);
-					border: 1px solid var(--border-color);
+					padding: 8px 12px;
+					background: rgb(var(--background));
+					border: 1px solid rgb(var(--border));
 					border-radius: 6px;
-					color: var(--text-primary);
+					color: rgb(var(--foreground));
 					font-size: 14px;
+					cursor: pointer;
 				}
 				
 				.grid {
@@ -300,7 +323,7 @@ templ Layout(data PageData) {
 				
 				.summary-label {
 					font-size: 12px;
-					color: var(--text-secondary);
+					color: rgb(var(--muted-foreground));
 					text-transform: uppercase;
 					letter-spacing: 0.5px;
 				}
@@ -312,7 +335,7 @@ templ Layout(data PageData) {
 				
 				.summary-target {
 					font-size: 11px;
-					color: var(--text-tertiary);
+					color: rgb(var(--muted-foreground));
 				}
 				
 				.alert {
@@ -322,25 +345,25 @@ templ Layout(data PageData) {
 				}
 				
 				.alert-success {
-					background: var(--accent-green-bg);
-					color: var(--accent-green);
-					border: 1px solid var(--accent-green);
+					background: rgb(var(--accent) / 0.15);
+					color: rgb(var(--accent));
+					border: 1px solid rgb(var(--accent));
 				}
 				
 				.alert-error {
-					background: var(--accent-red-bg);
-					color: var(--accent-red);
-					border: 1px solid var(--accent-red);
+					background: rgb(var(--destructive) / 0.15);
+					color: rgb(var(--destructive));
+					border: 1px solid rgb(var(--destructive));
 				}
 				
 				.alert-warning {
-					background: #fff3cd;
+					background: rgb(255 243 205 / 0.15);
 					color: #856404;
 					border: 1px solid #ffc107;
 				}
 				
-				:root[data-theme="dark"] .alert-warning {
-					background: #332701;
+				.dark .alert-warning {
+					background: rgb(51 39 1 / 0.3);
 					color: #ffc107;
 				}
 				
@@ -352,58 +375,25 @@ templ Layout(data PageData) {
 				
 				.constraint-list li:before {
 					content: "• ";
-					color: var(--text-secondary);
+					color: rgb(var(--muted-foreground));
 				}
 				
 				.controls-row {
 					display: flex;
 					gap: 12px;
-					align-items: center;
 					padding: 12px 16px;
-					background: var(--bg-tertiary);
-					border-bottom: 1px solid var(--border-color);
+					background: rgb(var(--muted));
+					border-bottom: 1px solid rgb(var(--border));
 				}
 				
 				.controls-row select {
 					flex: 1;
-					min-width: 0;
 				}
 				
-				.account-badge {
-					display: inline-block;
-					font-size: 11px;
-					padding: 2px 8px;
-					border-radius: 10px;
-					background: var(--bg-tertiary);
-					color: var(--text-secondary);
-					font-weight: 500;
-					margin-left: 6px;
-				}
-				
-				.trade-row {
-					display: flex;
-					justify-content: space-between;
-					padding: 12px 16px;
-					border-bottom: 1px solid var(--border-color);
-					font-size: 14px;
-				}
-				
-				.trade-row:last-child {
-					border-bottom: none;
-				}
-				
-				.trade-info {
-					flex: 1;
-				}
-				
-				.trade-symbol {
-					font-weight: 600;
-					margin-bottom: 2px;
-				}
-				
-				.trade-detail {
-					font-size: 12px;
-					color: var(--text-secondary);
+				.empty-state {
+					text-align: center;
+					color: rgb(var(--muted-foreground));
+					padding: 32px 16px;
 				}
 			</style>
 		</head>
@@ -421,13 +411,13 @@ templ Layout(data PageData) {
 			<script>
 				// Update theme icon
 				function updateThemeIcon() {
-					const theme = document.documentElement.getAttribute('data-theme');
-					document.getElementById('theme-icon').textContent = theme === 'dark' ? '☀' : '🌙';
+					const isDark = document.documentElement.classList.contains('dark');
+					document.getElementById('theme-icon').textContent = isDark ? '☀' : '🌙';
 				}
 				updateThemeIcon();
 				new MutationObserver(updateThemeIcon).observe(
 					document.documentElement,
-					{ attributes: true, attributeFilter: ['data-theme'] }
+					{ attributes: true, attributeFilter: ['class'] }
 				);
 			</script>
 		</body>
@@ -626,40 +616,49 @@ templ Positions(data PageData) {
 			</select>
 		</div>
 		if len(data.Positions) == 0 {
-			<div class="card-body">
-				<div style="text-align: center; color: var(--text-secondary); padding: 32px 16px;">
-					No positions loaded. Click "Load Positions" to start.
-				</div>
+			<div class="empty-state">
+				No positions loaded. Click "Load Positions" to start.
 			</div>
 		} else {
-			<div>
-				for _, p := range data.Positions {
-					<div class="position-item">
-						<div class="position-left">
-							<div class="position-symbol">{ p.Symbol }<span class="account-badge">{ p.Account }</span></div>
-							<div class="position-detail">
+			<div class="table-container">
+				<table class="table">
+					<thead>
+						<tr>
+							<th>Account</th>
+							<th>Symbol</th>
+							<th class="muted">Name</th>
+							<th class="muted">Class</th>
+							<th class="text-right">
 								if data.ListShows == "quantity" {
-									{ formatFloat(p.Quantity) } shares &bull; { p.AssetClass }
+									Quantity
 								} else if data.ListShows == "price" {
-									{ formatFloat(p.Quantity) } at { "$" + formatMoney(p.Price) }
+									Price
 								} else {
-									{ formatFloat(p.Quantity) } at { "$" + formatMoney(p.Price) } &bull; { p.AssetClass }
+									Value
 								}
-							</div>
-						</div>
-						<div class="position-right">
-							<div class="position-value">
-								if data.ListShows == "quantity" {
-									{ formatFloat(p.Quantity) }
-								} else if data.ListShows == "price" {
-									{ "$" + formatMoney(p.Price) }
-								} else {
-									{ "$" + formatMoney(p.MarketValue) }
-								}
-							</div>
-						</div>
-					</div>
-				}
+							</th>
+						</tr>
+					</thead>
+					<tbody>
+						for _, p := range data.Positions {
+							<tr>
+								<td class="muted">{ p.Account }</td>
+								<td class="symbol">{ p.Symbol }</td>
+								<td class="muted">{ p.Name }</td>
+								<td class="muted">{ p.AssetClass }</td>
+								<td class="text-right">
+									if data.ListShows == "quantity" {
+										{ formatFloat(p.Quantity) }
+									} else if data.ListShows == "price" {
+										{ "$" + formatMoney(p.Price) }
+									} else {
+										{ "$" + formatMoney(p.MarketValue) }
+									}
+								</td>
+							</tr>
+						}
+					</tbody>
+				</table>
 			</div>
 		}
 	</div>
@@ -669,31 +668,39 @@ templ Trades(data PageData) {
 	<div id="trades" class="card">
 		<div class="card-header">Proposed Trades</div>
 		if len(data.Trades) == 0 {
-			<div class="card-body">
-				<div style="text-align: center; color: var(--text-secondary); padding: 32px 16px;">
-					No trades proposed. Adjust target allocation to generate trades.
-				</div>
+			<div class="empty-state">
+				No trades proposed. Adjust target allocation to generate trades.
 			</div>
 		} else {
-			<div>
-				for _, t := range data.Trades {
-					<div class="trade-row">
-						<div class="trade-info">
-							<div class="trade-symbol">
-								{ t.Symbol }
-								<span class={ "pill", templ.KV("pill-green", t.Side == "BUY"), templ.KV("pill-red", t.Side == "SELL") }>
-									{ t.Side }
-								</span>
-							</div>
-							<div class="trade-detail">
-								{ t.Account } &bull; { formatInt(t.RoundedShares) } shares &bull; { t.Reason }
-							</div>
-						</div>
-						<div class="position-value">
-							{ "$" + formatMoney(t.Dollars) }
-						</div>
-					</div>
-				}
+			<div class="table-container">
+				<table class="table">
+					<thead>
+						<tr>
+							<th>Account</th>
+							<th>Side</th>
+							<th>Symbol</th>
+							<th class="text-right">Shares</th>
+							<th class="text-right">Dollars</th>
+							<th class="muted">Reason</th>
+						</tr>
+					</thead>
+					<tbody>
+						for _, t := range data.Trades {
+							<tr>
+								<td class="muted">{ t.Account }</td>
+								<td>
+									<span class={ "pill", templ.KV("pill-buy", t.Side == "BUY"), templ.KV("pill-sell", t.Side == "SELL") }>
+										{ t.Side }
+									</span>
+								</td>
+								<td class="symbol">{ t.Symbol }</td>
+								<td class="text-right">{ formatInt(t.RoundedShares) }</td>
+								<td class="text-right">{ "$" + formatMoney(t.Dollars) }</td>
+								<td class="muted">{ t.Reason }</td>
+							</tr>
+						}
+					</tbody>
+				</table>
 			</div>
 		}
 	</div>
