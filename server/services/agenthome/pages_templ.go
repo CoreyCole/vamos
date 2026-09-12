@@ -636,7 +636,7 @@ func RosterRail(view RosterView) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 51, "<style>\n\t\t\t#workbench-v2-roster a.roster-row:hover,\n\t\t\t#workbench-v2-roster a.roster-pin:hover {\n\t\t\t\tbackground-color: #1c1c1c;\n\t\t\t}\n\t\t\t#workbench-v2-roster a.roster-row-selected,\n\t\t\t#workbench-v2-roster a.roster-row-selected:hover,\n\t\t\t#workbench-v2-roster a.roster-pin-selected,\n\t\t\t#workbench-v2-roster a.roster-pin-selected:hover,\n\t\t\t#workbench-v2-roster a.roster-multi-selected {\n\t\t\t\tbackground-color: #2a2a2a;\n\t\t\t\tbox-shadow: inset 3px 0 0 0 hsl(var(--primary));\n\t\t\t}\n\t\t</style></div></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 51, "<style>\n\t\t\t#workbench-v2-roster a.roster-row:hover,\n\t\t\t#workbench-v2-roster a.roster-pin:hover {\n\t\t\t\tbackground-color: #1c1c1c;\n\t\t\t}\n\t\t\t#workbench-v2-roster a.roster-row-selected,\n\t\t\t#workbench-v2-roster a.roster-row-selected:hover,\n\t\t\t#workbench-v2-roster a.roster-pin-selected,\n\t\t\t#workbench-v2-roster a.roster-pin-selected:hover,\n\t\t\t#workbench-v2-roster a.roster-multi-selected {\n\t\t\t\tbackground-color: #3a3a3a;\n\t\t\t\tbox-shadow: inset 3px 0 0 0 hsl(var(--primary));\n\t\t\t}\n\t\t</style></div></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
