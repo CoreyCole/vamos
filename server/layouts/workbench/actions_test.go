@@ -74,3 +74,21 @@ func TestOverflowActionsRendersLinksAndFormModes(t *testing.T) {
 		t.Fatalf("overflow actions must be a portaled dropdown, not details: %s", html)
 	}
 }
+
+func TestChatHeaderShareOverflowLabels(t *testing.T) {
+	var body strings.Builder
+	if err := ChatHeaderShareOverflow().Render(t.Context(), &body); err != nil {
+		t.Fatal(err)
+	}
+	html := body.String()
+	for _, want := range []string{
+		`data-testid="workbench-overflow-actions"`,
+		"Share artifact",
+		"Share chat",
+		`aria-label="Share"`,
+	} {
+		if !strings.Contains(html, want) {
+			t.Fatalf("ChatHeaderShareOverflow missing %q in %s", want, html)
+		}
+	}
+}

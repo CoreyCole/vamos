@@ -30,7 +30,7 @@ func TestChatColumnWithReopen_ClosedShowsVisibleSlot(t *testing.T) {
 		t.Fatalf("chat header missing fixed h-10 desktop-only band: %s", out)
 	}
 	if !strings.Contains(out, ">B</span>") ||
-		!strings.Contains(out, `aria-label="Share"`) {
+		!strings.Contains(out, `data-testid="workbench-overflow-actions"`) {
 		t.Fatalf("chat header missing avatar or share: %s", out)
 	}
 	if !strings.Contains(out, "Show roster sidebar (Ctrl+B)") {
@@ -118,5 +118,22 @@ func TestChatColumnArtifactReopenWhenClosed(t *testing.T) {
 	}
 	if strings.Contains(out, `>Open details</span>`) && !strings.Contains(out, `sr-only">Open details`) {
 		t.Fatalf("Open details must not be visible label: %s", out)
+	}
+}
+
+func TestChatColumnShareOverflowMenu(t *testing.T) {
+	var buf bytes.Buffer
+	if err := ChatColumnWithReopen(true, true, "Bot", templ.Raw("<p>chat</p>")).Render(context.Background(), &buf); err != nil {
+		t.Fatal(err)
+	}
+	out := buf.String()
+	if !strings.Contains(out, `data-testid="workbench-overflow-actions"`) {
+		t.Fatalf("missing overflow menu: %s", out)
+	}
+	if !strings.Contains(out, "Share artifact") || !strings.Contains(out, "Share chat") {
+		t.Fatalf("missing Share menu items: %s", out)
+	}
+	if strings.Contains(out, `d="M4 12v7a1 1 0 001 1h14`) {
+		t.Fatalf("standalone share icon still present: %s", out)
 	}
 }

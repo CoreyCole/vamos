@@ -87,6 +87,29 @@ func escapeDatastarString(value string) string {
 	return strings.ReplaceAll(value, `'`, `\'`)
 }
 
+
+// ChatHeaderShareOverflow is the desktop chat-header ⋯ menu (Share artifact / Share chat).
+// Class A open only via OverflowActionsScript; stubs until share routes exist.
+func ChatHeaderShareOverflow() templ.Component {
+	return OverflowActions(OverflowActionsArgs{
+		Label: "Share",
+		Groups: []OverflowActionGroup{{
+			Actions: []OverflowAction{
+				{
+					Label:        "Share artifact",
+					Kind:         OverflowActionButton,
+					ClientAction: "el.closest('[data-overflow-menu]')?.style.setProperty('display','none')",
+				},
+				{
+					Label:        "Share chat",
+					Kind:         OverflowActionButton,
+					ClientAction: "el.closest('[data-overflow-menu]')?.style.setProperty('display','none')",
+				},
+			},
+		}},
+	})
+}
+
 func OverflowActionsScript() templ.Component {
 	return templ.ComponentFunc(func(ctx context.Context, w io.Writer) error {
 		_, err := io.WriteString(w, `<script data-overflow-chrome="1">
