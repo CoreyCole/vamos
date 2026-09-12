@@ -138,6 +138,25 @@ just verify-workspaces slug=multi-checkout-dev-workspaces start=true restart=tru
 just verify-workspaces slug=multi-checkout-dev-workspaces start=true restart=true stop=true browser=true agent_chat_probe=true
 ```
 
+### Ruby VA profile → slug map (stop 403 `slug not allowed`)
+
+On host `ruby`, Playwright / human VA minting must use a machine profile whose `AllowedSlugs` includes the target workspace slug. Verified map + one-command helper:
+
+| Profile | Slug(s) | Checkout |
+| --- | --- | --- |
+| `todo52-host` | `2026-09-08-10-10-54-agent-memory-observable-context` | `~/cn/chestnut-flake/vamos-2026-09-08_10-10-54_agent-memory-observable-context` (active feature tip) |
+| `ai470-converge-va` | `ai470-leftover-converge`, `ai470-agent-home-sketch` | converge/sketch checkouts under `~/cn/chestnut-flake/` (converge VA covers both) |
+| `ai470-sketch-va` | `ai470-agent-home-sketch` | sketch checkout only |
+
+```bash
+vamos-va-mint list
+vamos-va-mint cookie                                          # defaults to todo52 feature host
+vamos-va-mint cookie ai470-leftover-converge                  # converge
+vamos-va-mint cookie --profile ai470-converge-va
+```
+
+Writes mode-`600` artifacts under `/tmp/va-<tag>-…`. **Never paste tokens/cookies/tokenized login URLs into chat.** Prefer self-serve remints; ask E2E Lead when the stored profile/key is missing or expired. Full detail: `docs/e2e-story-testing.md` (Ruby VA profile → slug map).
+
 ## Fast workspace DB invariant gate
 
 For fast local/QRSPI phase checks, run the DB-only verifier against the current checkout database:
@@ -255,7 +274,7 @@ Include the report path and first failed layer in handoffs/reviews. Do not claim
 - **DNS**: `lookup main.vamos.test: no such host` means split DNS/wildcard DNS is not configured for the verifier machine. Configure Tailnet DNS so `*.vamos.test` resolves to the manager host.
 - **TLS**: `server gave HTTP response to HTTPS client`, certificate errors, or protocol errors mean HTTPS is not terminating correctly or the verifier does not trust Caddy's CA.
 - **Caddy/proxy**: TLS succeeds but public host returns the wrong app, 404, or unavailable while the child is running. Check wildcard site config, upstream address, and Host preservation.
-- **Auth**: 401/403 from internal endpoints usually means the restart token is wrong or the machine credential/profile cannot mint the scoped browser token.
+- **Auth**: 401/403 from internal endpoints usually means the restart token is wrong or the machine credential/profile cannot mint the scoped browser token. **403 `slug not allowed`** specifically means the chosen Playwright profile's AllowedSlugs does not include that workspace slug — run `vamos-va-mint list` and remint with the matching profile (see Ruby VA profile → slug map above).
 - **Lifecycle**: start/restart/stop failures or stale PID/port checks point to child process startup, state directory, env override, or port allocation problems.
 - **Metadata/logs**: missing metadata/log tails, runtime env snapshot, or TS worker identity marker indicate the child did not boot far enough or state/log paths are not isolated per workspace.
 - **Agent Chat probe**: `localhost:4200` callback/snapshot URLs, wrong cwd, missing internal token, or failed snapshot/callback proof mean the child web process did not build or accept child-local workflow endpoints. Check `VAMOS_INTERNAL_TOKEN`, `.vamos/run/runtime-env.json`, Agent Chat callback base, and child web logs.

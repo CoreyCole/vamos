@@ -39,7 +39,7 @@ eval "$(vamos auth playwright-env --slug <slug>)"
 
 Add `--purpose hermes_chat` when the same credential will also be used for `vamos chat`.
 
-Vamos Go Story auth helpers read `VAMOS_E2E_AUTH_TOKEN` and visit `/internal/agent-auth/browser-login` before scenario steps. Public workspace URLs require a minted token. Run stories with the local `just e2e` recipe; it delegates to `../datastarui/scripts/datastarui.sh` with this checkout's `datastarui-e2e.yml`. The script rebuilds the stable launcher `../datastarui/bin/datastarui` only when launcher sources change. The launcher builds `../datastarui/bin/datastarui-runtime-<hash>` when DatastarUI CLI/E2E sources change, then execs that runtime.
+Vamos Go Story auth helpers read `VAMOS_E2E_AUTH_TOKEN` and visit `/internal/agent-auth/browser-login` before scenario steps. Public workspace URLs require a minted token. `Authenticate()` uses Playwright `WaitForURL` until navigation leaves `/internal/agent-auth/browser-login` (and `/login`), so feature hosts that return HTTP 200 + meta-refresh (sets cookie) instead of an HTTP redirect do not false-fail at DomContentLoaded. For public HTTPS hosts, set `VAMOS_E2E_MACHINE_PROFILE=todo52-host` and `VAMOS_WORKSPACE_MANAGER_URL=https://main.workspaces.creative-mode.ai` (or re-`eval` `vamos auth playwright-env --profile todo52-host …` per run) so one-shot tokens are not replayed. Run stories with the local `just e2e` recipe; it delegates to `../datastarui/scripts/datastarui.sh` with this checkout's `datastarui-e2e.yml`. The script rebuilds the stable launcher `../datastarui/bin/datastarui` only when launcher sources change. The launcher builds `../datastarui/bin/datastarui-runtime-<hash>` when DatastarUI CLI/E2E sources change, then execs that runtime.
 
 List authored Go Story tests:
 
@@ -68,6 +68,52 @@ just e2e \
   --story durable-session-chat \
   --scenario freeform-chat-started-from-thoughts-root-survives-refresh-and-resume
 ```
+
+### Ruby VA profile → slug map (Playwright / human browser)
+
+Machine credentials on the manager enforce `AllowedSlugs`. Minting with the wrong `--profile` for a slug returns **403 `slug not allowed`**. On host `ruby`, use `/home/ruby/.local/bin/vamos-va-mint` so UX/FE agents do not need Lead to hand-mint.
+
+Verified from manager DB (`~/.local/state/vamos/agents.db`) + local profiles (`~/.vamos/credentials.json`):
+
+| Local profile (`--profile`) | Allowed slug(s) | Default email | Host checkout (when present) | Notes |
+| --- | --- | --- | --- | --- |
+| `todo52-host` | `2026-09-08-10-10-54-agent-memory-observable-context` | `agent@example.test` | `~/cn/chestnut-flake/vamos-2026-09-08_10-10-54_agent-memory-observable-context` | Active feature tip (e.g. `aacb9ca`). Manager key name: `todo-5-2-feature-host`. |
+| `ai470-converge-va` | `ai470-leftover-converge`, `ai470-agent-home-sketch` | `vamosagentsai@gmail.com` | `~/cn/chestnut-flake/vamos-ai470-leftover-converge` (converge) / `~/cn/chestnut-flake/vamos-ai470-agent-home-sketch` (sketch) | Converge **and** sketch. Prefer this over sketch-only when either host is fine. |
+| `ai470-sketch-va` | `ai470-agent-home-sketch` | `vamosagentsai@gmail.com` | `~/cn/chestnut-flake/vamos-ai470-agent-home-sketch` | Sketch-only key. |
+
+Manager URL: `https://main.workspaces.creative-mode.ai`.
+
+#### One-command mint (ruby)
+
+```bash
+# Current active feature host (todo52) — default when no slug/profile given
+vamos-va-mint cookie
+vamos-va-mint chrome
+
+# Converge
+vamos-va-mint cookie ai470-leftover-converge
+# or
+vamos-va-mint cookie --profile ai470-converge-va
+
+# Sketch (sketch-only profile, or converge VA which also allows sketch)
+vamos-va-mint cookie ai470-agent-home-sketch
+vamos-va-mint cookie --profile ai470-sketch-va
+
+# Print the map (no secrets)
+vamos-va-mint list
+```
+
+Env overrides: `VAMOS_VA_PROFILE`, `VAMOS_VA_CHECKOUT`, `VAMOS_VA_EMAIL`, `VAMOS_VA_MANAGER`, `VAMOS_VA_CLI_CHECKOUT`.
+
+Artifacts (mode `600`) under `/tmp`:
+
+- cookie: `/tmp/va-<tag>-thoughts-session.txt` (`tag` = `todo52` \| `converge` \| `sketch` \| …)
+- chrome one-shot URL: `/tmp/va-<tag>-chrome-only.url`
+
+**Never paste tokens, cookies, or browser-login URLs that contain tokens into chat.** Read the artifact on the host. Stderr prints DevTools inject tips (`thoughts_session`, host-scoped domain, `httpOnly`/`secure`/`sameSite=None`). `chrome` mode URLs are one-shot — open in Chrome only; do not `curl` them if you still need the unused URL.
+
+When a feature-host VA expires or the profile is missing, remint via `vamos-va-mint` if the local profile still works; otherwise ask **E2E Lead** to recreate/login the machine key. Do not invent slugs from checkout folder names.
+
 
 ### Portable applet smoke stories
 
@@ -124,6 +170,7 @@ After automated browser checks pass against the same URL, `/q-verify` must stop 
 ## Safety
 
 - Browser runs with fixtures must use a registered non-main workspace.
+- 403 `slug not allowed` means the Playwright machine profile's AllowedSlugs does not include the target slug — see the Ruby VA profile → slug map above; remint with the matching profile via `vamos-va-mint`.
 - Runtime metadata uses `.vamos/run/workspace.env` and `VAMOS_*` environment variables.
 - The runtime refuses canonical main database paths when fixture setup could mutate durable state.
 - DatastarUI `e2e review` may emit `needs-human-review`; that is a review handoff, not a deterministic test failure.

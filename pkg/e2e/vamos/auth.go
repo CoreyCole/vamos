@@ -230,6 +230,40 @@ func buildAuthURLWithToken(
 	return authURL.String(), nil
 }
 
+func waitForAuthSession(ctx context.Context, page playwright.Page) error {
+	// Feature hosts may return HTTP 200 + meta-refresh (sets cookie) instead of an
+	// HTTP redirect. Goto(DomContentLoaded) then lands on browser-login; wait until
+	// navigation leaves auth pages before treating the session as established.
+	err := page.WaitForURL(
+		func(url string) bool {
+			return !strings.Contains(url, "/internal/agent-auth/browser-login") &&
+				!strings.Contains(url, "/login")
+		},
+		playwright.PageWaitForURLOptions{
+			Timeout: playwright.Float(15_000),
+		},
+	)
+	if err != nil {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+		}
+		return fmt.Errorf("playwright auth failed; still on auth URL %s: %w", page.URL(), err)
+	}
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	default:
+	}
+	finalURL := page.URL()
+	if strings.Contains(finalURL, "/login") ||
+		strings.Contains(finalURL, "/internal/agent-auth/browser-login") {
+		return fmt.Errorf("playwright auth failed; final URL: %s", finalURL)
+	}
+	return nil
+}
+
 func AuthenticateSecondary(
 	ctx context.Context,
 	page playwright.Page,
@@ -260,14 +294,11 @@ func AuthenticateSecondary(
 	if response == nil || response.Status() < 200 || response.Status() >= 400 {
 		return errors.New("secondary playwright auth failed")
 	}
-	select {
-	case <-ctx.Done():
-		return ctx.Err()
-	default:
-	}
-	if strings.Contains(page.URL(), "/login") ||
-		strings.Contains(page.URL(), "/internal/agent-auth/browser-login") {
-		return errors.New("secondary playwright auth did not establish a session")
+	if err := waitForAuthSession(ctx, page); err != nil {
+		if strings.Contains(err.Error(), "still on auth URL") || strings.Contains(err.Error(), "final URL") {
+			return errors.New("secondary playwright auth did not establish a session")
+		}
+		return err
 	}
 	return nil
 }
@@ -305,15 +336,5 @@ func Authenticate(
 			hint,
 		)
 	}
-	select {
-	case <-ctx.Done():
-		return ctx.Err()
-	default:
-	}
-	finalURL := page.URL()
-	if strings.Contains(finalURL, "/login") ||
-		strings.Contains(finalURL, "/internal/agent-auth/browser-login") {
-		return fmt.Errorf("playwright auth failed; final URL: %s", finalURL)
-	}
-	return nil
+	return waitForAuthSession(ctx, page)
 }
