@@ -4,7 +4,7 @@
  * Lightweight touch-based pull-to-refresh for demo applets.
  * Lives in the iframe; no parent dependency.
  *
- * Default action: location.reload() for honest SSR + Datastar boot + SSE.
+ * Default action: location.reload() standalone; when hosted (iframe), postMessage {type:"vamos:ptr"} so parent can ReloadArtifact / reset iframe.src.
  * Applets may override by setting window.VamosApplet.onPullRefresh before this script runs.
  *
  * Usage:
@@ -79,13 +79,31 @@
     currentY = 0;
   }
 
+  function isHostedInParent() {
+    try {
+      return window.parent != null && window.parent !== window;
+    } catch (_) {
+      return true;
+    }
+  }
+
   function triggerRefresh() {
-    // Call custom handler if defined, otherwise reload
+    // Call custom handler if defined
     if (typeof window.VamosApplet.onPullRefresh === 'function') {
       window.VamosApplet.onPullRefresh();
-    } else {
-      location.reload();
+      return;
     }
+    // Hosted in thoughts/workbench: prefer parent ReloadArtifact (iframe.src reset)
+    if (isHostedInParent()) {
+      try {
+        window.parent.postMessage({ type: 'vamos:ptr' }, '*');
+        return;
+      } catch (_) {
+        // fall through to reload
+      }
+    }
+    // Standalone (or postMessage failed): honest document reload
+    location.reload();
   }
 
   // Apply soft overscroll containment
