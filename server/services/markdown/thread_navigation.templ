@@ -187,6 +187,7 @@ templ ThreadArtifactPane(browser ThreadArtifactBrowserArgs, document templ.Compo
 		<div id="thread-artifact-document" class="min-h-0 flex-1 overflow-auto" aria-live="polite">
 			@document
 		</div>
+		@workbench.ArtifactReloadPTRScript()
 	</div>
 }
 

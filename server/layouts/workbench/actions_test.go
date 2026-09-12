@@ -133,3 +133,66 @@ func TestChatHeaderShareOverflowOmitsReload(t *testing.T) {
 		t.Fatalf("HARD LOCK A: chat Share overflow must omit Reload: %s", html)
 	}
 }
+
+func TestArtifactReloadClickActionDebouncesBusy(t *testing.T) {
+	js := ArtifactReloadClickAction()
+	for _, want := range []string{
+		"__vamosArtifactReloadBusy",
+		`addEventListener("load"`,
+		"setTimeout(done,2000)",
+		"thread-artifact-document",
+		".src=",
+	} {
+		if !strings.Contains(js, want) {
+			t.Fatalf("ArtifactReloadClickAction missing %q in %s", want, js)
+		}
+	}
+	for _, bad := range []string{"/forms/applets/", "Restart", "agent-chat-scroll-region"} {
+		if strings.Contains(js, bad) {
+			t.Fatalf("click reload must not include %q: %s", bad, js)
+		}
+	}
+}
+
+func TestArtifactReloadPTRBootstrapMessageAndOverscroll(t *testing.T) {
+	js := ArtifactReloadPanePTRBootstrap()
+	for _, want := range []string{
+		"__vamosArtifactPTRBound",
+		`e.data.type !== "vamos:ptr"`,
+		`overscrollBehaviorY = "contain"`,
+		"e.source !== f.contentWindow",
+		"#thread-artifact-pane",
+		"threshold = 56",
+		"__vamosArtifactReloadBusy",
+		"#agent-chat-scroll-region",
+	} {
+		if !strings.Contains(js, want) {
+			t.Fatalf("PTR bootstrap missing %q in %s", want, js)
+		}
+	}
+	// HARD LOCK A / soft parks: bootstrap must not invent chat Reload or /static promotion markers.
+	for _, bad := range []string{"/static/", "allow-same-origin", "chat ⋯", "thread-artifact-reload-mobile"} {
+		if strings.Contains(js, bad) {
+			t.Fatalf("PTR bootstrap must not include %q: %s", bad, js)
+		}
+	}
+}
+
+func TestArtifactReloadPTRScriptRendersOnceGuard(t *testing.T) {
+	var body strings.Builder
+	if err := ArtifactReloadPTRScript().Render(t.Context(), &body); err != nil {
+		t.Fatal(err)
+	}
+	html := body.String()
+	for _, want := range []string{
+		`data-vamos-artifact-ptr="1"`,
+		"vamos:ptr",
+		"overscrollBehaviorY",
+		"__vamosArtifactPTRBound",
+	} {
+		if !strings.Contains(html, want) {
+			t.Fatalf("ArtifactReloadPTRScript missing %q in %s", want, html)
+		}
+	}
+}
+

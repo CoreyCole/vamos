@@ -34,6 +34,7 @@ templ ThoughtsAppletArtifactPane(applet AppletContext, process appletruntime.App
 		<div id="thread-artifact-document" class="min-h-0 flex-1 overflow-auto" aria-live="polite">
 			@AppletWorkbenchDocument(applet, process, comments)
 		</div>
+		@workbench.ArtifactReloadPTRScript()
 	</div>
 }
 

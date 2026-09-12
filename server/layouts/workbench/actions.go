@@ -168,8 +168,81 @@ func OverflowActionsScript() templ.Component {
 	})
 }
 
-// ArtifactReloadClickAction reassigns the artifact iframe src (full document reload).
+// ArtifactReloadJS is the shared iframe.src reset body (icon click, pane PTR, vamos:ptr).
 // Restart (process) is separate — this never posts /forms/applets/*/restart.
+// Debounces in-flight reloads via window.__vamosArtifactReloadBusy (load once + 2s fallback).
+func ArtifactReloadJS() string {
+	return `if(window.__vamosArtifactReloadBusy)return;var host=document.getElementById("thread-artifact-document")||document.getElementById("workbench-v2-artifact-body");if(!host)return;var f=host.querySelector("iframe[data-vamos-html-applet],[id^=\"applet-frame-\"] iframe,iframe");if(!f)return;window.__vamosArtifactReloadBusy=true;var done=function(){window.__vamosArtifactReloadBusy=false;};f.addEventListener("load",done,{once:true});setTimeout(done,2000);var s=f.getAttribute("src")||f.src;f.src=s;`
+}
+
+// ArtifactReloadClickAction reassigns the artifact iframe src (full document reload).
 func ArtifactReloadClickAction() string {
-	return `(function(){var host=document.getElementById("thread-artifact-document")||document.getElementById("workbench-v2-artifact-body");if(!host)return;var f=host.querySelector("iframe[data-vamos-html-applet],[id^=\"applet-frame-\"] iframe,iframe");if(!f)return;var s=f.getAttribute("src")||f.src;f.src=s;})()`
+	return `(function(){` + ArtifactReloadJS() + `})()`
+}
+
+// ArtifactReloadPanePTRBootstrap installs parent-owned pane PTR + allowlisted vamos:ptr listener.
+// Idempotent (window.__vamosArtifactPTRBound). Does not intercept #agent-chat-scroll-region.
+func ArtifactReloadPanePTRBootstrap() string {
+	return `(function(){
+  if (window.__vamosArtifactPTRBound) return;
+  window.__vamosArtifactPTRBound = true;
+  function reloadArtifact(){` + ArtifactReloadJS() + `}
+  function artifactIframe(){
+    var host=document.getElementById("thread-artifact-document")||document.getElementById("workbench-v2-artifact-body");
+    if(!host)return null;
+    return host.querySelector("iframe[data-vamos-html-applet],[id^=\"applet-frame-\"] iframe,iframe");
+  }
+  function bindPane(pane){
+    if(!pane || pane.dataset.vamosPtrBound) return;
+    pane.dataset.vamosPtrBound = "1";
+    pane.style.overscrollBehaviorY = "contain";
+    var doc = document.getElementById("thread-artifact-document");
+    if (doc) doc.style.overscrollBehaviorY = "contain";
+    var startY = 0, pulling = false, armed = false;
+    var threshold = 56;
+    function scrollTopAtParent(){
+      var el = document.getElementById("thread-artifact-document") || pane;
+      return !el || el.scrollTop <= 0;
+    }
+    pane.addEventListener("touchstart", function(evt){
+      if (!evt.touches || evt.touches.length !== 1) return;
+      if (evt.target && evt.target.closest && evt.target.closest("#agent-chat-scroll-region")) return;
+      armed = scrollTopAtParent();
+      startY = evt.touches[0].clientY;
+      pulling = false;
+    }, {passive: true});
+    pane.addEventListener("touchmove", function(evt){
+      if (!armed || !evt.touches || evt.touches.length !== 1) return;
+      if (!scrollTopAtParent()) { armed = false; return; }
+      var dy = evt.touches[0].clientY - startY;
+      if (dy > threshold) pulling = true;
+    }, {passive: true});
+    pane.addEventListener("touchend", function(){
+      if (pulling && armed) reloadArtifact();
+      armed = false; pulling = false;
+    }, {passive: true});
+  }
+  function bindAll(){
+    document.querySelectorAll("#thread-artifact-pane").forEach(bindPane);
+  }
+  bindAll();
+  window.addEventListener("message", function(e){
+    if (!e || !e.data || e.data.type !== "vamos:ptr") return;
+    var f = artifactIframe();
+    if (!f || e.source !== f.contentWindow) return;
+    reloadArtifact();
+  });
+  if (typeof MutationObserver !== "undefined") {
+    var mo = new MutationObserver(function(){ bindAll(); });
+    mo.observe(document.documentElement, {childList: true, subtree: true});
+  }
+})();`
+}
+
+// ArtifactReloadPTRScript injects the one-shot pane PTR + vamos:ptr bootstrap (not /static).
+func ArtifactReloadPTRScript() templ.Component {
+	return templ.ComponentFunc(func(ctx context.Context, w io.Writer) error {
+		_, err := io.WriteString(w, `<script data-vamos-artifact-ptr="1">`+"\n"+ArtifactReloadPanePTRBootstrap()+"\n</script>")
+		return err
+	})
 }
