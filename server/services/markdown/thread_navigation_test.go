@@ -124,6 +124,14 @@ func TestThreadArtifactPaneScopesStaticHandlersToBrowserRows(t *testing.T) {
 		Href:     "/threads/thread_1?artifact=thoughts%2Fsafe.md",
 		Endpoint: "/threads/thread_1/artifact?artifact=thoughts%2Fquote%27%5Cline%0A%3Cscript%3E.md",
 	}
+	dirEntry := ThreadArtifactEntry{
+		Name:           "docs",
+		Path:           "thoughts/owner/docs",
+		IsDir:          true,
+		BrowseHref:     "/threads/thread_1?artifact=thoughts%2Fsafe.md&artifact_dir=thoughts%2Fowner%2Fdocs",
+		BrowseEndpoint: "/threads/thread_1/artifact-browser?artifact=thoughts%2Fsafe.md&artifact_dir=thoughts%2Fowner%2Fdocs",
+		Endpoint:       "/threads/thread_1/artifact-directory?directory=thoughts%2Fowner%2Fdocs",
+	}
 	var body bytes.Buffer
 	if err := ThreadArtifactPane(
 		ThreadArtifactBrowserArgs{
@@ -132,7 +140,7 @@ func TestThreadArtifactPaneScopesStaticHandlersToBrowserRows(t *testing.T) {
 			DirectoryPath:  "owner",
 			ParentHref:     "/threads/thread_1?artifact=thoughts%2Fsafe.md&artifact_dir=thoughts",
 			ParentEndpoint: "/threads/thread_1/artifact-browser?artifact=thoughts%2Fsafe.md&artifact_dir=thoughts",
-			Entries:        []ThreadArtifactEntry{entry},
+			Entries:        []ThreadArtifactEntry{entry, dirEntry},
 			BrowserOpen:    true,
 		},
 		templ.Raw(`<p><a href="/thoughts/fullscreen.md">Fullscreen</a></p>`),
@@ -182,6 +190,18 @@ func TestThreadArtifactPaneScopesStaticHandlersToBrowserRows(t *testing.T) {
 			"file row was intercepted or document link intercepted: %s",
 			html,
 		)
+	}
+	// Ready(): no data-on:click on path-header sibling Up outside the browser.
+	upIdx := strings.Index(html, `id="thread-artifact-up"`)
+	if upIdx < 0 {
+		t.Fatalf("missing #thread-artifact-up: %s", html)
+	}
+	upEnd := strings.Index(html[upIdx:], ">")
+	upTag := html[upIdx : upIdx+upEnd]
+	if strings.Contains(upTag, "data-on:click") ||
+		strings.Contains(upTag, "data-on-click") ||
+		strings.Contains(upTag, "data-artifact-endpoint") {
+		t.Fatalf("path-header sibling Up must be plain GET: %s", upTag)
 	}
 }
 
@@ -567,4 +587,35 @@ func artifactPathHeader(t *testing.T, html string) string {
 		return header[:end]
 	}
 	return header
+}
+
+
+func TestViewChatDocumentLinkIsPlainGET(t *testing.T) {
+	t.Parallel()
+	var body strings.Builder
+	if err := ThreadArtifactPane(
+		ThreadArtifactBrowserArgs{
+			DocPath:            "owner/plans/alpha/design.md",
+			ViewDocumentHref:   "/rooms/plan/alpha?artifact=x",
+			DocumentViewActive: true,
+			ParentHref:         "/threads/t1?artifact=x&artifact_dir=thoughts",
+		},
+		templ.Raw("<p>doc</p>"),
+	).Render(t.Context(), &body); err != nil {
+		t.Fatal(err)
+	}
+	header := artifactPathHeader(t, body.String())
+	chat := strings.Index(header, `data-testid="view-chat"`)
+	if chat < 0 {
+		t.Fatalf("missing view-chat: %s", header)
+	}
+	// Slice from view-chat open tag through next >
+	end := strings.Index(header[chat:], ">")
+	tag := header[chat : chat+end]
+	if strings.Contains(tag, "data-on:click") || strings.Contains(tag, "data-on-click") {
+		t.Fatalf("view-chat document link must be plain GET for Ready(): %s", tag)
+	}
+	if !strings.Contains(header, `href="/rooms/plan/alpha?artifact=x"`) {
+		t.Fatalf("view-chat missing href: %s", header)
+	}
 }

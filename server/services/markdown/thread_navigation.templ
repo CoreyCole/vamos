@@ -23,7 +23,6 @@ templ ThreadArtifactPane(browser ThreadArtifactBrowserArgs, document templ.Compo
 					<a
 						href={ templ.URL(browser.ViewDocumentHref) }
 						data-testid="view-chat"
-						data-on:click={ commentsCloseCookieJS() }
 						class="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
 						aria-label="View Chat"
 						title="View Chat"
@@ -216,15 +215,11 @@ templ ThreadArtifactPath(browser ThreadArtifactBrowserArgs) {
 templ ThreadArtifactUp(browser ThreadArtifactBrowserArgs) {
 	<div id="thread-artifact-up-slot" class="contents">
 		if browser.ParentHref != "" {
+			<!-- Path-header sibling nav: plain GET (+ VT). Ready() forbids data-on:click outside [data-thread-artifact-browser]. -->
 			<a
 				id="thread-artifact-up"
 				href={ templ.URL(browser.ParentHref) }
 				data-thread-artifact-up
-				if browser.ParentEndpoint != "" {
-					data-artifact-endpoint={ browser.ParentEndpoint }
-					data-indicator="_threadArtifactLoading"
-					data-on:click={ threadArtifactBrowserClickAction() }
-				}
 				class="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
 				aria-label="Open parent folder"
 				title="Open parent folder"
