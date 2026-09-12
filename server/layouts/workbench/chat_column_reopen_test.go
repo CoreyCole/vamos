@@ -113,4 +113,10 @@ func TestChatColumnArtifactReopenWhenClosed(t *testing.T) {
 	if !strings.Contains(out, `id="workbench-v2-artifact-reopen"`) {
 		t.Fatalf("missing artifact reopen slot: %s", out)
 	}
+	if !strings.Contains(out, `class="sr-only"`) || !strings.Contains(out, "Open details") {
+		t.Fatalf("want icon-only Open details with sr-only: %s", out)
+	}
+	if strings.Contains(out, `>Open details</span>`) && !strings.Contains(out, `sr-only">Open details`) {
+		t.Fatalf("Open details must not be visible label: %s", out)
+	}
 }
