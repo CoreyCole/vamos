@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"strings"
 	"testing"
+	"time"
 
 	conversation "github.com/CoreyCole/vamos/pkg/agents/conversation"
 	"github.com/CoreyCole/vamos/pkg/db"
@@ -263,5 +264,104 @@ func TestBuildLiveTranscriptDecodeErrorDoesNotEmptyLive(t *testing.T) {
 	}
 	if !strings.Contains(html, "seeded before bad item") {
 		t.Fatalf("live HTML missing surviving user: %s", html)
+	}
+}
+
+func TestApplyCheckpointEmptyNewEntriesKeepsPendingUser(t *testing.T) {
+	service, queries := newThreadDraftService(t)
+	createDraftThread(t, queries, "thread_1")
+	service.liveThreads = make(map[string]*liveThreadState)
+
+	run, err := queries.CreateAgentRun(t.Context(), db.CreateAgentRunParams{
+		ID:          "run_empty_cp_keep_user",
+		ThreadID:    "thread_1",
+		Trigger:     "resume",
+		Status:      "running",
+		PromptText:  "keep me on empty checkpoint",
+		WorkflowID:  "wf_empty_cp",
+		RootDocPath: "thoughts/plan",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := service.seedPendingUserPrompt(db.AgentThread{ID: "thread_1"}, run); err != nil {
+		t.Fatal(err)
+	}
+	before, _ := service.buildLiveTranscript("thread_1")
+	if len(before.Items) == 0 {
+		t.Fatal("expected seeded pending user before empty ApplyCheckpoint")
+	}
+
+	if err := service.ApplyCheckpoint(t.Context(), conversation.Checkpoint{
+		RunID:      run.ID,
+		ThreadID:   "thread_1",
+		TurnIndex:  0,
+		NewEntries: nil,
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	after, _ := service.buildLiveTranscript("thread_1")
+	if len(after.Items) == 0 {
+		t.Fatal("empty NewEntries ApplyCheckpoint must not empty-REPLACE pending user")
+	}
+	foundUser := false
+	for _, item := range after.Items {
+		if strings.EqualFold(item.Role, "user") &&
+			strings.Contains(item.Content, "keep me on empty checkpoint") {
+			foundUser = true
+			break
+		}
+	}
+	if !foundUser {
+		t.Fatalf("expected pending user retained after empty checkpoint, got %#v", after.Items)
+	}
+}
+
+func TestApplyCheckpointWithUserEntryClearsLive(t *testing.T) {
+	service, queries := newThreadDraftService(t)
+	createDraftThread(t, queries, "thread_1")
+	service.liveThreads = make(map[string]*liveThreadState)
+
+	run, err := queries.CreateAgentRun(t.Context(), db.CreateAgentRunParams{
+		ID:          "run_cp_with_user",
+		ThreadID:    "thread_1",
+		Trigger:     "resume",
+		Status:      "running",
+		PromptText:  "promoted to stable",
+		WorkflowID:  "wf_cp_user",
+		RootDocPath: "thoughts/plan",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := service.seedPendingUserPrompt(db.AgentThread{ID: "thread_1"}, run); err != nil {
+		t.Fatal(err)
+	}
+	before, _ := service.buildLiveTranscript("thread_1")
+	if len(before.Items) == 0 {
+		t.Fatal("expected seeded pending user before promoting checkpoint")
+	}
+
+	payload := `{"type":"message","id":"entry_cp_user","message":{"role":"user","content":"promoted to stable"}}`
+	if err := service.ApplyCheckpoint(t.Context(), conversation.Checkpoint{
+		RunID:       run.ID,
+		ThreadID:    "thread_1",
+		TurnIndex:   1,
+		HeadEntryID: "entry_cp_user",
+		NewEntries: []conversation.SnapshotEntry{{
+			EntryID:     "entry_cp_user",
+			EntryType:   "message",
+			OriginOrder: 1,
+			Timestamp:   time.Now().UTC(),
+			PayloadJSON: payload,
+		}},
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	after, _ := service.buildLiveTranscript("thread_1")
+	if len(after.Items) != 0 {
+		t.Fatalf("NewEntries with user must clearLiveThread (no dup), got %#v", after.Items)
 	}
 }
