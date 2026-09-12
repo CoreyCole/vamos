@@ -223,3 +223,75 @@ func TestLiveTranscriptRegionSSROmitsWorkingWithoutFlag(t *testing.T) {
 		t.Fatalf("SSR empty live missing waiting copy: %s", html)
 	}
 }
+
+func setupFreeformResumeFixture(t *testing.T) (*Service, *db.Queries, *blockingTemporal) {
+	t.Helper()
+	service, queries := newThreadDraftService(t)
+	createDraftThread(t, queries, "thread_1")
+	blocker := &blockingTemporal{
+		started: make(chan struct{}, 1),
+		release: make(chan struct{}),
+	}
+	service.temporal = blocker
+	service.liveThreads = make(map[string]*liveThreadState)
+	return service, queries, blocker
+}
+
+func TestResumeEmbeddedFreeformThreadAcceptPatchesBeforeTemporal(t *testing.T) {
+	service, _, blocker := setupFreeformResumeFixture(t)
+	handler := NewHandler(service, nil)
+	values := url.Values{"prompt": {"freeform accept now"}}
+	req := httptest.NewRequest(
+		http.MethodPost,
+		"/thoughts/chat/thread/thread_1/resume?workbench_v2=1",
+		strings.NewReader(values.Encode()),
+	)
+	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationForm)
+	rec := httptest.NewRecorder()
+	ctx := echo.New().NewContext(req, rec)
+	ctx.SetParamNames("thread_id")
+	ctx.SetParamValues("thread_1")
+	ctx.Set("user_email", "owner@example.com")
+
+	done := make(chan error, 1)
+	go func() {
+		done <- handler.ResumeEmbeddedThread(ctx)
+	}()
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Fatalf("ResumeEmbeddedThread error = %v", err)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("freeform accept blocked on Temporal SignalWithStart")
+	}
+
+	body := rec.Body.String()
+	if !strings.Contains(body, `id="agent-chat-live-transcript"`) {
+		t.Fatalf("missing live transcript morph: %s", body)
+	}
+	if !strings.Contains(body, `id="agent-chat-working"`) ||
+		!strings.Contains(body, `data-testid="agent-chat-working"`) {
+		t.Fatalf("missing working row in live transcript: %s", body)
+	}
+	if !strings.Contains(body, "freeform accept now") {
+		t.Fatalf("missing optimistic user prompt in live transcript: %s", body)
+	}
+	if !strings.Contains(body, `id="live-message-000"`) &&
+		!strings.Contains(body, "live-message-000") {
+		t.Fatalf("missing live-message-000 key matching reducer: %s", body)
+	}
+	if !strings.Contains(body, `"chatDraft":""`) {
+		t.Fatalf("missing chatDraft clear: %s", body)
+	}
+	if strings.Contains(body, "doc-right-chat-panel") {
+		t.Fatalf("v2 must not morph right rail chrome: %s", body)
+	}
+
+	select {
+	case <-blocker.started:
+	case <-time.After(2 * time.Second):
+		t.Fatal("Temporal SignalWithStart was not started asynchronously")
+	}
+	close(blocker.release)
+}

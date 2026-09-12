@@ -1815,13 +1815,13 @@ func (s *Service) seedPendingUserPrompt(
 	thread db.AgentThread,
 	run db.AgentRun,
 ) error {
-	workspaceID := strings.TrimSpace(run.WorkspaceID.String)
-	if !run.WorkspaceID.Valid || workspaceID == "" {
-		return nil
-	}
 	prompt := strings.TrimSpace(run.PromptText)
 	if prompt == "" {
 		return nil
+	}
+	workspaceID := ""
+	if run.WorkspaceID.Valid {
+		workspaceID = strings.TrimSpace(run.WorkspaceID.String)
 	}
 
 	payload, err := json.Marshal(map[string]any{
@@ -1849,7 +1849,13 @@ func (s *Service) seedPendingUserPrompt(
 	}); err != nil {
 		return err
 	}
-	s.notifyLiveTranscriptDirty(workspaceID, thread.ID)
+	// Live flush keys on workspaceID; freeform/plan rooms without a workspace
+	// fall back to threadID so SharedThreadChat streams still wake.
+	notifyID := workspaceID
+	if notifyID == "" {
+		notifyID = thread.ID
+	}
+	s.notifyLiveTranscriptDirty(notifyID, thread.ID)
 	return nil
 }
 
@@ -2144,6 +2150,9 @@ func (s *Service) ApplyLiveEvent(env conversation.EventEnvelope) error {
 	s.liveMu.Lock()
 	defer s.liveMu.Unlock()
 
+	if s.liveThreads == nil {
+		s.liveThreads = make(map[string]*liveThreadState)
+	}
 	state := s.liveThreads[env.ThreadID]
 	if state == nil || state.RunID != env.RunID {
 		state = &liveThreadState{

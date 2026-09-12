@@ -1098,6 +1098,15 @@ func (h *Handler) resumeEmbeddedFreeformThreadByID(
 	if err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 	}
+	if c.QueryParam("workbench_v2") == "1" {
+		return h.acceptEmbeddedFreeformResumeV2(
+			c,
+			userEmail,
+			threadID,
+			prompt,
+			attachments,
+		)
+	}
 	_, run, err := h.service.ResumeThread(
 		c.Request().Context(),
 		userEmail,
@@ -1134,9 +1143,6 @@ func (h *Handler) resumeEmbeddedFreeformThreadByID(
 		}
 	}
 	sse := datastar.NewSSE(c.Response().Writer, c.Request())
-	if c.QueryParam("workbench_v2") == "1" {
-		return h.resetAndFocusEmbeddedComposer(sse)
-	}
 	args, err := h.service.BuildEmbeddedFreeformPanelArgs(
 		c.Request().Context(),
 		userEmail,
