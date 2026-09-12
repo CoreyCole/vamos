@@ -2269,17 +2269,17 @@ func projectedPartialMessage(
 	}
 }
 
-// checkpointPromotesStableMessages reports whether NewEntries include a user
-// or assistant message now in stable SoT. Empty / non-message checkpoints must
-// keep the Accept-seeded pending user via resetLiveThread instead of clearLive.
+// checkpointPromotesStableMessages reports whether NewEntries include a USER
+// message now in stable SoT. Assistant-only checkpoints must keep the
+// Accept-seeded pending user via resetLiveThread — clearLive is only safe when
+// the user itself was promoted (otherwise live empty-REPLACE leaves no copy).
 func checkpointPromotesStableMessages(entries []conversation.SnapshotEntry) bool {
 	for _, entry := range entries {
 		role, _, ok := semanticMessageFromSnapshotEntry(entry)
 		if !ok {
 			continue
 		}
-		switch strings.ToLower(strings.TrimSpace(role)) {
-		case "user", "assistant":
+		if strings.EqualFold(strings.TrimSpace(role), "user") {
 			return true
 		}
 	}
@@ -2557,10 +2557,10 @@ func (s *Service) ApplyCheckpoint(ctx context.Context, cp conversation.Checkpoin
 		return err
 	}
 
-	// Empty checkpoints must not hard-clear Accept's pending user (race vs
-	// working-clear / empty-REPLACE). Only clearLive when NewEntries promoted a
-	// user/assistant into stable SoT — otherwise MessagesPane would duplicate.
-	// Fail/cancel/finalize stay on resetLiveThread (2719aad).
+	// Empty / assistant-only checkpoints must not hard-clear Accept's pending
+	// user (race vs working-clear / empty-REPLACE). Only clearLive when
+	// NewEntries promoted a USER into stable SoT — otherwise live empties with
+	// no stable copy. Fail/cancel/finalize stay on resetLiveThread (2719aad).
 	if checkpointPromotesStableMessages(cp.NewEntries) {
 		s.clearLiveThread(thread.ID)
 	} else {

@@ -456,3 +456,79 @@ func TestApplyCheckpointWithUserEntryClearsLive(t *testing.T) {
 		t.Fatalf("NewEntries with user must clearLiveThread (no dup), got %#v", after.Items)
 	}
 }
+
+func TestApplyCheckpointAssistantOnlyKeepsPendingUser(t *testing.T) {
+	service, queries := newThreadDraftService(t)
+	createDraftThread(t, queries, "thread_1")
+	service.liveThreads = make(map[string]*liveThreadState)
+
+	run, err := queries.CreateAgentRun(t.Context(), db.CreateAgentRunParams{
+		ID:          "run_cp_assistant_only",
+		ThreadID:    "thread_1",
+		Trigger:     "resume",
+		Status:      "running",
+		PromptText:  "keep me on assistant-only ck",
+		WorkflowID:  "wf_cp_asst",
+		RootDocPath: "thoughts/plan",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := service.seedPendingUserPrompt(db.AgentThread{ID: "thread_1"}, run); err != nil {
+		t.Fatal(err)
+	}
+	before, _ := service.buildLiveTranscript("thread_1")
+	if len(before.Items) == 0 {
+		t.Fatal("expected seeded pending user before assistant-only checkpoint")
+	}
+
+	// Non-empty assistant with NO user entry: old gate cleared live; keep seed.
+	payload := `{"type":"message","id":"entry_cp_asst","message":{"role":"assistant","content":[{"type":"text","text":"assistant only"}]}}`
+	if err := service.ApplyCheckpoint(t.Context(), conversation.Checkpoint{
+		RunID:       run.ID,
+		ThreadID:    "thread_1",
+		TurnIndex:   1,
+		HeadEntryID: "entry_cp_asst",
+		NewEntries: []conversation.SnapshotEntry{{
+			EntryID:     "entry_cp_asst",
+			EntryType:   "message",
+			OriginOrder: 1,
+			Timestamp:   time.Now().UTC(),
+			PayloadJSON: payload,
+		}},
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	after, _ := service.buildLiveTranscript("thread_1")
+	if len(after.Items) == 0 {
+		t.Fatal("assistant-only NewEntries must not clearLive/empty-REPLACE pending user")
+	}
+	foundUser := false
+	for _, item := range after.Items {
+		if strings.EqualFold(item.Role, "user") &&
+			strings.Contains(item.Content, "keep me on assistant-only ck") {
+			foundUser = true
+			break
+		}
+	}
+	if !foundUser {
+		t.Fatalf("expected pending user retained after assistant-only checkpoint, got %#v", after.Items)
+	}
+
+	var buf strings.Builder
+	if err := LiveTranscriptRegion(
+		"thread_1",
+		TranscriptPaneState{Live: after, ShowWorking: false},
+		"",
+	).Render(t.Context(), &buf); err != nil {
+		t.Fatal(err)
+	}
+	html := buf.String()
+	if !strings.Contains(html, "keep me on assistant-only ck") {
+		t.Fatalf("PatchLive HTML must keep user bubble: %s", html)
+	}
+	if strings.Contains(html, "Waiting for the first completed turn") {
+		t.Fatalf("must not empty-REPLACE live: %s", html)
+	}
+}

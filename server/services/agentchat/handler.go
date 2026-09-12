@@ -812,7 +812,8 @@ func (h *Handler) StreamEmbeddedFreeform(c echo.Context) error {
 			if signal.Cursor <= since {
 				continue
 			}
-			if signal.Scope == PatchLiveTranscript {
+			switch signal.Scope {
+			case PatchLiveTranscript:
 				if err := h.patchEmbeddedFreeformLiveTranscript(
 					c,
 					sse,
@@ -820,8 +821,18 @@ func (h *Handler) StreamEmbeddedFreeform(c echo.Context) error {
 				); err != nil {
 					return err
 				}
-			} else if err := h.patchEmbeddedFreeformChatPanel(c, sse, userEmail); err != nil {
-				return err
+			case PatchStableTranscript:
+				if err := h.patchEmbeddedFreeformStableTranscript(
+					c,
+					sse,
+					userEmail,
+				); err != nil {
+					return err
+				}
+			default:
+				if err := h.patchEmbeddedFreeformChatPanel(c, sse, userEmail); err != nil {
+					return err
+				}
 			}
 			since = signal.Cursor
 		}
@@ -863,10 +874,10 @@ func (h *Handler) StreamEmbeddedThread(c echo.Context) error {
 	})
 
 	workbenchV2 := c.QueryParam("workbench_v2") == "1"
+	// patchPanel must refresh stable/panel SoT. Never route it through
+	// live-only morphs: that empty-REPLACE wiped Accept seeds on PatchStable
+	// after clearLive/reset while #agent-chat-stable-transcript stayed stale.
 	patchPanel := func() error {
-		if workbenchV2 {
-			return h.patchEmbeddedFreeformLiveTranscript(c, sse, userEmail)
-		}
 		if hasPrimary {
 			input := h.embeddedPatchInput(c, userEmail)
 			input.WorkspaceID = workspaceRecord.ID
@@ -876,16 +887,13 @@ func (h *Handler) StreamEmbeddedThread(c echo.Context) error {
 		return h.patchEmbeddedFreeformChatPanel(c, sse, userEmail)
 	}
 	patchTranscript := func() error {
-		if workbenchV2 {
+		if workbenchV2 || !hasPrimary {
 			return h.patchEmbeddedFreeformLiveTranscript(c, sse, userEmail)
 		}
-		if hasPrimary {
-			input := h.embeddedPatchInput(c, userEmail)
-			input.WorkspaceID = workspaceRecord.ID
-			input.ThreadID = threadID
-			return h.patchEmbeddedChatLiveTranscript(c, sse, input)
-		}
-		return h.patchEmbeddedFreeformLiveTranscript(c, sse, userEmail)
+		input := h.embeddedPatchInput(c, userEmail)
+		input.WorkspaceID = workspaceRecord.ID
+		input.ThreadID = threadID
+		return h.patchEmbeddedChatLiveTranscript(c, sse, input)
 	}
 
 	since := parseSince(c.QueryParam("since"))
@@ -897,6 +905,16 @@ func (h *Handler) StreamEmbeddedThread(c echo.Context) error {
 		since = h.service.CurrentCursor(threadID)
 	}
 
+	patchStable := func() error {
+		if hasPrimary {
+			input := h.embeddedPatchInput(c, userEmail)
+			input.WorkspaceID = workspaceRecord.ID
+			input.ThreadID = threadID
+			return h.patchEmbeddedChatStableTranscript(c, sse, input)
+		}
+		return h.patchEmbeddedFreeformStableTranscript(c, sse, userEmail)
+	}
+
 	for {
 		select {
 		case <-ctx.Done():
@@ -905,12 +923,19 @@ func (h *Handler) StreamEmbeddedThread(c echo.Context) error {
 			if signal.Cursor <= since {
 				continue
 			}
-			if signal.Scope == PatchLiveTranscript {
+			switch signal.Scope {
+			case PatchLiveTranscript:
 				if err := patchTranscript(); err != nil {
 					return err
 				}
-			} else if err := patchPanel(); err != nil {
-				return err
+			case PatchStableTranscript:
+				if err := patchStable(); err != nil {
+					return err
+				}
+			default:
+				if err := patchPanel(); err != nil {
+					return err
+				}
 			}
 			since = signal.Cursor
 		}
@@ -3136,6 +3161,29 @@ func (h *Handler) patchEmbeddedFreeformLiveTranscript(
 	)
 }
 
+func (h *Handler) patchEmbeddedFreeformStableTranscript(
+	c echo.Context,
+	sse *datastar.ServerSentEventGenerator,
+	userEmail string,
+) error {
+	args, err := h.service.BuildEmbeddedFreeformPanelArgs(
+		c.Request().Context(),
+		userEmail,
+		firstNonEmpty(c.QueryParam("thread"), c.Param("thread_id")),
+		strings.TrimSpace(c.QueryParam("run")),
+	)
+	if err != nil {
+		return err
+	}
+	return sse.PatchElementTempl(
+		StableTranscriptRegion(
+			args.ThreadID,
+			args.Transcript.Stable,
+			freeformForkAction(args.ThreadID),
+		),
+	)
+}
+
 func (h *Handler) patchEmbeddedChatLiveTranscript(
 	c echo.Context,
 	sse *datastar.ServerSentEventGenerator,
@@ -3156,6 +3204,23 @@ func (h *Handler) patchEmbeddedChatLiveTranscript(
 		return err
 	}
 	return sse.PatchElementTempl(LiveTranscriptRegion(threadID, state, ""))
+}
+
+func (h *Handler) patchEmbeddedChatStableTranscript(
+	c echo.Context,
+	sse *datastar.ServerSentEventGenerator,
+	input EmbeddedChatPatchInput,
+) error {
+	args, err := h.service.BuildEmbeddedChatPanelArgs(
+		c.Request().Context(),
+		input,
+	)
+	if err != nil {
+		return err
+	}
+	return sse.PatchElementTempl(
+		StableTranscriptRegion(args.ThreadID, args.Transcript.Stable, ""),
+	)
 }
 
 func (h *Handler) patchWorkspace(
@@ -3294,6 +3359,18 @@ func (h *Handler) patchThread(
 			),
 		)
 	}
+	patchStable := func() error {
+		threadID := getThreadID(args.CurrentThread)
+		// Stable-only: MessagesPane also embeds LiveTranscriptRegion and would
+		// empty-REPLACE #agent-chat-live-transcript after clearLive/reset.
+		return sse.PatchElementTempl(
+			StableTranscriptRegion(
+				threadID,
+				args.Transcript.Stable,
+				freeformForkAction(threadID),
+			),
+		)
+	}
 	patchDocs := func() error {
 		return sse.PatchElementTempl(
 			DocPane(args.DocPane, getThreadID(args.CurrentThread)),
@@ -3310,7 +3387,7 @@ func (h *Handler) patchThread(
 	case PatchDocPane:
 		return patchDocs()
 	case PatchStableTranscript:
-		return patchMessages()
+		return patchStable()
 	case PatchThreadPage:
 		if err := patchSidebar(); err != nil {
 			return err
