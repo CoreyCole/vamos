@@ -159,11 +159,13 @@ func TestRosterRail_LivePlans(t *testing.T) {
 				ID:    "plan-one",
 				Title: "Plan One",
 				Href:  "/rooms/plan/plan-one?artifact=thoughts%2Fowner%2Fplans%2Fplan-one%2Fdesign.md",
+				Time:  "Fri 1:02 PM",
 			},
 			{
 				ID:    "plan-two",
 				Title: "Plan Two",
 				Href:  "/rooms/plan/plan-two?artifact=thoughts%2Fowner%2Fplans%2Fplan-two%2Fdesign.md",
+				Time:  "Sat 4:05 PM",
 			},
 		},
 	}
@@ -184,9 +186,10 @@ func TestRosterRail_LivePlans(t *testing.T) {
 			t.Fatalf("missing %q", want)
 		}
 	}
+	if !strings.Contains(html, "Fri 1:02 PM") {
+		t.Fatal("plan row must show timestamp above title")
+	}
 	for _, ban := range []string{
-		"Fri 1:02 PM",
-		"Sat 4:05 PM",
 		">P</span>", // letter glyph from rosterInitial
 	} {
 		if strings.Contains(html, ban) {
@@ -214,8 +217,9 @@ func TestWorkbenchRosterChromeCSS(t *testing.T) {
 	for _, want := range []string{
 		"#workbench-v2-roster a.roster-row-selected",
 		"#3a3a3a",
-		"inset 3px 0 0 0 hsl(var(--primary))",
-	} {
+		"rgba(255, 255, 255, 0.28)",
+		"inset 0 0 0 1px",
+			} {
 		if !strings.Contains(css, want) {
 			t.Fatalf("static/css/index.css missing %q", want)
 		}

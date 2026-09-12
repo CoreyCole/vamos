@@ -27,6 +27,7 @@ type RosterPlanRow struct {
 	ID    string
 	Title string
 	Href  string
+	Time  string // shown above title (Corey feel); empty omits
 }
 
 // RosterView is the live left-rail model.
@@ -204,7 +205,12 @@ templ RosterRail(view RosterView) {
 										aria-hidden="true"
 										data-roster-plan-swatch
 									></span>
-									<span class="min-w-0 flex-1 truncate text-sm font-medium text-foreground">{ plan.Title }</span>
+									<span class="min-w-0 flex-1">
+										if plan.Time != "" {
+											<span class="block truncate text-[10px] font-normal text-muted-foreground">{ plan.Time }</span>
+										}
+										<span class="block truncate text-sm font-medium text-foreground">{ plan.Title }</span>
+									</span>
 								</a>
 							</li>
 						}

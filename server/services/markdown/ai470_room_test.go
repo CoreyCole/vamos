@@ -509,8 +509,8 @@ func TestLiveRosterListsPlanDirsFromIndex(t *testing.T) {
 		strings.Contains(html, ">Alpha<") {
 		t.Fatal("Alpha fixture must not appear")
 	}
-	if strings.Contains(html, rosterPlanTime(stampA)) {
-		t.Fatalf("plan roster must omit timestamp %q", rosterPlanTime(stampA))
+	if !strings.Contains(html, rosterPlanTime(stampA)) {
+		t.Fatalf("plan roster must show timestamp %q", rosterPlanTime(stampA))
 	}
 	if !strings.Contains(html, `data-roster-plan-swatch`) {
 		t.Fatal("plan roster must render color swatch")

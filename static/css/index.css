@@ -707,7 +707,8 @@ html[data-wb2-vt-nav="thread-switch"] #workbench-v2-chat {
 #workbench-v2-roster a.roster-pin-selected:hover,
 #workbench-v2-roster a.roster-multi-selected {
   background-color: #3a3a3a;
-  box-shadow: inset 3px 0 0 0 hsl(var(--primary));
+  /* Uniform opaque border — no primary leading edge (Corey). */
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.28);
 }
 
 /* Roster New-bot control — keep h-10 header band compact. */
