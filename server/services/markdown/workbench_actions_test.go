@@ -77,7 +77,6 @@ func TestBuildChatHeaderOverflowShareOnlyWithoutDoc(t *testing.T) {
 	html := renderChatHeaderOverflow(t, nil, "", false)
 	for _, want := range []string{
 		`data-testid="workbench-overflow-actions"`,
-		"Share artifact",
 		"Share chat",
 		"writeText",
 		"clipboard_success",
@@ -85,6 +84,9 @@ func TestBuildChatHeaderOverflowShareOnlyWithoutDoc(t *testing.T) {
 		if !strings.Contains(html, want) {
 			t.Fatalf("missing %q:\n%s", want, html)
 		}
+	}
+	if strings.Contains(html, "Share artifact") {
+		t.Fatalf("empty docPath must omit Share artifact:\n%s", html)
 	}
 	if strings.Contains(html, "Copy path") {
 		t.Fatalf("Copy path must be folded into Share artifact:\n%s", html)
@@ -100,6 +102,20 @@ func TestBuildChatHeaderOverflowShareOnlyWithoutDoc(t *testing.T) {
 	}
 	if strings.Contains(html, "agent-chat-composer-input") {
 		t.Fatalf("Share artifact must not append to composer:\n%s", html)
+	}
+}
+
+
+func TestBuildChatHeaderOverflowOmitsShareArtifactWhenDocPathEmpty(t *testing.T) {
+	t.Parallel()
+	for _, docPath := range []string{"", "   ", "\t\n"} {
+		html := renderChatHeaderOverflow(t, nil, docPath, false)
+		if strings.Contains(html, "Share artifact") {
+			t.Fatalf("docPath %q must omit Share artifact:\n%s", docPath, html)
+		}
+		if !strings.Contains(html, "Share chat") {
+			t.Fatalf("docPath %q must keep Share chat:\n%s", docPath, html)
+		}
 	}
 }
 

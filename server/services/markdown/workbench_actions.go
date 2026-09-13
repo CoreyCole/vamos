@@ -180,8 +180,12 @@ func BuildChatHeaderOverflow(
 	docPath string,
 	includePlanChat bool,
 ) templ.Component {
+	docPath = strings.TrimSpace(docPath)
 	actions := make([]workbench.OverflowAction, 0, 6)
-	actions = append(actions, ShareArtifactAction(docPath), ShareChatAction())
+	if docPath != "" {
+		actions = append(actions, ShareArtifactAction(docPath))
+	}
+	actions = append(actions, ShareChatAction())
 	if pageArgs != nil {
 		if pageArgs.ViewerArgs.RawMarkdown != "" {
 			actions = append(actions, DocumentCopyAction())
