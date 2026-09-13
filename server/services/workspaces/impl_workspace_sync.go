@@ -108,6 +108,7 @@ func (s *ImplWorkspaceSyncer) Sync(
 		Scanned:    len(discovered),
 		Discovered: len(discovered),
 	}
+	mergeTargets := BuildMergeProofTargets(ctx, discovered)
 	seen := collections.NewSet[string]()
 	for _, ws := range discovered {
 		slug := strings.TrimSpace(ws.Slug)
@@ -119,7 +120,8 @@ func (s *ImplWorkspaceSyncer) Sync(
 		}
 		seen.Add(seenKey)
 
-		gitState := InspectImplWorkspaceGit(ctx, ws.CheckoutPath, input.TrunkBranch)
+		subjectTargets := MergeProofTargetsForSubject(mergeTargets, ws.Slug, ws.CheckoutPath)
+		gitState := InspectImplWorkspaceGit(ctx, ws.CheckoutPath, input.TrunkBranch, subjectTargets)
 		before, beforeErr := s.Queries.GetImplWorkspace(
 			ctx,
 			db.GetImplWorkspaceParams{ProjectID: key.ProjectID, WorkspaceSlug: key.Slug},
@@ -218,7 +220,7 @@ func (s *ImplWorkspaceSyncer) Sync(
 		}
 	}
 
-	cleaned, merged, missingChanged, warnings, err := s.reconcileMissing(ctx, input, seen)
+	cleaned, merged, missingChanged, warnings, err := s.reconcileMissing(ctx, input, seen, mergeTargets)
 	if err != nil {
 		return ImplWorkspaceSyncResult{}, err
 	}
@@ -470,8 +472,7 @@ func implWorkspaceUpsertParams(
 	if proof.Kind == "" {
 		proof.Kind = MergeProofUnknown
 	}
-	protected := IsProtectedCheckoutRole(ws.CheckoutRole) || ws.IsMain ||
-		ws.Slug == mainWorkspaceSlug
+	protected := isMergeProofKeeperWorkspace(ws)
 	if gitState.Merged && !protected {
 		status = string(ImplWorkspaceStatusMerged)
 		mergeEvidence = nullableString(
@@ -620,6 +621,7 @@ func (s *ImplWorkspaceSyncer) reconcileMissing(
 	ctx context.Context,
 	input ImplWorkspaceSyncInput,
 	activeSlugs collections.Set[string],
+	mergeTargets []MergeProofTarget,
 ) (cleaned, merged int, changed bool, warnings []WorkspaceDiagnostic, err error) {
 	projectID := firstNonEmpty(input.Discovery.ProjectID, input.ProjectID)
 	repaired, err := s.Queries.RepairProtectedImplWorkspaceTerminalStatuses(
@@ -645,6 +647,7 @@ func (s *ImplWorkspaceSyncer) reconcileMissing(
 			configured.Has(row.WorkspaceSlug) ||
 			IsProtectedCheckoutRole(CheckoutRole(strings.TrimSpace(row.CheckoutRole))) ||
 			row.WorkspaceSlug == "stage" ||
+			matchesMergeProofKeeperToken(row.WorkspaceSlug, row.CheckoutPath, row.DisplayName) ||
 			!rowInDiscoveryScope(row, input.Discovery) {
 			continue
 		}
@@ -652,6 +655,7 @@ func (s *ImplWorkspaceSyncer) reconcileMissing(
 			ctx,
 			input.Discovery.MainCheckoutPath,
 			row,
+			mergeTargets,
 		)
 		if status == ImplWorkspaceStatusMerged {
 			n, err := s.Queries.MarkImplWorkspaceMerged(

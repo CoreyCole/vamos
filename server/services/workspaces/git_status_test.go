@@ -185,3 +185,158 @@ func TestGraphiteStackBranchesAllowsTrunkAsTop(t *testing.T) {
 		t.Fatalf("bottom branch = %q, want child-workspace-top", bottom)
 	}
 }
+
+func TestInspectMergeProofMultiPeerAncestorWins(t *testing.T) {
+	isolateImplSyncGitPath(t)
+	parent := t.TempDir()
+	subject := filepath.Join(parent, "subject")
+	peer := filepath.Join(parent, "peer")
+	for _, dir := range []string{subject, peer} {
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			t.Fatalf("MkdirAll: %v", err)
+		}
+	}
+	if err := os.WriteFile(filepath.Join(subject, "README.md"), []byte("base\n"), 0o644); err != nil {
+		t.Fatalf("write README: %v", err)
+	}
+	runImplSyncGit(t, subject, "init", "-b", "main")
+	runImplSyncGit(t, subject, "config", "user.email", "test@example.test")
+	runImplSyncGit(t, subject, "config", "user.name", "Test User")
+	runImplSyncGit(t, subject, "add", "README.md")
+	runImplSyncGit(t, subject, "commit", "-m", "initial")
+	runImplSyncGit(t, parent, "clone", subject, peer)
+	runImplSyncGit(t, peer, "config", "user.email", "test@example.test")
+	runImplSyncGit(t, peer, "config", "user.name", "Test User")
+	runImplSyncGit(t, subject, "checkout", "-b", "feature")
+	subjectHead := strings.TrimSpace(runImplSyncGit(t, subject, "rev-parse", "--short", "HEAD"))
+	if err := os.WriteFile(filepath.Join(peer, "peer.txt"), []byte("peer advance\n"), 0o644); err != nil {
+		t.Fatalf("write peer: %v", err)
+	}
+	runImplSyncGit(t, peer, "add", "peer.txt")
+	runImplSyncGit(t, peer, "commit", "-m", "peer tip")
+	peerSHA := strings.TrimSpace(runImplSyncGit(t, peer, "rev-parse", "--short", "HEAD"))
+
+	proof := InspectMergeProofMulti(context.Background(), subject, []MergeProofTarget{{
+		SourceRef:    "peer:2026-09-08-10-10-54-agent-memory-observable-context@" + peerSHA,
+		Commit:       peerSHA,
+		CheckoutPath: peer,
+		GitRef:       "HEAD",
+	}})
+	wantRef := "peer:2026-09-08-10-10-54-agent-memory-observable-context@" + peerSHA
+	if proof.Kind != MergeProofAncestor || proof.SourceRef != wantRef || proof.TargetCommit != peerSHA {
+		t.Fatalf("proof = %+v, want ancestor %s (subject %s)", proof, wantRef, subjectHead)
+	}
+}
+
+func TestInspectMergeProofMultiCheckoutMainAndStage(t *testing.T) {
+	isolateImplSyncGitPath(t)
+	parent := t.TempDir()
+	subject := filepath.Join(parent, "subject")
+	mainCheckout := filepath.Join(parent, "vamos-main")
+	stageCheckout := filepath.Join(parent, "vamos")
+	for _, dir := range []string{subject, mainCheckout, stageCheckout} {
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			t.Fatalf("MkdirAll: %v", err)
+		}
+	}
+	if err := os.WriteFile(filepath.Join(subject, "README.md"), []byte("base\n"), 0o644); err != nil {
+		t.Fatalf("write README: %v", err)
+	}
+	runImplSyncGit(t, subject, "init", "-b", "main")
+	runImplSyncGit(t, subject, "config", "user.email", "test@example.test")
+	runImplSyncGit(t, subject, "config", "user.name", "Test User")
+	runImplSyncGit(t, subject, "add", "README.md")
+	runImplSyncGit(t, subject, "commit", "-m", "initial")
+	runImplSyncGit(t, parent, "clone", subject, mainCheckout)
+	runImplSyncGit(t, parent, "clone", subject, stageCheckout)
+	runImplSyncGit(t, mainCheckout, "config", "user.email", "test@example.test")
+	runImplSyncGit(t, mainCheckout, "config", "user.name", "Test User")
+	runImplSyncGit(t, stageCheckout, "config", "user.email", "test@example.test")
+	runImplSyncGit(t, stageCheckout, "config", "user.name", "Test User")
+	runImplSyncGit(t, subject, "checkout", "-b", "feature")
+
+	if err := os.WriteFile(filepath.Join(mainCheckout, "main-only.txt"), []byte("main tip\n"), 0o644); err != nil {
+		t.Fatalf("write main tip: %v", err)
+	}
+	runImplSyncGit(t, mainCheckout, "add", "main-only.txt")
+	runImplSyncGit(t, mainCheckout, "commit", "-m", "main tip")
+	mainSHA := strings.TrimSpace(runImplSyncGit(t, mainCheckout, "rev-parse", "--short", "HEAD"))
+
+	proofMain := InspectMergeProofMulti(context.Background(), subject, []MergeProofTarget{{
+		SourceRef:    "checkout:main",
+		Commit:       mainSHA,
+		CheckoutPath: mainCheckout,
+		GitRef:       "HEAD",
+	}})
+	if proofMain.Kind != MergeProofAncestor || proofMain.SourceRef != "checkout:main" {
+		t.Fatalf("checkout:main proof = %+v", proofMain)
+	}
+
+	if err := os.WriteFile(filepath.Join(stageCheckout, "stage-only.txt"), []byte("stage tip\n"), 0o644); err != nil {
+		t.Fatalf("write stage tip: %v", err)
+	}
+	runImplSyncGit(t, stageCheckout, "add", "stage-only.txt")
+	runImplSyncGit(t, stageCheckout, "commit", "-m", "stage tip")
+	stageSHA := strings.TrimSpace(runImplSyncGit(t, stageCheckout, "rev-parse", "--short", "HEAD"))
+
+	proofStage := InspectMergeProofMulti(context.Background(), subject, []MergeProofTarget{{
+		SourceRef:    "checkout:stage",
+		Commit:       stageSHA,
+		CheckoutPath: stageCheckout,
+		GitRef:       "HEAD",
+	}})
+	if proofStage.Kind != MergeProofAncestor || proofStage.SourceRef != "checkout:stage" {
+		t.Fatalf("checkout:stage proof = %+v", proofStage)
+	}
+}
+
+func TestInspectMergeProofMultiIgnoresBareLocalMain(t *testing.T) {
+	isolateImplSyncGitPath(t)
+	checkout := t.TempDir()
+	if err := os.WriteFile(filepath.Join(checkout, "README.md"), []byte("base\n"), 0o644); err != nil {
+		t.Fatalf("write README: %v", err)
+	}
+	runImplSyncGit(t, checkout, "init", "-b", "main")
+	runImplSyncGit(t, checkout, "config", "user.email", "test@example.test")
+	runImplSyncGit(t, checkout, "config", "user.name", "Test User")
+	runImplSyncGit(t, checkout, "add", "README.md")
+	runImplSyncGit(t, checkout, "commit", "-m", "initial")
+	runImplSyncGit(t, checkout, "checkout", "-b", "feature")
+	mainSHA := strings.TrimSpace(runImplSyncGit(t, checkout, "rev-parse", "--short", "main"))
+
+	proof := InspectMergeProofMulti(context.Background(), checkout, []MergeProofTarget{{
+		SourceRef:    "main",
+		Commit:       mainSHA,
+		CheckoutPath: checkout,
+		GitRef:       "main",
+	}})
+	if proof.Kind != MergeProofUnknown || proof.Strong() {
+		t.Fatalf("proof = %+v, want unknown for bare local main", proof)
+	}
+}
+
+func TestMergeProofKeeperTokensMatchDogfoodSlugs(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		slug string
+		want bool
+	}{
+		{"2026-09-08-10-10-54-agent-memory-observable-context", true},
+		{"2026-09-12-14-30-21-household-rebalancer", true},
+		{"2026-09-11-21-25-37-datastar-sse-ui-declaration", true},
+		{"2026-09-12-13-33-37-instant-plan-chat-send", false},
+		{"main", false},
+	}
+	for _, tc := range cases {
+		got := matchesMergeProofKeeperToken(tc.slug, "vamos-"+tc.slug, tc.slug)
+		if got != tc.want {
+			t.Fatalf("matchesMergeProofKeeperToken(%q) = %v, want %v", tc.slug, got, tc.want)
+		}
+	}
+	if !isMergeProofKeeperWorkspace(Workspace{Slug: "main", IsMain: true}) {
+		t.Fatal("main workspace should be keeper")
+	}
+	if !isMergeProofKeeperWorkspace(Workspace{Slug: "stage", CheckoutRole: CheckoutRoleStage}) {
+		t.Fatal("stage workspace should be keeper")
+	}
+}

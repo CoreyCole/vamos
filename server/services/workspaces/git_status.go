@@ -197,6 +197,16 @@ func revParseRef(ctx context.Context, checkoutPath, ref string) string {
 	return strings.TrimSpace(out)
 }
 
+// MergeProofTarget is one cleanup merge-proof tip evaluated by InspectMergeProofMulti.
+// SourceRef uses the locked grammar: origin/main | checkout:main | checkout:stage | peer:<slug>@<sha>.
+// Bare same-repo branch names (e.g. local "main") are never strong multi-target proofs.
+type MergeProofTarget struct {
+	SourceRef    string
+	Commit       string
+	CheckoutPath string
+	GitRef       string
+}
+
 func InspectMergeProof(ctx context.Context, checkoutPath, trunkBranch string) MergeProof {
 	checkoutPath = strings.TrimSpace(checkoutPath)
 	if checkoutPath == "" {
@@ -219,6 +229,174 @@ func InspectMergeProof(ctx context.Context, checkoutPath, trunkBranch string) Me
 	}
 	reason := "HEAD is not proven merged into " + ref
 	return MergeProof{Kind: MergeProofUnknown, SourceRef: ref, TargetCommit: target, RiskReason: reason}
+}
+
+// InspectMergeProofMulti returns the first strong proof against targets (ancestor | patch_equivalent).
+// Targets should already be ordered: origin/main, checkout:main, checkout:stage, then peers (newer/longer first).
+func InspectMergeProofMulti(ctx context.Context, checkoutPath string, targets []MergeProofTarget) MergeProof {
+	checkoutPath = strings.TrimSpace(checkoutPath)
+	if checkoutPath == "" {
+		return MergeProof{Kind: MergeProofUnknown, RiskReason: "checkout path is empty"}
+	}
+	ctx, cancel := context.WithTimeout(ctx, 8*time.Second)
+	defer cancel()
+
+	head := strings.TrimSpace(revParseRef(ctx, checkoutPath, "HEAD"))
+	if head == "" {
+		return MergeProof{Kind: MergeProofUnknown, RiskReason: "HEAD commit unavailable"}
+	}
+
+	var last MergeProof
+	for _, target := range targets {
+		proof := inspectMergeProofAgainstTarget(ctx, checkoutPath, head, target)
+		if proof.Strong() {
+			return proof
+		}
+		if proof.Kind != "" {
+			last = proof
+		}
+	}
+	if last.Kind == "" {
+		last = MergeProof{Kind: MergeProofUnknown}
+	}
+	last.Kind = MergeProofUnknown
+	if strings.TrimSpace(last.RiskReason) == "" {
+		last.RiskReason = "not ancestor of any target"
+	}
+	return last
+}
+
+func inspectMergeProofAgainstTarget(
+	ctx context.Context,
+	subjectCheckout, subjectHead string,
+	target MergeProofTarget,
+) MergeProof {
+	sourceRef := strings.TrimSpace(target.SourceRef)
+	if sourceRef == "" {
+		return MergeProof{}
+	}
+	// Never treat a bare same-repo branch name as a multi-target strong proof.
+	if isBareLocalBranchMergeProofRef(sourceRef) {
+		return MergeProof{
+			Kind:       MergeProofUnknown,
+			SourceRef:  sourceRef,
+			RiskReason: "local branch name is not a strong merge-proof target",
+		}
+	}
+
+	if sourceRef == "origin/main" || strings.HasPrefix(sourceRef, "origin/") {
+		return inspectOriginMergeProof(ctx, subjectCheckout, sourceRef, target)
+	}
+
+	tipCheckout := strings.TrimSpace(target.CheckoutPath)
+	tipCommit := strings.TrimSpace(firstNonEmpty(target.Commit, target.GitRef))
+	if tipCheckout == "" || tipCommit == "" {
+		return MergeProof{Kind: MergeProofUnknown, SourceRef: sourceRef, RiskReason: "merge-proof target tip unavailable"}
+	}
+	if tipCommit == "HEAD" {
+		tipCommit = strings.TrimSpace(revParseRef(ctx, tipCheckout, "HEAD"))
+	}
+	if tipCommit == "" {
+		return MergeProof{Kind: MergeProofUnknown, SourceRef: sourceRef, RiskReason: "merge-proof target tip unavailable"}
+	}
+
+	if err := runCheckoutCommandNoOutput(ctx, tipCheckout, "git", "merge-base", "--is-ancestor", subjectHead, tipCommit); err == nil {
+		return MergeProof{
+			Kind:         MergeProofAncestor,
+			SourceRef:    sourceRef,
+			TargetCommit: tipCommit,
+			ProvenAt:     time.Now(),
+			Detail:       "HEAD is ancestor of " + sourceRef,
+		}
+	}
+	if provePatchEquivalentCommits(ctx, tipCheckout, tipCommit, subjectHead) {
+		return MergeProof{
+			Kind:         MergeProofPatchEquivalent,
+			SourceRef:    sourceRef,
+			TargetCommit: tipCommit,
+			ProvenAt:     time.Now(),
+			Detail:       "HEAD patch-equivalent to " + sourceRef,
+		}
+	}
+	return MergeProof{
+		Kind:         MergeProofUnknown,
+		SourceRef:    sourceRef,
+		TargetCommit: tipCommit,
+		RiskReason:   "not ancestor of any target",
+	}
+}
+
+func isBareLocalBranchMergeProofRef(sourceRef string) bool {
+	sourceRef = strings.TrimSpace(sourceRef)
+	if sourceRef == "" {
+		return false
+	}
+	if strings.Contains(sourceRef, "/") || strings.Contains(sourceRef, ":") || strings.HasPrefix(sourceRef, "peer:") {
+		return false
+	}
+	return true
+}
+
+func inspectOriginMergeProof(ctx context.Context, checkoutPath, ref string, target MergeProofTarget) MergeProof {
+	ref = strings.TrimSpace(firstNonEmpty(ref, "origin/main"))
+	fetchPath := strings.TrimSpace(firstNonEmpty(target.CheckoutPath, checkoutPath))
+	fetchErr := fetchOriginMain(ctx, fetchPath)
+	if fetchPath != checkoutPath && strings.TrimSpace(checkoutPath) != "" {
+		if err := fetchOriginMain(ctx, checkoutPath); err != nil {
+			fetchErr = err
+		}
+	}
+	if fetchErr != nil {
+		// Match InspectMergeProof: a failed fetch is not a strong live origin/main hit.
+		// Callers can still win via checkout:/peer targets or applyCachedMergeProof.
+		return MergeProof{
+			Kind:       MergeProofUnknown,
+			SourceRef:  ref,
+			RiskReason: "fetch " + ref + " failed: " + fetchErr.Error(),
+		}
+	}
+	tip := strings.TrimSpace(firstNonEmpty(
+		target.Commit,
+		revParseRef(ctx, checkoutPath, ref),
+		revParseRef(ctx, fetchPath, ref),
+	))
+	if tip == "" {
+		return MergeProof{Kind: MergeProofUnknown, SourceRef: ref, RiskReason: "origin/main tip unavailable"}
+	}
+	if err := runCheckoutCommandNoOutput(ctx, checkoutPath, "git", "merge-base", "--is-ancestor", "HEAD", ref); err == nil {
+		return MergeProof{Kind: MergeProofAncestor, SourceRef: ref, TargetCommit: tip, ProvenAt: time.Now(), Detail: "HEAD is ancestor of " + ref}
+	}
+	if err := runCheckoutCommandNoOutput(ctx, checkoutPath, "git", "merge-base", "--is-ancestor", "HEAD", tip); err == nil {
+		return MergeProof{Kind: MergeProofAncestor, SourceRef: ref, TargetCommit: tip, ProvenAt: time.Now(), Detail: "HEAD is ancestor of " + ref}
+	}
+	if provePatchEquivalent(ctx, checkoutPath, ref) || provePatchEquivalentCommits(ctx, checkoutPath, tip, "HEAD") {
+		return MergeProof{Kind: MergeProofPatchEquivalent, SourceRef: ref, TargetCommit: tip, ProvenAt: time.Now(), Detail: "HEAD patch-equivalent to " + ref}
+	}
+	return MergeProof{Kind: MergeProofUnknown, SourceRef: ref, TargetCommit: tip, RiskReason: "not ancestor of any target"}
+}
+
+func provePatchEquivalentCommits(ctx context.Context, checkoutPath, upstream, head string) bool {
+	upstream = strings.TrimSpace(upstream)
+	head = strings.TrimSpace(head)
+	if upstream == "" || head == "" {
+		return false
+	}
+	out, err := runCheckoutCommand(ctx, checkoutPath, "git", "cherry", upstream, head)
+	if err != nil {
+		return false
+	}
+	found := false
+	for _, line := range strings.Split(out, "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		found = true
+		if strings.HasPrefix(line, "+") {
+			return false
+		}
+	}
+	return found
 }
 
 func provePatchEquivalent(ctx context.Context, checkoutPath, ref string) bool {
