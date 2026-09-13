@@ -115,6 +115,38 @@ Artifacts (mode `600`) under `/tmp`:
 When a feature-host VA expires or the profile is missing, remint via `vamos-va-mint` if the local profile still works; otherwise ask **E2E Lead** to recreate/login the machine key. Do not invent slugs from checkout folder names.
 
 
+### Agent-memory VA fixture Stories (density / BotDMChip / pairwise)
+
+Authored Workbench v2 Stories seed chat chrome via query params on `/threads/{id}`:
+
+| Story name | Query | Asserts |
+| --- | --- | --- |
+| `agent-memory chat density fixture` | `?density_fixture=1` (or `?fixture=density`) | `#msg-ai470-density-fixture-reasoning` / `tool-0` / `tool-1` as Class A `<details data-chat-density>` |
+| `agent-memory group bubble BotDMChip` | `?group_bubble_fixture=1` (or `?fixture=group`) | `#msg-ai470-group-{peer,quote,user}-fixture`, `#bot-dm-chip-ai470-group-quote-fixture`, pairwise hrefs `/rooms/a2a/infra/lead` + `/rooms/a2a/lead/research` |
+| `agent-memory pairwise fixture view-only` | `?pairwise_fixture=1` (or `?fixture=pairwise`) | composer absent; `#msg-ai470-chroma-highlight-fixture` |
+
+Helpers live in `pkg/e2e/vamos/agent_memory_fixtures.go`. Stories: `pkg/e2e/workbenchv2tests/agent_memory_fixtures_story_test.go`. Default thread is WorkbenchV2 `wb2_alpha`; override with `VAMOS_E2E_AGENT_MEMORY_THREAD_ID` for tip-host dogfood (example `65f8ec8e-02c0-43bd-8cd4-fe3638178221`).
+
+```bash
+# Managed/local (fixture DB + wb2_alpha)
+just e2e --config datastarui-e2e-workbench-v2.yml \
+  --story agent-memory-chat-density-fixture
+
+just e2e --config datastarui-e2e-workbench-v2.yml \
+  --story agent-memory-group-bubble-botdmchip
+
+just e2e --config datastarui-e2e-workbench-v2.yml \
+  --story agent-memory-pairwise-fixture-view-only
+
+# Tip host (density live on 49da083+; auth via todo52-host profile — never paste tokens)
+VAMOS_E2E_MACHINE_PROFILE=todo52-host \
+VAMOS_E2E_AGENT_MEMORY_THREAD_ID=65f8ec8e-02c0-43bd-8cd4-fe3638178221 \
+  just e2e --base-url https://2026-09-08-10-10-54-agent-memory-observable-context.workspaces.creative-mode.ai \
+  --no-restart --story agent-memory-chat-density-fixture
+```
+
+If a tip host is still density-only, set `VAMOS_E2E_AGENT_MEMORY_ALLOW_PENDING_GATES=1` to skip group/pairwise Stories until the BE query gates for `group_bubble_fixture` / `pairwise_fixture` are tipped.
+
 ### Portable applet smoke stories
 
 Mint and export fresh browser auth as described above immediately before each command, then run these reusable stories against the exact local server under test. Point `VAMOS_E2E_THOUGHTS_ROOT` at that server's thoughts root; checkout-local verification servers normally use `.vamos/state/thoughts`. `--no-restart` keeps the runner on the explicitly supplied external server instead of invoking the configured managed-server command.

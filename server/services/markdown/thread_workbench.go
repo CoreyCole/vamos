@@ -331,6 +331,20 @@ type densityFixtureChatRenderer interface {
 	) (templ.Component, error)
 }
 
+type groupBubbleFixtureChatRenderer interface {
+	RenderSharedThreadChatWithGroupBubbleFixture(
+		ctx context.Context,
+		threadID, userEmail string,
+	) (templ.Component, error)
+}
+
+type pairwiseFixtureChatRenderer interface {
+	RenderSharedThreadChatWithPairwiseFixture(
+		ctx context.Context,
+		threadID, userEmail string,
+	) (templ.Component, error)
+}
+
 func densityFixtureRequested(c echo.Context) bool {
 	if strings.TrimSpace(c.QueryParam("density_fixture")) == "1" {
 		return true
@@ -338,14 +352,39 @@ func densityFixtureRequested(c echo.Context) bool {
 	return strings.EqualFold(strings.TrimSpace(c.QueryParam("fixture")), "density")
 }
 
+func groupBubbleFixtureRequested(c echo.Context) bool {
+	if strings.TrimSpace(c.QueryParam("group_bubble_fixture")) == "1" {
+		return true
+	}
+	return strings.EqualFold(strings.TrimSpace(c.QueryParam("fixture")), "group")
+}
+
+func pairwiseFixtureRequested(c echo.Context) bool {
+	if strings.TrimSpace(c.QueryParam("pairwise_fixture")) == "1" {
+		return true
+	}
+	return strings.EqualFold(strings.TrimSpace(c.QueryParam("fixture")), "pairwise")
+}
+
 func (s *Service) renderSharedThreadChatForRequest(
 	c echo.Context,
 	threadID, userEmail string,
 ) (templ.Component, error) {
 	ctx := c.Request().Context()
+	// Prefer explicit *_fixture=1 keys; dual-form ?fixture= aliases match FE contract.
 	if densityFixtureRequested(c) {
 		if r, ok := s.workbenchThreadsRenderer.(densityFixtureChatRenderer); ok {
 			return r.RenderSharedThreadChatWithDensityFixture(ctx, threadID, userEmail)
+		}
+	}
+	if groupBubbleFixtureRequested(c) {
+		if r, ok := s.workbenchThreadsRenderer.(groupBubbleFixtureChatRenderer); ok {
+			return r.RenderSharedThreadChatWithGroupBubbleFixture(ctx, threadID, userEmail)
+		}
+	}
+	if pairwiseFixtureRequested(c) {
+		if r, ok := s.workbenchThreadsRenderer.(pairwiseFixtureChatRenderer); ok {
+			return r.RenderSharedThreadChatWithPairwiseFixture(ctx, threadID, userEmail)
 		}
 	}
 	return s.workbenchThreadsRenderer.RenderSharedThreadChat(ctx, threadID, userEmail)
