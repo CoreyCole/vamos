@@ -1959,7 +1959,11 @@ func (s *Service) prepareRoomSession(
 		if err != nil {
 			return RoomIdentity{}, "", "", nil, err
 		}
-		injectFiles, err := BuildWindowInjectFiles(s.thoughtsRoot, room, nil)
+		roster, err := s.liveAgentRoster(ctx)
+		if err != nil {
+			return RoomIdentity{}, "", "", nil, err
+		}
+		injectFiles, err := BuildWindowInjectFiles(s.thoughtsRoot, room, roster)
 		if err != nil {
 			return RoomIdentity{}, "", "", nil, err
 		}
@@ -1974,6 +1978,37 @@ func (s *Service) prepareRoomSession(
 		return RoomIdentity{}, "", "", nil, err
 	}
 	return RoomIdentity{Kind: RoomKindPlan}, sessionFile, cwd, nil, nil
+}
+
+func (s *Service) liveAgentRoster(ctx context.Context) ([]AgentRosterRow, error) {
+	if s == nil || s.queries == nil {
+		return nil, nil
+	}
+	agents, err := s.queries.ListAgents(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return agentRosterFromAgents(agents), nil
+}
+
+func agentRosterFromAgents(agents []db.Agent) []AgentRosterRow {
+	out := make([]AgentRosterRow, 0, len(agents))
+	for _, agent := range agents {
+		slug := strings.TrimSpace(agent.Slug)
+		name := strings.TrimSpace(agent.Name)
+		label := strings.TrimSpace(agent.Label)
+		desc := strings.TrimSpace(agent.Description)
+		if slug == "" && name == "" && label == "" && desc == "" {
+			continue
+		}
+		out = append(out, AgentRosterRow{
+			Slug:        slug,
+			Name:        name,
+			Label:       label,
+			Description: desc,
+		})
+	}
+	return out
 }
 
 func (s *Service) nextOriginOrder(ctx context.Context, thread db.AgentThread) int64 {

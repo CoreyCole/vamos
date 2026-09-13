@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/CoreyCole/vamos/pkg/db"
+	serverdb "github.com/CoreyCole/vamos/server/services/db"
 )
 
 func TestPairwiseDirNameLexicographic(t *testing.T) {
@@ -294,5 +295,65 @@ func TestLastWorkingContextPreviewEmptyFile(t *testing.T) {
 	got := LastWorkingContextPreview(root, "nova")
 	if got.Text != "" {
 		t.Fatalf("empty jsonl preview = %q", got.Text)
+	}
+}
+
+func TestPrepareRoomSessionInjectsLiveAgentRoster(t *testing.T) {
+	t.Parallel()
+	database, err := serverdb.NewService(filepath.Join(t.TempDir(), "roster.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = database.Close() })
+	ctx := t.Context()
+	if _, err := database.Queries.CreateAgent(ctx, db.CreateAgentParams{
+		ID:          "agent-nova",
+		Slug:        "nova",
+		Name:        "Nova",
+		Label:       "lead",
+		Description: "does work",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := database.Queries.CreateAgent(ctx, db.CreateAgentParams{
+		ID:   "agent-other",
+		Slug: "other",
+		Name: "Other",
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	root := t.TempDir()
+	cwd := filepath.Join(root, "agents", "nova")
+	if err := os.MkdirAll(cwd, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	svc := &Service{
+		queries:      database.Queries,
+		thoughtsRoot: root,
+	}
+	_, _, _, injectFiles, err := svc.prepareRoomSession(ctx, db.AgentThread{
+		ID:  "thread-home",
+		Cwd: cwd,
+	}, "agent-nova")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var directory string
+	for _, file := range injectFiles {
+		if file.Path == "agent-directory.md" {
+			directory = file.Content
+			break
+		}
+	}
+	if directory == "" {
+		t.Fatal("missing agent-directory.md inject")
+	}
+	if strings.Contains(directory, "No agents are registered yet.") {
+		t.Fatalf("empty roster sentence in live inject: %s", directory)
+	}
+	if !strings.Contains(directory, "`nova`") ||
+		!strings.Contains(directory, "`other`") {
+		t.Fatalf("live slugs missing: %s", directory)
 	}
 }
