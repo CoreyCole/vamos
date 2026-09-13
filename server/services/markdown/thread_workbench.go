@@ -345,6 +345,13 @@ type pairwiseFixtureChatRenderer interface {
 	) (templ.Component, error)
 }
 
+type historyFixtureChatRenderer interface {
+	RenderSharedThreadChatWithHistoryFixture(
+		ctx context.Context,
+		threadID, userEmail string,
+	) (templ.Component, error)
+}
+
 func densityFixtureRequested(c echo.Context) bool {
 	if strings.TrimSpace(c.QueryParam("density_fixture")) == "1" {
 		return true
@@ -366,6 +373,13 @@ func pairwiseFixtureRequested(c echo.Context) bool {
 	return strings.EqualFold(strings.TrimSpace(c.QueryParam("fixture")), "pairwise")
 }
 
+func historyFixtureRequested(c echo.Context) bool {
+	if strings.TrimSpace(c.QueryParam("history_fixture")) == "1" {
+		return true
+	}
+	return strings.EqualFold(strings.TrimSpace(c.QueryParam("fixture")), "history")
+}
+
 func (s *Service) renderSharedThreadChatForRequest(
 	c echo.Context,
 	threadID, userEmail string,
@@ -385,6 +399,12 @@ func (s *Service) renderSharedThreadChatForRequest(
 	if pairwiseFixtureRequested(c) {
 		if r, ok := s.workbenchThreadsRenderer.(pairwiseFixtureChatRenderer); ok {
 			return r.RenderSharedThreadChatWithPairwiseFixture(ctx, threadID, userEmail)
+		}
+	}
+	// Priority: density > group_bubble > pairwise > history > none (FE/E2E contract).
+	if historyFixtureRequested(c) {
+		if r, ok := s.workbenchThreadsRenderer.(historyFixtureChatRenderer); ok {
+			return r.RenderSharedThreadChatWithHistoryFixture(ctx, threadID, userEmail)
 		}
 	}
 	return s.workbenchThreadsRenderer.RenderSharedThreadChat(ctx, threadID, userEmail)

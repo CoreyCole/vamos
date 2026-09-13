@@ -16,15 +16,19 @@ func TestAgentMemoryFixtureQueryContract(t *testing.T) {
 		density bool
 		group   bool
 		pair    bool
+		history bool
 	}{
-		{"density_fixture=1", true, false, false},
-		{"fixture=density", true, false, false},
-		{"fixture=Density", true, false, false},
-		{"group_bubble_fixture=1", false, true, false},
-		{"fixture=group", false, true, false},
-		{"pairwise_fixture=1", false, false, true},
-		{"fixture=pairwise", false, false, true},
-		{"", false, false, false},
+		{"density_fixture=1", true, false, false, false},
+		{"fixture=density", true, false, false, false},
+		{"fixture=Density", true, false, false, false},
+		{"group_bubble_fixture=1", false, true, false, false},
+		{"fixture=group", false, true, false, false},
+		{"pairwise_fixture=1", false, false, true, false},
+		{"fixture=pairwise", false, false, true, false},
+		{"history_fixture=1", false, false, false, true},
+		{"fixture=history", false, false, false, true},
+		{"fixture=History", false, false, false, true},
+		{"", false, false, false, false},
 	}
 	for _, tc := range cases {
 		req := httptest.NewRequest(http.MethodGet, "/threads/x?"+tc.raw, nil)
@@ -37,6 +41,9 @@ func TestAgentMemoryFixtureQueryContract(t *testing.T) {
 		}
 		if got := pairwiseFixtureRequested(c); got != tc.pair {
 			t.Fatalf("%q pairwise=%v want %v", tc.raw, got, tc.pair)
+		}
+		if got := historyFixtureRequested(c); got != tc.history {
+			t.Fatalf("%q history=%v want %v", tc.raw, got, tc.history)
 		}
 	}
 }
