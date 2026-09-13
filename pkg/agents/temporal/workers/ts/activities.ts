@@ -12,6 +12,7 @@ import {
   agentMemoryToolsEnabled,
 } from "./agent_memory.js";
 import { messageRoomContextFromRun, messageRoomTools } from "./message_room.js";
+import { resolveTurnModel, turnModelSelector } from "./pi_model.js";
 import type {
   ConversationRunFailure,
   ConversationRunInput,
@@ -44,9 +45,8 @@ export async function RunConversationTurn(
   const existingIds = entryIdsInSession(sessionManager);
   const authStorage = AuthStorage.create(process.env.PI_AUTH_PATH || undefined);
   const modelRegistry = ModelRegistry.create(authStorage);
-  const provider = process.env.PI_MODEL_PROVIDER || "openai-codex";
-  const modelId = process.env.PI_MODEL_ID || "gpt-5.5";
-  const model = modelRegistry.find(provider, modelId);
+  const { provider, modelId } = turnModelSelector();
+  const model = resolveTurnModel(modelRegistry, provider, modelId);
   const additionalSkillPaths = additionalSkillPathsForTurn(
     input.room?.kind,
     input.cwd,
@@ -73,7 +73,7 @@ export async function RunConversationTurn(
     sessionManager,
     authStorage,
     modelRegistry,
-    model: model ?? undefined,
+    model,
     thinkingLevel: input.thinking_level as any,
     resourceLoader,
     customTools,
