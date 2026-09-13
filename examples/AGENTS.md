@@ -47,6 +47,9 @@ Demo applets can include the shared `examples/shared/vamos-applet-ptr.js` bootst
 
 Chrome Refresh buttons should call `window.VamosApplet.requestRefresh()` (same hosted `vamos:ptr` / standalone `location.reload` rules as PTR), not bare `location.reload()`.
 
+Under appletruntime, asset URLs must be **relative** (e.g. `static/shared/vamos-applet-ptr.js`), not root-absolute `/static/...` — absolute paths hit the parent Vamos shell and 404.
+
+
 
 **Usage:**
 1. Copy `examples/shared/vamos-applet-ptr.js` to your applet's `static/shared/` directory.
