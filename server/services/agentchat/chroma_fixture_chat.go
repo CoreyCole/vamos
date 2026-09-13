@@ -2,6 +2,7 @@ package agentchat
 
 import (
 	"context"
+	"fmt"
 	"net/url"
 	"strings"
 
@@ -15,6 +16,8 @@ const (
 	densityFixtureReasoningDOMID = "ai470-density-fixture-reasoning"
 	densityFixtureTool0DOMID     = "ai470-density-fixture-tool-0"
 	densityFixtureTool1DOMID     = "ai470-density-fixture-tool-1"
+	pairwisePeerFixtureDOMID = "ai470-pairwise-peer-fixture"
+	pairwiseSelfFixtureDOMID = "ai470-pairwise-self-fixture"
 )
 
 // chromaHighlightFixtureMarkdown is a visible assistant bubble for UX chroma VA.
@@ -66,6 +69,8 @@ func (s *Service) renderSharedThreadChat(
 		stable = append(stable, s.groupBubbleFixtureMessages()...)
 		stable = append(stable, s.chromaHighlightFixtureMessage())
 	case "pairwise":
+		// Distinctive A2A peer/self bubbles so UX/E2E can assert #msg-ai470-pairwise-*.
+		stable = append(stable, s.pairwiseFixtureMessages()...)
 		stable = append(stable, s.chromaHighlightFixtureMessage())
 	case "density":
 		stable = append(stable, s.densityFixtureMessages()...)
@@ -123,6 +128,7 @@ func (s *Service) RenderSharedThreadChatWithDensityFixture(
 ) (templ.Component, error) {
 	return s.renderSharedThreadChat(ctx, threadID, userEmail, "density")
 }
+
 
 func groupBotDMChipFixture(originTurnID string) *BotDMChip {
 	return &BotDMChip{
@@ -237,4 +243,31 @@ func (s *Service) densityFixtureMessages() []TranscriptMessage {
 		HideBodyWhenCollapsed: true,
 	}
 	return []TranscriptMessage{reasoning, tool, subagent}
+}
+
+func (s *Service) pairwiseFixtureMessages() []TranscriptMessage {
+	peer := s.newBubbleTranscriptMessage(
+		pairwisePeerFixtureDOMID,
+		pairwisePeerFixtureDOMID,
+		"assistant",
+		"Pairwise peer fixture (AI-470) — left agent in the A2A pair.",
+		false,
+	)
+	peer.AuthorInitial = "P"
+	peer.AuthorName = "Pair Peer"
+	peer.AvatarBg = "bg-sky-600"
+	peer.NameColor = "text-sky-300"
+
+	self := s.newBubbleTranscriptMessage(
+		pairwiseSelfFixtureDOMID,
+		pairwiseSelfFixtureDOMID,
+		"assistant",
+		"Pairwise self fixture (AI-470) — pair partner, view-only composer.",
+		false,
+	)
+	self.AuthorInitial = "S"
+	self.AuthorName = "Pair Self"
+	self.AvatarBg = "bg-rose-600"
+	self.NameColor = "text-rose-300"
+	return []TranscriptMessage{peer, self}
 }
