@@ -830,7 +830,8 @@ func (h *Handler) StreamEmbeddedFreeform(c echo.Context) error {
 					return err
 				}
 			default:
-				if err := h.patchEmbeddedFreeformChatPanel(c, sse, userEmail); err != nil {
+				// Incremental default/resource: do not MessagesPane-nest live.
+				if err := h.patchEmbeddedFreeformLiveSafe(c, sse, userEmail); err != nil {
 					return err
 				}
 			}
@@ -874,9 +875,8 @@ func (h *Handler) StreamEmbeddedThread(c echo.Context) error {
 	})
 
 	workbenchV2 := c.QueryParam("workbench_v2") == "1"
-	// patchPanel must refresh stable/panel SoT. Never route it through
-	// live-only morphs: that empty-REPLACE wiped Accept seeds on PatchStable
-	// after clearLive/reset while #agent-chat-stable-transcript stayed stale.
+	// patchPanel is catchup-only (reconnect SoT). Incremental default must
+	// not MessagesPane-nest live via #doc-right-chat-panel REPLACE.
 	patchPanel := func() error {
 		if hasPrimary {
 			input := h.embeddedPatchInput(c, userEmail)
@@ -894,6 +894,15 @@ func (h *Handler) StreamEmbeddedThread(c echo.Context) error {
 		input.WorkspaceID = workspaceRecord.ID
 		input.ThreadID = threadID
 		return h.patchEmbeddedChatLiveTranscript(c, sse, input)
+	}
+	patchLiveSafe := func() error {
+		if hasPrimary {
+			input := h.embeddedPatchInput(c, userEmail)
+			input.WorkspaceID = workspaceRecord.ID
+			input.ThreadID = threadID
+			return h.patchEmbeddedChatLiveSafe(c, sse, input)
+		}
+		return h.patchEmbeddedFreeformLiveSafe(c, sse, userEmail)
 	}
 
 	since := parseSince(c.QueryParam("since"))
@@ -933,7 +942,7 @@ func (h *Handler) StreamEmbeddedThread(c echo.Context) error {
 					return err
 				}
 			default:
-				if err := patchPanel(); err != nil {
+				if err := patchLiveSafe(); err != nil {
 					return err
 				}
 			}
@@ -976,6 +985,8 @@ func (h *Handler) StreamEmbeddedWorkspace(c echo.Context) error {
 	since := parseSince(c.QueryParam("since"))
 	currentCursor := h.service.CurrentCursor(workspaceID)
 	if workspace.NeedsCatchup(since, currentCursor) {
+		// Catchup may full-panel once (reconnect SoT rebuild). Incremental
+		// signals must not MessagesPane-nest / empty-REPLACE live.
 		if err := h.patchEmbeddedChatPanel(
 			c,
 			sse,
@@ -994,28 +1005,31 @@ func (h *Handler) StreamEmbeddedWorkspace(c echo.Context) error {
 			if signal.Cursor <= since {
 				continue
 			}
-			if signal.Cursor > since+1 || signal.Scope == PatchWorkspaceResource {
-				if err := h.patchEmbeddedChatPanel(
-					c,
-					sse,
-					h.embeddedPatchInput(c, userEmail),
-				); err != nil {
-					return err
-				}
-			} else if signal.Scope == PatchLiveTranscript {
+			input := h.embeddedPatchInput(c, userEmail)
+			switch signal.Scope {
+			case PatchLiveTranscript:
 				if err := h.patchEmbeddedChatLiveTranscript(
 					c,
 					sse,
-					h.embeddedPatchInput(c, userEmail),
+					input,
 				); err != nil {
 					return err
 				}
-			} else if err := h.patchEmbeddedChatPanel(
-				c,
-				sse,
-				h.embeddedPatchInput(c, userEmail),
-			); err != nil {
-				return err
+			case PatchStableTranscript:
+				if err := h.patchEmbeddedChatStableTranscript(
+					c,
+					sse,
+					input,
+				); err != nil {
+					return err
+				}
+			default:
+				// PatchWorkspaceResource / cursor gap / other scopes after
+				// first paint: stable + composer only — never panel REPLACE
+				// that nests #agent-chat-live-transcript via MessagesPane.
+				if err := h.patchEmbeddedChatLiveSafe(c, sse, input); err != nil {
+					return err
+				}
 			}
 			since = signal.Cursor
 		}
@@ -3221,6 +3235,47 @@ func (h *Handler) patchEmbeddedChatStableTranscript(
 	return sse.PatchElementTempl(
 		StableTranscriptRegion(args.ThreadID, args.Transcript.Stable, ""),
 	)
+}
+
+func (h *Handler) patchEmbeddedChatComposer(
+	c echo.Context,
+	sse *datastar.ServerSentEventGenerator,
+	input EmbeddedChatPatchInput,
+) error {
+	args, err := h.service.BuildEmbeddedChatPanelArgs(
+		c.Request().Context(),
+		input,
+	)
+	if err != nil {
+		return err
+	}
+	return sse.PatchElementTempl(
+		EmbeddedWorkspaceComposer(args),
+		datastar.WithSelectorID("agent-chat-workspace-composer"),
+	)
+}
+
+// patchEmbeddedChatLiveSafe refreshes stable + composer without MessagesPane
+// nesting #agent-chat-live-transcript via #doc-right-chat-panel REPLACE.
+func (h *Handler) patchEmbeddedChatLiveSafe(
+	c echo.Context,
+	sse *datastar.ServerSentEventGenerator,
+	input EmbeddedChatPatchInput,
+) error {
+	if err := h.patchEmbeddedChatStableTranscript(c, sse, input); err != nil {
+		return err
+	}
+	return h.patchEmbeddedChatComposer(c, sse, input)
+}
+
+// patchEmbeddedFreeformLiveSafe refreshes stable without MessagesPane-nesting
+// live. Composer stays put; live morphs only via PatchLiveTranscript.
+func (h *Handler) patchEmbeddedFreeformLiveSafe(
+	c echo.Context,
+	sse *datastar.ServerSentEventGenerator,
+	userEmail string,
+) error {
+	return h.patchEmbeddedFreeformStableTranscript(c, sse, userEmail)
 }
 
 func (h *Handler) patchWorkspace(
