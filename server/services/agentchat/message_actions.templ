@@ -1,8 +1,6 @@
 package agentchat
 
-import (
-	"strconv"
-)
+import "strconv"
 
 templ MessageActionsCluster(threadID string, msg TranscriptMessage, forkAction string) {
 	{{ actionsID := msgActionsID(msg.DOMID) }}
@@ -81,9 +79,25 @@ templ MessageActionsMenu(threadID string, msg TranscriptMessage, forkAction stri
 			</svg>
 			Copy
 		</button>
+		<button
+			type="button"
+			role="menuitem"
+			class="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-xs font-medium text-foreground hover:bg-muted"
+			data-on:click={ messageQuoteClickExpr(msg.DOMID, plain) }
+		>
+			<svg class="h-3.5 w-3.5 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+				<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M3 10h10a4 4 0 014 4v2M3 10l4-4M3 10l4 4M21 14H11a4 4 0 01-4-4V8m14 6l-4 4m4-4l-4-4"></path>
+			</svg>
+			Quote
+		</button>
 		if msg.ShowForkForm {
 			<details class="rounded-sm">
-				<summary class="cursor-pointer list-none rounded-sm px-2 py-1.5 text-xs font-medium text-foreground hover:bg-muted [&::-webkit-details-marker]:hidden">Fork</summary>
+				<summary class="flex cursor-pointer list-none items-center gap-2 rounded-sm px-2 py-1.5 text-xs font-medium text-foreground hover:bg-muted [&::-webkit-details-marker]:hidden">
+					<svg data-msg-fork-icon class="h-3.5 w-3.5 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M6 3v12M18 9a3 3 0 100-6 3 3 0 000 6zM6 21a3 3 0 100-6 3 3 0 000 6zM15 6a9 9 0 00-9 9"></path>
+					</svg>
+					Fork
+				</summary>
 				<form class="space-y-2 p-2 pt-1" data-on:submit={ forkAction }>
 					<input type="hidden" name="source_thread_id" value={ threadID }/>
 					<input type="hidden" name="source_entry_id" value={ msg.EntryID }/>
@@ -137,7 +151,12 @@ templ MessageActionsSheet(threadID string, msg TranscriptMessage, forkAction str
 			<button type="button" class="rounded-md px-3 py-2.5 text-left text-sm hover:bg-muted" data-on:click={ messageCopyClickExpr(msg.DOMID, plain) }>Copy</button>
 			if msg.ShowForkForm {
 				<details class="rounded-md">
-					<summary class="cursor-pointer list-none rounded-md px-3 py-2.5 text-sm hover:bg-muted [&::-webkit-details-marker]:hidden">Fork</summary>
+					<summary class="flex cursor-pointer list-none items-center gap-2 rounded-md px-3 py-2.5 text-sm hover:bg-muted [&::-webkit-details-marker]:hidden">
+						<svg data-msg-fork-icon class="h-4 w-4 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M6 3v12M18 9a3 3 0 100-6 3 3 0 000 6zM6 21a3 3 0 100-6 3 3 0 000 6zM15 6a9 9 0 00-9 9"></path>
+						</svg>
+						Fork
+					</summary>
 					<form class="space-y-2 px-3 pb-2" data-on:submit={ forkAction }>
 						<input type="hidden" name="source_thread_id" value={ threadID }/>
 						<input type="hidden" name="source_entry_id" value={ msg.EntryID }/>

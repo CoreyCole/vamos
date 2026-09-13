@@ -48,10 +48,14 @@ func msgActionsCloseExpr(domID string) string {
 func messageCopyClickExpr(domID, content string) string {
 	show := toast.ShowToastExpr("clipboard_success", 2000)
 	closeMenu := msgActionsCloseExpr(domID)
-	return "navigator.clipboard.writeText(" + strconv.Quote(content) + ").then(() => { " + show + " }); " + closeMenu
+	return "navigator.clipboard.writeText(" + strconv.Quote(
+		content,
+	) + ").then(() => { " + show + " }); " + closeMenu
 }
 
-// messageQuoteClickExpr appends a markdown quote into the existing Class A $chatDraft.
+// messageQuoteClickExpr prepends a markdown quote into the composer textarea.
+// chatDraft is local to #agent-chat-composer-form; writing $chatDraft here would
+// miss that bind. Dispatch input so data-bind and autosize see the new value.
 func messageQuoteClickExpr(domID, content string) string {
 	text := strings.TrimSpace(content)
 	quoted := ""
@@ -63,8 +67,11 @@ func messageQuoteClickExpr(domID, content string) string {
 		quoted = strings.Join(lines, "\n") + "\n\n"
 	}
 	closeMenu := msgActionsCloseExpr(domID)
-	return "$chatDraft = " + strconv.Quote(quoted) + " + ($chatDraft || ''); " +
-		"document.getElementById('agent-chat-composer-input')?.focus(); " +
+	return "(() => { const el = document.getElementById('agent-chat-composer-input'); const next = " +
+		strconv.Quote(
+			quoted,
+		) +
+		" + ((el && el.value) || ''); if (el) { el.value = next; el.dispatchEvent(new Event('input', { bubbles: true })); el.focus(); } })(); " +
 		closeMenu
 }
 

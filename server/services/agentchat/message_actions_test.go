@@ -27,7 +27,8 @@ func TestMessageCopyClickExprUsesRootToast(t *testing.T) {
 	if !strings.Contains(expr, toast.ShowToastExpr("clipboard_success", 2000)) {
 		t.Fatalf("missing clipboard_success toast: %s", expr)
 	}
-	if !strings.Contains(expr, "hello \\\"world\\\"") && !strings.Contains(expr, `hello \"world\"`) {
+	if !strings.Contains(expr, "hello \\\"world\\\"") &&
+		!strings.Contains(expr, `hello \"world\"`) {
 		// strconv.Quote produces "hello \"world\""
 		if !strings.Contains(expr, `"hello \"world\""`) {
 			t.Fatalf("content not quoted safely: %s", expr)
@@ -35,10 +36,16 @@ func TestMessageCopyClickExprUsesRootToast(t *testing.T) {
 	}
 }
 
-func TestMessageQuoteClickExprUsesChatDraft(t *testing.T) {
+func TestMessageQuoteClickExprWritesComposerTextarea(t *testing.T) {
 	expr := messageQuoteClickExpr("abc", "line1\nline2")
-	if !strings.Contains(expr, "$chatDraft =") {
-		t.Fatalf("missing chatDraft: %s", expr)
+	if strings.Contains(expr, "$chatDraft") {
+		t.Fatalf("quote must not assign $chatDraft outside composer scope: %s", expr)
+	}
+	if !strings.Contains(expr, "agent-chat-composer-input") {
+		t.Fatalf("missing composer textarea id: %s", expr)
+	}
+	if !strings.Contains(expr, "dispatchEvent") {
+		t.Fatalf("missing input event so data-bind updates: %s", expr)
 	}
 	if !strings.Contains(expr, "> line1") || !strings.Contains(expr, "> line2") {
 		t.Fatalf("missing quoted lines: %s", expr)
@@ -62,7 +69,11 @@ func TestTranscriptMessageActionsRenderMorphMap(t *testing.T) {
 		AuthorName:   "Bot",
 	}
 	var b strings.Builder
-	if err := TranscriptMessageWithFork("t1", msg, "@post('/fork')").Render(t.Context(), &b); err != nil {
+	if err := TranscriptMessageWithFork(
+		"t1",
+		msg,
+		"@post('/fork')",
+	).Render(t.Context(), &b); err != nil {
 		t.Fatal(err)
 	}
 	html := b.String()
@@ -76,6 +87,7 @@ func TestTranscriptMessageActionsRenderMorphMap(t *testing.T) {
 		"Fork",
 		"Coming soon",
 		"Quote",
+		`data-msg-fork-icon`,
 	} {
 		if !strings.Contains(html, want) {
 			t.Fatalf("missing %q in %s", want, html)
@@ -84,7 +96,8 @@ func TestTranscriptMessageActionsRenderMorphMap(t *testing.T) {
 	if strings.Contains(html, "absolute right-2 top-2") {
 		t.Fatal("absolute fork overlay still present")
 	}
-	if strings.Contains(html, "view-transition-name") && strings.Contains(html, "msg-m1-actions") {
+	if strings.Contains(html, "view-transition-name") &&
+		strings.Contains(html, "msg-m1-actions") {
 		// ensure actions cluster itself has no VT name attribute nearby
 	}
 }

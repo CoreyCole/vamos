@@ -2363,7 +2363,9 @@ func liveSnapshotHasRenderableAssistant(snap conversation.LiveTurnState) bool {
 	return false
 }
 
-func liveSnapshotPendingUserItems(snap conversation.LiveTurnState) []conversation.LiveTurnItem {
+func liveSnapshotPendingUserItems(
+	snap conversation.LiveTurnState,
+) []conversation.LiveTurnItem {
 	out := make([]conversation.LiveTurnItem, 0, len(snap.Items))
 	for _, item := range snap.Items {
 		if item.Kind == conversation.LiveTurnUserMessage {
@@ -3031,7 +3033,10 @@ func (s *Service) BuildThreadPageArgs(
 		s.deriveSubagentLiveCards(ctx, thread),
 	)
 	args.Transcript.Cursor = args.Cursor
-	args.Transcript.ShowWorking = s.liveTranscriptShowWorking(thread.ID, args.Transcript.Live)
+	args.Transcript.ShowWorking = s.liveTranscriptShowWorking(
+		thread.ID,
+		args.Transcript.Live,
+	)
 	args.Transcript = applyStableTranscriptWindow(args.Transcript)
 
 	if strings.TrimSpace(input.RunID) != "" {
@@ -4606,6 +4611,8 @@ func (s *Service) decodePersistedTranscriptItems(
 			ToolName      string `json:"toolName"`
 			Details       any    `json:"details"`
 			IsError       bool   `json:"isError"`
+			ErrorMessage  string `json:"errorMessage"`
+			StopReason    string `json:"stopReason"`
 			UserEmail     string `json:"userEmail"`
 			FromAgentID   string `json:"fromAgentId"`
 			FromAgentSlug string `json:"fromAgentSlug"`
@@ -4633,6 +4640,15 @@ func (s *Service) decodePersistedTranscriptItems(
 			envelope.Message.Details,
 			envelope.Message.IsError,
 			toolCallPresentations,
+		)
+		items = s.withAssistantErrorFallback(
+			items,
+			domID,
+			envelope.ID,
+			envelope.Message.Role,
+			envelope.Message.ErrorMessage,
+			envelope.Message.StopReason,
+			envelope.Message.IsError,
 		)
 		applySpeakerAttribution(
 			items,
@@ -4698,6 +4714,8 @@ func (s *Service) liveTurnTranscriptItems(
 			ToolName      string `json:"toolName"`
 			Details       any    `json:"details"`
 			IsError       bool   `json:"isError"`
+			ErrorMessage  string `json:"errorMessage"`
+			StopReason    string `json:"stopReason"`
 			UserEmail     string `json:"userEmail"`
 			FromAgentID   string `json:"fromAgentId"`
 			FromAgentSlug string `json:"fromAgentSlug"`
@@ -4720,6 +4738,15 @@ func (s *Service) liveTurnTranscriptItems(
 			policy,
 			toolState,
 			toolCallPresentations,
+		)
+		items = s.withAssistantErrorFallback(
+			items,
+			domID,
+			domID,
+			message.Role,
+			message.ErrorMessage,
+			message.StopReason,
+			message.IsError,
 		)
 		applySpeakerAttribution(
 			items,
@@ -5319,6 +5346,59 @@ func (s *Service) newBubbleTranscriptMessage(
 	}
 	if role == "assistant" {
 		msg = withDefaultAssistantBubbleChrome(msg)
+	}
+	return msg
+}
+
+func (s *Service) withAssistantErrorFallback(
+	items []TranscriptMessage,
+	domID, entryID, role, errorMessage, stopReason string,
+	isError bool,
+) []TranscriptMessage {
+	if len(items) > 0 {
+		return items
+	}
+	if !strings.EqualFold(strings.TrimSpace(role), "assistant") {
+		return items
+	}
+	body := assistantErrorBody(errorMessage, stopReason)
+	if body == "" && isError {
+		body = "The model returned an error."
+	}
+	if body == "" {
+		return items
+	}
+	return []TranscriptMessage{{
+		DOMID:   domID,
+		EntryID: entryID,
+		Variant: "detail",
+		Title:   "Error",
+		Content: body,
+		IsError: true,
+	}}
+}
+
+func assistantErrorBody(errorMessage, stopReason string) string {
+	msg := strings.TrimSpace(errorMessage)
+	if msg == "" {
+		if strings.EqualFold(strings.TrimSpace(stopReason), "error") {
+			return "The model returned an error."
+		}
+		return ""
+	}
+	var payload struct {
+		Detail  string `json:"detail"`
+		Error   string `json:"error"`
+		Message string `json:"message"`
+	}
+	if json.Unmarshal([]byte(msg), &payload) == nil {
+		if text := firstNonEmpty(
+			payload.Detail,
+			payload.Error,
+			payload.Message,
+		); text != "" {
+			return text
+		}
 	}
 	return msg
 }
