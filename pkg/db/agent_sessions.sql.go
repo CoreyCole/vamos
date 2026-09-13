@@ -237,6 +237,65 @@ func (q *Queries) GetAgentSessionByPath(ctx context.Context, artifactPath sql.Nu
 	return i, err
 }
 
+const listAgentSessionsByProjectedThreadID = `-- name: ListAgentSessionsByProjectedThreadID :many
+SELECT id, identity_kind, artifact_path, plan_dir, parent_plan_dir, source_review_dir, agent, external_session_id, parent_session_id, cwd, workflow_id, workflow_node_id, continued_from_session_id, forked_from_session_id, file_size, file_mtime, file_hash, last_indexed_offset, projection_state, projected_thread_id, indexed_by_user_email, attached_workspace_id, imported_head_entry_id, last_imported_at, last_error, metadata_json, created_at, updated_at
+FROM agent_sessions
+WHERE projected_thread_id = ?1
+ORDER BY updated_at DESC
+`
+
+func (q *Queries) ListAgentSessionsByProjectedThreadID(ctx context.Context, projectedThreadID sql.NullString) ([]AgentSession, error) {
+	rows, err := q.db.QueryContext(ctx, listAgentSessionsByProjectedThreadID, projectedThreadID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []AgentSession
+	for rows.Next() {
+		var i AgentSession
+		if err := rows.Scan(
+			&i.ID,
+			&i.IdentityKind,
+			&i.ArtifactPath,
+			&i.PlanDir,
+			&i.ParentPlanDir,
+			&i.SourceReviewDir,
+			&i.Agent,
+			&i.ExternalSessionID,
+			&i.ParentSessionID,
+			&i.Cwd,
+			&i.WorkflowID,
+			&i.WorkflowNodeID,
+			&i.ContinuedFromSessionID,
+			&i.ForkedFromSessionID,
+			&i.FileSize,
+			&i.FileMtime,
+			&i.FileHash,
+			&i.LastIndexedOffset,
+			&i.ProjectionState,
+			&i.ProjectedThreadID,
+			&i.IndexedByUserEmail,
+			&i.AttachedWorkspaceID,
+			&i.ImportedHeadEntryID,
+			&i.LastImportedAt,
+			&i.LastError,
+			&i.MetadataJson,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listAgentSessionsByWorkspace = `-- name: ListAgentSessionsByWorkspace :many
 SELECT id, identity_kind, artifact_path, plan_dir, parent_plan_dir, source_review_dir, agent, external_session_id, parent_session_id, cwd, workflow_id, workflow_node_id, continued_from_session_id, forked_from_session_id, file_size, file_mtime, file_hash, last_indexed_offset, projection_state, projected_thread_id, indexed_by_user_email, attached_workspace_id, imported_head_entry_id, last_imported_at, last_error, metadata_json, created_at, updated_at
 FROM agent_sessions
@@ -758,6 +817,25 @@ func (q *Queries) UpdateAgentSessionInferenceState(ctx context.Context, arg Upda
 		arg.MetadataJson,
 		arg.ID,
 	)
+	return err
+}
+
+const updateAgentSessionProjectedThread = `-- name: UpdateAgentSessionProjectedThread :exec
+UPDATE agent_sessions
+SET projected_thread_id = ?1,
+artifact_path = COALESCE (?2, artifact_path),
+updated_at = CURRENT_TIMESTAMP
+WHERE id = ?3
+`
+
+type UpdateAgentSessionProjectedThreadParams struct {
+	ProjectedThreadID sql.NullString `json:"projected_thread_id"`
+	ArtifactPath      sql.NullString `json:"artifact_path"`
+	ID                string         `json:"id"`
+}
+
+func (q *Queries) UpdateAgentSessionProjectedThread(ctx context.Context, arg UpdateAgentSessionProjectedThreadParams) error {
+	_, err := q.db.ExecContext(ctx, updateAgentSessionProjectedThread, arg.ProjectedThreadID, arg.ArtifactPath, arg.ID)
 	return err
 }
 

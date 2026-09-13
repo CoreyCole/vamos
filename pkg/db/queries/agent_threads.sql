@@ -477,3 +477,33 @@ AND pair_agent_id_b = sqlc.arg ('pair_agent_id_b')
 AND room_kind = 'pairwise'
 AND archived_at IS NULL
 LIMIT 1 ;
+
+-- name: ListAgentThreadsByParentThreadID :many
+SELECT
+id,
+user_email,
+title,
+cwd,
+lineage_id,
+project_id,
+plan_dir_rel,
+head_entry_id,
+parent_thread_id,
+forked_from_entry_id,
+agent_id,
+room_kind,
+pair_agent_id_a,
+pair_agent_id_b,
+created_at,
+updated_at,
+archived_at
+FROM agent_threads
+WHERE parent_thread_id = sqlc.arg('parent_thread_id')
+AND archived_at IS NULL
+ORDER BY created_at ASC;
+
+-- name: SetAgentThreadRoomKind :exec
+UPDATE agent_threads
+SET room_kind = sqlc.arg('room_kind'),
+updated_at = CURRENT_TIMESTAMP
+WHERE id = sqlc.arg('id');

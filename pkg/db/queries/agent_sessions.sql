@@ -267,3 +267,16 @@ last_error = sqlc.narg('last_error'),
 metadata_json = sqlc.narg('metadata_json'),
 updated_at = CURRENT_TIMESTAMP
 WHERE id = sqlc.arg('id');
+
+-- name: ListAgentSessionsByProjectedThreadID :many
+SELECT *
+FROM agent_sessions
+WHERE projected_thread_id = sqlc.arg('projected_thread_id')
+ORDER BY updated_at DESC;
+
+-- name: UpdateAgentSessionProjectedThread :exec
+UPDATE agent_sessions
+SET projected_thread_id = sqlc.narg('projected_thread_id'),
+artifact_path = COALESCE (sqlc.narg('artifact_path'), artifact_path),
+updated_at = CURRENT_TIMESTAMP
+WHERE id = sqlc.arg('id');

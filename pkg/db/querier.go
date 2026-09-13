@@ -129,9 +129,11 @@ type Querier interface {
 	ListAgentRunsByThread(ctx context.Context, threadID string) ([]AgentRun, error)
 	ListAgentRunsByWorkspace(ctx context.Context, workspaceID sql.NullString) ([]AgentRun, error)
 	ListAgentRunsByWorkspaceNode(ctx context.Context, arg ListAgentRunsByWorkspaceNodeParams) ([]AgentRun, error)
+	ListAgentSessionsByProjectedThreadID(ctx context.Context, projectedThreadID sql.NullString) ([]AgentSession, error)
 	ListAgentSessionsByWorkspace(ctx context.Context, attachedWorkspaceID sql.NullString) ([]AgentSession, error)
 	ListAgentSurfaceAttachmentsBySession(ctx context.Context, chatSessionID string) ([]AgentSurfaceAttachment, error)
 	ListAgentThreads(ctx context.Context, arg ListAgentThreadsParams) ([]AgentThread, error)
+	ListAgentThreadsByParentThreadID(ctx context.Context, parentThreadID sql.NullString) ([]AgentThread, error)
 	// Plan-home children: FK only (freeform NULL excluded).
 	ListAgentThreadsByPlanDirRel(ctx context.Context, planDirRel sql.NullString) ([]AgentThread, error)
 	ListAgentThreadsByWorkspace(ctx context.Context, workspaceID string) ([]AgentThread, error)
@@ -201,6 +203,7 @@ type Querier interface {
 	RevokeMachineCredential(ctx context.Context, arg RevokeMachineCredentialParams) (int64, error)
 	// Backfill helper: do not bump updated_at (preserve most-recent ordering).
 	SetAgentThreadPlanDirRel(ctx context.Context, arg SetAgentThreadPlanDirRelParams) error
+	SetAgentThreadRoomKind(ctx context.Context, arg SetAgentThreadRoomKindParams) error
 	SetPlanWorkspaceLeadAgent(ctx context.Context, arg SetPlanWorkspaceLeadAgentParams) error
 	SoftDeleteDocumentComment(ctx context.Context, id string) error
 	TestSupportCountAgentEntries(ctx context.Context) (int64, error)
@@ -225,6 +228,7 @@ type Querier interface {
 	UpdateAgentSessionImportFinalState(ctx context.Context, arg UpdateAgentSessionImportFinalStateParams) error
 	UpdateAgentSessionImportingState(ctx context.Context, arg UpdateAgentSessionImportingStateParams) error
 	UpdateAgentSessionInferenceState(ctx context.Context, arg UpdateAgentSessionInferenceStateParams) error
+	UpdateAgentSessionProjectedThread(ctx context.Context, arg UpdateAgentSessionProjectedThreadParams) error
 	UpdateAgentThreadCwd(ctx context.Context, arg UpdateAgentThreadCwdParams) error
 	UpdateAgentThreadHead(ctx context.Context, arg UpdateAgentThreadHeadParams) error
 	UpdateAgentThreadProject(ctx context.Context, arg UpdateAgentThreadProjectParams) error

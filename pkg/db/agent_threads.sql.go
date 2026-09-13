@@ -668,6 +668,74 @@ func (q *Queries) ListAgentThreads(ctx context.Context, arg ListAgentThreadsPara
 	return items, nil
 }
 
+const listAgentThreadsByParentThreadID = `-- name: ListAgentThreadsByParentThreadID :many
+;
+
+SELECT
+id,
+user_email,
+title,
+cwd,
+lineage_id,
+project_id,
+plan_dir_rel,
+head_entry_id,
+parent_thread_id,
+forked_from_entry_id,
+agent_id,
+room_kind,
+pair_agent_id_a,
+pair_agent_id_b,
+created_at,
+updated_at,
+archived_at
+FROM agent_threads
+WHERE parent_thread_id = ?1
+AND archived_at IS NULL
+ORDER BY created_at ASC
+`
+
+func (q *Queries) ListAgentThreadsByParentThreadID(ctx context.Context, parentThreadID sql.NullString) ([]AgentThread, error) {
+	rows, err := q.db.QueryContext(ctx, listAgentThreadsByParentThreadID, parentThreadID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []AgentThread
+	for rows.Next() {
+		var i AgentThread
+		if err := rows.Scan(
+			&i.ID,
+			&i.UserEmail,
+			&i.Title,
+			&i.Cwd,
+			&i.LineageID,
+			&i.ProjectID,
+			&i.PlanDirRel,
+			&i.HeadEntryID,
+			&i.ParentThreadID,
+			&i.ForkedFromEntryID,
+			&i.AgentID,
+			&i.RoomKind,
+			&i.PairAgentIDA,
+			&i.PairAgentIDB,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.ArchivedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listAgentThreadsByPlanDirRel = `-- name: ListAgentThreadsByPlanDirRel :many
 ;
 
@@ -1160,6 +1228,23 @@ type SetAgentThreadPlanDirRelParams struct {
 // Backfill helper: do not bump updated_at (preserve most-recent ordering).
 func (q *Queries) SetAgentThreadPlanDirRel(ctx context.Context, arg SetAgentThreadPlanDirRelParams) error {
 	_, err := q.db.ExecContext(ctx, setAgentThreadPlanDirRel, arg.PlanDirRel, arg.ID)
+	return err
+}
+
+const setAgentThreadRoomKind = `-- name: SetAgentThreadRoomKind :exec
+UPDATE agent_threads
+SET room_kind = ?1,
+updated_at = CURRENT_TIMESTAMP
+WHERE id = ?2
+`
+
+type SetAgentThreadRoomKindParams struct {
+	RoomKind string `json:"room_kind"`
+	ID       string `json:"id"`
+}
+
+func (q *Queries) SetAgentThreadRoomKind(ctx context.Context, arg SetAgentThreadRoomKindParams) error {
+	_, err := q.db.ExecContext(ctx, setAgentThreadRoomKind, arg.RoomKind, arg.ID)
 	return err
 }
 
