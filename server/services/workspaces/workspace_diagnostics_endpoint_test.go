@@ -77,14 +77,18 @@ func TestWorkspacesPageRendersSourceLabeledDiagnostics(t *testing.T) {
 	}
 	html := body.String()
 	for _, want := range []string{
-		"Manager lifecycle: Merged",
+		"Manager lifecycle",
+		"Merged",
 		"source: manager DB",
-		"Scheduled sync: ok; last finished Jun 14, 16:30; warnings: 1",
-		"Local runtime diagnostics: crashed",
+		"Scheduled sync",
+		"ok; last finished Jun 14, 16:30; warnings: 1",
+		"Local runtime diagnostics",
+		"crashed",
 		"source: .vamos/run/status.json; diagnostic only",
 		"Scheduled sync could not prove merge state.",
 		"Local runtime diagnostics may be stale for this non-active workspace.",
 		"Cleanup requires human approval. Do not clean up or delete this checkout unless explicitly approved.",
+		`id="ws-row-feature"`,
 	} {
 		if !strings.Contains(html, want) {
 			t.Fatalf("WorkspacesPage missing %q: %s", want, html)

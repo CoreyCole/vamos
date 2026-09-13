@@ -402,6 +402,46 @@ func TestGroupFilterImplWorkspaceViews(t *testing.T) {
 	}
 }
 
+
+func TestWorkspaceCompactTableHelpers(t *testing.T) {
+	peer := ImplWorkspaceView{Row: db.ImplWorkspace{
+		Status:                string(ImplWorkspaceStatusMerged),
+		CleanupProofKind:      string(MergeProofAncestor),
+		CleanupProofSourceRef: sql.NullString{String: "peer:other@abcdef1", Valid: true},
+		AheadCount:            2,
+		BehindCount:           1,
+	}}
+	if !workspaceProofIsPeer(peer) {
+		t.Fatalf("expected peer proof")
+	}
+	if got := workspaceAheadBehindLabel(peer); got != "2 / 1" {
+		t.Fatalf("ahead/behind = %q", got)
+	}
+	if got := workspacePrimaryStatusLabel(peer); got != "Merged" {
+		t.Fatalf("status = %q", got)
+	}
+	if got := workspaceRowID("feature"); got != "ws-row-feature" {
+		t.Fatalf("row id = %q", got)
+	}
+	empty := ImplWorkspaceView{}
+	if !workspaceProofEmpty(empty) {
+		t.Fatalf("expected empty proof")
+	}
+	if got := workspaceLastSyncLabel(empty); got != "—" {
+		t.Fatalf("last sync empty = %q", got)
+	}
+	landed := ImplWorkspaceView{Row: db.ImplWorkspace{
+		CleanupProofKind:      string(MergeProofPatchEquivalent),
+		CleanupProofSourceRef: sql.NullString{String: "origin/main", Valid: true},
+	}}
+	if workspaceProofIsPeer(landed) {
+		t.Fatalf("origin/main should not be peer")
+	}
+	if got := workspaceProofKindShort(landed); got != "patch" {
+		t.Fatalf("kind = %q", got)
+	}
+}
+
 func workspaceViewSlugs(views []ImplWorkspaceView) []string {
 	out := make([]string, 0, len(views))
 	for _, view := range views {

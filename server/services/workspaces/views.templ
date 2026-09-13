@@ -305,7 +305,7 @@ templ ReleaseQueueItemCard(item ReleaseQueueItem) {
 
 templ WorkspacesList(groups WorkspaceGroups, managerURL string, projectFilter WorkspacesFilter) {
 	{{ showCleanedHistory := projectFilter.ShowHistorical() }}
-	<div id="workspaces-list" class="space-y-4">
+	<div id="workspaces-list" class="space-y-4" style="view-transition-name: none">
 		@WorkspaceGroupSection("Needs attention", "Active, unmerged, divergent, missing, or proof-unknown workspaces.", groups.NeedsAttention, "No active or uncertain workspaces.", managerURL, showCleanedHistory, projectFilter)
 		@WorkspaceGroupSection("Merged — safe to clean up", "Strong or cached proof says this HEAD landed on origin/main.", groups.SafeToCleanup, "No merged workspaces ready for cleanup.", managerURL, showCleanedHistory, projectFilter)
 		if showCleanedHistory {
@@ -316,12 +316,12 @@ templ WorkspacesList(groups WorkspaceGroups, managerURL string, projectFilter Wo
 
 templ WorkspaceGroupSection(title string, description string, items []ImplWorkspaceView, empty string, managerURL string, showCleanedHistory bool, projectFilter WorkspacesFilter) {
 	<section class="overflow-hidden rounded-xl border bg-card text-card-foreground shadow-sm">
-		<div class="border-b bg-muted/20 px-3 py-3">
+		<div class="border-b bg-muted/20 px-3 py-2">
 			<h2 class="text-sm font-semibold">{ title }</h2>
-			<p class="mt-1 text-xs text-muted-foreground">{ description }</p>
+			<p class="mt-0.5 text-xs text-muted-foreground">{ description }</p>
 		</div>
 		if len(items) == 0 {
-			<p class="px-3 py-4 text-sm text-muted-foreground">{ empty }</p>
+			<p class="px-3 py-3 text-sm text-muted-foreground">{ empty }</p>
 		} else {
 			@WorkspacesTable(items, managerURL, showCleanedHistory, projectFilter)
 		}
@@ -329,13 +329,24 @@ templ WorkspaceGroupSection(title string, description string, items []ImplWorksp
 }
 
 templ WorkspacesTable(items []ImplWorkspaceView, managerURL string, showHistorical bool, projectFilter WorkspacesFilter) {
-	<div class="space-y-2 overflow-visible p-2">
-		for _, view := range items {
-			@WorkspaceTableRow(view, managerURL, showHistorical, projectFilter)
-			for _, child := range view.Children {
-				@WorkspaceTableRow(child, managerURL, showHistorical, projectFilter)
+	<div class="overflow-visible">
+		<div class="sticky top-0 z-10 hidden border-b bg-card/95 px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground backdrop-blur md:grid md:grid-cols-[minmax(0,1.6fr)_7rem_5.5rem_5.5rem_minmax(0,1.4fr)_5.5rem_5.5rem] md:items-center md:gap-2">
+			<span>Slug</span>
+			<span>Status</span>
+			<span>Tip SHA</span>
+			<span>Ahead/behind</span>
+			<span>Proof</span>
+			<span>Cleanup</span>
+			<span>Last sync</span>
+		</div>
+		<div class="divide-y">
+			for _, view := range items {
+				@WorkspaceTableRow(view, managerURL, showHistorical, projectFilter)
+				for _, child := range view.Children {
+					@WorkspaceTableRow(child, managerURL, showHistorical, projectFilter)
+				}
 			}
-		}
+		</div>
 	</div>
 	for _, view := range items {
 		@WorkspaceDetailDialog(view, managerURL, showHistorical, projectFilter)
@@ -347,45 +358,102 @@ templ WorkspacesTable(items []ImplWorkspaceView, managerURL string, showHistoric
 
 templ WorkspaceTableRow(view ImplWorkspaceView, managerURL string, showHistorical bool, projectFilter WorkspacesFilter) {
 	{{ slug := workspaceViewSlug(view) }}
-	<div data-workspace-row={ slug } class="grid gap-3 rounded-lg border bg-background p-3 text-sm hover:bg-muted/20 md:grid-cols-[auto_minmax(0,1fr)]">
-		<div class="overflow-visible">
-			@WorkspaceActionsMenu(view, managerURL, showHistorical, projectFilter, "row")
+	{{ rowID := workspaceRowID(slug) }}
+	{{ cleanupAction := workspaceCleanupAction(view) }}
+	<div id={ rowID } style="view-transition-name: none" class="px-2 py-2 text-sm hover:bg-muted/20">
+		<div class="hidden md:grid md:grid-cols-[minmax(0,1.6fr)_7rem_5.5rem_5.5rem_minmax(0,1.4fr)_5.5rem_5.5rem] md:items-center md:gap-2">
+			<div class="min-w-0">
+				@dialog.DialogTrigger(dialog.DialogTriggerArgs{DialogID: "workspace-dialog-" + slug, Class: "font-medium hover:underline"}) {
+					{ workspaceViewLabel(view) }
+				}
+				if slug != "" {
+					<p class="truncate font-mono text-[11px] text-muted-foreground">{ slug }</p>
+				}
+			</div>
+			<div>
+				<span class="inline-flex max-w-full truncate rounded-full border px-2 py-0.5 text-[11px]">{ workspacePrimaryStatusLabel(view) }</span>
+			</div>
+			<div class="font-mono text-xs">{ shortCommit(workspaceCommit(view)) }</div>
+			<div class="font-mono text-xs text-muted-foreground">{ workspaceAheadBehindLabel(view) }</div>
+			<div class="min-w-0">
+				@WorkspaceProofCell(view)
+			</div>
+			<div>
+				@WorkspaceTableCleanupCell(cleanupAction, projectFilter)
+			</div>
+			<div class="text-xs text-muted-foreground">{ workspaceLastSyncLabel(view) }</div>
 		</div>
-		<div class="min-w-0 overflow-x-auto">
-			<table class="w-full text-sm">
-				<thead class="text-left text-xs uppercase tracking-wide text-muted-foreground">
-					<tr>
-						<th class="px-3 py-2">Workspace</th>
-						<th class="px-3 py-2">QRSPI</th>
-						<th class="px-3 py-2">Runtime</th>
-						<th class="px-3 py-2">Branch</th>
-						<th class="px-3 py-2">Commit</th>
-						<th class="px-3 py-2">Release</th>
-					</tr>
-				</thead>
-				<tbody>
-					<tr>
-						<td class="px-3 py-2 align-top">
-							@dialog.DialogTrigger(dialog.DialogTriggerArgs{DialogID: "workspace-dialog-" + slug, Class: "font-medium hover:underline"}) {
-								{ workspaceViewLabel(view) }
-							}
-							if slug != "" {
-								<p class="break-all font-mono text-xs text-muted-foreground">{ slug }</p>
-							}
-							@PlanWorkspaceRoleBadges(view.Plan)
-						</td>
-						<td class="px-3 py-2 align-top">{ workspaceQRSPIBadge(view) }</td>
-						<td class="px-3 py-2 align-top">
-							@WorkspaceDiagnosticBadges(view)
-						</td>
-						<td class="px-3 py-2 align-top font-mono text-xs">{ workspaceBranchLabel(view) }</td>
-						<td class="px-3 py-2 align-top font-mono text-xs">{ shortCommit(workspaceCommit(view)) }</td>
-						<td class="px-3 py-2 align-top">{ workspaceReleaseSummary(view) }</td>
-					</tr>
-				</tbody>
-			</table>
+		<div class="space-y-1 md:hidden">
+			<div class="flex min-w-0 items-center gap-2">
+				@dialog.DialogTrigger(dialog.DialogTriggerArgs{DialogID: "workspace-dialog-" + slug, Class: "min-w-0 truncate font-medium hover:underline"}) {
+					{ workspaceViewLabel(view) }
+				}
+				<span class="shrink-0 rounded-full border px-2 py-0.5 text-[11px]">{ workspacePrimaryStatusLabel(view) }</span>
+			</div>
+			<div class="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5 font-mono text-[11px] text-muted-foreground">
+				<span>{ shortCommit(workspaceCommit(view)) }</span>
+				<span aria-hidden="true">·</span>
+				<span>{ workspaceLastSyncLabel(view) }</span>
+				if workspaceAheadBehindLabel(view) != "—" {
+					<span aria-hidden="true">·</span>
+					<span>{ workspaceAheadBehindLabel(view) }</span>
+				}
+			</div>
+			<div class="flex min-w-0 flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
+				@WorkspaceProofCell(view)
+				@WorkspaceTableCleanupCell(cleanupAction, projectFilter)
+			</div>
 		</div>
 	</div>
+}
+
+templ WorkspaceProofCell(view ImplWorkspaceView) {
+	if workspaceProofEmpty(view) {
+		<span class="text-muted-foreground">—</span>
+	} else {
+		<div class="flex min-w-0 flex-wrap items-center gap-1">
+			if workspaceProofKindShort(view) != "" {
+				<span class="rounded border px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-muted-foreground">{ workspaceProofKindShort(view) }</span>
+			}
+			if workspaceProofSourceRef(view) != "" {
+				if workspaceProofIsPeer(view) {
+					<span class="truncate rounded border border-amber-300/70 bg-amber-50 px-1.5 py-0.5 font-mono text-[10px] text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-200" title="Peer-merged (not Chestnut-landed)">{ workspaceProofSourceRef(view) }</span>
+				} else {
+					<span class="truncate rounded border border-emerald-300/60 bg-emerald-50/60 px-1.5 py-0.5 font-mono text-[10px] text-emerald-900 dark:border-emerald-900/50 dark:bg-emerald-950/30 dark:text-emerald-200" title="Chestnut-landed proof source">{ workspaceProofSourceRef(view) }</span>
+				}
+			}
+		</div>
+	}
+}
+
+templ WorkspaceTableCleanupCell(action WorkspaceCleanupAction, projectFilter WorkspacesFilter) {
+	{{ projectFilter = projectFilter.WithDefaults() }}
+	if action.Slug != "" && !action.Disabled && action.Disposition == WorkspaceCleanupDispositionMerged {
+		{{ indicator := workspaceActionIndicator(action.Slug, "cleanup") }}
+		{{ indicatorSignal := workspaceActionIndicatorSignal(action.Slug, "cleanup") }}
+		<form method="post" action="/workspaces/cleanup" class="inline-flex" data-indicator={ indicator } data-on:submit="@post('/workspaces/cleanup', {contentType: 'form'})">
+			<input type="hidden" name="slug" value={ action.Slug }/>
+			<input type="hidden" name="project" value={ firstNonEmpty(projectFilter.ProjectQueryValue(), action.ProjectID) }/>
+			if projectFilter.QueryValue() != "" {
+				<input type="hidden" name="q" value={ projectFilter.QueryValue() }/>
+			}
+			if projectFilter.ShowHistorical() {
+				<input type="hidden" name="history" value="all"/>
+			}
+			if projectFilter.Group != WorkspacesGroupAll {
+				<input type="hidden" name="group" value={ string(projectFilter.Group) }/>
+			}
+			if projectFilter.Sort != WorkspacesSortUpdatedDesc {
+				<input type="hidden" name="sort" value={ string(projectFilter.Sort) }/>
+			}
+			@button.Button(button.ButtonArgs{Type: "submit", Variant: "outline", Size: "sm", Class: "h-7 px-2 text-[11px]", Attributes: templ.Attributes{"data-attr:disabled": indicatorSignal}}) {
+				<span data-show={ "!" + indicatorSignal }>{ action.Label }</span>
+				<span data-show={ indicatorSignal }>Working...</span>
+			}
+		</form>
+	} else {
+		<span class="text-muted-foreground">—</span>
+	}
 }
 
 templ WorkspaceDiagnosticBadges(view ImplWorkspaceView) {

@@ -908,21 +908,23 @@ func TestWorkspacesPageRendersWorkspaceTableAndDialogs(t *testing.T) {
 		"Implementation workspace",
 		"Local checkout",
 		"main",
-		"<table",
-		`data-workspace-row="main"`,
+		`id="ws-row-main"`,
 		`id="workspace-dialog-main"`,
-		"QRSPI",
-		"Runtime",
-		"Branch",
-		"Commit",
-		"Release",
+		"Slug",
+		"Status",
+		"Tip SHA",
+		"Ahead/behind",
+		"Proof",
+		"Cleanup",
+		"Last sync",
+		"view-transition-name: none",
 		"/workspaces/switch/main",
 		"127.0.0.1:4200",
 		`method="post"`,
 		`data-init="@get(&#39;/workspaces/stream&#39;)"`,
 		`id="workspaces-list"`,
 		"Feature Branch",
-		`data-workspace-row="feature"`,
+		`id="ws-row-feature"`,
 		`action="/workspaces/feature/start"`,
 		"Crashed Branch",
 		"exit status 1",
@@ -1340,8 +1342,8 @@ func TestWorkspacesPageRendersNestedReviewWorkspaces(t *testing.T) {
 		)
 	}
 	for _, want := range []string{
-		`data-workspace-row="parent"`,
-		`data-workspace-row="review-child"`,
+		`id="ws-row-parent"`,
+		`id="ws-row-review-child"`,
 		`id="workspace-dialog-review-child"`,
 		`action="/workspaces/review-child/start"`,
 		"creative-mode-agent/plans/workspace-discovery-sync/reviews/implementation-review",
@@ -1387,7 +1389,8 @@ func TestWorkspacesPageRendersWorkspaceGroups(t *testing.T) {
 		"Merged — safe to clean up",
 		"Active Workspace",
 		"Merged Safe Workspace",
-		"Merged · safe to clean up",
+		"origin/main",
+		"Clean up",
 	} {
 		if !strings.Contains(html, want) {
 			t.Fatalf("default grouped page missing %q: %s", want, html)
@@ -1812,7 +1815,7 @@ func TestWorkspaceActionsDropdownIDsAreScoped(t *testing.T) {
 	}
 }
 
-func TestWorkspacesTableKeepsActionsOutsideOverflowScroll(t *testing.T) {
+func TestWorkspacesTableRendersCompactStableRows(t *testing.T) {
 	view := BuildImplWorkspaceViews([]db.ImplWorkspace{{
 		ProjectID:     "example.com/alpha/app",
 		WorkspaceSlug: "feature",
@@ -1826,20 +1829,21 @@ func TestWorkspacesTableKeepsActionsOutsideOverflowScroll(t *testing.T) {
 		t.Fatalf("WorkspacesTable() error = %v", err)
 	}
 	html := body.String()
-	rowIdx := strings.Index(html, `data-workspace-row="feature"`)
-	if rowIdx < 0 {
-		t.Fatalf("table missing workspace row: %s", html)
+	if !strings.Contains(html, `id="ws-row-feature"`) {
+		t.Fatalf("table missing stable workspace row id: %s", html)
 	}
-	actionIdx := strings.Index(html[rowIdx:], `workspace_actions_feature_row`)
-	if actionIdx < 0 {
-		t.Fatalf("table missing row actions menu: %s", html)
+	if !strings.Contains(html, "view-transition-name: none") {
+		t.Fatalf("table missing VT none on rows: %s", html)
 	}
-	overflowIdx := strings.Index(html[rowIdx:], `overflow-x-auto`)
-	if overflowIdx < 0 {
-		t.Fatalf("table missing details overflow wrapper: %s", html)
+	for _, want := range []string{"Tip SHA", "Ahead/behind", "Proof", "Cleanup", "Last sync"} {
+		if !strings.Contains(html, want) {
+			t.Fatalf("compact table missing %q: %s", want, html)
+		}
 	}
-	if actionIdx > overflowIdx {
-		t.Fatalf("row actions menu rendered inside/after overflow wrapper: %s", html[rowIdx:])
+	for _, absent := range []string{`data-workspace-row=`, "Manager lifecycle:", "rounded-lg border bg-background p-3"} {
+		if strings.Contains(html, absent) {
+			t.Fatalf("compact table unexpectedly contained %q: %s", absent, html)
+		}
 	}
 }
 

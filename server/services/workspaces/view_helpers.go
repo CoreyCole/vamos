@@ -449,6 +449,91 @@ func workspaceLifecycleDiagnosticLabel(view ImplWorkspaceView) string {
 	return workspaceTitleCase(strings.ReplaceAll(lifecycle, "_", " "))
 }
 
+
+func workspacePrimaryStatusLabel(view ImplWorkspaceView) string {
+	switch strings.TrimSpace(view.Row.Status) {
+	case string(ImplWorkspaceStatusMerged):
+		return "Merged"
+	case string(ImplWorkspaceStatusCleanedUp):
+		return "Cleaned up"
+	}
+	if view.HasRuntime {
+		label := strings.TrimSpace(workspaceRuntimeLabel(view))
+		if label != "" {
+			return workspaceTitleCase(strings.ReplaceAll(label, "_", " "))
+		}
+	}
+	return workspaceLifecycleDiagnosticLabel(view)
+}
+
+func workspaceAheadBehindLabel(view ImplWorkspaceView) string {
+	ahead := view.Row.AheadCount
+	behind := view.Row.BehindCount
+	if ahead == 0 && behind == 0 {
+		return "—"
+	}
+	return fmt.Sprintf("%d / %d", ahead, behind)
+}
+
+func workspaceProofSourceRef(view ImplWorkspaceView) string {
+	return strings.TrimSpace(nullStringValue(view.Row.CleanupProofSourceRef))
+}
+
+func workspaceProofKindShort(view ImplWorkspaceView) string {
+	switch proofKindFromRow(view) {
+	case MergeProofAncestor:
+		return "ancestor"
+	case MergeProofPatchEquivalent:
+		return "patch"
+	case MergeProofCached:
+		return "cached"
+	default:
+		return ""
+	}
+}
+
+func workspaceProofIsPeer(view ImplWorkspaceView) bool {
+	return strings.HasPrefix(workspaceProofSourceRef(view), "peer:")
+}
+
+func workspaceProofEmpty(view ImplWorkspaceView) bool {
+	return workspaceProofKindShort(view) == "" && workspaceProofSourceRef(view) == ""
+}
+
+func formatRelativeTime(t time.Time) string {
+	if t.IsZero() {
+		return "—"
+	}
+	delta := time.Since(t)
+	if delta < 0 {
+		delta = 0
+	}
+	switch {
+	case delta < time.Minute:
+		return "just now"
+	case delta < time.Hour:
+		return fmt.Sprintf("%dm ago", int(delta/time.Minute))
+	case delta < 24*time.Hour:
+		return fmt.Sprintf("%dh ago", int(delta/time.Hour))
+	case delta < 7*24*time.Hour:
+		return fmt.Sprintf("%dd ago", int(delta/(24*time.Hour)))
+	default:
+		return t.Local().Format("Jan 2")
+	}
+}
+
+func workspaceLastSyncLabel(view ImplWorkspaceView) string {
+	return formatRelativeTime(view.Diagnostics.Sync.LastFinishedAt)
+}
+
+func workspaceRowID(slug string) string {
+	slug = strings.TrimSpace(slug)
+	if slug == "" {
+		return "ws-row-unknown"
+	}
+	return "ws-row-" + slug
+}
+
 func workspaceSyncDiagnosticLabel(sync WorkspaceSyncDiagnostic) string {
 	status := strings.TrimSpace(sync.Status)
 	if status == "" {
