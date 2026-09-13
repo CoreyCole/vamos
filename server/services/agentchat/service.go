@@ -4998,7 +4998,8 @@ func (s *Service) assistantTranscriptItemsWithPolicy(
 	bubbleIndexes := []int{}
 	textParts := []string{}
 	textIndex := 0
-	detailIndex := 0
+	toolIndex := 0
+	reasoningIndex := 0
 
 	flushText := func() {
 		text := strings.TrimSpace(strings.Join(textParts, ""))
@@ -5037,8 +5038,12 @@ func (s *Service) assistantTranscriptItemsWithPolicy(
 			if body == "" {
 				body = "Reasoning block recorded; model did not expose readable text."
 			}
+			reasoningDOMID := domID + "-reasoning"
+			if reasoningIndex > 0 {
+				reasoningDOMID = fmt.Sprintf("%s-reasoning-%d", domID, reasoningIndex)
+			}
 			msg := s.newDetailTranscriptMessage(
-				fmt.Sprintf("%s-detail-%d", domID, detailIndex),
+				reasoningDOMID,
 				entryID,
 				"thinking",
 				formatMarkdownBlockquote(body),
@@ -5049,7 +5054,7 @@ func (s *Service) assistantTranscriptItemsWithPolicy(
 			msg.HideBodyWhenCollapsed = true
 			msg.Collapsible = true
 			items = append(items, msg)
-			detailIndex++
+			reasoningIndex++
 		case "toolCall":
 			flushText()
 			toolCallID := strings.TrimSpace(valueAsString(block["id"]))
@@ -5069,7 +5074,7 @@ func (s *Service) assistantTranscriptItemsWithPolicy(
 				body = "_No arguments captured._"
 			}
 			msg := s.newDetailTranscriptMessage(
-				fmt.Sprintf("%s-detail-%d", domID, detailIndex),
+				fmt.Sprintf("%s-tool-%d", domID, toolIndex),
 				entryID,
 				title,
 				body,
@@ -5094,7 +5099,7 @@ func (s *Service) assistantTranscriptItemsWithPolicy(
 				continue
 			}
 			items = append(items, msg)
-			detailIndex++
+			toolIndex++
 		}
 	}
 

@@ -772,6 +772,28 @@ type transcriptDetailState struct {
 	Expanded bool `json:"expanded"`
 }
 
+
+// chatDensityKind labels expandable detail rows for MorphMap (tool vs reasoning).
+// Not used for bubble markdown/chroma messages.
+func chatDensityKind(msg TranscriptMessage) string {
+	if strings.EqualFold(strings.TrimSpace(msg.Title), "thinking") {
+		return "reasoning"
+	}
+	if strings.TrimSpace(msg.ToolCallID) != "" {
+		return "tool"
+	}
+	title := strings.ToLower(strings.TrimSpace(msg.Title))
+	switch title {
+	case "bash", "read", "subagent", "message_room", "edit", "write", "grep", "glob", "tool":
+		return "tool"
+	default:
+		if strings.HasPrefix(title, "tool") || strings.Contains(title, "subagent") {
+			return "tool"
+		}
+		return "detail"
+	}
+}
+
 func transcriptDetailSignalManager(msg TranscriptMessage) *utils.SignalManager {
 	return utils.Signals(
 		"agent-chat-detail-"+signalSafeID(msg.DOMID),
