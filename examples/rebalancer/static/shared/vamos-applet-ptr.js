@@ -106,6 +106,9 @@
     location.reload();
   }
 
+  // Public entry for header ↻ and other chrome — same hosted/standalone rules as PTR
+  window.VamosApplet.requestRefresh = triggerRefresh;
+
   // Apply soft overscroll containment
   function applyOverscrollContainment() {
     const scrollEl = getScrollElement();
