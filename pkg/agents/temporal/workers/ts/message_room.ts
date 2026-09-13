@@ -1,5 +1,8 @@
 import { randomUUID } from "node:crypto";
-import { defineTool, type ToolDefinition } from "@mariozechner/pi-coding-agent";
+import {
+  defineTool,
+  type ToolDefinition,
+} from "@earendil-works/pi-coding-agent";
 import { fetchWithTimeout } from "./conversation.js";
 import type { ConversationRunInput } from "./types.js";
 

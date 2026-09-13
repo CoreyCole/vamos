@@ -1,18 +1,19 @@
+import { homedir } from "node:os";
+import { join } from "node:path";
 import { Context } from "@temporalio/activity";
 import {
   createAgentSession,
   DefaultResourceLoader,
-  AuthStorage,
-  ModelRegistry,
+  ModelRuntime,
   type ToolDefinition,
-} from "@mariozechner/pi-coding-agent";
+} from "@earendil-works/pi-coding-agent";
 import {
   additionalSkillPathsForTurn,
   agentMemoryTools,
   agentMemoryToolsEnabled,
 } from "./agent_memory.js";
 import { messageRoomContextFromRun, messageRoomTools } from "./message_room.js";
-import { resolveTurnModel, turnModelSelector } from "./pi_model.js";
+import { requireModel, turnModelSelector } from "./pi_model.js";
 import type {
   ConversationRunFailure,
   ConversationRunInput,
@@ -43,16 +44,26 @@ export async function RunConversationTurn(
   Context.current().heartbeat();
   const sessionManager = await openRoomSession(input);
   const existingIds = entryIdsInSession(sessionManager);
-  const authStorage = AuthStorage.create(process.env.PI_AUTH_PATH || undefined);
-  const modelRegistry = ModelRegistry.create(authStorage);
+  const modelRuntime = await ModelRuntime.create({
+    authPath: process.env.PI_AUTH_PATH,
+  });
   const { provider, modelId } = turnModelSelector();
-  const model = resolveTurnModel(modelRegistry, provider, modelId);
+  const model = requireModel(
+    modelRuntime.getModel(provider, modelId),
+    provider,
+    modelId,
+  );
   const additionalSkillPaths = additionalSkillPathsForTurn(
     input.room?.kind,
     input.cwd,
   );
+  const agentDir =
+    process.env.PI_CODING_AGENT_DIR || join(homedir(), ".pi", "agent");
   const resourceLoader = new DefaultResourceLoader({
     cwd: input.cwd,
+    agentDir,
+    // Headless Temporal worker: do not load interactive Pi extensions (tmux subagents).
+    noExtensions: true,
     ...(additionalSkillPaths ? { additionalSkillPaths } : {}),
     agentsFilesOverride: () => ({
       agentsFiles: (input.inject_files ?? []).map((file) => ({
@@ -61,6 +72,7 @@ export async function RunConversationTurn(
       })),
     }),
   });
+  await resourceLoader.reload();
 
   const customTools: ToolDefinition[] = [
     ...messageRoomTools(messageRoomContextFromRun(input)),
@@ -71,8 +83,7 @@ export async function RunConversationTurn(
   const { session } = await createAgentSession({
     cwd: input.cwd,
     sessionManager,
-    authStorage,
-    modelRegistry,
+    modelRuntime,
     model,
     thinkingLevel: input.thinking_level as any,
     resourceLoader,

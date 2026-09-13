@@ -9,14 +9,13 @@
     "start": "node dist/pkg/agents/temporal/workers/ts/worker.js"
   },
   "dependencies": {
-    "@mariozechner/pi-coding-agent": "latest",
+    "@earendil-works/pi-coding-agent": "0.85.1",
     "@temporalio/activity": "^1.14.0",
     "@temporalio/common": "^1.14.0",
     "@temporalio/worker": "^1.14.0",
     "yaml": "2.9.0"
   },
   "devDependencies": {
-    "@earendil-works/pi-coding-agent": "0.80.3",
     "@tailwindcss/cli": "^4.1.12",
     "@types/node": "^22.0.0",
     "playwright": "^1.52.0",
