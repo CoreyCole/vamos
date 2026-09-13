@@ -786,6 +786,30 @@ func TestAgentChatScrollUsesSSRLatestAnchor(t *testing.T) {
 		t.Fatalf("#chat-latest must be nested inside #agent-chat-messages")
 	}
 
+	// Pattern A: Host id lives in MessagesPane (transcript.templ) via infinitescroll.Host.
+	morphBody, err := os.ReadFile("../../../server/services/agentchat/infinite_scroll.go")
+	if err != nil {
+		t.Fatalf("ReadFile(infinite_scroll.go) error = %v", err)
+	}
+	morphSrc := string(morphBody)
+	for _, want := range []string{
+		`agent-chat-scroll-region`,
+		`agent-chat-stable-transcript`,
+		`agent-chat-scroll-sentinel-above`,
+	} {
+		if !strings.Contains(morphSrc, want) {
+			t.Fatalf("infinite_scroll.go missing MorphMap id %q", want)
+		}
+	}
+	if !strings.Contains(transcriptSrc, "infinitescroll.Host") ||
+		!strings.Contains(transcriptSrc, "agentChatScrollHostID") {
+		t.Fatalf("transcript.templ must Host #agent-chat-scroll-region via Pattern A")
+	}
+	if !strings.Contains(transcriptSrc, "flex-col") ||
+		strings.Contains(transcriptSrc, "flex-col-reverse") ||
+		strings.Contains(transcriptSrc, "column-reverse") {
+		t.Fatalf("transcript.templ Host must use normal flex-col")
+	}
 	for _, rel := range []string{
 		"../../../server/services/agentchat/workbench_threads.templ",
 		"../../../server/services/agentchat/shell.templ",
@@ -797,15 +821,12 @@ func TestAgentChatScrollUsesSSRLatestAnchor(t *testing.T) {
 			t.Fatalf("ReadFile(%s) error = %v", rel, err)
 		}
 		src := string(body)
-		if !strings.Contains(src, `id="agent-chat-scroll-region"`) {
-			t.Fatalf("%s missing agent-chat-scroll-region", rel)
+		if strings.Contains(src, `id="agent-chat-scroll-region"`) {
+			t.Fatalf("%s must not duplicate Host id (owned by MessagesPane)", rel)
 		}
 		if strings.Contains(src, "flex-col-reverse") ||
 			strings.Contains(src, "column-reverse") {
 			t.Fatalf("%s must not use flex-col-reverse / column-reverse", rel)
-		}
-		if !strings.Contains(src, "flex-col") {
-			t.Fatalf("%s missing normal flex-col on scroll region", rel)
 		}
 	}
 

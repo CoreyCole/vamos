@@ -89,13 +89,13 @@ func (s *Service) BuildWorkspacePageArgs(
 		projection.Header.ModelLabel = metadata.ModelLabel
 		projection.Header.ThinkingLabel = metadata.ThinkingLabel
 		live, cursor := s.buildLiveTranscript(thread.ID)
-		projection.Transcript = TranscriptPaneState{
+		projection.Transcript = applyStableTranscriptWindow(TranscriptPaneState{
 			Cursor:      cursor,
 			Stable:      stable,
 			Live:        live,
 			Policy:      s.defaultTranscriptRenderPolicy(),
 			ShowWorking: s.liveTranscriptShowWorking(thread.ID, live),
-		}
+		})
 		projection.ActiveRun = s.lookupWorkspaceRun(
 			ctx,
 			workspace.ID,

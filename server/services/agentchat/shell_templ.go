@@ -182,15 +182,11 @@ func AgentChatChatPane(header templ.Component, messages templ.Component, compose
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 9, "<div id=\"agent-chat-scroll-region\" class=\"flex h-full min-w-0 flex-col overflow-y-auto overflow-x-hidden\">")
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
 		templ_7745c5c3_Err = messages.Render(ctx, templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 10, "</div></div><div class=\"absolute inset-x-0 bottom-0 z-20 bg-card p-4 pt-3 backdrop-blur supports-[backdrop-filter]:bg-card/95\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 9, "</div><div class=\"absolute inset-x-0 bottom-0 z-20 bg-card p-4 pt-3 backdrop-blur supports-[backdrop-filter]:bg-card/95\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -198,7 +194,7 @@ func AgentChatChatPane(header templ.Component, messages templ.Component, compose
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 11, "</div></main>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 10, "</div></main>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -227,7 +223,7 @@ func AgentChatRightPane(content templ.Component) templ.Component {
 			templ_7745c5c3_Var7 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 12, "<aside id=\"agent-chat-rail-pane\" class=\"hidden min-h-0 min-w-0 flex-1 md:block\" data-class=\"{'block': $mobilePane === 'rail', 'hidden md:block': $mobilePane !== 'rail'}\" role=\"tabpanel\" aria-labelledby=\"agent-chat-mobile-rail-tab\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 11, "<aside id=\"agent-chat-rail-pane\" class=\"hidden min-h-0 min-w-0 flex-1 md:block\" data-class=\"{'block': $mobilePane === 'rail', 'hidden md:block': $mobilePane !== 'rail'}\" role=\"tabpanel\" aria-labelledby=\"agent-chat-mobile-rail-tab\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -235,7 +231,7 @@ func AgentChatRightPane(content templ.Component) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 13, "</aside>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 12, "</aside>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -264,7 +260,7 @@ func AgentChatToast() templ.Component {
 			templ_7745c5c3_Var8 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 14, "<div class=\"pointer-events-none fixed bottom-4 left-1/2 z-50 -translate-x-1/2 rounded-full border border-border bg-background/95 px-3 py-1.5 text-xs font-medium text-foreground shadow-lg backdrop-blur\" data-show=\"$agentChatToast\" data-text=\"$agentChatToast\"></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 13, "<div class=\"pointer-events-none fixed bottom-4 left-1/2 z-50 -translate-x-1/2 rounded-full border border-border bg-background/95 px-3 py-1.5 text-xs font-medium text-foreground shadow-lg backdrop-blur\" data-show=\"$agentChatToast\" data-text=\"$agentChatToast\"></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -293,7 +289,7 @@ func ChatScrollControls() templ.Component {
 			templ_7745c5c3_Var9 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 15, "<div class=\"pointer-events-none absolute bottom-24 right-4 top-16 z-20 flex flex-col justify-between\"><button type=\"button\" class=\"pointer-events-auto inline-flex h-8 w-8 items-center justify-center rounded-md border border-border bg-background/95 text-muted-foreground shadow-sm backdrop-blur transition-colors hover:bg-muted hover:text-foreground\" aria-label=\"Scroll to top\" title=\"Scroll to top\" data-on:click=\"document.getElementById('agent-chat-scroll-region')?.scrollTo({ top: 0, behavior: 'smooth' })\"><svg class=\"h-4 w-4\" fill=\"none\" stroke=\"currentColor\" viewBox=\"0 0 24 24\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2\" d=\"M5 15l7-7 7 7\"></path></svg></button> <button type=\"button\" class=\"pointer-events-auto inline-flex h-8 w-8 items-center justify-center rounded-md border border-border bg-background/95 text-muted-foreground shadow-sm backdrop-blur transition-colors hover:bg-muted hover:text-foreground\" aria-label=\"Scroll to bottom\" title=\"Scroll to bottom\" data-on:click=\"document.getElementById('agent-chat-scroll-region')?.scrollTo({ top: document.getElementById('agent-chat-scroll-region')?.scrollHeight ?? 0, behavior: 'smooth' })\"><svg class=\"h-4 w-4\" fill=\"none\" stroke=\"currentColor\" viewBox=\"0 0 24 24\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2\" d=\"M19 9l-7 7-7-7\"></path></svg></button></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 14, "<div class=\"pointer-events-none absolute bottom-24 right-4 top-16 z-20 flex flex-col justify-between\"><button type=\"button\" class=\"pointer-events-auto inline-flex h-8 w-8 items-center justify-center rounded-md border border-border bg-background/95 text-muted-foreground shadow-sm backdrop-blur transition-colors hover:bg-muted hover:text-foreground\" aria-label=\"Scroll to top\" title=\"Scroll to top\" data-on:click=\"document.getElementById('agent-chat-scroll-region')?.scrollTo({ top: 0, behavior: 'smooth' })\"><svg class=\"h-4 w-4\" fill=\"none\" stroke=\"currentColor\" viewBox=\"0 0 24 24\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2\" d=\"M5 15l7-7 7 7\"></path></svg></button> <button type=\"button\" class=\"pointer-events-auto inline-flex h-8 w-8 items-center justify-center rounded-md border border-border bg-background/95 text-muted-foreground shadow-sm backdrop-blur transition-colors hover:bg-muted hover:text-foreground\" aria-label=\"Scroll to bottom\" title=\"Scroll to bottom\" data-on:click=\"document.getElementById('agent-chat-scroll-region')?.scrollTo({ top: document.getElementById('agent-chat-scroll-region')?.scrollHeight ?? 0, behavior: 'smooth' })\"><svg class=\"h-4 w-4\" fill=\"none\" stroke=\"currentColor\" viewBox=\"0 0 24 24\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2\" d=\"M19 9l-7 7-7-7\"></path></svg></button></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

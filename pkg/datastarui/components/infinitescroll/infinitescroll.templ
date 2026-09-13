@@ -1,0 +1,138 @@
+package infinitescroll
+
+// InfiniteScroll creates a complete infinite scroll container with configurable edges.
+// Happy path: one root call; children = first-page items. Root mints Host/Items/Sentinel.
+// Loading elements are patched onto sentinel IDs via same-id DOM replace.
+templ InfiniteScroll(args InfiniteScrollArgs) {
+	{{
+		hostID := args.HostID
+		if hostID == "" {
+			hostID = args.ID + "-host"
+		}
+		itemsID := args.ItemsID
+		if itemsID == "" {
+			itemsID = args.ID + "-items"
+		}
+		sentinelAboveID := args.SentinelAboveID
+		if sentinelAboveID == "" {
+			sentinelAboveID = args.ID + "-sentinel-above"
+		}
+		sentinelBelowID := args.SentinelBelowID
+		if sentinelBelowID == "" {
+			sentinelBelowID = args.ID + "-sentinel-below"
+		}
+		loadingAboveID := args.LoadingAboveID
+		if loadingAboveID == "" {
+			loadingAboveID = sentinelAboveID
+		}
+		loadingBelowID := args.LoadingBelowID
+		if loadingBelowID == "" {
+			loadingBelowID = sentinelBelowID
+		}
+		classes := InfiniteScrollVariants(args)
+	}}
+	<div class={ classes } { args.Attributes... }>
+		@Host(HostArgs{
+			ID:    hostID,
+			Class: "h-full",
+		}) {
+			if args.PatchAboveExpr != "" {
+				@LoadingSentinel(LoadingSentinelArgs{
+					ID:        sentinelAboveID,
+					Direction: DirectionAbove,
+					PatchExpr: args.PatchAboveExpr,
+					LoadingID: loadingAboveID,
+				})
+			}
+			@Items(ItemsArgs{
+				ID: itemsID,
+			}) {
+				{ children... }
+			}
+			if args.PatchBelowExpr != "" {
+				@LoadingSentinel(LoadingSentinelArgs{
+					ID:        sentinelBelowID,
+					Direction: DirectionBelow,
+					PatchExpr: args.PatchBelowExpr,
+					LoadingID: loadingBelowID,
+				})
+			}
+		}
+	</div>
+}
+
+// Host is the scroll container (never remorphed — patches target Items/Loading only).
+templ Host(args HostArgs) {
+	{{
+		classes := HostVariants(args)
+	}}
+	<div
+		id={ args.ID }
+		class={ classes }
+		{ args.Attributes... }
+	>
+		{ children... }
+	</div>
+}
+
+// Items holds stable history only. Live/working/latest stay outside as siblings.
+templ Items(args ItemsArgs) {
+	{{
+		classes := ItemsVariants(args)
+	}}
+	<div
+		id={ args.ID }
+		class={ classes }
+		{ args.Attributes... }
+	>
+		{ children... }
+	</div>
+}
+
+// Sentinel triggers load-more via data-on:intersect (colon form).
+templ Sentinel(args SentinelArgs) {
+	{{
+		classes := SentinelVariants(args)
+	}}
+	<div
+		id={ args.ID }
+		class={ classes }
+		data-on:intersect={ args.PatchExpr }
+		{ args.Attributes... }
+	></div>
+}
+
+// Loading is same-id DOM replace SoT while fetching.
+templ Loading(args LoadingArgs) {
+	{{
+		classes := LoadingVariants(args)
+	}}
+	<div
+		id={ args.ID }
+		class={ classes }
+		{ args.Attributes... }
+	>
+		if args.Direction == DirectionAbove {
+			<div class="animate-pulse space-y-3 p-4">
+				<div class="h-4 w-3/4 rounded bg-muted"></div>
+				<div class="h-3 w-1/2 rounded bg-muted"></div>
+			</div>
+		} else {
+			<div class="animate-pulse space-y-3 p-4">
+				<div class="h-4 w-3/4 rounded bg-muted"></div>
+				<div class="h-3 w-1/2 rounded bg-muted"></div>
+			</div>
+		}
+	</div>
+}
+
+// LoadingSentinel: first paint is Sentinel only; backend patches Loading onto same ID.
+templ LoadingSentinel(args LoadingSentinelArgs) {
+	@Sentinel(SentinelArgs{
+		ID:         args.ID,
+		Direction:  args.Direction,
+		PatchExpr:  args.PatchExpr,
+		Class:      args.Class,
+		Attributes: args.Attributes,
+	})
+}

@@ -178,6 +178,7 @@ func (h *Handler) RegisterMachineAPIRoutes(g *echo.Group) {
 // TODO(slice-5-runtime-rehome): move these endpoints under /thoughts/chat/*.
 func (h *Handler) RegisterRuntimeRoutes(g *echo.Group) {
 	g.GET("/thread/:thread_id/stream", h.StreamThread)
+	g.GET("/thread/:thread_id/history", h.StreamThreadHistory)
 	g.GET("/thread/:thread_id/slash-commands", h.ListThreadSlashCommands)
 	g.POST("/thread/:thread_id/resume", h.ResumeThreadByPath)
 	g.POST("/thread/:thread_id/fork", h.ForkThreadByPath)

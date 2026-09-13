@@ -2912,6 +2912,10 @@ func (s *Service) BuildLiveTranscriptState(
 	}
 
 	live, cursor := s.buildLiveTranscript(thread.ID)
+	// Subagent cards derive from parent_thread_id + agent_sessions (not Pi
+	// JSONL / BotDMChip). Appended after live SoT so empty-REPLACE keep-or-promote
+	// (2719aad) still surfaces cards on every BuildLiveTranscriptState.
+	live = mergeSubagentCardsIntoLive(live, s.deriveSubagentLiveCards(ctx, thread))
 	return TranscriptPaneState{
 		Cursor:      cursor,
 		Stable:      []TranscriptMessage{},
@@ -3022,8 +3026,13 @@ func (s *Service) BuildThreadPageArgs(
 		return nil, err
 	}
 	args.Transcript.Live, args.Cursor = s.buildLiveTranscript(thread.ID)
+	args.Transcript.Live = mergeSubagentCardsIntoLive(
+		args.Transcript.Live,
+		s.deriveSubagentLiveCards(ctx, thread),
+	)
 	args.Transcript.Cursor = args.Cursor
 	args.Transcript.ShowWorking = s.liveTranscriptShowWorking(thread.ID, args.Transcript.Live)
+	args.Transcript = applyStableTranscriptWindow(args.Transcript)
 
 	if strings.TrimSpace(input.RunID) != "" {
 		run, err := s.queries.GetAgentRun(ctx, strings.TrimSpace(input.RunID))

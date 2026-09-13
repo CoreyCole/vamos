@@ -56,9 +56,7 @@ templ SharedThreadChat(args EmbeddedFreeformPanelArgs) {
 		if args.StreamURL != "" {
 			<div class="hidden" data-init={ "@get('" + args.StreamURL + "')" }></div>
 		}
-		<div id="agent-chat-scroll-region" class="flex min-h-0 flex-1 flex-col overflow-y-auto overflow-x-hidden">
-			@MessagesPane(args.ThreadID, args.Transcript, args.HasThread, freeformForkAction(args.ThreadID), true)
-		</div>
+		@MessagesPane(args.ThreadID, args.Transcript, args.HasThread, freeformForkAction(args.ThreadID), true)
 		if !args.ComposerDisabled {
 			<div class="shrink-0 px-3 py-3">
 				@AgentChatComposer(AgentChatComposerArgs{Action: args.ComposerAction, ThreadID: args.ThreadID, RunID: args.RunID, Cwd: args.Cwd, ModeLabel: embeddedFreeformModeLabel(args.ThreadMetadata), Placeholder: sharedThreadComposerPlaceholder(args), HasThread: args.HasThread, IncludeCwd: !args.HasThread, ThreadMetadata: args.ThreadMetadata, InitialDraft: args.InitialDraft, DraftSaveAction: args.DraftSaveAction})

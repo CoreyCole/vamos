@@ -346,6 +346,9 @@ type TranscriptPaneState struct {
 	Live        LiveTranscriptView
 	Policy      TranscriptRenderPolicy
 	ShowWorking bool // true while latest run pending/running and live has no assistant yet
+	// Pattern A InfiniteScroll (above/scrollback). Items = Stable only.
+	HasMoreOlder bool
+	OlderBefore  string // DOMID cursor for ?before= on history endpoint
 }
 
 type SelectedChatAnnotation struct {

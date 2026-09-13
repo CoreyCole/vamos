@@ -36,9 +36,7 @@ templ FreeformChatPrimaryRegion(args ChatPageArgs) {
 		@FreeformRunHeader(ensureFreeformWorkbenchState(args))
 		<div class="relative min-h-0 flex-1">
 			@ChatScrollControls()
-			<div id="agent-chat-scroll-region" class="flex h-full min-w-0 flex-col overflow-y-auto overflow-x-hidden">
-				@MessagesPane(getThreadID(args.CurrentThread), args.Transcript, args.CurrentThread != nil, freeformForkAction(getThreadID(args.CurrentThread)), false)
-			</div>
+			@MessagesPane(getThreadID(args.CurrentThread), args.Transcript, args.CurrentThread != nil, freeformForkAction(getThreadID(args.CurrentThread)), false)
 		</div>
 		<div class="absolute inset-x-0 bottom-0 z-20 bg-card p-4 pt-3 backdrop-blur supports-[backdrop-filter]:bg-card/95">
 			@FreeformChatComposer(args)
@@ -69,9 +67,7 @@ templ WorkspaceChatPrimaryRegion(args WorkspacePageArgs) {
 		@WorkspaceHeader(args.Projection, ensureWorkspaceWorkbenchState(args))
 		<div class="relative min-h-0 flex-1">
 			@ChatScrollControls()
-			<div id="agent-chat-scroll-region" class="flex h-full min-w-0 flex-col overflow-y-auto overflow-x-hidden">
-				@MessagesPane(getThreadID(args.Projection.SelectedThread), args.Projection.Transcript, args.Projection.SelectedThread != nil, workspaceForkAction(args.WorkspaceID, getThreadID(args.Projection.SelectedThread)), false)
-			</div>
+			@MessagesPane(getThreadID(args.Projection.SelectedThread), args.Projection.Transcript, args.Projection.SelectedThread != nil, workspaceForkAction(args.WorkspaceID, getThreadID(args.Projection.SelectedThread)), false)
 		</div>
 		<div class="absolute inset-x-0 bottom-0 z-20 bg-card p-4 pt-3 backdrop-blur supports-[backdrop-filter]:bg-card/95">
 			@WorkspaceComposer(args.WorkspaceID, getThreadID(args.Projection.SelectedThread), args.Projection.SelectedThread != nil, "", args.PendingAttachments)
