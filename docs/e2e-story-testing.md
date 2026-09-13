@@ -115,7 +115,7 @@ Artifacts (mode `600`) under `/tmp`:
 When a feature-host VA expires or the profile is missing, remint via `vamos-va-mint` if the local profile still works; otherwise ask **E2E Lead** to recreate/login the machine key. Do not invent slugs from checkout folder names.
 
 
-### Agent-memory VA fixture Stories (density / BotDMChip / pairwise)
+### Agent-memory VA fixture Stories (density / BotDMChip / pairwise / history)
 
 Authored Workbench v2 Stories seed chat chrome via query params on `/threads/{id}`:
 
@@ -123,9 +123,10 @@ Authored Workbench v2 Stories seed chat chrome via query params on `/threads/{id
 | --- | --- | --- |
 | `agent-memory chat density fixture` | `?density_fixture=1` (or `?fixture=density`) | `#msg-ai470-density-fixture-reasoning` / `tool-0` / `tool-1` as Class A `<details data-chat-density>` |
 | `agent-memory group bubble BotDMChip` | `?group_bubble_fixture=1` (or `?fixture=group`) | `#msg-ai470-group-{peer,quote,user}-fixture`, `#bot-dm-chip-ai470-group-quote-fixture`, pairwise hrefs `/rooms/a2a/infra/lead` + `/rooms/a2a/lead/research` |
-| `agent-memory pairwise fixture view-only` | `?pairwise_fixture=1` (or `?fixture=pairwise`) | composer absent; `#msg-ai470-chroma-highlight-fixture` |
+| `agent-memory pairwise fixture view-only` | `?pairwise_fixture=1` (or `?fixture=pairwise`) | composer absent; `#msg-ai470-pairwise-{peer,self}-fixture`; `#msg-ai470-chroma-highlight-fixture` (BotDMChip on pairwise is follow-up — assert on group only for now) |
+| `agent-memory history fixture infinite-scroll` | `?history_fixture=1` (or `?fixture=history`) | `#agent-chat-scroll-sentinel-above`; first-paint `#msg-ai470-history-fixture-{5..54}` (sample 5+54, count≥40); before-cursor `ai470-history-fixture-5` on sentinel PatchAboveExpr |
 
-Helpers live in `pkg/e2e/vamos/agent_memory_fixtures.go`. Stories: `pkg/e2e/workbenchv2tests/agent_memory_fixtures_story_test.go`. Default thread is WorkbenchV2 `wb2_alpha`; override with `VAMOS_E2E_AGENT_MEMORY_THREAD_ID` for tip-host dogfood (example `65f8ec8e-02c0-43bd-8cd4-fe3638178221`).
+Helpers live in `pkg/e2e/vamos/agent_memory_fixtures.go`. Stories: `pkg/e2e/workbenchv2tests/agent_memory_fixtures_story_test.go`. Default thread is WorkbenchV2 `wb2_alpha`; override with `VAMOS_E2E_AGENT_MEMORY_THREAD_ID` for tip-host dogfood (`65f8ec8e-02c0-43bd-8cd4-fe3638178221`). History/pairwise/group gates are on tip `fa7ccca+`.
 
 ```bash
 # Managed/local (fixture DB + wb2_alpha)
@@ -138,14 +139,17 @@ just e2e --config datastarui-e2e-workbench-v2.yml \
 just e2e --config datastarui-e2e-workbench-v2.yml \
   --story agent-memory-pairwise-fixture-view-only
 
-# Tip host (density live on 49da083+; auth via todo52-host profile — never paste tokens)
+just e2e --config datastarui-e2e-workbench-v2.yml \
+  --story agent-memory-history-fixture-infinite-scroll
+
+# Tip host (auth via todo52-host profile — never paste tokens)
 VAMOS_E2E_MACHINE_PROFILE=todo52-host \
 VAMOS_E2E_AGENT_MEMORY_THREAD_ID=65f8ec8e-02c0-43bd-8cd4-fe3638178221 \
   just e2e --base-url https://2026-09-08-10-10-54-agent-memory-observable-context.workspaces.creative-mode.ai \
-  --no-restart --story agent-memory-chat-density-fixture
+  --no-restart --story agent-memory-history-fixture-infinite-scroll
 ```
 
-If a tip host is still density-only, set `VAMOS_E2E_AGENT_MEMORY_ALLOW_PENDING_GATES=1` to skip group/pairwise Stories until the BE query gates for `group_bubble_fixture` / `pairwise_fixture` are tipped.
+If a tip host is still density-only, set `VAMOS_E2E_AGENT_MEMORY_ALLOW_PENDING_GATES=1` to skip group/pairwise/history Stories until the BE query gates are tipped.
 
 ### Portable applet smoke stories
 

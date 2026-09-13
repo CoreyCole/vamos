@@ -14,30 +14,41 @@ import (
 
 // Agent-memory VA fixture query contract (dual form). Prefer *_fixture=1.
 const (
-	DensityFixtureQueryKey      = "density_fixture"
-	GroupBubbleFixtureQueryKey  = "group_bubble_fixture"
-	PairwiseFixtureQueryKey     = "pairwise_fixture"
-	FixtureAliasQueryKey        = "fixture"
-	DensityFixtureQueryValue    = "1"
-	GroupBubbleFixtureAlias     = "group"
-	PairwiseFixtureAlias        = "pairwise"
-	DensityFixtureAlias         = "density"
-	DefaultAgentMemoryThreadID  = "wb2_alpha"
+	DensityFixtureQueryKey     = "density_fixture"
+	GroupBubbleFixtureQueryKey = "group_bubble_fixture"
+	PairwiseFixtureQueryKey    = "pairwise_fixture"
+	HistoryFixtureQueryKey     = "history_fixture"
+	FixtureAliasQueryKey       = "fixture"
+	DensityFixtureQueryValue   = "1"
+	GroupBubbleFixtureAlias    = "group"
+	PairwiseFixtureAlias       = "pairwise"
+	HistoryFixtureAlias        = "history"
+	DensityFixtureAlias        = "density"
+	DefaultAgentMemoryThreadID = "wb2_alpha"
+	// Dogfood tip-host thread (set VAMOS_E2E_AGENT_MEMORY_THREAD_ID).
+	DogfoodAgentMemoryThreadID  = "65f8ec8e-02c0-43bd-8cd4-fe3638178221"
 	envAgentMemoryFixtureThread = "VAMOS_E2E_AGENT_MEMORY_THREAD_ID"
 )
 
 // DOM contract (rendered ids use msg- prefix; chip id does not).
 const (
-	DensityReasoningDOMID    = "msg-ai470-density-fixture-reasoning"
-	DensityTool0DOMID        = "msg-ai470-density-fixture-tool-0"
-	DensityTool1DOMID        = "msg-ai470-density-fixture-tool-1"
-	GroupPeerDOMID           = "msg-ai470-group-peer-fixture"
-	GroupQuoteDOMID          = "msg-ai470-group-quote-fixture"
-	GroupUserDOMID           = "msg-ai470-group-user-fixture"
-	GroupBotDMChipDOMID      = "bot-dm-chip-ai470-group-quote-fixture"
-	ChromaHighlightDOMID     = "msg-ai470-chroma-highlight-fixture"
-	PairwiseRoomInfraLead    = "/rooms/a2a/infra/lead"
-	PairwiseRoomLeadResearch = "/rooms/a2a/lead/research"
+	DensityReasoningDOMID      = "msg-ai470-density-fixture-reasoning"
+	DensityTool0DOMID          = "msg-ai470-density-fixture-tool-0"
+	DensityTool1DOMID          = "msg-ai470-density-fixture-tool-1"
+	GroupPeerDOMID             = "msg-ai470-group-peer-fixture"
+	GroupQuoteDOMID            = "msg-ai470-group-quote-fixture"
+	GroupUserDOMID             = "msg-ai470-group-user-fixture"
+	GroupBotDMChipDOMID        = "bot-dm-chip-ai470-group-quote-fixture"
+	ChromaHighlightDOMID       = "msg-ai470-chroma-highlight-fixture"
+	PairwisePeerDOMID          = "msg-ai470-pairwise-peer-fixture"
+	PairwiseSelfDOMID          = "msg-ai470-pairwise-self-fixture"
+	HistoryScrollSentinelDOMID = "agent-chat-scroll-sentinel-above"
+	// First-paint window after windowStableTranscript (limit=50, extra=5).
+	HistoryFixtureFirstPaintStart = 5
+	HistoryFixtureFirstPaintEnd   = 54
+	HistoryFixtureOlderBefore     = "ai470-history-fixture-5"
+	PairwiseRoomInfraLead         = "/rooms/a2a/infra/lead"
+	PairwiseRoomLeadResearch      = "/rooms/a2a/lead/research"
 )
 
 var AgentMemory agentMemoryFeature
@@ -78,6 +89,10 @@ func (pages) GroupBubbleFixtureThread(threadID string) page {
 
 func (pages) PairwiseFixtureThread(threadID string) page {
 	return Pages.ThreadWithFixture(threadID, PairwiseFixtureQueryKey+"="+DensityFixtureQueryValue)
+}
+
+func (pages) HistoryFixtureThread(threadID string) page {
+	return Pages.ThreadWithFixture(threadID, HistoryFixtureQueryKey+"="+DensityFixtureQueryValue)
 }
 
 func (pages) PairwiseA2ARoom(a, b string) page {
@@ -122,6 +137,18 @@ func (agentMemoryFeature) BotDMChip() spec.Locator {
 func (agentMemoryFeature) ChromaHighlight() spec.Locator {
 	return spec.CSS("#" + ChromaHighlightDOMID)
 }
+func (agentMemoryFeature) PairwisePeer() spec.Locator {
+	return spec.CSS("#" + PairwisePeerDOMID)
+}
+func (agentMemoryFeature) PairwiseSelf() spec.Locator {
+	return spec.CSS("#" + PairwiseSelfDOMID)
+}
+func (agentMemoryFeature) HistoryScrollSentinel() spec.Locator {
+	return spec.CSS("#" + HistoryScrollSentinelDOMID)
+}
+func (agentMemoryFeature) HistoryFixtureMsg(n int) spec.Locator {
+	return spec.CSS(fmt.Sprintf("#msg-ai470-history-fixture-%d", n))
+}
 func (agentMemoryFeature) ComposerForm() spec.Locator {
 	return spec.CSS("#workbench-v2-chat-body #agent-chat-composer-form, #agent-chat-composer-form")
 }
@@ -144,6 +171,13 @@ func OpenAgentMemoryPairwiseFixture() spec.Step {
 	return OpenAgentMemoryThreadFixture(
 		"pairwise",
 		PairwiseFixtureQueryKey+"="+DensityFixtureQueryValue,
+	)
+}
+
+func OpenAgentMemoryHistoryFixture() spec.Step {
+	return OpenAgentMemoryThreadFixture(
+		"history",
+		HistoryFixtureQueryKey+"="+DensityFixtureQueryValue,
 	)
 }
 
@@ -219,6 +253,8 @@ func ExpectBotDMChipPairwiseLinks() expectation {
 func ExpectPairwiseFixtureViewOnly() expectation {
 	return expectation{customStep("pairwise fixture is view-only", func(t testing.TB, ctx *duiruntime.Context) {
 		t.Helper()
+		waitVisible(t, ctx, "#"+PairwisePeerDOMID)
+		waitVisible(t, ctx, "#"+PairwiseSelfDOMID)
 		waitVisible(t, ctx, "#"+ChromaHighlightDOMID)
 		count, err := ctx.Page.Locator("#agent-chat-composer-form").Count()
 		if err != nil {
@@ -226,6 +262,33 @@ func ExpectPairwiseFixtureViewOnly() expectation {
 		}
 		if count != 0 {
 			t.Fatalf("pairwise fixture still has composer form (count=%d)", count)
+		}
+		// Soft: BotDMChip remains on group fixture for now; do not assert on pairwise yet.
+	})}
+}
+
+func ExpectHistoryFixtureInfiniteScroll() expectation {
+	return expectation{customStep("history fixture InfiniteScroll first paint", func(t testing.TB, ctx *duiruntime.Context) {
+		t.Helper()
+		waitVisible(t, ctx, "#"+HistoryScrollSentinelDOMID)
+		waitVisible(t, ctx, fmt.Sprintf("#msg-ai470-history-fixture-%d", HistoryFixtureFirstPaintStart))
+		waitVisible(t, ctx, fmt.Sprintf("#msg-ai470-history-fixture-%d", HistoryFixtureFirstPaintEnd))
+		// Sample: windowed first-paint should include [5..54] (50 msgs).
+		painted, err := ctx.Page.Locator(`[id^="msg-ai470-history-fixture-"]`).Count()
+		if err != nil || painted < 40 {
+			t.Fatalf("history fixture painted count=%d want >=40 err=%v", painted, err)
+		}
+		// Oldest pre-window ids must not be on first paint.
+		assertCount(t, ctx, "#msg-ai470-history-fixture-0", 0)
+		// Clear hook from PatchAboveExpr on the sentinel (unit-tested contract).
+		html, herr := ctx.Page.Locator("#"+HistoryScrollSentinelDOMID).First().Evaluate("el => el.outerHTML", nil)
+		if herr != nil {
+			t.Fatalf("read sentinel outerHTML: %v", herr)
+		}
+		s := fmt.Sprint(html)
+		if !strings.Contains(s, "before="+HistoryFixtureOlderBefore) &&
+			!strings.Contains(s, "before="+url.QueryEscape(HistoryFixtureOlderBefore)) {
+			t.Fatalf("sentinel missing before-cursor %s; html=%s", HistoryFixtureOlderBefore, s)
 		}
 	})}
 }

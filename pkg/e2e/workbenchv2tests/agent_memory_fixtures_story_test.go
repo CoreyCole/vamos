@@ -12,16 +12,16 @@ import (
 	"github.com/CoreyCole/vamos/pkg/e2e/vamos"
 )
 
-// Agent-memory VA fixture Stories (density / group_bubble / pairwise).
+// Agent-memory VA fixture Stories (density / group_bubble / pairwise / history).
 //
 // Query contract (dual form):
 //   - density:      ?density_fixture=1  OR ?fixture=density
 //   - group_bubble: ?group_bubble_fixture=1 OR ?fixture=group
 //   - pairwise:     ?pairwise_fixture=1 OR ?fixture=pairwise
+//   - history:      ?history_fixture=1 OR ?fixture=history
 //
-// Density is live on tip 49da083+. Group/pairwise require the BE query gates
-// that call RenderSharedThreadChatWith{GroupBubble,Pairwise}Fixture (same tip
-// as these Stories, or a later FE tip that wires the same keys).
+// Density/group/pairwise/history gates live on tip fa7ccca+ (RenderSharedThreadChatWith*
+// Fixture). History seeds 55 stable DOMIDs so InfiniteScroll paints SentinelAbove.
 //
 // Run against managed/local server (WorkbenchV2 fixture seeds wb2_alpha):
 //
@@ -78,9 +78,23 @@ func TestAgentMemoryPairwiseFixtureViewOnlyStory(t *testing.T) {
 		Run()
 }
 
+func TestAgentMemoryHistoryFixtureInfiniteScrollStory(t *testing.T) {
+	skipUnlessAgentMemoryFixtureGates(t, "history")
+	spec.Story(t, "agent-memory history fixture infinite-scroll").
+		App(vamos.App()).
+		Viewport(duiruntime.ViewportDesktopFull).
+		As(vamos.Robot).
+		With(vamos.WorkspaceFixture(fixtures.WorkbenchV2Fixture)).
+		Do(vamos.OpenAgentMemoryHistoryFixture()).
+		Expect(vamos.WorkbenchV2.Ready()).
+		Expect(vamos.ExpectHistoryFixtureInfiniteScroll()).
+		Expect(vamos.Console.Clean()).
+		Run()
+}
+
 // skipUnlessAgentMemoryFixtureGates lets CI list/compile Stories while a tip
 // host is still on density-only 49da083. Local managed runs (default) always
-// execute — this checkout wires group_bubble_fixture / pairwise_fixture.
+// execute — this checkout wires group_bubble / pairwise / history fixtures.
 func skipUnlessAgentMemoryFixtureGates(t *testing.T, kind string) {
 	t.Helper()
 	if strings.EqualFold(strings.TrimSpace(os.Getenv("VAMOS_E2E_REQUIRE_AGENT_MEMORY_FIXTURES")), "1") {
