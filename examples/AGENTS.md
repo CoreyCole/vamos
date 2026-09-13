@@ -45,6 +45,9 @@ Demo applets can include the shared `examples/shared/vamos-applet-ptr.js` bootst
 - Applies `overscroll-behavior-y: contain` to the main scrollable element.
 - Triggers on pull-down gesture at `scrollTop ≈ 0` when pull distance exceeds 80px.
 
+Chrome Refresh buttons should call `window.VamosApplet.requestRefresh()` (same hosted `vamos:ptr` / standalone `location.reload` rules as PTR), not bare `location.reload()`.
+
+
 **Usage:**
 1. Copy `examples/shared/vamos-applet-ptr.js` to your applet's `static/shared/` directory.
 2. Add `<script src="static/shared/vamos-applet-ptr.js"></script>` in the page `<head>` after Datastar.
