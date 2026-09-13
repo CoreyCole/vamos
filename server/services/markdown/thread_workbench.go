@@ -146,7 +146,6 @@ func (s *Service) indexArtifactComponent(
 	return ThreadArtifactPane(browser, content), page, browser.DocPath
 }
 
-
 // threadChatHeaderTitle resolves the /threads/:id header room name.
 // Plan-linked threads pass the plan-dir basename (often YYYY-MM-DD_HH-MM-SS_*)
 // so ChatColumnWithPlanReopen + ParseChatHeaderTitle yield Display + Datetime.
@@ -265,8 +264,8 @@ func (s *Service) ServeThread(c echo.Context) error {
 	if err != nil {
 		return err
 	}
-	chat, err := s.workbenchThreadsRenderer.RenderSharedThreadChat(
-		c.Request().Context(),
+	chat, err := s.renderSharedThreadChatForRequest(
+		c,
 		threadID,
 		userEmail,
 	)
@@ -323,4 +322,31 @@ func (s *Service) ServeThread(c echo.Context) error {
 		userEmail,
 		state,
 	).Render(c.Request().Context(), c.Response().Writer)
+}
+
+type densityFixtureChatRenderer interface {
+	RenderSharedThreadChatWithDensityFixture(
+		ctx context.Context,
+		threadID, userEmail string,
+	) (templ.Component, error)
+}
+
+func densityFixtureRequested(c echo.Context) bool {
+	if strings.TrimSpace(c.QueryParam("density_fixture")) == "1" {
+		return true
+	}
+	return strings.EqualFold(strings.TrimSpace(c.QueryParam("fixture")), "density")
+}
+
+func (s *Service) renderSharedThreadChatForRequest(
+	c echo.Context,
+	threadID, userEmail string,
+) (templ.Component, error) {
+	ctx := c.Request().Context()
+	if densityFixtureRequested(c) {
+		if r, ok := s.workbenchThreadsRenderer.(densityFixtureChatRenderer); ok {
+			return r.RenderSharedThreadChatWithDensityFixture(ctx, threadID, userEmail)
+		}
+	}
+	return s.workbenchThreadsRenderer.RenderSharedThreadChat(ctx, threadID, userEmail)
 }

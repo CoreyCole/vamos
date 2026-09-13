@@ -9,9 +9,12 @@ import (
 )
 
 const (
-	chromaHighlightFixtureDOMID = "ai470-chroma-highlight-fixture"
-	groupQuoteFixtureDOMID      = "ai470-group-quote-fixture"
-	groupPeerFixtureDOMID       = "ai470-group-peer-fixture"
+	chromaHighlightFixtureDOMID  = "ai470-chroma-highlight-fixture"
+	groupQuoteFixtureDOMID       = "ai470-group-quote-fixture"
+	groupPeerFixtureDOMID        = "ai470-group-peer-fixture"
+	densityFixtureReasoningDOMID = "ai470-density-fixture-reasoning"
+	densityFixtureTool0DOMID     = "ai470-density-fixture-tool-0"
+	densityFixtureTool1DOMID     = "ai470-density-fixture-tool-1"
 )
 
 // chromaHighlightFixtureMarkdown is a visible assistant bubble for UX chroma VA.
@@ -64,6 +67,9 @@ func (s *Service) renderSharedThreadChat(
 		stable = append(stable, s.chromaHighlightFixtureMessage())
 	case "pairwise":
 		stable = append(stable, s.chromaHighlightFixtureMessage())
+	case "density":
+		stable = append(stable, s.densityFixtureMessages()...)
+		stable = append(stable, s.chromaHighlightFixtureMessage())
 	}
 	live, cursor := s.buildLiveTranscript(thread.ID)
 	args := EmbeddedFreeformPanelArgs{
@@ -107,6 +113,15 @@ func (s *Service) RenderSharedThreadChatWithPairwiseFixture(
 	threadID, userEmail string,
 ) (templ.Component, error) {
 	return s.renderSharedThreadChat(ctx, threadID, userEmail, "pairwise")
+}
+
+// RenderSharedThreadChatWithDensityFixture seeds reasoning/tool/subagent details
+// plus a chroma markdown bubble so UX can re-VA chat density in dogfood.
+func (s *Service) RenderSharedThreadChatWithDensityFixture(
+	ctx context.Context,
+	threadID, userEmail string,
+) (templ.Component, error) {
+	return s.renderSharedThreadChat(ctx, threadID, userEmail, "density")
 }
 
 func groupBotDMChipFixture(originTurnID string) *BotDMChip {
@@ -183,4 +198,43 @@ func (s *Service) groupBubbleFixtureMessages() []TranscriptMessage {
 		false,
 	)
 	return []TranscriptMessage{peer, lead, user}
+}
+
+func (s *Service) densityFixtureMessages() []TranscriptMessage {
+	reasoning := TranscriptMessage{
+		DOMID:                 densityFixtureReasoningDOMID,
+		EntryID:               densityFixtureReasoningDOMID,
+		Variant:               "detail",
+		Title:                 "thinking",
+		HeaderSummary:         "[14] plan the change",
+		Content:               "> plan the change",
+		HTMLContent:           "<blockquote><p>plan the change</p></blockquote>",
+		Collapsible:           true,
+		HideBodyWhenCollapsed: true,
+	}
+	tool := TranscriptMessage{
+		DOMID:                 densityFixtureTool0DOMID,
+		EntryID:               densityFixtureTool0DOMID,
+		Variant:               "detail",
+		Title:                 "bash",
+		ToolCallID:            "call_density_bash_1",
+		HeaderCode:            "ls",
+		Content:               "```json\n{\n  \"command\": \"ls\"\n}\n```",
+		HTMLContent:           "<pre>ls</pre>",
+		Collapsible:           true,
+		HideBodyWhenCollapsed: true,
+	}
+	subagent := TranscriptMessage{
+		DOMID:                 densityFixtureTool1DOMID,
+		EntryID:               densityFixtureTool1DOMID,
+		Variant:               "detail",
+		Title:                 "subagent",
+		ToolCallID:            "call_density_sub_1",
+		HeaderSummary:         "agent: worker · task: inspect",
+		Content:               "```json\n{}\n```",
+		HTMLContent:           "<pre>{}</pre>",
+		Collapsible:           true,
+		HideBodyWhenCollapsed: true,
+	}
+	return []TranscriptMessage{reasoning, tool, subagent}
 }
