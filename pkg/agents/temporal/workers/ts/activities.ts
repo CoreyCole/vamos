@@ -6,7 +6,11 @@ import {
   ModelRegistry,
   type ToolDefinition,
 } from "@mariozechner/pi-coding-agent";
-import { agentMemoryTools, agentMemoryToolsEnabled } from "./agent_memory.js";
+import {
+  additionalSkillPathsForTurn,
+  agentMemoryTools,
+  agentMemoryToolsEnabled,
+} from "./agent_memory.js";
 import { messageRoomContextFromRun, messageRoomTools } from "./message_room.js";
 import type {
   ConversationRunFailure,
@@ -43,8 +47,13 @@ export async function RunConversationTurn(
   const provider = process.env.PI_MODEL_PROVIDER || "openai-codex";
   const modelId = process.env.PI_MODEL_ID || "gpt-5.5";
   const model = modelRegistry.find(provider, modelId);
+  const additionalSkillPaths = additionalSkillPathsForTurn(
+    input.room?.kind,
+    input.cwd,
+  );
   const resourceLoader = new DefaultResourceLoader({
     cwd: input.cwd,
+    ...(additionalSkillPaths ? { additionalSkillPaths } : {}),
     agentsFilesOverride: () => ({
       agentsFiles: (input.inject_files ?? []).map((file) => ({
         path: file.path,

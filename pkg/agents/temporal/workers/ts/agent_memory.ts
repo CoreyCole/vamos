@@ -1,3 +1,4 @@
+import { existsSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join, relative, resolve, sep } from "node:path";
 import { defineTool, type ToolDefinition } from "@mariozechner/pi-coding-agent";
@@ -7,6 +8,27 @@ export const BOT_HOME_KIND = "bot_home";
 export function agentMemoryToolsEnabled(kind?: string): boolean {
   return kind === BOT_HOME_KIND;
 }
+
+
+/** Pi DefaultResourceLoader option: agent-managed skills under bot-home cwd/skills. */
+export function additionalSkillPathsForTurn(
+  kind: string | undefined,
+  cwd: string,
+): string[] | undefined {
+  if (kind !== BOT_HOME_KIND) {
+    return undefined;
+  }
+  const root = (cwd ?? "").trim();
+  if (!root) {
+    return undefined;
+  }
+  const skillsDir = join(root, "skills");
+  if (!existsSync(skillsDir)) {
+    return undefined;
+  }
+  return [skillsDir];
+}
+
 
 function speakerRoot(cwd: string): string {
   return resolve(cwd);
