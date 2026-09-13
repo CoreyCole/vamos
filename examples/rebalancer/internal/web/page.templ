@@ -519,7 +519,7 @@ templ Layout(data PageData) {
 			<div class="header">
 				<div class="header-title">Portfolio Rebalancer</div>
 				<div class="header-controls">
-					<button class="refresh-button" onclick="location.reload()" title="Refresh" aria-label="Refresh">
+					<button class="refresh-button" onclick="(window.VamosApplet && window.VamosApplet.requestRefresh ? window.VamosApplet.requestRefresh() : location.reload())" title="Refresh" aria-label="Refresh">
 						<span>↻</span>
 					</button>
 					<button class="theme-toggle" onclick="window.toggleTheme()" title="Toggle theme">
