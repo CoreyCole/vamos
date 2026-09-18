@@ -4,9 +4,11 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 	"sort"
 	"strings"
 
+	"golang.org/x/sys/unix"
 	"gopkg.in/yaml.v3"
 )
 
@@ -76,6 +78,87 @@ func (s *Store) Get(slug string) (Bot, error) {
 		return Bot{}, ErrArchived
 	}
 	return *found, nil
+}
+
+func (s *Store) Create(bot Bot) (Bot, error) {
+	if err := ValidateSlug(bot.Slug); err != nil {
+		return Bot{}, err
+	}
+	if strings.TrimSpace(bot.Name) == "" {
+		bot.Name = bot.Slug
+	}
+
+	unlock, err := s.lockExclusive()
+	if err != nil {
+		return Bot{}, err
+	}
+	defer unlock()
+
+	doc, err := s.load()
+	if err != nil {
+		return Bot{}, err
+	}
+	for _, existing := range doc.Bots {
+		if existing.Slug == bot.Slug {
+			return Bot{}, ErrConflict
+		}
+	}
+	doc.Bots = append(doc.Bots, bot)
+	if err := s.writeAtomic(doc); err != nil {
+		return Bot{}, err
+	}
+	return bot, nil
+}
+
+func (s *Store) lockExclusive() (func(), error) {
+	dir := filepath.Dir(s.Path)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return nil, err
+	}
+	lockPath := filepath.Join(dir, "agents.yml.lock")
+	f, err := os.OpenFile(lockPath, os.O_CREATE|os.O_RDWR, 0o644)
+	if err != nil {
+		return nil, err
+	}
+	if err := unix.Flock(int(f.Fd()), unix.LOCK_EX); err != nil {
+		_ = f.Close()
+		return nil, err
+	}
+	return func() {
+		_ = unix.Flock(int(f.Fd()), unix.LOCK_UN)
+		_ = f.Close()
+	}, nil
+}
+
+func (s *Store) writeAtomic(doc Document) error {
+	data, err := yaml.Marshal(doc)
+	if err != nil {
+		return err
+	}
+	dir := filepath.Dir(s.Path)
+	tmp, err := os.CreateTemp(dir, ".agents.yml.*")
+	if err != nil {
+		return err
+	}
+	tmpName := tmp.Name()
+	wrote := false
+	defer func() {
+		if !wrote {
+			_ = os.Remove(tmpName)
+		}
+	}()
+	if _, err := tmp.Write(data); err != nil {
+		_ = tmp.Close()
+		return err
+	}
+	if err := tmp.Close(); err != nil {
+		return err
+	}
+	if err := os.Rename(tmpName, s.Path); err != nil {
+		return err
+	}
+	wrote = true
+	return nil
 }
 
 func (s *Store) load() (Document, error) {

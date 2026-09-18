@@ -4,6 +4,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"sync"
 	"testing"
 )
 
@@ -152,6 +153,88 @@ bots:
 	want := []string{"c", "a", "b"}
 	if slugs(got)[0] != want[0] || slugs(got)[1] != want[1] || slugs(got)[2] != want[2] {
 		t.Fatalf("order = %v, want %v", slugs(got), want)
+	}
+}
+
+func TestCreateVisibleToGet(t *testing.T) {
+	store := &Store{Path: filepath.Join(t.TempDir(), "agents.yml")}
+	got, err := store.Create(Bot{Slug: "nova"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Name != "nova" {
+		t.Fatalf("empty name default = %q, want slug", got.Name)
+	}
+	loaded, err := store.Get("nova")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if loaded.Slug != "nova" || loaded.Name != "nova" {
+		t.Fatalf("Get after Create = %+v", loaded)
+	}
+}
+
+func TestCreateDuplicateConflict(t *testing.T) {
+	path := writeRoster(t, `
+bots:
+  - slug: live
+    name: Live
+  - slug: old
+    name: Old
+    archived: true
+`)
+	store := &Store{Path: path}
+	_, err := store.Create(Bot{Slug: "live", Name: "Again"})
+	if !errors.Is(err, ErrConflict) {
+		t.Fatalf("active duplicate = %v, want ErrConflict", err)
+	}
+	_, err = store.Create(Bot{Slug: "old", Name: "Again"})
+	if !errors.Is(err, ErrConflict) {
+		t.Fatalf("archived duplicate = %v, want ErrConflict", err)
+	}
+}
+
+func TestCreateReserved(t *testing.T) {
+	store := &Store{Path: filepath.Join(t.TempDir(), "agents.yml")}
+	_, err := store.Create(Bot{Slug: "a2a"})
+	if !errors.Is(err, ErrReserved) {
+		t.Fatalf("a2a = %v, want ErrReserved", err)
+	}
+	_, err = store.Create(Bot{Slug: "_hidden"})
+	if !errors.Is(err, ErrReserved) {
+		t.Fatalf("_prefix = %v, want ErrReserved", err)
+	}
+}
+
+func TestCreateConcurrentDifferentSlugs(t *testing.T) {
+	store := &Store{Path: filepath.Join(t.TempDir(), "agents.yml")}
+	var wg sync.WaitGroup
+	errs := make([]error, 2)
+	wg.Add(2)
+	go func() {
+		defer wg.Done()
+		_, errs[0] = store.Create(Bot{Slug: "one", Name: "One"})
+	}()
+	go func() {
+		defer wg.Done()
+		_, errs[1] = store.Create(Bot{Slug: "two", Name: "Two"})
+	}()
+	wg.Wait()
+	for i, err := range errs {
+		if err != nil {
+			t.Fatalf("create %d: %v", i, err)
+		}
+	}
+	one, err := store.Get("one")
+	if err != nil {
+		t.Fatal(err)
+	}
+	two, err := store.Get("two")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if one.Slug != "one" || two.Slug != "two" {
+		t.Fatalf("lost bot: %+v %+v", one, two)
 	}
 }
 
