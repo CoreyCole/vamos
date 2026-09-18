@@ -26,7 +26,7 @@ func TestResolveSharedThreadPlanDirReturnsThoughtsIdentity(t *testing.T) {
 	); err != nil {
 		t.Fatal(err)
 	}
-	database, err := serverdb.NewService(filepath.Join(t.TempDir(), "threads.db"))
+	database, err := serverdb.NewService(filepath.Join(t.TempDir(), "threads.db"), filepath.Join(t.TempDir(), "agents.yml"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -83,7 +83,7 @@ func TestServeThreadDefaultArtifactAcceptsSharedThreadPlanIdentity(t *testing.T)
 	); err != nil {
 		t.Fatal(err)
 	}
-	database, err := serverdb.NewService(filepath.Join(t.TempDir(), "threads.db"))
+	database, err := serverdb.NewService(filepath.Join(t.TempDir(), "threads.db"), filepath.Join(t.TempDir(), "agents.yml"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -156,7 +156,7 @@ func TestServeThreadRendersComposerDraftAndTranscript(t *testing.T) {
 	); err != nil {
 		t.Fatal(err)
 	}
-	database, err := serverdb.NewService(filepath.Join(t.TempDir(), "threads.db"))
+	database, err := serverdb.NewService(filepath.Join(t.TempDir(), "threads.db"), filepath.Join(t.TempDir(), "agents.yml"))
 	if err != nil {
 		t.Fatal(err)
 	}

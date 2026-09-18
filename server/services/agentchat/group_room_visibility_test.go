@@ -18,19 +18,16 @@ import (
 
 func TestSharedRoomsVisibleAndComposableByOtherUsers(t *testing.T) {
 	t.Parallel()
-	database, err := serverdb.NewService(filepath.Join(t.TempDir(), "share.db"))
+	database, err := serverdb.NewService(
+		filepath.Join(t.TempDir(), "share.db"),
+		filepath.Join(t.TempDir(), "agents.yml"),
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = database.Close() })
 	q := database.Queries
 	ctx := t.Context()
-	agent, err := q.CreateAgent(ctx, db.CreateAgentParams{
-		ID: "agent-nova", Slug: "nova", Name: "Nova",
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
 	home, err := q.CreateAgentThread(ctx, db.CreateAgentThreadParams{
 		ID:        "thread-home",
 		UserEmail: "owner@example.com",
@@ -42,10 +39,10 @@ func TestSharedRoomsVisibleAndComposableByOtherUsers(t *testing.T) {
 		t.Fatal(err)
 	}
 	if err := q.BindAgentThreadBotHome(ctx, db.BindAgentThreadBotHomeParams{
-		AgentID: sql.NullString{String: agent.ID, Valid: true},
-		Cwd:     home.Cwd,
-		Title:   home.Title,
-		ID:      home.ID,
+		AgentSlug: sql.NullString{String: "nova", Valid: true},
+		Cwd:       home.Cwd,
+		Title:     home.Title,
+		ID:        home.ID,
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -94,27 +91,16 @@ func TestSharedRoomsVisibleAndComposableByOtherUsers(t *testing.T) {
 
 func TestPairwiseHumanComposeForbidden(t *testing.T) {
 	t.Parallel()
-	database, err := serverdb.NewService(filepath.Join(t.TempDir(), "pair.db"))
+	database, err := serverdb.NewService(
+		filepath.Join(t.TempDir(), "pair.db"),
+		filepath.Join(t.TempDir(), "agents.yml"),
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = database.Close() })
 	q := database.Queries
 	ctx := t.Context()
-	a, err := q.CreateAgent(
-		ctx,
-		db.CreateAgentParams{ID: "a", Slug: "alpha", Name: "Alpha"},
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-	b, err := q.CreateAgent(
-		ctx,
-		db.CreateAgentParams{ID: "b", Slug: "beta", Name: "Beta"},
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
 	thread, err := q.CreateAgentThread(ctx, db.CreateAgentThreadParams{
 		ID:        "thread-pair",
 		UserEmail: "owner@example.com",
@@ -126,11 +112,11 @@ func TestPairwiseHumanComposeForbidden(t *testing.T) {
 		t.Fatal(err)
 	}
 	if err := q.BindAgentThreadPairwise(ctx, db.BindAgentThreadPairwiseParams{
-		PairAgentIDA: sql.NullString{String: a.ID, Valid: true},
-		PairAgentIDB: sql.NullString{String: b.ID, Valid: true},
-		Cwd:          thread.Cwd,
-		Title:        thread.Title,
-		ID:           thread.ID,
+		PairAgentSlugA: sql.NullString{String: "alpha", Valid: true},
+		PairAgentSlugB: sql.NullString{String: "beta", Valid: true},
+		Cwd:            thread.Cwd,
+		Title:          thread.Title,
+		ID:             thread.ID,
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -163,8 +149,8 @@ func TestPairwiseHumanComposeForbidden(t *testing.T) {
 func TestGuardEnqueueDestinationBotHomeAndPlan(t *testing.T) {
 	t.Parallel()
 	home := db.AgentThread{
-		RoomKind: RoomKindBotHome,
-		AgentID:  sql.NullString{String: "home-bot", Valid: true},
+		RoomKind:  RoomKindBotHome,
+		AgentSlug: sql.NullString{String: "home-bot", Valid: true},
 	}
 	if err := GuardEnqueueDestination(home, EnqueueMail{
 		FromKind:    EnqueueFromAgent,
@@ -186,8 +172,8 @@ func TestGuardEnqueueDestinationBotHomeAndPlan(t *testing.T) {
 	}
 
 	plan := db.AgentThread{
-		RoomKind: RoomKindPlan,
-		AgentID:  sql.NullString{String: "lead", Valid: true},
+		RoomKind:  RoomKindPlan,
+		AgentSlug: sql.NullString{String: "lead", Valid: true},
 	}
 	if err := GuardEnqueueDestination(plan, EnqueueMail{
 		FromKind:    EnqueueFromAgent,
@@ -197,9 +183,9 @@ func TestGuardEnqueueDestinationBotHomeAndPlan(t *testing.T) {
 	}
 
 	pair := db.AgentThread{
-		RoomKind:     RoomKindPairwise,
-		PairAgentIDA: sql.NullString{String: "a", Valid: true},
-		PairAgentIDB: sql.NullString{String: "b", Valid: true},
+		RoomKind:       RoomKindPairwise,
+		PairAgentSlugA: sql.NullString{String: "a", Valid: true},
+		PairAgentSlugB: sql.NullString{String: "b", Valid: true},
 	}
 	if err := GuardEnqueueDestination(
 		pair,

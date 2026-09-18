@@ -135,7 +135,7 @@ func openMachineCredentialStore(ctx context.Context, databasePath string) (*dbsv
 	if err != nil {
 		return nil, nil, err
 	}
-	service, err := dbsvc.NewService(resolved)
+	service, err := dbsvc.NewService(resolved, "")
 	if err != nil {
 		return nil, nil, err
 	}

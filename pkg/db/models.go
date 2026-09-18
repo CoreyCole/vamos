@@ -9,17 +9,6 @@ import (
 	"time"
 )
 
-type Agent struct {
-	ID          string       `json:"id"`
-	Slug        string       `json:"slug"`
-	Name        string       `json:"name"`
-	Label       string       `json:"label"`
-	Description string       `json:"description"`
-	CreatedAt   time.Time    `json:"created_at"`
-	UpdatedAt   time.Time    `json:"updated_at"`
-	ArchivedAt  sql.NullTime `json:"archived_at"`
-}
-
 type AgentEntry struct {
 	LineageID        string         `json:"lineage_id"`
 	EntryID          string         `json:"entry_id"`
@@ -52,7 +41,7 @@ type AgentRun struct {
 	WorkflowResultJson   sql.NullString `json:"workflow_result_json"`
 	RootDocPath          string         `json:"root_doc_path"`
 	ErrorMessage         sql.NullString `json:"error_message"`
-	SpeakerAgentID       sql.NullString `json:"speaker_agent_id"`
+	SpeakerAgentSlug     sql.NullString `json:"speaker_agent_slug"`
 	CreatedAt            time.Time      `json:"created_at"`
 	CompletedAt          sql.NullTime   `json:"completed_at"`
 }
@@ -123,10 +112,10 @@ type AgentThread struct {
 	HeadEntryID       sql.NullString `json:"head_entry_id"`
 	ParentThreadID    sql.NullString `json:"parent_thread_id"`
 	ForkedFromEntryID sql.NullString `json:"forked_from_entry_id"`
-	AgentID           sql.NullString `json:"agent_id"`
+	AgentSlug         sql.NullString `json:"agent_slug"`
 	RoomKind          string         `json:"room_kind"`
-	PairAgentIDA      sql.NullString `json:"pair_agent_id_a"`
-	PairAgentIDB      sql.NullString `json:"pair_agent_id_b"`
+	PairAgentSlugA    sql.NullString `json:"pair_agent_slug_a"`
+	PairAgentSlugB    sql.NullString `json:"pair_agent_slug_b"`
 	CreatedAt         time.Time      `json:"created_at"`
 	UpdatedAt         time.Time      `json:"updated_at"`
 	ArchivedAt        sql.NullTime   `json:"archived_at"`
@@ -141,14 +130,14 @@ type AgentThreadDraft struct {
 }
 
 type AgentThreadOp struct {
-	ThreadID       string         `json:"thread_id"`
-	OpID           string         `json:"op_id"`
-	SpeakerAgentID sql.NullString `json:"speaker_agent_id"`
-	FromKind       string         `json:"from_kind"`
-	FromAgentID    sql.NullString `json:"from_agent_id"`
-	FromUserEmail  string         `json:"from_user_email"`
-	Body           string         `json:"body"`
-	CreatedAt      time.Time      `json:"created_at"`
+	ThreadID         string         `json:"thread_id"`
+	OpID             string         `json:"op_id"`
+	SpeakerAgentSlug sql.NullString `json:"speaker_agent_slug"`
+	FromKind         string         `json:"from_kind"`
+	FromAgentSlug    sql.NullString `json:"from_agent_slug"`
+	FromUserEmail    string         `json:"from_user_email"`
+	Body             string         `json:"body"`
+	CreatedAt        time.Time      `json:"created_at"`
 }
 
 type AgentThreadWorkspace struct {
@@ -413,7 +402,7 @@ type PlanWorkspace struct {
 	ArchivedAt              sql.NullTime   `json:"archived_at"`
 	ArchiveReason           string         `json:"archive_reason"`
 	ArchivedByEmail         string         `json:"archived_by_email"`
-	LeadAgentID             sql.NullString `json:"lead_agent_id"`
+	LeadAgentSlug           sql.NullString `json:"lead_agent_slug"`
 }
 
 type PlanWorkspaceImplBinding struct {

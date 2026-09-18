@@ -14,7 +14,7 @@ import (
 
 func newPlaywrightAuthTestService(t *testing.T) *Service {
 	t.Helper()
-	database, err := dbsvc.NewService(filepath.Join(t.TempDir(), "auth.db"))
+	database, err := dbsvc.NewService(filepath.Join(t.TempDir(), "auth.db"), filepath.Join(t.TempDir(), "agents.yml"))
 	if err != nil {
 		t.Fatalf("NewService returned error: %v", err)
 	}

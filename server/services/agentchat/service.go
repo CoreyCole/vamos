@@ -1699,7 +1699,7 @@ func (s *Service) createRunRecord(
 		WorkflowResultJson:   sql.NullString{},
 		RootDocPath:          docRoot,
 		ErrorMessage:         sql.NullString{},
-		SpeakerAgentID:       sql.NullString{},
+		SpeakerAgentSlug:     sql.NullString{},
 	})
 	if err != nil {
 		if isUniqueConstraintError(err) {
@@ -1899,7 +1899,7 @@ func (s *Service) buildRunInput(
 	room, sessionFile, cwd, injectFiles, err := s.prepareRoomSession(
 		ctx,
 		thread,
-		run.SpeakerAgentID.String,
+		run.SpeakerAgentSlug.String,
 	)
 	if err != nil {
 		return preparedRunInput{}, err
@@ -1931,7 +1931,7 @@ func (s *Service) buildRunInput(
 			Room: conversation.RoomContext{
 				Kind:        room.Kind,
 				SpeakerSlug: room.SpeakerSlug,
-				FromAgentID: strings.TrimSpace(run.SpeakerAgentID.String),
+				FromAgentID: strings.TrimSpace(run.SpeakerAgentSlug.String),
 				PairA:       room.PairA,
 				PairB:       room.PairB,
 				PlanDirRel:  room.PlanDirRel,
@@ -1945,14 +1945,9 @@ func (s *Service) buildRunInput(
 func (s *Service) prepareRoomSession(
 	ctx context.Context,
 	thread db.AgentThread,
-	speakerAgentID string,
+	speakerSlug string,
 ) (RoomIdentity, string, string, []conversation.InjectFile, error) {
-	speakerSlug := ""
-	if id := strings.TrimSpace(speakerAgentID); id != "" {
-		if agent, err := s.queries.GetAgent(ctx, id); err == nil {
-			speakerSlug = strings.TrimSpace(agent.Slug)
-		}
-	}
+	speakerSlug = strings.TrimSpace(speakerSlug)
 	room, err := RoomIdentityFromThread(s.thoughtsRoot, thread, speakerSlug)
 	if err == nil && strings.TrimSpace(s.thoughtsRoot) != "" {
 		sessionFile, err := EnsureRoomCurrentJSONL(s.thoughtsRoot, room)
@@ -1985,17 +1980,17 @@ func (s *Service) prepareRoomSession(
 }
 
 func (s *Service) liveAgentRoster(ctx context.Context) ([]AgentRosterRow, error) {
-	if s == nil || s.queries == nil {
+	if s == nil || s.roster == nil {
 		return nil, nil
 	}
-	agents, err := s.queries.ListAgents(ctx)
+	agents, err := s.roster.List()
 	if err != nil {
 		return nil, err
 	}
-	return agentRosterFromAgents(agents), nil
+	return agentRosterFromBots(agents), nil
 }
 
-func agentRosterFromAgents(agents []db.Agent) []AgentRosterRow {
+func agentRosterFromBots(agents []roster.Bot) []AgentRosterRow {
 	out := make([]AgentRosterRow, 0, len(agents))
 	for _, agent := range agents {
 		slug := strings.TrimSpace(agent.Slug)

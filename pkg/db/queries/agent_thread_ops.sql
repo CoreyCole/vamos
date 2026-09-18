@@ -2,18 +2,18 @@
 INSERT INTO agent_thread_ops (
     thread_id,
     op_id,
-    speaker_agent_id,
+    speaker_agent_slug,
     from_kind,
-    from_agent_id,
+    from_agent_slug,
     from_user_email,
     body
 )
 VALUES (
     sqlc.arg('thread_id'),
     sqlc.arg('op_id'),
-    sqlc.narg('speaker_agent_id'),
+    sqlc.narg('speaker_agent_slug'),
     sqlc.arg('from_kind'),
-    sqlc.narg('from_agent_id'),
+    sqlc.narg('from_agent_slug'),
     sqlc.arg('from_user_email'),
     sqlc.arg('body')
 )

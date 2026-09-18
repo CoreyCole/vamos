@@ -23,7 +23,7 @@ func setupPlanDirRelTest(
 	}
 	planRel = "owner/plans/alpha"
 	var err error
-	database, err = serverdb.NewService(filepath.Join(t.TempDir(), "plan-dir-rel.db"))
+	database, err = serverdb.NewService(filepath.Join(t.TempDir(), "plan-dir-rel.db"), filepath.Join(t.TempDir(), "agents.yml"))
 	if err != nil {
 		t.Fatal(err)
 	}

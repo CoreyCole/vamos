@@ -1,7 +1,6 @@
 package auth
 
 import (
-	"strings"
 	"bytes"
 	"crypto/ed25519"
 	"encoding/json"
@@ -9,6 +8,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -125,7 +125,7 @@ func TestSQLMachineCredentialSurvivesRestartAndMintsBrowserToken(t *testing.T) {
 		t.Fatalf("GenerateKey returned error: %v", err)
 	}
 	dbPath := filepath.Join(t.TempDir(), "agents.db")
-	svc, err := dbsvc.NewService(dbPath)
+	svc, err := dbsvc.NewService(dbPath, filepath.Join(t.TempDir(), "agents.yml"))
 	if err != nil {
 		t.Fatalf("NewService returned error: %v", err)
 	}
@@ -141,7 +141,7 @@ func TestSQLMachineCredentialSurvivesRestartAndMintsBrowserToken(t *testing.T) {
 		t.Fatalf("Close returned error: %v", err)
 	}
 
-	reopened, err := dbsvc.NewService(dbPath)
+	reopened, err := dbsvc.NewService(dbPath, filepath.Join(t.TempDir(), "agents.yml"))
 	if err != nil {
 		t.Fatalf("reopen NewService returned error: %v", err)
 	}

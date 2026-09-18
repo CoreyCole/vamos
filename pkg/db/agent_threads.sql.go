@@ -15,7 +15,7 @@ const bindAgentThreadBotHome = `-- name: BindAgentThreadBotHome :exec
 ;
 
 UPDATE agent_threads
-SET agent_id = ?1,
+SET agent_slug = ?1,
 room_kind = 'bot_home',
 cwd = ?2,
 title = ?3,
@@ -24,15 +24,15 @@ WHERE id = ?4
 `
 
 type BindAgentThreadBotHomeParams struct {
-	AgentID sql.NullString `json:"agent_id"`
-	Cwd     string         `json:"cwd"`
-	Title   string         `json:"title"`
-	ID      string         `json:"id"`
+	AgentSlug sql.NullString `json:"agent_slug"`
+	Cwd       string         `json:"cwd"`
+	Title     string         `json:"title"`
+	ID        string         `json:"id"`
 }
 
 func (q *Queries) BindAgentThreadBotHome(ctx context.Context, arg BindAgentThreadBotHomeParams) error {
 	_, err := q.db.ExecContext(ctx, bindAgentThreadBotHome,
-		arg.AgentID,
+		arg.AgentSlug,
 		arg.Cwd,
 		arg.Title,
 		arg.ID,
@@ -44,8 +44,8 @@ const bindAgentThreadPairwise = `-- name: BindAgentThreadPairwise :exec
 ;
 
 UPDATE agent_threads
-SET pair_agent_id_a = ?1,
-pair_agent_id_b = ?2,
+SET pair_agent_slug_a = ?1,
+pair_agent_slug_b = ?2,
 room_kind = 'pairwise',
 cwd = ?3,
 title = ?4,
@@ -54,17 +54,17 @@ WHERE id = ?5
 `
 
 type BindAgentThreadPairwiseParams struct {
-	PairAgentIDA sql.NullString `json:"pair_agent_id_a"`
-	PairAgentIDB sql.NullString `json:"pair_agent_id_b"`
-	Cwd          string         `json:"cwd"`
-	Title        string         `json:"title"`
-	ID           string         `json:"id"`
+	PairAgentSlugA sql.NullString `json:"pair_agent_slug_a"`
+	PairAgentSlugB sql.NullString `json:"pair_agent_slug_b"`
+	Cwd            string         `json:"cwd"`
+	Title          string         `json:"title"`
+	ID             string         `json:"id"`
 }
 
 func (q *Queries) BindAgentThreadPairwise(ctx context.Context, arg BindAgentThreadPairwiseParams) error {
 	_, err := q.db.ExecContext(ctx, bindAgentThreadPairwise,
-		arg.PairAgentIDA,
-		arg.PairAgentIDB,
+		arg.PairAgentSlugA,
+		arg.PairAgentSlugB,
 		arg.Cwd,
 		arg.Title,
 		arg.ID,
@@ -76,7 +76,7 @@ const bindAgentThreadPlan = `-- name: BindAgentThreadPlan :exec
 ;
 
 UPDATE agent_threads
-SET agent_id = ?1,
+SET agent_slug = ?1,
 room_kind = 'plan',
 cwd = ?2,
 title = ?3,
@@ -85,15 +85,15 @@ WHERE id = ?4
 `
 
 type BindAgentThreadPlanParams struct {
-	AgentID sql.NullString `json:"agent_id"`
-	Cwd     string         `json:"cwd"`
-	Title   string         `json:"title"`
-	ID      string         `json:"id"`
+	AgentSlug sql.NullString `json:"agent_slug"`
+	Cwd       string         `json:"cwd"`
+	Title     string         `json:"title"`
+	ID        string         `json:"id"`
 }
 
 func (q *Queries) BindAgentThreadPlan(ctx context.Context, arg BindAgentThreadPlanParams) error {
 	_, err := q.db.ExecContext(ctx, bindAgentThreadPlan,
-		arg.AgentID,
+		arg.AgentSlug,
 		arg.Cwd,
 		arg.Title,
 		arg.ID,
@@ -137,10 +137,10 @@ plan_dir_rel,
 head_entry_id,
 parent_thread_id,
 forked_from_entry_id,
-agent_id,
+agent_slug,
 room_kind,
-pair_agent_id_a,
-pair_agent_id_b,
+pair_agent_slug_a,
+pair_agent_slug_b,
 created_at,
 updated_at,
 archived_at
@@ -184,10 +184,10 @@ func (q *Queries) CreateAgentThread(ctx context.Context, arg CreateAgentThreadPa
 		&i.HeadEntryID,
 		&i.ParentThreadID,
 		&i.ForkedFromEntryID,
-		&i.AgentID,
+		&i.AgentSlug,
 		&i.RoomKind,
-		&i.PairAgentIDA,
-		&i.PairAgentIDB,
+		&i.PairAgentSlugA,
+		&i.PairAgentSlugB,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.ArchivedAt,
@@ -209,10 +209,10 @@ plan_dir_rel,
 head_entry_id,
 parent_thread_id,
 forked_from_entry_id,
-agent_id,
+agent_slug,
 room_kind,
-pair_agent_id_a,
-pair_agent_id_b,
+pair_agent_slug_a,
+pair_agent_slug_b,
 created_at,
 updated_at,
 archived_at
@@ -235,10 +235,10 @@ func (q *Queries) GetAgentThread(ctx context.Context, id string) (AgentThread, e
 		&i.HeadEntryID,
 		&i.ParentThreadID,
 		&i.ForkedFromEntryID,
-		&i.AgentID,
+		&i.AgentSlug,
 		&i.RoomKind,
-		&i.PairAgentIDA,
-		&i.PairAgentIDB,
+		&i.PairAgentSlugA,
+		&i.PairAgentSlugB,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.ArchivedAt,
@@ -260,10 +260,10 @@ plan_dir_rel,
 head_entry_id,
 parent_thread_id,
 forked_from_entry_id,
-agent_id,
+agent_slug,
 room_kind,
-pair_agent_id_a,
-pair_agent_id_b,
+pair_agent_slug_a,
+pair_agent_slug_b,
 created_at,
 updated_at,
 archived_at
@@ -295,10 +295,10 @@ func (q *Queries) GetAgentThreadForUser(ctx context.Context, arg GetAgentThreadF
 		&i.HeadEntryID,
 		&i.ParentThreadID,
 		&i.ForkedFromEntryID,
-		&i.AgentID,
+		&i.AgentSlug,
 		&i.RoomKind,
-		&i.PairAgentIDA,
-		&i.PairAgentIDB,
+		&i.PairAgentSlugA,
+		&i.PairAgentSlugB,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.ArchivedAt,
@@ -320,10 +320,10 @@ t.plan_dir_rel,
 t.head_entry_id,
 t.parent_thread_id,
 t.forked_from_entry_id,
-t.agent_id,
+t.agent_slug,
 t.room_kind,
-t.pair_agent_id_a,
-t.pair_agent_id_b,
+t.pair_agent_slug_a,
+t.pair_agent_slug_b,
 t.created_at,
 t.updated_at,
 t.archived_at
@@ -363,10 +363,10 @@ func (q *Queries) GetAgentThreadForWorkspaceUser(ctx context.Context, arg GetAge
 		&i.HeadEntryID,
 		&i.ParentThreadID,
 		&i.ForkedFromEntryID,
-		&i.AgentID,
+		&i.AgentSlug,
 		&i.RoomKind,
-		&i.PairAgentIDA,
-		&i.PairAgentIDB,
+		&i.PairAgentSlugA,
+		&i.PairAgentSlugB,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.ArchivedAt,
@@ -374,7 +374,7 @@ func (q *Queries) GetAgentThreadForWorkspaceUser(ctx context.Context, arg GetAge
 	return i, err
 }
 
-const getBotHomeThreadByAgentID = `-- name: GetBotHomeThreadByAgentID :one
+const getBotHomeThreadBySlug = `-- name: GetBotHomeThreadBySlug :one
 ;
 
 SELECT
@@ -388,22 +388,22 @@ plan_dir_rel,
 head_entry_id,
 parent_thread_id,
 forked_from_entry_id,
-agent_id,
+agent_slug,
 room_kind,
-pair_agent_id_a,
-pair_agent_id_b,
+pair_agent_slug_a,
+pair_agent_slug_b,
 created_at,
 updated_at,
 archived_at
 FROM agent_threads
-WHERE agent_id = ?1
+WHERE agent_slug = ?1
 AND room_kind = 'bot_home'
 AND archived_at IS NULL
 LIMIT 1
 `
 
-func (q *Queries) GetBotHomeThreadByAgentID(ctx context.Context, agentID sql.NullString) (AgentThread, error) {
-	row := q.db.QueryRowContext(ctx, getBotHomeThreadByAgentID, agentID)
+func (q *Queries) GetBotHomeThreadBySlug(ctx context.Context, agentSlug sql.NullString) (AgentThread, error) {
+	row := q.db.QueryRowContext(ctx, getBotHomeThreadBySlug, agentSlug)
 	var i AgentThread
 	err := row.Scan(
 		&i.ID,
@@ -416,10 +416,10 @@ func (q *Queries) GetBotHomeThreadByAgentID(ctx context.Context, agentID sql.Nul
 		&i.HeadEntryID,
 		&i.ParentThreadID,
 		&i.ForkedFromEntryID,
-		&i.AgentID,
+		&i.AgentSlug,
 		&i.RoomKind,
-		&i.PairAgentIDA,
-		&i.PairAgentIDB,
+		&i.PairAgentSlugA,
+		&i.PairAgentSlugB,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.ArchivedAt,
@@ -441,10 +441,10 @@ plan_dir_rel,
 head_entry_id,
 parent_thread_id,
 forked_from_entry_id,
-agent_id,
+agent_slug,
 room_kind,
-pair_agent_id_a,
-pair_agent_id_b,
+pair_agent_slug_a,
+pair_agent_slug_b,
 created_at,
 updated_at,
 archived_at
@@ -470,10 +470,10 @@ func (q *Queries) GetMostRecentAgentThreadByPlanDirRel(ctx context.Context, plan
 		&i.HeadEntryID,
 		&i.ParentThreadID,
 		&i.ForkedFromEntryID,
-		&i.AgentID,
+		&i.AgentSlug,
 		&i.RoomKind,
-		&i.PairAgentIDA,
-		&i.PairAgentIDB,
+		&i.PairAgentSlugA,
+		&i.PairAgentSlugB,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.ArchivedAt,
@@ -495,28 +495,28 @@ plan_dir_rel,
 head_entry_id,
 parent_thread_id,
 forked_from_entry_id,
-agent_id,
+agent_slug,
 room_kind,
-pair_agent_id_a,
-pair_agent_id_b,
+pair_agent_slug_a,
+pair_agent_slug_b,
 created_at,
 updated_at,
 archived_at
 FROM agent_threads
-WHERE pair_agent_id_a = ?1
-AND pair_agent_id_b = ?2
+WHERE pair_agent_slug_a = ?1
+AND pair_agent_slug_b = ?2
 AND room_kind = 'pairwise'
 AND archived_at IS NULL
 LIMIT 1
 `
 
 type GetPairwiseThreadParams struct {
-	PairAgentIDA sql.NullString `json:"pair_agent_id_a"`
-	PairAgentIDB sql.NullString `json:"pair_agent_id_b"`
+	PairAgentSlugA sql.NullString `json:"pair_agent_slug_a"`
+	PairAgentSlugB sql.NullString `json:"pair_agent_slug_b"`
 }
 
 func (q *Queries) GetPairwiseThread(ctx context.Context, arg GetPairwiseThreadParams) (AgentThread, error) {
-	row := q.db.QueryRowContext(ctx, getPairwiseThread, arg.PairAgentIDA, arg.PairAgentIDB)
+	row := q.db.QueryRowContext(ctx, getPairwiseThread, arg.PairAgentSlugA, arg.PairAgentSlugB)
 	var i AgentThread
 	err := row.Scan(
 		&i.ID,
@@ -529,10 +529,10 @@ func (q *Queries) GetPairwiseThread(ctx context.Context, arg GetPairwiseThreadPa
 		&i.HeadEntryID,
 		&i.ParentThreadID,
 		&i.ForkedFromEntryID,
-		&i.AgentID,
+		&i.AgentSlug,
 		&i.RoomKind,
-		&i.PairAgentIDA,
-		&i.PairAgentIDB,
+		&i.PairAgentSlugA,
+		&i.PairAgentSlugB,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.ArchivedAt,
@@ -554,10 +554,10 @@ plan_dir_rel,
 head_entry_id,
 parent_thread_id,
 forked_from_entry_id,
-agent_id,
+agent_slug,
 room_kind,
-pair_agent_id_a,
-pair_agent_id_b,
+pair_agent_slug_a,
+pair_agent_slug_b,
 created_at,
 updated_at,
 archived_at
@@ -580,10 +580,10 @@ func (q *Queries) GetSharedAgentThread(ctx context.Context, id string) (AgentThr
 		&i.HeadEntryID,
 		&i.ParentThreadID,
 		&i.ForkedFromEntryID,
-		&i.AgentID,
+		&i.AgentSlug,
 		&i.RoomKind,
-		&i.PairAgentIDA,
-		&i.PairAgentIDB,
+		&i.PairAgentSlugA,
+		&i.PairAgentSlugB,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.ArchivedAt,
@@ -605,10 +605,10 @@ plan_dir_rel,
 head_entry_id,
 parent_thread_id,
 forked_from_entry_id,
-agent_id,
+agent_slug,
 room_kind,
-pair_agent_id_a,
-pair_agent_id_b,
+pair_agent_slug_a,
+pair_agent_slug_b,
 created_at,
 updated_at,
 archived_at
@@ -647,10 +647,10 @@ func (q *Queries) ListAgentThreads(ctx context.Context, arg ListAgentThreadsPara
 			&i.HeadEntryID,
 			&i.ParentThreadID,
 			&i.ForkedFromEntryID,
-			&i.AgentID,
+			&i.AgentSlug,
 			&i.RoomKind,
-			&i.PairAgentIDA,
-			&i.PairAgentIDB,
+			&i.PairAgentSlugA,
+			&i.PairAgentSlugB,
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.ArchivedAt,
@@ -682,10 +682,10 @@ plan_dir_rel,
 head_entry_id,
 parent_thread_id,
 forked_from_entry_id,
-agent_id,
+agent_slug,
 room_kind,
-pair_agent_id_a,
-pair_agent_id_b,
+pair_agent_slug_a,
+pair_agent_slug_b,
 created_at,
 updated_at,
 archived_at
@@ -715,10 +715,10 @@ func (q *Queries) ListAgentThreadsByParentThreadID(ctx context.Context, parentTh
 			&i.HeadEntryID,
 			&i.ParentThreadID,
 			&i.ForkedFromEntryID,
-			&i.AgentID,
+			&i.AgentSlug,
 			&i.RoomKind,
-			&i.PairAgentIDA,
-			&i.PairAgentIDB,
+			&i.PairAgentSlugA,
+			&i.PairAgentSlugB,
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.ArchivedAt,
@@ -751,10 +751,10 @@ plan_dir_rel,
 head_entry_id,
 parent_thread_id,
 forked_from_entry_id,
-agent_id,
+agent_slug,
 room_kind,
-pair_agent_id_a,
-pair_agent_id_b,
+pair_agent_slug_a,
+pair_agent_slug_b,
 created_at,
 updated_at,
 archived_at
@@ -785,10 +785,10 @@ func (q *Queries) ListAgentThreadsByPlanDirRel(ctx context.Context, planDirRel s
 			&i.HeadEntryID,
 			&i.ParentThreadID,
 			&i.ForkedFromEntryID,
-			&i.AgentID,
+			&i.AgentSlug,
 			&i.RoomKind,
-			&i.PairAgentIDA,
-			&i.PairAgentIDB,
+			&i.PairAgentSlugA,
+			&i.PairAgentSlugB,
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.ArchivedAt,
@@ -820,10 +820,10 @@ t.plan_dir_rel,
 t.head_entry_id,
 t.parent_thread_id,
 t.forked_from_entry_id,
-t.agent_id,
+t.agent_slug,
 t.room_kind,
-t.pair_agent_id_a,
-t.pair_agent_id_b,
+t.pair_agent_slug_a,
+t.pair_agent_slug_b,
 t.created_at,
 t.updated_at,
 t.archived_at
@@ -855,10 +855,10 @@ func (q *Queries) ListAgentThreadsByWorkspace(ctx context.Context, workspaceID s
 			&i.HeadEntryID,
 			&i.ParentThreadID,
 			&i.ForkedFromEntryID,
-			&i.AgentID,
+			&i.AgentSlug,
 			&i.RoomKind,
-			&i.PairAgentIDA,
-			&i.PairAgentIDB,
+			&i.PairAgentSlugA,
+			&i.PairAgentSlugB,
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.ArchivedAt,
@@ -942,10 +942,10 @@ t.plan_dir_rel,
 t.head_entry_id,
 t.parent_thread_id,
 t.forked_from_entry_id,
-t.agent_id,
+t.agent_slug,
 t.room_kind,
-t.pair_agent_id_a,
-t.pair_agent_id_b,
+t.pair_agent_slug_a,
+t.pair_agent_slug_b,
 t.created_at,
 t.updated_at,
 t.archived_at,
@@ -976,10 +976,10 @@ type ListAgentThreadsForUserWithWorkspaceRow struct {
 	HeadEntryID          sql.NullString `json:"head_entry_id"`
 	ParentThreadID       sql.NullString `json:"parent_thread_id"`
 	ForkedFromEntryID    sql.NullString `json:"forked_from_entry_id"`
-	AgentID              sql.NullString `json:"agent_id"`
+	AgentSlug            sql.NullString `json:"agent_slug"`
 	RoomKind             string         `json:"room_kind"`
-	PairAgentIDA         sql.NullString `json:"pair_agent_id_a"`
-	PairAgentIDB         sql.NullString `json:"pair_agent_id_b"`
+	PairAgentSlugA       sql.NullString `json:"pair_agent_slug_a"`
+	PairAgentSlugB       sql.NullString `json:"pair_agent_slug_b"`
 	CreatedAt            time.Time      `json:"created_at"`
 	UpdatedAt            time.Time      `json:"updated_at"`
 	ArchivedAt           sql.NullTime   `json:"archived_at"`
@@ -1007,10 +1007,10 @@ func (q *Queries) ListAgentThreadsForUserWithWorkspace(ctx context.Context, user
 			&i.HeadEntryID,
 			&i.ParentThreadID,
 			&i.ForkedFromEntryID,
-			&i.AgentID,
+			&i.AgentSlug,
 			&i.RoomKind,
-			&i.PairAgentIDA,
-			&i.PairAgentIDB,
+			&i.PairAgentSlugA,
+			&i.PairAgentSlugB,
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.ArchivedAt,
@@ -1044,10 +1044,10 @@ t.plan_dir_rel,
 t.head_entry_id,
 t.parent_thread_id,
 t.forked_from_entry_id,
-t.agent_id,
+t.agent_slug,
 t.room_kind,
-t.pair_agent_id_a,
-t.pair_agent_id_b,
+t.pair_agent_slug_a,
+t.pair_agent_slug_b,
 t.created_at,
 t.updated_at,
 t.archived_at
@@ -1093,10 +1093,10 @@ func (q *Queries) ListSharedAgentThreadsByPlanDir(ctx context.Context, arg ListS
 			&i.HeadEntryID,
 			&i.ParentThreadID,
 			&i.ForkedFromEntryID,
-			&i.AgentID,
+			&i.AgentSlug,
 			&i.RoomKind,
-			&i.PairAgentIDA,
-			&i.PairAgentIDB,
+			&i.PairAgentSlugA,
+			&i.PairAgentSlugB,
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.ArchivedAt,
@@ -1128,10 +1128,10 @@ t.plan_dir_rel,
 t.head_entry_id,
 t.parent_thread_id,
 t.forked_from_entry_id,
-t.agent_id,
+t.agent_slug,
 t.room_kind,
-t.pair_agent_id_a,
-t.pair_agent_id_b,
+t.pair_agent_slug_a,
+t.pair_agent_slug_b,
 t.created_at,
 t.updated_at,
 t.archived_at,
@@ -1157,10 +1157,10 @@ type ListSharedAgentThreadsWithWorkspaceRow struct {
 	HeadEntryID          sql.NullString `json:"head_entry_id"`
 	ParentThreadID       sql.NullString `json:"parent_thread_id"`
 	ForkedFromEntryID    sql.NullString `json:"forked_from_entry_id"`
-	AgentID              sql.NullString `json:"agent_id"`
+	AgentSlug            sql.NullString `json:"agent_slug"`
 	RoomKind             string         `json:"room_kind"`
-	PairAgentIDA         sql.NullString `json:"pair_agent_id_a"`
-	PairAgentIDB         sql.NullString `json:"pair_agent_id_b"`
+	PairAgentSlugA       sql.NullString `json:"pair_agent_slug_a"`
+	PairAgentSlugB       sql.NullString `json:"pair_agent_slug_b"`
 	CreatedAt            time.Time      `json:"created_at"`
 	UpdatedAt            time.Time      `json:"updated_at"`
 	ArchivedAt           sql.NullTime   `json:"archived_at"`
@@ -1188,10 +1188,10 @@ func (q *Queries) ListSharedAgentThreadsWithWorkspace(ctx context.Context) ([]Li
 			&i.HeadEntryID,
 			&i.ParentThreadID,
 			&i.ForkedFromEntryID,
-			&i.AgentID,
+			&i.AgentSlug,
 			&i.RoomKind,
-			&i.PairAgentIDA,
-			&i.PairAgentIDB,
+			&i.PairAgentSlugA,
+			&i.PairAgentSlugB,
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.ArchivedAt,

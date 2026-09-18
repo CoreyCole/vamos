@@ -251,25 +251,16 @@ func TestAttachDerivedBotDMChipsReadsJSONLAndSurvivesRotate(t *testing.T) {
 
 func TestPairwiseLiveEventNotifiesOriginHomeThread(t *testing.T) {
 	t.Parallel()
-	database, err := serverdb.NewService(filepath.Join(t.TempDir(), "chip-notify.db"))
+	database, err := serverdb.NewService(
+		filepath.Join(t.TempDir(), "chip-notify.db"),
+		filepath.Join(t.TempDir(), "agents.yml"),
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = database.Close() })
 	q := database.Queries
 	ctx := t.Context()
-	lead, err := q.CreateAgent(ctx, db.CreateAgentParams{
-		ID: "id-lead", Slug: "lead", Name: "Lead",
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	infra, err := q.CreateAgent(ctx, db.CreateAgentParams{
-		ID: "id-infra", Slug: "infra", Name: "Infra",
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
 	home, err := q.CreateAgentThread(ctx, db.CreateAgentThreadParams{
 		ID:        "thread-home-lead",
 		UserEmail: "owner@example.com",
@@ -281,10 +272,10 @@ func TestPairwiseLiveEventNotifiesOriginHomeThread(t *testing.T) {
 		t.Fatal(err)
 	}
 	if err := q.BindAgentThreadBotHome(ctx, db.BindAgentThreadBotHomeParams{
-		AgentID: sql.NullString{String: lead.ID, Valid: true},
-		Cwd:     home.Cwd,
-		Title:   home.Title,
-		ID:      home.ID,
+		AgentSlug: sql.NullString{String: "lead", Valid: true},
+		Cwd:       home.Cwd,
+		Title:     home.Title,
+		ID:        home.ID,
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -299,11 +290,11 @@ func TestPairwiseLiveEventNotifiesOriginHomeThread(t *testing.T) {
 		t.Fatal(err)
 	}
 	if err := q.BindAgentThreadPairwise(ctx, db.BindAgentThreadPairwiseParams{
-		PairAgentIDA: sql.NullString{String: infra.ID, Valid: true},
-		PairAgentIDB: sql.NullString{String: lead.ID, Valid: true},
-		Cwd:          pair.Cwd,
-		Title:        pair.Title,
-		ID:           pair.ID,
+		PairAgentSlugA: sql.NullString{String: "infra", Valid: true},
+		PairAgentSlugB: sql.NullString{String: "lead", Valid: true},
+		Cwd:            pair.Cwd,
+		Title:          pair.Title,
+		ID:             pair.ID,
 	}); err != nil {
 		t.Fatal(err)
 	}

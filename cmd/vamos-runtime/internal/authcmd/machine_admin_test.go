@@ -24,7 +24,7 @@ func TestCreateMachineKeyWritesDBAndPrintsSecretOnce(t *testing.T) {
 	}
 	keyID := extractOutputValue(t, got, "key_id:")
 	secret := extractOutputValue(t, got, "secret:")
-	svc, err := dbsvc.NewService(dbPath)
+	svc, err := dbsvc.NewService(dbPath, filepath.Join(t.TempDir(), "agents.yml"))
 	if err != nil {
 		t.Fatalf("NewService: %v", err)
 	}
@@ -85,7 +85,7 @@ func TestRevokeMachineKeyPreventsAuth(t *testing.T) {
 	if err := cmd.Execute(); err != nil {
 		t.Fatalf("Execute revoke: %v", err)
 	}
-	svc, err := dbsvc.NewService(dbPath)
+	svc, err := dbsvc.NewService(dbPath, filepath.Join(t.TempDir(), "agents.yml"))
 	if err != nil {
 		t.Fatalf("NewService: %v", err)
 	}

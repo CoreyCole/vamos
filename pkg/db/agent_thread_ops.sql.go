@@ -46,7 +46,7 @@ func (q *Queries) DeleteAgentThreadOp(ctx context.Context, arg DeleteAgentThread
 const getAgentThreadOp = `-- name: GetAgentThreadOp :one
 ;
 
-SELECT thread_id, op_id, speaker_agent_id, from_kind, from_agent_id, from_user_email, body, created_at
+SELECT thread_id, op_id, speaker_agent_slug, from_kind, from_agent_slug, from_user_email, body, created_at
 FROM agent_thread_ops
 WHERE thread_id = ?1
 AND op_id = ?2
@@ -63,9 +63,9 @@ func (q *Queries) GetAgentThreadOp(ctx context.Context, arg GetAgentThreadOpPara
 	err := row.Scan(
 		&i.ThreadID,
 		&i.OpID,
-		&i.SpeakerAgentID,
+		&i.SpeakerAgentSlug,
 		&i.FromKind,
-		&i.FromAgentID,
+		&i.FromAgentSlug,
 		&i.FromUserEmail,
 		&i.Body,
 		&i.CreatedAt,
@@ -77,9 +77,9 @@ const insertAgentThreadOp = `-- name: InsertAgentThreadOp :execrows
 INSERT INTO agent_thread_ops (
     thread_id,
     op_id,
-    speaker_agent_id,
+    speaker_agent_slug,
     from_kind,
-    from_agent_id,
+    from_agent_slug,
     from_user_email,
     body
 )
@@ -96,22 +96,22 @@ ON CONFLICT (thread_id, op_id) DO NOTHING
 `
 
 type InsertAgentThreadOpParams struct {
-	ThreadID       string         `json:"thread_id"`
-	OpID           string         `json:"op_id"`
-	SpeakerAgentID sql.NullString `json:"speaker_agent_id"`
-	FromKind       string         `json:"from_kind"`
-	FromAgentID    sql.NullString `json:"from_agent_id"`
-	FromUserEmail  string         `json:"from_user_email"`
-	Body           string         `json:"body"`
+	ThreadID         string         `json:"thread_id"`
+	OpID             string         `json:"op_id"`
+	SpeakerAgentSlug sql.NullString `json:"speaker_agent_slug"`
+	FromKind         string         `json:"from_kind"`
+	FromAgentSlug    sql.NullString `json:"from_agent_slug"`
+	FromUserEmail    string         `json:"from_user_email"`
+	Body             string         `json:"body"`
 }
 
 func (q *Queries) InsertAgentThreadOp(ctx context.Context, arg InsertAgentThreadOpParams) (int64, error) {
 	result, err := q.db.ExecContext(ctx, insertAgentThreadOp,
 		arg.ThreadID,
 		arg.OpID,
-		arg.SpeakerAgentID,
+		arg.SpeakerAgentSlug,
 		arg.FromKind,
-		arg.FromAgentID,
+		arg.FromAgentSlug,
 		arg.FromUserEmail,
 		arg.Body,
 	)

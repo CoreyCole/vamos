@@ -17,7 +17,7 @@ INSERT INTO agent_runs (
     workflow_result_json,
     root_doc_path,
     error_message,
-    speaker_agent_id
+    speaker_agent_slug
 )
 VALUES (
     sqlc.arg('id'),
@@ -37,7 +37,7 @@ VALUES (
     sqlc.narg('workflow_result_json'),
     sqlc.arg('root_doc_path'),
     sqlc.narg('error_message'),
-    sqlc.narg('speaker_agent_id')
+    sqlc.narg('speaker_agent_slug')
 )
 RETURNING * ;
 

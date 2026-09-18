@@ -21,7 +21,10 @@ import (
 func TestPairwiseRoomsShareThreadAndURL(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
-	dbSvc, err := servicedb.NewService(filepath.Join(t.TempDir(), "pair.db"))
+	dbSvc, err := servicedb.NewService(
+		filepath.Join(t.TempDir(), "pair.db"),
+		filepath.Join(t.TempDir(), "agents.yml"),
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -31,6 +34,7 @@ func TestPairwiseRoomsShareThreadAndURL(t *testing.T) {
 		t.Fatal(err)
 	}
 	svc.WithQueries(dbSvc.Queries)
+	withTestRoster(t, svc)
 	mustMkdirAll(t, filepath.Join(root, "owner", "plans", "alpha"))
 	svc.WithWorkbenchThreadRenderer(&threadWorkbenchTestRenderer{
 		threadPlanDir: "owner/plans/alpha",
@@ -102,7 +106,10 @@ func TestPlanRoomWithoutLeadDisablesComposerAndBindingPersists(t *testing.T) {
 		t.Fatal(err)
 	}
 	mustWriteFile(t, filepath.Join(planAbs, "design.md"), []byte("# Design\n"))
-	dbSvc, err := servicedb.NewService(filepath.Join(t.TempDir(), "lead.db"))
+	dbSvc, err := servicedb.NewService(
+		filepath.Join(t.TempDir(), "lead.db"),
+		filepath.Join(t.TempDir(), "agents.yml"),
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -125,6 +132,7 @@ func TestPlanRoomWithoutLeadDisablesComposerAndBindingPersists(t *testing.T) {
 		t.Fatal(err)
 	}
 	svc.WithQueries(dbSvc.Queries)
+	withTestRoster(t, svc)
 	svc.WithWorkbenchThreadRenderer(&threadWorkbenchTestRenderer{
 		ensureID:      "thread-plan",
 		threadPlanDir: "thoughts/" + planRel,
@@ -175,14 +183,10 @@ func TestPlanRoomWithoutLeadDisablesComposerAndBindingPersists(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !row.LeadAgentID.Valid {
-		t.Fatal("lead_agent_id not persisted")
+	if !row.LeadAgentSlug.Valid {
+		t.Fatal("lead_agent_slug not persisted")
 	}
-	agent, err := dbSvc.Queries.GetAgentBySlug(ctx, "nova")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if row.LeadAgentID.String != agent.ID {
-		t.Fatalf("lead = %q want %q", row.LeadAgentID.String, agent.ID)
+	if row.LeadAgentSlug.String != "nova" {
+		t.Fatalf("lead = %q want nova", row.LeadAgentSlug.String)
 	}
 }

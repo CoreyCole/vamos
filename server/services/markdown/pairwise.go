@@ -13,6 +13,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
 
+	"github.com/CoreyCole/vamos/pkg/agents/roster"
 	"github.com/CoreyCole/vamos/pkg/db"
 )
 
@@ -20,30 +21,28 @@ func (s *Service) resolvePairwiseThread(
 	ctx context.Context,
 	slugA, slugB, userEmail string,
 ) (string, error) {
-	if s.queries == nil {
+	if s.queries == nil || s.roster == nil {
 		return "", nil
 	}
 	left, right, err := canonicalPairSlugs(slugA, slugB)
 	if err != nil {
 		return "", echo.NewHTTPError(http.StatusNotFound, err.Error())
 	}
-	agentA, err := s.queries.GetAgentBySlug(ctx, left)
-	if errors.Is(err, sql.ErrNoRows) {
-		return "", nil
-	}
-	if err != nil {
+	if _, err := s.roster.Get(left); err != nil {
+		if errors.Is(err, roster.ErrNotFound) || errors.Is(err, roster.ErrArchived) {
+			return "", echo.NewHTTPError(http.StatusNotFound, "agent not found")
+		}
 		return "", err
 	}
-	agentB, err := s.queries.GetAgentBySlug(ctx, right)
-	if errors.Is(err, sql.ErrNoRows) {
-		return "", nil
-	}
-	if err != nil {
+	if _, err := s.roster.Get(right); err != nil {
+		if errors.Is(err, roster.ErrNotFound) || errors.Is(err, roster.ErrArchived) {
+			return "", echo.NewHTTPError(http.StatusNotFound, "agent not found")
+		}
 		return "", err
 	}
 	existing, err := s.queries.GetPairwiseThread(ctx, db.GetPairwiseThreadParams{
-		PairAgentIDA: sql.NullString{String: agentA.ID, Valid: true},
-		PairAgentIDB: sql.NullString{String: agentB.ID, Valid: true},
+		PairAgentSlugA: sql.NullString{String: left, Valid: true},
+		PairAgentSlugB: sql.NullString{String: right, Valid: true},
 	})
 	if err == nil {
 		return existing.ID, nil
@@ -70,11 +69,11 @@ func (s *Service) resolvePairwiseThread(
 		return "", err
 	}
 	if err := s.queries.BindAgentThreadPairwise(ctx, db.BindAgentThreadPairwiseParams{
-		PairAgentIDA: sql.NullString{String: agentA.ID, Valid: true},
-		PairAgentIDB: sql.NullString{String: agentB.ID, Valid: true},
-		Cwd:          cwd,
-		Title:        left + " / " + right,
-		ID:           threadID,
+		PairAgentSlugA: sql.NullString{String: left, Valid: true},
+		PairAgentSlugB: sql.NullString{String: right, Valid: true},
+		Cwd:            cwd,
+		Title:          left + " / " + right,
+		ID:             threadID,
 	}); err != nil {
 		return "", err
 	}

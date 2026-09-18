@@ -22,7 +22,7 @@ import (
 
 func newThreadDraftService(t *testing.T) (*Service, *db.Queries) {
 	t.Helper()
-	database, err := serverdb.NewService(filepath.Join(t.TempDir(), "drafts.db"))
+	database, err := serverdb.NewService(filepath.Join(t.TempDir(), "drafts.db"), filepath.Join(t.TempDir(), "agents.yml"))
 	if err != nil {
 		t.Fatal(err)
 	}

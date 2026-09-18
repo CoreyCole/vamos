@@ -13,6 +13,7 @@ import (
 	"gopkg.in/yaml.v3"
 
 	conversation "github.com/CoreyCole/vamos/pkg/agents/conversation"
+	"github.com/CoreyCole/vamos/pkg/agents/roster"
 	"github.com/CoreyCole/vamos/pkg/db"
 )
 
@@ -263,14 +264,7 @@ func ValidateAgentSlug(slug string) error {
 }
 
 func validateSlug(slug string) error {
-	slug = strings.TrimSpace(slug)
-	if slug == "" || slug == "." || slug == ".." || strings.ContainsAny(slug, `/\\`) {
-		return fmt.Errorf("invalid slug %q", slug)
-	}
-	if slug == "a2a" || strings.HasPrefix(slug, "_") {
-		return fmt.Errorf("reserved slug %q", slug)
-	}
-	return nil
+	return roster.ValidateSlug(slug)
 }
 
 // SeedBotHomeTree writes thoughts/agents/{slug}/ role files and sessions dirs.

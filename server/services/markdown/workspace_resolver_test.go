@@ -171,7 +171,7 @@ func mustWriteFile(t *testing.T, path string, data []byte) {
 
 func newWorkspaceResolverTestQueries(t *testing.T) *pkgdb.Queries {
 	t.Helper()
-	service, err := servicedb.NewService(filepath.Join(t.TempDir(), "agents.db"))
+	service, err := servicedb.NewService(filepath.Join(t.TempDir(), "agents.db"), filepath.Join(t.TempDir(), "agents.yml"))
 	if err != nil {
 		t.Fatalf("NewService() error = %v", err)
 	}

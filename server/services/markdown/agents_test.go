@@ -12,14 +12,25 @@ import (
 
 	"github.com/labstack/echo/v4"
 
+	"github.com/CoreyCole/vamos/pkg/agents/roster"
 	"github.com/CoreyCole/vamos/server/services/agenthome"
 	servicedb "github.com/CoreyCole/vamos/server/services/db"
 )
 
+func withTestRoster(t *testing.T, svc *Service) string {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), "agents.yml")
+	svc.WithRoster(&roster.Store{Path: path})
+	return path
+}
+
 func TestCreateAgentSeedsDiskAndEnsuresHomeThread(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
-	dbSvc, err := servicedb.NewService(filepath.Join(t.TempDir(), "agents.db"))
+	dbSvc, err := servicedb.NewService(
+		filepath.Join(t.TempDir(), "agents.db"),
+		filepath.Join(t.TempDir(), "agents.yml"),
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -29,6 +40,7 @@ func TestCreateAgentSeedsDiskAndEnsuresHomeThread(t *testing.T) {
 		t.Fatal(err)
 	}
 	svc.WithQueries(dbSvc.Queries)
+	rosterPath := withTestRoster(t, svc)
 
 	ctx := context.Background()
 	a, err := svc.createAgent(ctx, createAgentInput{
@@ -68,6 +80,14 @@ func TestCreateAgentSeedsDiskAndEnsuresHomeThread(t *testing.T) {
 	if threadA == threadB {
 		t.Fatalf("two slugs shared thread %s", threadA)
 	}
+	body, err := os.ReadFile(rosterPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(body), "slug: nova") ||
+		!strings.Contains(string(body), "slug: research") {
+		t.Fatalf("roster yaml missing slugs: %s", body)
+	}
 
 	gotA, err := svc.resolveBotHomeThread(ctx, "nova", "t@example.com")
 	if err != nil {
@@ -92,7 +112,10 @@ func TestCreateAgentSeedsDiskAndEnsuresHomeThread(t *testing.T) {
 func TestCreateAgentRejectsReservedSlug(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
-	dbSvc, err := servicedb.NewService(filepath.Join(t.TempDir(), "agents.db"))
+	dbSvc, err := servicedb.NewService(
+		filepath.Join(t.TempDir(), "agents.db"),
+		filepath.Join(t.TempDir(), "agents.yml"),
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -102,6 +125,7 @@ func TestCreateAgentRejectsReservedSlug(t *testing.T) {
 		t.Fatal(err)
 	}
 	svc.WithQueries(dbSvc.Queries)
+	withTestRoster(t, svc)
 	_, err = svc.createAgent(
 		context.Background(),
 		createAgentInput{Slug: "a2a", Name: "Nope"},
@@ -122,10 +146,13 @@ func TestCreateAgentRejectsReservedSlug(t *testing.T) {
 	}
 }
 
-func TestServeAI470RoomUsesBotHomeThreadNotFixtureIndex(t *testing.T) {
+func TestCreateAgentRejectsArchivedSlug(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
-	dbSvc, err := servicedb.NewService(filepath.Join(t.TempDir(), "agents.db"))
+	dbSvc, err := servicedb.NewService(
+		filepath.Join(t.TempDir(), "agents.db"),
+		filepath.Join(t.TempDir(), "agents.yml"),
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -135,6 +162,51 @@ func TestServeAI470RoomUsesBotHomeThreadNotFixtureIndex(t *testing.T) {
 		t.Fatal(err)
 	}
 	svc.WithQueries(dbSvc.Queries)
+	rosterPath := withTestRoster(t, svc)
+	if err := os.WriteFile(
+		rosterPath,
+		[]byte("bots:\n  - slug: nova\n    name: Nova\n    archived: true\n"),
+		0o644,
+	); err != nil {
+		t.Fatal(err)
+	}
+	_, err = svc.createAgent(
+		context.Background(),
+		createAgentInput{Slug: "nova", Name: "Nova"},
+	)
+	if err == nil {
+		t.Fatal("archived slug accepted")
+	}
+	httpErr, ok := err.(*echo.HTTPError)
+	if !ok || httpErr.Code != http.StatusConflict {
+		t.Fatalf("err = %v", err)
+	}
+	body, err := os.ReadFile(rosterPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Count(string(body), "slug: nova") != 1 {
+		t.Fatalf("un-archived or duplicated slug: %s", body)
+	}
+}
+
+func TestServeAI470RoomUsesBotHomeThreadNotFixtureIndex(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	dbSvc, err := servicedb.NewService(
+		filepath.Join(t.TempDir(), "agents.db"),
+		filepath.Join(t.TempDir(), "agents.yml"),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = dbSvc.Close() })
+	svc, err := NewService(root, nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	svc.WithQueries(dbSvc.Queries)
+	withTestRoster(t, svc)
 	nova, err := svc.createAgent(context.Background(), createAgentInput{
 		Slug: "nova", Name: "Nova", UserEmail: "t@example.com",
 	})
@@ -166,7 +238,10 @@ func TestServeAI470RoomUsesBotHomeThreadNotFixtureIndex(t *testing.T) {
 func TestHandleCreateAgentRedirectsToBotHome(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
-	dbSvc, err := servicedb.NewService(filepath.Join(t.TempDir(), "agents.db"))
+	dbSvc, err := servicedb.NewService(
+		filepath.Join(t.TempDir(), "agents.db"),
+		filepath.Join(t.TempDir(), "agents.yml"),
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -176,6 +251,7 @@ func TestHandleCreateAgentRedirectsToBotHome(t *testing.T) {
 		t.Fatal(err)
 	}
 	svc.WithQueries(dbSvc.Queries)
+	withTestRoster(t, svc)
 
 	form := strings.NewReader("slug=hermes&name=Hermes")
 	req := httptest.NewRequest(http.MethodPost, "/agents", form)

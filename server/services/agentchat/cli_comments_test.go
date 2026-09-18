@@ -177,7 +177,7 @@ func newCLIQuoteCommentsFixture(
 			t.Fatal(err)
 		}
 	}
-	database, err := serverdb.NewService(filepath.Join(t.TempDir(), "comments.db"))
+	database, err := serverdb.NewService(filepath.Join(t.TempDir(), "comments.db"), filepath.Join(t.TempDir(), "agents.yml"))
 	if err != nil {
 		t.Fatal(err)
 	}

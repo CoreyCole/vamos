@@ -196,7 +196,7 @@ func (s *Service) EnsureSharedThreadForDoc(
 			ctx,
 			params.PlanDirRel.String,
 		); err == nil {
-			lead = row.LeadAgentID
+			lead = row.LeadAgentSlug
 		} else if !errors.Is(
 			err,
 			sql.ErrNoRows,
@@ -205,10 +205,10 @@ func (s *Service) EnsureSharedThreadForDoc(
 		}
 	}
 	if err := s.queries.BindAgentThreadPlan(ctx, db.BindAgentThreadPlanParams{
-		AgentID: lead,
-		Cwd:     cwd,
-		Title:   title,
-		ID:      thread.ID,
+		AgentSlug: lead,
+		Cwd:       cwd,
+		Title:     title,
+		ID:        thread.ID,
 	}); err != nil {
 		return "", err
 	}

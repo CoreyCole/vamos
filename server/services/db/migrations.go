@@ -5,7 +5,13 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
+
+	"gopkg.in/yaml.v3"
+
+	"github.com/CoreyCole/vamos/pkg/agents/roster"
 )
 
 type execer interface {
@@ -17,7 +23,282 @@ func enableSQLiteForeignKeys(ctx context.Context, database *sql.DB) error {
 	return err
 }
 
-func prepareSchemaCompatibilityMigrations(ctx context.Context, database *sql.DB) error {
+func cutoverAgentsToRoster(
+	ctx context.Context,
+	database *sql.DB,
+	rosterPath string,
+) error {
+	agentsExist, err := tableExists(ctx, database, "agents")
+	if err != nil {
+		return err
+	}
+	threadsExist, err := tableExists(ctx, database, "agent_threads")
+	if err != nil {
+		return err
+	}
+	var threadsHaveSlug bool
+	if threadsExist {
+		threadsHaveSlug, err = tableColumnExists(
+			ctx,
+			database,
+			"agent_threads",
+			"agent_slug",
+		)
+		if err != nil {
+			return err
+		}
+	}
+	if !agentsExist && (!threadsExist || threadsHaveSlug) {
+		return nil
+	}
+	if agentsExist {
+		if strings.TrimSpace(rosterPath) == "" {
+			return errors.New("cutover: agents table exists but roster path is empty")
+		}
+		if err := exportAgentsRosterIfMissing(ctx, database, rosterPath); err != nil {
+			return err
+		}
+	}
+	if err := addAgentSlugPointerColumns(ctx, database); err != nil {
+		return err
+	}
+	if agentsExist {
+		if err := copyAgentSlugsFromAgentsTable(ctx, database); err != nil {
+			return err
+		}
+	}
+	if err := replaceUUIDAgentPointerIndexes(ctx, database); err != nil {
+		return err
+	}
+	for _, col := range agentUUIDPointerColumns {
+		if err := dropColumnIfExists(ctx, database, col.table, col.uuid); err != nil {
+			return err
+		}
+	}
+	if _, err := database.ExecContext(ctx, "DROP TABLE IF EXISTS agents"); err != nil {
+		return err
+	}
+	_, err = database.ExecContext(ctx, "DROP INDEX IF EXISTS idx_agents_slug_active")
+	return err
+}
+
+var agentUUIDPointerColumns = []struct {
+	table string
+
+	uuid string
+	slug string
+}{
+	{table: "plan_workspaces", uuid: "lead_agent_id", slug: "lead_agent_slug"},
+	{table: "agent_threads", uuid: "agent_id", slug: "agent_slug"},
+	{table: "agent_threads", uuid: "pair_agent_id_a", slug: "pair_agent_slug_a"},
+	{table: "agent_threads", uuid: "pair_agent_id_b", slug: "pair_agent_slug_b"},
+	{table: "agent_runs", uuid: "speaker_agent_id", slug: "speaker_agent_slug"},
+	{table: "agent_thread_ops", uuid: "speaker_agent_id", slug: "speaker_agent_slug"},
+	{table: "agent_thread_ops", uuid: "from_agent_id", slug: "from_agent_slug"},
+}
+
+func exportAgentsRosterIfMissing(
+	ctx context.Context,
+	database *sql.DB,
+	rosterPath string,
+) error {
+	_, err := os.Stat(rosterPath)
+	if err == nil {
+		return nil
+	}
+	if !errors.Is(err, os.ErrNotExist) {
+		return err
+	}
+	rows, err := database.QueryContext(
+		ctx,
+		`SELECT id, slug, name, label, description, archived_at FROM agents`,
+	)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	doc := roster.Document{Bots: []roster.Bot{}}
+	for rows.Next() {
+		var (
+			id, slug, name, label, description sql.NullString
+			archivedAt                         sql.NullString
+		)
+		if err := rows.Scan(
+			&id,
+			&slug,
+			&name,
+			&label,
+			&description,
+			&archivedAt,
+		); err != nil {
+			return err
+		}
+		doc.Bots = append(doc.Bots, roster.Bot{
+			Slug:        slug.String,
+			Name:        name.String,
+			Label:       label.String,
+			Description: description.String,
+			Archived:    archivedAt.Valid && archivedAt.String != "",
+		})
+	}
+	if err := rows.Err(); err != nil {
+		return err
+	}
+	data, err := yaml.Marshal(doc)
+	if err != nil {
+		return err
+	}
+	if err := os.MkdirAll(filepath.Dir(rosterPath), 0o755); err != nil {
+		return err
+	}
+	return os.WriteFile(rosterPath, data, 0o644)
+}
+
+func addAgentSlugPointerColumns(ctx context.Context, database *sql.DB) error {
+	for _, col := range agentUUIDPointerColumns {
+		if err := ensureColumnIfTableExists(
+			ctx,
+			database,
+			col.table,
+			col.slug,
+			"TEXT",
+		); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func copyAgentSlugsFromAgentsTable(ctx context.Context, database *sql.DB) error {
+	for _, col := range agentUUIDPointerColumns {
+		exists, err := tableExists(ctx, database, col.table)
+		if err != nil {
+			return err
+		}
+		if !exists {
+			continue
+		}
+		hasUUID, err := tableColumnExists(ctx, database, col.table, col.uuid)
+		if err != nil {
+			return err
+		}
+		if !hasUUID {
+			continue
+		}
+		query := fmt.Sprintf(
+			`UPDATE %s SET %s = (SELECT slug FROM agents WHERE agents.id = %s.%s)`,
+			col.table, col.slug, col.table, col.uuid,
+		)
+		if _, err := database.ExecContext(ctx, query); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func replaceUUIDAgentPointerIndexes(ctx context.Context, database *sql.DB) error {
+	uuidIndexes := []struct {
+		name       string
+		uuidCols   []string
+		slugCreate string
+	}{
+		{
+			name:     "idx_agent_threads_bot_home_agent",
+			uuidCols: []string{"agent_id"},
+			slugCreate: `CREATE UNIQUE INDEX IF NOT EXISTS idx_agent_threads_bot_home_agent
+ON agent_threads (agent_slug)
+WHERE archived_at IS NULL AND room_kind = 'bot_home' AND agent_slug IS NOT NULL`,
+		},
+		{
+			name:     "idx_agent_threads_pairwise_agents",
+			uuidCols: []string{"pair_agent_id_a", "pair_agent_id_b"},
+			slugCreate: `CREATE UNIQUE INDEX IF NOT EXISTS idx_agent_threads_pairwise_agents
+ON agent_threads (pair_agent_slug_a, pair_agent_slug_b)
+WHERE archived_at IS NULL AND room_kind = 'pairwise'
+AND pair_agent_slug_a IS NOT NULL AND pair_agent_slug_b IS NOT NULL`,
+		},
+	}
+	for _, idx := range uuidIndexes {
+		onUUID, err := indexCoversColumns(ctx, database, idx.name, idx.uuidCols)
+		if err != nil {
+			return err
+		}
+		if onUUID {
+			if _, err := database.ExecContext(
+				ctx,
+				"DROP INDEX IF EXISTS "+idx.name,
+			); err != nil {
+				return err
+			}
+		}
+		exists, err := tableExists(ctx, database, "agent_threads")
+		if err != nil {
+			return err
+		}
+		if !exists {
+			continue
+		}
+		hasRoomKind, err := tableColumnExists(
+			ctx,
+			database,
+			"agent_threads",
+			"room_kind",
+		)
+		if err != nil {
+			return err
+		}
+		if !hasRoomKind {
+			continue
+		}
+		if _, err := database.ExecContext(ctx, idx.slugCreate); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func indexCoversColumns(
+	ctx context.Context,
+	database *sql.DB,
+	indexName string,
+	want []string,
+) (bool, error) {
+	rows, err := database.QueryContext(ctx, "PRAGMA index_info("+indexName+")")
+	if err != nil {
+		return false, err
+	}
+	defer rows.Close()
+	var have []string
+	for rows.Next() {
+		var seqno, cid int
+		var name sql.NullString
+		if err := rows.Scan(&seqno, &cid, &name); err != nil {
+			return false, err
+		}
+		have = append(have, name.String)
+	}
+	if err := rows.Err(); err != nil {
+		return false, err
+	}
+	if len(have) != len(want) {
+		return false, nil
+	}
+	for i := range want {
+		if have[i] != want[i] {
+			return false, nil
+		}
+	}
+	return true, nil
+}
+
+func prepareSchemaCompatibilityMigrations(
+	ctx context.Context,
+	database *sql.DB,
+	rosterPath string,
+) error {
+	if err := cutoverAgentsToRoster(ctx, database, rosterPath); err != nil {
+		return err
+	}
 	if err := ensureAgentRunsWorkflowColumnsIfTableExists(ctx, database); err != nil {
 		return err
 	}
@@ -114,7 +395,14 @@ func prepareSchemaCompatibilityMigrations(ctx context.Context, database *sql.DB)
 	return ensureArtifactCommentsDocPathColumn(ctx, database)
 }
 
-func runRuntimeMigrations(ctx context.Context, database *sql.DB) error {
+func runRuntimeMigrations(
+	ctx context.Context,
+	database *sql.DB,
+	rosterPath string,
+) error {
+	if err := cutoverAgentsToRoster(ctx, database, rosterPath); err != nil {
+		return err
+	}
 	if err := ensureLayoutPreferencesViewportClass(ctx, database); err != nil {
 		return err
 	}
@@ -705,7 +993,7 @@ func ensurePlanWorkspacesColumns(
 		{name: "qrspi_closed_reason", definition: "TEXT NOT NULL DEFAULT ''"},
 		{name: "archive_reason", definition: "TEXT NOT NULL DEFAULT '' CHECK (archive_reason IN ('', 'manual', 'missing_from_disk', 'lifecycle_closed'))"},
 		{name: "archived_by_email", definition: "TEXT NOT NULL DEFAULT ''"},
-		{name: "lead_agent_id", definition: "TEXT REFERENCES agents(id)"},
+		{name: "lead_agent_slug", definition: "TEXT"},
 	} {
 		if err := ensureColumn(
 			ctx,
@@ -880,78 +1168,40 @@ func ensureAgentThreadWorkspaces(ctx context.Context, database *sql.DB) error {
 }
 
 func ensureAgentsAndThreadRoomColumns(ctx context.Context, database *sql.DB) error {
-	agentsSQL := `
-CREATE TABLE IF NOT EXISTS agents (
-id TEXT PRIMARY KEY,
-slug TEXT NOT NULL,
-name TEXT NOT NULL,
-label TEXT NOT NULL DEFAULT '',
-description TEXT NOT NULL DEFAULT '',
-created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-archived_at DATETIME
-)`
-	if _, err := database.ExecContext(ctx, agentsSQL); err != nil {
-		return err
-	}
-	if err := ensureIndex(
-		ctx,
-		database,
-		"CREATE UNIQUE INDEX IF NOT EXISTS idx_agents_slug_active ON agents (slug) WHERE archived_at IS NULL",
-	); err != nil {
-		return err
-	}
 	exists, err := tableExists(ctx, database, "agent_threads")
 	if err != nil || !exists {
 		return err
 	}
-	if err := ensureColumn(
-		ctx,
-		database,
-		"agent_threads",
-		"agent_id",
-		"TEXT REFERENCES agents(id)",
-	); err != nil {
-		return err
-	}
-	if err := ensureColumn(
-		ctx,
-		database,
-		"agent_threads",
-		"room_kind",
-		"TEXT NOT NULL DEFAULT ''",
-	); err != nil {
-		return err
-	}
-	if err := ensureColumn(
-		ctx,
-		database,
-		"agent_threads",
-		"pair_agent_id_a",
-		"TEXT REFERENCES agents(id)",
-	); err != nil {
-		return err
-	}
-	if err := ensureColumn(
-		ctx,
-		database,
-		"agent_threads",
-		"pair_agent_id_b",
-		"TEXT REFERENCES agents(id)",
-	); err != nil {
-		return err
+	for _, column := range []struct {
+		name       string
+		definition string
+	}{
+		{name: "agent_slug", definition: "TEXT"},
+		{name: "room_kind", definition: "TEXT NOT NULL DEFAULT ''"},
+		{name: "pair_agent_slug_a", definition: "TEXT"},
+		{name: "pair_agent_slug_b", definition: "TEXT"},
+	} {
+		if err := ensureColumn(
+			ctx,
+			database,
+			"agent_threads",
+			column.name,
+			column.definition,
+		); err != nil {
+			return err
+		}
 	}
 	if err := ensureIndex(
 		ctx,
 		database,
-		"CREATE UNIQUE INDEX IF NOT EXISTS idx_agent_threads_bot_home_agent ON agent_threads (agent_id) WHERE archived_at IS NULL AND room_kind = 'bot_home' AND agent_id IS NOT NULL",
+		`CREATE UNIQUE INDEX IF NOT EXISTS idx_agent_threads_bot_home_agent ON agent_threads (agent_slug) WHERE archived_at IS NULL AND room_kind = 'bot_home' AND agent_slug IS NOT NULL`,
 	); err != nil {
 		return err
 	}
 	return ensureIndex(
 		ctx,
 		database,
-		"CREATE UNIQUE INDEX IF NOT EXISTS idx_agent_threads_pairwise_agents ON agent_threads (pair_agent_id_a, pair_agent_id_b) WHERE archived_at IS NULL AND room_kind = 'pairwise' AND pair_agent_id_a IS NOT NULL AND pair_agent_id_b IS NOT NULL",
+		`CREATE UNIQUE INDEX IF NOT EXISTS idx_agent_threads_pairwise_agents ON agent_threads (pair_agent_slug_a, pair_agent_slug_b) WHERE archived_at IS NULL AND room_kind = 'pairwise' AND pair_agent_slug_a IS NOT NULL AND pair_agent_slug_b IS NOT NULL`,
 	)
 }
 
@@ -1004,7 +1254,7 @@ func ensureAgentRunsWorkflowColumns(ctx context.Context, database *sql.DB) error
 		{name: "workflow_attempt", definition: "INTEGER NOT NULL DEFAULT 0"},
 		{name: "workflow_result_status", definition: "TEXT"},
 		{name: "workflow_result_json", definition: "TEXT"},
-		{name: "speaker_agent_id", definition: "TEXT REFERENCES agents(id)"},
+		{name: "speaker_agent_slug", definition: "TEXT"},
 	} {
 		if err := ensureColumn(
 			ctx,
@@ -1023,21 +1273,40 @@ func ensureAgentThreadOps(ctx context.Context, database *sql.DB) error {
 	if err := ensureAgentRunsWorkflowColumnsIfTableExists(ctx, database); err != nil {
 		return err
 	}
-	_, err := database.ExecContext(
+	if _, err := database.ExecContext(
 		ctx,
 		`CREATE TABLE IF NOT EXISTS agent_thread_ops (
 thread_id TEXT NOT NULL REFERENCES agent_threads (id),
 op_id TEXT NOT NULL,
-speaker_agent_id TEXT REFERENCES agents (id),
+speaker_agent_slug TEXT,
 from_kind TEXT NOT NULL CHECK (from_kind IN ('user', 'agent')),
-from_agent_id TEXT REFERENCES agents (id),
+from_agent_slug TEXT,
 from_user_email TEXT NOT NULL DEFAULT '',
 body TEXT NOT NULL DEFAULT '',
 created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
 PRIMARY KEY (thread_id, op_id)
 )`,
-	)
-	return err
+	); err != nil {
+		return err
+	}
+	for _, column := range []struct {
+		name       string
+		definition string
+	}{
+		{name: "speaker_agent_slug", definition: "TEXT"},
+		{name: "from_agent_slug", definition: "TEXT"},
+	} {
+		if err := ensureColumn(
+			ctx,
+			database,
+			"agent_thread_ops",
+			column.name,
+			column.definition,
+		); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func ensureColumn(

@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/CoreyCole/vamos/pkg/agents/roster"
 	"github.com/CoreyCole/vamos/pkg/db"
 	serverdb "github.com/CoreyCole/vamos/server/services/db"
 )
@@ -300,28 +301,19 @@ func TestLastWorkingContextPreviewEmptyFile(t *testing.T) {
 
 func TestPrepareRoomSessionInjectsLiveAgentRoster(t *testing.T) {
 	t.Parallel()
-	database, err := serverdb.NewService(filepath.Join(t.TempDir(), "roster.db"))
+	database, err := serverdb.NewService(
+		filepath.Join(t.TempDir(), "roster.db"),
+		filepath.Join(t.TempDir(), "agents.yml"),
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = database.Close() })
 	ctx := t.Context()
-	if _, err := database.Queries.CreateAgent(ctx, db.CreateAgentParams{
-		ID:          "agent-nova",
-		Slug:        "nova",
-		Name:        "Nova",
-		Label:       "lead",
-		Description: "does work",
-	}); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := database.Queries.CreateAgent(ctx, db.CreateAgentParams{
-		ID:   "agent-other",
-		Slug: "other",
-		Name: "Other",
-	}); err != nil {
-		t.Fatal(err)
-	}
+	store := seedTestRoster(t,
+		roster.Bot{Slug: "nova", Name: "Nova", Label: "lead", Description: "does work"},
+		roster.Bot{Slug: "other", Name: "Other"},
+	)
 
 	root := t.TempDir()
 	cwd := filepath.Join(root, "agents", "nova")
@@ -331,11 +323,12 @@ func TestPrepareRoomSessionInjectsLiveAgentRoster(t *testing.T) {
 	svc := &Service{
 		queries:      database.Queries,
 		thoughtsRoot: root,
+		roster:       store,
 	}
 	_, _, _, injectFiles, err := svc.prepareRoomSession(ctx, db.AgentThread{
 		ID:  "thread-home",
 		Cwd: cwd,
-	}, "agent-nova")
+	}, "nova")
 	if err != nil {
 		t.Fatal(err)
 	}

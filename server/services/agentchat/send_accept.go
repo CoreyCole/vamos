@@ -152,7 +152,10 @@ func (s *Service) AcceptResumeFreeformThread(
 	if err := GuardHumanCompose(thread); err != nil {
 		return nil, err
 	}
-	if err := GuardEnqueueDestination(thread, EnqueueMail{FromKind: EnqueueFromUser}); err != nil {
+	if err := GuardEnqueueDestination(
+		thread,
+		EnqueueMail{FromKind: EnqueueFromUser},
+	); err != nil {
 		return nil, err
 	}
 
@@ -162,12 +165,12 @@ func (s *Service) AcceptResumeFreeformThread(
 	rows, err := s.queries.InsertAgentThreadOp(ctx, db.InsertAgentThreadOpParams{
 		ThreadID: thread.ID,
 		OpID:     opID,
-		SpeakerAgentID: sql.NullString{
+		SpeakerAgentSlug: sql.NullString{
 			String: speakerID,
 			Valid:  speakerID != "",
 		},
 		FromKind:      EnqueueFromUser,
-		FromAgentID:   sql.NullString{},
+		FromAgentSlug: sql.NullString{},
 		FromUserEmail: userEmail,
 		Body:          prompt,
 	})

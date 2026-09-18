@@ -38,7 +38,7 @@ func newSelectCommentV2Service(t *testing.T) (*Service, *dbsvc.Service) {
 	); err != nil {
 		t.Fatal(err)
 	}
-	database, err := dbsvc.NewService(filepath.Join(t.TempDir(), "comments.db"))
+	database, err := dbsvc.NewService(filepath.Join(t.TempDir(), "comments.db"), filepath.Join(t.TempDir(), "agents.yml"))
 	if err != nil {
 		t.Fatal(err)
 	}

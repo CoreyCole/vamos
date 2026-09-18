@@ -25,7 +25,7 @@ func newTestCommentsService(t *testing.T) *Service {
 
 func newTestCommentsServiceWithBase(t *testing.T, markdownBasePath string) *Service {
 	t.Helper()
-	database, err := dbsvc.NewService(filepath.Join(t.TempDir(), "comments.db"))
+	database, err := dbsvc.NewService(filepath.Join(t.TempDir(), "comments.db"), filepath.Join(t.TempDir(), "agents.yml"))
 	if err != nil {
 		t.Fatalf("NewService() error = %v", err)
 	}

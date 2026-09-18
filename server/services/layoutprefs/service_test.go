@@ -18,7 +18,7 @@ import (
 func TestServiceUpsertGetReset(t *testing.T) {
 	t.Parallel()
 
-	svc, err := dbsvc.NewService(filepath.Join(t.TempDir(), "agents.db"))
+	svc, err := dbsvc.NewService(filepath.Join(t.TempDir(), "agents.db"), filepath.Join(t.TempDir(), "agents.yml"))
 	if err != nil {
 		t.Fatalf("NewService() error = %v", err)
 	}
@@ -101,7 +101,7 @@ func TestServiceUpsertGetReset(t *testing.T) {
 func TestLayoutPreferencesPartitionByViewportClass(t *testing.T) {
 	t.Parallel()
 
-	svc, err := dbsvc.NewService(filepath.Join(t.TempDir(), "agents.db"))
+	svc, err := dbsvc.NewService(filepath.Join(t.TempDir(), "agents.db"), filepath.Join(t.TempDir(), "agents.yml"))
 	if err != nil {
 		t.Fatalf("NewService() error = %v", err)
 	}
@@ -169,7 +169,7 @@ func TestLayoutPreferencesPartitionByViewportClass(t *testing.T) {
 func TestHandlerSaveAndReset(t *testing.T) {
 	t.Parallel()
 
-	svc, err := dbsvc.NewService(filepath.Join(t.TempDir(), "agents.db"))
+	svc, err := dbsvc.NewService(filepath.Join(t.TempDir(), "agents.db"), filepath.Join(t.TempDir(), "agents.yml"))
 	if err != nil {
 		t.Fatalf("NewService() error = %v", err)
 	}
@@ -237,7 +237,7 @@ func TestHandlerSaveAndReset(t *testing.T) {
 func TestHandlerResetAcceptsFormPayload(t *testing.T) {
 	t.Parallel()
 
-	svc, err := dbsvc.NewService(filepath.Join(t.TempDir(), "agents.db"))
+	svc, err := dbsvc.NewService(filepath.Join(t.TempDir(), "agents.db"), filepath.Join(t.TempDir(), "agents.yml"))
 	if err != nil {
 		t.Fatalf("NewService() error = %v", err)
 	}
@@ -268,7 +268,7 @@ func TestHandlerResetAcceptsFormPayload(t *testing.T) {
 func TestHandlerRejectsUnauthenticatedAndInvalidPayloads(t *testing.T) {
 	t.Parallel()
 
-	svc, err := dbsvc.NewService(filepath.Join(t.TempDir(), "agents.db"))
+	svc, err := dbsvc.NewService(filepath.Join(t.TempDir(), "agents.db"), filepath.Join(t.TempDir(), "agents.yml"))
 	if err != nil {
 		t.Fatalf("NewService() error = %v", err)
 	}
@@ -324,7 +324,7 @@ func TestHandlerRejectsUnauthenticatedAndInvalidPayloads(t *testing.T) {
 func TestServiceRejectsInvalidConfig(t *testing.T) {
 	t.Parallel()
 
-	svc, err := dbsvc.NewService(filepath.Join(t.TempDir(), "agents.db"))
+	svc, err := dbsvc.NewService(filepath.Join(t.TempDir(), "agents.db"), filepath.Join(t.TempDir(), "agents.yml"))
 	if err != nil {
 		t.Fatalf("NewService() error = %v", err)
 	}

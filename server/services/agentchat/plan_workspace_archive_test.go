@@ -19,7 +19,7 @@ import (
 
 func newPlanArchiveTestService(t *testing.T) (*Service, *db.Queries) {
 	t.Helper()
-	database, err := serverdb.NewService(filepath.Join(t.TempDir(), "plan-archive.db"))
+	database, err := serverdb.NewService(filepath.Join(t.TempDir(), "plan-archive.db"), filepath.Join(t.TempDir(), "agents.yml"))
 	if err != nil {
 		t.Fatalf("NewService: %v", err)
 	}

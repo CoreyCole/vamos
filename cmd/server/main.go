@@ -1077,7 +1077,11 @@ func main() {
 			"DATABASE_PATH=data/thoughts.db is ambiguous after pkg/agents cwd cutover; set an absolute DATABASE_PATH or ~/.local/state/cn-agents/agents.db",
 		)
 	}
-	dbService, err := db.NewService(cfg.DatabasePath)
+	rosterPath := config.ResolveRosterPath(basePath, "")
+	if useHostConfig {
+		rosterPath = hostCfg.Agents.RosterPath
+	}
+	dbService, err := db.NewService(cfg.DatabasePath, rosterPath)
 	if err != nil {
 		log.Fatal("Failed to initialize database:", err)
 	}
@@ -1129,10 +1133,6 @@ func main() {
 	)
 	if err != nil {
 		log.Fatal("Failed to create markdown service:", err)
-	}
-	rosterPath := config.ResolveRosterPath(basePath, "")
-	if useHostConfig {
-		rosterPath = hostCfg.Agents.RosterPath
 	}
 	rosterStore := &roster.Store{Path: rosterPath}
 

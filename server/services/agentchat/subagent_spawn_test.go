@@ -26,10 +26,10 @@ func TestSpawnSubagentInheritsParentEmailAndRoomKind(t *testing.T) {
 		t.Fatal(err)
 	}
 	if err := queries.BindAgentThreadPlan(ctx, db.BindAgentThreadPlanParams{
-		AgentID: sql.NullString{},
-		Cwd:     parent.Cwd,
-		Title:   parent.Title,
-		ID:      parent.ID,
+		AgentSlug: sql.NullString{},
+		Cwd:       parent.Cwd,
+		Title:     parent.Title,
+		ID:        parent.ID,
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -83,17 +83,11 @@ func TestAttachSubagentUpsertsSessionArtifactAndProjectedThread(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	agent, err := queries.CreateAgent(ctx, db.CreateAgentParams{
-		ID: "agent-nova", Slug: "nova", Name: "Nova",
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
 	if err := queries.BindAgentThreadBotHome(ctx, db.BindAgentThreadBotHomeParams{
-		AgentID: sql.NullString{String: agent.ID, Valid: true},
-		Cwd:     parent.Cwd,
-		Title:   parent.Title,
-		ID:      parent.ID,
+		AgentSlug: sql.NullString{String: "nova", Valid: true},
+		Cwd:       parent.Cwd,
+		Title:     parent.Title,
+		ID:        parent.ID,
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -159,7 +153,11 @@ func TestBuildLiveTranscriptStateIncludesSubagentCards(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	state, err := service.BuildLiveTranscriptState(ctx, "owner@example.com", "parent-live")
+	state, err := service.BuildLiveTranscriptState(
+		ctx,
+		"owner@example.com",
+		"parent-live",
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -188,7 +186,11 @@ func TestBuildLiveTranscriptStateIncludesSubagentCards(t *testing.T) {
 	}
 
 	var buf strings.Builder
-	if err := LiveTranscriptRegion("parent-live", state, "").Render(ctx, &buf); err != nil {
+	if err := LiveTranscriptRegion(
+		"parent-live",
+		state,
+		"",
+	).Render(ctx, &buf); err != nil {
 		t.Fatal(err)
 	}
 	html := buf.String()
@@ -205,7 +207,10 @@ func TestBuildLiveTranscriptStateIncludesSubagentCards(t *testing.T) {
 
 func TestSpawnDoesNotWriteRoomKindSubagent(t *testing.T) {
 	t.Parallel()
-	database, err := serverdb.NewService(filepath.Join(t.TempDir(), "no-subagent-kind.db"))
+	database, err := serverdb.NewService(
+		filepath.Join(t.TempDir(), "no-subagent-kind.db"),
+		filepath.Join(t.TempDir(), "agents.yml"),
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -225,10 +230,13 @@ func TestSpawnDoesNotWriteRoomKindSubagent(t *testing.T) {
 		t.Fatal("room_kind=subagent written")
 	}
 	// Attempting to set subagent via SetAgentThreadRoomKind must fail CHECK.
-	err = database.Queries.SetAgentThreadRoomKind(t.Context(), db.SetAgentThreadRoomKindParams{
-		RoomKind: "subagent",
-		ID:       child.ID,
-	})
+	err = database.Queries.SetAgentThreadRoomKind(
+		t.Context(),
+		db.SetAgentThreadRoomKindParams{
+			RoomKind: "subagent",
+			ID:       child.ID,
+		},
+	)
 	if err == nil {
 		t.Fatal("expected CHECK to reject room_kind=subagent")
 	}

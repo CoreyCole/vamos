@@ -51,7 +51,7 @@ LIMIT 1;
 
 -- name: SetPlanWorkspaceLeadAgent :exec
 UPDATE plan_workspaces
-SET lead_agent_id = sqlc.arg('lead_agent_id')
+SET lead_agent_slug = sqlc.arg('lead_agent_slug')
 WHERE plan_dir_rel = sqlc.arg('plan_dir_rel');
 
 -- name: UpsertDiscoveredPlanWorkspace :one

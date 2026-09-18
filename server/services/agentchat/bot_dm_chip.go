@@ -352,16 +352,16 @@ func (s *Service) notifyPairwiseOriginTranscripts(
 		}
 		s.notifyThreadScope(ctx, id, PatchLiveTranscript)
 	}
-	for _, agentID := range []string{
-		strings.TrimSpace(thread.PairAgentIDA.String),
-		strings.TrimSpace(thread.PairAgentIDB.String),
+	for _, agentSlug := range []string{
+		strings.TrimSpace(thread.PairAgentSlugA.String),
+		strings.TrimSpace(thread.PairAgentSlugB.String),
 	} {
-		if agentID == "" {
+		if agentSlug == "" {
 			continue
 		}
-		home, err := s.queries.GetBotHomeThreadByAgentID(
+		home, err := s.queries.GetBotHomeThreadBySlug(
 			ctx,
-			sql.NullString{String: agentID, Valid: true},
+			sql.NullString{String: agentSlug, Valid: true},
 		)
 		if err != nil {
 			continue

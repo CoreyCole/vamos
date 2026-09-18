@@ -73,12 +73,12 @@ func (s *Service) EnqueueThreadMail(
 	rows, err := s.queries.InsertAgentThreadOp(ctx, db.InsertAgentThreadOpParams{
 		ThreadID: threadID,
 		OpID:     opID,
-		SpeakerAgentID: sql.NullString{
+		SpeakerAgentSlug: sql.NullString{
 			String: speakerID,
 			Valid:  speakerID != "",
 		},
 		FromKind: fromKind,
-		FromAgentID: sql.NullString{
+		FromAgentSlug: sql.NullString{
 			String: strings.TrimSpace(in.FromAgentID),
 			Valid:  strings.TrimSpace(in.FromAgentID) != "",
 		},
@@ -124,7 +124,7 @@ func speakerAgentIDForMail(thread db.AgentThread, fromKind, fromAgentID string) 
 	if strings.TrimSpace(fromKind) == EnqueueFromAgent {
 		return strings.TrimSpace(fromAgentID)
 	}
-	return strings.TrimSpace(thread.AgentID.String)
+	return strings.TrimSpace(thread.AgentSlug.String)
 }
 
 func (s *Service) PrepareThreadTurn(
@@ -237,7 +237,7 @@ func (s *Service) createQueuedRun(
 		WorkflowResultJson:   sql.NullString{},
 		RootDocPath:          docRoot,
 		ErrorMessage:         sql.NullString{},
-		SpeakerAgentID: sql.NullString{
+		SpeakerAgentSlug: sql.NullString{
 			String: speakerAgentID,
 			Valid:  speakerAgentID != "",
 		},

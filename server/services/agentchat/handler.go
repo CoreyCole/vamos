@@ -2777,7 +2777,7 @@ func (h *Handler) HandleInternalEnqueue(c echo.Context) error {
 			return echo.NewHTTPError(resumeComposeHTTPStatus(err), err.Error())
 		}
 		payload.ThreadID = resolved.ThreadID
-		payload.SpeakerAgentID = resolved.SpeakerAgentID
+		payload.SpeakerAgentID = resolved.SpeakerSlug
 		payload.FromKind = EnqueueFromAgent
 	}
 	result, err := h.service.EnqueueThreadMail(

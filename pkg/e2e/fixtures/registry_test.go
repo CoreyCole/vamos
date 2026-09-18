@@ -217,7 +217,7 @@ func TestBuildWorkbenchV2ResetsFixtureOwnedState(t *testing.T) {
 }
 
 func TestBuildWorkbenchV2ResetsRealSchemaDependencyGraph(t *testing.T) {
-	database, err := serverdb.NewService(filepath.Join(t.TempDir(), "agents.db"))
+	database, err := serverdb.NewService(filepath.Join(t.TempDir(), "agents.db"), filepath.Join(t.TempDir(), "agents.yml"))
 	if err != nil {
 		t.Fatal(err)
 	}

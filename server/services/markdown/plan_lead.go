@@ -15,6 +15,7 @@ import (
 	"github.com/a-h/templ"
 	"github.com/labstack/echo/v4"
 
+	"github.com/CoreyCole/vamos/pkg/agents/roster"
 	"github.com/CoreyCole/vamos/pkg/db"
 	"github.com/CoreyCole/vamos/server/services/agenthome"
 )
@@ -210,8 +211,14 @@ func (s *Service) HandleBindPlanLead(c echo.Context) error {
 	if slug == "" {
 		return echo.NewHTTPError(http.StatusBadRequest, "agent_slug required")
 	}
-	agent, err := s.queries.GetAgentBySlug(c.Request().Context(), slug)
-	if errors.Is(err, sql.ErrNoRows) {
+	if s.roster == nil {
+		return echo.NewHTTPError(
+			http.StatusServiceUnavailable,
+			"database is not configured",
+		)
+	}
+	agent, err := s.roster.Get(slug)
+	if errors.Is(err, roster.ErrNotFound) || errors.Is(err, roster.ErrArchived) {
 		return echo.NewHTTPError(http.StatusNotFound, "agent not found")
 	}
 	if err != nil {
@@ -229,8 +236,8 @@ func (s *Service) HandleBindPlanLead(c echo.Context) error {
 	if err := s.queries.SetPlanWorkspaceLeadAgent(
 		c.Request().Context(),
 		db.SetPlanWorkspaceLeadAgentParams{
-			LeadAgentID: sql.NullString{String: agent.ID, Valid: true},
-			PlanDirRel:  planRel,
+			LeadAgentSlug: sql.NullString{String: agent.Slug, Valid: true},
+			PlanDirRel:    planRel,
 		},
 	); err != nil {
 		return err
@@ -251,10 +258,10 @@ func (s *Service) HandleBindPlanLead(c echo.Context) error {
 			if err := s.queries.BindAgentThreadPlan(
 				c.Request().Context(),
 				db.BindAgentThreadPlanParams{
-					AgentID: sql.NullString{String: agent.ID, Valid: true},
-					Cwd:     row.PlanDir,
-					Title:   row.Label,
-					ID:      threadID,
+					AgentSlug: sql.NullString{String: agent.Slug, Valid: true},
+					Cwd:       row.PlanDir,
+					Title:     row.Label,
+					ID:        threadID,
 				},
 			); err != nil {
 				return err
@@ -289,7 +296,8 @@ func (s *Service) planRoomNeedsLead(
 	if err != nil {
 		return false, err
 	}
-	return !row.LeadAgentID.Valid || strings.TrimSpace(row.LeadAgentID.String) == "", nil
+	return !row.LeadAgentSlug.Valid ||
+		strings.TrimSpace(row.LeadAgentSlug.String) == "", nil
 }
 
 func (s *Service) resolvePlanDirRelForRoom(
@@ -390,8 +398,8 @@ func (s *Service) planLeadBindComponent(
 	b.WriteString(
 		`<select id="plan-lead-agent-slug" name="agent_slug" class="rounded-md border border-border bg-background px-2 py-1 text-sm">`,
 	)
-	if s.queries != nil {
-		agents, err := s.queries.ListAgents(ctx)
+	if s.roster != nil {
+		agents, err := s.roster.List()
 		if err == nil {
 			for _, agent := range agents {
 				b.WriteString(`<option value="`)

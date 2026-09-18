@@ -6,78 +6,41 @@ import (
 	"testing"
 )
 
-func TestCreateAgentSlugUniqueAmongActive(t *testing.T) {
+func TestBotHomeThreadKeyedBySlug(t *testing.T) {
 	ctx := context.Background()
 	_, q := openWorkspaceDocsTestDB(t)
 
-	if _, err := q.CreateAgent(ctx, CreateAgentParams{
-		ID:   "agent-1",
-		Slug: "nova",
-		Name: "Nova",
-	}); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := q.CreateAgent(ctx, CreateAgentParams{
-		ID:   "agent-2",
-		Slug: "nova",
-		Name: "Nova 2",
-	}); err == nil {
-		t.Fatal("duplicate active slug accepted")
-	}
-	got, err := q.GetAgentBySlug(ctx, "nova")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if got.ID != "agent-1" {
-		t.Fatalf("GetAgentBySlug = %#v", got)
-	}
-}
-
-func TestBotHomeThreadKeyedByAgentID(t *testing.T) {
-	ctx := context.Background()
-	_, q := openWorkspaceDocsTestDB(t)
-
-	a, err := q.CreateAgent(
-		ctx,
-		CreateAgentParams{ID: "a1", Slug: "alpha", Name: "Alpha"},
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-	b, err := q.CreateAgent(ctx, CreateAgentParams{ID: "a2", Slug: "beta", Name: "Beta"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, agent := range []Agent{a, b} {
+	for _, slug := range []string{"alpha", "beta"} {
 		thread, err := q.CreateAgentThread(ctx, CreateAgentThreadParams{
-			ID:        "thread-" + agent.Slug,
+			ID:        "thread-" + slug,
 			UserEmail: "shared",
-			Title:     agent.Name,
-			Cwd:       "/tmp/" + agent.Slug,
-			LineageID: "lin-" + agent.Slug,
+			Title:     slug,
+			Cwd:       "/tmp/" + slug,
+			LineageID: "lin-" + slug,
 		})
 		if err != nil {
 			t.Fatal(err)
 		}
 		if err := q.BindAgentThreadBotHome(ctx, BindAgentThreadBotHomeParams{
-			AgentID: sql.NullString{String: agent.ID, Valid: true},
-			Cwd:     thread.Cwd,
-			Title:   agent.Name,
-			ID:      thread.ID,
+			AgentSlug: sql.NullString{String: slug, Valid: true},
+			Cwd:       thread.Cwd,
+			Title:     slug,
+			ID:        thread.ID,
 		}); err != nil {
 			t.Fatal(err)
 		}
 	}
-	homeA, err := q.GetBotHomeThreadByAgentID(
+
+	homeA, err := q.GetBotHomeThreadBySlug(
 		ctx,
-		sql.NullString{String: a.ID, Valid: true},
+		sql.NullString{String: "alpha", Valid: true},
 	)
 	if err != nil {
 		t.Fatal(err)
 	}
-	homeB, err := q.GetBotHomeThreadByAgentID(
+	homeB, err := q.GetBotHomeThreadBySlug(
 		ctx,
-		sql.NullString{String: b.ID, Valid: true},
+		sql.NullString{String: "beta", Valid: true},
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -87,5 +50,24 @@ func TestBotHomeThreadKeyedByAgentID(t *testing.T) {
 	}
 	if homeA.RoomKind != "bot_home" || homeB.RoomKind != "bot_home" {
 		t.Fatalf("room_kind a=%q b=%q", homeA.RoomKind, homeB.RoomKind)
+	}
+
+	dup, err := q.CreateAgentThread(ctx, CreateAgentThreadParams{
+		ID:        "thread-alpha-dup",
+		UserEmail: "shared",
+		Title:     "alpha-dup",
+		Cwd:       "/tmp/alpha-dup",
+		LineageID: "lin-alpha-dup",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := q.BindAgentThreadBotHome(ctx, BindAgentThreadBotHomeParams{
+		AgentSlug: sql.NullString{String: "alpha", Valid: true},
+		Cwd:       dup.Cwd,
+		Title:     "alpha-dup",
+		ID:        dup.ID,
+	}); err == nil {
+		t.Fatal("duplicate active bot_home agent_slug accepted")
 	}
 }

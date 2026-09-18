@@ -44,7 +44,7 @@ func (r *recordingTemporal) SignalWithStartWorkflow(
 
 func TestEnqueueThreadMailDedupesOpIDAcrossCalls(t *testing.T) {
 	t.Parallel()
-	database, err := serverdb.NewService(filepath.Join(t.TempDir(), "ops.db"))
+	database, err := serverdb.NewService(filepath.Join(t.TempDir(), "ops.db"), filepath.Join(t.TempDir(), "agents.yml"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -98,7 +98,7 @@ func TestEnqueueThreadMailDedupesOpIDAcrossCalls(t *testing.T) {
 
 func TestEnqueueThreadMailDeletesReceiptWhenSignalFails(t *testing.T) {
 	t.Parallel()
-	database, err := serverdb.NewService(filepath.Join(t.TempDir(), "ops-fail.db"))
+	database, err := serverdb.NewService(filepath.Join(t.TempDir(), "ops-fail.db"), filepath.Join(t.TempDir(), "agents.yml"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -144,7 +144,7 @@ func TestEnqueueThreadMailDeletesReceiptWhenSignalFails(t *testing.T) {
 
 func TestPrepareThreadTurnIsIdempotentForSameOp(t *testing.T) {
 	t.Parallel()
-	database, err := serverdb.NewService(filepath.Join(t.TempDir(), "prep.db"))
+	database, err := serverdb.NewService(filepath.Join(t.TempDir(), "prep.db"), filepath.Join(t.TempDir(), "agents.yml"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -191,7 +191,7 @@ func TestPrepareThreadTurnIsIdempotentForSameOp(t *testing.T) {
 
 func TestResumeThreadQueuesAttachments(t *testing.T) {
 	t.Parallel()
-	database, err := serverdb.NewService(filepath.Join(t.TempDir(), "resume.db"))
+	database, err := serverdb.NewService(filepath.Join(t.TempDir(), "resume.db"), filepath.Join(t.TempDir(), "agents.yml"))
 	if err != nil {
 		t.Fatal(err)
 	}

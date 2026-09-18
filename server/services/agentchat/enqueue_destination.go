@@ -44,8 +44,8 @@ func GuardEnqueueDestination(thread db.AgentThread, mail EnqueueMail) error {
 		if fromKind != EnqueueFromAgent {
 			return ErrPairwiseViewOnly
 		}
-		a := strings.TrimSpace(thread.PairAgentIDA.String)
-		b := strings.TrimSpace(thread.PairAgentIDB.String)
+		a := strings.TrimSpace(thread.PairAgentSlugA.String)
+		b := strings.TrimSpace(thread.PairAgentSlugB.String)
 		if fromAgentID == "" || (fromAgentID != a && fromAgentID != b) {
 			return ErrPairwiseSpeakerNotInPair
 		}
@@ -54,7 +54,7 @@ func GuardEnqueueDestination(thread db.AgentThread, mail EnqueueMail) error {
 		if fromKind != EnqueueFromAgent {
 			return nil
 		}
-		homeID := strings.TrimSpace(thread.AgentID.String)
+		homeID := strings.TrimSpace(thread.AgentSlug.String)
 		if fromAgentID != "" && fromAgentID == homeID {
 			return nil
 		}

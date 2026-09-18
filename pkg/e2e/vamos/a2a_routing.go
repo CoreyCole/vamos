@@ -14,6 +14,7 @@ import (
 	"github.com/coreycole/datastarui/e2e/spec"
 	"github.com/playwright-community/playwright-go"
 
+	"github.com/CoreyCole/vamos/pkg/agents/roster"
 	"github.com/CoreyCole/vamos/pkg/db"
 	"github.com/CoreyCole/vamos/server/services/agentchat"
 	serverdb "github.com/CoreyCole/vamos/server/services/db"
@@ -31,9 +32,6 @@ const (
 	a2aRoutingPlanEntryID     = "a2a-routing-plan-inbound"
 	a2aRoutingHomeQuoteID     = "a2a-routing-home-quote-v2"
 	a2aRoutingHomeToolID      = "a2a-routing-home-message-room"
-	a2aRoutingFromAgentID     = "a2a-route-alpha"
-	a2aRoutingToAgentID       = "a2a-route-beta"
-	a2aRoutingLeadAgentID     = "a2a-route-lead"
 	a2aRoutingFromHomeID      = "a2a-route-home-alpha"
 	a2aRoutingToHomeID        = "a2a-route-home-beta"
 )
@@ -51,12 +49,14 @@ func SeedA2ARoutingContract() spec.Step {
 			if thoughtsRoot == "" {
 				thoughtsRoot = filepath.Join(ctx.Config.RepoRoot, "thoughts")
 			}
-			database, err := serverdb.NewService(ws.DBPath)
+			rosterPath := filepath.Join(thoughtsRoot, "agents.yml")
+			database, err := serverdb.NewService(ws.DBPath, rosterPath)
 			if err != nil {
 				t.Fatal(err)
 			}
 			t.Cleanup(func() { _ = database.Close() })
 			q := database.Queries
+			store := &roster.Store{Path: rosterPath}
 			svc, err := agentchat.NewServiceWithOptions(
 				database.DB(),
 				q,
@@ -67,21 +67,22 @@ func SeedA2ARoutingContract() spec.Step {
 					ProjectRoot:  ctx.Config.RepoRoot,
 					ThoughtsRoot: thoughtsRoot,
 					DefaultCwd:   thoughtsRoot,
+					Roster:       store,
 				},
 			)
 			if err != nil {
 				t.Fatal(err)
 			}
 			bg := t.Context()
-			alpha := mustAgent(t, q, a2aRoutingFromAgentID, A2ARoutingFromSlug, "Alpha")
-			beta := mustAgent(t, q, a2aRoutingToAgentID, A2ARoutingToSlug, "Beta")
-			lead := mustAgent(t, q, a2aRoutingLeadAgentID, A2ARoutingLeadSlug, "Lead")
+			alpha := mustAgent(t, store, A2ARoutingFromSlug, "Alpha")
+			beta := mustAgent(t, store, A2ARoutingToSlug, "Beta")
+			lead := mustAgent(t, store, A2ARoutingLeadSlug, "Lead")
 			fromHomeID := ensureBotHome(t, q, alpha, a2aRoutingFromHomeID)
 			toHomeID := ensureBotHome(t, q, beta, a2aRoutingToHomeID)
 
 			pair, err := svc.ResolveMessageRoom(bg, agentchat.MessageRoomResolveInput{
 				To:          A2ARoutingToSlug,
-				FromAgentID: alpha.ID,
+				FromAgentID: alpha.Slug,
 			})
 			if err != nil {
 				t.Fatalf("resolve slug to pairwise: %v", err)
@@ -99,7 +100,7 @@ func SeedA2ARoutingContract() spec.Step {
 
 			plan, err := svc.ResolveMessageRoom(bg, agentchat.MessageRoomResolveInput{
 				To:          A2ARoutingPlanDir,
-				FromAgentID: alpha.ID,
+				FromAgentID: alpha.Slug,
 			})
 			if err != nil {
 				t.Fatalf("resolve plan dir: %v", err)
@@ -108,23 +109,23 @@ func SeedA2ARoutingContract() spec.Step {
 				t.Fatalf("plan resolve kind=%q want plan", plan.RoomKind)
 			}
 			_ = q.SetPlanWorkspaceLeadAgent(bg, db.SetPlanWorkspaceLeadAgentParams{
-				LeadAgentID: sql.NullString{String: lead.ID, Valid: true},
-				PlanDirRel:  strings.TrimPrefix(A2ARoutingPlanDir, "thoughts/"),
+				LeadAgentSlug: sql.NullString{String: lead.Slug, Valid: true},
+				PlanDirRel:    strings.TrimPrefix(A2ARoutingPlanDir, "thoughts/"),
 			})
 			if again, rerr := svc.ResolveMessageRoom(
 				bg,
 				agentchat.MessageRoomResolveInput{
 					To:          A2ARoutingPlanDir,
-					FromAgentID: alpha.ID,
+					FromAgentID: alpha.Slug,
 				},
 			); rerr == nil {
 				plan = again
-				if strings.TrimSpace(plan.SpeakerAgentID) != "" &&
-					plan.SpeakerAgentID != lead.ID {
+				if strings.TrimSpace(plan.SpeakerSlug) != "" &&
+					plan.SpeakerSlug != lead.Slug {
 					t.Fatalf(
 						"plan inbound speaker=%q want lead %q",
-						plan.SpeakerAgentID,
-						lead.ID,
+						plan.SpeakerSlug,
+						lead.Slug,
 					)
 				}
 			}
@@ -139,7 +140,7 @@ func SeedA2ARoutingContract() spec.Step {
 
 			_, err = svc.ResolveMessageRoom(bg, agentchat.MessageRoomResolveInput{
 				To:          A2ARoutingBotHomeRejectTo,
-				FromAgentID: alpha.ID,
+				FromAgentID: alpha.Slug,
 			})
 			if !errors.Is(err, agentchat.ErrMessageRoomBotHome) {
 				t.Fatalf("bot-home destination want ErrMessageRoomBotHome, got %v", err)
@@ -147,7 +148,7 @@ func SeedA2ARoutingContract() spec.Step {
 			home := mustThread(t, q, toHomeID)
 			if err := agentchat.GuardEnqueueDestination(home, agentchat.EnqueueMail{
 				FromKind:    agentchat.EnqueueFromAgent,
-				FromAgentID: alpha.ID,
+				FromAgentID: alpha.Slug,
 			}); !errors.Is(err, agentchat.ErrBotHomeRejectsA2A) {
 				t.Fatalf("guard bot home A2A: %v", err)
 			}
@@ -312,22 +313,18 @@ func assertNoText(t testing.TB, ctx *duiruntime.Context, text string) {
 	}
 }
 
-func mustAgent(t testing.TB, q *db.Queries, id, slug, name string) db.Agent {
+func mustAgent(t testing.TB, store *roster.Store, slug, name string) roster.Bot {
 	t.Helper()
-	bg := t.Context()
-	if row, err := q.GetAgentBySlug(bg, slug); err == nil {
-		return row
-	}
-	row, err := q.CreateAgent(bg, db.CreateAgentParams{
-		ID: id, Slug: slug, Name: name, Label: name, Description: name,
+	bot, err := store.Create(roster.Bot{
+		Slug: slug, Name: name, Label: name, Description: name,
 	})
 	if err != nil {
-		if row, gerr := q.GetAgentBySlug(bg, slug); gerr == nil {
-			return row
+		if existing, gerr := store.Get(slug); gerr == nil {
+			return existing
 		}
-		t.Fatalf("create agent %s: %v", slug, err)
+		t.Fatalf("create roster bot %s: %v", slug, err)
 	}
-	return row
+	return bot
 }
 
 func mustThread(t testing.TB, q *db.Queries, id string) db.AgentThread {
@@ -339,11 +336,16 @@ func mustThread(t testing.TB, q *db.Queries, id string) db.AgentThread {
 	return row
 }
 
-func ensureBotHome(t testing.TB, q *db.Queries, agent db.Agent, threadID string) string {
+func ensureBotHome(
+	t testing.TB,
+	q *db.Queries,
+	agent roster.Bot,
+	threadID string,
+) string {
 	t.Helper()
 	bg := t.Context()
-	agentNS := sql.NullString{String: agent.ID, Valid: true}
-	if existing, err := q.GetBotHomeThreadByAgentID(bg, agentNS); err == nil {
+	agentNS := sql.NullString{String: agent.Slug, Valid: true}
+	if existing, err := q.GetBotHomeThreadBySlug(bg, agentNS); err == nil {
 		return existing.ID
 	}
 	cwd := filepath.ToSlash(filepath.Join("thoughts", "agents", agent.Slug))
@@ -359,14 +361,14 @@ func ensureBotHome(t testing.TB, q *db.Queries, agent db.Agent, threadID string)
 		}
 	}
 	if err := q.BindAgentThreadBotHome(bg, db.BindAgentThreadBotHomeParams{
-		AgentID: agentNS,
-		Cwd:     cwd,
-		Title:   agent.Name + " home",
-		ID:      threadID,
+		AgentSlug: agentNS,
+		Cwd:       cwd,
+		Title:     agent.Name + " home",
+		ID:        threadID,
 	}); err != nil {
 		t.Fatalf("bind bot home %s: %v", agent.Slug, err)
 	}
-	if existing, err := q.GetBotHomeThreadByAgentID(bg, agentNS); err == nil {
+	if existing, err := q.GetBotHomeThreadBySlug(bg, agentNS); err == nil {
 		return existing.ID
 	}
 	return threadID

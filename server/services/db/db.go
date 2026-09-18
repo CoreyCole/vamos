@@ -19,8 +19,8 @@ type Service struct {
 	Queries *db.Queries
 }
 
-// NewService initializes the database connection and runs migrations
-func NewService(dbPath string) (*Service, error) {
+// NewService initializes the database connection and runs migrations.
+func NewService(dbPath, rosterPath string) (*Service, error) {
 	// Ensure the directory exists
 	dbDir := filepath.Dir(dbPath)
 	if err := os.MkdirAll(dbDir, 0o755); err != nil {
@@ -56,7 +56,11 @@ func NewService(dbPath string) (*Service, error) {
 		return nil, fmt.Errorf("failed to reconcile active agent runs: %w", err)
 	}
 
-	if err := prepareSchemaCompatibilityMigrations(ctx, database); err != nil {
+	if err := prepareSchemaCompatibilityMigrations(
+		ctx,
+		database,
+		rosterPath,
+	); err != nil {
 		return nil, fmt.Errorf(
 			"failed to prepare schema compatibility migrations: %w",
 			err,
@@ -73,7 +77,7 @@ func NewService(dbPath string) (*Service, error) {
 		return nil, fmt.Errorf("failed to run migrations: %w", err)
 	}
 
-	if err := runRuntimeMigrations(ctx, database); err != nil {
+	if err := runRuntimeMigrations(ctx, database, rosterPath); err != nil {
 		return nil, fmt.Errorf("failed to run runtime migrations: %w", err)
 	}
 

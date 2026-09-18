@@ -129,7 +129,10 @@ func TestServeAI470RoomOpensPlanDesignWithoutArtifactQuery(t *testing.T) {
 	heading := "Unique live plan design heading 3-2"
 	mustWriteFile(t, filepath.Join(plan, "design.md"), []byte("# "+heading+"\n"))
 
-	dbSvc, err := servicedb.NewService(filepath.Join(t.TempDir(), "plan-room.db"))
+	dbSvc, err := servicedb.NewService(
+		filepath.Join(t.TempDir(), "plan-room.db"),
+		filepath.Join(t.TempDir(), "agents.yml"),
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -203,7 +206,10 @@ func TestServeAI470RoomFallsBackToAgentsMd(t *testing.T) {
 	heading := "Unique live plan agents heading"
 	mustWriteFile(t, filepath.Join(plan, "AGENTS.md"), []byte("# "+heading+"\n"))
 
-	dbSvc, err := servicedb.NewService(filepath.Join(t.TempDir(), "agents-plan.db"))
+	dbSvc, err := servicedb.NewService(
+		filepath.Join(t.TempDir(), "agents-plan.db"),
+		filepath.Join(t.TempDir(), "agents.yml"),
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -302,7 +308,10 @@ func TestServeAI470Room404sOutOfV1Kinds(t *testing.T) {
 
 func TestServeAI470RoomMissingBotSlug404s(t *testing.T) {
 	t.Parallel()
-	dbSvc, err := servicedb.NewService(filepath.Join(t.TempDir(), "agents.db"))
+	dbSvc, err := servicedb.NewService(
+		filepath.Join(t.TempDir(), "agents.db"),
+		filepath.Join(t.TempDir(), "agents.yml"),
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -312,6 +321,7 @@ func TestServeAI470RoomMissingBotSlug404s(t *testing.T) {
 		t.Fatal(err)
 	}
 	svc.WithQueries(dbSvc.Queries)
+	withTestRoster(t, svc)
 	svc.WithWorkbenchThreadRenderer(&threadWorkbenchTestRenderer{})
 	rec := httptest.NewRecorder()
 	c := echo.New().NewContext(
@@ -331,7 +341,10 @@ func TestServeAI470RoomKnownBotHydratesHomeThread(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
 	mustMkdirAll(t, filepath.Join(root, "owner", "plans", "alpha"))
-	dbSvc, err := servicedb.NewService(filepath.Join(t.TempDir(), "agents.db"))
+	dbSvc, err := servicedb.NewService(
+		filepath.Join(t.TempDir(), "agents.db"),
+		filepath.Join(t.TempDir(), "agents.yml"),
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -341,6 +354,7 @@ func TestServeAI470RoomKnownBotHydratesHomeThread(t *testing.T) {
 		t.Fatal(err)
 	}
 	svc.WithQueries(dbSvc.Queries)
+	withTestRoster(t, svc)
 	nova, err := svc.createAgent(context.Background(), createAgentInput{
 		Slug: "nova", Name: "Nova", UserEmail: "t@example.com",
 	})
@@ -394,7 +408,10 @@ func TestServeAI470RoomKnownBotHydratesHomeThread(t *testing.T) {
 
 func TestAI470RoomTitleUsesLiveAgentName(t *testing.T) {
 	t.Parallel()
-	dbSvc, err := servicedb.NewService(filepath.Join(t.TempDir(), "agents.db"))
+	dbSvc, err := servicedb.NewService(
+		filepath.Join(t.TempDir(), "agents.db"),
+		filepath.Join(t.TempDir(), "agents.yml"),
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -404,6 +421,7 @@ func TestAI470RoomTitleUsesLiveAgentName(t *testing.T) {
 		t.Fatal(err)
 	}
 	svc.WithQueries(dbSvc.Queries)
+	withTestRoster(t, svc)
 	if _, err := svc.createAgent(context.Background(), createAgentInput{
 		Slug: "nova", Name: "Nova", UserEmail: "t@example.com",
 	}); err != nil {
@@ -432,7 +450,10 @@ func TestLiveRosterListsPlanDirsFromIndex(t *testing.T) {
 	mustWriteFile(t, filepath.Join(planA, "design.md"), []byte("# One\n"))
 	mustWriteFile(t, filepath.Join(planB, "design.md"), []byte("# Two\n"))
 
-	dbSvc, err := servicedb.NewService(filepath.Join(t.TempDir(), "plans.db"))
+	dbSvc, err := servicedb.NewService(
+		filepath.Join(t.TempDir(), "plans.db"),
+		filepath.Join(t.TempDir(), "agents.yml"),
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -523,7 +544,10 @@ func TestLiveRosterPlansEmptyIndexHasNoAlpha(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	dbSvc, err := servicedb.NewService(filepath.Join(t.TempDir(), "empty.db"))
+	dbSvc, err := servicedb.NewService(
+		filepath.Join(t.TempDir(), "empty.db"),
+		filepath.Join(t.TempDir(), "agents.yml"),
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -546,7 +570,10 @@ func TestLiveRosterPlansEmptyIndexHasNoAlpha(t *testing.T) {
 func TestLiveRosterBotPreviewFromJSONL(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
-	dbSvc, err := servicedb.NewService(filepath.Join(t.TempDir(), "agents.db"))
+	dbSvc, err := servicedb.NewService(
+		filepath.Join(t.TempDir(), "agents.db"),
+		filepath.Join(t.TempDir(), "agents.yml"),
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -556,6 +583,7 @@ func TestLiveRosterBotPreviewFromJSONL(t *testing.T) {
 		t.Fatal(err)
 	}
 	svc.WithQueries(dbSvc.Queries)
+	withTestRoster(t, svc)
 	ctx := context.Background()
 	if _, err := svc.createAgent(ctx, createAgentInput{
 		Slug: "nova", Name: "Nova", UserEmail: "t@example.com",

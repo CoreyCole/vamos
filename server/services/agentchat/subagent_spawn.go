@@ -50,7 +50,9 @@ func (s *Service) SpawnSubagent(
 	userEmail := strings.TrimSpace(in.UserEmail)
 	parentID := strings.TrimSpace(in.ParentThreadID)
 	if userEmail == "" || parentID == "" {
-		return db.AgentThread{}, fmt.Errorf("user_email and parent_thread_id are required")
+		return db.AgentThread{}, fmt.Errorf(
+			"user_email and parent_thread_id are required",
+		)
 	}
 	title := strings.TrimSpace(in.Title)
 	if title == "" {
@@ -160,7 +162,13 @@ func (s *Service) AttachSubagentSession(
 		return db.AgentSession{}, fmt.Errorf("child thread is not under parent")
 	}
 
-	session, err := s.upsertSubagentSession(ctx, s.queries, userEmail, child, artifactPath)
+	session, err := s.upsertSubagentSession(
+		ctx,
+		s.queries,
+		userEmail,
+		child,
+		artifactPath,
+	)
 	if err != nil {
 		return db.AgentSession{}, err
 	}
@@ -202,10 +210,10 @@ func (s *Service) inheritParentRoomKind(
 		return nil
 	case RoomKindPlan:
 		return q.BindAgentThreadPlan(ctx, db.BindAgentThreadPlanParams{
-			AgentID: parent.AgentID,
-			Cwd:     child.Cwd,
-			Title:   child.Title,
-			ID:      child.ID,
+			AgentSlug: parent.AgentSlug,
+			Cwd:       child.Cwd,
+			Title:     child.Title,
+			ID:        child.ID,
 		})
 	case RoomKindBotHome, RoomKindPairwise:
 		return q.SetAgentThreadRoomKind(ctx, db.SetAgentThreadRoomKindParams{
@@ -323,7 +331,10 @@ func (s *Service) subagentCardStatus(ctx context.Context, child db.AgentThread) 
 // mergeSubagentCardsIntoLive appends derived cards after live SoT items so they
 // ride BuildLiveTranscriptState (2719aad keep-or-promote): empty live reducer
 // still shows cards; never a new transcript entry type / BotDMChip.
-func mergeSubagentCardsIntoLive(live LiveTranscriptView, cards []TranscriptMessage) LiveTranscriptView {
+func mergeSubagentCardsIntoLive(
+	live LiveTranscriptView,
+	cards []TranscriptMessage,
+) LiveTranscriptView {
 	if len(cards) == 0 {
 		return live
 	}
@@ -343,7 +354,9 @@ func (s *Service) SteerSubagent(
 	childThreadID = strings.TrimSpace(childThreadID)
 	body = strings.TrimSpace(body)
 	if userEmail == "" || childThreadID == "" || body == "" {
-		return EnqueueThreadMailResult{}, fmt.Errorf("user_email, child_thread_id, and body are required")
+		return EnqueueThreadMailResult{}, fmt.Errorf(
+			"user_email, child_thread_id, and body are required",
+		)
 	}
 	if _, err := s.queries.GetAgentThreadForUser(ctx, db.GetAgentThreadForUserParams{
 		ID:        childThreadID,

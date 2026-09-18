@@ -9,8 +9,10 @@ import (
 	"strings"
 	"testing"
 
+	"gopkg.in/yaml.v3"
 	_ "modernc.org/sqlite"
 
+	"github.com/CoreyCole/vamos/pkg/agents/roster"
 	querydb "github.com/CoreyCole/vamos/pkg/db"
 )
 
@@ -47,7 +49,7 @@ func TestNewServiceCreatesParentAndMigratesSchema(t *testing.T) {
 	t.Parallel()
 
 	dbPath := filepath.Join(t.TempDir(), "nested", "agents.db")
-	svc, err := NewService(dbPath)
+	svc, err := NewService(dbPath, filepath.Join(t.TempDir(), "agents.yml"))
 	if err != nil {
 		t.Fatalf("NewService() error = %v", err)
 	}
@@ -67,7 +69,10 @@ func TestNewServiceCreatesParentAndMigratesSchema(t *testing.T) {
 func TestNewServiceAgentThreadQueriesDoNotRequireWorkspaceIDColumn(t *testing.T) {
 	t.Parallel()
 
-	svc, err := NewService(filepath.Join(t.TempDir(), "vamos.db"))
+	svc, err := NewService(
+		filepath.Join(t.TempDir(), "vamos.db"),
+		filepath.Join(t.TempDir(), "agents.yml"),
+	)
 	if err != nil {
 		t.Fatalf("NewService() error = %v", err)
 	}
@@ -167,7 +172,10 @@ func TestNewServiceAgentThreadQueriesDoNotRequireWorkspaceIDColumn(t *testing.T)
 func TestNewServiceEnablesForeignKeys(t *testing.T) {
 	t.Parallel()
 
-	svc, err := NewService(filepath.Join(t.TempDir(), "agents.db"))
+	svc, err := NewService(
+		filepath.Join(t.TempDir(), "agents.db"),
+		filepath.Join(t.TempDir(), "agents.yml"),
+	)
 	if err != nil {
 		t.Fatalf("NewService() error = %v", err)
 	}
@@ -188,7 +196,10 @@ func TestNewServiceEnablesForeignKeys(t *testing.T) {
 func TestNewServiceConfiguresBusyTimeoutOnPooledConnections(t *testing.T) {
 	t.Parallel()
 
-	svc, err := NewService(filepath.Join(t.TempDir(), "agents.db"))
+	svc, err := NewService(
+		filepath.Join(t.TempDir(), "agents.db"),
+		filepath.Join(t.TempDir(), "agents.yml"),
+	)
 	if err != nil {
 		t.Fatalf("NewService() error = %v", err)
 	}
@@ -227,7 +238,10 @@ func TestNewServiceConfiguresBusyTimeoutOnPooledConnections(t *testing.T) {
 func TestNewServiceEnablesForeignKeysOnPooledConnections(t *testing.T) {
 	t.Parallel()
 
-	svc, err := NewService(filepath.Join(t.TempDir(), "agents.db"))
+	svc, err := NewService(
+		filepath.Join(t.TempDir(), "agents.db"),
+		filepath.Join(t.TempDir(), "agents.yml"),
+	)
 	if err != nil {
 		t.Fatalf("NewService() error = %v", err)
 	}
@@ -307,7 +321,11 @@ VALUES ('comment-1', 'workspace-1', 'comment.md', 'user@example.com', 'body', 's
 		t.Fatalf("seed legacy path columns: %v", err)
 	}
 
-	if err := prepareSchemaCompatibilityMigrations(t.Context(), database); err != nil {
+	if err := prepareSchemaCompatibilityMigrations(
+		t.Context(),
+		database,
+		filepath.Join(t.TempDir(), "agents.yml"),
+	); err != nil {
 		t.Fatalf("prepareSchemaCompatibilityMigrations() error = %v", err)
 	}
 	assertRenamedColumn(
@@ -381,7 +399,11 @@ VALUES ('owner@example.com', 'workspace-1', 'thread-1', 'run-1', '2026-01-01 00:
 		t.Fatalf("seed legacy user_chat_selections: %v", err)
 	}
 
-	if err := prepareSchemaCompatibilityMigrations(t.Context(), database); err != nil {
+	if err := prepareSchemaCompatibilityMigrations(
+		t.Context(),
+		database,
+		filepath.Join(t.TempDir(), "agents.yml"),
+	); err != nil {
 		t.Fatalf("prepareSchemaCompatibilityMigrations() error = %v", err)
 	}
 	for _, column := range []string{"scope", "scope_id"} {
@@ -430,7 +452,11 @@ VALUES ('agent@example.com', 'thoughts', 'split', '{"version":1,"page":"thoughts
 		t.Fatalf("seed legacy layout_preferences: %v", err)
 	}
 
-	if err := prepareSchemaCompatibilityMigrations(t.Context(), database); err != nil {
+	if err := prepareSchemaCompatibilityMigrations(
+		t.Context(),
+		database,
+		filepath.Join(t.TempDir(), "agents.yml"),
+	); err != nil {
 		t.Fatalf("prepareSchemaCompatibilityMigrations() error = %v", err)
 	}
 	if !columnExists(t, database, "layout_preferences", "viewport_class") {
@@ -474,7 +500,11 @@ VALUES ('agent@example.com', 'thoughts', 'split', 'desktop-half', '{}');`)
 		t.Fatalf("seed layout_preferences: %v", err)
 	}
 
-	if err := prepareSchemaCompatibilityMigrations(t.Context(), database); err != nil {
+	if err := prepareSchemaCompatibilityMigrations(
+		t.Context(),
+		database,
+		filepath.Join(t.TempDir(), "agents.yml"),
+	); err != nil {
 		t.Fatalf("prepareSchemaCompatibilityMigrations() error = %v", err)
 	}
 	if _, err := database.ExecContext(t.Context(), `
@@ -511,7 +541,11 @@ INSERT INTO artifact_comments (id, artifact_path, body) VALUES ('comment-1', 'ol
 		t.Fatalf("seed pre-AgentChat artifact_comments: %v", err)
 	}
 
-	if err := prepareSchemaCompatibilityMigrations(t.Context(), database); err != nil {
+	if err := prepareSchemaCompatibilityMigrations(
+		t.Context(),
+		database,
+		filepath.Join(t.TempDir(), "agents.yml"),
+	); err != nil {
 		t.Fatalf("prepareSchemaCompatibilityMigrations() error = %v", err)
 	}
 	if testTableExists(t, database, "artifact_comments") {
@@ -548,7 +582,11 @@ CREATE TABLE artifact_comments (id TEXT PRIMARY KEY, artifact_path TEXT NOT NULL
 		t.Fatalf("seed conflict: %v", err)
 	}
 
-	if err := prepareSchemaCompatibilityMigrations(t.Context(), database); err != nil {
+	if err := prepareSchemaCompatibilityMigrations(
+		t.Context(),
+		database,
+		filepath.Join(t.TempDir(), "agents.yml"),
+	); err != nil {
 		t.Fatalf("prepareSchemaCompatibilityMigrations() error = %v", err)
 	}
 	if !testTableExists(t, database, "artifact_comments_pre_agentchat_2") {
@@ -573,7 +611,7 @@ CREATE TABLE artifact_comments (id TEXT PRIMARY KEY, artifact_path TEXT NOT NULL
 		t.Fatalf("seed old db: %v", err)
 	}
 
-	svc, err := NewService(path)
+	svc, err := NewService(path, filepath.Join(t.TempDir(), "agents.yml"))
 	if err != nil {
 		t.Fatalf("NewService() error = %v", err)
 	}
@@ -589,7 +627,11 @@ func TestRuntimeMigrationsAddWorkspaceSelectedDocPath(t *testing.T) {
 	database := openMigratorTestDB(t)
 	createOldShapeAgentChatTables(t, database)
 
-	if err := runRuntimeMigrations(t.Context(), database); err != nil {
+	if err := runRuntimeMigrations(
+		t.Context(),
+		database,
+		filepath.Join(t.TempDir(), "agents.yml"),
+	); err != nil {
 		t.Fatalf("runRuntimeMigrations() error = %v", err)
 	}
 	if !columnExists(t, database, "workspaces", "selected_doc_path") {
@@ -617,7 +659,11 @@ CREATE TABLE workspaces (
 		t.Fatalf("seed old workspaces: %v", err)
 	}
 
-	if err := prepareSchemaCompatibilityMigrations(t.Context(), database); err != nil {
+	if err := prepareSchemaCompatibilityMigrations(
+		t.Context(),
+		database,
+		filepath.Join(t.TempDir(), "agents.yml"),
+	); err != nil {
 		t.Fatalf("prepareSchemaCompatibilityMigrations() error = %v", err)
 	}
 	if !columnExists(t, database, "workspaces", "selected_doc_path") {
@@ -651,6 +697,7 @@ CREATE TABLE workspace_events (
 		if err := prepareSchemaCompatibilityMigrations(
 			t.Context(),
 			database,
+			filepath.Join(t.TempDir(), "agents.yml"),
 		); err != nil {
 			t.Fatalf("prepareSchemaCompatibilityMigrations() error = %v", err)
 		}
@@ -679,7 +726,11 @@ CREATE TABLE workspace_events (
 		t.Fatalf("seed old workspace_events: %v", err)
 	}
 
-	if err := runRuntimeMigrations(t.Context(), database); err != nil {
+	if err := runRuntimeMigrations(
+		t.Context(),
+		database,
+		filepath.Join(t.TempDir(), "agents.yml"),
+	); err != nil {
 		t.Fatalf("runRuntimeMigrations() error = %v", err)
 	}
 	for _, column := range []string{"doc_path", "comment_id"} {
@@ -726,7 +777,11 @@ CREATE TABLE plan_workspace_impl_bindings (
 		t.Fatalf("seed old plan workspace bindings: %v", err)
 	}
 
-	if err := runRuntimeMigrations(t.Context(), database); err != nil {
+	if err := runRuntimeMigrations(
+		t.Context(),
+		database,
+		filepath.Join(t.TempDir(), "agents.yml"),
+	); err != nil {
 		t.Fatalf("runRuntimeMigrations() error = %v", err)
 	}
 	for _, column := range []string{"workspace_slug", "checkout_path", "url", "binding_source", "impl_project_id", "impl_workspace_slug", "last_discovered_at", "archived_at"} {
@@ -802,7 +857,11 @@ VALUES
 		t.Fatalf("seed impl_workspaces: %v", err)
 	}
 
-	if err := runRuntimeMigrations(t.Context(), database); err != nil {
+	if err := runRuntimeMigrations(
+		t.Context(),
+		database,
+		filepath.Join(t.TempDir(), "agents.yml"),
+	); err != nil {
 		t.Fatalf("runRuntimeMigrations() error = %v", err)
 	}
 
@@ -855,8 +914,11 @@ ORDER BY workspace_slug`)
 
 	for _, slug := range []string{"stage", "durable-stage"} {
 		row := got[slug]
-		if row.status != "active" || row.mergedAt.Valid || row.cleanedUpAt.Valid || row.mergeEvidence.Valid ||
-			row.proofKind != "unknown" || row.sourceRef.Valid || row.targetCommit.Valid ||
+		if row.status != "active" || row.mergedAt.Valid || row.cleanedUpAt.Valid ||
+			row.mergeEvidence.Valid ||
+			row.proofKind != "unknown" ||
+			row.sourceRef.Valid ||
+			row.targetCommit.Valid ||
 			row.proofAt.Valid ||
 			row.riskReason.Valid {
 			t.Fatalf("%s = %+v, want active with cleared terminal metadata", slug, row)
@@ -894,7 +956,11 @@ VALUES ('vamos', 'stage', '/repo/vamos', 'Stage', 'active'),
 		t.Fatalf("seed duplicate workspace checkout paths: %v", err)
 	}
 
-	err = runRuntimeMigrations(t.Context(), database)
+	err = runRuntimeMigrations(
+		t.Context(),
+		database,
+		filepath.Join(t.TempDir(), "agents.yml"),
+	)
 	if err == nil {
 		t.Fatal(
 			"runRuntimeMigrations() error = nil, want duplicate checkout path failure",
@@ -922,7 +988,11 @@ CREATE INDEX idx_agent_threads_workspace_updated
 		t.Fatalf("seed legacy agent_threads workspace index: %v", err)
 	}
 
-	if err := runRuntimeMigrations(t.Context(), database); err != nil {
+	if err := runRuntimeMigrations(
+		t.Context(),
+		database,
+		filepath.Join(t.TempDir(), "agents.yml"),
+	); err != nil {
 		t.Fatalf("runRuntimeMigrations() error = %v", err)
 	}
 
@@ -1040,7 +1110,11 @@ VALUES ('session-1', 'terminal', '/tmp/session.jsonl', 'pending');`)
 		t.Fatalf("seed old agent_sessions: %v", err)
 	}
 
-	if err := runRuntimeMigrations(t.Context(), database); err != nil {
+	if err := runRuntimeMigrations(
+		t.Context(),
+		database,
+		filepath.Join(t.TempDir(), "agents.yml"),
+	); err != nil {
 		t.Fatalf("runRuntimeMigrations() error = %v", err)
 	}
 	if _, err := database.ExecContext(
@@ -1160,7 +1234,11 @@ VALUES
 	}
 
 	for range 2 {
-		if err := runRuntimeMigrations(t.Context(), database); err != nil {
+		if err := runRuntimeMigrations(
+			t.Context(),
+			database,
+			filepath.Join(t.TempDir(), "agents.yml"),
+		); err != nil {
 			t.Fatalf("runRuntimeMigrations() error = %v", err)
 		}
 	}
@@ -1212,7 +1290,11 @@ VALUES
 		t.Fatalf("seed duplicate runs: %v", err)
 	}
 
-	if err := runRuntimeMigrations(t.Context(), database); err != nil {
+	if err := runRuntimeMigrations(
+		t.Context(),
+		database,
+		filepath.Join(t.TempDir(), "agents.yml"),
+	); err != nil {
 		t.Fatalf("runRuntimeMigrations() error = %v", err)
 	}
 
@@ -1237,7 +1319,6 @@ VALUES
 	}
 }
 
-
 func TestEnsureAddsPlanWorkspaceArchiveColumnsAndAgentThreadPlanDir(t *testing.T) {
 	t.Parallel()
 
@@ -1260,7 +1341,11 @@ CREATE TABLE plan_workspaces (
 		t.Fatalf("seed old plan_workspaces: %v", err)
 	}
 
-	if err := prepareSchemaCompatibilityMigrations(t.Context(), database); err != nil {
+	if err := prepareSchemaCompatibilityMigrations(
+		t.Context(),
+		database,
+		filepath.Join(t.TempDir(), "agents.yml"),
+	); err != nil {
 		t.Fatalf("prepareSchemaCompatibilityMigrations() error = %v", err)
 	}
 	for _, column := range []string{"archive_reason", "archived_by_email"} {
@@ -1294,7 +1379,11 @@ CREATE TABLE plan_workspaces (
 	if err != nil {
 		t.Fatalf("seed old plan_workspaces for runtime: %v", err)
 	}
-	if err := runRuntimeMigrations(t.Context(), database2); err != nil {
+	if err := runRuntimeMigrations(
+		t.Context(),
+		database2,
+		filepath.Join(t.TempDir(), "agents.yml"),
+	); err != nil {
 		t.Fatalf("runRuntimeMigrations() error = %v", err)
 	}
 	for _, column := range []string{"archive_reason", "archived_by_email"} {
@@ -1307,6 +1396,181 @@ CREATE TABLE plan_workspaces (
 	}
 	if !indexExists(t, database2, "idx_agent_threads_plan_updated") {
 		t.Fatal("idx_agent_threads_plan_updated missing after runtime")
+	}
+}
+
+func TestCutoverAgentsToRosterAndSecondBoot(t *testing.T) {
+	t.Parallel()
+
+	const (
+		matchedID   = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+		unmatchedID = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
+		matchedSlug = "pi"
+	)
+
+	t.Run("missing yaml copies slug unmatched null drops agents", func(t *testing.T) {
+		t.Parallel()
+
+		dir := t.TempDir()
+		dbPath := filepath.Join(dir, "agents.db")
+		rosterPath := filepath.Join(dir, "agents.yml")
+		seedLegacyAgentsSQLite(t, dbPath, matchedID, unmatchedID, matchedSlug)
+
+		svc, err := NewService(dbPath, rosterPath)
+		if err != nil {
+			t.Fatalf("NewService() error = %v", err)
+		}
+		t.Cleanup(func() { _ = svc.Close() })
+
+		if testTableExists(t, svc.DB(), "agents") {
+			t.Fatal("agents table still exists after cutover")
+		}
+		if columnExists(t, svc.DB(), "agent_threads", "agent_id") {
+			t.Fatal("agent_threads.agent_id still exists after cutover")
+		}
+		if !columnExists(t, svc.DB(), "agent_threads", "agent_slug") {
+			t.Fatal("agent_threads.agent_slug missing after cutover")
+		}
+
+		var matchedSlugGot sql.NullString
+		if err := svc.DB().QueryRowContext(
+			t.Context(),
+			`SELECT agent_slug FROM agent_threads WHERE id = 'thread-matched'`,
+		).Scan(&matchedSlugGot); err != nil {
+			t.Fatalf("query matched thread: %v", err)
+		}
+		if !matchedSlugGot.Valid || matchedSlugGot.String != matchedSlug {
+			t.Fatalf("matched agent_slug = %v, want %q", matchedSlugGot, matchedSlug)
+		}
+
+		var unmatchedSlug sql.NullString
+		if err := svc.DB().QueryRowContext(
+			t.Context(),
+			`SELECT agent_slug FROM agent_threads WHERE id = 'thread-unmatched'`,
+		).Scan(&unmatchedSlug); err != nil {
+			t.Fatalf("query unmatched thread: %v", err)
+		}
+		if unmatchedSlug.Valid {
+			t.Fatalf("unmatched agent_slug = %q, want NULL", unmatchedSlug.String)
+		}
+
+		body, err := os.ReadFile(rosterPath)
+		if err != nil {
+			t.Fatalf("ReadFile roster: %v", err)
+		}
+		var doc roster.Document
+		if err := yaml.Unmarshal(body, &doc); err != nil {
+			t.Fatalf("unmarshal roster: %v", err)
+		}
+		if len(doc.Bots) != 1 || doc.Bots[0].Slug != matchedSlug {
+			t.Fatalf("roster bots = %+v, want one bot slug %q", doc.Bots, matchedSlug)
+		}
+	})
+
+	t.Run("existing yaml is not overwritten", func(t *testing.T) {
+		t.Parallel()
+
+		dir := t.TempDir()
+		dbPath := filepath.Join(dir, "agents.db")
+		rosterPath := filepath.Join(dir, "agents.yml")
+		seedLegacyAgentsSQLite(t, dbPath, matchedID, unmatchedID, matchedSlug)
+		wantYAML := []byte("bots:\n    - slug: keep-me\n      name: Keep\n")
+		if err := os.WriteFile(rosterPath, wantYAML, 0o644); err != nil {
+			t.Fatalf("WriteFile existing roster: %v", err)
+		}
+
+		svc, err := NewService(dbPath, rosterPath)
+		if err != nil {
+			t.Fatalf("NewService() error = %v", err)
+		}
+		t.Cleanup(func() { _ = svc.Close() })
+
+		got, err := os.ReadFile(rosterPath)
+		if err != nil {
+			t.Fatalf("ReadFile roster: %v", err)
+		}
+		if string(got) != string(wantYAML) {
+			t.Fatalf("roster overwritten: got %q want %q", got, wantYAML)
+		}
+	})
+
+	t.Run("second boot does not recreate agents or agent_id", func(t *testing.T) {
+		t.Parallel()
+
+		dir := t.TempDir()
+		dbPath := filepath.Join(dir, "agents.db")
+		rosterPath := filepath.Join(dir, "agents.yml")
+		seedLegacyAgentsSQLite(t, dbPath, matchedID, unmatchedID, matchedSlug)
+
+		svc, err := NewService(dbPath, rosterPath)
+		if err != nil {
+			t.Fatalf("first NewService() error = %v", err)
+		}
+		if err := svc.Close(); err != nil {
+			t.Fatalf("Close() error = %v", err)
+		}
+
+		svc2, err := NewService(dbPath, rosterPath)
+		if err != nil {
+			t.Fatalf("second NewService() error = %v", err)
+		}
+		t.Cleanup(func() { _ = svc2.Close() })
+
+		if testTableExists(t, svc2.DB(), "agents") {
+			t.Fatal("second boot recreated table agents")
+		}
+		if columnExists(t, svc2.DB(), "agent_threads", "agent_id") {
+			t.Fatal("second boot recreated agent_threads.agent_id")
+		}
+	})
+}
+
+func seedLegacyAgentsSQLite(
+	t *testing.T,
+	path, matchedID, unmatchedID, matchedSlug string,
+) {
+	t.Helper()
+	database, err := sql.Open("sqlite", path)
+	if err != nil {
+		t.Fatalf("sql.Open seed: %v", err)
+	}
+	_, err = database.ExecContext(t.Context(), `
+CREATE TABLE agents (
+    id TEXT PRIMARY KEY,
+    slug TEXT NOT NULL,
+    name TEXT NOT NULL DEFAULT '',
+    label TEXT NOT NULL DEFAULT '',
+    description TEXT NOT NULL DEFAULT '',
+    archived_at DATETIME,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE TABLE agent_threads (
+    id TEXT PRIMARY KEY,
+    user_email TEXT NOT NULL,
+    title TEXT NOT NULL DEFAULT 'New Chat',
+    cwd TEXT NOT NULL,
+    lineage_id TEXT NOT NULL,
+    head_entry_id TEXT,
+    parent_thread_id TEXT,
+    forked_from_entry_id TEXT,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    archived_at DATETIME,
+    agent_id TEXT
+);
+INSERT INTO agents (id, slug, name, label, description)
+VALUES (?, ?, 'Pi', 'pi', 'assistant');
+INSERT INTO agent_threads (id, user_email, title, cwd, lineage_id, agent_id)
+VALUES
+    ('thread-matched', 'user@example.com', 't', '.', 'lin-1', ?),
+    ('thread-unmatched', 'user@example.com', 't2', '.', 'lin-2', ?);
+`, matchedID, matchedSlug, matchedID, unmatchedID)
+	if closeErr := database.Close(); closeErr != nil && err == nil {
+		err = closeErr
+	}
+	if err != nil {
+		t.Fatalf("seed legacy agents db: %v", err)
 	}
 }
 

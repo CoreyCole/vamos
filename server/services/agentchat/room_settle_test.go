@@ -112,7 +112,7 @@ func TestSettleHotRoomInsertsHandoffCutWithoutWipingHistory(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	database, err := serverdb.NewService(filepath.Join(t.TempDir(), "settle.db"))
+	database, err := serverdb.NewService(filepath.Join(t.TempDir(), "settle.db"), filepath.Join(t.TempDir(), "agents.yml"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -258,7 +258,7 @@ func TestSettleHotRoomBadFilesLeavesCurrentAndNoCut(t *testing.T) {
 	if err := os.WriteFile(current, []byte("keep\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	database, err := serverdb.NewService(filepath.Join(t.TempDir(), "settle-fail.db"))
+	database, err := serverdb.NewService(filepath.Join(t.TempDir(), "settle-fail.db"), filepath.Join(t.TempDir(), "agents.yml"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -335,7 +335,7 @@ func TestSettleHotRoomPlanDoesNotWriteSpeakerMemory(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	database, err := serverdb.NewService(filepath.Join(t.TempDir(), "settle-plan.db"))
+	database, err := serverdb.NewService(filepath.Join(t.TempDir(), "settle-plan.db"), filepath.Join(t.TempDir(), "agents.yml"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -398,7 +398,7 @@ func TestSettleHotRoomRetryKeepsHistoryAndOneCut(t *testing.T) {
 	); err != nil {
 		t.Fatal(err)
 	}
-	database, err := serverdb.NewService(filepath.Join(t.TempDir(), "settle-retry.db"))
+	database, err := serverdb.NewService(filepath.Join(t.TempDir(), "settle-retry.db"), filepath.Join(t.TempDir(), "agents.yml"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -496,7 +496,7 @@ func TestSettleHotRoomPairwiseWritesSpeakerRoleFiles(t *testing.T) {
 	); err != nil {
 		t.Fatal(err)
 	}
-	database, err := serverdb.NewService(filepath.Join(t.TempDir(), "settle-pair.db"))
+	database, err := serverdb.NewService(filepath.Join(t.TempDir(), "settle-pair.db"), filepath.Join(t.TempDir(), "agents.yml"))
 	if err != nil {
 		t.Fatal(err)
 	}

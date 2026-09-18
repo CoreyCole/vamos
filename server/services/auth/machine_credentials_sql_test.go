@@ -12,7 +12,7 @@ import (
 func TestSQLMachineCredentialStorePersistsAuthenticateListAndRevoke(t *testing.T) {
 	ctx := t.Context()
 	dbPath := filepath.Join(t.TempDir(), "agents.db")
-	svc, err := dbsvc.NewService(dbPath)
+	svc, err := dbsvc.NewService(dbPath, filepath.Join(t.TempDir(), "agents.yml"))
 	if err != nil {
 		t.Fatalf("NewService: %v", err)
 	}
@@ -34,7 +34,7 @@ func TestSQLMachineCredentialStorePersistsAuthenticateListAndRevoke(t *testing.T
 		t.Fatalf("Close: %v", err)
 	}
 
-	reopened, err := dbsvc.NewService(dbPath)
+	reopened, err := dbsvc.NewService(dbPath, filepath.Join(t.TempDir(), "agents.yml"))
 	if err != nil {
 		t.Fatalf("reopen NewService: %v", err)
 	}
@@ -67,7 +67,7 @@ func TestSQLMachineCredentialStorePersistsAuthenticateListAndRevoke(t *testing.T
 
 func TestSQLMachineCredentialStoreRejectsExpiredCredential(t *testing.T) {
 	ctx := t.Context()
-	svc, err := dbsvc.NewService(filepath.Join(t.TempDir(), "agents.db"))
+	svc, err := dbsvc.NewService(filepath.Join(t.TempDir(), "agents.db"), filepath.Join(t.TempDir(), "agents.yml"))
 	if err != nil {
 		t.Fatalf("NewService: %v", err)
 	}

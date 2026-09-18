@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	"fmt"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -13,11 +12,12 @@ import (
 	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
 
+	"github.com/CoreyCole/vamos/pkg/agents/roster"
 	"github.com/CoreyCole/vamos/pkg/db"
 )
 
 func (s *Service) HandleCreateAgent(c echo.Context) error {
-	if s.queries == nil {
+	if s.queries == nil || s.roster == nil {
 		return echo.NewHTTPError(
 			http.StatusServiceUnavailable,
 			"database is not configured",
@@ -48,63 +48,63 @@ type createAgentInput struct {
 func (s *Service) createAgent(
 	ctx context.Context,
 	in createAgentInput,
-) (db.Agent, error) {
+) (roster.Bot, error) {
 	slug := strings.TrimSpace(in.Slug)
 	if err := validateAgentSlug(slug); err != nil {
-		return db.Agent{}, echo.NewHTTPError(http.StatusBadRequest, err.Error())
+		return roster.Bot{}, echo.NewHTTPError(http.StatusBadRequest, err.Error())
 	}
 	name := strings.TrimSpace(in.Name)
 	if name == "" {
 		name = slug
 	}
-	if s.queries == nil {
-		return db.Agent{}, echo.NewHTTPError(
+	if s.queries == nil || s.roster == nil {
+		return roster.Bot{}, echo.NewHTTPError(
 			http.StatusServiceUnavailable,
 			"database is not configured",
 		)
 	}
-	if _, err := s.queries.GetAgentBySlug(ctx, slug); err == nil {
-		return db.Agent{}, echo.NewHTTPError(
-			http.StatusConflict,
-			"agent slug already exists",
-		)
-	} else if !errors.Is(err, sql.ErrNoRows) {
-		return db.Agent{}, err
-	}
-	agent, err := s.queries.CreateAgent(ctx, db.CreateAgentParams{
-		ID:          uuid.NewString(),
+	agent, err := s.roster.Create(roster.Bot{
 		Slug:        slug,
 		Name:        name,
 		Label:       strings.TrimSpace(in.Label),
 		Description: strings.TrimSpace(in.Description),
 	})
 	if err != nil {
-		return db.Agent{}, err
+		if errors.Is(err, roster.ErrConflict) || errors.Is(err, roster.ErrArchived) {
+			return roster.Bot{}, echo.NewHTTPError(
+				http.StatusConflict,
+				"agent slug already exists",
+			)
+		}
+		if errors.Is(err, roster.ErrReserved) {
+			return roster.Bot{}, echo.NewHTTPError(http.StatusBadRequest, err.Error())
+		}
+		return roster.Bot{}, err
 	}
 	if err := seedBotHomeTree(s.basePath, slug, name); err != nil {
-		return db.Agent{}, err
+		return roster.Bot{}, err
 	}
 	if _, err := s.ensureBotHomeThread(
 		ctx,
 		agent,
 		strings.TrimSpace(in.UserEmail),
 	); err != nil {
-		return db.Agent{}, err
+		return roster.Bot{}, err
 	}
 	return agent, nil
 }
 
 func (s *Service) ensureBotHomeThread(
 	ctx context.Context,
-	agent db.Agent,
+	agent roster.Bot,
 	userEmail string,
 ) (string, error) {
 	if s.queries == nil {
 		return "", nil
 	}
-	existing, err := s.queries.GetBotHomeThreadByAgentID(ctx, sql.NullString{
-		String: agent.ID,
-		Valid:  true,
+	existing, err := s.queries.GetBotHomeThreadBySlug(ctx, sql.NullString{
+		String: agent.Slug,
+		Valid:  agent.Slug != "",
 	})
 	if err == nil {
 		return existing.ID, nil
@@ -131,10 +131,10 @@ func (s *Service) ensureBotHomeThread(
 		return "", err
 	}
 	if err := s.queries.BindAgentThreadBotHome(ctx, db.BindAgentThreadBotHomeParams{
-		AgentID: sql.NullString{String: agent.ID, Valid: true},
-		Cwd:     cwd,
-		Title:   agent.Name,
-		ID:      threadID,
+		AgentSlug: sql.NullString{String: agent.Slug, Valid: true},
+		Cwd:       cwd,
+		Title:     agent.Name,
+		ID:        threadID,
 	}); err != nil {
 		return "", err
 	}
@@ -142,14 +142,7 @@ func (s *Service) ensureBotHomeThread(
 }
 
 func validateAgentSlug(slug string) error {
-	slug = strings.TrimSpace(slug)
-	if slug == "" || slug == "." || slug == ".." || strings.ContainsAny(slug, `/\\`) {
-		return fmt.Errorf("invalid slug %q", slug)
-	}
-	if slug == "a2a" || strings.HasPrefix(slug, "_") {
-		return fmt.Errorf("reserved slug %q", slug)
-	}
-	return nil
+	return roster.ValidateSlug(slug)
 }
 
 func seedBotHomeTree(thoughtsRoot, slug, name string) error {

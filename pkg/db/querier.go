@@ -28,7 +28,6 @@ type Querier interface {
 	CompleteAgentRun(ctx context.Context, arg CompleteAgentRunParams) error
 	CountAgentThreadOps(ctx context.Context, threadID string) (int64, error)
 	CountUnresolvedWorkspaceComments(ctx context.Context, workspaceRoot string) (int64, error)
-	CreateAgent(ctx context.Context, arg CreateAgentParams) (Agent, error)
 	CreateAgentEntry(ctx context.Context, arg CreateAgentEntryParams) error
 	CreateAgentRun(ctx context.Context, arg CreateAgentRunParams) (AgentRun, error)
 	CreateAgentRunAttachment(ctx context.Context, arg CreateAgentRunAttachmentParams) (AgentRunAttachment, error)
@@ -63,8 +62,6 @@ type Querier interface {
 	FailAgentRunIfRunning(ctx context.Context, arg FailAgentRunIfRunningParams) (AgentRun, error)
 	FindWorkspaceByRootDocPath(ctx context.Context, rootDocPath string) (Workspace, error)
 	FindWorkspaceByRootDocPathForUser(ctx context.Context, arg FindWorkspaceByRootDocPathForUserParams) (Workspace, error)
-	GetAgent(ctx context.Context, id string) (Agent, error)
-	GetAgentBySlug(ctx context.Context, slug string) (Agent, error)
 	GetAgentEntry(ctx context.Context, arg GetAgentEntryParams) (AgentEntry, error)
 	GetAgentRun(ctx context.Context, id string) (AgentRun, error)
 	GetAgentRunForWorkspace(ctx context.Context, arg GetAgentRunForWorkspaceParams) (AgentRun, error)
@@ -75,7 +72,7 @@ type Querier interface {
 	GetAgentThreadForUser(ctx context.Context, arg GetAgentThreadForUserParams) (AgentThread, error)
 	GetAgentThreadForWorkspaceUser(ctx context.Context, arg GetAgentThreadForWorkspaceUserParams) (AgentThread, error)
 	GetAgentThreadOp(ctx context.Context, arg GetAgentThreadOpParams) (AgentThreadOp, error)
-	GetBotHomeThreadByAgentID(ctx context.Context, agentID sql.NullString) (AgentThread, error)
+	GetBotHomeThreadBySlug(ctx context.Context, agentSlug sql.NullString) (AgentThread, error)
 	GetChatCommandByIdempotencyKey(ctx context.Context, arg GetChatCommandByIdempotencyKeyParams) (ChatSessionCommand, error)
 	GetChatMessageCount(ctx context.Context, threadID string) (int64, error)
 	GetChatMessages(ctx context.Context, threadID string) ([]ChatMessage, error)
@@ -139,7 +136,6 @@ type Querier interface {
 	ListAgentThreadsByWorkspace(ctx context.Context, workspaceID string) ([]AgentThread, error)
 	ListAgentThreadsForPlanDirBackfill(ctx context.Context) ([]ListAgentThreadsForPlanDirBackfillRow, error)
 	ListAgentThreadsForUserWithWorkspace(ctx context.Context, userEmail string) ([]ListAgentThreadsForUserWithWorkspaceRow, error)
-	ListAgents(ctx context.Context) ([]Agent, error)
 	ListChatAnnotationsBySession(ctx context.Context, sessionID string) ([]ChatAnnotation, error)
 	ListChatSessionEventsAfter(ctx context.Context, arg ListChatSessionEventsAfterParams) ([]ChatSessionEvent, error)
 	ListChatSessionEventsThrough(ctx context.Context, arg ListChatSessionEventsThroughParams) ([]ChatSessionEvent, error)

@@ -10,6 +10,7 @@ import (
 	"github.com/a-h/templ"
 	"github.com/labstack/echo/v4"
 
+	"github.com/CoreyCole/vamos/pkg/agents/roster"
 	"github.com/CoreyCole/vamos/pkg/db"
 	"github.com/CoreyCole/vamos/server/layouts/workbench"
 	"github.com/CoreyCole/vamos/server/services/agenthome"
@@ -105,7 +106,9 @@ func (s *Service) ServeAI470Room(c echo.Context) error {
 			artifactQuery = planDoc
 		}
 		artifactComp, commentsComp, artifactPage, artifactDoc, err = s.threadArtifactAndComments(
-			c, threadID, artifactQuery,
+			c,
+			threadID,
+			artifactQuery,
 		)
 		if err != nil {
 			return echo.NewHTTPError(http.StatusBadRequest, err.Error())
@@ -249,11 +252,11 @@ func (s *Service) resolveBotHomeThread(
 	slug, userEmail string,
 ) (string, error) {
 	slug = strings.TrimSpace(slug)
-	if slug == "" || s.queries == nil {
+	if slug == "" || s.queries == nil || s.roster == nil {
 		return "", nil
 	}
-	agent, err := s.queries.GetAgentBySlug(ctx, slug)
-	if errors.Is(err, sql.ErrNoRows) {
+	agent, err := s.roster.Get(slug)
+	if errors.Is(err, roster.ErrNotFound) || errors.Is(err, roster.ErrArchived) {
 		return "", echo.NewHTTPError(http.StatusNotFound, "agent not found")
 	}
 	if err != nil {
@@ -267,11 +270,13 @@ func (s *Service) liveRoster(
 	sel agenthome.RosterSelection,
 ) agenthome.RosterView {
 	view := agenthome.RosterView{Selection: sel}
-	if s == nil || s.queries == nil {
+	if s == nil || s.roster == nil {
+		view.Plans = s.liveRosterPlans(ctx)
 		return view
 	}
-	agents, err := s.queries.ListAgents(ctx)
+	agents, err := s.roster.List()
 	if err != nil {
+		view.Plans = s.liveRosterPlans(ctx)
 		return view
 	}
 	for _, agent := range agents {
@@ -301,14 +306,13 @@ func (s *Service) rosterSelectionForLiveThread(
 	}
 	switch thread.RoomKind {
 	case "bot_home":
-		if !thread.AgentID.Valid {
+		if !thread.AgentSlug.Valid || strings.TrimSpace(thread.AgentSlug.String) == "" {
 			return agenthome.RosterSelection{}
 		}
-		agent, err := s.queries.GetAgent(ctx, thread.AgentID.String)
-		if err != nil {
-			return agenthome.RosterSelection{}
+		return agenthome.RosterSelection{
+			Kind: agenthome.KindDM,
+			ID:   thread.AgentSlug.String,
 		}
-		return agenthome.RosterSelection{Kind: agenthome.KindDM, ID: agent.Slug}
 	case "plan":
 		id := planLeadRoomID(thread.PlanDirRel.String)
 		if id == "" {
@@ -326,15 +330,15 @@ func (s *Service) pairwiseRosterSelection(
 	ctx context.Context,
 	thread db.AgentThread,
 ) agenthome.RosterSelection {
-	if !thread.PairAgentIDA.Valid || !thread.PairAgentIDB.Valid {
+	_ = ctx
+	if !thread.PairAgentSlugA.Valid || !thread.PairAgentSlugB.Valid {
 		return agenthome.RosterSelection{}
 	}
-	a, errA := s.queries.GetAgent(ctx, thread.PairAgentIDA.String)
-	b, errB := s.queries.GetAgent(ctx, thread.PairAgentIDB.String)
-	if errA != nil || errB != nil {
+	left := strings.TrimSpace(thread.PairAgentSlugA.String)
+	right := strings.TrimSpace(thread.PairAgentSlugB.String)
+	if left == "" || right == "" {
 		return agenthome.RosterSelection{}
 	}
-	left, right := a.Slug, b.Slug
 	if right < left {
 		left, right = right, left
 	}
@@ -388,8 +392,8 @@ func (s *Service) ai470RoomTitle(
 	id string,
 ) string {
 	id = strings.TrimSpace(id)
-	if kind == agenthome.KindDM && s != nil && s.queries != nil && id != "" {
-		agent, err := s.queries.GetAgentBySlug(ctx, id)
+	if kind == agenthome.KindDM && s != nil && s.roster != nil && id != "" {
+		agent, err := s.roster.Get(id)
 		if err == nil {
 			return agenthome.RosterBotTitle(agent.Name, agent.Slug)
 		}
