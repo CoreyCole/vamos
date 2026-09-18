@@ -436,6 +436,55 @@ func TestLoadFileConfigAgentsRosterPath(t *testing.T) {
 	}
 }
 
+func TestResolveRosterPath(t *testing.T) {
+	t.Parallel()
+
+	root := filepath.Join(string(filepath.Separator), "thoughts")
+
+	if got := ResolveRosterPath(root, ""); got != filepath.Join(root, "agents.yml") {
+		t.Fatalf("empty path = %q, want thoughts root agents.yml", got)
+	}
+
+	relative := ResolveRosterPath(root, filepath.Join("custom", "bots.yml"))
+	wantRelative := filepath.Join(root, "custom", "bots.yml")
+	if relative != wantRelative {
+		t.Fatalf("relative path = %q, want %q", relative, wantRelative)
+	}
+
+	abs := filepath.Join(string(filepath.Separator), "etc", "roster.yml")
+	if got := ResolveRosterPath(root, abs); got != abs {
+		t.Fatalf("absolute path = %q, want set path to win", got)
+	}
+}
+
+func TestValidateHostConfigResolvesRosterPath(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	cfg, err := ValidateHostConfig(server.HostConfig{
+		Runtime: server.RuntimeConfig{ThoughtsRoot: root},
+	})
+	if err != nil {
+		t.Fatalf("ValidateHostConfig() error = %v", err)
+	}
+	want := filepath.Join(root, "agents.yml")
+	if cfg.Agents.RosterPath != want {
+		t.Fatalf("empty RosterPath = %q, want %q", cfg.Agents.RosterPath, want)
+	}
+
+	set := filepath.Join(root, "override.yml")
+	cfg, err = ValidateHostConfig(server.HostConfig{
+		Runtime: server.RuntimeConfig{ThoughtsRoot: root},
+		Agents:  server.AgentsConfig{RosterPath: set},
+	})
+	if err != nil {
+		t.Fatalf("ValidateHostConfig() error = %v", err)
+	}
+	if cfg.Agents.RosterPath != set {
+		t.Fatalf("set RosterPath = %q, want %q", cfg.Agents.RosterPath, set)
+	}
+}
+
 func serverlessHostConfig(root string) server.HostConfig {
 	return server.HostConfig{
 		Runtime: server.RuntimeConfig{

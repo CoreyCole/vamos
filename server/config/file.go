@@ -119,6 +119,18 @@ func LoadFromEnvAndFile() (server.HostConfig, error) {
 	return ValidateHostConfig(cfg)
 }
 
+func ResolveRosterPath(thoughtsRoot, rosterPath string) string {
+	thoughtsRoot = strings.TrimSpace(thoughtsRoot)
+	rosterPath = strings.TrimSpace(rosterPath)
+	if rosterPath == "" {
+		return filepath.Join(thoughtsRoot, "agents.yml")
+	}
+	if filepath.IsAbs(rosterPath) {
+		return filepath.Clean(rosterPath)
+	}
+	return filepath.Join(thoughtsRoot, rosterPath)
+}
+
 func (fc FileConfig) HostConfig() server.HostConfig {
 	repos := make(map[string]server.RepoConfig, len(fc.Projects.Repos))
 	for name, repo := range fc.Projects.Repos {
@@ -198,6 +210,10 @@ func ValidateHostConfig(cfg server.HostConfig) (server.HostConfig, error) {
 	); err != nil {
 		return cfg, err
 	}
+	cfg.Agents.RosterPath = ResolveRosterPath(
+		cfg.Runtime.ThoughtsRoot,
+		cfg.Agents.RosterPath,
+	)
 	if cfg.Auth.GoogleCredentialsFile, err = ExpandOptionalHostPath(
 		"auth.google_credentials_file",
 		cfg.Auth.GoogleCredentialsFile,
