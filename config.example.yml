@@ -8,6 +8,9 @@ runtime:
   state_dir: ~/.local/state/vamos
   database_path: ~/.local/state/vamos/agents.db
 
+agents:
+  roster_path: ""
+
 web:
   listen_address: :4200
   public_base_url: http://localhost:4200

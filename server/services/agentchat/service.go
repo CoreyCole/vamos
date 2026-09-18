@@ -23,6 +23,7 @@ import (
 
 	"github.com/CoreyCole/vamos/pkg/agents/chatsession"
 	conversation "github.com/CoreyCole/vamos/pkg/agents/conversation"
+	"github.com/CoreyCole/vamos/pkg/agents/roster"
 	temporalmgr "github.com/CoreyCole/vamos/pkg/agents/temporal"
 	conversationworkflow "github.com/CoreyCole/vamos/pkg/agents/workflows/conversation"
 	agentworkspace "github.com/CoreyCole/vamos/pkg/agents/workspace"
@@ -91,6 +92,7 @@ type Service struct {
 	piCommandDiscovery                  PiCommandDiscovery
 	chatSessions                        *chatsession.Service
 	hermesGateway                       HermesGatewayClient
+	roster                              *roster.Store
 }
 
 type liveThreadState struct {
@@ -110,6 +112,7 @@ type ServiceOptions struct {
 	WorkspaceRestartToken   string
 	HermesGatewayURL        string
 	HermesGatewayToken      string
+	Roster                  *roster.Store
 }
 
 func NewService(
@@ -199,6 +202,7 @@ func NewServiceWithOptions(
 		workspaceManagerURL:     strings.TrimSpace(opts.WorkspaceManagerURL),
 		workspaceRestartToken:   strings.TrimSpace(opts.WorkspaceRestartToken),
 		chatSessions:            chatsession.NewService(database, queries),
+		roster:                  opts.Roster,
 	}
 	if gatewayURL := strings.TrimSpace(opts.HermesGatewayURL); gatewayURL != "" {
 		svc.hermesGateway = httpHermesGatewayClient{

@@ -17,6 +17,12 @@ Host-owned artifact and state paths:
 
 Back up the thoughts root and host config. Treat the database as rebuildable when workflows are driven from durable thoughts artifacts.
 
+## `agents`
+
+Optional bot roster file:
+
+- `roster_path`: YAML roster on disk. Empty string resolves to `thoughts_root/agents.yml`. A set relative path is joined to `thoughts_root`. An absolute path is used as given. Missing file or empty `bots` is an empty roster.
+
 ## `web`
 
 HTTP listen and public browser-facing settings:

@@ -17,6 +17,7 @@ import (
 	"github.com/labstack/echo/v4"
 	"gopkg.in/yaml.v3"
 
+	"github.com/CoreyCole/vamos/pkg/agents/roster"
 	"github.com/CoreyCole/vamos/pkg/db"
 	"github.com/CoreyCole/vamos/server"
 	"github.com/CoreyCole/vamos/server/services/comments"
@@ -85,6 +86,7 @@ type Service struct {
 	hermesThreadsRenderer    HermesThreadsRenderer
 	workbenchThreadsRenderer WorkbenchThreadRenderer
 	queries                  db.Querier
+	roster                   *roster.Store
 }
 
 func NewService(
@@ -157,6 +159,12 @@ func (s *Service) WithWorkbenchThreadRenderer(renderer WorkbenchThreadRenderer) 
 
 func (s *Service) WithQueries(queries db.Querier) *Service {
 	s.queries = queries
+
+	return s
+}
+
+func (s *Service) WithRoster(store *roster.Store) *Service {
+	s.roster = store
 
 	return s
 }

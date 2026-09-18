@@ -25,6 +25,7 @@ import (
 	"github.com/labstack/echo/v4/middleware"
 	temporalclient "go.temporal.io/sdk/client"
 
+	"github.com/CoreyCole/vamos/pkg/agents/roster"
 	temporalmgr "github.com/CoreyCole/vamos/pkg/agents/temporal"
 	agentworker "github.com/CoreyCole/vamos/pkg/agents/worker"
 	conversationworkflow "github.com/CoreyCole/vamos/pkg/agents/workflows/conversation"
@@ -1129,9 +1130,18 @@ func main() {
 	if err != nil {
 		log.Fatal("Failed to create markdown service:", err)
 	}
-	markdownService.WithQueries(dbService.Queries).WithWorkspaceResolver(
-		markdown.NewDBWorkspaceResolver(dbService.Queries, basePath),
-	).WithLayoutPreferenceService(layoutPrefsService)
+	rosterPath := config.ResolveRosterPath(basePath, "")
+	if useHostConfig {
+		rosterPath = hostCfg.Agents.RosterPath
+	}
+	rosterStore := &roster.Store{Path: rosterPath}
+
+	markdownService.WithQueries(dbService.Queries).
+		WithRoster(rosterStore).
+		WithWorkspaceResolver(
+			markdown.NewDBWorkspaceResolver(dbService.Queries, basePath),
+		).
+		WithLayoutPreferenceService(layoutPrefsService)
 
 	fmt.Printf("Markdown service initialized with comment service\n")
 
@@ -1256,6 +1266,7 @@ func main() {
 			CallbackBaseURL:         agentChatCallbackBaseURL(cfg),
 			HermesGatewayURL:        cfg.HermesGatewayURL,
 			HermesGatewayToken:      cfg.HermesGatewayToken,
+			Roster:                  rosterStore,
 		},
 	)
 	if err != nil {
