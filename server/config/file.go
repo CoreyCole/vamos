@@ -29,6 +29,7 @@ type FileConfig struct {
 	Projects   ProjectsConfigFile     `yaml:"projects"`
 	Workspaces server.WorkspaceConfig `yaml:"workspaces"`
 	Deploy     server.DeployConfig    `yaml:"deploy"`
+	Agents     server.AgentsConfig    `yaml:"agents"`
 }
 
 type ProjectsConfigFile struct {
@@ -146,6 +147,7 @@ func (fc FileConfig) HostConfig() server.HostConfig {
 		},
 		Workspaces: fc.Workspaces,
 		Deploy:     fc.Deploy,
+		Agents:     fc.Agents,
 	}
 }
 

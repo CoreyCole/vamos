@@ -24,6 +24,7 @@ type HostConfig struct {
 	Projects   ProjectsConfig
 	Workspaces WorkspaceConfig
 	Deploy     DeployConfig
+	Agents     AgentsConfig
 }
 
 type AppConfig struct {
@@ -36,6 +37,10 @@ type RuntimeConfig struct {
 	ThoughtsRoot string `yaml:"thoughts_root"`
 	StateDir     string `yaml:"state_dir"`
 	DatabasePath string `yaml:"database_path"`
+}
+
+type AgentsConfig struct {
+	RosterPath string `yaml:"roster_path"`
 }
 
 func (cfg RuntimeConfig) ResolveThoughtsRepo() (string, error) {

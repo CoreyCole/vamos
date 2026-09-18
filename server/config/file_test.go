@@ -399,6 +399,43 @@ func TestLoadFileConfigReportsMalformedYAML(t *testing.T) {
 	}
 }
 
+func TestLoadFileConfigAgentsRosterPath(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	withPath := filepath.Join(dir, "with-roster.yml")
+	if err := os.WriteFile(
+		withPath,
+		[]byte("agents:\n  roster_path: agents.yml\n"),
+		0o644,
+	); err != nil {
+		t.Fatalf("write config: %v", err)
+	}
+	withCfg, err := LoadFileConfig(LoadFileConfigOptions{Path: withPath})
+	if err != nil {
+		t.Fatalf("LoadFileConfig() error = %v", err)
+	}
+	if got := withCfg.HostConfig().Agents.RosterPath; got != "agents.yml" {
+		t.Fatalf("RosterPath = %q, want agents.yml", got)
+	}
+
+	missingPath := filepath.Join(dir, "no-agents.yml")
+	if err := os.WriteFile(
+		missingPath,
+		[]byte("app:\n  name: Vamos\n"),
+		0o644,
+	); err != nil {
+		t.Fatalf("write config: %v", err)
+	}
+	missingCfg, err := LoadFileConfig(LoadFileConfigOptions{Path: missingPath})
+	if err != nil {
+		t.Fatalf("LoadFileConfig() error = %v", err)
+	}
+	if got := missingCfg.HostConfig().Agents.RosterPath; got != "" {
+		t.Fatalf("RosterPath = %q, want empty", got)
+	}
+}
+
 func serverlessHostConfig(root string) server.HostConfig {
 	return server.HostConfig{
 		Runtime: server.RuntimeConfig{
