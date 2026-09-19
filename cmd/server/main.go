@@ -1261,6 +1261,7 @@ func main() {
 			ProjectRoot:             cfg.RepoPath,
 			ProjectName:             agentChatProjectName,
 			DefaultCwd:              agentChatDefaultDir,
+			Projects:                hostCfg.Projects,
 			ThoughtsRoot:            basePath,
 			DetailCollapseLineLimit: cfg.AgentChatDetailCollapseLineLimit,
 			CallbackBaseURL:         agentChatCallbackBaseURL(cfg),

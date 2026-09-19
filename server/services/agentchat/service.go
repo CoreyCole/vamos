@@ -28,7 +28,9 @@ import (
 	conversationworkflow "github.com/CoreyCole/vamos/pkg/agents/workflows/conversation"
 	agentworkspace "github.com/CoreyCole/vamos/pkg/agents/workspace"
 	"github.com/CoreyCole/vamos/pkg/db"
+	servercfg "github.com/CoreyCole/vamos/server"
 	"github.com/CoreyCole/vamos/server/services/markdown"
+	"github.com/CoreyCole/vamos/server/services/planworkspace"
 	"github.com/CoreyCole/vamos/server/services/workspaces"
 )
 
@@ -72,6 +74,7 @@ type Service struct {
 	projectRoot                         string
 	projectName                         string
 	defaultCwd                          string
+	projects                            servercfg.ProjectsConfig
 	thoughtsRoot                        string
 	piSessionsDir                       string
 	piIndexMu                           sync.Mutex
@@ -104,6 +107,7 @@ type ServiceOptions struct {
 	ProjectRoot             string
 	ProjectName             string
 	DefaultCwd              string
+	Projects                servercfg.ProjectsConfig
 	ThoughtsRoot            string
 	DetailCollapseLineLimit int
 	CallbackBaseURL         string
@@ -191,6 +195,7 @@ func NewServiceWithOptions(
 		projectRoot:             cleanProjectRoot,
 		projectName:             projectName,
 		defaultCwd:              defaultCwd,
+		projects:                opts.Projects,
 		thoughtsRoot:            thoughtsRoot,
 		piSessionsDir:           defaultPiSessionsDir(),
 		piIndexRunning:          make(map[string]bool),
@@ -1905,6 +1910,12 @@ func (s *Service) buildRunInput(
 		return preparedRunInput{}, err
 	}
 	nextOrigin := s.nextOriginOrder(ctx, thread)
+	if dirContext := workingDirInjectContent(injectFiles); dirContext != "" {
+		if inputContext != "" {
+			inputContext += "\n\n"
+		}
+		inputContext += dirContext
+	}
 	return preparedRunInput{
 		Input: conversation.RunInput{
 			WorkspaceID:            workspaceID,
@@ -1954,9 +1965,21 @@ func (s *Service) prepareRoomSession(
 		if err != nil {
 			return RoomIdentity{}, "", "", nil, err
 		}
-		cwd, err := RoomCwdAbs(s.thoughtsRoot, room)
+		roomDisk, err := RoomCwdAbs(s.thoughtsRoot, room)
 		if err != nil {
 			return RoomIdentity{}, "", "", nil, err
+		}
+		processCwd := roomDisk
+		var planFM planworkspace.PlanWorkspaceFrontmatter
+		if room.Kind == RoomKindPlan {
+			planFM, err = readPlanWorkspaceFrontmatter(roomDisk)
+			if err != nil {
+				return RoomIdentity{}, "", "", nil, err
+			}
+			processCwd, err = s.resolvePlanProcessCwd(roomDisk, planFM)
+			if err != nil {
+				return RoomIdentity{}, "", "", nil, err
+			}
 		}
 		roster, err := s.liveAgentRoster(ctx)
 		if err != nil {
@@ -1966,7 +1989,13 @@ func (s *Service) prepareRoomSession(
 		if err != nil {
 			return RoomIdentity{}, "", "", nil, err
 		}
-		return room, sessionFile, cwd, injectFiles, nil
+		if room.Kind == RoomKindPlan {
+			injectFiles = append(
+				injectFiles,
+				workingDirInjectFile(processCwd, room.PlanDirRel, planFM.ImplDir),
+			)
+		}
+		return room, sessionFile, processCwd, injectFiles, nil
 	}
 	cwd := strings.TrimSpace(thread.Cwd)
 	if cwd == "" {

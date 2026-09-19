@@ -41,6 +41,12 @@ branch from there.
 
 Host-specific copy notes, if any, live under `references/`.
 
+When the copy succeeds:
+
+1. Merge `impl_dir` onto the plan `AGENTS.md` YAML frontmatter (omit the key before the copy exists). Use the copy path, not the staging working checkout and not the plan directory.
+1. Put that same copy path on the QRSPI workspace result (`workspace` / `implementation_workspace`) so `EffectUpdateExecutionCwd` persists `State.ExecutionCwd`.
+1. After `impl_dir` is written, plan-room process cwd switches to the copy. Until then, process cwd stays the host working checkout.
+
 ## Hermes completion
 
 After durable work and verification, end with a normal final response that

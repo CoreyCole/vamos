@@ -1031,7 +1031,9 @@ func planWorkspaceFrontmatterHasSignal(fm planworkspace.PlanWorkspaceFrontmatter
 		len(fm.RelatedProjects) > 0 ||
 		fm.QRSPIStage != planworkspace.QRSPIStageQuestion ||
 		!fm.QRSPILifecycleUpdatedAt.IsZero() ||
-		strings.TrimSpace(fm.QRSPIClosedReason) != ""
+		strings.TrimSpace(fm.QRSPIClosedReason) != "" ||
+		strings.TrimSpace(fm.PlanDir) != "" ||
+		strings.TrimSpace(fm.ImplDir) != ""
 }
 
 func planWorkspaceActivityTimestamp(

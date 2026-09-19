@@ -11,7 +11,12 @@ import (
 
 func TestParsePlanWorkspaceFrontmatter(t *testing.T) {
 	updatedAt := "2026-05-24T10:00:00Z"
-	got, err := ParsePlanWorkspaceFrontmatter("AGENTS.md", []byte("---\nproject: ' example.com/alpha/app '\nqrspi_lifecycle: review_plan\nqrspi_lifecycle_updated_at: "+updatedAt+"\nqrspi_closed_reason: duplicate\n---\n# Body\n"))
+	got, err := ParsePlanWorkspaceFrontmatter(
+		"AGENTS.md",
+		[]byte(
+			"---\nproject: ' example.com/alpha/app '\nqrspi_lifecycle: review_plan\nqrspi_lifecycle_updated_at: "+updatedAt+"\nqrspi_closed_reason: duplicate\n---\n# Body\n",
+		),
+	)
 	if err != nil {
 		t.Fatalf("ParsePlanWorkspaceFrontmatter() error = %v", err)
 	}
@@ -30,7 +35,12 @@ func TestParsePlanWorkspaceFrontmatter(t *testing.T) {
 }
 
 func TestParsePlanWorkspaceFrontmatterNormalizesRelatedProjects(t *testing.T) {
-	got, err := ParsePlanWorkspaceFrontmatter("plan.md", []byte("---\nproject: vamos\nrelated_projects:\n  - datastarui\n  - ' vamos '\n  - ''\n  - cn-agents\n  - datastarui\n---\n# Body\n"))
+	got, err := ParsePlanWorkspaceFrontmatter(
+		"plan.md",
+		[]byte(
+			"---\nproject: vamos\nrelated_projects:\n  - datastarui\n  - ' vamos '\n  - ''\n  - cn-agents\n  - datastarui\n---\n# Body\n",
+		),
+	)
 	if err != nil {
 		t.Fatalf("ParsePlanWorkspaceFrontmatter() error = %v", err)
 	}
@@ -54,16 +64,41 @@ func TestParsePlanWorkspaceFrontmatterDefaultsMissingFrontmatterToQuestion(t *te
 }
 
 func TestParsePlanWorkspaceFrontmatterRejectsInvalidLifecycle(t *testing.T) {
-	_, err := ParsePlanWorkspaceFrontmatter("AGENTS.md", []byte("---\nqrspi_lifecycle: bogus\n---\n# Body\n"))
+	_, err := ParsePlanWorkspaceFrontmatter(
+		"AGENTS.md",
+		[]byte("---\nqrspi_lifecycle: bogus\n---\n# Body\n"),
+	)
 	if err == nil {
 		t.Fatal("ParsePlanWorkspaceFrontmatter() error = nil, want invalid lifecycle")
+	}
+}
+
+func TestParsePlanWorkspaceFrontmatterPlanAndImplDir(t *testing.T) {
+	got, err := ParsePlanWorkspaceFrontmatter(
+		"AGENTS.md",
+		[]byte(
+			"---\nplan_dir: ' thoughts/acme/plans/demo '\nimpl_dir: ' /tmp/copy '\n---\n# Body\n",
+		),
+	)
+	if err != nil {
+		t.Fatalf("ParsePlanWorkspaceFrontmatter() error = %v", err)
+	}
+	if got.PlanDir != "thoughts/acme/plans/demo" {
+		t.Fatalf("PlanDir = %q", got.PlanDir)
+	}
+	if got.ImplDir != "/tmp/copy" {
+		t.Fatalf("ImplDir = %q", got.ImplDir)
 	}
 }
 
 func TestMergePlanWorkspaceFrontmatter(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "AGENTS.md")
-	if err := os.WriteFile(path, []byte("---\nsource: test\nqrspi_lifecycle: question\n---\n# Body\n"), 0o644); err != nil {
+	if err := os.WriteFile(
+		path,
+		[]byte("---\nsource: test\nqrspi_lifecycle: question\n---\n# Body\n"),
+		0o644,
+	); err != nil {
 		t.Fatal(err)
 	}
 	updatedAt := time.Date(2026, 5, 24, 10, 0, 0, 0, time.UTC)
@@ -93,7 +128,8 @@ func TestMergePlanWorkspaceFrontmatter(t *testing.T) {
 }
 
 func TestIsHistoricalQRSPIStage(t *testing.T) {
-	if !IsHistoricalQRSPIStage(QRSPIStageMerged) || !IsHistoricalQRSPIStage(QRSPIStageClosed) {
+	if !IsHistoricalQRSPIStage(QRSPIStageMerged) ||
+		!IsHistoricalQRSPIStage(QRSPIStageClosed) {
 		t.Fatal("merged/closed should be historical")
 	}
 	if IsHistoricalQRSPIStage(QRSPIStageVerify) {

@@ -28,26 +28,71 @@ type Effect struct {
 	Message string          `json:"message,omitempty"`
 }
 
-func DeriveEffects(before wruntime.State, result wruntime.WorkflowResult, decision wruntime.TransitionDecision, context Context) ([]Effect, error) {
-	effects := []Effect{{Kind: EffectPersistResult, NodeID: result.SourceNodeID}}
-	if path := ExecutionCwdFromWorkspaceResult(result); path != "" && result.SourceNodeID == qrspi.NodeWorkspace {
-		effects = append(effects, Effect{Kind: EffectUpdateExecutionCwd, NodeID: result.SourceNodeID, Path: path})
+func ApplyEffects(state wruntime.State, effects []Effect) wruntime.State {
+	for _, effect := range effects {
+		if effect.Kind == EffectUpdateExecutionCwd {
+			if path := strings.TrimSpace(effect.Path); path != "" {
+				state.ExecutionCwd = path
+			}
+		}
 	}
-	if result.SourceNodeID == qrspi.NodeReviewImplementation && result.Outcome == wruntime.OutcomeNeedsFollowup {
+	return state
+}
+
+func DeriveEffects(
+	before wruntime.State,
+	result wruntime.WorkflowResult,
+	decision wruntime.TransitionDecision,
+	context Context,
+) ([]Effect, error) {
+	effects := []Effect{{Kind: EffectPersistResult, NodeID: result.SourceNodeID}}
+	if path := ExecutionCwdFromWorkspaceResult(
+		result,
+	); path != "" &&
+		result.SourceNodeID == qrspi.NodeWorkspace {
+		effects = append(
+			effects,
+			Effect{
+				Kind:   EffectUpdateExecutionCwd,
+				NodeID: result.SourceNodeID,
+				Path:   path,
+			},
+		)
+	}
+	if result.SourceNodeID == qrspi.NodeReviewImplementation &&
+		result.Outcome == wruntime.OutcomeNeedsFollowup {
 		followup, err := implementationFollowupPath(result)
 		if err != nil {
 			return nil, err
 		}
-		effects = append(effects, Effect{Kind: EffectEnterFollowup, NodeID: qrspi.NodeQuestion, Path: followup})
+		effects = append(
+			effects,
+			Effect{Kind: EffectEnterFollowup, NodeID: qrspi.NodeQuestion, Path: followup},
+		)
 	}
-	if result.SourceNodeID == qrspi.NodeReviewImplementation && result.Outcome == wruntime.OutcomeReadyForHumanReview && len(before.Followups) > 0 {
-		effects = append(effects, Effect{Kind: EffectExitFollowup, NodeID: qrspi.NodeReviewImplementation})
+	if result.SourceNodeID == qrspi.NodeReviewImplementation &&
+		result.Outcome == wruntime.OutcomeReadyForHumanReview &&
+		len(before.Followups) > 0 {
+		effects = append(
+			effects,
+			Effect{Kind: EffectExitFollowup, NodeID: qrspi.NodeReviewImplementation},
+		)
 	}
 	if decision.StartNext {
-		effects = append(effects, Effect{Kind: EffectStartNext, NodeID: decision.NextNodeID})
+		effects = append(
+			effects,
+			Effect{Kind: EffectStartNext, NodeID: decision.NextNodeID},
+		)
 	}
 	if decision.WaitingHuman || result.Status == wruntime.StatusNeedsHuman {
-		effects = append(effects, Effect{Kind: EffectWaitHuman, NodeID: decision.NextNodeID, Message: decision.StopReason})
+		effects = append(
+			effects,
+			Effect{
+				Kind:    EffectWaitHuman,
+				NodeID:  decision.NextNodeID,
+				Message: decision.StopReason,
+			},
+		)
 	}
 	return effects, nil
 }
@@ -55,7 +100,9 @@ func DeriveEffects(before wruntime.State, result wruntime.WorkflowResult, decisi
 func implementationFollowupPath(result wruntime.WorkflowResult) (string, error) {
 	followup := artifactByRole(result, "followup-plan", "followup-questions")
 	if followup == "" {
-		return "", fmt.Errorf("implementation follow-up requires followup-plan or followup-questions artifact")
+		return "", fmt.Errorf(
+			"implementation follow-up requires followup-plan or followup-questions artifact",
+		)
 	}
 	return inferImplementationReviewPlanDir(followup)
 }
@@ -79,5 +126,8 @@ func inferImplementationReviewPlanDir(artifactPath string) (string, error) {
 			return strings.Join(parts[:i+1], "/"), nil
 		}
 	}
-	return "", fmt.Errorf("implementation follow-up artifact %q must be under a *_implementation-review directory", artifactPath)
+	return "", fmt.Errorf(
+		"implementation follow-up artifact %q must be under a *_implementation-review directory",
+		artifactPath,
+	)
 }

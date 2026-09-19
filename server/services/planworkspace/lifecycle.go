@@ -37,25 +37,39 @@ type PlanWorkspaceFrontmatter struct {
 	QRSPIStage              QRSPIStage `yaml:"qrspi_lifecycle"`
 	QRSPILifecycleUpdatedAt time.Time  `yaml:"qrspi_lifecycle_updated_at"`
 	QRSPIClosedReason       string     `yaml:"qrspi_closed_reason"`
+	PlanDir                 string     `yaml:"plan_dir,omitempty"`
+	ImplDir                 string     `yaml:"impl_dir,omitempty"`
 	DeclaredSource          string     `yaml:"-"`
 }
 
-func ParsePlanWorkspaceFrontmatter(path string, data []byte) (PlanWorkspaceFrontmatter, error) {
+func ParsePlanWorkspaceFrontmatter(
+	path string,
+	data []byte,
+) (PlanWorkspaceFrontmatter, error) {
 	front, _, ok := splitYAMLFrontmatter(data)
 	if !ok {
 		return PlanWorkspaceFrontmatter{QRSPIStage: QRSPIStageQuestion}, nil
 	}
 	var fm PlanWorkspaceFrontmatter
 	if err := yaml.Unmarshal(front, &fm); err != nil {
-		return PlanWorkspaceFrontmatter{}, fmt.Errorf("parse %s frontmatter: %w", path, err)
+		return PlanWorkspaceFrontmatter{}, fmt.Errorf(
+			"parse %s frontmatter: %w",
+			path,
+			err,
+		)
 	}
 	fm.Project = strings.TrimSpace(fm.Project)
+	fm.PlanDir = strings.TrimSpace(fm.PlanDir)
+	fm.ImplDir = strings.TrimSpace(fm.ImplDir)
 	fm.RelatedProjects = NormalizeRelatedProjects(fm.Project, fm.RelatedProjects)
 	if fm.QRSPIStage == "" {
 		fm.QRSPIStage = QRSPIStageQuestion
 	}
 	if !ValidQRSPIStage(fm.QRSPIStage) {
-		return PlanWorkspaceFrontmatter{}, fmt.Errorf("invalid qrspi_lifecycle %q", fm.QRSPIStage)
+		return PlanWorkspaceFrontmatter{}, fmt.Errorf(
+			"invalid qrspi_lifecycle %q",
+			fm.QRSPIStage,
+		)
 	}
 	return fm, nil
 }
@@ -97,10 +111,18 @@ func MergePlanWorkspaceFrontmatter(path string, update PlanWorkspaceFrontmatter)
 		fields["qrspi_lifecycle"] = string(update.QRSPIStage)
 	}
 	if !update.QRSPILifecycleUpdatedAt.IsZero() {
-		fields["qrspi_lifecycle_updated_at"] = update.QRSPILifecycleUpdatedAt.Format(time.RFC3339)
+		fields["qrspi_lifecycle_updated_at"] = update.QRSPILifecycleUpdatedAt.Format(
+			time.RFC3339,
+		)
 	}
 	if update.QRSPIClosedReason != "" {
 		fields["qrspi_closed_reason"] = update.QRSPIClosedReason
+	}
+	if planDir := strings.TrimSpace(update.PlanDir); planDir != "" {
+		fields["plan_dir"] = planDir
+	}
+	if implDir := strings.TrimSpace(update.ImplDir); implDir != "" {
+		fields["impl_dir"] = implDir
 	}
 	encoded, err := yaml.Marshal(fields)
 	if err != nil {
@@ -172,8 +194,9 @@ func LifecycleLabel(stage QRSPIStage) string {
 	}
 }
 
-func splitYAMLFrontmatter(data []byte) (front []byte, body []byte, ok bool) {
-	if !bytes.HasPrefix(data, []byte("---\n")) && !bytes.HasPrefix(data, []byte("---\r\n")) {
+func splitYAMLFrontmatter(data []byte) (front, body []byte, ok bool) {
+	if !bytes.HasPrefix(data, []byte("---\n")) &&
+		!bytes.HasPrefix(data, []byte("---\r\n")) {
 		return nil, data, false
 	}
 	start := 4

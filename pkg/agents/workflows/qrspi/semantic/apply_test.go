@@ -28,25 +28,33 @@ func TestSemanticApplyReviewPlanPositiveRouting(t *testing.T) {
 			wantNormalization: string(wruntime.OutcomeReadyForWorkspace),
 		},
 		{
-			name:              "review dir routes to implement",
-			context:           Context{PlanDir: "thoughts/example/plans/parent/reviews/2026-01-01_implementation-review"},
+			name: "review dir routes to implement",
+			context: Context{
+				PlanDir: "thoughts/example/plans/parent/reviews/2026-01-01_implementation-review",
+			},
 			wantOutcome:       wruntime.OutcomeReadyForImplement,
 			wantNext:          qrspi.NodeImplement,
 			wantAction:        NextActionStartNext,
 			wantNormalization: string(wruntime.OutcomeReadyForImplement),
 		},
 		{
-			name:              "implementation cwd routes to implement",
-			context:           Context{PlanDir: "thoughts/example/plans/parent", ImplementationCwd: "/tmp/impl"},
+			name: "implementation cwd routes to implement",
+			context: Context{
+				PlanDir:           "thoughts/example/plans/parent",
+				ImplementationCwd: "/tmp/impl",
+			},
 			wantOutcome:       wruntime.OutcomeReadyForImplement,
 			wantNext:          qrspi.NodeImplement,
 			wantAction:        NextActionStartNext,
 			wantNormalization: string(wruntime.OutcomeReadyForImplement),
 		},
 		{
-			name:              "implementation cwd corrects explicit workspace outcome",
-			inputOutcome:      string(wruntime.OutcomeReadyForWorkspace),
-			context:           Context{PlanDir: "thoughts/example/plans/parent", ImplementationCwd: "/tmp/impl"},
+			name:         "implementation cwd corrects explicit workspace outcome",
+			inputOutcome: string(wruntime.OutcomeReadyForWorkspace),
+			context: Context{
+				PlanDir:           "thoughts/example/plans/parent",
+				ImplementationCwd: "/tmp/impl",
+			},
 			wantOutcome:       wruntime.OutcomeReadyForImplement,
 			wantNext:          qrspi.NodeImplement,
 			wantAction:        NextActionStartNext,
@@ -62,17 +70,31 @@ func TestSemanticApplyReviewPlanPositiveRouting(t *testing.T) {
 				inputOutcome = "complete"
 			}
 			got, err := Apply(context.Background(), ApplyInput{
-				RawOutput:    semanticResultYAML("review-plan", "complete", inputOutcome, "thoughts/example/reviews/plan/review.md", ""),
+				RawOutput: semanticResultYAML(
+					"review-plan",
+					"complete",
+					inputOutcome,
+					"thoughts/example/reviews/plan/review.md",
+					"",
+				),
 				ParseContext: wruntime.ParseContext{ExpectedNodeID: qrspi.NodeReviewPlan},
 				Context:      tt.context,
 			})
 			if err != nil {
 				t.Fatalf("Apply() error = %v", err)
 			}
-			if got.WorkflowResult.Outcome != tt.wantOutcome || got.Decision.NextNodeID != tt.wantNext || got.NextAction.Kind != tt.wantAction {
-				t.Fatalf("outcome/next/action = %q/%q/%q", got.WorkflowResult.Outcome, got.Decision.NextNodeID, got.NextAction.Kind)
+			if got.WorkflowResult.Outcome != tt.wantOutcome ||
+				got.Decision.NextNodeID != tt.wantNext ||
+				got.NextAction.Kind != tt.wantAction {
+				t.Fatalf(
+					"outcome/next/action = %q/%q/%q",
+					got.WorkflowResult.Outcome,
+					got.Decision.NextNodeID,
+					got.NextAction.Kind,
+				)
 			}
-			if len(got.Normalizations) != 1 || got.Normalizations[0].Canonical != tt.wantNormalization {
+			if len(got.Normalizations) != 1 ||
+				got.Normalizations[0].Canonical != tt.wantNormalization {
 				t.Fatalf("normalizations = %+v", got.Normalizations)
 			}
 		})
@@ -100,29 +122,91 @@ func TestSemanticApplyStatusActions(t *testing.T) {
 		wantNext   wruntime.NodeID
 		wantAction NextActionKind
 	}{
-		{name: "research handoff", node: qrspi.NodeResearch, status: "handoff", wantNext: qrspi.NodeResearch, wantAction: NextActionContinuePending},
-		{name: "review helper handoff", node: qrspi.NodeReviewOutline, status: "handoff", wantNext: qrspi.NodeReviewOutline, wantAction: NextActionContinuePending},
-		{name: "address review research handoff", node: qrspi.NodeAddressReviewResearchPlan, status: "handoff", wantNext: qrspi.NodeAddressReviewResearchPlan, wantAction: NextActionContinuePending},
-		{name: "workspace handoff", node: qrspi.NodeWorkspace, status: "handoff", wantNext: qrspi.NodeWorkspace, wantAction: NextActionContinuePending},
-		{name: "implement handoff", node: qrspi.NodeImplement, status: "handoff", wantNext: qrspi.NodeImplement, wantAction: NextActionContinuePending},
-		{name: "verify handoff", node: qrspi.NodeVerify, status: "handoff", wantNext: qrspi.NodeVerify, wantAction: NextActionContinuePending},
-		{name: "blocked", node: qrspi.NodeDesign, status: "blocked", wantAction: NextActionBlocked},
-		{name: "error", node: qrspi.NodeDesign, status: "error", wantAction: NextActionError},
-		{name: "needs human", node: qrspi.NodeDesign, status: "needs_human", wantAction: NextActionWaitHuman},
+		{
+			name:       "research handoff",
+			node:       qrspi.NodeResearch,
+			status:     "handoff",
+			wantNext:   qrspi.NodeResearch,
+			wantAction: NextActionContinuePending,
+		},
+		{
+			name:       "review helper handoff",
+			node:       qrspi.NodeReviewOutline,
+			status:     "handoff",
+			wantNext:   qrspi.NodeReviewOutline,
+			wantAction: NextActionContinuePending,
+		},
+		{
+			name:       "address review research handoff",
+			node:       qrspi.NodeAddressReviewResearchPlan,
+			status:     "handoff",
+			wantNext:   qrspi.NodeAddressReviewResearchPlan,
+			wantAction: NextActionContinuePending,
+		},
+		{
+			name:       "workspace handoff",
+			node:       qrspi.NodeWorkspace,
+			status:     "handoff",
+			wantNext:   qrspi.NodeWorkspace,
+			wantAction: NextActionContinuePending,
+		},
+		{
+			name:       "implement handoff",
+			node:       qrspi.NodeImplement,
+			status:     "handoff",
+			wantNext:   qrspi.NodeImplement,
+			wantAction: NextActionContinuePending,
+		},
+		{
+			name:       "verify handoff",
+			node:       qrspi.NodeVerify,
+			status:     "handoff",
+			wantNext:   qrspi.NodeVerify,
+			wantAction: NextActionContinuePending,
+		},
+		{
+			name:       "blocked",
+			node:       qrspi.NodeDesign,
+			status:     "blocked",
+			wantAction: NextActionBlocked,
+		},
+		{
+			name:       "error",
+			node:       qrspi.NodeDesign,
+			status:     "error",
+			wantAction: NextActionError,
+		},
+		{
+			name:       "needs human",
+			node:       qrspi.NodeDesign,
+			status:     "needs_human",
+			wantAction: NextActionWaitHuman,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			state := semanticTestState(t, tt.node)
 			got, err := Apply(context.Background(), ApplyInput{
-				RawOutput:    semanticResultYAML(string(tt.node), tt.status, tt.outcome, "thoughts/example/artifact.md", ""),
+				RawOutput: semanticResultYAML(
+					string(tt.node),
+					tt.status,
+					tt.outcome,
+					"thoughts/example/artifact.md",
+					"",
+				),
 				ParseContext: wruntime.ParseContext{ExpectedNodeID: tt.node},
 				Context:      Context{State: state},
 			})
 			if err != nil {
 				t.Fatalf("Apply() error = %v", err)
 			}
-			if got.Decision.NextNodeID != tt.wantNext || got.NextAction.Kind != tt.wantAction {
-				t.Fatalf("next/action = %q/%q", got.Decision.NextNodeID, got.NextAction.Kind)
+			if got.Decision.NextNodeID != tt.wantNext ||
+				got.NextAction.Kind != tt.wantAction {
+				t.Fatalf(
+					"next/action = %q/%q",
+					got.Decision.NextNodeID,
+					got.NextAction.Kind,
+				)
 			}
 		})
 	}
@@ -131,22 +215,33 @@ func TestSemanticApplyStatusActions(t *testing.T) {
 func TestSemanticApplyWorkspaceCwdEffect(t *testing.T) {
 	state := semanticTestState(t, qrspi.NodeWorkspace)
 	got, err := Apply(context.Background(), ApplyInput{
-		RawOutput: semanticResultYAML("workspace", "complete", "complete", "thoughts/example/plan.md", strings.Join([]string{
-			"  workspace: \"/tmp/top-workspace\"",
-			"  workspace_metadata:",
-			"    implementation_workspace: \"/tmp/metadata-workspace\"",
-		}, "\n")+"\n"),
+		RawOutput: semanticResultYAML(
+			"workspace",
+			"complete",
+			"complete",
+			"thoughts/example/plan.md",
+			strings.Join([]string{
+				"  workspace: \"/tmp/top-workspace\"",
+				"  workspace_metadata:",
+				"    implementation_workspace: \"/tmp/metadata-workspace\"",
+			}, "\n")+"\n",
+		),
 		ParseContext: wruntime.ParseContext{ExpectedNodeID: qrspi.NodeWorkspace},
 		Context:      Context{State: state},
 	})
 	if err != nil {
 		t.Fatalf("Apply() error = %v", err)
 	}
-	if got.NextAction.Kind != NextActionStartNext || got.Decision.NextNodeID != qrspi.NodeImplement {
+	if got.NextAction.Kind != NextActionStartNext ||
+		got.Decision.NextNodeID != qrspi.NodeImplement {
 		t.Fatalf("next/action = %q/%q", got.Decision.NextNodeID, got.NextAction.Kind)
 	}
-	if len(got.Effects) == 0 || !hasEffect(got.Effects, EffectUpdateExecutionCwd, "/tmp/top-workspace") {
+	if len(got.Effects) == 0 ||
+		!hasEffect(got.Effects, EffectUpdateExecutionCwd, "/tmp/top-workspace") {
 		t.Fatalf("effects = %+v", got.Effects)
+	}
+	if got.Decision.State.ExecutionCwd != "/tmp/top-workspace" {
+		t.Fatalf("ExecutionCwd = %q", got.Decision.State.ExecutionCwd)
 	}
 }
 

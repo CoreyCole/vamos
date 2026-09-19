@@ -70,7 +70,10 @@ func Apply(ctx context.Context, input ApplyInput) (ApplyResult, error) {
 		}
 	} else {
 		var more []Normalization
-		workflowResult, more = NormalizeWorkflowResultContextAware(workflowResult, input.Context)
+		workflowResult, more = NormalizeWorkflowResultContextAware(
+			workflowResult,
+			input.Context,
+		)
 		norms = append(norms, more...)
 	}
 	if err := qrspi.ValidateOutcomeArtifacts(workflowResult); err != nil {
@@ -84,6 +87,7 @@ func Apply(ctx context.Context, input ApplyInput) (ApplyResult, error) {
 	if err != nil {
 		return ApplyResult{}, err
 	}
+	decision.State = ApplyEffects(decision.State, effects)
 	return ApplyResult{
 		Parsed:         parsed,
 		WorkflowResult: workflowResult,
@@ -94,14 +98,20 @@ func Apply(ctx context.Context, input ApplyInput) (ApplyResult, error) {
 	}, nil
 }
 
-func parseOrConvert(def wruntime.Definition, input ApplyInput, parseCtx wruntime.ParseContext) (qrspi.Result, wruntime.WorkflowResult, []Normalization, error) {
+func parseOrConvert(
+	def wruntime.Definition,
+	input ApplyInput,
+	parseCtx wruntime.ParseContext,
+) (qrspi.Result, wruntime.WorkflowResult, []Normalization, error) {
 	if input.WorkflowResult != nil {
 		parsed, err := parsedFromWorkflowResult(*input.WorkflowResult)
 		return parsed, *input.WorkflowResult, nil, err
 	}
 	if input.ParsedResult != nil {
 		parsed := *input.ParsedResult
-		return parsed, wruntime.WorkflowResult{}, qrspiNormalizations(parsed.Normalizations), nil
+		return parsed, wruntime.WorkflowResult{}, qrspiNormalizations(
+			parsed.Normalizations,
+		), nil
 	}
 	parsedAny, err := def.ResultParser.Parse(input.RawOutput, parseCtx)
 	if err != nil {
@@ -109,9 +119,14 @@ func parseOrConvert(def wruntime.Definition, input ApplyInput, parseCtx wruntime
 	}
 	parsed, ok := parsedAny.(qrspi.Result)
 	if !ok {
-		return qrspi.Result{}, wruntime.WorkflowResult{}, nil, fmt.Errorf("expected qrspi Result, got %T", parsedAny)
+		return qrspi.Result{}, wruntime.WorkflowResult{}, nil, fmt.Errorf(
+			"expected qrspi Result, got %T",
+			parsedAny,
+		)
 	}
-	return parsed, wruntime.WorkflowResult{}, qrspiNormalizations(parsed.Normalizations), nil
+	return parsed, wruntime.WorkflowResult{}, qrspiNormalizations(
+		parsed.Normalizations,
+	), nil
 }
 
 func parsedFromWorkflowResult(result wruntime.WorkflowResult) (qrspi.Result, error) {
