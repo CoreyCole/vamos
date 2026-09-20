@@ -118,6 +118,17 @@ Use plain `just build` only when intentionally restarting a configured running s
 
 - Workbench V2 sibling artifact View Transitions: see `docs/workbench-view-transitions.md` (stable chrome names, per-name freeze, plain GET links; ephemeral chrome cookies vs ratio-only layout prefs).
 - Build MPAs with Datastar CQRS: backend source of truth, SSE streams for reads, short POSTs for writes.
+- **Datastar patch primitives (always):** SSE responses drive the browser with `datastar-patch-elements` and `datastar-patch-signals` (Go: `PatchElementTempl` / `MarshalAndPatchSignals`). Prefer these over ad-hoc `ExecuteScript` for UI state the DOM already binds (`data-show`, `data-class`, workbench `$workbench.regions.*.visible`, form open signals). Only execute script when there is no signal/DOM binding path.
+- **Patch elements:** morph HTML into selectors that **exist** in the live DOM. Never patch a selector that is not mounted (client `PatchElementsNoTargetsFound`). Keep target regions in the DOM and hide/show via signals when closed.
+- **Patch signals:** merge into existing page signals (`event: datastar-patch-signals` / `data: signals {…}`). Use for visibility toggles, form-open flags, and other interaction state; set a signal to `null` only when intentionally removing it.
+- Follow [The Tao of Datastar](https://data-star.dev/guide/the_tao_of_datastar):
+  - Backend is the source of truth; frontend is driven by patches.
+  - Use signals sparingly (user interaction + binding inputs to send state backend); do not mirror full app state in the browser.
+  - Prefer morph / fat morph; use `data-ignore-morph` only when required.
+  - SSE (`text/event-stream`) for 0..n events: patch elements, patch signals, scripts only when necessary.
+  - CQRS: long-lived read stream + short write POSTs.
+  - Prefer loading indicators over optimistic UI deception.
+  - Anchor navigation + browser history; avoid custom history stacks.
 - Use real HTML forms with `name` attributes and stable IDs for SSE-patched elements.
 - Avoid inline styles; use Tailwind utilities.
 - Shared UI primitives come from the pinned DatastarUI dependency (`github.com/coreycole/datastarui/components/*`). Prefer those primitives before bespoke Tailwind in templ UI.
