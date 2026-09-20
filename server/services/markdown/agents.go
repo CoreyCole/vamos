@@ -84,13 +84,6 @@ func (s *Service) createAgent(
 	if err := seedBotHomeTree(s.basePath, slug, name); err != nil {
 		return roster.Bot{}, err
 	}
-	if _, err := s.ensureBotHomeThread(
-		ctx,
-		agent,
-		strings.TrimSpace(in.UserEmail),
-	); err != nil {
-		return roster.Bot{}, err
-	}
 	return agent, nil
 }
 

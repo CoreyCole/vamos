@@ -1766,6 +1766,12 @@ func main() {
 		markdownService.ServeFreeformRoom,
 	)
 	agenthome.RegisterBindPlanLeadRoute(roomsGroup, markdownService.HandleBindPlanLead)
+	agenthome.RegisterEmptyScopeThreadRoutes(
+		roomsGroup,
+		markdownService.HandleCreateBotScopeThread,
+		markdownService.HandleCreatePlanScopeThread,
+		markdownService.HandleCreateFreeformScopeThread,
+	)
 	agenthome.RegisterAgentProfileRoute(
 		roomsGroup,
 		markdownService.HandleUpdateAgentProfile,

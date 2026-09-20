@@ -18,9 +18,10 @@ import (
 
 func renderScopedThreadListOrComposer(
 	rows []agenthome.ConversationRowArgs,
+	composerAction string,
 ) templ.Component {
 	if len(rows) == 0 {
-		return ScopedEmptyComposer()
+		return ScopedEmptyComposer(composerAction)
 	}
 	return ScopedThreadList(rows)
 }

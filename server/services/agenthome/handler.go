@@ -56,6 +56,22 @@ func RegisterBindPlanLeadRoute(g *echo.Group, bind echo.HandlerFunc) {
 	g.POST("/plan/:id/lead", bind)
 }
 
+// RegisterEmptyScopeThreadRoutes mounts N=0 composer POSTs that create a thread.
+func RegisterEmptyScopeThreadRoutes(
+	g *echo.Group,
+	createDM, createPlan, createFreeform echo.HandlerFunc,
+) {
+	if createDM != nil {
+		g.POST("/dm/:slug/threads", createDM)
+	}
+	if createPlan != nil {
+		g.POST("/plan/:id/threads", createPlan)
+	}
+	if createFreeform != nil {
+		g.POST("/freeform/threads", createFreeform)
+	}
+}
+
 // RedirectAgentsLand is a tiny helper when markdown is unavailable in tests.
 func RedirectAgentsLand(c echo.Context) error {
 	return c.Redirect(http.StatusSeeOther, "/threads")

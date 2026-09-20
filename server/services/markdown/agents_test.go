@@ -2,6 +2,7 @@ package markdown
 
 import (
 	"context"
+	"database/sql"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -235,7 +236,7 @@ func TestServeAI470RoomUsesBotHomeThreadNotFixtureIndex(t *testing.T) {
 	}
 }
 
-func TestHandleCreateAgentRedirectsToBotHome(t *testing.T) {
+func TestHandleCreateAgentRedirectsToBotListLand(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
 	dbSvc, err := servicedb.NewService(
@@ -267,6 +268,16 @@ func TestHandleCreateAgentRedirectsToBotHome(t *testing.T) {
 	}
 	if loc := rec.Header().Get("Location"); loc != "/rooms/dm/hermes" {
 		t.Fatalf("Location = %q", loc)
+	}
+	rows, err := dbSvc.Queries.ListAgentThreadsByAgentSlug(
+		context.Background(),
+		sql.NullString{String: "hermes", Valid: true},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(rows) != 0 {
+		t.Fatalf("create agent inserted %d bot_home rows", len(rows))
 	}
 }
 

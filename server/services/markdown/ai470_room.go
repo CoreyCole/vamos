@@ -58,7 +58,10 @@ func (s *Service) ServeFreeformRoom(c echo.Context) error {
 		threadsOpen,
 		artifactChromeOpen,
 		roomTitle,
-		renderScopedThreadListOrComposer(rows),
+		renderScopedThreadListOrComposer(
+			rows,
+			emptyScopeComposerAction("freeform", ""),
+		),
 		BuildChatHeaderOverflow(artifactPage, artifactDoc, true),
 	)
 	chatOpen, commentsOpen := chatCommentsOpen(c.Request(), true)
@@ -172,12 +175,19 @@ func (s *Service) ServeAI470Room(c echo.Context) error {
 		if hasArtifact && artifactPage != nil {
 			commentsComp = s.commentsPanelForThoughtsPage(c, artifactPage)
 		}
+		scopeKind := "dm"
+		if kind == agenthome.KindPlan {
+			scopeKind = "plan"
+		}
 		chatComp = chatColumnForAI470Room(
 			kind,
 			threadsOpen,
 			artifactChromeOpen,
 			roomTitle,
-			renderScopedThreadListOrComposer(rows),
+			renderScopedThreadListOrComposer(
+				rows,
+				emptyScopeComposerAction(scopeKind, id),
+			),
 			BuildChatHeaderOverflow(artifactPage, artifactDoc, includePlanChat),
 		)
 		chatOpen = true

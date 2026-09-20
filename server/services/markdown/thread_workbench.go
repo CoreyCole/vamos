@@ -78,7 +78,10 @@ func (s *Service) thoughtsWorkbenchChatColumn(
 		if err != nil && !errors.Is(err, sql.ErrNoRows) {
 			return nil, err
 		}
-		body = renderScopedThreadListOrComposer(rows)
+		body = renderScopedThreadListOrComposer(
+			rows,
+			emptyScopeComposerAction("plan", roomID),
+		)
 	}
 	column := workbench.ChatColumnWithReopen
 	if thoughtsChatHref(s.basePath, docPath) != "" || planLeadRoomID(docPath) != "" {
