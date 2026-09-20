@@ -3,6 +3,7 @@ package markdown
 import (
 	"bytes"
 	"context"
+	"database/sql"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -12,8 +13,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
 
+	"github.com/CoreyCole/vamos/pkg/agents/roster"
 	"github.com/CoreyCole/vamos/pkg/db"
 	"github.com/CoreyCole/vamos/server/services/agenthome"
 	servicedb "github.com/CoreyCole/vamos/server/services/db"
@@ -337,7 +340,7 @@ func TestServeAI470RoomMissingBotSlug404s(t *testing.T) {
 	}
 }
 
-func TestServeAI470RoomKnownBotHydratesHomeThread(t *testing.T) {
+func TestServeAI470RoomKnownBotListsHomeThread(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
 	mustMkdirAll(t, filepath.Join(root, "owner", "plans", "alpha"))
@@ -378,8 +381,11 @@ func TestServeAI470RoomKnownBotHydratesHomeThread(t *testing.T) {
 	if err := svc.ServeAI470Room(c); err != nil {
 		t.Fatal(err)
 	}
-	if renderer.chatThreadID != threadID {
-		t.Fatalf("chat thread = %q want %q", renderer.chatThreadID, threadID)
+	if renderer.chatThreadID != "" {
+		t.Fatalf(
+			"GET must not auto click-in SharedThreadChat, got %q",
+			renderer.chatThreadID,
+		)
 	}
 	body := rec.Body.String()
 	for _, bad := range []string{
@@ -392,6 +398,8 @@ func TestServeAI470RoomKnownBotHydratesHomeThread(t *testing.T) {
 		"reply-draft.md",
 		"onboarding-short.md",
 		"AgentFixtureMessage",
+		`id="thread-chat"`,
+		"/thoughts/chat/freeform/send",
 		`id="workbench-mobile-tabs"`,
 		`aria-label="Workbench regions"`,
 	} {
@@ -399,10 +407,162 @@ func TestServeAI470RoomKnownBotHydratesHomeThread(t *testing.T) {
 			t.Fatalf("body contains %q", bad)
 		}
 	}
-	for _, want := range []string{`id="thread-chat"`, "Nova"} {
+	for _, want := range []string{
+		`id="scoped-thread-list"`,
+		`href="/threads/` + threadID + `"`,
+		"Nova",
+		`id="roster-row-dm-nova"`,
+	} {
 		if !strings.Contains(body, want) {
 			t.Fatalf("missing %q: %s", want, body)
 		}
+	}
+}
+
+func TestServeAI470RoomBotZeroThreadsComposerDoesNotInsert(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	dbSvc, err := servicedb.NewService(
+		filepath.Join(t.TempDir(), "agents.db"),
+		filepath.Join(t.TempDir(), "agents.yml"),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = dbSvc.Close() })
+	svc, err := NewService(root, nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	svc.WithQueries(dbSvc.Queries)
+	withTestRoster(t, svc)
+	if _, err := svc.roster.Create(roster.Bot{Slug: "nova", Name: "Nova"}); err != nil {
+		t.Fatal(err)
+	}
+	svc.WithWorkbenchThreadRenderer(&threadWorkbenchTestRenderer{})
+	before, err := dbSvc.Queries.ListAgentThreadsByAgentSlug(
+		context.Background(),
+		sql.NullString{String: "nova", Valid: true},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(before) != 0 {
+		t.Fatalf("precondition threads = %d", len(before))
+	}
+	rec := httptest.NewRecorder()
+	c := echo.New().NewContext(
+		httptest.NewRequest(http.MethodGet, "/rooms/dm/nova", http.NoBody),
+		rec,
+	)
+	c.SetParamNames("kind", "id")
+	c.SetParamValues("dm", "nova")
+	c.Set("user_email", "t@example.com")
+	if err := svc.ServeAI470Room(c); err != nil {
+		t.Fatal(err)
+	}
+	after, err := dbSvc.Queries.ListAgentThreadsByAgentSlug(
+		context.Background(),
+		sql.NullString{String: "nova", Valid: true},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(after) != 0 {
+		t.Fatalf("GET inserted %d threads", len(after))
+	}
+	body := rec.Body.String()
+	if !strings.Contains(body, `id="agent-chat-composer"`) {
+		t.Fatalf("missing composer: %s", body)
+	}
+	if strings.Contains(body, "/thoughts/chat/freeform/send") {
+		t.Fatal("N=0 composer must not wire freeform send")
+	}
+	if strings.Contains(body, `id="thread-chat"`) {
+		t.Fatal("N=0 must not render SharedThreadChat")
+	}
+}
+
+func TestServeAI470RoomBotTwoThreadsListsBoth(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	dbSvc, err := servicedb.NewService(
+		filepath.Join(t.TempDir(), "agents.db"),
+		filepath.Join(t.TempDir(), "agents.yml"),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = dbSvc.Close() })
+	svc, err := NewService(root, nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	svc.WithQueries(dbSvc.Queries)
+	withTestRoster(t, svc)
+	nova, err := svc.createAgent(context.Background(), createAgentInput{
+		Slug: "nova", Name: "Nova", UserEmail: "t@example.com",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	first, err := svc.ensureBotHomeThread(context.Background(), nova, "t@example.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+	second := uuid.NewString()
+	if _, err := dbSvc.Queries.CreateAgentThread(
+		context.Background(),
+		db.CreateAgentThreadParams{
+			ID:          second,
+			UserEmail:   "t@example.com",
+			Title:       "Second",
+			Cwd:         filepath.Join(root, "agents", "nova"),
+			LineageID:   uuid.NewString(),
+			PiSessionID: uuid.NewString(),
+		},
+	); err != nil {
+		t.Fatal(err)
+	}
+	if err := dbSvc.Queries.BindAgentThreadBotHome(
+		context.Background(),
+		db.BindAgentThreadBotHomeParams{
+			AgentSlug: sql.NullString{String: "nova", Valid: true},
+			Cwd:       filepath.Join(root, "agents", "nova"),
+			Title:     "Second",
+			ID:        second,
+		},
+	); err != nil {
+		t.Fatal(err)
+	}
+	renderer := &threadWorkbenchTestRenderer{}
+	svc.WithWorkbenchThreadRenderer(renderer)
+	rec := httptest.NewRecorder()
+	c := echo.New().NewContext(
+		httptest.NewRequest(http.MethodGet, "/rooms/dm/nova", http.NoBody),
+		rec,
+	)
+	c.SetParamNames("kind", "id")
+	c.SetParamValues("dm", "nova")
+	c.Set("user_email", "t@example.com")
+	if err := svc.ServeAI470Room(c); err != nil {
+		t.Fatal(err)
+	}
+	if renderer.chatThreadID != "" {
+		t.Fatalf("N=2 must not auto click-in, got %q", renderer.chatThreadID)
+	}
+	body := rec.Body.String()
+	for _, want := range []string{
+		`id="scoped-thread-list"`,
+		`href="/threads/` + first + `"`,
+		`href="/threads/` + second + `"`,
+	} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("missing %q: %s", want, body)
+		}
+	}
+	if strings.Contains(body, `id="thread-chat"`) {
+		t.Fatal("N=2 must not render SharedThreadChat")
 	}
 }
 

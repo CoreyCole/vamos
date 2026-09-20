@@ -1,0 +1,26 @@
+package markdown
+
+import "github.com/CoreyCole/vamos/server/services/agenthome"
+
+templ ScopedThreadList(rows []agenthome.ConversationRowArgs) {
+	<div id="scoped-thread-list" class="flex h-full min-h-0 flex-col bg-background" data-testid="scoped-thread-list">
+		<nav class="min-h-0 flex-1 overflow-y-auto" aria-label="Threads">
+			for _, row := range rows {
+				@agenthome.ConversationRow(row)
+			}
+		</nav>
+	</div>
+}
+
+templ ScopedEmptyComposer() {
+	<div class="flex h-full min-h-0 flex-col bg-background">
+		<form id="agent-chat-composer" class="mt-auto shrink-0 px-3 py-3">
+			<textarea
+				id="agent-chat-composer-input"
+				name="prompt"
+				class="min-h-8 w-full rounded-md border border-input bg-background px-2 py-1 text-sm"
+				placeholder="Start a new thread"
+			></textarea>
+		</form>
+	</div>
+}

@@ -60,12 +60,6 @@ func (s *Service) ServeAI470Room(c echo.Context) error {
 	if planDoc != "" && !strings.HasPrefix(planDoc, "thoughts/") {
 		planDoc = "thoughts/" + planDoc
 	}
-	threadID, err := s.resolveAI470Thread(
-		c.Request().Context(), kind, id, pairA, pairB, planDoc, userEmail,
-	)
-	if err != nil {
-		return err
-	}
 	// Plan rooms no longer gate chat on binding a roster persona as "lead".
 	// Each plan dir owns its plan-lead identity; composer must work without
 	// a SetPlanWorkspaceLeadAgent bind (Corey UX lock).
@@ -88,51 +82,73 @@ func (s *Service) ServeAI470Room(c echo.Context) error {
 		artifactChromeOpen = true
 	}
 
-	if threadID == "" {
-		chatBody := WorkbenchUnavailable("No shared thread mapped for this room yet.")
-		chatComp = chatColumnForAI470Room(
-			kind,
-			threadsOpen,
-			artifactChromeOpen,
-			roomTitle,
-			chatBody,
-			BuildChatHeaderOverflow(artifactPage, artifactDoc, includePlanChat),
-		)
-		chatOpen = kind == agenthome.KindPlan && hasArtifact
-	} else {
-		chat, err := s.renderAI470SharedChat(
-			c.Request().Context(), threadID, userEmail,
-		)
-		if errors.Is(err, sql.ErrNoRows) {
-			return echo.NewHTTPError(http.StatusNotFound, "thread not found")
+	if kind == agenthome.KindDM {
+		if err := s.requireKnownBot(id); err != nil {
+			return err
 		}
+		rows, err := s.botScopedConversationRows(c.Request().Context(), id)
 		if err != nil {
 			return err
 		}
-		artifactQuery := c.QueryParam("artifact")
-		if strings.TrimSpace(artifactQuery) == "" {
-			artifactQuery = planDoc
-		}
-		artifactComp, commentsComp, artifactPage, artifactDoc, err = s.threadArtifactAndComments(
-			c,
-			threadID,
-			artifactQuery,
-		)
-		if err != nil {
-			return echo.NewHTTPError(http.StatusBadRequest, err.Error())
-		}
 		chatComp = chatColumnForAI470Room(
 			kind,
 			threadsOpen,
 			artifactChromeOpen,
 			roomTitle,
-			chat,
+			renderScopedThreadListOrComposer(rows),
 			BuildChatHeaderOverflow(artifactPage, artifactDoc, includePlanChat),
 		)
 		chatOpen = true
-	}
-	if kind == agenthome.KindDM {
-		chatOpen = true
+	} else {
+		threadID, err := s.resolveAI470Thread(
+			c.Request().Context(), kind, id, pairA, pairB, planDoc, userEmail,
+		)
+		if err != nil {
+			return err
+		}
+		if threadID == "" {
+			chatBody := WorkbenchUnavailable("No shared thread mapped for this room yet.")
+			chatComp = chatColumnForAI470Room(
+				kind,
+				threadsOpen,
+				artifactChromeOpen,
+				roomTitle,
+				chatBody,
+				BuildChatHeaderOverflow(artifactPage, artifactDoc, includePlanChat),
+			)
+			chatOpen = kind == agenthome.KindPlan && hasArtifact
+		} else {
+			chat, err := s.renderAI470SharedChat(
+				c.Request().Context(), threadID, userEmail,
+			)
+			if errors.Is(err, sql.ErrNoRows) {
+				return echo.NewHTTPError(http.StatusNotFound, "thread not found")
+			}
+			if err != nil {
+				return err
+			}
+			artifactQuery := c.QueryParam("artifact")
+			if strings.TrimSpace(artifactQuery) == "" {
+				artifactQuery = planDoc
+			}
+			artifactComp, commentsComp, artifactPage, artifactDoc, err = s.threadArtifactAndComments(
+				c,
+				threadID,
+				artifactQuery,
+			)
+			if err != nil {
+				return echo.NewHTTPError(http.StatusBadRequest, err.Error())
+			}
+			chatComp = chatColumnForAI470Room(
+				kind,
+				threadsOpen,
+				artifactChromeOpen,
+				roomTitle,
+				chat,
+				BuildChatHeaderOverflow(artifactPage, artifactDoc, includePlanChat),
+			)
+			chatOpen = true
+		}
 	}
 
 	if profileView(c) && kind == agenthome.KindDM {
