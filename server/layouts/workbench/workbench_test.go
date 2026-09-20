@@ -619,7 +619,6 @@ func TestWorkbenchResizeJSShowsHandlesForVisibleAdjacentRegions(t *testing.T) {
 		"const content = visible.filter((region) => region !== navigation)",
 		"if (!navigation || content.length === 0) return null",
 		"const datastarModule = import(\"@vamos/datastar\");",
-		"collapseRegion(root, navigationGroup.navigation)",
 		"clampRegionWidth(",
 		"regionMinWidth(before)",
 		"regionMinWidth(after)",
@@ -639,6 +638,7 @@ func TestWorkbenchResizeJSShowsHandlesForVisibleAdjacentRegions(t *testing.T) {
 		"workbenchResizeBound",
 		"lockPixelWidthsFromPaint",
 		"syncRatiosFromPaint",
+		"function shareChatCommentsRatio(root)",
 		"never auto-close from gutter drag",
 	} {
 		if !strings.Contains(js, want) {
@@ -1162,12 +1162,6 @@ func TestMobileChatCommentsHeaderRendersFromWorkbench(t *testing.T) {
 		if strings.Contains(header, refuse) {
 			t.Fatalf("mobile header unexpectedly contains %s: %s", refuse, header)
 		}
-	}
-	if !strings.Contains(ThreadsReopenDataClass(), "visible !== false") {
-		t.Fatalf(
-			"desktop ThreadsReopenDataClass missing visible !== false: %s",
-			ThreadsReopenDataClass(),
-		)
 	}
 }
 
@@ -1721,6 +1715,46 @@ func TestWorkbenchV2CommentsSitLeftOfArtifactAndXORChat(t *testing.T) {
 	}
 }
 
+func TestCoerceSharedChatCommentsRatioChatWins(t *testing.T) {
+	t.Parallel()
+	saved := DefaultWorkbenchConfig(WorkbenchPageThreads, WorkbenchViewSplit, "")
+	for i, region := range saved.Regions {
+		switch region.ID {
+		case WorkbenchV2ChatRegionID:
+			saved.Regions[i].Ratio = 0.42
+		case WorkbenchV2CommentsRegionID:
+			saved.Regions[i].Ratio = 0.21
+		}
+	}
+	state, err := BuildWorkbenchV2State(WorkbenchV2Args{
+		SavedConfig:  &saved,
+		ThreadsOpen:  true,
+		ChatOpen:     true,
+		ArtifactOpen: true,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if state.Regions[1].Ratio != 0.42 || state.Regions[2].Ratio != 0.42 {
+		t.Fatalf(
+			"chat=%v comments=%v, want 0.42 both",
+			state.Regions[1].Ratio,
+			state.Regions[2].Ratio,
+		)
+	}
+}
+
+func TestShareChatCommentsRatioJSWritesBoth(t *testing.T) {
+	t.Parallel()
+	js := shareChatCommentsRatioJS()
+	if !strings.Contains(js, "chat.dataset.workbenchRatio=r") ||
+		!strings.Contains(js, "comments.dataset.workbenchRatio=r") ||
+		!strings.Contains(js, "$workbench.regions.workbenchV2Chat.ratio=r") ||
+		!strings.Contains(js, "$workbench.regions.workbenchV2Comments.ratio=r") {
+		t.Fatalf("share JS must set both: %s", js)
+	}
+}
+
 func TestCommentsOpenFromRequestDefaultsClosed(t *testing.T) {
 	t.Parallel()
 	if CommentsOpenFromRequest(nil) {
@@ -2043,7 +2077,7 @@ func TestWorkbenchV2RegionsEnforceComposerFriendlyMinRem(t *testing.T) {
 	for _, fragment := range []string{
 		`data-workbench-region="workbench-v2-chat"`,
 		`data-workbench-min-rem="18"`,
-		`/js/workbench-resize.js?v=10`,
+		`/js/workbench-resize.js?v=17`,
 		`/js/workbench-history.js?v=23`,
 	} {
 		if !strings.Contains(html, fragment) {

@@ -4,6 +4,8 @@ import (
 	"net/http"
 	"strings"
 	"testing"
+
+	"github.com/a-h/templ"
 )
 
 func TestThreadsOpenFromRequest(t *testing.T) {
@@ -70,12 +72,36 @@ func TestThreadsToggleHotkeyActionUsesCtrlB(t *testing.T) {
 	}
 }
 
-func TestThreadsReopenDataClassTreatsMissingVisibleAsHidden(t *testing.T) {
+func TestThreadsToggleClickActionWritesCookie(t *testing.T) {
 	t.Parallel()
-	got := ThreadsReopenDataClass()
-	if !strings.Contains(got, "visible !== false") {
-		t.Fatalf("data-class = %q, want missing visible to keep hamburger hidden", got)
+	got := ThreadsToggleClickAction()
+	if !strings.Contains(got, "visible === false") ||
+		!strings.Contains(got, ThreadsOpenCookie+"=") {
+		t.Fatalf("toggle = %q", got)
 	}
+}
+
+func TestThreadsReopenControlStaysVisibleWhenOpen(t *testing.T) {
+	t.Parallel()
+	var body strings.Builder
+	if err := ThreadsReopenControl(
+		true,
+		"workbench-v2-threads-reopen",
+	).Render(t.Context(), &body); err != nil {
+		t.Fatal(err)
+	}
+	html := body.String()
+	if strings.Contains(html, "{'hidden'") || strings.Contains(html, `class="hidden`) {
+		t.Fatalf("open roster must not hide hamburger: %s", html)
+	}
+	if !strings.Contains(html, `aria-pressed="true"`) {
+		t.Fatalf("open roster must press hamburger: %s", html)
+	}
+	if !strings.Contains(html, "ThreadsToggleClickAction") &&
+		!strings.Contains(html, "visible === false") {
+		t.Fatalf("must be a true toggle: %s", html)
+	}
+	_ = templ.NopComponent
 }
 
 func TestThreadsOpenCookieDrivesEncodeWorkbenchSignals(t *testing.T) {

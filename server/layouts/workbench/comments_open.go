@@ -67,7 +67,7 @@ func ChatToggleClickAction() string {
 }
 
 func shareChatCommentsRatioJS() string {
-	return `var chat=document.querySelector("[data-workbench-region='workbench-v2-chat']"); var comments=document.querySelector("[data-workbench-region='workbench-v2-comments']"); if (chat && comments) { if ($workbench.regions.workbenchV2Comments.visible) { comments.dataset.workbenchRatio = chat.dataset.workbenchRatio; $workbench.regions.workbenchV2Comments.ratio = $workbench.regions.workbenchV2Chat.ratio } else { chat.dataset.workbenchRatio = comments.dataset.workbenchRatio; $workbench.regions.workbenchV2Chat.ratio = $workbench.regions.workbenchV2Comments.ratio } }`
+	return `var chat=document.querySelector("[data-workbench-region='workbench-v2-chat']"); var comments=document.querySelector("[data-workbench-region='workbench-v2-comments']"); if (chat && comments) { var r=$workbench.regions.workbenchV2Comments.visible ? $workbench.regions.workbenchV2Comments.ratio : $workbench.regions.workbenchV2Chat.ratio; if (r == null || r === 0) { r=Number(($workbench.regions.workbenchV2Comments.visible ? comments : chat).dataset.workbenchRatio || 0) } chat.dataset.workbenchRatio=r; comments.dataset.workbenchRatio=r; $workbench.regions.workbenchV2Chat.ratio=r; $workbench.regions.workbenchV2Comments.ratio=r }`
 }
 
 func CommentsToggleClickAction() string {

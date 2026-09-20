@@ -287,8 +287,23 @@ function isWorkbenchV2(root) {
   return root.dataset.workbenchPage === "threads";
 }
 
+function shareChatCommentsRatio(root) {
+  const chat = root.querySelector(
+    "[data-workbench-region='workbench-v2-chat']",
+  );
+  const comments = root.querySelector(
+    "[data-workbench-region='workbench-v2-comments']",
+  );
+  if (!chat || !comments) return;
+  const source = isVisible(comments) && !isVisible(chat) ? comments : chat;
+  const r = source.dataset.workbenchRatio;
+  chat.dataset.workbenchRatio = r;
+  comments.dataset.workbenchRatio = r;
+}
+
 function visibleRegionSpecs(root) {
   const ratioOnly = isWorkbenchV2(root);
+  if (ratioOnly) shareChatCommentsRatio(root);
   return allRegions(root).map((region) => ({
     id: region.dataset.workbenchRegion,
     slot: region.dataset.workbenchSlot,
@@ -353,6 +368,7 @@ function syncRatiosFromPaint(root) {
     region.dataset.workbenchWidthPx = w.toFixed(2);
     region.dataset.workbenchRatio = (w / denom).toFixed(4);
   });
+  shareChatCommentsRatio(root);
 }
 
 function lockPixelWidthsFromPaint(root) {
@@ -441,6 +457,7 @@ function startResize(event) {
     after.dataset.workbenchWidthPx = nextAfter.toFixed(2);
     setRegionWidth(before, nextBefore);
     setRegionWidth(after, nextAfter);
+    shareChatCommentsRatio(root);
   };
 
   const onUp = (upEvent) => {

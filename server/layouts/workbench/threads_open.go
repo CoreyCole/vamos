@@ -47,17 +47,21 @@ func ThreadsShowClickAction(signalKey string) string {
 		threadsOpenCookieWriteJS(true) + "; " + threadsLayoutReflowJS()
 }
 
+// ThreadsToggleClickAction opens or closes the roster and persists the cookie.
+func ThreadsToggleClickAction() string {
+	return "if ($workbench.regions.workbenchV2Threads.visible === false) { " +
+		ThreadsShowClickAction("workbenchV2Threads") +
+		" } else { " +
+		ThreadsHideClickAction() +
+		" }"
+}
+
 func ThreadsToggleHotkeyAction() string {
 	return "if ((evt.ctrlKey || evt.metaKey) && !evt.altKey && !evt.shiftKey && (evt.key === 'b' || evt.key === 'B')) { " +
 		"var n = evt.target; if (n && (n.tagName === 'INPUT' || n.tagName === 'TEXTAREA' || n.tagName === 'SELECT' || n.isContentEditable)) { return } " +
 		"evt.preventDefault(); " +
-		"if ($workbench.regions.workbenchV2Threads.visible === false) { " +
-		ThreadsShowClickAction(
-			"workbenchV2Threads",
-		) +
-		" } else { " +
-		ThreadsHideClickAction() +
-		" } }"
+		ThreadsToggleClickAction() +
+		" }"
 }
 
 func ThreadsHideControlTitle() string {
@@ -68,9 +72,6 @@ func ThreadsShowControlTitle() string {
 	return "Show roster sidebar (Ctrl+B)"
 }
 
-// ThreadsReopenDataClass hides the hamburger unless threads are explicitly closed.
-// Missing/undefined visible must stay hidden so Datastar hydrate cannot flash the
-// control open for a frame on thread/room GET (default cookie is threads open).
-func ThreadsReopenDataClass() string {
-	return "{'hidden': $workbench.regions.workbenchV2Threads.visible !== false}"
+func ThreadsToggleControlTitle() string {
+	return "Roster sidebar (Ctrl+B)"
 }

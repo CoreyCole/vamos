@@ -12,7 +12,7 @@ templ Workbench(state WorkbenchState) {
 		data-on:keydown__window={ ThreadsToggleHotkeyAction() }
 		class="flex h-full min-h-0 w-full overflow-hidden p-0"
 	>
-		<script type="module" src="/js/workbench-resize.js?v=16"></script>
+		<script type="module" src="/js/workbench-resize.js?v=17"></script>
 		<script type="module" src="/js/workbench-history.js?v=23"></script>
 		<script type="module" src="/js/workbench-doc-scroll.js?v=3"></script>
 		<script defer src="/js/frame-comment-bridge.js?v=4" data-commentui-mode="parent"></script>
@@ -32,23 +32,28 @@ templ Workbench(state WorkbenchState) {
 	</div>
 }
 
-// ThreadsReopenControl — icon control for the chat header row when left rail is closed.
+// ThreadsReopenControl — always-visible roster hamburger (pressed when open).
 // Hard lock: never a band above the chat column / above the 3-col grid.
 templ ThreadsReopenControl(threadsOpen bool, controlID string) {
 	<div
 		id={ controlID }
-		class={ "workbench-chrome flex h-7 w-7 shrink-0 items-center justify-center", templ.KV("hidden", threadsOpen) }
-		data-class={ ThreadsReopenDataClass() }
-		aria-hidden={ threadsOpenAriaHidden(threadsOpen) }
+		class="workbench-chrome flex h-7 w-7 shrink-0 items-center justify-center"
 	>
 		<button
 			type="button"
 			data-workbench-threads-reopen
-			class="inline-flex h-7 w-7 items-center justify-center rounded-md border border-border bg-background text-muted-foreground shadow-sm transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-			data-on:click={ ThreadsShowClickAction("workbenchV2Threads") }
+			class={ "inline-flex h-7 w-7 items-center justify-center rounded-md border border-border text-muted-foreground shadow-sm transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring", templ.KV("bg-muted text-foreground", threadsOpen) }
+			data-on:click={ ThreadsToggleClickAction() }
+			data-attr:aria-pressed="$workbench.regions.workbenchV2Threads.visible ? 'true' : 'false'"
+			data-class="{ 'bg-muted text-foreground': $workbench.regions.workbenchV2Threads.visible }"
 			aria-controls="workbench-v2-threads"
-			aria-label={ ThreadsShowControlTitle() }
-			title={ ThreadsShowControlTitle() }
+			aria-label={ ThreadsToggleControlTitle() }
+			title={ ThreadsToggleControlTitle() }
+			if threadsOpen {
+				aria-pressed="true"
+			} else {
+				aria-pressed="false"
+			}
 		>
 			<svg class="h-4 w-4" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 				<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>

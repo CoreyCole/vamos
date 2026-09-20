@@ -683,8 +683,7 @@ func TestCommentSharedPatchTargetsRenderStableIDs(t *testing.T) {
 		`aria-label="Add comment"`,
 		`/forms/comments/show`,
 		`id="workbench-v2-comments-threads-reopen"`,
-		`aria-label="Show roster sidebar (Ctrl+B)"`,
-		`visible !== false`,
+		`aria-label="Roster sidebar (Ctrl+B)"`,
 		`data-testid="comments-toggle"`,
 		`aria-label="Toggle comments"`,
 		`workbenchV2Comments.visible = !$workbench.regions.workbenchV2Comments.visible`,
@@ -710,8 +709,8 @@ func TestCommentSharedPatchTargetsRenderStableIDs(t *testing.T) {
 	idx := strings.Index(panelHTML, `id="workbench-v2-comments-threads-reopen"`)
 	end := strings.Index(panelHTML[idx:], ">")
 	openTag := panelHTML[idx : idx+end]
-	if !strings.Contains(openTag, "hidden") {
-		t.Fatalf("open threads should SSR-hide comments hamburger: %s", openTag)
+	if strings.Contains(openTag, "hidden") {
+		t.Fatalf("open threads must keep comments hamburger visible: %s", openTag)
 	}
 
 	var mobile bytes.Buffer

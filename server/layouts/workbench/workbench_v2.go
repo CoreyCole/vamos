@@ -93,7 +93,36 @@ func BuildWorkbenchV2State(args WorkbenchV2Args) (WorkbenchState, error) {
 		state.Config.Mobile.ActiveRegionID = WorkbenchV2ThreadsRegionID
 	}
 	state.MobileChatCommentsHeader = true
+	coerceSharedChatCommentsRatio(&state)
 	return state, nil
+}
+
+// coerceSharedChatCommentsRatio forces chat and comments to one ratio.
+// If saved prefs diverge, chat wins.
+func coerceSharedChatCommentsRatio(state *WorkbenchState) {
+	var chatRatio float64
+	var haveChat bool
+	for i := range state.Regions {
+		if state.Regions[i].ID == WorkbenchV2ChatRegionID {
+			chatRatio = state.Regions[i].Ratio
+			haveChat = true
+			break
+		}
+	}
+	if !haveChat {
+		return
+	}
+	for i := range state.Regions {
+		if state.Regions[i].ID == WorkbenchV2CommentsRegionID {
+			state.Regions[i].Ratio = chatRatio
+		}
+	}
+	for i := range state.Config.Regions {
+		switch state.Config.Regions[i].ID {
+		case WorkbenchV2ChatRegionID, WorkbenchV2CommentsRegionID:
+			state.Config.Regions[i].Ratio = chatRatio
+		}
+	}
 }
 
 func v2Region(

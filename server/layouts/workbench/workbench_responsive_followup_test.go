@@ -5,6 +5,8 @@ import (
 	"os"
 	"strings"
 	"testing"
+
+	"github.com/a-h/templ"
 )
 
 func TestWorkbenchResizeReflowsVisibleColumnsOnThreadsToggle(t *testing.T) {
@@ -60,13 +62,22 @@ func TestWorkbenchV2ThreadsHasIndependentHideAndReopenControls(t *testing.T) {
 	if err := Workbench(state).Render(t.Context(), &body); err != nil {
 		t.Fatal(err)
 	}
+	if err := ChatColumnWithReopen(
+		true,
+		true,
+		"Bot",
+		templ.NopComponent,
+		nil,
+	).Render(t.Context(), &body); err != nil {
+		t.Fatal(err)
+	}
 	html := body.String()
 	for _, want := range []string{
 		`data-workbench-threads-reopen`,
-		`aria-label="Show roster sidebar (Ctrl+B)"`,
-		`$workbench.regions.workbenchV2Threads.visible = true`,
+		`aria-label="Roster sidebar (Ctrl+B)"`,
+		`$workbench.regions.workbenchV2Threads.visible === false`,
 		`wb2_threads_open=1`,
-		`/js/workbench-resize.js?v=10`,
+		`/js/workbench-resize.js?v=17`,
 	} {
 		if !strings.Contains(html, want) {
 			t.Fatalf("workbench threads reopen control missing %q", want)

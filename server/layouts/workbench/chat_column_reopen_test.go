@@ -34,7 +34,7 @@ func TestChatColumnWithReopen_ClosedShowsVisibleSlot(t *testing.T) {
 		!strings.Contains(out, `data-testid="workbench-overflow-actions"`) {
 		t.Fatalf("chat header missing avatar or share: %s", out)
 	}
-	if !strings.Contains(out, "Show roster sidebar (Ctrl+B)") {
+	if !strings.Contains(out, "Roster sidebar (Ctrl+B)") {
 		t.Fatalf("reopen tooltip must show Ctrl+B: %s", out)
 	}
 	if strings.Contains(out, "/new") {
@@ -57,7 +57,7 @@ func TestChatColumnWithReopen_ClosedShowsVisibleSlot(t *testing.T) {
 	}
 }
 
-func TestChatColumnWithReopen_OpenHidesHamburgerSlot(t *testing.T) {
+func TestChatColumnWithReopen_OpenKeepsHamburgerPressed(t *testing.T) {
 	var b strings.Builder
 	if err := ChatColumnWithReopen(
 		true,
@@ -75,23 +75,23 @@ func TestChatColumnWithReopen_OpenHidesHamburgerSlot(t *testing.T) {
 	classIdx := strings.Index(openTag, `class="`)
 	classEnd := strings.Index(openTag[classIdx+7:], `"`)
 	classVal := openTag[classIdx+7 : classIdx+7+classEnd]
-	if !strings.Contains(classVal, "hidden") {
-		t.Fatalf(
-			"open threads should hide hamburger so title is left-aligned: %s",
-			classVal,
-		)
+	if strings.Contains(classVal, "hidden") {
+		t.Fatalf("open threads must keep hamburger visible: %s", classVal)
 	}
-	if !strings.Contains(out, "visible !== false") {
-		t.Fatalf("reopen data-class must not flash open before signals hydrate: %s", out)
-	}
-	if strings.Contains(classVal, "invisible") {
-		t.Fatalf("hidden hamburger must not keep layout space: %s", classVal)
+	if !strings.Contains(out, `aria-pressed="true"`) {
+		t.Fatalf("open roster hamburger must be pressed: %s", out)
 	}
 }
 
 func TestChatColumnWithPlanReopenUsesSwatchNotGlyph(t *testing.T) {
 	var buf bytes.Buffer
-	if err := ChatColumnWithPlanReopen(true, true, "2-alpha", templ.Raw("<div id=\"chat-body\"></div>"), nil).Render(context.Background(), &buf); err != nil {
+	if err := ChatColumnWithPlanReopen(
+		true,
+		true,
+		"2-alpha",
+		templ.Raw("<div id=\"chat-body\"></div>"),
+		nil,
+	).Render(context.Background(), &buf); err != nil {
 		t.Fatal(err)
 	}
 	out := buf.String()
@@ -105,7 +105,13 @@ func TestChatColumnWithPlanReopenUsesSwatchNotGlyph(t *testing.T) {
 
 func TestChatColumnArtifactReopenWhenClosed(t *testing.T) {
 	var buf bytes.Buffer
-	if err := ChatColumnWithReopen(true, false, "Bot", templ.Raw("<p>chat</p>"), nil).Render(context.Background(), &buf); err != nil {
+	if err := ChatColumnWithReopen(
+		true,
+		false,
+		"Bot",
+		templ.Raw("<p>chat</p>"),
+		nil,
+	).Render(context.Background(), &buf); err != nil {
 		t.Fatal(err)
 	}
 	out := buf.String()
@@ -115,17 +121,25 @@ func TestChatColumnArtifactReopenWhenClosed(t *testing.T) {
 	if !strings.Contains(out, `id="workbench-v2-artifact-reopen"`) {
 		t.Fatalf("missing artifact reopen slot: %s", out)
 	}
-	if !strings.Contains(out, `class="sr-only"`) || !strings.Contains(out, "Open details") {
+	if !strings.Contains(out, `class="sr-only"`) ||
+		!strings.Contains(out, "Open details") {
 		t.Fatalf("want icon-only Open details with sr-only: %s", out)
 	}
-	if strings.Contains(out, `>Open details</span>`) && !strings.Contains(out, `sr-only">Open details`) {
+	if strings.Contains(out, `>Open details</span>`) &&
+		!strings.Contains(out, `sr-only">Open details`) {
 		t.Fatalf("Open details must not be visible label: %s", out)
 	}
 }
 
 func TestChatColumnShareOverflowMenu(t *testing.T) {
 	var buf bytes.Buffer
-	if err := ChatColumnWithReopen(true, true, "Bot", templ.Raw("<p>chat</p>"), nil).Render(context.Background(), &buf); err != nil {
+	if err := ChatColumnWithReopen(
+		true,
+		true,
+		"Bot",
+		templ.Raw("<p>chat</p>"),
+		nil,
+	).Render(context.Background(), &buf); err != nil {
 		t.Fatal(err)
 	}
 	out := buf.String()
@@ -140,7 +154,6 @@ func TestChatColumnShareOverflowMenu(t *testing.T) {
 	}
 }
 
-
 func TestChatColumnUnifiedOverflowFoldsArtifactActions(t *testing.T) {
 	var buf bytes.Buffer
 	overflow := OverflowActions(OverflowActionsArgs{
@@ -149,12 +162,22 @@ func TestChatColumnUnifiedOverflowFoldsArtifactActions(t *testing.T) {
 			Actions: []OverflowAction{
 				{Label: "Share artifact", Kind: OverflowActionButton, ClientAction: "1"},
 				{Label: "Share chat", Kind: OverflowActionButton, ClientAction: "1"},
-				{Label: "Copy document contents", Kind: OverflowActionButton, ClientAction: "1"},
+				{
+					Label:        "Copy document contents",
+					Kind:         OverflowActionButton,
+					ClientAction: "1",
+				},
 				{Label: "Comment", Kind: OverflowActionButton, ClientAction: "1"},
 			},
 		}},
 	})
-	if err := ChatColumnWithReopen(true, true, "Bot", templ.Raw("<p>chat</p>"), overflow).Render(context.Background(), &buf); err != nil {
+	if err := ChatColumnWithReopen(
+		true,
+		true,
+		"Bot",
+		templ.Raw("<p>chat</p>"),
+		overflow,
+	).Render(context.Background(), &buf); err != nil {
 		t.Fatal(err)
 	}
 	out := buf.String()
@@ -183,7 +206,13 @@ func TestChatColumnUnifiedOverflowFoldsArtifactActions(t *testing.T) {
 func TestChatColumnPlanSlugTitleAndDatetime(t *testing.T) {
 	var buf bytes.Buffer
 	title := "2026-09-08_10-10-54_agent-memory-observable-context"
-	if err := ChatColumnWithPlanReopen(true, true, title, templ.Raw("<div></div>"), nil).Render(context.Background(), &buf); err != nil {
+	if err := ChatColumnWithPlanReopen(
+		true,
+		true,
+		title,
+		templ.Raw("<div></div>"),
+		nil,
+	).Render(context.Background(), &buf); err != nil {
 		t.Fatal(err)
 	}
 	out := buf.String()
