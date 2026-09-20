@@ -280,14 +280,22 @@ func (s *Service) threadHrefForDoc(ctx context.Context, docPath string) string {
 			return ""
 		}
 	}
-	artifact := url.QueryEscape("thoughts/" + canonical)
-	if s.workbenchThreadsRenderer == nil {
-		return "/threads?artifact=" + artifact
+	basePath := ""
+	if s != nil {
+		basePath = s.basePath
+	}
+	planHref := thoughtsChatHref(basePath, canonical)
+	if planHref == "" {
+		planHref = thoughtsChatHref("", canonical)
+	}
+	if s == nil || s.workbenchThreadsRenderer == nil {
+		return planHref
 	}
 	threadID, err := s.workbenchThreadsRenderer.FindSharedThreadForDoc(ctx, docPath)
 	if err != nil || strings.TrimSpace(threadID) == "" {
-		return "/threads?artifact=" + artifact
+		return planHref
 	}
+	artifact := url.QueryEscape("thoughts/" + canonical)
 	return "/threads/" + url.PathEscape(threadID) + "?artifact=" + artifact
 }
 

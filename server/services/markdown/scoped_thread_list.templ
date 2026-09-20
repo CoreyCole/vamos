@@ -12,9 +12,17 @@ templ ScopedThreadList(rows []agenthome.ConversationRowArgs) {
 	</div>
 }
 
-templ ScopedEmptyComposer(action string) {
+templ ScopedEmptyComposer(action string, attached []scopedComposerAttach) {
 	<div class="flex h-full min-h-0 flex-col bg-background">
 		<form id="agent-chat-composer" class="mt-auto shrink-0 px-3 py-3" data-on:submit__prevent={ action }>
+			if len(attached) > 0 {
+				<div id="agent-chat-composer-attachments" class="flex flex-wrap items-center gap-1 pb-2">
+					for _, item := range attached {
+						<input type="hidden" name="attached_paths[]" value={ item.Path }/>
+						<span class="rounded-full border border-border bg-muted px-2 py-0.5 text-xs text-muted-foreground">{ item.Basename }</span>
+					}
+				</div>
+			}
 			<textarea
 				id="agent-chat-composer-input"
 				name="prompt"

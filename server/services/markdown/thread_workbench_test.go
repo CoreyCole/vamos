@@ -182,7 +182,7 @@ func TestServeMarkdownLegacyChatWithoutThreadRedirectsToThreadIndex(t *testing.T
 		t.Fatal(err)
 	}
 	if got := rec.Header().
-		Get("Location"); got != "/threads?artifact=thoughts%2Fowner%2Fplans%2Falpha%2Fdesign.md" {
+		Get("Location"); got != "/rooms/plan/alpha?artifact=thoughts%2Fowner%2Fplans%2Falpha%2Fdesign.md" {
 		t.Fatalf("Location = %q", got)
 	}
 }
@@ -214,23 +214,12 @@ func TestServeThreadsHydratesArtifactAndCarriesIt(t *testing.T) {
 	if err := svc.ServeThreads(c); err != nil {
 		t.Fatal(err)
 	}
-	if r.artifact != "owner/plans/alpha/design.md" {
-		t.Fatalf("artifact = %q", r.artifact)
+	if rec.Code != http.StatusSeeOther {
+		t.Fatalf("status = %d, want 303", rec.Code)
 	}
-	body := rec.Body.String()
-	if !strings.Contains(body, "Distinctive artifact") {
-		t.Fatalf("missing artifact body: %s", body)
-	}
-	for _, bad := range []string{
-		"workbench-v2-artifact-list",
-		"$artPreview",
-		"reply-draft.md",
-		"onboarding-short.md",
-		"AgentFixtureMessage",
-	} {
-		if strings.Contains(body, bad) {
-			t.Fatalf("/threads contains sketch %q: %s", bad, body)
-		}
+	want := "/rooms/plan/alpha?artifact=thoughts%2Fowner%2Fplans%2Falpha%2Fdesign.md"
+	if got := rec.Header().Get("Location"); got != want {
+		t.Fatalf("Location = %q, want %q", got, want)
 	}
 }
 
@@ -367,12 +356,12 @@ func TestServeThreadsMobileIndexUsesRosterNotEmptyArtifact(t *testing.T) {
 	if err := svc.ServeThreads(echo.New().NewContext(deepReq, deepRec)); err != nil {
 		t.Fatal(err)
 	}
-	deepBody := deepRec.Body.String()
-	if !strings.Contains(deepBody, `data-workbench-mobile-active="workbenchV2Artifact"`) {
-		t.Fatalf("mobile ?artifact= active = %s", deepBody)
+	if deepRec.Code != http.StatusSeeOther {
+		t.Fatalf("mobile ?artifact= status = %d", deepRec.Code)
 	}
-	if !strings.Contains(deepBody, "Distinctive artifact") {
-		t.Fatalf("missing deep-link artifact: %s", deepBody)
+	wantLoc := "/rooms/plan/alpha?artifact=thoughts%2Fowner%2Fplans%2Falpha%2Fdesign.md"
+	if got := deepRec.Header().Get("Location"); got != wantLoc {
+		t.Fatalf("mobile ?artifact= Location = %q", got)
 	}
 }
 

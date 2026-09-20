@@ -163,6 +163,37 @@ func ThreadArtifactHrefAtDirectory(threadID, docPath, directoryPath string) stri
 	return threadArtifactPageBase(threadID) + "?" + query
 }
 
+func withArtifactDirQuery(href, directoryPath string) string {
+	if strings.TrimSpace(href) == "" {
+		return href
+	}
+	canonicalDir, err := CanonicalThoughtsDirPath(directoryPath)
+	if err != nil {
+		return href
+	}
+	parsed, err := url.Parse(href)
+	if err != nil {
+		return href
+	}
+	q := parsed.Query()
+	q.Set("artifact_dir", threadArtifactDirectoryIdentity(canonicalDir))
+	parsed.RawQuery = q.Encode()
+	return parsed.String()
+}
+
+// scopedBrowseArtifactHref is the Files / parent GET for an artifact pane.
+// Click-in keeps /threads/{id}. Empty threadID on a plan-scoped doc stays on
+// /rooms/plan/{id}?artifact= (plus artifact_dir), never pick-scope /threads.
+func scopedBrowseArtifactHref(threadID, docPath, directoryPath string) string {
+	if strings.TrimSpace(threadID) != "" {
+		return ThreadArtifactHrefAtDirectory(threadID, docPath, directoryPath)
+	}
+	if href := thoughtsChatHref("", docPath); href != "" {
+		return withArtifactDirQuery(href, directoryPath)
+	}
+	return ThreadArtifactHrefAtDirectory("", docPath, directoryPath)
+}
+
 func ThreadArtifactBrowserEndpoint(threadID, docPath, directoryPath string) string {
 	query, ok := threadArtifactQuery(docPath, directoryPath, true)
 	if !ok {
@@ -555,7 +586,7 @@ func (s *Service) threadArtifactBrowser(
 	}
 	if directoryPath != "" && docPath != "" {
 		parent := path.Dir(directoryPath)
-		args.ParentHref = ThreadArtifactHrefAtDirectory(threadID, docPath, parent)
+		args.ParentHref = scopedBrowseArtifactHref(threadID, docPath, parent)
 		args.ParentEndpoint = ThreadArtifactBrowserEndpoint(threadID, docPath, parent)
 	}
 	return args, nil
@@ -582,7 +613,7 @@ func (s *Service) buildThreadArtifactEntries(
 					activePath,
 					browserDirectory,
 				),
-				BrowseHref: ThreadArtifactHrefAtDirectory(
+				BrowseHref: scopedBrowseArtifactHref(
 					threadID,
 					activePath,
 					dirPath,
@@ -624,7 +655,7 @@ func (s *Service) buildThreadArtifactEntries(
 		entries = append(entries, ThreadArtifactEntry{
 			Name:     item.Name,
 			Path:     docPath,
-			Href:     ThreadArtifactHrefAtDirectory(threadID, docPath, browserDirectory),
+			Href:     scopedBrowseArtifactHref(threadID, docPath, browserDirectory),
 			IsActive: activePath == docPath,
 		})
 	}
@@ -737,7 +768,7 @@ func (s *Service) loadedThreadArtifactDirectory(
 			activePath,
 			browserDirectory,
 		),
-		BrowseHref:     ThreadArtifactHrefAtDirectory(threadID, activePath, dirPath),
+		BrowseHref:     scopedBrowseArtifactHref(threadID, activePath, dirPath),
 		BrowseEndpoint: ThreadArtifactBrowserEndpoint(threadID, activePath, dirPath),
 		TargetID:       threadArtifactDirectoryID(dirPath),
 		IsDir:          true,
@@ -871,7 +902,7 @@ func (s *Service) thoughtsDirectoryArtifactBrowser(
 		if parent == "." {
 			parent = ""
 		}
-		args.ParentHref = ThreadArtifactHrefAtDirectory("", canonical, parent)
+		args.ParentHref = scopedBrowseArtifactHref("", canonical, parent)
 		args.ParentEndpoint = ThreadArtifactBrowserEndpoint("", canonical, parent)
 	}
 	return args, nil

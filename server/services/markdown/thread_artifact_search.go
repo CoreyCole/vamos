@@ -91,7 +91,7 @@ func (s *Service) HandleThoughtsArtifactSearch(c echo.Context) error {
 		}
 		return echo.NewHTTPError(http.StatusBadRequest, "invalid artifact directory")
 	}
-	if threadID == "" {
+	if threadID == "" && thoughtsChatHref("", selectedDoc) == "" {
 		browser = remapThreadArtifactBrowserForThoughts(browser, selectedDoc)
 	}
 	results := ThreadArtifactBrowserResultsArgs{
@@ -224,6 +224,9 @@ func artifactSearchFileHref(threadID, docPath string) string {
 	if strings.TrimSpace(threadID) != "" {
 		return ThreadArtifactHref(threadID, docPath)
 	}
+	if href := thoughtsChatHref("", docPath); href != "" {
+		return href
+	}
 	return ThoughtsDocURL(docPath, "")
 }
 
@@ -233,6 +236,13 @@ func artifactSearchDirHref(selectedDoc, threadID, dirPath string) string {
 			return ThreadArtifactHrefAtDirectory(threadID, selectedDoc, dirPath)
 		}
 		return ThreadArtifactHrefAtDirectory(threadID, dirPath, dirPath)
+	}
+	doc := selectedDoc
+	if strings.TrimSpace(doc) == "" {
+		doc = dirPath
+	}
+	if href := thoughtsChatHref("", doc); href != "" {
+		return withArtifactDirQuery(href, dirPath)
 	}
 	return thoughtsArtifactPageURL(selectedDoc, dirPath)
 }

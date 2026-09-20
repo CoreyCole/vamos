@@ -29,6 +29,7 @@ func TestServeAI470RoomUsesArtifactPathForPlanChat(t *testing.T) {
 	plan := filepath.Join(root, "creative-mode-agent", "plans", "real-plan")
 	mustMkdirAll(t, plan)
 	mustWriteFile(t, filepath.Join(plan, "design.md"), []byte("# Real plan\n"))
+	mustWriteFile(t, filepath.Join(plan, "AGENTS.md"), []byte("# Agents\n"))
 	svc, err := NewService(root, nil, nil)
 	if err != nil {
 		t.Fatal(err)
@@ -65,10 +66,16 @@ func TestServeAI470RoomUsesArtifactPathForPlanChat(t *testing.T) {
 	for _, want := range []string{
 		`id="agent-chat-composer"`,
 		"Real plan",
+		"design.md",
+		"AGENTS.md",
+		`/rooms/plan/real-plan?artifact=thoughts%2Fcreative-mode-agent%2Fplans%2Freal-plan%2FAGENTS.md`,
 	} {
 		if !strings.Contains(body, want) {
 			t.Fatalf("missing %q: %s", want, body)
 		}
+	}
+	if strings.Contains(body, `/threads?artifact=`) {
+		t.Fatalf("Files href bounced to pick-scope /threads: %s", body)
 	}
 	if strings.Contains(body, `id="thread-chat"`) {
 		t.Fatalf("must not render SharedThreadChat: %s", body)

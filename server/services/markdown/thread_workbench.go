@@ -81,6 +81,7 @@ func (s *Service) thoughtsWorkbenchChatColumn(
 		body = renderScopedThreadListOrComposer(
 			rows,
 			emptyScopeComposerAction("plan", roomID),
+			artifact,
 		)
 	}
 	column := workbench.ChatColumnWithReopen
@@ -265,6 +266,18 @@ func (s *Service) ServeThreads(c echo.Context) error {
 	artifactPath, hasArtifact, err := optionalThreadArtifact(c.QueryParam("artifact"))
 	if err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
+	}
+	if hasArtifact {
+		href := thoughtsChatHref(s.basePath, artifactPath)
+		if href == "" {
+			href = thoughtsChatHref("", artifactPath)
+		}
+		if href != "" {
+			if dir := strings.TrimSpace(c.QueryParam("artifact_dir")); dir != "" {
+				href = withArtifactDirQuery(href, dir)
+			}
+			return c.Redirect(http.StatusSeeOther, href)
+		}
 	}
 	threads, err := s.workbenchThreadsRenderer.RenderWorkbenchThreadList(
 		c.Request().Context(), "", artifactPath,

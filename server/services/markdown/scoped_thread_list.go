@@ -19,11 +19,40 @@ import (
 func renderScopedThreadListOrComposer(
 	rows []agenthome.ConversationRowArgs,
 	composerAction string,
+	attachedDoc string,
 ) templ.Component {
 	if len(rows) == 0 {
-		return ScopedEmptyComposer(composerAction)
+		return ScopedEmptyComposer(composerAction, scopedAttachFromDoc(attachedDoc))
 	}
 	return ScopedThreadList(rows)
+}
+
+type scopedComposerAttach struct {
+	Path     string
+	Basename string
+}
+
+func scopedAttachFromDoc(doc string) []scopedComposerAttach {
+	canonical := strings.TrimSpace(doc)
+	if canonical == "" {
+		return nil
+	}
+	if parsed, err := CanonicalThoughtsDocPath(canonical); err == nil {
+		canonical = parsed
+	}
+	canonical = strings.Trim(canonical, "/")
+	if canonical == "" {
+		return nil
+	}
+	path := canonical
+	if !strings.HasPrefix(path, "thoughts/") {
+		path = "thoughts/" + path
+	}
+	base := filepath.Base(canonical)
+	if base == "." || base == "/" {
+		return nil
+	}
+	return []scopedComposerAttach{{Path: path, Basename: base}}
 }
 
 func (s *Service) requireKnownBot(slug string) error {
