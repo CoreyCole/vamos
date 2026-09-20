@@ -17,7 +17,7 @@ import (
 
 func chatCommentsOpen(r *http.Request, routeChatOpen bool) (chatOpen, commentsOpen bool) {
 	commentsOpen = workbench.CommentsOpenFromRequest(r)
-	chatOpen = routeChatOpen && !commentsOpen
+	chatOpen = routeChatOpen && workbench.ChatOpenFromRequest(r) && !commentsOpen
 	return chatOpen, commentsOpen
 }
 

@@ -531,6 +531,62 @@ func TestServeAI470RoomForcesArtifactOpenOnPlanViewChat(t *testing.T) {
 	}
 }
 
+func TestServeAI470RoomHonorsChatOpenCookieZero(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	plan := filepath.Join(root, "creative-mode-agent", "plans", "real-plan")
+	mustMkdirAll(t, plan)
+	mustWriteFile(t, filepath.Join(plan, "design.md"), []byte("# Real plan\n"))
+	svc, err := NewService(root, nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	renderer := &threadWorkbenchTestRenderer{
+		findID:        "thread-real",
+		threadPlanDir: "thoughts/creative-mode-agent/plans/real-plan",
+	}
+	svc.WithWorkbenchThreadRenderer(renderer)
+
+	artifact := "thoughts/creative-mode-agent/plans/real-plan/design.md"
+	req := httptest.NewRequest(
+		http.MethodGet,
+		"/rooms/plan/real-plan?artifact="+url.QueryEscape(artifact),
+		http.NoBody,
+	)
+	req.Header.Set("X-Vamos-Viewport-Class", "desktop-full")
+	req.AddCookie(&http.Cookie{Name: "wb2_chat_open", Value: "0"})
+	rec := httptest.NewRecorder()
+	c := echo.New().NewContext(req, rec)
+	c.SetParamNames("kind", "id")
+	c.SetParamValues("plan", "real-plan")
+	c.Set("user_email", "t@example.com")
+	if err := svc.ServeAI470Room(c); err != nil {
+		t.Fatal(err)
+	}
+	body := rec.Body.String()
+	needle := `&#34;workbenchV2Chat&#34;:{&#34;ratio&#34;`
+	idx := strings.Index(body, needle)
+	if idx < 0 {
+		idx = strings.Index(body, `"workbenchV2Chat":{"ratio"`)
+	}
+	if idx < 0 {
+		t.Fatalf("missing chat region signal: %s", body)
+	}
+	end := idx + 80
+	if end > len(body) {
+		end = len(body)
+	}
+	window := body[idx:end]
+	if !strings.Contains(window, `visible&#34;:false`) &&
+		!strings.Contains(window, `"visible":false`) {
+		t.Fatalf("rooms GET must keep chat closed when cookie=0: %s", window)
+	}
+	if !strings.Contains(body, `id="workbench-v2-threads-reopen"`) {
+		t.Fatalf("minimized chat must keep path-header hamburger: %s", body)
+	}
+}
+
 func TestLiveRosterListsPlanDirsFromIndex(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()

@@ -51,10 +51,18 @@ func paintChatCommentsLayoutJS() string {
 }
 
 func ChatToggleClickAction() string {
-	return "if ($workbench.regions.workbenchV2Chat.visible) { $workbench.regions.workbenchV2Chat.visible = false } else { $workbench.regions.workbenchV2Comments.visible = false; $workbench.regions.workbenchV2Chat.visible = true; $workbench.activeRegionID = 'workbenchV2Chat'; el.closest('#workbench-root').dataset.workbenchMobileActive = 'workbenchV2Chat'; " +
+	return "if ($workbench.regions.workbenchV2Chat.visible) { $workbench.regions.workbenchV2Chat.visible = false; " +
+		chatOpenCookieWriteJS(
+			false,
+		) +
+		" } else { $workbench.regions.workbenchV2Comments.visible = false; $workbench.regions.workbenchV2Chat.visible = true; $workbench.activeRegionID = 'workbenchV2Chat'; el.closest('#workbench-root').dataset.workbenchMobileActive = 'workbenchV2Chat'; " +
 		commentsOpenCookieWriteJS(
 			false,
-		) + " }; " +
+		) + "; " +
+		chatOpenCookieWriteJS(
+			true,
+		) +
+		" }; " +
 		paintChatCommentsLayoutJS()
 }
 
