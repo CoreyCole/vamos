@@ -1,10 +1,12 @@
 package infinitescroll
 
-// InfiniteScroll creates a complete infinite scroll container with configurable edges.
-// Happy path: one root call; children = first-page items. Root mints Host/Items/Sentinel.
+// InfiniteScroll creates a complete infinite scroll container with configurable edges
+// This is the happy path: one root call; children = first-page items.
+// Root mints Host/Items/Sentinel with derived IDs.
 // Loading elements are patched onto sentinel IDs via same-id DOM replace.
 templ InfiniteScroll(args InfiniteScrollArgs) {
 	{{
+		// Derive MorphMap IDs if not provided
 		hostID := args.HostID
 		if hostID == "" {
 			hostID = args.ID + "-host"
@@ -21,6 +23,7 @@ templ InfiniteScroll(args InfiniteScrollArgs) {
 		if sentinelBelowID == "" {
 			sentinelBelowID = args.ID + "-sentinel-below"
 		}
+		// Loading IDs default to sentinel IDs (same-id DOM replace)
 		loadingAboveID := args.LoadingAboveID
 		if loadingAboveID == "" {
 			loadingAboveID = sentinelAboveID
@@ -29,13 +32,15 @@ templ InfiniteScroll(args InfiniteScrollArgs) {
 		if loadingBelowID == "" {
 			loadingBelowID = sentinelBelowID
 		}
+
 		classes := InfiniteScrollVariants(args)
 	}}
 	<div class={ classes } { args.Attributes... }>
 		@Host(HostArgs{
 			ID:    hostID,
-			Class: "h-full",
+			Class: args.Class,
 		}) {
+			<!-- Above edge (inverse/scrollback) -->
 			if args.PatchAboveExpr != "" {
 				@LoadingSentinel(LoadingSentinelArgs{
 					ID:        sentinelAboveID,
@@ -44,11 +49,13 @@ templ InfiniteScroll(args InfiniteScrollArgs) {
 					LoadingID: loadingAboveID,
 				})
 			}
+			<!-- Items container (stable history) -->
 			@Items(ItemsArgs{
 				ID: itemsID,
 			}) {
 				{ children... }
 			}
+			<!-- Below edge (forward/more) -->
 			if args.PatchBelowExpr != "" {
 				@LoadingSentinel(LoadingSentinelArgs{
 					ID:        sentinelBelowID,
@@ -61,7 +68,7 @@ templ InfiniteScroll(args InfiniteScrollArgs) {
 	</div>
 }
 
-// Host is the scroll container (never remorphed — patches target Items/Loading only).
+// Host is the scroll container (never remorphed - patches target Items/Loading only)
 templ Host(args HostArgs) {
 	{{
 		classes := HostVariants(args)
@@ -75,7 +82,8 @@ templ Host(args HostArgs) {
 	</div>
 }
 
-// Items holds stable history only. Live/working/latest stay outside as siblings.
+// Items is the container for actual content items (stable history only)
+// New items are prepended (above) or appended (below) into this container
 templ Items(args ItemsArgs) {
 	{{
 		classes := ItemsVariants(args)
@@ -89,7 +97,8 @@ templ Items(args ItemsArgs) {
 	</div>
 }
 
-// Sentinel triggers load-more via data-on:intersect (colon form).
+// Sentinel is an invisible trigger element that loads more when intersected
+// Use data-on:intersect (colon form) to match other Datastar patterns
 templ Sentinel(args SentinelArgs) {
 	{{
 		classes := SentinelVariants(args)
@@ -102,7 +111,8 @@ templ Sentinel(args SentinelArgs) {
 	></div>
 }
 
-// Loading is same-id DOM replace SoT while fetching.
+// Loading is a visual indicator shown during fetch operations
+// This is the primary source of truth - uses same-id DOM replace
 templ Loading(args LoadingArgs) {
 	{{
 		classes := LoadingVariants(args)
@@ -113,21 +123,30 @@ templ Loading(args LoadingArgs) {
 		{ args.Attributes... }
 	>
 		if args.Direction == DirectionAbove {
-			<div class="animate-pulse space-y-3 p-4">
-				<div class="h-4 w-3/4 rounded bg-muted"></div>
-				<div class="h-3 w-1/2 rounded bg-muted"></div>
+			<div class="animate-pulse p-4 space-y-3">
+				<div class="h-4 bg-muted rounded w-3/4"></div>
+				<div class="h-3 bg-muted rounded w-1/2"></div>
 			</div>
 		} else {
-			<div class="animate-pulse space-y-3 p-4">
-				<div class="h-4 w-3/4 rounded bg-muted"></div>
-				<div class="h-3 w-1/2 rounded bg-muted"></div>
+			<div class="animate-pulse p-4 space-y-3">
+				<div class="h-4 bg-muted rounded w-3/4"></div>
+				<div class="h-3 bg-muted rounded w-1/2"></div>
 			</div>
 		}
 	</div>
 }
 
-// LoadingSentinel: first paint is Sentinel only; backend patches Loading onto same ID.
+// LoadingSentinel combines a sentinel and loading indicator for convenience
+// First paint: Sentinel only. Backend patches Loading onto the same ID (same-id DOM replace).
+// The LoadingID arg exists for advanced use; default is sentinel ID.
 templ LoadingSentinel(args LoadingSentinelArgs) {
+	{{
+		// LoadingID defaults to sentinel ID for same-id DOM replace
+		loadingID := args.LoadingID
+		if loadingID == "" {
+			loadingID = args.ID
+		}
+	}}
 	@Sentinel(SentinelArgs{
 		ID:         args.ID,
 		Direction:  args.Direction,
