@@ -147,6 +147,10 @@ func thoughtsAgentsDocPath(planDirRel string) string {
 	return thoughtsPlanDocPath(planDirRel, "AGENTS.md")
 }
 
+func thoughtsPlanMdDocPath(planDirRel string) string {
+	return thoughtsPlanDocPath(planDirRel, "plan.md")
+}
+
 func (s *Service) planDocExists(thoughtsRel string) bool {
 	if s == nil || strings.TrimSpace(s.basePath) == "" {
 		return false
@@ -169,6 +173,10 @@ func (s *Service) thoughtsPlanArtifactPath(planDirRel string) string {
 	agents := thoughtsAgentsDocPath(planDirRel)
 	if s.planDocExists(agents) {
 		return agents
+	}
+	plan := thoughtsPlanMdDocPath(planDirRel)
+	if s.planDocExists(plan) {
+		return plan
 	}
 	return design
 }
@@ -249,7 +257,7 @@ func (s *Service) globRosterPlans() []agenthome.RosterPlanRow {
 	}
 	var order []string
 	byDir := map[string]time.Time{}
-	for _, name := range []string{"design.md", "AGENTS.md"} {
+	for _, name := range []string{"design.md", "AGENTS.md", "plan.md"} {
 		matches, err := filepath.Glob(
 			filepath.Join(s.basePath, "*", "plans", "*", name),
 		)

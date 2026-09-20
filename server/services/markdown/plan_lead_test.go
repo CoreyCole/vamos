@@ -130,3 +130,58 @@ func TestThoughtsChatHrefNearestAgents(t *testing.T) {
 		}
 	}
 }
+
+func TestThoughtsPlanArtifactPathFallsBackToPlanMd(t *testing.T) {
+	root := t.TempDir()
+	alpha := filepath.Join(root, "owner", "plans", "alpha")
+	beta := filepath.Join(root, "owner", "plans", "beta")
+	gamma := filepath.Join(root, "owner", "plans", "gamma")
+	delta := filepath.Join(root, "owner", "plans", "delta")
+	mustMkdirAll(t, alpha)
+	mustMkdirAll(t, beta)
+	mustMkdirAll(t, gamma)
+	mustMkdirAll(t, delta)
+	mustWriteFile(t, filepath.Join(alpha, "design.md"), []byte("# d"))
+	mustWriteFile(t, filepath.Join(alpha, "plan.md"), []byte("# p"))
+	mustWriteFile(t, filepath.Join(beta, "AGENTS.md"), []byte("# a"))
+	mustWriteFile(t, filepath.Join(beta, "plan.md"), []byte("# p"))
+	mustWriteFile(t, filepath.Join(gamma, "plan.md"), []byte("# p"))
+	svc, err := NewService(root, nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cases := []struct {
+		dir, want string
+	}{
+		{"owner/plans/alpha", "thoughts/owner/plans/alpha/design.md"},
+		{"owner/plans/beta", "thoughts/owner/plans/beta/AGENTS.md"},
+		{"owner/plans/gamma", "thoughts/owner/plans/gamma/plan.md"},
+		{"owner/plans/delta", "thoughts/owner/plans/delta/design.md"},
+	}
+	for _, tc := range cases {
+		if got := svc.thoughtsPlanArtifactPath(tc.dir); got != tc.want {
+			t.Fatalf("thoughtsPlanArtifactPath(%q)=%q, want %q", tc.dir, got, tc.want)
+		}
+	}
+}
+
+func TestGlobRosterPlansIncludesPlanMdOnlyDirs(t *testing.T) {
+	root := t.TempDir()
+	planOnly := filepath.Join(root, "owner", "plans", "solo")
+	mustMkdirAll(t, planOnly)
+	mustWriteFile(t, filepath.Join(planOnly, "plan.md"), []byte("# p"))
+	svc, err := NewService(root, nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rows := svc.globRosterPlans()
+	if len(rows) != 1 {
+		t.Fatalf("globRosterPlans() = %#v, want 1 plan.md row", rows)
+	}
+	if rows[0].ID != "solo" {
+		t.Fatalf("id = %q", rows[0].ID)
+	}
+	if !strings.Contains(rows[0].Href, "plan.md") {
+		t.Fatalf("href = %q, want plan.md artifact", rows[0].Href)
+	}
+}

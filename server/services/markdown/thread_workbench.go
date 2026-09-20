@@ -155,7 +155,7 @@ func (s *Service) resolveThreadArtifact(
 	if strings.TrimSpace(planDir) == "" {
 		return "", false, nil
 	}
-	artifact, err := CanonicalThoughtsDocPath(path.Join(planDir, "design.md"))
+	artifact, err := CanonicalThoughtsDocPath(s.thoughtsPlanArtifactPath(planDir))
 	return artifact, false, err
 }
 

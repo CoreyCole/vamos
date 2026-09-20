@@ -124,6 +124,35 @@ func TestResolveThreadArtifactUsesQueryWhenPlanDirEmpty(t *testing.T) {
 	}
 }
 
+func TestResolveThreadArtifactDefaultsToPlanMdWhenDesignMissing(t *testing.T) {
+	root := t.TempDir()
+	planDir := filepath.Join(root, "owner", "plans", "solo")
+	mustMkdirAll(t, planDir)
+	mustWriteFile(t, filepath.Join(planDir, "plan.md"), []byte("# Plan"))
+	svc, err := NewService(root, nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	svc.WithWorkbenchThreadRenderer(&threadWorkbenchTestRenderer{
+		threadPlanDir: "owner/plans/solo",
+	})
+	got, explicit, err := svc.resolveThreadArtifact(
+		t.Context(),
+		"thread-solo",
+		"",
+		false,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if explicit {
+		t.Fatal("expected default artifact")
+	}
+	if got != "owner/plans/solo/plan.md" && got != "thoughts/owner/plans/solo/plan.md" {
+		t.Fatalf("artifact = %q", got)
+	}
+}
+
 func TestServeMarkdownLegacyChatWithoutThreadRedirectsToThreadIndex(t *testing.T) {
 	root := t.TempDir()
 	mustMkdirAll(t, filepath.Join(root, "owner", "plans", "alpha"))
