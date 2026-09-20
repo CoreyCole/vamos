@@ -137,15 +137,22 @@ func TestThoughtsPlanArtifactPathFallsBackToPlanMd(t *testing.T) {
 	beta := filepath.Join(root, "owner", "plans", "beta")
 	gamma := filepath.Join(root, "owner", "plans", "gamma")
 	delta := filepath.Join(root, "owner", "plans", "delta")
+	epsilon := filepath.Join(root, "owner", "plans", "epsilon")
+	zeta := filepath.Join(root, "owner", "plans", "zeta")
 	mustMkdirAll(t, alpha)
 	mustMkdirAll(t, beta)
 	mustMkdirAll(t, gamma)
 	mustMkdirAll(t, delta)
+	mustMkdirAll(t, epsilon)
+	mustMkdirAll(t, zeta)
 	mustWriteFile(t, filepath.Join(alpha, "design.md"), []byte("# d"))
 	mustWriteFile(t, filepath.Join(alpha, "plan.md"), []byte("# p"))
 	mustWriteFile(t, filepath.Join(beta, "AGENTS.md"), []byte("# a"))
 	mustWriteFile(t, filepath.Join(beta, "plan.md"), []byte("# p"))
 	mustWriteFile(t, filepath.Join(gamma, "plan.md"), []byte("# p"))
+	mustWriteFile(t, filepath.Join(epsilon, "README.md"), []byte("# r"))
+	mustWriteFile(t, filepath.Join(epsilon, "plan.md"), []byte("# p"))
+	mustWriteFile(t, filepath.Join(zeta, "README.md"), []byte("# r"))
 	svc, err := NewService(root, nil, nil)
 	if err != nil {
 		t.Fatal(err)
@@ -157,11 +164,34 @@ func TestThoughtsPlanArtifactPathFallsBackToPlanMd(t *testing.T) {
 		{"owner/plans/beta", "thoughts/owner/plans/beta/AGENTS.md"},
 		{"owner/plans/gamma", "thoughts/owner/plans/gamma/plan.md"},
 		{"owner/plans/delta", "thoughts/owner/plans/delta/design.md"},
+		{"owner/plans/epsilon", "thoughts/owner/plans/epsilon/README.md"},
+		{"owner/plans/zeta", "thoughts/owner/plans/zeta/README.md"},
 	}
 	for _, tc := range cases {
 		if got := svc.thoughtsPlanArtifactPath(tc.dir); got != tc.want {
 			t.Fatalf("thoughtsPlanArtifactPath(%q)=%q, want %q", tc.dir, got, tc.want)
 		}
+	}
+}
+
+func TestGlobRosterPlansIncludesReadmeOnlyDirs(t *testing.T) {
+	root := t.TempDir()
+	readmeOnly := filepath.Join(root, "owner", "plans", "solo")
+	mustMkdirAll(t, readmeOnly)
+	mustWriteFile(t, filepath.Join(readmeOnly, "README.md"), []byte("# r"))
+	svc, err := NewService(root, nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rows := svc.globRosterPlans()
+	if len(rows) != 1 {
+		t.Fatalf("globRosterPlans() = %#v, want 1 README.md row", rows)
+	}
+	if rows[0].ID != "solo" {
+		t.Fatalf("id = %q", rows[0].ID)
+	}
+	if !strings.Contains(rows[0].Href, "README.md") {
+		t.Fatalf("href = %q, want README.md artifact", rows[0].Href)
 	}
 }
 
