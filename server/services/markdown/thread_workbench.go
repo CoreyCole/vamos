@@ -70,12 +70,15 @@ func (s *Service) resolveThreadArtifact(
 		return "", false, errors.New("thread renderer is not configured")
 	}
 	planDir, err := s.workbenchThreadsRenderer.ResolveSharedThreadPlanDir(ctx, threadID)
-	if err != nil || strings.TrimSpace(planDir) == "" {
+	if err != nil {
 		return "", false, err
 	}
 	if hasArtifact {
 		artifact, explicit, err := optionalThreadArtifact(rawDoc)
 		return artifact, explicit, err
+	}
+	if strings.TrimSpace(planDir) == "" {
+		return "", false, nil
 	}
 	artifact, err := CanonicalThoughtsDocPath(path.Join(planDir, "design.md"))
 	return artifact, false, err

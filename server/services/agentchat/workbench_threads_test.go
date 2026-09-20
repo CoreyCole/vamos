@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -26,7 +27,10 @@ func TestResolveSharedThreadPlanDirReturnsThoughtsIdentity(t *testing.T) {
 	); err != nil {
 		t.Fatal(err)
 	}
-	database, err := serverdb.NewService(filepath.Join(t.TempDir(), "threads.db"), filepath.Join(t.TempDir(), "agents.yml"))
+	database, err := serverdb.NewService(
+		filepath.Join(t.TempDir(), "threads.db"),
+		filepath.Join(t.TempDir(), "agents.yml"),
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -69,6 +73,130 @@ func TestResolveSharedThreadPlanDirReturnsThoughtsIdentity(t *testing.T) {
 	}
 }
 
+func TestResolveSharedThreadPlanDirAgentsDesk(t *testing.T) {
+	projectRoot := t.TempDir()
+	thoughtsRoot := filepath.Join(projectRoot, "thoughts")
+	deskAbs := filepath.Join(thoughtsRoot, "docs", "vamos")
+	if err := os.MkdirAll(deskAbs, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(
+		filepath.Join(deskAbs, "AGENTS.md"),
+		[]byte("# desk\n"),
+		0o644,
+	); err != nil {
+		t.Fatal(err)
+	}
+	database, err := serverdb.NewService(
+		filepath.Join(t.TempDir(), "threads.db"),
+		filepath.Join(t.TempDir(), "agents.yml"),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = database.Close() })
+	service := &Service{
+		projectRoot:  projectRoot,
+		thoughtsRoot: thoughtsRoot,
+		queries:      database.Queries,
+	}
+	threadID, err := service.EnsureSharedThreadForDoc(
+		t.Context(),
+		"thoughts/docs/vamos/index.html",
+		"owner@example.com",
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if threadID == "" {
+		t.Fatal("expected desk thread")
+	}
+	got, err := service.ResolveSharedThreadPlanDir(t.Context(), threadID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != "thoughts/docs/vamos" {
+		t.Fatalf("ResolveSharedThreadPlanDir() = %q", got)
+	}
+}
+
+func TestServeThreadDocsDeskIndexHTMLCommentsPanel(t *testing.T) {
+	projectRoot := t.TempDir()
+	thoughtsRoot := filepath.Join(projectRoot, "thoughts")
+	deskAbs := filepath.Join(thoughtsRoot, "docs", "vamos")
+	if err := os.MkdirAll(deskAbs, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(
+		filepath.Join(deskAbs, "AGENTS.md"),
+		[]byte("# desk\n"),
+		0o644,
+	); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(
+		filepath.Join(deskAbs, "index.html"),
+		[]byte("<html><body>docs index</body></html>"),
+		0o644,
+	); err != nil {
+		t.Fatal(err)
+	}
+	database, err := serverdb.NewService(
+		filepath.Join(t.TempDir(), "threads.db"),
+		filepath.Join(t.TempDir(), "agents.yml"),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = database.Close() })
+	renderer := &Service{
+		projectRoot:  projectRoot,
+		thoughtsRoot: thoughtsRoot,
+		queries:      database.Queries,
+		db:           database.DB(),
+	}
+	markdownService, err := markdown.NewService(thoughtsRoot, nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	markdownService.WithWorkbenchThreadRenderer(renderer)
+	threadID, err := renderer.EnsureSharedThreadForDoc(
+		t.Context(),
+		"thoughts/docs/vamos/index.html",
+		"owner@example.com",
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	target := "/threads/" + threadID + "?artifact=" + url.QueryEscape(
+		"thoughts/docs/vamos/index.html",
+	)
+	rec := httptest.NewRecorder()
+	c := echo.New().NewContext(httptest.NewRequest(http.MethodGet, target, nil), rec)
+	c.SetParamNames("threadID")
+	c.SetParamValues(threadID)
+	c.Set("user_email", "owner@example.com")
+	if err := markdownService.ServeThread(c); err != nil {
+		t.Fatal(err)
+	}
+	if rec.Code != http.StatusOK {
+		t.Fatalf("ServeThread status = %d body=%q", rec.Code, rec.Body.String())
+	}
+	html := rec.Body.String()
+	for _, unwanted := range []string{
+		"Comments are unavailable for this artifact.",
+		"Comments are unavailable for directories.",
+		"Select an artifact to view comments.",
+	} {
+		if strings.Contains(html, unwanted) {
+			t.Fatalf("comments unavailable: %q", unwanted)
+		}
+	}
+	if !strings.Contains(html, `id="comments-context-panel"`) {
+		t.Fatalf("missing comments panel: %s", html)
+	}
+}
+
 func TestServeThreadDefaultArtifactAcceptsSharedThreadPlanIdentity(t *testing.T) {
 	projectRoot := t.TempDir()
 	thoughtsRoot := filepath.Join(projectRoot, "thoughts")
@@ -83,7 +211,10 @@ func TestServeThreadDefaultArtifactAcceptsSharedThreadPlanIdentity(t *testing.T)
 	); err != nil {
 		t.Fatal(err)
 	}
-	database, err := serverdb.NewService(filepath.Join(t.TempDir(), "threads.db"), filepath.Join(t.TempDir(), "agents.yml"))
+	database, err := serverdb.NewService(
+		filepath.Join(t.TempDir(), "threads.db"),
+		filepath.Join(t.TempDir(), "agents.yml"),
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -156,7 +287,10 @@ func TestServeThreadRendersComposerDraftAndTranscript(t *testing.T) {
 	); err != nil {
 		t.Fatal(err)
 	}
-	database, err := serverdb.NewService(filepath.Join(t.TempDir(), "threads.db"), filepath.Join(t.TempDir(), "agents.yml"))
+	database, err := serverdb.NewService(
+		filepath.Join(t.TempDir(), "threads.db"),
+		filepath.Join(t.TempDir(), "agents.yml"),
+	)
 	if err != nil {
 		t.Fatal(err)
 	}

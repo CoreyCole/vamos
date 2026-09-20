@@ -80,6 +80,36 @@ func (r *threadWorkbenchTestRenderer) RenderSharedThreadChat(
 	return templ.Raw(`<div id="thread-chat">original thread chat</div>`), nil
 }
 
+func TestResolveThreadArtifactUsesQueryWhenPlanDirEmpty(t *testing.T) {
+	root := t.TempDir()
+	mustMkdirAll(t, filepath.Join(root, "docs", "vamos"))
+	mustWriteFile(
+		t,
+		filepath.Join(root, "docs", "vamos", "index.html"),
+		[]byte("<html></html>"),
+	)
+	svc, err := NewService(root, nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	svc.WithWorkbenchThreadRenderer(&threadWorkbenchTestRenderer{threadPlanDir: " "})
+	got, explicit, err := svc.resolveThreadArtifact(
+		t.Context(),
+		"thread-docs",
+		"thoughts/docs/vamos/index.html",
+		true,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !explicit {
+		t.Fatal("expected explicit artifact")
+	}
+	if got != "docs/vamos/index.html" && got != "thoughts/docs/vamos/index.html" {
+		t.Fatalf("artifact = %q", got)
+	}
+}
+
 func TestServeMarkdownLegacyChatWithoutThreadRedirectsToThreadIndex(t *testing.T) {
 	root := t.TempDir()
 	mustMkdirAll(t, filepath.Join(root, "owner", "plans", "alpha"))

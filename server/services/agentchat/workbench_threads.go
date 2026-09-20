@@ -85,7 +85,7 @@ func (s *Service) ResolveSharedThreadPlanDir(
 	if err != nil {
 		return "", err
 	}
-	return thoughtsPlanKey(s.ResolveThreadPlanDir(ctx, thread)), nil
+	return s.thoughtsSharedThreadKey(s.ResolveThreadPlanDir(ctx, thread)), nil
 }
 
 func thoughtsPlanKey(raw string) string {
