@@ -121,7 +121,8 @@ func TestRosterRail_LiveBotsAndChrome(t *testing.T) {
 	if !strings.Contains(html, `data-testid="roster-new-bot"`) {
 		t.Fatal("roster header must expose New bot control")
 	}
-	if !strings.Contains(html, `action="/agents"`) || !strings.Contains(html, `id="workbench-v2-new-bot-sheet"`) {
+	if !strings.Contains(html, `action="/agents"`) ||
+		!strings.Contains(html, `id="workbench-v2-new-bot-sheet"`) {
 		t.Fatal("New bot must POST /agents via create sheet")
 	}
 
@@ -146,6 +147,46 @@ func TestRosterRail_LiveBotsAndChrome(t *testing.T) {
 	}
 	if !strings.Contains(html, "roster-row-selected") {
 		t.Fatal("selected live bot must use roster-row-selected")
+	}
+}
+
+func TestRosterRail_DocsAbovePlans(t *testing.T) {
+	t.Parallel()
+	var buf bytes.Buffer
+	view := RosterView{
+		Docs: []RosterDocRow{
+			{ID: "vamos", Title: "vamos", Href: "/thoughts/docs/vamos/index.html"},
+			{
+				ID:    "chestnut",
+				Title: "chestnut",
+				Href:  "/thoughts/docs/chestnut/index.html",
+			},
+		},
+		Plans: []RosterPlanRow{
+			{ID: "plan-one", Title: "Plan One", Href: "/rooms/plan/plan-one"},
+		},
+	}
+	if err := RosterRail(view).Render(context.Background(), &buf); err != nil {
+		t.Fatal(err)
+	}
+	html := buf.String()
+	if strings.Contains(html, "No Workspace content yet") {
+		t.Fatal("roster must not dead-end on empty workspace copy")
+	}
+	docsIdx := strings.Index(html, `id="workbench-v2-roster-docs"`)
+	plansIdx := strings.Index(html, `id="workbench-v2-roster-plans"`)
+	if docsIdx < 0 || plansIdx < 0 || docsIdx > plansIdx {
+		t.Fatalf("Docs must be collapsible above Plans: %s", html)
+	}
+	for _, want := range []string{
+		"<summary", ">Docs</summary>",
+		`href="/thoughts/docs/vamos/index.html"`,
+		`href="/thoughts/docs/chestnut/index.html"`,
+		"Plan One",
+	} {
+		if !strings.Contains(html, want) {
+			t.Fatalf("roster docs missing %q", want)
+		}
 	}
 }
 

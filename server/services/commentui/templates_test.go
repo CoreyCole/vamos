@@ -686,9 +686,9 @@ func TestCommentSharedPatchTargetsRenderStableIDs(t *testing.T) {
 		`id="workbench-v2-comments-threads-reopen"`,
 		`aria-label="Show roster sidebar (Ctrl+B)"`,
 		`visible !== false`,
-		`← Back`,
-		`workbenchV2Comments.visible = false`,
-		`workbenchV2Chat.visible = true`,
+		`data-testid="comments-toggle"`,
+		`aria-label="Toggle comments"`,
+		`workbenchV2Comments.visible = !$workbench.regions.workbenchV2Comments.visible`,
 	} {
 		if !strings.Contains(panelHTML, want) {
 			t.Fatalf("context panel missing %q: %s", want, panelHTML)
@@ -699,6 +699,14 @@ func TestCommentSharedPatchTargetsRenderStableIDs(t *testing.T) {
 			"comments header should match doc header height, not a two-line label: %s",
 			panelHTML,
 		)
+	}
+	if strings.Contains(panelHTML, `← Back`) {
+		t.Fatalf("desktop CommentsContextPanel must not render ← Back: %s", panelHTML)
+	}
+	toggleIdx := strings.Index(panelHTML, `data-testid="comments-toggle"`)
+	titleIdx := strings.Index(panelHTML, `>Comments</p>`)
+	if toggleIdx < 0 || titleIdx < 0 || toggleIdx > titleIdx {
+		t.Fatalf("comments toggle must sit left of Comments title: %s", panelHTML)
 	}
 	idx := strings.Index(panelHTML, `id="workbench-v2-comments-threads-reopen"`)
 	end := strings.Index(panelHTML[idx:], ">")

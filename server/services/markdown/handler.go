@@ -17,6 +17,7 @@ import (
 
 	"github.com/CoreyCole/vamos/pkg/db"
 	"github.com/CoreyCole/vamos/server/layouts/workbench"
+	"github.com/CoreyCole/vamos/server/services/agenthome"
 	"github.com/CoreyCole/vamos/server/services/applets"
 	"github.com/CoreyCole/vamos/server/services/comments"
 	"github.com/CoreyCole/vamos/server/services/commentui"
@@ -468,12 +469,15 @@ func (s *Service) buildThoughtsV2WorkbenchState(
 		UserEmail:     pageArgs.UserEmail,
 		ViewportClass: viewport,
 		SavedConfig:   s.savedThreadsWorkbenchConfig(c, pageArgs.UserEmail, viewport),
-		Artifact:      artifact,
-		Comments:      comments,
-		ThreadsOpen:   false,
-		ChatOpen:      false,
-		ArtifactOpen:  true,
-		CommentsOpen:  commentsOpen,
+		Threads: agenthome.RosterRail(
+			s.liveRoster(c.Request().Context(), agenthome.RosterSelection{}),
+		),
+		Artifact:     artifact,
+		Comments:     comments,
+		ThreadsOpen:  workbench.ThreadsOpenFromRequest(c.Request()),
+		ChatOpen:     false,
+		ArtifactOpen: true,
+		CommentsOpen: commentsOpen,
 	})
 }
 
@@ -625,12 +629,15 @@ func (s *Service) buildThoughtsDirectoryWorkbenchState(
 		UserEmail:     args.UserEmail,
 		ViewportClass: viewport,
 		SavedConfig:   s.savedThreadsWorkbenchConfig(c, args.UserEmail, viewport),
-		Artifact:      artifact,
-		Comments:      EmptyDirectoryContextPanel(),
-		ThreadsOpen:   false,
-		ChatOpen:      false,
-		ArtifactOpen:  true,
-		CommentsOpen:  commentsOpen,
+		Threads: agenthome.RosterRail(
+			s.liveRoster(c.Request().Context(), agenthome.RosterSelection{}),
+		),
+		Artifact:     artifact,
+		Comments:     EmptyDirectoryContextPanel(),
+		ThreadsOpen:  workbench.ThreadsOpenFromRequest(c.Request()),
+		ChatOpen:     false,
+		ArtifactOpen: true,
+		CommentsOpen: commentsOpen,
 	})
 }
 

@@ -176,6 +176,37 @@ func (s *Service) rosterPlanRowFromDirRel(
 	}
 }
 
+func (s *Service) liveRosterDocs() []agenthome.RosterDocRow {
+	if s == nil || strings.TrimSpace(s.basePath) == "" {
+		return nil
+	}
+	docsRoot := filepath.Join(s.basePath, "docs")
+	entries, err := os.ReadDir(docsRoot)
+	if err != nil {
+		return nil
+	}
+	out := make([]agenthome.RosterDocRow, 0, len(entries))
+	for _, entry := range entries {
+		if !entry.IsDir() {
+			continue
+		}
+		name := entry.Name()
+		if strings.HasPrefix(name, ".") {
+			continue
+		}
+		href := "/thoughts/docs/" + name + "/"
+		if _, err := os.Stat(filepath.Join(docsRoot, name, "index.html")); err == nil {
+			href = "/thoughts/docs/" + name + "/index.html"
+		}
+		out = append(out, agenthome.RosterDocRow{
+			ID:    name,
+			Title: name,
+			Href:  href,
+		})
+	}
+	return out
+}
+
 func (s *Service) liveRosterPlans(ctx context.Context) []agenthome.RosterPlanRow {
 	if s != nil && s.queries != nil {
 		rows, err := s.queries.ListCurrentPlanWorkspaces(ctx, "")

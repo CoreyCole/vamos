@@ -30,10 +30,18 @@ type RosterPlanRow struct {
 	Time  string // shown above title (Corey feel); empty omits
 }
 
+// RosterDocRow is one thoughts/docs/{product}/ desk in the Docs band.
+type RosterDocRow struct {
+	ID    string
+	Title string
+	Href  string
+}
+
 // RosterView is the live left-rail model.
 type RosterView struct {
 	Selection RosterSelection
 	Bots      []RosterBotRow
+	Docs      []RosterDocRow
 	Plans     []RosterPlanRow
 }
 
@@ -188,6 +196,23 @@ templ RosterRail(view RosterView) {
 							}
 						</ul>
 					}
+				</section>
+				<section id="workbench-v2-roster-docs" class="space-y-0.5 pt-1" aria-label="Docs">
+					<details class="group" open>
+						<summary class="cursor-pointer list-none px-1.5 pb-1 text-[10px] font-medium tracking-wide text-muted-foreground/80">Docs</summary>
+						<ul class="flex flex-col">
+							for _, doc := range view.Docs {
+								<li id={ "roster-row-doc-" + doc.ID }>
+									<a
+										href={ templ.SafeURL(doc.Href) }
+										class="flex items-center gap-2 rounded-md px-1.5 py-1 text-sm text-foreground hover:bg-white/[0.06]"
+									>
+										<span class="block truncate font-medium">{ doc.Title }</span>
+									</a>
+								</li>
+							}
+						</ul>
+					</details>
 				</section>
 				<section id="workbench-v2-roster-plans" class="space-y-0.5 pt-1" aria-label="Plan">
 					<h2 class="px-1.5 pb-1 text-[10px] font-medium tracking-wide text-muted-foreground/80">Plan</h2>

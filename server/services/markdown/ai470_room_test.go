@@ -628,3 +628,30 @@ func TestLiveRosterBotPreviewFromJSONL(t *testing.T) {
 		t.Fatal("fixture subtitle leaked")
 	}
 }
+
+func TestLiveRosterDocsPrefersIndexHTML(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	mustMkdirAll(t, filepath.Join(root, "docs", "vamos"))
+	mustMkdirAll(t, filepath.Join(root, "docs", "chestnut"))
+	mustWriteFile(
+		t,
+		filepath.Join(root, "docs", "vamos", "index.html"),
+		[]byte("<html></html>"),
+	)
+	svc, err := NewService(root, nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	docs := svc.liveRosterDocs()
+	byID := map[string]agenthome.RosterDocRow{}
+	for _, row := range docs {
+		byID[row.ID] = row
+	}
+	if byID["vamos"].Href != "/thoughts/docs/vamos/index.html" {
+		t.Fatalf("vamos href = %q", byID["vamos"].Href)
+	}
+	if byID["chestnut"].Href != "/thoughts/docs/chestnut/" {
+		t.Fatalf("chestnut href = %q", byID["chestnut"].Href)
+	}
+}

@@ -77,6 +77,10 @@ func WorkbenchV2CloseCommentsExpr() string {
 	return "$workbench.regions.workbenchV2Comments.visible = false; $workbench.regions.workbenchV2Chat.visible = true; try { document.cookie = 'wb2_comments_open=0; path=/; SameSite=Lax; Max-Age=31536000'; sessionStorage.setItem('workbench-v2:comments-open', '0') } catch (e) {}; if (window.workbenchApplyRegionVisible) { workbenchApplyRegionVisible('workbench-v2-chat', $workbench.regions.workbenchV2Chat.visible); workbenchApplyRegionVisible('workbench-v2-comments', $workbench.regions.workbenchV2Comments.visible) }; if (window.workbenchReflow) { workbenchReflow() }"
 }
 
+func WorkbenchV2ToggleCommentsExpr() string {
+	return "$workbench.regions.workbenchV2Comments.visible = !$workbench.regions.workbenchV2Comments.visible; if ($workbench.regions.workbenchV2Comments.visible) { $workbench.regions.workbenchV2Chat.visible = false; try { document.cookie = 'wb2_comments_open=1; path=/; SameSite=Lax; Max-Age=31536000'; sessionStorage.setItem('workbench-v2:comments-open', '1') } catch (e) {} } else { try { document.cookie = 'wb2_comments_open=0; path=/; SameSite=Lax; Max-Age=31536000'; sessionStorage.setItem('workbench-v2:comments-open', '0') } catch (e) {} }; if (window.workbenchApplyRegionVisible) { workbenchApplyRegionVisible('workbench-v2-chat', $workbench.regions.workbenchV2Chat.visible); workbenchApplyRegionVisible('workbench-v2-comments', $workbench.regions.workbenchV2Comments.visible) }; if (window.workbenchReflow) { workbenchReflow() }"
+}
+
 func commentComposerID(view CommentFormView) string {
 	if id := strings.TrimSpace(view.ComposerID); id != "" {
 		return id
@@ -522,15 +526,25 @@ templ CommentForm(view CommentFormView) {
 templ CommentsContextPanel(args CommentsPanelArgs) {
 	<aside id={ CommentsContextPanelID } class="flex h-full min-h-0 flex-col overflow-hidden bg-background">
 		<div class="flex h-10 min-h-10 max-h-10 shrink-0 items-center gap-2 border-b border-border px-2.5">
+			<button
+				type="button"
+				data-testid="comments-toggle"
+				class="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-border bg-muted text-foreground transition-colors hover:bg-muted hover:text-foreground"
+				data-on:click={ WorkbenchV2ToggleCommentsExpr() }
+				data-attr:aria-pressed="$workbench.regions.workbenchV2Comments.visible ? 'true' : 'false'"
+				aria-controls="workbench-v2-comments"
+				aria-label="Toggle comments"
+				title="Toggle comments"
+				aria-pressed="true"
+			>
+				<svg class="h-3.5 w-3.5" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z"></path></svg>
+			</button>
+			<p class="min-w-0 flex-1 truncate text-[13px] font-semibold leading-none text-foreground">Comments</p>
 			<div id="workbench-v2-comments-threads-reopen" class={ "workbench-chrome flex h-7 w-7 shrink-0 items-center justify-center", templ.KV("hidden", args.ThreadsOpen) } data-class={ commentsThreadsReopenClass() } aria-hidden={ commentsThreadsReopenAriaHidden(args.ThreadsOpen) }>
 				<button type="button" data-workbench-threads-reopen class="inline-flex h-7 w-7 items-center justify-center rounded-md border border-border bg-background text-muted-foreground shadow-sm transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" data-on:click={ commentsThreadsShowClick() } aria-controls="workbench-v2-threads" aria-label="Show roster sidebar (Ctrl+B)" title="Show roster sidebar (Ctrl+B)">
 					<svg class="h-4 w-4" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
 				</button>
 			</div>
-			<p class="min-w-0 flex-1 truncate text-[13px] font-semibold leading-none text-foreground">Comments</p>
-			<button type="button" class="rounded-md px-2 py-1 text-xs text-muted-foreground hover:bg-muted" data-on:click={ WorkbenchV2CloseCommentsExpr() }>
-				← Back
-			</button>
 			if args.Form != nil {
 				<button type="button" class="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground" data-on:click={ FocusComposerScript() } aria-label="Add comment" title="Add comment">
 					<svg class="h-3.5 w-3.5" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v14M5 12h14"></path></svg>

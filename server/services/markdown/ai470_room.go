@@ -270,6 +270,7 @@ func (s *Service) liveRoster(
 	sel agenthome.RosterSelection,
 ) agenthome.RosterView {
 	view := agenthome.RosterView{Selection: sel}
+	view.Docs = s.liveRosterDocs()
 	if s == nil || s.roster == nil {
 		view.Plans = s.liveRosterPlans(ctx)
 		return view
