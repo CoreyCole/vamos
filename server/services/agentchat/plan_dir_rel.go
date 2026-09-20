@@ -6,6 +6,7 @@ import (
 	"errors"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 
@@ -162,20 +163,35 @@ func (s *Service) EnsureSharedThreadForDoc(
 	if userEmail == "" || s == nil || s.queries == nil {
 		return "", nil
 	}
-	planKey := thoughtsPlanKey(docPath)
+	planKey := s.thoughtsSharedThreadKey(docPath)
 	if planKey == "" {
 		return "", nil
 	}
+	rel := strings.TrimPrefix(filepath.ToSlash(planKey), "thoughts/")
 	cwd := planKey
 	if abs, ok := s.canonicalPlanDirFromSource(planKey); ok {
 		cwd = abs
 	} else if s.thoughtsRoot != "" {
-		rel := strings.TrimPrefix(filepath.ToSlash(planKey), "thoughts/")
 		cwd = filepath.Join(s.thoughtsRoot, filepath.FromSlash(rel))
 	}
 	title := filepath.Base(filepath.ToSlash(planKey))
 	if title == "" || title == "." {
 		title = "Plan chat"
+	}
+	if _, found := s.lookupPlanDirRel(ctx, planKey); !found &&
+		strings.TrimSpace(rel) != "" {
+		if _, err := s.queries.UpsertDiscoveredPlanWorkspace(
+			ctx,
+			db.UpsertDiscoveredPlanWorkspaceParams{
+				PlanDirRel:        rel,
+				PlanDir:           cwd,
+				Label:             title,
+				ArtifactUpdatedAt: time.Now().UTC(),
+				QrspiLifecycle:    "plan",
+			},
+		); err != nil {
+			return "", err
+		}
 	}
 	params := s.attachPlanDirRel(ctx, db.CreateAgentThreadParams{
 		ID:         uuid.NewString(),

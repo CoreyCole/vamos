@@ -23,7 +23,10 @@ func setupPlanDirRelTest(
 	}
 	planRel = "owner/plans/alpha"
 	var err error
-	database, err = serverdb.NewService(filepath.Join(t.TempDir(), "plan-dir-rel.db"), filepath.Join(t.TempDir(), "agents.yml"))
+	database, err = serverdb.NewService(
+		filepath.Join(t.TempDir(), "plan-dir-rel.db"),
+		filepath.Join(t.TempDir(), "agents.yml"),
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -306,5 +309,66 @@ func TestEnsureSharedThreadForDocIgnoresNonPlan(t *testing.T) {
 	}
 	if got != "" {
 		t.Fatalf("EnsureSharedThreadForDoc = %q, want empty", got)
+	}
+}
+
+func TestEnsureSharedThreadForDocAgentsDesk(t *testing.T) {
+	_, thoughtsRoot, _, _, service, database := setupPlanDirRelTest(t)
+	deskAbs := filepath.Join(thoughtsRoot, "docs", "vamos")
+	if err := os.MkdirAll(deskAbs, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(
+		filepath.Join(deskAbs, "AGENTS.md"),
+		[]byte("# desk\n"),
+		0o644,
+	); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(
+		filepath.Join(deskAbs, "index.html"),
+		[]byte("<html></html>"),
+		0o644,
+	); err != nil {
+		t.Fatal(err)
+	}
+	doc := "thoughts/docs/vamos/index.html"
+	first, err := service.EnsureSharedThreadForDoc(
+		t.Context(), doc, "owner@example.com",
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if first == "" {
+		t.Fatal("expected created desk thread id")
+	}
+	second, err := service.EnsureSharedThreadForDoc(
+		t.Context(), doc, "owner@example.com",
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if second != first {
+		t.Fatalf("desk ensure reused %q, want %q", second, first)
+	}
+	thread, err := database.Queries.GetAgentThread(t.Context(), first)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if thread.RoomKind != RoomKindPlan {
+		t.Fatalf("room_kind = %q, want plan", thread.RoomKind)
+	}
+	if thread.Title != "vamos" {
+		t.Fatalf("title = %q, want vamos", thread.Title)
+	}
+	if got := service.thoughtsSharedThreadKey(doc); got != "thoughts/docs/vamos" {
+		t.Fatalf("thoughtsSharedThreadKey = %q", got)
+	}
+	ws, err := database.Queries.GetPlanWorkspace(t.Context(), "docs/vamos")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if ws.PlanDirRel != "docs/vamos" {
+		t.Fatalf("plan_dir_rel = %q", ws.PlanDirRel)
 	}
 }

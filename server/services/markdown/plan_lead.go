@@ -369,7 +369,13 @@ func (s *Service) resolvePlanDirRelForRoom(
 	if s.queries == nil {
 		return "", nil
 	}
-	for _, candidate := range []string{strings.TrimSpace(artifact), strings.TrimSpace(roomID)} {
+	roomID = strings.TrimSpace(roomID)
+	roomSlash := strings.ReplaceAll(roomID, "--", "/")
+	for _, candidate := range []string{
+		strings.TrimSpace(artifact),
+		roomID,
+		roomSlash,
+	} {
 		if candidate == "" {
 			continue
 		}

@@ -3,6 +3,7 @@ package agentchat
 import (
 	"context"
 	"net/url"
+	"os"
 	"path/filepath"
 	"sort"
 	"strconv"
@@ -95,11 +96,66 @@ func thoughtsPlanKey(raw string) string {
 	return filepath.ToSlash(planDirectoryRoot(path))
 }
 
+// thoughtsSharedThreadKey is the plan-home identity for a doc: classic
+// thoughts/<user>/plans/<id>, or the nearest AGENTS.md desk under thoughtsRoot.
+func (s *Service) thoughtsSharedThreadKey(docPath string) string {
+	if key := thoughtsPlanKey(docPath); key != "" {
+		return key
+	}
+	return s.thoughtsAgentsDeskKey(docPath)
+}
+
+func (s *Service) thoughtsAgentsDeskKey(docPath string) string {
+	if s == nil || strings.TrimSpace(s.thoughtsRoot) == "" {
+		return ""
+	}
+	path := filepath.ToSlash(strings.TrimSpace(docPath))
+	if path == "" {
+		return ""
+	}
+	root, err := filepath.Abs(s.thoughtsRoot)
+	if err != nil {
+		return ""
+	}
+	root = filepath.Clean(root)
+	var abs string
+	if filepath.IsAbs(filepath.FromSlash(path)) {
+		abs = filepath.Clean(filepath.FromSlash(path))
+	} else {
+		rel := path
+		if i := strings.Index(path, "thoughts/"); i >= 0 {
+			rel = strings.TrimPrefix(path[i:], "thoughts/")
+		}
+		abs = filepath.Join(root, filepath.FromSlash(rel))
+	}
+	dir := abs
+	if info, err := os.Stat(abs); err == nil {
+		if !info.IsDir() {
+			dir = filepath.Dir(abs)
+		}
+	} else {
+		dir = filepath.Dir(abs)
+	}
+	for {
+		if _, err := os.Stat(filepath.Join(dir, "AGENTS.md")); err == nil {
+			relDir, relErr := filepath.Rel(root, dir)
+			if relErr == nil && relDir != "." && !strings.HasPrefix(relDir, "..") {
+				return filepath.ToSlash(filepath.Join("thoughts", relDir))
+			}
+		}
+		if dir == root || dir == filepath.Dir(dir) {
+			break
+		}
+		dir = filepath.Dir(dir)
+	}
+	return ""
+}
+
 func (s *Service) FindSharedThreadForDoc(
 	ctx context.Context,
 	docPath string,
 ) (string, error) {
-	want := thoughtsPlanKey(docPath)
+	want := s.thoughtsSharedThreadKey(docPath)
 	if want == "" {
 		return "", nil
 	}
@@ -116,7 +172,7 @@ func (s *Service) FindSharedThreadForDoc(
 		return "", err
 	}
 	for _, group := range groups {
-		plan := thoughtsPlanKey(group.PlanDir)
+		plan := s.thoughtsSharedThreadKey(group.PlanDir)
 		if plan == "" || plan != want {
 			continue
 		}
