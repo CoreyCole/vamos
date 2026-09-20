@@ -104,6 +104,18 @@ func (id RoomIdentity) CurrentJSONLRel() (string, error) {
 	return sessions + "/" + currentJSONLName, nil
 }
 
+func (id RoomIdentity) PiSessionJSONLRel(piSessionID string) (string, error) {
+	sessions, err := id.SessionsRel()
+	if err != nil {
+		return "", err
+	}
+	piSessionID = strings.TrimSpace(piSessionID)
+	if piSessionID == "" {
+		return "", fmt.Errorf("pi session id is required")
+	}
+	return sessions + "/pi/" + piSessionID + ".jsonl", nil
+}
+
 func (id RoomIdentity) HandoffsRel() (string, error) {
 	sessions, err := id.SessionsRel()
 	if err != nil {
@@ -141,6 +153,22 @@ func EnsureRoomCurrentJSONL(
 	if err != nil {
 		return "", err
 	}
+	return ensureThoughtsJSONL(thoughtsRoot, rel)
+}
+
+func EnsureRoomPiSessionJSONL(
+	thoughtsRoot string,
+	id RoomIdentity,
+	piSessionID string,
+) (absPath string, err error) {
+	rel, err := id.PiSessionJSONLRel(piSessionID)
+	if err != nil {
+		return "", err
+	}
+	return ensureThoughtsJSONL(thoughtsRoot, rel)
+}
+
+func ensureThoughtsJSONL(thoughtsRoot, rel string) (absPath string, err error) {
 	absPath, err = AbsFromThoughtsRel(thoughtsRoot, rel)
 	if err != nil {
 		return "", err

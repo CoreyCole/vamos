@@ -2,11 +2,15 @@ package markdown
 
 import (
 	"bufio"
+	"context"
+	"database/sql"
 	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/CoreyCole/vamos/pkg/db"
 )
 
 type botHomePreview struct {
@@ -14,8 +18,43 @@ type botHomePreview struct {
 	Time time.Time
 }
 
-func lastBotHomePreview(thoughtsRoot, slug string) botHomePreview {
+func lastBotHomePreview(
+	ctx context.Context,
+	q db.Querier,
+	thoughtsRoot, slug string,
+) botHomePreview {
 	path := filepath.Join(thoughtsRoot, "agents", slug, "sessions", "current.jsonl")
+	if q != nil {
+		rows, err := q.ListAgentThreadsByAgentSlug(ctx, sql.NullString{
+			String: strings.TrimSpace(slug),
+			Valid:  strings.TrimSpace(slug) != "",
+		})
+		if err == nil && len(rows) > 0 {
+			row := rows[0]
+			if piID := strings.TrimSpace(row.PiSessionID); piID != "" {
+				path = filepath.Join(
+					thoughtsRoot,
+					"agents",
+					slug,
+					"sessions",
+					"pi",
+					piID+".jsonl",
+				)
+			} else {
+				path = filepath.Join(
+					thoughtsRoot,
+					"agents",
+					slug,
+					"sessions",
+					"current.jsonl",
+				)
+			}
+		}
+	}
+	return lastJSONLPreview(path)
+}
+
+func lastJSONLPreview(path string) botHomePreview {
 	info, err := os.Stat(path)
 	if err != nil {
 		return botHomePreview{}

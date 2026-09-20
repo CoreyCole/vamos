@@ -193,7 +193,7 @@ func (s *Service) createSpawnChildThreadRecord(
 		HeadEntryID:    sql.NullString{},
 		ParentThreadID: sql.NullString{String: parent.ID, Valid: true},
 	}
-	return q.CreateAgentThread(ctx, s.attachPlanDirRel(ctx, params))
+	return s.createAgentThread(ctx, q, params)
 }
 
 // inheritParentRoomKind copies shared room_kind so /threads/{child} opens via

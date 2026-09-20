@@ -293,7 +293,7 @@ func (s *Service) liveRoster(
 		return view
 	}
 	for _, agent := range agents {
-		preview := lastBotHomePreview(s.basePath, agent.Slug)
+		preview := lastBotHomePreview(ctx, s.queries, s.basePath, agent.Slug)
 		view.Bots = append(view.Bots, agenthome.RosterBotRow{
 			Slug:    agent.Slug,
 			Title:   agenthome.RosterBotTitle(agent.Name, agent.Slug),

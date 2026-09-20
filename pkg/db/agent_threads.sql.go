@@ -112,7 +112,8 @@ INSERT INTO agent_threads (
     plan_dir_rel,
     head_entry_id,
     parent_thread_id,
-    forked_from_entry_id
+    forked_from_entry_id,
+    pi_session_id
 )
 VALUES (
     ?1,
@@ -124,7 +125,8 @@ VALUES (
     ?7,
     ?8,
     ?9,
-    ?10
+    ?10,
+    ?11
 )
 RETURNING
 id,
@@ -137,6 +139,7 @@ plan_dir_rel,
 head_entry_id,
 parent_thread_id,
 forked_from_entry_id,
+pi_session_id,
 agent_slug,
 room_kind,
 pair_agent_slug_a,
@@ -157,6 +160,7 @@ type CreateAgentThreadParams struct {
 	HeadEntryID       sql.NullString `json:"head_entry_id"`
 	ParentThreadID    sql.NullString `json:"parent_thread_id"`
 	ForkedFromEntryID sql.NullString `json:"forked_from_entry_id"`
+	PiSessionID       string         `json:"pi_session_id"`
 }
 
 func (q *Queries) CreateAgentThread(ctx context.Context, arg CreateAgentThreadParams) (AgentThread, error) {
@@ -171,6 +175,7 @@ func (q *Queries) CreateAgentThread(ctx context.Context, arg CreateAgentThreadPa
 		arg.HeadEntryID,
 		arg.ParentThreadID,
 		arg.ForkedFromEntryID,
+		arg.PiSessionID,
 	)
 	var i AgentThread
 	err := row.Scan(
@@ -184,6 +189,7 @@ func (q *Queries) CreateAgentThread(ctx context.Context, arg CreateAgentThreadPa
 		&i.HeadEntryID,
 		&i.ParentThreadID,
 		&i.ForkedFromEntryID,
+		&i.PiSessionID,
 		&i.AgentSlug,
 		&i.RoomKind,
 		&i.PairAgentSlugA,
@@ -209,6 +215,7 @@ plan_dir_rel,
 head_entry_id,
 parent_thread_id,
 forked_from_entry_id,
+pi_session_id,
 agent_slug,
 room_kind,
 pair_agent_slug_a,
@@ -235,6 +242,7 @@ func (q *Queries) GetAgentThread(ctx context.Context, id string) (AgentThread, e
 		&i.HeadEntryID,
 		&i.ParentThreadID,
 		&i.ForkedFromEntryID,
+		&i.PiSessionID,
 		&i.AgentSlug,
 		&i.RoomKind,
 		&i.PairAgentSlugA,
@@ -260,6 +268,7 @@ plan_dir_rel,
 head_entry_id,
 parent_thread_id,
 forked_from_entry_id,
+pi_session_id,
 agent_slug,
 room_kind,
 pair_agent_slug_a,
@@ -295,6 +304,7 @@ func (q *Queries) GetAgentThreadForUser(ctx context.Context, arg GetAgentThreadF
 		&i.HeadEntryID,
 		&i.ParentThreadID,
 		&i.ForkedFromEntryID,
+		&i.PiSessionID,
 		&i.AgentSlug,
 		&i.RoomKind,
 		&i.PairAgentSlugA,
@@ -320,6 +330,7 @@ t.plan_dir_rel,
 t.head_entry_id,
 t.parent_thread_id,
 t.forked_from_entry_id,
+t.pi_session_id,
 t.agent_slug,
 t.room_kind,
 t.pair_agent_slug_a,
@@ -363,6 +374,7 @@ func (q *Queries) GetAgentThreadForWorkspaceUser(ctx context.Context, arg GetAge
 		&i.HeadEntryID,
 		&i.ParentThreadID,
 		&i.ForkedFromEntryID,
+		&i.PiSessionID,
 		&i.AgentSlug,
 		&i.RoomKind,
 		&i.PairAgentSlugA,
@@ -388,6 +400,7 @@ plan_dir_rel,
 head_entry_id,
 parent_thread_id,
 forked_from_entry_id,
+pi_session_id,
 agent_slug,
 room_kind,
 pair_agent_slug_a,
@@ -416,6 +429,7 @@ func (q *Queries) GetBotHomeThreadBySlug(ctx context.Context, agentSlug sql.Null
 		&i.HeadEntryID,
 		&i.ParentThreadID,
 		&i.ForkedFromEntryID,
+		&i.PiSessionID,
 		&i.AgentSlug,
 		&i.RoomKind,
 		&i.PairAgentSlugA,
@@ -441,6 +455,7 @@ plan_dir_rel,
 head_entry_id,
 parent_thread_id,
 forked_from_entry_id,
+pi_session_id,
 agent_slug,
 room_kind,
 pair_agent_slug_a,
@@ -470,6 +485,7 @@ func (q *Queries) GetMostRecentAgentThreadByPlanDirRel(ctx context.Context, plan
 		&i.HeadEntryID,
 		&i.ParentThreadID,
 		&i.ForkedFromEntryID,
+		&i.PiSessionID,
 		&i.AgentSlug,
 		&i.RoomKind,
 		&i.PairAgentSlugA,
@@ -495,6 +511,7 @@ plan_dir_rel,
 head_entry_id,
 parent_thread_id,
 forked_from_entry_id,
+pi_session_id,
 agent_slug,
 room_kind,
 pair_agent_slug_a,
@@ -529,6 +546,7 @@ func (q *Queries) GetPairwiseThread(ctx context.Context, arg GetPairwiseThreadPa
 		&i.HeadEntryID,
 		&i.ParentThreadID,
 		&i.ForkedFromEntryID,
+		&i.PiSessionID,
 		&i.AgentSlug,
 		&i.RoomKind,
 		&i.PairAgentSlugA,
@@ -554,6 +572,7 @@ plan_dir_rel,
 head_entry_id,
 parent_thread_id,
 forked_from_entry_id,
+pi_session_id,
 agent_slug,
 room_kind,
 pair_agent_slug_a,
@@ -580,6 +599,7 @@ func (q *Queries) GetSharedAgentThread(ctx context.Context, id string) (AgentThr
 		&i.HeadEntryID,
 		&i.ParentThreadID,
 		&i.ForkedFromEntryID,
+		&i.PiSessionID,
 		&i.AgentSlug,
 		&i.RoomKind,
 		&i.PairAgentSlugA,
@@ -605,6 +625,7 @@ plan_dir_rel,
 head_entry_id,
 parent_thread_id,
 forked_from_entry_id,
+pi_session_id,
 agent_slug,
 room_kind,
 pair_agent_slug_a,
@@ -647,6 +668,7 @@ func (q *Queries) ListAgentThreads(ctx context.Context, arg ListAgentThreadsPara
 			&i.HeadEntryID,
 			&i.ParentThreadID,
 			&i.ForkedFromEntryID,
+			&i.PiSessionID,
 			&i.AgentSlug,
 			&i.RoomKind,
 			&i.PairAgentSlugA,
@@ -682,6 +704,7 @@ plan_dir_rel,
 head_entry_id,
 parent_thread_id,
 forked_from_entry_id,
+pi_session_id,
 agent_slug,
 room_kind,
 pair_agent_slug_a,
@@ -718,6 +741,7 @@ func (q *Queries) ListAgentThreadsByAgentSlug(ctx context.Context, agentSlug sql
 			&i.HeadEntryID,
 			&i.ParentThreadID,
 			&i.ForkedFromEntryID,
+			&i.PiSessionID,
 			&i.AgentSlug,
 			&i.RoomKind,
 			&i.PairAgentSlugA,
@@ -753,6 +777,7 @@ plan_dir_rel,
 head_entry_id,
 parent_thread_id,
 forked_from_entry_id,
+pi_session_id,
 agent_slug,
 room_kind,
 pair_agent_slug_a,
@@ -786,6 +811,7 @@ func (q *Queries) ListAgentThreadsByParentThreadID(ctx context.Context, parentTh
 			&i.HeadEntryID,
 			&i.ParentThreadID,
 			&i.ForkedFromEntryID,
+			&i.PiSessionID,
 			&i.AgentSlug,
 			&i.RoomKind,
 			&i.PairAgentSlugA,
@@ -822,6 +848,7 @@ plan_dir_rel,
 head_entry_id,
 parent_thread_id,
 forked_from_entry_id,
+pi_session_id,
 agent_slug,
 room_kind,
 pair_agent_slug_a,
@@ -856,6 +883,7 @@ func (q *Queries) ListAgentThreadsByPlanDirRel(ctx context.Context, planDirRel s
 			&i.HeadEntryID,
 			&i.ParentThreadID,
 			&i.ForkedFromEntryID,
+			&i.PiSessionID,
 			&i.AgentSlug,
 			&i.RoomKind,
 			&i.PairAgentSlugA,
@@ -891,6 +919,7 @@ t.plan_dir_rel,
 t.head_entry_id,
 t.parent_thread_id,
 t.forked_from_entry_id,
+t.pi_session_id,
 t.agent_slug,
 t.room_kind,
 t.pair_agent_slug_a,
@@ -926,6 +955,7 @@ func (q *Queries) ListAgentThreadsByWorkspace(ctx context.Context, workspaceID s
 			&i.HeadEntryID,
 			&i.ParentThreadID,
 			&i.ForkedFromEntryID,
+			&i.PiSessionID,
 			&i.AgentSlug,
 			&i.RoomKind,
 			&i.PairAgentSlugA,
@@ -1013,6 +1043,7 @@ t.plan_dir_rel,
 t.head_entry_id,
 t.parent_thread_id,
 t.forked_from_entry_id,
+t.pi_session_id,
 t.agent_slug,
 t.room_kind,
 t.pair_agent_slug_a,
@@ -1047,6 +1078,7 @@ type ListAgentThreadsForUserWithWorkspaceRow struct {
 	HeadEntryID          sql.NullString `json:"head_entry_id"`
 	ParentThreadID       sql.NullString `json:"parent_thread_id"`
 	ForkedFromEntryID    sql.NullString `json:"forked_from_entry_id"`
+	PiSessionID          string         `json:"pi_session_id"`
 	AgentSlug            sql.NullString `json:"agent_slug"`
 	RoomKind             string         `json:"room_kind"`
 	PairAgentSlugA       sql.NullString `json:"pair_agent_slug_a"`
@@ -1078,6 +1110,7 @@ func (q *Queries) ListAgentThreadsForUserWithWorkspace(ctx context.Context, user
 			&i.HeadEntryID,
 			&i.ParentThreadID,
 			&i.ForkedFromEntryID,
+			&i.PiSessionID,
 			&i.AgentSlug,
 			&i.RoomKind,
 			&i.PairAgentSlugA,
@@ -1115,6 +1148,7 @@ t.plan_dir_rel,
 t.head_entry_id,
 t.parent_thread_id,
 t.forked_from_entry_id,
+t.pi_session_id,
 t.agent_slug,
 t.room_kind,
 t.pair_agent_slug_a,
@@ -1164,6 +1198,7 @@ func (q *Queries) ListSharedAgentThreadsByPlanDir(ctx context.Context, arg ListS
 			&i.HeadEntryID,
 			&i.ParentThreadID,
 			&i.ForkedFromEntryID,
+			&i.PiSessionID,
 			&i.AgentSlug,
 			&i.RoomKind,
 			&i.PairAgentSlugA,
@@ -1199,6 +1234,7 @@ t.plan_dir_rel,
 t.head_entry_id,
 t.parent_thread_id,
 t.forked_from_entry_id,
+t.pi_session_id,
 t.agent_slug,
 t.room_kind,
 t.pair_agent_slug_a,
@@ -1228,6 +1264,7 @@ type ListSharedAgentThreadsWithWorkspaceRow struct {
 	HeadEntryID          sql.NullString `json:"head_entry_id"`
 	ParentThreadID       sql.NullString `json:"parent_thread_id"`
 	ForkedFromEntryID    sql.NullString `json:"forked_from_entry_id"`
+	PiSessionID          string         `json:"pi_session_id"`
 	AgentSlug            sql.NullString `json:"agent_slug"`
 	RoomKind             string         `json:"room_kind"`
 	PairAgentSlugA       sql.NullString `json:"pair_agent_slug_a"`
@@ -1259,6 +1296,7 @@ func (q *Queries) ListSharedAgentThreadsWithWorkspace(ctx context.Context) ([]Li
 			&i.HeadEntryID,
 			&i.ParentThreadID,
 			&i.ForkedFromEntryID,
+			&i.PiSessionID,
 			&i.AgentSlug,
 			&i.RoomKind,
 			&i.PairAgentSlugA,
@@ -1280,6 +1318,26 @@ func (q *Queries) ListSharedAgentThreadsWithWorkspace(ctx context.Context) ([]Li
 		return nil, err
 	}
 	return items, nil
+}
+
+const setAgentThreadPiSessionID = `-- name: SetAgentThreadPiSessionID :exec
+;
+
+UPDATE agent_threads
+SET pi_session_id = ?1,
+updated_at = CURRENT_TIMESTAMP
+WHERE id = ?2
+AND pi_session_id = ''
+`
+
+type SetAgentThreadPiSessionIDParams struct {
+	PiSessionID string `json:"pi_session_id"`
+	ID          string `json:"id"`
+}
+
+func (q *Queries) SetAgentThreadPiSessionID(ctx context.Context, arg SetAgentThreadPiSessionIDParams) error {
+	_, err := q.db.ExecContext(ctx, setAgentThreadPiSessionID, arg.PiSessionID, arg.ID)
+	return err
 }
 
 const setAgentThreadPlanDirRel = `-- name: SetAgentThreadPlanDirRel :exec

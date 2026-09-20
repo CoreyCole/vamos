@@ -631,7 +631,8 @@ func (s *Service) ImportPiSession(
 		}
 	}
 	importPlanDir := scan.Inference.PlanDir
-	if identity.PlanOwned && session.PlanDir.Valid && strings.TrimSpace(session.PlanDir.String) != "" {
+	if identity.PlanOwned && session.PlanDir.Valid &&
+		strings.TrimSpace(session.PlanDir.String) != "" {
 		importPlanDir = strings.TrimSpace(session.PlanDir.String)
 	}
 	if !workspaceOK {
@@ -681,7 +682,13 @@ func (s *Service) ImportPiSession(
 	); err != nil {
 		return SessionImportResult{}, err
 	}
-	if err := q.AttachThreadToWorkspace(ctx, db.AttachThreadToWorkspaceParams{ID: thread.ID, WorkspaceID: nullString(workspace.ID)}); err != nil {
+	if err := q.AttachThreadToWorkspace(
+		ctx,
+		db.AttachThreadToWorkspaceParams{
+			ID:          thread.ID,
+			WorkspaceID: nullString(workspace.ID),
+		},
+	); err != nil {
 		return SessionImportResult{}, err
 	}
 	if err := tx.Commit(); err != nil {
@@ -772,7 +779,13 @@ func (s *Service) ImportPiSession(
 	); err != nil {
 		return SessionImportResult{}, err
 	}
-	if err := q.AttachThreadToWorkspace(ctx, db.AttachThreadToWorkspaceParams{ID: thread.ID, WorkspaceID: nullString(workspace.ID)}); err != nil {
+	if err := q.AttachThreadToWorkspace(
+		ctx,
+		db.AttachThreadToWorkspaceParams{
+			ID:          thread.ID,
+			WorkspaceID: nullString(workspace.ID),
+		},
+	); err != nil {
 		return SessionImportResult{}, err
 	}
 	_ = q.UpdateWorkspaceSelectedThread(
@@ -874,7 +887,8 @@ func (s *Service) resolveImportThreadFromScan(
 	workspace db.Workspace,
 	scan PiSessionScanSummary,
 ) (db.AgentThread, bool, error) {
-	if session.ProjectedThreadID.Valid && strings.TrimSpace(session.ProjectedThreadID.String) != "" {
+	if session.ProjectedThreadID.Valid &&
+		strings.TrimSpace(session.ProjectedThreadID.String) != "" {
 		thread, err := q.GetAgentThread(ctx, session.ProjectedThreadID.String)
 		if err != nil {
 			return db.AgentThread{}, false, err
@@ -915,7 +929,8 @@ func (s *Service) validatePiSessionPath(path string) (string, error) {
 	}
 	allowed := pathWithinRoot(resolved, root)
 	thoughtsRoot, thoughtsErr := resolveWorkspacePath(s.thoughtsRoot)
-	if !allowed && thoughtsErr == nil && pathWithinRoot(resolved, thoughtsRoot) && pathInPlanSessionDir(thoughtsRoot, resolved) {
+	if !allowed && thoughtsErr == nil && pathWithinRoot(resolved, thoughtsRoot) &&
+		pathInPlanSessionDir(thoughtsRoot, resolved) {
 		allowed = true
 	}
 	if !allowed {
@@ -1189,7 +1204,7 @@ func (s *Service) createImportedThreadFromScan(
 	} else if scan.Header.ID != "" {
 		title = "Terminal session " + scan.Header.ID
 	}
-	thread, err := q.CreateAgentThread(ctx, s.attachPlanDirRel(ctx, db.CreateAgentThreadParams{
+	thread, err := s.createAgentThread(ctx, q, db.CreateAgentThreadParams{
 		ID:                uuid.NewString(),
 		UserEmail:         workspace.UserEmail,
 		Title:             title,
@@ -1198,7 +1213,7 @@ func (s *Service) createImportedThreadFromScan(
 		HeadEntryID:       sql.NullString{},
 		ParentThreadID:    nullString(parentThreadID),
 		ForkedFromEntryID: sql.NullString{},
-	}))
+	})
 	return thread, diverged, err
 }
 

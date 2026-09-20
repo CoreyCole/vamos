@@ -55,6 +55,29 @@ func TestRoomPathsBotHomePlanPairwise(t *testing.T) {
 	if got != "thoughts/a2a/a__b/sessions/current.jsonl" {
 		t.Fatalf("pairwise current = %q", got)
 	}
+
+	piID := "sess-1"
+	got, err = home.PiSessionJSONLRel(piID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != "thoughts/agents/hermes/sessions/pi/sess-1.jsonl" {
+		t.Fatalf("home pi = %q", got)
+	}
+	got, err = plan.PiSessionJSONLRel(piID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != "thoughts/acme/plans/demo/.vamos/sessions/pi/sess-1.jsonl" {
+		t.Fatalf("plan pi = %q", got)
+	}
+	got, err = pair.PiSessionJSONLRel(piID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != "thoughts/a2a/a__b/sessions/pi/sess-1.jsonl" {
+		t.Fatalf("pairwise pi rel = %q", got)
+	}
 }
 
 func TestRoomIdentityFromThreadClassifiesHomes(t *testing.T) {

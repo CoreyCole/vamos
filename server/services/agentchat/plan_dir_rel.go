@@ -202,7 +202,7 @@ func (s *Service) EnsureSharedThreadForDoc(
 		ProjectID:  "",
 		PlanDirRel: sql.NullString{},
 	})
-	thread, err := s.queries.CreateAgentThread(ctx, params)
+	thread, err := s.createAgentThread(ctx, s.queries, params)
 	if err != nil {
 		return "", err
 	}
@@ -260,9 +260,10 @@ func (s *Service) EnsureFreeformLandThread(
 		}
 		return thread.ID, nil
 	}
-	created, err := s.queries.CreateAgentThread(
+	created, err := s.createAgentThread(
 		ctx,
-		s.attachPlanDirRel(ctx, db.CreateAgentThreadParams{
+		s.queries,
+		db.CreateAgentThreadParams{
 			ID:         uuid.NewString(),
 			UserEmail:  userEmail,
 			Title:      freeformLandThreadTitle,
@@ -270,7 +271,7 @@ func (s *Service) EnsureFreeformLandThread(
 			LineageID:  uuid.NewString(),
 			ProjectID:  "",
 			PlanDirRel: sql.NullString{},
-		}),
+		},
 	)
 	if err != nil {
 		return "", err
@@ -417,6 +418,9 @@ func (s *Service) attachPlanDirRel(
 	ctx context.Context,
 	params db.CreateAgentThreadParams,
 ) db.CreateAgentThreadParams {
+	if strings.TrimSpace(params.PiSessionID) == "" {
+		params.PiSessionID = uuid.NewString()
+	}
 	if params.PlanDirRel.Valid {
 		return params
 	}

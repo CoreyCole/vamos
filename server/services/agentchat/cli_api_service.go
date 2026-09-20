@@ -80,7 +80,11 @@ func (s *Service) SteerCLIChatThread(
 		return ChatRunRef{}, ChatSteerDisposition{}, fmt.Errorf("prompt is required")
 	}
 
-	workspace, ok, err := s.ResolvePrimaryWorkspaceForThread(ctx, actor.ActorEmail, threadID)
+	workspace, ok, err := s.ResolvePrimaryWorkspaceForThread(
+		ctx,
+		actor.ActorEmail,
+		threadID,
+	)
 	if err != nil {
 		return ChatRunRef{}, ChatSteerDisposition{}, err
 	}
@@ -89,10 +93,13 @@ func (s *Service) SteerCLIChatThread(
 	}
 
 	disposition := s.chatSteerDisposition(ctx, workspace, threadID, publicBaseURL)
-	latestRun, err := s.queries.GetLatestAgentRunByWorkspaceThread(ctx, db.GetLatestAgentRunByWorkspaceThreadParams{
-		WorkspaceID: nullString(workspace.ID),
-		ThreadID:    threadID,
-	})
+	latestRun, err := s.queries.GetLatestAgentRunByWorkspaceThread(
+		ctx,
+		db.GetLatestAgentRunByWorkspaceThreadParams{
+			WorkspaceID: nullString(workspace.ID),
+			ThreadID:    threadID,
+		},
+	)
 	if err == nil && isActiveRunStatus(latestRun.Status) {
 		ref := ChatRunRef{
 			WorkspaceID: workspace.ID,
@@ -108,7 +115,13 @@ func (s *Service) SteerCLIChatThread(
 		return ref, disposition, ErrThreadRunInProgress
 	}
 
-	thread, run, _, err := s.ResumeWorkspaceThread(ctx, workspace.ID, actor.ActorEmail, threadID, prompt)
+	thread, run, _, err := s.ResumeWorkspaceThread(
+		ctx,
+		workspace.ID,
+		actor.ActorEmail,
+		threadID,
+		prompt,
+	)
 	if err != nil {
 		if errors.Is(err, ErrThreadRunInProgress) {
 			disposition.Reason = "run_in_progress"
@@ -134,7 +147,11 @@ func (s *Service) SteerCLIChatThread(
 	return ref, disposition, nil
 }
 
-func (s *Service) chatSteerDisposition(ctx context.Context, workspace db.Workspace, threadID, publicBaseURL string) ChatSteerDisposition {
+func (s *Service) chatSteerDisposition(
+	ctx context.Context,
+	workspace db.Workspace,
+	threadID, publicBaseURL string,
+) ChatSteerDisposition {
 	latestThreadID := strings.TrimSpace(workspace.SelectedThreadID.String)
 	if latestThreadID == "" {
 		latestThreadID = threadID
@@ -142,10 +159,13 @@ func (s *Service) chatSteerDisposition(ctx context.Context, workspace db.Workspa
 	latestURL := ""
 	if latestThreadID != "" {
 		latestRunID := ""
-		if run, err := s.queries.GetLatestAgentRunByWorkspaceThread(ctx, db.GetLatestAgentRunByWorkspaceThreadParams{
-			WorkspaceID: nullString(workspace.ID),
-			ThreadID:    latestThreadID,
-		}); err == nil {
+		if run, err := s.queries.GetLatestAgentRunByWorkspaceThread(
+			ctx,
+			db.GetLatestAgentRunByWorkspaceThreadParams{
+				WorkspaceID: nullString(workspace.ID),
+				ThreadID:    latestThreadID,
+			},
+		); err == nil {
 			latestRunID = run.ID
 		}
 		latestURL = absoluteChatURL(publicBaseURL, latestThreadID, latestRunID)
@@ -186,7 +206,9 @@ func (s *Service) createCLIProjectWorkspace(
 	})
 }
 
-func (s *Service) createCLIProjectWorkspaceRoot(actorEmail, projectID string) (string, error) {
+func (s *Service) createCLIProjectWorkspaceRoot(
+	actorEmail, projectID string,
+) (string, error) {
 	root := strings.TrimSpace(s.thoughtsRoot)
 	if root == "" {
 		root = filepath.Join(s.resolveCwd(""), "thoughts")
@@ -214,7 +236,11 @@ func ensureWorkspaceRoot(dir, projectID string) error {
 		return err
 	}
 	defer func() { _ = file.Close() }()
-	_, err = fmt.Fprintf(file, "# CLI Agent Chat Workspace\n\nProject: `%s`\n", strings.TrimSpace(projectID))
+	_, err = fmt.Fprintf(
+		file,
+		"# CLI Agent Chat Workspace\n\nProject: `%s`\n",
+		strings.TrimSpace(projectID),
+	)
 	return err
 }
 
@@ -247,7 +273,7 @@ func (s *Service) startWorkspaceThreadWithCWD(
 	defer func() { _ = tx.Rollback() }()
 	q := s.queries.WithTx(tx)
 
-	thread, err := q.CreateAgentThread(ctx, s.attachPlanDirRel(ctx, db.CreateAgentThreadParams{
+	thread, err := s.createAgentThread(ctx, q, db.CreateAgentThreadParams{
 		ID:                uuid.NewString(),
 		UserEmail:         userEmail,
 		Title:             truncateTitle(prompt),
@@ -256,7 +282,7 @@ func (s *Service) startWorkspaceThreadWithCWD(
 		HeadEntryID:       sql.NullString{},
 		ParentThreadID:    sql.NullString{},
 		ForkedFromEntryID: sql.NullString{},
-	}))
+	})
 	if err != nil {
 		return nil, nil, nil, err
 	}
@@ -295,10 +321,24 @@ func (s *Service) startWorkspaceThreadWithCWD(
 	if err != nil {
 		return nil, nil, nil, err
 	}
-	if err := appendPromptAndRunStartedSessionEventsTx(ctx, q, chatSession, userEmail, thread, run, prompt); err != nil {
+	if err := appendPromptAndRunStartedSessionEventsTx(
+		ctx,
+		q,
+		chatSession,
+		userEmail,
+		thread,
+		run,
+		prompt,
+	); err != nil {
 		return nil, nil, nil, err
 	}
-	if err := s.appendRunAttachments(ctx, q, run.ID, thread.ID, flattenAttachedPaths(attachments)); err != nil {
+	if err := s.appendRunAttachments(
+		ctx,
+		q,
+		run.ID,
+		thread.ID,
+		flattenAttachedPaths(attachments),
+	); err != nil {
 		return nil, nil, nil, err
 	}
 	if err := q.UpdateWorkspaceSelectedThread(ctx, db.UpdateWorkspaceSelectedThreadParams{

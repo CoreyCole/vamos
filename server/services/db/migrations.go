@@ -1229,6 +1229,15 @@ func ensureAgentThreadProjectColumnsIfTableExists(
 	); err != nil {
 		return err
 	}
+	if err := ensureColumn(
+		ctx,
+		database,
+		"agent_threads",
+		"pi_session_id",
+		"TEXT NOT NULL DEFAULT ''",
+	); err != nil {
+		return err
+	}
 	if err := ensureIndex(
 		ctx,
 		database,

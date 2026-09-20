@@ -203,6 +203,7 @@ type Querier interface {
 	ResolveDocumentComment(ctx context.Context, arg ResolveDocumentCommentParams) error
 	ResolveWorkspaceForDocPath(ctx context.Context, arg ResolveWorkspaceForDocPathParams) (ResolveWorkspaceForDocPathRow, error)
 	RevokeMachineCredential(ctx context.Context, arg RevokeMachineCredentialParams) (int64, error)
+	SetAgentThreadPiSessionID(ctx context.Context, arg SetAgentThreadPiSessionIDParams) error
 	// Backfill helper: do not bump updated_at (preserve most-recent ordering).
 	SetAgentThreadPlanDirRel(ctx context.Context, arg SetAgentThreadPlanDirRelParams) error
 	SetAgentThreadRoomKind(ctx context.Context, arg SetAgentThreadRoomKindParams) error

@@ -855,9 +855,10 @@ func (s *Service) startWorkspaceThreadAccepted(
 	defer func() { _ = tx.Rollback() }()
 	q := s.queries.WithTx(tx)
 
-	thread, err := q.CreateAgentThread(
+	thread, err := s.createAgentThread(
 		ctx,
-		s.attachPlanDirRel(ctx, db.CreateAgentThreadParams{
+		q,
+		db.CreateAgentThreadParams{
 			ID:                uuid.NewString(),
 			UserEmail:         userEmail,
 			Title:             truncateTitle(prompt),
@@ -866,7 +867,7 @@ func (s *Service) startWorkspaceThreadAccepted(
 			HeadEntryID:       sql.NullString{},
 			ParentThreadID:    sql.NullString{},
 			ForkedFromEntryID: sql.NullString{},
-		}),
+		},
 	)
 	if err != nil {
 		return nil, nil, nil, err
@@ -1388,9 +1389,10 @@ func (s *Service) StartThread(
 	defer func() { _ = tx.Rollback() }()
 
 	q := s.queries.WithTx(tx)
-	thread, err := q.CreateAgentThread(
+	thread, err := s.createAgentThread(
 		ctx,
-		s.attachPlanDirRel(ctx, db.CreateAgentThreadParams{
+		q,
+		db.CreateAgentThreadParams{
 			ID:                threadID,
 			UserEmail:         userEmail,
 			Title:             title,
@@ -1399,7 +1401,7 @@ func (s *Service) StartThread(
 			HeadEntryID:       sql.NullString{},
 			ParentThreadID:    sql.NullString{},
 			ForkedFromEntryID: sql.NullString{},
-		}),
+		},
 	)
 	if err != nil {
 		return nil, nil, err
@@ -1763,7 +1765,7 @@ func (s *Service) createForkThreadRecord(
 		ParentThreadID:    sql.NullString{String: sourceThread.ID, Valid: true},
 		ForkedFromEntryID: sql.NullString{String: sourceEntry.EntryID, Valid: true},
 	}
-	thread, err := q.CreateAgentThread(ctx, s.attachPlanDirRel(ctx, forkParams))
+	thread, err := s.createAgentThread(ctx, q, forkParams)
 	if err != nil {
 		return db.AgentThread{}, sql.NullString{}, err
 	}
@@ -1961,7 +1963,7 @@ func (s *Service) prepareRoomSession(
 	speakerSlug = strings.TrimSpace(speakerSlug)
 	room, err := RoomIdentityFromThread(s.thoughtsRoot, thread, speakerSlug)
 	if err == nil && strings.TrimSpace(s.thoughtsRoot) != "" {
-		sessionFile, err := EnsureRoomCurrentJSONL(s.thoughtsRoot, room)
+		sessionFile, err := s.roomSessionFile(room, thread)
 		if err != nil {
 			return RoomIdentity{}, "", "", nil, err
 		}
@@ -2002,10 +2004,25 @@ func (s *Service) prepareRoomSession(
 		return RoomIdentity{}, "", "", nil, fmt.Errorf("thread cwd is required")
 	}
 	sessionFile := filepath.Join(cwd, ".vamos", "sessions", currentJSONLName)
+	if piID := strings.TrimSpace(thread.PiSessionID); piID != "" {
+		sessionFile = filepath.Join(cwd, ".vamos", "sessions", "pi", piID+".jsonl")
+	}
 	if err := os.MkdirAll(filepath.Dir(sessionFile), 0o755); err != nil {
 		return RoomIdentity{}, "", "", nil, err
 	}
 	return RoomIdentity{Kind: RoomKindPlan}, sessionFile, cwd, nil, nil
+}
+
+func (s *Service) roomSessionFile(
+	room RoomIdentity,
+	thread db.AgentThread,
+) (string, error) {
+	piID := strings.TrimSpace(thread.PiSessionID)
+	usePi := piID != "" && room.Kind != RoomKindPairwise
+	if usePi {
+		return EnsureRoomPiSessionJSONL(s.thoughtsRoot, room, piID)
+	}
+	return EnsureRoomCurrentJSONL(s.thoughtsRoot, room)
 }
 
 func (s *Service) liveAgentRoster(ctx context.Context) ([]AgentRosterRow, error) {

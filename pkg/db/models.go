@@ -112,6 +112,7 @@ type AgentThread struct {
 	HeadEntryID       sql.NullString `json:"head_entry_id"`
 	ParentThreadID    sql.NullString `json:"parent_thread_id"`
 	ForkedFromEntryID sql.NullString `json:"forked_from_entry_id"`
+	PiSessionID       string         `json:"pi_session_id"`
 	AgentSlug         sql.NullString `json:"agent_slug"`
 	RoomKind          string         `json:"room_kind"`
 	PairAgentSlugA    sql.NullString `json:"pair_agent_slug_a"`
