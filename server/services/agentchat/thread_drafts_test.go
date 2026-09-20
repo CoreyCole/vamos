@@ -22,7 +22,10 @@ import (
 
 func newThreadDraftService(t *testing.T) (*Service, *db.Queries) {
 	t.Helper()
-	database, err := serverdb.NewService(filepath.Join(t.TempDir(), "drafts.db"), filepath.Join(t.TempDir(), "agents.yml"))
+	database, err := serverdb.NewService(
+		filepath.Join(t.TempDir(), "drafts.db"),
+		filepath.Join(t.TempDir(), "agents.yml"),
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -279,7 +282,9 @@ func TestComposerDraftSignalAndSaveContract(t *testing.T) {
 		strings.Contains(html, "acknowledg") {
 		t.Fatalf("composer has client draft state: %s", html)
 	}
-	action := composerSubmitAction("@post('/send')")
+	action := composerSubmitAction(
+		normalizeComposerArgs(AgentChatComposerArgs{Action: "@post('/send')"}),
+	)
 	if !strings.Contains(action, "prompt.value = input.value") ||
 		strings.Contains(action, "input.value = ''") ||
 		strings.Contains(action, "dispatchEvent") ||

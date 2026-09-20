@@ -105,6 +105,46 @@ func TestMessageThreadHostDoesNotReplaceScrollRegion(t *testing.T) {
 	if strings.Contains(out, `id="agent-chat-message-thread-reply-form"`) {
 		t.Fatal("pairwise/view-only must omit reply composer")
 	}
+	if strings.Contains(out, `data-composer-shell`) {
+		t.Fatal("pairwise/view-only must omit shared composer shell")
+	}
+	if strings.Contains(out, `w-[360px]`) || strings.Contains(out, `border-l`) {
+		t.Fatal("desktop thread focus must not be a right split panel")
+	}
+}
+
+func TestMessageThreadReplyUsesSharedComposer(t *testing.T) {
+	t.Parallel()
+
+	view := MessageThreadView{
+		ThreadID: "t1",
+		Open:     true,
+		Parent: TranscriptMessage{
+			DOMID:   "parent-1",
+			EntryID: "parent-1",
+			Role:    "assistant",
+			Content: "parent body",
+		},
+	}
+	html := testhelpers.RenderToDocument(t, MessageThreadHost(view)).Doc
+	out, err := html.Html()
+	if err != nil {
+		t.Fatalf("Html() error = %v", err)
+	}
+	for _, want := range []string{
+		`id="agent-chat-message-thread-reply-form"`,
+		`data-composer-shell`,
+		`name="parent_entry_id"`,
+		`name="body"`,
+		`placeholder="Reply…"`,
+	} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("missing %q in:\n%s", want, out)
+		}
+	}
+	if strings.Contains(out, `id="agent-chat-composer-form"`) {
+		t.Fatal("thread reply must not steal the room composer form id")
+	}
 	if strings.Contains(out, `w-[360px]`) || strings.Contains(out, `border-l`) {
 		t.Fatal("desktop thread focus must not be a right split panel")
 	}

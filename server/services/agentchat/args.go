@@ -359,8 +359,26 @@ type SelectedChatAnnotation struct {
 	EventSeq int64
 }
 
+type ComposerHiddenField struct {
+	ID    string
+	Name  string
+	Value string
+}
+
+type ComposerTextareaField struct {
+	ID          string
+	Name        string
+	Label       string
+	Placeholder string
+}
+
 type AgentChatComposerArgs struct {
 	Action               string
+	FormID               string
+	InputID              string
+	PromptHiddenID       string
+	PromptName           string
+	DraftSignal          string
 	WorkspaceID          string
 	ThreadID             string
 	DocPath              string
@@ -370,6 +388,8 @@ type AgentChatComposerArgs struct {
 	Placeholder          string
 	HasThread            bool
 	IncludeCwd           bool
+	HideSlash            bool
+	HideNewThreadTargets bool
 	AttachedPaths        []AttachedPath
 	SlashEndpointBase    string
 	ShowCurrentDocToggle bool
@@ -378,6 +398,9 @@ type AgentChatComposerArgs struct {
 	ThreadMetadata       ThreadMetadataView
 	InitialDraft         string
 	DraftSaveAction      string
+	ExtraHidden          []ComposerHiddenField
+	ExtraTextareas       []ComposerTextareaField
+	ErrorID              string
 }
 
 type ChatMessageArgs struct {

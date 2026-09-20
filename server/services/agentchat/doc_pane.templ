@@ -264,25 +264,36 @@ templ WorkspaceDocComments(state DocPaneState) {
 					<summary class="cursor-pointer list-none px-3 py-2 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground [&::-webkit-details-marker]:hidden">
 						Comment on selected doc
 					</summary>
-					<form id="agent-chat-comment-form" class="space-y-2 border-t border-border p-3" data-on:submit={ "@post('/agent-chat/" + state.WorkspaceID + "/docs/comments', {contentType: 'form'})" }>
-						<input type="hidden" name="doc_rel_path" value={ state.Selected.RelativePath }/>
-						<input type="hidden" name="section_hint" value=""/>
-						<input type="hidden" name="heading_hint" value=""/>
-						<input type="hidden" name="start_line" value="0"/>
-						<input type="hidden" name="start_column" value="0"/>
-						<input type="hidden" name="end_line" value="0"/>
-						<input type="hidden" name="end_column" value="0"/>
-						<label class="block space-y-1 text-xs text-muted-foreground">
-							<span>Quoted text</span>
-							<textarea name="selected_text" class="min-h-16 w-full rounded-md border border-input bg-background px-2 py-1 text-xs text-foreground" placeholder="Paste the exact doc text being reviewed" data-ignore-morph></textarea>
-						</label>
-						<label class="block space-y-1 text-xs text-muted-foreground">
-							<span>Comment</span>
-							<textarea name="comment_text" class="min-h-20 w-full rounded-md border border-input bg-background px-2 py-1 text-xs text-foreground" placeholder="Add a review comment" data-ignore-morph></textarea>
-						</label>
-						<p id="agent-chat-comment-form-error" class="text-xs text-destructive" aria-live="polite"></p>
-						<button type="submit" class="inline-flex h-8 items-center rounded-md bg-primary px-3 text-xs font-medium text-primary-foreground transition-colors hover:bg-primary/90">Add comment</button>
-					</form>
+					<div class="border-t border-border p-3">
+						@AgentChatComposer(AgentChatComposerArgs{
+							Action:               "@post('/agent-chat/" + state.WorkspaceID + "/docs/comments', {contentType: 'form'})",
+							FormID:               "agent-chat-comment-form",
+							InputID:              "agent-chat-comment-input",
+							PromptName:           "comment_text",
+							DraftSignal:          "docCommentDraft",
+							WorkspaceID:          state.WorkspaceID,
+							Placeholder:          "Add a review comment",
+							HideSlash:            true,
+							HideNewThreadTargets: true,
+							ModeLabel:            "Doc comment",
+							ErrorID:              "agent-chat-comment-form-error",
+							ExtraHidden: []ComposerHiddenField{
+								{ID: "agent-chat-comment-doc-rel-path", Name: "doc_rel_path", Value: state.Selected.RelativePath},
+								{ID: "agent-chat-comment-section-hint", Name: "section_hint", Value: ""},
+								{ID: "agent-chat-comment-heading-hint", Name: "heading_hint", Value: ""},
+								{ID: "agent-chat-comment-start-line", Name: "start_line", Value: "0"},
+								{ID: "agent-chat-comment-start-column", Name: "start_column", Value: "0"},
+								{ID: "agent-chat-comment-end-line", Name: "end_line", Value: "0"},
+								{ID: "agent-chat-comment-end-column", Name: "end_column", Value: "0"},
+							},
+							ExtraTextareas: []ComposerTextareaField{{
+								ID:          "agent-chat-comment-selected-text",
+								Name:        "selected_text",
+								Label:       "Quoted text",
+								Placeholder: "Paste the exact doc text being reviewed",
+							}},
+						})
+					</div>
 				</details>
 				<div class="space-y-3">
 					if len(state.Comments) == 0 {
@@ -324,13 +335,23 @@ templ WorkspaceDocCommentCard(workspaceID string, view WorkspaceDocCommentView) 
 				}
 			</div>
 		}
-		<form class="space-y-2" data-on:submit={ "@post('/agent-chat/" + workspaceID + "/docs/comments/" + view.Comment.ID + "/replies', {contentType: 'form'})" }>
-			<input type="hidden" name="request_id" value={ uuid.NewString() }/>
-			<textarea name="reply_text" class="min-h-16 w-full rounded-md border border-input bg-background px-2 py-1 text-xs text-foreground" placeholder="Reply" data-ignore-morph></textarea>
-			<div class="flex flex-wrap gap-2">
-				<button type="submit" class="rounded-md bg-secondary px-2 py-1 text-xs font-medium text-secondary-foreground hover:bg-secondary/90">Reply</button>
-			</div>
-		</form>
+		@AgentChatComposer(AgentChatComposerArgs{
+			Action:               "@post('/agent-chat/" + workspaceID + "/docs/comments/" + view.Comment.ID + "/replies', {contentType: 'form'})",
+			FormID:               "agent-chat-comment-reply-form-" + view.Comment.ID,
+			InputID:              "agent-chat-comment-reply-input-" + view.Comment.ID,
+			PromptName:           "reply_text",
+			DraftSignal:          "docCommentReplyDraft",
+			WorkspaceID:          workspaceID,
+			Placeholder:          "Reply…",
+			HideSlash:            true,
+			HideNewThreadTargets: true,
+			ModeLabel:            "Doc comment reply",
+			ExtraHidden: []ComposerHiddenField{{
+				ID:    "agent-chat-comment-reply-request-" + view.Comment.ID,
+				Name:  "request_id",
+				Value: uuid.NewString(),
+			}},
+		})
 		if view.Comment.Resolved {
 			<form data-on:submit={ "@post('/agent-chat/" + workspaceID + "/docs/comments/" + view.Comment.ID + "/reopen', {contentType: 'form'})" }>
 				<input type="hidden" name="reply_text" value=""/>

@@ -456,38 +456,37 @@ func MessageThreadPanelBody(view MessageThreadView) templ.Component {
 			return templ_7745c5c3_Err
 		}
 		if !view.ComposerDisabled && view.Open {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 34, "<form id=\"agent-chat-message-thread-reply-form\" method=\"post\" class=\"shrink-0 border-t border-border px-3 py-2\" data-on:submit__prevent=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 34, "<div class=\"shrink-0 border-t border-border px-3 py-2\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			var templ_7745c5c3_Var21 string
-			templ_7745c5c3_Var21, templ_7745c5c3_Err = templ.ResolveAttributeValue(postMessageThreadReplyExpr(view.ThreadID, view.Parent.EntryID))
-			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/message_thread.templ`, Line: 115, Col: 92}
-			}
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var21)
+			templ_7745c5c3_Err = AgentChatComposer(AgentChatComposerArgs{
+				Action:               postMessageThreadReplyExpr(view.ThreadID, view.Parent.EntryID),
+				FormID:               "agent-chat-message-thread-reply-form",
+				InputID:              "agent-chat-message-thread-reply-input",
+				PromptName:           "body",
+				DraftSignal:          "threadReplyDraft",
+				ThreadID:             view.ThreadID,
+				Placeholder:          "Reply…",
+				HasThread:            true,
+				HideSlash:            true,
+				HideNewThreadTargets: true,
+				ModeLabel:            "Thread reply",
+				ExtraHidden: []ComposerHiddenField{{
+					ID:    "agent-chat-message-thread-parent",
+					Name:  "parent_entry_id",
+					Value: view.Parent.EntryID,
+				}},
+			}).Render(ctx, templ_7745c5c3_Buffer)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 35, "\"><input type=\"hidden\" name=\"parent_entry_id\" value=\"")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			var templ_7745c5c3_Var22 string
-			templ_7745c5c3_Var22, templ_7745c5c3_Err = templ.ResolveAttributeValue(view.Parent.EntryID)
-			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/message_thread.templ`, Line: 117, Col: 75}
-			}
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var22)
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 36, "\" id=\"agent-chat-message-thread-parent\"> <textarea name=\"body\" class=\"min-h-16 w-full rounded-md border border-input bg-background px-2 py-1 text-sm text-foreground\" placeholder=\"Reply…\"></textarea> <button type=\"submit\" class=\"mt-2 rounded-md bg-secondary px-2 py-1 text-xs font-medium text-secondary-foreground hover:bg-secondary/90\">Reply</button></form>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 35, "</div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 37, "</div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 36, "</div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

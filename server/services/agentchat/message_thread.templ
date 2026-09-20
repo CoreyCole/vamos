@@ -108,22 +108,26 @@ templ MessageThreadPanelBody(view MessageThreadView) {
 			</div>
 		</div>
 		if !view.ComposerDisabled && view.Open {
-			<form
-				id="agent-chat-message-thread-reply-form"
-				method="post"
-				class="shrink-0 border-t border-border px-3 py-2"
-				data-on:submit__prevent={ postMessageThreadReplyExpr(view.ThreadID, view.Parent.EntryID) }
-			>
-				<input type="hidden" name="parent_entry_id" value={ view.Parent.EntryID } id="agent-chat-message-thread-parent"/>
-				<textarea
-					name="body"
-					class="min-h-16 w-full rounded-md border border-input bg-background px-2 py-1 text-sm text-foreground"
-					placeholder="Reply…"
-				></textarea>
-				<button type="submit" class="mt-2 rounded-md bg-secondary px-2 py-1 text-xs font-medium text-secondary-foreground hover:bg-secondary/90">
-					Reply
-				</button>
-			</form>
+			<div class="shrink-0 border-t border-border px-3 py-2">
+				@AgentChatComposer(AgentChatComposerArgs{
+					Action:               postMessageThreadReplyExpr(view.ThreadID, view.Parent.EntryID),
+					FormID:               "agent-chat-message-thread-reply-form",
+					InputID:              "agent-chat-message-thread-reply-input",
+					PromptName:           "body",
+					DraftSignal:          "threadReplyDraft",
+					ThreadID:             view.ThreadID,
+					Placeholder:          "Reply…",
+					HasThread:            true,
+					HideSlash:            true,
+					HideNewThreadTargets: true,
+					ModeLabel:            "Thread reply",
+					ExtraHidden: []ComposerHiddenField{{
+						ID:    "agent-chat-message-thread-parent",
+						Name:  "parent_entry_id",
+						Value: view.Parent.EntryID,
+					}},
+				})
+			</div>
 		}
 	</div>
 }

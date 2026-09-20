@@ -19,8 +19,8 @@ templ FreeformChatComposer(args ChatPageArgs) {
 
 templ AgentChatComposer(args AgentChatComposerArgs) {
 	{{ args = normalizeComposerArgs(args) }}
-	<form id="agent-chat-composer-form" data-on:submit__prevent={ composerSubmitAction(args.Action) } data-signals={ composerSignals(args.InitialDraft) }>
-		<input id="agent-chat-composer-prompt-value" type="hidden" name="prompt"/>
+	<form id={ args.FormID } data-on:submit__prevent={ composerSubmitAction(args) } data-signals={ composerSignals(args.DraftSignal, args.InitialDraft) }>
+		<input id={ args.PromptHiddenID } type="hidden" name={ args.PromptName }/>
 		if args.IncludeCwd {
 			<input type="hidden" name="cwd" value={ args.Cwd }/>
 		}
@@ -33,8 +33,19 @@ templ AgentChatComposer(args AgentChatComposerArgs) {
 		if args.RunID != "" {
 			<input type="hidden" name="run_id" value={ args.RunID }/>
 		}
+		for _, hidden := range args.ExtraHidden {
+			<input type="hidden" id={ hidden.ID } name={ hidden.Name } value={ hidden.Value }/>
+		}
 		for _, annotation := range args.SelectedAnnotations {
 			<input type="hidden" name="annotation_ids[]" value={ annotation.ID }/>
+		}
+		for _, extra := range args.ExtraTextareas {
+			<label class="block space-y-1 pb-2 text-xs text-muted-foreground">
+				if extra.Label != "" {
+					<span>{ extra.Label }</span>
+				}
+				<textarea id={ extra.ID } name={ extra.Name } class="min-h-16 w-full rounded-md border border-input bg-background px-2 py-1 text-xs text-foreground" placeholder={ extra.Placeholder } data-ignore-morph></textarea>
+			</label>
 		}
 		<div id="agent-chat-composer-attachments" class="flex flex-wrap items-center gap-1 pb-2">
 			for _, annotation := range args.SelectedAnnotations {
@@ -55,12 +66,14 @@ templ AgentChatComposer(args AgentChatComposerArgs) {
 			}
 		</div>
 		<div class="relative">
-			<div id="agent-chat-slash-popover" class="absolute bottom-full left-0 z-30 mb-2 hidden max-h-64 w-full overflow-y-auto rounded-lg border border-border bg-popover p-2 shadow-lg" data-show="$slashOpen"></div>
+			if !args.HideSlash {
+				<div id="agent-chat-slash-popover" class="absolute bottom-full left-0 z-30 mb-2 hidden max-h-64 w-full overflow-y-auto rounded-lg border border-border bg-popover p-2 shadow-lg" data-show="$slashOpen"></div>
+			}
 			<div data-composer-shell data-multiline="0" class="group grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-1.5 rounded-full border border-white/10 bg-[#111111] px-1.5 py-1.5 data-[multiline=1]:grid-rows-[auto_auto] data-[multiline=1]:items-end data-[multiline=1]:rounded-3xl data-[multiline=1]:px-2 data-[multiline=1]:pb-1.5 data-[multiline=1]:pt-2">
 				<div class="col-start-1 row-start-1 group-data-[multiline=1]:row-start-2">
 					@ComposerMetadataButton(args)
 				</div>
-				<textarea id="agent-chat-composer-input" rows="1" class="col-start-2 row-start-1 min-h-8 min-w-0 w-full resize-none overflow-y-auto bg-transparent px-1 py-0 text-[13px] leading-8 text-foreground outline-none placeholder:text-muted-foreground group-data-[multiline=1]:col-span-full group-data-[multiline=1]:col-start-1 group-data-[multiline=1]:leading-6" placeholder={ args.Placeholder } data-bind="chatDraft" data-ignore-morph data-init={ composerAutosizeJS() } data-on:input__debounce.500ms={ args.DraftSaveAction } data-on:input={ composerInputHandler(args.WorkspaceID, args.ThreadID, args.SlashEndpointBase) } data-on:keydown="if (evt.key === 'Enter' && !evt.shiftKey) { evt.preventDefault(); el.form.requestSubmit() }"></textarea>
+				<textarea id={ args.InputID } rows="1" class="col-start-2 row-start-1 min-h-8 min-w-0 w-full resize-none overflow-y-auto bg-transparent px-1 py-0 text-[13px] leading-8 text-foreground outline-none placeholder:text-muted-foreground group-data-[multiline=1]:col-span-full group-data-[multiline=1]:col-start-1 group-data-[multiline=1]:leading-6" placeholder={ args.Placeholder } data-bind={ args.DraftSignal } data-ignore-morph data-init={ composerAutosizeJS() } data-on:input__debounce.500ms={ args.DraftSaveAction } data-on:input={ composerInputHandler(args) } data-on:keydown="if (evt.key === 'Enter' && !evt.shiftKey) { evt.preventDefault(); el.form.requestSubmit() }"></textarea>
 				<button type="button" class="col-start-3 row-start-1 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-white/[0.06] hover:text-foreground group-data-[multiline=1]:row-start-2" aria-label="Voice message" title="Voice message">
 					<svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
 						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3a3 3 0 00-3 3v6a3 3 0 006 0V6a3 3 0 00-3-3zM19 10v2a7 7 0 01-14 0v-2M12 19v3"></path>
@@ -69,12 +82,17 @@ templ AgentChatComposer(args AgentChatComposerArgs) {
 			</div>
 			<button type="submit" class="sr-only" aria-label="Send message">Send</button>
 		</div>
+		if args.ErrorID != "" {
+			<p id={ args.ErrorID } class="pt-2 text-xs text-destructive" aria-live="polite"></p>
+		}
 	</form>
-	@ThreadNewTargetForms(args.ThreadMetadata)
+	if !args.HideNewThreadTargets {
+		@ThreadNewTargetForms(args.ThreadMetadata)
+	}
 }
 
 templ ComposerMetadataButton(args AgentChatComposerArgs) {
-	{{ dropdownID := "agent-chat-composer-metadata" }}
+	{{ dropdownID := composerMetadataDropdownID(args.FormID) }}
 	@dropdown.DropdownMenu(dropdown.DropdownMenuArgs{ID: dropdownID, Class: "shrink-0"}) {
 		@dropdown.DropdownMenuTrigger(dropdown.DropdownMenuTriggerArgs{ID: dropdownID, Class: "inline-flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-white/[0.06] hover:text-foreground", Attributes: templ.Attributes{"aria-label": "Add", "title": "Add"}}) {
 			<svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
@@ -190,6 +208,25 @@ templ ThreadNewTargetForms(view ThreadMetadataView) {
 }
 
 func normalizeComposerArgs(args AgentChatComposerArgs) AgentChatComposerArgs {
+	if args.FormID == "" {
+		args.FormID = "agent-chat-composer-form"
+	}
+	if args.InputID == "" {
+		args.InputID = "agent-chat-composer-input"
+	}
+	if args.PromptName == "" {
+		args.PromptName = "prompt"
+	}
+	if args.PromptHiddenID == "" {
+		if args.FormID == "agent-chat-composer-form" {
+			args.PromptHiddenID = "agent-chat-composer-prompt-value"
+		} else {
+			args.PromptHiddenID = args.FormID + "-prompt-value"
+		}
+	}
+	if args.DraftSignal == "" {
+		args.DraftSignal = "chatDraft"
+	}
 	if args.ModeLabel == "" {
 		if args.WorkspaceID != "" {
 			args.ModeLabel = "Workspace chat"
@@ -200,22 +237,39 @@ func normalizeComposerArgs(args AgentChatComposerArgs) AgentChatComposerArgs {
 	return args
 }
 
-func composerSignals(initialDraft string) string {
-	return "{chatDraft: " + strconv.Quote(initialDraft) + ", slashOpen: false, slashPrefix: ''}"
+func composerMetadataDropdownID(formID string) string {
+	if formID == "" || formID == "agent-chat-composer-form" {
+		return "agent-chat-composer-metadata"
+	}
+	return formID + "-metadata"
+}
+
+func composerSignals(draftSignal, initialDraft string) string {
+	if draftSignal == "" {
+		draftSignal = "chatDraft"
+	}
+	return "{" + draftSignal + ": " + strconv.Quote(initialDraft) + ", slashOpen: false, slashPrefix: ''}"
 }
 
 func composerAutosizeJS() string {
 	return `el.style.height='2rem';const s=el.closest('[data-composer-shell]');if(s)s.dataset.multiline=(el.scrollHeight>40||el.value.indexOf('\n')>=0)?'1':'0';const size=()=>{el.style.height='2rem';el.style.height=Math.min(el.scrollHeight,144)+'px'};size();requestAnimationFrame(size)`
 }
 
-func composerInputHandler(workspaceID, threadID, endpointBase string) string {
-	return composerAutosizeJS() + ";" + slashCommandInputHandler(workspaceID, threadID, endpointBase)
+func composerInputHandler(args AgentChatComposerArgs) string {
+	if args.HideSlash {
+		return composerAutosizeJS()
+	}
+	return composerAutosizeJS() + ";" + slashCommandInputHandler(args.WorkspaceID, args.ThreadID, args.SlashEndpointBase)
 }
 
-func composerSubmitAction(action string) string {
+func composerSubmitAction(args AgentChatComposerArgs) string {
+	copy := "const input = document.getElementById(" + strconv.Quote(args.InputID) + "); const prompt = document.getElementById(" + strconv.Quote(args.PromptHiddenID) + "); if (input && prompt) { prompt.value = input.value; } "
+	if args.FormID != "" && args.FormID != "agent-chat-composer-form" {
+		return copy + args.Action
+	}
 	// When already pinned (dist~0), arm accept-path pin so fat-morph user+working
 	// does not leave the fold (UX: dist 0->73). Do not yank if scrolled up.
-	return "const input = document.getElementById('agent-chat-composer-input'); const prompt = document.getElementById('agent-chat-composer-prompt-value'); if (input && prompt) { prompt.value = input.value; } const __scr = document.getElementById('agent-chat-scroll-region'); if (__scr) { const __dist = __scr.scrollHeight - __scr.scrollTop - __scr.clientHeight; if (__dist <= 4) { window.__agentChatPinAfterAccept = true; } } " + action
+	return copy + "const __scr = document.getElementById('agent-chat-scroll-region'); if (__scr) { const __dist = __scr.scrollHeight - __scr.scrollTop - __scr.clientHeight; if (__dist <= 4) { window.__agentChatPinAfterAccept = true; } } " + args.Action
 }
 
 func threadNewTargetAction(threadID string, target ThreadNewTargetView) string {
