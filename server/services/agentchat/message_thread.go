@@ -296,6 +296,13 @@ func closeMessageThreadExpr(threadID string) string {
 	return "@get('/agent-chat/thread/" + url.PathEscape(threadID) + "/message-thread')"
 }
 
+func transcriptColumnSignals(hidden bool) string {
+	if hidden {
+		return "{messageThreadOpen: true}"
+	}
+	return "{messageThreadOpen: false}"
+}
+
 func postMessageThreadReplyExpr(threadID, parentEntryID string) string {
 	return "@post('/agent-chat/thread/" + url.PathEscape(threadID) +
 		"/replies', {contentType: 'form'})"

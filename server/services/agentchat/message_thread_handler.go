@@ -86,8 +86,10 @@ func patchMessageThreadOpenState(
 	sse *datastar.ServerSentEventGenerator,
 	view MessageThreadView,
 ) error {
-	if err := sse.PatchElementTempl(MessageThreadHost(view)); err != nil {
+	if err := sse.MarshalAndPatchSignals(map[string]any{
+		"messageThreadOpen": view.Open,
+	}); err != nil {
 		return err
 	}
-	return sse.PatchElementTempl(AgentChatTranscriptColumnPatch(view.Open))
+	return sse.PatchElementTempl(MessageThreadHost(view))
 }

@@ -257,18 +257,26 @@ func TestSharedThreadChatClosedUnhidesTranscriptColumn(t *testing.T) {
 		strings.Contains(hostOut, `← Back`) {
 		t.Fatalf("closed host must be empty contents; got %s", hostOut)
 	}
-	closedCol := testhelpers.RenderToDocument(
-		t,
-		AgentChatTranscriptColumnPatch(false),
-	).Doc
-	colOut, err := closedCol.Html()
-	if err != nil {
-		t.Fatalf("Html() error = %v", err)
+	if !strings.Contains(out, `data-class="{ hidden: $messageThreadOpen }"`) {
+		t.Fatal("transcript column must toggle hidden via signal, not ignore-morph")
 	}
-	if strings.Contains(colOut, `id="agent-chat-scroll-region"`) {
-		t.Fatal("visibility patch must not replace Pattern A Host")
+	if strings.Contains(out, `id="agent-chat-transcript-column-inner"`) &&
+		innerHasIgnoreMorph(out) {
+		t.Fatal("live transcript ancestor data-ignore-morph blocks send-accept morph")
 	}
-	assertTranscriptColumnHidden(t, colOut, false)
+}
+
+func innerHasIgnoreMorph(html string) bool {
+	marker := `id="agent-chat-transcript-column-inner"`
+	i := strings.Index(html, marker)
+	if i < 0 {
+		return false
+	}
+	window := html[i:]
+	if end := strings.Index(window, ">"); end > 0 {
+		window = window[:end+1]
+	}
+	return strings.Contains(window, "data-ignore-morph")
 }
 
 func assertTranscriptColumnHidden(t *testing.T, html string, wantHidden bool) {
@@ -282,7 +290,7 @@ func assertTranscriptColumnHidden(t *testing.T, html string, wantHidden bool) {
 	if end := strings.Index(window, ">"); end > 0 {
 		window = window[:end+1]
 	}
-	hasHidden := strings.Contains(window, "hidden")
+	hasHidden := strings.Contains(window, "flex-col hidden")
 	if hasHidden != wantHidden {
 		t.Fatalf(
 			"transcript column hidden=%v want %v; tag=%s",
