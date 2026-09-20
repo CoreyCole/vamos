@@ -98,6 +98,20 @@ func rosterInitial(title string) string {
 	return "?"
 }
 
+templ RosterSection(id string, label string, sectionClass string) {
+	<section id={ id } class={ sectionClass } aria-label={ label }>
+		<details class="group" open>
+			<summary class="flex cursor-pointer list-none items-center gap-1 px-1.5 pb-1 text-[10px] font-medium tracking-wide text-muted-foreground/80 [&::-webkit-details-marker]:hidden">
+				<svg class="h-3 w-3 shrink-0 transition-transform group-open:rotate-90" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+				</svg>
+				{ label }
+			</summary>
+			{ children... }
+		</details>
+	</section>
+}
+
 templ RosterRail(view RosterView) {
 	<div
 		id="workbench-v2-roster"
@@ -165,8 +179,7 @@ templ RosterRail(view RosterView) {
 				}
 			</div>
 			<div class="min-h-0 flex-1 space-y-3 overflow-y-auto px-1 pb-2">
-				<section id="workbench-v2-roster-agents" class="space-y-0.5" aria-label="Bots">
-					<h2 class="px-1.5 pb-1 text-[10px] font-medium tracking-wide text-muted-foreground/80">Bots</h2>
+				@RosterSection("workbench-v2-roster-agents", "Bots", "space-y-0.5") {
 					if len(view.Bots) == 0 {
 						<p class="px-1.5 text-xs text-muted-foreground">No bots yet</p>
 					} else {
@@ -196,26 +209,22 @@ templ RosterRail(view RosterView) {
 							}
 						</ul>
 					}
-				</section>
-				<section id="workbench-v2-roster-docs" class="space-y-0.5 pt-1" aria-label="Docs">
-					<details class="group" open>
-						<summary class="cursor-pointer list-none px-1.5 pb-1 text-[10px] font-medium tracking-wide text-muted-foreground/80">Docs</summary>
-						<ul class="flex flex-col">
-							for _, doc := range view.Docs {
-								<li id={ "roster-row-doc-" + doc.ID }>
-									<a
-										href={ templ.SafeURL(doc.Href) }
-										class="flex items-center gap-2 rounded-md px-1.5 py-1 text-sm text-foreground hover:bg-white/[0.06]"
-									>
-										<span class="block truncate font-medium">{ doc.Title }</span>
-									</a>
-								</li>
-							}
-						</ul>
-					</details>
-				</section>
-				<section id="workbench-v2-roster-plans" class="space-y-0.5 pt-1" aria-label="Plan">
-					<h2 class="px-1.5 pb-1 text-[10px] font-medium tracking-wide text-muted-foreground/80">Plan</h2>
+				}
+				@RosterSection("workbench-v2-roster-docs", "Docs", "space-y-0.5 pt-1") {
+					<ul class="flex flex-col">
+						for _, doc := range view.Docs {
+							<li id={ "roster-row-doc-" + doc.ID }>
+								<a
+									href={ templ.SafeURL(doc.Href) }
+									class="flex items-center gap-2 rounded-md px-1.5 py-1 text-sm text-foreground hover:bg-white/[0.06]"
+								>
+									<span class="block truncate font-medium">{ doc.Title }</span>
+								</a>
+							</li>
+						}
+					</ul>
+				}
+				@RosterSection("workbench-v2-roster-plans", "Plan", "space-y-0.5 pt-1") {
 					<ul class="flex flex-col">
 						for _, plan := range view.Plans {
 							<li id={ rosterPlanRowDOMID(plan.ID) }>
@@ -240,7 +249,7 @@ templ RosterRail(view RosterView) {
 							</li>
 						}
 					</ul>
-				</section>
+				}
 			</div>
 			@RosterContextMenu()
 			@EditProfileSheet()

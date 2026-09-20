@@ -129,14 +129,24 @@ func TestRosterRail_LiveBotsAndChrome(t *testing.T) {
 	if strings.Contains(html, "border-dashed") || strings.Contains(html, "Plan threads") {
 		t.Fatal("plan band must stay quiet: no dashed rule, label Plan")
 	}
-	if !strings.Contains(html, ">Plan</h2>") {
+	if strings.Contains(html, ">Plan</h2>") {
+		t.Fatal("plan band must use collapsible summary, not h2")
+	}
+	if !strings.Contains(html, "Plan</summary>") {
 		t.Fatal("plan band label must remain Plan")
 	}
 	if strings.Contains(html, "private DM") || strings.Contains(html, "Private DM") {
 		t.Fatal("roster must not call bot homes private DMs")
 	}
-	if !strings.Contains(html, ">Bots</h2>") {
+	if strings.Contains(html, ">Bots</h2>") {
+		t.Fatal("bots band must use collapsible summary, not h2")
+	}
+	if !strings.Contains(html, "Bots</summary>") {
 		t.Fatal("roster agent band must say Bots")
+	}
+	if !strings.Contains(html, "group-open:rotate-90") ||
+		!strings.Contains(html, "[&::-webkit-details-marker]:hidden") {
+		t.Fatal("roster sections must hide native marker and rotate chevron when open")
 	}
 	if strings.Contains(html, ">Group chats</h2>") {
 		t.Fatal("ad-hoc Group chats section must be gone")
@@ -179,7 +189,8 @@ func TestRosterRail_DocsAbovePlans(t *testing.T) {
 		t.Fatalf("Docs must be collapsible above Plans: %s", html)
 	}
 	for _, want := range []string{
-		"<summary", ">Docs</summary>",
+		"<summary", "Docs</summary>", "Bots</summary>", "Plan</summary>",
+		"group-open:rotate-90",
 		`href="/thoughts/docs/vamos/index.html"`,
 		`href="/thoughts/docs/chestnut/index.html"`,
 		"Plan One",
