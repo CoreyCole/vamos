@@ -117,16 +117,19 @@ func RegionSSRFlexStyle(state WorkbenchState, region WorkbenchRegion) string {
 	if !region.Visible || state.ViewportClass == ViewportMobile {
 		return ""
 	}
-	var total float64
-	for _, r := range state.Regions {
-		if r.Visible {
-			total += r.Ratio
+	switch region.Slot {
+	case WorkbenchSlotNavigation, WorkbenchSlotContext:
+		if region.Ratio <= 0 {
+			return ""
 		}
-	}
-	if total <= 0 || region.Ratio <= 0 {
+		// Absolute design share of the full workbench — freeze nav/context so
+		// opening chat/comments steals from primary, not by renormalizing threads.
+		return fmt.Sprintf("flex: 0 0 %.2f%%", region.Ratio*100)
+	case WorkbenchSlotPrimary:
+		return "flex: 1 1 0%"
+	default:
 		return ""
 	}
-	return fmt.Sprintf("flex: %.4f 1 0%%", region.Ratio/total)
 }
 
 func RegionInitialClass(state WorkbenchState, region WorkbenchRegion) string {

@@ -174,8 +174,10 @@ function regionWidth(region) {
 
 function regionHasSSRFlex(region) {
   const flex = (region.style && region.style.flex) || "";
-  // SSR RegionSSRFlexStyle: "0.2200 1 0%" — browsers may normalize 0% → 0px.
-  return /^\d/.test(flex.trim()) && /1\s+0(%|px)/.test(flex);
+  // Frozen nav/context: "0 0 22.00%". Primary: "1 1 0%" (browsers may use 0px).
+  const trimmed = flex.trim();
+  if (/^0\s+0\s+/.test(trimmed)) return true;
+  return /^\d/.test(trimmed) && /1\s+0(%|px)/.test(flex);
 }
 
 function applyRegionRatios(root) {
@@ -196,13 +198,8 @@ function applyRegionRatios(root) {
 
   const primary = regions.find((region) => regionSlot(region) === "primary");
   if (!primary) {
-    const total =
-      regions.reduce(
-        (sum, region) => sum + Number(region.dataset.workbenchRatio || 0),
-        0,
-      ) || 1;
     for (const region of regions) {
-      const ratio = Number(region.dataset.workbenchRatio || 0) / total;
+      const ratio = Number(region.dataset.workbenchRatio || 0);
       setRegionWidth(region, ratio * availableWidth);
     }
     return;
@@ -210,11 +207,6 @@ function applyRegionRatios(root) {
 
   const primaryMin = regionMinWidth(primary);
   const fixedRegions = regions.filter((region) => region !== primary);
-  const visibleRatioTotal =
-    regions.reduce(
-      (sum, region) => sum + Number(region.dataset.workbenchRatio || 0),
-      0,
-    ) || 1;
   let reservedForOthers = primaryMin;
   let fixedWidth = 0;
   const widths = new Map();
@@ -224,8 +216,7 @@ function applyRegionRatios(root) {
       .reduce((sum, other) => sum + regionMinWidth(other), 0);
     const storedWidth = Number(region.dataset.workbenchWidthPx || 0);
     const ratioWidth =
-      (Number(region.dataset.workbenchRatio || 0) / visibleRatioTotal) *
-      availableWidth;
+      Number(region.dataset.workbenchRatio || 0) * availableWidth;
     const width = clampRegionWidth(
       region,
       storedWidth > 0 ? storedWidth : ratioWidth,
@@ -512,14 +503,14 @@ function reflowVisibleRegionFlex(root) {
     return;
   }
   const regions = visibleRegions(root);
-  let total = 0;
   for (const region of regions) {
-    total += Number(region.dataset.workbenchRatio || 0);
-  }
-  if (total <= 0) total = 1;
-  for (const region of regions) {
-    const grow = Number(region.dataset.workbenchRatio || 0) / total;
-    region.style.flex = grow.toFixed(4) + " 1 0%";
+    const slot = regionSlot(region);
+    const ratio = Number(region.dataset.workbenchRatio || 0);
+    if (slot === "primary") {
+      region.style.flex = "1 1 0%";
+    } else if (ratio > 0) {
+      region.style.flex = "0 0 " + (ratio * 100).toFixed(2) + "%";
+    }
     region.style.removeProperty("width");
   }
 }
