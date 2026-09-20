@@ -98,22 +98,30 @@ func TestChatHeaderShareOverflowLabels(t *testing.T) {
 	}
 }
 
-
-func TestArtifactReloadButtonResetsIframeSrcOnly(t *testing.T) {
+func TestArtifactReloadOverflowActionResetsIframeSrcOnly(t *testing.T) {
+	action := ArtifactReloadOverflowAction()
+	if action.Label != "Reload" || action.TestID != "artifact-reload" {
+		t.Fatalf("reload overflow action = %#v", action)
+	}
 	var body strings.Builder
-	if err := ArtifactReloadButton().Render(t.Context(), &body); err != nil {
+	if err := OverflowActions(OverflowActionsArgs{
+		Label: "Artifact actions",
+		Groups: []OverflowActionGroup{{
+			Actions: []OverflowAction{action},
+		}},
+	}).Render(t.Context(), &body); err != nil {
 		t.Fatal(err)
 	}
 	html := body.String()
 	for _, want := range []string{
 		`data-testid="artifact-reload"`,
-		`aria-label="Reload"`,
+		">Reload</span>",
 		`thread-artifact-document`,
 		`applet-frame-`,
 		`.src=`,
 	} {
 		if !strings.Contains(html, want) {
-			t.Fatalf("ArtifactReloadButton missing %q in %s", want, html)
+			t.Fatalf("ArtifactReloadOverflowAction missing %q in %s", want, html)
 		}
 	}
 	for _, bad := range []string{"/forms/applets/", "Restart", "pull-to-refresh", "PTR"} {
@@ -129,7 +137,8 @@ func TestChatHeaderShareOverflowOmitsReload(t *testing.T) {
 		t.Fatal(err)
 	}
 	html := body.String()
-	if strings.Contains(html, `data-testid="artifact-reload"`) || strings.Contains(html, ">Reload<") {
+	if strings.Contains(html, `data-testid="artifact-reload"`) ||
+		strings.Contains(html, ">Reload<") {
 		t.Fatalf("HARD LOCK A: chat Share overflow must omit Reload: %s", html)
 	}
 }
@@ -195,4 +204,3 @@ func TestArtifactReloadPTRScriptRendersOnceGuard(t *testing.T) {
 		}
 	}
 }
-

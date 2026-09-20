@@ -740,7 +740,7 @@ func TestServeThreadPlanSlugHeaderTitleAndDatetime(t *testing.T) {
 		`truncate text-[13px] font-semibold leading-none text-foreground">`+slug,
 	)
 	kebab := strings.Count(body, `data-testid="workbench-overflow-actions"`)
-	if !hasTitle || !hasDT || rawInTitle || kebab != 1 {
+	if !hasTitle || !hasDT || rawInTitle || kebab != 2 {
 		t.Fatalf(
 			"title=%v datetime=%v rawInTitle=%v kebab=%d",
 			hasTitle,
@@ -748,5 +748,16 @@ func TestServeThreadPlanSlugHeaderTitleAndDatetime(t *testing.T) {
 			rawInTitle,
 			kebab,
 		)
+	}
+	chatStart := strings.Index(body, `id="workbench-v2-chat-header"`)
+	if chatStart >= 0 {
+		chatEnd := strings.Index(body[chatStart:], `</header>`)
+		if chatEnd > 0 {
+			chat := body[chatStart : chatStart+chatEnd]
+			if strings.Contains(chat, `data-testid="artifact-reload"`) ||
+				strings.Contains(chat, ">Reload</span>") {
+				t.Fatalf("HARD LOCK A: chat header kebab must omit Reload:\n%s", chat)
+			}
+		}
 	}
 }

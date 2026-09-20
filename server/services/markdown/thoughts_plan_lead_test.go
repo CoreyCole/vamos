@@ -62,7 +62,6 @@ func TestThoughtsPlanDocIsFullscreenWithPlanLeadChatLink(t *testing.T) {
 		}
 	}
 	for _, unwanted := range []string{
-		`id="workbench-v2-roster"`,
 		`id="thread-chat"`,
 		`id="workbench-v2-chat-header"`,
 		`id="workspace-doc-tree-header"`,

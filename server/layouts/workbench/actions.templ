@@ -47,7 +47,14 @@ templ overflowActionItem(action OverflowAction) {
 			}
 		</button>
 	} else if action.Kind == OverflowActionButton || action.ClientAction != "" {
-		<button type="button" data-on:click={ action.ClientAction } class="flex w-full flex-col rounded-sm px-2 py-1.5 text-left text-sm hover:bg-accent hover:text-accent-foreground">
+		<button
+			type="button"
+			data-on:click={ action.ClientAction }
+			class="flex w-full flex-col rounded-sm px-2 py-1.5 text-left text-sm hover:bg-accent hover:text-accent-foreground"
+			if action.TestID != "" {
+				data-testid={ action.TestID }
+			}
+		>
 			<span>{ overflowActionLabel(action) }</span>
 			if action.Description != "" {
 				<span class="text-xs text-muted-foreground">{ action.Description }</span>

@@ -636,7 +636,7 @@ func artifactPathHeader(t *testing.T, html string) string {
 	return header
 }
 
-func TestViewChatDocumentLinkIsPlainGET(t *testing.T) {
+func TestViewChatIsAlwaysToggle(t *testing.T) {
 	t.Parallel()
 	var body strings.Builder
 	if err := ThreadArtifactPane(
@@ -655,14 +655,13 @@ func TestViewChatDocumentLinkIsPlainGET(t *testing.T) {
 	if chat < 0 {
 		t.Fatalf("missing view-chat: %s", header)
 	}
-	// Slice from view-chat open tag through next >
 	end := strings.Index(header[chat:], ">")
 	tag := header[chat : chat+end]
-	if strings.Contains(tag, "data-on:click") || strings.Contains(tag, "data-on-click") {
-		t.Fatalf("view-chat document link must be plain GET for Ready(): %s", tag)
+	if !strings.Contains(tag, "data-on:click") {
+		t.Fatalf("view-chat must be a chat toggle: %s", tag)
 	}
-	if !strings.Contains(header, `href="/rooms/plan/alpha?artifact=x"`) {
-		t.Fatalf("view-chat missing href: %s", header)
+	if strings.Contains(header, `href="/rooms/plan/alpha?artifact=x"`) {
+		t.Fatalf("path-header chat control must not be a GET link: %s", header)
 	}
 }
 
@@ -723,13 +722,13 @@ func TestPathHeaderHidesCloseDetailsWhenDisabled(t *testing.T) {
 	}
 }
 
-func TestPathHeaderShowsReloadWhenShowReload(t *testing.T) {
+func TestPathHeaderReloadLivesInKebab(t *testing.T) {
 	var body strings.Builder
 	if err := ThreadArtifactPane(
 		ThreadArtifactBrowserArgs{
 			DocPath:       "thoughts/demo.html",
 			DirectoryPath: "thoughts",
-			ShowReload:    true,
+			HeaderActions: BuildThreadArtifactHeaderActions(nil, "thoughts/demo.html"),
 		},
 		templ.Raw(
 			`<iframe data-vamos-html-applet src="/thoughts/_render/html/demo.html"></iframe>`,
@@ -739,13 +738,50 @@ func TestPathHeaderShowsReloadWhenShowReload(t *testing.T) {
 	}
 	html := body.String()
 	header := artifactPathHeader(t, html)
-	if !strings.Contains(header, `data-testid="artifact-reload"`) {
-		t.Fatalf("path-header missing Reload icon:\n%s", header)
+	if !strings.Contains(header, `data-testid="workbench-overflow-actions"`) {
+		t.Fatalf("path-header missing kebab:\n%s", header)
 	}
-	if !strings.Contains(html, `data-testid="artifact-reload-mobile"`) {
-		t.Fatalf("soft mobile reload bar missing:\n%s", html)
+	if !strings.Contains(header, `data-testid="artifact-reload"`) ||
+		!strings.Contains(header, ">Reload</span>") {
+		t.Fatalf("path-header kebab missing Reload:\n%s", header)
+	}
+	if strings.Contains(html, `data-testid="artifact-reload-mobile"`) {
+		t.Fatalf("retired mobile reload strip still present:\n%s", html)
 	}
 	if strings.Contains(header, "pull-to-refresh") {
 		t.Fatalf("must not invent PTR")
+	}
+}
+
+func TestPathHeaderHamburgerBeforeChatToggle(t *testing.T) {
+	var body strings.Builder
+	if err := ThreadArtifactPane(
+		ThreadArtifactBrowserArgs{
+			DocPath:           "owner/plans/alpha/design.md",
+			ShowThreadsReopen: true,
+			ThreadsOpen:       false,
+		},
+		templ.Raw("<p>doc</p>"),
+	).Render(t.Context(), &body); err != nil {
+		t.Fatal(err)
+	}
+	header := artifactPathHeader(t, body.String())
+	hamburger := strings.Index(header, `id="workbench-artifact-threads-reopen"`)
+	chat := strings.Index(header, `data-testid="view-chat"`)
+	comments := strings.Index(header, `data-testid="view-comments"`)
+	path := strings.Index(header, `data-testid="artifact-browser-path"`)
+	if hamburger < 0 || chat < 0 || comments < 0 || path < 0 ||
+		!(hamburger < chat && chat < comments && comments < path) {
+		t.Fatalf(
+			"order hamburger=%d chat=%d comments=%d path=%d\n%s",
+			hamburger,
+			chat,
+			comments,
+			path,
+			header,
+		)
+	}
+	if strings.Contains(header, "md:hidden") {
+		t.Fatalf("thoughts hamburger must not be md:hidden:\n%s", header)
 	}
 }

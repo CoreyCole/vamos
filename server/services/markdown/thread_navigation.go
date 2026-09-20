@@ -808,15 +808,13 @@ func (s *Service) thoughtsArtifactPane(
 	}
 	browser = remapThreadArtifactBrowserForThoughts(browser, selectedDoc)
 	browser.ShowCloseDetails = false
+	browser.ShowThreadsReopen = true
 	setViewDocumentToggle(&browser, true, chatHref)
 	browser.HeaderActions = BuildThreadArtifactHeaderActionsWithBase(
 		page,
 		browser.DocPath,
 		s.basePath,
 	)
-	if page != nil && page.ViewerArgs.DocumentKind == DocumentKindHTMLApplet {
-		browser.ShowReload = true
-	}
 	return ThreadArtifactPane(browser, document), nil
 }
 
@@ -838,12 +836,13 @@ func (s *Service) thoughtsDirectoryArtifactBrowser(
 	}
 	entries = s.withArtifactCommentCounts(c.Request().Context(), entries)
 	args := ThreadArtifactBrowserArgs{
-		DocPath:          canonical,
-		DirectoryPath:    canonical,
-		Entries:          entries,
-		BrowserOpen:      ArtifactBrowserOpenFromRequest(c.Request()),
-		CommentsOpen:     workbench.CommentsOpenFromRequest(c.Request()),
-		ShowCloseDetails: false,
+		DocPath:           canonical,
+		DirectoryPath:     canonical,
+		Entries:           entries,
+		BrowserOpen:       ArtifactBrowserOpenFromRequest(c.Request()),
+		CommentsOpen:      workbench.CommentsOpenFromRequest(c.Request()),
+		ShowCloseDetails:  false,
+		ShowThreadsReopen: true,
 	}
 	if canonical != "" {
 		parent := path.Dir(canonical)
@@ -872,11 +871,11 @@ func (s *Service) threadArtifactAndComments(
 		return nil, nil, nil, "", err
 	}
 	content, page, directory := s.artifactContent(c, doc, explicit || !hasArtifact)
-	// Chat pages paint OverflowActions in the chat header only — no path-header kebab.
-	browser.HeaderActions = nil
-	if page != nil && page.ViewerArgs.DocumentKind == DocumentKindHTMLApplet {
-		browser.ShowReload = true
-	}
+	browser.HeaderActions = BuildThreadArtifactHeaderActionsWithBase(
+		page,
+		browser.DocPath,
+		s.basePath,
+	)
 	if directory {
 		setViewDocumentToggle(&browser, false, "")
 		return ThreadArtifactPane(

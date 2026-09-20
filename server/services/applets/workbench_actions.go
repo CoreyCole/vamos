@@ -23,14 +23,12 @@ func BuildAppletWorkbenchActions(
 	applet AppletContext,
 	process appletruntime.AppletProcessState,
 ) templ.Component {
-	actions := make([]workbench.OverflowAction, 0, 4)
+	actions := make([]workbench.OverflowAction, 0, 5)
+	actions = append(actions, workbench.ArtifactReloadOverflowAction())
 	if action, ok := AppletCommentAction(applet); ok {
 		actions = append(actions, action)
 	}
 	actions = append(actions, AppletLifecycleActions(applet, process)...)
-	if len(actions) == 0 {
-		return nil
-	}
 	return workbench.OverflowActions(workbench.OverflowActionsArgs{
 		Label: "Applet actions",
 		Groups: []workbench.OverflowActionGroup{{

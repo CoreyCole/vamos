@@ -36,6 +36,14 @@ func TestBuildThreadArtifactHeaderActionsOmitsThoughts(t *testing.T) {
 	if !strings.Contains(html, "Share artifact") {
 		t.Fatalf("path-header must include Share artifact:\n%s", html)
 	}
+	reload := strings.Index(html, ">Reload</span>")
+	share := strings.Index(html, "Share artifact")
+	if reload < 0 || share < 0 || reload > share {
+		t.Fatalf("Reload must be first Artifact action:\n%s", html)
+	}
+	if !strings.Contains(html, `data-testid="artifact-reload"`) {
+		t.Fatalf("Reload menu item missing testid:\n%s", html)
+	}
 	if strings.Contains(html, "Share chat") {
 		t.Fatalf("doc shell must not include Share chat:\n%s", html)
 	}
@@ -94,6 +102,10 @@ func TestBuildChatHeaderOverflowShareOnlyWithoutDoc(t *testing.T) {
 	if strings.Contains(html, ">Share</p>") || strings.Contains(html, ">Artifact</p>") {
 		t.Fatalf("flat menu must not paint Share/Artifact section headers:\n%s", html)
 	}
+	if strings.Contains(html, ">Reload</span>") ||
+		strings.Contains(html, `data-testid="artifact-reload"`) {
+		t.Fatalf("HARD LOCK A: chat overflow must omit Reload:\n%s", html)
+	}
 	if strings.Contains(html, "border-t border-border") {
 		t.Fatalf("flat menu must not paint section dividers:\n%s", html)
 	}
@@ -104,7 +116,6 @@ func TestBuildChatHeaderOverflowShareOnlyWithoutDoc(t *testing.T) {
 		t.Fatalf("Share artifact must not append to composer:\n%s", html)
 	}
 }
-
 
 func TestBuildChatHeaderOverflowOmitsShareArtifactWhenDocPathEmpty(t *testing.T) {
 	t.Parallel()

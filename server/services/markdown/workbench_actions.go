@@ -128,12 +128,17 @@ func threadArtifactOverflowActions(
 	thoughtsBasePath string,
 ) []workbench.OverflowAction {
 	docPath = strings.TrimSpace(docPath)
-	actions := make([]workbench.OverflowAction, 0, 4)
+	actions := make([]workbench.OverflowAction, 0, 5)
+	actions = append(actions, workbench.ArtifactReloadOverflowAction())
 	if docPath != "" {
 		actions = append(actions, ShareArtifactAction(docPath))
 	}
 	if includePlanChat {
-		if chatHref := thoughtsChatHref(thoughtsBasePath, docPath); chatHref != "" {
+		chatHref := thoughtsChatHref(thoughtsBasePath, docPath)
+		if chatHref == "" {
+			chatHref = thoughtsChatHref("", docPath)
+		}
+		if chatHref != "" {
 			chat := workbench.OverflowAction{
 				Label: "Chat about this plan",
 				Kind:  workbench.OverflowActionLink,

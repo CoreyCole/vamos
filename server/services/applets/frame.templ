@@ -19,16 +19,12 @@ templ AppletWorkbenchDocument(applet AppletContext, process appletruntime.Applet
 }
 
 // ThoughtsAppletArtifactPane wraps the HTTP applet iframe in stable ThreadArtifactPane
-// host IDs with a dedicated path-header Reload icon (src reassignment only; Restart stays
-// in Applet overflow). Soft mobile+desktop: Reload on path-header + mobile twin.
+// host IDs. Reload lives in the path-header kebab (src reassignment only; Restart stays
+// in Applet overflow).
 templ ThoughtsAppletArtifactPane(applet AppletContext, process appletruntime.AppletProcessState, comments commentui.CommentableMarkdownArgs) {
 	<div id="thread-artifact-pane" class="flex h-full min-h-0 flex-col bg-background">
-		<div class="flex h-10 min-h-10 max-h-10 shrink-0 items-center gap-2 overflow-hidden border-b border-border px-2.5 text-xs md:hidden" data-testid="artifact-reload-mobile">
-			@workbench.ArtifactReloadButton()
-		</div>
-		<div id="thread-artifact-path-header" class="hidden h-10 min-h-10 max-h-10 shrink-0 items-center gap-2 overflow-hidden border-b border-border px-2.5 text-xs md:flex">
+		<div id="thread-artifact-path-header" class="flex h-10 min-h-10 max-h-10 shrink-0 items-center gap-2 overflow-hidden border-b border-border px-2.5 text-xs">
 			<span class="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-muted-foreground" title={ applet.IdentityPath }>{ applet.IdentityPath }</span>
-			@workbench.ArtifactReloadButton()
 			@BuildAppletWorkbenchActions(applet, process)
 		</div>
 		<div id="thread-artifact-document" class="min-h-0 flex-1 overflow-auto" aria-live="polite">

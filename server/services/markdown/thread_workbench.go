@@ -136,11 +136,7 @@ func (s *Service) indexArtifactComponent(
 		return WorkbenchUnavailable("The artifact is unavailable."), page, artifact
 	}
 	setViewDocumentToggle(&browser, false, "")
-	// Chat pages paint OverflowActions in the chat header only — no path-header kebab.
-	browser.HeaderActions = nil
-	if page != nil && page.ViewerArgs.DocumentKind == DocumentKindHTMLApplet {
-		browser.ShowReload = true
-	}
+	browser.HeaderActions = BuildThreadArtifactHeaderActions(page, browser.DocPath)
 	if page != nil {
 		panelArgs := BuildDocumentPanelArgs(page)
 		panelArgs.Document.WorkbenchActions = nil

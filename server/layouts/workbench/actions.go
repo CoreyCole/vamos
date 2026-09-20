@@ -35,6 +35,7 @@ type OverflowAction struct {
 	Target       string
 	Rel          string
 	ClientAction string
+	TestID       string
 	HiddenFields map[string]string
 	Disabled     bool
 }
@@ -88,7 +89,6 @@ func escapeDatastarString(value string) string {
 	value = strings.ReplaceAll(value, `\`, `\\`)
 	return strings.ReplaceAll(value, `'`, `\'`)
 }
-
 
 // ChatHeaderShareOverflow is the desktop chat-header ⋯ fallback (Share artifact / Share chat)
 // when callers pass nil overflow. Prefer markdown.BuildChatHeaderOverflow for full flat menu.
@@ -180,6 +180,16 @@ func ArtifactReloadClickAction() string {
 	return `(function(){` + ArtifactReloadJS() + `})()`
 }
 
+// ArtifactReloadOverflowAction is Reload in the path-header kebab (not chat ⋯).
+func ArtifactReloadOverflowAction() OverflowAction {
+	return OverflowAction{
+		Label:        "Reload",
+		Kind:         OverflowActionButton,
+		ClientAction: ArtifactReloadClickAction() + "; " + overflowCloseMenuExpr(),
+		TestID:       "artifact-reload",
+	}
+}
+
 // ArtifactReloadPanePTRBootstrap installs parent-owned pane PTR + allowlisted vamos:ptr listener.
 // Idempotent (window.__vamosArtifactPTRBound). Does not intercept #agent-chat-scroll-region.
 func ArtifactReloadPanePTRBootstrap() string {
@@ -242,7 +252,10 @@ func ArtifactReloadPanePTRBootstrap() string {
 // ArtifactReloadPTRScript injects the one-shot pane PTR + vamos:ptr bootstrap (not /static).
 func ArtifactReloadPTRScript() templ.Component {
 	return templ.ComponentFunc(func(ctx context.Context, w io.Writer) error {
-		_, err := io.WriteString(w, `<script data-vamos-artifact-ptr="1">`+"\n"+ArtifactReloadPanePTRBootstrap()+"\n</script>")
+		_, err := io.WriteString(
+			w,
+			`<script data-vamos-artifact-ptr="1">`+"\n"+ArtifactReloadPanePTRBootstrap()+"\n</script>",
+		)
 		return err
 	})
 }
