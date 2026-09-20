@@ -105,6 +105,9 @@ func TestMessageThreadHostDoesNotReplaceScrollRegion(t *testing.T) {
 	if strings.Contains(out, `id="agent-chat-message-thread-reply-form"`) {
 		t.Fatal("pairwise/view-only must omit reply composer")
 	}
+	if strings.Contains(out, `w-[360px]`) || strings.Contains(out, `border-l`) {
+		t.Fatal("desktop thread focus must not be a right split panel")
+	}
 }
 
 func TestSharedThreadChatMessageThreadFixtureDOM(t *testing.T) {
@@ -141,5 +144,11 @@ func TestSharedThreadChatMessageThreadFixtureDOM(t *testing.T) {
 	}
 	if strings.Contains(out, `id="agent-chat-thread-family"`) {
 		t.Fatal("family bar must stay parked")
+	}
+	if strings.Contains(out, `w-[360px]`) {
+		t.Fatal("open thread must fill the chat column, not a 360px split")
+	}
+	if !strings.Contains(out, `hidden`) {
+		t.Fatal("open thread must hide the main transcript column")
 	}
 }

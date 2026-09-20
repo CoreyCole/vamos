@@ -213,7 +213,7 @@ func MessageThreadHost(view MessageThreadView) templ.Component {
 			return templ_7745c5c3_Err
 		}
 		if view.Open {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 16, "<div class=\"hidden h-full min-h-0 w-[360px] shrink-0 flex-col border-l border-border bg-background md:flex lg:w-[400px]\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 16, "<div class=\"hidden h-full min-h-0 w-full min-w-0 flex-1 flex-col bg-background md:flex\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
