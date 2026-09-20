@@ -216,6 +216,15 @@ func patchThoughtsCommentTargetWithForm(
 	)
 }
 
+// PatchOpenCommentsSignal opens the comments region; on workbench v2 it also
+// sets activeRegionID so max-md chrome can show the pane.
+func PatchOpenCommentsSignal(
+	sse *datastar.ServerSentEventGenerator,
+	workbenchV2 bool,
+) error {
+	return patchOpenCommentsSignal(sse, workbenchV2)
+}
+
 func patchOpenCommentsSignal(
 	sse *datastar.ServerSentEventGenerator,
 	workbenchV2 bool,

@@ -1751,6 +1751,15 @@ func TestCommentsToggleClickActionClosesWithoutOpeningChat(t *testing.T) {
 	if !strings.Contains(js, "workbenchV2Threads.visible = false") {
 		t.Fatalf("closing chat and comments should hide threads: %s", js)
 	}
+	if !strings.Contains(js, "$workbench.activeRegionID = 'workbenchV2Comments'") {
+		t.Fatalf("opening comments should set activeRegionID: %s", js)
+	}
+	if !strings.Contains(
+		js,
+		"el.closest('#workbench-root').dataset.workbenchMobileActive = 'workbenchV2Comments'",
+	) {
+		t.Fatalf("opening comments should set workbenchMobileActive: %s", js)
+	}
 }
 
 func TestChatToggleClickActionClosesWhenAlreadyOpen(t *testing.T) {

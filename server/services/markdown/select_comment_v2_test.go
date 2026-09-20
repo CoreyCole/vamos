@@ -96,6 +96,7 @@ func TestHandleSelectCommentForWorkbenchV2FocusesMountedTarget(t *testing.T) {
 	for _, want := range []string{
 		"workbenchV2Comments",
 		"visible",
+		`"activeRegionID":"workbenchV2Comments"`,
 		"← Back",
 		`id="` + commentui.WorkbenchMobileCommentsContentID + `"`,
 		`document.getElementById("comment-target-thoughts--thoughts-owner-plan-a-design-md`,
@@ -110,7 +111,6 @@ func TestHandleSelectCommentForWorkbenchV2FocusesMountedTarget(t *testing.T) {
 		"docWorkbenchRight",
 		"doc-right-comments-panel",
 		"comments_sheet",
-		"activeRegionID",
 	} {
 		if strings.Contains(body, unwanted) {
 			t.Fatalf("response retained %q: %s", unwanted, body)

@@ -63,7 +63,7 @@ func shareChatCommentsRatioJS() string {
 }
 
 func CommentsToggleClickAction() string {
-	return "$workbench.regions.workbenchV2Comments.visible = !$workbench.regions.workbenchV2Comments.visible; if ($workbench.regions.workbenchV2Comments.visible) { $workbench.regions.workbenchV2Chat.visible = false; " +
+	return "$workbench.regions.workbenchV2Comments.visible = !$workbench.regions.workbenchV2Comments.visible; if ($workbench.regions.workbenchV2Comments.visible) { $workbench.activeRegionID = 'workbenchV2Comments'; el.closest('#workbench-root').dataset.workbenchMobileActive = 'workbenchV2Comments'; $workbench.regions.workbenchV2Chat.visible = false; " +
 		commentsOpenCookieWriteJS(
 			true,
 		) + " } else { " + commentsOpenCookieWriteJS(

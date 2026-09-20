@@ -731,6 +731,9 @@ func (s *Service) HandleSelectComment(c echo.Context) error {
 		); err != nil {
 			return err
 		}
+		if err := comments.PatchOpenCommentsSignal(sse, true); err != nil {
+			return err
+		}
 		return sse.ExecuteScript(
 			"document.getElementById(" + strconv.Quote(
 				targetID,
