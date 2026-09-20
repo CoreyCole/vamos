@@ -17,8 +17,19 @@ func TestFamilyThreadHrefRoomsVsSpawn(t *testing.T) {
 		RoomKind:  RoomKindBotHome,
 		AgentSlug: sql.NullString{String: "nova", Valid: true},
 	}
-	if got, want := familyThreadHref(homeBot), "/rooms/dm/nova"; got != want {
-		t.Fatalf("bot home href = %q, want %q", got, want)
+	if got, want := familyThreadHref(homeBot), "/threads/home-bot"; got != want {
+		t.Fatalf("bot conversation href = %q, want %q", got, want)
+	}
+	secondBot := db.AgentThread{
+		ID:        "home-bot-2",
+		RoomKind:  RoomKindBotHome,
+		AgentSlug: sql.NullString{String: "nova", Valid: true},
+	}
+	if got, want := familyThreadHref(secondBot), "/threads/home-bot-2"; got != want {
+		t.Fatalf("second bot conversation href = %q, want %q", got, want)
+	}
+	if familyThreadHref(homeBot) == familyThreadHref(secondBot) {
+		t.Fatal("two nova threads must not share one /rooms/dm/nova href")
 	}
 
 	homePair := db.AgentThread{
@@ -37,11 +48,19 @@ func TestFamilyThreadHrefRoomsVsSpawn(t *testing.T) {
 		PlanDirRel: sql.NullString{String: "thoughts/owner/plans/alpha", Valid: true},
 	}
 	got := familyThreadHref(homePlan)
-	if !strings.HasPrefix(got, "/rooms/plan/alpha") {
-		t.Fatalf("plan home href = %q, want /rooms/plan/alpha...", got)
+	if got != "/threads/home-plan" {
+		t.Fatalf("plan conversation href = %q, want /threads/home-plan", got)
 	}
-	if !strings.Contains(got, "artifact=") {
-		t.Fatalf("plan home href missing artifact: %q", got)
+	secondPlan := db.AgentThread{
+		ID:         "home-plan-2",
+		RoomKind:   RoomKindPlan,
+		PlanDirRel: sql.NullString{String: "thoughts/owner/plans/alpha", Valid: true},
+	}
+	if familyThreadHref(secondPlan) != "/threads/home-plan-2" {
+		t.Fatalf("second plan conversation href = %q", familyThreadHref(secondPlan))
+	}
+	if familyThreadHref(homePlan) == familyThreadHref(secondPlan) {
+		t.Fatal("two plan threads must not share one /rooms/plan/{id} href")
 	}
 
 	child := db.AgentThread{

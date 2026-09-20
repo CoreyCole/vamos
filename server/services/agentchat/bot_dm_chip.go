@@ -359,14 +359,16 @@ func (s *Service) notifyPairwiseOriginTranscripts(
 		if agentSlug == "" {
 			continue
 		}
-		home, err := s.queries.GetBotHomeThreadBySlug(
+		origins, err := s.queries.ListAgentThreadsByAgentSlug(
 			ctx,
 			sql.NullString{String: agentSlug, Valid: true},
 		)
 		if err != nil {
 			continue
 		}
-		notify(home.ID)
+		for _, origin := range origins {
+			notify(origin.ID)
+		}
 	}
 	listed, err := s.queries.ListAgentThreads(ctx, db.ListAgentThreadsParams{
 		UserEmail: "",

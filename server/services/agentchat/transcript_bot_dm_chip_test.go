@@ -279,6 +279,24 @@ func TestPairwiseLiveEventNotifiesOriginHomeThread(t *testing.T) {
 	}); err != nil {
 		t.Fatal(err)
 	}
+	second, err := q.CreateAgentThread(ctx, db.CreateAgentThreadParams{
+		ID:        "thread-home-lead-2",
+		UserEmail: "owner@example.com",
+		Title:     "Lead later",
+		Cwd:       "thoughts/agents/lead",
+		LineageID: "lin-home-2",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := q.BindAgentThreadBotHome(ctx, db.BindAgentThreadBotHomeParams{
+		AgentSlug: sql.NullString{String: "lead", Valid: true},
+		Cwd:       second.Cwd,
+		Title:     second.Title,
+		ID:        second.ID,
+	}); err != nil {
+		t.Fatal(err)
+	}
 	pair, err := q.CreateAgentThread(ctx, db.CreateAgentThreadParams{
 		ID:        "thread-pair",
 		UserEmail: "owner@example.com",
@@ -302,15 +320,21 @@ func TestPairwiseLiveEventNotifiesOriginHomeThread(t *testing.T) {
 	notifier := NewNotifier()
 	originCh := notifier.Subscribe(home.ID)
 	defer notifier.Unsubscribe(home.ID, originCh)
+	secondCh := notifier.Subscribe(second.ID)
+	defer notifier.Unsubscribe(second.ID, secondCh)
 	svc := &Service{queries: q, notifier: notifier}
 	svc.notifyPairwiseOriginTranscripts(ctx, "", pair.ID)
 
-	select {
-	case signal := <-originCh:
-		if signal.Scope != PatchLiveTranscript {
-			t.Fatalf("scope = %q", signal.Scope)
+	for name, ch := range map[string]<-chan WorkspaceStreamSignal{
+		home.ID: originCh, second.ID: secondCh,
+	} {
+		select {
+		case signal := <-ch:
+			if signal.Scope != PatchLiveTranscript {
+				t.Fatalf("%s scope = %q", name, signal.Scope)
+			}
+		default:
+			t.Fatalf("pairwise live event did not dirty origin thread %s", name)
 		}
-	default:
-		t.Fatal("pairwise live event did not dirty origin home thread")
 	}
 }

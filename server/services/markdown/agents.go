@@ -95,15 +95,15 @@ func (s *Service) ensureBotHomeThread(
 	if s.queries == nil {
 		return "", nil
 	}
-	existing, err := s.queries.GetBotHomeThreadBySlug(ctx, sql.NullString{
+	live, err := s.queries.ListAgentThreadsByAgentSlug(ctx, sql.NullString{
 		String: agent.Slug,
 		Valid:  agent.Slug != "",
 	})
-	if err == nil {
-		return existing.ID, nil
-	}
-	if !errors.Is(err, sql.ErrNoRows) {
+	if err != nil {
 		return "", err
+	}
+	if len(live) > 0 {
+		return live[0].ID, nil
 	}
 	if strings.TrimSpace(userEmail) == "" {
 		userEmail = "shared"

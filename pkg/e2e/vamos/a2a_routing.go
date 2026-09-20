@@ -345,8 +345,12 @@ func ensureBotHome(
 	t.Helper()
 	bg := t.Context()
 	agentNS := sql.NullString{String: agent.Slug, Valid: true}
-	if existing, err := q.GetBotHomeThreadBySlug(bg, agentNS); err == nil {
-		return existing.ID
+	if existing, err := q.ListAgentThreadsByAgentSlug(
+		bg,
+		agentNS,
+	); err == nil &&
+		len(existing) > 0 {
+		return existing[0].ID
 	}
 	cwd := filepath.ToSlash(filepath.Join("thoughts", "agents", agent.Slug))
 	if _, err := q.GetAgentThread(bg, threadID); err != nil {
@@ -368,8 +372,12 @@ func ensureBotHome(
 	}); err != nil {
 		t.Fatalf("bind bot home %s: %v", agent.Slug, err)
 	}
-	if existing, err := q.GetBotHomeThreadBySlug(bg, agentNS); err == nil {
-		return existing.ID
+	if existing, err := q.ListAgentThreadsByAgentSlug(
+		bg,
+		agentNS,
+	); err == nil &&
+		len(existing) > 0 {
+		return existing[0].ID
 	}
 	return threadID
 }

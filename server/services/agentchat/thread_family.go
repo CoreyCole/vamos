@@ -3,8 +3,6 @@ package agentchat
 import (
 	"context"
 	"database/sql"
-	"net/url"
-	"path/filepath"
 	"strings"
 
 	"github.com/CoreyCole/vamos/pkg/db"
@@ -44,69 +42,15 @@ func familyThreadHref(row db.AgentThread) string {
 	if strings.TrimSpace(row.ID) == "" {
 		return ""
 	}
-	if strings.TrimSpace(row.ParentThreadID.String) != "" {
-		return "/threads/" + row.ID
-	}
-	switch strings.TrimSpace(row.RoomKind) {
-	case RoomKindBotHome:
-		slug := strings.TrimSpace(row.AgentSlug.String)
-		if slug != "" {
-			return "/rooms/dm/" + slug
-		}
-	case RoomKindPairwise:
+	if strings.TrimSpace(row.RoomKind) == RoomKindPairwise {
 		if href := pairwiseA2AHref(
 			row.PairAgentSlugA.String,
 			row.PairAgentSlugB.String,
 		); href != "" {
 			return href
 		}
-	case RoomKindPlan:
-		if href := familyPlanHomeHref(row); href != "" {
-			return href
-		}
 	}
 	return "/threads/" + row.ID
-}
-
-func familyPlanHomeHref(thread db.AgentThread) string {
-	rel := filepath.ToSlash(strings.TrimSpace(thread.PlanDirRel.String))
-	id := planIDFromThoughtsPath(rel)
-	if id == "" {
-		return ""
-	}
-	href := "/rooms/plan/" + url.PathEscape(id)
-	if rel == "" {
-		return href
-	}
-	if !strings.HasPrefix(rel, "thoughts/") {
-		rel = "thoughts/" + strings.TrimPrefix(rel, "/")
-	}
-	return href + "?artifact=" + url.QueryEscape(rel)
-}
-
-func planIDFromThoughtsPath(raw string) string {
-	path := filepath.ToSlash(strings.TrimSpace(raw))
-	path = strings.Trim(path, "/")
-	if path == "" {
-		return ""
-	}
-	if i := strings.Index(path, "thoughts/"); i >= 0 {
-		path = path[i:]
-	} else if !strings.HasPrefix(path, "thoughts/") {
-		path = "thoughts/" + path
-	}
-	parts := strings.Split(path, "/")
-	for i := 0; i+3 < len(parts); i++ {
-		if parts[i] != "thoughts" || parts[i+2] != "plans" {
-			continue
-		}
-		id := strings.TrimSpace(parts[i+3])
-		if id == "" || id == "." {
-			return ""
-		}
-		return id
-	}
-	return ""
 }
 
 func (s *Service) BuildChatThreadFamily(
