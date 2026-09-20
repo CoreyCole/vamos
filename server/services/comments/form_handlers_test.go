@@ -208,10 +208,9 @@ func TestWorkbenchV2CommentShowPatchesOnlyCommentsPaneSignal(t *testing.T) {
 	for _, want := range []string{
 		`comment-target-`,
 		commentui.CommentsContextPanelID,
-		commentui.WorkbenchMobileCommentsContentID,
-		`← Back`,
 		`workbenchV2Comments`,
-		`visible`,
+		`"visible":true`,
+		`workbenchV2Chat`,
 		`Add a comment...`,
 		`Selected paragraph`,
 	} {
@@ -219,10 +218,45 @@ func TestWorkbenchV2CommentShowPatchesOnlyCommentsPaneSignal(t *testing.T) {
 			t.Fatalf("response missing %q: %s", want, body)
 		}
 	}
+	if strings.Contains(body, "selector #"+commentui.WorkbenchMobileCommentsContentID) {
+		t.Fatalf("V2 show patched missing mobile sheet: %s", body)
+	}
 	for _, unwanted := range []string{"rightRailActiveTab", "docWorkbenchRight", `id="workbench-root"`, "workbench-v2-chat-body", "commentui-popover-target"} {
 		if strings.Contains(body, unwanted) {
 			t.Fatalf("response contains %q: %s", unwanted, body)
 		}
+	}
+}
+
+func TestWorkbenchV2CommentShowOpensCommentsWithoutMobileSheet(t *testing.T) {
+	t.Parallel()
+	svc := newTestCommentsService(t)
+	form := url.Values{
+		"doc_path":      {"thoughts/plan.md"},
+		"section_hint":  {"section-1"},
+		"heading_hint":  {"Plan"},
+		"selected_text": {"Quoted line"},
+		"workbench_v2":  {"1"},
+	}
+	c, rec := newCommentFormRequest(t, "/forms/comments/show", form)
+	if err := svc.HandleShowCommentForm(c); err != nil {
+		t.Fatalf("HandleShowCommentForm() error = %v", err)
+	}
+	body := rec.Body.String()
+	if !strings.Contains(body, "selector #"+commentui.CommentsContextPanelID) {
+		t.Fatalf("missing comments panel selector: %s", body)
+	}
+	if !strings.Contains(body, `"workbenchV2Comments":{"visible":true}`) {
+		t.Fatalf("missing nested comments visible signal: %s", body)
+	}
+	if !strings.Contains(body, `"workbenchV2Chat":{"visible":false}`) {
+		t.Fatalf("missing nested chat hidden signal: %s", body)
+	}
+	if strings.Contains(body, "selector #"+commentui.WorkbenchMobileCommentsContentID) {
+		t.Fatalf("patched mobile comments sheet: %s", body)
+	}
+	if strings.Contains(body, "Quoted line") == false {
+		t.Fatalf("missing quote text: %s", body)
 	}
 }
 
@@ -270,9 +304,8 @@ func TestWorkbenchV2CommentCreatePatchesOnlyCommentsPaneSignal(t *testing.T) {
 		"Please clarify",
 		"comment-target-",
 		commentui.CommentsContextPanelID,
-		commentui.WorkbenchMobileCommentsContentID,
-		"← Back",
 		"workbenchV2Comments",
+		`"visible":true`,
 		"/thoughts/actions/select-comment",
 		`commentui-thread-quote`,
 		"Plan",
@@ -281,7 +314,15 @@ func TestWorkbenchV2CommentCreatePatchesOnlyCommentsPaneSignal(t *testing.T) {
 			t.Fatalf("response missing %q: %s", want, body)
 		}
 	}
-	for _, unwanted := range []string{"rightRailActiveTab", "docWorkbenchRight", "doc-right-comments-panel", `id="workbench-root"`} {
+	if strings.Contains(body, "selector #"+commentui.WorkbenchMobileCommentsContentID) {
+		t.Fatalf("V2 create patched missing mobile sheet: %s", body)
+	}
+	for _, unwanted := range []string{
+		"rightRailActiveTab",
+		"docWorkbenchRight",
+		"doc-right-comments-panel",
+		`id="workbench-root"`,
+	} {
 		if strings.Contains(body, unwanted) {
 			t.Fatalf("response contains %q: %s", unwanted, body)
 		}
