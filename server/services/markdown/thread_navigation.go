@@ -492,6 +492,21 @@ func artifactThreadsReopenFrom(c echo.Context) bool {
 	return v
 }
 
+// applyWorkbenchPathHeaderThreadsReopen paints the roster hamburger on the
+// artifact path header (rooms/docs desks and thoughts-equivalent panes).
+func applyWorkbenchPathHeaderThreadsReopen(
+	c echo.Context,
+	browser *ThreadArtifactBrowserArgs,
+) {
+	if browser == nil {
+		return
+	}
+	browser.ShowThreadsReopen = artifactThreadsReopenFrom(c) || true
+	if c != nil {
+		browser.ThreadsOpen = workbench.ThreadsOpenFromRequest(c.Request())
+	}
+}
+
 func (s *Service) threadArtifactBrowser(
 	c echo.Context,
 	threadID, docPath string,
@@ -808,7 +823,7 @@ func (s *Service) thoughtsArtifactPane(
 	}
 	browser = remapThreadArtifactBrowserForThoughts(browser, selectedDoc)
 	browser.ShowCloseDetails = false
-	browser.ShowThreadsReopen = true
+	applyWorkbenchPathHeaderThreadsReopen(c, &browser)
 	setViewDocumentToggle(&browser, true, chatHref)
 	browser.HeaderActions = BuildThreadArtifactHeaderActionsWithBase(
 		page,
@@ -836,14 +851,14 @@ func (s *Service) thoughtsDirectoryArtifactBrowser(
 	}
 	entries = s.withArtifactCommentCounts(c.Request().Context(), entries)
 	args := ThreadArtifactBrowserArgs{
-		DocPath:           canonical,
-		DirectoryPath:     canonical,
-		Entries:           entries,
-		BrowserOpen:       ArtifactBrowserOpenFromRequest(c.Request()),
-		CommentsOpen:      workbench.CommentsOpenFromRequest(c.Request()),
-		ShowCloseDetails:  false,
-		ShowThreadsReopen: true,
+		DocPath:          canonical,
+		DirectoryPath:    canonical,
+		Entries:          entries,
+		BrowserOpen:      ArtifactBrowserOpenFromRequest(c.Request()),
+		CommentsOpen:     workbench.CommentsOpenFromRequest(c.Request()),
+		ShowCloseDetails: false,
 	}
+	applyWorkbenchPathHeaderThreadsReopen(c, &args)
 	if canonical != "" {
 		parent := path.Dir(canonical)
 		if parent == "." {
@@ -871,6 +886,7 @@ func (s *Service) threadArtifactAndComments(
 		return nil, nil, nil, "", err
 	}
 	content, page, directory := s.artifactContent(c, doc, explicit || !hasArtifact)
+	applyWorkbenchPathHeaderThreadsReopen(c, &browser)
 	browser.HeaderActions = BuildThreadArtifactHeaderActionsWithBase(
 		page,
 		browser.DocPath,

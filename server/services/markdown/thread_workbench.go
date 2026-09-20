@@ -136,6 +136,7 @@ func (s *Service) indexArtifactComponent(
 		return WorkbenchUnavailable("The artifact is unavailable."), page, artifact
 	}
 	setViewDocumentToggle(&browser, false, "")
+	applyWorkbenchPathHeaderThreadsReopen(c, &browser)
 	browser.HeaderActions = BuildThreadArtifactHeaderActions(page, browser.DocPath)
 	if page != nil {
 		panelArgs := BuildDocumentPanelArgs(page)

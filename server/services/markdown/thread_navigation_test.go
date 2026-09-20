@@ -10,6 +10,8 @@ import (
 
 	"github.com/a-h/templ"
 	"github.com/labstack/echo/v4"
+
+	"github.com/CoreyCole/vamos/server/layouts/workbench"
 )
 
 func TestThreadArtifactRoutesKeepThreadContext(t *testing.T) {
@@ -783,5 +785,40 @@ func TestPathHeaderHamburgerBeforeChatToggle(t *testing.T) {
 	}
 	if strings.Contains(header, "md:hidden") {
 		t.Fatalf("thoughts hamburger must not be md:hidden:\n%s", header)
+	}
+}
+
+func TestRoomsDocsDeskPathHeaderWiresThreadsReopen(t *testing.T) {
+	e := echo.New()
+	req := httptest.NewRequest(
+		http.MethodGet,
+		"/rooms/plan/docs--vamos?artifact=thoughts/x.md",
+		nil,
+	)
+	req.AddCookie(&http.Cookie{Name: workbench.ThreadsOpenCookie, Value: "0"})
+	c := e.NewContext(req, httptest.NewRecorder())
+	c.Set(artifactThreadsReopenKey, true)
+
+	var browser ThreadArtifactBrowserArgs
+	applyWorkbenchPathHeaderThreadsReopen(c, &browser)
+	if !browser.ShowThreadsReopen {
+		t.Fatal("rooms/docs desk must ShowThreadsReopen")
+	}
+	if browser.ThreadsOpen {
+		t.Fatal("ThreadsOpen should follow closed cookie")
+	}
+
+	var body strings.Builder
+	if err := ThreadArtifactPane(
+		browser,
+		templ.Raw("<p>doc</p>"),
+	).Render(t.Context(), &body); err != nil {
+		t.Fatal(err)
+	}
+	header := artifactPathHeader(t, body.String())
+	hamburger := strings.Index(header, `id="workbench-artifact-threads-reopen"`)
+	chat := strings.Index(header, `data-testid="view-chat"`)
+	if hamburger < 0 || chat < 0 || hamburger >= chat {
+		t.Fatalf("hamburger must precede view-chat in path header:\n%s", header)
 	}
 }
