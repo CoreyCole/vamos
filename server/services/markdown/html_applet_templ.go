@@ -70,7 +70,7 @@ func HTMLAppletFrame(docPath string, src string) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "\" sandbox=\"allow-scripts allow-forms allow-downloads allow-popups allow-popups-to-escape-sandbox\" class=\"h-full min-h-0 w-full flex-1 border-0 bg-white\" referrerpolicy=\"same-origin\"></iframe></section>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "\" sandbox=\"allow-scripts allow-forms allow-downloads allow-popups allow-popups-to-escape-sandbox allow-same-origin\" class=\"h-full min-h-0 w-full flex-1 border-0 bg-white\" referrerpolicy=\"same-origin\"></iframe></section>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

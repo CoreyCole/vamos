@@ -1414,7 +1414,7 @@ func iframeSandboxOmitsSameOrigin() spec.Expectation {
 func iframeSandboxOmitsSameOriginFor(selector string) spec.Expectation {
 	return spec.ExpectStep(
 		spec.Custom(
-			"iframe sandbox omits allow-same-origin",
+			"iframe sandbox includes allow-same-origin",
 			func(t testing.TB, ctx *duiruntime.Context) {
 				t.Helper()
 				iframe := ctx.Page.Locator(selector).First()
@@ -1429,13 +1429,18 @@ func iframeSandboxOmitsSameOriginFor(selector string) spec.Expectation {
 					"allow-scripts",
 					"allow-popups",
 					"allow-popups-to-escape-sandbox",
+					"allow-same-origin",
 				} {
 					if !strings.Contains(sandbox, permission) {
 						t.Fatalf("sandbox=%q missing %s", sandbox, permission)
 					}
 				}
-				if strings.Contains(sandbox, "allow-same-origin") {
-					t.Fatalf("sandbox=%q permits same-origin", sandbox)
+				if strings.Contains(sandbox, "allow-top-navigation") &&
+					!strings.Contains(
+						sandbox,
+						"allow-top-navigation-by-user-activation",
+					) {
+					t.Fatalf("sandbox=%q broadened with top-navigation", sandbox)
 				}
 			},
 		),

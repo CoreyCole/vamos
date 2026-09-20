@@ -1567,13 +1567,13 @@ func expectWorkbenchV2StaticHTMLUnchanged() spec.Step {
 
 func assertV2OpaqueFrame() spec.Step {
 	return spec.Custom(
-		"v2 static HTML frame remains opaque",
+		"v2 static HTML frame is seamless",
 		func(t testing.TB, ctx *duiruntime.Context) {
 			frame := ctx.Page.Locator("#workbench-v2-artifact-body iframe[data-vamos-html-applet]").
 				First()
 			sandbox, err := frame.GetAttribute("sandbox")
-			if err != nil || strings.Contains(sandbox, "allow-same-origin") {
-				t.Fatalf("static HTML frame is not opaque: %q %v", sandbox, err)
+			if err != nil || !strings.Contains(sandbox, "allow-same-origin") {
+				t.Fatalf("static HTML frame is not seamless: %q %v", sandbox, err)
 			}
 		},
 	)

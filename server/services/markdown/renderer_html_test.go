@@ -17,9 +17,17 @@ import (
 func TestResolveHTMLAppletAssetStaysUnderDocumentDirectory(t *testing.T) {
 	root := t.TempDir()
 	mustMkdirAll(t, filepath.Join(root, "plans", "demo", "assets"))
-	mustWriteFile(t, filepath.Join(root, "plans", "demo", "assets", "app.js"), []byte("console.log('ok')"))
+	mustWriteFile(
+		t,
+		filepath.Join(root, "plans", "demo", "assets", "app.js"),
+		[]byte("console.log('ok')"),
+	)
 
-	got, err := resolveHTMLAppletAsset(root, "thoughts/plans/demo/app.html", "plans/demo/assets/app.js")
+	got, err := resolveHTMLAppletAsset(
+		root,
+		"thoughts/plans/demo/app.html",
+		"plans/demo/assets/app.js",
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -47,7 +55,11 @@ func TestResolveHTMLAppletAssetRejectsEscapes(t *testing.T) {
 	mustWriteFile(t, filepath.Join(root, "secret.js"), []byte("bad"))
 
 	for _, asset := range []string{"../secret.js", "secret.js", "plans/other/app.js"} {
-		if _, err := resolveHTMLAppletAsset(root, "thoughts/plans/demo/app.html", asset); err == nil {
+		if _, err := resolveHTMLAppletAsset(
+			root,
+			"thoughts/plans/demo/app.html",
+			asset,
+		); err == nil {
 			t.Fatalf("asset %q unexpectedly allowed", asset)
 		}
 	}
@@ -125,10 +137,30 @@ func TestIframeSrcForHTMLAppletAddsNormalizedTheme(t *testing.T) {
 		theme   string
 		want    string
 	}{
-		{"dark", "thoughts/demo.html", "dark", "/thoughts/_render/html/demo.html?theme=dark"},
-		{"light", "thoughts/demo.html", "light", "/thoughts/_render/html/demo.html?theme=light"},
-		{"default", "thoughts/demo.html", "", "/thoughts/_render/html/demo.html?theme=dark"},
-		{"nested", "thoughts/plans/demo report.html", "light", "/thoughts/_render/html/plans/demo%20report.html?theme=light"},
+		{
+			"dark",
+			"thoughts/demo.html",
+			"dark",
+			"/thoughts/_render/html/demo.html?theme=dark",
+		},
+		{
+			"light",
+			"thoughts/demo.html",
+			"light",
+			"/thoughts/_render/html/demo.html?theme=light",
+		},
+		{
+			"default",
+			"thoughts/demo.html",
+			"",
+			"/thoughts/_render/html/demo.html?theme=dark",
+		},
+		{
+			"nested",
+			"thoughts/plans/demo report.html",
+			"light",
+			"/thoughts/_render/html/plans/demo%20report.html?theme=light",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -239,8 +271,12 @@ func TestHTMLAppletRendererReturnsSandboxedFrame(t *testing.T) {
 	if !strings.Contains(html, `allow-popups allow-popups-to-escape-sandbox`) {
 		t.Fatalf("sandbox does not permit new tabs: %s", html)
 	}
-	if strings.Contains(html, "allow-same-origin") {
-		t.Fatalf("sandbox permits same-origin: %s", html)
+	if !strings.Contains(html, "allow-same-origin") {
+		t.Fatalf("sandbox missing allow-same-origin: %s", html)
+	}
+	if strings.Contains(html, "allow-top-navigation") &&
+		!strings.Contains(html, "allow-top-navigation-by-user-activation") {
+		t.Fatalf("sandbox broadened with top-navigation: %s", html)
 	}
 	if strings.Contains(html, "HTML applet:") {
 		t.Fatalf("HTML renderer includes duplicate chrome: %s", html)
