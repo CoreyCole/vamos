@@ -1760,7 +1760,11 @@ func main() {
 	agenthome.RegisterCreateAgentRoute(agentsGroup, markdownService.HandleCreateAgent)
 	roomsGroup := e.Group("/rooms")
 	roomsGroup.Use(authMiddleware)
-	agenthome.RegisterRoomRoutes(roomsGroup, markdownService.ServeAI470Room)
+	agenthome.RegisterRoomRoutes(
+		roomsGroup,
+		markdownService.ServeAI470Room,
+		markdownService.ServeFreeformRoom,
+	)
 	agenthome.RegisterBindPlanLeadRoute(roomsGroup, markdownService.HandleBindPlanLead)
 	agenthome.RegisterAgentProfileRoute(
 		roomsGroup,

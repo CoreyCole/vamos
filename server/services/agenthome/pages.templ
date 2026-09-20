@@ -65,6 +65,14 @@ func rosterBotRowDOMID(slug string) string {
 	return "roster-row-dm-" + slug
 }
 
+func rosterFreeformHref() string {
+	return "/rooms/freeform"
+}
+
+func rosterFreeformRowDOMID() string {
+	return "roster-row-freeform"
+}
+
 func rosterPlanID(id string) string {
 	return string(KindPlan) + ":" + id
 }
@@ -218,6 +226,20 @@ templ RosterRail(view RosterView) {
 						</ul>
 					}
 				}
+				<ul class="flex flex-col">
+					<li id={ rosterFreeformRowDOMID() }>
+						@ConversationRow(ConversationRowArgs{
+							Href:            rosterFreeformHref(),
+							Title:           "Freeform",
+							Initial:         "F",
+							AccentClass:     "bg-emerald-500/90",
+							Selected:        view.Selection.Kind == KindFreeform,
+							DataRosterID:    string(KindFreeform),
+							DataRosterTitle: "Freeform",
+							TestID:          "roster-row-freeform",
+						})
+					</li>
+				</ul>
 				@RosterSection("workbench-v2-roster-docs", "Docs", "space-y-0.5 pt-1") {
 					<ul class="flex flex-col">
 						for _, doc := range view.Docs {

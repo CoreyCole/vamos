@@ -81,7 +81,7 @@ func TestPairwiseRoomsShareThreadAndURL(t *testing.T) {
 			return next(c)
 		}
 	})
-	agenthome.RegisterRoomRoutes(rooms, svc.ServeAI470Room)
+	agenthome.RegisterRoomRoutes(rooms, svc.ServeAI470Room, svc.ServeFreeformRoom)
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/rooms/a2a/research/nova", http.NoBody)
 	e.ServeHTTP(rec, req)

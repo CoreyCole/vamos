@@ -1134,6 +1134,79 @@ func (q *Queries) ListAgentThreadsForUserWithWorkspace(ctx context.Context, user
 	return items, nil
 }
 
+const listAgentThreadsFreeform = `-- name: ListAgentThreadsFreeform :many
+;
+
+SELECT
+id,
+user_email,
+title,
+cwd,
+lineage_id,
+project_id,
+plan_dir_rel,
+head_entry_id,
+parent_thread_id,
+forked_from_entry_id,
+pi_session_id,
+agent_slug,
+room_kind,
+pair_agent_slug_a,
+pair_agent_slug_b,
+created_at,
+updated_at,
+archived_at
+FROM agent_threads
+WHERE room_kind = ''
+AND plan_dir_rel IS NULL
+AND archived_at IS NULL
+AND parent_thread_id IS NULL
+ORDER BY updated_at DESC
+`
+
+// Top-level live freeform conversations (empty room_kind, no plan dir).
+func (q *Queries) ListAgentThreadsFreeform(ctx context.Context) ([]AgentThread, error) {
+	rows, err := q.db.QueryContext(ctx, listAgentThreadsFreeform)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []AgentThread
+	for rows.Next() {
+		var i AgentThread
+		if err := rows.Scan(
+			&i.ID,
+			&i.UserEmail,
+			&i.Title,
+			&i.Cwd,
+			&i.LineageID,
+			&i.ProjectID,
+			&i.PlanDirRel,
+			&i.HeadEntryID,
+			&i.ParentThreadID,
+			&i.ForkedFromEntryID,
+			&i.PiSessionID,
+			&i.AgentSlug,
+			&i.RoomKind,
+			&i.PairAgentSlugA,
+			&i.PairAgentSlugB,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.ArchivedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listSharedAgentThreadsByPlanDir = `-- name: ListSharedAgentThreadsByPlanDir :many
 ;
 

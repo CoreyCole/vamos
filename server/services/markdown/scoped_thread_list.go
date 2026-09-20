@@ -192,6 +192,58 @@ func (s *Service) planThreadJSONLPath(planDirRel string, thread db.AgentThread) 
 	)
 }
 
+func (s *Service) freeformScopedConversationRows(
+	ctx context.Context,
+) ([]agenthome.ConversationRowArgs, error) {
+	if s.queries == nil {
+		return nil, nil
+	}
+	threads, err := s.queries.ListAgentThreadsFreeform(ctx)
+	if err != nil {
+		return nil, err
+	}
+	rows := make([]agenthome.ConversationRowArgs, 0, len(threads))
+	for _, thread := range threads {
+		if strings.EqualFold(thread.RoomKind, "pairwise") {
+			continue
+		}
+		if thread.ParentThreadID.Valid &&
+			strings.TrimSpace(thread.ParentThreadID.String) != "" {
+			continue
+		}
+		rows = append(rows, s.conversationRowForFreeformThread(thread))
+	}
+	return rows, nil
+}
+
+func (s *Service) conversationRowForFreeformThread(
+	thread db.AgentThread,
+) agenthome.ConversationRowArgs {
+	title := strings.TrimSpace(thread.Title)
+	if title == "" {
+		title = "Untitled"
+	}
+	preview := lastJSONLPreview(s.freeformThreadJSONLPath(thread))
+	return agenthome.ConversationRowArgs{
+		ID:          "scoped-thread-row-" + thread.ID,
+		Href:        "/threads/" + thread.ID,
+		Title:       title,
+		Preview:     preview.Text,
+		Time:        rosterPlanTime(preview.Time),
+		Initial:     scopedRowInitial(title),
+		AccentClass: "bg-emerald-500/90",
+		TestID:      "scoped-thread-row",
+	}
+}
+
+func (s *Service) freeformThreadJSONLPath(thread db.AgentThread) string {
+	cwd := strings.TrimSpace(thread.Cwd)
+	if piID := strings.TrimSpace(thread.PiSessionID); piID != "" {
+		return filepath.Join(cwd, ".vamos", "sessions", "pi", piID+".jsonl")
+	}
+	return filepath.Join(cwd, ".vamos", "sessions", "current.jsonl")
+}
+
 func scopedRowInitial(title string) string {
 	for _, r := range strings.TrimSpace(title) {
 		return strings.ToUpper(string(r))

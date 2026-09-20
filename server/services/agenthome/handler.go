@@ -11,11 +11,12 @@ import (
 type RoomKind string
 
 const (
-	KindDM      RoomKind = "dm"
-	KindAgentDM RoomKind = "agent_dm"
-	KindGroup   RoomKind = "group"
-	KindPlan    RoomKind = "plan"
-	KindA2A     RoomKind = "a2a"
+	KindDM       RoomKind = "dm"
+	KindAgentDM  RoomKind = "agent_dm"
+	KindGroup    RoomKind = "group"
+	KindPlan     RoomKind = "plan"
+	KindA2A      RoomKind = "a2a"
+	KindFreeform RoomKind = "freeform"
 )
 
 // ParseKind validates a room kind path segment.
@@ -39,9 +40,13 @@ func RegisterCreateAgentRoute(g *echo.Group, create echo.HandlerFunc) {
 	g.POST("", create)
 }
 
-// RegisterRoomRoutes mounts GET /rooms/a2a/:a/:b and GET /rooms/:kind/:id.
-// serve is typically markdownService.ServeAI470Room.
-func RegisterRoomRoutes(g *echo.Group, serve echo.HandlerFunc) {
+// RegisterRoomRoutes mounts GET /rooms/freeform, GET /rooms/a2a/:a/:b,
+// and GET /rooms/:kind/:id. serveFreeform must be a one-segment handler;
+// ParseKind 404s unknown kinds on /:kind/:id.
+func RegisterRoomRoutes(g *echo.Group, serve, serveFreeform echo.HandlerFunc) {
+	if serveFreeform != nil {
+		g.GET("/freeform", serveFreeform)
+	}
 	g.GET("/a2a/:a/:b", serve)
 	g.GET("/:kind/:id", serve)
 }

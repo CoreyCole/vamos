@@ -251,46 +251,6 @@ func (s *Service) threadChatHeaderTitle(
 	return title, false
 }
 
-func freeformLandChatPlaceholder() templ.Component {
-	return templ.Raw(
-		`<div id="thread-chat"><div id="agent-chat-live-transcript"></div>` +
-			`<form id="agent-chat-composer" ` +
-			`data-on:submit="@post('/thoughts/chat/freeform/send', {contentType: 'form'})">` +
-			`<textarea name="prompt" placeholder="Message"></textarea>` +
-			`<button type="submit">Send</button></form></div>`,
-	)
-}
-
-func (s *Service) freeformLandChat(
-	c echo.Context,
-	userEmail string,
-) (templ.Component, string, error) {
-	index, hasThreads, err := s.workbenchThreadsRenderer.RenderRootThreadsIndex(
-		c.Request().Context(), userEmail,
-	)
-	if err != nil && !errors.Is(err, sql.ErrNoRows) {
-		return nil, "Chat", err
-	}
-	if hasThreads {
-		return index, "Threads", nil
-	}
-	threadID, err := s.workbenchThreadsRenderer.EnsureFreeformLandThread(
-		c.Request().Context(), userEmail,
-	)
-	if err != nil && !errors.Is(err, sql.ErrNoRows) {
-		return nil, "Chat", err
-	}
-	threadID = strings.TrimSpace(threadID)
-	if threadID == "" {
-		return freeformLandChatPlaceholder(), "Chat", nil
-	}
-	chat, err := s.renderSharedThreadChatForRequest(c, threadID, userEmail)
-	if errors.Is(err, sql.ErrNoRows) {
-		return freeformLandChatPlaceholder(), "Chat", nil
-	}
-	return chat, "Chat", err
-}
-
 func (s *Service) ServeThreads(c echo.Context) error {
 	if s.workbenchThreadsRenderer == nil {
 		return echo.NewHTTPError(
@@ -314,10 +274,8 @@ func (s *Service) ServeThreads(c echo.Context) error {
 	artifactComp, artifactPage, artifactDoc := s.indexArtifactComponent(
 		c, artifactPath, hasArtifact,
 	)
-	chat, chatTitle, err := s.freeformLandChat(c, userEmail)
-	if err != nil {
-		return err
-	}
+	chat := WorkbenchUnavailable("Pick a roster scope to see its threads.")
+	chatTitle := "Threads"
 	chatOpen, commentsOpen := chatCommentsOpen(c.Request(), true)
 	artifactOpen := hasArtifact && workbench.ArtifactOpenFromRequest(c.Request())
 	if !hasArtifact {

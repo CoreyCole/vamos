@@ -155,3 +155,44 @@ func TestListAgentThreadsByAgentSlug(t *testing.T) {
 		)
 	}
 }
+
+func TestListAgentThreadsFreeform(t *testing.T) {
+	ctx := context.Background()
+	_, q := openWorkspaceDocsTestDB(t)
+
+	free, err := q.CreateAgentThread(ctx, CreateAgentThreadParams{
+		ID:        "thread-free",
+		UserEmail: "shared",
+		Title:     "free",
+		Cwd:       "/tmp/free",
+		LineageID: "lin-free",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	bot, err := q.CreateAgentThread(ctx, CreateAgentThreadParams{
+		ID:        "thread-bot",
+		UserEmail: "shared",
+		Title:     "bot",
+		Cwd:       "/tmp/bot",
+		LineageID: "lin-bot",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := q.BindAgentThreadBotHome(ctx, BindAgentThreadBotHomeParams{
+		AgentSlug: sql.NullString{String: "alpha", Valid: true},
+		Cwd:       bot.Cwd,
+		Title:     "bot",
+		ID:        bot.ID,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	listed, err := q.ListAgentThreadsFreeform(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(listed) != 1 || listed[0].ID != free.ID {
+		t.Fatalf("freeform list = %+v", listed)
+	}
+}

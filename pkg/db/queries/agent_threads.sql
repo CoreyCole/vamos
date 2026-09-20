@@ -441,6 +441,34 @@ AND archived_at IS NULL
 AND parent_thread_id IS NULL
 ORDER BY updated_at DESC ;
 
+-- name: ListAgentThreadsFreeform :many
+-- Top-level live freeform conversations (empty room_kind, no plan dir).
+SELECT
+id,
+user_email,
+title,
+cwd,
+lineage_id,
+project_id,
+plan_dir_rel,
+head_entry_id,
+parent_thread_id,
+forked_from_entry_id,
+pi_session_id,
+agent_slug,
+room_kind,
+pair_agent_slug_a,
+pair_agent_slug_b,
+created_at,
+updated_at,
+archived_at
+FROM agent_threads
+WHERE room_kind = ''
+AND plan_dir_rel IS NULL
+AND archived_at IS NULL
+AND parent_thread_id IS NULL
+ORDER BY updated_at DESC ;
+
 -- name: GetBotHomeThreadBySlug :one
 SELECT
 id,

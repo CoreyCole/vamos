@@ -17,16 +17,17 @@ import (
 )
 
 type threadWorkbenchTestRenderer struct {
-	artifact      string
-	listThreadID  string
-	chatThreadID  string
-	threadPlanDir string
-	threadPlanErr error
-	findID        string
-	lastFindDoc   string
-	ensureID      string
-	lastEnsureDoc string
-	rootIndex     bool
+	artifact       string
+	listThreadID   string
+	chatThreadID   string
+	threadPlanDir  string
+	threadPlanErr  error
+	findID         string
+	lastFindDoc    string
+	ensureID       string
+	lastEnsureDoc  string
+	rootIndex      bool
+	ensureFreeform bool
 }
 
 func (r *threadWorkbenchTestRenderer) RenderWorkbenchThreadList(
@@ -76,6 +77,7 @@ func (r *threadWorkbenchTestRenderer) EnsureFreeformLandThread(
 	context.Context,
 	string,
 ) (string, error) {
+	r.ensureFreeform = true
 	if r.ensureID != "" {
 		return r.ensureID, nil
 	}
@@ -231,14 +233,23 @@ func TestServeThreadsIndexOpensFreeformChat(t *testing.T) {
 		t.Fatal(err)
 	}
 	body := rec.Body.String()
-	if r.chatThreadID != "land-chat" {
+	if r.ensureFreeform {
+		t.Fatal("GET /threads must not EnsureFreeformLandThread")
+	}
+	if r.chatThreadID != "" {
 		t.Fatalf("chat thread = %q", r.chatThreadID)
 	}
-	if strings.Contains(body, "Select a thread to open chat") {
-		t.Fatal("index still uses unavailable stub")
+	if strings.Contains(body, `id="agent-chat-composer"`) {
+		t.Fatal("pick-scope /threads must not render composer")
 	}
-	if !strings.Contains(body, `id="agent-chat-composer"`) {
-		t.Fatalf("missing composer: %s", body)
+	if strings.Contains(body, `data-testid="root-threads-index"`) {
+		t.Fatal("pick-scope /threads must not list freeform threads")
+	}
+	if !strings.Contains(body, "Pick a roster scope to see its threads.") {
+		t.Fatalf("missing pick-scope copy: %s", body)
+	}
+	if !strings.Contains(body, `href="/rooms/freeform"`) {
+		t.Fatalf("missing freeform navigator: %s", body)
 	}
 	if !strings.Contains(body, `data-testid="mobile-toggle-threads"`) {
 		t.Fatalf("missing roster hamburger: %s", body)
@@ -275,17 +286,14 @@ func TestServeThreadsIndexListsRootThreads(t *testing.T) {
 	if r.chatThreadID != "" {
 		t.Fatalf("opened full chat %q", r.chatThreadID)
 	}
-	if !strings.Contains(body, `data-testid="root-threads-index"`) {
-		t.Fatalf("missing threads index: %s", body)
+	if r.ensureFreeform {
+		t.Fatal("GET /threads must not ensure a freeform thread")
 	}
-	if !strings.Contains(body, "what is in your context?") {
-		t.Fatalf("missing first message: %s", body)
-	}
-	if !strings.Contains(body, `href="/threads/land-chat"`) {
-		t.Fatalf("missing thread link: %s", body)
+	if strings.Contains(body, `data-testid="root-threads-index"`) {
+		t.Fatal("bare /threads must not render the freeform list")
 	}
 	if strings.Contains(body, `id="agent-chat-composer"`) {
-		t.Fatal("index should not open full chat composer")
+		t.Fatal("pick-scope must not open composer")
 	}
 }
 

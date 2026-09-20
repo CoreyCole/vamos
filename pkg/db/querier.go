@@ -142,6 +142,8 @@ type Querier interface {
 	ListAgentThreadsByWorkspace(ctx context.Context, workspaceID string) ([]AgentThread, error)
 	ListAgentThreadsForPlanDirBackfill(ctx context.Context) ([]ListAgentThreadsForPlanDirBackfillRow, error)
 	ListAgentThreadsForUserWithWorkspace(ctx context.Context, userEmail string) ([]ListAgentThreadsForUserWithWorkspaceRow, error)
+	// Top-level live freeform conversations (empty room_kind, no plan dir).
+	ListAgentThreadsFreeform(ctx context.Context) ([]AgentThread, error)
 	ListChatAnnotationsBySession(ctx context.Context, sessionID string) ([]ChatAnnotation, error)
 	ListChatSessionEventsAfter(ctx context.Context, arg ListChatSessionEventsAfterParams) ([]ChatSessionEvent, error)
 	ListChatSessionEventsThrough(ctx context.Context, arg ListChatSessionEventsThroughParams) ([]ChatSessionEvent, error)
