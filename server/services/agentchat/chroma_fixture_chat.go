@@ -5,21 +5,25 @@ import (
 	"fmt"
 	"net/url"
 	"strings"
+	"time"
 
 	"github.com/a-h/templ"
 )
 
 const (
-	chromaHighlightFixtureDOMID  = "ai470-chroma-highlight-fixture"
-	groupQuoteFixtureDOMID       = "ai470-group-quote-fixture"
-	groupPeerFixtureDOMID        = "ai470-group-peer-fixture"
-	densityFixtureReasoningDOMID = "ai470-density-fixture-reasoning"
-	densityFixtureTool0DOMID     = "ai470-density-fixture-tool-0"
-	densityFixtureTool1DOMID     = "ai470-density-fixture-tool-1"
-	pairwisePeerFixtureDOMID     = "ai470-pairwise-peer-fixture"
-	pairwiseSelfFixtureDOMID     = "ai470-pairwise-self-fixture"
-	historyFixtureDOMIDPrefix    = "ai470-history-fixture-"
-	historyFixtureExtraMessages  = 5 // stableTranscriptInitialLimit+N so HasMoreOlder=true
+	chromaHighlightFixtureDOMID     = "ai470-chroma-highlight-fixture"
+	groupQuoteFixtureDOMID          = "ai470-group-quote-fixture"
+	groupPeerFixtureDOMID           = "ai470-group-peer-fixture"
+	densityFixtureReasoningDOMID    = "ai470-density-fixture-reasoning"
+	densityFixtureTool0DOMID        = "ai470-density-fixture-tool-0"
+	densityFixtureTool1DOMID        = "ai470-density-fixture-tool-1"
+	pairwisePeerFixtureDOMID        = "ai470-pairwise-peer-fixture"
+	pairwiseSelfFixtureDOMID        = "ai470-pairwise-self-fixture"
+	messageThreadParentFixtureDOMID = "ai470-message-thread-parent"
+	messageThreadReply1FixtureID    = "ai470-message-thread-reply-1"
+	messageThreadReply2FixtureID    = "ai470-message-thread-reply-2"
+	historyFixtureDOMIDPrefix       = "ai470-history-fixture-"
+	historyFixtureExtraMessages     = 5 // stableTranscriptInitialLimit+N so HasMoreOlder=true
 )
 
 // chromaHighlightFixtureMarkdown is a visible assistant bubble for UX chroma VA.
@@ -36,7 +40,7 @@ func (s *Service) RenderSharedThreadChatWithChromaFixture(
 	ctx context.Context,
 	threadID, userEmail string,
 ) (templ.Component, error) {
-	return s.renderSharedThreadChat(ctx, threadID, userEmail, "dm-bot")
+	return s.renderSharedThreadChat(ctx, threadID, userEmail, "dm-bot", "")
 }
 
 // RenderSharedThreadChatWithGroupBubbleFixture seeds multi-author bubbles + NestedQuoteBlock.
@@ -44,13 +48,14 @@ func (s *Service) RenderSharedThreadChatWithGroupBubbleFixture(
 	ctx context.Context,
 	threadID, userEmail string,
 ) (templ.Component, error) {
-	return s.renderSharedThreadChat(ctx, threadID, userEmail, "group")
+	return s.renderSharedThreadChat(ctx, threadID, userEmail, "group", "")
 }
 
 func (s *Service) renderSharedThreadChat(
 	ctx context.Context,
 	threadID, userEmail string,
 	fixtureMode string,
+	openParentEntryID string,
 ) (templ.Component, error) {
 	thread, err := s.queries.GetSharedAgentThread(ctx, strings.TrimSpace(threadID))
 	if err != nil {
@@ -80,6 +85,8 @@ func (s *Service) renderSharedThreadChat(
 	case "history":
 		// Long wipe so applyStableTranscriptWindow yields SentinelAbove.
 		stable = append(stable, s.historyFixtureMessages()...)
+	case "replies":
+		stable = append(stable, s.messageThreadFixtureMessages()...)
 	}
 	live, cursor := s.buildLiveTranscript(thread.ID)
 	args := EmbeddedFreeformPanelArgs{
@@ -117,6 +124,23 @@ func (s *Service) renderSharedThreadChat(
 	if family, ferr := s.BuildChatThreadFamily(ctx, thread.ID); ferr == nil {
 		args.ThreadFamily = family
 	}
+	openParent := strings.TrimSpace(openParentEntryID)
+	if openParent != "" && openParent != thread.ID {
+		parent := findTranscriptMessage(stable, openParent)
+		view, verr := s.loadMessageThreadView(
+			ctx,
+			thread.ID,
+			openParent,
+			parent,
+			args.ComposerDisabled,
+		)
+		if verr == nil {
+			if fixtureMode == "replies" && len(view.Replies) == 0 {
+				view = s.messageThreadFixtureView(thread.ID, args.ComposerDisabled)
+			}
+			args.MessageThread = view
+		}
+	}
 	return SharedThreadChat(args), nil
 }
 
@@ -125,7 +149,7 @@ func (s *Service) RenderSharedThreadChatWithPairwiseFixture(
 	ctx context.Context,
 	threadID, userEmail string,
 ) (templ.Component, error) {
-	return s.renderSharedThreadChat(ctx, threadID, userEmail, "pairwise")
+	return s.renderSharedThreadChat(ctx, threadID, userEmail, "pairwise", "")
 }
 
 // RenderSharedThreadChatWithDensityFixture seeds reasoning/tool/subagent details
@@ -134,7 +158,7 @@ func (s *Service) RenderSharedThreadChatWithDensityFixture(
 	ctx context.Context,
 	threadID, userEmail string,
 ) (templ.Component, error) {
-	return s.renderSharedThreadChat(ctx, threadID, userEmail, "density")
+	return s.renderSharedThreadChat(ctx, threadID, userEmail, "density", "")
 }
 
 // RenderSharedThreadChatWithHistoryFixture seeds >stableTranscriptInitialLimit
@@ -143,7 +167,20 @@ func (s *Service) RenderSharedThreadChatWithHistoryFixture(
 	ctx context.Context,
 	threadID, userEmail string,
 ) (templ.Component, error) {
-	return s.renderSharedThreadChat(ctx, threadID, userEmail, "history")
+	return s.renderSharedThreadChat(ctx, threadID, userEmail, "history", "")
+}
+
+func (s *Service) RenderSharedThreadChatWithMessageThreadFixture(
+	ctx context.Context,
+	threadID, userEmail string,
+) (templ.Component, error) {
+	return s.renderSharedThreadChat(
+		ctx,
+		threadID,
+		userEmail,
+		"replies",
+		messageThreadParentFixtureDOMID,
+	)
 }
 
 func groupBotDMChipFixture(originTurnID string) *BotDMChip {
@@ -309,4 +346,56 @@ func (s *Service) historyFixtureMessages() []TranscriptMessage {
 		)
 	}
 	return out
+}
+
+func (s *Service) messageThreadFixtureMessages() []TranscriptMessage {
+	parent := TranscriptMessage{
+		DOMID:   messageThreadParentFixtureDOMID,
+		EntryID: messageThreadParentFixtureDOMID,
+		Variant: "bubble",
+		Role:    "assistant",
+		Content: "Parent message with Slack-style replies (fixture).",
+	}
+	parent = withDefaultAssistantBubbleChrome(parent)
+	parent.ThreadSummary = &ThreadReplySummary{
+		ParentEntryID: messageThreadParentFixtureDOMID,
+		ReplyCount:    2,
+		LastReplyAt:   time.Now().Add(-2 * time.Minute),
+		Authors: []ThreadReplyAuthor{
+			{Initial: "C", Name: "Corey", AvatarBg: "bg-indigo-600"},
+			{Initial: "L", Name: "Lead", AvatarBg: "bg-emerald-600"},
+		},
+	}
+	return []TranscriptMessage{parent, s.chromaHighlightFixtureMessage()}
+}
+
+func (s *Service) messageThreadFixtureView(
+	threadID string,
+	composerDisabled bool,
+) MessageThreadView {
+	parent := s.messageThreadFixtureMessages()[0]
+	return MessageThreadView{
+		ThreadID:         threadID,
+		Parent:           parent,
+		ComposerDisabled: composerDisabled,
+		Open:             true,
+		Replies: []MessageThreadReply{
+			{
+				ID:   messageThreadReply1FixtureID,
+				Body: "First reply from Corey.",
+				Author: ThreadReplyAuthor{
+					Initial: "C", Name: "Corey", AvatarBg: "bg-indigo-600",
+				},
+				CreatedAt: time.Now().Add(-5 * time.Minute),
+			},
+			{
+				ID:   messageThreadReply2FixtureID,
+				Body: "Second reply from Lead.",
+				Author: ThreadReplyAuthor{
+					Initial: "L", Name: "Lead", AvatarBg: "bg-emerald-600",
+				},
+				CreatedAt: time.Now().Add(-2 * time.Minute),
+			},
+		},
+	}
 }

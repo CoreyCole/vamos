@@ -644,6 +644,26 @@ created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
 PRIMARY KEY (thread_id, op_id)
 ) ;
 
+-- Slack-style in-room replies (Option A). Same thread_id; parent_entry_id
+-- points at the parent transcript EntryID. Distinct from agent_entries lineage.
+CREATE TABLE IF NOT EXISTS agent_thread_entries (
+id TEXT PRIMARY KEY,
+thread_id TEXT NOT NULL REFERENCES agent_threads (id) ON DELETE CASCADE,
+parent_entry_id TEXT,
+author_kind TEXT NOT NULL DEFAULT 'user' CHECK (author_kind IN ('user',
+'agent')),
+author_name TEXT NOT NULL DEFAULT '',
+author_initial TEXT NOT NULL DEFAULT '',
+author_slug TEXT NOT NULL DEFAULT '',
+author_email TEXT NOT NULL DEFAULT '',
+avatar_bg TEXT NOT NULL DEFAULT '',
+body TEXT NOT NULL DEFAULT '',
+created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+) ;
+
+CREATE INDEX IF NOT EXISTS idx_agent_thread_entries_parent
+ON agent_thread_entries (thread_id, parent_entry_id, created_at ASC) ;
+
 CREATE INDEX IF NOT EXISTS idx_agent_runs_workspace_node_created
 ON agent_runs (workspace_id, workflow_node_id, created_at DESC)
 WHERE workflow_node_id IS NOT NULL ;

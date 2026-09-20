@@ -129,6 +129,20 @@ type AgentThreadDraft struct {
 	UpdatedAt      time.Time `json:"updated_at"`
 }
 
+type AgentThreadEntry struct {
+	ID            string         `json:"id"`
+	ThreadID      string         `json:"thread_id"`
+	ParentEntryID sql.NullString `json:"parent_entry_id"`
+	AuthorKind    string         `json:"author_kind"`
+	AuthorName    string         `json:"author_name"`
+	AuthorInitial string         `json:"author_initial"`
+	AuthorSlug    string         `json:"author_slug"`
+	AuthorEmail   string         `json:"author_email"`
+	AvatarBg      string         `json:"avatar_bg"`
+	Body          string         `json:"body"`
+	CreatedAt     time.Time      `json:"created_at"`
+}
+
 type AgentThreadOp struct {
 	ThreadID         string         `json:"thread_id"`
 	OpID             string         `json:"op_id"`

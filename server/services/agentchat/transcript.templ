@@ -16,7 +16,7 @@ templ MessagesPane(threadID string, state TranscriptPaneState, hasThread bool, f
 		}
 	}}
 	@infinitescroll.Host(infinitescroll.HostArgs{
-		ID: agentChatScrollHostID,
+		ID:    agentChatScrollHostID,
 		Class: "flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-y-auto overflow-x-hidden",
 	}) {
 		<div
@@ -102,6 +102,9 @@ templ TranscriptMessageWithFork(threadID string, msg TranscriptMessage, forkActi
 			@ChatMessageWithActions(chatMessageArgsFromTranscript(msg)) {
 				@MessageActionsCluster(threadID, msg, forkAction)
 			}
+			if msg.ThreadSummary != nil && msg.ThreadSummary.ReplyCount >= 1 {
+				@ThreadSummaryRow(threadID, msg)
+			}
 			if msg.BotDMChip != nil && len(msg.BotDMChip.Bots) > 0 {
 				@BotDMChipPopover(*msg.BotDMChip)
 			}
@@ -110,7 +113,6 @@ templ TranscriptMessageWithFork(threadID string, msg TranscriptMessage, forkActi
 		</div>
 	}
 }
-
 
 // SubagentLiveCard is Open + status only for child threads (not BotDMChip,
 // not Pi subagent toolCall detail row). DOMID = subagent-card-{childThreadId}.
@@ -359,7 +361,6 @@ templ ChatMessageComplete(args ChatMessageCompleteArgs) {
 		QuoteText:      args.QuoteText,
 	})
 }
-
 
 templ BotDMChipPopover(chip BotDMChip) {
 	{{ chipID := botDMChipID(chip) }}

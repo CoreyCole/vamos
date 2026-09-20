@@ -132,7 +132,14 @@ func (s *Service) RenderSharedThreadChat(
 	ctx context.Context,
 	threadID, userEmail string,
 ) (templ.Component, error) {
-	return s.renderSharedThreadChat(ctx, threadID, userEmail, "")
+	return s.renderSharedThreadChat(ctx, threadID, userEmail, "", "")
+}
+
+func (s *Service) RenderSharedThreadChatOpen(
+	ctx context.Context,
+	threadID, userEmail, openParentEntryID string,
+) (templ.Component, error) {
+	return s.renderSharedThreadChat(ctx, threadID, userEmail, "", openParentEntryID)
 }
 
 func (s *Service) ListWorkbenchThreads(

@@ -78,6 +78,20 @@ func TestAgentMemoryPairwiseFixtureViewOnlyStory(t *testing.T) {
 		Run()
 }
 
+func TestAgentMemoryMessageThreadFixtureStory(t *testing.T) {
+	skipUnlessAgentMemoryFixtureGates(t, "message_thread")
+	spec.Story(t, "agent-memory message thread replies").
+		App(vamos.App()).
+		Viewport(duiruntime.ViewportDesktopFull).
+		As(vamos.Robot).
+		With(vamos.WorkspaceFixture(fixtures.WorkbenchV2Fixture)).
+		Do(vamos.OpenAgentMemoryMessageThreadFixture()).
+		Expect(vamos.WorkbenchV2.Ready()).
+		Expect(vamos.ExpectMessageThreadFixtureSeeded()).
+		Expect(vamos.Console.Clean()).
+		Run()
+}
+
 func TestAgentMemoryHistoryFixtureInfiniteScrollStory(t *testing.T) {
 	skipUnlessAgentMemoryFixtureGates(t, "history")
 	spec.Story(t, "agent-memory history fixture infinite-scroll").
@@ -97,7 +111,10 @@ func TestAgentMemoryHistoryFixtureInfiniteScrollStory(t *testing.T) {
 // execute — this checkout wires group_bubble / pairwise / history fixtures.
 func skipUnlessAgentMemoryFixtureGates(t *testing.T, kind string) {
 	t.Helper()
-	if strings.EqualFold(strings.TrimSpace(os.Getenv("VAMOS_E2E_REQUIRE_AGENT_MEMORY_FIXTURES")), "1") {
+	if strings.EqualFold(
+		strings.TrimSpace(os.Getenv("VAMOS_E2E_REQUIRE_AGENT_MEMORY_FIXTURES")),
+		"1",
+	) {
 		return
 	}
 	base := strings.TrimSpace(os.Getenv("VAMOS_E2E_BASE_URL"))
@@ -107,7 +124,12 @@ func skipUnlessAgentMemoryFixtureGates(t *testing.T, kind string) {
 		return
 	}
 	if strings.Contains(base, "agent-memory-observable-context") &&
-		strings.TrimSpace(os.Getenv("VAMOS_E2E_AGENT_MEMORY_ALLOW_PENDING_GATES")) == "1" {
-		t.Skipf("pending FE/BE tip for %s fixture gates on tip host; unset VAMOS_E2E_AGENT_MEMORY_ALLOW_PENDING_GATES after tip", kind)
+		strings.TrimSpace(
+			os.Getenv("VAMOS_E2E_AGENT_MEMORY_ALLOW_PENDING_GATES"),
+		) == "1" {
+		t.Skipf(
+			"pending FE/BE tip for %s fixture gates on tip host; unset VAMOS_E2E_AGENT_MEMORY_ALLOW_PENDING_GATES after tip",
+			kind,
+		)
 	}
 }

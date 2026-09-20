@@ -86,26 +86,22 @@ func TestSharedThreadChatFamilyBarMorphMapAndComposerGate(t *testing.T) {
 		t.Fatalf("Html() error = %v", err)
 	}
 	for _, want := range []string{
-		`id="agent-chat-thread-family"`,
-		`id="agent-chat-thread-family-list"`,
-		`data-testid="agent-chat-thread-family"`,
-		`href="/rooms/dm/nova"`,
-		`href="/threads/child-1"`,
 		`id="agent-chat-scroll-region"`,
 		`id="agent-chat-stable-transcript"`,
+		`id="agent-chat-message-thread"`,
 	} {
 		if !strings.Contains(out, want) {
 			t.Fatalf("missing %q in:\n%s", want, out)
 		}
 	}
-	familyAt := strings.Index(out, `id="agent-chat-thread-family"`)
-	hostAt := strings.Index(out, `id="agent-chat-scroll-region"`)
-	if !(familyAt >= 0 && hostAt > familyAt) {
-		t.Fatalf(
-			"family bar must sit above Pattern A Host; family=%d host=%d",
-			familyAt,
-			hostAt,
-		)
+	for _, unwanted := range []string{
+		`id="agent-chat-thread-family"`,
+		`data-testid="agent-chat-thread-family"`,
+		`>Threads</span>`,
+	} {
+		if strings.Contains(out, unwanted) {
+			t.Fatalf("parked family bar leaked %q in:\n%s", unwanted, out)
+		}
 	}
 	if strings.Contains(out, `id="agent-chat-composer-form"`) {
 		t.Fatal("pairwise/composer-disabled chat must omit composer")

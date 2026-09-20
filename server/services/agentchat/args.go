@@ -130,6 +130,7 @@ type TranscriptMessage struct {
 	QuoteNameColor string
 	QuoteText      string
 	BotDMChip      *BotDMChip
+	ThreadSummary  *ThreadReplySummary
 }
 
 // BotDMChip is Grok-style group-room chrome for message_room traffic.
@@ -775,7 +776,6 @@ type transcriptDetailState struct {
 	Expanded bool `json:"expanded"`
 }
 
-
 // chatDensityKind labels expandable detail rows for MorphMap (tool vs reasoning).
 // Not used for bubble markdown/chroma messages.
 func chatDensityKind(msg TranscriptMessage) string {
@@ -787,7 +787,15 @@ func chatDensityKind(msg TranscriptMessage) string {
 	}
 	title := strings.ToLower(strings.TrimSpace(msg.Title))
 	switch title {
-	case "bash", "read", "subagent", "message_room", "edit", "write", "grep", "glob", "tool":
+	case "bash",
+		"read",
+		"subagent",
+		"message_room",
+		"edit",
+		"write",
+		"grep",
+		"glob",
+		"tool":
 		return "tool"
 	default:
 		if strings.HasPrefix(title, "tool") || strings.Contains(title, "subagent") {

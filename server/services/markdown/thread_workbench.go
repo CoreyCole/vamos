@@ -352,6 +352,20 @@ type historyFixtureChatRenderer interface {
 	) (templ.Component, error)
 }
 
+type messageThreadFixtureChatRenderer interface {
+	RenderSharedThreadChatWithMessageThreadFixture(
+		ctx context.Context,
+		threadID, userEmail string,
+	) (templ.Component, error)
+}
+
+type openMessageThreadChatRenderer interface {
+	RenderSharedThreadChatOpen(
+		ctx context.Context,
+		threadID, userEmail, openParentEntryID string,
+	) (templ.Component, error)
+}
+
 func densityFixtureRequested(c echo.Context) bool {
 	if strings.TrimSpace(c.QueryParam("density_fixture")) == "1" {
 		return true
@@ -380,6 +394,22 @@ func historyFixtureRequested(c echo.Context) bool {
 	return strings.EqualFold(strings.TrimSpace(c.QueryParam("fixture")), "history")
 }
 
+func messageThreadFixtureRequested(c echo.Context) bool {
+	if strings.TrimSpace(c.QueryParam("message_thread_fixture")) == "1" {
+		return true
+	}
+	alias := strings.ToLower(strings.TrimSpace(c.QueryParam("fixture")))
+	return alias == "replies" || alias == "message_thread"
+}
+
+func openMessageThreadParent(c echo.Context, threadID string) string {
+	open := strings.TrimSpace(c.QueryParam("thread"))
+	if open == "" || open == strings.TrimSpace(threadID) {
+		return ""
+	}
+	return open
+}
+
 func (s *Service) renderSharedThreadChatForRequest(
 	c echo.Context,
 	threadID, userEmail string,
@@ -393,7 +423,11 @@ func (s *Service) renderSharedThreadChatForRequest(
 	}
 	if groupBubbleFixtureRequested(c) {
 		if r, ok := s.workbenchThreadsRenderer.(groupBubbleFixtureChatRenderer); ok {
-			return r.RenderSharedThreadChatWithGroupBubbleFixture(ctx, threadID, userEmail)
+			return r.RenderSharedThreadChatWithGroupBubbleFixture(
+				ctx,
+				threadID,
+				userEmail,
+			)
 		}
 	}
 	if pairwiseFixtureRequested(c) {

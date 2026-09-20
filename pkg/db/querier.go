@@ -69,6 +69,7 @@ type Querier interface {
 	GetAgentSessionByPath(ctx context.Context, artifactPath sql.NullString) (AgentSession, error)
 	GetAgentThread(ctx context.Context, id string) (AgentThread, error)
 	GetAgentThreadDraft(ctx context.Context, arg GetAgentThreadDraftParams) (string, error)
+	GetAgentThreadEntry(ctx context.Context, id string) (AgentThreadEntry, error)
 	GetAgentThreadForUser(ctx context.Context, arg GetAgentThreadForUserParams) (AgentThread, error)
 	GetAgentThreadForWorkspaceUser(ctx context.Context, arg GetAgentThreadForWorkspaceUserParams) (AgentThread, error)
 	GetAgentThreadOp(ctx context.Context, arg GetAgentThreadOpParams) (AgentThreadOp, error)
@@ -113,6 +114,7 @@ type Querier interface {
 	GetWorkspaceEventByKey(ctx context.Context, arg GetWorkspaceEventByKeyParams) (WorkspaceEvent, error)
 	GetWorkspaceForUser(ctx context.Context, arg GetWorkspaceForUserParams) (Workspace, error)
 	GetWorkspaceSyncDiagnostic(ctx context.Context, arg GetWorkspaceSyncDiagnosticParams) (WorkspaceSyncDiagnostic, error)
+	InsertAgentThreadEntry(ctx context.Context, arg InsertAgentThreadEntryParams) error
 	InsertAgentThreadOp(ctx context.Context, arg InsertAgentThreadOpParams) (int64, error)
 	InsertSnapshotProcess(ctx context.Context, arg InsertSnapshotProcessParams) error
 	InsertSystemSnapshot(ctx context.Context, arg InsertSystemSnapshotParams) (SystemSnapshot, error)
@@ -129,6 +131,8 @@ type Querier interface {
 	ListAgentSessionsByProjectedThreadID(ctx context.Context, projectedThreadID sql.NullString) ([]AgentSession, error)
 	ListAgentSessionsByWorkspace(ctx context.Context, attachedWorkspaceID sql.NullString) ([]AgentSession, error)
 	ListAgentSurfaceAttachmentsBySession(ctx context.Context, chatSessionID string) ([]AgentSurfaceAttachment, error)
+	ListAgentThreadEntriesByParent(ctx context.Context, arg ListAgentThreadEntriesByParentParams) ([]AgentThreadEntry, error)
+	ListAgentThreadEntriesByThread(ctx context.Context, threadID string) ([]AgentThreadEntry, error)
 	ListAgentThreads(ctx context.Context, arg ListAgentThreadsParams) ([]AgentThread, error)
 	ListAgentThreadsByParentThreadID(ctx context.Context, parentThreadID sql.NullString) ([]AgentThread, error)
 	// Plan-home children: FK only (freeform NULL excluded).

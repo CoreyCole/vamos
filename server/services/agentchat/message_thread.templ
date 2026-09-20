@@ -1,0 +1,129 @@
+package agentchat
+
+import (
+	"strconv"
+
+	"github.com/CoreyCole/vamos/pkg/datastarui/components/sheet"
+)
+
+templ ThreadSummaryRow(threadID string, msg TranscriptMessage) {
+	if msg.ThreadSummary != nil && msg.ThreadSummary.ReplyCount >= 1 {
+		{{ sum := *msg.ThreadSummary }}
+		{{ shown, extra := visibleReplyAuthors(sum.Authors) }}
+		{{ entryID := transcriptEntryID(msg) }}
+		<button
+			type="button"
+			id={ messageThreadSummaryID(entryID) }
+			class="mt-0.5 flex max-w-[85%] items-center gap-1.5 py-0.5 text-left text-[12px] leading-5"
+			data-testid="agent-chat-thread-summary"
+			data-on:click={ openMessageThreadExpr(threadID, entryID) }
+		>
+			<span class="flex shrink-0 items-center" aria-hidden="true">
+				for i, author := range shown {
+					<span
+						class={
+							"inline-flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-semibold text-white ring-2 ring-background",
+							templ.KV(author.AvatarBg, author.AvatarBg != ""),
+							templ.KV("bg-slate-600", author.AvatarBg == ""),
+							templ.KV("-ml-1.5", i > 0),
+						}
+					>
+						{ author.Initial }
+					</span>
+				}
+				if extra > 0 {
+					<span class="ml-0.5 text-[11px] text-muted-foreground">+{ strconv.Itoa(extra) }</span>
+				}
+			</span>
+			<span class="font-medium text-sky-400">{ formatReplyCount(sum.ReplyCount) }</span>
+			if !sum.LastReplyAt.IsZero() {
+				<span class="truncate text-muted-foreground">{ formatLastReply(sum.LastReplyAt) }</span>
+			}
+		</button>
+	}
+}
+
+templ MessageThreadHost(view MessageThreadView) {
+	<div id={ agentChatMessageThreadID } class="contents">
+		if view.Open {
+			<div class="hidden h-full min-h-0 w-[360px] shrink-0 flex-col border-l border-border bg-background md:flex lg:w-[400px]">
+				@MessageThreadPanelBody(view)
+			</div>
+			<div class="md:hidden">
+				@sheet.Sheet(sheet.SheetArgs{
+					ID:          agentChatMessageThreadSheetID,
+					DefaultOpen: true,
+					Modal:       true,
+					Side:        "bottom",
+				}) {
+					@sheet.SheetContent(sheet.SheetContentArgs{SheetID: agentChatMessageThreadSheetID, Class: "max-h-[80vh] overflow-y-auto"}) {
+						@sheet.SheetHeader(sheet.SheetHeaderArgs{}) {
+							@sheet.SheetTitle(sheet.SheetTitleArgs{}) {
+								Thread
+							}
+						}
+						@MessageThreadPanelBody(view)
+					}
+				}
+			</div>
+		}
+	</div>
+}
+
+templ MessageThreadPanelBody(view MessageThreadView) {
+	<div class="flex min-h-0 flex-1 flex-col">
+		<div class="flex items-center justify-between gap-2 border-b border-border px-3 py-2">
+			<p class="text-sm font-medium text-foreground">Thread</p>
+			<button
+				type="button"
+				class="rounded-md px-2 py-1 text-xs text-muted-foreground hover:bg-muted"
+				data-on:click={ closeMessageThreadExpr(view.ThreadID) }
+			>
+				Close
+			</button>
+		</div>
+		<div class="min-h-0 flex-1 overflow-y-auto px-3 py-2">
+			if view.Parent.DOMID != "" || view.Parent.Content != "" {
+				<div class="mb-3 border-b border-border pb-3">
+					@ChatMessageWithActions(chatMessageArgsFromTranscript(view.Parent)) {
+						<span></span>
+					}
+				</div>
+			}
+			<div class="space-y-2">
+				for _, reply := range view.Replies {
+					<div
+						id={ messageThreadReplyRowID(view.Parent.EntryID, reply.ID) }
+						class="flex items-start gap-2"
+					>
+						@BubbleAvatar(reply.Author.Initial, reply.Author.AvatarBg)
+						<div class="min-w-0">
+							if reply.Author.Name != "" {
+								@BubbleAuthorName(reply.Author.Name, "text-muted-foreground")
+							}
+							<p class="whitespace-pre-wrap break-words text-[13px] leading-snug text-foreground">{ reply.Body }</p>
+						</div>
+					</div>
+				}
+			</div>
+		</div>
+		if !view.ComposerDisabled && view.Open {
+			<form
+				id="agent-chat-message-thread-reply-form"
+				method="post"
+				class="shrink-0 border-t border-border px-3 py-2"
+				data-on:submit__prevent={ postMessageThreadReplyExpr(view.ThreadID, view.Parent.EntryID) }
+			>
+				<input type="hidden" name="parent_entry_id" value={ view.Parent.EntryID } id="agent-chat-message-thread-parent"/>
+				<textarea
+					name="body"
+					class="min-h-16 w-full rounded-md border border-input bg-background px-2 py-1 text-sm text-foreground"
+					placeholder="Reply…"
+				></textarea>
+				<button type="submit" class="mt-2 rounded-md bg-secondary px-2 py-1 text-xs font-medium text-secondary-foreground hover:bg-secondary/90">
+					Reply
+				</button>
+			</form>
+		}
+	</div>
+}

@@ -183,6 +183,8 @@ func (h *Handler) RegisterRuntimeRoutes(g *echo.Group) {
 	g.POST("/thread/:thread_id/resume", h.ResumeThreadByPath)
 	g.POST("/thread/:thread_id/fork", h.ForkThreadByPath)
 	g.POST("/thread/:thread_id/draft", h.SaveThreadDraft)
+	g.GET("/thread/:thread_id/message-thread", h.GetMessageThread)
+	g.POST("/thread/:thread_id/replies", h.PostMessageThreadReply)
 	h.RegisterHermesRoutes(g)
 	g.GET("/sessions/stream", h.StreamSessions)
 	g.POST("/pi-sessions/open", h.OpenPiSession)

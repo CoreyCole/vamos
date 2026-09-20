@@ -29,6 +29,7 @@ func TestAgentMemoryFixtureQueryContract(t *testing.T) {
 		{"fixture=history", false, false, false, true},
 		{"fixture=History", false, false, false, true},
 		{"", false, false, false, false},
+		{"message_thread_fixture=1", false, false, false, false},
 	}
 	for _, tc := range cases {
 		req := httptest.NewRequest(http.MethodGet, "/threads/x?"+tc.raw, nil)
@@ -45,5 +46,10 @@ func TestAgentMemoryFixtureQueryContract(t *testing.T) {
 		if got := historyFixtureRequested(c); got != tc.history {
 			t.Fatalf("%q history=%v want %v", tc.raw, got, tc.history)
 		}
+	}
+	req := httptest.NewRequest(http.MethodGet, "/threads/x?message_thread_fixture=1", nil)
+	c := e.NewContext(req, httptest.NewRecorder())
+	if !messageThreadFixtureRequested(c) {
+		t.Fatal("message_thread_fixture=1 should request replies fixture")
 	}
 }

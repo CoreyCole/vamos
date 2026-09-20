@@ -4537,7 +4537,8 @@ func (s *Service) buildStableTranscript(
 		messages = append(messages, items...)
 	}
 
-	return s.attachDerivedBotDMChips(thread, combinePairedToolMessages(messages)), nil
+	messages = s.attachDerivedBotDMChips(thread, combinePairedToolMessages(messages))
+	return s.attachThreadReplySummaries(ctx, thread.ID, messages), nil
 }
 
 func (s *Service) buildLiveTranscript(threadID string) (LiveTranscriptView, int64) {

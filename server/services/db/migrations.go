@@ -392,6 +392,9 @@ func prepareSchemaCompatibilityMigrations(
 	if err := ensureAgentThreadOps(ctx, database); err != nil {
 		return err
 	}
+	if err := ensureAgentThreadEntries(ctx, database); err != nil {
+		return err
+	}
 	return ensureArtifactCommentsDocPathColumn(ctx, database)
 }
 
@@ -428,6 +431,9 @@ func runRuntimeMigrations(
 		return err
 	}
 	if err := ensureAgentThreadOps(ctx, database); err != nil {
+		return err
+	}
+	if err := ensureAgentThreadEntries(ctx, database); err != nil {
 		return err
 	}
 	if err := ensureColumn(
@@ -1307,6 +1313,33 @@ PRIMARY KEY (thread_id, op_id)
 		}
 	}
 	return nil
+}
+
+func ensureAgentThreadEntries(ctx context.Context, database *sql.DB) error {
+	if _, err := database.ExecContext(
+		ctx,
+		`CREATE TABLE IF NOT EXISTS agent_thread_entries (
+id TEXT PRIMARY KEY,
+thread_id TEXT NOT NULL REFERENCES agent_threads (id) ON DELETE CASCADE,
+parent_entry_id TEXT,
+author_kind TEXT NOT NULL DEFAULT 'user' CHECK (author_kind IN ('user', 'agent')),
+author_name TEXT NOT NULL DEFAULT '',
+author_initial TEXT NOT NULL DEFAULT '',
+author_slug TEXT NOT NULL DEFAULT '',
+author_email TEXT NOT NULL DEFAULT '',
+avatar_bg TEXT NOT NULL DEFAULT '',
+body TEXT NOT NULL DEFAULT '',
+created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+)`,
+	); err != nil {
+		return err
+	}
+	_, err := database.ExecContext(
+		ctx,
+		`CREATE INDEX IF NOT EXISTS idx_agent_thread_entries_parent
+ON agent_thread_entries (thread_id, parent_entry_id, created_at ASC)`,
+	)
+	return err
 }
 
 func ensureColumn(

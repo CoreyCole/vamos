@@ -273,65 +273,84 @@ func MessageActionsMenu(threadID string, msg TranscriptMessage, forkAction strin
 				return templ_7745c5c3_Err
 			}
 		}
-		if msg.ChatSessionID != "" && msg.ChatNodeID != "" && msg.ChatEventSeq > 0 {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 19, "<details class=\"rounded-sm\"><summary class=\"cursor-pointer list-none rounded-sm px-2 py-1.5 text-xs font-medium text-foreground hover:bg-muted [&::-webkit-details-marker]:hidden\">Annotate</summary><form class=\"space-y-2 p-2 pt-1\" data-on:submit=\"")
+		if msg.ThreadSummary != nil && msg.ThreadSummary.ReplyCount >= 1 {
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 19, "<button type=\"button\" role=\"menuitem\" class=\"flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-xs font-medium text-foreground hover:bg-muted\" data-on:click=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var18 string
-			templ_7745c5c3_Var18, templ_7745c5c3_Err = templ.ResolveAttributeValue("@post('/agent-chat/chat-sessions/" + msg.ChatSessionID + "/annotations', {contentType: 'form'})")
+			templ_7745c5c3_Var18, templ_7745c5c3_Err = templ.ResolveAttributeValue(openMessageThreadExpr(threadID, transcriptEntryID(msg)))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/message_actions.templ`, Line: 112, Col: 151}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/message_actions.templ`, Line: 114, Col: 75}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var18)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 20, "\"><input type=\"hidden\" name=\"session_id\" value=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 20, "\">View thread</button> ")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+		}
+		if msg.ChatSessionID != "" && msg.ChatNodeID != "" && msg.ChatEventSeq > 0 {
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 21, "<details class=\"rounded-sm\"><summary class=\"cursor-pointer list-none rounded-sm px-2 py-1.5 text-xs font-medium text-foreground hover:bg-muted [&::-webkit-details-marker]:hidden\">Annotate</summary><form class=\"space-y-2 p-2 pt-1\" data-on:submit=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var19 string
-			templ_7745c5c3_Var19, templ_7745c5c3_Err = templ.ResolveAttributeValue(msg.ChatSessionID)
+			templ_7745c5c3_Var19, templ_7745c5c3_Err = templ.ResolveAttributeValue("@post('/agent-chat/chat-sessions/" + msg.ChatSessionID + "/annotations', {contentType: 'form'})")
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/message_actions.templ`, Line: 113, Col: 69}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/message_actions.templ`, Line: 122, Col: 151}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var19)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 21, "\"> <input type=\"hidden\" name=\"node_id\" value=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 22, "\"><input type=\"hidden\" name=\"session_id\" value=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var20 string
-			templ_7745c5c3_Var20, templ_7745c5c3_Err = templ.ResolveAttributeValue(msg.ChatNodeID)
+			templ_7745c5c3_Var20, templ_7745c5c3_Err = templ.ResolveAttributeValue(msg.ChatSessionID)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/message_actions.templ`, Line: 114, Col: 63}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/message_actions.templ`, Line: 123, Col: 69}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var20)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 22, "\"> <input type=\"hidden\" name=\"event_seq\" value=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 23, "\"> <input type=\"hidden\" name=\"node_id\" value=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var21 string
-			templ_7745c5c3_Var21, templ_7745c5c3_Err = templ.ResolveAttributeValue(strconv.FormatInt(msg.ChatEventSeq, 10))
+			templ_7745c5c3_Var21, templ_7745c5c3_Err = templ.ResolveAttributeValue(msg.ChatNodeID)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/message_actions.templ`, Line: 115, Col: 90}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/message_actions.templ`, Line: 124, Col: 63}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var21)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 23, "\"> <textarea name=\"body_markdown\" class=\"min-h-[84px] w-full rounded-md border border-input bg-background px-2 py-1 text-xs text-foreground\" placeholder=\"Add annotation for a future reply\" data-ignore-morph></textarea> <button type=\"submit\" class=\"rounded-md bg-secondary px-2 py-1 text-xs font-medium text-secondary-foreground hover:bg-secondary/90\">Save annotation</button></form></details>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 24, "\"> <input type=\"hidden\" name=\"event_seq\" value=\"")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			var templ_7745c5c3_Var22 string
+			templ_7745c5c3_Var22, templ_7745c5c3_Err = templ.ResolveAttributeValue(strconv.FormatInt(msg.ChatEventSeq, 10))
+			if templ_7745c5c3_Err != nil {
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/message_actions.templ`, Line: 125, Col: 90}
+			}
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var22)
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 25, "\"> <textarea name=\"body_markdown\" class=\"min-h-[84px] w-full rounded-md border border-input bg-background px-2 py-1 text-xs text-foreground\" placeholder=\"Add annotation for a future reply\" data-ignore-morph></textarea> <button type=\"submit\" class=\"rounded-md bg-secondary px-2 py-1 text-xs font-medium text-secondary-foreground hover:bg-secondary/90\">Save annotation</button></form></details>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 24, "</div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 26, "</div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -355,240 +374,259 @@ func MessageActionsSheet(threadID string, msg TranscriptMessage, forkAction stri
 			}()
 		}
 		ctx = templ.InitializeContext(ctx)
-		templ_7745c5c3_Var22 := templ.GetChildren(ctx)
-		if templ_7745c5c3_Var22 == nil {
-			templ_7745c5c3_Var22 = templ.NopComponent
+		templ_7745c5c3_Var23 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var23 == nil {
+			templ_7745c5c3_Var23 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
 		sheetID := msgSheetID(msg.DOMID)
 		signals := msgActionsSignalsManager(msg.DOMID)
 		plain := messagePlainText(msg)
 		openExpr := msgActionsOpenExpr(msg.DOMID)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 25, "<button type=\"button\" class=\"hidden\" tabindex=\"-1\" aria-hidden=\"true\" data-msg-sheet-open=\"")
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		var templ_7745c5c3_Var23 string
-		templ_7745c5c3_Var23, templ_7745c5c3_Err = templ.ResolveAttributeValue(msg.DOMID)
-		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/message_actions.templ`, Line: 134, Col: 33}
-		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var23)
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 26, "\" data-on:click=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 27, "<button type=\"button\" class=\"hidden\" tabindex=\"-1\" aria-hidden=\"true\" data-msg-sheet-open=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var24 string
-		templ_7745c5c3_Var24, templ_7745c5c3_Err = templ.ResolveAttributeValue(msgActionsSetOpenExpr(msg.DOMID, true))
+		templ_7745c5c3_Var24, templ_7745c5c3_Err = templ.ResolveAttributeValue(msg.DOMID)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/message_actions.templ`, Line: 135, Col: 56}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/message_actions.templ`, Line: 144, Col: 33}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var24)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 27, "\"></button><div id=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 28, "\" data-on:click=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var25 string
-		templ_7745c5c3_Var25, templ_7745c5c3_Err = templ.ResolveAttributeValue(sheetID)
+		templ_7745c5c3_Var25, templ_7745c5c3_Err = templ.ResolveAttributeValue(msgActionsSetOpenExpr(msg.DOMID, true))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/message_actions.templ`, Line: 138, Col: 14}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/message_actions.templ`, Line: 145, Col: 56}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var25)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 28, "\" data-signals=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 29, "\"></button><div id=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var26 string
-		templ_7745c5c3_Var26, templ_7745c5c3_Err = templ.ResolveAttributeValue(signals.DataSignals)
+		templ_7745c5c3_Var26, templ_7745c5c3_Err = templ.ResolveAttributeValue(sheetID)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/message_actions.templ`, Line: 139, Col: 36}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/message_actions.templ`, Line: 148, Col: 14}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var26)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 29, "\" data-show=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 30, "\" data-signals=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var27 string
-		templ_7745c5c3_Var27, templ_7745c5c3_Err = templ.ResolveAttributeValue(openExpr)
+		templ_7745c5c3_Var27, templ_7745c5c3_Err = templ.ResolveAttributeValue(signals.DataSignals)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/message_actions.templ`, Line: 140, Col: 22}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/message_actions.templ`, Line: 149, Col: 36}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var27)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 30, "\" data-msg-sheet=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 31, "\" data-show=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var28 string
-		templ_7745c5c3_Var28, templ_7745c5c3_Err = templ.ResolveAttributeValue(msg.DOMID)
+		templ_7745c5c3_Var28, templ_7745c5c3_Err = templ.ResolveAttributeValue(openExpr)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/message_actions.templ`, Line: 141, Col: 28}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/message_actions.templ`, Line: 150, Col: 22}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var28)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 31, "\" class=\"fixed inset-x-0 bottom-0 z-[1000] max-h-[70vh] overflow-y-auto rounded-t-xl border border-border bg-popover p-3 text-popover-foreground shadow-xl md:!hidden\" style=\"display: none;\" role=\"dialog\" aria-label=\"Message actions\"><div class=\"mx-auto mb-3 h-1 w-10 rounded-full bg-muted-foreground/40\" aria-hidden=\"true\"></div><div class=\"grid gap-1\"><button type=\"button\" class=\"rounded-md px-3 py-2.5 text-left text-sm text-muted-foreground\" title=\"Coming soon\" disabled>React</button> <button type=\"button\" class=\"rounded-md px-3 py-2.5 text-left text-sm hover:bg-muted\" data-on:click=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 32, "\" data-msg-sheet=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var29 string
-		templ_7745c5c3_Var29, templ_7745c5c3_Err = templ.ResolveAttributeValue(messageQuoteClickExpr(msg.DOMID, plain))
+		templ_7745c5c3_Var29, templ_7745c5c3_Err = templ.ResolveAttributeValue(msg.DOMID)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/message_actions.templ`, Line: 150, Col: 144}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/message_actions.templ`, Line: 151, Col: 28}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var29)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 32, "\">Quote</button> <button type=\"button\" class=\"rounded-md px-3 py-2.5 text-left text-sm hover:bg-muted\" data-on:click=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 33, "\" class=\"fixed inset-x-0 bottom-0 z-[1000] max-h-[70vh] overflow-y-auto rounded-t-xl border border-border bg-popover p-3 text-popover-foreground shadow-xl md:!hidden\" style=\"display: none;\" role=\"dialog\" aria-label=\"Message actions\"><div class=\"mx-auto mb-3 h-1 w-10 rounded-full bg-muted-foreground/40\" aria-hidden=\"true\"></div><div class=\"grid gap-1\"><button type=\"button\" class=\"rounded-md px-3 py-2.5 text-left text-sm text-muted-foreground\" title=\"Coming soon\" disabled>React</button> <button type=\"button\" class=\"rounded-md px-3 py-2.5 text-left text-sm hover:bg-muted\" data-on:click=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var30 string
-		templ_7745c5c3_Var30, templ_7745c5c3_Err = templ.ResolveAttributeValue(messageCopyClickExpr(msg.DOMID, plain))
+		templ_7745c5c3_Var30, templ_7745c5c3_Err = templ.ResolveAttributeValue(messageQuoteClickExpr(msg.DOMID, plain))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/message_actions.templ`, Line: 151, Col: 143}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/message_actions.templ`, Line: 160, Col: 144}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var30)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 33, "\">Copy</button> ")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 34, "\">Quote</button> <button type=\"button\" class=\"rounded-md px-3 py-2.5 text-left text-sm hover:bg-muted\" data-on:click=\"")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var31 string
+		templ_7745c5c3_Var31, templ_7745c5c3_Err = templ.ResolveAttributeValue(messageCopyClickExpr(msg.DOMID, plain))
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/message_actions.templ`, Line: 161, Col: 143}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var31)
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 35, "\">Copy</button> ")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		if msg.ShowForkForm {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 34, "<details class=\"rounded-md\"><summary class=\"flex cursor-pointer list-none items-center gap-2 rounded-md px-3 py-2.5 text-sm hover:bg-muted [&::-webkit-details-marker]:hidden\"><svg data-msg-fork-icon class=\"h-4 w-4 text-muted-foreground\" fill=\"none\" stroke=\"currentColor\" viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"1.75\" d=\"M6 3v12M18 9a3 3 0 100-6 3 3 0 000 6zM6 21a3 3 0 100-6 3 3 0 000 6zM15 6a9 9 0 00-9 9\"></path></svg> Fork</summary><form class=\"space-y-2 px-3 pb-2\" data-on:submit=\"")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			var templ_7745c5c3_Var31 string
-			templ_7745c5c3_Var31, templ_7745c5c3_Err = templ.ResolveAttributeValue(forkAction)
-			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/message_actions.templ`, Line: 160, Col: 66}
-			}
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var31)
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 35, "\"><input type=\"hidden\" name=\"source_thread_id\" value=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 36, "<details class=\"rounded-md\"><summary class=\"flex cursor-pointer list-none items-center gap-2 rounded-md px-3 py-2.5 text-sm hover:bg-muted [&::-webkit-details-marker]:hidden\"><svg data-msg-fork-icon class=\"h-4 w-4 text-muted-foreground\" fill=\"none\" stroke=\"currentColor\" viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"1.75\" d=\"M6 3v12M18 9a3 3 0 100-6 3 3 0 000 6zM6 21a3 3 0 100-6 3 3 0 000 6zM15 6a9 9 0 00-9 9\"></path></svg> Fork</summary><form class=\"space-y-2 px-3 pb-2\" data-on:submit=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var32 string
-			templ_7745c5c3_Var32, templ_7745c5c3_Err = templ.ResolveAttributeValue(threadID)
+			templ_7745c5c3_Var32, templ_7745c5c3_Err = templ.ResolveAttributeValue(forkAction)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/message_actions.templ`, Line: 161, Col: 67}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/message_actions.templ`, Line: 170, Col: 66}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var32)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 36, "\"> <input type=\"hidden\" name=\"source_entry_id\" value=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 37, "\"><input type=\"hidden\" name=\"source_thread_id\" value=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var33 string
-			templ_7745c5c3_Var33, templ_7745c5c3_Err = templ.ResolveAttributeValue(msg.EntryID)
+			templ_7745c5c3_Var33, templ_7745c5c3_Err = templ.ResolveAttributeValue(threadID)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/message_actions.templ`, Line: 162, Col: 69}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/message_actions.templ`, Line: 171, Col: 67}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var33)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 37, "\"> <textarea name=\"prompt\" class=\"min-h-[84px] w-full rounded-md border border-input bg-background px-2 py-1 text-xs text-foreground\" placeholder=\"Write the alternative continuation\" data-ignore-morph></textarea> <button type=\"submit\" class=\"rounded-md bg-secondary px-2 py-1 text-xs font-medium text-secondary-foreground hover:bg-secondary/90\">Create fork</button></form></details> ")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-		}
-		if msg.ChatSessionID != "" && msg.ChatNodeID != "" && msg.ChatEventSeq > 0 {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 38, "<details class=\"rounded-md\"><summary class=\"cursor-pointer list-none rounded-md px-3 py-2.5 text-sm hover:bg-muted [&::-webkit-details-marker]:hidden\">Annotate</summary><form class=\"space-y-2 px-3 pb-2\" data-on:submit=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 38, "\"> <input type=\"hidden\" name=\"source_entry_id\" value=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var34 string
-			templ_7745c5c3_Var34, templ_7745c5c3_Err = templ.ResolveAttributeValue("@post('/agent-chat/chat-sessions/" + msg.ChatSessionID + "/annotations', {contentType: 'form'})")
+			templ_7745c5c3_Var34, templ_7745c5c3_Err = templ.ResolveAttributeValue(msg.EntryID)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/message_actions.templ`, Line: 171, Col: 153}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/message_actions.templ`, Line: 172, Col: 69}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var34)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 39, "\"><input type=\"hidden\" name=\"session_id\" value=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 39, "\"> <textarea name=\"prompt\" class=\"min-h-[84px] w-full rounded-md border border-input bg-background px-2 py-1 text-xs text-foreground\" placeholder=\"Write the alternative continuation\" data-ignore-morph></textarea> <button type=\"submit\" class=\"rounded-md bg-secondary px-2 py-1 text-xs font-medium text-secondary-foreground hover:bg-secondary/90\">Create fork</button></form></details> ")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+		}
+		if msg.ThreadSummary != nil && msg.ThreadSummary.ReplyCount >= 1 {
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 40, "<button type=\"button\" class=\"rounded-md px-3 py-2.5 text-left text-sm hover:bg-muted\" data-on:click=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var35 string
-			templ_7745c5c3_Var35, templ_7745c5c3_Err = templ.ResolveAttributeValue(msg.ChatSessionID)
+			templ_7745c5c3_Var35, templ_7745c5c3_Err = templ.ResolveAttributeValue(openMessageThreadExpr(threadID, transcriptEntryID(msg)))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/message_actions.templ`, Line: 172, Col: 70}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/message_actions.templ`, Line: 179, Col: 161}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var35)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 40, "\"> <input type=\"hidden\" name=\"node_id\" value=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 41, "\">View thread</button> ")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+		}
+		if msg.ChatSessionID != "" && msg.ChatNodeID != "" && msg.ChatEventSeq > 0 {
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 42, "<details class=\"rounded-md\"><summary class=\"cursor-pointer list-none rounded-md px-3 py-2.5 text-sm hover:bg-muted [&::-webkit-details-marker]:hidden\">Annotate</summary><form class=\"space-y-2 px-3 pb-2\" data-on:submit=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var36 string
-			templ_7745c5c3_Var36, templ_7745c5c3_Err = templ.ResolveAttributeValue(msg.ChatNodeID)
+			templ_7745c5c3_Var36, templ_7745c5c3_Err = templ.ResolveAttributeValue("@post('/agent-chat/chat-sessions/" + msg.ChatSessionID + "/annotations', {contentType: 'form'})")
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/message_actions.templ`, Line: 173, Col: 64}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/message_actions.templ`, Line: 184, Col: 153}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var36)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 41, "\"> <input type=\"hidden\" name=\"event_seq\" value=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 43, "\"><input type=\"hidden\" name=\"session_id\" value=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var37 string
-			templ_7745c5c3_Var37, templ_7745c5c3_Err = templ.ResolveAttributeValue(strconv.FormatInt(msg.ChatEventSeq, 10))
+			templ_7745c5c3_Var37, templ_7745c5c3_Err = templ.ResolveAttributeValue(msg.ChatSessionID)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/message_actions.templ`, Line: 174, Col: 91}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/message_actions.templ`, Line: 185, Col: 70}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var37)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 42, "\"> <textarea name=\"body_markdown\" class=\"min-h-[84px] w-full rounded-md border border-input bg-background px-2 py-1 text-xs text-foreground\" placeholder=\"Add annotation for a future reply\" data-ignore-morph></textarea> <button type=\"submit\" class=\"rounded-md bg-secondary px-2 py-1 text-xs font-medium text-secondary-foreground hover:bg-secondary/90\">Save annotation</button></form></details> ")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 44, "\"> <input type=\"hidden\" name=\"node_id\" value=\"")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			var templ_7745c5c3_Var38 string
+			templ_7745c5c3_Var38, templ_7745c5c3_Err = templ.ResolveAttributeValue(msg.ChatNodeID)
+			if templ_7745c5c3_Err != nil {
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/message_actions.templ`, Line: 186, Col: 64}
+			}
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var38)
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 45, "\"> <input type=\"hidden\" name=\"event_seq\" value=\"")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			var templ_7745c5c3_Var39 string
+			templ_7745c5c3_Var39, templ_7745c5c3_Err = templ.ResolveAttributeValue(strconv.FormatInt(msg.ChatEventSeq, 10))
+			if templ_7745c5c3_Err != nil {
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/message_actions.templ`, Line: 187, Col: 91}
+			}
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var39)
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 46, "\"> <textarea name=\"body_markdown\" class=\"min-h-[84px] w-full rounded-md border border-input bg-background px-2 py-1 text-xs text-foreground\" placeholder=\"Add annotation for a future reply\" data-ignore-morph></textarea> <button type=\"submit\" class=\"rounded-md bg-secondary px-2 py-1 text-xs font-medium text-secondary-foreground hover:bg-secondary/90\">Save annotation</button></form></details> ")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 43, "<button type=\"button\" class=\"mt-1 rounded-md px-3 py-2.5 text-left text-sm text-muted-foreground hover:bg-muted\" data-on:click=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 47, "<button type=\"button\" class=\"mt-1 rounded-md px-3 py-2.5 text-left text-sm text-muted-foreground hover:bg-muted\" data-on:click=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var38 string
-		templ_7745c5c3_Var38, templ_7745c5c3_Err = templ.ResolveAttributeValue(msgActionsCloseExpr(msg.DOMID))
+		var templ_7745c5c3_Var40 string
+		templ_7745c5c3_Var40, templ_7745c5c3_Err = templ.ResolveAttributeValue(msgActionsCloseExpr(msg.DOMID))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/message_actions.templ`, Line: 180, Col: 162}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `server/services/agentchat/message_actions.templ`, Line: 193, Col: 162}
 		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var38)
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var40)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 44, "\">Cancel</button></div></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 48, "\">Cancel</button></div></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -612,12 +650,12 @@ func MessageActionsPortalScript() templ.Component {
 			}()
 		}
 		ctx = templ.InitializeContext(ctx)
-		templ_7745c5c3_Var39 := templ.GetChildren(ctx)
-		if templ_7745c5c3_Var39 == nil {
-			templ_7745c5c3_Var39 = templ.NopComponent
+		templ_7745c5c3_Var41 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var41 == nil {
+			templ_7745c5c3_Var41 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 45, "<script data-msg-actions-portal=\"1\">\n(() => {\n  if (window.__msgActionsPortalBound) return;\n  window.__msgActionsPortalBound = true;\n  function ensurePortaled(el) {\n    if (!el) return el;\n    if (el.id) {\n      document.querySelectorAll(\"#\" + CSS.escape(el.id)).forEach((node) => {\n        if (node !== el) node.remove();\n      });\n    }\n    if (el.parentElement !== document.body) document.body.appendChild(el);\n    return el;\n  }\n  function placeMenu(trigger, menu) {\n    if (!trigger || !menu) return;\n    ensurePortaled(menu);\n    menu.style.position = \"fixed\";\n    menu.style.zIndex = \"1000\";\n    const r = trigger.getBoundingClientRect();\n    const w = menu.offsetWidth || 192;\n    const pad = 8;\n    menu.style.top = Math.min(r.bottom + 4, window.innerHeight - (menu.offsetHeight || 120) - pad) + \"px\";\n    menu.style.left = Math.max(pad, Math.min(r.right - w, window.innerWidth - w - pad)) + \"px\";\n  }\n  function placeSheet(sheet) {\n    if (!sheet) return;\n    ensurePortaled(sheet);\n    sheet.style.position = \"fixed\";\n    sheet.style.zIndex = \"1000\";\n  }\n  document.addEventListener(\"click\", (evt) => {\n    const trigger = evt.target.closest(\"[data-msg-menu-trigger]\");\n    if (!trigger) return;\n    if (!window.matchMedia(\"(min-width: 768px)\").matches) return;\n    const menuID = trigger.getAttribute(\"data-msg-menu-trigger\");\n    const menu = document.getElementById(menuID);\n    if (menu) requestAnimationFrame(() => placeMenu(trigger, menu));\n  });\n  const LONG_MS = 480;\n  const MOVE_PX = 10;\n  document.addEventListener(\"touchstart\", (evt) => {\n    if (window.matchMedia(\"(min-width: 768px)\").matches) return;\n    const root = evt.target.closest(\"[data-msg-actions-root]\");\n    if (!root || evt.target.closest(\"a,button,textarea,input,summary\")) return;\n    const domID = root.getAttribute(\"data-msg-actions-root\");\n    if (!domID) return;\n    const touch = evt.changedTouches[0];\n    if (!touch) return;\n    const startX = touch.clientX;\n    const startY = touch.clientY;\n    let moved = false;\n    let timer = setTimeout(() => {\n      timer = null;\n      if (moved) return;\n      const opener = root.querySelector('[data-msg-sheet-open=\"' + domID + '\"]');\n      if (opener) opener.click();\n      const sheet = document.getElementById(\"msg-\" + domID + \"-sheet\");\n      if (sheet) placeSheet(sheet);\n    }, LONG_MS);\n    const onMove = (e) => {\n      const t = e.changedTouches[0];\n      if (!t) return;\n      if (Math.abs(t.clientX - startX) > MOVE_PX || Math.abs(t.clientY - startY) > MOVE_PX) {\n        moved = true;\n        clearTimeout(timer);\n        timer = null;\n      }\n    };\n    const onEnd = () => {\n      clearTimeout(timer);\n      timer = null;\n      document.removeEventListener(\"touchmove\", onMove, true);\n      document.removeEventListener(\"touchend\", onEnd, true);\n      document.removeEventListener(\"touchcancel\", onEnd, true);\n    };\n    document.addEventListener(\"touchmove\", onMove, true);\n    document.addEventListener(\"touchend\", onEnd, true);\n    document.addEventListener(\"touchcancel\", onEnd, true);\n  }, { passive: true });\n  const portalAll = () => {\n    document.querySelectorAll(\"[data-msg-menu],[data-msg-sheet]\").forEach((el) => ensurePortaled(el));\n  };\n  portalAll();\n  new MutationObserver(portalAll).observe(document.documentElement, { childList: true, subtree: true });\n})();\n</script>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 49, "<script data-msg-actions-portal=\"1\">\n(() => {\n  if (window.__msgActionsPortalBound) return;\n  window.__msgActionsPortalBound = true;\n  function ensurePortaled(el) {\n    if (!el) return el;\n    if (el.id) {\n      document.querySelectorAll(\"#\" + CSS.escape(el.id)).forEach((node) => {\n        if (node !== el) node.remove();\n      });\n    }\n    if (el.parentElement !== document.body) document.body.appendChild(el);\n    return el;\n  }\n  function placeMenu(trigger, menu) {\n    if (!trigger || !menu) return;\n    ensurePortaled(menu);\n    menu.style.position = \"fixed\";\n    menu.style.zIndex = \"1000\";\n    const r = trigger.getBoundingClientRect();\n    const w = menu.offsetWidth || 192;\n    const pad = 8;\n    menu.style.top = Math.min(r.bottom + 4, window.innerHeight - (menu.offsetHeight || 120) - pad) + \"px\";\n    menu.style.left = Math.max(pad, Math.min(r.right - w, window.innerWidth - w - pad)) + \"px\";\n  }\n  function placeSheet(sheet) {\n    if (!sheet) return;\n    ensurePortaled(sheet);\n    sheet.style.position = \"fixed\";\n    sheet.style.zIndex = \"1000\";\n  }\n  document.addEventListener(\"click\", (evt) => {\n    const trigger = evt.target.closest(\"[data-msg-menu-trigger]\");\n    if (!trigger) return;\n    if (!window.matchMedia(\"(min-width: 768px)\").matches) return;\n    const menuID = trigger.getAttribute(\"data-msg-menu-trigger\");\n    const menu = document.getElementById(menuID);\n    if (menu) requestAnimationFrame(() => placeMenu(trigger, menu));\n  });\n  const LONG_MS = 480;\n  const MOVE_PX = 10;\n  document.addEventListener(\"touchstart\", (evt) => {\n    if (window.matchMedia(\"(min-width: 768px)\").matches) return;\n    const root = evt.target.closest(\"[data-msg-actions-root]\");\n    if (!root || evt.target.closest(\"a,button,textarea,input,summary\")) return;\n    const domID = root.getAttribute(\"data-msg-actions-root\");\n    if (!domID) return;\n    const touch = evt.changedTouches[0];\n    if (!touch) return;\n    const startX = touch.clientX;\n    const startY = touch.clientY;\n    let moved = false;\n    let timer = setTimeout(() => {\n      timer = null;\n      if (moved) return;\n      const opener = root.querySelector('[data-msg-sheet-open=\"' + domID + '\"]');\n      if (opener) opener.click();\n      const sheet = document.getElementById(\"msg-\" + domID + \"-sheet\");\n      if (sheet) placeSheet(sheet);\n    }, LONG_MS);\n    const onMove = (e) => {\n      const t = e.changedTouches[0];\n      if (!t) return;\n      if (Math.abs(t.clientX - startX) > MOVE_PX || Math.abs(t.clientY - startY) > MOVE_PX) {\n        moved = true;\n        clearTimeout(timer);\n        timer = null;\n      }\n    };\n    const onEnd = () => {\n      clearTimeout(timer);\n      timer = null;\n      document.removeEventListener(\"touchmove\", onMove, true);\n      document.removeEventListener(\"touchend\", onEnd, true);\n      document.removeEventListener(\"touchcancel\", onEnd, true);\n    };\n    document.addEventListener(\"touchmove\", onMove, true);\n    document.addEventListener(\"touchend\", onEnd, true);\n    document.addEventListener(\"touchcancel\", onEnd, true);\n  }, { passive: true });\n  const portalAll = () => {\n    document.querySelectorAll(\"[data-msg-menu],[data-msg-sheet]\").forEach((el) => ensurePortaled(el));\n  };\n  portalAll();\n  new MutationObserver(portalAll).observe(document.documentElement, { childList: true, subtree: true });\n})();\n</script>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
