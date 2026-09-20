@@ -25,3 +25,6 @@ scripts/workspace-db-verify/workspace-db-verify-*
 .pi/auth.json
 .pi/run-history.jsonl
 .pi-subagents/
+/reviews/
+/tmp/
+/thoughts-sibling/
