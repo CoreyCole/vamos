@@ -4605,9 +4605,14 @@ func (s *Service) buildLiveTranscriptFromSnapshot(
 	return LiveTranscriptView{Items: combined}
 }
 
+// staleInFlightRunTTL is the age after which a pending/running agent_run is
+// treated as orphaned for Working chrome (refresh after remount).
+const staleInFlightRunTTL = 15 * time.Minute
+
 // liveTranscriptShowWorking is true while the thread's latest run is pending or
-// running and the live SoT has not received an assistant message yet. Accept
-// still sets ShowWorking explicitly; stream/SSR rebuilds derive it here.
+// running, recent enough to still be in flight, and the live SoT has not
+// received an assistant message yet. Accept still sets ShowWorking explicitly;
+// stream/SSR rebuilds derive it here.
 func (s *Service) liveTranscriptShowWorking(
 	threadID string,
 	live LiveTranscriptView,
@@ -4627,10 +4632,38 @@ func (s *Service) liveTranscriptShowWorking(
 	}
 	switch strings.ToLower(strings.TrimSpace(run.Status)) {
 	case "pending", "running":
+		if staleInFlightAgentRun(run, time.Now()) {
+			s.failStaleInFlightAgentRun(run)
+			return false
+		}
 		return true
 	default:
 		return false
 	}
+}
+
+func staleInFlightAgentRun(run db.AgentRun, now time.Time) bool {
+	status := strings.ToLower(strings.TrimSpace(run.Status))
+	if status != "pending" && status != "running" {
+		return false
+	}
+	if run.CreatedAt.IsZero() {
+		return false
+	}
+	return now.Sub(run.CreatedAt) > staleInFlightRunTTL
+}
+
+func (s *Service) failStaleInFlightAgentRun(run db.AgentRun) {
+	if s == nil || s.queries == nil || strings.TrimSpace(run.ID) == "" {
+		return
+	}
+	_ = s.queries.FailAgentRun(context.Background(), db.FailAgentRunParams{
+		ID: run.ID,
+		ErrorMessage: sql.NullString{
+			String: "orphaned in-flight run (stale pending/running)",
+			Valid:  true,
+		},
+	})
 }
 
 func combinePairedToolMessages(items []TranscriptMessage) []TranscriptMessage {

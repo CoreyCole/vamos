@@ -396,6 +396,59 @@ func TestLiveTranscriptShowWorkingDerivedFromRunAndLive(t *testing.T) {
 	}
 }
 
+func TestLiveTranscriptShowWorkingFalseForStaleRunningRun(t *testing.T) {
+	service, queries := newThreadDraftService(t)
+	createDraftThread(t, queries, "thread_1")
+	service.liveThreads = make(map[string]*liveThreadState)
+
+	run, err := queries.CreateAgentRun(t.Context(), db.CreateAgentRunParams{
+		ID:          "run_stale_1",
+		ThreadID:    "thread_1",
+		Trigger:     "resume",
+		Status:      "running",
+		PromptText:  "orphaned",
+		WorkflowID:  "wf_stale",
+		RootDocPath: "thoughts/plan",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := service.db.ExecContext(
+		t.Context(),
+		`UPDATE agent_runs SET created_at = datetime('now', '-20 minutes') WHERE id = ?`,
+		run.ID,
+	); err != nil {
+		t.Fatal(err)
+	}
+
+	if service.liveTranscriptShowWorking("thread_1", LiveTranscriptView{}) {
+		t.Fatal("expected ShowWorking false for stale running run")
+	}
+	latest, err := queries.GetLatestAgentRunByThread(t.Context(), "thread_1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if latest.Status != "failed" {
+		t.Fatalf("expected stale run marked failed, got %q", latest.Status)
+	}
+}
+
+func TestStaleInFlightAgentRunAge(t *testing.T) {
+	now := time.Now()
+	if staleInFlightAgentRun(db.AgentRun{
+		Status:    "running",
+		CreatedAt: now.Add(-time.Minute),
+	}, now) {
+		t.Fatal("recent running run must not be stale")
+	}
+	if !staleInFlightAgentRun(db.AgentRun{
+		Status:    "running",
+		CreatedAt: now.Add(-16 * time.Minute),
+	}, now) {
+		t.Fatal("running run older than TTL must be stale")
+	}
+}
+
 func TestSeedPendingUserPromptNotifiesThreadWithoutWorkspace(t *testing.T) {
 	service, queries := newThreadDraftService(t)
 	createDraftThread(t, queries, "thread_1")
