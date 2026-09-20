@@ -277,7 +277,7 @@ func TestWorkbenchV2SectionTitleCommentQuotesHeading(t *testing.T) {
 	for _, want := range []string{
 		`name="selected_text" value="Alpha notes"`,
 		commentui.CommentsComposerTextID,
-		commentui.FocusComposerScript(),
+		`"activeRegionID":"workbenchV2Comments"`,
 	} {
 		if !strings.Contains(body, want) {
 			t.Fatalf("section title comment missing %q: %s", want, body)
@@ -731,5 +731,34 @@ func TestWorkbenchV2CommentReplyAndResolvePreserveV2Target(t *testing.T) {
 			}
 			assertWorkbenchV2CommentResponse(t, rec.Body.String(), true)
 		})
+	}
+}
+
+func TestHandleAddQuoteToChatPatchesComposerSignals(t *testing.T) {
+	t.Parallel()
+	svc := newTestCommentsService(t)
+	form := url.Values{
+		"doc_path":      {"thoughts/plan.md"},
+		"selected_text": {"quoted selection"},
+		"workbench_v2":  {"1"},
+	}
+	c, rec := newCommentFormRequest(t, "/forms/comments/add-to-chat", form)
+	if err := svc.HandleAddQuoteToChat(c); err != nil {
+		t.Fatalf("HandleAddQuoteToChat() error = %v", err)
+	}
+	body := rec.Body.String()
+	for _, want := range []string{
+		`"chatQuoteText":"quoted selection"`,
+		`"chatQuotePath":"plan.md"`,
+		`"activeRegionID":"workbenchV2Chat"`,
+		`"workbenchV2Comments":{"visible":false}`,
+	} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("add-to-chat missing %q: %s", want, body)
+		}
+	}
+	if strings.Contains(body, "ExecuteScript") ||
+		strings.Contains(body, "datastar-patch-elements") {
+		t.Fatalf("add-to-chat must be signals only: %s", body)
 	}
 }

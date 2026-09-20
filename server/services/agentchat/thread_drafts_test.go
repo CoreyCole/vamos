@@ -299,6 +299,25 @@ func TestComposerDraftSignalAndSaveContract(t *testing.T) {
 	}
 }
 
+func TestAgentChatComposerSeedsQuoteHost(t *testing.T) {
+	html := renderDraftComponent(t, AgentChatComposer(AgentChatComposerArgs{
+		Action:    "@post('/send')",
+		ThreadID:  "thread_1",
+		HasThread: true,
+	}))
+	for _, want := range []string{
+		`id="agent-chat-composer-quote"`,
+		`name="chat_quote_text"`,
+		`name="chat_quote_path"`,
+		`data-bind="chatQuoteText"`,
+		`chatQuoteText:`,
+	} {
+		if !strings.Contains(html, want) {
+			t.Fatalf("composer quote host missing %q: %s", want, html)
+		}
+	}
+}
+
 func TestAgentChatComposerStartsAsSingleLine(t *testing.T) {
 	html := renderDraftComponent(t, AgentChatComposer(AgentChatComposerArgs{
 		Action:    "@post('/send')",

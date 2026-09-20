@@ -1772,6 +1772,7 @@ func main() {
 	formsGroup.Use(authMiddleware)
 	formsGroup.POST("/comments", commentService.HandleCommentForm)
 	formsGroup.POST("/comments/show", commentService.HandleShowCommentForm)
+	formsGroup.POST("/comments/add-to-chat", commentService.HandleAddQuoteToChat)
 	formsGroup.POST("/comments/expand", commentService.HandleExpandSectionComments)
 	formsGroup.POST("/comments/cancel", commentService.HandleCancelCommentForm)
 	formsGroup.POST("/replies", commentService.HandleReplyForm)

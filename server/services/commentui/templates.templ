@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/CoreyCole/vamos/pkg/datastarui/components/dropdown"
 	"github.com/CoreyCole/vamos/pkg/datastarui/components/form"
 	"github.com/CoreyCole/vamos/pkg/datastarui/components/textarea"
 )
@@ -103,12 +104,55 @@ func commentsThreadsReopenAriaHidden(threadsOpen bool) string {
 	return "false"
 }
 
+func quoteActionRoute(route, fallback string) string {
+	if strings.TrimSpace(route) != "" {
+		return route
+	}
+	return fallback
+}
+
+func quoteMenuID(id string) string {
+	if strings.TrimSpace(id) == "" {
+		return "quote-actions"
+	}
+	return id
+}
+
+func quoteTriggerClass(class string) string {
+	if strings.TrimSpace(class) == "" {
+		return "inline-flex h-7 w-7 items-center justify-center rounded-md border border-border bg-primary text-primary-foreground shadow-lg transition-colors hover:bg-primary/90"
+	}
+	return class
+}
+
+func quoteTriggerLabel(label string) string {
+	if strings.TrimSpace(label) == "" {
+		return "Quote actions"
+	}
+	return label
+}
+
+func quoteMenuSubmitExpr(route string) string {
+	post := preventSubmitPostExpr(route)
+	if post == "" {
+		return "void 0"
+	}
+	return post
+}
+
+func selectionQuotePrepExpr(prefix string) string {
+	if prefix == "" {
+		return ""
+	}
+	p := "$" + prefix
+	return p + ".formTop = " + p + ".bottom || 0; " + p + ".formLeft = " + p + ".left || 0; "
+}
+
 func selectionTriggerSubmitExpr(args SelectionSignalArgs) string {
 	if args.Prefix == "" || args.ShowRoute == "" {
 		return ""
 	}
-	p := "$" + args.Prefix
-	return p + ".formTop = " + p + ".bottom || 0; " + p + ".formLeft = " + p + ".left || 0; " + preventSubmitPostExpr(args.ShowRoute)
+	return selectionQuotePrepExpr(args.Prefix) + preventSubmitPostExpr(args.ShowRoute)
 }
 
 func replyRoute(routes CommentRoutes, commentID string) string {
@@ -442,18 +486,73 @@ templ SidebarResolvedThreadChip(thread CommentThreadView, target CommentTargetVi
 }
 
 templ SectionMenu(args CommentTargetView) {
-	<details class="relative">
-		<summary class="inline-flex h-7 w-7 cursor-pointer list-none items-center justify-center rounded-full transition-colors hover:bg-muted [&::-webkit-details-marker]:hidden" aria-label="Section actions">
-			<svg class="h-3.5 w-3.5 text-muted-foreground" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="5" r="2"></circle><circle cx="12" cy="12" r="2"></circle><circle cx="12" cy="19" r="2"></circle></svg>
-		</summary>
-		<div class="absolute left-0 z-50 mt-2 min-w-36 rounded-md border border-border bg-popover p-1 text-popover-foreground shadow-md">
-			<form data-on:submit__prevent={ sectionAddCommentSubmitExpr(args.Routes.Show) } class="flex w-full items-center">
+	@QuoteActionMenu(QuoteActionMenuArgs{
+		ID:             "section-quote-" + args.SignalKey,
+		ShowRoute:      args.Routes.Show,
+		AddToChatRoute: quoteActionRoute(args.Routes.AddToChat, "/forms/comments/add-to-chat"),
+		HiddenFields:   args.HiddenFields,
+		SelectedText:   args.HeadingHint,
+		TriggerLabel:   "Section actions",
+		TriggerClass:   "inline-flex h-7 w-7 cursor-pointer items-center justify-center rounded-full transition-colors hover:bg-muted",
+	})
+}
+
+templ QuoteActionMenu(args QuoteActionMenuArgs) {
+	{{ menuID := args.ID }}
+	{{
+		if menuID == "" {
+			menuID = "quote-actions"
+		}
+	}}
+	{{ triggerClass := args.TriggerClass }}
+	{{
+		if triggerClass == "" {
+			triggerClass = "inline-flex h-7 w-7 items-center justify-center rounded-md border border-border bg-primary text-primary-foreground shadow-lg transition-colors hover:bg-primary/90"
+		}
+	}}
+	{{ triggerLabel := args.TriggerLabel }}
+	{{
+		if triggerLabel == "" {
+			triggerLabel = "Quote actions"
+		}
+	}}
+	@dropdown.DropdownMenu(dropdown.DropdownMenuArgs{ID: menuID, Class: "relative inline-flex"}) {
+		@dropdown.DropdownMenuTrigger(dropdown.DropdownMenuTriggerArgs{
+			ID:         menuID,
+			Class:      triggerClass,
+			Attributes: templ.Attributes{"aria-label": triggerLabel, "title": triggerLabel},
+		}) {
+			if args.TriggerLabel == "Section actions" {
+				<svg class="h-3.5 w-3.5 text-muted-foreground" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="5" r="2"></circle><circle cx="12" cy="12" r="2"></circle><circle cx="12" cy="19" r="2"></circle></svg>
+			} else {
+				<svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z"></path></svg>
+			}
+		}
+		@dropdown.DropdownMenuContent(dropdown.DropdownMenuContentArgs{ID: menuID, Side: "bottom", Align: "start", SideOffset: 4, Class: "min-w-36 p-1"}) {
+			<form method="post" data-on:submit__prevent={ selectionQuotePrepExpr(args.BindPrefix) + quoteMenuSubmitExpr(args.ShowRoute) } class="w-full">
 				@HiddenFields(args.HiddenFields)
-				<input type="hidden" name="selected_text" value={ args.HeadingHint }/>
-				<button type="submit" class="flex w-full items-center rounded-sm px-2 py-1.5 text-sm hover:bg-accent hover:text-accent-foreground"><span class="whitespace-nowrap">Add comment</span></button>
+				if args.BindPrefix != "" {
+					<input type="hidden" name="section_hint" data-bind={ args.BindPrefix + ".sectionId" }/>
+					<input type="hidden" name="heading_hint" data-bind={ args.BindPrefix + ".headingHint" }/>
+					<input type="hidden" name="selected_text" data-bind={ args.BindPrefix + ".text" }/>
+				} else {
+					<input type="hidden" name="selected_text" value={ args.SelectedText }/>
+				}
+				<button type="submit" class="flex w-full items-center rounded-sm px-2 py-1.5 text-sm hover:bg-accent hover:text-accent-foreground"><span class="whitespace-nowrap">Comment</span></button>
 			</form>
-		</div>
-	</details>
+			<form method="post" data-on:submit__prevent={ selectionQuotePrepExpr(args.BindPrefix) + quoteMenuSubmitExpr(args.AddToChatRoute) } class="w-full">
+				@HiddenFields(args.HiddenFields)
+				if args.BindPrefix != "" {
+					<input type="hidden" name="section_hint" data-bind={ args.BindPrefix + ".sectionId" }/>
+					<input type="hidden" name="heading_hint" data-bind={ args.BindPrefix + ".headingHint" }/>
+					<input type="hidden" name="selected_text" data-bind={ args.BindPrefix + ".text" }/>
+				} else {
+					<input type="hidden" name="selected_text" value={ args.SelectedText }/>
+				}
+				<button type="submit" class="flex w-full items-center rounded-sm px-2 py-1.5 text-sm hover:bg-accent hover:text-accent-foreground"><span class="whitespace-nowrap">Add to chat</span></button>
+			</form>
+		}
+	}
 }
 
 templ CommentToggle(args CommentTargetView) {
@@ -740,8 +839,7 @@ templ ActionForms(view CommentThreadView, target CommentTargetView) {
 templ SelectedTextTrigger(args SelectionSignalArgs) {
 	if args.Prefix != "" && args.ShowRoute != "" {
 		{{ showExpression := "$" + args.Prefix + ".text && $" + args.Prefix + ".sectionId != ''" }}
-		<form id={ args.Prefix + "-inline-comment-trigger" } class={ SelectionTriggerClass() + " hidden" } data-show={ showExpression } data-class={ "{'hidden': !(" + showExpression + ")}" } data-style={ "{'--commentui-selection-bottom': ($" + args.Prefix + ".bottom || 0) + 'px', '--commentui-selection-left': ($" + args.Prefix + ".left || 0) + 'px'}" } data-on:submit__prevent={ selectionTriggerSubmitExpr(args) }>
-			@HiddenFields(args.HiddenFields)
+		<div id={ args.Prefix + "-inline-comment-trigger" } class={ SelectionTriggerClass() + " hidden" } data-show={ showExpression } data-class={ "{'hidden': !(" + showExpression + ")}" } data-style={ "{'--commentui-selection-bottom': ($" + args.Prefix + ".bottom || 0) + 'px', '--commentui-selection-left': ($" + args.Prefix + ".left || 0) + 'px'}" }>
 			<input type="hidden" name="section_hint" data-commentui-selection-field="section-id" data-bind={ args.Prefix + ".sectionId" }/>
 			<input type="hidden" name="heading_hint" data-commentui-selection-field="heading-hint" data-bind={ args.Prefix + ".headingHint" }/>
 			<input type="hidden" name="selected_text" data-commentui-selection-field="text" data-bind={ args.Prefix + ".text" }/>
@@ -750,10 +848,15 @@ templ SelectedTextTrigger(args SelectionSignalArgs) {
 			<input type="hidden" data-commentui-selection-field="left" data-bind={ args.Prefix + ".left" }/>
 			<input type="hidden" data-bind={ args.Prefix + ".formTop" }/>
 			<input type="hidden" data-bind={ args.Prefix + ".formLeft" }/>
-			<button type="submit" class="rounded-md bg-primary p-2 text-primary-foreground shadow-lg transition-colors hover:bg-primary/90" aria-label="Comment on selection">
-				<svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z"></path></svg>
-			</button>
-		</form>
+			@QuoteActionMenu(QuoteActionMenuArgs{
+				ID:             args.Prefix + "-quote-menu",
+				ShowRoute:      args.ShowRoute,
+				AddToChatRoute: quoteActionRoute(args.AddToChatRoute, "/forms/comments/add-to-chat"),
+				HiddenFields:   args.HiddenFields,
+				BindPrefix:     args.Prefix,
+				TriggerLabel:   "Quote actions",
+			})
+		</div>
 	}
 }
 

@@ -1064,7 +1064,7 @@ func (h *Handler) SendEmbeddedFreeformPrompt(c echo.Context) error {
 	if !ok || userEmail == "" {
 		return echo.NewHTTPError(http.StatusUnauthorized, "not authenticated")
 	}
-	prompt := strings.TrimSpace(c.FormValue("prompt"))
+	prompt := chatPromptFromForm(c)
 	if prompt == "" {
 		return echo.NewHTTPError(http.StatusBadRequest, "prompt is required")
 	}
@@ -1132,7 +1132,7 @@ func (h *Handler) resumeEmbeddedFreeformThreadByID(
 	c echo.Context,
 	userEmail, threadID string,
 ) error {
-	prompt := strings.TrimSpace(c.FormValue("prompt"))
+	prompt := chatPromptFromForm(c)
 	if prompt == "" {
 		return echo.NewHTTPError(http.StatusBadRequest, "prompt is required")
 	}
@@ -1209,7 +1209,7 @@ func (h *Handler) SendPrompt(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusUnauthorized, "not authenticated")
 	}
 
-	prompt := strings.TrimSpace(c.FormValue("prompt"))
+	prompt := chatPromptFromForm(c)
 	if prompt == "" {
 		return echo.NewHTTPError(http.StatusBadRequest, "prompt is required")
 	}
@@ -1262,7 +1262,7 @@ func (h *Handler) resumeFreeformThreadByID(
 	c echo.Context,
 	userEmail, threadID string,
 ) error {
-	prompt := strings.TrimSpace(c.FormValue("prompt"))
+	prompt := chatPromptFromForm(c)
 	if prompt == "" {
 		return echo.NewHTTPError(http.StatusBadRequest, "prompt is required")
 	}
@@ -1331,7 +1331,7 @@ func (h *Handler) forkFreeformThreadByID(
 		return echo.NewHTTPError(http.StatusBadRequest, "source_entry_id is required")
 	}
 
-	prompt := strings.TrimSpace(c.FormValue("prompt"))
+	prompt := chatPromptFromForm(c)
 	if prompt == "" {
 		return echo.NewHTTPError(http.StatusBadRequest, "prompt is required")
 	}
@@ -1522,7 +1522,7 @@ func (h *Handler) SendWorkspacePrompt(c echo.Context) error {
 	if err != nil {
 		return echo.NewHTTPError(http.StatusNotFound, err.Error())
 	}
-	prompt := strings.TrimSpace(c.FormValue("prompt"))
+	prompt := chatPromptFromForm(c)
 	if prompt == "" {
 		return echo.NewHTTPError(http.StatusBadRequest, "prompt is required")
 	}
@@ -1569,7 +1569,7 @@ func (h *Handler) SendEmbeddedWorkspacePrompt(c echo.Context) error {
 	if err != nil {
 		return echo.NewHTTPError(http.StatusNotFound, err.Error())
 	}
-	prompt := strings.TrimSpace(c.FormValue("prompt"))
+	prompt := chatPromptFromForm(c)
 	if prompt == "" {
 		return echo.NewHTTPError(http.StatusBadRequest, "prompt is required")
 	}
@@ -1698,6 +1698,8 @@ func (h *Handler) resetAndFocusEmbeddedComposer(
 	if err := sse.MarshalAndPatchSignals(map[string]any{
 		"agentChatLastWriteOK": true,
 		"chatDraft":            "",
+		"chatQuoteText":        "",
+		"chatQuotePath":        "",
 	}); err != nil {
 		return err
 	}
@@ -1942,7 +1944,7 @@ func (h *Handler) resumeWorkspaceThreadByID(
 		}
 		return echo.NewHTTPError(status, err.Error())
 	}
-	prompt := strings.TrimSpace(c.FormValue("prompt"))
+	prompt := chatPromptFromForm(c)
 	if prompt == "" {
 		return echo.NewHTTPError(http.StatusBadRequest, "prompt is required")
 	}
@@ -2049,7 +2051,7 @@ func (h *Handler) resumeEmbeddedWorkspaceThread(
 		}
 		return echo.NewHTTPError(status, err.Error())
 	}
-	prompt := strings.TrimSpace(c.FormValue("prompt"))
+	prompt := chatPromptFromForm(c)
 	if prompt == "" {
 		return echo.NewHTTPError(http.StatusBadRequest, "prompt is required")
 	}
@@ -2164,7 +2166,7 @@ func (h *Handler) forkWorkspaceThreadByID(
 	if sourceEntryID == "" {
 		return echo.NewHTTPError(http.StatusBadRequest, "source_entry_id is required")
 	}
-	prompt := strings.TrimSpace(c.FormValue("prompt"))
+	prompt := chatPromptFromForm(c)
 	if prompt == "" {
 		return echo.NewHTTPError(http.StatusBadRequest, "prompt is required")
 	}
@@ -3057,6 +3059,8 @@ func (h *Handler) writeNoRedirectSuccess(c echo.Context) error {
 	if err := sse.MarshalAndPatchSignals(map[string]any{
 		"agentChatLastWriteOK": true,
 		"chatDraft":            "",
+		"chatQuoteText":        "",
+		"chatQuotePath":        "",
 	}); err != nil {
 		return err
 	}

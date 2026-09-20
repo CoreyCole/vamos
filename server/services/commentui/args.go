@@ -59,6 +59,7 @@ type CommentFrontmatterView struct {
 
 type CommentRoutes struct {
 	Show          string
+	AddToChat     string
 	Create        string
 	Cancel        string
 	Expand        string
@@ -209,8 +210,20 @@ type SelectionSignalArgs struct {
 	Prefix          string
 	ExcludeSelector string
 	ShowRoute       string
+	AddToChatRoute  string
 	HiddenFields    map[string]string
 	ContainerID     string
+}
+
+type QuoteActionMenuArgs struct {
+	ID             string
+	ShowRoute      string
+	AddToChatRoute string
+	HiddenFields   map[string]string
+	SelectedText   string
+	BindPrefix     string
+	TriggerLabel   string
+	TriggerClass   string
 }
 
 type FrameCommentBridgeArgs struct {

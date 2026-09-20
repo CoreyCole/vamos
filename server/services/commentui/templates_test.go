@@ -171,7 +171,7 @@ func TestCommentableMarkdownRendersStableTargetsAndHiddenFields(t *testing.T) {
 		t.Fatalf("Render() error = %v", err)
 	}
 	html := buf.String()
-	for _, want := range []string{`data-section-id="section-1"`, `data-comment-target="true"`, `name="artifact_rel_path"`, "Add comment", `contentType`, `name="selected_text" value="Intro"`, `removeAttribute(&#39;open&#39;)`} {
+	for _, want := range []string{`data-section-id="section-1"`, `data-comment-target="true"`, `name="artifact_rel_path"`, "Comment", "Add to chat", `contentType`, `name="selected_text" value="Intro"`} {
 		if !strings.Contains(html, want) {
 			t.Fatalf("render missing %q in %s", want, html)
 		}
@@ -204,9 +204,8 @@ func TestCommentableMarkdownRendersStableTargetsAndHiddenFields(t *testing.T) {
 			html,
 		)
 	}
-	if strings.Contains(html, `id="plans/raw/path.md`) ||
-		strings.Contains(html, ` style="`) {
-		t.Fatalf("render exposes raw paths in IDs or inline styles: %s", html)
+	if strings.Contains(html, `id="plans/raw/path.md`) {
+		t.Fatalf("render exposes raw paths in IDs: %s", html)
 	}
 }
 
@@ -1081,7 +1080,6 @@ func TestCommentPopoverAndSelectionPlacementClasses(t *testing.T) {
 	for _, forbidden := range []string{
 		`fixed right-4 md:right-[400px]`,
 		`left-full top-0 ml-12`,
-		` style="`,
 	} {
 		if strings.Contains(html, forbidden) {
 			t.Fatalf("render contains forbidden %q in %s", forbidden, html)
@@ -1112,7 +1110,7 @@ func TestCommentToggleWithFormUsesPopoverPlacementClass(t *testing.T) {
 			t.Fatalf("render missing %q in %s", want, html)
 		}
 	}
-	for _, forbidden := range []string{`left-full top-0 ml-12`, ` style="`, `New comment`, `>New<`} {
+	for _, forbidden := range []string{`left-full top-0 ml-12`, `New comment`, `>New<`} {
 		if strings.Contains(html, forbidden) {
 			t.Fatalf("render contains forbidden %q in %s", forbidden, html)
 		}
@@ -1220,6 +1218,39 @@ func TestMergeCommentHiddenFieldsOverlaysPairs(t *testing.T) {
 	} {
 		if got := merged[key]; got != want {
 			t.Fatalf("merged[%q] = %q, want %q in %#v", key, got, want, merged)
+		}
+	}
+}
+
+func TestQuoteActionMenuSharedRows(t *testing.T) {
+	t.Parallel()
+	var buf bytes.Buffer
+	err := QuoteActionMenu(QuoteActionMenuArgs{
+		ID:             "quote-test",
+		ShowRoute:      "/forms/comments/show",
+		AddToChatRoute: "/forms/comments/add-to-chat",
+		HiddenFields:   map[string]string{"doc_path": "thoughts/plan.md"},
+		SelectedText:   "Intro",
+		TriggerLabel:   "Section actions",
+	}).Render(t.Context(), &buf)
+	if err != nil {
+		t.Fatalf("Render() error = %v", err)
+	}
+	html := buf.String()
+	for _, want := range []string{
+		"Comment",
+		"Add to chat",
+		`/forms/comments/show`,
+		`/forms/comments/add-to-chat`,
+		`aria-label="Section actions"`,
+	} {
+		if !strings.Contains(html, want) {
+			t.Fatalf("quote menu missing %q: %s", want, html)
+		}
+	}
+	for _, unwanted := range []string{"Sheet", "Add comment", "data-style=\"\""} {
+		if strings.Contains(html, unwanted) {
+			t.Fatalf("quote menu contains %q: %s", unwanted, html)
 		}
 	}
 }

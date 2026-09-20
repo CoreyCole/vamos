@@ -47,6 +47,17 @@ templ AgentChatComposer(args AgentChatComposerArgs) {
 				<textarea id={ extra.ID } name={ extra.Name } class="min-h-16 w-full rounded-md border border-input bg-background px-2 py-1 text-xs text-foreground" placeholder={ extra.Placeholder } data-ignore-morph></textarea>
 			</label>
 		}
+		<div id="agent-chat-composer-quote" class="mb-2 hidden w-full rounded-md border border-border bg-muted/40 px-2 py-1.5 text-xs" data-show="$chatQuoteText" data-class="{'hidden': !$chatQuoteText}">
+			<input type="hidden" name="chat_quote_text" data-bind="chatQuoteText"/>
+			<input type="hidden" name="chat_quote_path" data-bind="chatQuotePath"/>
+			<div class="flex items-start gap-2">
+				<div class="min-w-0 flex-1">
+					<p class="truncate font-medium text-foreground" data-text="$chatQuotePath" title=""></p>
+					<blockquote class="commentui-thread-quote mt-1 whitespace-pre-wrap border-s-2 border-primary/50 ps-2 text-muted-foreground" data-text="$chatQuoteText"></blockquote>
+				</div>
+				<button type="button" class="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground" data-on:click="$chatQuoteText = ''; $chatQuotePath = ''" aria-label="Dismiss quote" title="Dismiss quote">×</button>
+			</div>
+		</div>
 		<div id="agent-chat-composer-attachments" class="flex flex-wrap items-center gap-1 pb-2">
 			for _, annotation := range args.SelectedAnnotations {
 				<span class="rounded-full border border-amber-500/40 bg-amber-500/10 px-2 py-0.5 text-xs text-amber-200">Annotation: { annotation.Label }</span>
@@ -248,7 +259,7 @@ func composerSignals(draftSignal, initialDraft string) string {
 	if draftSignal == "" {
 		draftSignal = "chatDraft"
 	}
-	return "{" + draftSignal + ": " + strconv.Quote(initialDraft) + ", slashOpen: false, slashPrefix: ''}"
+	return "{" + draftSignal + ": " + strconv.Quote(initialDraft) + ", slashOpen: false, slashPrefix: '', chatQuoteText: '', chatQuotePath: ''}"
 }
 
 func composerAutosizeJS() string {

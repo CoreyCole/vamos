@@ -2,13 +2,16 @@ package comments
 
 import (
 	"net/http"
+	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/labstack/echo/v4"
 	"github.com/starfederation/datastar-go/datastar"
 
 	"github.com/CoreyCole/vamos/pkg/db"
+	"github.com/CoreyCole/vamos/server/layouts/workbench"
 	"github.com/CoreyCole/vamos/server/services/commentui"
 )
 
@@ -76,6 +79,7 @@ func normalizeSectionID(sectionID string) string {
 func thoughtsCommentRoutes() commentui.CommentRoutes {
 	return commentui.CommentRoutes{
 		Show:          "/forms/comments/show",
+		AddToChat:     "/forms/comments/add-to-chat",
 		Create:        "/forms/comments",
 		Cancel:        "/forms/comments/cancel",
 		Expand:        "/forms/comments/expand",
@@ -219,6 +223,7 @@ func patchOpenCommentsSignal(
 	if workbenchV2 {
 		return sse.MarshalAndPatchSignals(map[string]any{
 			"workbench": map[string]any{
+				"activeRegionID": "workbenchV2Comments",
 				"regions": map[string]any{
 					"workbenchV2Comments": map[string]any{"visible": true},
 					"workbenchV2Chat":     map[string]any{"visible": false},
@@ -917,6 +922,14 @@ func (s *Service) HandleShowCommentForm(c echo.Context) error {
 	// Filter to section's comments
 	sectionComments := filterCommentsBySection(response.Comments, data.SectionID)
 
+	http.SetCookie(c.Response(), &http.Cookie{
+		Name:     workbench.CommentsOpenCookie,
+		Value:    "1",
+		Path:     "/",
+		MaxAge:   31536000,
+		SameSite: http.SameSiteLaxMode,
+		Expires:  time.Now().Add(365 * 24 * time.Hour),
+	})
 	sse := datastar.NewSSE(c.Response().Writer, c.Request())
 	target := s.thoughtsCommentTarget(
 		data.FilePath,
@@ -956,5 +969,36 @@ func (s *Service) HandleShowCommentForm(c echo.Context) error {
 	}); err != nil {
 		return err
 	}
-	return sse.ExecuteScript(commentui.FocusComposerScript())
+	return nil
+}
+
+func (s *Service) HandleAddQuoteToChat(c echo.Context) error {
+	userEmail, ok := c.Get("user_email").(string)
+	if !ok || userEmail == "" {
+		return echo.NewHTTPError(http.StatusUnauthorized, "user not authenticated")
+	}
+	data := parseCommentForm(c)
+	quote := strings.TrimSpace(data.SelectedText)
+	if quote == "" {
+		quote = strings.TrimSpace(data.HeadingHint)
+	}
+	pathName := filepath.Base(strings.TrimSpace(data.FilePath))
+	sse := datastar.NewSSE(c.Response().Writer, c.Request())
+	signals := map[string]any{
+		"chatQuoteText": quote,
+		"chatQuotePath": pathName,
+		"workbench": map[string]any{
+			"activeRegionID": "workbenchV2Chat",
+			"regions": map[string]any{
+				"workbenchV2Chat":     map[string]any{"visible": true},
+				"workbenchV2Comments": map[string]any{"visible": false},
+			},
+		},
+	}
+	if prefix := strings.TrimSpace(data.SelectionPrefix); prefix != "" {
+		signals[prefix+".text"] = ""
+		signals[prefix+".sectionId"] = ""
+		signals[prefix+".headingHint"] = ""
+	}
+	return sse.MarshalAndPatchSignals(signals)
 }
