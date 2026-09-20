@@ -447,7 +447,7 @@ func (s *Service) buildThoughtsV2WorkbenchState(
 	if err != nil {
 		return workbench.WorkbenchState{}, err
 	}
-	chatHref := planLeadChatHref(pageArgs.FilePath)
+	chatHref := thoughtsChatHref(s.basePath, pageArgs.FilePath)
 	panelArgs := BuildDocumentPanelArgs(pageArgs)
 	panelArgs.Document.WorkbenchActions = nil
 	artifact, err := s.thoughtsArtifactPane(
@@ -608,7 +608,7 @@ func (s *Service) buildThoughtsDirectoryWorkbenchState(
 		)
 	}
 	viewport := viewportClassForRequest(c)
-	chatHref := planLeadChatHref(args.Path)
+	chatHref := thoughtsChatHref(s.basePath, args.Path)
 	dirPath := strings.Trim(strings.TrimSpace(args.Path), "/")
 	artifact, err := s.thoughtsArtifactPane(
 		c,

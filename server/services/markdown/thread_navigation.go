@@ -809,9 +809,10 @@ func (s *Service) thoughtsArtifactPane(
 	browser = remapThreadArtifactBrowserForThoughts(browser, selectedDoc)
 	browser.ShowCloseDetails = false
 	setViewDocumentToggle(&browser, true, chatHref)
-	browser.HeaderActions = BuildThreadArtifactHeaderActions(
+	browser.HeaderActions = BuildThreadArtifactHeaderActionsWithBase(
 		page,
 		browser.DocPath,
+		s.basePath,
 	)
 	if page != nil && page.ViewerArgs.DocumentKind == DocumentKindHTMLApplet {
 		browser.ShowReload = true

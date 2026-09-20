@@ -125,6 +125,7 @@ func threadArtifactOverflowActions(
 	pageArgs *PageArgs,
 	docPath string,
 	includePlanChat bool,
+	thoughtsBasePath string,
 ) []workbench.OverflowAction {
 	docPath = strings.TrimSpace(docPath)
 	actions := make([]workbench.OverflowAction, 0, 4)
@@ -132,7 +133,7 @@ func threadArtifactOverflowActions(
 		actions = append(actions, ShareArtifactAction(docPath))
 	}
 	if includePlanChat {
-		if chatHref := planLeadChatHref(docPath); chatHref != "" {
+		if chatHref := thoughtsChatHref(thoughtsBasePath, docPath); chatHref != "" {
 			chat := workbench.OverflowAction{
 				Label: "Chat about this plan",
 				Kind:  workbench.OverflowActionLink,
@@ -159,7 +160,15 @@ func BuildThreadArtifactHeaderActions(
 	pageArgs *PageArgs,
 	docPath string,
 ) templ.Component {
-	actions := threadArtifactOverflowActions(pageArgs, docPath, true)
+	return BuildThreadArtifactHeaderActionsWithBase(pageArgs, docPath, "")
+}
+
+func BuildThreadArtifactHeaderActionsWithBase(
+	pageArgs *PageArgs,
+	docPath string,
+	thoughtsBasePath string,
+) templ.Component {
+	actions := threadArtifactOverflowActions(pageArgs, docPath, true, thoughtsBasePath)
 	if len(actions) == 0 {
 		return nil
 	}
@@ -195,7 +204,7 @@ func BuildChatHeaderOverflow(
 		}
 	}
 	if includePlanChat {
-		if chatHref := planLeadChatHref(docPath); chatHref != "" {
+		if chatHref := thoughtsChatHref("", docPath); chatHref != "" {
 			chat := workbench.OverflowAction{
 				Label: "Chat about this plan",
 				Kind:  workbench.OverflowActionLink,
@@ -220,9 +229,11 @@ func BuildChatHeaderOverflow(
 func DocumentCopyPathAction(docPath string) workbench.OverflowAction {
 	path := thoughtsClipboardPath(docPath)
 	return workbench.OverflowAction{
-		Label:        "Copy path",
-		Description:  "Copy path and attach in chat",
-		Kind:         workbench.OverflowActionButton,
-		ClientAction: "const p='" + escapeJSSingleQuoted(path) + "'; navigator.clipboard?.writeText(p); const input = document.getElementById('agent-chat-composer-input'); if (input) { input.value += (input.value ? '\\n' : '') + p; input.dispatchEvent(new Event('input', {bubbles: true})); } " + closeOverflowMenuExpr(),
+		Label:       "Copy path",
+		Description: "Copy path and attach in chat",
+		Kind:        workbench.OverflowActionButton,
+		ClientAction: "const p='" + escapeJSSingleQuoted(
+			path,
+		) + "'; navigator.clipboard?.writeText(p); const input = document.getElementById('agent-chat-composer-input'); if (input) { input.value += (input.value ? '\\n' : '') + p; input.dispatchEvent(new Event('input', {bubbles: true})); } " + closeOverflowMenuExpr(),
 	}
 }

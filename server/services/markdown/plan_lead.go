@@ -46,7 +46,25 @@ func planLeadRoomID(docPath string) string {
 }
 
 func planLeadChatHref(docPath string) string {
-	id := planLeadRoomID(docPath)
+	return thoughtsChatHref("", docPath)
+}
+
+// thoughtsChatHref builds a plain GET /rooms/plan/{id}?artifact=… link for the
+// nearest AGENTS.md ancestor of docPath. Classic thoughts/…/plans/{id} roots keep
+// id = that plan folder. Other AGENTS roots (docs desks) slug the relative dir
+// with "/" → "--" so the existing /rooms/:kind/:id route still matches. Empty
+// basePath keeps the plan-only fallback used by roster/overflow unit tests.
+func thoughtsChatHref(basePath, docPath string) string {
+	id := ""
+	if strings.TrimSpace(basePath) != "" {
+		root, ok := InferWorkspaceRoot(basePath, docPath)
+		if !ok {
+			return ""
+		}
+		id = thoughtsAgentsRoomID(root)
+	} else {
+		id = planLeadRoomID(docPath)
+	}
 	if id == "" {
 		return ""
 	}
@@ -62,6 +80,19 @@ func planLeadChatHref(docPath string) string {
 		return href
 	}
 	return href + "?artifact=" + url.QueryEscape("thoughts/"+canonical)
+}
+
+func thoughtsAgentsRoomID(agentsRoot string) string {
+	root := filepath.ToSlash(strings.TrimSpace(agentsRoot))
+	root = strings.Trim(root, "/")
+	root = strings.TrimPrefix(root, "thoughts/")
+	if root == "" {
+		return ""
+	}
+	if id := planLeadRoomID("thoughts/" + root); id != "" {
+		return id
+	}
+	return strings.ReplaceAll(root, "/", "--")
 }
 
 func rosterPlanTitle(label, planDirRel string) string {
