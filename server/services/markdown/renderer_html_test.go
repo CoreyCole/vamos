@@ -211,6 +211,27 @@ func TestInjectHTMLAppletBridgeIncludesThemeSyncModule(t *testing.T) {
 	}
 }
 
+func TestHTMLAppletJSPromotesThoughtsPageClicksToParent(t *testing.T) {
+	body, err := os.ReadFile(
+		filepath.Join("..", "..", "..", "static", "js", "vamos-html-applet.js"),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	src := string(body)
+	for _, want := range []string{
+		"thoughtsPageHrefForParent",
+		`window.top.location.assign(href)`,
+		`"/thoughts/raw/"`,
+		`"/thoughts/_render/"`,
+		`"/thoughts/_assets/"`,
+	} {
+		if !strings.Contains(src, want) {
+			t.Fatalf("missing %q in vamos-html-applet.js", want)
+		}
+	}
+}
+
 func TestInjectHTMLAppletBridgeFindsRealClosingBody(t *testing.T) {
 	original := []byte(
 		`<html><body><!-- </body> --><script>const marker = "</body>";</script><p>Demo</p></body></html>`,
