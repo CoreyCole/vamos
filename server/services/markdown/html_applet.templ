@@ -11,7 +11,7 @@ templ HTMLAppletFrame(docPath string, src string) {
 			data-commentui-transport="opaque-postmessage"
 			title={ "HTML applet " + docPath }
 			src={ templ.SafeURL(src) }
-			sandbox="allow-scripts allow-forms allow-downloads allow-popups allow-popups-to-escape-sandbox allow-same-origin"
+			sandbox="allow-scripts allow-forms allow-downloads allow-popups allow-popups-to-escape-sandbox allow-same-origin allow-top-navigation-by-user-activation"
 			class="h-full min-h-0 w-full flex-1 border-0 bg-white"
 			referrerpolicy="same-origin"
 		></iframe>

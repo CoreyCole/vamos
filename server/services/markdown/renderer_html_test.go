@@ -308,6 +308,9 @@ func TestHTMLAppletRendererReturnsSandboxedFrame(t *testing.T) {
 	if !strings.Contains(html, "allow-same-origin") {
 		t.Fatalf("sandbox missing allow-same-origin: %s", html)
 	}
+	if !strings.Contains(html, "allow-top-navigation-by-user-activation") {
+		t.Fatalf("sandbox missing allow-top-navigation-by-user-activation: %s", html)
+	}
 	if strings.Contains(html, "allow-top-navigation") &&
 		!strings.Contains(html, "allow-top-navigation-by-user-activation") {
 		t.Fatalf("sandbox broadened with top-navigation: %s", html)
