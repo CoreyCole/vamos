@@ -92,19 +92,11 @@ func workingDirInjectFile(
 }
 
 func formatWorkingDirContext(processCwd, planDirRel, implDir string) string {
-	var b strings.Builder
-	b.WriteString("process_cwd: ")
-	b.WriteString(strings.TrimSpace(processCwd))
-	b.WriteByte('\n')
-	b.WriteString("plan_dir: ")
-	b.WriteString(strings.TrimSpace(planDirRel))
-	b.WriteByte('\n')
-	if impl := strings.TrimSpace(implDir); impl != "" {
-		b.WriteString("impl_dir: ")
-		b.WriteString(impl)
-		b.WriteByte('\n')
-	}
-	return b.String()
+	return formatMessageFrontmatter([]messageFrontmatterField{
+		{Key: "process_cwd", Value: processCwd},
+		{Key: "plan_dir", Value: planDirRel},
+		{Key: "impl_dir", Value: implDir},
+	}, "")
 }
 
 func workingDirInjectContent(files []conversation.InjectFile) string {

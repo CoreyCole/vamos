@@ -82,6 +82,16 @@ func TestPlanRoomProcessCwdUsesWorkingCheckoutWhenImplDirEmpty(t *testing.T) {
 	if strings.Contains(content, "impl_dir:") {
 		t.Fatalf("empty impl_dir should be omitted:\n%s", content)
 	}
+	want := formatMessageFrontmatter([]messageFrontmatterField{
+		{Key: "process_cwd", Value: working},
+		{Key: "plan_dir", Value: planRel},
+	}, "")
+	if content != want {
+		t.Fatalf("inject = %q, want formatter output %q", content, want)
+	}
+	if _, _, ok := parseMessageFrontmatter(content); !ok {
+		t.Fatalf("inject must parse as message frontmatter:\n%s", content)
+	}
 	roomDisk, err := RoomCwdAbs(
 		root,
 		RoomIdentity{Kind: RoomKindPlan, PlanDirRel: planRel},
@@ -140,6 +150,14 @@ func TestPlanRoomProcessCwdUsesImplDir(t *testing.T) {
 	content := workingDirInjectContent(inject)
 	if !strings.Contains(content, "impl_dir: "+copyPath) {
 		t.Fatalf("inject missing impl_dir:\n%s", content)
+	}
+	want := formatMessageFrontmatter([]messageFrontmatterField{
+		{Key: "process_cwd", Value: copyPath},
+		{Key: "plan_dir", Value: planRel},
+		{Key: "impl_dir", Value: copyPath},
+	}, "")
+	if content != want {
+		t.Fatalf("inject = %q, want formatter output %q", content, want)
 	}
 }
 

@@ -12,6 +12,29 @@ type messageFrontmatterField struct {
 	Value string
 }
 
+func formatMessageFrontmatter(fields []messageFrontmatterField, body string) string {
+	var b strings.Builder
+	wrote := 0
+	for _, field := range fields {
+		key := strings.TrimSpace(field.Key)
+		value := strings.TrimSpace(field.Value)
+		if key == "" || value == "" {
+			continue
+		}
+		b.WriteString(key)
+		b.WriteString(": ")
+		b.WriteString(value)
+		b.WriteByte('\n')
+		wrote++
+	}
+	if wrote == 0 {
+		return body
+	}
+	b.WriteString("---\n")
+	b.WriteString(body)
+	return b.String()
+}
+
 func parseMessageFrontmatter(
 	content string,
 ) (fields []messageFrontmatterField, body string, ok bool) {
