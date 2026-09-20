@@ -225,6 +225,26 @@ func TestInjectHTMLAppletBridgeIncludesThemeSyncModule(t *testing.T) {
 	}
 }
 
+func TestInjectHTMLAppletBridgeStillInjectsWhenAuthorImportsAppletJS(t *testing.T) {
+	src := []byte(
+		`<html><body><script type="module">import("/js/vamos-html-applet.js?v=2")</script></body></html>`,
+	)
+	got := string(injectHTMLAppletBridge(src))
+	if !strings.Contains(got, `src="/js/frame-comment-bridge.js?v=4"`) {
+		t.Fatalf("author applet import skipped comment bridge: %q", got)
+	}
+	if !strings.Contains(got, `data-commentui-mode="child"`) {
+		t.Fatalf("missing child comment mode: %q", got)
+	}
+	if n := strings.Count(got, "/js/frame-comment-bridge.js"); n != 1 {
+		t.Fatalf("comment bridge count=%d body=%q", n, got)
+	}
+	twice := string(injectHTMLAppletBridge([]byte(got)))
+	if twice != got {
+		t.Fatalf("double inject changed output\nonce=%q\ntwice=%q", got, twice)
+	}
+}
+
 func TestHTMLAppletJSPromotesThoughtsPageClicksToParent(t *testing.T) {
 	body, err := os.ReadFile(
 		filepath.Join("..", "..", "..", "static", "js", "vamos-html-applet.js"),

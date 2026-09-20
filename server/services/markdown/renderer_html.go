@@ -280,7 +280,8 @@ func injectHTMLAppletThemeBoot(content []byte) []byte {
 }
 
 func injectHTMLAppletBridge(content []byte) []byte {
-	if bytes.Contains(content, []byte("/js/vamos-html-applet.js")) {
+	if bytes.Contains(content, []byte("/js/frame-comment-bridge.js")) ||
+		bytes.Contains(content, []byte(`data-commentui-mode="child"`)) {
 		return content
 	}
 	tokenizer := xhtml.NewTokenizer(bytes.NewReader(content))
