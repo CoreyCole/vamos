@@ -602,7 +602,6 @@ func artifactPathHeader(t *testing.T, html string) string {
 	return header
 }
 
-
 func TestViewChatDocumentLinkIsPlainGET(t *testing.T) {
 	t.Parallel()
 	var body strings.Builder
@@ -649,10 +648,46 @@ func TestPathHeaderOmitsOverflowWhenHeaderActionsNil(t *testing.T) {
 	header := artifactPathHeader(t, body.String())
 	if strings.Contains(header, `data-testid="workbench-overflow-actions"`) ||
 		strings.Contains(header, "data-overflow-root") {
-		t.Fatalf("path-header must not paint overflow when HeaderActions nil:\n%s", header)
+		t.Fatalf(
+			"path-header must not paint overflow when HeaderActions nil:\n%s",
+			header,
+		)
 	}
 }
 
+func TestPathHeaderShowsCloseDetailsWhenShowCloseDetails(t *testing.T) {
+	var body strings.Builder
+	if err := ThreadArtifactPane(
+		ThreadArtifactBrowserArgs{
+			DocPath:          "owner/plans/alpha/design.md",
+			ShowCloseDetails: true,
+		},
+		templ.Raw("<p>doc</p>"),
+	).Render(t.Context(), &body); err != nil {
+		t.Fatal(err)
+	}
+	header := artifactPathHeader(t, body.String())
+	if !strings.Contains(header, `data-testid="artifact-close-details"`) {
+		t.Fatalf("threads path-header missing Close details:\n%s", header)
+	}
+}
+
+func TestPathHeaderHidesCloseDetailsWhenDisabled(t *testing.T) {
+	var body strings.Builder
+	if err := ThreadArtifactPane(
+		ThreadArtifactBrowserArgs{
+			DocPath:          "owner/plans/alpha/design.md",
+			ShowCloseDetails: false,
+		},
+		templ.Raw("<p>doc</p>"),
+	).Render(t.Context(), &body); err != nil {
+		t.Fatal(err)
+	}
+	header := artifactPathHeader(t, body.String())
+	if strings.Contains(header, `data-testid="artifact-close-details"`) {
+		t.Fatalf("thoughts path-header still has Close details:\n%s", header)
+	}
+}
 
 func TestPathHeaderShowsReloadWhenShowReload(t *testing.T) {
 	var body strings.Builder
@@ -662,7 +697,9 @@ func TestPathHeaderShowsReloadWhenShowReload(t *testing.T) {
 			DirectoryPath: "thoughts",
 			ShowReload:    true,
 		},
-		templ.Raw(`<iframe data-vamos-html-applet src="/thoughts/_render/html/demo.html"></iframe>`),
+		templ.Raw(
+			`<iframe data-vamos-html-applet src="/thoughts/_render/html/demo.html"></iframe>`,
+		),
 	).Render(t.Context(), &body); err != nil {
 		t.Fatal(err)
 	}

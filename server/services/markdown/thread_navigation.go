@@ -57,6 +57,8 @@ type ThreadArtifactBrowserArgs struct {
 	ThreadsOpen        bool
 	// ShowReload paints the dedicated path-header Reload icon (iframe src reset only).
 	ShowReload bool
+	// ShowCloseDetails paints >> Close details. Threads workbench only; thoughts pages hide it.
+	ShowCloseDetails bool
 	// BrowserOpen is the SSR Files-browser preference (cookie wb2_artifact_browser).
 	// Default closed when unset so first visit does not show the sibling file list.
 	BrowserOpen bool
@@ -523,12 +525,13 @@ func (s *Service) threadArtifactBrowser(
 	}
 	entries = s.withArtifactCommentCounts(c.Request().Context(), entries)
 	args := ThreadArtifactBrowserArgs{
-		ThreadID:      threadID,
-		DocPath:       docPath,
-		DirectoryPath: directoryPath,
-		Entries:       entries,
-		BrowserOpen:   ArtifactBrowserOpenFromRequest(c.Request()),
-		CommentsOpen:  workbench.CommentsOpenFromRequest(c.Request()),
+		ThreadID:         threadID,
+		DocPath:          docPath,
+		DirectoryPath:    directoryPath,
+		Entries:          entries,
+		BrowserOpen:      ArtifactBrowserOpenFromRequest(c.Request()),
+		CommentsOpen:     workbench.CommentsOpenFromRequest(c.Request()),
+		ShowCloseDetails: true,
 	}
 	if directoryPath != "" && docPath != "" {
 		parent := path.Dir(directoryPath)
@@ -804,6 +807,7 @@ func (s *Service) thoughtsArtifactPane(
 		return nil, err
 	}
 	browser = remapThreadArtifactBrowserForThoughts(browser, selectedDoc)
+	browser.ShowCloseDetails = false
 	setViewDocumentToggle(&browser, true, chatHref)
 	browser.HeaderActions = BuildThreadArtifactHeaderActions(
 		page,
@@ -833,11 +837,12 @@ func (s *Service) thoughtsDirectoryArtifactBrowser(
 	}
 	entries = s.withArtifactCommentCounts(c.Request().Context(), entries)
 	args := ThreadArtifactBrowserArgs{
-		DocPath:       canonical,
-		DirectoryPath: canonical,
-		Entries:       entries,
-		BrowserOpen:   ArtifactBrowserOpenFromRequest(c.Request()),
-		CommentsOpen:  workbench.CommentsOpenFromRequest(c.Request()),
+		DocPath:          canonical,
+		DirectoryPath:    canonical,
+		Entries:          entries,
+		BrowserOpen:      ArtifactBrowserOpenFromRequest(c.Request()),
+		CommentsOpen:     workbench.CommentsOpenFromRequest(c.Request()),
+		ShowCloseDetails: false,
 	}
 	if canonical != "" {
 		parent := path.Dir(canonical)
@@ -881,7 +886,9 @@ func (s *Service) threadArtifactAndComments(
 	if page == nil {
 		setViewDocumentToggle(&browser, false, "")
 		return ThreadArtifactPane(browser, content),
-			WorkbenchUnavailable("Comments are unavailable for this artifact."), nil, browser.DocPath, nil
+			WorkbenchUnavailable(
+				"Comments are unavailable for this artifact.",
+			), nil, browser.DocPath, nil
 	}
 	userEmail, _ := c.Get("user_email").(string)
 	threads := []commentui.CommentThreadView{}
@@ -910,7 +917,6 @@ func (s *Service) threadArtifactAndComments(
 			commentui.BuildCommentsPanelArgs(page.CommentUI, ""),
 		), page, browser.DocPath, nil
 }
-
 
 func (s *Service) HandleThreadArtifactBrowser(c echo.Context) error {
 	threadID := strings.TrimSpace(c.Param("threadID"))

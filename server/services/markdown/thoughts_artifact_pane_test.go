@@ -77,6 +77,9 @@ func TestThoughtsArtifactPaneUsesSharedThreadChrome(t *testing.T) {
 	}
 	html := body.String()
 
+	if strings.Contains(html, `data-testid="artifact-close-details"`) {
+		t.Fatalf("thoughts workbench must not paint Close details")
+	}
 	for _, want := range []string{
 		`id="thread-artifact-path-header"`,
 		`aria-label="Toggle files"`,
