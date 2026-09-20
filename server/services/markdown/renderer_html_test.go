@@ -375,6 +375,44 @@ func TestHTMLAppletRendererReturnsSandboxedFrame(t *testing.T) {
 	}
 }
 
+func TestRenderThoughtsDocumentDocsIndexHTMLIsCommentable(t *testing.T) {
+	root := t.TempDir()
+	mustMkdirAll(t, filepath.Join(root, "docs", "vamos"))
+	mustWriteFile(
+		t,
+		filepath.Join(root, "docs", "vamos", "index.html"),
+		[]byte("<html><body>docs</body></html>"),
+	)
+	svc, err := NewService(root, nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, requestPath := range []string{
+		"docs/vamos/index.html",
+		"thoughts/docs/vamos/index.html",
+		"docs/vamos",
+	} {
+		page, err := svc.RenderThoughtsDocument(t.Context(), requestPath)
+		if err != nil {
+			t.Fatalf("%s: %v", requestPath, err)
+		}
+		if page == nil {
+			t.Fatalf("%s: nil page", requestPath)
+		}
+		if page.ViewerArgs.CommentMode != CommentModeDocumentOnly {
+			t.Fatalf(
+				"%s CommentMode=%q want %q",
+				requestPath,
+				page.ViewerArgs.CommentMode,
+				CommentModeDocumentOnly,
+			)
+		}
+		if page.ViewerArgs.DocumentKind != DocumentKindHTMLApplet {
+			t.Fatalf("%s kind=%q", requestPath, page.ViewerArgs.DocumentKind)
+		}
+	}
+}
+
 func TestPrepareHTMLAppletDocumentDarkTheme(t *testing.T) {
 	src := []byte(
 		`<!doctype html><html lang="en"><head><link rel="stylesheet" href="app.css"></head><body>Hi</body></html>`,

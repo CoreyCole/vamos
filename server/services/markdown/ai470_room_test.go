@@ -746,3 +746,53 @@ func TestLiveRosterDocsPrefersIndexHTML(t *testing.T) {
 		t.Fatalf("chestnut href = %q", byID["chestnut"].Href)
 	}
 }
+
+func TestServeAI470RoomDocsIndexHTMLCommentsPanel(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	docs := filepath.Join(root, "docs", "vamos")
+	mustMkdirAll(t, docs)
+	mustWriteFile(t, filepath.Join(docs, "AGENTS.md"), []byte("# Vamos docs\n"))
+	mustWriteFile(
+		t,
+		filepath.Join(docs, "index.html"),
+		[]byte("<html><body>docs index</body></html>"),
+	)
+	svc, err := NewService(root, nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	svc.WithWorkbenchThreadRenderer(&threadWorkbenchTestRenderer{
+		findID:        "thread-docs",
+		threadPlanDir: "docs/vamos",
+	})
+	artifact := "thoughts/docs/vamos/index.html"
+	rec := httptest.NewRecorder()
+	c := echo.New().NewContext(
+		httptest.NewRequest(
+			http.MethodGet,
+			"/rooms/plan/docs--vamos?artifact="+url.QueryEscape(artifact),
+			http.NoBody,
+		),
+		rec,
+	)
+	c.SetParamNames("kind", "id")
+	c.SetParamValues("plan", "docs--vamos")
+	c.Set("user_email", "t@example.com")
+	if err := svc.ServeAI470Room(c); err != nil {
+		t.Fatal(err)
+	}
+	body := rec.Body.String()
+	for _, unwanted := range []string{
+		"Comments are unavailable for this artifact.",
+		"Comments are unavailable for directories.",
+		"Select an artifact to view comments.",
+	} {
+		if strings.Contains(body, unwanted) {
+			t.Fatalf("comments unavailable: %q in %s", unwanted, body)
+		}
+	}
+	if !strings.Contains(body, `id="comments-context-panel"`) {
+		t.Fatalf("missing comments panel: %s", body)
+	}
+}

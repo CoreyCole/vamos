@@ -108,15 +108,15 @@ func (s *Service) artifactContent(
 	if !explicit {
 		return WorkbenchUnavailable("Select a thread to view an artifact."), nil, false
 	}
-	if _, err := s.GetDirectoryListing(artifact); err == nil {
+	page, err := s.RenderThoughtsDocument(c.Request().Context(), artifact)
+	if err == nil {
+		page.UserEmail, _ = c.Get("user_email").(string)
+		return DocumentPanel(BuildDocumentPanelArgs(page)), page, false
+	}
+	if _, dirErr := s.GetDirectoryListing(artifact); dirErr == nil {
 		return WorkbenchUnavailable("Select a file from the artifact browser."), nil, true
 	}
-	page, err := s.RenderThoughtsDocument(c.Request().Context(), artifact)
-	if err != nil {
-		return WorkbenchUnavailable("The requested artifact is unavailable."), nil, false
-	}
-	page.UserEmail, _ = c.Get("user_email").(string)
-	return DocumentPanel(BuildDocumentPanelArgs(page)), page, false
+	return WorkbenchUnavailable("The requested artifact is unavailable."), nil, false
 }
 
 func (s *Service) indexArtifactComponent(

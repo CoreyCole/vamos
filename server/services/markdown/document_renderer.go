@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
 
@@ -166,11 +167,26 @@ func (s *Service) resolveThoughtsDocumentRequest(
 		}
 	}
 	if info.IsDir() {
-		return DocumentRequest{}, fmt.Errorf(
-			"%w: %s",
-			errThoughtsDocumentIsDirectory,
-			requestPath,
-		)
+		resolved := false
+		for _, name := range []string{"index.html", "index.htm"} {
+			idxPath := filepath.Join(fullPath, name)
+			idxInfo, idxErr := os.Stat(idxPath)
+			if idxErr != nil || idxInfo.IsDir() {
+				continue
+			}
+			fullPath = idxPath
+			cleanPath = path.Join(cleanPath, name)
+			info = idxInfo
+			resolved = true
+			break
+		}
+		if !resolved {
+			return DocumentRequest{}, fmt.Errorf(
+				"%w: %s",
+				errThoughtsDocumentIsDirectory,
+				requestPath,
+			)
+		}
 	}
 	return DocumentRequest{
 		RequestPath: requestPath,
