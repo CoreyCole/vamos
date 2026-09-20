@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -28,6 +29,7 @@ func TestServeFreeformRoomListsEmptyKindRow(t *testing.T) {
 	}
 	t.Cleanup(func() { _ = dbSvc.Close() })
 	threadID := uuid.NewString()
+	piID := uuid.NewString()
 	if _, err := dbSvc.Queries.CreateAgentThread(
 		context.Background(),
 		db.CreateAgentThreadParams{
@@ -36,11 +38,16 @@ func TestServeFreeformRoomListsEmptyKindRow(t *testing.T) {
 			Title:       "Empty kind",
 			Cwd:         filepath.Join(root, "freeform"),
 			LineageID:   uuid.NewString(),
-			PiSessionID: uuid.NewString(),
+			PiSessionID: piID,
 		},
 	); err != nil {
 		t.Fatal(err)
 	}
+	writeJSONLUserMessage(
+		t,
+		filepath.Join(root, "freeform", ".vamos", "sessions", "pi", piID+".jsonl"),
+		piID,
+	)
 	svc, err := NewService(root, nil, nil)
 	if err != nil {
 		t.Fatal(err)
@@ -126,6 +133,18 @@ func TestServeFreeformRoomZeroThreadsComposerDoesNotInsert(t *testing.T) {
 	}
 	if strings.Contains(body, "/thoughts/chat/freeform/send") {
 		t.Fatal("N=0 composer must not wire freeform send")
+	}
+}
+
+func writeJSONLUserMessage(t *testing.T, path, sessionID string) {
+	t.Helper()
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	body := `{"type":"session","id":"` + sessionID + `"}` + "\n" +
+		`{"type":"message","message":{"role":"user","content":"hello"}}` + "\n"
+	if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
+		t.Fatal(err)
 	}
 }
 

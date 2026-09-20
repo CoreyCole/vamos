@@ -57,16 +57,22 @@ func TestScopedListsExcludePairwiseA2A(t *testing.T) {
 	}
 
 	botID := uuid.NewString()
+	botPi := uuid.NewString()
 	if _, err := dbSvc.Queries.CreateAgentThread(ctx, db.CreateAgentThreadParams{
 		ID:          botID,
 		UserEmail:   "t@example.com",
 		Title:       "Nova chat",
 		Cwd:         filepath.Join(root, "agents", "nova"),
 		LineageID:   uuid.NewString(),
-		PiSessionID: uuid.NewString(),
+		PiSessionID: botPi,
 	}); err != nil {
 		t.Fatal(err)
 	}
+	writeJSONLUserMessage(
+		t,
+		filepath.Join(root, "agents", "nova", "sessions", "pi", botPi+".jsonl"),
+		botPi,
+	)
 	if err := dbSvc.Queries.BindAgentThreadBotHome(ctx, db.BindAgentThreadBotHomeParams{
 		AgentSlug: sql.NullString{String: "nova", Valid: true},
 		Cwd:       filepath.Join(root, "agents", "nova"),
@@ -85,16 +91,22 @@ func TestScopedListsExcludePairwiseA2A(t *testing.T) {
 	}
 
 	freeID := uuid.NewString()
+	freePi := uuid.NewString()
 	if _, err := dbSvc.Queries.CreateAgentThread(ctx, db.CreateAgentThreadParams{
 		ID:          freeID,
 		UserEmail:   "t@example.com",
 		Title:       "Freeform",
 		Cwd:         filepath.Join(root, "freeform"),
 		LineageID:   uuid.NewString(),
-		PiSessionID: uuid.NewString(),
+		PiSessionID: freePi,
 	}); err != nil {
 		t.Fatal(err)
 	}
+	writeJSONLUserMessage(
+		t,
+		filepath.Join(root, "freeform", ".vamos", "sessions", "pi", freePi+".jsonl"),
+		freePi,
+	)
 
 	planRel := "owner/plans/alpha"
 	if _, err := dbSvc.Queries.UpsertDiscoveredPlanWorkspace(
@@ -110,6 +122,7 @@ func TestScopedListsExcludePairwiseA2A(t *testing.T) {
 		t.Fatal(err)
 	}
 	planID := uuid.NewString()
+	planPi := uuid.NewString()
 	if _, err := dbSvc.Queries.CreateAgentThread(ctx, db.CreateAgentThreadParams{
 		ID:          planID,
 		UserEmail:   "t@example.com",
@@ -117,10 +130,15 @@ func TestScopedListsExcludePairwiseA2A(t *testing.T) {
 		Cwd:         "thoughts/owner/plans/alpha",
 		LineageID:   uuid.NewString(),
 		PlanDirRel:  sql.NullString{String: planRel, Valid: true},
-		PiSessionID: uuid.NewString(),
+		PiSessionID: planPi,
 	}); err != nil {
 		t.Fatal(err)
 	}
+	writeJSONLUserMessage(
+		t,
+		filepath.Join(planDir, ".vamos", "sessions", "pi", planPi+".jsonl"),
+		planPi,
+	)
 	if err := dbSvc.Queries.BindAgentThreadPlan(ctx, db.BindAgentThreadPlanParams{
 		Cwd:   "thoughts/owner/plans/alpha",
 		Title: "Plan chat",
@@ -131,14 +149,21 @@ func TestScopedListsExcludePairwiseA2A(t *testing.T) {
 
 	assertNoPair := func(t *testing.T, body string) {
 		t.Helper()
-		if strings.Contains(body, `href="/threads/`+pairID+`"`) {
-			t.Fatalf("pairwise thread listed: %s", body)
+		list := body
+		if i := strings.Index(body, `id="scoped-thread-list"`); i >= 0 {
+			list = body[i:]
+			if j := strings.Index(list, `id="workbench-v2-chat-header"`); j > 0 {
+				list = list[:j]
+			}
 		}
-		if strings.Contains(body, "Messaged 2 Bots") {
-			t.Fatalf("fixture chips leaked into scoped list: %s", body)
+		if strings.Contains(list, `href="/threads/`+pairID+`"`) {
+			t.Fatal("pairwise thread listed in scoped list")
 		}
-		if strings.Contains(body, `id="workbench-v2-interagent-chips"`) {
-			t.Fatalf("fixture InterAgentMessageChips in scoped list: %s", body)
+		if strings.Contains(list, "Messaged 2 Bots") {
+			t.Fatal("fixture chips leaked into scoped list")
+		}
+		if strings.Contains(list, `id="workbench-v2-interagent-chips"`) {
+			t.Fatal("fixture InterAgentMessageChips in scoped list")
 		}
 	}
 
