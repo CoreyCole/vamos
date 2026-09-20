@@ -231,6 +231,53 @@ func (s *Service) EnsureSharedThreadForDoc(
 	return thread.ID, nil
 }
 
+const freeformLandThreadTitle = "Chat"
+
+func (s *Service) EnsureFreeformLandThread(
+	ctx context.Context,
+	userEmail string,
+) (string, error) {
+	userEmail = strings.TrimSpace(userEmail)
+	if userEmail == "" || s == nil || s.queries == nil {
+		return "", nil
+	}
+	threads, err := s.queries.ListAgentThreads(ctx, db.ListAgentThreadsParams{
+		UserEmail: userEmail,
+		Limit:     500,
+	})
+	if err != nil {
+		return "", err
+	}
+	for _, thread := range threads {
+		if thread.PlanDirRel.Valid {
+			continue
+		}
+		if strings.TrimSpace(thread.RoomKind) != "" {
+			continue
+		}
+		if strings.TrimSpace(thread.Title) != freeformLandThreadTitle {
+			continue
+		}
+		return thread.ID, nil
+	}
+	created, err := s.queries.CreateAgentThread(
+		ctx,
+		s.attachPlanDirRel(ctx, db.CreateAgentThreadParams{
+			ID:         uuid.NewString(),
+			UserEmail:  userEmail,
+			Title:      freeformLandThreadTitle,
+			Cwd:        s.defaultCwd,
+			LineageID:  uuid.NewString(),
+			ProjectID:  "",
+			PlanDirRel: sql.NullString{},
+		}),
+	)
+	if err != nil {
+		return "", err
+	}
+	return created.ID, nil
+}
+
 // ListPlanHomeThreads returns FK-linked threads for a plan. Freeform (NULL) excluded.
 func (s *Service) ListPlanHomeThreads(
 	ctx context.Context,

@@ -117,6 +117,15 @@ func (r *routingChatRenderer) EnsureSharedThreadForDoc(
 	return "", nil
 }
 
+func (r *routingChatRenderer) EnsureFreeformLandThread(
+	ctx context.Context,
+	userEmail string,
+) (string, error) {
+	_ = ctx
+	_ = userEmail
+	return "", nil
+}
+
 func (r *routingChatRenderer) RenderSharedThreadChat(
 	ctx context.Context,
 	threadID, userEmail string,

@@ -312,6 +312,38 @@ func TestEnsureSharedThreadForDocIgnoresNonPlan(t *testing.T) {
 	}
 }
 
+func TestEnsureFreeformLandThreadCreatesThenReuses(t *testing.T) {
+	_, _, _, _, service, database := setupPlanDirRelTest(t)
+	first, err := service.EnsureFreeformLandThread(
+		t.Context(), "owner@example.com",
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if first == "" {
+		t.Fatal("expected created thread id")
+	}
+	second, err := service.EnsureFreeformLandThread(
+		t.Context(), "owner@example.com",
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if second != first {
+		t.Fatalf("reused %q, want %q", second, first)
+	}
+	thread, err := database.Queries.GetAgentThread(t.Context(), first)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if thread.Title != freeformLandThreadTitle {
+		t.Fatalf("title = %q", thread.Title)
+	}
+	if thread.PlanDirRel.Valid {
+		t.Fatalf("plan_dir_rel = %q", thread.PlanDirRel.String)
+	}
+}
+
 func TestEnsureSharedThreadForDocAgentsDesk(t *testing.T) {
 	_, thoughtsRoot, _, _, service, database := setupPlanDirRelTest(t)
 	deskAbs := filepath.Join(thoughtsRoot, "docs", "vamos")

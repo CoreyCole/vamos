@@ -246,6 +246,15 @@ func (s stubWorkbenchThreads) EnsureSharedThreadForDoc(
 	return s.threadID, nil
 }
 
+func (s stubWorkbenchThreads) EnsureFreeformLandThread(
+	ctx context.Context,
+	userEmail string,
+) (string, error) {
+	_ = ctx
+	_ = userEmail
+	return s.threadID, nil
+}
+
 func (s stubWorkbenchThreads) RenderSharedThreadChat(
 	ctx context.Context,
 	threadID, userEmail string,

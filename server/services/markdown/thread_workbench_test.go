@@ -71,6 +71,16 @@ func (r *threadWorkbenchTestRenderer) EnsureSharedThreadForDoc(
 	return r.findID, nil
 }
 
+func (r *threadWorkbenchTestRenderer) EnsureFreeformLandThread(
+	context.Context,
+	string,
+) (string, error) {
+	if r.ensureID != "" {
+		return r.ensureID, nil
+	}
+	return "land-chat", nil
+}
+
 func (r *threadWorkbenchTestRenderer) RenderSharedThreadChat(
 	_ context.Context,
 	threadID,
@@ -190,6 +200,41 @@ func TestServeThreadsHydratesArtifactAndCarriesIt(t *testing.T) {
 		if strings.Contains(body, bad) {
 			t.Fatalf("/threads contains sketch %q: %s", bad, body)
 		}
+	}
+}
+
+func TestServeThreadsIndexOpensFreeformChat(t *testing.T) {
+	root := t.TempDir()
+	svc, err := NewService(root, nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	r := &threadWorkbenchTestRenderer{}
+	svc.WithWorkbenchThreadRenderer(r)
+	rec := httptest.NewRecorder()
+	c := echo.New().NewContext(httptest.NewRequest("GET", "/threads", nil), rec)
+	if err := svc.ServeThreads(c); err != nil {
+		t.Fatal(err)
+	}
+	body := rec.Body.String()
+	if r.chatThreadID != "land-chat" {
+		t.Fatalf("chat thread = %q", r.chatThreadID)
+	}
+	if strings.Contains(body, "Select a thread to open chat") {
+		t.Fatal("index still uses unavailable stub")
+	}
+	if !strings.Contains(body, `id="agent-chat-composer"`) {
+		t.Fatalf("missing composer: %s", body)
+	}
+	if !strings.Contains(body, `data-testid="mobile-toggle-threads"`) {
+		t.Fatalf("missing roster hamburger: %s", body)
+	}
+	if !strings.Contains(body, `id="workbench-v2-chat"`) ||
+		!strings.Contains(
+			body,
+			`&#34;workbenchV2Chat&#34;:{&#34;ratio&#34;:0.39,&#34;visible&#34;:true`,
+		) {
+		t.Fatalf("chat not open: %s", body)
 	}
 }
 

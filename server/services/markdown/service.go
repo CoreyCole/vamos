@@ -52,6 +52,10 @@ type WorkbenchThreadRenderer interface {
 		ctx context.Context,
 		docPath, userEmail string,
 	) (string, error)
+	EnsureFreeformLandThread(
+		ctx context.Context,
+		userEmail string,
+	) (string, error)
 	RenderSharedThreadChat(
 		ctx context.Context,
 		threadID, userEmail string,

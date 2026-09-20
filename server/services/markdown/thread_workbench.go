@@ -249,6 +249,37 @@ func (s *Service) threadChatHeaderTitle(
 	return title, false
 }
 
+func freeformLandChatPlaceholder() templ.Component {
+	return templ.Raw(
+		`<div id="thread-chat"><div id="agent-chat-live-transcript"></div>` +
+			`<form id="agent-chat-composer" ` +
+			`data-on:submit="@post('/thoughts/chat/freeform/send', {contentType: 'form'})">` +
+			`<textarea name="prompt" placeholder="Message"></textarea>` +
+			`<button type="submit">Send</button></form></div>`,
+	)
+}
+
+func (s *Service) freeformLandChat(
+	c echo.Context,
+	userEmail string,
+) (templ.Component, error) {
+	threadID, err := s.workbenchThreadsRenderer.EnsureFreeformLandThread(
+		c.Request().Context(), userEmail,
+	)
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return nil, err
+	}
+	threadID = strings.TrimSpace(threadID)
+	if threadID == "" {
+		return freeformLandChatPlaceholder(), nil
+	}
+	chat, err := s.renderSharedThreadChatForRequest(c, threadID, userEmail)
+	if errors.Is(err, sql.ErrNoRows) {
+		return freeformLandChatPlaceholder(), nil
+	}
+	return chat, err
+}
+
 func (s *Service) ServeThreads(c echo.Context) error {
 	if s.workbenchThreadsRenderer == nil {
 		return echo.NewHTTPError(
@@ -272,6 +303,11 @@ func (s *Service) ServeThreads(c echo.Context) error {
 	artifactComp, artifactPage, artifactDoc := s.indexArtifactComponent(
 		c, artifactPath, hasArtifact,
 	)
+	chat, err := s.freeformLandChat(c, userEmail)
+	if err != nil {
+		return err
+	}
+	chatOpen, commentsOpen := chatCommentsOpen(c.Request(), true)
 	state, err := workbench.BuildWorkbenchV2State(workbench.WorkbenchV2Args{
 		UserEmail:     userEmail,
 		ViewportClass: viewport,
@@ -286,7 +322,7 @@ func (s *Service) ServeThreads(c echo.Context) error {
 			workbench.ThreadsOpenFromRequest(c.Request()),
 			workbench.ArtifactOpenFromRequest(c.Request()),
 			"Chat",
-			WorkbenchUnavailable("Select a thread to open chat."),
+			chat,
 			BuildChatHeaderOverflow(artifactPage, artifactDoc, true),
 		),
 		Artifact: artifactComp,
@@ -294,10 +330,10 @@ func (s *Service) ServeThreads(c echo.Context) error {
 			"Select an artifact to view comments.",
 		),
 		ThreadsOpen: workbench.ThreadsOpenFromRequest(c.Request()),
-		ChatOpen:    false,
+		ChatOpen:    chatOpen,
 		// Index land: cookie missing => open so route-defaults Stories stay green.
 		ArtifactOpen: workbench.ArtifactOpenFromRequest(c.Request()),
-		CommentsOpen: false,
+		CommentsOpen: commentsOpen,
 	})
 	if err != nil {
 		return err
