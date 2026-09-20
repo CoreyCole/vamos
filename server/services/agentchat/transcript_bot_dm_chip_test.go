@@ -42,6 +42,9 @@ func TestBotDMChipPopoverCopyAndPairwiseHrefs(t *testing.T) {
 	if strings.Contains(out, "/rooms/agent_dm/") {
 		t.Fatalf("used leftover agent_dm URL; html = %s", out)
 	}
+	if strings.Contains(out, "Messaged 2 Bots") {
+		t.Fatalf("fixture InterAgentMessageChips copy; html = %s", out)
+	}
 }
 
 func TestPairwiseSharedThreadChatHasNoComposer(t *testing.T) {
