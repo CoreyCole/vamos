@@ -172,6 +172,7 @@ func TestSharedThreadChatMessageThreadFixtureDOM(t *testing.T) {
 	}
 	for _, want := range []string{
 		`id="agent-chat-scroll-region"`,
+		`id="agent-chat-transcript-column"`,
 		`id="msg-` + messageThreadParentFixtureDOMID + `-thread-summary"`,
 		`2 replies`,
 		`id="agent-chat-message-thread"`,
@@ -188,7 +189,91 @@ func TestSharedThreadChatMessageThreadFixtureDOM(t *testing.T) {
 	if strings.Contains(out, `w-[360px]`) {
 		t.Fatal("open thread must fill the chat column, not a 360px split")
 	}
-	if !strings.Contains(out, `hidden`) {
-		t.Fatal("open thread must hide the main transcript column")
+	assertTranscriptColumnHidden(t, out, true)
+}
+
+func TestSharedThreadChatClosedUnhidesTranscriptColumn(t *testing.T) {
+	t.Parallel()
+
+	r, err := markdown.NewRenderer("github-dark")
+	if err != nil {
+		t.Fatalf("NewRenderer: %v", err)
+	}
+	s := &Service{renderer: r}
+	stable := s.messageThreadFixtureMessages()
+	html := testhelpers.RenderToDocument(t, SharedThreadChat(EmbeddedFreeformPanelArgs{
+		ThreadID:   "fixture-thread",
+		HasThread:  true,
+		Transcript: applyStableTranscriptWindow(TranscriptPaneState{Stable: stable}),
+		MessageThread: MessageThreadView{
+			ThreadID: "fixture-thread",
+			Open:     false,
+		},
+	})).Doc
+	out, err := html.Html()
+	if err != nil {
+		t.Fatalf("Html() error = %v", err)
+	}
+	for _, want := range []string{
+		`id="agent-chat-transcript-column"`,
+		`id="agent-chat-scroll-region"`,
+		`id="msg-` + messageThreadParentFixtureDOMID + `-thread-summary"`,
+		`id="agent-chat-message-thread"`,
+	} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("missing %q in:\n%s", want, out)
+		}
+	}
+	if strings.Contains(out, `First reply from Corey.`) {
+		t.Fatal("closed host must not render thread replies")
+	}
+	assertTranscriptColumnHidden(t, out, false)
+
+	closedHost := testhelpers.RenderToDocument(t, MessageThreadHost(MessageThreadView{
+		ThreadID: "fixture-thread",
+		Open:     false,
+	})).Doc
+	hostOut, err := closedHost.Html()
+	if err != nil {
+		t.Fatalf("Html() error = %v", err)
+	}
+	if strings.Contains(hostOut, `First reply from Corey.`) ||
+		strings.Contains(hostOut, `>Thread<`) ||
+		strings.Contains(hostOut, `Close`) {
+		t.Fatalf("closed host must be empty contents; got %s", hostOut)
+	}
+	closedCol := testhelpers.RenderToDocument(
+		t,
+		AgentChatTranscriptColumnPatch(false),
+	).Doc
+	colOut, err := closedCol.Html()
+	if err != nil {
+		t.Fatalf("Html() error = %v", err)
+	}
+	if strings.Contains(colOut, `id="agent-chat-scroll-region"`) {
+		t.Fatal("visibility patch must not replace Pattern A Host")
+	}
+	assertTranscriptColumnHidden(t, colOut, false)
+}
+
+func assertTranscriptColumnHidden(t *testing.T, html string, wantHidden bool) {
+	t.Helper()
+	marker := `id="agent-chat-transcript-column"`
+	i := strings.Index(html, marker)
+	if i < 0 {
+		t.Fatalf("missing %s", marker)
+	}
+	window := html[i:]
+	if end := strings.Index(window, ">"); end > 0 {
+		window = window[:end+1]
+	}
+	hasHidden := strings.Contains(window, "hidden")
+	if hasHidden != wantHidden {
+		t.Fatalf(
+			"transcript column hidden=%v want %v; tag=%s",
+			hasHidden,
+			wantHidden,
+			window,
+		)
 	}
 }

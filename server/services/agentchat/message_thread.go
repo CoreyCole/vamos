@@ -14,9 +14,11 @@ import (
 )
 
 const (
-	agentChatMessageThreadID      = "agent-chat-message-thread"
-	agentChatMessageThreadSheetID = "agent-chat-message-thread-sheet"
-	messageThreadReplyAvatarCap   = 4
+	agentChatMessageThreadID         = "agent-chat-message-thread"
+	agentChatMessageThreadSheetID    = "agent-chat-message-thread-sheet"
+	agentChatTranscriptColumnID      = "agent-chat-transcript-column"
+	agentChatTranscriptColumnInnerID = "agent-chat-transcript-column-inner"
+	messageThreadReplyAvatarCap      = 4
 )
 
 // ThreadReplyAuthor is one distinct reply author for the Slack summary stack.

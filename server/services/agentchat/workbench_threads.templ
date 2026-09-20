@@ -53,7 +53,7 @@ templ WorkbenchThreadList(groups []WorkbenchThreadGroup, selectedID, artifact st
 
 templ SharedThreadChat(args EmbeddedFreeformPanelArgs) {
 	<div class="flex min-h-0 flex-1 bg-background">
-		<div class={ "flex min-h-0 min-w-0 flex-1 flex-col", templ.KV("hidden", args.MessageThread.Open) }>
+		@AgentChatTranscriptColumn(args.MessageThread.Open) {
 			if args.StreamURL != "" {
 				<div class="hidden" data-init={ "@get('" + args.StreamURL + "')" }></div>
 			}
@@ -63,7 +63,7 @@ templ SharedThreadChat(args EmbeddedFreeformPanelArgs) {
 					@AgentChatComposer(AgentChatComposerArgs{Action: args.ComposerAction, ThreadID: args.ThreadID, RunID: args.RunID, Cwd: args.Cwd, ModeLabel: embeddedFreeformModeLabel(args.ThreadMetadata), Placeholder: sharedThreadComposerPlaceholder(args), HasThread: args.HasThread, IncludeCwd: !args.HasThread, ThreadMetadata: args.ThreadMetadata, InitialDraft: args.InitialDraft, DraftSaveAction: args.DraftSaveAction})
 				</div>
 			}
-		</div>
+		}
 		@MessageThreadHost(args.MessageThread)
 	</div>
 }

@@ -179,7 +179,7 @@ func (s *Service) RenderSharedThreadChatWithMessageThreadFixture(
 		threadID,
 		userEmail,
 		"replies",
-		messageThreadParentFixtureDOMID,
+		"",
 	)
 }
 

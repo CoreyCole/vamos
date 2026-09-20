@@ -43,6 +43,28 @@ templ ThreadSummaryRow(threadID string, msg TranscriptMessage) {
 	}
 }
 
+templ AgentChatTranscriptColumn(hidden bool) {
+	<div
+		id={ agentChatTranscriptColumnID }
+		class={ "flex min-h-0 min-w-0 flex-1 flex-col", templ.KV("hidden", hidden) }
+	>
+		<div id={ agentChatTranscriptColumnInnerID } class="flex min-h-0 min-w-0 flex-1 flex-col" data-ignore-morph>
+			{ children... }
+		</div>
+	</div>
+}
+
+// AgentChatTranscriptColumnPatch toggles column visibility without replacing
+// Pattern A Host contents (inner is data-ignore-morph).
+templ AgentChatTranscriptColumnPatch(hidden bool) {
+	<div
+		id={ agentChatTranscriptColumnID }
+		class={ "flex min-h-0 min-w-0 flex-1 flex-col", templ.KV("hidden", hidden) }
+	>
+		<div id={ agentChatTranscriptColumnInnerID } class="flex min-h-0 min-w-0 flex-1 flex-col" data-ignore-morph></div>
+	</div>
+}
+
 templ MessageThreadHost(view MessageThreadView) {
 	<div id={ agentChatMessageThreadID } class="contents">
 		if view.Open {

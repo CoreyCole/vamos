@@ -36,7 +36,7 @@ func (h *Handler) GetMessageThread(c echo.Context) error {
 		return err
 	}
 	sse := datastar.NewSSE(c.Response().Writer, c.Request())
-	return sse.PatchElementTempl(MessageThreadHost(view))
+	return patchMessageThreadOpenState(sse, view)
 }
 
 func (h *Handler) PostMessageThreadReply(c echo.Context) error {
@@ -79,5 +79,15 @@ func (h *Handler) PostMessageThreadReply(c echo.Context) error {
 			return err
 		}
 	}
-	return sse.PatchElementTempl(MessageThreadHost(view))
+	return patchMessageThreadOpenState(sse, view)
+}
+
+func patchMessageThreadOpenState(
+	sse *datastar.ServerSentEventGenerator,
+	view MessageThreadView,
+) error {
+	if err := sse.PatchElementTempl(MessageThreadHost(view)); err != nil {
+		return err
+	}
+	return sse.PatchElementTempl(AgentChatTranscriptColumnPatch(view.Open))
 }
