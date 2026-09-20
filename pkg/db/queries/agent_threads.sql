@@ -399,6 +399,33 @@ SET plan_dir_rel = sqlc.arg ('plan_dir_rel')
 WHERE id = sqlc.arg ('id')
 AND plan_dir_rel IS NULL ;
 
+-- name: ListAgentThreadsByAgentSlug :many
+-- Top-level live bot-scoped conversations (room_kind is a scope tag).
+SELECT
+id,
+user_email,
+title,
+cwd,
+lineage_id,
+project_id,
+plan_dir_rel,
+head_entry_id,
+parent_thread_id,
+forked_from_entry_id,
+agent_slug,
+room_kind,
+pair_agent_slug_a,
+pair_agent_slug_b,
+created_at,
+updated_at,
+archived_at
+FROM agent_threads
+WHERE agent_slug = sqlc.arg ('agent_slug')
+AND room_kind = 'bot_home'
+AND archived_at IS NULL
+AND parent_thread_id IS NULL
+ORDER BY updated_at DESC ;
+
 -- name: GetBotHomeThreadBySlug :one
 SELECT
 id,
@@ -498,12 +525,12 @@ created_at,
 updated_at,
 archived_at
 FROM agent_threads
-WHERE parent_thread_id = sqlc.arg('parent_thread_id')
+WHERE parent_thread_id = sqlc.arg ('parent_thread_id')
 AND archived_at IS NULL
-ORDER BY created_at ASC;
+ORDER BY created_at ASC ;
 
 -- name: SetAgentThreadRoomKind :exec
 UPDATE agent_threads
-SET room_kind = sqlc.arg('room_kind'),
+SET room_kind = sqlc.arg ('room_kind'),
 updated_at = CURRENT_TIMESTAMP
-WHERE id = sqlc.arg('id');
+WHERE id = sqlc.arg ('id') ;

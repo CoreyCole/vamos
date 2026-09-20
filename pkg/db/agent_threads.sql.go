@@ -668,6 +668,77 @@ func (q *Queries) ListAgentThreads(ctx context.Context, arg ListAgentThreadsPara
 	return items, nil
 }
 
+const listAgentThreadsByAgentSlug = `-- name: ListAgentThreadsByAgentSlug :many
+;
+
+SELECT
+id,
+user_email,
+title,
+cwd,
+lineage_id,
+project_id,
+plan_dir_rel,
+head_entry_id,
+parent_thread_id,
+forked_from_entry_id,
+agent_slug,
+room_kind,
+pair_agent_slug_a,
+pair_agent_slug_b,
+created_at,
+updated_at,
+archived_at
+FROM agent_threads
+WHERE agent_slug = ?1
+AND room_kind = 'bot_home'
+AND archived_at IS NULL
+AND parent_thread_id IS NULL
+ORDER BY updated_at DESC
+`
+
+// Top-level live bot-scoped conversations (room_kind is a scope tag).
+func (q *Queries) ListAgentThreadsByAgentSlug(ctx context.Context, agentSlug sql.NullString) ([]AgentThread, error) {
+	rows, err := q.db.QueryContext(ctx, listAgentThreadsByAgentSlug, agentSlug)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []AgentThread
+	for rows.Next() {
+		var i AgentThread
+		if err := rows.Scan(
+			&i.ID,
+			&i.UserEmail,
+			&i.Title,
+			&i.Cwd,
+			&i.LineageID,
+			&i.ProjectID,
+			&i.PlanDirRel,
+			&i.HeadEntryID,
+			&i.ParentThreadID,
+			&i.ForkedFromEntryID,
+			&i.AgentSlug,
+			&i.RoomKind,
+			&i.PairAgentSlugA,
+			&i.PairAgentSlugB,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.ArchivedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listAgentThreadsByParentThreadID = `-- name: ListAgentThreadsByParentThreadID :many
 ;
 
@@ -1232,6 +1303,8 @@ func (q *Queries) SetAgentThreadPlanDirRel(ctx context.Context, arg SetAgentThre
 }
 
 const setAgentThreadRoomKind = `-- name: SetAgentThreadRoomKind :exec
+;
+
 UPDATE agent_threads
 SET room_kind = ?1,
 updated_at = CURRENT_TIMESTAMP

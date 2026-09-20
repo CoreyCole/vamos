@@ -203,13 +203,6 @@ func replaceUUIDAgentPointerIndexes(ctx context.Context, database *sql.DB) error
 		slugCreate string
 	}{
 		{
-			name:     "idx_agent_threads_bot_home_agent",
-			uuidCols: []string{"agent_id"},
-			slugCreate: `CREATE UNIQUE INDEX IF NOT EXISTS idx_agent_threads_bot_home_agent
-ON agent_threads (agent_slug)
-WHERE archived_at IS NULL AND room_kind = 'bot_home' AND agent_slug IS NOT NULL`,
-		},
-		{
 			name:     "idx_agent_threads_pairwise_agents",
 			uuidCols: []string{"pair_agent_id_a", "pair_agent_id_b"},
 			slugCreate: `CREATE UNIQUE INDEX IF NOT EXISTS idx_agent_threads_pairwise_agents
@@ -1197,10 +1190,9 @@ func ensureAgentsAndThreadRoomColumns(ctx context.Context, database *sql.DB) err
 			return err
 		}
 	}
-	if err := ensureIndex(
+	if _, err := database.ExecContext(
 		ctx,
-		database,
-		`CREATE UNIQUE INDEX IF NOT EXISTS idx_agent_threads_bot_home_agent ON agent_threads (agent_slug) WHERE archived_at IS NULL AND room_kind = 'bot_home' AND agent_slug IS NOT NULL`,
+		"DROP INDEX IF EXISTS idx_agent_threads_bot_home_agent",
 	); err != nil {
 		return err
 	}

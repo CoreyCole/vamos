@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"testing"
+	"time"
 )
 
 func TestBotHomeThreadKeyedBySlug(t *testing.T) {
@@ -67,7 +68,90 @@ func TestBotHomeThreadKeyedBySlug(t *testing.T) {
 		Cwd:       dup.Cwd,
 		Title:     "alpha-dup",
 		ID:        dup.ID,
-	}); err == nil {
-		t.Fatal("duplicate active bot_home agent_slug accepted")
+	}); err != nil {
+		t.Fatalf("second live bot_home for same slug: %v", err)
+	}
+}
+
+func TestListAgentThreadsByAgentSlug(t *testing.T) {
+	ctx := context.Background()
+	_, q := openWorkspaceDocsTestDB(t)
+
+	older, err := q.CreateAgentThread(ctx, CreateAgentThreadParams{
+		ID:        "thread-alpha-old",
+		UserEmail: "shared",
+		Title:     "alpha-old",
+		Cwd:       "/tmp/alpha-old",
+		LineageID: "lin-alpha-old",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := q.BindAgentThreadBotHome(ctx, BindAgentThreadBotHomeParams{
+		AgentSlug: sql.NullString{String: "alpha", Valid: true},
+		Cwd:       older.Cwd,
+		Title:     "alpha-old",
+		ID:        older.ID,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	time.Sleep(1100 * time.Millisecond)
+
+	newer, err := q.CreateAgentThread(ctx, CreateAgentThreadParams{
+		ID:        "thread-alpha-new",
+		UserEmail: "shared",
+		Title:     "alpha-new",
+		Cwd:       "/tmp/alpha-new",
+		LineageID: "lin-alpha-new",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := q.BindAgentThreadBotHome(ctx, BindAgentThreadBotHomeParams{
+		AgentSlug: sql.NullString{String: "alpha", Valid: true},
+		Cwd:       newer.Cwd,
+		Title:     "alpha-new",
+		ID:        newer.ID,
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	other, err := q.CreateAgentThread(ctx, CreateAgentThreadParams{
+		ID:        "thread-beta",
+		UserEmail: "shared",
+		Title:     "beta",
+		Cwd:       "/tmp/beta",
+		LineageID: "lin-beta",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := q.BindAgentThreadBotHome(ctx, BindAgentThreadBotHomeParams{
+		AgentSlug: sql.NullString{String: "beta", Valid: true},
+		Cwd:       other.Cwd,
+		Title:     "beta",
+		ID:        other.ID,
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	listed, err := q.ListAgentThreadsByAgentSlug(
+		ctx,
+		sql.NullString{String: "alpha", Valid: true},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(listed) != 2 {
+		t.Fatalf("got %d alpha threads, want 2", len(listed))
+	}
+	if listed[0].ID != newer.ID || listed[1].ID != older.ID {
+		t.Fatalf(
+			"order = %s,%s want %s,%s",
+			listed[0].ID,
+			listed[1].ID,
+			newer.ID,
+			older.ID,
+		)
 	}
 }

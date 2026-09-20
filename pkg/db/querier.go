@@ -134,6 +134,8 @@ type Querier interface {
 	ListAgentThreadEntriesByParent(ctx context.Context, arg ListAgentThreadEntriesByParentParams) ([]AgentThreadEntry, error)
 	ListAgentThreadEntriesByThread(ctx context.Context, threadID string) ([]AgentThreadEntry, error)
 	ListAgentThreads(ctx context.Context, arg ListAgentThreadsParams) ([]AgentThread, error)
+	// Top-level live bot-scoped conversations (room_kind is a scope tag).
+	ListAgentThreadsByAgentSlug(ctx context.Context, agentSlug sql.NullString) ([]AgentThread, error)
 	ListAgentThreadsByParentThreadID(ctx context.Context, parentThreadID sql.NullString) ([]AgentThread, error)
 	// Plan-home children: FK only (freeform NULL excluded).
 	ListAgentThreadsByPlanDirRel(ctx context.Context, planDirRel sql.NullString) ([]AgentThread, error)

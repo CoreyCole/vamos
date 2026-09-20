@@ -465,10 +465,6 @@ CREATE INDEX IF NOT EXISTS idx_agent_threads_plan_updated
 ON agent_threads (plan_dir_rel, updated_at DESC)
 WHERE archived_at IS NULL AND plan_dir_rel IS NOT NULL ;
 
-CREATE UNIQUE INDEX IF NOT EXISTS idx_agent_threads_bot_home_agent
-ON agent_threads (agent_slug)
-WHERE archived_at IS NULL AND room_kind = 'bot_home' AND agent_slug IS NOT NULL ;
-
 CREATE UNIQUE INDEX IF NOT EXISTS idx_agent_threads_pairwise_agents
 ON agent_threads (pair_agent_slug_a, pair_agent_slug_b)
 WHERE archived_at IS NULL AND room_kind = 'pairwise'
