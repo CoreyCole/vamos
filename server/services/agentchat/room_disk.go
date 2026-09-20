@@ -168,6 +168,138 @@ func EnsureRoomPiSessionJSONL(
 	return ensureThoughtsJSONL(thoughtsRoot, rel)
 }
 
+type jsonlTranscriptInspect struct {
+	HasSessionHeader bool
+	SessionID        string
+	HasUserMessage   bool
+	Unreadable       bool
+}
+
+// JSONLIsScopedListRow is true when the transcript has a user message.
+// Unreadable files and header-only empty homes are not list rows.
+func JSONLIsScopedListRow(path string) bool {
+	info := inspectJSONLTranscript(path)
+	return !info.Unreadable && info.HasUserMessage
+}
+
+func inspectJSONLTranscript(path string) jsonlTranscriptInspect {
+	path = strings.TrimSpace(path)
+	if path == "" {
+		return jsonlTranscriptInspect{Unreadable: true}
+	}
+	file, err := os.Open(path)
+	if err != nil {
+		return jsonlTranscriptInspect{Unreadable: true}
+	}
+	defer file.Close()
+	scanner := bufio.NewScanner(file)
+	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
+	out := jsonlTranscriptInspect{}
+	first := true
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if line == "" {
+			continue
+		}
+		var envelope struct {
+			Type    string `json:"type"`
+			ID      string `json:"id"`
+			Message struct {
+				Role string `json:"role"`
+			} `json:"message"`
+		}
+		if err := json.Unmarshal([]byte(line), &envelope); err != nil {
+			if first {
+				out.Unreadable = true
+				return out
+			}
+			first = false
+			continue
+		}
+		if first {
+			first = false
+			if envelope.Type == "session" && strings.TrimSpace(envelope.ID) != "" {
+				out.HasSessionHeader = true
+				out.SessionID = strings.TrimSpace(envelope.ID)
+			} else {
+				return out
+			}
+			continue
+		}
+		if envelope.Type == "message" &&
+			strings.EqualFold(strings.TrimSpace(envelope.Message.Role), "user") {
+			out.HasUserMessage = true
+		}
+	}
+	if err := scanner.Err(); err != nil {
+		out.Unreadable = true
+	}
+	return out
+}
+
+// MigrateLegacyCurrentJSONL renames a bot/plan/freeform current.jsonl into
+// pi/{header-id}.jsonl when a session header and user message exist.
+// Pairwise inspect is unchanged. Unreadable / no-header files are left unread.
+func MigrateLegacyCurrentJSONL(
+	thoughtsRoot string,
+	id RoomIdentity,
+) (destAbs string, migrated bool, err error) {
+	if id.Kind == RoomKindPairwise {
+		return "", false, nil
+	}
+	rel, err := id.CurrentJSONLRel()
+	if err != nil {
+		return "", false, err
+	}
+	currentAbs, err := AbsFromThoughtsRel(thoughtsRoot, rel)
+	if err != nil {
+		return "", false, err
+	}
+	return migrateLegacyCurrentJSONLFile(
+		currentAbs,
+		func(sessionID string) (string, error) {
+			return EnsureRoomPiSessionJSONL(thoughtsRoot, id, sessionID)
+		},
+	)
+}
+
+func MigrateLegacyCurrentJSONLAtPath(currentAbs string) (string, bool, error) {
+	return migrateLegacyCurrentJSONLFile(
+		currentAbs,
+		func(sessionID string) (string, error) {
+			dest := filepath.Join(filepath.Dir(currentAbs), "pi", sessionID+".jsonl")
+			if err := os.MkdirAll(filepath.Dir(dest), 0o755); err != nil {
+				return "", err
+			}
+			return dest, nil
+		},
+	)
+}
+
+func migrateLegacyCurrentJSONLFile(
+	currentAbs string,
+	destForID func(sessionID string) (string, error),
+) (destAbs string, migrated bool, err error) {
+	info := inspectJSONLTranscript(currentAbs)
+	if info.Unreadable || !info.HasSessionHeader || !info.HasUserMessage {
+		return "", false, nil
+	}
+	destAbs, err = destForID(info.SessionID)
+	if err != nil {
+		return "", false, err
+	}
+	if destAbs == currentAbs {
+		return destAbs, false, nil
+	}
+	if destInfo, statErr := os.Stat(destAbs); statErr == nil && destInfo.Size() > 0 {
+		return destAbs, false, nil
+	}
+	if err := os.Rename(currentAbs, destAbs); err != nil {
+		return "", false, err
+	}
+	return destAbs, true, nil
+}
+
 func ensureThoughtsJSONL(thoughtsRoot, rel string) (absPath string, err error) {
 	absPath, err = AbsFromThoughtsRel(thoughtsRoot, rel)
 	if err != nil {

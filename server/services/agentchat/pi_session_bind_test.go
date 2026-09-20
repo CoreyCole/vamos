@@ -57,11 +57,18 @@ func TestPrepareRoomSessionUsesPiJSONL(t *testing.T) {
 	}
 }
 
-func TestPrepareRoomSessionEmptyPiUsesCurrentJSONL(t *testing.T) {
+func TestPrepareRoomSessionEmptyPiMigratesCurrentJSONL(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
 	cwd := filepath.Join(root, "agents", "nova")
-	if err := os.MkdirAll(cwd, 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Join(cwd, "sessions"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	current := filepath.Join(cwd, "sessions", "current.jsonl")
+	body := `{"type":"session","id":"migrated-sess"}
+{"type":"message","message":{"role":"user","content":"hi"}}
+`
+	if err := os.WriteFile(current, []byte(body), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	svc := &Service{thoughtsRoot: root}
@@ -73,8 +80,12 @@ func TestPrepareRoomSessionEmptyPiUsesCurrentJSONL(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.HasSuffix(sessionFile, filepath.Join("sessions", "current.jsonl")) {
-		t.Fatalf("legacy sessionFile = %q", sessionFile)
+	want := filepath.Join(root, "agents", "nova", "sessions", "pi", "migrated-sess.jsonl")
+	if sessionFile != want {
+		t.Fatalf("legacy sessionFile = %q want %q", sessionFile, want)
+	}
+	if _, err := os.Stat(current); !os.IsNotExist(err) {
+		t.Fatalf("current.jsonl kept as cache: %v", err)
 	}
 }
 

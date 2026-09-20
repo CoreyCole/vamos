@@ -377,6 +377,7 @@ func TestServeAI470RoomKnownBotListsHomeThread(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	writeBotThreadUserMessage(t, dbSvc.Queries, root, "nova", threadID)
 	renderer := &threadWorkbenchTestRenderer{}
 	svc.WithWorkbenchThreadRenderer(renderer)
 	rec := httptest.NewRecorder()
@@ -425,6 +426,57 @@ func TestServeAI470RoomKnownBotListsHomeThread(t *testing.T) {
 		if !strings.Contains(body, want) {
 			t.Fatalf("missing %q: %s", want, body)
 		}
+	}
+}
+
+func TestServeAI470RoomEmptyHomeNotListRow(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	dbSvc, err := servicedb.NewService(
+		filepath.Join(t.TempDir(), "agents.db"),
+		filepath.Join(t.TempDir(), "agents.yml"),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = dbSvc.Close() })
+	svc, err := NewService(root, nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	svc.WithQueries(dbSvc.Queries)
+	withTestRoster(t, svc)
+	nova, err := svc.createAgent(context.Background(), createAgentInput{
+		Slug: "nova", Name: "Nova", UserEmail: "t@example.com",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	threadID, err := svc.ensureBotHomeThread(context.Background(), nova, "t@example.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+	svc.WithWorkbenchThreadRenderer(&threadWorkbenchTestRenderer{})
+	rec := httptest.NewRecorder()
+	c := echo.New().NewContext(
+		httptest.NewRequest(http.MethodGet, "/rooms/dm/nova", http.NoBody),
+		rec,
+	)
+	c.SetParamNames("kind", "id")
+	c.SetParamValues("dm", "nova")
+	c.Set("user_email", "t@example.com")
+	if err := svc.ServeAI470Room(c); err != nil {
+		t.Fatal(err)
+	}
+	body := rec.Body.String()
+	if strings.Contains(body, `id="scoped-thread-list"`) {
+		t.Fatal("empty home must not list")
+	}
+	if strings.Contains(body, `/threads/`+threadID) {
+		t.Fatal("empty home listed as row")
+	}
+	if !strings.Contains(body, `id="agent-chat-composer"`) {
+		t.Fatalf("want N=0 composer: %s", body)
 	}
 }
 
@@ -519,6 +571,7 @@ func TestServeAI470RoomBotTwoThreadsListsBoth(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	writeBotThreadUserMessage(t, dbSvc.Queries, root, "nova", first)
 	second := uuid.NewString()
 	if _, err := dbSvc.Queries.CreateAgentThread(
 		context.Background(),
@@ -544,6 +597,7 @@ func TestServeAI470RoomBotTwoThreadsListsBoth(t *testing.T) {
 	); err != nil {
 		t.Fatal(err)
 	}
+	writeBotThreadUserMessage(t, dbSvc.Queries, root, "nova", second)
 	renderer := &threadWorkbenchTestRenderer{}
 	svc.WithWorkbenchThreadRenderer(renderer)
 	rec := httptest.NewRecorder()
@@ -1134,6 +1188,7 @@ func TestServeAI470RoomPlanListOmitsUnattachedQRSPI(t *testing.T) {
 		t.Fatal(err)
 	}
 	threadID := uuid.NewString()
+	piID := uuid.NewString()
 	if _, err := dbSvc.Queries.CreateAgentThread(ctx, db.CreateAgentThreadParams{
 		ID:          threadID,
 		UserEmail:   "t@example.com",
@@ -1141,8 +1196,17 @@ func TestServeAI470RoomPlanListOmitsUnattachedQRSPI(t *testing.T) {
 		Cwd:         "thoughts/owner-a/plans/plan-one",
 		LineageID:   uuid.NewString(),
 		PlanDirRel:  sql.NullString{String: "owner-a/plans/plan-one", Valid: true},
-		PiSessionID: uuid.NewString(),
+		PiSessionID: piID,
 	}); err != nil {
+		t.Fatal(err)
+	}
+	piPath := filepath.Join(plan, ".vamos", "sessions", "pi", piID+".jsonl")
+	if err := os.MkdirAll(filepath.Dir(piPath), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	bodyJSONL := `{"type":"session","id":"` + piID + `"}` + "\n" +
+		`{"type":"message","message":{"role":"user","content":"plan hi"}}` + "\n"
+	if err := os.WriteFile(piPath, []byte(bodyJSONL), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	if err := dbSvc.Queries.BindAgentThreadPlan(ctx, db.BindAgentThreadPlanParams{
@@ -1199,5 +1263,40 @@ func TestServeAI470RoomPlanListOmitsUnattachedQRSPI(t *testing.T) {
 	}
 	if strings.Contains(body, `id="thread-chat"`) {
 		t.Fatal("N=1 must still show list, not SharedThreadChat")
+	}
+}
+
+func writeBotThreadUserMessage(
+	t *testing.T,
+	q db.Querier,
+	root, slug, threadID string,
+) {
+	t.Helper()
+	thread, err := q.GetAgentThread(context.Background(), threadID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	piID := strings.TrimSpace(thread.PiSessionID)
+	var piPath string
+	if piID != "" {
+		piPath = filepath.Join(root, "agents", slug, "sessions", "pi", piID+".jsonl")
+	} else {
+		piID = threadID
+		piPath = filepath.Join(root, "agents", slug, "sessions", "current.jsonl")
+	}
+	if err := os.MkdirAll(filepath.Dir(piPath), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	existing, _ := os.ReadFile(piPath)
+	if len(existing) == 0 {
+		existing = []byte(`{"type":"session","id":"` + piID + `"}` + "\n")
+	}
+	userLine := `{"type":"message","message":{"role":"user","content":"hello"}}` + "\n"
+	if err := os.WriteFile(
+		piPath,
+		append(existing, []byte(userLine)...),
+		0o644,
+	); err != nil {
+		t.Fatal(err)
 	}
 }

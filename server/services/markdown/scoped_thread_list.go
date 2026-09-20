@@ -64,6 +64,9 @@ func (s *Service) botScopedConversationRows(
 			strings.TrimSpace(thread.ParentThreadID.String) != "" {
 			continue
 		}
+		if !jsonlIsScopedListRow(s.botThreadJSONLPath(slug, thread)) {
+			continue
+		}
 		rows = append(rows, s.conversationRowForBotThread(slug, thread))
 	}
 	return rows, nil
@@ -91,14 +94,21 @@ func (s *Service) conversationRowForBotThread(
 }
 
 func (s *Service) botThreadJSONLPath(slug string, thread db.AgentThread) string {
+	current := filepath.Join(
+		s.basePath, "agents", slug, "sessions", "current.jsonl",
+	)
+	if dest, migrated, err := migrateLegacyCurrentJSONLAtPath(
+		current,
+	); err == nil &&
+		migrated {
+		return dest
+	}
 	if piID := strings.TrimSpace(thread.PiSessionID); piID != "" {
 		return filepath.Join(
 			s.basePath, "agents", slug, "sessions", "pi", piID+".jsonl",
 		)
 	}
-	return filepath.Join(
-		s.basePath, "agents", slug, "sessions", "current.jsonl",
-	)
+	return current
 }
 
 func (s *Service) planScopedConversationRows(
@@ -150,6 +160,9 @@ func (s *Service) planScopedConversationRows(
 			strings.TrimSpace(thread.ParentThreadID.String) != "" {
 			continue
 		}
+		if !jsonlIsScopedListRow(s.planThreadJSONLPath(rel, thread)) {
+			continue
+		}
 		rows = append(rows, s.conversationRowForPlanThread(rel, thread))
 	}
 	return rows, nil
@@ -178,6 +191,15 @@ func (s *Service) conversationRowForPlanThread(
 
 func (s *Service) planThreadJSONLPath(planDirRel string, thread db.AgentThread) string {
 	rel := strings.TrimPrefix(filepath.ToSlash(planDirRel), "thoughts/")
+	current := filepath.Join(
+		s.basePath, filepath.FromSlash(rel), ".vamos", "sessions", "current.jsonl",
+	)
+	if dest, migrated, err := migrateLegacyCurrentJSONLAtPath(
+		current,
+	); err == nil &&
+		migrated {
+		return dest
+	}
 	if piID := strings.TrimSpace(thread.PiSessionID); piID != "" {
 		return filepath.Join(
 			s.basePath,
@@ -188,9 +210,7 @@ func (s *Service) planThreadJSONLPath(planDirRel string, thread db.AgentThread) 
 			piID+".jsonl",
 		)
 	}
-	return filepath.Join(
-		s.basePath, filepath.FromSlash(rel), ".vamos", "sessions", "current.jsonl",
-	)
+	return current
 }
 
 func (s *Service) freeformScopedConversationRows(
@@ -210,6 +230,9 @@ func (s *Service) freeformScopedConversationRows(
 		}
 		if thread.ParentThreadID.Valid &&
 			strings.TrimSpace(thread.ParentThreadID.String) != "" {
+			continue
+		}
+		if !jsonlIsScopedListRow(s.freeformThreadJSONLPath(thread)) {
 			continue
 		}
 		rows = append(rows, s.conversationRowForFreeformThread(thread))
@@ -239,10 +262,17 @@ func (s *Service) conversationRowForFreeformThread(
 
 func (s *Service) freeformThreadJSONLPath(thread db.AgentThread) string {
 	cwd := strings.TrimSpace(thread.Cwd)
+	current := filepath.Join(cwd, ".vamos", "sessions", "current.jsonl")
+	if dest, migrated, err := migrateLegacyCurrentJSONLAtPath(
+		current,
+	); err == nil &&
+		migrated {
+		return dest
+	}
 	if piID := strings.TrimSpace(thread.PiSessionID); piID != "" {
 		return filepath.Join(cwd, ".vamos", "sessions", "pi", piID+".jsonl")
 	}
-	return filepath.Join(cwd, ".vamos", "sessions", "current.jsonl")
+	return current
 }
 
 func scopedRowInitial(title string) string {

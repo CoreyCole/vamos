@@ -119,6 +119,95 @@ func TestRoomIdentityFromThreadClassifiesHomes(t *testing.T) {
 	}
 }
 
+func TestMigrateLegacyCurrentJSONLMovesUserTranscript(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	id := RoomIdentity{Kind: RoomKindBotHome, SpeakerSlug: "nova"}
+	current, err := EnsureRoomCurrentJSONL(root, id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	body := `{"type":"session","id":"legacy-sess"}
+{"type":"message","message":{"role":"user","content":"hello from home"}}
+`
+	if err := os.WriteFile(current, []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	dest, migrated, err := MigrateLegacyCurrentJSONL(root, id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !migrated {
+		t.Fatal("expected migrate")
+	}
+	want := filepath.Join(root, "agents", "nova", "sessions", "pi", "legacy-sess.jsonl")
+	if dest != want {
+		t.Fatalf("dest = %q want %q", dest, want)
+	}
+	if _, err := os.Stat(current); !os.IsNotExist(err) {
+		t.Fatalf("current.jsonl still present: %v", err)
+	}
+	if _, err := os.Stat(want); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestMigrateLegacyCurrentJSONLEmptyHomeLeavesFile(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	id := RoomIdentity{Kind: RoomKindBotHome, SpeakerSlug: "nova"}
+	current, err := EnsureRoomCurrentJSONL(root, id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	body := `{"type":"session","id":"empty-home"}
+`
+	if err := os.WriteFile(current, []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	dest, migrated, err := MigrateLegacyCurrentJSONL(root, id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if migrated || dest != "" {
+		t.Fatalf("empty home migrated dest=%q", dest)
+	}
+	if !JSONLIsScopedListRow(current) {
+		// empty homes are not list rows
+	} else {
+		t.Fatal("empty home listed")
+	}
+	if _, err := os.Stat(current); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestMigrateLegacyCurrentJSONLNoHeaderLeavesUnread(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	id := RoomIdentity{Kind: RoomKindBotHome, SpeakerSlug: "nova"}
+	current, err := EnsureRoomCurrentJSONL(root, id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(current, []byte("not-json\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	dest, migrated, err := MigrateLegacyCurrentJSONL(root, id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if migrated || dest != "" {
+		t.Fatalf("unreadable migrated dest=%q", dest)
+	}
+	if JSONLIsScopedListRow(current) {
+		t.Fatal("unreadable file listed")
+	}
+	if _, err := os.Stat(current); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestEnsureRoomCurrentJSONLCreatesParent(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()

@@ -2003,8 +2003,24 @@ func (s *Service) prepareRoomSession(
 	if cwd == "" {
 		return RoomIdentity{}, "", "", nil, fmt.Errorf("thread cwd is required")
 	}
-	sessionFile := filepath.Join(cwd, ".vamos", "sessions", currentJSONLName)
-	if piID := strings.TrimSpace(thread.PiSessionID); piID != "" {
+	currentAbs := filepath.Join(cwd, ".vamos", "sessions", currentJSONLName)
+	sessionFile := currentAbs
+	if dest, migrated, err := migrateLegacyCurrentJSONLFile(
+		currentAbs,
+		func(sessionID string) (string, error) {
+			path := filepath.Join(cwd, ".vamos", "sessions", "pi", sessionID+".jsonl")
+			if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+				return "", err
+			}
+			return path, nil
+		},
+	); err != nil {
+		return RoomIdentity{}, "", "", nil, err
+	} else if migrated {
+		sessionFile = dest
+	} else if piID := strings.TrimSpace(
+		thread.PiSessionID,
+	); piID != "" {
 		sessionFile = filepath.Join(cwd, ".vamos", "sessions", "pi", piID+".jsonl")
 	}
 	if err := os.MkdirAll(filepath.Dir(sessionFile), 0o755); err != nil {
@@ -2017,9 +2033,19 @@ func (s *Service) roomSessionFile(
 	room RoomIdentity,
 	thread db.AgentThread,
 ) (string, error) {
+	if room.Kind == RoomKindPairwise {
+		return EnsureRoomCurrentJSONL(s.thoughtsRoot, room)
+	}
+	if dest, migrated, err := MigrateLegacyCurrentJSONL(
+		s.thoughtsRoot,
+		room,
+	); err != nil {
+		return "", err
+	} else if migrated {
+		return dest, nil
+	}
 	piID := strings.TrimSpace(thread.PiSessionID)
-	usePi := piID != "" && room.Kind != RoomKindPairwise
-	if usePi {
+	if piID != "" {
 		return EnsureRoomPiSessionJSONL(s.thoughtsRoot, room, piID)
 	}
 	return EnsureRoomCurrentJSONL(s.thoughtsRoot, room)
