@@ -19,6 +19,34 @@ func ChatOpenFromRequest(r *http.Request) bool {
 	return c.Value == "1"
 }
 
+// ChatOpenFromState is the SSR chat-open bool used to coalesce Datastar
+// $workbench.regions.workbenchV2Chat.visible before the first hydrate tick.
+func ChatOpenFromState(state WorkbenchState) bool {
+	for _, region := range state.Regions {
+		if region.ID == WorkbenchV2ChatRegionID {
+			return region.Visible
+		}
+	}
+	return true
+}
+
+// ChatVisibleCoalesce keeps data-class from treating undefined as false.
+func ChatVisibleCoalesce(ssrOpen bool) string {
+	lit := "false"
+	if ssrOpen {
+		lit = "true"
+	}
+	return "$workbench.regions.workbenchV2Chat.visible ?? " + lit
+}
+
+func ChatToggleDataClass(ssrOpen bool) string {
+	return "{ 'bg-muted text-foreground': " + ChatVisibleCoalesce(ssrOpen) + " }"
+}
+
+func ChatToggleAriaPressed(ssrOpen bool) string {
+	return ChatVisibleCoalesce(ssrOpen) + " ? 'true' : 'false'"
+}
+
 func chatOpenCookieWriteJS(open bool) string {
 	v := "0"
 	if open {

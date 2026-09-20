@@ -1165,6 +1165,57 @@ func TestMobileChatCommentsHeaderRendersFromWorkbench(t *testing.T) {
 	}
 }
 
+func TestMobileChatToggleCoalescesVisibleWithSSR(t *testing.T) {
+	t.Parallel()
+
+	render := func(chatOpen bool) string {
+		t.Helper()
+		state, err := BuildWorkbenchV2State(WorkbenchV2Args{
+			ViewportClass: ViewportMobile,
+			ThreadsOpen:   true,
+			ChatOpen:      chatOpen,
+			ArtifactOpen:  true,
+			Threads:       templ.NopComponent,
+			Chat:          templ.NopComponent,
+			Artifact:      templ.NopComponent,
+			Comments:      templ.NopComponent,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		var body bytes.Buffer
+		if err := Workbench(state).Render(t.Context(), &body); err != nil {
+			t.Fatal(err)
+		}
+		header := mobileChatCommentsHeaderHTML(body.String())
+		idx := strings.Index(header, `data-testid="mobile-toggle-chat"`)
+		if idx < 0 {
+			t.Fatal(header)
+		}
+		btn := header[idx:]
+		if end := strings.Index(btn, "</button>"); end > 0 {
+			btn = btn[:end]
+		}
+		return btn
+	}
+
+	open := render(true)
+	if !strings.Contains(open, "bg-muted text-foreground") {
+		t.Fatalf("open mobile chat toggle missing SSR selected class:\n%s", open)
+	}
+	if !strings.Contains(open, `$workbench.regions.workbenchV2Chat.visible ?? true`) {
+		t.Fatalf("open mobile chat toggle must coalesce:\n%s", open)
+	}
+	if strings.Contains(open, "transition-colors") {
+		t.Fatalf("mobile chat toggle must not animate leftover frames:\n%s", open)
+	}
+
+	closed := render(false)
+	if !strings.Contains(closed, `$workbench.regions.workbenchV2Chat.visible ?? false`) {
+		t.Fatalf("closed mobile chat toggle must coalesce false:\n%s", closed)
+	}
+}
+
 func TestWorkbenchV2DoesNotMountMobileCommentsSheet(t *testing.T) {
 	t.Parallel()
 

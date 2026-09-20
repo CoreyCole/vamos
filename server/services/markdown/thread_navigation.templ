@@ -24,12 +24,12 @@ templ ThreadArtifactPane(browser ThreadArtifactBrowserArgs, document templ.Compo
 				type="button"
 				data-testid="view-chat"
 				class={
-					"inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground",
+					"inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-border text-muted-foreground hover:bg-muted hover:text-foreground",
 					templ.KV("bg-muted text-foreground", browser.ChatOpen),
 				}
 				data-on:click={ chatToggleClickAction() }
-				data-attr:aria-pressed="$workbench.regions.workbenchV2Chat.visible ? 'true' : 'false'"
-				data-class="{ 'bg-muted text-foreground': $workbench.regions.workbenchV2Chat.visible }"
+				data-attr:aria-pressed={ workbench.ChatToggleAriaPressed(browser.ChatOpen) }
+				data-class={ workbench.ChatToggleDataClass(browser.ChatOpen) }
 				aria-controls="workbench-v2-chat"
 				aria-label="View Chat"
 				title="View Chat"

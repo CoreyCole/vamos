@@ -783,6 +783,12 @@ func TestPathHeaderChatToggleSSRSelectedWhenChatOpen(t *testing.T) {
 	if !strings.Contains(btn, `aria-pressed="true"`) {
 		t.Fatalf("open chat toggle missing aria-pressed true:\n%s", btn)
 	}
+	if !strings.Contains(btn, `$workbench.regions.workbenchV2Chat.visible ?? true`) {
+		t.Fatalf("open chat toggle must coalesce visible with SSR true:\n%s", btn)
+	}
+	if strings.Contains(btn, "transition-colors") {
+		t.Fatalf("chat toggle must not animate leftover frames:\n%s", btn)
+	}
 
 	body.Reset()
 	if err := ThreadArtifactPane(
@@ -807,6 +813,9 @@ func TestPathHeaderChatToggleSSRSelectedWhenChatOpen(t *testing.T) {
 	}
 	if !strings.Contains(btn, `aria-pressed="false"`) {
 		t.Fatalf("closed chat toggle missing aria-pressed false:\n%s", btn)
+	}
+	if !strings.Contains(btn, `$workbench.regions.workbenchV2Chat.visible ?? false`) {
+		t.Fatalf("closed chat toggle must coalesce visible with SSR false:\n%s", btn)
 	}
 }
 
