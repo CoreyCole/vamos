@@ -73,6 +73,22 @@ func rosterPlanRowDOMID(id string) string {
 	return "roster-row-plan-" + id
 }
 
+func RosterDocsBandSelected(sel RosterSelection, bandID string) bool {
+	if sel.Kind != KindPlan {
+		return false
+	}
+	id := strings.TrimSpace(sel.ID)
+	bandID = strings.TrimSpace(bandID)
+	if id == "" || bandID == "" {
+		return false
+	}
+	if id == bandID {
+		return true
+	}
+	prefix := "docs--" + bandID
+	return id == prefix || strings.HasPrefix(id, prefix+"--")
+}
+
 var rosterAccentClasses = []string{
 	"bg-fuchsia-500/90",
 	"bg-sky-500/80",
@@ -208,7 +224,7 @@ templ RosterRail(view RosterView) {
 							<li id={ "roster-row-doc-" + doc.ID }>
 								<a
 									href={ templ.SafeURL(doc.Href) }
-									class="flex items-center gap-2 rounded-md px-1.5 py-1 text-sm text-foreground hover:bg-white/[0.06]"
+									class={ rosterPlanRowClass(RosterDocsBandSelected(view.Selection, doc.ID)), "text-sm" }
 								>
 									<span class="block truncate font-medium">{ doc.Title }</span>
 								</a>

@@ -92,6 +92,11 @@ func TestThoughtsDocSSRWiresSharedChatNotEmptyRegion(t *testing.T) {
 		filepath.Join(root, "docs", "vamos", "index.html"),
 		[]byte("<html></html>"),
 	)
+	mustWriteFile(
+		t,
+		filepath.Join(root, "docs", "vamos", "AGENTS.md"),
+		[]byte("# desk\n"),
+	)
 	svc, err := NewService(root, nil, nil)
 	if err != nil {
 		t.Fatal(err)
@@ -126,16 +131,18 @@ func TestThoughtsDocSSRWiresSharedChatNotEmptyRegion(t *testing.T) {
 		t.Fatal("thoughts SSR used EmptyRegion chat copy")
 	}
 	for _, want := range []string{
-		`id="thread-chat"`,
-		`id="agent-chat-live-transcript"`,
 		`id="agent-chat-composer"`,
+		`id="roster-row-doc-vamos"`,
 	} {
 		if !strings.Contains(html, want) {
 			t.Fatalf("missing %q", want)
 		}
 	}
-	if renderer.lastEnsureDoc != "thoughts/docs/vamos/index.html" {
-		t.Fatalf("ensure doc = %q", renderer.lastEnsureDoc)
+	if strings.Contains(html, `id="thread-chat"`) {
+		t.Fatal("thoughts GET must not auto click-in")
+	}
+	if renderer.lastEnsureDoc != "" {
+		t.Fatalf("GET must not ensure, doc = %q", renderer.lastEnsureDoc)
 	}
 }
 

@@ -476,7 +476,10 @@ func (s *Service) buildThoughtsV2WorkbenchState(
 		ViewportClass: viewport,
 		SavedConfig:   s.savedThreadsWorkbenchConfig(c, pageArgs.UserEmail, viewport),
 		Threads: agenthome.RosterRail(
-			s.liveRoster(c.Request().Context(), agenthome.RosterSelection{}),
+			s.liveRoster(
+				c.Request().Context(),
+				s.rosterSelectionForThoughtsDoc(canonical),
+			),
 		),
 		Chat:         chat,
 		Artifact:     artifact,
@@ -643,7 +646,10 @@ func (s *Service) buildThoughtsDirectoryWorkbenchState(
 		ViewportClass: viewport,
 		SavedConfig:   s.savedThreadsWorkbenchConfig(c, args.UserEmail, viewport),
 		Threads: agenthome.RosterRail(
-			s.liveRoster(c.Request().Context(), agenthome.RosterSelection{}),
+			s.liveRoster(
+				c.Request().Context(),
+				s.rosterSelectionForThoughtsDoc(dirPath),
+			),
 		),
 		Chat:         chat,
 		Artifact:     artifact,

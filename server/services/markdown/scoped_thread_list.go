@@ -100,6 +100,98 @@ func (s *Service) botThreadJSONLPath(slug string, thread db.AgentThread) string 
 	)
 }
 
+func (s *Service) planScopedConversationRows(
+	ctx context.Context,
+	roomID, artifact string,
+) ([]agenthome.ConversationRowArgs, error) {
+	if s.queries == nil {
+		return nil, nil
+	}
+	rel, err := s.resolvePlanDirRelForRoom(ctx, roomID, artifact)
+	if err != nil {
+		return nil, err
+	}
+	if rel == "" {
+		if root, ok := InferWorkspaceRoot(s.basePath, artifact); ok {
+			rel = root
+		} else {
+			rel = strings.ReplaceAll(strings.TrimSpace(roomID), "--", "/")
+		}
+	}
+	rel = strings.Trim(strings.TrimPrefix(filepath.ToSlash(rel), "thoughts/"), "/")
+	seen := map[string]struct{}{}
+	var threads []db.AgentThread
+	for _, cand := range []string{rel, "thoughts/" + rel} {
+		if cand == "" || cand == "thoughts/" {
+			continue
+		}
+		got, err := s.queries.ListAgentThreadsByPlanDirRel(ctx, sql.NullString{
+			String: cand,
+			Valid:  true,
+		})
+		if err != nil {
+			return nil, err
+		}
+		for _, thread := range got {
+			if _, ok := seen[thread.ID]; ok {
+				continue
+			}
+			seen[thread.ID] = struct{}{}
+			threads = append(threads, thread)
+		}
+	}
+	rows := make([]agenthome.ConversationRowArgs, 0, len(threads))
+	for _, thread := range threads {
+		if !strings.EqualFold(strings.TrimSpace(thread.RoomKind), "plan") {
+			continue
+		}
+		if thread.ParentThreadID.Valid &&
+			strings.TrimSpace(thread.ParentThreadID.String) != "" {
+			continue
+		}
+		rows = append(rows, s.conversationRowForPlanThread(rel, thread))
+	}
+	return rows, nil
+}
+
+func (s *Service) conversationRowForPlanThread(
+	planDirRel string,
+	thread db.AgentThread,
+) agenthome.ConversationRowArgs {
+	title := strings.TrimSpace(thread.Title)
+	if title == "" {
+		title = filepath.Base(filepath.ToSlash(planDirRel))
+	}
+	preview := lastJSONLPreview(s.planThreadJSONLPath(planDirRel, thread))
+	return agenthome.ConversationRowArgs{
+		ID:          "scoped-thread-row-" + thread.ID,
+		Href:        "/threads/" + thread.ID,
+		Title:       title,
+		Preview:     preview.Text,
+		Time:        rosterPlanTime(preview.Time),
+		Initial:     scopedRowInitial(title),
+		AccentClass: "bg-sky-500/80",
+		TestID:      "scoped-thread-row",
+	}
+}
+
+func (s *Service) planThreadJSONLPath(planDirRel string, thread db.AgentThread) string {
+	rel := strings.TrimPrefix(filepath.ToSlash(planDirRel), "thoughts/")
+	if piID := strings.TrimSpace(thread.PiSessionID); piID != "" {
+		return filepath.Join(
+			s.basePath,
+			filepath.FromSlash(rel),
+			".vamos",
+			"sessions",
+			"pi",
+			piID+".jsonl",
+		)
+	}
+	return filepath.Join(
+		s.basePath, filepath.FromSlash(rel), ".vamos", "sessions", "current.jsonl",
+	)
+}
+
 func scopedRowInitial(title string) string {
 	for _, r := range strings.TrimSpace(title) {
 		return strings.ToUpper(string(r))

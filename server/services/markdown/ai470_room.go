@@ -14,6 +14,7 @@ import (
 	"github.com/CoreyCole/vamos/pkg/db"
 	"github.com/CoreyCole/vamos/server/layouts/workbench"
 	"github.com/CoreyCole/vamos/server/services/agenthome"
+	"github.com/CoreyCole/vamos/server/services/commentui"
 )
 
 // ServeAgentsLand redirects /agents onto the threads roster.
@@ -82,13 +83,24 @@ func (s *Service) ServeAI470Room(c echo.Context) error {
 		artifactChromeOpen = true
 	}
 
-	if kind == agenthome.KindDM {
-		if err := s.requireKnownBot(id); err != nil {
-			return err
+	if kind == agenthome.KindDM || kind == agenthome.KindPlan {
+		var rows []agenthome.ConversationRowArgs
+		var listErr error
+		if kind == agenthome.KindDM {
+			if err := s.requireKnownBot(id); err != nil {
+				return err
+			}
+			rows, listErr = s.botScopedConversationRows(c.Request().Context(), id)
+		} else {
+			rows, listErr = s.planScopedConversationRows(
+				c.Request().Context(), id, planDoc,
+			)
 		}
-		rows, err := s.botScopedConversationRows(c.Request().Context(), id)
-		if err != nil {
-			return err
+		if listErr != nil {
+			return listErr
+		}
+		if hasArtifact && artifactPage != nil {
+			commentsComp = s.commentsPanelForThoughtsPage(c, artifactPage)
 		}
 		chatComp = chatColumnForAI470Room(
 			kind,
@@ -229,50 +241,42 @@ func (s *Service) resolveAI470Thread(
 	id, pairA, pairB, artifact, userEmail string,
 ) (string, error) {
 	id = strings.TrimSpace(id)
-	artifact = strings.TrimSpace(artifact)
+	_ = strings.TrimSpace(artifact)
 	if kind == agenthome.KindA2A {
 		return s.resolvePairwiseThread(ctx, pairA, pairB, userEmail)
 	}
 
-	docs := make([]string, 0, 4)
-	if artifact != "" {
-		docs = append(docs, artifact)
-	}
-	seen := map[string]bool{}
-	for _, doc := range docs {
-		if seen[doc] {
-			continue
-		}
-		seen[doc] = true
-		threadID, err := s.workbenchThreadsRenderer.FindSharedThreadForDoc(ctx, doc)
-		if err != nil {
-			return "", err
-		}
-		if strings.TrimSpace(threadID) != "" {
-			return threadID, nil
-		}
-	}
-	if kind == agenthome.KindPlan && artifact != "" &&
-		strings.TrimSpace(userEmail) != "" {
-		threadID, err := s.workbenchThreadsRenderer.EnsureSharedThreadForDoc(
-			ctx, artifact, userEmail,
-		)
-		if err != nil {
-			return "", err
-		}
-		if strings.TrimSpace(threadID) != "" {
-			return threadID, nil
-		}
-		return "", nil
-	}
 	if kind == agenthome.KindPlan {
 		return "", nil
 	}
-
 	if kind == agenthome.KindDM {
 		return s.resolveBotHomeThread(ctx, id, userEmail)
 	}
 	return "", nil
+}
+
+func (s *Service) commentsPanelForThoughtsPage(
+	c echo.Context,
+	page *PageArgs,
+) templ.Component {
+	if page == nil {
+		return WorkbenchUnavailable("Select an artifact to view comments.")
+	}
+	userEmail, _ := c.Get("user_email").(string)
+	threads := []commentui.CommentThreadView{}
+	if s.commentService != nil {
+		if response, err := s.commentService.GetCommentsForScopeInternal(
+			c.Request().Context(),
+			page.FilePath,
+		); err == nil {
+			page.Comments = response
+			threads = thoughtsCommentThreads(response.Comments)
+		}
+	}
+	page.CommentUI = s.buildCommentUI(page, userEmail, threads)
+	return commentui.CommentsContextPanel(
+		commentui.BuildCommentsPanelArgs(page.CommentUI, ""),
+	)
 }
 
 func (s *Service) resolveBotHomeThread(
@@ -343,7 +347,14 @@ func (s *Service) rosterSelectionForLiveThread(
 			ID:   thread.AgentSlug.String,
 		}
 	case "plan":
-		id := planLeadRoomID(thread.PlanDirRel.String)
+		rel := ""
+		if thread.PlanDirRel.Valid {
+			rel = thread.PlanDirRel.String
+		}
+		id := thoughtsAgentsRoomID(rel)
+		if id == "" {
+			id = planLeadRoomID(rel)
+		}
 		if id == "" {
 			return agenthome.RosterSelection{}
 		}

@@ -82,6 +82,24 @@ func thoughtsChatHref(basePath, docPath string) string {
 	return href + "?artifact=" + url.QueryEscape("thoughts/"+canonical)
 }
 
+func (s *Service) rosterSelectionForThoughtsDoc(
+	docPath string,
+) agenthome.RosterSelection {
+	roomID := ""
+	if s != nil && strings.TrimSpace(s.basePath) != "" {
+		if root, ok := InferWorkspaceRoot(s.basePath, docPath); ok {
+			roomID = thoughtsAgentsRoomID(root)
+		}
+	}
+	if roomID == "" {
+		roomID = planLeadRoomID(docPath)
+	}
+	if roomID == "" {
+		return agenthome.RosterSelection{}
+	}
+	return agenthome.RosterSelection{Kind: agenthome.KindPlan, ID: roomID}
+}
+
 func thoughtsAgentsRoomID(agentsRoot string) string {
 	root := filepath.ToSlash(strings.TrimSpace(agentsRoot))
 	root = strings.Trim(root, "/")

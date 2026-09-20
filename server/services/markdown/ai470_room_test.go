@@ -55,20 +55,23 @@ func TestServeAI470RoomUsesArtifactPathForPlanChat(t *testing.T) {
 	if err := svc.ServeAI470Room(c); err != nil {
 		t.Fatal(err)
 	}
-	if renderer.lastFindDoc != artifact {
-		t.Fatalf("FindSharedThreadForDoc doc = %q", renderer.lastFindDoc)
+	if renderer.lastEnsureDoc != "" {
+		t.Fatalf("GET must not ensure, doc = %q", renderer.lastEnsureDoc)
 	}
-	if renderer.chatThreadID != "thread-real" {
-		t.Fatalf("chat thread = %q", renderer.chatThreadID)
+	if renderer.chatThreadID != "" {
+		t.Fatalf("GET must not auto click-in, got %q", renderer.chatThreadID)
 	}
 	body := rec.Body.String()
 	for _, want := range []string{
-		`id="thread-chat"`,
+		`id="agent-chat-composer"`,
 		"Real plan",
 	} {
 		if !strings.Contains(body, want) {
 			t.Fatalf("missing %q: %s", want, body)
 		}
+	}
+	if strings.Contains(body, `id="thread-chat"`) {
+		t.Fatalf("must not render SharedThreadChat: %s", body)
 	}
 	if strings.Contains(body, "Select a thread to view an artifact.") {
 		t.Fatalf("blank artifact pane: %s", body)
@@ -108,15 +111,21 @@ func TestServeAI470RoomEnsuresPlanThreadWhenMissing(t *testing.T) {
 	if err := svc.ServeAI470Room(c); err != nil {
 		t.Fatal(err)
 	}
-	if renderer.lastEnsureDoc != artifact {
-		t.Fatalf("EnsureSharedThreadForDoc doc = %q", renderer.lastEnsureDoc)
+	if renderer.lastEnsureDoc != "" {
+		t.Fatalf(
+			"GET must not EnsureSharedThreadForDoc, doc = %q",
+			renderer.lastEnsureDoc,
+		)
 	}
-	if renderer.chatThreadID != "thread-new" {
-		t.Fatalf("chat thread = %q", renderer.chatThreadID)
+	if renderer.chatThreadID != "" {
+		t.Fatalf("GET must not auto click-in, got %q", renderer.chatThreadID)
 	}
 	body := rec.Body.String()
-	if !strings.Contains(body, `id="thread-chat"`) {
-		t.Fatalf("missing plan chat: %s", body)
+	if !strings.Contains(body, `id="agent-chat-composer"`) {
+		t.Fatalf("missing N=0 composer: %s", body)
+	}
+	if strings.Contains(body, `id="thread-chat"`) {
+		t.Fatalf("must not render SharedThreadChat: %s", body)
 	}
 	if strings.Contains(body, "Select a thread to view an artifact.") {
 		t.Fatalf("blank artifact pane: %s", body)
@@ -673,8 +682,11 @@ func TestServeAI470RoomForcesArtifactOpenOnPlanViewChat(t *testing.T) {
 		!strings.Contains(window, `"visible":true`) {
 		t.Fatalf("plan View Chat must keep artifact open despite cookie=0: %s", window)
 	}
-	if !strings.Contains(body, `id="thread-chat"`) {
-		t.Fatalf("missing chat: %s", body)
+	if !strings.Contains(body, `id="agent-chat-composer"`) {
+		t.Fatalf("missing N=0 composer: %s", body)
+	}
+	if strings.Contains(body, `id="thread-chat"`) {
+		t.Fatal("plan GET must not auto click-in")
 	}
 	found := false
 	for _, ck := range rec.Result().Cookies() {
@@ -1010,5 +1022,182 @@ func TestServeAI470RoomDocsIndexHTMLCommentsPanel(t *testing.T) {
 	}
 	if !strings.Contains(body, `id="comments-context-panel"`) {
 		t.Fatalf("missing comments panel: %s", body)
+	}
+	if strings.Contains(body, `id="thread-chat"`) {
+		t.Fatal("docs land must not auto click-in")
+	}
+	if !strings.Contains(body, `id="roster-row-doc-vamos"`) {
+		t.Fatalf("missing docs band: %s", body)
+	}
+	if !strings.Contains(body, "roster-row-selected") {
+		t.Fatalf("docs band not selected: %s", body)
+	}
+}
+
+func TestServeAI470RoomPlanZeroThreadsDoesNotInsert(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	plan := filepath.Join(root, "owner-a", "plans", "plan-one")
+	mustMkdirAll(t, plan)
+	mustWriteFile(t, filepath.Join(plan, "design.md"), []byte("# Plan\n"))
+	dbSvc, err := servicedb.NewService(
+		filepath.Join(t.TempDir(), "plan-zero.db"),
+		filepath.Join(t.TempDir(), "agents.yml"),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = dbSvc.Close() })
+	if _, err := dbSvc.Queries.UpsertDiscoveredPlanWorkspace(
+		context.Background(),
+		db.UpsertDiscoveredPlanWorkspaceParams{
+			PlanDirRel:     "owner-a/plans/plan-one",
+			ProjectID:      "vamos",
+			PlanDir:        "thoughts/owner-a/plans/plan-one",
+			Label:          "Plan One",
+			QrspiLifecycle: "design",
+		},
+	); err != nil {
+		t.Fatal(err)
+	}
+	svc, err := NewService(root, nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	svc.WithQueries(dbSvc.Queries)
+	svc.WithWorkbenchThreadRenderer(&threadWorkbenchTestRenderer{})
+	before, err := dbSvc.Queries.ListAgentThreadsByPlanDirRel(
+		context.Background(),
+		sql.NullString{String: "owner-a/plans/plan-one", Valid: true},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(before) != 0 {
+		t.Fatalf("precondition threads = %d", len(before))
+	}
+	rec := httptest.NewRecorder()
+	c := echo.New().NewContext(
+		httptest.NewRequest(http.MethodGet, "/rooms/plan/plan-one", http.NoBody),
+		rec,
+	)
+	c.SetParamNames("kind", "id")
+	c.SetParamValues("plan", "plan-one")
+	c.Set("user_email", "t@example.com")
+	if err := svc.ServeAI470Room(c); err != nil {
+		t.Fatal(err)
+	}
+	after, err := dbSvc.Queries.ListAgentThreadsByPlanDirRel(
+		context.Background(),
+		sql.NullString{String: "owner-a/plans/plan-one", Valid: true},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(after) != 0 {
+		t.Fatalf("GET inserted %d threads", len(after))
+	}
+	body := rec.Body.String()
+	if !strings.Contains(body, `id="agent-chat-composer"`) {
+		t.Fatalf("missing composer: %s", body)
+	}
+	if strings.Contains(body, "/thoughts/chat/freeform/send") {
+		t.Fatal("N=0 composer must not wire freeform send")
+	}
+}
+
+func TestServeAI470RoomPlanListOmitsUnattachedQRSPI(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	plan := filepath.Join(root, "owner-a", "plans", "plan-one")
+	mustMkdirAll(t, plan)
+	mustWriteFile(t, filepath.Join(plan, "design.md"), []byte("# Plan\n"))
+	dbSvc, err := servicedb.NewService(
+		filepath.Join(t.TempDir(), "plan-list.db"),
+		filepath.Join(t.TempDir(), "agents.yml"),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = dbSvc.Close() })
+	ctx := context.Background()
+	if _, err := dbSvc.Queries.UpsertDiscoveredPlanWorkspace(
+		ctx,
+		db.UpsertDiscoveredPlanWorkspaceParams{
+			PlanDirRel:     "owner-a/plans/plan-one",
+			ProjectID:      "vamos",
+			PlanDir:        "thoughts/owner-a/plans/plan-one",
+			Label:          "Plan One",
+			QrspiLifecycle: "design",
+		},
+	); err != nil {
+		t.Fatal(err)
+	}
+	threadID := uuid.NewString()
+	if _, err := dbSvc.Queries.CreateAgentThread(ctx, db.CreateAgentThreadParams{
+		ID:          threadID,
+		UserEmail:   "t@example.com",
+		Title:       "Plan chat",
+		Cwd:         "thoughts/owner-a/plans/plan-one",
+		LineageID:   uuid.NewString(),
+		PlanDirRel:  sql.NullString{String: "owner-a/plans/plan-one", Valid: true},
+		PiSessionID: uuid.NewString(),
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := dbSvc.Queries.BindAgentThreadPlan(ctx, db.BindAgentThreadPlanParams{
+		Cwd:   "thoughts/owner-a/plans/plan-one",
+		Title: "Plan chat",
+		ID:    threadID,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := dbSvc.Queries.UpsertAgentSessionIndex(
+		ctx,
+		db.UpsertAgentSessionIndexParams{
+			ID:           uuid.NewString(),
+			IdentityKind: "plan_owned",
+			ArtifactPath: sql.NullString{
+				String: "owner-a/plans/plan-one/.vamos/sessions/hermes/q.jsonl",
+				Valid:  true,
+			},
+			PlanDir: sql.NullString{
+				String: "owner-a/plans/plan-one",
+				Valid:  true,
+			},
+			Agent:             "hermes",
+			FileSize:          1,
+			ProjectionState:   "hydrated",
+			ProjectedThreadID: sql.NullString{},
+		},
+	); err != nil {
+		t.Fatal(err)
+	}
+	svc, err := NewService(root, nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	svc.WithQueries(dbSvc.Queries)
+	svc.WithWorkbenchThreadRenderer(&threadWorkbenchTestRenderer{})
+	rec := httptest.NewRecorder()
+	c := echo.New().NewContext(
+		httptest.NewRequest(http.MethodGet, "/rooms/plan/plan-one", http.NoBody),
+		rec,
+	)
+	c.SetParamNames("kind", "id")
+	c.SetParamValues("plan", "plan-one")
+	c.Set("user_email", "t@example.com")
+	if err := svc.ServeAI470Room(c); err != nil {
+		t.Fatal(err)
+	}
+	body := rec.Body.String()
+	if !strings.Contains(body, `href="/threads/`+threadID+`"`) {
+		t.Fatalf("missing plan thread row: %s", body)
+	}
+	if strings.Contains(body, "hermes/q.jsonl") {
+		t.Fatal("unattached QRSPI session leaked into list")
+	}
+	if strings.Contains(body, `id="thread-chat"`) {
+		t.Fatal("N=1 must still show list, not SharedThreadChat")
 	}
 }

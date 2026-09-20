@@ -5,7 +5,20 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/CoreyCole/vamos/server/services/agenthome"
 )
+
+func TestRosterDocsBandSelectedDocsDeskRoomID(t *testing.T) {
+	t.Parallel()
+	sel := agenthome.RosterSelection{Kind: agenthome.KindPlan, ID: "docs--vamos"}
+	if !agenthome.RosterDocsBandSelected(sel, "vamos") {
+		t.Fatal("docs--vamos should select band id vamos")
+	}
+	if agenthome.RosterDocsBandSelected(sel, "chestnut") {
+		t.Fatal("docs--vamos must not select chestnut")
+	}
+}
 
 func TestPlanLeadRoomID(t *testing.T) {
 	t.Parallel()

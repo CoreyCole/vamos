@@ -47,6 +47,7 @@ func (s *Service) thoughtsWorkbenchChatColumn(
 	userEmail string,
 	pageArgs *PageArgs,
 ) (templ.Component, error) {
+	_ = userEmail
 	threadsOpen := workbench.ThreadsOpenFromRequest(c.Request())
 	title := "Chat"
 	if id := planLeadRoomID(docPath); id != "" {
@@ -56,27 +57,28 @@ func (s *Service) thoughtsWorkbenchChatColumn(
 	}
 	overflow := BuildChatHeaderOverflow(pageArgs, docPath, true)
 	body := WorkbenchUnavailable(thoughtsSharedThreadUnavailable)
-	if s != nil && s.workbenchThreadsRenderer != nil {
-		ensureDoc := thoughtsEnsureDocPath(docPath)
-		threadID, err := s.workbenchThreadsRenderer.EnsureSharedThreadForDoc(
-			c.Request().Context(), ensureDoc, userEmail,
+	scopeID := ""
+	if s != nil {
+		scopeID = thoughtsChatHref(s.basePath, docPath)
+	}
+	if scopeID == "" {
+		body = WorkbenchUnavailable(thoughtsSharedThreadUnavailable)
+	} else {
+		artifact := thoughtsEnsureDocPath(docPath)
+		roomID := ""
+		if root, ok := InferWorkspaceRoot(s.basePath, docPath); ok {
+			roomID = thoughtsAgentsRoomID(root)
+		}
+		if roomID == "" {
+			roomID = planLeadRoomID(docPath)
+		}
+		rows, err := s.planScopedConversationRows(
+			c.Request().Context(), roomID, artifact,
 		)
 		if err != nil && !errors.Is(err, sql.ErrNoRows) {
 			return nil, err
 		}
-		threadID = strings.TrimSpace(threadID)
-		if threadID != "" {
-			chat, err := s.renderAI470SharedChat(
-				c.Request().Context(), threadID, userEmail,
-			)
-			if errors.Is(err, sql.ErrNoRows) {
-				body = WorkbenchUnavailable(thoughtsSharedThreadUnavailable)
-			} else if err != nil {
-				return nil, err
-			} else {
-				body = chat
-			}
-		}
+		body = renderScopedThreadListOrComposer(rows)
 	}
 	column := workbench.ChatColumnWithReopen
 	if thoughtsChatHref(s.basePath, docPath) != "" || planLeadRoomID(docPath) != "" {
