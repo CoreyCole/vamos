@@ -100,6 +100,17 @@ function threadIdFromURL(urlLike) {
       return "thread:" + decodeURIComponent(parts[2]);
     }
     // AI-470 rooms: treat kind/id as the switch identity for pin + VT unname.
+    // Pairwise A2A is /rooms/a2a/{a}/{b} — do not truncate the pair.
+    if (parts[1] === "rooms" && parts[2] === "a2a" && parts[3] && parts[4]) {
+      let a = decodeURIComponent(parts[3]);
+      let b = decodeURIComponent(parts[4]);
+      if (a > b) {
+        const swap = a;
+        a = b;
+        b = swap;
+      }
+      return "room:a2a/" + a + "/" + b;
+    }
     if (parts[1] === "rooms" && parts[2] && parts[3]) {
       return "room:" + parts[2] + "/" + decodeURIComponent(parts[3]);
     }
@@ -114,7 +125,10 @@ function isThreadToThreadNavigation(fromURL, toURL) {
 }
 
 function setThreadSwitchChatUnname() {
-  document.documentElement.setAttribute("data-wb2-vt-nav", WB2_VT_THREAD_SWITCH);
+  document.documentElement.setAttribute(
+    "data-wb2-vt-nav",
+    WB2_VT_THREAD_SWITCH,
+  );
 }
 
 function clearThreadSwitchChatUnname() {
@@ -180,7 +194,7 @@ document.addEventListener(
       return;
     }
     const anchor = event.target?.closest?.(
-      "#workbench-v2-threads a[href], #workbench-v2-threads-body a[href], #workbench-v2-roster a[href]",
+      "#workbench-v2-threads a[href], #workbench-v2-threads-body a[href], #workbench-v2-roster a[href], #agent-chat-thread-family a[href]",
     );
     if (!anchor) {
       return;
@@ -212,7 +226,10 @@ function scheduleThreadSwitchChatUnnameOnReveal(event) {
     } catch (_) {}
     return;
   }
-  if (document.documentElement.getAttribute("data-wb2-vt-nav") === WB2_VT_THREAD_SWITCH) {
+  if (
+    document.documentElement.getAttribute("data-wb2-vt-nav") ===
+    WB2_VT_THREAD_SWITCH
+  ) {
     clearThreadSwitchChatUnnameAfter(event?.viewTransition);
   }
 }
@@ -224,7 +241,10 @@ if ("onpagereveal" in window) {
   });
 } else {
   // No pagereveal: one-shot settle only (pageshow still reinforces).
-  if (document.documentElement.getAttribute("data-wb2-vt-nav") === WB2_VT_THREAD_SWITCH) {
+  if (
+    document.documentElement.getAttribute("data-wb2-vt-nav") ===
+    WB2_VT_THREAD_SWITCH
+  ) {
     queueMicrotask(clearThreadSwitchChatUnname);
   }
   queueMicrotask(pinAfterFonts);

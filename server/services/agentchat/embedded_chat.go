@@ -79,6 +79,7 @@ type EmbeddedFreeformPanelArgs struct {
 	InitialDraft     string
 	DraftSaveAction  string
 	ComposerDisabled bool
+	ThreadFamily     ChatThreadFamily
 }
 
 func ParseEmbeddedChatURL(c echo.Context) EmbeddedChatURLState {

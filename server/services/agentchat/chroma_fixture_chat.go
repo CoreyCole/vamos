@@ -16,10 +16,10 @@ const (
 	densityFixtureReasoningDOMID = "ai470-density-fixture-reasoning"
 	densityFixtureTool0DOMID     = "ai470-density-fixture-tool-0"
 	densityFixtureTool1DOMID     = "ai470-density-fixture-tool-1"
-	pairwisePeerFixtureDOMID    = "ai470-pairwise-peer-fixture"
-	pairwiseSelfFixtureDOMID    = "ai470-pairwise-self-fixture"
-	historyFixtureDOMIDPrefix   = "ai470-history-fixture-"
-	historyFixtureExtraMessages = 5 // stableTranscriptInitialLimit+N so HasMoreOlder=true
+	pairwisePeerFixtureDOMID     = "ai470-pairwise-peer-fixture"
+	pairwiseSelfFixtureDOMID     = "ai470-pairwise-self-fixture"
+	historyFixtureDOMIDPrefix    = "ai470-history-fixture-"
+	historyFixtureExtraMessages  = 5 // stableTranscriptInitialLimit+N so HasMoreOlder=true
 )
 
 // chromaHighlightFixtureMarkdown is a visible assistant bubble for UX chroma VA.
@@ -114,6 +114,9 @@ func (s *Service) renderSharedThreadChat(
 		ComposerDisabled: fixtureMode == "pairwise" ||
 			thread.RoomKind == RoomKindPairwise,
 	}
+	if family, ferr := s.BuildChatThreadFamily(ctx, thread.ID); ferr == nil {
+		args.ThreadFamily = family
+	}
 	return SharedThreadChat(args), nil
 }
 
@@ -142,7 +145,6 @@ func (s *Service) RenderSharedThreadChatWithHistoryFixture(
 ) (templ.Component, error) {
 	return s.renderSharedThreadChat(ctx, threadID, userEmail, "history")
 }
-
 
 func groupBotDMChipFixture(originTurnID string) *BotDMChip {
 	return &BotDMChip{
@@ -297,8 +299,14 @@ func (s *Service) historyFixtureMessages() []TranscriptMessage {
 		if i%2 == 1 {
 			role = "assistant"
 		}
-		msgText := fmt.Sprintf("History fixture message %d (AI-470 long transcript for InfiniteScroll).", i)
-		out = append(out, s.newBubbleTranscriptMessage(domID, domID, role, msgText, false))
+		msgText := fmt.Sprintf(
+			"History fixture message %d (AI-470 long transcript for InfiniteScroll).",
+			i,
+		)
+		out = append(
+			out,
+			s.newBubbleTranscriptMessage(domID, domID, role, msgText, false),
+		)
 	}
 	return out
 }

@@ -56,6 +56,7 @@ templ SharedThreadChat(args EmbeddedFreeformPanelArgs) {
 		if args.StreamURL != "" {
 			<div class="hidden" data-init={ "@get('" + args.StreamURL + "')" }></div>
 		}
+		@ChatThreadFamilyBar(familyOrCurrent(args))
 		@MessagesPane(args.ThreadID, args.Transcript, args.HasThread, freeformForkAction(args.ThreadID), true)
 		if !args.ComposerDisabled {
 			<div class="shrink-0 px-3 py-3">

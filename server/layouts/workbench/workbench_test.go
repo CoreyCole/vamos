@@ -698,6 +698,9 @@ func TestWorkbenchHistoryJSReloadsSameDocumentArtifactPopstate(t *testing.T) {
 		`onpageswap`,
 		`pageswap`,
 		`scheduleThreadSwitchChatUnnameOnReveal`,
+		`#agent-chat-thread-family a[href]`,
+		`parts[2] === "a2a"`,
+		`room:a2a/`,
 	} {
 		if !strings.Contains(js, want) {
 			t.Fatalf("workbench-history.js missing %q in %s", want, js)
@@ -2053,7 +2056,7 @@ func TestWorkbenchV2RegionsEnforceComposerFriendlyMinRem(t *testing.T) {
 		`data-workbench-region="workbench-v2-chat"`,
 		`data-workbench-min-rem="18"`,
 		`/js/workbench-resize.js?v=10`,
-		`/js/workbench-history.js?v=21`,
+		`/js/workbench-history.js?v=23`,
 	} {
 		if !strings.Contains(html, fragment) {
 			t.Fatalf("workbench html missing %q", fragment)

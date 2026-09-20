@@ -3153,6 +3153,18 @@ func (h *Handler) patchEmbeddedFreeformChatPanel(
 	)
 }
 
+func (h *Handler) patchThreadFamilyList(
+	c echo.Context,
+	sse *datastar.ServerSentEventGenerator,
+	threadID string,
+) error {
+	family, err := h.service.BuildChatThreadFamily(c.Request().Context(), threadID)
+	if err != nil || len(family.Rows) == 0 {
+		return nil
+	}
+	return sse.PatchElementTempl(ChatThreadFamilyList(family))
+}
+
 func (h *Handler) patchEmbeddedFreeformLiveTranscript(
 	c echo.Context,
 	sse *datastar.ServerSentEventGenerator,
@@ -3167,13 +3179,16 @@ func (h *Handler) patchEmbeddedFreeformLiveTranscript(
 	if err != nil {
 		return err
 	}
-	return sse.PatchElementTempl(
+	if err := sse.PatchElementTempl(
 		LiveTranscriptRegion(
 			args.ThreadID,
 			args.Transcript,
 			freeformForkAction(args.ThreadID),
 		),
-	)
+	); err != nil {
+		return err
+	}
+	return h.patchThreadFamilyList(c, sse, args.ThreadID)
 }
 
 func (h *Handler) patchEmbeddedFreeformStableTranscript(
@@ -3380,9 +3395,12 @@ func (h *Handler) patchThread(
 		if err != nil {
 			return err
 		}
-		return sse.PatchElementTempl(
+		if err := sse.PatchElementTempl(
 			LiveTranscriptRegion(threadID, state, freeformForkAction(threadID)),
-		)
+		); err != nil {
+			return err
+		}
+		return h.patchThreadFamilyList(c, sse, threadID)
 	}
 
 	args, err := h.service.BuildPageArgs(
