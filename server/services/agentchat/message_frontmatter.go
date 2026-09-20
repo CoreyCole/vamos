@@ -56,7 +56,7 @@ func parseMessageFrontmatter(
 			break
 		}
 		if trim == "" {
-			return nil, content, false
+			continue
 		}
 		key, value, parsedOK := parseFrontmatterLine(lines[i])
 		if !parsedOK {

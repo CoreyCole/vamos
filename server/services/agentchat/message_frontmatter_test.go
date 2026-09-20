@@ -24,7 +24,8 @@ func TestFormatMessageFrontmatterRoundTrip(t *testing.T) {
 	if parsedBody != body {
 		t.Fatalf("body = %q", parsedBody)
 	}
-	if len(parsed) != 2 || parsed[0].Key != "process_cwd" || parsed[0].Value != "/tmp/workspace" ||
+	if len(parsed) != 2 || parsed[0].Key != "process_cwd" ||
+		parsed[0].Value != "/tmp/workspace" ||
 		parsed[1].Key != "plan_dir" ||
 		parsed[1].Value != "owner/plans/alpha" {
 		t.Fatalf("fields = %#v", parsed)
@@ -52,6 +53,23 @@ func TestParseMessageFrontmatter(t *testing.T) {
 		t.Fatalf("body = %q", body)
 	}
 	if len(fields) != 2 || fields[0].Key != "process_cwd" || fields[1].Key != "plan_dir" {
+		t.Fatalf("fields = %#v", fields)
+	}
+}
+
+func TestParseMessageFrontmatterAllowsBlankLinesBeforeCloser(t *testing.T) {
+	content := "process_cwd: /tmp/workspace\nplan_dir: owner/plans/alpha\n\n---\nPlease implement the groups.\n"
+	fields, body, ok := parseMessageFrontmatter(content)
+	if !ok {
+		t.Fatal("expected frontmatter with blank line before closer")
+	}
+	if body != "Please implement the groups.\n" {
+		t.Fatalf("body = %q", body)
+	}
+	if len(fields) != 2 || fields[0].Key != "process_cwd" ||
+		fields[0].Value != "/tmp/workspace" ||
+		fields[1].Key != "plan_dir" ||
+		fields[1].Value != "owner/plans/alpha" {
 		t.Fatalf("fields = %#v", fields)
 	}
 }
