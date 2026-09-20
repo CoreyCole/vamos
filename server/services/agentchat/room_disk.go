@@ -282,6 +282,9 @@ func migrateLegacyCurrentJSONLFile(
 ) (destAbs string, migrated bool, err error) {
 	info := inspectJSONLTranscript(currentAbs)
 	if info.Unreadable || !info.HasSessionHeader || !info.HasUserMessage {
+		if dest := soleMigratedPiJSONL(filepath.Dir(currentAbs)); dest != "" {
+			return dest, false, nil
+		}
 		return "", false, nil
 	}
 	destAbs, err = destForID(info.SessionID)
@@ -298,6 +301,27 @@ func migrateLegacyCurrentJSONLFile(
 		return "", false, err
 	}
 	return destAbs, true, nil
+}
+
+func soleMigratedPiJSONL(sessionsDir string) string {
+	matches, err := filepath.Glob(filepath.Join(sessionsDir, "pi", "*.jsonl"))
+	if err != nil {
+		return ""
+	}
+	var rows []string
+	for _, path := range matches {
+		if JSONLIsScopedListRow(path) {
+			rows = append(rows, path)
+		}
+	}
+	if len(rows) != 1 {
+		return ""
+	}
+	return rows[0]
+}
+
+func piSessionIDFromJSONLPath(path string) string {
+	return strings.TrimSuffix(filepath.Base(path), ".jsonl")
 }
 
 func ensureThoughtsJSONL(thoughtsRoot, rel string) (absPath string, err error) {

@@ -1963,7 +1963,7 @@ func (s *Service) prepareRoomSession(
 	speakerSlug = strings.TrimSpace(speakerSlug)
 	room, err := RoomIdentityFromThread(s.thoughtsRoot, thread, speakerSlug)
 	if err == nil && strings.TrimSpace(s.thoughtsRoot) != "" {
-		sessionFile, err := s.roomSessionFile(room, thread)
+		sessionFile, err := s.roomSessionFile(ctx, room, thread)
 		if err != nil {
 			return RoomIdentity{}, "", "", nil, err
 		}
@@ -2005,7 +2005,7 @@ func (s *Service) prepareRoomSession(
 	}
 	currentAbs := filepath.Join(cwd, ".vamos", "sessions", currentJSONLName)
 	sessionFile := currentAbs
-	if dest, migrated, err := migrateLegacyCurrentJSONLFile(
+	if dest, _, err := migrateLegacyCurrentJSONLFile(
 		currentAbs,
 		func(sessionID string) (string, error) {
 			path := filepath.Join(cwd, ".vamos", "sessions", "pi", sessionID+".jsonl")
@@ -2016,8 +2016,15 @@ func (s *Service) prepareRoomSession(
 		},
 	); err != nil {
 		return RoomIdentity{}, "", "", nil, err
-	} else if migrated {
+	} else if dest != "" {
 		sessionFile = dest
+		if err := s.persistPiSessionID(
+			ctx,
+			thread.ID,
+			piSessionIDFromJSONLPath(dest),
+		); err != nil {
+			return RoomIdentity{}, "", "", nil, err
+		}
 	} else if piID := strings.TrimSpace(
 		thread.PiSessionID,
 	); piID != "" {
@@ -2030,18 +2037,26 @@ func (s *Service) prepareRoomSession(
 }
 
 func (s *Service) roomSessionFile(
+	ctx context.Context,
 	room RoomIdentity,
 	thread db.AgentThread,
 ) (string, error) {
 	if room.Kind == RoomKindPairwise {
 		return EnsureRoomCurrentJSONL(s.thoughtsRoot, room)
 	}
-	if dest, migrated, err := MigrateLegacyCurrentJSONL(
+	if dest, _, err := MigrateLegacyCurrentJSONL(
 		s.thoughtsRoot,
 		room,
 	); err != nil {
 		return "", err
-	} else if migrated {
+	} else if dest != "" {
+		if err := s.persistPiSessionID(
+			ctx,
+			thread.ID,
+			piSessionIDFromJSONLPath(dest),
+		); err != nil {
+			return "", err
+		}
 		return dest, nil
 	}
 	piID := strings.TrimSpace(thread.PiSessionID)

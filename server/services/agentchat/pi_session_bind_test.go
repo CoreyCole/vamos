@@ -87,6 +87,22 @@ func TestPrepareRoomSessionEmptyPiMigratesCurrentJSONL(t *testing.T) {
 	if _, err := os.Stat(current); !os.IsNotExist(err) {
 		t.Fatalf("current.jsonl kept as cache: %v", err)
 	}
+	_, sessionFile, _, _, err = svc.prepareRoomSession(t.Context(), db.AgentThread{
+		ID:       "thread-legacy",
+		Cwd:      cwd,
+		RoomKind: RoomKindBotHome,
+	}, "nova")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if sessionFile != want {
+		t.Fatalf("second resume sessionFile = %q want %q", sessionFile, want)
+	}
+	if raw, err := os.ReadFile(want); err != nil {
+		t.Fatal(err)
+	} else if !strings.Contains(string(raw), "hi") {
+		t.Fatalf("pi jsonl lost user transcript: %s", raw)
+	}
 }
 
 func TestPrepareRoomSessionPairwiseKeepsCurrentJSONL(t *testing.T) {

@@ -31,23 +31,13 @@ func lastBotHomePreview(
 		})
 		if err == nil && len(rows) > 0 {
 			row := rows[0]
-			if piID := strings.TrimSpace(row.PiSessionID); piID != "" {
-				path = filepath.Join(
-					thoughtsRoot,
-					"agents",
-					slug,
-					"sessions",
-					"pi",
-					piID+".jsonl",
-				)
-			} else {
-				path = filepath.Join(
-					thoughtsRoot,
-					"agents",
-					slug,
-					"sessions",
-					"current.jsonl",
-				)
+			path = resolveScopedJSONLPath(path, row.PiSessionID)
+			if strings.TrimSpace(row.PiSessionID) == "" &&
+				strings.Contains(filepath.ToSlash(path), "/pi/") {
+				_ = q.SetAgentThreadPiSessionID(ctx, db.SetAgentThreadPiSessionIDParams{
+					PiSessionID: piSessionIDFromJSONLPath(path),
+					ID:          row.ID,
+				})
 			}
 		}
 	}

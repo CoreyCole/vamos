@@ -13,6 +13,24 @@ func jsonlIsScopedListRow(path string) bool {
 	return !info.unreadable && info.hasUserMessage
 }
 
+func resolveScopedJSONLPath(current, piID string) string {
+	piID = strings.TrimSpace(piID)
+	if piID != "" {
+		return filepath.Join(filepath.Dir(current), "pi", piID+".jsonl")
+	}
+	if dest, _, err := migrateLegacyCurrentJSONLAtPath(
+		current,
+	); err == nil &&
+		dest != "" {
+		return dest
+	}
+	return current
+}
+
+func piSessionIDFromJSONLPath(path string) string {
+	return strings.TrimSuffix(filepath.Base(path), ".jsonl")
+}
+
 type scopedJSONLInspect struct {
 	hasSessionHeader bool
 	sessionID        string
@@ -78,6 +96,9 @@ func inspectScopedJSONL(path string) scopedJSONLInspect {
 func migrateLegacyCurrentJSONLAtPath(currentAbs string) (string, bool, error) {
 	info := inspectScopedJSONL(currentAbs)
 	if info.unreadable || !info.hasSessionHeader || !info.hasUserMessage {
+		if dest := soleMigratedPiJSONL(filepath.Dir(currentAbs)); dest != "" {
+			return dest, false, nil
+		}
 		return "", false, nil
 	}
 	dest := filepath.Join(filepath.Dir(currentAbs), "pi", info.sessionID+".jsonl")
@@ -91,4 +112,21 @@ func migrateLegacyCurrentJSONLAtPath(currentAbs string) (string, bool, error) {
 		return "", false, err
 	}
 	return dest, true, nil
+}
+
+func soleMigratedPiJSONL(sessionsDir string) string {
+	matches, err := filepath.Glob(filepath.Join(sessionsDir, "pi", "*.jsonl"))
+	if err != nil {
+		return ""
+	}
+	var rows []string
+	for _, path := range matches {
+		if jsonlIsScopedListRow(path) {
+			rows = append(rows, path)
+		}
+	}
+	if len(rows) != 1 {
+		return ""
+	}
+	return rows[0]
 }

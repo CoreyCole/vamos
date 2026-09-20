@@ -629,6 +629,69 @@ func TestServeAI470RoomBotTwoThreadsListsBoth(t *testing.T) {
 	}
 }
 
+func TestServeAI470RoomLegacyHomeStaysListedAfterMigrate(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	dbSvc, err := servicedb.NewService(
+		filepath.Join(t.TempDir(), "agents.db"),
+		filepath.Join(t.TempDir(), "agents.yml"),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = dbSvc.Close() })
+	svc, err := NewService(root, nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	svc.WithQueries(dbSvc.Queries)
+	withTestRoster(t, svc)
+	nova, err := svc.createAgent(context.Background(), createAgentInput{
+		Slug: "nova", Name: "Nova", UserEmail: "t@example.com",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	threadID, err := svc.ensureBotHomeThread(
+		context.Background(), nova, "t@example.com",
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	writeBotThreadUserMessage(t, dbSvc.Queries, root, "nova", threadID)
+	svc.WithWorkbenchThreadRenderer(&threadWorkbenchTestRenderer{})
+	get := func() string {
+		t.Helper()
+		rec := httptest.NewRecorder()
+		c := echo.New().NewContext(
+			httptest.NewRequest(http.MethodGet, "/rooms/dm/nova", http.NoBody),
+			rec,
+		)
+		c.SetParamNames("kind", "id")
+		c.SetParamValues("dm", "nova")
+		c.Set("user_email", "t@example.com")
+		if err := svc.ServeAI470Room(c); err != nil {
+			t.Fatal(err)
+		}
+		return rec.Body.String()
+	}
+	first := get()
+	if !strings.Contains(first, `href="/threads/`+threadID+`"`) {
+		t.Fatalf("first GET missing row: %s", first)
+	}
+	row, err := dbSvc.Queries.GetAgentThread(context.Background(), threadID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.TrimSpace(row.PiSessionID) == "" {
+		t.Fatal("GET list did not persist pi_session_id after migrate")
+	}
+	second := get()
+	if !strings.Contains(second, `href="/threads/`+threadID+`"`) {
+		t.Fatalf("second GET dropped migrated row: %s", second)
+	}
+}
+
 func TestAI470RoomTitleUsesLiveAgentName(t *testing.T) {
 	t.Parallel()
 	dbSvc, err := servicedb.NewService(

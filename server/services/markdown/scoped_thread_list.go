@@ -64,15 +64,16 @@ func (s *Service) botScopedConversationRows(
 			strings.TrimSpace(thread.ParentThreadID.String) != "" {
 			continue
 		}
-		if !jsonlIsScopedListRow(s.botThreadJSONLPath(slug, thread)) {
+		if !jsonlIsScopedListRow(s.botThreadJSONLPath(ctx, slug, thread)) {
 			continue
 		}
-		rows = append(rows, s.conversationRowForBotThread(slug, thread))
+		rows = append(rows, s.conversationRowForBotThread(ctx, slug, thread))
 	}
 	return rows, nil
 }
 
 func (s *Service) conversationRowForBotThread(
+	ctx context.Context,
 	slug string,
 	thread db.AgentThread,
 ) agenthome.ConversationRowArgs {
@@ -80,7 +81,7 @@ func (s *Service) conversationRowForBotThread(
 	if title == "" {
 		title = slug
 	}
-	preview := lastJSONLPreview(s.botThreadJSONLPath(slug, thread))
+	preview := lastJSONLPreview(s.botThreadJSONLPath(ctx, slug, thread))
 	return agenthome.ConversationRowArgs{
 		ID:          "scoped-thread-row-" + thread.ID,
 		Href:        "/threads/" + thread.ID,
@@ -93,22 +94,17 @@ func (s *Service) conversationRowForBotThread(
 	}
 }
 
-func (s *Service) botThreadJSONLPath(slug string, thread db.AgentThread) string {
+func (s *Service) botThreadJSONLPath(
+	ctx context.Context,
+	slug string,
+	thread db.AgentThread,
+) string {
 	current := filepath.Join(
 		s.basePath, "agents", slug, "sessions", "current.jsonl",
 	)
-	if dest, migrated, err := migrateLegacyCurrentJSONLAtPath(
-		current,
-	); err == nil &&
-		migrated {
-		return dest
-	}
-	if piID := strings.TrimSpace(thread.PiSessionID); piID != "" {
-		return filepath.Join(
-			s.basePath, "agents", slug, "sessions", "pi", piID+".jsonl",
-		)
-	}
-	return current
+	path := resolveScopedJSONLPath(current, thread.PiSessionID)
+	s.persistPiSessionFromPath(ctx, thread, path)
+	return path
 }
 
 func (s *Service) planScopedConversationRows(
@@ -160,15 +156,16 @@ func (s *Service) planScopedConversationRows(
 			strings.TrimSpace(thread.ParentThreadID.String) != "" {
 			continue
 		}
-		if !jsonlIsScopedListRow(s.planThreadJSONLPath(rel, thread)) {
+		if !jsonlIsScopedListRow(s.planThreadJSONLPath(ctx, rel, thread)) {
 			continue
 		}
-		rows = append(rows, s.conversationRowForPlanThread(rel, thread))
+		rows = append(rows, s.conversationRowForPlanThread(ctx, rel, thread))
 	}
 	return rows, nil
 }
 
 func (s *Service) conversationRowForPlanThread(
+	ctx context.Context,
 	planDirRel string,
 	thread db.AgentThread,
 ) agenthome.ConversationRowArgs {
@@ -176,7 +173,7 @@ func (s *Service) conversationRowForPlanThread(
 	if title == "" {
 		title = filepath.Base(filepath.ToSlash(planDirRel))
 	}
-	preview := lastJSONLPreview(s.planThreadJSONLPath(planDirRel, thread))
+	preview := lastJSONLPreview(s.planThreadJSONLPath(ctx, planDirRel, thread))
 	return agenthome.ConversationRowArgs{
 		ID:          "scoped-thread-row-" + thread.ID,
 		Href:        "/threads/" + thread.ID,
@@ -189,28 +186,18 @@ func (s *Service) conversationRowForPlanThread(
 	}
 }
 
-func (s *Service) planThreadJSONLPath(planDirRel string, thread db.AgentThread) string {
+func (s *Service) planThreadJSONLPath(
+	ctx context.Context,
+	planDirRel string,
+	thread db.AgentThread,
+) string {
 	rel := strings.TrimPrefix(filepath.ToSlash(planDirRel), "thoughts/")
 	current := filepath.Join(
 		s.basePath, filepath.FromSlash(rel), ".vamos", "sessions", "current.jsonl",
 	)
-	if dest, migrated, err := migrateLegacyCurrentJSONLAtPath(
-		current,
-	); err == nil &&
-		migrated {
-		return dest
-	}
-	if piID := strings.TrimSpace(thread.PiSessionID); piID != "" {
-		return filepath.Join(
-			s.basePath,
-			filepath.FromSlash(rel),
-			".vamos",
-			"sessions",
-			"pi",
-			piID+".jsonl",
-		)
-	}
-	return current
+	path := resolveScopedJSONLPath(current, thread.PiSessionID)
+	s.persistPiSessionFromPath(ctx, thread, path)
+	return path
 }
 
 func (s *Service) freeformScopedConversationRows(
@@ -232,22 +219,23 @@ func (s *Service) freeformScopedConversationRows(
 			strings.TrimSpace(thread.ParentThreadID.String) != "" {
 			continue
 		}
-		if !jsonlIsScopedListRow(s.freeformThreadJSONLPath(thread)) {
+		if !jsonlIsScopedListRow(s.freeformThreadJSONLPath(ctx, thread)) {
 			continue
 		}
-		rows = append(rows, s.conversationRowForFreeformThread(thread))
+		rows = append(rows, s.conversationRowForFreeformThread(ctx, thread))
 	}
 	return rows, nil
 }
 
 func (s *Service) conversationRowForFreeformThread(
+	ctx context.Context,
 	thread db.AgentThread,
 ) agenthome.ConversationRowArgs {
 	title := strings.TrimSpace(thread.Title)
 	if title == "" {
 		title = "Untitled"
 	}
-	preview := lastJSONLPreview(s.freeformThreadJSONLPath(thread))
+	preview := lastJSONLPreview(s.freeformThreadJSONLPath(ctx, thread))
 	return agenthome.ConversationRowArgs{
 		ID:          "scoped-thread-row-" + thread.ID,
 		Href:        "/threads/" + thread.ID,
@@ -260,19 +248,39 @@ func (s *Service) conversationRowForFreeformThread(
 	}
 }
 
-func (s *Service) freeformThreadJSONLPath(thread db.AgentThread) string {
+func (s *Service) freeformThreadJSONLPath(
+	ctx context.Context,
+	thread db.AgentThread,
+) string {
 	cwd := strings.TrimSpace(thread.Cwd)
 	current := filepath.Join(cwd, ".vamos", "sessions", "current.jsonl")
-	if dest, migrated, err := migrateLegacyCurrentJSONLAtPath(
-		current,
-	); err == nil &&
-		migrated {
-		return dest
+	path := resolveScopedJSONLPath(current, thread.PiSessionID)
+	s.persistPiSessionFromPath(ctx, thread, path)
+	return path
+}
+
+func (s *Service) persistPiSessionFromPath(
+	ctx context.Context,
+	thread db.AgentThread,
+	path string,
+) {
+	if s == nil || s.queries == nil {
+		return
 	}
-	if piID := strings.TrimSpace(thread.PiSessionID); piID != "" {
-		return filepath.Join(cwd, ".vamos", "sessions", "pi", piID+".jsonl")
+	if strings.TrimSpace(thread.PiSessionID) != "" {
+		return
 	}
-	return current
+	if !strings.Contains(filepath.ToSlash(path), "/pi/") {
+		return
+	}
+	piID := piSessionIDFromJSONLPath(path)
+	if piID == "" || piID == "current" {
+		return
+	}
+	_ = s.queries.SetAgentThreadPiSessionID(ctx, db.SetAgentThreadPiSessionIDParams{
+		PiSessionID: piID,
+		ID:          thread.ID,
+	})
 }
 
 func scopedRowInitial(title string) string {

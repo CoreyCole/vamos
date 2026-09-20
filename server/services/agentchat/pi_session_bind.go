@@ -53,6 +53,24 @@ func (s *Service) createAgentThread(
 	return thread, nil
 }
 
+func (s *Service) persistPiSessionID(
+	ctx context.Context,
+	threadID, piID string,
+) error {
+	if s == nil || s.queries == nil {
+		return nil
+	}
+	threadID = strings.TrimSpace(threadID)
+	piID = strings.TrimSpace(piID)
+	if threadID == "" || piID == "" {
+		return nil
+	}
+	return s.queries.SetAgentThreadPiSessionID(ctx, db.SetAgentThreadPiSessionIDParams{
+		PiSessionID: piID,
+		ID:          threadID,
+	})
+}
+
 func (s *Service) writeThreadPiSession(
 	ctx context.Context,
 	q db.Querier,
