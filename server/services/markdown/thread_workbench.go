@@ -262,22 +262,31 @@ func freeformLandChatPlaceholder() templ.Component {
 func (s *Service) freeformLandChat(
 	c echo.Context,
 	userEmail string,
-) (templ.Component, error) {
+) (templ.Component, string, error) {
+	index, hasThreads, err := s.workbenchThreadsRenderer.RenderRootThreadsIndex(
+		c.Request().Context(), userEmail,
+	)
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return nil, "Chat", err
+	}
+	if hasThreads {
+		return index, "Threads", nil
+	}
 	threadID, err := s.workbenchThreadsRenderer.EnsureFreeformLandThread(
 		c.Request().Context(), userEmail,
 	)
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
-		return nil, err
+		return nil, "Chat", err
 	}
 	threadID = strings.TrimSpace(threadID)
 	if threadID == "" {
-		return freeformLandChatPlaceholder(), nil
+		return freeformLandChatPlaceholder(), "Chat", nil
 	}
 	chat, err := s.renderSharedThreadChatForRequest(c, threadID, userEmail)
 	if errors.Is(err, sql.ErrNoRows) {
-		return freeformLandChatPlaceholder(), nil
+		return freeformLandChatPlaceholder(), "Chat", nil
 	}
-	return chat, err
+	return chat, "Chat", err
 }
 
 func (s *Service) ServeThreads(c echo.Context) error {
@@ -303,11 +312,15 @@ func (s *Service) ServeThreads(c echo.Context) error {
 	artifactComp, artifactPage, artifactDoc := s.indexArtifactComponent(
 		c, artifactPath, hasArtifact,
 	)
-	chat, err := s.freeformLandChat(c, userEmail)
+	chat, chatTitle, err := s.freeformLandChat(c, userEmail)
 	if err != nil {
 		return err
 	}
 	chatOpen, commentsOpen := chatCommentsOpen(c.Request(), true)
+	artifactOpen := hasArtifact && workbench.ArtifactOpenFromRequest(c.Request())
+	if !hasArtifact {
+		commentsOpen = false
+	}
 	state, err := workbench.BuildWorkbenchV2State(workbench.WorkbenchV2Args{
 		UserEmail:     userEmail,
 		ViewportClass: viewport,
@@ -320,8 +333,8 @@ func (s *Service) ServeThreads(c echo.Context) error {
 		),
 		Chat: workbench.ChatColumnWithReopen(
 			workbench.ThreadsOpenFromRequest(c.Request()),
-			workbench.ArtifactOpenFromRequest(c.Request()),
-			"Chat",
+			artifactOpen,
+			chatTitle,
 			chat,
 			BuildChatHeaderOverflow(artifactPage, artifactDoc, true),
 		),
@@ -329,19 +342,13 @@ func (s *Service) ServeThreads(c echo.Context) error {
 		Comments: WorkbenchUnavailable(
 			"Select an artifact to view comments.",
 		),
-		ThreadsOpen: workbench.ThreadsOpenFromRequest(c.Request()),
-		ChatOpen:    chatOpen,
-		// Index land: cookie missing => open so route-defaults Stories stay green.
-		ArtifactOpen: workbench.ArtifactOpenFromRequest(c.Request()),
+		ThreadsOpen:  workbench.ThreadsOpenFromRequest(c.Request()),
+		ChatOpen:     chatOpen,
+		ArtifactOpen: artifactOpen,
 		CommentsOpen: commentsOpen,
 	})
 	if err != nil {
 		return err
-	}
-	// Bare /threads: keep artifact column Visible for route-defaults, but first-paint
-	// mobile pane is the roster (not the empty artifact).
-	if !hasArtifact {
-		state.Config.Mobile.ActiveRegionID = workbench.WorkbenchV2ThreadsRegionID
 	}
 	return ThreadWorkbenchPage(
 		userEmail,
@@ -397,6 +404,13 @@ func (s *Service) ServeThread(c echo.Context) error {
 	if planLinked {
 		chatColumn = workbench.ChatColumnWithPlanReopen
 	}
+	hasSplitArtifact := planLinked ||
+		c.Request().URL.Query().Has("artifact")
+	artifactOpen := hasSplitArtifact &&
+		workbench.ArtifactOpenFromRequest(c.Request())
+	if !hasSplitArtifact {
+		commentsOpen = false
+	}
 	state, err := workbench.BuildWorkbenchV2State(workbench.WorkbenchV2Args{
 		UserEmail:     userEmail,
 		ViewportClass: viewport,
@@ -409,7 +423,7 @@ func (s *Service) ServeThread(c echo.Context) error {
 		),
 		Chat: chatColumn(
 			workbench.ThreadsOpenFromRequest(c.Request()),
-			workbench.ArtifactOpenFromRequest(c.Request()),
+			artifactOpen,
 			title,
 			chat,
 			BuildChatHeaderOverflow(artifactPage, artifactDoc, true),
@@ -418,7 +432,7 @@ func (s *Service) ServeThread(c echo.Context) error {
 		Comments:     comments,
 		ThreadsOpen:  workbench.ThreadsOpenFromRequest(c.Request()),
 		ChatOpen:     chatOpen,
-		ArtifactOpen: workbench.ArtifactOpenFromRequest(c.Request()),
+		ArtifactOpen: artifactOpen,
 		CommentsOpen: commentsOpen,
 	})
 	if err != nil {

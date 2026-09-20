@@ -26,6 +26,7 @@ type threadWorkbenchTestRenderer struct {
 	lastFindDoc   string
 	ensureID      string
 	lastEnsureDoc string
+	rootIndex     bool
 }
 
 func (r *threadWorkbenchTestRenderer) RenderWorkbenchThreadList(
@@ -79,6 +80,19 @@ func (r *threadWorkbenchTestRenderer) EnsureFreeformLandThread(
 		return r.ensureID, nil
 	}
 	return "land-chat", nil
+}
+
+func (r *threadWorkbenchTestRenderer) RenderRootThreadsIndex(
+	context.Context,
+	string,
+) (templ.Component, bool, error) {
+	if !r.rootIndex {
+		return nil, false, nil
+	}
+	return templ.Raw(
+		`<div id="root-threads-index" data-testid="root-threads-index">` +
+			`<a href="/threads/land-chat" data-testid="root-thread-row">what is in your context?</a></div>`,
+	), true, nil
 }
 
 func (r *threadWorkbenchTestRenderer) RenderSharedThreadChat(
@@ -236,6 +250,43 @@ func TestServeThreadsIndexOpensFreeformChat(t *testing.T) {
 		) {
 		t.Fatalf("chat not open: %s", body)
 	}
+	if !strings.Contains(
+		body,
+		`&#34;workbenchV2Artifact&#34;:{&#34;ratio&#34;:0.39,&#34;visible&#34;:false`,
+	) {
+		t.Fatalf("empty artifact pane still open: %s", body)
+	}
+}
+
+func TestServeThreadsIndexListsRootThreads(t *testing.T) {
+	root := t.TempDir()
+	svc, err := NewService(root, nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	r := &threadWorkbenchTestRenderer{rootIndex: true}
+	svc.WithWorkbenchThreadRenderer(r)
+	rec := httptest.NewRecorder()
+	c := echo.New().NewContext(httptest.NewRequest("GET", "/threads", nil), rec)
+	if err := svc.ServeThreads(c); err != nil {
+		t.Fatal(err)
+	}
+	body := rec.Body.String()
+	if r.chatThreadID != "" {
+		t.Fatalf("opened full chat %q", r.chatThreadID)
+	}
+	if !strings.Contains(body, `data-testid="root-threads-index"`) {
+		t.Fatalf("missing threads index: %s", body)
+	}
+	if !strings.Contains(body, "what is in your context?") {
+		t.Fatalf("missing first message: %s", body)
+	}
+	if !strings.Contains(body, `href="/threads/land-chat"`) {
+		t.Fatalf("missing thread link: %s", body)
+	}
+	if strings.Contains(body, `id="agent-chat-composer"`) {
+		t.Fatal("index should not open full chat composer")
+	}
 }
 
 func TestServeThreadsMobileIndexUsesRosterNotEmptyArtifact(t *testing.T) {
@@ -255,7 +306,7 @@ func TestServeThreadsMobileIndexUsesRosterNotEmptyArtifact(t *testing.T) {
 	mobileBody := mobileRec.Body.String()
 	if !strings.Contains(
 		mobileBody,
-		`data-workbench-mobile-active="workbenchV2Threads"`,
+		`data-workbench-mobile-active="workbenchV2Chat"`,
 	) {
 		t.Fatalf("mobile /threads active = %s", mobileBody)
 	}
@@ -697,7 +748,7 @@ func TestServeThreadsRendersDirectoryArtifactsAndKeepsAbsentArtifactNeutral(
 	}{
 		{name: "root", target: "/threads?artifact=thoughts/", want: "root", wantArtifact: ""},
 		{name: "nested", target: "/threads?artifact=thoughts/owner/nested", want: "note", wantArtifact: "owner/nested"},
-		{name: "absent", target: "/threads", want: "Select a thread to view an artifact.", notWant: "root.md"},
+		{name: "absent", target: "/threads", want: `&#34;workbenchV2Artifact&#34;:{&#34;ratio&#34;:0.39,&#34;visible&#34;:false`, notWant: "root.md"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			svc, err := NewService(root, nil, nil)
