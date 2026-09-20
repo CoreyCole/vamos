@@ -9,7 +9,9 @@ const (
 	defaultBubbleNameColor     = "text-fuchsia-300"
 )
 
-func bubbleAuthorChrome(args ChatMessageArgs) (initial, name, avatarBg, nameColor string) {
+func bubbleAuthorChrome(
+	args ChatMessageArgs,
+) (initial, name, avatarBg, nameColor string) {
 	initial = strings.TrimSpace(args.AuthorInitial)
 	name = strings.TrimSpace(args.AuthorName)
 	avatarBg = strings.TrimSpace(args.AvatarBg)
@@ -29,7 +31,9 @@ func bubbleAuthorChrome(args ChatMessageArgs) (initial, name, avatarBg, nameColo
 	return initial, name, avatarBg, nameColor
 }
 
-func streamingBubbleAuthorChrome(args ChatMessageStreamingArgs) (initial, name, avatarBg, nameColor string) {
+func streamingBubbleAuthorChrome(
+	args ChatMessageStreamingArgs,
+) (initial, name, avatarBg, nameColor string) {
 	return bubbleAuthorChrome(ChatMessageArgs{
 		AuthorInitial: args.AuthorInitial,
 		AuthorName:    args.AuthorName,
@@ -47,7 +51,7 @@ func completeBubbleRole(args ChatMessageCompleteArgs) string {
 }
 
 func chatMessageArgsFromTranscript(msg TranscriptMessage) ChatMessageArgs {
-	return ChatMessageArgs{
+	return applyMessageFrontmatter(ChatMessageArgs{
 		ID:             msg.DOMID,
 		Role:           msg.Role,
 		Content:        msg.Content,
@@ -62,7 +66,7 @@ func chatMessageArgsFromTranscript(msg TranscriptMessage) ChatMessageArgs {
 		QuoteAvatarBg:  msg.QuoteAvatarBg,
 		QuoteNameColor: msg.QuoteNameColor,
 		QuoteText:      msg.QuoteText,
-	}
+	})
 }
 
 // withDefaultAssistantBubbleChrome fills Bot chrome when assistant author fields are empty.

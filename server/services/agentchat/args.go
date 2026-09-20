@@ -408,6 +408,7 @@ type ChatMessageArgs struct {
 	Role           string
 	Content        string
 	HTMLContent    string
+	Frontmatter    []messageFrontmatterField
 	Attachments    []AttachedPath
 	AuthorInitial  string
 	AuthorName     string

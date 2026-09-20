@@ -1,7 +1,6 @@
 package agentchat
 
 // iMessage/Grok bubble chrome ported from agenthome fixtures into SharedThreadChat.
-
 templ BubbleAvatar(initial string, bgClass string) {
 	<span class={ "flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[10px] font-semibold text-white", bgClass }>{ initial }</span>
 }
@@ -20,6 +19,17 @@ templ NestedQuoteBlock(initial string, name string, avatarBg string, nameColor s
 	</div>
 }
 
+templ MessageFrontmatterPills(id string, fields []messageFrontmatterField) {
+	<div id={ "msg-" + id + "-frontmatter" } class="mb-1.5 flex flex-wrap gap-1">
+		for _, field := range fields {
+			<span class="inline-flex max-w-full items-center overflow-hidden rounded-full border border-white/15 text-[10px] leading-none">
+				<span class="shrink-0 bg-white/10 px-1.5 py-0.5 font-medium uppercase tracking-wide text-white/55">{ field.Key }</span>
+				<span class="min-w-0 truncate px-1.5 py-0.5 text-white" title={ field.Value }>{ truncateFrontmatterValue(field.Value) }</span>
+			</span>
+		}
+	</div>
+}
+
 templ bubbleBodyInner(args ChatMessageArgs) {
 	if args.QuoteText != "" {
 		@NestedQuoteBlock(
@@ -29,6 +39,9 @@ templ bubbleBodyInner(args ChatMessageArgs) {
 			args.QuoteNameColor,
 			args.QuoteText,
 		)
+	}
+	if len(args.Frontmatter) > 0 {
+		@MessageFrontmatterPills(args.ID, args.Frontmatter)
 	}
 	if args.Role == "user" {
 		<div class="whitespace-pre-wrap break-words text-[13px] leading-snug text-white">{ args.Content }</div>

@@ -65,14 +65,15 @@ func (h *Handler) StreamThreadHistory(c echo.Context) error {
 	}
 
 	if len(older) == 0 {
-		return sse.RemoveElement("#"+agentChatScrollSentinelAbove, datastar.WithoutViewTransitions())
+		return sse.RemoveElement(
+			"#"+agentChatScrollSentinelAbove,
+			datastar.WithoutViewTransitions(),
+		)
 	}
 
 	var buf bytes.Buffer
-	for _, msg := range older {
-		if err := TranscriptMessageWithFork(thread.ID, msg, "").Render(ctx, &buf); err != nil {
-			return err
-		}
+	if err := TranscriptMessageList(thread.ID, older, "").Render(ctx, &buf); err != nil {
+		return err
 	}
 	if err := sse.PatchElements(
 		buf.String(),
@@ -84,7 +85,10 @@ func (h *Handler) StreamThreadHistory(c echo.Context) error {
 	}
 
 	if !hasMore || strings.TrimSpace(nextBefore) == "" {
-		return sse.RemoveElement("#"+agentChatScrollSentinelAbove, datastar.WithoutViewTransitions())
+		return sse.RemoveElement(
+			"#"+agentChatScrollSentinelAbove,
+			datastar.WithoutViewTransitions(),
+		)
 	}
 	return sse.PatchElementTempl(
 		infinitescroll.Sentinel(infinitescroll.SentinelArgs{
@@ -102,7 +106,10 @@ func (s *Service) resolveThreadForHistory(
 ) (db.AgentThread, error) {
 	threadID = strings.TrimSpace(threadID)
 	if threadID == "" {
-		return db.AgentThread{}, echo.NewHTTPError(http.StatusBadRequest, "thread id required")
+		return db.AgentThread{}, echo.NewHTTPError(
+			http.StatusBadRequest,
+			"thread id required",
+		)
 	}
 	// Workbench / shared A2A threads.
 	thread, err := s.queries.GetSharedAgentThread(ctx, threadID)
@@ -114,14 +121,20 @@ func (s *Service) resolveThreadForHistory(
 	}
 	userEmail = strings.TrimSpace(userEmail)
 	if userEmail == "" {
-		return db.AgentThread{}, echo.NewHTTPError(http.StatusUnauthorized, "not authenticated")
+		return db.AgentThread{}, echo.NewHTTPError(
+			http.StatusUnauthorized,
+			"not authenticated",
+		)
 	}
 	thread, err = s.queries.GetAgentThreadForUser(ctx, db.GetAgentThreadForUserParams{
 		ID:        threadID,
 		UserEmail: userEmail,
 	})
 	if errors.Is(err, sql.ErrNoRows) {
-		return db.AgentThread{}, echo.NewHTTPError(http.StatusNotFound, "thread not found")
+		return db.AgentThread{}, echo.NewHTTPError(
+			http.StatusNotFound,
+			"thread not found",
+		)
 	}
 	return thread, err
 }

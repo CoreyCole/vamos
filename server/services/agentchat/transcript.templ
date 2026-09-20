@@ -51,9 +51,7 @@ templ StableTranscriptRegion(threadID string, messages []TranscriptMessage, fork
 		ID:    agentChatScrollItemsID,
 		Class: "min-w-0 overflow-x-hidden",
 	}) {
-		for _, msg := range messages {
-			@TranscriptMessageWithFork(threadID, msg, forkAction)
-		}
+		@TranscriptMessageList(threadID, messages, forkAction)
 	}
 }
 
@@ -64,9 +62,7 @@ templ LiveTranscriptRegion(threadID string, state TranscriptPaneState, forkActio
 				<p class="p-4 text-sm text-muted-foreground">Waiting for the first completed turn…</p>
 			}
 		} else {
-			for _, msg := range state.Live.Items {
-				@TranscriptMessageWithFork(threadID, msg, forkAction)
-			}
+			@TranscriptMessageList(threadID, state.Live.Items, forkAction)
 		}
 		if state.ShowWorking {
 			@ChatWorkingRow()
@@ -87,6 +83,37 @@ templ ChatWorkingRow() {
 		<span class="agent-chat-working-dot inline-block h-2 w-2 rounded-full bg-muted-foreground/70" aria-hidden="true"></span>
 		<span class="agent-chat-working-label">Working…</span>
 	</div>
+}
+
+templ TranscriptMessageList(threadID string, messages []TranscriptMessage, forkAction string) {
+	for _, seg := range groupTranscriptActivity(messages) {
+		if seg.Grouped {
+			@TranscriptActivityGroup(threadID, seg.Messages, forkAction)
+		} else if len(seg.Messages) == 1 {
+			@TranscriptMessageWithFork(threadID, seg.Messages[0], forkAction)
+		}
+	}
+}
+
+templ TranscriptActivityGroup(threadID string, messages []TranscriptMessage, forkAction string) {
+	{{ groupID := activityGroupID(messages) }}
+	<details
+		id={ "msg-" + groupID + "-activity-group" }
+		class="group/chat-activity min-w-0 overflow-x-hidden border-b border-border first:border-t last:border-b-0"
+		data-chat-activity-group={ groupID }
+	>
+		<summary class="flex min-h-11 cursor-pointer select-none list-none items-center justify-between gap-3 px-4 py-2 text-left transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 [&::-webkit-details-marker]:hidden">
+			<p class="min-w-0 flex-1 truncate text-[11px] font-medium tracking-wide text-muted-foreground">{ activityGroupSummary(messages) }</p>
+			<svg class="h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform group-open/chat-activity:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+				<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+			</svg>
+		</summary>
+		<div class="min-w-0 overflow-x-hidden border-t border-border">
+			for _, msg := range messages {
+				@TranscriptMessageWithFork(threadID, msg, forkAction)
+			}
+		</div>
+	</details>
 }
 
 templ TranscriptMessageWithFork(threadID string, msg TranscriptMessage, forkAction string) {
@@ -345,7 +372,7 @@ templ ChatMessageDeltaHTML(args ChatMessageDeltaHTMLArgs) {
 }
 
 templ ChatMessageComplete(args ChatMessageCompleteArgs) {
-	@ChatMessage(ChatMessageArgs{
+	@ChatMessage(applyMessageFrontmatter(ChatMessageArgs{
 		ID:             args.ID,
 		Role:           completeBubbleRole(args),
 		Content:        args.Content,
@@ -359,7 +386,7 @@ templ ChatMessageComplete(args ChatMessageCompleteArgs) {
 		QuoteAvatarBg:  args.QuoteAvatarBg,
 		QuoteNameColor: args.QuoteNameColor,
 		QuoteText:      args.QuoteText,
-	})
+	}))
 }
 
 templ BotDMChipPopover(chip BotDMChip) {
