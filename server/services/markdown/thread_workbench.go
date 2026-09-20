@@ -21,6 +21,76 @@ func chatCommentsOpen(r *http.Request, routeChatOpen bool) (chatOpen, commentsOp
 	return chatOpen, commentsOpen
 }
 
+const thoughtsSharedThreadUnavailable = "No shared thread mapped for this document yet."
+
+func thoughtsEnsureDocPath(docPath string) string {
+	canonical, err := CanonicalThoughtsDocPath(docPath)
+	if err != nil {
+		canonical, err = CanonicalThoughtsDirPath(docPath)
+		if err != nil {
+			return strings.TrimSpace(docPath)
+		}
+	}
+	canonical = strings.Trim(strings.TrimSpace(canonical), "/")
+	if canonical == "" {
+		return strings.TrimSpace(docPath)
+	}
+	if strings.HasPrefix(canonical, "thoughts/") {
+		return canonical
+	}
+	return "thoughts/" + canonical
+}
+
+func (s *Service) thoughtsWorkbenchChatColumn(
+	c echo.Context,
+	docPath string,
+	userEmail string,
+	pageArgs *PageArgs,
+) (templ.Component, error) {
+	threadsOpen := workbench.ThreadsOpenFromRequest(c.Request())
+	title := "Chat"
+	if id := planLeadRoomID(docPath); id != "" {
+		if h := workbench.HumanizePlanRoomID(id); h != "" {
+			title = h
+		}
+	}
+	overflow := BuildChatHeaderOverflow(pageArgs, docPath, true)
+	body := WorkbenchUnavailable(thoughtsSharedThreadUnavailable)
+	if s != nil && s.workbenchThreadsRenderer != nil {
+		ensureDoc := thoughtsEnsureDocPath(docPath)
+		threadID, err := s.workbenchThreadsRenderer.EnsureSharedThreadForDoc(
+			c.Request().Context(), ensureDoc, userEmail,
+		)
+		if err != nil && !errors.Is(err, sql.ErrNoRows) {
+			return nil, err
+		}
+		threadID = strings.TrimSpace(threadID)
+		if threadID != "" {
+			chat, err := s.renderAI470SharedChat(
+				c.Request().Context(), threadID, userEmail,
+			)
+			if errors.Is(err, sql.ErrNoRows) {
+				body = WorkbenchUnavailable(thoughtsSharedThreadUnavailable)
+			} else if err != nil {
+				return nil, err
+			} else {
+				body = chat
+			}
+		}
+	}
+	column := workbench.ChatColumnWithReopen
+	if thoughtsChatHref(s.basePath, docPath) != "" || planLeadRoomID(docPath) != "" {
+		column = workbench.ChatColumnWithPlanReopen
+	}
+	return column(
+		threadsOpen,
+		true,
+		title,
+		body,
+		overflow,
+	), nil
+}
+
 func (s *Service) savedThreadsWorkbenchConfig(
 	c echo.Context,
 	userEmail string,

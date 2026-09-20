@@ -77,7 +77,9 @@ func (r *threadWorkbenchTestRenderer) RenderSharedThreadChat(
 	_ string,
 ) (templ.Component, error) {
 	r.chatThreadID = threadID
-	return templ.Raw(`<div id="thread-chat">original thread chat</div>`), nil
+	return templ.Raw(
+		`<div id="thread-chat"><div id="agent-chat-live-transcript"></div><form id="agent-chat-composer"></form>original thread chat</div>`,
+	), nil
 }
 
 func TestResolveThreadArtifactUsesQueryWhenPlanDirEmpty(t *testing.T) {

@@ -464,7 +464,13 @@ func (s *Service) buildThoughtsV2WorkbenchState(
 	comments := commentui.CommentsContextPanel(
 		commentui.BuildCommentsPanelArgs(pageArgs.CommentUI, ""),
 	)
-	_, commentsOpen := chatCommentsOpen(c.Request(), false)
+	chat, err := s.thoughtsWorkbenchChatColumn(
+		c, canonical, pageArgs.UserEmail, pageArgs,
+	)
+	if err != nil {
+		return workbench.WorkbenchState{}, err
+	}
+	chatOpen, commentsOpen := chatCommentsOpen(c.Request(), true)
 	return workbench.BuildWorkbenchV2State(workbench.WorkbenchV2Args{
 		UserEmail:     pageArgs.UserEmail,
 		ViewportClass: viewport,
@@ -472,10 +478,11 @@ func (s *Service) buildThoughtsV2WorkbenchState(
 		Threads: agenthome.RosterRail(
 			s.liveRoster(c.Request().Context(), agenthome.RosterSelection{}),
 		),
+		Chat:         chat,
 		Artifact:     artifact,
 		Comments:     comments,
 		ThreadsOpen:  workbench.ThreadsOpenFromRequest(c.Request()),
-		ChatOpen:     false,
+		ChatOpen:     chatOpen,
 		ArtifactOpen: true,
 		CommentsOpen: commentsOpen,
 	})
@@ -624,7 +631,13 @@ func (s *Service) buildThoughtsDirectoryWorkbenchState(
 	if err != nil {
 		return workbench.WorkbenchState{}, err
 	}
-	_, commentsOpen := chatCommentsOpen(c.Request(), false)
+	chat, err := s.thoughtsWorkbenchChatColumn(
+		c, dirPath, args.UserEmail, nil,
+	)
+	if err != nil {
+		return workbench.WorkbenchState{}, err
+	}
+	chatOpen, commentsOpen := chatCommentsOpen(c.Request(), true)
 	return workbench.BuildWorkbenchV2State(workbench.WorkbenchV2Args{
 		UserEmail:     args.UserEmail,
 		ViewportClass: viewport,
@@ -632,10 +645,11 @@ func (s *Service) buildThoughtsDirectoryWorkbenchState(
 		Threads: agenthome.RosterRail(
 			s.liveRoster(c.Request().Context(), agenthome.RosterSelection{}),
 		),
+		Chat:         chat,
 		Artifact:     artifact,
 		Comments:     EmptyDirectoryContextPanel(),
 		ThreadsOpen:  workbench.ThreadsOpenFromRequest(c.Request()),
-		ChatOpen:     false,
+		ChatOpen:     chatOpen,
 		ArtifactOpen: true,
 		CommentsOpen: commentsOpen,
 	})

@@ -62,14 +62,13 @@ func TestThoughtsPlanDocIsFullscreenWithPlanLeadChatLink(t *testing.T) {
 		}
 	}
 	for _, unwanted := range []string{
-		`id="thread-chat"`,
-		`id="workbench-v2-chat-header"`,
+		"No Chat content yet.",
 		`id="workspace-doc-tree-header"`,
 		"Related docs",
 		"workspaceDocTreeNode_",
 	} {
 		if strings.Contains(html, unwanted) {
-			t.Fatalf("thoughts is not fullscreen, found %q", unwanted)
+			t.Fatalf("found %q", unwanted)
 		}
 	}
 	overflowStart := strings.Index(html, `data-testid="workbench-overflow-actions"`)
@@ -82,5 +81,143 @@ func TestThoughtsPlanDocIsFullscreenWithPlanLeadChatLink(t *testing.T) {
 	}
 	if strings.Contains(overflow, "<span>Thoughts</span>") {
 		t.Fatalf("Thoughts still in 3-dot on thoughts:\n%s", overflow)
+	}
+}
+
+func TestThoughtsDocSSRWiresSharedChatNotEmptyRegion(t *testing.T) {
+	root := t.TempDir()
+	mustMkdirAll(t, filepath.Join(root, "docs", "vamos"))
+	mustWriteFile(
+		t,
+		filepath.Join(root, "docs", "vamos", "index.html"),
+		[]byte("<html></html>"),
+	)
+	svc, err := NewService(root, nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	renderer := &threadWorkbenchTestRenderer{ensureID: "thread-docs"}
+	svc.WithWorkbenchThreadRenderer(renderer)
+
+	e := echo.New()
+	req := httptest.NewRequest(
+		http.MethodGet,
+		"/thoughts/docs/vamos/index.html",
+		nil,
+	)
+	c := e.NewContext(req, httptest.NewRecorder())
+	page := &PageArgs{
+		FilePath:  "docs/vamos/index.html",
+		UserEmail: "t@example.com",
+		ViewerArgs: ViewerArgs{
+			RawMarkdown: "# Docs\n",
+		},
+	}
+	state, err := svc.buildThoughtsV2WorkbenchState(c, page)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var body bytes.Buffer
+	if err := workbench.Workbench(state).Render(t.Context(), &body); err != nil {
+		t.Fatal(err)
+	}
+	html := body.String()
+	if strings.Contains(html, "No Chat content yet.") {
+		t.Fatal("thoughts SSR used EmptyRegion chat copy")
+	}
+	for _, want := range []string{
+		`id="thread-chat"`,
+		`id="agent-chat-live-transcript"`,
+		`id="agent-chat-composer"`,
+	} {
+		if !strings.Contains(html, want) {
+			t.Fatalf("missing %q", want)
+		}
+	}
+	if renderer.lastEnsureDoc != "thoughts/docs/vamos/index.html" {
+		t.Fatalf("ensure doc = %q", renderer.lastEnsureDoc)
+	}
+}
+
+func TestThoughtsDocUnresolvedThreadUsesUnavailableNotEmptyRegion(t *testing.T) {
+	root := t.TempDir()
+	mustMkdirAll(t, filepath.Join(root, "docs", "vamos"))
+	mustWriteFile(
+		t,
+		filepath.Join(root, "docs", "vamos", "index.html"),
+		[]byte("<html></html>"),
+	)
+	svc, err := NewService(root, nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	svc.WithWorkbenchThreadRenderer(&threadWorkbenchTestRenderer{})
+
+	e := echo.New()
+	req := httptest.NewRequest(
+		http.MethodGet,
+		"/thoughts/docs/vamos/index.html",
+		nil,
+	)
+	c := e.NewContext(req, httptest.NewRecorder())
+	page := &PageArgs{
+		FilePath:  "docs/vamos/index.html",
+		UserEmail: "t@example.com",
+	}
+	state, err := svc.buildThoughtsV2WorkbenchState(c, page)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var body bytes.Buffer
+	if err := workbench.Workbench(state).Render(t.Context(), &body); err != nil {
+		t.Fatal(err)
+	}
+	html := body.String()
+	if strings.Contains(html, "No Chat content yet.") {
+		t.Fatal("unresolved thread used EmptyRegion")
+	}
+	if !strings.Contains(html, thoughtsSharedThreadUnavailable) {
+		t.Fatalf("missing unavailable copy in:\n%s", html)
+	}
+}
+
+func TestThoughtsDocHonorsChatOpenCookieZero(t *testing.T) {
+	root := t.TempDir()
+	mustMkdirAll(t, filepath.Join(root, "docs", "vamos"))
+	mustWriteFile(
+		t,
+		filepath.Join(root, "docs", "vamos", "index.html"),
+		[]byte("<html></html>"),
+	)
+	svc, err := NewService(root, nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	svc.WithWorkbenchThreadRenderer(&threadWorkbenchTestRenderer{ensureID: "thread-docs"})
+
+	e := echo.New()
+	req := httptest.NewRequest(
+		http.MethodGet,
+		"/thoughts/docs/vamos/index.html",
+		nil,
+	)
+	req.AddCookie(&http.Cookie{Name: workbench.ChatOpenCookie, Value: "0"})
+	c := e.NewContext(req, httptest.NewRecorder())
+	page := &PageArgs{
+		FilePath:  "docs/vamos/index.html",
+		UserEmail: "t@example.com",
+	}
+	state, err := svc.buildThoughtsV2WorkbenchState(c, page)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var chatVisible bool
+	for _, region := range state.Regions {
+		if region.ID == workbench.WorkbenchV2ChatRegionID {
+			chatVisible = region.Visible
+		}
+	}
+	if chatVisible {
+		t.Fatal("wb2_chat_open=0 must keep chat closed")
 	}
 }
