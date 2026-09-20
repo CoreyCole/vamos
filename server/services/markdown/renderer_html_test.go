@@ -205,7 +205,7 @@ func TestInjectHTMLAppletBridgeIncludesThemeSyncModule(t *testing.T) {
 	}
 	if !strings.Contains(
 		got,
-		`<script type="module" src="/js/vamos-html-applet.js"></script>`,
+		`<script type="module" src="/js/vamos-html-applet.js?v=2"></script>`,
 	) {
 		t.Fatalf("missing theme module: %q", got)
 	}
