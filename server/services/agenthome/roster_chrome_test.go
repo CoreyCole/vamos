@@ -268,6 +268,8 @@ func TestWorkbenchRosterChromeCSS(t *testing.T) {
 	css := string(b)
 	for _, want := range []string{
 		"#workbench-v2-roster a.roster-row-selected",
+		"#workbench-v2-chat a.roster-row-selected",
+		"#workbench-v2-chat a.roster-row:hover",
 		"#3a3a3a",
 		"rgba(255, 255, 255, 0.28)",
 		"inset 0 0 0 1px",
@@ -275,6 +277,41 @@ func TestWorkbenchRosterChromeCSS(t *testing.T) {
 		if !strings.Contains(css, want) {
 			t.Fatalf("static/css/index.css missing %q", want)
 		}
+	}
+}
+
+func TestConversationRow_GenericHref(t *testing.T) {
+	t.Parallel()
+	var buf bytes.Buffer
+	row := ConversationRowArgs{
+		ID:          "conversation-row-thread-abc",
+		Href:        "/threads/abc",
+		Title:       "Freeform",
+		Preview:     "hello",
+		Time:        "Fri 1:02 PM",
+		Initial:     "F",
+		AccentClass: "bg-sky-500/80",
+		TestID:      "conversation-row",
+	}
+	if err := ConversationRow(row).Render(context.Background(), &buf); err != nil {
+		t.Fatal(err)
+	}
+	html := buf.String()
+	for _, want := range []string{
+		`id="conversation-row-thread-abc"`,
+		`href="/threads/abc"`,
+		`data-testid="conversation-row"`,
+		"Freeform",
+		"hello",
+		"Fri 1:02 PM",
+		"roster-row",
+	} {
+		if !strings.Contains(html, want) {
+			t.Fatalf("conversation row missing %q in %s", want, html)
+		}
+	}
+	if strings.Contains(html, `/rooms/dm/`) {
+		t.Fatal("generic Href must not force /rooms/dm/")
 	}
 }
 

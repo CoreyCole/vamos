@@ -186,25 +186,17 @@ templ RosterRail(view RosterView) {
 						<ul class="flex flex-col">
 							for _, bot := range view.Bots {
 								<li id={ rosterBotRowDOMID(bot.Slug) }>
-									<a
-										href={ templ.SafeURL(rosterBotHref(bot.Slug)) }
-										data-roster-id={ rosterBotID(bot.Slug) }
-										data-roster-title={ bot.Title }
-										class={ rosterAgentRowClass(view.Selection.Kind == KindDM && view.Selection.ID == bot.Slug) }
-									>
-										<span class={ "mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-2xl text-xs font-semibold text-white", rosterBotAccent(bot.Slug) }>{ rosterInitial(bot.Title) }</span>
-										<span class="min-w-0 flex-1">
-											<span class="flex items-baseline justify-between gap-2">
-												<span class="truncate text-sm font-medium text-foreground">{ bot.Title }</span>
-												if bot.Time != "" {
-													<span class="shrink-0 text-[10px] text-muted-foreground">{ bot.Time }</span>
-												}
-											</span>
-											if bot.Preview != "" {
-												<span class="mt-0.5 block truncate text-xs text-muted-foreground">{ bot.Preview }</span>
-											}
-										</span>
-									</a>
+									@ConversationRow(ConversationRowArgs{
+										Href:            rosterBotHref(bot.Slug),
+										Title:           bot.Title,
+										Preview:         bot.Preview,
+										Time:            bot.Time,
+										Initial:         rosterInitial(bot.Title),
+										AccentClass:     rosterBotAccent(bot.Slug),
+										Selected:        view.Selection.Kind == KindDM && view.Selection.ID == bot.Slug,
+										DataRosterID:    rosterBotID(bot.Slug),
+										DataRosterTitle: bot.Title,
+									})
 								</li>
 							}
 						</ul>

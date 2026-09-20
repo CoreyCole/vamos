@@ -1,6 +1,9 @@
 package agentchat
 
-import "github.com/CoreyCole/vamos/server/layouts/workbench"
+import (
+	"github.com/CoreyCole/vamos/server/layouts/workbench"
+	"github.com/CoreyCole/vamos/server/services/agenthome"
+)
 
 templ WorkbenchThreadList(groups []WorkbenchThreadGroup, selectedID, artifact string) {
 	<div class="flex h-full min-h-0 flex-col bg-background" data-signals="{threadSearch: ''}">
@@ -55,23 +58,15 @@ templ RootThreadsIndex(rows []RootThreadPreview) {
 	<div id="root-threads-index" class="flex h-full min-h-0 flex-col bg-background" data-testid="root-threads-index">
 		<nav class="min-h-0 flex-1 overflow-y-auto" aria-label="Threads">
 			for _, row := range rows {
-				<a
-					href={ templ.URL(row.Href) }
-					class="flex gap-3 border-b border-border/70 px-4 py-3 hover:bg-muted/40"
-					data-testid="root-thread-row"
-				>
-					<span class={ "mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[12px] font-semibold text-white", row.AvatarClass }>{ row.Initial }</span>
-					<div class="min-w-0 flex-1">
-						<div class="flex items-baseline justify-between gap-2">
-							<span class="truncate text-[13px] font-semibold text-foreground">{ row.Author }</span>
-							<span class="shrink-0 text-[11px] tabular-nums text-muted-foreground">{ row.When }</span>
-						</div>
-						<p class="mt-0.5 line-clamp-2 text-[13px] leading-snug text-foreground/90">{ row.Preview }</p>
-						if row.ReplyLabel != "" {
-							<p class="mt-1 text-[12px] font-medium text-sky-400">{ row.ReplyLabel }</p>
-						}
-					</div>
-				</a>
+				@agenthome.ConversationRow(agenthome.ConversationRowArgs{
+					Href:        row.Href,
+					Title:       row.Author,
+					Preview:     row.Preview,
+					Time:        row.When,
+					Initial:     row.Initial,
+					AccentClass: row.AvatarClass,
+					TestID:      "root-thread-row",
+				})
 			}
 		</nav>
 	</div>
