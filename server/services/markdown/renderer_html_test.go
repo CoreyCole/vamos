@@ -108,8 +108,15 @@ func TestServeHTMLAppletInjectsCommentBridgeWithoutChangingArtifact(t *testing.T
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status=%d body=%s", rec.Code, rec.Body.String())
 	}
-	if got := rec.Body.String(); got != "<h1>Demo</h1>"+htmlAppletBridgeScript {
+	got := rec.Body.String()
+	if !strings.Contains(got, "<h1>Demo</h1>") {
 		t.Fatalf("body=%q", got)
+	}
+	if !strings.Contains(got, htmlAppletBridgeScript) {
+		t.Fatalf("missing bridge: %q", got)
+	}
+	if !strings.Contains(got, `data-vamos-theme-boot`) {
+		t.Fatalf("missing theme boot: %q", got)
 	}
 	saved, err := os.ReadFile(filepath.Join(root, "demo.html"))
 	if err != nil {
@@ -171,7 +178,7 @@ func TestIframeSrcForHTMLAppletAddsNormalizedTheme(t *testing.T) {
 	}
 }
 
-func TestServeHTMLAppletIgnoresThemeQueryAndInjectsCommentBridge(t *testing.T) {
+func TestServeHTMLAppletAppliesThemeQuery(t *testing.T) {
 	root := t.TempDir()
 	mustWriteFile(t, filepath.Join(root, "demo.html"), []byte("<h1>Demo</h1>"))
 
@@ -193,8 +200,15 @@ func TestServeHTMLAppletIgnoresThemeQueryAndInjectsCommentBridge(t *testing.T) {
 	if err := svc.ServeHTMLApplet(c); err != nil {
 		t.Fatal(err)
 	}
-	if got := rec.Body.String(); got != "<h1>Demo</h1>"+htmlAppletBridgeScript {
-		t.Fatalf("body=%q", got)
+	got := rec.Body.String()
+	if strings.Contains(got, `class="dark"`) {
+		t.Fatalf("light theme still has dark class: %q", got)
+	}
+	if !strings.Contains(got, "color-scheme: light") {
+		t.Fatalf("missing light color-scheme: %q", got)
+	}
+	if !strings.Contains(got, htmlAppletBridgeScript) {
+		t.Fatalf("missing bridge: %q", got)
 	}
 }
 
@@ -324,13 +338,100 @@ func TestHTMLAppletRendererReturnsSandboxedFrame(t *testing.T) {
 	if !strings.Contains(html, `referrerpolicy="same-origin"`) {
 		t.Fatalf("missing referrer policy: %s", html)
 	}
-	if !strings.Contains(html, `class="h-full min-h-0 w-full flex-1 border-0 bg-white"`) {
+	if !strings.Contains(
+		html,
+		`class="h-full min-h-0 w-full flex-1 border-0 bg-background"`,
+	) {
 		t.Fatalf(
-			"iframe must fill the surface with a readable unthemed fallback: %s",
+			"iframe must fill the surface with shell background: %s",
 			html,
 		)
 	}
+	if strings.Contains(html, "bg-white") {
+		t.Fatalf("iframe still uses bg-white: %s", html)
+	}
 	if strings.Contains(html, "min-h-[70vh]") || strings.Contains(html, "rounded-lg") {
 		t.Fatalf("HTML renderer keeps inset/card sizing: %s", html)
+	}
+}
+
+func TestPrepareHTMLAppletDocumentDarkTheme(t *testing.T) {
+	src := []byte(
+		`<!doctype html><html lang="en"><head><link rel="stylesheet" href="app.css"></head><body>Hi</body></html>`,
+	)
+	got := string(prepareHTMLAppletDocument(src, "dark"))
+	if !strings.Contains(got, `class="dark"`) && !strings.Contains(got, `class="dark `) &&
+		!strings.Contains(got, ` class="dark"`) {
+		if !strings.Contains(got, "dark") {
+			t.Fatalf("missing dark class: %q", got)
+		}
+	}
+	if !strings.Contains(got, `lang="en"`) {
+		t.Fatalf("lost lang: %q", got)
+	}
+	if !strings.Contains(got, "color-scheme: dark") {
+		t.Fatalf("missing dark color-scheme: %q", got)
+	}
+	boot := strings.Index(got, "data-vamos-theme-boot")
+	style := strings.Index(got, `rel="stylesheet"`)
+	if boot < 0 || style < 0 || boot > style {
+		t.Fatalf(
+			"boot must precede stylesheet: boot=%d style=%d body=%q",
+			boot,
+			style,
+			got,
+		)
+	}
+	if !strings.Contains(got, htmlAppletBridgeScript) {
+		t.Fatalf("missing module bridge: %q", got)
+	}
+}
+
+func TestPrepareHTMLAppletDocumentLightTheme(t *testing.T) {
+	src := []byte(`<html class="dark foo"><head></head><body></body></html>`)
+	got := string(prepareHTMLAppletDocument(src, "light"))
+	if strings.Contains(got, "class=\"dark\"") || strings.Contains(got, " dark") {
+		// foo must remain; dark must not
+	}
+	if !strings.Contains(got, "foo") {
+		t.Fatalf("lost existing class: %q", got)
+	}
+	if strings.Contains(got, "class=\"dark") || strings.Contains(got, " dark\"") ||
+		strings.Contains(got, "class=\"dark foo\"") {
+		t.Fatalf("dark class should be removed for light: %q", got)
+	}
+	if !strings.Contains(got, "color-scheme: light") {
+		t.Fatalf("missing light color-scheme: %q", got)
+	}
+}
+
+func TestPrepareHTMLAppletDocumentPreservesHTMLClasses(t *testing.T) {
+	src := []byte(`<html lang="en" class="foo bar"><head></head><body></body></html>`)
+	got := string(prepareHTMLAppletDocument(src, "dark"))
+	if !strings.Contains(got, "foo") || !strings.Contains(got, "bar") {
+		t.Fatalf("lost classes: %q", got)
+	}
+	if !strings.Contains(got, "dark") {
+		t.Fatalf("missing dark: %q", got)
+	}
+	if !strings.Contains(got, `lang="en"`) {
+		t.Fatalf("lost lang: %q", got)
+	}
+}
+
+func TestPrepareHTMLAppletDocumentIdempotent(t *testing.T) {
+	src := []byte(
+		`<html><head><link rel="stylesheet" href="a.css"></head><body>x</body></html>`,
+	)
+	once := prepareHTMLAppletDocument(src, "dark")
+	twice := prepareHTMLAppletDocument(once, "dark")
+	if string(once) != string(twice) {
+		t.Fatalf("double prepare changed output\nonce=%q\ntwice=%q", once, twice)
+	}
+	if n := strings.Count(string(once), "data-vamos-theme-boot"); n != 1 {
+		t.Fatalf("boot count=%d body=%q", n, once)
+	}
+	if n := strings.Count(string(once), "/js/vamos-html-applet.js?v=2"); n != 1 {
+		t.Fatalf("bridge count=%d body=%q", n, once)
 	}
 }
