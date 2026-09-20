@@ -47,4 +47,7 @@ func TestChatToggleClickActionWritesChatCookieBothWays(t *testing.T) {
 	if strings.Contains(js, "workbench-layout-save") {
 		t.Fatalf("must not persist via layout prefs: %s", js)
 	}
+	if strings.Contains(js, "workbenchV2Threads.visible = false") {
+		t.Fatalf("closing chat must not hide threads: %s", js)
+	}
 }

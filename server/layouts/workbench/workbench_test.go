@@ -1782,8 +1782,11 @@ func TestCommentsToggleClickActionClosesWithoutOpeningChat(t *testing.T) {
 	) {
 		t.Fatalf("comments should toggle: %s", js)
 	}
-	if !strings.Contains(js, "workbenchV2Threads.visible = false") {
-		t.Fatalf("closing chat and comments should hide threads: %s", js)
+	if strings.Contains(js, "workbenchV2Threads.visible = false") {
+		t.Fatalf("closing comments must not hide threads: %s", js)
+	}
+	if strings.Contains(js, ThreadsOpenCookie+"=0") {
+		t.Fatalf("comments toggle must not write threads cookie closed: %s", js)
 	}
 	if !strings.Contains(js, "$workbench.activeRegionID = 'workbenchV2Comments'") {
 		t.Fatalf("opening comments should set activeRegionID: %s", js)
@@ -1806,8 +1809,11 @@ func TestChatToggleClickActionClosesWhenAlreadyOpen(t *testing.T) {
 		!strings.Contains(js, "workbenchReflow") {
 		t.Fatalf("chat toggle must paint visibility before reflow: %s", js)
 	}
-	if !strings.Contains(js, "workbenchV2Threads.visible = false") {
-		t.Fatalf("closing chat and comments should hide threads: %s", js)
+	if strings.Contains(js, "workbenchV2Threads.visible = false") {
+		t.Fatalf("closing chat must not hide threads: %s", js)
+	}
+	if strings.Contains(js, ThreadsOpenCookie+"=0") {
+		t.Fatalf("chat toggle must not write threads cookie closed: %s", js)
 	}
 	if !strings.Contains(js, "$workbench.activeRegionID = 'workbenchV2Chat'") ||
 		!strings.Contains(js, "dataset.workbenchMobileActive = 'workbenchV2Chat'") {
