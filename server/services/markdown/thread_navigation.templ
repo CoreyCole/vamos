@@ -79,7 +79,6 @@ templ ThreadArtifactPane(browser ThreadArtifactBrowserArgs, document templ.Compo
 					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z"></path>
 				</svg>
 			</button>
-			@ThreadArtifactUp(browser)
 			@ThreadArtifactPath(browser)
 			<input
 				id="artifact-browser-search"
@@ -203,7 +202,7 @@ templ ThreadArtifactBrowser(browser ThreadArtifactBrowserArgs) {
 		class="min-h-0 max-h-64 shrink-0 overflow-y-auto border-b border-border"
 		aria-label="Artifact browser"
 	>
-		@ThreadArtifactBrowserResults(ThreadArtifactBrowserResultsArgs{Entries: browser.Entries})
+		@ThreadArtifactBrowserResults(ThreadArtifactBrowserResultsArgs{Entries: browser.Entries, ParentHref: browser.ParentHref})
 	</nav>
 }
 
@@ -238,9 +237,9 @@ templ ThreadArtifactPath(browser ThreadArtifactBrowserArgs) {
 }
 
 templ ThreadArtifactUp(browser ThreadArtifactBrowserArgs) {
-	<div id="thread-artifact-up-slot" class="contents">
+	<div id="thread-artifact-up-slot" class="flex shrink-0 self-start pt-0.5">
 		if browser.ParentHref != "" {
-			<!-- Path-header sibling nav: plain GET (+ VT). Ready() forbids data-on:click outside [data-thread-artifact-browser]. -->
+			<!-- Inside expanded browser only: plain GET (+ VT). Ready() forbids data-on:click outside [data-thread-artifact-browser]. -->
 			<a
 				id="thread-artifact-up"
 				href={ templ.URL(browser.ParentHref) }
@@ -258,19 +257,22 @@ templ ThreadArtifactUp(browser ThreadArtifactBrowserArgs) {
 }
 
 templ ThreadArtifactBrowserResults(args ThreadArtifactBrowserResultsArgs) {
-	<div id="thread-artifact-browser-results" class="px-2.5 py-2" data-testid="artifact-browser-results" data-on:keydown={ artifactBrowserSearchResultsKeydownAction() } data-init={ artifactBrowserFocusActiveHitAction() }>
-		if args.Query == "" {
-			<ul class="space-y-0.5">
-				for _, entry := range args.Entries {
-					@ThreadArtifactBrowserEntry(entry)
-				}
-			</ul>
-		} else if args.ShowAllThoughts {
-			@artifactSearchSection("This directory", "artifact-search-this-directory", args.Directory, true)
-			@artifactSearchSection("All thoughts", "artifact-search-all-thoughts", args.Global, true)
-		} else {
-			@artifactSearchSection("All thoughts", "artifact-search-all-thoughts", args.Directory, true)
-		}
+	<div id="thread-artifact-browser-results" class="flex items-start gap-1 px-2.5 py-2" data-testid="artifact-browser-results" data-on:keydown={ artifactBrowserSearchResultsKeydownAction() } data-init={ artifactBrowserFocusActiveHitAction() }>
+		@ThreadArtifactUp(ThreadArtifactBrowserArgs{ParentHref: args.ParentHref})
+		<div class="min-w-0 flex-1">
+			if args.Query == "" {
+				<ul class="space-y-0.5">
+					for _, entry := range args.Entries {
+						@ThreadArtifactBrowserEntry(entry)
+					}
+				</ul>
+			} else if args.ShowAllThoughts {
+				@artifactSearchSection("This directory", "artifact-search-this-directory", args.Directory, true)
+				@artifactSearchSection("All thoughts", "artifact-search-all-thoughts", args.Global, true)
+			} else {
+				@artifactSearchSection("All thoughts", "artifact-search-all-thoughts", args.Directory, true)
+			}
+		</div>
 	</div>
 }
 

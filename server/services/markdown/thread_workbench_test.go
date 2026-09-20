@@ -424,7 +424,6 @@ func TestHandleThreadArtifactBrowserPatchesOnlyBrowserAndHistory(t *testing.T) {
 	body := rec.Body.String()
 	for _, want := range []string{
 		"selector #thread-artifact-browser",
-		"selector #thread-artifact-up-slot",
 		"selector #thread-artifact-path-slot",
 		`data-testid="artifact-browser-cwd"`,
 		`>thoughts/owner/plans/alpha/docs</span>`,
@@ -438,6 +437,7 @@ func TestHandleThreadArtifactBrowserPatchesOnlyBrowserAndHistory(t *testing.T) {
 		}
 	}
 	for _, forbidden := range []string{
+		"selector #thread-artifact-up-slot",
 		"selector #workbench-v2-artifact-body",
 		"selector #workbench-v2-comments-body",
 		"selector #workbench-root",
@@ -705,10 +705,18 @@ func TestServeThreadPlanSlugHeaderTitleAndDatetime(t *testing.T) {
 	hasTitle := strings.Contains(body, "Agent Memory Observable Context")
 	hasDT := strings.Contains(body, "Sep 8, 2026 · 10:10")
 	// Slug may appear in artifact hrefs; header <p> must show humanized Display only.
-	rawInTitle := strings.Contains(body, `truncate text-[13px] font-semibold leading-none text-foreground">`+slug)
+	rawInTitle := strings.Contains(
+		body,
+		`truncate text-[13px] font-semibold leading-none text-foreground">`+slug,
+	)
 	kebab := strings.Count(body, `data-testid="workbench-overflow-actions"`)
 	if !hasTitle || !hasDT || rawInTitle || kebab != 1 {
-		t.Fatalf("title=%v datetime=%v rawInTitle=%v kebab=%d", hasTitle, hasDT, rawInTitle, kebab)
+		t.Fatalf(
+			"title=%v datetime=%v rawInTitle=%v kebab=%d",
+			hasTitle,
+			hasDT,
+			rawInTitle,
+			kebab,
+		)
 	}
 }
-

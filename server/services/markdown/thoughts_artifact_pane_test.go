@@ -336,7 +336,6 @@ func TestHandleThoughtsArtifactBrowserKeepsSelectedDoc(t *testing.T) {
 	body := rec.Body.String()
 	for _, want := range []string{
 		"selector #thread-artifact-browser",
-		"selector #thread-artifact-up-slot",
 		"selector #thread-artifact-path-slot",
 		`data-testid="artifact-browser-cwd"`,
 		`>thoughts/owner/plans</span>`,
@@ -350,6 +349,7 @@ func TestHandleThoughtsArtifactBrowserKeepsSelectedDoc(t *testing.T) {
 		}
 	}
 	for _, forbidden := range []string{
+		"selector #thread-artifact-up-slot",
 		"selector #thread-artifact-document",
 		"selector #workbench-v2-artifact-body",
 		`id="thoughts-directory-primary"`,

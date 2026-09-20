@@ -191,17 +191,23 @@ func TestThreadArtifactPaneScopesStaticHandlersToBrowserRows(t *testing.T) {
 			html,
 		)
 	}
-	// Ready(): no data-on:click on path-header sibling Up outside the browser.
+	// Ready(): no data-on:click on Up; keep it a plain GET inside the expanded browser.
 	upIdx := strings.Index(html, `id="thread-artifact-up"`)
 	if upIdx < 0 {
 		t.Fatalf("missing #thread-artifact-up: %s", html)
+	}
+	browserIdx := strings.Index(html, `id="thread-artifact-browser"`)
+	headerIdx := strings.Index(html, `id="thread-artifact-path-header"`)
+	if browserIdx < 0 || headerIdx < 0 ||
+		!(headerIdx < browserIdx && browserIdx < upIdx) {
+		t.Fatalf("Up must sit inside #thread-artifact-browser, not the path header")
 	}
 	upEnd := strings.Index(html[upIdx:], ">")
 	upTag := html[upIdx : upIdx+upEnd]
 	if strings.Contains(upTag, "data-on:click") ||
 		strings.Contains(upTag, "data-on-click") ||
 		strings.Contains(upTag, "data-artifact-endpoint") {
-		t.Fatalf("path-header sibling Up must be plain GET: %s", upTag)
+		t.Fatalf("browser Up must be plain GET: %s", upTag)
 	}
 }
 
@@ -315,6 +321,33 @@ func TestThreadArtifactBrowserSearchLivesInPathHeader(t *testing.T) {
 	toggle := header[toggleAt : toggleAt+toggleEnd]
 	if strings.Contains(toggle, `$_artifactBrowserOpen`) {
 		t.Fatalf("search must not toggle files open: %s", toggle)
+	}
+}
+
+func TestThreadArtifactUpLivesInExpandedBrowserNotPathHeader(t *testing.T) {
+	t.Parallel()
+
+	var closed strings.Builder
+	if err := ThreadArtifactPane(
+		ThreadArtifactBrowserArgs{
+			DocPath:    "owner/plans/alpha/design.md",
+			ParentHref: "/thoughts/owner/plans",
+		},
+		templ.Raw("<p>doc</p>"),
+	).Render(t.Context(), &closed); err != nil {
+		t.Fatal(err)
+	}
+	header := artifactPathHeader(t, closed.String())
+	if strings.Contains(header, `data-thread-artifact-up`) {
+		t.Fatalf("closed browser must not show parent-up in header: %s", header)
+	}
+	browserStart := strings.Index(closed.String(), `id="thread-artifact-browser"`)
+	if browserStart < 0 {
+		t.Fatal("missing browser")
+	}
+	browserHTML := closed.String()[browserStart:]
+	if !strings.Contains(browserHTML, `data-thread-artifact-up`) {
+		t.Fatalf("parent-up should still exist inside browser markup: %s", browserHTML)
 	}
 }
 
@@ -477,20 +510,21 @@ func TestViewDocumentButtonSitsLeftOfOverflow(t *testing.T) {
 	}
 	header := artifactPathHeader(t, body.String())
 	comments := strings.Index(header, `data-testid="view-comments"`)
-	up := strings.Index(header, `data-thread-artifact-up`)
 	path := strings.Index(header, `data-testid="artifact-browser-path"`)
 	search := strings.Index(header, `data-testid="artifact-browser-search-toggle"`)
 	files := strings.Index(header, `aria-label="Toggle files"`)
 	overflow := strings.Index(header, `data-testid="workbench-overflow-actions"`)
 	chat := strings.Index(header, `data-testid="view-chat"`)
-	if chat < 0 || comments < 0 || up < 0 || path < 0 || search < 0 || files < 0 ||
+	if strings.Contains(header, `data-thread-artifact-up`) {
+		t.Fatalf("Open parent folder must not live in the path header: %s", header)
+	}
+	if chat < 0 || comments < 0 || path < 0 || search < 0 || files < 0 ||
 		overflow < 0 ||
-		!(chat < comments && comments < up && up < path && path < search && search < files && files < overflow) {
+		!(chat < comments && comments < path && path < search && search < files && files < overflow) {
 		t.Fatalf(
-			"header order chat=%d comments=%d up=%d path=%d search=%d files=%d overflow=%d\n%s",
+			"header order chat=%d comments=%d path=%d search=%d files=%d overflow=%d\n%s",
 			chat,
 			comments,
-			up,
 			path,
 			search,
 			files,

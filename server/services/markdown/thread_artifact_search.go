@@ -31,6 +31,7 @@ type ThreadArtifactBrowserResultsArgs struct {
 	Directory       []ArtifactSearchHit
 	Global          []ArtifactSearchHit
 	ShowAllThoughts bool
+	ParentHref      string
 }
 
 func artifactSearchQueryMatch(query, name, itemPath string) bool {
@@ -97,6 +98,7 @@ func (s *Service) HandleThoughtsArtifactSearch(c echo.Context) error {
 		Query:           query,
 		Entries:         browser.Entries,
 		ShowAllThoughts: artifactSearchRelPrefix(browser.DirectoryPath) != "",
+		ParentHref:      browser.ParentHref,
 	}
 	if query != "" {
 		results.Directory, results.Global = s.artifactSearchSections(
