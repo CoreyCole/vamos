@@ -18,7 +18,7 @@ import (
 const (
 	htmlAppletRenderPrefix = "/thoughts/_render/html/"
 	thoughtsAssetPrefix    = "/thoughts/_assets/"
-	htmlAppletBridgeScript = `<script src="/js/frame-comment-bridge.js?v=4" data-commentui-mode="child"></script>`
+	htmlAppletBridgeScript = `<script src="/js/frame-comment-bridge.js?v=4" data-commentui-mode="child"></script><script type="module" src="/js/vamos-html-applet.js"></script>`
 )
 
 type HTMLAppletRenderer struct{}

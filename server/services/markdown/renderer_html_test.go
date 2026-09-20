@@ -198,6 +198,19 @@ func TestServeHTMLAppletIgnoresThemeQueryAndInjectsCommentBridge(t *testing.T) {
 	}
 }
 
+func TestInjectHTMLAppletBridgeIncludesThemeSyncModule(t *testing.T) {
+	got := string(injectHTMLAppletBridge([]byte("<h1>Demo</h1>")))
+	if !strings.Contains(got, `src="/js/frame-comment-bridge.js?v=4"`) {
+		t.Fatalf("missing comment bridge: %q", got)
+	}
+	if !strings.Contains(
+		got,
+		`<script type="module" src="/js/vamos-html-applet.js"></script>`,
+	) {
+		t.Fatalf("missing theme module: %q", got)
+	}
+}
+
 func TestInjectHTMLAppletBridgeFindsRealClosingBody(t *testing.T) {
 	original := []byte(
 		`<html><body><!-- </body> --><script>const marker = "</body>";</script><p>Demo</p></body></html>`,
