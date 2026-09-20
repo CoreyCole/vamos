@@ -111,6 +111,12 @@ func TestMessageThreadHostDoesNotReplaceScrollRegion(t *testing.T) {
 	if strings.Contains(out, `w-[360px]`) || strings.Contains(out, `border-l`) {
 		t.Fatal("desktop thread focus must not be a right split panel")
 	}
+	if strings.Contains(out, `id="agent-chat-message-thread-sheet"`) {
+		t.Fatal("open thread must not render a mobile sheet fork")
+	}
+	if strings.Count(out, `>Thread<`) != 1 {
+		t.Fatalf("open thread must have one Thread header, got html=%s", out)
+	}
 }
 
 func TestMessageThreadReplyUsesSharedComposer(t *testing.T) {
@@ -147,6 +153,9 @@ func TestMessageThreadReplyUsesSharedComposer(t *testing.T) {
 	}
 	if strings.Contains(out, `w-[360px]`) || strings.Contains(out, `border-l`) {
 		t.Fatal("desktop thread focus must not be a right split panel")
+	}
+	if strings.Contains(out, `id="agent-chat-message-thread-sheet"`) {
+		t.Fatal("open thread must not render a mobile sheet fork")
 	}
 }
 

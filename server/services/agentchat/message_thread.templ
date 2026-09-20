@@ -1,10 +1,6 @@
 package agentchat
 
-import (
-	"strconv"
-
-	"github.com/CoreyCole/vamos/pkg/datastarui/components/sheet"
-)
+import "strconv"
 
 templ ThreadSummaryRow(threadID string, msg TranscriptMessage) {
 	if msg.ThreadSummary != nil && msg.ThreadSummary.ReplyCount >= 1 {
@@ -68,25 +64,8 @@ templ AgentChatTranscriptColumnPatch(hidden bool) {
 templ MessageThreadHost(view MessageThreadView) {
 	<div id={ agentChatMessageThreadID } class="contents">
 		if view.Open {
-			<div class="hidden h-full min-h-0 w-full min-w-0 flex-1 flex-col bg-background md:flex">
+			<div class="flex h-full min-h-0 w-full min-w-0 flex-1 flex-col bg-background">
 				@MessageThreadPanelBody(view)
-			</div>
-			<div class="md:hidden">
-				@sheet.Sheet(sheet.SheetArgs{
-					ID:          agentChatMessageThreadSheetID,
-					DefaultOpen: true,
-					Modal:       true,
-					Side:        "bottom",
-				}) {
-					@sheet.SheetContent(sheet.SheetContentArgs{SheetID: agentChatMessageThreadSheetID, Class: "max-h-[80vh] overflow-y-auto"}) {
-						@sheet.SheetHeader(sheet.SheetHeaderArgs{}) {
-							@sheet.SheetTitle(sheet.SheetTitleArgs{}) {
-								Thread
-							}
-						}
-						@MessageThreadPanelBody(view)
-					}
-				}
 			</div>
 		}
 	</div>

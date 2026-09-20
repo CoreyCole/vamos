@@ -15,7 +15,6 @@ import (
 
 const (
 	agentChatMessageThreadID         = "agent-chat-message-thread"
-	agentChatMessageThreadSheetID    = "agent-chat-message-thread-sheet"
 	agentChatTranscriptColumnID      = "agent-chat-transcript-column"
 	agentChatTranscriptColumnInnerID = "agent-chat-transcript-column-inner"
 	messageThreadReplyAvatarCap      = 4
@@ -36,7 +35,7 @@ type ThreadReplySummary struct {
 	Authors       []ThreadReplyAuthor
 }
 
-// MessageThreadReply is one chronological reply in the panel/sheet.
+// MessageThreadReply is one chronological reply in the full-column panel.
 type MessageThreadReply struct {
 	ID        string
 	Body      string
@@ -44,7 +43,7 @@ type MessageThreadReply struct {
 	CreatedAt time.Time
 }
 
-// MessageThreadView is the open-thread panel/sheet payload.
+// MessageThreadView is the open-thread full-column panel payload.
 type MessageThreadView struct {
 	ThreadID         string
 	Parent           TranscriptMessage
