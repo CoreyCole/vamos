@@ -435,10 +435,24 @@ func (s *Service) renderSharedThreadChatForRequest(
 			return r.RenderSharedThreadChatWithPairwiseFixture(ctx, threadID, userEmail)
 		}
 	}
-	// Priority: density > group_bubble > pairwise > history > none (FE/E2E contract).
+	// Priority: density > group_bubble > pairwise > history > message_thread/replies > open ?thread= > none (FE/E2E contract).
 	if historyFixtureRequested(c) {
 		if r, ok := s.workbenchThreadsRenderer.(historyFixtureChatRenderer); ok {
 			return r.RenderSharedThreadChatWithHistoryFixture(ctx, threadID, userEmail)
+		}
+	}
+	if messageThreadFixtureRequested(c) {
+		if r, ok := s.workbenchThreadsRenderer.(messageThreadFixtureChatRenderer); ok {
+			return r.RenderSharedThreadChatWithMessageThreadFixture(
+				ctx,
+				threadID,
+				userEmail,
+			)
+		}
+	}
+	if open := openMessageThreadParent(c, threadID); open != "" {
+		if r, ok := s.workbenchThreadsRenderer.(openMessageThreadChatRenderer); ok {
+			return r.RenderSharedThreadChatOpen(ctx, threadID, userEmail, open)
 		}
 	}
 	return s.workbenchThreadsRenderer.RenderSharedThreadChat(ctx, threadID, userEmail)
