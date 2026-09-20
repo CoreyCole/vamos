@@ -18,6 +18,7 @@ const (
 	DocumentKindHTMLApplet  DocumentKind = "html-applet"
 	DocumentKindCSVTable    DocumentKind = "csv-table"
 	DocumentKindSource      DocumentKind = "source"
+	DocumentKindImage       DocumentKind = "image"
 	DocumentKindUnsupported DocumentKind = "unsupported"
 )
 

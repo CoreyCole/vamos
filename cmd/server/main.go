@@ -1844,6 +1844,7 @@ func main() {
 	)
 	thoughtsGroup.GET("/_assets/*", markdownService.ServeThoughtsAsset)
 	thoughtsGroup.GET("/_render/html/*", markdownService.ServeHTMLApplet)
+	thoughtsGroup.GET("/raw/*", markdownService.ServeThoughtsRaw)
 	thoughtsGroup.GET("/*", markdownService.ServeMarkdown)
 
 	// Temporal UI routes (auth-protected)

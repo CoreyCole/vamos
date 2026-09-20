@@ -1,0 +1,17 @@
+package markdown
+
+templ ImagePreview(args ImagePreviewArgs) {
+	<section id="thoughts-image-preview" class="flex h-full min-h-0 w-full flex-col items-center justify-center gap-3 px-4 py-6" data-section-id="document" data-heading-hint="Document">
+		<img
+			src={ args.Src }
+			alt={ args.Alt }
+			class="max-w-full h-auto rounded-md"
+			loading="lazy"
+			data-on:error="el.classList.add('hidden'); el.nextElementSibling.classList.remove('hidden')"
+		/>
+		<p class="hidden text-sm text-muted-foreground">Image could not be loaded.</p>
+		if args.Filename != "" {
+			<p class="text-xs text-muted-foreground">{ args.Filename }</p>
+		}
+	</section>
+}

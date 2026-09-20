@@ -49,11 +49,14 @@ func (r MarkdownDocumentRenderer) Render(
 	parser := parser.NewWithExtensions(parser.CommonExtensions | parser.AutoHeadingIDs)
 	parsed := parser.Parse(markdownContent)
 	toc := r.service.extractTableOfContents(parsed)
-	sections, err := r.renderer.RenderToSections(markdownContent)
+	sections, err := r.renderer.RenderToSectionsForDoc(markdownContent, req.CleanPath)
 	if err != nil {
 		return RenderedDocument{}, fmt.Errorf("render markdown sections: %w", err)
 	}
-	htmlContent, err := r.renderer.MarkdownBytesToHTML(markdownContent)
+	htmlContent, err := r.renderer.MarkdownBytesToHTMLForDoc(
+		markdownContent,
+		req.CleanPath,
+	)
 	if err != nil {
 		return RenderedDocument{}, fmt.Errorf("render markdown HTML: %w", err)
 	}

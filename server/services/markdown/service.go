@@ -119,6 +119,7 @@ func NewServiceWithOptions(
 		UnsupportedRenderer{},
 		NewMarkdownDocumentRenderer(service, renderer, opts.Projects),
 		HTMLAppletRenderer{},
+		ImageRenderer{},
 		CSVRenderer{MaxRows: 500, Renderer: renderer, SourceFallback: &sourceRenderer},
 		sourceRenderer,
 	)
@@ -528,7 +529,12 @@ func isThoughtsRenderableFile(name string) bool {
 		".jsx",
 		".sql",
 		".css",
-		".sh":
+		".sh",
+		".png",
+		".jpg",
+		".jpeg",
+		".gif",
+		".webp":
 		return true
 	default:
 		return false

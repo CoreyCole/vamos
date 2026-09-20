@@ -19,7 +19,11 @@ func TestGetDirectoryListingIncludesRenderableFormats(t *testing.T) {
 	mustWriteFile(t, filepath.Join(root, "app.html"), []byte("<h1>App</h1>"))
 	mustWriteFile(t, filepath.Join(root, "legacy.htm"), []byte("<h1>Legacy</h1>"))
 	mustWriteFile(t, filepath.Join(root, "data.csv"), []byte("a,b\n1,2"))
-	mustWriteFile(t, filepath.Join(root, "image.png"), []byte("skip"))
+	mustWriteFile(t, filepath.Join(root, "image.png"), []byte("png"))
+	mustWriteFile(t, filepath.Join(root, "photo.jpg"), []byte("jpg"))
+	mustWriteFile(t, filepath.Join(root, "anim.gif"), []byte("gif"))
+	mustWriteFile(t, filepath.Join(root, "shot.webp"), []byte("webp"))
+	mustWriteFile(t, filepath.Join(root, "vector.svg"), []byte("<svg></svg>"))
 	service, err := NewService(root, nil, nil)
 	if err != nil {
 		t.Fatal(err)
@@ -32,13 +36,13 @@ func TestGetDirectoryListingIncludesRenderableFormats(t *testing.T) {
 	for _, item := range listing.Items {
 		names[item.Name] = true
 	}
-	for _, want := range []string{"note", "app.html", "legacy.htm", "data.csv"} {
+	for _, want := range []string{"note", "app.html", "legacy.htm", "data.csv", "image.png", "photo.jpg", "anim.gif", "shot.webp"} {
 		if !names[want] {
 			t.Fatalf("missing %q in %#v", want, listing.Items)
 		}
 	}
-	if names["image.png"] {
-		t.Fatalf("image should be skipped: %#v", listing.Items)
+	if names["vector.svg"] {
+		t.Fatalf("svg should be skipped: %#v", listing.Items)
 	}
 }
 

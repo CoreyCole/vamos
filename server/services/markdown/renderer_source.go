@@ -34,14 +34,18 @@ type sourceReadResult struct {
 
 func (r SourceRenderer) Match(req DocumentRequest) bool {
 	switch req.Extension {
-	case ".md", ".markdown", ".html", ".htm", ".csv", ".tsv":
+	case ".md", ".markdown", ".html", ".htm", ".csv", ".tsv",
+		".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg":
 		return false
 	default:
 		return true
 	}
 }
 
-func (r SourceRenderer) Render(_ context.Context, req DocumentRequest) (RenderedDocument, error) {
+func (r SourceRenderer) Render(
+	_ context.Context,
+	req DocumentRequest,
+) (RenderedDocument, error) {
 	docPath := "thoughts/" + req.CleanPath
 	maxBytes := r.MaxBytes
 	if maxBytes <= 0 {
@@ -77,7 +81,9 @@ func (r SourceRenderer) Render(_ context.Context, req DocumentRequest) (Rendered
 		LineCount: sourceLineCount(content),
 	}
 	var component bytes.Buffer
-	if err := SourceDocumentView(sourceDoc).Render(context.Background(), &component); err != nil {
+	if err := SourceDocumentView(
+		sourceDoc,
+	).Render(context.Background(), &component); err != nil {
 		return RenderedDocument{}, err
 	}
 
@@ -103,10 +109,17 @@ func readSafeSource(path string, maxBytes int64) (sourceReadResult, error) {
 		return sourceReadResult{}, err
 	}
 	if int64(len(content)) > maxBytes {
-		return sourceReadResult{Reason: fmt.Sprintf("File is too large for inline source display (limit %d bytes).", maxBytes)}, nil
+		return sourceReadResult{
+			Reason: fmt.Sprintf(
+				"File is too large for inline source display (limit %d bytes).",
+				maxBytes,
+			),
+		}, nil
 	}
 	if !isSafeUTF8Text(content) {
-		return sourceReadResult{Reason: "File is binary or not valid UTF-8, so Vamos will not render it as source."}, nil
+		return sourceReadResult{
+			Reason: "File is binary or not valid UTF-8, so Vamos will not render it as source.",
+		}, nil
 	}
 	return sourceReadResult{Content: content}, nil
 }
@@ -158,7 +171,11 @@ func sourceLanguageForExtension(ext string) string {
 	}
 }
 
-func renderSourceFallback(ctx context.Context, req DocumentRequest, source SourceRenderer) (RenderedDocument, error) {
+func renderSourceFallback(
+	ctx context.Context,
+	req DocumentRequest,
+	source SourceRenderer,
+) (RenderedDocument, error) {
 	return source.Render(ctx, req)
 }
 

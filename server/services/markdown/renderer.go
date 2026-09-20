@@ -78,13 +78,20 @@ func NewRendererWithProjects(
 }
 
 func (m Renderer) MarkdownBytesToHTML(md []byte) (string, error) {
+	return m.MarkdownBytesToHTMLForDoc(md, "")
+}
+
+func (m Renderer) MarkdownBytesToHTMLForDoc(
+	md []byte,
+	docRelPath string,
+) (string, error) {
 	md = renderableMarkdown(md)
 
 	// Use parser with NoEmptyLineBeforeBlock so lists work without a preceding blank line
 	p := parser.NewWithExtensions(
 		parser.CommonExtensions | parser.AutoHeadingIDs | parser.NoEmptyLineBeforeBlock,
 	)
-	state := &renderState{}
+	state := &renderState{DocRelPath: docRelPath}
 	htmlBytes := markdown.ToHTML(
 		md,
 		p,
@@ -243,7 +250,8 @@ func renderCode(
 }
 
 type renderState struct {
-	err error
+	err        error
+	DocRelPath string
 }
 
 func (s *renderState) Err() error { return s.err }
@@ -364,6 +372,26 @@ func mdhtmlRendererWithOptions(
 				}
 				return write(w, "</div>"), true
 			}
+			if image, ok := node.(*ast.Image); ok {
+				if !entering {
+					return ast.GoToNext, true
+				}
+				dest := string(image.Destination)
+				src, ok := rewriteThoughtsImageSrc(dest, state.DocRelPath)
+				if !ok {
+					return ast.SkipChildren, true
+				}
+				alt := extractImageAlt(image)
+				if printf(
+					w,
+					`<img alt="%s" src="%s" class="max-w-full h-auto rounded-md" loading="lazy">`,
+					stdhtml.EscapeString(alt),
+					stdhtml.EscapeString(src),
+				) == ast.Terminate {
+					return ast.Terminate, true
+				}
+				return ast.SkipChildren, true
+			}
 			if code, ok := node.(*ast.Code); ok {
 				if path, ok := normalizeThoughtsPath(string(code.Literal)); ok {
 					if printf(
@@ -386,6 +414,12 @@ func mdhtmlRendererWithOptions(
 			}
 			if link, ok := node.(*ast.Link); ok {
 				dest := string(link.Destination)
+				if rewritten, ok := rewriteThoughtsRasterHref(
+					dest,
+					state.DocRelPath,
+				); ok {
+					dest = rewritten
+				}
 				if options.SafeLinks && !isSafeMarkdownLinkDestination(dest) {
 					return ast.GoToNext, true
 				}
@@ -567,6 +601,19 @@ func mdhtmlRendererWithOptions(
 	})
 }
 
+func extractImageAlt(image *ast.Image) string {
+	var alt strings.Builder
+	for _, child := range image.GetChildren() {
+		switch n := child.(type) {
+		case *ast.Text:
+			alt.Write(n.Literal)
+		case *ast.Code:
+			alt.Write(n.Literal)
+		}
+	}
+	return alt.String()
+}
+
 func isSafeMarkdownLinkDestination(destination string) bool {
 	if destination == "" || strings.ContainsAny(destination, "\x00\r\n") {
 		return false
@@ -705,6 +752,13 @@ func autoLinkThoughtsPaths(content string) string {
 
 // RenderToSections parses markdown and returns sections with metadata
 func (m Renderer) RenderToSections(md []byte) ([]Section, error) {
+	return m.RenderToSectionsForDoc(md, "")
+}
+
+func (m Renderer) RenderToSectionsForDoc(
+	md []byte,
+	docRelPath string,
+) ([]Section, error) {
 	md = renderableMarkdown(md)
 
 	// Parse markdown to AST - NoEmptyLineBeforeBlock allows lists without preceding blank
@@ -714,7 +768,7 @@ func (m Renderer) RenderToSections(md []byte) ([]Section, error) {
 	)
 	doc := p.Parse(md)
 
-	state := &renderState{}
+	state := &renderState{DocRelPath: docRelPath}
 	renderer := mdhtmlRenderer(m.highlightStyle, m.htmlFormatter, state)
 	sections := []Section{}
 	sectionID := 0
