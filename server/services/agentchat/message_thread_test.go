@@ -117,6 +117,12 @@ func TestMessageThreadHostDoesNotReplaceScrollRegion(t *testing.T) {
 	if strings.Count(out, `>Thread<`) != 1 {
 		t.Fatalf("open thread must have one Thread header, got html=%s", out)
 	}
+	if !strings.Contains(out, `← Back`) {
+		t.Fatalf("open thread must label restore as Back: %s", out)
+	}
+	if strings.Contains(out, `>Close<`) {
+		t.Fatal("open thread must not use Close for restore")
+	}
 }
 
 func TestMessageThreadReplyUsesSharedComposer(t *testing.T) {
@@ -248,7 +254,7 @@ func TestSharedThreadChatClosedUnhidesTranscriptColumn(t *testing.T) {
 	}
 	if strings.Contains(hostOut, `First reply from Corey.`) ||
 		strings.Contains(hostOut, `>Thread<`) ||
-		strings.Contains(hostOut, `Close`) {
+		strings.Contains(hostOut, `← Back`) {
 		t.Fatalf("closed host must be empty contents; got %s", hostOut)
 	}
 	closedCol := testhelpers.RenderToDocument(

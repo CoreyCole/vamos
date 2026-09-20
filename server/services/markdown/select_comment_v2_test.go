@@ -38,7 +38,10 @@ func newSelectCommentV2Service(t *testing.T) (*Service, *dbsvc.Service) {
 	); err != nil {
 		t.Fatal(err)
 	}
-	database, err := dbsvc.NewService(filepath.Join(t.TempDir(), "comments.db"), filepath.Join(t.TempDir(), "agents.yml"))
+	database, err := dbsvc.NewService(
+		filepath.Join(t.TempDir(), "comments.db"),
+		filepath.Join(t.TempDir(), "agents.yml"),
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -93,8 +96,7 @@ func TestHandleSelectCommentForWorkbenchV2FocusesMountedTarget(t *testing.T) {
 	for _, want := range []string{
 		"workbenchV2Comments",
 		"visible",
-		"workbench_v2_mobile_comments",
-		"matchMedia",
+		"← Back",
 		`id="` + commentui.WorkbenchMobileCommentsContentID + `"`,
 		`document.getElementById("comment-target-thoughts--thoughts-owner-plan-a-design-md`,
 	} {

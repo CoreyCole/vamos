@@ -686,6 +686,9 @@ func TestCommentSharedPatchTargetsRenderStableIDs(t *testing.T) {
 		`id="workbench-v2-comments-threads-reopen"`,
 		`aria-label="Show roster sidebar (Ctrl+B)"`,
 		`visible !== false`,
+		`← Back`,
+		`workbenchV2Comments.visible = false`,
+		`workbenchV2Chat.visible = true`,
 	} {
 		if !strings.Contains(panelHTML, want) {
 			t.Fatalf("context panel missing %q: %s", want, panelHTML)
@@ -726,7 +729,7 @@ func TestCommentSharedPatchTargetsRenderStableIDs(t *testing.T) {
 	}
 }
 
-func TestWorkbenchMobileCommentsPanelOpensNonModalSheetOnMobile(t *testing.T) {
+func TestWorkbenchMobileCommentsPanelOpensCommentsColumn(t *testing.T) {
 	t.Parallel()
 	var buf bytes.Buffer
 	form := CommentFormView{
@@ -755,7 +758,11 @@ func TestWorkbenchMobileCommentsPanelOpensNonModalSheetOnMobile(t *testing.T) {
 	html := buf.String()
 	for _, want := range []string{
 		`id="` + WorkbenchMobileCommentsContentID + `"`,
-		WorkbenchV2OpenCommentsExpr(),
+		`workbenchV2Comments.visible = true`,
+		`workbenchV2Chat.visible = false`,
+		`workbenchV2Comments.visible = false`,
+		`workbenchV2Chat.visible = true`,
+		`← Back`,
 		`id="` + WorkbenchMobileCommentsComposerID + `"`,
 		`name="workbench_v2" value="1"`,
 		"quoted",

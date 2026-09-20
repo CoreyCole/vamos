@@ -70,7 +70,11 @@ func FocusComposerScript() string {
 }
 
 func WorkbenchV2OpenCommentsExpr() string {
-	return "if (window.matchMedia('(max-width: 767px)').matches) { $workbench_v2_mobile_comments.open = true } else { $workbench.regions.workbenchV2Comments.visible = true; $workbench.regions.workbenchV2Chat.visible = false }"
+	return "$workbench.regions.workbenchV2Comments.visible = true; $workbench.regions.workbenchV2Chat.visible = false; try { document.cookie = 'wb2_comments_open=1; path=/; SameSite=Lax; Max-Age=31536000'; sessionStorage.setItem('workbench-v2:comments-open', '1') } catch (e) {}; if (window.workbenchApplyRegionVisible) { workbenchApplyRegionVisible('workbench-v2-chat', $workbench.regions.workbenchV2Chat.visible); workbenchApplyRegionVisible('workbench-v2-comments', $workbench.regions.workbenchV2Comments.visible) }; if (window.workbenchReflow) { workbenchReflow() }"
+}
+
+func WorkbenchV2CloseCommentsExpr() string {
+	return "$workbench.regions.workbenchV2Comments.visible = false; $workbench.regions.workbenchV2Chat.visible = true; try { document.cookie = 'wb2_comments_open=0; path=/; SameSite=Lax; Max-Age=31536000'; sessionStorage.setItem('workbench-v2:comments-open', '0') } catch (e) {}; if (window.workbenchApplyRegionVisible) { workbenchApplyRegionVisible('workbench-v2-chat', $workbench.regions.workbenchV2Chat.visible); workbenchApplyRegionVisible('workbench-v2-comments', $workbench.regions.workbenchV2Comments.visible) }; if (window.workbenchReflow) { workbenchReflow() }"
 }
 
 func commentComposerID(view CommentFormView) string {
@@ -524,6 +528,9 @@ templ CommentsContextPanel(args CommentsPanelArgs) {
 				</button>
 			</div>
 			<p class="min-w-0 flex-1 truncate text-[13px] font-semibold leading-none text-foreground">Comments</p>
+			<button type="button" class="rounded-md px-2 py-1 text-xs text-muted-foreground hover:bg-muted" data-on:click={ WorkbenchV2CloseCommentsExpr() }>
+				← Back
+			</button>
 			if args.Form != nil {
 				<button type="button" class="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground" data-on:click={ FocusComposerScript() } aria-label="Add comment" title="Add comment">
 					<svg class="h-3.5 w-3.5" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v14M5 12h14"></path></svg>
@@ -586,7 +593,12 @@ templ WorkbenchMobileCommentsTarget() {
 
 templ WorkbenchMobileCommentsPanel(args CommentsPanelArgs) {
 	<div id={ WorkbenchMobileCommentsContentID } class="flex min-h-0 flex-col" data-init={ WorkbenchV2OpenCommentsExpr() }>
-		<p class="shrink-0 border-b border-border px-3 py-2 text-[13px] font-semibold text-foreground">Comments</p>
+		<div class="flex items-center justify-between gap-2 border-b border-border px-3 py-2">
+			<p class="text-[13px] font-semibold text-foreground">Comments</p>
+			<button type="button" class="rounded-md px-2 py-1 text-xs text-muted-foreground hover:bg-muted" data-on:click={ WorkbenchV2CloseCommentsExpr() }>
+				← Back
+			</button>
+		</div>
 		if args.Form != nil {
 			<div class="shrink-0 border-b border-border p-3">
 				@CommentForm(*args.Form)

@@ -25,7 +25,10 @@ func newTestCommentsService(t *testing.T) *Service {
 
 func newTestCommentsServiceWithBase(t *testing.T, markdownBasePath string) *Service {
 	t.Helper()
-	database, err := dbsvc.NewService(filepath.Join(t.TempDir(), "comments.db"), filepath.Join(t.TempDir(), "agents.yml"))
+	database, err := dbsvc.NewService(
+		filepath.Join(t.TempDir(), "comments.db"),
+		filepath.Join(t.TempDir(), "agents.yml"),
+	)
 	if err != nil {
 		t.Fatalf("NewService() error = %v", err)
 	}
@@ -206,8 +209,7 @@ func TestWorkbenchV2CommentShowPatchesOnlyCommentsPaneSignal(t *testing.T) {
 		`comment-target-`,
 		commentui.CommentsContextPanelID,
 		commentui.WorkbenchMobileCommentsContentID,
-		`workbench_v2_mobile_comments`,
-		`matchMedia`,
+		`← Back`,
 		`workbenchV2Comments`,
 		`visible`,
 		`Add a comment...`,
@@ -269,8 +271,7 @@ func TestWorkbenchV2CommentCreatePatchesOnlyCommentsPaneSignal(t *testing.T) {
 		"comment-target-",
 		commentui.CommentsContextPanelID,
 		commentui.WorkbenchMobileCommentsContentID,
-		"workbench_v2_mobile_comments",
-		"matchMedia",
+		"← Back",
 		"workbenchV2Comments",
 		"/thoughts/actions/select-comment",
 		`commentui-thread-quote`,
