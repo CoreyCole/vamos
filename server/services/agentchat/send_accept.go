@@ -213,8 +213,8 @@ func (s *Service) AcceptResumeFreeformThread(
 }
 
 // patchLiveTranscriptSendAccept fat-morphs #agent-chat-live-transcript with the
-// seeded user bubble plus #agent-chat-working, then clears $chatDraft and runs
-// resetAndFocusComposerScript. Live transcript only — no messages chrome morph.
+// seeded user bubble plus #agent-chat-working, then clears $chatDraft via
+// PatchSignals only. Live transcript only — no Host/scroll-region remorph.
 func (h *Handler) patchLiveTranscriptSendAccept(
 	sse *datastar.ServerSentEventGenerator,
 	threadID, forkAction string,

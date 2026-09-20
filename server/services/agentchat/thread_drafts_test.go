@@ -546,9 +546,12 @@ func TestResetAndFocusEmbeddedComposerPatchesAcceptedDraft(t *testing.T) {
 		t.Fatal(err)
 	}
 	body := rec.Body.String()
-	if !strings.Contains(body, `"chatDraft":""`) ||
-		!strings.Contains(body, "agent-chat-composer-input") {
-		t.Fatalf("accepted response missing draft reset/focus: %s", body)
+	if !strings.Contains(body, `"chatDraft":""`) {
+		t.Fatalf("accepted response missing draft reset: %s", body)
+	}
+	if strings.Contains(body, "datastar-execute-script") ||
+		strings.Contains(body, "composer?.reset()") {
+		t.Fatalf("embedded composer reset must not ExecuteScript: %s", body)
 	}
 }
 

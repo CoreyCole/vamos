@@ -1695,15 +1695,12 @@ func (h *Handler) replaceEmbeddedChatURL(
 func (h *Handler) resetAndFocusEmbeddedComposer(
 	sse *datastar.ServerSentEventGenerator,
 ) error {
-	if err := sse.MarshalAndPatchSignals(map[string]any{
+	return sse.MarshalAndPatchSignals(map[string]any{
 		"agentChatLastWriteOK": true,
 		"chatDraft":            "",
 		"chatQuoteText":        "",
 		"chatQuotePath":        "",
-	}); err != nil {
-		return err
-	}
-	return sse.ExecuteScript(resetAndFocusComposerScript)
+	})
 }
 
 func (h *Handler) AttachCurrentDocToEmbeddedThread(c echo.Context) error {

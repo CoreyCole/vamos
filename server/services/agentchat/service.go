@@ -2152,13 +2152,22 @@ func (s *Service) notifyLiveTranscriptDirty(workspaceID, threadID string) {
 	}
 	workspaceID = strings.TrimSpace(workspaceID)
 	threadID = strings.TrimSpace(threadID)
-	if s.liveFlush == nil {
-		if s.notifier != nil && workspaceID != "" {
-			s.notifier.NotifyLiveTranscript(workspaceID)
+	notify := func(key string) {
+		if key == "" {
+			return
 		}
-		return
+		if s.liveFlush != nil {
+			s.liveFlush.MarkDirty(key, threadID)
+			return
+		}
+		if s.notifier != nil {
+			s.notifier.NotifyLiveTranscript(key)
+		}
 	}
-	s.liveFlush.MarkDirty(workspaceID, threadID)
+	notify(workspaceID)
+	if threadID != workspaceID {
+		notify(threadID)
+	}
 }
 
 func (s *Service) notifyThreadScope(

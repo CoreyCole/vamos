@@ -56,7 +56,9 @@ func (b *blockingTemporal) SignalWithStartWorkflow(
 	return b.StartWorkflow(ctx, "", nil, nil)
 }
 
-func setupWorkspaceResumeFixture(t *testing.T) (*Service, *db.Queries, *blockingTemporal) {
+func setupWorkspaceResumeFixture(
+	t *testing.T,
+) (*Service, *db.Queries, *blockingTemporal) {
 	t.Helper()
 	service, queries := newThreadDraftService(t)
 	createDraftThread(t, queries, "thread_1")
@@ -82,10 +84,13 @@ func setupWorkspaceResumeFixture(t *testing.T) (*Service, *db.Queries, *blocking
 	); err != nil {
 		t.Fatal(err)
 	}
-	if err := queries.AttachThreadToWorkspace(t.Context(), db.AttachThreadToWorkspaceParams{
-		ID:          "thread_1",
-		WorkspaceID: nullString("workspace_1"),
-	}); err != nil {
+	if err := queries.AttachThreadToWorkspace(
+		t.Context(),
+		db.AttachThreadToWorkspaceParams{
+			ID:          "thread_1",
+			WorkspaceID: nullString("workspace_1"),
+		},
+	); err != nil {
 		t.Fatal(err)
 	}
 	blocker := &blockingTemporal{
@@ -141,8 +146,12 @@ func TestResumeWorkspaceThreadAcceptPatchesBeforeTemporal(t *testing.T) {
 	if !strings.Contains(body, `"chatDraft":""`) {
 		t.Fatalf("missing chatDraft clear: %s", body)
 	}
-	if !strings.Contains(body, "agent-chat-composer-input") {
-		t.Fatalf("missing composer reset script: %s", body)
+	if strings.Contains(body, "datastar-execute-script") ||
+		strings.Contains(body, "composer?.reset()") {
+		t.Fatalf("must not ExecuteScript composer clear: %s", body)
+	}
+	if strings.Contains(body, `id="agent-chat-scroll-region"`) {
+		t.Fatalf("must not remorph Host scroll region: %s", body)
 	}
 	if strings.Contains(body, `id="agent-chat-messages"`) {
 		t.Fatalf("must not morph messages chrome: %s", body)
@@ -193,6 +202,13 @@ func TestResumeEmbeddedWorkspaceThreadAcceptPatchesLiveOnly(t *testing.T) {
 		!strings.Contains(body, "embedded accept") ||
 		!strings.Contains(body, `"chatDraft":""`) {
 		t.Fatalf("embedded accept missing patches: %s", body)
+	}
+	if strings.Contains(body, "datastar-execute-script") ||
+		strings.Contains(body, "composer?.reset()") {
+		t.Fatalf("must not ExecuteScript composer clear: %s", body)
+	}
+	if strings.Contains(body, `id="agent-chat-scroll-region"`) {
+		t.Fatalf("must not remorph Host scroll region: %s", body)
 	}
 	if strings.Contains(body, "doc-right-chat-panel") {
 		t.Fatalf("v2 must not morph right rail chrome: %s", body)
@@ -284,6 +300,13 @@ func TestResumeEmbeddedFreeformThreadAcceptPatchesBeforeTemporal(t *testing.T) {
 	if !strings.Contains(body, `"chatDraft":""`) {
 		t.Fatalf("missing chatDraft clear: %s", body)
 	}
+	if strings.Contains(body, "datastar-execute-script") ||
+		strings.Contains(body, "composer?.reset()") {
+		t.Fatalf("must not ExecuteScript composer clear: %s", body)
+	}
+	if strings.Contains(body, `id="agent-chat-scroll-region"`) {
+		t.Fatalf("must not remorph Host scroll region: %s", body)
+	}
 	if strings.Contains(body, "doc-right-chat-panel") {
 		t.Fatalf("v2 must not morph right rail chrome: %s", body)
 	}
@@ -350,11 +373,14 @@ func TestLiveTranscriptShowWorkingDerivedFromRunAndLive(t *testing.T) {
 	// Assistant live item drops working (Architect lock) — call helper directly
 	// so we do not need a markdown renderer for bubble HTML.
 	liveWithAssistant := LiveTranscriptView{
-		Items: append(append([]TranscriptMessage{}, state.Live.Items...), TranscriptMessage{
-			Role:    "assistant",
-			Content: "hello",
-			Variant: "bubble",
-		}),
+		Items: append(
+			append([]TranscriptMessage{}, state.Live.Items...),
+			TranscriptMessage{
+				Role:    "assistant",
+				Content: "hello",
+				Variant: "bubble",
+			},
+		),
 	}
 	if service.liveTranscriptShowWorking("thread_1", liveWithAssistant) {
 		t.Fatal("expected ShowWorking false once assistant live item exists")
@@ -367,5 +393,44 @@ func TestLiveTranscriptShowWorkingDerivedFromRunAndLive(t *testing.T) {
 	}
 	if service.liveTranscriptShowWorking("thread_1", state.Live) {
 		t.Fatal("expected ShowWorking false when latest run is complete")
+	}
+}
+
+func TestSeedPendingUserPromptNotifiesThreadWithoutWorkspace(t *testing.T) {
+	service, queries := newThreadDraftService(t)
+	createDraftThread(t, queries, "thread_1")
+	service.liveThreads = make(map[string]*liveThreadState)
+	service.liveFlush = nil
+	service.notifier = NewNotifier()
+
+	ch := service.notifier.Subscribe("thread_1")
+	defer service.notifier.Unsubscribe("thread_1", ch)
+
+	run, err := queries.CreateAgentRun(t.Context(), db.CreateAgentRunParams{
+		ID:          "run_no_ws",
+		ThreadID:    "thread_1",
+		Trigger:     "resume",
+		Status:      "running",
+		PromptText:  "docs desk prompt",
+		WorkflowID:  "wf_no_ws",
+		RootDocPath: "thoughts/plan",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := service.seedPendingUserPrompt(
+		db.AgentThread{ID: "thread_1"},
+		run,
+	); err != nil {
+		t.Fatal(err)
+	}
+	live, _ := service.buildLiveTranscript("thread_1")
+	if len(live.Items) == 0 {
+		t.Fatal("seed must apply without WorkspaceID")
+	}
+	select {
+	case <-ch:
+	case <-time.After(time.Second):
+		t.Fatal("expected live transcript notify on threadID")
 	}
 }
