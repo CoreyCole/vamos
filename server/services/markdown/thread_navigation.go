@@ -53,8 +53,10 @@ type ThreadArtifactBrowserArgs struct {
 	ViewDocumentHref   string
 	DocumentViewActive bool
 	CommentsOpen       bool
-	ShowThreadsReopen  bool
-	ThreadsOpen        bool
+	// ChatOpen SSR-selects the path-header chat toggle. Cookie missing => open.
+	ChatOpen          bool
+	ShowThreadsReopen bool
+	ThreadsOpen       bool
 	// ShowReload paints the dedicated path-header Reload icon (iframe src reset only).
 	ShowReload bool
 	// ShowCloseDetails paints >> Close details. Threads workbench only; thoughts pages hide it.
@@ -504,6 +506,7 @@ func applyWorkbenchPathHeaderThreadsReopen(
 	browser.ShowThreadsReopen = artifactThreadsReopenFrom(c) || true
 	if c != nil {
 		browser.ThreadsOpen = workbench.ThreadsOpenFromRequest(c.Request())
+		browser.ChatOpen, _ = chatCommentsOpen(c.Request(), true)
 	}
 }
 
@@ -539,6 +542,7 @@ func (s *Service) threadArtifactBrowser(
 		return ThreadArtifactBrowserArgs{}, err
 	}
 	entries = s.withArtifactCommentCounts(c.Request().Context(), entries)
+	chatOpen, _ := chatCommentsOpen(c.Request(), true)
 	args := ThreadArtifactBrowserArgs{
 		ThreadID:         threadID,
 		DocPath:          docPath,
@@ -546,6 +550,7 @@ func (s *Service) threadArtifactBrowser(
 		Entries:          entries,
 		BrowserOpen:      ArtifactBrowserOpenFromRequest(c.Request()),
 		CommentsOpen:     workbench.CommentsOpenFromRequest(c.Request()),
+		ChatOpen:         chatOpen,
 		ShowCloseDetails: true,
 	}
 	if directoryPath != "" && docPath != "" {
@@ -850,12 +855,14 @@ func (s *Service) thoughtsDirectoryArtifactBrowser(
 		return ThreadArtifactBrowserArgs{}, err
 	}
 	entries = s.withArtifactCommentCounts(c.Request().Context(), entries)
+	chatOpen, _ := chatCommentsOpen(c.Request(), true)
 	args := ThreadArtifactBrowserArgs{
 		DocPath:          canonical,
 		DirectoryPath:    canonical,
 		Entries:          entries,
 		BrowserOpen:      ArtifactBrowserOpenFromRequest(c.Request()),
 		CommentsOpen:     workbench.CommentsOpenFromRequest(c.Request()),
+		ChatOpen:         chatOpen,
 		ShowCloseDetails: false,
 	}
 	applyWorkbenchPathHeaderThreadsReopen(c, &args)

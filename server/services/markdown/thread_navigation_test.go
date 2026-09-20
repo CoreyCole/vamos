@@ -755,6 +755,61 @@ func TestPathHeaderReloadLivesInKebab(t *testing.T) {
 	}
 }
 
+func TestPathHeaderChatToggleSSRSelectedWhenChatOpen(t *testing.T) {
+	var body strings.Builder
+	if err := ThreadArtifactPane(
+		ThreadArtifactBrowserArgs{
+			DocPath:  "owner/plans/alpha/design.md",
+			ChatOpen: true,
+		},
+		templ.Raw("<p>doc</p>"),
+	).Render(t.Context(), &body); err != nil {
+		t.Fatal(err)
+	}
+	header := artifactPathHeader(t, body.String())
+	idx := strings.Index(header, `data-testid="view-chat"`)
+	if idx < 0 {
+		t.Fatal(header)
+	}
+	btn := header[idx:]
+	if end := strings.Index(btn, "</button>"); end > 0 {
+		btn = btn[:end]
+	}
+	classAttr := btn[strings.Index(btn, `class="`):]
+	classAttr = classAttr[:strings.Index(classAttr, `" `)+1]
+	if !strings.Contains(classAttr, "bg-muted text-foreground") {
+		t.Fatalf("open chat toggle missing SSR selected class:\n%s", classAttr)
+	}
+	if !strings.Contains(btn, `aria-pressed="true"`) {
+		t.Fatalf("open chat toggle missing aria-pressed true:\n%s", btn)
+	}
+
+	body.Reset()
+	if err := ThreadArtifactPane(
+		ThreadArtifactBrowserArgs{
+			DocPath:  "owner/plans/alpha/design.md",
+			ChatOpen: false,
+		},
+		templ.Raw("<p>doc</p>"),
+	).Render(t.Context(), &body); err != nil {
+		t.Fatal(err)
+	}
+	header = artifactPathHeader(t, body.String())
+	idx = strings.Index(header, `data-testid="view-chat"`)
+	btn = header[idx:]
+	if end := strings.Index(btn, "</button>"); end > 0 {
+		btn = btn[:end]
+	}
+	classAttr = btn[strings.Index(btn, `class="`):]
+	classAttr = classAttr[:strings.Index(classAttr, `" `)+1]
+	if strings.Contains(classAttr, "bg-muted text-foreground") {
+		t.Fatalf("closed chat toggle still SSR selected:\n%s", classAttr)
+	}
+	if !strings.Contains(btn, `aria-pressed="false"`) {
+		t.Fatalf("closed chat toggle missing aria-pressed false:\n%s", btn)
+	}
+}
+
 func TestPathHeaderHamburgerBeforeChatToggle(t *testing.T) {
 	var body strings.Builder
 	if err := ThreadArtifactPane(
